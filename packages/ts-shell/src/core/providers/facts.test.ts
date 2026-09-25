@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { RuntimeProvider } from "../../config/runtimeConfig.js";
-import { accountAuthKey, declaredProviders, providerFacts } from "./facts.js";
+import { RUNTIME_PROVIDERS, type RuntimeProvider } from "../../config/runtimeConfig.js";
+import { toGoogleAccountAuthConfig, toOpenAIAccountAuthConfig } from "../../core/auth/providerAuthContract.js";
+import { accountAuthKey, providerFacts, type ProviderFacts } from "./facts.js";
 
 /**
  * The declaration is only worth having if everything derives from it, so what is
@@ -10,21 +11,26 @@ import { accountAuthKey, declaredProviders, providerFacts } from "./facts.js";
  * across files are now single answers.
  */
 
-const UNION: readonly RuntimeProvider[] = [
-  "openai",
-  "anthropic",
-  "openai-compatible",
-  "google",
-  "antigravity",
-  "claudecode",
-];
+/**
+ * The providers to walk, taken from the one list rather than restated.
+ *
+ * A copy here would be the same drift the table exists to remove, one file away
+ * from where it was being removed: a provider added to the list and not to the
+ * copy would simply stop being tested, quietly.
+ */
+const UNION = RUNTIME_PROVIDERS;
 
 describe("providerFacts", () => {
   it("declares every provider the type allows", () => {
-    // The failure that matters: a provider added to the union and not declared
+    // The failure that matters: a provider added to the list and not declared
     // here would otherwise be found the first time someone used it, which is at
-    // the moment an environment variable or a label is needed.
-    expect([...declaredProviders()].sort()).toEqual([...UNION].sort());
+    // the moment an environment variable or a label is needed. `providerFacts`
+    // refuses an undeclared name by throwing, so reaching the label at all is
+    // the assertion: a miss fails here rather than reading as `undefined`.
+    expect(RUNTIME_PROVIDERS.length).toBeGreaterThan(0);
+    for (const provider of RUNTIME_PROVIDERS) {
+      expect(providerFacts(provider).label.length, provider).toBeGreaterThan(0);
+    }
   });
 
   it("gives every provider a label and an environment variable", () => {
@@ -78,15 +84,36 @@ describe("account auth facts", () => {
     expect(accountAuthKey("openai-compatible")).toBeUndefined();
   });
 
-  it("pairs each slot with the credential shape that belongs in it", () => {
+  it("pairs each slot with the credential shape its own login produces", () => {
     // The two are read together when a credential is filed: the slot decides
-    // where it goes and the discriminator decides whether it belongs there. A
-    // slot with no shape would accept anything written into it.
+    // where it goes and the discriminator decides whether it belongs there. So
+    // the assertion is the pairing, not merely that both are present — presence
+    // alone passes with the two providers' discriminators swapped, which would
+    // file Google's credential under OpenAI's slot and hand it to the wrong
+    // service on the next request.
+    //
+    // The expected shape is taken from the login that produces it rather than
+    // restated, so a change on either side breaks the test.
+    const producedByLogin: Partial<Record<NonNullable<ProviderFacts["accountAuthKey"]>, string>> = {
+      openai: toOpenAIAccountAuthConfig({
+        accessToken: "t",
+        refreshToken: "r",
+        expiresAt: "e",
+      }).type,
+      google: toGoogleAccountAuthConfig({
+        accessToken: "t",
+        refreshToken: "r",
+        expiresAt: "e",
+      }).type,
+    };
+
     for (const provider of UNION) {
       const facts = providerFacts(provider);
-      expect(facts.accountAuthKey === undefined, provider).toBe(
-        facts.accountAuthType === undefined,
-      );
+      if (facts.accountAuthKey === undefined) {
+        expect(facts.accountAuthType, provider).toBeUndefined();
+        continue;
+      }
+      expect(facts.accountAuthType, provider).toBe(producedByLogin[facts.accountAuthKey]);
     }
   });
 

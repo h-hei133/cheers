@@ -181,6 +181,42 @@ describe("runtime config", () => {
     expect(config.configDiagnostics).toHaveLength(1);
   });
 
+  /**
+   * An unknown provider from a file is not typed by anything. Before this was
+   * checked it reached the provider facts, which refuse an undeclared name by
+   * throwing — at the first request, and as a crash rather than a complaint.
+   */
+  it("falls back and says so when the config names a provider it does not know", () => {
+    fs.mkdirSync(path.dirname(getUserRuntimeConfigPath()), { recursive: true });
+    fs.writeFileSync(
+      getUserRuntimeConfigPath(),
+      JSON.stringify({ provider: "opemai" }),
+      "utf8",
+    );
+
+    const config = getRuntimeConfig(fakeRoot);
+    // Compared against the default, not against another read of the same bad
+    // file: two reads of the same config agree whatever it says, so that
+    // comparison would pass with the fallback removed.
+    expect(config.provider).toBe("openai");
+    const complaint = config.configDiagnostics.find((line) => line.includes("opemai"));
+    expect(complaint).toBeDefined();
+    // It names what does exist, so the typo can be corrected from the message.
+    expect(complaint).toContain("openai");
+    expect(complaint).toContain("anthropic");
+  });
+
+  it("takes a provider the config names when it is one it knows", () => {
+    // The negative case for the check above: being told about a name must not
+    // mean rejecting a good one.
+    fs.mkdirSync(path.dirname(getUserRuntimeConfigPath()), { recursive: true });
+    fs.writeFileSync(getUserRuntimeConfigPath(), JSON.stringify({ provider: "anthropic" }), "utf8");
+
+    const config = getRuntimeConfig(fakeRoot);
+    expect(config.provider).toBe("anthropic");
+    expect(config.configDiagnostics).toHaveLength(0);
+  });
+
   it("reports one diagnostic per distinct problem", () => {
     fs.writeFileSync(path.join(fakeRoot, ".cheers.json"), "{ not json", "utf8");
     const config = getRuntimeConfig(fakeRoot);

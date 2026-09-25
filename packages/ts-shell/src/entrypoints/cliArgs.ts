@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { RuntimeProvider } from "../config/runtimeConfig.js";
+import { RUNTIME_PROVIDERS, isRuntimeProvider } from "../config/runtimeConfig.js";
 import type {
   CliArgParseError,
   CliArgParseResult,
@@ -17,15 +17,6 @@ export type {
   NonInteractiveApprovalMode,
   ParseCliArgsOptions,
 } from "../cli/options/cliOptions.js";
-
-const VALID_PROVIDERS: readonly RuntimeProvider[] = [
-  "openai",
-  "anthropic",
-  "openai-compatible",
-  "google",
-  "antigravity",
-  "claudecode",
-];
 
 const VALUE_FLAGS = new Set([
   "--project",
@@ -220,7 +211,7 @@ export function parseCliArgs(
       assignOption(options, "provider", provider);
     } else {
       return parseError(
-        `Invalid --provider value: ${rawArgs[providerIdx + 1]}. Expected openai, anthropic, openai-compatible, google, antigravity, or claudecode.`,
+        `Invalid --provider value: ${rawArgs[providerIdx + 1]}. Expected one of: ${RUNTIME_PROVIDERS.join(", ")}.`,
       );
     }
   }
@@ -493,10 +484,6 @@ function derivePromptArgument(
 
   const prompt = positional.join(" ").trim();
   return prompt.length > 0 ? prompt : undefined;
-}
-
-function isRuntimeProvider(value: string): value is RuntimeProvider {
-  return VALID_PROVIDERS.includes(value as RuntimeProvider);
 }
 
 function normalizePathForCompare(value: string, cwd: string): string {

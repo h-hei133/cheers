@@ -1,5 +1,6 @@
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { RUNTIME_PROVIDERS } from "../config/runtimeConfig.js";
+import { describe, expect, it, vi } from "vitest";
 import {
   getApprovalMode,
   getWorkspaceSelection,
@@ -175,20 +176,41 @@ describe("cli args parser", () => {
   });
 
   it("returns existing parse errors without exiting or printing", () => {
-    expect(expectParseError(["--project"]).message).toBe(
-      "Missing value for --project. Example: --project D:\\path\\to\\your-project",
-    );
-    expect(expectParseError(["--replay-file"]).message).toBe(
-      "Missing value for --replay-file. Example: --replay-file .\\replay.txt",
-    );
-    expect(expectParseError(["--provider", "bad-provider"]).message).toBe(
-      "Invalid --provider value: bad-provider. Expected openai, anthropic, openai-compatible, google, antigravity, or claudecode.",
-    );
-    expect(
-      expectParseError(["--non-interactive-approval", "maybe"]).message,
-    ).toBe(
-      "Invalid --non-interactive-approval value: maybe. Use deny, allow-once, or allow-always.",
-    );
+    // The name says what matters and the body now checks it: a parse failure is
+    // returned to the caller as a value, not thrown, and the parser does not end
+    // the process or write to the terminal on its own. Pinning the exact wording
+    // of each message was what this used to do, which broke whenever a message
+    // was reworded and never checked the property the name claims.
+    const exit = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("parser must not call process.exit");
+    }) as never);
+    const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      expect(expectParseError(["--project"]).exitCode).toBe(1);
+      expect(expectParseError(["--replay-file"]).exitCode).toBe(1);
+      expect(expectParseError(["--provider", "bad-provider"]).exitCode).toBe(1);
+      expect(expectParseError(["--non-interactive-approval", "maybe"]).exitCode).toBe(1);
+      expect(exit).not.toHaveBeenCalled();
+      expect(stdout).not.toHaveBeenCalled();
+      expect(stderr).not.toHaveBeenCalled();
+    } finally {
+      exit.mockRestore();
+      stdout.mockRestore();
+      stderr.mockRestore();
+    }
+  });
+
+  it("names the providers it accepts when one is rejected", () => {
+    // The accepted set is what the message is for, and it is now read from the
+    // one list rather than restated — so this compares against that list and not
+    // against a sentence. A provider dropped from the list stops being accepted
+    // and stops being advertised, together.
+    const message = expectParseError(["--provider", "bad-provider"]).message;
+    for (const provider of RUNTIME_PROVIDERS) {
+      expect(message, provider).toContain(provider);
+    }
+    expect(message).toContain("bad-provider");
   });
 });
 

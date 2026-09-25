@@ -14,13 +14,31 @@ export interface ModelTokenBudget {
   readonly keepRecentTokens?: number;
 }
 
-export type RuntimeProvider =
-  | "openai"
-  | "anthropic"
-  | "openai-compatible"
-  | "google"
-  | "antigravity"
-  | "claudecode";
+/**
+ * The providers this build knows, as a list as well as a type.
+ *
+ * One list, because the type alone was not enough: a provider added to the union
+ * below was checked against the declaration table by `satisfies`, but every place
+ * that had to *iterate* providers kept its own copy of the names. Those copies
+ * failed the same silent way — a credentials entry for a provider missing from
+ * the copy was dropped without a word, and the config file looked like it had
+ * been read.
+ */
+export const RUNTIME_PROVIDERS = [
+  "openai",
+  "anthropic",
+  "openai-compatible",
+  "google",
+  "antigravity",
+  "claudecode",
+] as const;
+
+export type RuntimeProvider = (typeof RUNTIME_PROVIDERS)[number];
+
+/** Whether a value names a provider this build knows. */
+export function isRuntimeProvider(value: unknown): value is RuntimeProvider {
+  return typeof value === "string" && (RUNTIME_PROVIDERS as readonly string[]).includes(value);
+}
 export type ProviderConnectionAuthType =
   | "api-key"
   | "account-auth"
@@ -453,8 +471,22 @@ export function getRuntimeConfig(
     ? Number(maxTurnsFromEnv)
     : (merged.maxTurns ?? DEFAULT_CONFIG.maxTurns);
 
+  // A provider name from a file is not typed by anything, and an unknown one
+  // would reach the provider facts, which refuse it by throwing — at the first
+  // request rather than here, and as a crash rather than a complaint. Falling
+  // back to the default with a diagnostic is the same treatment every other
+  // unusable config value gets.
+  const configuredProvider = merged.provider;
+  const providerKnown = configuredProvider === undefined || isRuntimeProvider(configuredProvider);
+  const provider = providerKnown ? (configuredProvider ?? DEFAULT_CONFIG.provider) : DEFAULT_CONFIG.provider;
+  if (!providerKnown) {
+    diagnostics.push(
+      `Unknown provider '${configuredProvider}' in config. Using '${provider}'. Known providers: ${RUNTIME_PROVIDERS.join(", ")}.`,
+    );
+  }
+
   return {
-    provider: merged.provider ?? DEFAULT_CONFIG.provider,
+    provider,
     daemonEnabled,
     maxTurns,
     // Left absent when unset, rather than defaulted to an empty list: an empty
@@ -590,14 +622,7 @@ function normalizeProviderCredentials(
 
   const normalized: Partial<Record<RuntimeProvider, ProviderCredentialConfig>> =
     {};
-  for (const provider of [
-    "openai",
-    "anthropic",
-    "openai-compatible",
-    "google",
-    "antigravity",
-    "claudecode",
-  ] as const) {
+  for (const provider of RUNTIME_PROVIDERS) {
     const apiKey = credentials[provider]?.apiKey?.trim();
     const baseUrl = normalizeBaseUrl(credentials[provider]?.baseUrl);
     const model = credentials[provider]?.model?.trim();
@@ -631,14 +656,10 @@ function normalizeProviderConnections(
     if (!connection || typeof connection !== "object") {
       continue;
     }
-    if (
-      connection.provider !== "openai" &&
-      connection.provider !== "anthropic" &&
-      connection.provider !== "openai-compatible" &&
-      connection.provider !== "google" &&
-      connection.provider !== "antigravity" &&
-      connection.provider !== "claudecode"
-    ) {
+    // Asked of the one list, for the same reason the credential loop is: a
+    // provider added there would otherwise have its connections dropped here
+    // without a word, and the config would look as though it had been read.
+    if (!isRuntimeProvider(connection.provider)) {
       continue;
     }
     const id = normalizeConnectionId(connection.id);

@@ -468,25 +468,15 @@ function fallbackModelsForProvider(
   provider: RuntimeProvider,
   authType?: ProviderConnectionConfig["authType"],
 ): readonly string[] {
-  if (provider === "openai" && authType === "account-auth") {
-    return accountAuthModelFacts().allowed;
+  // The only case that is not simply the provider's declared list: an account
+  // login reaches a fixed set the service publishes, which is narrower than what
+  // the API offers. Read from this provider's own declaration — asking a fixed
+  // provider here would answer Google's login with OpenAI's models.
+  const facts = providerFacts(provider);
+  if (authType === "account-auth" && facts.accountAuthAllowedModels) {
+    return facts.accountAuthAllowedModels;
   }
-  if (provider === "openai") {
-    return ["gpt-4.1-mini", "gpt-4.1", "gpt-5.4"];
-  }
-  if (provider === "anthropic") {
-    return ["claude-sonnet-4-5", "claude-opus-4-1"];
-  }
-  if (provider === "google") {
-    return ["gemini-2.5-flash", "gemini-2.5-pro"];
-  }
-  if (provider === "antigravity") {
-    return ["gpt-4.1-mini", "gpt-4.1", "gpt-5.4"];
-  }
-  if (provider === "claudecode") {
-    return ["gpt-4.1-mini", "gpt-4.1", "gpt-5.4"];
-  }
-  return ["deepseek-ai/DeepSeek-V4-Flash", "Qwen/Qwen2.5-Coder-32B-Instruct"];
+  return facts.fallbackModels;
 }
 
 function normalizeProvider(input?: string): RuntimeProvider | undefined {

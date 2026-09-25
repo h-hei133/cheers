@@ -58,6 +58,15 @@ export interface ProviderFacts {
    * set. Absent means the account can reach whatever the provider lists.
    */
   readonly accountAuthAllowedModels?: readonly string[];
+  /**
+   * The models to offer when the catalogue cannot be reached.
+   *
+   * Declared here because it is a property of the service, and because the
+   * alternative — a chain of `if`s over provider names — had a fall-through that
+   * answered with a different company's models. A provider added to the list
+   * without one now fails to compile rather than silently offering those.
+   */
+  readonly fallbackModels: readonly string[];
 }
 
 /**
@@ -75,6 +84,7 @@ const FACTS = {
     accountAuthKey: "openai",
     accountAuthType: "openai-chatgpt-account",
     accountAuthDefaultModel: "gpt-5.4",
+    fallbackModels: ["gpt-4.1-mini", "gpt-4.1", "gpt-5.4"],
     accountAuthAllowedModels: [
       "gpt-5.1-codex",
       "gpt-5.1-codex-max",
@@ -90,11 +100,13 @@ const FACTS = {
     label: "Anthropic",
     apiKeyEnvVar: "ANTHROPIC_API_KEY",
     compatibleStyle: false,
+    fallbackModels: ["claude-sonnet-4-5", "claude-opus-4-1"],
   },
   "openai-compatible": {
     label: "OpenAI-compatible",
     apiKeyEnvVar: "OPENAI_COMPATIBLE_API_KEY",
     compatibleStyle: true,
+    fallbackModels: ["deepseek-ai/DeepSeek-V4-Flash", "Qwen/Qwen2.5-Coder-32B-Instruct"],
   },
   google: {
     label: "Google (OpenAI-compatible)",
@@ -103,16 +115,19 @@ const FACTS = {
     accountAuthKey: "google",
     accountAuthType: "google-gemini-account",
     accountAuthDefaultModel: "gemini-2.5-flash",
+    fallbackModels: ["gemini-2.5-flash", "gemini-2.5-pro"],
   },
   antigravity: {
     label: "Antigravity (OpenAI-compatible)",
     apiKeyEnvVar: "ANTIGRAVITY_API_KEY",
     compatibleStyle: true,
+    fallbackModels: ["gpt-4.1-mini", "gpt-4.1", "gpt-5.4"],
   },
   claudecode: {
     label: "Anthropic-compatible proxy",
     apiKeyEnvVar: "CLAUDECODE_API_KEY",
     compatibleStyle: true,
+    fallbackModels: ["gpt-4.1-mini", "gpt-4.1", "gpt-5.4"],
   },
 } as const satisfies Record<RuntimeProvider, ProviderFacts>;
 
@@ -131,11 +146,6 @@ export function providerFacts(provider: RuntimeProvider): ProviderFacts {
     throw new Error(`No declaration for provider '${String(provider)}'.`);
   }
   return facts;
-}
-
-/** The providers this build declares, for a surface that lists them. */
-export function declaredProviders(): readonly RuntimeProvider[] {
-  return Object.keys(FACTS) as RuntimeProvider[];
 }
 
 /**
