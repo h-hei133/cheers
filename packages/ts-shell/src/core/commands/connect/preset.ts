@@ -94,15 +94,6 @@ export function resolveProviderTarget(input?: string): ConnectPreset | null {
   return null;
 }
 
-export function isOpenAICompatibleStyleProvider(provider: RuntimeProvider): boolean {
-  return (
-    provider === "openai-compatible" ||
-    provider === "google" ||
-    provider === "antigravity" ||
-    provider === "claudecode"
-  );
-}
-
 export function buildConnectionId(provider: RuntimeProvider): string {
   return `${provider}-${Date.now().toString(36)}`;
 }

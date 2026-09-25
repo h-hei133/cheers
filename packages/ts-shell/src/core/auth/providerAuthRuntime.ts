@@ -7,6 +7,7 @@ import {
   type RuntimeConfigFile,
   type RuntimeProvider,
 } from "../../config/runtimeConfig.js";
+import { providerFacts } from "../providers/facts.js";
 import { openAIProviderAuthContract } from "../commands/openaiAccountAuth.js";
 import { googleProviderAuthContract } from "../commands/googleAccountAuth.js";
 import {
@@ -21,18 +22,6 @@ const CONTRACTS: readonly ProviderAuthContract[] = [
   openAIProviderAuthContract,
   googleProviderAuthContract,
 ];
-const OPENAI_ACCOUNT_AUTH_DEFAULT_MODEL = "gpt-5.4";
-const OPENAI_ACCOUNT_AUTH_ALLOWED_MODELS = new Set([
-  "gpt-5.1-codex",
-  "gpt-5.1-codex-max",
-  "gpt-5.1-codex-mini",
-  "gpt-5.2",
-  "gpt-5.2-codex",
-  "gpt-5.3-codex",
-  "gpt-5.4",
-  "gpt-5.4-mini",
-]);
-const GOOGLE_ACCOUNT_AUTH_DEFAULT_MODEL = "gemini-2.5-flash";
 let testOpenAILoginOverride:
   | ((...args: Parameters<ProviderAuthContract["loginAccountAuth"]>) => ReturnType<ProviderAuthContract["loginAccountAuth"]>)
   | undefined;
@@ -313,29 +302,30 @@ function buildConnectionId(provider: RuntimeProvider): string {
   return `${provider}-${Date.now().toString(36)}`;
 }
 
+/**
+ * Which model an account connection ends up using.
+ *
+ * Two shapes, and which one applies is a fact about the provider: one service
+ * publishes a fixed set of models its account can reach, so anything outside it
+ * cannot be used and the default is the only safe answer; another accepts the
+ * default or whatever the user named.
+ *
+ * Both halves come from the provider's declaration, so the default model is the
+ * same one the model command falls back to.
+ */
 function resolveAccountAuthModel(
   provider: RuntimeProvider,
   candidate?: string,
 ): string | undefined {
-  if (provider === "google") {
-    const normalized = normalizeText(candidate);
-    return normalized ?? GOOGLE_ACCOUNT_AUTH_DEFAULT_MODEL;
-  }
-
-  if (provider !== "openai") {
-    return normalizeText(candidate);
-  }
-
   const normalized = normalizeText(candidate);
-  if (!normalized) {
-    return OPENAI_ACCOUNT_AUTH_DEFAULT_MODEL;
+  const facts = providerFacts(provider);
+  if (!facts.accountAuthAllowedModels) {
+    return normalized ?? facts.accountAuthDefaultModel;
   }
-
-  if (OPENAI_ACCOUNT_AUTH_ALLOWED_MODELS.has(normalized)) {
+  if (normalized && facts.accountAuthAllowedModels.includes(normalized)) {
     return normalized;
   }
-
-  return OPENAI_ACCOUNT_AUTH_DEFAULT_MODEL;
+  return facts.accountAuthDefaultModel;
 }
 
 function withoutApiKey<T extends { readonly apiKey?: string }>(value: T): Omit<T, "apiKey"> {

@@ -2,9 +2,9 @@ import {
   readUserRuntimeConfigFile,
   type ProviderConnectionConfig,
 } from "../../../config/runtimeConfig.js";
+import { needsUserEndpoint } from "../../providers/facts.js";
 import {
   CONNECT_PRESETS,
-  isOpenAICompatibleStyleProvider,
   normalizeConnections,
 } from "./preset.js";
 
@@ -125,10 +125,10 @@ export function renderReadinessGuidance(input: {
     activeConnection.authType !== "account-auth" &&
     !activeConnection.apiKey?.trim();
   const missingBaseUrl =
-    isOpenAICompatibleStyleProvider(activeConnection.provider) &&
+    needsUserEndpoint(activeConnection.provider) &&
     !activeConnection.baseUrl?.trim();
   const missingModel =
-    isOpenAICompatibleStyleProvider(activeConnection.provider) &&
+    needsUserEndpoint(activeConnection.provider) &&
     !activeConnection.model?.trim();
 
   if (activeConnection.status === "pending") {

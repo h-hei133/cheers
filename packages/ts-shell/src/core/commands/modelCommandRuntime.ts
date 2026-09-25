@@ -11,22 +11,22 @@ import { defaultHookDispatcher } from "../hooks/hookDispatcher.js";
 import { loadCatalog, ensureUserCatalog, userCatalogPath } from "../models/catalogStore.js";
 import { refreshCatalog } from "../models/catalogRefresh.js";
 import { renderCatalog } from "../models/catalogSurface.js";
+import { needsUserEndpoint, providerFacts } from "../providers/facts.js";
 
 const MODELS_DEV_API_URL = "https://models.dev/api.json";
-const OPENAI_ACCOUNT_AUTH_ALLOWED_MODELS = [
-  "gpt-5.1-codex",
-  "gpt-5.1-codex-max",
-  "gpt-5.1-codex-mini",
-  "gpt-5.2",
-  "gpt-5.2-codex",
-  "gpt-5.3-codex",
-  "gpt-5.4",
-  "gpt-5.4-mini",
-] as const;
-const OPENAI_ACCOUNT_AUTH_ALLOWED_MODEL_SET = new Set<string>(
-  OPENAI_ACCOUNT_AUTH_ALLOWED_MODELS,
-);
-const OPENAI_ACCOUNT_AUTH_DEFAULT_MODEL = "gpt-5.4";
+
+/**
+ * The models an OpenAI account connection can use.
+ *
+ * Read from the provider's declaration rather than kept here. The same list was
+ * spelled out in this file and in the login runtime, so a model added to one and
+ * missed in the other would be offered by `/model list` and then refused by the
+ * switch.
+ */
+function accountAuthModelFacts(): { readonly allowed: readonly string[]; readonly defaultModel?: string } {
+  const facts = providerFacts("openai");
+  return { allowed: facts.accountAuthAllowedModels ?? [], defaultModel: facts.accountAuthDefaultModel };
+}
 
 interface ModelsDevModelInfo {
   readonly id?: string;
@@ -138,7 +138,7 @@ function renderModelStatus(): string {
     normalizeText(activeConnection?.model) ??
     normalizeText(config.providerCredentials?.[provider]?.model) ??
     (provider === "openai" && authType === "account-auth"
-      ? OPENAI_ACCOUNT_AUTH_DEFAULT_MODEL
+      ? providerFacts("openai").accountAuthDefaultModel
       : undefined);
 
   return [
@@ -208,7 +208,7 @@ function renderProviderReadinessLines(input: {
   }
 
   if (
-    isOpenAICompatibleStyleProvider(input.activeConnection.provider) &&
+    needsUserEndpoint(input.activeConnection.provider) &&
     !input.activeConnection.baseUrl?.trim()
   ) {
     return [
@@ -259,7 +259,7 @@ export async function readModelCatalog(refresh = false): Promise<ModelCatalog> {
     normalizeText(config.providerCredentials?.[provider]?.model);
 
   if (provider === "openai" && authType === "account-auth") {
-    return { provider, models: OPENAI_ACCOUNT_AUTH_ALLOWED_MODELS, active, offline: false };
+    return { provider, models: accountAuthModelFacts().allowed, active, offline: false };
   }
   const fromApi = await fetchModelsFromModelsDev(provider, refresh);
   if (fromApi.length > 0) return { provider, models: fromApi, active, offline: false };
@@ -365,12 +365,12 @@ async function setModel(args: string[], context?: CommandContext): Promise<strin
   if (
     activeConnection.provider === "openai" &&
     activeConnection.authType === "account-auth" &&
-    !OPENAI_ACCOUNT_AUTH_ALLOWED_MODEL_SET.has(model)
+    !accountAuthModelFacts().allowed.includes(model)
   ) {
     return [
       `Model "${model}" is not supported for OpenAI account-auth.`,
       "Allowed models:",
-      ...OPENAI_ACCOUNT_AUTH_ALLOWED_MODELS.map((item) => `- ${item}`),
+      ...accountAuthModelFacts().allowed.map((item) => `- ${item}`),
       "Tip: run /model list to inspect allowed account-auth models.",
     ].join("\n");
   }
@@ -439,7 +439,7 @@ async function fetchModelsFromModelsDev(
       string,
       ModelsDevProviderInfo
     >;
-    const providerKey = isOpenAICompatibleStyleProvider(provider)
+    const providerKey = needsUserEndpoint(provider)
       ? "openai"
       : provider;
     const providerInfo = payload[providerKey];
@@ -456,7 +456,7 @@ function renderOpenAIAccountAuthModelList(activeModel?: string): string {
   return [
     "Models for provider=openai (account-auth)",
     "Source: local account-auth allowed model set",
-    ...OPENAI_ACCOUNT_AUTH_ALLOWED_MODELS.map((model) =>
+    ...accountAuthModelFacts().allowed.map((model) =>
       model === activeModel ? `* ${model} (active)` : `- ${model}`,
     ),
     "",
@@ -469,7 +469,7 @@ function fallbackModelsForProvider(
   authType?: ProviderConnectionConfig["authType"],
 ): readonly string[] {
   if (provider === "openai" && authType === "account-auth") {
-    return OPENAI_ACCOUNT_AUTH_ALLOWED_MODELS;
+    return accountAuthModelFacts().allowed;
   }
   if (provider === "openai") {
     return ["gpt-4.1-mini", "gpt-4.1", "gpt-5.4"];
@@ -567,11 +567,3 @@ function getModelHelpText(): string {
   ].join("\n");
 }
 
-function isOpenAICompatibleStyleProvider(provider: RuntimeProvider): boolean {
-  return (
-    provider === "openai-compatible" ||
-    provider === "google" ||
-    provider === "antigravity" ||
-    provider === "claudecode"
-  );
-}

@@ -9,6 +9,7 @@ import type { QueryEvent } from "../query/runtime/events.js";
 import { buildUnavailableResult } from "../tools/toolPolicyResult.js";
 import { redactProviderFailureDetail } from "./providerFailureRedaction.js";
 import { getProviderApiKeyEnvVarName } from "./providerCredentials.js";
+import { needsUserEndpoint, providerFacts } from "../providers/facts.js";
 
 /**
  * Where a provider is reached when nothing configured one.
@@ -110,7 +111,7 @@ export async function checkRealProviderReadiness(
       ok: false,
       failure: providerUnavailableFailure(
         "missing-key",
-        `Provider readiness failed (provider-readiness:missing-key): ${envVarName} is not set for real provider mode. Set ${envVarName}, configure /connect set ${provider} <api-key>${isOpenAICompatibleStyleProvider(provider) ? " <base-url> <model>" : ""}, or create an account-auth connection via /connect login openai --account.`,
+        `Provider readiness failed (provider-readiness:missing-key): ${envVarName} is not set for real provider mode. Set ${envVarName}, configure /connect set ${provider} <api-key>${needsUserEndpoint(provider) ? " <base-url> <model>" : ""}, or create an account-auth connection via /connect login openai --account.`,
         "not-configured",
       ),
     };
@@ -156,7 +157,7 @@ export async function checkRealProviderReadiness(
   );
   const model = options.model?.trim();
 
-  if (isOpenAICompatibleStyleProvider(provider)) {
+  if (needsUserEndpoint(provider)) {
     if (!options.baseUrl?.trim()) {
       return {
         ok: false,
@@ -266,18 +267,7 @@ export async function checkRealProviderReadiness(
 }
 
 function getProviderLabel(provider: RuntimeProvider): string {
-  switch (provider) {
-    case "openai-compatible":
-      return "OpenAI-compatible";
-    case "google":
-      return "Google (OpenAI-compatible)";
-    case "antigravity":
-      return "Antigravity (OpenAI-compatible)";
-    case "claudecode":
-      return "Anthropic-compatible proxy";
-    default:
-      return "OpenAI";
-  }
+  return providerFacts(provider).label;
 }
 
 function providerUnavailableFailure(
@@ -304,15 +294,6 @@ function providerUnavailableFailure(
 
 function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, "");
-}
-
-function isOpenAICompatibleStyleProvider(provider: RuntimeProvider): boolean {
-  return (
-    provider === "openai-compatible" ||
-    provider === "google" ||
-    provider === "antigravity" ||
-    provider === "claudecode"
-  );
 }
 
 function compatibilityFlagSummary(

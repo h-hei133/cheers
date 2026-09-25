@@ -1,3 +1,4 @@
+import { accountAuthKey, providerFacts } from "../providers/facts.js";
 import type {
   GoogleAccountAuthConfig,
   OpenAIAccountAuthConfig,
@@ -60,18 +61,17 @@ export function resolveProviderCredential(
     activeConnection && activeConnection.provider === provider
       ? activeConnection
       : undefined;
-  const connectionAccountAuth =
-    provider === "openai"
-      ? activeConnectionProfile?.accountAuth?.openai
-      : provider === "google"
-        ? activeConnectionProfile?.accountAuth?.google
-        : undefined;
-  const configAccountAuth =
-    provider === "openai"
-      ? configProfile?.accountAuth?.openai
-      : provider === "google"
-        ? configProfile?.accountAuth?.google
-        : undefined;
+  // Which slot holds this provider's credential is a fact about the provider, so
+  // it is read from the declaration rather than decided here. A provider with no
+  // account login has no slot, and reading another one's would hand back a
+  // credential belonging to a different service.
+  const accountAuthSlot = accountAuthKey(provider);
+  const connectionAccountAuth = accountAuthSlot
+    ? activeConnectionProfile?.accountAuth?.[accountAuthSlot]
+    : undefined;
+  const configAccountAuth = accountAuthSlot
+    ? configProfile?.accountAuth?.[accountAuthSlot]
+    : undefined;
   const baseUrl = normalizeBaseUrl(
     input.cliBaseUrl ??
       activeConnectionProfile?.baseUrl ??
@@ -218,27 +218,7 @@ export function resolveProviderCredential(
 }
 
 export function getProviderApiKeyEnvVarName(provider: RuntimeProvider): string {
-  if (provider === "openai") {
-    return "OPENAI_API_KEY";
-  }
-
-  if (provider === "anthropic") {
-    return "ANTHROPIC_API_KEY";
-  }
-
-  if (provider === "google") {
-    return "GOOGLE_API_KEY";
-  }
-
-  if (provider === "antigravity") {
-    return "ANTIGRAVITY_API_KEY";
-  }
-
-  if (provider === "claudecode") {
-    return "CLAUDECODE_API_KEY";
-  }
-
-  return "OPENAI_COMPATIBLE_API_KEY";
+  return providerFacts(provider).apiKeyEnvVar;
 }
 
 export function maskApiKey(apiKey: string): string {
@@ -268,18 +248,15 @@ function normalizeAccountAuthModel(
   provider: RuntimeProvider,
   model?: string,
 ): string | undefined {
-  if (provider !== "openai") {
-    return model;
-  }
+  const facts = providerFacts(provider);
+  // A provider whose account publishes no fixed set takes whatever was named.
+  if (!facts.accountAuthAllowedModels) return model;
 
   const normalized = model?.trim();
-  if (
-    normalized &&
-    OPENAI_ACCOUNT_AUTH_ALLOWED_MODELS.has(normalized)
-  ) {
+  if (normalized && facts.accountAuthAllowedModels.includes(normalized)) {
     return normalized;
   }
-  return OPENAI_ACCOUNT_AUTH_DEFAULT_MODEL;
+  return facts.accountAuthDefaultModel;
 }
 
 function pickFallbackConnection(
@@ -319,23 +296,7 @@ function pickFallbackConnection(
 function resolveConnectionAccountAuth(
   connection: ProviderConnectionConfig,
 ): OpenAIAccountAuthConfig | GoogleAccountAuthConfig | undefined {
-  if (connection.provider === "openai") {
-    return connection.accountAuth?.openai;
-  }
-  if (connection.provider === "google") {
-    return connection.accountAuth?.google;
-  }
-  return undefined;
+  const slot = accountAuthKey(connection.provider);
+  return slot ? connection.accountAuth?.[slot] : undefined;
 }
 
-const OPENAI_ACCOUNT_AUTH_ALLOWED_MODELS = new Set([
-  "gpt-5.1-codex",
-  "gpt-5.1-codex-max",
-  "gpt-5.1-codex-mini",
-  "gpt-5.2",
-  "gpt-5.2-codex",
-  "gpt-5.3-codex",
-  "gpt-5.4",
-  "gpt-5.4-mini",
-]);
-const OPENAI_ACCOUNT_AUTH_DEFAULT_MODEL = "gpt-5.4";

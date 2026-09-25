@@ -14,7 +14,6 @@ import {
 import type { BrowserFlowRunner, ConnectPreset } from "./connect/types.js";
 import {
   buildConnectionId,
-  isOpenAICompatibleStyleProvider,
   normalizeBaseUrl,
   normalizeConnections,
   normalizeOptional,
@@ -22,6 +21,7 @@ import {
   parseFlagValue,
   resolveProviderTarget,
 } from "./connect/preset.js";
+import { needsUserEndpoint } from "../providers/facts.js";
 import {
   getConnectHelpText,
   renderConnectionStatus,
@@ -140,10 +140,10 @@ export async function addConnection(args: string[]): Promise<string> {
   const model = normalizeOptional(
     parseFlagValue(parsed.flags.model) ?? target.defaultModel,
   );
-  if (isOpenAICompatibleStyleProvider(target.provider) && !baseUrl) {
+  if (needsUserEndpoint(target.provider) && !baseUrl) {
     return `${target.provider} requires --base-url (or a preset that provides one).`;
   }
-  if (isOpenAICompatibleStyleProvider(target.provider) && !model) {
+  if (needsUserEndpoint(target.provider) && !model) {
     return `${target.provider} requires --model (or a preset that provides one).`;
   }
 
