@@ -246,6 +246,18 @@ confidence: high
 > 同有无围栏写入缺陷、导出只读 transcript 因而拿不到树、MCP resources/prompts 只有 mock。
 > **顺序**：N1+写入策略 → Mermaid → 扩展路径 1 → HTML 导出 → 图片输入 → 扩展路径 2。
 >
+> **第 1 步已完成（2026-09-25，见 `phase-9-step1-design.md`）**：
+> **N1** MCP 非 stdio 传输不再报告假成功——`connect` 判为 `failed`、`invokeTool` 抛 `config` 类错误；
+> 参考研究证实**五家实现无一返回成功桩**。**S1/N3** `/export` 与 `/report` 的写入目标改为经
+> `core/security/writeTarget.ts` 单一判定：工作区内直写、**相对路径逃逸一律拒绝（旗标也不能授权）**、
+> 工作区外绝对路径需 `--outside`；`/report` 因默认目标本就在工作区外而引入 `defaultOutside`。
+>
+> **第 2 步已完成（2026-09-25，见 `phase-9-step2-design.md`）**：
+> `mermaid` 围栏渲染为 Unicode 制表字符画（依赖 `grok-mermaid`，Apache-2.0、零传递依赖）。
+> 加两条保护：**按源文本缓存**（抵消我方「每 delta 全量重解析」的既有成本）与**体积上限**。
+> 只做 `off`/`streaming` 两档（`final` 是为参考侧「未闭合围栏」问题而设，我方已用 `trimPartialFence` 解决）。
+> **连带修掉** `cli-baseline.test.ts` 5 个失败用例——它们用假传输夹具钉住了第 1 步刚修掉的假连接。
+>
 > **Phase 8 复核轮已完成（2026-09-24，同文 §8）**：4 个只读子代理（skills/glob/
 > provider/TUI）+ 主代理亲验 origin 链与跨轮可达性。**3 项施工结论需更正**：
 > ①§7.1 对 sameModel 守卫「不可达」的**原因写错了**——实测同轮内救援**确实触发**

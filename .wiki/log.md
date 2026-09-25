@@ -3044,3 +3044,16 @@ Node 版本（41 项）、CI 不构建 Rust daemon、测试清理与子进程竞
 - **执行顺序（主代理定）**：**N1 + S1/N3 写入策略 → Mermaid → 扩展路径 1 → HTML 导出 → 图片输入 → 扩展路径 2**。排序依据：**先修「会主动说假话/会丢数据/会写错地方」的，再做加法；先做独立可验证的，再做跨层的**。Mermaid 排在扩展路径 1 前是因为它有**实测性能数据与硬验收标准**；图片输入排在导出后是因为 `content` 加宽会改 `exportCommandRuntime.ts`（在 19 文件清单内），先做要改两遍。
 - **文档**：新增 `phase-9-decisions.md`（§0 四项新缺陷 / §1 扩展边界与六行归类 / §2 图片输入 / §3 Mermaid 含实测 / §4 HTML 导出 / §5 S1+S4 / §6 顺序 / §7 与 pre-research 的差异 / §8 未验证）；`01-*` 行 55/56 改「永久不做」并给架构理由、MCP 行补三条如实性缺陷；`_index.md` 补裁决摘要。
 - **未验证（如实记录）**：剪贴板三条路径未实机；`grok-mermaid` 渲染质量未目视；参考导出的 HTML 未在浏览器打开；MCP 未接真实服务器；`/report` 缺陷按同形代码证据判定，未实机复现。
+
+## [2026-09-25] feat | Phase 9 第 2 步：终端图表渲染（`mermaid` 围栏）。**含一处既有测试夹具缺陷的连带修复**。
+- **参考实现**（`mermaid.ts` 89 行）已读：`MarkdownTransformer` 在渲染前换 token；`grok-mermaid` 的 `render()`；`cls` 映射主题；每行包成 inline code span + 硬换行以保对齐；三档模式（`off`/`final`/`streaming`）；宽度超限/warnings/返回空三种降级。
+- **我方与参考的结构差异决定了不能照搬**：①我方是**行级解析器**（无词法 token 可换），接入点是 `renderFence` 的**单点**调用（`markdown.ts:84`，全仓实测唯一围栏出口）；②我方输出**行数组**，参考的 code-span 包装是为了经 Markdown 往返保对齐，**我方不需要这层**（M3）；③参考用 `borderMuted`，而我方该令牌**是死令牌**（39 个中 15 个无读取者）——照抄会渲染不出颜色且不报错，故改用**活的** `border`（M4）。
+- **实测**（主代理亲测，子代理切片两次被内容过滤拦截）：库 API 为 `{plain: string[], styled: [{text,cls}][], width, warnings}`；**无效输入返回 `null` 不抛异常**；耗时小图 0.29ms / 120 节点 3.53ms；license Apache-2.0、**零传递依赖**、508,454 字节。
+- **关键机制**：我方**本来就每个 delta 全量重解析**（`blocks.ts:253-257`，未 finalize 的块直接调 `renderMarkdown`），实测 4,001 行单次重解析 4.31ms。故图表成本是**叠加在既有成本上**，不是新问题——因此加两条保护：**按源文本缓存**（M5，使 `streaming` 默认可成立）与**体积上限**（M6，兑现 pre-research 对参考实现「无 CPU 上限」的批评，**不对自己用两套标准**）。
+- **与裁决的一处记录**：只实现 `off` 与 `streaming` 两档，**不做 `final`**。参考的 `final` 是为「未闭合围栏会画出半张图」而存在；我方 `trimPartialFence` 已在解析前丢掉未闭合围栏，**该问题不存在**，做了是多余分支。
+- **施工中发现并修掉的既有缺陷（连带）**：`cli-baseline.test.ts` **5 个用例失败**，根因是**9 处测试夹具用了 `transport: "sdk"`**，其中 5 处带 `mockTools` 并断言 `connectedSdk: connected`——**它们钉住的正是第 1 步刚修掉的假连接**。处置：新增 `stdioServerFixture()`，5 处 connected 夹具改为**真实 stdio mock 服务器**（工具名改为该服务器真实暴露的 `echo_message`）；另 4 处 `enabled: false` 夹具保留 `sdk`（实测走 `connect` 的 disabled 短路，**在传输判定之前返回**，故不受影响）。**性质同第 1 步：不是改测试迁就代码，而是旧断言描述的行为已不存在**，各测试意图全部保留。
+- **实机（构建产物）**：`renderMarkdown` 输出真实图表——flowchart 带分支（`Request → Valid? → Handle/Reject`）与 sequenceDiagram（Alice/Bob 生命线 + 实线/虚线箭头）均正确；`off` 时回退为带 `mermaid` 标签的代码块。
+- **门禁**：`check:config-consumers` **fields=38 read=38**（新字段 `diagrams` 有生产读取者，否则该门禁会失败）；`verify:import-cycles` cycles=0；`check:declarations` 通过；`analyze:module-facades` monoliths=5（无新增）；`verify:docs-drift:strict` rules pass。
+- **反向验证**：删 `renderFence` 的 mermaid 分支 → 1 项失败；第 1 步的两处修复回归确认（各 2 项）。
+- **测试**：新增 `mermaid.test.ts` 12 项 + `markdown.test.ts` 补 5 项；受影响套件 35 文件 462 项通过；`cli-baseline.test.ts` **40/40 通过**。
+- **文档**：新增 `phase-9-step2-design.md`（参考/差异/实测/决定 M1–M8/文件/实机/反向验证/不做）。
