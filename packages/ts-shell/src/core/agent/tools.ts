@@ -1,3 +1,4 @@
+import { messageToText } from "../../model-adapters/multimodal.js";
 import type { AgentEventSink } from "./events.js";
 import { recordCount, recordTiming } from "../../observability/metrics.js";
 import type { AgentMessage } from "./state.js";
@@ -199,15 +200,19 @@ export async function executeToolBatch(
     requested === "sequential" || forcedSequential
       ? await runSequential(tools, assistantMessage, calls, hooks, signal, emit)
       : await runParallel(tools, assistantMessage, calls, hooks, signal, emit);
+  // Bounded text, and the type it feeds is a string: this is the batch the
+  // kernel records, and it carries text rather than attachments.
   const bounded = batch.messages.map((message) => ({
     ...message,
-    content: boundText(message.content),
+    content: boundText(messageToText(message.content)),
   }));
   if (!signal?.aborted) {
     return { messages: bounded, terminate: batch.terminate };
   }
   const pairedIds = new Set(bounded.map((message) => message.tool_call_id));
-  const messages = [...bounded];
+  // Annotated because the bounded copy narrows `content` to a string, and this
+  // array also receives the tool results appended below.
+  const messages: AgentMessage[] = [...bounded];
   for (const call of calls) {
     if (pairedIds.has(call.id)) {
       continue;

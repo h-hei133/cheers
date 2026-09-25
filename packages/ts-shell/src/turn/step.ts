@@ -1,3 +1,8 @@
+import {
+  formatNonVisionFallback,
+  toOpenAIImageUrlBlock,
+  type OpenAIImageUrlBlock,
+} from "../model-adapters/multimodal.js";
 import type { AgentToolCall } from "../core/agent/tools.js";
 import type { AgentMessage, AgentStopReason } from "../core/agent/state.js";
 import type { AssistantStep } from "../core/agent/loop.js";
@@ -218,6 +223,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
             ),
             tools: request.tools,
             allowTools: options.allowTools,
+            vision: shape.vision,
             temperature: samplingTemperature(request.workspaceRoot, request.temperature ?? 0.7),
             ...(request.topP != null ? { topP: request.topP } : {}),
             ...(request.maxOutputTokens ?? shape.maxOutputCeiling) != null
@@ -231,10 +237,12 @@ export function createStepFunction(request: StepRequest): StepFunction {
         model: request.provider.model,
         messages: [
           { role: shape.systemRole, content: request.systemPrompt },
+          // Each message's content is put into the shape this endpoint takes:
+          // a bare string, or an array of parts when the message carries images.
           ...bridgeToolResults(
             microcompactMessages(toChatMessages(messages), { keepRecentTurns: 3, maxOutputChars: 1000 }).messages,
             shape.assistantAfterToolResult,
-          ),
+          ).map((message) => ({ ...message, content: wireContent(message.content, shape.vision) })),
         ],
         tools: request.tools,
         tool_choice: options.allowTools ? "auto" : "none",
@@ -395,6 +403,34 @@ export function createStepFunction(request: StepRequest): StepFunction {
  *
  * A no-op for every model that did not ask for it, which is all of them today.
  */
+/**
+ * One message's content in the shape an OpenAI-compatible endpoint takes.
+ *
+ * A string stays a string, which is what every request looked like before images
+ * existed. A message with images becomes the array form, because sending the
+ * block array as-is would serialise to `[object Object]` and the model would read
+ * that as the message.
+ */
+function wireContent(
+  content: ChatMessage["content"],
+  vision: boolean,
+): string | readonly ({ readonly type: "text"; readonly text: string } | OpenAIImageUrlBlock)[] {
+  if (typeof content === "string") return content;
+  if (content === null || content === undefined) return "";
+  if (!vision) {
+    // The model cannot read a picture, so it is given the words for one instead.
+    // Sending the image anyway fails the whole request, which loses the text the
+    // user also wrote; describing it loses only what the model could not have
+    // used.
+    return content
+      .map((block) => (block.type === "text" ? block.text : formatNonVisionFallback(block)))
+      .join("\n");
+  }
+  return content.map((block) =>
+    block.type === "text" ? { type: "text" as const, text: block.text } : toOpenAIImageUrlBlock(block),
+  );
+}
+
 function bridgeToolResults(
   messages: readonly ChatMessage[],
   enabled: boolean,

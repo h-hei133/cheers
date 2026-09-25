@@ -1,3 +1,4 @@
+import { messageToText } from "../../model-adapters/multimodal.js";
 import type { Interface as ReadlineInterface } from "node:readline";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
@@ -228,8 +229,8 @@ export class InteractiveMode {
     const diskHistory = loadPromptHistory(options.runtimeContext.projectRoot);
     this.state.editor.loadHistory(diskHistory);
     const sessionTurns = options.runtimeContext.session.turns
-      ?.filter((t) => t.role === "user" && t.content?.trim())
-      .map((t) => t.content.trim()) ?? [];
+      ?.filter((t) => t.role === "user" && messageToText(t.content).trim())
+      .map((t) => messageToText(t.content).trim()) ?? [];
     this.state.editor.loadHistory(sessionTurns);
   }
 

@@ -1,3 +1,4 @@
+import { messageToText } from "../../model-adapters/multimodal.js";
 import { selectContinuityTerminalSource } from "../../result/terminal/truth.js";
 import {
   decodeQueryRuntimeTaskState,
@@ -114,7 +115,7 @@ export function buildSessionContinuitySnapshot(input: {
     lastCodingCompletion,
   });
   const lastUserIntent =
-    recoverySnapshot.lastUserMessage?.content ??
+    messageToText(recoverySnapshot.lastUserMessage?.content) ??
     findLastTurnContent(session.turns, "user");
   const mutationContinuity = projectSessionMutationContinuity({
     lastCodingResult,
@@ -138,7 +139,7 @@ export function buildSessionContinuitySnapshot(input: {
     projectRoot: session.projectRoot,
     lastUserIntent,
     lastAssistantOutput:
-      recoverySnapshot.lastAssistantMessage?.content ??
+      messageToText(recoverySnapshot.lastAssistantMessage?.content) ??
       findLastTurnContent(session.turns, "assistant"),
     lastTerminalClassification:
       continuityTerminalSource?.event.result.terminalClassification ??

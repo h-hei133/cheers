@@ -1,3 +1,4 @@
+import type { MultimodalContentBlock } from "../model-adapters/multimodal.js";
 import type { PermissionScope } from "../cli/approval/permissionScope.js";
 import { getActiveSessionGoal } from "../core/commands/goalCommandRuntime.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
@@ -18,7 +19,8 @@ export interface ChatToolCall {
 
 export interface ChatMessage {
   readonly role: "system" | "user" | "assistant" | "tool";
-  readonly content?: string | null;
+  /** Text, or text with images attached; see `SessionMessage.content`. */
+  readonly content?: string | readonly MultimodalContentBlock[] | null;
   readonly tool_calls?: readonly ChatToolCall[];
   readonly tool_call_id?: string;
 }
@@ -122,7 +124,16 @@ export function toChatMessages(history: readonly SessionMessage[] = []): ChatMes
     if (message.role !== "tool" && pendingCalls && pendingCalls.length > 0) closePending();
 
     if (message.role === "user") {
-      if (message.content?.trim()) result.push({ role: "user", content: message.content.trim() });
+      // A user message may carry images, so it is passed through rather than
+      // flattened: trimming is a text operation, and applying it here would drop
+      // the images a message was sent for.
+      const content = message.content;
+      if (typeof content === "string") {
+        const text = content.trim();
+        if (text) result.push({ role: "user", content: text });
+      } else if (Array.isArray(content) && content.length > 0) {
+        result.push({ role: "user", content });
+      }
     } else if (message.role === "assistant") {
       const calls =
         message.tool_calls && message.tool_calls.length > 0

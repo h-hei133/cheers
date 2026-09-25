@@ -1,3 +1,4 @@
+import { messageToText } from "../../model-adapters/multimodal.js";
 import type {
   TerminalClassification,
   TerminalReason,
@@ -66,8 +67,8 @@ export function projectSessionReentrySummary(input: {
     durableStatus: recoverySnapshot.durableStatus,
     terminalReason: recoverySnapshot.terminalReason,
     terminalClassification: recoverySnapshot.terminalClassification,
-    lastUserMessage: recoverySnapshot.lastUserMessage?.content,
-    lastAssistantMessage: recoverySnapshot.lastAssistantMessage?.content,
+    lastUserMessage: messageToText(recoverySnapshot.lastUserMessage?.content),
+    lastAssistantMessage: messageToText(recoverySnapshot.lastAssistantMessage?.content),
     recoverable: trustBoundary.recoverable,
     resumeDisposition: trustBoundary.disposition,
     autoResumeReady: trustBoundary.autoResumeReady,
@@ -96,7 +97,7 @@ export function projectSessionReentrySummary(input: {
 /** Whether a session holds a real exchange rather than only command bookkeeping. */
 export function sessionHasConversation(session: Session): boolean {
   return session.turns.some(
-    (turn) => (turn.role === "user" || turn.role === "assistant") && turn.content.trim().length > 0,
+    (turn) => (turn.role === "user" || turn.role === "assistant") && messageToText(turn.content).trim().length > 0,
   );
 }
 

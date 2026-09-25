@@ -1,3 +1,4 @@
+import { messageToText } from "../model-adapters/multimodal.js";
 import { isRecord } from "../core/values/record.js";
 import type { AgentLifecycleEvent } from "../core/agent/events.js";
 import type { AgentMessage } from "../core/agent/state.js";
@@ -77,7 +78,7 @@ export class TurnProjection {
         const open = this.openCalls.get(message.tool_call_id);
         this.openCalls.delete(message.tool_call_id);
         const isError = open?.isError ?? false;
-        const output = message.content ?? "";
+        const output = messageToText(message.content);
         return [
           {
             type: "tool.result",
@@ -145,8 +146,12 @@ export function concludeRun(messages: readonly AgentMessage[], prompt: string, s
         : (last.errorMessage ?? "The model call failed."),
     };
   }
-  const explained = !last?.content;
-  const finalOutput = last?.content || explainSilence(messages, last?.errorMessage);
+  // The text of the last message, or why there is none. An image-only answer has
+  // no text to show, which reads the same as a silent one — so it is treated the
+  // same way rather than reported as an empty answer.
+  const lastText = messageToText(last?.content);
+  const explained = lastText === "";
+  const finalOutput = lastText || explainSilence(messages, last?.errorMessage);
   const refused = refusedToolCall(messages);
   if (refused) {
     return {
@@ -195,7 +200,7 @@ function refusedToolCall(messages: readonly AgentMessage[]): string | undefined 
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
     if (message.role !== "tool") continue;
-    const content = message.content ?? "";
+    const content = messageToText(message.content);
     if (isApprovalRefusal(content)) return content;
     // The newest tool result is not a refusal, so whatever happened earlier was
     // recovered from; the run is not stopped by it.
@@ -217,8 +222,11 @@ function isApprovalRefusal(content: string): boolean {
 
 function explainSilence(messages: readonly AgentMessage[], stepExplanation: string | undefined): string {
   const lastTool = [...messages].reverse().find((message) => message.role === "tool");
-  if (lastTool?.content) {
-    return `The tools ran but no answer followed. What the last one returned:\n\n${lastTool.content.slice(0, 1000)}`;
+  // Through `messageToText`: this is shown to a person, and slicing a block array
+  // would print `[object Object]` where the tool's output should be.
+  const lastToolText = messageToText(lastTool?.content);
+  if (lastToolText) {
+    return `The tools ran but no answer followed. What the last one returned:\n\n${lastToolText.slice(0, 1000)}`;
   }
   return stepExplanation ?? "The model returned nothing at all. Ask again, or check the provider with `/connect`.";
 }

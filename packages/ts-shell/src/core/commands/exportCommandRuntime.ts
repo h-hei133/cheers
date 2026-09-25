@@ -1,3 +1,4 @@
+import { messageToText } from "../../model-adapters/multimodal.js";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { CommandContext, LocalCommandResult } from "./types.js";
@@ -207,10 +208,10 @@ function asMarkdown(messages: readonly SessionMessage[], sessionId: string, root
   ];
   for (const message of messages) {
     if (message.role === "tool") {
-      lines.push("<details><summary>Tool result</summary>", "", "```text", message.content.trim(), "```", "", "</details>", "");
+      lines.push("<details><summary>Tool result</summary>", "", "```text", messageToText(message.content, { placeholderForImages: true }).trim(), "```", "", "</details>", "");
       continue;
     }
-    lines.push(`## ${heading(message.role)}${message.timestamp ? ` · ${message.timestamp}` : ""}`, "", message.content.trim(), "");
+    lines.push(`## ${heading(message.role)}${message.timestamp ? ` · ${message.timestamp}` : ""}`, "", messageToText(message.content, { placeholderForImages: true }).trim(), "");
     for (const call of message.tool_calls ?? []) {
       lines.push(`> called \`${call.function.name}\` with \`${call.function.arguments}\``, "");
     }

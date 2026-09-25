@@ -1,3 +1,4 @@
+import { messageToText } from "../../model-adapters/multimodal.js";
 import {
   findLastQueryCompletionEvent,
 } from "../sessionContinuityModule.js";
@@ -168,8 +169,8 @@ export function hasSessionResumeContextEvidence(
   snapshot: RecoverySnapshot,
 ): boolean {
   const hasLastMessages =
-    Boolean(snapshot.lastUserMessage?.content?.trim()) ||
-    Boolean(snapshot.lastAssistantMessage?.content?.trim());
+    Boolean(messageToText(snapshot.lastUserMessage?.content).trim()) ||
+    Boolean(messageToText(snapshot.lastAssistantMessage?.content).trim());
   const hasCompletedTurn =
     findLastQueryCompletionEvent(snapshot.transcriptEvents) !== undefined;
   const hasRepairEvidence =

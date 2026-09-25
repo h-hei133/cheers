@@ -1,3 +1,4 @@
+import { messageToText } from "../model-adapters/multimodal.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { CodingResultSummary, CodingWriteEffect } from "../result/types.js";
 import type { SessionMessage } from "./schema/sessionMessage.js";
@@ -415,8 +416,10 @@ export function findLastTurnContent(
 ): string | undefined {
   for (let index = turns.length - 1; index >= 0; index -= 1) {
     const turn = turns[index];
-    if (turn.role === role && turn.content.trim().length > 0) {
-      return turn.content;
+    if (turn.role === role && messageToText(turn.content).trim().length > 0) {
+      // The text, not the content: this feeds a title and a resume summary, and
+      // a block array in either would be rendered as `[object Object]`.
+      return messageToText(turn.content);
     }
   }
   return undefined;

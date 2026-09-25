@@ -1,3 +1,4 @@
+import { messageToText } from "../../model-adapters/multimodal.js";
 import { splitFencedDiff, textBlock, type Block } from "../../presentation/tui/transcript/blocks.js";
 import { summarize } from "./toolCards.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
@@ -33,12 +34,12 @@ export function restoreConversation(turns: readonly SessionMessage[]): RestoredH
   const respondedToolIds = new Set<string>();
   for (const turn of turns) {
     if (turn.role === "user") {
-      const content = turn.content?.trim();
+      const content = messageToText(turn.content).trim();
       if (content) {
         blocks.push(textBlock("user", content));
       }
     } else if (turn.role === "assistant") {
-      const content = turn.content?.trim();
+      const content = messageToText(turn.content).trim();
       if (content) {
         blocks.push(textBlock("assistant", content));
       }
@@ -69,7 +70,7 @@ export function restoreConversation(turns: readonly SessionMessage[]): RestoredH
         respondedToolIds.add(turn.tool_call_id);
         const toolBlock = toolBlocksById.get(turn.tool_call_id);
         if (toolBlock) {
-          const body = (turn.content || "").replace(/\s+$/, "");
+          const body = messageToText(turn.content).replace(/\s+$/, "");
           toolBlock.text = body;
           splitFencedDiff(toolBlock);
           if (/^(\(Operation cancelled|Blocked\b|Tool execution error:|Tool '[^']+' is not available|Error\b)/i.test(body)) {
@@ -133,8 +134,8 @@ export function showConversation(target: HistoryTarget): void {
   for (const block of restored.blocks) target.transcript.append(block);
   target.transcript.finalizeAll();
   const userPrompts = session.turns
-    .filter((turn) => turn.role === "user" && turn.content.trim().length > 0)
-    .map((turn) => turn.content.trim());
+    .filter((turn) => turn.role === "user" && messageToText(turn.content).trim().length > 0)
+    .map((turn) => messageToText(turn.content).trim());
   target.editor?.loadHistory(userPrompts);
 }
 

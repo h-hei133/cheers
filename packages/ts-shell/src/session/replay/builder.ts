@@ -1,3 +1,4 @@
+import { messageToText } from "../../model-adapters/multimodal.js";
 import type { QueryEvent } from "../../core/query/runtime/events.js";
 import { deriveQueryRuntimeObservationState } from "../../core/query/runtime/observation.js";
 import type {
@@ -72,7 +73,7 @@ export function normalizeReplayTranscriptEvents(
     if (
       event.type === "message" &&
       event.role === "assistant" &&
-      event.content.trim().length === 0
+      messageToText(event.content).trim().length === 0
     ) {
       return false;
     }
@@ -103,7 +104,7 @@ export function prepareReplayTranscript(
       (event): event is Extract<TranscriptEvent, { type: "message" }> =>
         event.type === "message" &&
         event.role === "user" &&
-        event.content.trim() === normalizedPrompt,
+        messageToText(event.content).trim() === normalizedPrompt,
     );
 
     if (!hasPromptMessage && context.state.runPhase !== "idle") {
@@ -285,7 +286,7 @@ export function buildResumeReplayInput(input: {
 
   const initialPrompt =
     input.snapshot.pendingPrompt ??
-    input.snapshot.lastUserMessage?.content ??
+    messageToText(input.snapshot.lastUserMessage?.content) ??
     "";
   const startingRole =
     turnPairing.pairedTurns[0]?.started.role ??

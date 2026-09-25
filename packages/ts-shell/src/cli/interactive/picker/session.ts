@@ -1,3 +1,4 @@
+import { messageToText } from "../../../model-adapters/multimodal.js";
 import type { SessionManager } from "../../../session/SessionManager.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
 import type { Picker, PickerOutcome } from "../overlay.js";
@@ -51,11 +52,13 @@ function listSessions(sessionManager: SessionManager): readonly Option[] {
   const sessions = sessionManager.listRecentSessions(MAX_SESSIONS);
   return sessions.map<Option>((session) => {
     const firstMsg =
-      session.turns?.find((t) => (t.role === "user" || t.role === "assistant") && t.content?.trim())?.content ||
+      session.turns?.find(
+        (t) => (t.role === "user" || t.role === "assistant") && messageToText(t.content).trim(),
+      )?.content ||
       session.pendingPrompt;
     const label =
       session.title?.trim() ||
-      (firstMsg ? deriveSessionTitleFromPrompt(firstMsg) : "") ||
+      (firstMsg ? deriveSessionTitleFromPrompt(messageToText(firstMsg)) : "") ||
       "New session";
     return {
       id: session.id,

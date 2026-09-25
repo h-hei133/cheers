@@ -1,3 +1,4 @@
+import { messageToText } from "../../model-adapters/multimodal.js";
 import type { Interface as ReadlineInterface } from "node:readline";
 import process from "node:process";
 
@@ -40,7 +41,25 @@ import type { CatalogProvider } from "../../core/models/catalog.js";
 import { resolveContextWindow, resolveTokenBudget } from "../../core/models/window.js";
 import { createComponentLogger } from "../../observability/structuredLogger.js";
 import { toChatMessages } from "../../turn/prompt.js";
+import type { AgentMessage } from "../../core/agent/state.js";
+import type { CompactionChatMessage } from "../../core/query/compaction/summarize.js";
 import type { CompactionSetup } from "../../turn/session.js";
+
+/**
+ * Messages for a compaction call.
+ *
+ * The summariser reads text, so an attachment is described rather than passed:
+ * the summary model was asked to condense a conversation, not to look at a
+ * picture, and handing it one it never saw would spend tokens on an answer to a
+ * question nobody asked.
+ */
+function toCompactionMessages(messages: readonly AgentMessage[]): readonly CompactionChatMessage[] {
+  return toChatMessages(messages).map((message) => ({
+    role: message.role,
+    content: messageToText(message.content),
+    ...(message.tool_call_id ? { tool_call_id: message.tool_call_id } : {}),
+  }));
+}
 
 /** What a compaction needs from the provider, resolved once per entry point. */
 const windowLogger = createComponentLogger('model-window')
@@ -142,7 +161,7 @@ function buildCompactionWiring(input: {
         // as fatal to a turn as an answer that hangs, and harder to notice: the
         // conversation looks idle rather than broken.
         fetchImpl: providerFetchFromTimeouts(providerTimeoutsFrom(runtimeConfig)),
-        messages: toChatMessages(request.messages),
+        messages: toCompactionMessages(request.messages),
         previousSummary: request.previousSummary,
         instructions: request.instructions,
         signal: request.signal,
@@ -154,7 +173,7 @@ function buildCompactionWiring(input: {
       requestCompactionSummary({
         provider,
         fetchImpl: providerFetchFromTimeouts(providerTimeoutsFrom(runtimeConfig)),
-        messages: toChatMessages(messages),
+        messages: toCompactionMessages(messages),
         prompt: TURN_PREFIX_COMPACTION_PROMPT,
         signal,
       }),
@@ -311,7 +330,7 @@ export function createCliSessionRuntime(input: {
           // the global fetch, so a `/back` whose summary stalled waited forever with
           // no deadline and no abort signal. Same wiring as its two siblings.
           fetchImpl: providerFetchFromTimeouts(providerTimeoutsFrom(input.runtimeContext.runtimeConfig)),
-          messages: toChatMessages(messages),
+          messages: toCompactionMessages(messages),
         });
       });
     },

@@ -1,3 +1,4 @@
+import { messageToText } from "../../../model-adapters/multimodal.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
 import type { SessionMessage } from "../../../session/schema/sessionMessage.js";
 import type { Picker, PickerOutcome } from "../overlay.js";
@@ -67,10 +68,10 @@ export function rewindPoints(turns: readonly SessionMessage[]): RewindPoint[] {
     // existed does not. Those cannot be gone back to by name, so they are left
     // out rather than offered as a choice that would not survive being made.
     if (turn.id === undefined) continue;
-    if (turn.role !== "user" || turn.content.trim().length === 0) continue;
+    if (turn.role !== "user" || messageToText(turn.content).trim().length === 0) continue;
     points.push({
       entryId: turn.id,
-      prompt: turn.content.trim(),
+      prompt: messageToText(turn.content).trim(),
       // Counts what is left behind, which is everything after this question.
       // The question itself stays — it is what goes back in the editor — so
       // including it would overstate the cost by one every time.

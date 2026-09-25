@@ -7,6 +7,7 @@ import { readTranscriptEvents } from "../transcript/sessionTranscript.js";
 import type { SessionThreadEntry } from "../schema/sessionThread.js";
 import type { TranscriptEvent } from "../sessionEventCodec.js";
 import { redactExportText } from "../../core/security/redaction.js";
+import { messageToText } from "../../model-adapters/multimodal.js";
 import { renderMarkdownHtml } from "./htmlRender.js";
 
 /**
@@ -225,7 +226,7 @@ function toExportEntry(event: Extract<TranscriptEvent, { type: "message" }>): Ex
     // does not fit a shape, and the page shows them as text.
     arguments: redactExportText(call.function.arguments),
   }));
-  const content = redactExportText(event.content);
+  const content = redactExportText(messageToText(event.content, { placeholderForImages: true }));
   return {
     id: event.id ?? "",
     role: event.role,

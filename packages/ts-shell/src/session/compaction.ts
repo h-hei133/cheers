@@ -1,3 +1,4 @@
+import { messageToText } from "../model-adapters/multimodal.js";
 import type { NextStepSnapshot, NextStepUpdate } from "../core/agent/loop.js";
 import type { AgentMessage } from "../core/agent/state.js";
 import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS, estimateTokens, messageCharCount } from "./context.js";
@@ -487,7 +488,7 @@ export async function condenseContext(input: {
   // summarizer as the summary to revise rather than as history to condense —
   // condensing a condensation sheds a little of it on every pass.
   const existing = input.messages[head];
-  const previousSummary = existing ? readContextCheckpoint(existing.content) : undefined;
+  const previousSummary = existing ? readContextCheckpoint(messageToText(existing.content)) : undefined;
   const historyStart = previousSummary === undefined ? head : head + 1;
   // When the cut sits inside a turn, that turn's opening message is neither kept
   // nor part of the older history, so the history stops where the turn begins

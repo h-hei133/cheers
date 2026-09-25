@@ -1,3 +1,4 @@
+import { messageToText } from "../model-adapters/multimodal.js";
 import type { AgentToolCall } from "../core/agent/tools.js";
 import type { AgentMessage } from "../core/agent/state.js";
 import type { StepFunction } from "./step.js";
@@ -82,8 +83,9 @@ function lastUserText(messages: readonly AgentMessage[]): string {
     const message = messages[index];
     if (message.role !== "user") continue;
     // The opening message carries an environment line ahead of the prompt.
-    const lines = message.content.split("\n");
-    return (lines[0]?.startsWith("[Environment Context:") ? lines.slice(1).join("\n") : message.content).trim();
+    const content = messageToText(message.content);
+    const lines = content.split("\n");
+    return (lines[0]?.startsWith("[Environment Context:") ? lines.slice(1).join("\n") : content).trim();
   }
   return "";
 }

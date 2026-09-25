@@ -54,6 +54,14 @@ export interface CompactionProvider {
  */
 export interface CompactionChatMessage {
   readonly role: "system" | "user" | "assistant" | "tool";
+  /**
+   * Text only, deliberately.
+   *
+   * The summariser condenses a conversation into words, and it is given the text
+   * of it. Carrying images here would mean the summary model receiving pictures
+   * it was never asked to describe, so callers pass `messageToText` and this
+   * stays a string.
+   */
   readonly content?: string | null;
   readonly tool_call_id?: string;
 }

@@ -1,3 +1,4 @@
+import { messageToText } from "../../../model-adapters/multimodal.js";
 import type { ChatMessageLike } from "../../../core/query/microCompact.js";
 
 export interface TokenCategoryBreakdown {
@@ -53,7 +54,7 @@ export function auditContextHealth(
   const largeToolOutputs: Array<{ toolName: string; chars: number }> = [];
 
   for (const msg of messages) {
-    const contentTokens = estimateTextTokens(msg.content);
+    const contentTokens = estimateTextTokens(messageToText(msg.content));
     if (msg.role === "tool") {
       toolOutputsTokens += contentTokens;
       const chars = msg.content?.length || 0;

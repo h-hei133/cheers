@@ -1,3 +1,4 @@
+import { messageToText } from "../model-adapters/multimodal.js";
 import { AgentCore } from "../core/agent/agent.js";
 import type { AgentLifecycleEvent } from "../core/agent/events.js";
 import type { AgentMessage } from "../core/agent/state.js";
@@ -223,7 +224,8 @@ export function runTurn(options: TurnOptions): TurnRun {
 
   core.subscribe((event: AgentLifecycleEvent) => {
     if (event.type === "message_start" && event.message.role === "user") {
-      forget(steering, event.message.content) || forget(followUps, event.message.content);
+      const text = messageToText(event.message.content);
+      forget(steering, text) || forget(followUps, text);
     }
     if (event.type === "message_end" && event.message !== opening) persist(options.onMessage, event.message);
     // A step that reported usage is a request that completed, which is the only
