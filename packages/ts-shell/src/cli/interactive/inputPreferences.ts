@@ -98,11 +98,19 @@ export class InputPreferences {
    * is indistinguishable from one that is broken.
    */
   async attachClipboardImage(): Promise<void> {
-    const image = await readClipboardImage();
-    if (!image) {
+    const read = await readClipboardImage();
+    if (read.kind === "too-large") {
+      // Told apart from "there is no image", because there is one and the user can
+      // do something about it: a smaller crop sends, and the reason it did not is
+      // worth a sentence rather than the same message an empty clipboard gets.
+      const megabytes = (read.bytes / (1024 * 1024)).toFixed(1);
+      this.host.report(`That image is ${megabytes} MB, which is larger than this can send.`);
+      return;
+    }
+    if (read.kind === "none") {
       this.host.report("No image on the clipboard.");
       return;
     }
-    this.host.attachImage(image);
+    this.host.attachImage(read.image);
   }
 }

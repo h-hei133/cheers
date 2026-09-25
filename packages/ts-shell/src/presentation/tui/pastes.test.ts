@@ -182,3 +182,39 @@ describe("images held beside the draft", () => {
     expect(store.imagesIn(placeholder)).toEqual([]);
   });
 });
+
+describe("the store is bounded", () => {
+  const LONG = "x".repeat(400);
+
+  it("drops the oldest entries rather than growing for the session", () => {
+    // The history keeps a draft's placeholder, so an entry cannot go the moment
+    // its draft is sent. Without a bound the maps held every paste and every
+    // image for the life of the process, and an image is base64.
+    const store = new PasteStore();
+    const first = store.hold(LONG);
+    for (let index = 0; index < 200; index += 1) store.hold(`${LONG}${index}`);
+
+    expect(store.expand(first)).toBe(first);
+  });
+
+  it("still resolves what was pasted recently", () => {
+    // The bound has to leave the entries a user would actually reach for. The
+    // drafts recalled in a session are its recent ones.
+    const store = new PasteStore();
+    for (let index = 0; index < 200; index += 1) store.hold(`${LONG}${index}`);
+    const recent = store.hold("z".repeat(400));
+
+    expect(store.expand(recent)).toBe("z".repeat(400));
+  });
+
+  it("bounds images too", () => {
+    // Images are the reason the bound matters: one is megabytes where a text
+    // paste is kilobytes.
+    const store = new PasteStore();
+    const image = { type: "image" as const, data: "aGVsbG8=", mimeType: "image/png" };
+    const first = store.holdImage(image);
+    for (let index = 0; index < 200; index += 1) store.holdImage(image);
+
+    expect(store.imagesIn(first)).toEqual([]);
+  });
+});

@@ -28,6 +28,17 @@ const LIST_TIMEOUT_MS = 1_000;
 /** The Windows clipboard round trip is slower, so it gets more room. */
 const WINDOWS_TIMEOUT_MS = 5_000;
 
+/**
+ * The largest image worth attaching, in raw bytes.
+ *
+ * Providers reject an image whose base64 passes their own ceiling, and a refusal
+ * there fails the whole request — including whatever the user wrote beside the
+ * picture. 3.75 MB raw is 5 MB once base64 adds its third, which is the limit
+ * that matters. Nothing here can make a picture smaller, so an oversized one is
+ * refused where the user can still see why.
+ */
+const MAX_IMAGE_BYTES = 3.75 * 1024 * 1024;
+
 export interface ClipboardImage {
   readonly bytes: Buffer;
   readonly mimeType: string;
@@ -159,15 +170,23 @@ function isWindowsHosted(): boolean {
   }
 }
 
+/** What a read found: an image, a reason there is none, or nothing to say. */
+export type ClipboardRead =
+  | { readonly kind: "image"; readonly image: ClipboardImage }
+  | { readonly kind: "too-large"; readonly bytes: number }
+  | { readonly kind: "none" };
+
 /**
- * The image on the clipboard, or nothing when there is not one.
+ * The image on the clipboard, and what to say when there is not one.
  *
- * Returns nothing rather than throwing for every way this can fail: no clipboard
- * tool installed, no desktop session, a headless machine. None of those is an
- * error the caller can act on, and all of them mean the same thing to a user —
- * there is no image to paste.
+ * Failure is reported rather than thrown for every way this can go wrong: no
+ * clipboard tool installed, no desktop session, a headless machine. None of those
+ * is an error the caller can act on, and all of them mean the same thing to a
+ * user — there is no image to paste. An image that is too large is told apart
+ * from those, because it is the one case where the clipboard did hold a picture
+ * and the user can do something about it.
  */
-export async function readClipboardImage(): Promise<ClipboardImage | undefined> {
+export async function readClipboardImage(): Promise<ClipboardRead> {
   const backends = isWindowsHosted()
     ? [readViaWindows, readViaWlPaste, readViaXclip]
     : [readViaWlPaste, readViaXclip];
@@ -175,7 +194,12 @@ export async function readClipboardImage(): Promise<ClipboardImage | undefined> 
     const found = await backend();
     // `null` means the clipboard answered and held no image, which ends the
     // search; `undefined` means this backend could not be asked.
-    if (found !== undefined) return found ?? undefined;
+    if (found === undefined) continue;
+    if (found === null) return { kind: "none" };
+    if (found.bytes.length > MAX_IMAGE_BYTES) {
+      return { kind: "too-large", bytes: found.bytes.length };
+    }
+    return { kind: "image", image: found };
   }
-  return undefined;
+  return { kind: "none" };
 }

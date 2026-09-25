@@ -21,6 +21,17 @@ const PLACEHOLDER = /\[#(\d+) [^\]]*\]/g;
 /** Window in which a second paste of the same text means "show it in full". */
 const DOUBLE_PASTE_MS = 1200;
 
+/**
+ * How many entries the store keeps before the oldest are dropped.
+ *
+ * A draft keeps its placeholder in history, so an entry cannot be discarded the
+ * moment its draft is sent — recalling that draft has to expand it again. But the
+ * store has no other bound: the history is long, an image is base64, and a session
+ * that runs all day would hold every paste and every picture forever. Old enough
+ * that a recalled draft no longer resolves is the trade, and it is bounded.
+ */
+const MAX_HELD = 128;
+
 export class PasteStore {
   private readonly held = new Map<number, string>();
   /**
@@ -46,8 +57,24 @@ export class PasteStore {
     const clean = normalizePaste(text);
     const id = this.nextId++;
     this.held.set(id, clean);
+    this.evictOldest();
     this.lastHeld = { id, text: clean, at: now };
     return placeholderFor(id, clean);
+  }
+
+  /**
+   * Drop the oldest entries once the store is over its bound.
+   *
+   * Dropping the oldest rather than the newest because a recalled draft names the
+   * placeholders it was written with, and the drafts a user reaches for are the
+   * recent ones. A dropped entry stops resolving, which is the state a draft
+   * recalled long after its paste was cleared is already documented to be in.
+   */
+  private evictOldest(): void {
+    while (this.held.size > MAX_HELD) this.held.delete(this.held.keys().next().value!);
+    while (this.heldImages.size > MAX_HELD) {
+      this.heldImages.delete(this.heldImages.keys().next().value!);
+    }
   }
 
   /**
@@ -129,6 +156,7 @@ export class PasteStore {
   holdImage(image: ImageContent): string {
     const id = this.nextId++;
     this.heldImages.set(id, image);
+    this.evictOldest();
     const sizeKb = Math.round((image.data.length * 0.75) / 1024);
     return `[#${id} image ${image.mimeType} ${sizeKb}KB]`;
   }
@@ -152,6 +180,7 @@ export class PasteStore {
   clear(): void {
     this.held.clear();
     this.heldImages.clear();
+    this.lastHeld = undefined;
   }
 }
 
