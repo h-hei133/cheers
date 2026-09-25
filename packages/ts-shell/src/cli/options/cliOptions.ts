@@ -57,6 +57,14 @@ export interface CliOptions {
    */
   readonly useTheme?: string;
   /**
+   * Skip requests this session would make on its own.
+   *
+   * The same switch the `offline` setting carries, for one run: someone on a
+   * metered link or a locked-down machine wants it for this invocation without
+   * editing a file that outlives it.
+   */
+  readonly offline?: boolean;
+  /**
    * The only tools this run may offer, comma-separated.
    *
    * A flag rather than only a setting because a read-only pass is a per-run

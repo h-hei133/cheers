@@ -135,6 +135,24 @@ export interface RuntimeConfig {
    * working.
    */
   readonly allowUntrustedHooks?: boolean;
+  /**
+   * Skip requests this session would make on its own initiative.
+   *
+   * A release check and a catalogue refresh are the only ones today. A prompt or
+   * a tool the user asked for is unaffected: this is about being the party that
+   * decides when this machine talks to the network, not about working offline.
+   */
+  readonly offline?: boolean;
+  /**
+   * Whether to keep a prompt cached between requests.
+   *
+   * `streaming` refreshes only while a run is under way, where the next request
+   * is certainly coming; `idle` also refreshes while the session waits, which
+   * spends money on a bet that the user returns before the window lapses. `off`
+   * sends nothing. It only ever applies to a model whose prices are published,
+   * because the decision is arithmetic on those prices.
+   */
+  readonly cacheWarming?: "off" | "streaming" | "idle";
   readonly agentMode?: "plan" | "build";
   readonly theme?: "dark" | "light" | "auto";
   /**
@@ -282,6 +300,8 @@ export interface RuntimeConfigFile {
   reserveTokens?: number;
   modelTokenBudgets?: Record<string, ModelTokenBudget>;
   instructionBudgetBytes?: number;
+  offline?: boolean;
+  cacheWarming?: "off" | "streaming" | "idle";
   agentMode?: "plan" | "build";
   theme?: "dark" | "light" | "auto";
   tuiMode?: "regular" | "fullscreen" | "stream";
@@ -315,6 +335,8 @@ const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
   modelTokenBudgets: {},
   instructionBudgetBytes: 32 * 1024,
   allowUntrustedHooks: false,
+  offline: false,
+  cacheWarming: "streaming",
   agentMode: "build",
   theme: "dark",
   // The surface took the alternate screen unconditionally before this field was
@@ -357,6 +379,8 @@ const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
  */
 export interface RuntimeConfigOverrides {
   readonly instructionBudgetBytes?: number
+  /** Skip self-initiated requests; `undefined` leaves the configured value. */
+  readonly offline?: boolean
   /** The tools this run may offer. Naming none leaves the pool unrestricted. */
   readonly allowedTools?: readonly string[]
   /** Run declared hook commands without asking. Off unless a flag says otherwise. */
@@ -458,6 +482,8 @@ export function getRuntimeConfig(
       overrides?.instructionBudgetBytes ??
       merged.instructionBudgetBytes ??
       DEFAULT_CONFIG.instructionBudgetBytes,
+    offline: overrides?.offline ?? merged.offline ?? DEFAULT_CONFIG.offline,
+    cacheWarming: merged.cacheWarming ?? DEFAULT_CONFIG.cacheWarming,
     // Deliberately read from the overrides only. Every other field falls back to
     // the config files, but this one is an exemption from having hooks approved,
     // and a repository that could write it would be approving its own commands

@@ -14,6 +14,8 @@ import { listThemes, themeNamesFromPaths } from "../../presentation/themes/index
 import type { CliOptions } from "../options/cliOptions.js";
 import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import { printCliDoctor } from "../../entrypoints/cliDoctor.js";
+import { versionLabel } from "../../core/version/current.js";
+import { checkForUpdate, formatUpdateNotice } from "../../core/update/check.js";
 import { time } from "../../observability/startupTiming.js";
 import {
   createCliApprovalModeState,
@@ -67,7 +69,7 @@ export async function runCliProcess(
     input.exit(parsedCliArgs.error.exitCode);
   }
   if (parsedCliArgs.args.versionRequested) {
-    input.writeOutput("0.1.0 (ts-shell MVP)");
+    input.writeOutput(versionLabel());
     return;
   }
 
@@ -136,6 +138,18 @@ export async function runCliProcess(
   });
   time("startup surface rendered");
   logCliBootstrapSessionInitialized({ logger, bootstrapRuntime });
+  // Started and not waited on, so the first frame is never behind a network
+  // call. Only for an interactive session: a scripted run has nobody to read a
+  // notice, and asking on its behalf would be traffic with no reader.
+  if (!options.printMode) {
+    void checkForUpdate({
+      env: process.env,
+      configuredOffline: runtimeContext.runtimeConfig.offline === true,
+    }).then((result) => {
+      const notice = formatUpdateNotice(result);
+      if (notice) renderer.renderLine(`\n${notice}\n`);
+    });
+  }
 
   let readline: ReadlineInterface | null = null;
   let interactiveApprovalPrompt:

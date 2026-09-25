@@ -65,6 +65,9 @@ export function createCliRootContext(
     // the prompt builder.
     instructionBudgetBytes: input.options.noContextFiles ? 0 : undefined,
     allowUntrustedHooks: input.options.dangerouslyBypassHookTrust === true ? true : undefined,
+    // The flag wins over the file, and only when it was given: `undefined`
+    // leaves the configured value in place.
+    offline: input.options.offline === true ? true : undefined,
     // Passed through only when the flag named something: an empty array here
     // would mean "offer no tools at all", which is not what an absent flag says.
     allowedTools: input.options.allowedTools,

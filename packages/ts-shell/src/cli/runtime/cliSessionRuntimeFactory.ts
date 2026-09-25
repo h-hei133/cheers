@@ -23,6 +23,11 @@ import type { InteractiveApprovalResult } from "../interactive/picker/approval.j
 import { requestCompactionSummary } from "../../core/query/compaction/summarize.js";
 import { providerFetchFromTimeouts, providerTimeoutsFrom } from "../../provider/request/fetch.js";
 import { accountAuthFor, providerAuthorization, renewAccountAuthIfExpiring } from "../../provider/request/authorization.js";
+import { catalogModel, providerEndpoint } from "../../core/models/catalog.js";
+import { createCacheWarmingRunner, type CacheWarmingRunner } from "../../turn/cacheWarm.js";
+import { resolveCacheWarmingMode } from "../../core/models/cacheEconomics.js";
+import { sendSentRequest } from "../../provider/request/sentRequest.js";
+import { allowsSelfInitiatedRequests } from "../../core/network/policy.js";
 import { persistRenewedAccountAuth } from "../../core/auth/providerAuthRuntime.js";
 import { TURN_PREFIX_COMPACTION_PROMPT } from "../../core/query/compaction/summarizer.js";
 import { markContextUnknown, getSessionUsage } from "../../observability/usageTelemetry.js";
@@ -69,6 +74,8 @@ function buildCompactionWiring(input: {
     readonly baseUrl: string;
     readonly model: string;
     readonly providerId: string;
+    /** Which endpoint kind the summarizer must speak, when not the default. */
+    readonly endpoint?: "anthropic-messages";
   };
   readonly runtimeContext: ShellRuntimeContext;
   readonly sessionId: string;
@@ -182,6 +189,14 @@ export function createCliSessionRuntime(input: {
    * files synchronously on each call, so reading it per turn would put two file
    * reads on the path that decides whether to compact.
    */
+  /**
+   * The runner the current run is using, so the next run can retire it.
+   *
+   * Held here rather than on the runner because it is the factory that knows a
+   * new run has begun.
+   */
+  let previousCacheWarming: CacheWarmingRunner | undefined;
+
   const catalog = loadCatalog()
 
   /**
@@ -217,15 +232,24 @@ export function createCliSessionRuntime(input: {
     };
   };
 
+  /** The endpoint kind a provider is reached through, when the catalog names one. */
+  const endpointFor = (provider: string): "anthropic-messages" | undefined =>
+    providerEndpoint(catalog, provider);
+
   /** The provider the turn's own compaction summarizes with. */
   const compactionProvider = (): CompactionProvider | undefined => {
     const target = compactionTarget();
     if (!target) return undefined;
     return {
-      headers: providerAuthorization({ apiKey: target.apiKey, accountAuth: target.accountAuth }).headers,
+      headers: providerAuthorization({
+        apiKey: target.apiKey,
+        accountAuth: target.accountAuth,
+        ...(endpointFor(target.provider) ? { endpoint: endpointFor(target.provider) } : {}),
+      }).headers,
       baseUrl: target.baseUrl,
       model: target.model,
       providerId: target.provider,
+      ...(endpointFor(target.provider) ? { endpoint: endpointFor(target.provider) } : {}),
     };
   };
 
@@ -246,10 +270,12 @@ export function createCliSessionRuntime(input: {
       headers: providerAuthorization({
         apiKey: target.apiKey,
         accountAuth: renewed.accountAuth ?? target.accountAuth,
+        ...(endpointFor(target.provider) ? { endpoint: endpointFor(target.provider) } : {}),
       }).headers,
       baseUrl: target.baseUrl,
       model: target.model,
       providerId: target.provider,
+      ...(endpointFor(target.provider) ? { endpoint: endpointFor(target.provider) } : {}),
     };
   };
   const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
@@ -293,9 +319,50 @@ export function createCliSessionRuntime(input: {
       const resolvedCredential =
         input.providerRuntimeBridge.resolveCredentialSnapshot();
       const sessionId = input.runtimeContext.session.id;
+      // A runner left over from an earlier run in this session is still holding
+      // an idle timer, and it would refresh the same prefix the new runner is
+      // about to refresh — the same money spent twice. Only the current run
+      // keeps a window warm.
+      previousCacheWarming?.stop();
+      previousCacheWarming = undefined;
       const activeProvider = compactionProvider();
+      // The prices and the cache window belong to the model, so they are read
+      // from the catalogue entry this run is talking to.
+      const warmingTarget = compactionTarget();
+      const warmingModel = warmingTarget
+        ? catalogModel(catalog, warmingTarget.provider, warmingTarget.model)
+        : undefined;
       // Automatic compaction needs a provider to write the checkpoint; without
       // one the turn runs with the history it has and overflow reports itself.
+      // Built per run rather than per session: the model can change between
+      // runs, and the prices and window the decision rests on are properties of
+      // the model.
+      // A refresh is a request nobody asked for, so it answers to the same switch
+      // as every other one. Gated here rather than inside the runner: the runner
+      // decides whether a refresh is worth its price, and whether this session
+      // may make unasked requests at all is a different question with a different
+      // answer.
+      const mayRefreshOnItsOwn = allowsSelfInitiatedRequests({
+        configuredOffline: input.runtimeContext.runtimeConfig.offline === true,
+      });
+      const cacheWarming = createCacheWarmingRunner({
+        mode: mayRefreshOnItsOwn
+          ? resolveCacheWarmingMode(input.runtimeContext.runtimeConfig.cacheWarming)
+          : "off",
+        ...(warmingModel ? { cost: warmingModel.cost, promptCache: warmingModel.promptCache } : {}),
+        // Replays the request that went out. Rebuilding it here would produce a
+        // different prefix, and a different prefix is a cache miss at the full
+        // write price — the opposite of what a refresh is for.
+        refresh: async (sent, signal) => {
+          await sendSentRequest(
+            sent,
+            signal,
+            providerFetchFromTimeouts(providerTimeoutsFrom(input.runtimeContext.runtimeConfig)),
+          );
+        },
+      });
+      previousCacheWarming = cacheWarming;
+
       const compaction: CompactionSetup | undefined = activeProvider
         ? {
             ...buildCompactionWiring({ provider: activeProvider, runtimeContext: input.runtimeContext, sessionId, catalog }),
@@ -349,6 +416,7 @@ export function createCliSessionRuntime(input: {
         historyMessages,
         onTurnMessage: (message) => input.sessionManager.addTurn(sessionId, message),
         compaction,
+        cacheWarming,
         providerCredentialResolution: resolvedCredential,
         agentMode: sessionRuntime.getAgentMode(),
         providerRuntimeBridge: input.providerRuntimeBridge,

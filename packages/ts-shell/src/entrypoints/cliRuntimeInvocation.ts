@@ -13,6 +13,7 @@ import { registerDeclaredHooks, type HookApprovalRequest } from "../core/hooks/r
 import { createCoreToolRegistry } from "../core/tools/registry.js";
 import { filterVisibleToolNames } from "../core/tools/prefilter.js";
 import { loadCatalog } from "../core/models/catalogStore.js";
+import { providerEndpoint } from "../core/models/catalog.js";
 import type { RuntimeConfig } from "../config/runtimeConfig.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { buildSystemPrompt, type SystemPromptContext } from "../turn/prompt.js";
@@ -532,12 +533,26 @@ function sessionPathOption(sessionId: string): { readonly sessionPath: string } 
   }
 }
 
+/**
+ * The endpoint kind a provider is reached through, when the catalog names one.
+ *
+ * Read once per step function, like the request shape: a run that changed
+ * endpoint mid-answer would send half a reply to one protocol and half to
+ * another.
+ */
+
+
 function createProviderStep(
   request: CliRuntimeInvocationRequest,
   tools: ReadonlyMap<string, ToolDefinition>,
   promptContext: SystemPromptContext,
 ): StepFunction {
   const resolution = request.providerCredentialResolution;
+  // Read once for the whole step function, not once per use: loading the
+  // catalogue touches the filesystem, and a run that reloaded it mid-turn could
+  // change request shape between two steps of the same answer.
+  const catalog = loadCatalog();
+  const endpoint = providerEndpoint(catalog, resolution.provider);
   return createStepFunction({
     provider: {
       // Built from the whole credential, not from its key alone. An account login
@@ -546,12 +561,17 @@ function createProviderStep(
       headers: providerAuthorization({
         apiKey: resolution.credential?.apiKey,
         accountAuth: accountAuthFor(resolution.provider, resolution.credential ?? {}),
+        ...(endpoint ? { endpoint } : {}),
       }).headers,
       baseUrl: resolution.baseUrl ?? resolution.credential?.baseUrl ?? "",
       model: resolution.model ?? resolution.credential?.model ?? "",
       // The catalog is keyed by provider id, so the request shape cannot be
       // resolved without it.
       provider: resolution.provider,
+      // Which endpoint kind this provider is reached through. Read from the
+      // catalog rather than inferred from the provider id: the id names who
+      // answers, and an endpoint is how they want to be asked.
+      ...(endpoint ? { endpoint } : {}),
     },
     // Without this the request is sent with the global fetch, which has no
     // deadline: a provider that accepts the connection and then never answers
@@ -562,10 +582,7 @@ function createProviderStep(
     sessionId: request.sessionId,
     systemPrompt: buildSystemPrompt(request.agentMode, promptContext),
     tools: toolSchemas(tools),
-    // Read once per step function rather than per request: the catalog is a
-    // snapshot, and a run that reloaded it mid-turn could change request shape
-    // between two steps of the same answer.
-    catalog: loadCatalog(),
+    catalog,
     // Sampling settings travel with the request, not with the provider: a
     // provider that ignores them still receives a well-formed request, and a
     // run that sets none keeps the step's own defaults.

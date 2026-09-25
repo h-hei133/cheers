@@ -17,6 +17,9 @@ import { concludeRun, TurnProjection } from "./projection.js";
 import { EventChannel } from "./stream.js";
 import { isOverflowFailure, type StepFunction } from "./step.js";
 import { adaptTools, createToolHooks, type ToolGateOptions } from "./tools.js";
+import { getSessionUsage } from "../observability/usageTelemetry.js";
+import type { SentRequest } from "../provider/request/sentRequest.js";
+import type { CacheWarmingRunner } from "./cacheWarm.js";
 import type { ToolDefinition } from "../tools/types.js";
 
 /**
@@ -82,6 +85,14 @@ export interface TurnOptions {
     readonly baseDelayMs?: number;
     readonly maxDelayMs?: number;
   };
+  /**
+   * Keeping this run's prompt cached between requests.
+   *
+   * Absent means the session does not do it: the runner needs the model's prices
+   * and a way to send a refresh, and a caller that supplies neither has opted
+   * out by not supplying them.
+   */
+  readonly cacheWarming?: CacheWarmingRunner;
   /** How many queued steering messages reach the model at once. */
   readonly steeringMode?: "one-at-a-time" | "all";
   /** How many queued follow-up messages reach the model at once. */
@@ -127,6 +138,14 @@ export function runTurn(options: TurnOptions): TurnRun {
     content: `${environmentLine(options.workspaceRoot, options.permissionScope)}\n\n${options.prompt}`,
   };
   const hooks = createToolHooks(gate);
+  /**
+   * The request as it last went out, kept so a refresh can replay it.
+   *
+   * Captured at the step because that is the only place the request exists in
+   * the shape it was sent; a rebuild from the session's history is a different
+   * prefix.
+   */
+  let lastSentRequest: SentRequest | undefined;
   const core = new AgentCore({
     initialState: { messages: options.history as readonly AgentMessage[] },
     // Absent means the kernel's own default, which is the same value the config
@@ -149,7 +168,14 @@ export function runTurn(options: TurnOptions): TurnRun {
           onReasoning: (delta) => channel.push({ type: "reasoning.delta", role: "coder", delta }),
           onReplace: (text) => channel.push({ type: "message.replace", role: "coder", text }),
         },
-        { allowTools: projection.stepCount < options.maxSteps },
+        {
+          allowTools: projection.stepCount < options.maxSteps,
+          // Kept so a refresh can replay it. Captured at the step, because that
+          // is the only place the request exists in the shape it was sent.
+          onRequestSent: (sent) => {
+            lastSentRequest = sent;
+          },
+        },
       ),
     shouldStopAfterStep: () => projection.stepCount >= options.maxSteps,
     prepareNextStep: options.compaction
@@ -200,8 +226,24 @@ export function runTurn(options: TurnOptions): TurnRun {
       forget(steering, event.message.content) || forget(followUps, event.message.content);
     }
     if (event.type === "message_end" && event.message !== opening) persist(options.onMessage, event.message);
+    // A step that reported usage is a request that completed, which is the only
+    // moment a cache window starts.
+    if (event.type === "turn_end") noteWarmingRequest();
     for (const projected of projection.project(event)) channel.push(projected);
   });
+
+  // The turn is the only place that knows a request happened and how large it
+  // was, so it is the only place that can tell the warmer when a window starts.
+  // Reported from the usage the provider returned, not from an estimate: an
+  // estimate of the wrong size would schedule the refresh against the wrong
+  // window.
+  const noteWarmingRequest = (): void => {
+    if (!options.cacheWarming || !lastSentRequest) return;
+    const usage = getSessionUsage(options.sessionId);
+    if (usage.lastPromptTokens > 0) {
+      options.cacheWarming.noteRequest(usage.lastPromptTokens, lastSentRequest);
+    }
+  };
 
   let overflowRecovered = false;
   const drive = async (): Promise<void> => {
@@ -319,6 +361,9 @@ export function runTurn(options: TurnOptions): TurnRun {
       channel.push({ type: "query.failed", error: error instanceof Error ? error.message : String(error) });
     })
     .finally(async () => {
+      // The run is over, so the session is waiting on a person rather than on a
+      // model. What that means for refreshing is the runner's decision.
+      options.cacheWarming?.noteSettled();
       await options.hooks
         .dispatch({
           eventName: "SessionEnd",
