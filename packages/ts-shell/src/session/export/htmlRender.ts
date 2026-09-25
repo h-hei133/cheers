@@ -86,10 +86,81 @@ function renderSpans(text: string): string {
 
 /** `text` as HTML blocks. */
 export function renderMarkdownHtml(text: string): string {
-  return scanBlocks(text).map(renderBlockHtml).join("");
+  return groupBlocks(scanBlocks(text)).map(renderBlockHtml).join("");
 }
 
-function renderBlockHtml(block: MarkdownBlock): string {
+/**
+ * A block that owns several sibling lines.
+ *
+ * The scanner reports one block per line, because that is what a terminal draws.
+ * A browser does not: three `<ul>` elements in a row are three lists with a gap
+ * between them, and three `<ol>` elements each restart at 1, so a numbered list
+ * came out as "1. 1. 1.". Grouping happens here rather than in the scanner so the
+ * terminal renderer — which is correct as it stands — is untouched.
+ */
+type Grouped =
+  | { readonly kind: "list"; readonly ordered: boolean; readonly items: readonly string[] }
+  | { readonly kind: "quote"; readonly paragraphs: readonly (readonly string[])[] }
+  | Exclude<MarkdownBlock, { kind: "list" } | { kind: "quote" }>;
+
+/**
+ * Adjacent list items become one list, and adjacent quote lines one quote.
+ *
+ * A quote continues across a blank line, which is how a multi-paragraph quote is
+ * written; a list does not, because a blank line between items ends it. Only
+ * items of the same kind and indent join, so an ordered list nested under an
+ * unordered one stays a separate element.
+ */
+function groupBlocks(blocks: readonly MarkdownBlock[]): readonly Grouped[] {
+  const grouped: Grouped[] = [];
+  let list: { ordered: boolean; indent: string; items: string[] } | undefined;
+  let quote: string[][] | undefined;
+
+  const flush = (): void => {
+    if (list) grouped.push({ kind: "list", ordered: list.ordered, items: list.items });
+    if (quote) grouped.push({ kind: "quote", paragraphs: quote });
+    list = undefined;
+    quote = undefined;
+  };
+
+  for (const block of blocks) {
+    if (block.kind === "list") {
+      const ordered = /^\d+\.$/.test(block.marker);
+      if (list && list.ordered === ordered && list.indent === block.indent) {
+        list.items.push(block.text);
+        continue;
+      }
+      flush();
+      list = { ordered, indent: block.indent, items: [block.text] };
+      continue;
+    }
+    if (block.kind === "quote") {
+      // A bare `>` is how a paragraph break inside a quote is written, and the
+      // scanner reports it as a quote whose text is empty.
+      if (quote) {
+        if (block.text.trim() === "") quote.push([]);
+        else quote[quote.length - 1]!.push(block.text);
+      } else if (list) {
+        // A quote after a list ends the list; the two are not the same element.
+        flush();
+        quote = [[block.text]];
+      } else quote = [[block.text]];
+      continue;
+    }
+    if (block.kind === "text" && block.line.trim() === "") {
+      // A blank line ends a list but only starts a new paragraph inside a quote.
+      if (list) flush();
+      else if (quote) quote.push([]);
+      continue;
+    }
+    flush();
+    grouped.push(block);
+  }
+  flush();
+  return grouped;
+}
+
+function renderBlockHtml(block: Grouped): string {
   switch (block.kind) {
     case "heading": {
       const level = Math.min(6, Math.max(1, block.level));
@@ -102,14 +173,19 @@ function renderBlockHtml(block: MarkdownBlock): string {
     case "table":
       return renderTableHtml(block.header, block.rows);
     case "list": {
-      // The marker decides the list kind; the scan keeps it because a terminal
-      // prints it and a browser does not, so this is where the two part company.
-      const ordered = /^\d+\.$/.test(block.marker);
-      const tag = ordered ? "ol" : "ul";
-      return `<${tag}><li>${renderInlineHtml(block.text)}</li></${tag}>`;
+      // The marker decided the list kind when the items were grouped; a terminal
+      // prints the marker and a browser does not, so this is where they part.
+      const tag = block.ordered ? "ol" : "ul";
+      return `<${tag}>${block.items.map((item) => `<li>${renderInlineHtml(item)}</li>`).join("")}</${tag}>`;
     }
-    case "quote":
-      return `<blockquote>${renderInlineHtml(block.text)}</blockquote>`;
+    case "quote": {
+      // Paragraphs inside one quote are separate `<p>` elements, which is what
+      // makes a blank line between them mean what it looks like it means.
+      const parts = block.paragraphs
+        .filter((paragraph) => paragraph.length > 0)
+        .map((paragraph) => `<p>${paragraph.map((line) => renderInlineHtml(line)).join(" ")}</p>`);
+      return `<blockquote>${parts.join("")}</blockquote>`;
+    }
     default:
       return block.line.trim() === "" ? "" : `<p>${renderInlineHtml(block.line)}</p>`;
   }

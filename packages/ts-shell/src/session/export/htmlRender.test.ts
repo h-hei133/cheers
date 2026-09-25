@@ -106,7 +106,32 @@ describe("blocks", () => {
   });
 
   it("renders a quote", () => {
-    expect(renderMarkdownHtml("> quoted")).toBe("<blockquote>quoted</blockquote>");
+    expect(renderMarkdownHtml("> quoted")).toBe("<blockquote><p>quoted</p></blockquote>");
+  });
+
+  it("groups adjacent lines into one list", () => {
+    // Three `<ul>` elements in a row are three lists with a gap between them, and
+    // three `<ol>` elements each restart at 1. A reader who numbered five steps
+    // saw five steps numbered "1.".
+    expect(renderMarkdownHtml("- a\n- b\n- c")).toBe("<ul><li>a</li><li>b</li><li>c</li></ul>");
+    expect(renderMarkdownHtml("1. a\n2. b")).toBe("<ol><li>a</li><li>b</li></ol>");
+  });
+
+  it("keeps an unordered list and an ordered one apart", () => {
+    // The marker decides the element, so a change of kind ends the list rather
+    // than merging two things that are drawn differently.
+    expect(renderMarkdownHtml("1. a\n- b")).toBe("<ol><li>a</li></ol><ul><li>b</li></ul>");
+  });
+
+  it("ends a list at a blank line", () => {
+    expect(renderMarkdownHtml("- a\n- b\n\nplain")).toBe("<ul><li>a</li><li>b</li></ul><p>plain</p>");
+  });
+
+  it("keeps the paragraphs of one quote apart", () => {
+    // A bare `>` is how a paragraph break inside a quote is written. Joined into
+    // one paragraph it would lose the break the author put there.
+    expect(renderMarkdownHtml("> a\n>\n> b")).toBe("<blockquote><p>a</p><p>b</p></blockquote>");
+    expect(renderMarkdownHtml("> a\n> b")).toBe("<blockquote><p>a b</p></blockquote>");
   });
 
   it("renders a rule", () => {
