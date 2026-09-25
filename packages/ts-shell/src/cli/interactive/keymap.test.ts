@@ -119,6 +119,30 @@ describe("submission", () => {
     expect(surface.editor.getText()).toBe("");
   });
 
+  it("carries an attached image beside the text, not inside it", () => {
+    // The end of the chain the clipboard feeds: a draft holding an image must
+    // hand the picture over as an attachment, and must not leave the placeholder
+    // behind in the sentence where it would read as content.
+    const { press, surface, actions } = build();
+    const image = { type: "image" as const, data: "aGVsbG8=", mimeType: "image/png" };
+    const placeholder = surface.pastes.holdImage(image);
+    press(`look at this ${placeholder}`);
+    press("\r");
+
+    const [text, , attachments] = actions.submit.mock.calls[0]!;
+    expect(text).toBe("look at this");
+    expect(attachments).toEqual({ images: [image] });
+  });
+
+  it("submits text alone when nothing is attached", () => {
+    // The no-attachment shape is the one every existing reader was written for,
+    // so it has to stay a bare two-argument call rather than carry an empty bag.
+    const { press, actions } = build();
+    press("h");
+    press("\r");
+    expect(actions.submit.mock.calls[0]).toHaveLength(1);
+  });
+
   it("does nothing on an empty prompt", () => {
     const { press, actions } = build();
     press("\r");

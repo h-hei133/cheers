@@ -1,3 +1,4 @@
+import type { ImageContent } from "../model-adapters/multimodal.js";
 import { messageToText } from "../model-adapters/multimodal.js";
 import { AgentCore } from "../core/agent/agent.js";
 import type { AgentLifecycleEvent } from "../core/agent/events.js";
@@ -56,6 +57,14 @@ export interface TurnOptions {
   /** Where the session's files live, when the caller knows. Carried into the event stream. */
   readonly sessionPath?: string;
   readonly prompt: string;
+  /**
+   * Images the user attached to this prompt.
+   *
+   * They become blocks on the opening message rather than a message of their own,
+   * because they belong to the sentence the user wrote: a picture sent on its own
+   * is not a turn, and a turn split in two would read as two things said.
+   */
+  readonly attachments?: { readonly images: readonly ImageContent[] };
   readonly workspaceRoot: string;
   readonly agentMode?: "plan" | "build";
   readonly permissionScope?: ToolGateOptions["permissionScope"];
@@ -134,9 +143,16 @@ export function runTurn(options: TurnOptions): TurnRun {
     emit: (event) => channel.push(event),
     ...(options.commandEnv ? { commandEnv: options.commandEnv } : {}),
   };
+  const openingText = `${environmentLine(options.workspaceRoot, options.permissionScope)}\n\n${options.prompt}`;
+  const openingImages = options.attachments?.images ?? [];
   const opening: AgentMessage = {
     role: "user",
-    content: `${environmentLine(options.workspaceRoot, options.permissionScope)}\n\n${options.prompt}`,
+    // A message with no attachment keeps the plain string it has always been, so
+    // nothing downstream sees a block array it was not written for.
+    content:
+      openingImages.length === 0
+        ? openingText
+        : [{ type: "text" as const, text: openingText }, ...openingImages],
   };
   const hooks = createToolHooks(gate);
   /**

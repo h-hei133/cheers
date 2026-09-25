@@ -1,3 +1,4 @@
+import type { PromptAttachments } from "../core/shell/sessionRuntime.js";
 import * as fs from "node:fs";
 import type { ProviderCredentialResolution } from "../core/shell/providerCredentials.js";
 import { checkRealProviderReadiness } from "../core/shell/providerReadiness.js";
@@ -50,6 +51,8 @@ type ProviderMode = "synthetic" | "real";
 export interface CliRuntimeInvocationInput {
   readonly sessionId: string;
   readonly prompt: string;
+  /** Images that travelled with the prompt; see `PromptAttachments`. */
+  readonly attachments?: PromptAttachments;
   readonly workspaceRoot: string;
   readonly signal: AbortSignal;
   readonly maxTurns: number;
@@ -433,6 +436,7 @@ function startTurn(
     // nothing true to report.
     ...sessionPathOption(request.sessionId),
     prompt: request.prompt,
+    ...(request.attachments ? { attachments: request.attachments } : {}),
     workspaceRoot: request.workspaceRoot,
     agentMode: request.agentMode,
     permissionScope: request.permissionScope,

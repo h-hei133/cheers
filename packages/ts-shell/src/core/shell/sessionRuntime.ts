@@ -1,3 +1,4 @@
+import type { ImageContent } from "../../model-adapters/multimodal.js";
 import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type {
   SessionContinuitySnapshot,
@@ -33,6 +34,17 @@ import type { CompactionOutcome } from "./compaction.js";
 import type { TurnInput } from "../../turn/session.js";
 
 /**
+ * What travels with a prompt beside its text.
+ *
+ * Images are held apart from the words because they are not part of the
+ * sentence: the placeholder that stood for one in the draft expands back to
+ * nothing, so the picture has to be carried here or not at all.
+ */
+export interface PromptAttachments {
+  readonly images: readonly ImageContent[];
+}
+
+/**
  * A prompt in flight: its event stream, and the handle through which input
  * typed while it runs reaches it. A bare stream is a run that takes no input.
  */
@@ -48,6 +60,7 @@ export interface SessionRuntimeDependencies {
     signal: AbortSignal,
     runtimeSeed?: QueryRuntimeStateSeed,
     continuityState?: SessionContinuitySnapshot,
+    attachments?: PromptAttachments,
   ) => PromptRun;
   readonly compactCheckpointStore?: CompactLiveCheckpointStore;
   readonly compactInjectionStateStore?: CompactInjectionStateStore;
@@ -160,6 +173,7 @@ export class ShellSessionRuntime {
       runtimeSeed?: QueryRuntimeStateSeed;
       continuityState?: SessionContinuitySnapshot;
       outputMode?: "interactive" | "print";
+      attachments?: PromptAttachments;
     },
   ): Promise<string> {
     const run = this.trackRun(this.drivePrompt(sessionId, prompt, options));
@@ -192,6 +206,7 @@ export class ShellSessionRuntime {
       runtimeSeed?: QueryRuntimeStateSeed;
       continuityState?: SessionContinuitySnapshot;
       outputMode?: "interactive" | "print";
+      attachments?: PromptAttachments;
     },
   ): Promise<string> {
     this.currentRunController = new AbortController();
@@ -275,7 +290,13 @@ export class ShellSessionRuntime {
           options.runtimeSeed.recoveryBoundary === "mid-turn-reentry";
       }
 
-      const run = this.deps.runPrompt(promptForModel, signal, options?.runtimeSeed, continuityState);
+      const run = this.deps.runPrompt(
+        promptForModel,
+        signal,
+        options?.runtimeSeed,
+        continuityState,
+        options?.attachments,
+      );
       const events = Symbol.asyncIterator in run ? run : run.events;
       this.currentInput = Symbol.asyncIterator in run ? undefined : run.input;
       for await (const event of events) {

@@ -1,3 +1,4 @@
+import type { PromptAttachments } from "../../core/shell/sessionRuntime.js";
 import type { ProviderCredentialResolution } from "../../core/shell/providerCredentials.js";
 import type { EscalationPrompt, EscalationResponse } from "../../sandbox/index.js";
 import type { PermissionScope } from "../approval/permissionScope.js";
@@ -11,6 +12,8 @@ import type { RuntimeConfig } from "../../config/runtimeConfig.js";
 
 export function streamCliRuntimePrompt(input: {
   readonly prompt: string;
+  /** Images that travelled with the prompt; see `PromptAttachments`. */
+  readonly attachments?: PromptAttachments;
   readonly sessionId: string;
   readonly workspaceRoot: string;
   readonly signal: AbortSignal;
@@ -37,6 +40,7 @@ export function streamCliRuntimePrompt(input: {
   return runCliRuntimeInvocation({
     sessionId: input.sessionId,
     prompt: input.prompt,
+    ...(input.attachments ? { attachments: input.attachments } : {}),
     workspaceRoot: input.workspaceRoot,
     signal: input.signal,
     maxTurns: input.maxTurns,

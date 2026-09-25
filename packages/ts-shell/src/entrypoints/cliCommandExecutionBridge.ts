@@ -1,3 +1,4 @@
+import type { PromptAttachments } from "../core/shell/sessionRuntime.js";
 import { routeSlashCommand } from "../core/commands/slashRouter.js";
 import type { RuntimeConfig } from "../config/runtimeConfig.js";
 import { createBrowserCliExecutionBridge } from "../browser/cliExecutionBridge.js";
@@ -29,10 +30,17 @@ export type CliCommandExecution =
       readonly kind: "shell-action";
       readonly slashResult: Extract<SlashRouteResult, { kind: "shell-action" }>;
     }
-  | { readonly kind: "execute"; readonly effectivePrompt: string };
+  | {
+      readonly kind: "execute";
+      readonly effectivePrompt: string;
+      /** Images that travelled with the draft; see `PromptAttachments`. */
+      readonly attachments?: PromptAttachments;
+    };
 
 export interface BuildCliCommandExecutionInput {
   readonly prompt: string;
+  /** Images the draft referred to, carried beside the text rather than in it. */
+  readonly attachments?: PromptAttachments;
   readonly cwd: string;
   readonly renderer: StreamingRenderer;
   readonly printMode: boolean;
@@ -142,6 +150,10 @@ export async function buildCliCommandExecution(
   return {
     kind: "execute",
     effectivePrompt: slashResult?.kind === "prompt" ? slashResult.prompt : input.prompt,
+    // A slash command resolves to a prompt template, and a template has no way to
+    // refer to an attachment; the images the draft held still belong to the turn,
+    // so they travel with whichever text is finally sent.
+    ...(input.attachments ? { attachments: input.attachments } : {}),
   };
 }
 

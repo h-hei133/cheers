@@ -334,7 +334,7 @@ export function createCliSessionRuntime(input: {
         });
       });
     },
-    runPrompt: (prompt, signal): PromptRun => {
+    runPrompt: (prompt, signal, _runtimeSeed, _continuityState, attachments): PromptRun => {
       const resolvedCredential =
         input.providerRuntimeBridge.resolveCredentialSnapshot();
       const sessionId = input.runtimeContext.session.id;
@@ -416,7 +416,7 @@ export function createCliSessionRuntime(input: {
       const allTurns = existingSession?.turns ?? [];
       const historyMessages =
         allTurns.length > 0 &&
-        allTurns[allTurns.length - 1]?.content === prompt
+        messageToText(allTurns[allTurns.length - 1]?.content) === prompt
           ? allTurns.slice(0, -1)
           : allTurns;
 
@@ -424,6 +424,7 @@ export function createCliSessionRuntime(input: {
         // Carried so the tool pool honours disabledTools / hiddenToolPrefixes.
         runtimeConfig: input.runtimeContext.runtimeConfig,
         prompt,
+        ...(attachments ? { attachments } : {}),
         sessionId,
         workspaceRoot: input.runtimeContext.cwd,
         signal,

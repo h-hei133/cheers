@@ -1,3 +1,4 @@
+import type { PromptAttachments } from "../core/shell/sessionRuntime.js";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -331,6 +332,8 @@ export async function runNonInteractivePrompt(options: {
 export async function executeResolvedPromptTurn(options: {
   source: "interactive" | "non-interactive";
   effectivePrompt: string;
+  /** Images that travelled with the prompt; see `PromptAttachments`. */
+  attachments?: PromptAttachments;
   runtimeSeed?: QueryRuntimeStateSeed;
   continuityState?: SessionContinuitySnapshot;
   sessionManager: SessionManager;
@@ -431,6 +434,7 @@ export async function executeResolvedPromptTurn(options: {
           outputMode: options.printMode ? "print" : "interactive",
           runtimeSeed: options.runtimeSeed,
           continuityState: continuitySnapshot,
+          ...(options.attachments ? { attachments: options.attachments } : {}),
         },
       );
     } finally {
