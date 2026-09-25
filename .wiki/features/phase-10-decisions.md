@@ -18,7 +18,7 @@ summary: "Phase 10 是 01–07 的收尾阶段：6 项施工（T1–T6）+ 2 项
 | **T4** | Cache 浪费分析 | `06:62` | **做** |
 | **T5** | 端点协议分支收敛 | `03:53` | **做**（收敛，**不加新协议**） |
 | **T6** | 认证 provider 注册收敛 | `03:49` | **做**（收敛，**不加新 provider**） |
-| **T7** | 内置目录的 `cost` 数据 | `06:60` 正文余量（**复核补**） | **做** |
+| ~~**T7**~~ | ~~费率不得静默回退~~ | `06:60` 正文余量 | **不做**——前提经两轮实测推翻，见 §8 |
 | **D1** | `SYSTEM.md` 替换语义 | `01:64` | **维持不做**（理由已更正，见 §8.1） |
 | **D2** | 技能发现注记更正 | `01:57` | **仅改文档**（代码无余量） |
 | **D3** | Session 分享／发布链接 | `02:53` | **不纳入**——独立立项，非宿主下游（见 §8.3） |
@@ -180,9 +180,23 @@ for (const line of fs.readFileSync(transcriptPath, "utf8").split("
    老 entry 的派生 id 于是从 `line-1` 变成 `line-2`，与 `state.json` 里存的 id **错位**。
 2. **新 build 若产生无 id 的 entry**（异常或外部注入），其 id 会是 `line-2`；header 一旦被剥离又漂回 `line-1`。
 
-**裁决**：**header 行不参与 `lineNumber` 计数**。
-实现上：先判该行是否为 header，是则 `continue`（**在 `lineNumber += 1` 之前**），
-使**第一个 entry 仍是 `line-1`**。这样老文件的派生 id 与带 header 文件的派生 id **语义一致**。
+**裁决**：**header 行不参与 `lineNumber` 计数**，使**第一个 entry 仍是 `line-1`**——
+这样老文件的派生 id 与带 header 文件的派生 id **语义一致**。
+
+**但实现形状不能是「先判再自增」的随手写法**（复核指出**依赖倒置**）：
+`decodeTranscriptLineSafe`（`sessionEventCodec.ts:203-219`）**内部做 `JSON.parse`**，
+**并在同一个函数里**用 `lineNumber` 注入派生 id。所以：
+
+| 错误写法 | 问题 |
+|---|---|
+| 先调 `decodeTranscriptLineSafe` 判断是否 header | 行号已被消耗；无 id 的 entry 会拿到错号 |
+| 另外再 `JSON.parse` 一次做预检 | **每行解析两遍**（长会话是真实开销） |
+
+**正确形状：把「是不是 header」的判定交给解码器，行号只对非 header 行自增。**
+即调整 `readTranscriptEvents` 的循环，让解码**先**返回类别（header／entry／无法解析），
+**再**由调用方决定是否递增行号并注入 id。
+**这会动 `sessionEventCodec` 的接口**——施工时需同时改它的调用方（本文件与测试），
+不是只改 `sessionTranscript`。
 
 **这条必须有用例钉住**：同一个无 id entry，放在「无 header 文件的首行」与
 「有 header 文件的首行」，**必须得到相同的 id**。反向验证：去掉「header 不计数」→ 该用例失败。
@@ -208,12 +222,22 @@ header 就丢了**；且磁盘上已存在的 **0 字节文件**（老版本建�
 在新版本追加首个 turn 时**永远失去**写 header 的机会。
 
 **裁决**：把「确保首行合法」的逻辑**收敛进 `sessionTranscript` 模块内部**，
-在追加时检测「文件为空或首行不是 header」→ **先补 header 再追加**。
-理由：`sessionTranscript.ts` 是**唯一的追加入口**，把不变量放在这里，
-所有调用方自动满足，不依赖「必须走 sessionStore 建文件」这种不成文的约定。
+所有调用方自动满足，不依赖「必须走 `sessionStore` 建文件」这种不成文的约定。
 
-**注意**：这**不**违反 append-only——补 header 只发生在**空文件**上（0 字节，无已写字节可破坏）。
-**若文件非空且首行不是 header**，则视为老格式，**不补**（那才是真正的重写）。
+**触发条件只有一个，且必须严格**：**文件不存在，或存在且大小为 0 字节**。
+（复核指出前一稿写成「文件为空**或首行不是 header**」是**自相矛盾**的——
+老格式会话的首行本来就不是 header，按那个条件会在追加时给老会话**插入 header**，
+而那**正是**违反 append-only 的重写。）
+
+| 文件状态 | 行为 |
+|---|---|
+| 不存在 / 0 字节 | 写入 header，再追加 event |
+| 非空，首行**是** header | 直接追加 |
+| 非空，首行**不是** header（老格式） | **直接追加，不补 header**——读时推断为版本 0 |
+
+**为什么不给老文件补 header**：补 header 是**改写已写下的字节**，破坏 append-only 承诺
+（`sessionEventCodec.ts:104-113` 的注释正是为这条立的先例）。
+**老文件永远没有 header，读方按「首行不是 header → 版本 0」处理**——与 §2.4 的断言 ② 一致。
 
 ---
 
@@ -245,26 +269,44 @@ header 就丢了**；且磁盘上已存在的 **0 字节文件**（老版本建�
 删掉 7 天前的记录，等于**在用户要交 bug 报告时删掉他仅有的那次崩溃证据**——
 而且越是罕见的崩溃越可能只发生过一次。**这正是「不提示」与「删除」的区别所在。**
 
-**因此**：`readCrashLog` 过滤掉超过 7 天的记录（用于 `/crash` 展示与新鲜度判断），
-**但不在 `recordCrash` 里删除**。文件内容仍由既有的 `MAX_CRASH_RECORDS` 限制。
+**因此正确形状是：把「读全部」与「读新鲜的」拆成两个函数。**
+
+> **⚠️ 复核又抓到一处**：前一稿写「`readCrashLog` 过滤、`recordCrash` 不改」——**那仍然会删**。
+> 实测 `crashLog.ts:86`：`recordCrash` **正是通过 `readCrashLog(filePath)` 取旧记录再整文件覆写**
+> （`:88` `writeFileSync`）。若 `readCrashLog` 开始过滤，
+> **下一次崩溃写回时超龄记录就真的没了**——绕过了「不删除」的裁决。
+
+| 函数 | 语义 | 谁用 |
+|---|---|---|
+| `readCrashLog()` | **读全部**（保持既有签名与行为，**不过滤**） | `recordCrash`（`:86`，写回保真）、`/report`（`reportCommandRuntime.ts:73`） |
+| `readRecentCrashes()`（新） | 只返回 7 天内的 | `/crash`（`crashCommandRuntime.ts:16`） |
+
+**`/report` 读全部、`/crash` 读新鲜——这是正式裁决，不是倾向**：
+用户交 bug 报告时**要的正是那次罕见的崩溃**，哪怕它发生在 8 天前；
+`/crash` 是「最近出了什么事」的日常视图，**新鲜度过滤在这里才成立**。
+两者需求**方向相反**，所以是**两个函数**，不是一个带参数的行为。
+
+**`recordCrash` 保持读全部 + 整文件重写**——它维护的是既有的「最近 N 条」语义，**本任务不改它**。
 
 **若将来要真删**：需要的是**合规或隐私上的硬性要求**，而目前没有这样的要求。
 
 ### 3.4 改动面（按更正后的裁决）
-`src/observability/crashLog.ts`：新增 `MAX_CRASH_AGE_MS`；
-**`readCrashLog` 过滤**超龄记录；**`recordCrash` 不改**（保持既有 `MAX_CRASH_RECORDS` 语义）。
-
-**注意 `/report` 的影响面**：`reportCommandRuntime.ts` 也读崩溃记录。
-需确认过滤后它读到的是「近 7 天」而非「全部」——**这可能在 bug 报告里造成一种新的信息损失**，
-实施时要判断：`/report` 是否应该看**未过滤**的记录（因为用户交报告时正是需要那次崩溃）。
-**本裁决倾向 `/report` 读未过滤**，`/crash` 读过滤后的。
+| 文件 | 改动 |
+|---|---|
+| `src/observability/crashLog.ts` | 新增 `MAX_CRASH_AGE_MS`；**新增 `readRecentCrashes()`**；`readCrashLog` **不改**（继续读全部）；`recordCrash` **不改** |
+| `src/core/commands/crashCommandRuntime.ts:16` | 改用 `readRecentCrashes()` |
+| `src/core/commands/reportCommandRuntime.ts:73` | **不改**——继续读全部（见 §3.3 的分工裁决） |
 
 ### 3.5 顺序问题（实测已确认无冲突）
 现有序是**旧在前、新在后**（`crashCommandRuntime.ts:44-46` 注释自述「reading a crash report
 means reading forward through what happened」）。按时间淘汰自然从头部淘汰，**不破坏**既有遍历。
 
 ### 3.6 验证
-- 写入 8 天前的记录 + 今天的记录 → 只读回今天那条。
+- 写入 8 天前的记录 + 今天的记录 → `readRecentCrashes()` 只返回今天那条；
+  **`readCrashLog()` 仍返回两条**（证明「读全部」没被污染）。
+- **关键用例**：写入 8 天前的记录后，**再触发一次崩溃** →
+  `readCrashLog()` **仍能读到那条 8 天前的记录**（证明写回路径没有静默删除）。
+  反向验证：把 `recordCrash` 改成走过滤读 → 该用例失败。
 - 写入 6 天前的记录 → 仍读回。
 - 边界：恰好 7 天 → 按「≤ 保留」还是「< 保留」**要对齐参考实现的判定**（`<= MAX_AGE`）。
 - **反向验证**：去掉时间过滤 → 「8 天前不再返回」的用例失败。
@@ -387,12 +429,12 @@ means reading forward through what happened」）。按时间淘汰自然从头�
 
 **最后一条是必须照抄的语义**：不重置会把压缩本身记成浪费，那是**误报**。
 
-### 5.4 改动面（按 §5.6 的离线扫描形状）
+### 5.4 改动面（按 §5.6.1 的**方案 B**）
 | 文件 | 改动 |
 |---|---|
 | `src/observability/cacheStats.ts`（新） | `CacheMiss`／`CacheWasteTotals` 类型 + `detectMiss` + `scan`（**纯函数**） |
-| `src/core/commands/costCommandRuntime.ts` | 调用 `scan` 并展示命中率与浪费 |
-| `src/observability/usageTelemetry.ts` | **不改**（复核后改为离线扫描，不需要在这里加状态） |
+| `src/observability/usageTelemetry.ts` | `lastUpdated: number` → **有上限的**请求记录（**只存不算**） |
+| `src/core/commands/costCommandRuntime.ts` | 用请求记录调 `scan` 并展示；**输出注明「自本次启动以来」** |
 
 ### 5.5 约束：函数上限
 `usageTelemetry.ts` **已接近 20 个函数名的上限**（`AGENTS.md` 规则 3，`analyze:module-facades` 为 advisory）。
@@ -408,16 +450,58 @@ means reading forward through what happened」）。按时间淘汰自然从头�
 `sessionTranscript.ts:145` / `:163` 与 `appendCompactionEvent`／`appendBranchSummaryEvent`，
 **这些路径目前完全不碰 `usageTelemetry`**。
 
-**裁决**：**采用离线扫描，不采用在线状态**。理由：
-1. 参考实现的做法**已经被验证过**，且天然处理「历史被重建」这件事；
-2. 在线状态需要在 compaction／branch 两处新增通知，**漏一处就永久误报**（而误报会一直累积）；
-3. 离线扫描是**纯函数**——输入历史，输出统计，**可独立测试**，不需要给 `usageTelemetry` 加可变状态。
+**裁决**：**采用「历史上的纯函数扫描」**（而不是「一个覆盖式的当前状态」）。理由：
+1. 扫描**输入一段历史**，「重建点」只是**历史里的一个标记**——**不需要可变状态机**；
+2. 覆盖式状态**漏一处通知就永久误报**，且误报会累积；历史标记漏了只错在标记之后的那一段；
+3. 扫描是**纯函数**——输入历史，输出统计，**可独立测试**。
 
-**即 T4 的形状改为**：`cacheStats.ts` 暴露一个 `scan(events, priceLookup)` 纯函数；
-`/cost` 调用时传入本次会话的历史条目。**不往 `usageTelemetry` 里塞状态。**
+**但「接线」没有消失，只是变小了**（如实说明）：compaction 与 branch 发生时，
+仍需**往历史里追加一个重置标记**供扫描识别。**这依然是两处新增调用点**，必须接上，
+且各有一条用例（见 §5.7）。**不接 = 永久误报。**
+
+**即 T4 的形状**：`cacheStats.ts` 暴露 `scan(history, priceLookup)` 纯函数；
+`/cost` 调用时传入**本进程保留的请求历史**（见 §5.6.1 选定的方案 B——
+历史**放在 `usageTelemetry`**，但**判断逻辑不在那里**，那里只存不算）。
+
+### 5.6.1 ⚠️ 离线扫描的**数据缺口**（主代理复核 §5.6 时发现，必须解决）
+
+**离线扫描要有东西可扫。** 参考实现扫的是**会话条目**，其中 assistant 消息**自带 `usage`**
+（含 `cacheRead`/`cacheWrite`/`cost`），另有独立的 `usage` 条目记录缓存预热。
+
+**我方不是这样**。实测：
+
+| 事实 | 证据 |
+|---|---|
+| transcript 的条目类型里**没有** `usage` | `grep -n usage src/session/sessionEventCodec.ts` → **0** |
+| `SessionMessage` **没有** `usage` 字段 | `grep -n "usage\|cacheRead\|cacheWrite" src/session/schema/sessionMessage.ts` → **0** |
+| usage 存在**内存 Map** | `usageTelemetry.ts:165` `const sessionTelemetries: Map<string, SessionUsageTelemetry> = new Map();` |
+
+**含义**：**transcript 里没有每次请求的 token 数据**。
+纯函数若只接收 transcript 历史，**拿不到 `cacheRead`/`cacheWrite`**，`detectMiss` 无从计算。
+
+**这是真实的数据缺口，不是实现细节。** 三条出路：
+
+| 方案 | 内容 | 代价 |
+|---|---|---|
+| **A. usage 写进 transcript** | 每次请求追加一条 `usage` 条目（照参考实现） | 改会话文件格式（**与 T1 同族**）；文件变大 |
+| **B. 保留内存历史** | `usageTelemetry` 保留**每次请求**的记录（不只是一个 `lastUpdated`） | 不改文件格式；但**进程内**，重启丢失 |
+| **C. 混合** | usage 落盘 + 离线扫描 | 最完整，也最大 |
+
+**裁决：选 B**，理由：
+1. **不引入第二处文件格式变更**——T1 已经在动格式，**同阶段动两处风险叠加**；
+2. 浪费分析是**「本次运行的视图」**，重启后从零开始**是可接受的语义**；
+3. B 的实现就是「把 `lastUpdated: number` 换成一条**有上限的**请求记录」，
+   改动局部，且**不把判断逻辑放进 telemetry**。
+
+**B 的代价必须明说**：①记忆体要**上限**（保留最近 N 条即可，取能覆盖典型缓存 TTL 的量级）；
+②`/cost` 输出要注明**「自本次启动以来」**，**不能暗示它是整个会话**。
+
+**若将来要跨重启**：那才需要方案 A，且应与 T1 的格式版本**一起**规划——
+版本号正好能表达这次变更。
 
 ### 5.7 验证
 - 纯函数级 fixture：连续两次请求，第二次 `cacheRead` 明显小于第一次 prompt → 报出 miss 与金额。
+- **历史上限**：超过保留条数后最旧的被丢弃，**不报错**（方案 B 的内存上限）。
 - **compaction 重置**：夹一个 compaction → **不报**浪费。
 - **branch_summary 重置**：夹一个 branch_summary → **不报**浪费。
   （**复核指出原验证计划漏了这条**——只测 compaction，漏掉 branch_summary 时用例仍会全绿。）
@@ -589,38 +673,45 @@ means reading forward through what happened」）。按时间淘汰自然从头�
 
 ---
 
-## 8. T7 — 内置目录的 `cost` 数据（**复核补纳入**）
+## 8. T7 — **不做**：前提被两轮实测推翻（复核补纳入 → 自查后撤回）
 
-### 8.1 为什么它是本阶段的项
-它写在 `06-*.md:169` 的**正文**里（对应 `06:60`），而该行的判定列写的是「已收口」——
-**原范围枚举只读判定列与行内余量子句，漏了正文**（见 `phase-10-pre-research.md` §0.3）。
+> **保留完整过程**：文档记的那个「缺口」在代码里有**两层**——
+> 第一层是**文件测错了**，第二层是**该缺口已经被填过**。
 
-### 8.2 实测
-- `core/models/catalog.ts:31` 声明了 `readonly cost?: ModelCostRates`。
-- **但 `grep -c "cost:" core/models/catalog.ts` → 0**——**没有任何内置模型填它**。
-- 于是 `observability/usageTelemetry.ts:95` 的 `USAGE_RATES = { promptPerMTok: 0.14, completionPerMTok: 0.28 }`
-  这两个**写死的常量**成了唯一的费率来源（`:107`、`:158` 的 `?? USAGE_RATES` 回退）。
+### 8.1 文档的原始说法（`06-*.md:169` 正文余量）
+> 「**内置目录里没有一个模型声明 `cost`**（`grep -c 'cost:' core/models/catalog.ts` → 0），
+> 所以**所有费率仍走 `USAGE_RATES` 固定回退值**，「真实费率」这一半仍未收口」
 
-### 8.3 与 T4 的关系（**这是纳入它的真正理由**）
-T4 要算「本可命中却未命中多花了多少钱」。**没有真实费率，T4 算出来的金额是错的**——
-而 `/cost` 已经在输出时如实标注「estimates at a fixed fallback」。
-若 T4 引入一个**看起来精确**的浪费金额、但底层费率仍是那两个常量，
-等于把一个**已知的估算**升级成一个**看起来精确的估算**——**比不做更差**。
+### 8.2 推翻一：那个 grep 测的是**快照文件**，不是**生效目录**
+`catalog.ts` 确实没有 `cost:` 字面量（实测 → 0）。**但它只是内置快照**。
+生效目录是三层合并（`catalogStore.ts:46-53`）：内置快照 → **刷新缓存** → 用户文件。
 
-### 8.4 改动面与风险
-| 文件 | 改动 |
+刷新缓存**带费率**：`catalogRefresh.ts:94` 从索引 `projectCost(model?.cost)` 投影，
+`:124-131` 把索引的 `input`/`output`/`cache_read`/`cache_write` 映射成我方字段，`:68` 落盘。
+**跑过一次目录刷新后，模型就有真实费率。**
+
+### 8.3 推翻二：**「静默回退」也已经不存在**
+原以为 `usageTelemetry.ts:107`／`:158` 的 `?? USAGE_RATES` 是静默的。**实测不是**——
+`costCommandRuntime.ts:92` 按 `everyRatePublished` **分流两句不同的文案**：
+
+| 条件 | 输出 |
 |---|---|
-| `core/models/catalog.ts` | 给内置模型补 `cost` 数据（输入/输出/缓存读/缓存写 四个费率） |
+| 所有费率都来自模型 | 「The rates are the ones each model publishes.」 |
+| 有模型落到兜底 | 「Some rates are estimates at a fixed fallback that does not follow the model in use — check your provider's billing…」 |
 
-**风险**：费率是**会变的外部事实**。裁决：
-- 只填**有公开定价、且相对稳定**的模型的费率；
-- 拿不准的**不填**，让它继续回退到常量，并**保持输出里的免责说明**；
-- **不**从网络抓取费率（那是另一个特性，会引入网络依赖与缓存失效问题）。
+`everyRatePublished` 由 `usageTelemetry.ts:142-154` **逐桶**判定——
+**连「发布了费率但没发布缓存费率」这种半情况都单独算了**（`:151-153` 的注释说明了理由）。
 
-### 8.5 验证
-- 任一填了 `cost` 的模型 → `/cost` 用该模型的费率，**不再**用 `USAGE_RATES`。
-- 未填的模型 → 仍回退，输出仍带免责说明。
-- **反向验证**：去掉某个模型的 `cost` → `/cost` 对它回退到常量（证明读取链真的生效）。
+### 8.4 裁决：**T7 不做**
+**「费率静默回退」这个缺口不存在。** 已有：①刷新路径能拿到真实费率；
+②输出**已按实际情况**区分真实与兜底。
+
+**唯一残留是可选的精度问题**（非缺陷）：内置快照自身没费率，**从未刷新过的用户**会全程落兜底——
+**而输出已如实说明了这一点**，并给出该做的事。**这符合本仓库「不猜、如实说」的标准。**
+
+### 8.5 这一节的意义
+它验证了 `RvP10Scope` 那条复核意见的价值：**「正文记录的余量」确实值得扫**。
+但**扫出来的东西也要核实**——本条经核实**已不成立**。**记录在案，不施工。**
 
 ---
 
@@ -768,7 +859,28 @@ T4 要算「本可命中却未命中多花了多少钱」。**没有真实费率
 | `RvP10Rest` | T2/T3/T4 + 纪律 | ①T2 **与自己的研究矛盾**且删除理由**事实错误**（§3.3 已改为只过滤不删除）；②T3 **漏了重绘通知链**（§4.2）+ 生命周期防护不足（§4.5）；③T4 **漏测 branch_summary** + 在线状态接线空洞→改为**离线纯函数**（§5.6）；④执行顺序**无依赖支撑**、反向验证流于形式（§10／§12） |
 | `RvP10D1D2` | D1/D2 | ①D1 **夸大了安全风险**（运行时门禁仍在）；②D1 对参考实现的**分节保护理解有误**（它也跳过 tools/rules）；③D2 第三项「不构成缺陷」的表述是 **dodge**（见下） |
 
-### 13.1 一处**未完全采纳**的复核意见
+### 13.1 第二轮复核（**2026-09-25，只查更正本身**）
+
+第一轮的五份复核**全部判 `incorrect`**，更正后**又派 2 个 reviewer 专查更正**：
+
+| 复核者 | 结果 | 采纳 |
+|---|---|---|
+| `Rv2T3T4T7` | **`correct`，零发现** | T3/T4/T7 的更正经查成立 |
+| `Rv2T1T2` | `incorrect`，4 项 | **全部采纳**（见下） |
+
+**`Rv2T1T2` 的 4 项（这是第二轮的价值所在）**：
+1. **T2 的更正本身仍是错的**——「`readCrashLog` 过滤、`recordCrash` 不改」**仍然会删**：
+   `recordCrash` 正是通过 `readCrashLog` 读旧记录再整文件覆写。
+   **已改为两个函数**（`readCrashLog` 读全部 / `readRecentCrashes` 读新鲜），见 §3.3。
+2. **T2 的 `/report` vs `/crash` 分工未决**——已**正式裁决**并给出 API 契约，见 §3.3／§3.4。
+3. **T1 的「先判再自增」有依赖倒置**——`decodeTranscriptLineSafe` 内部就解析并注入 id；
+   已改为「让解码先返回类别」的明确形状，见 §2.10。
+4. **T1 `§2.12` 触发条件自相矛盾**——已收敛为**严格的「不存在或 0 字节」**，见 §2.12。
+
+**另有一处是主代理自查发现的（不在任何复核意见里）**：**T7 的前提被推翻两次**，
+最终**撤回该任务**——见 §8。**扫出来的东西也要核实。**
+
+### 13.2 一处**未完全采纳**的复核意见
 
 `RvP10T5T6` 判断「单一描述表在 T5/T6 上**都不是正确形状**」，理由是
 T5 的两条调用路径上下文差异大（`step.ts` 需要 tools/streaming/listener 推导，
@@ -784,7 +896,7 @@ OpenAI 注特定头）。
 - **因此**：方案保留，但**在实施时必须先证明**「表能表达现有两种协议的全部差异」——
   若发现某项差异放不进表，**如实记录并停止**，不硬套。
 
-### 13.2 一处**如实记录但不修**的复核意见
+### 13.3 一处**如实记录但不修**的复核意见
 
 `RvP10D1D2` 与 `RvP10Rest` 都指出：文档与代码脱节是**流程问题**——
 判定列写「已收口」而正文还记着余量、注记与所注行的判定自相矛盾。

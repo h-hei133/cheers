@@ -3171,3 +3171,15 @@ Node 版本（41 项）、CI 不构建 Rust daemon、测试清理与子进程竞
 - **文档**：`phase-10-pre-research.md`（含 §0.3 复核补入的 3 项）、`phase-10-decisions.md`（0–14 节，含 §13 复核记录）。
 - **顺带修掉**：`04-*.md:63` 的行级损坏（第三处同类）；`01-*.md` 的技能注记（D2）。
 - **门禁**：`verify:docs-drift:strict` rules pass（advisory 78 持平）。7 份文档表格**列数全部一致，0 处损坏**。
+
+## [2026-09-25] review | Phase 10 第二轮复核（**只查更正本身**）+ 一处自查撤回。**
+- **为什么有第二轮**：第一轮 5 个复核**全部判 `incorrect`**，更正后**那些更正本身就成了未复核的断言**——而这份文档唯一的职责就是可信。于是再派 2 个 reviewer **只查更正**。
+- **`Rv2T3T4T7`：`correct`，零发现**（T3/T4/T7 的更正经查成立）。
+- **`Rv2T1T2`：`incorrect`，4 项，全部采纳**：
+  - **T2 的更正本身仍是错的**——「`readCrashLog` 过滤、`recordCrash` 不改」**仍然会删**：实测 `crashLog.ts:86`，`recordCrash` **正是通过 `readCrashLog` 读旧记录再整文件覆写**（`:88` `writeFileSync`），`readCrashLog` 一开始过滤，**下次崩溃写回时超龄记录就真没了**。已改为**两个函数**：`readCrashLog()` 读全部（`recordCrash` 与 `/report` 用）、`readRecentCrashes()` 读新鲜（`/crash` 用）。**`/report` 读全部是正式裁决**——用户交报告要的正是那次罕见崩溃，哪怕它发生在 8 天前。
+  - **T2 的 `/report` vs `/crash` 分工未决** → 已正式裁决 + 给出 API 契约。
+  - **T1 的「先判再自增」有依赖倒置**——`decodeTranscriptLineSafe`（`sessionEventCodec.ts:203-219`）**内部就 `JSON.parse` 并注入派生 id**，所以「先判 header 再自增」无处可插；另外「单独预检」会让**每行解析两遍**。已改为明确形状：**让解码先返回类别，调用方再决定是否自增**，并写明**这会动 codec 接口**。
+  - **T1 `§2.12` 触发条件自相矛盾**——前一稿写「文件为空**或首行不是 header**」，那对老会话意味着**在追加时插入 header**，**正是它自己禁止的重写**。已收敛为**严格的一条**：**文件不存在或 0 字节**。
+- **一处主代理自查撤回（不在任何复核意见里）**：**T7 的前提被推翻两次**。① 原注记的 `grep -c 'cost:' catalog.ts` 测的是**内置快照**而非**生效目录**；生效目录是三层合并，**刷新缓存带费率**（`catalogRefresh.ts:94,124-131,68`）。② 以为「静默回退」，实测 `costCommandRuntime.ts:92` **已按 `everyRatePublished` 分流两句文案**，连「发布了费率但没发缓存费率」这种半情况都单独算了（`usageTelemetry.ts:142-154`）。**T7 撤回，不施工**。**结论：扫出来的东西也要核实。**
+- **T4 补一处数据缺口（主代理发现）**：离线扫描要有东西可扫。参考实现扫的会话条目**自带 `usage`**，而**我方 transcript 完全没有 usage**（`grep -n usage sessionEventCodec.ts` → 0；`SessionMessage` 无该字段；usage 只在**内存 Map**）。三条出路中**选 B**（保留有上限的内存在程历史）：不动会话格式（T1 已在动，同阶段动两处风险叠加），并**明确代价**——重启丢失、`/cost` 须注明「自本次启动以来」。
+- **门禁**：`verify:docs-drift:strict` rules pass（advisory 78 持平）。两份文档 `##` 无重复、代码栅栏成对。
