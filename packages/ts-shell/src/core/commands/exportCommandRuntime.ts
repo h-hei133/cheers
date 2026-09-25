@@ -11,6 +11,7 @@ import {
 } from "../../session/transcript/sessionTranscript.js";
 import type { TranscriptEvent } from "../../session/sessionEventCodec.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
+import { resolveWriteTarget } from "../security/writeTarget.js";
 
 /**
  * /export — write this session's conversation to a file.
@@ -40,7 +41,12 @@ export async function runExportCommand(
     return { kind: "local", output: "No session to export: this command needs a live session." };
   }
 
-  const format = args[0]?.toLowerCase() === "jsonl" ? "jsonl" : "markdown";
+  // `--outside` states an intent to write past the workspace. It is read before
+  // the format so that `--outside` in the destination's position cannot be
+  // mistaken for a filename.
+  const allowOutside = args.includes("--outside");
+  const positional = args.filter((arg) => !arg.startsWith("--"));
+  const format = positional[0]?.toLowerCase() === "jsonl" ? "jsonl" : "markdown";
   const events = readTranscript(sessionId);
   const messages = projectTranscriptMessages(events);
   if (events.length === 0) {
@@ -54,7 +60,34 @@ export async function runExportCommand(
     };
   }
 
-  const target = resolveTarget(root, args[1], sessionId, format);
+  const requested = positional[1];
+  // Judged only when the user named a destination. The command's own default
+  // cannot be a typo, and running it through a policy meant for a name someone
+  // chose would refuse the ordinary case of exporting with no argument.
+  let target: string;
+  if (requested !== undefined) {
+    const decision = resolveWriteTarget({
+      requested,
+      root,
+      ...(allowOutside ? { allowOutside: true } : {}),
+    });
+    if (!decision.allowed) {
+      // Nothing is written and the reason is stated, so a refused export is not
+      // indistinguishable from one that silently did nothing.
+      return {
+        kind: "local",
+        output: [
+          `Nothing was exported. ${decision.reason}`,
+          "",
+          decision.doNext,
+        ].join("\n"),
+      };
+    }
+    target = decision.resolvedPath;
+  } else {
+    target = resolveDefaultTarget(root, sessionId, format);
+  }
+
   const content = format === "jsonl" ? asJsonl(events) : asMarkdown(messages, sessionId, root);
   try {
     mkdirSync(path.dirname(target), { recursive: true });
@@ -102,9 +135,14 @@ function readTranscript(sessionId: string): readonly TranscriptEvent[] {
   }
 }
 
-/** Where to write, defaulting to a name that says which session it came from. */
-function resolveTarget(root: string, requested: string | undefined, sessionId: string, format: string): string {
-  if (requested) return path.resolve(root, requested);
+/**
+ * Where an export lands when the user named no destination.
+ *
+ * Always inside the workspace, and it needs no judgement: a name this command
+ * chose cannot be an escape, so it does not go through the policy that exists
+ * to judge a name the user chose.
+ */
+function resolveDefaultTarget(root: string, sessionId: string, format: string): string {
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
   return path.resolve(root, `${sessionId}-${stamp}.${format === "jsonl" ? "jsonl" : "md"}`);
 }

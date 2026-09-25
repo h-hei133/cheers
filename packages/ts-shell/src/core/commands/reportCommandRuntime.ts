@@ -5,6 +5,7 @@ import { readCrashLog } from "../../observability/crashLog.js";
 import { createZipArchive } from "../../observability/zipArchive.js";
 import { redactReportText } from "../security/redaction.js";
 import { resolveUserDataFile } from "../paths/userHome.js";
+import { resolveWriteTarget } from "../security/writeTarget.js";
 
 /**
  * `/report` — a bundle someone can attach to a bug report.
@@ -38,7 +39,35 @@ export async function runReportCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const destination = args[0] && !args[0].startsWith("-") ? args[0] : defaultReportPath();
+  const allowOutside = args.includes("--outside");
+  const requested = args.find((arg) => !arg.startsWith("-"));
+
+  // A path the user named is judged; the command's own default is not, because a
+  // name this command chose cannot be a typo. The default lives in the user data
+  // directory rather than the workspace on purpose — a report is about this
+  // machine, not about the project — so it is allowed to sit outside.
+  let destination: string;
+  if (requested) {
+    const decision = resolveWriteTarget({
+      requested,
+      root: context.cwd || process.cwd(),
+      // A report's own default lives in the user data directory, so writing
+      // outside the workspace is this command's ordinary business rather than a
+      // departure from it.
+      defaultOutside: true,
+      ...(allowOutside ? { allowOutside: true } : {}),
+    });
+    if (!decision.allowed) {
+      return {
+        kind: "local",
+        output: [`Nothing was written. ${decision.reason}`, "", decision.doNext].join("\n"),
+      };
+    }
+    destination = decision.resolvedPath;
+  } else {
+    destination = defaultReportPath();
+  }
+
   const redactions = new Set<string>();
 
   const crashes = readCrashLog().map((record) => ({

@@ -122,4 +122,30 @@ describe("export command", () => {
     // drops it — the file holds the folded view, not the raw transcript.
     expect(markdown).not.toContain("ask");
   });
+  it("refuses a relative path that would climb out, and writes nothing", async () => {
+    // The defect this replaces resolved the path and wrote it, so a mistyped
+    // destination overwrote a file outside the workspace while reporting a
+    // successful export.
+    const escapePath = path.join(workdir, "..", "escaped-export.md");
+    fs.rmSync(escapePath, { force: true });
+
+    const result = await runExportCommand(["markdown", "../escaped-export.md"], context());
+
+    expect(result.kind === "local" && result.output).toContain("Nothing was exported");
+    expect(fs.existsSync(escapePath)).toBe(false);
+  });
+
+  it("refuses an absolute path outside the workspace unless the intent is stated", async () => {
+    const outside = path.join(os.tmpdir(), `outside-export-${Date.now()}.md`);
+    fs.rmSync(outside, { force: true });
+
+    const refused = await runExportCommand(["markdown", outside], context());
+    expect(refused.kind === "local" && refused.output).toContain("Nothing was exported");
+    expect(fs.existsSync(outside)).toBe(false);
+
+    const allowed = await runExportCommand(["markdown", outside, "--outside"], context());
+    expect(allowed.kind === "local" && allowed.output).toContain("Exported");
+    expect(fs.existsSync(outside)).toBe(true);
+    fs.rmSync(outside, { force: true });
+  });
 });
