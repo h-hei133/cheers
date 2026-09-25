@@ -148,4 +148,37 @@ describe("export command", () => {
     expect(fs.existsSync(outside)).toBe(true);
     fs.rmSync(outside, { force: true });
   });
+  it("refuses an unknown format instead of writing markdown into it", async () => {
+    // This used to fall through to markdown, so `/export html out.html` wrote
+    // markdown into a file named `.html` — which a browser parses as markup,
+    // executing anything script-shaped the session ever contained.
+    const out = path.join(workdir, "out.html");
+    fs.rmSync(out, { force: true });
+
+    const result = await runExportCommand(["csv", "out.html"], context());
+
+    expect(result.kind === "local" && result.output).toContain("Unknown export format");
+    expect(result.kind === "local" && result.output).toContain("Nothing was written");
+    expect(fs.existsSync(out)).toBe(false);
+  });
+
+  it("writes a self-contained html page", async () => {
+    const result = await runExportCommand(["html", "page.html"], context());
+
+    expect(result.kind === "local" && result.output).toContain("Format: HTML");
+    const html = fs.readFileSync(path.join(workdir, "page.html"), "utf8");
+    // Self-contained: no stylesheet or script to fetch, so it opens offline.
+    expect(html).toContain("<style>");
+    expect(html).toContain('id="session-data"');
+    expect(html).not.toContain("http://");
+    expect(html).not.toContain("https://cdn");
+
+    // The conversation is in the payload, not in the markup, so it appears once.
+    const encoded = /<script id="session-data" type="text\/plain">([^<]*)<\/script>/.exec(html);
+    expect(encoded).not.toBeNull();
+    const payload = JSON.parse(Buffer.from(encoded![1]!, "base64").toString("utf8"));
+    expect(payload.entries.length).toBeGreaterThan(0);
+    expect(payload.leafId).toBeTruthy();
+    expect(payload.tree.length).toBeGreaterThan(0);
+  });
 });

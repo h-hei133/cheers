@@ -87,21 +87,57 @@ export function redactReportText(
 }
 
 /**
- * The rule chain, with no whitespace handling and no length cap.
+ * Rules that remove a credential, and nothing else.
  *
- * Split out so the caller can tell "a rule matched" from "the whitespace was
- * tidied", which the final value cannot distinguish on its own.
+ * These are safe for any output, because the text they replace is never the
+ * content anyone wanted: a bearer token, a key assignment, a known key shape, a
+ * provider environment dump, the real provider home path.
  */
-function applyRedactionRules(value: string): string {
+function applySecretRules(value: string): string {
   return value
     .replace(/\/home\/wang\/\.private-agents-real[^\s"'`]*/g, "[redacted-real-provider-home]")
     .replace(/\b(Bearer)\s+[A-Za-z0-9._~+/=-]+/gi, "$1 [redacted]")
     .replace(/\b(api[_-]?key|token|secret|cookie|authorization|password)\b\s*[:=]\s*\S+/gi, "$1=[redacted]")
     .replace(/\b(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, "[secret-redacted]")
-    .replace(/\bprovider\.env\b[^\n\r]*/gi, "provider.env=[redacted]")
+    .replace(/\bprovider\.env\b[^\n\r]*/gi, "provider.env=[redacted]");
+}
+
+/**
+ * Rules that remove content rather than credentials.
+ *
+ * These belong to a bug report, where the point is to describe a failure without
+ * carrying the user's code out of the machine. They strip diffs, provider
+ * responses, reasoning, and any embedded HTML. Applying them to a session export
+ * would delete exactly what the export exists to show, so they are kept apart
+ * from the rules above rather than mixed into one chain.
+ */
+function applyReportContentRules(value: string): string {
+  return value
     .replace(/\boldText[:=][\s\S]*?(?=\snewText[:=]|$)/gi, "oldText=[raw-content-excluded]")
     .replace(/\bnewText[:=][^\n\r]*/gi, "newText=[raw-content-excluded]")
     .replace(/\braw provider output[:=][^\n\r]*/gi, "raw-provider-output=[raw-content-excluded]")
     .replace(/\bhidden reasoning[:=]?[^\n\r]*/gi, "hidden-reasoning=[raw-content-excluded]")
     .replace(/<html[\s\S]*?<\/html>/gi, "[raw-content-excluded]");
+}
+
+/** The rule chain, with no whitespace handling and no length cap. */
+function applyRedactionRules(value: string): string {
+  return applyReportContentRules(applySecretRules(value));
+}
+
+/**
+ * Text prepared for a session export.
+ *
+ * Credentials are removed; nothing else is. An export is a file someone sends to
+ * another person, so a token must not survive it — but the conversation must. No
+ * whitespace folding, because that destroys code blocks and diffs; no length cap,
+ * because that truncates the answer; and none of the report rules, because they
+ * delete the content the reader opened the file to see.
+ *
+ * Kept in this module rather than beside the exporter so the two sets of rules
+ * stay side by side: the reason they differ is the whole point, and a reader who
+ * finds one needs to find the other.
+ */
+export function redactExportText(value: string): string {
+  return applySecretRules(value);
 }

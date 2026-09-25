@@ -12,6 +12,8 @@ import {
 import type { TranscriptEvent } from "../../session/sessionEventCodec.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 import { resolveWriteTarget } from "../security/writeTarget.js";
+import { gatherExport } from "../../session/export/collect.js";
+import { renderExportHtml } from "../../session/export/html.js";
 
 /**
  * /export — write this session's conversation to a file.
@@ -46,7 +48,22 @@ export async function runExportCommand(
   // mistaken for a filename.
   const allowOutside = args.includes("--outside");
   const positional = args.filter((arg) => !arg.startsWith("--"));
-  const format = positional[0]?.toLowerCase() === "jsonl" ? "jsonl" : "markdown";
+  const format = parseFormat(positional[0]);
+  if (format === undefined) {
+    // Refused rather than defaulted. This used to fall through to markdown, so
+    // `/export html out.html` wrote markdown into a file named `.html` — which a
+    // browser then parses as markup, executing anything script-shaped the
+    // session ever contained. A wrong format is a mistake worth reporting, and
+    // the report is what stops the file from being created at all.
+    return {
+      kind: "local",
+      output: [
+        `Unknown export format \`${positional[0]}\`. Nothing was written.`,
+        "",
+        "Formats: `markdown` (default), `jsonl`, `html`.",
+      ].join("\n"),
+    };
+  }
   const events = readTranscript(sessionId);
   const messages = projectTranscriptMessages(events);
   if (events.length === 0) {
@@ -88,7 +105,18 @@ export async function runExportCommand(
     target = resolveDefaultTarget(root, sessionId, format);
   }
 
-  const content = format === "jsonl" ? asJsonl(events) : asMarkdown(messages, sessionId, root);
+  let content: string;
+  if (format === "html") {
+    // The page needs the tree as well as the conversation, and the tree lives in
+    // the session state rather than the transcript, so this gathers both.
+    const gathered = gatherExport({ sessionId, workspace: root });
+    if (!gathered.ok) {
+      return { kind: "local", output: `${gathered.reason} Nothing was written.` };
+    }
+    content = renderExportHtml(gathered.payload);
+  } else {
+    content = format === "jsonl" ? asJsonl(events) : asMarkdown(messages, sessionId, root);
+  }
   try {
     mkdirSync(path.dirname(target), { recursive: true });
     writeFileSync(target, content, "utf8");
@@ -114,15 +142,31 @@ export async function runExportCommand(
   }
 
   const counts = tally(messages);
+  const label = format === "html" ? "HTML" : "Markdown";
+  const extra =
+    format === "html"
+      ? ["- Open the file in a browser; it needs no network."]
+      : [];
   return {
     kind: "local",
     output: [
       `Exported ${messages.length} messages to \`${shown}\`.`,
       "",
       `- ${counts.user} from you, ${counts.assistant} from the model, ${counts.tool} tool results`,
-      "- Format: Markdown",
+      `- Format: ${label}`,
+      ...extra,
     ].join("\n"),
   };
+}
+
+/** The three formats this command writes, or nothing for anything else. */
+function parseFormat(value: string | undefined): "markdown" | "jsonl" | "html" | undefined {
+  if (value === undefined) return "markdown";
+  const lowered = value.toLowerCase();
+  if (lowered === "markdown" || lowered === "md") return "markdown";
+  if (lowered === "jsonl") return "jsonl";
+  if (lowered === "html") return "html";
+  return undefined;
 }
 
 /** The transcript entries this session recorded, in order. */
@@ -144,7 +188,7 @@ function readTranscript(sessionId: string): readonly TranscriptEvent[] {
  */
 function resolveDefaultTarget(root: string, sessionId: string, format: string): string {
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-  return path.resolve(root, `${sessionId}-${stamp}.${format === "jsonl" ? "jsonl" : "md"}`);
+  return path.resolve(root, `${sessionId}-${stamp}.${format === "jsonl" ? "jsonl" : format === "html" ? "html" : "md"}`);
 }
 
 /**
