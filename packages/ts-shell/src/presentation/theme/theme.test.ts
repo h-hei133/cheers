@@ -124,3 +124,54 @@ describe("recoloring in place", () => {
     expect(new Set(seen).size).toBe(seen.length);
   });
 });
+
+describe("every declared token has a reader", () => {
+  /**
+   * A token nothing reads is a promise the palette does not keep.
+   *
+   * The palette defines every token, so a theme author can set all of them and
+   * see no error — while the surfaces they were aiming at keep rendering a
+   * hardcoded escape sequence. Fifteen tokens were in that state, and five of
+   * them were bypassed by literal ANSI codes at the call sites.
+   *
+   * This reads the source tree rather than the rendering, because the question is
+   * whether any production code names the token at all. A token reached only
+   * through a helper that takes the name as an argument still counts: the name
+   * appears in the file that passes it.
+   */
+  it("is named somewhere in production rendering code", async () => {
+    const { readdirSync, readFileSync, statSync } = await import("node:fs");
+    const { join } = await import("node:path");
+
+    const files: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir)) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) {
+          walk(full);
+          continue;
+        }
+        if (entry.endsWith(".ts") && !entry.endsWith(".test.ts")) files.push(full);
+      }
+    };
+    walk(join(process.cwd(), "src"));
+
+    // The palettes store the tokens; they are not readers. The theme module is
+    // read, but its union declaration names every token by definition, so that
+    // block is removed first — otherwise the test would pass for any token
+    // merely by being declared, which is the thing it is checking.
+    const readers = files.filter((file) => !file.includes("presentation/themes/"));
+    const source = readers
+      .map((file) => readFileSync(file, "utf8"))
+      .map((text) => text.replace(/export type ThemeColorToken\s*=[\s\S]*?;\n/, ""))
+      .join("\n");
+
+    const unread = ALL_TOKENS.filter(
+      (token) => !source.includes(`"${token}"`) && !source.includes(`'${token}'`),
+    );
+    expect(
+      unread,
+      `declared but never named in rendering code: ${unread.join(", ")}`,
+    ).toEqual([]);
+  });
+});

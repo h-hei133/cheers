@@ -1,3 +1,4 @@
+import { defaultTheme } from "../../theme/theme.js";
 import { padToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
 import { highlightSelection, type SelectionPoint, type SelectionSpan } from "./selection.js";
@@ -49,11 +50,19 @@ export function paintScrollbar(
   rows: readonly string[],
   geometry: ScrollbarGeometry,
   width: number,
-  style: ScrollbarStyle = { track: "\x1b[90m│\x1b[0m", thumb: "\x1b[37m█\x1b[0m" },
+  style?: ScrollbarStyle,
 ): string[] {
+  // Built per call rather than as a default parameter: a default object literal
+  // is constructed on every call whether or not the caller passed one, and the
+  // colours have to be read after the theme is applied rather than when this
+  // module was first imported.
+  const paint = style ?? {
+    track: defaultTheme.fg("scrollbarTrack", "│"),
+    thumb: defaultTheme.fg("scrollbarThumb", "█"),
+  };
   return rows.map((row, index) => {
     const isThumb = index >= geometry.thumbTop && index < geometry.thumbTop + geometry.thumbHeight;
-    return `${padToWidth(row, width - 1)}${isThumb ? style.thumb : style.track}`;
+    return `${padToWidth(row, width - 1)}${isThumb ? paint.thumb : paint.track}`;
   });
 }
 

@@ -31,7 +31,7 @@ export function renderBand(
     body = join(parts);
   }
   if (visibleWidth(body) > cells - 1) body = truncateToWidthWithMode(body, cells - 1, "end");
-  return `\x1b[48;5;236m${padToWidth(body, cells)}\x1b[0m`;
+  return `${defaultTheme.bgOpen("statusBandBg")}${padToWidth(body, cells)}\x1b[0m`;
 }
 
 /** Rendered text for each configured item that has something to show. */

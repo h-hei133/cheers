@@ -28,7 +28,6 @@ export interface Suggestion {
 }
 
 const MAX_VISIBLE = 8;
-const SELECTED_BG = "\x1b[48;5;238m";
 
 const enum Tier {
   Exact = 1000,
@@ -147,7 +146,7 @@ export class SuggestionList {
     const detail = item.detail ? defaultTheme.dim(item.detail) : "";
     const body = `  ${marker} ${padToWidth(label, labelWidth)}${detail}`;
     const fitted = truncateToWidth(body, width);
-    return active ? `${SELECTED_BG}${padToWidth(fitted, width)}\x1b[0m` : fitted;
+    return active ? `${defaultTheme.bgOpen("selectedBg")}${padToWidth(fitted, width)}\x1b[0m` : fitted;
   }
 
   private scrollToSelection(): void {

@@ -89,7 +89,7 @@ function renderRow(
   const gap = Math.max(0, width - visibleWidth(head) - visibleWidth(note) - RIGHT_PAD);
   const trailingPad = " ".repeat(RIGHT_PAD);
   const fitted = `${head}${" ".repeat(gap)}${note}${trailingPad}`;
-  return active ? `\x1b[48;5;238m${padToWidth(fitted, width)}\x1b[0m` : fitted;
+  return active ? `${defaultTheme.bgOpen("selectedBg")}${padToWidth(fitted, width)}\x1b[0m` : fitted;
 }
 
 /** Cursor arrow, or a checkbox when the picker takes several answers. */

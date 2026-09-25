@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { stripAnsi } from "../text/ansi.js";
+import { defaultTheme } from "../../theme/theme.js";
 import {
   needsScrollbar,
   paintScrollbar,
@@ -61,11 +62,26 @@ describe("scrollbar geometry", () => {
 
 describe("scrollbar visibility", () => {
   it("uses a high-contrast thumb and track that remain visible in the default theme", () => {
+    // The colours come from the theme rather than literal escapes, so this
+    // asserts that the default palette gives the two a different colour — which
+    // is what "visible" means here. Pinning the escapes would have passed for
+    // any theme, including one where the thumb and track are the same colour.
     const geometry = scrollbarGeometry(40, 10, 0, 39)!;
     const rows = paintScrollbar(Array.from({ length: 10 }, () => "content"), geometry, 40);
-    const ansi = rows[0]!;
-    expect(ansi).toContain("\x1b[37m█\x1b[0m");
-    expect(rows[9]).toContain("\x1b[90m│\x1b[0m");
+    const thumb = defaultTheme.fg("scrollbarThumb", "█");
+    const track = defaultTheme.fg("scrollbarTrack", "│");
+    expect(rows[0]).toContain(thumb);
+    expect(rows[9]).toContain(track);
+    expect(thumb).not.toBe(track);
+  });
+
+  it("follows the theme it is rendered under", () => {
+    // The defect this replaces: the scrollbar was two literal escape sequences,
+    // so a theme could not change it and a light theme inherited a dark bar.
+    const geometry = scrollbarGeometry(40, 10, 0, 39)!;
+    const rows = paintScrollbar(Array.from({ length: 10 }, () => "content"), geometry, 40);
+    expect(rows[0]).toMatch(/\x1b\[[0-9;]*m/);
+    expect(defaultTheme.fg("scrollbarThumb", "█")).not.toBe("\x1b[37m█\x1b[0m");
   });
 
   it("supports auto, always, and never visibility models", () => {

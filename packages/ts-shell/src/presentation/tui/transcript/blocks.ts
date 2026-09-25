@@ -104,7 +104,7 @@ function renderUser(block: Block, width: number): readonly string[] {
   const bodyWidth = Math.max(1, width - 4);
   const wrapped = block.text.split("\n").flatMap((line) => wrapToWidth(line, bodyWidth));
   const rows = wrapped.map((line) => {
-    const padded = padToWidth(`${GUTTER}${rail} \x1b[97m${line}\x1b[39m`, width);
+    const padded = padToWidth(`${GUTTER}${rail} ${defaultTheme.fg("userMessageText", line)}`, width);
     return `${bg}${padded.replaceAll("\x1b[0m", `\x1b[0m${bg}`)}\x1b[0m`;
   });
   rows.push("");
@@ -127,7 +127,13 @@ function renderThinking(block: Block, width: number): readonly string[] {
   }
   const bodyWidth = Math.max(8, width - visibleWidth(BODY_INDENT));
   const rows = [head, ""];
-  for (const row of wrapAll(block.text, bodyWidth)) rows.push(`${BODY_INDENT}${defaultTheme.dim(row)}`);
+  // The reasoning text has its own token rather than borrowing the muted one.
+  // Reasoning is a distinct kind of content — it is the model's working, not
+  // commentary about it — and a theme author who wants to pull it back or push
+  // it forward has nowhere to say so if it shares a colour with the hints.
+  for (const row of wrapAll(block.text, bodyWidth)) {
+    rows.push(`${BODY_INDENT}${defaultTheme.fg("thinkingText", row)}`);
+  }
   rows.push("");
   return rows;
 }

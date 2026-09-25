@@ -12,7 +12,6 @@
     "muted": "#777d88",
     "dim": "#5f6673",
     "text": "#d4d4d4",
-    "assistantText": "#d4d4d4",
     "thinkingText": "#777d88",
     "userMessageText": "#ffffff",
     "userMessageBg": "#221d1a",
@@ -32,14 +31,8 @@
     "diffRemoved": "#fc3a4b",
     "diffContext": "#777d88",
     "selectedBg": "#31363f",
-    "toolPendingBg": "#1d2129",
-    "toolSuccessBg": "#161a1f",
-    "toolErrorBg": "#291d1d",
-    "syntaxKeyword": "#569cd6",
-    "syntaxFunction": "#dcdcaa",
-    "syntaxVariable": "#9cdcfe",
-    "syntaxString": "#ce9178",
-    "syntaxNumber": "#b5cea8",
-    "syntaxComment": "#6a9955"
+    "statusBandBg": "#303030",
+    "scrollbarTrack": "#6c6c6c",
+    "scrollbarThumb": "#c0c0c0"
   }
 }

@@ -4,7 +4,6 @@
   "colors": {
     "text": "#111827",
     "userMessageText": "#111827",
-    "assistantText": "#1f2937",
     "thinkingText": "#6b7280",
     "toolTitle": "#0891b2",
     "toolOutput": "#6b7280",
@@ -32,14 +31,8 @@
     "borderMuted": "#e5e7eb",
     "selectedBg": "#f3f4f6",
     "userMessageBg": "#f9fafb",
-    "toolPendingBg": "#f3f4f6",
-    "toolSuccessBg": "#dcfce7",
-    "toolErrorBg": "#fee2e2",
-    "syntaxKeyword": "#2563eb",
-    "syntaxFunction": "#6d28d9",
-    "syntaxVariable": "#1f2937",
-    "syntaxString": "#a16207",
-    "syntaxNumber": "#b45309",
-    "syntaxComment": "#6b7280"
+    "statusBandBg": "#e5e7eb",
+    "scrollbarTrack": "#9ca3af",
+    "scrollbarThumb": "#4b5563"
   }
 }

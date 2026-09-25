@@ -72,7 +72,7 @@ function optionRows(option: Option, active: boolean, chrome: ModalChrome, inner:
 }
 
 function highlight(text: string, inner: number): string {
-  return `\x1b[48;5;238m${padToWidth(text, inner - 2)}\x1b[0m`;
+  return `${defaultTheme.bgOpen("selectedBg")}${padToWidth(text, inner - 2)}\x1b[0m`;
 }
 
 function top(title: string, model: OptionModel, inner: number): string {
@@ -93,8 +93,15 @@ function searchRow(model: OptionModel, inner: number): string {
   return body(`${prompt}${query}${CURSOR_MARKER}`, inner);
 }
 
+/**
+ * The rule between the search row and the list.
+ *
+ * Drawn in the muted border colour rather than the frame's, so the frame reads
+ * as one boundary and this reads as a division inside it. Two rules in the same
+ * colour make a panel look like two stacked panels.
+ */
 function divider(inner: number): string {
-  return defaultTheme.fg("border", `├${"─".repeat(inner)}┤`);
+  return defaultTheme.fg("borderMuted", `├${"─".repeat(inner)}┤`);
 }
 
 function bottom(inner: number): string {

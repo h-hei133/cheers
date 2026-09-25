@@ -12,7 +12,6 @@ import { loadTheme, getDefaultTheme, type ThemeConfig } from "../themes/index.js
 export type ThemeColorToken =
   | "text"
   | "userMessageText"
-  | "assistantText"
   | "thinkingText"
   | "toolTitle"
   | "toolOutput"
@@ -40,15 +39,9 @@ export type ThemeColorToken =
   | "borderMuted"
   | "selectedBg"
   | "userMessageBg"
-  | "toolPendingBg"
-  | "toolSuccessBg"
-  | "toolErrorBg"
-  | "syntaxKeyword"
-  | "syntaxFunction"
-  | "syntaxVariable"
-  | "syntaxString"
-  | "syntaxNumber"
-  | "syntaxComment";
+  | "statusBandBg"
+  | "scrollbarTrack"
+  | "scrollbarThumb"
 
 export class Theme {
   name: string;
@@ -110,8 +103,17 @@ export class Theme {
     return "\x1b[1m" + text + "\x1b[22m";
   }
 
+  /**
+   * Secondary text, in the theme's own colour.
+   *
+   * This used to emit the terminal's faint attribute directly, which meant every
+   * caller inherited the terminal's idea of dim rather than the theme's, and the
+   * `dim` token it looked like it used had no reader at all. Naming the token
+   * makes the colour the theme author's choice, which is what the palette was
+   * already offering.
+   */
   dim(text: string): string {
-    return "\x1b[2m" + text + "\x1b[22m";
+    return this.fg("dim", text);
   }
 
   private colorToAnsi(color: string): string {
