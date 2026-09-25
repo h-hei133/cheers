@@ -31,9 +31,18 @@ import { visibleWidth } from "../text/measure.js";
  * How a diagram is shown.
  *
  * Two settings rather than three. The reference has a third that defers drawing
- * until an answer stops arriving, because its parser can hand it an unterminated
- * fence and draw a half-formed diagram. Ours cannot: a fence without its closing
- * line is trimmed before parsing, so there is no half-formed diagram to defer.
+ * until an answer stops arriving, so a diagram is drawn once rather than on every
+ * delta. Its reason — an unterminated fence yielding a half-formed diagram — does
+ * not carry over here, because the diagram is drawn from whatever the fence holds
+ * at that moment and a partial graph is still a graph: nodes and edges are added
+ * as they arrive, and each frame is a correct drawing of what has been said so
+ * far. The third setting was therefore left out rather than a mode being added
+ * whose only effect would be to draw the same picture once instead of as it grows.
+ *
+ * What this does cost is redrawing on every delta of an answer containing a
+ * diagram. `renderDiagram` caches on the source and the width, so a re-render of
+ * an unchanged fence is a map lookup; the cost is the first draw of each new
+ * revision, which is bounded by MAX_DIAGRAM_CHARS.
  */
 export type DiagramMode = "off" | "streaming";
 
@@ -106,7 +115,11 @@ export function renderDiagram(source: string, cells: number): readonly string[] 
 
   // A diagram drawn at its natural width, then refused if it does not fit, would
   // be wasted work on every delta of an answer that can never show it.
-  const key = `${cells}\u0000${body}`;
+  // The theme revision is part of the key because the rows carry colour: a
+  // diagram drawn under one palette must not be served under another. Without it
+  // the drawn art kept its old colours after `/theme`, which is the one thing a
+  // theme change is supposed to alter.
+  const key = `${defaultTheme.colorRevision}\u0000${cells}\u0000${body}`;
   const cached = cache.get(key);
   if (cached) return cached;
 

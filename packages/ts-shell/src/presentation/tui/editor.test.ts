@@ -22,13 +22,20 @@ describe("text entry", () => {
     expect(editor.getText()).toBe("a  b");
   });
 
-  it("shows a dimmed placeholder for an empty prompt", () => {
-    // Dim, because the hint is not the user's text and should not read like it.
+  it("shows a placeholder for an empty prompt", () => {
     const editor = new Editor();
     editor.placeholder = "Ask anything";
     const rendered = shown(editor, 20)[0]!;
     expect(stripAnsi(rendered)).toBe("|Ask anything");
-    expect(rendered).toContain("\x1b[2");
+  });
+
+  it("leaves the placeholder uncoloured, so the composer owns its appearance", () => {
+    // The editor measures and wraps characters; the palette belongs to the layer
+    // that has a theme in hand. A colour emitted here would be one the composer
+    // could not replace, which is how the hint kept a hardcoded grey.
+    const editor = new Editor();
+    editor.placeholder = "Ask anything";
+    expect(editor.render(20)[0]).not.toContain("\x1b[");
   });
 
   it("omits the caret marker when it does not hold focus", () => {

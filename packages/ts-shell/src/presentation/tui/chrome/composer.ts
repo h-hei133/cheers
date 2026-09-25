@@ -42,10 +42,16 @@ export function renderComposer(
   const textWidth = composerTextWidth(width);
   const rows = editor.render(textWidth, maxRows);
   const cue = state.busy ? defaultTheme.fg("warning", CUE) : defaultTheme.fg("accent", CUE);
+  // The editor renders the placeholder as plain text, so the colour is applied
+  // here, where the theme is already in hand. The editor is a layout module that
+  // measures and wraps characters and has no business knowing a palette; a
+  // hardcoded grey in it meant a theme's muted colour did not reach the hint.
+  const showingPlaceholder = editor.getText() === "" && editor.placeholder !== undefined;
+  const styled = showingPlaceholder ? rows.map((row) => defaultTheme.dim(row)) : rows;
   // No trailing padding: the renderer erases to the end of each row anyway, and
   // padding is what turns a multi-row selection into text separated by runs of
   // spaces when the user copies it out of the terminal.
-  const rendered = rows.map((row, index) => truncateToWidth((index === 0 ? cue : CONTINUATION) + row, width));
+  const rendered = styled.map((row, index) => truncateToWidth((index === 0 ? cue : CONTINUATION) + row, width));
   if (!selection) return rendered;
   return highlightSelection(rendered, selection, true);
 }

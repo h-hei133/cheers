@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { DIAGRAM_LANGUAGE, diagramMode, renderDiagram, setDiagramMode } from "./mermaid.js";
+import { defaultTheme } from "../../theme/theme.js";
+import { getDefaultTheme } from "../../themes/index.js";
 
 /**
  * Diagrams in the transcript.
@@ -104,5 +106,25 @@ describe("the fence language", () => {
     // Named for the marker in the document rather than for this module, because
     // it is what the author typed and what the parser matches.
     expect(DIAGRAM_LANGUAGE).toBe("mermaid");
+  });
+});
+
+describe("the drawing follows the palette", () => {
+  const base = getDefaultTheme();
+
+  afterEach(() => defaultTheme.apply(base));
+
+  it("redraws when the theme changes", () => {
+    // The rows carry colour, so a drawing made under one palette cannot be served
+    // under another. Without the revision in the cache key the art kept its old
+    // colours after `/theme`, which is the one thing a theme change must alter.
+    const before = renderDiagram(CHART, 80);
+    expect(before).toBeDefined();
+
+    defaultTheme.apply({ ...base, name: "recoloured", colors: { ...base.colors, border: "#ff0000" } });
+    const after = renderDiagram(CHART, 80);
+
+    expect(after).not.toBe(before);
+    expect(after?.[0]).not.toBe(before?.[0]);
   });
 });
