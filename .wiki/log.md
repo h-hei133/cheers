@@ -3120,3 +3120,13 @@ Node 版本（41 项）、CI 不构建 Rust daemon、测试清理与子进程竞
 - **门禁**：`verify:import-cycles` cycles=0；`check:config-consumers` 38/38；`check:declarations` 通过；`analyze:module-facades` monoliths=5（无新增）。受影响套件 50 文件 516 项通过。
 - **不做（如实记录）**：不实现 resources/prompts；不把 stdio 封包改成 JSON-RPC 2.0；不实现 http/ws/sdk 传输（第 1 步已定为「明确失败」）。
 - **文档**：新增 `phase-9-step6-design.md`（三条缺陷现状/实测/决定 M1–M6/实现结果/类文档不实的更正/不做）。
+
+## [2026-09-25] fix | Phase 9 第 5 步补丁：粘贴通道。**剪贴板能读图，但没人调用它。**
+- **背景**：复核第 5 步时发现——剪贴板读取器、`PasteStore` 的图片通道、`alt+v` 绑定**全都就位，却没有任何调用方**。从编辑器一侧看，这与「没有这个能力」完全等价：用户按了键，图片进不了对话。第 1 步修的是「假成功」，这条是同一类问题的另一种形态：**造好了但没接上**。
+- **补齐**：`keymap submit` 收集草稿引用的图片 → 经 `PromptAttachments` 走 8 跳到达 `turn/session.ts`，开消息**在有图时**才建成块数组 `[{type:"text",…}, …images]`，无图时**保持原字符串**（下游形状只在真有图时才变，历史路径一个字节未动）。
+- **`alt+v` 与终端自带粘贴分开**：终端递送的是**文本**，图片**从来不以文本到达**。已加进按键指南；`keymap.test.ts` 会断言「指南列出的键 = 实际绑定的键」，故少写一处即失败。
+- **自身修掉的缺陷**：`expand()` 原本把**图片占位符原样留下**，消息里会出现字面量 `[#2 image image/png 12KB]`——**形似内容而不是内容**。现展开为**空串**（图片不是文本，另行随消息走）。**这是新测试抓到的**：我最初把断言写成了旧行为，而旧行为是错的。
+- **模块归属**：attach 逻辑放 `inputPreferences.ts`（本就在管编辑器输入动作）。放 `interactiveMode.ts` 会让它到 **21 个函数**、越过 20 的职责上限（`analyze:module-facades` 抓到 monoliths 5 → 6）；移出后回到 5。
+- **实机**：构建产物上验证链路——`invocation forwards attachments: true`、`session builds openingImages: true`、`branches on image count: true`；无图时按键**如实报告** `No image on the clipboard.` 而不是静默无事。
+- **门禁**：`verify:import-cycles` cycles=0；`check:config-consumers` 通过；`check:declarations` 通过；`analyze:module-facades` monoliths=5（回到基线）；`verify:docs-drift:strict` 78 项 advisory（与第 6 步持平，无新增）。受影响套件 120 文件 1299 项通过；`keymap.test.ts` 43 项、`pastes.test.ts` 23 项全绿。
+- **文档**：`phase-9-step5-design.md` 新增「补：粘贴通道」一节（按键/8 跳链路/开消息形状/自身缺陷/模块归属/测试）。

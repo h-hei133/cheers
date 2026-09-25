@@ -159,6 +159,42 @@ confidence: high
 故 7 项里只有 1 项在移除守卫时失败。改为走**校验过的** `decodeTranscriptLineSafe` 后，
 **3 项**在移除守卫时失败。即：**测试必须走真正做判定的那条路**，否则它测的是转换而非守卫。
 
+### 补：粘贴通道（复核时发现的缺口）
+
+复核时发现**剪贴板读取器、`PasteStore` 的图片通道、键盘绑定全部就位，但没有任何调用方**——
+从编辑器一侧看，这与「没有这个能力」完全等价。缺的是最后一跳：图片到不了模型。
+补齐如下。
+
+**按键**：`alt+v` → `app.editor.image`。与终端自带的粘贴分开，因为二者是不同的东西：
+终端递送的是**文本**，而图片**从来不以文本到达**。已加进按键指南（`chrome/keys.ts`），
+且 `keymap.test.ts` 会断言「指南列出的键 = 实际绑定的键」——绑定没人找得到就等于没有。
+
+**链路**（8 跳，`PromptAttachments` 是 ctor 之外唯一的载体）：
+
+```
+keymap submit ──images──> onSubmit ──> run ──> routeInteractiveCommand
+  ──> buildCliCommandExecution ──> runInteractivePromptExecution
+  ──> executeResolvedPromptTurn ──> sessionRuntime.executePrompt
+  ──> runPrompt ──> cliSessionRuntimeFactory ──> streamCliRuntimePrompt
+  ──> cliRuntimeInvocation ──> turn/session:opening
+```
+
+**开消息**：`turn/session.ts` 在**有图时**才把 `content` 建成块数组
+`[{type:"text", text:环境行+提示}, ...images]`，无图时保持原来的字符串。
+即下游读到的形状**只在真有图时才变**，没有图的历史路径一个字节都没动。
+
+**自身修掉的问题**：`expand()` 原本把**图片占位符原样留下**，于是消息里会带上
+字面量 `[#2 image image/png 12KB]`——**形似内容而不是内容**。现在 `expand()` 遇到
+「占位符指向已持有的图片」时展开为**空串**（图片不是文本，另行随消息走）。
+这一条是**新写的测试抓到的**：我最初把断言写成了旧行为，而旧行为是错的。
+
+**模块归属**：attach 逻辑放在 `inputPreferences.ts`（本就在管编辑器输入动作），
+不是放在 `interactiveMode.ts`。后者加上这个方法会到 **21 个函数**、越过 20 的职责上限
+（`analyze:module-facades` 抓到，monoliths 5 → 6）；移出后回到 5。
+
+**测试**：`pastes.test.ts` 新增 5 项（占位符内容、按草稿取图、无附件时为空、
+文本与图片两条通道互不干扰、`clear()` 一并清掉图片）。`keymap.test.ts` 43 项全绿。
+
 ## 7. 本步不做
 
 - 不做图片缩放/格式转换（需原生解码器；首版拒绝不支持的格式）。
