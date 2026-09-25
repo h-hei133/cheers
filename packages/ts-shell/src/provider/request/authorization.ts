@@ -5,7 +5,7 @@ import type {
 } from "../../config/runtimeConfig.js";
 import { isExpiring, refreshOAuthTokens, type OAuthProviderConfig } from "../../core/auth/oauth/flow.js";
 import { googleOAuthConfig, openAIOAuthConfig, resolveGoogleClientId } from "../../core/auth/oauth/providers.js";
-import { anthropicHeaders } from "../endpoints/anthropicMessages.js";
+import { endpointShape, type EndpointKind } from "../endpoints/index.js";
 
 /**
  * How one provider request authenticates.
@@ -70,13 +70,15 @@ export function providerAuthorization(input: {
    * version header. Formatting the header from the key alone is what made an
    * endpoint that wants neither form arrive unauthenticated.
    */
-  readonly endpoint?: "openai-compatible" | "anthropic-messages";
+  readonly endpoint?: EndpointKind;
 }): ProviderAuthorization {
-  // An endpoint with its own header shape takes the key directly: there is no
-  // account flow for it, and sending the default bearer would be a request the
-  // host rejects for a reason that looks like a bad key.
-  if (input.endpoint === "anthropic-messages" && input.apiKey?.trim()) {
-    return { headers: anthropicHeaders(input.apiKey.trim()), mode: "api-key" };
+  // An endpoint whose credential headers are not the default bearer takes the
+  // key directly: there is no account flow for it, and sending `Authorization`
+  // anyway is a request the host rejects for a reason that looks like a bad key.
+  // Which headers those are is the endpoint's own business, which is why this
+  // asks the shape rather than naming a protocol here.
+  if (input.endpoint && input.endpoint !== "openai-compatible" && input.apiKey?.trim()) {
+    return { headers: endpointShape(input.endpoint).headers(input.apiKey.trim()), mode: "api-key" };
   }
 
   const account = input.accountAuth;

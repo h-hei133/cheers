@@ -10,8 +10,7 @@ import {
   formatCheckpointMessage,
   parseCompactedSummary,
 } from "./summarizer.js";
-import { chatBody, chatUrl } from "../../../provider/endpoints/chatRequest.js";
-import { readChatText } from "../../../provider/endpoints/chatResponse.js";
+import { endpointBody, endpointKind, endpointText, endpointUrl } from "../../../provider/endpoints/index.js";
 
 /**
  * One summarization request.
@@ -116,13 +115,11 @@ export async function requestCompactionSummary(request: CompactionRequest): Prom
   // as the main one. There is no global-fetch fallback: it is what let a caller
   // keep the unbounded transport without anything failing.
   const fetchImpl = request.fetchImpl;
-  const res = await fetchImpl(chatUrl(request.provider.baseUrl, request.provider.endpoint), {
+  const res = await fetchImpl(endpointUrl(request.provider.baseUrl, endpointKind(request.provider.endpoint)), {
     method: "POST",
     headers: request.provider.headers,
     body: JSON.stringify(
-      chatBody({
-        endpoint: request.provider.endpoint,
-        baseUrl: request.provider.baseUrl,
+      endpointBody(endpointKind(request.provider.endpoint), {
         model: request.provider.model,
         messages: [
           ...(previousSummary
@@ -136,7 +133,7 @@ export async function requestCompactionSummary(request: CompactionRequest): Prom
     signal: request.signal,
   });
   if (!res.ok) return undefined;
-  const summaryContent = readChatText(request.provider.endpoint, await res.json());
+  const summaryContent = endpointText(endpointKind(request.provider.endpoint), await res.json());
   if (!summaryContent) return undefined;
   const { rawSummary } = parseCompactedSummary(summaryContent);
   // The previous checkpoint's own footprint is merged in, so a file read before

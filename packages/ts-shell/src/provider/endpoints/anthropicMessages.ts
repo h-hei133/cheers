@@ -7,6 +7,7 @@ import {
 import type { ChatMessage } from "../../turn/prompt.js";
 import type { ToolSchema } from "../../turn/tools.js";
 import type { ProviderUsage, StreamFragment, StreamedCompletion, StreamedToolCall } from "../../turn/completion.js";
+import { declareEndpoint } from "./kinds.js";
 
 /**
  * The Anthropic Messages wire shape.
@@ -534,3 +535,28 @@ function mapStopReason(reason: string): string {
   if (reason === "max_tokens") return "length";
   return reason;
 }
+
+/**
+ * The same protocol, declared to the registry.
+ *
+ * Here rather than in the registry so that this module is the whole of what a
+ * protocol is: it reads the wire shape and it says how it is reached. A new
+ * protocol copies this file's shape — the reader, then the declaration — and
+ * edits nothing else.
+ */
+declareEndpoint("anthropic-messages", {
+  path: "/messages",
+  headers: (apiKey) => anthropicHeaders(apiKey),
+  body: (input) =>
+    anthropicRequestBody({
+      model: input.model,
+      systemPrompt: input.systemPrompt ?? "",
+      messages: input.messages,
+      tools: [],
+      allowTools: false,
+      ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
+      ...(input.maxOutputTokens !== undefined ? { maxOutputTokens: input.maxOutputTokens } : {}),
+    }),
+  readBody: (body) => readAnthropicBody(body),
+  readStream: (body) => readAnthropicStream(body),
+});

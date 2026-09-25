@@ -45,6 +45,23 @@ export interface ProviderUsage {
   readonly cache_creation_input_tokens?: number;
 }
 
+/**
+ * A complete, non-streamed answer, as either endpoint reports one.
+ *
+ * The shape a reader has to satisfy. It is the same structure the streamed
+ * readers assemble into, so a caller that handles both does not need to know
+ * which one it got.
+ */
+export interface CompletedBody {
+  readonly choices?: readonly {
+    readonly message?: { readonly content?: string | null; readonly tool_calls?: readonly StreamedToolCall[] };
+    readonly finish_reason?: string | null;
+  }[];
+  readonly usage?: ProviderUsage;
+  /** The working out, when the provider sent it separately from the answer. */
+  readonly reasoning?: string;
+}
+
 export interface StreamedCompletion {
   /** Assembled message, shaped like `choices[0].message`. */
   readonly message: {

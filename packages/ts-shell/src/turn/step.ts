@@ -11,13 +11,9 @@ import { recordSessionUsage } from "../observability/usageTelemetry.js";
 import { samplingTemperature } from "../core/commands/fastCommandRuntime.js";
 import { getThinkingEffort } from "../core/commands/thinkingCommandRuntime.js";
 import { microcompactMessages } from "../core/query/microCompact.js";
-import { isEventStream, readCompletionStream, type ProviderUsage, type StreamedToolCall } from "./completion.js";
-import {
-  anthropicRequestBody,
-  readAnthropicBody,
-  readAnthropicStream,
-} from "../provider/endpoints/anthropicMessages.js";
-import { chatUrl } from "../provider/endpoints/chatRequest.js";
+import { isEventStream, type ProviderUsage, type StreamedToolCall } from "./completion.js";
+import { anthropicRequestBody } from "../provider/endpoints/anthropicMessages.js";
+import { DEFAULT_ENDPOINT_KIND, endpointKind, endpointShape, endpointUrl, type EndpointKind } from "../provider/endpoints/index.js";
 import type { SentRequest } from "../provider/request/sentRequest.js";
 import { toChatMessages, type ChatMessage } from "./prompt.js";
 import { PARSE_ERROR_KEY, type ToolSchema } from "./tools.js";
@@ -71,7 +67,7 @@ export interface ProviderTarget {
    * provider id, because a provider is who answers and an endpoint is how they
    * want to be asked — one provider can offer both.
    */
-  readonly endpoint?: "openai-compatible" | "anthropic-messages";
+  readonly endpoint?: EndpointKind;
 }
 
 /** What a step reports while it runs, before the assembled message exists. */
@@ -177,8 +173,8 @@ interface CompletionShape {
  * events disagrees about all of them, and expressing that as per-model flags
  * would spread one decision across four places that could then disagree.
  */
-function endpointFor(request: StepRequest): "openai-compatible" | "anthropic-messages" {
-  return request.provider.endpoint === "anthropic-messages" ? "anthropic-messages" : "openai-compatible";
+function endpointFor(request: StepRequest): EndpointKind {
+  return endpointKind(request.provider.endpoint) ?? DEFAULT_ENDPOINT_KIND;
 }
 
 export function createStepFunction(request: StepRequest): StepFunction {
@@ -296,7 +292,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
         let releaseNow = true;
         try {
           const attemptResponse = await fetchImpl(
-            chatUrl(request.provider.baseUrl, endpoint),
+            endpointUrl(request.provider.baseUrl, endpoint),
             {
               method: "POST",
               headers: request.provider.headers,
@@ -307,7 +303,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
           if (attemptResponse.ok) {
             response = attemptResponse;
             options.onRequestSent?.({
-              url: chatUrl(request.provider.baseUrl, endpoint),
+              url: endpointUrl(request.provider.baseUrl, endpoint),
               headers: request.provider.headers,
               body: JSON.stringify(payload),
             });
@@ -450,19 +446,17 @@ function bridgeToolResults(
 async function readCompletion(
   response: Response,
   listener: StepListener,
-  endpoint: "openai-compatible" | "anthropic-messages" = "openai-compatible",
+  endpoint?: EndpointKind,
 ): Promise<CompletionShape> {
   if (!isEventStream(response)) {
     // A provider that ignored `stream: true` answers with one JSON body; the
     // text then arrives in a single delta. The two endpoints disagree about the
     // body's shape as well, so the whole-body case is read the same way the
     // streamed one is.
-    if (endpoint === "anthropic-messages") return readAnthropicBody(await response.json());
-    return (await response.json()) as CompletionShape;
+    const read = endpointShape(endpoint).readBody(await response.json());
+    return read as CompletionShape;
   }
-  const stream = endpoint === "anthropic-messages"
-    ? readAnthropicStream(response.body!)
-    : readCompletionStream(response.body!);
+  const stream = endpointShape(endpoint).readStream(response.body!);
   let streamed = "";
   for (;;) {
     const step = await stream.next();
