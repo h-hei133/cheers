@@ -126,6 +126,27 @@ invokeTool     : threw
 
 ## 6. 本步不做（如实记录）
 
+### 复核轮复核（2026-09-25）
+
+第 6 步的声称**逐条对着代码核过**，全部成立：
+
+| 声称 | 核对方式 | 结果 |
+|---|---|---|
+| `types.ts` 不再有 mock 字段与描述符 | `grep -c` 四种名字 | 0 |
+| `client.ts` 不再有 `listResources`/`listPrompts` | `grep -c` | 0 |
+| `gateway.ts` 不再计算它们 | `grep -c` | 0 |
+| 快照只有 `{clients, tools}` | 读 `McpClientSnapshot` 定义 | 成立 |
+| 不实的「full JSON-RPC lifecycle」已删 | `grep -c` | 0 |
+| `mockTools` 生产路径读不到 | 复核者独立核对 | 成立（非 stdio 且无 command 时 `invokeTool` 抛错） |
+
+`surface.test.ts`（1 项）与 MCP 全套 18 项通过。**本步无新缺陷**。
+
+一处观察：`surface.test.ts` 断言的是「快照**不含**两个字段」，属**断言实现形状**而非行为。
+它是这个诚实化承诺的**唯一**守卫，够用但薄——若将来有人加回字段，它会失败，
+但不会有任何**行为**层面的测试因它而红。
+
+## 7 本步不做（原文保留）
+
 - **不实现 MCP resources/prompts**（M1：无执行面、无需求）。
 - **不把 stdio 封包改成 JSON-RPC 2.0**（M6：那是实现真 MCP 客户端，属新能力；
   且无第三方服务器可验证）。

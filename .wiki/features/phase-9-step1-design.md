@@ -202,6 +202,40 @@ empty                  -> REFUSE      <- 空串解析成 root 本身，会覆盖
 | S1/N3 | 反向验证：删判定行 → 逃逸用例失败 |
 | 全量 | `npm run test:ts`、四项门禁 |
 
+### 复核轮复核（2026-09-25）
+
+复核**逐条构造输入**验证了策略顺序，结论：**设计成立**。
+
+| 输入 | `allowOutside` | 结果 |
+|---|---|---|
+| `../../etc/passwd` | 否 | 拒 |
+| `../../etc/passwd` | **是** | **仍拒** ← 关键 |
+| `sub/../../etc/x` | **是** | **仍拒** ← 关键 |
+| `/etc/passwd` | 否 | 拒 |
+| `/etc/passwd` | 是 | 允许（用户明说） |
+| `out.html` / `sub/out.zip` | — | 允许 |
+
+即：**相对路径向上攀爬在 flag 之前被拒**，flag 无法授权一个拼写错误。这是本步最要紧的一条，守住。
+`connect()` 的提前返回顺序与 `invokeTool` 抛错也经独立核对，调用方无一处把它当「工具返回了错误」再静默。
+
+**但同一步的符号链接防护有真缺陷（已修，见 `fix(security)` 提交）。** 见下节。
+
+### 符号链接越界（复核发现，已修）
+
+`verifyPathContainment` 的 realpath 检查**只在目标已存在时**执行。于是**同一个**指向工作区外的
+符号链接目录：写已存在的文件被拒，写**尚不存在的新文件被放行**——因为新文件没有 realpath 可比，
+只剩词法前缀判定，而词法上它确实以 root 开头。
+
+本机复现：
+```
+escape/exists.html  -> allowed=false  (resolve 到 /tmp/jailtest/outside/exists.html)
+escape/new.html     -> allowed=true   (词法判定通过)
+```
+即 `/export escape/new.html` **写到了工作区外并报告成功**。
+
+修法：对不存在的目标，**解析最深的已存在祖先**再做 containment 判定。
+修复后同一输入被拒，而真的在子目录里建新文件仍被允许。
+
 ## 5. 本步不做（如实记录）
 
 - 不实现 `http`/`ws`/`sdk` 传输（属扩展路径 2 收尾，无需求证据）。
