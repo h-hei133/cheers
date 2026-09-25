@@ -3079,3 +3079,19 @@ Node 版本（41 项）、CI 不构建 Rust daemon、测试清理与子进程竞
 - **门禁**：`verify:import-cycles` cycles=0；`check:config-consumers` 38/38；`check:declarations` 通过；`analyze:module-facades` monoliths=5（无新增）；`verify:docs-drift:strict` rules pass。受影响套件 76 文件 950 项通过。
 - **教训（本轮第二次推翻历史裁决的理由，与 Phase 8 同型）**：`phase-4 §15.3` 的**结论**（保留死令牌）当时或许合理，但支撑它的**理由**经不起一次直接实验。**结论可以留，理由必须验。**
 - **文档**：新增 `phase-9-step3-design.md`（现状/参考/逐令牌决定/施工中新发现的 3 处硬编码/实现结果/反向验证/不做）。
+
+## [2026-09-25] feat | Phase 9 第 4 步：HTML 会话导出（单文件、可离线打开、含侧栏树与过滤）。
+- **裁决**：首版做**等价交互**（侧栏树/过滤/客户端脚本上千行）。两个只读子代理分别核脱敏与客户端架构。
+- **前置发现三项**（均有实证）：
+  - **脱敏不能照搬报告规则**：`redactReportText` 的 10 条规则里 **5 条是报告专用**——它们**删除内容**（`oldText`/`newText`、`raw provider output`、`hidden reasoning`、`<html>…</html>`），且会**折叠空白**与**截断长度**。导出恰恰要**看 diff、看代码、看推理**，照搬会掏空导出物。**参考对照**：pi 的导出**完全不做脱敏**（`index.ts:160` 直接 `JSON.stringify` → base64）；source-claudecode/gemini-cli 同样无；只有 opencode 有 `--sanitize`，但那是**结构性剥离**而非秘密扫描。**处置**：规则链拆为秘密类（5 条）/内容类（5 条），新增 `redactExportText`（秘密类，无折叠无截断）。
+  - **树必须联接两处**：`TranscriptEvent` **不带 `parentId`**，树在 `state.json` 的 `SessionThreadSnapshot`（**无消息内容**）。当前 `/export` 只读 transcript，**拿不到树**。改为同时读两处并按 entry id 联接。
+  - **参考是「一个解析器 + 两个渲染器」**（`marked` 解析 → 终端 ANSI / HTML 两套渲染器，1,015 行），**我方把解析与 ANSI 渲染焊在同一循环里**。直接为导出另写一份就会**有两套块判定逻辑**。**处置：按参考架构重构**——抽出 `markdownScan.ts`（`scanBlocks` 块判别联合），`renderMarkdown` 改为「分类 → ANSI 渲染」。**既有 23 项 markdown 测试全绿且未改一行**，这是等价性的证据。
+- **实机（headless Chromium 打开真实导出页）**：侧栏树 **301 行**、对话区 **300 turn**、首次渲染 **209ms**、**无水平溢出**；过滤 `message 29` → 11 行（真实退格清空后恢复 301）；「只看我的」→ 150 行；点击树行写入 `#turn_…` 且**重新加载后仍定位到该分支**；侧栏开关生效；浅色主题（`prefers-color-scheme`）生效。
+- **安全（真实 DOM 验证）**：注入的 script/img 节点 **0**、`javascript:` 链接 **0**、`https` 链接保留、markup 作为文本显示、凭据 `Bearer sk-…` → `[redacted]`。**而 `<html>`/diff/代码块原样保留**——这正是与报告脱敏的区别。
+- **施工中修掉 3 个自身缺陷**：①**链接正则吃掉右括号**（`[bad](javascript:alert(2))` 剥离后残留 `bad)`）——改为支持 URL 内配对括号，并**先抽链接再转义**，否则 URL 里的 `&` 会被转义两次；②**静态正文与载荷重复**（初稿把会话同时写进 markup 与 base64，**每条消息在文件里出现两次**，而静态副本对有脚本的读者不可见）——已删，改为 `<noscript>` 提示；③**「会话不存在」报成「没有对话」**（`locateExistingSessionLayout` **不校验目录存在**，只投影路径）——把读者引向缺失的消息而非缺失的会话，已加存在性检查。
+- **规模**：300 条消息 → 构建 1.2s / **导出 8ms** / 228KB。函数数 `collect` 6、`htmlRender` 9、`template` 2、`html` 1、`markdownScan` 2（**均远低于 20 上限**）。
+- **门禁**：`verify:import-cycles` cycles=0；`check:config-consumers` 38/38；`check:declarations` 通过；`analyze:module-facades` monoliths=5（无新增）。
+- **测试**：新增 `htmlRender` 20 项、`collect` 6 项、`exportCommandRuntime` +2 项；受影响套件 14 文件 173 项通过。**反向验证**：导出脱敏换成报告脱敏 → 内容被掏空（2 项失败）；未知格式回退 markdown → 2 项失败。
+- **全量套件**：**533 文件 3615 通过 / 1 skipped / 1 失败**——失败项是 `browserCacheMultiprocessScenarioExamples`（**隔离运行 6/6 通过**，并发真实 CLI 进程在满负载下的已知抖动；**该文件不触及本步任何改动模块**且早于本步存在）。
+- **不做**（各附理由）：参考的 ANSI→HTML 预渲染管线（我方直接渲染结构化卡片）、iframe/gist 注入钩子（自包含文件不需要）、浏览器内重导 JSONL、5 档过滤模式（只需「全部/只看用户」+ 文本搜索）、语法高亮器（第 3 步刚删掉 `syntax*` 令牌，因无消费者）。
+- **文档**：新增 `phase-9-step4-design.md`（前置发现/文件/载荷契约/客户端范围/实现结果/实机/安全/自身缺陷/不做）。
