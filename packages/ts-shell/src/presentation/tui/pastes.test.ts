@@ -133,4 +133,52 @@ describe("asking for a paste in full", () => {
     const code = 'echo $HOME $(date) ${x} $& $1 ${1} $$';
     expect(replaceLiteral("fix [#1 pasted 40 chars]", "[#1 pasted 40 chars]", code)).toBe(`fix ${code}`);
   });
- });
+});
+
+describe("images held beside the draft", () => {
+  const IMAGE = { type: "image" as const, data: "aGVsbG8=", mimeType: "image/png" };
+
+  it("stands for the image with a placeholder", () => {
+    // The placeholder is text, so the caret treats it like any other character
+    // and deleting it deletes the whole attachment.
+    const store = new PasteStore();
+    const placeholder = store.holdImage(IMAGE);
+    expect(placeholder).toContain("image/png");
+  });
+
+  it("finds the images a draft refers to", () => {
+    const store = new PasteStore();
+    const placeholder = store.holdImage(IMAGE);
+    expect(store.imagesIn(`look at this ${placeholder}`)).toEqual([IMAGE]);
+  });
+
+  it("reports nothing for a draft with no attachment", () => {
+    const store = new PasteStore();
+    expect(store.imagesIn("just words")).toEqual([]);
+    expect(store.hasImages("just words")).toBe(false);
+  });
+
+  it("keeps images and text pastes apart", () => {
+    // They are read differently: text is expanded back into the draft and sent as
+    // words, while an image never becomes part of the sentence. One map would make
+    // every reader decide which kind it had.
+    const store = new PasteStore();
+    const text = store.hold("x".repeat(400));
+    const image = store.holdImage(IMAGE);
+
+    expect(store.expand(text)).toContain("x".repeat(400));
+    // Expanding the image placeholder yields no text at all, which is why the
+    // image has to be collected separately.
+    expect(store.expand(image).trim()).toBe("");
+    expect(store.imagesIn(`${text} ${image}`)).toEqual([IMAGE]);
+  });
+
+  it("forgets attachments when the draft is cleared", () => {
+    // A submitted draft holds nothing; keeping the bytes would leak memory and
+    // let a later draft refer to an image the user had moved on from.
+    const store = new PasteStore();
+    const placeholder = store.holdImage(IMAGE);
+    store.clear();
+    expect(store.imagesIn(placeholder)).toEqual([]);
+  });
+});

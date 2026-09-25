@@ -1,3 +1,4 @@
+import type { ImageContent } from "../../../model-adapters/multimodal.js";
 import { Editor } from "../editor.js";
 import { PasteStore } from "../pastes.js";
 import type { AmbientContext } from "../chrome/hints.js";
@@ -81,7 +82,18 @@ export interface ViewActions {
    * text goes: steered into the running turn before its next model step, or
    * queued to run after it. Idle submissions carry none and simply run.
    */
-  submit(text: string, disposition?: "steer" | "followUp"): void;
+  /**
+   * Send what the user typed.
+   *
+   * `attachments` carries images the draft referred to. They travel beside the
+   * text rather than inside it, because an image is not part of the sentence: the
+   * placeholder that stood for it expands back to nothing.
+   */
+  submit(
+    text: string,
+    disposition?: "steer" | "followUp",
+    attachments?: { readonly images: readonly ImageContent[] },
+  ): void;
   /** Escape while a turn is running. */
   interrupt(): void;
   /** Leave the session. */
@@ -135,6 +147,15 @@ export interface ViewActions {
    * caller that cannot must leave the key unclaimed rather than pretend.
    */
   openExternalEditor?(): void;
+  /**
+   * Attach whatever image the clipboard holds, if any.
+   *
+   * Separate from the terminal's own paste because they are different things: the
+   * terminal delivers text, and an image never arrives as text. Optional for the
+   * same reason as above — a surface with no clipboard must leave the key
+   * unclaimed rather than bind it to nothing.
+   */
+  attachClipboardImage?(): void;
 }
 
 /**

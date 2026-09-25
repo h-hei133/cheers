@@ -11,6 +11,8 @@
  * deleting it deletes the whole paste rather than half of it.
  */
 
+import type { ImageContent } from "../../model-adapters/multimodal.js";
+
 /** Length past which a paste is held aside rather than shown in full. */
 export const PASTE_PLACEHOLDER_THRESHOLD = 320;
 
@@ -21,6 +23,16 @@ const DOUBLE_PASTE_MS = 1200;
 
 export class PasteStore {
   private readonly held = new Map<number, string>();
+  /**
+   * Images held for this draft, keyed like the text pastes.
+   *
+   * A parallel map rather than a union in `held`, because the two are read
+   * differently: text is expanded back into the draft and sent as words, while an
+   * image never becomes part of the text at all — it becomes a block beside it.
+   * Putting them in one map would mean every reader of `held` deciding which kind
+   * it had.
+   */
+  private readonly heldImages = new Map<number, ImageContent>();
   private nextId = 1;
   private lastHeld: { readonly id: number; readonly text: string; readonly at: number } | undefined;
 
@@ -74,9 +86,23 @@ export class PasteStore {
     return ids;
   }
 
-  /** `draft` with every placeholder replaced by the text it stands for. */
+  /**
+   * `draft` with every placeholder replaced by the text it stands for.
+   *
+   * A placeholder standing for an image becomes nothing, because the image is not
+   * text and travels beside the message instead. Leaving it would send the reader
+   * a literal `[#2 image image/png 12KB]` in the sentence, and sending the
+   * placeholder as words is worse than sending nothing: it looks like content.
+   *
+   * A placeholder for something not held here is left alone, which is what a
+   * draft recalled after its paste was cleared looks like.
+   */
   expand(draft: string): string {
-    return draft.replace(PLACEHOLDER, (whole, raw: string) => this.held.get(Number(raw)) ?? whole);
+    return draft.replace(PLACEHOLDER, (whole, raw: string) => {
+      const id = Number(raw);
+      if (this.heldImages.has(id)) return "";
+      return this.held.get(id) ?? whole;
+    });
   }
 
   /**
@@ -93,9 +119,39 @@ export class PasteStore {
     return PasteStore.shouldHold(text) ? this.hold(text) : text;
   }
 
+  /**
+   * Hold an image and return the placeholder that stands for it in the draft.
+   *
+   * The placeholder is text, so the caret treats it like any other character and
+   * deleting it deletes the whole attachment. What it stands for is kept
+   * separately and never becomes part of the sentence.
+   */
+  holdImage(image: ImageContent): string {
+    const id = this.nextId++;
+    this.heldImages.set(id, image);
+    const sizeKb = Math.round((image.data.length * 0.75) / 1024);
+    return `[#${id} image ${image.mimeType} ${sizeKb}KB]`;
+  }
+
+  /** The images a draft refers to, in the order their placeholders appear. */
+  imagesIn(draft: string): readonly ImageContent[] {
+    const images: ImageContent[] = [];
+    for (const match of draft.matchAll(PLACEHOLDER)) {
+      const image = this.heldImages.get(Number(match[1]));
+      if (image) images.push(image);
+    }
+    return images;
+  }
+
+  /** Whether this draft has anything attached to it. */
+  hasImages(draft: string): boolean {
+    return this.imagesIn(draft).length > 0;
+  }
+
   /** Forget everything; a submitted or discarded draft holds nothing. */
   clear(): void {
     this.held.clear();
+    this.heldImages.clear();
   }
 }
 

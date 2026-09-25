@@ -220,6 +220,12 @@ function runAction(action: string, event: ParsedKeyEvent, context: KeymapContext
     case "app.editor.external":
       actions.openExternalEditor?.();
       return "redrawn";
+    case "app.editor.image":
+      // Asynchronous, so the outcome arrives as a redraw rather than a return.
+      // The action is optional: a surface without a clipboard simply does not
+      // bind it, and the key falls through to the editor as text.
+      actions.attachClipboardImage?.();
+      return "redrawn";
     default:
       // An action with no handler here is one this surface does not implement.
       // Reported as unhandled so the key still reaches the editor as text rather
@@ -405,9 +411,22 @@ function submitDraft(context: KeymapContext, disposition?: "steer" | "followUp")
   // History keeps the draft as it looked, so recalling it brings back a short line
   // rather than the whole pasted file. What is sent is the expansion.
   const submission = view.pastes.expand(draft).trim();
+  // Images are collected beside the text rather than from it: the placeholder
+  // stands for an attachment, and expanding the draft turns it back into the
+  // words it stood for, which for an image is nothing.
+  const images = view.pastes.imagesIn(draft);
   view.editor.pushHistory(draft);
   view.editor.clear();
   view.setSuggesting(false);
-  if (disposition) actions.submit(submission, disposition);
-  else actions.submit(submission);
+  // Omitted rather than passed as undefined when there is nothing attached, so a
+  // caller reading the arguments sees only what was actually said.
+  const attachments = images.length > 0 ? { images } : undefined;
+  if (attachments) {
+    if (disposition) actions.submit(submission, disposition, attachments);
+    else actions.submit(submission, undefined, attachments);
+  } else if (disposition) {
+    actions.submit(submission, disposition);
+  } else {
+    actions.submit(submission);
+  }
 }

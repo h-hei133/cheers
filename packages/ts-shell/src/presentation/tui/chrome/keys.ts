@@ -75,6 +75,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   { keys: ["ctrl+t"], does: "collapse or expand the model's reasoning", group: "session" },
   { keys: ["ctrl+o"], does: "collapse or expand tool output", group: "session" },
   { keys: ["ctrl+g"], does: "edit the draft in your own editor", group: "session" },
+  { keys: ["alt+v"], does: "attach the image on your clipboard", group: "session" },
   { keys: ["alt+p"], does: "cycle how much a turn may do without asking", group: "session" },
   { keys: ["f5"], does: "retry the last turn that failed", group: "session" },
   { keys: ["ctrl+l"], does: "clear the conversation from the screen", group: "session" },

@@ -37,6 +37,8 @@ import { routeSearchKey, styleSearchRow } from "../../presentation/tui/transcrip
 import { OverlayHost, type Picker } from "./overlay.js";
 import { opensPicker, pickerFor, type PickerHost } from "./picker/registry.js";
 import { readStatusItems, writeStatusItems } from "./tuiSettings.js";
+import { readClipboardImage } from "../../presentation/tui/clipboardImage.js";
+import type { ImageContent } from "../../model-adapters/multimodal.js";
 import { readStatusFacts, readWelcomeState } from "./sessionFacts.js";
 import { couldBeCommand, slashSuggestions } from "./slashSuggestions.js";
 import { couldBeFileReference, fileSuggestions } from "./fileSuggestions.js";
@@ -110,6 +112,18 @@ export class InteractiveMode {
     workspaceRoot: () => this.options.runtimeContext.projectRoot,
     adoptDraft: (text) => this.state.editor.setDraftText(text),
     redraw: () => this.tui.requestRender(),
+    attachImage: (image) => {
+      // The placeholder goes in the draft and the bytes are held beside it: the
+      // sentence keeps a short token, and the picture travels as a block.
+      this.state.editor.insert(
+        this.state.pastes.holdImage({
+          type: "image",
+          data: image.bytes.toString("base64"),
+          mimeType: image.mimeType,
+        }),
+      );
+      this.tui.requestRender();
+    },
   });
   private readonly overlay: OverlayHost;
   private readonly pager = new Pager();
@@ -342,7 +356,7 @@ export class InteractiveMode {
       gesture: this.gesture,
       keybindings: this.preferences.keybindings,
       actions: {
-        submit: (text, disposition) => this.onSubmit(text, disposition),
+        submit: (text, disposition, attachments) => this.onSubmit(text, disposition, attachments),
         interrupt: () => void this.interrupt(),
         exit: () => this.shutdown(),
         redraw: () => this.tui.requestRender(),
@@ -379,6 +393,7 @@ export class InteractiveMode {
         copySelection: () => this.pointer.copySelection(),
         toggleCollapsed: (only) => this.view.toggleCollapsed(only),
         openExternalEditor: () => this.preferences.openExternalEditor(this.state.editor.getText()),
+        attachClipboardImage: () => void this.preferences.attachClipboardImage(),
       },
     });
   }
@@ -433,7 +448,11 @@ export class InteractiveMode {
 
 
 
-  private onSubmit(text: string, disposition?: "steer" | "followUp"): void {
+  private onSubmit(
+    text: string,
+    disposition?: "steer" | "followUp",
+    attachments?: { readonly images: readonly ImageContent[] },
+  ): void {
     this.toast = undefined;
     appendPromptHistory(this.options.runtimeContext.projectRoot, text);
     if (this.questions.answer(text)) {
@@ -458,12 +477,15 @@ export class InteractiveMode {
       this.tui.requestRender();
       return;
     }
-    void this.run(text);
+    void this.run(text, attachments);
   }
 
 
   /** Execute one submission, then drain anything typed while it ran. */
-  private async run(text: string): Promise<void> {
+  private async run(
+    text: string,
+    attachments?: { readonly images: readonly ImageContent[] },
+  ): Promise<void> {
     this.busy = true;
     // The elapsed time is computed at paint time, and paints are driven by events.
     // Between two events there are none, so without a clock of its own the timer

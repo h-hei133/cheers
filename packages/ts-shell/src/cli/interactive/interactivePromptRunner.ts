@@ -1,3 +1,4 @@
+import type { PromptAttachments } from "../../core/shell/sessionRuntime.js";
 import { runResumeLikeShellAction } from "../../core/shell/continueShellActionRuntime.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
@@ -60,6 +61,8 @@ export async function runInteractiveResumeAction(input: {
 
 export async function runInteractivePromptExecution(input: {
   readonly effectivePrompt: string;
+  /** Images the draft referred to; see `PromptAttachments`. */
+  readonly attachments?: PromptAttachments;
   readonly sessionManager: SessionManager;
   readonly runtimeContext: ShellRuntimeContext;
   readonly sessionRuntime: ShellSessionRuntime;
@@ -73,6 +76,7 @@ export async function runInteractivePromptExecution(input: {
   await executeResolvedPromptTurn({
     source: "interactive",
     effectivePrompt: input.effectivePrompt,
+    ...(input.attachments ? { attachments: input.attachments } : {}),
     sessionManager: input.sessionManager,
     setActiveNonInteractiveApprovalMode:
       input.setActiveNonInteractiveApprovalMode,

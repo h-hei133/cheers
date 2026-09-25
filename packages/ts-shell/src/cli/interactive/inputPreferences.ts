@@ -1,5 +1,6 @@
 import { Keybindings, loadUserKeybindings, type KeybindingsProblem } from "./keybindings.js";
 import { editExternally } from "./externalEditor.js";
+import { readClipboardImage } from "../../presentation/tui/clipboardImage.js";
 import { invalidateWorkspaceFiles, warmWorkspaceFiles } from "./fileSuggestions.js";
 
 /**
@@ -27,6 +28,8 @@ export interface InputPreferencesHost {
   adoptDraft(text: string): void;
   /** Repaint after the draft changed. */
   redraw(): void;
+  /** Put an image placeholder in the draft and hold the bytes beside it. */
+  attachImage(image: { readonly bytes: Buffer; readonly mimeType: string }): void;
 }
 
 export class InputPreferences {
@@ -82,5 +85,24 @@ export class InputPreferences {
     if (result.text !== undefined) this.host.adoptDraft(result.text);
     if (result.message !== undefined) this.host.report(result.message);
     this.host.redraw();
+  }
+
+  /**
+   * Put whatever image the clipboard holds into the draft.
+   *
+   * The draft gets a placeholder and the bytes are held beside it, because an
+   * image is not text: the caret can move over the placeholder and deleting it
+   * removes the attachment, while the picture never becomes part of the sentence.
+   *
+   * Says so when there is nothing to attach. A chord that silently does nothing
+   * is indistinguishable from one that is broken.
+   */
+  async attachClipboardImage(): Promise<void> {
+    const image = await readClipboardImage();
+    if (!image) {
+      this.host.report("No image on the clipboard.");
+      return;
+    }
+    this.host.attachImage(image);
   }
 }

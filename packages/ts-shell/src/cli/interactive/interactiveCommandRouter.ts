@@ -1,3 +1,4 @@
+import type { PromptAttachments } from "../../core/shell/sessionRuntime.js";
 import type { Interface as ReadlineInterface } from "node:readline";
 
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
@@ -38,6 +39,8 @@ import { describeCompaction, parseCompactCommand } from "./compact.js";
 
 export interface InteractiveCommandRouterInput {
   readonly prompt: string;
+  /** Images the draft referred to; carried beside the text, not inside it. */
+  readonly attachments?: PromptAttachments;
   readonly readline: ReadlineInterface;
   readonly mcpGateway: CliMcpGateway;
   readonly fallbackSessionId?: string;
@@ -96,6 +99,7 @@ export async function routeInteractiveCommand(
 
   const resolved = await buildCliCommandExecution({
     prompt: input.prompt,
+    ...(input.attachments ? { attachments: input.attachments } : {}),
     cwd: input.runtimeContext.cwd,
     renderer: input.renderer,
     printMode: false,
@@ -253,6 +257,7 @@ export async function routeInteractiveCommand(
     nextTurnNumber += 1;
     await runInteractivePromptExecution({
       effectivePrompt: resolved.effectivePrompt,
+      ...(resolved.attachments ? { attachments: resolved.attachments } : {}),
       sessionManager: input.sessionManager,
       runtimeContext: input.runtimeContext,
       sessionRuntime: input.sessionRuntime,

@@ -86,6 +86,9 @@ export const KEY_ACTIONS: Record<string, KeybindingDefinition> = {
   "app.scroll.fastUp": { defaultKeys: ["shift+up"], description: "Scroll up several rows at once" },
   "app.scroll.fastDown": { defaultKeys: ["shift+down"], description: "Scroll down several rows at once" },
   "app.editor.external": { defaultKeys: ["ctrl+g"], description: "Edit the draft in an external editor" },
+  // A separate chord from the terminal's own paste, because they are different
+  // things: the terminal sends text, and an image never arrives as text at all.
+  "app.editor.image": { defaultKeys: ["alt+v"], description: "Attach the image on the clipboard" },
 };
 
 /** Keys bound to one action, as a config file writes them. */
