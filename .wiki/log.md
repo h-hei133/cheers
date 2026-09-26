@@ -3583,3 +3583,84 @@ Promise 结算（`finish()` 幂等、无双重 settle）、cancel/timeout 优先
 
 **`log.md` 中的历史条目不改**——它们是当时的记录，改掉等于篡改历史；
 本次合并本身在本文记录。
+
+## [2026-09-26] research | Phase 11 续研：08 待办项的深入设计与新发现
+
+**维护者指示**：「在这基础上继续做一轮针对 08 里面提出的 feature 的研究，也可以添加新的 feature，
+结合 `~/projects/` 目录下的顶尖项目的实现方案（例如 pi 项目）派遣子代理帮助进行深度探索」。
+**产出**：`.wiki/features/11-gap-followup-design.md`（新建，`_index.md` §9 已同步）。**零代码改动**。
+
+**定位**：08 是**盘点**（哪些缺口存在），本文是**深化**（每项具体怎么改）。沿用 08 的条目编号。
+
+### 子代理事故（如实记录）
+
+`vsllm/gemini-3.8-flash-api` 端点本次会话**反复 TLS 失败**
+（`unknown certificate verification error` / `http2 connection force closed`）——
+**6 次派遣中 5 次因此中断**，与任务内容无关（`curl https://vsllm.com` 同样 `SSL_ERROR_SYSCALL`）。
+
+| 路 | 子代理 | 结果 |
+|---|---|---|
+| C | `R3ProviderCtx` | ✅ **完成**（provider / 上下文 / 权限切片，返回完整报告） |
+| A | `R1KernelLoop` → `R1bKernel` | ❌ 两次均未返回 |
+| B | `R2ToolsEdit` → `R2bTools` → `R2cDesign` | ❌ 三次均未返回 |
+
+**处置**：五个失败子代理的 **transcript 保留在 `history://`**，显示它们**已读完全部目标文件**
+（pi 的 `edit-diff.ts`、Claude Code 的 `FileEditTool.ts`、opencode 的 `lsp/`、
+我们的 `taskTool.ts`/`lsp.ts`/`registry.ts`）但未输出结论。
+**A/B 两路的结论由主代理直接完成**——参考实现的关键位置已从 transcript 定位，
+主代理逐一亲读并**实机验证**。这符合本仓库「子代理结论必须亲验」的既有纪律。
+
+### 三项 P0 的当前状态
+
+- **P0-A 已消除**：随 Rust 执行面整条删除（不是 08 建议的「落回本地」，而是更强的方案）。
+  实测：全新 HOME、无配置、PATH 无 cargo → 命令 `completed` / `execPath: ts-local`。
+- **P0-B 确认，但 08 的描述需更正**：`cheers.json` 不是「运行时配置放错文件名」，
+  而是**另一套 schema**（`settings.v1.json`，含 `mcpServers`/`skills`/`tui` 等
+  `RuntimeConfigFile` 没有的键），且 `maxTurns` **嵌在 `model` 下**、顶层不存在。
+  **同型第二例（08 未记录）**：`.agents/settings.json` 与之**逐字节相同**（已 `diff`），同样零读者。
+  **故这不是 3 行修复**——需裁决它「应该是什么」。
+- **P0-C 确认**，实测复现：`developer`→`system`、`max_completion_tokens`→`max_tokens`、
+  `vision:true`→`false`，模型 7 字段只剩 4。
+
+### 本轮新增 3 项（08 未记录）
+
+1. **Anthropic 流内 `error` 事件被静默丢弃**——`applyEvent`（`anthropicMessages.ts:480-505`）
+   只匹配 `content_block_*`，`event: error` 无分支、返回空片段。
+   后果：provider 侧错误表现为**「零 token 的正常结束」**，与 `AGENTS.md`
+   「不得把失败伪装成成功态」直接冲突。**成本低**。
+2. **工具 schema 与系统提示不计入上下文估算**——实测 13 个工具 schema = **8,933 字符 ≈ 2,552 token**、
+   系统提示 ≈ **301 token**；两者在 `openaiCompatible.ts:47` 是**独立参数**，而
+   `estimateTokens(messages)` 只看 `messages`。冷启动**漏算约 2,850 token**。
+3. **`lsp` 声明但从不读取 `line`/`character`**——实测带位置与不带位置**输出逐字节相同**。
+   对 `core/tools/` 全部工具做「声明 vs 读取」系统性扫描，**此为孤例**（`ask.ts` 的 `id` 经 `q.id` 读取，是误报）。
+
+### 证伪与更正
+
+| 项 | 08 原判 | 本轮结论 |
+|---|---|---|
+| **D6** SSE 事件头 | 会破坏帧解析 | **证伪**：OpenAI 不发 `event:` 头；Anthropic 的 `data:` JSON 自带 `type` 且我们按它分派。**该项应撤回**（但同一处发现上面的第 1 条） |
+| **D12** 编辑唯一性 | 泛指编辑路径 | **收窄**：实测**只有单段默认路径**静默改错位置；`replaceAll` 可全替换，**多段路径已会拒绝**（`edits[0] and edits[1] overlap`）。参考（pi 与 Claude Code）**都无条件拒绝任何重复** |
+| **P0-B** 文件结构 | 顶层 `maxTurns`/`allowRules` | **更正**：嵌在 `model`/`permissions` 下，且是另一套 schema |
+
+### D10 子代理：参考机制已确定
+
+pi 的子代理**把自己的 CLI 作为子进程拉起**（`spawn(execPath, [script,"--mode","json","-p",
+"--no-session","--model",…,"--thinking",…,"--tools",…])`，`subagent/index.ts:303-307,346`），
+因此**每个声明字段都流向真实 agent 循环**。我们读 12 个字段中的 6 个，
+`tools`/`disallowedTools`/`maxTurns`/`skills`/`effort`/`background` **从不读取**。
+**建议照 pi 的形状**：子进程跑自己的 CLI——工具集/循环/权限/压缩/记忆全部自动继承，
+worktree 隔离天然成立，已有 hook 事件无需改动。
+
+### 存疑（如实记录）
+
+**D8 的 jitter 是否真需要**：我们的策略是 provider 层 `maxRetries: 0`（**刻意**，
+`retry.ts` 模块头解释了原因：两层都重试会让一次失败付两次）+ turn 层 3 次。
+若一个回合**只发一个请求、无并发扇出**，惊群（thundering herd）**不可能发生**，
+jitter 就是照搬。**本轮未查清是否存在并发 provider 请求**，故列 P2。
+
+### 未验证
+
+Anthropic `budget_tokens` 的 400、`thinkingSignature` 缺失的 400、OpenAI 推理模型的
+temperature 400（**均无账号，属 `[INFERENCE]`**）；CJK/JSON 误差幅度（**本机无分词器**，
+数字来自公开 BPE 行为）；pi 子代理输出如何流回父级；opencode 39 个语言服务器的注册细节；
+`cheers.json`/`.agents/settings.json` 的设计意图（**无法从代码判断，故需维护者裁决**）。

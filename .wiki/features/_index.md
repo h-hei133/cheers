@@ -937,3 +937,62 @@ Phase 9 裁决已定其边界（路径 1 声明式 + 路径 2 进程外），但
 >
 > **全量套件 540 文件 / 3726 项 / 3 failed**——3 项全在 `cli-baseline.test.ts`，
 > **隔离运行 40/40 全绿**且该文件对本次改动模块引用数为 0（已记录的负载敏感子进程用例）。
+
+## 9. Phase 11 续研：08 待办项的深入设计与新发现（**2026-09-26**）
+
+> **见 [`11-gap-followup-design.md`](11-gap-followup-design.md)。零代码改动。**
+>
+> 08 是**盘点**（哪些缺口存在），本文是**深化**（每项具体怎么改）。沿用 08 的条目编号，不重复登记。
+>
+> ### 9.1 三项 P0 的当前状态
+>
+> | # | 状态 |
+> |---|---|
+> | **P0-A** `daemonEnabled` | **已消除**——随 Rust 执行面整条删除（不是 08 建议的「落回本地」）。实测：全新 HOME、无配置、PATH 无 cargo → `completed` / `ts-local` |
+> | **P0-B** `cheers.json` 不被读取 | **确认，但 08 的描述需更正**：它不是「运行时配置放错文件名」，而是**另一套 schema**（`settings.v1.json`，含 `mcpServers`/`skills`/`tui`）。`maxTurns` 嵌在 `model` 下、顶层不存在。**同型第二例**：`.agents/settings.json` 与之**逐字节相同**，同样零读者。故这**不是 3 行修复**，需裁决它该是什么 |
+> | **P0-C** 刷新抹掉能力声明 | **确认**，实测：`developer`→`system`、`max_completion_tokens`→`max_tokens`、`vision:true`→`false`，模型 7 字段只剩 4 |
+>
+> ### 9.2 provider 层（切片 C 完成 + 主代理复验）
+>
+> - **D1** 死分类器接线：实测它能区分 **auth / 安全拦截 / 限流 / 端点故障** 四类，而活轨把 401/403/400/429/500 **全压成同一句** `Provider HTTP <n>`。pi 的做法是**分类与策略分离**（配额耗尽快速失败、传输抖动才重试）。
+> - **D2** Anthropic 缺 `budget_tokens`：pi 发 `{type:"enabled", budget_tokens: …||1024, display}`，且对新模型走 `adaptive`+`effort` 分支。**无账号，400 属 `[INFERENCE]`**。
+> - **D3** `thinkingSignature` 被丢弃：pi 是**两半设计**——有签名发 `thinking` 块、**无签名降级为 `text` 块**（流中断时签名会缺）。我们两半都没有。
+> - **D4** 无条件 `temperature`：pi 用 `supportsTemperature` **且**在开启思考时也省略。
+> - **D7/D9'** token 估算：实测**对内容形态完全不敏感**（拉丁/CJK/JSON 三者同为 `chars/3.5`）。CJK 低估 65–79%、JSON 35–52%。
+> - **M1** 权限规则：`allowRules` **0 生产读取者**；Claude Code 的优先级是 `deny > ask > allow > 默认 ask`。
+>
+> ### 9.3 本轮新增 3 项（08 未记录）
+>
+> 1. **Anthropic 流内 `error` 事件被静默丢弃**——`applyEvent` 无 `error` 分支，provider 侧错误表现为**「零 token 的正常结束」**。与 `AGENTS.md`「不得把失败伪装成成功态」直接冲突。**成本低**。
+> 2. **工具 schema 与系统提示不计入上下文估算**——实测 13 个工具 schema = **8,933 字符 ≈ 2,552 token**、系统提示 ≈ **301 token**，冷启动**漏算约 2,850 token**（两者在 `openaiCompatible.ts:47` 是独立参数，`estimateTokens` 只看 `messages`）。
+> 3. **`lsp` 声明但从不读取 `line`/`character`**——实测带位置与不带位置**输出逐字节相同**。系统性扫描 `core/tools/` 全部工具，**此为孤例**。
+>
+> ### 9.4 证伪与更正
+>
+> | 项 | 08 原判 | 本轮 |
+> |---|---|---|
+> | **D6** SSE 事件头被丢弃 | 会破坏帧解析 | **证伪**：OpenAI 不发 `event:` 头；Anthropic 的 `data:` JSON 自带 `type` 且我们按它分派。**该项应撤回**（但同一处发现 §9.3 第 1 条） |
+> | **D12** 编辑唯一性 | 泛指编辑路径 | **收窄**：实测**只有单段默认路径**静默改错位置；`replaceAll` 可替换全部，**多段路径已会拒绝**（`edits[0] and edits[1] overlap`）。参考实现（pi 与 Claude Code）**都拒绝任何重复** |
+> | **P0-B** 的文件结构 | 顶层 `maxTurns`/`allowRules` | **更正**：嵌在 `model`/`permissions` 下，且是另一套 schema |
+>
+> ### 9.5 D10 子代理：参考机制已确定
+>
+> pi 的子代理**把自己的 CLI 作为子进程拉起**（`spawn(execPath, [script, "--mode","json","-p","--no-session","--model",…,"--thinking",…,"--tools",…])`），
+> 因此**每个声明字段都流向真实 agent 循环**。我们则读 12 个字段中的 6 个，其余（`tools`/`disallowedTools`/`maxTurns`/`skills`/`effort`/`background`）**从不读取**。
+> **建议照 pi 的形状**：子进程跑自己的 CLI——工具集/循环/权限/压缩/记忆全部自动继承，worktree 隔离天然成立，已有 hook 无需改动。
+>
+> ### 9.6 更新后的建议顺序
+>
+> 前四项都是**低成本的静默错误**（不报错，只让用户拿到错误结果或错误结论）：
+> ① P0-C 刷新抹能力 → ② Anthropic 流内 error 被吞 → ③ D12 单段编辑唯一性 →
+> ④ D1 接线死分类器 → ⑤ D4 temperature 门控 → ⑥ D2 `budget_tokens` →
+> ⑦ D8 jitter（**存疑，见下**）→ ⑧ token 估算 → ⑨ D10 子代理 → ⑩ P0-B（**需裁决**）。
+>
+> **存疑**：**D8 的 jitter 是否真需要**——我们的策略是 provider 层 `maxRetries: 0`（**刻意**，模块头有解释）+ turn 层 3 次。
+> 若一个回合只发一个请求、无并发扇出，**惊群不可能发生**，jitter 就是照搬。**本轮未查清**，故列 P2。
+>
+> **未验证**：Anthropic/OpenAI 的 400（**无账号**）、CJK 误差幅度（**本机无分词器**）、
+> pi 子代理输出如何流回父级、opencode 39 个服务器的注册细节。
+>
+> **事故**：`vsllm/gemini-3.8-flash-api` 端点本次 **6 次派遣中 5 次 TLS 失败**
+> （`unknown certificate verification error`），与任务无关。A/B 两路结论由主代理亲自完成。
