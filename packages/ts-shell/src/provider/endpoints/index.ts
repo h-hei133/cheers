@@ -12,6 +12,7 @@
  */
 import "./openaiCompatible.js";
 import "./anthropicMessages.js";
+import "./bedrockConverse.js";
 
 export {
   DEFAULT_ENDPOINT_KIND,
