@@ -141,7 +141,6 @@ export class SubagentLoader {
 
       const tools = this.parseList(meta.tools);
       const disallowedTools = this.parseList(meta.disallowedTools);
-      const skills = this.parseList(meta.skills);
 
       return {
         name,
@@ -154,8 +153,6 @@ export class SubagentLoader {
         isolation: (meta.isolation as SubagentIsolationMode) || undefined,
         memory: (meta.memory as SubagentMemoryScope) || undefined,
         maxTurns: typeof meta.maxTurns === "number" ? meta.maxTurns : undefined,
-        skills: skills.length > 0 ? skills : undefined,
-        background: Boolean(meta.background),
         filePath,
         source,
       };
