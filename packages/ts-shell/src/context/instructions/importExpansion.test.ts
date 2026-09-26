@@ -63,6 +63,56 @@ describe("expanding a reference", () => {
     });
   });
 
+  it("leaves a reference inside a tilde fence alone", async () => {
+    // Tildes are the fence a document uses to show backticks, so an instruction
+    // file explaining this syntax is exactly the file that has one — and reading
+    // it as prose expands the example the file was written to describe.
+    await withProject(async (root) => {
+      await fs.writeFile(path.join(root, "extra.md"), "SHOULD NOT APPEAR\n", "utf8");
+
+      const { content } = expandAt(root, "~~~\n@./extra.md\n~~~\n");
+
+      expect(content).not.toContain("SHOULD NOT APPEAR");
+    });
+  });
+
+  it("keeps a longer fence around a shorter one", async () => {
+    // A four-backtick fence exists to hold a three-backtick block, so the inner
+    // run must not be taken for the closer.
+    await withProject(async (root) => {
+      await fs.writeFile(path.join(root, "extra.md"), "SHOULD NOT APPEAR\n", "utf8");
+
+      const { content } = expandAt(root, "````\n```\n@./extra.md\n```\n````\n");
+
+      expect(content).not.toContain("SHOULD NOT APPEAR");
+    });
+  });
+
+  it("does not treat a shorter run as the closer", async () => {
+    // Opened with four and closed with three, which is not a fence at all: the
+    // reference is prose and is expanded.
+    await withProject(async (root) => {
+      await fs.writeFile(path.join(root, "extra.md"), "SHOULD APPEAR\n", "utf8");
+
+      const { content } = expandAt(root, "````\n@./extra.md\n```\n");
+
+      expect(content).toContain("SHOULD APPEAR");
+    });
+  });
+
+  it("does not read a pair of tildes in prose as a fence", async () => {
+    // CommonMark fences with three or more tildes at the start of a line. A
+    // looser rule would mask everything between two tildes anywhere, which is
+    // how a sentence about a delay hides the reference after it.
+    await withProject(async (root) => {
+      await fs.writeFile(path.join(root, "extra.md"), "SHOULD APPEAR\n", "utf8");
+
+      const { content } = expandAt(root, "Wait ~5 to ~10 minutes.\n@./extra.md\n");
+
+      expect(content).toContain("SHOULD APPEAR");
+    });
+  });
+
   it("expands a nested reference against the file that made it", async () => {
     // The second reference is relative to the file it is written in, not to the
     // file that pulled that one in. Resolving both against the same directory

@@ -109,14 +109,43 @@ function expand(
   return pieces.join("");
 }
 
-/** Where the fenced and inline code spans are, as half-open character ranges. */
+/**
+ * Where the fenced and inline code spans are, as half-open character ranges.
+ *
+ * Two delimiter families, because a fence may be written with backticks or with
+ * tildes and both are code. A tilde fence is how a document shows backticks, so
+ * an instruction file that explains the syntax is exactly the case that uses it
+ * — and treating it as prose expands the example the file was describing.
+ *
+ * Tildes only fence as a block, at the start of a line and at least three of
+ * them, which is what CommonMark says and what keeps prose out of it: a line
+ * reading `wait ~5 to ~10 minutes` has a pair of tildes and no code, and a
+ * looser rule would mask everything between them.
+ *
+ * A run closes on a run of the same character at least as long, which is what
+ * lets a four-backtick fence hold a three-backtick one.
+ */
 function codeBlockRegions(content: string): Array<[number, number]> {
   const regions: Array<[number, number]> = [];
-  const pattern = /(`+)([\s\S]*?)\1/g;
-  for (;;) {
-    const match = pattern.exec(content);
-    if (!match) break;
-    regions.push([match.index, match.index + match[0].length]);
+  const patterns = [/`+[\s\S]*?`+/g, /^~{3,}[\s\S]*?^~{3,}[ \t]*$/gm];
+  for (const pattern of patterns) {
+    for (;;) {
+      const match = pattern.exec(content);
+      if (!match) break;
+      // Non-greedy matching stops at the nearest run, which for a fence written
+      // with four backticks and closed with four is the pair itself, and for one
+      // written with four and closed with three is a pair that should not have
+      // been taken. A shorter closing run is not a closer: the scan moves on.
+      const opening = /^[`~]+/.exec(match[0])![0];
+      const closing = /[`~]+[ \t]*$/.exec(match[0])![0].trim();
+      if (closing.length < opening.length) {
+        // Continue scanning past this opening run rather than abandoning it:
+        // the real closer is further on.
+        pattern.lastIndex = match.index + opening.length;
+        continue;
+      }
+      regions.push([match.index, match.index + match[0].length]);
+    }
   }
   return regions;
 }
