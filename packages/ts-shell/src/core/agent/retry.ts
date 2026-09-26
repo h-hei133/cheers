@@ -39,6 +39,14 @@ export const DEFAULT_RETRY_MAX_DELAY_MS = 60_000;
 export const DEFAULT_TURN_RETRIES = 3;
 /** Retries the provider layer performs. Zero, so one failure is one retry. */
 export const DEFAULT_PROVIDER_RETRIES = 0;
+/**
+ * How much of a locally computed backoff may be shaved off to spread retries.
+ *
+ * Downward only, so a computed delay is never extended past what the caller
+ * asked to tolerate. A quarter is enough to separate clients that failed
+ * together without collapsing a backoff toward zero.
+ */
+const JITTER_FRACTION = 0.25;
 
 /**
  * Failures worth trying again, matched against the provider's own wording.
@@ -115,8 +123,15 @@ export function serverRequestedDelayMs(
  *
  * The server's number wins because it is knowledge rather than a guess: a
  * rate-limited host that says "wait a minute" is describing its own refill, and
- * retrying after two seconds spends a request to be refused again. The cap still
- * applies, so a host cannot ask for a wait longer than the run will tolerate.
+ * retrying after two seconds spends a request to be refused again. It is also
+ * used verbatim, because it is an instruction — spreading it out would be
+ * ignoring what the host asked for.
+ *
+ * A locally computed backoff is spread instead. Doubling alone makes every
+ * client that failed at the same moment retry at the same moment, which is the
+ * load the backoff exists to avoid: a shared outage turns into a synchronised
+ * one. The spread is downward only, so the delay never exceeds what was
+ * computed and the cap stays a real ceiling.
  */
 export function retryDelayMs(
   policy: RetryPolicy,
@@ -126,7 +141,10 @@ export function retryDelayMs(
   if (requestedMs !== undefined) return Math.min(requestedMs, policy.maxDelayMs);
   const doubled = policy.baseDelayMs * 2 ** Math.max(0, attempt - 1);
   const finite = Number.isSafeInteger(doubled) ? doubled : Number.MAX_SAFE_INTEGER;
-  return Math.min(finite, policy.maxDelayMs);
+  // Up to a quarter off, which is enough to separate clients that started
+  // together without turning a short backoff into no backoff at all.
+  const spread = finite * (1 - Math.random() * JITTER_FRACTION);
+  return Math.min(Math.round(spread), policy.maxDelayMs);
 }
 
 /**

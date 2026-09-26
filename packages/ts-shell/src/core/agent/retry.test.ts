@@ -95,19 +95,61 @@ describe("serverRequestedDelayMs", () => {
 describe("retryDelayMs", () => {
   const policy = { enabled: true, maxRetries: 3, baseDelayMs: 1_000, maxDelayMs: 60_000 };
 
+  /** The window a locally computed delay may fall in: full value down to 75%. */
+  function between(full: number): [number, number] {
+    return [full * 0.75, full];
+  }
+
   it("doubles from the base", () => {
-    expect(retryDelayMs(policy, 1, undefined)).toBe(1_000);
-    expect(retryDelayMs(policy, 2, undefined)).toBe(2_000);
-    expect(retryDelayMs(policy, 3, undefined)).toBe(4_000);
+    // Ranges rather than exact values: the delay is spread so clients that
+    // failed together do not retry together, and pinning the exact number would
+    // be pinning the absence of that spread.
+    for (const [attempt, full] of [
+      [1, 1_000],
+      [2, 2_000],
+      [3, 4_000],
+    ] as const) {
+      const [low, high] = between(full);
+      const delay = retryDelayMs(policy, attempt, undefined);
+      expect(delay, `attempt ${attempt}`).toBeGreaterThanOrEqual(low);
+      expect(delay, `attempt ${attempt}`).toBeLessThanOrEqual(high);
+    }
+  });
+
+  it("does not return the same delay every time", () => {
+    // The point of the spread: two clients that failed at the same instant must
+    // not wake at the same instant, or a shared outage becomes a synchronised
+    // one. Without jitter this set has exactly one member.
+    const delays = new Set(Array.from({ length: 20 }, () => retryDelayMs(policy, 3, undefined)));
+
+    expect(delays.size).toBeGreaterThan(1);
+  });
+
+  it("never exceeds the delay the backoff computed", () => {
+    // Downward only, so the ceiling stays a real ceiling.
+    for (let attempt = 1; attempt <= 6; attempt += 1) {
+      expect(retryDelayMs(policy, attempt, undefined)).toBeLessThanOrEqual(
+        Math.min(policy.baseDelayMs * 2 ** (attempt - 1), policy.maxDelayMs),
+      );
+    }
   });
 
   it("stops growing at the ceiling", () => {
-    expect(retryDelayMs({ ...policy, maxDelayMs: 3_000 }, 9, undefined)).toBe(3_000);
+    expect(retryDelayMs({ ...policy, maxDelayMs: 3_000 }, 9, undefined)).toBeLessThanOrEqual(3_000);
+    expect(retryDelayMs({ ...policy, maxDelayMs: 3_000 }, 9, undefined)).toBeGreaterThan(0);
   });
 
   it("lets the server's number override the local backoff", () => {
     // The server is describing its own refill; a guess cannot beat that.
     expect(retryDelayMs(policy, 1, 30_000)).toBe(30_000);
+  });
+
+  it("uses the server's number exactly rather than spreading it", () => {
+    // It is an instruction, not a guess: spreading it would be ignoring what the
+    // host asked for. Ten calls, one value.
+    const delays = new Set(Array.from({ length: 10 }, () => retryDelayMs(policy, 1, 30_000)));
+
+    expect([...delays]).toEqual([30_000]);
   });
 
   it("still caps what a server may ask for", () => {
