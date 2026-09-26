@@ -223,3 +223,153 @@ describe("read tool improvements", () => {
     await fs.rm(dir, { recursive: true, force: true });
   });
 });
+
+describe("reading a file that has not changed", () => {
+  async function withFile<T>(
+    content: string,
+    run: (input: { dir: string; file: string; sessionId: string }) => Promise<T>,
+  ): Promise<T> {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "read-dedup-"));
+    const file = path.join(dir, "target.ts");
+    await fs.writeFile(file, content, "utf8");
+    try {
+      return await run({ dir, file, sessionId: "sess-dedup" });
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  }
+
+  function read(dir: string, sessionId: string, args: Record<string, unknown> = {}) {
+    return createCoreToolRegistry()
+      .get("read")!
+      .execute({ path: "target.ts", ...args }, { workspaceRoot: dir, taskId: "t", sessionId } as never);
+  }
+
+  it("points at the earlier result rather than repeating the file", async () => {
+    // The second read spends the model's context to tell it what it was already
+    // told, so the answer is a pointer instead of the content.
+    await withFile("line one\nline two\n", async ({ dir, sessionId }) => {
+      const first = await read(dir, sessionId);
+      expect(first.output).toContain("line one");
+
+      const second = await read(dir, sessionId);
+      expect(second.success).toBe(true);
+      expect(second.output).toContain("unchanged");
+      expect(second.output).not.toContain("line one");
+    });
+  });
+
+  it("returns the content again once the file has changed", async () => {
+    // The pointer must never outlive the content it refers to. The mtime is set
+    // explicitly rather than by writing, because a write and the read before it
+    // can land in the same millisecond, and the test would then be asserting the
+    // clock rather than the check.
+    await withFile("before\n", async ({ dir, file, sessionId }) => {
+      await read(dir, sessionId);
+      await fs.writeFile(file, "after\n", "utf8");
+      const later = new Date(Date.now() + 2_000);
+      await fs.utimes(file, later, later);
+
+      const second = await read(dir, sessionId);
+      expect(second.output).toContain("after");
+      expect(second.output).not.toContain("unchanged");
+    });
+  });
+
+  it("reads again when a different range is asked for", async () => {
+    await withFile("one\ntwo\nthree\nfour\n", async ({ dir, sessionId }) => {
+      await read(dir, sessionId, { offset: 1, limit: 2 });
+
+      const different = await read(dir, sessionId, { offset: 3, limit: 2 });
+      expect(different.output).toContain("three");
+      expect(different.output).not.toContain("unchanged");
+    });
+  });
+
+  it("returns the content again after the file is edited", async () => {
+    // An edit changes the file, so the earlier read is stale. This does not go
+    // through the modification time at all: the edit forgets the entry, which is
+    // what makes it correct even when the write lands in the same millisecond as
+    // the read before it.
+    await withFile("value = 1\n", async ({ dir, sessionId }) => {
+      const registry = createCoreToolRegistry();
+      await registry.get("read")!.execute(
+        { path: "target.ts" },
+        { workspaceRoot: dir, taskId: "t", sessionId } as never,
+      );
+      await registry.get("edit")!.execute(
+        { path: "target.ts", oldText: "value = 1", newText: "value = 2" },
+        { workspaceRoot: dir, taskId: "t", sessionId } as never,
+      );
+
+      const after = await registry.get("read")!.execute(
+        { path: "target.ts" },
+        { workspaceRoot: dir, taskId: "t", sessionId } as never,
+      );
+      expect(after.output).toContain("value = 2");
+      expect(after.output).not.toContain("unchanged");
+    });
+  });
+
+  it("returns the content again after the file is written", async () => {
+    await withFile("value = 1\n", async ({ dir, sessionId }) => {
+      const registry = createCoreToolRegistry();
+      await registry.get("read")!.execute(
+        { path: "target.ts" },
+        { workspaceRoot: dir, taskId: "t", sessionId } as never,
+      );
+      await registry.get("write")!.execute(
+        { path: "target.ts", content: "rewritten\n" },
+        { workspaceRoot: dir, taskId: "t", sessionId } as never,
+      );
+
+      const after = await registry.get("read")!.execute(
+        { path: "target.ts" },
+        { workspaceRoot: dir, taskId: "t", sessionId } as never,
+      );
+      expect(after.output).toContain("rewritten");
+      expect(after.output).not.toContain("unchanged");
+    });
+  });
+
+  it("does not dedupe across sessions", async () => {
+    // A new conversation has not seen the file, so a pointer would refer to
+    // something the model cannot see.
+    await withFile("only here\n", async ({ dir }) => {
+      await read(dir, "session-one");
+      const other = await read(dir, "session-two");
+
+      expect(other.output).toContain("only here");
+      expect(other.output).not.toContain("unchanged");
+    });
+  });
+
+  it("does not dedupe a read that showed only part of the file", async () => {
+    // A partial read showed a part, and a later read of the same request must go
+    // to disk: pointing the model at a part would let it take the part for the
+    // file. This is the case a size limit produces — 1,600 short lines stay
+    // under the byte ceiling and are cut by the line limit instead.
+    const manyLines = Array.from({ length: 1_600 }, (_, index) => `line ${index}`).join("\n");
+    await withFile(manyLines, async ({ dir, sessionId }) => {
+      const first = await read(dir, sessionId);
+      expect(first.output).toContain("Showing lines 1-500 of 1600");
+
+      const second = await read(dir, sessionId);
+      expect(second.output).not.toContain("unchanged");
+      expect(second.output).toContain("line 0");
+    });
+  });
+
+  it("does not dedupe a read that spilled to an artifact", async () => {
+    // The same reasoning for the byte ceiling: the output was cut short and
+    // stored, so the model never saw the file.
+    const hugeLine = "var bundle=" + "x".repeat(60 * 1024);
+    await withFile(hugeLine, async ({ dir, sessionId }) => {
+      const first = await read(dir, sessionId);
+      expect(first.output).toContain("exceeds 50KB limit");
+
+      const second = await read(dir, sessionId);
+      expect(second.output).not.toContain("unchanged");
+    });
+  });
+});

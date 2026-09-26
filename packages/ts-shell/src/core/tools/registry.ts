@@ -3,6 +3,7 @@ import path from 'node:path'
 import { verifyPathContainment } from '../security/pathJail.js'
 import { formatNonVisionFallback, getImageMimeType, isImageFilePath } from '../../model-adapters/multimodal.js'
 import { replaceInContent, replaceManyInContent } from './editEngine.js'
+import { alreadySeen, forgetRead, rememberRead } from './readCache.js'
 import { withFileLock } from '../../runtime/execution/fileLock.js'
 import {
   detectLineEnding,
@@ -295,6 +296,10 @@ export function createCoreToolRegistry(options?: {
         let target = selector.cleanPath
         let isArtifact = target.startsWith('artifact://')
         let rawContent = ''
+        /** The file this read resolved to, when it read a workspace file. */
+        let readPath: string | undefined
+        let readOffset = 1
+        let readLimit = 0
 
         if (isArtifact) {
           const resolvedArtifact = artifactManager.resolve(target)
@@ -348,6 +353,31 @@ export function createCoreToolRegistry(options?: {
                 `Use bash to inspect it (e.g. file, identify, exiftool) if you need facts about it.`,
             )
           }
+          // Answered before the file is read: the question was already answered,
+          // and reading it again spends the model's context to repeat itself. The
+          // check is deliberately narrow — same file, same offset and limit, same
+          // modification time, and a previous read that showed the whole range —
+          // because a pointer to content the model cannot see, or to content that
+          // has since changed, is worse than a redundant read.
+          const requestedOffset = typeof args.offset === 'number' && args.offset > 0 ? Math.floor(args.offset) : 1
+          const requestedLimit = typeof args.limit === 'number' && args.limit > 0 ? Math.floor(args.limit) : 0
+          readPath = containment.resolvedPath
+          readOffset = requestedOffset
+          readLimit = requestedLimit
+          if (
+            context.sessionId &&
+            !selector.hasSelector &&
+            (await alreadySeen(context.sessionId, containment.resolvedPath, {
+              offset: requestedOffset,
+              limit: requestedLimit,
+            }))
+          ) {
+            return approvedResult(
+              `${selector.cleanPath} is unchanged since you last read it. ` +
+                'The content from that read is still current; refer to it rather than reading the file again.',
+            )
+          }
+
           rawContent = await executionService.readTextFile({
             operationKind: 'file.read',
             absolutePath: containment.resolvedPath,
@@ -398,6 +428,19 @@ export function createCoreToolRegistry(options?: {
           resultText += `\n\n[Showing lines ${startLine}-${startLine + truncated.shownLines - 1} of ${totalLines} (${Math.round(truncated.shownBytes / 1024)}KB). Output spilled to ${artifact.uri}]\n[Use selector to read other sections: read(path="${selector.cleanPath}:${startLine + truncated.shownLines}-${startLine + truncated.shownLines + 200}")]`
         } else if (startLine > 1 || endLine < totalLines) {
           resultText += `\n[Showing lines ${startLine}-${endLine} of ${totalLines}. Use selector :N-M or offset/limit to view other sections]`
+        }
+        // Remembered only when the model was shown everything it asked for. A
+        // truncated, spilled or partial read showed a *part*, and a later read
+        // of the same request must go to disk rather than be answered with a
+        // pointer to a part: the model would take the part for the file.
+        const shownEverything = !truncated.truncated && !truncated.firstLineExceedsLimit && startLine === 1 && endLine >= totalLines
+        if (context.sessionId && readPath !== undefined && shownEverything) {
+          rememberRead(context.sessionId, readPath, {
+            offset: readOffset,
+            limit: readLimit,
+            modifiedMs: (await fs.stat(readPath)).mtimeMs,
+            complete: true,
+          })
         }
         return approvedResult(resultText)
       },
@@ -466,6 +509,10 @@ export function createCoreToolRegistry(options?: {
             : originalUnreadable
               ? `Wrote ${relPath} (original unreadable, no diff)`
               : `Wrote ${relPath}`
+          // The file changed, so a pointer to the earlier read would point at
+          // content from before this write. Forgetting it makes the next read go
+          // to disk, which is what makes this write visible.
+          if (context.sessionId) forgetRead(context.sessionId, containment.resolvedPath)
           return approvedResult(output)
           })
       },
@@ -650,6 +697,10 @@ export function createCoreToolRegistry(options?: {
           : originalUnreadable
             ? `Updated ${relPath} (original unreadable, no diff)`
             : `Updated ${relPath}`
+        // The file changed, so a pointer to the earlier read would point at
+        // content from before this edit. Forgetting it makes the next read go to
+        // disk, which is what makes this edit visible.
+        if (context.sessionId) forgetRead(context.sessionId, containment.resolvedPath)
         return approvedResult(output)
         })
       },
