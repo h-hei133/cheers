@@ -1,13 +1,14 @@
 import { getSessionTodos } from "../../core/commands/todoCommandRuntime.js";
 import { AgentRegistryScanner } from "../../core/messaging/agentRegistryScanner.js";
+import { backgroundTasks } from "../../core/shell/background/tasks.js";
 import type { AmbientContext } from "../../presentation/tui/chrome/hints.js";
 
 /**
  * Background facts for the row under the prompt.
  *
- * Only facts with a real source appear here. There is deliberately no
- * "background commands" counter: the shell has no detached execution mode, so
- * the number could only ever be invented.
+ * Only facts with a real source appear here. The count of running commands has
+ * one now that the shell can start a command and not wait for it; before that it
+ * would have been a number with nothing behind it.
  */
 
 const scanner = new AgentRegistryScanner();
@@ -17,6 +18,7 @@ export function readAmbientFacts(sessionId: string): AmbientContext {
   return {
     openTodos: getSessionTodos().filter((todo) => todo.status !== "done").length,
     peerSessions: countPeerSessions(sessionId),
+    runningCommands: backgroundTasks.list().filter((task) => task.state === "running").length,
   };
 }
 

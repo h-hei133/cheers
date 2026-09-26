@@ -173,9 +173,12 @@ describe("the Anthropic subscription", () => {
 
     const credential = await refreshAnthropicToken({ refreshToken: "RT", fetchImpl });
 
-    // An hour, less the minute held back.
-    expect(credential.expiresAt).toBeGreaterThanOrEqual(before + 3_539_000);
-    expect(credential.expiresAt).toBeLessThanOrEqual(before + 3_540_000);
+    // An hour, less the minute held back. The window allows for the time the
+    // call itself takes: the assertion is about which skew was applied, not
+    // about how fast the machine is.
+    const lifetime = credential.expiresAt - before;
+    expect(lifetime).toBeGreaterThanOrEqual(3_539_000);
+    expect(lifetime).toBeLessThan(3_545_000);
   });
 
   it("carries what the endpoint said when it refuses", async () => {

@@ -4,6 +4,7 @@ import { verifyPathContainment } from '../security/pathJail.js'
 import { formatNonVisionFallback, getImageMimeType, isImageFilePath } from '../../model-adapters/multimodal.js'
 import { replaceInContent, replaceManyInContent } from './editEngine.js'
 import { alreadySeen, forgetRead, rememberRead } from './readCache.js'
+import { backgroundTasks, renderTask } from '../shell/background/tasks.js'
 import { withFileLock } from '../../runtime/execution/fileLock.js'
 import {
   detectLineEnding,
@@ -38,6 +39,7 @@ import type { McpToolDescriptor } from '../mcp/types.js'
 import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
 import { pathPermission, processPermission, resolveToolTarget } from './permissionContext.js'
 import { approvedResult, deniedResult } from './toolResultLifecycle.js'
+import type { ToolExecutionResult } from '../../tools/types.js'
 import { networkNotice, planSandboxedCommand, readSandboxRules } from '../../sandbox/osSandbox.js'
 import { resolveCommandTimeout, DEFAULT_COMMAND_TIMEOUT_MS, MAX_COMMAND_TIMEOUT_MS } from '../../runtime/execution/commandTimeout.js'
 
@@ -708,7 +710,7 @@ export function createCoreToolRegistry(options?: {
     createGrepToolDefinition(executionService),
     {
       name: 'bash',
-      description: 'Execute shell commands (including full Git operations: git status, git diff, git log, git commit, etc.). Safe read-only commands (git status, git diff, etc.) are permitted in plan mode.',
+      description: 'Execute shell commands (including full Git operations: git status, git diff, git log, git commit, etc.). Safe read-only commands (git status, git diff, etc.) are permitted in plan mode. Set runInBackground for a command that outlives this turn; read it back with taskOutput and end it with taskStop.',
       argsSchema: {
         type: 'object',
         properties: {
@@ -718,7 +720,12 @@ export function createCoreToolRegistry(options?: {
           },
           timeout: {
             type: 'number',
-            description: `Optional timeout in seconds. Defaults to ${DEFAULT_COMMAND_TIMEOUT_MS / 1000} seconds; the maximum is ${MAX_COMMAND_TIMEOUT_MS / 1000}. Raise it for a build, an install, or a full test run that needs longer.`,
+            description: `Optional timeout in seconds. Defaults to ${DEFAULT_COMMAND_TIMEOUT_MS / 1000} seconds; the maximum is ${MAX_COMMAND_TIMEOUT_MS / 1000}. Raise it for a build, an install, or a full test run that needs longer. Ignored when runInBackground is set, because such a command is not waited on.`,
+          },
+          runInBackground: {
+            type: 'boolean',
+            description:
+              'Start the command and return immediately instead of waiting for it. Use it for something that takes longer than this turn should be held open, then read it with taskOutput. The command keeps running if the turn ends.',
           },
         },
         required: ['command'],
@@ -730,9 +737,14 @@ export function createCoreToolRegistry(options?: {
       },
       async execute(args, context) {
         const command = typeof args.command === 'string' ? args.command : ''
+        if (args.runInBackground === true) {
+          return startBackgroundCommand(command, context)
+        }
         return runCommandTool(executionService, command, context, args.timeout)
       },
     },
+    createTaskOutputToolDefinition(),
+    createTaskStopToolDefinition(),
     createWebFetchToolDefinition(),
     createWebSearchToolDefinition(),
     createLspToolDefinition(executionService),
@@ -765,4 +777,104 @@ export function createCoreToolRegistry(options?: {
     })
   }
   return new Map(tools.map(tool => [tool.name, tool]))
+}
+
+/**
+ * Start a command and come back to it.
+ *
+ * The command is not waited on, so the answer is a handle rather than an outcome.
+ * Saying which handle is the whole point: without it there is no way to ask what
+ * happened, and a command nobody can ask about is indistinguishable from one that
+ * never ran.
+ */
+function startBackgroundCommand(command: string, context: ToolExecutionContext): ToolExecutionResult {
+  if (!command.trim()) {
+    return deniedResult('Error: No command provided to execute.', { status: 'failed', exitCode: 1 })
+  }
+  const task = backgroundTasks.start({
+    command,
+    cwd: context.workspaceRoot,
+    ...(context.commandEnv ? { env: context.commandEnv } : {}),
+  })
+  if (task.failure) {
+    return deniedResult(`Error: the command could not be started: ${task.failure}`, {
+      status: 'failed',
+      exitCode: 1,
+    })
+  }
+  return approvedResult(
+    `Started ${task.id} in the background.\n${renderTask(task)}\n\n` +
+      `Read it with taskOutput, or stop it with taskStop. It keeps running if this turn ends.`,
+  )
+}
+
+/** What a background command has produced, and whether it is still going. */
+function createTaskOutputToolDefinition(): ToolDefinition {
+  return {
+    name: 'taskOutput',
+    description:
+      'Read what a command started with runInBackground has produced. Reports whether it is still running and how it ended.',
+    argsSchema: {
+      type: 'object',
+      properties: {
+        taskId: { type: 'string', description: 'The identifier the background command was started under.' },
+        all: { type: 'boolean', description: 'List every background command instead of one.' },
+      },
+    },
+    permissions: { check: () => [] },
+    async execute(args) {
+      if (args.all === true) {
+        const tasks = backgroundTasks.list()
+        if (tasks.length === 0) return approvedResult('No background commands have been started.')
+        return approvedResult(tasks.map(renderTask).join('\n\n'))
+      }
+      const id = typeof args.taskId === 'string' ? args.taskId.trim() : ''
+      if (!id) {
+        return deniedResult('Error: give a taskId, or set all to list every background command.')
+      }
+      const task = backgroundTasks.get(id)
+      if (!task) {
+        return deniedResult(
+          `Error: no background command named '${id}'. Known: ${backgroundTasks.list().map((t) => t.id).join(', ') || 'none'}.`,
+        )
+      }
+      return approvedResult(renderTask(task))
+    },
+  }
+}
+
+/**
+ * Stop a command that was started in the background.
+ *
+ * Refused rather than reported as success when nothing matched: a caller that
+ * believes it stopped something and did not has a process still running under a
+ * name it will not ask about again.
+ */
+function createTaskStopToolDefinition(): ToolDefinition {
+  return {
+    name: 'taskStop',
+    description: 'Stop a command started with runInBackground, by signalling its whole process group.',
+    argsSchema: {
+      type: 'object',
+      properties: {
+        taskId: { type: 'string', description: 'The identifier of the command to stop.' },
+      },
+      required: ['taskId'],
+    },
+    permissions: { check: () => [] },
+    async execute(args) {
+      const id = typeof args.taskId === 'string' ? args.taskId.trim() : ''
+      if (!id) return deniedResult('Error: taskStop needs a taskId.')
+      const stopped = backgroundTasks.stop(id)
+      if (!stopped) {
+        const task = backgroundTasks.get(id)
+        return deniedResult(
+          task
+            ? `Error: ${id} is not running any more (${task.state}).`
+            : `Error: no background command named '${id}'.`,
+        )
+      }
+      return approvedResult(`Stopped ${id}.`)
+    },
+  }
 }

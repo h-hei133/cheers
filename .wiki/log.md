@@ -4347,3 +4347,16 @@ T2 Device Code、T3 订阅 OAuth、T1 后台执行。
 （多项式 `0xEDB88320`，256 项查表）。已实测校验值正确。
 
 **依赖面仍是 6 个**——零 AWS/Google SDK，与 `phase-3-decisions.md` §131 的先例一致。
+
+### Phase 13 施工续（**2026-09-26**）：OAuth 与后台执行
+
+| 任务 | 新增 | 验证 |
+|---|---|---|
+| **T7** provider 声明式注册 | `providers.ts` 的列表**从声明派生** | 列表与声明不再有两份；列出与构建分离 |
+| **T2** Device Code | `core/auth/oauth/deviceCode.ts`（RFC 8628 状态机） | 缺 `interval` 默认 5s；`slow_down` +5s；**可中断 sleep**；两种超时**区分开**（一种提示时钟不准） |
+| **T3** 订阅 OAuth | `core/auth/oauth/subscription.ts` | GitHub 设备流 + **token 直接可用**（无需二次交换）；Anthropic **JSON** token POST + 固定端口 53692 + 整段 URL 粘贴 |
+| **T1** 后台执行 | `core/shell/background/tasks.ts` + `bash` 的 `runInBackground` + `taskOutput`/`taskStop` | **真实进程验证**：启动/读输出/停止/状态落定；输出**保尾**（64KB）；停止信号打**整个进程组** |
+
+**一处必须同步的旧注释**：`ambientFacts.ts` 原文写着「the shell has no detached execution mode，
+so the counter could only ever be invented」。**后台执行落地后这句话变成假的**，
+已改，并**把计数器接上**（现在它有一个真实的来源）。

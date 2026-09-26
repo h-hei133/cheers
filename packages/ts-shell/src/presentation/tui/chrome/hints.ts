@@ -31,6 +31,8 @@ export interface AmbientContext {
   readonly openTodos: number;
   /** Other live sessions reachable for cross-session messaging. */
   readonly peerSessions: number;
+  /** Commands started in the background that have not finished. */
+  readonly runningCommands: number;
 }
 
 /** The transient hint for the current state, or undefined when there is none. */
@@ -56,6 +58,9 @@ function ambientFacts(ambient: AmbientContext): string | undefined {
   if (ambient.openTodos > 0) facts.push(`${ambient.openTodos} open todo${ambient.openTodos === 1 ? "" : "s"}`);
   if (ambient.peerSessions > 0) {
     facts.push(`${ambient.peerSessions} other session${ambient.peerSessions === 1 ? "" : "s"}`);
+  }
+  if (ambient.runningCommands > 0) {
+    facts.push(`${ambient.runningCommands} running command${ambient.runningCommands === 1 ? "" : "s"}`);
   }
   return facts.length > 0 ? join(facts) : undefined;
 }
