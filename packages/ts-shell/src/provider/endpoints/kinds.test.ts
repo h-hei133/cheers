@@ -29,7 +29,7 @@ const STUB_KIND = "test-stub";
  */
 function declareStub(): void {
   declareEndpoint(STUB_KIND, {
-    path: "/stub-resource",
+    path: () => "/stub-resource",
     headers: (apiKey) => ({ "x-stub-key": apiKey }),
     body: (input) => ({ stub_model: input.model, stub_messages: input.messages }),
     // The full-turn body, which is what the main loop asks for. A protocol that
@@ -102,10 +102,24 @@ describe("the kinds that ship", () => {
   });
 
   it("really disagree about the path, rather than both taking a default", () => {
-    expect(endpointUrl("https://x.test", "openai-compatible")).toBe(
+    expect(endpointUrl("https://x.test", "openai-compatible", "m")).toBe(
       "https://x.test/chat/completions",
     );
-    expect(endpointUrl("https://x.test", "anthropic-messages")).toBe("https://x.test/messages");
+    expect(endpointUrl("https://x.test", "anthropic-messages", "m")).toBe("https://x.test/messages");
+  });
+
+  it("let a protocol name the model in its path, which is why the path is a function", () => {
+    // Not every protocol puts the model in the body. One names it in the path,
+    // and a protocol that does cannot be expressed as a single constant — so the
+    // path is asked for a model and the ones that carry it in the body ignore it.
+    declareEndpoint("path-names-the-model", {
+      ...endpointShape("openai-compatible"),
+      path: (model) => `/model/${model}/invoke`,
+    });
+
+    expect(endpointUrl("https://x.test", "path-names-the-model", "abc")).toBe(
+      "https://x.test/model/abc/invoke",
+    );
   });
 
   it("send a credential differently, which is why headers are the protocol's business", () => {

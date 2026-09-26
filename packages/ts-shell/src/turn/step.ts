@@ -331,7 +331,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
         let releaseNow = true;
         try {
           const attemptResponse = await fetchImpl(
-            endpointUrl(request.provider.baseUrl, endpoint),
+            endpointUrl(request.provider.baseUrl, endpoint, request.provider.model),
             {
               method: "POST",
               headers: request.provider.headers,
@@ -342,7 +342,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
           if (attemptResponse.ok) {
             response = attemptResponse;
             options.onRequestSent?.({
-              url: endpointUrl(request.provider.baseUrl, endpoint),
+              url: endpointUrl(request.provider.baseUrl, endpoint, request.provider.model),
               headers: request.provider.headers,
               body: JSON.stringify(payload),
             });

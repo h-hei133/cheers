@@ -793,7 +793,7 @@ describe("speaking a second endpoint", () => {
   it("sends a protocol it has never heard of through the same path", async () => {
     const STUB = "test-turn-protocol";
     declareEndpoint(STUB, {
-      path: "/stub-turn",
+      path: () => "/stub-turn",
       headers: () => ({ "x-stub": "1" }),
       body: () => ({}),
       turnBody: (input) => ({ stub_turn: input.model, stub_tools: input.tools.length }),

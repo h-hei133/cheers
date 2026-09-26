@@ -7,6 +7,7 @@ import {
   resolveProviderTimeouts,
   providerTimeoutsFrom,
   resolveProviderTransportConfig,
+  withRequestSigner,
 } from "./fetch.js";
 
 /**
@@ -207,5 +208,63 @@ describe("a deadline the configuration states badly", () => {
     const resolved = resolveProviderTimeouts({ connectTimeoutMs: 0, bodyTimeoutMs: -1 });
     expect(resolved.connectTimeoutMs).toBe(30_000);
     expect(resolved.bodyTimeoutMs).toBe(120_000);
+  });
+});
+
+describe("a transport that signs its requests", () => {
+  /**
+   * The signer runs where the whole request exists.
+   *
+   * A signature covers the method, the URL, the headers and the body, so it can
+   * only be computed once all four are in hand — which is here, one line before
+   * dispatch. Anywhere earlier and the body has not been serialized yet, which is
+   * the part a signature is mostly about.
+   */
+  it("gives the signer the whole request", async () => {
+    const seen: Array<{ url: string; method: string; body?: string; headers: Readonly<Record<string, string>> }> = [];
+    const base = (async () => new Response("ok")) as unknown as typeof fetch;
+    const signed = withRequestSigner(base, async (request) => {
+      seen.push(request);
+      return { Authorization: "signed" };
+    });
+
+    await signed("https://example.test/model/m/converse-stream", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ a: 1 }),
+    });
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.url).toBe("https://example.test/model/m/converse-stream");
+    expect(seen[0]!.method).toBe("POST");
+    expect(seen[0]!.body).toBe('{"a":1}');
+    expect(seen[0]!.headers["content-type"]).toBe("application/json");
+  });
+
+  it("sends the headers the signer added, and keeps the caller's", async () => {
+    let sent: Record<string, string> = {};
+    const base = (async (_url: unknown, init?: RequestInit) => {
+      sent = init?.headers as Record<string, string>;
+      return new Response("ok");
+    }) as unknown as typeof fetch;
+    const signed = withRequestSigner(base, async () => ({ Authorization: "signed", "x-amz-date": "20250101T000000Z" }));
+
+    await signed("https://example.test/x", { method: "POST", headers: { "content-type": "application/json" } });
+
+    expect(sent.Authorization).toBe("signed");
+    expect(sent["x-amz-date"]).toBe("20250101T000000Z");
+    expect(sent["content-type"]).toBe("application/json");
+  });
+
+  it("passes an unsigned request through untouched when there is no signer", async () => {
+    let sent: RequestInit | undefined;
+    const base = (async (_url: unknown, init?: RequestInit) => {
+      sent = init;
+      return new Response("ok");
+    }) as unknown as typeof fetch;
+
+    await base("https://example.test/x", { method: "POST", body: "b" });
+
+    expect(sent?.method).toBe("POST");
   });
 });

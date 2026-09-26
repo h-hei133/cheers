@@ -40,8 +40,15 @@ export type EndpointKind = string;
 
 /** What one endpoint needs to say about itself. */
 export interface EndpointShape {
-  /** The resource appended to a base URL. */
-  readonly path: string;
+  /**
+   * The resource appended to a base URL, given the model this request is for.
+   *
+   * A function rather than a string because not every protocol puts the model in
+   * the body. Some name it in the path — `/model/{id}/converse-stream` — and a
+   * protocol that does cannot be expressed as one constant. The protocols that
+   * name it in the body ignore the argument and return their constant.
+   */
+  readonly path: (model: string) => string;
   /** The credential headers this endpoint authenticates with. */
   readonly headers: (apiKey: string) => Record<string, string>;
   /** A request body for the callers that send no tools. */
@@ -203,9 +210,15 @@ export function endpointKind(configured: string | undefined): EndpointKind | und
   return configured === undefined || configured === "" ? undefined : configured;
 }
 
-/** The URL a request goes to. */
-export function endpointUrl(baseUrl: string, kind: EndpointKind | undefined): string {
-  return `${baseUrl.replace(/\/+$/, "")}${endpointShape(kind).path}`;
+/**
+ * The URL a request goes to.
+ *
+ * The model travels in because a protocol may name it in the path. Passing it
+ * here rather than letting each caller assemble the URL keeps one place that
+ * knows how a base URL and a resource join.
+ */
+export function endpointUrl(baseUrl: string, kind: EndpointKind | undefined, model: string): string {
+  return `${baseUrl.replace(/\/+$/, "")}${endpointShape(kind).path(model)}`;
 }
 
 /** The body a request with no tools sends. */

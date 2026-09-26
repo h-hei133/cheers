@@ -738,7 +738,8 @@ function mapStopReason(reason: string): string {
  * edits nothing else.
  */
 declareEndpoint("anthropic-messages", {
-  path: "/messages",
+  // The model travels in the body, so the path is the same for every one.
+  path: () => "/messages",
   headers: (apiKey) => anthropicHeaders(apiKey),
   body: (input) =>
     anthropicRequestBody({
