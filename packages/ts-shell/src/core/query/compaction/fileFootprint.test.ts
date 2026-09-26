@@ -5,6 +5,7 @@ import {
   mergeFileFootprints,
   parseFileFootprintXml,
 } from "./fileFootprint.js";
+import { formatCheckpointMessage } from "./summarizer.js";
 
 /**
  * The footprint exists so the model does not re-read what it has already seen.
@@ -162,5 +163,42 @@ describe("mergeFileFootprints", () => {
       { readFiles: ["a.ts"], modifiedFiles: [] },
     );
     expect(merged.readFiles).toEqual(["a.ts"]);
+  });
+});
+
+describe("the checkpoint the model is handed", () => {
+  it("says what the file lists are, because the paths do not carry their contents", () => {
+    // A path with no explanation reads as a file the model already knows the
+    // contents of — and the contents it would be recalling are the ones the
+    // checkpoint just removed. The sentence is what makes the list a pointer
+    // rather than a false memory.
+    const checkpoint = formatCheckpointMessage(
+      "the summary",
+      formatFileFootprintXml({ readFiles: ["src/a.ts"], modifiedFiles: ["src/b.ts"] }),
+    );
+
+    expect(checkpoint).toContain("src/a.ts");
+    expect(checkpoint).toContain("src/b.ts");
+    expect(checkpoint).toMatch(/contents are not included/i);
+    expect(checkpoint).toMatch(/read a file again/i);
+  });
+
+  it("adds no such sentence when there is no footprint", () => {
+    // Nothing to explain, and a sentence about absent lists is noise in a prompt
+    // that was just condensed to save room.
+    const checkpoint = formatCheckpointMessage("the summary");
+
+    expect(checkpoint).toContain("the summary");
+    expect(checkpoint).not.toMatch(/contents are not included/i);
+  });
+
+  it("keeps the summary and the lists together", () => {
+    const checkpoint = formatCheckpointMessage(
+      "what happened",
+      formatFileFootprintXml({ readFiles: ["a.ts"], modifiedFiles: [] }),
+    );
+
+    expect(checkpoint).toContain("what happened");
+    expect(checkpoint.indexOf("what happened")).toBeLessThan(checkpoint.indexOf("a.ts"));
   });
 });

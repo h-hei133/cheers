@@ -145,7 +145,16 @@ export function formatCheckpointMessage(summary: string, footprintXml?: string):
   ];
 
   if (footprintXml && footprintXml.trim()) {
-    parts.push("", footprintXml.trim());
+    // The lists name files; they do not carry them. A model that reads a path and
+    // assumes it still holds what it held before the checkpoint will edit from
+    // memory — and the memory it would be using is the one that was just
+    // condensed away. Saying what the lists are, and that the contents have to
+    // be read again, is the difference between a pointer and a false recollection.
+    parts.push(
+      "",
+      "These files were read or changed earlier in this session. Their contents are not included here; read a file again before relying on what it holds.",
+      footprintXml.trim(),
+    );
   }
 
   return parts.join("\n");
