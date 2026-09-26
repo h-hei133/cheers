@@ -23,8 +23,14 @@ import { DEFAULT_ENDPOINT_KIND, endpointShape, type EndpointKind } from "../endp
 export interface ProviderAuthorization {
   /** The header set for the request, `Authorization` included. */
   readonly headers: Readonly<Record<string, string>>;
-  /** Which kind of credential produced this, so a failure can name the right fix. */
-  readonly mode: "api-key" | "account-auth";
+  /**
+   * Which kind of credential produced this, so a failure can name the right fix.
+   *
+   * `signed` is the case where the credential is not a header at all: the
+   * transport computes it per request, and what is here is only the headers that
+   * travel with every request regardless.
+   */
+  readonly mode: "api-key" | "account-auth" | "signed";
 }
 
 /** Headers every request carries, before authorization. */
@@ -79,8 +85,17 @@ export function providerAuthorization(input: {
   // asks the shape for them rather than composing one here. The comparison is
   // against the declared default rather than a spelled-out name, so the two
   // cannot disagree about which kind that is.
-  if (input.endpoint !== undefined && input.endpoint !== DEFAULT_ENDPOINT_KIND && input.apiKey?.trim()) {
-    return { headers: endpointShape(input.endpoint).headers(input.apiKey.trim()), mode: "api-key" };
+  if (input.endpoint !== undefined && input.endpoint !== DEFAULT_ENDPOINT_KIND) {
+    const shape = endpointShape(input.endpoint);
+    // An endpoint whose credential is computed per request declares a signer and
+    // needs no key here. Refusing it for the absence of one would make a
+    // correctly configured account look uncredentialed.
+    if (shape.signer && !input.apiKey?.trim()) {
+      return { headers: shape.headers(""), mode: "signed" };
+    }
+    if (input.apiKey?.trim()) {
+      return { headers: shape.headers(input.apiKey.trim()), mode: "api-key" };
+    }
   }
 
   const account = input.accountAuth;

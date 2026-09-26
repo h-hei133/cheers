@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createPkcePair, createState } from "./pkce.js";
 import { startCallbackServer } from "./callback.js";
 import { isExpiring, refreshOAuthTokens, runOAuthLogin, type OAuthProviderConfig } from "./flow.js";
+import { oauthConfigFor, oauthProviderIds } from "./providers.js";
 
 const CONFIG: OAuthProviderConfig = {
   id: "test",
@@ -299,5 +300,47 @@ describe("keeping a login alive", () => {
   it("calls a token expiring inside the window, and a fresh one not", () => {
     expect(isExpiring(Date.now() + 10_000)).toBe(true);
     expect(isExpiring(Date.now() + 10 * 60_000)).toBe(false);
+  });
+});
+
+describe("the providers this build can sign into", () => {
+  /**
+   * The list is derived from the declarations, not written twice.
+   *
+   * A second list is a second thing to keep in step, and the way it fails is
+   * quiet: a provider added to one and not the other is either offered by a
+   * surface that cannot sign it in, or reachable but invisible.
+   */
+  it("names the providers a surface may offer, without needing them configured", () => {
+    // Listing a provider is a fact about this build; whether its credential is
+    // set up yet is a fact about the account. A list that threw for the second
+    // reason would make a chooser fail on a machine nobody had signed into.
+    const saved = process.env.GOOGLE_OAUTH_CLIENT_ID;
+    delete process.env.GOOGLE_OAUTH_CLIENT_ID;
+    try {
+      expect(oauthProviderIds()).toEqual(["openai", "google"]);
+    } finally {
+      if (saved !== undefined) process.env.GOOGLE_OAUTH_CLIENT_ID = saved;
+    }
+  });
+
+  it("builds each provider's configuration on request", () => {
+    // A surface asks for a provider by name rather than knowing which exist, and
+    // a name nothing declares answers nothing rather than throwing.
+    expect(oauthConfigFor("openai", undefined)?.authorizeUrl).toContain("openai");
+    expect(oauthConfigFor("google", "client-from-caller")?.clientId).toBe("client-from-caller");
+    expect(oauthConfigFor("not-a-provider")).toBeUndefined();
+  });
+
+  it("says what is missing when a provider needs the caller to supply it", () => {
+    // Refusing here is what turns an unconfigured provider into a sentence
+    // rather than a failed authorization much later.
+    const saved = process.env.GOOGLE_OAUTH_CLIENT_ID;
+    delete process.env.GOOGLE_OAUTH_CLIENT_ID;
+    try {
+      expect(() => oauthConfigFor("google")).toThrow(/client id/i);
+    } finally {
+      if (saved !== undefined) process.env.GOOGLE_OAUTH_CLIENT_ID = saved;
+    }
   });
 });

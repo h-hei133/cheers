@@ -1,4 +1,5 @@
 import type { ChatMessage } from "../../turn/prompt.js";
+import type { RequestSigner } from "../request/fetch.js";
 import type { ToolSchema } from "../../turn/tools.js";
 import {
   isEventStream,
@@ -49,8 +50,27 @@ export interface EndpointShape {
    * name it in the body ignore the argument and return their constant.
    */
   readonly path: (model: string) => string;
-  /** The credential headers this endpoint authenticates with. */
+  /**
+   * The credential headers this endpoint authenticates with.
+   *
+   * A constant, for the credentials that are one. An endpoint whose credential
+   * depends on the request — a signature, or a token that expires — declares a
+   * `signer` instead and returns nothing here, because a header that has to be
+   * computed per request cannot be resolved when the session is built.
+   */
   readonly headers: (apiKey: string) => Record<string, string>;
+  /**
+   * How this endpoint authenticates a request when a constant header will not do.
+   *
+   * A factory rather than a value because building one may be asynchronous —
+   * reading a credential file, or obtaining a token. Returning nothing means the
+   * endpoint has no signer and the transport sends the request as it is.
+   *
+   * The signer runs at the transport, which is the only place that sees a request
+   * whole: a signature covers the body, and the body does not exist when the
+   * session is built.
+   */
+  readonly signer?: () => Promise<RequestSigner | undefined>;
   /** A request body for the callers that send no tools. */
   readonly body: (input: SimpleRequest) => Record<string, unknown>;
   /**

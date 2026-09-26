@@ -87,7 +87,49 @@ export function resolveGoogleClientId(explicit?: string): string {
   );
 }
 
-/** Every provider that can be signed into, for a surface that lists them. */
+/**
+ * Every provider that can be signed into, for a surface that lists them.
+ *
+ * Derived from the declarations above rather than written out. A second list is
+ * a second thing to keep in step, and the way it fails is quiet: a provider added
+ * to one and not the other is either offered by a surface that cannot sign it in,
+ * or reachable but invisible.
+ *
+ * A provider whose config needs a value from the caller is listed all the same —
+ * that it is signable is a fact about the build, and whether it is configured yet
+ * is a fact about the account.
+ */
 export function oauthProviderIds(): readonly string[] {
-  return ["openai", "google"];
+  return signInProviders.map((provider) => provider.id);
+}
+
+/** The declarations, in the order a chooser should offer them. */
+const signInProviders: readonly OAuthProviderDeclaration[] = [
+  { id: "openai", make: () => openAIOAuthConfig() },
+  { id: "google", make: (clientId) => googleOAuthConfig(resolveGoogleClientId(clientId)) },
+];
+
+/** One signable provider: its name, and how to build its configuration. */
+interface OAuthProviderDeclaration {
+  readonly id: string;
+  /**
+   * Its configuration, given a client id the caller may have.
+   *
+   * A parameter because some providers cannot ship one: the account registers its
+   * own, and refusing there is what turns a missing client id into a sentence
+   * rather than a failed authorization. Listing a provider does not build its
+   * configuration, which is why the missing value is not an error until one is
+   * asked for.
+   */
+  readonly make: (clientId?: string) => OAuthProviderConfig;
+}
+
+/**
+ * The configuration for a provider, or nothing when this build cannot sign it in.
+ *
+ * The single place a caller asks "can this be signed into, and with what", so a
+ * surface does not have to know which providers exist.
+ */
+export function oauthConfigFor(provider: string, clientId?: string): OAuthProviderConfig | undefined {
+  return signInProviders.find((candidate) => candidate.id === provider)?.make(clientId);
 }

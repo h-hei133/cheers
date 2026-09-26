@@ -16,6 +16,8 @@
 import { declareEndpoint } from "./kinds.js";
 import type { EndpointShape, SimpleRequest, TurnRequest } from "./kinds.js";
 import { readEventStream, type EventMessage } from "../aws/eventStream.js";
+import { signAwsRequest } from "../aws/signature.js";
+import type { RequestSigner } from "../request/fetch.js";
 import type { ChatMessage } from "../../turn/prompt.js";
 import type { CompletedBody, StreamFragment, StreamedCompletion } from "../../turn/completion.js";
 
@@ -212,12 +214,44 @@ function converseBody(input: TurnRequest): Record<string, unknown> {
   };
 }
 
+/**
+ * The signer for this endpoint.
+ *
+ * The host is derived from the region because the signature covers it, and the
+ * host has to be the one the request actually goes to or the service rejects the
+ * signature. A base URL that already names a host wins, so a caller pointing at a
+ * gateway signs for the gateway.
+ */
+async function bedrockSigner(): Promise<RequestSigner | undefined> {
+  const { resolveCredentials } = await import("../aws/credentials.js");
+  const credentials = await resolveCredentials();
+  const region = process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? "us-east-1";
+  return async (request) => {
+    const url = new URL(request.url);
+    return signAwsRequest({
+      method: request.method,
+      host: url.hostname,
+      path: url.pathname,
+      ...(url.search ? { query: url.search.slice(1) } : {}),
+      headers: request.headers,
+      body: request.body ?? "",
+      region,
+      service: "bedrock-runtime",
+      credentials,
+    });
+  };
+}
+
 declareEndpoint("bedrock-converse-stream", {
   // This protocol names the model in the URL, which is why the path is a function.
   path: (model) => `/model/${encodeURIComponent(model)}/converse-stream`,
   // Signing happens at the transport, because a signature covers the body and the
   // body does not exist here. These are the headers that are always true.
   headers: () => ({ "content-type": "application/json", accept: "application/vnd.amazon.eventstream" }),
+  // A signature covers the body, so it is built at the transport rather than
+  // here. The region and service are fixed; the credential is whatever the
+  // account provides.
+  signer: () => bedrockSigner(),
   body: (input: SimpleRequest) => converseBody(simpleAsTurn(input)),
   turnBody: converseBody,
   readBody: readConverseBody,

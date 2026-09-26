@@ -226,6 +226,48 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
     ],
   },
   {
+    id: "bedrock",
+    label: "AWS Bedrock",
+    runtime: "openai-compatible",
+    endpoint: "bedrock-converse-stream",
+    auth: "none",
+    // The address is regional and names no account, so it is the region's host.
+    // A caller pointing at a gateway overrides it.
+    baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+    models: [
+      { id: "anthropic.claude-sonnet-4-5-v1:0", contextWindow: 200_000, vision: true },
+      { id: "anthropic.claude-opus-4-5-v1:0", contextWindow: 200_000, vision: true },
+      { id: "amazon.nova-pro-v1:0", contextWindow: 300_000, vision: true },
+    ],
+  },
+  {
+    id: "google-ai",
+    label: "Google AI",
+    runtime: "google",
+    endpoint: "google-generative-ai",
+    auth: "api-key",
+    baseUrl: "https://generativelanguage.googleapis.com",
+    envVar: "GEMINI_API_KEY",
+    models: [
+      { id: "gemini-2.5-pro", contextWindow: 1_000_000, vision: true },
+      { id: "gemini-2.5-flash", contextWindow: 1_000_000, vision: true },
+    ],
+  },
+  {
+    id: "vertex",
+    label: "Google Vertex",
+    runtime: "google",
+    endpoint: "google-vertex",
+    auth: "none",
+    // The real base names the account and is built from the environment; this is
+    // the shape it takes, so a reader can see where requests go.
+    baseUrl: "https://us-central1-aiplatform.googleapis.com/v1/projects/GOOGLE_CLOUD_PROJECT/locations/GOOGLE_CLOUD_LOCATION/publishers/google/models",
+    models: [
+      { id: "gemini-2.5-pro", contextWindow: 1_000_000, vision: true },
+      { id: "gemini-2.5-flash", contextWindow: 1_000_000, vision: true },
+    ],
+  },
+  {
     id: "openai",
     label: "OpenAI",
     runtime: "openai",

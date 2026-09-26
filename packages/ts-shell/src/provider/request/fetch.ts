@@ -1,4 +1,5 @@
 import { Agent, ProxyAgent, fetch as undiciFetch } from "undici";
+import type { EndpointKind } from "../endpoints/kinds.js";
 
 export interface ProviderFetchEnvironment {
   readonly CHEERS_PROVIDER_PROXY?: string;
@@ -53,7 +54,9 @@ export interface SignableRequest {
  * for the ones whose value depends on the request, which is what a signature is.
  * Async because signing is: deriving a key and hashing a body are both.
  */
-export type RequestSigner = (request: SignableRequest) => Promise<Readonly<Record<string, string>>>;
+export type RequestSigner = (
+  request: SignableRequest,
+) => Promise<Readonly<Record<string, string | undefined>>>;
 
 /** The three deadlines a request runs against, as configuration states them. */
 export interface ProviderTimeoutOverrides {
@@ -140,10 +143,14 @@ export function withRequestSigner(base: typeof fetch, signer: RequestSigner): ty
       headers,
       ...(body !== undefined ? { body } : {}),
     });
-    return await base(input, {
-      ...(init ?? {}),
-      headers: { ...headers, ...signed },
-    });
+    // An absent entry is not a header: a signer with nothing to add for an
+    // optional field says so by leaving it out, and sending the name with no
+    // value would be a header the service reads as empty.
+    const merged: Record<string, string> = { ...headers };
+    for (const [name, value] of Object.entries(signed)) {
+      if (value !== undefined) merged[name] = value;
+    }
+    return await base(input, { ...(init ?? {}), headers: merged });
   }) as typeof fetch;
 }
 
@@ -246,6 +253,37 @@ export function providerFetchFor(config: {
   readonly providerBodyTimeoutMs?: number;
 } | undefined): typeof fetch {
   return providerFetchFromTimeouts(providerTimeoutsFrom(config));
+}
+
+/**
+ * The transport for a run, with the endpoint's own signing applied.
+ *
+ * The endpoint decides how its requests are authenticated, and for two of them
+ * that cannot be a constant: a signature covers the body, and a bearer token
+ * expires. Both are computed here, one line before dispatch, because this is the
+ * only place a request exists whole.
+ *
+ * The signer is built on the first request rather than when this is called, so
+ * that constructing a transport stays a synchronous act. Building one may read a
+ * credential file or obtain a token, and neither is work that should happen to a
+ * session that never makes a request. It is built once: the signer is what is per
+ * request, and a token that expires is the signer's business, not this one's.
+ */
+export function providerFetchForEndpoint(
+  config: Parameters<typeof providerFetchFor>[0],
+  endpoint: EndpointKind | undefined,
+  shapeFor: (kind: EndpointKind | undefined) => { readonly signer?: () => Promise<RequestSigner | undefined> },
+): typeof fetch {
+  const signer = shapeFor(endpoint).signer;
+  if (!signer) return providerFetchFor(config);
+
+  let built: RequestSigner | undefined;
+  let building: Promise<RequestSigner | undefined> | undefined;
+  return withRequestSigner(providerFetchFor(config), async (request) => {
+    building ??= signer();
+    built ??= await building;
+    return built ? await built(request) : {};
+  });
 }
 
 export function resolveProviderTransportConfig(

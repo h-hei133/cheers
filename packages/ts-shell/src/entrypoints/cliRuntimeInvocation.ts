@@ -33,7 +33,12 @@ import { neutraliseForDisplay } from "../core/text/safety.js";
 import { projectTrust } from "../core/security/projectTrust.js";
 import { runTurn, type CompactionSetup, type TurnRun } from "../turn/session.js";
 import { createStepFunction, type StepFunction } from "../turn/step.js";
-import { providerFetchFromTimeouts, providerTimeoutsFrom } from "../provider/request/fetch.js";
+import {
+  providerFetchForEndpoint,
+  providerFetchFromTimeouts,
+  providerTimeoutsFrom,
+} from "../provider/request/fetch.js";
+import { endpointShape } from "../provider/endpoints/index.js";
 import { accountAuthFor, providerAuthorization, renewAccountAuthIfExpiring } from "../provider/request/authorization.js";
 import { persistRenewedAccountAuth } from "../core/auth/providerAuthRuntime.js";
 import type {
@@ -635,7 +640,11 @@ function createProviderStep(
     // deadline: a provider that accepts the connection and then never answers
     // leaves the turn waiting forever, and the retry layer cannot rescue it
     // because it classifies a failure only after a response arrives.
-    fetchImpl: providerFetch(request.runtimeConfig),
+    // The endpoint decides how its requests are authenticated, and for two of
+    // them that is not a constant header: one signs, one carries a token that
+    // expires. Both are applied by the transport, which is the only place a
+    // request exists whole.
+    fetchImpl: providerFetchForEndpoint(request.runtimeConfig, endpoint, endpointShape),
     workspaceRoot: request.workspaceRoot,
     sessionId: request.sessionId,
     systemPrompt: buildSystemPrompt(request.agentMode, promptContext),

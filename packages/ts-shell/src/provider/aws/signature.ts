@@ -46,14 +46,20 @@ export interface SignatureInput {
   readonly at?: Date;
 }
 
-/** What the request has to carry for the service to accept the signature. */
-export interface SignedHeaders {
+/**
+ * What the request has to carry for the service to accept the signature.
+ *
+ * A header map that also names the four fields always present, so a reader that
+ * needs one gets it without a lookup and a transport can still treat the whole
+ * thing as headers. The session token appears only when the credential is
+ * temporary, which is why it is not among the named ones.
+ */
+export type SignedHeaders = Record<string, string> & {
   readonly host: string;
   readonly "x-amz-date": string;
   readonly "x-amz-content-sha256": string;
   readonly authorization: string;
-  readonly "x-amz-security-token"?: string;
-}
+};
 
 const ALGORITHM = "AWS4-HMAC-SHA256";
 const TERMINATOR = "aws4_request";

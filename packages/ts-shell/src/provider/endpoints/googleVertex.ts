@@ -23,6 +23,7 @@ import {
   type GoogleRequestBody,
 } from "./googleWire.js";
 import { accessToken } from "../google/auth.js";
+import type { RequestSigner } from "../request/fetch.js";
 
 /**
  * The host for a location.
@@ -107,6 +108,8 @@ declareEndpoint("google-vertex", {
   // No static credential: a token is fetched per request and added by the
   // transport, which is the only place that sees the request it belongs to.
   headers: () => ({ "content-type": "application/json", accept: "text/event-stream" }),
+  // The token expires, so it is obtained per request rather than resolved once.
+  signer: () => vertexAuthorization(),
   body: (input) =>
     vertexBody({
       systemPrompt: input.systemPrompt ?? "",
@@ -138,7 +141,9 @@ declareEndpoint("google-vertex", {
  * moment a request is complete: a token has to be attached to the request it
  * belongs to, and only the transport sees all of one.
  */
-export async function vertexAuthorization(): Promise<Readonly<Record<string, string>>> {
-  const token = await accessToken();
-  return { authorization: `Bearer ${token.token}` };
+export async function vertexAuthorization(): Promise<RequestSigner> {
+  return async () => {
+    const token = await accessToken();
+    return { authorization: `Bearer ${token.token}` };
+  };
 }

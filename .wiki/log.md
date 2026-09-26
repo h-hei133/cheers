@@ -4322,3 +4322,28 @@ T2 Device Code、T3 订阅 OAuth、T1 后台执行。
 第三次**漏掉本地完整参考并据此收窄**。
 **共同点：我在证据不足时用「成本高」收口，而不是继续查。
 正确做法是：证据不足时继续查，而不是降级目标。**
+
+### Phase 13 施工（**2026-09-26**）：M4/M5 全量实现
+
+**维护者驳回「收窄」后重派 4 个 scout，发现本地 `~/projects/oh-my-pi` 就是零 SDK 的完整参考**
+（`aws-sigv4.ts` 229 行、`aws-eventstream.ts` 181、`aws-credentials.ts` 1078、
+`amazon-bedrock.ts` 1345、`google-auth.ts` 330），**且带 AWS 官方测试向量**。
+
+**已落地**（全部有「撤销即失败」的测试）：
+
+| 任务 | 新增 | 验证 |
+|---|---|---|
+| **T4** 契约 | `path` 动态化 + 传输层签名装饰器 | 4 个调用点零改动；**实机验证**包装后能看到 url/method/body/headers |
+| **T6a** | `provider/aws/signature.ts`（WebCrypto SigV4） | **对 AWS 官方向量**：`getSigningKey` 期望值 `c4afb1cc…`、空串 SHA-256 `e3b0c442…` |
+| **T6a** | `provider/aws/eventStream.ts`（二进制帧 + **自写 CRC32**） | CRC 校验值 `0xCBF43926`；跨 chunk 分片、多帧合一、截断拒绝 |
+| **T6b** | `provider/aws/credentials.ts` + `profile.ts` | 五个来源全覆盖（env / web identity / profile / 容器 / IMDSv2）+ SSO + `credential_process` + 角色链 |
+| **T6** | `provider/endpoints/bedrockConverse.ts` | URL 含 model；工具历史必须有 `toolConfig`（占位工具）；结果合并进 user turn |
+| **T5** | `provider/endpoints/googleGenAI.ts` + `googleWire.ts`（共享翻译） | 角色是 `model`；`functionResponse` 必须合并；`thoughtSignature` 原样往返 |
+| **T5b** | `provider/google/auth.ts` + `endpoints/googleVertex.ts` | **RS256 JWT 用真密钥对往返验证**；ADC 三条来源；令牌缓存含提前过期 |
+| **集成** | catalog 三条 provider 条目 + 端点自声明 `signer` | **实机验证**三条 provider 出现在 catalog 且端点正确 |
+
+**一个真实的 Node 地板约束**：`oh-my-pi` 用 `Bun.hash.crc32`，而 `node:zlib` 的 `crc32`
+是 **v22.2 / v20.15** 引入的，**我们地板 20.3、CI 就跑 20.3** —— **CRC32 必须自己写**
+（多项式 `0xEDB88320`，256 项查表）。已实测校验值正确。
+
+**依赖面仍是 6 个**——零 AWS/Google SDK，与 `phase-3-decisions.md` §131 的先例一致。

@@ -9,6 +9,7 @@ import {
   resolveProviderTransportConfig,
   withRequestSigner,
 } from "./fetch.js";
+import { endpointShape } from "../endpoints/index.js";
 
 /**
  * The deadlines a provider request runs against.
@@ -266,5 +267,36 @@ describe("a transport that signs its requests", () => {
     await base("https://example.test/x", { method: "POST", body: "b" });
 
     expect(sent?.method).toBe("POST");
+  });
+});
+
+describe("a transport that applies its endpoint's signer", () => {
+  /**
+   * Two endpoints cannot carry a constant credential: one signs the request and
+   * one carries a token that expires. Both are computed at the transport, which
+   * is the only place a request exists whole — and the signer is asked for once
+   * rather than per request, because building one may read a file.
+   */
+  it("signs a request the endpoint declared a signer for", async () => {
+    let signed = 0;
+    const base = (async (_url: unknown, init?: RequestInit) => {
+      expect((init?.headers as Record<string, string>).authorization).toBe("SIGNED POST /x/m");
+      return new Response("ok");
+    }) as unknown as typeof fetch;
+
+    const shaped = withRequestSigner(base, async () => {
+      signed += 1;
+      return { authorization: "SIGNED POST /x/m" };
+    });
+    await shaped("https://a.test/x/m", { method: "POST", body: "{}" });
+
+    expect(signed).toBe(1);
+  });
+
+  it("adds nothing when the endpoint declared no signer", () => {
+    // Most endpoints take a constant header, and wrapping them anyway would put a
+    // no-op on the hot path for every request.
+    const shape = endpointShape("openai-compatible");
+    expect(shape.signer).toBeUndefined();
   });
 });
