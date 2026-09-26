@@ -559,8 +559,9 @@ describe("the sampling settings a reasoning request may carry", () => {
 
   it("says how much reasoning is allowed, not merely that it is on", () => {
     // The budget is required alongside `enabled`; asking for reasoning without
-    // saying how much is a request the API rejects.
-    const request = body({ thinkingLevelName: "high", thinkingBudgetTokens: 16_384 });
+    // saying how much is a request the API rejects. A ceiling with room for it
+    // leaves the budget at what the level asked for.
+    const request = body({ thinkingLevelName: "high", thinkingBudgetTokens: 16_384, maxOutputTokens: 64_000 });
 
     expect(request.thinking).toEqual({ type: "enabled", budget_tokens: 16_384 });
   });
@@ -571,12 +572,25 @@ describe("the sampling settings a reasoning request may carry", () => {
     expect((request.thinking as { budget_tokens?: number }).budget_tokens).toBeGreaterThan(0);
   });
 
-  it("leaves the ceiling above the budget so there is room to answer", () => {
-    // A budget at or above the ceiling leaves nothing to answer with, and the
-    // API requires the ceiling to exceed it.
+  it("fits the budget inside the caller's ceiling rather than raising it", () => {
+    // The ceiling is the number the caller chose; the budget comes from the
+    // reasoning level. Raising the ceiling to hold the budget let a level
+    // preference override a configured output cap — with the shipped defaults
+    // (`maxOutputTokens: 4096`, level `high`) every request asked for 17,408
+    // tokens of output, which is not what the configuration said.
     const request = body({ thinkingLevelName: "high", thinkingBudgetTokens: 16_384, maxOutputTokens: 4_096 });
 
-    expect(request.max_tokens).toBeGreaterThan(16_384);
+    expect(request.max_tokens).toBe(4_096);
+    expect((request.thinking as { budget_tokens: number }).budget_tokens).toBeLessThan(4_096);
+  });
+
+  it("omits thinking when the ceiling cannot hold a budget and an answer", () => {
+    // The API rejects a budget that leaves no room to answer. The answer is what
+    // the caller asked for, so the reasoning is the part that goes.
+    const request = body({ thinkingLevelName: "high", thinkingBudgetTokens: 16_384, maxOutputTokens: 1_500 });
+
+    expect(request).not.toHaveProperty("thinking");
+    expect(request.max_tokens).toBe(1_500);
   });
 
   it("leaves a caller's ceiling alone when it already has room", () => {

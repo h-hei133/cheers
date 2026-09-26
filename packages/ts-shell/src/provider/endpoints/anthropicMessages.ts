@@ -49,6 +49,9 @@ const API_VERSION = "2023-06-01";
 const DEFAULT_MAX_TOKENS = 4_096;
 /** Room left for the answer when a thinking budget would consume the ceiling. */
 const MIN_ANSWER_TOKENS = 1_024;
+
+/** Below this the API rejects a budget, so a smaller ceiling gets no thinking. */
+const MIN_THINKING_BUDGET_TOKENS = 1_024;
 /** Used when a level was requested without a resolved budget. */
 const DEFAULT_THINKING_BUDGET_TOKENS = 8_192;
 
@@ -141,16 +144,24 @@ export function anthropicRequestBody(input: AnthropicRequestInput): Record<strin
   if (input.thinkingLevelName !== undefined) {
     // The budget is required alongside `enabled`: the API rejects the field
     // without one, so asking for reasoning without saying how much is not a
-    // request it accepts. The ceiling is raised to hold it when the caller's own
-    // is smaller — a budget at or above `max_tokens` leaves no room to answer.
-    const budget = input.thinkingBudgetTokens ?? DEFAULT_THINKING_BUDGET_TOKENS;
-    body.thinking = { type: "enabled", budget_tokens: budget };
-    // A budget at or above the ceiling leaves nothing to answer with, and the
-    // API requires the ceiling to exceed it. Raised by the room an answer needs
-    // rather than doubled: a caller that set a ceiling meant it.
+    // request it accepts.
+    //
+    // The budget fits inside the ceiling rather than the other way round. The
+    // API requires `max_tokens` to exceed `budget_tokens`, and the ceiling is
+    // the number the caller actually chose — a configured output cap is a
+    // statement about how much answer is wanted, while the budget comes from the
+    // reasoning level and is a preference within it. Raising the ceiling to hold
+    // the budget read the level as the stronger of the two and overrode the cap:
+    // with the shipped defaults (`maxOutputTokens: 4096`, level `high`) every
+    // request asked for 17,408 tokens of output.
     const ceiling = input.maxOutputTokens ?? DEFAULT_MAX_TOKENS;
-    if (ceiling <= budget) {
-      body.max_tokens = budget + MIN_ANSWER_TOKENS;
+    const wanted = input.thinkingBudgetTokens ?? DEFAULT_THINKING_BUDGET_TOKENS;
+    const budget = Math.min(wanted, ceiling - MIN_ANSWER_TOKENS);
+    // A ceiling too small to hold a budget and an answer at all: thinking is
+    // omitted rather than sent as a request the API refuses. The answer is what
+    // the caller asked for; the reasoning was a preference.
+    if (budget >= MIN_THINKING_BUDGET_TOKENS) {
+      body.thinking = { type: "enabled", budget_tokens: budget };
     }
   }
 
