@@ -113,11 +113,11 @@ describe("subagent subsystem", () => {
   });
 
   describe("Task Tool Integration", () => {
-    it("prepares the subagent and says it was not dispatched without a provider", async () => {
-      // No credential is configured here, so nothing is sent. The tool used to
-      // answer "success: true" with "All delegated instructions have been
-      // completed" on the strength of an empty response string, which a caller
-      // cannot tell from real work.
+    it("prepares the subagent and reports that nothing ran without a model", async () => {
+      // No runner is supplied here, so nothing is sent. The tool used to answer
+      // "success: true" with "All delegated instructions have been completed" on
+      // the strength of an empty response string, which a caller cannot tell from
+      // real work.
       const taskTool = createTaskToolDefinition();
       const result = await taskTool.execute(
         {
@@ -137,7 +137,7 @@ describe("subagent subsystem", () => {
       expect(report).toContain("# 🤖 Subagent Task Executed");
       expect(report).toContain("code-reviewer");
       expect(report).toContain("Review auth tokens");
-      expect(report).toContain("not dispatched");
+      expect(report).toContain("was not started");
     });
   });
 });

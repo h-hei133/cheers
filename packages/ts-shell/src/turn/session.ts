@@ -21,6 +21,7 @@ import { isOverflowFailure, type StepFunction } from "./step.js";
 import { adaptTools, createToolHooks, type ToolGateOptions } from "./tools.js";
 import { getSessionUsage } from "../observability/usageTelemetry.js";
 import type { SentRequest } from "../provider/request/sentRequest.js";
+import type { SubagentRunner } from "../core/subagents/runner.js";
 import type { CacheWarmingRunner } from "./cacheWarm.js";
 import type { ToolDefinition } from "../tools/types.js";
 
@@ -84,6 +85,14 @@ export interface TurnOptions {
   /** What a command the model runs should know about this session. */
   readonly commandEnv?: Readonly<Record<string, string>>;
   /**
+   * How to run a subagent, when this session can delegate.
+   *
+   * Passed through to the tool layer, which reaches it from a tool's context.
+   * Resolved by the caller because running a subagent needs the model side and
+   * this layer's job is the conversation, not the provider.
+   */
+  readonly runSubagent?: SubagentRunner;
+  /**
    * How a failed step is retried, resolved once by the caller.
    *
    * Absent means the turn layer's default, which is to retry. Resolved outside
@@ -142,6 +151,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     interactiveAsk: options.interactiveAsk,
     emit: (event) => channel.push(event),
     ...(options.commandEnv ? { commandEnv: options.commandEnv } : {}),
+    ...(options.runSubagent ? { runSubagent: options.runSubagent } : {}),
   };
   const openingText = `${environmentLine(options.workspaceRoot, options.permissionScope)}\n\n${options.prompt}`;
   const openingImages = options.attachments?.images ?? [];

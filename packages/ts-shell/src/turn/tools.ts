@@ -8,6 +8,7 @@ import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { AskQuestion } from "../core/tools/ask.js";
 import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
 import type { ToolDefinition } from "../tools/types.js";
+import type { SubagentRunner } from "../core/subagents/runner.js";
 import { neutraliseForDisplay } from "../core/text/safety.js";
 
 /** A tool definition in the shape a chat completion request takes. */
@@ -48,6 +49,13 @@ export interface ToolGateOptions {
    * answering, not about this process.
    */
   readonly commandEnv?: Readonly<Record<string, string>>;
+  /**
+   * How to run a subagent, handed down so the delegating tool can reach it.
+   *
+   * Supplied by whoever assembled the turn, because running one needs the model
+   * side and this layer has none of it. Absent means the tool cannot delegate.
+   */
+  readonly runSubagent?: SubagentRunner;
 }
 
 /** Tools a planning session may call: the ones that only look. */
@@ -115,6 +123,7 @@ async function executeTool(
       interactiveAsk: options.interactiveAsk,
       sessionId: options.sessionId,
       ...(options.commandEnv ? { commandEnv: options.commandEnv } : {}),
+      ...(options.runSubagent ? { runSubagent: options.runSubagent } : {}),
       // A tool that reports progress passes it on; one that does not is
       // unaffected, since the callback only fires if the tool calls it.
       ...(onUpdate ? { onOutput: (chunk: string) => onUpdate(chunk) } : {}),

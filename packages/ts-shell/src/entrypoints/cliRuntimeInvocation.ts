@@ -46,6 +46,8 @@ import { commandEnvironment } from "../runtime/execution/commandEnvironment.js";
 import { createSessionStoreLayout, locateExistingSessionLayout } from "../session/store/sessionFileLayout.js";
 import { getThinkingEffort } from "../core/commands/thinkingCommandRuntime.js";
 import { toolSchemas } from "../turn/tools.js";
+import { runSubagent, type SubagentRunner } from "../core/subagents/runner.js";
+import { adaptTools } from "../turn/tools.js";
 
 type ProviderMode = "synthetic" | "real";
 
@@ -423,6 +425,13 @@ function withRequestOverhead(
   return { ...compaction, policy: { ...compaction.policy, overhead } };
 }
 
+/**
+ * Steps a delegated run gets when its definition declares none.
+ *
+ * A subagent has no user watching it, so nothing else would end one that loops.
+ */
+const SUBAGENT_DEFAULT_STEPS = 20;
+
 function startTurn(
   request: CliRuntimeInvocationRequest,
   dependencies: CliRuntimeInvocationDependencies,
@@ -454,8 +463,40 @@ function startTurn(
     systemPrompt: buildSystemPrompt(request.agentMode, promptContext),
     tools: toolSchemas(tools),
   });
+  // The step and the tool set both exist here, so this is where a subagent's
+  // run can be bound. The tool layer receives a function and never the model
+  // side, which is what keeps a provider out of a layer that has no business
+  // holding one.
+  // One step for the whole invocation. A second one would be a second provider
+  // resolution, and the run and its subagents would not necessarily be talking
+  // to the same model.
+  const step = request.providerMode === "synthetic"
+    ? createSyntheticStep({ toolIntent: syntheticToolIntent() })
+    : (dependencies.createStep ?? createProviderStep)(request, tools, promptContext);
+  const runSubagentTool: SubagentRunner = (subagentInput) =>
+    runSubagent(subagentInput, {
+      tools: new Map(
+        adaptTools(tools, {
+          sessionId: request.sessionId,
+          workspaceRoot: request.workspaceRoot,
+          hooks,
+          emit: () => {},
+          ...(request.agentMode ? { agentMode: request.agentMode } : {}),
+          ...(request.permissionScope ? { permissionScope: request.permissionScope } : {}),
+          ...(request.escalationPromptHandler
+            ? { escalationPromptHandler: request.escalationPromptHandler }
+            : {}),
+          ...(request.interactiveAsk ? { interactiveAsk: request.interactiveAsk } : {}),
+        }).map((tool) => [tool.name, tool] as const),
+      ),
+      step: (messages, signal) =>
+        step(messages, signal, { onText: () => {}, onReasoning: () => {} }, { allowTools: true }),
+      defaultMaxSteps: SUBAGENT_DEFAULT_STEPS,
+    });
+
   const run = runTurn({
     commandEnv: commandEnvironmentFor(request),
+    runSubagent: runSubagentTool,
     sessionId: request.sessionId,
     // The directory the session writes to, so a consumer of the event stream can
     // find the transcript without reconstructing the layout itself. Omitted when the
@@ -471,7 +512,7 @@ function startTurn(
     interactiveAsk: request.interactiveAsk,
     history: request.historyMessages ?? [],
     onMessage: request.onTurnMessage ?? (() => {}),
-    step: request.providerMode === "synthetic" ? createSyntheticStep({ toolIntent: syntheticToolIntent() }) : (dependencies.createStep ?? createProviderStep)(request, tools, promptContext),
+    step,
     tools,
     hooks,
     maxSteps: request.maxTurns,

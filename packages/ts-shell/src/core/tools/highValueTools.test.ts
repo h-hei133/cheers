@@ -200,7 +200,7 @@ describe("High-Value Modern Built-in Tools Subsystem", () => {
       expect(report).toContain("Subagent Task Executed");
       expect(report).toContain("Description**: Analyze dependency tree");
       expect(report).toContain("PLAN (Read-Only)");
-      expect(report).toContain("not dispatched");
+      expect(report).toContain("was not started");
       expect(report).not.toContain("have been completed");
     });
   });

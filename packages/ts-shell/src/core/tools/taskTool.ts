@@ -9,6 +9,16 @@ import { projectTrust } from "../security/projectTrust.js";
 const defaultWorktreeManager = new GitWorktreeManager();
 
 /**
+ * Steps a subagent gets when its definition declares none.
+ *
+ * A delegated run has no user watching it, so nothing else would end one that
+ * loops. Bounded rather than generous: the point of delegating is to get an
+ * answer back, and a subagent that runs long enough to exhaust the context has
+ * usually misunderstood the task.
+ */
+const DEFAULT_SUBAGENT_STEPS = 20;
+
+/**
  * /task & /agent tool
  * Dispatches an isolated subagent to perform an independent research, analysis, or modification task.
  * Integrates .agents/*.md frontmatter loader, worktree isolation, persistent agent-memory, and lifecycle hooks.
@@ -127,56 +137,38 @@ export function createTaskToolDefinition(
       // Where a subagent's changes were left, when it made any. Reported because
       // a kept worktree is the only way to find them.
       let keptWorktree: { readonly worktreePath: string; readonly branch: string } | undefined;
-      const apiKey = process.env.SILICONFLOW_API_KEY || process.env.OPENAI_API_KEY || "";
-      const baseUrl = process.env.SILICONFLOW_BASE_URL || process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
-      const model = subagentDef?.model || (process.env.SILICONFLOW_API_KEY ? "deepseek-ai/DeepSeek-V4-Flash" : "gpt-4o-mini");
-
-      const systemPrompt = [
-        subagentDef?.systemPrompt || `You are ${agentType}, an autonomous subagent for: "${description}".`,
-        `Mode: ${mode}. Working Directory: ${effectiveWorkspace}.`,
-        memoryContext,
-      ].join("\n");
+      let usedTools: readonly string[] = [];
+      let stepsTaken = 0;
 
       try {
-        if (apiKey && !process.env.VITEST && process.env.NODE_ENV !== "test") {
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 30_000);
-          try {
-            const res = await fetch(`${baseUrl.replace(/\/+$/, "")}/chat/completions`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${apiKey}`,
-              },
-              body: JSON.stringify({
-                model,
-                messages: [
-                  {
-                    role: "system",
-                    content: systemPrompt,
-                  },
-                  {
-                    role: "user",
-                    content: `${prompt}\n\nContext:\n${contextStr || "No additional context provided."}`,
-                  },
-                ],
-                temperature: 0.3,
-              }),
-              signal: controller.signal,
-            });
-            if (res.ok) {
-              const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-              subagentResponse = data.choices?.[0]?.message?.content?.trim() || "";
-            } else {
-              subagentFailure = `The provider answered ${res.status}.`;
-            }
-          } finally {
-            // Disarmed after the body is read, not after the headers. Clearing it
-            // as soon as `fetch` resolved left the body read unbounded: a provider
-            // that sends headers and then stalls hung this tool forever, and the
-            // 30s deadline could not fire because it was already gone.
-            clearTimeout(timer);
-          }
+        // The runner is supplied by the turn, which owns the model side. Without
+        // it there is nothing to run a subagent on, and saying so is the only
+        // honest answer — the previous implementation reached for environment
+        // variables instead and asked a provider the session had not chosen.
+        if (!context.runSubagent) {
+          subagentFailure = "no model is available to this session, so the subagent was not started";
+        } else {
+          const result = await context.runSubagent({
+            definition: {
+              name: agentType,
+              description,
+              systemPrompt: subagentDef?.systemPrompt
+                ?? `You are ${agentType}, an autonomous subagent for: "${description}".`,
+              ...(subagentDef?.tools ? { tools: subagentDef.tools } : {}),
+              ...(subagentDef?.disallowedTools ? { disallowedTools: subagentDef.disallowedTools } : {}),
+              ...(subagentDef?.maxTurns !== undefined ? { maxTurns: subagentDef.maxTurns } : {}),
+              source: subagentDef?.source ?? "builtin",
+            },
+            prompt,
+            workspace: effectiveWorkspace,
+            ...(contextStr ? { context: contextStr } : {}),
+            ...(memoryContext ? { memory: memoryContext } : {}),
+            ...(context.abortSignal ? { signal: context.abortSignal } : {}),
+          });
+          subagentResponse = result.text;
+          usedTools = result.tools;
+          stepsTaken = result.steps;
+          if (result.failed) subagentFailure = result.failure ?? "the subagent failed";
         }
       } catch (error) {
         subagentFailure = error instanceof Error ? error.message : String(error);
@@ -219,6 +211,8 @@ export function createTaskToolDefinition(
         `- **Mode**: \`${mode}\``,
         `- **Filesystem Isolation**: \`${shouldIsolate ? `Git Worktree (${effectiveWorkspace})` : "Shared Workspace"}\``,
         ...(contextStr ? [`- **Context Attached**: ${contextStr}`] : []),
+        `- **Tools**: ${usedTools.length > 0 ? `\`${usedTools.join("\`, \`")}\`` : "none"}`,
+        `- **Steps Used**: ${stepsTaken}`,
         "",
         ...(keptWorktree
           ? [

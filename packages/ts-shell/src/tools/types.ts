@@ -1,4 +1,5 @@
 import type { PermissionCheck } from '../sandbox/index.js'
+import type { SubagentRunner } from '../core/subagents/runner.js'
 import type {
   ToolReportSafeProjection,
   ToolResultDetails,
@@ -24,6 +25,15 @@ export interface ToolExecutionContext {
    * one that has hung. Chunks arrive as they are written, not at the end.
    */
   readonly onOutput?: (chunk: string) => void
+  /**
+   * How to run a subagent, for the tool that delegates to one.
+   *
+   * Supplied by the turn because running one needs the model side — the
+   * provider, the transport, the step function — and this layer has none of it.
+   * Absent means delegation is not available, which the tool reports rather than
+   * faking a completion.
+   */
+  readonly runSubagent?: SubagentRunner
   readonly interactiveAsk?: (
     questions: Array<{
       id: string
