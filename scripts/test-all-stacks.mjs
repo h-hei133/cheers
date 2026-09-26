@@ -3,14 +3,12 @@
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { detectCargo, detectPython, detectVitestModule } from './toolchain.mjs'
+import { detectVitestModule } from './toolchain.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '..')
 const nodeExe = process.execPath
 const vitestModule = detectVitestModule(rootDir)
-const python = detectPython()
-const cargo = detectCargo()
 
 function runStack(name, command, args, extraEnv = {}) {
   process.stdout.write(`\n${'='.repeat(60)}\n`)
@@ -42,25 +40,16 @@ function runStack(name, command, args, extraEnv = {}) {
 
 function main() {
   process.stdout.write(`${'='.repeat(60)}\n`)
-  process.stdout.write('Tri-Stack Test Infrastructure - Unified Runner\n')
+  process.stdout.write('TypeScript Test Infrastructure - Unified Runner\n')
   process.stdout.write(`${'='.repeat(60)}\n`)
-
-  if (!python.ok) {
-    throw new Error(`Python toolchain unavailable. ${python.output}`)
-  }
-  if (!cargo.ok) {
-    throw new Error(`Cargo toolchain unavailable. ${cargo.output}`)
-  }
 
   runStack('TypeScript Tests (vitest)', nodeExe, [vitestModule, 'run', '--dir', 'packages/ts-shell/src'])
   // The gates under scripts/ carry their own tests so a gate that stops
   // detecting what it was written for fails here rather than silently passing.
   runStack('Script Tests (node --test)', nodeExe, ['--test', 'scripts/*.test.mjs'])
-  runStack('Rust Tests (cargo test)', cargo.command, ['test', '--manifest-path', 'packages/rust-core/Cargo.toml'])
-  runStack('Python Tests (pytest)', python.command, ['scripts/run-python-tests.py'])
 
   process.stdout.write(`\n${'='.repeat(60)}\n`)
-  process.stdout.write('✓ All tri-stack tests PASSED\n')
+  process.stdout.write('✓ All tests PASSED\n')
   process.stdout.write(`${'='.repeat(60)}\n`)
 }
 

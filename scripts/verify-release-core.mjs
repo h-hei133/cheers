@@ -39,19 +39,6 @@ if (permissionCode !== 0) {
   process.exit(permissionCode)
 }
 
-const rustEnvCode = await runNodeScript('verify-rust-execution.mjs', ['env'])
-if (rustEnvCode !== 0) {
-  console.log(`[config-failure] release-core - rust env exited ${rustEnvCode}`)
-  process.exit(3)
-}
-
-const rustHardCode = await runNodeScript('verify-rust-execution.mjs', ['hard'])
-if (rustHardCode !== 0) {
-  const status = rustHardCode === 3 ? 'config-failure' : 'product-regression'
-  console.log(`[${status}] release-core - rust execution exited ${rustHardCode}`)
-  process.exit(rustHardCode)
-}
-
 const sessionLifecycleCode = await runNodeScript('verify-session-lifecycle.mjs')
 if (sessionLifecycleCode !== 0) {
   const status = sessionLifecycleCode === 3 ? 'config-failure' : 'product-regression'

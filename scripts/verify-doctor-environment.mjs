@@ -16,8 +16,6 @@ const syntheticHome = getSyntheticHome()
 const realHome = getRealProviderHome({ allowDefault: true })
 const requiredCommands = [
   'verify:permission-memory',
-  'verify:rust-execution:env',
-  'verify:rust-execution',
   'verify:session-lifecycle',
   'verify:query-orchestration',
   'verify:cli-entry',
@@ -251,8 +249,6 @@ async function main() {
   checks.push(await checkTool('node-toolchain', process.execPath, ['--version']))
   checks.push(await checkTool('npm-toolchain', process.platform === 'win32' ? 'npm.cmd' : 'npm', ['--version']))
   checks.push(await checkTool('pnpm-toolchain', process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm', ['--version'], false))
-  checks.push(await checkTool('cargo-toolchain', 'cargo', ['--version']))
-  checks.push(await checkTool('rustc-toolchain', 'rustc', ['--version']))
   checks.push(checkHome('synthetic-home', syntheticHome))
   checks.push(checkHome('real-provider-home', realHome))
   checks.push(await checkSyntheticModeEnv())

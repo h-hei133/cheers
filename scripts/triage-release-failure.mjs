@@ -53,7 +53,7 @@ function classify(text, exitCode) {
   if (exitCode === 2 || /\[provider-network-inconclusive\]|provider-network-inconclusive|network inconclusive|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|fetch failed|socket hang up|provider.*unreachable/i.test(text)) {
     return 'provider-network-inconclusive'
   }
-  if (exitCode === 3 || /\[config-failure\]|config-failure|environment failure|missing.*config|credential missing|HOME.*wrong|toolchain|cargo.*missing|rustc.*missing/i.test(text)) {
+  if (exitCode === 3 || /\[config-failure\]|config-failure|environment failure|missing.*config|credential missing|HOME.*wrong|toolchain/i.test(text)) {
     return 'config-failure'
   }
   if (/\[product-regression\]|product-regression|AssertionError|expected .* to|missing=|should not|failed assertion/i.test(text)) {
