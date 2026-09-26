@@ -1335,3 +1335,40 @@ Vertex 支持 **API key**（`google-vertex.ts:27-32`）。
 
 **注**：`interception.ts` 的类型被活文件引用，**不能整文件删**——
 这正是 §2.2「删除单元取连通分量整簇」要防的那种「看着像死代码、其实是编译契约」。
+
+
+---
+
+## 15. Phase 13 施工结果（**2026-09-26**）
+
+**10 项全部落地，零新增依赖**（仍是 6 个）。详见 `phase-13-decisions.md` §9。
+
+| 任务 | 模块 |
+|---|---|
+| **T4** 契约 | `path` 动态化 + 传输层签名装饰器 + 端点自声明 `signer` |
+| **T6a** | `provider/aws/signature.ts`、`eventStream.ts` |
+| **T6b** | `provider/aws/credentials.ts`、`profile.ts` |
+| **T6** | `provider/endpoints/bedrockConverse.ts` |
+| **T5** | `provider/endpoints/googleGenAI.ts`、`googleWire.ts` |
+| **T5b** | `provider/google/auth.ts`、`endpoints/googleVertex.ts` |
+| **T7** | `providers.ts` 列表派生 |
+| **T2** | `core/auth/oauth/deviceCode.ts` |
+| **T3** | `core/auth/oauth/subscription.ts` |
+| **T1** | `core/shell/background/tasks.ts` + `runInBackground`/`taskOutput`/`taskStop` |
+
+### 15.1 集成（否则就是 demo 模块）
+
+协议写完**不等于可用**，必须接线：catalog 三条 provider 条目、
+端点自声明签名器、传输层应用签名、授权层接受「有签名器无 key」、
+UI 计数器接真实来源。
+
+**实机验证**：三条 provider 在 catalog 且端点正确；两个新工具在 registry；
+后台命令完整生命周期走通。
+
+### 15.2 一个真实约束与一个被推翻的注释
+
+**Node 地板**：`node:zlib` 的 `crc32` 需要 20.15/22.2，**我们地板 20.3** —— 自己写 CRC32。
+**一个特性不值得抬高整个包的地板。**
+
+**旧注释变成假话**：`ambientFacts.ts` 说「没有后台命令计数器，因为 shell 没有
+detached 执行模式」。**后台执行落地后这是假的** —— 已删并接上真实来源。

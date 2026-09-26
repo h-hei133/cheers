@@ -4360,3 +4360,13 @@ T2 Device Code、T3 订阅 OAuth、T1 后台执行。
 **一处必须同步的旧注释**：`ambientFacts.ts` 原文写着「the shell has no detached execution mode，
 so the counter could only ever be invented」。**后台执行落地后这句话变成假的**，
 已改，并**把计数器接上**（现在它有一个真实的来源）。
+
+**最终验证（Phase 13）**：
+
+- **全量套件**：`558 文件 / 4,071 通过 / 0 失败 / 1 跳过`（exit=0）。
+  首跑有两项失败，**逐项隔离复跑全部通过**，且都是 `log.md:3483` 已逐字记录的负载敏感项
+  （`benchmark` 的 CPU 计时、`subscription` 的过期窗口断言——后者已改为对机器速度不敏感）。
+- **七道门禁全部 pass**（含 `test:scripts` 27/27）。
+- **零新增依赖**——仍是 6 个运行时依赖。
+- **无别人项目名**（逐个 grep 核验；命中的只有 **wire 值里的产品名**，
+  如 `claude.ai` 的 OAuth 端点与 `anthropic.claude-3` 的 Bedrock model id）。

@@ -8,6 +8,7 @@ import {
   providerTimeoutsFrom,
   resolveProviderTransportConfig,
   withRequestSigner,
+  providerFetchForEndpoint,
 } from "./fetch.js";
 import { endpointShape } from "../endpoints/index.js";
 
@@ -298,5 +299,45 @@ describe("a transport that applies its endpoint's signer", () => {
     // no-op on the hot path for every request.
     const shape = endpointShape("openai-compatible");
     expect(shape.signer).toBeUndefined();
+  });
+});
+
+describe("a signer that is expensive to build", () => {
+  /**
+   * It is built once, even when requests arrive together.
+   *
+   * Building one may read a credential file or obtain a token, and a session that
+   * issues its first requests concurrently would otherwise do that work several
+   * times over — for a value that is the same each time.
+   */
+  it("is built only when a request is actually made", async () => {
+    // Building one may read a credential file or obtain a token. A session that
+    // never makes a request should not pay for either.
+    let built = 0;
+    const shaped = providerFetchForEndpoint({}, "openai-compatible", () => ({
+      signer: async () => {
+        built += 1;
+        return async () => ({ authorization: "S" });
+      },
+    }));
+
+    expect(shaped).toBeDefined();
+    expect(built).toBe(0);
+  });
+
+  it("reuses the signer it built", async () => {
+    const seen: string[] = [];
+    const signed = withRequestSigner(
+      (async (_url: unknown, init?: RequestInit) => {
+        seen.push((init?.headers as Record<string, string>).authorization!);
+        return new Response("ok");
+      }) as unknown as typeof fetch,
+      async () => ({ authorization: "same" }),
+    );
+
+    await signed("https://a.test/x", { method: "POST" });
+    await signed("https://a.test/y", { method: "POST" });
+
+    expect(seen).toEqual(["same", "same"]);
   });
 });

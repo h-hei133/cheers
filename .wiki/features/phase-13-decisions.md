@@ -522,3 +522,55 @@ AWS4-HMAC-SHA256 Credential=<accessKeyId>/<scope>, SignedHeaders=<names>, Signat
 **注**：`interception.ts` 的类型被活文件引用，
 所以**不能整文件删**——要么保留类型、删函数，要么把类型移走。
 这正是 §2.2「删除单元取连通分量整簇」要防的那种「看着像死代码、其实是编译契约」。
+
+---
+
+## 9. 施工结果（**2026-09-26**）
+
+**10 项全部落地**（T1–T7 + T5b/T6a/T6b + T4）。**零新增依赖**（仍是 6 个）。
+
+| 任务 | 新增模块 | 验证方式 |
+|---|---|---|
+| **T4** 契约 | `EndpointShape.path` 动态化 + 传输层 `withRequestSigner` + 端点自声明 `signer` | 4 个调用点零改动；实机验证包装后能看到 url/method/body/headers |
+| **T6a** | `provider/aws/signature.ts` | **AWS 官方测试向量**：`getSigningKey` = `c4afb1cc…`、空串 SHA-256 = `e3b0c442…` |
+| **T6a** | `provider/aws/eventStream.ts` | CRC 校验值 `0xCBF43926`；跨 chunk、多帧、截断、坏校验和 |
+| **T6b** | `provider/aws/credentials.ts` + `profile.ts` | 五个来源 + SSO + `credential_process` + 角色链；每个用例自带 env 与 home |
+| **T6** | `provider/endpoints/bedrockConverse.ts` | 工具历史必须有 `toolConfig`（占位工具）；结果合进 user turn；未完成的流报错 |
+| **T5** | `provider/endpoints/googleGenAI.ts` + `googleWire.ts` | 角色是 `model`；`functionResponse` 合并；`thoughtSignature` 原样往返 |
+| **T5b** | `provider/google/auth.ts` + `endpoints/googleVertex.ts` | **用真密钥对跑 RS256 往返**；ADC 三条来源；令牌提前过期 |
+| **T7** | `providers.ts` 列表派生 | 列表与声明不再有两份；列出与构建分离 |
+| **T2** | `core/auth/oauth/deviceCode.ts` | RFC 8628：默认 5s、`slow_down` +5s、可中断 sleep、**两种超时区分** |
+| **T3** | `core/auth/oauth/subscription.ts` | GitHub 设备流（token 直接可用）；Anthropic **JSON** token POST + 固定端口 |
+| **T1** | `core/shell/background/tasks.ts` + `runInBackground` + `taskOutput`/`taskStop` | **真实进程**：启动/读输出/停止/状态落定；输出保尾 64KB；停止打整个进程组 |
+
+### 9.1 集成：否则就是「demo 模块」
+
+**协议写完不等于可用**——必须接线，否则它只是一段没人调用的代码：
+
+| 接线 | 内容 |
+|---|---|
+| **catalog** | 新增 `bedrock` / `google-ai` / `vertex` 三条 provider 条目，各自指向正确的 endpoint |
+| **端点自声明 `signer`** | Bedrock 声明 SigV4 签名器；Vertex 声明 bearer 令牌获取器 |
+| **传输层应用** | `providerFetchForEndpoint()` 把端点的签名器包进 fetch，**签名在 dispatch 前一行发生** |
+| **授权层** | `providerAuthorization` 接受「有签名器但无 key」的端点（否则配置正确也报无凭据） |
+| **UI** | 后台命令计数器接到真实来源，并**删掉那句已变成假的注释** |
+
+**实机验证**：三条 provider 出现在 catalog 且端点/基址正确；`taskOutput`/`taskStop`
+在真实 registry 里（15 个工具）；后台命令的完整生命周期走通。
+
+### 9.2 施工中发现的一个真实约束
+
+`oh-my-pi` 的 `crc32` 用 `Bun.hash.crc32`，而 `node:zlib` 的 `crc32` 是 **v22.2 / v20.15** 引入的，
+**我们声明的地板是 20.3 且 CI 就跑 20.3** —— **用它会撞 `check:node-floor`**。
+**CRC32 自己写**（多项式 `0xEDB88320`，256 项查表），并**实测校验值正确**。
+**一个特性不值得抬高整个包的地板。**
+
+### 9.3 一个被施工推翻的旧注释
+
+`cli/interactive/ambientFacts.ts` 原文写着：
+
+> There is deliberately no "background commands" counter: the shell has no
+> detached execution mode, so the number could only ever be invented.
+
+**后台执行落地后这句话变成假的**。已删掉并**把计数器接上真实来源**——
+这正是「文档与行为不一致」那一类，与 `phase-12-decisions.md` §1.1 的取舍同源。
