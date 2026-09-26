@@ -81,6 +81,11 @@ export interface StreamedCompletion {
    * text it covers rather than being dropped with the display copy.
    */
   readonly reasoningSignature?: string;
+  /**
+   * Whether that reasoning was withheld and the signature is its opaque payload.
+   * See `SessionMessage.reasoning.redacted`.
+   */
+  readonly reasoningRedacted?: boolean;
   readonly finishReason?: string;
   readonly usage?: ProviderUsage;
 }

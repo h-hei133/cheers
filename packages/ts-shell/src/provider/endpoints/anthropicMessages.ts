@@ -54,6 +54,14 @@ const MIN_ANSWER_TOKENS = 1_024;
 const MIN_THINKING_BUDGET_TOKENS = 1_024;
 /** Used when a level was requested without a resolved budget. */
 const DEFAULT_THINKING_BUDGET_TOKENS = 8_192;
+/**
+ * What a withheld reasoning block reads as.
+ *
+ * The provider does not give us the text, and inventing one would be a lie the
+ * model could act on. What it needs to know is that reasoning happened here and
+ * is not being shown, which is what this says.
+ */
+const REDACTED_REASONING = "[reasoning withheld by the provider]";
 
 export interface AnthropicRequestInput {
   readonly model: string;
@@ -172,6 +180,7 @@ export function anthropicRequestBody(input: AnthropicRequestInput): Record<strin
 type ContentBlock =
   | { readonly type: "text"; readonly text: string }
   | { readonly type: "thinking"; readonly thinking: string; readonly signature: string }
+  | { readonly type: "redacted_thinking"; readonly data: string }
   | AnthropicImageBlock
   | { readonly type: "tool_use"; readonly id: string; readonly name: string; readonly input: unknown }
   | { readonly type: "tool_result"; readonly tool_use_id: string; readonly content: string };
@@ -229,7 +238,12 @@ function convertMessages(
     // tool's result is refused.
     if (message.reasoning?.text) {
       const signature = message.reasoning.signature?.trim();
-      if (signature) {
+      if (message.reasoning.redacted && signature) {
+        // Issued as an opaque payload, so it goes back the same way. Sending it
+        // as a `thinking` block would present withheld text as ours and be
+        // rejected; dropping it would leave the tool calls it preceded unsigned.
+        blocks.push({ type: "redacted_thinking", data: signature });
+      } else if (signature) {
         blocks.push({ type: "thinking", thinking: message.reasoning.text, signature });
       } else if (allowEmptySignature) {
         // A provider that issues no signature also accepts one it did not
@@ -415,6 +429,7 @@ export async function* readAnthropicStream(
   let text = "";
   let reasoning = "";
   let reasoningSignature = "";
+  let reasoningRedacted = false;
   let finishReason: string | undefined;
   let usage: ProviderUsage | undefined;
   let sawMessageStart = false;
@@ -433,10 +448,17 @@ export async function* readAnthropicStream(
     const fragments: StreamFragment[] = [];
     let rest = buffer;
     for (;;) {
-      const boundary = rest.indexOf("\n\n");
-      if (boundary === -1) break;
-      const raw = rest.slice(0, boundary);
-      rest = rest.slice(boundary + 2);
+      // Every separator the event-stream format allows, not just the one this
+      // provider is expected to send. A stream framed with CRLF is legal, and a
+      // reader that only looks for `\n\n` never finds a boundary in it: the
+      // buffer grows until the connection closes and the run sees no output at
+      // all. The other reader in this codebase already takes all three, which is
+      // how this one was found — the same wire format parsed two ways, and only
+      // one of them right.
+      const boundary = findEventBoundary(rest);
+      if (!boundary) break;
+      const raw = rest.slice(0, boundary.at);
+      rest = rest.slice(boundary.at + boundary.width);
       const event = parseEvent(raw);
       if (!event) continue;
       // A failure the provider reports in band. The stream itself stays healthy,
@@ -453,6 +475,7 @@ export async function* readAnthropicStream(
           onText: (chunk) => (text += chunk),
           onReasoning: (chunk) => (reasoning += chunk),
           onSignature: (chunk) => (reasoningSignature += chunk),
+          onRedacted: () => (reasoningRedacted = true),
         }),
       );
       if (event.type === "message_start") {
@@ -532,6 +555,7 @@ export async function* readAnthropicStream(
     },
     reasoning,
     ...(reasoningSignature ? { reasoningSignature } : {}),
+    ...(reasoningRedacted ? { reasoningRedacted: true } : {}),
     ...(finishReason ? { finishReason: mapStopReason(finishReason) } : {}),
     ...(usage ? { usage } : {}),
   };
@@ -554,6 +578,8 @@ interface AnthropicEvent {
     readonly type?: string;
     readonly id?: string;
     readonly name?: string;
+    /** The opaque payload of a `redacted_thinking` block, echoed back verbatim. */
+    readonly data?: string;
   };
   readonly message?: {
     readonly usage?: AnthropicUsage;
@@ -580,7 +606,19 @@ interface AnthropicUsage {
   readonly cache_creation_input_tokens?: number;
 }
 
-/** The `data:` payload of one event block, or nothing when it carries none. */
+/** Where the next complete event ends, and how wide its separator is. */
+function findEventBoundary(buffer: string): { readonly at: number; readonly width: number } | undefined {
+  let at = -1;
+  let width = 0;
+  for (const separator of ["\r\n\r\n", "\n\n", "\r\r"]) {
+    const index = buffer.indexOf(separator);
+    if (index < 0 || (at >= 0 && index >= at)) continue;
+    at = index;
+    width = separator.length;
+  }
+  return at < 0 ? undefined : { at, width };
+}
+
 function parseEvent(raw: string): AnthropicEvent | undefined {
   const data = raw
     .split("\n")
@@ -609,6 +647,8 @@ function applyEvent(
     onText: (text: string) => void;
     onReasoning: (text: string) => void;
     onSignature: (signature: string) => void;
+    /** Marks that the reasoning just accumulated was withheld by the provider. */
+    onRedacted: () => void;
   },
 ): StreamFragment[] {
   const fragments: StreamFragment[] = [];
@@ -620,6 +660,22 @@ function applyEvent(
       name: event.content_block.name ?? "",
       args: "",
     });
+    return fragments;
+  }
+
+  // Reasoning the provider has withheld. The text is not ours to read, but the
+  // opaque `data` is a signed block like any other: a later turn that omits it
+  // while carrying the tool calls it preceded is refused. Carried through as
+  // reasoning with the payload as its signature, so the round trip stays intact
+  // and the model sees that something was there rather than a silent gap.
+  if (event.type === "content_block_start" && event.content_block?.type === "redacted_thinking") {
+    const data = event.content_block.data ?? "";
+    if (data) {
+      state.onReasoning(REDACTED_REASONING);
+      state.onSignature(data);
+      state.onRedacted();
+      fragments.push({ kind: "reasoning", text: REDACTED_REASONING });
+    }
     return fragments;
   }
 

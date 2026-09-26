@@ -33,6 +33,8 @@ export interface ChatMessage {
   readonly reasoning?: {
     readonly text: string;
     readonly signature?: string;
+    /** See `SessionMessage.reasoning.redacted`. */
+    readonly redacted?: boolean;
   };
 }
 

@@ -64,5 +64,15 @@ export interface SessionMessage {
   reasoning?: {
     readonly text: string;
     readonly signature?: string;
+    /**
+     * Whether the provider withheld this reasoning and the signature is its
+     * opaque payload.
+     *
+     * Such a block is not ours to read, but it must go back exactly as it came:
+     * a later turn that drops it while carrying the tool calls it preceded is
+     * refused. The flag is what lets the request be rebuilt with the block type
+     * the provider issued rather than a plain `thinking` block it will reject.
+     */
+    readonly redacted?: boolean;
   };
 }

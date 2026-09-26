@@ -167,4 +167,30 @@ describe("a refusal nothing overrides", () => {
     expect(result.denied).toBe(true);
     expect(result.reason).toContain("write");
   });
+  it("refuses the same file however the path is spelled", () => {
+    // A prefix rule is only as good as the spelling it is compared to. These are
+    // all the same file, and each costs a caller nothing to write — so a rule
+    // that only caught the first would be defeated by typing the path a
+    // different way, which is not something a user would think to defend against.
+    const rules = [{ tool: "read", pattern: "src/secrets" }];
+    const denied = (p: string) =>
+      evaluateToolPermissionScope("read", { path: p }, "allow-all", "/proj", rules).denied;
+
+    expect(denied("src/secrets/key.ts")).toBe(true);
+    expect(denied("./src/secrets/key.ts")).toBe(true);
+    expect(denied("src/other/../secrets/key.ts")).toBe(true);
+    expect(denied("src/public/key.ts")).toBeFalsy();
+  });
+
+  it("still compares a bash command as written", () => {
+    // A command is not a path and is not resolved against the workspace, so
+    // rewriting it would compare the rule against something never run.
+    const rules = [{ tool: "bash", pattern: "curl" }];
+    const denied = (c: string) =>
+      evaluateToolPermissionScope("bash", { command: c }, "allow-all", "/proj", rules).denied;
+
+    expect(denied("curl http://x")).toBe(true);
+    expect(denied("echo hi")).toBeFalsy();
+  });
+
 });

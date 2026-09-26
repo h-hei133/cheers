@@ -40,6 +40,22 @@ export const READ_ONLY_BROWSER_ACTIONS: Record<string, true> = {
   ariasnapshot: true,
 };
 
+/**
+ * The same target with `.` and `..` resolved, so a prefix rule sees one spelling.
+ *
+ * Returns the input unchanged when it is not a path — a bash command or a URL is
+ * compared as written, because those are not resolved against the workspace and
+ * rewriting them would compare a rule against something the tool never runs.
+ */
+function normalizedPathTarget(target: string, workspaceRoot: string): string {
+  if (target === "" || target.startsWith("(")) return target;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target)) return target;
+  if (/[\s|&;<>$`()]/.test(target)) return target;
+  const root = path.resolve(workspaceRoot);
+  const resolved = path.resolve(root, target);
+  return resolved === root ? target : path.relative(root, resolved) || target;
+}
+
 export function evaluateToolPermissionScope(
   toolName: string,
   args: Record<string, unknown> = {},
@@ -104,7 +120,16 @@ export function evaluateToolPermissionScope(
   // Before every scope branch, because a refusal is not a scope. `allow-all`
   // allows what approval governs; it does not un-write a rule the user wrote,
   // and a scope that could override one would make the rule a suggestion.
-  const denied = matchDenyRule(denyRules, toolName, target);
+  //
+  // Matched against the path as written *and* against its normalized form,
+  // because a prefix rule is only as good as the spelling it is compared to.
+  // `src/secrets` is the same file as `./src/secrets` and as
+  // `src/other/../secrets`, and a rule that refused the first while letting the
+  // other two through would be defeated by writing the path differently — which
+  // costs nothing and is not something a user would think to defend against.
+  const denied =
+    matchDenyRule(denyRules, toolName, target) ??
+    matchDenyRule(denyRules, toolName, normalizedPathTarget(target, workspaceRoot));
   if (denied) {
     return {
       requiresEscalation: false,

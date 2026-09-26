@@ -76,6 +76,7 @@ export type TranscriptEvent =
       reasoning?: {
         readonly text: string;
         readonly signature?: string;
+        readonly redacted?: boolean;
       };
       /**
        * Why an assistant answer failed, when it did.

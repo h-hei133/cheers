@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_PROVIDER_RETRIES,
   DEFAULT_TURN_RETRIES,
+  exceedsRetryCeiling,
   isRetryableFailure,
   isRetryableStatus,
   resolveRetryPolicy,
@@ -9,6 +10,8 @@ import {
   serverRequestedDelayMs,
   waitBeforeRetry,
 } from "./retry.js";
+import { createStepFunction } from "../../turn/step.js";
+import { runAgentLoop } from "./loop.js";
 
 /**
  * Retrying is a decision about which failures are worth a second request. What
@@ -190,5 +193,105 @@ describe("waitBeforeRetry", () => {
     const controller = new AbortController();
     controller.abort();
     await expect(waitBeforeRetry(5_000, controller.signal)).resolves.toBe(false);
+  });
+});
+
+describe("a wait longer than the ceiling", () => {
+  /**
+   * A server that names a delay beyond the ceiling is saying the endpoint is not
+   * worth asking again yet. Sleeping the ceiling and asking anyway spends a
+   * request to be told the same thing, and the number it gave — the part a caller
+   * can act on — never reaches anyone.
+   */
+  it("is recognised as a refusal rather than clamped into a retry", () => {
+    const policy = { enabled: true, maxRetries: 3, baseDelayMs: 2_000, maxDelayMs: 60_000 };
+
+    expect(exceedsRetryCeiling(policy, 3_600_000)).toBe(true);
+    expect(exceedsRetryCeiling(policy, 5_000)).toBe(false);
+    expect(exceedsRetryCeiling(policy, undefined)).toBe(false);
+    // A ceiling of zero means no ceiling, so nothing exceeds it.
+    expect(exceedsRetryCeiling({ ...policy, maxDelayMs: 0 }, 3_600_000)).toBe(false);
+  });
+
+  it("leaves a short server delay untouched", () => {
+    const policy = { enabled: true, maxRetries: 3, baseDelayMs: 2_000, maxDelayMs: 60_000 };
+
+    expect(retryDelayMs(policy, 1, 5_000)).toBe(5_000);
+  });
+});
+
+describe("two layers retrying the same failure", () => {
+  /**
+   * Only one layer may act on a given failure.
+   *
+   * Both exist because they see different facts — the provider layer sees the
+   * status and the server's own delay, the turn layer sees the finished step and
+   * can retry after the context has been reshaped. But a failure both of them
+   * retry is retried once per layer, which multiplies rather than chooses: with
+   * two retries each, one overloaded endpoint receives nine requests.
+   *
+   * Counted at the transport, because that is the only place the multiplication
+   * is visible — each layer believes it made the retries it was configured for.
+   */
+  it("sends one request per retry, not one per layer per retry", async () => {
+    let calls = 0;
+    const retry = { enabled: true, maxRetries: 2, baseDelayMs: 1, maxDelayMs: 2 };
+    const step = createStepFunction({
+      provider: { apiKey: "k", baseUrl: "https://p.test/v1", model: "m" },
+      workspaceRoot: process.cwd(),
+      sessionId: "s",
+      systemPrompt: "x",
+      tools: [],
+      retry,
+      fetchImpl: async () => {
+        calls += 1;
+        return new Response("busy", { status: 503 });
+      },
+    });
+    await runAgentLoop(
+      [{ role: "user", content: "hi" }],
+      [],
+      { tools: [], streamStep: (context, signal) => step(context, signal, {}, { allowTools: true }), retry },
+      () => {},
+      undefined,
+    );
+
+    // One attempt plus two retries. Nine is what the two layers produce if both
+    // act on the same failure.
+    expect(calls).toBe(3);
+  });
+
+  it("still lets the turn layer retry when the provider layer does not", async () => {
+    // The default is no provider retries, so the loop is the only layer that
+    // can. A marker set unconditionally would leave a transient failure with no
+    // retry at all — worse than the doubling it exists to prevent.
+    let calls = 0;
+    // The provider layer is configured with none, which is the default; the turn
+    // layer keeps its own. They are separate settings precisely so this is
+    // expressible.
+    const providerRetry = { enabled: true, maxRetries: 0, baseDelayMs: 1, maxDelayMs: 2 };
+    const turnRetry = { enabled: true, maxRetries: 3, baseDelayMs: 1, maxDelayMs: 2 };
+    const step = createStepFunction({
+      provider: { apiKey: "k", baseUrl: "https://p.test/v1", model: "m" },
+      workspaceRoot: process.cwd(),
+      sessionId: "s",
+      systemPrompt: "x",
+      tools: [],
+      retry: providerRetry,
+      fetchImpl: async () => {
+        calls += 1;
+        return new Response("busy", { status: 503 });
+      },
+    });
+    await runAgentLoop(
+      [{ role: "user", content: "hi" }],
+      [],
+      { tools: [], streamStep: (context, signal) => step(context, signal, {}, { allowTools: true }), retry: turnRetry },
+      () => {},
+      undefined,
+    );
+
+    // The turn layer's three retries apply: 1 + 3.
+    expect(calls).toBe(4);
   });
 });

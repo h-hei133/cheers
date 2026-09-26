@@ -231,3 +231,57 @@ describe("replaceManyInContent", () => {
     expect(result.content).toContain("const x = 2;");
   });
 });
+
+describe("normalization that changes a string's length", () => {
+  /**
+   * An index found in normalized text is not an index into the original.
+   *
+   * NFKC is not length-preserving: a ligature becomes two characters, a
+   * full-width form becomes one narrower one. Slicing the original at a
+   * normalized offset therefore lands in the wrong place — and because the
+   * result is a valid string, the edit reports success while the file comes back
+   * with a character eaten from the join. That is the failure this pins.
+   */
+  it("does not eat the character after a ligature", () => {
+    const content = "const \uFB01le = 1;\nconst other = 2;\n";
+    const result = replaceInContent(content, "const file = 1;", "const file = 9;");
+
+    expect(result.success).toBe(true);
+    expect(result.content).toBe("const file = 9;\nconst other = 2;\n");
+  });
+
+  it("does not eat the character after smart punctuation", () => {
+    const content = "const a = \u201Chello\u201D;\nconst b = 2;\n";
+    const result = replaceInContent(content, 'const a = "hello";', "const a = 'hi';");
+
+    expect(result.success).toBe(true);
+    expect(result.content).toBe("const a = 'hi';\nconst b = 2;\n");
+  });
+});
+
+describe("a multi-edit segment that is not unique", () => {
+  /**
+   * The rule a single edit follows, applied to each segment of a multi-edit.
+   *
+   * Without it the two forms disagree: the same ambiguous text is refused when
+   * written as one edit and silently applied to the first occurrence when
+   * written as several. The caller who wrote several segments is the one least
+   * able to notice which occurrence was chosen.
+   */
+  it("is refused rather than applied to the first occurrence", () => {
+    const content = "const a = 1;\nconst a = 1;\nconst b = 2;\n";
+    const result = replaceManyInContent(content, [{ oldText: "const a = 1;", newText: "const a = 9;" }]);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/2 places/);
+    expect(result.content).toBe(content);
+  });
+
+  it("still applies a segment that identifies one place", () => {
+    const content = "const a = 1;\nconst b = 2;\n";
+    const result = replaceManyInContent(content, [{ oldText: "const b = 2;", newText: "const b = 9;" }]);
+
+    expect(result.success).toBe(true);
+    expect(result.content).toBe("const a = 1;\nconst b = 9;\n");
+  });
+});

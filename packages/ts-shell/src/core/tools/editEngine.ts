@@ -41,6 +41,52 @@ function normalizeNFKC(str: string): string {
     .replace(/[\u00A0\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u202F\u205F\u3000]/g, " ");
 }
 
+/**
+ * Normalize, and keep the way back to the original offsets.
+ *
+ * Normalization is not length-preserving: a ligature becomes two characters, a
+ * full-width form becomes one narrower one, and the compatibility characters
+ * above each map to a single ASCII stand-in. An index found in the normalized
+ * string is therefore not an index into the original, and using it as one slices
+ * the file at the wrong place — the edit succeeds and the file comes back with a
+ * character eaten from the join. That is the failure this mapping prevents.
+ *
+ * Built per code point rather than per UTF-16 unit, so a surrogate pair stays
+ * one entry and the map holds offsets `String.prototype.slice` understands.
+ */
+function normalizeWithMap(str: string): { normalized: string; map: readonly number[] } {
+  const parts: string[] = [];
+  const map: number[] = [];
+  let index = 0;
+  while (index < str.length) {
+    const point = str.codePointAt(index);
+    if (point === undefined) break;
+    const character = String.fromCodePoint(point);
+    const normalizedCharacter = normalizeNFKC(character);
+    for (let k = 0; k < normalizedCharacter.length; k++) map.push(index);
+    parts.push(normalizedCharacter);
+    index += character.length;
+  }
+  return { normalized: parts.join(""), map };
+}
+
+/** The span in the original text that a normalized match at `start` covers. */
+function originalSpanFor(
+  normalized: string,
+  start: number,
+  normalizedLength: number,
+  map: readonly number[],
+): { start: number; end: number } | undefined {
+  const lastIndex = start + normalizedLength - 1;
+  if (start < 0 || lastIndex >= normalized.length) return undefined;
+  const originalStart = map[start];
+  const lastOriginalStart = map[lastIndex];
+  if (originalStart === undefined || lastOriginalStart === undefined) return undefined;
+  const point = normalized.codePointAt(lastIndex);
+  const lastWidth = point === undefined ? 1 : String.fromCodePoint(point).length;
+  return { start: originalStart, end: lastOriginalStart + lastWidth };
+}
+
 function levenshteinRatio(a: string, b: string): number {
   if (a === b) return 1.0;
   if (!a.length || !b.length) return 0.0;
@@ -124,13 +170,19 @@ export function locateInContent(originalContent: string, oldText: string): Locat
 
   // 3. NFKC and smart punctuation: curly quotes and en dashes standing in for
   // the characters the model actually typed.
-  const normOriginal = normalizeNFKC(originalContent);
+  const { normalized: normOriginal, map: normMap } = normalizeWithMap(originalContent);
   const normOld = normalizeNFKC(oldText);
   const normalized = normOriginal.indexOf(normOld);
   if (normalized !== -1) {
-    const matchedSpan = originalContent.slice(normalized, normalized + oldText.length);
-    if (!isDisproportionateMatch(matchedSpan, oldText)) {
-      return { start: normalized, end: normalized + oldText.length, strategy: "nfkc-normalized" };
+    // The span comes from the map, not from the normalized offsets: the two
+    // strings have different lengths wherever a character normalized to more or
+    // fewer than it started as.
+    const span = originalSpanFor(normOriginal, normalized, normOld.length, normMap);
+    if (span) {
+      const matchedSpan = originalContent.slice(span.start, span.end);
+      if (!isDisproportionateMatch(matchedSpan, oldText)) {
+        return { start: span.start, end: span.end, strategy: "nfkc-normalized" };
+      }
     }
   }
 
@@ -354,6 +406,22 @@ export function replaceManyInContent(
         success: false,
         content: originalContent,
         error: `edits[${index}] did not match: no strategy found the text it names.`,
+      };
+    }
+    // The same rule a single edit follows. A segment whose text appears more
+    // than once would otherwise edit the first occurrence and report success,
+    // while the identical call written as one edit is refused — and the caller
+    // who wrote several segments is the one least able to notice which of the
+    // occurrences was chosen.
+    const occurrences = countStrategyMatches(originalContent, segment.oldText, edit.strategy);
+    if (occurrences > 1) {
+      return {
+        success: false,
+        content: originalContent,
+        error:
+          `edits[${index}] matches ${occurrences} places in the file. ` +
+          `Include more surrounding context so it identifies exactly one, ` +
+          `or split it into separate edits that do.`,
       };
     }
     located.push({ edit, newText: segment.newText, index });

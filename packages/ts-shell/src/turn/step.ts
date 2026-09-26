@@ -17,6 +17,7 @@ import type { CatalogProvider } from "../core/models/catalog.js";
 import {
   isRetryableStatus,
   resolveRetryPolicy,
+  exceedsRetryCeiling,
   retryDelayMs,
   serverRequestedDelayMs,
   waitBeforeRetry,
@@ -150,6 +151,8 @@ interface CompletionShape {
   readonly reasoning?: string;
   /** The provider's signature over that reasoning, when it issued one. */
   readonly reasoningSignature?: string;
+  /** Whether that reasoning was withheld; see `SessionMessage.reasoning.redacted`. */
+  readonly reasoningRedacted?: boolean;
   /** Text already delivered as deltas; it must not be delivered a second time. */
   readonly streamed?: string;
 }
@@ -387,7 +390,27 @@ export function createStepFunction(request: StepRequest): StepFunction {
 
         attempt += 1;
         if (!transient || attempt > retry.maxRetries) {
-          return stamp(refusalClass ? failedStep(refusal, "", refusalClass) : errorStep(refusal));
+          // Marked only when this layer actually retried. With the default of no
+          // provider retries nothing was tried again here, so the loop above is
+          // the only layer that can — marking it then would leave a transient
+          // failure with no retry at all, which is worse than the doubling this
+          // exists to prevent.
+          const tried = retry.maxRetries > 0;
+          return stamp(
+            refusalClass
+              ? failedStep(refusal, "", refusalClass, tried)
+              : errorStep(refusal, tried),
+          );
+        }
+        // The server named a wait longer than this run will take, so it is not
+        // worth asking again now. Reported rather than slept through: the number
+        // it gave is the part a caller can act on, and waiting the ceiling to be
+        // told the same thing costs a request and says nothing about why.
+        if (exceedsRetryCeiling(retry, requestedDelayMs)) {
+          const seconds = Math.ceil((requestedDelayMs ?? 0) / 1000);
+          return stamp(
+            errorStep(`Provider asked for a ${seconds}s wait before retrying, which is longer than this run will wait.`),
+          );
         }
         const waited = await waitBeforeRetry(retryDelayMs(retry, attempt, requestedDelayMs), signal);
         if (!waited) return stamp(abortedStep(""));
@@ -527,6 +550,7 @@ export function toStep(completion: CompletionShape, listener: StepListener): Ass
           reasoning: {
             text: completion.reasoning,
             ...(completion.reasoningSignature ? { signature: completion.reasoningSignature } : {}),
+            ...(completion.reasoningRedacted ? { redacted: true } : {}),
           },
         }
       : {}),
@@ -605,8 +629,14 @@ function cacheTokensFromUsage(usage: ProviderUsage): {
   };
 }
 
-function errorStep(message: string): AssistantStep {
-  return { text: "", toolCalls: [], stopReason: "error", errorMessage: message };
+function errorStep(message: string, retriesExhausted = false): AssistantStep {
+  return {
+    text: "",
+    toolCalls: [],
+    stopReason: "error",
+    errorMessage: message,
+    ...(retriesExhausted ? { retriesExhausted: true } : {}),
+  };
 }
 
 /**
@@ -626,6 +656,7 @@ function failedStep(
   message: string,
   shown = "",
   failureClass?: ProviderFailureClass,
+  retriesExhausted = false,
 ): AssistantStep {
   return {
     text: shown,
@@ -633,6 +664,7 @@ function failedStep(
     stopReason: "error",
     errorMessage: message,
     ...(failureClass ? { failureClass } : {}),
+    ...(retriesExhausted ? { retriesExhausted: true } : {}),
   };
 }
 

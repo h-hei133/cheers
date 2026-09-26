@@ -33,6 +33,19 @@ export interface AssistantStep {
    */
   readonly failureClass?: ProviderFailureClass;
   /**
+   * Whether the layer that made this request already used up its retries.
+   *
+   * Two layers retry and they see different facts, so both exist on purpose —
+   * but only one may act on the same failure. The step knows the HTTP status and
+   * the server's own `Retry-After`, so it is the layer that retries a provider
+   * refusal; by the time it gives up, asking again from above is asking the same
+   * endpoint the same question a second time. Marked here so the loop can tell
+   * "this failed and nobody has retried it" from "this failed and the layer that
+   * understood it has already tried", which is the difference between one retry
+   * and one per layer.
+   */
+  readonly retriesExhausted?: boolean;
+  /**
    * The working out this step came with, and the provider's signature over it.
    *
    * Not the answer and not shown as one. It is carried because some providers
@@ -151,6 +164,12 @@ async function retryStep(
   let attempt = 0;
   for (;;) {
     const step = await config.streamStep(context, signal);
+    // A step whose own layer already retried is not retried again here. The
+    // provider layer sees the status and the server's delay, so it is the one
+    // that knows whether asking again is worth anything; by the time it gives up
+    // the answer is no. Retrying anyway multiplies the two counts instead of
+    // choosing between them.
+    if (step.retriesExhausted) return step;
     if (!isRetryableFailure(step.stopReason, step.errorMessage)) return step;
     attempt += 1;
     if (attempt > policy.maxRetries) return step;

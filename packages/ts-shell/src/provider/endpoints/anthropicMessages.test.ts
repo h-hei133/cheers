@@ -623,3 +623,81 @@ describe("the sampling settings a reasoning request may carry", () => {
     expect(body({ temperature: 0.7 })).not.toHaveProperty("thinking");
   });
 });
+
+describe("a stream framed with CRLF", () => {
+  /**
+   * The event-stream format allows CRLF as the separator, and a reader that only
+   * looks for `\n\n` never finds a boundary in such a stream: the buffer grows
+   * until the connection closes and the run sees no output at all — not an
+   * error, just silence, which is the worse of the two.
+   */
+  it("finds the events", async () => {
+    const encoder = new TextEncoder();
+    const crlf = (payload: unknown) =>
+      `event: message\r\ndata: ${JSON.stringify(payload)}\r\n\r\n`;
+    const stream = readAnthropicStream(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(encoder.encode(crlf({ type: "message_start", message: { usage: {} } })));
+          controller.enqueue(
+            encoder.encode(crlf({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "hi" } })),
+          );
+          controller.enqueue(encoder.encode(crlf({ type: "message_stop" })));
+          controller.close();
+        },
+      }),
+    );
+
+    const fragments: string[] = [];
+    let step = await stream.next();
+    while (step.done !== true) {
+      if (step.value.kind === "text") fragments.push(step.value.text);
+      step = await stream.next();
+    }
+    expect(fragments.join("")).toBe("hi");
+  });
+});
+
+describe("reasoning the provider withholds", () => {
+  /**
+   * A `redacted_thinking` block is not ours to read, but it is a signed block
+   * like any other: the request that supplies a tool's result has to bring it
+   * back, or the provider refuses. Dropping it loses the trajectory; sending it
+   * as a `thinking` block presents withheld text as ours and is rejected too.
+   */
+  it("is captured with its payload and marked as withheld", async () => {
+    const stream = readAnthropicStream(
+      sseStream(
+        event({ type: "message_start", message: { usage: {} } }),
+        event({ type: "content_block_start", index: 0, content_block: { type: "redacted_thinking", data: "OPAQUE" } }),
+        event({ type: "message_stop" }),
+      ),
+    );
+    let step = await stream.next();
+    while (step.done !== true) step = await stream.next();
+    const completion = step.value as { reasoningSignature?: string; reasoningRedacted?: boolean };
+
+    expect(completion.reasoningSignature).toBe("OPAQUE");
+    expect(completion.reasoningRedacted).toBe(true);
+  });
+
+  it("goes back as a redacted block, not as ordinary reasoning", () => {
+    const body = anthropicRequestBody({
+      model: "claude-sonnet-4-5",
+      systemPrompt: "s",
+      messages: [
+        {
+          role: "assistant",
+          content: "working",
+          reasoning: { text: "[reasoning withheld by the provider]", signature: "OPAQUE", redacted: true },
+        },
+        { role: "user", content: "continue" },
+      ],
+    });
+    const blocks = (body.messages as Array<{ content: Array<{ type: string; data?: string }> }>)[0]!.content;
+    const redacted = blocks.find((block) => block.type === "redacted_thinking");
+
+    expect(redacted).toBeDefined();
+    expect(redacted!.data).toBe("OPAQUE");
+  });
+});

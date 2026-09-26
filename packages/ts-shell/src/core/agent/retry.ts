@@ -148,6 +148,18 @@ export function retryDelayMs(
 }
 
 /**
+ * Whether a server's requested wait is longer than this run is willing to wait.
+ *
+ * A server that names a delay beyond the ceiling is saying the endpoint is not
+ * worth asking again yet, and the number it gives is the useful part of the
+ * answer. Waiting the ceiling and asking anyway spends a request to be told the
+ * same thing, and reports nothing about why.
+ */
+export function exceedsRetryCeiling(policy: RetryPolicy, requestedMs: number | undefined): boolean {
+  return requestedMs !== undefined && policy.maxDelayMs > 0 && requestedMs > policy.maxDelayMs;
+}
+
+/**
  * Wait out a backoff, or give up as soon as the run is cancelled.
  *
  * Resolves `false` when the wait was cut short, so the caller returns instead of
