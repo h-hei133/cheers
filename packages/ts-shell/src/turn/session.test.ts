@@ -3,6 +3,7 @@ import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
 import type { ToolDefinition } from "../tools/types.js";
+import { createTaskToolDefinition } from "../core/tools/taskTool.js";
 import { runTurn, type TurnOptions } from "./session.js";
 import type { StepFunction } from "./step.js";
 import { CONTEXT_OVERFLOW_PREFIX } from "./step.js";
@@ -328,5 +329,107 @@ describe("progress from a tool reaches the shell", () => {
     // The progress is not the result: the whole output still arrives separately.
     const result = events.find((event) => event.type === "tool.result") as { output?: string } | undefined;
     expect(result?.output).toContain("final output");
+  });
+});
+
+describe("a subagent's calls answer to the session's rules", () => {
+  /**
+   * The rule reaches the door the subagent comes through.
+   *
+   * The session and a subagent each adapt a tool set, and the two gates were
+   * built from separate option lists — the subagent's left out the user's
+   * refusals. A rule that only the session's own calls obeyed is a rule that
+   * holds until something delegates, which is not a rule.
+   */
+  it("refuses, inside the subagent, a tool the session refuses", async () => {
+    const ran: string[] = [];
+    const bashTool: ToolDefinition = {
+      name: "bash",
+      description: "run a command",
+      argsSchema: { type: "object", properties: {} },
+      permissions: { check: () => [] },
+      execute: async () => {
+        ran.push("bash");
+        return { success: true, output: "ran" };
+      },
+    };
+    const taskTool: ToolDefinition = {
+      ...createTaskToolDefinition(),
+    };
+    const tools = new Map<string, ToolDefinition>([
+      ["bash", bashTool],
+      ["task", taskTool],
+    ]);
+    // Step 1: the session delegates. Step 2+: the subagent asks for bash.
+    let n = 0;
+    const step: StepFunction = async (_messages, _signal, _listener, stepOptions) => {
+      n += 1;
+      if (n === 1) {
+        return {
+          text: "",
+          toolCalls: [{ id: "c1", name: "task", args: { description: "d", prompt: "run bash", subagent_type: "general" } }],
+          stopReason: "stop",
+        };
+      }
+      if (stepOptions.allowTools) {
+        return { text: "", toolCalls: [{ id: `c${n}`, name: "bash", args: { command: "echo hi" } }], stopReason: "stop" };
+      }
+      return { text: "done", toolCalls: [], stopReason: "stop" };
+    };
+
+    const run = runTurn(
+      options({
+        tools,
+        denyRules: [{ tool: "bash" }],
+        step,
+        subagentHost: { step, defaultMaxSteps: 3 },
+        maxSteps: 6,
+      }),
+    );
+    await drain(run.events);
+
+    expect(ran).toEqual([]);
+  });
+
+  /**
+   * The rule reaches the door the subagent comes through.
+   *
+   * The session and a subagent each adapt a tool set, and the two gates were
+   * built from separate option lists — the subagent's left out the user's
+   * refusals. A rule that only the session's own calls obeyed is a rule that
+   * holds until something delegates, which is not a rule.
+   */
+  it("refuses a tool the session refuses, even when a subagent asks for it", async () => {
+    const ran: string[] = [];
+    const bashTool: ToolDefinition = {
+      name: "bash",
+      description: "run a command",
+      argsSchema: { type: "object", properties: {} },
+      permissions: { check: () => [] },
+      execute: async () => {
+        ran.push("bash");
+        return { success: true, output: "ran" };
+      },
+    };
+    // The subagent's own step asks for bash. Without the rule reaching its gate
+    // this call is executed, which is the failure this pins.
+    const step: StepFunction = async (_messages, _signal, _listener, stepOptions) => {
+      if (stepOptions.allowTools) {
+        return { text: "", toolCalls: [{ id: "c1", name: "bash", args: { command: "echo hi" } }], stopReason: "stop" };
+      }
+      return { text: "answered", toolCalls: [], stopReason: "stop" };
+    };
+
+    const run = runTurn(
+      options({
+        tools: new Map([["bash", bashTool]]),
+        denyRules: [{ tool: "bash" }],
+        step,
+        subagentHost: { step, defaultMaxSteps: 3 },
+      }),
+    );
+    await drain(run.events);
+
+    expect(ran).toEqual([]);
   });
 });

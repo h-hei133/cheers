@@ -65,17 +65,61 @@ export function matchDenyRule(
  * rather than thrown on. A malformed rule that stopped the session would be
  * worse than one that does nothing: the failure would be at startup, far from
  * the line that caused it.
+ *
+ * Dropped and *reported*, though, because the two are different. A rule the
+ * user wrote and the session silently ignored is a rule the user believes is
+ * protecting them — the call it names runs, and nothing said why. What comes
+ * back is therefore the rules that applied and a line for each one that did
+ * not, so the surface can say the rule was not understood instead of leaving
+ * the user to infer it from a tool that kept working.
  */
-export function parseDenyRules(value: unknown): readonly DenyRule[] {
-  if (!Array.isArray(value)) return [];
+export interface ParsedDenyRules {
+  readonly rules: readonly DenyRule[];
+  /** One line per entry that was not understood, naming what was wrong. */
+  readonly dropped: readonly string[];
+}
+
+export function parseDenyRules(value: unknown): ParsedDenyRules {
+  if (value === undefined) return { rules: [], dropped: [] };
+  if (!Array.isArray(value)) {
+    return { rules: [], dropped: [`denyRules must be a list; got ${describe(value)}.`] };
+  }
   const rules: DenyRule[] = [];
+  const dropped: string[] = [];
   for (const entry of value) {
-    if (!entry || typeof entry !== "object") continue;
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      dropped.push(`Ignoring deny rule ${describe(entry)}: expected an object with a "tool" name.`);
+      continue;
+    }
     const record = entry as Record<string, unknown>;
     const tool = typeof record.tool === "string" ? record.tool.trim() : "";
-    if (!tool) continue;
+    if (!tool) {
+      dropped.push(
+        `Ignoring deny rule ${describe(entry)}: "tool" must be a non-empty tool name (or "*").`,
+      );
+      continue;
+    }
     const pattern = typeof record.pattern === "string" ? record.pattern : undefined;
+    if (record.pattern !== undefined && pattern === undefined) {
+      dropped.push(`Ignoring deny rule for '${tool}': "pattern" must be a string.`);
+      continue;
+    }
     rules.push({ tool, ...(pattern ? { pattern } : {}) });
   }
-  return rules;
+  return { rules, dropped };
+}
+
+/** What a malformed value was, for a message that names it. */
+function describe(value: unknown): string {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "a list";
+  if (typeof value === "string") return JSON.stringify(value);
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return "an object";
+    }
+  }
+  return String(value);
 }

@@ -41,8 +41,10 @@ export async function runBtwCommand(
   const credential = resolution.credential;
 
   let answer = "";
+  let attempted = false;
   const accountAuth = credential ? accountAuthFor(resolution.provider, credential) : undefined;
   if (credential && (credential.apiKey || accountAuth)) {
+    attempted = true;
     const catalog = loadCatalog();
     const endpoint = providerEndpoint(catalog, resolution.provider);
     const controller = new AbortController();
@@ -78,7 +80,12 @@ export async function runBtwCommand(
   }
 
   if (!answer) {
-    answer = `Side question noted: "${question}".\n(No provider credential is configured, so nothing was sent.)`;
+    // Two different situations, and telling them apart is the difference between
+    // a user checking their configuration and a user checking their network. A
+    // request that went out and failed is not a missing credential.
+    answer = attempted
+      ? `Side question noted: "${question}".\n(The provider was asked and did not answer — a failed request or a timeout, not a missing credential.)`
+      : `Side question noted: "${question}".\n(No provider credential is configured, so nothing was sent.)`;
   }
 
   const lines: string[] = [

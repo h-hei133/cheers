@@ -137,7 +137,7 @@ export function createTaskToolDefinition(
       // Where a subagent's changes were left, when it made any. Reported because
       // a kept worktree is the only way to find them.
       let keptWorktree: { readonly worktreePath: string; readonly branch: string } | undefined;
-      let usedTools: readonly string[] = [];
+      let allowedTools: readonly string[] = [];
       let stepsTaken = 0;
 
       try {
@@ -166,7 +166,7 @@ export function createTaskToolDefinition(
             ...(context.abortSignal ? { signal: context.abortSignal } : {}),
           });
           subagentResponse = result.text;
-          usedTools = result.tools;
+          allowedTools = result.allowedTools;
           stepsTaken = result.steps;
           if (result.failed) subagentFailure = result.failure ?? "the subagent failed";
         }
@@ -211,7 +211,7 @@ export function createTaskToolDefinition(
         `- **Mode**: \`${mode}\``,
         `- **Filesystem Isolation**: \`${shouldIsolate ? `Git Worktree (${effectiveWorkspace})` : "Shared Workspace"}\``,
         ...(contextStr ? [`- **Context Attached**: ${contextStr}`] : []),
-        `- **Tools**: ${usedTools.length > 0 ? `\`${usedTools.join("\`, \`")}\`` : "none"}`,
+        `- **Tools available**: ${allowedTools.length > 0 ? `\`${allowedTools.join("\`, \`")}\`` : "none"}`,
         `- **Steps Used**: ${stepsTaken}`,
         "",
         ...(keptWorktree

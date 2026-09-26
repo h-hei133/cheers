@@ -856,10 +856,17 @@ describe("speaking a second endpoint", () => {
 });
 
 describe("the last step a run may act on", () => {
-  async function bodyFor(allowTools: boolean): Promise<Record<string, unknown>> {
+  /** A tool the model may call, so the notice has something to withdraw. */
+  const TOOL_FOR_THE_NOTICE = [{
+    type: "function" as const,
+    function: { name: "read", description: "read a file", parameters: { type: "object", properties: {} } },
+  }];
+
+  async function bodyFor(allowTools: boolean, tools = request.tools): Promise<Record<string, unknown>> {
     let body: Record<string, unknown> = {};
     const step = createStepFunction({
       ...request,
+      tools,
       fetchImpl: async (_url: string | URL, init?: RequestInit) => {
         body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
         return jsonResponse({ choices: [{ message: { content: "ok" } }] });
@@ -874,15 +881,26 @@ describe("the last step a run may act on", () => {
     // list and cannot call from it reads the harness as broken rather than the
     // budget as reached, and the useful move — answer with what you have — is
     // one it has to be told to make.
-    const body = await bodyFor(false);
+    const body = await bodyFor(false, TOOL_FOR_THE_NOTICE);
     const messages = body.messages as Array<{ role: string; content: string }>;
 
     expect(messages[messages.length - 1]!.content).toMatch(/reached the limit/i);
     expect(messages[messages.length - 1]!.content).toMatch(/cannot call any more tools/i);
   });
 
+  it("says nothing of the kind on a run that never had tools", async () => {
+    // A run configured with no tools did not reach a limit; there was no budget
+    // to spend. Telling its model about a withdrawn tool list it never had is a
+    // false statement the model cannot check, and on the protocol that requires
+    // turns to alternate it also appends a second user turn in a row.
+    const body = await bodyFor(false, []);
+    const messages = body.messages as Array<{ role: string; content: string }>;
+
+    expect(JSON.stringify(messages)).not.toMatch(/reached the limit/i);
+  });
+
   it("says nothing of the kind while tools are still available", async () => {
-    const body = await bodyFor(true);
+    const body = await bodyFor(true, TOOL_FOR_THE_NOTICE);
     const messages = body.messages as Array<{ role: string; content: string }>;
 
     expect(JSON.stringify(messages)).not.toMatch(/reached the limit/i);

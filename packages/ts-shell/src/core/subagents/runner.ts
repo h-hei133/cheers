@@ -1,5 +1,5 @@
 import { runAgentLoop, type AssistantStep } from "../agent/loop.js";
-import type { AgentTool } from "../agent/tools.js";
+import type { AgentTool, ToolHooks } from "../agent/tools.js";
 import type { AgentMessage } from "../agent/state.js";
 import type { SubagentDefinition } from "./types.js";
 import { subagentMaxSteps, subagentTools } from "./boundary.js";
@@ -19,10 +19,19 @@ import { subagentMaxSteps, subagentTools } from "./boundary.js";
  * step; this decides what the subagent may do with it.
  */
 export interface SubagentStep {
-  /** The next assistant step for a context, as the main loop asks for it. */
+  /**
+   * The next assistant step for a context, as the main loop asks for it.
+   *
+   * `allowTools` is passed through because the budget is this module's to
+   * enforce, not the step's. The main session withdraws tools on its last step
+   * so the model answers with what it has; a subagent whose final step could
+   * still call tools would execute them and then stop before the model saw the
+   * results — the run would end mid-thought, with narration as its answer.
+   */
   readonly step: (
     messages: readonly AgentMessage[],
-    signal?: AbortSignal,
+    signal: AbortSignal | undefined,
+    options: { readonly allowTools: boolean },
   ) => Promise<AssistantStep>;
 }
 
@@ -58,8 +67,14 @@ export interface SubagentRunResult {
   readonly failure?: string;
   /** Steps it actually took. */
   readonly steps: number;
-  /** The tools it was allowed to use, after the boundary was applied. */
-  readonly tools: readonly string[];
+  /**
+   * The tools it was allowed to use, after the boundary was applied.
+   *
+   * Not the tools it called. A caller reporting these as "tools used" claims a
+   * subagent did something it may never have touched, so the name says which of
+   * the two this is.
+   */
+  readonly allowedTools: readonly string[];
 }
 
 /**
@@ -105,6 +120,16 @@ export async function runSubagent(
     readonly tools: ReadonlyMap<string, AgentTool>;
     readonly step: SubagentStep["step"];
     readonly defaultMaxSteps: number;
+    /**
+     * The gate a subagent's tool calls pass through, when the caller has one.
+     *
+     * The session's own calls go through this, and a subagent's are calls like
+     * any other: plan mode, the approval scope, the doom-loop check and the
+     * user's refusals all live here. A subagent that ran without them was a run
+     * of the same loop answering to none of the same rules.
+     */
+    readonly beforeToolCall?: ToolHooks["beforeToolCall"];
+    readonly afterToolCall?: ToolHooks["afterToolCall"];
   },
 ): Promise<SubagentRunResult> {
   const available = [...host.tools.keys()];
@@ -137,9 +162,11 @@ export async function runSubagent(
       tools: [...selected.values()],
       streamStep: (context, signal) => {
         steps += 1;
-        return host.step(context, signal);
+        return host.step(context, signal, { allowTools: steps < maxSteps });
       },
       shouldStopAfterStep: () => steps >= maxSteps,
+      ...(host.beforeToolCall ? { beforeToolCall: host.beforeToolCall } : {}),
+      ...(host.afterToolCall ? { afterToolCall: host.afterToolCall } : {}),
     },
     () => {},
     input.signal,
@@ -151,9 +178,16 @@ export async function runSubagent(
     .filter(Boolean)
     .join("\n\n");
 
-  const last = produced[produced.length - 1];
-  if (last && last.role === "assistant" && (last.stopReason === "error" || last.stopReason === "aborted")) {
-    failure = last.errorMessage ?? `the run stopped with reason ${last.stopReason}`;
+  const lastAssistant = [...produced].reverse().find((message) => message.role === "assistant");
+  if (lastAssistant && (lastAssistant.stopReason === "error" || lastAssistant.stopReason === "aborted")) {
+    failure = lastAssistant.errorMessage ?? `the run stopped with reason ${lastAssistant.stopReason}`;
+  } else if (steps >= maxSteps && lastAssistant?.tool_calls?.length) {
+    // The last step asked for tools and the budget ended there. Reported as a
+    // failure because the alternative is a caller reading narration as an
+    // answer: the text above is what the subagent said on the way, not what it
+    // concluded. A run that answers on its final step is not this case, which is
+    // why the check is the step still wanting tools rather than the count alone.
+    failure = `the subagent used all ${maxSteps} of its steps without finishing`;
   }
 
   return {
@@ -161,6 +195,6 @@ export async function runSubagent(
     failed: failure !== undefined,
     ...(failure ? { failure } : {}),
     steps,
-    tools: allowed,
+    allowedTools: allowed,
   };
 }

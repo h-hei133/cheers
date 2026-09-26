@@ -86,8 +86,8 @@ describe("running a subagent", () => {
       { tools, step: stepThatCallsOnce("read"), ...HOST_BASE },
     );
 
-    expect(result.tools).toEqual(["read"]);
-    expect(result.tools).not.toContain("write");
+    expect(result.allowedTools).toEqual(["read"]);
+    expect(result.allowedTools).not.toContain("write");
     expect(called).toEqual(["read"]);
   });
 
@@ -111,6 +111,79 @@ describe("running a subagent", () => {
     );
 
     expect(result.steps).toBe(3);
+  });
+
+  it("withdraws tools on the last step it may take", async () => {
+    // The main session stops offering tools on its final step so the model
+    // answers with what it has. A subagent whose last step could still call
+    // tools would run them and then stop before the model saw the results, so
+    // the run would end mid-thought with narration standing in for an answer.
+    const seen: boolean[] = [];
+    const tools = new Map<string, AgentTool>([["read", tool("read", () => {})]]);
+    const step: SubagentStep["step"] = async (_messages, _signal, options) => {
+      seen.push(options.allowTools);
+      return { text: "looking", toolCalls: [{ id: `c${seen.length}`, name: "read", args: {} }], stopReason: "stop" };
+    };
+
+    await runSubagent(
+      {
+        definition: { name: "a", description: "d", systemPrompt: "s", maxTurns: 3, source: "builtin" },
+        prompt: "go",
+        workspace: "/tmp",
+      },
+      { tools, step, ...HOST_BASE },
+    );
+
+    expect(seen).toEqual([true, true, false]);
+  });
+
+  it("reports a run that used every step without finishing as a failure", async () => {
+    // Narration is not an answer. A caller that reads it as one acts on a
+    // half-finished delegation believing it succeeded.
+    const tools = new Map<string, AgentTool>([["read", tool("read", () => {})]]);
+    let n = 0;
+    const neverAnswers = async (): Promise<AssistantStep> => {
+      n += 1;
+      return { text: "still going", toolCalls: [{ id: `c${n}`, name: "read", args: {} }], stopReason: "stop" };
+    };
+
+    const result = await runSubagent(
+      {
+        definition: { name: "a", description: "d", systemPrompt: "s", maxTurns: 2, source: "builtin" },
+        prompt: "go",
+        workspace: "/tmp",
+      },
+      { tools, step: neverAnswers, ...HOST_BASE },
+    );
+
+    expect(result.failed).toBe(true);
+    expect(result.failure).toContain("2");
+  });
+
+  it("does not call a run that answers on its last step a failure", async () => {
+    // The budget ending and the run being cut off are different. A subagent
+    // that answers with its final step did what was asked of it.
+    const tools = new Map<string, AgentTool>([["read", tool("read", () => {})]]);
+    let n = 0;
+    const answersOnTheLastStep = async (): Promise<AssistantStep> => {
+      n += 1;
+      if (n < 2) {
+        return { text: "looking", toolCalls: [{ id: "c1", name: "read", args: {} }], stopReason: "stop" };
+      }
+      return { text: "the answer", toolCalls: [], stopReason: "stop" };
+    };
+
+    const result = await runSubagent(
+      {
+        definition: { name: "a", description: "d", systemPrompt: "s", maxTurns: 2, source: "builtin" },
+        prompt: "go",
+        workspace: "/tmp",
+      },
+      { tools, step: answersOnTheLastStep, ...HOST_BASE },
+    );
+
+    expect(result.failed).toBe(false);
+    expect(result.text).toContain("the answer");
   });
 
   it("reports a failure rather than a quiet empty answer", async () => {
@@ -168,7 +241,7 @@ describe("running a subagent", () => {
       { tools: new Map([["read", tool("read", () => {})]]), step: capture, ...HOST_BASE },
     );
 
-    expect(result.tools).toEqual([]);
+    expect(result.allowedTools).toEqual([]);
     expect(result.text).toContain("You have no tools");
   });
 });

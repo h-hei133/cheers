@@ -60,30 +60,54 @@ describe("matching a refusal", () => {
 
 describe("reading refusals from configuration", () => {
   it("takes the shape a file holds", () => {
-    const rules = parseDenyRules([{ tool: "bash", pattern: "curl" }, { tool: "write" }]);
+    const { rules, dropped } = parseDenyRules([{ tool: "bash", pattern: "curl" }, { tool: "write" }]);
 
     expect(rules).toEqual([{ tool: "bash", pattern: "curl" }, { tool: "write" }]);
+    expect(dropped).toEqual([]);
   });
 
-  it("drops entries that name no tool", () => {
+  it("drops entries that name no tool, and says so", () => {
     // A rule with no tool could only mean "everything", which is a decision
-    // nobody wrote. Dropped rather than widened.
-    expect(parseDenyRules([{ pattern: "src/" }, { tool: "" }, { tool: "  " }])).toEqual([]);
+    // nobody wrote. Dropped rather than widened — but reported, because a rule
+    // the user wrote and the session ignored is one they believe protects them.
+    const { rules, dropped } = parseDenyRules([{ pattern: "src/" }, { tool: "" }, { tool: "  " }]);
+
+    expect(rules).toEqual([]);
+    expect(dropped).toHaveLength(3);
+    expect(dropped[0]).toContain("tool");
   });
 
-  it("drops entries that are not objects", () => {
-    expect(parseDenyRules(["bash", 42, null, undefined])).toEqual([]);
+  it("drops entries that are not objects, and says so", () => {
+    const { rules, dropped } = parseDenyRules(["bash", 42, null, undefined]);
+
+    expect(rules).toEqual([]);
+    expect(dropped).toHaveLength(4);
   });
 
   it("drops an empty pattern rather than matching everything", () => {
     // An empty prefix matches every target, so keeping it would turn a rule about
     // one path into a rule about the whole tool.
-    expect(parseDenyRules([{ tool: "bash", pattern: "" }])).toEqual([{ tool: "bash" }]);
+    const { rules, dropped } = parseDenyRules([{ tool: "bash", pattern: "" }]);
+
+    expect(rules).toEqual([{ tool: "bash" }]);
+    expect(dropped).toEqual([]);
   });
 
-  it("answers nothing for a value that is not a list", () => {
-    expect(parseDenyRules(undefined)).toEqual([]);
-    expect(parseDenyRules({ tool: "bash" })).toEqual([]);
-    expect(parseDenyRules("bash")).toEqual([]);
+  it("drops a pattern that is not a string, and says so", () => {
+    // Silently dropping the pattern would widen the rule to the whole tool,
+    // which refuses more than the user asked for.
+    const { rules, dropped } = parseDenyRules([{ tool: "bash", pattern: 42 }]);
+
+    expect(rules).toEqual([]);
+    expect(dropped).toHaveLength(1);
+    expect(dropped[0]).toContain("pattern");
+  });
+
+  it("answers nothing, and complains, for a value that is not a list", () => {
+    // A bare string is the shape a user reaches for, so it is worth naming.
+    expect(parseDenyRules(undefined)).toEqual({ rules: [], dropped: [] });
+    expect(parseDenyRules({ tool: "bash" }).rules).toEqual([]);
+    expect(parseDenyRules({ tool: "bash" }).dropped).toHaveLength(1);
+    expect(parseDenyRules("bash").dropped).toHaveLength(1);
   });
 });

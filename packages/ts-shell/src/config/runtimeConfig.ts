@@ -480,6 +480,10 @@ export function getRuntimeConfig(
   // back to the default with a diagnostic is the same treatment every other
   // unusable config value gets.
   const configuredProvider = merged.provider;
+  // Parsed before the result is built so what it dropped can travel out with the
+  // other diagnostics, which are collected into `diagnostics` and returned.
+  const denyRules = parseDenyRules(merged.denyRules);
+  diagnostics.push(...denyRules.dropped);
   const providerKnown = configuredProvider === undefined || isRuntimeProvider(configuredProvider);
   const provider = providerKnown ? (configuredProvider ?? DEFAULT_CONFIG.provider) : DEFAULT_CONFIG.provider;
   if (!providerKnown) {
@@ -499,8 +503,10 @@ export function getRuntimeConfig(
       : {}),
     disabledTools: merged.disabledTools ?? DEFAULT_CONFIG.disabledTools,
     // Parsed here rather than at the gate, so a malformed entry is dropped once
-    // at load instead of on every tool call.
-    denyRules: parseDenyRules(merged.denyRules),
+    // at load instead of on every tool call. What was dropped is pushed out as a
+    // diagnostic rather than discarded: a rule the user wrote and the session
+    // ignored is a rule they believe is protecting them.
+    denyRules: denyRules.rules,
     hiddenToolPrefixes:
       merged.hiddenToolPrefixes ?? DEFAULT_CONFIG.hiddenToolPrefixes,
     enableMcpTools: merged.enableMcpTools ?? DEFAULT_CONFIG.enableMcpTools,

@@ -21,7 +21,7 @@ import { isOverflowFailure, type StepFunction } from "./step.js";
 import { adaptTools, createToolHooks, type ToolGateOptions } from "./tools.js";
 import { getSessionUsage } from "../observability/usageTelemetry.js";
 import type { SentRequest } from "../provider/request/sentRequest.js";
-import type { SubagentRunner } from "../core/subagents/runner.js";
+import { runSubagent as runSubagentWith, type SubagentRunner } from "../core/subagents/runner.js";
 import type { DenyRule } from "../core/shell/approval/deny.js";
 import type { CacheWarmingRunner } from "./cacheWarm.js";
 import type { ToolDefinition } from "../tools/types.js";
@@ -86,13 +86,19 @@ export interface TurnOptions {
   /** What a command the model runs should know about this session. */
   readonly commandEnv?: Readonly<Record<string, string>>;
   /**
-   * How to run a subagent, when this session can delegate.
+   * What a subagent needs from the model side, when this session can delegate.
    *
-   * Passed through to the tool layer, which reaches it from a tool's context.
-   * Resolved by the caller because running a subagent needs the model side and
-   * this layer's job is the conversation, not the provider.
+   * A step and a budget, not a whole runner: the tool set a subagent may use has
+   * to be adapted with this session's gate, and the session is where that gate
+   * exists. A caller that composed the runner itself would be writing the gate
+   * options out a second time, and the two lists drift — the first version of
+   * this left the user's refusals out of the subagent's copy, so a rule held at
+   * the front door and not at the one the subagent came through.
    */
-  readonly runSubagent?: SubagentRunner;
+  readonly subagentHost?: {
+    readonly step: StepFunction;
+    readonly defaultMaxSteps: number;
+  };
   /** Calls this session refuses outright; see `ToolGateOptions.denyRules`. */
   readonly denyRules?: readonly DenyRule[];
   /**
@@ -139,12 +145,19 @@ export interface TurnRun extends TurnInput {
 /** Tools whose calls must not interleave: each one changes what the next sees. */
 const SEQUENTIAL_TOOLS = new Set(["bash", "write", "edit", "task", "browser"]);
 
-export function runTurn(options: TurnOptions): TurnRun {
-  const channel = new EventChannel<QueryEvent>();
-  const projection = new TurnProjection();
-  const steering: string[] = [];
-  const followUps: string[] = [];
-  const gate: ToolGateOptions = {
+/**
+ * Everything a tool call is judged by, from the turn's own options.
+ *
+ * One function because there is one set of facts. The session's gate and a
+ * subagent's are both built from this, so a rule added here reaches both — the
+ * defect this replaced was two hand-written lists, and the subagent's was
+ * missing the user's refusals.
+ */
+function gateOptionsFor(
+  options: TurnOptions,
+  emit: (event: QueryEvent) => void,
+): ToolGateOptions {
+  return {
     sessionId: options.sessionId,
     workspaceRoot: options.workspaceRoot,
     agentMode: options.agentMode,
@@ -152,10 +165,52 @@ export function runTurn(options: TurnOptions): TurnRun {
     hooks: options.hooks,
     escalationPromptHandler: options.escalationPromptHandler,
     interactiveAsk: options.interactiveAsk,
-    emit: (event) => channel.push(event),
+    emit,
     ...(options.commandEnv ? { commandEnv: options.commandEnv } : {}),
-    ...(options.runSubagent ? { runSubagent: options.runSubagent } : {}),
     ...(options.denyRules ? { denyRules: options.denyRules } : {}),
+  };
+}
+
+export function runTurn(options: TurnOptions): TurnRun {
+  const channel = new EventChannel<QueryEvent>();
+  const projection = new TurnProjection();
+  const steering: string[] = [];
+  const followUps: string[] = [];
+  // A subagent's tool set is adapted from the same options this session's gate
+  // is built from, so the user's refusals reach it. Composed here rather than by
+  // the caller because the gate is built here, and a caller writing those
+  // options out again is how the two copies drifted in the first place — the
+  // subagent's list was missing the refusals, so a rule held at the front door
+  // and not at the one the subagent came through.
+  const host = options.subagentHost;
+  const runSubagent: SubagentRunner | undefined = host
+    ? (input) =>
+        runSubagentWith(input, {
+          tools: new Map(
+            adaptTools(options.tools, gateOptionsFor(options, () => {})).map(
+              (tool) => [tool.name, tool] as const,
+            ),
+          ),
+          step: (messages, signal, stepOptions) =>
+            host.step(
+              messages,
+              signal,
+              { onText: () => {}, onReasoning: () => {}, onReplace: () => {} },
+              stepOptions,
+            ),
+          // The same gate the session's own calls pass through. Without it a
+          // subagent's calls skipped plan mode, the approval scope, the doom-loop
+          // check and the user's refusals — every decision the gate exists to
+          // make. A subagent is a run of the same loop, so it answers to the same
+          // rules; what differs is only what it was handed.
+          beforeToolCall: hooks.beforeToolCall,
+          afterToolCall: hooks.afterToolCall,
+          defaultMaxSteps: host.defaultMaxSteps,
+        })
+    : undefined;
+  const gate: ToolGateOptions = {
+    ...gateOptionsFor(options, (event) => channel.push(event)),
+    ...(runSubagent ? { runSubagent } : {}),
   };
   const openingText = `${environmentLine(options.workspaceRoot, options.permissionScope)}\n\n${options.prompt}`;
   const openingImages = options.attachments?.images ?? [];

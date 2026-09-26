@@ -185,12 +185,18 @@ function endpointFor(request: StepRequest): EndpointKind {
  * Appended as the last user turn rather than put in the system prompt, because
  * it is true only of this request: the system instruction is built once for the
  * whole run, and a run's earlier steps may call tools freely.
+ *
+ * Sent only when there were tools to withdraw. A run configured with none — or
+ * a caller that never offered any — is not one that reached a limit, and telling
+ * its model about a budget it was never spending is a false statement the model
+ * has no way to check.
  */
 function withFinalStepNotice(
   messages: readonly ChatMessage[],
   allowTools: boolean,
+  hadTools: boolean,
 ): readonly ChatMessage[] {
-  if (allowTools) return messages;
+  if (allowTools || !hadTools) return messages;
   return [
     ...messages,
     {
@@ -258,6 +264,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
               shape.assistantAfterToolResult,
             ),
             options.allowTools,
+            request.tools.length > 0,
           ),
           tools: request.tools,
           allowTools: options.allowTools,

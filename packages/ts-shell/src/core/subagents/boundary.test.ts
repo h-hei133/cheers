@@ -100,3 +100,23 @@ describe("the steps a subagent may take", () => {
     expect(subagentMaxSteps({ maxTurns: 4.7 }, 20)).toBe(4);
   });
 });
+
+describe("a tool no definition can ask for", () => {
+  /**
+   * A subagent cannot be given the tool that spawns subagents.
+   *
+   * It is refused today by construction — the runner builds a subagent's tool
+   * set without a runner of its own, so a nested call has no model side. That is
+   * a property of one call site, though, and the cost of losing it is unbounded:
+   * each level multiplies the one above and nothing counts the depth. The rule
+   * is stated here so it does not depend on how the call site happens to be
+   * wired.
+   */
+  it("withholds task even when the definition asks for it", () => {
+    expect(subagentTools({ tools: ["read", "task"] }, ["read", "task", "write"])).toEqual(["read"]);
+  });
+
+  it("withholds task when the definition says nothing about tools", () => {
+    expect(subagentTools({}, ["read", "task"])).toEqual(["read"]);
+  });
+});

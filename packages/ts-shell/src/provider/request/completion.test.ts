@@ -138,3 +138,59 @@ describe("an out-of-band completion", () => {
     expect(answer).toBeUndefined();
   });
 });
+
+describe("the system instruction of an out-of-band request", () => {
+  /**
+   * It travels in the field that protocol has for it, not as a message.
+   *
+   * One protocol drops a `system` role from `messages` outright — its system
+   * instruction is a top-level field and a `system` message there is rejected.
+   * A caller writing the instruction as the first message therefore had it
+   * silently discarded, and the request arrived with no instruction at all.
+   */
+  it("arrives as the system field on the protocol that requires it", async () => {
+    const { fetchImpl, requests } = capturingFetch();
+
+    await requestSimpleCompletion({
+      provider: {
+        headers: {},
+        baseUrl: "https://api.example.test",
+        model: "m",
+        endpoint: "anthropic-messages",
+        fetchImpl,
+      },
+      messages: [
+        { role: "system", content: "answer in one line" },
+        { role: "user", content: "hello" },
+      ],
+    });
+
+    const body = JSON.parse(String(requests[0]!.init.body)) as Record<string, unknown>;
+    expect(JSON.stringify(body.system)).toContain("answer in one line");
+    // And not left in the messages, where it would be dropped a second time.
+    expect(JSON.stringify(body.messages)).not.toContain("answer in one line");
+  });
+
+  it("arrives as the leading message on the protocol that keeps it there", async () => {
+    const { fetchImpl, requests } = capturingFetch();
+
+    await requestSimpleCompletion({
+      provider: {
+        headers: {},
+        baseUrl: "https://api.example.test",
+        model: "m",
+        endpoint: "openai-compatible",
+        fetchImpl,
+      },
+      messages: [
+        { role: "system", content: "answer in one line" },
+        { role: "user", content: "hello" },
+      ],
+    });
+
+    const body = JSON.parse(String(requests[0]!.init.body)) as Record<string, unknown>;
+    const messages = body.messages as Array<{ role: string; content: string }>;
+    expect(messages[0]!.role).toBe("system");
+    expect(messages[0]!.content).toBe("answer in one line");
+  });
+});

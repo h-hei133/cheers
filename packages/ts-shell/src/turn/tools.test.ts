@@ -256,3 +256,27 @@ describe("adaptTools", () => {
     expect(() => tool.prepareArguments!({ [PARSE_ERROR_KEY]: "Unexpected token" })).toThrow(/Malformed JSON arguments/);
   });
 });
+
+describe("a refusal written in the config", () => {
+  /**
+   * The rule reaches whichever gate the call comes through.
+   *
+   * The session builds one gate for its own calls and another for a subagent's.
+   * A refusal that only the first one knew about held at the front door and not
+   * at the one the subagent used, which is the whole reason a rule is worth
+   * writing — so the gate is built the same way in both places and this pins the
+   * part that is easy to leave out.
+   */
+  it("blocks a call the rule names, even where the scope would allow everything", async () => {
+    const hooks = createToolHooks(gate({ permissionScope: "allow-all", denyRules: [{ tool: "bash" }] }));
+    const decision = await hooks.beforeToolCall(call("bash", { command: "rm -rf /" }), undefined);
+    expect(decision?.block).toBe(true);
+    expect(decision?.reason).toContain("Refused by a rule");
+  });
+
+  it("lets an unrelated tool through", async () => {
+    const hooks = createToolHooks(gate({ permissionScope: "allow-all", denyRules: [{ tool: "bash" }] }));
+    const decision = await hooks.beforeToolCall(call("read", { path: "a.ts" }), undefined);
+    expect(decision?.block).toBeFalsy();
+  });
+});

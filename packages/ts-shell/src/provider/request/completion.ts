@@ -63,13 +63,24 @@ export async function requestSimpleCompletion(
 ): Promise<string | undefined> {
   const kind = endpointKind(request.provider.endpoint);
   const fetchImpl = request.provider.fetchImpl ?? fetch;
+  // The system instruction travels in its own field, because that is the only
+  // place one protocol accepts it: a `system` role inside `messages` is dropped
+  // there rather than converted. A caller writing the instruction as the first
+  // message would have it silently discarded, and the request would arrive with
+  // no instruction at all.
+  const systemPrompt = request.messages
+    .filter((message) => message.role === "system")
+    .map((message) => message.content)
+    .join("\n\n");
+  const messages = request.messages.filter((message) => message.role !== "system");
   const res = await fetchImpl(endpointUrl(request.provider.baseUrl, kind), {
     method: "POST",
     headers: request.provider.headers,
     body: JSON.stringify(
       endpointBody(kind, {
         model: request.provider.model,
-        messages: request.messages,
+        systemPrompt,
+        messages,
         ...(request.maxOutputTokens !== undefined ? { maxOutputTokens: request.maxOutputTokens } : {}),
         ...(request.supportsTemperature !== undefined
           ? { supportsTemperature: request.supportsTemperature }
