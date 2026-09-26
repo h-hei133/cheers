@@ -14,8 +14,6 @@ const TASK_STATUSES = new Set([
 const STREAM_CHANNELS = new Set(['stdout', 'stderr', 'system', 'assistant', 'tool'])
 const RUNTIME_ORIGINS = new Set([
   'typescript',
-  'rust',
-  'python',
   'user',
   'system',
   'external',
@@ -43,11 +41,10 @@ const EXECUTION_AUTHORITY_MODES = new Set([
 const EXECUTION_AUTHORITY_SOURCES = new Set([
   'tool-runtime-approval',
   'workspace-authority',
-  'daemon-sandbox',
   'none',
   'unknown-transitional',
 ])
-const EXECUTION_PATHS = new Set(['ts-local', 'rust-daemon'])
+const EXECUTION_PATHS = new Set(['ts-local'])
 const EXECUTION_STATUSES = new Set(['completed', 'failed', 'timeout', 'cancelled'])
 const EXECUTION_FAILURE_KINDS = new Set([
   'sandbox_preflight',

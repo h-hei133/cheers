@@ -1,15 +1,14 @@
 {
   "name": "cheers",
   "version": "0.1.0",
-  "description": "Maintainable three-layer workspace: TypeScript shell, Rust core, Python eval",
+  "description": "Maintainable TypeScript coding agent: shell, session, orchestration and execution",
   "private": true,
   "type": "module",
   "bin": {
     "cheers": "./dist/cli.js"
   },
   "workspaces": [
-    "packages/ts-shell",
-    "packages/rust-core"
+    "packages/ts-shell"
   ],
   "scripts": {
     "bootstrap": "node scripts/bootstrap.mjs",
@@ -20,13 +19,11 @@
     "build": "npm run build --workspaces",
     "build:ts": "npm run build -w packages/ts-shell && node scripts/build-cli-bin.mjs",
     "build:cli": "npm run build:ts",
-    "build:rust": "npm run build -w packages/rust-core",
+    "build:exe": "node scripts/build-cli-executable.mjs",
     "test": "npm run test:gate:golden-main-path && node scripts/test-all-stacks.mjs",
     "test:ts": "npm run test -w packages/ts-shell",
     "test:scripts": "node --test scripts/*.test.mjs",
     "test:gate:golden-main-path": "npm run test:gate:golden-main-path -w packages/ts-shell",
-    "test:rust": "npm run test -w packages/rust-core",
-    "test:python": "D:\\conda-envs\\coding_agents\\python.exe scripts/run-python-tests.py",
     "test:all": "npm run test:gate:golden-main-path && node scripts/test-all-stacks.mjs",
     "dev": "npm run dev -w packages/ts-shell --",
     "start": "npm run start -w packages/ts-shell --",
@@ -44,8 +41,6 @@
     "verify:permission-memory:real": "node scripts/verify-permission-memory.mjs real",
     "verify:permission-memory:all": "node scripts/verify-permission-memory.mjs all",
     "verify:doctor": "node scripts/verify-doctor-environment.mjs",
-    "verify:rust-execution": "node scripts/verify-rust-execution.mjs hard",
-    "verify:rust-execution:env": "node scripts/verify-rust-execution.mjs env",
     "verify:session-lifecycle": "node scripts/verify-session-lifecycle.mjs",
     "verify:query-orchestration": "node scripts/verify-query-orchestration.mjs",
     "verify:cli-entry": "node scripts/verify-cli-entry.mjs",
@@ -62,7 +57,6 @@
     "verify:result-contract": "node scripts/verify-result-contract.mjs",
     "verify:product:permission-memory": "npm run verify:permission-memory --",
     "verify:product:doctor": "npm run verify:doctor --",
-    "verify:product:rust-execution": "npm run verify:rust-execution --",
     "verify:product:session-lifecycle": "npm run verify:session-lifecycle --",
     "verify:product:query-orchestration": "npm run verify:query-orchestration --",
     "verify:product:cli-entry": "npm run verify:cli-entry --",

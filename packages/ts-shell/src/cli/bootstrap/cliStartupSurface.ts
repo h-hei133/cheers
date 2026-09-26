@@ -1,4 +1,3 @@
-import { isRustDaemonEnabled } from "../../daemon/client.js";
 import {
   renderStartupSurface,
 } from "../../core/shell/startupSurfaceRenderer.js";
@@ -74,7 +73,7 @@ export function projectAndRenderCliStartupSurface(
       provider: startupPlan.provider.provider,
       model: startupPlan.provider.model,
       maxTurns: startupPlan.maxTurns,
-      executionPath: isRustDaemonEnabled() ? "rust-daemon" : "ts-local",
+      executionPath: "ts-local",
       stdinTransportMode: startupPlan.stdinTransportMode,
     });
   }

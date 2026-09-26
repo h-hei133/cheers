@@ -2,10 +2,10 @@ export const RUNTIME_PROTOCOL_SCHEMA_VERSION = '1.0.0' as const
 
 export type SchemaVersion = `${number}.${number}.${number}`
 
+// `rust` and `python` were removed with the workspace members that could produce
+// them. Keeping them here would advertise an origin nothing can emit.
 export type RuntimeOrigin =
   | 'typescript'
-  | 'rust'
-  | 'python'
   | 'user'
   | 'system'
   | 'external'
@@ -53,11 +53,10 @@ export type ExecutionAuthorityMode =
 export type ExecutionAuthoritySource =
   | 'tool-runtime-approval'
   | 'workspace-authority'
-  | 'daemon-sandbox'
   | 'none'
   | 'unknown-transitional'
 
-export type ExecutionPath = 'ts-local' | 'rust-daemon'
+export type ExecutionPath = 'ts-local'
 export type ExecutionStatus = 'completed' | 'failed' | 'timeout' | 'cancelled'
 export type ExecutionFailureKind =
   | 'sandbox_preflight'

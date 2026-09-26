@@ -21,14 +21,12 @@ describe("runtime config", () => {
     fakeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-root-"));
     process.env.USERPROFILE = fakeHome;
     process.env.HOME = fakeHome;
-    delete process.env.DAEMON_ENABLED;
     delete process.env.CHEERS_MAX_TURNS;
   });
 
   afterEach(() => {
     process.env.USERPROFILE = originalHome;
     process.env.HOME = originalUnixHome;
-    delete process.env.DAEMON_ENABLED;
     delete process.env.CHEERS_MAX_TURNS;
     fs.rmSync(fakeHome, { recursive: true, force: true });
     fs.rmSync(fakeRoot, { recursive: true, force: true });
@@ -39,7 +37,6 @@ describe("runtime config", () => {
     // Assert the fields a caller actually reads, not the exact key set: pinning
     // the key set is what let a missing field go unnoticed.
     expect(config.provider).toBe("openai");
-    expect(config.daemonEnabled).toBe(true);
     expect(config.maxTurns).toBe(15);
     expect(config.disabledTools).toEqual([]);
     expect(config.hiddenToolPrefixes).toEqual([]);
@@ -322,7 +319,6 @@ describe("runtime config", () => {
     fs.writeFileSync(
       configPath,
       JSON.stringify({
-        daemonEnabled: false,
         maxTurns: 9,
         activeProviderConnectionId: "conn-compatible",
         providerConnections: [
@@ -349,12 +345,10 @@ describe("runtime config", () => {
       }),
       "utf8",
     );
-    process.env.DAEMON_ENABLED = "1";
     process.env.CHEERS_MAX_TURNS = "12";
 
     const config = getRuntimeConfig(fakeRoot);
     expect(config.provider).toBe("openai");
-    expect(config.daemonEnabled).toBe(true);
     expect(config.maxTurns).toBe(12);
     expect(config.providerCredentials.openai?.apiKey).toBe("cfg-openai-key");
     expect(config.providerCredentials.anthropic?.apiKey).toBe(

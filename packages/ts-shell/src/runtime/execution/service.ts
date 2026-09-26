@@ -5,13 +5,8 @@ import path from 'node:path'
 import { createWorkspaceWriteAuthority } from '../../edit/authority/workspace.js'
 import { buildEditSnapshotStoreConfig } from '../../edit/recovery/editSnapshot.js'
 import { captureRecoveryAuthorityRecord } from '../../edit/recovery/recoveryAuthorityStore.js'
-import {
-  checkRustDaemonAvailability,
-  executeLocally,
-  executeViaRustDaemon,
-  isRustDaemonEnabled,
-  type NormalizedExecutionResult,
-} from '../../daemon/client.js'
+import { executeLocally } from './local.js'
+import type { NormalizedExecutionResult } from './types.js'
 import {
   classifyCommandExecutionOutcome,
   type ExecutionErrorClass,
@@ -132,52 +127,17 @@ async function captureSnapshotBeforeWrite(input: {
 }
 
 async function runCommand(request: CommandExecutionRequest): Promise<CommandExecutionResult> {
-  if (isRustDaemonEnabled()) {
-    const availability = checkRustDaemonAvailability()
-    if (!availability.available) {
-      const recoveryReason = availability.reason ?? 'Rust daemon unavailable'
-      return withCommandExecutionProjection(request, 'rust-daemon', {
-        status: 'failed',
-        exitCode: null,
-        stdout: '',
-        stderr: recoveryReason,
-        failureKind: 'execution_failure',
-        recoveryReason,
-      })
-    }
-
-    try {
-      const daemonResult = await executeViaRustDaemon({
-        command: request.command,
-        args: [...request.args],
-        cwd: request.cwd,
-        workspaceRoot: request.workspaceRoot,
-        timeoutMs: request.timeoutMs,
-        abortSignal: request.abortSignal,
-        ...(request.env ? { env: request.env } : {}),
-      })
-      return withCommandExecutionProjection(request, 'rust-daemon', {
-        ...daemonResult,
-      })
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error)
-      const recoveryReason = `Rust daemon execution failed: ${reason}`
-      return withCommandExecutionProjection(request, 'rust-daemon', {
-        status: 'failed',
-        exitCode: null,
-        stdout: '',
-        stderr: recoveryReason,
-        failureKind: 'execution_failure',
-        recoveryReason,
-      })
-    }
-  }
-
   const localResult = await executeLocally({
     command: request.command,
     args: [...request.args],
     cwd: request.cwd,
     timeoutMs: request.timeoutMs,
+    // Forwarded, and the only path that could have: the branch that used to be
+    // taken by default (the daemon) passed this through, while this one dropped
+    // it. With the daemon gone this is the only route a command takes, so the
+    // omission became universal — Ctrl+C left a command running to completion
+    // and reported it as `completed`.
+    ...(request.abortSignal ? { abortSignal: request.abortSignal } : {}),
     ...(request.env ? { env: request.env } : {}),
     ...(request.onOutput ? { onOutput: request.onOutput } : {}),
   })

@@ -25,7 +25,6 @@ function createRuntimeContext(session: Session): ShellRuntimeContext {
     rootBindingDiagnostics: [],
     runtimeConfig: {
       provider: "openai",
-      daemonEnabled: true,
       maxTurns: 6,
       disabledTools: [],
       hiddenToolPrefixes: [],

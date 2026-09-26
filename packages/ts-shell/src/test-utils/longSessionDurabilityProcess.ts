@@ -282,7 +282,6 @@ function createRuntimeContext(session: Session): ShellRuntimeContext {
     rootBindingDiagnostics: [],
     runtimeConfig: {
       provider: "synthetic",
-      daemonEnabled: false,
       maxTurns: 6,
       disabledTools: [],
       hiddenToolPrefixes: [],

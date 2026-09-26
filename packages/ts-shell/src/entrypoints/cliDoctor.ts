@@ -1,6 +1,5 @@
 import process from "node:process";
 import { getRuntimeConfig } from "../config/runtimeConfig.js";
-import { isRustDaemonEnabled } from "../daemon/client.js";
 import { getWorkflowGitContext } from "../workflow/gitContext.js";
 
 export function printCliDoctor(targetCwd: string, launchCwd: string): void {
@@ -8,9 +7,7 @@ export function printCliDoctor(targetCwd: string, launchCwd: string): void {
   const gitContext = getWorkflowGitContext(targetCwd);
   console.log("Cheers CLI Doctor");
   console.log(`Node: ${process.version}`);
-  console.log(
-    `Execution path: ${isRustDaemonEnabled() ? "rust-daemon" : "ts-local"}`,
-  );
+  console.log("Execution path: ts-local");
   console.log(`Provider: ${runtimeConfig.provider}`);
   console.log(`Max turns: ${runtimeConfig.maxTurns}`);
   console.log(

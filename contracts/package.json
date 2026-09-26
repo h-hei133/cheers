@@ -1,14 +1,12 @@
 {
   "name": "@cheers/contracts",
   "version": "0.1.0",
-  "description": "Cross-runtime protocol contracts (TS/Rust/Python)",
+  "description": "Cross-runtime protocol contracts",
   "type": "module",
   "main": "./index.js",
   "files": [
     "runtime-protocol.schema.json",
     "versioning-policy.md",
-    "typescript",
-    "rust",
-    "python"
+    "typescript"
   ]
 }

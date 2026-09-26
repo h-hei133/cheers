@@ -9,7 +9,7 @@ export async function runDoctorCommand(context: CommandContext): Promise<LocalCo
 
   const lines = [
     'Cheers CLI Doctor',
-    `Execution path: ${runtimeConfig.daemonEnabled ? 'rust-daemon' : 'ts-local'}`,
+    'Execution path: ts-local',
     `Provider: ${runtimeConfig.provider}`,
     `Max turns: ${runtimeConfig.maxTurns}`,
     `Config sources: ${runtimeConfig.configSources.join(', ') || 'none'}`,
@@ -67,7 +67,7 @@ export async function runDiagnoseCommand(context: CommandContext): Promise<Local
   const diagnostics = getWorkflowGitDiagnostics(context.cwd, { limit: 12 })
   const lines = [
     'Repository diagnosis',
-    `Execution path: ${runtimeConfig.daemonEnabled ? 'rust-daemon' : 'ts-local'}`,
+    'Execution path: ts-local',
     `Provider: ${runtimeConfig.provider}`,
     `Active connection: ${runtimeConfig.activeProviderConnectionId ?? 'none'}`,
     `Provider config: ${summarizeProviderConfig(runtimeConfig)}`,

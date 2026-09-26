@@ -89,7 +89,6 @@ export interface ProviderConnectionConfig {
 
 export interface RuntimeConfig {
   readonly provider: RuntimeProvider;
-  readonly daemonEnabled: boolean;
   readonly maxTurns: number;
   /**
    * The only tools this run may offer, when the user named any.
@@ -308,7 +307,6 @@ export interface TuiPreferences {
 
 export interface RuntimeConfigFile {
   provider?: RuntimeProvider;
-  daemonEnabled?: boolean;
   maxTurns?: number;
   allowedTools?: string[];
   disabledTools?: string[];
@@ -346,7 +344,6 @@ export interface RuntimeConfigFile {
 
 const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
   provider: "openai",
-  daemonEnabled: true,
   maxTurns: 15,
   disabledTools: [],
   hiddenToolPrefixes: [],
@@ -460,12 +457,6 @@ export function getRuntimeConfig(
     }
   }
 
-  const daemonFromEnv = process.env.DAEMON_ENABLED;
-  const daemonEnabled =
-    daemonFromEnv === undefined
-      ? (merged.daemonEnabled ?? DEFAULT_CONFIG.daemonEnabled)
-      : daemonFromEnv === "1";
-
   const maxTurnsFromEnv = process.env.CHEERS_MAX_TURNS;
   const maxTurns = maxTurnsFromEnv
     ? Number(maxTurnsFromEnv)
@@ -487,7 +478,6 @@ export function getRuntimeConfig(
 
   return {
     provider,
-    daemonEnabled,
     maxTurns,
     // Left absent when unset, rather than defaulted to an empty list: an empty
     // allowlist means "offer nothing", and defaulting to it would disable every

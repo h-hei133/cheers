@@ -97,7 +97,7 @@ export function renderStartupSurface(
     provider: string;
     model?: string;
     maxTurns: number;
-    executionPath: "rust-daemon" | "ts-local";
+    executionPath: "ts-local";
     stdinTransportMode: StartupSurfaceStdinTransportMode;
   },
 ): void {

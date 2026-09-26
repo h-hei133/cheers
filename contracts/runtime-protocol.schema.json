@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://claudecode.dev/schemas/runtime-protocol.schema.json",
+  "$id": "https://cheers.dev/schemas/runtime-protocol.schema.json",
   "title": "Cross-runtime Protocol Contract",
-  "description": "Versioned protocol contract for TypeScript ↔ Rust ↔ Python runtime boundaries.",
+  "description": "Versioned protocol contract for the TypeScript runtime boundary.",
   "type": "object",
   "oneOf": [
     {
@@ -35,10 +35,9 @@
     },
     "RuntimeOrigin": {
       "type": "string",
+      "description": "Who issued the request. `rust` and `python` were removed with the workspace members that could produce them; no producer can emit them now.",
       "enum": [
         "typescript",
-        "rust",
-        "python",
         "user",
         "system",
         "external"
@@ -150,7 +149,6 @@
       "enum": [
         "tool-runtime-approval",
         "workspace-authority",
-        "daemon-sandbox",
         "none",
         "unknown-transitional"
       ]
@@ -158,8 +156,7 @@
     "ExecutionPath": {
       "type": "string",
       "enum": [
-        "ts-local",
-        "rust-daemon"
+        "ts-local"
       ]
     },
     "ExecutionStatus": {

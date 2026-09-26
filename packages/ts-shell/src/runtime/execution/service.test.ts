@@ -17,7 +17,6 @@ import {
   type ExecutionEvent,
 } from './service.js'
 
-const originalDaemonEnabled = process.env.DAEMON_ENABLED
 let workspaceRoot: string | undefined
 const READ_AUTHORITY = {
   mode: 'read-only',
@@ -37,15 +36,13 @@ const COMMAND_AUTHORITY = {
 
 describe('execution service boundary', () => {
   afterEach(async () => {
-    process.env.DAEMON_ENABLED = originalDaemonEnabled
     if (workspaceRoot) {
       await fs.rm(workspaceRoot, { recursive: true, force: true })
       workspaceRoot = undefined
     }
   })
 
-  it('routes command execution through the TS-local boundary when the daemon is disabled', async () => {
-    process.env.DAEMON_ENABLED = '0'
+  it('runs a command through the execution boundary', async () => {
     workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'cheers-execution-service-'))
     const service = createDefaultExecutionService()
 
@@ -92,6 +89,110 @@ describe('execution service boundary', () => {
       }),
     ])
   })
+
+  it('stops a running command when the caller aborts, and says it was cancelled', async () => {
+    workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'cheers-execution-service-'))
+    const service = createDefaultExecutionService()
+    const controller = new AbortController()
+
+    // The abort is driven by the child's own first output, not by a wait: the
+    // child announces it is running and the signal is raised on that event. A
+    // guessed delay would either abort before the process exists (testing the
+    // already-aborted branch by accident) or after it has finished.
+    //
+    // The child then stays alive far longer than this test's timeout. If the
+    // signal is not forwarded, the run does not come back and vitest fails the
+    // test on its deadline — which is the regression this pins.
+    const childScript = [
+      'process.stdout.write("running")',
+      'setTimeout(() => {}, 60000)',
+    ].join(';')
+
+    const pending = service.runCommand({
+      operationKind: 'command.run',
+      command: process.execPath,
+      args: ['-e', childScript],
+      cwd: workspaceRoot,
+      workspaceRoot,
+      authority: COMMAND_AUTHORITY,
+      caller: 'execution-service-test',
+      reason: 'verify an aborted command is stopped rather than awaited',
+      reportSafeCommand: 'node -e <long-running child>',
+      timeoutMs: 120_000,
+      abortSignal: controller.signal,
+      onOutput: () => {
+        if (!controller.signal.aborted) controller.abort()
+      },
+    })
+
+    const result = await pending
+
+    // `cancelled`, not `timeout` and not `completed`. The distinction is the whole
+    // point: a stop the user asked for reported as a timeout, or worse as a
+    // success, is a status nobody can act on. Before the abort signal was
+    // forwarded this came back `completed` once the child finally exited.
+    expect(result.status).toBe('cancelled')
+    expect(result.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'execution.cancelled', status: 'cancelled' }),
+      ]),
+    )
+  }, 15_000)
+
+  it('reports a command that ran too long as a timeout, not as a failure', async () => {
+    workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'cheers-execution-service-'))
+    const service = createDefaultExecutionService()
+
+    // The other half of the abort test: `timeout` and `cancelled` and `failed`
+    // are three different facts, and a command stopped by the timeout must not be
+    // reported as one the user stopped or one that exited badly. The child exits
+    // on its own once the timeout kills it, so no wait is needed.
+    const result = await service.runCommand({
+      operationKind: 'command.run',
+      command: process.execPath,
+      args: ['-e', 'setTimeout(() => {}, 60000)'],
+      cwd: workspaceRoot,
+      workspaceRoot,
+      authority: COMMAND_AUTHORITY,
+      caller: 'execution-service-test',
+      reason: 'verify a command past its deadline is reported as a timeout',
+      reportSafeCommand: 'node -e <long-running child>',
+      timeoutMs: 500,
+    })
+
+    expect(result.status).toBe('timeout')
+    expect(result.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'execution.timed_out', status: 'timeout' }),
+      ]),
+    )
+  }, 20_000)
+
+  it('reports a command killed by an external signal as a failure, not a timeout', async () => {
+    workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'cheers-execution-service-'))
+    const service = createDefaultExecutionService()
+
+    // A child that signals itself is the deterministic form of "something other
+    // than this code stopped the process": an operator's SIGTERM, a supervisor
+    // reaping it, an OOM kill. It did not run too long, so calling it a timeout
+    // points the reader at a deadline that was never reached.
+    //
+    // No wait is needed — the child terminates itself immediately.
+    const result = await service.runCommand({
+      operationKind: 'command.run',
+      command: process.execPath,
+      args: ['-e', 'process.kill(process.pid, "SIGTERM")'],
+      cwd: workspaceRoot,
+      workspaceRoot,
+      authority: COMMAND_AUTHORITY,
+      caller: 'execution-service-test',
+      reason: 'verify an externally signalled command is not reported as a timeout',
+      reportSafeCommand: 'node -e <self-terminating child>',
+      timeoutMs: 30_000,
+    })
+
+    expect(result.status).toBe('failed')
+  }, 20_000)
 
   it('centralizes basic text file side effects for tool callers', async () => {
     workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'cheers-execution-service-'))

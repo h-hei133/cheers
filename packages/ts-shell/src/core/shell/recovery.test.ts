@@ -20,7 +20,6 @@ function createRuntimeContext(): ShellRuntimeContext {
     gitRoot: "D:/repo",
     runtimeConfig: {
       provider: "openai",
-      daemonEnabled: true,
       maxTurns: 6,
       disabledTools: [],
       hiddenToolPrefixes: [],
@@ -264,7 +263,6 @@ describe("shell recovery helpers", () => {
       gitRoot: "D:/repo",
       runtimeConfig: {
         provider: "openai",
-        daemonEnabled: true,
         maxTurns: 6,
         disabledTools: [],
         hiddenToolPrefixes: [],
@@ -365,7 +363,6 @@ describe("shell recovery helpers", () => {
       gitRoot: "D:/repo",
       runtimeConfig: {
         provider: "openai",
-        daemonEnabled: true,
         maxTurns: 6,
         disabledTools: [],
         hiddenToolPrefixes: [],

@@ -9,7 +9,6 @@ import {
 function createRuntimeConfig(): RuntimeConfig {
   return {
     provider: "openai",
-    daemonEnabled: true,
     maxTurns: 6,
     disabledTools: [],
     hiddenToolPrefixes: [],

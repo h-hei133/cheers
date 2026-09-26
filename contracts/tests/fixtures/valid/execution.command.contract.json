@@ -106,12 +106,12 @@
       "stdout": "",
       "stderr": "Command cancelled",
       "failureKind": "cancelled",
-      "executionPath": "rust-daemon",
+      "executionPath": "ts-local",
       "events": [
         {
           "kind": "execution.started",
           "operationKind": "command.run",
-          "executionPath": "rust-daemon",
+          "executionPath": "ts-local",
           "authorityMode": "command-allowlisted",
           "caller": "core-tool:bash",
           "reportSafeCommand": "printf execution-contract",
@@ -120,7 +120,7 @@
         {
           "kind": "execution.cancelled",
           "operationKind": "command.run",
-          "executionPath": "rust-daemon",
+          "executionPath": "ts-local",
           "authorityMode": "command-allowlisted",
           "status": "cancelled",
           "exitCode": null,

@@ -1,5 +1,20 @@
 import type { FileWalkOptions } from './fileWalk.js'
-import type { NormalizedExecutionResult } from '../../daemon/client.js'
+
+/**
+ * What a command run reports, before it is given an execution path and a receipt.
+ *
+ * Every field is something the runner observed. `status` is the outcome, not a
+ * judgement about it: a non-zero exit is `failed` here and becomes a classified
+ * error only in `error.ts`.
+ */
+export interface NormalizedExecutionResult {
+  readonly status: 'completed' | 'failed' | 'timeout' | 'cancelled'
+  readonly exitCode: number | null
+  readonly stdout: string
+  readonly stderr: string
+  readonly failureKind?: 'sandbox_preflight' | 'execution_failure' | 'timeout' | 'cancelled'
+}
+
 export type ExecutionErrorClass =
   | 'success'
   | 'command_failed'
@@ -39,7 +54,7 @@ export interface RuntimeExecutionReceiptProjection {
   readonly outputSummary?: string
 }
 
-export type ExecutionPath = 'ts-local' | 'rust-daemon'
+export type ExecutionPath = 'ts-local'
 export type ExecutionOperationKind =
   | 'command.run'
   | 'file.read'
@@ -61,7 +76,6 @@ export type ExecutionAuthorityMode =
 export type ExecutionAuthoritySource =
   | 'tool-runtime-approval'
   | 'workspace-authority'
-  | 'daemon-sandbox'
   | 'none'
   | 'unknown-transitional'
 
@@ -189,10 +203,6 @@ export interface CommandExecutionResult extends NormalizedExecutionResult {
   readonly events: readonly ExecutionEvent[]
   readonly errorClass: ExecutionErrorClass
   readonly receipt: RuntimeExecutionReceiptProjection
-  readonly daemonInstanceId?: string
-  readonly daemonPid?: number
-  readonly daemonRequestSeq?: number
-  readonly daemonExecutionId?: string
   readonly recoveryReason?: string
 }
 
