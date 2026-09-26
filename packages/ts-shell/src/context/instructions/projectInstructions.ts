@@ -25,6 +25,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { splitByteOrderMark } from "../../runtime/execution/fileText.js";
 import { projectDirectories } from "../../core/project/directories.js";
+import { expandImports } from "./importExpansion.js";
 import { escapeAttribute, neutraliseTagBoundaries } from "../../core/text/safety.js";
 import { userDataSearchDirsFor } from "../../core/paths/userHome.js";
 
@@ -126,9 +127,18 @@ function loadAncestorFiles(cwd: string): InstructionFile[] {
   const files: InstructionFile[] = [];
   // The same chain skills are found along, so a repository cannot have its rules
   // honored from a directory while its skills are ignored from that directory.
-  for (const directory of projectDirectories(cwd)) {
+  const directories = projectDirectories(cwd);
+  // The outermost directory of the chain is the project boundary: a reference
+  // may reach anywhere inside the project and nowhere outside it.
+  const projectRoot = directories[0];
+  for (const directory of directories) {
     const file = loadOneFrom(directory);
-    if (file) files.push(file);
+    if (!file) continue;
+    files.push(
+      projectRoot === undefined
+        ? file
+        : { ...file, content: expandImports(file.content, { baseDirectory: directory, projectRoot }).content },
+    );
   }
   return files;
 }

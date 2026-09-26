@@ -72,6 +72,39 @@ describe("High-Value Modern Built-in Tools Subsystem", () => {
       const err = result.error || result.output;
       expect(err).toContain("filePath parameter is required");
     });
+
+    it("declares no position arguments, because it takes none", async () => {
+      // It advertised `line` and `character` and never read either, so a caller
+      // following the schema would believe it could ask about a position and get
+      // the precision of a language server. It cannot: the answers come from
+      // parsing source. A schema promising what the tool does not do is worse
+      // than a smaller schema, because the caller cannot tell the difference.
+      const tool = createLspToolDefinition(createDefaultExecutionService());
+      const properties = (tool.argsSchema as { properties: Record<string, unknown> }).properties;
+
+      expect(Object.keys(properties)).not.toContain("line");
+      expect(Object.keys(properties)).not.toContain("character");
+    });
+
+    it("says it is a symbol scanner rather than a language server", async () => {
+      const tool = createLspToolDefinition(createDefaultExecutionService());
+
+      expect(tool.description).toMatch(/symbol scanner/i);
+      expect(tool.description).toMatch(/not a language server/i);
+    });
+
+    it("answers a hover from the symbol name alone", async () => {
+      // The operation survives without a position, which is the evidence that
+      // the position was never used.
+      const tool = createLspToolDefinition(createDefaultExecutionService());
+      const result = await tool.execute(
+        { operation: "hover", filePath: "src/service.ts", symbol: "UserService" },
+        { workspaceRoot: tempDir, taskId: "task-1" },
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.output).toContain("UserService");
+    });
   });
 
   describe("ask tool", () => {

@@ -9,7 +9,16 @@ import { TOOL_APPROVED_READ_AUTHORITY } from "./grep.js";
 
 /**
  * /lsp tool
- * Code intelligence operations: definition, references, hover, documentSymbol, workspaceSymbol
+ *
+ * Code intelligence over the source it can parse: definitions, references and
+ * symbol listings.
+ *
+ * It is a symbol scanner rather than a language server. The operations are
+ * answered by parsing the workspace's own source, so there is no server to
+ * start and nothing to configure, and the answers are as good as the parser.
+ * It takes no line or column: a query is a name, and pretending to accept a
+ * position would invite callers to expect the precision of a real language
+ * server while getting a text scan.
  */
 export function createLspToolDefinition(
   executionService: ExecutionService,
@@ -17,7 +26,7 @@ export function createLspToolDefinition(
   return {
     name: "lsp",
     description:
-      "Perform code intelligence operations: jump to definition, find all references, hover type signature, or list document/workspace symbols.",
+      "Code intelligence over the workspace's source: jump to definition, find references, or list document and workspace symbols. This is a symbol scanner, not a language server — queries are by symbol name, not by file position.",
     argsSchema: {
       type: "object",
       properties: {
@@ -35,14 +44,6 @@ export function createLspToolDefinition(
         filePath: {
           type: "string",
           description: "Relative file path in the workspace.",
-        },
-        line: {
-          type: "number",
-          description: "1-based line number in the target file.",
-        },
-        character: {
-          type: "number",
-          description: "1-based character offset on the target line.",
         },
         symbol: {
           type: "string",
