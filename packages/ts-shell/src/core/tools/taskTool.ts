@@ -124,6 +124,9 @@ export function createTaskToolDefinition(
       // Why no answer arrived, when none did. Without it the report below claimed
       // the work was completed on the strength of an empty string.
       let subagentFailure = "";
+      // Where a subagent's changes were left, when it made any. Reported because
+      // a kept worktree is the only way to find them.
+      let keptWorktree: { readonly worktreePath: string; readonly branch: string } | undefined;
       const apiKey = process.env.SILICONFLOW_API_KEY || process.env.OPENAI_API_KEY || "";
       const baseUrl = process.env.SILICONFLOW_BASE_URL || process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
       const model = subagentDef?.model || (process.env.SILICONFLOW_API_KEY ? "deepseek-ai/DeepSeek-V4-Flash" : "gpt-4o-mini");
@@ -179,17 +182,22 @@ export function createTaskToolDefinition(
         subagentFailure = error instanceof Error ? error.message : String(error);
       } finally {
         if (allocatedWorktree) {
-          await worktreeManager.releaseWorktree(subtaskId, { squashMerge: true });
-          // Paired with the create above, and dispatched after the release so the
-          // path in the payload is one that no longer exists.
-          await defaultHookDispatcher.dispatch({
-            eventName: "WorktreeRemove",
-            sessionId: context.taskId || subtaskId,
-            workspaceRoot: context.workspaceRoot,
-            timestamp: new Date().toISOString(),
-            subtaskId,
-            worktreePath: allocatedWorktree.worktreePath,
-          });
+          // Released, not merged. Changes are kept and reported below; the
+          // caller decides whether they belong in the working tree. A release
+          // that removed the worktree dispatches the removal hook, because the
+          // path in that payload is one that no longer exists.
+          const release = await worktreeManager.releaseWorktree(subtaskId);
+          keptWorktree = release.outcome === "kept" ? release : undefined;
+          if (release.outcome === "removed") {
+            await defaultHookDispatcher.dispatch({
+              eventName: "WorktreeRemove",
+              sessionId: context.taskId || subtaskId,
+              workspaceRoot: context.workspaceRoot,
+              timestamp: new Date().toISOString(),
+              subtaskId,
+              worktreePath: allocatedWorktree.worktreePath,
+            });
+          }
         }
 
         // 4. Dispatch SubagentStop lifecycle hook
@@ -211,6 +219,15 @@ export function createTaskToolDefinition(
         `- **Mode**: \`${mode}\``,
         `- **Filesystem Isolation**: \`${shouldIsolate ? `Git Worktree (${effectiveWorkspace})` : "Shared Workspace"}\``,
         ...(contextStr ? [`- **Context Attached**: ${contextStr}`] : []),
+        "",
+        ...(keptWorktree
+          ? [
+              "",
+              "## Changes Left In A Worktree",
+              `The subagent changed files. They were **not** merged into the working tree; they are at \`${keptWorktree.worktreePath}\` on branch \`${keptWorktree.branch}\`.`,
+              "Review them and merge, or remove the worktree when they are not wanted.",
+            ]
+          : []),
         "",
         "## Subagent Execution Result:",
         subagentResponse ||

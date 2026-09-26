@@ -9,14 +9,37 @@ export interface WorktreeAllocation {
   readonly worktreePath: string;
   readonly workspaceRoot: string;
   readonly isIsolated: boolean;
+  /**
+   * The commit the worktree was made at.
+   *
+   * Recorded here because it is the only thing a later comparison can be
+   * against: asking git what changed since "wherever this branch started"
+   * after the branch exists gives the whole history when there is no remote
+   * to exclude, which reads as "everything changed".
+   */
+  readonly headCommit?: string;
 }
 
 /**
- * GitWorktreeManager
- * Manages isolated physical worktrees (`git worktree add -b <branch> <path>`) for parallel subagents.
- * Prevents file mutation collisions and git index lock contention.
- * Automatically cleans up worktree directories and branches upon task completion.
+ * Worktrees for parallel subagents.
+ *
+ * Each allocation is a real `git worktree` on its own branch, so two agents
+ * editing at once cannot collide in the index. A release does not merge: work
+ * that changed is kept and reported, work that did not is removed. Merging here
+ * would put a subagent's edits into the working tree with nobody having read
+ * them, and the caller is the one that knows whether that is wanted.
  */
+/**
+ * What happened to a worktree when it was released.
+ *
+ * The caller has to know whether work was kept, because a kept worktree is a
+ * directory and a branch that outlive the call: its path is the only way to
+ * find the changes, and leaving it unreported leaves it unreachable.
+ */
+export type WorktreeRelease =
+  | { readonly outcome: "removed" }
+  | { readonly outcome: "kept"; readonly worktreePath: string; readonly branch: string };
+
 export class GitWorktreeManager {
   private readonly workspaceRoot: string;
   private readonly isGitRepo: boolean;
@@ -78,6 +101,7 @@ export class GitWorktreeManager {
         worktreePath,
         workspaceRoot: this.workspaceRoot,
         isIsolated: true,
+        ...(this.headCommit() ? { headCommit: this.headCommit() } : {}),
       };
 
       this.activeAllocations.set(subtaskId, allocation);
@@ -95,46 +119,104 @@ export class GitWorktreeManager {
     }
   }
 
-  async releaseWorktree(subtaskId: string, options?: { readonly squashMerge?: boolean }): Promise<void> {
+  /**
+   * Release a worktree, keeping it when it holds changes.
+   *
+   * Nothing is merged. A subagent's edits reach the working tree only when the
+   * caller puts them there, because the alternative is putting them there
+   * unread — and a merge that conflicts does so silently, leaving the caller
+   * believing work arrived when it did not.
+   *
+   * A worktree with no changes is removed along with its branch: it is an
+   * allocation nobody used, and keeping it would leave the repository growing a
+   * directory per call. One with changes is kept, and its path and branch are
+   * returned so the caller can say where they are.
+   */
+  async releaseWorktree(subtaskId: string): Promise<WorktreeRelease> {
     const allocation = this.activeAllocations.get(subtaskId);
-    if (!allocation) return;
+    if (!allocation) return { outcome: "removed" };
 
     if (!allocation.isIsolated || allocation.worktreePath === this.workspaceRoot) {
       this.activeAllocations.delete(subtaskId);
-      return;
+      return { outcome: "removed" };
     }
 
     try {
-      if (this.isGitRepo) {
-        if (options?.squashMerge && allocation.branch.startsWith("subagent/")) {
-          try {
-            execSync(`git merge --squash "${allocation.branch}"`, {
-              cwd: this.workspaceRoot,
-              stdio: "ignore",
-            });
-          } catch {
-            // Conflict or clean merge skip
-          }
-        }
-
-        execSync(`git worktree remove --force "${allocation.worktreePath}"`, {
-          cwd: this.workspaceRoot,
-          stdio: "ignore",
-        });
-
-        execSync(`git branch -D "${allocation.branch}"`, {
-          cwd: this.workspaceRoot,
-          stdio: "ignore",
-        });
-      } else {
-        if (fs.existsSync(allocation.worktreePath)) {
-          fs.rmSync(allocation.worktreePath, { recursive: true, force: true });
-        }
+      if (this.hasChanges(allocation)) {
+        this.activeAllocations.delete(subtaskId);
+        return { outcome: "kept", worktreePath: allocation.worktreePath, branch: allocation.branch };
       }
-    } catch {
-      // Best-effort cleanup
-    } finally {
+
+      this.removeWorktree(allocation);
       this.activeAllocations.delete(subtaskId);
+      return { outcome: "removed" };
+    } catch {
+      // Best-effort cleanup. A release that failed to remove leaves the worktree
+      // where it is, which is the safe side of the two: the work is still there.
+      this.activeAllocations.delete(subtaskId);
+      return { outcome: "kept", worktreePath: allocation.worktreePath, branch: allocation.branch };
+    }
+  }
+
+  /**
+   * Whether anything in the worktree differs from the commit it was made at.
+   *
+   * Uncommitted edits first, then commits made on the branch. Both are needed:
+   * an agent that edits and stops leaves the first, one that commits leaves the
+   * second, and a check for either alone would call the other empty.
+   *
+   * A directory that is not a repository has no history to compare against, so
+   * anything it holds counts: without that, the ephemeral fallback would be
+   * deleted on the strength of a check that could not look.
+   */
+  private hasChanges(allocation: WorktreeAllocation): boolean {
+    if (!this.isGitRepo || allocation.headCommit === undefined) return true;
+    try {
+      const status = execSync("git status --porcelain", {
+        cwd: allocation.worktreePath,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+      if (status.trim().length > 0) return true;
+      const ahead = execSync(
+        `git rev-list --count "${allocation.headCommit}..HEAD"`,
+        { cwd: allocation.worktreePath, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+      );
+      return Number(ahead.trim()) > 0;
+    } catch {
+      // A worktree that cannot be inspected is treated as holding work. Removing
+      // one on the strength of a failed lookup would discard edits, and being
+      // told a directory was kept is cheaper than losing what was in it.
+      return true;
+    }
+  }
+
+  /** The commit the repository is at, or nothing when it cannot be read. */
+  private headCommit(): string | undefined {
+    try {
+      return execSync("git rev-parse HEAD", {
+        cwd: this.workspaceRoot,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Remove a worktree and its branch, for an allocation that holds nothing. */
+  private removeWorktree(allocation: WorktreeAllocation): void {
+    try {
+      execSync(`git worktree remove --force "${allocation.worktreePath}"`, {
+        cwd: this.workspaceRoot,
+        stdio: "ignore",
+      });
+      execSync(`git branch -D "${allocation.branch}"`, {
+        cwd: this.workspaceRoot,
+        stdio: "ignore",
+      });
+    } catch {
+      // Best-effort: a worktree that will not go is reported by git itself.
     }
   }
 
