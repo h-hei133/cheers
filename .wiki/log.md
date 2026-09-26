@@ -3664,3 +3664,86 @@ Anthropic `budget_tokens` 的 400、`thinkingSignature` 缺失的 400、OpenAI �
 temperature 400（**均无账号，属 `[INFERENCE]`**）；CJK/JSON 误差幅度（**本机无分词器**，
 数字来自公开 BPE 行为）；pi 子代理输出如何流回父级；opencode 39 个语言服务器的注册细节；
 `cheers.json`/`.agents/settings.json` 的设计意图（**无法从代码判断，故需维护者裁决**）。
+
+## [2026-09-26] planning | Phase 11 规划：收口 08 与 11 的未完成项
+
+**维护者指示**：「继续根据 08 和 11 文档中未完成的任务规划 Phase 11，先完成
+`phase-11-pre-research.md` 和 `phase-11-decisions.md`，你做好的裁决要经过子代理复核，
+没有偏离 pi 项目的实现方案；结合 `~/projects/` 下的顶尖项目派遣子代理深度探索，
+模型用 `vsllm/gemini-3.8-flash-api:max`，同时运行限制最高 3 个」。
+
+**产出**：`.wiki/features/phase-11-pre-research.md`（500 行）+ `phase-11-decisions.md`（908 行）。
+**零代码改动。**
+
+**范围**：08 §6 的 T1–T18 与 11 §5 的 14 项**去重**（11 已证伪的 D6、已完成的 P0-A 移出）
+→ **13 项施工 + 5 项待维护者裁决**。
+
+### 本阶段最重要的产出：推翻 5 处旧记录对参考实现的引用
+
+| # | 旧记录 | 实测 |
+|---|---|---|
+| **C1** | 11 §4.3 建议照 pi「子进程跑自己的 CLI」 | pi 的子代理**不在核心**（`core/tools/` 只有 7 个工具），在 `examples/extensions/`；**Claude Code 与 opencode 都是进程内** |
+| **C2** | 08 `M2` 把 pi `bash.ts:98` 的 `detached` 当后台执行对照 | 它是**进程组管理**（`setsid` + `kill(-pid)`），**从不 `unref()`**，`await waitForChildProcess` 同步阻塞 |
+| **C3** | 08 `M9` 说 `@import` 参考是 pi `resource-loader` | pi **根本没有 import 展开**（唯一的 `@import` 命中在 vendored highlight.js 里）；真参考是 **gemini-cli** |
+| **C4** | 08 `D9` 未给 Doom Loop 参考 | **pi 没有此检测器**；真参考是 **gemini-cli** `loopDetectionService.ts` 的 k=1..5 检测 |
+| **C5** | 08 `D7` 把「CJK 低估」列为相对缺口 | **pi 也不特判 CJK**（扁平 `Math.ceil(len/4)`）；真缺口是**系统提示与工具 schema 完全不计入** |
+
+**5 处里 3 处是同一个错误**：把参考项目里**非产品层**的东西（示例扩展、进程组管理）当成了产品设计。
+据此立纪律：**引用参考时必须写明它在哪一层**（`core/` 产品 / `examples/` 示例 / `docs/` 文档）。
+
+### 主代理实机复现（`npx tsx`）
+
+- **P0-C**：内置模型经刷新补丁后 `compat`/`vision` **全部丢失**（`compat survived: NO`）。
+- **D12**：`replaceInContent` 文本出现两次时不传 `replaceAll` → **`success: true`，只改第一处，无提示**。
+- **D9**：`A B A B A B A B` **从不触发**。
+- **冷启动漏算**：13 个工具 schema = **8,933 字符 ≈ 2,553 token**，系统提示 ≈ 323 token，**均不计入**。
+
+### 裁决复核（维护者要求「裁决要经过子代理复核」）
+
+三个复核子代理**全部完成并 yield 结论**：`V1Corrections`（5 处更正**全部 CONFIRMED**，0 findings）、
+`V2Provider`（3 项）、`V3Tools`（3 项）。**后两者判 `overall_correctness: incorrect`。**
+
+**核对后确有 5 处实质错误，全部已改**：
+
+1. **T10**：初稿称 gemini-cli「只在参数与**结果**实质相同时才算循环，我们拿不到结果」。
+   **错**——`getToolCallKey` 只哈希 `name`+`args`，**从不记录结果**；那句是**给 LLM 双检的提示词**。
+   **我们与它完全对等**，不存在「更容易误报」的差距。
+2. **T10 阈值**：初稿的统一 `R=3` 会把 `read edit read edit read edit`（**正常节奏**）
+   判成死循环（主代理实测）。**改为按 k 分档**：k=1 用 R=3（保既有）、k≥2 用 R=5（照 gemini-cli）。
+3. **T12**：漏了「包含性基准是**项目根**而非当前目录」（子目录 `@../sibling.md` 合法），
+   且 gemini-cli 的拒绝**是静默的**（`:266-271` 直接 `continue`）——**我们照语义但不照静默**。
+4. **T4**：初稿把 `utils/retry.ts` 与 `provider-retry.ts` 说成一处「分类 vs 策略」拆分。
+   **它们是两个不同层的重试**（输入类型不同）。后果：`x-should-retry` 只在 HTTP 层可得，
+   我们的接线点接不了——**裁决不为此新增传递通道**。
+5. **T5**：初稿指摘「11 §2.4 漏了 `thinkingEnabled`」。**读原文后确认不实**，已撤回。
+6. **D1**：初稿用「pi 的子代理在 `examples/` 里」反对子进程方案。**`V3Tools` 指出这是范畴错误**；
+   主代理核实 `examples` **确在 pi 的发布清单**（`package.json:35`），且 pi 文档把扩展当**架构级能力**。
+   **已删掉该理由**，仅保留其余三条。
+
+**主代理自行做的 4 处更正也被复核独立确认**：T1 改动面收窄（投影**故意**不猜 `compat`）、
+T7 的 `allowEmptySignature`、D1 的范畴错误、T5 的撤回。
+
+### 子代理端点事故（如实记录）
+
+复核期间端点返回 **402「当前账户暂无生效套餐，请前往钱包页面激活订阅」**，
+`W*`/`X*` 两轮重派共 **6 次全部失败**（每次 <1s 即失败，非超时）。
+维护者补足额度后，原三个子代理的结论可读。**这不是任务失败，是额度问题。**
+
+### 待维护者裁决的 5 项
+
+**D2 权限规则**（我们**完全没有 deny 概念**——用户无法表达「永远不许用这个工具」；
+但 pi 的立场是「进程边界才是安全边界」，`docs/security.md:1-17` 明文说审查**不构成安全边界**——
+**倾向只补 deny，不做完整规则表**）、
+**D3 `cheers.json`/`.agents/settings.json`**（**逐字节相同**、**零读者**、
+**含外部项目名 `.codex/skills`** 且该路径不存在——**倾向删除**）、
+**D4 动态工具装载增量**（pi 的机制是**重放确定性**，前提是工具集**会变**；
+**我们的工具集在会话构造时固定**，照抄是空转——**倾向只处理 `maxSteps` 那一处**）、
+**D5 后台命令执行**（与 `ambientFacts.ts:9` 的既有立场冲突；
+**倾向先查 `processTree.ts` 是否漏了孤儿进程清理**，那是缺陷而功能是另一件事）、
+**D7 死代码处置**（`plan.md` §2.1 明确「可达性不授权删除」）。
+
+### 执行顺序
+
+**静默错误优先**（不报错却给错结果的一类）：T1 → T2 → T3 → T7 → T9，
+之后是响亮失败（T4/T5/T6）与能力补齐（T8/T10/T11/T12/T13）。
+**T1/T2/T3 成本低，可立即开工。**
