@@ -3,6 +3,7 @@ import type { AgentTool, AgentToolResult, ToolHooks } from "../core/agent/tools.
 import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import { DoomLoopDetector } from "../core/query/doomLoopDetector.js";
 import { buildToolEscalationPrompt, evaluateToolPermissionScope, READ_ONLY_BROWSER_ACTIONS } from "../core/query/toolPolicy.js";
+import type { DenyRule } from "../core/shell/approval/deny.js";
 import { isReadOnlyBashCommand } from "../core/shell/approval/evaluator.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { AskQuestion } from "../core/tools/ask.js";
@@ -56,6 +57,13 @@ export interface ToolGateOptions {
    * side and this layer has none of it. Absent means the tool cannot delegate.
    */
   readonly runSubagent?: SubagentRunner;
+  /**
+   * Tools this session refuses, whatever else says otherwise.
+   *
+   * Read from the run's configuration. Empty means nothing is refused, which is
+   * what a session that declares no rules has always had.
+   */
+  readonly denyRules?: readonly DenyRule[];
 }
 
 /** Tools a planning session may call: the ones that only look. */
@@ -250,7 +258,30 @@ async function askPermission(
   options: ToolGateOptions,
   signal: AbortSignal | undefined,
 ): Promise<{ readonly blocked?: string; readonly approved?: { operation: string; decision: string } }> {
-  const evaluation = evaluateToolPermissionScope(toolName, args, options.permissionScope ?? "ask", options.workspaceRoot);
+  const evaluation = evaluateToolPermissionScope(
+    toolName,
+    args,
+    options.permissionScope ?? "ask",
+    options.workspaceRoot,
+    options.denyRules ?? [],
+  );
+  // A refusal is an answer, not a question. Asking about it would offer the user
+  // a chance to override what the user already wrote, and the tool would be
+  // usable again by answering "allow" — which is what makes a rule real.
+  if (evaluation.denied) {
+    options.emit({ type: "approval.resolved", toolName, taskId: toolCallId, outcome: "denied" });
+    await options.hooks.dispatch({
+      eventName: "PermissionDenied",
+      sessionId: options.sessionId,
+      workspaceRoot: options.workspaceRoot,
+      timestamp: new Date().toISOString(),
+      toolName,
+      toolCallId,
+      args,
+      reason: evaluation.reason,
+    });
+    return { blocked: `Blocked: ${evaluation.reason}` };
+  }
   if (!evaluation.requiresEscalation) return {};
   if (!options.escalationPromptHandler) {
     return { blocked: `Blocked: Tool '${toolName}' requires permission (${evaluation.reason}), but no interactive handler is available.` };

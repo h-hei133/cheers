@@ -2,12 +2,22 @@ import path from "node:path";
 import type { PermissionScope } from "../../cli/approval/permissionScope.js";
 import type { EscalationPrompt } from "../../sandbox/index.js";
 import { isReadOnlyBashCommand } from "../shell/approval/evaluator.js";
+import { matchDenyRule, type DenyRule } from "../shell/approval/deny.js";
 
 export interface ToolPermissionEvaluation {
   readonly requiresEscalation: boolean;
   readonly operation: "read" | "write" | "delete" | "execute";
   readonly target: string;
   readonly reason: string;
+  /**
+   * Set when a rule refuses this call outright.
+   *
+   * Separate from `requiresEscalation` because the two mean opposite things: an
+   * escalation is a question, and a refusal is an answer. A caller that only
+   * read `requiresEscalation` would offer to ask the user about a call the user
+   * had already forbidden, and a user who said "never" would be asked again.
+   */
+  readonly denied?: boolean;
 }
 
 const READ_ONLY_TOOLS: Record<string, true> = {
@@ -35,6 +45,7 @@ export function evaluateToolPermissionScope(
   args: Record<string, unknown> = {},
   scope: PermissionScope = "ask",
   workspaceRoot: string = process.cwd(),
+  denyRules: readonly DenyRule[] = [],
 ): ToolPermissionEvaluation {
   const safeArgs = args && typeof args === "object" ? args : {};
   let operation: "read" | "write" | "delete" | "execute" = "read";
@@ -88,6 +99,22 @@ export function evaluateToolPermissionScope(
     operation = "execute";
     target = toolName;
     isReadOnly = false;
+  }
+
+  // Before every scope branch, because a refusal is not a scope. `allow-all`
+  // allows what approval governs; it does not un-write a rule the user wrote,
+  // and a scope that could override one would make the rule a suggestion.
+  const denied = matchDenyRule(denyRules, toolName, target);
+  if (denied) {
+    return {
+      requiresEscalation: false,
+      denied: true,
+      operation,
+      target,
+      reason:
+        `Refused by a rule: '${denied.rule.tool}'` +
+        `${denied.rule.pattern ? ` matching '${denied.rule.pattern}'` : ""} is not permitted.`,
+    };
   }
 
   if (scope === "allow-all") {

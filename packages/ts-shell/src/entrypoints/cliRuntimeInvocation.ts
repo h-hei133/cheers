@@ -527,6 +527,7 @@ function startTurn(
       baseDelayMs: request.runtimeConfig?.retryBaseDelayMs,
       maxDelayMs: request.runtimeConfig?.retryMaxDelayMs,
     },
+    denyRules: request.runtimeConfig?.denyRules ?? [],
     ...(request.runtimeConfig?.steeringMode ? { steeringMode: request.runtimeConfig.steeringMode } : {}),
     ...(request.runtimeConfig?.followUpMode ? { followUpMode: request.runtimeConfig.followUpMode } : {}),
   });

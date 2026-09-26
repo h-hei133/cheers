@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { resolveUserDataFile, userDataDir } from "../core/paths/userHome.js"
+import { parseDenyRules, type DenyRule } from "../core/shell/approval/deny.js"
 
 /**
  * Token budgets for one model.
@@ -100,6 +101,15 @@ export interface RuntimeConfig {
   readonly allowedTools?: readonly string[];
   readonly disabledTools: readonly string[];
   readonly hiddenToolPrefixes: readonly string[];
+  /**
+   * Calls this session refuses outright, whatever approval would say.
+   *
+   * Distinct from `disabledTools`, which takes a tool off the list the model
+   * sees. This leaves the tool available and refuses particular calls within it,
+   * so "use bash, but never that command" is expressible — a statement neither
+   * of the other two fields can make.
+   */
+  readonly denyRules: readonly DenyRule[];
   readonly enableMcpTools: boolean;
   readonly activeProviderConnectionId?: string;
   readonly providerConnections: readonly ProviderConnectionConfig[];
@@ -311,6 +321,7 @@ export interface RuntimeConfigFile {
   allowedTools?: string[];
   disabledTools?: string[];
   hiddenToolPrefixes?: string[];
+  denyRules?: unknown[];
   enableMcpTools?: boolean;
   activeProviderConnectionId?: string;
   providerConnections?: ProviderConnectionConfig[];
@@ -346,6 +357,7 @@ const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
   provider: "openai",
   maxTurns: 15,
   disabledTools: [],
+  denyRules: [],
   hiddenToolPrefixes: [],
   enableMcpTools: true,
   activeProviderConnectionId: undefined,
@@ -486,6 +498,9 @@ export function getRuntimeConfig(
       ? { allowedTools: overrides?.allowedTools ?? merged.allowedTools }
       : {}),
     disabledTools: merged.disabledTools ?? DEFAULT_CONFIG.disabledTools,
+    // Parsed here rather than at the gate, so a malformed entry is dropped once
+    // at load instead of on every tool call.
+    denyRules: parseDenyRules(merged.denyRules),
     hiddenToolPrefixes:
       merged.hiddenToolPrefixes ?? DEFAULT_CONFIG.hiddenToolPrefixes,
     enableMcpTools: merged.enableMcpTools ?? DEFAULT_CONFIG.enableMcpTools,

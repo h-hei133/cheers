@@ -103,3 +103,68 @@ describe("toolPolicy", () => {
     expect(prompt.defaultOption).toBe("deny");
   });
 });
+
+describe("a refusal nothing overrides", () => {
+  const rules = [{ tool: "bash", pattern: "rm -rf" }];
+
+  it("refuses the call in every scope", () => {
+    // The point of the rule. `allow-all` allows what approval governs; a rule the
+    // user wrote is not something a scope can answer away, or the rule would be
+    // a suggestion and the user would have no way to say never.
+    for (const scope of ["ask", "allow-all", "accept-edits"] as const) {
+      const result = evaluateToolPermissionScope(
+        "bash",
+        { command: "rm -rf /" },
+        scope,
+        "/workspace",
+        rules,
+      );
+
+      expect(result.denied).toBe(true);
+      expect(result.reason).toContain("rm -rf");
+    }
+  });
+
+  it("does not ask, because a refusal is an answer and not a question", () => {
+    // Asking would offer the user a chance to override their own rule, and
+    // answering "allow" would make the tool usable again.
+    const result = evaluateToolPermissionScope(
+      "bash",
+      { command: "rm -rf /" },
+      "ask",
+      "/workspace",
+      rules,
+    );
+
+    expect(result.denied).toBe(true);
+    expect(result.requiresEscalation).toBe(false);
+  });
+
+  it("leaves calls the rule does not name alone", () => {
+    const result = evaluateToolPermissionScope(
+      "bash",
+      { command: "ls -la" },
+      "allow-all",
+      "/workspace",
+      rules,
+    );
+
+    expect(result.denied).toBeUndefined();
+    expect(result.requiresEscalation).toBe(false);
+  });
+
+  it("refuses nothing when no rules are given", () => {
+    const result = evaluateToolPermissionScope("bash", { command: "rm -rf /" }, "allow-all");
+
+    expect(result.denied).toBeUndefined();
+  });
+
+  it("names the tool it refused, so the reason is actionable", () => {
+    const result = evaluateToolPermissionScope("write", { path: "secrets/key" }, "ask", "/w", [
+      { tool: "write" },
+    ]);
+
+    expect(result.denied).toBe(true);
+    expect(result.reason).toContain("write");
+  });
+});

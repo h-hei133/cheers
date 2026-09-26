@@ -22,6 +22,7 @@ import { adaptTools, createToolHooks, type ToolGateOptions } from "./tools.js";
 import { getSessionUsage } from "../observability/usageTelemetry.js";
 import type { SentRequest } from "../provider/request/sentRequest.js";
 import type { SubagentRunner } from "../core/subagents/runner.js";
+import type { DenyRule } from "../core/shell/approval/deny.js";
 import type { CacheWarmingRunner } from "./cacheWarm.js";
 import type { ToolDefinition } from "../tools/types.js";
 
@@ -92,6 +93,8 @@ export interface TurnOptions {
    * this layer's job is the conversation, not the provider.
    */
   readonly runSubagent?: SubagentRunner;
+  /** Calls this session refuses outright; see `ToolGateOptions.denyRules`. */
+  readonly denyRules?: readonly DenyRule[];
   /**
    * How a failed step is retried, resolved once by the caller.
    *
@@ -152,6 +155,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     emit: (event) => channel.push(event),
     ...(options.commandEnv ? { commandEnv: options.commandEnv } : {}),
     ...(options.runSubagent ? { runSubagent: options.runSubagent } : {}),
+    ...(options.denyRules ? { denyRules: options.denyRules } : {}),
   };
   const openingText = `${environmentLine(options.workspaceRoot, options.permissionScope)}\n\n${options.prompt}`;
   const openingImages = options.attachments?.images ?? [];
