@@ -524,15 +524,42 @@ export function mergeProviders(
       ...patch,
       // A user's models add to what ships rather than replacing it, so patching a
       // base URL does not quietly cost them the model list.
-      models: patch.models ? dedupeModels([...existing.models, ...patch.models]) : existing.models,
+      models: patch.models ? mergeModelEntries([...existing.models, ...patch.models]) : existing.models,
       custom: true,
     };
   }
   return merged;
 }
 
-function dedupeModels(models: readonly CatalogModel[]): CatalogModel[] {
+/**
+ * One entry per model id, later entries patching earlier ones field by field.
+ *
+ * A refresh snapshot carries what its publisher knows — an id, a context
+ * window, a price — and says nothing about how the model wants a request
+ * shaped. Replacing the entry outright therefore reads the snapshot's silence
+ * as an instruction to forget, and a refresh that only meant to update a price
+ * costs the model its `compat`, its `promptCache` and its `vision` declaration:
+ * the system role reverts, the token ceiling field reverts, and a model that
+ * accepts images stops being offered them.
+ *
+ * Merging keeps the shipped entry as the base and lets the later one win only
+ * where it actually speaks. Fields are merged at the top level rather than
+ * recursively, so a patch that declares `compat` replaces that whole object —
+ * half of a request shape from each source would be a third shape neither
+ * side declared.
+ */
+function mergeModelEntries(models: readonly CatalogModel[]): CatalogModel[] {
   const byId = new Map<string, CatalogModel>();
-  for (const model of models) byId.set(model.id, model);
+  for (const model of models) {
+    const existing = byId.get(model.id);
+    byId.set(model.id, existing ? { ...existing, ...withoutUndefined(model) } : model);
+  }
   return [...byId.values()];
+}
+
+/** The model's own fields, with the absent ones left out so they cannot overwrite. */
+function withoutUndefined(model: CatalogModel): Partial<CatalogModel> {
+  return Object.fromEntries(
+    Object.entries(model).filter(([, value]) => value !== undefined),
+  ) as Partial<CatalogModel>;
 }

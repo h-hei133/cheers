@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BUILTIN_PROVIDERS, mergeProviders, providerEndpoint } from "./catalog.js";
+import { BUILTIN_PROVIDERS, catalogModel, mergeProviders, providerEndpoint } from "./catalog.js";
 import { resolveRequestShape } from "./requestShape.js";
 
 /**
@@ -96,5 +96,57 @@ describe("the shipped catalog", () => {
     // And one that does not declare it stays false, which is a decision rather
     // than an omission: this model is not sent images.
     expect(resolveRequestShape(BUILTIN_PROVIDERS, "openai", "gpt-5.3-codex").vision).toBe(false);
+  });
+
+  it("keeps a model's declared shape when a refresh patches it", () => {
+    // A refresh snapshot knows prices and context windows, not request shapes.
+    // Reading its silence as "forget what you knew" reverted the system role and
+    // the token field, so a model that had been fixed went back to the request
+    // its endpoint rejects — silently, since the catalog still answered.
+    const before = shapeFor("openai", "gpt-5.3");
+    expect(before.systemRole).toBe("developer");
+    expect(before.maxTokensField).toBe("max_completion_tokens");
+
+    const merged = mergeProviders(BUILTIN_PROVIDERS, [
+      {
+        id: "openai",
+        models: [{ id: "gpt-5.3", contextWindow: 400_000 }],
+      },
+    ]);
+
+    expect(resolveRequestShape(merged, "openai", "gpt-5.3")).toEqual(before);
+    expect(catalogModel(merged, "openai", "gpt-5.3")?.contextWindow).toBe(400_000);
+  });
+
+  it("keeps a model's vision declaration when a refresh patches it", () => {
+    const merged = mergeProviders(BUILTIN_PROVIDERS, [
+      { id: "anthropic", models: [{ id: "claude-sonnet-4-5", contextWindow: 500_000 }] },
+    ]);
+    expect(resolveRequestShape(merged, "anthropic", "claude-sonnet-4-5").vision).toBe(true);
+  });
+
+  it("lets a patch that does declare a shape replace it wholesale", () => {
+    // Field-by-field merging stops at the top level on purpose: half a request
+    // shape from each source would be a third shape neither side declared.
+    const merged = mergeProviders(BUILTIN_PROVIDERS, [
+      { id: "openai", models: [{ id: "gpt-5.3", compat: { systemRole: "system" } }] },
+    ]);
+    expect(resolveRequestShape(merged, "openai", "gpt-5.3").systemRole).toBe("system");
+  });
+
+  it("still lets a user's model override a shipped one", () => {
+    // The merge must not make shipped entries win: a user who describes a model
+    // differently means it.
+    const merged = mergeProviders(BUILTIN_PROVIDERS, [
+      { id: "openai", models: [{ id: "gpt-5.3", vision: false }] },
+    ]);
+    expect(resolveRequestShape(merged, "openai", "gpt-5.3").vision).toBe(false);
+  });
+
+  it("adds a model the catalog did not have", () => {
+    const merged = mergeProviders(BUILTIN_PROVIDERS, [
+      { id: "openai", models: [{ id: "gpt-9-preview", contextWindow: 1_000_000 }] },
+    ]);
+    expect(catalogModel(merged, "openai", "gpt-9-preview")?.contextWindow).toBe(1_000_000);
   });
 });

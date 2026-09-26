@@ -64,6 +64,66 @@ describe("9-Stage Resilient File Replacer", () => {
   });
 });
 
+describe("an edit whose text is not unique", () => {
+  const twice = ["function alpha() {", "  return 1;", "}", "", "function beta() {", "  return 1;", "}", ""].join("\n");
+
+  it("refuses rather than changing the first of several matches", () => {
+    // The block is a valid exact match, so the old behaviour applied it to the
+    // first occurrence and reported success: `beta` was never touched, and
+    // nothing in the result said the edit had landed somewhere unintended.
+    const res = replaceInContent(twice, "  return 1;", "  return 42;");
+
+    expect(res.success).toBe(false);
+    expect(res.content).toBe(twice);
+    expect(res.error).toContain("2 occurrences");
+  });
+
+  it("names both ways to make the edit land", () => {
+    // A refusal that does not say what to do next just costs a turn. Both
+    // remedies are real: one argument replaces every occurrence, and more
+    // context narrows it to one.
+    const res = replaceInContent(twice, "  return 1;", "  return 42;");
+
+    expect(res.error).toContain("replaceAll");
+    expect(res.error).toMatch(/more context/i);
+  });
+
+  it("replaces every occurrence when asked to", () => {
+    const res = replaceInContent(twice, "  return 1;", "  return 42;", { replaceAll: true });
+
+    expect(res.success).toBe(true);
+    expect(res.strategy).toBe("exact-all");
+    expect(res.content.match(/return 42;/g)).toHaveLength(2);
+  });
+
+  it("still edits a text that appears once", () => {
+    const original = "function alpha() {\n  return 1;\n}\n\nfunction beta() {\n  return 2;\n}\n";
+    const res = replaceInContent(original, "  return 1;", "  return 42;");
+
+    expect(res.success).toBe(true);
+    expect(res.content).toContain("return 42;");
+    expect(res.content).toContain("return 2;");
+  });
+
+  it("still reports a text that is not there at all", () => {
+    const res = replaceInContent(twice, "  return 99;", "  return 42;");
+
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/could not find/i);
+  });
+
+  it("does not count a resilient match, which is how one block is found", () => {
+    // The trimmed and normalized strategies exist to locate the single block the
+    // caller meant when the text does not match verbatim. Counting over those
+    // would refuse an edit that has exactly one answer.
+    const original = "function test() {\n    const x = 1;\n    const y = 2;\n}";
+    const res = replaceInContent(original, "const x = 1;\n  const y = 2;", "  const sum = 3;");
+
+    expect(res.success).toBe(true);
+    expect(res.strategy).toBe("line-trimmed");
+  });
+});
+
 describe("replaceManyInContent", () => {
   it("applies several replacements in one call", () => {
     const original = "const a = 1;\nconst b = 2;\nconst c = 3;";

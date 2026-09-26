@@ -366,7 +366,13 @@ export function createStepFunction(request: StepRequest): StepFunction {
         return stamp(toStep(completion, watched));
       } catch (error) {
         if (signal?.aborted) return stamp(abortedStep(shown));
-        return stamp(errorStep(`Network error: ${error instanceof Error ? error.message : String(error)}`));
+        // The text already streamed is kept and the step is still marked failed.
+        // Keeping it alone would present a truncated answer as a finished one —
+        // the user has read the opening and nothing says the rest is missing —
+        // and discarding it would take away what they already saw. Both facts
+        // travel: the text is what was said, `stopReason` is that it stopped
+        // early.
+        return stamp(failedStep(`Network error: ${error instanceof Error ? error.message : String(error)}`, shown));
       } finally {
         // Reading ends as soon as the answer is complete, which can be before
         // the host closes the stream — a keep-alive proxy holds the connection
@@ -531,6 +537,18 @@ function cacheTokensFromUsage(usage: ProviderUsage): {
 
 function errorStep(message: string): AssistantStep {
   return { text: "", toolCalls: [], stopReason: "error", errorMessage: message };
+}
+
+/**
+ * A step that failed after it had already said something.
+ *
+ * The text is carried because the user has read it, and the stop reason is
+ * carried because it is not the answer. A failure that dropped the text loses
+ * what the user saw; one that returned only the text claims a finished answer
+ * that never arrived.
+ */
+function failedStep(message: string, shown: string): AssistantStep {
+  return { text: shown, toolCalls: [], stopReason: "error", errorMessage: message };
 }
 
 /**

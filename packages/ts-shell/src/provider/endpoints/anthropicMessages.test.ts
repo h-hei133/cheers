@@ -284,8 +284,12 @@ describe("reading this endpoint's stream", () => {
     expect(step.value.message.content).toBe("answer");
   });
 
-  it("keeps what it already said when the stream breaks", async () => {
-    // The part the user has read is worth more than the failure that ended it.
+  it("keeps what it already said when the stream breaks, and reports the break", async () => {
+    // Two facts have to survive together. The part the user has read is worth
+    // more than the failure that ended it, and the failure is still a failure:
+    // returning the partial text alone would present a truncated answer as a
+    // finished one, which is what this used to do.
+    //
     // The chunk is pulled before the failure, which is the order a real socket
     // produces: data that arrived, then a connection that went away.
     const encoder = new TextEncoder();
@@ -304,10 +308,70 @@ describe("reading this endpoint's stream", () => {
     });
 
     const stream = readAnthropicStream(broken);
+    let seen = "";
+    await expect(async () => {
+      let step = await stream.next();
+      while (step.done !== true) {
+        seen += step.value.text;
+        step = await stream.next();
+      }
+    }).rejects.toThrow(/connection lost/);
+
+    // The text still reached the caller before the failure did.
+    expect(seen).toBe("partial");
+  });
+
+  it("fails when the provider reports an error in band", async () => {
+    // The failure arrives as an ordinary event on a healthy stream, so nothing
+    // below the event loop notices it. Unread, it left the caller with a
+    // completion of zero tokens that looked exactly like a model choosing to
+    // say nothing.
+    const stream = readAnthropicStream(
+      sseStream(
+        event({ type: "message_start", message: { usage: { input_tokens: 10 } } }),
+        event({ type: "error", error: { type: "overloaded_error", message: "Overloaded" } }),
+      ),
+    );
+
+    await expect(async () => {
+      let step = await stream.next();
+      while (step.done !== true) step = await stream.next();
+    }).rejects.toThrow(/Overloaded/);
+  });
+
+  it("fails when the stream ends without saying the message is complete", async () => {
+    // A truncated stream is not an empty answer. With neither a stop reason nor
+    // a completion event, the connection went away mid-answer and the caller has
+    // to be told rather than handed the opening.
+    const stream = readAnthropicStream(
+      sseStream(
+        event({ type: "message_start", message: { usage: { input_tokens: 10 } } }),
+        event({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "half an ans" } }),
+      ),
+    );
+
+    await expect(async () => {
+      let step = await stream.next();
+      while (step.done !== true) step = await stream.next();
+    }).rejects.toThrow(/before it reported the message was complete/);
+  });
+
+  it("accepts a stream that reported its stop reason without a completion event", async () => {
+    // A host in front of the API may send one signal and not the other. A stream
+    // that said why it stopped was answered, and failing it would reject a
+    // response that arrived.
+    const stream = readAnthropicStream(
+      sseStream(
+        event({ type: "message_start", message: { usage: { input_tokens: 10 } } }),
+        event({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "the answer" } }),
+        event({ type: "message_delta", delta: { stop_reason: "end_turn" } }),
+      ),
+    );
+
     let step = await stream.next();
     while (step.done !== true) step = await stream.next();
 
-    expect(step.value.message.content).toBe("partial");
+    expect(step.value.message.content).toBe("the answer");
   });
 });
 

@@ -341,6 +341,9 @@ export async function* readAnthropicStream(
   let reasoning = "";
   let finishReason: string | undefined;
   let usage: ProviderUsage | undefined;
+  let sawMessageStart = false;
+  let sawMessageStop = false;
+  let streamFailure: string | undefined;
   const calls = new Map<number, { id: string; name: string; args: string }>();
 
   /**
@@ -360,6 +363,14 @@ export async function* readAnthropicStream(
       rest = rest.slice(boundary + 2);
       const event = parseEvent(raw);
       if (!event) continue;
+      // A failure the provider reports in band. The stream itself stays healthy,
+      // so this is the only place it can be seen — and it is seen before the
+      // fragments are folded, because a failure event carries no content and
+      // folding it first would only make the next reader look again.
+      if (event.type === "error") {
+        streamFailure = event.error?.message || event.error?.type || "provider reported an error mid-stream";
+        continue;
+      }
       fragments.push(
         ...applyEvent(event, {
           calls,
@@ -367,6 +378,12 @@ export async function* readAnthropicStream(
           onReasoning: (chunk) => (reasoning += chunk),
         }),
       );
+      if (event.type === "message_start") {
+        sawMessageStart = true;
+      }
+      if (event.type === "message_stop") {
+        sawMessageStop = true;
+      }
       if (event.type === "message_delta" && typeof event.delta?.stop_reason === "string") {
         finishReason = event.delta.stop_reason;
       }
@@ -384,13 +401,16 @@ export async function* readAnthropicStream(
     let chunk: IteratorResult<Uint8Array>;
     try {
       chunk = await iterator.next();
-    } catch {
+    } catch (error) {
       // A stream that fails mid-answer keeps what it already said, which is the
       // part the user has already read. The buffer is drained first: the last
       // event can arrive in the same chunk that carries the failure, and
       // dropping it would lose text the user was already shown.
       for (const fragment of drain().fragments) yield fragment;
-      break;
+      // Kept, not swallowed. Returning here would present a truncated answer as
+      // a finished one: the caller sees a normal message with no finish reason
+      // and has nothing to tell the user that anything went wrong.
+      throw new Error(`Stream interrupted: ${error instanceof Error ? error.message : String(error)}`);
     }
     if (chunk.done) break;
 
@@ -407,6 +427,25 @@ export async function* readAnthropicStream(
       type: "function" as const,
       function: { name: call.name, arguments: call.args || "{}" },
     }));
+
+  // The two ways a stream ends without having answered, each of which used to
+  // return an empty completion that read as a finished one.
+  //
+  // Checked after the loop rather than at each sighting because the failure is
+  // the whole stream's outcome: what was already said still belongs to the
+  // caller's `streamed` text, and the throw is what stops that text from being
+  // taken for the answer.
+  if (streamFailure) {
+    throw new Error(`Provider reported an error mid-stream: ${streamFailure}`);
+  }
+  // A stream that began and then stopped without ever saying why. Either signal
+  // counts as having finished: `stop_reason` is the model's own word for it and
+  // `message_stop` is the transport's, and a host in front of the API may send
+  // one without the other. Requiring both would fail requests that were
+  // answered, so a stream that reported either is left alone.
+  if (sawMessageStart && finishReason === undefined && !sawMessageStop) {
+    throw new Error("Provider stream ended before it reported the message was complete");
+  }
 
   return {
     message: {
@@ -440,6 +479,18 @@ interface AnthropicEvent {
     readonly usage?: AnthropicUsage;
   };
   readonly usage?: AnthropicUsage;
+  /**
+   * A failure the stream reports in band.
+   *
+   * This arrives as an ordinary event rather than as a broken connection, so
+   * nothing below the event loop notices it: the stream stays healthy, the
+   * answer simply never comes. Read it or the failure is indistinguishable from
+   * a model that chose to say nothing.
+   */
+  readonly error?: {
+    readonly type?: string;
+    readonly message?: string;
+  };
 }
 
 interface AnthropicUsage {

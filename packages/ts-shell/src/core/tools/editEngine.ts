@@ -203,7 +203,50 @@ export function replaceInContent(
       error: "Could not find a matching block for the specified oldText across the resilient replacement strategies.",
     };
   }
+
+  // A block that appears more than once is an edit the caller has not finished
+  // describing. Applying it to the first occurrence would change a region the
+  // caller never chose, and report success while doing it — the file is edited,
+  // the text they meant to change is untouched, and nothing says so.
+  //
+  // Only the exact-match path is counted. The resilient strategies below it
+  // exist to find the *one* block the caller meant when the text does not match
+  // verbatim, and a count over a fuzzy match would be counting matches that
+  // differ from each other by definition.
+  if (located.strategy === "exact") {
+    const occurrences = countOccurrences(originalContent, oldText);
+    if (occurrences > 1) {
+      return {
+        success: false,
+        content: originalContent,
+        error:
+          `Found ${occurrences} occurrences of the text to replace. ` +
+          "To replace all of them, set replaceAll to true. " +
+          "To replace only one, provide more context to identify it uniquely.",
+      };
+    }
+  }
+
   return { success: true, content: applyEdit(originalContent, located, newText), strategy: located.strategy };
+}
+
+/**
+ * How many times `needle` appears in `haystack`, counting each start once.
+ *
+ * Non-overlapping, which is what a replacement means: `aaa` holds `aa` twice,
+ * and replacing both gives `bb a`, not an edit that consumed three characters
+ * twice.
+ */
+function countOccurrences(haystack: string, needle: string): number {
+  if (!needle) return 0;
+  let count = 0;
+  let from = 0;
+  for (;;) {
+    const at = haystack.indexOf(needle, from);
+    if (at === -1) return count;
+    count += 1;
+    from = at + needle.length;
+  }
 }
 
 /** One replacement in a multi-edit call. */
