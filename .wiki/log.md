@@ -4381,3 +4381,16 @@ so the counter could only ever be invented」。**后台执行落地后这句话
 
 **两项都不触及本轮改动的模块**（benchmark 只 import TUI 渲染；
 `/sessions current` 不引用 `readAmbientFacts`）。
+
+**Phase 13 复核轮（2026-09-27）**：三个子代理复核 + 逐条回读代码自证。
+
+复核条目**不盲信**：A4 经与参考实现比对**证伪**（参考同样静默回落）；
+A2 **理由错、方向对**（顺序本就正确，真正缺陷是继续读完整条流）。
+
+**复核看不到的一类更严重**：函数内部写对了，但**整个模块没有入口**。
+实测证据——三个 catalog id 的 `isRuntimeProvider` 全为 `false`，
+`deviceCode.ts` / `subscription.ts` 零生产调用者，`vertexBaseUrl` 零调用者，
+`onEnded` 零订阅者。**判定为 demo 模块，已全部接线。**
+
+共修复 19 条（复核 13 + 自证 6），**每条撤销即失败**。
+全量 `561 文件 / 4,124 通过 / 0 失败`；七道门禁全 pass。
