@@ -3808,3 +3808,42 @@ T7 的 `allowEmptySignature`、D1 的范畴错误、T5 的撤回。
   - **T9** 经 `/context` 实跑：报告 `~2,643 tokens (13 tools)`，与实测的 2,553 量级一致；
   - **CLI** `--version` → `0.1.0`，`--json -p` 正常产出 `run-event-stream.v1` 事件流。
 - **推送**：`d88ff085..e2fb63f5`（6 个提交：3 个 fix、2 个 feat、1 个 docs）。
+
+## [2026-09-26] review | Phase 11 复核轮：5 个真缺陷 + 剩余 features 清单
+
+**维护者指示**：「针对最近几轮有实质性代码修改的 commit 进行 review 复核，
+参照 ~/projects/ 下的顶尖项目找出漏洞与未完成任务，最后修复、更新文档，
+并总结 08 和 11 文档中还有哪些 features 没完成」。
+
+### 复核方式与事故
+
+派出 3 个 reviewer（`V4Wire`/`V5Context`/`V6Tools`），**三个全部失败**：
+每个烧掉 30–33 次工具调用后撞上端点 **429 限流**（`stopReason: error`），
+**零 findings 产出**。重新派出 `W1Wire`/`W2Tools`（**收紧到「最多读 6 个文件、读完立刻 yield」**），
+两者**都成功**；`W2` 完成后补派 `W3Context`。
+
+**教训**：reviewer 的任务书里必须**限定读取预算**并**要求提前 yield**。
+不限定预算的 reviewer 会把全部额度花在阅读上，然后在写结论前耗尽额度。
+
+### 复核找出的 5 个真缺陷（**施工轮自己没看见**）
+
+| # | 缺陷 | 实机证据 | 为什么施工轮漏了 |
+|---|---|---|---|
+| **R1** | 目录补丁把 `compat`/`promptCache`/`thinkingLevelMap` **整体替换** | 用户设 `compat:{allowEmptySignature:true}` → `systemRole` 退回 `system`、`maxTokensField` 退回 `max_tokens`（**推理模型 400**） | T1 只修**顶层**合并，**嵌套那层同型问题没看见** |
+| **R2** | 编辑唯一性**只在精确路径计数** | 缩进不同的两个块被算作 1 个，`success:true`，只改了第一处 | T3 修精确路径，**模糊路径同型问题没看见** |
+| **R3** | `budget_tokens` **抬高 `max_tokens` 覆盖用户上限** | 默认配置（cap 4096 + level high）→ 每个请求变成 **17,408** token | T6 方向对（要发 budget），**谁优先判断反了** |
+| **R4** | `thinkingSignature` **写进 transcript 却读不回来** | `transcriptEventToSessionMessage` 漏字段 → **重启后 T7 失效** | T7 只测**写入**，没测**读回** |
+| **R5** | `~~~` 围栏与**四反引号套三反引号**未被识别为代码块 | `~~~` 里的示例被展开（正是手扫要防的） | T12 手扫只认反引号且要求**等长**配对 |
+
+**共性**：R1/R2/R4 都是「**修了同型问题的一层/一路，漏了另一层/另一路**」。
+**施工轮的测试全绿，因为测的都是修过的那条路。**
+
+另修正 `phase-11-decisions.md` 两处记账错误：§16 标题「5 项」→「6 项」；
+D1 在 §0 记成「做」但 §18/§16.6 是待裁决 → 改为「待裁决」。
+
+### 剩余 features 清单
+
+**Phase 11 完成的是「已登记为任务的 13 项」，不是「08/11 的全部缺口」。**
+08 §4 登记 24 项（MISSING 10 + DEFICIENT 14），其中只有 16 项被登记为任务，
+**8 项从未登记**。剩余 **12 项**：可做漏登记 4、无环境可验 4、需裁决 6。
+完整清单与复现命令见 `.wiki/features/12-remaining-features.md`。

@@ -30,7 +30,12 @@ declareEndpoint("openai-compatible", {
       ...(input.systemPrompt ? [{ role: "system" as const, content: input.systemPrompt }] : []),
       ...input.messages,
     ],
-    ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
+    // Gated the same way the full request gates it. A caller that declares the
+    // model rejects a temperature gets a request without one, whether or not the
+    // call carries tools.
+    ...(input.temperature !== undefined && input.supportsTemperature !== false
+      ? { temperature: input.temperature }
+      : {}),
     ...(input.maxOutputTokens !== undefined ? { max_tokens: input.maxOutputTokens } : {}),
   }),
   /**

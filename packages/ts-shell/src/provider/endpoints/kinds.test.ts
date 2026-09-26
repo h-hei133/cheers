@@ -139,3 +139,29 @@ describe("an undeclared kind", () => {
     expect(endpointKind("")).toBeUndefined();
   });
 });
+
+describe("a request with no tools", () => {
+  it("omits a temperature the model is declared to reject", () => {
+    // The same gate the full turn applies. A summarizer sends this shape, and a
+    // caller that sets a temperature on a model that refuses one would otherwise
+    // have no way to say so — the field was on the request and nothing read it.
+    const body = endpointBody("openai-compatible", {
+      model: "m",
+      messages: [{ role: "user", content: "summarize" }],
+      temperature: 0.7,
+      supportsTemperature: false,
+    });
+
+    expect(body).not.toHaveProperty("temperature");
+  });
+
+  it("sends a temperature the model accepts", () => {
+    const body = endpointBody("openai-compatible", {
+      model: "m",
+      messages: [{ role: "user", content: "summarize" }],
+      temperature: 0.7,
+    });
+
+    expect(body.temperature).toBe(0.7);
+  });
+});

@@ -72,6 +72,16 @@ export interface SimpleRequest {
   readonly systemPrompt?: string;
   readonly maxOutputTokens?: number;
   readonly temperature?: number;
+  /**
+   * Whether this model accepts a sampling temperature at all.
+   *
+   * Absent means it does, which is what every model got before the catalogue
+   * could say otherwise. Declared here as well as on the full request because a
+   * caller that sets a temperature has to be able to say the model rejects one:
+   * without it the only way to send a temperature was to send it ungated, which
+   * is the 400 this field exists to avoid.
+   */
+  readonly supportsTemperature?: boolean;
 }
 
 /**
