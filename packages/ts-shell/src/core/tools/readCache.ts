@@ -18,14 +18,6 @@ interface SeenRead {
   readonly limit: number;
   /** The file's modification time when the read happened, in milliseconds. */
   readonly modifiedMs: number;
-  /**
-   * Whether the model was shown everything it asked for.
-   *
-   * False when the output was cut short or spilled, in which case the earlier
-   * result is not a substitute for reading again: pointing the model at a part
-   * would let it take the part for the file.
-   */
-  readonly complete: boolean;
 }
 
 const seenBySession = new Map<string, Map<string, SeenRead>>()
@@ -62,7 +54,7 @@ export async function alreadySeen(
   request: { readonly offset: number; readonly limit: number },
 ): Promise<boolean> {
   const seen = sessionCache(sessionId).get(absolutePath)
-  if (!seen || !seen.complete) return false
+  if (!seen) return false
   if (seen.offset !== request.offset || seen.limit !== request.limit) return false
   try {
     return (await stat(absolutePath)).mtimeMs === seen.modifiedMs

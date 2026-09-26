@@ -439,7 +439,6 @@ export function createCoreToolRegistry(options?: {
             offset: readOffset,
             limit: readLimit,
             modifiedMs: (await fs.stat(readPath)).mtimeMs,
-            complete: true,
           })
         }
         return approvedResult(resultText)

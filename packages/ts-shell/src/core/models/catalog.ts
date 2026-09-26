@@ -561,23 +561,39 @@ export function mergeProviders(
  * accepts images stops being offered them.
  *
  * Merging keeps the shipped entry as the base and lets the later one win only
- * where it actually speaks. Fields are merged at the top level rather than
- * recursively, so a patch that declares `compat` replaces that whole object —
- * half of a request shape from each source would be a third shape neither
- * side declared.
+ * where it actually speaks — at the top level and one level in, because
+ * `compat`, `promptCache` and `thinkingLevelMap` are objects of their own. A
+ * patch that speaks about one flag inside `compat` is not also an instruction
+ * to forget the others, and merging the field whole would read it as one.
  */
+function mergeModelEntry(existing: CatalogModel, patch: CatalogModel): CatalogModel {
+  const merged = { ...existing, ...withoutUndefined(patch) };
+  const baseCompat = existing.compat;
+  const nextCompat = patch.compat;
+  const baseCache = existing.promptCache;
+  const nextCache = patch.promptCache;
+  const baseLevels = existing.thinkingLevelMap;
+  const nextLevels = patch.thinkingLevelMap;
+  return {
+    ...merged,
+    ...(baseCompat && nextCompat ? { compat: { ...baseCompat, ...withoutUndefined(nextCompat) } } : {}),
+    ...(baseCache && nextCache ? { promptCache: { ...baseCache, ...withoutUndefined(nextCache) } } : {}),
+    ...(baseLevels && nextLevels ? { thinkingLevelMap: { ...baseLevels, ...withoutUndefined(nextLevels) } } : {}),
+  };
+}
+
 function mergeModelEntries(models: readonly CatalogModel[]): CatalogModel[] {
   const byId = new Map<string, CatalogModel>();
   for (const model of models) {
     const existing = byId.get(model.id);
-    byId.set(model.id, existing ? { ...existing, ...withoutUndefined(model) } : model);
+    byId.set(model.id, existing ? mergeModelEntry(existing, model) : model);
   }
   return [...byId.values()];
 }
 
-/** The model's own fields, with the absent ones left out so they cannot overwrite. */
-function withoutUndefined(model: CatalogModel): Partial<CatalogModel> {
+/** The fields that were actually declared, so a patch's silence is not read as an instruction. */
+function withoutUndefined<T extends object>(value: T): Partial<T> {
   return Object.fromEntries(
-    Object.entries(model).filter(([, value]) => value !== undefined),
-  ) as Partial<CatalogModel>;
+    Object.entries(value).filter(([, field]) => field !== undefined),
+  ) as Partial<T>;
 }

@@ -33,6 +33,7 @@ import { allowsSelfInitiatedRequests } from "../../core/network/policy.js";
 import { persistRenewedAccountAuth } from "../../core/auth/providerAuthRuntime.js";
 import { TURN_PREFIX_COMPACTION_PROMPT } from "../../core/query/compaction/summarizer.js";
 import { markContextUnknown, getSessionUsage } from "../../observability/usageTelemetry.js";
+import { forgetSessionReads } from "../../core/tools/readCache.js";
 import { recordCount } from "../../observability/metrics.js";
 import { estimateTokens } from "../../session/context.js";
 import { KEEP_RECENT_TOKENS, type CompactionPolicy, type SummarizeHistory, type SummarizeTurnPrefix } from "../../session/compaction.js";
@@ -389,6 +390,10 @@ export function createCliSessionRuntime(input: {
             onCompact: (record) => {
               input.sessionManager.appendCompactionEntry(sessionId, record);
               markContextUnknown(sessionId);
+              // The earlier read results have just left the model's context, so a
+              // pointer to one would refer to something the model can no longer
+              // see. Forgetting them makes the next read go to disk.
+              forgetSessionReads(sessionId);
               // Counted at the point a compaction actually happened, which is
               // low frequency, so recording it inline is not a hot path.
               recordCount("compaction.runs", 1, {});

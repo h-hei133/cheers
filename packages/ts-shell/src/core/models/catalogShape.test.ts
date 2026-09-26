@@ -125,9 +125,22 @@ describe("the shipped catalog", () => {
     expect(resolveRequestShape(merged, "anthropic", "claude-sonnet-4-5").vision).toBe(true);
   });
 
-  it("lets a patch that does declare a shape replace it wholesale", () => {
-    // Field-by-field merging stops at the top level on purpose: half a request
-    // shape from each source would be a third shape neither side declared.
+  it("merges a patch into a shape field by field rather than replacing the shape", () => {
+    // A patch that speaks about one flag is speaking about that flag. Merging
+    // the shape whole read it as an instruction to forget the rest, so a user
+    // who set one flag on a reasoning model silently got the request shape the
+    // shipped entry existed to correct — the developer role reverted, and the
+    // request went out in a form the endpoint rejects.
+    const merged = mergeProviders(BUILTIN_PROVIDERS, [
+      { id: "openai", models: [{ id: "gpt-5.3", compat: { allowEmptySignature: true } }] },
+    ]);
+    const shape = resolveRequestShape(merged, "openai", "gpt-5.3");
+    expect(shape.allowEmptySignature).toBe(true);
+    expect(shape.systemRole).toBe("developer");
+    expect(shape.maxTokensField).toBe("max_completion_tokens");
+  });
+
+  it("still lets a patch change a flag the shape already declared", () => {
     const merged = mergeProviders(BUILTIN_PROVIDERS, [
       { id: "openai", models: [{ id: "gpt-5.3", compat: { systemRole: "system" } }] },
     ]);
