@@ -30,11 +30,13 @@ Detailed rules: [provider and secret boundary](agent-rules/provider-and-secret-b
 
 ## Architecture Summary
 
-- TypeScript is the primary product runtime and control plane: shell, session, orchestration, query loop, slash commands, permission UX, recovery, replay, runtime durability, result mapping, terminal/session surface, high-level capability routing, and most current execution adapters.
-- Execution is an explicit runtime boundary/interface implemented in `packages/ts-shell/src/` (see `core/tools/`, `tools/`, `sandbox/`, and the `browser/*Executor.ts` adapters). A Rust daemon path exists under `packages/rust-core/`, reached through `src/daemon/`; it is not the default execution plane.
-- Rust is a future native executor candidate for OS/process/sandbox/isolation/distribution-critical responsibilities; do not claim Rust owns current execution unless the code path proves it.
+- TypeScript is the primary product runtime and control plane: shell, session, orchestration, query loop, slash commands, permission UX, recovery, replay, runtime durability, result mapping, terminal/session surface, high-level capability routing, and every current execution adapter.
+- Execution is an explicit runtime boundary/interface implemented in `packages/ts-shell/src/` (see `core/tools/`, `tools/`, `sandbox/`, and the `browser/*Executor.ts` adapters). Commands run through `runtime/execution/`, which is the single execution path: `runtime/execution/service.ts` projects a result, `runtime/execution/local.ts` spawns the process and streams its output.
+- Isolation is owned by `sandbox/` (`bwrap` on Linux, `sandbox-exec` on macOS), not by a separate runtime. There is no second execution plane.
+- Where a mature native tool already exists, call it instead of reimplementing it in-process. `grep` runs `rg` when it is installed and falls back to the in-process walk when it is not; the fallback is what keeps a machine without `rg` working. Do not add a second language to reach the same speed — the compared implementations all reach it by running ripgrep, one of them by linking its crates.
+- Distribution: `npm run build:exe` compiles a single-file executable (no Node required, ~7× faster startup). The build bakes in the version and name, because a compiled binary has no manifest to read.
 - `contracts` carries schemas, events, lifecycle states, permission semantics, and serialization rules only when there is a real cross-runtime consumer.
-- `packages/python-eval/` is isolated offline benchmark evaluation only, not a production workspace member.
+- The product is single-language: TypeScript. There is no Rust or Python workspace member. A native sandbox module may be reconsidered if a benchmark shows `bwrap` is insufficient; until such evidence exists, adding a second language is a cost with no measured benefit.
 - Project master knowledge base, technical RFCs (RFC-001 through RFC-004), and architecture specifications live in `.wiki/` (`.wiki/_index.md`).
 Detailed rules: [architecture boundaries](agent-rules/architecture-boundaries.md).
 

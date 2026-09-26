@@ -2,27 +2,32 @@
 
 ## Current Boundary Summary
 
-The product runtime is TypeScript-first. TypeScript owns the shell, session,
+The product runtime is TypeScript. TypeScript owns the shell, session,
 orchestration, query loop, permission UX, recovery, replay, runtime durability,
 result mapping, terminal/session surface, provider-facing adapters, tool
-runtime, MCP integration, browser control surfaces, and most current execution
-adapters.
+runtime, MCP integration, browser control surfaces, and every current execution
+adapter.
 
-Execution is an explicit boundary/interface. The current boundary is represented
-in TypeScript by `packages/ts-shell/src/runtime/execution/executionService.ts`,
-which can route command execution to the TypeScript local path or the optional
-Rust daemon path according to runtime configuration.
+Execution is an explicit boundary/interface. It is implemented in
+`packages/ts-shell/src/runtime/execution/`: `service.ts` projects a result onto
+the contract, `local.ts` spawns the process and streams its output, and
+`fileWalk.ts` owns traversal. There is one execution path; it is not routed
+anywhere else according to configuration.
 
-Rust is a native executor candidate and optional execution path for low-level
-OS/process/sandbox/isolation, timeout/cancellation, daemon, distribution, and
-audit-critical responsibilities. Rust is not the current default execution
-plane unless a concrete runtime path enables and proves it.
+Isolation is owned by `packages/ts-shell/src/sandbox/`, which builds a real
+OS-level confinement (`bwrap` on Linux, `sandbox-exec` on macOS) rather than a
+command-line inspection.
 
 `contracts/` carries cross-runtime schemas, lifecycle states, permission
 semantics, serialized events, and protocol surfaces. It must not own product
 orchestration or side-effect helpers.
 
-`packages/python-eval/` is offline evaluation only, not production runtime.
+The workspace is single-language. A Rust execution daemon and a Python
+evaluation layer both existed and were removed on 2026-09-26: the daemon could
+not stream output, cost an IPC round trip plus a `cargo run` start, and its
+"sandbox" was a substring search weaker than the `bwrap` path already in
+TypeScript; the Python layer had no production code at all. See
+`.wiki/features/08-gap-and-debt-research.md` §2.
 
 ## System Design
 
@@ -42,36 +47,36 @@ orchestration or side-effect helpers.
         │ • Permission policy enforcement        │
         │ • Model adapter interface              │
         │ • Tool registry & dispatch             │
+        │ • Execution: spawn + stream + sandbox  │
         └─────┬──────────────────┬───────────────┘
               │                  │
               ↓                  ↓
       ┌───────────────┐  ┌──────────────────┐
-      │ Model API     │  │ Rust Daemon      │
-      │ (opt-in       │  │ (optional native │
-      │ provider path)│  │ executor path)   │
+      │ Model API     │  │ Local Executor   │
+      │ (opt-in       │  │ (runtime/        │
+      │ provider path)│  │  execution/)     │
       │               │  │                  │
       │ Provider      │  │ • Execution      │
       │ Adapter       │  │ • Timeout/Cancel │
-      │ Interface     │  │ • Sandbox        │
-      └───────────────┘  └──────────────────┘
-              │                  │
-              ├──────────────────┴─────────────┐
-              │                                 │
-              ↓                                 ↓
+      │ Interface     │  │ • Process tree   │
+      └───────────────┘  └────────┬─────────┘
+              │                   │
+              ├───────────────────┴───────────┐
+              │                               │
+              ↓                               ↓
       ┌──────────────┐            ┌─────────────────────┐
-      │ Provider     │            │ Offline Evaluation  │
-      │ Capability   │            │ (python-eval)       │
+      │ Provider     │            │ OS Confinement      │
+      │ Capability   │            │ (sandbox/)          │
       │ Negotiation  │            │                     │
-      └──────────────┘            │ • Trace/dataset eval│
-                                  │ • Schema validate   │
-                                  │ • Offline utilities │
+      └──────────────┘            │ • bwrap / seatbelt  │
+                                  │ • Network unshare   │
+                                  │ • Filesystem binds  │
                                   └─────────────────────┘
 
       Contract Boundaries (versioned schemas):
       ─────────────────────────────────────────
-      • TS ↔ Model API: OpenAI streaming protocol
-      • TS ↔ Rust daemon: runtime-protocol.schema.json
-      • Python eval: offline-only evaluation artifacts, not product runtime
+      • TS ↔ Model API: OpenAI / Anthropic wire protocols
+      • Execution results: runtime-protocol.schema.json
 ```
 
 ---
@@ -126,21 +131,54 @@ User Input
 User Output (streamed)
 ```
 
-### Execution Plane Routing
+### Execution Path
 
-When `DAEMON_ENABLED=1`:
-- Execution-bound tool requests prefer the Rust daemon via IPC bridge
-- Rust performs command execution, timeout/cancel handling, and sandbox preflight
-- TS remains the owner of shell/session/orchestration/permission UX semantics
-- TS receives execution results through the versioned contract envelope
+There is one. Every command runs through `runtime/execution/service.ts`, which
+hands it to `local.ts`:
 
-If the Rust daemon path is enabled but unavailable:
-- The execution service reports a failed `rust-daemon` result with recovery
-  reason metadata.
-- The TypeScript local execution path remains the normal path when the daemon
-  is disabled.
-- Do not describe the Rust daemon as the default execution plane or as a
-  guaranteed transparent fallback path.
+- `local.ts` spawns the process in its own process group (so a timeout or a
+  cancel can signal the whole tree, not just the shell), forwards stdout and
+  stderr as they arrive, and reports `completed` / `failed` / `timeout` /
+  `cancelled`.
+- `service.ts` classifies the outcome and attaches a receipt. It never reports
+  a status it did not observe.
+- `sandbox/osSandbox.ts` decides whether to wrap the command in `bwrap` or
+  `sandbox-exec`, and says so on the result when isolation was requested but
+  unavailable rather than silently running unconfined.
+
+No configuration selects a different executor. An earlier revision routed to a
+Rust daemon when `DAEMON_ENABLED` was set; that path is gone, and with it the
+failure mode where a missing `cargo` made every command fail on a fresh install.
+
+### Search
+
+`grep` runs `rg` when it is installed, and falls back to an in-process walk when
+it is not. The two paths return the same shape — same message, same truncation,
+same spill-to-artifact — so the transcript does not reveal which one answered.
+
+The fallback is not a compatibility shim; it is what keeps a machine without
+ripgrep working. It reads files one at a time and tests each line, which is
+measurably slower (1.3s against 30ms for a pattern occurring twice in this
+repository). That gap is not the language: it is literal pre-filtering,
+parallel traversal, memory-mapped reads and binary detection, all of which
+ripgrep already solved. Every implementation compared against reaches that speed
+by running ripgrep — one ships the binary inside its executable, one downloads
+it on demand, one links its crates. None of them reimplements the search.
+
+### Distribution
+
+`npm run build:exe` compiles a single-file executable from the TypeScript entry
+point. It needs no Node on the target machine, and starts in about 0.2s against
+1.4s for the interpreted form.
+
+The version and name are baked in at build time, because a compiled binary has
+no manifest to read: `import.meta.url` resolves inside the runtime's virtual
+filesystem, so the upward walk for a `package.json` finds nothing. The manifest
+still wins when one is reachable, so a source checkout cannot report a stale
+version.
+
+Cross-compilation is available (`--target`), but the default is the host: a
+binary built for another platform cannot be run to check it.
 
 ---
 
@@ -251,7 +289,7 @@ Schema version: `MAJOR.MINOR.PATCH`
 - Schema mismatch → dump full context, suggest update
 - Contract version incompatibility → refuse to proceed, show migration path
 - Session corruption → graceful fallback to new session
-- Daemon crash → automatic TS fallback, notification
+- Executable not found → `command_unavailable`, naming the command and the spawn error
 
 ---
 
@@ -349,32 +387,16 @@ If session file corrupted:
 - Session state transitions
 - Adapter normalization (mocked providers)
 
-**Rust Core**: `cargo test`
-- Executor lifecycle
-- Timeout/cancel reliability
-- Sandbox enforcement
-- Error type serialization
-
-**Python Eval**: pytest
-- Schema validation
-- Document parsing
-- Utility functions
-
 ### Integration Tests (Cross-Layer)
 
 **E2E Scenario**: Interactive CLI
 - Full happy path: prompt → handoff → tool → result → finish
 - Full failure path: forbidden tool → escalation → deny → recovery
 
-**Contract Tests**: All layers
+**Contract Tests**:
 - Valid payload acceptance
 - Invalid payload rejection
 - Schema version compatibility
-
-**Functional Parity** (Phase-2):
-- TS path and Rust path produce identical results
-- Timeout/cancel behavior consistent
-- Error messages equivalent
 
 ---
 
@@ -397,12 +419,12 @@ If session file corrupted:
    - unresolved approvals/tools are kept inside the existing `state.json`
    - there is no separate lifecycle database or sidecar index file
 
-5. Rust remains a native executor candidate only
-   - these replay/recovery/terminal-classification semantics intentionally stay in the TS product runtime/control plane
-   - Rust focuses on opt-in command execution, timeout/cancel, and sandbox preflight paths rather than shell/session ownership
-
-6. Python eval is offline only
-   - This is intentional (offline only)
+5. Native isolation is delegated to an external launcher
+   - `bwrap` on Linux and `sandbox-exec` on macOS are required for confinement;
+     when neither is present the command runs unconfined and the result says so
+   - building confinement in-process (seccomp, namespaces) would remove that
+     dependency, but it needs a benchmark showing the launcher is insufficient
+     before a native module is worth its cost
    - Fits local-first model
 
 7. Single-machine only

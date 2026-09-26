@@ -3,9 +3,9 @@ title: "功能开发：pi 对照总索引"
 category: article
 sources: [pi-source-2026-09-20, repo-audit-2026-09-20, phase-5-pre-research-2026-09-23, phase-6-pre-research-2026-09-23, phase-6-execution-2026-09-24]
 created: 2026-09-20
-updated: 2026-09-23
+updated: 2026-09-26
 tags: [features, gap-analysis, pi, index]
-summary: "功能开发前锋探索的总入口。对照本地参考仓 pi，把能力缺口按七个切片分类登记：共 40 项 DEFICIENT、38 项 MISSING、16 项 OURS-ONLY、7 项平手。Phase 0–5 已闭环；Phase 5 的前置研究、裁决、施工与复核均已完成（7 项任务 + 22 项补充裁决），核心是删除 32 文件 / 8,330 行的零消费者「报告投影族」、补上缺失的重试与错误分类、并让 compat 标志真正改变请求形状。裁决经五个独立复核者证伪式复核，推翻主代理 4 项错误（含 T2 闭包方向算错，数字从 36/10,008 更正为 32/8,330）；施工后的复核轮再发现并修复 8 处缺陷，其中一处让每个致命崩溃变成进程带病继续运行。Phase 6 **已完成**（T5a 回写 25 行滞后判定 + T1 HTTP 超时接线 + T2 metrics 采集与读取 + T3 用量按模型分桶 + T4 `/report`），四项代码任务全部有反向验证与实机验证。Phase 6 前置研究与裁决（零代码改动）：重新盘点发现 44 个看似开放的条目里 25 个已实现但未标注，真正仍开放 10 项，其中 3 项是行为缺口（HTTP 超时未接线、metrics 采集面为空、用量记账不按模型分桶）；两个复核者各覆盖一半、均判 incorrect，共推翻主代理 9 处。"
+summary: "功能开发前锋探索的总入口。对照本地参考仓 pi，把能力缺口按七个切片分类登记：共 40 项 DEFICIENT、38 项 MISSING、16 项 OURS-ONLY、7 项平手。Phase 0–5 已闭环；Phase 5 的前置研究、裁决、施工与复核均已完成（7 项任务 + 22 项补充裁决），核心是删除 32 文件 / 8,330 行的零消费者「报告投影族」、补上缺失的重试与错误分类、并让 compat 标志真正改变请求形状。裁决经五个独立复核者证伪式复核，推翻主代理 4 项错误（含 T2 闭包方向算错，数字从 36/10,008 更正为 32/8,330）；施工后的复核轮再发现并修复 8 处缺陷，其中一处让每个致命崩溃变成进程带病继续运行。Phase 6 **已完成**（T5a 回写 25 行滞后判定 + T1 HTTP 超时接线 + T2 metrics 采集与读取 + T3 用量按模型分桶 + T4 `/report`），四项代码任务全部有反向验证与实机验证。Phase 6 前置研究与裁决（零代码改动）：重新盘点发现 44 个看似开放的条目里 25 个已实现但未标注，真正仍开放 10 项，其中 3 项是行为缺口（HTTP 超时未接线、metrics 采集面为空、用量记账不按模型分桶）；两个复核者各覆盖一半、均判 incorrect，共推翻主代理 9 处。**§10 续研（2026-09-26）回答「优化 Rust/Python 是否胜过纯 TS」**：实测本仓真瓶颈是 `grep`（1,294ms vs ripgrep 10–30ms，43–130×），但**三家参考实现没有一家自己写搜索算法**——Claude Code 内嵌 ripgrep 二进制、pi 直接 `spawn(rg)`、oh-my-pi 用 napi 链接 ripgrep 的库。**Rust 在 agent 里的真实价值是「原生库的粘合层」，不是「更快的实现」**；而同一速度用纯 TS 的 `spawn(rg)` 即可拿到，成本低一个数量级。Bun `--compile` 实测可用（启动 1,370ms → 200ms，7×；用户免装 Node；产物 106MB；`--version` 有一处缺陷）。**Phase 11 前置研究已完成（2026-09-26，零代码改动）**：见 `08-gap-and-debt-research.md`。5 路只读子代理覆盖内核循环／工具执行／provider 模型／上下文记忆／架构债务五个切片（债务总扫被上游 content_filter 拦截，已重派两个避开敏感阅读面的窄切片）。**头条不是新差距而是三项 P0 既有缺陷**：① `daemonEnabled` 默认 true 而 Rust 执行面缺 cargo 时不降级，**全新安装 bash 100% 失败**（实机复现；本机被用户配置的 false 掩盖）；② `cheers.json` 是 git 跟踪的配置契约却**从不被读取**（CLI 报 max-turns=15 而文件写 30）；③ `/model refresh` 把内置模型的 `compat`/`promptCache`/`vision` **整体抹掉**（实机复现 developer→system、vision true→false），静默回滚 Phase 5/9 已修好的缺陷。差距侧 10 MISSING / 14 DEFICIENT；债务侧三层口径 129 → 90（21,247 行）→ **35 真死文件（6,650 行）**，seam 校验 0 条活引用。子代理 3 项结论经核验被推翻或更正（memory 实际已接线、context 域是子集而非整体未接线）。"
 confidence: high
 ---
 
@@ -599,3 +599,341 @@ Phase 9 裁决已定其边界（路径 1 声明式 + 路径 2 进程外），但
    若扩展宿主立项，它们应一并重估。
 3. **包分发（01）** 是扩展宿主的下游，宿主不做则它无意义——跟随第 1 条。
 4. `OURS-ONLY`／平手的 27 行按维护者指示暂缓，待结合其他参考项目另行开发。
+
+## 8. Phase 11 前置研究：差距、债务、死代码与三语言架构裁决（**2026-09-26**）
+
+> **见 [`08-gap-and-debt-research.md`](08-gap-and-debt-research.md)。**
+> **合并版**：原 08/09/10 三份文档已于 2026-09-26 合并为该文件（§1 差距与债务、§2 语言裁决、§3 热路径续研）。
+> 索引的 §8.6 / §8.7 对应原 §9 / §10。
+>
+> 维护者指示：对照 `~/projects/` 下的顶尖项目，探索**差距 / 架构债务 / 死代码**，
+> 报告写入 features 的新文档（从 `08` 起），完成后更新本索引。
+> **本文件是 Phase 11 的前置研究**——文件名按维护者指示用 `08-`，
+> 阶段序号是 Phase 11（`01-*`～`07-*` 是能力切片，`phase-N-*` 是执行阶段，Phase 10 已收尾）。
+>
+> **执行方式**：5 路只读子代理（并发上限 5）覆盖内核循环、工具执行、provider/模型、
+> 上下文/记忆、架构债务五个切片；其中债务总扫 `S5DebtDeadCode` **被上游 `content_filter`
+> 拦截**（第 4 次记录，拦截点与前三次一致：session 编解码／凭据遮蔽／认证分派），
+> 处置照既有结论——**该阅读面由主代理亲验**，并重派两个避开该面的窄切片（**重派成功**）。
+> 所有头条数字由主代理**自写脚本独立重算**，不采信子代理。
+>
+> ### 8.1 头条：三项「开箱即坏 / 静默降级」P0 缺陷
+>
+> 这三项**不是相比 pi 的差距**，而是我方自身的既有缺陷，前 10 个阶段都没覆盖——
+> 因为它们不在 `01-*`～`07-*` 的七份切片范围内。
+>
+> | # | 缺陷 | 性质 | 证据 |
+> |---|---|---|---|
+> | **P0-A** | `daemonEnabled` **默认 `true`**，而 Rust 执行面在 cargo 缺失时**直接判失败、不落回本地** | **全新安装开箱即坏**：bash 工具 100% 失败 | `runtimeConfig.ts:349` 默认 true；`service.ts:135-146` 每条失败路径都 `return`，`executeLocally` 在 `if` 之后不可达。**实机复现**（`HOME=/tmp/fresh`、无配置、PATH 去掉 cargo）：`success:false, "Cargo executable not available"`；加回 cargo 则成功（127ms）。本机被 `~/.private-agents/config.json` 的 `daemonEnabled:false` **掩盖**——与「CI 用 Node 20、本地 Node 24」同型。**违反 `AGENTS.md`**「Rust … is not the default execution plane」 |
+> | **P0-B** | `cheers.json`（**git 跟踪**、含 `maxTurns:30`、`allowRules`）**从不被读取** | 静默失效的配置契约 | 候选路径只有 `resolveUserDataFile("config.json")` 与 `<root>/.cheers.json`（`runtimeConfig.ts:555-561`）。**实机**：CLI 首屏报 `max-turns=15`，文件写 `30`。`log.md:2751` 当时**记录了它却没立项** |
+> | **P0-C** | `/model refresh` **抹掉**内置模型的 `compat`/`promptCache`/`vision` | **已修复缺陷的静默回滚** | `catalogRefresh.ts:79-100` 只投影 6 个字段；`mergeProviders` 的 `dedupeModels` 是 `Map.set` **整体替换**而非深合并。**实机复现**：`gpt-5.3` 的 `compat.systemRole: "developer"` → `"system"`、`maxTokensField` → `max_tokens`、`vision: true` → `false`。即刷新后**推理模型会拒绝 `max_tokens`（400）**、**图片请求会整个失败**——两者都是 Phase 5 / Phase 9 已修好的缺陷 |
+>
+> ### 8.2 差距清单
+>
+> **10 项 MISSING**：数据驱动权限规则（`allowRules` 声明但零读者，**与 P0-B 同根**）、
+> 后台命令执行、OAuth Device Code、Bedrock、Google GenAI/Vertex、
+> Copilot/Anthropic OAuth、未变更文件去重、压缩后文件恢复、指令 `@import`、动态工具装载增量。
+>
+> **14 项 DEFICIENT**，其中最重的三项：
+> ① **编辑不检查 `oldText` 唯一性**——`editEngine.ts:198-206` 取**首个**匹配，
+> **实机复现**：`success: true` 且只改第一处；pi 有 `countOccurrences` + 「The text must be unique」；
+> ② **子代理 `task` 工具不是 agent**——`taskTool.ts:142` 是一次裸 `fetch`，
+> `grep AgentCore|createStepFunction|runTurn` → **0**，`subagentDef.tools` 被忽略、worktree 无人执行；
+> ③ **`classifyProviderFailure` 是死代码**（生产 0 引用），活轨改用临时代码串匹配。
+>
+> ### 8.3 架构债务与死代码（三层口径，逐层收紧）
+>
+> | 口径 | 文件 | LOC |
+> |---|---:|---:|
+> | `analyze-boundaries.py` 的 `cliOpaque` | 129 | — |
+> | CLI 不可达（排除 harness/test-utils/eval） | **90** | **21,247** |
+> | **真死**（不可达 **且** 零生产导入者） | **35** | **6,650** |
+>
+> **seam 校验**：对 90 个不可达文件扫描非测试、非 harness 导入者 → **0 条**。
+> 90 个文件构成 **36 个连通簇**（并集 == 全集），最大三簇
+> `planning/runtime/engine.ts`(33/9,283)、`context/acquisition/projection.ts`(28/7,756)、
+> `edit/multifile/model.ts`(12/3,831)。
+>
+> **结构性死代码**：`core/workflow/` 的 6 个「管线」模块
+> （`builderValidator`/`adversarialRefuter`/`contextInjector`/`pipelineExecutor`/`cacheStaggering`/`teamStore`，
+> 共 508 行）**零生产导入者**，活轨 `/workflow` 走的是 `runner`+`dagResolver`+`parallelDispatcher`。
+> `log.md` 2026-08-30 曾把它们记为「Delivered」——**与 phase-5 的「报告投影族」完全同型**。
+> 另有 `tools/policy/interception.ts`（411 行）与整条工具结果投影链（`ToolReportSafeProjection`、
+> `MVP_TOOL_ALLOWLIST`）**零消费者**。
+>
+> **⚠️ 删除授权**：`plan.md` §2.1 明文「**可达性只用于分析，不授权删除**」，
+> §9.18 的 T16a 已对其中一簇裁决「暂不删除」。**本轮同样只登记不删除**，处置需明示授权。
+>
+> ### 8.4 子代理结论中被主代理**推翻**的项
+>
+> | 原判 | 核验 | 处置 |
+> |---|---|---|
+> | S4：「memory 子系统未接入活轨」 | **错误**：`core/shell/sessionRuntime.ts:268` → `buildPromptWithFutureTurnInjections` → `memory/projectMemoryFutureTurnInjection.ts`，可达性 **REACHABLE** | 已推翻，不登记 |
+> | S4：「`context/acquisition/` 与 `context/graph/` 是 100% 未接线」 | **部分错误**：前者 10 中 6 可达、后者 12 中 7 可达，**未接线的是子集**（4+5） | 已更正 |
+> | S1：「retry 已完整接线」 | **成立但缺 jitter**（`retry.ts:127` 无 `Math.random`；pi 有 `* (1 - Math.random()*0.25)`） | 部分保留 |
+>
+> **方法论教训**（与 §4.2 同源）：子代理的**可达性结论**必须用同一张图重算——
+> S4 两处错误都是「把**子集**说成**整个域**」。
+>
+> ### 8.5 建议顺序
+>
+> **第 1 梯队（P0，不需等裁决即可确认是缺陷）**：T1 `daemonEnabled` 不降级 →
+> T2 `cheers.json` 不生效 → T3 刷新抹掉 compat。
+> **T1 的具体形态需裁决**：默认改 `false`，还是 cargo 缺失时**落回本地**（本文件推荐后者，
+> 它同时覆盖「cargo 存在但冷编译超 30s」等同类情形）。
+> **第 2 梯队**：编辑唯一性、子代理不是 agent、死分类器接线、重试 jitter、Doom Loop 交替检测、
+> temperature 按模型条件化。**第 3 梯队**：文件去重、`@import`、工具装载增量、权限规则集。
+> **第 4 梯队（需独立裁决）**：后台命令、Device Code、**死代码处置（需明示授权）**、
+> 路由期命名残留、新协议（无账号可验，`phase-10-decisions.md` §1.1 已有先例）。
+>
+> **未验证项如实记录**：Anthropic `thinking` 缺 `budget_tokens`、OpenAI 推理模型 temperature、
+> OAuth 登录成功路径、SSE 事件头——**均无账号或未独立复现**，见该文 §5。
+
+> ### 8.6 三语言架构裁决（原 §9，2026-09-26 已施工）
+>
+> 回答维护者的直接提问：「三门语言写 agent 是否有价值，还是噱头？是否应全部转写 TS？」
+> **Python 层与 Rust 执行面均已按裁决删除并实机验证。**
+
+
+> **2026-09-26 已按裁决施工：Python 层与 Rust 执行面均已删除，实机验证通过（§9.5）。**
+>
+> 回答维护者的直接提问：「三门语言写 agent 是否有价值，还是噱头？是否应全部转写 TS？」
+>
+> ### 8.6.1 结论
+>
+> | 层 | 现状（实测） | 裁决 |
+> |---|---|---|
+> | **TypeScript** | 975 生产文件 / ~165k 行，承载**全部**产品行为 | **保留**——它就是产品 |
+> | **Python** | **30 行**（一个冒烟测试）；`src/` **不存在**；`test:python` 在本机**硬失败**（`D:\conda-envs\...`） | **删除** |
+> | **Rust** | **1,112 行**，且比 TS 侧**已有实现更弱** | **删除当前实现**，保留方向 |
+>
+> ### 8.6.2 Rust 是负资产的七条实测证据
+>
+> | # | 证据 |
+> |---|---|
+> | 1 | **沙箱是字符串匹配**——`executor.rs:205-238` 判 `joined.contains("http://") \|\| joined.contains("curl ")`；而 TS 侧 `sandbox/osSandbox.ts:237-256` 是**真的 `bwrap --ro-bind/--bind/--tmpfs/--unshare-net`**（本机 `bwrap` 已装）。**Rust 的隔离弱于 TS 已有的** |
+> | 2 | **静默丢失流式输出**——实测同一命令：Rust 路径 `onOutput callbacks: []`（零回调），TS 路径 `[[5,"1"],[307,"2"],[609,"3"]]`。`service.ts:150-163` 的 daemon 分支**没传 `onOutput`**，而 `daemon/client.ts:137-142` 的注释承诺「forwarded as it arrives」——**代码在说谎** |
+> | 3 | **延迟净增**——热路径 **60ms vs 4ms**；首次 **923ms vs 16ms**；冷编译 **15.1s** |
+> | 4 | **契约是测试专用**——`contracts/rust/mod.rs`（293 行）只被 `#[cfg(test)]` 引用（`executor.rs:287-290`）；`schema_version_is_valid` 唯一调用者是自己的测试 |
+> | 5 | **跨层 `schemaVersion` 从未发送**——`WORKSPACE.md:170` 声称「MUST include」，`grep schemaVersion` 在 `daemon/*.ts` 与 `daemon.rs` 均为 **0** |
+> | 6 | **预编译二进制无人引用**——`target/release/daemon`（1.1MB）存在，`grep -rn 'target/release' daemon/` → **0**；代码永远走 `cargo run` |
+> | 7 | **默认值让产品开箱即坏**——`daemonEnabled: true` + 缺 cargo 不降级（§1 P0-A）。**这是 Rust 层净负价值的直接后果** |
+>
+> ### 8.6.3 参考项目普查（14 仓，主代理自测；排除 vendor/test）
+>
+> **11/14 是纯单语言。** 两个多语言反例的机制都与我们不同：
+> - **codex**：**Rust 是产品本身**（1,540,578 行 Rust vs 9,221 行 TS——TS 只是 SDK 客户端）
+> - **oh-my-pi**：TS 主体 + Rust **进程内 napi 绑定**（`crates/pi-natives/src/` 50 个模块，**10 个 TS 包依赖**）
+>
+> **我们是「TS 主体 + Rust 独立守护进程」——两边都不像**：没有 oh-my-pi 的零 IPC，也没有 codex 的 Rust 主体地位。
+>
+> ### 8.6.4 网络研究（TinyFish）的三条关键证据
+>
+> 1. **Claude Code = 1,884 个 TS 文件 / 512,664 行纯 TypeScript**，且**刻意把 Yoga 重写为纯 TS**，注释写明目标是「**zero native dependencies, enabling single-binary deployment**」；分发靠 **Bun `--compile` 出单二进制**。**即：「要单二进制分发」不构成用 Rust 的理由。**
+> 2. Red Hat 那篇「Python→Rust」的核心论点是 **Python 的 GIL**，**不是** Node——Node 的事件循环处理 I/O 密集的 agent 编排无同类瓶颈。
+> 3. Rust 在 agent 领域**唯一被反复验证的硬价值是系统级沙箱**（`seccomp-BPF`/`user namespaces`/`Seatbelt`），不是「跑命令」。
+>
+> **方法论警告**：搜索结果中 `ossinsight.io` 一篇（声称 Q1 2026 有 7 个 Rust agent 仓、597 stars/day）数字形态可疑且无法从一手来源核实，**本文件明确不采信**。
+>
+> ### 8.6.5 裁决与执行结果（**2026-09-26，已施工**）
+>
+> 维护者裁定：**「将 Python 和 Rust 都删除」**。已执行完毕并实机验证。
+>
+> **删除清单**：`packages/rust-core/`（含 603MB `target/`）、`packages/python-eval/`、
+> `packages/ts-shell/src/daemon/`（6 文件）、`core/tools/registry-rust-bridge.test.ts`（414 行）、
+> `contracts/{rust,python}/`、5 个脚本（`run-rust-command`/`run-python-command`/`run-python-tests`/`verify-rust-execution`/`toolchain` 的对应部分）、
+> `RuntimeConfig.daemonEnabled` + `DAEMON_ENABLED` 分支、根 `package.json` 的 6 条脚本与 `rust-core` workspace。
+> **新增** `runtime/execution/local.ts`（原 daemon client 的本地实现，去掉 daemon 部分）。
+>
+> **`service.ts` 的 `if (isRustDaemonEnabled())` 整段删除** → `runCommand` 只剩一条路径。
+> **副作用：`onOutput` 不再被丢弃**——它以前只传给 `executeLocally`，而 daemon 分支在它之前 `return`，
+> 所以 daemon 开启时实时输出**永远到不了调用方**。
+> `ExecutionPath` 收窄为 `'ts-local'`；`CommandExecutionResult` 删掉 4 个 `daemon*` 字段。
+>
+> **验证（全部实机）**：`tsc` **0 错误**；`validate` PASS；`verify:docs-drift:strict`
+> **rules 0 / docs 0 dangling**（修掉 3 处绑定规则引用 + 3 处当前态文档引用）；
+> `verify:import-cycles` 0 环；`check:config-consumers`/`check:declarations`/`check:node-floor` 全 pass。
+> **P0-A 场景复测**（`HOME=/tmp/fresh2`、PATH 去掉 cargo、无配置）：
+> `daemonEnabled` 字段已不存在，bash 命令 **`completed`/exit 0/`ts-local`**（修复前 `success:false, "Cargo executable not available"`）。
+> **流式复测**：`[[4,"1"],[308,"2"],[610,"3"]]` 实时到达（修复前 daemon 路径 0 回调）。
+> **§1 的 P0-A 因此自动消失**——没有 daemon 就没有 daemon 默认值。
+>
+> ### 8.6.6 Bun `--compile` 有什么好处（D3 答复）
+>
+> **有，且正好命中 Rust 被引入时的两个理由**——但是否值得取决于**是否要对外分发**。
+>
+> | 好处 | 说明 |
+> |---|---|
+> | **用户不需装 Node** | 单文件可执行含 Bun 运行时——**这正是「用 Rust 出单二进制」原本想要的，用零新语言拿到** |
+> | **启动更快、内存更省** | 编译把「读盘+解析+转译」从运行时移到构建时；`--bytecode` 再省一截（官方示例：大型 CLI 冷启动 1.0s→0.53s，启动内存 −40MB） |
+> | **交叉编译现成** | `--target=bun-{linux,darwin,windows}-{x64,arm64}[-musl]` 八个目标一条命令 |
+> | **可嵌入资源** | `with { type: "file" }` / `--asset` 把主题、技能模板、默认配置打进二进制 |
+>
+> | 代价 | 说明 |
+> |---|---|
+> | **产物很大** | Claude Code 的二进制 **224–280MB**；Bun 官方也承认「二进制还是太大」 |
+> | **新增构建依赖** | 需在 CI/发布装 Bun（不是运行时依赖） |
+> | **运行时加载默认关闭** | `tsconfig.json`/`package.json` 运行时加载默认关；`.env`/`bunfig.toml` 默认开 |
+> | **动态入口需显式声明** | 动态 `import()`、`new Worker(path)`、相对路径读文件都要列为入口或 `--asset` |
+> | **兼容性未实测** | 我们大量用 `node:` 内建与 `.js` 后缀导入，**没有跑过一次真实构建** |
+>
+> **建议**：**要对外分发 → 值得做**，作为独立任务（第一步是验证 Bun 能否打包我们的代码）；
+> **只在本机/团队内用 → 收益低**（成员已有 Node，多一个 200MB+ 产物与一条新构建链）。
+> **无论做不做：不要因为「要单二进制」而重新引入 Rust**——这条理由已被 Claude Code 的实践证伪
+> （它 51 万行纯 TS，刻意把 Yoga 重写为纯 TS 以避免原生依赖，然后 Bun 编译成单二进制）。
+>
+> **未验证项**：Bun `--compile` 在本项目的兼容性、产物实际体积、`--bytecode` 可用性——**均未实测**，
+> 是 D3 落地前必须做的第一步。
+>
+> **与 §1 的关系**：本文件是 §1 的直接延伸。**删除 Rust 执行面后 §1 的 P0-A 自动消失**。
+>
+> **未验证项**：Rust 沙箱的绕过用例（`[INFERENCE]`，未实构造）、Node 高并发 spawn 上限、
+> Bun `--compile` 在本项目的兼容性、产物实际体积、codex/oh-my-pi 的实跑。
+
+> ### 8.7 热路径续研：优化 Rust/Python 能否超过纯 TS（原 §10，2026-09-26 已施工第 1+3 项）
+>
+> 回答维护者的追问：「不是直接删掉，而是把这两部分**优化**成有价值的资产，这条策略成立吗？」
+> **本轮补上了原 §2 缺失的关键证据——实测热路径与实测 Bun 编译。**
+
+
+>
+> 维护者追问：「**不是直接删除，而是优化这两部分，让他们不再是负担而是有价值的一部分**，
+> 这条策略成立吗？还是就算优化，价值也不如直接用 TS 重写？」
+>
+> **先承认 §9 的论证缺口**：§2 证明的是「**现有 1,112 行是负资产**」，
+> 不是「Rust 优化后仍不如 TS」。§9 里写了「需先有基准证明 `bwrap` 不够」，
+> **但那一轮自己没做基准，也没量化时间花在哪里**。§10 补上。
+>
+> ### 8.7.1 实测热路径（本仓 2,830 文件 / 28.9MB）
+>
+> | 路径 | 耗时 | 评价 |
+> |---|---|---|
+> | **CLI 冷启动（`tsx`）** | **1,370–1,580 ms** | 最大单项 |
+> | **`grep` 罕见模式**（`registerTool`） | **1,294 ms** | **真瓶颈**——`grep.ts:104-134` 逐文件串行 stat+read+逐行正则，无早退 |
+> | `grep` 宽模式（`function`） | 206 ms | 尚可 |
+> | `glob` / `fileWalk` / AST 解析 | 17 / 15 / 163 ms | 快 |
+>
+> **对照 `ripgrep` 同查询**：`registerTool` **1,294ms vs 10–30ms = 43–130×**。
+> **把同一算法改成有界并发 32（仍是 TS）**：**1,211ms → 454ms（2.7×）**。
+> **即：先拿 2.7× 是 TS 实现缺陷；剩下的 15–45× 来自 ripgrep 的成熟工程，不是「Rust 比 JS 快」。**
+>
+> ### 8.7.2 核心发现：参考项目**没有一家自己写搜索算法**
+>
+> | 参考 | 做法 | 证据 |
+> |---|---|---|
+> | **Claude Code** | **内嵌 ripgrep 二进制** | `utils/ripgrep.ts:47`「ripgrep is **statically compiled into** bun-internal」 |
+> | **pi** | **`spawn(rgPath, args)`**，缺失时**自动下载 rg** | `tools/grep.ts:168`；`:121` |
+> | **oh-my-pi** | Rust napi，**但链接的是 ripgrep 的库** | `crates/pi-natives/Cargo.toml`：`grep-searcher`/`grep-regex`/`grep-pcre2`/`ignore`/`globset` |
+>
+> **oh-my-pi 那行是决定性的**：它的 Rust 价值是**「用 napi 把 ripgrep 的现成库链进进程」**，
+> **不是「用 Rust 写更快的搜索」**。**Rust 在这里是原生库的粘合层。**
+> AST 同理：Claude Code 用 **tree-sitter NAPI + 优雅降级**（`bash/parser.ts:41` `tree-sitter: unavailable`），
+> oh-my-pi 用 `tree-sitter` + `ast-grep-core`。**我们用的 `ts.createSourceFile` 是官方编译器，精度更高，这一项不差。**
+>
+> ### 8.7.3 Bun `--compile` 实测（§2 的未验证项，本轮跑了）
+>
+> ```
+> bun build …/cli.tsx --compile  →  bundle 750 modules / compile 464ms / 产物 106MB
+> 启动: tsx 1,370–1,580ms  |  bun run 270–850ms  |  Bun 编译产物 200ms
+> 实机: /tmp/cheers-test-bin --print "run echo BUN_BINARY_OK" → Outcome: success
+> ```
+>
+> **发现一个真实缺陷（仅记录未修）**：编译产物 `--version` 输出 **`version unknown`**。
+> 根因：`core/version/current.ts:26-35` 的 `manifestPath()` 从 `import.meta.url` 上溯 6 层找
+> `package.json`，而编译产物里它指向 Bun 虚拟 FS（`/$bunfs/...`）。**`--compile-autoload-package-json` 实测无效**。
+>
+> ### 8.7.4 直接回答维护者的问题（三层）
+>
+> **① Rust 优化技术上成立**，参考项目正是这么做的。
+> **② 但本项目的收益来自「接入既有工具」，不是「用 Rust 写代码」**——
+> 三家参考的 Rust/原生价值**全部是「把已存在的成熟实现接进来」**。
+> **③ Rust 唯一 TS 拿不到的位置是系统级沙箱**（`seccomp`/namespaces 细粒度策略），
+> **但零需求证据**——`bwrap` 能做的已做且工作正常（`sandbox/osSandbox.ts:237`）。
+>
+> **所以「优化 Rust」在本项目会退化成二选一**：
+>
+> | 选择 | 拿到的东西 | 成本 |
+> |---|---|---|
+> | **A. `spawn(rg)`（纯 TS）** | 与 Rust 方案**完全相同的速度** | 低——一个子进程 |
+> | **B. Rust + napi 链接 ripgrep** | 同上 | 高——第二门语言、napi 工具链、多平台产物、加载失败处理 |
+>
+> **A 与 B 终点相同，A 成本低一个数量级。** 这就是答案：
+> **不是「TS 写得更快」，而是「TS 可以直接调用那个更快的原生工具，不必自己成为它」。**
+>
+> ### 8.7.5 建议路线（先便宜后昂贵）
+>
+> | # | 动作 | 语言 | 收益 |
+> |---|---|---|---|
+> | 1 | `grep` 改 **`spawn(rg)`**，保留 TS 实现作回退 | **纯 TS** | **1,294ms → ~30ms（43×）** |
+> | 2 | 退路：`grep` 加有界并发 | 纯 TS | 1,294 → ~450ms（2.7×） |
+> | 3 | Bun `--compile` 单二进制（修 `--version`） | 纯 TS + Bun | 启动 **1,370 → 200ms（7×）**，用户免装 Node |
+> | 4 | **条件性候选**：将来需 `seccomp` 级策略时再引 Rust/napi | Rust | 未量化 |
+>
+> **1 + 3 合起来，用零新语言拿到**：快 43× 的搜索 + 快 7× 的启动 + 免装 Node。
+>
+> ### 8.7.6 Python：**连优化对象都不存在**
+>
+> 30 行冒烟测试、`src/` 不存在；评测需求**已被 TS 覆盖**
+> （`src/eval/browser/` + `real-shape-coverage.mjs`/`broader-regression.mjs`/`comprehensive-regression.mjs`）；
+> Python 的独占优势（numpy/pandas/torch/Jupyter）**本产品一项都不用**。
+> 若真要做对标 `inspect_ai` 的评测框架，那是**独立项目**，不是「本产品的一层」。
+>
+> ### 8.7.7 施工结果（**2026-09-26，第 1 与第 3 项已执行**）
+>
+> 维护者裁定「执行 1+3」，两项均已落地并实机验证：
+>
+> | 项 | 修复前 | 现在 |
+> |---|---|---|
+> | `grep` 罕见模式（`registerTool`） | **1,294 ms** | **53 ms（24×）** |
+> | `grep` 宽模式（`function`） | 206 ms | 57 ms |
+> | CLI 启动 | 1.91–1.97 s（`tsx`） | **0.18 s**（编译产物，≈10×） |
+> | `--version` | — | **`0.1.0`**（编译产物修复前是 `version unknown`） |
+> | 需装 Node | 是 | **否** |
+>
+> **回退路径返回完全相同的行数**（13 / 100），即行为等价的降级而非功能缺失。
+> 新增 `core/tools/grepRipgrep.ts`（12 项测试）、`scripts/build-cli-executable.mjs` + `npm run build:exe`、
+> `core/version/current.test.ts`（4 项）。
+> **施工中发现两处实测事实**：① 必须加 `--hidden`——`rg` 默认跳隐藏目录而我们的 walk 不跳，
+> 不加会让两条路径搜索**不同文件集**（实测 2 vs 13 处命中）；② 必须用 `--json`——
+> `path:line:text` 无法可靠切分（文件名可含冒号、单文件搜索时 `rg` 省略文件名）。
+> 验证：`tsc` 0 错、五道门禁全 pass、聚焦 179 项通过、全量 3715 项 3 failed（**均为既有负载抖动**：
+> 隔离复跑全绿、不引用本轮模块、启动时间 A/B 无回归、`log.md` 已记录）。
+>
+> **未验证**：编译产物的交互式 TUI/Playwright/MCP 功能面、95MB 产物的分发接受度、
+> 大仓库（10×/100×）表现、更早 `rg` 版本的标志兼容性（本机 `rg 15.1.0` 无 `--files-from`）。
+
+> ### 8.7.8 复核轮（2026-09-26）：Rust/Python 删除 + TS 重写
+>
+> 3 个 review 子代理按互不重叠切片并行，其中 2 个在**序列化报告时崩溃**（`JSON Parse error` / `http2 force closed`），
+> 探索过程留在 transcript 中并逐条复核；补派 2 个完成覆盖。
+>
+> **修复 24 项**，其中 **2 个 P0**（CI 执行已删除的 `build:rust`/`cargo build` 步骤 → 每次 push 必红；
+> `.cheers.example.json` 仍设已移除的 `daemonEnabled`）与 **6 个 P1**：
+>
+> | 问题 | 实测证据 |
+> |---|---|
+> | `runCommand` 不转发 `abortSignal`，Ctrl+C 取消不了命令 | abort 后仍跑满 **5012ms** 并报 `completed`；修复后 404ms 报 `cancelled` |
+> | `current.ts` 抛 `ReferenceError`（`typeof` 只保护**直接操作数**，传参即求值） | 独立复现 `__CHEERS_BUILD_VERSION__ is not defined` |
+> | **工作区逃逸**：`path="foo/../../outside"` 读到工作区外文件 | `secret.txt:1: SECRET_NEEDLE outside`，`success:true`；**回退路径反而拒绝了它** |
+> | 外部 SIGTERM 被误报为 `timeout` | 改为只认自己置的 `timedOut` 标记 |
+> | glob 大小写分歧（walk `nocase` vs `rg --glob` 默认敏感） | 同一过滤器两条路径返回不同文件集；加 `--glob-case-insensitive` |
+> | `contracts/package.json` 的 `files` 列出已删除的 rust/python 目录 | 发布清单指向不存在的目录 |
+> | **文件大小上限分歧**：walk 跳过 >10MB，`rg` 默认照搜 | 11MB 文件 rg 命中 / walk 跳过；加 `--max-filesize` 后两条路径**输出完全一致** |
+> | `package-lock.json` 仍声明 `packages/rust-core` 为 workspace 成员 | `npm ci` 会解析已删除目录；已重新生成 |
+> | `OWNERSHIP.md` 整章描述已删除的 rust-core / python-eval 所有权 | 已重写为单运行时文档 |
+>
+> **证伪 1 项**：子代理称信号判断会匹配任意信号名——`===` 是严格相等，实测外部 SIGKILL → `failed`，不成立
+> （但同一线索挖出上表第 4 行更窄的真实缺陷）。
+>
+> **如实记录的未改项**：命令输出无上限累积（200MB 输出 → 堆增长 399MB）。与已删除的 `daemon/client.ts` **逐字相同**，
+> 非本改动引入；对照参考实现的滚动缓冲 + 超限转写临时文件是正确做法，但需要改动输出所有权与 artifact 契约，未仓促重构。
+>
+> 验证：`tsc` 0 错、六道门禁全 pass、`test:scripts` 27/27、契约 7 PASS/6 REJECT、
+> 聚焦 **26 文件 / 220 项通过**、编译产物 `--version` 正确且真实 bash/grep 调用成功。
+> 每个新增回归测试都验证过「去掉修复即失败」。
+>
+> **两条路径最终等价性**（实测，行数完全一致）：`registerTool` 52ms vs 1398ms（18/18）、
+> `function` 58ms vs 199ms（100/100）、`glob=*.ts` 16ms vs 740ms（12/12）。
+>
+> **全量套件 540 文件 / 3726 项 / 3 failed**——3 项全在 `cli-baseline.test.ts`，
+> **隔离运行 40/40 全绿**且该文件对本次改动模块引用数为 0（已记录的负载敏感子进程用例）。

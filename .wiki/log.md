@@ -3247,3 +3247,339 @@ TypeError: Promise.withResolvers is not a function
 - 全仓再无其他晚于下限的 API（另扫 `Object.groupBy`／`Array.fromAsync`／`Set.prototype.union`／`fs.globSync` 等）。
 - `test:scripts` **26/26**（原 18 + 新增 8）；五道门禁全过；受影响套件 604 项通过；tsc 0 错。
 - `AGENTS.md` 的门禁清单**补上新门禁**（不补就等于文档说谎）。
+
+## [2026-09-26] research | Phase 11 前置研究：差距、架构债务与死代码（零代码改动）
+
+**产出**：`.wiki/features/08-gap-and-debt-research.md`（新建，`_index.md` §8 已同步）。维护者指定报告从 `08-` 起编号以避开 01–07；阶段序号是 **Phase 11**（Phase 10 已收尾）。
+
+**执行**：5 路只读子代理（并发上限 5）——内核循环／工具执行／provider 模型／上下文记忆／架构债务。**债务总扫 `S5DebtDeadCode` 被上游 `content_filter` 拦截（第 4 次记录，拦截点与前三次一致：session 编解码／凭据遮蔽／认证分派）**；处置照既有结论——该阅读面由主代理亲验，并重派两个避开该面的窄切片（**重派成功**，证明拦截与阅读面有关而非措辞）。所有头条数字由主代理**自写 Python import 图 + BFS + `npx tsx` 直接调用生产函数**独立重算。
+
+**头条：三项 P0 既有缺陷（不是「相比 pi 的差距」，前 10 个阶段都未覆盖）**
+
+- **P0-A `daemonEnabled` 默认 true 且 Rust 面不降级**。`runtimeConfig.ts:349` 默认 `true`；`service.ts:133-146` 的每条失败路径都 `return`，`executeLocally` 位于 `if` 之后**不可达**。**实机复现**（`HOME=/tmp/fresh`、无配置、PATH 去掉 cargo）：`success:false, "Cargo executable not available. Checked: /tmp/fresh/.cargo/bin/cargo, cargo"`；把 cargo 加回 PATH 则同一调用成功（127ms、`executionPath: rust-daemon`）。**全新安装的 bash 工具 100% 失败**。本机一直被 `~/.private-agents/config.json` 的 `"daemonEnabled": false` 掩盖——与 log 2026-09-25「CI 用 Node 20、本地 Node 24」同型。**违反 `AGENTS.md`**「A Rust daemon path … is not the default execution plane」。
+- **P0-B `cheers.json` 从不被读取**。该文件**已被 git 跟踪**（含 `maxTurns: 30`、`permissions.allowRules`、`tui.mode`），但候选路径只有 `resolveUserDataFile("config.json")` 与 `<root>/.cheers.json`（`runtimeConfig.ts:555-561`）。**实机**：CLI 首屏报 `max-turns=15`，文件写 `30`。`log.md:2751` 当时记录了它、判定「改名前即如此」，**却未立项**。
+- **P0-C `/model refresh` 抹掉内置模型的 `compat`/`promptCache`/`vision`**。`catalogRefresh.ts:79-100` 只投影 6 个字段；`mergeProviders` 的 `dedupeModels` 是 `Map.set` **整体替换**而非深合并。**实机复现**：`gpt-5.3` 的 `compat.systemRole: "developer"` → `"system"`、`maxTokensField: "max_completion_tokens"` → `"max_tokens"`、`vision: true` → `false`。即刷新后**推理模型会拒绝 `max_tokens`（400）**、**图片请求整个失败并丢掉旁边文字**——两者都是 Phase 5 / Phase 9 已修好的缺陷，**静默回滚且无测试覆盖**。
+
+**差距清单**：**10 MISSING**（数据驱动权限规则、后台命令执行、OAuth Device Code、Bedrock、Google GenAI/Vertex、Copilot/Anthropic OAuth、未变更文件去重、压缩后文件恢复、指令 `@import`、动态工具装载增量）、**14 DEFICIENT**。最重三项：① **编辑不检查 `oldText` 唯一性**——`editEngine.ts:198-206` 取首个匹配，**实机复现** `success: true` 且只改第一处；pi 有 `countOccurrences` + 「The text must be unique」；② **子代理 `task` 工具不是 agent**——`taskTool.ts:142` 是一次裸 `fetch`，`grep AgentCore|createStepFunction|runTurn` → **0**，`subagentDef.tools` 被忽略、worktree 内无人执行；③ **`classifyProviderFailure` 是死代码**（`provider.ts:240`，生产 0 引用、测试 6），活轨改用临时代码串匹配。
+
+**债务（三层口径逐层收紧）**：`cliOpaque` 129 → **CLI 不可达（非 harness）90 文件 / 21,247 行** → **真死（不可达 且 零生产导入者）35 文件 / 6,650 行**。**seam 校验**：90 个不可达文件的**非测试、非 harness** 导入者 → **0 条**。90 个文件构成 **36 个连通簇**（并集 == 全集），最大三簇 `planning/runtime/engine.ts`(33/9,283)、`context/acquisition/projection.ts`(28/7,756)、`edit/multifile/model.ts`(12/3,831)。**结构性死代码**：`core/workflow/` 的 6 个「管线」模块（508 行）零生产导入者，活轨 `/workflow` 走 `runner`+`dagResolver`+`parallelDispatcher`——而 log 2026-08-30 曾把它们记为「Delivered」，**与 phase-5 的「报告投影族」完全同型**；`tools/policy/interception.ts`（411 行）与整条工具结果投影链（`ToolReportSafeProjection`、`MVP_TOOL_ALLOWLIST` 含**已删除的** `git-status`/`git-diff`）零消费者。**⚠️ `plan.md` §2.1 明文「可达性只用于分析，不授权删除」，§9.18 T16a 已对其中一簇裁决「暂不删除」——本轮同样只登记不删除，处置需明示授权。**
+
+**子代理结论中被推翻/更正 3 项**：① S4「memory 未接入活轨」**错误**——`core/shell/sessionRuntime.ts:268` → `buildPromptWithFutureTurnInjections` → `memory/projectMemoryFutureTurnInjection.ts`，可达性 **REACHABLE**；② S4「`context/acquisition`/`context/graph` 100% 未接线」**部分错误**——前者 10 中 6 可达、后者 12 中 7 可达，未接线的是**子集**（4+5）；③ S1「retry 已完整接线」**成立但缺 jitter**（`retry.ts:127` 无 `Math.random`；pi `provider-retry.ts:66` 有 `* (1 - Math.random()*0.25)`）。**方法论教训**（与 `_index.md` §4.2 同源）：子代理的可达性结论必须用同一张图重算——两处错误都是「把**子集**说成**整个域**」。
+
+**验证纪律**：零源码改动（`git status` 仅新增该文档）；头条数字全部自写脚本重算；**6 项实机执行**（daemon 默认值与 cargo 缺失、cargo 存在时 daemon、`cheers.json` 不生效、刷新抹掉 compat、编辑唯一性、`--json` 事件流）。**未验证项如实记录**：Anthropic `thinking` 缺 `budget_tokens`、OpenAI 推理模型 temperature、OAuth 登录成功路径、SSE 事件头——均无账号或未独立复现。清理：子代理 wiki 工具在仓库根落下的 `omx_wiki/` 空壳（仅自述元数据、无内容价值，其真实发现在结构化返回中且已逐条核验）已删除。
+
+## [2026-09-26] research | 三语言架构裁决：TS + Rust + Python 是否值得保留（零代码改动）
+
+**产出**：`.wiki/features/09-language-architecture-verdict.md`（新建，`_index.md` §9 已同步）。回答维护者的直接提问——「三门语言写 agent 是否有价值，还是噱头？是否应全部转写 TS？」。
+
+**证据基础**：① 本机实测（`npx tsx` 直接调用生产函数 + 真实 CLI + `cargo build` 计时）；② 14 个参考仓的**主代理自测语言普查**（排除 vendor/test/node_modules）；③ TinyFish 网络研究（Claude Code 架构、Red Hat Python→Rust 论证、IEEE TSE 2024 多语言实证、Rust agent 沙箱）。
+
+**结论**：**TS 保留（它就是产品）；Python 删除；Rust 删除当前实现、保留方向。** 「三门语言」这个设想**本身不是噱头**（codex 1.54M 行 Rust、oh-my-pi napi 绑定是活证据），**但本项目的实现让两层都成了负数**——不是「还没长起来」，而是「已经长歪了」。
+
+**Rust 是负资产的七条实测证据**：
+1. **沙箱是字符串匹配**——`executor.rs:205-238` 判 `joined.contains("http://") || joined.contains("curl ")`；而 TS 侧 `sandbox/osSandbox.ts:237-256` 是**真的 `bwrap --ro-bind/--bind/--tmpfs/--unshare-net`**（本机 `bwrap` 已装）。**Rust 的隔离弱于 TS 已有的**。
+2. **静默丢失流式输出**——同一命令实测：Rust 路径 `onOutput callbacks: []`（零回调），TS 路径 `[[5,"1"],[307,"2"],[609,"3"]]`。`service.ts:150-163` 的 daemon 分支**没传 `onOutput`**，而 `daemon/client.ts:137-142` 的注释承诺「forwarded as it arrives」——**代码在说谎**。
+3. **延迟净增**——热路径 **60ms vs 4ms**；首次 **923ms vs 16ms**；冷编译 **15.1s**。
+4. **契约是测试专用**——`contracts/rust/mod.rs`（293 行）只被 `#[cfg(test)]` 引用（`executor.rs:287-290`）；`schema_version_is_valid` 唯一调用者是自己的测试。
+5. **跨层 `schemaVersion` 从未发送**——`WORKSPACE.md:170` 声称「MUST include」，`grep schemaVersion` 在 `daemon/*.ts` 与 `daemon.rs` 均为 **0**。
+6. **预编译二进制无人引用**——`target/release/daemon`（1.1MB）存在，`grep -rn 'target/release' daemon/` → **0**；代码永远走 `cargo run`。
+7. **默认值让产品开箱即坏**——`daemonEnabled: true` + 缺 cargo 不降级（`08-*` P0-A）。**这是 Rust 层净负价值的直接后果；删除执行面则 P0-A 自动消失**。
+
+**Python 是空的**：`packages/python-eval/` 全部内容是 `package.json` + `pyproject.toml` + **30 行冒烟测试**；`packages/python-eval/src` **不存在**，而 `package.json` 的 `check`/`lint` 指向 `mypy src`/`pylint src`；根 `test:python` 硬编码 `D:\conda-envs\coding_agents\python.exe`，本机实测 `sh: 1: D:conda-envscoding_agentspython.exe: not found` → **硬失败**；`contracts/python/types.py`（152 行）零引用；生产 Python LOC = **0**。
+
+**参考仓普查（14 仓，排除 vendor/test）**：**11/14 是纯单语言**（8 纯 TS、3 纯 Python）。两个多语言反例机制都与我们不同——**codex 是 Rust 主体**（1,540,578 行 Rust vs 9,221 行 TS，TS 只是 SDK 客户端）；**oh-my-pi 是 TS 主体 + Rust 进程内 napi 绑定**（`crates/pi-natives/src/` 50 个模块，10 个 TS 包依赖）。**我们是「TS 主体 + Rust 独立守护进程」——两边都不像**：没有 oh-my-pi 的零 IPC，也没有 codex 的 Rust 主体地位。
+
+**网络研究三条关键证据**：① **Claude Code = 1,884 个 TS 文件 / 512,664 行纯 TypeScript**，且**刻意把 Yoga 重写为纯 TS**，注释写明目标是「zero native dependencies, enabling single-binary deployment」，分发靠 **Bun `--compile`**——**即「要单二进制分发」不构成用 Rust 的理由**；② Red Hat 那篇「Python→Rust」的核心论点是 **Python 的 GIL**，**不是** Node；③ Rust 在 agent 领域**唯一被反复验证的硬价值是系统级沙箱**（seccomp-BPF / user namespaces / Seatbelt），不是「跑命令」。
+**方法论警告**：搜索结果中 `ossinsight.io` 一篇（声称 Q1 2026 有 7 个 Rust agent 仓、597 stars/day）数字形态可疑且无法从一手来源核实，**明确不采信**，仅记录该事实。
+
+**待裁决三点**：D1 Python 层删除还是另开独立评测仓（建议删除）；D2 Rust 执行面删除还是重写为 napi 沙箱绑定（建议**先删除**——它现在是负资产，重写需先有基准证明 TS 的 `bwrap` 不够）；D3 是否改用 Bun `--compile` 出单二进制（用**零新语言**解决 Rust 原本被引入的理由）。
+
+**验证纪律**：零源码改动；七条 Rust 证据与 Python 证据**全部实测**（含 `cargo build` 计时、`onOutput` 回调计数、`test:python` 实跑）；参考仓普查为自写脚本。**未验证项如实记录**：Rust 沙箱绕过用例（`[INFERENCE]`，未实构造）、Node 高并发 spawn 上限、Bun `--compile` 兼容性、codex/oh-my-pi 实跑。
+**子代理事故**：本轮派遣的 3 个 scout（R1/R2/R3）**全部 401 `无效的令牌`** 失败——是子代理模型凭据在会话中途失效，非任务问题（此前 5 个 scout 正常工作）。已改为**主代理直接完成全部工作**，未因此降低证据标准。
+
+## [2026-09-26] refactor | 删除 Python 层与 Rust 执行面（维护者裁决执行）
+
+**裁决**：维护者裁定「将 Python 和 Rust 都删除」，并追问「改用 Bun `--compile` 出单二进制有什么好处」。前置研究见 `.wiki/features/09-language-architecture-verdict.md`。
+
+**删除清单**（`git rm`，保留历史）：
+
+| 类别 | 内容 |
+|---|---|
+| 包 | `packages/rust-core/`（含 **603MB** `target/`）、`packages/python-eval/` |
+| TS 执行路径 | `packages/ts-shell/src/daemon/`（`client.ts`/`resident.ts`/`protocol.ts`/`types.ts` + 2 个测试） |
+| TS 测试 | `core/tools/registry-rust-bridge.test.ts`（**414 行**，全部断言 rust-daemon 元数据） |
+| 契约 | `contracts/rust/mod.rs`（293 行）、`contracts/python/types.py`（152 行） |
+| 脚本 | `run-rust-command.mjs`、`run-python-command.mjs`、`run-python-tests.py`、`verify-rust-execution.mjs`；`toolchain.mjs` 的 Python/Cargo/Rustup 检测 |
+| 配置 | `RuntimeConfig.daemonEnabled`、`RuntimeConfigFile.daemonEnabled`、`DEFAULT_CONFIG.daemonEnabled`、`process.env.DAEMON_ENABLED` 分支、`getExecutionPathLabel` 的双答案 |
+| 根 package.json | `workspaces` 去掉 `rust-core`；删 `build:rust`/`test:rust`/`test:python`/`verify:rust-execution`/`verify:rust-execution:env`/`verify:product:rust-execution`；`description` 改述 |
+
+**新增** `runtime/execution/local.ts`：原 `daemon/client.ts` 的本地实现（`collectStreamed` + `executeLocally`），去掉 daemon 相关部分。`processTree` 仍在 `core/shell/platform/`（零内部依赖，`runtime/` → `core/` 是合法方向）。
+
+**核心改动**：`runtime/execution/service.ts` 的 `if (isRustDaemonEnabled()) { … }` **整段删除**，`runCommand` 只剩一条路径。**副作用是修复而非等价替换**——`onOutput` 以前只传给 `executeLocally`，而 daemon 分支在它之前 `return`，所以**daemon 开启时实时输出永远到不了调用方**（前置研究实测 0 回调）。类型收窄：`ExecutionPath` 由 `'ts-local' | 'rust-daemon'` → `'ts-local'`；`CommandExecutionResult` 删掉 4 个 `daemon*` 字段；`NormalizedExecutionResult` 移入 `runtime/execution/types.ts`。
+
+**同步修改的脚本**：`bootstrap.mjs`（去掉 rust/python 目录与工具链快照）、`doctor.mjs`（只留 Node）、`validate-structure.mjs`、`test-all-stacks.mjs`（「Tri-Stack」→ 仅 TS）、`verify-doctor-environment.mjs`（去掉 cargo/rustc 检查与 2 条必需命令）、`verify-release-core.mjs`（去掉 rust env/hard 两步）、`triage-release-failure.mjs`（分类正则去掉 `cargo.*missing|rustc.*missing`）。
+
+**文档同步**：`AGENTS.md`（架构摘要改述为「单一运行时 TypeScript」+ 新增 reintroduction 约束）、`agent-rules/architecture-boundaries.md`（「Python Eval Layer」章 → 「Single Runtime」章）、`ARCHITECTURE.md`（边界摘要、系统图、Execution Plane Routing 章 → Execution Path、测试策略、Known Limitations）、`WORKSPACE.md`（整篇重写为单语言）、`PROJECT_GUIDE.md`（三层运行时模型 → 单一运行时模型；顺带修正一处既存不实引用：`verification/command/selection.ts` 不存在，实为 `plan.ts`）、`docs/product-architecture-reset/executionBoundary/README.md`、`.wiki/refactor/plan.md`（2 处历史条目补记该事实已失效）。
+
+**验证（全部实机，非推理）**：
+
+| 项 | 结果 |
+|---|---|
+| `npm run build`（tsc） | **0 错误** |
+| `npm run validate` | **PASS** |
+| `verify:docs-drift:strict` | **rules_dangling 0 / docs_dangling 0**（施工后一度报 3 处绑定规则 + 3 处当前态文档悬空，**已全部修复**） |
+| `verify:import-cycles` | **0 环** |
+| `check:config-consumers` / `check:declarations` / `check:node-floor` | 全 **pass** |
+| **P0-A 场景复测** | `HOME=/tmp/fresh2` + PATH 去掉 `~/.cargo/bin` + 无配置 → `daemonEnabled` 字段**已不存在**；bash 命令 **`completed` / exit 0 / `executionPath: ts-local`**（修复前：`success:false, "Cargo executable not available"`） |
+| **流式复测** | 同一命令 **`[[4,"1"],[308,"2"],[610,"3"]]`** 实时到达（修复前 daemon 路径 **0 回调**） |
+| 测试中残留的 `DAEMON_ENABLED`/`daemonEnabled` | 7 个测试文件 + 1 个 test-utils fixture 中的 **10 处**已清理（它们钉住的是已删除的字段） |
+| `tsconfig.json`（含测试）类型错误 | 466 → **465**（**全部为既存错误**：该配置不参与 `build`，逐文件对比确认我触碰的 7 个文件错误数**不变**） |
+
+**`08-*` 的 P0-A 因此自动消失**——没有 daemon 就没有 daemon 默认值。这正是前置研究 §6 预测的结果。
+
+**Bun `--compile` 的答复（D3）**：**有好处，且正好命中 Rust 被引入时的理由**——用户不需装 Node（单文件含 Bun 运行时）、启动更快内存更省（官方示例：大型 CLI 冷启动 1.0s→0.53s、启动内存 −40MB）、八个交叉编译目标、可嵌入资源。**代价**：产物 **224–280MB**（Claude Code 实测）、新增构建依赖、`tsconfig.json`/`package.json` 运行时加载默认关闭、动态入口需显式声明。**建议**：要对外分发则值得做（独立任务，第一步是验证 Bun 能否打包本仓代码）；只在本机用则收益低。**无论做不做，不要因为「要单二进制」重新引入 Rust**——该理由已被 Claude Code 的实践证伪。**未实测**：Bun 打包兼容性、产物实际体积、`--bytecode` 可用性。
+
+**全量套件**：见下一条记录（失败项需按既有纪律分类：`core/harness/browser*ScenarioExamples` 是**已知的负载敏感抖动**，log 中已有两条前例）。
+
+**全量套件结果**：**538 文件 / 3702 项 / 1 failed / 3700 passed / 1 skipped**。唯一失败项：
+`src/presentation/tui/surface/benchmark.test.ts > long-transcript budget > windows a large tool output without re-laying the whole history`。
+
+**分类为「既有负载抖动，非本轮引入」**，四条依据：
+① 该断言是**纯墙钟预算**（`benchmark.test.ts:141` `expect(elapsed).toBeLessThan(1000)`），
+在 538 文件并发下测量 CPU 计时，**不检查任何行为**；
+② **隔离复跑 3 次全部 7/7 通过**；
+③ **基线对照**：`git stash` 后在改动前的树上单独跑该文件同样 7/7 通过——但它在**全量并发下**的失败
+**早于本轮存在**，`log.md:556` 已逐字记录过它：「2 项失败为既有负载抖动：`cli-baseline.test.ts` 子进程、
+`presentation/tui/surface/benchmark.test.ts` **CPU 计时**，隔离复跑均通过」；
+④ 该测试**只 import `presentation/tui/*`**（`render/paint.js`、`transcript/blocks.js`、`transcript/container.js`、`surface/pane.js`），
+**零引用**本轮删除或修改的任何模块。
+
+**本轮触碰区域的聚焦验证**：`runtime/execution` + `config` + `core/shell` + `localCommandRuntime.test.ts`
+→ **31 文件 / 237 项全通过**。
+
+**首轮全量（施工前）曾报 4 项失败**（3 文件：`browserCacheMultiprocessScenarioExamples`、
+`browserCliExecution`/`browserNetworkEgress` 一类 harness 场景测试 + 上述 benchmark）——
+与 `log.md` 2026-09-17 与 2026-09-25 记录的**同型**（`core/harness/browser*ScenarioExamples` 含真实子进程
+spawn，对机器负载敏感）；本轮复跑后收敛为 1 项，进一步支持「负载抖动」而非回归。
+
+**收尾补记**：契约面也在本轮同步——`contracts/runtime-protocol.schema.json` 的 `ExecutionPath` 枚举由 `["ts-local","rust-daemon"]` 收窄为 `["ts-local"]`；`ExecutionAuthoritySource` 删掉 `daemon-sandbox`（生产唯一引用在 `runtime/execution/types.ts`，一并删除）；`contracts/typescript/types.ts` 与 `contracts/tests/fixtures/valid/execution.command.contract.json` 同步。**契约测试实跑**：`node contracts/tests/run-contract-tests.mjs` → 6 PASS / 6 REJECT（全部符合预期）。
+
+**最终规模**：**59 文件 / +486 −4674**（另 21 个文件被删除，含 603MB `target/` 未计入行数）。门禁全过；`test:scripts` 27/27；`build` 0 错；**实机端到端**：真实 CLI + 真实 bash 工具调用 + **PATH 无 cargo** → `END_TO_END_OK` / `Outcome: success`；`--doctor` 报 `Execution path: ts-local`。
+
+## [2026-09-26] research | 三语言续研：优化 Rust/Python 是否胜过纯 TS（零代码改动）
+
+**背景**：维护者追问——「不是直接删除，而是**优化**这两部分让它们变成有价值的资产，这条策略成立吗？还是就算优化，价值也不如直接用 TS 重写？」并要求继续研究。
+
+**先承认 §9 的论证缺口**：§9 证明的是「**现有 1,112 行是负资产**」（字符串匹配沙箱弱于 bwrap、丢流式、多 60ms、默认值让全新安装失败），**不是**「Rust 优化后仍不如 TS」。§9 里写了「需先有基准证明 `bwrap` 不够」，**但那一轮自己没做基准，也没量化时间花在哪里**。本轮补上。产出 `.wiki/features/10-optimize-vs-rewrite-research.md`。
+
+**实测热路径**（本仓 2,830 文件 / 28.9MB，`npx tsx` 直接调用生产函数）：
+
+| 路径 | 耗时 |
+|---|---|
+| **CLI 冷启动（`tsx`）** | **1,370–1,580 ms** ← 最大单项 |
+| **`grep` 罕见模式（`registerTool`）** | **1,294 ms** ← 真瓶颈 |
+| `grep` 宽模式（`function`） | 206 ms |
+| `glob '**/*.ts'` | 17 ms |
+| `fileWalk`（全仓 2,852 文件） | 14–17 ms |
+| AST 解析 300 个 TS 文件 | 163 ms（0.54ms/文件） |
+
+**对照 `ripgrep` 同查询**：`registerTool` **1,294ms vs 10–30ms = 43–130×**。根因不是语言：`core/tools/grep.ts:104-134` 是**逐文件串行 stat + readFile + 逐行正则**，无早退。**把同一算法改为有界并发 32（仍是 TS）**：**1,211ms → 454ms（2.7×）**。即：2.7× 是 TS 实现缺陷，剩下的 15–45× 来自 ripgrep 的成熟工程。
+
+**核心发现——三家参考实现没有一家自己写搜索算法**：
+
+| 参考 | 做法 | 证据 |
+|---|---|---|
+| **Claude Code** | **内嵌 ripgrep 二进制** | `utils/ripgrep.ts:47`「ripgrep is **statically compiled into** bun-internal」 |
+| **pi** | **`spawn(rgPath, args)`**，缺失时**自动下载 rg** | `tools/grep.ts:168`；`:121` |
+| **oh-my-pi** | Rust napi，**但链接的是 ripgrep 的库** | `crates/pi-natives/Cargo.toml`：`grep-searcher`/`grep-regex`/`grep-pcre2`/`grep-matcher`/`ignore`/`globset` |
+
+**oh-my-pi 那行是决定性的**：它的 Rust 价值是**「用 napi 把 ripgrep 的现成库链进进程」**，不是「用 Rust 写更快的搜索」——**Rust 在这里是原生库的粘合层**。AST 同理：Claude Code 用 **tree-sitter NAPI + 优雅降级**（`utils/bash/parser.ts:41` `tree-sitter: unavailable`），oh-my-pi 用 `tree-sitter` + `ast-grep-core`；**我们的 `ts.createSourceFile` 是官方编译器，精度更高，这一项不差**。
+
+**Bun `--compile` 实测（§9 列为未验证项，本轮跑了）**：
+```
+bun build …/cli.tsx --compile → bundle 750 modules / compile 464ms / 产物 106MB
+启动：tsx 1,370–1,580ms | bun run 270–850ms | Bun 编译产物 200ms
+实机：/tmp/cheers-test-bin --print "run echo BUN_BINARY_OK" → Outcome: success
+```
+**发现一个真实缺陷（仅记录未修）**：编译产物 `--version` 输出 **`version unknown`**。根因：`core/version/current.ts:26-35` 的 `manifestPath()` 从 `import.meta.url` 上溯 6 层找 `package.json`，而编译产物里它指向 Bun 虚拟 FS（`/$bunfs/...`）。**`--compile-autoload-package-json` 实测无效**。
+
+**直接回答（三层）**：
+① **Rust 优化技术上成立**，参考项目正是这么做的；
+② **但本项目的收益来自「接入既有工具」，不是「用 Rust 写代码」**——三家参考的 Rust/原生价值**全部是「把已存在的成熟实现接进来」**；
+③ **Rust 唯一 TS 拿不到的位置是系统级沙箱**（`seccomp`/namespaces 细粒度策略），**但零需求证据**——`bwrap` 能做的已做且工作正常（`sandbox/osSandbox.ts:237`）。
+
+**所以「优化 Rust」在本项目退化成二选一**：**A. `spawn(rg)`（纯 TS）** 与 **B. Rust + napi 链接 ripgrep** **拿到完全相同的速度**，而 A 的成本低一个数量级（一个子进程 vs 第二门语言 + napi 工具链 + 多平台产物 + 加载失败处理）。**这就是答案：不是「TS 写得更快」，而是「TS 可以直接调用那个更快的原生工具，不必自己成为它」。**
+
+**Python 连优化对象都不存在**：30 行冒烟测试、`src/` 不存在；评测需求**已被 TS 覆盖**（`src/eval/browser/` + `real-shape-coverage.mjs`/`broader-regression.mjs`/`comprehensive-regression.mjs`）；Python 的独占优势（numpy/pandas/torch/Jupyter）**本产品一项都不用**。若真要对标 `inspect_ai`，那是**独立项目**。
+
+**建议路线（先便宜后昂贵）**：① `grep` 改 **`spawn(rg)`**（纯 TS，**1,294ms → ~30ms，43×**），保留 TS 实现作回退；② 退路：加有界并发（2.7×）；③ Bun `--compile` 单二进制（**启动 7×**，用户免装 Node，需修 `--version`）；④ **条件性候选**：将来需 `seccomp` 级策略时再引 Rust/napi。**①+③ 合起来用零新语言拿到快 43× 的搜索 + 快 7× 的启动 + 免装 Node。**
+
+**未验证**：`spawn(rg)` 的完整改动面与端到端测量、`rg` 缺失时的回退行为、编译产物的交互式 TUI/Playwright/MCP 功能面、106MB 产物的分发接受度、大仓库（10×/100×）表现。**按维护者「暂时不用改动代码」的指示，本轮零代码改动**；顺带还原了跑契约测试时被改写的 `.sisyphus/evidence/task-1-valid-schema.txt`。
+
+## [2026-09-26] feat | 执行建议路线 1+3：grep 接入 ripgrep + Bun 单文件可执行
+
+**依据**：`10-optimize-vs-rewrite-research.md` §6 的建议路线。维护者裁定「执行 1+3」。
+
+### 第 1 项：`grep` 接入 ripgrep（保留 TS 回退）
+
+**新增** `core/tools/grepRipgrep.ts`：`rg --json --line-number --color=never --hidden` + 显式 `--glob '!{node_modules,.git,dist,.normproof}'`；解析 JSON 记录；`rg` 缺失时返回 `not-installed` 让调用方回退。
+
+**为什么是 `--json` 而不是 `path:line:text`**：后者**无法可靠切分**——文件名可含冒号，且 `rg` 在**单文件搜索时会省略文件名**，读方必须猜自己拿到的是哪种形状。JSON 记录自己说明是哪种。已写成测试钉住。
+
+**为什么加 `--hidden`**：`rg` 默认跳过隐藏目录，而**我们的 in-process walk 不跳**。不加这个标志，两条路径会搜索**不同的文件集**，回退时会静默换一个问题回答。实测差异：不加 → 2 处命中；加了 → 13 处（与 TS 路径一致）。**这个差异是实测发现的，不是推理的。**
+
+**`grep.ts` 的改动**：先走 `searchWithRipgrep`，`ok` 就返回；否则走原有的串行遍历。两条路径都经**同一个** `reportGrepMatches`（同样的措辞、截断、artifact 落盘）——否则「用了哪条路径」会泄漏到 transcript 里。
+
+**实测（同一查询、同一仓库）**：
+
+| 查询 | 修复前（串行 TS） | 现在（rg） | 回退（无 rg 时） |
+|---|---|---|---|
+| `registerTool` | **1,294 ms** | **53 ms**（24×） | 1,383 ms |
+| `function` | 206 ms | 57 ms | 197 ms |
+
+**回退路径返回完全相同的行数**（13 / 100），即回退是行为等价的降级而非功能缺失。回退的**耗时与修复前一致**（1,383 vs 1,294ms）——因为它就是修复前那段代码。
+
+**新增测试** `core/tools/grepRipgrep.test.ts`（12 项）：argv 形状（含 `--json`/`--hidden`/prune globs/`--` 分隔符/`.` 默认路径）、解析（正常记录、**含冒号的文件名**、limit、坏记录跳过、字段形状错误、空流）、格式化（路径:行:文本、长行走同一个 `truncateLineWidth`）。
+
+### 第 3 项：Bun 单文件可执行
+
+**新增** `scripts/build-cli-executable.mjs` + `npm run build:exe`。`--compile --minify`，**版本号与包名用 `--define` 在构建期注入**。
+
+**为什么必须注入**：编译产物里 `import.meta.url` 指向运行时虚拟 FS（`/$bunfs/...`），`manifestPath()` 的上溯找不到任何 `package.json` → `--version` 输出 `version unknown`。**这是实测的**：本轮第一次构建就是这个结果，`--compile-autoload-package-json` 实测**无效**。
+
+**`core/version/current.ts` 的改动**：`packageVersion()`/`packageName()` 在**读不到 manifest 时**才用构建期常量。**manifest 优先**——否则源码检出会报出过期的内置版本，正是该模块当初被写出来要避免的漂移。
+
+**实测**：
+
+| 项 | `tsx` | 编译产物 |
+|---|---|---|
+| 启动 | 1.91–1.97 s | **0.18 s**（≈10×） |
+| `--version` | `0.1.0` | **`0.1.0`**（修复前 `version unknown`） |
+| 需装 Node | 是 | **否** |
+| 产物 | — | **95 MB**（`--minify` 后；未 minify 是 106 MB） |
+
+**编译产物实机端到端**：`--print "run echo BUN_BINARY_OK"` → success；`--print "grep for registerTool …"` → **成功走 `rg` 路径**（模型正确报出 7 个文件、且指出源码内零命中），证明 `execFileSync` 在 Bun 编译环境下可用。
+
+**新增测试** `core/version/current.test.ts`（4 项）：钉住「manifest 优先于构建期常量」这一优先级——**编译期分支无法从测试进程内触发**（标识符被 bundler 替换，在测试运行器下就是未声明的），故测试覆盖的是让那条路径安全的**优先级**。
+
+**`dist/` 已在 `.gitignore`**（95MB 产物不入库）。
+
+### 验证
+
+| 项 | 结果 |
+|---|---|
+| `npm run build`（tsc） | **0 错误** |
+| 门禁 `verify:docs-drift:strict` / `verify:import-cycles` / `check:config-consumers` / `check:declarations` / `check:node-floor` | **全 pass** |
+| 聚焦测试（`core/tools` + `runtime/execution` + `core/version`） | **24 文件 / 179 项通过**；新增 2 个测试文件后 `core/tools`+`core/version` **16 项**通过 |
+| 全量套件 | **539 文件 / 3715 项 / 3 failed / 3711 passed / 1 skipped** |
+
+**3 项失败的分类（判定为既有负载抖动，非本轮引入）**：
+`cli-baseline.test.ts`（`streams output incrementally without blocking`、`pipe-spawn interactive slash command smoke …`）
+与 `browserCacheMultiprocessScenarioExamples.test.ts`（`runs concurrent real CLI execute writes …`）。
+四条依据：
+① **隔离复跑全绿**——`cli-baseline.test.ts` **40/40 连跑两次**；`browserCacheMultiprocess` **6/6**；
+② **两个文件都不引用本轮改动的模块**（`grep -c 'grepRipgrep\|tools/grep\|core/version\|build-cli-executable'` → **0**）；
+③ **启动时间 A/B 实测无回归**——把 `grep.ts`/`current.ts` 还原成基线后测 5 次得 **1.91–1.96 s**，改动后 **1.92–1.97 s**（`cli-baseline` 的 streaming 用例断言的是 7 秒内出现 CLI 横幅，即启动时序）；
+④ **`log.md` 已逐字记录过这两项是负载敏感**：`:556`（benchmark CPU 计时）、`:3095`（`browserCacheMultiprocess` 隔离 6/6 通过）、`:3210`/`:3352`（`cli-baseline` 子进程）。
+
+## [2026-09-26] review | 复核轮：Rust/Python 删除 + TS 重写（3 个子代理，另 2 个崩溃后重派）
+
+**范围**：当前工作区全部 69 项改动（删除两个语言运行时、重写其行为、新增 ripgrep 与单文件可执行）。
+**方式**：3 个 review 子代理按互不重叠的切片并行（执行面 / 非 TS 表面 / 新功能面），标准为 `~/projects/` 下顶尖项目的对应决策。
+**结果**：`RevSurfaces` 与 `RevExecCutover` 在**序列化报告时崩溃**（`JSON Parse error` / `http2 connection force closed`），`RevNewFeatures` 同样在收尾时崩溃——三者的**探索过程**都留在 transcript 里并被逐条复核。已按「失败即重派」补派 `RevSurfaces2`（完成）与 `RevExec2`（完成）。
+
+### 修复清单
+
+| # | 级别 | 问题 | 证据 |
+|---|---|---|---|
+| 1 | **P0** | **CI 必然失败**：`.github/workflows/ci.yml:75-78` 仍执行 `npm run build:rust` + `cargo build --manifest-path packages/rust-core/Cargo.toml`，两者都已删除 | 步骤已删；`build:rust` 在 `package.json` 中不存在 |
+| 2 | **P0** | **`.cheers.example.json:3` 仍设 `"daemonEnabled": true`**——该字段已从配置中移除，照抄示例的用户会静默拿到一个无效配置 | 已删该字段 |
+| 3 | **P1** | **`runCommand` 不转发 `abortSignal`**——Ctrl+C 无法取消正在运行的命令 | 实测：`sleep 5` 在 400ms 时 abort，仍跑满 **5012ms** 并报 `completed`；修复后 **404ms**、报 `cancelled` |
+| 4 | **P1** | **`current.ts` 抛 `ReferenceError`**：`buildTimeConstant(__CHEERS_BUILD_VERSION__)` 把未声明的标识符**当参数求值**，`typeof` 守卫只保护**直接操作数**。manifest 不可达时 `packageVersion()` 崩溃而非返回 `undefined` | 独立复现：`ReferenceError: __CHEERS_BUILD_VERSION__ is not defined` at `current.ts:89` |
+| 5 | **P1** | **工作区逃逸**：`path="foo/../../outside"` 使 grep **读到工作区之外**的文件（前导分隔符剥离正则管不到中段 `../`） | 实测 `foo/../../outside/secret.txt:1: SECRET_NEEDLE outside`，`success:true`。**回退路径反而拒绝了它**——快速路径比回退更不安全，方向错了 |
+| 6 | **P1** | **外部信号被误报为 timeout**：`execError.signal === 'SIGTERM'` 把运维发的 SIGTERM 报成「命令超时」 | 实测：外部 SIGTERM → `timeout`；改为只认自己置的 `timedOut` 标记 → `failed` |
+| 7 | **P1** | **glob 大小写分歧**：walk 用 `nocase: true`，`rg --glob` 默认区分大小写，同一过滤器两条路径返回不同文件集 | 实测 `glob="*.ts"`：rg 只中 `other.ts`，walk 中 `File.TS`+`other.ts`；加 `--glob-case-insensitive` 后一致 |
+| 8 | P1 | `contracts/package.json` 的 `description`/`files` 仍列出已删除的 `rust`/`python` 目录（发布清单指向不存在的目录） | 已收敛为 `typescript` |
+| 9 | P2 | `runtime-protocol.schema.json:3` 的 `$id` 是**别的项目的域名**（`claudecode.dev`），且全仓 0 处引用 | 改为本项目域名；AGENTS.md 明令禁止外部项目名 |
+| 10 | P2 | 同文件 `:5` description 写「TypeScript ↔ Rust ↔ Python runtime boundaries」，与 `:37-43` 的 `RuntimeOrigin` 注释自相矛盾 | 已改 |
+| 11 | P2 | `RuntimeOrigin` 仍枚举 `rust`/`python`，但**无任何生产者能发出这两个值** | 按 `ExecutionPath` 收窄的同一先例收敛为 `typescript`/`user`/`system`/`external`；0 处持久化数据使用它们 |
+| 12 | P2 | `.gitignore` 残留 `packages/rust-core/target/`、`packages/python-eval/.pytest_cache/`、`.ruff_cache/`、`.pytest_cache/` | 已删；`__pycache__`/`*.py[cod]` 保留（`scripts/analyze-boundaries.py` 仍在） |
+| 13 | P2 | `.gitignore:44` 注释说 `undefined/` 是 rustup 配置，实际内容是 `.cheers/` 会话状态 | 已改为如实描述 |
+| 14 | P2 | `agent-rules/architecture-boundaries.md:25` 称「Rust daemon path available where the code opts into it」——已无此路径 | 已改 |
+| 15 | P2 | 同文件 `:38-51`「Rust Native Executor Candidate」把 daemon/单文件分发列为 Rust 职责，而单文件分发**已被 Bun `--compile` 在 TS 内解决** | 重写为「Native Executor Candidate」，逐条标注现任归属 |
+| 16 | P2 | `agent-rules/README.md:11` 仍称该文件覆盖「Rust, Python eval」 | 已改 |
+| 17 | P2 | `ARCHITECTURE.md:292` 把「Daemon crash → 自动 TS 回退」列为已处理错误类——daemon 已不存在 | 改为真实存在的 `command_unavailable`（实测 spawn 失败即此分类） |
+| 18 | P2 | `PROJECT_GUIDE.md` 模块树含已删除的 `orchestration/targetSetEditRoute.ts`、`edit/patch/gauntlet/astGauntlet.ts`；provider 适配器已迁至 `provider/endpoints/` | 按实际目录重写整棵树；用脚本逐项校验 83 个条目**全部存在** |
+| 19 | P2 | `PROJECT_GUIDE.md` 头部与 §4 测试数字互相矛盾（38/245 vs 28/208），实测为 **540 个测试文件** | 改为实测值；分支名 `normproof-observation` → `main` |
+| 20 | P2 | `PROJECT_GUIDE.md:57` 列出多个**外部项目名**，违反 AGENTS.md 命名禁令 | 已删该列举 |
+
+| 21 | **P1** | **文件大小上限分歧**：walk 跳过 >10MB 的文件，`rg` 默认照搜——同一查询两条路径返回**不同文件集** | 实测 11MB 文件：rg 命中、walk 跳过；加 `--max-filesize` 后两条路径输出**完全一致** |
+| 22 | P1 | `package-lock.json` 仍声明 `packages/rust-core` 为 workspace 成员（`npm ci` 会尝试解析已删除的目录） | `npm install --package-lock-only` 重新生成，0 处引用 |
+| 23 | P1 | `OWNERSHIP.md` 有整个 `rust-core: Execution Daemon` 与 `python-eval: Research & Analysis` 章节，以及「TS 不得导入 Rust」等**已无意义的禁令** | 重写为单运行时所有权文档 |
+| 24 | P2 | `INSTALL.md:33` 在「Supported keys」中仍列 `daemonEnabled` | 已删 |
+
+**一致性收口**：`MAX_SEARCHED_FILE_BYTES` 从 `grepRipgrep.ts` 导出，`grep.ts` 的 walk 复用同一常量——原先两处各写一个字面量 `10 * 1024 * 1024`，正是它们会漂移的原因。
+
+### 复核中被**证伪**的发现（记录以免再被重提）
+
+- **「信号判断匹配任意信号名」**：子代理称 `execError.signal === 'SIGTERM'` 会匹配任何信号。`===` 是严格相等，**实测外部 SIGKILL → `failed`**，不成立。但按同一线索实测发现**外部 SIGTERM 确被报成 timeout**（上表 #6），故该线索有真实但更窄的缺陷。
+- **「`onOutput` 在旧 daemon 路径被静默丢弃」**：子代理未推翻，但**旧 daemon 分支确实传了 `abortSignal`，本地分支没传**——这才是 #3 的根因：daemon 删除后，原先只在「无 cargo 时才走到」的缺陷变成了**唯一路径**。
+
+### 复核确认**无问题**的部分
+
+Promise 结算（`finish()` 幂等、无双重 settle）、cancel/timeout 优先级、stdout/stderr 交错顺序、`env` 传递（替换语义，调用方按此使用）、`collectStreamed` 从 `daemon/client.ts` 的搬迁为逐行忠实复制、`daemonEnabled` 在接口/默认值/解析/返回值中全部清除（0 引用）、`ExecutionPath` 所有消费方已更新、启动面四处一致报 `ts-local`、10 个 scripts 全部仍具实际功能且不引用已删路径、根 `package.json` 106 个脚本目标全部可解析。
+
+### 已知但**本轮未改**（如实记录，非本改动引入）
+
+**命令输出无上限累积**：`local.ts:77,82` 的 `stdout += text` 不设上限，`registry.ts:169` 的 `truncateTail` 只在**全部累积之后**才裁剪。实测 200MB 输出 → **堆增长 399MB**、完整保留 200MB 字符串。可达（`yes` 在 60 秒默认超时内足以 OOM）。**性质**：该代码与已删除的 `daemon/client.ts` 逐字相同，**本改动未使其变差**，属既有问题。对照 `pi` 的 `output-accumulator.ts`：滚动缓冲 + 超限转写临时文件（`maxRollingBytes`），是正确做法。**未在本轮仓促重构**——它需要改动输出所有权与 artifact 契约，值得独立一轮。
+
+### 验证
+
+| 项 | 结果 |
+|---|---|
+| `npm run build`（tsc） | **0 错误** |
+| 六道门禁（`verify:docs-drift:strict`/`verify:import-cycles`/`check:config-consumers`/`check:declarations`/`check:node-floor`/`validate`） | **全 pass** |
+| `npm run test:scripts` | **27/27 pass** |
+| 契约测试 | **7 PASS / 6 REJECT**（与改动前一致） |
+| 聚焦测试（`core/tools` + `core/version` + `runtime/execution`） | **25 文件 / 190 项通过** |
+| 编译产物 | `--version` → `0.1.0`；`--print` 真实 bash 调用成功；grep 走 rg 路径成功 |
+
+**新增回归测试（每项都验证过「去掉修复即失败」）**：
+`service.test.ts` abort 传播（去掉转发 → 失败）、`service.test.ts` 外部信号分类（改回旧判断 → 失败）、`service.test.ts` 真实超时分类、`grepRipgrep.test.ts` 工作区 containment（禁用检查 → 失败）、`grepRipgrep.test.ts` glob 大小写标志、`grepRipgrep.test.ts` 文件大小上限标志、`current.test.ts` manifest 优先于构建期常量。
+
+### 两条路径的最终等价性（实测）
+
+| 查询 | rg | walk | 行数一致 |
+|---|---|---|---|
+| `registerTool` | **52 ms** | 1,398 ms | ✅ 18 / 18 |
+| `function` | **58 ms** | 199 ms | ✅ 100 / 100 |
+| `ripgrepArgs` + `glob=*.ts` | **16 ms** | 740 ms | ✅ 12 / 12 |
+
+### 全量套件
+
+**540 文件 / 3726 项 / 3 failed / 3722 passed / 1 skipped**。
+3 项失败**全部**在 `src/cli-baseline.test.ts`（`streams output incrementally without blocking`、`pipe-spawn interactive slash command smoke …`、`persists session metadata to local filesystem`）——
+**隔离运行 40/40 全绿**，且该文件对 `grepRipgrep|tools/grep|core/version|execution/local|build-cli-executable` 的引用数为 **0**。
+`log.md:556`、`:3210`、`:3352` 已逐字记录该文件是负载敏感的子进程用例（`cli-baseline` 的 streaming 用例断言的是 7 秒内出现 CLI 横幅，即启动时序，而启动时间 A/B 已实测无回归）。
+
+## [2026-09-26] docs | 合并 features 08/09/10 为单一文档
+
+**维护者指示**：「先将 09 和 10 都合并了，将里面的 feature 融合到 08 中」。
+
+**理由**：三份文档是同一条研究线的三个阶段（差距/债务盘点 → 语言裁决 → 热路径续研），
+交叉引用密集，分开阅读需要在三份之间往返。合并后单一入口。
+
+**做法**：程序化重排编号，**内容零删减**：
+- 原 08 的 §0（范围与执行方式）/ §1（三项 P0）保持原位；
+- 原 09 整体成为 **§2「三语言架构裁决」**（含其 §8 的施工结果 → §2.6）；
+- 原 10 整体成为 **§3「热路径实测与优化裁决」**（含其 §7 施工结果 → §3.7）；
+- 原 08 的 §2–§7 顺延为 §4–§9；
+- 三份的「未验证项」合并为 **§7**。
+
+**验证**：关键发现逐项抽查仍在（`P0-A`/`P0-B`/`P0-C`、`1,540,578` 行 Rust 普查、
+`daemonEnabled`、`CHARS_PER_TOKEN`、ripgrep 基准、Bun 编译数据全部在位）。
+交叉引用全部改指合并后的 §2/§3，**0 处悬空**。
+`_index.md` 的 §9/§10 折入 §8 成为 §8.6 / §8.7，索引尾部不再有独立章节。
+
+**`log.md` 中的历史条目不改**——它们是当时的记录，改掉等于篡改历史；
+本次合并本身在本文记录。

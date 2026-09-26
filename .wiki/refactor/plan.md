@@ -851,7 +851,7 @@ or decision history"。**它们是标注错误，不是内容过期。**
 |---|---|
 | `docs/` 分类归档（route 时代约 700 份） | ✅ **已完成**（阶段 B2，`2b262fe7`）：**0/775 文档未分类**（原 677 篇无状态行）；新建 5 个着陆页；`product_architecture_reset_routes` 挂 `historical` banner。**零文件搬迁** |
 | 把 DOCS 作用域以 `--strict` 纳入门禁 | ✅ **已完成**：DOCS 224 → **0**，`verify:docs-drift:strict` 已接入 `verify-release-core` |
-| `AGENTS.md`：execution 措辞 + 补顶层域 | ✅ **已完成**（阶段 A4 / R3）：`file-placement-and-naming.md` 的 Owner Domains 补全为 **26/26 顶层域**；`AGENTS.md` execution 措辞点名真实所有者并补 `packages/rust-core/` 事实 |
+| `AGENTS.md`：execution 措辞 + 补顶层域 | ✅ **已完成**（阶段 A4 / R3）：`file-placement-and-naming.md` 的 Owner Domains 补全为 **26/26 顶层域**；`AGENTS.md` execution 措辞点名真实所有者并补 Rust 守护进程事实（**该事实已于 2026-09-26 失效**：Rust 守护进程与 Python 层均已删除，见 `.wiki/features/08-gap-and-debt-research.md` §2） |
 | 收紧 `tsconfig.build.json` 的 `exclude`（同 §3.8 发现 1） | ✅ **已完成**（阶段 A4 / R2）：已加 `src/test-utils/**` 与 `src/**/__tests__/**` |
 
 **结论：§3.8 与 §3.9 的全部产出均已收敛**——6 项架构发现（§3.8）+ 4 项漂移待裁决（§3.9.6）
@@ -1344,7 +1344,7 @@ B（R4/R5/R6/R7）、C（R8/R9/R10/R11）完成。
 | A1 | **R1 `strict` S1** —— `runtime/events/projection.ts` | ✅ **已完成**（`ffcf63bf` + 复核修正）：73 错全部清零，生产 strict 错误 **136 → 63**；零 `!` 或 `as`。**复核发现原提交归因错误**：根因是 16 个 `*Like` 镜像接口比真实生产者类型更窄，不是"循环体缺守卫"。已回退防御式改动，改为对齐 15 个镜像到真实类型并删除死接口（保留 1 个真实断环镜像）。**A2/A3 适用同一教训：先对齐类型，再考虑防御** |
 | A2 | R1 S2 —— 三个 boundary/lifecycle 文件（26 错） | ✅ **已完成**：26 个生产错全部清零（生产 strict **63 → 37**）。**三个文件形态各不相同**，逐个定因而非套用 A1 模板：① `provider/request/boundary.ts`：3 个镜像无环风险 → 对齐真实类型并删除（8 错）；② `verification/result/boundary.ts`：`RepairApplyObservationLike` **是真断环**（`repair/handoff/boundary.ts` 可达它），不能导入真实类型 → 只修正 13 个字段的可选性使其忠于生产者（10 错）；③ `core/tools/toolResultLifecycle.ts`：`LifecycleEventLike` 的**兜底成员**（`type: string` + 全字段可选）破坏 `switch` 收窄 → 对齐真实生产者 `QueryEvent` 并删除兜底成员（8 错） |
 | A3 | R1 S3 —— 其余 ~13 文件（37 错） | ✅ **已完成**：37 处生产 strict 错误全部清零（散在 **24 个文件**，最大单文件 6 处——与 S1/S2 的"单文件集中"形态完全不同，故逐文件定因）。`tsconfig.build.json` 已加 `"strict": true`，`npm run build` **0 错误**。详见 log 的 `strict-s3` 条目 |
-| A4 | **R2 + R3** | ✅ **R2 已完成**：`tsconfig.build.json` 的 `exclude` 增加 `src/test-utils/**` 与 `src/**/__tests__/**`，`dist` **961 → 954**，差集**恰为那 7 个测试支撑文件**（逐一验证非测试 importer 为零）；`longSessionDurabilityProcess.ts` 由 `tsx` 从 `src/` 启动故排除安全。✅ **R3 已完成**：`file-placement-and-naming.md` 的 Owner Domains 补全为 **26/26 顶层域**（实测 15 个原不在名单）；`AGENTS.md` execution 措辞点名真实所有者并补 `packages/rust-core/` 事实。**均经 `verify:docs-drift:strict` 验证** |
+| A4 | **R2 + R3** | ✅ **R2 已完成**：`tsconfig.build.json` 的 `exclude` 增加 `src/test-utils/**` 与 `src/**/__tests__/**`，`dist` **961 → 954**，差集**恰为那 7 个测试支撑文件**（逐一验证非测试 importer 为零）；`longSessionDurabilityProcess.ts` 由 `tsx` 从 `src/` 启动故排除安全。✅ **R3 已完成**：`file-placement-and-naming.md` 的 Owner Domains 补全为 **26/26 顶层域**（实测 15 个原不在名单）；`AGENTS.md` execution 措辞点名真实所有者并补 Rust 守护进程事实（**该事实已于 2026-09-26 失效**——Rust 与 Python 层已删除，`AGENTS.md` 现述「单一运行时 TypeScript」，见 `.wiki/features/08-gap-and-debt-research.md` §2）。**均经 `verify:docs-drift:strict` 验证** |
 | A5 | R12 | ✅ **已完成，结论与预设不同**：`check:ts-imports` **反向**（它禁止 `.js` 后缀，而本仓规则**要求** `.js`，实测 4918 处）→ 不可借鉴；`check:entry-graphs` **不适用**（它按已发布包的 `exports` map 设预算，而本仓无 `exports`，根因即 3.10.2 ①）；`check:runtime-deps` **适用且当场查出真实缺陷**——`typescript` 被**生产代码**（`postMutationLspGuard.ts`，CLI 静态可达）导入却只在 `devDependencies`，`--omit=dev` 安装会使 CLI 启动失败 → 已移入 `dependencies`，`package-lock.json` 仅一行移动 |
 
 **为什么 `strict` 排在最前**：它是三轮探索中**唯一不依赖我们任何自定规则、且被外部项目实践支持**的项；

@@ -1,10 +1,10 @@
 # Cheers 项目全景指南 (Project Overview & Architecture Guide)
 
-> **版本**：v0.5.0 (SOTA 全栈工业级智能体架构 - 跨会话通信、大输出溢出、9 阶弹性源码编辑、持久化会话与网络弹性)  
-> **当前 Git 分支**：`normproof-observation`  
-> **更新时间**：2026-08-31  
-> **测试状态**：38 个测试套件，245/245 项单测 100% 绿色通过 (PASS)  
-> **形式化架构**：NormProof SATISFIED (0 阻断项，严格单向无环架构)
+> **版本**：v0.6.0 (SOTA 全栈工业级智能体架构 - 跨会话通信、大输出溢出、多阶段弹性源码编辑、持久化会话与网络弹性)  
+> **当前 Git 分支**：`main`  
+> **更新时间**：2026-09-26  
+> **测试状态**：540 个测试文件，全量 `npm run test:ts` 通过  
+> **形式化架构**：NormProof judge 运行（无环依赖为阻断项，函数数上限为咨询项）
 
 ---
 
@@ -20,9 +20,15 @@
 
 ## 一、 项目定位与核心架构
 
-`cheers` 是一个企业级多层自主编码智能体（Autonomous Coding Agent）开发框架，旨在为开发者提供具备**编译器级真实 AST 前检、原生四层记忆（QuadMemory）、智能体软件工程工作流（Agentic SDLC）、跨平台终端自适应、原生多模型协议分流（OpenAI / Anthropic Messages API）、14 重反检测浏览器与细粒度权限控制**的新一代终端编码助手。
+`cheers` 是一个企业级自主编码智能体（Autonomous Coding Agent）开发框架，旨在为开发者提供具备**编译器级真实 AST 前检、原生四层记忆（QuadMemory）、智能体软件工程工作流（Agentic SDLC）、跨平台终端自适应、原生多模型协议分流（OpenAI / Anthropic Messages API）、14 重反检测浏览器与细粒度权限控制**的新一代终端编码助手。
 
-### 三层运行时模型 (Three-Layer Runtime)
+### 单一运行时模型 (Single Runtime)
+
+产品是**单一语言**：TypeScript。控制平面与执行平面同属 `packages/ts-shell/`。
+Rust 执行守护进程与 Python 评测层已于 2026-09-26 删除——实测显示两者都没有提供
+TypeScript 路径尚未做得更好的能力（守护进程无法流式输出、多一次 IPC 往返与 `cargo run`
+启动、其「沙箱」是弱于既有 `bwrap` 的字符串匹配；Python 层则完全没有生产代码）。
+依据见 `.wiki/features/08-gap-and-debt-research.md` §2。
 
 ```mermaid
 graph TD
@@ -39,12 +45,8 @@ graph TD
     AgentSession --> HookEngine[Enterprise 6-Phase Hook 调度与收据账本]
   end
 
-  subgraph "2. Rust 底层执行器 (packages/rust-core)"
-    DaemonClient[Daemon IPC 客户端] <--> RustDaemon[Rust 常驻守护进程 / 沙箱环境隔离]
-  end
-
-  subgraph "3. 离线评测套件 (benchmarks/python-eval)"
-    EvalSuite[SWE-bench / Trajectory 离线自动化评测]
+  subgraph "2. 执行与隔离平面 (runtime/execution + sandbox)"
+    LocalExec[local.ts 进程组派生 / 实时流式输出] --> OSConfine[bwrap / sandbox-exec 真实内核隔离]
   end
 ```
 
@@ -52,7 +54,9 @@ graph TD
 
 ## 二、 SOTA 架构演进与 7 阶段去伪存真全景
 
-项目深度解构并吸纳了开源标杆（**Pi, OpenCode, GitNexus, Claude Code, Codex, DeepSeek-Harness, MemPalace, Mem0**）的设计哲学，历经 **7 个阶段（Phases A ~ G）的系统性攻坚**，彻底清退了 26 项 Demo 级假数据与假算法：
+项目深度解构并吸纳了开源标杆的设计哲学，历经 **7 个阶段（Phases A ~ G）的系统性攻坚**，彻底清退了 26 项 Demo 级假数据与假算法。
+
+> **注**：下图为**历史记录**——它记录每个阶段当时交付了什么。其中若干模块在后续重构中已被删除或搬迁（例如 `targetSetEditRoute` 已由 `edit/multifile/` 的模型与结算取代，`astGauntlet` 已删除）。当前目录结构以第五节为准。
 
 ```mermaid
 timeline
@@ -109,7 +113,7 @@ npm run build:ts
 ```bash
 npm test
 ```
-全量执行 28 个测试套件，验证 208 项单测，保证 100% 绿色通过。
+全量执行 `packages/ts-shell/src` 下的测试文件（当前 540 个），保证 100% 绿色通过。
 
 ### 3. 执行 NormProof 形式化架构判定
 ```bash
@@ -129,7 +133,7 @@ node dist/cli.js
 ```text
 packages/ts-shell/src/
 ├── turn/                         # 产品级会话门面：驱动内核、持久化、压缩、转向/跟进输入
-│   ├── session.ts / step.ts / tools.ts / prompt.ts / projection.ts / completion.ts
+│   └── step.ts / tools.ts / prompt.ts / projection.ts / completion.ts
 ├── core/
 │   ├── commands/                 # Slash 现代化命令运行时
 │   │   ├── costCommandRuntime.ts    # /cost 真实 completions.usage 计费
@@ -139,28 +143,29 @@ packages/ts-shell/src/
 │   │   ├── pluginCommandRuntime.ts  # /plugin 磁盘持久化 (~/.cheers/plugins.json)
 │   │   └── brainstormCommandRuntime.ts # /brainstorm 异步大模型 ADR 推导
 │   ├── agent/                    # 通用执行内核（步进循环、双待办队列、工具批次、终态屏障）
-│   │   ├── loop.ts / agent.ts / queue.ts / tools.ts / state.ts / events.ts
-│   ├── query/doomLoopDetector.ts # 50 项滑动窗口与规范化参数哈希死循环熔断
+│   │   └── loop.ts / agent.ts / queue.ts / tools.ts / state.ts / events.ts / retry.ts
+│   ├── query/                    # 查询循环
+│   │   └── doomLoopDetector.ts      # 50 项滑动窗口与规范化参数哈希死循环熔断
 │   ├── memory/                   # Native QuadMemory 四层原生记忆
-│   │   ├── types.ts / memoryStore.ts/ factArbiter.ts / memoryTools.ts
+│   │   └── types.ts / memoryStore.ts / factArbiter.ts / memoryTools.ts
 │   ├── tools/                    # 生产级真实工具库
 │   │   ├── lsp.ts                   # 真实 AST 符号签名与悬停信息提取
 │   │   ├── taskTool.ts              # 真实子代理独立 API 派发
+│   │   ├── grep.ts                  # 优先调用 ripgrep，缺失时回退进程内遍历
 │   │   └── webSearch.ts / webFetch.ts # 带有缺失 Key 显式报错的真实网络检索
 │   └── shell/approval/           # 细粒度权限安全引擎
 │       ├── store.ts                 # 全指令签名哈希 (Exact Command Scoping)
 │       └── evaluator.ts             # 严格只读白名单 (剔除危险写工具)
-├── model-adapters/               # 多 Provider 原生协议适配器
-│   ├── providers/openai/            # OpenAIModelAdapter (/chat/completions)
-│   ├── providers/anthropic/         # AnthropicModelAdapter (/v1/messages)
-│   └── registry.ts                  # Provider 协议精准分流注册表
-├── edit/patch/gauntlet/          # 编译器级 AST 语法守护
-│   └── astGauntlet.ts               # ts.createSourceFile + parseDiagnostics 真实诊断
-├── verification/command/         # 智能工程清单驱动测试选择器
-│   └── selection.ts                 # 基于 package.json / Cargo.toml 动态选择测试
+├── provider/                     # Provider 协议适配
+│   ├── endpoints/                   # anthropicMessages.ts / openaiCompatible.ts / kinds.ts
+│   └── registry/provider.ts         # 协议分流注册表
+├── edit/                         # 源码编辑
+│   ├── multifile/model.ts           # 多目标原子写入的模型与结算
+│   └── result/perFilePatchResultProjection.ts # 逐文件补丁结果投影
 ├── context/graph/                # 真实 AST 语法树代码图谱与调用分析
-│   ├── ast/parser.ts                # ts.forEachChild AST Visitor 符号提取
-│   └── callGraph.ts                 # ts.isCallExpression / NewExpression 真实调用图
+│   └── ast/parser.ts                # ts.forEachChild AST Visitor 符号提取
+├── verification/command/         # 智能工程清单驱动测试选择器
+│   └── plan.ts                      # 基于命令清单分类测试/构建意图
 ├── presentation/tui/             # 备用屏差分终端引擎
 │   ├── text/                        # width(UAX#11) / ansi / measure / layout / sgr / motion
 │   ├── render/                      # frame / paint / engine（差分绘制与退出转写）
@@ -170,14 +175,12 @@ packages/ts-shell/src/
 │   ├── surface/                     # contract / view / pane / scroll（唯一交互表面）
 │   ├── editor.ts                    # 簇级光标 + 软换行 + kill-ring 多行编辑器
 │   └── terminal.ts                  # 终端驱动（模式恢复电池 / 输出积压计量）
-├── cli/interactive/              # 交互会话宿主
-│   ├── interactiveLoop.ts           # 按终端能力选择全屏宿主或行式循环
-│   ├── interactiveMode.ts           # 全屏宿主：持有 ViewState 与唯一表面，路由输入与回合
-│   ├── keymap.ts                     # 按键路由与拦截层级
-│   ├── turnSink.ts                   # 回合输出路由（事件 + 散文双通道去重）
-│   └── questionBridge.ts             # readline 替身，授权问答走宿主提示符
-└── orchestration/                # 生产级事务编排
-    └── targetSetEditRoute.ts        # 多文件原子写入与失败 100% 自动回滚
+└── cli/interactive/              # 交互会话宿主
+    ├── interactiveLoop.ts           # 按终端能力选择全屏宿主或行式循环
+    ├── interactiveMode.ts           # 全屏宿主：持有 ViewState 与唯一表面，路由输入与回合
+    ├── keymap.ts                     # 按键路由与拦截层级
+    ├── turnSink.ts                   # 回合输出路由（事件 + 散文双通道去重）
+    └── questionBridge.ts             # readline 替身，授权问答走宿主提示符
 ```
 
 ---

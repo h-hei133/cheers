@@ -30,7 +30,6 @@ npm start
 Supported keys:
 
 - `provider`
-- `daemonEnabled`
 - `maxTurns`
 - `providerCredentials`
 

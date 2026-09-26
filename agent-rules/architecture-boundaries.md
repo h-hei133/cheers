@@ -22,7 +22,7 @@ Keep product runtime and control-plane semantics in TypeScript.
 
 ## Execution Boundary
 
-Execution is an explicit boundary/interface. In the current codebase it is implemented mostly in TypeScript, with a Rust daemon path available only where the active code path opts into it.
+Execution is an explicit boundary/interface, implemented in TypeScript. `runtime/execution/service.ts` is the only implementation: it projects a result, and `runtime/execution/local.ts` spawns the process and streams its output. There is no second execution plane and no configuration that selects one.
 
 The TypeScript execution boundary should own runtime-neutral request/result/event shapes for:
 
@@ -35,20 +35,19 @@ The TypeScript execution boundary should own runtime-neutral request/result/even
 
 New direct external side effects must go through the current owner module or a documented execution/file/workspace boundary. Do not scatter `child_process`, writable `fs`, shell/PTY, browser process, MCP process, or runtime network side effects into unrelated product modules.
 
-## Rust Native Executor Candidate
+## Native Executor Candidate
 
-Rust is a future native executor candidate for responsibilities that need:
+A native module is a candidate only for responsibilities TypeScript cannot reach at all — system-level isolation (`seccomp`, namespaces, Seatbelt), where the kernel interface has no TypeScript binding. It is not a candidate for anything already reachable:
 
-- daemon behavior
-- OS/process guarantees
-- timeout, cancellation, and process tree cleanup reliability
-- sandbox preflight
-- low-level execution isolation
-- PTY/process lifecycle reliability
-- single-binary distribution
-- security-sensitive execution audit
+- **daemon behavior** — there is no daemon. `runtime/execution/local.ts` spawns and streams in-process.
+- **timeout, cancellation, process-tree cleanup** — owned by `runtime/execution/local.ts` and `core/shell/platform/processTree.ts`.
+- **sandbox preflight** — owned by `sandbox/`.
+- **single-binary distribution** — `npm run build:exe` compiles the TypeScript entrypoint into one executable with no Node runtime required. This is exactly the argument a second language used to be justified by, and it is now answered inside the existing one.
+- **security-sensitive execution audit** — the receipt and event projection in `runtime/execution/` is the record, and it is TypeScript.
 
-Do not claim Rust owns the current execution plane unless the concrete code path proves it. Do not move shell, session, replay, recovery, permission, result semantics, or product orchestration into Rust for convenience.
+Before adding a native module, bring a benchmark showing the TypeScript path is insufficient for the specific responsibility, and add it as an in-process binding rather than a separate process. "It would be faster" is not sufficient: execution latency is dominated by the child process being spawned.
+
+Do not move shell, session, replay, recovery, permission, result semantics, or product orchestration into a native module for convenience.
 
 ## Contracts Boundary
 
@@ -58,9 +57,11 @@ Contract changes must keep producer and consumer semantics aligned.
 
 `contracts` must not contain business orchestration, model/provider calls, shell helpers, file-system helpers, UI helpers, test mock convenience, or runtime side-effect code.
 
-## Python Eval Layer
+## Single Runtime
 
-`packages/python-eval/` is offline evaluation only. It may read traces, datasets, and evaluation artifacts, but it must not own production orchestration, permissions, replay, recovery, persistence, agent loop, runtime side effects, or production tool lifecycle.
+The product is TypeScript only. There is no Python evaluation layer and no Rust execution daemon; both were removed after measurement showed they provided nothing the TypeScript path did not already do better (see `.wiki/features/08-gap-and-debt-research.md` section 2).
+
+Do not reintroduce a second language for performance. Execution latency is dominated by the child process a command spawns, not by the orchestrator that spawns it. If a future need is genuinely native — system-level isolation such as `seccomp`/namespaces/Seatbelt — bring a benchmark that proves the existing `sandbox/` implementation is insufficient, and add it as an in-process binding rather than a separate process.
 
 ## Domain Ownership
 

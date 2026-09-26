@@ -3,19 +3,22 @@
 ## Layer Ownership
 
 ### ts-shell: CLI Shell & Orchestration
+
+The product. One package owns the control plane and the execution plane alike.
+
 **Primary Responsibilities**:
 - [ ] CLI input/output loop and streaming renderer
 - [ ] Session state persistence and recovery
 - [ ] Multi-agent orchestration (planner/coder/reviewer handoff)
 - [ ] Permission policy enforcement (default-deny + explicit escalation)
-- [ ] Model provider adapter interface and OpenAI implementation
+- [ ] Model provider adapter interface and its implementations
 - [ ] Tool registry and permission-aware dispatch
 - [ ] User-facing error messages and recovery prompts
+- [ ] Command execution: spawn, stream, timeout, cancellation, process-tree cleanup
+- [ ] Sandbox policy enforcement (`sandbox/`)
 
 **Does NOT own**:
-- Execution of arbitrary commands (Rust core owns this)
-- Complex system-level resource management
-- Python research utilities (Python eval owns this)
+- Nothing in this repository. There is no second layer to hand work to.
 
 **Testing**:
 - Unit tests via Vitest
@@ -24,75 +27,24 @@
 
 ---
 
-### rust-core: Execution Daemon
-**Primary Responsibilities** (Phase-2, not MVP):
-- [ ] Long-running daemon process lifecycle
-- [ ] Command execution with configurable timeout/cancellation
-- [ ] Child process resource limits and cleanup
-- [ ] Sandbox policy enforcement (mirrors TS path)
-- [ ] Structured logging and error propagation
-- [ ] IPC bridge for TS↔Rust request/response
-
-**Does NOT own**:
-- User-facing CLI interface (TS shell owns this)
-- Permission prompts or escalation workflow (TS shell owns this)
-- Model decisions or orchestration (TS shell owns this)
-
-**Testing**:
-- Unit tests via `cargo test`
-- Contract tests against `runtime-protocol.schema.json`
-- Functional parity tests with TS fallback path
-
----
-
-### python-eval: Research & Analysis
-**Primary Responsibilities**:
-- [ ] Document parsing and analysis
-- [ ] Contract schema validation
-- [ ] Offline evaluation utilities
-- [ ] Research-only helper functions
-
-**Does NOT own**:
-- Online execution (never in critical path)
-- Model API communication
-- User-facing interfaces
-
-**Testing**:
-- Unit tests via pytest
-- No online/network tests
-
----
-
 ## Ownership Boundaries
 
 ### Code Location Rules
 
-**TS Shell** (`packages/ts-shell/src/`):
-- Entrypoints, CLI, main.tsx patterns
-- Everything in `entrypoints/`, `cli/`, `orchestration/`, `sandbox/`, `session/`
-- Service adapters for providers, IPC, session storage
-- Types derived from `contracts/types.ts`
-
-**Rust Core** (`packages/rust-core/src/`):
-- Daemon entry point and process management
-- Executor engine and timeout/cancel logic
-- Sandbox enforcement mirroring TS policy
-- Types derived from `contracts/mod.rs`
-
-**Python Eval** (`packages/python-eval/src/`):
-- Research utilities and helpers
-- Schema validators
-- Types derived from `contracts/types.py`
+**Product** (`packages/ts-shell/src/`):
+- Entrypoints, CLI, and the interactive surface
+- `entrypoints/`, `cli/`, `turn/`, `session/`, `runtime/`, `sandbox/`
+- Service adapters for providers, session storage, and execution
+- Types derived from `contracts/typescript/types.ts`
 
 ### Shared Code (in `contracts/`)
 
-**Never to be modified during T2-T10**:
-- `runtime-protocol.schema.json` — versioned RPC schema
+- `runtime-protocol.schema.json` — versioned protocol schema
 - `versioning-policy.md` — compatibility rules
-- Type definition files (`types.ts`, `types.py`, `mod.rs`)
+- Type definition files (`typescript/types.ts`)
 - Test fixtures
 
-These files are **source of truth** for all cross-layer communication.
+These files are the **source of truth** for the serialized protocol.
 
 ---
 
@@ -100,82 +52,62 @@ These files are **source of truth** for all cross-layer communication.
 
 These are **NOT ALLOWED**:
 
-1. ❌ TS imports Rust modules: `import { x } from '../rust-core'`
-2. ❌ Unversioned payloads: `{ command: "...", data: ... }`  (must have `schemaVersion`)
-3. ❌ Python in online path: Python may only be used for offline eval
-4. ❌ TS calling Python directly: Must use subprocess or skip for MVP
-5. ❌ Rust calling TS: Only via IPC bridge with contracts
-6. ❌ Hardwired provider logic: All provider-specific code must be in adapters
+1. ❌ Unversioned payloads: `{ command: "...", data: ... }` (must have `schemaVersion`)
+2. ❌ Hardwired provider logic: all provider-specific code belongs in the provider adapters
+3. ❌ A declared enum value that no producer can emit — it advertises a state that cannot occur
+4. ❌ Direct `child_process`, writable `fs`, shell/PTY, browser-process, MCP-process, or runtime-network side effects scattered into unrelated product modules. They go through the owning boundary (`runtime/execution/`, `sandbox/`).
 
 ---
 
 ## Decision-Making Across Boundaries
 
-When a feature spans multiple layers:
+When a feature spans several modules:
 
-1. **Design first**: Update `contracts/` with new schema if needed
-2. **TS implementation**: Do TS layer work
-3. **Feature-gate Rust**: Add Rust feature behind `DAEMON_ENABLED` flag
-4. **Contract tests**: Ensure all payloads validate
-5. **Integration test**: End-to-end scenario across layers
+1. **Design first**: update `contracts/` with a new schema only when there is a real serialized consumer
+2. **Implement in the owning module**: not in an entrypoint, a shim, or a vague helper bucket
+3. **Contract tests**: ensure every payload still validates
+4. **Integration test**: end-to-end scenario through the real boundary
 
 ---
 
 ## Review Checklist (Before Committing)
 
-For changes touching multiple layers:
+For changes touching the execution boundary:
 
-- [ ] All payload changes documented in schema version
-- [ ] Types updated in all three language definitions
-- [ ] Cross-layer integration tests added
-- [ ] No direct imports across layer boundaries
-- [ ] Feature flags correct for MVP vs Phase-2
-- [ ] Error handling mirrors in both TS and Rust paths (when applicable)
+- [ ] The change does not weaken containment: a model-supplied path stays inside the workspace
+- [ ] `timeout`, `cancelled`, and `failed` remain distinguishable, and each is reported from a fact that was observed rather than inferred
+- [ ] Process-tree cleanup still signals the group, not just the direct child
 
-For TS-only changes:
+For any product change:
 
-- [ ] No new `rust-core` or `python-eval` dependencies
-- [ ] No hardwired provider-specific logic
+- [ ] No hardwired provider-specific logic outside the provider adapters
 - [ ] Sandbox policy consistently enforced
 - [ ] Session state persistence handles corruption gracefully
-
-For Rust-only changes (Phase-2):
-
-- [ ] Mirrors sandbox policy from TS implementation
-- [ ] All error types conform to contract envelope
-- [ ] Timeout/cancel semantics deterministic and tested
-
-For Python-only changes:
-
-- [ ] Never called from online path
-- [ ] All tests pass without network access
-- [ ] Types match contract definitions
+- [ ] No second language or workspace member introduced (see `agent-rules/architecture-boundaries.md`)
 
 ---
 
 ## Escalation Path
 
-If you need to violate these boundaries for MVP:
+If a boundary needs to be crossed:
 
-1. Document the violation in `.sisyphus/notepads/T2-issues.md`
-2. Add a TODO with GitHub issue link
-3. Plan for Phase-2 refactor to restore isolation
-4. DO NOT merge without explicit acknowledgment
+1. Document why in the task's own record
+2. Name the concrete evidence that the current owner is insufficient
+3. Do not merge without explicit acknowledgment
 
-Examples of acceptable "violations":
-- Sharing test fixtures between layers (allowed via `contracts/fixtures/`)
-- Calling Python offline utilities from Rust (allowed, not in critical path)
-- Environment variable sharing via config files (allowed)
+Examples of acceptable exceptions:
+- Sharing test fixtures (`contracts/tests/fixtures/`)
+- Environment variable sharing via config files
 
 Examples of unacceptable violations:
-- Circular imports across layers
+- Circular imports
 - Unversioned payload passing
-- Python in online execution path
+- A search or read path that can reach outside the workspace root
 
 ---
 
 ## References
 
 - Workspace structure: `WORKSPACE.md`
-- Plan task T2 acceptance criteria: `.sisyphus/plans/private-coding-agents-rewrite.md` (lines 193-230)
+- Architecture boundaries: `agent-rules/architecture-boundaries.md`
 - Contract definitions: `contracts/runtime-protocol.schema.json`
