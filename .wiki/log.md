@@ -3790,3 +3790,21 @@ T7 的 `allowEmptySignature`、D1 的范畴错误、T5 的撤回。
 - 五道门禁 `verify:import-cycles` / `check:config-consumers` / `check:declarations` / `check:node-floor` / `validate` **全部 pass**。
 - **`longSessionDurability.test.ts` 与 harness 系列**在**错误的 cwd** 下会失败
   （它按 `process.cwd()` 反推仓库根找 `tsx`）——从 `packages/ts-shell` 运行即通过，**与本轮改动无关**。
+
+### Phase 11 施工的最终验证（**2026-09-26**）
+
+- **全量套件**：`npm run test:ts` → **541 文件 / 3,799 通过 / 0 失败 / 1 跳过**。
+  首跑有 3 项 `browser*ScenarioExamples` 失败，**经查为已记录的并发负载抖动**
+  （`log.md:243`、`:279` 有先例：这些用例单个需 8–10 秒，默认 `testTimeout` 5 秒）；
+  三个套件在 `--testTimeout=60000` 下**全部通过**（14 秒内），且重跑全量零失败。
+- **五道门禁**：`verify:import-cycles` / `check:config-consumers` / `check:declarations` /
+  `check:node-floor` / `validate` **全部 pass**；`test:scripts` 27/27；
+  `verify:docs-drift:strict` `docs_dangling=0`（advisory 79 项与 Phase 11 前持平）。
+- **端到端实机验证**（不是只跑单测）：
+  - **T12** 经 `loadInstructionFiles` 实跑：`AGENTS.md` 里的 `@./docs/style.md`
+    被替换为实际内容，原始引用消失，自身内容保留；
+  - **T3 + T11** 经**真实工具注册表**实跑：歧义编辑**抛出**并同时给出
+    `replaceAll` 与「更多上下文」两条出路；重复读取第一次返回内容、第二次返回指针；
+  - **T9** 经 `/context` 实跑：报告 `~2,643 tokens (13 tools)`，与实测的 2,553 量级一致；
+  - **CLI** `--version` → `0.1.0`，`--json -p` 正常产出 `run-event-stream.v1` 事件流。
+- **推送**：`d88ff085..e2fb63f5`（6 个提交：3 个 fix、2 个 feat、1 个 docs）。
