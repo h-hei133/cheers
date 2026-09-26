@@ -4,7 +4,7 @@ import { verifyPathContainment } from '../security/pathJail.js'
 import { formatNonVisionFallback, getImageMimeType, isImageFilePath } from '../../model-adapters/multimodal.js'
 import { replaceInContent, replaceManyInContent } from './editEngine.js'
 import { alreadySeen, forgetRead, rememberRead } from './readCache.js'
-import { backgroundTasks, renderTask } from '../shell/background/tasks.js'
+import { backgroundTasks, renderTask, TaskRegistry } from '../shell/background/tasks.js'
 import { withFileLock } from '../../runtime/execution/fileLock.js'
 import {
   detectLineEnding,
@@ -822,6 +822,12 @@ function startBackgroundCommand(
   context: ToolExecutionContext,
   requestedTimeoutSeconds?: unknown,
 ): ToolExecutionResult {
+  // Output past the in-memory limit goes beside this session's other artifacts,
+  // so the file a reader is pointed at sits with the ones the foreground tools
+  // write rather than in a directory of its own.
+  TaskRegistry.getShared().spillDirectory = ArtifactManager.getShared(
+    context.workspaceRoot,
+  ).directory;
   if (!command.trim()) {
     return deniedResult('Error: No command provided to execute.', { status: 'failed', exitCode: 1 })
   }

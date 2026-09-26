@@ -672,3 +672,23 @@ vertex         | preset=true | provider=vertex         | methods=none
 
 **全量套件**：`561 文件 / 4,124 通过 / 0 失败`（首跑 3 项负载敏感，
 **逐项隔离复跑 40/40、6/6、CLI 正常启动**，且都与本轮改动无关）。
+
+### 10.5 补齐计划里的 T1 落盘要求（**2026-09-27**）
+
+计划 §T1 原写：`background/output.ts`「滚动缓冲 + 超限落盘（内存留尾，超限写文件）」。
+**施工时只做了内存留尾**，超限部分直接丢弃——与计划不符，且丢失的正是「开头为什么出问题」。
+
+已补 `core/shell/background/output.ts`：**超限才建文件**（多数命令几行输出，不该产生空日志），
+文件**从第一行开始完整**（不是溢出之后的续写），内存仍留尾供通知使用，
+通知改为**给出文件路径**而不是「已丢弃」。
+
+**实机验证**（真实进程，30000 行输出）：
+
+```
+truncated: true | outputPath set: true
+notice:   (earlier output is in /tmp/.../bg_1-muip6rfh-30598.log)
+file starts with: "line-1-xxxxxxxxxxxxx"
+file contains line-1-: true
+```
+
+落盘目录取 `ArtifactManager.directory`（与前台工具产物同处），而非自造路径。

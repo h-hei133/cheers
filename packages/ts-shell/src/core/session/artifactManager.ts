@@ -34,6 +34,17 @@ export class ArtifactManager {
     }
   }
 
+  /**
+   * The directory this session's artifacts live in.
+   *
+   * Exposed so a writer that is not this class puts its files beside these
+   * rather than reconstructing the path: the layout is this class's business, and
+   * a second copy of it would drift the first time the layout changed.
+   */
+  get directory(): string {
+    return this.artifactsDir;
+  }
+
   static getShared(workspaceRoot: string = process.cwd(), sessionId: string = "default"): ArtifactManager {
     if (!ArtifactManager.instance) {
       ArtifactManager.instance = new ArtifactManager(workspaceRoot, sessionId);

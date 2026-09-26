@@ -14,6 +14,7 @@
 
 import { spawn, type ChildProcess } from "node:child_process";
 import { trackChildPid, untrackChildPid, killProcessTree } from "../platform/processTree.js";
+import { createOutputSink, type OutputSink } from "./output.js";
 
 /** How much of a command's output is kept. */
 const OUTPUT_BYTES = 64 * 1024;
@@ -37,6 +38,14 @@ export interface BackgroundTask {
    * printed, and act on a report whose beginning is missing.
    */
   readonly outputTruncated?: boolean;
+  /**
+   * Where the whole output went, once it outgrew what is kept in memory.
+   *
+   * Present only when the output was long enough to be written out. Without it a
+   * reader would have to take the notice at its word and had no way to see the
+   * beginning; with it the notice can name a file they can open.
+   */
+  readonly outputPath?: string;
   /** Set when the command could not be started at all. */
   readonly failure?: string;
 }
@@ -64,20 +73,6 @@ export interface BackgroundRunner {
 }
 
 /**
- * Keeping output from growing without bound.
- *
- * The tail rather than the head: a command that fails says why at the end, and a
- * command's beginning is usually the part a reader already knows. Slicing on a
- * character count is an approximation of a byte limit that is exact enough here —
- * the cost of being wrong is a few kilobytes either way.
- */
-function keepTail(current: string, addition: string): { output: string; dropped: boolean } {
-  const combined = current + addition;
-  if (combined.length <= OUTPUT_BYTES) return { output: combined, dropped: false };
-  return { output: combined.slice(combined.length - OUTPUT_BYTES), dropped: true };
-}
-
-/**
  * The registry of commands that outlive the turn that started them.
  *
  * Exported so a test can own one outright: the shared instance keeps state for
@@ -90,6 +85,14 @@ export class TaskRegistry {
   private readonly children = new Map<string, ChildProcess>();
   private readonly listeners: Array<(task: BackgroundTask) => void> = [];
   private nextId = 1;
+  /**
+   * Where output past the in-memory limit is written.
+   *
+   * Settable because only a caller with a session knows where that session's
+   * files belong. Unset means memory only, which is a smaller loss than guessing
+   * at a directory and writing somewhere the session does not own.
+   */
+  spillDirectory: string | undefined;
 
   static getShared(): TaskRegistry {
     if (!TaskRegistry.instance) TaskRegistry.instance = new TaskRegistry();
@@ -181,9 +184,19 @@ export class TaskRegistry {
     this.tasks.set(id, task);
     this.children.set(id, child);
 
+    const sink = createOutputSink({
+      limitBytes: OUTPUT_BYTES,
+      label: id,
+      ...(this.spillDirectory ? { spillDirectory: this.spillDirectory } : {}),
+    });
     const append = (text: string): void => {
-      const { output, dropped } = keepTail(task.output, text);
-      task = { ...task, output, ...(dropped || task.outputTruncated ? { outputTruncated: true } : {}) };
+      sink.append(text);
+      task = {
+        ...task,
+        output: sink.tail,
+        ...(sink.truncated ? { outputTruncated: true } : {}),
+        ...(sink.spillPath ? { outputPath: sink.spillPath } : {}),
+      };
       this.tasks.set(id, task);
     };
     child.stdout?.on("data", (chunk: Buffer) => append(chunk.toString()));
@@ -196,6 +209,7 @@ export class TaskRegistry {
     const finish = (state: "exited" | "killed", code: number | null): void => {
       if (ended) return;
       ended = true;
+      void sink.close();
       const finished: BackgroundTask = { ...task, state, exitCode: code ?? undefined };
       this.tasks.set(id, finished);
       this.children.delete(id);
@@ -257,7 +271,11 @@ export function renderTask(task: BackgroundTask): string {
   if (task.failure) lines.push(`  could not start: ${task.failure}`);
   if (task.output) {
     if (task.outputTruncated) {
-      lines.push("  (earlier output was dropped to stay within the size limit)");
+      lines.push(
+        task.outputPath
+          ? `  (earlier output is in ${task.outputPath})`
+          : "  (earlier output was dropped to stay within the size limit)",
+      );
     }
     lines.push("  output so far:", task.output.split("\n").map((line) => `    ${line}`).join("\n"));
   }
