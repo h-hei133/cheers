@@ -161,17 +161,22 @@ describe("createStepFunction", () => {
     expect(result.toolCalls).toHaveLength(1);
   });
 
-  it("forbids tools on the closing step", async () => {
-    let body: { tool_choice?: string } = {};
+  it("forbids tools on the closing step by not sending them", async () => {
+    // Omitted rather than sent with `tool_choice: "none"`. Both stop the call,
+    // but sending the schemas spends tokens on declarations the model may not
+    // use — and the other protocol omitted them, so the two disagreed about what
+    // a model can even see.
+    let body: { tool_choice?: string; tools?: unknown } = {};
     const step = createStepFunction({
       ...request,
       fetchImpl: async (_url, init) => {
-        body = JSON.parse(String(init?.body)) as { tool_choice?: string };
+        body = JSON.parse(String(init?.body)) as { tool_choice?: string; tools?: unknown };
         return jsonResponse({ choices: [{ message: { content: "final" }, finish_reason: "stop" }] });
       },
     });
     await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: false });
-    expect(body.tool_choice).toBe("none");
+    expect(body.tool_choice).toBeUndefined();
+    expect(body.tools).toBeUndefined();
   });
 
   it("explains an empty answer instead of inventing one", async () => {
@@ -848,4 +853,46 @@ describe("speaking a second endpoint", () => {
     expect(result.errorMessage).toContain("openai-compatible");
   });
 
+});
+
+describe("the last step a run may act on", () => {
+  async function bodyFor(allowTools: boolean): Promise<Record<string, unknown>> {
+    let body: Record<string, unknown> = {};
+    const step = createStepFunction({
+      ...request,
+      fetchImpl: async (_url: string | URL, init?: RequestInit) => {
+        body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return jsonResponse({ choices: [{ message: { content: "ok" } }] });
+      },
+    });
+    await step([{ role: "user", content: "do the thing" }], undefined, {}, { allowTools });
+    return body;
+  }
+
+  it("says so when the tools have been withdrawn", async () => {
+    // Withdrawing the tools is not self-explanatory. A model that sees its tool
+    // list and cannot call from it reads the harness as broken rather than the
+    // budget as reached, and the useful move — answer with what you have — is
+    // one it has to be told to make.
+    const body = await bodyFor(false);
+    const messages = body.messages as Array<{ role: string; content: string }>;
+
+    expect(messages[messages.length - 1]!.content).toMatch(/reached the limit/i);
+    expect(messages[messages.length - 1]!.content).toMatch(/cannot call any more tools/i);
+  });
+
+  it("says nothing of the kind while tools are still available", async () => {
+    const body = await bodyFor(true);
+    const messages = body.messages as Array<{ role: string; content: string }>;
+
+    expect(JSON.stringify(messages)).not.toMatch(/reached the limit/i);
+  });
+
+  it("sends no tool list on that step either", async () => {
+    // The notice and the withdrawal travel together: a notice about tools the
+    // request still carries would contradict the request.
+    const body = await bodyFor(false);
+
+    expect(body).not.toHaveProperty("tools");
+  });
 });

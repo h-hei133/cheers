@@ -58,8 +58,14 @@ declareEndpoint("openai-compatible", {
         content: wireContent(message.content, input.vision),
       })),
     ],
-    tools: input.tools,
-    tool_choice: input.allowTools ? "auto" : "none",
+    // Omitted rather than sent with `tool_choice: "none"`, which is what the
+    // other protocol already did. Both ways stop the call, but keeping the
+    // schemas spends tokens on declarations the model is forbidden to use — and
+    // the two protocols disagreeing about what a model can even see is how one
+    // run and the next behave differently on the same setting.
+    ...(input.allowTools && input.tools.length > 0
+      ? { tools: input.tools, tool_choice: "auto" as const }
+      : {}),
     stream: true,
     stream_options: { include_usage: true },
     // Omitted where the model is known to reject it, and where thinking is on:

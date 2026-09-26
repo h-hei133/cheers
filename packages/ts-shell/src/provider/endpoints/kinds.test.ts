@@ -165,3 +165,42 @@ describe("a request with no tools", () => {
     expect(body.temperature).toBe(0.7);
   });
 });
+
+describe("what a request says when tools may not be called", () => {
+  const tool = {
+    type: "function" as const,
+    function: { name: "read", description: "read", parameters: { type: "object", properties: {} } },
+  };
+  const base = {
+    model: "m",
+    systemPrompt: "s",
+    messages: [{ role: "user" as const, content: "hi" }],
+    tools: [tool],
+    vision: false,
+    systemRole: "system" as const,
+    reasoningEffort: false,
+    maxTokensField: "max_tokens" as const,
+    assistantAfterToolResult: false,
+  };
+
+  it("omits the tool list, in both protocols, when the model may not call one", () => {
+    // The two used to disagree: one omitted the list and the other sent it with
+    // `tool_choice: "none"`. Both stop the call, but sending the schemas spends
+    // tokens on declarations the model is forbidden to use, and a model that can
+    // see a tool is a model that may try it.
+    for (const kind of ["openai-compatible", "anthropic-messages"] as const) {
+      const body = endpointTurnBody(kind, { ...base, allowTools: false });
+
+      expect(body).not.toHaveProperty("tools");
+      expect(body).not.toHaveProperty("tool_choice");
+    }
+  });
+
+  it("sends the tool list when the model may call one", () => {
+    for (const kind of ["openai-compatible", "anthropic-messages"] as const) {
+      const body = endpointTurnBody(kind, { ...base, allowTools: true });
+
+      expect(body).toHaveProperty("tools");
+    }
+  });
+});

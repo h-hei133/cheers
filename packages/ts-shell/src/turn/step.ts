@@ -174,6 +174,34 @@ function endpointFor(request: StepRequest): EndpointKind {
   return endpointKind(request.provider.endpoint) ?? DEFAULT_ENDPOINT_KIND;
 }
 
+/**
+ * Tell the model when this is the last step it may act on.
+ *
+ * Withdrawing the tools is not self-explanatory. The model sees the list it had
+ * and cannot call from it, which reads as the harness being broken rather than
+ * as a budget it has reached — and the useful thing for it to do at that point
+ * is answer with what it has, which it cannot know to do unless told.
+ *
+ * Appended as the last user turn rather than put in the system prompt, because
+ * it is true only of this request: the system instruction is built once for the
+ * whole run, and a run's earlier steps may call tools freely.
+ */
+function withFinalStepNotice(
+  messages: readonly ChatMessage[],
+  allowTools: boolean,
+): readonly ChatMessage[] {
+  if (allowTools) return messages;
+  return [
+    ...messages,
+    {
+      role: "user",
+      content:
+        "You have reached the limit of steps you may take. You cannot call any more tools on this turn. " +
+        "Answer now with what you have: say what you did, what you found, and what remains unfinished.",
+    },
+  ];
+}
+
 export function createStepFunction(request: StepRequest): StepFunction {
   let effortAccepted = true;
   const fetchImpl = request.fetchImpl ?? fetch;
@@ -224,9 +252,12 @@ export function createStepFunction(request: StepRequest): StepFunction {
         payload = endpointTurnBody(endpoint, {
           model: request.provider.model,
           systemPrompt: request.systemPrompt,
-          messages: bridgeToolResults(
-            microcompactMessages(toChatMessages(messages), { keepRecentTurns: 3, maxOutputChars: 1000 }).messages,
-            shape.assistantAfterToolResult,
+          messages: withFinalStepNotice(
+            bridgeToolResults(
+              microcompactMessages(toChatMessages(messages), { keepRecentTurns: 3, maxOutputChars: 1000 }).messages,
+              shape.assistantAfterToolResult,
+            ),
+            options.allowTools,
           ),
           tools: request.tools,
           allowTools: options.allowTools,
