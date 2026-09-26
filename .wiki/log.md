@@ -4048,3 +4048,64 @@ T6 `budget_tokens`）在 `task` 与 `/btw` 上**全部失效**——这是**整�
 - `phase-12-decisions.md`：任务表（7 项裁决全部落定）、§2.4 重写、§2.5 裁定、§5 执行顺序、§8 扩展
 - `phase-12-pre-research.md`：新增 §9「网上调研」（含官方文档引文与逐项对照）
 - **零代码改动**（规划阶段）
+
+### Phase 12 施工（**2026-09-26**）
+
+**维护者指示**：「遵守 AGENTS.md，保持项目结构干净，不要出现别人项目的名字，
+文件名简洁清晰，设计好复用方案，不要造重复功能，完成后更新文档，提交至 GitHub」。
+
+按 `phase-12-decisions.md` §5 的顺序执行，**9 项全部落地**。
+
+| # | 任务 | 提交 | 撤销验证 |
+|---|---|---|---|
+| **T2** | `/btw` 改走 provider 层 | `d00936d4` | 新增 `provider/request/completion.ts` 作为唯一出口 |
+| **T3** | worktree 语义改为保留+回报 | `b20f7c27` | 撤销后 3 项失败 |
+| **D1+T1** | 子代理跑真 agent 循环 + 工具边界生效 | `336e966f` | 撤销后 6 项失败（边界）+ 6 项失败（循环） |
+| **D4** | 压缩后文件清单的说明 | `e16645a5` | 撤销后 1 项失败 |
+| **D2** | 最小 deny（绕过免疫） | `859b75bb` | 撤销后 3 项失败 |
+| **T4/T5** | 工具撤销时告知模型 + 两协议统一 | `f778e991` | 撤销后 4 项失败 |
+| **D3** | 删除两份异 schema 草稿 | `341db195` | — |
+| — | 子代理三个死字段（`skills`/`effort`/`background`） | `1528f169` | — |
+
+### 施工中的两处**发现更正**（施工轮推翻了自己的计划）
+
+**更正一：D4 大部分已经实现。** 计划把「压缩后恢复文件」列为缺口并提议新建。
+**实机核实**：压缩**已经**把会话读过/改过的文件写进替换历史的检查点
+（`fileFootprint.ts`），**跨多次压缩累积**、**有上限**（200）、**能从自己的文本读回**，
+且有 13 个测试覆盖。**真正缺的只有一句话**——`<read-files>`/`<modified-files>`
+两处 XML 标签**只在格式化函数里出现**，**没有任何地方告诉模型它们是什么**。
+模型拿到一串路径、没有解释，会当成「自己还记得内容」——
+而它要回忆的内容正是检查点刚压缩掉的。**已补上这句说明。**
+
+**更正二：`.agents/workflows/verify.json` 有读者。** D3 提交信息里我说它「无读者」，
+**这是错的**——`definition.ts:38-47` 的 `workflowsDir`/`listWorkflowNames`
+读的就是这个目录，`/workflow list` 实测能列出 `verify (3 steps)`。
+**该文件是活的，不应删除**（本轮未删，仅更正记录）。
+
+### 死代码处置（D7 第一簇）
+
+按 `plan.md` §2.2 的**六项检查**处置 `core/workflow/`：
+
+| 检查 | 结果 |
+|---|---|
+| 1 功能读审 | 5 个模块各 1 个导出，`builderValidator`/`adversarialRefuter`/`cacheStaggering` 是纯声明，**零实现** |
+| 2 等价实现核验 | 活轨是 `definition.ts`+`runner.ts`+`runStore.ts`（`/workflow` 命令用），**与这 5 个无交集** |
+| 3 消费者存活 | **5 个模块非测试导入者全部为 0** |
+| 4 动态入口 | 无 `spawn`/`import()`/`process.argv` 引用 |
+| 5 公共面 | `index.ts` 导出的 `artifacts/workflow/model.js` 是**另一个模块** |
+| 6 `scripts/` 引用 | **无** |
+
+**删除 5 个模块**（`builderValidator` 68 / `adversarialRefuter` 68 / `contextInjector` 66 /
+`pipelineExecutor` 60 / `cacheStaggering` 33 = **295 行**），并移除只测它们的测试块。
+
+**`teamStore` 不在本簇**：它有 9 个方法，被 `messagingAndTeams.test.ts` 与**活的**
+`sessionSocketHost`/`sessionSocketClient`/`messagingTools` 一起测试，
+**不满足「零消费者」**，故保留待单独判断。
+
+### 验证
+
+- `tsc` 每项后通过；`verify:import-cycles`/`check:config-consumers`/`check:declarations`/
+  `check:node-floor`/`validate` 全部 pass。
+- **端到端实机验证**：`/btw` 返回真实答案（走会话的 provider）；
+  deny 规则实测拦住 `bash`（且不经过审批路径）；`/workflow list` 正常；
+  子代理的边界与循环各有 6 项测试。
