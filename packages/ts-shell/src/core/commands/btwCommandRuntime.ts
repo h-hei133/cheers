@@ -1,10 +1,28 @@
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
+import { resolveProviderCredential } from "../shell/providerCredentials.js";
+import { accountAuthFor, providerAuthorization } from "../../provider/request/authorization.js";
+import { requestSimpleCompletion } from "../../provider/request/completion.js";
+import { loadCatalog } from "../models/catalogStore.js";
+import { providerEndpoint } from "../models/catalog.js";
+import { providerFetchFor } from "../../provider/request/fetch.js";
+
+/** How long a side question may take before it is abandoned. */
+const SIDE_QUESTION_TIMEOUT_MS = 15_000;
+
+/** What the side channel is asked to be. Terse, because the answer is a tangent. */
+const SIDE_QUESTION_SYSTEM_PROMPT =
+  "You are a concise, helpful coding assistant answering a quick side-question out of band. Give a direct, accurate, terse answer in markdown.";
 
 /**
- * /btw (aliases: /side, /ask)
- * Executes a side-question out of band without polluting or writing to the main conversation history.
- * Dynamically resolves provider and auth configurations from runtime config and environment.
+ * A side question, answered out of band.
+ *
+ * It goes through the provider layer like every other model call. It used to
+ * build its own request against whatever `SILICONFLOW_*` or `OPENAI_*` variables
+ * happened to be set, which meant a session configured through `/connect` asked
+ * its side question of a different provider entirely — and the request-shape,
+ * credential, and transport handling done in the provider layer never applied to
+ * it.
  */
 export async function runBtwCommand(
   args: string[],
@@ -19,59 +37,48 @@ export async function runBtwCommand(
   }
 
   const runtimeConfig = getRuntimeConfig(context.cwd);
-  let apiKey = process.env.SILICONFLOW_API_KEY || process.env.OPENAI_API_KEY || "";
-  let baseUrl = process.env.SILICONFLOW_BASE_URL || "https://api.siliconflow.cn/v1";
-  let model = "deepseek-ai/DeepSeek-V4-Flash";
-
-  if (process.env.OPENAI_API_KEY && !process.env.SILICONFLOW_API_KEY) {
-    baseUrl = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
-    model = "gpt-4o-mini";
-  }
+  const resolution = resolveProviderCredential({ runtimeConfig });
+  const credential = resolution.credential;
 
   let answer = "";
-  if (apiKey && !process.env.VITEST && process.env.NODE_ENV !== "test") {
+  const accountAuth = credential ? accountAuthFor(resolution.provider, credential) : undefined;
+  if (credential && (credential.apiKey || accountAuth)) {
+    const catalog = loadCatalog();
+    const endpoint = providerEndpoint(catalog, resolution.provider);
     const controller = new AbortController();
-    const timeoutMs = 15_000;
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
+    const timer = setTimeout(() => controller.abort(), SIDE_QUESTION_TIMEOUT_MS);
     try {
-      const res = await fetch(`${baseUrl.replace(/\/+$/, "")}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model,
+      answer =
+        (await requestSimpleCompletion({
+          provider: {
+            headers: providerAuthorization({
+              apiKey: credential.apiKey,
+              ...(accountAuth ? { accountAuth } : {}),
+              ...(endpoint ? { endpoint } : {}),
+            }).headers,
+            baseUrl: resolution.baseUrl ?? credential.baseUrl ?? "",
+            model: resolution.model ?? credential.model ?? "",
+            providerId: resolution.provider,
+            ...(endpoint ? { endpoint } : {}),
+            fetchImpl: providerFetchFor(runtimeConfig),
+          },
           messages: [
-            {
-              role: "system",
-              content: "You are a concise, helpful coding assistant answering a quick side-question out of band. Give a direct, accurate, terse answer in markdown.",
-            },
-            {
-              role: "user",
-              content: question,
-            },
+            { role: "system", content: SIDE_QUESTION_SYSTEM_PROMPT },
+            { role: "user", content: question },
           ],
-        }),
-        signal: controller.signal,
-      });
-
-      if (res.ok) {
-        const json = (await res.json()) as {
-          choices?: Array<{ message?: { content?: string } }>;
-        };
-        answer = json.choices?.[0]?.message?.content || "";
-      }
+          supportsTemperature: false,
+          signal: controller.signal,
+        })) ?? "";
     } catch {
-      // Graceful fallback on network abort or error
+      // A side question that fails is a side question with no answer; the
+      // fallback below says so rather than reporting a transport error.
     } finally {
       clearTimeout(timer);
     }
   }
 
   if (!answer) {
-    answer = `Side question noted: "${question}".\n(Fast out-of-band response channel ready. Provider: ${runtimeConfig.provider || "openai-compatible"}).`;
+    answer = `Side question noted: "${question}".\n(No provider credential is configured, so nothing was sent.)`;
   }
 
   const lines: string[] = [

@@ -161,6 +161,22 @@ export function providerTimeoutsFrom(config: {
   };
 }
 
+/**
+ * The transport for a run, from the configuration it was started with.
+ *
+ * Six call sites wrote `providerFetchFromTimeouts(providerTimeoutsFrom(config))`
+ * themselves. Composing it here means a run's deadline is decided in one place,
+ * and a caller that has a configuration does not have to know that two functions
+ * are involved.
+ */
+export function providerFetchFor(config: {
+  readonly providerConnectTimeoutMs?: number;
+  readonly providerHeadersTimeoutMs?: number;
+  readonly providerBodyTimeoutMs?: number;
+} | undefined): typeof fetch {
+  return providerFetchFromTimeouts(providerTimeoutsFrom(config));
+}
+
 export function resolveProviderTransportConfig(
   env: ProviderFetchEnvironment = process.env,
   timeouts: ProviderTimeoutOverrides = {},
