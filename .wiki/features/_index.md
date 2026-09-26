@@ -1206,3 +1206,72 @@ Phase 11 完成的是「已登记为任务的 13 项」，**不是 08/11 的全�
 **死代码第一簇**（D7）：按 `plan.md` §2.2 **六项检查**处置 `core/workflow/`，
 删除 **5 个模块 / 295 行**（3 个是纯声明、零实现）。
 `teamStore` **不在本簇**——它与**活的** messaging 模块一起被测试，不满足「零消费者」。
+
+### 13.9 复核轮（**2026-09-26**）
+
+对 Phase 12 的 8 个实质改动提交做了复核（3 个只读子代理 + 主代理亲验），
+**找到并修复 6 个缺陷**，全部复现、全部有「撤销即失败」的测试。
+详见 `phase-12-decisions.md` §12。
+
+**其中最重的一个是本轮自己引入的**：子代理的工具调用**不经过任何门禁**
+（plan 模式、审批 scope、doom-loop、**用户的 deny 规则**全都不生效），
+根因是**两份手写的 gate 选项列表**漂移。修复方式是**消除重复**——
+`gateOptionsFor()` 成为唯一来源，子代理的 runner 由 turn 自己组装。
+
+---
+
+### 13.10 08 / 11 的 feature 完成情况总表（**2026-09-26 实测**）
+
+口径：`08-*` §4 的 **MISSING(10) + DEFICIENT(14) = 24 项**，
+逐条**实机核实**当前状态（命令见下）。
+
+#### 已完成（**16 项**）
+
+| 08 编号 | 项 | 核实 |
+|---|---|---|
+| M1 | 权限规则集 | ✅ **Phase 12 D2**——`denyRules` 可配、绕过免疫、可选 pattern |
+| M7 | 未变更文件去重 | ✅ **Phase 11 T11**——`readCache.ts` |
+| M8 | 压缩后恢复工作文件 | ✅ **Phase 11 T9 / 12 D4**——`fileFootprint.ts`（跨压缩累积 + 说明） |
+| M9 | 指令 `@import` | ✅ **Phase 11 T12**——`importExpansion.ts` |
+| D1 | `classifyProviderFailure` 接线 | ✅ **Phase 11 T4**——`turn/step.ts` 生产引用 |
+| D2 | Anthropic `budget_tokens` | ✅ **Phase 11 T6**——含 `min(ceiling - MIN_ANSWER)` 上限 |
+| D3 | `thinkingSignature` | ✅ **Phase 11 T7**——**双向**往返（codec 也带） |
+| D4 | `temperature` 条件化 | ✅ **Phase 11 T6 / R6**——`supportsTemperature` 进 `requestShape` |
+| D5 | 目录刷新抹掉能力 | ✅ **Phase 11 T1**——`mergeModelEntries` 深合并 |
+| D8 | 重试 jitter | ✅ **Phase 11 T8**——`JITTER_FRACTION = 0.25`（只向下） |
+| D9 | Doom Loop 交替检测 | ✅ **Phase 11 T10**——`findRepeatingCycle()` |
+| D7 | CJK token 低估 | ✅ **与 D9 同根**（08 §4.3 注：D7/D9' 合并为一个修复项）——`RequestOverhead` 计入系统提示与工具 schema |
+| D10 | 子代理不是 agent | ✅ **Phase 12 D1+T1**——真循环 + 边界 + **门禁**（复核后补） |
+| D12 | 编辑唯一性 | ✅ **Phase 11 T3 / R2**——`countStrategyMatches` |
+| D13 | `lsp` 不是 LSP | ✅ **Phase 11 T13**——schema 去掉 `line`/`character` |
+| D14 | `grep` 用 ripgrep | ✅ **Phase 11 项 1**——有 `rg` 用 `rg --json`，无则 TS 回退 |
+
+#### 未完成（**8 项 M/D** + 1 项非 M/D）
+
+| 08 编号 | 项 | 状态 | 性质 |
+|---|---|---|---|
+| **M2** | 后台命令执行（detach） | ❌ `run_in_background` 仍为 **0** | **可做**，成本中 |
+| **M10** | 动态工具装载增量 | ❌ `toolsAdded`/`toolsRemoved` 仍为 **0**；**工具集在 run 内固定**。Phase 12 T4 **只覆盖了我们唯一会中途变工具集的那种情况**（末步撤回），**动态装载本身不存在也未排期** | **可做**，成本低 |
+| **M3** | OAuth Device Code | ❌ `device_code` 仍为 **0** | **无账号可验** |
+| **M4** | Bedrock 协议 | ❌ 端点仍只有 2 种 | **无账号可验** |
+| **M5** | Google GenAI / Vertex | ❌ 同上 | **无账号可验** |
+| **M6** | Copilot / Anthropic 订阅 OAuth | ❌ 仍只有 `openai`/`google` | **无账号可验** |
+| **D6** | SSE 事件头被丢弃 | ❌ **未复现**（11 §2.6 已**证伪**该条） | **08 的该项不成立** |
+| **D11** | 中途换模型/推理档 | ❌ 仍只有压缩用的 `prepareNextStep` | **可做**，成本中 |
+| **T17** | 路由期命名残留 | ❌ | **已裁决不做**（文档卫生，不占施工预算）。**注**：T17 是 08 §6 的梯队编号，**不在 24 项之内** |
+
+#### 结论
+
+**M/D 24 项里完成 16 项，剩 8 项**。剩的 8 项分成三类：
+
+| 类别 | 项 | 处置 |
+|---|---|---|
+| **可做**（3 项） | M2 后台执行、M10 动态装载、D11 中途换模型 | **需要维护者排期** |
+| **无账号/无环境可验**（4 项） | M3/M4/M5/M6 | 与 `phase-10-decisions.md` §1.1「不加无法验证的表面」一致 |
+| **08 判断不成立**（1 项） | D6 | 11 §2.6 已**证伪**该条 |
+
+（另：08 §6 的 **T17** 是梯队编号、**不在 24 项之内**，已裁决不做。）
+
+另外，`08-*` §5 的**死代码**还剩两簇未处置：
+`tools/policy/interception.ts`（411 行）与真死文件（35 个 / 6,650 行）。
+`core/workflow/` 那一簇**已在 Phase 12 D7 处置**（删 5 模块 / 295 行）。
