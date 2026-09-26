@@ -29,19 +29,38 @@ export interface BackgroundTask {
   readonly exitCode?: number;
   /** The output so far, oldest first and bounded. */
   readonly output: string;
+  /**
+   * Whether earlier output was dropped to stay within the bound.
+   *
+   * Carried rather than inferred from the length: a reader shown a clipped tail
+   * with nothing to say so would take it for the whole of what the command
+   * printed, and act on a report whose beginning is missing.
+   */
+  readonly outputTruncated?: boolean;
   /** Set when the command could not be started at all. */
   readonly failure?: string;
 }
 
 /** What a caller may do with a background command. */
 export interface BackgroundRunner {
-  start(input: { readonly command: string; readonly cwd: string; readonly env?: Readonly<Record<string, string>> }): BackgroundTask;
+  start(input: {
+    readonly command: string;
+    readonly cwd: string;
+    readonly env?: Readonly<Record<string, string>>;
+    readonly shell?: { readonly command: string; readonly args: readonly string[] };
+  }): BackgroundTask;
   list(): readonly BackgroundTask[];
   get(id: string): BackgroundTask | undefined;
   /** Stop one, which signals its whole process group. */
   stop(id: string): boolean;
-  /** Called when a command ends, so the conversation can be told. */
-  onEnded(listener: (task: BackgroundTask) => void): void;
+  /**
+   * Called when a command ends, so the conversation can be told.
+   *
+   * The return value stops the subscription. A listener that cannot be removed
+   * outlives the surface that wanted it, because the registry is a process
+   * singleton and nothing else would ever forget it.
+   */
+  onEnded(listener: (task: BackgroundTask) => void): () => void;
 }
 
 /**
@@ -52,14 +71,20 @@ export interface BackgroundRunner {
  * character count is an approximation of a byte limit that is exact enough here —
  * the cost of being wrong is a few kilobytes either way.
  */
-function keepTail(current: string, addition: string): string {
+function keepTail(current: string, addition: string): { output: string; dropped: boolean } {
   const combined = current + addition;
-  if (combined.length <= OUTPUT_BYTES) return combined;
-  return combined.slice(combined.length - OUTPUT_BYTES);
+  if (combined.length <= OUTPUT_BYTES) return { output: combined, dropped: false };
+  return { output: combined.slice(combined.length - OUTPUT_BYTES), dropped: true };
 }
 
-/** The shared registry of commands that outlive the turn that started them. */
-class TaskRegistry {
+/**
+ * The registry of commands that outlive the turn that started them.
+ *
+ * Exported so a test can own one outright: the shared instance keeps state for
+ * the life of the process, which is right for the product and wrong for a test
+ * that asserts on what a single command did.
+ */
+export class TaskRegistry {
   private static instance?: TaskRegistry;
   private readonly tasks = new Map<string, BackgroundTask>();
   private readonly children = new Map<string, ChildProcess>();
@@ -71,8 +96,20 @@ class TaskRegistry {
     return TaskRegistry.instance;
   }
 
-  onEnded(listener: (task: BackgroundTask) => void): void {
+  /**
+   * Be told when a command ends.
+   *
+   * Returns the way to stop being told. A subscriber that cannot unsubscribe is
+   * a listener that lives as long as the registry does, and the registry is a
+   * process singleton — so a session that restarted its subscriber would keep
+   * notifying the old one for the rest of the process's life.
+   */
+  onEnded(listener: (task: BackgroundTask) => void): () => void {
     this.listeners.push(listener);
+    return () => {
+      const at = this.listeners.indexOf(listener);
+      if (at !== -1) this.listeners.splice(at, 1);
+    };
   }
 
   list(): readonly BackgroundTask[] {
@@ -87,10 +124,22 @@ class TaskRegistry {
     readonly command: string;
     readonly cwd: string;
     readonly env?: Readonly<Record<string, string>>;
+    /**
+     * The program and arguments to launch instead of the platform shell.
+     *
+     * A caller that has already planned the launch passes them here, so the
+     * command it starts is the one it planned — an isolation launcher, for
+     * instance, rather than the bare shell it was meant to wrap.
+     */
+    readonly shell?: { readonly command: string; readonly args: readonly string[] };
   }): BackgroundTask {
     const id = `bg_${this.nextId++}`;
-    const shell = process.platform === "win32" ? "cmd.exe" : "/bin/sh";
-    const shellArgs = process.platform === "win32" ? ["/d", "/s", "/c", input.command] : ["-c", input.command];
+    const shell = input.shell?.command ?? (process.platform === "win32" ? "cmd.exe" : "/bin/sh");
+    const shellArgs = input.shell
+      ? [...input.shell.args]
+      : process.platform === "win32"
+        ? ["/d", "/s", "/c", input.command]
+        : ["-c", input.command];
 
     let child: ChildProcess;
     try {
@@ -133,20 +182,27 @@ class TaskRegistry {
     this.children.set(id, child);
 
     const append = (text: string): void => {
-      task = { ...task, output: keepTail(task.output, text) };
+      const { output, dropped } = keepTail(task.output, text);
+      task = { ...task, output, ...(dropped || task.outputTruncated ? { outputTruncated: true } : {}) };
       this.tasks.set(id, task);
     };
     child.stdout?.on("data", (chunk: Buffer) => append(chunk.toString()));
     child.stderr?.on("data", (chunk: Buffer) => append(chunk.toString()));
 
+    // A child that cannot be spawned reports both an error and a close, so the
+    // ending is recorded once: a caller told twice would run its follow-up
+    // twice, and the second notice would arrive after the task was already gone.
+    let ended = false;
     const finish = (state: "exited" | "killed", code: number | null): void => {
-      const ended: BackgroundTask = { ...task, state, exitCode: code ?? undefined };
-      this.tasks.set(id, ended);
+      if (ended) return;
+      ended = true;
+      const finished: BackgroundTask = { ...task, state, exitCode: code ?? undefined };
+      this.tasks.set(id, finished);
       this.children.delete(id);
       if (child.pid) untrackChildPid(child.pid);
       // Told once. A caller that missed it can still see the finished state by
       // asking, so a listener that arrives late loses nothing.
-      for (const listener of this.listeners) listener(ended);
+      for (const listener of this.listeners) listener(finished);
     };
     child.on("error", (error) => {
       append(`\n${error.message}\n`);
@@ -200,6 +256,9 @@ export function renderTask(task: BackgroundTask): string {
   const lines = [`${task.id}: ${task.command}`, `  ${state}, started ${new Date(task.startedAt).toISOString()}`];
   if (task.failure) lines.push(`  could not start: ${task.failure}`);
   if (task.output) {
+    if (task.outputTruncated) {
+      lines.push("  (earlier output was dropped to stay within the size limit)");
+    }
     lines.push("  output so far:", task.output.split("\n").map((line) => `    ${line}`).join("\n"));
   }
   return lines.join("\n");

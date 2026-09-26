@@ -36,6 +36,11 @@ function text(name: string, value: string): readonly [string, number, number[]] 
   return [name, 7, [bytes.length >> 8, bytes.length & 0xff, ...bytes]];
 }
 
+/** A byte-array header, the type the protocol reserves for binary values. */
+function binary(name: string, bytes: number[]): readonly [string, number, number[]] {
+  return [name, 6, [bytes.length >> 8, bytes.length & 0xff, ...bytes]];
+}
+
 describe("the checksum", () => {
   it("matches the standard check value", () => {
     // Every CRC-32 implementation is expected to produce this for "123456789";
@@ -154,5 +159,28 @@ describe("reading a stream", () => {
     new DataView(bytes.buffer).setUint32(0, 4, false);
 
     await expect(collect(streamOf(bytes))).rejects.toThrow(/below the minimum/);
+  });
+});
+
+describe("a header whose value is raw bytes", () => {
+  /**
+   * It is carried as base64 text.
+   *
+   * The decoder surfaces every header as a string, so a byte-array header — the
+   * type the protocol reserves for binary values — needs an encoding that
+   * survives that. Reaching for a Node-only helper here would have thrown at
+   * runtime, in the one branch the protocol's own streams happen not to use,
+   * which is exactly the kind of breakage that waits for a third-party sender.
+   */
+  it("is readable as base64 text", () => {
+    const message = frame([binary(":binary", [1, 2, 3])], []);
+
+    expect(decodeMessage(message).headers[":binary"]).toBe("AQID");
+  });
+
+  it("handles bytes that are not valid UTF-8", () => {
+    const message = frame([binary(":raw", [0xff, 0xfe, 0x00])], []);
+
+    expect(decodeMessage(message).headers[":raw"]).toBe("//4A");
   });
 });

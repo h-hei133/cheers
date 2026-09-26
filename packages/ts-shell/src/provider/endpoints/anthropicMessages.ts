@@ -103,10 +103,13 @@ export interface AnthropicRequestInput {
 }
 
 /** The headers this endpoint authenticates with, given an API key. */
-export function anthropicHeaders(apiKey: string): Record<string, string> {
+export function anthropicHeaders(apiKey?: string): Record<string, string> {
+  // The key is absent for an endpoint that computes its credential per request:
+  // what comes back is then the headers that travel with every request, rather
+  // than a header naming an empty key.
   return {
     "content-type": "application/json",
-    "x-api-key": apiKey,
+    ...(apiKey ? { "x-api-key": apiKey } : {}),
     "anthropic-version": API_VERSION,
   };
 }

@@ -60,7 +60,7 @@ export function googleBody(input: {
 declareEndpoint("google-generative-ai", {
   // The model is in the path, and the streaming method is a different one.
   path: (model) => googlePath(model, true),
-  headers: (apiKey) => ({ "x-goog-api-key": apiKey, "content-type": "application/json" }),
+  headers: (apiKey) => ({ ...(apiKey ? { "x-goog-api-key": apiKey } : {}), "content-type": "application/json" }),
   body: (input) =>
     googleBody({
       systemPrompt: input.systemPrompt ?? "",

@@ -199,6 +199,12 @@ function canonicalPath(path: string): string {
  * `x`, while encoded its leading `%` sorts before. The service computes the
  * signature over its own canonicalization, so an order that differs from the
  * specification's is a rejected request rather than a wrong-looking one.
+ *
+ * A component is decoded before it is re-encoded so that a value already
+ * escaped once — an ARN's `:` and `/`, a percent sign — is canonicalized rather
+ * than left as the caller wrote it. A lone `%` is not a valid escape, and a
+ * decoder that threw on one would turn a working request into an exception, so
+ * it is passed through and encoded as the literal it is.
  */
 export function canonicalQuery(query: string | undefined): string {
   if (!query) return "";
@@ -209,12 +215,29 @@ export function canonicalQuery(query: string | undefined): string {
     const rawKey = equals === -1 ? part : part.slice(0, equals);
     const rawValue = equals === -1 ? "" : part.slice(equals + 1);
     pairs.push([
-      encodeComponent(decodeURIComponent(rawKey)),
-      encodeComponent(decodeURIComponent(rawValue)),
+      encodeComponent(safelyDecode(rawKey)),
+      encodeComponent(safelyDecode(rawValue)),
     ]);
   }
   pairs.sort((left, right) => (left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : left[1] < right[1] ? -1 : left[1] > right[1] ? 1 : 0));
   return pairs.map(([key, value]) => `${key}=${value}`).join("&");
+}
+
+/**
+ * A component with its escapes resolved, or unchanged when they are not escapes.
+ *
+ * Percent-encoding is lossy to read: `+` means a space in a form body and a plus
+ * in a path, and only the caller knows which convention produced the string. So
+ * a component that arrived already escaped is treated as escaped, and the one
+ * case that is unambiguously wrong — a `%` that does not begin a two-digit
+ * escape — is left alone rather than allowed to throw.
+ */
+function safelyDecode(component: string): string {
+  try {
+    return decodeURIComponent(component);
+  } catch {
+    return component;
+  }
 }
 
 /**

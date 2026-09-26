@@ -1,7 +1,7 @@
 import { accountAuthKey, providerFacts } from "../providers/facts.js";
+import { vertexBaseUrl, vertexTarget } from "../../provider/endpoints/googleVertex.js";
 import type {
-  GoogleAccountAuthConfig,
-  OpenAIAccountAuthConfig,
+  AccountAuthConfig,
   RuntimeConfig,
   ProviderConnectionConfig,
   RuntimeProvider,
@@ -14,7 +14,7 @@ export interface ResolvedProviderCredential {
   readonly provider: RuntimeProvider;
   readonly authMode: ProviderCredentialAuthMode;
   readonly apiKey?: string;
-  readonly accountAuth?: OpenAIAccountAuthConfig | GoogleAccountAuthConfig;
+  readonly accountAuth?: AccountAuthConfig;
   readonly baseUrl?: string;
   readonly model?: string;
   readonly source: ProviderCredentialSource;
@@ -72,11 +72,16 @@ export function resolveProviderCredential(
   const configAccountAuth = accountAuthSlot
     ? configProfile?.accountAuth?.[accountAuthSlot]
     : undefined;
-  const baseUrl = normalizeBaseUrl(
+  // An address that names the account cannot be written down once, so it is
+  // built here from the environment that holds the account. Every other provider
+  // either states a host or has one supplied.
+  const configuredBaseUrl = normalizeBaseUrl(
     input.cliBaseUrl ??
       activeConnectionProfile?.baseUrl ??
       configProfile?.baseUrl,
   );
+  const baseUrl =
+    configuredBaseUrl ?? (provider === "vertex" ? vertexBaseUrlFromEnvironment(env) : undefined);
   const model = normalizeModel(
     input.cliModel ?? activeConnectionProfile?.model ?? configProfile?.model,
   );
@@ -295,8 +300,23 @@ function pickFallbackConnection(
 
 function resolveConnectionAccountAuth(
   connection: ProviderConnectionConfig,
-): OpenAIAccountAuthConfig | GoogleAccountAuthConfig | undefined {
+): AccountAuthConfig | undefined {
   const slot = accountAuthKey(connection.provider);
   return slot ? connection.accountAuth?.[slot] : undefined;
 }
 
+/**
+ * The address a Vertex request goes to, from the account in the environment.
+ *
+ * Nothing is guessed: the project and the location are read from the names the
+ * tooling that sets up a Google account already writes, and a missing one yields
+ * no address at all rather than a string with a placeholder where an account
+ * should be. Readiness reports the absence; a request never leaves with it.
+ */
+function vertexBaseUrlFromEnvironment(
+  env: Readonly<Record<string, string | undefined>>,
+): string | undefined {
+  const { project, location } = vertexTarget(env);
+  if (!project || !location) return undefined;
+  return vertexBaseUrl({ project, location });
+}

@@ -218,3 +218,35 @@ describe("what a request says when tools may not be called", () => {
     }
   });
 });
+
+describe("a shape asked for headers without a key", () => {
+  /**
+   * It names no credential at all.
+   *
+   * An endpoint that computes its credential per request declares a signer and
+   * calls this with no key. Returning `Authorization: Bearer ` — a header naming
+   * an empty credential — is worse than returning nothing: the request goes out
+   * looking authenticated, and the host rejects it for a reason that points at
+   * the key rather than at the missing signature.
+   */
+  it("never produces a header naming an empty credential", () => {
+    for (const kind of ["openai-compatible", "anthropic-messages"] as const) {
+      const headers = endpointShape(kind).headers();
+      const authorization = headers.Authorization ?? headers.authorization;
+      const apiKey = headers["x-api-key"];
+      expect(authorization, kind).toBeUndefined();
+      expect(apiKey, kind).toBeUndefined();
+    }
+  });
+
+  it("still carries the headers every request needs", () => {
+    const headers = endpointShape("openai-compatible").headers();
+
+    expect(headers).not.toHaveProperty("Authorization");
+  });
+
+  it("produces the credential when one is given", () => {
+    expect(endpointShape("openai-compatible").headers("sk-1").Authorization).toBe("Bearer sk-1");
+    expect(endpointShape("anthropic-messages").headers("sk-2")["x-api-key"]).toBe("sk-2");
+  });
+});

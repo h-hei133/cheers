@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { generateKeyPairSync } from "node:crypto";
@@ -218,5 +218,24 @@ describe("a file that is not a credential", () => {
     forgetAccessToken();
 
     await expect(accessToken({ env })).rejects.toThrow(/not JSON/);
+  });
+
+  it("fails immediately when GOOGLE_APPLICATION_CREDENTIALS points to a missing file", async () => {
+    const env = { GOOGLE_APPLICATION_CREDENTIALS: "/nonexistent/path/credentials.json" };
+    forgetAccessToken();
+
+    await expect(accessToken({ env })).rejects.toThrow(GoogleAuthError);
+    await expect(accessToken({ env })).rejects.toThrow(/GOOGLE_APPLICATION_CREDENTIALS points to an unreadable file/);
+  });
+
+  it("fails when default ADC file is unparseable JSON rather than silently ignoring it", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "google-auth-unparseable-"));
+    const configDir = join(directory, ".config", "gcloud");
+    await mkdir(configDir, { recursive: true });
+    await writeFile(join(configDir, "application_default_credentials.json"), "{ invalid json ");
+    const env = { HOME: directory };
+    forgetAccessToken();
+
+    await expect(accessToken({ env })).rejects.toThrow(/is not JSON/);
   });
 });

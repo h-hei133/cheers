@@ -92,28 +92,67 @@ describe("finishing a GitHub sign-in", () => {
     expiresInSeconds: 60,
   };
 
-  it("keeps polling until the code has been entered", async () => {
+  it("keeps polling until the code has been entered and exchanges the token for a Copilot credential", async () => {
     const { fetchImpl, calls } = scripted(
       { body: { error: "authorization_pending" } },
       { body: { access_token: "GHO_TOKEN" } },
+      { body: { token: "tid=session;proxy-ep=proxy.individual.githubcopilot.com", expires_at: 1_800_000_000 } },
     );
 
     const credential = await completeGitHubDeviceFlow({ grant, fetchImpl });
 
-    expect(credential.accessToken).toBe("GHO_TOKEN");
-    expect(calls).toHaveLength(2);
+    expect(credential.accessToken).toBe("tid=session;proxy-ep=proxy.individual.githubcopilot.com");
+    expect(credential.refreshToken).toBe("GHO_TOKEN");
+    expect(calls).toHaveLength(3);
     expect(calls[1]!.body).toContain("grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code");
+    expect(calls[2]!.url).toBe("https://api.github.com/copilot_internal/v2/token");
+    expect(calls[2]!.headers.authorization).toBe("Bearer GHO_TOKEN");
   });
 
-  it("stores the token as its own renewal, because nothing else is needed", async () => {
-    // GitHub's own tokens are long-lived and stay usable, so a renewal is a
-    // re-login rather than an exchange and there is no second value to keep.
-    const { fetchImpl } = scripted({ body: { access_token: "GHO_TOKEN" } });
+  it("stores the reported expiry with the skew convention applied", async () => {
+    const { fetchImpl } = scripted(
+      { body: { access_token: "GHO_TOKEN" } },
+      { body: { token: "COPILOT_SESSION_TOKEN", expires_at: 1_800_000_000 } },
+    );
 
     const credential = await completeGitHubDeviceFlow({ grant, fetchImpl });
 
     expect(credential.refreshToken).toBe("GHO_TOKEN");
-    expect(credential.expiresAt).toBe(Number.MAX_SAFE_INTEGER);
+    // 60-second refresh skew matches the existing convention in this directory
+    expect(credential.expiresAt).toBe((1_800_000_000 - 60) * 1_000);
+  });
+
+  it("sets the baseUrl using the endpoint hint in the Copilot token", async () => {
+    const { fetchImpl } = scripted(
+      { body: { access_token: "GHO_TOKEN" } },
+      { body: { token: "tid=x;proxy-ep=proxy.individual.githubcopilot.com", expires_at: 1_800_000_000 } },
+    );
+
+    const credential = await completeGitHubDeviceFlow({ grant, fetchImpl });
+
+    expect(credential.baseUrl).toBe("https://api.individual.githubcopilot.com");
+  });
+
+  it("falls back to the apiBase when the token does not contain an endpoint hint", async () => {
+    const { fetchImpl } = scripted(
+      { body: { access_token: "GHO_TOKEN" } },
+      { body: { token: "plain_token_without_hint", expires_at: 1_800_000_000 } },
+    );
+
+    const credential = await completeGitHubDeviceFlow({ grant, fetchImpl });
+
+    expect(credential.baseUrl).toBe("https://api.github.com");
+  });
+
+  it("reports a failed token exchange with the endpoint's response text", async () => {
+    const { fetchImpl } = scripted(
+      { body: { access_token: "GHO_TOKEN" } },
+      { text: "Copilot subscription not found for user", status: 403 },
+    );
+
+    await expect(completeGitHubDeviceFlow({ grant, fetchImpl })).rejects.toThrow(
+      "GitHub refused the Copilot token exchange: Copilot subscription not found for user",
+    );
   });
 
   it("stops when the person refuses", async () => {

@@ -30,8 +30,15 @@ export const RUNTIME_PROVIDERS = [
   "anthropic",
   "openai-compatible",
   "google",
+  // Providers reached through their own protocol rather than a compatible
+  // gateway. They are members because a connection names its provider by this
+  // id, and a protocol nothing can name is a protocol nobody can use.
+  "bedrock",
+  "google-ai",
+  "vertex",
   "antigravity",
   "claudecode",
+  "github-copilot",
 ] as const;
 
 export type RuntimeProvider = (typeof RUNTIME_PROVIDERS)[number];
@@ -62,9 +69,40 @@ export interface GoogleAccountAuthConfig {
   readonly accountEmail?: string;
 }
 
+/**
+ * A credential from a subscription rather than from a registered API client.
+ *
+ * The flows that issue one — a device code entered elsewhere, a loopback
+ * callback on a fixed port — produce a token that is renewed with a different
+ * token rather than by signing in again, which is why the refresh material is
+ * kept beside it. It carries no account id: the subscription is the identity.
+ */
+export interface SubscriptionAccountAuthConfig {
+  readonly type: "subscription";
+  readonly accessToken: string;
+  readonly refreshToken: string;
+  readonly expiresAt: number;
+  /** The API base the subscription is routed to, when the issuer states one. */
+  readonly baseUrl?: string;
+}
+
+/**
+ * Any credential an account sign-in can produce.
+ *
+ * Named once because it is threaded through the resolver, the readiness check,
+ * the authorization layer and the request path: spelling the union out at each
+ * of those is how a new kind of credential gets added to most of them and missed
+ * in one, and the miss shows up as a credential silently not being sent.
+ */
+export type AccountAuthConfig =
+  | OpenAIAccountAuthConfig
+  | GoogleAccountAuthConfig
+  | SubscriptionAccountAuthConfig;
+
 export interface ProviderAccountAuthConfig {
   readonly openai?: OpenAIAccountAuthConfig;
   readonly google?: GoogleAccountAuthConfig;
+  readonly subscription?: SubscriptionAccountAuthConfig;
 }
 
 export interface ProviderCredentialConfig {

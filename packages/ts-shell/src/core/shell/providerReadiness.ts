@@ -1,8 +1,5 @@
 import type { RuntimeProvider } from "../../config/runtimeConfig.js";
-import type {
-  GoogleAccountAuthConfig,
-  OpenAIAccountAuthConfig,
-} from "../../config/runtimeConfig.js";
+import type { AccountAuthConfig } from "../../config/runtimeConfig.js";
 import { createProviderFetchFromEnv } from "../../provider/request/fetch.js";
 import type { ProviderRegistryProjection } from "../../provider/registry/provider.js";
 import type { QueryEvent } from "../query/runtime/events.js";
@@ -48,7 +45,7 @@ export interface ProviderReadinessCheckOptions {
   readonly timeoutMs?: number;
   readonly provider?: RuntimeProvider;
   readonly apiKey?: string;
-  readonly accountAuth?: OpenAIAccountAuthConfig | GoogleAccountAuthConfig;
+  readonly accountAuth?: AccountAuthConfig;
   readonly baseUrl?: string;
   readonly model?: string;
 }

@@ -113,12 +113,10 @@ export async function startGitHubDeviceFlow(options: {
 /**
  * Wait until the code has been entered, and return the credential.
  *
- * The polling and its rules live in the device-flow module; this only asks GitHub
- * once per attempt and classifies the answer.
- *
- * The token GitHub returns is the credential. Its own tokens are long-lived and
- * remain usable, so there is no second exchange — the field names below reflect
- * that the access token is also what a refresh would send.
+ * Polling GitHub's device flow produces a GitHub OAuth access token. That token is
+ * then exchanged at the Copilot token endpoint for a short-lived Copilot session
+ * token, which carries its own expiry and routing endpoint. The long-lived GitHub
+ * token is retained as the refresh token for future renewals.
  */
 export async function completeGitHubDeviceFlow(input: {
   readonly grant: DeviceCodeGrant;
@@ -128,7 +126,7 @@ export async function completeGitHubDeviceFlow(input: {
 }): Promise<SubscriptionCredential> {
   const domain = input.domain ?? "github.com";
   const endpoints = gitHubEndpoints(domain);
-  let accessToken = "";
+  let gitHubToken = "";
 
   await pollDeviceFlow<null>({
     ...(input.grant.intervalSeconds !== undefined ? { intervalSeconds: input.grant.intervalSeconds } : {}),
@@ -147,21 +145,50 @@ export async function completeGitHubDeviceFlow(input: {
       const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
       const outcome = classifyDeviceTokenResponse(body);
       if (outcome.status === "complete") {
-        accessToken = String((outcome.value as Record<string, unknown>).access_token);
+        gitHubToken = String((outcome.value as Record<string, unknown>).access_token);
         return { status: "complete", value: null };
       }
       return outcome;
     },
   });
 
+  const exchangeResponse = await (input.fetchImpl ?? fetch)(endpoints.copilotToken, {
+    headers: {
+      accept: "application/json",
+      authorization: `Bearer ${gitHubToken}`,
+      "user-agent": "cheers",
+    },
+    ...(input.signal ? { signal: input.signal } : {}),
+  });
+  const responseText = await exchangeResponse.text();
+  if (!exchangeResponse.ok) {
+    throw new SubscriptionError(
+      `GitHub refused the Copilot token exchange: ${responseText.slice(0, 200)}`,
+      "github-copilot",
+    );
+  }
+
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(responseText) as Record<string, unknown>;
+  } catch {
+    throw new SubscriptionError("GitHub's Copilot token answer was not JSON", "github-copilot");
+  }
+
+  const sessionToken = payload.token;
+  if (typeof sessionToken !== "string") {
+    throw new SubscriptionError("GitHub's Copilot token answer carried no token", "github-copilot");
+  }
+
+  const expiresAtSec = typeof payload.expires_at === "number" ? payload.expires_at : Math.floor(Date.now() / 1_000) + 3_600;
+  const expiresAtMs = (expiresAtSec - 60) * 1_000;
+
   return {
     provider: "github-copilot",
-    accessToken,
-    // The same value: GitHub's tokens are long-lived, so a renewal is a re-login
-    // rather than an exchange, and nothing else has to be stored to do one.
-    refreshToken: accessToken,
-    expiresAt: Number.MAX_SAFE_INTEGER,
-    baseUrl: endpoints.apiBase,
+    accessToken: sessionToken,
+    refreshToken: gitHubToken,
+    expiresAt: expiresAtMs,
+    baseUrl: copilotBaseUrl(sessionToken, endpoints.apiBase),
   };
 }
 

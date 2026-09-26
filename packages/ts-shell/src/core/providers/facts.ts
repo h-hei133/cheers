@@ -42,9 +42,9 @@ export interface ProviderFacts {
    * Naming the key here is what lets the readers stop spelling out which
    * provider owns which slot.
    */
-  readonly accountAuthKey?: "openai" | "google";
+  readonly accountAuthKey?: "openai" | "google" | "subscription";
   /** The credential discriminator this provider's account login produces. */
-  readonly accountAuthType?: "openai-chatgpt-account" | "google-gemini-account";
+  readonly accountAuthType?: "openai-chatgpt-account" | "google-gemini-account" | "subscription";
   /**
    * The model an account connection uses when the user named none.
    *
@@ -100,6 +100,11 @@ const FACTS = {
     label: "Anthropic",
     apiKeyEnvVar: "ANTHROPIC_API_KEY",
     compatibleStyle: false,
+    // Reached with either an API key or a subscription, so it has an account
+    // slot as well. The two are told apart by the credential's own discriminator
+    // at read time rather than by which slot it is in.
+    accountAuthKey: "subscription",
+    accountAuthType: "subscription",
     fallbackModels: ["claude-sonnet-4-5", "claude-opus-4-1"],
   },
   "openai-compatible": {
@@ -117,11 +122,65 @@ const FACTS = {
     accountAuthDefaultModel: "gemini-2.5-flash",
     fallbackModels: ["gemini-2.5-flash", "gemini-2.5-pro"],
   },
+  /**
+   * A provider reached through its own protocol, not a compatible gateway.
+   *
+   * Not `compatibleStyle`: that flag asks whether the user must supply an
+   * endpoint and a model, and these three carry both — the host is fixed and the
+   * model list ships with the catalogue.
+   */
+  bedrock: {
+    label: "AWS Bedrock",
+    // Deliberately not `AWS_ACCESS_KEY_ID`. This name is what the credential
+    // resolver looks up, and a value found under it is treated as a static key
+    // — which would take the place of the signature entirely and send unsigned
+    // requests. The account's key really does belong in that variable, and it is
+    // read by the signing chain, so naming it here would read it twice and the
+    // second reader would win.
+    apiKeyEnvVar: "BEDROCK_API_KEY",
+    compatibleStyle: false,
+    fallbackModels: ["anthropic.claude-sonnet-4-5-v1:0", "amazon.nova-pro-v1:0"],
+  },
+  "google-ai": {
+    label: "Google AI",
+    apiKeyEnvVar: "GEMINI_API_KEY",
+    compatibleStyle: false,
+    fallbackModels: ["gemini-2.5-pro", "gemini-2.5-flash"],
+  },
+  /**
+   * Vertex names its account in the address, so the base URL is built rather
+   * than written down. Everything else about it is the same as Google AI.
+   */
+  vertex: {
+    label: "Google Vertex",
+    // Same reasoning as Bedrock: this one names a path to a credential file,
+    // not a key, and the file is read by the account chain. Naming it here would
+    // put the path where a key is expected.
+    apiKeyEnvVar: "VERTEX_API_KEY",
+    compatibleStyle: false,
+    fallbackModels: ["gemini-2.5-pro", "gemini-2.5-flash"],
+  },
   antigravity: {
     label: "Antigravity (OpenAI-compatible)",
     apiKeyEnvVar: "ANTIGRAVITY_API_KEY",
     compatibleStyle: true,
     fallbackModels: ["gpt-4.1-mini", "gpt-4.1", "gpt-5.4"],
+  },
+  /**
+   * Reached with a subscription rather than an API key.
+   *
+   * The credential is a session token the account's own sign-in issues, so there
+   * is no variable to read a key from and no account slot: the slot is the
+   * subscription one, and its `accountAuthType` is what the stored credential
+   * has to agree with.
+   */
+  "github-copilot": {
+    label: "GitHub Copilot",
+    apiKeyEnvVar: "GITHUB_COPILOT_API_KEY",
+    compatibleStyle: false,
+    accountAuthKey: "subscription",
+    accountAuthType: "subscription",
+    fallbackModels: ["gpt-4.1"],
   },
   claudecode: {
     label: "Anthropic-compatible proxy",

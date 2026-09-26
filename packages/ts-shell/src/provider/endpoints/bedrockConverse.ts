@@ -16,6 +16,7 @@
 import { declareEndpoint } from "./kinds.js";
 import type { EndpointShape, SimpleRequest, TurnRequest } from "./kinds.js";
 import { readEventStream, type EventMessage } from "../aws/eventStream.js";
+import { resolveCredentials } from "../aws/credentials.js";
 import { signAwsRequest } from "../aws/signature.js";
 import type { RequestSigner } from "../request/fetch.js";
 import type { ChatMessage } from "../../turn/prompt.js";
@@ -215,19 +216,38 @@ function converseBody(input: TurnRequest): Record<string, unknown> {
 }
 
 /**
+ * Extract an AWS region from an endpoint hostname, when the hostname carries one.
+ *
+ * Bedrock hostnames look like `bedrock-runtime.eu-west-1.amazonaws.com` (or with cn- domains).
+ * A custom gateway or reverse proxy will not carry a standard region segment, in which case
+ * undefined is returned and the caller falls back to the environment or default region.
+ */
+function regionFromHost(host: string): string | undefined {
+  const match = /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.([a-z]{2}-[a-z]+-\d+)\.amazonaws\.com(?:\.cn)?$/i.exec(host);
+  return match ? match[1] : undefined;
+}
+
+/**
  * The signer for this endpoint.
  *
  * The host is derived from the region because the signature covers it, and the
  * host has to be the one the request actually goes to or the service rejects the
  * signature. A base URL that already names a host wins, so a caller pointing at a
  * gateway signs for the gateway.
+ *
+ * The credential is resolved per request so that expiring credentials (such as STS
+ * AssumeRole, SSO, container, or IMDS sessions) are refreshed by the credentials
+ * provider cache rather than captured once for the lifetime of the signer.
  */
 async function bedrockSigner(): Promise<RequestSigner | undefined> {
-  const { resolveCredentials } = await import("../aws/credentials.js");
-  const credentials = await resolveCredentials();
-  const region = process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? "us-east-1";
   return async (request) => {
     const url = new URL(request.url);
+    const region =
+      regionFromHost(url.hostname) ??
+      process.env.AWS_REGION ??
+      process.env.AWS_DEFAULT_REGION ??
+      "us-east-1";
+    const credentials = await resolveCredentials();
     return signAwsRequest({
       method: request.method,
       host: url.hostname,
@@ -284,16 +304,20 @@ async function* readConverseStream(
   const calls = new Map<number, { id: string; name: string; args: string }>();
   let sawMessageStart = false;
   let sawMessageStop = false;
-  let failure: string | undefined;
 
   for await (const message of readEventStream(body)) {
     const messageType = message.headers[":message-type"];
     if (messageType === "exception" || messageType === "error") {
       // The stream carries provider failures in band, which is the only place
-      // they can be seen: the transport succeeded, the answer did not.
+      // they can be seen: the transport succeeded, the answer did not. The frame
+      // is terminal — the answer is already known to be unusable — so the rest of
+      // the stream is not read. Draining it would spend the connection on bytes
+      // that cannot change the outcome, and would delay the failure until the
+      // provider chose to close.
       const detail = (message.headers[":exception-type"] ?? message.headers[":error-code"] ?? "error").toString();
-      failure = `${detail}: ${new TextDecoder().decode(message.payload).slice(0, 300)}`;
-      continue;
+      throw new Error(
+        `Provider reported an error mid-stream: ${detail}: ${new TextDecoder().decode(message.payload).slice(0, 300)}`,
+      );
     }
     if (messageType !== "event") continue;
 
@@ -352,9 +376,6 @@ async function* readConverseStream(
     }
   }
 
-  if (failure !== undefined) {
-    throw new Error(`Provider reported an error mid-stream: ${failure}`);
-  }
   if (sawMessageStart && !sawMessageStop) {
     // A stream that started and never finished is a truncated answer, and saying
     // so beats returning the part that arrived as though it were the whole thing.

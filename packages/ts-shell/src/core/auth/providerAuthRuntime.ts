@@ -1,12 +1,4 @@
-import {
-  type GoogleAccountAuthConfig,
-  readUserRuntimeConfigFile,
-  writeUserRuntimeConfigFile,
-  type OpenAIAccountAuthConfig,
-  type ProviderConnectionConfig,
-  type RuntimeConfigFile,
-  type RuntimeProvider,
-} from "../../config/runtimeConfig.js";
+import { AccountAuthConfig, type GoogleAccountAuthConfig, type OpenAIAccountAuthConfig, type ProviderConnectionConfig, readUserRuntimeConfigFile, type RuntimeConfigFile, type RuntimeProvider, writeUserRuntimeConfigFile } from "../../config/runtimeConfig.js";
 import { providerFacts } from "../providers/facts.js";
 import { openAIProviderAuthContract } from "../commands/openaiAccountAuth.js";
 import { googleProviderAuthContract } from "../commands/googleAccountAuth.js";
@@ -14,13 +6,23 @@ import {
   type ProviderAccountAuthResult,
   toGoogleAccountAuthConfig,
   toOpenAIAccountAuthConfig,
+  toSubscriptionAccountAuthConfig,
   type ProviderAccountAuthConnectionSummary,
   type ProviderAuthContract,
 } from "./providerAuthContract.js";
+import {
+  anthropicSubscriptionProviderAuthContract,
+  gitHubCopilotProviderAuthContract,
+} from "../commands/subscriptionAccountAuth.js";
 
 const CONTRACTS: readonly ProviderAuthContract[] = [
   openAIProviderAuthContract,
   googleProviderAuthContract,
+  // A subscription is not an API key, and neither of these can be reached with
+  // one: the credential is issued to the account by a sign-in, so without a
+  // contract here the flow exists and nothing can start it.
+  gitHubCopilotProviderAuthContract,
+  anthropicSubscriptionProviderAuthContract,
 ];
 let testOpenAILoginOverride:
   | ((...args: Parameters<ProviderAuthContract["loginAccountAuth"]>) => ReturnType<ProviderAuthContract["loginAccountAuth"]>)
@@ -103,7 +105,14 @@ export async function runProviderAccountAuthLogin(input: {
   }
 }
 
-function resolveProviderAuthContract(
+/**
+ * The contract for a provider, if this build can sign it in.
+ *
+ * Exported because it is the question "can this provider be signed into", and
+ * the answer decides whether a surface offers the sign-in at all. A surface that
+ * could not ask would offer one and then fail at the end of it.
+ */
+export function resolveProviderAuthContract(
   provider: RuntimeProvider,
 ): ProviderAuthContract | undefined {
   const match = CONTRACTS.find((item) => item.provider === provider);
@@ -131,7 +140,7 @@ export function __setOpenAIProviderAuthLoginForTest(
 function persistConnectedAccountAuth(input: {
   readonly provider: RuntimeProvider;
   readonly connectionId: string;
-  readonly accountAuth: OpenAIAccountAuthConfig | GoogleAccountAuthConfig;
+  readonly accountAuth: AccountAuthConfig;
   readonly authorizeUrl: string;
   readonly callbackUrl: string;
 }): ProviderAccountAuthConnectionSummary {
@@ -197,7 +206,7 @@ function persistConnectedAccountAuth(input: {
  */
 export function persistRenewedAccountAuth(input: {
   readonly provider: RuntimeProvider;
-  readonly accountAuth: OpenAIAccountAuthConfig | GoogleAccountAuthConfig;
+  readonly accountAuth: AccountAuthConfig;
 }): boolean {
   const latest = readUserRuntimeConfigFile();
   const accountAuth = toProviderAccountAuthConfig(input.provider, input.accountAuth);
@@ -336,7 +345,7 @@ function withoutApiKey<T extends { readonly apiKey?: string }>(value: T): Omit<T
 function resolveAccountAuthConfig(
   provider: RuntimeProvider,
   result: ProviderAccountAuthResult,
-): OpenAIAccountAuthConfig | GoogleAccountAuthConfig | undefined {
+): AccountAuthConfig | undefined {
   if (provider === "openai") {
     return toOpenAIAccountAuthConfig(result);
   }
@@ -348,6 +357,17 @@ function resolveAccountAuthConfig(
       );
     }
     return config;
+  }
+  // A subscription sign-in issues the same three fields through a different
+  // route, and the stored shape records that it did — the two have to agree at
+  // read time, which is what the stored `type` is for.
+  if (provider === "github-copilot" || provider === "anthropic") {
+    return toSubscriptionAccountAuthConfig({
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      expiresAt: result.expiresAt,
+      ...(result.callbackUrl ? { baseUrl: result.callbackUrl } : {}),
+    });
   }
   return undefined;
 }
@@ -363,7 +383,7 @@ function resolveAccountAuthConfig(
  */
 function toProviderAccountAuthConfig(
   provider: RuntimeProvider,
-  config: OpenAIAccountAuthConfig | GoogleAccountAuthConfig,
+  config: AccountAuthConfig,
 ): NonNullable<ProviderConnectionConfig["accountAuth"]> {
   const facts = providerFacts(provider);
   if (!facts.accountAuthKey || config.type !== facts.accountAuthType) return {};

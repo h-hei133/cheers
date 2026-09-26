@@ -66,6 +66,31 @@ describe("the canonical query", () => {
   it("keeps a parameter with no value", () => {
     expect(canonicalQuery("flag")).toBe("flag=");
   });
+
+  /**
+   * A component that is not valid percent-encoding is not an error.
+   *
+   * A query string is not required to be escaped — `100%` is a value a caller may
+   * legitimately send — and a decoder that threw on the lone `%` would turn a
+   * working request into an exception at the last step before the wire.
+   */
+  it("accepts a value that is not valid percent-encoding", () => {
+    expect(canonicalQuery("t=100%")).toBe("t=100%25");
+    expect(canonicalQuery("q=a%b")).toBe("q=a%25b");
+  });
+
+  /**
+   * A component already escaped is canonicalized rather than passed through.
+   *
+   * An ARN in a query carries a colon and a slash, which the caller may have
+   * escaped. The service signs the canonical form, so a value left as the caller
+   * wrote it would be signed differently from the way the service reads it.
+   */
+  it("canonicalizes a value that arrived escaped", () => {
+    expect(canonicalQuery("role=arn:aws:iam::1:role/a%2Fb")).toBe(
+      "role=arn%3Aaws%3Aiam%3A%3A1%3Arole%2Fa%2Fb",
+    );
+  });
 });
 
 describe("signing a request", () => {

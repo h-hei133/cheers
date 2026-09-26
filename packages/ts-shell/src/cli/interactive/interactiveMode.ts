@@ -1,4 +1,5 @@
 import { messageToText } from "../../model-adapters/multimodal.js";
+import { backgroundTasks, renderTask } from "../../core/shell/background/tasks.js";
 import type { Interface as ReadlineInterface } from "node:readline";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
@@ -152,6 +153,8 @@ export class InteractiveMode {
    * and follow-ups run after it, both through the runtime's input handle.
    */
   private readonly queue: string[] = [];
+  /** Stops the background-completion notice from reaching a disposed session. */
+  private readonly stopWatchingBackground: () => void;
   private releaseEvents: (() => void) | undefined;
   /**
    * The theme file being followed, when the theme in use came from one.
@@ -186,6 +189,19 @@ export class InteractiveMode {
       onReload: () => this.tui.requestRender({ force: true }),
     });
     this.tui.setDisconnectHandler(() => this.stop());
+    // A command that ends while nobody is looking is announced through the queue
+    // a follow-up already uses, rather than through a mechanism of its own: the
+    // model should learn about it the same way it learns about anything else the
+    // user queued, and a second channel would need its own ordering rules.
+    this.stopWatchingBackground = backgroundTasks.onEnded((task) => {
+      const runtime = this.options.sessionRuntime;
+      if (this.busy) {
+        runtime.input?.()?.followUp(backgroundNotice(task));
+      } else {
+        this.queue.push(backgroundNotice(task));
+      }
+      this.tui.requestRender();
+    });
     this.state = createViewState();
     this.view = new InteractiveSurface(
       {
@@ -332,6 +348,9 @@ export class InteractiveMode {
     this.theme.stop();
     this.releaseEvents?.();
     this.releaseEvents = undefined;
+    // The registry outlives this surface, so the subscription has to be given
+    // back or a later command would be announced to a session already gone.
+    this.stopWatchingBackground();
     this.clipboard.release();
     this.questions.abandon();
     this.options.renderer.clearSink();
@@ -745,4 +764,16 @@ export class InteractiveMode {
       exit: this.options.exit,
     });
   }
+}
+
+/**
+ * What the user is told when a background command ends.
+ *
+ * Phrased as something to act on rather than a status line: the command was
+ * started so its result could be used later, and the moment it ends is when that
+ * becomes possible. The tail of its output travels with the notice because the
+ * only other way to get it is a second tool call.
+ */
+function backgroundNotice(task: Parameters<typeof renderTask>[0]): string {
+  return `A background command finished.\n\n${renderTask(task)}\n\nRead the full output with taskOutput if you need more than the tail.`;
 }

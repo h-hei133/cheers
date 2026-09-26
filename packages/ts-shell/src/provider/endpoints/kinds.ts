@@ -58,7 +58,14 @@ export interface EndpointShape {
    * `signer` instead and returns nothing here, because a header that has to be
    * computed per request cannot be resolved when the session is built.
    */
-  readonly headers: (apiKey: string) => Record<string, string>;
+  /**
+   * The headers that carry a static key, given the key.
+   *
+   * The key is absent for an endpoint whose credential is computed per request
+   * instead of sent: what comes back is then the headers that travel with every
+   * request, and never a placeholder where a real credential would go.
+   */
+  readonly headers: (apiKey?: string) => Record<string, string>;
   /**
    * How this endpoint authenticates a request when a constant header will not do.
    *

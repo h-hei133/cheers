@@ -85,16 +85,21 @@ export function parseArguments(arguments_: string): Record<string, unknown> {
  */
 export function convertContents(messages: readonly GoogleMessage[]): GoogleContent[] {
   const contents: GoogleContent[] = [];
+  const toolCallNames = new Map<string, string>();
 
   for (const message of messages) {
     if (message.role === "system") continue;
 
     if (message.role === "tool") {
+      const resolvedName =
+        (message.tool_call_id ? toolCallNames.get(message.tool_call_id) : undefined) ??
+        message.toolName ??
+        "unknown";
       const part: GooglePart = {
         functionResponse: {
           // The protocol identifies a result by the tool's name, not by the id
           // the call carried, so the name has to travel with the result.
-          name: message.toolName ?? "unknown",
+          name: resolvedName,
           response: { output: textOf(message.content) },
           ...(message.tool_call_id ? { id: message.tool_call_id } : {}),
         },
@@ -128,6 +133,7 @@ export function convertContents(messages: readonly GoogleMessage[]): GoogleConte
     const text = textOf(message.content);
     if (text) parts.push({ text });
     for (const call of message.tool_calls ?? []) {
+      toolCallNames.set(call.id, call.function.name);
       parts.push({
         functionCall: {
           name: call.function.name,
@@ -177,12 +183,55 @@ export interface Chunk {
   readonly promptFeedback?: { readonly blockReason?: string; readonly blockReasonMessage?: string };
 }
 
+/** Map a Google finishReason into the stop reason the turn layer expects. */
+export function mapGoogleFinishReason(reason: string | undefined): string | undefined {
+  if (!reason) return undefined;
+  if (reason === "MAX_TOKENS") return "length";
+  return "stop";
+}
+
+/** Extract tool calls from parts in the same shape both stream and body readers produce. */
+function toolCallsFromParts(parts: readonly GooglePart[]): Array<{ id: string; name: string; args: string }> {
+  const calls: Array<{ id: string; name: string; args: string }> = [];
+  for (const part of parts) {
+    if (part.functionCall) {
+      calls.push({
+        id: part.functionCall.id ?? `call_${calls.length}`,
+        name: part.functionCall.name ?? "",
+        args: JSON.stringify(part.functionCall.args ?? {}),
+      });
+    }
+  }
+  return calls;
+}
+
 /** The answer out of a non-streamed response. */
 export function readGoogleBody(body: unknown): CompletedBody {
-  const candidates = (body as Chunk)?.candidates;
-  const parts = candidates?.[0]?.content?.parts ?? [];
+  const candidate = (body as Chunk)?.candidates?.[0];
+  const parts = candidate?.content?.parts ?? [];
   const text = parts.map((part) => part.text ?? "").join("");
-  return { choices: [{ message: { content: text } }] };
+  const calls = toolCallsFromParts(parts);
+  const finish_reason = mapGoogleFinishReason(candidate?.finishReason);
+  return {
+    choices: [
+      {
+        message: {
+          content: text,
+          ...(calls.length > 0
+            ? {
+                tool_calls: calls.map((call, index) => ({
+                  id: call.id,
+                  type: "function" as const,
+                  function: { name: call.name, arguments: call.args },
+                  index,
+                })),
+              }
+            : {}),
+        },
+        ...(finish_reason ? { finish_reason } : {}),
+      },
+    ],
+  };
 }
 
 /**
@@ -234,7 +283,7 @@ export async function* readGoogleStream(
       }
 
       const candidate = parsed.candidates?.[0];
-      if (candidate?.finishReason) finishReason = candidate.finishReason;
+      if (candidate?.finishReason) finishReason = mapGoogleFinishReason(candidate.finishReason);
       if (parsed.usageMetadata) {
         usage = {
           prompt_tokens: parsed.usageMetadata.promptTokenCount ?? 0,
@@ -242,15 +291,9 @@ export async function* readGoogleStream(
         };
       }
 
+      calls.push(...toolCallsFromParts(candidate?.content?.parts ?? []));
       for (const part of candidate?.content?.parts ?? []) {
-        if (part.functionCall) {
-          calls.push({
-            id: part.functionCall.id ?? `call_${calls.length}`,
-            name: part.functionCall.name ?? "",
-            args: JSON.stringify(part.functionCall.args ?? {}),
-          });
-          continue;
-        }
+        if (part.functionCall) continue;
         if (!part.text) continue;
         if (part.thought) {
           reasoning += part.text;

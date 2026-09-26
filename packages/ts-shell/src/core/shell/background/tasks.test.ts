@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { backgroundTasks, renderTask } from "./tasks.js";
+import { backgroundTasks, TaskRegistry, renderTask } from "./tasks.js";
 
 /**
  * Commands that outlive the turn that started them.
@@ -179,3 +179,108 @@ describe("the list", () => {
     expect(backgroundTasks.get("bg_nonexistent")).toBeUndefined();
   });
 });
+
+describe("a command that could not start", () => {
+  /**
+   * It is announced once.
+   *
+   * A child that cannot be spawned reports an error and then a close, so an
+   * unguarded handler fires twice. A caller using the notice to continue the turn
+   * would continue it twice, and the second notice would arrive for a task that
+   * had already been reported finished.
+   */
+  it("notifies once, not once per event", async () => {
+    const registry = new TaskRegistry();
+    const seen: string[] = [];
+    registry.onEnded((task) => seen.push(task.id));
+
+    // A working directory that does not exist makes the spawn itself fail, which
+    // is the path that reports an error and then a close.
+    const task = registry.start({ command: "echo hi", cwd: "/nonexistent-directory-for-a-test" });
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    expect(seen).toEqual([task.id]);
+    expect(registry.get(task.id)?.state).toBe("exited");
+  });
+});
+
+
+describe("being told when a command ends", () => {
+  /**
+   * The subscription can be given back.
+   *
+   * The registry is a process singleton, so a listener that cannot be removed
+   * outlives the surface that asked for it. A session that restarted its
+   * subscriber would keep notifying the old one for the life of the process —
+   * and the old one belongs to a conversation that is over.
+   */
+  it("stops notifying once the subscription is released", async () => {
+    const registry = new TaskRegistry();
+    const seen: string[] = [];
+    const release = registry.onEnded((task) => seen.push(task.id));
+
+    release();
+    registry.start({ command: "echo done", cwd: process.cwd() });
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    expect(seen).toEqual([]);
+  });
+
+  it("keeps notifying a listener that is still subscribed", async () => {
+    const registry = new TaskRegistry();
+    const seen: string[] = [];
+    const release = registry.onEnded((task) => seen.push(task.id));
+    registry.onEnded(() => undefined);
+
+    registry.start({ command: "echo done", cwd: process.cwd() });
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    release();
+
+    expect(seen).toHaveLength(1);
+  });
+});
+
+describe("output past the size limit", () => {
+  /**
+   * The reader is told that earlier output was dropped.
+   *
+   * The buffer keeps the tail, because a command that fails says why at the end.
+   * What must not happen is a reader being handed a clipped tail with nothing to
+   * say it was clipped: a report whose beginning is missing reads as the whole
+   * story, and the missing part is exactly where the command said what it was
+   * doing.
+   */
+  it("says so rather than looking like the whole output", async () => {
+    const registry = new TaskRegistry();
+    // Comfortably past the buffer, so something is definitely dropped.
+    const task = registry.start({
+      command: "for i in $(seq 1 20000); do echo line-$i-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx; done",
+      cwd: process.cwd(),
+    });
+    await new Promise((resolve) => setTimeout(resolve, 2_500));
+
+    const finished = registry.get(task.id)!;
+    expect(finished.outputTruncated).toBe(true);
+    expect(renderTask(finished)).toMatch(/earlier output was dropped/);
+  }, 20_000);
+
+  it("does not claim a drop when there was none", () => {
+    const task = registry_spy();
+    expect(task.outputTruncated).not.toBe(true);
+    expect(renderTask(task)).not.toMatch(/earlier output was dropped/);
+  });
+});
+
+/** A finished task with a small output, built directly. */
+function registry_spy() {
+  return {
+    id: "bg_1",
+    command: "echo hi",
+    cwd: process.cwd(),
+    pid: undefined,
+    startedAt: Date.now(),
+    state: "exited" as const,
+    exitCode: 0,
+    output: "hi\n",
+  };
+}

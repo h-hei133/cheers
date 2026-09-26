@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { RUNTIME_PROVIDERS, type RuntimeProvider } from "../../config/runtimeConfig.js";
-import { toGoogleAccountAuthConfig, toOpenAIAccountAuthConfig } from "../../core/auth/providerAuthContract.js";
+import {
+  toGoogleAccountAuthConfig,
+  toOpenAIAccountAuthConfig,
+  toSubscriptionAccountAuthConfig,
+} from "../../core/auth/providerAuthContract.js";
 import { accountAuthKey, providerFacts, type ProviderFacts } from "./facts.js";
 
 /**
@@ -78,10 +82,15 @@ describe("account auth facts", () => {
   it("names a config slot only for the providers that have an account login", () => {
     expect(accountAuthKey("openai")).toBe("openai");
     expect(accountAuthKey("google")).toBe("google");
+    // A subscription is an account credential too, so the two providers that
+    // take one name the subscription slot.
+    expect(accountAuthKey("anthropic")).toBe("subscription");
+    expect(accountAuthKey("github-copilot")).toBe("subscription");
     // Nothing, rather than a guess: reading another provider's slot would hand
     // back a credential belonging to a different service.
-    expect(accountAuthKey("anthropic")).toBeUndefined();
     expect(accountAuthKey("openai-compatible")).toBeUndefined();
+    expect(accountAuthKey("bedrock")).toBeUndefined();
+    expect(accountAuthKey("vertex")).toBeUndefined();
   });
 
   it("pairs each slot with the credential shape its own login produces", () => {
@@ -104,6 +113,11 @@ describe("account auth facts", () => {
         accessToken: "t",
         refreshToken: "r",
         expiresAt: "e",
+      }).type,
+      subscription: toSubscriptionAccountAuthConfig({
+        accessToken: "t",
+        refreshToken: "r",
+        expiresAt: 0,
       }).type,
     };
 

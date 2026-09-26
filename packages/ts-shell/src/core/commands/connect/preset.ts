@@ -33,6 +33,33 @@ export const CONNECT_PRESETS: readonly ConnectPreset[] = [
     defaultModel: "gemini-2.5-flash",
   },
   {
+    id: "google-ai",
+    label: "Google AI",
+    provider: "google-ai",
+    defaultBaseUrl: "https://generativelanguage.googleapis.com",
+    defaultModel: "gemini-2.5-flash",
+  },
+  {
+    id: "bedrock",
+    label: "AWS Bedrock",
+    provider: "bedrock",
+    defaultModel: "anthropic.claude-sonnet-4-5-v1:0",
+  },
+  {
+    id: "vertex",
+    label: "Google Vertex",
+    // No default base URL: this one names the account, so it is built from the
+    // environment rather than written here — see where the connection resolves.
+    provider: "vertex",
+    defaultModel: "gemini-2.5-flash",
+  },
+  {
+    id: "github-copilot",
+    label: "GitHub Copilot",
+    provider: "github-copilot",
+    defaultModel: "gpt-4.1",
+  },
+  {
     id: "antigravity",
     label: "Antigravity",
     provider: "antigravity",

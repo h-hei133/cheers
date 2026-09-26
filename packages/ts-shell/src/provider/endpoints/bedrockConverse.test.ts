@@ -282,3 +282,119 @@ describe("reading the answer", () => {
     await expect(readAll([bytes])).rejects.toThrow(/ThrottlingException/);
   });
 });
+
+describe("a failure that arrives in the stream", () => {
+  /** One exception message, framed the way the protocol frames them. */
+  function exception(name: string, payload: unknown): Uint8Array {
+    const headerBytes: number[] = [];
+    const encoder = new TextEncoder();
+    for (const [key, value] of [
+      [":message-type", "exception"],
+      [":exception-type", name],
+    ] as const) {
+      const name_ = encoder.encode(key);
+      const value_ = encoder.encode(value);
+      headerBytes.push(name_.length, ...name_, 7, value_.length >> 8, value_.length & 0xff, ...value_);
+    }
+    const payloadBytes = [...encoder.encode(JSON.stringify(payload))];
+    const total = 12 + headerBytes.length + payloadBytes.length + 4;
+    const bytes = new Uint8Array(total);
+    const view = new DataView(bytes.buffer);
+    view.setUint32(0, total, false);
+    view.setUint32(4, headerBytes.length, false);
+    view.setUint32(8, crc32(bytes.subarray(0, 8)), false);
+    bytes.set(headerBytes, 12);
+    bytes.set(payloadBytes, 12 + headerBytes.length);
+    view.setUint32(total - 4, crc32(bytes.subarray(0, total - 4)), false);
+    return bytes;
+  }
+
+  /**
+   * It ends the read rather than being noticed at the end of it.
+   *
+   * An exception frame is terminal: the answer is already known to be unusable.
+   * Continuing to consume the stream spends the connection on bytes that cannot
+   * change the outcome, and holds the failure back until the provider decides to
+   * close — which is exactly the case where something has gone wrong upstream and
+   * nothing is coming.
+   */
+  it("is raised without reading the rest of the stream", async () => {
+    const stream = endpointShape("bedrock-converse-stream").readStream(
+      streamOf(
+        exception("ValidationException", { message: "the model id is not valid" }),
+        event("contentBlockDelta", { delta: { text: "never reached" } }),
+      ),
+    );
+
+    await expect(stream.next()).rejects.toThrow(/ValidationException/);
+  });
+
+  it("carries the provider's own words", async () => {
+    const stream = endpointShape("bedrock-converse-stream").readStream(
+      streamOf(exception("ThrottlingException", { message: "too many requests" })),
+    );
+
+    await expect(stream.next()).rejects.toThrow(/too many requests/);
+  });
+});
+
+describe("the bedrock signer", () => {
+  it("derives the signing region from the host when the host names one", async () => {
+    const saved = { ...process.env };
+    Object.assign(process.env, {
+      AWS_ACCESS_KEY_ID: "AKIDEXAMPLE",
+      AWS_SECRET_ACCESS_KEY: "secret",
+      AWS_REGION: "us-east-1",
+    });
+    try {
+      const shape = endpointShape("bedrock-converse-stream");
+      const signer = await shape.signer!();
+      const signed = await signer!({
+        url: "https://bedrock-runtime.eu-west-1.amazonaws.com/model/m1/converse-stream",
+        method: "POST",
+        headers: shape.headers(""),
+        body: "{}",
+      });
+
+      expect(signed.authorization).toContain("/eu-west-1/bedrock-runtime/aws4_request");
+    } finally {
+      for (const name of ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION"]) delete process.env[name];
+      Object.assign(process.env, saved);
+    }
+  });
+
+  it("re-resolves credentials per request rather than capturing them once", async () => {
+    const saved = { ...process.env };
+    Object.assign(process.env, {
+      AWS_ACCESS_KEY_ID: "FIRST_KEY",
+      AWS_SECRET_ACCESS_KEY: "secret1",
+      AWS_REGION: "us-east-1",
+    });
+    try {
+      const shape = endpointShape("bedrock-converse-stream");
+      const signer = await shape.signer!();
+
+      const firstSigned = await signer!({
+        url: "https://bedrock-runtime.us-east-1.amazonaws.com/model/m1/converse-stream",
+        method: "POST",
+        headers: shape.headers(""),
+        body: "{}",
+      });
+      expect(firstSigned.authorization).toContain("Credential=FIRST_KEY/");
+
+      process.env.AWS_ACCESS_KEY_ID = "SECOND_KEY";
+      process.env.AWS_SECRET_ACCESS_KEY = "secret2";
+
+      const secondSigned = await signer!({
+        url: "https://bedrock-runtime.us-east-1.amazonaws.com/model/m1/converse-stream",
+        method: "POST",
+        headers: shape.headers(""),
+        body: "{}",
+      });
+      expect(secondSigned.authorization).toContain("Credential=SECOND_KEY/");
+    } finally {
+      for (const name of ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION"]) delete process.env[name];
+      Object.assign(process.env, saved);
+    }
+  });
+});

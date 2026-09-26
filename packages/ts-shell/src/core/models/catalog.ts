@@ -228,7 +228,7 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
   {
     id: "bedrock",
     label: "AWS Bedrock",
-    runtime: "openai-compatible",
+    runtime: "bedrock",
     endpoint: "bedrock-converse-stream",
     auth: "none",
     // The address is regional and names no account, so it is the region's host.
@@ -243,7 +243,7 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
   {
     id: "google-ai",
     label: "Google AI",
-    runtime: "google",
+    runtime: "google-ai",
     endpoint: "google-generative-ai",
     auth: "api-key",
     baseUrl: "https://generativelanguage.googleapis.com",
@@ -256,12 +256,14 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
   {
     id: "vertex",
     label: "Google Vertex",
-    runtime: "google",
+    runtime: "vertex",
     endpoint: "google-vertex",
     auth: "none",
-    // The real base names the account and is built from the environment; this is
-    // the shape it takes, so a reader can see where requests go.
-    baseUrl: "https://us-central1-aiplatform.googleapis.com/v1/projects/GOOGLE_CLOUD_PROJECT/locations/GOOGLE_CLOUD_LOCATION/publishers/google/models",
+    // No base URL is written here on purpose. This one names the account that
+    // makes the request — project and location are part of the address — so any
+    // fixed string would be a placeholder, and a placeholder that reaches a
+    // user is worse than nothing: it is copied into a command and sent. The
+    // address is built from the environment when the connection is resolved.
     models: [
       { id: "gemini-2.5-pro", contextWindow: 1_000_000, vision: true },
       { id: "gemini-2.5-flash", contextWindow: 1_000_000, vision: true },

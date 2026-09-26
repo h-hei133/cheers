@@ -15,7 +15,7 @@ import { createCoreToolRegistry } from "../core/tools/registry.js";
 import { filterVisibleToolNames } from "../core/tools/prefilter.js";
 import { loadCatalog } from "../core/models/catalogStore.js";
 import { providerEndpoint } from "../core/models/catalog.js";
-import type { RuntimeConfig } from "../config/runtimeConfig.js";
+import type { AccountAuthConfig, RuntimeConfig } from "../config/runtimeConfig.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { buildSystemPrompt, type SystemPromptContext } from "../turn/prompt.js";
 import type { RequestOverhead } from "../session/context.js";
@@ -169,11 +169,11 @@ async function renewAccountAuth(input: {
   readonly provider: RuntimeProvider;
   readonly credential: {
     readonly apiKey?: string;
-    readonly accountAuth?: OpenAIAccountAuthConfig | GoogleAccountAuthConfig;
+    readonly accountAuth?: AccountAuthConfig;
   };
   readonly runtimeConfig: RuntimeConfig | undefined;
 }): Promise<{
-  readonly accountAuth?: OpenAIAccountAuthConfig | GoogleAccountAuthConfig;
+  readonly accountAuth?: AccountAuthConfig;
   readonly failure?: string;
 }> {
   // The renewal carries the same deadline as any other request to the provider's

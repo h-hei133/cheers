@@ -6,6 +6,10 @@ export type ConnectPresetId =
   | "anthropic"
   | "siliconflow"
   | "google"
+  | "google-ai"
+  | "vertex"
+  | "bedrock"
+  | "github-copilot"
   | "antigravity"
   | "claudecode";
 

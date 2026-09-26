@@ -80,6 +80,18 @@ const FILE_SESSION_TTL_MS = 5 * 60_000;
 const METADATA_TIMEOUT_MS = 1_000;
 
 /**
+ * How long a local credential source may take.
+ *
+ * A `credential_process` is an arbitrary program, and one that hangs would
+ * otherwise hold the session open indefinitely with nothing to show for it: the
+ * caller has no timeout of its own, and the failure mode — a request that never
+ * starts — is worse than an error naming the source. Thirty seconds is enough
+ * for a helper that talks to a local agent and short enough that a wedged one is
+ * reported rather than waited on.
+ */
+const LOCAL_SOURCE_TIMEOUT_MS = 30_000;
+
+/**
  * Resolve a credential, or say why none could be found.
  *
  * The error names every source that was tried, because the failure a user can act
@@ -260,6 +272,17 @@ async function resolveRoleSource(
   );
 }
 
+/**
+ * A caller's signal, with a deadline of its own added.
+ *
+ * Both matter: the deadline bounds a source that never answers, and the caller's
+ * signal still aborts the work when the request it was for is abandoned.
+ */
+function boundedSignal(existing: AbortSignal | undefined, timeoutMs: number): AbortSignal {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  return existing ? AbortSignal.any([existing, timeout]) : timeout;
+}
+
 /** Read one of the profile files, treating absence as an empty file. */
 async function readProfileFile(path: string): Promise<ProfileFile> {
   const text = await readFile(path, "utf8").catch(() => undefined);
@@ -283,7 +306,7 @@ async function fromCredentialProcess(command: string, options: ResolveOptions): 
   let stdout: string;
   try {
     const result = await execFileAsync(shellBinary(), shellArguments(command), {
-      signal: options.signal,
+      signal: boundedSignal(options.signal, LOCAL_SOURCE_TIMEOUT_MS),
     });
     stdout = result.stdout;
   } catch (error) {
@@ -363,7 +386,7 @@ async function fromSso(
     `?account_id=${encodeURIComponent(accountId)}&role_name=${encodeURIComponent(roleName)}`;
   const response = await (options.fetchImpl ?? fetch)(url, {
     headers: { "x-amz-sso_bearer_token": token },
-    ...(options.signal ? { signal: options.signal } : {}),
+    signal: boundedSignal(options.signal, LOCAL_SOURCE_TIMEOUT_MS),
   });
   if (!response.ok) {
     throw new CredentialsError(`the single sign-on role request answered ${response.status}`, "sso");
@@ -407,7 +430,7 @@ async function readSsoToken(
       grantType: "refresh_token",
       refreshToken: cached.refreshToken,
     }),
-    ...(options.signal ? { signal: options.signal } : {}),
+    signal: boundedSignal(options.signal, LOCAL_SOURCE_TIMEOUT_MS),
   });
   if (!response.ok) return cached.accessToken;
   const refreshed = (await response.json()) as { accessToken?: string };
@@ -563,8 +586,7 @@ async function fromInstanceMetadata(
  * the chain would stall on every run of every user who does not need it.
  */
 function metadataSignal(existing: AbortSignal | undefined): AbortSignal {
-  const timeout = AbortSignal.timeout(METADATA_TIMEOUT_MS);
-  return existing ? AbortSignal.any([existing, timeout]) : timeout;
+  return boundedSignal(existing, METADATA_TIMEOUT_MS);
 }
 
 /**

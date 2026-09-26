@@ -37,7 +37,7 @@ import { createTaskToolDefinition } from './taskTool.js'
 import type { PwRuntimeStatus } from '../../browser/playwrightRuntime.js'
 import type { McpToolDescriptor } from '../mcp/types.js'
 import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
-import { pathPermission, processPermission, resolveToolTarget } from './permissionContext.js'
+import { pathPermission, processPermission, processStopPermission, resolveToolTarget } from './permissionContext.js'
 import { approvedResult, deniedResult } from './toolResultLifecycle.js'
 import type { ToolExecutionResult } from '../../tools/types.js'
 import { networkNotice, planSandboxedCommand, readSandboxRules } from '../../sandbox/osSandbox.js'
@@ -108,6 +108,44 @@ function inferFailureKind(result: {
   }
 }
 
+/**
+ * How a command will be launched: the shell, its arguments, and the isolation
+ * plan.
+ *
+ * Shared so the two ways a command can be started cannot disagree about either
+ * of the safety decisions here. A path that composed its own argv would quietly
+ * skip the sandbox, which is a real confinement boundary rather than a flag, and
+ * the difference would only show up as a command running unjailed.
+ */
+function planCommandLaunch(
+  command: string,
+  context: ToolExecutionContext,
+): { shellBin: string; shellArgs: string[]; sandbox: ReturnType<typeof planSandboxedCommand> } {
+  const env = ShellManager.getActiveEnvironment()
+  const isWindows = process.platform === 'win32'
+  const shellBin = env.executionPath
+  let shellArgs: string[]
+
+  if (env.activeBackend === 'powershell') {
+    shellArgs = ['-NoProfile', '-NonInteractive', '-Command', command]
+  } else if (env.activeBackend === 'git-bash' || env.activeBackend === 'bash') {
+    shellArgs = ['-c', command]
+  } else if (env.activeBackend === 'wsl') {
+    shellArgs = ['-e', 'sh', '-c', command]
+  } else {
+    shellArgs = isWindows ? ['/d', '/s', '/c', command] : ['-c', command]
+  }
+  // OS-level isolation, when it has been turned on. The plan says which of the
+  // three states applies, and an unavailable launcher is reported on the result
+  // rather than quietly downgraded to no isolation.
+  const sandbox = planSandboxedCommand({
+    shell: shellBin,
+    shellArgs,
+    workspaceRoot: context.workspaceRoot,
+  })
+  return { shellBin, shellArgs, sandbox }
+}
+
 async function runCommandTool(
   executionService: ExecutionService,
   command: string,
@@ -126,28 +164,7 @@ async function runCommandTool(
   if (!timeout.ok) {
     return deniedResult(`Error: ${timeout.reason}`, { status: 'failed', exitCode: 1 })
   }
-  const env = ShellManager.getActiveEnvironment();
-  const isWindows = process.platform === 'win32';
-  const shellBin = env.executionPath;
-  let shellArgs: string[];
-
-  if (env.activeBackend === 'powershell') {
-    shellArgs = ['-NoProfile', '-NonInteractive', '-Command', command];
-  } else if (env.activeBackend === 'git-bash' || env.activeBackend === 'bash') {
-    shellArgs = ['-c', command];
-  } else if (env.activeBackend === 'wsl') {
-    shellArgs = ['-e', 'sh', '-c', command];
-  } else {
-    shellArgs = isWindows ? ['/d', '/s', '/c', command] : ['-c', command];
-  }
-  // OS-level isolation, when it has been turned on. The plan says which of the
-  // three states applies, and an unavailable launcher is reported on the result
-  // rather than quietly downgraded to no isolation.
-  const sandbox = planSandboxedCommand({
-    shell: shellBin,
-    shellArgs,
-    workspaceRoot: context.workspaceRoot,
-  })
+  const { shellBin, shellArgs, sandbox } = planCommandLaunch(command, context)
   const result = await executionService.runCommand({
     operationKind: 'command.run',
     command: sandbox.command ?? shellBin,
@@ -738,7 +755,7 @@ export function createCoreToolRegistry(options?: {
       async execute(args, context) {
         const command = typeof args.command === 'string' ? args.command : ''
         if (args.runInBackground === true) {
-          return startBackgroundCommand(command, context)
+          return startBackgroundCommand(command, context, args.timeout)
         }
         return runCommandTool(executionService, command, context, args.timeout)
       },
@@ -787,13 +804,40 @@ export function createCoreToolRegistry(options?: {
  * happened, and a command nobody can ask about is indistinguishable from one that
  * never ran.
  */
-function startBackgroundCommand(command: string, context: ToolExecutionContext): ToolExecutionResult {
+/**
+ * Start a command that outlives the turn.
+ *
+ * A background command is the same command as a foreground one: it is planned
+ * through the same launcher, so it carries the same isolation rather than
+ * running bare on the host. The only thing that differs is that nothing waits
+ * for it.
+ *
+ * A timeout is refused rather than ignored. There is no deadline to enforce on
+ * work that deliberately continues past the turn, so accepting a number here
+ * would report a limit that nothing applies — and a caller who asked for one
+ * means to stop it, which is what taskStop is for.
+ */
+function startBackgroundCommand(
+  command: string,
+  context: ToolExecutionContext,
+  requestedTimeoutSeconds?: unknown,
+): ToolExecutionResult {
   if (!command.trim()) {
     return deniedResult('Error: No command provided to execute.', { status: 'failed', exitCode: 1 })
   }
+  if (requestedTimeoutSeconds !== undefined) {
+    return deniedResult(
+      'Error: a background command has no timeout, because nothing waits for it. Start it without one and stop it with taskStop.',
+      { status: 'failed', exitCode: 1 },
+    )
+  }
+  const { sandbox } = planCommandLaunch(command, context)
   const task = backgroundTasks.start({
     command,
     cwd: context.workspaceRoot,
+    ...(sandbox.command && sandbox.args
+      ? { shell: { command: sandbox.command, args: [...sandbox.args] } }
+      : {}),
     ...(context.commandEnv ? { env: context.commandEnv } : {}),
   })
   if (task.failure) {
@@ -802,8 +846,13 @@ function startBackgroundCommand(command: string, context: ToolExecutionContext):
       exitCode: 1,
     })
   }
+  const isolation = sandbox.state === 'isolated'
+    ? `\n[sandbox] ${sandbox.notice ?? 'Runs inside the workspace sandbox.'}`
+    : sandbox.notice
+      ? `\n[sandbox] ${sandbox.notice}`
+      : ''
   return approvedResult(
-    `Started ${task.id} in the background.\n${renderTask(task)}\n\n` +
+    `Started ${task.id} in the background.\n${renderTask(task)}${isolation}\n\n` +
       `Read it with taskOutput, or stop it with taskStop. It keeps running if this turn ends.`,
   )
 }
@@ -861,7 +910,14 @@ function createTaskStopToolDefinition(): ToolDefinition {
       },
       required: ['taskId'],
     },
-    permissions: { check: () => [] },
+    permissions: {
+      // Stopping is a process operation in its own right. The approval that
+      // started the command covered starting it, not ending whatever it has
+      // since become.
+      check(args, context) {
+        return processStopPermission(args, context)
+      },
+    },
     async execute(args) {
       const id = typeof args.taskId === 'string' ? args.taskId.trim() : ''
       if (!id) return deniedResult('Error: taskStop needs a taskId.')

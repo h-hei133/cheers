@@ -85,10 +85,26 @@ export async function accessToken(options: {
   const cached = cache;
   if (cached && cached.expiresAt - REFRESH_SKEW_MS > Date.now()) return cached;
 
-  const path = env.GOOGLE_APPLICATION_CREDENTIALS ?? adcPath(env);
-  const text = await readFile(path, "utf8").catch(() => undefined);
+  const namedPath = env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (namedPath !== undefined) {
+    let text: string;
+    try {
+      text = await readFile(namedPath, "utf8");
+    } catch (error) {
+      throw new GoogleAuthError(
+        `GOOGLE_APPLICATION_CREDENTIALS points to an unreadable file: ${namedPath} (${error instanceof Error ? error.message : String(error)})`,
+        "credentials file",
+      );
+    }
+    const token = await fromCredentialFile(text, namedPath, options);
+    cache = token;
+    return token;
+  }
+
+  const defaultPath = adcPath(env);
+  const text = await readFile(defaultPath, "utf8").catch(() => undefined);
   if (text !== undefined) {
-    const token = await fromCredentialFile(text, path, options);
+    const token = await fromCredentialFile(text, defaultPath, options);
     cache = token;
     return token;
   }

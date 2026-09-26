@@ -150,6 +150,26 @@ describe("the request body", () => {
     expect(contents[0]!.parts[0]!.functionResponse!.name).toBe("read");
   });
 
+  it("resolves the tool name from the earlier call that it answers without toolName", () => {
+    const body = endpointTurnBody("google-generative-ai", {
+      ...BASE,
+      messages: [
+        {
+          role: "assistant",
+          content: "",
+          tool_calls: [
+            { id: "call_abc123", type: "function", function: { name: "readFile", arguments: "{}" } },
+          ],
+        },
+        { role: "tool", content: "file content", tool_call_id: "call_abc123" },
+      ],
+    } as never);
+
+    const contents = body.contents as ReadonlyArray<{ parts: ReadonlyArray<{ functionResponse?: { name: string } }> }>;
+    const toolTurn = contents.find((c) => c.parts.some((p) => p.functionResponse));
+    expect(toolTurn?.parts[0]?.functionResponse?.name).toBe("readFile");
+  });
+
   it("hands signed reasoning back in the part it came from", () => {
     // Dropping or moving a signature leaves the model unable to continue its own
     // reasoning, which is why it travels with the text it covers.
@@ -240,5 +260,41 @@ describe("reading the answer", () => {
     while (step.done !== true) step = await generator.next();
 
     expect((step.value as { usage?: unknown }).usage).toMatchObject({ prompt_tokens: 5, completion_tokens: 2 });
+  });
+
+  it("maps finishReason MAX_TOKENS to length for turn-layer truncation handling", async () => {
+    const generator = endpointShape("google-generative-ai").readStream(
+      sseStream({ candidates: [{ content: { parts: [{ text: "cut short" }] }, finishReason: "MAX_TOKENS" }] }),
+    );
+    let step = await generator.next();
+    while (step.done !== true) step = await generator.next();
+
+    expect(step.value.finishReason).toBe("length");
+  });
+
+  it("reads non-streamed body preserving functionCall tool calls and finishReason", () => {
+    const shape = endpointShape("google-generative-ai");
+    const body = shape.readBody({
+      candidates: [
+        {
+          content: {
+            parts: [
+              { text: "calling tool" },
+              { functionCall: { id: "call_1", name: "bash", args: { command: "ls" } } },
+            ],
+          },
+          finishReason: "MAX_TOKENS",
+        },
+      ],
+    });
+
+    expect(body.choices?.[0]?.message?.content).toBe("calling tool");
+    expect(body.choices?.[0]?.finish_reason).toBe("length");
+    expect(body.choices?.[0]?.message?.tool_calls).toHaveLength(1);
+    expect(body.choices?.[0]?.message?.tool_calls?.[0]).toMatchObject({
+      id: "call_1",
+      type: "function",
+      function: { name: "bash", arguments: '{"command":"ls"}' },
+    });
   });
 });

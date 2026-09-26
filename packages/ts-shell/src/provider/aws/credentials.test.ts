@@ -323,3 +323,22 @@ describe("when nothing answers", () => {
     ).rejects.toThrow(/environment.*web identity.*profile.*container.*metadata/s);
   });
 });
+
+describe("a credential source that never answers", () => {
+  /**
+   * It is given up on rather than waited on.
+   *
+   * A `credential_process` is an arbitrary program. One that hangs would hold the
+   * request open with nothing to show for it, and the failure a user sees would
+   * be a request that never starts rather than one that names the source.
+   */
+  it("bounds a credential process that does not finish", async () => {
+    // No caller signal is passed: the deadline has to come from this layer, or a
+    // wedged helper holds the request open with nothing to wait for.
+    const env = await home({ credentials: "[default]\ncredential_process = sleep 600\n" });
+
+    const started = Date.now();
+    await expect(resolveCredentials({ env })).rejects.toThrow(/credential process failed/);
+    expect(Date.now() - started).toBeLessThan(60_000);
+  }, 90_000);
+});

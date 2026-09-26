@@ -1,8 +1,4 @@
-import type {
-  GoogleAccountAuthConfig,
-  OpenAIAccountAuthConfig,
-  RuntimeProvider,
-} from "../../config/runtimeConfig.js";
+import type { AccountAuthConfig, RuntimeProvider } from "../../config/runtimeConfig.js";
 import { isExpiring, refreshOAuthTokens, type OAuthProviderConfig } from "../../core/auth/oauth/flow.js";
 import { googleOAuthConfig, openAIOAuthConfig, resolveGoogleClientId } from "../../core/auth/oauth/providers.js";
 import { DEFAULT_ENDPOINT_KIND, endpointShape, type EndpointKind } from "../endpoints/index.js";
@@ -42,15 +38,22 @@ const BASE_HEADERS: Readonly<Record<string, string>> = {
 export function accountAuthFor(
   provider: RuntimeProvider,
   credential: {
-    readonly accountAuth?: OpenAIAccountAuthConfig | GoogleAccountAuthConfig;
+    readonly accountAuth?: AccountAuthConfig;
   },
-): OpenAIAccountAuthConfig | GoogleAccountAuthConfig | undefined {
+): AccountAuthConfig | undefined {
   const account = credential.accountAuth;
   if (!account) return undefined;
   // The stored credential and the provider have to agree, or a Google token could
   // be sent to OpenAI. The stored `type` is what identifies which flow issued it.
   if (provider === "openai" && account.type === "openai-chatgpt-account") return account;
   if (provider === "google" && account.type === "google-gemini-account") return account;
+  // A subscription credential belongs to the account it was issued to, and the
+  // two subscription providers are told apart by the token rather than by a
+  // client id. Accepting it for any other provider would send one service's
+  // token to another.
+  if (account.type === "subscription" && (provider === "github-copilot" || provider === "anthropic")) {
+    return account;
+  }
   return undefined;
 }
 
@@ -67,7 +70,7 @@ export function accountAuthFor(
  */
 export function providerAuthorization(input: {
   readonly apiKey?: string;
-  readonly accountAuth?: OpenAIAccountAuthConfig | GoogleAccountAuthConfig;
+  readonly accountAuth?: AccountAuthConfig;
   /**
    * The endpoint this request goes to, when it is not the default one.
    *
@@ -91,7 +94,10 @@ export function providerAuthorization(input: {
     // needs no key here. Refusing it for the absence of one would make a
     // correctly configured account look uncredentialed.
     if (shape.signer && !input.apiKey?.trim()) {
-      return { headers: shape.headers(""), mode: "signed" };
+      // The key is left out rather than passed as empty text: a shape that
+      // composes `Authorization: Bearer <key>` would otherwise send a header
+      // naming an empty credential, which a host rejects as a bad one.
+      return { headers: shape.headers(), mode: "signed" };
     }
     if (input.apiKey?.trim()) {
       return { headers: shape.headers(input.apiKey.trim()), mode: "api-key" };
@@ -123,7 +129,7 @@ export function providerAuthorization(input: {
 /** The OAuth client configuration for a provider, or nothing when it has none. */
 function oauthConfigFor(
   provider: RuntimeProvider,
-  account: OpenAIAccountAuthConfig | GoogleAccountAuthConfig,
+  account: AccountAuthConfig,
 ) {
   if (provider === "openai") return openAIOAuthConfig();
   if (provider === "google") {
@@ -144,7 +150,7 @@ function oauthConfigFor(
  */
 export interface AccountAuthRenewal {
   /** The credential to use from here on. */
-  readonly accountAuth?: OpenAIAccountAuthConfig | GoogleAccountAuthConfig;
+  readonly accountAuth?: AccountAuthConfig;
   /** True only for the call that ran the exchange. */
   readonly renewed: boolean;
   /** Why the exchange failed, when it did. */
@@ -173,7 +179,7 @@ export async function renewAccountAuthIfExpiring(input: {
   readonly provider: RuntimeProvider;
   readonly credential: {
     readonly apiKey?: string;
-    readonly accountAuth?: OpenAIAccountAuthConfig | GoogleAccountAuthConfig;
+    readonly accountAuth?: AccountAuthConfig;
   };
   readonly fetchImpl: typeof fetch;
   readonly signal?: AbortSignal;
@@ -240,7 +246,7 @@ function providerLabel(provider: RuntimeProvider): string {
 
 async function exchangeAccountAuth(input: {
   readonly provider: RuntimeProvider;
-  readonly account: OpenAIAccountAuthConfig | GoogleAccountAuthConfig;
+  readonly account: AccountAuthConfig;
   readonly config: OAuthProviderConfig;
   readonly refreshToken: string;
   readonly fetchImpl: typeof fetch;

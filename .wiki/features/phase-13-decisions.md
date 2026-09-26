@@ -574,3 +574,101 @@ AWS4-HMAC-SHA256 Credential=<accessKeyId>/<scope>, SignedHeaders=<names>, Signat
 
 **后台执行落地后这句话变成假的**。已删掉并**把计数器接上真实来源**——
 这正是「文档与行为不一致」那一类，与 `phase-12-decisions.md` §1.1 的取舍同源。
+
+---
+
+## 10. 复核轮（**2026-09-26**）：三个子代理 + 逐条自证
+
+复核针对 Phase 13 的 11 个 commit。**三个子代理各返回若干条，我逐条回读代码核实**
+——**不盲信**，其中一条被证伪、一条降级。
+
+### 10.1 已证伪 / 降级的两条
+
+| 复核结论 | 核实结果 |
+|---|---|
+| A4「显式 profile 缺 key 应报错而非回落 IMDS」 | **证伪**。参考实现同样静默回落（`aws-credentials.ts` 五级链里 profile 返回空即继续）。**与参考一致，不改**。 |
+| A2「流内异常应在收到时立即抛出」 | **方向对、理由错**。复核说 `failure` 检查被截断检查遮蔽——**实际顺序是对的**（先 `failure` 后截断）。真正的缺陷是**继续读完整条流**。 |
+
+**教训**：复核结论的「为什么」也需要核实。否则会按错的理由改对的代码。
+
+### 10.2 比复核更严重的一类：**实现了但没有入口**
+
+复核只看到「函数内部对不对」。**更严重的是这批代码根本没人能调用到**：
+
+| 模块 | 实际状态 |
+|---|---|
+| `core/auth/oauth/deviceCode.ts` | **零生产调用者**（只被 `subscription.ts` 引，而后者也没人引） |
+| `core/auth/oauth/subscription.ts` | **零生产调用者** |
+| `core/models/catalog.ts` 的 `bedrock` / `google-ai` / `vertex` | 三个 id **都不在 `RUNTIME_PROVIDERS`**，因此**永远不可能被选中** |
+| `provider/endpoints/googleVertex.ts` 的 `vertexBaseUrl` / `vertexTarget` | **零调用者**——真实 URL 从未被算出来 |
+| `core/shell/background/tasks.ts` 的 `onEnded` | **零订阅者**——「完成通知」从未存在 |
+
+**实机证据**（跑真实代码，不是读码）：
+
+```
+bedrock   | isRuntimeProvider = false | endpoint = "bedrock-converse-stream"
+google-ai | isRuntimeProvider = false | endpoint = "google-generative-ai"
+vertex    | isRuntimeProvider = false | endpoint = "google-vertex"
+```
+
+端点声明**认得**这三个 id，但连接层的 `provider` 被约束成 `RuntimeProvider`，
+所以**没有任何路径能把 "bedrock" 传进去**。
+
+**同一条链上的第二个坑**：连接选择器按 catalog 条目拼建议命令，
+对 `vertex` 会拼出**字面占位符** `--base-url .../projects/GOOGLE_CLOUD_PROJECT/...`
+——照抄就会把这个字符串发出去。
+
+**判定**：这就是维护者说的「demo 模块」——写完了、测过了、**用户碰不到**。
+按「不能有任何 demo 模块」的要求，必须接线，不是记一笔。
+
+### 10.3 本轮的其它真实缺陷（均已修复并撤销验证）
+
+| # | 缺陷 | 后果 |
+|---|---|---|
+| O1 | `runInBackground` 走 `spawn` 裸启动 | **绕过沙箱、超时校验与执行授权**——同一命令前台受约束、后台不受 |
+| O3 | `taskStop` 权限检查为空 | 结束任意进程组**无审批门** |
+| G1 | `GOOGLE_APPLICATION_CREDENTIALS` 指向坏文件时静默回落 | 掩盖配置错误，还会去问 metadata server |
+| G2 | Google 的 `finishReason` 未映射 | `MAX_TOKENS` 被当成正常停止，**截断处理不触发** |
+| G3 | tool 结果发给 Google 时名字是 `"unknown"` | 名字与 call 不匹配，**API 拒绝** |
+| G4 | 非流式响应丢弃 `functionCall` | 非流式工具调用直接消失 |
+| A1 | 签名区域固定取自环境变量 | 跨区域请求 `SignatureDoesNotMatch` |
+| A3 | 凭据解析一次后不刷新 | 临时凭据过期后**直到重启都失败** |
+| A2 | 流内异常帧后继续读完 | 白耗连接，失败被推迟 |
+| O2 | Copilot 未做 token 交换 | 拿去用的是 GitHub OAuth token，**不是 Copilot 会话 token** |
+| 新 | `credential_process` / SSO 无超时 | 卡住的子进程**无限期挂住会话** |
+| 新 | `finish` 在 error+close 时触发两次 | 完成通知**重复投递** |
+| 新 | `renderTask` 注释称会说明截断，实际不说 | 读者把截断的尾巴当完整输出 |
+| 新 | 签名器 `headers("")` 传空 key | 拼出 `Authorization: Bearer `（**空凭据**） |
+
+**共同点**：**静默降级**——不报错、不崩溃，只是给出一个看起来正常的错误答案。
+这类最难查，也最该在生产代码里杜绝。
+
+### 10.4 修复结果（**2026-09-27**）
+
+全部**撤销即失败**验证过（每条给出实际断言文本）。除复核条目外，自证还发现 5 条。
+
+**接线（把 demo 变成可用）**：
+
+| 项 | 做法 |
+|---|---|
+| 三个协议可选 | `RUNTIME_PROVIDERS` 加 `bedrock` / `google-ai` / `vertex`，各补 `FACTS` 条目 |
+| vertex 地址 | catalog 不再写占位符；**用回 `vertexBaseUrl` / `vertexTarget`**，从环境算真实地址 |
+| 订阅登录可达 | 新增 `subscriptionAccountAuth.ts` 契约，注册进 `CONTRACTS`；`/connect login github-copilot --account` 已跑通 |
+
+**实机确认**：
+
+```
+github-copilot | preset=true | provider=github-copilot | methods=device-code,account-auth
+anthropic      | preset=true | provider=anthropic      | methods=account-auth,api-key
+bedrock        | preset=true | provider=bedrock        | methods=none
+vertex         | preset=true | provider=vertex         | methods=none
+```
+
+**一个必须避开的陷阱**：`apiKeyEnvVar` 是这个解析器**去找静态 key 的名字**，
+找到就当成 key 用。所以 `bedrock` 若写成 `AWS_ACCESS_KEY_ID`，
+环境里那份真实凭据会被当成 bearer key **顶替掉签名**——请求就不签了。
+实测确认（撤销即失败）：`expected { provider: 'bedrock', … } to be undefined`。
+故改用 `BEDROCK_API_KEY` / `VERTEX_API_KEY`，并在测试里锁住「不与签名链读的变量同名」。
+
+**全量套件**：`561 文件 / 4,124 通过 / 0 失败`（首跑 3 项负载敏感，
+**逐项隔离复跑 40/40、6/6、CLI 正常启动**，且都与本轮改动无关）。
