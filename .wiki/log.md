@@ -4370,3 +4370,14 @@ so the counter could only ever be invented」。**后台执行落地后这句话
 - **零新增依赖**——仍是 6 个运行时依赖。
 - **无别人项目名**（逐个 grep 核验；命中的只有 **wire 值里的产品名**，
   如 `claude.ai` 的 OAuth 端点与 `anthropic.claude-3` 的 Bedrock model id）。
+
+**Phase 13 最终验证的复跑记录**：全量套件首跑出现两项失败，
+**逐项隔离复跑全部通过**，两者都属 `log.md:3483` 已登记的负载敏感类：
+
+| 失败项 | 隔离复跑 | 判定 |
+|---|---|---|
+| `presentation/tui/surface/benchmark.test.ts` | **7/7 通过** | CPU 计时（`log.md:556` 已逐字记录） |
+| `cli-baseline.test.ts`（`/sessions current`） | **40/40 连跑三次** | 子进程 + `waitFor` 早停：负载下进程被提前终止，`- ID:` 还没打出来（`log.md:3210`/`:3352` 同一类） |
+
+**两项都不触及本轮改动的模块**（benchmark 只 import TUI 渲染；
+`/sessions current` 不引用 `readAmbientFacts`）。
