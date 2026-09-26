@@ -3863,3 +3863,22 @@ D1 在 §0 记成「做」但 §18/§16.6 是待裁决 → 改为「待裁决」
 
 另清理 `readCache.ts` 的 `complete` 字段：它唯一的写入点是字面量 `true`，
 读取它的分支**永不成立**——调用方已经在事实发生的地方做了同一个判断。
+
+### 复核轮最终验证（**2026-09-26**）
+
+- **全量套件**：`541 文件 / 3,812 通过 / 0 失败 / 1 跳过`（172 秒）。
+  中途一次运行有 3 项 `browser*ScenarioExamples` 失败，
+  **逐套件单跑全部通过**（22/22），且**不 import 本轮改动的任何文件**——
+  确认为已记录的并发负载抖动（这些用例会 spawn 真实 CLI 子进程）。
+- **五道门禁**：全部 pass。`docs_drift` 无新增。
+- **端到端实机验证**（复核修复项）：
+  - R1：`compat` 补丁后 `systemRole` 仍为 `developer`、`maxTokensField` 仍为 `max_completion_tokens`；
+    `promptCache.short` 被改而 `long` 保留；`thinkingLevelMap` 与 `vision` 同理。
+  - R2：模糊路径（缩进不同）与 **block-anchor 路径**都正确拒绝重复；唯一块仍可编辑。
+  - R3：cap 4096→budget 3072；cap 100000→budget 16384；cap 2000→不发 thinking；`max_tokens` 永不超 cap。
+  - R4：经**真实恢复投影** `projectTranscriptMessages` 验证签名存活。
+  - R5：6 种围栏情形全部正确（含 `~~~`、四套三、不匹配对、散文波浪号）。
+  - R6：`SimpleRequest` 声明不接受 temperature 时不再发送。
+  - 另核：`@import` 的**符号链接逃逸**被拦（`outside the project`）；
+    Doom Loop 阈值与文档一致（`read edit`×3 不触发、×5 触发、不同文件永不触发）。
+- **推送**：`a395aab8..3ef1e1f3`（7 个提交：6 个复核修复 + 1 个文档）。
