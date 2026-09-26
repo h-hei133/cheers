@@ -122,6 +122,30 @@ describe("an edit whose text is not unique", () => {
     expect(res.success).toBe(true);
     expect(res.strategy).toBe("line-trimmed");
   });
+
+  it("refuses a resilient match that has two answers, not one", () => {
+    // The same block twice with different indentation. Neither matches verbatim,
+    // so the trimmed strategy locates one of them — and picking the first is a
+    // choice the request never made. Counting only verbatim hits found one and
+    // edited it, which is the silent wrong-region edit this guard exists for.
+    const original = "if (x) {\n    doThing();\n}\n\nif (x) {\n  doThing();\n}\n";
+    const res = replaceInContent(original, "if (x) {\n\tdoThing();\n}", "if (x) {\n\tdone();\n}");
+
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/2 occurrences/i);
+    expect(res.content).toBe(original);
+  });
+
+  it("refuses a normalized match that has two answers, not one", () => {
+    // Same text twice, written with curly quotes. Neither matches verbatim, so
+    // the normalized strategy locates one of them.
+    const original = "const a = \u201Cone\u201D;\nconst b = 0;\nconst a = \u201Cone\u201D;\n";
+    const res = replaceInContent(original, 'const a = "one";', 'const a = "two";');
+
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/2 occurrences/i);
+    expect(res.content).toBe(original);
+  });
 });
 
 describe("replaceManyInContent", () => {

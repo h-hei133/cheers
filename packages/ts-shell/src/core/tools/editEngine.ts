@@ -209,25 +209,84 @@ export function replaceInContent(
   // caller never chose, and report success while doing it — the file is edited,
   // the text they meant to change is untouched, and nothing says so.
   //
-  // Only the exact-match path is counted. The resilient strategies below it
-  // exist to find the *one* block the caller meant when the text does not match
-  // verbatim, and a count over a fuzzy match would be counting matches that
-  // differ from each other by definition.
-  if (located.strategy === "exact") {
-    const occurrences = countOccurrences(originalContent, oldText);
-    if (occurrences > 1) {
-      return {
-        success: false,
-        content: originalContent,
-        error:
-          `Found ${occurrences} occurrences of the text to replace. ` +
-          "To replace all of them, set replaceAll to true. " +
-          "To replace only one, provide more context to identify it uniquely.",
-      };
-    }
+  // Counted by the same matching the located strategy used, not verbatim: a
+  // block that matches twice with different indentation is still two regions the
+  // caller could have meant, and counting only exact hits would find one and
+  // edit it.
+  const occurrences = countStrategyMatches(originalContent, oldText, located.strategy);
+  if (occurrences > 1) {
+    return {
+      success: false,
+      content: originalContent,
+      error:
+        `Found ${occurrences} occurrences of the text to replace. ` +
+        "To replace all of them, set replaceAll to true. " +
+        "To replace only one, provide more context to identify it uniquely.",
+    };
   }
 
   return { success: true, content: applyEdit(originalContent, located, newText), strategy: located.strategy };
+}
+
+/**
+ * How many places the located strategy's own matching would find.
+ *
+ * The exact path counts exact occurrences, which is the same thing the replace
+ * matches. The resilient strategies match a looser thing — trimmed lines, NFKC
+ * forms, similar blocks — so counting verbatim occurrences there would count
+ * something other than what was matched, and a block that appears twice in
+ * trimmed form would be counted once and edited anyway.
+ *
+ * Each count below mirrors the strategy that produced the match, so the number
+ * answers the question the guard is actually asking: how many regions could the
+ * caller have meant?
+ */
+function countStrategyMatches(
+  content: string,
+  oldText: string,
+  strategy: string,
+): number {
+  if (strategy === "exact") return countOccurrences(content, oldText);
+
+  const lines = content.split("\n");
+  const searchLines = oldText.split("\n");
+
+  if (strategy === "line-trimmed") {
+    const trimmedSearch = searchLines.map((line) => line.trim());
+    let windows = 0;
+    for (let i = 0; i + searchLines.length <= lines.length; i++) {
+      if (trimmedSearch.every((want, offset) => lines[i + offset]!.trim() === want)) windows += 1;
+    }
+    return windows;
+  }
+
+  if (strategy === "nfkc-normalized") {
+    return countOccurrences(normalizeNFKC(content), normalizeNFKC(oldText));
+  }
+
+  // Block anchors: the same anchor pair search the strategy ran, counted rather
+  // than ranked. Two pairs that both clear the similarity floor are two regions
+  // the caller could have meant, and picking the marginally higher one is a
+  // choice nothing in the request made.
+  if (strategy === "block-anchor-levenshtein" && searchLines.length >= 3) {
+    const firstAnchor = searchLines[0]!.trim();
+    const lastAnchor = searchLines[searchLines.length - 1]!.trim();
+    const interiorSearch = searchLines.slice(1, -1).map((line) => line.trim()).join("\n");
+    let matches = 0;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i]!.trim() !== firstAnchor) continue;
+      const minEnd = Math.max(i + 2, i + searchLines.length - 4);
+      const maxEnd = Math.min(lines.length - 1, i + searchLines.length + 4);
+      for (let j = minEnd; j <= maxEnd; j++) {
+        if (lines[j]!.trim() !== lastAnchor) continue;
+        const interior = lines.slice(i + 1, j).map((line) => line.trim()).join("\n");
+        if (levenshteinRatio(interior, interiorSearch) >= 0.45) matches += 1;
+      }
+    }
+    return matches;
+  }
+
+  return 1;
 }
 
 /**

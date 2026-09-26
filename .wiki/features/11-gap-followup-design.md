@@ -471,3 +471,40 @@ if (inheritsDispatchConfig && thinkingLevel) args.push("--thinking", thinkingLev
 | 参考侧结论附具体位置 | ✅ pi / Claude Code / opencode 均给出 `path:line` |
 | **零代码改动** | ✅ 仅新增本文档与索引/日志条目 |
 | 子代理并发上限 3 | ✅ 全程未超过 3 |
+
+---
+
+## 8. 复核轮（**2026-09-26**）：08 的缺口清单里，哪些从未进入 Phase 11
+
+复核发现一个**记账缺口**：`08-*` §4 的 MISSING(10) + DEFICIENT(14) 共 24 项，
+但 `phase-11-decisions.md` §0 的任务表只覆盖了其中 **16 项**（T1–T13 + D1–D3），
+**另外 8 项从未被登记为任何任务或裁决点**——不是「决定不做」，是**漏了**。
+
+### 8.1 从未进入 Phase 11 的项（本轮逐条实机核实，全部仍未实现）
+
+| 08 编号 | 项 | 核实命令与结果 | 性质 |
+|---|---|---|---|
+| **M8** | 压缩后恢复工作文件 | `grep -rn 'POST_COMPACT\|restoreFile\|filesToRestore' packages/ts-shell/src` → **0** | 能力缺失，**可做** |
+| **M6** | Copilot / Anthropic 订阅 OAuth | `grep -n 'copilot\|anthropic' core/auth/oauth/providers.ts` → **0**（只有 openai/google） | 能力缺失，**无账号可验** |
+| **M3** | OAuth Device Code 流 | `grep -rn 'deviceCode\|device_code' core/auth/oauth/` → **0**（只有 loopback） | 能力缺失，**无账号可验** |
+| **D11** | `prepareNextStep` 不能中途改模型/推理档 | `turn/session.ts` 只有压缩用的 `prepareNextStep`，无模型切换 | 能力缺失，**可做** |
+| **M4** | Bedrock 协议 | `provider/endpoints/` 只有 `anthropicMessages` + `openaiCompatible` | **无账号可验** |
+| **M5** | Google GenAI / Vertex 原生协议 | 同上 | **无账号可验** |
+| **T15** | （= M3 的梯队编号） | 同上 | — |
+| **T17/D8** | 路由期命名残留 | 属文档卫生，`phase-11-decisions.md` §17 已明确**不纳入施工预算** | 已裁决不做 |
+
+**其中 4 项是「可做但漏登记」**（M8、D11，以及 M6/M3 中不需要账号验证的部分），
+**4 项是「无账号/无环境可验」**（M4、M5、M6、M3 的端到端路径）。
+
+### 8.2 这一节要更正的两处记账
+
+1. **`phase-11-decisions.md` §16 标题原写「5 项」，实际列出 6 个小节**——
+   D1 的**形状**（§16.6）同样是裁决点，但 §0 任务表把它记成「做」，
+   读起来像「D1 已施工」。**实际 D1 未施工**：方向已定（改为真 agent），形状待裁决。
+   标题与任务表已同步更正为「6 项」与「待裁决」。
+2. **08 §4 的 24 项与 Phase 11 的 16 项之间的差额从未说明**。本节把差额补齐。
+
+### 8.3 结论
+
+Phase 11 完成的是 **08/11 中「已登记为任务」的全部 13 项**；
+**不是**「08/11 的全部缺口」。剩余缺口分三类，见主报告。
