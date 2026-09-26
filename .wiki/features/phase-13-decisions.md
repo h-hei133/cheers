@@ -13,9 +13,11 @@
 | **T1** | **M2** 后台命令执行 | 08 `M2` | ✅ **做** | P1 |
 | **T2** | **M3** OAuth Device Code（RFC 8628） | 08 `M3` | ✅ **做** | P1 |
 | **T3** | **M6** Copilot + Anthropic 订阅 OAuth | 08 `M6` | ✅ **做** | P1 |
-| **T4** | **端点契约扩展**（`path` 动态化、`headers` 拿到请求上下文） | pre-research §4.1 | ✅ **做**（M4/M5 的前置） | P0 |
-| **T5** | **M5** Google GenAI 协议 | 08 `M5` | ✅ **做**（依赖 T4）；**Vertex 为其上的增量** | P0 |
+| **T4** | **端点契约扩展**（`path` 动态化 + **传输层签名装饰器**） | pre-research §4.1 | ✅ **做**（M4/M5 的前置） | P0 |
+| **T5** | **M5** Google GenAI 协议（AI Studio） | 08 `M5` | ✅ **做**（依赖 T4） | P0 |
 | **T6** | **M4** AWS Bedrock 协议 | 08 `M4` | ✅ **做**（依赖 T4） | P0 |
+| **T5b** | **M5** Google **Vertex** 协议 + **ADC/service account 认证** | 08 `M5` | ✅ **做**（依赖 T4） | P0 |
+| **T6b** | **AWS 凭据链**（env → profile → SSO/process → ECS → IMDSv2） | pre-research §1.1 | ✅ **做** | P0 |
 | **T7** | OAuth provider 声明式注册 | pre-research §3.3 | ✅ **做**（T2/T3 的接缝） | P1 |
 | ~~**T8**~~ | ~~T6 plan 恢复~~ | 12 §8 | ❌ **不做**——**前提不成立**（见 §2.1） | — |
 | ~~**T9**~~ | ~~T7 去重扩到 `read` 以外~~ | 12 §8 | ❌ **不做**——**与参考不符**（见 §2.2） | — |
@@ -33,90 +35,103 @@
 | **Q2** | T6 前提不成立，怎么办？ | **不做**，并更正记录。理由见 §2.1 |
 | **Q3** | T7 与参考不符？ | **不做**，更正 08 的描述。理由见 §2.2 |
 | **Q4** | R1 递归？ | **不改**。理由见 §2.3 |
-| **Q5** | **Bedrock 本轮是否只做 Bearer、Google 只做 GenAI**？ | **是**（推荐）。**论据比原稿强**：SigV4 与 Vertex ADC **都需要打通一条跨 3 个调用点的认证链**（见 §4 T4），而 Bearer 与 API key 都只是静态头部。**这从「省事」升级为「避开一次结构性改动」** |
+| ~~**Q5**~~ | ~~Bedrock 只做 Bearer、Google 只做 GenAI~~ | ❌ **作废**——维护者驳回「收窄」，**全量实现**（见 §1.1） |
 
-### 1.1 Q1 的裁定与理由
+### 1.1 Q1 的裁定与理由 —— **全量实现，不收窄**（**维护者驳回收窄后重写**）
 
-**裁定：M4/M5 用裸 HTTP 自行实现，不引入 `@aws-sdk/client-bedrock-runtime` 与 `@google/genai`。**
+**裁定：M4/M5 按生产企业级实现，不引入任何 AWS/Google SDK，也不收窄认证路径。**
 
-**理由一：pi 自己就为此付出了可查的代价。**
+#### 我上一版错在哪
 
-`pi/packages/ai/src/api/bedrock-converse-stream.lazy.ts` 的原文注释：
+上一版我裁定「Bedrock 只做 Bearer、Google 只做 GenAI」，理由是
+「SigV4 与 ADC 需要打通一条跨 5 个调用点的认证链，成本高」。
+**维护者驳回：「为什么收窄？我要的是生产企业级别的项目，不要老是做一些 demo 模块。」**
 
-> Loads the bedrock implementation through a variable specifier so **bundlers
-> (browser smoke, Bun compile) cannot follow the import into the Node-only AWS SDK**.
+**驳回是对的**，理由有三：
 
-**即：AWS SDK 是 Node-only 的，pi 必须用「变量说明符 + 动态 import」的 hack
-才能让打包器不去跟进这个依赖**，还要额外维护 `setBedrockProviderModule`
-给 Bun 编译用（同文件 `:19-24`）。**这是引入 SDK 的真实代价，不是假设。**
+① **Bearer-only 的 Bedrock 是半成品**：真实 AWS 用户用 IAM 凭据（SigV4），
+   只支持 Bearer 等于「看起来支持 Bedrock，实际大部分人用不了」；
+② **API-key-only 的 Vertex 同样是半成品**：Vertex 的标准企业用法就是 ADC/service account；
+③ **我把「需要一点结构改动」当成了「不值得做」**——这正是上一轮已经被纠正过的同一类错误。
 
-**理由二：我们的依赖面是 6 个，`phase-3-decisions.md:131` 已有先例。**
+#### 决定性发现：**本地就有一份零 SDK 的生产级参考**
 
-> 引入网络依赖（离线不可用）、供应链面（**下载并执行未经校验的第三方二进制**）……
-> **不该为此破例**。
+`~/projects/oh-my-pi` 用**纯 WebCrypto + 手写协议**实现了全部所需能力，
+**零 AWS/Google SDK 依赖**（`grep '@aws-sdk\|aws-sdk'` → 0）：
 
-**理由三：我们已有裸 HTTP 设施。**
-`provider/request/fetch.ts:1` 已从 `undici` 引入 `Agent`/`ProxyAgent`/`fetch`，
-并已处理代理与超时。**写新协议不需要新增网络层。**
-
-#### 成本更正（**主代理自查发现，原估过低**）
-
-**我最初写「SigV4 + 二进制事件流解码约 400–600 行」，这个估算过低。**
-核实依据：
-
-| 事实 | 证据 |
-|---|---|
-| pi 的 Bedrock 实现 **1,345 行** | `wc -l pi/.../bedrock-converse-stream.ts` |
-| pi 的 Vertex 实现 **1,540 行**（三文件） | `wc -l pi/.../google-{vertex,generative-ai,shared}.ts` |
-| **且这两个数字还是「用了 SDK 之后」的** | `grep SigV4` 在 pi 的 bedrock 文件里 → **0 处实现**，签名全由 SDK 完成 |
-| **二进制事件流解码也是 SDK 做的** | `bedrock-converse-stream.ts:296` `for await (const item of response.stream!)` |
-| pi **没有**任何手写的事件流解码器可抄 | `grep -rln 'eventstream\|prelude\|crc32'` → 只有无关的 `zip.ts` |
-
-**即：裸 HTTP 意味着 pi 让 SDK 承担的那部分（SigV4 签名 + AWS 二进制帧解码）
-我们要从零写，而 pi 没有留下可抄的实现。**
-
-#### 但有一条显著降低成本的路径（**主代理发现**）
-
-**Bedrock 支持 Bearer token，可完全绕过 SigV4**
-（`pi/.../bedrock-converse-stream.ts:104-108`）：
-
-> Bearer token for Bedrock API key authentication.
-> **When set, bypasses SigV4 signing** and sends `Authorization: Bearer <token>` instead.
-> Set via `AWS_BEARER_TOKEN_BEDROCK` env var or pass directly.
-
-**这把最难的一部分（SigV4 的规范化请求、签名头、负载哈希、凭据作用域）变成可选的**。
-`bearerToken` 路径下，Bedrock 只是一个普通 HTTPS 端点 + 二进制帧解码。
-
-**修正后的成本**：
-
-| 部分 | 估 | 说明 |
+| 文件 | 行数 | 内容 |
 |---|---|---|
-| Bedrock 请求体（`toolSpec`/`toolUse`/`toolResult` 映射） | 中 | 机械翻译，可单测 |
-| **AWS 二进制事件流解码** | **高** | prelude + headers + CRC 校验；**无参考可抄**，但有公开规范 |
-| Bedrock Bearer 认证 | 低 | 一个头部 |
-| Bedrock SigV4（**可选**） | **高** | 若要支持标准 AWS 凭据链则必须；**建议本轮只做 Bearer** |
-| Vertex 请求体 + `?alt=sse` | 中 | SSE 形态，我们已有解析器 |
-| Vertex 认证（API key / ADC） | 中 | ADC 需读 `~/.config/gcloud/...` 并刷新令牌 |
+| `packages/ai/src/providers/aws-sigv4.ts` | **229** | 手写 SigV4（**WebCrypto-only**，注释明写「no node:crypto」） |
+| `packages/ai/src/providers/aws-eventstream.ts` | **181** | AWS 二进制事件流解码器（含 `crc32`/`decodeMessage`/`decodeEventStream`） |
+| `packages/ai/src/providers/aws-credentials.ts` | **1,078** | 完整凭据链：env → profile（静态/SSO/`credential_process`/角色链/`web_identity`）→ ECS → **IMDSv2** |
+| `packages/ai/src/providers/amazon-bedrock.ts` | **1,345** | Bedrock provider 本身 |
+| `packages/ai/src/providers/google-auth.ts` | **330** | **RS256 JWT 交换**（service account）→ 用户 ADC → GCE metadata |
+| `packages/ai/src/providers/google-shared.ts` | **1,136** | 两个 Google 协议的请求/响应/工具/thinking |
+| `packages/ai/src/providers/google-vertex.ts` / `google.ts` | 135 / 53 | 两个 provider 的入口 |
 
-#### 建议的收窄：本轮两个协议都只做「简单认证」路径
+**且有测试与 AWS 官方测试向量**：
+`test/aws-sigv4.test.ts` 直接引用 `aws-sig-v4-test-suite`
+（含 `getSigningKey` 的官方期望值 `c4afb1cc...`），
+`test/aws-eventstream.test.ts`、`test/aws-credentials.test.ts`、
+以及 **12+ 个 `bedrock-*.test.ts`**。
 
-**同一个模式在两个协议上都成立**——各自都有一条不需要复杂签名的路径：
+**即：这条路已经被走通过，且有可对照的测试向量。**
 
-| 协议 | 复杂路径 | **本轮采用的简单路径** | 证据 |
-|---|---|---|---|
-| **Bedrock** | SigV4（规范化请求 + 签名头 + 负载哈希 + 凭据作用域） | **Bearer token**（`AWS_BEARER_TOKEN_BEDROCK`） | `pi/.../bedrock-converse-stream.ts:104-108` |
-| **Vertex** | **必须** ADC 或 service account（**且还要 project + location**） | **API key** | `pi/.../google-vertex.ts:21,27-32`（`api-key` 是三个选项之一，只要一个 key） |
+#### 依赖结论不变，但理由更强
 
-**理由**：
-① 复杂路径是**成本与风险的主要来源**，且 **pi 的实现全在 SDK 里、无参考可抄**；
-② 简单路径**能拿到可用的协议**——Bearer 的 Bedrock 与 API-key 的 Vertex 都是真实可用的；
-③ 复杂路径是**非破坏性的增量**：`headers` 已经拿到请求上下文（T4），
-   将来加 SigV4/ADC **不需要改契约**；
-④ 与我们「不加无法验证的表面」的既有纪律一致——
-   本轮**能验证的是形状与状态机**，而 SigV4/ADC 的核心（签名正确性）
-   **恰好是最需要真实账号才能验证的部分**。
+**不引入 SDK** 仍然成立，且现在**有了实证**：
+`oh-my-pi` 就是零 SDK 做到的，**不是理论上的可行性**。
+pi 用 SDK 是它的选择；`oh-my-pi` 证明另一条路同样完整。
 
-**这个收窄需要维护者确认**（见 §8 Q5）。
+#### 结构问题的正解：**签名放在传输层**（4 个 scout 独立收敛到同一方案）
+
+上一版我说「要打通一条跨 5 个调用点的认证链」——**那个判断本身也是错的**。
+
+**正解**：SigV4 需要 `method`/`url`/`headers`/`body`，
+而**这四样在 `fetchImpl` 里全都有**。所以签名的位置不是「更早」，而是「**正好在那里**」：
+
+```
+fetchImpl(url, { method, headers, body })   ← 四样齐备
+```
+
+**做法**：把 `providerFetchFor()` 的返回值再包一层签名装饰器
+（`packages/ts-shell/src/provider/request/fetch.ts:172`）。
+**3 个调用点（`step.ts` / `summarize.ts` / `completion.ts`）一行都不用改**，
+两个构造点也不用改。
+
+**已实机验证**：包装后的 fetch 能拿到 url、method、body、headers 全部四项。
+
+#### 修正后的 T4 范围
+
+| 层 | 改动 |
+|---|---|
+| `EndpointShape.path` | `string` → `(model) => string`（Bedrock 的 URL 含 modelId） |
+| `EndpointShape.headers` | **不改签名**——需要签名的协议用**传输层装饰器** |
+| `providerFetchFor` | 增加可选的 `signer`，返回包装后的 fetch |
+| 3 个调用点 | **不改** |
+
+#### 成本（**重新估算，基于参考的实际规模**）
+
+| 模块 | 参考规模 | 我们的估计 |
+|---|---|---|
+| `aws/sigv4.ts` | 229 行 | ~250 行 + 官方测试向量 |
+| `aws/eventStream.ts` | 181 行 | ~200 行（**CRC32 要自己写**，见下） |
+| `aws/credentials.ts` | 1,078 行 | **分级实现**（见 §4 T6） |
+| `endpoints/bedrockConverse.ts` | 1,345 行 | ~600–800 行 |
+| `google/auth.ts` | 330 行 | ~350 行 |
+| `endpoints/googleGenAI.ts` + `googleVertex.ts` | 1,324 行 | ~700–900 行 |
+
+#### 一个真实的 Node 地板约束（**主代理实测发现**）
+
+`oh-my-pi` 的 `crc32` 用 `Bun.hash.crc32`（`aws-eventstream.ts:36`）——**我们跑 Node**。
+而 `node:zlib` 的 `crc32` 是 **v22.2.0 引入、v20.15.0 回移**的，
+**我们的地板是 20.3.0，CI 就跑 20.3.0**（`.github/workflows/ci.yml:25`）。
+
+**即：`zlib.crc32` 在 20.3.0–20.14.0 上会 `TypeError`，是 `check:node-floor` 违规。**
+**必须自己写 CRC32**（IEEE 802.3 多项式 `0xEDB88320`，256 项查表，约 20 行）。
+
+**已实测**：WebCrypto 的 HMAC-SHA256 与 SHA-256 在本机可用，
+空串 SHA-256 得到 `e3b0c442...b855`，与 `oh-my-pi` 测试里 pin 的常量一致。
 
 ## 2. 三项「不做」的详细理由
 
@@ -213,70 +228,212 @@
 
 | 改动 | 内容 |
 |---|---|
-| `EndpointShape.path` | `string` → `(model: string) => string` |
-| `EndpointShape.headers` | **不能只改签名**——见下方「T4 的真实范围」 |
-| `endpointUrl()` | 接受 model 参数 |
-| 两个现有协议 | 各改 1 处（`path` 返回常量） |
+| `EndpointShape.path` | `string` → `(model: string) => string`（Bedrock 的 REST 路径含 modelId） |
+| `EndpointShape.headers` | **签名不改**——需要签名的协议走传输层装饰器（见下） |
+| `providerFetchFor`（`fetch.ts:172`） | 增加可选 `signer`，返回包装后的 fetch |
+| 3 个调用点 | **一行不改** |
+| 2 个构造点 | **不改** |
 
-**不做的事**：**不引入签名器抽象**。Bedrock 是唯一需要看 body 的消费者。
-
-#### T4 的真实范围（**复核子代理指出，主代理已核实并更正**）
-
-**我原稿说「`headers` 改成拿到请求上下文就够了」——这是错的。**
-核实：`request.provider.headers` 是一个**预先解析好的静态对象**，
-在**会话构造时**就构建完成（`cliRuntimeInvocation.ts:619`），
-而 `step.ts:337` 只是把它传进 fetch：
+**签名装饰器为什么是最干净的接缝**：SigV4 需要 `method` / `url` / `headers` / `body`，
+而**这四样在 `fetchImpl` 里全都有**：
 
 ```ts
-headers: request.provider.headers,   // ← 早已构建，此处不参与任何计算
-body: JSON.stringify(payload),       // ← payload 在这里才存在
+fetchImpl(url, { method, headers, body })   // ← 四样齐备
 ```
 
-**即：headers 的构建点距离 payload 有整条调用链那么远**，
-`providerAuthorization`（`authorization.ts:62-74`）**只拿到 apiKey 与 endpoint，
-拿不到 body、拿不到最终 URL**。SigV4 恰恰要签这两样。
+**已实机验证**：包装后的 fetch 能拿到全部四项。
+**4 个独立 scout 各自收敛到同一方案**——不是我的偏好。
 
-**所以 T4 不是「改一个函数签名」，而是要打通一条链**：
+**为什么不在 `authorization.ts` 里签**：那里在**会话构造期**运行
+（`cliRuntimeInvocation.ts:619`），payload 还不存在；
+强行让它在请求期运行会牵动 3 个调用点与 2 个构造点，而**收益为零**。
 
-| 层 | 现状 | T4 需要 |
+---
+
+### T6a — `aws/sigv4.ts` + `aws/eventStream.ts`（**纯函数，最先做**）
+
+两个模块都是**纯函数、零依赖、可对着官方测试向量验证**，因此排在最前，
+且可以与其他任务并行。
+
+#### SigV4 的精确算法（**已核实**）
+
+**规范化请求**（6 行，`\n` 分隔）：
+```
+<METHOD>
+<CanonicalURI>            ← 各段 RFC 3986 编码，`/` 保留
+<CanonicalQueryString>    ← 先编码，再按**编码后**的字节序排序
+<CanonicalHeaders>        ← 名字小写、按字典序；值去首尾空白并折叠内部空白；每条结尾带 \n
+<SignedHeaders>           ← 分号分隔的小写名
+<Hex(SHA256(body))>
+```
+
+**String to sign**（4 行）：
+```
+AWS4-HMAC-SHA256
+<YYYYMMDDTHHMMSSZ>
+<YYYYMMDD>/<region>/<service>/aws4_request
+<Hex(SHA256(CanonicalRequest))>
+```
+
+**签名密钥**（链式 HMAC-SHA256）：
+```
+kDate    = HMAC("AWS4" + secret, YYYYMMDD)
+kRegion  = HMAC(kDate, region)
+kService = HMAC(kRegion, service)
+kSigning = HMAC(kService, "aws4_request")
+signature = Hex(HMAC(kSigning, stringToSign))
+```
+
+**Authorization 头**：
+```
+AWS4-HMAC-SHA256 Credential=<accessKeyId>/<scope>, SignedHeaders=<names>, Signature=<sig>
+```
+
+**必须签**：`host`、`x-amz-date`、`x-amz-content-sha256`、
+`x-amz-security-token`（有会话令牌时）、`content-type`、`accept`。
+**必须排除**：`authorization`、`user-agent`、`connection` 等不可签头部。
+
+**Bedrock 的 payload hash 是 body 的普通 SHA-256**（`applyChecksum: true`），
+**不是** `STREAMING-AWS4-HMAC-SHA256-PAYLOAD` 分块变体。
+
+#### 二进制事件流（**已核实字节布局**）
+
+```
+[0..3]   total_length    u32 BE（最小 16）
+[4..7]   headers_length  u32 BE
+[8..11]  prelude_crc     u32 BE（CRC32 覆盖 [0..7]）
+[12 .. 12+headers_length)             头部块
+[12+headers_length .. total_length-4) payload
+[total_length-4 .. total_length)      message_crc（CRC32 覆盖 [0..total_length-4)）
+```
+
+**头部条目**：`[name_len u8][name utf8][type u8][value]`，
+类型 `0/1`=布尔、`2/3/4/5`=有符号整数（1/2/4/8 字节 BE）、
+`6`=字节数组（`[len u16][bytes]`）、`7`=字符串（`[len u16][utf8]`）、
+`8`=时间戳、`9`=UUID。
+
+**Bedrock 用到**：`:message-type`、`:event-type`、`:content-type`、`:exception-type`。
+
+#### **CRC32 必须自己写**（Node 地板约束，**已实测**）
+
+`oh-my-pi` 用 `Bun.hash.crc32`（`aws-eventstream.ts:36`）——**我们跑 Node**。
+而 `node:zlib` 的 `crc32` **v22.2.0 引入、v20.15.0 回移**，
+**我们的地板是 20.3.0，CI 就跑 20.3.0**（`.github/workflows/ci.yml:25`）。
+
+**在 20.3.0–20.14.0 上调用 `zlib.crc32` 会 `TypeError`**，是 `check:node-floor` 违规。
+**自己写**：IEEE 802.3 多项式 `0xEDB88320`，256 项查表，约 20 行。
+
+**已实测**：WebCrypto 的 HMAC-SHA256 与 SHA-256 在本机可用；
+空串 SHA-256 得到 `e3b0c442…b855`，与参考测试里 pin 的常量一致。
+
+---
+
+### T6b — `aws/credentials.ts`（**分级，但都要做**）
+
+| 优先级 | 来源 | 为什么 |
 |---|---|---|
-| `providerAuthorization` | 构造期调用，产出静态 headers | 改为产出**按请求签名的能力** |
-| `ProviderConfig.headers` | 静态 `Record<string,string>` | 改为 `headersFor(request) => ...` |
-| 三处 fetch 调用点 | 直接用 `provider.headers` | 改为传 method/url/body 进去 |
-| `EndpointShape.headers` | `(apiKey) => headers` | 移到请求期，能看到完整请求 |
+| **P0** | 环境变量（`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` / `AWS_REGION`） | 最基本，CI 也走这条 |
+| **P0** | `~/.aws/credentials` + `~/.aws/config` 的 profile | 笔记本上的标准做法 |
+| **P1** | SSO token 缓存（`~/.aws/sso/cache/`） | 企业 AWS 开发环境的标准 |
+| **P1** | `credential_process` | `aws-vault` / `granted` / 1Password CLI 走这条 |
+| **P2** | ECS 容器凭据、EC2 IMDSv2 | 云上才需要，**生产实现应当包含** |
 
-**这条链有 3 个调用点**（`step.ts` / `summarize.ts` / `completion.ts`）
-与 2 个构造点（`cliRuntimeInvocation.ts:619`、`cliSessionRuntimeFactory.ts:265,291`），
-**改动面比原稿描述的大得多**。
+**P0 先行**（否则 Bedrock 不可用），**P1/P2 同属本轮范围**——
+只做 P0 就是维护者说的 demo 模块。
 
-**这直接影响 Q5**：SigV4 需要打通这条链，**成本比「写个签名函数」高得多**；
-而 **Bearer 认证只需要一个静态头部**（`Authorization: Bearer <token>`），
-**完全不需要动这条链**。
-**这让「本轮只做 Bearer」从「省事」变成了「避开一次结构性改动」**——
-论据比我原稿写的强。
+---
 
-#### 收窄之后的 T4 反而变小了（**主代理进一步核实**）
+### T6 — `endpoints/bedrockConverse.ts`
 
-既然本轮认证都是静态头部，**`headers` 那半不需要改**。剩下的是：
+请求体映射（与两个现有协议不同）：
 
-| 协议 | 需要 `path` 动态化吗 | 依据 |
+| 维度 | 我们现有 | Bedrock |
 |---|---|---|
-| **Bedrock** | ✅ **需要** | REST 路径含 `{modelId}`；`modelId` 是请求参数（`bedrock-converse-stream.ts:265`） |
-| **Google GenAI** | ❌ **不需要** | SDK 把 model 作为**参数**传入（`google-generative-ai.ts:100` `client.models.generateContentStream(params)`），**不在 URL 里** |
+| 工具声明 | `tools[].function` | `toolConfig.tools[].toolSpec` |
+| 工具调用 | `tool_calls` | `toolUse` |
+| 工具结果 | `role: "tool"` | `toolResult` |
+| 系统提示 | `systemPrompt` 字段 | `system: [{ text }]` |
+| 流格式 | SSE | **二进制事件流**（T6a 解码） |
 
-**即收窄后的 T4 = 只把 `path` 从 `string` 改成 `(model) => string`，
-并同步 3 个调用点。** 这是个小改动，**比我原稿描述的两种方案都小**。
+---
 
-**代价**：将来要做 SigV4 或 Vertex ADC 时，**仍需打通那条认证链**——
-但那时的改动是**纯增量**（`headers` 加一个能看请求的形态），
-**不会推翻本轮的任何结构**。
+### T5 — Google GenAI（AI Studio）
+
+| 项 | 值 |
+|---|---|
+| URL | `https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse` |
+| 认证 | `x-goog-api-key: <key>` |
+| 角色名 | `user` / **`model`** |
+| 工具 | `functionDeclarations` / `functionCall` / `functionResponse` |
+| 推理 | **`thoughtSignature` 必须往返** |
+| 流格式 | **SSE**（`?alt=sse`），与我们已有的解析器同构 |
+
+**先做它**，因为它形态最简单，**用来验证 T4 的契约改对了**。
+
+---
+
+### T5b — Google Vertex + `google/auth.ts`（**全量认证**）
+
+| 项 | 值 |
+|---|---|
+| URL | `https://{location}-aiplatform.googleapis.com/v1/projects/{project}/locations/{location}/publishers/google/models/{model}:streamGenerateContent?alt=sse` |
+| 认证 | **ADC / service account** → `Authorization: Bearer <token>` |
+| 额外必填 | **project + location** |
+
+#### 认证流程（参考 `oh-my-pi/.../google-auth.ts`，330 行，**零 SDK**）
+
+优先级：
+
+1. **`GOOGLE_APPLICATION_CREDENTIALS`** 指向的文件（`type: "service_account"`）→ **RS256 JWT 交换**
+2. **`~/.config/gcloud/application_default_credentials.json`**（`type: "authorized_user"`）→ **refresh_token 交换**
+3. **GCE / Cloud Run metadata server**（`metadata.google.internal`）
+
+| 流程 | 细节 |
+|---|---|
+| **Service account JWT** | header `{alg: RS256, typ: JWT, kid}`；claims `{iss: client_email, scope: "…/cloud-platform", aud: "https://oauth2.googleapis.com/token", iat, exp: iat+3600}`；**WebCrypto `RSASSA-PKCS1-v1_5` + `importKey("pkcs8")`** |
+| **交换端点** | `POST https://oauth2.googleapis.com/token`，`grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer` |
+| **用户 ADC** | 同端点，`grant_type=refresh_token` + `client_id`/`client_secret`/`refresh_token` |
+| **缓存** | 按 `expires_in` 缓存，**提前 60s 过期** |
+
+**已实测**：WebCrypto 的 `RSASSA-PKCS1-v1_5` 与 `pkcs8` 导入在本机 Node 可用。
+
+**为什么不能只做 API key**：Vertex 的企业标准用法就是 ADC/service account。
+只做 API key 等于「声称支持 Vertex，实际企业用户用不了」。
+
+---
+
+### T7 — provider 声明式注册
+
+`providers.ts:91-93` 的硬编码 `["openai","google"]` 改为声明式，
+使「加一个 provider」是加一条声明而不是改代码。
+**T2/T3 依赖它**（Device Code 与订阅 OAuth 是两种不同的 flow）。
+
+---
+
+### T2 — M3 Device Code（RFC 8628）
+
+`core/auth/oauth/device.ts`：`pollDeviceCode()`——RFC 8628 状态机：
+缺 `interval` 时**默认 5 秒**；`slow_down` → **间隔 +5 秒**；
+`authorization_pending` 继续；`expired_token`/`access_denied` 立即失败；
+**可中断的 sleep**（AbortSignal 贯穿）。
+
+---
+
+### T3 — M6 订阅 OAuth
+
+- `copilot.ts`：token 端点 `https://api.${domain}/copilot_internal/v2/token`，
+  从 token 解 `proxy-ep=` 得 API base，过期 `expires_at * 1000 - 5min`
+- `anthropic.ts`：token 端点 `https://platform.claude.com/v1/oauth/token`，
+  **JSON** token POST（非 form-encoded），**固定端口 53692**，手动粘贴回调的降级路径
+
+---
 
 ### T1 — M2 后台命令执行
 
 | 新增 | 职责 |
 |---|---|
 | `core/shell/background/tasks.ts` | `BackgroundTaskManager`：`spawn`/`list`/`stop`/`output`，接 `trackChildPid` |
-| `core/shell/background/output.ts` | 滚动缓冲 + 超限落盘（参照 pi `output-accumulator.ts`：内存留 `2×maxBytes` 尾，超限写临时文件） |
+| `core/shell/background/output.ts` | 滚动缓冲 + 超限落盘（内存留 `2×maxBytes` 尾，超限写临时文件） |
 | bash 参数 | 加 `runInBackground` |
 | 两个工具 | `taskOutput`、`taskStop` |
 | 完成通知 | **复用现有 follow-up 队列**，不新造机制 |
@@ -284,65 +441,37 @@ body: JSON.stringify(payload),       // ← payload 在这里才存在
 **必须同步**：`cli/interactive/ambientFacts.ts:9` 的「no detached execution mode」
 将变成假话。
 
-### T2 — M3 Device Code
-
-`core/auth/oauth/device.ts`：`pollDeviceCode()`——RFC 8628 状态机
-（缺 `interval` 默认 5s、`slow_down` +5s、可中断 sleep）。
-
-### T3 — M6 订阅 OAuth
-
-`copilot.ts`（token 端点 + `proxy-ep` 解析）、`anthropic.ts`
-（**JSON** token POST + 固定端口 53692 + 手动粘贴降级）。
-
-### T7 — provider 声明式注册
-
-`providers.ts:91-93` 的硬编码 `["openai","google"]` 改为声明式，
-使「加一个 provider」是加一条声明而不是改代码。
-
-### T5 — M5：**两个不同的 provider，不是一个**
-
-**复核子代理指出、主代理已核实的更正**：我原稿把「Google GenAI」与
-「Vertex」当成同一个协议的两种认证——**它们其实是两个不同的 provider**：
-
-| | **Google GenAI（AI Studio）** | **Vertex AI** |
-|---|---|---|
-| 认证 | **API key**（`x-goog-api-key`） | **ADC 或 service account**，**且必须再给 project + location** |
-| pi 的位置 | `providers/google.ts` + `api/google-generative-ai.ts` | `providers/google-vertex.ts` + `api/google-vertex.ts` |
-| 我们的 M5 原文 | 「Google GenAI / Vertex 原生协议」**——把两者混为一谈** | 同左 |
-| 本轮 | ✅ **做** | ⏸ **增量**（见下） |
-
-**证据**（`pi/packages/ai/src/providers/google-vertex.ts`）：
-`:21-23` 三个认证选项里 `api-key` 只是其一，另两个是 `adc` 与 `service-account`；
-`:49-50` 还要额外问 **project** 与 **location**；
-`:11` 的注释明确说「ADC additionally requires project and location env vars」。
-
-**即：Vertex 不是「另一种 header」，它多一套凭据解析与两个必填参数。**
-
-**本轮裁定**：
-① **做 GenAI**（API key，形态简单，`?alt=sse` 与我们已有的 SSE 解析同构）；
-② **Vertex 留作其上的增量**——它需要 ADC 令牌获取（读
-`~/.config/gcloud/application_default_credentials.json` 或 service account JWT 交换），
-**这部分恰好是最难离线验证的**（与 SigV4 同理）。
-
-### T6 — M4 Bedrock
-
-按 pre-research §4.2 的差异表逐项实现，**认证走 Bearer**（见 §1.1）。
-
 ---
+
+### 测试策略（**全阶段**）
+
+| 层 | 可离线验证 | 不能验证 |
+|---|---|---|
+| **SigV4** | **AWS 官方测试向量**（`aws-sig-v4-test-suite`） | 真实端点接受与否 |
+| **事件流** | 手工构造帧 + 双 CRC + 跨 chunk 分片 | 真实 Bedrock 流 |
+| **凭据链** | 假文件系统 + 假 IMDS/ECS 响应 | 真实 IAM |
+| **Google JWT** | 固定密钥对 + 断言签名与 claims | 真实 ADC |
+| **协议形状** | 请求体、工具映射、`thoughtSignature` 往返 | 真实端点 |
+| **RFC 8628** | 假授权服务器注入响应序列 | 真实 provider |
+| **后台执行** | 真实短命令：spawn → 读输出 → 停止 → 校验清理 | Windows 进程组 |
+
 
 ## 5. 执行顺序
 
 | 序 | 任务 | 级别 | 为什么在这个位置 |
 |---|---|---|---|
-| 1 | **T4** 端点契约扩展 | **P0** | **M4/M5 的前置**；两个现有协议必须同步改并保持全绿 |
-| 2 | **T5** M5 Google 协议 | P0 | 依赖 T4；**先做 GenAI（API key + `?alt=sse`，形态简单）**，以验证契约改对了；**Vertex 作为其上的增量** |
-| 3 | **T6** M4 Bedrock | P0 | 依赖 T4；SigV4 + 二进制事件流，最重 |
-| 4 | **T7** provider 声明式注册 | P1 | **T2/T3 的接缝**，先做省得后面改两遍 |
-| 5 | **T2** M3 Device Code | P1 | 独立；RFC 8628 状态机可完整单测 |
-| 6 | **T3** M6 订阅 OAuth | P1 | 依赖 T7 |
-| 7 | **T1** M2 后台执行 | P1 | 独立；接缝最多（工具 + 通知 + 输出） |
+| 1 | **T4** 端点契约（`path` 动态化 + 传输层签名装饰器） | **P0** | **M4/M5 的前置**；两个现有协议同步改并保持全绿 |
+| 2 | **T6a** `aws/sigv4.ts` + `aws/eventStream.ts` | **P0** | **纯函数，可对着 AWS 官方测试向量做**，不依赖其他任务 |
+| 3 | **T6b** `aws/credentials.ts` | **P0** | 依赖 T6a 的类型；分级实现，P0 部分先行 |
+| 4 | **T6** `endpoints/bedrockConverse.ts` | **P0** | 依赖 T4/T6a/T6b |
+| 5 | **T5** Google GenAI | P0 | 依赖 T4；形态最简单，**用来验证契约改对了** |
+| 6 | **T5b** Google Vertex + `google/auth.ts` | P0 | 依赖 T5 与 T4 |
+| 7 | **T7** provider 声明式注册 | P1 | T2/T3 的接缝 |
+| 8 | **T2** M3 Device Code | P1 | 独立，RFC 8628 状态机可完整单测 |
+| 9 | **T3** M6 订阅 OAuth | P1 | 依赖 T7 |
+| 10 | **T1** M2 后台执行 | P1 | 独立 |
 
-**可并行组**：{T5, T6} 在 T4 之后 / {T2, T1} / {T3} 在 T7 之后。
+**可并行组**：{T6a, T6b} 与 T4 并行（纯函数）/ {T5, T6} 在 T4 之后 / {T2, T1} / {T3} 在 T7 之后。
 
 ---
 
@@ -354,7 +483,9 @@ body: JSON.stringify(payload),       // ← payload 在这里才存在
 | **C2** | `08-*` §4.3 称参考「按内容哈希去重**任何**工具结果」 | **与参考不符**——`FILE_UNCHANGED_STUB` 定义在 `FileReadTool` 内 | pre-research §5.2 |
 | **C3** | `08-*` §4.2 把 M4/M5 列为「成本高」 | **成本来源是依赖 + 认证链**，不是协议本身 | §1.1 |
 | **C4** | 本文档初稿把「Google GenAI」与「Vertex」当成同一协议的两种认证 | **是两个 provider**：GenAI 只需 API key；Vertex 需 ADC/service account **且要 project + location** | §4 T5 |
-| **C5** | 本文档初稿称 T4「改 `headers` 签名就够」 | **不够**——headers 在**会话构造期**就解析完了（`cliRuntimeInvocation.ts:619`），距 payload 整条链；SigV4 要签 body，必须打通这条链 | §4 T4 |
+| **C5** | 本文档初稿称 T4「改 `headers` 签名就够」 | **不够**——headers 在**会话构造期**就解析完了（`cliRuntimeInvocation.ts:619`），距 payload 整条链 | §4 T4 |
+| **C6** | 本文档第二稿据此收窄为「Bedrock 只做 Bearer、Google 只做 GenAI」 | **收窄是错的**，维护者驳回。正解是**签名放在 `fetchImpl`**（四样信息齐备），3 个调用点零改动；认证**全量实现** | §1.1、§4 T4 |
+| **C7** | 本文档称「SigV4 与事件流解码约 400–600 行，无参考可抄」 | **有零 SDK 的完整参考**：`~/projects/oh-my-pi` 的 `aws-sigv4.ts`(229) + `aws-eventstream.ts`(181) + `aws-credentials.ts`(1078) + `google-auth.ts`(330)，**且含 AWS 官方测试向量** | §1.1 |
 
 ---
 

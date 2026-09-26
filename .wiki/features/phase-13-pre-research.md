@@ -29,25 +29,57 @@
 
 ---
 
-## 1. 决定性约束：依赖面
+## 1. 决定性约束：依赖面，与一条被忽略的参考路径
 
-**这是本轮最重要的约束，且它不是技术问题。**
+**这是本轮最重要的发现，且它推翻了本文档初稿的结论。**
 
-| | 我们的 | pi 的 |
+### 1.1 依赖面（事实）
+
+| | 我们的 | pi | **oh-my-pi** |
+|---|---|---|---|
+| 运行时依赖 | **6 个** | 数十个 | 少量内部包 |
+| Bedrock | — | `@aws-sdk/client-bedrock-runtime` | **零 AWS SDK** |
+| Vertex | — | `@google/genai` | **零 Google SDK** |
+
+### 1.2 初稿的结论与它的错误
+
+**初稿结论**：M4/M5「要么裸 HTTP 自己写，要么打破先例引入两个重型 SDK」，
+并把自写成本估为 400–600 行。
+
+**错误**：**漏掉了 `~/projects/oh-my-pi`**——它已经用**零 SDK** 走通了整条路，
+而且**留下了可对照的测试向量**。
+
+### 1.3 `oh-my-pi` 的完整实现（**已逐文件核实**）
+
+| 文件 | 行数 | 内容 |
 |---|---|---|
-| 运行时依赖 | **6 个**（`grok-mermaid`/`ignore`/`picomatch`/`playwright-core`/`typescript`/`undici`） | 数十个 |
-| Bedrock | — | **`@aws-sdk/client-bedrock-runtime`**（`pi/packages/ai/package.json:67`） |
-| Vertex | — | **`@google/genai`**（同上 `:69`） |
+| `packages/ai/src/providers/aws-sigv4.ts` | **229** | 手写 SigV4，**WebCrypto-only**（`:2` 注释：「no node:crypto」） |
+| `packages/ai/src/providers/aws-eventstream.ts` | **181** | AWS 二进制帧解码：`crc32` / `decodeMessage` / `decodeEventStream` |
+| `packages/ai/src/providers/aws-credentials.ts` | **1,078** | 凭据链：env → profile（静态/SSO/`credential_process`/角色链/`web_identity`）→ ECS → **IMDSv2** |
+| `packages/ai/src/providers/amazon-bedrock.ts` | **1,345** | Bedrock provider |
+| `packages/ai/src/providers/google-auth.ts` | **330** | **RS256 JWT**（service account）→ 用户 ADC → GCE metadata |
+| `packages/ai/src/providers/google-shared.ts` | **1,136** | 两个 Google 协议的请求/响应/工具/thinking |
+| `packages/ai/src/providers/google-vertex.ts` / `google.ts` | 135 / 53 | 两个 provider 的入口 |
 
-**已有先例裁决**（`phase-3-decisions.md:131`）：
+**测试**：`test/aws-sigv4.test.ts`（含 **AWS 官方测试向量**
+`aws-sig-v4-test-suite`，pin 了 `getSigningKey` 的期望值 `c4afb1cc…`）、
+`test/aws-eventstream.test.ts`、`test/aws-credentials.test.ts`、
+以及 **12+ 个 `bedrock-*.test.ts`**。
 
-> 引入网络依赖（离线不可用）、供应链面（**下载并执行未经校验的第三方二进制**），
-> 而我们的依赖面**只有 3 个**（已核实）。**不该为此破例**。
+**依赖核实**：`grep '@aws-sdk\|aws-sdk' packages/ai/package.json` → **0**。
 
-**推论**：M4/M5 **要么裸 HTTP 实现**（自己写 SigV4 与事件流解码），
-**要么打破既有先例引入两个重型 SDK**。这是本阶段最需要维护者拍板的一点（见 §6）。
+### 1.4 结论
 
----
+**M4/M5 全量实现、零新增依赖，是已被走通过的路，不是理论可行性。**
+
+### 1.5 一个真实的 Node 地板约束（**主代理实测**）
+
+`oh-my-pi` 的 `crc32` 用 `Bun.hash.crc32`（`aws-eventstream.ts:36`）——**我们跑 Node**。
+`node:zlib` 的 `crc32` 是 **v22.2.0 引入、v20.15.0 回移**，
+而**我们的地板是 20.3.0，CI 就跑 20.3.0**（`.github/workflows/ci.yml:25`）。
+
+**即：`zlib.crc32` 在 20.3.0–20.14.0 上是 `TypeError`，属 `check:node-floor` 违规。**
+**必须自己写 CRC32**（IEEE 802.3 多项式 `0xEDB88320`，256 项查表，约 20 行）。
 
 ## 2. M2 — 后台命令执行
 
@@ -179,7 +211,9 @@ readonly headers: (apiKey: string) => Record<string, string>;  // ← 只有 api
 且 **Bedrock 需要 SigV4 签名**（`pi` 用 `@aws-sdk/client-bedrock-runtime`），
 **Vertex 需要 ADC / service account 令牌获取**（异步）。
 
-**即：M4/M5 不是 drop-in，契约必须先改。**
+**即：M4/M5 不是 drop-in，`path` 必须先改。**
+（**但 `headers` 不需要改**——需要签名的协议把签名放在 `fetchImpl` 装饰器里，
+那里能看到 url/method/body，3 个调用点零改动。详见 `phase-13-decisions.md` §4 T4。）
 
 ### 4.2 Bedrock 的差异（**已核实**）
 
@@ -203,15 +237,16 @@ readonly headers: (apiKey: string) => Record<string, string>;  // ← 只有 api
 | 工具结果 | `role: "tool"` | `functionResponse` |
 | 推理 | `thinking` + signature | **`thoughtSignature` 必须往返** |
 
-### 4.4 契约改法（**两个选项，见 §6 裁决点**）
+### 4.4 契约改法（**已定案，见 `phase-13-decisions.md` §4 T4**）
 
-| 选项 | 内容 | 代价 |
-|---|---|---|
-| **(a) 最小扩展** | `path` 改成 `(model) => string`；`headers` 改成 `(ctx) => headers \| Promise<headers>`，ctx 带 method/url/body | 改动小，**两个现有协议同步改**（各 1 处调用点） |
-| **(b) 引入签名器抽象** | `headers` 换成 `sign(request) => Promise<Request>` | 更通用，但**为 2 个消费者造抽象** |
+**只改 `path`**（`string` → `(model) => string`），**`headers` 不动**。
 
-**倾向 (a)**：Bedrock 的 SigV4 是唯一需要「看 body」的消费者，
-而它可以在自己的模块里实现——`headers` 只要能拿到 body 即可，不需要抽象成签名器。
+**签名放在传输层**：`fetchImpl(url, { method, headers, body })` 四样齐备，
+正是 SigV4 需要的。做法是给 `providerFetchFor()` 的返回值加一层签名装饰器，
+**3 个调用点与 2 个构造点全部零改动**。
+
+**已实机验证**包装后的 fetch 能拿到全部四项；
+**4 个独立 scout 各自收敛到同一方案**。
 
 ---
 
@@ -370,3 +405,65 @@ SDK 承担了 **SigV4 签名、凭据发现、HTTP 代理、连接池、二进�
 **两次都是复核子代理抓到的，不是我自己发现的。**
 这与 `phase-12-decisions.md` §9 记录的教训一致：
 **写完裁决后必须让独立读者去查，而不是自查**。
+
+
+---
+
+## 10. 第二轮探索与维护者裁定（**2026-09-26，收窄被驳回后**）
+
+### 10.1 维护者裁定
+
+> 「为什么收窄？重新派遣子代理，继续学习，我要的是生产企业级别的项目，
+> 不要老是做一些 demo 模块在里面影响」
+
+**裁定：M4/M5 全量实现，不收窄。** §4.4 与 `phase-13-decisions.md` §1.1 已按此重写。
+
+### 10.2 我错在哪（**两条，都要记**）
+
+**错误一：把「需要结构改动」当成了「不值得做」。**
+我以「SigV4/ADC 需要打通一条跨 5 个调用点的链，成本高」为理由收窄。
+**这个推断本身也是错的**——签名不需要「更早」，它需要「正好能看到全部请求信息的地方」，
+而那个地方就是 `fetchImpl`。**3 个调用点一行都不用改。**
+
+**错误二：漏掉了一份零 SDK 的完整参考。**
+我只查了 `pi` 与 `source-claudecode`，
+**没查 `~/projects/oh-my-pi`**——它用纯 WebCrypto 实现了 SigV4、
+手写事件流解码、完整凭据链、Google RS256 JWT，**零 AWS/Google SDK**，
+**且带 AWS 官方测试向量**。
+
+**即：我把「没有参考」当成了「成本高」的理由，而参考就在本地。**
+
+### 10.3 第二轮 4 个 scout 的产出
+
+| Scout | 关键产出 |
+|---|---|
+| `SigV4A` | SigV4 的精确算法（规范化请求/string-to-sign/密钥派生/必签头部）；**Bedrock 的 payload hash 是 body 的普通 SHA-256**，不是分块变体 |
+| `EventStreamA` | **字节级帧布局**（prelude/headers/payload/双 CRC）+ 头部类型编码表；**确认 `zlib.crc32` 是地板违规** |
+| `CredsA` | 凭据链的五个来源与优先级；**独立提出「签名放在传输层」** |
+| `GoogleA` | ADC 的三种来源、service account 的 RS256 JWT 细节（claims/端点/缓存）；**两个 Google provider 的 URL 与认证头** |
+
+**4 个 scout 独立收敛到同一个结构性方案**（签名放传输层），
+这是本方案可信度的重要证据。
+
+### 10.4 主代理的独立核实
+
+| 论断 | 核实方式 | 结果 |
+|---|---|---|
+| `oh-my-pi` 零 AWS SDK | `grep '@aws-sdk' package.json` | ✅ **0** |
+| SigV4 是 WebCrypto-only | 读 `aws-sigv4.ts:2,72` | ✅ 注释明写「no node:crypto」 |
+| 事件流帧布局 | 读 `aws-eventstream.ts:22-56` 的常量与 CRC 覆盖范围 | ✅ 一致 |
+| Google 用 RS256 + pkcs8 | 读 `google-auth.ts:116-124` | ✅ `importKey("pkcs8")` + `RSASSA-PKCS1-v1_5` |
+| 签名装饰器可行 | **实机跑**一个包装 fetch | ✅ 拿到 url/method/body/headers 四项 |
+| WebCrypto 原语可用 | **实机跑** HMAC-SHA256 与空串 SHA-256 | ✅ 空串得 `e3b0c442…b855`，与参考测试常量一致 |
+| `zlib.crc32` 是地板违规 | 读 CI 配置（跑 20.3.0）+ 查该 API 引入版本（22.2 / 20.15） | ✅ **确认违规** |
+
+### 10.5 教训
+
+**与 `phase-12-decisions.md` §9 和本文档 §9.4 同类，且这次更重**：
+**连续三轮，我的估算错误都是「以为自己查全了」。**
+第一次漏掉「pi 的行数是 SDK 之上的」，
+第二次把 GenAI 的形态安到 Vertex 头上，
+第三次**漏掉了本地一份完整参考，并据此收窄了范围**。
+
+**共同点：我倾向于在「证据不足」时用「成本高」来收口，而不是继续查。**
+**正确做法是：证据不足时继续查，而不是降级目标。**

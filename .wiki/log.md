@@ -4264,3 +4264,61 @@ M4 Bedrock、M5 Vertex、M6 订阅 OAuth），加 `phase-12-decisions.md` §8 �
 **两个协议都收窄到简单认证路径**，把最贵且最难离线验证的部分留作后续增量。
 
 **待维护者确认**：Q5（收窄认证路径）、死代码两簇是否授权处置。
+
+
+### Phase 13 规划的第二轮（**2026-09-26**）：收窄被驳回，改为全量实现
+
+**维护者裁定**：
+
+> 「为什么收窄？重新派遣子代理，继续学习，我要的是生产企业级别的项目，
+> 不要老是做一些 demo 模块在里面影响」
+
+**裁定：M4/M5 全量实现，不收窄。** 4 个 scout 重派，两份文档按此重写。
+
+#### 我错在哪（**两条**）
+
+**错误一：把「需要结构改动」当成了「不值得做」。**
+我以「SigV4/ADC 需要打通一条跨 5 个调用点的链」为由收窄。
+**这个推断本身也是错的**——签名不需要「更早」，它需要「正好能看到全部请求信息的地方」，
+**而那个地方就是 `fetchImpl`**（`fetchImpl(url, {method, headers, body})` 四样齐备）。
+**3 个调用点一行都不用改。已实机验证。**
+
+**错误二：漏掉了一份零 SDK 的完整参考。**
+我只查了 `pi` 与 `source-claudecode`，**没查 `~/projects/oh-my-pi`**。
+它用纯 WebCrypto 实现了 SigV4、手写事件流解码、完整凭据链、Google RS256 JWT，
+**零 AWS/Google SDK**，**且带 AWS 官方测试向量**（`aws-sig-v4-test-suite`）。
+**我把「没有参考」当成了「成本高」的理由，而参考就在本地。**
+
+#### `oh-my-pi` 的完整实现（**已逐文件核实**）
+
+| 文件 | 行数 |
+|---|---|
+| `aws-sigv4.ts`（**WebCrypto-only**，注释明写「no node:crypto」） | 229 |
+| `aws-eventstream.ts`（帧解码 + CRC32） | 181 |
+| `aws-credentials.ts`（env → profile → SSO/process → ECS → IMDSv2） | 1,078 |
+| `amazon-bedrock.ts` | 1,345 |
+| `google-auth.ts`（**RS256 JWT** + 用户 ADC + metadata） | 330 |
+| `google-shared.ts` | 1,136 |
+
+**依赖核实**：`grep '@aws-sdk' packages/ai/package.json` → **0**。
+
+#### 一个真实的 Node 地板约束（**主代理实测**）
+
+`oh-my-pi` 的 `crc32` 用 `Bun.hash.crc32`——**我们跑 Node**。
+而 `node:zlib` 的 `crc32` **v22.2.0 引入、v20.15.0 回移**，
+**我们的地板是 20.3.0，CI 就跑 20.3.0**。
+**即：`zlib.crc32` 在 20.3.0–20.14.0 上是 `TypeError`，属 `check:node-floor` 违规。**
+**必须自己写 CRC32**（多项式 `0xEDB88320`，256 项查表，约 20 行）。
+
+#### 任务集合（**10 项要做**）
+
+T4 契约（`path` 动态化 + 传输层签名装饰器）、T6a SigV4+事件流、T6b 凭据链、
+T6 Bedrock、T5 Google GenAI、T5b Vertex+ADC、T7 provider 注册、
+T2 Device Code、T3 订阅 OAuth、T1 后台执行。
+
+#### 教训（**连续三轮同类**）
+
+第一次漏掉「pi 的行数是 SDK 之上的」；第二次把 GenAI 的形态安到 Vertex 头上；
+第三次**漏掉本地完整参考并据此收窄**。
+**共同点：我在证据不足时用「成本高」收口，而不是继续查。
+正确做法是：证据不足时继续查，而不是降级目标。**
