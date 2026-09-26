@@ -14,6 +14,7 @@ import "./openaiCompatible.js";
 import "./anthropicMessages.js";
 import "./bedrockConverse.js";
 import "./googleGenAI.js";
+import "./googleVertex.js";
 
 export {
   DEFAULT_ENDPOINT_KIND,
