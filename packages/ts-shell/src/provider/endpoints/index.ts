@@ -13,6 +13,7 @@
 import "./openaiCompatible.js";
 import "./anthropicMessages.js";
 import "./bedrockConverse.js";
+import "./googleGenAI.js";
 
 export {
   DEFAULT_ENDPOINT_KIND,
