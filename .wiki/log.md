@@ -4109,3 +4109,19 @@ T6 `budget_tokens`）在 `task` 与 `/btw` 上**全部失效**——这是**整�
 - **端到端实机验证**：`/btw` 返回真实答案（走会话的 provider）；
   deny 规则实测拦住 `bash`（且不经过审批路径）；`/workflow list` 正常；
   子代理的边界与循环各有 6 项测试。
+
+### Phase 12 验证（**2026-09-26**）
+
+- **七道门禁全部 pass**：`verify:import-cycles` / `check:config-consumers` /
+  `check:declarations` / `check:node-floor` / `validate` / `test:scripts`（27/27）/
+  `verify:docs-drift:strict`（rules_dangling=0，advisory 79 项与 Phase 12 前持平）。
+- **每项都做了「撤销修复 → 测试必须失败」的验证**，共 **23 个断言组**：
+  T3（3）/ D1+T1（12：边界 6 + 循环 6）/ D4（1）/ D2（3）/ T4+T5（4）。
+- **端到端实机验证**（不只跑单测）：
+  - `/btw` 走会话的 provider 并返回真实答案；
+  - **deny 规则实测拦住 `bash`**，且**不经过审批路径**（绕过免疫）；
+  - `/workflow list` 正常列出 `verify (3 steps)`——证明删掉 5 个模块**没有**影响活轨；
+  - worktree 三种情形（无改动删 / 未提交保留 / 已提交保留）实机验证，
+    且**主工作区未被改动**。
+- **新增文件命名**：`completion.ts` / `deny.ts` / `boundary.ts` / `runner.ts` /
+  `readCache.ts`——短名、职责单一、无堆砌名词、**零外部项目名**（已逐个 grep 核验）。
