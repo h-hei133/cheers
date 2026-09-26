@@ -17,6 +17,38 @@ import { fileURLToPath } from "node:url";
 
 let cached: string | undefined;
 
+/**
+ * Values a build baked in, when the build baked any in.
+ *
+ * A single-file executable has no manifest to walk up to: `import.meta.url`
+ * points inside the runtime's virtual filesystem (`/$bunfs/...`), so the walk
+ * below finds nothing and the binary reports "version unknown" — measured, not
+ * assumed. The build replaces these identifiers with literals, so a compiled
+ * binary answers from itself.
+ *
+ * `typeof` is applied to the identifier *directly*, and that is load-bearing.
+ * Under `tsx` and `node` the identifiers are not declared at all, and
+ * `typeof someUndeclaredName` is the only form that reads one without throwing.
+ * Handing the identifier to a helper instead — `bakedValue(__CHEERS_BUILD_VERSION__)`
+ * — evaluates it as an argument, which throws before any guard inside the helper
+ * can run. That mistake was made here and shipped: a build whose manifest was
+ * unreachable threw `ReferenceError: __CHEERS_BUILD_VERSION__ is not defined`
+ * from `packageVersion()` instead of returning `undefined`.
+ */
+declare const __CHEERS_BUILD_VERSION__: string | undefined;
+declare const __CHEERS_BUILD_NAME__: string | undefined;
+
+/** A baked-in value, or `undefined` when the build supplied none. */
+const bakedVersion: string | undefined =
+  typeof __CHEERS_BUILD_VERSION__ === "string" && __CHEERS_BUILD_VERSION__.trim() !== ""
+    ? __CHEERS_BUILD_VERSION__.trim()
+    : undefined;
+
+const bakedName: string | undefined =
+  typeof __CHEERS_BUILD_NAME__ === "string" && __CHEERS_BUILD_NAME__.trim() !== ""
+    ? __CHEERS_BUILD_NAME__.trim()
+    : undefined;
+
 /** The manifest fields this needs. */
 interface PackageManifest {
   readonly name?: unknown;
@@ -58,15 +90,23 @@ function readManifest(): PackageManifest | undefined {
  */
 export function packageVersion(): string | undefined {
   if (cached !== undefined) return cached || undefined;
-  const version = readManifest()?.version;
-  cached = typeof version === "string" ? version.trim() : "";
-  return cached || undefined;
+  const fromManifest = readManifest()?.version;
+  // Manifest first, because it is what a release tool edits and a stale baked-in
+  // constant is exactly the drift this module was written to avoid. The build
+  // constant only answers where no manifest is reachable.
+  const version =
+    typeof fromManifest === "string" && fromManifest.trim() !== ""
+      ? fromManifest.trim()
+      : bakedVersion;
+  cached = version ?? "";
+  return version;
 }
 
 /** The package name, for a user agent that says who is asking. */
 export function packageName(): string | undefined {
-  const name = readManifest()?.name;
-  return typeof name === "string" && name.trim() !== "" ? name.trim() : undefined;
+  const fromManifest = readManifest()?.name;
+  if (typeof fromManifest === "string" && fromManifest.trim() !== "") return fromManifest.trim();
+  return bakedName;
 }
 
 /**
