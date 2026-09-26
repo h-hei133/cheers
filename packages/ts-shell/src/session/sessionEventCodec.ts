@@ -77,6 +77,14 @@ export type TranscriptEvent =
         readonly text: string;
         readonly signature?: string;
       };
+      /**
+       * Why an assistant answer failed, when it did.
+       *
+       * The provider's own wording is kept in `errorMessage`; this is the
+       * category it belongs to, so a reader can tell a rate limit from a bad
+       * request without matching on prose that varies by provider.
+       */
+      failureClass?: string;
       timestamp: string;
     }
   | {
@@ -188,6 +196,7 @@ export function createMessageTranscriptEvent(
     ...(message.tool_call_id ? { tool_call_id: message.tool_call_id } : {}),
     ...(message.origin ? { origin: message.origin } : {}),
     ...(message.reasoning ? { reasoning: message.reasoning } : {}),
+    ...(message.failureClass ? { failureClass: message.failureClass } : {}),
     timestamp: message.timestamp,
   };
 }
@@ -341,6 +350,12 @@ export function transcriptEventToSessionMessage(
     tool_calls: event.tool_calls,
     tool_call_id: event.tool_call_id,
     ...(event.origin ? { origin: event.origin } : {}),
+    // Carried back, not dropped. The signature is what makes a replayed
+    // assistant turn acceptable to a provider that validates it, so losing it
+    // here would undo the reason it was recorded: a resumed session would send
+    // the working out back unsigned, and the request would be refused.
+    ...(event.reasoning ? { reasoning: event.reasoning } : {}),
+    ...(event.failureClass ? { failureClass: event.failureClass } : {}),
     timestamp: event.timestamp,
   };
 }

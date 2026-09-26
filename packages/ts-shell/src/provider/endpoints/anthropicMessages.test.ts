@@ -339,6 +339,26 @@ describe("reading this endpoint's stream", () => {
     }).rejects.toThrow(/Overloaded/);
   });
 
+  it("fails on an error that arrives after the message was reported complete", async () => {
+    // A completion event does not make a later failure not a failure. The
+    // provider said the answer was done and then said something went wrong, and
+    // the answer it already sent may be a prefix of the one it meant to send.
+    const stream = readAnthropicStream(
+      sseStream(
+        event({ type: "message_start", message: { usage: { input_tokens: 10 } } }),
+        event({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "half" } }),
+        event({ type: "message_delta", delta: { stop_reason: "end_turn" } }),
+        event({ type: "message_stop" }),
+        event({ type: "error", error: { type: "overloaded_error", message: "Overloaded" } }),
+      ),
+    );
+
+    await expect(async () => {
+      let step = await stream.next();
+      while (step.done !== true) step = await stream.next();
+    }).rejects.toThrow(/Overloaded/);
+  });
+
   it("fails when the stream ends without saying the message is complete", async () => {
     // A truncated stream is not an empty answer. With neither a stop reason nor
     // a completion event, the connection went away mid-answer and the caller has

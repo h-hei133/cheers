@@ -3,6 +3,7 @@ import {
   createMessageTranscriptEvent,
   decodeTranscriptLineSafe,
   encodeTranscriptEvent,
+  transcriptEventToSessionMessage,
   type TranscriptEvent,
 } from "./sessionEventCodec.js";
 import { readTranscriptEvents } from "./transcript/sessionTranscript.js";
@@ -64,6 +65,46 @@ describe("a transcript entry round-trips", () => {
 
     const back = decodeTranscriptLineSafe(encodeTranscriptEvent(event));
     expect(back?.type === "message" && back.content).toEqual([IMAGE]);
+  });
+
+  it("keeps the reasoning signature across a write and a read", () => {
+    // A resumed session replays these messages into the next request, and a
+    // provider that validates the signature refuses an assistant turn that
+    // carries the working out unsigned. Losing it on the way back undoes the
+    // reason it was recorded, and the failure appears on the following request
+    // rather than here.
+    const event = createMessageTranscriptEvent({
+      role: "assistant",
+      content: "done",
+      reasoning: { text: "I thought about it", signature: "sig-abc" },
+      timestamp: "2026-09-26T00:00:01.000Z",
+    });
+
+    const line = encodeTranscriptEvent(event);
+    expect(decodeTranscriptLineSafe(line)?.type === "message" && decodeTranscriptLineSafe(line)!.reasoning).toEqual({
+      text: "I thought about it",
+      signature: "sig-abc",
+    });
+    // And through the path a resumed session actually takes, which is the one
+    // that builds the next request's messages.
+    expect(transcriptEventToSessionMessage(decodeTranscriptLineSafe(line)!).reasoning).toEqual({
+      text: "I thought about it",
+      signature: "sig-abc",
+    });
+  });
+
+  it("keeps the failure class of an answer that failed", () => {
+    // The provider's wording is in the message; the category is what lets a
+    // reader tell a rate limit from a bad request without matching on prose.
+    const event = createMessageTranscriptEvent({
+      role: "assistant",
+      content: "half an answer",
+      failureClass: "rate_limit",
+      timestamp: "2026-09-26T00:00:02.000Z",
+    });
+
+    const line = encodeTranscriptEvent(event);
+    expect(transcriptEventToSessionMessage(decodeTranscriptLineSafe(line)!).failureClass).toBe("rate_limit");
   });
 
   it("reads an entry written before images existed", () => {
