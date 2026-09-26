@@ -1,4 +1,5 @@
 import type { AgentEventSink } from "./events.js";
+import type { ProviderFailureClass } from "../../provider/registry/provider.js";
 import { flushMetrics, recordCount, recordTiming } from "../../observability/metrics.js";
 import type { AgentMessage, AgentStopReason } from "./state.js";
 import {
@@ -22,6 +23,15 @@ export interface AssistantStep {
   readonly toolCalls: readonly AgentToolCall[];
   readonly stopReason: AgentStopReason;
   readonly errorMessage?: string;
+  /**
+   * What kind of failure this was, when it was a provider failure.
+   *
+   * Separate from `errorMessage`, which holds the provider's own wording. The
+   * class is the part a reader can branch on: an expired credential, an
+   * exhausted quota and a transient outage all read as prose that differs by
+   * provider, but only one of them is worth retrying.
+   */
+  readonly failureClass?: ProviderFailureClass;
   /**
    * The working out this step came with, and the provider's signature over it.
    *
@@ -237,6 +247,7 @@ async function driveLoop(
           : {}),
         stopReason: step.stopReason,
         ...(step.errorMessage ? { errorMessage: step.errorMessage } : {}),
+        ...(step.failureClass ? { failureClass: step.failureClass } : {}),
         ...(step.reasoning ? { reasoning: step.reasoning } : {}),
         ...(step.origin ? { origin: step.origin } : {}),
       };

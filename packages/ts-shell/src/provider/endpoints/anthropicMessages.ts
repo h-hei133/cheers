@@ -47,6 +47,10 @@ const API_VERSION = "2023-06-01";
  * it the safe default rather than a claim about what the model can do.
  */
 const DEFAULT_MAX_TOKENS = 4_096;
+/** Room left for the answer when a thinking budget would consume the ceiling. */
+const MIN_ANSWER_TOKENS = 1_024;
+/** Used when a level was requested without a resolved budget. */
+const DEFAULT_THINKING_BUDGET_TOKENS = 8_192;
 
 export interface AnthropicRequestInput {
   readonly model: string;
@@ -75,6 +79,16 @@ export interface AnthropicRequestInput {
    * request, while demoting the text to ordinary content is accepted by both.
    */
   readonly allowEmptySignature?: boolean;
+  /**
+   * Whether this model accepts a sampling temperature; see
+   * `ResolvedRequestShape.supportsTemperature`.
+   */
+  readonly supportsTemperature?: boolean;
+  /**
+   * How many tokens the model may spend working out its answer; see
+   * `ResolvedRequestShape.thinkingBudgetTokens`.
+   */
+  readonly thinkingBudgetTokens?: number;
 }
 
 /** The headers this endpoint authenticates with, given an API key. */
@@ -115,13 +129,29 @@ export function anthropicRequestBody(input: AnthropicRequestInput): Record<strin
     const tools = convertTools(input.tools);
     body.tools = markLastForCaching(tools);
   }
-  if (input.temperature !== undefined) body.temperature = input.temperature;
+  // Omitted where the model is known to reject it, and where thinking is on: a
+  // reasoning mode and a sampling temperature are alternatives, not companions.
+  if (input.temperature !== undefined && input.supportsTemperature !== false && !input.thinkingLevelName) {
+    body.temperature = input.temperature;
+  }
   if (input.topP !== undefined) body.top_p = input.topP;
   // Only sent when the model declared a name for the level. An endpoint that
   // does not know the field rejects the whole request, so an unmapped level
   // stays unsent rather than being guessed at.
   if (input.thinkingLevelName !== undefined) {
-    body.thinking = { type: "enabled" };
+    // The budget is required alongside `enabled`: the API rejects the field
+    // without one, so asking for reasoning without saying how much is not a
+    // request it accepts. The ceiling is raised to hold it when the caller's own
+    // is smaller — a budget at or above `max_tokens` leaves no room to answer.
+    const budget = input.thinkingBudgetTokens ?? DEFAULT_THINKING_BUDGET_TOKENS;
+    body.thinking = { type: "enabled", budget_tokens: budget };
+    // A budget at or above the ceiling leaves nothing to answer with, and the
+    // API requires the ceiling to exceed it. Raised by the room an answer needs
+    // rather than doubled: a caller that set a ceiling meant it.
+    const ceiling = input.maxOutputTokens ?? DEFAULT_MAX_TOKENS;
+    if (ceiling <= budget) {
+      body.max_tokens = budget + MIN_ANSWER_TOKENS;
+    }
   }
 
   return body;
@@ -673,6 +703,8 @@ declareEndpoint("anthropic-messages", {
         ? { thinkingLevelName: input.thinkingLevelName }
         : {}),
       ...(input.allowEmptySignature ? { allowEmptySignature: true } : {}),
+      ...(input.supportsTemperature !== undefined ? { supportsTemperature: input.supportsTemperature } : {}),
+      ...(input.thinkingBudgetTokens !== undefined ? { thinkingBudgetTokens: input.thinkingBudgetTokens } : {}),
     }),
   readBody: (body) => readAnthropicBody(body),
   readStream: (body) => readAnthropicStream(body),

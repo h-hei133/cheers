@@ -57,7 +57,12 @@ declareEndpoint("openai-compatible", {
     tool_choice: input.allowTools ? "auto" : "none",
     stream: true,
     stream_options: { include_usage: true },
-    temperature: input.temperature,
+    // Omitted where the model is known to reject it, and where thinking is on:
+    // a reasoning mode and a sampling temperature are alternatives, not
+    // companions, and a host that enforces that rejects the whole request.
+    ...(input.supportsTemperature !== false && !input.thinkingLevelName
+      ? { temperature: input.temperature }
+      : {}),
     // The model's own name for the level; sent only where the model accepts it,
     // because a host that does not know the field rejects the whole request.
     ...(input.reasoningEffort && input.thinkingLevelName

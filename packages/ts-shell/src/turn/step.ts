@@ -9,6 +9,7 @@ import { microcompactMessages } from "../core/query/microCompact.js";
 import { isEventStream, type ProviderUsage, type StreamedToolCall } from "./completion.js";
 import { DEFAULT_ENDPOINT_KIND, endpointKind, endpointShape, endpointTurnBody, endpointUrl, type EndpointKind } from "../provider/endpoints/index.js";
 import type { SentRequest } from "../provider/request/sentRequest.js";
+import { classifyProviderFailure, type ProviderFailureClass } from "../provider/registry/provider.js";
 import { toChatMessages, type ChatMessage } from "./prompt.js";
 import { PARSE_ERROR_KEY, type ToolSchema } from "./tools.js";
 import { resolveRequestShape } from "../core/models/requestShape.js";
@@ -239,6 +240,10 @@ export function createStepFunction(request: StepRequest): StepFunction {
             ? { thinkingLevelName: shape.thinkingLevelName }
             : {}),
           ...(shape.allowEmptySignature ? { allowEmptySignature: true } : {}),
+          supportsTemperature: shape.supportsTemperature,
+          ...(shape.thinkingBudgetTokens !== undefined
+            ? { thinkingBudgetTokens: shape.thinkingBudgetTokens }
+            : {}),
           systemRole: shape.systemRole,
           reasoningEffort: shape.reasoningEffort,
           maxTokensField: shape.maxTokensField,
@@ -273,6 +278,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
       let response: Response | undefined;
       let releaseAfterRead: AbortController | undefined;
       let refusal = "";
+      let refusalClass: ProviderFailureClass | undefined;
       let dropEffort = false;
       for (;;) {
         const releaseStream = new AbortController();
@@ -314,6 +320,15 @@ export function createStepFunction(request: StepRequest): StepFunction {
             break;
           }
           refusal = `Provider HTTP ${attemptResponse.status}: ${detail.slice(0, 200)}`;
+          // The class is recorded alongside the message rather than replacing
+          // it: the message carries the provider's own words, which is what
+          // makes a failure diagnosable, while the class is what lets a reader
+          // tell an expired key from an exhausted quota without matching on
+          // prose that every provider phrases differently.
+          refusalClass = classifyProviderFailure({
+            status: attemptResponse.status,
+            message: detail,
+          });
           transient = isRetryableStatus(attemptResponse.status);
           if (transient) {
             requestedDelayMs = serverRequestedDelayMs(
@@ -333,7 +348,9 @@ export function createStepFunction(request: StepRequest): StepFunction {
         }
 
         attempt += 1;
-        if (!transient || attempt > retry.maxRetries) return stamp(errorStep(refusal));
+        if (!transient || attempt > retry.maxRetries) {
+          return stamp(refusalClass ? failedStep(refusal, "", refusalClass) : errorStep(refusal));
+        }
         const waited = await waitBeforeRetry(retryDelayMs(retry, attempt, requestedDelayMs), signal);
         if (!waited) return stamp(abortedStep(""));
       }
@@ -555,15 +572,30 @@ function errorStep(message: string): AssistantStep {
 }
 
 /**
- * A step that failed after it had already said something.
+ * A step that failed, with whatever it had already said.
  *
- * The text is carried because the user has read it, and the stop reason is
- * carried because it is not the answer. A failure that dropped the text loses
- * what the user saw; one that returned only the text claims a finished answer
- * that never arrived.
+ * `shown` is carried because the user has read it and dropping it loses what
+ * they saw. The stop reason is set regardless, because it is not the answer: a
+ * step that returned only the text would claim a finished answer that never
+ * arrived.
+ *
+ * `failureClass` is recorded alongside `message` rather than folded into it.
+ * The message is the provider's own words, which is what makes a failure
+ * diagnosable; the class is what lets a reader act on it without matching
+ * against prose every provider phrases differently.
  */
-function failedStep(message: string, shown: string): AssistantStep {
-  return { text: shown, toolCalls: [], stopReason: "error", errorMessage: message };
+function failedStep(
+  message: string,
+  shown = "",
+  failureClass?: ProviderFailureClass,
+): AssistantStep {
+  return {
+    text: shown,
+    toolCalls: [],
+    stopReason: "error",
+    errorMessage: message,
+    ...(failureClass ? { failureClass } : {}),
+  };
 }
 
 /**

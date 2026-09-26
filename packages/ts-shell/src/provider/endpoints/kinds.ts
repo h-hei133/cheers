@@ -106,6 +106,18 @@ export interface TurnRequest {
    * protocol has such a block, so the others ignore it.
    */
   readonly allowEmptySignature?: boolean;
+  /**
+   * Whether this model accepts a sampling temperature; see
+   * `ResolvedRequestShape.supportsTemperature`. Absent means yes, which is what
+   * every model got before the field existed.
+   */
+  readonly supportsTemperature?: boolean;
+  /**
+   * How many tokens the model may spend working out its answer; see
+   * `ResolvedRequestShape.thinkingBudgetTokens`. Only the Anthropic-shaped
+   * protocol takes a budget, so the others ignore it.
+   */
+  readonly thinkingBudgetTokens?: number;
   /** The role carrying the system instruction. */
   readonly systemRole: "system" | "developer";
   /** Whether the level may be sent at all. */

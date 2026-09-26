@@ -39,6 +39,14 @@ export interface SessionMessage {
     readonly model: string;
   };
   /**
+   * What kind of provider failure produced this message, when one did.
+   *
+   * Recorded next to `errorMessage` rather than inside it: the message is the
+   * provider's own words, and the class is what a reader can branch on. Absent
+   * on every other message, and on failures that were not the provider's.
+   */
+  failureClass?: string;
+  /**
    * The working out an assistant answer came with, and the provider's signature
    * over it.
    *

@@ -133,6 +133,15 @@ export interface ModelRequestShape {
    * one, and saying so keeps the block typed as reasoning.
    */
   readonly allowEmptySignature?: boolean;
+  /**
+   * Whether the model accepts a sampling temperature.
+   *
+   * Absent means it was not declared, which is treated as yes: a temperature was
+   * always sent before the catalogue could describe a model, and a host that
+   * disliked it said so. `false` is for a model known to reject the field —
+   * sending it anyway fails the whole request rather than being ignored.
+   */
+  readonly supportsTemperature?: boolean;
 }
 
 /**

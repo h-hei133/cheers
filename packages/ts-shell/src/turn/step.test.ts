@@ -351,6 +351,72 @@ describe("createStepFunction", () => {
     expect(result.errorMessage).toContain("400");
   });
 
+  it("records what kind of failure a rejected request was", async () => {
+    // The message alone is prose every provider words differently, so nothing
+    // downstream can act on it without matching text. The class is the part
+    // that distinguishes an expired credential from an exhausted quota.
+    const cases: Array<[number, string, string]> = [
+      [401, "unauthorized", "provider_auth"],
+      [403, "forbidden", "provider_auth"],
+      [429, "slow down", "provider_rate_limited"],
+      [500, "server error", "provider_endpoint"],
+    ];
+
+    for (const [status, body, expected] of cases) {
+      const step = createStepFunction({
+        ...request,
+        fetchImpl: async () =>
+          ({
+            ok: false,
+            status,
+            headers: new Headers(),
+            text: async () => body,
+          }) as unknown as Response,
+      });
+
+      const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+      expect(result.failureClass, `status ${status}`).toBe(expected);
+      // The provider's own words survive alongside it.
+      expect(result.errorMessage).toContain(body);
+    }
+  });
+
+  it("records a safety block as its own class rather than a status", async () => {
+    // A content filter arrives with whatever status the provider chose, so the
+    // class cannot be derived from the status alone.
+    const step = createStepFunction({
+      ...request,
+      fetchImpl: async () =>
+        ({
+          ok: false,
+          status: 400,
+          headers: new Headers(),
+          text: async () => '{"error":{"type":"content_filter","message":"blocked"}}',
+        }) as unknown as Response,
+    });
+
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    expect(result.failureClass).toBe("provider_safety_block");
+  });
+
+  it("records no class for a network failure the provider never answered", async () => {
+    // There is no status to classify, and the transport failure already has its
+    // own wording. Recording a class here would mean inventing one.
+    const step = createStepFunction({
+      ...request,
+      fetchImpl: async () => {
+        throw new Error("socket hang up");
+      },
+    });
+
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    expect(result.failureClass).toBeUndefined();
+    expect(result.errorMessage).toContain("socket hang up");
+  });
+
   it("waits the delay the server asked for", async () => {
     const started = Date.now();
     let calls = 0;

@@ -527,3 +527,65 @@ describe("handing the working out back", () => {
     expect(blocks).toEqual([{ type: "text", text: "plain answer" }]);
   });
 });
+
+describe("the sampling settings a reasoning request may carry", () => {
+  function body(overrides: Record<string, unknown>) {
+    return anthropicRequestBody({
+      model: "claude-x",
+      systemPrompt: "be brief",
+      messages: [{ role: "user", content: "hi" }],
+      tools: [],
+      allowTools: false,
+      ...overrides,
+    });
+  }
+
+  it("sends the temperature for a model that takes one", () => {
+    expect(body({ temperature: 0.7 }).temperature).toBe(0.7);
+  });
+
+  it("leaves out the temperature for a model that rejects it", () => {
+    // Sending a field the model refuses fails the whole request rather than
+    // being ignored, so this is the difference between an answer and an error.
+    expect(body({ temperature: 0.7, supportsTemperature: false })).not.toHaveProperty("temperature");
+  });
+
+  it("leaves out the temperature when the model is reasoning", () => {
+    // A reasoning mode and a sampling temperature are alternatives, not
+    // companions. Asking for both is a request the host refuses.
+    const request = body({ temperature: 0.7, thinkingLevelName: "high" });
+    expect(request).not.toHaveProperty("temperature");
+  });
+
+  it("says how much reasoning is allowed, not merely that it is on", () => {
+    // The budget is required alongside `enabled`; asking for reasoning without
+    // saying how much is a request the API rejects.
+    const request = body({ thinkingLevelName: "high", thinkingBudgetTokens: 16_384 });
+
+    expect(request.thinking).toEqual({ type: "enabled", budget_tokens: 16_384 });
+  });
+
+  it("uses a budget even when the caller resolved none", () => {
+    const request = body({ thinkingLevelName: "high" });
+
+    expect((request.thinking as { budget_tokens?: number }).budget_tokens).toBeGreaterThan(0);
+  });
+
+  it("leaves the ceiling above the budget so there is room to answer", () => {
+    // A budget at or above the ceiling leaves nothing to answer with, and the
+    // API requires the ceiling to exceed it.
+    const request = body({ thinkingLevelName: "high", thinkingBudgetTokens: 16_384, maxOutputTokens: 4_096 });
+
+    expect(request.max_tokens).toBeGreaterThan(16_384);
+  });
+
+  it("leaves a caller's ceiling alone when it already has room", () => {
+    const request = body({ thinkingLevelName: "low", thinkingBudgetTokens: 2_048, maxOutputTokens: 64_000 });
+
+    expect(request.max_tokens).toBe(64_000);
+  });
+
+  it("sends no thinking field at all when no level was asked for", () => {
+    expect(body({ temperature: 0.7 })).not.toHaveProperty("thinking");
+  });
+});

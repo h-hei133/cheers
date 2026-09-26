@@ -67,6 +67,24 @@ export interface ResolvedRequestShape {
    * signatures rejects an unsigned block outright.
    */
   readonly allowEmptySignature: boolean;
+  /**
+   * Whether a sampling temperature may be sent.
+   *
+   * Defaults to yes, unlike `vision`: the field was always sent before the
+   * catalogue could describe a model, and defaulting it off would silently
+   * change every model nobody has described.
+   */
+  readonly supportsTemperature: boolean;
+  /**
+   * How many tokens the model may spend working out its answer, when a level is
+   * set and the protocol takes a budget.
+   *
+   * Per level rather than one number, because the level is the user's request
+   * about how much reasoning to do, and a single budget would make every level
+   * mean the same thing. Absent when no level is set, which is the difference
+   * between "think this much" and "the provider decides".
+   */
+  readonly thinkingBudgetTokens?: number;
 }
 
 /**
@@ -90,6 +108,10 @@ export const DEFAULT_REQUEST_SHAPE: ResolvedRequestShape = {
   // No, not yes: an unsigned reasoning block is rejected by a provider that
   // validates signatures, and demoting it to content is accepted by both kinds.
   allowEmptySignature: false,
+  // Yes, not no: this is what every model got before the catalogue could
+  // describe one, and a host that dislikes the field says so. Defaulting it off
+  // would silently drop a setting for every model nobody has described.
+  supportsTemperature: true,
 };
 
 /**
@@ -133,8 +155,10 @@ export function resolveRequestShape(
     reasoningEffort,
     assistantAfterToolResult: compat.assistantAfterToolResult === true,
     allowEmptySignature: compat.allowEmptySignature === true,
+    supportsTemperature: compat.supportsTemperature !== false,
     vision: entry.vision === true,
     ...(reasoningEffort && level ? { thinkingLevelName: levelNameFor(entry, level) } : {}),
+    ...(reasoningEffort && level ? { thinkingBudgetTokens: THINKING_BUDGET_TOKENS[level] } : {}),
   };
 }
 
@@ -161,7 +185,22 @@ function levelNameFor(entry: CatalogModel, level: ThinkingLevel): string | undef
   return undefined;
 }
 
-/** The catalog entry for a model, by provider first and then by id alone. */
+/**
+ * Tokens a level may spend on working out the answer, when the protocol takes a
+ * budget.
+ *
+ * The same ladder a reasoning effort implies elsewhere, so choosing a level
+ * means the same thing whichever protocol carries it. The numbers are what the
+ * providers' own guidance describes: enough to think through a problem, with
+ * room left for the answer under the request's ceiling.
+ */
+const THINKING_BUDGET_TOKENS: Record<ThinkingLevel, number> = {
+  low: 2_048,
+  medium: 8_192,
+  high: 16_384,
+};
+
+/** The catalogue entry for a model, by provider first and then by id alone. */
 function findModel(
   catalog: readonly CatalogProvider[],
   provider: string,
