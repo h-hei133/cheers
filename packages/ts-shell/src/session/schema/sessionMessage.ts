@@ -38,4 +38,23 @@ export interface SessionMessage {
     readonly provider?: string;
     readonly model: string;
   };
+  /**
+   * The working out an assistant answer came with, and the provider's signature
+   * over it.
+   *
+   * Kept apart from `content` because it is not what the answer says: the text
+   * here is the reasoning a model produced before answering, and a reader that
+   * treated it as content would put it in front of the user as the answer.
+   *
+   * It is stored at all because some providers require it back. A provider that
+   * signs its reasoning rejects a later request in the same trajectory that
+   * omits the signed block, so dropping this after displaying it turns the next
+   * turn into a rejected one. `signature` is opaque and belongs to the provider
+   * that issued it — a signature is bound to the credential that produced it,
+   * which is why it is carried with the message rather than reconstructed.
+   */
+  reasoning?: {
+    readonly text: string;
+    readonly signature?: string;
+  };
 }

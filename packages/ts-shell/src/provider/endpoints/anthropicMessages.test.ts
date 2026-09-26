@@ -409,7 +409,6 @@ describe("reading a whole-body answer", () => {
 
 describe("a message carrying an image", () => {
   const IMAGE = { type: "image" as const, data: "aGVsbG8=", mimeType: "image/png" };
-
   function body(vision: boolean | undefined) {
     return anthropicRequestBody({
       model: "claude-x",
@@ -445,5 +444,86 @@ describe("a message carrying an image", () => {
   it("treats an undeclared model as unable to read one", () => {
     // Absent means unknown, and unknown has to be the safe side.
     expect(JSON.stringify(body(undefined))).toContain("non-vision fallback");
+  });
+});
+
+describe("handing the working out back", () => {
+  const SIGNED = {
+    role: "assistant" as const,
+    content: "the answer",
+    reasoning: { text: "I thought about it", signature: "sig-abc" },
+  };
+
+  function body(messages: unknown[], allowEmptySignature?: boolean) {
+    return anthropicRequestBody({
+      model: "claude-x",
+      systemPrompt: "be brief",
+      messages: messages as never,
+      tools: [],
+      allowTools: false,
+      ...(allowEmptySignature ? { allowEmptySignature: true } : {}),
+    });
+  }
+
+  function blocksOf(requestBody: Record<string, unknown>, index = 0): Array<Record<string, unknown>> {
+    return (requestBody.messages as Array<{ content: Array<Record<string, unknown>> }>)[index]!.content;
+  }
+
+  it("collects the signature the provider streams after the reasoning", async () => {
+    // The signature arrives as its own delta, after the text it covers, and can
+    // be split across frames like everything else. A reader that only handled
+    // `thinking_delta` would drop it and have nothing to hand back.
+    const stream = readAnthropicStream(
+      sseStream(
+        event({ type: "message_start", message: { usage: { input_tokens: 10 } } }),
+        event({ type: "content_block_delta", index: 0, delta: { type: "thinking_delta", thinking: "I thought " } }),
+        event({ type: "content_block_delta", index: 0, delta: { type: "signature_delta", signature: "sig-" } }),
+        event({ type: "content_block_delta", index: 0, delta: { type: "signature_delta", signature: "abc" } }),
+        event({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "the answer" } }),
+        event({ type: "message_delta", delta: { stop_reason: "end_turn" } }),
+      ),
+    );
+
+    let step = await stream.next();
+    while (step.done !== true) step = await stream.next();
+
+    expect(step.value.reasoning).toBe("I thought ");
+    expect(step.value.reasoningSignature).toBe("sig-abc");
+  });
+
+  it("sends the signed block back ahead of the answer", () => {
+    // An assistant turn that carries a tool call has to bring the signed block
+    // that preceded it, or the request that supplies the tool's result is
+    // refused. Order matters: it is the order the block was produced in.
+    const blocks = blocksOf(body([SIGNED]));
+
+    expect(blocks[0]).toEqual({ type: "thinking", thinking: "I thought about it", signature: "sig-abc" });
+    expect(blocks[1]).toEqual({ type: "text", text: "the answer" });
+  });
+
+  it("demotes unsigned reasoning to content rather than sending it unsigned", () => {
+    // An unsigned thinking block is rejected outright by a provider that
+    // validates signatures. Carrying the text as ordinary content keeps the
+    // reasoning reachable and the request valid.
+    const blocks = blocksOf(body([{ role: "assistant", content: "the answer", reasoning: { text: "I thought" } }]));
+
+    expect(blocks[0]).toEqual({ type: "text", text: "I thought" });
+    expect(JSON.stringify(blocks)).not.toContain('"thinking"');
+  });
+
+  it("keeps the block typed as reasoning for a model that accepts an empty signature", () => {
+    // A compatible endpoint that issues no signature also accepts one it did
+    // not issue, so the block stays reasoning rather than being demoted.
+    const blocks = blocksOf(
+      body([{ role: "assistant", content: "the answer", reasoning: { text: "I thought" } }], true),
+    );
+
+    expect(blocks[0]).toEqual({ type: "thinking", thinking: "I thought", signature: "" });
+  });
+
+  it("sends nothing extra for a turn that has no reasoning", () => {
+    const blocks = blocksOf(body([{ role: "assistant", content: "plain answer" }]));
+
+    expect(blocks).toEqual([{ type: "text", text: "plain answer" }]);
   });
 });

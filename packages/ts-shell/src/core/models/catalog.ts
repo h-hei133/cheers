@@ -124,6 +124,15 @@ export interface ModelRequestShape {
    * because reordering would change what the conversation says.
    */
   readonly assistantAfterToolResult?: boolean;
+  /**
+   * Whether the model accepts a reasoning block whose signature is empty.
+   *
+   * Absent means it was not declared, which is treated as no. An endpoint that
+   * validates signatures rejects an unsigned block, so the reasoning is sent as
+   * ordinary content instead; one that issues no signatures accepts the empty
+   * one, and saying so keeps the block typed as reasoning.
+   */
+  readonly allowEmptySignature?: boolean;
 }
 
 /**

@@ -18,6 +18,7 @@ import { providerEndpoint } from "../core/models/catalog.js";
 import type { RuntimeConfig } from "../config/runtimeConfig.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { buildSystemPrompt, type SystemPromptContext } from "../turn/prompt.js";
+import type { RequestOverhead } from "../session/context.js";
 import { renderSkillList, type Skill } from "../core/skills/skillLoader.js";
 import { resolveSkillCatalog } from "../core/skills/skillCatalog.js";
 import {
@@ -406,6 +407,22 @@ async function approveDeclaredHook(
   return response.decision === "allow" || response.decision === "allow-once" || response.decision === "allow-always";
 }
 
+/**
+ * The compaction setup with the request's fixed overhead attached.
+ *
+ * A no-op when there is no compaction to configure. The overhead is attached to
+ * the policy rather than passed separately so every reader of that policy — the
+ * automatic threshold and the `/compact` command — sees the same number, which
+ * is the reason the two share a policy in the first place.
+ */
+function withRequestOverhead(
+  compaction: CompactionSetup | undefined,
+  overhead: RequestOverhead,
+): CompactionSetup | undefined {
+  if (!compaction) return undefined;
+  return { ...compaction, policy: { ...compaction.policy, overhead } };
+}
+
 function startTurn(
   request: CliRuntimeInvocationRequest,
   dependencies: CliRuntimeInvocationDependencies,
@@ -427,6 +444,16 @@ function startTurn(
     ? restrictToolPool(registry, request.runtimeConfig)
     : registry;
   const promptContext = buildPromptContext(request, skills, [...tools.keys()]);
+  // What the request spends outside the conversation. Computed here because this
+  // is the only place both facts exist: the instruction as it will be sent, and
+  // the declarations of the tools actually in the pool after the user's own
+  // filters have been applied. The compaction policy needs it for the estimate
+  // it falls back to before any request has reported its usage, which is the
+  // cold start — the moment those two are the bulk of the request.
+  const compaction = withRequestOverhead(request.compaction, {
+    systemPrompt: buildSystemPrompt(request.agentMode, promptContext),
+    tools: toolSchemas(tools),
+  });
   const run = runTurn({
     commandEnv: commandEnvironmentFor(request),
     sessionId: request.sessionId,
@@ -448,7 +475,7 @@ function startTurn(
     tools,
     hooks,
     maxSteps: request.maxTurns,
-    compaction: request.compaction,
+    compaction,
     signal: request.signal,
     // Read once per run: a policy that changed mid-run would make the number of
     // retries depend on when the config was reloaded rather than on what the

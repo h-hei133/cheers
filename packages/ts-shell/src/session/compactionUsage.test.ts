@@ -153,3 +153,53 @@ describe("a budget larger than the window", () => {
     expect(planCompactionCut(messages, policy)).not.toBeUndefined();
   });
 });
+
+describe("the request's fixed overhead", () => {
+  // The instruction and the tool declarations travel as their own parameters,
+  // so an estimate over `messages` alone cannot see them. It matters most on a
+  // cold start, which is exactly when no provider count exists to fall back on.
+  //
+  // Measured: a 20,000-character instruction plus one tool declaration is about
+  // 5,720 tokens, while eight exchanges of this conversation are about 1,843.
+  const overhead = { systemPrompt: "s".repeat(20_000), tools: [{ name: "read" }] };
+
+  it("counts towards the threshold when no request has reported usage", () => {
+    // Eight exchanges estimate to ~1,843, comfortably inside a 16,000 window
+    // with an 8,000 reserve. Adding the overhead puts the request at ~7,563,
+    // still inside — so the window is tightened to where the two differ.
+    const messages = longConversation(8);
+    const window = { contextWindow: 4_000, reserveTokens: 1_000, keepRecentTokens: 200 };
+
+    expect(planCompaction(messages, window)).toBeUndefined();
+    expect(planCompaction(messages, { ...window, overhead })).not.toBeUndefined();
+  });
+
+  it("does not double-count once the provider has measured the request", () => {
+    // The provider's number already covers the instruction and the tools, so
+    // adding the overhead on top of it would count them twice and compact early.
+    const messages = longConversation(8);
+    const policy: CompactionPolicy = {
+      contextWindow: 16_000,
+      reserveTokens: 8_000,
+      keepRecentTokens: 200,
+      overhead,
+    };
+
+    // 9,000 is over 16,000 - 8,000, so this compacts on the measurement alone.
+    expect(planCompaction(messages, { ...policy, measureContextTokens: () => 9_000 })).not.toBeUndefined();
+    // 7,000 is under it, and the overhead must not push it over.
+    expect(planCompaction(messages, { ...policy, measureContextTokens: () => 7_000 })).toBeUndefined();
+  });
+
+  it("never moves the cut", () => {
+    // The budget is about the conversation. The overhead is a fixed cost that
+    // does not shrink as history is dropped, so letting it into the cut would
+    // scale the budget by something the cut cannot change.
+    const messages = longConversation(8);
+    const base = { contextWindow: 64_000, reserveTokens: 8_000, keepRecentTokens: 600 };
+
+    expect(planCompactionCut(messages, { ...base, overhead })?.cut).toBe(
+      planCompactionCut(messages, base)?.cut,
+    );
+  });
+});

@@ -100,6 +100,12 @@ export interface TurnRequest {
   readonly maxOutputTokens?: number;
   /** The model's own name for the reasoning level, when it has one. */
   readonly thinkingLevelName?: string;
+  /**
+   * Whether this model accepts a reasoning block whose signature is empty; see
+   * `AnthropicRequestInput.allowEmptySignature`. Only the Anthropic-shaped
+   * protocol has such a block, so the others ignore it.
+   */
+  readonly allowEmptySignature?: boolean;
   /** The role carrying the system instruction. */
   readonly systemRole: "system" | "developer";
   /** Whether the level may be sent at all. */

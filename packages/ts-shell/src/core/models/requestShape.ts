@@ -58,6 +58,15 @@ export interface ResolvedRequestShape {
    * exactly the models that do understand it.
    */
   readonly thinkingLevelName?: string;
+  /**
+   * Whether the model accepts a reasoning block with an empty signature.
+   *
+   * Read here for the same reason as `vision`: the endpoint that writes the
+   * block should not be the place that decides whether this model tolerates it.
+   * Absent in the catalogue means no, because a provider that validates
+   * signatures rejects an unsigned block outright.
+   */
+  readonly allowEmptySignature: boolean;
 }
 
 /**
@@ -78,6 +87,9 @@ export const DEFAULT_REQUEST_SHAPE: ResolvedRequestShape = {
   // a model that cannot read one fails the request rather than the image.
   vision: false,
   assistantAfterToolResult: false,
+  // No, not yes: an unsigned reasoning block is rejected by a provider that
+  // validates signatures, and demoting it to content is accepted by both kinds.
+  allowEmptySignature: false,
 };
 
 /**
@@ -120,6 +132,7 @@ export function resolveRequestShape(
     ...(entry.maxTokens !== undefined ? { maxOutputCeiling: entry.maxTokens } : {}),
     reasoningEffort,
     assistantAfterToolResult: compat.assistantAfterToolResult === true,
+    allowEmptySignature: compat.allowEmptySignature === true,
     vision: entry.vision === true,
     ...(reasoningEffort && level ? { thinkingLevelName: levelNameFor(entry, level) } : {}),
   };

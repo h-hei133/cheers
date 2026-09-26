@@ -23,6 +23,17 @@ export interface ChatMessage {
   readonly content?: string | readonly MultimodalContentBlock[] | null;
   readonly tool_calls?: readonly ChatToolCall[];
   readonly tool_call_id?: string;
+  /**
+   * The working out an assistant turn came with, and the provider's signature
+   * over it; see `SessionMessage.reasoning`.
+   *
+   * Carried through to the endpoint that needs it back, and ignored by the ones
+   * that do not: a protocol with no place for it simply does not read it.
+   */
+  readonly reasoning?: {
+    readonly text: string;
+    readonly signature?: string;
+  };
 }
 
 export interface SystemPromptContext {
@@ -147,6 +158,7 @@ export function toChatMessages(history: readonly SessionMessage[] = []): ChatMes
         role: "assistant",
         content: message.content ?? (calls ? null : ""),
         ...(calls ? { tool_calls: calls } : {}),
+        ...(message.reasoning ? { reasoning: message.reasoning } : {}),
       });
       if (calls && calls.length > 0) pendingCalls = calls.map((call) => ({ id: call.id, name: call.function.name }));
     } else if (message.role === "tool" && message.tool_call_id && pendingCalls) {

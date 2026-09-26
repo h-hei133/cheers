@@ -69,6 +69,14 @@ export type TranscriptEvent =
         readonly provider?: string;
         readonly model: string;
       };
+      /**
+       * The working out an assistant answer came with, and the provider's
+       * signature over it. See `SessionMessage.reasoning` for why it is kept.
+       */
+      reasoning?: {
+        readonly text: string;
+        readonly signature?: string;
+      };
       timestamp: string;
     }
   | {
@@ -179,6 +187,7 @@ export function createMessageTranscriptEvent(
     ...(message.tool_calls ? { tool_calls: message.tool_calls } : {}),
     ...(message.tool_call_id ? { tool_call_id: message.tool_call_id } : {}),
     ...(message.origin ? { origin: message.origin } : {}),
+    ...(message.reasoning ? { reasoning: message.reasoning } : {}),
     timestamp: message.timestamp,
   };
 }

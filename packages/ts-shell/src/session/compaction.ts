@@ -1,7 +1,7 @@
 import { messageToText } from "../model-adapters/multimodal.js";
 import type { NextStepSnapshot, NextStepUpdate } from "../core/agent/loop.js";
 import type { AgentMessage } from "../core/agent/state.js";
-import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS, estimateTokens, messageCharCount } from "./context.js";
+import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS, estimateRequestTokens, estimateTokens, messageCharCount, type RequestOverhead } from "./context.js";
 
 export const KEEP_RECENT_TOKENS = 20_000;
 
@@ -35,6 +35,22 @@ export interface CompactionPolicy {
    * budget still produced a cut, and the cut shrank as that overhead grew.
    */
   readonly measureContextTokens?: (messages: readonly AgentMessage[]) => number | undefined;
+  /**
+   * What the request carries besides the conversation: the instruction, and the
+   * tool declarations.
+   *
+   * Only the fallback estimate reads it. The provider's own count already
+   * includes these, so adding them there would double-count; but when no request
+   * has reported yet — a cold start, or just after a compaction — the estimate
+   * is all there is, and it measures `messages` alone. On a cold start that is
+   * nearly the whole request, so leaving it out under-reports the context by
+   * several thousand tokens at exactly the moment the threshold is being
+   * decided.
+   *
+   * The cut deliberately does not use it: the budget is about the conversation,
+   * and the overhead is a fixed cost that does not shrink as history is dropped.
+   */
+  readonly overhead?: RequestOverhead;
 }
 
 /**
@@ -325,7 +341,7 @@ export function planCompaction(
   }
   // The provider's own count wins when it exists: it measured the prompt that
   // was actually sent, while the estimate only measures the text we kept.
-  const tokensBefore = policy.measureContextTokens?.(messages) ?? plan.tokensBefore;
+  const tokensBefore = policy.measureContextTokens?.(messages) ?? estimateRequestTokens(messages, policy.overhead);
   if (!shouldCompact(tokensBefore, policy.contextWindow, reserve, policy.enabled ?? true)) {
     return undefined;
   }
@@ -345,7 +361,7 @@ function isBelowThreshold(
   policy: CompactionPolicy,
 ): boolean {
   const reserve = policy.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
-  const tokensBefore = policy.measureContextTokens?.(messages) ?? estimateTokens(messages);
+  const tokensBefore = policy.measureContextTokens?.(messages) ?? estimateRequestTokens(messages, policy.overhead);
   return !shouldCompact(tokensBefore, policy.contextWindow, reserve, policy.enabled ?? true);
 }
 

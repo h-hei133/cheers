@@ -23,6 +23,17 @@ export interface AssistantStep {
   readonly stopReason: AgentStopReason;
   readonly errorMessage?: string;
   /**
+   * The working out this step came with, and the provider's signature over it.
+   *
+   * Not the answer and not shown as one. It is carried because some providers
+   * require it back: a signed reasoning block that is omitted from the next
+   * request in the same trajectory makes the provider reject that request.
+   */
+  readonly reasoning?: {
+    readonly text: string;
+    readonly signature?: string;
+  };
+  /**
    * The model this step came from, so a failure can be told apart from the
    * current model's failure after a switch.
    *
@@ -226,6 +237,7 @@ async function driveLoop(
           : {}),
         stopReason: step.stopReason,
         ...(step.errorMessage ? { errorMessage: step.errorMessage } : {}),
+        ...(step.reasoning ? { reasoning: step.reasoning } : {}),
         ...(step.origin ? { origin: step.origin } : {}),
       };
       await emit({ type: "message_start", message: assistant });

@@ -71,6 +71,16 @@ export interface StreamedCompletion {
   };
   /** Everything the model said while working it out, when it reported any. */
   readonly reasoning: string;
+  /**
+   * The provider's signature over that working out, when it issued one.
+   *
+   * Opaque, and not a checksum the caller can verify: some providers sign the
+   * reasoning so the next request can prove the reasoning it is being handed
+   * back is the reasoning they produced. A signed block that is not returned
+   * makes the provider reject the request, so the signature travels with the
+   * text it covers rather than being dropped with the display copy.
+   */
+  readonly reasoningSignature?: string;
   readonly finishReason?: string;
   readonly usage?: ProviderUsage;
 }

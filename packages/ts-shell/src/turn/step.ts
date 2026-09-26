@@ -147,6 +147,8 @@ interface CompletionShape {
   }[];
   readonly usage?: ProviderUsage;
   readonly reasoning?: string;
+  /** The provider's signature over that reasoning, when it issued one. */
+  readonly reasoningSignature?: string;
   /** Text already delivered as deltas; it must not be delivered a second time. */
   readonly streamed?: string;
 }
@@ -236,6 +238,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
           ...(shape.reasoningEffort && shape.thinkingLevelName
             ? { thinkingLevelName: shape.thinkingLevelName }
             : {}),
+          ...(shape.allowEmptySignature ? { allowEmptySignature: true } : {}),
           systemRole: shape.systemRole,
           reasoningEffort: shape.reasoningEffort,
           maxTokensField: shape.maxTokensField,
@@ -433,6 +436,7 @@ async function readCompletion(
         choices: [{ message: step.value.message, finish_reason: step.value.finishReason }],
         usage: step.value.usage,
         reasoning: step.value.reasoning,
+        ...(step.value.reasoningSignature ? { reasoningSignature: step.value.reasoningSignature } : {}),
         streamed,
       };
     }
@@ -460,6 +464,17 @@ export function toStep(completion: CompletionShape, listener: StepListener): Ass
     text,
     toolCalls: calls.map(toToolCall),
     stopReason: stopReasonOf(choice?.finish_reason),
+    // Carried so the next request in this trajectory can hand the reasoning back
+    // signed. It is not shown a second time — the deltas already were — but a
+    // provider that signed it rejects the request that omits it.
+    ...(completion.reasoning
+      ? {
+          reasoning: {
+            text: completion.reasoning,
+            ...(completion.reasoningSignature ? { signature: completion.reasoningSignature } : {}),
+          },
+        }
+      : {}),
     ...(silent ? { errorMessage: emptyAnswerExplanation(choice?.finish_reason, completion.reasoning?.length ?? 0) } : {}),
   };
 }

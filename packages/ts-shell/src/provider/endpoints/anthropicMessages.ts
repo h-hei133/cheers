@@ -66,6 +66,15 @@ export interface AnthropicRequestInput {
   readonly maxOutputTokens?: number;
   /** The model's own name for the reasoning level, when it has one. */
   readonly thinkingLevelName?: string;
+  /**
+   * Whether this model accepts a reasoning block whose signature is empty.
+   *
+   * A compatible endpoint may emit no signature and still accept the block
+   * back. Absent means it was not declared, which is treated as no: sending an
+   * unsigned block to a provider that validates signatures is a rejected
+   * request, while demoting the text to ordinary content is accepted by both.
+   */
+  readonly allowEmptySignature?: boolean;
 }
 
 /** The headers this endpoint authenticates with, given an API key. */
@@ -92,7 +101,7 @@ export function anthropicRequestBody(input: AnthropicRequestInput): Record<strin
     // value that fits one model truncates another.
     max_tokens: input.maxOutputTokens ?? DEFAULT_MAX_TOKENS,
     stream: true,
-    messages: convertMessages(input.messages, input.vision),
+    messages: convertMessages(input.messages, input.vision, input.allowEmptySignature === true),
   };
 
   // The instruction and the tool declarations are the stable front of every
@@ -121,6 +130,7 @@ export function anthropicRequestBody(input: AnthropicRequestInput): Record<strin
 /** One content block, as this API writes them. */
 type ContentBlock =
   | { readonly type: "text"; readonly text: string }
+  | { readonly type: "thinking"; readonly thinking: string; readonly signature: string }
   | AnthropicImageBlock
   | { readonly type: "tool_use"; readonly id: string; readonly name: string; readonly input: unknown }
   | { readonly type: "tool_result"; readonly tool_use_id: string; readonly content: string };
@@ -142,7 +152,11 @@ interface WireMessage {
  *   - A `tool` message becomes a `user` turn carrying a `tool_result` block: the
  *     API has no `tool` role, and its result blocks only appear in user turns.
  */
-function convertMessages(messages: readonly ChatMessage[], vision: boolean | undefined): WireMessage[] {
+function convertMessages(
+  messages: readonly ChatMessage[],
+  vision: boolean | undefined,
+  allowEmptySignature: boolean,
+): WireMessage[] {
   const wire: WireMessage[] = [];
 
   for (const message of messages) {
@@ -167,6 +181,26 @@ function convertMessages(messages: readonly ChatMessage[], vision: boolean | und
     }
 
     const blocks: ContentBlock[] = [];
+    // The signed working out goes first, because that is the order it was
+    // produced in and the order this API expects it back. Dropping it is what
+    // this endpoint rejects: an assistant turn that carries a tool call has to
+    // bring the signed block that preceded it, or the request that supplies the
+    // tool's result is refused.
+    if (message.reasoning?.text) {
+      const signature = message.reasoning.signature?.trim();
+      if (signature) {
+        blocks.push({ type: "thinking", thinking: message.reasoning.text, signature });
+      } else if (allowEmptySignature) {
+        // A provider that issues no signature also accepts one it did not
+        // issue, so the block is kept as reasoning rather than demoted.
+        blocks.push({ type: "thinking", thinking: message.reasoning.text, signature: "" });
+      } else {
+        // No signature to prove it with. Sending an unsigned thinking block is
+        // rejected outright, so the text is carried as ordinary content: the
+        // reasoning still reaches the model, and the request is still valid.
+        blocks.push({ type: "text", text: message.reasoning.text });
+      }
+    }
     // A message may carry images, and this endpoint takes them as their own
     // blocks in the same array as the text. Flattening to text here would send a
     // request the model reads as a description of a picture it cannot see.
@@ -339,6 +373,7 @@ export async function* readAnthropicStream(
   let buffer = "";
   let text = "";
   let reasoning = "";
+  let reasoningSignature = "";
   let finishReason: string | undefined;
   let usage: ProviderUsage | undefined;
   let sawMessageStart = false;
@@ -376,6 +411,7 @@ export async function* readAnthropicStream(
           calls,
           onText: (chunk) => (text += chunk),
           onReasoning: (chunk) => (reasoning += chunk),
+          onSignature: (chunk) => (reasoningSignature += chunk),
         }),
       );
       if (event.type === "message_start") {
@@ -454,6 +490,7 @@ export async function* readAnthropicStream(
       ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
     },
     reasoning,
+    ...(reasoningSignature ? { reasoningSignature } : {}),
     ...(finishReason ? { finishReason: mapStopReason(finishReason) } : {}),
     ...(usage ? { usage } : {}),
   };
@@ -469,6 +506,8 @@ interface AnthropicEvent {
     readonly partial_json?: string;
     readonly stop_reason?: string | null;
     readonly thinking?: string;
+    /** A fragment of the provider's signature over the thinking block. */
+    readonly signature?: string;
   };
   readonly content_block?: {
     readonly type?: string;
@@ -528,6 +567,7 @@ function applyEvent(
     calls: Map<number, { id: string; name: string; args: string }>;
     onText: (text: string) => void;
     onReasoning: (text: string) => void;
+    onSignature: (signature: string) => void;
   },
 ): StreamFragment[] {
   const fragments: StreamFragment[] = [];
@@ -550,6 +590,11 @@ function applyEvent(
   } else if (event.delta.type === "thinking_delta" && event.delta.thinking) {
     state.onReasoning(event.delta.thinking);
     fragments.push({ kind: "reasoning", text: event.delta.thinking });
+  } else if (event.delta.type === "signature_delta" && event.delta.signature !== undefined) {
+    // The signature covers the reasoning block that preceded it, and arrives
+    // after the text it signs. Accumulated rather than replaced: it is streamed
+    // in fragments like everything else here.
+    state.onSignature(event.delta.signature);
   } else if (event.delta.type === "input_json_delta" && event.delta.partial_json !== undefined) {
     const call = state.calls.get(index);
     if (call) call.args += event.delta.partial_json;
@@ -627,6 +672,7 @@ declareEndpoint("anthropic-messages", {
       ...(input.reasoningEffort && input.thinkingLevelName
         ? { thinkingLevelName: input.thinkingLevelName }
         : {}),
+      ...(input.allowEmptySignature ? { allowEmptySignature: true } : {}),
     }),
   readBody: (body) => readAnthropicBody(body),
   readStream: (body) => readAnthropicStream(body),
