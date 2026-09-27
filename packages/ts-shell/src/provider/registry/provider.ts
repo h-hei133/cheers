@@ -261,6 +261,9 @@ export function classifyProviderFailure(input: {
   if (/malformed response|invalid response json|response schema/i.test(input.message ?? "")) {
     return "provider_response_malformed";
   }
+  if (/throttl|rate.?exceed|resource.?exhausted/i.test(input.message ?? "")) {
+    return "provider_rate_limited";
+  }
   if (input.malformedStreamEvent) return "provider_stream_event_malformed";
   if (input.streamProtocolError) return "provider_stream_protocol_error";
   if (input.cancelled) return "provider_cancelled";

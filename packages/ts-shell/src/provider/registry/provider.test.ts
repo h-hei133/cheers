@@ -117,6 +117,7 @@ describe("provider registry metadata", () => {
     expect(classifyProviderFailure({ missingAuth: true })).toBe("provider_auth");
     expect(classifyProviderFailure({ message: "network unreachable" })).toBe("provider_network");
     expect(classifyProviderFailure({ status: 500 })).toBe("provider_endpoint");
+    expect(classifyProviderFailure({ message: "ThrottlingException: rate exceeded" })).toBe("provider_rate_limited");
     expect(classifyProviderFailure({ status: 429 })).toBe("provider_rate_limited");
     expect(classifyProviderFailure({ errorName: "AbortError" })).toBe("provider_timeout");
     expect(classifyProviderFailure({ cancelled: true })).toBe("provider_cancelled");
