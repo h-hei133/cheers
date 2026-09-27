@@ -658,7 +658,27 @@ export function writeUserRuntimeConfigFile(config: RuntimeConfigFile): string {
     fs.mkdirSync(configDir, { recursive: true });
   }
 
-  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), "utf8");
+  // Merge over what is on disk now, not over what the caller read earlier.
+  // Two sessions resolving settings and both saving used to have the second
+  // replace the first wholesale — a model chosen in one vanished when the
+  // other saved a theme — because the save wrote back a stale snapshot. Reading
+  // here, inside the write, narrows the window between read and replace; it
+  // does not close it, and a cross-process lock is deliberately not added: the
+  // loss it guards is a setting the user set by hand, recoverable by setting it
+  // again, and a lock file that survives a crash would block every later write
+  // for reasons that read as a broken config.
+  const onDisk = readUserRuntimeConfigFile();
+  const merged = { ...onDisk, ...config } as typeof onDisk;
+  // An active-connection pointer has to name a connection in the list that
+  // lands on disk, whichever side contributed each half. Keeping an id whose
+  // record was just replaced leaves every reader reporting a connection that
+  // does not exist, and the pointer is meaningless without its record.
+  const connections = (merged.providerConnections ?? []) as ReadonlyArray<{ id?: string }>;
+  const activeId = merged.activeProviderConnectionId?.trim();
+  if (activeId !== undefined && !connections.some((c) => c.id === activeId)) {
+    delete merged.activeProviderConnectionId;
+  }
+  fs.writeFileSync(configPath, JSON.stringify(merged, null, 2), "utf8");
   return configPath;
 }
 

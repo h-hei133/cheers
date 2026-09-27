@@ -501,4 +501,27 @@ describe("runtime config", () => {
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]).toContain(".cheers.json");
   });
+
+  it("does not lose a concurrent edit made between read and write", async () => {
+    // Two sessions can both resolve settings, then both write. The second write
+    // used to clobber the first wholesale, so a model chosen in one session
+    // vanished when the other saved a theme. The write has to merge over what is
+    // on disk now rather than replace it with what was read earlier.
+    const configPath = getUserRuntimeConfigPath();
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify({ maxTurns: 5 }), "utf8");
+    fs.writeFileSync(configPath, JSON.stringify({ maxTurns: 7, theme: "light" }), "utf8");
+
+    const first = readUserRuntimeConfigFile();
+    // Another session writes between this read and this session's save. Its
+    // `maxTurns` is what this session also knows and sets; `theme` is a field
+    // this session never touched, and the merge is what keeps it.
+    fs.writeFileSync(configPath, JSON.stringify({ maxTurns: 5 }), "utf8");
+    writeUserRuntimeConfigFile({ ...first, maxTurns: 5, provider: "anthropic" });
+
+    const merged = readUserRuntimeConfigFile();
+    expect(merged.provider).toBe("anthropic");
+    expect(merged.maxTurns).toBe(5);
+    expect(merged.theme).toBe("light");
+  });
 });
