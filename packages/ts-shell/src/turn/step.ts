@@ -257,7 +257,25 @@ export function createStepFunction(request: StepRequest): StepFunction {
       // the loop's retry wrapper, which does not catch it, and reach the user as
       // an uncaught crash with no mention of the file.
       let payload: Record<string, unknown>;
+      let requestHeaders: Readonly<Record<string, string>> = {};
       try {
+        requestHeaders = endpointShape(endpoint).requestHeaders?.({
+          provider: request.provider.provider,
+          model: request.provider.model,
+          systemPrompt: request.systemPrompt,
+          messages: bridgeToolResults(
+            microcompactMessages(toChatMessages(messages), { keepRecentTurns: 3, maxOutputChars: 1000 }).messages,
+            shape.assistantAfterToolResult,
+          ),
+          tools: request.tools,
+          allowTools: options.allowTools,
+          vision: shape.vision,
+          temperature: samplingTemperature(request.workspaceRoot, request.temperature ?? 0.7),
+          systemRole: shape.systemRole,
+          reasoningEffort: Boolean(shape.reasoningEffort),
+          maxTokensField: shape.maxTokensField,
+          assistantAfterToolResult: shape.assistantAfterToolResult,
+        }) ?? {};
         payload = endpointTurnBody(endpoint, {
           model: request.provider.model,
           systemPrompt: request.systemPrompt,
@@ -334,7 +352,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
             endpointUrl(request.provider.baseUrl, endpoint, request.provider.model),
             {
               method: "POST",
-              headers: request.provider.headers,
+              headers: { ...request.provider.headers, ...requestHeaders },
               body: JSON.stringify(payload),
               signal: requestSignal,
             },
@@ -343,11 +361,9 @@ export function createStepFunction(request: StepRequest): StepFunction {
             response = attemptResponse;
             options.onRequestSent?.({
               url: endpointUrl(request.provider.baseUrl, endpoint, request.provider.model),
-              headers: request.provider.headers,
+              headers: { ...request.provider.headers, ...requestHeaders },
               body: JSON.stringify(payload),
             });
-            releaseAfterRead = releaseStream;
-            releaseNow = false;
             break;
           }
           const detail = await attemptResponse.text();

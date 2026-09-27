@@ -90,6 +90,8 @@ export interface EndpointShape {
    * have.
    */
   readonly turnBody: (input: TurnRequest) => Record<string, unknown>;
+  /** Gateway metadata derived from the provider and conversation. */
+  readonly requestHeaders?: (input: TurnRequest) => Record<string, string>;
   /** A complete, non-streamed answer, flattened to the shape both kinds share. */
   readonly readBody: (body: unknown) => CompletedBody;
   /** The chunks of a streamed answer, and the completion they add up to. */
@@ -133,6 +135,7 @@ export interface SimpleRequest {
  */
 export interface TurnRequest {
   readonly model: string;
+  readonly provider?: string;
   readonly systemPrompt: string;
   readonly messages: readonly ChatMessage[];
   readonly tools: readonly ToolSchema[];
