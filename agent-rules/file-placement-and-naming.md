@@ -101,7 +101,6 @@ runtime/extensions/
 provider/registry/
 provider/request/
 tools/policy/
-tools/result/
 session/replay/
 session/continuation/
 presentation/sidebar/

@@ -1,9 +1,5 @@
 import type { PermissionCheck } from '../sandbox/index.js'
 import type { SubagentRunner } from '../core/subagents/runner.js'
-import type {
-  ToolReportSafeProjection,
-  ToolResultDetails,
-} from './result/split.js'
 
 export interface ToolExecutionContext {
   readonly taskId: string
@@ -50,8 +46,6 @@ export interface ToolExecutionResult {
   readonly error?: string
   readonly metadata?: Record<string, unknown>
   readonly content?: string
-  readonly details?: ToolResultDetails
-  readonly reportSafe?: ToolReportSafeProjection
 }
 
 export interface ToolPermissionRequirements {
