@@ -71,7 +71,7 @@ export function createLspToolDefinition(
           const parsed = parseSourceSymbols(filePath, content);
           const symbols = parsed.symbols.map(
             (symbol) =>
-              `- ${symbol.kind}: \`${symbol.qualifiedName}\` (line ${symbol.span.startLine}:${symbol.span.startColumn})`,
+              `- ${symbol.kind === "class" ? "Class" : symbol.kind === "function" ? "Function" : symbol.kind === "method" ? "Method" : symbol.kind === "interface" ? "Type/Interface" : symbol.kind === "type" ? "Type/Interface" : "Constant"}: \`${symbol.qualifiedName}\` (line ${symbol.span.startLine}:${symbol.span.startColumn})`,
           );
           return approvedResult(
             symbols.length > 0
