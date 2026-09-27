@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { createEmptyLifecycleIndex } from "../core/tools/toolResultLifecycle.js";
-import { projectSessionContextRebuild } from "../context/sessionContextRebuildProjection.js";
 import type {
   RecoverySnapshot,
   Session,
@@ -24,7 +23,6 @@ import {
   projectCurrentSessionMetadata,
   projectSessionMetadata,
 } from "./sessionMetadataProjection.js";
-import { projectSessionTree } from "./sessionTreeProjection.js";
 import { projectCompactRetentionPlanInput } from "./sessionCompactProjection.js";
 import {
   projectRecoveryTrustBoundaryBlock,
@@ -273,211 +271,13 @@ describe("session substrate projections", () => {
     });
   });
 
-  it("projects a schema-neutral active path without raw transcript content or terminal success claims", () => {
-    const projection = projectSessionTree({
-      session: {
-        ...makeSession({
-          id: "sess_tree",
-          status: "completed",
-          updatedAt: "2026-05-19T00:00:03.000Z",
-        }),
-        turns: [
-          {
-            role: "user",
-            content: "token=secret oldText=raw-before",
-            timestamp: "2026-05-19T00:00:01.000Z",
-          },
-          {
-            role: "assistant",
-            content: "raw provider output: hidden reasoning",
-            timestamp: "2026-05-19T00:00:02.000Z",
-          },
-        ],
-      },
-      stateSnapshot: {
-        status: "completed",
-        terminalClassification: "success",
-        terminalReason: "completed",
-      },
-    });
-    const serialized = JSON.stringify(projection);
 
-    expect(projection.treeSupport).toBe("linear-path");
-    expect(projection.branchSupport).toBe("not-proven");
-    expect(projection.activePath).toEqual([
-      "sess_tree:root",
-      "sess_tree:turn-1",
-      "sess_tree:turn-2",
-    ]);
-    expect(projection.terminal.terminalSuccessClaim).toBe(false);
-    expect(projection.terminal.notProvenClaims).toContain("terminal-success");
-    expect(serialized).not.toMatch(/token=secret|raw-before|hidden reasoning|raw provider output/i);
-  });
 
-  it("projects branch-capable entries with active leaf and unsupported branch truthfulness", () => {
-    const projection = projectSessionTree({
-      session: {
-        ...makeSession({
-          id: "sess_branch_contract",
-          status: "active",
-        }),
-        turns: [
-          {
-            role: "user",
-            content: "build it",
-            timestamp: "2026-05-19T00:00:01.000Z",
-          },
-        ],
-      },
-    });
 
-    expect(projection.activeLeafId).toBe("sess_branch_contract:turn-1");
-    expect(projection.activePathProjection).toMatchObject({
-      activeLeafId: "sess_branch_contract:turn-1",
-      pathLength: 2,
-      entryKinds: ["session-root", "turn-message"],
-      contextRebuildReadiness: "projection-ready",
-    });
-    expect(projection.nodes.at(-1)).toMatchObject({
-      activeLeaf: true,
-      activePath: true,
-      sourceSessionIdentity: "sess_branch_contract",
-      payloadSummary: "metadata-only",
-    });
-    expect(projection.branchSupport).toBe("not-proven");
-    expect(projection.branchSummary.notProvenClaims).toContain(
-      "branch-navigation",
-    );
-    expect(JSON.stringify(projection)).not.toContain("build it");
-  });
 
-  it("projects compaction and branch summary contracts without success evidence or raw summaries", () => {
-    const projection = projectSessionTree({
-      session: makeSession({
-        id: "sess_compaction_contract",
-        status: "completed",
-      }),
-      compactions: [
-        {
-          id: "compact_1",
-          firstKeptEntryId: "sess_compaction_contract:turn-2",
-          summary:
-            "raw provider output: hidden reasoning token=secret oldText=raw-before newText=raw-after",
-          tokensBefore: 1200,
-          evidence: "observed",
-        },
-      ],
-      branchSummaries: [
-        {
-          id: "branch_summary_1",
-          sourceBranchIdentity: "sess_compaction_contract",
-          targetLocation:
-            "/home/wang/.private-agents-real/provider.env raw provider output: hidden reasoning",
-          summary: "branch summary exists",
-        },
-      ],
-    });
-    const serialized = JSON.stringify(projection);
 
-    expect(projection.compaction).toMatchObject({
-      availability: "observed",
-      terminalSuccessClaim: false,
-    });
-    expect(projection.compaction.records[0]).toMatchObject({
-      compactionId: "compact_1",
-      firstKeptEntryId: "sess_compaction_contract:turn-2",
-      summaryAvailability: "available",
-      evidence: "observed",
-      tokenMetadata: { tokensBefore: 1200 },
-      terminalSuccessClaim: false,
-    });
-    expect(projection.branchSummary.records[0]).toMatchObject({
-      branchSummaryId: "branch_summary_1",
-      sourceBranchIdentity: "sess_compaction_contract",
-      summaryAvailability: "available",
-      terminalSuccessClaim: false,
-    });
-    expect(serialized).not.toMatch(
-      /hidden reasoning|token=secret|raw-before|raw-after|cheers-real|branch summary exists/i,
-    );
-    expect(serialized).not.toContain('"success":true');
-    expect(projection.compaction.records[0]?.notProvenClaims).toContain(
-      "compaction-summary-truth",
-    );
-    expect(projection.branchSummary.records[0]?.notProvenClaims).toContain(
-      "branch-summary-truth",
-    );
-  });
 
-  it("projects context rebuild inputs from the active path with policy exclusions and missing facts", () => {
-    const sessionProjection = projectSessionTree({
-      session: {
-        ...makeSession({
-          id: "sess_rebuild",
-          status: "active",
-        }),
-        turns: [
-          {
-            role: "user",
-            content: "unsafe file contents",
-            timestamp: "2026-05-19T00:00:01.000Z",
-          },
-        ],
-      },
-      compactions: [
-        {
-          id: "compact_rebuild",
-          summary: "summarized",
-          evidence: "planned",
-        },
-      ],
-    });
 
-    const rebuild = projectSessionContextRebuild({ sessionProjection });
-    const serialized = JSON.stringify(rebuild);
-
-    expect(rebuild.rebuildSource).toMatchObject({
-      sessionIdentity: "sess_rebuild",
-      activeLeafId: "sess_rebuild:turn-1",
-      treeSupport: "linear-path",
-      branchSupport: "not-proven",
-    });
-    expect(rebuild.activePathEntriesConsidered).toEqual([
-      {
-        id: "sess_rebuild:root",
-        kind: "session-root",
-        payloadSummary: "metadata-only",
-      },
-      {
-        id: "sess_rebuild:turn-1",
-        kind: "turn-message",
-        payloadSummary: "metadata-only",
-      },
-    ]);
-    expect(rebuild.compactionSummariesConsidered).toEqual([
-      {
-        compactionId: "compact_rebuild",
-        summaryAvailability: "available",
-        evidence: "planned",
-        retainedContextFactIds: [],
-        excludedContextFactIds: [],
-        staleInputIds: [],
-        unsafeInputIds: [],
-        missingFactIds: [],
-        unsupportedFactIds: [],
-      },
-    ]);
-    expect(rebuild.policy).toEqual({
-      resourceDetails: "excluded",
-      toolDetails: "excluded",
-      rawTranscript: "excluded",
-    });
-    expect(rebuild.missingFacts).toContain(
-      "storage-backed-branch-navigation",
-    );
-    expect(rebuild.terminalSuccessClaim).toBe(false);
-    expect(serialized).not.toMatch(/unsafe file contents|summarized/i);
-  });
 
   it("projects recovery trust boundary blocks with the existing hint shape", () => {
     expect(

@@ -296,12 +296,59 @@ grep -rn 'projectSessionTree|SessionTreeProjection' src --include=*.ts | grep -v
 
 ---
 
-## 6. 待办
+## 6. 执行结果（**2026-09-27**，三档全部完成）
 
-- [ ] 第一档删除执行（逐簇，含上述测试处置与 `plan.md` §1 计数表同步）
-- [ ] 第二档删除执行（55 文件 / 16,531 行；含 §3 第二档「必须随删除一并留下的记录」四条）
-- [ ] 第三档删除执行（3 文件 / 932 行；含 `schema/sessionThread.ts` 的事实字段同轮裁决、
-      `sessionProjection.test.ts` 改写）
+| 档 | 提交 | 删除 |
+|---|---|---|
+| 第一档 | `812d7f22` | 23 核心文件 + 6 专属测试 + 2 harness 文件 = 31 |
+| 第二档 | `33c369ae` | 55 核心文件 + 29 测试 = 84 |
+| 第三档 | （本次） | 3 核心文件 + 1 专属测试 = 4 |
+
+**每档独立验证**：`tsc` 0 错误 → 全量套件 → 七道门禁。
+
+**实测计数变化**（`analyze-boundaries.py`）：
+
+```text
+删除前:  production=988  cliReachable=864  cliOpaque=124
+第一档后: production=964  cliReachable=864  cliOpaque=100
+第二档后: production=909  cliReachable=864  cliOpaque=45
+第三档后: production=906  cliReachable=864  cliOpaque=42
+```
+
+**最终**：`520 文件 / 3960 通过 / 1 跳过 / 0 失败`；七道门禁全 pass；
+`plan.md` §1 表与 frontmatter 已同步。
+
+**删除过程中的三个实测修正**（记录备查）：
+
+1. **闭包比清单大**：删核心文件后 `tsc` 会暴露所有悬挂引用。
+   第一档因此多删了 2 个 harness 文件（spike fixture 及其场景测试，
+   整个子图只为已删适配器而存在）。
+2. **「混合测试」需按断言目标而非 import 分辨**：12 个引用活模块的测试中，
+   6 个只是**拿活模块当夹具、断言却全部落在死模块上**（删），
+   4 个真正测试活链（改），2 个是纯悬挂 import（改）。
+   判据：测试体里对**哪个模块**的调用产生了 `expect`。
+3. **门禁会抓文档漂移**：`verify:docs-drift:strict` 两次因删除而失败——
+   一条 binding rule 的示例路径、一条 active sprint plan 的四个证据路径。
+   按各文档**既有约定**修正（rule 换成活文件；sprint plan 标注删除日期），
+   而非删除引用。
+
+**遗留**（未在本轮裁决，见 §3 第三档注意项）：
+`schema/sessionThread.ts` 的 `retainedContextFacts` / `excludedContextFacts` /
+`SessionCompactionFact` 在被删簇之后**只剩测试读者**（`threadState.test.ts`）。
+该 schema 文件本身是活的（`threadState.ts` 仍用 `addDurableSessionCompaction`），
+故**未随簇删除**；这些字段的去留需另行裁决。
+
+---
+
+## 7. 待办
+
+- [x] 第一档删除执行（`812d7f22`）
+- [x] 第二档删除执行（`33c369ae`）
+- [x] 第三档删除执行（见 §6）
+- [ ] **§3 第二档「必须随删除一并留下的记录」四条**：其中第 2、3 条
+      （`editCapabilityReadiness.ts:134-136` 的 `blocked("atomic-rollback")` 加注释、
+      `capability-backlog.md` 留条目）**尚未执行**——属记录工作，不影响构建
+- [ ] `schema/sessionThread.ts` 事实字段的去留（见 §6 遗留）
 - [x] 第二档方向研究 —— 见 `tier2-direction-research-2026-09-27.md`
       （结论：簇 1 能力非必需；簇 2 能力真实缺失但**无任何可参照方案**）
 - [x] 第三档 §2.2-2 —— 结论：**可删**（数据流死；详见 §3）

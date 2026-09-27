@@ -3,9 +3,9 @@ title: "Architecture Refactor Plan"
 category: article
 sources: [repo-audit-2026-09-15, tsc-baseline-2026-09-15, vitest-baseline-2026-09-15, failures-baseline, reachability-audit-2026-09-15, subagent-reviews-2026-09-15]
 created: 2026-09-15
-updated: 2026-09-20
+updated: 2026-09-27
 tags: [refactor, architecture, plan]
-summary: "Module boundary refactor plan v7。当前生产 939 / CLI 可达 771 / 全量测试 2740 项（490 文件 / 2739 通过 / 1 跳过 / 0 失败；2026-09-20 实测，见 §1）。删除授权依据为「职责已被活轨承担」（§2.1），可达性只用于分析、不授权删除。Step 1–7 与阶段 A/B/C 全部完成；§9 的 T1–T18 待办已全部收口（18 项已完成、T3 前提被推翻），§9.5 四项开放问题与 93 个单文件孤立簇均已裁决，结论均为「保留」并登记 disposition。本轮另修两处真实缺陷：T2 引入的不可变性回归（§9.17 P1）与 SSRF 防线漏 169.254.0.0/16（§9.24）。§9.18–§9.25 为 2026-09-20 的复核、研究与施工记录。"
+summary: "Module boundary refactor plan v8。当前生产 906 / CLI 可达 864 / 全量测试 3961 项（520 文件 / 3960 通过 / 1 跳过 / 0 失败；2026-09-27 实测，见 §1）。不可达代码已按三档全部删除（81 文件 / 20,862 行；见 dead-code-tiers-2026-09-27.md）。删除授权依据为「职责已被活轨承担」（§2.1），可达性只用于分析、不授权删除。Step 1–7 与阶段 A/B/C 全部完成；§9 的 T1–T18 待办已全部收口（18 项已完成、T3 前提被推翻），§9.5 四项开放问题与 93 个单文件孤立簇均已裁决，结论均为「保留」并登记 disposition。本轮另修两处真实缺陷：T2 引入的不可变性回归（§9.17 P1）与 SSRF 防线漏 169.254.0.0/16（§9.24）。§9.18–§9.25 为 2026-09-20 的复核、研究与施工记录。"
 confidence: high
 ---
 
@@ -27,21 +27,25 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 
 ---
 
-## 1. 当前状态（2026-09-20，§9.8/§9.5 全部收口后）
+## 1. 当前状态（2026-09-27，不可达代码三档删除后）
 
 | 指标 | 值 |
 |---|---:|
-| 生产文件 | 939 |
-| CLI 可达 | 771 |
-| CLI 不可达 | 168（仅测试 131 + 零引用 36 + 仅公共 API 1） |
-| 全量测试 | **2740 项**（490 文件 / 2739 通过 / 1 跳过 / 0 失败） |
-| 稳定失败 | **0** |
+| 生产文件 | 906 |
+| CLI 可达 | 864 |
+| CLI 不可达 | 42（仅测试 35 + 零引用 6 + 仅公共 API 1） |
+| 全量测试 | **3961 项**（520 文件 / 3960 通过 / 1 跳过 / 0 失败） |
+| 稳定失败 | **0**（本轮首跑出现的负载敏感项，隔离复跑 47/47 通过） |
 | `tsc -p tsconfig.build.json` | 0 错误 |
-| **import 环** | ✅ **runtime 0 / type-only 0**（`npm run verify:import-cycles`，1429 文件） |
-| **越界模块** | **3**，均有 disposition；`npm run analyze:module-facades` |
-| NormProof judge | verdict `partial`；**blocking 义务 0 项未满足** |
-| `strict` | ✅ **已对生产开启**（`tsconfig.build.json` `strict: true`）；`npm run build` **0 错误**；零 `!` / 零 `as` |
+| **import 环** | ✅ **runtime 0 / type-only 0**（`npm run verify:import-cycles`，1426 文件） |
+| **越界模块** | **7**，均为 advisory（无阻断门禁）；`npm run analyze:module-facades` |
+| NormProof judge | **本地不可用**（`normproof` 不在 registry）；见 §9.29 |
+| `strict` | ✅ **已对生产开启**（`tsconfig.build.json` `strict: true`） |
 | 文档/规则漂移门禁 | ✅ `verify:docs-drift:strict`（RULES 0 死引用、DOCS **0 dangling**），已接入 `verify-release-core` |
+
+> **本条与三档删除的关系**：`production 939→906`、`cliOpaque 124→42` 是
+> `.wiki/refactor/dead-code-tiers-2026-09-27.md` 所记 81 文件 / 20,862 行删除的结果。
+> 该表**已按删除前后实测各更新一次**，符合本表下方「每次删除轮次结束必须重跑」的要求。
 
 **每个数字的产生命令**（可复核）：
 
