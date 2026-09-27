@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { resolveUserDataFile, userDataDir } from "../core/paths/userHome.js"
 import { parseDenyRules, type DenyRule } from "../core/shell/approval/deny.js"
+import { writeJsonFileAtomic } from "../session/store/sessionFileStore.js"
 
 /**
  * Token budgets for one model.
@@ -653,10 +654,6 @@ function dedupeDiagnostics(messages: readonly string[]): string[] {
 
 export function writeUserRuntimeConfigFile(config: RuntimeConfigFile): string {
   const configPath = getUserRuntimeConfigPath();
-  const configDir = path.dirname(configPath);
-  if (!fs.existsSync(configDir)) {
-    fs.mkdirSync(configDir, { recursive: true });
-  }
 
   // Merge over what is on disk now, not over what the caller read earlier.
   // Two sessions resolving settings and both saving used to have the second
@@ -678,7 +675,12 @@ export function writeUserRuntimeConfigFile(config: RuntimeConfigFile): string {
   if (activeId !== undefined && !connections.some((c) => c.id === activeId)) {
     delete merged.activeProviderConnectionId;
   }
-  fs.writeFileSync(configPath, JSON.stringify(merged, null, 2), "utf8");
+  // Written through the same temp-and-rename the session store uses, so a
+  // write interrupted mid-flight leaves the last whole config rather than a
+  // truncated file every later read rejects. The merge above is not a lock:
+  // the rename is what makes the single writer's own landing safe, and the
+  // lost-update window the comment above accepts is unchanged by it.
+  writeJsonFileAtomic(configPath, merged);
   return configPath;
 }
 
