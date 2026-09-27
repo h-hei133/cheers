@@ -311,7 +311,8 @@ that shared path.
 - Owner domains: `edit/recovery`, `runtime/loop`, `runtime/events`,
   `tools/policy`, `tools`, `verification`, `repair`, `evidence`, `result`,
   `session/replay`, `session/presentation`, `presentation`, and `core/shell`.
-- Evidence: `packages/ts-shell/src/edit/recovery/model.test.ts` and
+- Evidence: `edit/recovery/model.test.ts`（**已于 2026-09-27 随不可达代码清理
+  删除**）and
   packages/ts-shell/src/runtime/loop/mutationRecovery.test.ts, alongside the
   focused edit, provider, tool policy/dispatch, runtime event, replay, surface,
   status, evidence, and result owner tests.
@@ -339,7 +340,8 @@ that shared path.
   `runtime/api`, `runtime/evaluation`, `verification`, `evidence`, `result`,
   `session/replay`, `session/presentation`, `presentation`, `core/shell`, and
   host evidence/result.
-- Evidence: `packages/ts-shell/src/edit/multifile/model.test.ts`,
+- Evidence: `edit/multifile/model.test.ts`（**已于 2026-09-27 随不可达代码清理
+  删除**）,
   packages/ts-shell/src/runtime/loop/mutationRuntime.test.ts, and
   packages/ts-shell/src/runtime/api/host/runtime.test.ts, alongside focused
   event, replay, surface, status, and build validation.
@@ -369,7 +371,8 @@ that shared path.
   `runtime/api`（**已删**）、`runtime/evaluation`, `verification`, `evidence`, `result`,
   `session/replay`, `session/presentation`（**已删**）、`presentation`（**surface 已删**）、
   以及 `core/shell`。
-- Evidence: `packages/ts-shell/src/edit/multifile/model.test.ts`（**仍存在**）；
+- Evidence: `edit/multifile/model.test.ts`（**已于 2026-09-27 随不可达代码清理
+  删除**）；
   其余所列测试文件（`runtime/loop/mutationRuntime.test.ts`、
   `runtime/api/host/runtime.test.ts`、`session/replay/state.test.ts`、
   `presentation/surface/model.test.ts`、`session/presentation/envelope.test.ts`、
@@ -492,7 +495,7 @@ that shared path.
   packages/ts-shell/src/runtime/api/host/io.test.ts,
   packages/ts-shell/src/cli/host/runner.test.ts,
   packages/ts-shell/src/runtime/distribution/model.test.ts,
-  `packages/ts-shell/src/result/host/verdict.test.ts`,
+  packages/ts-shell/src/result/host/verdict.test.ts（**已于 2026-09-27 随不可达代码清理删除**）,
   `packages/ts-shell/src/smoke.test.ts`, and
   scripts/verify-host-surface.mjs.
 - Boundary: package readiness is a static/package host smoke, not package

@@ -5,8 +5,6 @@ import { buildAnalysisBrief } from "./analysisBrief.js";
 import { buildTaskExecutionPlan } from "./taskExecutionPlan.js";
 import { buildTaskIntent } from "./taskIntent.js";
 import { buildTaskLifecycle } from "./taskLifecycle.js";
-import { buildTaskLifecycleResult } from "./taskLifecycleResult.js";
-import { buildTaskLifecycleTrace } from "./taskLifecycleTrace.js";
 import { buildTaskReadPlan } from "./taskReadPlan.js";
 import { buildTaskStage } from "./taskStage.js";
 import type { WorkflowTaskPlan } from "./workflowTaskPlanner.js";
@@ -75,20 +73,6 @@ describe("task lifecycle loop", () => {
       lifecycle,
       agentPlan,
     });
-    const result = buildTaskLifecycleResult({
-      lifecycle,
-      readPlan,
-      analysisBrief: brief,
-      executionPlan,
-    });
-    const trace = buildTaskLifecycleTrace({
-      lifecycle,
-      readPlan,
-      analysisBrief: brief,
-      executionPlan,
-      planQualityId: "plan_quality_1",
-      codeGraphTraceId: "code_graph_trace_1",
-    });
 
     expect(intent.mutationAuthority).toBe("not-granted");
     expect(readPlan.noWriteEvidence).toContain("task-read-plan:no-provider-call");
@@ -97,8 +81,6 @@ describe("task lifecycle loop", () => {
     expect(executionPlan.requiredConfirmation).toContain(
       "proposal review before edit handoff",
     );
-    expect(result.output).toContain("No-write status: mutation authority not granted");
-    expect(trace.evidence).toContain(`task-lifecycle-trace:lifecycle:${lifecycle.lifecycleId}`);
   });
 
   it("stops provider/edit readiness when analysis evidence is missing", () => {
