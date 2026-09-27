@@ -7,6 +7,7 @@ import {
 import type { ChatMessage } from "../../turn/prompt.js";
 import type { ToolSchema } from "../../turn/tools.js";
 import type { ProviderUsage, StreamFragment, StreamedCompletion, StreamedToolCall } from "../../turn/completion.js";
+import { copilotRequestHeaders } from "./copilotHeaders.js";
 import { declareEndpoint } from "./kinds.js";
 
 /**
@@ -744,6 +745,9 @@ declareEndpoint("anthropic-messages", {
   // The model travels in the body, so the path is the same for every one.
   path: () => "/messages",
   headers: (apiKey) => anthropicHeaders(apiKey),
+  // Copilot serves Claude models through this protocol, and its gateway wants
+  // the same metadata on these turns as on chat-completions ones.
+  requestHeaders: copilotRequestHeaders,
   body: (input) =>
     anthropicRequestBody({
       model: input.model,

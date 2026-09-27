@@ -5,6 +5,7 @@ import {
 } from "../../model-adapters/multimodal.js";
 import { readCompletionStream, type CompletedBody } from "../../turn/completion.js";
 import type { ChatMessage } from "../../turn/prompt.js";
+import { copilotRequestHeaders } from "./copilotHeaders.js";
 import { declareEndpoint } from "./kinds.js";
 
 /**
@@ -25,22 +26,7 @@ declareEndpoint("openai-compatible", {
   // The model travels in the body, so the path is the same for every one.
   path: () => PATH,
   headers: (apiKey) => ({ ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) }),
-  requestHeaders: (input) => {
-    if (input.provider !== "github-copilot") return {};
-    const last = input.messages[input.messages.length - 1];
-    const hasImages = input.messages.some(
-      (message) => Array.isArray(message.content) && message.content.some((part) => part.type === "image"),
-    );
-    return {
-      "Editor-Version": "vscode/1.107.0",
-      "Editor-Plugin-Version": "copilot-chat/0.35.0",
-      "Copilot-Integration-Id": "vscode-chat",
-      "User-Agent": "GitHubCopilotChat/0.35.0",
-      "X-Initiator": last && last.role !== "user" ? "agent" : "user",
-      "Openai-Intent": "conversation-edits",
-      ...(hasImages ? { "Copilot-Vision-Request": "true" } : {}),
-    };
-  },
+  requestHeaders: copilotRequestHeaders,
   body: (input) => ({
     model: input.model,
     messages: [
