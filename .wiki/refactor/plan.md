@@ -1253,6 +1253,8 @@ runtime 装配四重证据。
 | `t6-t18-disposition.md` | T6 runtimeSeed 形参 / T18 依赖方向（后者原记录不成立）|
 | `t14-t17-disposition.md` | T14 四组重复收口 / T17 根跑 vitest 处置 |
 | `unreachable-clusters-disposition.md` | §9.5-1：不可达簇三口径与逐域分类 |
+| `dead-code-tiers-2026-09-27.md` | 不可达代码分档与**第一档删除授权**（实测 81/20,862，非 35/6,650）+ 第二档被推翻的裁决 + 第三档未查清 |
+| `tier2-direction-research-2026-09-27.md` | 第二档方向研究：簇 1 能力非必需；簇 2 能力真实缺失但无参照方案 |
 | `duplicate-groups-disposition.md` | §9.5-2：重复普查（96 组 / 344 份）与 5 组推进 |
 | `query-runtime-orphans-disposition.md` | §9.5-3：`core/query/runtime/` 逐文件分类 |
 | `browser-layout-disposition.md` | §9.5-4：browser 形状实测与不搬迁结论 |
