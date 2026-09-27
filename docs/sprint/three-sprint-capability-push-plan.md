@@ -98,7 +98,7 @@ Product owners to change:
 - `packages/ts-shell/src/session/replay`
 - `packages/ts-shell/src/core/context/compact/injection`
 - `packages/ts-shell/src/core/query/runtime/state.ts`
-- `packages/ts-shell/src/core/query/runtime/policy.ts`
+- `packages/ts-shell/src/core/query/runtime/taskState.ts`
 - `packages/ts-shell/src/repair/iteration`
 - `packages/ts-shell/src/repair/handoff`
 - `packages/ts-shell/src/verification`

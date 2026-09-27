@@ -153,7 +153,7 @@ Prefer this:
 runtime/execution/receipt.ts
 runtime/execution/fileWalk.ts
 runtime/execution/fileLock.ts
-runtime/resources/projection.ts
+runtime/resources/descriptor.ts
 presentation/terminal/streaming.ts
 provider/registry/provider.ts
 ```

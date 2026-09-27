@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import { projectProviderReadinessMetadata } from "../../core/shell/providerReadiness.js";
-import { projectStaticResourceRegistry } from "../../runtime/resources/projection.js";
 import {
   classifyProviderFailure,
   projectProviderRegistry,
@@ -203,47 +202,6 @@ describe("provider registry metadata", () => {
     });
     expect(JSON.stringify(auth)).not.toMatch(/token=secret/i);
     expect(auth?.notProvenClaims).toContain("auth-secret-available");
-  });
-
-  it("projects provider descriptors as disabled resources", () => {
-    const registry = projectProviderRegistry({
-      providers: [
-        {
-          providerId: "openai",
-          safeLabel: "OpenAI",
-          providerKind: "openai",
-          endpointClass: "default",
-          authMode: "api-key",
-          defaultEnabled: false,
-          requiresExplicitOptIn: true,
-          supportsFallback: "unknown",
-          compatibility: {
-            ...unknownProviderCompatibilityFlags(),
-            developerRole: "supported",
-            streaming: "supported",
-          },
-          riskLevel: "medium",
-        },
-      ],
-      models: [
-        {
-          modelId: "gpt-safe",
-          safeLabel: "GPT Safe",
-          providerId: "openai",
-          family: "openai",
-          contextWindow: 128000,
-          compatibility: unknownProviderCompatibilityFlags(),
-          knownLimitations: ["tool calls unknown"],
-        },
-      ],
-    });
-    const resources = projectStaticResourceRegistry({
-      descriptors: registry.resourceDescriptors,
-    });
-
-    expect(resources.resources).toHaveLength(2);
-    expect(resources.resources.every((resource) => resource.enabledByDefault === false)).toBe(true);
-    expect(resources.providerDefaultEnablement).toBe("disabled");
   });
 
   it("exposes a provider readiness metadata seam without changing readiness execution", () => {

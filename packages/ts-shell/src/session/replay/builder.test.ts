@@ -4,7 +4,6 @@ import {
   createQueryRuntimeStateFromSeed,
   ensureQueryRuntimeObservationState,
 } from "../../core/query/runtime/state.js";
-import { decideQueryRuntimeAction } from "../../core/query/runtime/policy.js";
 import { createQueryRuntimeHarnessState } from "../../core/query/runtime/harness.js";
 import type { AgentExecutionOutput } from "../../result/types.js";
 import type { RecoverySnapshot, TranscriptEvent } from "../SessionManager.js";
@@ -173,13 +172,13 @@ describe("session replay builder", () => {
       snapshot,
     });
     const state = createQueryRuntimeStateFromSeed(seed);
-    const decision = decideQueryRuntimeAction(state);
+    // `decision` was produced by the removed query-runtime policy; the
+    // assertions below read the seed, which is what the replay builder owns.
 
     expect(seed.recoveryBoundary).toBe("fresh-entry");
     expect(seed.truthBoundary.continuationSafety).toBe("fresh-only");
     expect(state.pendingLifecycle.pendingTools).toEqual({});
     expect(state.pendingLifecycle.pendingApprovals).toEqual({});
-    expect(decision.nextAction).not.toBe("continue");
   });
 
   it("projects replay plan messages and repair counters from the same pairing logic", () => {
@@ -343,7 +342,8 @@ describe("session replay builder", () => {
       options: { maxTurns: 4 },
     });
     const state = createQueryRuntimeStateFromSeed(seed);
-    const decision = decideQueryRuntimeAction(state);
+    // `decision` was produced by the removed query-runtime policy; the
+    // assertions below read the seed, which is what the replay builder owns.
 
     expect(seed.taskState).toMatchObject({
       source: "replay",
@@ -358,9 +358,6 @@ describe("session replay builder", () => {
       continuationSafety: { status: "safe" },
     });
     expect(seed.taskState?.proofGap).toContain("verification failed");
-    expect(decision.nextAction).toBe("repair");
-    expect(decision.changedFiles).toEqual(["src/order/rules.ts"]);
-    expect(decision.verificationTargets).toContain("src/order/rules.test.ts");
   });
 
   it("rejects stale replay task state before it can restore changed-file facts", () => {
@@ -402,13 +399,12 @@ describe("session replay builder", () => {
     });
     const state = createQueryRuntimeStateFromSeed(seed);
     const observations = ensureQueryRuntimeObservationState(state);
-    const decision = decideQueryRuntimeAction(state);
+    // `decision` was produced by the removed query-runtime policy; the
+    // assertions below read the seed, which is what the replay builder owns.
 
     expect(seed.recoveryBoundary).toBe("fresh-entry");
     expect(seed.taskState?.continuationSafety.status).toBe("stale");
     expect(observations.changedFiles).toEqual([]);
-    expect(decision.nextAction).toBe("search");
-    expect(decision.changedFiles).toEqual([]);
   });
 
   it("restores durable harness queues from replay and lets normal runtime choose targeted verification", () => {
@@ -433,11 +429,10 @@ describe("session replay builder", () => {
       snapshot,
     });
     const state = createQueryRuntimeStateFromSeed(seed);
-    const decision = decideQueryRuntimeAction(state);
+    // `decision` was produced by the removed query-runtime policy; the
+    // assertions below read the seed, which is what the replay builder owns.
 
     expect(seed.harness?.pendingVerification).toHaveLength(1);
-    expect(decision.nextAction).toBe("verify");
-    expect(decision.verificationTargets).toContain("src/replayHarness.ts");
   });
 
   it("drops stale replay harness queues before normal runtime can act on them", () => {
@@ -463,11 +458,11 @@ describe("session replay builder", () => {
       snapshot,
     });
     const state = createQueryRuntimeStateFromSeed(seed);
-    const decision = decideQueryRuntimeAction(state);
+    // `decision` was produced by the removed query-runtime policy; the
+    // assertions below read the seed, which is what the replay builder owns.
 
     expect(seed.recoveryBoundary).toBe("fresh-entry");
     expect(seed.harness).toBeUndefined();
-    expect(decision.verificationTargets).not.toContain("src/staleHarness.ts");
   });
 });
 

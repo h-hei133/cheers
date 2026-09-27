@@ -7,7 +7,6 @@ import { runBrowserActionLoopExecutor } from "../../browser/actionLoopExecutor.j
 import { BrowserRuntimeAdapterExecutor } from "../../browser/runtime/core/adapterExecutor.js";
 import { validateBrowserSkillRuntimeBinding, type BrowserSkillRuntimeBinding } from "../../browser/skill/runtime/binding.js";
 import { validateBrowserRuntimeManifest } from "../../browser/runtime/core/manifest.js";
-import { applyBrowserSelectorRepair } from "../../browser/selectorRepairApplyExecutor.js";
 import {
   createBrowserRuntimeAdapterFixture,
 } from "./browserRuntimeAdapterFixtures.js";

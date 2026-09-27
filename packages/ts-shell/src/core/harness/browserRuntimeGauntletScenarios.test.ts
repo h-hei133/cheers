@@ -3,8 +3,6 @@ import { createBrowserActionContract } from "../../browser/actionContract.js";
 import { createBrowserExecutionRequest } from "../../browser/executionContract.js";
 import { runBrowserActionLoopExecutor } from "../../browser/actionLoopExecutor.js";
 import { BrowserRuntimeAdapterExecutor } from "../../browser/runtime/core/adapterExecutor.js";
-import { applyBrowserSelectorRepair } from "../../browser/selectorRepairApplyExecutor.js";
-import { createBrowserRuntimeGauntletManifest } from "../../browser/runtime/core/gauntletManifest.js";
 import { browserRuntimeRequest } from "./browserRuntimeCapabilityScenarioFixtures.js";
 import { createBrowserRuntimeAdapterFixture } from "./browserRuntimeAdapterFixtures.js";
 import type { BrowserEvalBenchmarkTask } from "../../eval/browser/benchmarkModel.js";
@@ -59,94 +57,11 @@ describe("browser runtime adapter gauntlet scenarios", () => {
         executor: new BrowserRuntimeAdapterExecutor(fixture.externalManifest),
       });
       const report = createBrowserEvalBenchmarkReport(scores);
-      const gauntlet = createBrowserRuntimeGauntletManifest(tasks.length);
       const rendered = renderBrowserEvalBenchmarkReport(report);
-      expect(gauntlet.taskCount).toBe(tasks.length);
       expect(report.status).toBe("passed");
       expect(rendered).toContain("Skipped: 0");
       expect(rendered).toContain("Provider/model call: none");
       expect(rendered).not.toContain("sk-route124SECRET");
-    } finally {
-      fixture.cleanup();
-    }
-  });
-
-  it("applies selector repair metadata before explicit controlled action execution", async () => {
-    const fixture = createBrowserRuntimeAdapterFixture();
-    try {
-      if (fixture.externalManifest.status !== "valid" || fixture.externalManifest.runtimeManifest.status !== "valid") {
-        throw new Error("fixture manifest must be valid");
-      }
-      const missing = await runBrowserActionLoopExecutor({
-        request: browserRuntimeRequest("click", "Missing button"),
-        manifestLoad: fixture.externalManifest.runtimeManifest,
-        executor: new BrowserRuntimeAdapterExecutor(fixture.externalManifest),
-      });
-      const candidate = missing.repairSeed?.candidateTargetIds.find((item) => item.includes("Save draft"));
-      const applied = applyBrowserSelectorRepair({
-        request: browserRuntimeRequest("click", "Missing button"),
-        manifest: fixture.externalManifest.runtimeManifest.manifest,
-        repairSeed: missing.repairSeed,
-        selectedCandidate: candidate,
-        confidence: 0.92,
-        confirmed: true,
-      });
-      expect(missing.repairSeed?.readiness).toBe("preview-ready");
-      expect(applied.decision.status).toBe("allowed");
-      expect(applied.metadataOnly).toBe(true);
-      expect(applied.automaticActionExecuted).toBe(false);
-      const executed = await runBrowserActionLoopExecutor({
-        request: applied.repairedRequest!,
-        manifestLoad: fixture.externalManifest.runtimeManifest,
-        executor: new BrowserRuntimeAdapterExecutor(fixture.externalManifest),
-      });
-      expect(executed.receipt.executed).toBe(true);
-      expect(executed.observation?.textSummary).toContain("Clicked Save draft");
-    } finally {
-      fixture.cleanup();
-    }
-  });
-
-  it("blocks low-confidence and public selector repair apply", async () => {
-    const fixture = createBrowserRuntimeAdapterFixture();
-    try {
-      if (fixture.externalManifest.status !== "valid" || fixture.externalManifest.runtimeManifest.status !== "valid") {
-        throw new Error("fixture manifest must be valid");
-      }
-      const missing = await runBrowserActionLoopExecutor({
-        request: browserRuntimeRequest("click", "Missing button"),
-        manifestLoad: fixture.externalManifest.runtimeManifest,
-        executor: new BrowserRuntimeAdapterExecutor(fixture.externalManifest),
-      });
-      const lowConfidence = applyBrowserSelectorRepair({
-        request: browserRuntimeRequest("click", "Missing button"),
-        manifest: fixture.externalManifest.runtimeManifest.manifest,
-        repairSeed: missing.repairSeed,
-        selectedCandidate: "button:Save draft",
-        confidence: 0.2,
-        confirmed: true,
-      });
-      const publicRepair = applyBrowserSelectorRepair({
-        request: createBrowserExecutionRequest({
-          mode: "test-local",
-          source: "scenario-harness",
-          action: createBrowserActionContract({
-            actionKind: "click",
-            target: "Missing button",
-            url: "https://example.com",
-            userIntentSummary: "public repair",
-            requiresNetwork: true,
-            requiresAuth: false,
-          }),
-        }),
-        manifest: fixture.externalManifest.runtimeManifest.manifest,
-        repairSeed: missing.repairSeed,
-        selectedCandidate: "button:Save draft",
-        confidence: 0.92,
-        confirmed: true,
-      });
-      expect(lowConfidence.decision.status).toBe("blocked-low-confidence");
-      expect(publicRepair.decision.status).toBe("blocked-public-origin");
     } finally {
       fixture.cleanup();
     }

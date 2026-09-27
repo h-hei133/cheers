@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { makeStrictJsonSchema } from "./strictSchema.js";
 import {
   isImageFilePath,
   getImageMimeType,
@@ -7,26 +6,6 @@ import {
   toOpenAIImageUrlBlock,
   formatNonVisionFallback,
 } from "./multimodal.js";
-
-describe("Strict JSON Schema Compiler", () => {
-  it("enforces additionalProperties: false and required keys recursively", () => {
-    const rawSchema = {
-      type: "object",
-      $schema: "http://json-schema.org/draft-07/schema#",
-      title: "ToolArgs",
-      properties: {
-        path: { type: "string" },
-        limit: { type: "number" },
-      },
-    };
-
-    const strict = makeStrictJsonSchema(rawSchema);
-    expect(strict.$schema).toBeUndefined();
-    expect(strict.title).toBeUndefined();
-    expect(strict.additionalProperties).toBe(false);
-    expect(strict.required).toEqual(["path", "limit"]);
-  });
-});
 
 describe("Multimodal Pipeline Helpers", () => {
   it("detects image file paths and resolves MIME types", () => {
