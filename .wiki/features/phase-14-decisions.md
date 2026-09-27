@@ -282,6 +282,18 @@ confidence: high
 
 ---
 
+## 4ter. 施工进度补记（2026-09-27 第二轮）
+
+| 项 | 状态 | 提交 / 证据 |
+|---|---|---|
+| 流中断重试（首 token 前断流自动重发） | ✅ | `06d544e8`；撤销后 1 项失败 |
+| 用户配置写入改为**对盘上现值合并**；悬空 activeConnectionId 一并清除 | ✅ | `c03dd05f`；撤销后 1 项失败，修复后 108 项配置/连接/认证测试通过 |
+| 门禁把 `...spread(...)` 调用误判为成员访问（4 个活模块被报死） | ✅ 已修 | `72105c1c`；撤销复跑：58 → 修复后 54 |
+| 死簇第二块：planning/proposal 链 85 文件 / 13,164 行 | ✅ | `e335e84e`；tsc 0、482 文件 3893 通过 1 跳过、七门禁全绿、docs-drift 修复后 exit=0 |
+| transcript `parentId` | **维持不做** | 追踪：append 回调无 active parent；`sessionThread` state 已承载分支拓扑，往 transcript 硬加会形成与 state 竞争的第二事实源。见 §5 Q5 |
+
+---
+
 ## 5. 须维护者拍板的 4 个裁决点
 
 > 这几项**不该由我单方面决定**：或涉及破坏性删除、或涉及安全默认值。
@@ -291,6 +303,7 @@ confidence: high
 | **Q1** | 沙箱 `fail-closed` 的**默认值** | (a) 默认 fail-open（现状），用户可开启 fail-closed<br>(b) 默认 fail-closed，用户可退回 | **(a)**——默认拒绝会让没装 `bwrap` 的环境**完全不能用**；而现状**每次都提示**，风险可见。变更默认值属于行为破坏 |
 | **Q2** | `lsp` 的范围 | (a) 只修既有 5 个操作用 AST<br>(b) 另补位置式查询（`line`/`character`） | **(a)**——`phase-11` 刚把死参数 `line`/`character` **删掉**（D13），补回来需要先证明确有需求 |
 | **Q3** | T12 流中断的处理 | (a) 仅重试（重新发请求）<br>(b) 断点续读（需要协议支持） | **(a)**——OpenAI 兼容流不带可续读的游标；**(b) 在多数 provider 上不可实现** |
+| **Q5** | transcript 是否逐行记 `parentId` | (a) 不记——分支拓扑只由 `sessionThread` state 承担<br>(b) 记——transcript 独立可重建分支 | **(a)**。当前 append 回调没有 active parent 可传；两处各记一份迟早分歧，且现有导出器已从 state 投影 `parentId`（`export/collect.ts:175`），transcript 自带该字段只服务「脱离 state 重建」一个场景 |
 | **Q4** | `index.ts` 公开 API 面（pre-research §3.7） | (a) 删除（它是无消费者的承诺面，根包 `private: true`）<br>(b) 保留并明确为受维护的公开 API<br>(c) 保留但标注为不保证兼容 | **(c)**——删掉会失去「未来可做 SDK」的锚点；但**当前无消费者是事实**，不应伪装成已承诺的 API |
 
 **另外两项需知会（不需选择，但如果反对请说）**：
