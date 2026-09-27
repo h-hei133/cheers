@@ -75,3 +75,36 @@ describe("lsp symbol scanning", () => {
   });
 });
 
+
+describe("lsp references", () => {
+  const source = [
+    "export function greet(name: string) {",
+    "  return `hi ${name}`;",
+    "}",
+    "// greet is a nice name for a function",
+    "const s = 'greet was mentioned in a string';",
+    "const notGreeting = greet;",
+    "export function caller() {",
+    "  return greet('x');",
+    "}",
+  ].join("\n");
+
+  it("counts identifier uses, not words that happen to match", async () => {
+    const workspaceRoot = workspaceWith({ "src/g.ts": source });
+    const tool = createLspToolDefinition(executionService(["src/g.ts"]));
+
+    const result = await tool.execute(
+      { operation: "references", symbol: "greet", filePath: "src/g.ts" },
+      { workspaceRoot, taskId: "lsp-test" },
+    );
+
+    expect(result.success).toBe(true);
+    // The definition line, the alias assignment, and the call site. The
+    // comment on line 4 and the string on line 5 are words, not uses, and a
+    // line scan would count both.
+    expect(result.output).toContain("src/g.ts:6");
+    expect(result.output).toContain("src/g.ts:8");
+    expect(result.output).not.toContain("nice name");
+    expect(result.output).not.toContain("mentioned in a string");
+  });
+});

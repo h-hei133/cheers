@@ -4,7 +4,8 @@ import path from "node:path";
 import { approvedResult, deniedResult } from "./toolResultLifecycle.js";
 import type { ToolDefinition } from "../../tools/types.js";
 import type { ExecutionService } from "../../runtime/execution/service.js";
-import { parseSourceSymbols } from "../../context/graph/ast/parser.js";
+import { parseSourceSymbols, detectLanguageFromPath } from "../../context/graph/ast/parser.js";
+import ts from "typescript";
 import { TOOL_APPROVED_READ_AUTHORITY } from "./grep.js";
 
 /**
@@ -119,13 +120,15 @@ export function createLspToolDefinition(
               if (matches.length >= 100) break;
             }
             if (op === "references" && matches.length < 100) {
-              const lines = content.split("\n");
-              const word = new RegExp(`\\b${escapeRegex(query)}\\b`);
-              lines.forEach((line, index) => {
-                if (matches.length < 100 && word.test(line) && !matches.some((match) => match.file === relative && match.line === index + 1)) {
-                  matches.push({ file: relative, line: index + 1, text: line.trim(), isDefinition: false });
+              for (const use of identifierUses(relative, content, query)) {
+                if (matches.length >= 100) break;
+                const already = matches.some(
+                  (match) => match.file === relative && match.line === use.line,
+                );
+                if (!already) {
+                  matches.push({ file: relative, line: use.line, text: use.text, isDefinition: false });
                 }
-              });
+              }
             }
           } catch {
             // Skip unreadable files; the workspace scan remains best effort.
@@ -196,9 +199,42 @@ export function createLspToolDefinition(
     },
   };
 }
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/**
+ * Lines where `name` is used as an identifier, for TS/JS-family sources.
+ *
+ * A reference is an identifier, not a word: the same letters in a comment, a
+ * string literal or an import path are prose or spelling, not a use the code
+ * depends on. Walking the AST's identifier nodes is what keeps those out; a
+ * line regex cannot tell them apart and counts every occurrence.
+ *
+ * Sources outside the TS/JS family fall back to no uses rather than to a word
+ * scan: reporting prose as a reference is the failure this exists to prevent,
+ * and a non-TS file simply has no reference to find here.
+ */
+function identifierUses(
+  relative: string,
+  content: string,
+  name: string,
+): Array<{ line: number; text: string }> {
+  const language = detectLanguageFromPath(relative);
+  if (language !== "typescript" && language !== "javascript") return [];
+  const sourceFile = ts.createSourceFile(relative, content, ts.ScriptTarget.Latest, true);
+  const uses: Array<{ line: number; text: string }> = [];
+  const seen = new Set<number>();
+  const walk = (node: ts.Node): void => {
+    if (ts.isIdentifier(node) && node.text === name) {
+      const line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+      if (!seen.has(line)) {
+        seen.add(line);
+        uses.push({ line, text: (content.split("\n")[line - 1] ?? "").trim() });
+      }
+    }
+    ts.forEachChild(node, walk);
+  };
+  walk(sourceFile);
+  return uses;
 }
+
 
 async function readSource(
   executionService: ExecutionService,
