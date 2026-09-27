@@ -52,6 +52,15 @@ describe("the event stream line", () => {
     expect(asObject(parsed.facts, "facts")).toMatchObject({ sessionId: "s1", prompt: "hi" });
   });
 
+  it("derives stable turn and tool-call correlation fields when events carry them", () => {
+    const { lines, write } = collect();
+    write({ type: "turn.started", role: "assistant", turn: 3 });
+    write({ type: "tool.started", toolName: "read", taskId: "call-7" });
+
+    expect(readLine(lines[0]!).turnId).toBe("turn:3");
+    expect(readLine(lines[1]!).toolCallId).toBe("call-7");
+  });
+
   it("never claims the work succeeded", () => {
     // The stream reports what was observed. A consumer deciding whether a task
     // finished has to reach that conclusion from the events, not from a flag here

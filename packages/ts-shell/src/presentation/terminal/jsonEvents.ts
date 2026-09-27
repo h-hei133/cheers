@@ -18,6 +18,10 @@ export interface JsonEventStreamLine {
   readonly schemaVersion: typeof SCHEMA_VERSION;
   /** Position in this stream, from 1. */
   readonly order: number;
+  /** Stable run correlation, when the event carries one. */
+  readonly turnId?: string;
+  /** Stable tool-call correlation, when the event carries one. */
+  readonly toolCallId?: string;
   readonly eventType: QueryEvent["type"];
   readonly facts: QueryEvent;
   readonly truthfulness: {
@@ -37,9 +41,13 @@ export function createJsonEventWriter(write: (line: string) => void): (event: Qu
   let order = 0;
   return (event: QueryEvent): void => {
     order += 1;
+    const turnId = "turn" in event && typeof event.turn === "number" ? `turn:${event.turn}` : undefined;
+    const toolCallId = "taskId" in event && typeof event.taskId === "string" ? event.taskId : undefined;
     const line: JsonEventStreamLine = {
       schemaVersion: SCHEMA_VERSION,
       order,
+      ...(turnId ? { turnId } : {}),
+      ...(toolCallId ? { toolCallId } : {}),
       eventType: event.type,
       facts: event,
       truthfulness: {
