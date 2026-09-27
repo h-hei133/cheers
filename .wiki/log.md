@@ -4534,3 +4534,21 @@ tools/result/split 被 tools/types 依赖）——「零函数调用不足以授
 consumers、declarations、node floor、validate、docs-drift 全 pass；
 完整 suite **482 文件 / 3893 通过 / 1 跳过 / 0 失败**；
 `check:call-reachability` 54 → **20**（剩余项见 gate advisory，未授权不删）。
+
+
+**Phase 14 补遗：工具拦截链（2026-09-27 第三轮）**
+
+`_index.md` 长期记载「`interception.ts` 的类型被活文件引用，不能整文件删」。
+本轮把 import 追到字段级：`tools/types.ts` 声明的 `details` / `reportSafe`
+两个字段**从未被任何代码写入或读取**——工具门只读 `output` / `content` /
+`success`。三个模块（interception / split / tools.types 的两个字段）是一条
+**没有任何人交付的契约**。删除字段即删除模块存在的理由（`2694d3cc`）。
+
+其余 14 个零调用模块经同样检查**保留**：browser 运行时读它的 evidence mapper、
+query runtime 事件携带 batch/proof 投影、continuity manifest 读它的 layer
+model——**被活代码以类型或值引用即是使用**，这些是。
+
+**最终实测（第三轮）**：`tsc` 0；七门禁 + docs-drift 全绿；
+完整 suite **473 文件 / 3865 通过 / 1 跳过**，3 个负载敏感失败隔离复跑全过
+（`benchmark.test.ts` 7/7、`cli-baseline` 目标用例 1/1）——与 log 记录的
+已知类一致，非本轮回归。
