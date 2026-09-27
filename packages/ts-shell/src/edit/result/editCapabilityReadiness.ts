@@ -131,9 +131,16 @@ const READINESS: readonly EditCapabilityReadiness[] = [
     "recoveryExecuted remains false in route results",
     "restore requires explicit user/session action",
   ]),
+  // The closest thing to an executor existed and was removed on purpose. The
+  // multi-target mutation model reversed its applied writes in order and was the
+  // only implementation of this capability in the tree; it was deleted on
+  // 2026-09-27 with the rest of the unreachable code, because nothing produced
+  // the state it read and no comparable implementation has one to copy. So this
+  // entry now records a decision, not an omission: the capability is not planned
+  // rather than not yet wired. See `.wiki/refactor/dead-code-tiers-2026-09-27.md`.
   blocked("atomic-rollback", [
     "rollbackAtomicityClaim remains false",
-    "no transaction rollback executor exists",
+    "no transaction rollback executor exists; the implementation was removed by decision",
   ]),
   blocked("default-durable-persistence", [
     "recovery authority requires explicit non-default root",

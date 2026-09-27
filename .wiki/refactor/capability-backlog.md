@@ -326,6 +326,45 @@ account-auth 登录入口**仍然可用**，用户可完成登录并看到 conne
 
 ---
 
+## CB-007 多文件原子事务与回滚（决策放弃）
+
+- **状态**：`已拒绝`（维护者裁决 2026-09-27）
+- **来源**：`.wiki/refactor/dead-code-tiers-2026-09-27.md`、`tier2-direction-research-2026-09-27.md`
+
+### 事实
+
+活轨在编辑能力清单里**主动报告**该能力缺失：
+
+```text
+edit/result/editCapabilityReadiness.ts
+  blocked("atomic-rollback", ["no transaction rollback executor exists"])
+  blocked("automatic-recovery", ["restore requires explicit user/session action"])
+```
+
+而**已有实现**曾存在于 `edit/multifile/model.ts`：`runControlledMultiTargetMutation`
+逆序调用 `writeTextFile` 恢复内容，记录 `revertedTargetIds` / `failedTargetIds`；
+`edit/recovery/model.ts` 提供恢复裁判的契约（844 行，全部为类型）。
+**与活轨 hunk 契约不同**：活轨 `edit/patch/plan/hunkSet.ts` 的 `targetBinding` 是 `"single-target"`。
+
+### 裁决理由（**不是「多余」**）
+
+1. **无任何可参照方案**：四个同级项目零实现——
+   `pi` 全仓 `rollback` 0 命中（其 `file-mutation-queue.ts` 仅 62 行做按路径串行化）；
+   `opencode` `packages/core/src/file-mutation.ts:205` 原文仍是
+   `TODO: Design multi-file transactions / rollback if apply_patch needs atomic edits`；
+   `oh-my-pi` 与另一 CLI 的 rollback 命中均与编辑无关。
+2. **与既有设计意图相悖**：活轨把 `automatic-recovery` 也标为 blocked，
+   理由是「restore requires explicit user/session action」——即**恢复须显式触发**。
+3. **接入成本高于收益**：需改编辑核心路径的契约（`single-target` → 多目标）。
+
+### 若未来要做
+
+- 实现入口曾是 `edit/multifile/model.ts` 与 `edit/recovery/model.ts`，
+  **已于 2026-09-27 随不可达代码清理删除**（提交 `33c369ae`）。
+- 恢复该能力前先确认第 2 条的设计意图是否已改变。
+
+---
+
 ## 登记流程（供后续复用）
 
 1. 发现测试期望 ≠ 生产实现时，先判定：**是回退（实现改坏了）还是缺失（从未实现）**。
