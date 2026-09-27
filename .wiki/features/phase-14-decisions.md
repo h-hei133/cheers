@@ -62,6 +62,27 @@ confidence: high
 
 ---
 
+## 1ter. 最新施工进度（2026-09-27）
+
+| 项 | 状态 | 提交 / 证据 |
+|---|---|---|
+| SSRF 守卫提取、IPv6/CGNAT 扩充、webFetch 流式限额与逐跳重定向 | ✅ | `a86edb25` |
+| 沙箱 `failClosed`，前台/后台/hook 三条路径拒绝执行 | ✅ | `c071b614`；撤销后 2 项测试失败 |
+| LSP AST 符号/声明扫描 | ✅ | `115d0e9f`；2 项新测试通过 |
+| Copilot gateway headers | ✅ | `d920561a`；2 项新测试通过 |
+| Provider throttling 文本分类 | ✅ | `7de43855`；6 项 registry 测试通过 |
+| JSON 事件 `turnId`/`toolCallId` | ✅ | `dc2d2142`；6 项事件测试通过 |
+| `/cost` prompt cache hit rate | ✅ | `cf7fb2c3`；10 项 cost/cache 测试通过 |
+| 零调用簇：workflow action graph | ✅ | `b0601ada`；`tsc` 通过，58 项剩余候选 |
+| Project memory model tool | **未做** | 生产设计明确要求 explicit-local + review-before-write；当前 CLI 无生产 store 构造点，不能默认落盘或接入非持久化 duplicate |
+| Transcript `parentId` | **未做** | parentage 目前属于 `sessionThread` state；append callback 没有 active parent，新增空字段会是假接线 |
+| Provider 流中断重试 | **未做** | 需要明确重发语义与已输出前缀，不能把“重新发请求”伪装成断点续读 |
+
+**当前门禁**：`tsc` 0 错误；`test:scripts` 39/39；import cycles、config consumers、declarations、node floor、validate 全 pass。
+完整 suite 尚未作为本阶段最终门禁；不要把上述 focused evidence 写成全量通过。
+
+---
+
 ## 2. 六步施工方案
 
 ### 步 1：安全（D4 + D5）
