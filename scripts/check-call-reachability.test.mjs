@@ -153,3 +153,15 @@ test('a tree with no source files cannot pass', (t) => {
   assert.equal(result.status, 3)
   assert.match(result.stderr, /holds no source files/)
 })
+
+test('a spread call counts, so the callee is not reported', (t) => {
+  // `...renderSearchBar(...)` puts a dot before the name, and the member-access
+  // exclusion read that as a property call. The function was reported dead
+  // while its caller pushed its output into every frame it rendered.
+  const root = fixture(t, {
+    'bar.ts': 'export function renderSearchBar(): string[] { return [] }\n',
+    'view.ts': 'import { renderSearchBar } from "./bar.js"\nexport const rows = [...renderSearchBar()]\n',
+  })
+  const result = run(root)
+  assert.doesNotMatch(result.stderr, /bar\.ts/)
+})

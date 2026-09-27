@@ -242,7 +242,11 @@ function referencedNames(source) {
     // Two characters after the first, so a three-letter name like `TUI` counts.
     // Requiring three made every such name invisible, and an invisible use is
     // indistinguishable from no use: the gate reported `new TUI(...)` as dead.
-    for (const m of line.matchAll(/(?<![\w.$])([A-Za-z_]\w{2,})(?![\w$])/g)) names.add(m[1])
+    // A spread call `...renderSearchBar(...)` puts a `.` before the name, and a
+    // one-character lookbehind read that as a member access and reported the
+    // live function dead. Three dots means spread; two or one still reads as a
+    // member access and stays excluded.
+    for (const m of line.replace(/\.\.\.([A-Za-z_])/g, ' $1').matchAll(/(?<![\w.$])([A-Za-z_]\w{2,})(?![\w$])/g)) names.add(m[1])
   }
   return names
 }
