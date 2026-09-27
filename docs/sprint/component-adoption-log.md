@@ -1101,7 +1101,8 @@ focused validation.
 ## Multi-Target Mutation Settlement Ordering
 
 - Selected mode: behavior-only alignment.
-- Owner domain: `packages/ts-shell/src/edit/multifile/` with proof and verdict
+- Owner domain: `edit/multifile/`（**历史记录，目录已于 2026-09-27 随不可达
+  代码清理删除**；见 `.wiki/refactor/dead-code-tiers-2026-09-27.md`）with proof and verdict
   facts under `evidence/projection/mutation/` and
   `result/projection/mutation/`.
 - Reason for use: controlled multi-target mutation needs deterministic ordered
@@ -1144,7 +1145,8 @@ focused validation.
 ## Bounded Mutation Group Settlement
 
 - Selected mode: behavior-only alignment.
-- Owner domain: `packages/ts-shell/src/edit/multifile/` with proof facts under
+- Owner domain: `edit/multifile/`（**历史记录，目录已于 2026-09-27 随不可达
+  代码清理删除**）with proof facts under
   `evidence/projection/mutation/`, result verdicts under
   `result/projection/mutation/`, and consumer projections under runtime,
   replay, and presentation owners.

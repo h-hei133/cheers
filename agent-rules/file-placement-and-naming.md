@@ -99,7 +99,6 @@ runtime/execution/
 runtime/resources/
 runtime/extensions/
 planning/task/
-planning/handoff/
 provider/registry/
 provider/request/
 tools/policy/
