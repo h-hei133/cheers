@@ -25,6 +25,25 @@ describe("addresses that must be refused", () => {
     }
   });
 
+  it("refuses a trailing dot, which the resolver treats as the same name", () => {
+    // `localhost.` is the fully-qualified form of the same loopback name: the
+    // trailing dot means "exactly this, no search suffix". Node resolves it to
+    // ::1, so a guard that reads it as a different, public host is a bypass.
+    for (const host of [
+      "localhost.",
+      "api.localhost.",
+      "api.local.",
+      "myhost.",
+      "127.0.0.1.",
+    ]) {
+      expect(isBlockedHost(host), host).toBe(true);
+      expect(blockedHostReason(host), host).toBeTruthy();
+    }
+    // A public name keeps its trailing dot and stays allowed: the dot is a
+    // syntax form, not evidence of being internal.
+    expect(isBlockedHost("example.com.")).toBe(false);
+  });
+
   it("refuses the private ranges", () => {
     for (const host of ["10.0.0.1", "10.255.255.254", "192.168.0.1", "172.16.0.1", "172.31.255.1"]) {
       expect(isBlockedHost(host), host).toBe(true);

@@ -128,7 +128,12 @@ function expandIpv6(hostname: string): number[] | undefined {
  * address rule from a DNS failure.
  */
 export function blockedHostReason(hostname: string): string | undefined {
-  const host = hostname.trim().toLowerCase();
+  // A trailing dot is the fully-qualified form of the same name — `localhost.`
+  // resolves to ::1 exactly like `localhost`, and `127.0.0.1.` is the same
+  // address — so it is stripped before any rule reads the host. Judging the
+  // dotted form as a different host is the bypass: every rule below would
+  // mis-read a name the resolver treats as identical.
+  const host = hostname.trim().toLowerCase().replace(/\.+$/, "");
   if (host === "") return "empty host";
   if (host === "localhost" || host.endsWith(".localhost")) return "loopback name";
   if (host.endsWith(".local")) return "local network name";
