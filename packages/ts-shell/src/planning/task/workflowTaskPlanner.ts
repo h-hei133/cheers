@@ -1,9 +1,6 @@
 import type { CodingTaskKind } from "../../result/types.js";
 import type { GroundedDeliverableMode } from "../../result/projection/runtimeHandoffProjection.js";
-import type {
-  WorkflowActionGraph,
-  WorkflowDependentTarget,
-} from "../action/graph.js";
+
 
 export type ReflectiveStateQueryKind =
   | "stop-reason"
@@ -101,11 +98,8 @@ export interface WorkflowTaskPlan {
   readonly avoidPreviousDirection?: boolean;
   readonly failedTransforms?: readonly ContinuationTransform[];
   readonly crossFileRepair?: boolean;
-  readonly additionalTargetPaths?: readonly string[];
-  readonly dependentTargets?: readonly WorkflowDependentTarget[];
-  readonly actionGraph?: WorkflowActionGraph;
-  readonly crossFileConvergedNoop?: boolean;
   readonly previousRemainingTargets?: readonly string[];
+  readonly additionalTargetPaths?: readonly string[];
   readonly previousFailedEntries?: ReadonlyArray<{
     path: string;
     failureCode: "read-failed" | "patch-generation-failed" | "write-failed";
@@ -149,10 +143,6 @@ export function buildWorkflowDecisionTrace(plan: WorkflowTaskPlan): string[] {
   }
   if (plan.previousFailedEntries?.length) {
     parts.push(`failedEntries=${plan.previousFailedEntries.length}`);
-  }
-  if (plan.actionGraph) {
-    parts.push(`actionGraph=${plan.actionGraph.graphId}`);
-    parts.push(`actionNodes=${plan.actionGraph.orderedNodeIds.length}`);
   }
   if (plan.continuationLineage?.length) {
     parts.push(...plan.continuationLineage);
