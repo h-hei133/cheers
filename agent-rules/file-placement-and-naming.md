@@ -98,7 +98,6 @@ When a domain becomes broad, add meaningful subdomains instead of lengthening fi
 runtime/execution/
 runtime/resources/
 runtime/extensions/
-planning/task/
 provider/registry/
 provider/request/
 tools/policy/
