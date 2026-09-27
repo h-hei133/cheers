@@ -10,9 +10,9 @@ import {
   type ModelUsageBucket,
 } from "../../observability/usageTelemetry.js";
 import type { ModelCostRates } from "../models/catalog.js";
-import { CACHE_TTL_MS, findCacheWaste } from "../../observability/cacheWaste.js";
-import type { SessionUsageTelemetry } from "../../observability/usageTelemetry.js";
+import { CACHE_TTL_MS, findCacheWaste, summarizeCacheUsage } from "../../observability/cacheWaste.js";
 import { loadCatalog } from "../models/catalogStore.js";
+import type { SessionUsageTelemetry } from "../../observability/usageTelemetry.js";
 import { resolveModelCost } from "../models/window.js";
 
 /**
@@ -130,6 +130,7 @@ function cacheWasteSection(
     "",
     "### Prompt cache",
     "",
+    `- Prompt cache hit rate: ${renderCacheHitRate(telemetry.recentRequests)}`,
     `- ${missedTokens.toLocaleString()} prompt tokens were sent again and billed in full, across ${missCount} ${missCount === 1 ? "request" : "requests"}`,
     `- Of those, an estimated $${missedCost.toFixed(4)} extra was spent against what a cache read would have cost`,
     ...(switched > 0
@@ -156,6 +157,11 @@ function cacheWasteSection(
 }
 
 /** One model's table, with the total row. */
+function renderCacheHitRate(history: readonly import("../../observability/usageTelemetry.js").UsageHistoryEntry[]): string {
+  const accounted = summarizeCacheUsage(history);
+  return accounted.hitRate === undefined ? "unknown" : `${accounted.hitRate.toFixed(1)}%`;
+}
+
 function renderModelSection(input: {
   readonly model: string;
   readonly bucket: ModelUsageBucket;

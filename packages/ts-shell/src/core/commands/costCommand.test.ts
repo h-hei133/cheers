@@ -127,10 +127,11 @@ describe("runCostCommand", () => {
     resetSessionUsage(session);
     // Two requests of the same 100k prompt with nothing read from cache: the
     // second should have been a read, and was not.
-    recordSessionUsage(session, { promptTokens: 100_000, completionTokens: 0, model: "meter", provider: "priced" });
-    recordSessionUsage(session, { promptTokens: 100_000, completionTokens: 0, model: "meter", provider: "priced" });
-
+    recordSessionUsage(session, { promptTokens: 99_999, cacheWriteTokens: 1, completionTokens: 0, model: "meter", provider: "priced" });
+    recordSessionUsage(session, { promptTokens: 99_999, cacheWriteTokens: 1, completionTokens: 0, model: "meter", provider: "priced" });
     const result = await runCostCommand([], contextFor(session, workspace()));
+
+    expect(result.output).toContain("Prompt cache hit rate: 0.0%");
     expect(result.output).toContain("Prompt cache");
     expect(result.output).toContain("100,000 prompt tokens");
     // 3.00 - 0.30 per million over 100k tokens.

@@ -63,6 +63,33 @@ export interface CacheWasteReport {
  */
 export type CacheRateLookup = (provider: string, model: string) => ModelCostRates | undefined;
 
+export interface CacheUsageSummary {
+  readonly promptTokens: number;
+  readonly cacheReadTokens: number;
+  readonly hitRate?: number;
+  readonly requestCount: number;
+}
+
+/**
+ * The provider-reported cache hit rate over the retained, cache-accounted
+ * requests. Requests without cache accounting are excluded rather than treated
+ * as misses: zero can mean a real miss or an unsupported provider, and the
+ * telemetry already records that distinction in `reportedCache`.
+ */
+export function summarizeCacheUsage(
+  history: readonly UsageHistoryEntry[],
+): CacheUsageSummary {
+  const accounted = history.filter((entry) => entry.kind === "request" && entry.reportedCache);
+  const promptTokens = accounted.reduce((sum, entry) => sum + entry.promptTokens, 0);
+  const cacheReadTokens = accounted.reduce((sum, entry) => sum + entry.cacheReadTokens, 0);
+  return {
+    promptTokens,
+    cacheReadTokens,
+    ...(promptTokens > 0 ? { hitRate: (cacheReadTokens / promptTokens) * 100 } : {}),
+    requestCount: accounted.length,
+  };
+}
+
 /** A request worth comparing against, with everything the comparison needs. */
 interface Comparable {
   readonly promptTokens: number;
