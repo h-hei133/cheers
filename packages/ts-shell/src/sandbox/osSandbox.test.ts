@@ -2,7 +2,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { networkNotice, planSandboxedCommand, readSandboxRules } from "./osSandbox.js";
+import {
+  networkNotice,
+  planSandboxedCommand,
+  planWithoutLauncher,
+  readSandboxRules,
+} from "./osSandbox.js";
 
 describe("os sandbox rules", () => {
   let workspace = "";
@@ -165,6 +170,80 @@ describe("os sandbox rules", () => {
       expect(plan.notice).toMatch(/WITHOUT isolation/);
       expect(plan.command).toBeUndefined();
     }
+  });
+
+  /**
+   * The refusal path, tested through the function that decides it.
+   *
+   * Written against `planWithoutLauncher` rather than the plan because the plan
+   * has to look for a launcher, and on a machine that has one it takes the
+   * isolating branch and never reaches this decision. The first version of this
+   * test did exactly that: it passed, and it passed with the refusal deleted,
+   * because the host had `bwrap` installed. A test that cannot fail is not
+   * evidence, so the decision was separated from the lookup.
+   */
+  it("refuses when isolation was required and no launcher exists", () => {
+    const plan = planWithoutLauncher({ enabled: true, failClosed: true });
+
+    expect(plan.state).toBe("refused");
+    expect(plan.command).toBeUndefined();
+    expect(plan.notice).toMatch(/Refused to run/);
+    // The message has to say what to do, or the setting is a dead end.
+    expect(plan.notice).toMatch(/bwrap|sandbox-exec|launcher|no sandbox/);
+    expect(plan.notice).toMatch(/failClosed/);
+  });
+
+  it("runs and reports it when isolation was required but not insisted on", () => {
+    // The default, unchanged: a notice on every command. Someone who wants the
+    // command to run anyway keeps getting it run.
+    const plan = planWithoutLauncher({ enabled: true });
+
+    expect(plan.state).toBe("unavailable");
+    expect(plan.notice).toMatch(/WITHOUT isolation/);
+    expect(plan.command).toBeUndefined();
+  });
+
+  it("does not refuse when isolation was never requested", () => {
+    // `failClosed` without `enabled` asks nothing be enforced, so nothing is
+    // refused: it qualifies a request for isolation, it is not one.
+    const plan = planSandboxedCommand({
+      shell: "bash",
+      shellArgs: ["-c", "ls"],
+      workspaceRoot: workspace,
+      rules: { failClosed: true },
+    });
+    expect(plan.state).toBe("off");
+  });
+
+  it("accumulates failClosed across the two files, like denyRead", () => {
+    // A restriction, so a project cannot switch off what the user asked for:
+    // the project file here says `false` and the user file says `true`, and the
+    // answer has to be the user's. Written through the reader so it covers the
+    // merge rather than only the type.
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "sandbox-home-"));
+    process.env.HOME = home;
+    delete process.env.USERPROFILE;
+    try {
+      fs.mkdirSync(path.join(home, ".private-agents"), { recursive: true });
+      fs.writeFileSync(
+        path.join(home, ".private-agents", "sandbox.json"),
+        JSON.stringify({ enabled: true, failClosed: true }),
+        "utf8",
+      );
+      writeRules({ failClosed: false });
+
+      const rules = readSandboxRules(workspace);
+      expect(rules.failClosed).toBe(true);
+      expect(planWithoutLauncher(rules).state).toBe("refused");
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("lets the project ask for failClosed when the user did not", () => {
+    // The other direction, so this is not a test that only ever returns true.
+    writeRules({ enabled: true, failClosed: true });
+    expect(readSandboxRules(workspace).failClosed).toBe(true);
   });
 
   it("runs the same command it was given, under the launcher", () => {

@@ -165,6 +165,15 @@ async function runCommandTool(
     return deniedResult(`Error: ${timeout.reason}`, { status: 'failed', exitCode: 1 })
   }
   const { shellBin, shellArgs, sandbox } = planCommandLaunch(command, context)
+  // A refusal is not a command to run: the sandbox answered "I could not isolate
+  // this and you asked me not to proceed without it". Running it anyway would be
+  // the setting doing nothing, so it stops here.
+  if (sandbox.state === 'refused') {
+    return deniedResult(`Error: ${sandbox.notice ?? 'sandbox refused the command'}`, {
+      status: 'failed',
+      exitCode: 1,
+    })
+  }
   const result = await executionService.runCommand({
     operationKind: 'command.run',
     command: sandbox.command ?? shellBin,
@@ -838,6 +847,14 @@ function startBackgroundCommand(
     )
   }
   const { sandbox } = planCommandLaunch(command, context)
+  // Same refusal as the foreground path: a background command is not a way to
+  // run something the sandbox declined to isolate.
+  if (sandbox.state === 'refused') {
+    return deniedResult(`Error: ${sandbox.notice ?? 'sandbox refused the command'}`, {
+      status: 'failed',
+      exitCode: 1,
+    })
+  }
   const task = backgroundTasks.start({
     command,
     cwd: context.workspaceRoot,

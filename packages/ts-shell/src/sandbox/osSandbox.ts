@@ -21,6 +21,20 @@ import { resolveUserDataFile } from "../core/paths/userHome.js";
 
 export interface SandboxRules {
   readonly enabled?: boolean;
+  /**
+   * Whether a command is refused when isolation was asked for and cannot be
+   * arranged.
+   *
+   * Absent means the default, which is to run and say so. Set, it means the
+   * command does not run: an operator who wants containment wants containment,
+   * and a warning in a log is not one.
+   *
+   * A restriction rather than a grant, so it accumulates the way `denyRead`
+   * does — either file can ask for it and neither can take it away. A project
+   * that could clear it would be able to un-ask the user's question, which is
+   * the same widening the rest of this file exists to prevent.
+   */
+  readonly failClosed?: boolean;
   readonly network?: {
     /** Hosts the command may reach. An empty list denies all network. */
     readonly allowedDomains?: readonly string[];
@@ -35,7 +49,7 @@ export interface SandboxRules {
   };
 }
 
-export type SandboxState = "off" | "isolated" | "unavailable";
+export type SandboxState = "off" | "isolated" | "unavailable" | "refused";
 
 export interface SandboxPlan {
   readonly state: SandboxState;
@@ -107,6 +121,7 @@ function tighten(user: SandboxRules | undefined, project: SandboxRules | undefin
   // type; the value is assembled once and never changed afterwards.
   const result: {
     enabled?: boolean
+    failClosed?: boolean
     network?: SandboxRules["network"]
     filesystem?: SandboxRules["filesystem"]
   } = {};
@@ -115,6 +130,11 @@ function tighten(user: SandboxRules | undefined, project: SandboxRules | undefin
   // tightening direction.
   const enabled = user.enabled === true || project.enabled === true;
   if (enabled) result.enabled = true;
+
+  // A restriction, so it accumulates like `denyRead`: either file can ask for it
+  // and neither can withdraw it. Letting a project clear it would let a cloned
+  // repository switch off a refusal its user asked for.
+  if (user.failClosed === true || project.failClosed === true) result.failClosed = true;
 
   // A permission grant belongs to whoever asked for the confinement. When the
   // user turned isolation on, the grants are theirs even where they listed no
@@ -195,12 +215,40 @@ export function sandboxLauncher(): { readonly kind: "bwrap" | "sandbox-exec"; re
 }
 
 /**
- * How to run `command` under the rules in force.
+ * What to do when isolation was asked for and no launcher could be found.
  *
- * The three answers are kept apart on purpose: isolation is off, isolation is in
- * force, or isolation was asked for and could not be arranged. Only the second
- * means the command is contained.
+ * Separated from `planSandboxedCommand` because the decision is the part worth
+ * testing and the launcher lookup is the part that depends on the machine.
+ * A test written against the plan has to take whichever branch this machine
+ * happens to be in, and on a host with `bwrap` installed it takes the isolating
+ * branch and never checks the refusal at all — which is exactly what happened
+ * the first time this was tested.
  */
+export function planWithoutLauncher(
+  rules: SandboxRules,
+): SandboxPlan {
+  const missing =
+    process.platform === "linux"
+      ? "`bwrap` is not installed"
+      : process.platform === "darwin"
+        ? "`sandbox-exec` is unavailable"
+        : `no sandbox launcher exists for ${process.platform}`;
+  // Asked to fail closed, so it does. The command does not run and the reason is
+  // one a person can act on: install the tool, or turn the requirement off
+  // deliberately. Running it anyway would answer "isolate this" with "not
+  // isolated", which is the answer the setting exists to refuse.
+  if (rules.failClosed === true) {
+    return {
+      state: "refused",
+      notice: `Refused to run: the sandbox is enabled and set to fail closed, but ${missing}, so the command could not be isolated. Install it, or set \`failClosed\` to false to accept unisolated execution.`,
+    };
+  }
+  return {
+    state: "unavailable",
+    notice: `Ran WITHOUT isolation: the sandbox is enabled but ${missing}.`,
+  };
+}
+
 export function planSandboxedCommand(input: {
   readonly shell: string;
   readonly shellArgs: readonly string[];
@@ -210,17 +258,8 @@ export function planSandboxedCommand(input: {
   const rules = input.rules ?? readSandboxRules(input.workspaceRoot);
   if (rules.enabled !== true) return { state: "off" };
   const launcher = sandboxLauncher();
-  if (!launcher) {
-    return {
-      state: "unavailable",
-      notice:
-        process.platform === "linux"
-          ? "Ran WITHOUT isolation: the sandbox is enabled but `bwrap` is not installed."
-          : process.platform === "darwin"
-            ? "Ran WITHOUT isolation: the sandbox is enabled but `sandbox-exec` is unavailable."
-            : `Ran WITHOUT isolation: no sandbox launcher exists for ${process.platform}.`,
-    };
-  }
+  if (!launcher) return planWithoutLauncher(rules);
+
   const args =
     launcher.kind === "bwrap"
       ? bwrapArgs(rules, input.workspaceRoot, input.shell, input.shellArgs)

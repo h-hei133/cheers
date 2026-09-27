@@ -231,6 +231,14 @@ export class HookDispatcher {
           shellArgs: ["-c", hook.command],
           workspaceRoot: payload.workspaceRoot,
         });
+        if (sandbox.state === "refused") {
+          // A hook command is still a command, and a hook that does not run must
+          // not read as a hook that ran and approved: the return value here is
+          // what the caller consults, so the refusal carries through as a deny.
+          const reason = sandbox.notice ?? "sandbox refused the hook command";
+          logger.warn(reason, { event: relevantEvent, command: hook.command });
+          return { decision: "block", reason };
+        }
         if (sandbox.state === "unavailable" && sandbox.notice) {
           logger.warn(sandbox.notice, { event: relevantEvent, command: hook.command });
         }
