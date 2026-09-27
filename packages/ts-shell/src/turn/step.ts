@@ -364,6 +364,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
               headers: { ...request.provider.headers, ...requestHeaders },
               body: JSON.stringify(payload),
             });
+            releaseAfterRead = releaseStream;
+            releaseNow = false;
             break;
           }
           const detail = await attemptResponse.text();
