@@ -296,6 +296,25 @@ import cycles、config consumers、declarations、node floor、validate、docs-d
 
 ---
 
+## 4quater. 复核轮（2026-09-28）：3 个 reviewer × 13 个实质提交
+
+复核方法：3 个只读 reviewer（并发 3）对照 pi 逐提交复核 13 个实质提交；
+**每条结论先经我核实再动手**——7 条中 6 条成立、1 条不适用。
+
+| # | reviewer 结论 | 核实结果 | 处置 |
+|---|---|---|---|
+| R1 | `localhost.` 尾点绕过 egress 守卫 | **成立（实测）**：`blockedHostReason("localhost.")` 返回空、Node 把它解析成 `::1` | `779d376b`；规则前置统一去尾点，撤销验证：删去尾点后新测试 1 项失败 |
+| R2 | 流重试条件只看文本——推理已展示仍重试 | **成立（读码+实测）**：`onReasoning` 直达终端 `think()`，`shown` 只积累 `onText`。reviewer 说工具调用也会重复是**错的**：工具调用存于流读取器局部状态、异常即弃 | `d5ff76b6`；双通道 `shownAnything` 标志，新测试撤销后 2 次请求 vs 修复后 1 次 |
+| R3 | missCount=0 时命中率被整段隐藏 | **成立（实测）**：完美缓存会话什么都不显示 | `ccc1620b`；命中率与浪费叙事分开判定。曾把 100% 算错——`promptTokens` 是「整提示」（raw+读+写），照约定修正测试预期 |
+| R4 | 配置写入 read-modify-write 不原子 | **部分成立**：丢更新窗口已在注释里明确接受（不加跨进程锁的裁决维持）；但 `writeFileSync` 截断窗口致**崩溃损毁**是真的 | `3fd611e9`；复用 sessionStore 的 `writeJsonFileAtomic`（临时文件+rename）。pi 用 `proper-lockfile`——锁被裁决不采，理由已存注释 |
+| R5 | Copilot 经 anthropic-messages 时缺网关头 | **成立（pi 实证）**：pi 生成器把 copilot 的 claude-* 模型路由到 anthropic-messages（`generate-models.ts:2295-2302`）并注入同样的动态头（`anthropic-messages.ts:554-562`） | `1a3f6ae8`；头集合提取为 `copilotHeaders.ts` 单点，两端点共用；4 项新测试撤销后全红 |
+| R6 | vision 头漏查 toolResult 中的图片 | **不适用**：cheers 的 `AgentToolResult.output` 是 `string`，`toChatMessages` 对 tool 消息也只传字符串——工具结果**不可能**携带图片。pi 的 Message 类型可以，两者数据模型不同 | 不改。pi 的检查逻辑已在 R5 的共享模块里，若未来工具结果可带图，`hasImages` 天然覆盖 |
+| R7 | lsp references 用行正则——注释/字符串算引用 | **成立（实测）**：`/\bfoo\b/` 匹配注释行 | `ea322a84`；TS/JS 族改为 AST 标识符遍历；非 TS 源报「无引用」而非退回词扫描。新测试钉死注释/字符串排除、别名/调用包含 |
+
+**复核的复核**：reviewer 也不免错——R2 的工具调用断言错误、R6 不适用、R3 我自己第一版测试预期也错（把「整提示」约定当成 raw）。每条都落到代码级证据再动手。
+
+---
+
 ## 5. 须维护者拍板的 4 个裁决点
 
 > 这几项**不该由我单方面决定**：或涉及破坏性删除、或涉及安全默认值。
