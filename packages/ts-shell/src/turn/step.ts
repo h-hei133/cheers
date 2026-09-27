@@ -316,13 +316,22 @@ export function createStepFunction(request: StepRequest): StepFunction {
         return stamp(errorStep(error instanceof Error ? error.message : String(error)));
       }
       // What has been shown so far, so an interrupted answer keeps the part
-      // the user already read instead of vanishing from the conversation.
+      // the user already read instead of vanishing from the conversation. Both
+      // channels count: reasoning the user has watched is as impossible to take
+      // back as text, and a retry after either would present the same output
+      // twice — the retry is only for a stream that showed nothing at all.
       let shown = "";
+      let shownAnything = false;
       const watched: StepListener = {
         ...listener,
         onText: (delta) => {
           shown += delta;
+          shownAnything = true;
           listener.onText?.(delta);
+        },
+        onReasoning: (delta) => {
+          shownAnything = true;
+          listener.onReasoning?.(delta);
         },
       };
       // Send the request, retrying a transient failure. A refusal of
@@ -467,7 +476,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
       } catch (error) {
         if (signal?.aborted) return stamp(abortedStep(shown));
         const detail = error instanceof Error ? error.message : String(error);
-        if (!shown && streamAttempts < retry.maxRetries && /socket|connection|network|fetch|terminated|unexpected eof/i.test(detail)) {
+        if (!shownAnything && streamAttempts < retry.maxRetries && /socket|connection|network|fetch|terminated|unexpected eof/i.test(detail)) {
           streamAttempts += 1;
           releaseAfterRead?.abort();
           const waited = await waitBeforeRetry(retryDelayMs(retry, streamAttempts, undefined), signal);

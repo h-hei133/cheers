@@ -942,3 +942,40 @@ describe("the last step a run may act on", () => {
     expect(result.stopReason).toBe("stop");
     expect(result.text).toBe("recovered");
   });
+
+  it("does not retry a stream that already showed reasoning, only one that showed nothing", async () => {
+    // A thinking model streams its reasoning before any text. Once the user has
+    // read reasoning, a retry would re-emit it — the same argument as retrying
+    // after text, and it is guarded for the same reason.
+    let attempts = 0;
+    const seen: string[] = [];
+    const step = createStepFunction({
+      ...request,
+      retry: { enabled: true, maxRetries: 3, baseDelayMs: 1, maxDelayMs: 1 },
+      fetchImpl: async () => {
+        attempts += 1;
+        const body = new ReadableStream<Uint8Array>({
+          start(controller) {
+            const encode = (text: string) => new TextEncoder().encode(text);
+            controller.enqueue(
+              encode(`data: ${JSON.stringify({ choices: [{ delta: { reasoning_content: "thinking hard" } }] })}\n\n`),
+            );
+            setTimeout(() => controller.error(new Error("socket hang up")), 5);
+          },
+        });
+        return new Response(body, { headers: { "content-type": "text/event-stream" } });
+      },
+    });
+    const result = await step(
+      [{ role: "user", content: "hi" }],
+      undefined,
+      {
+        onText: (delta) => seen.push(delta),
+        onReasoning: (delta) => seen.push(delta),
+      },
+      { allowTools: true },
+    );
+    expect(attempts).toBe(1);
+    expect(result.stopReason).toBe("error");
+    expect(seen).toEqual(["thinking hard"]);
+  });
