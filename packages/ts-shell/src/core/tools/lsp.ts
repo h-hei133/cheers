@@ -66,35 +66,22 @@ export function createLspToolDefinition(
         if (!filePath) {
           return deniedResult("Error: filePath parameter is required for documentSymbol operation.");
         }
-        const fullPath = path.resolve(context.workspaceRoot, filePath);
         try {
-          const stat = await fs.stat(fullPath);
-          if (stat.size > 5 * 1024 * 1024) {
-            return deniedResult(`File ${filePath} exceeds maximum 5MB size limit for documentSymbol.`);
-          }
-          const content = await fs.readFile(fullPath, "utf8");
-          const lines = content.split("\n");
-          const symbols: string[] = [];
-
-          lines.forEach((line, idx) => {
-            const funcMatch = line.match(/(?:export\s+)?(?:async\s+)?function\s+([a-zA-Z0-9_$]+)/);
-            const classMatch = line.match(/(?:export\s+)?class\s+([a-zA-Z0-9_$]+)/);
-            const typeMatch = line.match(/(?:export\s+)?(?:type|interface)\s+([a-zA-Z0-9_$]+)/);
-            const constMatch = line.match(/(?:export\s+)?const\s+([a-zA-Z0-9_$]+)\s*=/);
-
-            if (funcMatch) symbols.push(`- Function: \`${funcMatch[1]}\` (line ${idx + 1})`);
-            if (classMatch) symbols.push(`- Class: \`${classMatch[1]}\` (line ${idx + 1})`);
-            if (typeMatch) symbols.push(`- Type/Interface: \`${typeMatch[1]}\` (line ${idx + 1})`);
-            if (constMatch) symbols.push(`- Constant: \`${constMatch[1]}\` (line ${idx + 1})`);
-          });
-
+          const content = await readSource(executionService, context.workspaceRoot, filePath);
+          const parsed = parseSourceSymbols(filePath, content);
+          const symbols = parsed.symbols.map(
+            (symbol) =>
+              `- ${symbol.kind}: \`${symbol.qualifiedName}\` (line ${symbol.span.startLine}:${symbol.span.startColumn})`,
+          );
           return approvedResult(
             symbols.length > 0
               ? `# Document Symbols in \`${filePath}\`\n\n${symbols.join("\n")}`
               : `No top-level declarations detected in \`${filePath}\`.`,
           );
-        } catch (err: any) {
-          return deniedResult(`Failed to read document symbols for ${filePath}: ${err.message}`);
+        } catch (error: unknown) {
+          return deniedResult(
+            `Failed to read document symbols for ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+          );
         }
       }
 
@@ -104,10 +91,6 @@ export function createLspToolDefinition(
         }
 
         const query = symbolQuery || (filePath ? path.basename(filePath, path.extname(filePath)) : "");
-        const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const symbolWordRegex = new RegExp(`\\b${escapedQuery}\\b`);
-        const defRegex = new RegExp(`(?:function|class|interface|type|const|let|var|enum)\\s+${escapedQuery}\\b`);
-
         const allFiles = await executionService.listFilesRecursive({
           operationKind: "file.list",
           absoluteRoot: context.workspaceRoot,
@@ -117,67 +100,59 @@ export function createLspToolDefinition(
           reason: "Scan workspace files for code intelligence symbols.",
           reportSafeTarget: context.workspaceRoot,
         });
+        const targetFiles = allFiles.filter((file) => /\.(?:ts|tsx|js|jsx|mjs|cjs)$/.test(file));
+        const matches: Array<{ file: string; line: number; text: string; isDefinition: boolean }> = [];
 
-        // The walk already applied the shared prune and ignore policy; this only
-        // narrows to the extensions the symbol scan understands.
-        const targetFiles = allFiles.filter(
-          (f) => f.endsWith(".ts") || f.endsWith(".tsx") || f.endsWith(".js"),
-        );
-
-        const matches: Array<{ file: string; line: number; text: string; isDef: boolean }> = [];
-
-        for (const rel of targetFiles) {
+        for (const relative of targetFiles) {
           if (matches.length >= 100) break;
-          const fullPath = path.resolve(context.workspaceRoot, rel);
           try {
-            const stat = await fs.stat(fullPath);
-            if (stat.size > 5 * 1024 * 1024) continue;
-            const content = await fs.readFile(fullPath, "utf8");
-            const lines = content.split("\n");
-            for (let i = 0; i < lines.length; i++) {
-              const l = lines[i];
-              if (symbolWordRegex.test(l)) {
-                const isDef = defRegex.test(l);
-                matches.push({ file: rel, line: i + 1, text: l.trim(), isDef });
-                if (matches.length >= 100) break;
-              }
+            const content = await readSource(executionService, context.workspaceRoot, relative);
+            const parsed = parseSourceSymbols(relative, content);
+            for (const symbol of parsed.symbols) {
+              if (symbol.name !== query && symbol.qualifiedName !== query) continue;
+              matches.push({
+                file: relative,
+                line: symbol.span.startLine,
+                text: `${symbol.kind} ${symbol.qualifiedName}`,
+                isDefinition: true,
+              });
+              if (matches.length >= 100) break;
+            }
+            if (op === "references" && matches.length < 100) {
+              const lines = content.split("\n");
+              const word = new RegExp(`\\b${escapeRegex(query)}\\b`);
+              lines.forEach((line, index) => {
+                if (matches.length < 100 && word.test(line) && !matches.some((match) => match.file === relative && match.line === index + 1)) {
+                  matches.push({ file: relative, line: index + 1, text: line.trim(), isDefinition: false });
+                }
+              });
             }
           } catch {
-            // Skip unreadable
+            // Skip unreadable files; the workspace scan remains best effort.
           }
         }
 
         if (op === "definition") {
-          const defs = matches.filter((m) => m.isDef);
-          if (defs.length > 0) {
-            return approvedResult(
-              `# Definitions for \`${query}\`\n\n` +
-                defs.map((d) => `- \`${d.file}:${d.line}\`: \`${d.text}\``).join("\n"),
-            );
-          }
           return approvedResult(
-            matches.length > 0
-              ? `# Best Candidate Definition for \`${query}\`\n\n- \`${matches[0].file}:${matches[0].line}\`: \`${matches[0].text}\``
+            matches.filter((match) => match.isDefinition).length > 0
+              ? `# Definitions for \`${query}\`\n\n${matches.filter((match) => match.isDefinition).map((match) => `- \`${match.file}:${match.line}\`: \`${match.text}\``).join("\n")}`
               : `No definition found for symbol \`${query}\`.`,
           );
         }
-
         if (op === "references") {
           return approvedResult(
             matches.length > 0
-              ? `# References to \`${query}\` (${matches.length} found)\n\n` +
-                  matches.slice(0, 50).map((m) => `- \`${m.file}:${m.line}\`: ${m.text}`).join("\n")
+              ? `# References to \`${query}\` (${matches.length} found)\n\n${matches.slice(0, 50).map((match) => `- \`${match.file}:${match.line}\`: ${match.text}`).join("\n")}`
               : `No references found for symbol \`${query}\`.`,
           );
         }
-
         return approvedResult(
           matches.length > 0
-            ? `# Workspace Symbol Matches for \`${query}\`\n\n` +
-                matches.slice(0, 30).map((m) => `- \`${m.file}:${m.line}\`: ${m.text}`).join("\n")
+            ? `# Workspace Symbol Matches for \`${query}\` (${matches.length} found)\n\n${matches.slice(0, 30).map((match) => `- \`${match.file}:${match.line}\`: ${match.text}`).join("\n")}`
             : `No workspace symbols matched query \`${query}\`.`,
         );
       }
+
 
       if (op === "hover") {
         if (!filePath) {
@@ -220,4 +195,24 @@ export function createLspToolDefinition(
       return deniedResult(`Unknown LSP operation: ${op}`);
     },
   };
+}
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function readSource(
+  executionService: ExecutionService,
+  workspaceRoot: string,
+  relativePath: string,
+): Promise<string> {
+  const target = path.resolve(workspaceRoot, relativePath);
+  return executionService.readTextFile({
+    operationKind: "file.read",
+    absolutePath: target,
+    workspaceRoot,
+    authority: TOOL_APPROVED_READ_AUTHORITY,
+    caller: "core-tool:lsp",
+    reason: "Read an approved source file for code intelligence.",
+    reportSafeTarget: target,
+  });
 }
