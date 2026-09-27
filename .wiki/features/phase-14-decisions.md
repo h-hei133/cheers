@@ -78,8 +78,10 @@ confidence: high
 | Transcript `parentId` | **未做** | parentage 目前属于 `sessionThread` state；append callback 没有 active parent，新增空字段会是假接线 |
 | Provider 流中断重试 | **未做** | 需要明确重发语义与已输出前缀，不能把“重新发请求”伪装成断点续读 |
 
-**当前门禁**：`tsc` 0 错误；`test:scripts` 39/39；import cycles、config consumers、declarations、node floor、validate 全 pass。
-完整 suite 尚未作为本阶段最终门禁；不要把上述 focused evidence 写成全量通过。
+**当前门禁（2026-09-27 第二轮收尾实测）**：`tsc` 0 错误；`test:scripts` 40/40；
+import cycles、config consumers、declarations、node floor、validate、docs-drift 全 pass；
+`check:call-reachability` advisory 54 → **20**（其中 planning/proposal 簇 85 文件已删，提交 `e335e84e`）；
+完整 suite **482 文件 / 3893 通过 / 1 跳过 / 0 失败**（`bg_164`，2026-09-27）。
 
 ---
 

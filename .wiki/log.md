@@ -4488,3 +4488,49 @@ A2 **理由错、方向对**（顺序本就正确，真正缺陷是继续读完�
 「不给答案的服务器」用例原有 `expect(elapsed).toBeLessThan(10_000)`，
 负载下实测 14,469ms 失败。该断言**测的是机器忙不忙，不是死线有没有生效**——
 已删除上界（下界 250ms 才是判据），并撤销验证：撤掉死线后该用例挂死超时。
+
+**Phase 14：全阶段功能复核与 demo 级代码升级（2026-09-27）**
+
+**复核结论是双向的**：并非「普遍 demo」。经 6 个只读子代理分域比对 + 2 个 reviewer
+证伪复核，编辑引擎、压缩、OS 沙箱、缓存保活、崩溃归档 15 项经逐条读码确认为
+生产级（含错误路径与边界测试），若干处强于 pi（如行宽截断、多段编辑的 NFKC
+偏移映射）。**先记录这 15 项，防止误判为 demo 而重写已验证实现。**
+
+**真缺陷 6 类 + 一类新死代码**：
+
+| 缺陷 | 修复提交 |
+|---|---|
+| D1 `lsp` 五个操作中四个用正则扫行，AST 解析器就在同一文件却只服务 hover | `115d0e9f`（AST 化）+ `f4d00dca`（保留标签兼容） |
+| D2 记忆系统模型不可用：无 memory 工具，被动注入路径生产无构造点 | **不做伪造接线**——设计文档明确要求 explicit-local + review-before-write，接入须显式 store 构造点，见 decisions §4ter |
+| D3 Copilot 可登录但缺网关必需头 | `d920561a` |
+| D4 `webFetch` 无 SSRF 防线（守卫在库里但未接入） | `a86edb25` |
+| D5 沙箱降级不 fail-closed | `c071b614`（`failClosed` 累积式限制） |
+| D6 `/cost` 无全局缓存命中率 | `cf7fb2c3` |
+
+**一类此前清理看不见的死代码**：import 可达 ≠ 被调用。63/65 被
+`analyze-boundaries.py` 判为「CLI 可达」，却没有任何代码调用其导出。
+新门禁 `check:call-reachability`（11 条测试，含 `.tsx`、三字母标识符、
+`export const` 单例、`...spread()` 四个曾致误报的漏读，每个各配回归测试）。
+
+**门禁自身被复核揪出 5 处**（Terminal 单例、ContinuityManifest 值引用、
+redactProviderEditText 被活模块调用、escalationWorkflow 21 个类型消费者、
+tools/result/split 被 tools/types 依赖）——「零函数调用不足以授权删除」
+成为步 4 的第 7、8 条准入检查。
+
+**删除按连通分量整簇**：workflow action graph（`b0601ada`）→ planning/proposal 链
+85 文件 / 13,164 行（`e335e84e`）。删除中保留了三处活代码：AST 解析器
+（lsp 在用）、runtime source facts + harness 链（会话连续性快照每轮在读）、
+`projectTaskStateVerificationPlan`（verification plan 唯一活导出）。
+`FencedEditMapping` 类型迁到唯一读者旁。
+
+**施工中的自我更正**（均经撤销验证）：
+
+- Copilot 头提交曾丢 `releaseNow=false`，真 HTTP 回归测试抓到（stub 抓不到）；
+- T4 第一版测试在本机（装了 bwrap）**永远走隔离分支**，删掉修复也通过——
+  决策抽为纯函数 `planWithoutLauncher` 后才可测，修后撤销验证 2 项失败；
+- 流中断重试首版 `retryDelayMs` 参数缺一个，tsc 抓到。
+
+**最终实测**：`tsc` 0 错误；`test:scripts` 40/40；import cycles、config
+consumers、declarations、node floor、validate、docs-drift 全 pass；
+完整 suite **482 文件 / 3893 通过 / 1 跳过 / 0 失败**；
+`check:call-reachability` 54 → **20**（剩余项见 gate advisory，未授权不删）。
