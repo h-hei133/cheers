@@ -38,7 +38,7 @@ confidence: high
 有错误路径、有边界断言、有与 pi 对应的机制。若干处我方**强于** pi。
 
 **但有 6 类真缺陷**（§2），以及一类**此前清理漏掉的死代码**
-（§3，**65 文件 / 12,855 行**——数字经复核两轮修正，见 §3 开头）。
+（§3，**59 文件 / 11,890 行**——数字经复核**三轮**修正，见 §3 开头）。
 
 ### 1.1 先记录「经核实为生产级」的部分（避免误升级）
 
@@ -111,12 +111,21 @@ confidence: high
 
 ### D4 `webFetch` / `webSearch` 无 SSRF 防线 —— **而防线就在库里**
 
-- **证据**：`webFetch.ts:88-90` 只校验 `http://`/`https://` 前缀。
+- **证据**：`webFetch.ts` 只校验 `http://`/`https://` 前缀。
   `grep '127.0.0.1\|169.254\|private'` 在该文件 → **0 命中**。
-  `webSearch.ts` 同样直接对用户 query 构造外发请求。
-- **对照**：`browser/networkAllowlist.ts:239` 的 `isPrivateNetworkHost` 是**生产级 SSRF 守卫**
-  —— 注释显式处理 RFC1918、**链路本地 `169.254.0.0/16`**（云元数据端点）、
-  以及 **AWS IPv6 等价地址 `fd00:ec2::254`**。
+- **`webSearch` 经复核**：**无此问题**——它只向三个**硬编码**主机发请求
+  （`html.duckduckgo.com:81`、`api.exa.ai:138`、`api.tavily.com:180`），
+  **用户输入只作为查询串，不作为目标地址**。故其不在 D4 范围内。
+- **对照**：`browser/networkAllowlist.ts:239` 的 `isPrivateNetworkHost` 是**已在用的 SSRF 守卫**
+  —— 覆盖 loopback、RFC1918、**链路本地 `169.254.0.0/16`**（云元数据端点）、
+  `.local`/`.localhost`。
+- **该守卫的边界（其注释自述，不可夸大）**：**不覆盖** IPv6 链路本地（`fe80::/10`）、
+  CGNAT（`100.64.0.0/10`）、`0.0.0.0`、DNS rebinding；
+  **也不覆盖 IPv6 元数据地址 `fd00:ec2::254`**——注释说明这是**有意留下**的
+  （覆盖它需要解析 IPv6 范围，改动更大），并明确写了
+  「A caller that must be safe against the metadata endpoint should not treat
+  this guard as sufficient on its own」。
+  **所以 T1 不只是「接上守卫」，还要补 IPv6 与 CGNAT**——否则修完仍是半个防线。
 - **性质**：**守卫已写好、已验证，但没有被另外两个外发工具使用**。
 - **额外**：`webFetch` 用 `await response.text()` 全量读入后才截断（`:139`），
   大文件可瞬时打满内存。
@@ -143,12 +152,20 @@ confidence: high
 - `config/runtimeConfig.ts` 单次读取、`fs.writeFileSync` 写入；
   **无热重载、无多进程文件锁** —— 多个会话共享 `~/.cheers/config.json` 时可互相覆盖。
 
-## 3. 此前清理漏掉的一类死代码（**65 文件 / 12,855 行**）
+## 3. 此前清理漏掉的一类死代码（**59 文件 / 11,890 行**）
 
-> **本节数字经过两轮修正**。初稿写「66 文件 / 13,023 行」，由**手工脚本**得出；
-> 复核发现该脚本有两个漏读：**`.tsx` 未被扫描**（CLI 入口正是唯一的 `.tsx`），
-> 以及**三字母标识符被正则漏掉**（`\w{3,}` 把 `TUI` 排除，于是 `new TUI(...)` 看不见）。
-> 修正后并入门禁脚本 `scripts/check-call-reachability.mjs`，结论为 **65 文件 / 12,855 行**。
+> **本节数字经过三轮修正**，每一轮都由**别人指出后才重算**——这是本节最重要的记录。
+>
+> | 轮 | 数字 | 触发原因 |
+> |---|---|---|
+> | 初稿（手工脚本） | 66 文件 / 13,023 行 | — |
+> | 复核后 | 65 文件 / 12,855 行 | 漏读 **`.tsx`**（CLI 入口是唯一的 `.tsx`）+ 正则 `\w{3,}` 漏掉三字母名（`TUI`） |
+> | **再复核后** | **59 文件 / 11,890 行** | 漏查 **`export const`**——单例导出（`export const processTerminal = new Terminal()`）未被计入，于是**被 CLI 实际使用**的类被判为死 |
+>
+> **三个漏读都是同一类错误**：检测器看不见某样东西，于是把「看不见」当成「不存在」。
+> 每修一个，数字下降一次。**这说明数字本身不是结论，方法才是**——
+> 所以本轮把方法固化成了门禁（§3.2），并给每个漏读补了一条回归测试。
+>
 > **初稿的两个「典型例子」是错的**（见 §3.4）——这正是复核的价值。
 
 ### 3.1 为什么 `analyze-boundaries.py` 没抓到它们
@@ -197,7 +214,7 @@ testOnly :  2
 **仍然会误报的方向**（已知、保守）：仅被**类型**位置引用的导出会被算作「有调用」。
 即「靠类型吊命」的模块会被判为活的。
 
-### 3.4 初稿两个例子**是错的**（复核更正，保留记录）
+### 3.4 复核剔除的假阳性（保留记录）
 
 初稿把这两个列为「零调用点」的实测证据，**都错了**：
 
@@ -207,21 +224,33 @@ testOnly :  2
 | `cli/errors/cliFatalErrorBoundary.ts` → `handleCliFatalError` 0 调用 | **`entrypoints/cli.tsx:31` 直接调用** |
 
 **原因**：手工脚本只扫 `.ts`，而 `cli.tsx` 是本仓库**唯一的 `.tsx`**。
-**教训**：漏读一个文件与漏读一行是同一类错误，只是粒度更粗。
-门禁已修，并各配一条回归测试。
 
-### 3.5 分区（按域，**65 文件 / 12,855 行**）
+**第三轮又剔除了 6 项**（同属「看不见就当不存在」）：
+
+| 被误报 | 实际 |
+|---|---|
+| `presentation/tui/terminal.ts`（`Terminal` 类） | 文件导出 `const processTerminal = new Terminal()`，**被 `interactiveMode.ts:20,169` 使用**——CLI 交互模式的终端就是它 |
+| `presentation/tui/render/engine.ts`（`TUI` 类） | 同上，单例导出；`new TUI(...)` 在 `interactiveMode.ts:182` |
+| `core/security/projectTrust.ts` | 单例导出 |
+| `provider/aws/eventStream.ts` | `readEventStream` 是**生成器**（`export async function*`），旧正则漏掉 |
+| `core/commands/{google,openai,subscription}AccountAuth.ts` | 裸函数名未被调用，但**文件**被 `providerAuthRuntime.ts` 用的**契约对象**引用——门禁的工作粒度是文件，已正确保留 |
+| `tools/policy/strategy.ts` | 被 `index.ts` 导出（`chooseToolStrategy`），门禁的用词扫描已正确计为有引用 |
+
+**教训**：漏读一个文件、漏一个语法形式（生成器）、漏一种导出形态（`const` 单例），
+与漏读一行是**同一类错误**，只是粒度不同。门禁已逐条修补，且**每条各配一条回归测试**。
+
+### 3.5 分区（按域，**59 文件 / 11,890 行**）
 
 | 域 | 文件数 | 内容 |
 |---|---:|---|
 | `planning/` | 16 | 完整规划状态机：`agentPlan`/`taskLifecycle`/`taskExecutionPlan`/`testImpactPlan`/`analysisBrief`… **Agent 主循环从不经过它** |
-| `core/` | 9 | `query/runtime/{proof,actionAuthority,batch}`、`context/model/*`、`security/projectTrust`、`commands/{google,openai,subscription}AccountAuth` |
-| `provider/` | 8 | `proposal/*` 提案与锚点匹配/冲突/校验全链 + `aws/eventStream`（**注**：`eventStream` 经复核**确认为误报已剔除**，见 §3.6） |
+| `provider/` | 8 | `proposal/*` 提案与锚点匹配/冲突/校验全链 |
 | `edit/` | 8 | `proposal/*` 围栏编辑、提案评审、修复提案；`patch/status/mixedOperation` |
 | `context/` | 7 | `graph/*`（图谱、评分、包）、`acquisition/code/*`（事实、影响、陈旧度、追踪） |
-| `tools/` | 3 | `policy/interception` + `policy/strategy` + `types` |
+| `core/` | 4 | `query/runtime/{proof,actionAuthority,batch}`、`context/model/*`（**注**：`security/projectTrust` 与三处 `*AccountAuth` **经复核剔除**，见 §3.4） |
+| `tools/` | 3 | `policy/interception` + `types` + `result/split` |
 | `browser/` | 3 | `playwrightEvidence`、`runtime/core/directionDecision`、`toolServerBackendComparison` |
-| 其余 | 11 | `session/`、`presentation/`、`eval/`、`sandbox/`、`runtime/`、`result/`、`repair/`、`evidence/` |
+| 其余 | 10 | `session/`、`presentation/`、`eval/`、`sandbox/`、`runtime/`、`result/`、`repair/`、`evidence/` |
 
 ### 3.6 必须单列的两个
 

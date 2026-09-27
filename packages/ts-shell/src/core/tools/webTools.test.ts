@@ -65,4 +65,39 @@ describe("Web Fetch & Search Tools", () => {
     const errOutput = result.error || result.output;
     expect(errOutput).toContain("URL must start with http:// or https://");
   });
+
+  /**
+   * The addresses a fetch must refuse before it makes a request.
+   *
+   * Written against the tool rather than the guard alone, because the guard being
+   * correct is worth nothing if the call site does not ask it. The failure this
+   * covers is the one that was there: any URL beginning `http` was fetched, and
+   * `169.254.169.254` answers with the instance's temporary credentials.
+   */
+  describe("refuses addresses that are not public", () => {
+    const tool = createWebFetchToolDefinition();
+    const context = { workspaceRoot: "/workspace", taskId: "task-1" };
+
+    it.each([
+      ["the IPv4 metadata endpoint", "http://169.254.169.254/latest/meta-data/"],
+      ["its IPv6 counterpart", "http://[fd00:ec2::254]/latest/meta-data/"],
+      ["loopback by name", "http://localhost:8080/admin"],
+      ["loopback by address", "http://127.0.0.1:3000/"],
+      ["the IPv6 loopback", "http://[::1]:9000/"],
+      ["a private range", "http://10.0.0.5/"],
+      ["another private range", "http://192.168.1.1/"],
+      ["a CGNAT address", "http://100.64.0.1/"],
+      ["the unspecified address", "http://0.0.0.0/"],
+      ["a bare hostname resolved by search domain", "http://intranet/"],
+      ["an IPv4 address written in IPv6 form", "http://[::ffff:127.0.0.1]/"],
+      ["a file URL that would read the disk", "file:///etc/passwd"],
+    ])("refuses %s", async (_label, url) => {
+      const result = await tool.execute({ url }, context);
+      expect(result.success).toBe(false);
+      const text = result.error || result.output;
+      // Two refusal sites, both correct: the scheme check answers first for a
+      // non-http scheme, and the address check answers for everything else.
+      expect(text).toMatch(/refusing to fetch|must start with http/);
+    });
+  });
 });

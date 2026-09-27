@@ -225,6 +225,12 @@ function exportedNames(source) {
     names.add(m[1])
   }
   for (const m of source.matchAll(/export\s+class\s+(\w+)/g)) names.add(m[1])
+  // An exported singleton is how a class is used without anyone writing `new`:
+  // `export const processTerminal = new Terminal()` is instantiated here, and
+  // `Terminal` is then named only in its own declaration and in the type
+  // position of that line. Checking classes alone reported the class as dead
+  // while the CLI was importing the instance and running the app on it.
+  for (const m of source.matchAll(/export\s+const\s+(\w+)/g)) names.add(m[1])
   return names
 }
 

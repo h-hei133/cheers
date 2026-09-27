@@ -1,8 +1,32 @@
 import { approvedResult, deniedResult } from "./toolResultLifecycle.js";
+import { blockedHostReason } from "../security/egressGuard.js";
 import type { ToolDefinition } from "../../tools/types.js";
 
 const DEFAULT_FETCH_TIMEOUT_MS = 20_000;
 const MAX_OUTPUT_CHARS = 10_000;
+
+/**
+ * How much of a response body is read before giving up on it.
+ *
+ * The tool only ever returns ten thousand characters, so a body past this cannot
+ * change what the model sees; it can only occupy memory until the process dies.
+ * The limit exists because `response.text()` reads the whole thing first and
+ * checks afterwards, which means a large enough response — a download endpoint,
+ * a misconfigured path that streams a disk image — is an out-of-memory before it
+ * is ever a truncation.
+ */
+const MAX_BODY_BYTES = 5 * 1024 * 1024;
+
+/**
+ * How many redirects are followed, and why each one is re-checked.
+ *
+ * Followed at all because a documentation link that moved is a normal thing to
+ * fetch. Re-checked because the address rule has to apply to where the request
+ * actually goes: a public URL that redirects to `169.254.169.254` is a public URL
+ * by the first check and a metadata read by the second, and only following the
+ * chain by hand lets the second one happen.
+ */
+const MAX_REDIRECTS = 5;
 
 /**
  * Cleanly convert HTML string into readable Markdown/plain text
@@ -78,6 +102,145 @@ export function htmlToMarkdown(html: string): string {
   return text;
 }
 
+const BROWSER_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  Accept: "text/markdown, text/html, application/xhtml+xml, text/plain;q=0.9, */*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7",
+} as const;
+
+type FetchOutcome =
+  | { readonly ok: true; readonly response: Response; readonly finalUrl: string }
+  | { readonly ok: false; readonly reason: string };
+
+/**
+ * Whether a URL may be requested, and why not when it may not.
+ *
+ * Parsed rather than prefix-matched. A string test on `http://` accepts
+ * `http://[::1]/` and `http://169.254.169.254/` equally, and the address is the
+ * part that decides.
+ */
+function refuseUrl(url: string): string | undefined {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return `Error: ${url} is not a valid URL`;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return `Error: refusing to fetch ${parsed.protocol}// — only http and https are allowed`;
+  }
+  const reason = blockedHostReason(parsed.hostname);
+  if (reason) {
+    return `Error: refusing to fetch ${url} — ${parsed.hostname} is a ${reason}. This tool reaches the public web only.`;
+  }
+  return undefined;
+}
+
+/**
+ * Fetch `url`, following redirects one at a time so each hop is checked.
+ *
+ * `redirect: "manual"` is what makes that possible: with the default the runtime
+ * follows the chain internally and the only URL the guard ever sees is the first
+ * one, which is exactly the URL an attacker does not need to control.
+ */
+async function fetchFollowingCheckedRedirects(
+  url: string,
+  signal: AbortSignal,
+): Promise<FetchOutcome> {
+  let current = url;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+    const refusal = refuseUrl(current);
+    if (refusal) return { ok: false, reason: refusal };
+
+    const response = await fetch(current, {
+      method: "GET",
+      headers: BROWSER_HEADERS,
+      redirect: "manual",
+      signal,
+    });
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      if (!location) {
+        return { ok: false, reason: `HTTP ${response.status} from ${current} carried no Location` };
+      }
+      if (hop === MAX_REDIRECTS) {
+        return {
+          ok: false,
+          reason: `Error: ${url} redirected more than ${MAX_REDIRECTS} times; refusing to follow further`,
+        };
+      }
+      // Relative locations are resolved against the URL that named them.
+      current = new URL(location, current).toString();
+      continue;
+    }
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        reason: `HTTP ${response.status} ${response.statusText} fetching ${current}`,
+      };
+    }
+    return { ok: true, response, finalUrl: current };
+  }
+  return { ok: false, reason: `Error: too many redirects fetching ${url}` };
+}
+
+/**
+ * Read a body up to `MAX_BODY_BYTES`, then stop and say so.
+ *
+ * Streamed rather than `response.text()` because the length is only knowable
+ * after the fact otherwise: the whole body is already in memory by the time the
+ * limit could be applied, and the limit exists to prevent exactly that. The
+ * declared `Content-Length` is checked first to avoid reading at all when the
+ * server has already said the answer, and it is not trusted on its own because a
+ * server may omit it or understate it.
+ */
+async function readBoundedBody(
+  response: Response,
+): Promise<{ readonly ok: true; readonly text: string } | { readonly ok: false; readonly reason: string }> {
+  const declared = Number(response.headers.get("content-length") ?? "");
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+    return {
+      ok: false,
+      reason: `Error: response declares ${declared} bytes, past the ${MAX_BODY_BYTES}-byte read limit`,
+    };
+  }
+
+  const stream = response.body;
+  if (!stream) return { ok: true, text: "" };
+
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let read = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      read += value.byteLength;
+      if (read > MAX_BODY_BYTES) {
+        return {
+          ok: false,
+          reason: `Error: response exceeded the ${MAX_BODY_BYTES}-byte read limit; refused rather than truncated`,
+        };
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const joined = new Uint8Array(read);
+  let offset = 0;
+  for (const chunk of chunks) {
+    joined.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { ok: true, text: new TextDecoder().decode(joined) };
+}
+
 export function createWebFetchToolDefinition(): ToolDefinition {
   return {
     name: "web_fetch",
@@ -122,43 +285,32 @@ export function createWebFetchToolDefinition(): ToolDefinition {
       }
 
       try {
-        const response = await fetch(rawUrl, {
-          method: "GET",
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            Accept:
-              "text/markdown, text/html, application/xhtml+xml, text/plain;q=0.9, */*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7",
-          },
-          signal: controller.signal,
-        });
+        const fetched = await fetchFollowingCheckedRedirects(rawUrl, controller.signal);
+        if (!fetched.ok) return deniedResult(fetched.reason);
 
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          return deniedResult(
-            `HTTP ${response.status} ${response.statusText} fetching ${rawUrl}`,
-          );
-        }
-
+        const { response, finalUrl } = fetched;
         const contentType = response.headers.get("content-type") || "";
-        const rawBody = await response.text();
+        const body = await readBoundedBody(response);
+        if (!body.ok) return deniedResult(body.reason);
+
+        const rawUrlForName = finalUrl;
+        const rawBody = body.text;
 
         let formattedContent: string;
         if (
           contentType.includes("markdown") ||
-          rawUrl.endsWith(".md") ||
-          rawUrl.endsWith(".txt")
+          rawUrlForName.endsWith(".md") ||
+          rawUrlForName.endsWith(".txt")
         ) {
           formattedContent = rawBody;
         } else {
           formattedContent = htmlToMarkdown(rawBody);
         }
 
+        const notRendered = "no readable text was extracted";
         if (!formattedContent.trim()) {
           return approvedResult(
-            `[Fetched ${rawUrl} successfully, but no readable text was extracted]`,
+            `[Fetched ${rawUrlForName} successfully, but ${notRendered}]`,
           );
         }
 

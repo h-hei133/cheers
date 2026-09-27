@@ -124,12 +124,26 @@ test('a call from a .tsx file counts, so the callee is not reported', (t) => {
 
 test('the gate passes on a tree where everything is called', (t) => {
   const root = fixture(t, {
+    // `boot.ts` exports nothing, so there is no unused export of its own: the
+    // fixture has to be clean in both directions or it tests the wrong thing.
     'impl.ts': 'export function used(): number { return 1 }\n',
-    'boot.ts': 'import { used } from "./impl.js"\nexport const v = used()\n',
+    'boot.ts': 'import { used } from "./impl.js"\nconst v = used()\nconsole.log(v)\n',
   })
   const result = run(root)
   assert.equal(result.status, 0, result.stderr)
   assert.match(result.stdout, /\[pass\] call-reachability/)
+})
+
+test('an exported singleton counts as a use of the class it instantiates', (t) => {
+  // `class T` is named in its own declaration and in the singleton's type, and
+  // nowhere else. Checking classes without checking exported consts reported the
+  // class dead while the app was importing the instance and running on it.
+  const root = fixture(t, {
+    'terminal.ts': 'export class Terminal {}\nexport const processTerminal = new Terminal()\n',
+    'mode.ts': 'import { processTerminal } from "./terminal.js"\nconsole.log(processTerminal)\n',
+  })
+  const result = run(root)
+  assert.doesNotMatch(result.stderr, /terminal\.ts/)
 })
 
 test('a tree with no source files cannot pass', (t) => {

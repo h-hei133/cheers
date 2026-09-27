@@ -1,3 +1,4 @@
+import { isBlockedHost } from "../core/security/egressGuard.js";
 import { sanitizeBrowserText } from "./capabilityModel.js";
 import type { BrowserExecutionRequest } from "./executionContract.js";
 
@@ -237,17 +238,17 @@ export function decideBrowserNetworkAllowlist(input: {
  * metadata endpoint should not treat this guard as sufficient on its own.
  */
 export function isPrivateNetworkHost(hostname: string): boolean {
-  return (
-    hostname === "localhost" ||
-    hostname.endsWith(".localhost") ||
-    hostname.endsWith(".local") ||
-    hostname === "::1" ||
-    hostname.startsWith("127.") ||
-    hostname.startsWith("10.") ||
-    hostname.startsWith("192.168.") ||
-    hostname.startsWith("169.254.") ||
-    /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
-  );
+  // Delegates to the shared guard rather than keeping a second copy.
+  //
+  // The list is a superset of what this function used to hold: it adds CGNAT and
+  // the IPv6 ranges, which this one never covered, so every host that was
+  // refused here is still refused here. That direction matters — this function
+  // decides whether a navigation is blocked, and a shared guard narrower than
+  // this one would turn a refusal into an allowance.
+  //
+  // The ranges this used to test itself are gone rather than left beside the
+  // call: a rule stated twice is a rule that can be edited once.
+  return isBlockedHost(hostname);
 }
 
 function decision(
