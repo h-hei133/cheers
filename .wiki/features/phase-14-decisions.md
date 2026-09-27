@@ -106,34 +106,60 @@ confidence: high
 
 ---
 
-### 步 4：零调用模块的逐簇处置（65 文件 / 12,855 行）
+### 步 4：零调用模块的逐簇处置（**59 文件 / 11,890 行**）
 
 **这一块最大，必须逐簇裁决**，按 `plan.md` §2.2 的六项检查。
 
-**已知分组**（pre-research §3.5）：
+> **数字经三轮修正**（66 → 65 → **59**）。**每轮都是因为检测器看不见某样东西**：
+> 漏读 `.tsx`、漏读三字母名（`TUI`）、漏读 `export const` 单例。
+> **所以门禁输出只是线索，不是授权**——已剔除的 6 个假阳性
+> （含**被 CLI 实际使用**的终端类）见 pre-research §3.4。
+
+### ⚠️ 复核推翻了三处「整簇删除」
+
+复核（`ReviewPlanB`）逐条追引用，找到 4 处「**函数零调用，但被活模块以值或类型引用**」的模块。
+**主代理逐条实测确认全部成立**。这正是 `plan.md` §2.2 警告的
+「看着像死代码、其实是编译契约」——**它不是特例，是一类**：
+
+| 模块 | 被谁引用 | 证据 | 处置 |
+|---|---|---|---|
+| `core/context/model/contextContinuityManifest.ts` | `contextStateProjection.ts:2,428`、`context/compact/continuity/routeContinuityHandoff.ts:10,237` —— **值导入** | `CONTEXT_CONTINUITY_MANIFEST` 被装进 handoff 证据链 | **保留**。要删须先搬走该常量 |
+| `provider/proposal/providerEditContext.ts` | `repair/verificationRepairContext.ts:9,187` —— **值调用** | `redactProviderEditText` 脱敏函数 | **保留该函数**；同目录其余文件可评估 |
+| `sandbox/escalationWorkflow.ts` | **21 个生产文件**引 `EscalationPrompt`/`EscalationResponse`（`entrypoints/cliApprovalModule.ts:5`、`approvalPromptBridge.ts:11` …） | 类型是**全系统审批流契约** | **保留类型**；实现可评估。删前须迁契约 |
+| `tools/result/split.ts` + `tools/policy/interception.ts` | `tools/types.ts:6` 导入 `ToolResultDetails`/`ToolReportSafeProjection` | 核心工具层类型 | **保留类型**；先迁契约 |
+
+### 分组与初判（**已按上述修正**）
 
 | 组 | 文件 | 初判 |
 |---|---:|---|
-| `planning/` 规划状态机 | 16 | **删**——Agent 主循环从不经过；无参考实现有等价物 |
-| `provider/proposal/` + `edit/proposal/` | 16 | **删**——同族，且活轨编辑已用另一条链（`editEngine` + `presentation/.../diff.ts`） |
+| `planning/` 规划状态机 | 16 | **删**——Agent 主循环从不经过；无参考实现有等价物。**仍需过准入 7/8** |
+| `provider/proposal/` + `edit/proposal/` | 16 | **部分删**——`providerEditContext.ts` **必须保留**（值被引用）；其余逐个核 |
 | `context/graph/` + `acquisition/code/` | 7 | **删**——除 `ast/parser.ts`（**步 2 要用，保留**） |
-| `tools/policy/{interception,strategy}.ts` + `tools/result/split.ts` | 3 | **作为同一连通分量删**——`split.ts` 引 `interception.ts` 的类型 |
-| `core/query/runtime/{proof,actionAuthority,batch}.ts` | 3 | 逐簇核实 |
-| `sandbox/{auditTrail,escalationWorkflow,sandboxEnforcer}.ts` | 3 | **删**——闭环孤岛，真实权限已由 `cli/approval/` 接管 |
-| `core/context/model/*` | 2 | 逐簇核实 |
-| `core/commands/{google,openai,subscription}AccountAuth.ts` 的**裸函数导出** | 0（文件保留） | 文件保留（契约对象在 `providerAuthRuntime.ts` 被用）；**只删未被引用的裸导出** |
-| 其余 | ~15 | 逐簇核实 |
+| `tools/policy/interception.ts` + `result/split.ts` + `tools/types.ts` | 3 | **先迁类型契约**再评估；`tools/types.ts` 是核心，大概率保留 |
+| `sandbox/{auditTrail,escalationWorkflow,sandboxEnforcer}.ts` | 3 | **先迁 `Escalation*` 类型**（21 个消费者），再评估实现 |
+| `core/context/model/*` | 2 | **`contextContinuityManifest` 保留**；`contextLayerModel` 有类型消费者，先核 |
+| `core/query/runtime/{proof,actionAuthority,batch}.ts` | 3 | 逐簇核实（需过准入 7/8） |
+| 其余 | ~12 | 逐簇核实 |
 
 **准入检查（每簇必过）**：
-1. `grep` 确认零生产调用点（用 `check:call-reachability` 的输出 + 手工复核）；
-2. 确认**不是编译契约**（类型被活文件引用——`interception.ts` 即是此例）；
+
+1. `grep` 确认零生产调用点（用 `check:call-reachability` 输出 + 手工复核）；
+2. 确认**不是编译契约**（类型被活文件引用）；
 3. 确认**不是公开 API 面**（见 §5 Q4）；
 4. 确认**不是侧效应注册**；
 5. 确认对应的**测试**一并处置（删或改，按 `dead-code-tiers` §4 的原则：
    断言落在死模块上 → 删；拿活模块当夹具 → 改）；
-6. 删除后 `tsc` + 全量套件 + 门禁全绿。
+6. 删除后 `tsc` + 全量套件 + 门禁全绿；
+7. **生产值引用检查**——`grep` 该模块每个导出名，确认无活模块**以值导入并使用**。
+   **仅「函数零调用」不足以授权删除**（本轮 4 例中的 2 例即死于此）；
+8. **类型契约检查**——确认其类型**不被活模块引用**；若被引用，
+   **先把类型迁到中立位置**（或保留该文件）**再**评估删除。
 
-**步 4 完成后**：把 `check:call-reachability` 从 **advisory 改为阻断**（见 pre-research §6 尾注）。
+> **第 7、8 条是复核要求，已采纳。** 它们把 `plan.md` §2.2 的六项检查具体化，
+> 并把 `_index.md` §13.10 尾注（`interception.ts` 类型被引用）从特例推广为**通用准入**。
+
+**步 4 完成后**：把 `check:call-reachability` 从 **advisory 改为阻断**
+（见 pre-research §6 尾注）——届时 59 项应全部归零，门禁变绿才有意义。
 
 ---
 
@@ -181,6 +207,28 @@ confidence: high
 | 「自行分步」 | 6 步，按缺陷类别而非文件顺序 |
 | 「派遣子代理探索细节」 | 已用 6 scout + 2 reviewer；施工中按需再派 |
 | 「不要造重复功能，破坏原有结构」 | 原则 1 + 原则 2（接线优先于新建） |
+
+---
+
+## 4bis. 本方案经 2 个复核者证伪（**主代理被更正 9 处**）
+
+施工方案不是一次写成的。**2 个独立复核者**逐条追引用后，主代理**实测确认并采纳**以下更正：
+
+| # | 复核指出 | 主代理实测 | 落在哪一节 |
+|---|---|---|---|
+| 1 | **`presentation/tui/terminal.ts` 是活代码**——被 `interactiveMode.ts:20,169` 用作 CLI 终端 | **成立**。根因：门禁只查 `export function`/`class`，**漏 `export const` 单例**（`export const processTerminal = new Terminal()`）。**已修门禁 + 加回归测试** | pre-research §3.4 |
+| 2 | **`contextContinuityManifest` 有生产值引用** | **成立**（`routeContinuityHandoff.ts:10,237`） | 步 4 |
+| 3 | **`providerEditContext.redactProviderEditText` 被活模块值调用** | **成立**（`repair/verificationRepairContext.ts:9,187`） | 步 4 |
+| 4 | **`escalationWorkflow` 的类型被 21 个生产文件引用** | **成立**（`cliApprovalModule.ts:5` 等） | 步 4 |
+| 5 | **`tools/result/split.ts` 被 `tools/types.ts` 依赖** | **成立**（`types.ts:6`） | 步 4 |
+| 6 | **`parseSourceSymbols` 是单文件语法树，无 `TypeChecker`**，做不了跨文件 `definition` | **成立**（`ts.createSourceFile`，无 `createProgram`）。**T7 验收标准已收紧** | 步 2 |
+| 7 | **`SandboxRules` 在 `osSandbox.ts`，不受 `check:config-consumers` 管** | **成立**。T4 的验收说明已改 | 步 1 |
+| 8 | **`memoryTools.ts` 没有 `ToolDefinition` 工厂**，`check:declarations` 会拦 | **成立**。T5 已补「必须新建工厂」 | 步 2 |
+| 9 | **T16 在零依赖下可行**（原子锁文件 / 临时文件 rename） | **成立**。T16 由「视情况」改为**纳入** | 步 5 |
+
+**这一节保留的意义**：方案里最容易错的就是「删什么」与「能不能验证」。
+**9 处更正里，5 处是「准备删的东西其实是活的」**——
+即如果没有这轮复核，步 4 会直接破坏生产代码。**这就是为什么复核不是形式。**
 
 ---
 
