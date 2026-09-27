@@ -161,9 +161,41 @@ describe("runCostCommand", () => {
     });
 
     const result = await runCostCommand([], contextFor(session, workspace()));
-    // A heading with a zero under it would suggest the cache was doing badly,
-    // when the truth is there was nothing to report.
-    expect(result.output).not.toContain("Prompt cache");
+    // The waste story stays silent — no misses, so nothing to fix — but the hit
+    // rate is the session's own efficiency and is worth reporting on its own.
+    // The recorded prompt is the whole one (raw input plus cache read plus
+    // write premium), so 100k read against a 200k whole prompt is 50%.
+    expect(result.output).toContain("Prompt cache hit rate: 50.0%");
+    expect(result.output).not.toContain("prompt tokens were sent again");
+  });
+
+  it("reports a perfect hit rate rather than nothing", async () => {
+    const home = workspace();
+    process.env.HOME = home;
+    process.env.USERPROFILE = home;
+    writeCatalogCache([
+      {
+        id: "priced",
+        models: [{ id: "meter", cost: { promptPerMTok: 3, completionPerMTok: 15, cacheReadPerMTok: 0.3 } }],
+      },
+    ]);
+
+    const session = "sess_cost_allhits";
+    resetSessionUsage(session);
+    // The whole prompt served from cache: no fresh input tokens at all. The
+    // completion tokens are what keep the report out of its empty-session
+    // early return — a cached-prompt turn still produced an answer.
+    recordSessionUsage(session, {
+      promptTokens: 0,
+      completionTokens: 50,
+      model: "meter",
+      provider: "priced",
+      cacheReadTokens: 100_000,
+    });
+
+    const result = await runCostCommand([], contextFor(session, workspace()));
+    expect(result.output).toContain("Prompt cache hit rate: 100.0%");
+    expect(result.output).not.toContain("prompt tokens were sent again");
   });
 
   /**

@@ -105,9 +105,11 @@ export async function runCostCommand(
 /**
  * What the prompt cache did not save, over the requests still held.
  *
- * Says nothing when there is nothing to say: a session with no counted miss, or
- * one where no request could be judged, has no cache story and a heading with a
- * zero under it would suggest otherwise.
+ * Two figures with different jobs. The hit rate is the session's own efficiency
+ * and shows whenever a request reported cache at all — a perfect one is exactly
+ * what the user ran the command to see. The waste story underneath it stays
+ * silent when there is nothing to fix: a session with no counted miss has no
+ * problem, and complaint lines under a 100% rate would read as one.
  *
  * The window is named because it is genuinely bounded — the history keeps the
  * recent requests, not every one — and a figure presented without that would read
@@ -117,8 +119,13 @@ function cacheWasteSection(
   telemetry: SessionUsageTelemetry,
   rateFor: (provider: string, model: string) => ModelCostRates | undefined,
 ): readonly string[] {
+  const usage = summarizeCacheUsage(telemetry.recentRequests);
   const report = findCacheWaste(telemetry.recentRequests, rateFor);
-  if (report.totals.missCount === 0) return [];
+  // Silent only when there is no cache story of either kind: no request
+  // reported cache activity, and no request was judged a waste. A model
+  // switch re-sent a prompt no cache could have served, and that is worth
+  // saying even though nothing in the session reported cache tokens.
+  if (usage.requestCount === 0 && report.totals.missCount === 0) return [];
 
   const { missedTokens, missedCost, missCount } = report.totals;
   // Named because the headline figure is not all one kind of thing: tokens a
@@ -130,14 +137,18 @@ function cacheWasteSection(
     "",
     "### Prompt cache",
     "",
-    `- Prompt cache hit rate: ${renderCacheHitRate(telemetry.recentRequests)}`,
-    `- ${missedTokens.toLocaleString()} prompt tokens were sent again and billed in full, across ${missCount} ${missCount === 1 ? "request" : "requests"}`,
-    `- Of those, an estimated $${missedCost.toFixed(4)} extra was spent against what a cache read would have cost`,
-    ...(switched > 0
-      ? [
-          `- ${switched} of them followed a model change, which re-bills the prompt by design — those could not have been cache reads at all`,
-        ]
-      : []),
+    `- Prompt cache hit rate: ${usage.hitRate === undefined ? "unknown" : `${usage.hitRate.toFixed(1)}%`}`,
+    ...(missCount === 0
+      ? []
+      : [
+          `- ${missedTokens.toLocaleString()} prompt tokens were sent again and billed in full, across ${missCount} ${missCount === 1 ? "request" : "requests"}`,
+          `- Of those, an estimated $${missedCost.toFixed(4)} extra was spent against what a cache read would have cost`,
+          ...(switched > 0
+            ? [
+                `- ${switched} of them followed a model change, which re-bills the prompt by design — those could not have been cache reads at all`,
+              ]
+            : []),
+        ]),
   ];
 
   // Named separately because the remedy differs: an idle gap is fixed by asking
@@ -157,11 +168,6 @@ function cacheWasteSection(
 }
 
 /** One model's table, with the total row. */
-function renderCacheHitRate(history: readonly import("../../observability/usageTelemetry.js").UsageHistoryEntry[]): string {
-  const accounted = summarizeCacheUsage(history);
-  return accounted.hitRate === undefined ? "unknown" : `${accounted.hitRate.toFixed(1)}%`;
-}
-
 function renderModelSection(input: {
   readonly model: string;
   readonly bucket: ModelUsageBucket;
