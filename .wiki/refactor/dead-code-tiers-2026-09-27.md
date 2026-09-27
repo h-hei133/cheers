@@ -69,8 +69,9 @@ testOnly=94     noReference=29
 
 ## 3. 分档
 
-分档标准是**证据强度与体量**，不是「确定性」——三档的裁决原本都是删除，
-但**第二档经逐文件复核后裁决被推翻**。
+分档标准是**证据强度与体量**，不是「确定性」。
+**三档现均已查清，裁决均为删除**：第一档证据最硬、第二档经逐文件复核后由维护者裁决删除、
+第三档经数据流实测判定可删。
 
 ### 第一档 —— **授权删除**（18 簇 / 23 文件 / 3,399 行）
 
@@ -102,7 +103,7 @@ testOnly=94     noReference=29
 | `runtime/runtimePhase.ts` | 51 | 活的 `core/shell/stateMachine.ts` 才是状态机 |
 | `workflow/gitChangeSetAttribution.ts` | 50 | 活的 `workflow/gitContext.ts` 已承担 |
 
-### 第二档 —— **裁决被推翻，暂不删除**（2 簇 / 55 文件 / 16,531 行）
+### 第二档 —— **维护者裁决：删除**（2 簇 / 55 文件 / 16,531 行）
 
 - 簇 1：34 文件 / 9,584 行（`context/`、`evidence/`、`planning/`、`result/`、`verification/`）
 - 簇 2：21 文件 / 6,947 行（`edit/`、`repair/`、`context/readWindow`）
@@ -134,15 +135,127 @@ edit/result/editCapabilityReadiness.ts:134-136
 > **所以「第二档已有其他模块实现、属多余」不成立。**
 > 删掉它等于**主动删掉活轨自己报告为 blocked 的能力**。
 
-### 第三档 —— **未查清**（1 簇 / 3 文件 / 932 行）
+#### 维护者裁决（2026-09-27）：**删除**
 
-- `context/sessionContextRebuildProjection.ts`（185）
-- `session/sessionTreeProjection.ts`（515）
-- `session/store/host/state.ts`（232）
+理由与记录（**不是**「因为它多余」——它不多余）：
 
-活轨 `session/query/sessionEntries.ts` 承担了会话树读取，
-但 `host/state.ts` 的持久化模型（`appendHostSessionTurn` 等 9 个函数）**未找到活的对应物**。
-可能是「会话 host 状态」这条**未建成的线**，也可能是被 `SessionManager` 取代。**§2.2-2 未做到底。**
+- 该能力**无任何可参照方案**：四个顶级项目零实现
+  （`pi` 全仓 `rollback` 0 命中；`opencode` `packages/core/src/file-mutation.ts:205`
+  仍写着 `TODO: Design multi-file transactions / rollback`；
+  `oh-my-pi`、`source-claudecode` 的命中均与编辑无关）。详见
+  `tier2-direction-research-2026-09-27.md` §1.2。
+- 我方活轨**另一条** `blocked` 条目提供了设计意图证据：
+  `edit/result/editCapabilityReadiness.ts:131-134` 记
+  `blocked("automatic-recovery", ["restore requires explicit user/session action"])`
+  ——即**产品当前的设计意图是「恢复必须显式触发」**，自动回滚与之相悖。
+- 现有文件（`edit/multifile/model.ts`）只到一半：编排与回滚循环有实现，
+  但恢复裁判（`edit/recovery/model.ts`，844 行）**全是类型零函数**，
+  且与活轨 hunk（`targetBinding: "single-target"`）**契约不同**——
+  接入需要改编辑核心路径的契约，风险高于收益。
+
+**⚠️ 必须随删除一并留下的记录（否则下次复核会重新发现一遍）**：
+
+1. **这是一次明确的能力放弃，不是清理。** 删除后「多文件原子事务 + 回滚」
+   在本产品中**不存在**，且**无实现路径**。
+2. **`edit/result/editCapabilityReadiness.ts:134-136` 的 `blocked("atomic-rollback", ...)`
+   保持不变**——它现在**更加**准确（不再是「未接线」，而是「已决定不做」）。
+   执行删除时应在该条目**加注释**，指向本文件，写明「实现曾存在于
+   `edit/multifile/model.ts`，已于 <日期> 按本裁决删除」。
+3. **在 `capability-backlog.md` 留一条**，与簇 1 同类处理：写明若未来要做
+   多文件事务，此处曾有实现，以及**为何当时删除**（无参照、与显式恢复的设计意图冲突）。
+4. **删除会移除 `editCapabilityReadiness` 所报告状态的部分依据。**
+   该文件声称「no transaction rollback executor exists」——删除后这句话
+   从「尚未接线」变为「永久成立」。**已实测复核该文件全部 8 条 `blocked`**，
+   其中 **3 条**与本能力域相关，执行时需一并加注释指向本文件：
+
+   | 条目 | 现有理由 | 删除后的含义 |
+   |---|---|---|
+   | `arbitrary-broad-apply-patch` | `workspace authority remains file-scoped` | 不变（活轨权威本就是文件级） |
+   | `automatic-recovery` | `restore requires explicit user/session action` | **不变**，且与本次裁决一致 |
+   | `atomic-rollback` | `no transaction rollback executor exists` | 由「未接线」变为「已决定不做」 |
+   | `default-durable-persistence` | `no SessionManager persistence wiring` | 不变 |
+
+   其余 4 条（`fuzzy-patch`、`binary-mode-symlink-submodule-copy`、
+   `directory-operations`、`overwrite`）与被删文件无关。
+
+### 第三档 —— **已查清：可删**（1 簇 / 3 文件 / 932 行）
+
+- `session/store/host/state.ts`（232）—— 全仓**零引用（连测试都没有）**
+- `session/sessionTreeProjection.ts`（515）—— **无自身测试**
+- `context/sessionContextRebuildProjection.ts`（185）—— 有测试
+
+**两个复核结论最初相反**（代码派判 KEEP、参照派判 DELETABLE），
+**由本人实测裁决为可删**，关键证据如下。
+
+#### 决定性证据：数据流是死的，不只是「没人 import」
+
+该簇声称做「会话树 + 压缩记录 + 事实出处 + 上下文重建审计」。
+实测其**数据来源从未被生产代码写入**：
+
+```text
+# 1. 谁构造 SessionCompactionRecord？
+grep -rn 'addDurableSessionCompaction' src --include=*.ts | grep -v '\.test\.'
+  → 只有它自己的定义，零调用者
+grep -rn 'addSessionCompactionRecord' src --include=*.ts | grep -v '\.test\.'
+  → 只有 schema 定义 + threadState.ts:87 —— 而该函数的唯一出口
+     addDurableSessionCompaction 零调用者
+  ⟹ 生产代码从不写入任何 compaction 记录
+
+# 2. 谁读 thread.compactions？
+grep -rn '\.compactions' src --include=*.ts | grep -v '\.test\.'
+  → sessionTreeProjection.ts:176、:222（**死文件自己**）
+  → schema/sessionThread.ts:179（定义处）
+  ⟹ 读它的只有死文件
+
+# 3. 谁读 retainedContextFacts / staleInputIds / unsafeInputIds / missingFactIds？
+  → 仅 schema 定义 + sessionTreeProjection.ts（死）+ 两个测试
+  ⟹ 零活轨读者
+
+# 4. 死簇的输出被谁用？
+grep -rn 'projectSessionTree|SessionTreeProjection' src --include=*.ts | grep -v test
+  → 仅 session/store/host/state.ts:8,192,193（**同为死文件**）
+  ⟹ 输出只在簇内流转，无出口
+```
+
+**活轨读 `SessionThreadSnapshot` 的只有 `activeLeafId`**
+（`query/sessionEntries.ts:183`、`export/collect.ts:159`、`entriesCommandRuntime.ts:58`），
+即**「当前叶子在哪」**，而**不是**压缩记录、事实出处或树出处标记。
+
+#### 与参照实现的对照
+
+| 维度 | 本簇 | 参照实现 |
+|---|---|---|
+| 会话树 | 携带 compaction + 事实出处 + `treeSupport`/`branchSupport` | 纯拓扑父子图（节点 + 子引用），**不带出处审计** |
+| 恢复上下文 | 产出**审计结构**（缺哪些事实、哪些过期） | 产出**可执行消息流**（回退到最近 compaction，拼 summary + 保留尾部） |
+| 内存态会话 | 裸 `HostSessionRecord[]` 数组，无消费者 | 完整存储后端（实现 commit/scan/get/set/delete），**已接线** |
+
+**本簇产出的是「审计投影」，不是「可执行数据」。** 而活轨**已有**可执行侧：
+`session/recovery/resumeContextBuilder.ts` 的 `buildSessionResumeContext`、
+`session/replay/builder.ts:260` 的 `replayMessages`。
+
+#### 裁决
+
+**可删。** 理由分三层：
+
+1. **数据流死**（上述实测）：来源从无写入、输出无出口、标记无读者。
+   「职责未被活轨承担」与「这份职责从未成立」是两件事——本簇属后者。
+2. **能力方向不一致**：本簇的审计式投影与产品既有路线（可执行消息流 + 显式恢复）**不是同一条**，
+   参照实现亦无对应物。
+3. **`state.ts` 的「内存态多会话协调」**：这是唯一可能有价值的残余，
+   但**零引用（连 harness 与测试都没有）**，属「未建成的线」而非「被取代的能力」；
+   重建成本低于维护成本。
+
+**⚠️ 删除时的注意项**：
+- `schema/sessionThread.ts` 的 `retainedContextFacts` / `excludedContextFacts` /
+  `SessionCompactionFact` **不是**本簇文件——它们是 `schema` 的一部分。
+  删除本簇后这些字段**将失去唯一的读者**，应在**同一轮**一并裁决
+  （`schema/sessionThread.ts` 本身是活的：`buildLinearSessionThreadSnapshot`、
+  `appendSessionThreadChild` 等被活轨使用）。
+- `state.ts` 引用的 `buildLinearSessionThreadSnapshot` / `appendSessionThreadChild`
+  在 schema 内是活的，**不要连带删除**。
+- `context/sessionContextRebuildProjection.test.ts` 与
+  `session/sessionProjection.test.ts`（后者同时测活轨的续接投影）需分别处置：
+  前者随簇删除，**后者必须改写**（去掉对死模块的引用，保留活轨断言）。
 
 ---
 
@@ -176,13 +289,19 @@ edit/result/editCapabilityReadiness.ts:134-136
 - `core/harness/` 内的场景文件未评估其自身是否应保留（超本次范围）。
 - 第二档的 **48 个 `NONE FOUND`** 是「按导出面与职责未找到等价」，
   **不是**「已证明产品需要它们」——是否接入需另行裁决（见 `plan.md` 后续记录）。
-- 第三档未查清。
+- 第三档**已查清**（见 §3），其中「参照实现是否有对应物」由子代理在 `~/projects/pi`
+  与 `~/projects/oh-my-pi` 上核实；本簇的**数据流死结论由本人实测**（命令与输出见 §3）。
+- 第三档遗留：`schema/sessionThread.ts` 的 `retainedContextFacts` 等字段在删除后将失去唯一读者，
+  其**去留**尚未裁决（属 schema 文件，不在本簇范围内）。
 
 ---
 
 ## 6. 待办
 
 - [ ] 第一档删除执行（逐簇，含上述测试处置与 `plan.md` §1 计数表同步）
+- [ ] 第二档删除执行（55 文件 / 16,531 行；含 §3 第二档「必须随删除一并留下的记录」四条）
+- [ ] 第三档删除执行（3 文件 / 932 行；含 `schema/sessionThread.ts` 的事实字段同轮裁决、
+      `sessionProjection.test.ts` 改写）
 - [x] 第二档方向研究 —— 见 `tier2-direction-research-2026-09-27.md`
       （结论：簇 1 能力非必需；簇 2 能力真实缺失但**无任何可参照方案**）
-- [ ] 第三档 `session/store/host/state.ts` 单独做 §2.2-2
+- [x] 第三档 §2.2-2 —— 结论：**可删**（数据流死；详见 §3）
