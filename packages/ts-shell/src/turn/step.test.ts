@@ -914,3 +914,31 @@ describe("the last step a run may act on", () => {
     expect(body).not.toHaveProperty("tools");
   });
 });
+  it("retries a stream that fails before delivering any text", async () => {
+    let attempts = 0;
+    const step = createStepFunction({
+      ...request,
+      retry: { enabled: true, maxRetries: 1, baseDelayMs: 1, maxDelayMs: 1 },
+      fetchImpl: async () => {
+        attempts += 1;
+        if (attempts === 1) {
+          const body = new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.error(new Error("socket hang up"));
+            },
+          });
+          return new Response(body, { headers: { "content-type": "text/event-stream" } });
+        }
+        return new Response(
+          `data: ${JSON.stringify({ choices: [{ delta: { content: "recovered" } }] })}\n\n` +
+            `data: ${JSON.stringify({ choices: [{ delta: { content: "" }, finish_reason: "stop" }] })}\n\n` +
+            "data: [DONE]\n\n",
+          { headers: { "content-type": "text/event-stream" } },
+        );
+      },
+    });
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+    expect(attempts).toBe(2);
+    expect(result.stopReason).toBe("stop");
+    expect(result.text).toBe("recovered");
+  });

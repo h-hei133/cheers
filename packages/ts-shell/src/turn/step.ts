@@ -231,6 +231,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
     // this body that forgets the stamp is invisible to the type, which is why
     // every exit goes through it.
     const stamp = (step: AssistantStep): AssistantStep => (origin ? { ...step, origin } : step);
+    let streamAttempts = 0;
     for (;;) {
       const effort = effortAccepted ? getThinkingEffort(request.workspaceRoot) : undefined;
       // Resolved per attempt rather than once, because the shape depends on the
@@ -465,6 +466,14 @@ export function createStepFunction(request: StepRequest): StepFunction {
         return stamp(toStep(completion, watched));
       } catch (error) {
         if (signal?.aborted) return stamp(abortedStep(shown));
+        const detail = error instanceof Error ? error.message : String(error);
+        if (!shown && streamAttempts < retry.maxRetries && /socket|connection|network|fetch|terminated|unexpected eof/i.test(detail)) {
+          streamAttempts += 1;
+          releaseAfterRead?.abort();
+          const waited = await waitBeforeRetry(retryDelayMs(retry, streamAttempts, undefined), signal);
+          if (!waited) return stamp(abortedStep(""));
+          continue;
+        }
         // The text already streamed is kept and the step is still marked failed.
         // Keeping it alone would present a truncated answer as a finished one —
         // the user has read the opening and nothing says the rest is missing —
