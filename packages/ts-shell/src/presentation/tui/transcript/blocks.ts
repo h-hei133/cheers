@@ -2,6 +2,8 @@ import { defaultTheme } from "../../theme/theme.js";
 import { formatCommandLine, formatToolDetail } from "../../theme/commandHighlight.js";
 import { padToWidth, wrapToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
+import type { ImageContent } from "../../../model-adapters/multimodal.js";
+import { inlineImageSequence, type ImageProtocol } from "../image.js";
 import { renderDiff } from "./diff.js";
 import { renderMarkdown, trimPartialFence } from "./markdown.js";
 
@@ -43,11 +45,29 @@ export interface Block {
   /** Milliseconds the block's work took, when that is a fact worth showing. */
   elapsedMs?: number;
   /**
+   * Images attached to the message the block echoes. Rendered inline when the
+   * terminal speaks a graphics protocol, named in text when it does not — the
+   * placeholder token alone says a picture travelled, not what it is.
+   */
+  readonly images?: readonly ImageContent[];
+  /**
    * Self-rendering override, for blocks whose presentation depends on the frame
    * width in a way plain re-wrapping cannot reproduce — an elided path, say.
    * Called with the current width on every reflow.
    */
   rows?: (width: number) => readonly string[];
+}
+
+/**
+ * What the renderer needs to know about the terminal drawing its rows.
+ *
+ * Carried per render call rather than read from the environment inside, so a
+ * caller (and every test) can state what the terminal said once, and a change
+ * of terminal mid-session re-renders rather than half-remembers.
+ */
+export interface BlockRenderOptions {
+  /** Inline-image protocol the terminal speaks, or nothing. */
+  readonly imageProtocol?: ImageProtocol;
 }
 
 /**
@@ -64,11 +84,15 @@ const BODY_INDENT = "";
 const STATUS_GLYPH: Record<ToolStatus, string> = { running: "◐", ok: "✔", failed: "✗" };
 
 /** Rows for one block at `width`, including its trailing separator row. */
-export function renderBlock(block: Block, width: number): readonly string[] {
+export function renderBlock(
+  block: Block,
+  width: number,
+  options: BlockRenderOptions = {},
+): readonly string[] {
   if (block.rows) return [...block.rows(width), ""];
   switch (block.kind) {
     case "user":
-      return renderUser(block, width);
+      return renderUser(block, width, options);
     case "thinking":
       return renderThinking(block, width);
     case "tool":
@@ -98,7 +122,7 @@ export function renderBlock(block: Block, width: number): readonly string[] {
  * the drag-to-copy path trims trailing cells before rebuilding text, so the
  * padding never reaches the clipboard.
  */
-function renderUser(block: Block, width: number): readonly string[] {
+function renderUser(block: Block, width: number, options: BlockRenderOptions = {}): readonly string[] {
   const rail = defaultTheme.fg("accent", "▌");
   const bg = defaultTheme.bgOpen("userMessageBg");
   const bodyWidth = Math.max(1, width - 4);
@@ -107,6 +131,22 @@ function renderUser(block: Block, width: number): readonly string[] {
     const padded = padToWidth(`${GUTTER}${rail} ${defaultTheme.fg("userMessageText", line)}`, width);
     return `${bg}${padded.replaceAll("\x1b[0m", `\x1b[0m${bg}`)}\x1b[0m`;
   });
+  // Images drawn inline ride on their own rows, after the words: the protocol
+  // sequence occupies zero cells, so the bubble's styling wraps around it
+  // without shifting a single column, and the wrap leaves the sequence whole.
+  for (const image of block.images ?? []) {
+    if (options.imageProtocol) {
+      const sequence = inlineImageSequence(options.imageProtocol, image.data, {
+        columns: Math.max(4, Math.min(bodyWidth, 48)),
+      });
+      const padded = padToWidth(`${GUTTER}${rail} `, width);
+      rows.push(`${bg}${padded}${sequence}\x1b[0m`);
+    } else {
+      const label = `${image.mimeType}, ${Math.round((image.data.length * 3) / 4 / 1024)} KB`;
+      const padded = padToWidth(`${GUTTER}${rail} ${defaultTheme.fg("userMessageText", `image attachment: ${label}`)}`, width);
+      rows.push(`${bg}${padded.replaceAll("\x1b[0m", `\x1b[0m${bg}`)}\x1b[0m`);
+    }
+  }
   rows.push("");
   return rows;
 }

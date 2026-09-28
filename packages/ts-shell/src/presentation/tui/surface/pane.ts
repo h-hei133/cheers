@@ -1,4 +1,4 @@
-import type { Block } from "../transcript/blocks.js";
+import type { Block, BlockRenderOptions } from "../transcript/blocks.js";
 import type { Transcript } from "../transcript/container.js";
 import type { SelectionPoint, SelectionSpan } from "../transcript/selection.js";
 import {
@@ -44,6 +44,7 @@ export class TranscriptPane {
     capacity: number,
     selection: SelectionSpan | undefined,
     highlight?: (row: string, contentRow: number) => string,
+    options?: BlockRenderOptions,
   ): string[] {
     const safeWidth = Math.max(1, Math.floor(width));
     const safeCapacity = Math.max(1, capacity);
@@ -53,7 +54,7 @@ export class TranscriptPane {
       safeWidth,
     );
     const contentWidth = hasScrollbar ? Math.max(1, safeWidth - 1) : safeWidth;
-    const { rows, owners } = this.transcript.render(contentWidth);
+    const { rows, owners } = this.transcript.render(contentWidth, options);
     this.scroller.updateLayout(rows.length, safeCapacity);
     const top = this.scroller.scrollTop;
     const visible = rows.slice(top, top + safeCapacity);

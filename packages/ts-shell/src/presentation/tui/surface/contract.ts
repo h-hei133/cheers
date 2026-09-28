@@ -1,4 +1,5 @@
 import type { ImageContent } from "../../../model-adapters/multimodal.js";
+import type { ImageProtocol } from "../image.js";
 import { Editor } from "../editor.js";
 import { PasteStore } from "../pastes.js";
 import type { AmbientContext } from "../chrome/hints.js";
@@ -71,6 +72,8 @@ export interface ViewContext {
   composerSelection?(): SelectionSpan | undefined;
   /** What an open search should show in the bar, or nothing when none is open. */
   searchBar?(): { readonly query: string; readonly matchCount: number; readonly currentNumber: number } | undefined;
+  /** Inline-image protocol the terminal speaks, or nothing when it does not. */
+  imageProtocol?(): ImageProtocol | undefined;
   /** Style the matches in one rendered row of the transcript. */
   highlightSearchMatches?(row: string, contentRow: number): string;
 }

@@ -1,5 +1,5 @@
 import { defaultTheme } from "../../theme/theme.js";
-import { type Block, renderBlock } from "./blocks.js";
+import { type Block, renderBlock, type BlockRenderOptions } from "./blocks.js";
 
 /**
  * Ordered transcript.
@@ -15,6 +15,8 @@ import { type Block, renderBlock } from "./blocks.js";
  */
 
 interface CacheEntry {
+  /** The render options the cached rows were built with; protocol changes re-render. */
+  options?: BlockRenderOptions;
   readonly width: number;
   /** The palette revision the rows were rendered with. */
   readonly revision: number;
@@ -101,12 +103,12 @@ export class Transcript {
    * The owner list is what lets a click on a row reach the block under it — a
    * collapsed reasoning block or a tool card that can be expanded.
    */
-  render(width: number): RenderedTranscript {
+  render(width: number, options?: BlockRenderOptions): RenderedTranscript {
     if (this.blocks.length === 0) return { rows: EMPTY, owners: EMPTY as unknown as number[] };
     const rows: string[] = [];
     const owners: number[] = [];
     for (let index = 0; index < this.blocks.length; index++) {
-      for (const row of this.rowsFor(this.blocks[index]!, width)) {
+      for (const row of this.rowsFor(this.blocks[index]!, width, options)) {
         rows.push(row);
         owners.push(index);
       }
@@ -115,18 +117,23 @@ export class Transcript {
   }
 
   /** Rendered rows for one block, memoised while the block cannot change. */
-  private rowsFor(block: Block, width: number): readonly string[] {
-    if (!block.finalized) return renderBlock(block, width);
+  private rowsFor(block: Block, width: number, options?: BlockRenderOptions): readonly string[] {
+    if (!block.finalized) return renderBlock(block, width, options);
     const cached = this.cache.get(block);
     // The palette is recolored in place, so the same block at the same width
     // renders differently after a theme change. Keying on width alone left the
     // scrollback in the old theme until a resize happened to invalidate it.
     const revision = defaultTheme.colorRevision;
-    if (cached && cached.width === width && cached.revision === revision) {
+    if (
+      cached &&
+      cached.width === width &&
+      cached.revision === revision &&
+      cached.options?.imageProtocol === options?.imageProtocol
+    ) {
       return cached.rows;
     }
-    const rows = renderBlock(block, width);
-    this.cache.set(block, { width, revision, rows });
+    const rows = renderBlock(block, width, options);
+    this.cache.set(block, { width, revision, rows, options });
     return rows;
   }
 }

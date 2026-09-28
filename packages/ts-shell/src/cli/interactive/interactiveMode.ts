@@ -24,6 +24,7 @@ import type { StreamingRenderer } from "../../presentation/terminal/streaming.js
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import { replaceLiteral } from "../../presentation/tui/pastes.js";
+import { detectImageProtocol } from "../../presentation/tui/image.js";
 import { InteractiveSurface } from "../../presentation/tui/surface/view.js";
 import { createViewState, type ViewState } from "../../presentation/tui/surface/contract.js";
 import { approvalPicker, type InteractiveApprovalResult } from "./picker/approval.js";
@@ -142,6 +143,8 @@ export class InteractiveMode {
   private stopped = false;
   private busy = false;
   private toast?: string;
+  /** What the terminal said it can draw, read once from its environment. */
+  private readonly imageProtocol = detectImageProtocol();
   private tick: ReturnType<typeof setInterval> | undefined;
   private turnNumber = 0;
   /** The last thing submitted that was a prompt rather than a command. */
@@ -242,6 +245,10 @@ export class InteractiveMode {
         // them. The query and the counter stay; only the styling waits.
         highlightSearchMatches: (row, contentRow) =>
           this.busy ? row : styleSearchRow(this.search, row, contentRow),
+        // Read once: the terminal does not change while the session lives, and
+        // the renderer asks on every frame — a function per frame would re-run
+        // the environment probe that never has a different answer.
+        imageProtocol: () => this.imageProtocol,
       },
       this.state,
     );
@@ -506,7 +513,11 @@ export class InteractiveMode {
       this.openPicker(text);
       return;
     }
-    this.state.transcript.append(textBlock("user", text));
+    this.state.transcript.append(
+      attachments && attachments.images.length > 0
+        ? { ...textBlock("user", text), images: attachments.images }
+        : textBlock("user", text),
+    );
     // Sending is a statement that the user is done reading back: the window
     // returns to the newest rows so the echo and the answer are in view.
     this.view.scrollToEnd();

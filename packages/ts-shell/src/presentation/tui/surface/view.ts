@@ -74,6 +74,7 @@ export class InteractiveSurface implements InteractiveView {
       capacity,
       this.context.selection(),
       this.context.highlightSearchMatches,
+      this.context.imageProtocol ? { imageProtocol: this.context.imageProtocol() } : {},
     );
     // The split and the full document are reported, not just performed: a
     // surface appending to the terminal's scrollback has no window onto the

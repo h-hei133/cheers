@@ -65,3 +65,34 @@ describe("width discipline", () => {
     expect(rows).toContain("zeta");
   });
 });
+
+describe("image attachments in the prompt echo", () => {
+  const IMG = { type: "image" as const, data: "QUJD", mimeType: "image/png" };
+
+  it("renders the inline sequence on a protocol terminal, unwrapped", () => {
+    // The sequence is carried through wrapping intact — escape sequences hold
+    // zero cells, so the wrap never splits them — and the row keeps its width
+    // from the surrounding styling, not from the payload.
+    const rows = renderBlock(
+      { ...textBlock("user", "what is this?"), images: [IMG] },
+      WIDTH,
+      { imageProtocol: "kitty" },
+    );
+    const imageRows = rows.filter((row) => row.includes("\x1b_G"));
+    expect(imageRows.length).toBe(1);
+    expect(imageRows[0]).toContain("a=T,f=100,q=2");
+    expect(imageRows[0]).toContain("QUJD");
+  });
+
+  it("falls back to the placeholder token when no protocol speaks", () => {
+    const rows = renderBlock(
+      { ...textBlock("user", "what is this?"), images: [IMG] },
+      WIDTH,
+      { imageProtocol: undefined },
+    );
+    expect(rows.some((row) => row.includes("\x1b_G") || row.includes("1337"))).toBe(false);
+    // The row still says what the image is, so the bubble is honest on a
+    // terminal that cannot draw it.
+    expect(rows.some((row) => row.includes("image/png"))).toBe(true);
+  });
+});
