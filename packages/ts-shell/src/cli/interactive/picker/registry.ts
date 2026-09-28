@@ -19,6 +19,7 @@ import { skillPicker } from "./skills.js";
 import { sourcePicker } from "./sources.js";
 import { sessionPicker } from "./session.js";
 import { statusItemPicker } from "./statusItems.js";
+import { settingsPicker } from "./settings.js";
 
 /**
  * Which commands open a chooser.
@@ -49,6 +50,10 @@ export interface PickerHost {
   sessionTurns(): readonly SessionMessage[];
   /** Drop everything after a chosen point, leaving the workspace alone. */
   rewind(point: RewindPoint): Promise<string | undefined>;
+  /** The stored value of a settings toggle, or its default. */
+  readSetting(key: "attentionOnIdle" | "offline"): boolean;
+  /** Persist a settings toggle; the host owns where that lives. */
+  saveSetting(key: "attentionOnIdle" | "offline", value: boolean): Promise<void>;
 }
 
 type PickerFactory = (host: PickerHost) => Picker;
@@ -84,6 +89,7 @@ const PICKERS: Record<string, PickerFactory> = {
       save: host.saveStatusItems,
       preview: host.previewStatusItems,
     }),
+  settings: (host) => settingsPicker(host),
 };
 
 /** The picker a bare command opens, or undefined when it has none. */

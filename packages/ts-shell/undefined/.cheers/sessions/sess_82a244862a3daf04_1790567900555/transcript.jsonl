@@ -1,0 +1,3 @@
+{"type":"session","version":1,"id":"sess_82a244862a3daf04_1790567900555","timestamp":"2026-09-28T03:58:20.555Z","cwd":"/home/wang/projects/cheers/packages/ts-shell"}
+{"type":"message","id":"turn_cd5147ad","role":"user","content":"the original question","timestamp":"2026-09-28T03:58:20.559Z"}
+{"type":"message","id":"turn_2f0c42a8","role":"assistant","content":"the original answer","timestamp":"2026-09-28T03:58:20.561Z"}

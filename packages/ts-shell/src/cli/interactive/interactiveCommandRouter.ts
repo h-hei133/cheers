@@ -25,7 +25,7 @@ import {
   runCliMcpCommand,
 } from "../../entrypoints/cliMcpModule.js";
 import { runCliPermissionCommand } from "../../entrypoints/cliPermissionModule.js";
-import { runCliSessionCommand } from "../../entrypoints/cliSessionModule.js";
+import { runCliSessionCommand, switchRuntimeSessionProjectContext } from "../../entrypoints/cliSessionModule.js";
 import {
   runCliWorkspaceCommand,
 } from "../../entrypoints/cliWorkspaceModule.js";
@@ -202,6 +202,36 @@ export async function routeInteractiveCommand(
     };
   }
 
+  if (isShellAction(slashResult, "fork-session")) {
+    // The source is "here" when no id came, which is the session the runtime
+    // context holds. Forked, then switched to: the fork exists to be
+    // continued in a second direction, and leaving the user on the source
+    // would have them type into the wrong conversation.
+    const sourceId = slashResult.sessionId ?? input.runtimeContext.session.id;
+    try {
+      const forked = input.sessionManager.fork(
+        sourceId,
+        input.runtimeContext.projectRoot,
+      );
+      switchRuntimeSessionProjectContext(input.runtimeContext, forked);
+      renderProjectedLines(input.renderer, [
+        `Forked ${sourceId} into ${forked.id}: same conversation, new direction. The source is untouched.`,
+        "",
+      ]);
+      return {
+        turnNumber: nextTurnNumber,
+        refreshPromptChrome: true,
+        refreshMcpGateway: true,
+        sessionOpened: true,
+        ...(themeChanged ? { themeChanged: true } : {}),
+      };
+    } catch (error) {
+      input.renderer.renderLine(
+        `\nFork failed: ${error instanceof Error ? error.message : String(error)}\n`,
+      );
+      return { turnNumber: nextTurnNumber, ...(themeChanged ? { themeChanged: true } : {}) };
+    }
+  }
   if (isShellAction(slashResult, "show-workspace")) {
     let projectContextSwitched = false;
     runCliWorkspaceCommand({

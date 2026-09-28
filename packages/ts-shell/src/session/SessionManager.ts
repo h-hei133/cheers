@@ -11,6 +11,7 @@ import type { CurrentSessionSelectionResolution } from "./store/currentSelection
 import { SESSION_APPROVAL_AUDIT_HISTORY_LIMIT } from "./approval/sessionApprovalMemory.js";
 import { type TranscriptEvent } from "./sessionEventCodec.js";
 import { appendBranchSummaryEvent } from "./transcript/sessionTranscript.js";
+import { appendTranscriptEvent, readTranscriptEvents } from "./transcript/sessionTranscript.js";
 import { sessionThreadPath } from "./schema/sessionThread.js";
 import {
   readSessionThreadSnapshot,
@@ -223,6 +224,32 @@ export class SessionManager extends SessionReadSurface {
       projectRoot,
       options,
     });
+  }
+
+  /**
+   * A new session carrying this one's conversation.
+   *
+   * A revert moves the same session's active leaf back; a fork leaves the
+   * source untouched and copies its transcript into a session that grows on
+   * its own — for when a conversation is worth continuing twice in two
+   * directions. The copy is the source's events verbatim, timestamps
+   * included, because the fork's own records begin where the source's ended.
+   */
+  fork(sessionId: string, projectRoot?: string): Session {
+    if (!this.sessionExists(sessionId)) {
+      throw new Error(`Cannot fork: session ${sessionId} does not exist`);
+    }
+    const source = this.host.store.load(sessionId);
+    const events = readTranscriptEvents(this.host.store.transcriptPath(sessionId));
+    const forked = createSession({
+      callbacks: this.createSessionCreationCallbacks(),
+      projectRoot: projectRoot ?? source.projectRoot,
+    });
+    const transcriptPath = this.host.store.transcriptPath(forked.id);
+    for (const event of events) {
+      appendTranscriptEvent(transcriptPath, event);
+    }
+    return forked;
   }
 
   resume(sessionId: string, projectRoot?: string): Session {

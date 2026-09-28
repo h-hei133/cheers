@@ -1,4 +1,4 @@
-import type { CommandContext, ShellActionResult } from "./types.js";
+import type { CommandContext, CommandExecutionResult } from "./types.js";
 
 /**
  * `/resume` — the single session entry point.
@@ -32,8 +32,38 @@ function isSessionReference(token: string | undefined): boolean {
 export async function runResumeCommand(
   args: string[],
   _context: CommandContext,
-): Promise<ShellActionResult> {
+): Promise<CommandExecutionResult> {
   const first = args[0]?.trim();
+
+  // Fork is not a mode of this command's table: it reads its target
+  // differently ("here" is the current session, where a mode would never be),
+  // and it leaves the source session untouched rather than moving within it.
+  if (first?.toLowerCase() === "fork") {
+    const reference = args[1]?.trim();
+    if (!reference) {
+      return {
+        kind: "local",
+        output: [
+          "Usage: `/fork [sessionId|here]`",
+          "",
+          "Creates a new session carrying the target's conversation, then",
+          "switches to it. The source is untouched: revert moves within one",
+          "session, fork continues the same conversation in a second one.",
+          "",
+          "- `/fork here` — fork the session you are in",
+          "- `/fork sess_xxx` — fork a session by id",
+        ].join("\n"),
+      };
+    }
+    return {
+      kind: "shell-action",
+      action: "fork-session",
+      // "here" carries no id: the host resolves it to the session in the
+      // runtime context, which is the only place "here" means anything.
+      ...(reference.toLowerCase() !== "here" ? { sessionId: reference } : {}),
+    };
+  }
+
   const mode = first ? MODES[first.toLowerCase()] : undefined;
 
   if (mode === undefined) {

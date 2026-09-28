@@ -1,0 +1,40 @@
+{
+  "status": "active",
+  "projectRoot": "/home/wang/projects/cheers/packages/ts-shell",
+  "runPhase": "idle",
+  "pendingLifecycle": {
+    "pendingApprovals": {},
+    "pendingTools": {},
+    "taskStates": {}
+  },
+  "thread": {
+    "schemaVersion": 1,
+    "entries": [
+      {
+        "id": "sess_45d60f0ee4afe601_1790567784157:root",
+        "kind": "session-root",
+        "order": 0,
+        "timestamp": "2026-09-28T03:56:24.157Z"
+      },
+      {
+        "id": "turn_740ae081",
+        "parentId": "sess_45d60f0ee4afe601_1790567784157:root",
+        "kind": "turn-message",
+        "role": "user",
+        "order": 1,
+        "timestamp": "2026-09-28T03:56:24.160Z"
+      },
+      {
+        "id": "turn_f2fd8fbb",
+        "parentId": "turn_740ae081",
+        "kind": "turn-message",
+        "role": "assistant",
+        "order": 2,
+        "timestamp": "2026-09-28T03:56:24.163Z"
+      }
+    ],
+    "activeLeafId": "turn_f2fd8fbb",
+    "branches": [],
+    "compactions": []
+  }
+}

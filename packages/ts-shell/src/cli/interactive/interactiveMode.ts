@@ -26,6 +26,7 @@ import type { StreamingRenderer } from "../../presentation/terminal/streaming.js
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import { replaceLiteral } from "../../presentation/tui/pastes.js";
+import { readUserRuntimeConfigFile, writeUserRuntimeConfigFile } from "../../config/runtimeConfig.js";
 import { InteractiveSurface } from "../../presentation/tui/surface/view.js";
 import { createViewState, type ViewState } from "../../presentation/tui/surface/contract.js";
 import { approvalPicker, type InteractiveApprovalResult } from "./picker/approval.js";
@@ -736,6 +737,14 @@ export class InteractiveMode {
       saveStatusItems: async (items) => {
         this.statusItems = items;
         return `Status band items saved to ${writeStatusItems(this.options.runtimeContext.projectRoot, items)}`;
+      },
+      // The toggles the settings panel flips live in the user's config file,
+      // which is where the rest of their settings already are.
+      readSetting: (key) =>
+        (readUserRuntimeConfigFile() as Record<string, unknown>)[key] === true,
+      saveSetting: async (key, value) => {
+        const existing = readUserRuntimeConfigFile() as Record<string, unknown>;
+        writeUserRuntimeConfigFile({ ...existing, [key]: value });
       },
     };
   }

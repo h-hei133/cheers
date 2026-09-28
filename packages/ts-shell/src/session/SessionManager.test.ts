@@ -3874,3 +3874,29 @@ describe("SessionManager", () => {
     );
   });
 });
+
+describe("fork", () => {
+  it("creates a new session carrying the source conversation", () => {
+    const manager = new SessionManager();
+    const source = manager.createNew();
+    manager.addTurn(source.id, { role: "user", content: "the original question" });
+    manager.addTurn(source.id, { role: "assistant", content: "the original answer" });
+
+    const forked = manager.fork(source.id);
+    expect(forked.id).not.toBe(source.id);
+
+    // The fork is its own session: writes to it never touch the source.
+    manager.addTurn(forked.id, { role: "user", content: "only in the fork" });
+    const sourceEvents = manager.getTranscriptEvents(source.id);
+    const forkedEvents = manager.getTranscriptEvents(forked.id);
+    expect(sourceEvents.length).toBeLessThan(forkedEvents.length);
+    expect(JSON.stringify(forkedEvents)).toContain("the original question");
+    expect(JSON.stringify(forkedEvents)).toContain("only in the fork");
+    expect(JSON.stringify(sourceEvents)).not.toContain("only in the fork");
+  });
+
+  it("refuses to fork a session that does not exist", () => {
+    const manager = new SessionManager();
+    expect(() => manager.fork("sess_missing")).toThrow(/not exist/i);
+  });
+});

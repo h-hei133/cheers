@@ -17,6 +17,7 @@ import { runClearCommand } from "./clearCommandRuntime.js";
 import { runReviewCommand } from "./reviewCommandRuntime.js";
 import { runReloadCommand } from "./reloadCommandRuntime.js";
 import { runThemeCommand } from "./themeCommandRuntime.js";
+import { runSettingsCommand } from "./settingsCommandRuntime.js";
 import { runTrustCommand } from "./trustCommandRuntime.js";
 import { runInitCommand } from "./initCommandRuntime.js";
 import { runCostCommand } from "./costCommandRuntime.js";
@@ -192,6 +193,17 @@ export function createCommandRegistry(
       execute: (args, context) => runResumeCommand(args, context),
     },
     {
+      name: "fork",
+      kind: "prompt",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: false,
+      summary: "continue one session's conversation in a second, new session",
+      group: "session",
+      argumentHint: "[here|sessionId]",
+      execute: (args, context) => runResumeCommand(["fork", ...args], context),
+    },
+    {
       name: "continue",
       aliases: ["c"],
       kind: "prompt",
@@ -325,6 +337,19 @@ export function createCommandRegistry(
       summary: "re-read the configuration this session started with",
       group: "context",
       execute: (args, context) => runReloadCommand(args, context),
+    },
+    {
+      // The bare form opens the settings panel; the interactive surface keeps
+      // the pickers, so the command's own output is the non-interactive story.
+      name: "settings",
+      kind: "local",
+      availability: "available",
+      enabled: true,
+      bridgeSafe: true,
+      summary: "open the settings panel, or name what a setting does",
+      group: "workspace",
+      argumentHint: "[setting]",
+      execute: (args, context) => runSettingsCommand(args, context),
     },
     {
       name: "theme",

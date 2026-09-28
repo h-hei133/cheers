@@ -274,6 +274,20 @@ export async function runNonInteractivePrompt(options: {
       return;
     }
 
+    if (resolved.slashResult.action === "fork-session") {
+      // Piped sessions fork but do not switch: there is no conversation to
+      // continue here, so the id is the answer and the fork is what the caller
+      // resumes later.
+      const sourceId = resolved.slashResult.sessionId ?? options.runtimeContext.session.id;
+      try {
+        const forked = options.sessionManager.fork(sourceId, options.runtimeContext.projectRoot);
+        options.renderer.renderLine(`Forked ${sourceId} into ${forked.id}. Resume it with: cheers --resume ${forked.id}`);
+      } catch (error) {
+        options.renderer.renderLine(`Fork failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      return;
+    }
+
     if (isResumeLikeShellAction(resolved.slashResult)) {
       await runResumeLikeShellAction({
         slashResult: resolved.slashResult,

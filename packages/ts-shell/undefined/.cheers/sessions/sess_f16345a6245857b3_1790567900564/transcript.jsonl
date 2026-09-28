@@ -1,0 +1,4 @@
+{"type":"session","version":1,"id":"sess_f16345a6245857b3_1790567900564","timestamp":"2026-09-28T03:58:20.564Z","cwd":"/home/wang/projects/cheers/packages/ts-shell"}
+{"type":"message","id":"turn_cd5147ad","role":"user","content":"the original question","timestamp":"2026-09-28T03:58:20.559Z"}
+{"type":"message","id":"turn_2f0c42a8","role":"assistant","content":"the original answer","timestamp":"2026-09-28T03:58:20.561Z"}
+{"type":"message","id":"turn_46ca2c37","role":"user","content":"only in the fork","timestamp":"2026-09-28T03:58:20.567Z"}

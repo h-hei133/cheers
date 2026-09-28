@@ -54,3 +54,24 @@ describe("resume as the only session entry point", () => {
     expect(await runResumeCommand(["LIST"], CONTEXT)).toMatchObject({ sessionAction: "list" });
   });
 });
+
+describe("fork as the session that continues twice", () => {
+  it("asks for fork usage when no target is given", async () => {
+    const result = await runResumeCommand(["fork"], CONTEXT);
+    expect(result.kind).toBe("local");
+    expect((result as { output: string }).output).toContain("/fork");
+  });
+
+  it("carries a fork target through as a fork-session action", async () => {
+    expect(await runResumeCommand(["fork", "sess_abc123"], CONTEXT)).toEqual({
+      kind: "shell-action",
+      action: "fork-session",
+      sessionId: "sess_abc123",
+    });
+  });
+
+  it("forks the current session when the target is 'here'", async () => {
+    const result = await runResumeCommand(["fork", "here"], CONTEXT);
+    expect(result).toMatchObject({ kind: "shell-action", action: "fork-session" });
+  });
+});

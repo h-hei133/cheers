@@ -123,6 +123,7 @@ export interface ShellActionResult {
     | 'exit-session'
     | 'retry-turn'
     | 'clear-session'
+    | 'fork-session'
   readonly sessionId?: string
   readonly viewMode?: 'compact' | 'verbose'
   readonly sessionAction?: 'panel' | 'list' | 'switch' | 'current' | 'help'
