@@ -38,7 +38,7 @@ import type { PwRuntimeStatus } from '../../browser/playwrightRuntime.js'
 import type { McpToolDescriptor } from '../mcp/types.js'
 import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
 import { pathPermission, processPermission, processStopPermission, resolveToolTarget } from './permissionContext.js'
-import { approvedResult, deniedResult } from './toolResultLifecycle.js'
+import { approvedResult, deniedResult, runtimeErrorResult } from './toolResultLifecycle.js'
 import type { ToolExecutionResult } from '../../tools/types.js'
 import { networkNotice, planSandboxedCommand, readSandboxRules } from '../../sandbox/osSandbox.js'
 import { resolveCommandTimeout, DEFAULT_COMMAND_TIMEOUT_MS, MAX_COMMAND_TIMEOUT_MS } from '../../runtime/execution/commandTimeout.js'
@@ -796,9 +796,32 @@ export function createCoreToolRegistry(options?: {
       },
       async execute(args, _context) {
         if (!options?.mcpGateway) {
-          throw new Error(`Missing MCP gateway for ${tool.qualifiedName}`)
+          // A tool without its gateway is a registration mistake, and the
+          // mistake is best said here rather than answered with a fake
+          // success the model cannot recover from.
+          return deniedResult(
+            `The MCP gateway is not connected, so ${tool.qualifiedName} cannot be called. Report this to the user.`,
+          )
         }
-        return approvedResult(`MCP tool ${tool.qualifiedName} called`)
+        try {
+          const answer = await options.mcpGateway.invokeTool(
+            tool.serverName,
+            tool.toolName,
+            args,
+          )
+          if (answer.isError) {
+            // The server answered, and what it said is a failure in its own
+            // words. Handed back as success the model would believe the call
+            // worked; as a failure it can react, or tell the user what the
+            // server said.
+            return deniedResult(
+              `${tool.qualifiedName} failed on server "${tool.serverName}": ${answer.content}`,
+            )
+          }
+          return approvedResult(answer.content)
+        } catch (error) {
+          return runtimeErrorResult(error)
+        }
       },
     })
   }

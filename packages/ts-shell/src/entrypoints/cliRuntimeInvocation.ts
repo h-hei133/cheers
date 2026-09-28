@@ -31,6 +31,8 @@ import {
 import { createComponentLogger } from "../observability/structuredLogger.js";
 import { neutraliseForDisplay } from "../core/text/safety.js";
 import { projectTrust } from "../core/security/projectTrust.js";
+import { CoreMcpGateway } from "../core/mcp/gateway.js";
+import type { McpToolDescriptor } from "../core/mcp/types.js";
 import { runTurn, type CompactionSetup, type TurnRun } from "../turn/session.js";
 import { createStepFunction, type StepFunction } from "../turn/step.js";
 import {
@@ -142,10 +144,10 @@ export function buildCliRuntimeInvocation(input: CliRuntimeInvocationInput): Cli
  * run with one actionable line instead of a request that fails later. Both
  * modes then drive the same turn; only the model behind it differs.
  */
-export function runCliRuntimeInvocation(
+export async function runCliRuntimeInvocation(
   input: CliRuntimeInvocationInput,
   dependencies: CliRuntimeInvocationDependencies = defaultDependencies,
-): CliRuntimeInvocationResult {
+): Promise<CliRuntimeInvocationResult> {
   const request = buildCliRuntimeInvocation(input);
   if (request.providerMode === "real") {
     return deferUntilReady(request, dependencies);
@@ -236,7 +238,7 @@ function deferUntilReady(
       });
       return;
     }
-    started = startTurn(request, dependencies);
+    started = await startTurn(request, dependencies);
     for (const text of bufferedSteers) started.input?.steer(text);
     for (const text of bufferedFollowUps) started.input?.followUp(text);
     bufferedSteers.length = 0;
@@ -306,6 +308,33 @@ function discoverSkills(request: CliRuntimeInvocationRequest): ReadonlyMap<strin
   }
 
   return skills;
+}
+
+/**
+ * The MCP tools this run may offer, with the gateway that serves them.
+ *
+ * Nothing when the user has not enabled MCP tools: the servers are not
+ * connected, and connecting them costs a process spawn per stdio server that a
+ * run which never calls one should not pay.
+ *
+ * A snapshot that fails also yields nothing — the failure is reported to the
+ * user by the command surface (`/mcp status` names the server and the reason),
+ * and the run proceeds without tools the model cannot use. Registering a
+ * server's tools from its config entry instead of its answer would advertise
+ * tools that may not exist.
+ */
+async function mcpToolsForRun(
+  request: CliRuntimeInvocationRequest,
+): Promise<{ tools: readonly McpToolDescriptor[]; gateway: CoreMcpGateway } | undefined> {
+  if (request.runtimeConfig?.enableMcpTools !== true) return undefined;
+  const gateway = new CoreMcpGateway(request.workspaceRoot);
+  try {
+    const snapshot = await gateway.snapshot();
+    if (snapshot.tools.length === 0) return undefined;
+    return { tools: snapshot.tools, gateway };
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -437,10 +466,10 @@ function withRequestOverhead(
  */
 const SUBAGENT_DEFAULT_STEPS = 20;
 
-function startTurn(
+async function startTurn(
   request: CliRuntimeInvocationRequest,
   dependencies: CliRuntimeInvocationDependencies,
-): CliRuntimeInvocationResult {
+): Promise<CliRuntimeInvocationResult> {
   const hooks = dependencies.hooks ?? defaultHookDispatcher;
   setupBuiltinVerificationHooks(hooks);
   // Declared hooks are registered here so the user can be asked about them; the
@@ -451,7 +480,16 @@ function startTurn(
     bypassed: request.runtimeConfig?.allowUntrustedHooks === true,
   });
   const skills = discoverSkills(request);
-  const registry = dependencies.tools?.() ?? createCoreToolRegistry({ skills });
+  // MCP tools enter the pool only when the user asked for them, and only after
+  // a real snapshot: the descriptors say what a server exposes, and inventing
+  // them from the config file would advertise tools that may not answer. A
+  // failed snapshot registers nothing rather than half a registry — the
+  // model is told nothing exists instead of being handed tools that fail.
+  const mcp = await mcpToolsForRun(request);
+  const registry = dependencies.tools?.() ?? createCoreToolRegistry({
+    skills,
+    ...(mcp ? { mcpTools: mcp.tools, mcpGateway: mcp.gateway } : {}),
+  });
   // Honour disabledTools / hiddenToolPrefixes from user config. Without this the
   // fields are accepted then ignored, so a tool the user disabled still runs.
   const tools = request.runtimeConfig

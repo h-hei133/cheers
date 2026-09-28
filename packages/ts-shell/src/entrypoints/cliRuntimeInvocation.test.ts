@@ -84,16 +84,14 @@ describe("CLI runtime invocation", () => {
   it("drives a synthetic prompt through the turn without touching the provider", async () => {
     const { deps, calls } = dependencies();
     const recorded: string[] = [];
-    const events = await collect(
-      runCliRuntimeInvocation(
-        baseInput({
-          providerModeEnv: "synthetic",
-          prompt: "hello there",
-          onTurnMessage: (message) => recorded.push(`${message.role}:${message.content}`),
-        }),
-        deps,
-      ).events,
-    );
+    const events = await collect((await runCliRuntimeInvocation(
+      baseInput({
+        providerModeEnv: "synthetic",
+        prompt: "hello there",
+        onTurnMessage: (message) => recorded.push(`${message.role}:${message.content}`),
+      }),
+      deps,
+    )).events);
 
     expect(calls).toEqual([]);
     expect(events[0]).toEqual({ type: "query.started", sessionId: "sess_123", prompt: "hello there" });
@@ -110,7 +108,7 @@ describe("CLI runtime invocation", () => {
 
   it("checks real-provider readiness before the model is asked anything", async () => {
     const { deps, calls } = dependencies();
-    const events = await collect(runCliRuntimeInvocation(baseInput({ providerModeEnv: "real" }), deps).events);
+    const events = await collect((await runCliRuntimeInvocation(baseInput({ providerModeEnv: "real" }), deps)).events);
 
     expect(calls).toEqual(["readiness", "step"]);
     expect(events.at(-1)?.type).toBe("query.completed");
@@ -126,9 +124,7 @@ describe("CLI runtime invocation", () => {
         return { ok: false, failure: { kind: "missing-key", stopReason: "missing provider key" } };
       },
     };
-    const events = await collect(
-      runCliRuntimeInvocation(baseInput({ providerModeEnv: "real", prompt: "write a file" }), failingDeps).events,
-    );
+    const events = await collect((await runCliRuntimeInvocation(baseInput({ providerModeEnv: "real", prompt: "write a file" }), failingDeps)).events);
 
     expect(events).toEqual([event("readiness-event")]);
     expect(calls).toEqual(["readiness", "readiness-event:missing provider key"]);
@@ -147,7 +143,7 @@ describe("CLI runtime invocation", () => {
         return { text, toolCalls: [], stopReason: "stop" };
       },
     };
-    const run = runCliRuntimeInvocation(baseInput({ providerModeEnv: "real", prompt: "first" }), slowDeps);
+    const run = await runCliRuntimeInvocation(baseInput({ providerModeEnv: "real", prompt: "first" }), slowDeps);
     const collected: QueryEvent[] = [];
     const reading = (async () => {
       for await (const entry of run.events) {
@@ -179,7 +175,7 @@ describe("CLI runtime invocation", () => {
         return { ok: true };
       },
     };
-    const run = runCliRuntimeInvocation(baseInput({ providerModeEnv: "real", prompt: "first" }), gatedDeps);
+    const run = await runCliRuntimeInvocation(baseInput({ providerModeEnv: "real", prompt: "first" }), gatedDeps);
     run.input?.steer("early steer");
     run.input?.followUp("early follow-up");
     expect(run.input?.pending()).toEqual({ steering: ["early steer"], followUps: ["early follow-up"] });
