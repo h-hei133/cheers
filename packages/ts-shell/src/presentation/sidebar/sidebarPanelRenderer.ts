@@ -4,6 +4,7 @@ import {
   type SidebarPanelLine,
   type SidebarPanelSection,
 } from "./sidebarPanelModel.js";
+import { truncateToWidth, widthPad, wrapToWidth } from "../tui/text/layout.js";
 
 export interface RenderSidebarPanelOptions {
   readonly maxWidth?: number;
@@ -28,7 +29,7 @@ export function renderSidebarPanel(
   const output: string[] = [];
 
   output.push(border("top", width));
-  output.push(boxLine(truncate(panel.title, innerWidth), width));
+  output.push(boxLine(truncateToWidth(panel.title, innerWidth), width));
   output.push(border("middle", width));
 
   for (const section of panel.sections) {
@@ -86,42 +87,17 @@ function renderPanelLine(
 }
 
 function wrapOrTruncate(value: string, maxWidth: number): readonly string[] {
+  // Cell-accurate wrapping, so a fact carrying a CJK path or a combining mark
+  // wraps on its real width instead of its code-unit count — the naive count
+  // pushed wide content past the border and broke the box frame. Capped at
+  // three rows; the third carries what is left, ellipsised, rather than
+  // spilling the panel past its line budget.
   const compact = value.replace(/\s+/g, " ").trim();
-  if (compact.length <= maxWidth) {
-    return [compact];
+  const wrapped = wrapToWidth(compact, maxWidth);
+  if (wrapped.length <= 3) {
+    return wrapped.length > 0 ? wrapped : [""];
   }
-  const words = compact.split(" ");
-  const lines: string[] = [];
-  let current = "";
-  for (const word of words) {
-    const next = current ? `${current} ${word}` : word;
-    if (next.length <= maxWidth) {
-      current = next;
-      continue;
-    }
-    if (current) {
-      lines.push(current);
-      current = "";
-    }
-    if (word.length > maxWidth) {
-      lines.push(truncate(word, maxWidth));
-      continue;
-    }
-    current = word;
-    if (lines.length >= 2) {
-      break;
-    }
-  }
-  if (current && lines.length < 3) {
-    lines.push(current);
-  }
-  if (lines.length === 0) {
-    return [truncate(compact, maxWidth)];
-  }
-  if (lines.length > 3) {
-    return [...lines.slice(0, 2), truncate(lines[2] ?? "", maxWidth)];
-  }
-  return lines.slice(0, 3);
+  return [wrapped[0]!, wrapped[1]!, truncateToWidth(wrapped.slice(2).join(" "), maxWidth)];
 }
 
 function enforceLineBudget(
@@ -158,25 +134,14 @@ function markerForSeverity(severity: SidebarPanelLine["severity"]): string {
 
 function boxLine(value: string, width: number): string {
   const contentWidth = width - 4;
-  const safe = truncate(value, contentWidth);
-  return `| ${safe.padEnd(contentWidth, " ")} |`;
+  const safe = truncateToWidth(value, contentWidth);
+  return `| ${safe}${widthPad(safe, contentWidth)} |`;
 }
 
 function border(kind: "top" | "middle" | "bottom", width: number): string {
   const left = kind === "top" ? "+" : kind === "bottom" ? "+" : "+";
   const right = left;
   return `${left}${"-".repeat(width - 2)}${right}`;
-}
-
-function truncate(value: string, maxWidth: number): string {
-  const compact = value.replace(/\s+/g, " ").trim();
-  if (compact.length <= maxWidth) {
-    return compact;
-  }
-  if (maxWidth <= 3) {
-    return ".".repeat(Math.max(0, maxWidth));
-  }
-  return `${compact.slice(0, maxWidth - 3)}...`;
 }
 
 function clampInteger(value: number, min: number, max: number): number {

@@ -309,9 +309,26 @@ async function mcpToolsForRun(
   const gateway = new CoreMcpGateway(request.workspaceRoot);
   try {
     const snapshot = await gateway.snapshot();
+    // Servers that failed to connect are named here for the same reason a skill
+    // that loaded nothing is: the run continues without their tools, and without
+    // a line saying so, a server the user configured looks exactly like one the
+    // model chose not to use. Individual failures are not fatal — the other
+    // servers' tools still reach the pool — so this warns rather than stops.
+    const unavailable = snapshot.clients.filter((client) => client.type !== "connected");
+    if (unavailable.length > 0) {
+      createComponentLogger("mcp").warn(
+        `MCP tools unavailable this run: ${unavailable.map((client) => `${client.name} (${client.type})`).join(", ")}.`,
+      );
+    }
     if (snapshot.tools.length === 0) return undefined;
     return { tools: snapshot.tools, gateway };
-  } catch {
+  } catch (error) {
+    // A snapshot that threw registers nothing, so the model is told nothing
+    // exists rather than being handed tools that fail. Said out loud, because
+    // the alternative is a run that silently has fewer tools than configured.
+    createComponentLogger("mcp").warn(
+      `MCP tool discovery failed, so this run has no MCP tools: ${error instanceof Error ? error.message : String(error)}.`,
+    );
     return undefined;
   }
 }

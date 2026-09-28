@@ -86,7 +86,10 @@ describe("sidebar panel layout and renderer", () => {
     expect(activity?.lines.filter((line) => !line.text.includes("hidden by budget"))).toHaveLength(2);
     expect(output.split("\n").every((line) => line.length <= 48)).toBe(true);
     expect(output.split("\n").length).toBeLessThanOrEqual(panel.budget.maxLines);
-    expect(output).toContain("...");
+    // Truncation uses the shared renderer's ellipsis (…), the same marker the
+    // rest of the TUI cuts with, rather than a bespoke "..." — the point is
+    // that the over-long summary was cut to keep the panel within budget.
+    expect(output).toContain("…");
     expect(panel.warnings.some((warning) => warning.id === "activity-budget")).toBe(true);
   });
 
