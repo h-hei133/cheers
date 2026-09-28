@@ -44,3 +44,4 @@ rtk/
 # state from a test run. Never project content — a script that writes here has a
 # bug, and this keeps its output out of a commit until the bug is found.
 /undefined/
+packages/ts-shell/undefined/
