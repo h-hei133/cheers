@@ -75,3 +75,21 @@ docs-drift 必须全绿；`log.md` 与 `_index.md` 同步。
   pager 阈值机制已天然覆盖（行数 > 18 自动全屏），删掉字段回到最小路径
 - /settings 只上布尔开关（attentionOnIdle/offline）；复杂嵌套配置仍走
   文件，面板不放伪装条目
+
+## 6. 15-D 补遗：placement 机制补齐（2026-09-28 追问触发）
+
+维护者问「15-D 是否只是初版」——追查证实比「缓期」更糟：默认
+`tuiMode: "fullscreen"` 是 alt-screen，diff 每次滚动/缩放都会**重写含
+完整 Kitty 传输的行 → 载荷每帧重发**。这不是优雅降级，是视觉损坏。
+当初把 transmit-once/place-on-redraw 判为「渲染器级工程单独排期」的
+裁决是错的：**接了协议却让默认模式不能正确用，就是半成品**。
+
+补齐（`fc062549`）：
+- `imageIdsIn` / `swapTransmittedForPlacement`（image.ts）——帧两侧把已
+  传输的 id 换成 `a=p` 放置序列；首次绘制仍发传输，之后每帧只放置
+- 引擎测试双向钉死：滚动后写 `a=p`、载荷跨帧计数与首绘一致——
+  **删 swap 复跑红（已验证），恢复后绿**
+- iTerm2 无 placement 模式，照旧透传（其重绘成本是单条行内序列，
+  不是载荷重发）
+
+撤销验证记录：swap 删除时「sends the payload once」1 项红。
