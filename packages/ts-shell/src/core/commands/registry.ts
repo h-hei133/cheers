@@ -537,7 +537,7 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       bridgeSafe: true,
-      summary: "install, list, enable, or disable plugin capabilities",
+      summary: "record, list, enable, or disable extension registrations",
       group: "workflow",
       argumentHint: "[list|install|uninstall|enable|disable]",
       getArgumentCompletions: (prefix) => subcommandCompletions("plugin", prefix),

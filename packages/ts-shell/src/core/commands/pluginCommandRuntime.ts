@@ -147,12 +147,13 @@ export async function runPluginCommand(
           "",
           "None registered.",
           "",
-          "Register one by package name or by path:",
+          "Record one by package name or by path:",
           "",
           "- `/plugin add ./tools/my-extension` — read now from its `package.json`",
           "- `/plugin add some-package` — recorded unresolved until it is installed",
           "",
-          "Nothing is executed from a registration in this build.",
+          "A registration is a record only. This build loads no code from one;",
+          "the record is kept so a future loader can pick it up unchanged.",
         ].join("\n"),
       };
     }
@@ -170,7 +171,8 @@ export async function runPluginCommand(
       "",
       `Registry: \`${getPluginStoragePath()}\``,
       "",
-      "Nothing is executed from a registration in this build.",
+      "A registration is a record only. This build loads no code from one;",
+      "the record is kept so a future loader can pick it up unchanged.",
     );
     return { kind: "local", output: lines.join("\n") };
   }
@@ -305,9 +307,10 @@ export async function runPluginCommand(
       "- `/plugin` — list registered extensions",
       "- `/plugin add <path-or-package>` — register one by location or name",
       "- `/plugin remove <name>` — drop a registration",
-      "- `/plugin enable <name>` / `/plugin disable <name>` — mark one for loading",
+      "- `/plugin enable <name>` / `/plugin disable <name>` — set the record's enabled flag",
       "",
-      "Nothing is executed from a registration in this build.",
+      "A registration is a record only. This build loads no code from one;",
+      "the record is kept so a future loader can pick it up unchanged.",
     ].join("\n"),
   };
 }
