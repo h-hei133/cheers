@@ -31,6 +31,7 @@ import {
 import { createComponentLogger } from "../observability/structuredLogger.js";
 import { neutraliseForDisplay } from "../core/text/safety.js";
 import { projectTrust } from "../core/security/projectTrust.js";
+import { pendingTurnInput } from "../turn/pendingInput.js";
 import { CoreMcpGateway } from "../core/mcp/gateway.js";
 import type { McpToolDescriptor } from "../core/mcp/types.js";
 import { runTurn, type CompactionSetup, type TurnRun } from "../turn/session.js";
@@ -200,9 +201,9 @@ function deferUntilReady(
   request: CliRuntimeInvocationRequest,
   dependencies: CliRuntimeInvocationDependencies,
 ): CliRuntimeInvocationResult {
-  let started: CliRuntimeInvocationResult | undefined;
-  const bufferedSteers: string[] = [];
-  const bufferedFollowUps: string[] = [];
+  // Input typed before the run exists is held by the shared handle and handed
+  // over when `adopt` sees the run; see `pendingTurnInput`.
+  const buffered = pendingTurnInput();
   const events = (async function* (): AsyncIterable<QueryEvent> {
     // Renewed before the readiness check, because the check is what tells the user
     // the credential is usable: one that passes on a token about to expire produces
@@ -238,33 +239,11 @@ function deferUntilReady(
       });
       return;
     }
-    started = await startTurn(request, dependencies);
-    for (const text of bufferedSteers) started.input?.steer(text);
-    for (const text of bufferedFollowUps) started.input?.followUp(text);
-    bufferedSteers.length = 0;
-    bufferedFollowUps.length = 0;
-    yield* started.events;
+    const run = await startTurn(request, dependencies);
+    buffered.adopt(run);
+    yield* run.events;
   })();
-  return {
-    events,
-    input: {
-      steer: (text) => {
-        if (started?.input) started.input.steer(text);
-        else bufferedSteers.push(text);
-      },
-      followUp: (text) => {
-        if (started?.input) started.input.followUp(text);
-        else bufferedFollowUps.push(text);
-      },
-      pending: () => started?.input?.pending() ?? { steering: [...bufferedSteers], followUps: [...bufferedFollowUps] },
-      clearQueue: () => {
-        const taken = [...bufferedSteers, ...bufferedFollowUps];
-        bufferedSteers.length = 0;
-        bufferedFollowUps.length = 0;
-        return [...taken, ...(started?.input?.clearQueue() ?? [])];
-      },
-    },
-  };
+  return { events, input: buffered.input };
 }
 
 /**

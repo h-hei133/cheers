@@ -7,6 +7,7 @@ import type { AskQuestion } from "../../core/tools/ask.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 import { runCliRuntimeInvocation, type CliRuntimeInvocationResult } from "../../entrypoints/cliRuntimeInvocation.js";
 import type { CompactionSetup } from "../../turn/session.js";
+import { pendingTurnInput } from "../../turn/pendingInput.js";
 import type { CacheWarmingRunner } from "../../turn/cacheWarm.js";
 import type { CliProviderRuntimeBridge } from "../provider/cliProviderRuntimeBridge.js";
 import type { RuntimeConfig } from "../../config/runtimeConfig.js";
@@ -66,38 +67,16 @@ export function streamCliRuntimePrompt(input: {
   const events = (async function* (): AsyncIterable<QueryEvent> {
     yield* (await started).events;
   })();
-  // The input handle only exists once the run has started — the readiness
-  // wait comes first. A caller that steers through this shell before then
-  // would have its text dropped, so the handle buffers the same way the
-  // deferred one inside does: the call is held and delivered when the run
-  // it belongs to exists.
-  const bufferedSteers: string[] = [];
-  const bufferedFollowUps: string[] = [];
-  // The run's own input handle once it exists, or nothing while the readiness
-  // wait is still pending. Buffered text below is delivered through this.
-  const settled = async (): Promise<CliRuntimeInvocationResult | undefined> =>
-    started;
-  return {
-    events,
-    input: {
-      steer: (text: string) => {
-        void settled().then((run) => (run?.input?.steer ? run.input.steer(text) : bufferedSteers.push(text)));
-      },
-      followUp: (text: string) => {
-        void settled().then((run) => (run?.input?.followUp ? run.input.followUp(text) : bufferedFollowUps.push(text)));
-      },
-      pending: () =>
-        // Buffered text is this shell's own while the run has not started, and
-        // the run's once it has; a caller reading both gets one coherent queue.
-        bufferedSteers.length + bufferedFollowUps.length > 0
-          ? { steering: [...bufferedSteers], followUps: [...bufferedFollowUps] }
-          : { steering: [], followUps: [] },
-      clearQueue: () => {
-        const taken = [...bufferedSteers, ...bufferedFollowUps];
-        bufferedSteers.length = 0;
-        bufferedFollowUps.length = 0;
-        return taken;
-      },
-    },
-  };
+  // Input typed before the run exists is held and delivered when it does; see
+  // `pendingTurnInput`. Adoption is not awaited, so steering is not delayed by
+  // the readiness check. A run that fails never produces a handle, and its
+  // failure already reaches the caller through the event stream — so nothing is
+  // reported from this branch, and the buffer stays intact rather than feeding
+  // a second, unhandled rejection.
+  const buffered = pendingTurnInput();
+  void started.then(
+    (run) => buffered.adopt(run),
+    () => {},
+  );
+  return { events, input: buffered.input };
 }
