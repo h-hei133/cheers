@@ -82,6 +82,9 @@ describe("image attachments in the prompt echo", () => {
     expect(imageRows.length).toBe(1);
     expect(imageRows[0]).toContain("a=T,f=100,q=2");
     expect(imageRows[0]).toContain("QUJD");
+    // The sequence carries an image id, without which a redraw in alt-screen
+    // cannot place the image and resends the whole payload every frame.
+    expect(imageRows[0]).toMatch(/\x1b_G(?:[^;]*,)?i=\d+/);
   });
 
   it("falls back to the placeholder token when no protocol speaks", () => {

@@ -470,6 +470,92 @@ describe("kitty image rows under redraw", () => {
     // And the payload left the process exactly once, in the first paint.
     expect(bytesAfterSecond.split("QUJD").length).toBe(bytesAfterFirst.split("QUJD").length);
   });
+
+  it("places an image that scrolls back into view rather than resending it", () => {
+    // The terminal still holds the pixels while the row is off screen, so the
+    // registry is the session's, not the previous frame's viewport: rebuilding
+    // it from the visible rows resent the whole payload on every return.
+    const { tui, terminal, scheduler, provider } = boot();
+    const image = "image row \x1b_Ga=T,f=100,q=2,c=10,i=11;QUJD\x1b\\";
+    provider.rows = [image, "under it"];
+    tui.start();
+    scheduler.flush();
+    expect(terminal.drain()).toContain("QUJD");
+
+    // Scroll it off: only the other row remains.
+    provider.rows = ["under it"];
+    tui.requestRender();
+    scheduler.flush();
+    terminal.drain();
+    // Scroll back: the row returns and must be placed, not retransmitted.
+    provider.rows = ["under it", image];
+    tui.requestRender();
+    scheduler.flush();
+    const bytes = terminal.drain();
+    expect(bytes).toContain("a=p");
+    expect(bytes).not.toContain("QUJD");
+  });
+
+  it("frees offscreen images once the session holds more than the budget", () => {
+    // Kitty holds every image until it is deleted, so without a budget an
+    // afternoon of screenshots is an afternoon of decoded pixels the terminal
+    // never releases. Past the cap, the offscreen ones are freed oldest-first.
+    const { tui, terminal, scheduler, provider } = boot();
+    tui.start();
+    scheduler.flush();
+    // Each image passes through the viewport alone, so all but the last are
+    // offscreen by the time the budget is next tested.
+    const imageRow = (index: number): string =>
+      `row ${index} \x1b_Ga=T,f=100,q=2,c=4,i=${2000 + index};${"QUJD".repeat(4)}\x1b\\`;
+    for (let index = 0; index < 60; index += 1) {
+      provider.rows = [imageRow(index)];
+      tui.renderNow();
+    }
+    scheduler.flush();
+
+    const bytes = terminal.drain();
+    const deletions = bytes.match(/\x1b_Ga=d,d=i,i=\d+/g) ?? [];
+    // 60 images, a budget of 32 offscreen plus the one on screen: the rest go.
+    expect(deletions.length).toBeGreaterThan(0);
+    expect(deletions.length).toBeLessThan(60);
+  });
+
+  it("frees the terminal's images when the session gives the screen back", () => {
+    // Kitty keeps a transmitted image until it is deleted or the emulator
+    // exits, so a session that ends without saying so leaves the process's
+    // pixels behind for the whole emulator lifetime.
+    const { tui, terminal, scheduler, provider } = boot();
+    provider.rows = ["image row \x1b_Ga=T,f=100,q=2,c=10,i=13;QUJD\x1b\\"];
+    tui.start();
+    scheduler.flush();
+    terminal.drain();
+
+    tui.stop();
+    expect(terminal.drain()).toContain("\x1b_Ga=d,d=A");
+  });
+
+  it("forgets image ids across a child process, which may clear the screen", () => {
+    // The child owns the screen and may erase it. Freeing the images says so to
+    // the terminal, and forgetting the ids makes the next frame transmit them
+    // again — a remembered id would be re-placed onto an emptied slot, showing a
+    // blank row where a picture was.
+    const { tui, terminal, scheduler, provider } = boot();
+    const image = "image row \x1b_Ga=T,f=100,q=2,c=10,i=17;QUJD\x1b\\";
+    provider.rows = [image];
+    tui.start();
+    scheduler.flush();
+    expect(terminal.drain()).toContain("QUJD");
+
+    tui.suspend(() => {});
+    scheduler.flush();
+    const afterChild = terminal.drain();
+    // Freed, and then sent again because the id is no longer remembered.
+    expect(afterChild).toContain("\x1b_Ga=d,d=A");
+    expect(afterChild).toContain("QUJD");
+    // And the frame after that places it, since this one just transmitted it.
+    tui.renderNow();
+    expect(terminal.drain()).not.toContain("QUJD");
+  });
 });
 
 /** The bytes the terminal has received so far, joined for substring checks. */

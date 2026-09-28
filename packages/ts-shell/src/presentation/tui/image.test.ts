@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { visibleWidth } from "./text/measure.js";
-import { detectImageProtocol, inlineImageSequence, kittyPlacementFor, windowTitle, idleNotification, bell } from "./image.js";
+import { detectImageProtocol, inlineImageSequence, kittyPlacementFor, swapTransmittedForPlacement, windowTitle, idleNotification, bell } from "./image.js";
 
 /** The environment of a terminal that identifies itself, with nothing else. */
 function env(overrides: Record<string, string | undefined> = {}): NodeJS.ProcessEnv {
@@ -93,6 +93,31 @@ describe("transmit-once placement under redraw", () => {
     expect(again).not.toContain("QUJD");
     // Zero-cell either way, so the layout the row was built for holds.
     expect(visibleWidth(again!)).toBe(0);
+  });
+
+  it("collapses a multi-chunk transmission to a single placement, leaving no payload", () => {
+    // A payload past 4 KiB is sent as an initiator chunk plus continuations.
+    // The placement swap has to consume the whole run: a continuation left
+    // behind would reach the terminal as a stray graphics chunk with no
+    // initiator and corrupt the frame.
+    const big = "Q".repeat(9000);
+    const transmission = inlineImageSequence("kitty", big, { columns: 10, imageId: 9 });
+    expect(transmission.split("\x1b_G").length - 1).toBeGreaterThan(1);
+    const placed = swapTransmittedForPlacement(`before ${transmission} after`, new Set([9]));
+    expect(placed).toContain("a=p");
+    expect(placed).toContain("i=9");
+    // Not one byte of the payload, and not one orphaned continuation chunk.
+    expect(placed).not.toContain(big.slice(0, 4096));
+    expect(placed).not.toContain("m=1");
+    expect(placed).not.toContain("m=0");
+    // The surrounding text is untouched, and the placement holds zero cells.
+    expect(placed.startsWith("before ")).toBe(true);
+    expect(placed.endsWith(" after")).toBe(true);
+  });
+
+  it("leaves a transmission whose id was never placed exactly as it was", () => {
+    const transmission = inlineImageSequence("kitty", "QUJD", { columns: 10, imageId: 3 });
+    expect(swapTransmittedForPlacement(transmission, new Set([7]))).toBe(transmission);
   });
 
   it("leaves iterm2 sequences alone: that protocol has no placement mode", () => {

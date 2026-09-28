@@ -1,5 +1,5 @@
 import { DISABLE_MOUSE, ENABLE_MOUSE } from "../input/mouse.js";
-import { imageIdsIn, swapTransmittedForPlacement } from "../image.js";
+import { kittyDeleteAllImages, kittyDeleteImage, swapTransmittedForPlacement, transmissionsIn } from "../image.js";
 import type { TerminalDevice, TerminalStartOptions } from "../terminal.js";
 import { processTerminal } from "../terminal.js";
 import {
@@ -44,6 +44,18 @@ const MIN_FRAME_INTERVAL_MS = Math.floor(1000 / 30);
 const MAX_ADAPTIVE_DELAY_MS = 200;
 const OUTPUT_BACKLOG_BYTES = 256 * 1024;
 const BACKLOG_RETRY_MS = 10;
+/**
+ * How much terminal-side image memory a session may hold off screen.
+ *
+ * An image the terminal keeps costs it the decoded pixels, which are far larger
+ * than the base64 this side sends, but the transmission bytes are the only size
+ * known here without decoding formats this layer deliberately does not decode.
+ * They are a proportional stand-in, and the count is the hard bound: a screen
+ * holds a handful of images at once, so a cap of 32 off screen is generous for
+ * scrolling back and far below what an unbounded session accumulates.
+ */
+const MAX_OFFSCREEN_IMAGES = 32;
+const MAX_OFFSCREEN_IMAGE_BYTES = 32 * 1024 * 1024;
 
 export class TUI {
   private readonly terminal: TerminalDevice;
@@ -51,6 +63,12 @@ export class TUI {
   private provider?: TerminalFrameProvider;
 
   private window: readonly string[] = [];
+  /**
+   * Image ids the terminal is holding, with the payload size each cost, oldest
+   * first. Session-scoped rather than per-frame: the terminal keeps an image
+   * until it is deleted, and that outlives any one frame's viewport.
+   */
+  private readonly transmitted = new Map<number, { readonly bytes: number }>();
   private lastWidth = 0;
   private lastHeight = 0;
   private painted = false;
@@ -185,6 +203,10 @@ export class TUI {
 
     this.scheduler.clearTimeout(this.frameTimer);
     this.setMouseTracking(false);
+    // The child owns the screen now and may clear it. Remembering image ids
+    // across that would place pictures onto slots the child emptied.
+    const freed = this.forgetTransmittedImages({ free: true });
+    if (freed) this.terminal.write(freed);
     this.leaveScreen();
     // The driver restores every mode it may have set, unbuffered, and that
     // battery includes releasing raw mode — which is the whole point here.
@@ -222,10 +244,18 @@ export class TUI {
       // There is no screen to give back — this never took one. The rows the
       // caller wanted left behind are already in the scrollback, having been
       // appended as they were produced, so only the cursor has to be placed.
+      // The images in that scrollback are the user's to keep: deleting them
+      // would blank the pictures the conversation was left behind with.
+      this.forgetTransmittedImages({ free: false });
       this.mainScreen.stop();
       this.mainScreen = undefined;
       return;
     }
+    // Leaving the alternate screen takes its images with it, and the emulator
+    // keeps holding them until the process is told otherwise. Said before the
+    // screen goes, because the sequence belongs to the screen being left.
+    const freed = this.forgetTransmittedImages({ free: true });
+    if (freed) this.terminal.write(freed);
     const document = prepareRows(options?.document ?? [], width);
     this.terminal.write(leaveScreen(document, this.terminal.capabilities.supportsDec2026Sync));
   }
@@ -295,20 +325,35 @@ export class TUI {
     // A kitty image row transmits its payload once. A row whose image has
     // already been sent is rewritten as "place image N" on both sides of the
     // diff — the terminal holds the pixels, and a scroll or resize that
-    // moves the row must not send them again. The ids a frame carries are
-    // collected from what is on screen now, so the first paint of an image
-    // still sends its transmission and every later one places it.
-    const placed = new Set<number>();
-    for (const row of this.window) {
-      for (const id of imageIdsIn(row)) placed.add(id);
-    }
+    // moves the row must not send them again.
+    //
+    // `placed` is the session's registry, not the previous frame's viewport:
+    // an image whose row scrolls out of view and back is still held by the
+    // terminal, and rebuilding the set from the visible rows alone resent the
+    // whole payload every time it returned.
+    const placed = new Set(this.transmitted.keys());
     const swapRows = (frame: readonly string[]): readonly string[] =>
       frame.map((row) => swapTransmittedForPlacement(row, placed));
+
+    // Register this frame's transmissions after the swap, so the first paint of
+    // an image sends its payload rather than placing pixels the terminal has
+    // never been given. Visible images move to the young end of the registry.
+    const visible = new Map<number, number>();
+    for (const row of rows) {
+      for (const transmission of transmissionsIn(row)) {
+        visible.set(transmission.imageId, transmission.bytes);
+      }
+    }
+    for (const [imageId, bytes] of visible) {
+      this.transmitted.delete(imageId);
+      this.transmitted.set(imageId, { bytes });
+    }
 
     let buffer = paintBegin(this.terminal.capabilities.supportsDec2026Sync);
     buffer += stable && !force
       ? diffPaint(swapRows(this.window), swapRows(rows), 0, height)
       : fullPaint(swapRows(rows), height);
+    buffer += this.evictOffscreenImages(visible);
     buffer += cursorPaint(cursorTarget(source, 0, height), 0);
     buffer += paintEnd(this.terminal.capabilities.supportsDec2026Sync);
     this.terminal.write(buffer);
@@ -317,5 +362,53 @@ export class TUI {
     this.lastWidth = width;
     this.lastHeight = height;
     this.painted = true;
+  }
+
+  /**
+   * Free the terminal's memory for images that have scrolled away, when the
+   * session holds more than it should.
+   *
+   * Kitty keeps every transmitted image until it is deleted or the emulator
+   * exits, so an afternoon of pasted screenshots is an afternoon of decoded
+   * pixels the terminal never releases. Visible images are never evicted — the
+   * delete would blank a row the user is looking at — so the budget applies to
+   * the ones off screen, oldest first, which are the ones a scroll back to the
+   * beginning would need to re-transmit if it ever gets there.
+   */
+  private evictOffscreenImages(visible: ReadonlyMap<number, number>): string {
+    let offscreen = 0;
+    let offscreenBytes = 0;
+    for (const [imageId, held] of this.transmitted) {
+      if (visible.has(imageId)) continue;
+      offscreen += 1;
+      offscreenBytes += held.bytes;
+    }
+    let deletions = "";
+    for (const [imageId, held] of this.transmitted) {
+      if (offscreen <= MAX_OFFSCREEN_IMAGES && offscreenBytes <= MAX_OFFSCREEN_IMAGE_BYTES) break;
+      if (visible.has(imageId)) continue;
+      deletions += kittyDeleteImage(imageId);
+      this.transmitted.delete(imageId);
+      offscreen -= 1;
+      offscreenBytes -= held.bytes;
+    }
+    return deletions;
+  }
+
+  /**
+   * Forget what the terminal holds, and free it, when the screen is given up.
+   *
+   * Whoever takes the terminal next may clear it, and an image whose pixels are
+   * gone but whose id is still remembered would be re-placed onto an empty slot
+   * — a blank row where a picture was. Forgetting makes the next paint send the
+   * payload again. The deletion is only sent when there is no scrollback to
+   * lose: on the terminal's own screen the images are part of what the user
+   * keeps to scroll back through.
+   */
+  private forgetTransmittedImages(options: { readonly free: boolean }): string {
+    const remembered = this.transmitted.size > 0;
+    this.transmitted.clear();
+    if (!options.free || !remembered) return "";
+    return kittyDeleteAllImages();
   }
 }

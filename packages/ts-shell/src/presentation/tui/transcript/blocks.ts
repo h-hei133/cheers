@@ -3,7 +3,7 @@ import { formatCommandLine, formatToolDetail } from "../../theme/commandHighligh
 import { padToWidth, wrapToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
 import type { ImageContent } from "../../../model-adapters/multimodal.js";
-import { inlineImageSequence, type ImageProtocol } from "../image.js";
+import { imageIdForData, inlineImageSequence, type ImageProtocol } from "../image.js";
 import { renderDiff } from "./diff.js";
 import { renderMarkdown, trimPartialFence } from "./markdown.js";
 
@@ -138,6 +138,7 @@ function renderUser(block: Block, width: number, options: BlockRenderOptions = {
     if (options.imageProtocol) {
       const sequence = inlineImageSequence(options.imageProtocol, image.data, {
         columns: Math.max(4, Math.min(bodyWidth, 48)),
+        imageId: imageIdForData(image.data),
       });
       const padded = padToWidth(`${GUTTER}${rail} `, width);
       rows.push(`${bg}${padded}${sequence}\x1b[0m`);

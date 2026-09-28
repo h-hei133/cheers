@@ -16,6 +16,23 @@
 
 export type ImageProtocol = "kitty" | "iterm2";
 
+/**
+ * One kitty transmission: an initiator chunk carrying the controls, then any
+ * number of continuation chunks (`m=1` … `m=0`) when the payload runs past 4 KiB.
+ *
+ * Anchored on both ends of every chunk so a row holding several images parses as
+ * several transmissions, and so text between them cannot be swallowed. A
+ * continuation is recognized by its controls rather than by being exactly `m=1`,
+ * because the protocol allows a continuation to carry other keys too.
+ *
+ * Built per call rather than shared: a global pattern carries `lastIndex` as
+ * mutable state, and both `matchAll` and `replace` read it. One shared instance
+ * would make a parse depend on whether some earlier parse had finished.
+ */
+function kittyTransmissionPattern(): RegExp {
+  return /\x1b_G([^;]*);[^\x1b]*\x1b\\(?:\x1b_G(?:[^;]*,)?m=1;[^\x1b]*\x1b\\)*(?:\x1b_G(?:[^;]*,)?m=0;[^\x1b]*\x1b\\)?/g;
+}
+
 /** Which inline-image protocol the terminal speaks, or nothing. */
 export function detectImageProtocol(env: NodeJS.ProcessEnv = process.env): ImageProtocol | undefined {
   const term = (env.TERM ?? "").toLowerCase();
@@ -91,13 +108,72 @@ export function kittyPlacementFor(line: string): string | undefined {
   return `\x1b_Ga=p,q=2,${controls.join(",")}\x1b\\`;
 }
 
-/** The image ids a line's kitty sequences carry, in order. */
-export function imageIdsIn(line: string): readonly number[] {
-  const ids: number[] = [];
-  for (const match of line.matchAll(/\x1b_G(?:[^;]*,)?i=(\d+)[^;]*;/g)) {
-    ids.push(Number(match[1]));
+/** One kitty transmission found in a rendered row. */
+export interface KittyTransmission {
+  readonly imageId: number;
+  /** Bytes the transmission occupies, payload included. */
+  readonly bytes: number;
+}
+
+/**
+ * The kitty transmissions a row carries, with the bytes each one holds.
+ *
+ * A transmission is an initiator chunk carrying the controls plus any number of
+ * continuation chunks; the run is one unit, so it is parsed as one. The byte
+ * count is what an eviction budget accounts in: the payload size is the cost
+ * the terminal paid to hold the image, and it is the only size this side can
+ * know without decoding formats it deliberately does not decode.
+ */
+export function transmissionsIn(line: string): readonly KittyTransmission[] {
+  const found: KittyTransmission[] = [];
+  for (const match of line.matchAll(kittyTransmissionPattern())) {
+    const id = /i=(\d+)/.exec(match[0])?.[1];
+    if (id === undefined) continue;
+    found.push({ imageId: Number(id), bytes: match[0].length });
   }
-  return ids;
+  return found;
+}
+
+/**
+ * A deletion for one kitty image, so the terminal can free its pixels.
+ *
+ * An image stays in the terminal's memory until it is deleted or the emulator
+ * exits, and nothing else in the protocol expires it: a session that pastes
+ * screenshots for an afternoon would hold every one of them. `d=i` frees the
+ * image and every placement of it, which is what an eviction needs.
+ */
+export function kittyDeleteImage(imageId: number): string {
+  return `\x1b_Ga=d,d=i,i=${imageId},q=2\x1b\\`;
+}
+
+/** A deletion for every kitty image this session transmitted. */
+export function kittyDeleteAllImages(): string {
+  return "\x1b_Ga=d,d=A,q=2\x1b\\";
+}
+
+/**
+ * A stable kitty image id derived from the image's own bytes.
+ *
+ * The transmit-once machinery needs the same image to carry the same id on
+ * every frame: the first paint sends the payload under it, and a later paint
+ * that finds the id already on screen places the image instead of resending.
+ * A content hash gives that without threading identity through the render tree,
+ * which rebuilds its blocks each frame. Kitty ids are positive 32-bit, and `0`
+ * reads as "unset", so it is mapped away.
+ *
+ * The 32-bit width is the protocol's, not a choice made here: a random
+ * allocator has the same collision probability and would additionally need
+ * per-image state to stay stable across frames, which a stateless renderer
+ * does not have.
+ */
+export function imageIdForData(base64Data: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < base64Data.length; index += 1) {
+    hash ^= base64Data.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  const id = hash >>> 0;
+  return id === 0 ? 1 : id;
 }
 
 /**
@@ -114,7 +190,14 @@ export function swapTransmittedForPlacement(
   transmitted: ReadonlySet<number>,
 ): string {
   if (!row.includes("\x1b_G")) return row;
-  return row.replace(/\x1b_G([^;]*);[^\x1b]*(?:\x1b\\)/g, (sequence) => {
+  // A kitty transmission is one initiator chunk carrying the controls followed
+  // by any number of continuation chunks (`m=1` … `m=0`) when the payload runs
+  // past 4 KiB. The whole run has to collapse to one placement: replacing chunk
+  // by chunk would leave the continuation payloads behind, and a terminal that
+  // reads a stray `m=1` continuation with no initiator draws nothing and faults
+  // its graphics parser. So the match spans the initiator and every chunk that
+  // follows it, and only the initiator's id decides whether the run is placed.
+  return row.replace(kittyTransmissionPattern(), (sequence) => {
     const id = /\x1b_G(?:[^;]*,)?i=(\d+)/.exec(sequence)?.[1];
     if (id === undefined || !transmitted.has(Number(id))) return sequence;
     return kittyPlacementFor(sequence) ?? sequence;
