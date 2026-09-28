@@ -4,8 +4,9 @@ import { parseSidebarLivePanelCommandArgs } from "../../presentation/sidebar/sid
 import { runSidebarLivePanelCommand } from "../../presentation/sidebar/sidebarLivePanelCommandRunner.js";
 import { parseSidebarPanelCommandArgs } from "../../presentation/sidebar/sidebarPanelCommandContract.js";
 import { runSidebarPanelCommand } from "../../presentation/sidebar/sidebarPanelCommandRunner.js";
+import { buildSidebarPanel } from "../../presentation/sidebar/sidebarPanelLayout.js";
+import { renderSidebarPanel } from "../../presentation/sidebar/sidebarPanelRenderer.js";
 import { projectSidebarState } from "../../presentation/sidebar/sidebarStateProjection.js";
-import { renderSidebarStateSurface } from "../../presentation/sidebar/sidebarStateSurface.js";
 import {
   sidebarLiveEventStoreForContext,
   sidebarSessionScopeId,
@@ -53,7 +54,7 @@ export async function runSidebarLocalCommand(
   const snapshot = projectSidebarState({
     task: {
       title: "visible agent state",
-      objective: "Preview shared visible agent state and recent activity without building a sidebar UI.",
+      objective: "Read-only panel of session state, tools, and checkpoints.",
       constraints: [
         "read-only",
         "no dynamic MCP/skills discovery",
@@ -106,9 +107,21 @@ export async function runSidebarLocalCommand(
       output: panel.output,
     };
   }
-
+  // The default view: the boxed panel as an interactive overlay, with the
+  // same text as the output for a caller that prints instead of opening
+  // modals. The panel is the structured form of what the state surface says
+  // in prose — bordered, sectioned, width-budgeted — and a full-screen modal
+  // is where the surface already puts a view too structured for the
+  // transcript's wrapping.
+  // The boxed panel replaces the prose preview: it is the same facts, but
+  // sectioned, bordered and width-budgeted — a real view rather than a
+  // disclaimed one. At its standard density it runs past the pager's
+  // threshold, so the interactive surface opens it full-screen with its own
+  // scrolling while the transcript keeps its place; a piped session prints
+  // the same text unchanged.
+  const panel = buildSidebarPanel(snapshot, { density: "normal" });
   return {
     kind: "local",
-    output: renderSidebarStateSurface(snapshot),
+    output: renderSidebarPanel(panel),
   };
 }

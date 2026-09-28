@@ -91,7 +91,7 @@ function headerSection(snapshot: SidebarStateSnapshot): SidebarPanelSection {
     id: "header",
     title: "Sidebar panel",
     lines: [
-      line("Preview panel: explicit read-only command, not an always-on UI.", "info"),
+      line("Read-only panel of session state, shown on demand.", "info"),
       line(
         `Safety: raw content ${snapshot.safety.rawContent}; provider/model calls ${snapshot.safety.providerCall}/${snapshot.safety.modelCall}.`,
         "info",
