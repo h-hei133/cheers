@@ -4623,3 +4623,168 @@ LaTeX 缓，G5 fork+settings 做，G6 做，G2 收缩文案、真加载器独立
 **明确不冒进**：alt-screen 下的图片重绘需要 pi 的 transmit-once/
 place-on-redraw 机制（image id、placement-only 序列、逐出预算）——
 是渲染器级工程，单独排期，不在 15-D 里塞半套。
+
+**Phase 15 复核轮（2026-09-28）：3 只读子代理分域复核 + 逐条核实 + 修复**
+
+子代理（`vsllm/gemini-3.8-flash-api:max`，并发 3）分域复核 7 个实质提交
+（`b77e00dc` `8f9897a3` `70e4460f` `64b7e033` `fc062549` `2edb8aed`
+`56093d22`）。**每条发现均由我读码核实**——剔除 2 条错误断言，确认 3 类真
+缺陷并修复。
+
+核实结论（子代理判断的更正）：
+- **15-A MCP 接线真实**：`registry.ts` 的 execute 确实 `gateway.invokeTool`，
+  `isError`→失败、传输异常→`runtimeErrorResult`；生产注入 `mcpToolsForRun`
+  经 `startTurn` 一次性建 gateway。子代理"每 turn 重建 gateway"**判断错误**
+  ——`startTurn` 每次调用（每会话）仅一次，非每 turn。taxonomy metadata 无
+  模型侧消费者、content-block 是既有 client 简化（stdio-only），均记 backlog
+  不在本轮。
+- **15-C sidebar 投影层已被消费**：子代理"27 文件全断开"**判断错误**——
+  `sidebarCommandRuntime` 实际调用 `projectSidebarState` + `buildSidebarPanel`
+  + `renderSidebarPanel` 并消费真实 store（compact/memory/warmup/liveEvents）。
+  全屏面板（非分栏右列）是裁决选择，非断开。
+- **15-B plugin**：`plugins.json` 喂 `/plugin` picker（list/enable/disable），
+  非纯只写；真加载器按裁决独立阶段。维持。
+- **15-F fork 功能真实**：`fork` 仅复制 transcript，但 `loadSessionRecord`
+  在无 thread 状态时由 transcript 投影 turns（`projectBranchMessages` 的
+  "thread 命名不到消息则 transcript 胜出"分支），复核实测 `resume` 后
+  turns 携带完整会话——证明模型侧可见，非假串。
+
+修复的 3 类真缺陷：
+1. **15-D 图片重绘损坏（P1，两处）**——(a) `renderUser`（blocks.ts:139）
+   发图序列时**从不带 `imageId`**，`swapTransmittedForPlacement` 认不出 →
+   `fc062549` 的 transmit-once 机制对真实回显路径**完全空转**，alt-screen
+   每帧重发整载荷；(b) `swap` 正则逐 chunk 匹配，多 chunk（>4KiB 即真实图片）
+   时首 chunk 换成 placement、**续 chunk 成孤儿**（`\x1b_Gm=1;…`）残留 →
+   kitty 解析器错误、帧损坏。修复：`image.ts` 增 `imageIdForData`（内容哈希
+   稳定 id），`renderUser` 用之；`swap` 正则改为吞掉初始 chunk + 全部续 chunk
+   整体换一个 placement。回归测试：多 chunk 整体折叠无残留载荷、未 placed
+   的传输原样返回、renderUser 输出携带 `i=<id>`（删修复即红）。
+2. **fork 测试隔离缺失 → `undefined/.cheers` 残留根因（P1）**——
+   `SessionManager.test.ts` 主 describe 的 afterEach `process.env.HOME =
+   originalHome`，Linux 下 `originalHome`/`USERPROFILE` 本就 `undefined` →
+   **被强制转成字符串 "undefined"**；新增的 `describe("fork")` 无 HOME 隔离，
+   `new SessionManager()` 遂把会话写进 `undefined/.cheers`（即 `56093d22`
+   误提交、`4eda5b24` 删除、`905cac47` gitignore 的残留来源——此前只治标）。
+   修复：afterEach 改为"原值 undefined 则 delete，否则还原"；fork describe
+   加临时 home 隔离；并把 fork 测试断言从"transcript 文件有字节"强化为
+   "`resume` 重载后 turns 携带三条会话"（证明加载路径真的把复制的会话投影出来）。
+3. **sidebar 面板渲染器用码元宽度（Finding 4，中）**——
+   `sidebarPanelRenderer.ts` 的 `truncate`/`boxLine`/`wrapOrTruncate` 全用
+   `.length`/`.slice`/`.padEnd`，CJK/宽字符（真实文件路径、记忆文本会有）按
+   1 计但占 2 格 → 右边框错位、box 破框。项目自有 `text/measure.visibleWidth`
+   + `text/layout.{truncateToWidth,widthPad,wrapToWidth}`（预研究 §3 列为既有
+   能力），渲染器却另造一套裸算。修复：改用共享的按格宽工具；截断标记随之
+   从 `"..."` 归一为项目标准省略号 `"…"`。回归测试：宽字符面板每行 `visibleWidth`
+   等于边框宽（删修复即错位）。
+
+验证：`tsc -p tsconfig.build.json` **0 错**；五个 check/verify 门禁全绿
+（config-consumers 39/39、declarations 18+10、node-floor、import-cycles、
+docs-drift）；`test:scripts` **40/40**；改动域套件全绿（image 13 / blocks 9 /
+engine 33 / SessionManager 61 / sidebarPanelRenderer 1 / sidebarPanelLayout 4 /
+sidebarCommandRunner 2 / sidebarOverlay 2）。全量 vitest **3895 通过 / 12 失败**
+——12 项经隔离复跑**全部通过**（benchmark 407ms<1000ms、cli-baseline 40/40、
+browserCacheMultiprocess 6/6、deepResearch 5/5），确认为既有负载敏感项（真
+子进程 spawn + 墙钟断言，479 文件并发下抖动），非本轮引入，与 log 243/279/284
+同一集合。提交前 `git status` 无 `undefined/.cheers` 残留（隔离修复生效）。
+
+**Phase 15 复核轮续：测试 env 还原债务统一整改（2026-09-28）**
+
+复核中发现的 `undefined/.cheers` 残留根因（`SessionManager.test.ts` 的
+afterEach 把 Linux 下本就 unset 的 `USERPROFILE` 还原成字符串 `"undefined"`）
+并非孤例。派 1 只读子代理审计全测试树，核实后确认 **21 个测试文件**同类：
+盲还原（`process.env.X = original`，`original` 为 undefined 时转 `"undefined"`）、
+只 set 不还原的泄漏、或无条件 `delete process.env.HOME`。因 `userHome.ts` 是
+`USERPROFILE || HOME || os.homedir()`，被污染的 `USERPROFILE="undefined"`
+（truthy）会让同一 vitest worker 里后续任何未隔离的 session/team/task 写入
+`undefined/.cheers`。
+
+统一整改（3 个 task 子代理并发，互不重叠文件组，逐条我核实 diff）：
+- **盲还原 → 守卫还原**（match 既有 SAFE 文件写法 `if (orig===undefined)
+  delete; else assign`）：`cli-baseline`、`config/runtimeConfig`（含 swapped
+  变量名）、`connect/model CommandRuntime`、`slashRouter`（两个 describe）、
+  `mcp/{config,gateway}`、`skills/skillCatalog`、`shell/{recovery(13 块),
+  sessionRuntime(6 块+1 处补 HOME),bootstrap(补 HOME 隔离),
+  continueShellActionRuntime}`、`session/longSessionDurability`。
+- **泄漏 → 补 capture+守卫还原**：`keybindings`、`costCommand`、`entriesCommand`
+  （无条件 delete→守卫）、`exportCommandRuntime`、`themes/watch`、
+  `session/export/collect`。
+- **未隔离 `createSessionStoreLayout()` → 传显式 `home`**：`exportCommandRuntime`、
+  `session/store/{sessionStore,threadState}`（threadState 另补 `priorUserProfile`
+  捕获，原来只捕获 HOME 却把 USERPROFILE 还原成 HOME 值）。
+
+核实：`grep` 确认全树**零**剩余盲还原（每个从捕获值还原的文件都配有 delete
+守卫）；diff 仅限 env save/restore 区（无测试逻辑改动）；swapped-name/threadState/
+entriesCommand 三处最易错的 diff 逐行核对正确。
+验证：全量 vitest **3896 通过（一次复跑 0 失败）**，另一次 11 项失败全为既有
+负载敏感抖动项；**关键证据——全量套件跑完后 `undefined/` 残留为 NONE**（整改前
+同样跑法会生成），证明污染源已在全 worker 范围消除。子代理报告的 pass 数经全量
+复跑覆盖。
+
+**Phase 15 第二次复核轮（2026-09-28）：3 子代理分域复核 + 逐条核实 + 修复**
+
+在工作区既有修复之上再复核 7 个实质提交。3 只读子代理（`vsllm/gemini-3.8-flash-api:max`，
+并发 3）分域（MCP 接线 / 图片重绘与协议 / sidebar-fork-plugin），每条结论均经我
+读实现、跑探针或删修复复跑核实。
+
+**剔除 3 条子代理断言**：
+- 「MCP 工具 `permissions.check` 返回 `[]` → 无审批执行」——错。真正门是
+  `turn/tools.ts` → `core/query/toolPolicy.ts:evaluateToolPermissionScope`，MCP
+  工具落 else 分支得 `operation="execute"`，`ask`/`accept-edits` 下需升级审批。
+  该字段确无消费者，但门存在。
+- 「`isError` → `deniedResult` 误分类为『用户拒绝』」——错。`deniedResult` 即全仓
+  通用失败结果（10+ 工具同用），仅映射 `success:false`；用户拒绝发生在
+  `beforeToolCall`，不经此路径，二者无消费者区分。
+- 「每 turn 重建 MCP gateway」——方向对幅度错：`startTurn` 每次 `runPrompt`
+  一次（**每 prompt**），故每 prompt 重 `snapshot()`，每 stdio server 每 prompt
+  一个 `listTools` 子进程。更正此前「每会话仅一次」的记录。
+
+**修复（1 P1 + 4 P2/P3）**：
+
+1. **输入句柄丢委托（P1，`b77e00dc` 引入的回归）**——bridge 与 `deferUntilReady`
+   各手写一份缓冲，bridge 那份的 `pending()`/`clearQueue()` 只读本地 buffer、
+   从不问 run：run 已启动并持有排队消息时 `pending()` 报空、`clearQueue()` 返空，
+   `interrupt()` 把待投递文本交回编辑器时拿不回任何东西——**用户输入丢失**。
+   探针复现；抽出单一实现 `turn/pendingInput.ts`（`adopt` 绑定句柄，读写全经它），
+   两处共用并删重复。撤销验证：还原旧语义后 4 项测试全红。
+2. **kitty 图片内存（P2）**——(a) 全仓无删除序列，终端保留每张图直到进程退出；
+   (b) `placed` 每帧从上一帧视口重建，图片滚出再滚回整载荷重发。引擎改持会话级
+   `transmitted` 注册表；离屏超预算（32 张 / 32MiB）按最旧 `d=i` 释放；离开备用屏
+   与把终端交给子进程时 `d=A` 并清注册表；主屏模式只清不删。实测 60 张→剔除 27。
+3. **fork 丢身份（P2）**——`Session.parentSession` 沿 `SessionCreationOptions` →
+   metadata → 载入投影贯通；fork 复制源 title 并记 `parentSession`。pi `forkFrom`
+   写 `parentSession`、`pi.session.name` 跨 fork 保留，同判。实机验证：磁盘
+   metadata 有 `parentSession` 与继承 title。
+4. **MCP 快照失败静默（P2）**——失败与「server 未连上」分别 warn。
+5. **`/plugin` 措辞（P3）**——`argumentHint`、补全列表、usage、「not installed」
+   归一为 `add/remove` 与「registered」。
+
+**记 backlog（本轮不做）**：无。MCP per-prompt gateway 重建（每 prompt 重新
+`listTools` 子进程）经复核确认存在，但属性能优化而非缺陷（stdio 子进程为
+请求/应答式短进程，不累积），且修它需把 gateway 提升到会话作用域、牵动
+`runtimeContext`——记入 `.wiki/features/_index.md` 待独立裁决。
+
+**职责上限（规则 3，advisory）**：复核实测 1054 模块 / 7 个超 20 名上限
+（interactiveMode 21、sessionRuntime 21、sessionStoreAccess 22、turnSink 22、
+credentials 26、editor 29、cli-baseline.test 30）。除 editor/turnSink 早有
+裁决外，其余 5 条本轮append 至 `.normproof/dispositions.md`（defer，各附理由，
+未删旧行）。
+
+验证：`tsc -p tsconfig.build.json` 0 错；5 门禁全绿（config-consumers 39/39、
+declarations 18+10、node-floor、import-cycles、docs-drift）；`test:scripts`
+40/40；改动域 124 文件 / 1195 测试全绿；全量复跑见下条。
+
+**第二轮复核验证证据（2026-09-28）**：
+- `tsc -p tsconfig.build.json` 0 错；`npm run build:ts` 产出 dist/cli.js。
+- 5 门禁全绿：import-cycles（runtime 0 / type-only 1，既有的 fetch↔kinds 类型回边）、
+  config-consumers 39/39、declarations 18 dispatches + 10 factories、
+  node-floor、docs-drift（rules_dangling 0、docs_dangling 0）。
+  `test:scripts` 40/40。
+- 改动域 124 文件 / 1195 测试全绿。
+- **全量 vitest 无争用跑：480/480 文件、3917 通过、1 skipped、0 失败**。
+  （此前记录 3896/3895 与 11–12 项负载敏感抖动，是在两个全量套件并发，
+  或全量与探针并发时出现的争用伪影：并发下 `cli-baseline`、
+  `browser*ScenarioExamples` 等真 spawn 子进程 + 墙钟断言的用例抖动；
+  逐一隔离复跑全部通过。单独跑即 0 失败——这一点本身是本轮修正的一条记录。）
+- live 冒烟（`dist/cli.js`，隔离 HOME）：`/fork here` 与 `/fork <id>` 真建会话且
+  磁盘 metadata 带 `parentSession` 与继承 `title`；`/plugin remove nope` →
+  「not registered」；`/sidebar` 渲染 boxed panel（宽字符不破框）。

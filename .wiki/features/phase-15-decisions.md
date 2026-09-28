@@ -93,3 +93,51 @@ docs-drift 必须全绿；`log.md` 与 `_index.md` 同步。
   不是载荷重发）
 
 撤销验证记录：swap 删除时「sends the payload once」1 项红。
+
+## 7. 复核轮修复（2026-09-28）
+
+3 只读子代理分域复核 7 个实质提交，逐条核实后修复 3 类真缺陷（2 条子代理
+断言经核实剔除：MCP「每 turn 重建 gateway」实为每会话一次；sidebar「投影层
+全断开」实为经命令路径消费）。
+
+| 缺陷 | 严重度 | 提交前状态 | 修复 |
+|---|---|---|---|
+| 15-D `renderUser` 发图不带 imageId | P1 | transmit-once 对真实回显路径空转，alt-screen 每帧重发整载荷 | `imageIdForData` 内容哈希稳定 id；`renderUser` 用之 |
+| 15-D `swap` 逐 chunk 匹配 | P1 | 多 chunk（真实图片 >4KiB）首块变 placement、续块成孤儿残留 → kitty 解析器损坏 | `swap` 正则整体吞初始块+全部续块，换单个 placement |
+| fork 测试无 HOME 隔离 | P1 | afterEach 把 unset 的 env 还原成字符串 "undefined"，fork describe 写进 `undefined/.cheers`（残留根因，此前 gitignore 治标） | afterEach 改 delete-when-undefined；fork describe 加临时 home；断言强化为 resume 后 turns 携带会话 |
+| sidebar 渲染器码元宽度 | 中 | `.length`/`.slice`/`.padEnd` 使 CJK/宽字符破框 | 改用 `text/{measure,layout}` 的按格宽工具；标记归一为 `…` |
+
+记 backlog（本轮不做）：MCP 工具结果的 errorTaxonomy metadata（无模型侧
+消费者）、MCP content-block/图片透传（既有 client stdio-only 简化，独立阶段）。
+
+验证：build tsc 0 错；5 门禁 + test:scripts 40/40 全绿；改动域套件全绿；
+全量 3895 通过 / 12 负载敏感项隔离复跑全过。
+
+## 8. 第二次复核轮（2026-09-28，在工作区修复之上）
+
+3 只读子代理（并发 3，`vsllm/gemini-3.8-flash-api:max`）分域复核 7 个实质提交
+**及上一次复核的未提交修复**。核实方式是读实现、跑探针、删修复复跑；
+**3 条子代理断言经核实剔除**，另发现 1 条子代理全部漏报的 P1。
+
+### 剔除的子代理断言（留档）
+
+| 断言 | 核实结论 |
+|---|---|
+| 「MCP 工具 `permissions.check` 返回 `[]` → 无审批执行」 | **错**。该字段确无消费者，但真正的门是 `turn/tools.ts` → `core/query/toolPolicy.ts:evaluateToolPermissionScope`：MCP 工具不在 `READ_ONLY_TOOLS`，落入 else 分支得 `operation="execute"`，`ask`/`accept-edits` 下 `requiresEscalation=true`。有审批，不是裸执行 |
+| 「`isError` → `deniedResult` 误分类（谎称用户拒绝）」 | **错**。`deniedResult` 即全仓通用失败结果（10+ 工具同用），只映射为 `success:false`；用户拒绝发生在 `beforeToolCall`，不经此路径。二者无消费者区分 |
+| 「`mcpToolsForRun` 每 turn 重建 gateway」 | **方向对、幅度错**：`startTurn` 每次 `runPrompt` 一次（每 prompt，非每 turn）。故每 prompt 重新 `snapshot()`，每 stdio server 每 prompt 一个 `listTools` 子进程。此前记录「每会话仅一次」有误，此处更正 |
+
+### 修复的真缺陷
+
+| 缺陷 | 严重度 | 提交前状态 | 修复 |
+|---|---|---|---|
+| 输入句柄丢委托（`b77e00dc` 回归） | **P1** | bridge 与 `deferUntilReady` 各手写一份缓冲；bridge 那份的 `pending()`/`clearQueue()` 只读本地 buffer，**从不问 run**。run 已启动并持有排队消息时 `pending()` 报空、`clearQueue()` 返空 → `interrupt()` 把待投递文本交回编辑器时**拿不回任何东西，用户输入丢失**（探针复现） | 抽出单一实现 `turn/pendingInput.ts`（`adopt` 绑定 run 句柄，读写全经它），两处共用，删掉重复 |
+| kitty 图片内存无界 + 去重视口化 | P2 | (a) 全仓无 `\x1b_Ga=d` 删除序列：终端保留每张图直到进程退出，长会话无界增长；(b) `placed` 集合每帧从 `this.window`（上一帧视口）重建，图片滚出再滚回即整载荷重发，transmit-once 失效 | 引擎持会话级 `transmitted` 注册表（id→字节）；`placed` 取自注册表；离屏超预算（32 张 / 32MiB）按最旧发 `d=i` 删除；离开备用屏、以及把终端交给子进程时发 `d=A` 并清注册表（子进程可能清屏，记住 id 会往空槽贴图）；主屏模式只清不删（滚动回看是用户的） |
+| fork 丢会话身份 | P2 | 只复制 transcript；`title` 归 `undefined`，无来源记录 | `Session.parentSession` 沿 `SessionCreationOptions` → metadata → 载入投影贯通；fork 复制源 title 并记 `parentSession=源 id`（pi `forkFrom` 写 `parentSession`、`pi.session.name` 跨 fork 保留，同判） |
+| MCP 快照失败静默 | P2 | `catch { return undefined }` 无声；用户配置的 server 消失与模型主动不用无法区分 | 失败与「server 未连上」分别 warn（含 server 名与类型），工具仍照常提供其余 server 的 |
+| `/plugin` 仍暗示可执行 | P3 | `argumentHint` 与补全仍列 `install|uninstall`；`Usage: /plugin uninstall`；「is not installed」 | 归一为 `add/remove`；usage 与提示改「remove」「not registered」；补全列表删去已废弃动词 |
+| 5 个模块超出职责上限（21–30 个函数名，规则 3 advisory） | — | 复核实测 | **本轮不做**：均超过 20，是真应拆分的模块，但拆分牵动会话/交互/凭证层，属独立结构性工作。记录见 `.normproof/dispositions.md` |
+
+撤销验证（删修复即红，恢复即绿）：`pendingInput` 3 项；引擎滚回放置 1 项；
+fork 身份 1 项。新增永久测试：`pendingInput.test.ts` 4 项、engine 3 项
+（滚回放置 / 预算剔除 60→剔除 27 / 退出释放）、SessionManager fork 身份 1 项。

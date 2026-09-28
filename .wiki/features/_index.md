@@ -1372,3 +1372,64 @@ UI 计数器接真实来源。
 
 **旧注释变成假话**：`ambientFacts.ts` 说「没有后台命令计数器，因为 shell 没有
 detached 执行模式」。**后台执行落地后这是假的** —— 已删并接上真实来源。
+
+## 16. Phase 15：六个缺口收口与两轮复核（**2026-09-28**）
+
+> **裁决见 [`phase-15-decisions.md`](phase-15-decisions.md)；预研究见
+> [`phase-15-pre-research.md`](phase-15-pre-research.md)。本段记录施工与复核结果。**
+>
+> 方法：3 只读子代理分域扫描（TUI 表面 / agent 功能 / 会话生命周期），对照
+> `pi`，每条结论经读码或 live 验证后才落盘；预研究已剔除 2 条子代理错误断言。
+
+### 16.1 六个缺口的处置
+
+| 缺口 | 裁决 | 提交 | 结果 |
+|---|---|---|---|
+| G1 MCP 模型侧调用是假串（转发层返回硬编码成功串 + 生产从不注入 mcpTools） | 做 | `b77e00dc` | registry `execute` 真调 `gateway.invokeTool`；`startTurn` 经 `snapshot()` 真注入；`isError` 按服务器原话回传失败 |
+| G2 `/plugin` 无执行引擎 | 缩减 | `8f9897a3` | 诚实的本地声明管理；真加载器独立阶段 |
+| G3 sidebar 整层未接 TUI | 接通 | `70e4460f` | 默认视图改 boxed panel（>`PAGER_THRESHOLD_ROWS` → 交互模式全屏）；删 prose 预览器 |
+| G4 图片 / LaTeX | 图片做，LaTeX 缓 | `64b7e033` `fc062549` | Kitty `\x1b_G` + iTerm2 OSC 1337；transmit-once / place-on-redraw |
+| G5 fork / import / share / name / settings | fork + settings 做 | `56093d22` | `SessionManager.fork` 逐事件重放；`/settings` 面板；import/share/name 记 backlog |
+| G6 title / 通知 / bell | 做 | `2edb8aed` | OSC 0 title；`attentionOnIdle` 门控 bell + OSC 777（默认关） |
+
+### 16.2 两轮复核（同型于 Phase 14 D1–D6）
+
+复核方式：子代理分域 + 逐条核实 + **删修复复跑（撤销验证）**。**累计剔除 5 条
+子代理错误断言**（Phase 15 预研究 2 条、第一轮 2 条、第二轮 3 条，去重后共 5 类）。
+
+真缺陷与修复（细节见 `phase-15-decisions.md` §7、§8）：
+
+- **P1 输入句柄丢委托**（第二轮发现，子代理全部漏报）：bridge 的
+  `pending()`/`clearQueue()` 只读本地 buffer 从不问 run → 中断时用户输入丢失。
+  抽 `turn/pendingInput.ts` 单一实现。
+- **P1 图片重绘**（第一轮）：`renderUser` 不带 imageId（transmit-once 空转）；
+  `swap` 逐 chunk 匹配致续 chunk 成孤儿。
+- **P2 图片内存无界 + `placed` 视口化**（第二轮）：无删除序列；滚出滚回重发。
+- **P2 fork 丢 title 与来源**（第二轮）：补 `Session.parentSession` 全链路。
+- **P2 fork 测试无 HOME 隔离 → `undefined/.cheers` 残留根因**（第一轮）。
+- **P2 MCP 快照失败静默**（第二轮）：补 warn。
+- **P3 sidebar 码元宽度 / `/plugin` 措辞**（第一轮 / 第二轮）。
+
+### 16.3 本轮新增 backlog（**需独立裁决**）
+
+- **MCP gateway 每 prompt 重建**：`startTurn` 每次 `runPrompt` 一次，故每 prompt
+  重新 `snapshot()`，每个 stdio server 每 prompt 一个 `listTools` 子进程。
+  复核确认存在。属性能优化非缺陷（stdio 为请求/应答短进程，不累积），
+  修它需把 gateway 提升到会话作用域、牵动 `runtimeContext` 生命周期 —— 独立裁决。
+- **LaTeX**（G4 缓做）：等模型侧数学输出频率给出证据。
+- **`/import` `/share` `/name`**（G5）：`/share` 涉及网络上传与凭据，独立裁决。
+- **MCP SSE/HTTP 传输**：`client.ts` 非 stdio 直接抛 `unsupportedTransportDetail`。
+- **MCP 工具结果 errorTaxonomy metadata、content-block/图片透传**（第一轮记）。
+- **`ToolDefinition.permissions` 是死字段**：21 处声明（`registry.ts` 6 处真实现 +
+  各工具 `check: () => []`），`packages/ts-shell/src` 内**零读取者**（`grep '\.permissions\b'`
+  非测试命中 0）。真正的审批门在 `turn/tools.ts` → `core/query/toolPolicy.ts`。
+  要么接上（让 `pathPermission`/`processPermission` 的结论进入门），要么连同
+  `ToolPermissionRequirements` 一起删。21 处的声明接口删除超出复核轮范围，
+  且需确认 sandbox 层未来是否要用它 —— 独立裁决。
+- **状态栏后台 git watcher / 扩展注入口**：等真实卡顿证据。
+
+### 16.4 文档漂移
+
+`.wiki/features/_index.md` 本节之前止于 Phase 13 —— **Phase 14、15 均未同步本
+文件**（log 声称同步过）。本次补记本节；`verify:docs-drift:strict` 的
+docs-source 计数为 advisory（118 条，非阻断），未逐条修。
