@@ -90,7 +90,7 @@ describe("sessionStore", () => {
   it("does not disturb an existing transcript when the record is written again", () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "session-store-rewrite-"));
     try {
-      const layout = createSessionStoreLayout();
+      const layout = createSessionStoreLayout(home);
       const fileLayout = locateExistingSessionLayout(layout, "sess_rewrite");
       const session: Session = {
         id: "sess_rewrite",

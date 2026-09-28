@@ -18,6 +18,8 @@ import type { CommandContext } from "./types.js";
 
 const tempDirs: string[] = [];
 
+const originalHome = process.env.HOME;
+const originalUserProfile = process.env.USERPROFILE;
 function workspace(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cost-cmd-"));
   tempDirs.push(dir);
@@ -30,6 +32,10 @@ function contextFor(sessionId: string, cwd: string): CommandContext {
 
 afterEach(() => {
   for (const dir of tempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+  if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+  else process.env.USERPROFILE = originalUserProfile;
+  if (originalHome === undefined) delete process.env.HOME;
+  else process.env.HOME = originalHome;
 });
 
 describe("runCostCommand", () => {

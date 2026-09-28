@@ -1036,8 +1036,10 @@ describe("shell session runtime (W5)", () => {
         `next=${nextAction.replace(/[.]+$/, "")}.`,
       );
     } finally {
-      process.env.USERPROFILE = originalUserProfile;
-      process.env.HOME = originalHome;
+      if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = originalUserProfile;
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
       fs.rmSync(fakeHome, { recursive: true, force: true });
     }
   });
@@ -1142,8 +1144,10 @@ describe("shell session runtime (W5)", () => {
         expect(rendered).not.toContain(`Changed files: ${targetPath}`);
         expect(rendered).not.toContain("Success handoff: status=passed");
       } finally {
-        process.env.USERPROFILE = originalUserProfile;
-        process.env.HOME = originalHome;
+        if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+        else process.env.USERPROFILE = originalUserProfile;
+        if (originalHome === undefined) delete process.env.HOME;
+        else process.env.HOME = originalHome;
         fs.rmSync(fakeHome, { recursive: true, force: true });
       }
     },
@@ -2102,8 +2106,10 @@ describe("shell session runtime (W5)", () => {
         fixture.nextAction,
       );
     } finally {
-      process.env.USERPROFILE = originalUserProfile;
-      process.env.HOME = originalHome;
+      if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = originalUserProfile;
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
       fs.rmSync(fakeHome, { recursive: true, force: true });
     }
   });
@@ -3346,10 +3352,12 @@ describe("shell session runtime (W5)", () => {
 
   it("records interrupted prompt vs interrupted turn differently", async () => {
     const originalUserProfile = process.env.USERPROFILE;
+    const originalHome = process.env.HOME;
     const fakeHome = fs.mkdtempSync(
       path.join(os.tmpdir(), "cheers-interrupt-kind-"),
     );
     process.env.USERPROFILE = fakeHome;
+    process.env.HOME = fakeHome;
 
     try {
       const manager = new SessionManager();
@@ -3403,7 +3411,10 @@ describe("shell session runtime (W5)", () => {
       snapshot = manager.getRecoverySnapshot(resumed.id);
       expect(snapshot.interruptedKind).toBe("turn");
     } finally {
-      process.env.USERPROFILE = originalUserProfile;
+      if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = originalUserProfile;
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
       fs.rmSync(fakeHome, { recursive: true, force: true });
     }
   });
@@ -3463,8 +3474,10 @@ describe("shell session runtime (W5)", () => {
       expect(state.lastContinuationReason).toBe("retryable-error");
       expect(state.lastError).toBeUndefined();
     } finally {
-      process.env.USERPROFILE = originalUserProfile;
-      process.env.HOME = originalHome;
+      if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = originalUserProfile;
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
       fs.rmSync(fakeHome, { recursive: true, force: true });
     }
   });
@@ -3509,8 +3522,10 @@ describe("shell session runtime (W5)", () => {
       expect(state.terminalClassification).toBe("error");
       expect(state.lastError).toBe("daemon panic");
     } finally {
-      process.env.USERPROFILE = originalUserProfile;
-      process.env.HOME = originalHome;
+      if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = originalUserProfile;
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
       fs.rmSync(fakeHome, { recursive: true, force: true });
     }
   });

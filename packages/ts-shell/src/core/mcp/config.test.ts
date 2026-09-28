@@ -7,6 +7,7 @@ import { loadMcpConfigs } from "./config.js";
 describe("project-scoped MCP configuration", () => {
   let tempDir: string;
   const originalHome = process.env.HOME;
+  const originalUserProfile = process.env.USERPROFILE;
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mcp-trust-"));
@@ -17,7 +18,10 @@ describe("project-scoped MCP configuration", () => {
   });
 
   afterEach(() => {
-    process.env.HOME = originalHome;
+    if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = originalUserProfile;
+    if (originalHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalHome;
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 

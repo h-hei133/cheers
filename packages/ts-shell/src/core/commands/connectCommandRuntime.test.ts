@@ -32,8 +32,10 @@ describe("connect command runtime", () => {
   });
 
   afterEach(() => {
-    process.env.USERPROFILE = originalHome;
-    process.env.HOME = originalUnixHome;
+    if (originalHome === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = originalHome;
+    if (originalUnixHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalUnixHome;
     __setConnectBrowserFlowRunnerForTest(undefined);
     __setOpenAIAccountAuthRunnerForTest(undefined);
     fs.rmSync(fakeHome, { recursive: true, force: true });

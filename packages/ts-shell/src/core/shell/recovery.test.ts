@@ -735,8 +735,10 @@ describe("shell recovery helpers", () => {
         ),
       ).toHaveLength(1);
     } finally {
-      process.env.USERPROFILE = originalUserProfile;
-      process.env.HOME = originalHome;
+      if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = originalUserProfile;
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
       fs.rmSync(fakeHome, { recursive: true, force: true });
     }
   });
@@ -811,8 +813,10 @@ describe("shell recovery helpers", () => {
       ).toBe("tool.result");
       expect(lines.join("\n")).toContain(`Resumed session ${session.id}`);
     } finally {
-      process.env.USERPROFILE = originalUserProfile;
-      process.env.HOME = originalHome;
+      if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = originalUserProfile;
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
       fs.rmSync(fakeHome, { recursive: true, force: true });
     }
   });
@@ -902,8 +906,10 @@ describe("shell recovery helpers", () => {
         ignoredRoleMismatchedTurnCompletions: 1,
       });
     } finally {
-      process.env.USERPROFILE = originalUserProfile;
-      process.env.HOME = originalHome;
+      if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = originalUserProfile;
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
       fs.rmSync(fakeHome, { recursive: true, force: true });
     }
   });
@@ -1154,8 +1160,10 @@ describe("shell recovery helpers", () => {
         "mid-turn-safe:mid-turn-reentry",
       ]);
     } finally {
-      process.env.USERPROFILE = originalUserProfile;
-      process.env.HOME = originalHome;
+      if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = originalUserProfile;
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
       fs.rmSync(fakeHome, { recursive: true, force: true });
     }
   });
@@ -1258,8 +1266,10 @@ describe("shell recovery helpers", () => {
         },
       ]);
     } finally {
-      process.env.USERPROFILE = originalUserProfile;
-      process.env.HOME = originalHome;
+      if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = originalUserProfile;
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
       fs.rmSync(fakeHome, { recursive: true, force: true });
     }
   });
@@ -1396,8 +1406,10 @@ describe("shell recovery helpers", () => {
       expect(snapshot.pendingLifecycle.pendingTools).toEqual({});
       expect(snapshot.terminalClassification).toBe("stopped");
     } finally {
-      process.env.USERPROFILE = originalUserProfile;
-      process.env.HOME = originalHome;
+      if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = originalUserProfile;
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
       fs.rmSync(fakeHome, { recursive: true, force: true });
     }
   });
@@ -1519,8 +1531,10 @@ describe("shell recovery helpers", () => {
         toolName: "bash",
       });
     } finally {
-      process.env.USERPROFILE = originalUserProfile;
-      process.env.HOME = originalHome;
+      if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = originalUserProfile;
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
       fs.rmSync(fakeHome, { recursive: true, force: true });
     }
   });
@@ -1630,8 +1644,10 @@ describe("shell recovery helpers", () => {
       const snapshot = manager.getRecoverySnapshot(session.id);
       expect(snapshot.pendingLifecycle.pendingApprovals).toEqual({});
     } finally {
-      process.env.USERPROFILE = originalUserProfile;
-      process.env.HOME = originalHome;
+      if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = originalUserProfile;
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
       fs.rmSync(fakeHome, { recursive: true, force: true });
     }
   });
@@ -1878,8 +1894,10 @@ describe("shell recovery helpers", () => {
       expect(snapshot.terminalClassification).toBe("stopped");
       expect(snapshot.lastContinuationReason).toBe("retryable-error");
     } finally {
-      process.env.USERPROFILE = originalUserProfile;
-      process.env.HOME = originalHome;
+      if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = originalUserProfile;
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
       fs.rmSync(fakeHome, { recursive: true, force: true });
     }
   });
@@ -2068,8 +2086,10 @@ describe("shell recovery helpers", () => {
         ),
       ).toHaveLength(1);
     } finally {
-      process.env.USERPROFILE = originalUserProfile;
-      process.env.HOME = originalHome;
+      if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = originalUserProfile;
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
       fs.rmSync(fakeHome, { recursive: true, force: true });
     }
   });
@@ -2302,8 +2322,10 @@ describe("shell recovery helpers", () => {
       expect(finalState.terminalClassification).toBe("stopped");
       expect(finalState.lastError).toBeUndefined();
     } finally {
-      process.env.USERPROFILE = originalUserProfile;
-      process.env.HOME = originalHome;
+      if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = originalUserProfile;
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
       fs.rmSync(fakeHome, { recursive: true, force: true });
     }
   });
@@ -2484,8 +2506,10 @@ describe("shell recovery helpers", () => {
       expect(snapshot.pendingLifecycle.pendingApprovals).toEqual({});
       expect(snapshot.pendingLifecycle.pendingTools).toEqual({});
     } finally {
-      process.env.USERPROFILE = originalUserProfile;
-      process.env.HOME = originalHome;
+      if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = originalUserProfile;
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
       fs.rmSync(fakeHome, { recursive: true, force: true });
     }
   });
@@ -2676,8 +2700,10 @@ describe("shell recovery helpers", () => {
       expect(snapshot.pendingLifecycle.pendingApprovals).toEqual({});
       expect(snapshot.pendingLifecycle.pendingTools).toEqual({});
     } finally {
-      process.env.USERPROFILE = originalUserProfile;
-      process.env.HOME = originalHome;
+      if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = originalUserProfile;
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
       fs.rmSync(fakeHome, { recursive: true, force: true });
     }
   });

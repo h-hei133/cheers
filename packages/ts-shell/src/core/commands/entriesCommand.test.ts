@@ -23,6 +23,8 @@ import type { CommandContext } from "./types.js";
  * everything in between", so they cannot share a result.
  */
 describe("entries command", () => {
+  const originalHome = process.env.HOME;
+  const originalUserProfile = process.env.USERPROFILE;
   let home: string;
   let workdir: string;
   const sessionId = "sess_entries_command";
@@ -79,8 +81,10 @@ describe("entries command", () => {
   afterEach(() => {
     fs.rmSync(home, { recursive: true, force: true });
     fs.rmSync(workdir, { recursive: true, force: true });
-    delete process.env.HOME;
-    delete process.env.USERPROFILE;
+    if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = originalUserProfile;
+    if (originalHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalHome;
   });
 
   it("lists every entry in append order", async () => {

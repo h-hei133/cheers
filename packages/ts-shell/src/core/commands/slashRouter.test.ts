@@ -33,8 +33,10 @@ describe("slash router (W4)", () => {
   });
 
   afterEach(() => {
-    process.env.USERPROFILE = originalUserProfile;
-    process.env.HOME = originalHome;
+    if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = originalUserProfile;
+    if (originalHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalHome;
     fs.rmSync(fakeHomeDir, { recursive: true, force: true });
     fs.rmSync(workspaceRoot, { recursive: true, force: true });
   });
@@ -1212,8 +1214,10 @@ describe("a skill the command line named", () => {
   });
 
   afterEach(() => {
-    process.env.USERPROFILE = originalUserProfile;
-    process.env.HOME = originalHome;
+    if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = originalUserProfile;
+    if (originalHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalHome;
     fs.rmSync(fakeHomeDir, { recursive: true, force: true });
     fs.rmSync(workspaceRoot, { recursive: true, force: true });
   });

@@ -11,15 +11,20 @@ import { SessionBootstrapError } from './bootstrap.js'
 
 describe('shell bootstrap', () => {
   const originalUserProfile = process.env.USERPROFILE
+  const originalHome = process.env.HOME
   let fakeHome = ''
 
   beforeEach(() => {
     fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-bootstrap-'))
     process.env.USERPROFILE = fakeHome
+    process.env.HOME = fakeHome
   })
 
   afterEach(() => {
-    process.env.USERPROFILE = originalUserProfile
+    if (originalUserProfile === undefined) delete process.env.USERPROFILE
+    else process.env.USERPROFILE = originalUserProfile
+    if (originalHome === undefined) delete process.env.HOME
+    else process.env.HOME = originalHome
     fs.rmSync(fakeHome, { recursive: true, force: true })
   })
 

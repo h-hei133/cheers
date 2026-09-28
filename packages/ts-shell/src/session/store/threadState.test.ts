@@ -385,6 +385,7 @@ describe("branching", () => {
     // saying anything had been left behind.
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "session-trace-"));
     const priorHome = process.env.HOME;
+    const priorUserProfile = process.env.USERPROFILE;
     try {
       process.env.HOME = home;
       process.env.USERPROFILE = home;
@@ -395,7 +396,7 @@ describe("branching", () => {
       manager.addTurn(created.id, { role: "user", content: "three" } as never);
 
       const traceLayout = locateExistingSessionLayout(
-        createSessionStoreLayout(),
+        createSessionStoreLayout(home),
         created.id,
       );
       const before = fs.readFileSync(traceLayout.transcriptPath, "utf8");
@@ -408,8 +409,10 @@ describe("branching", () => {
       expect(after).toContain("branch_summary");
       expect(after).toContain("toEntryId");
     } finally {
-      process.env.HOME = priorHome;
-      process.env.USERPROFILE = priorHome;
+      if (priorUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = priorUserProfile;
+      if (priorHome === undefined) delete process.env.HOME;
+      else process.env.HOME = priorHome;
       fs.rmSync(home, { recursive: true, force: true });
     }
   });

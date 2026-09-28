@@ -17,8 +17,10 @@ describe("long-session compact/reload continuation durability", () => {
   });
 
   afterEach(() => {
-    process.env.HOME = originalHome;
-    process.env.USERPROFILE = originalUserProfile;
+    if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = originalUserProfile;
+    if (originalHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalHome;
     fs.rmSync(fakeHome, { recursive: true, force: true });
   });
 

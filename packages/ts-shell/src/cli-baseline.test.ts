@@ -2756,8 +2756,10 @@ describe("CLI streaming baseline (T3)", () => {
       expect(transcript).toContain("npm test -- src/long-session.test.ts");
       expect(transcript).toContain(fixture.nextAction);
     } finally {
-      process.env.USERPROFILE = originalUserProfile;
-      process.env.HOME = originalHome;
+      if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = originalUserProfile;
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
     }
   }, 60000);
 

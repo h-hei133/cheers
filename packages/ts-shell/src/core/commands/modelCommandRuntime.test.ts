@@ -29,8 +29,10 @@ describe("model command runtime", () => {
   });
 
   afterEach(() => {
-    process.env.USERPROFILE = originalHome;
-    process.env.HOME = originalUnixHome;
+    if (originalHome === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = originalHome;
+    if (originalUnixHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalUnixHome;
     fs.rmSync(fakeHome, { recursive: true, force: true });
     fs.rmSync(workspaceRoot, { recursive: true, force: true });
   });

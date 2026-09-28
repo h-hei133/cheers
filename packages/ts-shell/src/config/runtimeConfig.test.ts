@@ -25,8 +25,10 @@ describe("runtime config", () => {
   });
 
   afterEach(() => {
-    process.env.USERPROFILE = originalHome;
-    process.env.HOME = originalUnixHome;
+    if (originalHome === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = originalHome;
+    if (originalUnixHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalUnixHome;
     delete process.env.CHEERS_MAX_TURNS;
     fs.rmSync(fakeHome, { recursive: true, force: true });
     fs.rmSync(fakeRoot, { recursive: true, force: true });

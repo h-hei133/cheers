@@ -16,6 +16,8 @@ import { createThemeReloader, RELOAD_DEBOUNCE_MS, resolveThemeTarget, watchTheme
  */
 
 const homes: string[] = [];
+const originalHome = process.env.HOME;
+const originalUserProfile = process.env.USERPROFILE;
 
 /** A user themes directory, the place a theme is discovered from. */
 function withUserThemes(): string {
@@ -42,6 +44,10 @@ function selectedBackground(): string {
 }
 
 afterEach(() => {
+  if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+  else process.env.USERPROFILE = originalUserProfile;
+  if (originalHome === undefined) delete process.env.HOME;
+  else process.env.HOME = originalHome;
   vi.useRealTimers();
   for (const home of homes.splice(0)) fs.rmSync(home, { recursive: true, force: true });
   // The palette is a shared instance, so a test must not leave its colours behind.

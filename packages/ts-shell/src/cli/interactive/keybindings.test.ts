@@ -17,6 +17,8 @@ import {
  * too, and a malformed file that stops the session from starting.
  */
 describe("keybindings", () => {
+  const originalHome = process.env.HOME;
+  const originalUserProfile = process.env.USERPROFILE;
   let home: string;
 
   beforeEach(() => {
@@ -27,6 +29,10 @@ describe("keybindings", () => {
 
   afterEach(() => {
     fs.rmSync(home, { recursive: true, force: true });
+    if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = originalUserProfile;
+    if (originalHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalHome;
   });
 
   function writeConfig(contents: string): void {

@@ -27,6 +27,8 @@ import type { CommandContext } from "./types.js";
  * compacted and what was stepped back past.
  */
 describe("export command", () => {
+  const originalHome = process.env.HOME;
+  const originalUserProfile = process.env.USERPROFILE;
   let home: string;
   let workdir: string;
   let sessionId: string;
@@ -41,7 +43,7 @@ describe("export command", () => {
     process.env.HOME = home;
     process.env.USERPROFILE = home;
 
-    const layout = createSessionStoreLayout();
+    const layout = createSessionStoreLayout(home);
     ensureSessionStoreLayout(layout);
     sessionId = createSessionId();
     const session = locateExistingSessionLayout(layout, sessionId);
@@ -70,6 +72,10 @@ describe("export command", () => {
   afterEach(() => {
     fs.rmSync(home, { recursive: true, force: true });
     fs.rmSync(workdir, { recursive: true, force: true });
+    if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = originalUserProfile;
+    if (originalHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalHome;
   });
 
   function readExported(name: string): Record<string, unknown>[] {
@@ -112,7 +118,7 @@ describe("export command", () => {
     // A transcript from an older build has content and no header, and reports 0:
     // nobody wrote a version on it, and claiming the current one would say its
     // lines are in a shape they never had.
-    const session = locateExistingSessionLayout(createSessionStoreLayout(), sessionId);
+    const session = locateExistingSessionLayout(createSessionStoreLayout(home), sessionId);
     fs.writeFileSync(
       session.transcriptPath,
       `${JSON.stringify({ type: "message", id: "msg_old", role: "user", content: "old", timestamp: "t0" })}\n`,
