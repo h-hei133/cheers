@@ -234,6 +234,11 @@ export class SessionManager extends SessionReadSurface {
    * its own — for when a conversation is worth continuing twice in two
    * directions. The copy is the source's events verbatim, timestamps
    * included, because the fork's own records begin where the source's ended.
+   *
+   * What it carries besides the conversation is the source's identity: the
+   * title, so a reader recognises the fork as the same thread of work, and the
+   * source id, because the copied events say nothing about where they came
+   * from. Both are the source's, not invented for the copy.
    */
   fork(sessionId: string, projectRoot?: string): Session {
     if (!this.sessionExists(sessionId)) {
@@ -244,6 +249,10 @@ export class SessionManager extends SessionReadSurface {
     const forked = createSession({
       callbacks: this.createSessionCreationCallbacks(),
       projectRoot: projectRoot ?? source.projectRoot,
+      options: {
+        ...(source.title ? { title: source.title } : {}),
+        parentSession: source.id,
+      },
     });
     const transcriptPath = this.host.store.transcriptPath(forked.id);
     for (const event of events) {

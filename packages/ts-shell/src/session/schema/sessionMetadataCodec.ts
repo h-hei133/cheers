@@ -9,6 +9,8 @@ export interface SessionMetadata {
   targetPathBase?: string;
   gitRoot?: string | null;
   title?: string;
+  /** The session this one was forked from, when it was. */
+  parentSession?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -26,6 +28,7 @@ export function projectSessionMetadata(session: Session): SessionMetadata {
       ? { gitRoot: session.gitRoot ?? null }
       : {}),
     title: session.title,
+    ...(session.parentSession ? { parentSession: session.parentSession } : {}),
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
   };

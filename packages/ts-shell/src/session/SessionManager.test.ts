@@ -17,8 +17,14 @@ describe("SessionManager", () => {
   });
 
   afterEach(() => {
-    process.env.USERPROFILE = originalUserProfile;
-    process.env.HOME = originalHome;
+    // Assigning `undefined` to a process env var coerces it to the string
+    // "undefined", which the home resolver then treats as a real directory —
+    // that is how a test run once wrote sessions into `undefined/.cheers`. When
+    // the variable was unset to begin with, it has to be deleted, not restored.
+    if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = originalUserProfile;
+    if (originalHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalHome;
     fs.rmSync(fakeHome, { recursive: true, force: true });
   });
 
@@ -3876,6 +3882,28 @@ describe("SessionManager", () => {
 });
 
 describe("fork", () => {
+  const originalUserProfile = process.env.USERPROFILE;
+  const originalHome = process.env.HOME;
+  let forkHome: string;
+
+  beforeEach(() => {
+    // Without a home of its own, `new SessionManager()` writes sessions into
+    // the developer's real `~/.cheers` — or, when an earlier suite left the env
+    // pointing at the string "undefined", into an `undefined/.cheers` tree in
+    // the working directory. Both have happened; a temp home ends it.
+    forkHome = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-fork-home-"));
+    process.env.USERPROFILE = forkHome;
+    process.env.HOME = forkHome;
+  });
+
+  afterEach(() => {
+    if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = originalUserProfile;
+    if (originalHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalHome;
+    fs.rmSync(forkHome, { recursive: true, force: true });
+  });
+
   it("creates a new session carrying the source conversation", () => {
     const manager = new SessionManager();
     const source = manager.createNew();
@@ -3893,6 +3921,37 @@ describe("fork", () => {
     expect(JSON.stringify(forkedEvents)).toContain("the original question");
     expect(JSON.stringify(forkedEvents)).toContain("only in the fork");
     expect(JSON.stringify(sourceEvents)).not.toContain("only in the fork");
+
+    // The conversation the model would resume from — reloaded from disk, so
+    // the copied turns count only if the fork's own load path surfaces them,
+    // not merely because the bytes reached the transcript file.
+    const reloaded = manager.resume(forked.id);
+    const contents = reloaded.turns.map((turn) => turn.content).join("\n");
+    expect(contents).toContain("the original question");
+    expect(contents).toContain("the original answer");
+    expect(contents).toContain("only in the fork");
+  });
+
+  it("keeps the source's identity, so a copied conversation stays traceable", () => {
+    // The transcript copy carries no provenance of its own: every event is the
+    // source's. Without the title and the source id, a fork and its origin are
+    // two unrelated sessions that happen to hold the same conversation.
+    const manager = new SessionManager();
+    const source = manager.createNew();
+    manager.renameSession(source.id, "investigate the retry bug");
+    manager.addTurn(source.id, { role: "user", content: "where does the retry go wrong" });
+
+    const forked = manager.fork(source.id);
+    expect(forked.title).toBe("investigate the retry bug");
+    expect(forked.parentSession).toBe(source.id);
+
+    // Recorded on disk, not only in the returned object: `listSessions` reads
+    // metadata, and a lineage nobody can look up is not a record of anything.
+    const reloaded = manager.resume(forked.id);
+    expect(reloaded.title).toBe("investigate the retry bug");
+    expect(reloaded.parentSession).toBe(source.id);
+    // The source is untouched.
+    expect(manager.resume(source.id).parentSession).toBeUndefined();
   });
 
   it("refuses to fork a session that does not exist", () => {

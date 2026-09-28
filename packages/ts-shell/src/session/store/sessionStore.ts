@@ -152,6 +152,7 @@ export function projectLoadedSession(input: {
       ? { gitRoot: metadata.gitRoot?.trim() || null }
       : {}),
     title: metadata.title,
+    ...(metadata.parentSession ? { parentSession: metadata.parentSession } : {}),
     createdAt: metadata.createdAt,
     updatedAt: metadata.updatedAt,
     status: input.state.status,

@@ -6,6 +6,10 @@ export interface SessionCreationOptions {
   readonly requestedWorkspaceRoot?: string;
   readonly targetPathBase?: string;
   readonly gitRoot?: string | null;
+  /** A title to start with, for a session that is born carrying another's. */
+  readonly title?: string;
+  /** The session this one is copied from, when it is a fork. */
+  readonly parentSession?: string;
 }
 
 interface SessionCreationCallbacks {
@@ -65,7 +69,8 @@ function createBoundSession(input: {
   const session: Session = {
     id: input.sessionId,
     ...binding,
-    title: undefined,
+    ...(input.options?.title ? { title: input.options.title } : { title: undefined }),
+    ...(input.options?.parentSession ? { parentSession: input.options.parentSession } : {}),
     createdAt: now,
     updatedAt: now,
     status: "active",
