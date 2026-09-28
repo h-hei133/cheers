@@ -1,4 +1,5 @@
 import { DISABLE_MOUSE, ENABLE_MOUSE } from "../input/mouse.js";
+import { imageIdsIn, swapTransmittedForPlacement } from "../image.js";
 import type { TerminalDevice, TerminalStartOptions } from "../terminal.js";
 import { processTerminal } from "../terminal.js";
 import {
@@ -291,8 +292,23 @@ export class TUI {
     const rows = padToHeight(prepareRows(source, width), height);
     const stable = this.painted && this.lastWidth === width && this.lastHeight === height;
 
+    // A kitty image row transmits its payload once. A row whose image has
+    // already been sent is rewritten as "place image N" on both sides of the
+    // diff — the terminal holds the pixels, and a scroll or resize that
+    // moves the row must not send them again. The ids a frame carries are
+    // collected from what is on screen now, so the first paint of an image
+    // still sends its transmission and every later one places it.
+    const placed = new Set<number>();
+    for (const row of this.window) {
+      for (const id of imageIdsIn(row)) placed.add(id);
+    }
+    const swapRows = (frame: readonly string[]): readonly string[] =>
+      frame.map((row) => swapTransmittedForPlacement(row, placed));
+
     let buffer = paintBegin(this.terminal.capabilities.supportsDec2026Sync);
-    buffer += stable && !force ? diffPaint(this.window, rows, 0, height) : fullPaint(rows, height);
+    buffer += stable && !force
+      ? diffPaint(swapRows(this.window), swapRows(rows), 0, height)
+      : fullPaint(swapRows(rows), height);
     buffer += cursorPaint(cursorTarget(source, 0, height), 0);
     buffer += paintEnd(this.terminal.capabilities.supportsDec2026Sync);
     this.terminal.write(buffer);

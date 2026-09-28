@@ -60,12 +60,65 @@ export function inlineImageSequence(
     readonly columns?: number;
     readonly rows?: number;
     readonly name?: string;
+    /** Id for a kitty image, so a redraw can place it without resending. */
+    readonly imageId?: number;
   } = {},
 ): string {
   if (protocol === "kitty") {
     return encodeKitty(base64Data, options);
   }
   return encodeITerm2(base64Data, options);
+}
+
+/**
+ * A placement-only sequence for a kitty image line already transmitted.
+ *
+ * A redraw of a frame rewrites rows that moved, and a row holding a full
+ * transmission would resend the bytes every time the screen scrolled. Kitty's
+ * own answer is the image id: transmit once with one, then re-place with
+ * `a=p` — the terminal already holds the pixels. Returns nothing for a line
+ * with no id (unidentifiable, so the caller must resend or drop) and nothing
+ * for iTerm2, whose protocol has no placement mode at all.
+ */
+export function kittyPlacementFor(line: string): string | undefined {
+  const match = /\x1b_G([^;]*);/.exec(line);
+  if (!match) return undefined;
+  // The placement keys are the geometry ones; payload and delete controls
+  // belong to the transmission and must not ride along.
+  const PLACEMENT = new Set(["i", "p", "x", "y", "w", "h", "X", "Y", "c", "r", "C", "U", "z", "P", "Q", "H", "V"]);
+  const controls = match[1]!.split(",").filter((control) => PLACEMENT.has(control.split("=", 1)[0] ?? ""));
+  if (!controls.some((control) => control.startsWith("i="))) return undefined;
+  return `\x1b_Ga=p,q=2,${controls.join(",")}\x1b\\`;
+}
+
+/** The image ids a line's kitty sequences carry, in order. */
+export function imageIdsIn(line: string): readonly number[] {
+  const ids: number[] = [];
+  for (const match of line.matchAll(/\x1b_G(?:[^;]*,)?i=(\d+)[^;]*;/g)) {
+    ids.push(Number(match[1]));
+  }
+  return ids;
+}
+
+/**
+ * Rewrite a row so images the screen already holds appear as placements.
+ *
+ * Both sides of a frame diff go through this: the rows that are on screen
+ * now and the rows about to be. A transmitted image whose id is in
+ * `transmitted` becomes its `a=p` form, so a moved row redraws as "place",
+ * never as the payload again. Rows without images, and every iTerm2 row,
+ * pass through untouched.
+ */
+export function swapTransmittedForPlacement(
+  row: string,
+  transmitted: ReadonlySet<number>,
+): string {
+  if (!row.includes("\x1b_G")) return row;
+  return row.replace(/\x1b_G([^;]*);[^\x1b]*(?:\x1b\\)/g, (sequence) => {
+    const id = /\x1b_G(?:[^;]*,)?i=(\d+)/.exec(sequence)?.[1];
+    if (id === undefined || !transmitted.has(Number(id))) return sequence;
+    return kittyPlacementFor(sequence) ?? sequence;
+  });
 }
 
 /** The window title, for a terminal that keeps one above the tab. */
@@ -89,12 +142,13 @@ export function bell(): string {
 /** Kitty transmits in chunks: one control sequence per 4 KiB of payload. */
 function encodeKitty(
   base64Data: string,
-  options: { readonly columns?: number; readonly rows?: number },
+  options: { readonly columns?: number; readonly rows?: number; readonly imageId?: number },
 ): string {
   const CHUNK = 4096;
   const params = ["a=T", "f=100", "q=2"];
   if (options.columns !== undefined) params.push(`c=${options.columns}`);
   if (options.rows !== undefined) params.push(`r=${options.rows}`);
+  if (options.imageId !== undefined) params.push(`i=${options.imageId}`);
   if (base64Data.length <= CHUNK) {
     return `\x1b_G${params.join(",")};${base64Data}\x1b\\`;
   }

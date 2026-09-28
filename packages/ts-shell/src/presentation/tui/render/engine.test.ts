@@ -447,3 +447,32 @@ describe("handing the terminal to a child process", () => {
     expect(tui.suspend(() => "ran")).toBe("ran");
   });
 });
+
+describe("kitty image rows under redraw", () => {
+  it("sends the payload once and places it on every later paint", () => {
+    const { tui, terminal, scheduler, provider } = boot();
+    const transmitted =
+      "text before \x1b_Ga=T,f=100,q=2,c=10,i=7;QUJD\x1b\\ text after";
+    provider.rows = [transmitted];
+
+    tui.start();
+    scheduler.flush();
+    const bytesAfterFirst = transmittedBytes(terminal);
+    expect(bytesAfterFirst).toContain("QUJD");
+
+    // Scroll: the row moves position, so the diff rewrites it. The rewrite
+    // must place image 7, not resend the bytes.
+    provider.rows = ["", transmitted];
+    tui.requestRender();
+    scheduler.flush();
+    const bytesAfterSecond = transmittedBytes(terminal);
+    expect(bytesAfterSecond).toContain("a=p");
+    // And the payload left the process exactly once, in the first paint.
+    expect(bytesAfterSecond.split("QUJD").length).toBe(bytesAfterFirst.split("QUJD").length);
+  });
+});
+
+/** The bytes the terminal has received so far, joined for substring checks. */
+function transmittedBytes(terminal: RecordingTerminal): string {
+  return terminal.writes.join("");
+}

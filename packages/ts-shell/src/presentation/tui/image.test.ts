@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { detectImageProtocol, inlineImageSequence, windowTitle, idleNotification, bell } from "./image.js";
+import { visibleWidth } from "./text/measure.js";
+import { detectImageProtocol, inlineImageSequence, kittyPlacementFor, windowTitle, idleNotification, bell } from "./image.js";
 
 /** The environment of a terminal that identifies itself, with nothing else. */
 function env(overrides: Record<string, string | undefined> = {}): NodeJS.ProcessEnv {
@@ -74,5 +75,28 @@ describe("terminal attention sequences", () => {
   it("raises an idle notification over OSC 777 and a bell over BEL", () => {
     expect(idleNotification("Turn finished")).toBe("\x1b]777;notify;cheers;Turn finished\x07");
     expect(bell()).toBe("\x07");
+  });
+});
+
+describe("transmit-once placement under redraw", () => {
+  it("places a transmitted kitty image instead of resending its bytes", () => {
+    // First appearance: full transmission, carrying an image id.
+    const first = inlineImageSequence("kitty", "QUJD", { columns: 10, imageId: 7 });
+    expect(first).toContain("i=7");
+    expect(first).toContain("QUJD");
+    // A redraw of the same row must not carry the payload again — it says
+    // "place image 7", and the bytes never leave twice.
+    const again = kittyPlacementFor(first);
+    expect(again).toBeDefined();
+    expect(again).toContain("a=p");
+    expect(again).toContain("i=7");
+    expect(again).not.toContain("QUJD");
+    // Zero-cell either way, so the layout the row was built for holds.
+    expect(visibleWidth(again!)).toBe(0);
+  });
+
+  it("leaves iterm2 sequences alone: that protocol has no placement mode", () => {
+    const first = inlineImageSequence("iterm2", "QUJD", { columns: 10 });
+    expect(kittyPlacementFor(first)).toBeUndefined();
   });
 });
