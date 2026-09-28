@@ -68,6 +68,24 @@ export function inlineImageSequence(
   return encodeITerm2(base64Data, options);
 }
 
+/** The window title, for a terminal that keeps one above the tab. */
+export function windowTitle(title: string): string {
+  // OSC 0 sets both window and tab titles, and BEL is the terminator every
+  // emulator honours. A title with a control character would cut the
+  // sequence short, so the text is taken to its printable form.
+  return `\x1b]0;${title.replace(/[\x00-\x1f\x7f]/g, " ")}\x07`;
+}
+
+/** A desktop notification for the turn that finished while nobody watched. */
+export function idleNotification(message: string): string {
+  return `\x1b]777;notify;cheers;${message.replace(/[\x00-\x1f\x7f]/g, " ")}\x07`;
+}
+
+/** The terminal's own attention signal. */
+export function bell(): string {
+  return "\x07";
+}
+
 /** Kitty transmits in chunks: one control sequence per 4 KiB of payload. */
 function encodeKitty(
   base64Data: string,

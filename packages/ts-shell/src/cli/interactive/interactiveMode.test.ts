@@ -91,3 +91,29 @@ describe("session wiring", () => {
     mode.stop();
   });
 });
+
+describe("terminal attention", () => {
+  it("sets the window title to the session and project on start", () => {
+    const { mode, terminal } = build();
+    mode.start();
+    // One OSC 0 write naming the session and the project directory, so a
+    // tab among many says which conversation it holds.
+    const title = terminal.writes.find((write) => write.startsWith("\x1b]0;"));
+    expect(title).toBeDefined();
+    expect(title).toContain("sess_1");
+    expect(title).toContain("workspace");
+  });
+});
+
+describe("attention on idle", () => {
+  it("leaves a session quiet when the flag is off, which is the default", () => {
+    const { mode, terminal } = build();
+    mode.start();
+    // The build helper sets no attentionOnIdle, so the default — off — is
+    // what runs. The title write happens once at start and nothing after it
+    // may carry a BEL: a bell that fires when nobody asked is the failure.
+    const title = terminal.writes.find((write) => write.startsWith("\x1b]0;"));
+    const afterTitle = terminal.writes.slice(terminal.writes.indexOf(title!) + 1);
+    expect(afterTitle.some((write) => write.includes("\x07"))).toBe(false);
+  });
+});

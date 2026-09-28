@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectImageProtocol, inlineImageSequence } from "./image.js";
+import { detectImageProtocol, inlineImageSequence, windowTitle, idleNotification, bell } from "./image.js";
 
 /** The environment of a terminal that identifies itself, with nothing else. */
 function env(overrides: Record<string, string | undefined> = {}): NodeJS.ProcessEnv {
@@ -60,5 +60,19 @@ describe("inline image sequences", () => {
     const sequence = inlineImageSequence("iterm2", small, { columns: 10, rows: 5, name: "shot.png" });
     expect(sequence.startsWith("\x1b]1337;File=inline=1;size=4;width=10;height=5;name=")).toBe(true);
     expect(sequence.endsWith(`:${small}\x07`)).toBe(true);
+  });
+});
+
+describe("terminal attention sequences", () => {
+  // These are byte contracts with the terminal: an OSC title, an OSC 9/777
+  // notification, and a BEL. Each is one small function on the terminal's
+  // write path; pinned here so no refactor changes what the terminal hears.
+  it("sets the window title over OSC 0", () => {
+    expect(windowTitle("cheers — my-project")).toBe("\x1b]0;cheers — my-project\x07");
+  });
+
+  it("raises an idle notification over OSC 777 and a bell over BEL", () => {
+    expect(idleNotification("Turn finished")).toBe("\x1b]777;notify;cheers;Turn finished\x07");
+    expect(bell()).toBe("\x07");
   });
 });

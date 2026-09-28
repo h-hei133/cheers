@@ -210,6 +210,12 @@ export interface RuntimeConfig {
    */
   readonly offline?: boolean;
   /**
+   * Signal when a turn finishes while the user is elsewhere: a bell, plus a
+   * desktop notification the terminal forwards. Off unless a flag says
+   * otherwise — attention grabbing is a preference, not a default.
+   */
+  readonly attentionOnIdle?: boolean;
+  /**
    * Whether to keep a prompt cached between requests.
    *
    * `streaming` refreshes only while a run is under way, where the next request

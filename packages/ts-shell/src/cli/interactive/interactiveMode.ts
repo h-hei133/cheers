@@ -1,9 +1,11 @@
 import { messageToText } from "../../model-adapters/multimodal.js";
 import { backgroundTasks, renderTask } from "../../core/shell/background/tasks.js";
 import type { Interface as ReadlineInterface } from "node:readline";
+import path from "node:path";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
+import { detectImageProtocol, windowTitle, idleNotification, bell } from "../../presentation/tui/image.js";
 import type { EscalationPrompt } from "../../sandbox/index.js";
 import { handleShellClose } from "../../core/shell/signalHandlers.js";
 import type { CliMcpGateway } from "../../entrypoints/cliMcpModule.js";
@@ -24,7 +26,6 @@ import type { StreamingRenderer } from "../../presentation/terminal/streaming.js
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import { replaceLiteral } from "../../presentation/tui/pastes.js";
-import { detectImageProtocol } from "../../presentation/tui/image.js";
 import { InteractiveSurface } from "../../presentation/tui/surface/view.js";
 import { createViewState, type ViewState } from "../../presentation/tui/surface/contract.js";
 import { approvalPicker, type InteractiveApprovalResult } from "./picker/approval.js";
@@ -65,6 +66,9 @@ const ACTIVITY_TICK_MS = 100;
 
 /** Window in which the exit hint stays on screen after one cancel press. */
 const CANCEL_ARMED_MS = 600;
+
+/** Turns shorter than this finish before anyone could have looked away. */
+const ATTENTION_AFTER_MS = 30_000;
 
 export interface InteractiveModeOptions {
   readonly runtimeContext: ShellRuntimeContext;
@@ -305,6 +309,14 @@ export class InteractiveMode {
           width,
         ),
     });
+    // A tab among many needs to say which conversation it holds. The title is
+    // session and project — the two things that identify a conversation — and
+    // it is written once, here: the terminal owns it after that.
+    this.terminal.write(
+      windowTitle(
+        `cheers — ${path.basename(this.options.runtimeContext.projectRoot)} — ${this.options.runtimeContext.session.id}`,
+      ),
+    );
     this.stdin.onKey((event) => this.onKey(event));
     this.stdin.onMouse((report) => this.pointer.handle(report));
     this.stdin.onPaste((text) => {
@@ -541,6 +553,9 @@ export class InteractiveMode {
     attachments?: { readonly images: readonly ImageContent[] },
   ): Promise<void> {
     this.busy = true;
+    // When the turn began, so an idle signal can say how long the work took
+    // rather than firing on every turn however brief.
+    const turnStartedAt = Date.now();
     // The elapsed time is computed at paint time, and paints are driven by events.
     // Between two events there are none, so without a clock of its own the timer
     // sits at whatever it read when the turn began.
@@ -611,6 +626,17 @@ export class InteractiveMode {
       }
       this.tui.requestRender();
       const next = retrying ?? this.queue.shift();
+      // The attention pair, when the user asked for it and the turn was long
+      // enough that they may have looked away. A queued follow-up keeps the
+      // conversation running, so the signal waits for the turn that ends it.
+      if (next === undefined && this.options.runtimeContext.runtimeConfig.attentionOnIdle === true) {
+        const tookMs = Date.now() - turnStartedAt;
+        if (tookMs >= ATTENTION_AFTER_MS) {
+          this.terminal.write(
+            `${bell()}${idleNotification(`Turn finished (${Math.round(tookMs / 1000)}s)`)}`,
+          );
+        }
+      }
       if (next !== undefined) void this.run(next);
     }
   }
