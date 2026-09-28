@@ -4599,3 +4599,27 @@ steering/审批/hooks/导出全实测通过。真差距 6 个：**
 ——字段都在；transcript parentId——已裁决维持不做）。裁决见
 `phase-15-decisions.md`：G1 立即修（纯接线），G3 接通，G4 图片先做
 LaTeX 缓，G5 fork+settings 做，G6 做，G2 收缩文案、真加载器独立阶段。
+
+**Phase 15 执行（2026-09-28）：六个缺口全部收口**
+
+按 phase-15-decisions 的顺序执行，六项各自独立提交，全部撤销验证：
+
+| 项 | 提交 | 关键证据 |
+|---|---|---|
+| MCP 真转发 + 生产注入 | `b77e00dc` | 3 项测试对假串全红；内存 gateway double 断言调用到达 |
+| plugin 收缩 | `8f9897a3` | 伪装动词改为「记录为未来加载器保留」的真实用途 |
+| sidebar 接通 | `70e4460f` | boxed panel 40 行过 pager 阈值自动全屏；prose 预览器删除 |
+| 终端图片显示 | `64b7e033` | Kitty/iTerm2 双协议；序列零宽经 wrap 实测不破坏；multiplexer 置空与 pi 同判 |
+| 终端三小件 | `2edb8aed` | OSC 0 title；attentionOnIdle 门控 bell+通知（30s 阈值，默认关） |
+| fork + settings | `56093d22` | SessionManager.fork 逐事件重放；/settings 复用 picker 框架 |
+
+**执行中的自我更正**：
+- 15-D 第一版给命令结果加 overlayRows 字段——实测发现 pager 阈值机制
+  天然覆盖该场景，删除字段回到最小路径（少一个概念，同一行为）
+- startTurn 因 MCP snapshot 转 async 的波及面：入口返回 Promise、桥接层
+  把等待折进事件流并缓冲 steering（与既有 defer 路径同模式）
+- 钉住旧道歉句/旧回退行为的测试全部按新词汇重写，不弱化断言
+
+**明确不冒进**：alt-screen 下的图片重绘需要 pi 的 transmit-once/
+place-on-redraw 机制（image id、placement-only 序列、逐出预算）——
+是渲染器级工程，单独排期，不在 15-D 里塞半套。

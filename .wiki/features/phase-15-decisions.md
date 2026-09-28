@@ -58,3 +58,20 @@ docs-drift 必须全绿；`log.md` 与 `_index.md` 同步。
   （已知的负载敏感测试）——基线时间改动前先隔离复跑取基线。
 - 15-D 的协议序列在 tmux/screen 下的穿透（passthrough）必须带探测
   回退，pi 的 `terminal-image.ts` 已处理，照抄不要自创。
+
+## 5. 执行进度（2026-09-28）
+
+| 项 | 状态 | 提交 / 证据 |
+|---|---|---|
+| 15-A MCP 真转发 + 生产注入 | ✅ | `b77e00dc`；撤销验证：3 项测试对假串全红，内存 gateway double 断言调用到达（含 server/tool 拆分与参数透传）；isError 语义按服务器原话回传失败 |
+| 15-B plugin 收缩 | ✅ | `8f9897a3`；三处"Nothing is executed"改为「记录只为未来加载器保留」的真实用途；install→record、capabilities→registrations |
+| 15-C sidebar 接通 | ✅ | `70e4460f`；默认视图换为 boxed panel（40 行 > pager 阈值 18 → 交互模式自动全屏视图），prose 预览器连同自述「无真实 UI」三行一起删除；钉住旧道歉句的两个测试按面板词汇重写 |
+| 15-D 终端图片 | ✅ | `64b7e033`；Kitty 分块传输 + iTerm2 OSC 1337 + multiplexer 置空（pi 同判）；粘贴回显挂用户气泡行——序列零宽，wrap/pad 均不破坏（实测验证）；transcript 缓存以 protocol 为键。alt-screen 重绘需 pi 的 transmit-once/place-on-redraw 机制，明确**不做**（见 §3 不做清单已述及的理由） |
+| 15-E 终端三小件 | ✅ | `2edb8aed`；OSC 0 title（项目+会话）；attentionOnIdle 配置门控 bell+OSC 777（30s 阈值、队列空才响，默认关）；config-consumers 门禁对新增字段过绿 |
+| 15-F fork + settings | ✅ | `56093d22`；SessionManager.fork 逐事件重放（时间戳原样）、/fork here|id（交互切换/管道打印 id）；/settings 裸调用开 picker 面板（复用 chrome/options 框架），非交互给命名清单 |
+
+**执行中的取舍**：
+- 15-D 第一版给 LocalCommandResult 加了 overlayRows 字段——验证后发现
+  pager 阈值机制已天然覆盖（行数 > 18 自动全屏），删掉字段回到最小路径
+- /settings 只上布尔开关（attentionOnIdle/offline）；复杂嵌套配置仍走
+  文件，面板不放伪装条目
