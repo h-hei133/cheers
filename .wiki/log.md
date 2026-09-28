@@ -4577,3 +4577,25 @@ model——**被活代码以类型或值引用即是使用**，这些是。
 **复核的复核**：reviewer 断言不可盲信——R2 的「工具调用会重复」错误
 （流局部状态异常即弃）、R6 不适用、R3 我的第一版测试预期也错（把
 「整提示」约定当 raw）。全部落到代码级证据再动手。
+
+**Phase 15 预研（2026-09-28）：全面差距扫描**
+
+任务：找未实现功能、demo 级代码、TUI 缺组件/未接线面。3 个只读子代理
+并发分域（TUI 表面 / agent 功能 / 会话生命周期），对照 pi 逐项核。
+
+**结论：不是普遍 demo。TUI 核心零 stub、鼠标五条消费路径全接线、
+steering/审批/hooks/导出全实测通过。真差距 6 个：**
+
+| # | 缺口 | 核实 |
+|---|---|---|
+| G1 | MCP 模型侧调用返回硬编码假串 + 生产从不注入 mcpTools（`registry.ts:799-803`、`cliRuntimeInvocation.ts:454`）——底层 client/gateway 是真实现，`/mcp` 诊断可用，唯独模型调用是空壳 | 逐行 |
+| G2 | `/plugin` 三处明文「此构建不执行任何注册项」 | 逐字 |
+| G3 | `presentation/sidebar/` 27 文件自述「无真实 sidebar UI」，从未被 view/engine 引入，仅 `/sidebar` 纯文本 | 逐字 |
+| G4 | 终端图片显示（Kitty/iTerm2）与 LaTeX 双缺——图片只进不出 | grep 零命中 |
+| G5 | fork/clone、/import、/share、/name、/settings 五命令缺 | 对照 42 命令清单 |
+| G6 | OSC title / 空闲通知 / bell 全缺 | grep 零命中 |
+
+**子代理错误断言 2 条已剔除留档**（cacheWaste「缺 idleMs/modelChanged」
+——字段都在；transcript parentId——已裁决维持不做）。裁决见
+`phase-15-decisions.md`：G1 立即修（纯接线），G3 接通，G4 图片先做
+LaTeX 缓，G5 fork+settings 做，G6 做，G2 收缩文案、真加载器独立阶段。
