@@ -34,7 +34,7 @@ const SUBCOMMAND_VALUES = {
   goal: ["pause", "resume", "complete", "clear"],
   workflow: ["list", "run", "status"],
   marketplace: ["list", "add", "remove", "rm", "delete"],
-  plugin: ["list", "install", "search", "uninstall", "enable", "disable", "add", "find", "rm", "remove"],
+  plugin: ["list", "add", "remove", "search", "enable", "disable"],
   memory: ["inspect", "add", "recall", "use", "invalidate", "save", "status", "review"],
   connect: ["status", "list", "presets", "login", "set", "use", "logout", "help"],
   compact: ["preview", "render", "json"],

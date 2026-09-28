@@ -130,7 +130,11 @@ function normalizePluginName(name: string): string {
 
 /**
  * /plugin command
- * Manages plugin lifecycle with permanent disk persistence: list, install, uninstall, enable, disable, search.
+ *
+ * Manages the registry of extension registrations with permanent disk
+ * persistence: list, add, remove, enable, disable, search. Nothing here loads
+ * code — a registration is a record kept for a loader that does not exist yet,
+ * and the messages say so rather than implying the registration took effect.
  */
 export async function runPluginCommand(
   args: string[],
@@ -241,7 +245,7 @@ export async function runPluginCommand(
     if (!pluginName) {
       return {
         kind: "local",
-        output: "Usage: `/plugin uninstall <plugin-name>`",
+        output: "Usage: `/plugin remove <plugin-name>`",
       };
     }
 
@@ -250,7 +254,7 @@ export async function runPluginCommand(
     if (index === -1) {
       return {
         kind: "local",
-        output: `Plugin \`${normalized}\` is not installed.`,
+        output: `Plugin \`${normalized}\` is not registered.`,
       };
     }
 
