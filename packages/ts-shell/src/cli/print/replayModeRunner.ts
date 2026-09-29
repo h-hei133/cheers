@@ -8,12 +8,15 @@ import type { CliOptions } from "../options/cliOptions.js";
 import {
   runReplayPromptScript,
 } from "../../entrypoints/cliRuntimeModule.js";
+import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 
 export interface RunCliReplayModeInput {
   readonly replayFile: string;
   readonly bootstrapRuntime: CliBootstrapRuntimeContext;
   readonly sessionRuntime: ShellSessionRuntime;
   readonly logger: StructuredLogger;
+  /** Passed through so a scripted `/permissions` writes the same trust store. */
+  readonly approvalTrustPolicy: ApprovalTrustPolicy;
   readonly printMode: boolean;
   readonly setActiveNonInteractiveApprovalMode: (
     mode: ApprovalModeObject | undefined,
@@ -31,6 +34,7 @@ export async function runCliReplayMode(
     renderer: input.bootstrapRuntime.renderer,
     sessionRuntime: input.sessionRuntime,
     logger: input.logger,
+    approvalTrustPolicy: input.approvalTrustPolicy,
     printMode: input.printMode,
     fallbackSessionId: input.bootstrapRuntime.recoveryCandidate?.id,
     lifecycleNotices: input.bootstrapRuntime.bootstrap.lifecycleNotices,

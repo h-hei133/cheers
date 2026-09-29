@@ -4,6 +4,7 @@ import type {
   CliBootstrapRuntimeContext,
 } from "../bootstrap/cliBootstrapContext.js";
 import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
+import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import type { CliOptions } from "../options/cliOptions.js";
 import type { CliModePlan } from "../../entrypoints/cliModeDispatch.js";
 import {
@@ -27,6 +28,8 @@ export interface RunCliPrintModeRouterInput {
   readonly setActiveNonInteractiveApprovalMode: (
     mode: ApprovalModeObject | undefined,
   ) => void;
+  /** Passed through so a scripted `/permissions` writes the same trust store. */
+  readonly approvalTrustPolicy: ApprovalTrustPolicy;
 }
 
 export async function runCliPrintModeRouter(
@@ -43,6 +46,7 @@ export async function runCliPrintModeRouter(
     setActiveNonInteractiveApprovalMode:
       input.setActiveNonInteractiveApprovalMode,
     nonInteractiveCliApprovalMode: input.options.nonInteractiveApproval,
+    approvalTrustPolicy: input.approvalTrustPolicy,
   };
 
   if (input.cliModePlan.kind === "replay") {
@@ -51,6 +55,7 @@ export async function runCliPrintModeRouter(
       bootstrapRuntime: input.bootstrapRuntime,
       sessionRuntime: input.sessionRuntime,
       logger: input.logger,
+      approvalTrustPolicy: input.approvalTrustPolicy,
       printMode: Boolean(input.options.printMode),
       setActiveNonInteractiveApprovalMode:
         input.setActiveNonInteractiveApprovalMode,

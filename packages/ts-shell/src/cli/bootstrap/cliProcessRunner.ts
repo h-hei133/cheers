@@ -194,6 +194,7 @@ export async function runCliProcess(
     setActiveNonInteractiveApprovalMode: (mode) => {
       approvalModeState.set(mode);
     },
+    approvalTrustPolicy,
   });
   if (handledPrintMode) {
     return;

@@ -41,6 +41,8 @@ import {
 } from "./cliCommandExecutionBridge.js";
 import { formatCliContextTag } from "./cliInteractiveLoopState.js";
 import { createCliMcpGateway, runCliMcpCommand } from "./cliMcpModule.js";
+import { runCliPermissionCommand } from "./cliPermissionModule.js";
+import type { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
 import { runCliSessionCommand, switchRuntimeSessionProjectContext } from "./cliSessionModule.js";
 import { runCliWorkspaceCommand } from "./cliWorkspaceModule.js";
 import { renderUserHelp, renderSessionCommandMap } from "./slashCommandRegistry.js";
@@ -54,6 +56,8 @@ export async function runNonTtyPromptStream(options: {
   logger: StructuredLogger;
   fallbackSessionId?: string;
   lifecycleNotices?: readonly string[];
+  /** Passed through so a scripted `/permissions` writes the same trust store. */
+  approvalTrustPolicy: ApprovalTrustPolicy;
   setActiveNonInteractiveApprovalMode: (
     mode: ApprovalModeObject | undefined,
   ) => void;
@@ -101,6 +105,7 @@ export async function runNonTtyPromptStream(options: {
           sessionRuntime: options.sessionRuntime,
           logger: options.logger,
           printMode: false,
+          approvalTrustPolicy: options.approvalTrustPolicy,
           fallbackSessionId: options.fallbackSessionId,
           lifecycleNotices: options.lifecycleNotices,
           setActiveNonInteractiveApprovalMode:
@@ -198,6 +203,12 @@ export async function runNonInteractivePrompt(options: {
   jsonEvents?: boolean;
   fallbackSessionId?: string;
   lifecycleNotices?: readonly string[];
+  /**
+   * Required by `/permissions`, whose `revoke`/`reset` forms write the trust
+   * store. The interactive surface has always had this policy; the scripted
+   * paths now reach the same command rather than reporting it as interactive-only.
+   */
+  approvalTrustPolicy: ApprovalTrustPolicy;
   setActiveNonInteractiveApprovalMode: (
     mode: ApprovalModeObject | undefined,
   ) => void;
@@ -210,6 +221,7 @@ export async function runNonInteractivePrompt(options: {
   const resolved = await resolveTurnInputForExecution({
     prompt: trimmedPrompt,
     cwd: options.runtimeContext.cwd,
+    projectRoot: options.runtimeContext.projectRoot,
     renderer: options.renderer,
     printMode: options.printMode,
     interactive: false,
@@ -236,6 +248,17 @@ export async function runNonInteractivePrompt(options: {
   if (resolved.kind === "shell-action") {
     if (resolved.slashResult.action === "show-help") {
       renderUserHelp(options.renderer);
+      return;
+    }
+
+    if (resolved.slashResult.action === "manage-permissions") {
+      runCliPermissionCommand({
+        renderer: options.renderer,
+        trustPolicy: options.approvalTrustPolicy,
+        projectRoot: options.runtimeContext.projectRoot,
+        permissionAction: resolved.slashResult.permissionAction,
+        permissionSelector: resolved.slashResult.permissionSelector,
+      });
       return;
     }
 
@@ -526,6 +549,8 @@ export async function runReplayPromptScript(options: {
   printMode: boolean;
   fallbackSessionId?: string;
   lifecycleNotices?: readonly string[];
+  /** Passed through so a scripted `/permissions` writes the same trust store. */
+  approvalTrustPolicy: ApprovalTrustPolicy;
   setActiveNonInteractiveApprovalMode: (
     mode: ApprovalModeObject | undefined,
   ) => void;
@@ -561,6 +586,7 @@ export async function runReplayPromptScript(options: {
       printMode: options.printMode,
       fallbackSessionId: options.fallbackSessionId,
       lifecycleNotices: options.lifecycleNotices,
+      approvalTrustPolicy: options.approvalTrustPolicy,
       setActiveNonInteractiveApprovalMode:
         options.setActiveNonInteractiveApprovalMode,
       nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
