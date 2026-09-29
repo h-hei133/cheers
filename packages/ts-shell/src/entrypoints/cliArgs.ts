@@ -1,5 +1,6 @@
 import path from "node:path";
 import { RUNTIME_PROVIDERS, isRuntimeProvider } from "../config/runtimeConfig.js";
+import { listSlashCommands } from "./slashCommandRegistry.js";
 import type {
   CliArgParseError,
   CliArgParseResult,
@@ -39,106 +40,52 @@ const VALUE_FLAGS = new Set([
   "--use-theme",
 ]);
 
-const RESERVED_SHELL_SLASH_COMMANDS = new Set([
-  "/continue",
-  "/c",
-  "/restore",
-  "/sessions",
-  "/mcp",
-  "/resume",
-  "/workspace",
-  "/where",
-  "/project",
-  "/cd",
-  "/pwd",
-  "/cancel",
-  "/build",
-  "/mode-build",
-  "/plan",
-  "/mode-plan",
-  "/mode",
-  "/agent-mode",
-  "/view",
-  "/diagnose",
-  "/repo",
-  "/changes",
-  "/doctor",
-  "/workflow-status",
-  "/status",
-  "/compact",
-  "/handoff",
-  "/memory",
-  "/warmup",
-  "/browser",
-  "/sidebar",
-  "/connect",
-  "/providers",
-  "/model",
-  "/models",
-  "/permissions",
-  "/approval-policy",
-  "/help",
-  "/",
-  "/exit",
-  "/quit",
-  "/q",
-  "/clear",
-  "/reset",
-  "/cls",
-  "/review",
-  "/audit",
-  "/check",
-  "/init",
-  "/setup",
-  "/cost",
-  "/tokens",
-  "/stats",
-  "/undo",
-  "/back",
-  "/export",
-  "/save",
-  "/copy",
-  "/cp",
-  "/goal",
-  "/objective",
-  "/target",
-  "/loop",
-  "/ralph",
-  "/autoloop",
-  "/todo",
-  "/tasks",
-  "/checklist",
-  "/fast",
-  "/turbo",
-  "/speed",
-  "/context",
-  "/ctx",
-  "/tokens-map",
-  "/btw",
-  "/side",
-  "/ask",
-  "/marketplace",
-  "/marketplaces",
-  "/market",
-  "/plugin",
-  "/plugins",
-  "/mem",
-  "/recall",
-  "/retain",
-  "/workflow",
-  "/wf",
-  "/pipeline",
-  "/dag",
-  "/deep-research",
-  "/research",
-  "/deep",
-  "/brainstorm",
-  "/explore",
-  "/brainstorming",
-  "/shell",
-  "/sh",
-  "/platform",
-]);
+/**
+ * The words that name a command rather than a file.
+ *
+ * Read from the registry instead of listed here. The list this replaces was a
+ * hand-kept copy of the same names, and it drifted the way hand-kept copies do:
+ * 26 commands registered since (`/settings`, `/theme`, `/tools`, `/statusline`
+ * among them) were missing, so `cheers --print "<one of them> <args>"` tried to
+ * open `<command> <args>` as a directory. Ten names it still listed had no
+ * command behind them at all.
+ *
+ * A slash-leading token is only ambiguous when its first segment could be a
+ * command: `/memory save x` is a command with arguments, `/tmp/project` is a
+ * path. Both used to be decided by whether the *whole* token was in the list,
+ * which is why every command with an argument was read as a path.
+ */
+function commandNames(): Set<string> {
+  const names = new Set<string>();
+  // The same list the help and the completion menu show, which is what a user
+  // may therefore type: it includes the picker-only commands the registry has
+  // no entry for, and `/back` is one of them.
+  for (const command of listSlashCommands()) {
+    names.add(command.name.toLowerCase());
+    for (const alias of command.aliases ?? []) {
+      names.add(alias.toLowerCase());
+    }
+  }
+  return names;
+}
+
+let reservedCommandNames: Set<string> | undefined;
+
+/** The first path segment of a slash-leading token, when that segment is a command. */
+function leadingCommandName(arg: string): string | undefined {
+  if (!arg.startsWith("/")) return undefined;
+  // A Windows-style `\server\share` is a path; only a single leading slash
+  // starts a command, and `//host` is a UNC path rather than the command `host`.
+  if (arg.startsWith("//")) return undefined;
+  const firstSegment = arg
+    .slice(1)
+    .split(/[\s\\/]/)[0]
+    ?.toLowerCase();
+  if (!firstSegment) return undefined;
+  reservedCommandNames ??= commandNames();
+  return reservedCommandNames.has(firstSegment) ? firstSegment : undefined;
+}
+
 export function parseCliArgs(
   rawArgs: readonly string[],
   parseOptions: ParseCliArgsOptions,
@@ -179,9 +126,16 @@ export function parseCliArgs(
     }
     assignOption(options, "projectPath", rawArgs[projectIdx + 1]);
   } else {
-    const positionalProject = positionalArgs.find(
-      isPositionalProjectFallbackCandidate,
+    // Positionals that follow a command name are its arguments, not candidate
+    // paths. Without this, `/model use openai/gpt-4` mined the model name as the
+    // project — a command that worked only when the argument happened to avoid
+    // a slash. The first command token decides: once one is seen, everything
+    // after it belongs to that command.
+    const commandIdx = positionalArgs.findIndex(
+      (token) => leadingCommandName(token) !== undefined,
     );
+    const candidates = commandIdx === -1 ? positionalArgs : positionalArgs.slice(0, commandIdx);
+    const positionalProject = candidates.find(isPositionalProjectFallbackCandidate);
     if (positionalProject) {
       assignOption(options, "projectPath", positionalProject);
     }
@@ -392,11 +346,7 @@ function getProjectFlagIndex(args: readonly string[]): number {
 }
 
 function isPositionalProjectFallbackCandidate(arg: string): boolean {
-  return /[\\/]/.test(arg) && !isReservedShellSlashCommand(arg);
-}
-
-function isReservedShellSlashCommand(arg: string): boolean {
-  return RESERVED_SHELL_SLASH_COMMANDS.has(arg.trim().toLowerCase());
+  return /[\\/]/.test(arg) && leadingCommandName(arg.trim()) === undefined;
 }
 
 function parseNonInteractiveApprovalMode(

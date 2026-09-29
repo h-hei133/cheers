@@ -1,5 +1,6 @@
 import path from "node:path";
 import { RUNTIME_PROVIDERS } from "../config/runtimeConfig.js";
+import { listSlashCommands } from "./slashCommandRegistry.js";
 import { describe, expect, it, vi } from "vitest";
 import {
   getApprovalMode,
@@ -93,6 +94,65 @@ describe("cli args parser", () => {
 
     expect(parsed.options.projectPath).toBeUndefined();
     expect(parsed.options.promptArg).toBe(`${command} last`);
+  });
+
+  // The list of reserved words is read from the command registry now; it used
+  // to be a hand-kept copy of the same names. These pin the two ways a copy
+  // fails: a command registered after the copy was written, and a command
+  // called with arguments.
+  it("keeps every registered command out of the project fallback", () => {
+    // Derived, not listed: a command added later is covered without an edit
+    // here, which is the property the copy could not have.
+    const commandNames = listSlashCommands().flatMap((command) => [
+      command.name,
+      ...(command.aliases ?? []),
+    ]);
+    expect(commandNames.length).toBeGreaterThan(50);
+    for (const name of commandNames) {
+      const parsed = expectParsed([`/${name}`, "explain"]);
+      expect(parsed.options.projectPath, `/${name} was read as a project path`).toBeUndefined();
+    }
+  });
+
+  it("keeps a command's arguments out of the project fallback", () => {
+    // `/model use openai/gpt-4` mined `openai/gpt-4` as the project, so a
+    // command worked only while its argument happened to avoid a slash.
+    const parsed = expectParsed(["/model", "use", "openai/gpt-4"]);
+
+    expect(parsed.options.projectPath).toBeUndefined();
+    expect(parsed.options.promptArg).toBe("/model use openai/gpt-4");
+  });
+
+  it("still reads a real path before the command as the project", () => {
+    const parsed = expectParsed(["/tmp/project", "explain", "status"]);
+
+    expect(parsed.options.projectPath).toBe("/tmp/project");
+    expect(parsed.options.promptArg).toBe("explain status");
+  });
+
+  it("leaves an unknown slash word as a path candidate", () => {
+    // Nothing claims `/unknowncmd`, so the existing reading stands: it is a
+    // path that does not exist, reported by the same code that reports any
+    // other missing project directory.
+    const parsed = expectParsed(["/unknowncmd", "arg"]);
+
+    expect(parsed.options.projectPath).toBe("/unknowncmd");
+    expect(parsed.options.promptArg).toBe("arg");
+  });
+
+  it("treats a UNC path as a path, not the command named by its host", () => {
+    const parsed = expectParsed(["//host/share", "x"]);
+
+    expect(parsed.options.projectPath).toBe("//host/share");
+    expect(parsed.options.promptArg).toBe("x");
+  });
+
+  it("keeps a command name apart from a same-named directory", () => {
+    // A single token with a space is how `--print "/statusline list"` arrives.
+    const parsed = expectParsed(["/statusline list"]);
+
+    expect(parsed.options.projectPath).toBeUndefined();
+    expect(parsed.options.promptArg).toBe("/statusline list");
   });
 
   it("does not parse /continue last as project=/continue", () => {
