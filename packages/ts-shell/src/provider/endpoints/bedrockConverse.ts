@@ -413,7 +413,7 @@ async function* readConverseStream(
     }
     if (type === "messageStop") {
       sawMessageStop = true;
-      finishReason = event.stopReason as string | undefined;
+      finishReason = mapConverseStopReason(event.stopReason);
       continue;
     }
     if (type === "metadata") {
@@ -484,6 +484,28 @@ function simpleAsTurn(input: SimpleRequest): TurnRequest {
 }
 
 /** The block a delta belongs to, as a number the accumulator keys on. */
+/**
+ * Bedrock's stop reason, in the vocabulary the turn layer reads.
+ *
+ * Total for the same reason the other protocols' mappers are: the turn layer
+ * decides between an answer and a failure from this value alone, so a provider
+ * that hands over its own words leaves it guessing. Bedrock names the ordinary
+ * ending `end_turn` and truncation `max_tokens`, neither of which the turn layer
+ * knows — passing them through made every normal reply a failure and every
+ * truncated one a generic error.
+ *
+ * The context-window case is grouped with truncation because that is what it is:
+ * the reply was cut for want of room, and the remedy (ask for less, or compact)
+ * is the same one.
+ */
+function mapConverseStopReason(reason: unknown): string | undefined {
+  if (typeof reason !== "string") return undefined;
+  if (reason === "end_turn" || reason === "stop_sequence") return "stop";
+  if (reason === "max_tokens" || reason === "model_context_window_exceeded") return "length";
+  if (reason === "tool_use") return "tool_calls";
+  return reason;
+}
+
 function blockIndex(event: Record<string, unknown>): number {
   const index = event.contentBlockIndex;
   return typeof index === "number" ? index : 0;

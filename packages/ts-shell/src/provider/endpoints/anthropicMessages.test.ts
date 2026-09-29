@@ -218,7 +218,9 @@ describe("reading this endpoint's stream", () => {
 
     expect(fragments).toEqual(["Hel", "lo"]);
     expect(step.value.message.content).toBe("Hello");
-    expect(step.value.finishReason).toBe("end_turn");
+    // Normalized here rather than passed through: the turn layer reads one
+    // vocabulary, and `end_turn` is not a word in it.
+    expect(step.value.finishReason).toBe("stop");
   });
 
   it("reports usage from both halves of the stream", async () => {
@@ -395,6 +397,52 @@ describe("reading this endpoint's stream", () => {
   });
 });
 
+describe("stop reasons, in the turn layer's vocabulary", () => {
+  // The turn layer decides between a delivered answer and a failure from this
+  // one value, and it has no way to know which protocol spelled it. A protocol
+  // that hands over its own word therefore makes every ordinary reply look like
+  // an unfinished one — which is exactly what happened when `end_turn` was
+  // passed through, and it failed every normal turn.
+  it("reads the ordinary ending as finished, not as an unread reason", () => {
+    const body = readAnthropicBody({
+      content: [{ type: "text", text: "done" }],
+      stop_reason: "end_turn",
+    });
+
+    expect(body.choices?.[0]?.finish_reason).toBe("stop");
+  });
+
+  it("reads truncation as length", () => {
+    const body = readAnthropicBody({
+      content: [{ type: "text", text: "cut" }],
+      stop_reason: "max_tokens",
+    });
+
+    expect(body.choices?.[0]?.finish_reason).toBe("length");
+  });
+
+  it("reads a tool call as the loop's word for it", () => {
+    const body = readAnthropicBody({
+      content: [{ type: "tool_use", id: "t1", name: "read", input: { path: "a.ts" } }],
+      stop_reason: "tool_use",
+    });
+
+    expect(body.choices?.[0]?.finish_reason).toBe("tool_calls");
+  });
+
+  it("leaves a reason it does not know for the turn layer to judge", () => {
+    // A refusal is not a finished answer, and the mapper must not make it look
+    // like one. Passing it through is what lets the turn layer treat it as the
+    // unfinished answer it is.
+    const body = readAnthropicBody({
+      content: [],
+      stop_reason: "refusal",
+    });
+
+    expect(body.choices?.[0]?.finish_reason).toBe("refusal");
+  });
+});
+
 describe("reading a whole-body answer", () => {
   it("takes the text out of the content blocks", () => {
     // A host that ignored `stream: true` answers with blocks, not a string;
@@ -406,7 +454,8 @@ describe("reading a whole-body answer", () => {
     });
 
     expect(body.choices[0]?.message.content).toBe("the answer");
-    expect(body.choices[0]?.finish_reason).toBe("end_turn");
+    // The ordinary ending, in the turn layer's vocabulary.
+    expect(body.choices[0]?.finish_reason).toBe("stop");
     expect(body.usage?.prompt_tokens).toBe(5);
   });
 

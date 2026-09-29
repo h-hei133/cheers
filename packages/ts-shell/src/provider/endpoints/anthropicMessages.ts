@@ -727,9 +727,23 @@ function mergeUsage(previous: ProviderUsage | undefined, next: AnthropicUsage): 
  * going from that word; leaving it untranslated would end a turn that had calls
  * to run.
  */
+/**
+ * Anthropic's stop reason, in the vocabulary the turn layer reads.
+ *
+ * Total, because the turn layer decides between an answer and a failure from
+ * this value and has no way to tell one provider's word for "finished" from
+ * another's. `end_turn` is the ordinary one and is why this exists: passing it
+ * through unchanged made every normal reply end the run as a failure. The
+ * remaining known reasons are mapped to what they mean rather than what they
+ * say; a reason this has never seen is left for the turn layer to treat as an
+ * unfinished answer, which is the safe reading of an unknown.
+ */
 function mapStopReason(reason: string): string {
   if (reason === "tool_use") return "tool_calls";
   if (reason === "max_tokens") return "length";
+  // The model refused, or its output was cut for a reason that is not length —
+  // a safety stop is not a finished answer and must not be reported as one.
+  if (reason === "end_turn" || reason === "stop_sequence" || reason === "pause_turn") return "stop";
   return reason;
 }
 

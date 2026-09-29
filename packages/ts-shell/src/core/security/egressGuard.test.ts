@@ -168,8 +168,23 @@ describe("host classes", () => {
     // never resolves one, so a public-looking name that points inward is not
     // caught by it.
     expect(classifyBlockedHost("intranet-host")?.class).toBe("search-domain");
-    expect(classifyBlockedHost("metadata.google.internal")).toBeUndefined();
     expect(classifyBlockedHost("example.com")).toBeUndefined();
+  });
+
+  it("refuses the metadata services that are reached by name", () => {
+    // The address ranges cover metadata by IP; these are the names the vendors
+    // document, and a name is the form a user or a page actually writes. The
+    // GCP endpoint is published as `metadata.google.internal`, and it answers
+    // with instance credentials to anything that can resolve it.
+    expect(classifyBlockedHost("metadata.google.internal")?.class).toBe("metadata");
+    expect(blockedHostReason("metadata.google.internal")).toBeDefined();
+    // The fully-qualified spelling is the same host, and a check that reads it
+    // as a different one is the bypass this closes.
+    expect(blockedHostReason("metadata.google.internal.")).toBeDefined();
+    expect(blockedHostReason("METADATA.GOOGLE.INTERNAL")).toBeDefined();
+    // A public name that merely contains the label is somebody else's machine.
+    expect(classifyBlockedHost("metadata.example.com")).toBeUndefined();
+    expect(classifyBlockedHost("metadata")).toBeDefined();
   });
 
   it("keeps the metadata prefix out of the private class", () => {
@@ -200,6 +215,10 @@ describe("the browser policy", () => {
     expect(blockedBrowserHostReason("127.0.0.1")).toBeUndefined();
     expect(blockedBrowserHostReason("localhost")).toBeUndefined();
     expect(blockedBrowserHostReason("::1")).toBeUndefined();
+    // The loopback allowance is for loopback alone. A metadata name is not a
+    // local development server, and the browser reaching one leaks credentials
+    // just as the fetcher would.
+    expect(blockedBrowserHostReason("metadata.google.internal")).toBeDefined();
   });
 
   it("refuses metadata, private and link-local addresses", () => {

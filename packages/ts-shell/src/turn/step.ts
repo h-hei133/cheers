@@ -608,15 +608,20 @@ function toToolCall(call: StreamedToolCall): AgentToolCall {
 /**
  * The kernel stop reason for a provider's finish reason.
  *
+ * Every protocol normalizes its own vocabulary at its reader — `end_turn` and
+ * `MAX_TOKENS` and the rest are translated there, where the protocol's own
+ * meanings are known — so this reads one vocabulary and not six.
+ *
  * `length` is the one reason that means "truncated, ask for less". `stop` is
- * the one that means "finished". Everything else — `content_filter`, `error`,
- * and any value a provider invents that this code has never seen — is an error:
- * the answer did not arrive, and claiming it finished would present a refusal
- * as a completed turn.
+ * the one that means "finished". `content_filter` is a refusal: the answer did
+ * not arrive, and saying it finished would present a withheld reply as a
+ * completed turn. `null` is a provider that narrated a stream without saying how
+ * it ended, which the readers only produce for a reason they could not read.
  */
 function stopReasonOf(finishReason: string | null | undefined): AgentStopReason {
   if (finishReason === "length") return "length";
-  if (finishReason === "stop" || finishReason === "tool_calls" || finishReason == null) return "stop";
+  if (finishReason === "stop" || finishReason === "tool_calls") return "stop";
+  if (finishReason == null) return "stop";
   return "error";
 }
 

@@ -97,6 +97,27 @@ const BLOCKED_IPV4: readonly (BlockedHostRule & { test: (first: number, second: 
  * `::ffff:0:0/96` (IPv4-mapped, whose payload is then checked as IPv4) and
  * `2001:db8::/32` (documentation).
  */
+/**
+ * Names that answer with instance credentials rather than with a page.
+ *
+ * The address ranges above cover the metadata services reached by IP. These are
+ * the ones reached by name, and a name is how the documented endpoint is
+ * published: the GCP metadata service is documented as
+ * `http://metadata.google.internal/computeMetadata/v1/`, and AWS documents its
+ * own under a similar name. Checking only the addresses left the documentation's
+ * own spelling of the endpoint reachable.
+ *
+ * Suffix-matched rather than compared whole, because the dotted forms of the
+ * same name (`metadata.google.internal.`) resolve identically and a check that
+ * reads them as different hosts is the bypass this exists to close.
+ */
+const BLOCKED_METADATA_NAMES = [
+  "metadata.google.internal",
+  "metadata.goog",
+  "instance-data",
+  "metadata",
+];
+
 const BLOCKED_IPV6_GROUP0 = new Map<string, BlockedHostRule>([
   ["::", { reason: "unspecified address", class: "unspecified" }],
   ["::1", { reason: "loopback address", class: "loopback" }],
@@ -178,6 +199,12 @@ export function classifyBlockedHost(
     return { reason: "loopback name", class: "loopback" };
   }
   if (host.endsWith(".local")) return { reason: "local network name", class: "search-domain" };
+  // Before the public-name branch: these are dotted names that resolve to a
+  // metadata service, and everything below this line assumes a dotted name is
+  // somebody else's machine.
+  if (BLOCKED_METADATA_NAMES.some((name) => host === name || host.endsWith(`.${name}`))) {
+    return { reason: "cloud metadata name", class: "metadata" };
+  }
   // A single label with no dot is resolved by search domains, and a search domain
   // routinely points inside the network, so it is not a public name.
   if (!host.includes(".") && !host.includes(":")) {
