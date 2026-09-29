@@ -87,9 +87,14 @@ export function clearTakeoverNotice(lockPath: string): void {
  * a lock whose owner's pid is gone (checked only when it was written on this
  * host — a pid from another machine names a process this one cannot ask
  * about); a lock older than the age threshold regardless of what its pid
- * says; and a lock that cannot be read at all, which is a file nobody is
- * maintaining. A lock that fails none of these is left alone, and the caller
- * keeps waiting.
+ * says; and a lock that cannot be read at all *and is older than the threshold*,
+ * which is a file nobody is maintaining.
+ *
+ * The age requirement on the third is not decoration. The holder creates the
+ * lock and then writes its record into it, so a lock that cannot be read may be
+ * one that is being acquired right now; taking it over in that window leaves two
+ * writers on one state file. Age is what separates "nobody is writing this" from
+ * "somebody is writing this".
  */
 export function isLockStale(lockPath: string, now: number = Date.now()): StaleLockTakeover | undefined {
   let owner: { readonly pid?: number; readonly hostname?: string; readonly createdAt?: string } | undefined;
@@ -97,10 +102,26 @@ export function isLockStale(lockPath: string, now: number = Date.now()): StaleLo
     const raw = fs.readFileSync(lockPath, "utf8");
     owner = JSON.parse(raw) as typeof owner;
   } catch {
-    // Unreadable is a distinct case from missing: missing means nobody holds
-    // the lock, unreadable means somebody wrote something the format does not
-    // recognize. Both are resolved by taking over, but for different reasons.
-    return { reason: "lock-unreadable", hostname: os.hostname(), at: new Date(now).toISOString() };
+    // Unreadable is a distinct case from missing: missing means nobody holds the
+    // lock, unreadable means somebody wrote something the format does not
+    // recognize.
+    //
+    // It is only a reason to take over once the file is old. The holder creates
+    // the lock and then writes its record, so between those two steps the file
+    // exists, is empty, and is unreadable — and a reader that took that as proof
+    // of a dead owner would take the lock away from a process that is midway
+    // through acquiring it. Both would then hold it and both would write the
+    // state. The window is microseconds; the age threshold is what makes it
+    // irrelevant rather than a race.
+    try {
+      const stat = fs.statSync(lockPath);
+      if (now - stat.mtimeMs >= STALE_LOCK_AGE_MS) {
+        return { reason: "lock-unreadable", hostname: os.hostname(), at: new Date(now).toISOString() };
+      }
+    } catch {
+      // The file vanished between the read and here, which means it was released.
+    }
+    return undefined;
   }
 
   if (typeof owner?.createdAt === "string") {

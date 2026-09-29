@@ -180,3 +180,39 @@ describe("withFileLock with a stale lock on disk", () => {
     }
   });
 });
+
+describe("a lock that is being acquired", () => {
+  it("is not stale while it is still being written", () => {
+    // The holder creates the file and then writes its record into it. In that
+    // window the file exists, is empty, and cannot be parsed — and a reader that
+    // treated that as proof of a dead owner would take the lock away from a
+    // process midway through acquiring it, leaving two writers on one state
+    // file. The window is microseconds; requiring age is what makes it matter
+    // not at all.
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-lock-"));
+    const lockPath = path.join(directory, "state.lock");
+
+    fs.writeFileSync(lockPath, "");
+    expect(isLockStale(lockPath)).toBeUndefined();
+
+    fs.writeFileSync(lockPath, '{"pid":');
+    expect(isLockStale(lockPath)).toBeUndefined();
+
+    fs.rmSync(directory, { recursive: true, force: true });
+  });
+
+  it("is recovered once it is old, because then nobody is writing it", () => {
+    // The other half: an unreadable lock that has been sitting there is a file
+    // nobody is maintaining, and refusing to take it over would block the
+    // session forever — which is the failure the takeover exists to remove.
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-lock-"));
+    const lockPath = path.join(directory, "state.lock");
+    fs.writeFileSync(lockPath, "");
+    const past = new Date(Date.now() - 120_000);
+    fs.utimesSync(lockPath, past, past);
+
+    expect(isLockStale(lockPath)?.reason).toBe("lock-unreadable");
+
+    fs.rmSync(directory, { recursive: true, force: true });
+  });
+});
