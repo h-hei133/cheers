@@ -179,14 +179,35 @@ describe("createStepFunction", () => {
     expect(body.tools).toBeUndefined();
   });
 
-  it("explains an empty answer instead of inventing one", async () => {
+  it("maps a refusal to an error stop reason rather than a finished one", async () => {
+    // A content filter is the provider refusing, not the model finishing. The
+    // refusal has to reach the kernel as an error so the turn stops instead of
+    // treating a refusal as a completed answer.
     const step = createStepFunction({
       ...request,
-      fetchImpl: async () => jsonResponse({ choices: [{ message: { content: "" }, finish_reason: "content_filter" }] }),
+      fetchImpl: async () =>
+        jsonResponse({
+          choices: [{ message: { content: "" }, finish_reason: "content_filter" }],
+        }),
+    });
+
+    const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
+
+    expect(result.stopReason).toBe("error");
+  });
+
+  it("explains an empty answer instead of inventing one", async () => {
+    // An answer with no content and no refusal reason is the provider saying
+    // nothing, not the provider refusing: the refusal is `content_filter`, which
+    // is an error, while an empty finish is a step to explain rather than a
+    // stop to report as clean.
+    const step = createStepFunction({
+      ...request,
+      fetchImpl: async () => jsonResponse({ choices: [{ message: { content: "" }, finish_reason: "stop" }] }),
     });
     const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
     expect(result.text).toBe("");
-    expect(result.errorMessage).toContain("withheld the reply");
+    expect(result.errorMessage).toContain("returned nothing at all");
     expect(result.stopReason).toBe("stop");
   });
 

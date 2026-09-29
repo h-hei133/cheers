@@ -605,9 +605,19 @@ function toToolCall(call: StreamedToolCall): AgentToolCall {
   return { id: call.id, name: call.function.name, args };
 }
 
+/**
+ * The kernel stop reason for a provider's finish reason.
+ *
+ * `length` is the one reason that means "truncated, ask for less". `stop` is
+ * the one that means "finished". Everything else — `content_filter`, `error`,
+ * and any value a provider invents that this code has never seen — is an error:
+ * the answer did not arrive, and claiming it finished would present a refusal
+ * as a completed turn.
+ */
 function stopReasonOf(finishReason: string | null | undefined): AgentStopReason {
   if (finishReason === "length") return "length";
-  return "stop";
+  if (finishReason === "stop" || finishReason === "tool_calls" || finishReason == null) return "stop";
+  return "error";
 }
 
 /**

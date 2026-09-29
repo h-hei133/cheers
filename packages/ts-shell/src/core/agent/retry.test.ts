@@ -67,6 +67,15 @@ describe("isRetryableFailure", () => {
     expect(isRetryableFailure("error", message)).toBe(false);
   });
 
+  it("does not retry a safety block or a content filter", () => {
+    // A refusal is not a transient failure: the same request asked again gets
+    // the same refusal, and each attempt spends quota to learn nothing.
+    expect(isRetryableFailure("error", "Network error: Provider finish_reason: content_filter")).toBe(false);
+    expect(isRetryableFailure("error", "Network error: Provider finish_reason: SAFETY")).toBe(false);
+    expect(isRetryableFailure("error", "Provider reported an error mid-stream: overloaded_error")).toBe(true);
+    expect(isRetryableFailure("error", "Network error: upstream exploded")).toBe(true);
+  });
+
   it("leaves a successful step alone", () => {
     expect(isRetryableFailure("stop", undefined)).toBe(false);
   });

@@ -183,11 +183,22 @@ export interface Chunk {
   readonly promptFeedback?: { readonly blockReason?: string; readonly blockReasonMessage?: string };
 }
 
-/** Map a Google finishReason into the stop reason the turn layer expects. */
+/**
+ * Map a Google finishReason into the stop reason the turn layer expects.
+ *
+ * `MAX_TOKENS` is the one reason that means "truncated, ask for less": every
+ * other value the API sends — `SAFETY`, `RECITATION`, `BLOCKLIST`,
+ * `PROHIBITED_CONTENT`, `SPII`, `IMAGE_SAFETY`, `MALFORMED_FUNCTION_CALL` and
+ * the rest — means the provider refused to produce the answer, which is an
+ * error rather than a finished one. Unknown values take the same branch: a
+ * reason this code has never heard of is not a reason to claim the answer is
+ * complete.
+ */
 export function mapGoogleFinishReason(reason: string | undefined): string | undefined {
   if (!reason) return undefined;
+  if (reason === "STOP") return "stop";
   if (reason === "MAX_TOKENS") return "length";
-  return "stop";
+  return "error";
 }
 
 /** Extract tool calls from parts in the same shape both stream and body readers produce. */
@@ -309,6 +320,47 @@ export async function* readGoogleStream(
 
   if (blocked !== undefined) {
     throw new Error(`The provider refused the prompt: ${blocked}`);
+  }
+
+  // A host that closes without a blank line after its last event leaves it in
+  // the buffer. Dropping it costs whatever that event carried, which on a short
+  // answer is the answer — the same tail the OpenAI-compatible reader flushes.
+  if (buffer.trim().length > 0) {
+    const payload = dataOf(buffer);
+    if (payload !== undefined) {
+      try {
+        const parsed = JSON.parse(payload) as Chunk;
+        if (parsed.promptFeedback?.blockReason) {
+          throw new Error(
+            `The provider refused the prompt: ${parsed.promptFeedback.blockReasonMessage ?? parsed.promptFeedback.blockReason}`,
+          );
+        }
+        const candidate = parsed.candidates?.[0];
+        if (candidate?.finishReason) finishReason = mapGoogleFinishReason(candidate.finishReason);
+        if (parsed.usageMetadata) {
+          usage = {
+            prompt_tokens: parsed.usageMetadata.promptTokenCount ?? 0,
+            completion_tokens: parsed.usageMetadata.candidatesTokenCount ?? 0,
+          };
+        }
+        calls.push(...toolCallsFromParts(candidate?.content?.parts ?? []));
+        for (const part of candidate?.content?.parts ?? []) {
+          if (part.functionCall) continue;
+          if (!part.text) continue;
+          if (part.thought) {
+            reasoning += part.text;
+            if (part.thoughtSignature) reasoningSignature += part.thoughtSignature;
+            yield { kind: "reasoning", text: part.text };
+          } else {
+            text += part.text;
+            yield { kind: "text", text: part.text };
+          }
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message.startsWith("The provider refused")) throw error;
+        // A partial or malformed tail is skipped like any other bad frame.
+      }
+    }
   }
 
   return {

@@ -121,6 +121,14 @@ interface DeltaChunk {
     readonly finish_reason?: string | null;
   }[];
   readonly usage?: StreamedCompletion["usage"];
+  /**
+   * An error the provider reports in band, where the transport succeeded and
+   * the answer did not. OpenAI-compatible hosts send this as a top-level
+   * `error` object on a chunk; without it the reader treats the chunk as an
+   * empty delta and the turn reports whatever text arrived before it as a
+   * finished answer.
+   */
+  readonly error?: { readonly message?: string; readonly type?: string; readonly code?: string | number } | null;
 }
 
 /** A tool call being assembled across deltas. */
@@ -331,6 +339,14 @@ function absorb(
   if (payload === "[DONE]") return { fragments: [], ended: true, settled: false };
   const parsed = parseChunk(payload);
   if (!parsed) return { fragments: [], ended: false, settled: false };
+  // Thrown rather than recorded, because a recorded error would still leave
+  // the fragments already yielded looking like an answer. The caller keeps
+  // them as the text the user has already read; the throw is what stops them
+  // from being taken for the answer.
+  if (parsed.error) {
+    const detail = parsed.error.message || parsed.error.type || String(parsed.error.code ?? "unknown error");
+    throw new Error(`Provider reported an error mid-stream: ${detail}`);
+  }
   if (parsed.usage) state.usage = parsed.usage;
   const choice = parsed.choices?.[0];
   if (choice?.finish_reason) state.finishReason = choice.finish_reason;

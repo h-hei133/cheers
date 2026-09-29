@@ -103,6 +103,39 @@ describe("requestCompactionSummary", () => {
     expect(checkpoint).not.toContain("<modified-files>");
   });
 
+  it("carries the temperature the protocol gates on, when the caller sets one", async () => {
+    // The compaction request passes the model's own tolerance through to the
+    // protocol, which is the layer that decides whether to write the field. A
+    // summarizer that could not say would send a temperature a host refuses.
+    const bodies: string[] = [];
+    const fetchImpl = (async (_url: string, init?: RequestInit) => {
+      bodies.push(String(init?.body ?? ""));
+      return {
+        ok: true,
+        json: async () => ({ choices: [{ message: { content: "a summary" } }] }),
+      } as unknown as Response;
+    }) as unknown as typeof fetch;
+
+    // A temperature the caller set reaches the body when the model accepts one.
+    await requestCompactionSummary({
+      provider: { baseUrl: "https://provider.test/v1", headers: {}, model: "m", supportsTemperature: true },
+      fetchImpl,
+      messages: [{ role: "user", content: "hi" }],
+      temperature: 0.2,
+    });
+    // And the same request is built without it when the model rejects one.
+    await requestCompactionSummary({
+      provider: { baseUrl: "https://provider.test/v1", headers: {}, model: "m", supportsTemperature: false },
+      fetchImpl,
+      messages: [{ role: "user", content: "hi" }],
+      temperature: 0.2,
+    });
+
+    const bodiesJson = bodies.map((body) => JSON.parse(body) as Record<string, unknown>);
+    expect(bodiesJson[0]).toMatchObject({ temperature: 0.2 });
+    expect(bodiesJson[1]).not.toHaveProperty("temperature");
+  });
+
   it("returns nothing when the provider gives no summary", async () => {
     const fetchImpl = (async () => ({ ok: true, json: async () => ({}) }) as unknown as Response) as unknown as typeof fetch;
     const result = await requestCompactionSummary({

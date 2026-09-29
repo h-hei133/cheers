@@ -27,6 +27,7 @@ import { requestCompactionSummary } from "../../core/query/compaction/summarize.
 import { providerFetchFromTimeouts, providerTimeoutsFrom } from "../../provider/request/fetch.js";
 import { accountAuthFor, providerAuthorization, renewAccountAuthIfExpiring } from "../../provider/request/authorization.js";
 import { catalogModel, providerEndpoint } from "../../core/models/catalog.js";
+import { resolveRequestShape } from "../../core/models/requestShape.js";
 import type { EndpointKind } from "../../provider/endpoints/kinds.js";
 import { projectMemoryRootFor } from "../../memory/projectMemoryRoot.js";
 import { createCacheWarmingRunner, type CacheWarmingRunner } from "../../turn/cacheWarm.js";
@@ -264,6 +265,11 @@ export function createCliSessionRuntime(input: {
   const compactionProvider = (): CompactionProvider | undefined => {
     const target = compactionTarget();
     if (!target) return undefined;
+    // Resolved from the catalogue the way the turn resolves it, so a model
+    // that rejects a temperature does not get one in its summary request
+    // either. The compaction body carries no temperature of its own; the flag
+    // is what the protocols gate on.
+    const shape = resolveRequestShape(catalog, target.provider, target.model, undefined);
     return {
       headers: providerAuthorization({
         apiKey: target.apiKey,
@@ -274,6 +280,7 @@ export function createCliSessionRuntime(input: {
       model: target.model,
       providerId: target.provider,
       ...(endpointFor(target.provider) ? { endpoint: endpointFor(target.provider) } : {}),
+      supportsTemperature: shape.supportsTemperature,
     };
   };
 

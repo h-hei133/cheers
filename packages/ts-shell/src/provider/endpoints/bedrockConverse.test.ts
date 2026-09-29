@@ -182,6 +182,76 @@ describe("the request body", () => {
   });
 });
 
+describe("a message with an image", () => {
+  it("sends the image as its own block rather than its description", () => {
+    // Flattening to text would send a request the model reads as a
+    // description of a picture it cannot see. The picture has to arrive.
+    const body = endpointTurnBody("bedrock-converse-stream", {
+      ...BASE,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "what is in this" },
+            { type: "image", mimeType: "image/png", data: "aW1hZ2U=" },
+          ],
+        },
+      ],
+    });
+    const messages = body.messages as ReadonlyArray<{ content: ReadonlyArray<Record<string, unknown>> }>;
+    const kinds = messages[0]!.content.map((block) => Object.keys(block)[0]);
+    expect(kinds).toEqual(["text", "image"]);
+    const image = messages[0]!.content[1]!.image as { format: string; source: { bytes: string } };
+    expect(image.format).toBe("png");
+    expect(image.source.bytes).toBe("aW1hZ2U=");
+  });
+
+  it("maps a JPEG MIME type to the format name this protocol expects", () => {
+    const body = endpointTurnBody("bedrock-converse-stream", {
+      ...BASE,
+      messages: [
+        {
+          role: "user",
+          content: [{ type: "image", mimeType: "image/jpg", data: "aW1hZ2U=" }],
+        },
+      ],
+    });
+    const messages = body.messages as ReadonlyArray<{ content: ReadonlyArray<Record<string, unknown>> }>;
+    const image = messages[0]!.content[0]!.image as { format: string };
+    expect(image.format).toBe("jpeg");
+  });
+
+  it("carries the text beside the image, which flattening would have dropped", () => {
+    const body = endpointTurnBody("bedrock-converse-stream", {
+      ...BASE,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "look at this" },
+            { type: "image", mimeType: "image/png", data: "aW1hZ2U=" },
+          ],
+        },
+      ],
+    });
+    const messages = body.messages as ReadonlyArray<{ content: ReadonlyArray<Record<string, unknown>> }>;
+    expect(messages[0]!.content[0]).toEqual({ text: "look at this" });
+  });
+
+  it("carries a thinking budget in the protocol's own field, not the sampling settings", () => {
+    const body = endpointTurnBody("bedrock-converse-stream", {
+      ...BASE,
+      thinkingBudgetTokens: 4096,
+    }) as { additionalModelRequestFields?: { thinking?: { type: string; budget_tokens: number } } };
+    expect(body.additionalModelRequestFields?.thinking).toEqual({ type: "enabled", budget_tokens: 4096 });
+  });
+
+  it("omits the thinking field when no budget was configured", () => {
+    const body = endpointTurnBody("bedrock-converse-stream", BASE) as { additionalModelRequestFields?: unknown };
+    expect(body.additionalModelRequestFields).toBeUndefined();
+  });
+});
+
 describe("reading the answer", () => {
   it("joins the text fragments", async () => {
     const result = await readAll([

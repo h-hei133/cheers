@@ -244,6 +244,27 @@ describe("reading the answer", () => {
     expect((await readAll(stream)).text).toBe("ok");
   });
 
+  it("maps a safety stop reason to an error rather than a finish", async () => {
+    // SAFETY means the provider refused to produce the answer, not that the
+    // answer is complete. Mapping it to "stop" would end the turn cleanly on a
+    // refusal the user never saw explained.
+    const generator = endpointShape("google-generative-ai").readStream(
+      sseStream({ candidates: [{ content: { parts: [{ text: "partial" }] }, finishReason: "SAFETY" }] }),
+    );
+    let step = await generator.next();
+    while (step.done !== true) step = await generator.next();
+    expect(step.value.finishReason).toBe("error");
+  });
+
+  it("maps MAX_TOKENS to the one reason that means truncation", async () => {
+    const generator = endpointShape("google-generative-ai").readStream(
+      sseStream({ candidates: [{ content: { parts: [{ text: "cut off" }] }, finishReason: "MAX_TOKENS" }] }),
+    );
+    let step = await generator.next();
+    while (step.done !== true) step = await generator.next();
+    expect(step.value.finishReason).toBe("length");
+  });
+
   it("refuses a prompt the provider blocked", async () => {
     // The provider answered, so the transport looks healthy; without this the run
     // would report an empty answer as though the model had nothing to say.

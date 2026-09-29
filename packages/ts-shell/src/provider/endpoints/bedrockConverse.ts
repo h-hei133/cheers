@@ -96,8 +96,7 @@ function convertMessages(messages: readonly ChatMessage[]): WireMessage[] {
     }
 
     if (message.role === "user") {
-      const text = textOf(message.content);
-      if (text) pushUser({ text });
+      pushUserBlocks(pushUser, message.content);
       continue;
     }
 
@@ -135,11 +134,54 @@ function convertMessages(messages: readonly ChatMessage[]): WireMessage[] {
   return wire;
 }
 
+type PushUser = (block: UserBlock) => void;
+
 /** The text of a message whose content may be a string or a list of blocks. */
 function textOf(content: ChatMessage["content"]): string {
   if (typeof content === "string") return content;
   if (!content) return "";
   return content.map((block) => (block.type === "text" ? block.text : "")).join("");
+}
+
+/**
+ * A user message's blocks in this protocol's shape.
+ *
+ * Text stays text and an image stays an image: flattening to text here would
+ * send a request the model reads as a description of a picture it cannot see,
+ * and the picture would never arrive. A block this code does not recognize is
+ * carried as its text rather than dropped, so an unknown shape costs the
+ * picture rather than the words beside it.
+ */
+function pushUserBlocks(pushUser: PushUser, content: ChatMessage["content"]): void {
+  if (typeof content === "string") {
+    if (content) pushUser({ text: content });
+    return;
+  }
+  if (!content) return;
+  for (const block of content) {
+    if (block.type === "text") {
+      if (block.text) pushUser({ text: block.text });
+      continue;
+    }
+    if (block.type === "image") {
+      pushUser({
+        image: {
+          format: imageFormat(block.mimeType),
+          source: { bytes: block.data },
+        },
+      });
+      continue;
+    }
+    const fallback: string = (block as { readonly text?: string }).text ?? "";
+    if (fallback) pushUser({ text: fallback });
+  }
+}
+
+/** The format name this protocol expects for a MIME type. */
+function imageFormat(mimeType: string): string {
+  const format = mimeType.split("/")[1]?.toLowerCase();
+  if (format === "jpg") return "jpeg";
+  return format ?? "png";
 }
 
 /** Arguments as an object, falling back to an empty one for text that is not JSON. */
@@ -211,6 +253,17 @@ function converseBody(input: TurnRequest): Record<string, unknown> {
         : {}),
       ...(input.topP !== undefined ? { topP: input.topP } : {}),
     },
+    // Thinking is a model-level request, not a sampling setting: it travels in
+    // the protocol's own fields, and only when the run configured a budget.
+    // Sending it unasked would turn on reasoning for a model the caller wanted
+    // fast, and omitting it when asked would silently drop the setting.
+    ...(input.thinkingBudgetTokens !== undefined
+      ? {
+          additionalModelRequestFields: {
+            thinking: { type: "enabled", budget_tokens: input.thinkingBudgetTokens },
+          },
+        }
+      : {}),
     ...(toolConfig ? { toolConfig } : {}),
   };
 }

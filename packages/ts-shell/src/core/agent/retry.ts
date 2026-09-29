@@ -64,9 +64,26 @@ const RETRYABLE_FAILURE =
  * An account out of budget stays out of budget, and a retry spends quota to
  * learn the same thing. These are checked first: a message can carry both a
  * limit and a status code, and the limit is the truer answer.
+ *
+ * A refusal belongs here for the same reason. A safety block or a content
+ * filter answers the same request the same way every time, so retrying one
+ * spends quota to be refused again — and presents the refusal as a transient
+ * outage the user should wait out.
  */
 const UNRECOVERABLE_FAILURE =
   /GoUsageLimitError|FreeUsageLimitError|Monthly usage limit reached|available balance|insufficient_quota|out of budget|quota exceeded|billing/i;
+
+/**
+ * A refusal, as distinct from a failure.
+ *
+ * Checked alongside the unrecoverable set, but kept as its own pattern because
+ * the reason differs: a limit will still hold tomorrow, while a refusal holds
+ * for this request no matter when it is asked. Both mean the same thing for the
+ * retry decision — asking again cannot help — but conflating them would report
+ * a safety block as an exhausted account.
+ */
+const REFUSAL =
+  /content.?filter|\bsafety\b|recitation|prohibited.?content|blocked.?content|refused the prompt/i;
 
 /**
  * Whether a finished step failed for a reason another attempt could survive.
@@ -79,6 +96,7 @@ export function isRetryableFailure(stopReason: string, errorMessage: string | un
   if (stopReason !== "error") return false;
   const message = errorMessage ?? "";
   if (UNRECOVERABLE_FAILURE.test(message)) return false;
+  if (REFUSAL.test(message)) return false;
   return RETRYABLE_FAILURE.test(message);
 }
 

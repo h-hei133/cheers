@@ -33,6 +33,15 @@ export interface CompactionProvider {
   readonly headers: Readonly<Record<string, string>>;
   readonly model: string;
   /**
+   * Whether this model accepts a sampling temperature.
+   *
+   * Absent means it does, which is what every model got before the catalogue
+   * could say otherwise. The compaction request carries no temperature of its
+   * own, but the protocols gate on this flag, and a summarizer that cannot say
+   * it is a model that rejects one would send a field the host refuses.
+   */
+  readonly supportsTemperature?: boolean;
+  /**
    * Which endpoint kind this request goes to.
    *
    * Absent means the default one. Summarizing is a model call like any other, so
@@ -90,6 +99,14 @@ export interface CompactionRequest {
   /** Which summary to ask for; defaults to the full checkpoint prompt. */
   readonly prompt?: string;
   /**
+   * A sampling temperature for the summarization, when the caller has one.
+   *
+   * Gated by the provider's `supportsTemperature`, the same gate the main
+   * request uses: a model that rejects the field gets a request without it
+   * rather than a 400.
+   */
+  readonly temperature?: number;
+  /**
    * The checkpoint the messages already begin with, when a previous compaction
    * wrote one.
    *
@@ -121,6 +138,10 @@ export async function requestCompactionSummary(request: CompactionRequest): Prom
     body: JSON.stringify(
       endpointBody(endpointKind(request.provider.endpoint), {
         model: request.provider.model,
+        ...(request.provider.supportsTemperature !== undefined
+          ? { supportsTemperature: request.provider.supportsTemperature }
+          : {}),
+        ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
         messages: [
           ...(previousSummary
             ? [{ role: "user" as const, content: `<previous-summary>\n${previousSummary}\n</previous-summary>` }]

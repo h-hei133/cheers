@@ -124,6 +124,28 @@ describe("reading a streamed completion", () => {
   });
 });
 
+describe("an error the provider reports mid-stream", () => {
+  it("throws instead of presenting the text so far as a finished answer", async () => {
+    // The transport succeeded and the answer did not. Without this the reader
+    // treats the chunk as an empty delta, and the turn reports "Hello" as the
+    // complete answer to a request the provider refused.
+    await expect(
+      collect(
+        streamOf(
+          chunk({ content: "Hello" }),
+          `data: ${JSON.stringify({ error: { message: "upstream exploded", type: "server_error" } })}\n\n`,
+        ),
+      ),
+    ).rejects.toThrow("Provider reported an error mid-stream: upstream exploded");
+  });
+
+  it("names the error type when the frame carries no message", async () => {
+    await expect(
+      collect(streamOf(`data: ${JSON.stringify({ error: { type: "overloaded_error" } })}\n\n`)),
+    ).rejects.toThrow("Provider reported an error mid-stream: overloaded_error");
+  });
+});
+
 describe("reasoning that arrives beside the answer", () => {
   it("keeps the working out on its own channel", async () => {
     const { deltas, thinking, result } = await collect(
