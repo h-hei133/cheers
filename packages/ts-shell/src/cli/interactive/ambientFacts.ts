@@ -16,7 +16,7 @@ const scanner = new AgentRegistryScanner();
 /** Current ambient state, recomputed per frame from live stores. */
 export function readAmbientFacts(sessionId: string): AmbientContext {
   return {
-    openTodos: getSessionTodos().filter((todo) => todo.status !== "done").length,
+    openTodos: getSessionTodos(sessionId).filter((todo) => todo.status !== "done").length,
     peerSessions: countPeerSessions(sessionId),
     runningCommands: backgroundTasks.list().filter((task) => task.state === "running").length,
   };

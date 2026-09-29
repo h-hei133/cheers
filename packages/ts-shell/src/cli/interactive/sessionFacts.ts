@@ -72,7 +72,7 @@ export function readStatusFacts(
     worktreeDirty: context.gitContext.isClean === null ? undefined : !context.gitContext.isClean,
     queued: live.queued,
     peers: live.peers,
-    openTodos: getSessionTodos().filter((todo) => todo.status !== "done").length,
+    openTodos: getSessionTodos(context.session.id).filter((todo) => todo.status !== "done").length,
     // Absent until a real request has been accounted for: a zeroed gauge is a
     // fabricated fact, not a neutral one.
     ...(usage.lastPromptTokens > 0

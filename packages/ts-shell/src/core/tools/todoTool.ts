@@ -1,6 +1,6 @@
 import { approvedResult, deniedResult } from "./toolResultLifecycle.js";
 import type { ToolDefinition } from "../../tools/types.js";
-import { runTodoCommand } from "../commands/todoCommandRuntime.js";
+import { getSessionTodos, runTodoCommand } from "../commands/todoCommandRuntime.js";
 
 /**
  * /todo tool
@@ -53,12 +53,23 @@ export function createTodoToolDefinition(): ToolDefinition {
         cmdArgs.push(String(numericId));
       }
 
-      const result = await runTodoCommand(action === "list" ? [] : cmdArgs, {
-        cwd: context.workspaceRoot,
-        sessionId: context.taskId,
-      });
+      // The list travels in the result's metadata as well as its prose, so the
+      // session it changed can be restored from the record of the change —
+      // after a resume, or on the branch this turn ends up on.
+      const sessionId = context.sessionId ?? context.taskId;
+      const result = await runTodoCommand(
+        action === "list" ? [] : cmdArgs,
+        { cwd: context.workspaceRoot },
+        sessionId,
+      );
 
-      return approvedResult(result.output);
+      return approvedResult(result.output, {
+        todo: getSessionTodos(sessionId).map((item) => ({
+          id: item.id,
+          text: item.text,
+          status: item.status,
+        })),
+      });
     },
   };
 }

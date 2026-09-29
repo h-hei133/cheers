@@ -13,6 +13,16 @@ export interface AgentToolResult {
   readonly output: string;
   readonly isError: boolean;
   readonly terminate?: boolean;
+  /**
+   * Structured facts a tool wants recorded beside its prose.
+   *
+   * The prose is what the model reads and answers; the metadata is what a
+   * later reader replays state from — the todo checklist, say, which is part of
+   * the session's facts rather than of the answer. It travels with the result
+   * message and is bounded at the event boundary, so recording state does not
+   * pay for it in the prompt.
+   */
+  readonly metadata?: Record<string, unknown>;
 }
 
 export type AgentToolExecutionMode = "sequential" | "parallel";
@@ -98,8 +108,17 @@ export function boundText(text: string, limit: number = TOOL_OUTPUT_LIMIT): stri
   return `${text.slice(0, limit)}\n\n[... output truncated to ${limit} chars]`;
 }
 
-export function createToolResultMessage(toolCallId: string, output: string): AgentMessage {
-  return { role: "tool", tool_call_id: toolCallId, content: output };
+export function createToolResultMessage(
+  toolCallId: string,
+  output: string,
+  metadata?: Record<string, unknown>,
+): AgentMessage {
+  return {
+    role: "tool",
+    tool_call_id: toolCallId,
+    content: output,
+    ...(metadata ? { metadata } : {}),
+  };
 }
 
 function abortedResult(): AgentToolResult {
@@ -137,7 +156,12 @@ export async function failTruncatedCalls(
       isError: true,
     };
     await emitExecutionEnd(emit, call, true);
-    messages.push(await emitToolResultMessage(createToolResultMessage(call.id, result.output), emit));
+    messages.push(
+      await emitToolResultMessage(
+        createToolResultMessage(call.id, result.output, result.metadata),
+        emit,
+      ),
+    );
   }
   return messages;
 }
@@ -325,7 +349,12 @@ async function runSequential(
     }
     await emitExecutionEnd(emit, call, result.isError);
     results.push(result);
-    messages.push(await emitToolResultMessage(createToolResultMessage(call.id, result.output), emit));
+    messages.push(
+      await emitToolResultMessage(
+        createToolResultMessage(call.id, result.output, result.metadata),
+        emit,
+      ),
+    );
     if (signal?.aborted) {
       break;
     }

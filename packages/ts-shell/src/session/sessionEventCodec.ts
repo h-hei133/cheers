@@ -60,6 +60,12 @@ export type TranscriptEvent =
       tool_calls?: readonly SessionToolCall[];
       tool_call_id?: string;
       /**
+       * Structured facts recorded beside a tool's prose; see
+       * `SessionMessage.metadata`. Bounded when the event is written, so a
+       * large record cannot swell the transcript.
+       */
+      metadata?: Record<string, unknown>;
+      /**
        * The model an assistant answer came from. Absent on every line written
        * before the field existed, and on every role that has no model behind
        * it. Readers treat absence as the current model, so old transcripts
@@ -195,6 +201,7 @@ export function createMessageTranscriptEvent(
     content: message.content,
     ...(message.tool_calls ? { tool_calls: message.tool_calls } : {}),
     ...(message.tool_call_id ? { tool_call_id: message.tool_call_id } : {}),
+    ...(message.metadata ? { metadata: message.metadata } : {}),
     ...(message.origin ? { origin: message.origin } : {}),
     ...(message.reasoning ? { reasoning: message.reasoning } : {}),
     ...(message.failureClass ? { failureClass: message.failureClass } : {}),
@@ -350,6 +357,8 @@ export function transcriptEventToSessionMessage(
     content: event.content,
     tool_calls: event.tool_calls,
     tool_call_id: event.tool_call_id,
+    // Carried back so a resumed session can replay the state the tool recorded.
+    ...(event.metadata ? { metadata: event.metadata } : {}),
     ...(event.origin ? { origin: event.origin } : {}),
     // Carried back, not dropped. The signature is what makes a replayed
     // assistant turn acceptable to a provider that validates it, so losing it

@@ -136,7 +136,11 @@ async function executeTool(
       // unaffected, since the callback only fires if the tool calls it.
       ...(onUpdate ? { onOutput: (chunk: string) => onUpdate(chunk) } : {}),
     });
-    return { output: result.output || result.content || "Success", isError: !result.success };
+    return {
+      output: result.output || result.content || "Success",
+      isError: !result.success,
+      ...(result.metadata ? { metadata: result.metadata } : {}),
+    };
   } catch (error) {
     return { output: `Tool execution error: ${error instanceof Error ? error.message : String(error)}`, isError: true };
   }

@@ -24,6 +24,15 @@ export interface SessionMessage {
   content: string | readonly MultimodalContentBlock[];
   tool_calls?: readonly SessionToolCall[];
   tool_call_id?: string;
+  /**
+   * Structured facts recorded beside a tool's prose.
+   *
+   * The prose is the answer the model reads; this is the state a later reader
+   * replays from — the todo checklist a session carries, restored after a
+   * resume or on the branch this turn belongs to. Optional and additive, so
+   * every transcript written before it exists reads exactly as it did.
+   */
+  metadata?: Record<string, unknown>;
   timestamp?: string;
   /**
    * The model an assistant answer came from, when the answer was model-shaped.

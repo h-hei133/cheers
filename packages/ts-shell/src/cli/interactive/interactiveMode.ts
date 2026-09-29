@@ -41,6 +41,7 @@ import { routeSearchKey, styleSearchRow } from "../../presentation/tui/transcrip
 import { OverlayHost, type Picker } from "./overlay.js";
 import { opensPicker, pickerFor, type PickerHost } from "./picker/registry.js";
 import { readStatusItems, writeStatusItems } from "./tuiSettings.js";
+import { replayTodosFromMessages } from "../../core/commands/todoCommandRuntime.js";
 import type { ImageContent } from "../../model-adapters/multimodal.js";
 import { readStatusFacts, readWelcomeState } from "./sessionFacts.js";
 import { couldBeCommand, slashSuggestions } from "./slashSuggestions.js";
@@ -176,6 +177,19 @@ export class InteractiveMode {
   constructor(private readonly options: InteractiveModeOptions) {
     this.terminal = options.terminal ?? processTerminal;
     this.statusItems = readStatusItems(options.runtimeContext.projectRoot);
+    // The checklist is part of what a session carried, so a session being opened
+    // resumes its own list rather than starting empty — and a rewind to an
+    // earlier branch resumes the list as of that branch, because the turns the
+    // rewind keeps are the turns replayed.
+    try {
+      replayTodosFromMessages(
+        options.runtimeContext.session.id,
+        options.sessionManager.loadSession(options.runtimeContext.session.id).turns,
+      );
+    } catch {
+      // A session that cannot be read yet has no turns to replay; an empty list
+      // is the honest state for one whose record is not loadable.
+    }
     this.clipboard = new Clipboard({
       cwd: options.runtimeContext.cwd,
       sessionId: options.runtimeContext.session.id,

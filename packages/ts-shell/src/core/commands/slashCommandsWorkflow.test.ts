@@ -89,24 +89,27 @@ describe("Phase 5 High-Level Workflow Commands Subsystem", () => {
 
   describe("/todo command", () => {
     it("adds tasks, marks them in_progress and done, and visualizes checklist", async () => {
-      await runTodoCommand(["clear"], { cwd: tempDir });
+      // The list is per session now, so the test drives one session the way
+      // the surface does: named, and read back through the same id.
+      const session = "sess_todo_workflow";
+      await runTodoCommand(["clear"], { cwd: tempDir }, session);
 
       // Add tasks
-      await runTodoCommand(["add", "Write unit tests"], { cwd: tempDir });
-      await runTodoCommand(["add", "Refactor session manager"], { cwd: tempDir });
+      await runTodoCommand(["add", "Write unit tests"], { cwd: tempDir }, session);
+      await runTodoCommand(["add", "Refactor session manager"], { cwd: tempDir }, session);
 
-      expect(getSessionTodos().length).toBe(2);
+      expect(getSessionTodos(session).length).toBe(2);
 
       // Start task 1
-      await runTodoCommand(["start", "1"], { cwd: tempDir });
-      expect(getSessionTodos()[0].status).toBe("in_progress");
+      await runTodoCommand(["start", "1"], { cwd: tempDir }, session);
+      expect(getSessionTodos(session)[0].status).toBe("in_progress");
 
       // Complete task 1
-      await runTodoCommand(["done", "1"], { cwd: tempDir });
-      expect(getSessionTodos()[0].status).toBe("done");
+      await runTodoCommand(["done", "1"], { cwd: tempDir }, session);
+      expect(getSessionTodos(session)[0].status).toBe("done");
 
       // Render checklist
-      const viewRes = await runTodoCommand([], { cwd: tempDir });
+      const viewRes = await runTodoCommand([], { cwd: tempDir }, session);
       expect(viewRes.output).toContain("Session Task Checklist");
       expect(viewRes.output).toContain("[X] **#1**: Write unit tests *(done)*");
       expect(viewRes.output).toContain("[ ] **#2**: Refactor session manager *(pending)*");
