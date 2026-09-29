@@ -1433,3 +1433,175 @@ detached 执行模式」。**后台执行落地后这是假的** —— 已删�
 `.wiki/features/_index.md` 本节之前止于 Phase 13 —— **Phase 14、15 均未同步本
 文件**（log 声称同步过）。本次补记本节；`verify:docs-drift:strict` 的
 docs-source 计数为 advisory（118 条，非阻断），未逐条修。
+
+---
+
+## 17. Phase 16：第二轮全面差距扫描（**2026-09-28/29**）
+
+> 前置研究全文见 [`12-gap-and-debt-research-2.md`](12-gap-and-debt-research-2.md)。
+> 本轮性质：01–07 与 Phase 0–15 全部收口之后的**第二轮**扫描，
+> 目标从「相比 pi 差在哪」转为「**哪些已登记为完成的东西实测仍不成立**」。
+> **零代码改动**，只产出分类、证据与方向。
+
+### 17.1 执行方式与两次基础设施事故
+
+3 个只读子代理分域 + 主代理自建**模块可达图**与 12 个探针。
+
+- **上游账户额度耗尽（首次记录）**：W2a（浏览器栈）、W2b（上下文记忆）因
+  `402 当前账户暂无生效套餐` 终止；维护者指示改由主代理完成，故本阶段
+  绝大部分结论由主代理亲验产出。
+- **`content_filter`（第 5 次记录）**：`cli/interactive/**` 切片连续三次被拦截。
+  处置照既有结论——该阅读面由主代理亲验。
+
+### 17.2 四项头条：登记为完成／已修，实测仍不成立
+
+| # | 缺陷 | 类别 | 证据等级 |
+|---|---|---|---|
+| **§1.1** | **项目记忆注入链在生产装配处断掉**：`cliSessionRuntimeFactory.ts:302` 构造 `ShellSessionRuntime` 时**从不传 `projectMemoryStore`**；`createProjectMemoryLocalStore` 生产调用者为 0。实机 `/memory` 全程 `Store mode: disabled` / `Persistence: not enabled` | WIRING | ✅ 模块图 + 实机 |
+| **§1.2** | **`/compact` 是 `previewOnly` 报告而非压缩**（`compactCommandContract.ts:48`）；交互路径经 `interactiveCommandRouter` 走真引擎，命令路径走报告。真压缩路径（`core/shell/compaction.ts`）**不派发 `PreCompact`/`PostCompact`**；`reason:"manual"` 零生产调用者 | WIRING + 语义分裂 | ✅ 读码 + 实机 |
+| **§1.3** | **`regular` 主屏模式丢失原地增长的内容**（比注释所述更严重）：探针显示流式增长的同一行**根本不会被写**（`mainScreen.ts:110` 的 `content.length <= alreadyWritten` 直接 return）；`suspend()` 后**整份 transcript 重复追加** | DEFECTIVE | ✅ 探针 |
+| **§1.4** | **模型侧 `browser` 工具在 Chromium 不可用时返回编造的成功**：6 个动作全部 `success:true`，含 `Simulated click on element 'e1'` | DEMO/欺骗 | ✅ 探针 |
+
+### 17.3 浏览器双栈（§2）
+
+模块图：模型侧 `browser` 工具只到达 **13/162** 个 browser 模块，
+`/browser` 命令到达 **160/162**。模型侧**完全绕开**允许清单、出站决策、沙箱授权、
+执行确认、回执缓存——而 `core/security/egressGuard.ts:3-8` 的注释声称
+「browser allowlist、web fetchers、egress guard **都**问这个」，
+**该句对浏览器侧已不成立**（`web_fetch` 确实问了）。
+仓库自己的 `browser/runtime/core/directionDecision.ts` 把
+`hand-rolled-low-level-runtime` 列为 `rejectedPaths`，而 `sessionManager.ts` 正是它。
+
+### 17.4 其余已核实缺陷
+
+| 面 | 缺陷 | 类别 |
+|---|---|---|
+| 渲染 | 每帧**三遍全文档遍历**（`rowCount`+`render`+`documentRows`）；实测 20k 块 **48.82 ms/帧**，纯 O(N)；`documentRows` 在默认模式根本不被读 | TUI-UX |
+| 主题 | 无条件降 256 色、忽略 truecolor；`hasTrueColor`/`has256Color` 无可达消费者；**`NO_COLOR`/`FORCE_COLOR` 全仓零处理**；`tuiMode:"stream"` 无行为 | TUI-UX |
+| TUI | 代码围栏**无语法着色**（pi 有 56 个语法令牌，我们 32 个且无高亮器） | MISSING |
+| 会话 | **陈旧会话锁永久阻塞**：探针预置无人持有的 lock → 1218ms 抛错且锁留存；同仓 `browser/receipt/lock.ts` 已有带 `expiresAt` 的正确实现 | DEFECTIVE |
+| 会话 | `/todo` 是模块级单例，**不持久化**（跨 resume 丢失，状态条报 0 与事实相反） | DEFECTIVE |
+| 命令 | 广告与派发不一致：`statusline`/`status`/`back` 进帮助与补全但不进派发注册表，带参数必报未知命令 | WIRING |
+| 命令 | **`CommandDefinition.bridgeSafe` 是死字段**（30+ 声明、零消费者），`/permissions` 声明为真却在非交互被拦（与 Phase 9 S2 同型的第二个） | WIRING |
+| provider | OpenAI 兼容流内 `error` 帧被吞（探针：错误夹在增量间仍输出 "Hello" 当完整回答） | DEFECTIVE |
+| provider | Google `mapGoogleFinishReason` 把 SAFETY/RECITATION/OTHER 全映射为 `stop`（pi 全映射为 `error` 且穷尽检查） | DEFECTIVE |
+| provider | Bedrock 丢图片块、不下发 thinking 预算；Google 尾帧未分隔事件丢失；次要模型调用漏传 `supportsTemperature` | DEFECTIVE |
+| 死代码 | 从 CLI 不可达 **46** 个非测试模块：`core/harness/**` 29（位置错）、`test-utils/**` 9（正常）、`edit/patch` 三角 429 行（**真死码，含一套未接线的严格冲突检测**）、`eval/browser/**` 3、`runtimeHandoffProjection.ts` 502 行、`workspaceFileContract.ts` 205 行 | DEAD |
+
+### 17.5 已核实健全（防止未来重查）
+
+主题 token 覆盖（32/32 缺失 0）；transcript 截断行跳过而非致命；
+损坏 `state.json` 明确报告并起新会话；编辑的重复锚点**显式拒绝**而非改第一处；
+`fileLock` 同链可重入 + 信号量正确释放；18 个钩子事件**全部**有派发点且判定被消费；
+所有文本流用 `decode(..., {stream:true})`（UTF-8 跨块安全）；
+45+ slash 命令**零桩**（全接真实引擎）。
+
+### 17.6 建议执行序（16-A…16-N，14 项）
+
+详表见 `12-gap-and-debt-research-2.md` §9。前四项：
+**16-A 记忆注入链** → **16-D+16-E 浏览器假成功与双栈收敛** →
+**16-B `/compact` 合并与钩子** → **16-I `bridgeSafe` 接线或删除**。
+
+### 17.7 本轮边界
+
+`browser/**` 160 个模块的**逐个** real-vs-demo 判定未做（上游 402 中断），
+列为下一轮首要任务；交互层键位与文档的双向 diff 未产出（`content_filter`）；
+`session/continuation/**`（27 文件）与 `session/recovery/**` 未逐项审计；
+真实 provider 端到端未做（无凭据且禁止触碰真实配置）。
+
+---
+
+## 19. Phase 16: gap-and-debt round 2 execution (2026-09-29)
+
+**Scope**: 10 items from [`phase-16-decisions.md`](phase-16-decisions.md), executed in 4 waves.
+Zero items skipped; every one committed separately with its own revert verification.
+
+| Item | Commit | One-line outcome |
+|---|---|---|
+| 16-I | 3 commits | `bridgeSafe` (54 declarations, zero readers) deleted; `/permissions` reachable from a scripted run; `/statusline` became a real command whose write lands in the layer that decides it |
+| 16-D+16-E | 3 commits | the browser tool reports what it did instead of `Simulated …` when no browser is running; metadata/private/link-local refused, loopback allowed, redirect landings re-judged; one rule table now feeds both the fetcher's and the browser's policies |
+| 16-A | 2 commits | `projectMemoryStore` supplied at both the turn and the command assembly; `/memory save` writes to disk and the next prompt carries `<project_memory_context>` |
+| 16-B | 1 commit | bare `/compact` condenses on both surfaces; the checkpoint producer moved from the command to where a condensation happens, so a preview no longer stages an injection; PreCompact/PostCompact dispatch with the trigger reason and a blocked hook aborts before the summarizer is asked |
+| 16-K | 2 commits | a refusal is an error rather than a finished answer, in stream frames and both stop-reason mappings; Bedrock sends images and thinking; the compaction request carries the temperature gate; refusals are not retried |
+| 16-G | 1 commit | a lock its owner cannot release is recovered: owner recorded, three staleness readings, directory-claimed takeover, notice written beside the lock |
+| 16-C | 1 commit | the main screen rewrites rows still on screen instead of never; shrink erases; the fixed block is clamped; suspend restores per mode rather than re-appending the transcript |
+| 16-F | 1 commit | the frame carries the document as a function so the alternate screen stops paying for it; five mutation sites routed through the transcript so its row cache stops serving stale rows; `tuiMode: "stream"` gone |
+| 16-H | 1 commit | the todo checklist is per session, recorded beside each tool result, replayed from the turns a branch kept — a rewind sees the branch's own list |
+
+**Findings recorded during execution** (details in the decisions doc, one section per item):
+- `RESERVED_SHELL_SLASH_COMMANDS` was a hand-kept copy of the command registry, 26 commands adrift — every multi-word slash command in a scripted run was read as a project path.
+- `::1` was classified as an IPv4-mapped unspecified address, and `fd00:ec2::254` inherited the LAN's allowance.
+- A read-only checkout made the memory store throw instead of refusing.
+- The row cache served stale rows after five different mutation sites wrote to finalized blocks.
+- The retry matcher retried a safety block, because every in-band failure arrives with a `Network error:` prefix.
+
+**Backlog left open**: automatic memory injection (product-model change), runtime enum validation for config values, an epoch on `state.json` for lock takeover, generic metadata size bounds, Bedrock/Google live-provider credentials for E2E, syntax highlighting, dead code, `NO_COLOR`.
+
+## 18. Phase 16 规划：从 14 个候选中选出 10 项（**2026-09-29**）
+
+> 预研究 [`phase-16-pre-research.md`](phase-16-pre-research.md)、
+> 裁决 [`phase-16-decisions.md`](phase-16-decisions.md)。
+
+### 18.1 裁剪结果：14 → 10
+
+**纳入**（按执行序）：**16-I**（`bridgeSafe` 死字段 + `/permissions` + `/statusline` `/back`）
+→ **16-D+16-E**（浏览器假成功 + 出站治理，同一提交）→ **16-A**（记忆注入链接通）
+→ **16-B**（`/compact` 合并 + 压缩钩子）→ **16-K**（provider 错误保真）
+→ **16-G**（会话锁陈旧回收）→ **16-C**（`regular` 主屏记账重写）
+→ **16-F**（每帧 O(N)）→ **16-H**（`/todo` 可重放持久化）。
+
+**移出**：16-J 死代码清理（债务非缺陷）、16-L 的 Bedrock 端到端（无账号）、
+16-M `NO_COLOR`/truecolor/`"stream"`（P3）、16-N 语法着色（P3 增强）。
+
+### 18.2 预研究的关键参考事实
+
+- **16-A**：**pi 没有记忆子系统**（`grep auto-memory|MEMORY.md` 零命中），
+  真正的先例是 **Claude Code**（现行规格：`~/.claude/projects/<project>/memory/`、
+  `MEMORY.md` 索引常驻 200 行/25KB、topic 文件惰性、`type` 分四类、记忆豁免清理保留期）。
+  我方设计是**显式 `/memory use` 按需注入**，与 Claude Code 的**常驻注入**是不同产品模型。
+- **16-B**：pi 是**单一手动入口**（`agent-session.ts:2406 compact()`），
+  emit `reason:"manual"` 并派发**可取消**的 `session_before_compact`，
+  自动与手动共用底层 `_runDefaultCompaction`。
+- **16-D**：`playwright-mcp`/`stagehand` **都**在不可用时**抛错**，从不编造成功。
+- **16-C**：pi 用 `captureRenderState`/`restoreRenderState` + `viewportTop`/`hardwareCursorRow`
+  差分重写**可见**行；`firstChanged < prevViewportTop` 才整屏重绘；
+  **从不查 DSR**（我方注释所说的「DSR 太贵」在两侧都不成立，真实理由是**不需要**）。
+- **16-F**：pi 在组件/布局层按视口切片（`scroll-view.ts` 维护 `contentHeight`/`currentScrollTop`）。
+- **16-G**：pi 用 `proper-lockfile`；opencode 自建 flock（`staleMs: 60_000` + breaker 目录）。
+- **16-H**：pi 的 todo **是扩展**，状态存**工具结果 details**，载入/切分支时**按序重放**
+  ⇒ **分支正确**；其 `let todos = []` 也是内存态，持久化来自「结果自带状态」。
+
+### 18.3 主代理在规划中发现的新缺陷（12 号文档未载）
+
+| 缺陷 | 证据 | 归属 |
+|---|---|---|
+| **render 缓存先于折叠失效** | 探针：20 行 `finalized` 块 `setCollapsed(true)` 后仍 **21 行**；`notify` 改文本后行数仍是旧值（绕过缓存则变化）⇒ **折叠完全不生效** | 并入 16-F |
+| **`/clear` 清不掉 regular 滚回区** | `interactiveMode.ts:798-800` 注释称「连终端滚回区一起清空」，实现只有 `transcript.clear()` + 强制重绘，**无清屏序列** | 并入 16-C |
+| **5 个写入方改 `finalized` 块** | `turnSink:124`、`toolCards:44/61/67/100/102`、**`pager:28-29`**、**`blocks:336-337`**（后两处为复核补全） | 并入 16-F |
+
+### 18.4 三路复核：18 条断言，**15 条修正**
+
+| 复核 | 切面 | 结论 |
+|---|---|---|
+| **R1** `R1MemoryCompactReview` | 16-A / 16-B | 6 条：3 条 `correct`，**3 条修正** |
+| **R2** `R2BrowserProviderReview` | 16-D / 16-E / 16-K | 8 条：4 条 `correct`，**4 条修正** |
+| **R3** `R3TuiSessionReview` | 16-C / 16-F / 16-G / 16-H / 16-I | 12 条：7 条 `correct`，**5 条修正** |
+
+**最重要的一条修正（R2-e）**：主代理初稿断言「更严格的映射不会让安全拦截变成可重试」，
+依据是一次**用自造消息**的探针；复核指出 `turn/step.ts:491` 实际产生
+**`Network error: …`** 前缀，命中 `RETRYABLE_FAILURE` 的 `/network.?error/i`。
+主代理**换用真实消息形状重跑探针证实**：4 个样本全 `RETRY` ⇒
+**所有**流内错误会被无差别重试。**探针必须复用生产路径的消息构造。**
+
+**其余关键修正**：`compactCommandRuntime` 是 checkpoint 的**唯一生产者**且有 **4 个消费者**
+（不可直接删，须先迁移）；`CommandContext` **够不到会话存储**（16-B 须加接口）；
+`setMockHtml` + mock DOM 是**第二条编造通路**；`getPwRuntimeStatus` 是**被动**探测
+（报不出启动期失败）；只删 6 处 `Simulated` 不够；
+`.agents/memory` 与 subagent 记忆**命名空间冲突**（须再下一层）；
+`writeStatusItems` 只写用户配置而 `readStatusItems` 优先读项目配置（**静默被遮蔽**）；
+惰性 getter 比 `needsDocumentRows()` **更简**；租约锁**无 fencing**，须如实降级其保证。
+
+### 18.5 下一步
+
+按 §3 的四波执行序施工；每波跑 5 门禁 + `test:scripts` + 改动域测试；
+每波末位完成后同步本文件与 `log.md`。

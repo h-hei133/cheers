@@ -4788,3 +4788,248 @@ declarations 18+10、node-floor、import-cycles、docs-drift）；`test:scripts`
 - live 冒烟（`dist/cli.js`，隔离 HOME）：`/fork here` 与 `/fork <id>` 真建会话且
   磁盘 metadata 带 `parentSession` 与继承 `title`；`/plugin remove nope` →
   「not registered」；`/sidebar` 渲染 boxed panel（宽字符不破框）。
+
+## [2026-09-28/29] research | Phase 16 第二轮全面差距扫描：四项「登记为完成但实测不成立」+ 浏览器双栈 + 每帧 O(N)
+
+**性质**：**零代码改动**。01–07 七份切片与 Phase 0–15 全部收口之后的第二轮扫描，
+目标从「相比 pi 差在哪」转为「哪些已登记为完成的东西实测仍不成立」。
+产出 [`features/12-gap-and-debt-research-2.md`](features/12-gap-and-debt-research-2.md)。
+
+**执行**：3 个子代理分域（并发上限 3）+ 主代理自建**模块可达图**（ESM import 解析
++ 从 `entrypoints/cli.tsx` BFS，864 个非测试模块）与 12 个 `npx tsx` / live-CLI 探针。
+**所有头条数字与断言由主代理独立重算**，子代理结论逐条复验。
+
+**两次基础设施事故**：
+1. **上游账户额度耗尽（首次）**——`vsllm/gemini-3.8-flash-api` 返回
+   `402 当前账户暂无生效套餐`，W2a（浏览器栈）、W2b（上下文记忆）终止。
+   维护者指示改用当前模型自行完成，故本阶段绝大部分结论由主代理亲验产出。
+2. **`content_filter`（第 5 次）**——`cli/interactive/**` 切片连续三次被拦截，
+   处置照既有结论：该阅读面由主代理亲验。
+
+**四项头条（均为「已登记为完成／已修」而实测不成立）**：
+
+1. **项目记忆注入链在生产装配处断掉**——`cli/runtime/cliSessionRuntimeFactory.ts:302`
+   构造 `ShellSessionRuntime` 时**从不传 `projectMemoryStore`**；
+   `createProjectMemoryLocalStore` 的生产调用者为 **0**（唯一构造者是测试夹具）。
+   实机（隔离 HOME）：`/memory` → `Persistence: not enabled` / `Retrieval / wake-up / recall:
+   not enabled`；`/memory save` → `Store mode: disabled`。**实现齐全、UI 齐全、
+   缺的只是最后一根线**。
+
+2. **`/compact` 是 `previewOnly` 报告而非压缩**——命令路径
+   （`compactCommandRuntime.ts:39`）产报告，`compactCommandContract.ts:48` 自述
+   `previewOnly: true`；交互路径（`interactiveCommandRouter.ts:98`）才是真压缩。
+   真压缩路径 `core/shell/compaction.ts` **不派发 `PreCompact`/`PostCompact`**
+   （只有 turn 层压缩派发）；`reason:"manual"` 在生产代码**零调用者**。
+
+3. **`regular` 主屏模式丢失原地增长的内容**（比源码注释更严重）——
+   探针实测：同一行上增长的流式文本**根本不会被写**（`mainScreen.ts:114`
+   的 `content.length <= alreadyWritten` 直接 return；注释只承认「固定块未重新锚定」）。
+   另实测 `suspend()`（交给外部编辑器/子进程后）**整份 transcript 重复追加**进滚回区。
+   pi 用 `hardwareCursorRow` + `viewportTop` 记账（`tui-main-screen.ts:256-260`），
+   从不假设「已写行不可变」。
+
+4. **模型侧 `browser` 工具在 Chromium 不可用时返回编造的成功**——探针
+   （`PLAYWRIGHT_BROWSERS_PATH=/nonexistent`）6 个动作**全部 `success:true`**，
+   含 `Simulated click on element 'e1' (selector: e1).`。与 Phase 15 修掉的 MCP 假串同型，
+   但更隐蔽（返回的是具体可信的成功叙述而非寡淡措辞）。
+
+**浏览器双栈（模块图）**：模型侧工具只到达 **13/162** 个 browser 模块，`/browser` 命令到达
+**160/162**。模型侧完全绕开允许清单、出站决策、沙箱授权、执行确认、回执缓存。
+`core/security/egressGuard.ts:3-8` 的注释声称三处都问它——**对浏览器侧已不成立**
+（`web_fetch.ts:133` 确实问了）。仓库自己的 `directionDecision.ts` 把
+`hand-rolled-low-level-runtime` 列为 `rejectedPaths`，而 `sessionManager.ts` 正是它。
+
+**其余已核实**：每帧**三遍**全文档遍历（`rowCount`+`render`+`documentRows`），
+实测 500→1.63ms / 2k→4.53 / 8k→20.09 / 20k→**48.82 ms/帧**（纯 O(N)，视口仅 40 行）；
+主题无条件降 256 色且忽略 truecolor，`hasTrueColor`/`has256Color` 无可达消费者，
+**`NO_COLOR`/`FORCE_COLOR` 全仓零处理**，`tuiMode:"stream"` 无行为；
+代码围栏无语法着色（pi 56 个语法令牌）；**陈旧会话锁永久阻塞**（探针：1218ms 抛错、
+锁文件留存，而同仓 `browser/receipt/lock.ts` 已有带 `expiresAt` 的正确实现）；
+`/todo` 是模块级单例**不持久化**（跨 resume 丢失，状态条报 0 与事实相反）；
+`statusline`/`status`/`back` 进帮助与补全但不进派发注册表（带参数必报未知命令）；
+**`CommandDefinition.bridgeSafe` 是死字段**（30+ 声明、零消费者），`/permissions` 被拦；
+provider 流内 `error` 帧被吞（探针："Hello" 当完整回答）、Google `SAFETY`/`OTHER` 映射为 `stop`
+（pi 全映射 `error` 且穷尽检查）、Bedrock 丢图片块与 thinking 预算、Google 尾帧丢失、
+次要模型调用漏传 `supportsTemperature`；
+从 CLI 不可达 **46** 个非测试模块（`core/harness/**` 29 位置错、
+`edit/patch` 三角 429 行含**一套未接线的严格冲突检测**、`runtimeHandoffProjection.ts` 502 行等）。
+
+**剔除的子代理断言（留档）**：`colorToAnsi` 的 `index < 16` 分支经穷举
+**不可达**（`closestColor` 值域 16..255）——子代理称会发出非法 ANSI 序列**不成立**
+（但「无条件降 256 色」成立）；sidebar 经模块图确认**27 个文件全部有生产消费者**，
+「未接线」应更正为「已接通但是文本面板而非分栏」。
+**主代理自我更正**：首版 test-only 扫描只匹配双引号，误报 `editEngine.ts`/`taskTool.ts`/`lsp.ts`
+为孤立；改双向匹配后收敛——**教训与 `interaction-issues.md` §0 同型：先怀疑工具**。
+
+**已核实健全（防止未来重查）**：主题 token 覆盖 32/32 缺失 0；transcript 截断行跳过而非致命；
+损坏 `state.json` 明确报告并起新会话；编辑重复锚点**显式拒绝**；`fileLock` 同链可重入；
+18 个钩子事件**全部**有派发点且判定被消费；所有文本流用 `decode(...,{stream:true})`；
+45+ slash 命令**零桩**。
+
+**验证**：全部探针脚本写在 `packages/ts-shell/src/.probe_*.ts` 并在运行后删除，
+工作区结束时 `git status --short` 为空。本轮**未触碰任何生产代码**。
+
+**建议执行序**：16-A 记忆注入链 → 16-D+16-E 浏览器假成功与双栈收敛 →
+16-B `/compact` 合并与钩子 → 16-I `bridgeSafe` 接线或删除 → …（共 14 项，见 12-* §9）。
+
+**本轮边界**：`browser/**` 160 个模块逐项 real-vs-demo 判定未做（上游 402 中断），
+列为下一轮首要任务；交互层键位与文档双向 diff 未产出（`content_filter`）；
+`session/continuation/**` 与 `session/recovery/**` 未逐项审计；
+真实 provider 端到端未做（无凭据且禁止触碰真实配置）。
+
+## [2026-09-29] plan | Phase 16 规划：14 项候选裁为 10 项，产出预研究与裁决，经三路复核修正 15 条
+
+**性质**：**零代码改动**。按维护者指示「不用一次性全规划，取平衡数量」，
+从 `12-gap-and-debt-research-2.md` §9 的 **14 项**候选中裁出 **10 项**进入 Phase 16。
+
+**产出**：
+[`features/phase-16-pre-research.md`](features/phase-16-pre-research.md)（490 行）
+与 [`features/phase-16-decisions.md`](features/phase-16-decisions.md)（735 行）。
+
+**纳入（按执行序）**：16-I → 16-D+16-E → 16-A → 16-B → 16-K → 16-G → 16-C → 16-F → 16-H。
+**移出**：16-J 死代码（债务）、16-L Bedrock 端到端（无账号）、16-M `NO_COLOR`/truecolor/`"stream"`（P3）、
+16-N 语法着色（P3）。
+
+**预研究的关键参考事实**：
+- **16-A**：**pi 没有记忆子系统**（`grep auto-memory|MEMORY.md` 零命中）⇒ 真先例是 **Claude Code**
+  （已按维护者指示核对**线上现行文档**，本地 `source-claudecode` 是早期版本）：
+  `~/.claude/projects/<project>/memory/` + `MEMORY.md` 索引**常驻**（200 行/25KB）+ topic 文件**惰性** +
+  `type` 分四类 + 记忆**豁免**清理保留期 + `/compact` 后项目 CLAUDE.md **重读重注入**。
+  我方是**显式 `/memory use` 按需注入**（注入文本自述 `Automatic memory injection: no.`）⇒ **不同产品模型**，裁决维持不改。
+- **16-B**：pi **单一手动入口**（`agent-session.ts:2406`）emit `reason:"manual"` +
+  派发**可取消**的 `session_before_compact`，与自动共用底层 `_runDefaultCompaction`。
+- **16-D**：`playwright-mcp:68024-68084` / `stagehand:279-493` **都抛错**，从不编造成功。
+- **16-C**：pi `capture/restoreRenderState` + `viewportTop`/`hardwareCursorRow` 差分重写**可见**行；
+  仅 `firstChanged < prevViewportTop` 才整屏重绘；**从不查 DSR**（我方注释的「DSR 太贵」两侧都不成立）。
+- **16-H**：pi 的 todo **是扩展**，状态存**工具结果 details**、载入/切分支**按序重放** ⇒ **分支正确**；
+  其 `let todos = []` 同为内存态，持久化来自「结果自带状态」。
+
+**主代理在规划中新查出的缺陷（12 号文档未载）**：
+1. **render 缓存先于折叠失效**——探针：20 行 `finalized` 块 `setCollapsed(true)` 后仍 **21 行**、
+   `render()` 仍返回展开行 ⇒ **折叠完全不生效**；`TurnSink.notify` 改 `finalized` 块文本后
+   行数仍为旧值（绕过缓存即变化）⇒ 根因是缓存键不含内容/折叠状态。
+2. **`/clear` 清不掉 `regular` 滚回区**——`interactiveMode.ts:798-800` 注释称「连终端滚回区一起清空」，
+   实现只有 `transcript.clear()` + 强制重绘，**无任何清屏序列**。
+3. **写入方全集是 5 个**（初稿只列 2 个）：`turnSink:124`、`toolCards:44/61/67/100/102`、
+   **`pager:28-29`**、**`blocks:336-337`**。
+
+**三路只读复核（并发 3，允许失败后重派）**：**18 条断言，15 条修正**。
+`R1MemoryCompactReview` 3 修正 / `R2BrowserProviderReview` 4 修正 / `R3TuiSessionReview` 5 修正。
+
+**最重要的一条（R2-e）**：初稿断言「更严格的停因映射不会把安全拦截变成可重试」，
+依据是一次**用自造消息**的探针。复核指出 `turn/step.ts:491` 实际产生 **`Network error: …`** 前缀，
+命中 `RETRYABLE_FAILURE` 的 `/network.?error/i`。**换用真实消息形状重跑探针证实 4/4 全 RETRY**
+⇒ 所有流内错误会被**无差别重试**（安全拦截重试是错的），且这是**既有行为**、16-K 会**放大**它。
+**方法学教训：探针必须复用生产路径的消息构造，否则测的是探针的假设。**
+
+**其余关键修正**：
+- `compactCommandRuntime:41` 是 `CompactLiveCheckpoint` 的**唯一生产者**，有 **4 个消费者**
+  （`sidebarCommandRuntime:32`、`memoryCommandRuntime:135`、`sessionFutureTurnProjection:49`、
+  `agentScenarioRunner:214`）⇒ 初稿「直接删影子写入」**错误**，改为「**先迁移生产者、后删除**」。
+- `CommandContext` **没有** `sessionManager`/会话存储（`grep` 零命中）⇒ 16-B 须**新增会话访问接口**，
+  不是「把命令改指一个函数」。
+- `setMockHtml`（`sessionManager.ts:37-40`）+ `observe()` 的 `:216-230` mock DOM 是**第二条编造通路**，
+  且 `browserUnified.test.ts` 五个正向用例正靠它 ⇒ 只删 6 处 `Simulated` **不够**。
+- `getPwRuntimeStatus` 是**被动静态探测**（`passiveStatusCheck: true`、`browserLaunched: false`）
+  ⇒ 报不出「二进制在但启动失败」⇒ 须补**主动启动期分类**。
+- `blockedHostReason(hostname)` 与 `decideBrowserNetworkAllowlist(request)` **形状不匹配**，
+  后者空 `allowedOrigins` **默认全拒** ⇒ 须写**专用 URL 预检**（含方案/凭据校验 + 落点复核）。
+- **重定向逃逸**：`page.goto` 默认跟随 302，预检只看初始 URL ⇒ 公开 URL 可跳私网；
+  `web_fetch` 用 `redirect: 'manual'` 逐跳复核，浏览器侧须 route 拦截或落点复核。
+- `.agents/memory` 与 subagent 记忆（`agentMemoryManager.ts:36` 建 `<agentName>/` 子目录）
+  **命名空间冲突** ⇒ root 定为 `<root>/.agents/memory/project/`。
+- `writeStatusItems` **只写用户配置**，而 `readStatusItems` **优先读项目配置**（形参 `_workspaceRoot` 未使用）
+  ⇒ `/statusline use …` 会**静默被项目配置遮蔽**。
+- **惰性 getter 比新增 `needsDocumentRows()` 更简**（`frame.ts:43` 改 getter，备用屏根本不访问）
+  ⇒ 采纳复核形态，零 `ViewContext` 改动。
+- 租约锁**无 fencing token**，进程 `SIGSTOP` 超 `staleMs` 后可被夺锁并并发写 ⇒
+  16-G 的保证**如实降级**为「消除死进程永久阻塞」，并加 epoch 乐观并发检测。
+
+**已核实健全（复核独立复现）**：`bridgeSafe` 54 处声明 **零读取者**且 git 历史证明**从未接过线**；
+仓库内**无任何执行器能浏览任意 URL**（`BrowserPlaywrightLocalRunner` 从未被构造）；
+`tool.result` **无** `metadata`；`SessionMessage` 需扩展；回退经 `projectBranchMessages`
+按活动分支过滤 ⇒ **天然重建该点状态**（16-H 的核心依据）。
+
+**验证**：5 门禁全 PASS（`check:config-consumers`/`check:declarations`/`check:node-floor`/
+`verify:import-cycles`（`runtime_cycles=0`）/`test:scripts`）；
+`verify:docs-drift:strict` → `rules_dangling 0`、`docs_dangling 0`。
+全部探针脚本写在 `packages/ts-shell/src/.probe_*.ts` 并运行后删除，无残留。
+
+## [2026-09-29] plan | Phase 16 两处裁决经维护者质疑后更正：loopback 改为默认放行；删除 `tuiMode:"stream"`
+
+**性质**：**零代码改动**，仅更正两份规划文档。
+
+### 1. 16-E loopback：**推翻初稿的「默认拒绝」，改为「默认放行」**
+
+维护者质疑「这个 loopback 不对齐是指什么」+「不放行 agent 如何帮我调试本地服务」。
+主代理二次核实后确认**初稿建立在两个错误前提上**：
+
+**前提一（错）：把 `web_fetch` 当基准。**
+`webFetch.ts:135` 的拒绝信息是 *"This tool reaches the public web only."* ——
+它是**有意只做公网**；而 `browserToolUnified.ts:13` 自称
+*"open URLs (**including localhost**)"* ——它的**本职就是本地页面**。
+两者不是「意外不一致」，是**两个用途不同的工具各自有意为之**。
+
+**前提二（错）：以为该守卫构成安全边界。** 实测：
+- `bash` **完全无出站限制**——`grep blockedHostReason core/tools/registry.ts` **零命中**，
+  `planCommandLaunch`（`registry.ts:120-143`）不做出站判定；
+- **OS 沙箱默认关闭**——探针 `sandbox plan state: off`；
+  `osSandbox.ts:259` `if (rules.enabled !== true) return { state: "off" }`，
+  本工作区 `readSandboxRules` 返回 `{}`。只有显式开沙箱**且**无域名允许清单时才加
+  `--unshare-net`（`:294`）。
+
+⇒ agent 今天就能 `curl localhost` 与 `curl 169.254.169.254`。
+**拦 browser 的 loopback 拦不住任何东西**，是安全剧场；初稿列的
+「SSRF / 读本地管理端口 / 读自家 MCP sidecar」三条属**理论风险，已被 bash 的实际能力消解**。
+
+**更正后裁决**：**loopback 默认放行**（工具本职，两个参考实现亦默认放行）；
+**链路本地/云元数据（`169.254.0.0/16`、`fd00:ec2::254`）默认拒绝**；
+**RFC1918/CGNAT 默认拒绝但可显式放行**。
+并把该守卫定位写诚实：它是**意图声明与可审计性**，**不是**新建安全边界。
+
+**不受影响、仍必做**：**重定向落点复核**（第 8 条）——它保证私网/元数据规则在**跳转之后**依然成立。
+
+### 2. `tuiMode:"stream"`：**维护者裁决删除**
+
+探针实测它与 `"fullscreen"` **行为逐字节相同**：
+全仓唯一读取点 `interactiveMode.ts:354` 只做 `tuiMode !== "regular"`，
+写 `{"tuiMode":"stream"}` 得 `useAlternateScreen = true`。
+裁决：两处 union（`runtimeConfig.ts:251`、`:387`）改为 `"regular" | "fullscreen"`，
+并清理两处「已预留但无定义」的说明。
+**附带记录（本次不做）**：配置是 `JSON.parse(...) as RuntimeConfigFile`（`:496`/`:642`）
+**无枚举校验**，实测 `{"tuiMode":"totally-made-up"}` 被原样接受——类型删除只挡编译期，
+要挡配置文件写错需另加运行时校验。
+
+**验证**：`verify:docs-drift:strict` → `rules_dangling 0`、`docs_dangling 0`。
+
+## [2026-09-29] feat | Phase 16 executed: 10 gap-and-debt items across 4 waves
+
+**Commits** (each independently revert-verified):
+
+1. `44ebf44e` fix: stop reading every multi-word slash command as a project path
+2. `91f31876` fix: delete the command field nothing ever read (`bridgeSafe`)
+3. `3a86ef3b` feat: let a scripted run reach /permissions instead of being told it cannot
+4. `e79f173f` feat: make the status band's items a command, not only a panel
+5. `faf63e9c` fix: write a display setting to the file that decides it
+6. `18d6cab3` fix: name the host classes, so two callers can refuse different ones
+7. `ce8fe8b6` feat: decide a browser URL before anything navigates it
+8. `ca92d6df` fix: report what the browser did, instead of claiming a simulated success
+9. `50d800e4` fix: let a memory be written to disk, and refuse one rather than throw
+10. `a591083a` feat: supply the project memory store to the turn that reads it
+11. `79ae6619` fix: route /compact to the real engine and produce checkpoints only from condensations
+12. `d8f69e5b` fix: stop treating a provider's refusal as a finished answer
+13. `a1b18c47` fix: stage the harness compact checkpoint through the producer that owns it
+14. `1b429beb` fix: recover a session lock its owner cannot release
+15. `81f90a31` fix: let the main screen repaint rows it has not scrolled away
+16. `759459b7` fix: stop a frame paying for a document it never reads
+17. `b0a1cf38` fix: make the todo checklist part of the session it belongs to
+
+**Verification**: full suite 483 files / 3952+ tests green at the last full run;
+affected-slice runs green after every item; all five `check:*`/`verify:*` gates plus
+`test:scripts` green after every wave.
+
+**Execution-time findings** are recorded in `phase-16-decisions.md`, one
+supplement per item, including the three the plan did not contain:
+the stale command-name copy in the argument parser (16-I), the two host
+misclassifications in the shared egress table (16-D+16-E), and the row cache
+serving stale rows from five untracked mutation sites (16-F).
