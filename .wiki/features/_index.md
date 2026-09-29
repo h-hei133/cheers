@@ -1511,6 +1511,20 @@ docs-source 计数为 advisory（118 条，非阻断），未逐条修。
 
 ---
 
+## 20. Phase 16 复审（2026-09-29）
+
+对抗性复核 Phase 16 全部 17 个实质提交，5 个只读 reviewer 按子系统切片，主代理逐条独立复验。
+
+**确认并修复 10 项**（8 commit）：3 个 P0 在主屏渲染路径（chrome 块被当内容吞掉末行、光标账户每帧重算导致覆盖、
+`suspend` 重建 painter 导致整个转录重复追加），3 个 P0 在浏览器与协议边界（页面自发请求完全不经判定、
+Anthropic/Bedrock 正常完成被报成 failed、页面首帧提示写两遍），4 个 P1（并行工具丢 metadata、
+斜杠 `/todo` 写临时列表、无页面时动作启动浏览器白等 5s、Google 端点丢弃 temperature 声明）。
+另有 P2 三项与主代理独立发现的**每帧重复排版**（8000 块 21.2ms/帧）一并修复。
+
+**复验后否决/改判 4 条子代理结论**，记录在 decisions 文档 §6.3，含一条「结论方向对但修法会引入新缺陷」。
+
+**16-F 的第 4 条（按视口裁剪块）仍未做**，reason 与可行形态记在 §6.2——按原写法会破坏选择与搜索。
+
 ## 19. Phase 16: gap-and-debt round 2 execution (2026-09-29)
 
 **Scope**: 10 items from [`phase-16-decisions.md`](phase-16-decisions.md), executed in 4 waves.

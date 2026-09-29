@@ -5033,3 +5033,24 @@ supplement per item, including the three the plan did not contain:
 the stale command-name copy in the argument parser (16-I), the two host
 misclassifications in the shared egress table (16-D+16-E), and the row cache
 serving stale rows from five untracked mutation sites (16-F).
+
+## [2026-09-29] review | Phase 16 对抗性复核：10 项确认缺陷修复
+
+**方法**：5 个只读 reviewer 子代理（TUI 渲染 / 浏览器 / provider / 压缩-记忆-todo / 锁-命令接线），
+每条结论要求 grep 或读码证明，主代理逐条独立复验后才修。
+
+**复核抓出的 P0**：
+- 主屏 `documentRows` 不含 chrome 尾块而 painter 按数量减它 ⇒ 转录末 N 行从不绘制；
+- painter 光标账户每帧按帧形状重算，与帧内相对移动不一致 ⇒ 行被覆盖（无 fixed block 时必现）；
+- `suspend()` 销毁 painter 后重建为空 ⇒ 返回时整个转录被重新追加进 scrollback；
+- `stopReasonOf` 把 Anthropic/Bedrock 的正常完成 `end_turn` 判为 error ⇒ 每次正常回复报 failed；
+- 浏览器只判定调用者给的 URL 与重定向落点，页面自身发起的请求不过判定 ⇒ 可被诱导访问元数据服务。
+
+**另修复**：页面首帧提示写两遍；并行工具路径丢 metadata；斜杠 `/todo` 写进临时列表（输出说成功）；
+无页面时动作启动浏览器白等 5s；Google/Vertex 丢弃 `supportsTemperature`；
+`overflow` 救援压缩不派发钩子；todo map 无界增长；`turnSink.line` 未走失效入口。
+
+**主代理独立发现（子代理未提）**：块级行缓存单槽 + 一帧两个宽度 ⇒ 每个已定稿块每帧重排版
+（8000 块 21.2ms/帧）。修复为多宽度缓存，并把允许 1000ms 的基准改为计数断言。
+
+**复验后否决 4 条子代理结论**，含一条「修法本身会引入新缺陷」，记录在 decisions §6.3。
