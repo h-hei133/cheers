@@ -49,6 +49,7 @@ const SUBCOMMAND_VALUES = {
   brainstorm: ["-i", "-s"],
   export: ["jsonl"],
   shell: ["status", "use", "auto"],
+  statusline: ["list", "use"],
 } as const;
 
 export type EnumerableCommand = keyof typeof SUBCOMMAND_VALUES;

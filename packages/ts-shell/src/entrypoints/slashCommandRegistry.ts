@@ -60,13 +60,11 @@ function builtinCommands(): readonly SlashCommandSpec[] {
  * the behavior; this entry carries only what the menu and guide display.
  */
 const PICKER_ONLY: readonly SlashCommandSpec[] = [
-  {
-    name: "statusline",
-    aliases: ["status"],
-    group: "workspace",
-    summary: "choose which facts the status band keeps in view",
-    argumentHint: "use <preset|item...>",
-  },
+  // `/back` alone. It needs the session's turns to choose from, so there is no
+  // useful non-interactive form, and it carries no argument hint: the grammar it
+  // once advertised (`rewind <n>`) is not a form the picker accepts. Anything
+  // else that opens a picker is also a real command, and listing it here as well
+  // would give it two summaries — the menu showed the stale one.
   {
     name: "back",
     group: "session",

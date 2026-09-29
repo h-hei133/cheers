@@ -90,10 +90,13 @@ describe("command completions", () => {
     expect(slashSuggestions("/goal")?.[0]?.detail).toContain("<goal instruction>");
   });
 
-  it("shows the picker-only statusline command", () => {
+  it("offers statusline and names the grammar it actually accepts", () => {
     const matches = slashSuggestions("/statusline");
     expect(matches?.some((match) => match.value === "/statusline")).toBe(true);
-    expect(matches?.find((match) => match.value === "/statusline")?.detail).toContain("<preset|item...>");
+    // The hint used to advertise `use <preset|item...>`, a form the command
+    // never accepted — a presets feature does not exist. The grammar shown has
+    // to be one the handler parses.
+    expect(matches?.find((match) => match.value === "/statusline")?.detail).toContain("[list|use <item...>]");
   });
 
   it("completes subcommands for commands with an enumerable set", () => {
