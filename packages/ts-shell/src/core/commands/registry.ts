@@ -483,7 +483,11 @@ export function createCommandRegistry(
       group: "workflow",
       argumentHint: "[add|start|done|clear]",
       getArgumentCompletions: (prefix) => subcommandCompletions("todo", prefix),
-      execute: (args, context) => runTodoCommand(args, context),
+      // The checklist belongs to a session, so the session travels with the
+      // call. Without it the command answers with a freshly allocated list that
+      // nobody reads, and reports success while the session's own list is
+      // untouched.
+      execute: (args, context) => runTodoCommand(args, context, context.sessionId),
     },
     {
       name: "fast",

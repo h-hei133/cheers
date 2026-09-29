@@ -13,6 +13,7 @@ import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalSt
 import { createProjectMemoryReviewStateStore } from "../../memory/projectMemoryReviewState.js";
 import { createSidebarLiveEventStore } from "../../presentation/sidebar/sidebarLiveEventStore.js";
 import { createStartupWarmContextCacheStore } from "../../context/startup/startupWarmContextHealth.js";
+import { getSessionTodos } from "./todoCommandRuntime.js";
 import { createCommandRegistry, listVisibleCommands } from "./registry.js";
 import { routeSlashCommand } from "./slashRouter.js";
 
@@ -98,8 +99,21 @@ describe("slash router (W4)", () => {
     }
   });
 
+  it("hands the checklist command the session it belongs to", async () => {
+    // The checklist is per session, and the dispatcher is what passes the
+    // session in. It used to be left out, so the command answered with a
+    // freshly allocated list nobody could read: the output said "Task added"
+    // and the session's own checklist was never touched.
+    const context = { cwd: workspaceRoot, sessionId: "sess_todo_route" };
+    const added = await routeSlashCommand("/todo add route me", context);
+
+    expect((added as { output?: string }).output).toContain("route me");
+    expect(getSessionTodos("sess_todo_route").map((item) => item.text)).toEqual(["route me"]);
+  });
+
   it("still reports a slash word that is neither a command nor a template", async () => {
     const result = await routeSlashCommand("/nosuchthing", { cwd: workspaceRoot });
+
     expect(result?.kind).toBe("local");
     if (result?.kind === "local") {
       expect(result.output).toContain("Unknown slash command");
