@@ -1,6 +1,6 @@
 import path from "node:path";
 import { RUNTIME_PROVIDERS, isRuntimeProvider } from "../config/runtimeConfig.js";
-import { listSlashCommands } from "./slashCommandRegistry.js";
+import { listSlashCommands, subscribeSlashCommands } from "./slashCommandRegistry.js";
 import type {
   CliArgParseError,
   CliArgParseResult,
@@ -69,7 +69,26 @@ function commandNames(): Set<string> {
   return names;
 }
 
+/**
+ * The names, built once and dropped when the list changes.
+ *
+ * A cache rather than a per-call walk because the argument parser runs for every
+ * token of every invocation, and the list is a few hundred entries. Dropped by
+ * subscription rather than only built once, because `registerSlashCommand`
+ * exists and a command registered after the first parse would otherwise never be
+ * recognized — the list would be right for the first caller and stale for
+ * everyone after. Nothing in the product registers one today; the subscription
+ * is what keeps that from being the thing this depends on.
+ */
 let reservedCommandNames: Set<string> | undefined;
+
+function subscribeToCommandChanges(): void {
+  subscriptions ??= subscribeSlashCommands(() => {
+    reservedCommandNames = undefined;
+  });
+}
+
+let subscriptions: (() => void) | undefined;
 
 /** The first path segment of a slash-leading token, when that segment is a command. */
 function leadingCommandName(arg: string): string | undefined {
@@ -82,6 +101,7 @@ function leadingCommandName(arg: string): string | undefined {
     .split(/[\s\\/]/)[0]
     ?.toLowerCase();
   if (!firstSegment) return undefined;
+  subscribeToCommandChanges();
   reservedCommandNames ??= commandNames();
   return reservedCommandNames.has(firstSegment) ? firstSegment : undefined;
 }

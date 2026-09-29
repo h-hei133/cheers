@@ -1,6 +1,6 @@
 import path from "node:path";
 import { RUNTIME_PROVIDERS } from "../config/runtimeConfig.js";
-import { listSlashCommands } from "./slashCommandRegistry.js";
+import { listSlashCommands, registerSlashCommand } from "./slashCommandRegistry.js";
 import { describe, expect, it, vi } from "vitest";
 import {
   getApprovalMode,
@@ -408,5 +408,31 @@ describe("--theme and --use-theme", () => {
     const missingPath = parseCliArgs(["--theme"], { cwd: process.cwd() });
     expect(missingPath.ok).toBe(false);
     if (!missingPath.ok) expect(missingPath.error.message).toContain("--theme");
+  });
+});
+
+describe("a command registered after the first parse", () => {
+  it("is recognized without restarting the process", () => {
+    // The reserved-name set is built once and kept, because the parser runs per
+    // token. A command registered later — the registry supports it, and a future
+    // surface may use it — must not be read as a project path by the parser
+    // while the completion menu already offers it.
+    const before = expectParsed(["/probe-late", "arg"]);
+    const registered = registerSlashCommand({
+      name: "probe-late",
+      kind: "local",
+      summary: "a command registered during a session",
+    } as unknown as Parameters<typeof registerSlashCommand>[0]);
+    try {
+      const after = expectParsed(["/probe-late", "arg"]);
+
+      // Before it existed, the word was an unknown path — which is the reading
+      // that must not survive its registration.
+      expect(before.options.projectPath).toBe("/probe-late");
+      expect(after.options.projectPath).toBeUndefined();
+      expect(after.options.promptArg).toBe("/probe-late arg");
+    } finally {
+      registered();
+    }
   });
 });
