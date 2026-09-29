@@ -207,7 +207,17 @@ export class TUI {
     // across that would place pictures onto slots the child emptied.
     const freed = this.forgetTransmittedImages({ free: true });
     if (freed) this.terminal.write(freed);
-    this.leaveScreen();
+    // The screen the child gets depends on which one this session runs on. The
+    // alternate screen is given back — the child wants an ordinary terminal and
+    // the session takes a fresh one on return. The main screen is not given
+    // back, because it was never taken: the painter stays, its rows stay in the
+    // scrollback, and it only steps the cursor clear of the block so the child's
+    // first line does not land on it.
+    if (this.mainScreen) {
+      this.mainScreen.leaveForExternalOutput();
+    } else {
+      this.leaveScreen();
+    }
     // The driver restores every mode it may have set, unbuffered, and that
     // battery includes releasing raw mode — which is the whole point here.
     this.terminal.stop();
@@ -216,26 +226,27 @@ export class TUI {
       return run();
     } finally {
       this.beginTerminal({});
-      this.enterScreen();
-      this.setMouseTracking(true);
-      // What to repaint after the child had the terminal depends on which
-      // screen this session runs on, and the two answers are opposite.
+      // What to repaint after the child had the terminal depends on which screen
+      // this session runs on, and the two answers are opposite.
       //
       // The alternate screen is one the child drew over, so every row the last
-      // frame left is suspect: the next frame is a full paint rather than a
-      // diff against rows that may no longer be there.
+      // frame left is suspect. The screen is taken again and the next frame is a
+      // full paint rather than a diff against rows that may no longer be there.
       //
       // The main screen is the terminal's own, and its rows are history: the
-      // child wrote below them, not over them. A full paint here would mean
-      // appending the entire transcript again — the one thing this mode must
-      // not do. Instead the painter keeps its account and re-anchors the
-      // cursor, which the child moved to wherever it liked.
+      // child wrote *below* them, not over them. Taking that screen again would
+      // mean nothing to take, and painting the document again would put the
+      // whole conversation in the scrollback a second time. So the painter is
+      // the one instance that continues — it keeps the rows it wrote as history
+      // and starts its viewport on the first row after the child's output.
       if (this.mainScreen) {
-        this.mainScreen.reanchor(this.mainScreen.trackedRows);
+        this.mainScreen.resumeAfterExternalOutput();
       } else {
+        this.enterScreen();
         this.painted = false;
         this.window = [];
       }
+      this.setMouseTracking(true);
       this.requestRender({ force: true });
     }
   }

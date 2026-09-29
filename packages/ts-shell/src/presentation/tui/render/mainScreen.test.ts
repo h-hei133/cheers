@@ -113,6 +113,17 @@ class Screen {
   get sawAlternateScreen(): boolean {
     return this.started;
   }
+
+  /**
+   * Where the terminal's cursor actually is, as a screen row.
+   *
+   * The painter keeps its own account and moves relative to it; the two drifting
+   * apart is invisible in the byte stream but corrupts every later frame, so the
+   * account is checked against this rather than against itself.
+   */
+  get cursorScreenRow(): number {
+    return this.row;
+  }
 }
 
 describe("MainScreenPainter", () => {
@@ -310,6 +321,65 @@ describe("MainScreenPainter", () => {
     expect(terminal.countInScrollback("three")).toBe(0);
     // The block stayed on the screen.
     expect(terminal.countOnScreen("chrome")).toBe(1);
+  });
+
+  it("keeps its cursor account on the row it actually wrote", () => {
+    // The account and the terminal's cursor are one fact. A frame that leaves
+    // them apart makes every later move land on the wrong row: the row the
+    // previous frame wrote is overwritten and the new one is lost. Frames with
+    // no fixed block are exactly where that used to happen, because the account
+    // was recomputed from the frame's shape and the recomputation was off by
+    // one only in that case.
+    const terminal = new Screen();
+    const painter = new MainScreenPainter(terminal.asDevice());
+    painter.start();
+    const start = terminal.cursorScreenRow;
+
+    const frames: Array<[string[], string[]]> = [
+      [["one", "two", "three"], []],
+      [["one", "two", "three!"], []],
+      [["one", "two", "three!"], []],
+      [["one", "two", "three!", "four"], []],
+      [["one", "two", "three!", "four"], ["chrome"]],
+      [["one", "two", "three!", "four", "five"], ["chrome"]],
+    ];
+    for (const [rows, chrome] of frames) {
+      painter.paint(rows, chrome);
+      const tracked = painter.trackedCursorRow;
+      expect(terminal.cursorScreenRow).toBe(tracked + start);
+    }
+  });
+
+  it("never overwrites a row it wrote when the next frame appends", () => {
+    // The failure the account causes, stated as the user sees it: a row of the
+    // transcript disappears.
+    const terminal = new Screen();
+    const painter = new MainScreenPainter(terminal.asDevice());
+    painter.start();
+
+    painter.paint(["alpha", "beta", "gamma"], []);
+    painter.paint(["alpha", "beta", "gamma", "delta"], []);
+
+    const lines = terminal.allLines();
+    for (const row of ["alpha", "beta", "gamma", "delta"]) {
+      expect(lines.filter((line) => line === row), `${row} was lost`).toHaveLength(1);
+    }
+  });
+
+  it("paints every row of a document whose fixed block was passed alongside it", () => {
+    // The producer hands the painter the document and the block separately, and
+    // the document carries the block at its end. Getting that shape wrong drops
+    // the last rows of the transcript without an error anywhere — the screen
+    // simply stops one block too early.
+    const terminal = new Screen();
+    const painter = new MainScreenPainter(terminal.asDevice());
+    painter.start();
+
+    painter.paint(["t1", "t2", "block-a", "block-b"], ["block-a", "block-b"]);
+
+    for (const row of ["t1", "t2", "block-a", "block-b"]) {
+      expect(terminal.allLines().filter((line) => line === row), `${row} missing`).toHaveLength(1);
+    }
   });
 
   it("keeps drawing after the width changes", () => {

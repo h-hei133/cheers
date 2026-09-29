@@ -84,7 +84,11 @@ export class InteractiveSurface implements InteractiveView {
     return {
       rows: [...transcriptRows, ...chrome.rows],
       chromeRows: chrome.rows,
-      documentRows: () => this.pane.documentRows(width),
+      // The document carries the block at its end, the same way `rows` does:
+      // the main screen splits the tail off by count, so a document without it
+      // told the painter the block was content and the last rows of the
+      // transcript were never painted at all.
+      documentRows: () => [...this.pane.documentRows(width), ...chrome.rows],
     };
   }
 

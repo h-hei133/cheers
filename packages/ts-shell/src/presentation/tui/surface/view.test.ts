@@ -62,6 +62,36 @@ function frame(view: InteractiveSurface, size = SIZE): string[] {
   return view.renderFrame(size).rows.map(stripAnsi);
 }
 
+describe("the document a main-screen frame reports", () => {
+  it("ends with the fixed block, the same way the composed rows do", () => {
+    // The main screen splits the block off the document's tail by count. A
+    // document that omitted it told the painter the block was content, so the
+    // last rows of the transcript were never painted — no error, just a screen
+    // that stopped short.
+    const { view } = surface();
+    view.transcript.append({ kind: "user", text: "hello", finalized: true });
+    const plan = view.renderFrame(SIZE);
+    const document = (plan.documentRows ?? (() => plan.rows))().map(stripAnsi);
+    const chrome = (plan.chromeRows ?? []).map(stripAnsi);
+
+    expect(chrome.length).toBeGreaterThan(0);
+    expect(document.slice(document.length - chrome.length)).toEqual(chrome);
+  });
+
+  it("carries every content row the viewport would have dropped", () => {
+    const { view } = surface();
+    for (let index = 0; index < 60; index++) {
+      view.transcript.append({ kind: "user", text: `line ${index}`, finalized: true });
+    }
+    const plan = view.renderFrame({ columns: 60, rows: 10 });
+    const document = (plan.documentRows ?? (() => []))().map(stripAnsi);
+
+    expect(document.join("\n")).toContain("line 0");
+    expect(document.join("\n")).toContain("line 59");
+    expect(document.length).toBeGreaterThan(plan.rows.length);
+  });
+});
+
 describe("frame composition", () => {
   it("composes the transcript, band, prompt, and hint row into one frame", () => {
     const { view } = surface({ ambient: () => ({ openTodos: 2, peerSessions: 0 }) });

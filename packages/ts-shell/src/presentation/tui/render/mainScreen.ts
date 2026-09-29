@@ -67,6 +67,16 @@ export class MainScreenPainter {
   /** The rows of the fixed block, as last drawn. */
   private fixedRows: readonly string[] = [];
   private started = false;
+  /**
+   * Set while a child process holds the terminal, cleared by the first frame
+   * after it returns.
+   *
+   * There is one thing the painter cannot know across a child: how many rows it
+   * wrote. So the frame after a child does not compute a position from the
+   * account at all — it starts writing where the cursor already is, which is
+   * the first free row below the child's output.
+   */
+  private viewportUnplaced = false;
 
   constructor(private readonly device: MainScreenDevice) {}
 
@@ -125,6 +135,27 @@ export class MainScreenPainter {
     const scrolledNow = Math.max(0, newScrolled - this.scrolled);
     const previousOnScreen = this.visibleContent.slice(Math.min(scrolledNow, this.visibleContent.length));
 
+    // Every write below goes through `move`, and every move keeps `cursor` in
+    // step with the terminal. The account is carried here and assigned once at
+    // the end rather than recomputed from the frame's shape: the moves inside a
+    // frame are made relative to where the previous one left the cursor, and a
+    // frame that ended one row further down than the recomputation believed
+    // would put every later move on the wrong row. That is the defect this
+    // shape removes — a recomputed account and a relative move cannot disagree
+    // if there is only one account.
+    // After a child process the account cannot say where the cursor is, because
+    // it cannot say how many rows the child wrote. So this frame's first write
+    // happens where the cursor already is — the first free row below the child's
+    // output — and every move after it is an ordinary relative move from there.
+    let cursor = this.viewportUnplaced ? newScrolled + onScreenContent.length : this.cursorRow;
+    this.viewportUnplaced = false;
+    const move = (row: number): string => {
+      const delta = row - cursor;
+      cursor = row;
+      if (delta === 0) return "\r";
+      return delta > 0 ? `\x1b[${delta}B\r` : `\x1b[${-delta}A\r`;
+    };
+
     let buffer = beginFrame(this.device);
     if (appendRows.length > 0) {
       // Appending happens at the bottom of the content, which means stepping
@@ -132,14 +163,18 @@ export class MainScreenPainter {
       // is the cursor's own account rather than the fixed block's last row,
       // because the two differ and the append has to land on the row that is
       // actually free.
-      buffer += this.moveToRow(writtenTotal);
+      buffer += move(writtenTotal);
       for (const row of appendRows) {
+        // The newline after each row is what feeds the scrollback: a row written
+        // on the screen's last line stays there until a newline pushes it up,
+        // and without that push the transcript would stop growing at one screen
+        // and the bottom line would be overwritten forever.
         buffer += `${ERASE_LINE}${row}\r\n`;
       }
-      // Each appended row ended with a newline, so the cursor is now one row
-      // past the last of them — which is where the frame's accounting expects
-      // to find it when it moves to the fixed block below.
-      this.cursorRow = writtenTotal + appendRows.length;
+      // Each appended row ended with a newline, so the cursor is one row past
+      // the last of them. That is also the row the fixed block starts on when
+      // the frame has one, which is why this is where the block picks up.
+      cursor += appendRows.length;
     }
 
     // Rows that changed while already on screen are rewritten in place. Only
@@ -152,7 +187,7 @@ export class MainScreenPainter {
       onScreenContent.slice(0, sharedContent),
     );
     if (changedFrom < sharedContent) {
-      buffer += this.moveToRow(newScrolled + changedFrom);
+      buffer += move(newScrolled + changedFrom);
       for (let index = changedFrom; index < sharedContent; index++) {
         buffer += `${ERASE_LINE}${onScreenContent[index] ?? ""}`;
         // A newline between rows moves the cursor down; a trailing one would
@@ -162,7 +197,7 @@ export class MainScreenPainter {
       }
       // The rewrite left the cursor on the last row it wrote, which is the
       // row the accounting names.
-      this.cursorRow = newScrolled + sharedContent - 1;
+      cursor = newScrolled + sharedContent - 1;
     }
 
     // The content shrank with nothing appended: rows the previous frame used
@@ -174,25 +209,29 @@ export class MainScreenPainter {
     // block is redrawn below on this path rather than only when its own diff
     // says it changed.
     if (appendRows.length === 0 && previousOnScreen.length > onScreenContent.length) {
-      // Erase downward from the first row the content no longer keeps. The
-      // cursor is on the last kept row after a rewrite, so one explicit
-      // descent reaches it; erasing there clears the dropped rows and the
-      // fixed block, which is redrawn below on this path.
-      buffer += this.moveToRow(newScrolled + Math.max(0, onScreenContent.length - 1));
-      buffer += onScreenContent.length > 0 ? "\x1b[B" : "";
+      const blockTop = newScrolled + onScreenContent.length;
+      buffer += move(blockTop);
+      if (onScreenContent.length > 0) {
+        // A newline rather than a bare down-move: at the screen's last row a
+        // down-move does nothing and the erase would start on the row the
+        // content still keeps, while a newline scrolls the kept rows into the
+        // scrollback and hands back the blank row the erase wants.
+        buffer += "\r\n";
+        cursor += 1;
+      }
       buffer += ERASE_TO_END_OF_SCREEN;
       this.fixedRows = [];
-      this.cursorRow = newScrolled + onScreenContent.length;
     }
 
     // The fixed block, redrawn under the content wherever it changed.
     if (fixed.length > 0 || this.fixedRows.length > 0) {
-      buffer += this.moveToRow(newScrolled + onScreenContent.length);
+      buffer += move(newScrolled + onScreenContent.length);
       for (let index = 0; index < fixed.length; index++) {
         buffer += `${ERASE_LINE}${fixed[index] ?? ""}`;
         if (index < fixed.length - 1) buffer += "\r\n";
       }
       if (this.fixedRows.length > fixed.length) buffer += ERASE_TO_END_OF_SCREEN;
+      if (fixed.length > 0) cursor = newScrolled + onScreenContent.length + fixed.length - 1;
     }
 
     buffer += endFrame(this.device);
@@ -201,20 +240,57 @@ export class MainScreenPainter {
     this.visibleContent = onScreenContent;
     this.scrolled = newScrolled;
     this.fixedRows = fixed;
-    this.cursorRow = this.scrolled + this.visibleContent.length + Math.max(0, fixed.length - 1);
+    // Carried, not recomputed: see `move` above.
+    this.cursorRow = cursor;
   }
 
   /**
-   * Re-derive the account after something else wrote to the terminal.
+   * Hand the terminal to a child process, keeping the account.
    *
-   * A suspended child can move the cursor anywhere, so the tracked row and the
-   * real one have drifted apart and no relative move computed from the account
-   * can be trusted. This asks the caller where the cursor really is and resumes
-   * from there: the rows already written are left alone — they are in the
-   * scrollback or still on screen — and the next frame diffs against them.
+   * Not {@link stop}: the rows already written stay in the scrollback and the
+   * session comes back to them, so the painter survives. All that is needed is
+   * for the cursor to start below everything this wrote, so the child's first
+   * line continues the history instead of overwriting the fixed block.
    */
-  reanchor(cursorRow: number): void {
-    this.cursorRow = cursorRow;
+  leaveForExternalOutput(): void {
+    if (!this.started) return;
+    // The block is this painter's own and is redrawn on return, so it is erased
+    // rather than left behind: a copy above the child's output would read as a
+    // second prompt the session never drew.
+    const blockTop = this.scrolled + this.visibleContent.length;
+    this.device.write(`${this.moveToRow(blockTop)}${ERASE_TO_END_OF_SCREEN}${SHOW_CURSOR}`);
+    this.cursorRow = blockTop;
+    // Whatever the child does next, the account cannot follow it: the child
+    // writes as many rows as it likes. So the next frame does not compute a
+    // position from the account at all; it writes where the cursor already is.
+    this.viewportUnplaced = true;
+  }
+
+  /**
+   * Continue after a child process had the terminal.
+   *
+   * Every row this painter wrote is still where it wrote it, so how many
+   * document rows have been written does not change — that count is what tells
+   * the next frame which rows are new. What does change is the window onto
+   * them: the child's output now sits under those rows, so the block erased
+   * before the handoff is not on screen to be moved back over, and the rows
+   * above it are history rather than something to rewrite.
+   *
+   * Dropping the window is what stops the next frame from appending the whole
+   * document a second time — the failure this exists to prevent, and one that
+   * is invisible until the user scrolls back and finds the conversation twice.
+   */
+  resumeAfterExternalOutput(): void {
+    if (!this.started) return;
+    // Rows already written are a fact about the scrollback and do not change:
+    // the count is what tells the next frame which document rows are new. The
+    // window this painter had on screen is not a fact any more — the block was
+    // erased before the handoff and the rows above it are history now, so
+    // rewriting them would put the conversation in the scrollback twice.
+    const written = this.scrolled + this.visibleContent.length;
+    this.scrolled = written;
+    this.visibleContent = [];
+    this.fixedRows = [];
   }
 
   /**
@@ -231,9 +307,16 @@ export class MainScreenPainter {
     this.device.write(`${this.moveToRow(total)}\r\n${SHOW_CURSOR}`);
   }
 
-  /** For a device that wants to know whether a repaint is worth attempting. */
-  get trackedRows(): number {
-    return this.scrolled + this.visibleContent.length + this.fixedRows.length;
+  /**
+   * The row the account says the cursor is on, counted from the first row this
+   * painter wrote.
+   *
+   * Read by tests: the account and the terminal's real cursor drifting apart is
+   * invisible in the byte stream and corrupts every later frame, so the two are
+   * compared rather than the account being compared against itself.
+   */
+  get trackedCursorRow(): number {
+    return this.cursorRow;
   }
 
   /**

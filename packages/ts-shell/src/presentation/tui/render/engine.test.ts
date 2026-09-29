@@ -6,9 +6,16 @@ import { ManualScheduler, RecordingTerminal } from "../../../test-utils/terminal
 
 class StubProvider implements TerminalFrameProvider {
   rows: string[] = ["row"];
+  /** The fixed block at the end of the frame, for the screen that redraws it. */
+  chrome: string[] = [];
 
   renderFrame(_dimensions: ViewportSize): TerminalFramePlan {
-    return { rows: this.rows };
+    if (this.chrome.length === 0) return { rows: this.rows };
+    return {
+      rows: [...this.rows, ...this.chrome],
+      chromeRows: this.chrome,
+      documentRows: () => [...this.rows, ...this.chrome],
+    };
   }
 }
 
@@ -27,6 +34,44 @@ function boot(): {
 }
 
 describe("keeping the terminal's own screen", () => {
+  it("does not write the transcript again after a child had the terminal", () => {
+    // An external editor runs inside `suspend`, and the session comes back to
+    // the same screen. Appending the document a second time there is invisible
+    // until the user scrolls back and finds the conversation twice — and the
+    // child's own output is what a user reads to know the editor ran at all.
+    const { tui, terminal, provider } = boot();
+    tui.start({ useAlternateScreen: false });
+    provider.rows = ["t1", "t2"];
+    provider.chrome = ["chrome"];
+    tui.renderNow();
+    terminal.drain();
+
+    tui.suspend(() => {});
+    tui.renderNow();
+
+    const written = terminal.drain();
+    expect(written).not.toContain("t1");
+    expect(written).not.toContain("t2");
+    // The block is redrawn, because the handoff erased it and the session comes
+    // back to a screen that still needs one.
+    expect(written).toContain("chrome");
+  });
+
+  it("still takes the alternate screen again after a child", () => {
+    // The other mode's answer is the opposite one: the child drew over the
+    // private screen, so it is taken again and the frame is a full repaint.
+    const { tui, terminal, scheduler } = boot();
+    tui.start();
+    scheduler.flush();
+    terminal.drain();
+
+    tui.suspend(() => {});
+    scheduler.flush();
+    tui.renderNow();
+
+    expect(terminal.drain()).toContain("\x1b[?1049h");
+  });
+
   it("does not take the alternate screen when asked not to", () => {
     // What `tuiMode: "regular"` selects: no screen is taken, so none has to be
     // given back and the conversation stays in the scrollback.
