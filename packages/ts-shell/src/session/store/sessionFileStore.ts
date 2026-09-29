@@ -1,5 +1,7 @@
 import * as fs from "node:fs";
+import os from "node:os";
 import * as path from "node:path";
+import { isLockStale, takeOverStaleLock } from "./lockStaleness.js";
 
 const STATE_IO_MAX_ATTEMPTS = 6;
 const STATE_IO_RETRY_DELAY_MS = 12;
@@ -62,6 +64,11 @@ export function withFileLock<T>(lockPath: string, action: () => T): T {
     try {
       fd = fs.openSync(lockPath, "wx");
       try {
+        fs.writeFileSync(
+          fd,
+          JSON.stringify({ pid: process.pid, hostname: os.hostname(), createdAt: new Date().toISOString() }, null, 2),
+          "utf8",
+        );
         return action();
       } finally {
         if (fd !== undefined) {
@@ -77,6 +84,14 @@ export function withFileLock<T>(lockPath: string, action: () => T): T {
     } catch (error) {
       if (!isTransientLockError(error)) {
         throw error;
+      }
+      // A lock whose owner is gone would otherwise hold the session until the
+      // timeout, every time, for as long as the file survives. Judged stale on
+      // the evidence in the lock itself and taken over once, with a notice
+      // written beside it rather than a silent replacement.
+      const stale = isLockStale(lockPath);
+      if (stale && takeOverStaleLock(lockPath, stale)) {
+        continue;
       }
       const elapsed = Date.now() - startedAt;
       if (elapsed >= STATE_LOCK_TIMEOUT_MS) {
