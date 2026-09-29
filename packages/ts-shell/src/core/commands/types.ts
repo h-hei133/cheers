@@ -28,6 +28,15 @@ export type CommandKind = 'local' | 'prompt' | 'shell-action'
 
 export interface CommandContext {
   readonly cwd: string
+  /**
+   * Where this project's own assets live, when the caller knows.
+   *
+   * Not always `cwd`: a session can be working in a subdirectory while the
+   * project file sits at the root, and a command that resolves project assets
+   * against `cwd` would then read the wrong file or write one nothing reads.
+   * Callers that do not know leave it out, and the command falls back to `cwd`.
+   */
+  readonly projectRoot?: string
   readonly sessionId?: string
   /**
    * How this run was asked to load skills.
@@ -150,7 +159,6 @@ export interface CommandDefinition {
   readonly kind: CommandKind
   readonly availability?: 'available' | 'hidden'
   readonly enabled?: boolean
-  readonly bridgeSafe?: boolean
   /** One-line summary shown in the command guide and completion list. */
   readonly summary: string
   /** Guide grouping. */
