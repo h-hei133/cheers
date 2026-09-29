@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blockedHostReason, isBlockedHost } from "./egressGuard.js";
+import { blockedBrowserHostReason, blockedHostReason, classifyBlockedHost, isBlockedHost } from "./egressGuard.js";
 
 /**
  * The addresses that must be refused, and the ones that must not be.
@@ -151,5 +151,65 @@ describe("inputs that are not addresses", () => {
 
   it("handles a zone index, which names an interface rather than an address", () => {
     expect(isBlockedHost("fe80::1%eth0")).toBe(true);
+  });
+});
+
+describe("host classes", () => {
+  it("names the class a caller decides on, alongside the reason a reader sees", () => {
+    // The class is what the browser policy acts on; the reason is what a person
+    // reads. A caller that had only the sentence would have to match on prose.
+    expect(classifyBlockedHost("127.0.0.1")?.class).toBe("loopback");
+    expect(classifyBlockedHost("10.0.0.1")?.class).toBe("private");
+    expect(classifyBlockedHost("169.254.169.254")?.class).toBe("metadata");
+    expect(classifyBlockedHost("0.0.0.0")?.class).toBe("unspecified");
+    expect(classifyBlockedHost("ff02::1")?.class).toBe("multicast");
+    // A single label is a search-domain name; a dotted name is not decided here
+    // at all, which is the documented scope — this guard reads a hostname and
+    // never resolves one, so a public-looking name that points inward is not
+    // caught by it.
+    expect(classifyBlockedHost("intranet-host")?.class).toBe("search-domain");
+    expect(classifyBlockedHost("metadata.google.internal")).toBeUndefined();
+    expect(classifyBlockedHost("example.com")).toBeUndefined();
+  });
+
+  it("keeps the metadata prefix out of the private class", () => {
+    // `fd00:ec2::/64` sits inside unique-local space. Reading it as an ordinary
+    // LAN address would hand it whatever allowance the LAN has, which is the
+    // allowance an instance-metadata endpoint must not inherit.
+    expect(classifyBlockedHost("fd00:ec2::254")?.class).toBe("metadata");
+    expect(classifyBlockedHost("fd12:3456::1")?.class).toBe("private");
+  });
+
+  it("reads an IPv6 loopback as loopback, not as an embedded IPv4 address", () => {
+    // `::1` is arithmetically the IPv4-compatible form of `0.0.0.1`, and the
+    // embedded-address branch used to win: the address was refused, but as
+    // "unspecified", which is the wrong class for any caller that switches on it.
+    expect(classifyBlockedHost("::1")?.class).toBe("loopback");
+    expect(classifyBlockedHost("::")?.class).toBe("unspecified");
+    expect(classifyBlockedHost("[::ffff:127.0.0.1]")?.class).toBe("loopback");
+    expect(classifyBlockedHost("::ffff:10.0.0.1")?.class).toBe("private");
+  });
+});
+
+describe("the browser policy", () => {
+  it("allows loopback, which the fetcher refuses", () => {
+    // The two differ because the tools differ: a fetcher reading a public page
+    // has no use for 127.0.0.1, while a browser opened on a local development
+    // server is the ordinary case.
+    expect(blockedHostReason("127.0.0.1")).toBeDefined();
+    expect(blockedBrowserHostReason("127.0.0.1")).toBeUndefined();
+    expect(blockedBrowserHostReason("localhost")).toBeUndefined();
+    expect(blockedBrowserHostReason("::1")).toBeUndefined();
+  });
+
+  it("refuses metadata, private and link-local addresses", () => {
+    for (const host of ["169.254.169.254", "fd00:ec2::254", "10.0.0.1", "192.168.1.1", "100.64.0.1", "0.0.0.0"]) {
+      expect(blockedBrowserHostReason(host), host).toBeDefined();
+    }
+  });
+
+  it("allows the public addresses the fetcher also allows", () => {
+    expect(blockedBrowserHostReason("example.com")).toBeUndefined();
+    expect(blockedBrowserHostReason("2606:4700:4700::1111")).toBeUndefined();
   });
 });
