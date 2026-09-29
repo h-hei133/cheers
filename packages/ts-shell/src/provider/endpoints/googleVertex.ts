@@ -81,6 +81,8 @@ function vertexBody(input: {
   readonly tools: Parameters<typeof convertTools>[0];
   readonly allowTools: boolean;
   readonly temperature: number;
+  /** Absent means the model takes one; see `supportsTemperature` in kinds. */
+  readonly supportsTemperature?: boolean;
   readonly topP?: number;
   readonly maxOutputTokens?: number;
   readonly thinkingBudgetTokens?: number;
@@ -90,7 +92,10 @@ function vertexBody(input: {
     contents: convertContents(input.messages),
     ...(input.systemPrompt.trim() !== "" ? { systemInstruction: { parts: [{ text: input.systemPrompt }] } } : {}),
     generationConfig: {
-      temperature: input.temperature,
+      // Gated the way the other protocols gate it: a model that rejects a
+      // sampling temperature rejects the whole request, and the caller that
+      // declared it unsupported gets a request without one.
+      ...(input.supportsTemperature !== false ? { temperature: input.temperature } : {}),
       ...(input.topP !== undefined ? { topP: input.topP } : {}),
       ...(input.maxOutputTokens !== undefined ? { maxOutputTokens: input.maxOutputTokens } : {}),
       ...(thinkingConfigFor(input.thinkingBudgetTokens) ?? {}),
@@ -117,6 +122,7 @@ declareEndpoint("google-vertex", {
       tools: [],
       allowTools: false,
       temperature: input.temperature ?? 0,
+      supportsTemperature: input.supportsTemperature,
       ...(input.maxOutputTokens !== undefined ? { maxOutputTokens: input.maxOutputTokens } : {}),
     }) as never,
   turnBody: (input) =>
@@ -125,10 +131,11 @@ declareEndpoint("google-vertex", {
       messages: input.messages as never,
       tools: input.tools,
       allowTools: input.allowTools,
-      temperature: input.temperature,
+      ...(input.supportsTemperature !== false ? { temperature: input.temperature } : {}),
       ...(input.topP !== undefined ? { topP: input.topP } : {}),
       ...(input.maxOutputTokens !== undefined ? { maxOutputTokens: input.maxOutputTokens } : {}),
       ...(input.thinkingBudgetTokens !== undefined ? { thinkingBudgetTokens: input.thinkingBudgetTokens } : {}),
+      supportsTemperature: input.supportsTemperature,
     }) as never,
   readBody: readGoogleBody,
   readStream: readGoogleStream,

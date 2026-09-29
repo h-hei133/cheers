@@ -190,6 +190,31 @@ describe("the request body", () => {
   });
 });
 
+  it("omits the temperature for a model that rejects one", () => {
+    // A model that refuses a sampling temperature refuses the whole request, so
+    // the caller that declares it unsupported has to get a request without one.
+    // The other three protocols gate on this; Google set it unconditionally, so
+    // the declaration was silently ignored on the endpoint most likely to be
+    // pointed at a model with a fixed temperature.
+    const body = endpointTurnBody("google-generative-ai", {
+      ...BASE,
+      supportsTemperature: false,
+    }) as {
+      generationConfig: Record<string, unknown>;
+    };
+
+    expect(body.generationConfig).not.toHaveProperty("temperature");
+    // The rest of the generation config is untouched: this is one field, not a
+    // different request shape.
+    expect(body.generationConfig).toHaveProperty("maxOutputTokens");
+  });
+
+  it("sends the temperature when the model takes one", () => {
+    const body = endpointTurnBody("google-generative-ai", BASE) as { generationConfig: Record<string, unknown> };
+
+    expect(body.generationConfig["temperature"]).toBe(0.2);
+  });
+
 describe("reading the answer", () => {
   it("joins the text of the chunks", async () => {
     const result = await readAll(

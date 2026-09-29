@@ -104,3 +104,48 @@ describe("a declared protocol nobody ships", () => {
     expect(endpointUrl("https://a.test", "test-vertex-shaped", "m")).toBe("https://a.test/x");
   });
 });
+
+describe("the sampling temperature", () => {
+  it("is omitted for a model that rejects one, as the other protocols do", () => {
+    // The declaration existed and the other three endpoints honoured it; this
+    // one set the field unconditionally, so a model with a fixed temperature
+    // rejected the whole request and the declaration read as though it worked.
+    const body = endpointTurnBody("google-vertex", {
+      model: "gemini-2.5-pro",
+      systemPrompt: "be helpful",
+      messages: [{ role: "user" as const, content: "hello" }],
+      tools: [],
+      allowTools: true,
+      vision: false,
+      temperature: 0.2,
+      maxOutputTokens: 512,
+      systemRole: "system" as const,
+      supportsTemperature: false,
+      reasoningEffort: false,
+      maxTokensField: "max_tokens" as const,
+      assistantAfterToolResult: false,
+    }) as { generationConfig: Record<string, unknown> };
+
+    expect(body.generationConfig).not.toHaveProperty("temperature");
+    expect(body.generationConfig).toHaveProperty("maxOutputTokens");
+  });
+
+  it("is sent when the model takes one", () => {
+    const body = endpointTurnBody("google-vertex", {
+      model: "gemini-2.5-pro",
+      systemPrompt: "be helpful",
+      messages: [{ role: "user" as const, content: "hello" }],
+      tools: [],
+      allowTools: true,
+      vision: false,
+      temperature: 0.2,
+      maxOutputTokens: 512,
+      systemRole: "system" as const,
+      reasoningEffort: false,
+      maxTokensField: "max_tokens" as const,
+      assistantAfterToolResult: false,
+    }) as { generationConfig: Record<string, unknown> };
+
+    expect(body.generationConfig["temperature"]).toBe(0.2);
+  });
+});
