@@ -123,6 +123,38 @@ describe("long-transcript budget", () => {
     expect(elapsed).toBeLessThan(1000);
   });
 
+  it("does not re-lay the transcript because a frame asks at two widths", () => {
+    // A frame measures at the full width to decide whether a scrollbar is
+    // needed and renders one column narrower because the scrollbar takes the
+    // last one. With one cache slot per block those two questions evicted each
+    // other, so every block was laid out again on every frame — measured at
+    // 18ms against 0.9ms on a conversation of 8,000 blocks.
+    //
+    // Counted rather than timed, so this fails on the shape of the cache and
+    // not on how busy the machine running it happens to be.
+    const transcript = new Transcript();
+    let layouts = 0;
+    transcript.append({
+      kind: "assistant",
+      text: "measured",
+      finalized: true,
+      rows: (width) => {
+        layouts += 1;
+        return [`measured at ${width}`];
+      },
+    });
+
+    for (let frame = 0; frame < 3; frame++) {
+      transcript.render(119);
+      transcript.render(120);
+    }
+
+    // Two widths, laid out once each. A cache that holds one of them re-lays
+    // the other every time it is asked again.
+    expect(layouts).toBe(2);
+    expect(transcript.render(120).rows.join("")).toContain("measured at 120");
+  });
+
   it("windows a large tool output without re-laying the whole history", () => {
     const transcript = buildTranscript(20);
     transcript.append({
