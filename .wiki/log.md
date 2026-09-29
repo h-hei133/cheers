@@ -5054,3 +5054,12 @@ serving stale rows from five untracked mutation sites (16-F).
 （8000 块 21.2ms/帧）。修复为多宽度缓存，并把允许 1000ms 的基准改为计数断言。
 
 **复验后否决 4 条子代理结论**，含一条「修法本身会引入新缺陷」，记录在 decisions §6.3。
+
+**收尾复核追加三项**（子代理未报、主代理复验确认）：
+- `withFileLock` 建锁与写 owner 之间的窗口被判为「可夺取的不可读锁」⇒ 双写同一 state；
+  已要求不可读同样满足年龄阈值；
+- Bedrock `imageFormat` 把 MIME 子类型当格式名（`svg+xml`/`bmp`）⇒ API 拒绝整个请求；
+  改为四种格式白名单，不可携带者在图片位置说明原因；
+- `cliArgs` 的保留名缓存不跟随 `registerSlashCommand`（补全菜单已订阅）⇒ 运行时新增的命令
+  会被读成项目路径；按相邻模块模式订阅失效。
+- `.probe_*.ts` 未入 `.gitignore`（本轮之前两次被误提交）⇒ 已加模式。
