@@ -147,6 +147,12 @@ describe("Unified Browser Tool & Session Manager", () => {
   });
 
   it("types text and presses a key", async () => {
+    // A page first, which is what a caller with a field to type into has. An
+    // action used to launch its own browser when none was open, so this passed
+    // without one — against a blank page, after waiting out the locator
+    // timeout, and reporting success from whatever the double did with it.
+    await manager.openUrl("http://localhost:3000/dashboard");
+
     const typed = await manager.type("#user-input", "admin");
     expect(typed.ok).toBe(true);
     if (typed.ok) expect(typed.output).toContain('Typed "admin"');
@@ -154,6 +160,21 @@ describe("Unified Browser Tool & Session Manager", () => {
     const pressed = await manager.pressKey("Enter");
     expect(pressed.ok).toBe(true);
     if (pressed.ok) expect(pressed.output).toContain("Pressed key 'Enter'");
+  });
+
+  it("refuses an action with no page open instead of launching one", async () => {
+    // The launch succeeds, the page is blank, and the action then waits out its
+    // full element timeout to report a failure that was knowable immediately.
+    const started = Date.now();
+    const clicked = await manager.click("e1");
+    const elapsed = Date.now() - started;
+
+    expect(clicked.ok).toBe(false);
+    if (!clicked.ok) expect(clicked.failure.kind).toBe("not-launched");
+    // The double launches instantly, so time alone does not prove the browser
+    // was not started; the failure reason does. The bound is what a real launch
+    // plus a locator timeout would exceed.
+    expect(elapsed).toBeLessThan(1000);
   });
 
   it("closes the session and releases it", async () => {

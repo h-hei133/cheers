@@ -394,14 +394,19 @@ class BrowserSessionManager {
     act: (page: PwPage, selector: string) => Promise<void>,
   ): Promise<BrowserActionResult> {
     const selector = this.resolveSelector(target);
-    const page = await this.getOrCreatePage();
+    // A page the caller never opened is not a failure of this action, and
+    // launching a browser to answer it is worse than saying so: the launch
+    // succeeds, the page is blank, and the action then spends its full locator
+    // timeout waiting for an element on a page nobody asked for. The answer the
+    // caller needs is that there is no page yet.
+    const page = this.currentPage;
     if (!page) {
       return {
         ok: false,
         failure: this.launchFailure ?? {
           kind: "not-launched",
-          reason: "The browser is not running, so nothing was done.",
-          nextAction: "Open a page first, and check the runtime status if it will not start.",
+          reason: "No page is open, so nothing was done.",
+          nextAction: "Open a page first, then act on an element it lists.",
         },
       };
     }
@@ -445,14 +450,16 @@ class BrowserSessionManager {
   }
 
   async pressKey(key: string): Promise<BrowserActionResult> {
-    const page = await this.getOrCreatePage();
+    // Same rule as the element actions: no page means nothing to press a key
+    // into, and launching a browser to discover that spends seconds proving it.
+    const page = this.currentPage;
     if (!page) {
       return {
         ok: false,
         failure: this.launchFailure ?? {
           kind: "not-launched",
-          reason: "The browser is not running, so no key was pressed.",
-          nextAction: "Open a page first, and check the runtime status if it will not start.",
+          reason: "No page is open, so no key was pressed.",
+          nextAction: "Open a page first, then press the key.",
         },
       };
     }
