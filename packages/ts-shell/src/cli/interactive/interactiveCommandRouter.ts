@@ -114,6 +114,7 @@ export async function routeInteractiveCommand(
     prompt: input.prompt,
     ...(input.attachments ? { attachments: input.attachments } : {}),
     cwd: input.runtimeContext.cwd,
+    projectRoot: input.runtimeContext.projectRoot,
     renderer: input.renderer,
     printMode: false,
     interactive: true,

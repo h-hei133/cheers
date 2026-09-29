@@ -42,6 +42,8 @@ export interface BuildCliCommandExecutionInput {
   /** Images the draft referred to, carried beside the text rather than in it. */
   readonly attachments?: PromptAttachments;
   readonly cwd: string;
+  /** The project root, when it differs from `cwd`. See `CommandContext.projectRoot`. */
+  readonly projectRoot?: string;
   readonly renderer: StreamingRenderer;
   readonly printMode: boolean;
   readonly interactive: boolean;
@@ -104,6 +106,7 @@ export async function buildCliCommandExecution(
     : undefined;
   const slashResult = await bridge.routeSlashCommand(input.prompt, {
     cwd: input.cwd,
+    ...(input.projectRoot ? { projectRoot: input.projectRoot } : {}),
     sessionId: input.sessionId,
     ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
     ...(input.themePaths ? { themePaths: input.themePaths } : {}),

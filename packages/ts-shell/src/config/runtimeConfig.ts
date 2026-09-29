@@ -606,13 +606,25 @@ export function getRuntimeConfig(
   };
 }
 
+/**
+ * The two files a runtime config can come from, in the order they are merged.
+ *
+ * Named separately because readers and writers do not want the same one. A
+ * reader takes everything; a writer has to say which scope it is changing, and
+ * "the project's file" and "the user's file" are different answers to that.
+ */
+export function getUserConfigPath(): string {
+  return resolveUserDataFile("config.json");
+}
+
+export function getProjectConfigPath(rootDir: string = process.cwd()): string {
+  return path.join(rootDir, ".cheers.json");
+}
+
 export function getCandidateConfigPaths(
   rootDir: string = process.cwd(),
 ): string[] {
-  return [
-    resolveUserDataFile("config.json"),
-    path.join(rootDir, ".cheers.json"),
-  ];
+  return [getUserConfigPath(), getProjectConfigPath(rootDir)];
 }
 
 export function getUserRuntimeConfigPath(): string {
@@ -620,18 +632,17 @@ export function getUserRuntimeConfigPath(): string {
 }
 
 /**
- * The user's own config file, read to be modified and written back.
+ * A config file read to be modified and written back.
  *
  * This deliberately still throws, unlike `getRuntimeConfig`, and the difference
  * is the whole reason the two are separate functions. Callers here take the
  * result, change one field and write the file again; returning an empty object
  * for a file that could not be parsed would make that write replace everything
- * the user had with the one field the command was setting. Losing a config file
+ * the file held with the one field the command was setting. Losing a config file
  * to a typo is worse than refusing the command that would have done it, so the
  * error stops the caller instead.
  */
-export function readUserRuntimeConfigFile(): RuntimeConfigFile {
-  const configPath = getUserRuntimeConfigPath();
+export function readRuntimeConfigFileAt(configPath: string): RuntimeConfigFile {
   if (!fs.existsSync(configPath)) {
     return {};
   }
@@ -647,6 +658,16 @@ export function readUserRuntimeConfigFile(): RuntimeConfigFile {
   }
 }
 
+/** The user's config file, read to be modified and written back. */
+export function readUserRuntimeConfigFile(): RuntimeConfigFile {
+  return readRuntimeConfigFileAt(getUserRuntimeConfigPath());
+}
+
+/** The project's config file, read to be modified and written back. */
+export function readProjectRuntimeConfigFile(rootDir: string): RuntimeConfigFile {
+  return readRuntimeConfigFileAt(getProjectConfigPath(rootDir));
+}
+
 /**
  * One line per distinct complaint.
  *
@@ -658,8 +679,20 @@ function dedupeDiagnostics(messages: readonly string[]): string[] {
   return [...new Set(messages)];
 }
 
-export function writeUserRuntimeConfigFile(config: RuntimeConfigFile): string {
-  const configPath = getUserRuntimeConfigPath();
+/**
+ * Write one config file back, merging over what is on disk now.
+ *
+ * The merge is not a lock: it narrows the window between read and replace, and
+ * the rename below is what makes a single writer's own landing safe. A
+ * cross-process lock is deliberately absent for the user file — the loss it
+ * would guard is a setting the user can set again, while a lock file that
+ * survived a crash would block every later write for reasons that read as a
+ * broken config.
+ */
+export function writeRuntimeConfigFileAt(
+  configPath: string,
+  config: RuntimeConfigFile,
+): string {
 
   // Merge over what is on disk now, not over what the caller read earlier.
   // Two sessions resolving settings and both saving used to have the second
@@ -670,7 +703,7 @@ export function writeUserRuntimeConfigFile(config: RuntimeConfigFile): string {
   // loss it guards is a setting the user set by hand, recoverable by setting it
   // again, and a lock file that survives a crash would block every later write
   // for reasons that read as a broken config.
-  const onDisk = readUserRuntimeConfigFile();
+  const onDisk = readRuntimeConfigFileAt(configPath);
   const merged = { ...onDisk, ...config } as typeof onDisk;
   // An active-connection pointer has to name a connection in the list that
   // lands on disk, whichever side contributed each half. Keeping an id whose
@@ -688,6 +721,19 @@ export function writeUserRuntimeConfigFile(config: RuntimeConfigFile): string {
   // lost-update window the comment above accepts is unchanged by it.
   writeJsonFileAtomic(configPath, merged);
   return configPath;
+}
+
+/** Persist to the user's config file, returning the path written. */
+export function writeUserRuntimeConfigFile(config: RuntimeConfigFile): string {
+  return writeRuntimeConfigFileAt(getUserRuntimeConfigPath(), config);
+}
+
+/** Persist to the project's config file, returning the path written. */
+export function writeProjectRuntimeConfigFile(
+  rootDir: string,
+  config: RuntimeConfigFile,
+): string {
+  return writeRuntimeConfigFileAt(getProjectConfigPath(rootDir), config);
 }
 
 function normalizeProviderCredentials(

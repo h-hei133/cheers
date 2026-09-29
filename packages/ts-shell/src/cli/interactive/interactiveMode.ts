@@ -736,7 +736,10 @@ export class InteractiveMode {
       },
       saveStatusItems: async (items) => {
         this.statusItems = items;
-        return `Status band items saved to ${writeStatusItems(this.options.runtimeContext.projectRoot, items)}`;
+        const written = writeStatusItems(this.options.runtimeContext.projectRoot, items);
+        return written.scope === "project"
+          ? `Status band items saved to ${written.path} (this project's file, which wins over your own)`
+          : `Status band items saved to ${written.path}`;
       },
       // The toggles the settings panel flips live in the user's config file,
       // which is where the rest of their settings already are.

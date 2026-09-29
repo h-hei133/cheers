@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import {
-  getCandidateConfigPaths,
+  getProjectConfigPath,
+  readProjectRuntimeConfigFile,
   readUserRuntimeConfigFile,
+  writeProjectRuntimeConfigFile,
   writeUserRuntimeConfigFile,
 } from "../../config/runtimeConfig.js";
 import {
@@ -23,13 +25,64 @@ export function readStatusItems(workspaceRoot: string): readonly StatusItemId[] 
   return normalizeStatusItems(readProjectStatusItems(workspaceRoot) ?? userStatusItems());
 }
 
-/** Persist `items` for this user, returning the path written. */
-export function writeStatusItems(_workspaceRoot: string, items: readonly StatusItemId[]): string {
+/**
+ * What a write changed, and where it went.
+ *
+ * The scope travels out with the path because it is the user-facing half: a
+ * setting that silently landed one layer below the value in effect is a setting
+ * the user cannot see, and "saved" would be the wrong word for it.
+ */
+export interface StatusItemsWrite {
+  readonly path: string;
+  readonly scope: "user" | "project";
+}
+
+/**
+ * Persist `items`, writing to whichever file currently decides the value.
+ *
+ * The reader prefers a project value over the user's, so writing the user file
+ * while a project value exists leaves the new value shadowed — the command
+ * reports success and the band does not move. Writing to the deciding layer is
+ * what makes the report true: the value that is written is the value that is
+ * read back, whichever layer that turns out to be.
+ */
+export function writeStatusItems(
+  workspaceRoot: string,
+  items: readonly StatusItemId[],
+): StatusItemsWrite {
+  if (readProjectStatusItems(workspaceRoot) !== undefined) {
+    return {
+      path: writeProjectRuntimeConfigFile(workspaceRoot, {
+        ...readProjectRuntimeConfigFile(workspaceRoot),
+        tui: { ...readProjectStatusItemsFile(workspaceRoot)?.tui, statusItems: items },
+      }),
+      scope: "project",
+    };
+  }
+
   const existing = readUserRuntimeConfigFile();
-  return writeUserRuntimeConfigFile({
-    ...existing,
-    tui: { ...existing.tui, statusItems: items },
-  });
+  return {
+    path: writeUserRuntimeConfigFile({
+      ...existing,
+      tui: { ...existing.tui, statusItems: items },
+    }),
+    scope: "user",
+  };
+}
+
+/** The project file's own `tui` block, so a write does not drop its siblings. */
+function readProjectStatusItemsFile(
+  workspaceRoot: string,
+): { readonly tui?: { readonly diagrams?: "off" | "streaming"; readonly statusItems?: readonly string[] } } | undefined {
+  const projectPath = getProjectConfigPath(workspaceRoot);
+  if (!fs.existsSync(projectPath)) return undefined;
+  try {
+    return JSON.parse(fs.readFileSync(projectPath, "utf8")) as {
+      readonly tui?: { readonly diagrams?: "off" | "streaming"; readonly statusItems?: readonly string[] };
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 function userStatusItems(): readonly string[] | undefined {
@@ -53,7 +106,7 @@ function userDiagramMode(): "off" | "streaming" | undefined {
 }
 
 function readProjectDiagramMode(workspaceRoot: string): "off" | "streaming" | undefined {
-  const [, projectPath] = getCandidateConfigPaths(workspaceRoot);
+  const projectPath = getProjectConfigPath(workspaceRoot);
   if (!fs.existsSync(projectPath)) return undefined;
   try {
     const parsed = JSON.parse(fs.readFileSync(projectPath, "utf8")) as {
@@ -70,7 +123,7 @@ function readProjectDiagramMode(workspaceRoot: string): "off" | "streaming" | un
 }
 
 function readProjectStatusItems(workspaceRoot: string): readonly string[] | undefined {
-  const [, projectPath] = getCandidateConfigPaths(workspaceRoot);
+  const projectPath = getProjectConfigPath(workspaceRoot);
   if (!fs.existsSync(projectPath)) return undefined;
   try {
     const parsed = JSON.parse(fs.readFileSync(projectPath, "utf8")) as {
