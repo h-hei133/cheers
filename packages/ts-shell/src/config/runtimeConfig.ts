@@ -244,11 +244,10 @@ export interface RuntimeConfig {
    * grows, so the prompt and the output drift out of place during a turn. Use it
    * for the scrollback, not for the layout.
    *
-   * Anything else, including `stream`, is treated as `fullscreen`: `stream` is
-   * reserved and has no defined meaning yet, so it does not get a behavior
-   * invented for it.
+   * The terminal decides what an unknown value means; this type states which
+   * values a configuration file may claim.
    */
-  readonly tuiMode?: "regular" | "fullscreen" | "stream";
+  readonly tuiMode?: "regular" | "fullscreen";
   readonly tui?: TuiPreferences;
   /**
    * Whether a failed model call is asked for again.
@@ -384,7 +383,7 @@ export interface RuntimeConfigFile {
   cacheWarming?: "off" | "streaming" | "idle";
   agentMode?: "plan" | "build";
   theme?: "dark" | "light" | "auto";
-  tuiMode?: "regular" | "fullscreen" | "stream";
+  tuiMode?: "regular" | "fullscreen";
   tui?: TuiPreferences;
   retryEnabled?: boolean;
   retryMaxRetries?: number;

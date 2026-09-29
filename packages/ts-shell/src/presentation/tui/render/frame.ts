@@ -38,9 +38,12 @@ export interface TerminalFramePlan {
    * has no viewport, so it needs the whole document — the window onto it would
    * silently drop everything that scrolled past.
    *
+   * Supplied as a function rather than an array so a frame that never asks pays
+   * nothing: the alternate screen composes a viewport and does not want the
+   * document, and composing it cost a walk over every block on every frame.
    * Absent means `rows` is already the whole document.
    */
-  readonly documentRows?: readonly string[]
+  readonly documentRows?: () => readonly string[]
 }
 
 export interface TerminalFrameProvider {

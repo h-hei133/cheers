@@ -71,6 +71,8 @@ export function restoreConversation(turns: readonly SessionMessage[]): RestoredH
         const toolBlock = toolBlocksById.get(turn.tool_call_id);
         if (toolBlock) {
           const body = messageToText(turn.content).replace(/\s+$/, "");
+          // These blocks are being composed, not yet in a transcript, so no
+          // cache holds their rows; the direct write is the correct form here.
           toolBlock.text = body;
           splitFencedDiff(toolBlock);
           if (/^(\(Operation cancelled|Blocked\b|Tool execution error:|Tool '[^']+' is not available|Error\b)/i.test(body)) {

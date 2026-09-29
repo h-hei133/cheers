@@ -21,12 +21,20 @@ export const PAGER_THRESHOLD_ROWS = 18;
  * Move a block's text into the pager when it is long enough to be worth a view of
  * its own, leaving a one-line summary in the transcript. Returns whether it moved.
  */
-export function pageLongOutput(pager: Pager, title: string, block: PageableBlock): boolean {
+export function pageLongOutput(pager: Pager, title: string, block: PageableBlock, transcript?: { clearDiff(block: PageableBlock): void; setText(block: PageableBlock, text: string): void }): boolean {
   const lines = block.text.split("\n").length;
   if (lines < PAGER_THRESHOLD_ROWS) return false;
   pager.open(title, block.text);
-  block.text = `${lines} lines — shown in a full-screen view; esc closes it.`;
-  block.diff = undefined;
+  // Routed through the transcript's own setters when there is one, because the
+  // block's cached rows are keyed by width and theme and do not know that its
+  // text changed underneath them.
+  if (transcript) {
+    transcript.clearDiff(block);
+    transcript.setText(block, `${lines} lines — shown in a full-screen view; esc closes it.`);
+  } else {
+    block.text = `${lines} lines — shown in a full-screen view; esc closes it.`;
+    block.diff = undefined;
+  }
   return true;
 }
 

@@ -121,7 +121,9 @@ export class TurnSink implements RendererSink {
   notify(text: string, tag?: string): void {
     const now = Date.now();
     if (tag && this.lastNotice?.tag === tag && now - this.lastNotice.timestamp < 10_000) {
-      this.lastNotice.block.text = text;
+      // The notice block is finalized, so its rows are cached; the write goes
+      // through the transcript so the cache follows the change.
+      this.transcript.setText(this.lastNotice.block, text);
       this.lastNotice.timestamp = now;
       this.onChange();
       return;

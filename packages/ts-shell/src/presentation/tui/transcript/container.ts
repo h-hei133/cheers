@@ -80,6 +80,33 @@ export class Transcript {
     this.cache.delete(block);
   }
 
+  /**
+   * Replace a block's body, forgetting its cached rows.
+   *
+   * Five call sites changed `text` on a finalized block directly — a notification
+   * updating itself, the pager taking a long body over, a diff being lifted out
+   * of the prose — and each left the screen showing the rows from before,
+   * because the cache is keyed by width and theme and knows nothing about the
+   * change. Routing every write through here is what makes a stale cache
+   * impossible to reintroduce by forgetting one of them.
+   */
+  setText(block: Block, text: string): void {
+    block.text = text;
+    this.cache.delete(block);
+  }
+
+  /** Attach a diff below the body, forgetting the cached rows it changes. */
+  setDiff(block: Block, diff: string): void {
+    block.diff = diff;
+    this.cache.delete(block);
+  }
+
+  /** Drop the diff, forgetting the cached rows it was part of. */
+  clearDiff(block: Block): void {
+    block.diff = undefined;
+    this.cache.delete(block);
+  }
+
   /** Mark every block finished, so its rendering is stable and cacheable. */
   finalizeAll(): void {
     for (const block of this.blocks) block.finalized = true;

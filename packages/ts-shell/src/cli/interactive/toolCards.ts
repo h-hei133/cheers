@@ -41,7 +41,7 @@ export class ToolCards {
   note(taskId: string, note: string): void {
     const block = this.cards.get(taskId);
     if (!block) return;
-    block.text = block.text ? `${block.text}\n${note}` : note;
+    this.transcript.setText(block, block.text ? `${block.text}\n${note}` : note);
     this.onChange();
   }
 
@@ -58,13 +58,13 @@ export class ToolCards {
     if (!block) return;
     const text = chunk.replace(/\s+$/, "");
     if (!text) return;
-    block.text = block.text ? `${block.text}\n${text}` : text;
+    this.transcript.setText(block, block.text ? `${block.text}\n${text}` : text);
     // A card the user opened to watch should keep showing the latest output, not
     // grow past the view. The body is clipped here rather than at finish, because
     // while running there is no "full output" to point at yet.
     const lines = block.text.split("\n");
     if (lines.length > LIVE_OUTPUT_LINES) {
-      block.text = lines.slice(-LIVE_OUTPUT_LINES).join("\n");
+      this.transcript.setText(block, lines.slice(-LIVE_OUTPUT_LINES).join("\n"));
     }
     this.onChange();
   }
@@ -97,9 +97,9 @@ export class ToolCards {
     block.status = success ? "ok" : "failed";
     const body = (output ?? (success ? "" : failureReason ?? "")).replace(/\s+$/, "");
     if (body) {
-      block.text = block.text ? `${block.text}\n${body}` : body;
-      splitFencedDiff(block);
-      block.collapsed = success;
+      this.transcript.setText(block, block.text ? `${block.text}\n${body}` : body);
+      splitFencedDiff(block, this.transcript);
+      this.transcript.setCollapsed(block, success);
     }
     block.finalized = true;
     this.cards.delete(taskId);

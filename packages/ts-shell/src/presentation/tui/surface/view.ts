@@ -78,11 +78,13 @@ export class InteractiveSurface implements InteractiveView {
     );
     // The split and the full document are reported, not just performed: a
     // surface appending to the terminal's scrollback has no window onto the
-    // transcript, so it needs every row rather than the ones that fit.
+    // transcript, so it needs every row rather than the ones that fit. The
+    // document is a function so the surface that does not read it never pays
+    // for the walk.
     return {
       rows: [...transcriptRows, ...chrome.rows],
       chromeRows: chrome.rows,
-      documentRows: this.pane.documentRows(width),
+      documentRows: () => this.pane.documentRows(width),
     };
   }
 

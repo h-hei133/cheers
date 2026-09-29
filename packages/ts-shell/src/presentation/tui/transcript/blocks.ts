@@ -329,10 +329,27 @@ const DIFF_FENCE = /```diff\n([\s\S]*?)```/;
  * fenced renders them as a generic code block, losing the per-line colouring and
  * the intra-line emphasis that make a diff readable at a glance.
  */
-export function splitFencedDiff(block: Block): void {
+/**
+ * Move a fenced diff out of the prose and into the diff field.
+ *
+ * The caller supplies the transcript's own setters when the block is in one,
+ * so the cached rows the change invalidates are dropped; a block outside a
+ * transcript has no cache to forget.
+ */
+export function splitFencedDiff(
+  block: Block,
+  transcript?: { setDiff(block: Block, diff: string): void; setText(block: Block, text: string): void },
+): void {
   if (block.diff) return;
   const match = DIFF_FENCE.exec(block.text);
   if (!match) return;
-  block.diff = match[1]!.replace(/\s+$/, "");
-  block.text = block.text.replace(match[0], "").replace(/\n{3,}/g, "\n\n").trim();
+  const diff = match[1]!.replace(/\s+$/, "");
+  const text = block.text.replace(match[0], "").replace(/\n{3,}/g, "\n\n").trim();
+  if (transcript) {
+    transcript.setDiff(block, diff);
+    transcript.setText(block, text);
+  } else {
+    block.diff = diff;
+    block.text = text;
+  }
 }

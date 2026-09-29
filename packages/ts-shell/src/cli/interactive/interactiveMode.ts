@@ -349,7 +349,7 @@ export class InteractiveMode {
     this.preferences.reload();
     // `regular` keeps the conversation in the terminal's own scrollback, so a
     // session that ends leaves something to scroll back through. `fullscreen` is
-    // the private screen, and `stream` is reserved without a defined meaning.
+    // the private screen.
     this.tui.start({
       useAlternateScreen: this.options.runtimeContext.runtimeConfig.tuiMode !== "regular",
     });
@@ -610,7 +610,7 @@ export class InteractiveMode {
       // Long command output gets a view of its own: it is read once, and reading it
       // should not cost the conversation its place on screen.
       const output = this.sink.commandOutput;
-      if (output) pageLongOutput(this.pager, output.title, output.block);
+      if (output) pageLongOutput(this.pager, output.title, output.block, this.state.transcript);
       this.sink.end();
       this.busy = false;
       if (exiting) {
