@@ -164,9 +164,17 @@ function pushUserBlocks(pushUser: PushUser, content: ChatMessage["content"]): vo
       continue;
     }
     if (block.type === "image") {
+      const format = imageFormat(block.mimeType);
+      if (!format) {
+        // Named rather than silently sent: the API would reject the whole
+        // request and blame a field the user never set, so the reason the
+        // picture is missing is stated where the picture would have been.
+        pushUser({ text: `[an image of type ${block.mimeType} cannot be sent to this model]` });
+        continue;
+      }
       pushUser({
         image: {
-          format: imageFormat(block.mimeType),
+          format,
           source: { bytes: block.data },
         },
       });
@@ -177,11 +185,32 @@ function pushUserBlocks(pushUser: PushUser, content: ChatMessage["content"]): vo
   }
 }
 
-/** The format name this protocol expects for a MIME type. */
-function imageFormat(mimeType: string): string {
-  const format = mimeType.split("/")[1]?.toLowerCase();
-  if (format === "jpg") return "jpeg";
-  return format ?? "png";
+/** The four formats this protocol accepts, and nothing else. */
+const CONVERSE_IMAGE_FORMATS: Record<string, true> = {
+  png: true,
+  jpeg: true,
+  gif: true,
+  webp: true,
+};
+
+/**
+ * The format name this protocol expects, or nothing for a type it cannot carry.
+ *
+ * Reading the MIME subtype as the format sent values the API rejects:
+ * `image/svg+xml` became the format `svg+xml`, and the request then failed with
+ * a validation error naming a field the user never set. The picture was lost
+ * either way, but the error did not say that was what happened.
+ *
+ * A type nobody recorded is sent as PNG, which is what every image used to be
+ * sent as. A type this protocol cannot carry returns nothing, so the caller can
+ * say so instead of the API refusing the whole request.
+ */
+function imageFormat(mimeType: string | undefined): string | undefined {
+  if (!mimeType) return "png";
+  const subtype = mimeType.split("/")[1]?.toLowerCase();
+  if (!subtype) return "png";
+  if (subtype === "jpg") return "jpeg";
+  return CONVERSE_IMAGE_FORMATS[subtype] === true ? subtype : undefined;
 }
 
 /** Arguments as an object, falling back to an empty one for text that is not JSON. */

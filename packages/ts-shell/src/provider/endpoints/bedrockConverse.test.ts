@@ -221,6 +221,49 @@ describe("a message with an image", () => {
     expect(image.format).toBe("jpeg");
   });
 
+  it("names an image type this protocol cannot carry instead of sending it", () => {
+    // Reading the MIME subtype as the format produced `svg+xml` for an SVG, and
+    // the API then rejected the whole request naming a field the user never set.
+    // The picture is still lost, but the reason is where the picture was.
+    const body = endpointTurnBody("bedrock-converse-stream", {
+      ...BASE,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "look at this" },
+            { type: "image", mimeType: "image/svg+xml", data: "aW1hZ2U=" },
+          ],
+        },
+      ],
+    });
+
+    const messages = body.messages as ReadonlyArray<{ content: ReadonlyArray<Record<string, unknown>> }>;
+    const blocks = messages[0]!.content;
+    expect(blocks.some((block) => "image" in block)).toBe(false);
+    expect(blocks.map((block) => block["text"]).join(" ")).toContain("image/svg+xml");
+    // The words beside the picture survive, which is the same rule the unknown
+    // block shape follows.
+    expect(blocks.map((block) => block["text"]).join(" ")).toContain("look at this");
+  });
+
+  it("sends the four formats the protocol accepts", () => {
+    for (const [mimeType, expected] of [
+      ["image/png", "png"],
+      ["image/jpeg", "jpeg"],
+      ["image/gif", "gif"],
+      ["image/webp", "webp"],
+    ] as const) {
+      const body = endpointTurnBody("bedrock-converse-stream", {
+        ...BASE,
+        messages: [{ role: "user", content: [{ type: "image", mimeType, data: "aW1hZ2U=" }] }],
+      });
+      const messages = body.messages as ReadonlyArray<{ content: ReadonlyArray<Record<string, unknown>> }>;
+      const image = messages[0]!.content[0]!.image as { format: string };
+      expect(image.format, mimeType).toBe(expected);
+    }
+  });
+
   it("carries the text beside the image, which flattening would have dropped", () => {
     const body = endpointTurnBody("bedrock-converse-stream", {
       ...BASE,
