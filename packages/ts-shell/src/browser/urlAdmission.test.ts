@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { admitBrowserRedirect, admitBrowserUrl } from "./urlAdmission.js";
+import { admitBrowserRedirect, admitBrowserUrl, admitPageRequest } from "./urlAdmission.js";
 import { readBrowserOriginPolicy } from "./originPolicy.js";
 
 const open = { allowedOrigins: [], allowPrivateNetwork: false };
@@ -128,5 +128,40 @@ describe("browser origin policy", () => {
     expect(readBrowserOriginPolicy({ CHEERS_BROWSER_ALLOW_PRIVATE_NETWORK: "1" }).allowPrivateNetwork).toBe(true);
     expect(readBrowserOriginPolicy({ CHEERS_BROWSER_ALLOW_PRIVATE_NETWORK: "true" }).allowPrivateNetwork).toBe(false);
     expect(readBrowserOriginPolicy({ CHEERS_BROWSER_ALLOW_PRIVATE_NETWORK: "0" }).allowPrivateNetwork).toBe(false);
+  });
+});
+
+describe("a request the page made for itself", () => {
+  it("refuses the hosts that answer with credentials", () => {
+    // A document has no legitimate reason to ask for the metadata service, and
+    // this is the request that no caller named: `open` decided the address, and
+    // a script inside the page decides every request after it.
+    expect(admitPageRequest("http://169.254.169.254/latest/meta-data/", open).allowed).toBe(false);
+    expect(admitPageRequest("http://metadata.google.internal/computeMetadata/v1/", open).allowed).toBe(false);
+    expect(admitPageRequest("http://10.0.0.5/admin", open).allowed).toBe(false);
+  });
+
+  it("allows the page's own furniture, which is not a navigation", () => {
+    // Stylesheets, images, fonts, data URLs and a websocket to the server the
+    // page came from are what a working page is made of. Refusing them would
+    // break the local development server the tool exists to reach.
+    expect(admitPageRequest("https://example.com/app.css", open).allowed).toBe(true);
+    expect(admitPageRequest("http://localhost:3000/hmr", open).allowed).toBe(true);
+    expect(admitPageRequest("data:image/png;base64,iVBOR", open).allowed).toBe(true);
+    expect(admitPageRequest("blob:http://localhost:3000/abc", open).allowed).toBe(true);
+  });
+
+  it("is not narrowed by the allowlist, which is about what the caller names", () => {
+    // A caller that allowlisted one origin still gets that page's stylesheet
+    // and fonts from wherever they are served.
+    const narrowed = { allowedOrigins: ["example.com"], allowPrivateNetwork: false };
+    expect(admitPageRequest("https://cdn.example.net/font.woff2", narrowed).allowed).toBe(true);
+  });
+
+  it("follows the private-network setting the open decision used", () => {
+    const permissive = { allowedOrigins: [], allowPrivateNetwork: true };
+    expect(admitPageRequest("http://10.0.0.5/admin", permissive).allowed).toBe(true);
+    // Metadata is not private-network, so the setting never reaches it.
+    expect(admitPageRequest("http://169.254.169.254/", permissive).allowed).toBe(false);
   });
 });

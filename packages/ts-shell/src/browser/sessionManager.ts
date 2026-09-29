@@ -6,7 +6,7 @@ import {
   DEFAULT_VIEWPORT,
   buildStealthPreloadScript,
 } from "./stealthPreload.js";
-import { admitBrowserRedirect, admitBrowserUrl, type BrowserUrlRefusal } from "./urlAdmission.js";
+import { admitBrowserRedirect, admitBrowserUrl, admitPageRequest, type BrowserUrlRefusal } from "./urlAdmission.js";
 import { readBrowserOriginPolicy, type BrowserOriginPolicy } from "./originPolicy.js";
 
 export interface BrowserElementRef {
@@ -122,6 +122,15 @@ class BrowserSessionManager {
   private elementRefs: Map<string, string> = new Map();
   private initPromise: Promise<PwPage | null> | null = null;
   private cleanupRegistered = false;
+  /**
+   * The policy the current page's own requests are judged by.
+   *
+   * Held rather than passed at page creation, because the page is created
+   * lazily and the caller that names a policy is `openUrl` — which may run
+   * before or after the page exists. Defaults to the environment's policy, the
+   * same one a caller that names none gets.
+   */
+  private requestPolicy: BrowserOriginPolicy = readBrowserOriginPolicy();
   /** The last launch failure, so the reason survives the failed attempt. */
   private launchFailure: BrowserSessionFailure | null = null;
 
@@ -169,12 +178,29 @@ class BrowserSessionManager {
           locale: "en-US",
           timezoneId: "America/New_York",
         });
+        // The guard on page-initiated navigation.
+        //
+        // `open` decides the address the caller asked for and the address the
+        // page landed on. Neither covers a script on the page calling
+        // `location.assign` afterwards, and a context-wide handler is the only
+        // place that sees one. It is installed before any page exists so every
+        // page and popup inherits it.
+        //
+        // What it does not cover, stated because a reader will assume otherwise:
+        // this is the *main frame* only. A subresource another origin serves —
+        // an image, a script, a `fetch()` from page code — is not a navigation
+        // and does not pass through here, so a page on an admitted origin can
+        // still ask the network for anything the machine can reach. Blocking
+        // that is not this function: it would need a request-level allowlist,
+        // and the tool's purpose is reaching a local server, so both the
+        // reference implementations leave it to the sandbox the process runs in.
         // The stealth preload is installed on the context so every page and popup
         // inherits it rather than only the first one.
         const stealthScript = buildStealthPreloadScript();
         await this.context.addInitScript?.(stealthScript);
 
         this.currentPage = await this.context.newPage();
+        await this.installRequestGuard(this.currentPage);
         // A crashed or closed page must not stay as the handle every later call
         // uses, or the session keeps answering from a page that is gone.
         this.currentPage.on("close", () => {
@@ -223,6 +249,9 @@ class BrowserSessionManager {
     policy: BrowserOriginPolicy = readBrowserOriginPolicy(),
     timeoutMs = 20_000,
   ): Promise<BrowserOpenResult> {
+    // Recorded before the page exists, so the guard it installs judges the
+    // page's own requests by the policy this caller named.
+    this.requestPolicy = policy;
     const admission = this.dependencies.admitUrl(url, policy);
     if (!admission.allowed && admission.refusal) {
       return {
@@ -362,6 +391,43 @@ class BrowserSessionManager {
       elements,
       outline: outlineLines.join("\n"),
     };
+  }
+
+  /**
+   * Refuse a request the caller never asked for.
+   *
+   * `open` decides the address the caller named and the address the page landed
+   * on. Neither covers what the page asks for next: a script calling
+   * `location.assign`, a redirect the runtime follows internally, an image or a
+   * `fetch()` pointing at a metadata service. Each of those is a request, and
+   * `route` is the one place that sees a request before it is made — including
+   * the hops a navigation takes, which a check after `goto` returns has already
+   * let out.
+   *
+   * Every request is judged, not only navigations, because the host check has no
+   * legitimate consumer on a page the browser is allowed to be on: this tool
+   * reaches a public site or a local development server, and a document that
+   * asks for `169.254.169.254` is asking for credentials.
+   *
+   * A request that is refused is aborted, and the refusal is recorded so the
+   * next action reports why rather than appearing to work.
+   */
+  private async installRequestGuard(page: PwPage): Promise<void> {
+    await page.route("**/*", (route) => {
+      const target = route.request().url();
+      const admission = admitPageRequest(target, this.requestPolicy);
+      if (admission.allowed) {
+        void route.continue();
+        return;
+      }
+      this.launchFailure = {
+        kind: "url-refused",
+        reason: `The page asked for ${target}, and ${admission.refusal!.reason}`,
+        nextAction: `${admission.refusal!.nextAction} A page cannot reach what the tool may not.`,
+        refusal: admission.refusal,
+      };
+      void route.abort("blockedbyclient");
+    });
   }
 
   /** Where the page actually is. Read through one place so a failure has one shape. */

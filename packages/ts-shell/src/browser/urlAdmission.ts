@@ -141,6 +141,48 @@ function refuse(
  * case this guards, and re-deciding them would refuse a legitimate `/login`
  * redirect for no gain.
  */
+/**
+ * Decide a request the page made for itself, rather than one the caller named.
+ *
+ * Only the host rule applies here, and that is the whole point of a separate
+ * entry point: a document legitimately asks for images, stylesheets, fonts,
+ * `data:` URLs, and a websocket to the same local server it came from, so
+ * applying the open-URL rules to every request would refuse the page's own
+ * furniture and break pages the tool exists to serve. What no document has a
+ * legitimate reason to ask for is a host that answers with credentials — the
+ * metadata services and the private network behind them.
+ *
+ * The allowlist is not consulted: it narrows what the caller may ask for, and a
+ * page's own subresources are not the caller asking.
+ */
+export function admitPageRequest(
+  url: string,
+  policy: BrowserOriginPolicy = { allowedOrigins: [], allowPrivateNetwork: false },
+): BrowserUrlAdmission {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    // A request the runtime cannot parse is not something this can judge; the
+    // runtime's own handling of it is what decides.
+    return { allowed: true, url, hostname: "" };
+  }
+  // A `data:` or `blob:` request has no host to judge, and a scheme the browser
+  // supports for page content is not a navigation out of it.
+  if (parsed.protocol === "data:" || parsed.protocol === "blob:" || parsed.protocol === "about:") {
+    return { allowed: true, url, hostname: "" };
+  }
+  const blocked = blockedUnderPolicy(parsed.hostname, policy);
+  if (!blocked) return { allowed: true, url, hostname: parsed.hostname };
+  return refuse(
+    "blocked-host",
+    url,
+    parsed.hostname,
+    `The page asked for ${parsed.hostname}, which is a ${blocked}.`,
+    "Load the page somewhere that does not need it, or check what the page is reaching for.",
+  );
+}
+
 export function admitBrowserRedirect(
   requestedUrl: string,
   finalUrl: string,

@@ -40,6 +40,24 @@ describe.skipIf(!canLaunch)("browser session against real Chromium", () => {
         res.end();
         return;
       }
+      // A page whose own script asks for a metadata address. No caller named
+      // it: the tool was told to open this page, and the page decided what to
+      // ask for next.
+      if (req.url === "/reaches-metadata") {
+        res.writeHead(200, { "content-type": "text/html" });
+        // The outcome goes in the title, which is readable through `observe`.
+        // The fetch has no server to answer it either way in a test, so the
+        // difference being asserted is that the request was *refused* rather
+        // than left to hang or to be sent.
+        res.end(
+          "<html><head><title>asking</title></head><body><h1>Page</h1><script>" +
+            "fetch('http://169.254.169.254/latest/meta-data/')" +
+            ".then(function(){document.title='reached'})" +
+            ".catch(function(){document.title='blocked'});" +
+            "</script></body></html>",
+        );
+        return;
+      }
       if (req.url === "/redirect-same-origin") {
         res.writeHead(302, { location: "/" });
         res.end();
@@ -78,6 +96,30 @@ describe.skipIf(!canLaunch)("browser session against real Chromium", () => {
       const state = await manager.observe();
       expect(state.elements.length).toBeGreaterThan(0);
       expect(state.outline).toContain("Hello");
+    } finally {
+      await manager.closeSession();
+    }
+  });
+
+  it("refuses a request the page made for a metadata address", async () => {
+    // The subresource case, which no post-`goto` check can see: `open` was given
+    // an address that is admitted, and the page then asked for one that is not.
+    // Without a request-level guard the fetch goes out and comes back with
+    // whatever the machine's metadata service hands it.
+    const manager = new BrowserSessionManager();
+    try {
+      const opened = await manager.openUrl(`${origin}/reaches-metadata`, openPolicy);
+      expect(opened.ok, opened.ok ? "" : opened.failure?.reason).toBe(true);
+
+      // The guard aborts the request rather than answering it, so there is no
+      // response to await — the page's own script settles the title.
+      let title = "";
+      for (let attempt = 0; attempt < 40 && title !== "blocked"; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        title = (await manager.observe()).title ?? "";
+      }
+
+      expect(title).toBe("blocked");
     } finally {
       await manager.closeSession();
     }
