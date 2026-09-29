@@ -1,5 +1,8 @@
 import type { PromptAttachments } from "../core/shell/sessionRuntime.js";
 import { routeSlashCommand } from "../core/commands/slashRouter.js";
+import { createProjectMemoryLocalStore } from "../memory/projectMemoryLocalStore.js";
+import { projectMemoryRootFor } from "../memory/projectMemoryRoot.js";
+import type { ProjectMemoryStore } from "../memory/projectMemoryStoreContract.js";
 import type { RuntimeConfig } from "../config/runtimeConfig.js";
 import { createBrowserCliExecutionBridge } from "../browser/cliExecutionBridge.js";
 import { loadBrowserCliExecutorInjectionFromEnv } from "../browser/cliExecutorInjection.js";
@@ -63,6 +66,13 @@ export interface BuildCliCommandExecutionInput {
   readonly themePaths?: readonly string[];
   readonly compactCheckpointStore?: CompactLiveCheckpointStore;
   readonly compactInjectionStateStore?: CompactInjectionStateStore;
+  /**
+   * Overrides the memory store the commands write through.
+   *
+   * Absent means the project's own store, derived from the project root. A
+   * caller that supplies one is testing the command rather than the layout.
+   */
+  readonly projectMemoryStore?: ProjectMemoryStore;
   readonly env?: Readonly<Record<string, string | undefined>>;
   /** True when the terminal agreed to report modified keys. */
   readonly modifierKeysReported?: boolean;
@@ -104,9 +114,19 @@ export async function buildCliCommandExecution(
   const browserReceiptCacheStore = receiptCacheManifest.ok
     ? createBrowserReceiptCacheStore({ manifest: receiptCacheManifest.manifest })
     : undefined;
+  // The same store the turn-side injection planner reads from, so a record
+  // `/memory save` writes is a record `/memory use` can inject. Deriving it here
+  // is what makes the two sides agree without each caller repeating the root.
+  const projectRoot = input.projectRoot ?? input.cwd;
+  const projectMemoryStore =
+    input.projectMemoryStore ??
+    createProjectMemoryLocalStore({
+      ref: { mode: "explicit-local", root: projectMemoryRootFor(projectRoot) },
+    });
   const slashResult = await bridge.routeSlashCommand(input.prompt, {
     cwd: input.cwd,
-    ...(input.projectRoot ? { projectRoot: input.projectRoot } : {}),
+    projectRoot,
+    projectMemoryStore,
     sessionId: input.sessionId,
     ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
     ...(input.themePaths ? { themePaths: input.themePaths } : {}),

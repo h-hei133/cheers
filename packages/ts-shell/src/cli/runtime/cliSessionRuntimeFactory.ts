@@ -20,12 +20,14 @@ import type { EscalationPrompt } from "../../sandbox/index.js";
 import { promptInteractiveQuestions } from "../interactive/interactiveAskBridge.js";
 import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
 import { compactSessionHistory } from "../../core/shell/compaction.js";
+import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalStore.js";
 import type { InteractiveApprovalResult } from "../interactive/picker/approval.js";
 import { requestCompactionSummary } from "../../core/query/compaction/summarize.js";
 import { providerFetchFromTimeouts, providerTimeoutsFrom } from "../../provider/request/fetch.js";
 import { accountAuthFor, providerAuthorization, renewAccountAuthIfExpiring } from "../../provider/request/authorization.js";
 import { catalogModel, providerEndpoint } from "../../core/models/catalog.js";
 import type { EndpointKind } from "../../provider/endpoints/kinds.js";
+import { projectMemoryRootFor } from "../../memory/projectMemoryRoot.js";
 import { createCacheWarmingRunner, type CacheWarmingRunner } from "../../turn/cacheWarm.js";
 import { resolveCacheWarmingMode } from "../../core/models/cacheEconomics.js";
 import { sendSentRequest } from "../../provider/request/sentRequest.js";
@@ -302,6 +304,18 @@ export function createCliSessionRuntime(input: {
   const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
     sessionManager: input.sessionManager,
     renderer: input.renderer,
+    // The store the memory commands write through and the injection planner
+    // reads from. Without it every one of them reported `Store mode: disabled`,
+    // and `/memory save` had nowhere to put a record — the chain was absent
+    // rather than broken at one link.
+    //
+    // The root is the project's own directory, so a memory travels with the
+    // repository rather than living only on the machine that recorded it. It
+    // sits one level below the subagent memories, which name a directory after
+    // each agent: the two must not share a path, and they do not.
+    projectMemoryStore: createProjectMemoryLocalStore({
+      ref: { mode: "explicit-local", root: projectMemoryRootFor(input.runtimeContext.projectRoot) },
+    }),
     compactHistory: (sessionId, signal, instructions) => {
       return renewedCompactionProvider().then((provider) => {
         if (!provider) {
