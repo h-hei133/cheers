@@ -1,38 +1,37 @@
 /**
  * Painting to the terminal's own screen, with its scrollback left intact.
  *
- * **Experimental: not yet adapted to the whole surface.** What exists is the
- * screen handling — appending the transcript once, never rewriting it, and
- * redrawing the fixed block in place. What is missing is re-anchoring that block
- * as content grows: the fixed block is placed relative to rows already written,
- * and a turn that appends rows without a resize does not move it, so the prompt
- * and the output drift apart while a turn runs. Reached through
- * `tuiMode: "regular"`; the default is the alternate screen, which does not have
- * this problem because it repaints the whole viewport each frame.
- *
  * The alternate screen is the other mode: a private screen the surface owns, no
  * scrollback, and leaving it restores whatever the user had. That is the right
  * default for a full-screen application, and the wrong one for a conversation —
  * anything that scrolled past is gone, and a session that ends leaves nothing
  * behind to scroll back through.
  *
- * Here the transcript is *appended* to the terminal's scrollback, once, and never
- * rewritten. Only the fixed block at the bottom is redrawn in place, by moving the
- * cursor up over it. The terminal owns the history; this owns the last few rows.
+ * Here the transcript is appended to the terminal's scrollback and the fixed
+ * block at the bottom is redrawn in place, by moving the cursor up over it. The
+ * terminal owns the history; this owns the last few rows.
  *
- * What that costs: rows that scrolled past cannot be repainted, so a width change
- * cannot reflow them. Rewriting history to fix that would mean taking the screen
- * over, which is the mode this exists to avoid. A resize therefore re-anchors and
- * redraws the fixed block against the new width, and leaves the history as the
- * terminal wrapped it.
+ * What that costs, and it is the rule the rest of this file serves: rows that
+ * scrolled past cannot be repainted, because writing over one would duplicate it
+ * into the scrollback. So the accounting keeps two facts — what is on screen and
+ * which of those rows are above the fixed block — and a frame may only ever
+ * rewrite rows that are still visible. A row that has left the screen upward is
+ * history; the diff stops there.
+ *
+ * What is deliberately not claimed: this does not reflow history on a width
+ * change. Rewriting it would mean taking the screen over, which is the mode this
+ * exists to avoid. A resize re-anchors the fixed block against the new width and
+ * leaves the history as the terminal wrapped it.
  *
  * The cursor is tracked rather than queried. Terminals do not report their cursor
  * position unsolicited, and asking (DSR) means a round trip with a timeout on a
- * path that runs on every frame. Every write here goes through `write`, which
+ * path that runs on every frame. Every write here goes through `moveToRow`, which
  * accounts for what the terminal will do with it, so the tracked row and the real
- * one stay together as long as nothing else writes to the terminal.
+ * one stay together as long as nothing else writes to the terminal. When
+ * something else has — a suspended child process — the caller restores through
+ * {@link reanchor}, which re-derives the position from what is on screen rather
+ * than trusting the account.
  */
-
 
 /** Everything this needs from the terminal, so a double can stand in for one. */
 export interface MainScreenDevice {
@@ -53,13 +52,20 @@ const endFrame = (device: MainScreenDevice): string =>
   device.capabilities.supportsDec2026Sync ? SYNC_END : "";
 
 export class MainScreenPainter {
-  /** Rows already written to the terminal, in order. */
-  private written: readonly string[] = [];
-  /** How many of the last written rows are the fixed block, and get redrawn. */
-  private fixedRows = 0;
+  /**
+   * The rows on screen that are content, top row first.
+   *
+   * Only rows still on screen are listed. A row that scrolled out of the
+   * viewport upward is history and is dropped from this list rather than kept
+   * for a rewrite it must never get.
+   */
+  private visibleContent: readonly string[] = [];
+  /** How many leading rows of `visibleContent` are already scrolled away. */
+  private scrolled = 0;
   /** Where the cursor is, counted from the first row this painter wrote. */
   private cursorRow = 0;
-  private width = 0;
+  /** The rows of the fixed block, as last drawn. */
+  private fixedRows: readonly string[] = [];
   private started = false;
 
   constructor(private readonly device: MainScreenDevice) {}
@@ -67,89 +73,167 @@ export class MainScreenPainter {
   /** Put the cursor below the fixed block and hand the cursor back to the user. */
   start(): void {
     this.started = true;
-    this.width = Math.max(1, this.device.getDimensions().columns);
     this.device.write(SHOW_CURSOR);
   }
 
   /**
    * Draw one frame.
    *
-   * `rows` is the whole surface and `chromeRows` its fixed tail. Rows above the
-   * fixed block that have never been written are appended to the scrollback;
-   * everything already written stays as it is.
+   * `rows` is the whole document and `chromeRows` its fixed tail. Content rows
+   * that grew past what the screen holds are appended once and become history;
+   * the tail of the content that is still visible, and the fixed block, are
+   * rewritten in place.
    */
   paint(rows: readonly string[], chromeRows: readonly string[]): void {
     if (!this.started) return;
-    const width = Math.max(1, this.device.getDimensions().columns);
-    // History cannot be reflowed without owning the screen, so a width change
-    // re-anchors: the fixed block is redrawn against the new width and the
-    // history is left as the terminal wrapped it.
-    this.width = width;
-    this.appendNewRows(this.contentRows(rows, chromeRows));
-    this.rewriteFixedBlock(chromeRows);
-  }
+    const dimensions = this.device.getDimensions();
+    const height = Math.max(1, dimensions.rows);
 
-  /**
-   * What to append to the scrollback: the frame's rows above its fixed block.
-   *
-   * The fixed block is never appended — it is redrawn in place — so only the
-   * leading rows are history.
-   */
-  private contentRows(rows: readonly string[], chromeRows: readonly string[]): readonly string[] {
-    const content = rows.length - chromeRows.length;
-    return content > 0 ? rows.slice(0, content) : [];
-  }
+    // `content` is the document minus the fixed block at its end. The block is
+    // subtracted by count rather than by identity: a caller may pass rows whose
+    // text repeats, and the block this painter removes is the tail, not
+    // whichever rows happen to match.
+    const content = rows.length - chromeRows.length > 0
+      ? rows.slice(0, rows.length - chromeRows.length)
+      : rows;
 
-  /**
-   * Write rows the terminal has not seen, and nothing else.
-   *
-   * Rows already written are skipped rather than rewritten: on this screen a
-   * rewrite would duplicate them into the scrollback, which is the one thing this
-   * mode must not do.
-   */
-  private appendNewRows(content: readonly string[]): void {
-    // `written` counts content rows only, so its length is what has already been
-    // emitted. The fixed block is not part of it — it is drawn in place, below.
-    const alreadyWritten = this.written.length;
-    if (content.length <= alreadyWritten) return;
+    // The fixed block is clamped to the screen height. An unclamped block would
+    // push the cursor above the top of the screen while this still believes it
+    // is at the block's last row, and every later move would be computed from a
+    // row that no longer exists.
+    const fixed = chromeRows.length > height ? chromeRows.slice(chromeRows.length - height) : chromeRows;
+    // The screen holds the fixed block plus whatever content fits above it. When
+    // the block is taller than the screen there is no room for content at all.
+    const contentCapacity = Math.max(0, height - fixed.length);
 
-    // New content belongs directly after the content already on screen, which
-    // means stepping back over the fixed block drawn beneath it.
-    let buffer = beginFrame(this.device) + this.moveToRow(alreadyWritten);
-    for (let index = alreadyWritten; index < content.length; index++) {
-      buffer += `${ERASE_LINE}${content[index] ?? ""}\r\n`;
+    // The accounting, in the order the facts are established.
+    //
+    // `writtenTotal` is how many content rows the terminal has ever seen:
+    // history plus what is still on screen. Rows beyond it are new and get
+    // appended once; rows below it are either history (out of reach) or on
+    // screen (rewritable), and the two are separated by how many rows the
+    // screen can hold below the fixed block.
+    const writtenTotal = this.scrolled + this.visibleContent.length;
+    const appendRows = content.length > writtenTotal ? content.slice(writtenTotal) : [];
+    const overflow = Math.max(0, content.length - contentCapacity);
+    const newScrolled = Math.max(this.scrolled, overflow);
+    const onScreenContent = content.length > newScrolled ? content.slice(newScrolled) : [];
+
+    // The previous frame's on-screen rows, adjusted for anything that scrolled
+    // out during this one. The two lists compared below both cover only rows
+    // that are on screen now.
+    const scrolledNow = Math.max(0, newScrolled - this.scrolled);
+    const previousOnScreen = this.visibleContent.slice(Math.min(scrolledNow, this.visibleContent.length));
+
+    let buffer = beginFrame(this.device);
+    if (appendRows.length > 0) {
+      // Appending happens at the bottom of the content, which means stepping
+      // over the fixed block to reach it. `writtenTotal` is that bottom, and it
+      // is the cursor's own account rather than the fixed block's last row,
+      // because the two differ and the append has to land on the row that is
+      // actually free.
+      buffer += this.moveToRow(writtenTotal);
+      for (const row of appendRows) {
+        buffer += `${ERASE_LINE}${row}\r\n`;
+      }
+      // Each appended row ended with a newline, so the cursor is now one row
+      // past the last of them — which is where the frame's accounting expects
+      // to find it when it moves to the fixed block below.
+      this.cursorRow = writtenTotal + appendRows.length;
     }
-    buffer += endFrame(this.device);
-    this.device.write(buffer);
 
-    this.written = content;
-    // Just below the last content row, because each row ended with a newline.
-    this.cursorRow = content.length;
-  }
-
-  /**
-   * Redraw the fixed block under the content.
-   *
-   * Erasing each row where it already is, rather than appending it, is what keeps
-   * the block "fixed" and out of the scrollback.
-   */
-  private rewriteFixedBlock(chromeRows: readonly string[]): void {
-    if (chromeRows.length === 0 && this.fixedRows === 0) return;
-    // The block starts where the content ends.
-    let buffer = beginFrame(this.device) + this.moveToRow(this.written.length);
-    for (let index = 0; index < chromeRows.length; index++) {
-      buffer += `${ERASE_LINE}${chromeRows[index] ?? ""}`;
-      if (index < chromeRows.length - 1) buffer += "\r\n";
+    // Rows that changed while already on screen are rewritten in place. Only
+    // rows both frames show are compared: a row this frame appended was
+    // written a moment ago, and rewriting it would put a second copy in the
+    // scrollback.
+    const sharedContent = Math.min(previousOnScreen.length, onScreenContent.length);
+    const changedFrom = firstDifference(
+      previousOnScreen.slice(0, sharedContent),
+      onScreenContent.slice(0, sharedContent),
+    );
+    if (changedFrom < sharedContent) {
+      buffer += this.moveToRow(newScrolled + changedFrom);
+      for (let index = changedFrom; index < sharedContent; index++) {
+        buffer += `${ERASE_LINE}${onScreenContent[index] ?? ""}`;
+        // A newline between rows moves the cursor down; a trailing one would
+        // step past the last row and leave the account one ahead of the
+        // terminal for every move that follows.
+        if (index < sharedContent - 1) buffer += "\r\n";
+      }
+      // The rewrite left the cursor on the last row it wrote, which is the
+      // row the accounting names.
+      this.cursorRow = newScrolled + sharedContent - 1;
     }
-    // Clear any rows the previous block used and this one does not.
-    if (this.fixedRows > chromeRows.length) {
+
+    // The content shrank with nothing appended: rows the previous frame used
+    // and this one does not are erased, not rewritten — the rows are leaving.
+    //
+    // The erase starts on the row *after* the last one the content keeps,
+    // because the last row of the content is real and erasing from it would
+    // clear a row the frame just wrote. It clears the fixed block too, so the
+    // block is redrawn below on this path rather than only when its own diff
+    // says it changed.
+    if (appendRows.length === 0 && previousOnScreen.length > onScreenContent.length) {
+      // Erase downward from the first row the content no longer keeps. The
+      // cursor is on the last kept row after a rewrite, so one explicit
+      // descent reaches it; erasing there clears the dropped rows and the
+      // fixed block, which is redrawn below on this path.
+      buffer += this.moveToRow(newScrolled + Math.max(0, onScreenContent.length - 1));
+      buffer += onScreenContent.length > 0 ? "\x1b[B" : "";
       buffer += ERASE_TO_END_OF_SCREEN;
+      this.fixedRows = [];
+      this.cursorRow = newScrolled + onScreenContent.length;
     }
+
+    // The fixed block, redrawn under the content wherever it changed.
+    if (fixed.length > 0 || this.fixedRows.length > 0) {
+      buffer += this.moveToRow(newScrolled + onScreenContent.length);
+      for (let index = 0; index < fixed.length; index++) {
+        buffer += `${ERASE_LINE}${fixed[index] ?? ""}`;
+        if (index < fixed.length - 1) buffer += "\r\n";
+      }
+      if (this.fixedRows.length > fixed.length) buffer += ERASE_TO_END_OF_SCREEN;
+    }
+
     buffer += endFrame(this.device);
     this.device.write(buffer);
-    this.fixedRows = chromeRows.length;
-    // Left on the block's last row, which is where a terminal leaves it too.
-    this.cursorRow = this.written.length + Math.max(0, chromeRows.length - 1);
+
+    this.visibleContent = onScreenContent;
+    this.scrolled = newScrolled;
+    this.fixedRows = fixed;
+    this.cursorRow = this.scrolled + this.visibleContent.length + Math.max(0, fixed.length - 1);
+  }
+
+  /**
+   * Re-derive the account after something else wrote to the terminal.
+   *
+   * A suspended child can move the cursor anywhere, so the tracked row and the
+   * real one have drifted apart and no relative move computed from the account
+   * can be trusted. This asks the caller where the cursor really is and resumes
+   * from there: the rows already written are left alone — they are in the
+   * scrollback or still on screen — and the next frame diffs against them.
+   */
+  reanchor(cursorRow: number): void {
+    this.cursorRow = cursorRow;
+  }
+
+  /**
+   * Leave the screen as the user should find it.
+   *
+   * There is no screen to give back — this never took one. The cursor is placed
+   * below everything written so the shell prompt continues the history rather
+   * than overwriting it.
+   */
+  stop(): void {
+    if (!this.started) return;
+    this.started = false;
+    const total = this.scrolled + this.visibleContent.length + this.fixedRows.length;
+    this.device.write(`${this.moveToRow(total)}\r\n${SHOW_CURSOR}`);
+  }
+
+  /** For a device that wants to know whether a repaint is worth attempting. */
+  get trackedRows(): number {
+    return this.scrolled + this.visibleContent.length + this.fixedRows.length;
   }
 
   /**
@@ -163,23 +247,13 @@ export class MainScreenPainter {
     if (delta === 0) return "\r";
     return delta > 0 ? `\x1b[${delta}B\r` : `\x1b[${-delta}A\r`;
   }
+}
 
-  /**
-   * Leave the screen as the user should find it.
-   *
-   * There is no screen to give back — this never took one. The cursor is placed
-   * below everything written so the shell prompt continues the history rather
-   * than overwriting it.
-   */
-  stop(): void {
-    if (!this.started) return;
-    this.started = false;
-    const total = this.written.length + this.fixedRows;
-    this.device.write(`${this.moveToRow(total)}\r\n${SHOW_CURSOR}`);
+/** The first index where two lists differ, or the end of the shorter one. */
+function firstDifference<T>(left: readonly T[], right: readonly T[]): number {
+  const shared = Math.min(left.length, right.length);
+  for (let index = 0; index < shared; index++) {
+    if (left[index] !== right[index]) return index;
   }
-
-  /** For a device that wants to know whether a repaint is worth attempting. */
-  get trackedRows(): number {
-    return this.written.length + this.fixedRows;
-  }
+  return shared;
 }

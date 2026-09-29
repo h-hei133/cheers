@@ -218,10 +218,24 @@ export class TUI {
       this.beginTerminal({});
       this.enterScreen();
       this.setMouseTracking(true);
-      // The child wrote to the screen, so the next frame is a full paint rather
-      // than a diff against rows that are no longer there.
-      this.painted = false;
-      this.window = [];
+      // What to repaint after the child had the terminal depends on which
+      // screen this session runs on, and the two answers are opposite.
+      //
+      // The alternate screen is one the child drew over, so every row the last
+      // frame left is suspect: the next frame is a full paint rather than a
+      // diff against rows that may no longer be there.
+      //
+      // The main screen is the terminal's own, and its rows are history: the
+      // child wrote below them, not over them. A full paint here would mean
+      // appending the entire transcript again — the one thing this mode must
+      // not do. Instead the painter keeps its account and re-anchors the
+      // cursor, which the child moved to wherever it liked.
+      if (this.mainScreen) {
+        this.mainScreen.reanchor(this.mainScreen.trackedRows);
+      } else {
+        this.painted = false;
+        this.window = [];
+      }
       this.requestRender({ force: true });
     }
   }

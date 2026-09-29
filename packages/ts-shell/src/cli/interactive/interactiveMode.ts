@@ -797,7 +797,17 @@ export class InteractiveMode {
     this.tui.requestRender();
   }
 
-  /** Drop the visible transcript and the terminal's scrollback together. */
+  /**
+   * Drop the transcript the surface holds.
+   *
+   * On the alternate screen this empties what the session shows. On the
+   * terminal's own screen the rows already written are history, and history
+   * cannot be erased by a repaint — rewriting those rows would append a second
+   * copy of them, which is the one thing this mode must not do. There the
+   * conversation stays in the scrollback, and clearing the terminal itself is
+   * the user's to do; saying so here is honest, pretending it was cleared is
+   * not.
+   */
   private clearScreen(): void {
     this.state.transcript.clear();
     this.tui.requestRender({ force: true });

@@ -272,6 +272,46 @@ describe("MainScreenPainter", () => {
     expect(written.join("")).not.toContain("\x1b[?2026h");
   });
 
+  it("rewrites a row that grew, instead of appending a second copy", () => {
+    // The frame composes the whole document each time, so a row that changed is
+    // at the same position in both frames. Skipping the rewrite would leave the
+    // terminal showing the shorter text forever, and appending it would put two
+    // copies in the scrollback.
+    const terminal = new Screen();
+    const painter = new MainScreenPainter(terminal.asDevice());
+    painter.start();
+
+    painter.paint(["hel", "chrome"], ["chrome"]);
+    painter.paint(["hello world", "chrome"], ["chrome"]);
+
+    const lines = terminal.allLines();
+    expect(lines.filter((line) => line.includes("hello world"))).toHaveLength(1);
+    expect(lines.filter((line) => line === "hel")).toHaveLength(0);
+  });
+
+  it("erases the rows a shrunken frame no longer uses", () => {
+    // Collapsing a block leaves fewer content rows. The ones that went must
+    // leave the screen: the row the frame still wants stays, and the rows it
+    // dropped appear nowhere — not above the fixed block, and not a second
+    // time in the scrollback.
+    const terminal = new Screen();
+    const painter = new MainScreenPainter(terminal.asDevice());
+    painter.start();
+
+    painter.paint(["one", "two", "three", "chrome"], ["chrome"]);
+    painter.paint(["one", "chrome"], ["chrome"]);
+
+    const lines = terminal.allLines();
+    expect(lines.filter((line) => line === "one")).toHaveLength(1);
+    // The rows that left are gone from both the screen and the scrollback.
+    expect(terminal.countOnScreen("two")).toBe(0);
+    expect(terminal.countOnScreen("three")).toBe(0);
+    expect(terminal.countInScrollback("two")).toBe(0);
+    expect(terminal.countInScrollback("three")).toBe(0);
+    // The block stayed on the screen.
+    expect(terminal.countOnScreen("chrome")).toBe(1);
+  });
+
   it("keeps drawing after the width changes", () => {
     // Rows that scrolled past cannot be repainted without taking the screen
     // over, so a resize re-anchors and redraws the block rather than reflowing.
