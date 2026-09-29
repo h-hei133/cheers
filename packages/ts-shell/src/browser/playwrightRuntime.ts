@@ -16,6 +16,8 @@ export interface PwBrowserType {
     readonly headless?: boolean;
     readonly executablePath?: string;
     readonly timeout?: number;
+    readonly args?: readonly string[];
+    readonly ignoreDefaultArgs?: readonly string[];
   }): Promise<PwBrowser>;
 }
 
@@ -26,27 +28,51 @@ export interface PwBrowser {
 
 export interface PwBrowserContext {
   newPage(): Promise<PwPage>;
+  /** Present in Playwright; optional here because a minimal double need not take a script. */
+  addInitScript?(script: string): Promise<unknown>;
   close(): Promise<void>;
 }
 
-export interface PwLocator {
-  first(): PwLocator;
-  count(): Promise<number>;
-  click(options?: { readonly timeout?: number }): Promise<void>;
-  fill(value: string, options?: { readonly timeout?: number }): Promise<void>;
-  innerText(options?: { readonly timeout?: number }): Promise<string>;
-  evaluateAll<T>(pageFunction: (elements: Element[]) => T): Promise<T>;
-}
-
+/**
+ * The page surface this runtime uses.
+ *
+ * Narrow on purpose: it is everything the browser session calls, and nothing
+ * else. A wider declaration would describe Playwright rather than our use of it,
+ * and every member declared but unused is one a reader has to rule out before
+ * they can trust the ones that are. The locator API (`locator`, `getByRole`,
+ * `getByLabel`) was declared here and never called from anywhere; the session
+ * evaluates selectors directly, so it is gone rather than carried.
+ *
+ * The shapes match Playwright's, so the value returned by a real launch
+ * satisfies this without a cast.
+ */
 export interface PwPage {
-  setDefaultTimeout(timeoutMs: number): void;
-  setContent(html: string, options?: { readonly waitUntil?: "load" | "domcontentloaded" | "networkidle"; readonly timeout?: number }): Promise<void>;
-  waitForFunction(pageFunction: string | ((...args: unknown[]) => unknown), arg?: unknown, options?: { readonly timeout?: number }): Promise<unknown>;
+  goto(url: string, options?: { readonly waitUntil?: "load" | "domcontentloaded" | "networkidle" | "commit"; readonly timeout?: number }): Promise<unknown>;
+  url(): string;
   title(): Promise<string>;
-  locator(selector: string): PwLocator;
-  getByRole(role: string, options?: { readonly name?: string | RegExp }): PwLocator;
-  getByLabel(text: string | RegExp): PwLocator;
+  evaluate<T>(pageFunction: () => T): Promise<T>;
+  click(selector: string, options?: { readonly timeout?: number }): Promise<void>;
+  fill(selector: string, value: string, options?: { readonly timeout?: number }): Promise<void>;
+  selectOption(selector: string, value: string, options?: { readonly timeout?: number }): Promise<void>;
+  hover(selector: string, options?: { readonly timeout?: number }): Promise<void>;
+  keyboard: { press(key: string): Promise<void> };
+  on(event: string, handler: () => void): void;
+  /**
+   * Intercept requests before they are made.
+   *
+   * A navigation that redirects is followed internally, so a check placed after
+   * `goto` returns has already let the second request out. Routing is the only
+   * place that sees each hop before it happens.
+   */
+  route(pattern: string, handler: (route: PwRoute) => void): Promise<void>;
   close(): Promise<void>;
+}
+
+/** One intercepted request, as much of it as the policy check reads. */
+export interface PwRoute {
+  request(): { url(): string };
+  continue(): Promise<void>;
+  abort(reason?: string): Promise<void>;
 }
 
 export interface PwRuntimeModule {

@@ -1,10 +1,18 @@
 import { approvedResult, deniedResult } from "./toolResultLifecycle.js";
-import type { ToolDefinition } from "../../tools/types.js";
+import type { ToolDefinition, ToolExecutionResult } from "../../tools/types.js";
 import { defaultBrowserSessionManager } from "../../browser/sessionManager.js";
+import type { BrowserActionResult, BrowserSessionFailure } from "../../browser/sessionManager.js";
+import { getPwRuntimeStatus } from "../../browser/playwrightRuntime.js";
+import { readBrowserOriginPolicy } from "../../browser/originPolicy.js";
 
 /**
- * Unified Browser Tool
- * Controls a stateful, persistent browser session across multi-turn interactions.
+ * A stateful browser session the model drives across turns.
+ *
+ * Every outcome here is one of two things: what happened, or why it could not.
+ * There is no third state where an action reports success without a page — an
+ * earlier version answered `Simulated click on element 'e1'` when no browser was
+ * running, which is the failure mode a reader cannot detect and therefore cannot
+ * recover from.
  */
 export function createUnifiedBrowserToolDefinition(): ToolDefinition {
   return {
@@ -26,11 +34,11 @@ export function createUnifiedBrowserToolDefinition(): ToolDefinition {
             "press",
             "close",
           ],
-          description: "Browser action to execute.",
+          description: "The browser action to perform.",
         },
         url: {
           type: "string",
-          description: "URL to navigate to for 'open' action (e.g. http://localhost:3000, https://example.com).",
+          description: "URL to open for 'open' action (e.g. https://example.com or http://localhost:3000).",
         },
         selector: {
           type: "string",
@@ -52,11 +60,13 @@ export function createUnifiedBrowserToolDefinition(): ToolDefinition {
       required: ["action"],
     },
     permissions: { check: () => [] },
-    async execute(args, _context) {
+    async execute(args, context) {
       const action = typeof args.action === "string" ? args.action.toLowerCase().trim() : "";
       if (!action) {
         return deniedResult("Error: action parameter is required for browser tool.");
       }
+
+      const policy = readBrowserOriginPolicy();
 
       switch (action) {
         case "open": {
@@ -64,29 +74,38 @@ export function createUnifiedBrowserToolDefinition(): ToolDefinition {
           if (!url) {
             return deniedResult("Error: url parameter is required for 'open' action.");
           }
-          const { title } = await defaultBrowserSessionManager.openUrl(url);
+          const opened = await defaultBrowserSessionManager.openUrl(url, policy);
+          if (!opened.ok) {
+            return deniedResult(await renderFailure(opened.failure!));
+          }
           const state = await defaultBrowserSessionManager.observe();
           return approvedResult(
-            `# Navigated to \`${url}\` (Title: "${title}")\n\n${state.outline}`,
+            `# Navigated to \`${opened.url}\` (Title: "${opened.title ?? ""}")\n\n${state.outline}`,
           );
         }
 
         case "observe": {
           const state = await defaultBrowserSessionManager.observe();
-          return approvedResult(
-            `# Browser Page State (\`${state.url}\`)\n\n${state.outline}`,
-          );
+          if (state.elements.length === 0 && state.url === "about:blank") {
+            // Nothing has been opened, so the honest answer is that there is no
+            // page rather than an empty element list from a blank one.
+            return deniedResult(await renderFailure(
+              {
+                kind: "not-launched",
+                reason: "No page has been opened yet, so there is nothing to observe.",
+                nextAction: 'Run `browser` with `action: "open"` and a URL first.',
+              },
+            ));
+          }
+          return approvedResult(`# Browser Page State (\`${state.url}\`)\n\n${state.outline}`);
         }
+
         case "click": {
           const selector = typeof args.selector === "string" ? args.selector.trim() : "";
           if (!selector) {
             return deniedResult("Error: selector parameter (e.g. 'e1' or CSS selector) is required for 'click' action.");
           }
-          const result = await defaultBrowserSessionManager.click(selector);
-          if (result.startsWith("Click attempt failed")) {
-            return deniedResult(result);
-          }
-          return approvedResult(result);
+          return runBrowserAction(defaultBrowserSessionManager.click(selector));
         }
 
         case "type": {
@@ -95,11 +114,7 @@ export function createUnifiedBrowserToolDefinition(): ToolDefinition {
           if (!selector) {
             return deniedResult("Error: selector parameter is required for 'type' action.");
           }
-          const result = await defaultBrowserSessionManager.type(selector, text);
-          if (result.startsWith("Type attempt failed")) {
-            return deniedResult(result);
-          }
-          return approvedResult(result);
+          return runBrowserAction(defaultBrowserSessionManager.type(selector, text));
         }
 
         case "select": {
@@ -108,11 +123,7 @@ export function createUnifiedBrowserToolDefinition(): ToolDefinition {
           if (!selector || !value) {
             return deniedResult("Error: selector and value parameters are required for 'select' action.");
           }
-          const result = await defaultBrowserSessionManager.selectOption(selector, value);
-          if (result.startsWith("Select option failed")) {
-            return deniedResult(result);
-          }
-          return approvedResult(result);
+          return runBrowserAction(defaultBrowserSessionManager.selectOption(selector, value));
         }
 
         case "hover": {
@@ -120,11 +131,7 @@ export function createUnifiedBrowserToolDefinition(): ToolDefinition {
           if (!selector) {
             return deniedResult("Error: selector parameter is required for 'hover' action.");
           }
-          const result = await defaultBrowserSessionManager.hover(selector);
-          if (result.startsWith("Hover failed")) {
-            return deniedResult(result);
-          }
-          return approvedResult(result);
+          return runBrowserAction(defaultBrowserSessionManager.hover(selector));
         }
 
         case "press": {
@@ -132,16 +139,11 @@ export function createUnifiedBrowserToolDefinition(): ToolDefinition {
           if (!key) {
             return deniedResult("Error: key parameter is required for 'press' action.");
           }
-          const result = await defaultBrowserSessionManager.pressKey(key);
-          if (result.startsWith("Key press failed")) {
-            return deniedResult(result);
-          }
-          return approvedResult(result);
+          return runBrowserAction(defaultBrowserSessionManager.pressKey(key));
         }
 
         case "close": {
-          const result = await defaultBrowserSessionManager.closeSession();
-          return approvedResult(result);
+          return runBrowserAction(defaultBrowserSessionManager.closeSession());
         }
 
         default:
@@ -151,4 +153,51 @@ export function createUnifiedBrowserToolDefinition(): ToolDefinition {
       }
     },
   };
+}
+
+/**
+ * One page action's outcome, as the tool reports it.
+ *
+ * Stands apart from `execute` because the arms differ only in which method they
+ * call: repeating the result-to-output mapping left each arm free to drift and,
+ * at this function's length, defeated the compiler's narrowing of the result
+ * union. One mapping, one place.
+ */
+async function runBrowserAction(action: Promise<BrowserActionResult>): Promise<ToolExecutionResult> {
+  const result = await action;
+  if (!result.ok) {
+    return deniedResult(await renderFailure(result.failure));
+  }
+  return approvedResult(result.output);
+}
+
+/**
+ * A refusal, with the detail that makes it actionable.
+ *
+ * The launch case is the one that needs the extra step: this report comes from a
+ * failed launch, and the passive runtime status can say whether the package and
+ * binary are present, which distinguishes "not installed" from "will not start".
+ * Its own answer is included rather than restated, so the two readings agree.
+ */
+async function renderFailure(failure: BrowserSessionFailure): Promise<string> {
+  const lines = [`Error: ${failure.reason}`, `Next: ${failure.nextAction}`];
+
+  if (failure.kind === "not-launched") {
+    const status = await getPwRuntimeStatus().catch(() => undefined);
+    if (status) {
+      lines.push(
+        `Runtime: ${status.status} (dependency: ${status.dependency}, executable: ${status.executableSource}).`,
+        `Runtime next action: ${status.nextAction}`,
+      );
+      if (status.warnings.length > 0) {
+        lines.push(`Runtime warnings: ${status.warnings.join(", ")}.`);
+      }
+    }
+  }
+
+  if (failure.refusal) {
+    lines.push(`Refused: ${failure.refusal.code} (${failure.refusal.hostname || "no host"}).`);
+  }
+
+  return lines.join("\n");
 }
