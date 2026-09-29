@@ -106,7 +106,17 @@ function writeRecord(
       "Memory record contains raw content, hidden reasoning, or secret-looking material.",
     );
   }
-  fs.mkdirSync(path.dirname(recordsFile), { recursive: true });
+  try {
+    fs.mkdirSync(path.dirname(recordsFile), { recursive: true });
+  } catch (error) {
+    // A read-only checkout is a normal thing to work in. The write is refused
+    // with the reason rather than thrown, so a memory that cannot be recorded
+    // reports that instead of taking the session down with it.
+    return blocked(
+      "project-memory-local-store:write-unavailable",
+      `Memory store is not writable at ${recordsFile}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
   const records = readRecordsSync(ref);
   if (records.some((record) => record.id === request.record.id)) {
     return {
@@ -186,8 +196,17 @@ function invalidateRecord(
     sourceCommand: request.sourceCommand,
     reason: sanitizeLifecycleReason(request.reason),
   };
-  fs.mkdirSync(path.dirname(recordsFile), { recursive: true });
-  fs.appendFileSync(recordsFile, `${JSON.stringify(tombstone)}\n`, "utf8");
+  try {
+    fs.mkdirSync(path.dirname(recordsFile), { recursive: true });
+    fs.appendFileSync(recordsFile, `${JSON.stringify(tombstone)}\n`, "utf8");
+  } catch (error) {
+    return {
+      invalidated: false,
+      skipped: false,
+      blocker: `Memory store is not writable at ${recordsFile}: ${error instanceof Error ? error.message : String(error)}`,
+      evidence: ["project-memory-local-store:invalidate-unavailable"],
+    };
+  }
   return {
     record: {
       ...existing,
@@ -250,11 +269,20 @@ function deleteRecord(
     sourceCommand: request.sourceCommand,
     reason: sanitizeLifecycleReason(request.reason),
   };
-  fs.mkdirSync(path.dirname(recordsFile), { recursive: true });
-  const payload = [...retained, tombstone]
-    .map((entry) => JSON.stringify(entry))
-    .join("\n");
-  fs.writeFileSync(recordsFile, `${payload}\n`, "utf8");
+  let payload: string;
+  try {
+    fs.mkdirSync(path.dirname(recordsFile), { recursive: true });
+    payload = [...retained, tombstone].map((entry) => JSON.stringify(entry)).join("\n");
+    fs.writeFileSync(recordsFile, `${payload}\n`, "utf8");
+  } catch (error) {
+    return {
+      recordId: request.recordId,
+      deleted: false,
+      skipped: false,
+      blocker: `Memory store is not writable at ${recordsFile}: ${error instanceof Error ? error.message : String(error)}`,
+      evidence: ["project-memory-local-store:delete-unavailable"],
+    };
+  }
   return {
     recordId: request.recordId,
     deleted: true,

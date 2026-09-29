@@ -36,6 +36,12 @@ rtk/
 # NormProof judge output
 .normproof/out/
 
+# Project memory written by /memory save. The directory holds what a session
+# recorded about this project, which is per-machine working state rather than
+# repository content — the same reason .normproof/out/ and .omp/ are here.
+# Subagent memories live in sibling directories and were never tracked.
+.agents/memory/
+
 # omp project settings (model overrides for subagents)
 .omp/
 
