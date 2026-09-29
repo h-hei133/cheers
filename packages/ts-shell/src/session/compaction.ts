@@ -423,6 +423,14 @@ export function readContextCheckpoint(content: string): string | undefined {
  */
 export type CompactionDecline =
   /**
+   * Refused by a `PreCompact` hook.
+   *
+   * Not a judgement about the conversation: nothing was examined and nothing
+   * changed. The caller reports it as a policy refusal, which is why it needs its
+   * own reason rather than sharing one with the size-based declines.
+   */
+  | "blocked-by-hook"
+  /**
    * The conversation already fits inside the recent-tail budget, so there is
    * nothing older than the kept tail to replace. This is the common case: a
    * conversation that is growing but has not yet outgrown what compaction would
@@ -483,6 +491,21 @@ export async function condenseContext(input: {
    * missed its size in the first place.
    */
   readonly force?: boolean;
+  /**
+   * Told before and after the condensation, and able to refuse it.
+   *
+   * Both entry points pass one so a hook sees the same event with the same
+   * `reason` whether the user typed `/compact` or the window filled up.
+   */
+  readonly lifecycle?: CompactionLifecycle;
+  /**
+   * Which trigger this is, for the lifecycle hooks.
+   *
+   * Separate from `lifecycle` because the reason is a fact about the call while
+   * the lifecycle is the mechanism reporting it, and a caller that supplies a
+   * lifecycle without a reason is the manual case.
+   */
+  readonly lifecycleReason?: CompactionReason;
 }): Promise<CondenseOutcome> {
   const plan = input.force
     ? planCompactionCut(input.messages, input.policy)
@@ -510,6 +533,17 @@ export async function condenseContext(input: {
   // nor part of the older history, so the history stops where the turn begins
   // and the opener is summarized separately.
   const historyEnd = plan.splitsTurn ? plan.turnStart : plan.cut;
+  // Asked before the summary is requested, so a refusal costs nothing. The
+  // tokens are the same estimate the rest of this function works from.
+  const proceed = await input.lifecycle?.before?.({
+    reason: input.lifecycleReason ?? "manual",
+    tokensBefore: plan.tokensBefore,
+    messageCount: input.messages.length,
+  });
+  if (proceed === false) {
+    return { status: "declined", reason: "blocked-by-hook" };
+  }
+
   const history = input.messages.slice(historyStart, historyEnd);
   const prefix = plan.splitsTurn ? input.messages.slice(Math.max(plan.turnStart, head), plan.cut) : [];
 
@@ -558,6 +592,12 @@ export async function condenseContext(input: {
   // The head the checkpoint replaces spans from the first message it discards
   // to the cut, which includes any earlier checkpoint it was merged with.
   const summarized = plan.cut - head;
+  await input.lifecycle?.after?.({
+    reason: input.lifecycleReason ?? "manual",
+    summary,
+    keptMessages: plan.keptMessages,
+    tokensBefore: plan.tokensBefore,
+  });
   return { status: "condensed", plan, summary, messages, summarized, tokensAfter: after };
 }
 
@@ -606,14 +646,9 @@ export function createCompactionStep(
     if (tokensBefore === undefined) {
       return undefined;
     }
-    const proceed = await options.lifecycle?.before?.({
-      reason,
-      tokensBefore,
-      messageCount: snapshot.messages.length,
-    });
-    if (proceed === false) {
-      return undefined;
-    }
+    // The lifecycle travels into `condenseContext` rather than being invoked
+    // here: one place dispatches the hooks, so the manual and automatic paths
+    // cannot report different payloads for the same event.
     let condensed: CondenseOutcome;
     try {
       condensed = await condenseContext({
@@ -622,6 +657,8 @@ export function createCompactionStep(
         summarize: options.summarize,
         summarizeTurnPrefix: options.summarizeTurnPrefix,
         signal,
+        ...(options.lifecycle ? { lifecycle: options.lifecycle } : {}),
+        lifecycleReason: reason,
       });
     } catch (error) {
       if (signal?.aborted) {
@@ -638,12 +675,6 @@ export function createCompactionStep(
     }
     const { plan, summary } = condensed;
     options.onCompact?.({ summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore });
-    await options.lifecycle?.after?.({
-      reason,
-      summary,
-      keptMessages: plan.keptMessages,
-      tokensBefore: plan.tokensBefore,
-    });
     return { messages: condensed.messages };
   };
 }

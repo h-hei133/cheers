@@ -18,9 +18,18 @@ export function parseCompactCommand(prompt: string): CompactRequest | undefined 
   const parts = prompt.trim().split(/\s+/);
   const name = parts[0]?.toLowerCase();
   if (name !== "/compact" && name !== "/handoff") return undefined;
-  const args = parts.slice(1).filter((part) => !part.startsWith("--"));
-  if (args[0] && HANDOFF_FORMS.has(args[0].toLowerCase())) return undefined;
-  const instructions = args.join(" ").trim();
+  const rest = parts.slice(1);
+  const positional = rest.filter((part) => !part.startsWith("--"));
+  // Both spellings of a handoff form count. The command parses `preview` as a
+  // positional *and* `--preview` as a flag — `parseCompactCommandArgs` accepts
+  // either, and the argument hint advertises `[preview|render|json]`. Reading
+  // only the positional meant `--preview` was taken for focus instructions and
+  // condensed the history, which is the opposite of a read-only form.
+  if (positional[0] && HANDOFF_FORMS.has(positional[0].toLowerCase())) return undefined;
+  if (rest.some((part) => part.startsWith("--") && HANDOFF_FORMS.has(part.slice(2).toLowerCase()))) {
+    return undefined;
+  }
+  const instructions = positional.join(" ").trim();
   return instructions ? { instructions } : {};
 }
 

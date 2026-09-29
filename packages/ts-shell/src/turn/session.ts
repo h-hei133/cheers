@@ -15,6 +15,7 @@ import {
   type SummarizeTurnPrefix,
 } from "../session/compaction.js";
 import { environmentLine } from "./prompt.js";
+import { buildCompactionLifecycle } from "../core/shell/compaction.js";
 import { concludeRun, TurnProjection } from "./projection.js";
 import { EventChannel } from "./stream.js";
 import { isOverflowFailure, type StepFunction } from "./step.js";
@@ -269,32 +270,14 @@ export function runTurn(options: TurnOptions): TurnRun {
           summarize: options.compaction.summarize,
           summarizeTurnPrefix: options.compaction.summarizeTurnPrefix,
           onCompact: options.compaction.onCompact,
-          lifecycle: {
-            before: async (input) => {
-              const decision = await options.hooks.dispatch({
-                eventName: "PreCompact",
-                sessionId: options.sessionId,
-                workspaceRoot: options.workspaceRoot,
-                timestamp: new Date().toISOString(),
-                reason: options.compaction?.reason ?? "threshold",
-                tokensBefore: input.tokensBefore,
-                messageCount: input.messageCount,
-              });
-              return decision.decision !== "block";
-            },
-            after: async (input) => {
-              await options.hooks.dispatch({
-                eventName: "PostCompact",
-                sessionId: options.sessionId,
-                workspaceRoot: options.workspaceRoot,
-                timestamp: new Date().toISOString(),
-                reason: options.compaction?.reason ?? "threshold",
-                summary: input.summary,
-                keptMessages: input.keptMessages,
-                tokensBefore: input.tokensBefore,
-              });
-            },
-          },
+          // One builder for both entry points, so a hook sees the same event
+          // with the same reason whether the window filled up or the user asked.
+          lifecycle: buildCompactionLifecycle({
+            hooks: options.hooks,
+            sessionId: options.sessionId,
+            workspaceRoot: options.workspaceRoot,
+            reason: options.compaction.reason ?? "threshold",
+          }),
           reason: options.compaction.reason ?? "threshold",
         })
       : undefined,

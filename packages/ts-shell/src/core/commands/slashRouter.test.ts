@@ -6,6 +6,7 @@ import {
   createCompactLiveCheckpointStore,
   getLatestCompactCheckpoint,
 } from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
+import { recordCompactionCheckpoint } from "../../context/compact/checkpoint/compactionCheckpoint.js";
 import { createCompactInjectionStateStore } from "../../context/compact/injection/compactInjectionState.js";
 import { createProjectMemoryInjectionStateStore } from "../../memory/projectMemoryInjectionState.js";
 import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalStore.js";
@@ -137,6 +138,16 @@ describe("slash router (W4)", () => {
     const compactInjectionStateStore = createCompactInjectionStateStore({
       now: () => "2026-05-15T00:00:00.000Z",
     });
+    // A checkpoint is what a completed compaction produces, not what a
+    // read-only handoff report writes. Seed one through the production
+    // producer, the way the engine does after condensing.
+    recordCompactionCheckpoint({
+      sessionScopeId: "session:sess_slash",
+      sourceCommand: "/compact",
+      projectRoot: workspaceRoot,
+      checkpointStore: compactCheckpointStore,
+      injectionStateStore: compactInjectionStateStore,
+    });
     const result = await routeSlashCommand("/compact", {
       cwd: workspaceRoot,
       sessionId: "sess_slash",
@@ -152,6 +163,8 @@ describe("slash router (W4)", () => {
       expect(result.output).toContain("- Provider/model call: none");
       expect(result.output).toContain("- Recovery execution: none");
       expect(result.output).toContain("run /memory to review candidates");
+      // The report describes the checkpoint the condensation left behind; it
+      // does not create one of its own.
       expect(result.output).toContain("Compact checkpoint");
       expect(result.output).toContain("- Checkpoint id: checkpoint-slash-1");
       expect(result.output).toContain("- Future-turn adapter: ready-for-adapter");
@@ -179,10 +192,11 @@ describe("slash router (W4)", () => {
     const projectMemoryReviewStateStore = createProjectMemoryReviewStateStore({
       now: () => "2026-05-16T00:00:00.000Z",
     });
-    await routeSlashCommand("/compact", {
-      cwd: workspaceRoot,
-      sessionId: "sess_memory_review",
-      compactCheckpointStore,
+    recordCompactionCheckpoint({
+      sessionScopeId: "session:sess_memory_review",
+      sourceCommand: "/compact",
+      projectRoot: workspaceRoot,
+      checkpointStore: compactCheckpointStore,
     });
 
     const result = await routeSlashCommand("/memory", {
@@ -216,10 +230,11 @@ describe("slash router (W4)", () => {
     const projectMemoryStore = createProjectMemoryLocalStore({
       ref: { mode: "test-only", root: memoryStoreRoot },
     });
-    await routeSlashCommand("/compact", {
-      cwd: workspaceRoot,
-      sessionId: "sess_memory_save",
-      compactCheckpointStore,
+    recordCompactionCheckpoint({
+      sessionScopeId: "session:sess_memory_save",
+      sourceCommand: "/compact",
+      projectRoot: workspaceRoot,
+      checkpointStore: compactCheckpointStore,
     });
     const review = await routeSlashCommand("/memory", {
       cwd: workspaceRoot,
@@ -462,11 +477,11 @@ describe("slash router (W4)", () => {
       },
     });
     try {
-      await routeSlashCommand("/compact", {
-        cwd: workspaceRoot,
-        sessionId: "sess_sidebar_live",
-        compactCheckpointStore,
-        sidebarLiveEventStore,
+      recordCompactionCheckpoint({
+        sessionScopeId: "session:sess_sidebar_live",
+        sourceCommand: "/compact",
+        projectRoot: workspaceRoot,
+        checkpointStore: compactCheckpointStore,
       });
       const review = await routeSlashCommand("/memory", {
         cwd: workspaceRoot,
@@ -551,9 +566,12 @@ describe("slash router (W4)", () => {
           maxEvents: 20,
         })
         .events.map((event) => event.title);
+      // The read-only handoff report no longer emits a "Compact checkpoint"
+      // event: it writes no checkpoint, so there is nothing to announce. The
+      // event fires when the engine records one after a real condensation.
+      expect(capturedTitles).not.toContain("Compact checkpoint");
       expect(capturedTitles).toEqual(
         expect.arrayContaining([
-          "Compact checkpoint",
           "Memory saved",
           "Memory recalled",
           "Memory use staged",
@@ -598,10 +616,11 @@ describe("slash router (W4)", () => {
         }),
       );
     }
+    // A read-only artifact form writes no checkpoint: there is nothing to
+    // inject because nothing was condensed.
     expect(
-      getLatestCompactCheckpoint(compactCheckpointStore, "session:sess_json")
-        ?.checkpointId,
-    ).toBe("checkpoint-json");
+      getLatestCompactCheckpoint(compactCheckpointStore, "session:sess_json"),
+    ).toBeUndefined();
 
     const invalidResult = await routeSlashCommand("/compact --execute", {
       cwd: workspaceRoot,
@@ -626,6 +645,9 @@ describe("slash router (W4)", () => {
     const compactInjectionStateStore = createCompactInjectionStateStore({
       now: () => "2026-05-15T00:00:00.000Z",
     });
+    // Both forms are read-only handoff reports, so neither writes a
+    // checkpoint of its own. The supersede chain below is seeded through the
+    // production producer, the way the engine does after condensing.
     const first = await routeSlashCommand("/compact", {
       cwd: workspaceRoot,
       sessionId: "sess_alias",
@@ -641,10 +663,24 @@ describe("slash router (W4)", () => {
 
     expect(first?.kind).toBe("local");
     expect(second?.kind).toBe("local");
-    if (second?.kind === "local") {
-      expect(second.output).toContain("- Checkpoint id: checkpoint-alias-2");
-      expect(second.output).toContain("- Source command: /handoff");
-    }
+    expect(
+      getLatestCompactCheckpoint(compactCheckpointStore, "session:sess_alias"),
+    ).toBeUndefined();
+
+    recordCompactionCheckpoint({
+      sessionScopeId: "session:sess_alias",
+      sourceCommand: "/compact",
+      projectRoot: workspaceRoot,
+      checkpointStore: compactCheckpointStore,
+      injectionStateStore: compactInjectionStateStore,
+    });
+    recordCompactionCheckpoint({
+      sessionScopeId: "session:sess_alias",
+      sourceCommand: "/handoff",
+      projectRoot: workspaceRoot,
+      checkpointStore: compactCheckpointStore,
+      injectionStateStore: compactInjectionStateStore,
+    });
     expect(compactCheckpointStore.getById("checkpoint-alias-1")?.status).toBe(
       "superseded",
     );
@@ -669,11 +705,12 @@ describe("slash router (W4)", () => {
     const compactInjectionStateStore = createCompactInjectionStateStore({
       now: () => "2026-05-15T00:00:00.000Z",
     });
-    await routeSlashCommand("/compact", {
-      cwd: workspaceRoot,
-      sessionId: "sess_command_only",
-      compactCheckpointStore,
-      compactInjectionStateStore,
+    recordCompactionCheckpoint({
+      sessionScopeId: "session:sess_command_only",
+      sourceCommand: "/compact",
+      projectRoot: workspaceRoot,
+      checkpointStore: compactCheckpointStore,
+      injectionStateStore: compactInjectionStateStore,
     });
     const commandOnly = await routeSlashCommand("/model", {
       cwd: workspaceRoot,
@@ -705,11 +742,12 @@ describe("slash router (W4)", () => {
     const compactInjectionStateStore = createCompactInjectionStateStore({
       now: () => "2026-05-16T00:00:00.000Z",
     });
-    await routeSlashCommand("/compact", {
-      cwd: workspaceRoot,
-      sessionId: "sess_fresh_after_consumed",
-      compactCheckpointStore,
-      compactInjectionStateStore,
+    recordCompactionCheckpoint({
+      sessionScopeId: "session:sess_fresh_after_consumed",
+      sourceCommand: "/compact",
+      projectRoot: workspaceRoot,
+      checkpointStore: compactCheckpointStore,
+      injectionStateStore: compactInjectionStateStore,
     });
     compactInjectionStateStore.markInjected({
       sessionScopeId: "session:sess_fresh_after_consumed",
@@ -718,6 +756,15 @@ describe("slash router (W4)", () => {
     compactInjectionStateStore.markConsumed({
       sessionScopeId: "session:sess_fresh_after_consumed",
       checkpointId: "checkpoint-fresh-1",
+    });
+    // A second condensation records a second checkpoint through the same
+    // producer, which is what supersedes the consumed one.
+    recordCompactionCheckpoint({
+      sessionScopeId: "session:sess_fresh_after_consumed",
+      sourceCommand: "/compact",
+      projectRoot: workspaceRoot,
+      checkpointStore: compactCheckpointStore,
+      injectionStateStore: compactInjectionStateStore,
     });
     const fresh = await routeSlashCommand("/compact", {
       cwd: workspaceRoot,

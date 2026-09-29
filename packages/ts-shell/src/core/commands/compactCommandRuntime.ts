@@ -5,12 +5,9 @@ import {
 import { formatCompactCheckpointStatus } from "../../context/compact/checkpoint/compactCheckpointSurface.js";
 import {
   DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE,
-  updateLatestCompactCheckpoint,
+  getLatestCompactCheckpoint,
 } from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
-import {
-  DEFAULT_COMPACT_INJECTION_STATE_STORE,
-  markCompactCheckpointPendingInjection,
-} from "../../context/compact/injection/compactInjectionState.js";
+import { DEFAULT_COMPACT_INJECTION_STATE_STORE } from "../../context/compact/injection/compactInjectionState.js";
 import { runCompactCommand } from "../../context/compact/command/compactCommandRunner.js";
 import { formatCompactSessionSurface } from "../../context/compact/delivery/compactSessionSurface.js";
 import { emitCommandResultToSidebar } from "./sidebarCommandEvents.js";
@@ -37,28 +34,28 @@ export async function runCompactLocalCommand(
       },
     });
     const result = runCompactCommand(request);
+    // The handoff forms write an artifact; they do not condense anything. They
+    // used to create a live checkpoint and stage it for injection as well, so
+    // `/compact --preview` — a read-only form the help advertises — changed what
+    // the next turn received. Producing a checkpoint is now what a real
+    // condensation does, and this command never condenses.
+    //
+    // The checkpoint surface is still printed when one exists, so the report
+    // describes the compactions that actually happened rather than implying this
+    // preview made one.
     const sessionScopeId = compactSessionScopeId(context);
-    const checkpoint = updateLatestCompactCheckpoint(
+    const existingCheckpoint = getLatestCompactCheckpoint(
       context.compactCheckpointStore ?? DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE,
-      {
-        sessionScopeId,
-        sourceCommand: compactSourceCommand(context.rawCommandName),
-        result,
-      },
+      sessionScopeId,
     );
-    const injectionState = markCompactCheckpointPendingInjection(
-      context.compactInjectionStateStore ??
-        DEFAULT_COMPACT_INJECTION_STATE_STORE,
-      {
-        sessionScopeId,
-        checkpointId: checkpoint.checkpointId,
-        sourceCommand: checkpoint.sourceCommand,
-        createdAt: checkpoint.createdAt,
-      },
-    );
+    const existingInjection = (
+      context.compactInjectionStateStore ?? DEFAULT_COMPACT_INJECTION_STATE_STORE
+    ).get(sessionScopeId);
     const outputLines: string[] = [
       formatCompactSessionSurface(result),
-      formatCompactCheckpointStatus(checkpoint, injectionState),
+      ...(existingCheckpoint
+        ? [formatCompactCheckpointStatus(existingCheckpoint, existingInjection)]
+        : []),
     ];
 
     if (customInstructions) {

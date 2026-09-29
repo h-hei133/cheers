@@ -20,6 +20,7 @@ import type { EscalationPrompt } from "../../sandbox/index.js";
 import { promptInteractiveQuestions } from "../interactive/interactiveAskBridge.js";
 import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
 import { compactSessionHistory } from "../../core/shell/compaction.js";
+import { recordCompactionCheckpoint } from "../../context/compact/checkpoint/compactionCheckpoint.js";
 import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalStore.js";
 import type { InteractiveApprovalResult } from "../interactive/picker/approval.js";
 import { requestCompactionSummary } from "../../core/query/compaction/summarize.js";
@@ -334,6 +335,20 @@ export function createCliSessionRuntime(input: {
           summarizeTurnPrefix: wiring.summarizeTurnPrefix,
           signal,
           instructions,
+          // A user typed this one, which is the distinction the hook payload
+          // could not previously make: the automatic path reports `threshold` or
+          // `overflow`, and this path is the only `manual`.
+          reason: "manual",
+          workspaceRoot: input.runtimeContext.projectRoot,
+          // The checkpoint is written here, after the condensation, because the
+          // store it feeds is the same one the automatic path writes through.
+          // Previously the command side wrote it before knowing whether any
+          // condensing happened, which is how a preview staged an injection.
+          checkpoint: {
+            sessionScopeId: `session:${sessionId}`,
+            sourceCommand: "/compact",
+            projectRoot: input.runtimeContext.projectRoot,
+          },
         });
       });
     },

@@ -107,6 +107,107 @@ describe("session compaction", () => {
     expect(summarize).not.toHaveBeenCalled();
   });
 
+  it("dispatches PreCompact and PostCompact around a manual condensation", async () => {
+    const events: Array<{ name: string; reason: string }> = [];
+    const hooks = {
+      dispatch: async (payload: { eventName: string; reason: string }) => {
+        events.push({ name: payload.eventName, reason: payload.reason });
+        return { decision: "allow" as const };
+      },
+    };
+    const outcome = await compactSessionHistory({
+      store: store(exchange(6)),
+      sessionId: "s",
+      policy: POLICY,
+      summarize: async () => "checkpoint summary",
+      hooks: hooks as never,
+      workspaceRoot: "/workspace",
+      reason: "manual",
+    });
+    expect(outcome.status).toBe("compacted");
+    expect(events).toEqual([
+      { name: "PreCompact", reason: "manual" },
+      { name: "PostCompact", reason: "manual" },
+    ]);
+  });
+
+  it("aborts the condensation when a PreCompact hook blocks it", async () => {
+    const summarize = vi.fn(async () => "never called");
+    const target = store(exchange(6));
+    const outcome = await compactSessionHistory({
+      store: target,
+      sessionId: "s",
+      policy: POLICY,
+      summarize,
+      hooks: {
+        dispatch: async () => ({ decision: "block" as const, reason: "policy" }),
+      } as never,
+      reason: "manual",
+    });
+    expect(outcome.status).toBe("failed");
+    if (outcome.status !== "failed") throw new Error("unreachable");
+    expect(outcome.reason).toContain("refused by a PreCompact hook");
+    // A refusal costs nothing: no summary requested, no entry written.
+    expect(summarize).not.toHaveBeenCalled();
+    expect(target.entries).toEqual([]);
+  });
+
+  it("records a checkpoint only when the condensation happened", async () => {
+    const { createCompactLiveCheckpointStore, getLatestCompactCheckpoint } =
+      await import("../../context/compact/checkpoint/compactLiveCheckpoint.js");
+    const { createCompactInjectionStateStore } = await import(
+      "../../context/compact/injection/compactInjectionState.js"
+    );
+    const checkpointStore = createCompactLiveCheckpointStore({
+      now: () => "2026-05-15T00:00:00.000Z",
+      nextId: () => "checkpoint-engine-1",
+    });
+    const injectionStateStore = createCompactInjectionStateStore({
+      now: () => "2026-05-15T00:00:00.000Z",
+    });
+    const outcome = await compactSessionHistory({
+      store: store(exchange(6)),
+      sessionId: "s",
+      policy: POLICY,
+      summarize: async () => "checkpoint summary",
+      checkpoint: {
+        sessionScopeId: "session:checkpoint-records",
+        sourceCommand: "/compact",
+        projectRoot: "/workspace",
+        checkpointStore,
+        injectionStateStore,
+      },
+    });
+    expect(outcome.status).toBe("compacted");
+    // The checkpoint exists because the condensation happened — and it is the
+    // one producer, so a second call supersedes rather than duplicates.
+    expect(
+      getLatestCompactCheckpoint(checkpointStore, "session:checkpoint-records")
+        ?.checkpointId,
+    ).toBe("checkpoint-engine-1");
+    expect(
+      injectionStateStore.get("session:checkpoint-records").injectionStatus,
+    ).toBe("pending");
+
+    const declined = await compactSessionHistory({
+      store: store(exchange(2)),
+      sessionId: "s",
+      policy: POLICY,
+      summarize: async () => "never called",
+      checkpoint: {
+        sessionScopeId: "session:checkpoint-declined",
+        sourceCommand: "/compact",
+        projectRoot: "/workspace",
+        checkpointStore,
+        injectionStateStore,
+      },
+    });
+    expect(declined.status).toBe("nothing");
+    expect(
+      getLatestCompactCheckpoint(checkpointStore, "session:checkpoint-declined"),
+    ).toBeUndefined();
+  });
+
   it("refuses to replace messages with a summary that is not smaller", async () => {
     const target = store(exchange(6));
     const outcome = await compactSessionHistory({

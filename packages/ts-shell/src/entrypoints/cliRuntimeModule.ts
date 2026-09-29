@@ -46,6 +46,7 @@ import type { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
 import { runCliSessionCommand, switchRuntimeSessionProjectContext } from "./cliSessionModule.js";
 import { runCliWorkspaceCommand } from "./cliWorkspaceModule.js";
 import { renderUserHelp, renderSessionCommandMap } from "./slashCommandRegistry.js";
+import { describeCompaction, parseCompactCommand } from "../cli/interactive/compact.js";
 import { getRuntimeConfig } from "../config/runtimeConfig.js";
 
 export async function runNonTtyPromptStream(options: {
@@ -218,6 +219,25 @@ export async function runNonInteractivePrompt(options: {
   if (!trimmedPrompt) {
     return;
   }
+
+  // The same interception the interactive surface makes, for the same reason:
+  // bare `/compact` (and `/compact <focus>`) condenses the live history, while
+  // the handoff sub-forms (`preview`/`render`/`json`) stay in the command
+  // registry because they write an artifact instead of changing the context.
+  // Without this the scripted path answered the bare form with a handoff report
+  // that says "Preview only: yes" and condenses nothing.
+  const compaction = parseCompactCommand(trimmedPrompt);
+  if (compaction) {
+    const outcome = await options.sessionRuntime.compactHistory(
+      options.runtimeContext.session.id,
+      compaction.instructions,
+    );
+    for (const line of describeCompaction(outcome)) {
+      options.renderer.renderLine(line);
+    }
+    return;
+  }
+
   const resolved = await resolveTurnInputForExecution({
     prompt: trimmedPrompt,
     cwd: options.runtimeContext.cwd,

@@ -1,4 +1,10 @@
 import { markContextUnknown } from "../../observability/usageTelemetry.js";
+import { defaultHookDispatcher, type HookDispatcher } from "../hooks/hookDispatcher.js";
+import { recordCompactionCheckpoint } from "../../context/compact/checkpoint/compactionCheckpoint.js";
+import type { CompactLiveCheckpointStore } from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
+import type { CompactInjectionStateStore } from "../../context/compact/injection/compactInjectionState.js";
+import type { CompactionLifecycle, CompactionReason } from "../../session/compaction.js";
+export type { CompactionReason };
 import {
   condenseContext,
   type CompactionDecline,
@@ -8,6 +14,51 @@ import {
   type SummarizeTurnPrefix,
 } from "../../session/compaction.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
+
+/**
+ * The lifecycle a compaction reports through, built once for both entry points.
+ *
+ * `CompactionLifecycle` is what the engine offers, and the automatic path
+ * already used it to dispatch hooks while the manual path did not — which is the
+ * same split this module exists to close. Building it here means a hook sees one
+ * shape of event whether the user typed `/compact` or the window filled up, and
+ * `reason` is what tells those two apart.
+ */
+export function buildCompactionLifecycle(input: {
+  readonly hooks?: HookDispatcher;
+  readonly sessionId: string;
+  readonly workspaceRoot?: string;
+  readonly reason: CompactionReason;
+}): CompactionLifecycle {
+  const hooks = input.hooks ?? defaultHookDispatcher;
+  const workspaceRoot = input.workspaceRoot ?? process.cwd();
+  return {
+    before: async ({ tokensBefore, messageCount }) => {
+      const decision = await hooks.dispatch({
+        eventName: "PreCompact",
+        sessionId: input.sessionId,
+        workspaceRoot,
+        timestamp: new Date().toISOString(),
+        reason: input.reason,
+        tokensBefore,
+        messageCount,
+      });
+      return decision.decision !== "block";
+    },
+    after: async ({ summary, keptMessages, tokensBefore }) => {
+      await hooks.dispatch({
+        eventName: "PostCompact",
+        sessionId: input.sessionId,
+        workspaceRoot,
+        timestamp: new Date().toISOString(),
+        reason: input.reason,
+        summary,
+        keptMessages,
+        tokensBefore,
+      });
+    },
+  };
+}
 
 /**
  * The `/compact` command, applied to a stored session.
@@ -53,6 +104,30 @@ export interface CompactionInput {
   readonly summarizeTurnPrefix?: SummarizeTurnPrefix;
   readonly signal?: AbortSignal;
   readonly instructions?: string;
+  /** Defaults to the process-wide dispatcher; injectable so a test need not install a hook. */
+  readonly hooks?: HookDispatcher;
+  /** Where the hook payload says the work happened. */
+  readonly workspaceRoot?: string;
+  /**
+   * Which trigger this is. Defaults to `manual`, which is the only caller this
+   * path had before the reason was threaded through.
+   */
+  readonly reason?: CompactionReason;
+  /**
+   * Where to record the checkpoint a completed compaction produces.
+   *
+   * Absent means nothing is recorded, which is what a caller that keeps its own
+   * record — a test, or a surface that only reports — wants. Present means the
+   * one producer runs, here, so a checkpoint exists exactly when a condensation
+   * happened rather than whenever a command was typed.
+   */
+  readonly checkpoint?: {
+    readonly sessionScopeId: string;
+    readonly sourceCommand: "/compact" | "/handoff" | "internal";
+    readonly projectRoot: string;
+    readonly checkpointStore?: CompactLiveCheckpointStore;
+    readonly injectionStateStore?: CompactInjectionStateStore;
+  };
 }
 
 /**
@@ -66,6 +141,11 @@ export interface CompactionInput {
  */
 function declineOutcome(reason: CompactionDecline): CompactionOutcome {
   switch (reason) {
+    case "blocked-by-hook":
+      // A refusal, not an emptiness: the caller must be able to tell a project
+      // rule from "there was nothing to do", or a policy that blocks every
+      // compaction reads as a conversation that never needed one.
+      return { status: "failed", reason: "Compaction was refused by a PreCompact hook." };
     case "fits-budget":
       return {
         status: "nothing",
@@ -96,6 +176,14 @@ function declineOutcome(reason: CompactionDecline): CompactionOutcome {
 
 export async function compactSessionHistory(input: CompactionInput): Promise<CompactionOutcome> {
   const turns = input.store.getSession(input.sessionId)?.turns ?? [];
+  const reason = input.reason ?? "manual";
+  const lifecycle = buildCompactionLifecycle({
+    ...(input.hooks ? { hooks: input.hooks } : {}),
+    sessionId: input.sessionId,
+    ...(input.workspaceRoot ? { workspaceRoot: input.workspaceRoot } : {}),
+    reason,
+  });
+
   // The user asked for this, so the size threshold does not stand in the way:
   // `/compact` on a conversation under the limit still condenses it. The
   // engine's own refusal to grow the context applies either way.
@@ -108,6 +196,7 @@ export async function compactSessionHistory(input: CompactionInput): Promise<Com
       summarizeTurnPrefix: input.summarizeTurnPrefix,
       instructions: input.instructions,
       signal: input.signal,
+      lifecycle,
       force: true,
     });
   } catch (error) {
@@ -122,9 +211,25 @@ export async function compactSessionHistory(input: CompactionInput): Promise<Com
     keptMessages: condensed.plan.keptMessages,
     tokensBefore: condensed.plan.tokensBefore,
   });
+
   // The gauge showed the last request's context; that request predates the
   // checkpoint, so its number is no longer a fact until the next response.
   markContextUnknown(input.sessionId);
+  // After the entry is stored, so a reader of the checkpoint and a reader of the
+  // session see the same compaction.
+  if (input.checkpoint) {
+    recordCompactionCheckpoint({
+      sessionScopeId: input.checkpoint.sessionScopeId,
+      sourceCommand: input.checkpoint.sourceCommand,
+      projectRoot: input.checkpoint.projectRoot,
+      ...(input.checkpoint.checkpointStore
+        ? { checkpointStore: input.checkpoint.checkpointStore }
+        : {}),
+      ...(input.checkpoint.injectionStateStore
+        ? { injectionStateStore: input.checkpoint.injectionStateStore }
+        : {}),
+    });
+  }
   return {
     status: "compacted",
     summarized: condensed.summarized,
