@@ -5,6 +5,7 @@ import { createCompactInjectionStateStore } from "../../context/compact/injectio
 import { createCompactLiveCheckpointStore } from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
 import { createProjectMemoryInjectionStateStore } from "../../memory/projectMemoryInjectionState.js";
 import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalStore.js";
+import { recordCompactionCheckpoint } from "../../context/compact/checkpoint/compactionCheckpoint.js";
 import { createProjectMemoryReviewStateStore } from "../../memory/projectMemoryReviewState.js";
 import type { ProjectMemoryRecord } from "../../memory/projectMemoryStoreContract.js";
 import { createSidebarLiveEventStore } from "../../presentation/sidebar/sidebarLiveEventStore.js";
@@ -74,6 +75,18 @@ export function createAgentScenarioFixtureContext(input: {
   const sidebarLiveEventStore = createSidebarLiveEventStore({
     now,
     nextId: () => nextId("sidebar-event"),
+  });
+  // The scenario's `/compact` step is a command step, which routes through the
+  // registry: the read-only handoff forms, not the condensing engine. The
+  // checkpoint it used to leave behind was the command path's side effect, and
+  // that moved to where a condensation happens. A scenario that wants a
+  // checkpoint stages one through the same producer the engine uses.
+  recordCompactionCheckpoint({
+    sessionScopeId: `session:${sessionId}`,
+    sourceCommand: "/compact",
+    projectRoot: workspaceRoot,
+    checkpointStore: compactCheckpointStore,
+    injectionStateStore: compactInjectionStateStore,
   });
   const commandContext: CommandContext = {
     cwd: workspaceRoot,
