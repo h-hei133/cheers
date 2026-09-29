@@ -45,6 +45,12 @@ rtk/
 # omp project settings (model overrides for subagents)
 .omp/
 
+# Throwaway probe scripts. A probe exists to answer one question about the real
+# behavior and is deleted when it has; the convention is a `.probe_*.ts` name in
+# the directory of the code it drives, so the pattern is anchored to that shape
+# and never matches a fixture a test legitimately keeps.
+**/.probe_*.ts
+
 # A path built from an undefined variable, so the literal directory `undefined`
 # appears. Seen twice: a committed rustup config, and local `.cheers/` session
 # state from a test run. Never project content — a script that writes here has a
