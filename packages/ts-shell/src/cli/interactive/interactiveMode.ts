@@ -41,7 +41,6 @@ import { routeSearchKey, styleSearchRow } from "../../presentation/tui/transcrip
 import { OverlayHost, type Picker } from "./overlay.js";
 import { opensPicker, pickerFor, type PickerHost } from "./picker/registry.js";
 import { readStatusItems, writeStatusItems } from "./tuiSettings.js";
-import { replayTodosFromMessages } from "../../core/commands/todoCommandRuntime.js";
 import type { ImageContent } from "../../model-adapters/multimodal.js";
 import { readStatusFacts, readWelcomeState } from "./sessionFacts.js";
 import { couldBeCommand, slashSuggestions } from "./slashSuggestions.js";
@@ -174,32 +173,15 @@ export class InteractiveMode {
    */
   private readonly theme: ThemeFollower;
 
-  /**
-   * The turns the active branch of this session has, read from the record.
-   *
-   * Read rather than held: a rewind moves which leaf is active and writes that
-   * to the session's state, so the loaded session is the only account that
-   * reflects where the user is now. The in-memory session keeps every turn,
-   * including the ones the branch left behind.
-   */
-  private branchTurns(): ReturnType<SessionManager["loadSession"]>["turns"] {
-    try {
-      return this.options.sessionManager.loadSession(this.options.runtimeContext.session.id).turns;
-    } catch {
-      // A session whose record cannot be read has no turns to offer; the
-      // callers treat that as an empty branch rather than as an error.
-      return [];
-    }
-  }
 
   constructor(private readonly options: InteractiveModeOptions) {
     this.terminal = options.terminal ?? processTerminal;
     this.statusItems = readStatusItems(options.runtimeContext.projectRoot);
-    // The checklist is part of what a session carried, so a session being opened
-    // resumes its own list rather than starting empty — and a rewind to an
-    // earlier branch resumes the list as of that branch, because the turns the
-    // rewind keeps are the turns replayed.
-    replayTodosFromMessages(options.runtimeContext.session.id, this.branchTurns());
+    // The checklist travels with the session, and every path that puts a
+    // conversation on screen — opening, resuming, forking, rewinding — restores
+    // it through `showConversation`. A session opened for the first time has no
+    // turns to restore from, so there is nothing to do here that the first
+    // frame will not have already had done.
     this.clipboard = new Clipboard({
       cwd: options.runtimeContext.cwd,
       sessionId: options.runtimeContext.session.id,
@@ -734,7 +716,8 @@ export class InteractiveMode {
       },
       refreshServer: (serverName) => this.runCommandLine(`/mcp refresh ${serverName}`),
       revokeGrant: (key) => this.runCommandLine(`/permissions revoke ${key}`),
-      sessionTurns: () => this.branchTurns(),
+      sessionTurns: () =>
+        this.options.sessionManager.getSession(this.options.runtimeContext.session.id)?.turns ?? [],
       rewind: async (point) => {
         const dropped = await this.options.sessionManager.revertTo(
           this.options.runtimeContext.session.id,
@@ -745,12 +728,6 @@ export class InteractiveMode {
         // nothing with the last one. Saying so is what keeps the rebuilt prompt
         // from being read as prompt that should have come from the cache.
         //
-        // The checklist is part of that conversation, so it is replayed from the
-        // turns the branch now has. Without this a rewind left the band showing
-        // the list the abandoned turns had built — the exact thing the recorded
-        // list exists to prevent, and the state a snapshot could not correct
-        // because it has no way to say which branch it came from.
-        replayTodosFromMessages(this.options.runtimeContext.session.id, this.branchTurns());
         markContextUnknown(this.options.runtimeContext.session.id);
         showConversation(this.historyTarget());
         this.tui.requestRender({ force: true });

@@ -408,7 +408,10 @@ async function runParallel(
   const paired = calls.slice(0, results.length);
   for (let index = 0; index < paired.length; index += 1) {
     messages.push(
-      await emitToolResultMessage(createToolResultMessage(paired[index].id, results[index].output), emit),
+      await emitToolResultMessage(
+        createToolResultMessage(paired[index].id, results[index].output, results[index].metadata),
+        emit,
+      ),
     );
   }
   return { messages, terminate: shouldTerminateBatch(results) };

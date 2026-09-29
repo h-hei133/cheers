@@ -103,7 +103,13 @@ export class MainScreenPainter {
     // subtracted by count rather than by identity: a caller may pass rows whose
     // text repeats, and the block this painter removes is the tail, not
     // whichever rows happen to match.
-    const content = rows.length - chromeRows.length > 0
+    //
+    // `>=` and not `>`: the first frame of a session is the block alone, so the
+    // document and the block are the same length and the content is empty.
+    // Reading that as "no block to remove" left the block in the content, which
+    // was appended to the scrollback and then drawn again below — the prompt
+    // twice, permanently, on the very first frame of every session.
+    const content = rows.length >= chromeRows.length
       ? rows.slice(0, rows.length - chromeRows.length)
       : rows;
 

@@ -177,7 +177,12 @@ export class TurnSink implements RendererSink {
     if (!trimmed) return;
     const block = this.prose ?? this.openProse();
     block.text = block.text ? `${block.text}\n${trimmed}` : trimmed;
-    splitFencedDiff(block);
+    // Through the transcript, like the tool-card path: the split moves text out
+    // of the body and into a diff, and a block whose rows are already cached
+    // would keep showing the body that no longer has the diff in it. Prose here
+    // is open rather than finalized, so today the cache is not consulted — the
+    // argument is what keeps that from being the thing this depends on.
+    splitFencedDiff(block, this.transcript);
     this.onChange();
   }
 

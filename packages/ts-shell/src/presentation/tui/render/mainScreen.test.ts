@@ -366,6 +366,21 @@ describe("MainScreenPainter", () => {
     }
   });
 
+  it("paints the block once on a session's first frame", () => {
+    // A session starts with nothing said, so the frame is the block alone and
+    // the document is exactly as long as the block. Reading that as "there was
+    // no block to remove" left the block in the content as well, which put the
+    // prompt in the scrollback and drew a second copy under it — permanently,
+    // on the first frame of every session.
+    const terminal = new Screen();
+    const painter = new MainScreenPainter(terminal.asDevice());
+    painter.start();
+
+    painter.paint(["prompt>"], ["prompt>"]);
+
+    expect(terminal.allLines().filter((line) => line === "prompt>")).toHaveLength(1);
+  });
+
   it("paints every row of a document whose fixed block was passed alongside it", () => {
     // The producer hands the painter the document and the block separately, and
     // the document carries the block at its end. Getting that shape wrong drops

@@ -380,6 +380,17 @@ export function runTurn(options: TurnOptions): TurnRun {
       summarizeTurnPrefix: options.compaction.summarizeTurnPrefix,
       signal: options.signal,
       force: true,
+      // The rescue is a compaction like any other, and the only one whose reason
+      // is `overflow`: a hook that watches for the context being cut has to see
+      // this one, or the case that discards the most context is the one it never
+      // hears about. `overflow` was a declared reason with no producer.
+      lifecycle: buildCompactionLifecycle({
+        hooks: options.hooks,
+        sessionId: options.sessionId,
+        workspaceRoot: options.workspaceRoot,
+        reason: "overflow",
+      }),
+      lifecycleReason: "overflow",
     }).catch(() => undefined);
     // A decline here leaves the run reporting the overflow it already hit: the
     // engine judged that condensing would not make the context smaller, so

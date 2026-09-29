@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { restoreConversation } from "./history.js";
+import { forgetSessionTodos, getSessionTodos, setSessionTodos } from "../../core/commands/todoCommandRuntime.js";
+import { Transcript } from "../../presentation/tui/transcript/container.js";
+import { restoreConversation, showConversation, startFreshSession } from "./history.js";
 import { rewindPoints, rewindPicker } from "./picker/rewind.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 
@@ -181,6 +183,55 @@ describe("restoring a conversation", () => {
     expect(blocks[0]!.status).toBe("failed");
     expect(blocks[0]!.text).toBe("(Operation interrupted)");
     expect(blocks[0]!.collapsed).toBe(false);
+  });
+});
+
+describe("showing a session", () => {
+  it("restores the checklist of the session being shown", () => {
+    // Every path that puts a conversation on screen goes through here — opening
+    // a session, `/resume`, the sessions panel, a fork, a rewind — so this is
+    // the one place that has to restore the checklist. Doing it per command is
+    // how the band came to show one session's checklist while another was on
+    // screen: the paths that forgot were the paths nobody listed.
+    const turns = [
+      { role: "tool", content: "Task added", metadata: { todo: [{ id: 1, text: "switch me", status: "pending" }] } },
+    ] as unknown as SessionMessage[];
+    const transcript = new Transcript();
+
+    showConversation({
+      transcript,
+      sessionManager: {
+        getSession: () => ({ turns } as never),
+        createNew: () => ({ id: "new" } as never),
+        discardIfEmpty: () => true,
+      },
+      context: { session: { id: "s-shown" } } as never,
+    });
+
+    expect(getSessionTodos("s-shown").map((item) => item.text)).toEqual(["switch me"]);
+  });
+
+  it("clears the checklist when a fresh session starts", () => {
+    setSessionTodos("s-old", [{ id: 1, text: "from before", status: "pending" }]);
+    const transcript = new Transcript();
+
+    startFreshSession({
+      transcript,
+      sessionManager: {
+        getSession: () => undefined,
+        createNew: () => ({ id: "s-new" } as never),
+        discardIfEmpty: () => true,
+      },
+      context: {
+        session: { id: "s-old" },
+        projectRoot: "/p",
+        rootMode: "project",
+        gitContext: { root: null },
+      } as never,
+    });
+
+    // Nothing of the discarded session's list is left for the new one to show.
+    expect(getSessionTodos("s-new")).toEqual([]);
   });
 });
 

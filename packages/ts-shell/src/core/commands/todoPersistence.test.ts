@@ -6,6 +6,7 @@ import {
 } from "../../session/sessionEventCodec.js";
 import { createTodoToolDefinition } from "../tools/todoTool.js";
 import {
+  forgetSessionTodos,
   getSessionTodos,
   replayTodosFromMessages,
   runTodoCommand,
@@ -27,6 +28,18 @@ const context = (sessionId: string) =>
   ({ workspaceRoot: "/workspace", sessionId, taskId: "task-1" }) as never;
 
 describe("the todo checklist per session", () => {
+  it("forgets a list when the session it belonged to is gone", async () => {
+    // A deleted session's id is not reused by this code, but restoring one from
+    // a backup brings the id back with it. A list left behind then reads as the
+    // new session's own, which is a checklist nobody in that session built.
+    await runTodoCommand(["add", "gone"], context("s-deleted"), "s-deleted");
+    expect(getSessionTodos("s-deleted").map((item) => item.text)).toEqual(["gone"]);
+
+    forgetSessionTodos("s-deleted");
+
+    expect(getSessionTodos("s-deleted")).toEqual([]);
+  });
+
   it("keeps two sessions' lists apart", async () => {
     await runTodoCommand(["add", "mine"], context("s-one"), "s-one");
     await runTodoCommand(["add", "yours"], context("s-two"), "s-two");

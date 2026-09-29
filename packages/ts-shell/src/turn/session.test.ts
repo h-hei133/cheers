@@ -179,6 +179,46 @@ describe("runTurn", () => {
     if (terminal?.type === "query.completed") expect(terminal.result.finalOutput).toBe("answered after compaction");
   });
 
+  it("tells a hook the rescue compaction is an overflow", async () => {
+    // The rescue is the compaction that discards the most context, and it used
+    // to reach `condenseContext` without a lifecycle at all — so a hook watching
+    // for the context being cut never heard about this one. The reason it
+    // reported to be told about is `overflow`, which no code produced.
+    const seen: Array<{ name: string; reason?: string }> = [];
+    const history: SessionMessage[] = [];
+    for (let index = 0; index < 4; index += 1) {
+      history.push(
+        { role: "user", content: `q${index} ${"x".repeat(400)}` },
+        { role: "assistant", content: `a${index} ${"y".repeat(400)}` },
+      );
+    }
+    let calls = 0;
+    const setup = options({
+      history,
+      hooks: {
+        dispatch: async (input: { eventName: string; reason?: string }) => {
+          seen.push({ name: input.eventName, ...(input.reason ? { reason: input.reason } : {}) });
+          return { decision: "allow" as const };
+        },
+      } as unknown as HookDispatcher,
+      step: async (messages) => {
+        calls += 1;
+        if (calls === 1) return { text: "", toolCalls: [], stopReason: "error", errorMessage: `${CONTEXT_OVERFLOW_PREFIX}too big` };
+        return { text: "done", toolCalls: [], stopReason: "stop" };
+      },
+      compaction: {
+        policy: { contextWindow: 1_000_000, keepRecentTokens: 300 },
+        summarize: async () => "older work",
+        onCompact: () => {},
+      },
+    });
+    await drain(runTurn(setup).events);
+
+    const compactHooks = seen.filter((entry) => entry.name === "PreCompact" || entry.name === "PostCompact");
+    expect(compactHooks.map((entry) => entry.name)).toEqual(["PreCompact", "PostCompact"]);
+    expect(compactHooks.every((entry) => entry.reason === "overflow")).toBe(true);
+  });
+
   it("reports overflow failure when the summarizer fails", async () => {
     const history: SessionMessage[] = [];
     for (let index = 0; index < 4; index += 1) {

@@ -1,4 +1,5 @@
 import { messageToText } from "../../model-adapters/multimodal.js";
+import { replayTodosFromMessages } from "../../core/commands/todoCommandRuntime.js";
 import { splitFencedDiff, textBlock, type Block } from "../../presentation/tui/transcript/blocks.js";
 import { summarize } from "./toolCards.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
@@ -126,6 +127,12 @@ export interface HistoryTarget {
 export function showConversation(target: HistoryTarget): void {
   const session = target.sessionManager.getSession(target.context.session.id);
   if (!session) return;
+  // The checklist belongs to the session being shown, and switching to a
+  // session is the moment to say so. Doing it here rather than at each command
+  // that can switch is what makes `/resume`, the sessions panel, a fork, and a
+  // rewind all correct: they establish a session by calling this, and a session
+  // that is being shown is a session whose checklist has just been restored.
+  replayTodosFromMessages(target.context.session.id, session.turns);
   const restored = restoreConversation(session.turns);
   target.transcript.clear();
   if (restored.omitted > 0) {
@@ -159,4 +166,8 @@ export function startFreshSession(target: HistoryTarget): void {
   target.sessionManager.discardIfEmpty(previous);
   target.context.session = created;
   target.transcript.clear();
+  // A new session has no turns, so this clears rather than restores. It is
+  // still done here: the band would otherwise keep showing the checklist of the
+  // session that was just discarded.
+  replayTodosFromMessages(created.id, []);
 }

@@ -18,6 +18,7 @@
  */
 
 import { createComponentLogger } from "../observability/structuredLogger.js";
+import { forgetSessionTodos } from "../core/commands/todoCommandRuntime.js";
 import { sessionHasReentrySurface } from "./presentation/sessionReentrySurface.js";
 import { buildRecoverySnapshotForSession } from "./recovery/sessionRecoveryRuntime.js";
 import {
@@ -124,6 +125,11 @@ export abstract class SessionReadSurface extends SessionLifecycleWrites {
 
   deleteSession(sessionId: string): void {
     this.host.store.deleteSession(sessionId);
+    // The checklist lived beside the session, so it goes with it. Every deletion
+    // — the sessions panel, `/resume`'s chooser, and the discard of a session
+    // nothing was said in — reaches the store through here, which is what makes
+    // this the one place that has to remember.
+    forgetSessionTodos(sessionId);
   }
 
   getTranscriptEvents(sessionId: string): TranscriptEvent[] {

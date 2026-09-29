@@ -34,6 +34,21 @@ export function setSessionTodos(sessionId: string, items: readonly TodoItem[]): 
   listsBySession.set(sessionId, { items: [...items], nextId });
 }
 
+/**
+ * Drop a session's list, because the session is gone.
+ *
+ * Written because a reader has to be able to say the list is not the session's
+ * any more. Reusing a deleted session's id would otherwise show a checklist the
+ * new session never built — the id is generated, but a deleted session that is
+ * restored from a backup or a copy brings its id back with it.
+ *
+ * Only the checklist is dropped; nothing else here holds state, so this is the
+ * whole of what a caller has to remember.
+ */
+export function forgetSessionTodos(sessionId: string): void {
+  listsBySession.delete(sessionId);
+}
+
 /** The list a command mutates, created on first use. */
 function sessionList(sessionId: string | undefined): { items: TodoItem[]; nextId: number } {
   if (!sessionId) {
