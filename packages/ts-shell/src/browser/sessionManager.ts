@@ -133,6 +133,7 @@ class BrowserSessionManager {
   private requestPolicy: BrowserOriginPolicy = readBrowserOriginPolicy();
   /** The last launch failure, so the reason survives the failed attempt. */
   private launchFailure: BrowserSessionFailure | null = null;
+  private requestFailure: BrowserSessionFailure | null = null;
 
 
   constructor(private readonly dependencies: SessionDependencies = { admitUrl: admitBrowserUrl }) {}
@@ -177,30 +178,16 @@ class BrowserSessionManager {
           viewport: DEFAULT_VIEWPORT,
           locale: "en-US",
           timezoneId: "America/New_York",
+          serviceWorkers: "block",
         });
-        // The guard on page-initiated navigation.
-        //
-        // `open` decides the address the caller asked for and the address the
-        // page landed on. Neither covers a script on the page calling
-        // `location.assign` afterwards, and a context-wide handler is the only
-        // place that sees one. It is installed before any page exists so every
-        // page and popup inherits it.
-        //
-        // What it does not cover, stated because a reader will assume otherwise:
-        // this is the *main frame* only. A subresource another origin serves —
-        // an image, a script, a `fetch()` from page code — is not a navigation
-        // and does not pass through here, so a page on an admitted origin can
-        // still ask the network for anything the machine can reach. Blocking
-        // that is not this function: it would need a request-level allowlist,
-        // and the tool's purpose is reaching a local server, so both the
-        // reference implementations leave it to the sandbox the process runs in.
-        // The stealth preload is installed on the context so every page and popup
-        // inherits it rather than only the first one.
+        // Install before any page exists, including a popup's first request.
+        // Service workers are disabled because they can bypass routing.
+        await this.installRequestGuard(this.context);
+        // Every page and popup also inherits the preload.
         const stealthScript = buildStealthPreloadScript();
         await this.context.addInitScript?.(stealthScript);
 
         this.currentPage = await this.context.newPage();
-        await this.installRequestGuard(this.currentPage);
         // A crashed or closed page must not stay as the handle every later call
         // uses, or the session keeps answering from a page that is gone.
         this.currentPage.on("close", () => {
@@ -267,6 +254,7 @@ class BrowserSessionManager {
     }
 
     this.elementRefs.clear();
+    this.requestFailure = null;
     const page = await this.getOrCreatePage();
     if (!page) {
       return { ok: false, url, failure: this.launchFailure ?? {
@@ -282,7 +270,7 @@ class BrowserSessionManager {
       return {
         ok: false,
         url,
-        failure: {
+        failure: this.requestFailure ?? {
           kind: "navigation-failed",
           reason: `${url} did not load: ${error instanceof Error ? error.message : String(error)}`,
           nextAction: "Check that the address is serving, then retry.",
@@ -329,7 +317,11 @@ class BrowserSessionManager {
       this.currentTitle = (await page.title().catch(() => this.currentTitle)) || this.currentTitle;
     }
 
-    outlineLines.push(`Page URL: ${this.currentUrl}`, `Page Title: ${this.currentTitle}`, "", "Interactive Elements:");
+    outlineLines.push(`Page URL: ${this.currentUrl}`, `Page Title: ${this.currentTitle}`);
+    if (this.requestFailure) {
+      outlineLines.push(`Request guard: ${this.requestFailure.reason}`, this.requestFailure.nextAction);
+    }
+    outlineLines.push("", "Interactive Elements:");
 
     if (page) {
       try {
@@ -394,39 +386,33 @@ class BrowserSessionManager {
   }
 
   /**
-   * Refuse a request the caller never asked for.
-   *
-   * `open` decides the address the caller named and the address the page landed
-   * on. Neither covers what the page asks for next: a script calling
-   * `location.assign`, a redirect the runtime follows internally, an image or a
-   * `fetch()` pointing at a metadata service. Each of those is a request, and
-   * `route` is the one place that sees a request before it is made — including
-   * the hops a navigation takes, which a check after `goto` returns has already
-   * let out.
-   *
-   * Every request is judged, not only navigations, because the host check has no
-   * legitimate consumer on a page the browser is allowed to be on: this tool
-   * reaches a public site or a local development server, and a document that
-   * asks for `169.254.169.254` is asking for credentials.
-   *
-   * A request that is refused is aborted, and the refusal is recorded so the
-   * next action reports why rather than appearing to work.
+   * Judge page, popup, and subresource requests using the current policy.
+   * Routing sees only the first URL of a server redirect, so openUrl still
+   * validates the landing URL. This is not per-hop network isolation.
    */
-  private async installRequestGuard(page: PwPage): Promise<void> {
-    await page.route("**/*", (route) => {
-      const target = route.request().url();
-      const admission = admitPageRequest(target, this.requestPolicy);
-      if (admission.allowed) {
-        void route.continue();
-        return;
+  private async installRequestGuard(context: PwBrowserContext): Promise<void> {
+    await context.route("**/*", async (route) => {
+      try {
+        const admission = admitPageRequest(route.request().url(), this.requestPolicy);
+        if (admission.allowed) {
+          await route.continue();
+          return;
+        }
+        await route.abort("blockedbyclient");
+        this.requestFailure = {
+          kind: "url-refused",
+          reason: `A page request was blocked: ${admission.refusal!.reason}`,
+          nextAction: admission.refusal!.nextAction,
+          refusal: admission.refusal,
+        };
+      } catch (error) {
+        // A failed disposition is not proof that a request was blocked.
+        this.requestFailure = {
+          kind: "action-failed",
+          reason: `Request handling failed: ${error instanceof Error ? error.message : String(error)}`,
+          nextAction: "Close the browser session and retry; request disposition could not be confirmed.",
+        };
       }
-      this.launchFailure = {
-        kind: "url-refused",
-        reason: `The page asked for ${target}, and ${admission.refusal!.reason}`,
-        nextAction: `${admission.refusal!.nextAction} A page cannot reach what the tool may not.`,
-        refusal: admission.refusal,
-      };
-      void route.abort("blockedbyclient");
     });
   }
 
@@ -567,6 +553,7 @@ class BrowserSessionManager {
     this.currentUrl = "about:blank";
     this.currentTitle = "Blank Page";
     this.launchFailure = null;
+    this.requestFailure = null;
     return { ok: true, output: "Browser session closed and resources released." };
   }
 }

@@ -27,6 +27,8 @@ export interface PwBrowser {
 }
 
 export interface PwBrowserContext {
+  /** Covers pages and popup first requests, but not every server redirect hop. */
+  route(pattern: string, handler: (route: PwRoute) => Promise<void>): Promise<void>;
   newPage(): Promise<PwPage>;
   /** Present in Playwright; optional here because a minimal double need not take a script. */
   addInitScript?(script: string): Promise<unknown>;
@@ -57,14 +59,6 @@ export interface PwPage {
   hover(selector: string, options?: { readonly timeout?: number }): Promise<void>;
   keyboard: { press(key: string): Promise<void> };
   on(event: string, handler: () => void): void;
-  /**
-   * Intercept requests before they are made.
-   *
-   * A navigation that redirects is followed internally, so a check placed after
-   * `goto` returns has already let the second request out. Routing is the only
-   * place that sees each hop before it happens.
-   */
-  route(pattern: string, handler: (route: PwRoute) => void): Promise<void>;
   close(): Promise<void>;
 }
 

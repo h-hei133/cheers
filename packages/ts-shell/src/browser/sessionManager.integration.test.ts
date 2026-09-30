@@ -1,6 +1,7 @@
 import { createServer, type Server } from "node:http";
+import { networkInterfaces } from "node:os";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { BrowserSessionManager } from "./sessionManager.js";
+import { BrowserSessionManager, type ObservedPageState } from "./sessionManager.js";
 import { getPwRuntimeStatus } from "./playwrightRuntime.js";
 import type { BrowserOriginPolicy } from "./originPolicy.js";
 
@@ -18,12 +19,18 @@ import type { BrowserOriginPolicy } from "./originPolicy.js";
  */
 const runtimeStatus = await getPwRuntimeStatus();
 const canLaunch = runtimeStatus.status === "ready";
+const privateAddress = Object.values(networkInterfaces()).flat().find((entry) =>
+  entry?.family === "IPv4" && !entry.internal && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(entry.address),
+)?.address;
 
 describe.skipIf(!canLaunch)("browser session against real Chromium", () => {
   let server: Server;
   let origin: string;
   let otherServer: Server;
   let otherOrigin: string;
+  let privateOrigin: string;
+  let otherRequests = 0;
+  let workerRequests = 0;
 
   beforeAll(async () => {
     server = createServer((req, res) => {
@@ -40,22 +47,27 @@ describe.skipIf(!canLaunch)("browser session against real Chromium", () => {
         res.end();
         return;
       }
-      // A page whose own script asks for a metadata address. No caller named
-      // it: the tool was told to open this page, and the page decided what to
-      // ask for next.
-      if (req.url === "/reaches-metadata") {
+      if (req.url === "/subresource") {
         res.writeHead(200, { "content-type": "text/html" });
-        // The outcome goes in the title, which is readable through `observe`.
-        // The fetch has no server to answer it either way in a test, so the
-        // difference being asserted is that the request was *refused* rather
-        // than left to hang or to be sent.
-        res.end(
-          "<html><head><title>asking</title></head><body><h1>Page</h1><script>" +
-            "fetch('http://169.254.169.254/latest/meta-data/')" +
-            ".then(function(){document.title='reached'})" +
-            ".catch(function(){document.title='blocked'});" +
-            "</script></body></html>",
-        );
+        res.end(`<title>asking</title><script>fetch('${privateOrigin}/resource')
+          .then(() => document.title='reached').catch(() => document.title='blocked');</script>`);
+        return;
+      }
+      if (req.url === "/popup") {
+        res.writeHead(200, { "content-type": "text/html" });
+        res.end(`<title>popup</title><script>window.open('${privateOrigin}/popup');</script>`);
+        return;
+      }
+      if (req.url === "/worker") {
+        res.writeHead(200, { "content-type": "text/html" });
+        res.end(`<title>asking</title><script>navigator.serviceWorker.register('/worker.js')
+          .then((registration) => document.title=registration ? 'registered' : 'blocked').catch(() => document.title='blocked');</script>`);
+        return;
+      }
+      if (req.url === "/worker.js") {
+        workerRequests++;
+        res.writeHead(200, { "content-type": "application/javascript" });
+        res.end("self.addEventListener('fetch', () => {});");
         return;
       }
       if (req.url === "/redirect-same-origin") {
@@ -71,12 +83,14 @@ describe.skipIf(!canLaunch)("browser session against real Chromium", () => {
     origin = typeof address === "object" && address ? `http://127.0.0.1:${address.port}` : "";
 
     otherServer = createServer((_req, res) => {
-      res.writeHead(200, { "content-type": "text/html" });
+      otherRequests++;
+      res.writeHead(200, { "content-type": "text/html", "access-control-allow-origin": "*" });
       res.end("<html><head><title>Elsewhere</title></head><body><h1>Elsewhere</h1></body></html>");
     });
-    await new Promise<void>((resolve) => otherServer.listen(0, "127.0.0.1", resolve));
+    await new Promise<void>((resolve) => otherServer.listen(0, "0.0.0.0", resolve));
     const otherAddress = otherServer.address();
     otherOrigin = typeof otherAddress === "object" && otherAddress ? `http://127.0.0.1:${otherAddress.port}` : "";
+    privateOrigin = typeof otherAddress === "object" && otherAddress ? `http://${privateAddress}:${otherAddress.port}` : "";
   });
 
   afterAll(async () => {
@@ -101,25 +115,32 @@ describe.skipIf(!canLaunch)("browser session against real Chromium", () => {
     }
   });
 
-  it("refuses a request the page made for a metadata address", async () => {
-    // The subresource case, which no post-`goto` check can see: `open` was given
-    // an address that is admitted, and the page then asked for one that is not.
-    // Without a request-level guard the fetch goes out and comes back with
-    // whatever the machine's metadata service hands it.
+  it.skipIf(!privateAddress).each(["subresource", "popup"])("blocks the first %s request before it reaches a reachable disallowed server", async (path) => {
+    // Positive control: the denied origin is serving, so zero requests proves
+    // interception rather than a failed network connection.
+    const control = await fetch(`${privateOrigin}/control`);
+    expect(control.status).toBe(200);
+    await control.text();
+    const before = otherRequests;
     const manager = new BrowserSessionManager();
     try {
-      const opened = await manager.openUrl(`${origin}/reaches-metadata`, openPolicy);
-      expect(opened.ok, opened.ok ? "" : opened.failure?.reason).toBe(true);
+      const opened = await manager.openUrl(`${origin}/${path}`, { allowedOrigins: [origin], allowPrivateNetwork: false });
+      expect(opened.ok, opened.failure?.reason).toBe(true);
+      await waitForPage(manager, (state) => state.outline.includes("A page request was blocked:"));
+      expect((await manager.observe()).outline).toContain("private address");
+      expect(otherRequests).toBe(before);
+    } finally {
+      await manager.closeSession();
+    }
+  });
 
-      // The guard aborts the request rather than answering it, so there is no
-      // response to await — the page's own script settles the title.
-      let title = "";
-      for (let attempt = 0; attempt < 40 && title !== "blocked"; attempt++) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        title = (await manager.observe()).title ?? "";
-      }
-
-      expect(title).toBe("blocked");
+  it("disables service worker registration before a page can bypass request routing", async () => {
+    const before = workerRequests;
+    const manager = new BrowserSessionManager();
+    try {
+      expect((await manager.openUrl(`${origin}/worker`, openPolicy)).ok).toBe(true);
+      await waitForPage(manager, (state) => state.title === "blocked");
+      expect(workerRequests).toBe(before);
     } finally {
       await manager.closeSession();
     }
@@ -132,8 +153,12 @@ describe.skipIf(!canLaunch)("browser session against real Chromium", () => {
     // address the page actually landed on.
     const policy: BrowserOriginPolicy = { allowedOrigins: [origin], allowPrivateNetwork: false };
     try {
+      const before = otherRequests;
       const opened = await manager.openUrl(`${origin}/redirect-elsewhere`, policy);
 
+      // The framework follows this hop without invoking the route handler.
+      // Landing refusal is observable, but cannot undo that network request.
+      expect(otherRequests).toBeGreaterThan(before);
       expect(opened.ok).toBe(false);
       expect(opened.failure?.kind).toBe("url-refused");
       expect(opened.failure?.reason).toContain("not in the configured browser origin allowlist");
@@ -173,3 +198,11 @@ describe.skipIf(!canLaunch)("browser session against real Chromium", () => {
     }
   });
 });
+
+async function waitForPage(manager: BrowserSessionManager, ready: (state: ObservedPageState) => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    if (ready(await manager.observe())) return;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  expect(ready(await manager.observe())).toBe(true);
+}
