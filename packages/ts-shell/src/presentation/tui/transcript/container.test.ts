@@ -1,8 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import darkJson from "../../themes/dark.json" with { type: "json" };
 import { defaultTheme } from "../../theme/theme.js";
 import { Transcript } from "./container.js";
 import { textBlock, type Block } from "./blocks.js";
+import { getDefaultTheme } from "../../themes/index.js";
+
+// Color assertions run under an explicit capability, independent of NO_COLOR.
+const originalColorMode = defaultTheme.colorMode;
+beforeEach(() => defaultTheme.apply(getDefaultTheme(), "256"));
+afterEach(() => defaultTheme.apply(getDefaultTheme(), originalColorMode));
 
 const WIDTH = 40;
 

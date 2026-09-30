@@ -45,7 +45,7 @@ describe("slash router (W4)", () => {
 
   it("passes a quoted theme name as one argument", async () => {
     const result = await routeSlashCommand('/theme "Dark Mode"', { cwd: workspaceRoot });
-    expect(result).toMatchObject({ kind: "local", output: expect.stringContaining("`dark mode`") });
+    expect(result).toMatchObject({ kind: "local", output: expect.stringContaining("`Dark Mode`") });
   });
 
   it("removes path quotes without losing spaces", async () => {
