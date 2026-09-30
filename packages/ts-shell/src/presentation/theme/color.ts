@@ -15,6 +15,14 @@ const BASIC_RGB = [
 ] as const;
 
 export function detectColorMode(env: NodeJS.ProcessEnv = process.env): ColorMode {
+  // Explicit overrides take precedence over passive capability detection.
+  switch (env.FORCE_COLOR?.toLowerCase()) {
+    case "0": case "false": return "none";
+    case "": case "1": case "true": return "16";
+    case "2": return "256";
+    case "3": return "truecolor";
+  }
+  if (env.NO_COLOR) return "none";
   return detectTerminalCapabilities(env).hasTrueColor ? "truecolor" : "256";
 }
 

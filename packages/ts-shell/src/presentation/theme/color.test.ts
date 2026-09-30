@@ -5,8 +5,25 @@ import { Theme, getTheme } from "./theme.js";
 afterEach(() => vi.unstubAllEnvs());
 
 it("passes detected capability into named themes", () => {
+  vi.stubEnv("FORCE_COLOR", "3");
   vi.stubEnv("COLORTERM", "truecolor");
   expect(getTheme("dark").fg("text", "body")).toMatch(/^\x1b\[38;2;/);
+});
+
+it.each([
+  ["", "16"], ["0", "none"], ["false", "none"], ["1", "16"],
+  ["true", "16"], ["2", "256"], ["3", "truecolor"], ["invalid", "none"],
+] as const)("honors FORCE_COLOR=%s before NO_COLOR", (force, expected) => {
+  expect(detectColorMode({ FORCE_COLOR: force, NO_COLOR: "1", COLORTERM: "truecolor" })).toBe(expected);
+});
+
+it("honors nonempty NO_COLOR without removing text attributes", () => {
+  expect(detectColorMode({ NO_COLOR: "0", COLORTERM: "truecolor" })).toBe("none");
+  expect(detectColorMode({ NO_COLOR: "", COLORTERM: "truecolor" })).toBe("truecolor");
+  const theme = new Theme({ name: "plain", description: "", colors: { text: "#123456", selectedBg: "#ffffff" } }, "none");
+  expect(theme.fg("text", "body")).toBe("body");
+  expect(theme.bg("selectedBg", "body")).toBe("body");
+  expect(theme.style("text", "body", { bg: "selectedBg", bold: true })).toBe("\x1b[1mbody\x1b[22m");
 });
 
 it("detects and encodes truecolor without quantizing RGB channels", () => {
