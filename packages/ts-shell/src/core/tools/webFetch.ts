@@ -260,7 +260,6 @@ export function createWebFetchToolDefinition(): ToolDefinition {
       },
       required: ["url"],
     },
-    permissions: { check: () => [] },
     async execute(args, context) {
       const rawUrl = typeof args.url === "string" ? args.url.trim() : "";
       if (!rawUrl) {

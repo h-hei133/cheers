@@ -56,7 +56,6 @@ export function createAskToolDefinition(): ToolDefinition {
       },
       required: ["questions"],
     },
-    permissions: { check: () => [] },
     async execute(args, context) {
       const questions = args.questions as AskQuestion[] | undefined;
       if (!questions || !Array.isArray(questions) || questions.length === 0) {

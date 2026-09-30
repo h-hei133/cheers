@@ -21,7 +21,6 @@ function echoTool(name: string, output: string): ToolDefinition {
     name,
     description: name,
     argsSchema: { type: "object", properties: {} },
-    permissions: { check: () => [] },
     execute: async () => ({ success: true, output }),
   };
 }
@@ -387,7 +386,6 @@ describe("a subagent's calls answer to the session's rules", () => {
       name: "bash",
       description: "run a command",
       argsSchema: { type: "object", properties: {} },
-      permissions: { check: () => [] },
       execute: async () => {
         ran.push("bash");
         return { success: true, output: "ran" };
@@ -445,7 +443,6 @@ describe("a subagent's calls answer to the session's rules", () => {
       name: "bash",
       description: "run a command",
       argsSchema: { type: "object", properties: {} },
-      permissions: { check: () => [] },
       execute: async () => {
         ran.push("bash");
         return { success: true, output: "ran" };

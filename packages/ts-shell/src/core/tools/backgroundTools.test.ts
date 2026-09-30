@@ -6,7 +6,6 @@ import { createCoreToolRegistry } from "./registry.js";
 import { planSandboxedCommand } from "../../sandbox/osSandbox.js";
 import { TaskRegistry } from "../shell/background/tasks.js";
 import type { ToolExecutionContext } from "../../tools/types.js";
-import { processStopPermission } from "./permissionContext.js";
 
 const context = {
   workspaceRoot: process.cwd(),
@@ -19,28 +18,6 @@ function tool(name: string) {
   if (!definition) throw new Error(`${name} is not registered`);
   return definition;
 }
-
-describe("stopping a background command", () => {
-  /**
-   * It answers to a permission check.
-   *
-   * Starting a command and stopping one are separate operations: the approval
-   * that covered the start did not cover ending whatever the command went on to
-   * spawn. A tool that ends a process group with no check at all is the one
-   * place an approval gate can be walked around.
-   */
-  it("asks for permission to end a process", () => {
-    const checks = tool("taskStop").permissions?.check?.({ taskId: "bg_1" }, context) ?? [];
-
-    expect(checks).toHaveLength(1);
-    expect(checks[0]?.scope).toBe("process");
-    expect(checks[0]?.target).toBe("bg_1");
-  });
-
-  it("names the process it is about to end", () => {
-    expect(processStopPermission({ taskId: "bg_7" }, context)[0]?.target).toBe("bg_7");
-  });
-});
 
 describe("starting a command in the background", () => {
   /**

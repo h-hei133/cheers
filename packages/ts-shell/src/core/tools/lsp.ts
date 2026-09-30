@@ -53,7 +53,6 @@ export function createLspToolDefinition(
       },
       required: ["operation"],
     },
-    permissions: { check: () => [] },
     async execute(args, context) {
       const op = typeof args.operation === "string" ? args.operation : "";
       if (!op) {

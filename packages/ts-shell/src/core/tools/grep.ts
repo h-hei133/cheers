@@ -56,7 +56,6 @@ export function createGrepToolDefinition(
       },
       required: ["pattern"],
     },
-    permissions: { check: () => [] },
     async execute(args, context) {
       const rawPattern = typeof args.pattern === "string" ? args.pattern : "";
       if (!rawPattern) {

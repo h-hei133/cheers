@@ -38,7 +38,7 @@ import { createTaskToolDefinition } from './taskTool.js'
 import type { PwRuntimeStatus } from '../../browser/playwrightRuntime.js'
 import type { McpToolDescriptor } from '../mcp/types.js'
 import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
-import { pathPermission, processPermission, processStopPermission, resolveToolTarget } from './permissionContext.js'
+import { resolveToolTarget } from './permissionContext.js'
 import { approvedResult, deniedResult, runtimeErrorResult } from './toolResultLifecycle.js'
 import type { ToolExecutionResult } from '../../tools/types.js'
 import { networkNotice, planSandboxedCommand, readSandboxRules } from '../../sandbox/osSandbox.js'
@@ -313,11 +313,6 @@ export function createCoreToolRegistry(options?: {
         },
         required: ['path'],
       },
-      permissions: {
-        check(args, context) {
-          return pathPermission('read', args, context)
-        },
-      },
       async execute(args, context) {
         const rawPath = typeof args.path === 'string' ? args.path : ''
         const selector = parsePathSelector(rawPath)
@@ -490,11 +485,6 @@ export function createCoreToolRegistry(options?: {
         },
         required: ['path', 'content'],
       },
-      permissions: {
-        check(args, context) {
-          return pathPermission('write', args, context)
-        },
-      },
       async execute(args, context) {
         // The read decides the write, so both sit under one lock: taking it
         // only for the write would let two edits read the same original.
@@ -588,11 +578,6 @@ export function createCoreToolRegistry(options?: {
           },
         },
         required: ['path'],
-      },
-      permissions: {
-        check(args, context) {
-          return pathPermission('write', args, context)
-        },
       },
       async execute(args, context) {
         // Read-modify-write under one lock. The read is what decides the write,
@@ -757,11 +742,6 @@ export function createCoreToolRegistry(options?: {
         },
         required: ['command'],
       },
-      permissions: {
-        check(args, context) {
-          return processPermission(args, context)
-        },
-      },
       async execute(args, context) {
         const command = typeof args.command === 'string' ? args.command : ''
         if (args.runInBackground === true) {
@@ -790,11 +770,6 @@ export function createCoreToolRegistry(options?: {
       name: tool.qualifiedName,
       description: `[MCP:${tool.serverName}] ${tool.description}`,
       argsSchema: tool.inputSchema ?? { type: 'object' },
-      permissions: {
-        check(_args, _context) {
-          return []
-        },
-      },
       async execute(args, _context) {
         if (!options?.mcpGateway) {
           // A tool without its gateway is a registration mistake, and the
@@ -923,7 +898,6 @@ function createTaskOutputToolDefinition(): ToolDefinition {
         all: { type: 'boolean', description: 'List every background command instead of one.' },
       },
     },
-    permissions: { check: () => [] },
     async execute(args) {
       if (args.all === true) {
         const tasks = backgroundTasks.list()
@@ -962,14 +936,6 @@ function createTaskStopToolDefinition(): ToolDefinition {
         taskId: { type: 'string', description: 'The identifier of the command to stop.' },
       },
       required: ['taskId'],
-    },
-    permissions: {
-      // Stopping is a process operation in its own right. The approval that
-      // started the command covered starting it, not ending whatever it has
-      // since become.
-      check(args, context) {
-        return processStopPermission(args, context)
-      },
     },
     async execute(args) {
       const id = typeof args.taskId === 'string' ? args.taskId.trim() : ''

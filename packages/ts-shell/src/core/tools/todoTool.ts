@@ -30,7 +30,6 @@ export function createTodoToolDefinition(): ToolDefinition {
       },
       required: ["action"],
     },
-    permissions: { check: () => [] },
     async execute(args, context) {
       const action = typeof args.action === "string" ? args.action.toLowerCase().trim() : "";
       const validActions = ["add", "start", "done", "clear", "list"];

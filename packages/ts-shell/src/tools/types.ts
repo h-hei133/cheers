@@ -1,4 +1,3 @@
-import type { PermissionCheck } from '../sandbox/index.js'
 import type { SubagentRunner } from '../core/subagents/runner.js'
 
 export interface ToolExecutionContext {
@@ -48,15 +47,10 @@ export interface ToolExecutionResult {
   readonly content?: string
 }
 
-export interface ToolPermissionRequirements {
-  check(args: Record<string, unknown>, context: ToolExecutionContext): PermissionCheck[]
-}
-
 export interface ToolDefinition {
   readonly name: string
   readonly description: string
   readonly argsSchema: Record<string, unknown>
-  readonly permissions: ToolPermissionRequirements
   execute(
     args: Record<string, unknown>,
     context: ToolExecutionContext,

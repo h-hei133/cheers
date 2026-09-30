@@ -234,7 +234,6 @@ export function createWebSearchToolDefinition(): ToolDefinition {
       },
       required: ["query"],
     },
-    permissions: { check: () => [] },
     async execute(args, context) {
       const query = typeof args.query === "string" ? args.query.trim() : "";
       if (!query) {

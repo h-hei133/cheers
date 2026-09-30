@@ -36,7 +36,6 @@ export function createSkillToolDefinition(skills: SkillCatalog): ToolDefinition 
       },
       required: ['name'],
     },
-    permissions: { check: () => [] },
     async execute(args) {
       const requested = typeof args.name === 'string' ? args.name.trim() : ''
       if (requested === '') {

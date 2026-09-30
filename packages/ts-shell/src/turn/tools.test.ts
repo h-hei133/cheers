@@ -239,7 +239,6 @@ describe("adaptTools", () => {
         name: "echo",
         description: "echo",
         argsSchema: { type: "object", properties: {} },
-        permissions: { check: () => [] },
         execute: async (args) => ({ success: true, output: String(args.text) }),
       },
     ],
@@ -279,4 +278,19 @@ describe("a refusal written in the config", () => {
     const decision = await hooks.beforeToolCall(call("read", { path: "a.ts" }), undefined);
     expect(decision?.block).toBeFalsy();
   });
+});
+
+
+it.each(["ask", "accept-edits"] as const)("requires live approval to stop a task under %s", async (permissionScope) => {
+  const prompts: unknown[] = [];
+  const hooks = createToolHooks(gate({ permissionScope,
+    escalationPromptHandler: async (prompt) => {
+      prompts.push(prompt);
+      return { promptId: prompt.id, decision: "deny", respondedAt: 1 };
+    },
+  }));
+  const blocked = await hooks.beforeToolCall!(call("taskStop", { taskId: "bg_7" }));
+  expect(prompts).toHaveLength(1);
+  expect(prompts[0]).toMatchObject({ context: { toolName: "taskStop", operation: "execute" } });
+  expect(blocked?.block).toBe(true);
 });

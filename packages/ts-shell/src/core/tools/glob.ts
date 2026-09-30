@@ -53,7 +53,6 @@ export function createGlobToolDefinition(
       },
       required: ['pattern'],
     },
-    permissions: { check: () => [] },
     async execute(args, context) {
       // Only trimmed. Stripping a leading `./` looks helpful but is not: the
       // character class that did it also ate the leading dot of a hidden file, so

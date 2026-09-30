@@ -59,7 +59,6 @@ export function createUnifiedBrowserToolDefinition(): ToolDefinition {
       },
       required: ["action"],
     },
-    permissions: { check: () => [] },
     async execute(args, context) {
       const action = typeof args.action === "string" ? args.action.toLowerCase().trim() : "";
       if (!action) {

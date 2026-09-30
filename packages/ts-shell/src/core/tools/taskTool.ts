@@ -62,7 +62,6 @@ export function createTaskToolDefinition(
       },
       required: ["description", "prompt"],
     },
-    permissions: { check: () => [] },
     async execute(args, context) {
       const description = typeof args.description === "string" ? args.description.trim() : "";
       const prompt = typeof args.prompt === "string" ? args.prompt.trim() : "";
