@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { createCoreToolRegistry } from "./registry.js";
 import type { McpToolDescriptor } from "../mcp/types.js";
 import type { CoreMcpGateway } from "../mcp/gateway.js";
+import { McpGatewayBlockedError } from "../mcp/gateway.js";
+import { McpClassifiedError, classifyMcpFailure } from "../mcp/errorTaxonomy.js";
 
 /**
  * What an MCP tool call does when it actually works.
@@ -50,6 +52,21 @@ function minimalContext(): never {
 }
 
 describe("mcp tools in the registry", () => {
+  it.each([
+    [new McpClassifiedError(classifyMcpFailure({ failureClass: "protocol", detail: "bad response token=hidden" })), "protocol", "protocol-level"],
+    [new McpGatewayBlockedError({ message: "server unavailable", blockerKind: "environment-not-ready", doNext: "refresh", mcpFailureClass: "server-unavailable" }), "server-unavailable", "server-availability"],
+    [new Error("unexpected token=hidden"), "unknown", "unknown"],
+  ])("preserves and redacts classified failures in metadata and model-visible text", async (error, failureClass, failurePlane) => {
+    const gateway = recordingGateway({ content: "unused" });
+    gateway.invokeTool = async () => { throw error; };
+    const tool = createCoreToolRegistry({ mcpTools: [toolDescriptor()], mcpGateway: gateway }).get("notes__append")!;
+    const result = await tool.execute({}, minimalContext());
+    expect(result.success).toBe(false);
+    expect(result.metadata).toMatchObject({ mcpFailureClass: failureClass, mcpFailurePlane: failurePlane });
+    expect(result.error).toContain(`[MCP ${failureClass}; ${failurePlane}]`);
+    expect(JSON.stringify(result)).not.toContain("hidden");
+  });
+
   it("forwards the call to the gateway and returns its content", async () => {
     const gateway = recordingGateway({ content: "note saved as #42" });
     const registry = createCoreToolRegistry({

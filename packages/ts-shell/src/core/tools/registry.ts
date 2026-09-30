@@ -21,7 +21,8 @@ import {
   type ExecutionAuthority,
   type ExecutionService,
 } from '../../runtime/execution/service.js'
-import { type CoreMcpGateway } from '../mcp/gateway.js'
+import { McpGatewayBlockedError, type CoreMcpGateway } from '../mcp/gateway.js'
+import { classifyMcpFailure, classifyUnknownMcpFailure, mcpFailureMetadata } from '../mcp/errorTaxonomy.js'
 import { formatDirectoryListing } from './directoryListing.js'
 import { createGlobToolDefinition } from './glob.js'
 import { createSkillToolDefinition, type SkillCatalog } from './skill.js'
@@ -820,7 +821,13 @@ export function createCoreToolRegistry(options?: {
           }
           return approvedResult(answer.content)
         } catch (error) {
-          return runtimeErrorResult(error)
+          const failure = error instanceof McpGatewayBlockedError
+            ? classifyMcpFailure({ failureClass: error.mcpFailureClass, detail: error.mcpSafeDetail })
+            : classifyUnknownMcpFailure(error)
+          return runtimeErrorResult(
+            `[MCP ${failure.failureClass}; ${failure.failurePlane}] ${failure.safeDetail}`,
+            mcpFailureMetadata(failure),
+          )
         }
       },
     })
