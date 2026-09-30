@@ -147,6 +147,7 @@ export class InteractiveMode {
   private previewItems: readonly StatusItemId[] | undefined;
   private stopped = false;
   private closing = false;
+  private readonly alternateScreen: boolean;
   private busy = false;
   private toast?: string;
   /** What the terminal said it can draw, read once from its environment. */
@@ -176,6 +177,7 @@ export class InteractiveMode {
 
 
   constructor(private readonly options: InteractiveModeOptions) {
+    this.alternateScreen = options.runtimeContext.runtimeConfig.tuiMode !== "regular";
     this.terminal = options.terminal ?? processTerminal;
     this.statusItems = readStatusItems(options.runtimeContext.projectRoot);
     // The checklist travels with the session, and every path that puts a
@@ -358,7 +360,7 @@ export class InteractiveMode {
     // session that ends leaves something to scroll back through. `fullscreen` is
     // the private screen.
     this.tui.start({
-      useAlternateScreen: this.options.runtimeContext.runtimeConfig.tuiMode !== "regular",
+      useAlternateScreen: this.alternateScreen,
     });
     // After the first frame, not before it: the first paint decides what the
     // surface looks like, and a reload landing in the middle of it would be
@@ -442,7 +444,7 @@ export class InteractiveMode {
           this.tui.requestRender();
         },
         openSearch: () => {
-          if (this.options.runtimeContext.runtimeConfig.tuiMode === "regular") {
+          if (!this.alternateScreen) {
             this.toast = "Transcript search requires fullscreen mode; use terminal search here.";
             this.tui.requestRender();
             return;
@@ -599,7 +601,7 @@ export class InteractiveMode {
         approvalTrustPolicy: this.options.approvalTrustPolicy,
         turnNumber: this.turnNumber,
         modifierKeysReported: (this.terminal.keyboardProtocol ?? "legacy") !== "legacy",
-        keyGuide: this.preferences.keybindings.guide(this.options.runtimeContext.runtimeConfig.tuiMode !== "regular"),
+        keyGuide: this.preferences.keybindings.guide(this.alternateScreen),
         setActiveNonInteractiveApprovalMode:
           this.options.setActiveNonInteractiveApprovalMode ?? (() => {}),
         refreshKeybindings: () => this.preferences.reload(),
@@ -705,7 +707,7 @@ export class InteractiveMode {
           : {}),
         ...(this.options.themePaths ? { themePaths: this.options.themePaths } : {}),
         modifierKeysReported: (this.terminal.keyboardProtocol ?? "legacy") !== "legacy",
-        keyGuide: this.preferences.keybindings.guide(this.options.runtimeContext.runtimeConfig.tuiMode !== "regular"),
+        keyGuide: this.preferences.keybindings.guide(this.alternateScreen),
       },
       transcript: this.state.transcript,
       sessionManager: this.options.sessionManager,
@@ -831,6 +833,9 @@ export class InteractiveMode {
   private async shutdown(): Promise<void> {
     if (this.closing || this.stopped) return;
     this.closing = true;
+    // A single stdin chunk can contain the exit key and further complete keys,
+    // paste or mouse events. Detach dispatch before yielding to the drain.
+    this.stdin.dispose();
     try {
       await this.terminal.drainInput?.();
     } catch {
@@ -846,4 +851,3 @@ export class InteractiveMode {
     });
   }
 }
-

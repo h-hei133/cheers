@@ -21,15 +21,12 @@ import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 function boot(
   overrides: Partial<InteractiveModeOptions> = {},
   tuiMode?: "regular" | "fullscreen",
-): { mode: InteractiveMode; terminal: RecordingTerminal; scheduler: ManualScheduler } {
+): { mode: InteractiveMode; terminal: RecordingTerminal; scheduler: ManualScheduler; runtimeContext: ShellRuntimeContext } {
   const terminal = new RecordingTerminal();
   terminal.columns = 80;
   terminal.rows = 24;
   const scheduler = new ManualScheduler();
-  const mode = new InteractiveMode({
-    terminal,
-    scheduler,
-    runtimeContext: {
+  const runtimeContext = {
       cwd: "/workspace",
       projectRoot: "/workspace",
       session: { id: "sess_first_frame" },
@@ -41,7 +38,11 @@ function boot(
         agentMode: "build",
         tuiMode,
       },
-    } as unknown as ShellRuntimeContext,
+    } as unknown as ShellRuntimeContext;
+  const mode = new InteractiveMode({
+    terminal,
+    scheduler,
+    runtimeContext,
     sessionRuntime: {
       observeEvents: () => () => {},
       cancelCurrentRun: () => {},
@@ -59,10 +60,26 @@ function boot(
     initialMcpGateway: {} as unknown as CliMcpGateway,
     ...overrides,
   });
-  return { mode, terminal, scheduler };
+  return { mode, terminal, scheduler, runtimeContext };
 }
 
 describe("transcript search ownership", () => {
+  it.each(["regular", "fullscreen"] as const)("retains the actual %s screen after config reload", (screen) => {
+    const { mode, terminal, scheduler, runtimeContext } = boot({}, screen);
+    mode.start();
+    scheduler.flush();
+    terminal.drain();
+    try {
+      runtimeContext.runtimeConfig = { ...runtimeContext.runtimeConfig, tuiMode: screen === "regular" ? "fullscreen" : "regular" };
+      terminal.input("\x1b[102;6u");
+      scheduler.flush();
+      const output = terminal.drain();
+      expect(output).not.toContain("\x1b[?1049h");
+      expect(stripAnsi(output).includes("find:")).toBe(screen === "fullscreen");
+      expect(stripAnsi(output).includes("requires fullscreen mode")).toBe(screen === "regular");
+    } finally { mode.stop(); }
+  });
+
   it("explains the regular-screen limitation and leaves typing in the composer", () => {
     const { mode, terminal, scheduler } = boot({}, "regular");
     mode.start();

@@ -48,6 +48,18 @@ function build(overrides: { observeEvents?: () => () => void } = {}): {
 }
 
 describe("session wiring", () => {
+  it("does not submit buffered keys after an exit key in the same chunk", async () => {
+    const { mode, terminal } = build();
+    let finish!: () => void;
+    Object.assign(terminal, { drainInput: () => new Promise<void>((resolve) => { finish = resolve; }) });
+    const submit = vi.spyOn(mode as unknown as { onSubmit(text: string): void }, "onSubmit").mockImplementation(() => {});
+    mode.start();
+    terminal.input("\x04should-not-submit\r\x1b[200~pasted\x1b[201~\r");
+    expect(submit).not.toHaveBeenCalled();
+    finish();
+    await vi.waitFor(() => expect(terminal.stopped).toBe(true));
+  });
+
   it("waits for late input before closing the terminal on user exit", async () => {
     const { mode, terminal } = build();
     let finish!: () => void;
