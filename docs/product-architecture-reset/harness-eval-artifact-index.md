@@ -1,42 +1,32 @@
-# Harness And Eval Artifact Index
+# Test Support And Evaluation Index
 
-This index re-owns the visible `packages/ts-shell/src/core/harness/` surface for
-Phase 2 Goal 3. It is an ownership and compatibility index, not a feature plan.
+Updated 2026-09-30 after the scenario support migration. Paths below are
+relative to `packages/ts-shell/src/`.
 
-## Current Judgment
+## Current Ownership
 
-Status: RE-OWNED IN PLACE.
+Fixtures, subprocess runners, assertions, and scenario reports belong to
+`test-utils/`. Product code imports its own runtime domains and must not import
+test support. The former core support directory has been removed.
 
-`packages/ts-shell/src/core/harness/` remains in its current path for
-compatibility. The directory is classified as dev/eval harness plus focused
-product-adjacent test support. It must not be treated as product runtime truth
-or route-history readiness.
+| Family | Current owner | Boundary |
+|---|---|---|
+| Agent scenarios | `test-utils/scenarios/` | Scenario fixtures, runner, assertions, and reports. |
+| CLI scenarios | `test-utils/cli/` | Subprocess setup, runner, assertions, and reports. |
+| Browser scenarios | `test-utils/browser/` | Support grouped by execution, network, cache, replay, healing, receipt, runtime, and skills. |
+| Browser evaluation | `eval/browser/` | Existing benchmark model, runner, and report; retained for evaluation consumers. |
+| Opt-in browser smoke | `browser/smoke/` | Runtime configuration, runner, and report used by the CLI smoke command. |
 
-## Artifact Families
+## Import And Evidence Rules
 
-| Family | Example files | Current owner | Disposition |
-|---|---|---|---|
-| Agent scenario harness | `agentScenario*.ts`, `agentCliScenario*.ts` | Dev/eval harness | Keep in place; import-compatible move later only with focused tests. |
-| Browser transaction evidence | `browserTxn*.ts`, `browserTrace.test.ts`, `browserScore.test.ts` | Browser/evidence harness | **Removed 2026-09-17** with the dormant cluster; the gate and every file it named are gone. Live path is `eval/browser/*`. |
-| Browser runtime scenario fixtures | `browserRuntimeMvpScenarioFixtures.ts`, `browserRuntimeAdapterFixtures.ts` | Browser eval harness | Keep route-era labels as provenance. |
-| Browser eval benchmark model | `eval/browser/benchmarkModel.ts`, `eval/browser/benchmarkRunner.ts`, `eval/browser/benchmarkReport.ts`; shims at `core/harness/browserEvalBenchmark*.ts` | Browser eval benchmark | Moved in Phase 2.5 Phase B; old imports preserved through re-export shims. |
-| Playwright closeout/runtime tests | `pwRuntime.test.ts`, `pwReal.test.ts`, `pwCloseout.test.ts`, `pwMcp.test.ts` | Browser harness tests | Keep default-safe; no live provider or public-web default. |
-| Public read-only smoke config | `browserPublicReadOnlyWebSmokeConfig.ts` | CLI smoke config adapter | Keep in place for compatibility; default remains controlled and opt-in. |
+- Internal test support has no public import compatibility contract. The
+  migration updated its consumers without keeping unused re-export shims.
+- Keep product runtime and evaluation ownership distinct from scenario setup.
+  Do not add a second runtime implementation to support a test.
+- Run focused scenario tests and build after moving a support family. Path-only
+  changes must preserve behavior and assertions.
+- Keep provider, network, persistence, and write opt-ins explicit. Local fixture
+  success does not prove a live provider, browser launch, or authorized write.
 
-## Compatibility Rules
-
-- Do not move the whole harness directory as one block.
-- Preserve old import paths before moving any subfamily.
-- Keep focused harness gates green for moved subfamilies.
-- Do not let local fixture, browser, MCP, or smoke evidence become a default
-  product success claim.
-- Keep Route221 active evidence infrastructure outside this cleanup; it is not
-  part of this harness re-ownership.
-
-## Product Boundary Finding
-
-The harness directory still sits under `core`, which is not the final physical
-shape. That is recorded as remaining debt instead of being hidden by a broad
-move. The safe next physical step is a subfamily move, such as browser eval
-benchmark files behind an import-compatible shim, after the browser/runtime
-owner surface is selected.
+The migration and validation evidence is recorded in
+[Phase 17 decisions](../../.wiki/features/phase-17-decisions.md), section 8.9.

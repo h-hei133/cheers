@@ -672,3 +672,8 @@ call-reachability（7 个 advisory，已逐项处置）、docs-drift:strict（�
 `source_graph_is_acyclic` 与 `source_graph_has_no_unresolved_specifiers` 均 satisfied。
 verdict 仍是 partial：函数上限 advisory 涉及 6 个模块（内置 judge 与 facade 脚本计数口径不同），
 阻断义务和阻断证据缺口都是 0。未通过篡改 profile 或 disposition 降低判定。
+
+首次推送 `ae3f487f` 的 CI 在文档门禁失败：当前状态的测试支撑索引仍两次引用已迁走的目录，
+本地残留空目录让 exists 检查误判通过。随后更新索引与状态表，清理确认为空的旧目录，
+并在只复制 Git 跟踪文件的临时树中复验文档门禁；未修改门禁规则或降低检查范围。
+同次 Architecture Watch 完成，judge 退出 0；观察工作流成功不替代构建与测试 CI。
