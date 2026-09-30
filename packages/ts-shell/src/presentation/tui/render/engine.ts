@@ -95,6 +95,8 @@ export class TUI {
    * session started with, not whatever the field happens to hold.
    */
   private alternateScreen = false;
+  /** A full-screen overlay borrowing the alternate screen from a regular session. */
+  private overlayScreen = false;
   private readonly inputListeners = new Set<(data: string) => void>();
   private disconnectHandler?: () => void;
 
@@ -207,6 +209,10 @@ export class TUI {
     // across that would place pictures onto slots the child emptied.
     const freed = this.forgetTransmittedImages({ free: true });
     if (freed) this.terminal.write(freed);
+    if (this.overlayScreen) {
+      this.terminal.write(EXIT_ALT_SCREEN);
+      this.overlayScreen = false;
+    }
     // The screen the child gets depends on which one this session runs on. The
     // alternate screen is given back — the child wants an ordinary terminal and
     // the session takes a fresh one on return. The main screen is not given
@@ -257,6 +263,10 @@ export class TUI {
     this.started = false;
     this.scheduler.clearTimeout(this.frameTimer);
     this.setMouseTracking(false);
+    if (this.overlayScreen) {
+      this.terminal.write(this.forgetTransmittedImages({ free: true }) + EXIT_ALT_SCREEN);
+      this.overlayScreen = false;
+    }
     // The driver restores every mode it may have set, unbuffered, and that
     // battery includes leaving the screen — which on most terminals also puts the
     // cursor back where it was when the screen was taken. So the driver goes
@@ -309,7 +319,17 @@ export class TUI {
     const startedAt = this.scheduler.now();
     const dimensions = this.terminal.getDimensions();
     const frame = this.provider.renderFrame(dimensions, this.mainScreen ? "document" : "viewport");
-    if (this.mainScreen) {
+    const overlayScreen = !!this.mainScreen && frame.fullScreen === true;
+    if (overlayScreen !== this.overlayScreen) {
+      // Keep the main painter and its cursor account: leaving the alternate
+      // screen restores that cursor and the original rows, without appending.
+      const freed = this.forgetTransmittedImages({ free: true });
+      this.terminal.write(freed + (overlayScreen ? ENTER_ALT_SCREEN : EXIT_ALT_SCREEN));
+      this.overlayScreen = overlayScreen;
+      this.painted = false;
+      this.window = [];
+    }
+    if (this.mainScreen && !this.overlayScreen) {
       // The fixed block is redrawn in place; the content was appended to the
       // scrollback when it was first composed and is left alone. The whole
       // document is passed rather than the viewport, because there is no

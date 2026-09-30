@@ -60,7 +60,7 @@ export class InteractiveSurface implements InteractiveView {
     if (this.context.overlayFullScreen()) {
       // A full-screen overlay owns every row, so there is no fixed block to
       // redraw separately.
-      return { rows: this.context.overlayRows(width, height) };
+      return { rows: this.context.overlayRows(width, height), fullScreen: true };
     }
     const chrome = this.renderChrome(width, height);
     const capacity = Math.max(MIN_TRANSCRIPT_ROWS, height - chrome.rows.length);

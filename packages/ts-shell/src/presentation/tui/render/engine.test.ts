@@ -9,10 +9,11 @@ class StubProvider implements TerminalFrameProvider {
   /** The fixed block at the end of the frame, for the screen that redraws it. */
   chrome: string[] = [];
   layouts: FrameLayout[] = [];
+  fullScreen = false;
 
   renderFrame(_dimensions: ViewportSize, layout: FrameLayout = "viewport"): TerminalFramePlan {
     this.layouts.push(layout);
-    if (this.chrome.length === 0) return { rows: this.rows };
+    if (this.chrome.length === 0) return { rows: this.rows, fullScreen: this.fullScreen };
     return {
       rows: [...this.rows, ...this.chrome],
       chromeRows: this.chrome,
@@ -35,6 +36,62 @@ function boot(): {
 }
 
 describe("keeping the terminal's own screen", () => {
+  it("borrows a screen for paging and resumes history without duplicating it", () => {
+    const { tui, terminal, provider } = boot();
+    tui.start({ useAlternateScreen: false });
+    provider.rows = ["history"];
+    tui.renderNow();
+    terminal.drain();
+
+    provider.fullScreen = true;
+    provider.rows = ["page one"];
+    tui.renderNow();
+    expect(terminal.drain()).toContain("\x1b[?1049h");
+    provider.rows = ["page two"];
+    tui.renderNow();
+    const page = terminal.drain();
+    expect(page).toContain("page two");
+    expect(page).not.toContain("\x1b[?1049h");
+    expect(page).not.toContain("page two\r\n");
+
+    provider.fullScreen = false;
+    provider.rows = ["history", "new content"];
+    tui.renderNow();
+    const restored = terminal.drain();
+    expect(restored).toContain("\x1b[?1049l");
+    expect(restored).not.toContain("history");
+    expect(restored).toContain("new content");
+  });
+
+  it.each(["stop", "suspend"])("releases a borrowed screen before %s", (action) => {
+    const { tui, terminal, provider } = boot();
+    tui.start({ useAlternateScreen: false });
+    tui.renderNow();
+    provider.fullScreen = true;
+    provider.rows = ["reader"];
+    tui.renderNow();
+    terminal.drain();
+    if (action === "stop") tui.stop();
+    else tui.suspend(() => expect(terminal.drain()).toContain("\x1b[?1049l"));
+    if (action === "stop") expect(terminal.drain()).toContain("\x1b[?1049l");
+    else {
+      tui.renderNow();
+      expect(terminal.drain()).toContain("\x1b[?1049h");
+    }
+  });
+
+  it("does not nest alternate screens for an overlay in a full-screen session", () => {
+    const { tui, terminal, provider } = boot();
+    tui.start();
+    tui.renderNow();
+    terminal.drain();
+    provider.fullScreen = true;
+    tui.renderNow();
+    provider.fullScreen = false;
+    tui.renderNow();
+    expect(terminal.drain()).not.toMatch(/\x1b\[\?1049[hl]/);
+  });
+
   it.each([false, true])("requests one layout before rendering (alternate screen: %s)", (useAlternateScreen) => {
     const { tui, provider } = boot();
     tui.start({ useAlternateScreen });

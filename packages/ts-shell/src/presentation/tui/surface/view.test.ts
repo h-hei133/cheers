@@ -172,7 +172,9 @@ describe("frame composition", () => {
     const { view, live } = surface();
     view.transcript.append({ kind: "assistant", text: "hidden while the reader is up", finalized: true });
     live.fullScreen = true;
-    const rows = view.renderFrame({ columns: 40, rows: 6 }).rows;
+    const overlay = view.renderFrame({ columns: 40, rows: 6 }, "document");
+    expect(overlay.fullScreen).toBe(true);
+    const rows = overlay.rows;
     expect(rows).toHaveLength(6);
     expect(rows.join("\n")).not.toContain("hidden while");
     expect(rows[0]).toBe("modal 0");
