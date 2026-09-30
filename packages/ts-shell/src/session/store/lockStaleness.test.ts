@@ -5,16 +5,14 @@ import { describe, expect, it } from "vitest";
 import { withFileLock, writeJsonFileAtomic } from "./sessionFileStore.js";
 import {
   STALE_LOCK_AGE_MS,
-  clearTakeoverNotice,
   isLockStale,
-  readTakeoverNotice,
   takeOverStaleLock,
 } from "./lockStaleness.js";
 
 /**
  * A lock nobody can release blocks every later write to that session. What is
  * checked here is the recovery: a stale lock is detected, taken over exactly
- * once by exactly one contender, and reported rather than silently replaced.
+ * by one contender at a time without leaving an unused notification sidecar.
  *
  * Equally, what is deliberately not claimed here: a lock whose owner is merely
  * paused past the age threshold is still declared stale, and the takeover
@@ -98,23 +96,21 @@ describe("a lock whose owner is gone", () => {
       const claim = `${lockPath}.takeover`;
       fs.mkdirSync(claim);
       try {
-        expect(takeOverStaleLock(lockPath, stale)).toBe(false);
+        expect(takeOverStaleLock(lockPath)).toBe(false);
       } finally {
         fs.rmSync(claim, { recursive: true, force: true });
       }
 
-      expect(takeOverStaleLock(lockPath, stale)).toBe(true);
+      expect(takeOverStaleLock(lockPath)).toBe(true);
       expect(fs.existsSync(lockPath)).toBe(false);
 
-      const notice = readTakeoverNotice(lockPath);
-      expect(notice?.reason).toBe("owner-dead");
-      expect(notice?.previousPid).toBe(2 ** 31 - 1);
+      expect(fs.readdirSync(root)).toEqual([]);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
   });
 
-  it("clears the notice on release, so a clean lock leaves no residue", () => {
+  it("releases a recovered lock when its action fails without notification residue", () => {
     const root = tempDir("notice-");
     try {
       const lockPath = path.join(root, "state.lock");
@@ -124,11 +120,8 @@ describe("a lock whose owner is gone", () => {
       );
       const stale = isLockStale(lockPath);
       if (!stale) throw new Error("unreachable");
-      takeOverStaleLock(lockPath, stale);
-      expect(readTakeoverNotice(lockPath)).toBeDefined();
-
-      clearTakeoverNotice(lockPath);
-      expect(readTakeoverNotice(lockPath)).toBeUndefined();
+      expect(() => withFileLock(lockPath, () => { throw new Error("action failed"); })).toThrow("action failed");
+      expect(fs.readdirSync(root)).toEqual([]);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
@@ -156,8 +149,7 @@ describe("withFileLock with a stale lock on disk", () => {
       });
       expect(written).toBe(true);
       expect(fs.readFileSync(statePath, "utf8")).toContain("written-through-a-recovered-lock");
-      // The takeover is reported, not silent.
-      expect(readTakeoverNotice(lockPath)?.reason).toBe("owner-dead");
+      expect(fs.existsSync(`${lockPath}.stale`)).toBe(false);
       // And the lock itself is gone, so the next write is not held up either.
       expect(fs.existsSync(lockPath)).toBe(false);
     } finally {

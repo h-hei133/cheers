@@ -6,7 +6,7 @@ import os from "node:os";
  *
  * A crashed process leaves its lock file behind, and a lock nobody can take
  * blocks every later write to that session. This module answers two questions:
- * whether the lock is stale, and who took it over when it was.
+ * whether the lock is stale and whether it can be removed for another attempt.
  *
  * What this does and does not achieve, stated so the next reader does not
  * over-trust it: it removes the common failure — a dead process blocking
@@ -14,8 +14,8 @@ import os from "node:os";
  * past the age threshold (SIGSTOP, a VM pause, a long GC) is declared stale
  * while it still considers itself the owner, and a takeover then has two
  * writers on one state file. There is no fencing token to stop the first from
- * overwriting the second, which is why the writers that care compare the
- * content they read against what is on disk before replacing it.
+ * overwriting the second. Callers must not treat recovery as fencing or as
+ * proof that another paused writer cannot resume.
  *
  * The checks are heuristics rather than proofs, and the liveness one is the
  * weakest. A PID can be reused by an unrelated process, so `kill(pid, 0)` can
@@ -28,56 +28,13 @@ import os from "node:os";
 /** How old a lock must be before its owner is presumed gone. */
 export const STALE_LOCK_AGE_MS = 60_000;
 
-/** A lock that was taken over, recorded where the next reader will find it. */
+/** The observation that makes a lock eligible for recovery. */
 export interface StaleLockTakeover {
   readonly reason: "owner-dead" | "lock-expired" | "lock-unreadable";
   /** The pid recorded in the lock that was removed. */
   readonly previousPid?: number;
   readonly hostname: string;
   readonly at: string;
-}
-
-/** The path a takeover is reported at, beside the lock it concerns. */
-export function takeoverNoticePath(lockPath: string): string {
-  return `${lockPath}.stale`;
-}
-
-/**
- * Read the takeover notice a lock carries, when it carries one.
- *
- * A notice is not an error and does not block anything; it is the record that
- * the lock now in place was not the first. `writeSessionState` reads it on
- * every write because the caller that wants to know cannot have been watching
- * at the moment it happened.
- */
-export function readTakeoverNotice(lockPath: string): StaleLockTakeover | undefined {
-  try {
-    const raw = fs.readFileSync(takeoverNoticePath(lockPath), "utf8");
-    const parsed = JSON.parse(raw) as StaleLockTakeover;
-    if (!parsed || typeof parsed !== "object" || !parsed.reason) return undefined;
-    return parsed;
-  } catch {
-    return undefined;
-  }
-}
-
-/** Write the takeover notice, replacing any earlier one for the same lock. */
-export function writeTakeoverNotice(lockPath: string, notice: StaleLockTakeover): void {
-  try {
-    fs.writeFileSync(takeoverNoticePath(lockPath), JSON.stringify(notice, null, 2), "utf8");
-  } catch {
-    // The notice is a record, not a requirement: a lock whose notice cannot be
-    // written is still taken over, and the write that proceeds is unaffected.
-  }
-}
-
-/** Remove the notice, for the owner that released cleanly and wants no residue. */
-export function clearTakeoverNotice(lockPath: string): void {
-  try {
-    fs.rmSync(takeoverNoticePath(lockPath), { force: true });
-  } catch {
-    // Same reasoning as the write: best effort.
-  }
 }
 
 /**
@@ -173,7 +130,7 @@ export function isLockStale(lockPath: string, now: number = Date.now()): StaleLo
  * succeeds is the only one that removes the lock, which is what stops a
  * takeover from racing itself.
  */
-export function takeOverStaleLock(lockPath: string, stale: StaleLockTakeover): boolean {
+export function takeOverStaleLock(lockPath: string): boolean {
   const claim = `${lockPath}.takeover`;
   try {
     fs.mkdirSync(claim);
@@ -184,7 +141,6 @@ export function takeOverStaleLock(lockPath: string, stale: StaleLockTakeover): b
   }
   try {
     fs.rmSync(lockPath, { force: true });
-    writeTakeoverNotice(lockPath, stale);
     return true;
   } finally {
     try {

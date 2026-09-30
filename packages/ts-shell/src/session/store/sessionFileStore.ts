@@ -87,10 +87,9 @@ export function withFileLock<T>(lockPath: string, action: () => T): T {
       }
       // A lock whose owner is gone would otherwise hold the session until the
       // timeout, every time, for as long as the file survives. Judged stale on
-      // the evidence in the lock itself and taken over once, with a notice
-      // written beside it rather than a silent replacement.
+      // the evidence in the lock itself and removed before retrying acquisition.
       const stale = isLockStale(lockPath);
-      if (stale && takeOverStaleLock(lockPath, stale)) {
+      if (stale && takeOverStaleLock(lockPath)) {
         continue;
       }
       const elapsed = Date.now() - startedAt;
