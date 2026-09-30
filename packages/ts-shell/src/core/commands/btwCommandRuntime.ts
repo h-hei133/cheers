@@ -4,6 +4,7 @@ import { resolveProviderCredential } from "../shell/providerCredentials.js";
 import { accountAuthFor, providerAuthorization } from "../../provider/request/authorization.js";
 import { requestSimpleCompletion } from "../../provider/request/completion.js";
 import { loadCatalog } from "../models/catalogStore.js";
+import { resolveRequestShape } from "../models/requestShape.js";
 import { providerEndpoint } from "../models/catalog.js";
 import { providerFetchFor } from "../../provider/request/fetch.js";
 
@@ -47,6 +48,8 @@ export async function runBtwCommand(
     attempted = true;
     const catalog = loadCatalog();
     const endpoint = providerEndpoint(catalog, resolution.provider);
+    const model = resolution.model ?? credential.model ?? "";
+    const shape = resolveRequestShape(catalog, resolution.provider, model, undefined);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), SIDE_QUESTION_TIMEOUT_MS);
     try {
@@ -59,7 +62,7 @@ export async function runBtwCommand(
               ...(endpoint ? { endpoint } : {}),
             }).headers,
             baseUrl: resolution.baseUrl ?? credential.baseUrl ?? "",
-            model: resolution.model ?? credential.model ?? "",
+            model,
             providerId: resolution.provider,
             ...(endpoint ? { endpoint } : {}),
             fetchImpl: providerFetchFor(runtimeConfig),
@@ -68,7 +71,7 @@ export async function runBtwCommand(
             { role: "system", content: SIDE_QUESTION_SYSTEM_PROMPT },
             { role: "user", content: question },
           ],
-          supportsTemperature: false,
+          supportsTemperature: shape.supportsTemperature,
           signal: controller.signal,
         })) ?? "";
     } catch {

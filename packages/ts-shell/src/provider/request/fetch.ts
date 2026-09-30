@@ -1,5 +1,4 @@
 import { Agent, ProxyAgent, fetch as undiciFetch } from "undici";
-import type { EndpointKind } from "../endpoints/kinds.js";
 
 export interface ProviderFetchEnvironment {
   readonly CHEERS_PROVIDER_PROXY?: string;
@@ -271,8 +270,8 @@ export function providerFetchFor(config: {
  */
 export function providerFetchForEndpoint(
   config: Parameters<typeof providerFetchFor>[0],
-  endpoint: EndpointKind | undefined,
-  shapeFor: (kind: EndpointKind | undefined) => { readonly signer?: () => Promise<RequestSigner | undefined> },
+  endpoint: string | undefined,
+  shapeFor: (kind: string | undefined) => { readonly signer?: () => Promise<RequestSigner | undefined> },
 ): typeof fetch {
   const signer = shapeFor(endpoint).signer;
   if (!signer) return providerFetchFor(config);

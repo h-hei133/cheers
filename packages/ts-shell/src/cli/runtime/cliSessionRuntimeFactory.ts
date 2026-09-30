@@ -23,7 +23,7 @@ import { compactSessionHistory } from "../../core/shell/compaction.js";
 import { recordCompactionCheckpoint } from "../../context/compact/checkpoint/compactionCheckpoint.js";
 import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalStore.js";
 import type { InteractiveApprovalResult } from "../interactive/picker/approval.js";
-import { requestCompactionSummary } from "../../core/query/compaction/summarize.js";
+import { requestCompactionSummary, type CompactionProvider as SummaryProvider } from "../../core/query/compaction/summarize.js";
 import { providerFetchFromTimeouts, providerTimeoutsFrom } from "../../provider/request/fetch.js";
 import { accountAuthFor, providerAuthorization, renewAccountAuthIfExpiring } from "../../provider/request/authorization.js";
 import { catalogModel, providerEndpoint } from "../../core/models/catalog.js";
@@ -70,10 +70,7 @@ function toCompactionMessages(messages: readonly AgentMessage[]): readonly Compa
 /** What a compaction needs from the provider, resolved once per entry point. */
 const windowLogger = createComponentLogger('model-window')
 
-interface CompactionProvider {
-  readonly headers: Readonly<Record<string, string>>;
-  readonly baseUrl: string;
-  readonly model: string;
+interface CompactionProvider extends SummaryProvider {
   readonly providerId: string;
 }
 
@@ -306,6 +303,7 @@ export function createCliSessionRuntime(input: {
       baseUrl: target.baseUrl,
       model: target.model,
       providerId: target.provider,
+      supportsTemperature: resolveRequestShape(catalog, target.provider, target.model, undefined).supportsTemperature,
       ...(endpointFor(target.provider) ? { endpoint: endpointFor(target.provider) } : {}),
     };
   };
