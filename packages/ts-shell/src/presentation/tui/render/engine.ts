@@ -308,16 +308,14 @@ export class TUI {
     }
     const startedAt = this.scheduler.now();
     const dimensions = this.terminal.getDimensions();
-    const frame = this.provider.renderFrame(dimensions);
+    const frame = this.provider.renderFrame(dimensions, this.mainScreen ? "document" : "viewport");
     if (this.mainScreen) {
       // The fixed block is redrawn in place; the content was appended to the
       // scrollback when it was first composed and is left alone. The whole
       // document is passed rather than the viewport, because there is no
       // viewport here — rows that do not fit are history, not something to
       // scroll to.
-      // `documentRows` is lazy: only this mode reads it, so the alternate
-      // screen's frames never pay for the whole-document walk.
-      this.mainScreen.paint(frame.documentRows?.() ?? frame.rows, frame.chromeRows ?? []);
+      this.mainScreen.paint(frame.rows, frame.chromeRows ?? []);
     } else {
       this.paint(frame.rows, dimensions);
     }

@@ -1,20 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { TUI } from "./engine.js";
 import { CURSOR_MARKER } from "./paint.js";
-import type { TerminalFramePlan, TerminalFrameProvider, ViewportSize } from "./frame.js";
+import type { FrameLayout, TerminalFramePlan, TerminalFrameProvider, ViewportSize } from "./frame.js";
 import { ManualScheduler, RecordingTerminal } from "../../../test-utils/terminalDouble.js";
 
 class StubProvider implements TerminalFrameProvider {
   rows: string[] = ["row"];
   /** The fixed block at the end of the frame, for the screen that redraws it. */
   chrome: string[] = [];
+  layouts: FrameLayout[] = [];
 
-  renderFrame(_dimensions: ViewportSize): TerminalFramePlan {
+  renderFrame(_dimensions: ViewportSize, layout: FrameLayout = "viewport"): TerminalFramePlan {
+    this.layouts.push(layout);
     if (this.chrome.length === 0) return { rows: this.rows };
     return {
       rows: [...this.rows, ...this.chrome],
       chromeRows: this.chrome,
-      documentRows: () => [...this.rows, ...this.chrome],
     };
   }
 }
@@ -34,6 +35,14 @@ function boot(): {
 }
 
 describe("keeping the terminal's own screen", () => {
+  it.each([false, true])("requests one layout before rendering (alternate screen: %s)", (useAlternateScreen) => {
+    const { tui, provider } = boot();
+    tui.start({ useAlternateScreen });
+    tui.renderNow();
+
+    expect(provider.layouts).toEqual([useAlternateScreen ? "viewport" : "document"]);
+  });
+
   it("does not write the transcript again after a child had the terminal", () => {
     // An external editor runs inside `suspend`, and the session comes back to
     // the same screen. Appending the document a second time there is invisible

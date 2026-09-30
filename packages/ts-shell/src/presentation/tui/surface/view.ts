@@ -2,7 +2,7 @@ import { renderBand } from "../chrome/band.js";
 import { renderComposer } from "../chrome/composer.js";
 import { renderHints } from "../chrome/hints.js";
 import { renderSearchBar } from "../chrome/searchBar.js";
-import type { TerminalFramePlan, ViewportSize } from "../render/frame.js";
+import type { FrameLayout, TerminalFramePlan, ViewportSize } from "../render/frame.js";
 import type { Block } from "../transcript/blocks.js";
 import { renderActivity } from "../transcript/live.js";
 import type { SelectionPoint, SelectionSpan } from "../transcript/selection.js";
@@ -54,7 +54,7 @@ export class InteractiveSurface implements InteractiveView {
     if (!open) this.suggestions.reset();
   }
 
-  renderFrame(dimensions: ViewportSize): TerminalFramePlan {
+  renderFrame(dimensions: ViewportSize, layout: FrameLayout = "viewport"): TerminalFramePlan {
     const width = Math.max(8, dimensions.columns);
     const height = Math.max(4, dimensions.rows);
     if (this.context.overlayFullScreen()) {
@@ -64,31 +64,22 @@ export class InteractiveSurface implements InteractiveView {
     }
     const chrome = this.renderChrome(width, height);
     const capacity = Math.max(MIN_TRANSCRIPT_ROWS, height - chrome.rows.length);
-    this.lastComposerGeometry = {
-      top: capacity + chrome.composerOffset,
-      bottom: capacity + chrome.composerOffset + chrome.composerRows.length - 1,
-      rows: chrome.composerRows,
-    };
     const transcriptRows = this.pane.render(
       width,
       capacity,
       this.context.selection(),
       this.context.highlightSearchMatches,
       this.context.imageProtocol ? { imageProtocol: this.context.imageProtocol() } : {},
+      layout,
     );
-    // The split and the full document are reported, not just performed: a
-    // surface appending to the terminal's scrollback has no window onto the
-    // transcript, so it needs every row rather than the ones that fit. The
-    // document is a function so the surface that does not read it never pays
-    // for the walk.
+    this.lastComposerGeometry = {
+      top: transcriptRows.length + chrome.composerOffset,
+      bottom: transcriptRows.length + chrome.composerOffset + chrome.composerRows.length - 1,
+      rows: chrome.composerRows,
+    };
     return {
       rows: [...transcriptRows, ...chrome.rows],
       chromeRows: chrome.rows,
-      // The document carries the block at its end, the same way `rows` does:
-      // the main screen splits the tail off by count, so a document without it
-      // told the painter the block was content and the last rows of the
-      // transcript were never painted at all.
-      documentRows: () => [...this.pane.documentRows(width), ...chrome.rows],
     };
   }
 

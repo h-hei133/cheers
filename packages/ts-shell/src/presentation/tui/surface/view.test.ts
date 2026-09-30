@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { stripAnsi } from "../text/ansi.js";
 import type { Block } from "../transcript/blocks.js";
 import { createViewState, type ViewContext } from "./contract.js";
@@ -70,8 +70,8 @@ describe("the document a main-screen frame reports", () => {
     // that stopped short.
     const { view } = surface();
     view.transcript.append({ kind: "user", text: "hello", finalized: true });
-    const plan = view.renderFrame(SIZE);
-    const document = (plan.documentRows ?? (() => plan.rows))().map(stripAnsi);
+    const plan = view.renderFrame(SIZE, "document");
+    const document = plan.rows.map(stripAnsi);
     const chrome = (plan.chromeRows ?? []).map(stripAnsi);
 
     expect(chrome.length).toBeGreaterThan(0);
@@ -83,12 +83,43 @@ describe("the document a main-screen frame reports", () => {
     for (let index = 0; index < 60; index++) {
       view.transcript.append({ kind: "user", text: `line ${index}`, finalized: true });
     }
-    const plan = view.renderFrame({ columns: 60, rows: 10 });
-    const document = (plan.documentRows ?? (() => []))().map(stripAnsi);
+    const plan = view.renderFrame({ columns: 60, rows: 10 }, "document");
+    const document = plan.rows.map(stripAnsi);
 
     expect(document.join("\n")).toContain("line 0");
     expect(document.join("\n")).toContain("line 59");
-    expect(document.length).toBeGreaterThan(plan.rows.length);
+    expect(document.length).toBeGreaterThan(10);
+    expect(view.scrollbarGeometry()).toBeUndefined();
+    expect(document.join("\n")).not.toContain("█");
+  });
+
+  it("decorates a single document layout at the requested width", () => {
+    const highlight = vi.fn((row: string, index: number) => `${row}\x1b[4m${index}\x1b[24m`);
+    const { view, live } = surface({ highlightSearchMatches: highlight, imageProtocol: () => "kitty" });
+    view.transcript.append({ kind: "user", text: "hello", finalized: true });
+    view.transcript.append({ kind: "user", text: "picture", finalized: true, images: [{ type: "image", mimeType: "image/png", data: "QUJD" }] });
+    live.selection = { from: { row: 0, column: 0 }, to: { row: 0, column: 10 } };
+    const render = vi.spyOn(view.transcript, "render");
+    const plan = view.renderFrame({ columns: 30, rows: 5 }, "document");
+    const content = plan.rows.slice(0, -plan.chromeRows!.length);
+
+    expect(render).toHaveBeenCalledOnce();
+    expect(render).toHaveBeenCalledWith(30, { imageProtocol: "kitty" });
+    expect(content[0]).toContain("\x1b[7m");
+    expect(content[0]).toContain("\x1b[4m0\x1b[24m");
+    expect(content.join("\n")).toContain("QUJD");
+    expect(highlight).toHaveBeenCalledTimes(content.length);
+    expect(view.scrollbarGeometry()).toBeUndefined();
+  });
+
+  it("uses the same decorated content for a document and an unscrolled viewport", () => {
+    const { view, live } = surface({ highlightSearchMatches: (row, index) => `${row}\x1b[4m${index}\x1b[24m` });
+    view.transcript.append({ kind: "user", text: "hello", finalized: true });
+    live.selection = { from: { row: 0, column: 0 }, to: { row: 0, column: 10 } };
+    const document = view.renderFrame(SIZE, "document");
+    const viewport = view.renderFrame(SIZE, "viewport");
+
+    expect(viewport.rows.slice(-document.rows.length)).toEqual(document.rows);
   });
 });
 

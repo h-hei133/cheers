@@ -1,4 +1,5 @@
 import type { Block, BlockRenderOptions } from "../transcript/blocks.js";
+import type { FrameLayout } from "../render/frame.js";
 import type { Transcript } from "../transcript/container.js";
 import type { SelectionPoint, SelectionSpan } from "../transcript/selection.js";
 import {
@@ -45,16 +46,17 @@ export class TranscriptPane {
     selection: SelectionSpan | undefined,
     highlight?: (row: string, contentRow: number) => string,
     options?: BlockRenderOptions,
+    layout: FrameLayout = "viewport",
   ): string[] {
     const safeWidth = Math.max(1, Math.floor(width));
-    const safeCapacity = Math.max(1, capacity);
-    const hasScrollbar = needsScrollbar(
+    const hasScrollbar = layout === "viewport" && needsScrollbar(
       this.transcript.rowCount(safeWidth),
-      safeCapacity,
+      Math.max(1, capacity),
       safeWidth,
     );
     const contentWidth = hasScrollbar ? Math.max(1, safeWidth - 1) : safeWidth;
     const { rows, owners } = this.transcript.render(contentWidth, options);
+    const safeCapacity = layout === "document" ? rows.length : Math.max(1, capacity);
     this.scroller.updateLayout(rows.length, safeCapacity);
     const top = this.scroller.scrollTop;
     const visible = rows.slice(top, top + safeCapacity);
@@ -132,17 +134,6 @@ export class TranscriptPane {
   }
 
   /** Rendered rows of the full transcript at the last width, for selection copying. */
-  /**
-   * The whole transcript, not just the window onto it.
-   *
-   * A surface that owns its screen shows a window and scrolls it. A surface
-   * appending to the terminal's scrollback has no window to show: every row is
-   * history, and it is written once.
-   */
-  documentRows(width: number): readonly string[] {
-    return this.transcript.render(Math.max(1, Math.floor(width))).rows;
-  }
-
   contentRows(): readonly string[] {
     if (this.window.layout.rows.length > 0) return this.window.layout.rows;
     return this.transcript.render(this.geometry ? Math.max(1, this.width - 1) : this.width).rows;
