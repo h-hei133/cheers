@@ -56,34 +56,3 @@ export interface ToolDefinition {
     context: ToolExecutionContext,
   ): Promise<ToolExecutionResult>
 }
-
-export type MvpToolName =
-  | 'read'
-  | 'write'
-  | 'edit'
-  | 'glob'
-  | 'bash'
-  | 'git-status'
-  | 'git-diff'
-  | 'browser.observe'
-  | 'browser.extract'
-  | 'browser.click'
-  | 'browser.type'
-
-export const MVP_TOOL_ALLOWLIST: ReadonlySet<MvpToolName> = new Set([
-  'read',
-  'write',
-  'edit',
-  'glob',
-  'bash',
-  'git-status',
-  'git-diff',
-  'browser.observe',
-  'browser.extract',
-  'browser.click',
-  'browser.type',
-])
-
-export function isAllowlistedTool(toolName: string): toolName is MvpToolName {
-  return MVP_TOOL_ALLOWLIST.has(toolName as MvpToolName)
-}
