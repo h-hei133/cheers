@@ -15,6 +15,7 @@ export interface TodoItem {
  * session asked last, which is fine for one and wrong for two.
  */
 const listsBySession = new Map<string, { readonly items: TodoItem[]; nextId: number }>();
+const USAGE = "Usage: /todo list | /todo add <task> | /todo start <id> | /todo done <id> | /todo clear";
 
 /**
  * This session's list.
@@ -74,11 +75,12 @@ export async function runTodoCommand(
   sessionId?: string,
 ): Promise<LocalCommandResult> {
   const sessionTodoList = getSessionTodos(sessionId);
-  if (args.length === 0) {
+  const firstArg = args[0]?.toLowerCase();
+  if (args.length === 0 || (firstArg === "list" && args.length === 1)) {
     if (sessionTodoList.length === 0) {
       return {
         kind: "local",
-        output: "No tasks currently on the todo list.\nUsage: /todo add <task> | /todo start <id> | /todo done <id> | /todo clear",
+        output: `No tasks currently on the todo list.\n${USAGE}`,
       };
     }
 
@@ -101,7 +103,9 @@ export async function runTodoCommand(
     };
   }
 
-  const firstArg = args[0]?.toLowerCase();
+  if ((firstArg === "list" || firstArg === "clear") && args.length !== 1) {
+    return { kind: "local", output: USAGE };
+  }
   if (firstArg === "clear" && args.length === 1) {
     if (sessionId) setSessionTodos(sessionId, []);
     return {
@@ -159,18 +163,9 @@ export async function runTodoCommand(
     };
   }
 
-  // Fallback: treat whole text as a new task
-  const directText = args.join(" ").trim();
-  const list = sessionList(sessionId);
-  const directItem: TodoItem = {
-    id: list.nextId++,
-    text: directText,
-    status: "pending",
-  };
-  list.items.push(directItem);
   return {
     kind: "local",
-    output: `Task added: **#${directItem.id}** "${directText}"`,
+    output: `Unknown todo subcommand: ${args[0]}.\n${USAGE}`,
   };
 }
 

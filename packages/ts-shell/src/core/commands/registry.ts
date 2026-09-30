@@ -494,7 +494,7 @@ export function createCommandRegistry(
       enabled: true,
       summary: "manage structured task checklist and view progress",
       group: "workflow",
-      argumentHint: "[add|start|done|clear]",
+      argumentHint: "[list|add|start|done|clear]",
       getArgumentCompletions: (prefix) => subcommandCompletions("todo", prefix),
       // The checklist belongs to a session, so the session travels with the
       // call. Without it the command answers with a freshly allocated list that

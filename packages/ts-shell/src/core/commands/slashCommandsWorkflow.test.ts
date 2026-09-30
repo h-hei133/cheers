@@ -88,6 +88,24 @@ describe("Phase 5 High-Level Workflow Commands Subsystem", () => {
   });
 
   describe("/todo command", () => {
+    it("lists the current tasks without creating one named list", async () => {
+      const context = { cwd: tempDir, sessionId: "sess_todo_list" };
+      await routeSlashCommand("/todo clear", context);
+      await routeSlashCommand("/todo add existing task", context);
+      const listed = await routeSlashCommand("/todo list", context);
+      expect(listed).toMatchObject({ kind: "local", output: expect.stringContaining("Session Task Checklist") });
+      expect(getSessionTodos(context.sessionId).map((item) => item.text)).toEqual(["existing task"]);
+    });
+
+    it.each(["lits", "some task text", "clear unexpected", "list unexpected"])("rejects /todo %s without changing the checklist", async (args) => {
+      const context = { cwd: tempDir, sessionId: "sess_todo_unknown" };
+      await routeSlashCommand("/todo clear", context);
+      await routeSlashCommand("/todo add existing task", context);
+      const result = await routeSlashCommand(`/todo ${args}`, context);
+      expect(result).toMatchObject({ kind: "local", output: expect.stringContaining("Usage: /todo list") });
+      expect(getSessionTodos(context.sessionId).map((item) => item.text)).toEqual(["existing task"]);
+    });
+
     it("adds tasks, marks them in_progress and done, and visualizes checklist", async () => {
       // The list is per session now, so the test drives one session the way
       // the surface does: named, and read back through the same id.
