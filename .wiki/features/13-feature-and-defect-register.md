@@ -306,7 +306,9 @@ wordStart("hello world again", 10)       -> 6     ← 正确
 
 ## 3. 主题与色彩（`THM`）
 
-### THM-01 · 终端能力探测存在，主题从不询问 — `OPEN` `P1` `CONFIRMED`
+### THM-01 · 终端能力探测存在，主题从不询问 — `FIXED` `P1` `CONFIRMED`
+
+**2026-09-30 实施**：587cf063：共享编码器按实际模式输出真彩色、256 色或 16 色。 W3 相关 113/113 通过；独立代码 APPROVE、架构 CLEAR。以下为修复前研究记录。
 
 `terminalCapabilities.ts:38-48` 探测 `hasTrueColor`/`has256Color` 并挂在 `capabilities`
 （`:57-58`），但**除定义与 `test-utils/terminalDouble.ts` 外零消费者**。
@@ -350,7 +352,9 @@ first global reset at index 27 of 99 -> background lost mid-row
 
 ---
 
-### THM-03 · 主题令牌 32 个、无 schema；`auto` 被静默当作未设置 — `OPEN` `P2` `CONFIRMED`
+### THM-03 · 主题令牌 32 个、无 schema；`auto` 被静默当作未设置 — `PARTIAL` `P2` `CONFIRMED`
+
+**2026-09-30 实施**：1d419b15、6ddf40a8：schema、变量解析、逐项诊断和启动错误传播已落地；auto 与扩充主题数量仍按裁决延期。 W3 相关 113/113 通过；独立代码 APPROVE、架构 CLEAR。以下为修复前研究记录。
 
 | 维度 | 我方 | pi | oh-my-pi |
 |---|---|---|---|
@@ -373,7 +377,9 @@ first global reset at index 27 of 99 -> background lost mid-row
 
 ---
 
-### THM-04 · `NO_COLOR` / `FORCE_COLOR` 全仓零处理 — `OPEN` `P3` `CONFIRMED`
+### THM-04 · `NO_COLOR` / `FORCE_COLOR` 全仓零处理 — `FIXED` `P3` `CONFIRMED`
+
+**2026-09-30 实施**：6c18da5a：有效 FORCE_COLOR 优先，否则非空 NO_COLOR 禁色；保留文本属性。 W3 相关 113/113 通过；独立代码 APPROVE、架构 CLEAR。以下为修复前研究记录。
 
 `grep -rn "NO_COLOR\|FORCE_COLOR" packages/ts-shell/src` **零命中**。
 `NO_COLOR=1` 是标准且与无障碍相关的约定，用户说了不加色我们照加。
@@ -384,7 +390,9 @@ first global reset at index 27 of 99 -> background lost mid-row
 
 ---
 
-### THM-05 · `closestColor` 的 `index < 16` 分支不可达，且没有真正的 16 色降级 — `OPEN` `P3` `CONFIRMED`
+### THM-05 · `closestColor` 的 `index < 16` 分支不可达，且没有真正的 16 色降级 — `FIXED` `P3` `CONFIRMED`
+
+**2026-09-30 实施**：587cf063：移除不可达分支，使用真实 16 色映射。 W3 相关 113/113 通过；独立代码 APPROVE、架构 CLEAR。以下为修复前研究记录。
 
 `theme.ts:183-186` 与 `:218-221` 都有 `if (index < 16) return \`\x1b[3${index}m\`;`。
 穷举全部 16,777,216 个 RGB 输入：**返回值域 16–255，`< 16` 出现 0 次**。
@@ -398,7 +406,9 @@ first global reset at index 27 of 99 -> background lost mid-row
 
 ---
 
-### THM-06 · 代码围栏除 bash 外无语法制色 — `OPEN` `P2` `CONFIRMED`
+### THM-06 · 代码围栏除 bash 外无语法制色 — `FIXED` `P2` `CONFIRMED`
+
+**2026-09-30 实施**：272681ae、6ddf40a8：显式语言子集、多行高亮、原文保真、回退主题颜色和禁色快路径。 W3 相关 113/113 通过；独立代码 APPROVE、架构 CLEAR。以下为修复前研究记录。
 
 `markdown.ts:161-167`：`const isBash = language === "bash" || "sh" || "zsh"`，
 其余语言 `defaultTheme.fg("text", wrapped)`——**纯文本**。
@@ -415,7 +425,9 @@ first global reset at index 27 of 99 -> background lost mid-row
 
 ---
 
-### THM-07 · SGR 合并器声称支持冒号分隔扩展色，实际只切分号 — `OPEN` `P3` `CONFIRMED`
+### THM-07 · SGR 合并器声称支持冒号分隔扩展色，实际只切分号 — `FIXED` `P3` `CONFIRMED`
+
+**2026-09-30 实施**：bbab352e：未发现生产冒号色序列，注释改为分号完整性检查，冒号参数保持不透明。 W3 相关 113/113 通过；独立代码 APPROVE、架构 CLEAR。以下为修复前研究记录。
 
 `sgr.ts:11-13` 的文档说支持冒号分隔；`:43-56`/`:80` 只 `split(";")`。
 `\x1b[38:2::255:0:0m` 会被当成单个未解析参数，与相邻序列合并时产出
