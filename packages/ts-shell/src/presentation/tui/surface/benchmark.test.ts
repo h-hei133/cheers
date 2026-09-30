@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { diffPaint, prepareRows } from "../render/paint.js";
 import { textBlock } from "../transcript/blocks.js";
 import { Transcript } from "../transcript/container.js";
@@ -57,6 +57,28 @@ function changedRows(before: readonly string[], after: readonly string[]): numbe
 }
 
 describe("long-transcript budget", () => {
+  it.each(["document", "viewport"] as const)("composes 20,000 cached blocks once per %s frame", (layout) => {
+    const transcript = new Transcript();
+    let layouts = 0;
+    for (let index = 0; index < 20_000; index++) {
+      transcript.append({
+        kind: "assistant", text: `row ${index}`, finalized: true,
+        rows: () => { layouts++; return [`row ${index}`]; },
+      });
+    }
+    const pane = new TranscriptPane(transcript);
+    pane.render(100, 30, undefined, undefined, undefined, layout);
+    layouts = 0;
+    const render = vi.spyOn(transcript, "render");
+    const measure = vi.spyOn(transcript, "rowCount");
+    const rows = pane.render(100, 30, undefined, undefined, undefined, layout);
+    expect(layouts).toBe(0);
+    expect(render).toHaveBeenCalledOnce();
+    expect(measure).toHaveBeenCalledTimes(layout === "document" ? 0 : 1);
+    expect(rows).toHaveLength(layout === "document" ? 40_000 : 30);
+    expect(rows.at(-2)).toContain("row 19999");
+  });
+
   it("renders 50 turns", () => {
     const transcript = buildTranscript(50);
 
