@@ -285,3 +285,12 @@ describe("a multi-edit segment that is not unique", () => {
     expect(result.content).toBe("const a = 1;\nconst b = 9;\n");
   });
 });
+
+
+it("applies disjoint cascading replacements against the original ranges", () => {
+  const result = replaceManyInContent("gamma\nbeta\n", [
+    { oldText: "gamma", newText: "beta" },
+    { oldText: "beta", newText: "delta" },
+  ]);
+  expect(result).toMatchObject({ success: true, content: "beta\ndelta\n" });
+});
