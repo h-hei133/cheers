@@ -8,9 +8,10 @@
  * terminal, because SGR parameters apply left to right within a sequence exactly
  * as they do across sequences.
  *
- * Extended colours (`38;2;r;g;b`, `48;5;n`, and their colon-delimited forms)
+ * Semicolon-delimited extended colours (`38;2;r;g;b`, `48;5;n`)
  * only merge when the whole parameter list is present, so a truncated row can
- * never fuse a partial colour into its neighbour's parameters.
+ * never fuse a partial colour into its neighbour's parameters. Colon-delimited
+ * groups are carried as opaque parameters; their component count is not checked.
  */
 
 const RESET = "\x1b[0m";
