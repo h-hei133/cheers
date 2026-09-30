@@ -76,11 +76,10 @@ describe("source chooser", () => {
     expect(await picker.apply(["add"])).toEqual({ draft: "/marketplace add " });
   });
 
-  it("keeps the default source registered", async () => {
+  it("offers registration without inventing a default source", async () => {
     const picker = sourcePicker(CONTEXT);
-    const outcome = await picker.apply(["official"]);
-
-    expect(outcome?.note).toContain("stays registered");
+    expect((await picker.load()).map((option) => option.id)).toEqual(["add"]);
+    expect(await picker.apply(["unknown-source"])).toBeUndefined();
   });
 });
 
