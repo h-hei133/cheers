@@ -84,6 +84,59 @@ grep -rn "hooks.json" packages/ts-shell/src --include='*.ts'   # → 仅 hookDis
 
 **最小改动建议（已完成）**：✅ 已读 `.agents/hooks.json` 并注册，另加信任门（`core/hooks/trust.ts`）。
 
+### 2.1.1 当前钩子配置与事件载荷（2026-09-30）
+
+当前支持 18 个声明式事件。用户级 `~/.cheers/hooks.json` 与工作区
+`.agents/hooks.json` 都会加载；磁盘命令需通过现有信任门才能执行。
+以下示例在工具执行前运行工作区脚本，脚本从 stdin 读取一份 JSON：
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "^edit$",
+      "hooks": [{ "command": "node scripts/check-edit.mjs" }]
+    }]
+  }
+}
+```
+
+每份载荷均含 `eventName`、`sessionId`、`workspaceRoot`、`timestamp`；
+`agentId`、`agentType` 是可选字段。下表列出额外字段，字段类型以
+`packages/ts-shell/src/core/hooks/types.ts` 为准。
+
+| 事件 | 发生时机 | 额外字段 |
+|---|---|---|
+| `SessionStart` | 会话启动 | `resumed: boolean` |
+| `SessionEnd` | 会话结束 | `turnsExecuted: number` |
+| `UserPromptSubmit` | 用户提交提示 | `prompt: string` |
+| `PreToolUse` | 工具执行前 | `toolName`, `toolCallId`, `args: object` |
+| `PostToolUse` | 工具返回结果 | `toolName`, `toolCallId`, `args`, `output: string`, `success: boolean` |
+| `PostToolUseFailure` | 工具失败 | `toolName`, `toolCallId`, `args`, `error: string` |
+| `PermissionRequest` | 请求工具授权 | `toolName`, `toolCallId`, `args` |
+| `PermissionDenied` | 工具授权被拒 | `toolName`, `toolCallId`, `args`, `reason: string` |
+| `PreModelSwitch` | 切换模型前 | `fromModel`, `toModel` |
+| `PostModelSwitch` | 切换模型后 | `fromModel`, `toModel` |
+| `PreCompact` | 压缩前 | `reason: manual/threshold/overflow`, `tokensBefore`, `messageCount` |
+| `PostCompact` | 压缩后 | `reason`, `summary: string`, `keptMessages`, `tokensBefore` |
+| `SubagentStart` | 子任务启动 | 基础字段中的 `agentId`、`agentType`，无额外专用字段 |
+| `SubagentStop` | 子任务结束 | 基础字段中的 `agentId`、`agentType`，无额外专用字段 |
+| `WorktreeCreate` | 创建隔离工作树 | `subtaskId`, `worktreePath`, `branch` |
+| `WorktreeRemove` | 移除隔离工作树 | `subtaskId`, `worktreePath` |
+| `Stop` | 查询正常停止 | `turnsExecuted`, `finalOutput: string` |
+| `StopFailure` | 查询失败停止 | `turnsExecuted`, `error: string` |
+
+未显式注明类型的标识、路径、模型名为字符串；计数为数字。
+`matcher` 仅对三个工具事件匹配 `toolName`（正则，非法正则退回忽略大小写的精确匹配）；
+其他事件不按工具名过滤。省略或使用 `*` 表示全部匹配。
+命令可输出 `{"decision":"allow"}` 或 `{"decision":"block","reason":"说明"}`；
+退出码 2 且 stderr 非空也会形成 block。`PreToolUse` 的执行失败、超时和非法 JSON
+按阻止执行处理。观察事件不因此撤销已经完成的动作；声明一个事件不意味着它有否决能力。
+常规命令超时为 15 秒，`SessionEnd`、`Stop`、`StopFailure` 为 3 秒。
+
+这份索引补齐现有事件的可发现性，不增加扩展宿主或内建事件消费者。
+上节的旧事件数与「无外部路径」描述保留作研究历史，以本节及当前代码为准。
+
 ### 2.2 技能：发现面窄、无校验、无优先级规则（置信度：高）—— ⚠️ **2026-09-23 部分更正**
 
 > **更正说明**：下方表格有 **3 行已过时**，实际代码已补齐。复核证据：
