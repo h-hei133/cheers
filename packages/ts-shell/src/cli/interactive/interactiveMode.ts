@@ -146,6 +146,7 @@ export class InteractiveMode {
    */
   private previewItems: readonly StatusItemId[] | undefined;
   private stopped = false;
+  private closing = false;
   private busy = false;
   private toast?: string;
   /** What the terminal said it can draw, read once from its environment. */
@@ -825,7 +826,14 @@ export class InteractiveMode {
     this.tui.requestRender({ force: true });
   }
 
-  private shutdown(): void {
+  private async shutdown(): Promise<void> {
+    if (this.closing || this.stopped) return;
+    this.closing = true;
+    try {
+      await this.terminal.drainInput?.();
+    } catch {
+      // A disconnected terminal must still reach synchronous cleanup.
+    }
     this.stop();
     handleShellClose({
       sessionRuntime: this.options.sessionRuntime,

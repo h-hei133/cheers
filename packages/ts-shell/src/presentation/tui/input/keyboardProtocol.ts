@@ -85,6 +85,15 @@ export class KeyboardNegotiation {
     return "";
   }
 
+  /** Disable once: a second pop could undo the parent program's protocol. */
+  stop(): string {
+    const restore = this.restore;
+    this.protocol = "legacy";
+    this.settled = true;
+    this.held = "";
+    return restore;
+  }
+
   /**
    * Inspect one input chunk during negotiation, stripping any reply so it never
    * reaches the editor as typed text.

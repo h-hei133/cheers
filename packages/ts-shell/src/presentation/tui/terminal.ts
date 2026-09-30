@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { drainInput } from "./input/drain.js";
 import { KeyboardNegotiation, type KeyboardProtocol } from "./input/keyboardProtocol.js";
 import { detectTerminalCapabilities, type TerminalCapabilities } from "./terminalCapabilities.js";
 
@@ -67,12 +68,15 @@ export interface TerminalDevice {
   ): void;
   stop(): void;
   enableInput(): void;
+  /** Consume late protocol reports before a graceful exit; crash cleanup stays synchronous. */
+  drainInput?(): Promise<void>;
 }
 
 export class Terminal implements TerminalDevice {
   readonly capabilities: TerminalCapabilities;
 
-  private readonly keyboard = new KeyboardNegotiation();
+  private keyboard = new KeyboardNegotiation();
+  private draining = false;
   private started = false;
   private disconnected = false;
   private rawOwned = false;
@@ -86,6 +90,7 @@ export class Terminal implements TerminalDevice {
   private onDisconnect: DisconnectHandler = () => {};
 
   private readonly handleData = (chunk: Buffer | string): void => {
+    if (this.draining) return;
     let text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
     if (this.keyboard.pending) {
       const step = this.keyboard.consume(text);
@@ -145,6 +150,8 @@ export class Terminal implements TerminalDevice {
   ): void {
     if (this.started) return;
     this.started = true;
+    this.draining = false;
+    this.keyboard = new KeyboardNegotiation();
     // However the process leaves — clean exit, crash, or a signal — the terminal
     // must not be left in raw mode with the cursor hidden and autowrap off.
     process.once("exit", this.handleExit);
@@ -204,13 +211,24 @@ export class Terminal implements TerminalDevice {
     process.stdin.off("data", this.handleData);
     process.stdin.off("end", this.handleEnd);
     process.stdin.off("close", this.handleEnd);
-    this.writeSync(`${this.keyboard.restore}${RESTORE_MODES}`);
+    this.writeSync(`${this.keyboard.stop()}${RESTORE_MODES}`);
     this.releaseRawMode();
+  }
+
+  async drainInput(): Promise<void> {
+    if (!this.started || !process.stdin.isTTY || this.disconnected) return;
+    this.draining = true;
+    if (this.keyboardTimer) clearTimeout(this.keyboardTimer);
+    this.keyboardTimer = undefined;
+    this.deferredInput = [];
+    // Stop generating reports before waiting for those already in flight.
+    this.writeSync(this.keyboard.stop());
+    await drainInput(process.stdin);
   }
 
   /** Unbuffered restore for exit and crash handlers, where queued writes are lost. */
   restoreSync(): void {
-    this.writeSync(`${this.keyboard.restore}${RESTORE_MODES}`);
+    this.writeSync(`${this.keyboard.stop()}${RESTORE_MODES}`);
     this.releaseRawMode();
   }
 

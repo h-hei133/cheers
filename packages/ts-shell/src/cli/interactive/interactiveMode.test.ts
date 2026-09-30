@@ -32,8 +32,9 @@ function build(overrides: { observeEvents?: () => () => void } = {}): {
       getAgentMode: () => "build",
       getPermissionScope: () => "ask",
       getCurrentRunController: () => null,
+      terminate: () => {},
     } as unknown as ShellSessionRuntime,
-    sessionManager: {} as unknown as SessionManager,
+    sessionManager: { sessionExists: () => false } as unknown as SessionManager,
     renderer,
     logger: { info: () => {}, warn: () => {}, error: () => {} } as unknown as StructuredLogger,
     approvalTrustPolicy: {} as unknown as ApprovalTrustPolicy,
@@ -47,6 +48,20 @@ function build(overrides: { observeEvents?: () => () => void } = {}): {
 }
 
 describe("session wiring", () => {
+  it("waits for late input before closing the terminal on user exit", async () => {
+    const { mode, terminal } = build();
+    let finish!: () => void;
+    const drain = vi.fn(() => new Promise<void>((resolve) => { finish = resolve; }));
+    Object.assign(terminal, { drainInput: drain });
+    mode.start();
+    terminal.input("\x04");
+    terminal.input("\x04");
+    expect(drain).toHaveBeenCalledOnce();
+    expect(terminal.stopped).toBe(false);
+    finish();
+    await vi.waitFor(() => expect(terminal.stopped).toBe(true));
+  });
+
   it("installs a readline stand-in that can answer runtime questions", () => {
     // Runtime code asks through readline.question; without a working stand-in the
     // approval flow throws instead of prompting.
