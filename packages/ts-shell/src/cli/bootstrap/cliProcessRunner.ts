@@ -263,9 +263,9 @@ function applyStartupTheme(input: {
 
   try {
     applyTheme(requested, input.workspaceRoot, extraPaths);
-  } catch {
+  } catch (error) {
     input.renderer.renderLine(
-      `No theme named \`${requested}\`. Using the default. Available: ${listThemes(input.workspaceRoot, extraPaths).join(", ")}.`,
+      `Could not load theme \`${requested}\`: ${error instanceof Error ? error.message : String(error)}. Using the default. Available: ${listThemes(input.workspaceRoot, extraPaths).join(", ")}.`,
     );
   }
 }

@@ -46,6 +46,14 @@ it("falls back to source if rendering fails", () => {
   expect(highlightCode("const x = 1;", "js", broken)).toBe("const x = 1;");
 });
 
+it("skips scope rendering when colors are disabled", () => {
+  const plain = new Theme(getDefaultTheme(), "none");
+  const render = vi.spyOn(plain, "fg");
+  const code = "const value = 42;\n".repeat(2000);
+  expect(highlightCode(code, "js", plain)).toBe(code);
+  expect(render).not.toHaveBeenCalled();
+});
+
 it.each(["none", "16", "256", "truecolor"] as const)("uses the theme's %s encoding", (mode) => {
   const code = "const x = 1;";
   const palette = new Theme(getDefaultTheme(), mode);

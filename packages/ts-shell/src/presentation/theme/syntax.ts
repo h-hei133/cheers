@@ -60,7 +60,7 @@ function renderScopes(html: string, theme: Theme): string {
 
 /** Explicit language only; unsupported, oversized or failed highlighting preserves the source. */
 export function highlightCode(code: string, language: string, theme: Theme = defaultTheme): string {
-  if (code.length > 64 * 1024 || !language || !highlighter.getLanguage(language)) return code;
+  if (theme.colorMode === "none" || code.length > 64 * 1024 || !language || !highlighter.getLanguage(language)) return code;
   try {
     const html = highlighter.highlight(code, { language, ignoreIllegals: true }).value;
     const rendered = renderScopes(html, theme);

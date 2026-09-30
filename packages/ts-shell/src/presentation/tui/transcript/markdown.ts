@@ -161,7 +161,7 @@ function renderFence(body: readonly string[], language: string, cells: number): 
   const highlighted = highlightCode(body.join("\n"), language);
   for (const line of highlighted.split("\n")) {
     for (const wrapped of wrapToWidth(line, Math.max(1, cells - 4))) {
-      rows.push(`${defaultTheme.fg("border", "│")} ${wrapped}`);
+      rows.push(`${defaultTheme.fg("border", "│")} ${defaultTheme.fg("text", wrapped)}`);
     }
   }
   rows.push(defaultTheme.fg("border", `└${"─".repeat(Math.max(0, cells - 2))}┘`));

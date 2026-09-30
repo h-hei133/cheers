@@ -110,6 +110,10 @@ export class Theme {
     return this.revision;
   }
 
+  get colorMode(): ColorMode {
+    return this.mode;
+  }
+
   fg(token: ThemeColorToken, text: string): string {
     return this.style(token, text);
   }
