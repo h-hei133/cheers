@@ -471,7 +471,7 @@ export async function* readAnthropicStream(
       // folding it first would only make the next reader look again.
       if (event.type === "error") {
         streamFailure = event.error?.message || event.error?.type || "provider reported an error mid-stream";
-        continue;
+        break;
       }
       fragments.push(
         ...applyEvent(event, {
@@ -501,27 +501,33 @@ export async function* readAnthropicStream(
     return { fragments, rest };
   };
 
-  for (;;) {
-    let chunk: IteratorResult<Uint8Array>;
-    try {
-      chunk = await iterator.next();
-    } catch (error) {
-      // A stream that fails mid-answer keeps what it already said, which is the
-      // part the user has already read. The buffer is drained first: the last
-      // event can arrive in the same chunk that carries the failure, and
-      // dropping it would lose text the user was already shown.
-      for (const fragment of drain().fragments) yield fragment;
-      // Kept, not swallowed. Returning here would present a truncated answer as
-      // a finished one: the caller sees a normal message with no finish reason
-      // and has nothing to tell the user that anything went wrong.
-      throw new Error(`Stream interrupted: ${error instanceof Error ? error.message : String(error)}`);
+  try {
+    for (;;) {
+      let chunk: IteratorResult<Uint8Array>;
+      try {
+        chunk = await iterator.next();
+      } catch (error) {
+        // A stream that fails mid-answer keeps what it already said, which is the
+        // part the user has already read. The buffer is drained first: the last
+        // event can arrive in the same chunk that carries the failure, and
+        // dropping it would lose text the user was already shown.
+        for (const fragment of drain().fragments) yield fragment;
+        // Kept, not swallowed. Returning here would present a truncated answer as
+        // a finished one: the caller sees a normal message with no finish reason
+        // and has nothing to tell the user that anything went wrong.
+        throw new Error(`Stream interrupted: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      if (chunk.done) break;
+  
+      buffer += decoder.decode(chunk.value, { stream: true });
+      const drained = drain();
+      buffer = drained.rest;
+      for (const fragment of drained.fragments) yield fragment;
+      if (streamFailure) throw new Error(`Provider reported an error mid-stream: ${streamFailure}`);
     }
-    if (chunk.done) break;
-
-    buffer += decoder.decode(chunk.value, { stream: true });
-    const drained = drain();
-    buffer = drained.rest;
-    for (const fragment of drained.fragments) yield fragment;
+  } finally {
+    // Release the reader and cancel a connection that stays open after failure.
+    await iterator.return?.().catch(() => undefined);
   }
 
   const toolCalls: StreamedToolCall[] = [...calls.entries()]
@@ -532,16 +538,6 @@ export async function* readAnthropicStream(
       function: { name: call.name, arguments: call.args || "{}" },
     }));
 
-  // The two ways a stream ends without having answered, each of which used to
-  // return an empty completion that read as a finished one.
-  //
-  // Checked after the loop rather than at each sighting because the failure is
-  // the whole stream's outcome: what was already said still belongs to the
-  // caller's `streamed` text, and the throw is what stops that text from being
-  // taken for the answer.
-  if (streamFailure) {
-    throw new Error(`Provider reported an error mid-stream: ${streamFailure}`);
-  }
   // A stream that began and then stopped without ever saying why. Either signal
   // counts as having finished: `stop_reason` is the model's own word for it and
   // `message_stop` is the transport's, and a host in front of the API may send

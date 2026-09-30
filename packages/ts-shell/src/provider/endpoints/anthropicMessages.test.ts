@@ -750,3 +750,23 @@ describe("reasoning the provider withholds", () => {
     expect(redacted!.data).toBe("OPAQUE");
   });
 });
+
+
+it("rejects an in-band error without waiting for EOF and cancels the reader", async () => {
+  let cancelled = false;
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const events = [
+        { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "before" } },
+        { type: "error", error: { type: "overloaded_error", message: "overloaded" } },
+        { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "after" } },
+      ];
+      controller.enqueue(new TextEncoder().encode(events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("")));
+    },
+    cancel() { cancelled = true; },
+  });
+  const reader = readAnthropicStream(stream);
+  expect(await reader.next()).toMatchObject({ done: false, value: { kind: "text", text: "before" } });
+  await expect(reader.next()).rejects.toThrow("overloaded");
+  expect(cancelled).toBe(true);
+}, 1000);
