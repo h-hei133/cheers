@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   isEventStream,
   readCompletionStream,
@@ -334,20 +334,25 @@ describe("a stream that ends without its sentinel", () => {
   }
 
   it("finishes on the terminal reason instead of waiting for [DONE]", async () => {
-    const started = Date.now();
-    const { deltas, result } = await collect(
-      openStream(
+    vi.useFakeTimers();
+    try {
+      let completed = false;
+      const pending = collect(openStream(
         chunk({ content: "Answer" }),
         chunk({}, { finish_reason: "stop" }),
-      ),
-    );
+      )).then((value) => { completed = true; return value; });
 
-    // Before this was handled the reader waited for a close that never came, and
-    // the turn ran forever.
-    expect(deltas).toEqual(["Answer"]);
-    expect(result.message.content).toBe("Answer");
-    expect(result.finishReason).toBe("stop");
-    expect(Date.now() - started).toBeLessThan(5_000);
+      // The connection never closes. The protocol must settle before this
+      // deadline regardless of how long the test worker is descheduled.
+      await vi.advanceTimersByTimeAsync(4_999);
+      expect(completed).toBe(true);
+      const { deltas, result } = await pending;
+      expect(deltas).toEqual(["Answer"]);
+      expect(result.message.content).toBe("Answer");
+      expect(result.finishReason).toBe("stop");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("still collects usage reported after the terminal reason", async () => {
