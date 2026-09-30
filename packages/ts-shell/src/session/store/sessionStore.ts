@@ -54,11 +54,7 @@ export function writeSessionMetadataRecord(input: {
   readonly layout: Pick<SessionFileLayout, "metadataPath">;
 }): void {
   const metadata = projectSessionMetadata(input.session);
-  fs.writeFileSync(
-    input.layout.metadataPath,
-    JSON.stringify(metadata, null, 2),
-    "utf8",
-  );
+  writeJsonFileAtomic(input.layout.metadataPath, metadata);
 }
 
 export function deleteSessionRecord(input: {

@@ -1,4 +1,5 @@
 import * as fs from "node:fs";
+import { randomUUID } from "node:crypto";
 import os from "node:os";
 import * as path from "node:path";
 import { isLockStale, takeOverStaleLock } from "./lockStaleness.js";
@@ -115,23 +116,26 @@ export function writeJsonFileAtomic(filePath: string, payload: unknown): void {
     fs.mkdirSync(directory, { recursive: true });
   }
 
-  const tempPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+  const tempPath = `${filePath}.tmp-${process.pid}-${randomUUID()}`;
   const serialized = JSON.stringify(payload, null, 2);
-  const tempFd = fs.openSync(tempPath, "w");
+  const tempFd = fs.openSync(tempPath, "wx");
   try {
-    fs.writeFileSync(tempFd, serialized, "utf8");
-    fs.fsyncSync(tempFd);
-  } finally {
-    fs.closeSync(tempFd);
-  }
-
-  try {
-    fs.renameSync(tempPath, filePath);
-  } catch (error) {
-    if (!isTransientIoError(error)) {
-      throw error;
+    try {
+      fs.writeFileSync(tempFd, serialized, "utf8");
+      fs.fsyncSync(tempFd);
+    } finally {
+      fs.closeSync(tempFd);
     }
-    fs.writeFileSync(filePath, serialized, "utf8");
+    for (let attempt = 1; ; attempt++) {
+      try {
+        fs.renameSync(tempPath, filePath);
+        break;
+      } catch (error) {
+        // A busy destination may become replaceable, but must never be truncated.
+        if (!isTransientIoError(error) || attempt >= STATE_IO_MAX_ATTEMPTS) throw error;
+        sleepBlocking(STATE_IO_RETRY_DELAY_MS);
+      }
+    }
   } finally {
     if (fs.existsSync(tempPath)) {
       fs.rmSync(tempPath, { force: true });

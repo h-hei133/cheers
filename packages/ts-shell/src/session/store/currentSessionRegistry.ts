@@ -1,5 +1,5 @@
 import * as fs from "node:fs";
-import * as path from "node:path";
+import { writeJsonFileAtomic } from "./sessionFileStore.js";
 import type { Session } from "../schema/sessionRecord.js";
 import {
   createEmptyCurrentSessionSelectionStore,
@@ -79,15 +79,7 @@ export function writeSessionRegistryStore(input: {
   readonly storePath: string;
   readonly store: CurrentSessionSelectionStore;
 }): void {
-  const storeDir = path.dirname(input.storePath);
-  if (!fs.existsSync(storeDir)) {
-    fs.mkdirSync(storeDir, { recursive: true });
-  }
-  fs.writeFileSync(
-    input.storePath,
-    JSON.stringify(input.store, null, 2),
-    "utf8",
-  );
+  writeJsonFileAtomic(input.storePath, input.store);
 }
 
 export function projectCurrentSessionSelectionStore(input: {
