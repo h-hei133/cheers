@@ -15,12 +15,9 @@
 
 import { declareEndpoint } from "./kinds.js";
 import {
-  convertContents,
-  convertTools,
+  googleBody,
   readGoogleBody,
   readGoogleStream,
-  thinkingConfigFor,
-  type GoogleRequestBody,
 } from "./googleWire.js";
 import { accessToken } from "../google/auth.js";
 import type { RequestSigner } from "../request/fetch.js";
@@ -74,37 +71,6 @@ export function vertexTarget(env: Readonly<Record<string, string | undefined>>):
   };
 }
 
-/** The request body, in the shape the shared translation builds. */
-function vertexBody(input: {
-  readonly systemPrompt: string;
-  readonly messages: readonly Parameters<typeof convertContents>[0][number][];
-  readonly tools: Parameters<typeof convertTools>[0];
-  readonly allowTools: boolean;
-  readonly temperature: number;
-  /** Absent means the model takes one; see `supportsTemperature` in kinds. */
-  readonly supportsTemperature?: boolean;
-  readonly topP?: number;
-  readonly maxOutputTokens?: number;
-  readonly thinkingBudgetTokens?: number;
-}): GoogleRequestBody {
-  const tools = input.allowTools ? convertTools(input.tools) : undefined;
-  return {
-    contents: convertContents(input.messages),
-    ...(input.systemPrompt.trim() !== "" ? { systemInstruction: { parts: [{ text: input.systemPrompt }] } } : {}),
-    generationConfig: {
-      // Gated the way the other protocols gate it: a model that rejects a
-      // sampling temperature rejects the whole request, and the caller that
-      // declared it unsupported gets a request without one.
-      ...(input.supportsTemperature !== false ? { temperature: input.temperature } : {}),
-      ...(input.topP !== undefined ? { topP: input.topP } : {}),
-      ...(input.maxOutputTokens !== undefined ? { maxOutputTokens: input.maxOutputTokens } : {}),
-      ...(thinkingConfigFor(input.thinkingBudgetTokens) ?? {}),
-    },
-    ...(tools ? { tools } : {}),
-    ...(tools ? { toolConfig: { functionCallingConfig: { mode: "AUTO" } } } : {}),
-  };
-}
-
 declareEndpoint("google-vertex", {
   // The base address carries the account; this adds the model and the method.
   // The streaming form is a different method name, and the query is what asks for
@@ -116,7 +82,8 @@ declareEndpoint("google-vertex", {
   // The token expires, so it is obtained per request rather than resolved once.
   signer: () => vertexAuthorization(),
   body: (input) =>
-    vertexBody({
+    googleBody({
+      model: input.model,
       systemPrompt: input.systemPrompt ?? "",
       messages: input.messages as never,
       tools: [],
@@ -126,7 +93,9 @@ declareEndpoint("google-vertex", {
       ...(input.maxOutputTokens !== undefined ? { maxOutputTokens: input.maxOutputTokens } : {}),
     }) as never,
   turnBody: (input) =>
-    vertexBody({
+    googleBody({
+      model: input.model,
+      vision: input.vision,
       systemPrompt: input.systemPrompt,
       messages: input.messages as never,
       tools: input.tools,

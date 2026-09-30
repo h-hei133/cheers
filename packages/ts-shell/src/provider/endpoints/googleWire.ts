@@ -17,16 +17,19 @@
  *     makes the model unable to continue its own train of thought.
  */
 
+import { formatNonVisionFallback, messageToText, type MultimodalContentBlock } from "../../model-adapters/multimodal.js";
 import type { CompletedBody, StreamFragment, StreamedCompletion } from "../../turn/completion.js";
 
 /** A part of a message. The wire treats the field names as the discriminator. */
 export interface GooglePart {
   readonly text?: string;
+  readonly inlineData?: { readonly mimeType: string; readonly data: string };
   readonly thought?: boolean;
   readonly thoughtSignature?: string;
   readonly functionCall?: { readonly name?: string; readonly args?: Record<string, unknown>; readonly id?: string };
   readonly functionResponse?: {
     readonly name: string;
+    readonly parts?: readonly GooglePart[];
     readonly response: Record<string, unknown>;
     readonly id?: string;
   };
@@ -50,7 +53,7 @@ export interface GoogleRequestBody {
 /** What a message carries, in the terms this file needs. */
 export interface GoogleMessage {
   readonly role: "system" | "user" | "assistant" | "tool";
-  readonly content?: string | null;
+  readonly content?: string | readonly MultimodalContentBlock[] | null;
   readonly tool_calls?: readonly {
     readonly id: string;
     readonly function: { readonly name: string; readonly arguments: string };
@@ -62,8 +65,21 @@ export interface GoogleMessage {
 }
 
 /** The text of a message whose content may be absent. */
-export function textOf(content: string | null | undefined): string {
-  return typeof content === "string" ? content : "";
+export function textOf(content: GoogleMessage["content"]): string {
+  return messageToText(content);
+}
+
+const IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/heic", "image/heif"]);
+
+/** Keep unsupported images visible as text without sending invalid binary parts. */
+function contentParts(content: GoogleMessage["content"], vision: boolean): GooglePart[] {
+  if (typeof content === "string") return content ? [{ text: content }] : [];
+  return (content ?? []).map((block) => {
+    if (block.type === "text") return { text: block.text };
+    if (!vision) return { text: formatNonVisionFallback(block) };
+    if (!IMAGE_MIMES.has(block.mimeType)) return { text: `[Unsupported image type: ${block.mimeType}]` };
+    return { inlineData: { mimeType: block.mimeType, data: block.data } };
+  });
 }
 
 /** Arguments as an object, or an empty one for text that is not JSON. */
@@ -83,24 +99,36 @@ export function parseArguments(arguments_: string): Record<string, unknown> {
  * tidy-up: the API rejects a request whose count of response parts does not match
  * its count of call parts, and one result per turn is how that happens.
  */
-export function convertContents(messages: readonly GoogleMessage[]): GoogleContent[] {
+export function convertContents(messages: readonly GoogleMessage[], model = "", vision = false): GoogleContent[] {
   const contents: GoogleContent[] = [];
   const toolCallNames = new Map<string, string>();
+  const nestedImages = Number(/(?:^|\/)gemini-(\d+)(?:[.-]|$)/i.exec(model)?.[1] ?? 0) >= 3;
+  let pendingImages: GooglePart[] = [];
+  const flushImages = (): void => {
+    if (pendingImages.length > 0) contents.push({ role: "user", parts: pendingImages });
+    pendingImages = [];
+  };
 
   for (const message of messages) {
     if (message.role === "system") continue;
+
+    if (message.role !== "tool") flushImages();
 
     if (message.role === "tool") {
       const resolvedName =
         (message.tool_call_id ? toolCallNames.get(message.tool_call_id) : undefined) ??
         message.toolName ??
         "unknown";
+      const converted = contentParts(message.content, vision);
+      const images = converted.filter((part) => part.inlineData);
+      const output = converted.flatMap((part) => part.text === undefined ? [] : [part.text]).join("\n");
       const part: GooglePart = {
         functionResponse: {
           // The protocol identifies a result by the tool's name, not by the id
           // the call carried, so the name has to travel with the result.
           name: resolvedName,
-          response: { output: textOf(message.content) },
+          response: { output: output || (images.length > 0 ? "(see attached image)" : "") },
+          ...(nestedImages && images.length > 0 ? { parts: images } : {}),
           ...(message.tool_call_id ? { id: message.tool_call_id } : {}),
         },
       };
@@ -110,12 +138,14 @@ export function convertContents(messages: readonly GoogleMessage[]): GoogleConte
       } else {
         contents.push({ role: "user", parts: [part] });
       }
+      // Defer image turns until all parallel function responses have been grouped.
+      if (!nestedImages && images.length > 0) pendingImages.push({ text: `Tool result image (${resolvedName}):` }, ...images);
       continue;
     }
 
     if (message.role === "user") {
-      const text = textOf(message.content);
-      if (text) contents.push({ role: "user", parts: [{ text }] });
+      const parts = contentParts(message.content, vision);
+      if (parts.length > 0) contents.push({ role: "user", parts });
       continue;
     }
 
@@ -144,6 +174,7 @@ export function convertContents(messages: readonly GoogleMessage[]): GoogleConte
     }
     if (parts.length > 0) contents.push({ role: "model", parts });
   }
+  flushImages();
   return contents;
 }
 
@@ -406,5 +437,44 @@ function dataOf(raw: string): string | undefined {
     .map((line) => line.slice(5).trim())
     .join("");
   return data === "" ? undefined : data;
+}
+
+
+/** The request body, shared with the other Google endpoint. */
+export function googleBody(input: {
+  readonly model: string;
+  readonly vision?: boolean;
+  readonly systemPrompt: string;
+  readonly messages: readonly Parameters<typeof convertContents>[0][number][];
+  readonly tools: Parameters<typeof convertTools>[0];
+  readonly allowTools: boolean;
+  readonly temperature?: number;
+  /** Absent means the model takes one; see `supportsTemperature` in kinds. */
+  readonly supportsTemperature?: boolean;
+  readonly topP?: number;
+  readonly maxOutputTokens?: number;
+  readonly thinkingBudgetTokens?: number;
+}): GoogleRequestBody {
+  const tools = input.allowTools ? convertTools(input.tools) : undefined;
+  return {
+    contents: convertContents(input.messages, input.model, input.vision ?? false),
+    ...(input.systemPrompt.trim() !== ""
+      ? { systemInstruction: { parts: [{ text: input.systemPrompt }] } }
+      : {}),
+    generationConfig: {
+      // Gated the way the other protocols gate it: a model that rejects a
+      // sampling temperature rejects the whole request, and the caller that
+      // declared it unsupported gets a request without one.
+      ...(input.supportsTemperature !== false && input.temperature !== undefined ? { temperature: input.temperature } : {}),
+      ...(input.topP !== undefined ? { topP: input.topP } : {}),
+      ...(input.maxOutputTokens !== undefined ? { maxOutputTokens: input.maxOutputTokens } : {}),
+      ...(thinkingConfigFor(input.thinkingBudgetTokens) ?? {}),
+    },
+    ...(tools ? { tools } : {}),
+    // Stated rather than left to the provider: the caller decides whether this
+    // turn may call a tool, and a mode the provider chose would be that decision
+    // made somewhere else.
+    ...(tools ? { toolConfig: { functionCallingConfig: { mode: "AUTO" } } } : {}),
+  };
 }
 

@@ -344,3 +344,55 @@ describe("reading the answer", () => {
     });
   });
 });
+
+
+describe.each(["google-generative-ai", "google-vertex"])("%s images", (kind) => {
+  const image = { type: "image" as const, data: "aGVsbG8=", mimeType: "image/png" };
+  it("preserves user text and encodes image bytes", () => {
+    const body = endpointTurnBody(kind, { ...BASE, vision: true, messages: [
+      { role: "user", content: [{ type: "text", text: "look" }, image] },
+    ] });
+    expect(body.contents).toEqual([{ role: "user", parts: [
+      { text: "look" }, { inlineData: { mimeType: image.mimeType, data: image.data } },
+    ] }]);
+  });
+  it.each(["gemini-2.5-pro", "gemini-3-pro-preview", "gemini-4-flash"])("keeps parallel tool responses together for %s", (model) => {
+    const body = endpointTurnBody(kind, { ...BASE, model, vision: true, messages: [
+      { role: "assistant", tool_calls: ["a", "b"].map((id) => ({ id, type: "function", function: { name: id, arguments: "{}" } })) },
+      { role: "tool", tool_call_id: "a", content: [image] },
+      { role: "tool", tool_call_id: "b", content: [{ type: "text", text: "second" }, image] },
+      { role: "user", content: "next" },
+    ] });
+    const contents = body.contents as import("./googleWire.js").GoogleContent[];
+    const responses = contents[1]!.parts;
+    expect(responses.map((part) => part.functionResponse?.name)).toEqual(["a", "b"]);
+    expect(responses[0]!.functionResponse?.response.output).toBe("(see attached image)");
+    if (model.startsWith("gemini-2")) {
+      expect(responses.every((part) => !part.functionResponse?.parts)).toBe(true);
+      expect(contents[2]!.parts.filter((part) => part.inlineData)).toHaveLength(2);
+      expect(contents[3]!.parts).toEqual([{ text: "next" }]);
+    } else {
+      expect(responses.map((part) => part.functionResponse?.parts)).toEqual([
+        [{ inlineData: { mimeType: image.mimeType, data: image.data } }],
+        [{ inlineData: { mimeType: image.mimeType, data: image.data } }],
+      ]);
+      expect(contents[2]!.parts).toEqual([{ text: "next" }]);
+    }
+  });
+  it("flushes trailing tool images and respects vision and MIME boundaries", () => {
+    for (const [vision, mimeType, expected] of [
+      [false, "image/png", "non-vision fallback"], [true, "image/svg+xml", "Unsupported image type"],
+    ] as const) {
+      const body = endpointTurnBody(kind, { ...BASE, vision, messages: [
+        { role: "tool", tool_call_id: "a", content: [{ ...image, mimeType }] },
+      ] });
+      expect(JSON.stringify(body.contents)).toContain(expected);
+      expect(JSON.stringify(body.contents)).not.toContain("inlineData");
+    }
+    const body = endpointTurnBody(kind, { ...BASE, vision: true, messages: [
+      { role: "tool", tool_call_id: "a", content: [image] },
+    ] });
+    expect((body.contents as unknown[])).toHaveLength(2);
+    expect(JSON.stringify(body.contents)).toContain("inlineData");
+  });
+});

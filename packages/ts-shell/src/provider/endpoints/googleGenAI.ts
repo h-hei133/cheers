@@ -11,13 +11,10 @@
 import { declareEndpoint } from "./kinds.js";
 
 import {
-  convertContents,
-  convertTools,
+  googleBody,
   readGoogleBody,
   readGoogleStream,
-  thinkingConfigFor,
   type GooglePart,
-  type GoogleRequestBody,
 } from "./googleWire.js";
 
 /** Where a request goes, given the model. */
@@ -26,48 +23,13 @@ export function googlePath(model: string, stream: boolean): string {
   return `/v1beta/models/${encodeURIComponent(model)}:${method}`;
 }
 
-/** The request body, shared with the other Google endpoint. */
-export function googleBody(input: {
-  readonly systemPrompt: string;
-  readonly messages: readonly Parameters<typeof convertContents>[0][number][];
-  readonly tools: Parameters<typeof convertTools>[0];
-  readonly allowTools: boolean;
-  readonly temperature: number;
-  /** Absent means the model takes one; see `supportsTemperature` in kinds. */
-  readonly supportsTemperature?: boolean;
-  readonly topP?: number;
-  readonly maxOutputTokens?: number;
-  readonly thinkingBudgetTokens?: number;
-}): GoogleRequestBody {
-  const tools = input.allowTools ? convertTools(input.tools) : undefined;
-  return {
-    contents: convertContents(input.messages),
-    ...(input.systemPrompt.trim() !== ""
-      ? { systemInstruction: { parts: [{ text: input.systemPrompt }] } }
-      : {}),
-    generationConfig: {
-      // Gated the way the other protocols gate it: a model that rejects a
-      // sampling temperature rejects the whole request, and the caller that
-      // declared it unsupported gets a request without one.
-      ...(input.supportsTemperature !== false ? { temperature: input.temperature } : {}),
-      ...(input.topP !== undefined ? { topP: input.topP } : {}),
-      ...(input.maxOutputTokens !== undefined ? { maxOutputTokens: input.maxOutputTokens } : {}),
-      ...(thinkingConfigFor(input.thinkingBudgetTokens) ?? {}),
-    },
-    ...(tools ? { tools } : {}),
-    // Stated rather than left to the provider: the caller decides whether this
-    // turn may call a tool, and a mode the provider chose would be that decision
-    // made somewhere else.
-    ...(tools ? { toolConfig: { functionCallingConfig: { mode: "AUTO" } } } : {}),
-  };
-}
-
 declareEndpoint("google-generative-ai", {
   // The model is in the path, and the streaming method is a different one.
   path: (model) => googlePath(model, true),
   headers: (apiKey) => ({ ...(apiKey ? { "x-goog-api-key": apiKey } : {}), "content-type": "application/json" }),
   body: (input) =>
     googleBody({
+      model: input.model,
       systemPrompt: input.systemPrompt ?? "",
       messages: input.messages as never,
       tools: [],
@@ -78,6 +40,8 @@ declareEndpoint("google-generative-ai", {
     }) as never,
   turnBody: (input) =>
     googleBody({
+      model: input.model,
+      vision: input.vision,
       systemPrompt: input.systemPrompt,
       messages: input.messages as never,
       tools: input.tools,
