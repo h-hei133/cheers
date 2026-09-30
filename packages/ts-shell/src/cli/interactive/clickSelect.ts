@@ -1,4 +1,4 @@
-import type { SelectionPoint, SelectionSpan } from "./selection.js";
+import type { SelectionPoint, SelectionSpan } from "../../presentation/tui/transcript/selection.js";
 import { lineCells } from "../../presentation/tui/text/measure.js";
 
 /**

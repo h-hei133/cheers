@@ -213,7 +213,7 @@ export function decideBrowserNetworkAllowlist(input: {
  * request is made, so a rule that exists in one copy and not another is a
  * bypass in the copy that lacks it. It was previously duplicated verbatim in
  * `publicReadOnlyWebPolicy.ts`, `publicReadOnlyWebManifest.ts` and
- * `core/harness/browserPublicReadOnlyWebSmokeConfig.ts`, and a second,
+ * `browser/smoke/config.ts`, and a second,
  * independently written copy lived in `networkEgressGuard.ts` as
  * `isPrivateOrigin`; that one now delegates here.
  *
