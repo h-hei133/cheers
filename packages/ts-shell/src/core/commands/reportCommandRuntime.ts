@@ -69,22 +69,21 @@ export async function runReportCommand(
   }
 
   const redactions = new Set<string>();
+  const projectRoot = context.cwd || process.cwd();
 
   const crashes = readCrashLog().map((record) => ({
     timestamp: record.timestamp,
     kind: record.kind,
     // A crash message can quote a file path, a URL, or a token in an error string.
-    message: redactReportText(record.message, MAX_FIELD_LENGTH, { redactions }),
-    ...(record.sessionId ? { sessionId: redactReportText(record.sessionId, MAX_FIELD_LENGTH, { redactions }) } : {}),
+    message: redactReportText(record.message, MAX_FIELD_LENGTH, { redactions, projectRoot }),
+    ...(record.sessionId ? { sessionId: redactReportText(record.sessionId, MAX_FIELD_LENGTH, { redactions, projectRoot }) } : {}),
     // The stack is scrubbed too, and it has to be: a V8 stack begins with
     // `Error: <message>`, so whatever the message carried is repeated verbatim in
     // it. Scrubbing only the message left the secret in the archive — found by
     // extracting an archive a byte-level check had called clean.
     //
-    // Line by line, because the scrubber collapses whitespace by design and a
-    // stack whose frames run together is not worth including. The frame
-    // indentation is restored so the result still reads as a stack.
-    ...(record.stack ? { stack: scrubStack(record.stack, redactions) } : {}),
+    // Preserve line structure without splitting cross-line content rules.
+    ...(record.stack ? { stack: scrubStack(record.stack, redactions, projectRoot) } : {}),
   }));
 
   const report = {
@@ -171,7 +170,7 @@ export function defaultReportPath(now: Date = new Date()): string {
  * include a stack at all, and the cap drops the tail rather than the head: the
  * frames nearest the throw are the informative ones.
  */
-function scrubStack(stack: string, redactions: Set<string>): string {
-  const scrubbed = redactReportText(stack, MAX_STACK_LENGTH, { redactions, preserveLines: true });
+function scrubStack(stack: string, redactions: Set<string>, projectRoot: string): string {
+  const scrubbed = redactReportText(stack, MAX_STACK_LENGTH, { redactions, preserveLines: true, projectRoot });
   return scrubbed.length >= MAX_STACK_LENGTH ? `${scrubbed}\n...` : scrubbed;
 }

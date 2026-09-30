@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runReportCommand } from "./reportCommandRuntime.js";
 import { createZipArchive } from "../../observability/zipArchive.js";
@@ -11,8 +12,8 @@ import type { CommandContext } from "./types.js";
  *
  * This is the one path whose output leaves the machine, which makes it the place
  * a scrubbing gap matters most — and the place a private copy of the scrubber
- * would eventually drift. The assertions therefore scan the archive's **bytes**,
- * not the structured fields: a secret that survives in a field the code never
+ * would eventually drift. The assertions therefore scan all extracted content:
+ * a secret that survives in a field the code never
  * thought to scrub is exactly what a field-by-field check would miss.
  */
 
@@ -54,40 +55,15 @@ function contextFor(cwd: string): CommandContext {
  * bytes. A byte-level check therefore passes on an archive that leaks — which is
  * exactly what happened here, and only extracting the entries showed it.
  *
- * This walks the local headers and inflates each entry, so what is scanned is what
- * a reader of the archive would see.
+ * Use an independent archive reader, including its central-directory validation.
  */
 function archiveContents(file: string): string {
-  return archiveEntries(file)
-    .map((entry) => entry.data)
-    .join("\n");
+  return execFileSync("unzip", ["-p", file], { encoding: "utf8" });
 }
 
-/** One entry's decompressed text, by the name in its local header. */
+/** One entry's decompressed text. */
 function archiveEntry(file: string, name: string): string {
-  const entry = archiveEntries(file).find((candidate) => candidate.name === name);
-  if (!entry) throw new Error(`no entry named ${name}`);
-  return entry.data;
-}
-
-function archiveEntries(file: string): Array<{ name: string; data: string }> {
-  const { inflateRawSync } = require("node:zlib") as typeof import("node:zlib");
-  const buffer = fs.readFileSync(file);
-  const entries: Array<{ name: string; data: string }> = [];
-  let cursor = 0;
-  while (cursor + 30 <= buffer.length && buffer.readUInt32LE(cursor) === 0x04034b50) {
-    const compressedLength = buffer.readUInt32LE(cursor + 18);
-    const nameLength = buffer.readUInt16LE(cursor + 26);
-    const extraLength = buffer.readUInt16LE(cursor + 28);
-    const nameStart = cursor + 30;
-    const dataStart = nameStart + nameLength + extraLength;
-    entries.push({
-      name: buffer.subarray(nameStart, nameStart + nameLength).toString("utf8"),
-      data: inflateRawSync(buffer.subarray(dataStart, dataStart + compressedLength)).toString("utf8"),
-    });
-    cursor = dataStart + compressedLength;
-  }
-  return entries;
+  return execFileSync("unzip", ["-p", file, name], { encoding: "utf8" });
 }
 
 describe("runReportCommand", () => {
@@ -97,9 +73,7 @@ describe("runReportCommand", () => {
     const result = await runReportCommand([target], contextFor(dir));
     expect(result.output).toContain("Report written");
     expect(fs.existsSync(target)).toBe(true);
-    // The zip signature, so this is a real archive rather than a renamed file.
-    const head = fs.readFileSync(target).subarray(0, 4);
-    expect(head.readUInt32LE(0)).toBe(0x04034b50);
+    expect(execFileSync("unzip", ["-t", target], { encoding: "utf8" })).toContain("No errors detected");
   });
 
   it("does not include the conversation", async () => {
@@ -181,9 +155,11 @@ describe("runReportCommand", () => {
     // Collapsing whitespace always changes the text, so a value comparison calls
     // any multi-line message scrubbed. The marker has to mean a rule fired.
     const { recordCrash } = await import("../../observability/crashLog.js");
+    const error = new Error("a plain failure\n    at somewhere");
+    error.stack = "Error: a plain failure\n    at somewhere";
     recordCrash({
       kind: "uncaught-exception",
-      error: new Error("a plain failure\n    at somewhere"),
+      error,
       cwd: "/work",
     });
 
@@ -207,6 +183,34 @@ describe("runReportCommand", () => {
     const stack = report.crashes[0].stack ?? "";
     // A stack joined onto one line is not worth including.
     expect(stack.split("\n").length).toBeGreaterThan(1);
+  });
+
+  it("removes machine paths from extracted messages and frames while preserving locations", async () => {
+    const { recordCrash } = await import("../../observability/crashLog.js");
+    const error = new Error("cannot open '/home/person/project/a file.txt'");
+    error.stack = [
+      `Error: ${error.message}`,
+      "    at run (file:///home/person/project/src/a%20file.ts:7:9)",
+      String.raw`    at call (C:\Users\person\private\b.ts:2:3)`,
+      String.raw`    at load (\\server\share\private\c.ts:4:5)`,
+      "    at external (/opt/private/lib/d.ts:8:2)",
+      "    at /home/person name/work/src/e.ts:1:2",
+      "    at async /home/person name/work/src/e.ts:3:4",
+      "    at encoded (file:///home/person/project/api%5Fkey%3Dsecret-value.txt:1:2)",
+      "    at encoded (file:///home/person/project/name%20%2Fhome%2Fperson%2Fprivate%2Fa.ts:1:2)",
+    ].join("\n");
+    recordCrash({ kind: "uncaught-exception", error, cwd: "/home/person/project" });
+    const target = path.join(fakeHome(), "paths.zip");
+    const result = await runReportCommand([target], contextFor("/home/person/project"));
+    const contents = archiveContents(target);
+    for (const privatePart of ["/home/", "person", "Users", "server", "share", "/opt/private/", "secret-value"]) {
+      expect(contents).not.toContain(privatePart);
+    }
+    const report = JSON.parse(archiveEntry(target, "report.json"));
+    expect(report.crashes[0].message).toBe("cannot open '[project]/a file.txt'");
+    expect(report.crashes[0].stack).toContain("at run ([project]/src/a file.ts:7:9)");
+    expect(report.crashes[0].stack).toContain("at call ([external]/b.ts:2:3)");
+    expect(result.output).toContain("Scrubbed");
   });
 
   it("reports when nothing needed scrubbing", async () => {

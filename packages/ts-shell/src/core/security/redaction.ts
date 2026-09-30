@@ -26,6 +26,8 @@
  * and that variation is deliberate.
  */
 
+import { redactReportPaths } from "./paths.js";
+
 /**
  * Applies the shared rule chain and returns the scrubbed text.
  *
@@ -54,10 +56,17 @@ export function redactReportText(
     readonly redactions?: Set<string>;
     readonly ellipsis?: boolean;
     readonly preserveLines?: boolean;
+    /** Reports may remove absolute machine paths; durable session consumers opt out. */
+    readonly projectRoot?: string;
   } = {},
 ): string {
   const { redactions, ellipsis = false, preserveLines = false } = options;
-  const scrubbed = applyRedactionRules(value);
+  const content = applyRedactionRules(value);
+  // Path normalization decodes file URLs; filter the decoded text as well so
+  // encoded credential assignments and raw-content markers cannot bypass rules.
+  const scrubbed = options.projectRoot === undefined
+    ? content
+    : applyRedactionRules(redactReportPaths(content, options.projectRoot));
   // Whether a rule fired, not whether the text changed. Collapsing whitespace
   // always changes the text, so comparing the final value reported "unsafe
   // content" for any message holding a newline or a double space — the marker
