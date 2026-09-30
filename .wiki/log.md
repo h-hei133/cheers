@@ -5063,3 +5063,218 @@ serving stale rows from five untracked mutation sites (16-F).
 - `cliArgs` 的保留名缓存不跟随 `registerSlashCommand`（补全菜单已订阅）⇒ 运行时新增的命令
   会被读成项目路径；按相邻模块模式订阅失效。
 - `.probe_*.ts` 未入 `.gitignore`（本轮之前两次被误提交）⇒ 已加模式。
+
+## [2026-09-30] research | 建立常驻登记册 `13-feature-and-defect-register.md`（68 条）
+
+**性质**：维护者指出 `12-gap-and-debt-research-2.md` 的研究面只为 Phase 16 服务，要的是
+**专门记录 feature 与不足的常驻文档**。故新建总账：**新发现追加、已修复条目标注状态而不删除**，
+避免同一缺陷跨轮被反复「重新发现」。**零代码改动**。
+
+**方法**：3 波共 **9 个只读子代理**（并发 3）+ 主代理自建**模块可达图**
+（值边/类型边分列，从 `cli.tsx` BFS）+ `npx tsx` 行为探针 + 隔离 `HOME` 的 CLI/PTY 实机。
+
+**事故：成功 4、失败 5。**
+- `content_filter` **第 7、8 次**（浏览器栈、provider 凭据相邻读面）→ 按既有结论**改由主代理亲验**；
+  provider 那路的证据笔记本 `local://slice-W2ProviderProtocol.md` 抢救成功。
+- 上游额度耗尽（402）**第 2 次** → 最后三个并发**同时**终止、**零产出**，
+  故平台集成、上下文记忆、工具执行三节**只覆盖主代理亲验的部分**，正文逐节点明不掩饰。
+
+**四条头条**：
+1. **CMD-01** `slashRouter.ts:15` 的 `split(/\s+/)` 让**全部 56 个命令**的带空格参数失效
+   （实测 `/theme "Dark Mode"` → `No theme named \`"dark\``；`/cd "dir with spaces"` 引号原样保留
+   必致 stat 失败）。**单点修复、全局收益**，列第一档首位。
+2. **BRW-01** `sessionManager.ts:416` 的 `page.route` 只覆盖**一个页面**，而 `:179-199` 的注释
+   宣称「context-wide … every page and popup inherits it」；`PwBrowserContext` 连 `route` 都没声明。
+   ⇒ **页面开出的新页面/弹窗完全不过出站判定**。本轮唯一一条「绕过判定」缺口。
+3. **TUI-01** `pane.ts:142` 的 `documentRows` 是**裸渲染**，不带搜索高亮/选区反显/滚动条
+   （探针：备用屏有 `\u001b[7m` 与滚动条，`documentRows` 两者皆无）——维护者点名的
+   「`regular` 还未适配」正是这件事。
+4. **CDE-03** `sandbox/{sandboxPolicy,sandboxEnforcer,escalationWorkflow,auditTrail}.ts`（834 行）
+   **从未被实例化**（`new Sandbox*` 生产零命中），活的是 `osSandbox.ts`（bwrap）；
+   但 `index.ts` 的 `EscalationPrompt` 被 **17 个文件按类型引用** ⇒ **不能整文件删**
+   ——「编译契约而非死码」的实例。
+
+**死码精确分列**（口径统一，避免上一轮 270 文件那种数字）：
+生产非测试模块 **829**；值可达 **755**；含类型边可达 **817**；
+**完全不可达 12 文件 / 1,349 行**；**有运行期导出但只被 `import type` 引用 37 文件 / 6,691 行**。
+
+**证伪 4 条子代理断言**（§12bis），其中两条**同型错误 = 读旧文档不回到当前代码**：
+`W1TuiSurface` 引用了**已不存在的符号** `alreadyWritten`（Phase 16 16-C 已重写记账），
+并把 `/help` 只列 4 键的**有意设计**读成遗漏；
+`W2ProviderProtocol` 断言「拒答会被重试」——**探针实测 NO-RETRY**
+（`retry.ts` 的 `REFUSAL` 先于 `RETRYABLE_FAILURE` 检查）。
+
+**已复核为健全**：16-A 注入链（两条装配路径都在）、16-B `/compact` 合并与钩子
+（两路径共用同一 lifecycle builder，三种 `reason` 都有生产者）、16-K 七项全成立、
+上下文记账已含系统提示与工具 schema（Phase 11 缺口已闭合）、
+浏览器 6 处 `Simulated …` 确已删除、`planSandboxedCommand` 三态如实上报不静默降级。
+
+**门禁**（文档-only 仍全跑）：`verify:import-cycles` / `check:config-consumers`(39/39) /
+`check:declarations`(18/18, 10/10) / `check:node-floor` / `test:scripts` **全 PASS**；
+`verify:docs-drift:strict` rules_dangling 0、docs_dangling 0（docs-source 118 为 advisory）；
+`check:call-reachability` advisory 18 条（与 §12 判定高度重合，是**已存在**的检测器）。
+
+### 补做轮（同日，上游 402 之后）
+
+最后三个子代理**同时**因 402 零产出终止，派不出去了 ⇒ **主代理把缺口自己补完**：
+- **内核循环（§8bis，此前零覆盖）** 5 条：`LOP-01` Doom Loop 在第 3 次相同调用就阻断
+  （探针 `[false,false,true]`），且阻断文案宣称「without state progression」而这**检测器不比较任何结果**；
+  另 4 条已核实健全（无界 `while(true)` 是有意的——上限由 `shouldStopAfterStep` 从 turn 层按；
+  工具批 `every(terminate)` 正确；中止在每个 await 后检查；三层重试边界清晰且第 3 层有
+  `!shownAnything` 守卫防非幂等重试）。
+- **浏览器逐模块表（BRW-00，此前 3 轮未产出）**：164 模块四分类
+  **REAL 7 / FIXTURE 140 / ASSEMBLED 12 / DEAD 5**。`ASSEMBLED` 这一列是新增的——
+  从 `cli.tsx` 可达但被环境 manifest 开关关着（receipt 缓存 7 个模块 + cliExecutorInjection 等），
+  **默认关闭是设计**（Phase 16 已裁定），但「配了才生效」只写在代码里。
+- **`OBS-08` 日志轮转**：探针实测写 60 行、当前分片 `.log.19`、`getRecentLines(50)` **只返回 3 行**
+  ——只读当前分片 ⇒ **写满一个分片后 `/log tail` 从「最近 50 行」突变为「最近几行」**，
+  恰与 tail 语义相反。另 `OBS-09` 只有时长上界无文件数上界。
+- **`OBS-07` MCP 分类丢失**：`classifyMcpFailure` 在 client/gateway 用了 9 处（分类**算了的**），
+  但 `mcpFailureMetadata` **零消费者**，dispatch 的 `catch` 只取 `error.message` ⇒
+  `failureClass`/`failurePlane` 到不了模型。函数已写好，一个参数的事。
+- **`TOL-04` 全工具 schema 核对**：41 个字段**全部有读取者**，Phase 5 的三处静默忽略已改成显式互斥抛错 ⇒ **无缺陷**。
+
+**补做轮更正自己 3 处**（价值最高）：
+① `TOL-01` 初判「与 `bridgeSafe` 同型、第二次出现」是**错的**——它就是 Phase 15 §16.3
+已登记的 CARRIED-OVER，声明数由 21 重数为 **17**；
+② 浏览器表初版把「两条路径都不经过」直接判 `DEAD` 得 **17 个**，用**全入口闭包**复核后是 **5 个**
+——**「两条路径都不经过」不等于「没有入口」**；
+③ `OBS-06`（`/report` 归档泄漏绝对路径）手写 ZIP 解压探针返回 **0 条**，**差点据此撤销**；
+真实 `unzip` 解出 **5 个唯一路径**，**泄漏属实、坏的是探针**。
+⇒ **「探针返回空」与「目标确实为空」在输出上不可区分，必须用第二种手段交叉验证**；
+这是 `check-call-reachability.mjs` 已写下的「工具出错时先怀疑工具」的又一次实证。
+
+### 额度恢复后重派（同日，模型换成 `google-antigravity/gemini-3.8-flash:high`）
+
+维护者提示原 `vsllm/gemini-3.8-flash-api:max` 额度耗尽，改用 `google-antigravity/gemini-3.8-flash`。
+`.omp/config.yml` 的 `task.agentModelOverrides`（`scout`/`reviewer`/`task`）已改指新端点
+（该文件在 `.gitignore` 内，不入库）。**三个被阻塞的切片重新派遣**：
+`F2ProviderTables`（四端点请求形状表 + 流解析矩阵 + 重试表）、
+`G2MemoryContext`（`memory/**` 36 + `context/**` 28 逐模块 + 持久化文件失败模式）、
+`H2EditAtomicity`（多文件原子性 + 读后写竞态 + `TOL-02` 的 adopt-or-delete 判定）。
+
+三份 brief 都**显式列出已完成的条目**（§7/§8/§9 的哪些不要重做）与
+**必须交叉验证探针**的纪律（上一轮手写 ZIP 解压返回 0 条差点误撤一条真缺陷）。
+
+### `H2EditAtomicity` 返回（8m04s，成功）—— **推翻了我自己一条**
+
+**`TOL-02` 判决翻转**：我上一轮写「`edits[]` 分段形式**没有重叠检查**」并倾向「建议接入」。
+子代理指到 `core/tools/editEngine.ts:430-441`，我读码确认**生产路径有区间重叠检查**
+（排序后比 `previous.end > current.start`），且 `registry.ts:650` 的 `edits[]`
+**正是**委托给 `replaceManyInContent`。**我的那句是错的。**
+更关键的是反向证据：三角里的 `conflict.ts:121-142` 用**顺序文本搜索**，
+对 `gamma→beta` + `beta→delta` 这种**互不相交**的级联会**误报冲突**。
+⇒ **判决改为「删除」**（432 行，按 CDE-01）。
+**教训：「没找到反例」≠「候选更强」——必须反向再测一次（候选会不会误报）。**
+
+**新增四条（均已逐条复验）**：
+- **`TOL-06`** 多文件编辑**无事务**：`registry.ts:711` 每个工具调用立即写盘，
+  `service.ts:99` 原地写无 staging ⇒ 第 3 个失败时前 2 个**已在盘上**。
+  `editCapabilityReadiness.ts:141-144` 自述该能力**被决定移除**（不是遗漏）。
+  **我补上了一层子代理漏掉的**：`captureSnapshotBeforeWrite`（`service.ts:88-94`）
+  **确实**为 `/undo`/`/restore` 记录原内容 ⇒ **可回滚的是内容，不可回滚的是「这一批操作」**。
+- **`TOL-07`** 读后写**无内容复核**：`registry.ts:635` 读、`:711` 写，中间零比对。
+  且 `fileLock.ts:30` 的 `withFileLock` 是**进程内 `Promise` 队列**（`grep flock|fcntl` 零命中），
+  **挡不住**另一进程/编辑器/`bash` 子进程。
+- **`TOL-08`** 进程树回收三处：`setsid` 孙进程逃逸（`kill(-pid)` 只及本组）；
+  Windows `taskkill` **未 await**（`:54-58`）；父进程被 `SIGKILL` 时 `exit` 处理器不跑。
+  另：**直接 `SIGKILL`，无 `SIGTERM` 宽限**（已核实全文只有强杀）。
+- **`TOL-09`** 子代理报的「12 个新死模块 1,561 行」**与 CDE-05 完全同一批**，
+  且行数实测为 **1,469**（它多算 92）⇒ **不新增条目**，只把 CDE-05 的数字按实测收准。
+
+### 第二轮全部返回（同日）—— 新增 11 条，**推翻主代理自己 2 条**
+
+`F2ProviderTables`(12m56s) / `G2MemoryContext`(12m46s) / `H2EditAtomicity`(8m04s) 全部成功。
+**12 个切片至此全部完成。**
+
+**3 条 P1**：
+- **`PRV-07`** 部分输出后的流失败会让**外层循环重跑整个 step**：
+  `turn/step.ts:479` 的 `!shownAnything` 守卫只说内层；
+  `grep -n 'errorStep(|failedStep(' turn/step.ts` 显示**只有 `:429-430` 传了 `retriesExhausted`**，
+  其余路径默认 `false` ⇒ `loop.ts:172` 的守卫不生效，而 `Network error: …` 命中重试模式。
+  探针实测 `:492`（shownAnything=true）→ **RETRY**。
+- **`PRV-08`** **Google GenAI/Vertex 完全丢弃图片块**：`inlineData` 全仓**零命中**；
+  而 Anthropic(`:264-275`) 与 Bedrock(`:166-182`) 都做了。⇒ 四端点里唯一没做多模态的。
+  与 16-K 修 Bedrock 丢图片**同型**——同一缺陷多端点重复、只修了一处。
+- **`CTX-06`** 目录可写、**文件只读**时 `projectMemoryLocalStore.ts:133` 的
+  `appendFileSync` 抛**未捕获 EACCES**（探针复现：`code: EACCES`）。
+  同文件的 `invalidateRecord`/`deleteRecord` **都返回 `blocked`** ⇒ 一个 store 两种处置。
+- **`CTX-07`** JSONL 任一行损坏 ⇒ `list()` 与 `health()` **整体抛**
+  （探针：`NOT_JSON` + 截断行 ⇒ `Unexpected token 'N'`）。
+  **对照**：`sessionEventCodec.ts:317` 的 transcript 是**按行隔离**的，
+  Phase 16 §4.2 明确记为「已正确处理」。⇒ 同仓两种标准。
+
+**`CTX-09` 与既有结论冲突**：5 处单调增长（`readCache`、`compactLiveCheckpoint`、
+两个 injection state、review state），而 Phase 16 §4.5 写的是「**未发现无界增长**」
+——说明上一轮的扫描没有覆盖这些状态存储。**这正是「常驻登记册」存在的理由。**
+
+**推翻主代理自己 2 条**：
+- **`TOL-02` 判决翻转**：我写「`edits[]` 没有重叠检查」→ 错。
+  `editEngine.ts:430-441` **有**区间重叠检查，`registry.ts:650` 正是委托给它；
+  反向证据：三角里的 `conflict.ts:121-142` 对**不相交**的级联会**误报**。
+  ⇒ **由「建议接入」改为「删除」（432 行）**。
+- **`LOP-05` 由「已核实健全」改为「有缺口」**（即 `PRV-07`）。
+
+**方法论**：同一个错误模式**第三次**出现——「只看了一层就断言这一层的行为」
+（`TOL-02` / 浏览器表 12 个装配模块 / `LOP-05`）。三次**都是子代理指出后才发现**的。
+`BRW-00` 与 `PRV-09`…`PRV-11` 的 `failDirection` 均已按此校正。
+
+## [2026-09-30] plan | Phase 17 规划：`phase-17-pre-research.md` + `phase-17-decisions.md`
+
+**输入**：13 号登记册的 **70 条 OPEN**（12 P1 / 45 P2 / 11 P3，机械统计）
+＋ `phase-16-decisions.md` §4 移出的 16-J…16-N。
+
+**方法**：3 个研究子代理（`R1TuiRegular`/`R2ThemeColorCmd`/`R3ProviderStream`，
+并发 3）做**参考实现机制研究**（不是找缺陷），
+主代理**亲验**每一条参考断言（读了 `tui-main-screen.ts`、`colors.ts`、
+`terminal-image.ts`、`syntax-highlight.ts`、`retry.ts`、`provider-retry.ts`、
+`agent-session.ts`、`session-manager.ts`、`jsonl/storage.ts`、`edit-diff.ts`、
+`file-mutation-queue.ts` 等）。**零代码改动。**
+
+**裁决**：**38 项纳入**（12 条 P1 全部），分 **W1–W6 六波**；22 项移出；
+6 项明确不做；4 项需独立裁决。
+
+**⚠️ 收尾自查抓到一个主代理自己的规划漏洞（记录在 decisions §7.3.5）**：
+初稿声称「12 条 P1 全部纳入」，但 §2 的五波里**一条 `TUI-*` 都没有**——
+把 TUI 域 **8 条 OPEN**（含 P1 的 `TUI-01`）整体漏掉。
+根因是**「拿研究当计划」**：前置研究 §1 **做了**这一节的机制研究
+（还是最详实的一节），写裁决时却从 W1 直接跳到色彩管道。
+**处置**：新增 **W2「TUI 主屏收敛」**（8 项），原 W2–W5 顺延为 W3–W6，
+条目编号重编为 1–38。**这是「只看一层就断言」的第 4 次同型错误**
+（前三次：`TOL-02`、浏览器表、`LOP-05`），**且这次是自查发现的，不是复核者**。
+
+**前置研究的关键发现**（均亲验）：
+- **pi 的主屏只有一条渲染路径**（`tui-main-screen.ts:264` 的 `this.render(width)`）
+  ⇒ 我方 `documentRows` 的**裸渲染**是自造的第二条路径（`TUI-01` 的病根）；
+- **pi 的重试在会话层**（`agent-session.ts:3684-3685` 的 `_omitRecoveryAttempt`），
+  用 `appendContextEdit(targetId, null)` **持久地把部分输出从模型投影里去掉**
+  （`session-manager.ts:519-524` 的 `if (replacement === null) return []`）；
+- **pi 的 edit 与我方同构**（`edit-diff.ts:341-349` 的区间重叠检查）
+  ⇒ 给 `TOL-02` 的「**删除**」判决加了参考侧佐证；
+- **pi 没有浏览器工具**（只有 `open-browser.ts`），`playwright-mcp` 源码**不在本地**
+  ⇒ `BRW` 一节的参考基线要重定；
+- 主题用 **Draft-07 schema + vars + OSC 10/11 + DEC 2031**；语法着色用
+  **highlight.js 10.7.3**（`lib/core.js` + 21 eager 语言 + 懒加载 + **自写 HTML→ANSI**）。
+
+**复核**：3 个证伪式复核者（`RvAW1Claims`/`RvBW2W4Mechanisms`/`RvCW3W5Deletions`，
+23m50s/11m52s/22m43s），32 条断言：**correct 22 / partly-wrong 8 / wrong 1 / unverifiable 1**。
+**7 处实质改动 + 1 处取舍纠正**，其中**1 条 `wrong` 推翻了主代理**：
+
+- **`BLD-02`**：主代理称「删 shim 会让 `verify:docs-drift:strict` 的 `rules_dangling` 变红」。
+  复核者指出 `RULES` 只有 `['AGENTS.md','agent-rules','.wiki/_index.md']`（`verify-docs-and-rules-drift.mjs:44`），
+  **不含 `docs/`**；且被引文档在 `DOC_STATUS.md:38,41` 标的是 **`superseded`** 非 `active`。
+  主代理读码确认 **复核者对、自己错**。**真正要同步的是三个测试**，不是 docs。
+  ⇒ **13 号册的同一处错误已一并更正**（教训：门禁的判定范围要读源码，不能从名字推断）。
+- **`CMD-01`**「单点修复」不成立：`statuslineCommandRuntime.ts:38-42` 会二次切分。
+- **`CMD-02`**：非交互路径不处理 `show-view`/`set-view` ⇒ 光注册命令不够。
+- **`OBS-08`**：同仓 `metricsCommandRuntime.ts:119-155` 的 `readMetricLines`
+  **已经**跨分片读 ⇒ 改为照抄它，而不是自己设计。
+- **`PRV-09`**：探针实测现有 `REFUSAL` 正则**不匹配** `refusal`/`guardrail_intervened`，
+  必须**扩展**而不能只「复用」。
+- **`SES-01`**：通用通道成本**高于**特例（推翻主代理的成本判断）。
+- **`THM-02`**：`style()` 无法表达**行级背景**（跨多段外层背景）⇒ 定向复位是根本前提。
+- **`BRW-01`**：初稿的「(b)+弹窗补拦截」**自相矛盾**（弹窗必须 context 级才能观察）。
+
+**本轮复核**没有**推翻复核者**（前几轮每轮 4-6 条），原因写进 decisions §7.3.4：
+brief 把证据门槛写死（无 `file:line` 的 `wrong` 无效、探针返回空必须换方法），
+且要求复核者**自己跑探针**（`CTX-06` 的 EACCES 与 `OBS-06` 的归档泄漏都由复核者独立复现）。

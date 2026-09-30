@@ -1,9 +1,9 @@
 ---
 title: "功能开发：pi 对照总索引"
 category: article
-sources: [pi-source-2026-09-20, repo-audit-2026-09-20, phase-5-pre-research-2026-09-23, phase-6-pre-research-2026-09-23, phase-6-execution-2026-09-24]
+sources: [pi-source-2026-09-20, repo-audit-2026-09-20, phase-5-pre-research-2026-09-23, phase-6-pre-research-2026-09-23, phase-6-execution-2026-09-24, 13-feature-and-defect-register]
 created: 2026-09-20
-updated: 2026-09-26
+updated: 2026-09-30
 tags: [features, gap-analysis, pi, index]
 summary: "功能开发前锋探索的总入口。对照本地参考仓 pi，把能力缺口按七个切片分类登记：共 40 项 DEFICIENT、38 项 MISSING、16 项 OURS-ONLY、7 项平手。Phase 0–5 已闭环；Phase 5 的前置研究、裁决、施工与复核均已完成（7 项任务 + 22 项补充裁决），核心是删除 32 文件 / 8,330 行的零消费者「报告投影族」、补上缺失的重试与错误分类、并让 compat 标志真正改变请求形状。裁决经五个独立复核者证伪式复核，推翻主代理 4 项错误（含 T2 闭包方向算错，数字从 36/10,008 更正为 32/8,330）；施工后的复核轮再发现并修复 8 处缺陷，其中一处让每个致命崩溃变成进程带病继续运行。Phase 6 **已完成**（T5a 回写 25 行滞后判定 + T1 HTTP 超时接线 + T2 metrics 采集与读取 + T3 用量按模型分桶 + T4 `/report`），四项代码任务全部有反向验证与实机验证。Phase 6 前置研究与裁决（零代码改动）：重新盘点发现 44 个看似开放的条目里 25 个已实现但未标注，真正仍开放 10 项，其中 3 项是行为缺口（HTTP 超时未接线、metrics 采集面为空、用量记账不按模型分桶）；两个复核者各覆盖一半、均判 incorrect，共推翻主代理 9 处。**§10 续研（2026-09-26）回答「优化 Rust/Python 是否胜过纯 TS」**：实测本仓真瓶颈是 `grep`（1,294ms vs ripgrep 10–30ms，43–130×），但**三家参考实现没有一家自己写搜索算法**——Claude Code 内嵌 ripgrep 二进制、pi 直接 `spawn(rg)`、oh-my-pi 用 napi 链接 ripgrep 的库。**Rust 在 agent 里的真实价值是「原生库的粘合层」，不是「更快的实现」**；而同一速度用纯 TS 的 `spawn(rg)` 即可拿到，成本低一个数量级。Bun `--compile` 实测可用（启动 1,370ms → 200ms，7×；用户免装 Node；产物 106MB；`--version` 有一处缺陷）。**Phase 11 前置研究已完成（2026-09-26，零代码改动）**：见 `08-gap-and-debt-research.md`。5 路只读子代理覆盖内核循环／工具执行／provider 模型／上下文记忆／架构债务五个切片（债务总扫被上游 content_filter 拦截，已重派两个避开敏感阅读面的窄切片）。**头条不是新差距而是三项 P0 既有缺陷**：① `daemonEnabled` 默认 true 而 Rust 执行面缺 cargo 时不降级，**全新安装 bash 100% 失败**（实机复现；本机被用户配置的 false 掩盖）；② `cheers.json` 是 git 跟踪的配置契约却**从不被读取**（CLI 报 max-turns=15 而文件写 30）；③ `/model refresh` 把内置模型的 `compat`/`promptCache`/`vision` **整体抹掉**（实机复现 developer→system、vision true→false），静默回滚 Phase 5/9 已修好的缺陷。差距侧 10 MISSING / 14 DEFICIENT；债务侧三层口径 129 → 90（21,247 行）→ **35 真死文件（6,650 行）**，seam 校验 0 条活引用。子代理 3 项结论经核验被推翻或更正（memory 实际已接线、context 域是子集而非整体未接线）。"
 confidence: high
@@ -1619,3 +1619,184 @@ Zero items skipped; every one committed separately with its own revert verificat
 
 按 §3 的四波执行序施工；每波跑 5 门禁 + `test:scripts` + 改动域测试；
 每波末位完成后同步本文件与 `log.md`。
+---
+
+## 21. 常驻登记册建立：`13-feature-and-defect-register.md`（**2026-09-29/30**）
+
+> **维护者指示**：`12-gap-and-debt-research-2.md` 的研究面太窄——它只为 Phase 16 服务。
+> 要的是**专门用来记录 feature 与不足的文档**，不是某一个 Phase 的前置研究。
+> 故新建**常驻总账** `13-feature-and-defect-register.md`，从此往后追加而不重写。
+>
+> **与 08 / 11 / 12 的根本区别**：那三份是**某一轮**的盘点（08 = Phase 11 的盘点、
+> 11 = 08 待办项的深化设计、12 = Phase 16 的预研究），阶段结束即归档；
+> 13 号**不服务任何阶段**，已修复的条目标注状态而不删除，
+> 以免同一个缺陷在两轮之间被反复「重新发现」。
+
+### 21.1 本轮的做法
+
+**三波共 9 个只读子代理**（并发上限 3），主代理自建**模块可达图**
+（值边 / 类型边分列，从 `entrypoints/cli.tsx` BFS）与 `npx tsx` 行为探针、
+隔离 `HOME` 的真实 CLI/PTY 实机。**零代码改动**。
+
+**事故：成功 4、失败 5**（两类都是本仓已多次记录的）：
+- **`content_filter` 第 7、8 次**——浏览器栈切片与 provider 切片（凭据相邻读面）。
+  按既有结论**改由主代理亲验**；provider 那路的证据笔记本抢救出来了。
+- **上游额度耗尽（402）第 2 次**——最后三个并发**同时**终止，**无产出**：
+  平台集成、上下文记忆、工具执行三节因此**只覆盖主代理亲验的部分**，
+  在正文里逐节点明，不假装完整。
+
+### 21.2 十二域的登记结果
+
+| 域 | 条目数 | 其中 P0/P1 |
+|---|---|---|
+| `TUI` 渲染与交互 | 9 | 1（TUI-01 `regular` 丢高亮/选区/滚动条） |
+| `THM` 主题与色彩 | 8 | 2（THM-01 truecolor 从不询问、THM-02 全局复位破坏嵌套样式） |
+| `CMD` slash 命令 | 8 | 1（CMD-01 引号参数全仓失效） |
+| `BRW` 浏览器 | 6 | 1（BRW-01 请求守卫是页级的，弹窗不过判定） |
+| `SES` 会话持久化 | 8 | 1（SES-01 用户键入的 `/todo` 不落盘） |
+| `PRV` provider | 11 | **3**（PRV-07 部分输出后整段重跑；PRV-08 Google 丢图片；＋ 一条 `CORRECTED`） |
+| `CTX` 上下文记忆 | 9 | **2**（CTX-06 只读文件抛未捕获 EACCES；CTX-07 JSONL 一行损坏则整体抛） |
+| `TOL` 工具与执行 | 9 | 0（五条 P2，含多文件无事务、读后写无复核） |
+| `OBS` 平台集成 | 10 | 1（OBS-04 MCP 网关每 prompt 重建） |
+| `LOP` 内核循环与守卫 | 5 | **1**（LOP-05 由「健全」更正为「有缺口」） |
+| `CLI` 入口 | 1 | 0 |
+| `BLD` 构建与发布 | 2 | 0（两条 P2） |
+| `CDE` 死代码 | 6 | 1（CDE-03 834 行进程内沙箱从未实例化） |
+| **合计** | **93** | **14** |
+
+> **第二轮（同日，模型换成 `google-antigravity/gemini-3.8-flash:high` 后）**：
+> 重派的三个切片全部返回，**新增 11 条**（含 3 条 P1），并**推翻主代理自己 2 条**
+> （`TOL-02` 判决由「接入」翻为「删除」——生产实现更强；
+> `LOP-05` 由「已核实健全」更正为「有缺口」——内层 `!shownAnything` 守卫只管内层）。
+> 至此**全部 12 个切片完成**。
+>
+> **补做轮（同日）**：子代理全部因上游 402 终止后，主代理自行补完
+> **内核循环（§8bis，此前零覆盖）**、**浏览器逐模块分类表（BRW-00，此前 3 轮未产出）**、
+> **全工具 schema 字段核对（TOL-04，判定无缺陷）**、**MCP 错误分类（OBS-07）**、
+> **日志轮转（OBS-08/09）**、**技能发现（OBS-10）**。
+> **三项明确未完成**（见 13 号文档 §18，不冒充完成）：provider 逐字段请求形状表、
+> `memory`/`context` 逐模块审计、编辑路径原子性与读后写竞态。
+> 期间**更正了自己三处**：TOL-01 被误标为「第二次出现」（实为 Phase 15 已登记的
+> CARRIED-OVER）、浏览器表初版被误标 17 个死模块（实为 **5** 个——
+> 「两条路径都不经过」≠「没有入口」）、
+> **探针自身出错**差点导致撤销一条真缺陷（OBS-06 `/report` 泄漏绝对路径；
+> 手写 ZIP 解压返回 0 条，真实 `unzip` 解出 5 个 —— 「探针返回空」与「目标为空」
+> 在输出上不可区分，必须交叉验证）。
+
+### 21.3 四项头条（维护者点名的九类各自落点）
+
+1. **CMD-01 引号参数**——`slashRouter.ts:15` 的 `split(/\s+/)` 让**全部 56 个命令**
+   的带空格参数失效（实测 `/theme "Dark Mode"`、`/cd "dir with spaces"`）。
+   **单点修复、全局收益**，列为第一档第一项。
+2. **BRW-01 请求守卫是页级**——`sessionManager.ts:416` 的 `page.route` 只覆盖**一个页面**，
+   而 `:179-199` 的注释宣称「context-wide … every page and popup inherits it」。
+   `PwBrowserContext` 连 `route` 都没声明 ⇒ 页面开出的新页面/弹窗**完全不过出站判定**。
+   **本轮唯一一条「绕过判定」的缺口**。
+3. **TUI-01 `regular` 适配的核心缺失**——`pane.ts:142` 的 `documentRows` 是**裸渲染**，
+   不带搜索高亮、选区反显、滚动条。探针实测：备用屏有 `\u001b[7m` 与滚动条，
+   `documentRows` **两者都没有**。维护者点名的「`regular` 还未开始适配」正是这件事。
+4. **CDE-03 834 行的进程内沙箱从未被实例化**——`sandbox/{sandboxPolicy,sandboxEnforcer,
+   escalationWorkflow,auditTrail}.ts` 只被彼此引用；活的沙箱是 `osSandbox.ts`（bwrap）。
+   而 `sandbox/index.ts` 的 `EscalationPrompt` **被 17 个文件按类型引用** ⇒
+   **不能整文件删**——这正是「编译契约而非死码」的实例。
+
+### 21.4 本轮证伪 4 条子代理断言
+
+记录在 13 号文档 §12bis。最值得记的是两条**同型错误**（读旧文档而不回到当前代码）：
+`W1TuiSurface` 引用了**已不存在的符号** `alreadyWritten`（Phase 16 的 16-C 已重写），
+并把 `/help` 只列 4 个键的**有意设计**读成遗漏；
+`W2ProviderProtocol` 断言「拒答会被重试」，**探针实测为 NO-RETRY**。
+教训与既有的「探针必须复用生产路径的消息构造」是同一件事的另一面：
+**引用必须重新解析，不能沿用文档里的行号与符号名**。
+
+### 21.5 已复核为**健全**的项（防未来重查）
+
+| 面 | 结论 |
+|---|---|
+| 16-A 记忆注入链 | **已接通**（两条装配路径都在） |
+| 16-B `/compact` 合并与钩子 | **全部成立**，两条路径共用同一 lifecycle builder，三种 `reason` 都有生产者 |
+| 16-K provider 修复 | **七项全部成立**，无回归 |
+| 上下文记账 | **已含系统提示与工具 schema**，且 provider 实测值优先——Phase 11 的缺口已闭合 |
+| 编造的成功 | 浏览器的 6 处 `Simulated …` **确已删除**；`/plugin` 是**诚实**的登记簿 |
+| 沙箱不可用时 | `planSandboxedCommand` 的三种状态**如实上报**，不静默降级为无隔离 |
+| 流式解码 | 全部文本流用 `decode(..., {stream:true})`；Bedrock 二进制帧先 CRC32 校验 |
+
+### 21.6 下一轮的首要任务（本轮未覆盖，见 13 号文档 §13.2）
+
+`browser/**` **164 模块的逐个** real-vs-demo 判定（自身子代理死于 `content_filter`）；
+每个内置工具的**逐字段**核对；编辑路径的多文件原子性与读后写竞态；
+执行运行时的超时/上界/进程树回收；MCP 错误分类与技能发现优先级；
+日志轮转正确性；`core/shell` + `core/query` + `turn` 的完整审计。
+
+---
+
+## 22. Phase 17 规划：前置研究与裁决（**2026-09-30**）
+
+> 文档：[`phase-17-pre-research.md`](phase-17-pre-research.md)（参考实现机制研究）、
+> [`phase-17-decisions.md`](phase-17-decisions.md)（26 项纳入 / 5 波 / 4 项待独立裁决）。
+> **零代码改动。** 输入是 13 号登记册的 **70 条 OPEN**（12 P1 / 45 P2 / 11 P3）
+> 加 `phase-16-decisions.md` §4 移出的 16-J…16-N。
+
+### 22.1 与前面各阶段的区别
+
+前几份文档（08/11/12/13）是**盘点**——哪里有缺口、证据是什么。
+本文档是**设计级研究**——参考实现**到底怎么解决的**、我方缺口精确在哪、按什么形态改。
+所以每条都给出 `<repo>/<path>:<line>` 与关键代码引文，
+并在参考没有对应机制时**明标 `自研`**，不伪装成「对齐参考」。
+
+### 22.2 五波与规模
+
+| 波 | 主题 | 项数 |
+|---|---|---|
+| **W1** | 错误承诺与单点全局收益 | 9 |
+| **W2** | **TUI 主屏收敛（P1，结构最大）** | **8** |
+| **W3** | 色彩管道与主题（含一次依赖裁决） | 5 |
+| **W4** | 未捕获异常与数据丢失（P1 集中） | 6 |
+| **W5** | 流式与重试语义（P1 集中） | 5 |
+| **W6** | 债务与可达性（逐个闭包核实） | 5 |
+| **合计** | | **38**（+ 22 移出 + 6 不做 + 4 待裁决） |
+
+### 22.3 前置研究的六项关键发现（全部主代理亲验）
+
+1. **pi 的主屏只有一条渲染路径**（`tui-main-screen.ts:264` 的 `this.render(width)`）
+   ⇒ 我方 `documentRows` 的**裸渲染**是自造的第二条路径，这就是 `TUI-01` 的病根；
+   修复不是「给 `documentRows` 加参数」而是**收敛成一条**。
+2. **pi 的重试在会话层，不在 agent 循环**：`agent-session.ts:3684-3685` 的
+   `_omitRecoveryAttempt` 用 `appendContextEdit(targetId, null)`
+   **持久地把部分输出从模型投影里去掉**（`session-manager.ts:519-524`：
+   `if (replacement === null) return []`）。
+   ⇒ `PRV-07`/`LOP-05` 因此有两条路：(a) 学参考做抹除+重试；(b) 已显示过就不重试。
+3. **pi 的 edit 与我方同构**（`edit-diff.ts:341-349` 的区间重叠检查与我方
+   `editEngine.ts:430-441` 同一写法）⇒ 给 `TOL-02` 的「**删除** `edit/patch` 三角」
+   加了**参考侧佐证**，不再是仅凭我方内部比较。
+4. **pi 没有浏览器工具**（只有 `open-browser.ts`），且
+   `playwright-mcp` 源码**不在本地**（`src/README.md` 指向上游 monorepo）
+   ⇒ `BRW` 一节的参考基线要重定；`stagehand` 的 `page.route` 也是**页级**。
+5. **主题**：Draft-07 schema + `vars` 变量（带循环检测）+ **OSC 10/11 + DEC 2031**
+   探测外观 + WCAG 对比度判 dark/light；**56 令牌**。
+6. **语法着色**：`highlight.js@10.7.3`，`lib/core.js` + 21 个 eager 语言 +
+   `setImmediate` 懒加载其余（**失败也降级**）+ **自写 HTML→ANSI**
+   （不依赖 hljs 主题系统）。
+
+### 22.4 复核结果：7 处实质改动 + 1 处推翻主代理
+
+3 个证伪式复核者，**32 条断言：correct 22 / partly-wrong 8 / wrong 1 / unverifiable 1**。
+
+**唯一一条 `wrong` 打在主代理身上**（`BLD-02`）：
+我曾断言「删三个入口 shim 会让 `verify:docs-drift:strict` 的 `rules_dangling` 变红，
+所以要先同步 `docs/` 的 6 处引用」。复核者指出
+`verify-docs-and-rules-drift.mjs:44` 的 `RULES` **不含 `docs/`**，
+且被引文档在 `DOC_STATUS.md:38,41` 标的是 **`superseded`** 而非 `active`。
+主代理读码确认**复核者对、自己错** ⇒ **真正要同步的是三个测试**。
+**13 号册同一处错误已一并更正**——教训：**门禁的判定范围要读源码，不能从名字推断。**
+
+**其余 6 处改动**：`CMD-01` 的「单点修复」不成立（下游二次切分）；
+`CMD-02` 需补非交互分支；`OBS-08` 应照抄同仓已有的 `readMetricLines`；
+`PRV-09` 必须**扩展** `REFUSAL` 正则（探针实测现有正则不匹配两个新值）；
+`SES-01` 通用通道成本高于特例；`THM-02` 的 `style()` 无法表达行级背景；
+`BRW-01` 的初稿选项自相矛盾（弹窗必须 context 级才能观察）。
+
+**本轮没有推翻复核者**（前几轮每轮 4-6 条），原因记在 decisions §7.3.4：
+brief 把证据门槛写死（无 `file:line` 的 `wrong` 无效、探针返回空必须换方法复核），
+且要求复核者**自己跑探针**——`CTX-06` 的 EACCES 与 `OBS-06` 的归档泄漏
+都由复核者独立复现，不是读码推断。
