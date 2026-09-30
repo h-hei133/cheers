@@ -119,9 +119,3 @@ export function messageToText(
   return texts.join("\n");
 }
 
-/** Whether `content` carries an image, for a caller that must decide something. */
-export function hasImageContent(
-  content: string | readonly MultimodalContentBlock[] | null | undefined,
-): boolean {
-  return Array.isArray(content) && content.some((block) => block.type === "image");
-}

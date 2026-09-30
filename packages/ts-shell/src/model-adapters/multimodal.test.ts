@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  hasImageContent,
   messageToText,
   toAnthropicImageBlock,
   toOpenAIImageUrlBlock,
@@ -58,16 +57,6 @@ describe("reading a message as text", () => {
   it("handles absent content", () => {
     expect(messageToText(undefined)).toBe("");
     expect(messageToText(null)).toBe("");
-  });
-});
-
-describe("telling whether a message carries an image", () => {
-  it("is true only for a block array holding one", () => {
-    expect(hasImageContent(MIXED)).toBe(true);
-    expect(hasImageContent([IMAGE])).toBe(true);
-    expect(hasImageContent("text")).toBe(false);
-    expect(hasImageContent([{ type: "text", text: "x" }])).toBe(false);
-    expect(hasImageContent(undefined)).toBe(false);
   });
 });
 

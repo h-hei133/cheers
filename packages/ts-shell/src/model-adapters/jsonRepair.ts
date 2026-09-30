@@ -197,20 +197,3 @@ export function parseJsonWithRepair<T>(json: string): T {
   }
 }
 
-/**
- * Attempts to parse potentially incomplete JSON during streaming.
- * Always returns a valid object, even if the JSON is incomplete.
- */
-export function parseStreamingJson<T = Record<string, unknown>>(
-  partialJson: string | undefined,
-): T {
-  if (!partialJson || partialJson.trim() === "") {
-    return {} as T;
-  }
-
-  try {
-    return parseJsonWithRepair<T>(partialJson);
-  } catch {
-    return {} as T;
-  }
-}
