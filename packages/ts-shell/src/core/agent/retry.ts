@@ -82,8 +82,8 @@ const UNRECOVERABLE_FAILURE =
  * retry decision — asking again cannot help — but conflating them would report
  * a safety block as an exhausted account.
  */
-const REFUSAL =
-  /content.?filter|\bsafety\b|recitation|prohibited.?content|blocked.?content|refused the prompt/i;
+export const REFUSAL =
+  /\brefusal\b|guardrail_intervened|content.?filter|\bsafety\b|recitation|prohibited.?content|blocked.?content|refused the prompt/i;
 
 /**
  * Whether a finished step failed for a reason another attempt could survive.

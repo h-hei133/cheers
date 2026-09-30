@@ -15,6 +15,7 @@ import { PARSE_ERROR_KEY, type ToolSchema } from "./tools.js";
 import { resolveRequestShape } from "../core/models/requestShape.js";
 import type { CatalogProvider } from "../core/models/catalog.js";
 import {
+  REFUSAL,
   isRetryableStatus,
   resolveRetryPolicy,
   exceedsRetryCeiling,
@@ -738,7 +739,7 @@ export function emptyAnswerExplanation(finishReason: string | null | undefined, 
   if (finishReason === "length") {
     return "The reply was cut off before any of it arrived — the context is probably full. Run `/compact` and ask again.";
   }
-  if (finishReason === "content_filter") {
+  if (REFUSAL.test(finishReason ?? "")) {
     return "The provider withheld the reply. Rephrasing the request usually gets past it.";
   }
   if (reasoningLength > 0) {

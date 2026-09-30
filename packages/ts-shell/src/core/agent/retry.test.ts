@@ -304,3 +304,8 @@ describe("two layers retrying the same failure", () => {
     expect(calls).toBe(4);
   });
 });
+
+
+it.each(["refusal", "guardrail_intervened", "content_filter", "safety", "recitation"])("does not retry %s despite network wording", (reason) => {
+  expect(isRetryableFailure("error", `Network error: ${reason}`)).toBe(false);
+});

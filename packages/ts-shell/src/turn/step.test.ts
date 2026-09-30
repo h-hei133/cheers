@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { createStepFunction, CONTEXT_OVERFLOW_PREFIX, isContextOverflow } from "./step.js";
+import { createStepFunction, emptyAnswerExplanation, CONTEXT_OVERFLOW_PREFIX, isContextOverflow } from "./step.js";
 import { getSessionUsage, resetSessionUsage } from "../observability/usageTelemetry.js";
 import { writeProjectState } from "../core/state/projectState.js";
 import { declareEndpoint } from "../provider/endpoints/index.js";
@@ -1030,3 +1030,9 @@ describe("the last step a run may act on", () => {
     expect(result.stopReason).toBe("error");
     expect(seen).toEqual(["thinking hard"]);
   });
+
+
+it.each(["refusal", "guardrail_intervened", "content_filter", "safety", "recitation"])("explains %s as a refusal", (reason) => {
+  expect(emptyAnswerExplanation(reason, 0)).toContain("withheld");
+  expect(emptyAnswerExplanation(reason, 20)).not.toContain("/connect");
+});
