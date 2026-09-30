@@ -85,18 +85,18 @@ export class RotatingFileSink {
     return lines;
   }
 
-  getFiles(): string[] {
-    return orderedLogFiles(this.logDir, this.getCurrentFilePath(), true);
+  getFiles(strict = false): string[] {
+    return orderedLogFiles(this.logDir, this.getCurrentFilePath(), { familyOnly: true, strict });
   }
 
   exportTo(target: string): number {
-    const files = this.getFiles();
+    const files = this.getFiles(true);
     if (files.length) exportLogFiles(files, target);
     return files.length;
   }
 
   clear(): void {
-    for (const file of this.getFiles()) fs.writeFileSync(file, "", "utf8");
+    for (const file of this.getFiles(true)) fs.writeFileSync(file, "", "utf8");
     this.currentFileSize = 0;
   }
 

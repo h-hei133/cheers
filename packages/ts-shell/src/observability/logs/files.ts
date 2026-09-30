@@ -5,19 +5,19 @@ import { randomUUID } from "node:crypto";
 export const LOG_TAIL_BYTES = 512 * 1024;
 
 /** Oldest first; callers choose a single live family or the full metrics history. */
-export function orderedLogFiles(directory: string, currentPath: string, familyOnly = false): string[] {
+export function orderedLogFiles(directory: string, currentPath: string, options: { familyOnly?: boolean; strict?: boolean } = {}): string[] {
   let names: string[];
   try { names = fs.readdirSync(directory); } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    if (!options.strict || (error as NodeJS.ErrnoException).code === "ENOENT") return [];
     throw error;
   }
   const base = path.basename(currentPath).replace(/\.log(?:\.\d+)?$/, ".log");
   return names.filter((name) => /\.log(?:\.\d+)?$/.test(name)
-    && (!familyOnly || name === base || (name.startsWith(`${base}.`) && /^\d+$/.test(name.slice(base.length + 1)))))
+    && (!options.familyOnly || name === base || (name.startsWith(`${base}.`) && /^\d+$/.test(name.slice(base.length + 1)))))
     .flatMap((name) => {
       const file = path.join(directory, name);
       try { const stat = fs.statSync(file); return stat.isFile() ? [{ file, time: stat.mtimeMs }] : []; } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+        if (!options.strict || (error as NodeJS.ErrnoException).code === "ENOENT") return [];
         throw error;
       }
     })
