@@ -20,7 +20,7 @@ import type { BrowserExternalRuntimeManifestLoadResult } from '../../browser/run
 import type { BrowserSkillRuntimeBinding } from '../../browser/skill/runtime/binding.js'
 import type { BrowserActionCache } from '../../browser/actionCache.js'
 import type { BrowserReceiptCacheStore } from '../../browser/receipt/store.js'
-import type { BrowserPublicReadOnlyWebSmokeConfig } from '../harness/browserPublicReadOnlyWebSmokeConfig.js'
+import type { BrowserPublicReadOnlyWebSmokeConfig } from '../../browser/smoke/config.js'
 import type { RuntimeConfig } from "../../config/runtimeConfig.js"
 import type { SidebarEventSink } from '../../presentation/sidebar/sidebarEventSink.js'
 import type { SidebarLiveEventStore } from '../../presentation/sidebar/sidebarLiveEventStore.js'

@@ -1,6 +1,6 @@
-import { sanitizeBrowserText } from "../../browser/capabilityModel.js";
-import { isPrivateNetworkHost, parseBrowserNetworkTarget } from "../../browser/networkAllowlist.js";
-import type { BrowserPublicReadOnlyWebMethod } from "../../browser/publicReadOnlyWebManifest.js";
+import { sanitizeBrowserText } from "../capabilityModel.js";
+import { isPrivateNetworkHost, parseBrowserNetworkTarget } from "../networkAllowlist.js";
+import type { BrowserPublicReadOnlyWebMethod } from "../publicReadOnlyWebManifest.js";
 
 export const PUBLIC_WEB_SMOKE_ENABLE_ENV = "CHEERS_ENABLE_PUBLIC_WEB_SMOKE";
 export const PUBLIC_WEB_SMOKE_URL_ENV = "CHEERS_PUBLIC_WEB_SMOKE_URL";

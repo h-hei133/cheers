@@ -1,8 +1,8 @@
 import { parseBrowserCommandArgs } from "../../browser/commandContract.js";
 import { runBrowserCommandAsync } from "../../browser/commandRunner.js";
-import { parseBrowserPublicReadOnlyWebSmokeConfig } from "../harness/browserPublicReadOnlyWebSmokeConfig.js";
-import { renderBrowserPublicReadOnlyWebSmokeReport } from "../harness/browserPublicReadOnlyWebSmokeReport.js";
-import { runBrowserPublicReadOnlyWebSmoke } from "../harness/browserPublicReadOnlyWebSmokeRunner.js";
+import { parseBrowserPublicReadOnlyWebSmokeConfig } from "../../browser/smoke/config.js";
+import { renderBrowserPublicReadOnlyWebSmokeReport } from "../../browser/smoke/report.js";
+import { runBrowserPublicReadOnlyWebSmoke } from "../../browser/smoke/runner.js";
 import { emitCommandResultToSidebar } from "./sidebarCommandEvents.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 

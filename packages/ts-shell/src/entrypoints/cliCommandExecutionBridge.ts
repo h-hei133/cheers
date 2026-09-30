@@ -21,7 +21,7 @@ import {
   createBrowserPublicReadOnlyWebHarnessContext,
   loadBrowserPublicReadOnlyWebManifestFromEnv,
 } from "../browser/publicReadOnlyWebManifest.js";
-import { parseBrowserPublicReadOnlyWebSmokeConfig } from "../core/harness/browserPublicReadOnlyWebSmokeConfig.js";
+import { parseBrowserPublicReadOnlyWebSmokeConfig } from "../browser/smoke/config.js";
 import type { CompactInjectionStateStore } from "../context/compact/injection/compactInjectionState.js";
 import type { CompactLiveCheckpointStore } from "../context/compact/checkpoint/compactLiveCheckpoint.js";
 import type { StreamingRenderer } from "../presentation/terminal/streaming.js";

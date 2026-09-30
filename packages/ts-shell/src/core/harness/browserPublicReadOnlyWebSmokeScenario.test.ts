@@ -11,9 +11,9 @@ import {
   PUBLIC_WEB_SMOKE_TIMEOUT_ENV,
   PUBLIC_WEB_SMOKE_URL_ENV,
   parseBrowserPublicReadOnlyWebSmokeConfig,
-} from "./browserPublicReadOnlyWebSmokeConfig.js";
-import { renderBrowserPublicReadOnlyWebSmokeReport } from "./browserPublicReadOnlyWebSmokeReport.js";
-import { runBrowserPublicReadOnlyWebSmoke } from "./browserPublicReadOnlyWebSmokeRunner.js";
+} from "../../browser/smoke/config.js";
+import { renderBrowserPublicReadOnlyWebSmokeReport } from "../../browser/smoke/report.js";
+import { runBrowserPublicReadOnlyWebSmoke } from "../../browser/smoke/runner.js";
 import { createBrowserPublicReadOnlyWebScenarioFixture } from "./browserPublicReadOnlyWebScenarioFixtures.js";
 import { agentCliAssertionFailures } from "./agentCliScenarioAssertions.js";
 import { renderAgentCliScenarioReport } from "./agentCliScenarioReport.js";

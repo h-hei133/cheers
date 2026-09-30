@@ -1,23 +1,23 @@
-import { createBrowserActionContract } from "../../browser/actionContract.js";
-import { createBrowserExecutionRequest } from "../../browser/executionContract.js";
+import { createBrowserActionContract } from "../actionContract.js";
+import { createBrowserExecutionRequest } from "../executionContract.js";
 import {
   createBrowserPublicReadOnlyWebManifest,
   type BrowserPublicReadOnlyWebManifestLoadResult,
-} from "../../browser/publicReadOnlyWebManifest.js";
+} from "../publicReadOnlyWebManifest.js";
 import {
   type BrowserPublicReadOnlyHttpClient,
   runBrowserPublicReadOnlyWebExecutor,
-} from "../../browser/publicReadOnlyWebExecutor.js";
-import { decideBrowserPublicReadOnlyWebPolicy } from "../../browser/publicReadOnlyWebPolicy.js";
+} from "../publicReadOnlyWebExecutor.js";
+import { decideBrowserPublicReadOnlyWebPolicy } from "../publicReadOnlyWebPolicy.js";
 import {
   createBrowserPublicReadOnlyWebReceipt,
   type BrowserPublicReadOnlyWebReceipt,
-} from "../../browser/publicReadOnlyWebReceipt.js";
+} from "../publicReadOnlyWebReceipt.js";
 import {
   createBrowserPublicReadOnlyWebUxSummary,
   type BrowserPublicReadOnlyWebUxSummary,
-} from "../../browser/publicReadOnlyWebUxSummary.js";
-import type { BrowserPublicReadOnlyWebSmokeConfig } from "./browserPublicReadOnlyWebSmokeConfig.js";
+} from "../publicReadOnlyWebUxSummary.js";
+import type { BrowserPublicReadOnlyWebSmokeConfig } from "./config.js";
 
 export type BrowserPublicReadOnlyWebSmokeStatus =
   | "skipped"

@@ -1,6 +1,6 @@
-import { sanitizeBrowserText } from "../../browser/capabilityModel.js";
-import { renderBrowserPublicReadOnlyWebUxSummary } from "../../browser/publicReadOnlyWebUxSummary.js";
-import type { BrowserPublicReadOnlyWebSmokeResult } from "./browserPublicReadOnlyWebSmokeRunner.js";
+import { sanitizeBrowserText } from "../capabilityModel.js";
+import { renderBrowserPublicReadOnlyWebUxSummary } from "../publicReadOnlyWebUxSummary.js";
+import type { BrowserPublicReadOnlyWebSmokeResult } from "./runner.js";
 
 export function renderBrowserPublicReadOnlyWebSmokeReport(
   result: BrowserPublicReadOnlyWebSmokeResult,
