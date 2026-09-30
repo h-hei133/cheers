@@ -27,21 +27,28 @@ v4 方向重定（删除依据改为"是否已有实现的一部分"）→ **v5 
 
 ---
 
-## 1. 当前状态（2026-09-27，不可达代码三档删除后）
+## 1. 当前状态（2026-09-30，Phase 17 逐簇处置后）
 
 | 指标 | 值 |
 |---|---:|
-| 生产文件 | 906 |
-| CLI 可达 | 864 |
-| CLI 不可达 | 42（仅测试 35 + 零引用 6 + 仅公共 API 1） |
-| 全量测试 | **3961 项**（520 文件 / 3960 通过 / 1 跳过 / 0 失败） |
-| 稳定失败 | **0**（本轮首跑出现的负载敏感项，隔离复跑 47/47 通过） |
+| 生产文件 | 863 |
+| CLI 可达 | 820 |
+| CLI 不可达 | 43（仅测试 35 + 零引用 7 + 仅公共 API 1） |
+| 全量测试 | **4178 项**（486 文件 / 4177 通过 / 1 原有跳过 / 0 失败），251.73 秒 |
+| 稳定失败 | **0**；旧预期、颜色环境假设与负载敏感墙钟断言已分别修正，完整复跑通过 |
 | `tsc -p tsconfig.build.json` | 0 错误 |
-| **import 环** | ✅ **runtime 0 / type-only 0**（`npm run verify:import-cycles`，1426 文件） |
+| **import 环** | ✅ **runtime 0 / type-only 0**（`npm run verify:import-cycles`，1349 文件；混合环另由 packaged judge 检查） |
 | **越界模块** | **7**，均为 advisory（无阻断门禁）；`npm run analyze:module-facades` |
-| NormProof judge | **本地不可用**（`normproof` 不在 registry）；见 §9.29 |
+| NormProof judge | 仓库内置 tgz 可运行：退出 0、verdict partial；循环与导入解析 satisfied，函数上限仍有 advisory（6 模块） |
 | `strict` | ✅ **已对生产开启**（`tsconfig.build.json` `strict: true`） |
-| 文档/规则漂移门禁 | ✅ `verify:docs-drift:strict`（RULES 0 死引用、DOCS **0 dangling**），已接入 `verify-release-core` |
+| 文档/规则漂移门禁 | ✅ `verify:docs-drift:strict`（RULES 0 死引用、DOCS **0 dangling**，未加前缀的源码引用 120 条 advisory），已接入 `verify-release-core` |
+
+当前数字由 `analyze-boundaries.py`、静态门禁与仓库内置 judge 实测。
+Phase 17 未把不可达计数作为删除配额：公共包入口、被消费类型和独有测试支撑保留，
+处置清单及定向证据见 `.wiki/features/phase-17-decisions.md` §8.9。
+内置 judge 在 `selection.ts` / `clickSelect.ts` 间发现混合值/类型环；
+`6584b08f` 改为引用类型原所有者后，两项图义务均满足，54 项测试和 build:ts 通过。
+普通静态门禁分别查值图与类型图，不能据其 0 环结论排除混合环。
 
 > **本条与三档删除的关系**：`production 939→906`、`cliOpaque 124→42` 是
 > `.wiki/refactor/dead-code-tiers-2026-09-27.md` 所记 81 文件 / 20,862 行删除的结果。

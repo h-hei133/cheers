@@ -479,12 +479,12 @@ W6 债务与可达性                  5 项（34-38）
 
 | 波次 | 状态 | 已实施 / 计划交付项 |
 |---|---|---|
-| W1 | 已实施；新构建待 W5 基线修复 | 9 / 9 |
+| W1 | 已实施；W5 已修复构建基线 | 9 / 9 |
 | W2 | 已实施并完成独立复核 | 8 / 8 |
 | W3 | 已实施并完成独立复核 | 5 / 5 |
-| W4 | 实施中 | 2 / 6 |
-| W5 | 待实施 | 0 / 5 |
-| W6 | 待实施 | 0 / 5 |
+| W4 | 已实施并完成独立复核 | 6 / 6 |
+| W5 | 已实施并完成独立复核 | 5 / 5 |
+| W6 | 已逐簇处置并完成独立复核 | 5 / 5 |
 
 ### 8.1 已实施项
 
@@ -512,9 +512,9 @@ W1 波末：静态门禁全部退出 0；脚本测试 40/40。依赖门禁仍报
 - **日志范围**：共享分片枚举、mtime 全序与有界尾读；`/log` 保持当前日志族的范围，不能因复用 metrics 的跨进程读取而清空其他进程日志。导出目标若与输入分片相同，必须在打开写入前拒绝，避免截断源文件。
 - **删除口径**：`index.ts` 仍导出请求包、策略、验证、修复与证明 API；它们不被 CLI 调用不构成删除依据。运行期候选表存在重叠，逐簇核对六项检查，保留类型消费者和公共 API 后再处置行为。
 
-### 8.3 验证限制与待处理基线
+### 8.3 验证限制与构建基线
 
-W1 首次构建退出 2：`cliSessionRuntimeFactory.ts` 的 `CompactionProvider` 未声明调用处已有的 `supportsTemperature`；`googleVertex.ts` 的参数类型要求 `temperature: number`，调用处允许缺省。这两个文件在 W1 无修改，归入 W5 温度能力传递的复核范围。最终构建仍须实际通过，当前不宣称通过。
+W1 首次构建退出 2：`cliSessionRuntimeFactory.ts` 的 `CompactionProvider` 未声明调用处已有的 `supportsTemperature`；`googleVertex.ts` 的参数类型要求 `temperature: number`，调用处允许缺省。这两个文件在 W1 无修改，归入 W5 温度能力传递的复核范围。这是 W1 当时的失败记录。W5 的共享请求体与温度能力传递已修复两处错误；W5/W6 的完整 build 均实际退出 0。
 
 ### 8.4 独立取舍的实施结论
 
@@ -552,3 +552,123 @@ W1 首次构建退出 2：`cliSessionRuntimeFactory.ts` 的 `CompactionProvider`
 定向验证 8 文件 113/113；SGR 8/8。撤销高亮接线后整块多行测试失败；前序颜色注入、禁色和校验撤销也分别失败。独立复核发现启动诊断被掩盖、回退代码失去正文颜色，以及禁色仍执行高亮，均已修正；最终代码 APPROVE、架构 CLEAR。架构复核的 63,800 字符禁色探针由约 55–73 ms 降到 0.033 ms 以下，不据此宣称端到端延迟。
 
 隔离 HOME 的源码 CLI 用无效主题启动，实际输出 Unknown color token: teext，进程退出 0。静态门禁全部退出 0；test:scripts 40/40；call-reachability 为 advisory（包含令牌常量的非调用式使用），类型循环和两处温度构建错误仍待 W5。未使用真实提供方。
+
+
+### 8.7 W4 交付与复核
+
+| 项 | 提交 | 最终行为与验证 |
+|---|---|---|
+| 23 `CTX-07` | `b70b5902` | 逐行读出可恢复记忆并带损坏诊断；坏行和不可读存储阻止变更，保留原字节 |
+| 24 `CTX-06` | `8dcff541` | 追加失败返回 blocked；记忆相关 9/9 |
+| 25 `SES-04` | `2f9dcd49` | metadata 与 registry 使用独占临时文件、fsync 和有界 rename 重试；不再在 rename 失败时覆盖旧目标。存储 12 文件 51/51 |
+| 26 `SES-01` | `58f81280`、`3311f2ba`、`67ae3a6a` | 待办状态经既有 turn sink 持久化，快照不可变，脚本和交互恢复在首帧前重建；相关 37/37、bootstrap/router 21/21 |
+| 27 `OBS-08` | `0d3de5a9`、`ee4bac5d` | 当前日志族跨分片 tail/export/clear；读取容忍单个不可读分片，导出/清空严格报错。17/17 |
+| 28 `OBS-07` | `1f609933` | MCP 分类同时进入结果 metadata 与模型可读文本。25/25 |
+
+持久化的本地命令记录采用 user 角色与 `[Local command result]` 前缀及结构化 metadata，
+不制造缺少调用来源的 tool 消息，也不升级为 system 权限。
+实际恢复参数是 `--session-id ID`，不是早期文档中的 `--resume`。
+隔离 HOME、合成配置的真实 PTY 在普通/全屏下完成待办、退出、print 恢复与交互恢复，均退出 0。
+metadata 与 registry 的 SIGKILL 探针均退出 -9，旧 JSON 保持可解析且字节不变；不宣称覆盖断电持久性。
+独立代码 APPROVE（另跑 bootstrap 13/13），架构 CLEAR（bootstrap 9 个函数声明，运行时环 0）。
+
+### 8.8 W5 交付与复核
+
+| 项 | 提交 | 最终行为与验证 |
+|---|---|---|
+| 29 `PRV-07` / `LOP-05` | `44842ca3` | text/reasoning/replace 任一可见输出后禁止内外层重试；保留已有 retriesExhausted 通道，不新增上下文抹除状态。初验 73/73，撤销守卫后 3 项失败 |
+| 30 `PRV-08` | `168d1c0a` | 两个 Google 端点共用 googleWire 请求体和图片编码；新模型使用嵌套结果 parts，旧模型在所有连续工具响应分组完成后追加图片。45/45，反向 10 项失败 |
+| 31 `PRV-09` | `3ceed5e7`、`cb4883e4`、`4ba647ca` | 共用并扩展拒答词汇；Google JSON/SSE 保留安全停因，未知停因仍是普通错误；带 Network 字样的安全拒答也只请求一次 |
+| 32 `PRV-01` | `ba398a9d` | Anthropic 流内 error 立即结算并取消迭代器，保留此前片段，不消费后续事件。46/46；反向实际失败是错误之后仍产出文本，未以超时作为证据 |
+| 33 `PRV-02` | `154671d6` | `/btw`、压缩与续期透传目录中的温度能力；修复共用契约与类型循环。btw 3/3，相关请求/压缩/传输 40/40，完整 build 退出 0 |
+
+主代理扩大验证 16 文件 293/293；复核发现安全停因被压成 error、内层重试未先排除安全拒答，
+分别修复后独立代码复跑 3 文件 119/119，最终 APPROVE；架构 CLEAR，运行/类型环均 0。
+所有提供方响应均为合成协议数据，没有真实凭据或在线模型成功证据。
+新发现的 Google 次要请求 URL 与 JSON 读取方式不匹配另记登记册 `PRV-12`，
+温度请求体通过不代表该端点的 `/btw` 或压缩已完成在线验证。
+
+### 8.9 W6 交付与逐簇裁决
+
+| 项 | 提交 | 处置与验证 |
+|---|---|---|
+| 34 `TOL-02` / `CDE-01/02` | `c13fa25d` | 删除封闭编辑三角，保留生产原文区间重叠检查；级联替换回归使撤销检查后 1 项失败。21 文件 93/93 |
+| 35 `TOL-01` | `c75d0bb9`、`50771545` | 移除无人读取的 permissions 声明及旧工具白名单；保留实际目标解析和 turn 授权，改用真实 ask/accept-edits 拦截测试。21 文件 241/241 |
+| 36 `CDE-03` | `f69ff3f6` | 审批类型归入 core/shell/approval/contract.ts，删除四个未使用的进程内实现；OS 隔离保持。10 文件 102/102 |
+| 37 `CDE-05` / `PRV-11` | 见下方闭包清单 | 删除未采用的行为，保留持久化类型、公共 API 与独有测试支撑；每簇 build 均通过 |
+| 38 `CDE-06` | `8adc76f9`、`505c7f25`、`609d64cc` | 活跃 smoke 三模块归 browser/smoke；CLI/agent 场景与浏览器支撑按域归 test-utils。smoke 6/6 加 1 原有跳过，CLI/agent 8/8，浏览器 39 套件 221/221 加 1 原有跳过 |
+
+项 37 的独立闭包提交：
+
+- `4a4acf91` 删除无人消费的 provider registry 投影，保留失败分类和 readiness 契约（65/65）。
+- `8bcc42e6` 删除未采用的扩展生命周期/资源描述实现及无消费者字段。
+- `ff4d9900` 删除未使用的图片判定和第二份流式 JSON 包装（13/13）。
+- `ea0d2148` 将 query runtime actionAuthority/batch/proof 收为类型契约。
+- `c67e6311` 将 journal、perFilePatchResultProjection、mixedOperation 收为类型，删除无人使用的 writePolicy；恢复与 codec/continuity 11 文件 42/42。
+- `06b33ffb`、`48123a32` 删除完全无引用的 handoff 投影和 workspaceFileContract。
+- `2cafa35b`、`07e21e80` 删除 contextLayerModel 与 playwrightEvidence 的无人调用行为，保留类型；后续 context/continuation 12 文件 43/43。
+
+**纠正删除口径**：旧表的 37 文件包含重叠候选和活跃公共导出，不能当作删除配额。
+保留 index.ts 及公共契约；actionCache、模拟执行器、runtimeManifest、运行方向/后端诊断、
+startupWarmContextHealth、恢复兼容视图、浏览器评测 runner/report/model 都有独有测试或注入消费者，
+没有证据证明现有运行路径可等价替代。保留理由已追加 `.normproof/dispositions.md`，不改变门禁判定。
+
+初次浏览器并发验证 196 通过 / 3 失败 / 1 跳过，失败集中于子进程退出和缓存负载；
+三个失败套件串行复跑 18/18，完整迁移面串行 221/221。没有弱化断言或新增跳过。
+独立代码 APPROVE：66 处迁移经归一化导入后的 AST 比较一致，另跑 7 文件 73/73；
+架构 CLEAR：1349 文件相对导入零悬空、生产到 test-utils 零反向依赖、运行/类型环均 0。
+本范围改动生产模块均不超过 20 个函数声明；全仓仍有 7 个既有超限模块，不宣称全仓达标。
+
+### 8.10 浏览器守卫与钩子可发现性
+
+`07bade66` 在 newPage 前安装上下文 route，并设置 serviceWorkers:block；
+等待 continue/abort，异常通过 observe 记录未确认处置，不能把处置失败写成阻断成功。
+页内请求继续遵循现有主机规则；origin allowlist 仅约束导航，不在本轮偷偷扩大到全部子资源。
+本机真实 Chromium 与受控私网地址服务器证明子资源和弹窗首请求的服务端计数不增长，
+同时先做可达性正对照。无私网接口时这两项明确跳过；本机未跳过。
+服务器重定向仍可能先触达目标，落点检查之后才拒绝读取，这不是逐跳网络隔离。
+3 文件 20/20 与 build 通过；撤销 context 路由和 worker 禁用后 2 个实机用例失败。
+初版测试误以为子资源使用 origin allowlist，且把 worker 注册 promise 完成误当注册成功；
+读实际主机规则与框架注册实现后纠正测试，未改变既定策略来迎合测试。
+独立复核另跑真实浏览器 7/7；代码 APPROVE、架构 CLEAR。
+
+`46529616` 在既有扩展文档 §2.1.1 列出 18 个钩子事件、载荷、matcher 范围和超时。
+只增加现有机制的文档可发现性，不添加内建消费者或扩展宿主。
+W3 波末双模式真实 PTY 也验证了分页器、改绑后的 f6、鼠标协议归属与退出；
+该探针证明终端交互兼容，不作为色彩外观的截图验收。
+
+
+### 8.11 最终验证与基线分类
+
+最终构建 `npm run build:ts` 退出 0，包含实际 CLI 产物。
+`npm run test:gate:golden-main-path` 退出 0：选中 1 项通过，其余 39 项因名称过滤而不执行。
+
+全量首跑（单线程）486 文件 / 4178 项：4169 通过、8 失败、1 原有 opt-in 跳过。
+8 个失败是 1 个主题名大小写旧预期、7 个依赖环境有颜色的断言；
+`012b4b01` 保留断言并显式设置颜色能力后，6 套件 115/115。
+两线程全量复跑为 4176 通过、1 失败、1 跳过；唯一失败为已有终止帧用例的
+5 秒墙钟阈值在负载下实测 5947 ms，主代理单独复跑 31/31 通过。
+`988847b7` 将该测试改为虚拟时钟，在 4999 ms 明确验证开放连接已完成，保留内容和停因断言；
+31/31 通过，反向把生产宽限时间改为 6000 ms 时用例确实失败，生产文件恢复原字节。
+独立复核 APPROVE，另以名称过滤执行该用例：1 通过、30 未执行。
+最终执行 `VITEST_MAX_THREADS=2 VITEST_MIN_THREADS=1 npm run test:ts` 退出 0：
+486 文件全部通过，4177 项通过、1 原有 opt-in 跳过，耗时 251.73 秒。
+
+推送前静态门禁均退出 0：import-cycles（1349 文件、运行/类型环各 0）、
+config-consumers（39/39）、declarations（18/18 钩子、10/10 工具）、node-floor、
+call-reachability（7 个 advisory，已逐项处置）、docs-drift:strict（规则和文档死链接各 0，
+120 条未加前缀的源码引用为 advisory）；脚本测试 40/40。
+
+隔离 HOME 与嵌套临时 Git 工作区，使用本地合成 HTTP 模型服务完成双模式真实 TUI 回合：
+输入 → write 工具 → Allow once 交互审批 → 实际文件写入 → 最终回复 → 正常退出。
+审批前文件不存在，之后字节精确匹配；transcript 有工具结果和最终回复，state 有 approvalAudit，
+普通屏/全屏均退出 0，总计 4 次本地模型 HTTP 请求。没有真实提供方请求。
+初版探针没有建立独立 Git 根，产品按其现有规则解析到外层仓库；修正探针后通过，
+初版生成的文件和编辑快照已按确切路径清理。另复跑待办双模式持久化与 print/交互恢复，全部通过。
+
+`normproof` 不在 PATH 不代表不可执行：使用仓库内置包
+`npm exec --yes --package ./.normproof/normproof-0.1.0.tgz -- normproof judge` 实际退出 0。
+首次发现 CLI selection 的混合值/类型导入环；`6584b08f` 直接引用类型原所有者后，
+`source_graph_is_acyclic` 与 `source_graph_has_no_unresolved_specifiers` 均 satisfied。
+verdict 仍是 partial：函数上限 advisory 涉及 6 个模块（内置 judge 与 facade 脚本计数口径不同），
+阻断义务和阻断证据缺口都是 0。未通过篡改 profile 或 disposition 降低判定。

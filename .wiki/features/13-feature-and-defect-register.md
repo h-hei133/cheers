@@ -3,7 +3,7 @@ title: "功能与缺陷登记册：持续维护的能力缺口与缺陷总账"
 category: article
 sources: [12-gap-and-debt-research-2, repo-probes-2026-09-29, reference-survey-2026-09-29]
 created: 2026-09-29
-updated: 2026-09-29
+updated: 2026-09-30
 tags: [features, gap-analysis, register, defects, tui, browser, session, provider, memory, dead-code]
 summary: "长期维护的登记册，不是某一阶段的前置研究。登记每一处 demo 级实现、已核实缺陷、接线中断、缺失能力、TUI 体验不足与死代码，每条给出证据等级、参考实现的对应位置与修复方向。与 08/11/12 的关系：那三份是某一轮的盘点与设计，读完即归档；本册是持续更新的总账，新发现追加而不重写。第一版覆盖 TUI 表面、主题与色彩、slash 命令面、浏览器栈、会话持久化、provider 协议、上下文与记忆、工具与执行、平台集成、CLI 与发布面、死代码可达性十一类。"
 confidence: high
@@ -70,6 +70,13 @@ confidence: high
 - `P3` — 增强、标准符合性、债务。
 
 ---
+
+## 0.4 当前实施状态（2026-09-30）
+
+Phase 17 的 38 个交付项已逐项实施或完成候选保留裁决，另完成浏览器守卫及钩子文档。
+完整提交、定向/反向验证和独立复核见 [phase-17-decisions.md](phase-17-decisions.md) §8。
+下方仍为 OPEN 的其他登记项不自动纳入本阶段；锁 fencing、扩展宿主、分栏侧栏和真实提供方验证
+继续遵循已有独立裁决。新增 PRV-12 明确记录次要 Google 请求协议不一致。
 
 ## 1. 本轮方法
 
@@ -702,7 +709,9 @@ TOTAL browser non-test modules: 164
 > 教训：**「两条路径都不经过」不等于「没有入口」**；
 > 判定死码必须用**全入口闭包**，不能用「某几条路径的差集」。
 
-### BRW-01 · 请求守卫是**页级**的，而注释宣称**上下文级、覆盖每个页面与弹窗** — `OPEN` `P1` `CONFIRMED`
+### BRW-01 · 请求守卫是**页级**的，而注释宣称**上下文级、覆盖每个页面与弹窗** — `FIXED` `P1` `CONFIRMED`
+
+**2026-09-30 实施/裁决**：07bade66：建页前安装 context.route 并禁用 Service Worker，覆盖弹窗首请求。真实 Chromium 7/7、相关共 20/20；可达私网服务器请求计数证明阻断。服务器重定向可能先触达目标，保留落点拒绝，不宣称逐跳网络隔离。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 `sessionManager.ts:415-417`：
 
@@ -742,7 +751,9 @@ private async installRequestGuard(page: PwPage): Promise<void> {
 弹窗若需单独处理，加 `context.on("page")` 再补一次。**并修掉那段注释**
 ——它现在描述的是一个不存在的实现（这也是 TUI 之外的第二处「注释说谎」实例）。
 
-### BRW-02 · 同一段注释在另一个方向也已经过时 — `OPEN` `P3` `CONFIRMED`
+### BRW-02 · 同一段注释在另一个方向也已经过时 — `FIXED` `P3` `CONFIRMED`
+
+**2026-09-30 实施/裁决**：07bade66：删除 main-frame-only、逐重定向拦截等错误注释；明确页内请求遵循主机规则，导航遵循 allowlist；处置 Promise 均 await/catch。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 同一注释块 `:188-196` 说：
 
@@ -861,7 +872,9 @@ grep -rn "Simulated click\|Simulated navigat\|Simulated Session" packages/ts-she
 > 本节由子代理 `W2SessionDurability` 产出（36m41s，成功返回），
 > **主代理逐条复验**。复验改判了两处（SES-05 的严重度、SES-04 的影响面）。
 
-### SES-01 · 用户键入的 `/todo` 不入库，跨 `--resume` 丢失 — `OPEN` `P1` `CONFIRMED`
+### SES-01 · 用户键入的 `/todo` 不入库，恢复会话后丢失 — `FIXED` `P1` `CONFIRMED`
+
+**2026-09-30 实施/裁决**：58f81280、3311f2ba、67ae3a6a：待办本地状态通过现有消息持久化，恢复在交互首帧前完成。实际参数是 `--session-id ID`；两种屏幕的真实 PTY 创建与恢复、print 恢复均退出 0。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 **三层事实**（子代理与主代理各自独立复现）：
 
@@ -938,7 +951,9 @@ to stop the first from …」。年龄阈值 `STALE_LOCK_AGE_MS = 60_000`（`:29
 或删掉整条通知机制（`writeTakeoverNotice` 的 `catch` 已经声称「The notice is a record,
 not a requirement」，那就说明它不是必需品）。**不能保留一句话描述它被读、而它不被读。**
 
-### SES-04 · `metadata.json` / `current-session.json` 写入**非原子** — `OPEN` `P2` `CONFIRMED`（影响面已修正）
+### SES-04 · `metadata.json` / `current-session.json` 写入**非原子** — `FIXED` `P2` `CONFIRMED`（影响面已修正）
+
+**2026-09-30 实施/裁决**：2f9dcd49：metadata 与当前会话注册表改用独占临时文件、fsync、rename。12 文件 51/51，两个 SIGKILL 探针保留旧 JSON；不宣称断电持久性。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 `session/store/sessionStore.ts:52-61`：
 
@@ -1045,7 +1060,9 @@ fs.writeFileSync(input.layout.metadataPath, JSON.stringify(metadata, null, 2), "
 
 **结论**：16-K 的七项**全部成立**，无回归。
 
-### PRV-01 · Anthropic 在流内 `error` 之后仍等 EOF，与 Bedrock 的处置相反 — `OPEN` `P2` `CONFIRMED`
+### PRV-01 · Anthropic 在流内 `error` 之后仍等 EOF，与 Bedrock 的处置相反 — `FIXED` `P2` `CONFIRMED`
+
+**2026-09-30 实施/裁决**：ba398a9d：流内 error 立即结束、取消迭代器，保留此前片段并忽略后续事件。46/46；反向用例因后续文本被产出而失败。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 `provider/endpoints/anthropicMessages.ts:471-475`：
 
@@ -1069,7 +1086,9 @@ Phase 16 的 12 号文档已记此项；**本轮确认仍未修**（并补上了
 **方向**：把 `continue` 改为立即 throw（保留 `drain()` 已产出的 fragment，
 与 `:509-515` 的 `catch` 分支同一模式）。
 
-### PRV-02 · 次要模型调用的 `supportsTemperature` 是**硬编码 `false`** — `OPEN` `P2` `CONFIRMED`
+### PRV-02 · 次要模型调用的 `supportsTemperature` 是**硬编码 `false`** — `FIXED` `P2` `CONFIRMED`
+
+**2026-09-30 实施/裁决**：154671d6：次要请求与压缩使用目录温度能力，续期也传递；btw 3/3，相关请求/压缩/传输 40/40，build 通过。仅验证请求形状，Google 次要通路的另一个问题见 PRV-12。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 全部 `endpointBody` 调用点只有两个（`grep` 证实）：
 
@@ -1093,7 +1112,9 @@ Phase 16 的 12 号文档已记此项；**本轮确认仍未修**（并补上了
 **注意**：`request/completion.ts:85-87` 的 `!== undefined` 判断本身是对的
 （区分「不知道」与「明确为假」），不要改成 `?? false`。
 
-### PRV-03 · `content_filter` 被当作**终止帧**，于是**不进入拒答分类** — `OPEN` `P2` `CONFIRMED`
+### PRV-03 · `content_filter` 被当作**终止帧**，于是**不进入拒答分类** — `FIXED` `P2` `CONFIRMED`
+
+**2026-09-30 实施/裁决**：3ceed5e7、cb4883e4、4ba647ca：停因进入共享拒答分类；Google 安全原因跨适配器保留，内层重试也先排除拒答。独立相关 119/119。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 这是本轮**新增**的一条，Phase 16 未记。
 
@@ -1157,7 +1178,9 @@ Phase 16 的 12 号文档已记此项；**本轮确认仍未修**（并补上了
 - 凭据路径（`grep -n "Bearer" provider/` 有 114 行命中，未逐条读）——
   **凭据面是两次 `content_filter` 终止的读面，按本仓纪律留给维护者或后续轮次**。
 
-### PRV-07 · **部分输出后的流失败会被外层循环重跑整个 step** — `OPEN` `P1` `CONFIRMED`
+### PRV-07 · **部分输出后的流失败会被外层循环重跑整个 step** — `FIXED` `P1` `CONFIRMED`
+
+**2026-09-30 实施/裁决**：44842ca3：text/reasoning/replace 任一可见输出后都不再自动重试；复用 retriesExhausted，不引入持久化上下文抹除。初验 73/73；撤销后 3 项失败。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 > ⚠️ **本条推翻了我自己 LOP-05 的一半。** 我上一轮写「第 3 层有 `!shownAnything` 守卫
 > ⇒ 已在屏幕上显示过内容的请求不会重试，**三层各有明确边界**」。
@@ -1206,7 +1229,9 @@ noretry | step.ts:385 上下文溢出
 `step.text.length > 0 && step.stopReason === "error"` 时也拒绝重试（更防御，
 但把判断放到两层）。**推荐前者**（改动点单一，且语义就在失败点）。
 
-### PRV-08 · Google GenAI / Vertex **完全丢弃图片块** — `OPEN` `P1` `CONFIRMED`
+### PRV-08 · Google GenAI / Vertex **完全丢弃图片块** — `FIXED` `P1` `CONFIRMED`
+
+**2026-09-30 实施/裁决**：168d1c0a：两个端点共用 googleWire 图片编码；新旧模型工具结果形状分别处理，旧模型图片放在连续工具响应分组之后。45/45，反向 10 项失败；未做真实提供方调用。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 `provider/endpoints/googleWire.ts` 的 `textOf(content)` 在
 `content` 不是字符串时返回 `''`（`:65` 一带），于是
@@ -1226,7 +1251,9 @@ noretry | step.ts:385 上下文溢出
 **这是「同一缺陷在多端点重复、只修了一处」的又一例**——
 与本册 TOL-01/`bridgeSafe`、SES-06 同型。
 
-### PRV-09 · 安全拒答的 `finishReason` 只在 `content_filter` 一个值上被识别 — `OPEN` `P2` `CONFIRMED`
+### PRV-09 · 安全拒答的 `finishReason` 只在 `content_filter` 一个值上被识别 — `FIXED` `P2` `CONFIRMED`
+
+**2026-09-30 实施/裁决**：3ceed5e7、cb4883e4、4ba647ca：共享拒答词汇扩展、适配器透传安全停因、内外重试一致；unknown/malformed 仍归普通 error。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 `turn/step.ts:729-740` 的 `emptyAnswerExplanation` **只判 `content_filter`**：
 
@@ -1264,7 +1291,9 @@ T3 修的是**同进程内**换模型后的计价，**没有涉及跨进程**。
 
 **方向**：把 telemetry 快照随会话落盘（`state.json` 的既有扩展点），resume 时载回。
 
-### PRV-11 · `provider/**` 与 `model-adapters/**` 的死码（**新发现，此前未登记**） — `OPEN` `P3` `CONFIRMED`
+### PRV-11 · `provider/**` 与 `model-adapters/**` 的死码（**新发现，此前未登记**） — `FIXED` `P3` `CONFIRMED`
+
+**2026-09-30 实施/裁决**：4a4acf91、ff4d9900、07e21e80：移除无人消费的 registry 投影、hasImageContent、parseStreamingJson 和第二套浏览器映射；保留失败分类、readiness 与类型。逐簇 build 通过。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 子代理 `F2ProviderTables` 报了三处，**主代理逐条 grep 复验，全部成立**：
 
@@ -1286,6 +1315,23 @@ T3 修的是**同进程内**换模型后的计价，**没有涉及跨进程**。
 **方向**：删 `projectProviderRegistry` 及其 15 个私有函数、
 `packet.ts`、两个未用导出。**先确认**没有测试依赖它们的**行为**
 （测试引用不算生产消费者，但删前要知道会动哪些测试）。
+
+### PRV-12 · Google 次要请求使用流式 URL，却按单个 JSON 响应读取 — `OPEN` `P2` `CONFIRMED`
+
+**2026-09-30 新发现，读码确认**：`provider/request/completion.ts` 的
+`requestSimpleCompletion` 与 `core/query/compaction/summarize.ts` 的
+`requestCompactionSummary` 都调用 `endpointUrl` 后执行 `res.json()`。
+两个 Google 端点的 path 均为 `streamGenerateContent`，其中 Vertex 明确请求 `alt=sse`；
+`readGoogleBody` 接受单个候选文档，不接受 SSE 文本或数组。
+因此次要通路的 URL/响应解码契约不一致。该问题早于本轮温度能力修复。
+
+**影响与证据边界**：影响 `/btw` 与压缩的 Google 请求；本轮温度测试仅证明 body 的字段传递，
+没有真实提供方调用，不能把该测试推广为通路成功。
+**后续修复方向**：由端点所有者明确区分单次与流式路径，或统一复用已存在的流读取器；
+先对照底层 SDK 对两种方法的使用，再以 URL 与真实响应格式成对的合成测试验证。
+不新增第二份 Google 内容转换器。
+
+---
 
 ## 8. 上下文与记忆（`CTX`）
 
@@ -1466,7 +1512,9 @@ return results.length > 0 && results.every((result) => result.terminate === true
 立刻 `if (signal?.aborted)`。`loop.ts:306-310` 在中止时仍发出
 `turn_end` + `agent_end`（不静默退出）。**健全。**
 
-### LOP-05 · 两层重试分工**有缺口**：内层守卫只管内层 — `OPEN` `P1` `CORRECTED`
+### LOP-05 · 两层重试分工**有缺口**：内层守卫只管内层 — `FIXED` `P1` `CORRECTED`
+
+**2026-09-30 实施**：44842ca3、4ba647ca：可见输出禁止内外层自动重试，拒答词汇先于网络错误判断；独立相关 119/119 通过。以下保留修复前研究记录。
 
 > ⚠️ **本条初稿判定为「已核实健全」，是错的。** 详见 **PRV-07** 的完整证据链。
 > 我当初只读到 `turn/step.ts:479` 的 `!shownAnything` 守卫就下了结论，
@@ -1491,7 +1539,9 @@ grep -n 'errorStep(|failedStep(' turn/step.ts   -> 只有 :429-430 传了 `tried
 （`TOL-02` 把生产实现判为更弱、浏览器表把 12 个装配模块判为死码、本条）。
 **三次都是同一个模式：只看了一层就断言这一层的行为。**
 
-### CTX-06 · 记忆文件只读时**未捕获的 EACCES 直接抛出** — `OPEN` `P1` `CONFIRMED`
+### CTX-06 · 记忆文件只读时**未捕获的 EACCES 直接抛出** — `FIXED` `P1` `CONFIRMED`
+
+**2026-09-30 实施/裁决**：8dcff541：追加失败返回 blocked，不泄漏未捕获异常；与损坏读写边界共同通过 9/9。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 `memory/projectMemoryLocalStore.ts:109-118` 的 `mkdirSync` **有** try/catch，
 其注释明确写「A read-only checkout is a normal thing to work in. The write is refused
@@ -1519,7 +1569,9 @@ CTX-06 read-only file, second write THREW: EACCES: permission denied,
 `blocked("project-memory-local-store:write-unavailable", …)`，与另外两个方法一致。
 **这是一个 catch 块的差距，不是设计问题**——注释已经写出了正确意图。
 
-### CTX-07 · JSONL 任一行损坏 ⇒ `list()` / `health()` **整体抛异常** — `OPEN` `P1` `CONFIRMED`
+### CTX-07 · JSONL 任一行损坏 ⇒ `list()` / `health()` **整体抛异常** — `FIXED` `P1` `CONFIRMED`
+
+**2026-09-30 实施/裁决**：b70b5902：逐行读取存活记录并报告诊断；损坏或不可读存储阻止变更、保留原字节。读取许可与写入许可已区分。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 `memory/memoryPersistence.ts:31-36`：
 
@@ -1591,7 +1643,9 @@ CTX-07 health() THREW: Unexpected token 'N', "NOT_JSON" is not valid JSON
 > 沙箱双实现、以及执行运行时的几处检查。**未覆盖**：每个内置工具的逐字段核对、
 > 编辑路径的完整原子性、重试/分类表。缺口列在 §14。
 
-### TOL-01 · `ToolDefinition.permissions` 17 处声明、**零读取者** — `OPEN` `P2` `CARRIED-OVER`
+### TOL-01 · `ToolDefinition.permissions` 17 处声明、**零读取者** — `FIXED` `P2` `CARRIED-OVER`
+
+**2026-09-30 实施/裁决**：c75d0bb9、50771545：删除无人消费的权限声明和旧白名单，实际目标解析、turn 授权和 hook 仍在。21 文件 241/241，build 通过。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 > **更正**：本节初稿写「与已删的 `bridgeSafe` 同型——**第二次出现**」，
 > **这是错的**。核实后：它**就是** Phase 15 §16.3 已登记的那一条
@@ -1627,7 +1681,9 @@ grep -rn "tool\.permissions\|def\.permissions\|\.permissions\.check"  -> 零命�
 若确实预期接上，则应写进 disposition 并给出接入点，而不是继续留着 17 处空实现。
 **这是本册里「最容易做、最容易反复」的一条**——它已经以 `bridgeSafe` 的名字被删过一次。
 
-### TOL-02 · `edit/patch` 三角：**判定删除**（一套更弱的检测器） — `FIXED`（决策）, `OPEN`（执行） — `CONFIRMED`
+### TOL-02 · `edit/patch` 三角：**判定删除**（一套更弱的检测器） — `FIXED` — `CONFIRMED`
+
+**2026-09-30 实施/裁决**：c13fa25d：执行删除封闭三角，保留生产原文区间检查及不相交级联回归。21 文件 93/93，撤销生产检查后回归失败；此前候选误报断言仍只保留历史证据等级。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 > ⚠️ **本条推翻了我自己上一句结论**。§9 初稿写「`edits[]` 分段形式**没有重叠检查**」，
 > 并据此建议「先验证再二选一」。**那句是错的。** 子代理 `H2EditAtomicity`
@@ -1665,7 +1721,9 @@ for (let index = 1; index < ordered.length; index += 1) {
 而真相是**生产实现更好、候选实现更差**。
 「没找到反例」不等于「候选更强」——必须**反向也测一次**（候选会不会误报）。
 
-### TOL-03 · 沙箱有两套，活的是 OS 级那套 — `OPEN` `P2` `CONFIRMED`
+### TOL-03 · 沙箱有两套，活的是 OS 级那套 — `FIXED` `P2` `CONFIRMED`
+
+**2026-09-30 实施/裁决**：f69ff3f6：移除未采用的进程内沙箱四类；活跃审批类型归 core/shell/approval/contract.ts，OS 隔离保留。10 文件 102/102。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 | 实现 | 规模 | 状态 |
 |---|---|---|
@@ -1816,7 +1874,9 @@ something to take back」。所以**并非「零回滚能力」**——
 >
 > **OBS-01 / OBS-02 见下方**（`/marketplace` 的假 URL 与 `/plugin` 的诚实登记簿）。
 
-### OBS-03 · 18 个钩子事件**全部有派发点，但内建消费者只覆盖 1 个** — `OPEN` `P2` `CONFIRMED`
+### OBS-03 · 18 个钩子事件**全部有派发点，但内建消费者只覆盖 1 个** — `FIXED` `P2` `CONFIRMED`
+
+**2026-09-30 实施**：46529616：既有扩展文档 §2.1.1 已列出 18 个事件、载荷字段、配置示例与匹配/超时边界；本阶段只补文档可发现性，不新增内建消费者。以下是研究历史。
 
 **先明确两个不同的门禁**：`npm run check:declarations` 报
 `hook_events=18 dispatched=18`——它证明的是**每个声明的事件都有一个派发点**。
@@ -1880,11 +1940,15 @@ ShellSessionRuntime.deps.runPrompt                       core/shell/sessionRunti
 
 **方向**：不改（性能），但**把它写进 disposition**，因为它会在每一轮被重新发现。
 
-### OBS-05 · 18 个钩子事件的用户可见性为零 — `OPEN`（并入 OBS-03）
+### OBS-05 · 18 个钩子事件的用户可见性为零 — `FIXED`（并入 OBS-03）
+
+**2026-09-30 实施**：46529616：既有扩展文档 §2.1.1 已列出 18 个事件、载荷字段、配置示例与匹配/超时边界；本阶段只补文档可发现性，不新增内建消费者。以下是研究历史。
 
 不单独登记，见 OBS-03 的「方向」。
 
-### OBS-07 · MCP 的错误分类**到不了模型**：`mcpFailureMetadata` 零消费者 — `OPEN` `P2` `CONFIRMED`
+### OBS-07 · MCP 的错误分类**到不了模型**：`mcpFailureMetadata` 零消费者 — `FIXED` `P2` `CONFIRMED`
+
+**2026-09-30 实施/裁决**：1f609933：MCP class/plane 同时进入 metadata 与模型可见错误文本；25/25。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 `core/mcp/errorTaxonomy.ts` 定义了一套完整分类
 （`McpFailureClass`、`McpFailurePlane`、`safeDetail`、`McpClassifiedError`），
@@ -1914,7 +1978,9 @@ ShellSessionRuntime.deps.runPrompt                       core/shell/sessionRunti
 
 **方向**：`catch` 里传 `mcpFailureMetadata(error)`——函数已经写好，一个参数的事。
 
-### OBS-08 · `/log tail` 只读**当前一个**分片，写多了就读不到 — `OPEN` `P2` `CONFIRMED`
+### OBS-08 · `/log tail` 只读**当前一个**分片，写多了就读不到 — `FIXED` `P2` `CONFIRMED`
+
+**2026-09-30 实施/裁决**：0d3de5a9、ee4bac5d：tail/export/clear 都按当前日志族枚举轮转分片；读面容忍单分片失败，导出/清空严格返回失败。17/17。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 **探针**（真实 `RotatingFileSink`，1KB 触发轮转）：
 
@@ -2243,7 +2309,9 @@ const output = frames.map((frame) => renderSidebarLivePanelFrame(frame)).join("\
 
 ## 12. 死代码与模块卫生（`CDE`）
 
-### CDE-01 · 完全不可达 12 文件 / 1,349 行 — `OPEN` `P2` `CONFIRMED`
+### CDE-01 · 完全不可达 12 文件 / 1,349 行 — `FIXED` `P2` `CONFIRMED`
+
+**2026-09-30 实施/裁决**：完成逐项处置：c13fa25d 删除编辑三角，06b33ffb/48123a32 删除零引用投影与契约，入口 shim 在 W1 已删。eval/browser 有实际场景消费者，index.ts 是公共包入口，保留；旧表不是删除配额。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 | 文件 | 行数 | 类别 |
 |---|---|---|
@@ -2260,7 +2328,9 @@ const output = frames.map((frame) => renderSidebarLivePanelFrame(frame)).join("\
 | `edit/patch/plan/fencedEditMapping.ts` | 24 | 三角成员 |
 | `index.ts` | 56 | 见 CDE-04 |
 
-### CDE-02 · `edit/patch` 三角：一套更严格的冲突检测写好了没接上 — `OPEN` `P2` `CONFIRMED`
+### CDE-02 · `edit/patch` 三角：一套更严格的冲突检测写好了没接上 — `FIXED` `P2` `CONFIRMED`
+
+**2026-09-30 实施/裁决**：c13fa25d：实际生产检查比候选更合适，已删除封闭三角并保留回归。不能继续把生产检查描述为“没有重复/重叠检测”。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 三者互相引用成一个**封闭三角**，无任何外部消费者（连类型边都没有）：
 
@@ -2283,7 +2353,9 @@ edit/patch/apply/conflict.ts (219)
 **强则接入、弱则删除**——不要既不接也不删。
 这一条是本册里**唯一一条可能需要「接入而非删除」的死码**，值得单独立项。
 
-### CDE-03 · `sandbox/` 内 834 行进程内沙箱模型从未被实例化 — `OPEN` `P1` `CONFIRMED`
+### CDE-03 · `sandbox/` 内 834 行进程内沙箱模型从未被实例化 — `FIXED` `P1` `CONFIRMED`
+
+**2026-09-30 实施/裁决**：f69ff3f6：活跃类型归真正审批所有者，四个无人实例化的类及出口删除。权限检查旧类型的消费者已随死声明删除；OS 执行通路不变。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 | 文件 | 行数 | 被谁用 |
 |---|---|---|
@@ -2313,7 +2385,9 @@ edit/patch/apply/conflict.ts (219)
 `permissionContext.ts` 引的是 `sandbox/index.js`，即**删除会牵动它**。
 这一步要按 §2.2 的六项检查逐条走。
 
-### CDE-04 · `index.ts` 的 15 文件岛，9 个目标只有类型引用 — `OPEN` `P2` `CONFIRMED`
+### CDE-04 · `index.ts` 的 15 文件岛，9 个目标只有类型引用 — `WONTFIX` `P2` `CONFIRMED`
+
+**2026-09-30 实施/裁决**：保留公共包 API。68dabc14 已修 main 为 dist/index.js，并完成真实导入验证；不被 CLI 调用不构成删除公共出口的依据。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 `packages/ts-shell/src/index.ts`（56 行）是包的公共 API 面（`package.json` 的 `main` 指向它，
 见 BLD-01）。它自身**完全不可达**，`export ... from` 的 9 个目标中：
@@ -2340,7 +2414,9 @@ edit/patch/apply/conflict.ts (219)
 若不发布（当前无任何内部消费者），整个岛连同 `main`/`files` 声明一起删。
 **需一次产品决定**。
 
-### CDE-05 · 运行期死码 37 文件 / 6,691 行 — `OPEN` `P2` `CONFIRMED`
+### CDE-05 · 运行期死码 37 文件 / 6,691 行 — `FIXED` `P2` `CONFIRMED`
+
+**2026-09-30 实施/裁决**：本阶段逐簇处置完成，不代表所有候选都删除。详见 phase-17-decisions.md §8.9：journal/query/context/browser 保留被消费类型；公共 API、独有测试/注入能力保留并追加 disposition，旧 37 文件计数存在交叠。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 「有运行期导出（`export function|const|class|enum`）但只被 `import type` 引用」。
 最大几簇：
@@ -2360,7 +2436,9 @@ edit/patch/apply/conflict.ts (219)
 `.normproof/dispositions.md` 的 disposition 行（该协议要求「反复出现的发现先尝试修，
 只有真正决定延后时才记录」）。
 
-### CDE-06 · `core/harness/` 位置错（29 文件在 `core/` 下但只被测试用）— `OPEN` `P3` `CONFIRMED`
+### CDE-06 · `core/harness/` 位置错（29 文件在 `core/` 下但只被测试用）— `FIXED` `P3` `CONFIRMED`
+
+**2026-09-30 实施/裁决**：8adc76f9、505c7f25、609d64cc：活跃 smoke 归 browser/smoke，其他场景支撑按域归 test-utils。66 处迁移经 AST 对比行为不变；浏览器 39 文件 221 通过/1 原有跳过，build 通过。 以下保留修复前研究事实；当前结果以本注及阶段实施记录为准。
 
 自建可达图把 `core/harness/**` 的 29 个非测试模块排除在「生产」口径外——
 它们是**场景夹具与 runner**，被各自的 `*.test.ts` 直接 import
