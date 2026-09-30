@@ -61,6 +61,14 @@ jobs:
       - name: Build TypeScript packages
         run: npm run build:ts
 
+      - name: Install native search test dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y ripgrep
+
+      - name: Install Chromium test dependency
+        run: node node_modules/playwright-core/cli.js install --with-deps chromium
+
       - name: Run Focused & Unit Tests
         run: npm run test:ts
 
