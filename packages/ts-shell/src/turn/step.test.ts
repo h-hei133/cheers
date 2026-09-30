@@ -6,6 +6,7 @@ import { createStepFunction, CONTEXT_OVERFLOW_PREFIX, isContextOverflow } from "
 import { getSessionUsage, resetSessionUsage } from "../observability/usageTelemetry.js";
 import { writeProjectState } from "../core/state/projectState.js";
 import { declareEndpoint } from "../provider/endpoints/index.js";
+import { runAgentLoop } from "../core/agent/loop.js";
 
 /**
  * The step is the only place a provider is spoken to. What matters here is
@@ -33,6 +34,35 @@ function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {
 }
 
 describe("createStepFunction", () => {
+  it.each(["content", "reasoning_content"])("does not retry partial %s at the outer loop", async (channel) => {
+    let requests = 0;
+    const shown: string[] = [];
+    const step = createStepFunction({ ...request, fetchImpl: async () => {
+      requests++;
+      return new Response(new ReadableStream<Uint8Array>({ start(controller) {
+        controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { [channel]: "already seen" } }] })}\n\n`));
+        setTimeout(() => controller.error(new Error("connection lost")), 5);
+      } }), { headers: { "content-type": "text/event-stream" } });
+    } });
+    const produced = await runAgentLoop([{ role: "user", content: "hello" }], [], {
+      retry: { maxRetries: 2, baseDelayMs: 0, maxDelayMs: 0 },
+      streamStep: (messages, signal) => step(messages, signal, {
+        onText: (text) => shown.push(text), onReasoning: (text) => shown.push(text),
+      }, { allowTools: true }),
+    }, () => {}, undefined);
+    expect(requests).toBe(1);
+    expect(shown).toEqual(["already seen"]);
+    expect(produced.at(-1)?.stopReason).toBe("error");
+  });
+
+  it("marks returned error completions after visible output as non-retryable", async () => {
+    const step = createStepFunction({ ...request, fetchImpl: async () => jsonResponse({
+      choices: [{ message: { content: "partial answer" }, finish_reason: "error" }],
+    }) });
+    const result = await step([], undefined, {}, { allowTools: true });
+    expect(result).toMatchObject({ text: "partial answer", stopReason: "error", retriesExhausted: true });
+  });
+
   it("reports a cancelled request as an aborted step, not a network failure", async () => {
     const controller = new AbortController();
     const step = createStepFunction({

@@ -326,12 +326,17 @@ export function createStepFunction(request: StepRequest): StepFunction {
         ...listener,
         onText: (delta) => {
           shown += delta;
-          shownAnything = true;
+          shownAnything ||= delta.length > 0;
           listener.onText?.(delta);
         },
         onReasoning: (delta) => {
-          shownAnything = true;
+          shownAnything ||= delta.length > 0;
           listener.onReasoning?.(delta);
+        },
+        onReplace: (text) => {
+          shown = text;
+          shownAnything ||= text.length > 0;
+          listener.onReplace?.(text);
         },
       };
       // Send the request, retrying a transient failure. A refusal of
@@ -472,7 +477,10 @@ export function createStepFunction(request: StepRequest): StepFunction {
             promptMessageCount: messages.length + 1,
           });
         }
-        return stamp(toStep(completion, watched));
+        const completed = toStep(completion, watched);
+        return stamp(shownAnything && completed.stopReason === "error"
+          ? { ...completed, retriesExhausted: true }
+          : completed);
       } catch (error) {
         if (signal?.aborted) return stamp(abortedStep(shown));
         const detail = error instanceof Error ? error.message : String(error);
@@ -489,7 +497,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
         // and discarding it would take away what they already saw. Both facts
         // travel: the text is what was said, `stopReason` is that it stopped
         // early.
-        return stamp(failedStep(`Network error: ${error instanceof Error ? error.message : String(error)}`, shown));
+        return stamp(failedStep(`Network error: ${error instanceof Error ? error.message : String(error)}`, shown, undefined, shownAnything || streamAttempts > 0));
       } finally {
         // Reading ends as soon as the answer is complete, which can be before
         // the host closes the stream — a keep-alive proxy holds the connection
