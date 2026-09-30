@@ -48,6 +48,7 @@ import { runCliWorkspaceCommand } from "./cliWorkspaceModule.js";
 import { renderUserHelp, renderSessionCommandMap } from "./slashCommandRegistry.js";
 import { describeCompaction, parseCompactCommand } from "../cli/interactive/compact.js";
 import { getRuntimeConfig } from "../config/runtimeConfig.js";
+import { formatViewModeStatusLines, formatViewModeUpdatedLine } from "./cliDisplayProjection.js";
 
 export async function runNonTtyPromptStream(options: {
   sessionManager: SessionManager;
@@ -266,6 +267,20 @@ export async function runNonInteractivePrompt(options: {
     return;
   }
   if (resolved.kind === "shell-action") {
+    if (resolved.slashResult.action === "show-view") {
+      for (const line of formatViewModeStatusLines({ viewMode: options.sessionRuntime.getViewMode() })) {
+        options.renderer.renderLine(line);
+      }
+      return;
+    }
+
+    if (resolved.slashResult.action === "set-view") {
+      const nextMode = resolved.slashResult.viewMode ?? "compact";
+      options.sessionRuntime.setViewMode(nextMode);
+      options.renderer.renderLine(formatViewModeUpdatedLine({ viewMode: nextMode }));
+      return;
+    }
+
     if (resolved.slashResult.action === "show-help") {
       renderUserHelp(options.renderer);
       return;

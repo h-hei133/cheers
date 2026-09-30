@@ -62,6 +62,7 @@ import {
   runMcpShellAction,
   runPermissionsShellAction,
   runPwdShellAction,
+  runViewShellAction,
   runWorkspaceShellAction,
 } from "./shellActionRuntime.js";
 import type { CommandDefinition } from "./types.js";
@@ -342,6 +343,17 @@ export function createCommandRegistry(
       group: "workspace",
       argumentHint: "[setting]",
       execute: (args, context) => runSettingsCommand(args, context),
+    },
+    {
+      name: "view",
+      kind: "shell-action",
+      availability: "available",
+      enabled: true,
+      summary: "inspect or switch between user and developer output",
+      argumentHint: "[status|user|developer]",
+      group: "workspace",
+      getArgumentCompletions: (prefix) => subcommandCompletions("view", prefix),
+      execute: (args, context) => runViewShellAction(args, context),
     },
     {
       name: "theme",

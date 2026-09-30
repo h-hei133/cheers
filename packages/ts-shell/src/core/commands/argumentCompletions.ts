@@ -31,6 +31,7 @@ const SUBCOMMAND_VALUES = {
   fast: ["on", "off", "toggle", "enable", "disable"],
   log: ["tail", "path", "export", "clear"],
   todo: ["add", "start", "done", "clear"],
+  view: ["status", "user", "developer"],
   goal: ["pause", "resume", "complete", "clear"],
   workflow: ["list", "run", "status"],
   marketplace: ["list", "add", "remove", "rm", "delete"],

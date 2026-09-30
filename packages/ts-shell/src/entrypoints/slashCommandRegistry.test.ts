@@ -22,6 +22,7 @@ describe("slash command registry CLI surface", () => {
     expect(getSlashCommand("/continue")?.name).toBe("continue");
     expect(getSlashCommand("c")?.name).toBe("continue");
     expect(isKnownSlashCommand("/workspace")).toBe(true);
+    expect(getSlashCommand("/view")?.argumentHint).toBe("[status|user|developer]");
     expect(isKnownSlashCommand("definitely-missing")).toBe(false);
     expect(listSlashCommands().map((command) => command.name)).toContain("mcp");
   });

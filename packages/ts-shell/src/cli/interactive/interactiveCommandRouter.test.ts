@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
+import { runNonInteractivePrompt } from "../../entrypoints/cliRuntimeModule.js";
 
 function createHarness() {
   const lines: string[] = [];
   let agentMode: "plan" | "build" = "build";
+  let viewMode: "compact" | "verbose" = "compact";
   return {
     lines,
     input: {
@@ -22,8 +24,8 @@ function createHarness() {
         renderLine: (line: string) => lines.push(line),
       } as never,
       sessionRuntime: {
-        getViewMode: () => "compact",
-        setViewMode: () => undefined,
+        getViewMode: () => viewMode,
+        setViewMode: (nextMode: "compact" | "verbose") => { viewMode = nextMode; },
         getAgentMode: () => agentMode,
         setAgentMode: (nextMode: "plan" | "build") => {
           agentMode = nextMode;
@@ -39,10 +41,25 @@ function createHarness() {
       setActiveNonInteractiveApprovalMode: () => undefined,
     },
     getAgentMode: () => agentMode,
+    getViewMode: () => viewMode,
   };
 }
 
 describe("interactive command router", () => {
+  it.each(["interactive", "piped", "print"])("switches and reads the session view in %s mode", async (mode) => {
+    const harness = createHarness();
+    for (const prompt of ["/view developer", "/view status", "/view user"]) {
+      if (mode === "interactive") {
+        await routeInteractiveCommand({ ...harness.input, prompt });
+      } else {
+        await runNonInteractivePrompt({ ...harness.input, prompt, printMode: mode === "print" });
+      }
+      expect(harness.getViewMode()).toBe(prompt === "/view user" ? "compact" : "verbose");
+    }
+    expect(harness.lines.join("\n")).toContain("Current view mode: developer (verbose)");
+    expect(harness.lines.join("\n")).toContain("View mode updated to user (compact)");
+  });
+
   it("routes /compact to the session runtime and prints the outcome", async () => {
     const harness = createHarness();
     const calls: Array<[string, string | undefined]> = [];
