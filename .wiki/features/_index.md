@@ -1733,7 +1733,7 @@ Zero items skipped; every one committed separately with its own revert verificat
 ## 22. Phase 17 规划：前置研究与裁决（**2026-09-30**）
 
 > 文档：[`phase-17-pre-research.md`](phase-17-pre-research.md)（参考实现机制研究）、
-> [`phase-17-decisions.md`](phase-17-decisions.md)（26 项纳入 / 5 波 / 4 项待独立裁决）。
+> [`phase-17-decisions.md`](phase-17-decisions.md)（38 个交付项 / 6 波 / 4 项独立取舍；实施与验证记录见该文）。
 > **零代码改动。** 输入是 13 号登记册的 **70 条 OPEN**（12 P1 / 45 P2 / 11 P3）
 > 加 `phase-16-decisions.md` §4 移出的 16-J…16-N。
 

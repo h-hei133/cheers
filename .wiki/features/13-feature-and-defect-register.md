@@ -304,7 +304,9 @@ wordStart("hello world again", 10)       -> 6     ← 正确
 
 ---
 
-### THM-02 · `fg`/`bg` 无条件追加全局复位，嵌套样式互相破坏 — `OPEN` `P1` `CONFIRMED`
+### THM-02 · `fg`/`bg` 无条件追加全局复位，嵌套样式互相破坏 — `FIXED` `P1` `CONFIRMED`
+
+**2026-09-30 实施**：`864d74dc`：定向复位、合成样式与嵌套属性恢复；移除气泡背景补丁。展示域 539/539；还原旧实现后 11 项失败。以下为修复前记录。
 
 **事实**：`theme.ts:139-146`
 
@@ -423,7 +425,9 @@ Phase 16 的裁决已把该取值删除（与 `fullscreen` 行为逐字节相同
 > 本节回答这一问，分三层：**能不能路由**（CMD-02…CMD-04）、**参数对不对**（CMD-01、CMD-05、
 > CMD-07）、**实现真不真**（CMD-08）。
 
-### CMD-01 · 参数按空白裸切分，带空格的引号参数全仓失效 — `OPEN` `P1` `CONFIRMED`
+### CMD-01 · 参数按空白裸切分，带空格的引号参数全仓失效 — `FIXED` `P1` `CONFIRMED`
+
+**2026-09-30 实施**：`188d7c53`、`616200fd`：共享引号分词，shell 源码交由所属命令处理；主代理重跑命令、模板与接线测试共 114/114，通过 shell 注释与 here-document 回归。 以下事实为修复前记录。
 
 `slashRouter.ts:15`：
 
@@ -449,7 +453,9 @@ const [rawName, ...args] = input.slice(1).split(/\s+/).filter(Boolean);
 
 ---
 
-### CMD-02 · `/view` 有完整实现、有交互侧处理器，但没进注册表，且三处在宣传它 — `OPEN` `P2` `CONFIRMED`
+### CMD-02 · `/view` 有完整实现、有交互侧处理器，但没进注册表，且三处在宣传它 — `FIXED` `P2` `CONFIRMED`
+
+**2026-09-30 实施**：`7b1673fd`：注册已有视图命令，并补齐非交互分支。交互、管道、print 接线测试通过；隔离 HOME 的真实 PTY、print 与管道进程验收通过。以下事实为修复前记录。
 
 - `shellActionRuntime.ts:125-154` 定义 `runViewShellAction`（产出 `show-view`/`set-view`）。
 - `grep -rn runViewShellAction packages/ts-shell/src` → **仅 1 处命中：它自己的声明**。
@@ -548,7 +554,9 @@ pi（`packages/coding-agent/src/core/slash-commands.ts:19-44`）有：
 
 ---
 
-### CMD-07 · `/todo list` 被解析成一条名为 "list" 的新任务 — `OPEN` `P2` `CONFIRMED`
+### CMD-07 · `/todo list` 被解析成一条名为 "list" 的新任务 — `FIXED` `P2` `CONFIRMED`
+
+**2026-09-30 实施**：`139fe6d4`：list 显式列举，未知子命令与错误参数只返回用法，不新建任务。5 个回归场景在旧实现上全部失败。 以下事实为修复前记录。
 
 `todoCommandRuntime.ts:158-171` 的兜底分支：不认识的子命令一律当作**新任务文本**。实机：
 
@@ -881,7 +889,9 @@ to stop the first from …」。年龄阈值 `STALE_LOCK_AGE_MS = 60_000`（`:29
 需要 fencing（`state.json` 里放 epoch、写入前比对）才能真正成立。
 与 `.normproof/dispositions.md` 里那条「租约锁无 fencing，须如实降级其保证」**同一条**。
 
-### SES-03 · 夺取通知写了盘，但**从不被读** — `OPEN` `P2` `CONFIRMED`
+### SES-03 · 夺取通知写了盘，但**从不被读** — `FIXED` `P2` `CONFIRMED`
+
+**2026-09-30 实施**：`66a70f3e`：采用删除无人读取的通知机制方案，保留锁恢复及 finally 释放。11/11 测试通过；恢复旧机制时 2 项失败。没有新增 fencing 保证。 以下事实为修复前记录。
 
 `lockStaleness.ts:53` 定义 `readTakeoverNotice`，其上方 `:49-51` 的文档写：
 
@@ -1939,7 +1949,9 @@ lines on disk across all parts: 60
 
 **未覆盖**：技能体的大小上界（是否 bounded）与本轮未展开的其余 `subagents` 面。
 
-### OBS-01 · `/marketplace` 的默认源是两个不存在的地址 — `OPEN` `P2` `CONFIRMED`
+### OBS-01 · `/marketplace` 的默认源是两个不存在的地址 — `FIXED` `P2` `CONFIRMED`
+
+**2026-09-30 实施**：`413a9141`：删除两个虚构默认源，默认显示空列表及添加用法；两个旧 URL 实测 HTTP 404，9/9 定向测试通过，恢复旧实现时 1 项失败。 以下事实为修复前记录。
 
 `marketplaceCommandRuntime.ts:10-22` 硬编码两个源：
 
@@ -2007,7 +2019,9 @@ printf "say hi\n" | cheers -p --json > out.txt 2> err.txt
 
 ---
 
-### OBS-06 · `/report` 的归档**仍然泄漏绝对路径**（栈帧里的） — `OPEN` `P2` `CONFIRMED`
+### OBS-06 · `/report` 的归档**仍然泄漏绝对路径**（栈帧里的） — `FIXED` `P2` `CONFIRMED`
+
+**2026-09-30 实施**：共享脱敏器增加报告专用路径归一选项，保留项目相对位置与外部文件名/行号；覆盖驱动器、共享路径、文件 URL、空格及异步匿名帧。解码后再次过滤秘密与原始内容。36/36 定向测试使用系统 unzip 检查实际内容；绕过路径规则后 21 项失败。以下为修复前记录。
 
 **发现方式**：本轮在工作区发现两个**未跟踪的归档残留**
 （`./some_argument_xyz`、`./testarg123`，各 1,225 字节，Sep 29 22:54 / 23:07，
@@ -2080,7 +2094,9 @@ unzip -p /tmp/cheers-report-check.zip report.json | grep -o '/home/[A-Za-z0-9_./
 
 ---
 
-### BLD-01 · `packages/ts-shell/package.json` 的 `main` 指向不存在的路径 — `OPEN` `P2` `CONFIRMED`
+### BLD-01 · `packages/ts-shell/package.json` 的 `main` 指向不存在的路径 — `FIXED` `P2` `CONFIRMED`
+
+**2026-09-30 实施**：`68dabc14`：main 改指 dist/index.js。真实包导入在旧值时 ERR_MODULE_NOT_FOUND（退出 1），新值时成功（退出 0）；3/3 smoke 通过。完整构建仍受两项既有类型错误阻断，待 W5。 以下事实为修复前记录。
 
 ```json
 "main": "./dist/packages/ts-shell/src/index.js"
@@ -2109,7 +2125,9 @@ node -e "import('@cheers/ts-shell')"
 
 ---
 
-### BLD-02 · 3 个入口 shim 与 1 个信号处理器完全不可达 — `OPEN` `P2` `CONFIRMED`
+### BLD-02 · 3 个入口 shim 与 1 个信号处理器完全不可达 — `FIXED` `P2` `CONFIRMED`
+
+**2026-09-30 实施**：`b87a5da6`：删除两个重导入口和一个无人调用的信号处理器，测试改测活轨。6 项入口/信号测试及 1 项 CLI 基线场景通过；还原旧测试导入后 3 套件解析失败。生产与脚本旧路径引用为零。 以下事实为修复前记录。
 
 | 文件 | 行数 | 事实 |
 |---|---|---|

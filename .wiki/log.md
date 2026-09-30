@@ -5278,3 +5278,5 @@ serving stale rows from five untracked mutation sites (16-F).
 **本轮复核**没有**推翻复核者**（前几轮每轮 4-6 条），原因写进 decisions §7.3.4：
 brief 把证据门槛写死（无 `file:line` 的 `wrong` 无效、探针返回空必须换方法），
 且要求复核者**自己跑探针**（`CTX-06` 的 EACCES 与 `OBS-06` 的归档泄漏都由复核者独立复现）。
+
+## [2026-09-30] implement | Phase 17 W1 九项落地：命令参数与视图、待办操作、扩展源默认值、锁通知删除、包入口、入口包装器、嵌套样式、报告路径脱敏。定向及反向测试、静态门禁、40 项脚本测试、隔离真实 PTY 与管道验收通过；两处既有温度类型构建错误待 W5 修复，尚未推送。详见 features/phase-17-decisions.md §8。
