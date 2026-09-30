@@ -1,5 +1,5 @@
 import { defaultTheme } from "../../theme/theme.js";
-import { formatCommandLine } from "../../theme/commandHighlight.js";
+import { highlightCode } from "../../theme/syntax.js";
 import { padToWidth, truncateToWidth, wrapToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
 import { DIAGRAM_LANGUAGE, renderDiagram } from "./mermaid.js";
@@ -158,11 +158,10 @@ function renderFence(body: readonly string[], language: string, cells: number): 
   const label = language ? ` ${language} ` : " code ";
   const head = defaultTheme.fg("border", `┌${label}${"─".repeat(Math.max(0, cells - visibleWidth(label) - 2))}┐`);
   const rows = [head];
-  const isBash = language === "bash" || language === "sh" || language === "zsh";
-  for (const line of body) {
+  const highlighted = highlightCode(body.join("\n"), language);
+  for (const line of highlighted.split("\n")) {
     for (const wrapped of wrapToWidth(line, Math.max(1, cells - 4))) {
-      const styled = isBash ? formatCommandLine(wrapped) : defaultTheme.fg("text", wrapped);
-      rows.push(`${defaultTheme.fg("border", "│")} ${styled}`);
+      rows.push(`${defaultTheme.fg("border", "│")} ${wrapped}`);
     }
   }
   rows.push(defaultTheme.fg("border", `└${"─".repeat(Math.max(0, cells - 2))}┘`));

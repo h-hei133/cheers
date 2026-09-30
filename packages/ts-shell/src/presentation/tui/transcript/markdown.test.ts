@@ -3,6 +3,8 @@ import { setDiagramMode } from "./mermaid.js";
 import { renderInline, renderMarkdown, trimPartialFence } from "./markdown.js";
 import { visibleWidth } from "../text/measure.js";
 import { stripAnsi } from "../text/ansi.js";
+import { defaultTheme } from "../../theme/theme.js";
+import { getDefaultTheme } from "../../themes/index.js";
 
 const WIDTH = 40;
 
@@ -51,6 +53,18 @@ describe("block structure", () => {
     expect(stripAnsi(rows[0]!)).toContain("ts");
     expect(plain(rows)).toContain("const x = 1;");
     expect(stripAnsi(rows.at(-1)!)).toMatch(/^└─+┘$/);
+  });
+
+  it("highlights an entire fence before wrapping its lines", () => {
+    defaultTheme.apply(getDefaultTheme(), "truecolor");
+    try {
+      const rows = renderMarkdown("```js\n/* first\nsecond */\nconst value = 1234567890;\n```", 18);
+      expect(rows[2]).toContain(defaultTheme.fg("muted", "second */"));
+      expect(rows[3]).toContain(defaultTheme.fg("commandFlag", "const"));
+      for (const row of rows) expect(visibleWidth(row)).toBeLessThanOrEqual(18);
+    } finally {
+      defaultTheme.apply(getDefaultTheme(), "none");
+    }
   });
 
   it("closes an unterminated fence at the end of the text", () => {
