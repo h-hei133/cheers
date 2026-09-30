@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { renderBlock, textBlock } from "./blocks.js";
 import { visibleWidth } from "../text/measure.js";
 import { stripAnsi } from "../text/ansi.js";
+import { defaultTheme } from "../../theme/theme.js";
 
 const WIDTH = 40;
 
@@ -19,6 +20,22 @@ describe("prompt echo", () => {
     for (const row of renderBlock(textBlock("user", "\u4f60\u597d\u4e16\u754c".repeat(20)), WIDTH)) {
       expect(visibleWidth(row)).toBeLessThanOrEqual(WIDTH);
     }
+  });
+
+  it("restores the bubble background after nested colors and raw resets", () => {
+    const nested = defaultTheme.bg("selectedBg", "inner");
+    const [row] = renderBlock(textBlock("user", `${nested} after\x1b[0m final`), WIDTH);
+    const background = defaultTheme.bgOpen("userMessageBg");
+    expect(row).toContain(`\x1b[49m${background}`);
+    expect(row).toContain(`\x1b[0m${background}`);
+    expect(stripAnsi(row!)).toContain("inner after final");
+    expect(visibleWidth(row!)).toBe(WIDTH);
+  });
+
+  it("keeps the rail, body and padding on one background without mid-row global resets", () => {
+    const [row] = renderBlock(textBlock("user", "hello"), WIDTH);
+    expect(row!.indexOf("\x1b[0m")).toBe(row!.length - "\x1b[0m".length);
+    expect(stripAnsi(row!).endsWith(" ")).toBe(true);
   });
 });
 

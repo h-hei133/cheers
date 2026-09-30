@@ -6,6 +6,7 @@ import {
   THEME_COLOR_TOKENS,
   defaultTheme,
   getTheme,
+  type ThemeColorToken,
 } from "../theme/theme.js";
 import { listThemes } from "../themes/index.js";
 
@@ -72,7 +73,8 @@ describe("Semantic Theme Engine", () => {
     const output = defaultTheme.fg("success", "Build passing");
     expect(output).toContain("Build passing");
     expect(output.startsWith("\x1b[")).toBe(true);
-    expect(output.endsWith("\x1b[0m")).toBe(true);
+    expect(output.endsWith("\x1b[39m")).toBe(true);
+    expect(output).not.toContain("\x1b[0m");
   });
 
   it("formats backgrounds and inverse text styles", () => {
@@ -80,8 +82,10 @@ describe("Semantic Theme Engine", () => {
     expect(inv).toContain("\x1b[7m");
     expect(inv).toContain("diff-word");
 
-    const bg = defaultTheme.bg("toolSuccessBg", "OK");
+    const bg = defaultTheme.bg("userMessageBg", "OK");
     expect(bg).toContain("OK");
+    expect(bg.endsWith("\x1b[49m")).toBe(true);
+    expect(bg).not.toContain("\x1b[0m");
   });
 
   it("allows loading a custom theme config", () => {
@@ -113,6 +117,61 @@ describe("Semantic Theme Engine", () => {
   it("has filename token (blue)", () => {
     const filename = defaultTheme.fg("filename", "test.ts");
     expect(filename).toContain("test.ts");
+  });
+});
+
+describe("composed theme styles", () => {
+  const theme = new Theme({
+    name: "styles",
+    description: "",
+    colors: { text: "red", accent: "green", selectedBg: "#0000ff", userMessageBg: "#ff0000" },
+  });
+
+  it("closes combined attributes in reverse order without resetting unrelated state", () => {
+    expect(theme.style("text", "word", {
+      bg: "selectedBg", bold: true, dim: true, italic: true,
+      underline: true, inverse: true, strikethrough: true,
+    })).toBe(
+      "\x1b[31m\x1b[48;5;21m\x1b[1m\x1b[2m\x1b[3m\x1b[4m\x1b[7m\x1b[9mword"
+      + "\x1b[29m\x1b[27m\x1b[24m\x1b[23m\x1b[22m\x1b[49m\x1b[39m",
+    );
+  });
+
+  it("restores an outer foreground after an inner foreground closes", () => {
+    const output = theme.fg("text", `before ${theme.fg("accent", "inside")} after`);
+    expect(output).toContain("\x1b[32minside\x1b[39m\x1b[31m after");
+    expect(output.endsWith("\x1b[39m")).toBe(true);
+  });
+
+  it("restores an outer background after an inner background closes", () => {
+    const output = theme.bg("selectedBg", `before ${theme.bg("userMessageBg", "inside")} after`);
+    expect(output).toContain("\x1b[48;5;196minside\x1b[49m\x1b[48;5;21m after");
+    expect(output.endsWith("\x1b[49m")).toBe(true);
+  });
+
+  it("restores nested intensity and inverse without clearing other attributes", () => {
+    expect(theme.bold(`before ${theme.bold("inside")} after`))
+      .toContain("inside\x1b[22m\x1b[1m after");
+    expect(theme.inverse(`before ${theme.inverse("inside")} after`))
+      .toContain("inside\x1b[27m\x1b[7m after");
+    expect(theme.style("text", `${theme.bold("inside")} after`, { bold: true, dim: true }))
+      .toContain("inside\x1b[22m\x1b[1m\x1b[2m after");
+  });
+
+  it("restores active styles after global and grouped resets in their original order", () => {
+    const output = theme.style("text", "a\x1b[0;32mb\x1b[39;22mc\x1b[md", {
+      bg: "selectedBg", bold: true,
+    });
+    const prefix = "\x1b[31m\x1b[48;5;21m\x1b[1m";
+    expect(output).toContain(`a\x1b[0m${prefix}\x1b[32mb`);
+    expect(output).toContain("b\x1b[39m\x1b[31m\x1b[22m\x1b[1mc");
+    expect(output).toContain(`c\x1b[m${prefix}d`);
+  });
+
+  it("does not treat extended-color components as reset attributes", () => {
+    const body = "\x1b[38;2;0;39;22mRGB\x1b[48;5;0mindexed\x1b[38:2::0:39:22mcolon";
+    expect(theme.style("text", body, { bold: true }))
+      .toBe(`\x1b[31m\x1b[1m${body}\x1b[22m\x1b[39m`);
   });
 });
 

@@ -100,6 +100,65 @@ type MissingToken = Exclude<ThemeColorToken, (typeof THEME_COLOR_TOKENS)[number]
 const _everyTokenIsListed: [MissingToken] extends [never] ? true : false = true;
 void _everyTokenIsListed;
 
+export interface ThemeStyleOptions {
+  readonly bg?: ThemeColorToken;
+  readonly bold?: boolean;
+  readonly dim?: boolean;
+  readonly italic?: boolean;
+  readonly underline?: boolean;
+  readonly inverse?: boolean;
+  readonly strikethrough?: boolean;
+}
+
+type StyleLayer = readonly [open: string, close: number];
+
+const TEXT_ATTRIBUTES = [
+  ["italic", "\x1b[3m", 23],
+  ["underline", "\x1b[4m", 24],
+  ["inverse", "\x1b[7m", 27],
+  ["strikethrough", "\x1b[9m", 29],
+] as const;
+
+/** Reopen only the outer attributes that an embedded reset closes. */
+function reopenStyles(text: string, prefix: string, openings: ReadonlyMap<number, string>): string {
+  if (!text.includes("\x1b[")) return text;
+  return text.replace(/\x1b\[([\d;:]*)m/g, (sequence, parameters: string) => {
+    const parts = parameters.split(";");
+    let restored = "";
+    let start = 0;
+    for (let index = 0; index < parts.length; index++) {
+      const code = Number(parts[index]);
+      if (code === 38 || code === 48 || code === 58) {
+        // RGB channels and indexed colors are operands, even when their numbers
+        // equal a reset code. Colon-delimited groups remain opaque.
+        const mode = parts[index + 1];
+        index += mode === "2" ? 4 : mode === "5" ? 2 : parts.length;
+        continue;
+      }
+      const opening = code === 0 ? prefix : openings.get(code);
+      if (!opening) continue;
+      restored += `\x1b[${parts.slice(start, index + 1).join(";")}m${opening}`;
+      start = index + 1;
+    }
+    if (start === 0) return sequence;
+    if (start < parts.length) restored += `\x1b[${parts.slice(start).join(";")}m`;
+    return restored;
+  });
+}
+
+/** Open in order, close in reverse order, and preserve nesting of each property. */
+function applyStyles(text: string, layers: readonly StyleLayer[]): string {
+  let prefix = "";
+  let suffix = "";
+  const openings = new Map<number, string>();
+  for (const [open, close] of layers) {
+    prefix += open;
+    suffix = `\x1b[${close}m${suffix}`;
+    openings.set(close, open);
+  }
+  return prefix + reopenStyles(text, prefix, openings) + suffix;
+}
+
 export class Theme {
   name: string;
   private colors: Map<ThemeColorToken, string>;
@@ -137,27 +196,39 @@ export class Theme {
   }
 
   fg(token: ThemeColorToken, text: string): string {
-    const color = this.colors.get(token) ?? "#ffffff";
-    return this.colorToAnsi(color) + text + "\x1b[0m";
+    return this.style(token, text);
   }
 
   bg(token: ThemeColorToken, text: string): string {
-    const color = this.colors.get(token) ?? "#000000";
-    return this.colorToAnsiBg(color) + text + "\x1b[0m";
+    return applyStyles(text, [[this.bgOpen(token), 49]]);
   }
 
-  /** The opening sequence alone, for rows that re-open the shade after resets. */
+  /** Combine a foreground with background and text attributes in one scope. */
+  style(token: ThemeColorToken, text: string, options: ThemeStyleOptions = {}): string {
+    const color = this.colors.get(token) ?? "#ffffff";
+    const layers: StyleLayer[] = [[this.colorToAnsi(color), 39]];
+    if (options.bg) layers.push([this.bgOpen(options.bg), 49]);
+    if (options.bold || options.dim) {
+      layers.push([(options.bold ? "\x1b[1m" : "") + (options.dim ? "\x1b[2m" : ""), 22]);
+    }
+    for (const [attribute, open, close] of TEXT_ATTRIBUTES) {
+      if (options[attribute]) layers.push([open, close]);
+    }
+    return applyStyles(text, layers);
+  }
+
+  /** The opening sequence alone, for rows that own their background and final reset. */
   bgOpen(token: ThemeColorToken): string {
     const color = this.colors.get(token) ?? "#000000";
     return this.colorToAnsiBg(color);
   }
 
   inverse(text: string): string {
-    return "\x1b[7m" + text + "\x1b[27m";
+    return applyStyles(text, [["\x1b[7m", 27]]);
   }
 
   bold(text: string): string {
-    return "\x1b[1m" + text + "\x1b[22m";
+    return applyStyles(text, [["\x1b[1m", 22]]);
   }
 
   /**

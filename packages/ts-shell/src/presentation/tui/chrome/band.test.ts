@@ -25,6 +25,15 @@ describe("status band", () => {
     }
   });
 
+  it("keeps the row background through colored segments and trailing padding", () => {
+    const band = renderBand(facts, ["model", "provider", "branch"], 80);
+    expect(band.startsWith("\x1b[48;")).toBe(true);
+    expect(band.indexOf("\x1b[0m")).toBe(band.length - "\x1b[0m".length);
+    expect(band).not.toContain("\x1b[49m");
+    expect(visibleWidth(band)).toBe(80);
+    expect(stripAnsi(band).endsWith(" ")).toBe(true);
+  });
+
   it("stays exact when a segment holds wide characters", () => {
     const wide = { ...facts, directory: "~/项目/子目录" };
     expect(visibleWidth(renderBand(wide, DEFAULT_STATUS_ITEMS, 60))).toBe(60);

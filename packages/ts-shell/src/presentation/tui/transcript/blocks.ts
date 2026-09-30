@@ -124,12 +124,11 @@ export function renderBlock(
  */
 function renderUser(block: Block, width: number, options: BlockRenderOptions = {}): readonly string[] {
   const rail = defaultTheme.fg("accent", "▌");
-  const bg = defaultTheme.bgOpen("userMessageBg");
   const bodyWidth = Math.max(1, width - 4);
   const wrapped = block.text.split("\n").flatMap((line) => wrapToWidth(line, bodyWidth));
   const rows = wrapped.map((line) => {
     const padded = padToWidth(`${GUTTER}${rail} ${defaultTheme.fg("userMessageText", line)}`, width);
-    return `${bg}${padded.replaceAll("\x1b[0m", `\x1b[0m${bg}`)}\x1b[0m`;
+    return `${defaultTheme.bg("userMessageBg", padded)}\x1b[0m`;
   });
   // Images drawn inline ride on their own rows, after the words: the protocol
   // sequence occupies zero cells, so the bubble's styling wraps around it
@@ -141,11 +140,11 @@ function renderUser(block: Block, width: number, options: BlockRenderOptions = {
         imageId: imageIdForData(image.data),
       });
       const padded = padToWidth(`${GUTTER}${rail} `, width);
-      rows.push(`${bg}${padded}${sequence}\x1b[0m`);
+      rows.push(`${defaultTheme.bg("userMessageBg", padded + sequence)}\x1b[0m`);
     } else {
       const label = `${image.mimeType}, ${Math.round((image.data.length * 3) / 4 / 1024)} KB`;
       const padded = padToWidth(`${GUTTER}${rail} ${defaultTheme.fg("userMessageText", `image attachment: ${label}`)}`, width);
-      rows.push(`${bg}${padded.replaceAll("\x1b[0m", `\x1b[0m${bg}`)}\x1b[0m`);
+      rows.push(`${defaultTheme.bg("userMessageBg", padded)}\x1b[0m`);
     }
   }
   rows.push("");
@@ -201,7 +200,7 @@ function renderTool(block: Block, width: number): readonly string[] {
   const glyph = status === "ok" ? defaultTheme.fg("success", STATUS_GLYPH.ok)
     : status === "failed" ? defaultTheme.fg("error", STATUS_GLYPH.failed)
     : defaultTheme.fg("warning", STATUS_GLYPH.running);
-  const name = defaultTheme.bold(defaultTheme.fg("toolTitle", block.title ?? "tool"));
+  const name = defaultTheme.style("toolTitle", block.title ?? "tool", { bold: true });
   const rawDetail = block.detail ? elide(block.detail, headroom(width, block.title)) : "";
   const detail = rawDetail ? ` ${formatToolDetail(block.title, rawDetail)}` : "";
   const body = block.text.replace(/\s+$/, "");
