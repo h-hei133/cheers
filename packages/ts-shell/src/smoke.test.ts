@@ -42,7 +42,7 @@ describe("TypeScript shell smoke tests", () => {
     };
     const entry = await import("./index.js");
 
-    expect(shellPackage.main).toBe("./dist/packages/ts-shell/src/index.js");
+    expect(shellPackage.main).toBe("./dist/index.js");
     expect(typeof entry.selectVerification).toBe("function");
     expect(typeof entry.buildTaskProofInput).toBe("function");
     expect(typeof entry.chooseToolStrategy).toBe("function");
