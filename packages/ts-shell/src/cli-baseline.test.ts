@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { handleSigint } from "./entrypoints/handleSigint.js";
+import { handleShellSigint } from "./core/shell/signalHandlers.js";
 import { createLongSessionContinuityFixture } from "./test-utils/longSessionContinuityFixtures.js";
 import { SessionManager } from "./session/SessionManager.js";
 import {
@@ -1007,31 +1007,26 @@ describe("CLI streaming baseline (T3)", () => {
 
   it("handles Ctrl+C interrupt gracefully", () => {
     const rendered: string[] = [];
-    const sessionCalls: string[] = [];
     const controller = new AbortController();
-    let promptCalled = false;
+    let cancellations = 0;
+    let closed = false;
 
-    const nextController = handleSigint({
-      currentRunController: controller,
+    handleShellSigint({
+      sessionRuntime: {
+        getCurrentRunController: () => controller,
+        cancelCurrentRun() {
+          cancellations += 1;
+          controller.abort();
+        },
+      } as never,
       renderer: {
         renderLine(line: string) {
           rendered.push(line);
         },
       } as never,
-      sessionManager: {
-        saveInterrupted(sessionId: string) {
-          sessionCalls.push(`interrupted:${sessionId}`);
-        },
-        saveTerminated(sessionId: string) {
-          sessionCalls.push(`terminated:${sessionId}`);
-        },
-      } as never,
-      sessionId: "sess_test",
+      runtimeContext: { session: { id: "sess_test" } } as never,
       readline: {
-        prompt() {
-          promptCalled = true;
-        },
-        close() {},
+        close() { closed = true; },
       } as never,
       exit() {
         throw new Error("exit should not be called when cancelling a run");
@@ -1039,10 +1034,9 @@ describe("CLI streaming baseline (T3)", () => {
     });
 
     expect(controller.signal.aborted).toBe(true);
-    expect(nextController).toBeNull();
-    expect(rendered).toContain("\nRun cancelled by user (Ctrl+C)");
-    expect(sessionCalls).toContain("interrupted:sess_test");
-    expect(promptCalled).toBe(true);
+    expect(cancellations).toBe(1);
+    expect(rendered).toEqual(["\nCancellation requested by user (Ctrl+C)."]);
+    expect(closed).toBe(false);
   });
 
   it("supports --version flag", async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { runCliStdinMode } from "./cliStdinModeRunner.js";
+import { runCliStdinMode } from "../cli/print/stdinBatchModeRunner.js";
 
 describe("CLI stdin mode runner", () => {
   it("delegates live stdin stream mode to the existing stream runner", async () => {

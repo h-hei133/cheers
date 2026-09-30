@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { runCliPrintMode } from "./cliPrintModeRunner.js";
+import { runCliPrintMode } from "../cli/print/printModeRunner.js";
 
 describe("CLI print mode runner", () => {
   it("preserves the missing-prompt error and exit behavior", async () => {
