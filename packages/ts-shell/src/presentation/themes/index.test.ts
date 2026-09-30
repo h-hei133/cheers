@@ -78,7 +78,7 @@ describe("theme discovery", () => {
     }
   });
 
-  it("ignores a theme file that is not usable", () => {
+  it("lists invalid themes but reports why they cannot be selected", () => {
     // A broken palette is a broken theme, not a broken session.
     fs.mkdirSync(path.join(root, ".git"), { recursive: true });
     const dir = path.join(root, ".agents", "themes");
@@ -86,9 +86,10 @@ describe("theme discovery", () => {
     fs.writeFileSync(path.join(dir, "broken.json"), "{ not json", "utf8");
     writeTheme(dir, "nocolors.json", { name: "nocolors" });
 
-    expect(listThemes(root)).not.toContain("broken");
-    expect(listThemes(root)).not.toContain("nocolors");
-    expect(loadTheme("broken", root)).toBeUndefined();
+    expect(listThemes(root)).toContain("broken");
+    expect(listThemes(root)).toContain("nocolors");
+    expect(() => loadTheme("broken", root)).toThrow("Invalid theme broken");
+    expect(() => loadTheme("nocolors", root)).toThrow("colors must be an object");
   });
 
   it("returns nothing for a name no theme claims", () => {
@@ -200,7 +201,8 @@ describe("themes a path named on the command line", () => {
     // reports it and the default palette stands.
     fs.writeFileSync(path.join(named, "broken.json"), "{ not json", "utf8");
 
-    expect(themeNamesFromPaths([path.join(named, "broken.json")])).toEqual([]);
+    expect(themeNamesFromPaths([path.join(named, "broken.json")])).toEqual(["broken"]);
+    expect(() => loadTheme("broken", workspace, [path.join(named, "broken.json")])).toThrow("Invalid theme broken");
     expect(listThemes(workspace, [path.join(named, "broken.json")])).toEqual(
       expect.arrayContaining(["dark", "light"]),
     );

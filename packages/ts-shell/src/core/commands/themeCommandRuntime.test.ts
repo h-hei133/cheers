@@ -66,4 +66,19 @@ describe("the theme command", () => {
       expect(result.output).toContain("dark");
     }
   });
+
+  it("reports invalid tokens and keeps other themes selectable", async () => {
+    const file = path.join(named, "broken.json");
+    fs.writeFileSync(file, JSON.stringify({ colors: { accentt: "#ffffff" } }));
+    const context = { cwd: workspace, themePaths: [file] };
+    expect((await runThemeCommand(["broken"], context)).output).toContain("Unknown color token: accentt");
+    expect((await runThemeCommand([], context)).output).toContain("Invalid theme broken");
+    expect((await runThemeCommand(["dark"], context)).output).toContain("Theme set to");
+  });
+
+  it("preserves a theme name containing spaces and uppercase letters", async () => {
+    const file = path.join(named, "custom.json");
+    writeTheme(file, "Dark Mode", "#ff00ff");
+    expect((await runThemeCommand(["Dark Mode"], { cwd: workspace, themePaths: [file] })).output).toContain("Theme set to `Dark Mode`");
+  });
 });

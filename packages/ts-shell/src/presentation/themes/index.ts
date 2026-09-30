@@ -5,11 +5,8 @@ import lightJson from "./light.json" with { type: "json" };
 import { projectDirectories } from "../../core/project/directories.js";
 import { userDataSearchDirsFor } from "../../core/paths/userHome.js";
 
-export interface ThemeConfig {
-  name: string;
-  description: string;
-  colors: Record<string, string>;
-}
+import { parseTheme, type ThemeConfig } from "./schema.js";
+export type { ThemeConfig } from "./schema.js";
 
 /**
  * The themes that ship, keyed by name.
@@ -30,7 +27,9 @@ const PROJECT_THEME_PATH = [".agents", "themes"] as const;
 
 /** A theme file a user wrote, with where it came from. */
 interface DiscoveredTheme {
-  readonly config: ThemeConfig;
+  readonly name: string;
+  readonly config?: ThemeConfig;
+  readonly error?: Error;
   readonly filePath: string;
 }
 
@@ -69,7 +68,7 @@ function discoverThemes(
 
   for (const directory of [...userDirs, ...projectDirs]) {
     for (const theme of readThemeDirectory(directory)) {
-      found.set(theme.config.name, theme);
+      found.set(theme.name, theme);
     }
   }
   // A named path may be one file or a directory of them, which is the shape the
@@ -77,7 +76,7 @@ function discoverThemes(
   // the directory is how a theme collection is shared.
   for (const entry of extraPaths) {
     for (const theme of readThemePath(entry)) {
-      found.set(theme.config.name, theme);
+      found.set(theme.name, theme);
     }
   }
   return found;
@@ -100,17 +99,22 @@ function readThemePath(entry: string): DiscoveredTheme[] {
   return theme ? [theme] : [];
 }
 
-/** One theme file, or nothing when it is unreadable or malformed. */
-function readThemeFile(filePath: string): DiscoveredTheme | undefined {
-  let parsed: unknown;
+/** Preserve invalid files as diagnostics so selecting one cannot silently fall back. */
+function readThemeFile(filePath: string): DiscoveredTheme {
+  const fallback = path.basename(filePath, ".json");
+  let name = fallback;
   try {
-    parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
-  } catch {
-    // A theme file with a stray comma is a broken theme, not a broken session.
-    return undefined;
+    if (fs.statSync(filePath).size > 256 * 1024) throw new Error("Theme exceeds 256 KiB.");
+    const parsed: unknown = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    if (parsed && typeof parsed === "object" && "name" in parsed && typeof parsed.name === "string" && parsed.name.trim()) {
+      name = parsed.name.trim();
+    }
+    const config = parseTheme(parsed, fallback, builtIn.dark!);
+    return { name: config.name, config, filePath };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return { name, filePath, error: new Error(`Invalid theme ${name}: ${reason}`) };
   }
-  const config = asThemeConfig(parsed, path.basename(filePath));
-  return config ? { config, filePath } : undefined;
 }
 
 /** Every readable theme file in one directory, ignoring anything malformed. */
@@ -129,36 +133,6 @@ function readThemeDirectory(directory: string): DiscoveredTheme[] {
     if (theme) themes.push(theme);
   }
   return themes;
-}
-
-/**
- * A parsed theme file, or nothing when it is not usable.
- *
- * The name falls back to the file name so a theme can be identified without
- * repeating itself inside the file.
- *
- * Colors are completed from the bundled dark theme rather than left to the
- * renderer's per-token fallback. That fallback is a hardcoded white for text,
- * which a theme defining only `accent` would then use for every message body —
- * an unreadable theme on a light terminal, from a file that looks perfectly
- * valid. Inheriting means a partial theme is a *recolor* of a working one, so
- * omitting a token is never a mistake the reader has to see.
- */
-function asThemeConfig(parsed: unknown, fileName: string): ThemeConfig | undefined {
-  if (!parsed || typeof parsed !== "object") return undefined;
-  const record = parsed as { name?: unknown; description?: unknown; colors?: unknown };
-  if (!record.colors || typeof record.colors !== "object") return undefined;
-  const colors: Record<string, string> = { ...builtIn.dark!.colors };
-  for (const [token, value] of Object.entries(record.colors as Record<string, unknown>)) {
-    if (typeof value === "string") colors[token] = value;
-  }
-  return {
-    name: typeof record.name === "string" && record.name.trim() !== ""
-      ? record.name.trim()
-      : path.basename(fileName, ".json"),
-    description: typeof record.description === "string" ? record.description : "",
-    colors,
-  };
 }
 
 /** Every theme name a user may select: the bundled ones, plus any on disk. */
@@ -183,7 +157,9 @@ export function loadTheme(
   workspaceRoot: string = process.cwd(),
   extraPaths: readonly string[] = [],
 ): ThemeConfig | undefined {
-  return discoverThemes(workspaceRoot, extraPaths).get(name)?.config ?? builtIn[name];
+  const theme = discoverThemes(workspaceRoot, extraPaths).get(name);
+  if (theme?.error) throw theme.error;
+  return theme?.config ?? (Object.hasOwn(builtIn, name) ? builtIn[name] : undefined);
 }
 
 /**
@@ -226,7 +202,7 @@ export function themeSource(
 export function themeNamesFromPaths(extraPaths: readonly string[]): string[] {
   const names = new Set<string>();
   for (const entry of extraPaths) {
-    for (const theme of readThemePath(entry)) names.add(theme.config.name);
+    for (const theme of readThemePath(entry)) names.add(theme.name);
   }
   return [...names].sort();
 }

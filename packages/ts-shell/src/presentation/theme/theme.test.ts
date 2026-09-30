@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import darkJson from "../themes/dark.json" with { type: "json" };
 import lightJson from "../themes/light.json" with { type: "json" };
 import {
@@ -30,6 +30,9 @@ import { listThemes } from "../themes/index.js";
  * reached the list.
  */
 const ALL_TOKENS = THEME_COLOR_TOKENS;
+
+// Color assertions must not depend on the invoking terminal's NO_COLOR setting.
+beforeEach(() => defaultTheme.apply(darkJson, "256"));
 
 describe("built-in themes", () => {
   it("define every token the palette has", () => {

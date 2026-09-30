@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { applyTheme, currentTheme, defaultTheme } from "../theme/theme.js";
 import { createThemeReloader, RELOAD_DEBOUNCE_MS, resolveThemeTarget, watchTheme, type ThemeWatchTarget } from "./watch.js";
 
@@ -18,6 +18,11 @@ import { createThemeReloader, RELOAD_DEBOUNCE_MS, resolveThemeTarget, watchTheme
 const homes: string[] = [];
 const originalHome = process.env.HOME;
 const originalUserProfile = process.env.USERPROFILE;
+
+beforeEach(() => {
+  vi.stubEnv("FORCE_COLOR", "2");
+  applyTheme("dark", process.cwd());
+});
 
 /** A user themes directory, the place a theme is discovered from. */
 function withUserThemes(): string {
@@ -50,6 +55,7 @@ afterEach(() => {
   else process.env.HOME = originalHome;
   vi.useRealTimers();
   for (const home of homes.splice(0)) fs.rmSync(home, { recursive: true, force: true });
+  vi.unstubAllEnvs();
   // The palette is a shared instance, so a test must not leave its colours behind.
   applyTheme("dark", process.cwd());
 });

@@ -1,0 +1,160 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Theme",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "colors"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "vars": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "colors": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "userMessageText": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "thinkingText": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "toolTitle": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "toolOutput": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "diffAdded": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "diffRemoved": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "diffContext": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "filename": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "command": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "commandArg": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "commandFlag": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "commandString": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "commandNumber": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "commandPipe": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "mdHeading": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "mdCode": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "mdLink": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "success": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "error": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "warning": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "muted": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "dim": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "accent": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "border": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "borderAccent": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "borderMuted": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "selectedBg": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "userMessageBg": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "statusBandBg": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "scrollbarTrack": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "scrollbarThumb": {
+          "type": "string",
+          "description": "A six-digit hex color, ANSI color name, or variable name."
+        }
+      }
+    }
+  }
+}
