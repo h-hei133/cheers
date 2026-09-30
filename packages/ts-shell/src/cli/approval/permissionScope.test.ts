@@ -6,7 +6,7 @@ import {
   scopeLabel,
   scopeMeaning,
 } from "./permissionScope.js";
-import type { EscalationPrompt } from "../../sandbox/index.js";
+import type { EscalationPrompt } from "../../core/shell/approval/contract.js";
 
 function prompt(operation: string): EscalationPrompt {
   return {

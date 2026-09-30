@@ -8,7 +8,7 @@ import {
   renderApprovalPromptFacts,
 } from "../core/shell/approvalPromptRenderer.js";
 import type { StreamingRenderer } from "../presentation/terminal/streaming.js";
-import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
+import type { EscalationPrompt, EscalationResponse } from "../core/shell/approval/contract.js";
 
 export type { ApprovalAuditRecord };
 

@@ -7,7 +7,7 @@ import type { DenyRule } from "../core/shell/approval/deny.js";
 import { isReadOnlyBashCommand } from "../core/shell/approval/evaluator.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { AskQuestion } from "../core/tools/ask.js";
-import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
+import type { EscalationPrompt, EscalationResponse } from "../core/shell/approval/contract.js";
 import type { ToolDefinition } from "../tools/types.js";
 import type { SubagentRunner } from "../core/subagents/runner.js";
 import { neutraliseForDisplay } from "../core/text/safety.js";

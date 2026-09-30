@@ -7,7 +7,7 @@ import {
 import type { ApprovalModeObject } from "./approvalModeContract.js";
 import type { PermissionScope } from "./permissionScope.js";
 import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
-import type { EscalationPrompt, EscalationResponse } from "../../sandbox/index.js";
+import type { EscalationPrompt, EscalationResponse } from "../../core/shell/approval/contract.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import { persistApprovalAuditDecision } from "./cliApprovalAuditBridge.js";
 import type { InteractiveApprovalResult } from "../interactive/picker/approval.js";

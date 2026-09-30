@@ -39,7 +39,7 @@ import {
 import {
   runInteractiveLoop,
 } from "../interactive/interactiveLoop.js";
-import type { EscalationPrompt } from "../../sandbox/index.js";
+import type { EscalationPrompt } from "../../core/shell/approval/contract.js";
 import {
   runCliPrintModeRouter,
 } from "../print/printModeRouter.js";

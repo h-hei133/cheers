@@ -1,5 +1,5 @@
 import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
-import type { EscalationPrompt } from "../../sandbox/index.js";
+import type { EscalationPrompt } from "./approval/contract.js";
 
 export interface ApprovalAuditRecord {
   readonly channel: "interactive" | "non-interactive";

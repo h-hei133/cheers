@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { EscalationPrompt } from "../../../sandbox/index.js";
+import type { EscalationPrompt } from "./contract.js";
 import { resolveUserDataFile, userDataDir } from "../../../core/paths/userHome.js"
 
 export interface PersistedApprovalGrant {

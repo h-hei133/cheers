@@ -1,7 +1,7 @@
 import type { PromptAttachments } from "../../core/shell/sessionRuntime.js";
 import type { QueryEvent } from "../../core/query/runtime/events.js";
 import type { ProviderCredentialResolution } from "../../core/shell/providerCredentials.js";
-import type { EscalationPrompt, EscalationResponse } from "../../sandbox/index.js";
+import type { EscalationPrompt, EscalationResponse } from "../../core/shell/approval/contract.js";
 import type { PermissionScope } from "../approval/permissionScope.js";
 import type { AskQuestion } from "../../core/tools/ask.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";

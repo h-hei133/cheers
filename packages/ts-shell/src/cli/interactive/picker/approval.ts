@@ -1,4 +1,4 @@
-import type { EscalationPrompt } from "../../../sandbox/index.js";
+import type { EscalationPrompt } from "../../../core/shell/approval/contract.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
 import type { Picker } from "../overlay.js";
 

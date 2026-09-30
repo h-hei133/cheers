@@ -6,7 +6,7 @@ import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.j
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
 import { detectImageProtocol, windowTitle, idleNotification, bell } from "../../presentation/tui/image.js";
-import type { EscalationPrompt } from "../../sandbox/index.js";
+import type { EscalationPrompt } from "../../core/shell/approval/contract.js";
 import { handleShellClose } from "../../core/shell/signalHandlers.js";
 import type { CliMcpGateway } from "../../entrypoints/cliMcpModule.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";

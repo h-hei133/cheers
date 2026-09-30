@@ -16,7 +16,7 @@ import {
 } from "../approval/cliApprovalEscalationBridge.js";
 import type { CliApprovalModeState } from "../approval/cliApprovalModeState.js";
 import type { CliProviderRuntimeBridge } from "../provider/cliProviderRuntimeBridge.js";
-import type { EscalationPrompt } from "../../sandbox/index.js";
+import type { EscalationPrompt } from "../../core/shell/approval/contract.js";
 import { promptInteractiveQuestions } from "../interactive/interactiveAskBridge.js";
 import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
 import { compactSessionHistory } from "../../core/shell/compaction.js";

@@ -1,4 +1,4 @@
-import type { EscalationPrompt } from "../../sandbox/index.js";
+import type { EscalationPrompt } from "./approval/contract.js";
 import type {
   ApprovalEvaluation,
   ApprovalTrustPolicy,

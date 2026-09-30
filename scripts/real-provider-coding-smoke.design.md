@@ -88,13 +88,10 @@ auto-recovery semantics.
 
 ## Audit Isolation Guard
 
-The smoke must set `CHEERS_AUDIT_LOG_PATH` for the child CLI process to
-an isolated path under the configured test root. `AuditTrail` path precedence is:
-explicit constructor config, then `CHEERS_AUDIT_LOG_PATH`, then the
-legacy `process.cwd()/.sisyphus/audit/permissions.jsonl` default. The override
-does not change permission semantics and must fail through the existing audit
-write behavior if the path is invalid or unwritable; it must not silently fall
-back to the repository path.
+Runtime homes and output artifacts must remain isolated under the configured
+test root. The former in-process sandbox audit writer has been removed;
+`CHEERS_AUDIT_LOG_PATH` is no longer a product audit routing contract. Permission
+decisions and session evidence use the active approval and event owners.
 
 ## Repo-Aware Routing Guard
 

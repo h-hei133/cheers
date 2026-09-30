@@ -7,7 +7,7 @@ import type { StreamingRenderer } from "../../presentation/terminal/streaming.js
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import type { CliMcpGateway } from "../../entrypoints/cliMcpModule.js";
-import type { EscalationPrompt } from "../../sandbox/index.js";
+import type { EscalationPrompt } from "../../core/shell/approval/contract.js";
 import { InteractiveMode } from "./interactiveMode.js";
 import type { InteractiveApprovalResult } from "./picker/approval.js";
 import { runLineLoop } from "./lineLoop.js";

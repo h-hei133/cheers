@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import type { ProviderCredentialResolution } from "../core/shell/providerCredentials.js";
 import { checkRealProviderReadiness } from "../core/shell/providerReadiness.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
-import type { EscalationPrompt, EscalationResponse } from "../sandbox/index.js";
+import type { EscalationPrompt, EscalationResponse } from "../core/shell/approval/contract.js";
 import { createProviderReadinessCliTerminalEvent } from "./providerReadinessCliSurface.js";
 import type { PermissionScope } from "../cli/approval/permissionScope.js";
 import type { AskQuestion } from "../core/tools/ask.js";

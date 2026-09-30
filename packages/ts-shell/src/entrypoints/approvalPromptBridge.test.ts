@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { StreamingRenderer } from "../presentation/terminal/streaming.js";
-import type { EscalationPrompt } from "../sandbox/index.js";
+import type { EscalationPrompt } from "../core/shell/approval/contract.js";
 import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
 import { createCliEscalationPromptHandler } from "./cliApprovalModule.js";
 import {

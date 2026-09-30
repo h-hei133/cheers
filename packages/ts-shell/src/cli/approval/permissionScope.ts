@@ -1,4 +1,4 @@
-import type { EscalationPrompt } from "../../sandbox/index.js";
+import type { EscalationPrompt } from "../../core/shell/approval/contract.js";
 
 /**
  * How much a turn may do before it has to ask.
