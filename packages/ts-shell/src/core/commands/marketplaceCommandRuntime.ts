@@ -7,40 +7,14 @@ export interface MarketplaceSource {
   readonly isDefault?: boolean;
 }
 
-let marketplaceSources: MarketplaceSource[] = [
-  {
-    name: "official",
-    url: "https://github.com/cheers/marketplace",
-    description: "Official verified plugins directory",
-    isDefault: true,
-  },
-  {
-    name: "community",
-    url: "https://github.com/cheers/community-plugins",
-    description: "Community curated agent capabilities and tools",
-    isDefault: false,
-  },
-];
+let marketplaceSources: MarketplaceSource[] = [];
 
 export function getMarketplaceSources(): readonly MarketplaceSource[] {
   return marketplaceSources;
 }
 
 export function resetMarketplaceSources(): void {
-  marketplaceSources = [
-    {
-      name: "official",
-      url: "https://github.com/cheers/marketplace",
-      description: "Official verified plugins directory",
-      isDefault: true,
-    },
-    {
-      name: "community",
-      url: "https://github.com/cheers/community-plugins",
-      description: "Community curated agent capabilities and tools",
-      isDefault: false,
-    },
-  ];
+  marketplaceSources = [];
 }
 
 /**
@@ -57,7 +31,9 @@ export async function runMarketplaceCommand(
     const lines: string[] = [
       "# Plugin Marketplaces (/marketplace)",
       "",
-      "Registered marketplace sources for plugin discovery:",
+      marketplaceSources.length === 0
+        ? "No marketplace sources configured."
+        : "Registered marketplace sources for plugin discovery:",
       "",
     ];
 

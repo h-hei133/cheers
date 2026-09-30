@@ -44,12 +44,13 @@ describe("Model, Marketplace & Plugin Commands", () => {
   });
 
   describe("/marketplace command", () => {
-    it("lists default marketplace sources", async () => {
+    it("starts with no sources and explains how to register one", async () => {
       const listRes = await runMarketplaceCommand(["list"], { cwd: process.cwd() });
       expect(listRes.kind).toBe("local");
       expect(listRes.output).toContain("Plugin Marketplaces");
-      expect(listRes.output).toContain("official");
-      expect(listRes.output).toContain("community");
+      expect(getMarketplaceSources()).toEqual([]);
+      expect(listRes.output).toContain("No marketplace sources configured.");
+      expect(listRes.output).toContain("/marketplace add <name> <url>");
     });
 
     it("adds and removes custom marketplace sources", async () => {
