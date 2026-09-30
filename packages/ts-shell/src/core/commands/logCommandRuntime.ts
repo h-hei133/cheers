@@ -1,4 +1,3 @@
-import * as fs from "node:fs";
 import * as path from "node:path";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { getGlobalRotatingFileSink } from "../../observability/rotatingFileSink.js";
@@ -10,7 +9,7 @@ import { getGlobalRotatingFileSink } from "../../observability/rotatingFileSink.
  *   /log tail [lines]   - Show recent structured log entries (default: 30)
  *   /log path           - Show current session log file path
  *   /log export [dest]  - Export full log to a destination file
- *   /log clear          - Clear current session log file
+ *   /log clear          - Clear current log family
  */
 export async function runLogCommand(
   args: string[],
@@ -68,15 +67,14 @@ export async function runLogCommand(
 
   if (subCommand === "export") {
     const targetPath =
-      args[1] || path.join(context.cwd, `cheers-debug-${Date.now()}.jsonl`);
+      path.resolve(context.cwd, args[1] || `cheers-debug-${Date.now()}.jsonl`);
     try {
-      if (!fs.existsSync(currentPath)) {
+      if (sink.exportTo(targetPath) === 0) {
         return {
           kind: "local",
           output: "No log file found to export.",
         };
       }
-      fs.copyFileSync(currentPath, targetPath);
       return {
         kind: "local",
         output: `Successfully exported agent runtime logs to:\n\`${targetPath}\``,
@@ -91,12 +89,10 @@ export async function runLogCommand(
 
   if (subCommand === "clear") {
     try {
-      if (fs.existsSync(currentPath)) {
-        fs.writeFileSync(currentPath, "", "utf8");
-      }
+      sink.clear();
       return {
         kind: "local",
-        output: `Cleared current session log file: \`${currentPath}\``,
+        output: `Cleared current log family: \`${currentPath}\``,
       };
     } catch (err) {
       return {
@@ -113,7 +109,7 @@ export async function runLogCommand(
       "- `/log tail [N]`: Display the last N structured log entries (default: 30)",
       "- `/log path`: Display active session log path and logging directory",
       "- `/log export [destination]`: Export current session logs for diagnostics",
-      "- `/log clear`: Clear current session log file",
+      "- `/log clear`: Clear current log family",
     ].join("\n"),
   };
 }

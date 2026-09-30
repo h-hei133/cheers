@@ -1,5 +1,4 @@
-import * as fs from "node:fs";
-import * as path from "node:path";
+import { orderedLogFiles, tailLines } from "../../observability/logs/files.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { getGlobalRotatingFileSink } from "../../observability/rotatingFileSink.js";
 
@@ -37,16 +36,6 @@ interface Aggregated {
 }
 
 const TAG_KEYS = ["tool", "outcome", "reason", "sessionId"] as const;
-
-/**
- * How much of each log file is examined, from its end.
- *
- * A rotated part can hold 5 MB and the retention window is a week, so reading
- * every file whole made the command's memory use the size of the whole log store.
- * Metrics are the sparse lines among many ordinary ones, so the tail is where the
- * interesting ones are anyway.
- */
-const TAIL_BYTES = 512 * 1024;
 
 export async function runMetricsCommand(
   args: string[],
@@ -117,76 +106,17 @@ export async function runMetricsCommand(
  *   and a week of 5 MB parts is a lot of text to hold for a few dozen numbers.
  */
 function readMetricLines(logDir: string, currentPath: string, limit: number): MetricLine[] {
-  let names: string[];
-  try {
-    names = fs.readdirSync(logDir);
-  } catch {
-    // No directory yet means nothing has been logged, which is the empty case.
-    return [];
-  }
-  const files = names
-    // `.log` and its rotated parts `.log.1`, `.log.2`, ...
-    .filter((name) => /\.log(\.\d+)?$/.test(name))
-    .map((name) => path.join(logDir, name))
-    // Oldest first, so the slice below keeps the most recent lines. The
-    // comparison falls through to the name so it is a total order: two files
-    // written in the same millisecond would otherwise compare equal and leave
-    // their relative order to the directory listing.
-    .sort((left, right) => {
-      const leftTime = safeMtime(left);
-      const rightTime = safeMtime(right);
-      if (leftTime !== rightTime) return leftTime - rightTime;
-      // Same timestamp: the current process's file is the newest by definition.
-      const leftCurrent = left === currentPath ? 1 : 0;
-      const rightCurrent = right === currentPath ? 1 : 0;
-      if (leftCurrent !== rightCurrent) return leftCurrent - rightCurrent;
-      return left.localeCompare(right);
-    });
+  let files: string[];
+  try { files = orderedLogFiles(logDir, currentPath); } catch { return []; }
 
   const metrics: MetricLine[] = [];
   for (const file of files) {
-    for (const line of tailLines(file, TAIL_BYTES)) {
+    for (const line of tailLines(file)) {
       const metric = parseMetricLine(line);
       if (metric) metrics.push(metric);
     }
   }
   return metrics.slice(-limit);
-}
-
-/**
- * The last `maxBytes` of a file, as whole lines.
- *
- * The first line of a tail read is dropped: it is almost certainly a fragment of a
- * line whose beginning is before the cut, and a partial JSON object would either
- * fail to parse or, worse, parse into something wrong.
- */
-function tailLines(file: string, maxBytes: number): string[] {
-  let handle: number | undefined;
-  try {
-    const size = fs.statSync(file).size;
-    const start = Math.max(0, size - maxBytes);
-    const length = size - start;
-    if (length <= 0) return [];
-    handle = fs.openSync(file, "r");
-    const buffer = Buffer.alloc(length);
-    fs.readSync(handle, buffer, 0, length, start);
-    const text = buffer.toString("utf8");
-    const lines = text.split("\n").filter((line) => line.trim().length > 0);
-    return start > 0 ? lines.slice(1) : lines;
-  } catch {
-    // A file that cannot be read is skipped rather than failing the command.
-    return [];
-  } finally {
-    if (handle !== undefined) fs.closeSync(handle);
-  }
-}
-
-function safeMtime(file: string): number {
-  try {
-    return fs.statSync(file).mtimeMs;
-  } catch {
-    return 0;
-  }
 }
 
 /** Read one structured log line as a metric, or nothing when it is not one. */

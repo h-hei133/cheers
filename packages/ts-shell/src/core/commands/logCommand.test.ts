@@ -82,4 +82,39 @@ describe("/log Slash Command Test Suite", () => {
     expect(exportRes.output).toContain("Successfully exported agent runtime logs to:");
     expect(fs.existsSync(exportDest)).toBe(true);
   });
+
+  it("tails, exports and clears every part of only the current log family", async () => {
+    sink = new RotatingFileSink({ logDir: tempLogDir, filePrefix: "rotation", pid: 77777, maxFileSizeMb: 0.0003 });
+    setGlobalRotatingFileSink(sink);
+    for (let index = 0; index < 60; index++) sink.write({
+      timestamp: "2026-09-30T12:00:00Z", level: "info", traceId: "trace", spanId: "span",
+      component: "test", message: `line-${index}`, fields: {},
+    });
+    const files = sink.getFiles();
+    expect(files.length).toBeGreaterThan(10);
+    // Filesystem timestamps may tie; suffixes must still follow their numeric order.
+    for (const file of files) fs.utimesSync(file, 100, 100);
+    const other = path.join(tempLogDir, "rotation.2026-09-30.88888.log");
+    fs.writeFileSync(other, "other process\n");
+    expect(sink.getRecentLines(50).map((line) => JSON.parse(line).message))
+      .toEqual(Array.from({ length: 50 }, (_, index) => `line-${index + 10}`));
+    const exported = await runLogCommand(["export", "export.jsonl"], { cwd: tempLogDir });
+    expect(exported.output).toContain("Successfully exported");
+    expect(fs.readFileSync(path.join(tempLogDir, "export.jsonl"), "utf8").trim().split("\n")).toHaveLength(60);
+    await runLogCommand(["clear"], dummyContext);
+    expect(sink.getRecentLines()).toEqual([]);
+    expect(fs.readFileSync(other, "utf8")).toBe("other process\n");
+  });
+
+  it.each(["same", "symlink", "hardlink"])("rejects a %s export destination before changing source bytes", async (alias) => {
+    const source = sink.getCurrentFilePath();
+    const content = '{"message":"retained"}\n';
+    fs.writeFileSync(source, content);
+    const target = alias === "same" ? source : path.join(tempLogDir, alias);
+    if (alias === "symlink") fs.symlinkSync(source, target);
+    if (alias === "hardlink") fs.linkSync(source, target);
+    const result = await runLogCommand(["export", target], dummyContext);
+    expect(result.output).toContain("Failed to export logs: Export destination is an input log file");
+    expect(fs.readFileSync(source, "utf8")).toBe(content);
+  });
 });

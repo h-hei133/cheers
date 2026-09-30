@@ -1,5 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { orderedLogFiles, tailLines, exportLogFiles } from "./logs/files.js";
 import type { StructuredLogEntry } from "./types.js";
 import { userDataDir } from "../core/paths/userHome.js"
 
@@ -72,17 +73,31 @@ export class RotatingFileSink {
     }
   }
   getRecentLines(limit: number = 50): string[] {
-    const filePath = this.getCurrentFilePath();
-    if (!fs.existsSync(filePath)) {
-      return [];
-    }
+    const bounded = Number.isFinite(limit) ? Math.max(0, Math.min(10_000, Math.trunc(limit))) : 50;
+    if (bounded === 0) return [];
+    let lines: string[] = [];
     try {
-      const content = fs.readFileSync(filePath, "utf8");
-      const lines = content.split("\n").filter((l) => l.trim().length > 0);
-      return lines.slice(-limit);
-    } catch {
-      return [];
-    }
+      for (const file of this.getFiles().reverse()) {
+        lines = [...tailLines(file), ...lines].slice(-bounded);
+        if (lines.length >= bounded) break;
+      }
+    } catch { return []; }
+    return lines;
+  }
+
+  getFiles(): string[] {
+    return orderedLogFiles(this.logDir, this.getCurrentFilePath(), true);
+  }
+
+  exportTo(target: string): number {
+    const files = this.getFiles();
+    if (files.length) exportLogFiles(files, target);
+    return files.length;
+  }
+
+  clear(): void {
+    for (const file of this.getFiles()) fs.writeFileSync(file, "", "utf8");
+    this.currentFileSize = 0;
   }
 
   flushAndClose(): void {
