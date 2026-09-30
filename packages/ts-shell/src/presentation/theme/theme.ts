@@ -7,6 +7,7 @@
  * 3. ANSI color escape sequences
  */
 
+import { colorToAnsi, detectColorMode, type ColorMode } from "./color.js";
 import { loadTheme, getDefaultTheme, type ThemeConfig } from "../themes/index.js";
 
 export type ThemeColorToken =
@@ -152,6 +153,7 @@ function applyStyles(text: string, layers: readonly StyleLayer[]): string {
   let suffix = "";
   const openings = new Map<number, string>();
   for (const [open, close] of layers) {
+    if (!open) continue;
     prefix += open;
     suffix = `\x1b[${close}m${suffix}`;
     openings.set(close, open);
@@ -172,7 +174,7 @@ export class Theme {
    */
   private revision = 0;
 
-  constructor(theme: ThemeConfig) {
+  constructor(theme: ThemeConfig, private mode: ColorMode = "256") {
     this.name = theme.name;
     this.colors = new Map(Object.entries(theme.colors) as [ThemeColorToken, string][]);
   }
@@ -184,7 +186,8 @@ export class Theme {
    * the palette here is what lets a theme change reach every surface that was
    * already rendering.
    */
-  apply(theme: ThemeConfig): void {
+  apply(theme: ThemeConfig, mode: ColorMode = this.mode): void {
+    this.mode = mode;
     this.name = theme.name;
     this.colors = new Map(Object.entries(theme.colors) as [ThemeColorToken, string][]);
     this.revision += 1;
@@ -206,7 +209,7 @@ export class Theme {
   /** Combine a foreground with background and text attributes in one scope. */
   style(token: ThemeColorToken, text: string, options: ThemeStyleOptions = {}): string {
     const color = this.colors.get(token) ?? "#ffffff";
-    const layers: StyleLayer[] = [[this.colorToAnsi(color), 39]];
+    const layers: StyleLayer[] = [[colorToAnsi(color, this.mode), 39]];
     if (options.bg) layers.push([this.bgOpen(options.bg), 49]);
     if (options.bold || options.dim) {
       layers.push([(options.bold ? "\x1b[1m" : "") + (options.dim ? "\x1b[2m" : ""), 22]);
@@ -220,7 +223,7 @@ export class Theme {
   /** The opening sequence alone, for rows that own their background and final reset. */
   bgOpen(token: ThemeColorToken): string {
     const color = this.colors.get(token) ?? "#000000";
-    return this.colorToAnsiBg(color);
+    return colorToAnsi(color, this.mode, true);
   }
 
   inverse(text: string): string {
@@ -244,71 +247,7 @@ export class Theme {
     return this.fg("dim", text);
   }
 
-  private colorToAnsi(color: string): string {
-    // Handle hex colors
-    if (color.startsWith("#")) {
-      const r = parseInt(color.slice(1, 3), 16);
-      const g = parseInt(color.slice(3, 5), 16);
-      const b = parseInt(color.slice(5, 7), 16);
-      // Try to find closest 256 color
-      const index = this.closestColor(r, g, b);
-      if (index < 16) {
-        return `\x1b[3${index}m`;
-      }
-      return `\x1b[38;5;${index}m`;
-    }
-    // Handle ANSI color names
-    const ansiMap: Record<string, string> = {
-      "black": "30",
-      "red": "31",
-      "green": "32",
-      "yellow": "33",
-      "blue": "34",
-      "magenta": "35",
-      "cyan": "36",
-      "white": "37",
-      "brightblack": "90",
-      "brightred": "91",
-      "brightgreen": "92",
-      "brightyellow": "93",
-      "brightblue": "94",
-      "brightmagenta": "95",
-      "brightcyan": "96",
-      "brightwhite": "97",
-    };
-    const ansi = ansiMap[color.toLowerCase()];
-    if (ansi) return `\x1b[${ansi}m`;
-    return "\x1b[37m"; // fallback to white
-  }
 
-  private colorToAnsiBg(color: string): string {
-    if (color.startsWith("#")) {
-      const r = parseInt(color.slice(1, 3), 16);
-      const g = parseInt(color.slice(3, 5), 16);
-      const b = parseInt(color.slice(5, 7), 16);
-      const index = this.closestColor(r, g, b);
-      if (index < 16) {
-        return `\x1b[4${index}m`;
-      }
-      return `\x1b[48;5;${index}m`;
-    }
-    return "\x1b[40m"; // fallback to black
-  }
-
-  private closestColor(r: number, g: number, b: number): number {
-    const maxDiff = Math.max(Math.abs(r - g), Math.abs(r - b), Math.abs(g - b));
-    if (maxDiff < 12) {
-      const avg = (r + g + b) / 3;
-      if (avg < 4) return 16;
-      if (avg > 248) return 231;
-      return Math.round(232 + ((avg - 8) / 240) * 23);
-    }
-    const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
-    const rn = Math.min(5, Math.max(0, Math.round((clamp(r) / 255) * 5)));
-    const gn = Math.min(5, Math.max(0, Math.round((clamp(g) / 255) * 5)));
-    const bn = Math.min(5, Math.max(0, Math.round((clamp(b) / 255) * 5)));
-    return 16 + rn * 36 + gn * 6 + bn;
-  }
 }
 
 let currentThemeName = "dark";
@@ -323,7 +262,7 @@ export function getTheme(
   if (!config) {
     throw new Error(`Theme not found: ${name}`);
   }
-  return new Theme(config);
+  return new Theme(config, detectColorMode());
 }
 
 /**
@@ -341,7 +280,7 @@ export function applyTheme(
   if (!config) {
     throw new Error(`Theme not found: ${name}`);
   }
-  defaultTheme.apply(config);
+  defaultTheme.apply(config, detectColorMode());
   currentThemeName = config.name;
 }
 
@@ -350,4 +289,4 @@ export function currentTheme(): string {
   return currentThemeName;
 }
 
-export const defaultTheme = new Theme(getDefaultTheme());
+export const defaultTheme = new Theme(getDefaultTheme(), detectColorMode());
