@@ -2,11 +2,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { agentCliAssertionFailures } from "./agentCliScenarioAssertions.js";
+import { agentCliAssertionFailures } from "../../test-utils/cli/assertions.js";
 import { createBrowserCliLocalFixtureManifestFixture } from "./browserCliScenarioFixtures.js";
-import { renderAgentCliScenarioReport } from "./agentCliScenarioReport.js";
-import { runAgentCliScenario } from "./agentCliScenarioRunner.js";
-import type { AgentCliScenario } from "./agentCliScenarioModel.js";
+import { renderAgentCliScenarioReport } from "../../test-utils/cli/report.js";
+import { runAgentCliScenario } from "../../test-utils/cli/runner.js";
+import type { AgentCliScenario } from "../../test-utils/cli/model.js";
 
 describe("browser CLI execution scenario examples", () => {
   const tempRoots: string[] = [];

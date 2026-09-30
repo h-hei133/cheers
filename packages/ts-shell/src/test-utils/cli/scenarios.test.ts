@@ -2,10 +2,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { agentCliAssertionFailures } from "./agentCliScenarioAssertions.js";
-import { renderAgentCliScenarioReport } from "./agentCliScenarioReport.js";
-import { runAgentCliScenario } from "./agentCliScenarioRunner.js";
-import type { AgentCliScenario } from "./agentCliScenarioModel.js";
+import { agentCliAssertionFailures } from "./assertions.js";
+import { renderAgentCliScenarioReport } from "./report.js";
+import { runAgentCliScenario } from "./runner.js";
+import type { AgentCliScenario } from "./model.js";
 
 describe("Agent CLI scenario harness", () => {
   const tempRoots: string[] = [];

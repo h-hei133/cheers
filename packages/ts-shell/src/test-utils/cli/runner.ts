@@ -5,11 +5,11 @@ import {
   evaluateAgentCliAssertion,
   runAgentCliSafetyChecks,
   selectCliProcessForAssertion,
-} from "./agentCliScenarioAssertions.js";
+} from "./assertions.js";
 import {
   buildProjectCliProcessSpec,
   runAgentCliProcess,
-} from "./agentCliProcess.js";
+} from "./process.js";
 import {
   deterministicCliScenarioTimestamp,
   mergeCliEvidence,
@@ -18,7 +18,7 @@ import {
   type AgentCliScenarioResult,
   type AgentCliScenarioStatus,
   type AgentCliScenarioStepResult,
-} from "./agentCliScenarioModel.js";
+} from "./model.js";
 
 export interface RunAgentCliScenarioInput {
   readonly scenario: AgentCliScenario;

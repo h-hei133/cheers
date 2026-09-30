@@ -1,4 +1,4 @@
-import type { AgentScenarioResult } from "./agentScenarioModel.js";
+import type { AgentScenarioResult } from "./model.js";
 
 export function renderAgentScenarioReport(result: AgentScenarioResult): string {
   const passedAssertions = result.assertions.filter((item) => item.status === "passed").length;

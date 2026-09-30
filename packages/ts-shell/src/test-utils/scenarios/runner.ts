@@ -1,4 +1,4 @@
-import { routeSlashCommand } from "../commands/slashRouter.js";
+import { routeSlashCommand } from "../../core/commands/slashRouter.js";
 import {
   getCompactInjectionState,
   type CompactInjectionStateStore,
@@ -10,8 +10,8 @@ import {
 import { planCompactFutureTurnInjection } from "../../context/compact/injection/compactFutureTurnInjection.js";
 import type { ProjectMemoryInjectionStateStore } from "../../memory/projectMemoryInjectionState.js";
 import { planProjectMemoryFutureTurnInjection } from "../../memory/projectMemoryFutureTurnInjection.js";
-import { evaluateAgentScenarioAssertion } from "./agentScenarioAssertions.js";
-import { seedProjectMemoryRecord, createValidationEvidenceFixture } from "./agentScenarioFixtures.js";
+import { evaluateAgentScenarioAssertion } from "./assertions.js";
+import { seedProjectMemoryRecord, createValidationEvidenceFixture } from "./fixtures.js";
 import {
   mergeScenarioEvidence,
   summarizeScenarioOutput,
@@ -22,8 +22,8 @@ import {
   type AgentScenarioStatus,
   type AgentScenarioStep,
   type AgentScenarioStepResult,
-} from "./agentScenarioModel.js";
-import { runAgentScenarioSafetyChecks } from "./agentScenarioSafety.js";
+} from "./model.js";
+import { runAgentScenarioSafetyChecks } from "./safety.js";
 
 export async function runAgentScenario(input: {
   readonly scenario: AgentScenario;

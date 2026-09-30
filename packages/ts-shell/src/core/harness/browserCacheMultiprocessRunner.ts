@@ -3,8 +3,8 @@ import { createBrowserReceiptCacheManifest } from "../../browser/receipt/manifes
 import { createBrowserReceiptCacheStore } from "../../browser/receipt/store.js";
 import { scanBrowserReceiptCacheIntegrity } from "../../browser/receipt/integrity.js";
 import { readBrowserReceiptCacheLock } from "../../browser/receipt/lock.js";
-import { runAgentCliProcess } from "./agentCliProcess.js";
-import { mergeCliEvidence } from "./agentCliScenarioModel.js";
+import { runAgentCliProcess } from "../../test-utils/cli/process.js";
+import { mergeCliEvidence } from "../../test-utils/cli/model.js";
 import {
   summarizeBrowserCacheStressStatus,
   type BrowserCacheAssertionSummary,

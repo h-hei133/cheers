@@ -1,7 +1,7 @@
 import type {
   AgentScenarioAssertionResult,
   AgentScenarioStatus,
-} from "./agentScenarioModel.js";
+} from "./model.js";
 
 export interface AgentScenarioSafetyOptions {
   readonly expectAutomaticRecovery?: boolean;

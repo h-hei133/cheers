@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { FakeBrowserExecutor } from "../../browser/executor.js";
 import { createBrowserNetworkAllowlist } from "../../browser/networkAllowlist.js";
 import { createBrowserSandboxAuthority } from "../../browser/sandboxAuthority.js";
-import { createAgentScenarioFixtureContext } from "./agentScenarioFixtures.js";
-import { runAgentScenario } from "./agentScenarioRunner.js";
-import type { AgentScenario } from "./agentScenarioModel.js";
+import { createAgentScenarioFixtureContext } from "../../test-utils/scenarios/fixtures.js";
+import { runAgentScenario } from "../../test-utils/scenarios/runner.js";
+import type { AgentScenario } from "../../test-utils/scenarios/model.js";
 
 describe("browser sandbox scenario examples", () => {
   it("covers browser execution blocked by missing sandbox authority", async () => {

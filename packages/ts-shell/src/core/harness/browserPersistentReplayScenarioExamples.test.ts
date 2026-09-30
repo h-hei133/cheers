@@ -3,8 +3,8 @@ import { parseBrowserCommandArgs } from "../../browser/commandContract.js";
 import { runBrowserCommandAsync } from "../../browser/commandRunner.js";
 import { buildCliCommandExecution } from "../../entrypoints/cliCommandExecutionBridge.js";
 import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
-import { renderAgentCliScenarioReport } from "./agentCliScenarioReport.js";
-import type { AgentCliScenarioResult } from "./agentCliScenarioModel.js";
+import { renderAgentCliScenarioReport } from "../../test-utils/cli/report.js";
+import type { AgentCliScenarioResult } from "../../test-utils/cli/model.js";
 import {
   createBrowserPersistentReplayScenarioFixture,
   type BrowserPersistentReplayScenarioFixture,

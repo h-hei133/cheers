@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { createBrowserSandboxAuthority } from "../../browser/sandboxAuthority.js";
 import { BrowserPlaywrightCliLocalFixtureExecutor } from "../../browser/playwrightCliExecutor.js";
-import { createAgentScenarioFixtureContext } from "./agentScenarioFixtures.js";
-import { runAgentScenario } from "./agentScenarioRunner.js";
-import type { AgentScenario } from "./agentScenarioModel.js";
+import { createAgentScenarioFixtureContext } from "../../test-utils/scenarios/fixtures.js";
+import { runAgentScenario } from "../../test-utils/scenarios/runner.js";
+import type { AgentScenario } from "../../test-utils/scenarios/model.js";
 
 describe("browser local execution scenario examples", () => {
   it("covers default execution blocked for observe", async () => {

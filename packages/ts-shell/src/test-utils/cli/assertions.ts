@@ -5,8 +5,8 @@ import type {
   AgentCliProcessResult,
   AgentCliScenarioStepResult,
   AgentCliScenarioStatus,
-} from "./agentCliScenarioModel.js";
-import { evaluateBrowserExecutionReceiptAssertion } from "./browserExecutionReceiptAssertions.js";
+} from "./model.js";
+import { evaluateBrowserExecutionReceiptAssertion } from "../../core/harness/browserExecutionReceiptAssertions.js";
 
 export function evaluateAgentCliAssertion(input: {
   readonly assertion: AgentCliAssertion;

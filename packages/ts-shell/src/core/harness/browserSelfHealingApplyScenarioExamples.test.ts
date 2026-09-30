@@ -15,8 +15,8 @@ import {
   captureCliOutput,
   deterministicCliScenarioTimestamp,
   type AgentCliScenarioResult,
-} from "./agentCliScenarioModel.js";
-import { renderAgentCliScenarioReport } from "./agentCliScenarioReport.js";
+} from "../../test-utils/cli/model.js";
+import { renderAgentCliScenarioReport } from "../../test-utils/cli/report.js";
 
 describe("browser self-healing apply scenario examples", () => {
   const roots: string[] = [];

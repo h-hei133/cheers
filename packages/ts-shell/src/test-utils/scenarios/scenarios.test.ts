@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { createAgentScenarioFixtureContext, seedProjectMemoryRecord } from "./agentScenarioFixtures.js";
-import { renderAgentScenarioReport } from "./agentScenarioReport.js";
-import { runAgentScenario } from "./agentScenarioRunner.js";
-import type { AgentScenario, AgentScenarioFixtureContext } from "./agentScenarioModel.js";
+import { createAgentScenarioFixtureContext, seedProjectMemoryRecord } from "./fixtures.js";
+import { renderAgentScenarioReport } from "./report.js";
+import { runAgentScenario } from "./runner.js";
+import type { AgentScenario, AgentScenarioFixtureContext } from "./model.js";
 
 describe("agent scenario harness foundation", () => {
   const contexts: AgentScenarioFixtureContext[] = [];

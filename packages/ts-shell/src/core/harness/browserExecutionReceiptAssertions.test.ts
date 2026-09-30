@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { evaluateBrowserExecutionReceiptAssertion } from "./browserExecutionReceiptAssertions.js";
-import type { AgentCliProcessResult } from "./agentCliScenarioModel.js";
-import { captureCliOutput } from "./agentCliScenarioModel.js";
+import type { AgentCliProcessResult } from "../../test-utils/cli/model.js";
+import { captureCliOutput } from "../../test-utils/cli/model.js";
 
 describe("browser execution receipt assertions", () => {
   it("checks receipt status, replay readiness, safety, decisions, and next action", () => {

@@ -1,5 +1,5 @@
-import type { AgentCliScenarioResult } from "./agentCliScenarioModel.js";
-import { summarizeBrowserSelfHealingApplyCliScenario } from "./browserSelfHealingApplyCliReport.js";
+import type { AgentCliScenarioResult } from "./model.js";
+import { summarizeBrowserSelfHealingApplyCliScenario } from "../../core/harness/browserSelfHealingApplyCliReport.js";
 
 export function renderAgentCliScenarioReport(
   result: AgentCliScenarioResult,

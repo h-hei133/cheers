@@ -14,12 +14,12 @@ import type { BrowserExecutionConfirmationRecord } from "../../browser/execution
 import type { BrowserNetworkAllowlist } from "../../browser/networkAllowlist.js";
 import type { BrowserSandboxAuthority } from "../../browser/sandboxAuthority.js";
 import { createStartupWarmContextCacheStore } from "../../context/startup/startupWarmContextHealth.js";
-import type { CommandContext } from "../commands/types.js";
+import type { CommandContext } from "../../core/commands/types.js";
 import {
   deterministicScenarioTimestamp,
   scenarioSessionScopeId,
   type AgentScenarioContext,
-} from "./agentScenarioModel.js";
+} from "./model.js";
 
 export interface AgentScenarioFixtureContext extends AgentScenarioContext {
   readonly workspaceRoot: string;

@@ -1,4 +1,4 @@
-import type { CommandContext, CommandExecutionResult } from "../commands/types.js";
+import type { CommandContext, CommandExecutionResult } from "../../core/commands/types.js";
 import type { SidebarEvent } from "../../presentation/sidebar/sidebarEventModel.js";
 
 export type AgentScenarioStatus = "passed" | "failed" | "blocked" | "skipped";

@@ -2,7 +2,7 @@ import type {
   AgentCliAssertion,
   AgentCliAssertionResult,
   AgentCliProcessResult,
-} from "./agentCliScenarioModel.js";
+} from "../../test-utils/cli/model.js";
 
 export type BrowserExecutionReceiptAssertionKind =
   | "browser-receipt-exists"

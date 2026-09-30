@@ -4,7 +4,7 @@ import type {
   AgentScenarioResult,
   AgentScenarioStatus,
   AgentScenarioStepResult,
-} from "./agentScenarioModel.js";
+} from "./model.js";
 
 export function evaluateAgentScenarioAssertion(input: {
   readonly assertion: AgentScenarioAssertion;

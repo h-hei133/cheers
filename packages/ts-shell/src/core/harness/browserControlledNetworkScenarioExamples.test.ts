@@ -9,10 +9,10 @@ import { renderBrowserExternalNetworkExecutionSurface } from "../../browser/exte
 import { createBrowserControlledNetworkRunnerManifest } from "../../browser/controlledNetworkRunnerManifest.js";
 import { createBrowserNetworkAllowlist } from "../../browser/networkAllowlist.js";
 import { createBrowserSandboxAuthority } from "../../browser/sandboxAuthority.js";
-import { agentCliAssertionFailures } from "./agentCliScenarioAssertions.js";
-import { renderAgentCliScenarioReport } from "./agentCliScenarioReport.js";
-import { runAgentCliScenario } from "./agentCliScenarioRunner.js";
-import type { AgentCliScenario } from "./agentCliScenarioModel.js";
+import { agentCliAssertionFailures } from "../../test-utils/cli/assertions.js";
+import { renderAgentCliScenarioReport } from "../../test-utils/cli/report.js";
+import { runAgentCliScenario } from "../../test-utils/cli/runner.js";
+import type { AgentCliScenario } from "../../test-utils/cli/model.js";
 import { createBrowserControlledNetworkScenarioFixture } from "./browserControlledNetworkScenarioFixtures.js";
 import { createBrowserControlledNetworkServer, type BrowserControlledNetworkServer } from "./browserControlledNetworkServer.js";
 

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { parseBrowserCommandArgs } from "../../browser/commandContract.js";
 import { runBrowserCommandAsync } from "../../browser/commandRunner.js";
-import { renderAgentCliScenarioReport } from "./agentCliScenarioReport.js";
-import type { AgentCliScenarioResult } from "./agentCliScenarioModel.js";
+import { renderAgentCliScenarioReport } from "../../test-utils/cli/report.js";
+import type { AgentCliScenarioResult } from "../../test-utils/cli/model.js";
 import {
   createBrowserReplayScenarioFixture,
   type BrowserReplayScenarioFixture,

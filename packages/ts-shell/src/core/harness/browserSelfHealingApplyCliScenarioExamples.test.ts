@@ -2,9 +2,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { agentCliAssertionFailures } from "./agentCliScenarioAssertions.js";
-import { runAgentCliScenario } from "./agentCliScenarioRunner.js";
-import { renderAgentCliScenarioReport } from "./agentCliScenarioReport.js";
+import { agentCliAssertionFailures } from "../../test-utils/cli/assertions.js";
+import { runAgentCliScenario } from "../../test-utils/cli/runner.js";
+import { renderAgentCliScenarioReport } from "../../test-utils/cli/report.js";
 import {
   renderBrowserSelfHealingApplyCliReport,
   summarizeBrowserSelfHealingApplyCliScenario,
@@ -14,7 +14,7 @@ import {
   writeInvalidBrowserSelfHealingApplyCliManifest,
   type BrowserSelfHealingApplyCliScenarioFixture,
 } from "./browserSelfHealingApplyCliScenarioFixtures.js";
-import type { AgentCliScenario } from "./agentCliScenarioModel.js";
+import type { AgentCliScenario } from "../../test-utils/cli/model.js";
 
 describe("browser self-healing apply real CLI scenario examples", () => {
   const fixtures: BrowserSelfHealingApplyCliScenarioFixture[] = [];

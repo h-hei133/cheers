@@ -1,4 +1,4 @@
-import type { AgentCliScenarioResult } from "./agentCliScenarioModel.js";
+import type { AgentCliScenarioResult } from "../../test-utils/cli/model.js";
 
 export interface BrowserSelfHealingApplyCliReportInput {
   readonly scenarioId: string;

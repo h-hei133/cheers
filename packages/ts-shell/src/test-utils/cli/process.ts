@@ -8,7 +8,7 @@ import {
   summarizeCliPrompt,
   type AgentCliProcessResult,
   type AgentCliProcessSpec,
-} from "./agentCliScenarioModel.js";
+} from "./model.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(currentDir, "../../../../..");

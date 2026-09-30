@@ -14,8 +14,8 @@ import {
 import {
   buildProjectCliProcessSpec,
   type BuildProjectCliProcessSpecInput,
-} from "./agentCliProcess.js";
-import type { AgentCliProcessSpec } from "./agentCliScenarioModel.js";
+} from "../../test-utils/cli/process.js";
+import type { AgentCliProcessSpec } from "../../test-utils/cli/model.js";
 import type { BrowserCacheProcessRole, BrowserCacheProcessStep } from "./browserCacheMultiprocessScenarioModel.js";
 
 export interface BrowserCacheMultiprocessFixture {

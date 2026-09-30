@@ -15,10 +15,10 @@ import {
 import { renderBrowserPublicReadOnlyWebSmokeReport } from "../../browser/smoke/report.js";
 import { runBrowserPublicReadOnlyWebSmoke } from "../../browser/smoke/runner.js";
 import { createBrowserPublicReadOnlyWebScenarioFixture } from "./browserPublicReadOnlyWebScenarioFixtures.js";
-import { agentCliAssertionFailures } from "./agentCliScenarioAssertions.js";
-import { renderAgentCliScenarioReport } from "./agentCliScenarioReport.js";
-import { runAgentCliScenario } from "./agentCliScenarioRunner.js";
-import type { AgentCliScenario } from "./agentCliScenarioModel.js";
+import { agentCliAssertionFailures } from "../../test-utils/cli/assertions.js";
+import { renderAgentCliScenarioReport } from "../../test-utils/cli/report.js";
+import { runAgentCliScenario } from "../../test-utils/cli/runner.js";
+import type { AgentCliScenario } from "../../test-utils/cli/model.js";
 
 describe("browser public read-only web smoke scenario", () => {
   const cleanupFns: (() => void | Promise<void>)[] = [];
