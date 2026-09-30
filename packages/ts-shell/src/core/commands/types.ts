@@ -102,6 +102,8 @@ export interface CommandContext {
 export interface LocalCommandResult {
   readonly kind: 'local'
   readonly output: string
+  /** State changed by this command, recorded with its result for session replay. */
+  readonly state?: Record<string, unknown>
 }
 
 export interface PromptCommandResult {

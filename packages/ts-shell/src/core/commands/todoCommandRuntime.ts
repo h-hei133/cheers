@@ -111,6 +111,7 @@ export async function runTodoCommand(
     return {
       kind: "local",
       output: "Todo checklist cleared.",
+      state: { todo: [] },
     };
   }
   if (firstArg === "add") {
@@ -128,6 +129,7 @@ export async function runTodoCommand(
     return {
       kind: "local",
       output: `Task added: **#${item.id}** "${text}"`,
+      state: { todo: list.items.map((entry) => ({ ...entry })) },
     };
   }
 
@@ -144,6 +146,7 @@ export async function runTodoCommand(
     return {
       kind: "local",
       output: `Task marked done: **#${item.id}** "${item.text}"`,
+      state: { todo: sessionTodoList.map((entry) => ({ ...entry })) },
     };
   }
 
@@ -160,6 +163,7 @@ export async function runTodoCommand(
     return {
       kind: "local",
       output: `Task in progress: **#${item.id}** "${item.text}"`,
+      state: { todo: sessionTodoList.map((entry) => ({ ...entry })) },
     };
   }
 
@@ -182,7 +186,7 @@ export async function runTodoCommand(
 export function replayTodosFromMessages(sessionId: string, messages: readonly SessionMessage[]): void {
   let latest: readonly TodoItem[] | undefined;
   for (const message of messages) {
-    if (message.role !== "tool") continue;
+    if (message.role !== "tool" && message.role !== "user") continue;
     const todo = message.metadata?.todo;
     if (!Array.isArray(todo)) continue;
     const items = todo.filter(

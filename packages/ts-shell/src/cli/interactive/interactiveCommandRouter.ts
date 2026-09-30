@@ -121,6 +121,7 @@ export async function routeInteractiveCommand(
     printMode: false,
     interactive: true,
     sessionId: input.runtimeContext.session.id,
+    onTurnMessage: (message) => input.sessionManager.addTurn(input.runtimeContext.session.id, message),
     ...(input.runtimeContext.skillOptions ? { skillOptions: input.runtimeContext.skillOptions } : {}),
     ...(input.runtimeContext.themePaths ? { themePaths: input.runtimeContext.themePaths } : {}),
     modifierKeysReported: input.modifierKeysReported,

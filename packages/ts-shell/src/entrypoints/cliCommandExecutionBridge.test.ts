@@ -10,6 +10,9 @@ import {
 } from "./cliCommandExecutionBridge.js";
 import type { CommandExecutionResult } from "../core/commands/types.js";
 import { BROWSER_RECEIPT_CACHE_ROOT_ENV } from "../browser/receipt/manifest.js";
+import { forgetSessionTodos, getSessionTodos, replayTodosFromMessages } from "../core/commands/todoCommandRuntime.js";
+import type { SessionMessage } from "../session/schema/sessionMessage.js";
+import { createMessageTranscriptEvent, transcriptEventToSessionMessage } from "../session/sessionEventCodec.js";
 
 function renderer(): Pick<StreamingRenderer, "renderLine"> & {
   readonly lines: string[];
@@ -30,6 +33,43 @@ function bridge(result: CommandExecutionResult | null): CliCommandExecutionBridg
 }
 
 describe("CLI command execution bridge", () => {
+  it("records only successful todo mutations and replays immutable state across aliases", async () => {
+    const sessionId = "local-checklist";
+    forgetSessionTodos(sessionId);
+    const messages: SessionMessage[] = [];
+    const output = renderer();
+    const run = (prompt: string) => buildCliCommandExecution({
+      prompt, cwd: "/workspace", renderer: output as StreamingRenderer, printMode: false, interactive: true, sessionId,
+      onTurnMessage: (message) => messages.push(transcriptEventToSessionMessage(createMessageTranscriptEvent({ ...message, timestamp: "today" }))!),
+    });
+    await run('/todo add "durable checklist"');
+    await run("/tasks start 1");
+    await run("/checklist done 1");
+    await run("/todo list");
+    await run("/todo unknown");
+    expect(messages).toHaveLength(3);
+    expect(messages.every((message) => message.role === "user" && !message.tool_call_id)).toBe(true);
+    forgetSessionTodos(sessionId);
+    replayTodosFromMessages(sessionId, messages.slice(0, 1));
+    expect(getSessionTodos(sessionId)).toEqual([{ id: 1, text: "durable checklist", status: "pending" }]);
+    replayTodosFromMessages(sessionId, messages);
+    expect(getSessionTodos(sessionId)[0]?.status).toBe("done");
+    await run("/todo clear");
+    forgetSessionTodos(sessionId);
+    replayTodosFromMessages(sessionId, messages);
+    expect(getSessionTodos(sessionId)).toEqual([]);
+  });
+
+  it("does not render success if recording changed local state fails", async () => {
+    const output = renderer();
+    await expect(buildCliCommandExecution({
+      prompt: "/todo clear", cwd: "/workspace", renderer: output as StreamingRenderer,
+      printMode: false, interactive: true, sessionId: "failed-record",
+      onTurnMessage: () => { throw new Error("disk full"); },
+    })).rejects.toThrow("disk full");
+    expect(output.lines).toEqual([]);
+  });
+
   it("passes the live keyboard guide through to the hotkey command", async () => {
     const output = renderer();
     await buildCliCommandExecution({

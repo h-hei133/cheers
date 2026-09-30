@@ -25,6 +25,7 @@ import { parseBrowserPublicReadOnlyWebSmokeConfig } from "../core/harness/browse
 import type { CompactInjectionStateStore } from "../context/compact/injection/compactInjectionState.js";
 import type { CompactLiveCheckpointStore } from "../context/compact/checkpoint/compactLiveCheckpoint.js";
 import type { StreamingRenderer } from "../presentation/terminal/streaming.js";
+import type { SessionMessage } from "../session/schema/sessionMessage.js";
 
 type SlashRouteResult = Awaited<ReturnType<typeof routeSlashCommand>>;
 
@@ -52,6 +53,7 @@ export interface BuildCliCommandExecutionInput {
   readonly printMode: boolean;
   readonly interactive: boolean;
   readonly sessionId?: string;
+  readonly onTurnMessage?: (message: SessionMessage) => void;
   /**
    * How this run was asked to load skills.
    *
@@ -148,6 +150,11 @@ export async function buildCliCommandExecution(
     browserPublicReadOnlyWebSmokeConfig,
   });
   if (slashResult?.kind === "local") {
+    if (slashResult.state) {
+      // A local action has no assistant tool call to pair with. Keep it at user
+      // authority, with replay state beside the result, through the existing sink.
+      input.onTurnMessage?.({ role: "user", content: `[Local command result]\n${slashResult.output}`, metadata: slashResult.state });
+    }
     input.renderer.renderLine(
       input.printMode ? slashResult.output : `\n${slashResult.output}\n`,
     );
