@@ -132,7 +132,14 @@ function writeRecord(
       ],
     };
   }
-  fs.appendFileSync(recordsFile, `${snapshot.appendPrefix}${JSON.stringify(request.record)}\n`, "utf8");
+  try {
+    fs.appendFileSync(recordsFile, `${snapshot.appendPrefix}${JSON.stringify(request.record)}\n`, "utf8");
+  } catch (error) {
+    return blocked(
+      "project-memory-local-store:write-unavailable",
+      `Memory store is not writable at ${recordsFile}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
   return {
     record: request.record,
     written: true,

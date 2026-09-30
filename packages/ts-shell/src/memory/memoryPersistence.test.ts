@@ -83,3 +83,14 @@ it("reports an unreadable store and blocks mutations without altering bytes", as
   vi.restoreAllMocks();
   expect(fs.readFileSync(file, "utf8")).toBe(content);
 });
+
+it("returns a blocked write when the append fails after a successful read", async () => {
+  const content = `${JSON.stringify(record)}\n`;
+  const { file, store } = setup(content);
+  vi.spyOn(fs, "appendFileSync").mockImplementation(() => { throw Object.assign(new Error("permission denied"), { code: "EACCES" }); });
+  const result = await store.write({ record: { ...record, id: "two" }, storeRef: store.ref });
+  expect(result).toMatchObject({ written: false, skipped: false });
+  expect(result.blocker).toContain("permission denied");
+  expect(result.evidence).toContain("project-memory-local-store:write-unavailable");
+  expect(fs.readFileSync(file, "utf8")).toBe(content);
+});
