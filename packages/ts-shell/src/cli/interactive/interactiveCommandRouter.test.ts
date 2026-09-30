@@ -3,18 +3,24 @@ import { describe, expect, it } from "vitest";
 import { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
 import { runNonInteractivePrompt } from "../../entrypoints/cliRuntimeModule.js";
+import { forgetSessionTodos } from "../../core/commands/todoCommandRuntime.js";
+import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 
 function createHarness() {
   const lines: string[] = [];
   let agentMode: "plan" | "build" = "build";
   let viewMode: "compact" | "verbose" = "compact";
+  const turns: SessionMessage[] = [];
   return {
     lines,
     input: {
       readline: {} as never,
       mcpGateway: {} as never,
       fallbackSessionId: undefined,
-      sessionManager: {} as never,
+      sessionManager: {
+        getSession: () => ({ turns: structuredClone(turns) }),
+        addTurn: (_id: string, message: SessionMessage) => turns.push(structuredClone(message)),
+      } as never,
       runtimeContext: {
         cwd: "/tmp/project-alpha",
         projectRoot: "/tmp/project-alpha",
@@ -46,6 +52,22 @@ function createHarness() {
 }
 
 describe("interactive command router", () => {
+  it.each([true, false])("persists and restores checklist state in scripted mode (print=%s)", async (printMode) => {
+    const harness = createHarness();
+    const sessionId = "sess_1234567890abcdef";
+    forgetSessionTodos(sessionId);
+    await runNonInteractivePrompt({ ...harness.input, prompt: "/todo add persisted-script-task", printMode });
+    forgetSessionTodos(sessionId);
+    harness.lines.length = 0;
+    await runNonInteractivePrompt({ ...harness.input, prompt: "/todo list", printMode });
+    expect(harness.lines.join("\n")).toContain("persisted-script-task");
+    await runNonInteractivePrompt({ ...harness.input, prompt: "/todo clear", printMode });
+    forgetSessionTodos(sessionId);
+    harness.lines.length = 0;
+    await runNonInteractivePrompt({ ...harness.input, prompt: "/todo list", printMode });
+    expect(harness.lines.join("\n")).toContain("No tasks currently");
+  });
+
   it.each(["interactive", "piped", "print"])("switches and reads the session view in %s mode", async (mode) => {
     const harness = createHarness();
     for (const prompt of ["/view developer", "/view status", "/view user"]) {

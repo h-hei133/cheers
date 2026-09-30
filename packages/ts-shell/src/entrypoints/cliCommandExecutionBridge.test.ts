@@ -52,6 +52,10 @@ describe("CLI command execution bridge", () => {
     forgetSessionTodos(sessionId);
     replayTodosFromMessages(sessionId, messages.slice(0, 1));
     expect(getSessionTodos(sessionId)).toEqual([{ id: 1, text: "durable checklist", status: "pending" }]);
+    await run("/todo start 1");
+    replayTodosFromMessages(sessionId, messages.slice(0, 1));
+    expect(getSessionTodos(sessionId)[0]?.status).toBe("pending");
+    messages.pop();
     replayTodosFromMessages(sessionId, messages);
     expect(getSessionTodos(sessionId)[0]?.status).toBe("done");
     await run("/todo clear");

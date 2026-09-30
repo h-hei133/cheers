@@ -32,7 +32,7 @@ export function getSessionTodos(sessionId?: string): readonly TodoItem[] {
 /** Replace the list a session sees. Used by the replay that restores one. */
 export function setSessionTodos(sessionId: string, items: readonly TodoItem[]): void {
   const nextId = items.reduce((highest, item) => Math.max(highest, item.id), 0) + 1;
-  listsBySession.set(sessionId, { items: [...items], nextId });
+  listsBySession.set(sessionId, { items: items.map((item) => ({ ...item })), nextId });
 }
 
 /**

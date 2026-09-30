@@ -49,6 +49,7 @@ import { renderUserHelp, renderSessionCommandMap } from "./slashCommandRegistry.
 import { describeCompaction, parseCompactCommand } from "../cli/interactive/compact.js";
 import { getRuntimeConfig } from "../config/runtimeConfig.js";
 import { formatViewModeStatusLines, formatViewModeUpdatedLine } from "./cliDisplayProjection.js";
+import { replayTodosFromMessages } from "../core/commands/todoCommandRuntime.js";
 
 export async function runNonTtyPromptStream(options: {
   sessionManager: SessionManager;
@@ -239,6 +240,7 @@ export async function runNonInteractivePrompt(options: {
     return;
   }
 
+  replayTodosFromMessages(options.runtimeContext.session.id, options.sessionManager.getSession(options.runtimeContext.session.id)?.turns ?? []);
   const resolved = await resolveTurnInputForExecution({
     prompt: trimmedPrompt,
     cwd: options.runtimeContext.cwd,
@@ -247,6 +249,7 @@ export async function runNonInteractivePrompt(options: {
     printMode: options.printMode,
     interactive: false,
     sessionId: options.runtimeContext.session.id,
+    onTurnMessage: (message) => options.sessionManager.addTurn(options.runtimeContext.session.id, message),
     ...(options.runtimeContext.skillOptions
       ? { skillOptions: options.runtimeContext.skillOptions }
       : {}),
