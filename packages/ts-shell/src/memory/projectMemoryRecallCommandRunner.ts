@@ -32,7 +32,7 @@ export async function runProjectMemoryRecallCommand(
   const health = input.memoryStore
     ? await input.memoryStore.health()
     : disabledStoreHealth();
-  if (!input.memoryStore || !health.writable) {
+  if (!input.memoryStore || !(health.readable ?? health.writable)) {
     return buildResult({
       input,
       health,

@@ -37,8 +37,8 @@ export async function runProjectMemoryUseCommand(
     return blocked(input, injectionStateStore.get(input.sessionScopeId), "Explicit local memory store root is required.");
   }
   const health = await input.memoryStore.health();
-  if (!health.writable) {
-    return blocked(input, injectionStateStore.get(input.sessionScopeId), "Explicit local memory store root is not writable.");
+  if (!(health.readable ?? health.writable)) {
+    return blocked(input, injectionStateStore.get(input.sessionScopeId), health.detail);
   }
 
   const selected =
@@ -55,7 +55,7 @@ export async function runProjectMemoryUseCommand(
     mode: input.request.mode,
     query: input.request.query,
     recordIds: selected.recordIds,
-    warnings: selected.warnings,
+    warnings: [...selected.warnings, ...(health.diagnostics ?? []).map((message, index) => ({ id: `store:${index}`, message }))],
     redactions: selected.redactions,
   });
   return {

@@ -20,20 +20,63 @@ export function recordsFileFor(ref: ProjectMemoryStoreRef): string {
   return ref.recordsFile ?? path.join(ref.root, "project-memory.jsonl");
 }
 
-export function readEntriesSync(ref: ProjectMemoryStoreRef): ProjectMemoryStoreEntry[] {
+export interface MemoryRead {
+  readonly entries: ProjectMemoryStoreEntry[];
+  readonly diagnostics: string[];
+  readonly readable: boolean;
+  readonly appendPrefix: string;
+}
+
+export function readEntriesSync(ref: ProjectMemoryStoreRef): MemoryRead {
+  const result: MemoryRead = { entries: [], diagnostics: [], readable: true, appendPrefix: "" };
   if (!projectMemoryStoreRefIsWritable(ref)) {
-    return [];
+    return { ...result, readable: false };
   }
   const recordsFile = recordsFileFor(ref);
-  if (!fs.existsSync(recordsFile)) {
-    return [];
+  let content: string;
+  try {
+    content = fs.readFileSync(recordsFile, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return result;
+    return { ...result, readable: false, diagnostics: ["Memory store could not be read; changes are blocked."] };
   }
-  return fs
-    .readFileSync(recordsFile, "utf8")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as ProjectMemoryStoreEntry);
+  for (const [index, line] of content.split(/\r?\n/).entries()) {
+    if (!line.trim()) continue;
+    try {
+      const entry: unknown = JSON.parse(line);
+      if (!isStoreEntry(entry)) throw new Error("Invalid memory entry");
+      result.entries.push(entry);
+    } catch {
+      result.diagnostics.push(`Memory store line ${index + 1} is invalid; changes are blocked.`);
+    }
+  }
+  return { ...result, appendPrefix: content.length > 0 && !content.endsWith("\n") ? "\n" : "" };
+}
+
+/** Validate the fields consumed by folding, retrieval and rendering before admission. */
+function isStoreEntry(value: unknown): value is ProjectMemoryStoreEntry {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const entry = value as Record<string, unknown>;
+  if (entry.version !== 1 || typeof entry.createdAt !== "string") return false;
+  if (entry.entryKind === "project-memory-lifecycle") {
+    return typeof entry.recordId === "string" && entry.sourceCommand === "/memory"
+      && (entry.operation === "delete" || entry.operation === "invalidate")
+      && (entry.reason === undefined || typeof entry.reason === "string");
+  }
+  if (entry.entryKind !== undefined) return false;
+  if (!["id", "candidateId", "candidateKind", "retentionClass", "approvedAt", "memoryText", "source", "safety"]
+    .every((key) => typeof entry[key] === "string")) return false;
+  if (entry.approvedBySourceCommand !== "/memory") return false;
+  if (!["evidence", "routeReferences", "redactions"].every((key) =>
+    Array.isArray(entry[key]) && (entry[key] as unknown[]).every((item) => typeof item === "string"))) return false;
+  if (!["sourcePacket", "invalidatedAt", "invalidationReason", "invalidatedBySourceCommand"]
+    .every((key) => entry[key] === undefined || typeof entry[key] === "string")) return false;
+  if (entry.structuredFact !== undefined) {
+    if (!entry.structuredFact || typeof entry.structuredFact !== "object" || Array.isArray(entry.structuredFact)) return false;
+    const fact = entry.structuredFact as Record<string, unknown>;
+    if (!["subject", "predicate", "object"].every((key) => fact[key] === undefined || typeof fact[key] === "string")) return false;
+  }
+  return true;
 }
 
 export function foldProjectMemoryEntries(

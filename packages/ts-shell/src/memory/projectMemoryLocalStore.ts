@@ -117,7 +117,9 @@ function writeRecord(
       `Memory store is not writable at ${recordsFile}: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  const records = readRecordsSync(ref);
+  const snapshot = readEntriesSync(ref);
+  if (snapshot.diagnostics.length) return blocked("project-memory-local-store:damaged", snapshot.diagnostics.join(" "));
+  const records = foldProjectMemoryEntries(snapshot.entries, {});
   if (records.some((record) => record.id === request.record.id)) {
     return {
       record: request.record,
@@ -130,7 +132,7 @@ function writeRecord(
       ],
     };
   }
-  fs.appendFileSync(recordsFile, `${JSON.stringify(request.record)}\n`, "utf8");
+  fs.appendFileSync(recordsFile, `${snapshot.appendPrefix}${JSON.stringify(request.record)}\n`, "utf8");
   return {
     record: request.record,
     written: true,
@@ -161,7 +163,9 @@ function invalidateRecord(
     };
   }
   const recordsFile = recordsFileFor(ref);
-  const existing = readRecordsSync(ref, { includeInvalidated: true }).find(
+  const snapshot = readEntriesSync(ref);
+  if (snapshot.diagnostics.length) return { invalidated: false, skipped: false, blocker: snapshot.diagnostics.join(" "), evidence: ["project-memory-local-store:damaged"] };
+  const existing = foldProjectMemoryEntries(snapshot.entries, { includeInvalidated: true }).find(
     (record) => record.id === request.recordId,
   );
   if (!existing) {
@@ -198,7 +202,7 @@ function invalidateRecord(
   };
   try {
     fs.mkdirSync(path.dirname(recordsFile), { recursive: true });
-    fs.appendFileSync(recordsFile, `${JSON.stringify(tombstone)}\n`, "utf8");
+    fs.appendFileSync(recordsFile, `${snapshot.appendPrefix}${JSON.stringify(tombstone)}\n`, "utf8");
   } catch (error) {
     return {
       invalidated: false,
@@ -241,7 +245,9 @@ function deleteRecord(
     };
   }
   const recordsFile = recordsFileFor(ref);
-  const entries = readEntriesSync(ref);
+  const snapshot = readEntriesSync(ref);
+  if (snapshot.diagnostics.length) return { recordId: request.recordId, deleted: false, skipped: false, blocker: snapshot.diagnostics.join(" "), evidence: ["project-memory-local-store:damaged"] };
+  const entries = snapshot.entries;
   const existing = foldProjectMemoryEntries(entries, {
     includeInvalidated: true,
   }).find((record) => record.id === request.recordId);
@@ -302,10 +308,13 @@ function readRecords(
   ref: ProjectMemoryStoreRef,
   options: ProjectMemoryListOptions = {},
 ): ProjectMemoryListResult {
+  const snapshot = readEntriesSync(ref);
   return {
-    records: readRecordsSync(ref, options),
+    records: foldProjectMemoryEntries(snapshot.entries, options),
+    diagnostics: snapshot.diagnostics,
     evidence: [
       "project-memory-local-store:list",
+      ...snapshot.diagnostics,
       options.includeInvalidated
         ? "project-memory-local-store:include-invalidated-explicit"
         : "project-memory-local-store:exclude-invalidated-default",
@@ -314,19 +323,13 @@ function readRecords(
   };
 }
 
-function readRecordsSync(
-  ref: ProjectMemoryStoreRef,
-  options: ProjectMemoryListOptions = {},
-): ProjectMemoryRecord[] {
-  return foldProjectMemoryEntries(readEntriesSync(ref), options);
-}
-
 function storeHealth(ref: ProjectMemoryStoreRef): ProjectMemoryStoreHealth {
   if (!projectMemoryStoreRefIsWritable(ref)) {
     return {
       mode: ref.mode,
       ok: ref.mode === "disabled",
       writable: false,
+      readable: false,
       detail: "No explicit local memory store root configured.",
       evidence: [
         "project-memory-local-store:disabled",
@@ -335,16 +338,20 @@ function storeHealth(ref: ProjectMemoryStoreRef): ProjectMemoryStoreHealth {
     };
   }
   const recordsFile = recordsFileFor(ref);
+  const snapshot = readEntriesSync(ref);
   return {
     mode: ref.mode,
-    ok: true,
-    writable: true,
-    recordCount: readRecordsSync(ref, { includeInvalidated: true }).length,
+    ok: snapshot.readable && snapshot.diagnostics.length === 0,
+    writable: snapshot.readable && snapshot.diagnostics.length === 0,
+    readable: snapshot.readable,
+    diagnostics: snapshot.diagnostics,
+    recordCount: foldProjectMemoryEntries(snapshot.entries, { includeInvalidated: true }).length,
     storeRoot: ref.root,
     recordsFile,
-    detail: "Explicit local JSONL memory store is configured.",
+    detail: snapshot.diagnostics.join(" ") || "Explicit local JSONL memory store is configured.",
     evidence: [
       "project-memory-local-store:health",
+      ...snapshot.diagnostics,
       "project-memory-local-store:explicit-local",
     ],
   };

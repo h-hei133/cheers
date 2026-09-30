@@ -71,6 +71,7 @@ export interface ProjectMemoryWriteResult {
 
 export interface ProjectMemoryListResult {
   readonly records: readonly ProjectMemoryRecord[];
+  readonly diagnostics?: readonly string[];
   readonly evidence: readonly string[];
 }
 
@@ -109,6 +110,8 @@ export interface ProjectMemoryStoreHealth {
   readonly mode: ProjectMemoryStoreMode;
   readonly ok: boolean;
   readonly writable: boolean;
+  readonly readable?: boolean;
+  readonly diagnostics?: readonly string[];
   readonly recordCount?: number;
   readonly storeRoot?: string;
   readonly recordsFile?: string;

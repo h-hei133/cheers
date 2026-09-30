@@ -64,7 +64,7 @@ export async function planProjectMemoryFutureTurnInjection(
     return invalid(input, "memory-store-missing", "Explicit local memory store is required.", baseEvidence);
   }
   const health = await input.memoryStore.health();
-  if (!health.writable) {
+  if (!(health.readable ?? health.writable)) {
     return invalid(input, "memory-store-not-writable", "Explicit local memory store is not writable.", [
       ...baseEvidence,
       ...health.evidence,
