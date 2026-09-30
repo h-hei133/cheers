@@ -485,7 +485,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
       } catch (error) {
         if (signal?.aborted) return stamp(abortedStep(shown));
         const detail = error instanceof Error ? error.message : String(error);
-        if (!shownAnything && streamAttempts < retry.maxRetries && /socket|connection|network|fetch|terminated|unexpected eof/i.test(detail)) {
+        if (!shownAnything && !REFUSAL.test(detail) && streamAttempts < retry.maxRetries && /socket|connection|network|fetch|terminated|unexpected eof/i.test(detail)) {
           streamAttempts += 1;
           releaseAfterRead?.abort();
           const waited = await waitBeforeRetry(retryDelayMs(retry, streamAttempts, undefined), signal);

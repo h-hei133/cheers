@@ -1050,3 +1050,19 @@ it.each(["SAFETY", "RECITATION", "PROHIBITED_CONTENT"])("keeps Google %s refusal
     expect(result.errorMessage).not.toContain("/connect");
   }
 });
+
+
+it("never retries a streamed safety rejection even when its detail mentions a network", async () => {
+  let requests = 0;
+  const step = createStepFunction({ ...request,
+    provider: { ...request.provider, endpoint: "google-generative-ai" },
+    retry: { maxRetries: 2, baseDelayMs: 0, maxDelayMs: 0 },
+    fetchImpl: async () => {
+      requests++;
+      return new Response(`data: ${JSON.stringify({ promptFeedback: { blockReason: "SAFETY", blockReasonMessage: "Network access blocked by safety rules" } })}\n\n`, { headers: { "content-type": "text/event-stream" } });
+    },
+  });
+  const result = await step([], undefined, {}, { allowTools: true });
+  expect(result.stopReason).toBe("error");
+  expect(requests).toBe(1);
+});
