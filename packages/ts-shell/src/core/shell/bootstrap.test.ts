@@ -8,6 +8,7 @@ import { SessionManager } from '../../session/SessionManager.js'
 import { getWorkflowGitContext } from '../../workflow/gitContext.js'
 import { bootstrapShellRuntime } from './bootstrap.js'
 import { SessionBootstrapError } from './bootstrap.js'
+import { forgetSessionTodos, getSessionTodos } from '../commands/todoCommandRuntime.js'
 
 describe('shell bootstrap', () => {
   const originalUserProfile = process.env.USERPROFILE
@@ -101,6 +102,10 @@ describe('shell bootstrap', () => {
     const nestedEntry = path.join(sessionRoot, 'nested', 'entry')
     fs.mkdirSync(nestedEntry, { recursive: true })
     const session = sessionManager.createNew(sessionRoot)
+    sessionManager.addTurn(session.id, { role: 'user', content: 'Local checklist change', metadata: {
+      todo: [{ id: 1, text: 'restored at startup', status: 'pending' }],
+    } })
+    forgetSessionTodos(session.id)
 
     const result = bootstrapShellRuntime({
       cwd: nestedEntry,
@@ -115,6 +120,7 @@ describe('shell bootstrap', () => {
     expect(path.resolve(result.context.session.projectRoot)).toBe(path.resolve(sessionRoot))
     expect(path.resolve(result.context.projectRoot)).toBe(path.resolve(sessionRoot))
     expect(result.context.session.id).toBe(session.id)
+    expect(getSessionTodos(session.id)).toEqual([{ id: 1, text: 'restored at startup', status: 'pending' }])
   })
 
   it('explicitly rebinds compatible roots when migration flag is set', () => {

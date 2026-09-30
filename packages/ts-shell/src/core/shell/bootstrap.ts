@@ -14,6 +14,7 @@ import {
 } from "./runtimeContext.js";
 import { getWorkflowGitContext } from "../../workflow/gitContext.js";
 import path from "node:path";
+import { replayTodosFromMessages } from "../commands/todoCommandRuntime.js";
 
 export type ShellBootstrapPhase =
   | "fast-path-parse"
@@ -258,6 +259,7 @@ export function bootstrapShellRuntime(input: {
     );
     return reboundSession;
   })();
+  replayTodosFromMessages(session.id, session.turns);
   const boundProjectRoot = session.projectRoot || requestedProjectRoot;
   const boundGitContext = getWorkflowGitContext(boundProjectRoot);
   const boundRootMode = session.rootMode ?? resolveWorkspaceRootMode(boundGitContext);
