@@ -441,6 +441,11 @@ export class InteractiveMode {
           this.tui.requestRender();
         },
         openSearch: () => {
+          if (this.options.runtimeContext.runtimeConfig.tuiMode === "regular") {
+            this.toast = "Transcript search requires fullscreen mode; use terminal search here.";
+            this.tui.requestRender();
+            return;
+          }
           // Not while a run is producing rows: the search matches the rows on
           // screen, and rows that are still being written would move under it and
           // carry their highlights with them.

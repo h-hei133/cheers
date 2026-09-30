@@ -8,6 +8,7 @@ import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
+import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 
 /**
  * Boot the real host against a recording device.
@@ -19,6 +20,7 @@ import type { StructuredLogger } from "../../observability/structuredLogger.js";
  */
 function boot(
   overrides: Partial<InteractiveModeOptions> = {},
+  tuiMode?: "regular" | "fullscreen",
 ): { mode: InteractiveMode; terminal: RecordingTerminal; scheduler: ManualScheduler } {
   const terminal = new RecordingTerminal();
   terminal.columns = 80;
@@ -37,6 +39,7 @@ function boot(
         providerCredentials: { openai: { model: "opus-5" } },
         contextWindow: 200_000,
         agentMode: "build",
+        tuiMode,
       },
     } as unknown as ShellRuntimeContext,
     sessionRuntime: {
@@ -58,6 +61,48 @@ function boot(
   });
   return { mode, terminal, scheduler };
 }
+
+describe("transcript search ownership", () => {
+  it("explains the regular-screen limitation and leaves typing in the composer", () => {
+    const { mode, terminal, scheduler } = boot({}, "regular");
+    mode.start();
+    scheduler.flush();
+    terminal.drain();
+    try {
+      terminal.input("\x1b[102;6u");
+      scheduler.flush();
+      const notice = stripAnsi(terminal.drain());
+      expect(notice).toContain("Transcript search requires fullscreen mode");
+      expect(notice).not.toContain("find:");
+
+      terminal.input("draft");
+      scheduler.flush();
+      const typed = stripAnsi(terminal.drain());
+      expect(typed).toContain("╰─ draft");
+      expect(typed).not.toContain("find:");
+    } finally {
+      mode.stop();
+    }
+  });
+
+  it("keeps transcript search available on the alternate screen", () => {
+    const { mode, terminal, scheduler } = boot({}, "fullscreen");
+    mode.start();
+    scheduler.flush();
+    terminal.drain();
+    try {
+      terminal.input("\x1b[102;6u");
+      terminal.input("Cheers");
+      scheduler.flush();
+      const searched = stripAnsi(terminal.drain());
+      expect(searched).toContain("find: Cheers");
+      expect(searched).not.toContain("requires fullscreen mode");
+      expect(searched).not.toContain("╰─ Cheers");
+    } finally {
+      mode.stop();
+    }
+  });
+});
 
 describe("first painted frame", () => {
   it("reaches the device instead of throwing", () => {
