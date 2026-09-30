@@ -281,3 +281,15 @@ export function renderTask(task: BackgroundTask): string {
   }
   return lines.join("\n");
 }
+
+/**
+ * What the user is told when a background command ends.
+ *
+ * Phrased as something to act on rather than a status line: the command was
+ * started so its result could be used later, and the moment it ends is when that
+ * becomes possible. The tail of its output travels with the notice because the
+ * only other way to get it is a second tool call.
+ */
+export function renderTaskNotice(task: Parameters<typeof renderTask>[0]): string {
+  return `A background command finished.\n\n${renderTask(task)}\n\nRead the full output with taskOutput if you need more than the tail.`;
+}

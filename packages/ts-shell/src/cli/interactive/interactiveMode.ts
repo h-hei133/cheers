@@ -1,5 +1,5 @@
 import { messageToText } from "../../model-adapters/multimodal.js";
-import { backgroundTasks, renderTask } from "../../core/shell/background/tasks.js";
+import { backgroundTasks, renderTaskNotice } from "../../core/shell/background/tasks.js";
 import type { Interface as ReadlineInterface } from "node:readline";
 import path from "node:path";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
@@ -211,9 +211,9 @@ export class InteractiveMode {
     this.stopWatchingBackground = backgroundTasks.onEnded((task) => {
       const runtime = this.options.sessionRuntime;
       if (this.busy) {
-        runtime.input?.()?.followUp(backgroundNotice(task));
+        runtime.input?.()?.followUp(renderTaskNotice(task));
       } else {
-        this.queue.push(backgroundNotice(task));
+        this.queue.push(renderTaskNotice(task));
       }
       this.tui.requestRender();
     });
@@ -847,14 +847,3 @@ export class InteractiveMode {
   }
 }
 
-/**
- * What the user is told when a background command ends.
- *
- * Phrased as something to act on rather than a status line: the command was
- * started so its result could be used later, and the moment it ends is when that
- * becomes possible. The tail of its output travels with the notice because the
- * only other way to get it is a second tool call.
- */
-function backgroundNotice(task: Parameters<typeof renderTask>[0]): string {
-  return `A background command finished.\n\n${renderTask(task)}\n\nRead the full output with taskOutput if you need more than the tail.`;
-}
