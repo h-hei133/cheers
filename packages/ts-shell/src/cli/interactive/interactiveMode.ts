@@ -599,6 +599,7 @@ export class InteractiveMode {
         approvalTrustPolicy: this.options.approvalTrustPolicy,
         turnNumber: this.turnNumber,
         modifierKeysReported: (this.terminal.keyboardProtocol ?? "legacy") !== "legacy",
+        keyGuide: this.preferences.keybindings.guide(this.options.runtimeContext.runtimeConfig.tuiMode !== "regular"),
         setActiveNonInteractiveApprovalMode:
           this.options.setActiveNonInteractiveApprovalMode ?? (() => {}),
         refreshKeybindings: () => this.preferences.reload(),
@@ -704,6 +705,7 @@ export class InteractiveMode {
           : {}),
         ...(this.options.themePaths ? { themePaths: this.options.themePaths } : {}),
         modifierKeysReported: (this.terminal.keyboardProtocol ?? "legacy") !== "legacy",
+        keyGuide: this.preferences.keybindings.guide(this.options.runtimeContext.runtimeConfig.tuiMode !== "regular"),
       },
       transcript: this.state.transcript,
       sessionManager: this.options.sessionManager,

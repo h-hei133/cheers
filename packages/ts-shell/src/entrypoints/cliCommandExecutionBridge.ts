@@ -1,3 +1,4 @@
+import type { KeyBinding } from "../presentation/tui/chrome/keys.js";
 import type { PromptAttachments } from "../core/shell/sessionRuntime.js";
 import { routeSlashCommand } from "../core/commands/slashRouter.js";
 import { createProjectMemoryLocalStore } from "../memory/projectMemoryLocalStore.js";
@@ -75,6 +76,7 @@ export interface BuildCliCommandExecutionInput {
   readonly projectMemoryStore?: ProjectMemoryStore;
   readonly env?: Readonly<Record<string, string | undefined>>;
   /** True when the terminal agreed to report modified keys. */
+  readonly keyGuide?: readonly KeyBinding[];
   readonly modifierKeysReported?: boolean;
   /** How `/reload` re-reads the session's configuration. Absent off-session. */
   readonly refreshRuntimeConfig?: () => { readonly before: RuntimeConfig; readonly after: RuntimeConfig };
@@ -131,6 +133,7 @@ export async function buildCliCommandExecution(
     ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
     ...(input.themePaths ? { themePaths: input.themePaths } : {}),
     modifierKeysReported: input.modifierKeysReported,
+    keyGuide: input.keyGuide,
     refreshRuntimeConfig: input.refreshRuntimeConfig,
     compactCheckpointStore: input.compactCheckpointStore,
     compactInjectionStateStore: input.compactInjectionStateStore,

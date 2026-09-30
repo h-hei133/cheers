@@ -1,3 +1,4 @@
+import type { KeyBinding } from "../../presentation/tui/chrome/keys.js";
 import type { CompactLiveCheckpointStore } from '../../context/compact/checkpoint/compactLiveCheckpoint.js'
 import type { CompactInjectionStateStore } from '../../context/compact/injection/compactInjectionState.js'
 import type { ProjectMemoryReviewStateStore } from '../../memory/projectMemoryReviewState.js'
@@ -58,6 +59,7 @@ export interface CommandContext {
    */
   readonly themePaths?: readonly string[]
   /** True when the terminal agreed to report modified keys, so chords arrive. */
+  readonly keyGuide?: readonly KeyBinding[];
   readonly modifierKeysReported?: boolean
   readonly rawCommandName?: string
   /** Original argument source for commands that accept shell syntax. */

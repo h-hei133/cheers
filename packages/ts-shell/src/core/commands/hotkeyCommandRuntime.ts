@@ -15,6 +15,6 @@ export async function runHotkeyCommand(
 ): Promise<LocalCommandResult> {
   return {
     kind: "local",
-    output: renderKeyGuide(context.modifierKeysReported === true),
+    output: renderKeyGuide(context.modifierKeysReported === true, context.keyGuide),
   };
 }

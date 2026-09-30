@@ -102,14 +102,14 @@ const GROUP_TITLES: Record<KeyGroup, string> = {
  * The whole table as Markdown, grouped, with the keys a terminal may not deliver
  * marked as such rather than silently listed alongside ones that always work.
  */
-export function renderKeyGuide(negotiated: boolean): string {
+export function renderKeyGuide(negotiated: boolean, resolved: readonly KeyBinding[] = KEY_BINDINGS): string {
   const lines: string[] = [];
   for (const group of Object.keys(GROUP_TITLES) as KeyGroup[]) {
-    const bindings = KEY_BINDINGS.filter((binding) => binding.group === group);
+    const bindings = resolved.filter((binding) => binding.group === group);
     if (bindings.length === 0) continue;
     lines.push(`### ${GROUP_TITLES[group]}`, "", "| Key | Does |", "| :--- | :--- |");
     for (const binding of bindings) {
-      const keys = binding.keys.map((key) => `\`${key}\``).join(" / ");
+      const keys = binding.keys.map((key) => `\`${key}\``).join(" / ") || "*(unbound)*";
       const caveat = binding.negotiated && !negotiated ? " *(this terminal did not offer it)*" : "";
       lines.push(`| ${keys} | ${binding.does}${caveat} |`);
     }

@@ -1,3 +1,4 @@
+import type { KeyBinding } from "../../presentation/tui/chrome/keys.js";
 import type { PromptAttachments } from "../../core/shell/sessionRuntime.js";
 import type { Interface as ReadlineInterface } from "node:readline";
 
@@ -53,6 +54,7 @@ export interface InteractiveCommandRouterInput {
   readonly approvalTrustPolicy: ApprovalTrustPolicy;
   readonly turnNumber: number;
   /** True when the terminal agreed to report modified keys. */
+  readonly keyGuide?: readonly KeyBinding[];
   readonly modifierKeysReported?: boolean;
   readonly setActiveNonInteractiveApprovalMode: (
     mode: ApprovalModeObject | undefined,
@@ -122,6 +124,7 @@ export async function routeInteractiveCommand(
     ...(input.runtimeContext.skillOptions ? { skillOptions: input.runtimeContext.skillOptions } : {}),
     ...(input.runtimeContext.themePaths ? { themePaths: input.runtimeContext.themePaths } : {}),
     modifierKeysReported: input.modifierKeysReported,
+    keyGuide: input.keyGuide,
     // The settings live on the context this session carries, so replacing them in
     // place is what makes `/reload` take effect for the rest of the session rather
     // than only for the turn that ran it.

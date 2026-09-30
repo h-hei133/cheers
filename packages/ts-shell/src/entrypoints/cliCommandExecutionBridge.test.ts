@@ -30,6 +30,17 @@ function bridge(result: CommandExecutionResult | null): CliCommandExecutionBridg
 }
 
 describe("CLI command execution bridge", () => {
+  it("passes the live keyboard guide through to the hotkey command", async () => {
+    const output = renderer();
+    await buildCliCommandExecution({
+      prompt: "/hotkey", cwd: "/workspace", renderer: output as StreamingRenderer,
+      printMode: false, interactive: true, modifierKeysReported: true,
+      keyGuide: [{ keys: ["ctrl+r"], does: "Retry the last prompt", group: "session" }],
+    });
+    expect(output.lines.join("\n")).toContain("`ctrl+r`");
+    expect(output.lines.join("\n")).not.toContain("`f5`");
+  });
+
   it("renders local slash command output with interactive spacing", async () => {
     const output = renderer();
     const resolved = await buildCliCommandExecution(

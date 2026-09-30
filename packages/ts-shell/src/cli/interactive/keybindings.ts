@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { KEY_BINDINGS, type KeyBinding } from "../../presentation/tui/chrome/keys.js";
 import { resolveUserDataFile, userDataDirFor } from "../../core/paths/userHome.js";
 
 /**
@@ -78,7 +79,7 @@ export const KEY_ACTIONS: Record<string, KeybindingDefinition> = {
   "app.exit": { defaultKeys: ["ctrl+d"], description: "Exit when the draft is empty" },
   "app.clearScreen": { defaultKeys: ["ctrl+l"], description: "Clear the screen" },
   "app.message.followUp": { defaultKeys: ["ctrl+q"], description: "Queue a follow-up while a run is active" },
-  "app.thinking.cycle": { defaultKeys: ["shift+tab"], description: "Cycle the thinking level" },
+  "app.thinking.cycle": { defaultKeys: ["shift+tab"], description: "Switch between planning and building" },
   "app.thinking.toggle": { defaultKeys: ["ctrl+t"], description: "Collapse or expand thinking blocks" },
   "app.tools.expand": { defaultKeys: ["ctrl+o"], description: "Collapse or expand tool output" },
   "app.permission.cycle": { defaultKeys: ["alt+p"], description: "Cycle the permission scope" },
@@ -279,6 +280,23 @@ export class Keybindings {
   /** The keys bound to an action, in the order they were declared. */
   keysFor(actionId: string): readonly string[] {
     return Object.hasOwn(this.byAction, actionId) ? this.byAction[actionId]! : [];
+  }
+
+  /** Display only the keys that dispatch to each action after conflict resolution. */
+  guide(fullScreen: boolean): readonly KeyBinding[] {
+    const actions = Object.entries(KEY_ACTIONS).map(([id, definition]): KeyBinding => {
+      const base = KEY_BINDINGS.find((row) => row.keys.some((key) => definition.defaultKeys.includes(key)));
+      const keys = this.keysFor(id).filter((key) => this.actionFor(key) === id);
+      const availability = !fullScreen && id === "tui.altScreen.search" ? " (requires fullscreen mode)" : "";
+      return {
+        keys,
+        does: definition.description + availability,
+        group: base?.group ?? "session",
+        negotiated: keys.some((key) => /^(ctrl\+shift\+|shift\+enter$|alt\+enter$)/.test(key)),
+      };
+    });
+    const gestures = KEY_BINDINGS.filter((row) => row.group === "pointer" || row.keys.includes("paste twice"));
+    return [...actions, ...gestures.filter((row) => fullScreen || row.group !== "pointer")];
   }
 
   /** Keys claimed by more than one action, so the ambiguity is visible. */
