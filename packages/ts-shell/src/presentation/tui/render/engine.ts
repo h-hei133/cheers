@@ -142,7 +142,7 @@ export class TUI {
     this.beginTerminal({ deferInput: options?.deferInput === true });
     this.alternateScreen = options?.useAlternateScreen !== false;
     this.enterScreen();
-    this.setMouseTracking(true);
+    this.setMouseTracking(this.alternateScreen);
     this.requestRender({ force: true });
   }
 
@@ -246,7 +246,7 @@ export class TUI {
         this.painted = false;
         this.window = [];
       }
-      this.setMouseTracking(true);
+      this.setMouseTracking(this.alternateScreen);
       this.requestRender({ force: true });
     }
   }

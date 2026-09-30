@@ -91,12 +91,26 @@ describe("keeping the terminal's own screen", () => {
     expect(terminal.drain()).not.toContain("\x1b[?1049h");
   });
 
-  it("still asks for the mouse on the terminal's own screen", () => {
+  it("leaves wheel and drag ownership with the terminal on its own screen", () => {
     const { tui, terminal, scheduler } = boot();
     tui.start({ useAlternateScreen: false });
     scheduler.flush();
 
-    expect(terminal.drain()).toContain("\x1b[?1002h");
+    const output = terminal.drain();
+    expect(output).not.toContain("\x1b[?1002h");
+    expect(output).not.toContain("\x1b[?1006h");
+  });
+
+  it.each([false, true])("restores mouse ownership after a child (alternate screen: %s)", (useAlternateScreen) => {
+    const { tui, terminal, scheduler } = boot();
+    tui.start({ useAlternateScreen });
+    scheduler.flush();
+    terminal.drain();
+
+    tui.suspend(() => {});
+    scheduler.flush();
+
+    expect(terminal.drain().includes("\x1b[?1002h")).toBe(useAlternateScreen);
   });
 
   it("keeps content out of the alternate screen's full repaint", () => {
