@@ -292,7 +292,7 @@ export class Keybindings {
         keys,
         does: definition.description + availability,
         group: base?.group ?? "session",
-        negotiated: keys.some((key) => /^(ctrl\+shift\+|shift\+enter$|alt\+enter$)/.test(key)),
+        negotiatedKeys: keys.filter((key) => /^(ctrl\+shift\+|shift\+enter$|alt\+enter$)/.test(key)),
       };
     });
     const gestures = KEY_BINDINGS.filter((row) => row.group === "pointer" || row.keys.includes("paste twice"));

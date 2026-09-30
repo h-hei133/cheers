@@ -20,3 +20,12 @@ it("displays resolved overrides, unbound actions and conflict winners", () => {
   expect(text).toContain("requires fullscreen mode");
   expect(text).not.toContain("`wheel`");
 });
+
+it("marks only protocol-dependent alternatives and never invents a rebound newline key", () => {
+  const defaults = renderKeyGuide(false, new Keybindings().guide(true));
+  expect(defaults).toContain("`shift+enter` *(not reported)*");
+  expect(defaults).toContain("`ctrl+j` |");
+  const rebound = renderKeyGuide(false, new Keybindings({ "tui.input.newLine": "f2" }).guide(true));
+  expect(rebound).toContain("`f2`");
+  expect(rebound).not.toContain("ctrl+j");
+});

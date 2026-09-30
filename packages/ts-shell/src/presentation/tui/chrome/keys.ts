@@ -17,6 +17,8 @@ export interface KeyBinding {
   readonly group: KeyGroup;
   /** True when the terminal must negotiate modifier reporting for it to arrive. */
   readonly negotiated?: boolean;
+  /** Per-key capability requirements for a row with mixed alternatives. */
+  readonly negotiatedKeys?: readonly string[];
 }
 
 export const KEY_BINDINGS: readonly KeyBinding[] = [
@@ -109,16 +111,19 @@ export function renderKeyGuide(negotiated: boolean, resolved: readonly KeyBindin
     if (bindings.length === 0) continue;
     lines.push(`### ${GROUP_TITLES[group]}`, "", "| Key | Does |", "| :--- | :--- |");
     for (const binding of bindings) {
-      const keys = binding.keys.map((key) => `\`${key}\``).join(" / ") || "*(unbound)*";
-      const caveat = binding.negotiated && !negotiated ? " *(this terminal did not offer it)*" : "";
-      lines.push(`| ${keys} | ${binding.does}${caveat} |`);
+      const keys = binding.keys.map((key) => {
+        const requiresProtocol = binding.negotiatedKeys?.includes(key) ?? binding.negotiated;
+        const caveat = requiresProtocol && !negotiated ? " *(not reported)*" : "";
+        return `\`${key}\`${caveat}`;
+      }).join(" / ") || "*(unbound)*";
+      lines.push(`| ${keys} | ${binding.does} |`);
     }
     lines.push("");
   }
   lines.push(
     negotiated
-      ? "This terminal reports modified keys, so the shifted Enter chords above are available."
-      : "This terminal does not report modified keys, so `ctrl+j` is the newline that always works.",
+      ? "This terminal reports modified keys."
+      : "This terminal does not report modified keys; use an unmarked alternative where available.",
   );
   return lines.join("\n");
 }
