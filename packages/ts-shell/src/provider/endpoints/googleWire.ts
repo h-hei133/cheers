@@ -229,6 +229,11 @@ export function mapGoogleFinishReason(reason: string | undefined): string | unde
   if (!reason) return undefined;
   if (reason === "STOP") return "stop";
   if (reason === "MAX_TOKENS") return "length";
+  // Preserve refusal vocabulary for the shared retry and guidance classifier.
+  // Unknown and malformed-call reasons remain errors without claiming safety.
+  if (["SAFETY", "RECITATION", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "IMAGE_SAFETY"].includes(reason)) {
+    return reason === "BLOCKLIST" || reason === "SPII" || reason === "IMAGE_SAFETY" ? "safety" : reason.toLowerCase();
+  }
   return "error";
 }
 

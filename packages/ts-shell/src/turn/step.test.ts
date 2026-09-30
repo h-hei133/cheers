@@ -1036,3 +1036,17 @@ it.each(["refusal", "guardrail_intervened", "content_filter", "safety", "recitat
   expect(emptyAnswerExplanation(reason, 0)).toContain("withheld");
   expect(emptyAnswerExplanation(reason, 20)).not.toContain("/connect");
 });
+
+
+it.each(["SAFETY", "RECITATION", "PROHIBITED_CONTENT"])("keeps Google %s refusal guidance through JSON and SSE", async (finishReason) => {
+  for (const stream of [false, true]) {
+    const body = { candidates: [{ content: { parts: [] }, finishReason }] };
+    const step = createStepFunction({ ...request, provider: { ...request.provider, endpoint: "google-generative-ai" }, fetchImpl: async () =>
+      stream ? new Response(`data: ${JSON.stringify(body)}\n\n`, { headers: { "content-type": "text/event-stream" } }) : jsonResponse(body),
+    });
+    const result = await step([], undefined, {}, { allowTools: true });
+    expect(result.stopReason).toBe("error");
+    expect(result.errorMessage).toContain("withheld");
+    expect(result.errorMessage).not.toContain("/connect");
+  }
+});

@@ -269,7 +269,7 @@ describe("reading the answer", () => {
     expect((await readAll(stream)).text).toBe("ok");
   });
 
-  it("maps a safety stop reason to an error rather than a finish", async () => {
+  it("preserves safety vocabulary for turn-layer error guidance", async () => {
     // SAFETY means the provider refused to produce the answer, not that the
     // answer is complete. Mapping it to "stop" would end the turn cleanly on a
     // refusal the user never saw explained.
@@ -278,7 +278,7 @@ describe("reading the answer", () => {
     );
     let step = await generator.next();
     while (step.done !== true) step = await generator.next();
-    expect(step.value.finishReason).toBe("error");
+    expect(step.value.finishReason).toBe("safety");
   });
 
   it("maps MAX_TOKENS to the one reason that means truncation", async () => {
