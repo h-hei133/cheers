@@ -1,4 +1,3 @@
-import type { StaticResourceDescriptor } from "../../runtime/resources/descriptor.js";
 
 export type ProviderCapabilityState = "supported" | "unsupported" | "unknown";
 
@@ -158,7 +157,6 @@ export interface ProviderRegistryProjection {
   readonly readinessMatrix: readonly ProviderReadinessMatrixEntry[];
   readonly fallbackPolicies: readonly ProviderFallbackPolicyMetadata[];
   readonly failureTaxonomy: readonly ProviderFailureClass[];
-  readonly resourceDescriptors: readonly StaticResourceDescriptor[];
   readonly redaction: ProviderRegistryRedaction;
   readonly terminalSuccessClaim: false;
   readonly notProvenClaims: readonly string[];
