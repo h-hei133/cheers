@@ -1,4 +1,5 @@
 import type { Skill } from "../skills/skillLoader.js";
+import { tokenizeCommandArgs } from "../commands/arguments.js";
 
 /**
  * Turning a typed line into what the model receives.
@@ -36,31 +37,14 @@ const SKILL_PREFIX = "/skill:";
  * with the quote still attached.
  */
 export function parseArguments(argsText: string): string[] {
-  const args: string[] = [];
-  let current = "";
-  let quote: string | null = null;
-
-  for (const char of argsText) {
-    if (quote) {
-      if (char === quote) quote = null;
-      else current += char;
-      continue;
-    }
-    if (char === '"' || char === "'") {
-      quote = char;
-      continue;
-    }
-    if (/\s/.test(char)) {
-      if (current) {
-        args.push(current);
-        current = "";
-      }
-      continue;
-    }
-    current += char;
+  try {
+    return tokenizeCommandArgs(argsText);
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+    // Template arguments can be unfinished prose. Keep it verbatim instead of
+    // losing an apostrophe or letting a typing error escape the prompt path.
+    return argsText.trim() ? [argsText.trim()] : [];
   }
-  if (current) args.push(current);
-  return args;
 }
 
 /**

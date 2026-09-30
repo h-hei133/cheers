@@ -3,6 +3,7 @@ import { resolveSkillCatalog } from "../skills/skillCatalog.js";
 import { TemplateLoader } from "../prompts/templateLoader.js";
 import { expandSkill, expandTemplate } from "../prompts/expansion.js";
 import type { CommandContext, CommandExecutionResult } from "./types.js";
+import { tokenizeCommandArgs } from "./arguments.js";
 
 export async function routeSlashCommand(
   input: string,
@@ -12,7 +13,9 @@ export async function routeSlashCommand(
     return null;
   }
 
-  const [rawName, ...args] = input.slice(1).split(/\s+/).filter(Boolean);
+  const invocation = /^\/\s*(\S+)(?:\s+([\s\S]*))?$/.exec(input);
+  const rawName = invocation?.[1];
+  const rawCommandArgs = invocation?.[2] ?? "";
   if (!rawName) {
     return {
       kind: "local",
@@ -74,9 +77,17 @@ export async function routeSlashCommand(
     command.availability !== "hidden" &&
     command.enabled !== false
   ) {
+    let args: string[];
+    try {
+      args = tokenizeCommandArgs(rawCommandArgs);
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+      return { kind: "local", output: `Invalid /${rawName} arguments: ${error.message}` };
+    }
     return command.execute(args, {
       ...context,
       rawCommandName: rawName,
+      rawCommandArgs,
     });
   }
 

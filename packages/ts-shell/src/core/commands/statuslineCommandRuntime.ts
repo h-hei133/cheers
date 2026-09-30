@@ -36,8 +36,7 @@ export async function runStatuslineCommand(
   }
 
   const requested = rest
-    .join(" ")
-    .split(/[\s,]+/)
+    .flatMap((value) => value.split(","))
     .map((value) => value.trim())
     .filter(Boolean);
 

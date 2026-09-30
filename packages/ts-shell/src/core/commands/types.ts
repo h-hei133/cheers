@@ -60,6 +60,8 @@ export interface CommandContext {
   /** True when the terminal agreed to report modified keys, so chords arrive. */
   readonly modifierKeysReported?: boolean
   readonly rawCommandName?: string
+  /** Original argument source for commands that accept shell syntax. */
+  readonly rawCommandArgs?: string
   readonly compactCheckpointStore?: CompactLiveCheckpointStore
   readonly compactInjectionStateStore?: CompactInjectionStateStore
   readonly projectMemoryReviewStateStore?: ProjectMemoryReviewStateStore

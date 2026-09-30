@@ -43,6 +43,41 @@ describe("slash router (W4)", () => {
     fs.rmSync(workspaceRoot, { recursive: true, force: true });
   });
 
+  it("passes a quoted theme name as one argument", async () => {
+    const result = await routeSlashCommand('/theme "Dark Mode"', { cwd: workspaceRoot });
+    expect(result).toMatchObject({ kind: "local", output: expect.stringContaining("`dark mode`") });
+  });
+
+  it("removes path quotes without losing spaces", async () => {
+    expect(await routeSlashCommand('/cd "a b"', { cwd: workspaceRoot })).toMatchObject({
+      kind: "shell-action", workspaceTarget: "a b",
+    });
+  });
+
+  it("keeps a quoted status item intact through validation", async () => {
+    const result = await routeSlashCommand('/statusline use "a b"', { cwd: workspaceRoot });
+    expect(result).toMatchObject({ kind: "local", output: expect.stringContaining("Not a status item: `a b`.") });
+  });
+
+  it.each(['/cd "unfinished', "/cd 'unfinished", "/cd trailing\\"])("reports invalid quoting for %s", async (source) => {
+    expect(await routeSlashCommand(source, { cwd: workspaceRoot })).toMatchObject({
+      kind: "local", output: expect.stringContaining("Invalid /cd arguments:"),
+    });
+  });
+
+  it("keeps shell source intact when a loop gate contains quoted arguments", async () => {
+    const result = await routeSlashCommand(`/loop "2" node -e "process.exit(process.argv[1] === 'a b' ? 0 : 1)" "a b"`, { cwd: workspaceRoot });
+    expect(result).toMatchObject({ kind: "local", output: expect.stringContaining("already passes") });
+  });
+
+  it("keeps unfinished template prose readable", async () => {
+    const promptsDir = path.join(workspaceRoot, ".agents", "prompts");
+    fs.mkdirSync(promptsDir, { recursive: true });
+    fs.writeFileSync(path.join(promptsDir, "explain.md"), "$@", "utf8");
+    expect(await routeSlashCommand("/explain don't stop", { cwd: workspaceRoot })).toMatchObject({
+      kind: "prompt", prompt: "don't stop",
+    });
+  });
 
   it("expands a skill invocation into a prompt instead of refusing it", async () => {
     // The defect stated as a test. `/skill:name` used to be parsed as a command
