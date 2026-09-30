@@ -1,21 +1,6 @@
-interface Argument {
-  readonly value: string;
-  readonly start: number;
-}
-
 /** POSIX quoting and escapes only; no expansion or shell evaluation. */
 export function tokenizeCommandArgs(input: string): string[] {
-  return scan(input).map((argument) => argument.value);
-}
-
-/** Preserve shell syntax for a command that explicitly accepts shell source. */
-export function commandArgsFrom(input: string, index: number): string {
-  const start = scan(input)[index]?.start;
-  return start === undefined ? "" : input.slice(start);
-}
-
-function scan(input: string): Argument[] {
-  const args: Argument[] = [];
+  const args: string[] = [];
   let value = "";
   let start = -1;
   let quote: string | null = null;
@@ -43,7 +28,7 @@ function scan(input: string): Argument[] {
       if (start < 0) start = index;
       quote = char;
     } else if (/\s/.test(char)) {
-      if (start >= 0) args.push({ value, start });
+      if (start >= 0) args.push(value);
       value = "";
       start = -1;
     } else {
@@ -52,6 +37,6 @@ function scan(input: string): Argument[] {
     }
   }
   if (quote) throw new SyntaxError(`Unclosed ${quote === '"' ? "double" : "single"} quote in command arguments.`);
-  if (start >= 0) args.push({ value, start });
+  if (start >= 0) args.push(value);
   return args;
 }

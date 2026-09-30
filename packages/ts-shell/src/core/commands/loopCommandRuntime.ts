@@ -1,6 +1,5 @@
 import { exec } from "node:child_process";
 import type { CommandContext, CommandExecutionResult } from "./types.js";
-import { commandArgsFrom } from "./arguments.js";
 
 /**
  * /loop — repair until a gate passes.
@@ -59,12 +58,13 @@ export async function runLoopCommand(
 
 /** The attempt budget and the gate command, in either order of appearance. */
 function parse(args: string[], source?: string): { readonly attempts: number; readonly gate: string } {
-  const leading = Number.parseInt(args[0] ?? "", 10);
+  const prefix = source?.match(/^(?:"(\d+)"|'(\d+)'|(\d+))(?=\s|$)\s*/);
+  const leading = Number.parseInt(source === undefined ? args[0] ?? "" : prefix?.slice(1).find(Boolean) ?? "", 10);
   const hasCount = Number.isFinite(leading) && leading > 0;
   const attempts = hasCount ? Math.min(leading, MAX_ATTEMPTS) : DEFAULT_ATTEMPTS;
   const gate = (source === undefined
     ? (hasCount ? args.slice(1) : args).join(" ")
-    : commandArgsFrom(source, hasCount ? 1 : 0)).trim() || "npm test";
+    : hasCount ? source.slice(prefix![0].length) : source).trim() || "npm test";
   return { attempts, gate };
 }
 

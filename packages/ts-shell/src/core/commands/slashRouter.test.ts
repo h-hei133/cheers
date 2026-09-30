@@ -70,6 +70,14 @@ describe("slash router (W4)", () => {
     expect(result).toMatchObject({ kind: "local", output: expect.stringContaining("already passes") });
   });
 
+  it.each([
+    "printf ok # don't split this",
+    "cat <<'END'\ndon't split this\nEND",
+  ])("passes shell comments and here-documents to a loop gate: %s", async (gate) => {
+    const result = await routeSlashCommand(`/loop 1 ${gate}`, { cwd: workspaceRoot });
+    expect(result).toMatchObject({ kind: "local", output: expect.stringContaining("already passes") });
+  });
+
   it("keeps unfinished template prose readable", async () => {
     const promptsDir = path.join(workspaceRoot, ".agents", "prompts");
     fs.mkdirSync(promptsDir, { recursive: true });

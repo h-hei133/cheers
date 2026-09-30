@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { commandArgsFrom, tokenizeCommandArgs } from "./arguments.js";
+import { tokenizeCommandArgs } from "./arguments.js";
 
 describe("command argument quoting", () => {
   it.each([
@@ -23,7 +23,4 @@ describe("command argument quoting", () => {
     expect(() => tokenizeCommandArgs(source)).toThrow(SyntaxError);
   });
 
-  it("retains original shell text after a quoted leading argument", () => {
-    expect(commandArgsFrom('"2" node -e "process.exit(0)"', 1)).toBe('node -e "process.exit(0)"');
-  });
 });

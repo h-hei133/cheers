@@ -79,7 +79,9 @@ export async function routeSlashCommand(
   ) {
     let args: string[];
     try {
-      args = tokenizeCommandArgs(rawCommandArgs);
+      args = command.argumentMode === "raw"
+        ? (rawCommandArgs ? [rawCommandArgs] : [])
+        : tokenizeCommandArgs(rawCommandArgs);
     } catch (error) {
       if (!(error instanceof SyntaxError)) throw error;
       return { kind: "local", output: `Invalid /${rawName} arguments: ${error.message}` };

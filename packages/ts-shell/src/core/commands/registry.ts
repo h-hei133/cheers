@@ -482,6 +482,7 @@ export function createCommandRegistry(
       summary: "run autonomous edit-and-verify loops until test pass",
       group: "workflow",
       argumentHint: "[attempts] <gate-command>",
+      argumentMode: "raw",
       getArgumentCompletions: loopArgumentCompletions,
       execute: (args, context) => runLoopCommand(args, context),
     },
