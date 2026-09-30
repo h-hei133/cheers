@@ -120,7 +120,9 @@ Phase 16 的 16-C 重写了那套记账。这类「读了旧文档、没读当�
 
 ## 2. TUI 表面（`TUI`）
 
-### TUI-01 · `documentRows` 不带任何装饰，`regular` 模式丢失高亮、选区与滚动条 — `OPEN` `P1` `CONFIRMED`
+### TUI-01 · `documentRows` 不带任何装饰，`regular` 模式丢失高亮、选区与滚动条 — `FIXED` `P1` `CONFIRMED`
+
+> 已实施：`8ab1c5cc`；验证与裁决更正见 `phase-17-decisions.md` §8.5。历史发现保留如下。
 
 **事实**：`presentation/tui/surface/view.ts:63` 的 `documentRows` 返回
 `[...this.pane.documentRows(width), ...chrome.rows]`，而 `pane.ts:142` 的实现是
@@ -161,7 +163,9 @@ main-screen documentRows: count = 60 (capacity was 6)
 
 ---
 
-### TUI-02 · `regular` 模式劫持滚轮，却不滚动任何东西 — `OPEN` `P2` `CONFIRMED`
+### TUI-02 · `regular` 模式劫持滚轮，却不滚动任何东西 — `FIXED` `P2` `CONFIRMED`
+
+> 已实施：`9e2c987b`；验证与裁决更正见 `phase-17-decisions.md` §8.5。历史发现保留如下。
 
 **事实**：`engine.ts:145` 的 `this.setMouseTracking(true)` **无条件**执行
 （`:143` 决定 `alternateScreen`，`:145` 不看它）。
@@ -181,7 +185,9 @@ main-screen documentRows: count = 60 (capacity was 6)
 
 ---
 
-### TUI-03 · `regular` 模式下 `ctrl+shift+f` 找到匹配但屏幕不动 — `OPEN` `P2` `CONFIRMED`
+### TUI-03 · `regular` 模式下 `ctrl+shift+f` 找到匹配但屏幕不动 — `FIXED` `P2` `CONFIRMED`
+
+> 已实施：`7967d2da / 1fb68616`；验证与裁决更正见 `phase-17-decisions.md` §8.5。历史发现保留如下。
 
 **事实**：`interactiveMode.ts:405-408` 把 `scrollToContentRow` 接到 `TranscriptPane`，
 `pane.ts:89-94` 改 `scroller.scrollTop`；`engine.ts:320` 的 `mainScreen.paint` 不读它。
@@ -191,7 +197,9 @@ main-screen documentRows: count = 60 (capacity was 6)
 
 ---
 
-### TUI-04 · `regular` 模式下分页器把每一页灌进永久滚回区 — `OPEN` `P2` `CONFIRMED`
+### TUI-04 · `regular` 模式下分页器把每一页灌进永久滚回区 — `FIXED` `P2` `CONFIRMED`
+
+> 已实施：`b560c7f0`；验证与裁决更正见 `phase-17-decisions.md` §8.5。历史发现保留如下。
 
 **事实**：`interactiveMode.ts:242-244` 在 pager 打开时令 `overlayFullScreen()` 为真、
 `overlayRows()` 返回 `pager.render(width, height)`，**不带 `chromeRows`/`documentRows`**；
@@ -203,7 +211,9 @@ main-screen documentRows: count = 60 (capacity was 6)
 
 ---
 
-### TUI-05 · 每帧多次全文档遍历（`regular` 实际 4 遍）— `OPEN` `P2` `CONFIRMED`
+### TUI-05 · 每帧多次全文档遍历（`regular` 实际 4 遍）— `FIXED` `P2` `CONFIRMED`
+
+> 已实施：`81359c2b`；验证与裁决更正见 `phase-17-decisions.md` §8.5。历史发现保留如下。
 
 | # | 位置 | 做什么 |
 |---|---|---|
@@ -223,7 +233,9 @@ Phase 16 的 16-F 已让 `documentRows` 惰性（备用屏不付这份钱）并�
 
 ---
 
-### TUI-06 · 关闭时就地写文档与 `exit` 的时序 — `OPEN` `P2` `CONFIRMED`（子代理结论已修正）
+### TUI-06 · 关闭时就地写文档与 `exit` 的时序 — `FIXED` `P2` `CONFIRMED`（子代理结论已修正）
+
+> 已实施：`dc324a63 / 1fb68616`；验证与裁决更正见 `phase-17-decisions.md` §8.5。历史发现保留如下。
 
 **事实**：`engine.ts:266` 先 `this.terminal.stop()`（`:207` 用 `writeSync(...RESTORE_MODES...)`，**同步**），
 随后 `:285` `this.terminal.write(leaveScreen(document))`（**异步**），
@@ -248,7 +260,9 @@ Phase 16 的 16-F 已让 `documentRows` 惰性（备用屏不付这份钱）并�
 
 ---
 
-### TUI-08 · 字词导航对 CJK 失效 — `OPEN` `P2` `CONFIRMED`
+### TUI-08 · 字词导航对 CJK 失效 — `FIXED` `P2` `CONFIRMED`
+
+> 已实施：`ee200c53`；验证与裁决更正见 `phase-17-decisions.md` §8.5。历史发现保留如下。
 
 **事实**：`motion.ts:31-45` 用 `WHITESPACE` 判词边界。探针：
 
@@ -265,7 +279,9 @@ wordStart("hello world again", 10)       -> 6     ← 正确
 
 ---
 
-### TUI-09 · 键位帮助与用户重绑定脱节 — `OPEN` `P2` `CONFIRMED`（子代理断言已修正）
+### TUI-09 · 键位帮助与用户重绑定脱节 — `FIXED` `P2` `CONFIRMED`（子代理断言已修正）
+
+> 已实施：`702c1f0d / c49a6869`；验证与裁决更正见 `phase-17-decisions.md` §8.5。历史发现保留如下。
 
 **子代理断言**：`chrome/keys.ts` 是硬编码表、忽略 `keybindings.json`，
 且 `/help` 只列 4 个键而 `keybindings.ts` 有 39 个 → 「35 个动作的帮助缺失」。
