@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { parseBrowserCommandArgs } from "../../commandContract.js";
 import { BrowserExternalRunnerExecutor } from "./executor.js";
 import { validateBrowserExternalRunnerManifest } from "./manifest.js";
-import { createBrowserExternalRunnerScenarioFixture } from "../../../core/harness/browserExternalRunnerScenarioFixtures.js";
+import { createBrowserExternalRunnerScenarioFixture } from "../../../test-utils/browser/execution/external/fixtures.js";
 
 describe("browser external runner executor", () => {
   const cleanupFns: (() => void)[] = [];

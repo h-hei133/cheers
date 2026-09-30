@@ -7,10 +7,10 @@ import { BrowserExternalRunnerExecutor } from "../../browser/runtime/external/ex
 import { validateBrowserExternalRunnerManifest } from "../../browser/runtime/external/manifest.js";
 import { createBrowserSkillRunnerMetadata } from "../../browser/skill/runner/metadata.js";
 import { classifyBrowserSkillRunnerReadiness } from "../../browser/skill/runner/readiness.js";
-import { createBrowserSkillExecutionScenarioFixture } from "../harness/browserSkillExecutionScenarioFixtures.js";
+import { createBrowserSkillExecutionScenarioFixture } from "../../test-utils/browser/skills/fixtures.js";
 import { createBrowserCliExecutionBridge } from "../../browser/cliExecutionBridge.js";
 import { loadBrowserCliExecutorInjectionFromEnv } from "../../browser/cliExecutorInjection.js";
-import { createBrowserExternalRunnerScenarioFixture } from "../harness/browserExternalRunnerScenarioFixtures.js";
+import { createBrowserExternalRunnerScenarioFixture } from "../../test-utils/browser/execution/external/fixtures.js";
 
 describe("browser local command runtime", () => {
   it("emits a sidebar event for blocked browser execution", async () => {
