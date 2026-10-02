@@ -197,7 +197,7 @@ W6-23已把侧栏重复编号改为OBS-11/OBS-12；本表按更正后的24个唯
 | **27** | `PRV-06`：四端点逐字段形状表 + 流边界矩阵（含 Bedrock 单次路径） | 13 册 `PRV-06` | (a) 四端点**逐字段**请求形状与参考的对照表；(b) 流解析**完整边界矩阵**（SSE 注释、`\r\n` 边界、无终止帧）；(c) 用量记账跨模型/跨 resume；(d) 超时与取消的**逐路径**覆盖（`provider/request/fetch.ts` 是否被所有路径使用） | 4 协议 |
 | **28** | `BRW-06`：`receipt/**` 的保证强度 | 13 册 `BRW-06` | 9 个模块 / 1,447 行的**保证强度逐项核验**（`retention.ts` 的预算先扣 tombstone、`lock.ts:140-160` 的 `expiresAt`/`ownerId` 陈旧判定是本仓**正确实现**；但整族未逐项验） | 9 模块 |
 | **29** | `memory/**`(36) + `context/**`(28) **逐模块**审计 | 13 册 §13.2 / §16.4 | 前置研究已覆盖 `CTX-02/06/07/08/09`（含 3 条 P1）；**其余模块的逐模块行为**未做 | 64 模块 |
-| **30** | 子代理递归深度与**工具继承** | 13 册 §13.2 / §16.4 | ⚠️ **主代理本轮初查：工具继承已经接上了**——`core/subagents/runner.ts:135-142` 用 `subagentTools(definition, available)` 过滤并把选中的工具装进 `selected`，`NEVER_GIVEN`（`core/subagents/boundary.ts:17`）剥掉 `task`。**Phase 12/13 的记录（「与参考一致，不改」）需要复核是否仍然成立**；若无缺口，本条降级为「已核实健全，登记留档」 | 2 模块 |
+| **30** | 子代理递归深度与**工具继承** | 13 册 §13.2 / §16.4 | 已完成：单层递归和工具交集已核验；修复权限、正文、模型schema、执行工作区与worktree生命周期。清理仅保证保留检查时可见改动，要求写入方已停止；后台并发写入限制见本项实施记录 | 原runner、工具门与worktree owner |
 | **31** | `core/shell`(37) 完整审计 | 13 册 §13.2 | 13 册 §13.2 明确记「`core/shell` 仍部分未覆盖」（补做轮只覆盖了内核循环）。**37 个非测试模块** | 37 模块 |
 | **32** | `context/startup/**` + `readCache` 的**行为**验证 | 13 册 §18 | **有界性**已记 `CTX-09`（且 W3-13 会给它加上限），但**命中/失效语义未验**（`startupWarmContextCache` 的缓存命中判定、`readCache` 的「同一请求同一 mtime」谓词在真实编辑循环下的行为）。`context/startup/` 是 6 个非测试模块 | 6 模块 |
 | **33** | provider 四端点**真实**流边界（TLS/HTTP2 层） | 13 册 §16.4 / §18 | 合成块覆盖了帧级；**TLS/HTTP2 层未覆盖**。⚠️ **凭据已就位**（§9 已跑通 openai 兼容与 Anthropic 原生两条路径）⇒ **OpenAI 兼容侧现在即可执行**；Anthropic 原生侧需给 `anthropic` provider 另配 baseUrl；**Google 侧该中转站不支持（405）**，需另一家 | 4 协议（本轮可执行 2/4） |
@@ -573,7 +573,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W6-23 | sidebar编号改为OBS-11/OBS-12，钩子/MCP保持OBS-03/OBS-04 | 已完成文档修正 |
 | W6-24 | 修正浏览器总数与历史分类口径；CTX-08/CDE-01已纠正；PRV-04按W2修复保留FIXED | 已完成文档修正 |
 | W7-25 / THM-03 | auto已落地；48个实用令牌、4套预设及旧主题继承；数字对齐裁决按实际消费者修正 | 已完成，本地验证通过 |
-| W7-30 / W8-34 / SUB-01 | 子运行按父/定义/请求最窄模式建门，报告实际模式；递归task剥除和步数有界验证；同域额外缺口继续处理 | 权限部分已完成，本地验证通过 |
+| W7-30 / W8-34 / SUB-01 | 最窄权限、单层递归、工具清单、任务正文、执行上下文及worktree生命周期已闭合；清理须停止写入方 | 已完成，本地验证通过；并发后台写入为明确限制 |
 | W8-40 / TOL-10（随W7-30） | 失败原因及部分答复保留；工具阶段取消和空答复按失败结算；适配器向父模型传递error | 已完成，定向验证通过；旧result-contract脚本仍失败 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
@@ -1273,7 +1273,15 @@ runner把已裁决的allowedTools传给step，step只对绑定的父schema做交
 上下文验证：5个唯一套件92项通过，构建、双线独立APPROVE/CLEAR。入口测试最初用global fetch mock未拦截实际自有传输，0请求，归类harness/setup drift；改为本地HTTP服务后7项通过。撤销工作区/模式绑定后2项失败、6通过，源码字节恢复。
 隔离编译运行时调用真实bash，验证pwd、读取及新建文件均在子目录，父目录未产生文件，hooks携带子根；生产入口本地HTTP验证PLAN子请求与BUILD父请求。此验收未经过worktree分配器，也不是实际provider调用。
 
-### worktree分配与释放待修复项
+### worktree分配与释放（W7-30相邻修复）
 
 已定位：默认manager在模块加载时绑定process.cwd而非task工作区；非Git分配空临时目录，Git失败返回isIsolated:false的父目录，task仍宣称Git Worktree；拼接`.git`目录不支持linked worktree；removeWorktree吞掉失败后上层仍返回removed。WorktreeCreate在运行try/finally之前也可能绕过释放与Stop。
 定向参考比较：工作树服务拒绝非Git项目，按当前项目工作区传递cwd，以argv执行Git，创建非零退出是明确失败，移除失败会复核仍存在的工作树。计划同意这些决策，保留本项目“有改动则保留、绝不自动合并”的既有规则；不复制外部服务或全局存储结构。后续修复需覆盖分配失败不启动子任务、工作区来源、linked worktree、清理失败不冒充removed及已产生工作的可追溯路径。
+
+实施：默认manager按task工作区创建，Git命令经既有ExecutionService与固定argv集合执行，单命令60秒上限；审批元数据仅归属已获准的task，不授予子工具写权限。非Git、bare、unborn、冲突和创建失败均阻止子运行，不回落空目录或共享目录。Git common-dir支持linked worktree，选中子目录映射至新checkout，创建前拒绝重定向容器并在创建后复核路径、HEAD和分支。
+释放保留检查时可见的tracked/untracked/ignored改动、HEAD变化（含向祖先reset）与切分支；不自动合并、不force删除。目录、注册记录、分支均移除才报告removed；部分清理和未知ID返回unverified，重复/并发释放共享已记录结果。创建hook纳入保护区，release、remove hook和stop分别尝试；原因与子任务部分正文一起返回。
+
+验证：前轮6套71项通过；容器重定向/并发释放补测及其余受影响工具验证后5套74项通过，累计8个唯一套件105项。构建通过。反向撤销容器拒绝、ignored保护和清理失败投影后5项失败、18通过；源码逐字节恢复。独立代码通道APPROVE，架构通道WATCH，综合COMMENT：无剩余架构阻塞，但清理依赖写入方已停止。
+架构通道另行真实Git验证：状态检查之后写入ignored文件，非force remove仍会删除它。因此本契约是观察结果，不是原子并发保护；await子runner不足以证明脱离控制的后台进程已停止。API注释与文档明确此限制，不以重复status冒充解决竞态；未声称任意并发写入可保留。
+隔离无凭据的编译运行时经真实turn/task注册表、默认manager、Git及read/write/bash验证子目录读写、父文件/HEAD不变、有改动保留、干净目录删除、分配失败不启动子任务、locked worktree清理unverified；退出0。未调用真实provider。上一提交fec423f0的CI 37010035753与Architecture Watch 37010035734均已通过，本提交远端结果另行跟踪。
+静态门禁通过：1396文件零环、39/39配置消费者、18/18 hooks、10/10工厂、Node最低版本与严格文档门禁；文档120项、可达性7项与函数上限7项既有advisory无新增。旧result-contract脚本既有失败仍待session/shell审计处理，本项未重新宣称通过。

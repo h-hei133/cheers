@@ -1,35 +1,23 @@
 import { approvedResult, deniedResult } from "./toolResultLifecycle.js";
 import type { ToolDefinition } from "../../tools/types.js";
-import { GitWorktreeManager } from "../workflow/gitWorktreeManager.js";
+import { GitWorktreeManager, type WorktreeAllocation, type WorktreeRelease } from "../workflow/gitWorktreeManager.js";
 import { SubagentLoader } from "../subagents/subagentLoader.js";
 import { AgentMemoryManager } from "../subagents/agentMemoryManager.js";
 import { defaultHookDispatcher } from "../hooks/hookDispatcher.js";
 import { projectTrust } from "../security/projectTrust.js";
 
-const defaultWorktreeManager = new GitWorktreeManager();
-
-/**
- * Steps a subagent gets when its definition declares none.
- *
- * A delegated run has no user watching it, so nothing else would end one that
- * loops. Bounded rather than generous: the point of delegating is to get an
- * answer back, and a subagent that runs long enough to exhaust the context has
- * usually misunderstood the task.
- */
-const DEFAULT_SUBAGENT_STEPS = 20;
-
 /**
  * /task & /agent tool
- * Dispatches an isolated subagent to perform an independent research, analysis, or modification task.
+ * Dispatches a subagent to perform an independent research, analysis, or modification task.
  * Integrates .agents/*.md frontmatter loader, worktree isolation, persistent agent-memory, and lifecycle hooks.
  */
 export function createTaskToolDefinition(
-  worktreeManager: GitWorktreeManager = defaultWorktreeManager,
+  worktreeManager?: Pick<GitWorktreeManager, "allocateWorktree" | "releaseWorktree">,
 ): ToolDefinition {
   return {
     name: "task",
     description:
-      "Dispatch an isolated background or foreground subagent to perform focused multi-step tasks without cluttering the main conversation history.",
+      "Delegate a focused multi-step task and return its result. Optionally use a separate Git worktree.",
     argsSchema: {
       type: "object",
       properties: {
@@ -65,109 +53,72 @@ export function createTaskToolDefinition(
     async execute(args, context) {
       const description = typeof args.description === "string" ? args.description.trim() : "";
       const prompt = typeof args.prompt === "string" ? args.prompt.trim() : "";
-      if (!description || !prompt) {
-        return deniedResult("Error: description and prompt are required for task tool.");
-      }
+      if (!description || !prompt) return deniedResult("Error: description and prompt are required for task tool.");
       if (args.agentMode !== undefined && args.agentMode !== "plan" && args.agentMode !== "build") {
         return deniedResult("Error: agentMode must be plan or build.");
       }
-
+      if (args.isolation !== undefined && args.isolation !== "worktree" && args.isolation !== "none") {
+        return deniedResult("Error: isolation must be worktree or none.");
+      }
       const requestedType = (typeof args.subagent_type === "string" ? args.subagent_type.trim() : "") || "general-purpose";
       const loader = new SubagentLoader(context.workspaceRoot);
-      const subagentDef = loader.getSubagent(
-        requestedType,
-        !projectTrust.isProjectUntrusted(context.workspaceRoot),
-      );
-
-      const randomSuffix = Math.random().toString(36).slice(2, 8).padEnd(6, "0");
-      const subtaskId = `task_${randomSuffix}`;
+      const subagentDef = loader.getSubagent(requestedType, !projectTrust.isProjectUntrusted(context.workspaceRoot));
+      const subtaskId = `task_${Math.random().toString(36).slice(2, 8).padEnd(6, "0")}`;
       const agentType = subagentDef?.name || requestedType;
-      let mode = "not started";
       const contextStr = typeof args.context === "string" ? args.context.trim() : "";
       const shouldIsolate = (args.isolation || subagentDef?.isolation) === "worktree";
-
-      // 1. Dispatch SubagentStart lifecycle hook
-      await defaultHookDispatcher.dispatch({
-        eventName: "SubagentStart",
-        sessionId: context.taskId || subtaskId,
-        workspaceRoot: context.workspaceRoot,
-        timestamp: new Date().toISOString(),
-        agentId: subtaskId,
-        agentType,
-      });
-
-      // 2. Resolve Agent Memory if defined
-      let memoryContext = "";
-      if (subagentDef?.memory) {
-        const memoryMgr = new AgentMemoryManager(context.workspaceRoot);
-        const mem = memoryMgr.loadMemory(agentType, subagentDef.memory);
-        if (mem.content) {
-          memoryContext = `\n\n[Agent Persistent Memory (${subagentDef.memory})]:\n${mem.content.slice(0, 1000)}`;
-        }
-      }
-
-      // 3. Allocate Git Worktree if isolation requested
-      let allocatedWorktree = null;
+      const manager = shouldIsolate ? worktreeManager ?? new GitWorktreeManager(context.workspaceRoot) : undefined;
+      let allocated: WorktreeAllocation | undefined;
+      let release: WorktreeRelease | undefined;
       let effectiveWorkspace = context.workspaceRoot;
-
-      if (shouldIsolate) {
-        try {
-          allocatedWorktree = await worktreeManager.allocateWorktree(subtaskId);
-          effectiveWorkspace = allocatedWorktree.worktreePath;
-        } catch {
-          // Fallback to shared workspace
-        }
-        // Announced outside the allocation guard: a hook that throws is a hook
-        // problem, not a reason to silently drop the worktree we just made.
-        if (allocatedWorktree) {
-          await defaultHookDispatcher.dispatch({
-            eventName: "WorktreeCreate",
-            sessionId: context.taskId || subtaskId,
-            workspaceRoot: context.workspaceRoot,
-            timestamp: new Date().toISOString(),
-            subtaskId,
-            worktreePath: allocatedWorktree.worktreePath,
-            branch: allocatedWorktree.branch,
-          });
-        }
-      }
-
+      let mode = "not started";
       let subagentResponse = "";
-      // Why no answer arrived, when none did. Without it the report below claimed
-      // the work was completed on the strength of an empty string.
       let subagentFailure = "";
-      // Where a subagent's changes were left, when it made any. Reported because
-      // a kept worktree is the only way to find them.
-      let keptWorktree: { readonly worktreePath: string; readonly branch: string } | undefined;
       let allowedTools: readonly string[] = [];
       let stepsTaken = 0;
+      let startAttempted = false;
+      const fail = (message: string): void => {
+        subagentFailure = [subagentFailure, message.trim() || "the subagent failed"].filter(Boolean).join("; ");
+      };
+      const reason = (error: unknown): string => error instanceof Error ? error.message : String(error);
 
       try {
-        // The runner is supplied by the turn, which owns the model side. Without
-        // it there is nothing to run a subagent on, and saying so is the only
-        // honest answer — the previous implementation reached for environment
-        // variables instead and asked a provider the session had not chosen.
         if (!context.runSubagent) {
-          subagentFailure = "no model is available to this session, so the subagent was not started";
+          fail("no model is available to this session, so the subagent was not started");
         } else {
+          startAttempted = true;
+          await defaultHookDispatcher.dispatch({ eventName: "SubagentStart", sessionId: context.taskId || subtaskId,
+            workspaceRoot: context.workspaceRoot, timestamp: new Date().toISOString(), agentId: subtaskId, agentType });
+          let memoryContext = "";
+          if (subagentDef?.memory) {
+            const mem = new AgentMemoryManager(context.workspaceRoot).loadMemory(agentType, subagentDef.memory);
+            if (mem.content) memoryContext = `[Agent Persistent Memory (${subagentDef.memory})]:\n${mem.content.slice(0, 1000)}`;
+          }
+          if (manager) {
+            const candidate = await manager.allocateWorktree(subtaskId, context.abortSignal);
+            if (!candidate.isIsolated || candidate.worktreePath === context.workspaceRoot) {
+              throw new Error("An isolated worktree was not established; the subagent was not started.");
+            }
+            allocated = candidate;
+            effectiveWorkspace = candidate.workingDirectory;
+            await defaultHookDispatcher.dispatch({ eventName: "WorktreeCreate", sessionId: context.taskId || subtaskId,
+              workspaceRoot: context.workspaceRoot, timestamp: new Date().toISOString(), subtaskId,
+              worktreePath: allocated.worktreePath, branch: allocated.branch });
+          }
+          if (context.abortSignal?.aborted) throw new Error("The task was cancelled before the subagent started.");
           mode = "not reported by runner";
           const result = await context.runSubagent({
             definition: {
-              name: agentType,
-              description,
-              systemPrompt: subagentDef?.systemPrompt
-                ?? `You are ${agentType}, an autonomous subagent for: "${description}".`,
+              name: agentType, description,
+              systemPrompt: subagentDef?.systemPrompt ?? `You are ${agentType}, an autonomous subagent for: "${description}".`,
               ...(subagentDef?.tools ? { tools: subagentDef.tools } : {}),
               ...(subagentDef?.disallowedTools ? { disallowedTools: subagentDef.disallowedTools } : {}),
               ...(subagentDef?.maxTurns !== undefined ? { maxTurns: subagentDef.maxTurns } : {}),
               ...(subagentDef?.permissionMode ? { permissionMode: subagentDef.permissionMode } : {}),
               source: subagentDef?.source ?? "builtin",
             },
-            prompt,
-            ...(args.agentMode ? { agentMode: args.agentMode } : {}),
-            workspace: effectiveWorkspace,
-            ...(contextStr ? { context: contextStr } : {}),
-            ...(memoryContext ? { memory: memoryContext } : {}),
+            prompt, ...(args.agentMode ? { agentMode: args.agentMode } : {}), workspace: effectiveWorkspace,
+            ...(contextStr ? { context: contextStr } : {}), ...(memoryContext ? { memory: memoryContext } : {}),
             ...(context.abortSignal ? { signal: context.abortSignal } : {}),
           });
           subagentResponse = result.text;
@@ -175,71 +126,60 @@ export function createTaskToolDefinition(
             : result.agentMode === "build" ? "BUILD (Standard)" : "not reported by runner";
           allowedTools = result.allowedTools;
           stepsTaken = result.steps;
-          if (result.failed) subagentFailure = result.failure?.trim() || "the subagent failed";
-          else if (!result.text.trim()) subagentFailure = "the subagent returned no answer";
+          if (result.failed) fail(result.failure || "the subagent failed");
+          else if (!result.text.trim()) fail("the subagent returned no answer");
         }
       } catch (error) {
-        subagentFailure = (error instanceof Error ? error.message : String(error)).trim() || "the subagent failed";
+        fail(reason(error));
       } finally {
-        if (allocatedWorktree) {
-          // Released, not merged. Changes are kept and reported below; the
-          // caller decides whether they belong in the working tree. A release
-          // that removed the worktree dispatches the removal hook, because the
-          // path in that payload is one that no longer exists.
-          const release = await worktreeManager.releaseWorktree(subtaskId);
-          keptWorktree = release.outcome === "kept" ? release : undefined;
-          if (release.outcome === "removed") {
-            await defaultHookDispatcher.dispatch({
-              eventName: "WorktreeRemove",
-              sessionId: context.taskId || subtaskId,
-              workspaceRoot: context.workspaceRoot,
-              timestamp: new Date().toISOString(),
-              subtaskId,
-              worktreePath: allocatedWorktree.worktreePath,
-            });
+        if (allocated && manager) {
+          try {
+            // Cleanup has its own bounded lifetime even after the child is cancelled.
+            release = await manager.releaseWorktree(subtaskId);
+          } catch (error) {
+            release = { outcome: "unverified", worktreePath: allocated.worktreePath, branch: allocated.branch,
+              worktreeStatus: "unknown", branchStatus: "unknown", reason: reason(error) };
+          }
+          if (release.outcome === "unverified") fail(`Worktree cleanup unverified: ${release.reason}`);
+          if (release.outcome === "removed" || (release.outcome === "unverified" && release.worktreeStatus === "removed")) {
+            try {
+              await defaultHookDispatcher.dispatch({ eventName: "WorktreeRemove", sessionId: context.taskId || subtaskId,
+                workspaceRoot: context.workspaceRoot, timestamp: new Date().toISOString(), subtaskId, worktreePath: allocated.worktreePath });
+            } catch (error) { fail(`WorktreeRemove hook failed: ${reason(error)}`); }
           }
         }
-
-        // 4. Dispatch SubagentStop lifecycle hook
-        await defaultHookDispatcher.dispatch({
-          eventName: "SubagentStop",
-          sessionId: context.taskId || subtaskId,
-          workspaceRoot: context.workspaceRoot,
-          timestamp: new Date().toISOString(),
-          agentId: subtaskId,
-          agentType,
-        });
+        if (startAttempted) {
+          try {
+            await defaultHookDispatcher.dispatch({ eventName: "SubagentStop", sessionId: context.taskId || subtaskId,
+              workspaceRoot: context.workspaceRoot, timestamp: new Date().toISOString(), agentId: subtaskId, agentType });
+          } catch (error) { fail(`SubagentStop hook failed: ${reason(error)}`); }
+        }
       }
 
       const lines: string[] = [
-        `# 🤖 Subagent Task ${subagentFailure ? "Failed" : "Completed"} (\`${subtaskId}\`)`,
-        "",
+        `# 🤖 Subagent Task ${subagentFailure ? "Failed" : "Completed"} (\`${subtaskId}\`)`, "",
         `- **Agent Type**: \`${agentType}\` (${subagentDef?.source || "dynamic"})`,
-        `- **Description**: ${description}`,
-        `- **Mode**: \`${mode}\``,
-        `- **Filesystem Isolation**: \`${shouldIsolate ? `Git Worktree (${effectiveWorkspace})` : "Shared Workspace"}\``,
+        `- **Description**: ${description}`, `- **Mode**: \`${mode}\``,
+        `- **Filesystem Isolation**: \`${allocated ? `Git Worktree (${effectiveWorkspace})` : shouldIsolate ? "not established" : "Shared Workspace"}\``,
+        ...(release ? [`- **Worktree cleanup**: ${release.outcome}`] : []),
         ...(contextStr ? [`- **Context Attached**: ${contextStr}`] : []),
-        `- **Tools available**: ${allowedTools.length > 0 ? `\`${allowedTools.join("\`, \`")}\`` : "none"}`,
-        `- **Steps Used**: ${stepsTaken}`,
-        "",
-        ...(keptWorktree
-          ? [
-              "",
-              "## Changes Left In A Worktree",
-              `The subagent changed files. They were **not** merged into the working tree; they are at \`${keptWorktree.worktreePath}\` on branch \`${keptWorktree.branch}\`.`,
-              "Review them and merge, or remove the worktree when they are not wanted.",
-            ]
-          : []),
-        "",
-        "## Subagent Execution Result:",
-        ...(subagentFailure ? [`Task failed: ${subagentFailure}`, ""] : []),
-        ...(subagentResponse.trim() ? [subagentFailure ? "Partial response:" : "Response:", subagentResponse] : []),
+        `- **Tools available**: ${allowedTools.length > 0 ? allowedTools.join(", ") : "none"}`,
+        `- **Steps Used**: ${stepsTaken}`, "",
       ];
-      // Partial narration is not completion evidence. Keep the failed report
-      // in the error field so adapters preserve the result's failure status.
-      return subagentFailure
-        ? { success: false, error: lines.join("\n") }
-        : approvedResult(lines.join("\n"));
+      if (release?.outcome === "kept") {
+        lines.push("## Worktree Retained", release.reason,
+          `Work remains at \`${release.worktreePath}\`; it was not merged into the parent workspace.`,
+          `Checkout: ${release.currentBranch === "HEAD" ? "detached HEAD" : `branch \`${release.currentBranch}\``}. Allocated branch: \`${release.branch}\`.`,
+          "Review the retained work before merging or removing it.", "");
+      } else if (release?.outcome === "unverified") {
+        lines.push("## Worktree Cleanup Unverified",
+          `Inspect \`${allocated?.worktreePath}\` and branch \`${allocated?.branch}\`.`,
+          `Worktree: ${release.worktreeStatus}; branch: ${release.branchStatus}.`, release.reason, "");
+      }
+      lines.push("## Subagent Execution Result:",
+        ...(subagentFailure ? [`Task failed: ${subagentFailure}`, ""] : []),
+        ...(subagentResponse.trim() ? [subagentFailure ? "Partial response:" : "Response:", subagentResponse] : []));
+      return subagentFailure ? { success: false, error: lines.join("\n") } : approvedResult(lines.join("\n"));
     },
   };
 }
