@@ -654,6 +654,35 @@ W2 小项 `OBS-13`（自研）：2 文件 / 25 项定向测试和构建通过；
 恢复后 20 项通过。`/qu` 返回 `/quit`，`/where re` 与 `/workspace re` 使用同一参数候选；
 大小写、动态注册/卸载和重复别名均覆盖。候选冲突保留注册表的先匹配语义。
 
+W2 波末复核（2026-10-02）：两路独立复核发现并修复三个遗漏，修复期间又发现一条嵌套队列回归：
+
+- `4393be92`：祖先消息缺失会使整条后代路径不可导航，健康兄弟分支不受影响。
+  对照持久条目遍历后，按本仓索引与 transcript 分离的结构补上消息完整性条件；
+  选择器与直接 ID 路径都验证 state/transcript 未变。3 文件 / 35 项通过；撤销后 2 失败 / 8 通过。
+- `cb9d8382`、`f875115f`：排队命令保留选择器确认语义；选择器内部执行命令时，
+  最外层选择操作独占队列消费，内部命令结束不能提前启动下一条输入。
+  覆盖导航/嵌套命令与确认/取消的四种组合；4 文件 / 59 项通过。
+  两次撤销分别使两项回归失败。复核明确记录了首版队列修复的不足，未把首版当成最终验收。
+- `71798437`（自研）：端点解析保留结构化拒答与 prompt-block 原因，单次请求先分类再接受正文；
+  即使拒答伴随部分正文，也不会宣称回答成功。7 文件 / 165 项通过；撤销后 7 项拒答回归全部失败。
+  对照流适配器保留停止原因的决策，单次请求的补充映射由本仓实现，不复制另一套请求通道。
+
+修复后两路定向复核分别为 **APPROVE / CLEAR**。最终收尾执行：
+`npm run test:ts -- src/session/query/navigation.test.ts src/cli/runtime/navigation.test.ts
+src/cli/interactive/interactiveMode.test.ts src/provider/request/completion.test.ts`，
+4 文件 / 39 项通过；`build:ts` 退出 0。
+`verify:import-cycles`（1365 文件，运行时/类型环均 0）、`check:config-consumers`（39/39）、
+`check:declarations`（18/18、10/10）、`check:node-floor` 均退出 0；`test:scripts` 40 项通过。
+`check:call-reachability` 与 `analyze:module-facades` 分别保留 7 个既有 advisory，未声称已消除。
+
+最新构建真实 PTY 验收：隔离 HOME/USERPROFILE、独立临时 git workspace、合成配置、无凭据；
+regular/fullscreen 均验证 `/back 2` 先选择后确认、`/tree` 保留其他分支、按 ID 切换持久活动叶、
+分支摘要落盘、记忆 store 状态、缺凭据 `/btw` 与 `/exit` 退出 0。
+两种配置下的 `--json --replay-file` 分别输出 24 行合法 JSON，order 为连续的 1–24，
+按 ID 导航在进程结束后仍生效。探针早期失败归因于启动画面假设、Escape 分帧、分页器关闭时机与
+单复数文案；修正探针后通过，没有依据这些探针错误修改产品。
+本波未跑本地完整 TypeScript 套件、未调用真实提供方；新提交的远端 CI 另记。
+
 ---
 
 ### 8.5 主代理在等待复核者期间新增的六处自查（已并入正文）

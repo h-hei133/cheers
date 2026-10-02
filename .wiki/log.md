@@ -5473,3 +5473,12 @@ catalog 外的 model 会退回 `DEFAULT_REQUEST_SHAPE`）。
 编译产物 regular/fullscreen/JSON 真实 PTY 验收通过。结构审计仍报告既有函数数量 advisory；
 本地未跑完整 TypeScript 套件，远端状态另记。详细证据见
 [裁决 §8.4](features/phase-18-decisions.md#84-实施记录)。W2–W8 继续实施。
+
+## [2026-10-02] implement | Phase 18 W2 命令面收口与独立复核
+
+会话树导航、带参数回退、记忆健康状态、侧问题失败分类与别名补全已完成。
+波末独立复核补修缺消息祖先路径、排队选择器和结构化拒答；随后用完整嵌套序列捕获并修复
+选择器内外两层重复消费输入队列的回归。最终代码复核通过、架构复核 CLEAR。
+最新构建 regular/fullscreen 真实 PTY 与两组 JSON 回放通过；定向回归、静态阻断门禁和
+40 项脚本测试通过。保留已有结构 advisory，本地未跑全套 TypeScript 测试，未调用真实提供方。
+逐项提交与撤销证据见[裁决 §8.4](features/phase-18-decisions.md#84-实施记录)；后续继续 W3–W8。
