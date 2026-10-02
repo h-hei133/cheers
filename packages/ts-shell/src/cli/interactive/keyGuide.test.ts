@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import { runHotkeyCommand } from "../../core/commands/hotkeyCommandRuntime.js";
 import { expect, it } from "vitest";
 import { KEY_ACTIONS, Keybindings } from "./keybindings.js";
 import { KEY_BINDINGS, renderKeyGuide } from "../../presentation/tui/chrome/keys.js";
@@ -28,4 +30,32 @@ it("marks only protocol-dependent alternatives and never invents a rebound newli
   const rebound = renderKeyGuide(false, new Keybindings({ "tui.input.newLine": "f2" }).guide(true));
   expect(rebound).toContain("`f2`");
   expect(rebound).not.toContain("ctrl+j");
+});
+
+const guideDocument = fs.readFileSync(new URL("../../../../../.wiki/guides/keybindings.md", import.meta.url), "utf8");
+function section(name: string): string {
+  return guideDocument.split(`<!-- ${name}:start -->`)[1]!.split(`<!-- ${name}:end -->`)[0]!.trim();
+}
+
+it("keeps the documented action and gesture tables equal to the runtime catalogues", () => {
+  const rows = Object.entries(KEY_ACTIONS).map(([id, action]) =>
+    `| \`${id}\` | ${action.defaultKeys.map(key => `\`${key}\``).join(" / ")} | ${action.description} |`);
+  expect(section("key-actions").split("\n").slice(2)).toEqual(rows);
+  const gestures = KEY_BINDINGS.filter(row => row.group === "pointer" || row.keys.includes("paste twice"))
+    .map(row => `| ${row.keys.map(key => `\`${key}\``).join(" / ")} | ${row.does} |`);
+  expect(section("key-gestures").split("\n").slice(2)).toEqual(gestures);
+  const index = fs.readFileSync(new URL("../../../../../.wiki/_index.md", import.meta.url), "utf8");
+  expect(index).toContain("(guides/keybindings.md)");
+});
+
+it("shows the documented rebinding example in the effective hotkey command", async () => {
+  const config = JSON.parse(section("config-example").replace(/^```json\n|\n```$/g, ""));
+  const bindings = new Keybindings(config);
+  const result = await runHotkeyCommand([], {
+    cwd: process.cwd(), modifierKeysReported: true, keyGuide: bindings.guide(true),
+  });
+  for (const row of section("example-guide").split("\n").slice(2)) expect(result.output).toContain(row);
+  expect(bindings.actionFor("f2")).toBe("app.retry");
+  expect(bindings.actionFor("f5")).toBeUndefined();
+  expect(bindings.keysFor("app.editor.image")).toEqual([]);
 });

@@ -82,6 +82,7 @@ export function buildSystemPrompt(
       ? "PLAN MODE ACTIVE: You have full access to inspect files, search symbols via LSP, run safe read-only commands (like git status, git diff) via bash, and explore websites via browser and web tools, but cannot modify files. Produce a structured execution plan based on real file contents."
       : "BUILD MODE ACTIVE: You have full access to inspect, search, execute, browse, and edit files to accomplish the user's task.",
     "CRITICAL EXECUTION & ANSWER RULES:",
+    "For Cheers keyboard shortcut help, direct the user to /hotkey in their interactive session; it shows effective bindings, overrides, and terminal limitations.",
     "1. When you run tools and gather facts, you MUST provide a final, comprehensive, structured markdown answer to the user.",
     "2. NEVER stop after running tools without giving your findings, explanation, and answer in text.",
     "3. For web searching: use `web_search` to retrieve online technical references.",

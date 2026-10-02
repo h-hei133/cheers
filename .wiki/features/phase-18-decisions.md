@@ -563,7 +563,8 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W5-17 / TOL-06 | 明确每文件提交边界和显式恢复入口 | 已实现，本地验证通过 |
 | W5-18 / TOL-08 | 有界 TERM/KILL 与 Windows launcher 等待；失败可见、退出等待 pending | 已实现，本地验证通过 |
 | W5-19 / PRV-12、PRV-13 | 两Google端点区分单次/流式方法并对齐Accept与解码 | 已实现，本地验证通过 |
-| W5-20–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
+| W5-20 | 键位参考页、表格漂移检测、重绑定示例与runtime提示入口 | 已实现，本地验证通过 |
+| W5-21–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
 src/runtime/execution/service.test.ts src/runtime/execution/fileLock.test.ts
@@ -817,6 +818,16 @@ W5-19 / PRV-12、PRV-13（2026-10-02）：对照底层 SDK 使用独立 generate
 URL/Accept/SSE或JSON解码均符合约定。独立复核 APPROVE / CLEAR。传输扩展测试首次因 Date.now 负耗时
 （-3685ms，疑似环境时钟回拨）失败1项；未改源码，单独复跑25项全部通过。未做真实Google提供方验证。
 同型边界：Bedrock简单调用仍固定converse-stream（先前缺口），已登记到W7-27而未混入Google提交。
+
+
+W5-20（2026-10-02）：新增 [键位参考页](../guides/keybindings.md)，39个action及5个gesture从既有表导出；
+测试逐行比对以阻止增删/描述漂移，并将文档JSON示例送入真实 Keybindings 与 /hotkey 渲染，验证覆盖和禁用。
+采纳参考的动作ID/覆盖/禁用/reload使用方式，不采用其手写帮助表；表派生/一致性验证属本仓自研。
+裁决微调：包只发布dist/src、不携带.wiki，产品可在任意项目目录运行，所以系统提示指向实时/hotkey，
+仓库文档通过wiki索引接入，不往运行时注入不存在的仓库文档路径。
+4文件81项定向测试和构建通过；篡改默认表与示例后2项失败，文档逐字恢复后5项guide测试通过。
+独立复核APPROVE / CLEAR。实际常规/全屏PTY均验证f2绑定、image禁用显示unbound、修改后/reload切到f3，退出0。
+验收脚本曾未关闭长输出查看器/等待视口外文字，已按真实交互调整；没有据此修改产品行为。
 
 ### 8.5 主代理在等待复核者期间新增的六处自查（已并入正文）
 

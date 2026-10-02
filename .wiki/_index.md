@@ -16,6 +16,7 @@ Last updated: 2026-10-02
 
 ## Quick Navigation
 
+- [Keyboard shortcuts and rebinding](guides/keybindings.md)
 - [Phase 18 decisions and implementation evidence](features/phase-18-decisions.md)
 - [Feature and defect register](features/13-feature-and-defect-register.md)
 - [All Sources](raw/_index.md)
