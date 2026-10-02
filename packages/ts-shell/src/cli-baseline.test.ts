@@ -978,32 +978,21 @@ describe("CLI streaming baseline (T3)", () => {
   }, 90000);
 
   it("persists session metadata to local filesystem", async () => {
-    await new Promise<void>((resolve, reject) => {
-      const cli = spawnCli(fakeHomeDir);
-
-      setTimeout(() => {
-        cli.kill();
-        try {
-          const sessionDirs = fs
-            .readdirSync(sessionsDir)
-            .filter((file) => file.startsWith("sess_"));
-          expect(sessionDirs.length).toBeGreaterThan(0);
-          const firstSessionDir = path.join(sessionsDir, sessionDirs[0]);
-          expect(
-            fs.existsSync(path.join(firstSessionDir, "metadata.json")),
-          ).toBe(true);
-          expect(fs.existsSync(path.join(firstSessionDir, "state.json"))).toBe(
-            true,
-          );
-          resolve();
-        } catch (error) {
-          reject(error);
-        }
-      }, 2500);
-
-      cli.on("error", reject);
+    // Observe completed work, rather than killing startup after a fixed delay.
+    const result = await runCliCommandToClose({
+      spawnCli,
+      fakeHome: fakeHomeDir,
+      args: ["--print", "hello"],
+      envOverrides: { CHEERS_PROVIDER_MODE: "synthetic" },
+      timeoutMs: 30000,
     });
-  }, 10000);
+    expect(result.code).toBe(0);
+    const sessionDirs = fs.readdirSync(sessionsDir).filter(file => file.startsWith("sess_"));
+    expect(sessionDirs.length).toBeGreaterThan(0);
+    const firstSessionDir = path.join(sessionsDir, sessionDirs[0]);
+    expect(isReadableJsonFile(path.join(firstSessionDir, "metadata.json"))).toBe(true);
+    expect(isReadableJsonFile(path.join(firstSessionDir, "state.json"))).toBe(true);
+  }, 35000);
 
   it("handles Ctrl+C interrupt gracefully", () => {
     const rendered: string[] = [];
