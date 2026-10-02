@@ -8,6 +8,9 @@ import type { SessionManager } from "../../session/SessionManager.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
 import { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import { RecordingTerminal } from "../../test-utils/terminalDouble.js";
+import { stripAnsi } from "../../presentation/tui/text/ansi.js";
+import type { OverlayHost, Picker } from "./overlay.js";
+import type { PickerHost } from "./picker/registry.js";
 
 function build(overrides: { observeEvents?: () => () => void } = {}): {
   mode: InteractiveMode;
@@ -48,6 +51,55 @@ function build(overrides: { observeEvents?: () => () => void } = {}): {
 }
 
 describe("session wiring", () => {
+  it.each(["dismiss", "confirm"])("opens queued back selectors after navigation and resumes the queue after %s", async (action) => {
+    const { mode, terminal } = build();
+    const host = mode as unknown as {
+      busy: boolean;
+      queue: string[];
+      overlay: OverlayHost;
+      pickerHost(): PickerHost;
+      applyPicker(picker: Picker, ids: readonly string[]): void;
+      run(text: string): Promise<void>;
+    };
+    let finishNext!: () => void;
+    const nextNavigation = new Promise<undefined>((resolve) => { finishNext = () => resolve(undefined); });
+    const rewind = vi.fn(() => nextNavigation);
+    vi.spyOn(host, "pickerHost").mockReturnValue({
+      sessionTurns: () => [
+        { id: "first", role: "user", content: "First question" },
+        { id: "second", role: "user", content: "Second question" },
+      ], rewind,
+    } as unknown as PickerHost);
+    let finish!: () => void;
+    const navigation = new Promise<undefined>((resolve) => { finish = () => resolve(undefined); });
+    const run = host.run.bind(host);
+    const dispatched = vi.spyOn(host, "run").mockImplementation((text) => text === "/help" ? Promise.resolve() : run(text));
+    mode.start();
+    try {
+      host.applyPicker({ title: "Session tree", form: "modal", empty: "", exclusive: true,
+        load: async () => [], apply: () => navigation,
+      }, ["first"]);
+      host.queue.push("/back 2", "/help");
+      expect(host.busy).toBe(true);
+      expect(dispatched).not.toHaveBeenCalled();
+      finish();
+      await vi.waitFor(() => expect(host.overlay.active).toBe(true));
+      expect(stripAnsi(host.overlay.render(100, 30).join("\n"))).toContain("Ask again from");
+      expect(dispatched).not.toHaveBeenCalledWith("/help");
+      if (action === "confirm") {
+        terminal.input("\r");
+        await vi.waitFor(() => expect(rewind).toHaveBeenCalledWith(expect.objectContaining({ entryId: "first" })));
+        expect(dispatched).not.toHaveBeenCalledWith("/help");
+        finishNext();
+      } else {
+        terminal.input("\x1b");
+        expect(rewind).not.toHaveBeenCalled();
+      }
+      await vi.waitFor(() => expect(dispatched).toHaveBeenCalledWith("/help"));
+      expect(host.queue).toEqual([]);
+    } finally { mode.stop(); }
+  });
+
   it("does not submit buffered keys after an exit key in the same chunk", async () => {
     const { mode, terminal } = build();
     let finish!: () => void;

@@ -401,7 +401,13 @@ export class InteractiveMode {
       this.tui.requestRender();
       return;
     }
-    if (this.overlay.handleKey(event, (picker, ids) => this.applyPicker(picker, ids))) return;
+    if (this.overlay.handleKey(event, (picker, ids) => this.applyPicker(picker, ids))) {
+      if (!this.overlay.active && !this.busy) {
+        const next = this.queue.shift();
+        if (next !== undefined) void this.run(next);
+      }
+      return;
+    }
     // An open search owns the keyboard the way a picker does: the arrows move
     // between matches and every printable character belongs to the query, so it has
     // to be intercepted before the keymap turns them into editor input.
@@ -567,6 +573,12 @@ export class InteractiveMode {
     text: string,
     attachments?: { readonly images: readonly ImageContent[] },
   ): Promise<void> {
+    // Queued input reaches this same dispatch point after the current operation
+    // settles. A chooser still needs confirmation, even if its command waited.
+    if (opensPicker(text)) {
+      this.openPicker(text, true);
+      return;
+    }
     this.busy = true;
     // When the turn began, so an idle signal can say how long the work took
     // rather than firing on every turn however brief.
@@ -674,10 +686,10 @@ export class InteractiveMode {
   }
 
   /** Open the chooser a bare command maps to. */
-  private openPicker(command: string): void {
+  private openPicker(command: string, waitForApply = false): void {
     const picker = pickerFor(command, this.pickerHost());
     if (!picker) return;
-    this.overlay.open(picker);
+    this.overlay.open(waitForApply ? { ...picker, exclusive: true } : picker);
   }
 
   /** Hand the choice to the picker that produced it and surface what it reports. */
