@@ -6,7 +6,8 @@ import {
 import { renderProjectMemoryInjectionSurface } from "./projectMemoryInjectionSurface.js";
 import type { ProjectMemoryUseCommandRequest } from "./projectMemoryUseCommandContract.js";
 import { retrieveProjectMemoryRecords } from "./projectMemoryRetrieval.js";
-import type { ProjectMemoryStore } from "./projectMemoryStoreContract.js";
+import type { ProjectMemoryStore, ProjectMemoryStoreHealth } from "./projectMemoryStoreContract.js";
+import { readProjectMemoryHealth } from "./store/health.js";
 import { buildProjectMemoryWakeupPreview } from "./projectMemoryWakeup.js";
 
 export type ProjectMemoryUseCommandOutcome = "staged" | "blocked";
@@ -33,12 +34,12 @@ export async function runProjectMemoryUseCommand(
 ): Promise<ProjectMemoryUseCommandResult> {
   const injectionStateStore =
     input.injectionStateStore ?? DEFAULT_PROJECT_MEMORY_INJECTION_STATE_STORE;
+  const health = await readProjectMemoryHealth(input.memoryStore);
   if (!input.memoryStore) {
-    return blocked(input, injectionStateStore.get(input.sessionScopeId), "Explicit local memory store root is required.");
+    return blocked(input, injectionStateStore.get(input.sessionScopeId), "Explicit local memory store root is required.", health);
   }
-  const health = await input.memoryStore.health();
   if (!(health.readable ?? health.writable)) {
-    return blocked(input, injectionStateStore.get(input.sessionScopeId), health.detail);
+    return blocked(input, injectionStateStore.get(input.sessionScopeId), health.detail, health);
   }
 
   const selected =
@@ -46,7 +47,7 @@ export async function runProjectMemoryUseCommand(
       ? await selectWakeRecords(input.memoryStore)
       : await selectRecallRecords(input.memoryStore, input.request.query);
   if (selected.recordIds.length === 0) {
-    return blocked(input, injectionStateStore.get(input.sessionScopeId), "No saved project memory records matched this /memory use request.");
+    return blocked(input, injectionStateStore.get(input.sessionScopeId), "No saved project memory records matched this /memory use request.", health);
   }
 
   const state = injectionStateStore.markPending({
@@ -64,6 +65,7 @@ export async function runProjectMemoryUseCommand(
     output: renderProjectMemoryInjectionSurface({
       outcome: "staged",
       state,
+      health,
     }),
     providerCall: "none",
     persistence: "none",
@@ -125,6 +127,7 @@ function blocked(
   input: RunProjectMemoryUseCommandInput,
   state: ProjectMemoryInjectionState,
   blocker: string,
+  health: ProjectMemoryStoreHealth,
 ): ProjectMemoryUseCommandResult {
   return {
     outcome: "blocked",
@@ -133,12 +136,14 @@ function blocked(
       outcome: "blocked",
       state,
       blocker,
+      health,
     }),
     providerCall: "none",
     persistence: "none",
     autoInjected: false,
     evidence: [
       ...input.request.evidence,
+      ...health.evidence,
       "project-memory-use-command-runner:blocked",
       "project-memory-use-command-runner:no-provider-call",
       "project-memory-use-command-runner:no-persistence",

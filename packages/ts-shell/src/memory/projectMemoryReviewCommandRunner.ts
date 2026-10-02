@@ -14,6 +14,7 @@ import {
   type ProjectMemoryReviewStateStore,
 } from "./projectMemoryReviewState.js";
 import { renderProjectMemoryReviewSurface } from "./projectMemoryReviewSurface.js";
+import type { ProjectMemoryStoreHealth } from "./projectMemoryStoreContract.js";
 
 export type ProjectMemoryReviewCommandOutcome =
   | "listed"
@@ -27,6 +28,7 @@ export interface RunProjectMemoryReviewCommandInput {
   readonly candidates: readonly ProjectMemoryCandidate[];
   readonly store?: ProjectMemoryReviewStateStore;
   readonly sourceCommand?: ProjectMemoryReviewSourceCommand;
+  readonly health?: ProjectMemoryStoreHealth;
 }
 
 export interface ProjectMemoryReviewCommandResult {
@@ -74,6 +76,7 @@ export function runProjectMemoryReviewCommand(
       quality,
       outcome,
       blocker,
+      health: input.health,
     }),
     persistence: "none",
     providerCall: "none",
@@ -84,7 +87,7 @@ export function runProjectMemoryReviewCommand(
       "project-memory-review-command-runner:session-scoped-only",
       "project-memory-review-command-runner:no-persistence",
       "project-memory-review-command-runner:no-provider-call",
-      "project-memory-review-command-runner:no-memory-store",
+      "project-memory-review-command-runner:no-memory-store-write",
     ],
   };
 }

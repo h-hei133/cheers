@@ -1411,7 +1411,11 @@ Phase 16 §17.2 记录的头条缺陷是「`projectMemoryStore` 从不出现在�
 
 ⇒ **见 CTX-02。**
 
-### CTX-02 · `/memory review` 的持久化状态是硬编码文案，不是实测值 — `OPEN` `P2` `CONFIRMED`
+### CTX-02 · `/memory review` 的持久化状态是硬编码文案，不是实测值 — `FIXED` `P2` `CONFIRMED`
+
+**2026-10-02 修复**：命令层读取实际 store health，review 与 status 共享状态投影。
+可读、可写、模式、健康诊断与本次是否写入分别展示。10 文件 / 90 项定向测试和构建通过，
+撤销接线后新增 7 项全部失败。以下保留修复前诊断。
 
 `memory/projectMemoryReviewSurface.ts:39-42`：
 
@@ -1651,7 +1655,11 @@ CTX-07 health() THREW: Unexpected token 'N', "NOT_JSON" is not valid JSON
 ⇒ **同一个仓库里，transcript 的损坏被正确隔离，记忆的损坏没有。**
 这一对比本身就是修复方向：**按行隔离，收集诊断，返回存活条目**。
 
-### CTX-08 · `CTX-02` 的范围比初判更广：**6 个 surface**，不是 1 个 — `OPEN` `P2` `CONFIRMED`
+### CTX-08 · 记忆状态面：4 个缺快照、3 个部分派生、1 个模型提示面 — `FIXED` `P2` `CONFIRMED`
+
+**2026-10-02 修复**：四个缺快照的用户面完成接线；三个部分派生的面移除已过时的能力常量。
+共享健康投影保留 disabled、readable、writable、degraded 的差别；模型提示面保留其单次授权合同。
+「6」混入了原表中的对照项，正确口径为 4 + 3 + 1；下表保留修复前调查范围。
 
 `CTX-02` 记录了 `projectMemoryReviewSurface.ts:39-42` 的四行硬编码文案。
 本轮核实**这是同一形态的第 6 例**（逐文件确认）：

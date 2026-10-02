@@ -1,4 +1,5 @@
 import type { CompactCommandRunResult } from "../command/compactCommandRunner.js";
+import type { ProjectMemoryStoreHealth } from "../../../memory/projectMemoryStoreContract.js";
 import {
   renderProjectMemoryCandidateSurface,
   summarizeProjectMemoryCandidates,
@@ -6,6 +7,7 @@ import {
 
 export function formatCompactSessionSurface(
   result: CompactCommandRunResult,
+  health?: ProjectMemoryStoreHealth,
 ): string {
   const packet = result.packet;
   const lines = [
@@ -14,7 +16,7 @@ export function formatCompactSessionSurface(
     `- Mode: ${result.request.mode}`,
     `- Source: ${result.request.source}`,
     "- Preview only: yes",
-    "- Persistence: none",
+    "- Handoff persisted: no",
     "- Provider/model call: none",
     "- Recovery execution: none",
     `- Packet: ${packet.packetVersion}`,
@@ -33,6 +35,7 @@ export function formatCompactSessionSurface(
     renderProjectMemoryCandidateSurface({
       candidates: result.memoryCandidates,
       quality: result.memoryCandidateQuality,
+      health,
     }),
     "",
     "Redactions / warnings",

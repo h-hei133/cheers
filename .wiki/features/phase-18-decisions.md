@@ -547,6 +547,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W1-6 / `BRW-04` | 逐个观察资源关闭结果，失败指名并保留句柄供重试；并发关闭共享结果，等待进行中的初始化 | 已实现，本地验证通过 |
 | W2-7 / `CMD-06` | `/tree` 选择器与按 ID 导航共享既有叶切换、摘要、上下文与 todo 重建；损坏路径可见但不可导航 | 已实现，本地验证通过 |
 | W2-8 / `CMD-03` | `/back` 参数交给同一选择器：最近序号或条目 ID 预选，其余文本筛选；确认后才导航 | 已实现，本地验证通过 |
+| W2-9 / `CTX-02`、`CTX-08` | 各记忆命令从实际 store 健康快照派生可读、可写、模式与诊断；未写入操作仍明确报告未写入 | 已实现，本地验证通过 |
 | W2 其余项、W3–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -627,6 +628,16 @@ src/cli/interactive/overlay.test.ts src/presentation/tui/chrome/options.test.ts`
 与 W2-7 共用选择器和确认语义；数字从最近问题起按 1 计数，精确 ID 预选，其余参数作为初始筛选。
 仅 `/back` 接管带参数形式，`/resume id`、`/model use name`、`/tree id` 保留各自直接调用路径；
 未知命令和对象原型属性名均不被误接管。此处未宣称已完成 W2 的波末真实 PTY 验收。
+
+W2-9：10 文件 / 90 项定向测试通过，构建退出 0。移除命令层实际 health 接线后，新增的
+7 项生产入口/状态矩阵测试全部失败；恢复后 7 项通过，循环门禁通过。
+对照决策为「每次读取实际配置和存储状态再渲染」，
+保留可读但不可写的损坏存储状态；无快照明确显示 `not checked`，不推断为 disabled。
+同进程覆盖真实 CLI 装配的 `/memory`、`/memory status`、`/compact preview`，
+并覆盖禁用、测试存储、显式本地存储、可读损坏、不可读以及损坏后恢复。
+review/preview/use 的「没有写入」仍是操作结果，不推导出存储不存在；recall/wake/use 能力随可读状态派生。
+三个 runner 的禁用快照复用同一个 owner，既有证据来源保留。
+模型可见的单次显式注入提示属于授权与上下文合同，未作为用户状态面改写；本项不更改保存或注入权限。
 
 ---
 

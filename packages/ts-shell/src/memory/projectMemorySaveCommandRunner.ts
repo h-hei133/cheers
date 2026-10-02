@@ -1,3 +1,4 @@
+import { readProjectMemoryHealth } from "./store/health.js";
 import {
   evaluateProjectMemoryCandidateQuality,
   type ProjectMemoryCandidateQualityResult,
@@ -55,9 +56,7 @@ export async function runProjectMemorySaveCommand(
     candidates: input.candidates,
     sourceCommand: "/memory",
   });
-  const health = input.memoryStore
-    ? await input.memoryStore.health()
-    : disabledStoreHealth();
+  const health = await readProjectMemoryHealth(input.memoryStore, "project-memory-save-command-runner");
 
   if (input.request.mode === "status") {
     return buildResult({
@@ -251,19 +250,6 @@ function buildResult(input: {
       "project-memory-save-command-runner:no-auto-load",
       "project-memory-save-command-runner:no-retrieval",
       "project-memory-save-command-runner:no-provider-call",
-    ],
-  };
-}
-
-function disabledStoreHealth(): ProjectMemoryStoreHealth {
-  return {
-    mode: "disabled",
-    ok: true,
-    writable: false,
-    detail: "No explicit local memory store configured.",
-    evidence: [
-      "project-memory-save-command-runner:store-disabled",
-      "project-memory-save-command-runner:no-default-path",
     ],
   };
 }

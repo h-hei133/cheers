@@ -1,9 +1,12 @@
 import type { ProjectMemoryCandidate } from "./projectMemoryCandidate.js";
 import type { ProjectMemoryCandidateQualityResult } from "./projectMemoryCandidateQuality.js";
+import type { ProjectMemoryStoreHealth } from "./projectMemoryStoreContract.js";
+import { renderProjectMemoryHealth } from "./store/health.js";
 
 export interface RenderProjectMemoryCandidateSurfaceInput {
   readonly candidates: readonly ProjectMemoryCandidate[];
   readonly quality?: ProjectMemoryCandidateQualityResult;
+  readonly health?: ProjectMemoryStoreHealth;
 }
 
 export function renderProjectMemoryCandidateSurface(
@@ -33,9 +36,9 @@ export function renderProjectMemoryCandidateSurface(
     "Memory candidates",
     "- Candidate preview: yes",
     "- Memory written: no",
-    "- Persistence: none",
-    "- Cross-session loading: none",
-    "- Future route must decide review and persistence UX before anything is stored.",
+    ...renderProjectMemoryHealth(input.health),
+    "- Cross-session loading performed: no",
+    "- Review with /memory; approval alone does not write records.",
     `- Quality: ${input.quality?.qualityStatus ?? "not evaluated"}`,
     `- Total candidates: ${candidates.length}`,
     `- Project-scoped candidates: ${projectScoped.length}`,

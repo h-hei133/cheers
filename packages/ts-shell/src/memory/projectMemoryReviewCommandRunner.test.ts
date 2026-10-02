@@ -27,8 +27,8 @@ describe("project memory review command runner", () => {
     expect(result.state.latestCandidates.length).toBeGreaterThan(0);
     expect(result.output).toContain("Project memory review");
     expect(result.output).toContain("- Memory written: no");
-    expect(result.output).toContain("- Persistence: not enabled");
-    expect(result.output).toContain("- Retrieval / wake-up / recall: not enabled");
+    expect(result.output).toContain("- Store mode: not checked");
+    expect(result.output).toContain("- Retrieval / wake-up / recall: not checked");
     expect(result.persistence).toBe("none");
     expect(result.providerCall).toBe("none");
   });

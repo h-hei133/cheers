@@ -8,6 +8,7 @@ import {
   ProjectMemoryReviewCommandContractError,
 } from "../../memory/projectMemoryReviewCommandContract.js";
 import { runProjectMemoryReviewCommand } from "../../memory/projectMemoryReviewCommandRunner.js";
+import { readProjectMemoryHealth } from "../../memory/store/health.js";
 import {
   parseProjectMemoryRecallCommandArgs,
   ProjectMemoryRecallCommandContractError,
@@ -220,6 +221,7 @@ export async function runMemoryLocalCommand(
         context.projectMemoryReviewStateStore ??
         DEFAULT_PROJECT_MEMORY_REVIEW_STATE_STORE,
       sourceCommand: "/memory",
+      health: await readProjectMemoryHealth(context.projectMemoryStore),
     });
     const localResult: LocalCommandResult = {
       kind: "local",

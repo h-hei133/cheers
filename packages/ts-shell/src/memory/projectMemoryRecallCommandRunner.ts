@@ -1,3 +1,4 @@
+import { readProjectMemoryHealth } from "./store/health.js";
 import type { ProjectMemoryRecallCommandRequest } from "./projectMemoryRecallCommandContract.js";
 import { retrieveProjectMemoryRecords } from "./projectMemoryRetrieval.js";
 import { buildProjectMemoryWakeupPreview } from "./projectMemoryWakeup.js";
@@ -29,9 +30,7 @@ export interface ProjectMemoryRecallCommandResult {
 export async function runProjectMemoryRecallCommand(
   input: RunProjectMemoryRecallCommandInput,
 ): Promise<ProjectMemoryRecallCommandResult> {
-  const health = input.memoryStore
-    ? await input.memoryStore.health()
-    : disabledStoreHealth();
+  const health = await readProjectMemoryHealth(input.memoryStore, "project-memory-recall-command-runner");
   if (!input.memoryStore || !(health.readable ?? health.writable)) {
     return buildResult({
       input,
@@ -98,19 +97,6 @@ function buildResult(input: {
       "project-memory-recall-command-runner:no-provider-call",
       "project-memory-recall-command-runner:no-persistence-write",
       "project-memory-recall-command-runner:no-auto-injection",
-    ],
-  };
-}
-
-function disabledStoreHealth(): ProjectMemoryStoreHealth {
-  return {
-    mode: "disabled",
-    ok: true,
-    writable: false,
-    detail: "No explicit local memory store configured.",
-    evidence: [
-      "project-memory-recall-command-runner:store-disabled",
-      "project-memory-recall-command-runner:no-default-path",
     ],
   };
 }

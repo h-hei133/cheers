@@ -216,7 +216,7 @@ describe("slash router (W4)", () => {
     if (result?.kind === "local") {
       expect(result.output).toContain("Compact v2 handoff generated");
       expect(result.output).toContain("Markdown handoff");
-      expect(result.output).toContain("- Persistence: none");
+      expect(result.output).toContain("- Handoff persisted: no");
       expect(result.output).toContain("- Provider/model call: none");
       expect(result.output).toContain("- Recovery execution: none");
       expect(result.output).toContain("run /memory to review candidates");
@@ -267,8 +267,8 @@ describe("slash router (W4)", () => {
     if (result?.kind === "local") {
       expect(result.output).toContain("Project memory review");
       expect(result.output).toContain("- Memory written: no");
-      expect(result.output).toContain("- Persistence: not enabled");
-      expect(result.output).toContain("- Retrieval / wake-up / recall: not enabled");
+      expect(result.output).toContain("- Store mode: disabled");
+      expect(result.output).toContain("- Retrieval / wake-up / recall: unavailable (store not readable)");
       expect(result.output).toContain("closeout-candidate");
       expect(result.output).not.toContain("Unknown slash command");
     }
@@ -336,7 +336,7 @@ describe("slash router (W4)", () => {
       expect(saved.output).toContain("Project memory store");
       expect(saved.output).toContain("- Memory written: yes");
       expect(saved.output).toContain("- Auto-load: no");
-      expect(saved.output).toContain("- Retrieval / wake-up / recall: not enabled");
+      expect(saved.output).toContain("- Retrieval / wake-up / recall: available on explicit request");
     }
     expect(fs.existsSync(path.join(memoryStoreRoot, "project-memory.jsonl"))).toBe(true);
   });
@@ -377,7 +377,7 @@ describe("slash router (W4)", () => {
       expect(recall.output).toContain("Project memory recall");
       expect(recall.output).toContain("Result count: 1");
       expect(recall.output).toContain("Auto-injected: no");
-      expect(recall.output).toContain("Future-turn injection: not enabled");
+      expect(recall.output).toContain("Future-turn injection: explicit staged use only (/memory use)");
     }
 
     const wake = await routeSlashCommand("/memory wake", {
@@ -388,7 +388,7 @@ describe("slash router (W4)", () => {
     expect(wake?.kind).toBe("local");
     if (wake?.kind === "local") {
       expect(wake.output).toContain("Project memory wake-up preview");
-      expect(wake.output).toContain("Startup cache: not enabled");
+      expect(wake.output).toContain("Startup cache changed: no");
       expect(wake.output).toContain("Auto-injected: no");
     }
   });

@@ -5,6 +5,7 @@ import type {
 } from "./projectMemoryRetrieval.js";
 import type { ProjectMemoryWakeupPreview } from "./projectMemoryWakeup.js";
 import type { ProjectMemoryStoreHealth } from "./projectMemoryStoreContract.js";
+import { renderProjectMemoryHealth } from "./store/health.js";
 
 export interface ProjectMemoryRecallSurfaceInput {
   readonly request: ProjectMemoryRecallCommandRequest;
@@ -33,13 +34,10 @@ function renderRecallSurface(input: ProjectMemoryRecallSurfaceInput): string {
     ...(input.blocker ? [`- BlockerKind: memory-recall-blocked`, `- Reason: ${input.blocker}`] : []),
     `- Query: ${safeSnippet(input.request.query ?? "", 180)}`,
     `- Result count: ${matches.length}`,
-    `- Store mode: ${input.health.mode}`,
-    ...(input.health.diagnostics ?? []).map((diagnostic) => `- Warning: ${diagnostic}`),
-    `- Store writable: ${input.health.writable ? "yes" : "no"}`,
+    ...renderProjectMemoryHealth(input.health),
     "- Provider/model call: none",
     "- Auto-injected: no",
-    "- Startup cache: not enabled",
-    "- Future-turn injection: not enabled",
+    "- Startup cache changed: no",
     "",
     "Matches",
     ...matchLines(matches),
@@ -56,13 +54,11 @@ function renderWakeSurface(input: ProjectMemoryRecallSurfaceInput): string {
     "Result",
     `- Outcome: ${input.outcome}`,
     ...(input.blocker ? [`- BlockerKind: memory-wakeup-blocked`, `- Reason: ${input.blocker}`] : []),
-    `- Store mode: ${input.health.mode}`,
-    ...(input.health.diagnostics ?? []).map((diagnostic) => `- Warning: ${diagnostic}`),
+    ...renderProjectMemoryHealth(input.health),
     `- Total records scanned: ${wakeup?.totalRecords ?? 0}`,
     "- Provider/model call: none",
     "- Auto-injected: no",
-    "- Startup cache: not enabled",
-    "- Future-turn injection: not enabled",
+    "- Startup cache changed: no",
     "",
     wakeup?.l0.title ?? "L0-like stable project facts and explicit preferences",
     ...recordLines(wakeup?.l0.records ?? []),
@@ -120,7 +116,7 @@ function nextAction(
   if (matchCount === 0) {
     return "- Try a different query or save approved memories first.";
   }
-  return "- Use the recalled references manually. They were not injected into future turns.";
+  return "- Use the recalled references manually or stage them with /memory use <query>. This recall did not inject them.";
 }
 
 function safeSnippet(value: string, maxLength: number): string {

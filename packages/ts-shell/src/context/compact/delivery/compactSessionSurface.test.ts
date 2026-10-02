@@ -46,7 +46,7 @@ describe("compact session surface", () => {
 
     expect(output).toContain("Compact v2 handoff generated");
     expect(output).toContain("- Preview only: yes");
-    expect(output).toContain("- Persistence: none");
+    expect(output).toContain("- Handoff persisted: no");
     expect(output).toContain("- Provider/model call: none");
     expect(output).toContain("- Recovery execution: none");
     expect(output).toContain("- Edit capability status: closeout-candidate");

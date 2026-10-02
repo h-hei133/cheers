@@ -205,7 +205,7 @@ describe("project memory candidate extraction", () => {
     );
     expect(surface).toContain("Memory candidates");
     expect(surface).toContain("- Memory written: no");
-    expect(surface).toContain("- Persistence: none");
-    expect(surface).toContain("- Cross-session loading: none");
+    expect(surface).toContain("- Store mode: not checked");
+    expect(surface).toContain("- Cross-session loading performed: no");
   });
 });

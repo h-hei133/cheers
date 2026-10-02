@@ -10,6 +10,7 @@ import {
 import { DEFAULT_COMPACT_INJECTION_STATE_STORE } from "../../context/compact/injection/compactInjectionState.js";
 import { runCompactCommand } from "../../context/compact/command/compactCommandRunner.js";
 import { formatCompactSessionSurface } from "../../context/compact/delivery/compactSessionSurface.js";
+import { readProjectMemoryHealth } from "../../memory/store/health.js";
 import { emitCommandResultToSidebar } from "./sidebarCommandEvents.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
@@ -52,7 +53,7 @@ export async function runCompactLocalCommand(
       context.compactInjectionStateStore ?? DEFAULT_COMPACT_INJECTION_STATE_STORE
     ).get(sessionScopeId);
     const outputLines: string[] = [
-      formatCompactSessionSurface(result),
+      formatCompactSessionSurface(result, await readProjectMemoryHealth(context.projectMemoryStore)),
       ...(existingCheckpoint
         ? [formatCompactCheckpointStatus(existingCheckpoint, existingInjection)]
         : []),

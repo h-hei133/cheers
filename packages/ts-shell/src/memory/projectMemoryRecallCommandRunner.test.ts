@@ -74,7 +74,7 @@ describe("project memory recall command runner", () => {
     });
     expect(result.output).toContain("Project memory wake-up preview");
     expect(result.output).toContain("Auto-injected: no");
-    expect(result.output).toContain("Startup cache: not enabled");
+    expect(result.output).toContain("Startup cache changed: no");
     expect(result.output).toContain("Current edit capability remains bounded");
   });
 
@@ -142,7 +142,7 @@ describe("project memory recall command runner", () => {
     expect(result.outcome).toBe("recalled");
     expect(result.output).toContain("Result count: 1");
     expect(result.output).toContain("Provider/model call: none");
-    expect(result.output).toContain("Future-turn injection: not enabled");
+    expect(result.output).toContain("Future-turn injection: explicit staged use only (/memory use)");
   });
 });
 

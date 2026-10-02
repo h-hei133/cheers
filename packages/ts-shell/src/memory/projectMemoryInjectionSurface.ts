@@ -1,9 +1,12 @@
 import type { ProjectMemoryInjectionState } from "./projectMemoryInjectionState.js";
+import type { ProjectMemoryStoreHealth } from "./projectMemoryStoreContract.js";
+import { renderProjectMemoryHealth } from "./store/health.js";
 
 export interface ProjectMemoryInjectionSurfaceInput {
   readonly outcome: "staged" | "blocked" | "status";
   readonly state: ProjectMemoryInjectionState;
   readonly blocker?: string;
+  readonly health?: ProjectMemoryStoreHealth;
 }
 
 export function renderProjectMemoryInjectionSurface(
@@ -26,11 +29,11 @@ export function renderProjectMemoryInjectionSurface(
     "- Over-budget warnings: none yet",
     "- Provider/model call: none",
     "- Provider retrieval: no",
-    "- Persistence: none",
-    "- Startup auto-load: no",
+    "- Memory written: no",
+    ...renderProjectMemoryHealth(input.health),
+    "- Startup cache changed: no",
     "- Automatic memory injection: no",
     "- Auto-injected: no",
-    "- Future-turn injection: explicit staged use only",
     "",
     "Warnings",
     ...warningLines(input.state),

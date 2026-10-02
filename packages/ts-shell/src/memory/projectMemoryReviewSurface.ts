@@ -1,4 +1,6 @@
 import type { ProjectMemoryCandidateQualityResult } from "./projectMemoryCandidateQuality.js";
+import type { ProjectMemoryStoreHealth } from "./projectMemoryStoreContract.js";
+import { renderProjectMemoryHealth } from "./store/health.js";
 import type {
   ProjectMemoryReviewDecision,
   ProjectMemoryReviewEntry,
@@ -10,6 +12,7 @@ export interface RenderProjectMemoryReviewSurfaceInput {
   readonly quality: ProjectMemoryCandidateQualityResult;
   readonly outcome?: "listed" | "approved" | "rejected" | "blocked";
   readonly blocker?: string;
+  readonly health?: ProjectMemoryStoreHealth;
 }
 
 export function renderProjectMemoryReviewSurface(
@@ -37,9 +40,8 @@ export function renderProjectMemoryReviewSurface(
     `- Outcome: ${input.outcome ?? "listed"}`,
     ...(input.blocker ? [`- BlockerKind: memory-review-blocked`, `- Reason: ${input.blocker}`] : []),
     "- Memory written: no",
-    "- Persistence: not enabled",
-    "- Cross-session loading: none",
-    "- Retrieval / wake-up / recall: not enabled",
+    ...renderProjectMemoryHealth(input.health),
+    "- Cross-session loading performed: no",
     "- Provider/model call: none",
     `- Review session: ${input.state.reviewSessionId}`,
     `- Quality: ${input.quality.qualityStatus}`,

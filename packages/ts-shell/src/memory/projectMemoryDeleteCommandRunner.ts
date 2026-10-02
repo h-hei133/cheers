@@ -1,3 +1,4 @@
+import { readProjectMemoryHealth } from "./store/health.js";
 import type { ProjectMemoryDeleteCommandRequest } from "./projectMemoryDeleteCommandContract.js";
 import {
   deleteProjectMemoryRecord,
@@ -36,9 +37,7 @@ export interface ProjectMemoryDeleteCommandResult {
 export async function runProjectMemoryDeleteCommand(
   input: RunProjectMemoryDeleteCommandInput,
 ): Promise<ProjectMemoryDeleteCommandResult> {
-  const health = input.memoryStore
-    ? await input.memoryStore.health()
-    : disabledStoreHealth();
+  const health = await readProjectMemoryHealth(input.memoryStore, "project-memory-delete-command-runner");
   if (!input.memoryStore || !health.writable) {
     return buildResult({
       input,
@@ -119,19 +118,6 @@ function buildResult(input: {
       "project-memory-delete-command-runner:no-provider-call",
       "project-memory-delete-command-runner:no-auto-cleanup",
       "project-memory-delete-command-runner:no-auto-injection",
-    ],
-  };
-}
-
-function disabledStoreHealth(): ProjectMemoryStoreHealth {
-  return {
-    mode: "disabled",
-    ok: true,
-    writable: false,
-    detail: "No explicit local memory store configured.",
-    evidence: [
-      "project-memory-delete-command-runner:store-disabled",
-      "project-memory-delete-command-runner:no-default-path",
     ],
   };
 }

@@ -72,7 +72,7 @@ describe("project memory save command runner", () => {
     expect(result.savedRecords[0]?.evidence).toContain("route82:test");
     expect(result.output).toContain("- Memory written: yes");
     expect(result.output).toContain("- Auto-load: no");
-    expect(result.output).toContain("- Retrieval / wake-up / recall: not enabled");
+    expect(result.output).toContain("- Retrieval / wake-up / recall: available on explicit request");
     expect(fs.readFileSync(path.join(storeRoot, "project-memory.jsonl"), "utf8")).toContain(
       safe.summary,
     );

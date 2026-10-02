@@ -4,6 +4,7 @@ import type {
   ProjectMemoryInvalidateResult,
   ProjectMemoryStoreHealth,
 } from "./projectMemoryStoreContract.js";
+import { renderProjectMemoryHealth } from "./store/health.js";
 
 export interface ProjectMemoryDeleteSurfaceInput {
   readonly request: ProjectMemoryDeleteCommandRequest;
@@ -37,13 +38,11 @@ export function renderProjectMemoryDeleteSurface(
       ? [`- Invalidated at: ${input.invalidateResult.record.invalidatedAt}`]
       : []),
     ...(input.deleteResult?.deletedAt ? [`- Deleted at: ${input.deleteResult.deletedAt}`] : []),
-    `- Store mode: ${input.health.mode}`,
-    `- Store writable: ${input.health.writable ? "yes" : "no"}`,
+    ...renderProjectMemoryHealth(input.health),
     "- Provider/model call: none",
     "- Auto-cleanup: no",
     "- Auto-injected: no",
-    "- Startup cache: not enabled",
-    "- Future-turn injection: not enabled",
+    "- Startup cache changed: no",
     "",
     "Recall / wake-up effect",
     effectLine(input),
