@@ -1426,3 +1426,13 @@ Cookie与逗号后缀、JSON标量、畸形codingResult/turn、shell拼接均有
 
 后续继续continuation根路径替换、锁内状态投影、跨query连续性以及损坏transcript对恢复准入的影响；
 本批只保证已检查记录的读取与导出降级，不宣称所有恢复消费者已消费诊断或实现原子快照。
+
+### W7-26 第二批CI测试夹具修正（2026-10-03）
+
+提交`0d17cf0c`的CI 37049054966为520套通过/1套失败、4639项通过/1失败/1跳过；
+Architecture Watch 37049055051通过。唯一失败是旧export用例未创建会话却断言空会话提示，
+归类为夹具与新缺失/空会话契约失配。拆成缺失会话与真实header-only空会话，
+双向排除错误原因并继续断言Nothing was written和目标文件不存在，HOME/USERPROFILE隔离后恢复。
+仓内TMPDIR复验同时暴露review夹具向上发现父仓库的环境依赖；只给该用例建立独立Git根，保留原断言。
+最终`npm run test -w packages/ts-shell -- src/core/commands/slashCommandsModern.test.ts src/core/commands/exportCommandRuntime.test.ts --reporter=dot`
+在仓内TMPDIR运行，2套26项通过（exit0）。本次仅改测试与记录，不包含continuation进行中的产品变更。

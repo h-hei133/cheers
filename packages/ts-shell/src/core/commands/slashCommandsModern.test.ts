@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { promises as fs } from "node:fs";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import os from "node:os";
 import { runClearCommand } from "./clearCommandRuntime.js";
@@ -10,6 +11,8 @@ import { runUndoCommand } from "./undoCommandRuntime.js";
 import { runExportCommand } from "./exportCommandRuntime.js";
 import { runCopyCommand } from "./copyCommandRuntime.js";
 import { routeSlashCommand } from "./slashRouter.js";
+import { createSessionStoreLayout, projectSessionFileLayout } from "../../session/store/sessionFileLayout.js";
+import { createTranscriptHeader } from "../../session/sessionEventCodec.js";
 
 describe("Modern Slash Commands Subsystem", () => {
   let tempDir: string;
@@ -19,6 +22,7 @@ describe("Modern Slash Commands Subsystem", () => {
   });
 
   afterEach(async () => {
+    vi.unstubAllEnvs();
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
@@ -32,6 +36,7 @@ describe("Modern Slash Commands Subsystem", () => {
   });
 
   it("/review outputs clean tree status and diff report", async () => {
+    execFileSync("git", ["init", "--quiet", tempDir]);
     const result = await runReviewCommand(["focus on tests"], { cwd: tempDir, sessionId: "sess_1" });
     expect(result.kind).toBe("local");
     expect(result.output).toContain("Working tree clean");
@@ -65,13 +70,22 @@ describe("Modern Slash Commands Subsystem", () => {
     expect(result.output).not.toContain("Rollback Assistant");
   });
 
-  it("/export refuses to report an export when there is no conversation", async () => {
+  it.each(["missing", "empty"])("/export distinguishes a %s session and writes no file", async state => {
+    const isolatedHome = path.join(tempDir, "home");
+    vi.stubEnv("HOME", isolatedHome);
+    vi.stubEnv("USERPROFILE", isolatedHome);
+    if (state === "empty") {
+      const layout = projectSessionFileLayout({ sessionsDir: createSessionStoreLayout(isolatedHome).sessionsDir, sessionId: "sess_export" });
+      await fs.mkdir(layout.sessionDir, { recursive: true });
+      await fs.writeFile(layout.transcriptPath, JSON.stringify(createTranscriptHeader({ sessionId: "sess_export", timestamp: "2026-10-03T00:00:00Z", cwd: tempDir })) + "\n");
+    }
     const result = await runExportCommand(["markdown", "export.md"], { cwd: tempDir, sessionId: "sess_export" });
 
     // It used to write a file whose whole body was "(Session transcript recorded
     // and preserved in working store)" and call that a successful export.
     expect(result.kind).toBe("local");
-    expect(result.output).toContain("nothing to export");
+    expect(result.output).toContain(state === "missing" ? "was not found" : "nothing to export");
+    expect(result.output).not.toContain(state === "missing" ? "nothing to export" : "was not found");
     expect(result.output).toContain("Nothing was written");
     await expect(fs.access(path.join(tempDir, "export.md"))).rejects.toThrow();
   });
