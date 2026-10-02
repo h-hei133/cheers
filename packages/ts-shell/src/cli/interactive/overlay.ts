@@ -33,6 +33,8 @@ export interface Picker {
   readonly form: PickerForm;
   /** Queue new submissions until a conversation-changing selection has settled. */
   readonly exclusive?: boolean;
+  readonly initialSelection?: string;
+  readonly initialFilter?: string;
   /** Shown when the option set turns out to be empty. */
   readonly empty: string;
   /** True when the picker collects several answers before applying. */
@@ -110,13 +112,14 @@ export class OverlayHost {
     this.subTargetLabel = undefined;
     this.renameDraft = "";
     this.denyDraft = "";
-    this.model.setFilter("");
+    this.model.setFilter(picker.initialFilter ?? "");
     this.onChange();
     void picker
       .load()
       .then((options) => {
         if (this.picker !== picker) return;
         this.model.setOptions(options);
+        if (picker.initialSelection) this.model.focus(picker.initialSelection);
       })
       .catch(() => {
         if (this.picker === picker) this.model.setOptions([]);

@@ -546,6 +546,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W1-5 / `OBS-09` | 日志按年龄、mtime 与数量清理；启动和持续轮转均执行，默认保留 20 文件 | 已实现，本地验证通过 |
 | W1-6 / `BRW-04` | 逐个观察资源关闭结果，失败指名并保留句柄供重试；并发关闭共享结果，等待进行中的初始化 | 已实现，本地验证通过 |
 | W2-7 / `CMD-06` | `/tree` 选择器与按 ID 导航共享既有叶切换、摘要、上下文与 todo 重建；损坏路径可见但不可导航 | 已实现，本地验证通过 |
+| W2-8 / `CMD-03` | `/back` 参数交给同一选择器：最近序号或条目 ID 预选，其余文本筛选；确认后才导航 | 已实现，本地验证通过 |
 | W2 其余项、W3–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -618,6 +619,14 @@ W2-7：12 个定向文件 / 158 项通过，构建与循环门禁通过。撤销
 读取线程就会改变活动叶。为压实/分支摘要增加 `metadata.contextSummary`，线程补齐与分支计数忽略该投影，
 保留真实摘要事件和原始消息；集成测试钉住「摘要成功后仍指向所选 ID」，不能用无摘要路径代替。
 会话选择器在异步导航期间排队新输入，直到历史和草稿均恢复后再消费。
+
+W2-8：`npm run test:ts -- src/cli/interactive/picker/rewind.test.ts
+src/cli/interactive/picker/pickers.test.ts src/cli/interactive/history.test.ts
+src/cli/interactive/overlay.test.ts src/presentation/tui/chrome/options.test.ts`，
+5 文件 / 101 项通过，构建退出 0。撤销选择器入口后 7 失败 / 5 通过；恢复后 12 项通过。
+与 W2-7 共用选择器和确认语义；数字从最近问题起按 1 计数，精确 ID 预选，其余参数作为初始筛选。
+仅 `/back` 接管带参数形式，`/resume id`、`/model use name`、`/tree id` 保留各自直接调用路径；
+未知命令和对象原型属性名均不被误接管。此处未宣称已完成 W2 的波末真实 PTY 验收。
 
 ---
 

@@ -57,7 +57,7 @@ export interface PickerHost {
   saveSetting(key: "attentionOnIdle" | "offline", value: boolean): Promise<void>;
 }
 
-type PickerFactory = (host: PickerHost) => Picker;
+type PickerFactory = (host: PickerHost, argument?: string) => Picker;
 
 const PICKERS: Record<string, PickerFactory> = {
   model: (host) => modelPicker(host.commandContext),
@@ -83,7 +83,7 @@ const PICKERS: Record<string, PickerFactory> = {
   skill: (host) => skillPicker(host.commandContext),
   // Reachable either way: `/back`, or Escape twice on an empty prompt. The
   // gesture is fast once known; the command is how it becomes known.
-  back: (host) => rewindPicker({ turns: host.sessionTurns(), rewind: host.rewind }),
+  back: (host, selector) => rewindPicker({ turns: host.sessionTurns(), rewind: host.rewind, selector }),
   tree: (host) => treePicker(host.commandContext, host.rewind),
   statusline: (host) =>
     statusItemPicker({
@@ -94,17 +94,17 @@ const PICKERS: Record<string, PickerFactory> = {
   settings: (host) => settingsPicker(host),
 };
 
-/** The picker a bare command opens, or undefined when it has none. */
+/** Arguments belong to the picker when that command explicitly accepts them. */
 export function pickerFor(command: string, host: PickerHost): Picker | undefined {
-  return PICKERS[command.replace(/^\//, "").toLowerCase()]?.(host);
+  const [first = "", ...rest] = command.trim().split(/\s+/);
+  const name = first.replace(/^\//, "").toLowerCase();
+  return Object.hasOwn(PICKERS, name) ? PICKERS[name]!(host, rest.join(" ")) : undefined;
 }
 
-/** Whether a submitted line is a bare command that opens a picker. */
+/** Back accepts a selector; other commands keep their direct argument forms. */
 export function opensPicker(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed.startsWith("/")) return false;
-  // Arguments mean the user already knows what they want; only the bare form
-  // opens a chooser, so `/model use x` still works as typed.
-  const name = trimmed.slice(1).toLowerCase();
-  return !/\s/.test(trimmed) && name in PICKERS;
+  const name = trimmed.slice(1).split(/\s+/)[0]!.toLowerCase();
+  return Object.hasOwn(PICKERS, name) && (name === "back" || !/\s/.test(trimmed));
 }

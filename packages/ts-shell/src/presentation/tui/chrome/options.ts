@@ -62,6 +62,12 @@ export class OptionModel {
     return this.matches[this.cursor];
   }
 
+  /** Focus a named, choosable option without accepting it. */
+  focus(id: string): void {
+    const index = this.matches.findIndex((option) => option.id === id && !option.disabled);
+    if (index >= 0) this.cursor = index;
+  }
+
   /** Ids toggled on, in the order the options were supplied. */
   chosenIds(): readonly string[] {
     return this.all.filter((option) => this.chosen.has(option.id)).map((option) => option.id);

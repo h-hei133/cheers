@@ -544,9 +544,13 @@ const [rawName, ...args] = input.slice(1).split(/\s+/).filter(Boolean);
 
 ---
 
-### CMD-03 · `/back` 带参数落进未知命令 — `OPEN` `P3` `CONFIRMED`（严重度已下调）
+### CMD-03 · `/back` 带参数落进未知命令 — `FIXED` `P3` `CONFIRMED`（严重度已下调）
 
-**当前状态**（对照 Phase 16 的 16-I）：`argumentHint` 已从 `PICKER_ONLY` 条目上删掉
+**2026-10-02 修复**：裸命令与带参数形式共用回退选择器；序号和精确 ID 只预选，文本只筛选，
+用户确认后才导航。101 项定向测试与构建通过；撤销入口后 7 项失败，恢复后 12 项通过。
+其他带参数命令与未知命令的派发不变。以下保留修复前诊断。
+
+**修复前状态**（对照 Phase 16 的 16-I）：`argumentHint` 已从 `PICKER_ONLY` 条目上删掉
 （`slashCommandRegistry.ts:62-73` 的注释解释了为什么——它曾宣传一个选择器并不接受的语法）。
 实机：
 

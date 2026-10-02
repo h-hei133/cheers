@@ -32,16 +32,24 @@ export interface RewindPoint {
 
 export interface RewindPickerInput {
   readonly turns: readonly SessionMessage[];
+  /** A one-based recent point, a stable entry id, or initial search text. */
+  readonly selector?: string;
   /** Make `point` active again, and put its prompt back in the composer. */
   rewind(point: RewindPoint): Promise<string | undefined>;
 }
 
 export function rewindPicker(input: RewindPickerInput): Picker {
   const points = rewindPoints(input.turns);
+  const selector = input.selector?.trim();
+  const selected = selector && /^[1-9]\d*$/.test(selector)
+    ? points[Number(selector) - 1]
+    : points.find((point) => point.entryId === selector);
   return {
     title: "Ask again from",
     form: "panel",
     exclusive: true,
+    ...(selected ? { initialSelection: selected.entryId } : {}),
+    ...(selector && !selected ? { initialFilter: selector } : {}),
     empty: "Nothing to go back to yet — no questions have been asked in this session.",
     async load(): Promise<readonly Option[]> {
       return points.map<Option>((point) => ({
