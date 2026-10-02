@@ -12,6 +12,7 @@
  */
 
 import { createComponentLogger } from "../../observability/structuredLogger.js";
+import { forgetSessionTodos } from "../../core/commands/todoCommandRuntime.js";
 import type { QueryEvent } from "../../core/query/runtime/events.js";
 import type { QueryRuntimeRecoveryBoundary } from "../../core/query/runtime/state.js";
 import type { DurableLifecycleIndex } from "../../core/tools/toolResultLifecycle.js";
@@ -212,6 +213,7 @@ export abstract class SessionLifecycleWrites {
     if (sessionHasConversation(session)) return false;
     const projectRoot = session.projectRoot;
     this.host.store.deleteSession(sessionId);
+    forgetSessionTodos(sessionId);
     // The pointer must not outlive the record it points at.
     const current = projectRoot ? this.host.store.getCurrentSessionForProject(projectRoot) : null;
     if (current?.id === sessionId) this.host.store.clearCurrentSessionForProject(projectRoot);

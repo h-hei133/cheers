@@ -1066,7 +1066,13 @@ fs.writeFileSync(input.layout.metadataPath, JSON.stringify(metadata, null, 2), "
 因为它恒空，删除是安全的（无行为变化）——但**这个结论要一次实机验证**
 （跑一个真实会话，确认 resumed 摘要里不含任何 parity 行）。
 
-### SES-07 · `listsBySession` 跨会话不回收 — `OPEN` `P3` `CONFIRMED`（严重度已下调）
+### SES-07 · `listsBySession` 跨会话不回收 — `FIXED` `P3` `CONFIRMED`（2026-10-02）
+
+W3-12 在 substrate transition 更换会话 ID 时释放旧表，并补齐 `discardIfEmpty` 删除成功后的清理。
+同 ID/root-only 更新保留清单；共享切换入口从传入会话历史重建清单，不依赖 UI 展示触发恢复。
+存储删除失败不清理。
+下述为历史定位，原先根据继承关系推断所有删除都经过 read-surface 的结论不成立：
+空会话丢弃直接调用 store，现已单独补齐。83 项定向回归通过；撤销两处修复后 3 项回归失败。
 
 `forgetSessionTodos` 的唯一生产调用者是 `session/sessionReadSurface.ts:132`，
 在 `deleteSession` 内。子代理据此判「长驻进程内存泄漏」，

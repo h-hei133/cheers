@@ -2,6 +2,7 @@ import type { RuntimeConfig } from '../../config/runtimeConfig.js'
 import type { Session, WorkspaceRootMode } from '../../session/SessionManager.js'
 import type { WorkflowGitContext } from '../../workflow/gitContext.js'
 import path from 'node:path'
+import { forgetSessionTodos, replayTodosFromMessages } from '../commands/todoCommandRuntime.js'
 
 export interface ActiveSessionIdentity {
   readonly sessionId: string
@@ -180,6 +181,11 @@ export function applyShellSubstrateTransition(
       gitContext: nextGitContext,
     })
 
+  if (nextSession.id !== context.session.id) {
+    forgetSessionTodos(context.session.id)
+    forgetSessionTodos(nextSession.id)
+    replayTodosFromMessages(nextSession.id, nextSession.turns)
+  }
   context.cwd = nextCwd
   context.originalCwd = nextOriginalCwd
   context.projectRoot = nextProjectRoot

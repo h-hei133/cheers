@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { forgetSessionTodos, getSessionTodos, setSessionTodos } from '../commands/todoCommandRuntime.js'
 import { applyShellSubstrateTransition, createSessionRootMismatchDiagnostic, createShellRuntimeContext, createWorkspaceAttachSwitchDiagnostic, resolveRootBindingDiagnostics, switchActiveSession } from './runtimeContext.js'
 
 describe('shell runtime context', () => {
@@ -33,6 +34,16 @@ describe('shell runtime context', () => {
       },
     })
 
+    const oldSession = context.session
+    const oldTodos = [{ id: 1, text: 'restore me', status: 'pending' as const }]
+    oldSession.turns.push({ role: 'tool', content: 'saved', metadata: { todo: oldTodos } })
+    setSessionTodos(oldSession.id, oldTodos)
+    switchActiveSession(context, oldSession)
+    expect(getSessionTodos(oldSession.id)).toEqual(oldTodos)
+    applyShellSubstrateTransition(context, { cwd: 'D:/repo/subdir' })
+    expect(getSessionTodos(oldSession.id)).toEqual(oldTodos)
+
+    setSessionTodos('sess_new', [{ id: 1, text: 'stale', status: 'pending' }])
     switchActiveSession(context, {
       id: 'sess_new',
       createdAt: 'later',
@@ -46,6 +57,11 @@ describe('shell runtime context', () => {
       sessionId: 'sess_new',
       sessionProjectDir: 'D:/repo/worktree-a',
     })
+    expect(getSessionTodos(oldSession.id)).toEqual([])
+    expect(getSessionTodos('sess_new')).toEqual([])
+    switchActiveSession(context, oldSession)
+    expect(getSessionTodos(oldSession.id)).toEqual(oldTodos)
+    forgetSessionTodos(oldSession.id)
   })
 
   it('applies workspace and session substrate transitions atomically', () => {
@@ -79,6 +95,7 @@ describe('shell runtime context', () => {
       },
     })
 
+    setSessionTodos(context.session.id, [{ id: 1, text: 'old workspace', status: 'pending' }])
     applyShellSubstrateTransition(context, {
       cwd: 'D:/repo/worktree-a',
       originalCwd: 'D:/repo',
@@ -103,6 +120,7 @@ describe('shell runtime context', () => {
     expect(context.targetPathBase).toBe('D:/repo/worktree-a')
     expect(context.gitRoot).toBeNull()
     expect(context.session.id).toBe('sess_worktree')
+    expect(getSessionTodos('sess_old')).toEqual([])
     expect(context.activeSession).toEqual({
       sessionId: 'sess_worktree',
       sessionProjectDir: 'D:/repo/worktree-a',

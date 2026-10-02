@@ -553,7 +553,8 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W2-10 / `PRV-04` | `/btw` 兜底显示超时、网络、拒答、HTTP、空答或坏 JSON 分类，保留缺凭据路径 | 已实现，本地验证通过 |
 | W2 小项 / `OBS-13` | 命令名与别名共同参与候选，参数补全使用既有别名解析；注册变更使缓存失效 | 已实现，本地验证通过 |
 | W3-11 / R3 / OBS-04、OBS-15 | 标准 stdio JSON-RPC，握手后可用；同一会话复用连接，配置/目录切换释放旧进程；关闭取消等待并拒绝排队调用 | 已实现，本地验证通过 |
-| W3-12/13、W4–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
+| W3-12 / SES-07 | 切换会话释放旧 todo；两条删除路径均在存储删除成功后释放，同 ID 更新保留 | 已实现，本地验证通过 |
+| W3-13、W4–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
 src/runtime/execution/service.test.ts src/runtime/execution/fileLock.test.ts
@@ -731,6 +732,14 @@ SDK 依赖精确固定 1.31.0；锁文件新增 92 项，原有依赖版本没�
 所涉及版本与提交前锁文件相同；未扩大范围执行 audit fix，也未授权受阻的安装脚本。
 
 ---
+
+W3-12（2026-10-02）：沿用既有 todo owner，在 substrate transition 与空会话 discard 补清理。
+独立复核指出行模式缺少恢复调用，已将输入会话历史重放也放在共享切换入口，避免依赖 TUI 展示。
+最终两条独立复核为 APPROVE / CLEAR；切走再切回的回归无需测试手动调用 replay。
+参考比较采用显式生命周期移除，不另建状态所有者。`runtimeContext`、`todoPersistence`、
+`SessionManager` 三文件 83 项通过，覆盖正常恢复、同 ID 保留、两条成功删除及失败不清理。
+撤销新增的两处清理后 3 项失败（exit 1），恢复原字节。
+W3-11 推送头 `1e8ce643` 的 CI `36972204423` 与 NormProof `36972204373` 均 success。
 
 ### 8.5 主代理在等待复核者期间新增的六处自查（已并入正文）
 

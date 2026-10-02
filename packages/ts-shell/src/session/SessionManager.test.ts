@@ -4,6 +4,8 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createLongSessionContinuityFixture } from "../test-utils/longSessionContinuityFixtures.js";
 import { SessionManager } from "./SessionManager.js";
+import { SessionStoreAccess } from "./store/sessionStoreAccess.js";
+import { forgetSessionTodos, getSessionTodos, setSessionTodos } from "../core/commands/todoCommandRuntime.js";
 
 describe("SessionManager", () => {
   const originalUserProfile = process.env.USERPROFILE;
@@ -45,6 +47,42 @@ describe("SessionManager", () => {
     expect(resumed.session.status).toBe("active");
     expect(resumed.session.pendingPrompt).toBe("resume me later");
     expect(resumed.session.turns).toHaveLength(1);
+  });
+
+  it.each(["deleteSession", "discardIfEmpty"] as const)("releases todos through %s", (operation) => {
+    const manager = new SessionManager();
+    const session = manager.createNew();
+    setSessionTodos(session.id, [{ id: 1, text: "gone", status: "pending" }]);
+    manager[operation](session.id);
+    expect(manager.sessionExists(session.id)).toBe(false);
+    expect(getSessionTodos(session.id)).toEqual([]);
+  });
+
+  it("keeps todos when a nonempty session is retained", () => {
+    const manager = new SessionManager();
+    const session = manager.createNew();
+    manager.addTurn(session.id, { role: "user", content: "keep this conversation" });
+    const todos = [{ id: 1, text: "keep", status: "pending" as const }];
+    setSessionTodos(session.id, todos);
+    expect(manager.discardIfEmpty(session.id)).toBe(false);
+    expect(getSessionTodos(session.id)).toEqual(todos);
+    forgetSessionTodos(session.id);
+  });
+
+  it.each(["deleteSession", "discardIfEmpty"] as const)("keeps todos when %s fails to delete storage", (operation) => {
+    const manager = new SessionManager();
+    const session = manager.createNew();
+    const todos = [{ id: 1, text: "keep", status: "pending" as const }];
+    setSessionTodos(session.id, todos);
+    const removal = vi.spyOn(SessionStoreAccess.prototype, "deleteSession")
+      .mockImplementationOnce(() => { throw new Error("storage unavailable"); });
+    try {
+      expect(() => manager[operation](session.id)).toThrow("storage unavailable");
+      expect(getSessionTodos(session.id)).toEqual(todos);
+    } finally {
+      removal.mockRestore();
+      forgetSessionTodos(session.id);
+    }
   });
 
   it("persists workspace root mode and requested workspace metadata", () => {
