@@ -255,3 +255,20 @@ it("cannot recursively dispatch even when a definition and model both request ta
   expect(nested).toBe(0);
   expect(result.allowedTools).toEqual([]);
 });
+
+
+it("delivers the exact delegated task after its definition and attached context", async () => {
+  const prompt = 'Review src/auth.ts only.\n保留原有行为。';
+  let seen: readonly AgentMessage[] = [];
+  await runSubagent({ definition: { name: "review", description: "short label", systemPrompt: "Review code.", source: "builtin" },
+    prompt, workspace: "/work", context: "caller context", memory: "prior notes" }, {
+    tools: new Map(), defaultMaxSteps: 2, step: async (messages) => {
+      seen = [...messages];
+      return { text: "done", toolCalls: [], stopReason: "stop" };
+    },
+  });
+  expect(seen.at(-1)).toEqual({ role: "user", content: prompt });
+  expect(seen[0]?.content).toContain("Review code.");
+  expect(seen[0]?.content).toContain("caller context");
+  expect(seen[0]?.content).toContain("prior notes");
+});

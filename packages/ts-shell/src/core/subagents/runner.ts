@@ -157,7 +157,10 @@ export async function runSubagent(
 
   let steps = 0;
   let failure: string | undefined;
-  const messages: AgentMessage[] = [{ role: "user", content: instruction }];
+  const messages: AgentMessage[] = [
+    { role: "user", content: instruction },
+    { role: "user", content: input.prompt },
+  ];
 
   const produced = await runAgentLoop(
     messages,
