@@ -71,26 +71,21 @@ confidence: high
 
 ---
 
-## 0.4 当前实施状态（2026-10-01）
+## 0.4 当前实施状态（2026-10-02）
 
 Phase 17 的 38 个交付项已逐项实施或完成候选保留裁决，另完成浏览器守卫及钩子文档。
 完整提交、定向/反向验证和独立复核见 [phase-17-decisions.md](phase-17-decisions.md) §8。
 
-**Phase 18 已规划（零代码改动）**：13 号册剩下的 **23 条唯一 OPEN** 中的 21 条
-（从未被任何阶段规划过的那些）+ 新登记的 `PRV-12`，加 12 号 §10 的未覆盖面，
-已做成 **24 个交付项 / 6 波 / 4 项明确不做 / 2 项待裁决**：
-见 [phase-18-pre-research.md](phase-18-pre-research.md) 与 [phase-18-decisions.md](phase-18-decisions.md)。
-其中 `SES-02` 经 Phase 18 复核确认「fencing 在所有参考实现里都 `NOT-FOUND`」，
-按 Phase 17 §5-3 的裁决**保持 OPEN**（本阶段只补续期与 release owner 校验两条廉价缓解）。
+**Phase 18 正在实施**：W1–W6已完成相应实现、缓解或文档裁决，W7–W8继续按执行表推进。
+当前逐项状态、验证与限制见 [phase-18-decisions.md §8.4](phase-18-decisions.md#84-实施记录)。
+原规划的24个OPEN标题是施工前输入快照，不代表当前未完成数；该快照的侧栏重复编号已更正。
+`SES-02`只交付锁续期、owner校验和空锁恢复等缓解，未实现fencing，继续OPEN。
 
-**Phase 18 记录的五处待回写更正**（施工轮执行，本轮不改本册的条目行）：
-`BRW-00` 的模块数 `164` → `167`（差额 3 = Phase 17 `8adc76f9` 以 rename 从 `core/harness/`
-迁入 `browser/smoke/` 的三模块，表未随之更新）；`CTX-08` 的「6 个 surface」
-→ **4 个同型缺陷 + 3 个部分派生 + 1 个模型可见提示面**（原计数把标 ✅ 的对照行算进了缺陷侧）；
-`PRV-04` → `PARTIAL`（`attempted` 标志已在 `4429a89c` 区分「请求失败」与「凭据缺失」，
-剩余缺口只是**不区分失败类别**）；§12 的不可达数字加口径说明；
-编号冲突已于W6-23更正：§10的`OBS-03`（钩子）/`OBS-04`（MCP）保持不变，
-§11bis侧栏两条使用`OBS-11`（快照命名）/`OBS-12`（事件源）。旧侧栏编号仅供历史辨认，不再作为引用。
+**W6-24统计修正**：browser当前167个非测试TS模块，旧164分类表漏了Phase17迁入的3个smoke模块，
+本轮仅纠正总量，不伪造重新运行的可达性或逐行审计结论；CTX-08的正确调查口径为4+3+1，
+其中原表的两个对照面不计作同型缺陷。PRV-04的“改PARTIAL”是W2施工前裁决，
+W2-10已补齐失败分类，当前保留FIXED；CDE-01的12文件/1,349行是历史候选，最终处置见Phase17 §8.9。
+编号冲突已于W6-23更正：§10的OBS-03/OBS-04专指钩子/MCP，§11bis侧栏使用OBS-11/OBS-12。
 
 **真实 provider 验证**：**已于 2026-10-01 实机执行**（中转站 `ai.onyxaxis.org`）——
 `verify:provider-readiness:real` 两项 `[pass]`，并首次用**真实**端点跑通多步工具回合；
@@ -674,7 +669,10 @@ CMD-04（非交互无退出路径）说明：**命令不假，不等于命令对
 > 终止的实例的 transcript（`history://W2BrowserStack`）显示它已完成
 > 164 个模块的清点与多数读码，但**未产出结论**；下面的每条断言均由主代理重新跑过。
 
-### 5.0 可达性实测（口径与上一轮不同，勿混用）
+### 5.0 历史可达性实测（口径与上一轮不同，勿混用）
+
+**W6-24口径说明**：本节164是迁入smoke前三模块之外的旧闭包快照；2026-10-02实际目录总数为167，
+本轮未重跑此历史闭包，16/160等结果保留其原时点。
 
 脚本：解析相对 ESM 导入（含 `import type`），从两个入口分别做闭包。
 
@@ -709,7 +707,8 @@ browser non-test modules: 164
 | **CLI 装配闭包** | 从 `entrypoints/cli.tsx` 沿值边可达（**捕获「装配了但被开关关闭」**） |
 
 ```
-TOTAL browser non-test modules: 164
+TOTAL browser non-test modules: 167 (2026-10-02目录实测；下列原四类为历史分类)
+  MOVED       3 files               ← smoke/{config,report,runner}.ts；未补作四类闭包分类
   REAL        7 files    1893 lines   ← 模型侧闭包内（真正被 agent 执行的）
   FIXTURE   140 files   18484 lines   ← 只在 /browser 闭包内（受治理的夹具/证据栈）
   ASSEMBLED  12 files    2540 lines   ← 从 CLI 可达，但不在上面任一条浏览器路径里
@@ -909,7 +908,7 @@ grep -rn "Simulated click\|Simulated navigat\|Simulated Session" packages/ts-she
 （`retention.ts` 的逻辑读起来正确：预算先扣 tombstone，超预算发 warning 而非静默截断）；
 列入 §14 的待办。
 
-**待补**：167（现 164）个模块的逐个 real-vs-demo 逐行判定；
+**待补**：167个模块的逐个real-vs-demo逐行判定（W6-24纠正目录总数，未执行逐行判定）；
 `runtime/core/*` + `skill/*` 的 `disabled` 默认是否有用户可见的告知；
 浏览器进程在 crash / `/clear` / `suspend()` 下的生命周期。
 
@@ -1693,7 +1692,8 @@ CTX-07 health() THREW: Unexpected token 'N', "NOT_JSON" is not valid JSON
 「6」混入了原表中的对照项，正确口径为 4 + 3 + 1；下表保留修复前调查范围。
 
 `CTX-02` 记录了 `projectMemoryReviewSurface.ts:39-42` 的四行硬编码文案。
-本轮核实**这是同一形态的第 6 例**（逐文件确认）：
+修复前同型缺快照面为**4个**；下面两个标为对照的面不计入同型缺陷。
+此外3个部分派生面及1个模型提示面使用不同判据，详见上方4+3+1口径：
 
 | 文件 | 行 | 形态 |
 |---|---|---|
@@ -2635,7 +2635,7 @@ edit/patch/apply/conflict.ts (219)
 
 | 面 | 规模 | 说明 |
 |---|---|---|
-| `browser/**` 逐模块 real-vs-demo 判定 | 164 模块 | §5 只给了入口级可达性 + 治理走向 + 3 条具体缺陷；**逐模块表未产出**（补做轮仍**未**完成，见 §13.4） |
+| `browser/**` 逐模块 real-vs-demo 判定 | 167模块（原审计表164） | §5 只给了入口级可达性 + 治理走向 + 3 条具体缺陷；**逐模块表未产出**（补做轮仍**未**完成，见 §13.4） |
 | `memory/**` / `context/**` 逐模块审计 | 36 + 28 模块 | §8 只覆盖 16-A/16-B 复核与记账 |
 | ~~每个内置工具的逐字段核对~~ | ~~17 个工具声明~~ | ✅ **补做轮已完成** → **TOL-04**（41 个字段全部有读取者，无缺陷） |
 | 编辑路径的多文件原子性、读后写竞态 | `edit/**` 28 模块 | 未做 |
@@ -2752,7 +2752,7 @@ npm run check:call-reachability     [advisory] 18 module(s) export work nothing 
 | 缺口 | 结果 | 条目 |
 |---|---|---|
 | 内核循环（`turn`/`core/agent`/`core/query`）——**此前零覆盖** | 5 条（1 条 P2 + 4 条已核实健全） | §8bis `LOP-01…05` |
-| 浏览器逐模块分类——**此前 3 轮未产出** | 164 模块四分类表 | `BRW-00` |
+| 浏览器逐模块分类——**此前 3 轮未产出** | 历史164模块四分类表；当前167含迁入3模块 | `BRW-00` |
 | 全工具 schema 字段核对 | 41 个字段**全部有读取者** | `TOL-04` |
 | MCP 错误分类到模型的链路 | 1 条 P2（分类被丢弃） | `OBS-07` |
 | 日志轮转 | 2 条（`/log tail` 读不到轮转分片；无文件数上界） | `OBS-08/09` |

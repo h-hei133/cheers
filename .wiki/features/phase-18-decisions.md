@@ -571,7 +571,8 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W5小项 / TUI-11 | 全屏picker/补全点击聚焦，仍由键盘确认；弹层捕获完整指针手势 | 已实现，本地验证通过 |
 | W5小项 / OBS-14 | 删除未消费换行提示链，实际输入与/hotkey保持既有路径 | 已实现，本地验证通过 |
 | W6-23 | sidebar编号改为OBS-11/OBS-12，钩子/MCP保持OBS-03/OBS-04 | 已完成文档修正 |
-| W6-24、W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
+| W6-24 | 修正浏览器总数与历史分类口径；CTX-08/CDE-01已纠正；PRV-04按W2修复保留FIXED | 已完成文档修正 |
+| W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
 src/runtime/execution/service.test.ts src/runtime/execution/fileLock.test.ts
@@ -1181,3 +1182,8 @@ Node>=20.3；docs strict无失效绑定路径，120个已有advisory；call reac
 
 W6-23（2026-10-02）：侧栏重复编号改为OBS-11/OBS-12，更新当前裁决、前置研究和Phase17侧栏引用；
 历史编号冲突说明保留并明确已更正。旧CLI汇总中的歧义编号未强行归属，不作为侧栏独立验收。
+
+W6-24（2026-10-02）：实测browser非测试TS模块167，核对8adc76f9迁入smoke/config、report、runner三模块；
+历史四类164分区与行数不改造成新审计结论，新增迁入3模块单列，逐行审计仍未完成。
+CTX-08清除“第6例”误计对照项，CDE-01已由W5-22修正；PRV-04依据W2-10实际修复保留FIXED，
+不执行旧PARTIAL降级。同步原输入OPEN快照的时间限定。纯文档修正，未运行构建或测试。
