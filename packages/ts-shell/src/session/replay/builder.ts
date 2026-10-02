@@ -30,6 +30,8 @@ import type { RecoverySnapshot } from "../recovery/types.js";
 import type { ReplayPlan } from "./types.js";
 import type { SessionMessage } from "../schema/sessionMessage.js";
 import type { TranscriptEvent } from "../sessionEventCodec.js";
+import { transcriptEventToSessionMessage } from "../sessionEventCodec.js";
+import { latestTranscriptRunStart, startsTranscriptScope } from "../transcript/scope.js";
 
 export interface ReplayTranscriptState {
   readonly status: "active" | "interrupted" | "completed" | "error" | "terminated";
@@ -73,7 +75,9 @@ export function normalizeReplayTranscriptEvents(
     if (
       event.type === "message" &&
       event.role === "assistant" &&
-      messageToText(event.content).trim().length === 0
+      messageToText(event.content).trim().length === 0 &&
+      !(Array.isArray(event.content) && event.content.some((block) => block.type === "image")) &&
+      !event.tool_calls?.length && !event.reasoning && !event.failureClass && !event.metadata
     ) {
       return false;
     }
@@ -86,7 +90,9 @@ export function prepareReplayTranscript(
   events: readonly TranscriptEvent[],
   context: ReplayTranscriptRepairContext,
 ): ReplayPreparation {
-  const repaired = [...events];
+  const runStart = latestTranscriptRunStart(events);
+  const history = events.slice(0, runStart);
+  const repaired = events.slice(runStart);
   const baseTimestamp = new Date(context.updatedAt).getTime();
   let syntheticOffset = 0;
   let insertedPromptMessage = false;
@@ -190,7 +196,7 @@ export function prepareReplayTranscript(
   }
 
   return {
-    transcriptEvents: withoutInterruptedTerminalQueries,
+    transcriptEvents: [...history, ...withoutInterruptedTerminalQueries],
     repairSummary: {
       insertedPromptMessage,
       insertedQueryStarted,
@@ -216,8 +222,25 @@ export function buildReplayTurnPairingState(
   let ignoredUnpairedTurnCompletions = 0;
   let ignoredRoleMismatchedTurnCompletions = 0;
 
-  for (const event of transcriptEvents) {
+  for (const event of transcriptEvents.slice(latestTranscriptRunStart(transcriptEvents))) {
+    if (startsTranscriptScope(event)) {
+      pairedTurns.length = 0;
+      openTurn = undefined;
+      ignoredDuplicateTurnStarts = 0;
+      ignoredUnpairedTurnCompletions = 0;
+      ignoredRoleMismatchedTurnCompletions = 0;
+      continue;
+    }
+    if (event.type === "lifecycle" &&
+      (event.event === "run-completed" || event.event === "run-error" || event.event === "run-terminated")) {
+      openTurn = undefined;
+    }
     if (event.type !== "query-event") {
+      continue;
+    }
+
+    if (event.event.type === "query.completed" || event.event.type === "query.failed") {
+      openTurn = undefined;
       continue;
     }
 
@@ -417,11 +440,7 @@ export function projectReplayMessages(
       (event): event is Extract<TranscriptEvent, { type: "message" }> =>
         event.type === "message",
     )
-    .map((event) => ({
-      role: event.role,
-      content: event.content,
-      timestamp: event.timestamp,
-    }));
+    .map((event) => transcriptEventToSessionMessage(event)!);
 }
 
 function buildReplayRepairSummary(
@@ -443,19 +462,17 @@ function selectRuntimeTaskState(input: {
   readonly compactTaskState?: QueryRuntimeTaskState;
   readonly continuationAllowsReplayFacts: boolean;
 }): QueryRuntimeTaskState | undefined {
-  if (input.replayTaskState && input.continuationAllowsReplayFacts) {
-    return input.replayTaskState;
-  }
-  if (input.replayTaskState && !input.continuationAllowsReplayFacts) {
+  const candidate = input.replayTaskState ?? input.compactTaskState;
+  if (candidate && !input.continuationAllowsReplayFacts) {
     return {
-      ...input.replayTaskState,
+      ...candidate,
       continuationSafety: {
         status: "stale",
         reasons: ["replay task state rejected by continuation safety"],
       },
     };
   }
-  return input.compactTaskState;
+  return candidate;
 }
 
 function selectRuntimeHarnessState(input: {

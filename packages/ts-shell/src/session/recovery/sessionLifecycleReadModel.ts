@@ -5,11 +5,13 @@ import {
   type DurableLifecycleIndex,
 } from "../../core/tools/toolResultLifecycle.js";
 import type { TranscriptEvent } from "../sessionEventCodec.js";
+import { latestTranscriptRunStart, startsTranscriptScope } from "../transcript/scope.js";
 
 export function deriveLifecycleIndexFromTranscript(
   events: readonly TranscriptEvent[],
 ): DurableLifecycleIndex {
-  return events.reduce<DurableLifecycleIndex>((index, event) => {
+  return events.slice(latestTranscriptRunStart(events)).reduce<DurableLifecycleIndex>((index, event) => {
+    if (startsTranscriptScope(event)) return createEmptyLifecycleIndex();
     if (event.type !== "query-event") {
       return index;
     }
@@ -29,13 +31,8 @@ export function isDuplicateDurableResolutionEvent(input: {
     return false;
   }
 
-  return input.events.some((existing) => {
-    if (existing.type !== "query-event") {
-      return false;
-    }
-
-    return JSON.stringify(existing.event) === JSON.stringify(input.event);
-  });
+  const existing = findCompensatedLifecycleEvent(input.events, input.event);
+  return existing !== undefined && JSON.stringify(existing) === JSON.stringify(input.event);
 }
 
 export function findCompensatedLifecycleEvent(
@@ -46,28 +43,15 @@ export function findCompensatedLifecycleEvent(
 ):
   | Extract<QueryEvent, { type: "approval.resolved" | "tool.result" }>
   | undefined {
-  return events.find(
-    (
-      event,
-    ): event is Extract<TranscriptEvent, { type: "query-event" }> & {
-      event: Extract<QueryEvent, { type: "approval.resolved" | "tool.result" }>;
-    } => {
-      if (event.type !== "query-event") {
-        return false;
-      }
-
-      if (event.event.type !== input.type) {
-        return false;
-      }
-
-      if (
-        event.event.taskId !== input.taskId ||
-        event.event.toolName !== input.toolName
-      ) {
-        return false;
-      }
-
-      return true;
-    },
-  )?.event;
+  const startType = input.type === "tool.result" ? "tool.started" : "approval.requested";
+  const scopeStart = latestTranscriptRunStart(events);
+  for (let index = events.length - 1; index >= scopeStart; index -= 1) {
+    const event = events[index]!;
+    if (startsTranscriptScope(event)) return undefined;
+    if (event.type !== "query-event") continue;
+    const candidate = event.event;
+    if (candidate.type === startType && candidate.taskId === input.taskId) return undefined;
+    if (candidate.type === input.type && candidate.taskId === input.taskId && candidate.toolName === input.toolName) return candidate;
+  }
+  return undefined;
 }

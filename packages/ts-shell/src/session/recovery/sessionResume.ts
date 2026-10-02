@@ -35,18 +35,7 @@ export function resumeSession(
   }
 
   try {
-    const session = callbacks.loadSession(sessionId);
-    if (!session.projectRoot?.trim() && projectRoot?.trim()) {
-      session.projectRoot = projectRoot.trim();
-    }
-    session.status = "active";
-    session.updatedAt = callbacks.now();
-    callbacks.writeSessionMetadata(session);
-    callbacks.setCurrentSessionForProject(
-      session.projectRoot || projectRoot || callbacks.cwd(),
-      session.id,
-    );
-    return session;
+    return activateSession(callbacks, callbacks.loadSession(sessionId), projectRoot);
   } catch (error) {
     throw new Error(
       `Failed to resume session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`,
@@ -65,16 +54,16 @@ export function tryResumeSession(
     const mode = options?.mode ?? "runtime-recovery";
     if (mode === "runtime-recovery") {
       const trustBoundary = callbacks.evaluateRecoveryTrustBoundary(session);
-      if (!trustBoundary.recoverable && trustBoundary.block) {
+      if (!trustBoundary.recoverable) {
         return {
           ok: false,
-          error: `Session ${sessionId} is not recoverable: ${trustBoundary.block.detail}`,
-          recoveryHint: trustBoundary.block.recoveryHint,
+          error: `Session ${sessionId} is not recoverable: ${trustBoundary.block?.detail ?? trustBoundary.detail}`,
+          recoveryHint: trustBoundary.block?.recoveryHint ?? `Start a fresh session or inspect ${callbacks.sessionDir(sessionId)}.`,
         };
       }
     }
 
-    return { ok: true, session: resumeSession(callbacks, sessionId, projectRoot) };
+    return { ok: true, session: activateSession(callbacks, session, projectRoot) };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     return {
@@ -85,4 +74,18 @@ export function tryResumeSession(
       recoveryHint: `Session ${sessionId} could not be restored. Start a fresh session or inspect ${callbacks.sessionDir(sessionId)}.`,
     };
   }
+}
+
+function activateSession(callbacks: SessionResumeCallbacks, loaded: Session, projectRoot?: string): Session {
+  const session: Session = {
+    ...loaded,
+    projectRoot: loaded.projectRoot?.trim() ? loaded.projectRoot : projectRoot?.trim() || loaded.projectRoot,
+    status: "active",
+    updatedAt: callbacks.now(),
+  };
+  // Metadata stores identity and time. Durable status stays recoverable until
+  // the runtime reentry boundary writes state; selection alone is not execution.
+  callbacks.writeSessionMetadata(session);
+  callbacks.setCurrentSessionForProject(session.projectRoot || callbacks.cwd(), session.id);
+  return session;
 }

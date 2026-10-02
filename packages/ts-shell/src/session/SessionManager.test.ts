@@ -49,6 +49,20 @@ describe("SessionManager", () => {
     expect(resumed.session.turns).toHaveLength(1);
   });
 
+  it("uses the same loaded session through the production recovery admission path", () => {
+    const manager = new SessionManager();
+    const session = manager.createNew();
+    manager.persistUserPromptBarrier(session.id, "resume this prompt");
+    manager.saveInterrupted(session.id);
+    const load = vi.spyOn(SessionStoreAccess.prototype, "load");
+    try {
+      expect(manager.tryResume(session.id).ok).toBe(true);
+      expect(load).toHaveBeenCalledTimes(1);
+    } finally {
+      load.mockRestore();
+    }
+  });
+
   it.each(["deleteSession", "discardIfEmpty"] as const)("releases todos through %s", (operation) => {
     const manager = new SessionManager();
     const session = manager.createNew();
@@ -3088,16 +3102,26 @@ describe("SessionManager", () => {
     snapshot = manager.getRecoverySnapshot(session.id);
     expect(snapshot.pendingLifecycle.pendingApprovals).toEqual({});
     expect(snapshot.pendingLifecycle.pendingTools).toEqual({});
-    expect(snapshot.pendingLifecycle.taskStates.task_approval).toMatchObject({
-      lastEvent: "approval.resolved",
-      compensated: true,
-      outcome: "denied",
-    });
-    expect(snapshot.pendingLifecycle.taskStates.task_tool).toMatchObject({
-      lastEvent: "tool.result",
-      compensated: true,
-      success: false,
-    });
+    expect(snapshot.pendingLifecycle.taskStates).toEqual({});
+    // New-run state is empty; historical resolutions remain in the transcript.
+    expect(manager.getTranscriptEvents(session.id).filter((event) =>
+      event.type === "query-event" && (event.event.type === "approval.resolved" || event.event.type === "tool.result"),
+    )).toHaveLength(2);
+  });
+
+  it("settles a repeated tool ID from its current attempt and keeps both outcomes", () => {
+    const manager = new SessionManager();
+    const session = manager.createNew();
+    manager.persistUserPromptBarrier(session.id, "first attempt");
+    manager.appendQueryEvent(session.id, { type: "tool.started", toolName: "bash", taskId: "call_0" });
+    manager.appendQueryEvent(session.id, { type: "tool.result", toolName: "bash", taskId: "call_0", success: true });
+    manager.appendQueryEvent(session.id, { type: "tool.started", toolName: "bash", taskId: "call_0" });
+    const reconciled = manager.reconcilePendingLifecycle(session.id);
+    expect(reconciled.taskStates.call_0).toMatchObject({ success: false, compensated: true });
+    expect(manager.getTranscriptEvents(session.id).filter((event) => event.type === "query-event" && event.event.type === "tool.result")).toHaveLength(2);
+    manager.appendQueryEvent(session.id, { type: "tool.started", toolName: "bash", taskId: "call_0" });
+    manager.reconcilePendingLifecycle(session.id);
+    expect(manager.getTranscriptEvents(session.id).filter((event) => event.type === "query-event" && event.event.type === "tool.result")).toHaveLength(3);
   });
 
   it("reconcilePendingLifecycle is idempotent across repeated calls", () => {

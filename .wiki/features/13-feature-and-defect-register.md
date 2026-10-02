@@ -1109,6 +1109,10 @@ W3-12 在 substrate transition 更换会话 ID 时释放旧表，并补齐 `disc
 `session/replay/**`、`session/export/**` 的往返正确性未验证；
 会话内其它 map 的有界性未系统扫描。§14 列出。
 
+2026-10-03 W7-26进行中：第一批修复了回放跨运行污染、结构化消息丢失、fresh-only的compact事实回流、
+重复调用ID错误结算和恢复准入二次加载。13套161项定向验证通过；完整36模块审计尚未完成。
+导出分支关联、坏图/深树、JSON凭据脱敏、codec输入降级与continuation仍在处理，详见Phase18裁决的W7-26第一批。
+
 ## 7. Provider 与协议（`PRV`）
 
 > 本节由**主代理**完成。子代理 `W2ProviderProtocol` 于 31m47s 后因上游

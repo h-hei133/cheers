@@ -17,6 +17,88 @@ import {
 } from "./builder.js";
 
 describe("session replay builder", () => {
+  it("preserves structured assistant messages and their roundtrip fields", () => {
+    const events: TranscriptEvent[] = [
+      { type: "message", id: "call-message", role: "assistant", content: "", timestamp: "2026-05-13T00:00:00.000Z", tool_calls: [{ id: "call_0", type: "function", function: { name: "read", arguments: "{}" } }], origin: { provider: "test", model: "test" }, reasoning: { text: "thinking", signature: "signature" }, metadata: { fixture: true }, failureClass: "interrupted" },
+      { type: "message", id: "result-message", role: "tool", content: "result", tool_call_id: "call_0", timestamp: "2026-05-13T00:00:01.000Z" },
+      { type: "message", role: "assistant", content: [{ type: "image", data: "AA==", mimeType: "image/png" }], timestamp: "2026-05-13T00:00:02.000Z" },
+      { type: "message", role: "assistant", content: "", reasoning: { text: "thinking" }, timestamp: "2026-05-13T00:00:03.000Z" },
+    ];
+    const normalized = normalizeReplayTranscriptEvents(events);
+    expect(normalized).toEqual(events);
+    expect(projectReplayMessages(normalized)).toEqual(events.map(({ type, ...message }) => message));
+  });
+
+  it("repairs only the latest run, even when prompts repeat", () => {
+    const history: TranscriptEvent[] = [
+      { type: "lifecycle", event: "run-started", timestamp: "2026-05-13T00:00:00.000Z" },
+      { type: "message", role: "user", content: "same prompt", timestamp: "2026-05-13T00:00:00.000Z" },
+      { type: "query-event", event: { type: "query.started", sessionId: "s", prompt: "same prompt" }, timestamp: "2026-05-13T00:00:00.000Z" },
+      { type: "query-event", event: { type: "query.failed", error: "old failure" }, timestamp: "2026-05-13T00:00:01.000Z" },
+      { type: "lifecycle", event: "run-interrupted", timestamp: "2026-05-13T00:00:01.000Z" },
+    ];
+    const latest: TranscriptEvent = { type: "lifecycle", event: "run-started", timestamp: "2026-05-13T00:00:02.000Z" };
+    const repaired = prepareReplayTranscript([...history, latest, turnStarted("coder", 1)], {
+      sessionId: "s", pendingPrompt: "same prompt", updatedAt: "2026-05-13T00:00:03.000Z", state: { status: "interrupted", runPhase: "turn-active" },
+    });
+    expect(repaired.transcriptEvents.slice(0, history.length)).toEqual(history);
+    expect(repaired.repairSummary).toMatchObject({ insertedPromptMessage: true, insertedQueryStarted: true, insertedRunInterrupted: true, strippedInterruptedTerminalEvents: 0 });
+    expect(repaired.transcriptEvents[history.length]).toBe(latest);
+  });
+
+  it("does not pair a new query completion with an old query start", () => {
+    const events: TranscriptEvent[] = [
+      turnStarted("coder", 1),
+      { type: "query-event", event: { type: "query.failed", error: "failed" }, timestamp: "2026-05-13T00:00:01.000Z" },
+      { type: "query-event", event: { type: "query.started", sessionId: "s", prompt: "new" }, timestamp: "2026-05-13T00:00:02.000Z" },
+      turnCompleted(makeOutput("coder", "new output")),
+    ];
+    expect(buildReplayTurnPairingState(events)).toMatchObject({ pairedTurns: [], ignoredUnpairedTurnCompletions: 1 });
+  });
+
+  it.each([true, false])("preserves terminal history with mixed or missing start markers (latest query started: %s)", (started) => {
+    const history: TranscriptEvent[] = [
+      { type: "lifecycle", event: "run-started", timestamp: "2026-05-13T00:00:00.000Z" },
+      { type: "message", role: "user", content: "old", timestamp: "2026-05-13T00:00:00.000Z" },
+      { type: "query-event", event: { type: "query.started", sessionId: "s", prompt: "old" }, timestamp: "2026-05-13T00:00:00.000Z" },
+      { type: "query-event", event: { type: "query.failed", error: "old failure" }, timestamp: "2026-05-13T00:00:01.000Z" },
+    ];
+    const current: TranscriptEvent[] = [
+      { type: "message", role: "user", content: "new", timestamp: "2026-05-13T00:00:02.000Z" },
+      ...(started ? [{ type: "query-event", event: { type: "query.started", sessionId: "s", prompt: "new" }, timestamp: "2026-05-13T00:00:02.000Z" } as const] : []),
+      turnStarted("planner", 1),
+    ];
+    for (const prefix of [history, history.slice(1)]) {
+      const repaired = prepareReplayTranscript([...prefix, ...current], { sessionId: "s", pendingPrompt: "new", updatedAt: "2026-05-13T00:00:03.000Z", state: { status: "interrupted", runPhase: "turn-active" } });
+      expect(repaired.transcriptEvents.slice(0, prefix.length)).toEqual(prefix);
+      expect(repaired.repairSummary.insertedQueryStarted).toBe(!started);
+      expect(repaired.repairSummary.strippedInterruptedTerminalEvents).toBe(0);
+    }
+  });
+
+  it("reenters only the latest query and drops abandoned branch outputs", () => {
+    const history = [turnStarted("coder", 1), turnCompleted(makeOutput("coder", "old"))];
+    const seed = buildResumeReplayInput({ sessionId: "s", snapshot: makeSnapshot([
+      ...history,
+      { type: "query-event", event: { type: "query.started", sessionId: "s", prompt: "new" }, timestamp: "2026-05-13T00:00:02.000Z" },
+      turnStarted("planner", 1),
+    ]) });
+    expect(seed.config.startingRole).toBe("planner");
+    expect(seed.derivedState.transcript).toEqual([]);
+    expect(buildReplayTurnPairingState([...history, { type: "branch_summary", droppedTurns: 2, timestamp: "2026-05-13T00:00:02.000Z" }]).pairedTurns).toEqual([]);
+  });
+
+  it("scopes a markerless suffix even without a pending prompt to repair it", () => {
+    const events: TranscriptEvent[] = [
+      turnStarted("coder", 1), turnCompleted(makeOutput("coder", "old output")),
+      { type: "query-event", event: { type: "query.failed", error: "old failure" }, timestamp: "2026-05-13T00:00:01.000Z" },
+      { type: "message", role: "user", content: "new", timestamp: "2026-05-13T00:00:02.000Z" },
+      turnStarted("planner", 1),
+    ];
+    const seed = buildResumeReplayInput({ sessionId: "s", snapshot: { ...makeSnapshot(events), pendingPrompt: undefined } });
+    expect(seed.config.startingRole).toBe("planner");
+    expect(seed.derivedState.transcript).toEqual([]);
+  });
   it("repairs interrupted replay transcript without changing event order", () => {
     const events: TranscriptEvent[] = [
       {
@@ -360,7 +442,7 @@ describe("session replay builder", () => {
     expect(seed.taskState?.proofGap).toContain("verification failed");
   });
 
-  it("rejects stale replay task state before it can restore changed-file facts", () => {
+  it.each(["safe", "stale"] as const)("rejects %s compact task state when current replay drifts", (status) => {
     const snapshot = {
       ...makeSnapshot([
         turnStarted("coder", 1),
@@ -387,7 +469,7 @@ describe("session replay builder", () => {
           missingClaims: [],
         },
         continuationSafety: {
-          status: "stale" as const,
+          status,
           reasons: ["turn pairing drift"],
         },
       },

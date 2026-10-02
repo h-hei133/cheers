@@ -50,6 +50,7 @@ import { applySessionWorkspaceBinding } from "./store/sessionProjectBinding.js";
 import { SessionReadSurface } from "./sessionReadSurface.js";
 import { rebindSessionProjectRootContinuity } from "./continuation/sessionProjectRootRebind.js";
 import {
+  buildRecoverySnapshotForSession,
   evaluateRecoveryTrustBoundaryForSession,
   projectRecoveryTrustBoundaryBlockForSession,
 } from "./recovery/sessionRecoveryRuntime.js";
@@ -433,7 +434,12 @@ export class SessionManager extends SessionReadSurface {
   ): SessionResumeEligibility {
     return evaluateRecoveryTrustBoundaryForSession({
       session,
-      loadRecoverySnapshot: (sessionId) => this.getRecoverySnapshot(sessionId),
+      loadRecoverySnapshot: () => buildRecoverySnapshotForSession({
+        sessionId: session.id,
+        session,
+        state: this.host.store.readStateSnapshotRequired(this.host.store.statePath(session.id)),
+        transcriptEvents: this.getTranscriptEvents(session.id),
+      }),
       createBlock: (targetSession, reason, detail) =>
         this.createRecoveryTrustBoundaryBlock(targetSession, reason, detail),
     });

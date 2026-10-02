@@ -1350,3 +1350,42 @@ read/list/get契约新增blocked与missing区分，返回记录必须来自完�
 W7-28最终验证：`npm run test -w packages/ts-shell -- src/browser/receipt src/browser/replayCommandRunner.test.ts src/browser/replayPlanner.test.ts src/browser/replayPolicy.test.ts src/browser/executionCommandRunner.test.ts src/test-utils/browser/cache src/test-utils/browser/replay/persistent.test.ts src/test-utils/browser/healing/apply.test.ts` 在仓内隔离TMPDIR运行，18套137项通过（exit 0）。构建、import-cycles（1403文件零循环）、config39/39、hooks18/18、factory10/10、Node floor、docs严格门通过；旧docs120/reachability7/function-ceiling7提示不变。
 双线复核APPROVE/CLEAR；架构线独立15套121项通过，代码线内存故障探针通过。原15个产品文件回退后26失败/4通过，全部逐字节恢复。隔离编译产物实际slash路由/文件store验收与四子进程过期owner互斥通过；未跑真实provider或浏览器。
 `verify:result-contract`仍exit 1：两处旧测试路径不存在，print/replay旧标记失配；已知脚本债务留到W7-26/31，不记为通过。W7-28完成，下一项W7-26。
+
+### W7-26 第一批：回放范围与恢复准入（2026-10-03）
+
+W7-26仍在执行，以下只闭合第一批，不代表36模块审计完成。
+发现并复现：跨query配对旧输出；修复扫描整个历史而删除旧终结事件；空文本助手消息丢失工具调用/推理；
+fresh-only回放从compact状态重新拿回safe任务事实；重复工具ID复用旧成功/批准或抑制本次相同结算；
+恢复准入与激活读取不同session对象。
+
+实施决定：
+
+- `session/transcript/scope.ts`给修复、配对和生命周期读模共用当前范围：比较run/query/branch边界；
+  旧格式缺少启动事件时，终结事件后的新用户消息/turn确定新后缀。历史终结事件保留。
+- `replay/builder.ts`保留结构化空文本消息，复用现有消息转换器；派生事实不允许时，compact回退同样标为stale。
+- 生命周期反向查找只接纳本次请求/启动之后的最新结算；重复ID不再把旧批准/成功当作新调用证据。
+  新运行的当前任务索引清空，历史仍保存在append-only transcript。
+- `sessionResume.ts`激活准入已检查的同一份session副本；负准入即使无可选block也拒绝。
+  实际manager准入调用既有snapshot builder，避免其内部再load一次。metadata→selection顺序保留。
+  metadata不存状态：选择会话仍保留磁盘interrupted，真正`markRecoveryReentry`才写active。
+  多文件读取/写入没有整体事务或并发writer fencing，本批不作该保证。
+
+对照决定：会话参考`core/session-manager.ts:439-464`保留完整消息、`:476-511`按选中路径恢复；
+运行参考`session/prompt.ts:1092-1116`绑定最新用户消息与其assistant，`session/processor.ts:586-610`
+只结算当前调用。采纳完整消息、来源范围与当前调用结算，保留本仓owner；不复制实现。
+参考导出也存在全局toolCallId匹配，不能作为分支正确性证据，后续导出批次明确不采纳。
+
+验证：初始回放/生命周期8失败13通过、恢复3失败2通过；扩展组曾有1条旧断言仍要求新run返回历史taskStates，
+按当前运行索引合同改成空索引并断言历史结算仍完整保留。最终定向13套161项通过，构建通过。
+反转5个产品文件后15失败15通过，原字节恢复。独立复核先后补出实际manager二次load与无pendingPrompt的旧格式边界，
+修复后第一批代码APPROVE、架构CLEAR；架构最终独立25项通过。
+仓内隔离的编译产物真实文件store验收通过：新manager重开、重复ID补偿、旧终结事件保留、
+当前query seed与结构化消息往返、恢复选择后仍interrupted及runtime重入后active均有断言。
+静态门通过：1404文件零循环，配置39/39、hooks18/18、工厂10/10、Node floor与docs strict；
+既有docs120、可达性7、函数上限7提示无新增。未做本地完整TS套件或真实provider调用。
+
+未完成的已确认问题：导出跨分支/重复call ID结果串用、非消息祖先和坏图遍历、深树序列化、
+JSON凭据字段/元信息脱敏、损坏数据降级标识、codec嵌套输入检查；continuation的根路径替换及状态投影继续审计。
+`verify:result-contract`保持exit1（旧路径和旧输出断言）；首轮误用旧脚本仓外默认测试路径，随后显式设置
+`CHEERS_SYNTHETIC_HOME`和`CHEERS_TEST_ROOT`为仓内`.tmp/tmp`重跑，失败相同；不把TMPDIR当作该脚本的完整隔离配置。
+前批`4d651202`的CI 37029534144与Architecture Watch 37029534173均成功。
