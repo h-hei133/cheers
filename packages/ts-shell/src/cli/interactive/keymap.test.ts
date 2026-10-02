@@ -20,7 +20,6 @@ function build(busy = false): {
     queuedCount: () => 0,
     now: () => 0,
     ambient: () => ({}),
-    newlineKey: () => "ctrl+j",
     cancelArmed: () => false,
     overlayFullScreen: () => false,
     overlayRows: () => [],

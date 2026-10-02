@@ -212,7 +212,6 @@ export class InteractiveSurface implements InteractiveView {
           cancelArmed: this.context.cancelArmed(),
           queued: this.context.queuedCount(),
           steering: this.context.steeringCount?.() ?? 0,
-          newlineKey: this.context.newlineKey(),
           toast: this.context.toast?.(),
         },
         this.context.ambient(),

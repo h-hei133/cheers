@@ -23,7 +23,6 @@ export interface HintContext {
   readonly queued: number;
   /** Prompts waiting to be steered into the current turn. */
   readonly steering?: number;
-  readonly newlineKey: string;
   readonly toast?: string;
 }
 export interface AmbientContext {
@@ -77,11 +76,6 @@ export function renderHints(
   const text = transientHint(context) ?? ambientFacts(ambient);
   if (!text) return [];
   return [defaultTheme.dim(truncateToWidth(text, width))];
-}
-export function newlineKeyFor(protocol: "enhanced" | "modify-other-keys" | "legacy"): string {
-  // Only a negotiated protocol can carry the Shift modifier on Enter. Claiming
-  // shift+enter on a terminal that cannot report it is the defect this replaces.
-  return protocol === "legacy" ? "ctrl+j" : "shift+enter";
 }
 
 function join(parts: readonly string[]): string {

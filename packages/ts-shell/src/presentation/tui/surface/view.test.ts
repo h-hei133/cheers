@@ -40,7 +40,6 @@ function contextFor(live: Facts, overrides: Partial<ViewContext> = {}): ViewCont
     queuedCount: () => live.queued,
     now: () => live.now,
     ambient: () => ({ openTodos: 0, peerSessions: 0 }),
-    newlineKey: () => "ctrl+j",
     cancelArmed: () => live.cancelArmed,
     overlayFullScreen: () => live.fullScreen,
     overlayRows: (_width, height) =>

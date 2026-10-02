@@ -10,7 +10,6 @@ import type { EscalationPrompt } from "../../core/shell/approval/contract.js";
 import { handleShellClose } from "../../core/shell/signalHandlers.js";
 import type { CliMcpGateway } from "../../entrypoints/cliMcpModule.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
-import { newlineKeyFor } from "../../presentation/tui/chrome/hints.js";
 import { loadPromptHistory, appendPromptHistory } from "./historyStore.js";
 import type { StatusItemId } from "../../presentation/tui/chrome/items.js";
 import { renderWelcome } from "../../presentation/tui/chrome/welcome.js";
@@ -239,7 +238,6 @@ export class InteractiveMode {
         steeringCount: () => this.options.sessionRuntime.input?.()?.pending().steering.length ?? 0,
         now: () => Date.now(),
         ambient: () => readAmbientFacts(this.options.runtimeContext.session.id),
-        newlineKey: () => newlineKeyFor(this.terminal.keyboardProtocol ?? "legacy"),
         cancelArmed: () =>
           this.gesture.lastCancelAt !== undefined &&
           Date.now() - this.gesture.lastCancelAt < CANCEL_ARMED_MS,

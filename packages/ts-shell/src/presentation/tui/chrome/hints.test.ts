@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderHints, newlineKeyFor } from "./hints.js";
+import { renderHints } from "./hints.js";
 import { stripAnsi } from "../text/ansi.js";
 
 describe("renderHints", () => {
@@ -10,7 +10,6 @@ describe("renderHints", () => {
         suggesting: false,
         cancelArmed: false,
         queued: 0,
-        newlineKey: "ctrl+j",
         toast: "Copied 501 characters across 8 lines to clipboard",
       },
       { openTodos: 0, peerSessions: 0 },
@@ -28,7 +27,6 @@ describe("renderHints", () => {
         suggesting: true,
         cancelArmed: false,
         queued: 0,
-        newlineKey: "ctrl+j",
         toast: "Copied 501 characters to clipboard",
       },
       { openTodos: 0, peerSessions: 0 },
@@ -46,7 +44,6 @@ describe("renderHints", () => {
         suggesting: false,
         cancelArmed: false,
         queued: 0,
-        newlineKey: "ctrl+j",
       },
       { openTodos: 3, peerSessions: 2 },
       80,
@@ -63,7 +60,6 @@ describe("renderHints", () => {
         suggesting: false,
         cancelArmed: false,
         queued: 0,
-        newlineKey: "ctrl+j",
       },
       { openTodos: 0, peerSessions: 0 },
       80,
@@ -72,10 +68,6 @@ describe("renderHints", () => {
     expect(rows).toEqual([]);
   });
 
-  it("advertises proper newline key for keyboard protocols", () => {
-    expect(newlineKeyFor("enhanced")).toBe("shift+enter");
-    expect(newlineKeyFor("legacy")).toBe("ctrl+j");
-  });
   it("distinguishes steering from follow-up queue actions while busy", () => {
     const rows = renderHints(
       {
@@ -83,7 +75,6 @@ describe("renderHints", () => {
         suggesting: false,
         cancelArmed: false,
         queued: 0,
-        newlineKey: "ctrl+j",
       },
       { openTodos: 0, peerSessions: 0 },
       80,
@@ -99,7 +90,6 @@ describe("renderHints", () => {
         suggesting: false,
         cancelArmed: false,
         queued: 2,
-        newlineKey: "ctrl+j",
       },
       { openTodos: 0, peerSessions: 0 },
       80,

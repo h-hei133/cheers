@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { composerTextWidth, renderComposer } from "./composer.js";
-import { newlineKeyFor, renderHints } from "./hints.js";
+import { renderHints } from "./hints.js";
 import { renderWelcome } from "./welcome.js";
 import { Editor } from "../editor.js";
 import { visibleWidth } from "../text/measure.js";
@@ -56,7 +56,7 @@ describe("prompt block", () => {
   });
 });
 
-const quiet = { busy: false, suggesting: false, cancelArmed: false, queued: 0, newlineKey: "shift+enter" };
+const quiet = { busy: false, suggesting: false, cancelArmed: false, queued: 0 };
 const nothing = { openTodos: 0, peerSessions: 0 };
 
 describe("the row under the prompt", () => {
@@ -110,17 +110,6 @@ describe("the row under the prompt", () => {
   it("fits the width", () => {
     const row = renderHints(quiet, { openTodos: 12, peerSessions: 4 }, 24).join("");
     expect(visibleWidth(row)).toBeLessThanOrEqual(24);
-  });
-});
-
-describe("newline key", () => {
-  it("advertises shift+enter only when a protocol can report it", () => {
-    expect(newlineKeyFor("enhanced")).toBe("shift+enter");
-    expect(newlineKeyFor("modify-other-keys")).toBe("shift+enter");
-  });
-
-  it("falls back to the key every terminal can express", () => {
-    expect(newlineKeyFor("legacy")).toBe("ctrl+j");
   });
 });
 

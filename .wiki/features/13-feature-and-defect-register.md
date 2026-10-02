@@ -3173,7 +3173,11 @@ picker（`/back`、`/model`、`/resume`…）与补全列表**纯键盘**，点�
 注册表本身解析别名正常（`entrypoints/slashCommandRegistry.ts:107`，`getSlashCommand` 查 aliases）⇒
 **命令能跑、补全不认**。**参考**：`pi` 的内建命令**无别名**（`NOT-FOUND`）⇒ 属 `自研` 完善。
 
-### OBS-14 · 提示行的 `newlineKey` **已接线但从不渲染** — `OPEN` `P3` `CONFIRMED`
+### OBS-14 · 删除未消费的换行提示字段链 — `FIXED` `P3` `CONFIRMED`
+
+**2026-10-02 裁决/实施**：保留空闲无提示时不占行的布局，删除newlineKey字段、传参和仅为它服务的协议名称转换器；实际按键解析、换行dispatch与/hotkey不变，键位发现由实际绑定表和参考页负责。删除的三个测试只验证该死辅助函数，归类为obsolete scenario；其余渲染、键位和文档契约测试保留。6文件121项定向测试、构建通过。
+
+以下保留修复前证据：
 
 `presentation/tui/chrome/hints.ts:26` 定义 `HintContext.newlineKey`，
 `presentation/tui/surface/view.ts:198` 传入（`interactiveMode.ts:241` 由 `newlineKeyFor(...)` 产出），

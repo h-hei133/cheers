@@ -56,8 +56,6 @@ export interface ViewContext {
   now(): number;
   /** Background facts for the row under the prompt. */
   ambient(): AmbientContext;
-  /** Key that inserts a newline on this terminal. */
-  newlineKey(): string;
   /** True while a second cancel press would exit. */
   cancelArmed(): boolean;
   /** True when an open picker or reader wants the whole screen. */
