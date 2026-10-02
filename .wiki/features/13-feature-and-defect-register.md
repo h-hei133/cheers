@@ -897,18 +897,22 @@ grep -rn "Simulated click\|Simulated navigat\|Simulated Session" packages/ts-she
 **其余残余 `mock`/`fake` 命中**全部位于测试或夹具模式标记
 （`fake-test` 是 `BrowserAllowedOrigin.mode` 的合法取值）。**无生产路径说谎。**
 
-### BRW-06 · `receipt/**` 的健康度与本次判定的关系
+### BRW-06 · `receipt/**` 的保证强度 — W7-28 已修复并逐项核验
 
-`receipt/*`（9 模块 / 1,447 行）**全部**只被 `/browser` 闭包（夹具栈）与
-`core/harness` 场景夹具引用；模型侧零引用。
-`createBrowserReceiptCacheStore` 的生产调用者是 `cliCommandExecutionBridge.ts:10`
-——即**只有 `/browser` 命令路径**会建它。
+原九个模块只服务显式 `/browser` 缓存路径，默认不启用；生产装配在
+`entrypoints/cliCommandExecutionBridge.ts`。夹具定位不豁免权限、持久化与结果真实性要求。
+原“expiresAt/ownerId陈旧判定正确”的结论被行为测试推翻：普通覆盖过期锁没有互斥保证。
 
-**判定**：在夹具栈的定位下（BRW-03）这**不是缺陷**。
-`receipt/lock.ts:140-160` 的 `expiresAt`/`ownerId` 陈旧判定是本仓的**正确实现**
-（会话锁曾缺失它，见 SES 一节）。本轮**未**逐项核验 receipt 的保证强度
-（`retention.ts` 的逻辑读起来正确：预算先扣 tombstone，超预算发 warning 而非静默截断）；
-列入 §14 的待办。
+当前实现：manifest校验后冻结权限；read先过门，有界读取且健康查询不写盘；
+嵌套receipt/entry校验并核对派生一致性；任何损坏/未知/不安全行隔离整个日志，阻止回放与重写，保留原字节。
+写入在一个owner中执行独占锁、锁内读取、原子替换与读回验证；不自动抢占过期锁，清理失败单独报告。
+保留策略先扣tombstone预算，内存条目别名也须查持久化失效记录。
+compact只处理完整日志，repair对完整日志为unchanged、对不确定日志为blocked；不能推断遗失的tombstone。
+命令与自修复入口保持written/unchanged/blocked/unverified及锁清理事实。
+
+保证限于稳定本地目录中的合作写入方；不提供fencing、作者认证或fsync崩溃持久性。
+遗留锁/损坏日志须停止写入方后恢复已知正确备份或选择新的空缓存根。
+逐模块矩阵和定向/进程验收见phase-18裁决末尾W7-28记录。
 
 **待补**：167个模块的逐个real-vs-demo逐行判定（W6-24纠正目录总数，未执行逐行判定）；
 `runtime/core/*` + `skill/*` 的 `disabled` 默认是否有用户可见的告知；

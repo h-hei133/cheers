@@ -87,7 +87,7 @@ describe("browser persistent cache hardening scenario examples", () => {
     expect(fixture.readCacheFile()).not.toContain("RAW_");
   });
 
-  it("blocks compact while a busy lock is active and recovers stale locks", async () => {
+  it("blocks compact and requires stopped writers before stale lock recovery", async () => {
     const fixture = track(createBrowserPersistentReplayScenarioFixture({ kind: "external-runner" }));
     const busy = acquireBrowserReceiptCacheLock({
       cacheRoot: fixture.cacheRoot,
@@ -114,7 +114,8 @@ describe("browser persistent cache hardening scenario examples", () => {
     });
     const recovered = await runCommand("/browser replay cache repair", fixture);
     expect(recovered.output).toContain("Cache action: repair");
-    expect(recovered.output).not.toContain("Outcome: blocked");
+    expect(recovered.output).toContain("Outcome: blocked");
+    expect(recovered.output).toContain("Stop all writers");
   });
 
   it("preserves execute-write and cross-process replay after compaction", async () => {
@@ -130,7 +131,7 @@ describe("browser persistent cache hardening scenario examples", () => {
     };
     const replay = await runCommand(`/browser replay ${receiptId}`, separateProcess);
 
-    expect(execute.output).toContain("Cache write: yes");
+    expect(execute.output).toContain("Cache write: written");
     expect(compact.output).toContain("Cache action: compact");
     expect(replay.output).toContain("Executed: yes");
     expect(replay.output).toContain("Cache source: persistent");

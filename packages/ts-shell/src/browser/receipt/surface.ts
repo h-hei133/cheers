@@ -41,7 +41,7 @@ function nextAction(health: BrowserReceiptCacheHealth): string {
     return "Fix the explicit cache manifest/root before relying on persistent replay.";
   }
   if (health.integrityStatus === "unsafe" || health.integrityStatus === "corrupted") {
-    return "Run /browser replay cache repair or delete the explicit cache root after review.";
+    return "Preserve the cache and stop writers before restoring a known-good log or selecting a new empty cache root.";
   }
   if (health.duplicateActiveCount > 0 || health.overBudgetCount > 0) {
     return "Run /browser replay cache compact to remove superseded sanitized records.";

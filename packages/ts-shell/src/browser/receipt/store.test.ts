@@ -30,12 +30,12 @@ describe("browser receipt cache store", () => {
 
     const write = store.writeReceipt(receipt);
     expect(write.written).toBe(true);
-    expect(store.get(receipt.receiptId)?.status).toBe("active");
+    expect(store.get(receipt.receiptId)).toMatchObject({ status: "found", record: { status: "active" } });
     expect(store.list().records).toHaveLength(1);
 
     const invalidated = store.invalidate(receipt.receiptId, "test invalidation");
     expect(invalidated.changed).toBe(true);
-    expect(store.get(receipt.receiptId)).toBeUndefined();
+    expect(store.get(receipt.receiptId).status).toBe("missing");
     expect(store.health().invalidatedCount).toBe(1);
 
     const deleted = store.delete(receipt.receiptId, "test delete");
@@ -57,8 +57,8 @@ describe("browser receipt cache store", () => {
 
     const health = inspectBrowserReceiptCacheHealth(store);
 
-    expect(health.status).toBe("configured");
+    expect(health.status).toBe("invalid");
     expect(health.corruptedCount).toBe(1);
-    expect(health.warnings).toContain("browser-receipt-cache-store:corrupted-records-skipped");
+    expect(health.warnings).toContain("browser-receipt-cache-recovery:records-skipped");
   });
 });

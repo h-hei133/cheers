@@ -20,6 +20,7 @@ export interface BrowserReplayPolicyDecision {
 }
 
 export interface DecideBrowserReplayPolicyInput {
+  readonly cacheBlockers?: readonly string[];
   readonly entry?: BrowserActionCacheEntry;
   readonly runnerAvailable?: boolean;
   readonly skillRunnerBindingAvailable?: boolean;
@@ -31,6 +32,9 @@ export interface DecideBrowserReplayPolicyInput {
 export function decideBrowserReplayPolicy(
   input: DecideBrowserReplayPolicyInput,
 ): BrowserReplayPolicyDecision {
+  if (input.cacheBlockers?.length) {
+    return decision("replay-blocked", input.cacheBlockers, "Inspect the explicit cache before replaying; unreadable or inactive records cannot authorize replay.");
+  }
   const entry = input.entry;
   if (!entry) {
     return decision("replay-not-found", ["cache-entry-missing"], "Run /browser replay status or execute a replay-ready local/test browser action first.");

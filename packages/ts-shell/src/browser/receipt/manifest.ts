@@ -1,7 +1,9 @@
 import { isRecord } from "../../core/values/record.js";
 import path from "node:path";
-import fs from "node:fs";
 import { browserActionCacheEntryHasForbiddenContent } from "../actionCacheEntry.js";
+import { freezeDeep } from "../../core/values/freeze.js";
+import { redactReportText } from "../../core/security/redaction.js";
+import { readReceiptFile } from "./io.js";
 
 export const BROWSER_RECEIPT_CACHE_MANIFEST_ENV =
   "CHEERS_BROWSER_RECEIPT_CACHE_MANIFEST";
@@ -79,7 +81,11 @@ export function validateBrowserReceiptCacheManifest(
   if (!isSafeExplicitRoot(normalizedRoot)) {
     return invalid("Cache root must be an explicit non-global local path.");
   }
-  if (browserActionCacheEntryHasForbiddenContent(JSON.stringify(value))) {
+  let serialized: string;
+  try { serialized = JSON.stringify(value); } catch { return invalid("Cache manifest is not serializable."); }
+  const redactions = new Set<string>();
+  redactReportText(serialized, 16_384, { redactions });
+  if (Buffer.byteLength(serialized) > 16_384 || redactions.size > 0 || browserActionCacheEntryHasForbiddenContent(serialized)) {
     return invalid("Cache manifest contains unsafe content.", ["browser-receipt-cache-manifest:redacted"]);
   }
   if (!["cli-harness", "explicit-local", "test-only"].includes(manifest.source ?? "")) {
@@ -88,8 +94,8 @@ export function validateBrowserReceiptCacheManifest(
   if (!["project", "session", "harness"].includes(manifest.scope ?? "")) {
     return invalid("Cache manifest scope is unsupported.");
   }
-  if (!Number.isInteger(manifest.maxRecords) || (manifest.maxRecords ?? 0) <= 0) {
-    return invalid("Cache manifest requires a positive maxRecords budget.");
+  if (!Number.isInteger(manifest.maxRecords) || (manifest.maxRecords ?? 0) <= 0 || (manifest.maxRecords ?? 0) > 1000) {
+    return invalid("Cache manifest requires a maxRecords budget between 1 and 1000.");
   }
   const operations = manifest.allowedOperations;
   if (!Array.isArray(operations) || operations.length === 0) {
@@ -104,9 +110,12 @@ export function validateBrowserReceiptCacheManifest(
   if (!["manual", "delete-tombstone"].includes(manifest.cleanupPolicy ?? "")) {
     return invalid("Cache manifest cleanup policy is unsupported.");
   }
+  if (!Array.isArray(manifest.warnings) || !manifest.warnings.every((warning) => typeof warning === "string")) {
+    return invalid("Cache manifest warnings must be strings.");
+  }
   return {
     ok: true,
-    manifest: {
+    manifest: freezeDeep({
       version: "browser-receipt-cache-manifest/v1",
       cacheRoot: normalizedRoot,
       source: manifest.source,
@@ -115,8 +124,8 @@ export function validateBrowserReceiptCacheManifest(
       maxRecords: manifest.maxRecords,
       redactionPolicy: "safe-summary-only",
       cleanupPolicy: manifest.cleanupPolicy,
-      warnings: manifest.warnings ?? [],
-    } as BrowserReceiptCacheManifest,
+      warnings: [...manifest.warnings],
+    } as BrowserReceiptCacheManifest),
     evidence: [
       "browser-receipt-cache-manifest:valid",
       "browser-receipt-cache-manifest:explicit-root",
@@ -134,9 +143,10 @@ export function loadBrowserReceiptCacheManifestFromEnv(input: {
   const manifestPath = env[BROWSER_RECEIPT_CACHE_MANIFEST_ENV];
   const root = env[BROWSER_RECEIPT_CACHE_ROOT_ENV];
   if (manifestPath) {
-    const readFile = input.readFile ?? ((target) => fs.readFileSync(target, "utf8"));
     try {
-      return validateBrowserReceiptCacheManifest(JSON.parse(readFile(manifestPath)));
+      const file = input.readFile ? { status: "read", content: input.readFile(manifestPath) } : readReceiptFile(manifestPath, 16_384);
+      if (file.status !== "read" || !("content" in file) || Buffer.byteLength(file.content) > 16_384) return invalid("Browser receipt cache manifest is unavailable or oversized.");
+      return validateBrowserReceiptCacheManifest(JSON.parse(file.content));
     } catch {
       return invalid("Browser receipt cache manifest could not be read or parsed.", ["browser-receipt-cache-manifest"]);
     }

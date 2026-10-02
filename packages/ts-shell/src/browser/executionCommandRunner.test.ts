@@ -90,7 +90,7 @@ describe("browser execution command runner", () => {
       });
 
       expect(result.output).toContain("Browser receipt cache");
-      expect(result.output).toContain("Cache write: yes");
+      expect(result.output).toContain("Cache write: written");
       expect(store.health().replayableCount).toBe(1);
       expect(fs.readFileSync(path.join(root, "browser-receipt-cache.jsonl"), "utf8")).not.toContain("RAW_");
     } finally {

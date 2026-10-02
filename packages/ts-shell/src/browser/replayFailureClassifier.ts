@@ -35,10 +35,10 @@ export function classifyBrowserReplayFailure(input: {
     return classification("none", "info", "Replay is allowed.", "No repair preview is needed.");
   }
   if (plan.cacheIntegrityStatus === "corrupted" || blockers.includes("cache-record-corrupted")) {
-    return classification("corrupted-cache-record", "repairable", "Persistent cache has corrupt records.", "Run /browser replay cache repair, then retry explicitly.");
+    return classification("corrupted-cache-record", "repairable", "Persistent cache has corrupt records.", "Preserve the cache and stop writers before restoring a known-good log or selecting a new empty cache root.");
   }
   if (plan.cacheIntegrityStatus === "unsafe") {
-    return classification("unsafe-evidence", "blocked", "Persistent cache contains unsafe records.", "Delete or repair the explicit cache before relying on replay.");
+    return classification("unsafe-evidence", "blocked", "Persistent cache contains unsafe records.", "Preserve the cache and use a known-good log or a new empty cache root before replay.");
   }
   if (plan.cacheRecordStatus === "deleted" || plan.cacheRecordStatus === "invalidated") {
     return classification("invalidated-or-deleted-receipt", "blocked", "The cached receipt was invalidated or deleted.", "Run a new explicit local/test browser execution.");

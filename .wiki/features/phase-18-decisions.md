@@ -195,7 +195,7 @@ W6-23已把侧栏重复编号改为OBS-11/OBS-12；本表按更正后的24个唯
 | **25** | **`THM-03` 的剩余两半**（`auto` + 扩充令牌/主题数） | 13 册原`PARTIAL`，现`FIXED` | 已完成：auto跟随终端报告；32→48个有实际消费者的令牌；2→4套预设。原数字规模对齐已按本节末实施裁决修正，详见§8.4与W7-25记录 | 原主题owner与两个新增预设 |
 | **26** | `SES-08`：session 四域逐模块行为审计 | 13 册 `SES-08` + 12 册 §10 | `session/continuation`(16) / `recovery`(11) / `replay`(5) / `export`(4) = **36 个非测试模块**的**行为**正确性（往返、边界、损坏输入降级）。**前置研究 §7.3 只做了可达性**（16/16、10/11、4/5、4/4 可达；两个不可达 `types.ts` 是契约） | 36 模块 |
 | **27** | `PRV-06`：四端点逐字段形状表 + 流边界矩阵（含 Bedrock 单次路径） | 13 册 `PRV-06` | (a) 四端点**逐字段**请求形状与参考的对照表；(b) 流解析**完整边界矩阵**（SSE 注释、`\r\n` 边界、无终止帧）；(c) 用量记账跨模型/跨 resume；(d) 超时与取消的**逐路径**覆盖（`provider/request/fetch.ts` 是否被所有路径使用） | 4 协议 |
-| **28** | `BRW-06`：`receipt/**` 的保证强度 | 13 册 `BRW-06` | 9 个模块 / 1,447 行的**保证强度逐项核验**（`retention.ts` 的预算先扣 tombstone、`lock.ts:140-160` 的 `expiresAt`/`ownerId` 陈旧判定是本仓**正确实现**；但整族未逐项验） | 9 模块 |
+| **28** | `BRW-06`：`receipt/**` 的保证强度 | 13 册 `BRW-06` | 已完成：九模块逐项核验并修复权限、无副作用查询、锁、完整日志隔离、嵌套准入及结果投影；原过期锁“正确实现”判断已推翻，保证边界见本项实施记录 | 9 模块 |
 | **29** | `memory/**`(36) + `context/**`(28) **逐模块**审计 | 13 册 §13.2 / §16.4 | 前置研究已覆盖 `CTX-02/06/07/08/09`（含 3 条 P1）；**其余模块的逐模块行为**未做 | 64 模块 |
 | **30** | 子代理递归深度与**工具继承** | 13 册 §13.2 / §16.4 | 已完成：单层递归和工具交集已核验；修复权限、正文、模型schema、执行工作区与worktree生命周期。清理仅保证保留检查时可见改动，要求写入方已停止；后台并发写入限制见本项实施记录 | 原runner、工具门与worktree owner |
 | **31** | `core/shell`(37) 完整审计 | 13 册 §13.2 | 13 册 §13.2 明确记「`core/shell` 仍部分未覆盖」（补做轮只覆盖了内核循环）。**37 个非测试模块** | 37 模块 |
@@ -576,6 +576,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W7-30 / W8-34 / SUB-01 | 最窄权限、单层递归、工具清单、任务正文、执行上下文及worktree生命周期已闭合；清理须停止写入方 | 已完成，本地验证通过；并发后台写入为明确限制 |
 | W8-40 / TOL-10（随W7-30） | 失败原因及部分答复保留；工具阶段取消和空答复按失败结算；适配器向父模型传递error | 已完成，定向验证通过；旧result-contract脚本仍失败 |
 | W7-32 | read每次返回正文；startup结构/身份/有界读写、freshness与命令投影已修复；保留默认禁用 | 已完成，定向验证与隔离验收通过 |
+| W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1319,3 +1320,33 @@ freshness表：没有当前来源签名为unknown；签名不等或TTL过期为s
 隔离编译运行时经实际slashRouter与文件store验证rebuild回读、无来源unknown、损坏blocked、修复、侧栏项目绑定和默认禁用；未使用真实provider。常规/全屏PTY验证/warmup status为disabled、rebuild为blocked，退出0。首轮PTY误以为regular长输出不打开阅读器，第二条命令进入阅读器过滤；改为关闭阅读器后两模式均通过，这是验收交互设置错误。
 前一read提交33118b2b的CI 37014985304与Architecture Watch 37014985560均通过。W7-32完成，继续W7-28 receipt保证强度审计。
 静态门禁全部通过：1395文件零环，配置39/39、hooks18/18、工厂10/10、Node floor和docs strict；文档120项、可达性7项与函数上限7项advisory无新增。旧result-contract脚本仍待后续session/shell审计处理。
+
+### W7-28 receipt保证审计实施裁决
+
+审计推翻原“expiresAt/ownerId陈旧判定正确”的表述：超时只能观察，不能证明旧owner停止。采用独占创建、无自动抢占、唯一token、文件身份复核及幂等释放；只保证稳定本地目录中合作写入方的互斥，不声称抵抗外部替换的fencing。遗留锁须停止所有写入方后人工处理。
+
+读取在权限门后执行，缺失/拒绝/不可读/损坏保持区分；状态不创建目录。未知版本或任一不可解释的行可能包含tombstone，因此整份日志逻辑隔离：保留原字节、拒绝回放及重写式维护，不将“过滤坏行”称为修复成功。默认缓存仍关闭。list与compact共用保留策略，tombstone优先于预算，内存回放也遵守持久化失效记录。
+
+只读对照既有配置存储实现的三个决定：不可信项目在读取前短路；错误独立于空数据保存；只在实际写入时创建目录。本仓均采纳并用反转回归验证。对照锁封装后保留本地同步接口，但不复制忙等重试，也不以定时心跳替代互斥证明。compaction只生成计划，所有提交归入receipt写入owner；临时文件独占创建、同目录rename，清理状态单独报告，不声称fsync崩溃持久性。
+
+| 原owner | 核验结论与修复 | 证据边界 |
+|---|---|---|
+| manifest | 工厂校验并冻结快照，read门先于I/O；文件16KiB，预算1–1000 | 畸形warnings、越权、后续原对象修改不扩权 |
+| integrity | 同一次恢复观察投影，缺失/拒绝/不可读不混同；未知版本为阻断 | unavailable及未知版本测试，无二次文件扫描 |
+| retention | tombstone先扣预算，超过预算仍保留；list与compact共用 | 两个tombstone在预算1仍可观察；别名回放被阻断 |
+| lock | wx与唯一token、文件身份检查、幂等释放；过期不转移owner | 四进程过期锁竞争全部拒绝；外部替换只能检测，非fencing |
+| recovery | 8MiB常规文件、单条256KiB、UTF-8；损坏保留；唯一临时文件替换并读回 | 目录/软链/超限、换行缺失、rename和读回故障 |
+| store | 读观察与mutation owner分离；所有重写需read及对应操作权限 | 锁内读，失败无成功升级；write与cleanup分别投影 |
+| compaction | 纯计划；不确定日志拒绝改写；完整日志保留失效语义 | 五种mutation均不能抹掉损坏行；repair无自动过滤恢复 |
+| health | 无目录创建；记录、完整性共享一份观察；writable仅目录访问观察 | status只调用一次health；不是未来写入承诺 |
+| surface | 真实outcome、失效别名、清理失败及自修复unchanged可见 | 实际slash路由与隔离文件store验收，无真实provider/browser |
+
+准入新owner `receipt/validation.ts` 复用现有entry构造器校验派生关系，不建立第二套重放器；结构准入不证明文件作者身份。
+read/list/get契约新增blocked与missing区分，返回记录必须来自完整日志。原无锁effectful compact/repair导出已移除，调用者统一经store。
+独立复核额外发现并修复日期注释夹带敏感内容、缓存别名绕过tombstone、自修复把unchanged升级applied三处问题。
+初轮测试7失败/2通过；生命周期补测12失败/2通过。旧“覆盖陈旧锁/滤除坏行”断言按已修订契约收紧为拒绝并核对原字节。
+扩展外部runner首轮因隔离TMPDIR没有现有策略要求的`/tmp/`路径段而被拒；只调整测试目录到仓内`.tmp/tmp/receipt-tests`，未改执行策略，随后五套31项通过。
+
+W7-28最终验证：`npm run test -w packages/ts-shell -- src/browser/receipt src/browser/replayCommandRunner.test.ts src/browser/replayPlanner.test.ts src/browser/replayPolicy.test.ts src/browser/executionCommandRunner.test.ts src/test-utils/browser/cache src/test-utils/browser/replay/persistent.test.ts src/test-utils/browser/healing/apply.test.ts` 在仓内隔离TMPDIR运行，18套137项通过（exit 0）。构建、import-cycles（1403文件零循环）、config39/39、hooks18/18、factory10/10、Node floor、docs严格门通过；旧docs120/reachability7/function-ceiling7提示不变。
+双线复核APPROVE/CLEAR；架构线独立15套121项通过，代码线内存故障探针通过。原15个产品文件回退后26失败/4通过，全部逐字节恢复。隔离编译产物实际slash路由/文件store验收与四子进程过期owner互斥通过；未跑真实provider或浏览器。
+`verify:result-contract`仍exit 1：两处旧测试路径不存在，print/replay旧标记失配；已知脚本债务留到W7-26/31，不记为通过。W7-28完成，下一项W7-26。

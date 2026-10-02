@@ -34,7 +34,7 @@ describe("browser receipt cache lock", () => {
     expect(readBrowserReceiptCacheLock(root).status).toBe("missing");
   });
 
-  it("blocks busy locks and replaces stale locks deterministically", () => {
+  it("blocks both busy and stale locks without takeover", () => {
     const active = acquireBrowserReceiptCacheLock({
       cacheRoot: root,
       operation: "compact",
@@ -70,7 +70,7 @@ describe("browser receipt cache lock", () => {
       lockId: "replacement",
       now: () => "2026-05-17T00:00:02.000Z",
     });
-    expect(replaced.status).toBe("acquired");
-    expect(replaced.evidence).toContain("browser-receipt-cache-lock:acquired-after-stale");
+    expect(replaced.status).toBe("expired");
+    expect(replaced.evidence).toContain("browser-receipt-cache-lock:expired");
   });
 });

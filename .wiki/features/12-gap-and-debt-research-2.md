@@ -439,6 +439,10 @@ lock file still present: true
 `expiresAt`/`ownerId`，读时判定 `stale`/`active`，并显式报告
 `browser-receipt-cache-lock:stale` 警告。**同类问题在同仓已有先例**，会话锁只是没采用。
 
+**后续纠正（Phase 18 W7-28）**：上述receipt锁“正确实现”仅为早期阅读判断，
+行为审计证实过期锁覆盖不具互斥保障，已改为不自动抢占。超龄或进程标识不是fencing；
+下面是历史建议，不作为当前锁保证。具体保证与恢复边界见Phase 18的W7-28裁决。
+
 **修复方向**（16-G）：会话锁带上 `pid` + `startedAt`，读时判定
 （`kill(pid,0)` 探活 + 超龄阈值）→ 陈旧则记录警告并夺取，而不是干等；
 或改用 `flock`/`proper-lockfile` 式的内核锁（进程退出即释放）。

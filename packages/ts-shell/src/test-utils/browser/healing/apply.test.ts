@@ -31,7 +31,7 @@ describe("browser self-healing apply scenario examples", () => {
     }
   });
 
-  it("applies cache repair with explicit cache context", async () => {
+  it("preserves uncertain cache bytes during explicit repair", async () => {
     const root = tempRoot();
     fs.writeFileSync(path.join(root, "browser-receipt-cache.jsonl"), "not-json\n", "utf8");
     const store = createBrowserReceiptCacheStore({
@@ -43,12 +43,23 @@ describe("browser self-healing apply scenario examples", () => {
       confirm: true,
     });
 
-    expect(result.output).toContain("Outcome: applied");
+    expect(result.output).toContain("Outcome: blocked");
     expect(result.output).toContain("Target: cache");
-    expect(result.output).toContain("Metadata/cache changed: yes");
+    expect(result.output).toContain("Metadata/cache changed: no");
     expect(result.output).toContain("Browser executed: no");
     expect(result.output).toContain("Replay executed: no");
-    expect(fs.readFileSync(path.join(root, "browser-receipt-cache.jsonl"), "utf8")).not.toContain("not-json");
+    expect(fs.readFileSync(path.join(root, "browser-receipt-cache.jsonl"), "utf8")).toBe("not-json\n");
+  });
+
+  it("reports an empty cache repair as unchanged without creating data", async () => {
+    const root = tempRoot();
+    const store = createBrowserReceiptCacheStore({ manifest: createBrowserReceiptCacheManifest({ cacheRoot: root }) });
+    const result = await runRepairApply({ proposalId: proposalId("missing-cache-entry"), receiptCacheStore: store, confirm: true });
+    expect(result.output).toContain("Outcome: unchanged");
+    expect(result.output).toContain("Applied: no");
+    expect(result.output).toContain("Metadata/cache changed: no");
+    expect(result.output).toContain("Cache lock cleanup: released");
+    expect(fs.readdirSync(root)).toEqual([]);
   });
 
   it("missing runner proposal blocks without manifest context", async () => {

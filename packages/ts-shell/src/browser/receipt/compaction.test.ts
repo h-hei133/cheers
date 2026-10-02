@@ -3,7 +3,6 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { safeReceipt } from "../actionCacheEntry.test.js";
-import { compactBrowserReceiptCache, repairBrowserReceiptCache } from "./compaction.js";
 import { createBrowserPersistentReceiptCacheRecord, createBrowserPersistentReceiptCacheTombstone } from "../persistentReceiptCache.js";
 import { createBrowserReceiptCacheManifest } from "./manifest.js";
 import { createBrowserReceiptCacheStore } from "./store.js";
@@ -19,7 +18,7 @@ describe("browser receipt cache compaction and repair", () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it("removes duplicates, skips corrupt records, and preserves tombstone semantics", () => {
+  it("removes duplicates and preserves tombstone semantics in a valid log", () => {
     const manifest = createBrowserReceiptCacheManifest({ cacheRoot: root, maxRecords: 2 });
     const receipt = safeReceipt();
     const record = createBrowserPersistentReceiptCacheRecord({
@@ -40,25 +39,24 @@ describe("browser receipt cache compaction and repair", () => {
     });
     fs.writeFileSync(
       path.join(root, "browser-receipt-cache.jsonl"),
-      `${JSON.stringify(record.record)}\nnot-json\n${JSON.stringify(record.record)}\n${JSON.stringify(tombstone)}\n`,
+      `${JSON.stringify(record.record)}\n${JSON.stringify(record.record)}\n${JSON.stringify(tombstone)}\n`,
       "utf8",
     );
 
-    const report = compactBrowserReceiptCache({
-      manifest,
-      now: () => "2026-05-17T00:00:03.000Z",
-    });
+    const result = createBrowserReceiptCacheStore({ manifest }).compact();
+    expect(result.outcome).toBe("written");
+    const report = result.report!;
     const compacted = fs.readFileSync(path.join(root, "browser-receipt-cache.jsonl"), "utf8");
     const store = createBrowserReceiptCacheStore({ manifest });
 
-    expect(report.recordsBefore).toBe(4);
+    expect(report.recordsBefore).toBe(3);
     expect(report.recordsAfter).toBe(1);
     expect(report.tombstonesKept).toBe(1);
     expect(compacted).not.toContain("not-json");
-    expect(store.get(receipt.receiptId)).toBeUndefined();
+    expect(store.get(receipt.receiptId).status).toBe("missing");
   });
 
-  it("repair removes corrupt and unsafe lines without compacting valid duplicates", () => {
+  it("repair preserves a damaged log because a lost tombstone cannot be inferred", () => {
     const manifest = createBrowserReceiptCacheManifest({ cacheRoot: root });
     const record = createBrowserPersistentReceiptCacheRecord({
       receipt: safeReceipt(),
@@ -75,14 +73,13 @@ describe("browser receipt cache compaction and repair", () => {
       "utf8",
     );
 
-    const report = repairBrowserReceiptCache({
-      manifest,
-      now: () => "2026-05-17T00:00:03.000Z",
-    });
+    const before = fs.readFileSync(path.join(root, "browser-receipt-cache.jsonl"), "utf8");
+    const result = createBrowserReceiptCacheStore({ manifest }).repair();
     const repaired = fs.readFileSync(path.join(root, "browser-receipt-cache.jsonl"), "utf8");
 
-    expect(report.recordsBefore).toBe(3);
-    expect(report.recordsAfter).toBe(2);
-    expect(repaired).not.toContain("RAW_SECRET");
+    expect(result.outcome).toBe("blocked");
+    expect(result.changed).toBe(false);
+    expect(repaired).toBe(before);
+    expect(JSON.stringify(result)).not.toContain("RAW_SECRET");
   });
 });

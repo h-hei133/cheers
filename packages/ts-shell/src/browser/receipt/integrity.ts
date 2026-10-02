@@ -1,11 +1,10 @@
-import fs from "node:fs";
 import {
   type BrowserPersistentReceiptCacheRecord,
 } from "../persistentReceiptCache.js";
 import type { BrowserReceiptCacheManifest } from "./manifest.js";
 import {
-  browserReceiptCacheFilePath,
   readBrowserReceiptCacheRecordsForRecovery,
+  type BrowserReceiptCacheRecoveryResult,
 } from "./recovery.js";
 
 export type BrowserReceiptCacheIntegrityStatus =
@@ -13,6 +12,7 @@ export type BrowserReceiptCacheIntegrityStatus =
   | "warning"
   | "corrupted"
   | "unsafe"
+  | "unavailable"
   | "empty";
 
 export interface BrowserReceiptCacheIntegrityReport {
@@ -41,14 +41,22 @@ export function scanBrowserReceiptCacheIntegrity(input: {
   readonly manifest: BrowserReceiptCacheManifest;
 }): BrowserReceiptCacheIntegrityReport {
   const recovery = readBrowserReceiptCacheRecordsForRecovery({ manifest: input.manifest });
+  return projectBrowserReceiptCacheIntegrity(input.manifest, recovery);
+}
+
+export function projectBrowserReceiptCacheIntegrity(
+  manifest: BrowserReceiptCacheManifest,
+  recovery: BrowserReceiptCacheRecoveryResult,
+): BrowserReceiptCacheIntegrityReport {
   const duplicateActiveCount = countDuplicateActiveRecords(recovery.records);
   const active = recovery.records.filter((record) => record.status === "active");
   const invalidated = recovery.records.filter((record) => record.status === "invalidated");
   const deleted = recovery.records.filter((record) => record.status === "deleted");
   const staleReplayReadinessCount = active.filter((record) => record.replayReadinessStatus !== "replay-ready").length;
-  const overBudgetCount = Math.max(0, recovery.records.length - input.manifest.maxRecords);
+  const overBudgetCount = Math.max(0, recovery.records.length - manifest.maxRecords);
   const redactionViolationCount = recovery.unsafeRecordCount;
-  const integrityStatus = determineStatus({
+  const unavailable = recovery.status === "denied" || recovery.status === "unavailable";
+  const integrityStatus = unavailable ? "unavailable" : determineStatus({
     lineCount: recovery.lineCount,
     unsafeCount: recovery.unsafeRecordCount,
     corruptCount: recovery.invalidJsonCount + recovery.invalidRecordCount,
@@ -62,6 +70,8 @@ export function scanBrowserReceiptCacheIntegrity(input: {
     ...(recovery.unknownVersionCount > 0 ? ["browser-receipt-cache-integrity:unknown-version"] : []),
   ];
   const blockers = [
+    ...(unavailable ? [`browser-receipt-cache-integrity:${recovery.status}`] : []),
+    ...(recovery.unknownVersionCount > 0 ? ["browser-receipt-cache-integrity:unknown-version"] : []),
     ...(recovery.unsafeRecordCount > 0 ? ["browser-receipt-cache-integrity:unsafe-records"] : []),
     ...(recovery.invalidJsonCount + recovery.invalidRecordCount > 0 ? ["browser-receipt-cache-integrity:corrupted-records"] : []),
   ];
@@ -86,9 +96,7 @@ export function scanBrowserReceiptCacheIntegrity(input: {
     nextAction: nextAction(integrityStatus, duplicateActiveCount, overBudgetCount),
     evidence: [
       ...recovery.evidence,
-      fs.existsSync(browserReceiptCacheFilePath(input.manifest.cacheRoot))
-        ? "browser-receipt-cache-integrity:scanned"
-        : "browser-receipt-cache-integrity:empty",
+      `browser-receipt-cache-integrity:${recovery.status === "read" ? "scanned" : recovery.status}`,
       "browser-receipt-cache-integrity:no-raw-content",
     ],
   };
@@ -135,8 +143,9 @@ function nextAction(
     return "Run an explicit replay-ready browser execution before relying on persistent cache.";
   }
   if (status === "unsafe" || status === "corrupted") {
-    return "Run /browser replay cache repair or delete the explicit cache root after review.";
+    return "Preserve the cache and stop writers before restoring a known-good log or selecting a new empty cache root.";
   }
+  if (status === "unavailable") return "Check read permission and the explicit cache file before replaying.";
   if (duplicateActiveCount > 0 || overBudgetCount > 0) {
     return "Run /browser replay cache compact to remove superseded sanitized records.";
   }

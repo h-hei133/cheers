@@ -204,7 +204,9 @@ export async function runBrowserExecutionCommand(input: {
         ? [
             "",
             "Browser receipt cache",
-            `- Cache write: ${persistentCacheResult?.written ? "yes" : "no"}`,
+            `- Cache write: ${persistentCacheResult?.outcome ?? "not-run"}`,
+            `- Lock cleanup: ${persistentCacheResult?.cleanup ?? "not-acquired"}`,
+            `- Blockers/warnings: ${[...(persistentCacheResult?.blockers ?? []), ...(persistentCacheResult?.warnings ?? [])].join("; ") || "none"}`,
             `- Cache status: ${persistentCacheResult?.record?.status ?? result.receipt.replayReadiness.status}`,
             `- Receipt id: ${persistentCacheResult?.record?.receiptId ?? result.receipt.receiptId}`,
             "- Persistence: explicit only",

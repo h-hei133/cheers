@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { browserActionCacheEntryHasForbiddenContent } from "../actionCacheEntry.js";
 import {
@@ -6,8 +7,12 @@ import {
   type BrowserPersistentReceiptCacheRecord,
 } from "../persistentReceiptCache.js";
 import type { BrowserReceiptCacheManifest } from "./manifest.js";
+import { readReceiptFile } from "./io.js";
+
+export const MAX_RECEIPT_CACHE_BYTES = 8 * 1024 * 1024;
 
 export interface BrowserReceiptCacheRecoveryResult {
+  readonly status: "read" | "missing" | "denied" | "unavailable";
   readonly records: readonly BrowserPersistentReceiptCacheRecord[];
   readonly lineCount: number;
   readonly invalidJsonCount: number;
@@ -26,9 +31,12 @@ export function browserReceiptCacheFilePath(cacheRoot: string): string {
 export function readBrowserReceiptCacheRecordsForRecovery(input: {
   readonly manifest: BrowserReceiptCacheManifest;
 }): BrowserReceiptCacheRecoveryResult {
-  const filePath = browserReceiptCacheFilePath(input.manifest.cacheRoot);
-  if (!fs.existsSync(filePath)) {
+  const file = input.manifest.allowedOperations.includes("read")
+    ? readReceiptFile(browserReceiptCacheFilePath(input.manifest.cacheRoot), MAX_RECEIPT_CACHE_BYTES)
+    : { status: "denied" as const };
+  if (file.status !== "read") {
     return {
+      status: file.status,
       records: [],
       lineCount: 0,
       invalidJsonCount: 0,
@@ -36,8 +44,8 @@ export function readBrowserReceiptCacheRecordsForRecovery(input: {
       unsafeRecordCount: 0,
       unknownVersionCount: 0,
       skippedCount: 0,
-      evidence: ["browser-receipt-cache-recovery:empty"],
-      warnings: [],
+      evidence: [`browser-receipt-cache-recovery:${file.status}`],
+      warnings: file.status === "missing" ? [] : [`browser-receipt-cache-recovery:${file.status}`],
     };
   }
   const records: BrowserPersistentReceiptCacheRecord[] = [];
@@ -45,11 +53,17 @@ export function readBrowserReceiptCacheRecordsForRecovery(input: {
   let invalidRecordCount = 0;
   let unsafeRecordCount = 0;
   let unknownVersionCount = 0;
-  const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/).filter(Boolean);
+  const lines = file.content.split(/\r?\n/).filter(Boolean);
   for (const line of lines) {
+    if (Buffer.byteLength(line) > 262_144) {
+      invalidRecordCount += 1;
+      continue;
+    }
     let value: unknown;
     try {
       value = JSON.parse(line);
+      // Deeply nested JSON can parse successfully but overflow serialization.
+      JSON.stringify(value);
     } catch {
       invalidJsonCount += 1;
       continue;
@@ -76,6 +90,7 @@ export function readBrowserReceiptCacheRecordsForRecovery(input: {
   }
   const skippedCount = invalidJsonCount + invalidRecordCount + unsafeRecordCount + unknownVersionCount;
   return {
+    status: "read",
     records,
     lineCount: lines.length,
     invalidJsonCount,
@@ -85,7 +100,7 @@ export function readBrowserReceiptCacheRecordsForRecovery(input: {
     skippedCount,
     evidence: [
       "browser-receipt-cache-recovery:read",
-      "browser-receipt-cache-recovery:safe-skips",
+      "browser-receipt-cache-recovery:bounded-read",
     ],
     warnings: skippedCount > 0 ? ["browser-receipt-cache-recovery:records-skipped"] : [],
   };
@@ -102,16 +117,36 @@ export function serializeBrowserReceiptCacheRecords(
 export function writeBrowserReceiptCacheFileAtomic(input: {
   readonly cacheRoot: string;
   readonly content: string;
-  readonly now?: () => string;
-  readonly suffix?: string;
-}): void {
-  fs.mkdirSync(input.cacheRoot, { recursive: true });
+  readonly ownsLock: () => boolean;
+}): { readonly outcome: "written" | "blocked" | "unverified"; readonly warnings: readonly string[] } {
+  if (Buffer.byteLength(input.content) > MAX_RECEIPT_CACHE_BYTES) {
+    return { outcome: "blocked", warnings: ["browser-receipt-cache-store:byte-budget-exceeded"] };
+  }
   const target = browserReceiptCacheFilePath(input.cacheRoot);
-  const safeNow = (input.now?.() ?? new Date().toISOString()).replace(/[^0-9A-Za-z]/g, "");
-  const temp = path.join(
-    input.cacheRoot,
-    `.browser-receipt-cache.${input.suffix ?? "write"}.${process.pid}.${safeNow}.tmp`,
-  );
-  fs.writeFileSync(temp, input.content, "utf8");
-  fs.renameSync(temp, target);
+  const temp = path.join(input.cacheRoot, `.browser-receipt-cache.${randomUUID()}.tmp`);
+  let ownedTemp = false;
+  let attemptedRename = false;
+  let outcome: "written" | "blocked" | "unverified" = "blocked";
+  const warnings: string[] = [];
+  try {
+    const fd = fs.openSync(temp, "wx", 0o600);
+    ownedTemp = true;
+    try { fs.writeFileSync(fd, input.content, "utf8"); } finally { fs.closeSync(fd); }
+    if (!input.ownsLock()) throw new Error("Lock ownership unavailable.");
+    attemptedRename = true;
+    fs.renameSync(temp, target);
+    ownedTemp = false;
+    const readback = readReceiptFile(target, MAX_RECEIPT_CACHE_BYTES);
+    outcome = readback.status === "read" && readback.content === input.content ? "written" : "unverified";
+  } catch {
+    outcome = attemptedRename ? "unverified" : "blocked";
+  } finally {
+    if (ownedTemp) {
+      try { fs.unlinkSync(temp); } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") warnings.push("browser-receipt-cache-store:temporary-cleanup-unverified");
+      }
+    }
+  }
+  if (outcome !== "written") warnings.push(`browser-receipt-cache-store:write-${outcome}`);
+  return { outcome, warnings };
 }

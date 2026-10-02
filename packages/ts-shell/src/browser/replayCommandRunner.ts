@@ -44,6 +44,7 @@ export async function runBrowserReplayCommand(input: {
       actionKind: entry.actionKind,
       replayStatus: entry.replayReadinessSnapshot.status,
     })) ?? [];
+    const health = inspectBrowserReceiptCacheHealth(input.receiptCacheStore);
     return {
       output: [
         renderBrowserReplayStatusSurface({
@@ -54,12 +55,12 @@ export async function runBrowserReplayCommand(input: {
         "",
         renderBrowserReceiptCacheSurface({
           manifest: input.receiptCacheStore?.manifest,
-          health: inspectBrowserReceiptCacheHealth(input.receiptCacheStore),
+          health,
         }),
       ].join("\n"),
       evidence: [
         ...summary.evidence,
-        ...inspectBrowserReceiptCacheHealth(input.receiptCacheStore).evidence,
+        ...health.evidence,
         "browser-replay-command-runner:status",
         "browser-replay-command-runner:no-automatic-replay",
       ],
@@ -73,9 +74,11 @@ export async function runBrowserReplayCommand(input: {
       output: [
         "Browser replay",
         "Result",
-        `- Outcome: ${mutation?.changed ? input.request.mode.replace("cache-", "") : "blocked"}`,
+        `- Outcome: ${mutation?.outcome === "written" ? input.request.mode.replace("cache-", "") : mutation?.outcome ?? "blocked"}`,
         `- Receipt id: ${input.request.receiptId ?? "none"}`,
         `- Cache status: ${mutation?.record?.status ?? "missing"}`,
+        `- Lock cleanup: ${mutation?.cleanup ?? "not-acquired"}`,
+        `- Blockers/warnings: ${[...(mutation?.blockers ?? ["No explicit receipt cache is configured."]), ...(mutation?.warnings ?? [])].join("; ") || "none"}`,
         "- Persistence: explicit only",
         "- Raw evidence stored: no",
         "- Automatic replay: no",
@@ -96,15 +99,16 @@ export async function runBrowserReplayCommand(input: {
       output: [
         "Browser replay",
         "Result",
-        `- Outcome: ${maintenance?.blockers.length ? "blocked" : action}`,
+        `- Outcome: ${maintenance?.outcome === "written" ? action : maintenance?.outcome ?? "blocked"}`,
         `- Cache action: ${action}`,
+        `- Lock cleanup: ${maintenance?.cleanup ?? "not-acquired"}`,
         `- Records before/after: ${maintenance?.report ? `${maintenance.report.recordsBefore}/${maintenance.report.recordsAfter}` : "none"}`,
-        `- Records removed: ${maintenance?.report?.recordsRemoved ?? 0}`,
-        `- Tombstones kept: ${maintenance?.report?.tombstonesKept ?? 0}`,
+        `- Records removed: ${maintenance?.report?.recordsRemoved ?? "not-confirmed"}`,
+        `- Tombstones kept: ${maintenance?.report?.tombstonesKept ?? "not-confirmed"}`,
         "- Persistence: explicit only",
         "- Raw evidence stored: no",
         "- Automatic replay: no",
-        `- Blockers/warnings: ${[...(maintenance?.blockers ?? []), ...(maintenance?.warnings ?? [])].join("; ") || "none"}`,
+        `- Blockers/warnings: ${[...(maintenance?.blockers ?? ["No explicit receipt cache is configured."]), ...(maintenance?.warnings ?? [])].join("; ") || "none"}`,
         `- Next action: ${maintenance?.report?.nextAction ?? "Provide an explicit writable receipt cache."}`,
       ].join("\n"),
       evidence: [
@@ -114,13 +118,10 @@ export async function runBrowserReplayCommand(input: {
     };
   }
   const memoryEntry = input.request.receiptId && input.actionCache?.get(input.request.receiptId);
-  const persistentRecord = !memoryEntry && input.request.receiptId
-    ? input.receiptCacheStore?.get(input.request.receiptId)
-    : undefined;
-  const persistentListRecord = !persistentRecord && input.request.receiptId
-    ? input.receiptCacheStore?.list().records.find((record) => record.receiptId === input.request.receiptId)
-    : persistentRecord;
-  const cacheHealth = inspectBrowserReceiptCacheHealth(input.receiptCacheStore);
+  const sourceReceiptId = memoryEntry ? memoryEntry.sourceReceiptId : input.request.receiptId;
+  const persistentList = input.request.receiptId ? input.receiptCacheStore?.list() : undefined;
+  const persistentListRecord = persistentList?.records.find((record) => record.receiptId === sourceReceiptId);
+  const persistentRecord = persistentListRecord?.status === "active" ? persistentListRecord : undefined;
   const entry = (memoryEntry || undefined) ?? persistentRecord?.cacheEntry;
   const sourceReceipt = entry
     ? input.actionCache?.getReceipt(entry.sourceReceiptId) ?? persistentRecord?.receipt
@@ -134,7 +135,8 @@ export async function runBrowserReplayCommand(input: {
     allowlistConfirmed: Boolean(input.networkAllowlist),
     confirmationRecorded: Boolean(input.confirmations?.some((confirmation) => confirmation.status === "confirmed")),
     cacheRecordStatus: persistentListRecord?.status,
-    cacheIntegrityStatus: cacheHealth.integrityStatus,
+    cacheIntegrityStatus: persistentList?.integrity.integrityStatus,
+    cacheBlockers: persistentList?.blockers,
     skillMetadataAvailable: Boolean(input.cliExecutionBridgeSummary?.skillRunnerMetadata),
   });
   const execution = await executeBrowserReplay({
@@ -159,8 +161,10 @@ export async function runBrowserReplayCommand(input: {
             "",
             "Browser receipt cache",
             `- Cache source: ${persistentRecord ? "persistent" : "memory"}`,
-            `- Cache write: ${persistentReplayWrite?.written ? "yes" : "no"}`,
-            `- Cache status: ${persistentRecord?.status ?? "none"}`,
+            `- Cache write: ${persistentReplayWrite?.outcome ?? "not-run"}`,
+            `- Lock cleanup: ${persistentReplayWrite?.cleanup ?? "not-acquired"}`,
+            `- Cache status: ${persistentList?.status === "blocked" ? "blocked" : persistentListRecord?.status ?? "none"}`,
+            `- Blockers/warnings: ${[...(persistentList?.blockers ?? []), ...(persistentReplayWrite?.warnings ?? []), ...(persistentReplayWrite?.reason ? [persistentReplayWrite.reason] : [])].join("; ") || "none"}`,
             "- Persistence: explicit only",
             "- Raw evidence stored: no",
           ]
@@ -171,6 +175,7 @@ export async function runBrowserReplayCommand(input: {
       ...execution.evidence,
       ...(persistentRecord ? ["browser-replay-command-runner:persistent-cache-read"] : []),
       ...(persistentReplayWrite?.evidence ?? []),
+      ...(persistentList?.evidence ?? []),
       "browser-replay-command-runner:explicit-replay",
       "browser-replay-command-runner:no-default-persistence",
     ],

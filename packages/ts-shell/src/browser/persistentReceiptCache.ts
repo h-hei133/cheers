@@ -1,3 +1,5 @@
+import { isRecord } from "../core/values/record.js";
+import { date, text, stringList, onlyKeys, oneOf, validReceiptPair } from "./receipt/validation.js";
 import {
   browserActionCacheEntryHasForbiddenContent,
   createBrowserActionCacheEntryFromReceipt,
@@ -83,7 +85,7 @@ export function createBrowserPersistentReceiptCacheRecord(input: {
     providerCall: "none",
     modelCall: "none",
   };
-  if (browserActionCacheEntryHasForbiddenContent(JSON.stringify(record))) {
+  if (!parseBrowserPersistentReceiptCacheRecord(record)) {
     return blocked("Persistent browser cache record contains unsafe content.", ["browser-persistent-cache:redacted"]);
   }
   return {
@@ -105,7 +107,7 @@ export function createBrowserPersistentReceiptCacheTombstone(input: {
   readonly reason: string;
   readonly now: string;
 }): BrowserPersistentReceiptCacheRecord {
-  return {
+  const record: BrowserPersistentReceiptCacheRecord = {
     version: "browser-persistent-receipt-cache/v1",
     receiptId: input.receiptId,
     status: input.status,
@@ -122,31 +124,33 @@ export function createBrowserPersistentReceiptCacheTombstone(input: {
     providerCall: "none",
     modelCall: "none",
   };
+  if (!parseBrowserPersistentReceiptCacheRecord(record)) throw new Error("Cache tombstone is invalid or unsafe.");
+  return record;
 }
 
 export function parseBrowserPersistentReceiptCacheRecord(
   value: unknown,
 ): BrowserPersistentReceiptCacheRecord | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return undefined;
-  }
-  const record = value as Partial<BrowserPersistentReceiptCacheRecord>;
-  if (record.version !== "browser-persistent-receipt-cache/v1") {
-    return undefined;
-  }
-  if (!record.receiptId || typeof record.receiptId !== "string") {
-    return undefined;
-  }
-  if (!["active", "invalidated", "deleted"].includes(record.status ?? "")) {
-    return undefined;
-  }
-  if (browserActionCacheEntryHasForbiddenContent(JSON.stringify(record))) {
-    return undefined;
-  }
-  if (record.status === "active" && (!record.cacheEntry || !record.receipt)) {
-    return undefined;
-  }
-  return record as BrowserPersistentReceiptCacheRecord;
+  try {
+    const serialized = JSON.stringify(value);
+    if (!serialized || Buffer.byteLength(serialized) > 262_144 || browserActionCacheEntryHasForbiddenContent(serialized)) return undefined;
+    const record: unknown = JSON.parse(serialized);
+    if (!isRecord(record) || !onlyKeys(record, ["version", "receiptId", "status", "source", "cacheEntry", "receipt", "evidenceSummary", "replayReadinessStatus", "createdAt", "invalidatedAt", "deletedAt", "reason", "redactions", "warnings", "rawEvidenceStored", "providerCall", "modelCall"]) ||
+        record.version !== "browser-persistent-receipt-cache/v1" || !text(record.receiptId) || !record.receiptId.trim() ||
+        !oneOf(record.status, ["active", "invalidated", "deleted"]) || !oneOf(record.source, ["cli-harness", "explicit-local", "test-only"]) ||
+        !text(record.evidenceSummary) || !date(record.createdAt) || !stringList(record.redactions) || !stringList(record.warnings) ||
+        record.rawEvidenceStored !== "no" || record.providerCall !== "none" || record.modelCall !== "none") return undefined;
+    if (record.status === "active") {
+      if (!validReceiptPair(record.receipt, record.cacheEntry) || record.receiptId !== record.receipt.receiptId ||
+          record.replayReadinessStatus !== record.receipt.replayReadiness.status ||
+          record.invalidatedAt !== undefined || record.deletedAt !== undefined || record.reason !== undefined) return undefined;
+    } else {
+      if (record.receipt !== undefined || record.cacheEntry !== undefined || record.replayReadinessStatus !== "replay-blocked" || !text(record.reason)) return undefined;
+      if (record.status === "deleted" ? record.deletedAt !== record.createdAt || record.invalidatedAt !== undefined
+        : record.invalidatedAt !== record.createdAt || record.deletedAt !== undefined) return undefined;
+    }
+    return record as unknown as BrowserPersistentReceiptCacheRecord;
+  } catch { return undefined; }
 }
 
 function safeSummary(receipt: BrowserExecutionReceipt): string {

@@ -100,7 +100,7 @@ describe("browser cache multiprocess scenario examples", () => {
     expect(assertBrowserCacheStressSafe(result)).toEqual([]);
   }, 20000);
 
-  it("blocks compact under busy lock, recovers stale locks, and repairs corrupt unsafe lines", async () => {
+  it("blocks busy and stale locks while preserving uncertain log bytes", async () => {
     const fixture = track(createBrowserCacheMultiprocessFixture());
     const record = createBrowserPersistentReceiptCacheRecord({
       receipt: safeReceipt(),
@@ -137,6 +137,7 @@ describe("browser cache multiprocess scenario examples", () => {
     expect(busy.processes.find((process) => process.role === "compactor")?.process.output.combined).toContain("busy");
 
     fixture.writeStaleLock("repair");
+    const originalCache = cacheText(fixture);
     const repair = await runBrowserCacheMultiprocessScenario({
       scenario: {
         id: "route110-stale-lock-repair",
@@ -147,6 +148,7 @@ describe("browser cache multiprocess scenario examples", () => {
             id: "repair",
             role: "repairer",
             prompt: "/browser replay cache repair",
+            expectedBlocked: true,
           }),
           fixture.cliStep({
             id: "status",
@@ -157,12 +159,13 @@ describe("browser cache multiprocess scenario examples", () => {
       },
     });
 
-    expect(repair.status).toBe("passed");
-    expect(repair.integrity.status).not.toBe("unsafe");
-    expect(repair.integrity.status).not.toBe("corrupted");
-    expect(repair.integrity.skippedCount).toBe(0);
-    expect(cacheText(fixture)).not.toContain("RAW_SECRET");
-    expect(assertBrowserCacheStressSafe(repair)).toEqual([]);
+    expect(repair.processes[0]?.process.output.combined).toContain("Outcome: blocked");
+    expect(repair.processes[0]?.process.output.combined).toContain("Stop all writers");
+    expect(repair.integrity.status).toBe("unsafe");
+    expect(repair.integrity.skippedCount).toBe(2);
+    expect(cacheText(fixture)).toBe(originalCache);
+    expect(repair.assertions.rawLeakCount).toBe(0);
+    expect(assertBrowserCacheStressSafe(repair)).toEqual(["unsafe-cache-records"]);
   }, 20000);
 
   it("renders a concise report without raw child-process output", async () => {

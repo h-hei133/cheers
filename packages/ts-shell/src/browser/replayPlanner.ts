@@ -43,6 +43,7 @@ export function planBrowserReplay(input: {
   readonly cacheRecordStatus?: BrowserPersistentReceiptCacheRecordStatus;
   readonly cacheIntegrityStatus?: BrowserReceiptCacheIntegrityStatus;
   readonly skillMetadataAvailable?: boolean;
+  readonly cacheBlockers?: readonly string[];
 }): BrowserReplayPlan {
   const policy = decideBrowserReplayPolicy({
     entry: input.entry,
@@ -51,6 +52,11 @@ export function planBrowserReplay(input: {
     sandboxConfirmed: input.sandboxConfirmed,
     allowlistConfirmed: input.allowlistConfirmed,
     confirmationRecorded: input.confirmationRecorded,
+    cacheBlockers: [
+      ...(input.cacheBlockers ?? []),
+      ...(input.cacheRecordStatus === "deleted" || input.cacheRecordStatus === "invalidated" ? ["cache-record-inactive"] : []),
+      ...(["corrupted", "unsafe", "unavailable"].includes(input.cacheIntegrityStatus ?? "") ? ["cache-integrity-blocked"] : []),
+    ],
   });
   const entry = input.entry;
   const request = policy.allowed && entry ? requestFromEntry(entry) : undefined;

@@ -26,7 +26,7 @@ describe("browser persistent replay scenario examples", () => {
 
     expect(execute.output).toContain("Executed: yes");
     expect(execute.output).toContain("Browser receipt cache");
-    expect(execute.output).toContain("Cache write: yes");
+    expect(execute.output).toContain("Cache write: written");
     expect(fixture.readCacheFile()).toContain("browser-persistent-receipt-cache/v1");
     expect(fixture.readCacheFile()).not.toContain("RAW_");
     expect(fixture.readCacheFile()).not.toContain("sk-");
@@ -62,7 +62,7 @@ describe("browser persistent replay scenario examples", () => {
       env: fixture.persistentEnv,
     });
     const executeOutput = first.lines.join("\n");
-    expect(executeOutput).toContain("Cache write: yes");
+    expect(executeOutput).toContain("Cache write: written");
 
     const second = renderer();
     await buildCliCommandExecution({

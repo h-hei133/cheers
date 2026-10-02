@@ -1,4 +1,4 @@
-import type { BrowserReceiptCacheStore } from "./receipt/store.js";
+import type { BrowserReceiptCacheStore, BrowserReceiptCacheMaintenanceResult } from "./receipt/store.js";
 import type { BrowserSelfHealingApplyPlan } from "./selfHealingApplyPlan.js";
 import { writeBrowserSelfHealingManifestPatch, type BrowserSelfHealingManifestPatchWriteResult } from "./selfHealingManifestPatchWriter.js";
 import type { BrowserSelfHealingManifestPatchKind } from "./selfHealingManifestPatch.js";
@@ -11,9 +11,11 @@ export interface BrowserSelfHealingApplyResult {
   readonly applied: boolean;
   readonly browserActionExecuted: false;
   readonly replayExecuted: false;
-  readonly metadataCacheChanged: "yes" | "no";
+  readonly metadataCacheChanged: "yes" | "no" | "unverified";
   readonly changedSummary: string;
   readonly manifestPatch?: BrowserSelfHealingManifestPatchWriteResult;
+  readonly cacheOutcome?: BrowserReceiptCacheMaintenanceResult["outcome"];
+  readonly cacheCleanup?: BrowserReceiptCacheMaintenanceResult["cleanup"];
   readonly blockers: readonly string[];
   readonly warnings: readonly string[];
   readonly nextAction: string;
@@ -44,25 +46,29 @@ export function executeBrowserSelfHealingApply(input: {
       return result({
         plan,
         applied: false,
-        metadataCacheChanged: "no",
+        metadataCacheChanged: maintenance?.outcome === "unverified" ? "unverified" : "no",
         changedSummary: "none",
+        cacheOutcome: maintenance?.outcome ?? "blocked",
+        cacheCleanup: maintenance?.cleanup ?? "not-acquired",
         blockers: maintenance?.blockers ?? ["missing-explicit-cache-store"],
         warnings: maintenance?.warnings ?? [],
-        nextAction: "Provide an explicit writable receipt cache store, then retry apply.",
+        nextAction: "Inspect cache status; preserve uncertain logs and stop writers before recovery.",
         evidence: maintenance?.evidence ?? ["browser-self-healing-apply-executor:missing-cache-store"],
       });
     }
     return result({
       plan,
-      applied: true,
-      metadataCacheChanged: "yes",
+      applied: maintenance.outcome === "written",
+      metadataCacheChanged: maintenance.outcome === "written" ? "yes" : "no",
+      cacheOutcome: maintenance.outcome,
+      cacheCleanup: maintenance.cleanup,
       changedSummary: `cache repair records before/after=${maintenance.report?.recordsBefore ?? 0}/${maintenance.report?.recordsAfter ?? 0}`,
       blockers: [],
       warnings: maintenance.warnings,
       nextAction: "Run /browser replay <receipt-id> explicitly after reviewing cache status.",
       evidence: [
         ...maintenance.evidence,
-        "browser-self-healing-apply-executor:cache-repair-applied",
+        `browser-self-healing-apply-executor:cache-repair-${maintenance.outcome}`,
         "browser-self-healing-apply-executor:no-browser-execution",
         "browser-self-healing-apply-executor:no-automatic-replay",
       ],
@@ -119,9 +125,11 @@ export function executeBrowserSelfHealingApply(input: {
 function result(input: {
   readonly plan: BrowserSelfHealingApplyPlan;
   readonly applied: boolean;
-  readonly metadataCacheChanged: "yes" | "no";
+  readonly metadataCacheChanged: "yes" | "no" | "unverified";
   readonly changedSummary: string;
   readonly manifestPatch?: BrowserSelfHealingManifestPatchWriteResult;
+  readonly cacheOutcome?: BrowserReceiptCacheMaintenanceResult["outcome"];
+  readonly cacheCleanup?: BrowserReceiptCacheMaintenanceResult["cleanup"];
   readonly blockers: readonly string[];
   readonly warnings: readonly string[];
   readonly nextAction: string;
@@ -138,6 +146,8 @@ function result(input: {
     metadataCacheChanged: input.metadataCacheChanged,
     changedSummary: input.changedSummary,
     manifestPatch: input.manifestPatch,
+    cacheOutcome: input.cacheOutcome,
+    cacheCleanup: input.cacheCleanup,
     blockers: input.blockers,
     warnings: input.warnings,
     nextAction: input.nextAction,
