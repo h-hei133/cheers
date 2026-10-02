@@ -37,6 +37,8 @@ export interface SubagentStep {
 
 export interface SubagentRunInput {
   readonly definition: SubagentDefinition;
+  /** Requested restriction; the host intersects it with its own permission boundary. */
+  readonly agentMode?: "plan" | "build";
   /** What the caller asked the subagent to do. */
   readonly prompt: string;
   /** Where the subagent works, named in its instruction so it knows its root. */
@@ -59,6 +61,8 @@ export interface SubagentRunInput {
 export type SubagentRunner = (input: SubagentRunInput) => Promise<SubagentRunResult>;
 
 export interface SubagentRunResult {
+  /** Set by the host that built the actual tool gate; absent for unbound runners. */
+  readonly agentMode?: "plan" | "build";
   /** What the subagent said, in order. */
   readonly text: string;
   /** Whether it ended by failing rather than by finishing. */

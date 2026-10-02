@@ -22,7 +22,7 @@ import { isOverflowFailure, type StepFunction } from "./step.js";
 import { adaptTools, createToolHooks, type ToolGateOptions } from "./tools.js";
 import { getSessionUsage } from "../observability/usageTelemetry.js";
 import type { SentRequest } from "../provider/request/sentRequest.js";
-import { runSubagent as runSubagentWith, type SubagentRunner } from "../core/subagents/runner.js";
+import { createSubagentRunner } from "./subagent.js";
 import type { DenyRule } from "../core/shell/approval/deny.js";
 import type { CacheWarmingRunner } from "./cacheWarm.js";
 import type { ToolDefinition } from "../tools/types.js";
@@ -177,42 +177,11 @@ export function runTurn(options: TurnOptions): TurnRun {
   const projection = new TurnProjection();
   const steering: string[] = [];
   const followUps: string[] = [];
-  // A subagent's tool set is adapted from the same options this session's gate
-  // is built from, so the user's refusals reach it. Composed here rather than by
-  // the caller because the gate is built here, and a caller writing those
-  // options out again is how the two copies drifted in the first place — the
-  // subagent's list was missing the refusals, so a rule held at the front door
-  // and not at the one the subagent came through.
-  const host = options.subagentHost;
-  const runSubagent: SubagentRunner | undefined = host
-    ? (input) =>
-        runSubagentWith(input, {
-          tools: new Map(
-            adaptTools(options.tools, gateOptionsFor(options, () => {})).map(
-              (tool) => [tool.name, tool] as const,
-            ),
-          ),
-          step: (messages, signal, stepOptions) =>
-            host.step(
-              messages,
-              signal,
-              { onText: () => {}, onReasoning: () => {}, onReplace: () => {} },
-              stepOptions,
-            ),
-          // The same gate the session's own calls pass through. Without it a
-          // subagent's calls skipped plan mode, the approval scope, the doom-loop
-          // check and the user's refusals — every decision the gate exists to
-          // make. A subagent is a run of the same loop, so it answers to the same
-          // rules; what differs is only what it was handed.
-          beforeToolCall: hooks.beforeToolCall,
-          afterToolCall: hooks.afterToolCall,
-          defaultMaxSteps: host.defaultMaxSteps,
-        })
+  const parentGate = gateOptionsFor(options, (event) => channel.push(event));
+  const runSubagent = options.subagentHost
+    ? createSubagentRunner(options.subagentHost, options.tools, parentGate)
     : undefined;
-  const gate: ToolGateOptions = {
-    ...gateOptionsFor(options, (event) => channel.push(event)),
-    ...(runSubagent ? { runSubagent } : {}),
-  };
+  const gate: ToolGateOptions = { ...parentGate, ...(runSubagent ? { runSubagent } : {}) };
   const openingText = `${environmentLine(options.workspaceRoot, options.permissionScope)}\n\n${options.prompt}`;
   const openingImages = options.attachments?.images ?? [];
   const opening: AgentMessage = {

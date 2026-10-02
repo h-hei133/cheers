@@ -99,6 +99,11 @@ describe("the steps a subagent may take", () => {
   it("floors a fractional limit, since a step is not divisible", () => {
     expect(subagentMaxSteps({ maxTurns: 4.7 }, 20)).toBe(4);
   });
+
+  it("keeps small fractions and invalid host budgets finite and positive", () => {
+    expect(subagentMaxSteps({ maxTurns: 0.4 }, 20)).toBe(1);
+    for (const fallback of [0, -1, Infinity, NaN]) expect(subagentMaxSteps({}, fallback)).toBe(1);
+  });
 });
 
 describe("a tool no definition can ask for", () => {

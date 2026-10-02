@@ -573,6 +573,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W6-23 | sidebar编号改为OBS-11/OBS-12，钩子/MCP保持OBS-03/OBS-04 | 已完成文档修正 |
 | W6-24 | 修正浏览器总数与历史分类口径；CTX-08/CDE-01已纠正；PRV-04按W2修复保留FIXED | 已完成文档修正 |
 | W7-25 / THM-03 | auto已落地；48个实用令牌、4套预设及旧主题继承；数字对齐裁决按实际消费者修正 | 已完成，本地验证通过 |
+| W7-30 / W8-34 / SUB-01 | 子运行按父/定义/请求最窄模式建门，报告实际模式；递归task剥除和步数有界验证；同域额外缺口继续处理 | 权限部分已完成，本地验证通过 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1076,7 +1077,7 @@ OAuth 只在「直连上游订阅（Copilot / Anthropic 订阅）」时有意义
 
 | # | 条目 | 形态 | 参考 / 标记 | 撤销验证 |
 |---|---|---|---|---|
-| **34** | `SUB-01`（`R10-1`） | 把 `definition.permissionMode` 穿进 `runSubagent` 建门（`agentMode: definition.permissionMode ?? 会话模式`）；`taskTool.ts:82` 的展示串改读**生效值** | `gemini-cli/.../policy-engine.ts:610` `check(…, subagent?, …)` | 在 build 会话派 `code-reviewer` ⇒ 其 `bash` 调用**被 plan 门拦**；展示与实际一致 |
+| **34** | `SUB-01`（`R10-1`） | 已完成：父/定义/请求plan取交集，复用工具门工厂；task显示建门owner回传的生效值；未启动与未回报分开 | `gemini-cli/.../policy-engine.ts:610` `check(…, subagent?, …)` | 在 build 会话派 `code-reviewer` ⇒ 其 `bash` 调用**被 plan 门拦**；展示与实际一致 |
 | **35** | `PRV-13`（`R10-2`） | `googleGenAI` 的 `path` 加 `?alt=sse`（流式），并接出 `googlePath(model,false)`（非流式）；改 `googleGenAI.test.ts:65-67` | `googleVertex.ts:78` 同仓对照；`gemini-cli` 的 `alt:'sse'` | 「URL 与响应格式成对」的合成测试：流式 URL 以 `?alt=sse` 结尾且按 SSE 解码；非流式走单 JSON |
 | **36** | `PRV-14` | 两处 `data:` 多行连接改 `join("\n")`（`anthropicMessages.ts:622-631`、`googleWire.ts:437-444`） | `pi/.../anthropic-messages.ts:409`；`gemini-cli/.../server.ts:510`；**同仓正确处** `turn/completion.ts:563` | 合成多行 `data:` 事件 ⇒ 解码后含 `\n` 且 JSON 可解析 |
 | **37** | `PRV-15` | 把服务器 `requestedDelayMs` 带到 failed step（新字段），`core/agent/loop.ts:178` 的 `retryDelayMs(policy, attempt, undefined)` 改传它 | `pi/.../provider-retry.ts:51-70`（层内消费服务器延迟） | `429` + `Retry-After: 5` ⇒ 首次重试延迟 ≥5s |
@@ -1224,3 +1225,19 @@ W7-25令牌验证：首轮6文件104项通过，兼容修正后3文件67项通�
 四套预设均48字段且通过schema；高对比度两套在声明的黑/白背景上通过前景4.5:1门槛，消息正文7:1，选中区/状态带关键文字4.5:1。命名预设不替用户设置终端背景。
 撤销语法/Markdown独立令牌与旧字段继承后4项失败，源码逐字节恢复。隔离无凭据的常规/全屏PTY均验证两套预设切换及自定义mdListBullet的真实ANSI输出，退出0。
 静态门禁通过：1391文件零环；配置/声明/Node门禁正常；docs严格门禁通过并保留120项既有advisory；可达性7项、函数上限7项既有advisory，无新增。本项未运行本地全套TypeScript或真实provider。
+
+
+### W7-30 权限边界实施设计（2026-10-02）
+
+SUB-01仍成立：task丢失permissionMode，子运行复用父hooks。现有工具集合交/差集与task剥除正常，递归仍限制为一层。
+对照参考的共享策略引擎把subagent身份纳入同一次决策，而非另开无门执行器，保留同一ToolGateOptions与createToolHooks，按每个子运行创建门。
+有效模式采用权限交集：父会话plan、定义plan、任务请求plan任一成立即plan；build请求不能覆盖只读定义或父plan。其余兼容permissionMode值不授予额外审批权限，permissionScope与denyRules原样继承。
+模式由建门owner回传，task显示实际结果，未启动/未回报分开；不把声明串冒充实际状态。
+同域审计额外发现：runner未把input.prompt送到模型；模型步骤仍看父工具schema；worktree路径只进入说明、工具上下文仍是父工作区。这些先登记，按独立修复与回归处理，勿把SUB-01的通过扩大为全域健全。
+
+
+W7-30权限验证：初轮6套76项通过；异常状态修正后3套32项及子运行套件11项通过（6套唯一77项），构建通过。最初1项测试失败为测试设置使用不存在的scope/decision枚举，按真实ask/deny契约纠正，未修改权限实现来迁就测试。
+双线最终APPROVE/CLEAR。复核捕获的「工具已执行、下一模型步抛错却显示未启动」已修复并有真实建门路径回归。
+撤销模式交集后5项失败，源码字节恢复。隔离无凭据的编译运行时接真实工具注册表，build派code-reviewer尝试touch：返回plan拒绝，标记文件不存在，task显示PLAN；模型步骤由脚本驱动，本次未声称真实provider或PTY模型委派验收。
+静态门禁通过：1393文件零环、39/39配置、18/18 hooks、10/10工厂、Node最低版本与严格文档门禁，120项既有文档advisory。递归task运行时不可执行；0<maxTurns<1取1，非法宿主步数也收敛为1。
+SUB-01完成；下一步先闭合同域已登记的task正文/工具schema/工作区和TOL-10结果真实性，随后进入W7-32。

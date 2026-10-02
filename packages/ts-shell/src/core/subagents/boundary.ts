@@ -62,6 +62,15 @@ export function subagentMaxSteps(
   fallback: number,
 ): number {
   const declared = definition.maxTurns;
-  if (declared === undefined) return fallback;
-  return Number.isFinite(declared) && declared > 0 ? Math.floor(declared) : fallback;
+  const value = declared !== undefined && Number.isFinite(declared) && declared > 0 ? declared : fallback;
+  return Number.isFinite(value) && value > 0 ? Math.max(1, Math.floor(value)) : 1;
+}
+
+/** A delegated run may narrow, but never lift, a parent's or definition's plan boundary. */
+export function subagentMode(
+  parent: "plan" | "build" | undefined,
+  declared: SubagentDefinition["permissionMode"],
+  requested?: "plan" | "build",
+): "plan" | "build" {
+  return parent === "plan" || declared === "plan" || requested === "plan" ? "plan" : "build";
 }

@@ -3208,7 +3208,9 @@ MCP 不能连真实 server 是**能力缺口**而非「记录项」。⇒ 记为
 (b) 维持现状，但 `/mcp doctor` 必须**明确声明**「本构建只能连自带夹具协议」。
 **这一条 `phase-18-decisions.md` 完全没有涉及**（`W3-11` 只谈连接复用）。
 
-### SUB-01 · 子代理定义里的 `permissionMode` **只用于显示**，不进工具门 — `OPEN` `P2` `CONFIRMED`
+### SUB-01 · 子代理定义里的 `permissionMode` **只用于显示**，不进工具门 — `FIXED` `P2` `CONFIRMED`
+
+**2026-10-02 修复**：定义/请求/父会话的plan限制取交集，由每个子运行的工具门执行；父拒绝规则与审批范围保留，task只显示建门owner回报的模式。77项定向用例、构建和双线复核通过；撤销后5项失败。编译运行时真实工具注册表验收plan阻止文件创建；无真实provider。正文/schema/工作区等同域额外缺口另行处理。以下为历史研究。
 
 `subagentLoader.ts:13,22,39` 三个内置定义声明 `permissionMode: "plan"`（Explore / Plan / code-reviewer）。
 `core/tools/taskTool.ts:82` 只用它拼**展示字符串**（`"PLAN (Read-Only)"`）；

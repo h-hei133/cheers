@@ -470,3 +470,32 @@ describe("a subagent's calls answer to the session's rules", () => {
     expect(ran).toEqual([]);
   });
 });
+
+
+it("binds the delegated reviewer mode through the real turn composition", async () => {
+  let executed = false;
+  let observed = "";
+  const childStep: StepFunction = async (messages) => {
+    const result = messages.find((message) => message.role === "tool");
+    if (result) {
+      observed = String(result.content);
+      return { text: "review done", toolCalls: [], stopReason: "stop" };
+    }
+    return { text: "checking", toolCalls: [{ id: "child", name: "bash", args: { command: "touch marker" } }], stopReason: "stop" };
+  };
+  const setup = options({
+    agentMode: "build",
+    step: scripted([{ text: "delegating", toolCalls: [{ id: "dispatch", name: "task", args: {
+      description: "review", prompt: "inspect", subagent_type: "code-reviewer", agentMode: "build",
+    } }], stopReason: "stop" }]),
+    subagentHost: { step: childStep, defaultMaxSteps: 3 },
+    tools: new Map([
+      ["task", createTaskToolDefinition()],
+      ["bash", { ...echoTool("bash", "executed"), execute: async () => { executed = true; return { success: true, output: "executed" }; } }],
+    ]),
+  });
+  await drain(runTurn(setup).events);
+  expect(executed).toBe(false);
+  expect(observed).toContain("Plan mode is active");
+  expect(setup.persisted.some((message) => String(message.content).includes("PLAN (Read-Only)"))).toBe(true);
+});

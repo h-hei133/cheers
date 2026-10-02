@@ -68,6 +68,9 @@ export function createTaskToolDefinition(
       if (!description || !prompt) {
         return deniedResult("Error: description and prompt are required for task tool.");
       }
+      if (args.agentMode !== undefined && args.agentMode !== "plan" && args.agentMode !== "build") {
+        return deniedResult("Error: agentMode must be plan or build.");
+      }
 
       const requestedType = (typeof args.subagent_type === "string" ? args.subagent_type.trim() : "") || "general-purpose";
       const loader = new SubagentLoader(context.workspaceRoot);
@@ -79,7 +82,7 @@ export function createTaskToolDefinition(
       const randomSuffix = Math.random().toString(36).slice(2, 8).padEnd(6, "0");
       const subtaskId = `task_${randomSuffix}`;
       const agentType = subagentDef?.name || requestedType;
-      const mode = (args.agentMode || subagentDef?.permissionMode) === "plan" ? "PLAN (Read-Only)" : "BUILD (Standard)";
+      let mode = "not started";
       const contextStr = typeof args.context === "string" ? args.context.trim() : "";
       const shouldIsolate = (args.isolation || subagentDef?.isolation) === "worktree";
 
@@ -147,6 +150,7 @@ export function createTaskToolDefinition(
         if (!context.runSubagent) {
           subagentFailure = "no model is available to this session, so the subagent was not started";
         } else {
+          mode = "not reported by runner";
           const result = await context.runSubagent({
             definition: {
               name: agentType,
@@ -156,15 +160,19 @@ export function createTaskToolDefinition(
               ...(subagentDef?.tools ? { tools: subagentDef.tools } : {}),
               ...(subagentDef?.disallowedTools ? { disallowedTools: subagentDef.disallowedTools } : {}),
               ...(subagentDef?.maxTurns !== undefined ? { maxTurns: subagentDef.maxTurns } : {}),
+              ...(subagentDef?.permissionMode ? { permissionMode: subagentDef.permissionMode } : {}),
               source: subagentDef?.source ?? "builtin",
             },
             prompt,
+            ...(args.agentMode ? { agentMode: args.agentMode } : {}),
             workspace: effectiveWorkspace,
             ...(contextStr ? { context: contextStr } : {}),
             ...(memoryContext ? { memory: memoryContext } : {}),
             ...(context.abortSignal ? { signal: context.abortSignal } : {}),
           });
           subagentResponse = result.text;
+          mode = result.agentMode === "plan" ? "PLAN (Read-Only)"
+            : result.agentMode === "build" ? "BUILD (Standard)" : "not reported by runner";
           allowedTools = result.allowedTools;
           stepsTaken = result.steps;
           if (result.failed) subagentFailure = result.failure ?? "the subagent failed";

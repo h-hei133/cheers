@@ -245,3 +245,13 @@ describe("running a subagent", () => {
     expect(result.text).toContain("You have no tools");
   });
 });
+
+
+it("cannot recursively dispatch even when a definition and model both request task", async () => {
+  let nested = 0;
+  const result = await runSubagent({ definition: { name: "nested", description: "d", systemPrompt: "s", tools: ["task"], source: "builtin" },
+    prompt: "dispatch", workspace: "/tmp" }, { tools: new Map([["task", tool("task", () => { nested++; })]]),
+    step: stepThatCallsOnce("task"), defaultMaxSteps: 2 });
+  expect(nested).toBe(0);
+  expect(result.allowedTools).toEqual([]);
+});
