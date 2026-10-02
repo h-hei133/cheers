@@ -566,7 +566,8 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W5-20 | 键位参考页、表格漂移检测、重绑定示例与runtime提示入口 | 已实现，本地验证通过 |
 | W5-21 / OBS-03(sidebar) | 正式snapshot入口；旧别名仅单帧快照，默认布局保留 | 已实现，本地验证通过 |
 | W5-22 / CDE-01 | 明确早期候选数不等于当前不可达数或删除配额；链接最终闭包 | 已完成文档修正 |
-| W5小项、W6–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
+| W5小项 / CMD-11 | 未闭合参数保留原文，已完成参数和正常引号解析保留 | 已实现，本地验证通过 |
+| W5其余小项、W6–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
 src/runtime/execution/service.test.ts src/runtime/execution/fileLock.test.ts
@@ -1148,3 +1149,7 @@ W8 复核轮新增            11 项（§10.2）+ 8 小项（§10.3）
 
 **登记册新增条目**：`PRV-13/14/15`、`SES-09/10`、`TOL-10/11/12/13`、`CMD-09/10/11/12/13`、
 `TUI-10/11`、`OBS-13/14/15`、`SUB-01`——**共 20 条**（13 号册 §20.1）。
+
+CMD-11（2026-10-02）：对照参考提示模板解析器的容错策略，但不采纳丢弃未闭合引号的行为；
+复用现有tokenizer，未闭合最后参数按原文保留且不再拆分，先前参数仍正常解析。
+4文件94项定向测试、构建和双线APPROVE/CLEAR；撤销8项失败后逐字恢复。常规/全屏PTY的/btw撇号验收通过。

@@ -19,7 +19,17 @@ describe("command argument quoting", () => {
     expect(tokenizeCommandArgs(source)).toEqual(expected);
   });
 
-  it.each(['"unfinished', "'unfinished", "trailing\\"])("rejects %s", (source) => {
+  it.each([
+    ['"unfinished', ['"unfinished']],
+    ["don't stop", ["don't stop"]],
+    ['-i explain "unfinished prose', ['-i', 'explain', '"unfinished prose']],
+    ['add "name --remove other', ['add', '"name --remove other']],
+    ['"two words" don\'t change', ['two words', "don't change"]],
+  ])("keeps the unfinished argument literal in %s", (source, expected) => {
+    expect(tokenizeCommandArgs(source)).toEqual(expected);
+  });
+
+  it.each(["trailing\\"])("rejects %s", (source) => {
     expect(() => tokenizeCommandArgs(source)).toThrow(SyntaxError);
   });
 

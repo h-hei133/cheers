@@ -3096,7 +3096,11 @@ web search/fetch → `extractLearningsFromContent`（`:168-183` 按标点切句�
 ⇒ `/review` 输出的是任何读者不看 diff 也能写出的模板。
 **方向**：对齐 `/commit`——把 diff 交给模型做评审。
 
-### CMD-11 · 引号未闭合（含英文撇号）令整条命令参数**硬失败** — `OPEN` `P2` `CONFIRMED`
+### CMD-11 · 未闭合引号按字面参数传递 — `FIXED` `P2` `CONFIRMED`
+
+**2026-10-02 修复**：共用 tokenizer 保留已经完成的参数；最后一个未闭合参数从原始起点取到末尾，保留引号/撇号，不重新拆分选项状尾部。合法引号与转义规则不变，末尾孤立反斜杠仍报错。命令与模板采用同一规则。94项定向测试、构建、独立APPROVE/CLEAR；撤销后8项失败。常规/全屏PTY验证 `/btw` 撇号问题可传递，隔离环境无提供方凭据。
+
+以下保留修复前证据：
 
 **实机复现**：`printf "/btw what's the difference\n"` ⇒
 `Invalid /btw arguments: Unclosed single quote in command arguments.`（`slashRouter.ts:85-88`）。

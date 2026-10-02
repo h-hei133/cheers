@@ -1,4 +1,4 @@
-/** POSIX quoting and escapes only; no expansion or shell evaluation. */
+/** Quoting and escapes without expansion; an unfinished quoted argument stays literal. */
 export function tokenizeCommandArgs(input: string): string[] {
   const args: string[] = [];
   let value = "";
@@ -36,7 +36,8 @@ export function tokenizeCommandArgs(input: string): string[] {
       value += char;
     }
   }
-  if (quote) throw new SyntaxError(`Unclosed ${quote === '"' ? "double" : "single"} quote in command arguments.`);
-  if (start >= 0) args.push(value);
+  // Preserve the whole unfinished argument, including its opening quote or
+  // apostrophe. Do not split its tail again: it may contain option-like prose.
+  if (start >= 0) args.push(quote ? input.slice(start) : value);
   return args;
 }

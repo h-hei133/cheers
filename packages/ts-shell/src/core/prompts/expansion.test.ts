@@ -39,7 +39,7 @@ function input(text: string, options: { skills?: Skill[]; templates?: PromptTemp
 
 describe("argument parsing", () => {
   it.each(["don't stop", 'explain "unfinished prose'])("keeps incomplete prose %s verbatim", (text) => {
-    expect(parseArguments(text)).toEqual([text]);
+    expect(parseArguments(text).join(" ")).toBe(text);
   });
 
   it("keeps a quoted phrase as one argument", () => {

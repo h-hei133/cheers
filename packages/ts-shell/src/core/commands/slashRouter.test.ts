@@ -59,7 +59,19 @@ describe("slash router (W4)", () => {
     expect(result).toMatchObject({ kind: "local", output: expect.stringContaining("Not a status item: `a b`.") });
   });
 
-  it.each(['/cd "unfinished', "/cd 'unfinished", "/cd trailing\\"])("reports invalid quoting for %s", async (source) => {
+  it.each(['/cd "unfinished', "/cd 'unfinished"])("keeps an unfinished path literal: %s", async (source) => {
+    expect(await routeSlashCommand(source, { cwd: workspaceRoot })).toMatchObject({
+      kind: "shell-action", workspaceTarget: source.slice(4),
+    });
+  });
+
+  it("preserves a contraction and brainstorm options through routing", async () => {
+    const result = await routeSlashCommand("/brainstorm -i don't lose the draft", { cwd: workspaceRoot });
+    expect(result).toMatchObject({ kind: "prompt", prompt: expect.stringContaining("Requirement elicitation") });
+    expect(result).toMatchObject({ prompt: expect.stringContaining("don't lose the draft") });
+  });
+
+  it.each(["/cd trailing\\"])("reports invalid escaping for %s", async (source) => {
     expect(await routeSlashCommand(source, { cwd: workspaceRoot })).toMatchObject({
       kind: "local", output: expect.stringContaining("Invalid /cd arguments:"),
     });
