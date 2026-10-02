@@ -89,8 +89,8 @@ Phase 17 的 38 个交付项已逐项实施或完成候选保留裁决，另完�
 → **4 个同型缺陷 + 3 个部分派生 + 1 个模型可见提示面**（原计数把标 ✅ 的对照行算进了缺陷侧）；
 `PRV-04` → `PARTIAL`（`attempted` 标志已在 `4429a89c` 区分「请求失败」与「凭据缺失」，
 剩余缺口只是**不区分失败类别**）；§12 的不可达数字加口径说明；
-以及 **`OBS-03`/`OBS-04` 的编号冲突**——§10（MCP/钩子）与 §11bis（sidebar）各有一组同号条目，
-违反 §0.1「编号一经分配永不复用」，应把 §11bis 的两条改为 `OBS-11`/`OBS-12`。
+编号冲突已于W6-23更正：§10的`OBS-03`（钩子）/`OBS-04`（MCP）保持不变，
+§11bis侧栏两条使用`OBS-11`（快照命名）/`OBS-12`（事件源）。旧侧栏编号仅供历史辨认，不再作为引用。
 
 **真实 provider 验证**：**已于 2026-10-01 实机执行**（中转站 `ai.onyxaxis.org`）——
 `verify:provider-readiness:real` 两项 `[pass]`，并首次用**真实**端点跑通多步工具回合；
@@ -2378,12 +2378,12 @@ node -e "import('@cheers/ts-shell')"
 
 > 维护者点名：「是否存在没有接入 tui 的功能」。本节单独回答这一问。
 
-### OBS-03 · `/sidebar watch` 是「同步吐 N 帧」而不是实时面板 — `FIXED` `P2` `CONFIRMED`
+### OBS-11 · `/sidebar watch` 是「同步吐 N 帧」而不是实时面板 — `FIXED` `P2` `CONFIRMED`
 
 **2026-10-02 实施**：正式入口为 `/sidebar snapshot`，帮助/补全/标题同步声明单次捕获，命令owner
 只生成一帧。旧 `watch/live` 保留为同一快照的兼容别名，不再列入补全；裸 `/sidebar` 保留原有
 normal布局（不额外添加采集元信息，以免挤掉状态），panel/compact/detail仍为快照的密度变体。
-没有新增定时刷新或分栏容器，OBS-04/sidebar的命令事件源缺口继续OPEN。以下保留修复前事实。
+没有新增定时刷新或分栏容器，OBS-12/sidebar的命令事件源缺口继续OPEN。以下保留修复前事实。
 
 `/sidebar watch`（别名 `/sidebar live`）的整条实现是：
 
@@ -2413,7 +2413,7 @@ const output = frames.map((frame) => renderSidebarLivePanelFrame(frame)).join("\
 两个低成本选项：(a) 改名为 `/sidebar snapshot`（诚实），
 或 (b) 真的接一个 tick 源（需要 TUI 侧栏容器，即产品决定）。
 
-### OBS-04 · sidebar 的实时事件流只由命令结果驱动 — `OPEN` `P3` `CONFIRMED`
+### OBS-12 · sidebar 的实时事件流只由命令结果驱动 — `OPEN` `P3` `CONFIRMED`
 
 `emitCommandResultToSidebar` 的调用者全部是命令实现
 （`compactCommandRuntime.ts:73,84`、`warmupCommandRuntime.ts:25,36`、
@@ -2653,7 +2653,7 @@ edit/patch/apply/conflict.ts (219)
 |---|---|---|
 | 自建 ESM 可达图（值边 / 类型边 / 从 `cli.tsx` BFS） | 死码、接线中断、双栈 | §12 的 12 / 37 文件分列 |
 | `npx tsx` 直调生产函数 | 行为验证（非读码推断） | TUI-01 的装饰丢失、TUI-02 的 `documentRows`、THM-02 的状态栏背景、TUI-08 的 CJK、PRV-03 的重试谓词、SES-06 的 parity 恒空、CTX-01 的回放 |
-| 真实 CLI（隔离 `HOME`） | 端到端实机 | CMD-01/02/03/04/07、CLI-01、OBS-03、SES-01 |
+| 真实 CLI（隔离 `HOME`） | 端到端实机 | CMD-01/02/03/04/07、CLI-01、OBS-03（原记录未限定域，不作独立侧栏验收）、SES-01 |
 | PTY（`\r` 提交） | 交互面实机 | SES-01 的 `/todo` 不落盘、TUI-04 的 pager |
 | `curl` | 外部可达性 | OBS-01 的两个 404 |
 | 七门禁 + `test:scripts` | 结构性 | 全 PASS（见 §14） |
@@ -2708,7 +2708,7 @@ edit/patch/apply/conflict.ts (219)
 
 ### 明确不做或需裁决（不自行决定）
 
-- **真正的 alt-screen 分栏侧栏**（OBS-03）：Phase 15/16 两次记为 backlog，产品决定。
+- **真正的 alt-screen 分栏侧栏**（OBS-11）：Phase 15/16 两次记为 backlog，产品决定。
 - **记忆自动注入**（CTX-05）：有意分歧，产品模型变更。
 - **`/share` `/import` `/name` `/changelog`**：Phase 15 已记 backlog。
 - **MCP SSE/HTTP 传输**：Phase 15 已记 backlog。
