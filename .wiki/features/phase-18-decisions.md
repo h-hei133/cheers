@@ -559,7 +559,8 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W8-38 / SES-09（随 W4） | 空/半写锁 500ms 创建宽限；文件读取错误不夺锁 | 已实现，本地验证通过 |
 | W4-15 / PRV-10 | 累计用量随现有 state 写入；锁内增量合并；恢复重建上下文测量 | 已实现，本地验证通过 |
 | W4-16 / SES-06 | 删除旧显示规则和未消费投影；保留历史阻断/写入状态恢复 | 已实现，本地验证通过 |
-| CMD-12、W5–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
+| CMD-12 | 来源列表持久化、失败显式显示、移除无实现的搜索承诺 | 已实现，本地验证通过 |
+| W5–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
 src/runtime/execution/service.test.ts src/runtime/execution/fileLock.test.ts
@@ -834,6 +835,20 @@ snapshot 保留 verify 提示与安全过滤，仅取消 claim-ledger 的特殊�
 该脚本另有 11 个先前已缺失目标、无 package/CI 调用，不声明其门禁通过。
 补充 compact 4/4 通过（含独立复跑），累计主代理 147 项定向测试通过，双线最终 APPROVE / CLEAR。
 撤销五处退役改动后 15 项失败，精确恢复源字节；脚本语法检查与严格文档漂移门禁通过。
+
+CMD-12（2026-10-02）：来源列表由 `core/commands/marketplace/store.ts` 所有，当前用户目录
+`marketplaces.json` + `CHEERS_MARKETPLACES_FILE` 可覆盖。参考 settings-manager 的锁内读取与合并决策，
+复用本仓既有 lock/atomic write；无进程缓存，修改前读最新文件。未照搬 plugin 的吞掉 I/O 错误行为：
+仅 ENOENT 视为空，损坏 JSON/schema/重复名称报错并保留文件，命令不报成功，picker 有禁用错误行。
+帮助与 picker 注释不再承诺目录搜索。既有 plugin 的吞错问题留作后续扩展域审计，不属于此项已修范围。
+
+`npm run test:ts -- src/core/commands/marketplace/store.test.ts src/core/commands/pluginsAndMarketplace.test.ts src/cli/interactive/picker/pickers.test.ts`
+**3 文件 / 41 测试通过**；构建通过，独立双线 APPROVE / CLEAR。实际编译 CLI 三个独立进程
+分别 add/list/remove，JSON 有效行 **20/21/21**、全退出 0；4 个并发进程新增不同源，最终保留 4 项、全退出 0。
+撤销来源写入后 3 项回归失败，精确恢复源字节。
+W4 收口静态门禁：import cycles（1379 文件、零环）、config（39/39）、declarations（18/18、10/10）、
+Node floor、strict docs 均通过；脚本测试 **40/40**。call reachability 仍 7 项既有 advisory；
+函数 ceiling 仍 7 项，未新增。W5–W8 继续执行，本地未跑全套 TypeScript 或真实提供方。
 
 ## 9. 真实 provider 验证：**已执行**（2026-10-01，中转站 `ai.onyxaxis.org`）
 

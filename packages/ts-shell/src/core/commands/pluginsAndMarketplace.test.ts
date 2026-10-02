@@ -19,6 +19,8 @@ describe("Model, Marketplace & Plugin Commands", () => {
   // The registry persists, so it is pointed at a scratch file: a test run must
   // not rewrite the registry the user is actually working with.
   const registryDir = fs.mkdtempSync(path.join(os.tmpdir(), "extension-registry-"));
+  const previousMarketplaceFile = process.env.CHEERS_MARKETPLACES_FILE;
+  process.env.CHEERS_MARKETPLACES_FILE = path.join(registryDir, "marketplaces.json");
   process.env.CHEERS_PLUGINS_FILE = path.join(registryDir, "plugins.json");
 
   beforeEach(() => {
@@ -28,6 +30,8 @@ describe("Model, Marketplace & Plugin Commands", () => {
 
   afterAll(() => {
     delete process.env.CHEERS_PLUGINS_FILE;
+    if (previousMarketplaceFile === undefined) delete process.env.CHEERS_MARKETPLACES_FILE;
+    else process.env.CHEERS_MARKETPLACES_FILE = previousMarketplaceFile;
     fs.rmSync(registryDir, { recursive: true, force: true });
   });
 

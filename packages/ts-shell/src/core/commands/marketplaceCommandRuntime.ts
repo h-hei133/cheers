@@ -1,39 +1,34 @@
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
-export interface MarketplaceSource {
-  readonly name: string;
-  readonly url: string;
-  readonly description?: string;
-  readonly isDefault?: boolean;
-}
-
-let marketplaceSources: MarketplaceSource[] = [];
-
-export function getMarketplaceSources(): readonly MarketplaceSource[] {
-  return marketplaceSources;
-}
-
-export function resetMarketplaceSources(): void {
-  marketplaceSources = [];
-}
+import { addMarketplaceSource, getMarketplaceSources, removeMarketplaceSource } from "./marketplace/store.js";
+export { getMarketplaceSources, resetMarketplaceSources, type MarketplaceSource } from "./marketplace/store.js";
 
 /**
  * /marketplace command
- * Manages plugin marketplace sources for discovering, adding, and removing plugin catalogs.
+ * Records source addresses. This build does not fetch or search catalogues.
  */
 export async function runMarketplaceCommand(
   args: string[],
   _context: CommandContext,
 ): Promise<LocalCommandResult> {
+  try {
+    return runMarketplaceAction(args);
+  } catch (error) {
+    return { kind: "local", output: `Marketplace source operation failed: ${error instanceof Error ? error.message : "storage unavailable"}` };
+  }
+}
+
+function runMarketplaceAction(args: string[]): LocalCommandResult {
   const subCommand = args[0]?.toLowerCase();
 
   if (!subCommand || subCommand === "list" || subCommand === "ls") {
+    const marketplaceSources = getMarketplaceSources();
     const lines: string[] = [
       "# Plugin Marketplaces (/marketplace)",
       "",
       marketplaceSources.length === 0
         ? "No marketplace sources configured."
-        : "Registered marketplace sources for plugin discovery:",
+        : "Registered marketplace source addresses:",
       "",
     ];
 
@@ -51,7 +46,8 @@ export async function runMarketplaceCommand(
       "Commands:",
       "- `/marketplace add <name> <url>` : Register a new plugin marketplace",
       "- `/marketplace remove <name>` : Unregister a marketplace source",
-      "- `/plugin search <keyword>` : Search for plugins across all marketplaces",
+      "",
+      "Sources are saved addresses to visit yourself. This build does not fetch or search catalogues.",
     );
 
     return {
@@ -70,18 +66,12 @@ export async function runMarketplaceCommand(
       };
     }
 
-    if (marketplaceSources.some((m) => m.name === name)) {
+    if (!addMarketplaceSource({ name, url, description: `Custom marketplace source (${url})` })) {
       return {
         kind: "local",
         output: `Marketplace with name '${name}' already exists. Use a distinct name or remove it first.`,
       };
     }
-
-    marketplaceSources.push({
-      name,
-      url,
-      description: `Custom marketplace source (${url})`,
-    });
 
     return {
       kind: "local",
@@ -98,15 +88,13 @@ export async function runMarketplaceCommand(
       };
     }
 
-    const index = marketplaceSources.findIndex((m) => m.name === name);
-    if (index === -1) {
+    if (!removeMarketplaceSource(name)) {
       return {
         kind: "local",
         output: `Marketplace source '${name}' not found. Run \`/marketplace list\` to view available sources.`,
       };
     }
 
-    marketplaceSources.splice(index, 1);
     return {
       kind: "local",
       output: `Marketplace source \`${name}\` removed.`,

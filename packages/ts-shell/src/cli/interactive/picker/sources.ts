@@ -19,12 +19,21 @@ import type { Picker, PickerOutcome } from "../overlay.js";
 const ADD_ID = "add";
 
 export function sourcePicker(context: CommandContext): Picker {
-  const sources = getMarketplaceSources();
+  let sources: readonly MarketplaceSource[] = [];
   return {
     title: "Extension sources",
     form: "panel",
     empty: "No sources registered.",
     async load(): Promise<readonly Option[]> {
+      try {
+        sources = getMarketplaceSources();
+      } catch (error) {
+        sources = [];
+        return [{
+          id: "load-error", label: "Could not load extension sources", disabled: true,
+          detail: error instanceof Error ? error.message : "Storage unavailable",
+        }];
+      }
       return [
         ...sources.map<Option>((source) => ({
           id: source.name,
@@ -45,8 +54,7 @@ export function sourcePicker(context: CommandContext): Picker {
       if (chosen === ADD_ID) return { draft: "/marketplace add " };
       const source = sources.find((candidate) => candidate.name === chosen);
       if (!source) return undefined;
-      // The default source is what a bare search falls back to, so removing it
-      // would leave the search with nowhere to look.
+      // Sources marked default remain read-only in this picker.
       if (source.isDefault) {
         return { note: `\`${source.name}\` is the default source and stays registered.\n\n${describe(source)}` };
       }

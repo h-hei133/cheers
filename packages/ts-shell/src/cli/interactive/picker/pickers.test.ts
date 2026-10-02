@@ -70,6 +70,15 @@ describe("connection chooser", () => {
 });
 
 describe("source chooser", () => {
+  let directory: string;
+  beforeEach(() => {
+    directory = fs.mkdtempSync(path.join(os.tmpdir(), "source-picker-"));
+    vi.stubEnv("CHEERS_MARKETPLACES_FILE", path.join(directory, "sources.json"));
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    fs.rmSync(directory, { recursive: true, force: true });
+  });
   it("drafts an add rather than asking for a URL in the list", async () => {
     const picker = sourcePicker(CONTEXT);
 

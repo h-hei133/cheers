@@ -3087,7 +3087,11 @@ tokenizer（`core/commands/arguments.ts`，Phase 17 W1-1 引入）把撇号当**
 **参考**：`pi` 的 CLI 层 `--` 终止符（`cli/args.ts:82`）是另一回事；斜杠层无先例（`NOT-FOUND`）。
 **方向**：未闭合引号**回落为字面文本**（shell 的做法）或给出可恢复提示，而非整条失败。
 
-### CMD-12 · `/marketplace` 只存在内存；帮助还指向 `/plugin search` 而后者自称无目录服务 — `OPEN` `P3` `CONFIRMED`
+### CMD-12 · `/marketplace` 来源持久化与真实能力说明 — `FIXED` `P3` `CONFIRMED`（2026-10-02）
+
+来源保存到当前用户数据目录的 `marketplaces.json`，支持 `CHEERS_MARKETPLACES_FILE` 隔离覆盖。共享文件锁内读最新列表并原子替换，不缓存旧列表；损坏 JSON/非法条目阻止写入，写失败不报告成功，picker 显示独立错误行。来源只是供用户访问的地址，不提供抓取/目录搜索。41 项测试、构建与新进程 CLI 增删查、4 个并发写入者验收通过。
+
+以下保留修复前证据：
 
 `marketplaceCommandRuntime.ts:10` `let marketplaceSources: MarketplaceSource[] = []`——模块级数组，
 `grep writeFile|persist` **零命中** ⇒ 重启即丢，而输出说「successfully registered」。
