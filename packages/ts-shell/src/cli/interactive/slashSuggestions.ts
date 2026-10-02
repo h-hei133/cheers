@@ -2,6 +2,7 @@ import type { Suggestion } from "../../presentation/tui/chrome/suggestions.js";
 import { matchSuggestions } from "../../presentation/tui/chrome/suggestions.js";
 import {
   listSlashCommands,
+  getSlashCommand,
   subscribeSlashCommands,
 } from "../../entrypoints/slashCommandRegistry.js";
 
@@ -12,18 +13,29 @@ function candidates(): readonly Suggestion[] {
   unsubscribe ??= subscribeSlashCommands(() => {
     cached = undefined;
   });
-  cached ??= listSlashCommands().map((command) => ({
-    value: `/${command.name}`,
-    label: `/${command.name}`,
-    detail: command.argumentHint ? `${command.summary} ${command.argumentHint}` : command.summary,
-  }));
+  if (!cached) {
+    const suggestions = new Map<string, Suggestion>();
+    for (const command of listSlashCommands()) {
+      const detail = command.argumentHint ? `${command.summary} ${command.argumentHint}` : command.summary;
+      for (const name of [command.name, ...(command.aliases ?? [])]) {
+        // The registry resolves the first matching name or alias.
+        if (suggestions.has(name)) continue;
+        suggestions.set(name, {
+          value: `/${name}`,
+          label: `/${name}`,
+          detail: name === command.name ? detail : `${detail} (alias of /${command.name})`,
+        });
+      }
+    }
+    cached = [...suggestions.values()];
+  }
   return cached;
 }
 
 function argumentSuggestions(draft: string): Suggestion[] | null {
   const match = /^(\/[^\s]+)\s+(.*)$/.exec(draft.trimStart());
   if (!match) return null;
-  const command = listSlashCommands().find((entry) => `/${entry.name}` === match[1]);
+  const command = getSlashCommand(match[1]!);
   const values = command?.getArgumentCompletions?.(match[2]);
   // The provider already filtered by prefix; matchSuggestions would re-filter
   // with the whole argument text as query, which breaks multi-word arguments.
@@ -46,8 +58,6 @@ export function slashSuggestions(draft: string): Suggestion[] | null {
  * not contain, which is exactly what tells the two apart.
  */
 const COMMAND_DRAFT = /^\/[A-Za-z0-9-]*$/;
-
-/**
 
 /**
  * Whether the draft could still become a command, and so whether an edit to it

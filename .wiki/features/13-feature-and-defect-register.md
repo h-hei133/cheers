@@ -3087,7 +3087,10 @@ picker（`/back`、`/model`、`/resume`…）与补全列表**纯键盘**，点�
 （左键点选）+ 消息组件用 `MouseRegion` 做折叠切换（`assistant-message.ts:164`）。
 **产品决定**：做到什么程度（本次仅登记）。
 
-### OBS-13 · 斜杠命令**别名不参与补全** — `OPEN` `P3` `CONFIRMED`
+### OBS-13 · 斜杠命令**别名不参与补全** — `FIXED` `P3` `CONFIRMED`
+
+**2026-10-02 修复**：候选包含去重别名，参数补全复用注册表解析，新增/卸载命令同步清除缓存。
+25 项定向测试和构建通过；撤销后 3 项失败，恢复后 20 项通过。自研完善；以下保留修复前诊断。
 
 `cli/interactive/slashSuggestions.ts:15-19` 的 `candidates()` 只映射 `/${command.name}`，
 **丢弃 `aliases`**；`:26` 的 `argumentSuggestions` 用 `/${entry.name}` **精确匹配**，

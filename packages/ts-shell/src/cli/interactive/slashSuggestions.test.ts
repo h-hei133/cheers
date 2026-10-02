@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { slashSuggestions } from "./slashSuggestions.js";
-import { listSlashCommands } from "../../entrypoints/slashCommandRegistry.js";
+import { listSlashCommands, getSlashCommand, registerSlashCommand } from "../../entrypoints/slashCommandRegistry.js";
 
 describe("command completions", () => {
   it("offers nothing for ordinary prose", () => {
@@ -8,19 +8,43 @@ describe("command completions", () => {
   });
 
   it("offers every registered command for a bare slash", () => {
-    expect(slashSuggestions("/")).toHaveLength(listSlashCommands().length);
+    const names = new Set(listSlashCommands().flatMap((command) => [command.name, ...(command.aliases ?? [])]));
+    expect(slashSuggestions("/")).toHaveLength(names.size);
   });
 
   it("only ever offers commands the router dispatches", () => {
     // A hand-maintained list drifts and ends up advertising commands that fail.
-    const registered = new Set(listSlashCommands().map((command) => `/${command.name}`));
     for (const suggestion of slashSuggestions("/") ?? []) {
-      expect(registered.has(suggestion.value)).toBe(true);
+      expect(getSlashCommand(suggestion.value)).toBeDefined();
     }
   });
 
   it("ranks the typed prefix first", () => {
     expect(slashSuggestions("/mod")?.[0]?.value).toBe("/model");
+  });
+
+  it("completes aliases and resolves their argument candidates through the registry", () => {
+    expect(slashSuggestions("/qu")?.[0]?.value).toBe("/quit");
+    expect(slashSuggestions("/qu")?.[0]?.detail).toContain("alias of /exit");
+    expect(slashSuggestions("/where re")).toEqual(slashSuggestions("/workspace re"));
+    expect(slashSuggestions("/WHERE re")?.[0]?.value).toBe("recent");
+  });
+
+  it("invalidates cached names and aliases when an extension is removed", () => {
+    slashSuggestions("/");
+    const remove = registerSlashCommand({
+      name: "sample-command", aliases: ["sample-alias", "sample-alias"],
+      group: "workflow", summary: "temporary command",
+      getArgumentCompletions: () => [{ value: "item", label: "item" }],
+    });
+    try {
+      expect(slashSuggestions("/sample-alias")?.filter((entry) => entry.value === "/sample-alias")).toHaveLength(1);
+      expect(slashSuggestions("/sample-alias ")?.[0]?.value).toBe("item");
+    } finally {
+      remove();
+    }
+    expect(slashSuggestions("/sample-alias")).toBeNull();
+    expect(slashSuggestions("/sample-alias ")).toBeNull();
   });
 
   it("offers argument completions once the command name is exact", () => {
