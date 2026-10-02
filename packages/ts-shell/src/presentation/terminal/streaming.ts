@@ -18,9 +18,11 @@ export interface RendererSink {
 export class StreamingRenderer {
   private sink: RendererSink | undefined;
 
-  /** Route output to `sink` instead of stdout until {@link clearSink}. */
-  setSink(sink: RendererSink): void {
+  /** Route output to `sink`; the returned function restores the previous sink. */
+  setSink(sink: RendererSink): () => void {
+    const previous = this.sink;
     this.sink = sink;
+    return () => { this.sink = previous; };
   }
 
   clearSink(): void {

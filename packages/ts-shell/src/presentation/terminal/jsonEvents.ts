@@ -14,6 +14,12 @@ import type { QueryEvent } from "../../core/query/runtime/events.js";
 
 const SCHEMA_VERSION = "run-event-stream.v1";
 
+/** Output without a model turn, including commands and startup diagnostics. */
+export type JsonStreamEvent = QueryEvent | {
+  readonly type: "cli.output";
+  readonly text: string;
+};
+
 export interface JsonEventStreamLine {
   readonly schemaVersion: typeof SCHEMA_VERSION;
   /** Position in this stream, from 1. */
@@ -22,8 +28,8 @@ export interface JsonEventStreamLine {
   readonly turnId?: string;
   /** Stable tool-call correlation, when the event carries one. */
   readonly toolCallId?: string;
-  readonly eventType: QueryEvent["type"];
-  readonly facts: QueryEvent;
+  readonly eventType: JsonStreamEvent["type"];
+  readonly facts: JsonStreamEvent;
   readonly truthfulness: {
     readonly observationOnly: true;
     readonly terminalSuccessClaim: false;
@@ -37,9 +43,9 @@ export interface JsonEventStreamLine {
  * stream's own property: a consumer that sorts by it must see one sequence, not
  * one per producer that happened to be writing.
  */
-export function createJsonEventWriter(write: (line: string) => void): (event: QueryEvent) => void {
+export function createJsonEventWriter(write: (line: string) => void): (event: JsonStreamEvent) => void {
   let order = 0;
-  return (event: QueryEvent): void => {
+  return (event: JsonStreamEvent): void => {
     order += 1;
     const turnId = "turn" in event && typeof event.turn === "number" ? `turn:${event.turn}` : undefined;
     const toolCallId = "taskId" in event && typeof event.taskId === "string" ? event.taskId : undefined;

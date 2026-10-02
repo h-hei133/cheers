@@ -209,7 +209,7 @@ export function parseCliArgs(
   assignOption(
     options,
     "printMode",
-    rawArgs.includes("--print") || rawArgs.includes("-p"),
+    rawArgs.includes("--print") || rawArgs.includes("-p") || rawArgs.includes("--json"),
   );
   assignOption(options, "jsonEvents", rawArgs.includes("--json"));
   assignOption(options, "noContextFiles", rawArgs.includes("--no-context-files"));

@@ -13,7 +13,6 @@ import {
 } from "../core/shell/printPromptInput.js";
 import type { ShellRuntimeContext } from "../core/shell/runtimeContext.js";
 import { ShellSessionRuntime } from "../core/shell/sessionRuntime.js";
-import { createJsonEventWriter } from "../presentation/terminal/jsonEvents.js";
 import {
   isResumeLikeShellAction,
   renderInteractiveOnlyShellActionBlocked,
@@ -506,16 +505,12 @@ export async function executeResolvedPromptTurn(options: {
       sessionId: options.runtimeContext.session.id,
     });
     options.setActiveNonInteractiveApprovalMode(approvalModeObject);
-    // An event consumer gets the run as events and nothing else: prose arriving
-    // on the same stream would interleave with the JSON lines and make them
-    // unparseable. Prose is routed to a sink that drops it, and the events are
-    // written to the device directly.
-    const unsubscribe = options.jsonEvents
-      ? options.sessionRuntime.observeEvents(
-          createJsonEventWriter((line) => process.stdout.write(line)),
-        )
+    // The CLI owns one event writer across commands and turns. Suppress the
+    // duplicate prose projection during the model turn, then restore its sink
+    // so later command output still belongs to the same JSON stream.
+    const restoreOutput = options.jsonEvents
+      ? options.renderer.setSink({ line: () => {}, chunk: () => {} })
       : undefined;
-    if (options.jsonEvents) options.renderer.setSink({ line: () => {}, chunk: () => {} });
     try {
       await options.sessionRuntime.executePrompt(
         options.runtimeContext.session.id,
@@ -528,8 +523,7 @@ export async function executeResolvedPromptTurn(options: {
         },
       );
     } finally {
-      unsubscribe?.();
-      if (options.jsonEvents) options.renderer.clearSink();
+      restoreOutput?.();
       // The prompt counter is recorded before the turn runs, so a run that never
       // reached a turn — a readiness failure, an aborted start — would leave it
       // buffered forever. Flushed here so the counter survives the failure that
@@ -600,6 +594,7 @@ export async function runReplayPromptScript(options: {
   sessionRuntime: ShellSessionRuntime;
   logger: StructuredLogger;
   printMode: boolean;
+  jsonEvents?: boolean;
   fallbackSessionId?: string;
   lifecycleNotices?: readonly string[];
   /** Passed through so a scripted `/permissions` writes the same trust store. */
@@ -637,6 +632,7 @@ export async function runReplayPromptScript(options: {
       sessionRuntime: options.sessionRuntime,
       logger: options.logger,
       printMode: options.printMode,
+      jsonEvents: options.jsonEvents,
       fallbackSessionId: options.fallbackSessionId,
       lifecycleNotices: options.lifecycleNotices,
       approvalTrustPolicy: options.approvalTrustPolicy,

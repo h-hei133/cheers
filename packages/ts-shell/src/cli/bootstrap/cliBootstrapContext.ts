@@ -7,6 +7,7 @@ import {
 } from "../../core/shell/bootstrap.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import { StreamingRenderer } from "../../presentation/terminal/streaming.js";
+import { createJsonEventWriter } from "../../presentation/terminal/jsonEvents.js";
 import type { StructuredLogger } from "../../observability/index.js";
 import { SessionManager } from "../../session/SessionManager.js";
 import { getWorkflowGitContext } from "../../workflow/gitContext.js";
@@ -32,6 +33,7 @@ export interface CliRootContext {
 export interface CliBootstrapRuntimeContext extends CliRootContext {
   readonly sessionManager: SessionManager;
   readonly renderer: StreamingRenderer;
+  readonly writeJsonEvent?: ReturnType<typeof createJsonEventWriter>;
   readonly recoveryCandidate: ReturnType<
     SessionManager["getSuggestedRecoverySession"]
   >;
@@ -93,6 +95,15 @@ export function createCliBootstrapRuntimeContext(
 ): CliBootstrapRuntimeContext {
   const sessionManager = new SessionManager();
   const renderer = new StreamingRenderer();
+  const writeJsonEvent = input.options.jsonEvents
+    ? createJsonEventWriter((line) => process.stdout.write(line))
+    : undefined;
+  if (writeJsonEvent) {
+    renderer.setSink({
+      line: (text) => writeJsonEvent({ type: "cli.output", text: `${text}\n` }),
+      chunk: (text) => writeJsonEvent({ type: "cli.output", text }),
+    });
+  }
   // What a bare `/resume` or `/continue` falls back to. Recovery eligibility is too
   // narrow for that: a session that finished cleanly is exactly what someone means
   // by "the one I was in".
@@ -152,6 +163,7 @@ export function createCliBootstrapRuntimeContext(
     ...input.rootContext,
     sessionManager,
     renderer,
+    ...(writeJsonEvent ? { writeJsonEvent } : {}),
     recoveryCandidate,
     recoveryCandidateSummary,
     recoveryBlockedNotice,

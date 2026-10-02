@@ -180,6 +180,9 @@ export async function runCliProcess(
     // is built.
     getPromptInteractiveApproval: () => interactiveApprovalPrompt,
   });
+  if (bootstrapRuntime.writeJsonEvent) {
+    sessionRuntime.observeEvents(bootstrapRuntime.writeJsonEvent);
+  }
 
   const handledPrintMode = await runCliPrintModeRouter({
     cliModePlan: stdinPromptCapture.cliModePlan,

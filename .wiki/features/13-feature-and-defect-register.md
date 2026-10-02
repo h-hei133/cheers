@@ -2118,7 +2118,13 @@ https://github.com/cheers/community-plugins    -> HTTP 404（实测 curl）
 
 ## 11. CLI 入口、构建与发布面（`CLI` / `BLD`）
 
-### CLI-01 · `--json` 只在 `--print` 下产生 JSON，否则静默降级为 prose — `OPEN` `P2` `CONFIRMED`
+### CLI-01 · `--json` 模式与完整输出通道 — `FIXED` `P2` `CONFIRMED`
+
+**2026-10-02 修复**：`--json` 隐含非交互模式；启动时安装唯一 JSON 输出器，
+命令回复与诊断以 `cli.output` 事件输出，模型回合继续使用原有事件契约。
+临时抑制回合重复文本后恢复此前的输出器，后续命令仍输出 JSON，跨回合序号连续。
+67 项定向测试、构建与含启动诊断的真实回放验收通过；反向撤销后 5 项失败。
+以下保留修复前诊断。
 
 `entrypoints/cliArgs.ts:214` 把 `--json` 记为 `jsonEvents`；
 `cliRuntimeModule.ts:480-485` 只在**非交互 prompt 路径**里挂 `createJsonEventWriter`

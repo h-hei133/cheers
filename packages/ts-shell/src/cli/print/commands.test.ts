@@ -13,6 +13,30 @@ afterEach(async () => {
 });
 
 describe("scripted session commands", () => {
+  it.each([false, true])("emits only JSON, including commands after a model turn (turn=%s)", async (includeTurn) => {
+    const spec = buildProjectCliProcessSpec({
+      prompt: "", projectPath: path.join(root, "workspace"), homeDir: path.join(root, "home"),
+      args: ["--json", "--offline"],
+      env: { CHEERS_PROVIDER_MODE: "synthetic", CHEERS_TEST_ROOT: root }, timeoutMs: 20_000,
+    });
+    const result = await runAgentCliProcess({
+      ...spec, args: spec.args.filter((arg) => arg !== "" && arg !== "--print"),
+      stdin: `${includeTurn ? "Hello\n" : ""}/help\n/todo list\n/exit\n`,
+    });
+    expect(result.timedOut).toBe(false);
+    expect(result.exitCode, result.output.combined).toBe(0);
+    const lines = result.output.stdout.trim().split("\n").map((line) => JSON.parse(line));
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines.map((line) => line.order)).toEqual(lines.map((_, index) => index + 1));
+    expect(lines.every((line) => line.schemaVersion === "run-event-stream.v1")).toBe(true);
+    const output = lines.filter((line) => line.eventType === "cli.output").map((line) => line.facts.text).join("");
+    expect(output).toContain("No tasks currently");
+    if (includeTurn) {
+      expect(lines.some((line) => line.eventType === "query.started")).toBe(true);
+      expect(lines.some((line) => line.eventType === "query.completed")).toBe(true);
+    }
+  }, 25_000);
+
   it.each([true, false])("starts a fresh session and stops queued input (print=%s)", async (printMode) => {
     const spec = buildProjectCliProcessSpec({
       prompt: "", projectPath: path.join(root, "workspace"), homeDir: path.join(root, "home"),

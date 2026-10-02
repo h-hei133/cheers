@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createJsonEventWriter } from "./jsonEvents.js";
-import type { QueryEvent } from "../../core/query/runtime/events.js";
+import { createJsonEventWriter, type JsonStreamEvent } from "./jsonEvents.js";
 
 /**
  * The shape of the event stream, which is a published contract.
@@ -35,12 +34,23 @@ function asObject(value: unknown, what: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function collect(): { readonly lines: string[]; readonly write: (event: QueryEvent) => void } {
+function collect(): { readonly lines: string[]; readonly write: (event: JsonStreamEvent) => void } {
   const lines: string[] = [];
   return { lines, write: createJsonEventWriter((line) => lines.push(line)) };
 }
 
 describe("the event stream line", () => {
+  it("preserves command text without promoting it to a success claim", () => {
+    const { lines, write } = collect();
+    write({ type: "cli.output", text: 'line one\n"line two"\n' });
+    write({ type: "query.started", sessionId: "s", prompt: "hello" });
+    expect(readLine(lines[0]!)).toMatchObject({
+      order: 1, eventType: "cli.output", facts: { text: 'line one\n"line two"\n' },
+      truthfulness: { observationOnly: true, terminalSuccessClaim: false },
+    });
+    expect(readLine(lines[1]!).order).toBe(2);
+    expect(lines[0]!.split("\n")).toHaveLength(2);
+  });
   it("carries a version, a position, and the fact itself", () => {
     const { lines, write } = collect();
     write({ type: "query.started", sessionId: "s1", prompt: "hi" });

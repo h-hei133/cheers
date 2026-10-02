@@ -57,6 +57,7 @@ export async function runCliPrintModeRouter(
       logger: input.logger,
       approvalTrustPolicy: input.approvalTrustPolicy,
       printMode: Boolean(input.options.printMode),
+      jsonEvents: input.options.jsonEvents,
       setActiveNonInteractiveApprovalMode:
         input.setActiveNonInteractiveApprovalMode,
       nonInteractiveCliApprovalMode: input.options.nonInteractiveApproval,

@@ -18,6 +18,7 @@ export interface RunCliReplayModeInput {
   /** Passed through so a scripted `/permissions` writes the same trust store. */
   readonly approvalTrustPolicy: ApprovalTrustPolicy;
   readonly printMode: boolean;
+  readonly jsonEvents?: boolean;
   readonly setActiveNonInteractiveApprovalMode: (
     mode: ApprovalModeObject | undefined,
   ) => void;
@@ -36,6 +37,7 @@ export async function runCliReplayMode(
     logger: input.logger,
     approvalTrustPolicy: input.approvalTrustPolicy,
     printMode: input.printMode,
+    jsonEvents: input.jsonEvents,
     fallbackSessionId: input.bootstrapRuntime.recoveryCandidate?.id,
     lifecycleNotices: input.bootstrapRuntime.bootstrap.lifecycleNotices,
     setActiveNonInteractiveApprovalMode:
