@@ -32,7 +32,7 @@ export interface ObservedPageState {
  * such element" decides what the next attempt should be.
  */
 export interface BrowserSessionFailure {
-  readonly kind: "not-launched" | "url-refused" | "navigation-failed" | "action-failed";
+  readonly kind: "not-launched" | "url-refused" | "navigation-failed" | "action-failed" | "close-failed";
   /** What went wrong, in the terms the user can act on. */
   readonly reason: string;
   readonly nextAction: string;
@@ -121,6 +121,7 @@ class BrowserSessionManager {
   private currentTitle = "Blank Page";
   private elementRefs: Map<string, string> = new Map();
   private initPromise: Promise<PwPage | null> | null = null;
+  private closePromise: Promise<BrowserActionResult> | null = null;
   private cleanupRegistered = false;
   /**
    * The policy the current page's own requests are judged by.
@@ -131,8 +132,8 @@ class BrowserSessionManager {
    * same one a caller that names none gets.
    */
   private requestPolicy: BrowserOriginPolicy = readBrowserOriginPolicy();
-  /** The last launch failure, so the reason survives the failed attempt. */
-  private launchFailure: BrowserSessionFailure | null = null;
+  /** A failed launch or cleanup, retained until the operation can be retried. */
+  private sessionFailure: BrowserSessionFailure | null = null;
   private requestFailure: BrowserSessionFailure | null = null;
 
 
@@ -146,6 +147,8 @@ class BrowserSessionManager {
    * instead of a second launch attempt with the same outcome.
    */
   async getOrCreatePage(): Promise<PwPage | null> {
+    if (this.closePromise) await this.closePromise;
+    if (this.sessionFailure?.kind === "close-failed") return null;
     if (this.currentPage) return this.currentPage;
     if (this.initPromise) return this.initPromise;
 
@@ -160,7 +163,7 @@ class BrowserSessionManager {
         // answered and what evidence it has, which the failure path reuses.
         const imported = await importPwRuntime();
         if (!imported.ok || !imported.module.chromium) {
-          this.launchFailure = {
+          this.sessionFailure = {
             kind: "not-launched",
             reason: "Neither playwright-core nor playwright could be imported.",
             nextAction: "Install the workspace dependency, then retry.",
@@ -203,18 +206,14 @@ class BrowserSessionManager {
           });
           this.cleanupRegistered = true;
         }
-        this.launchFailure = null;
+        this.sessionFailure = null;
         return this.currentPage;
       } catch (error) {
-        this.launchFailure = classifyLaunchFailure(
+        const launchFailure = classifyLaunchFailure(
           error instanceof Error ? error.message : String(error),
         );
-        if (this.browser) {
-          await this.browser.close().catch(() => {});
-          this.browser = null;
-          this.context = null;
-          this.currentPage = null;
-        }
+        const cleanup = await this.closeResources();
+        if (cleanup.ok) this.sessionFailure = launchFailure;
         return null;
       } finally {
         this.initPromise = null;
@@ -257,7 +256,7 @@ class BrowserSessionManager {
     this.requestFailure = null;
     const page = await this.getOrCreatePage();
     if (!page) {
-      return { ok: false, url, failure: this.launchFailure ?? {
+      return { ok: false, url, failure: this.sessionFailure ?? {
         kind: "not-launched",
         reason: "The browser could not be started.",
         nextAction: "Check the browser runtime status for the available next step.",
@@ -455,7 +454,7 @@ class BrowserSessionManager {
     if (!page) {
       return {
         ok: false,
-        failure: this.launchFailure ?? {
+        failure: this.sessionFailure ?? {
           kind: "not-launched",
           reason: "No page is open, so nothing was done.",
           nextAction: "Open a page first, then act on an element it lists.",
@@ -508,7 +507,7 @@ class BrowserSessionManager {
     if (!page) {
       return {
         ok: false,
-        failure: this.launchFailure ?? {
+        failure: this.sessionFailure ?? {
           kind: "not-launched",
           reason: "No page is open, so no key was pressed.",
           nextAction: "Open a page first, then press the key.",
@@ -532,28 +531,48 @@ class BrowserSessionManager {
 
   /** Close the session and release the browser. */
   async closeSession(): Promise<BrowserActionResult> {
+    if (this.closePromise) return this.closePromise;
+    const closing = (async () => {
+      // A launch already in progress owns resources this close must observe.
+      if (this.initPromise) await this.initPromise;
+      return this.closeResources();
+    })();
+    this.closePromise = closing;
     try {
-      if (this.currentPage) {
-        await this.currentPage.close().catch(() => {});
-        this.currentPage = null;
+      return await closing;
+    } finally {
+      if (this.closePromise === closing) this.closePromise = null;
+    }
+  }
+
+  private async closeResources(): Promise<BrowserActionResult> {
+    const failures: string[] = [];
+    const resources = [
+      ["currentPage", "page"], ["context", "context"], ["browser", "browser"],
+    ] as const;
+    for (const [key, label] of resources) {
+      const resource = this[key];
+      if (!resource) continue;
+      try {
+        await resource.close();
+        if (this[key] === resource) this[key] = null;
+      } catch (error) {
+        failures.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
       }
-      if (this.context) {
-        await this.context.close().catch(() => {});
-        this.context = null;
-      }
-      if (this.browser) {
-        await this.browser.close().catch(() => {});
-        this.browser = null;
-      }
-    } catch {
-      // Closing is best-effort: a browser that will not close is already gone,
-      // and reporting it would leave the session unusable for no gain.
     }
     this.elementRefs.clear();
+    this.requestFailure = null;
+    if (failures.length > 0) {
+      this.sessionFailure = {
+        kind: "close-failed",
+        reason: `Browser cleanup failed for ${failures.join("; ")}.`,
+        nextAction: "Retry the close action before opening another browser session.",
+      };
+      return { ok: false, failure: this.sessionFailure };
+    }
     this.currentUrl = "about:blank";
     this.currentTitle = "Blank Page";
-    this.launchFailure = null;
-    this.requestFailure = null;
+    this.sessionFailure = null;
     return { ok: true, output: "Browser session closed and resources released." };
   }
 }
