@@ -19,7 +19,7 @@ export interface StartupWarmContextSurfaceInput {
 export function renderStartupWarmContextSurface(
   input: StartupWarmContextSurfaceInput,
 ): string {
-  const cache = input.cache ?? input.write?.cache ?? input.read?.cache;
+  const cache = input.read ? input.read.cache : input.cache ?? input.write?.cache;
   return [
     "Startup warm context",
     "Result",
@@ -63,6 +63,7 @@ function warningLines(values: readonly string[]): readonly string[] {
 
 function nextAction(input: StartupWarmContextSurfaceInput): string {
   if (input.blocker) {
+    if (input.health.staleness === "invalid") return "- Rebuild the invalid cache with /warmup rebuild after checking the explicit cache path.";
     return "- Provide an explicit project/cache root harness, then rerun /warmup status or /warmup rebuild.";
   }
   if (input.outcome === "rebuilt") {
@@ -74,5 +75,6 @@ function nextAction(input: StartupWarmContextSurfaceInput): string {
   if (input.health.staleness === "stale") {
     return "- Rebuild the warm cache when the safe source summaries change.";
   }
+  if (input.health.staleness === "unknown") return "- Freshness has not been checked against current sources. Rebuild to refresh the local summaries.";
   return "- Continue normally. Warm cache remains a local status surface only.";
 }

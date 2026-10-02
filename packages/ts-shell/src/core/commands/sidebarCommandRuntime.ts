@@ -1,4 +1,6 @@
 import { getLatestCompactCheckpoint } from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
+import path from "node:path";
+import { projectStartupWarmContextCacheHealth } from "../../context/startup/startupWarmContextHealth.js";
 import { browserCapabilitySidebarToolItem } from "../../browser/capabilitySurface.js";
 import { parseSidebarLivePanelCommandArgs } from "../../presentation/sidebar/sidebarLivePanelCommandContract.js";
 import { runSidebarLivePanelCommand } from "../../presentation/sidebar/sidebarLivePanelCommandRunner.js";
@@ -38,11 +40,14 @@ export async function runSidebarLocalCommand(
   const projectMemoryRecords = context.projectMemoryStore
     ? (await context.projectMemoryStore.list()).records
     : undefined;
-  const startupWarmHealth = context.startupWarmContextCacheStore
-    ? await context.startupWarmContextCacheStore.health()
-    : undefined;
   const startupWarmRead = context.startupWarmContextCacheStore
-    ? await context.startupWarmContextCacheStore.read()
+    ? context.startupWarmContextCacheStore.ref.projectRoot
+      && path.resolve(context.startupWarmContextCacheStore.ref.projectRoot) !== path.resolve(context.cwd)
+      ? { found: false, staleness: "invalid" as const, blocker: "Startup warm cache belongs to a different project.", evidence: ["startup-warm-context-store:project-mismatch"] }
+      : await context.startupWarmContextCacheStore.read()
+    : undefined;
+  const startupWarmHealth = context.startupWarmContextCacheStore && startupWarmRead
+    ? projectStartupWarmContextCacheHealth(context.startupWarmContextCacheStore.ref, startupWarmRead)
     : undefined;
   const liveEvents = sidebarLiveEventStoreForContext(context).listRecent({
     sessionScopeId,

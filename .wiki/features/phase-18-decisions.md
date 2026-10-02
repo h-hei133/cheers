@@ -199,7 +199,7 @@ W6-23已把侧栏重复编号改为OBS-11/OBS-12；本表按更正后的24个唯
 | **29** | `memory/**`(36) + `context/**`(28) **逐模块**审计 | 13 册 §13.2 / §16.4 | 前置研究已覆盖 `CTX-02/06/07/08/09`（含 3 条 P1）；**其余模块的逐模块行为**未做 | 64 模块 |
 | **30** | 子代理递归深度与**工具继承** | 13 册 §13.2 / §16.4 | 已完成：单层递归和工具交集已核验；修复权限、正文、模型schema、执行工作区与worktree生命周期。清理仅保证保留检查时可见改动，要求写入方已停止；后台并发写入限制见本项实施记录 | 原runner、工具门与worktree owner |
 | **31** | `core/shell`(37) 完整审计 | 13 册 §13.2 | 13 册 §13.2 明确记「`core/shell` 仍部分未覆盖」（补做轮只覆盖了内核循环）。**37 个非测试模块** | 37 模块 |
-| **32** | `context/startup/**` + `readCache` 的**行为**验证 | 13 册 §18 | **有界性**已记 `CTX-09`（且 W3-13 会给它加上限），但**命中/失效语义未验**（`startupWarmContextCache` 的缓存命中判定、`readCache` 的「同一请求同一 mtime」谓词在真实编辑循环下的行为）。`context/startup/` 是 6 个非测试模块 | 6 模块 |
+| **32** | `context/startup/**` + 原read去重的行为审计 | 13 册 §18 | 已完成：read去重退役；startup六模块验证输入、项目绑定、fresh/stale/invalid/unknown及失败状态，缺失来源不再以占位文字冒充 | 六模块及现有命令/侧栏消费者 |
 | **33** | provider 四端点**真实**流边界（TLS/HTTP2 层） | 13 册 §16.4 / §18 | 合成块覆盖了帧级；**TLS/HTTP2 层未覆盖**。⚠️ **凭据已就位**（§9 已跑通 openai 兼容与 Anthropic 原生两条路径）⇒ **OpenAI 兼容侧现在即可执行**；Anthropic 原生侧需给 `anthropic` provider 另配 baseUrl；**Google 侧该中转站不支持（405）**，需另一家 | 4 协议（本轮可执行 2/4） |
 
 **波内顺序建议**：**25 → 30 → 32 → 28 → 26 → 31 → 27 → 29 → 33**。
@@ -575,6 +575,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W7-25 / THM-03 | auto已落地；48个实用令牌、4套预设及旧主题继承；数字对齐裁决按实际消费者修正 | 已完成，本地验证通过 |
 | W7-30 / W8-34 / SUB-01 | 最窄权限、单层递归、工具清单、任务正文、执行上下文及worktree生命周期已闭合；清理须停止写入方 | 已完成，本地验证通过；并发后台写入为明确限制 |
 | W8-40 / TOL-10（随W7-30） | 失败原因及部分答复保留；工具阶段取消和空答复按失败结算；适配器向父模型传递error | 已完成，定向验证通过；旧result-contract脚本仍失败 |
+| W7-32 | read每次返回正文；startup结构/身份/有界读写、freshness与命令投影已修复；保留默认禁用 | 已完成，定向验证与隔离验收通过 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1295,3 +1296,26 @@ runner把已裁决的allowedTools传给step，step只对绑定的父schema做交
 
 验证：新4项在旧实现上全部失败；修复后8套128项通过，构建通过。隔离无凭据的编译运行时经真实turn/task注册表验证父read→共享目录子read→同mtime外部改写→父read，两个模型均收到对应正文；未调用真实provider。
 独立代码/架构复核最终APPROVE/CLEAR。将registry与原缓存恢复至修复前后，两套测试5失败、18通过；源码字节与删除状态恢复。静态阻断门禁通过：1395文件零环，配置39/39、hooks18/18、工厂10/10、Node floor与docs strict（120项既有advisory）。前一worktree提交e7303863的CI 37013332299与Architecture Watch 37013332066均通过。
+
+### W7-32 startup六模块行为审计
+
+这是一份显式本地、可丢弃的摘要缓存，生产默认不创建store、不启动时加载、不注入模型。源审和编译探针证实：错误项目/安全字段/日期被当作fresh返回；未知版本仍返回正文；disabled带路径仍读文件；损坏文件被health称作安全缺失；runner以占位说明冒充三类真实来源。
+参考的本地设置加载器把解析错误与空配置分开，未获信任的项目不读配置；本实现采用“拒绝入口与保留错误”决策。参考没有等价warm-cache协议，以下结构、freshness与显式来源规则标为自研，不声称照搬缓存机制。
+
+| 模块 | 判据及结果 |
+|---|---|
+| startupWarmContextCache | 先验证unknown结构、枚举、日期及精确安全字面量，再按已知字段投影；嵌套额外数据不会透传。项目根统一resolve；签名针对安全摘要，不是认证证据 |
+| startupWarmContextBuilder | 编辑能力来源仍为现有清单；记忆来源走原预览/有效记录过滤；省略的compact/validation/phase为missing。既有脱敏与无provider/持久写入测试通过 |
+| startupWarmContextHealth | disabled在I/O前返回；匹配显式项目root/hash；只读打开的常规文件，上限256KiB；仅ENOENT是missing，其余无效/不可读不返回摘要。写入经独占临时文件和同目录rename；替换前失败保留旧缓存且只清理自有临时文件 |
+| startupWarmCommandContract | 原status/rebuild语法保持，超额/未知参数仍由契约拒绝；合法命令经现有runner与路由验收 |
+| startupWarmCommandRunner | 去掉固定compact/validation/phase占位输入；status取单次读取；rebuild写入后以当前来源签名回读验证，写成功而回读失败仍blocked；不同项目不读store |
+| startupWarmContextSurface | 缺失、invalid、unknown与blocked分别展示；invalid不显示write阶段旧摘要，给出重建动作；unknown不宣称当前来源已验证 |
+
+freshness表：没有当前来源签名为unknown；签名不等或TTL过期为stale；签名相等且其他检查正常才为fresh；未来时间/非法日期/TTL为invalid。未过期TTL只证明年龄，不能证明来源相同。侧栏同样绑定选定项目，并用同次读取投影健康状态和正文。
+项目hash防止误配，不认证缓存作者。rename避免半写文件，但不承诺fsync崩溃持久性；显式路径由调用者配置，不把本地缓存当授权或事实证明。
+
+验证：实现前新增两套用例10失败、7通过。初轮14套97项通过；附加边界与侧栏项目保护后相关4套70项通过，累计14个唯一套件103项；构建通过。一次超大write测试误用相同warnings，被既有去重收敛，归类harness/setup drift；改成不同内容后通过，未削弱产品限额。
+独立代码/架构最终APPROVE/CLEAR；复核补入侧栏项目拒绝及无真实来源的missing状态。反向恢复5个生产模块后17失败、53通过，源文件逐字节恢复。
+隔离编译运行时经实际slashRouter与文件store验证rebuild回读、无来源unknown、损坏blocked、修复、侧栏项目绑定和默认禁用；未使用真实provider。常规/全屏PTY验证/warmup status为disabled、rebuild为blocked，退出0。首轮PTY误以为regular长输出不打开阅读器，第二条命令进入阅读器过滤；改为关闭阅读器后两模式均通过，这是验收交互设置错误。
+前一read提交33118b2b的CI 37014985304与Architecture Watch 37014985560均通过。W7-32完成，继续W7-28 receipt保证强度审计。
+静态门禁全部通过：1395文件零环，配置39/39、hooks18/18、工厂10/10、Node floor和docs strict；文档120项、可达性7项与函数上限7项advisory无新增。旧result-contract脚本仍待后续session/shell审计处理。

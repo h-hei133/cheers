@@ -1,4 +1,6 @@
 import type { ProjectMemoryStore } from "../../memory/projectMemoryStoreContract.js";
+import path from "node:path";
+import { projectStartupWarmContextCacheHealth } from "./startupWarmContextHealth.js";
 import { buildStartupWarmContext } from "./startupWarmContextBuilder.js";
 import type { StartupWarmCommandRequest } from "./startupWarmCommandContract.js";
 import { renderStartupWarmContextSurface } from "./startupWarmContextSurface.js";
@@ -26,30 +28,32 @@ export interface StartupWarmCommandResult {
 export async function runStartupWarmCommand(
   input: RunStartupWarmCommandInput,
 ): Promise<StartupWarmCommandResult> {
-  const health = input.cacheStore
-    ? await input.cacheStore.health()
-    : disabledHealth();
   if (!input.cacheStore) {
     if (input.request.mode === "status") {
       return result(input, {
         outcome: "status",
-        health,
+        health: disabledHealth(),
       });
     }
     return result(input, {
       outcome: "blocked",
-      health,
+      health: disabledHealth(),
       blocker: "Explicit local startup warm cache store is required.",
     });
+  }
+  if (input.cacheStore.ref.projectRoot && path.resolve(input.cacheStore.ref.projectRoot) !== path.resolve(input.projectRoot)) {
+    return result(input, { outcome: "blocked", health: disabledHealth(), blocker: "Startup warm cache belongs to a different project." });
   }
   if (input.request.mode === "status") {
     const read = await input.cacheStore.read();
     return result(input, {
-      outcome: "status",
-      health: await input.cacheStore.health(),
+      outcome: read.blocker ? "blocked" : "status",
+      health: projectStartupWarmContextCacheHealth(input.cacheStore.ref, read),
       read,
+      blocker: read.blocker,
     });
   }
+  const health = await input.cacheStore.health();
   if (!health.writable) {
     return result(input, {
       outcome: "blocked",
@@ -62,20 +66,16 @@ export async function runStartupWarmCommand(
     cacheMode: input.cacheStore.ref.mode,
     createdAt: input.now ? input.now() : new Date().toISOString(),
     memoryStore: input.memoryStore,
-    compactSummary: "Compact v2 summary source is safe-summary-only when supplied by route/session code.",
-    validationEvidence: ["warmup-command:rebuild-explicit"],
-    routePhase: {
-      summary: "Startup warm context cache prototype is local, discardable, and not auto-injected.",
-      nextAction: "Inspect status; defer startup auto-load and sidebar integration.",
-      evidence: ["route87:warmup-command"],
-    },
   });
   const write = await input.cacheStore.write(built.cache);
+  const read = await input.cacheStore.read({ currentSourceSignature: built.cache.sourceSummary.sourceSignature });
+  const verified = write.written && read.found && read.staleness === "fresh";
   return result(input, {
-    outcome: write.written ? "rebuilt" : "blocked",
-    health: await input.cacheStore.health(),
+    outcome: verified ? "rebuilt" : "blocked",
+    health: projectStartupWarmContextCacheHealth(input.cacheStore.ref, read),
     write,
-    blocker: write.blocker,
+    read,
+    blocker: verified ? undefined : write.blocker ?? read.blocker ?? "The rebuilt cache could not be verified.",
     extraEvidence: built.evidence,
   });
 }

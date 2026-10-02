@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import path from "node:path";
+import { isRecord } from "../../core/values/record.js";
 
 export const STARTUP_WARM_CONTEXT_CACHE_VERSION = 1 as const;
 
@@ -61,6 +63,34 @@ export interface StartupWarmContextCacheInput {
   readonly staleness?: StartupWarmContextStaleness;
 }
 
+/** Validate persisted values before projecting any of their summaries. */
+export function isStartupWarmContextCache(value: unknown): value is StartupWarmContextCache {
+  if (!isRecord(value) || !isRecord(value.projectRef) || !isRecord(value.sourceSummary) || !isRecord(value.safety)) return false;
+  const safety = value.safety;
+  return value.cacheVersion === STARTUP_WARM_CONTEXT_CACHE_VERSION
+    && typeof value.cacheMode === "string" && ["disabled", "explicit-local", "test-only"].includes(value.cacheMode)
+    && typeof value.projectRef.projectRootHash === "string"
+    && (value.projectRef.projectRoot === undefined || typeof value.projectRef.projectRoot === "string")
+    && typeof value.createdAt === "string" && Number.isFinite(Date.parse(value.createdAt))
+    && typeof value.sourceSummary.sourceSignature === "string"
+    && isStringList(value.sourceSummary.sources) && isStringList(value.sourceSummary.generatedFrom)
+    && [value.editCapabilitySummary, value.compactSummary, value.memoryWakeupSummary, value.validationSummary, value.routePhaseSummary].every(isSection)
+    && isStringList(value.redactions) && isStringList(value.warnings)
+    && typeof value.staleness === "string" && ["fresh", "stale", "invalid", "unknown"].includes(value.staleness)
+    && safety.injectedIntoModel === false && safety.startupAutoLoad === false
+    && safety.providerCall === "none" && safety.vectorStore === "none"
+    && safety.rawContent === "excluded" && safety.discardable === true;
+}
+
+function isStringList(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+}
+
+function isSection(value: unknown): value is StartupWarmContextSection {
+  return isRecord(value) && typeof value.status === "string" && ["available", "missing", "stale", "blocked"].includes(value.status)
+    && typeof value.summary === "string" && isStringList(value.evidence);
+}
+
 export function buildStartupWarmContextCache(
   input: StartupWarmContextCacheInput,
 ): StartupWarmContextCache {
@@ -68,8 +98,8 @@ export function buildStartupWarmContextCache(
     cacheVersion: STARTUP_WARM_CONTEXT_CACHE_VERSION,
     cacheMode: input.cacheMode,
     projectRef: {
-      projectRoot: input.projectRoot,
-      projectRootHash: projectRootHash(input.projectRoot ?? "unknown-project-root"),
+      projectRoot: input.projectRoot ? path.resolve(input.projectRoot) : undefined,
+      projectRootHash: projectRootHash(input.projectRoot ? path.resolve(input.projectRoot) : "unknown-project-root"),
     },
     createdAt: input.createdAt,
     sourceSummary: input.sourceSummary,
@@ -99,9 +129,14 @@ export function sanitizeStartupWarmContextCache(
   const redactions = new Set(cache.redactions);
   const sanitize = (value: string) => sanitizeWarmCacheText(value, redactions);
   return {
-    ...cache,
+    cacheVersion: cache.cacheVersion,
+    cacheMode: cache.cacheMode,
+    projectRef: { projectRoot: cache.projectRef.projectRoot, projectRootHash: cache.projectRef.projectRootHash },
+    createdAt: cache.createdAt,
+    staleness: cache.staleness,
+    safety: { injectedIntoModel: false, startupAutoLoad: false, providerCall: "none", vectorStore: "none", rawContent: "excluded", discardable: true },
     sourceSummary: {
-      ...cache.sourceSummary,
+      sourceSignature: cache.sourceSummary.sourceSignature,
       sources: cache.sourceSummary.sources.map(sanitize),
       generatedFrom: cache.sourceSummary.generatedFrom.map(sanitize),
     },
@@ -177,7 +212,7 @@ function sanitizeSection(
   sanitize: (value: string) => string,
 ): StartupWarmContextSection {
   return {
-    ...section,
+    status: section.status,
     summary: sanitize(section.summary),
     evidence: dedupe(section.evidence.map(sanitize)),
   };

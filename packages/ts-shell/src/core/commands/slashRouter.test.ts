@@ -666,6 +666,23 @@ describe("slash router (W4)", () => {
     }
   });
 
+  it("does not inspect a warm cache attached to a different sidebar workspace", async () => {
+    let reads = 0;
+    let healthChecks = 0;
+    const startupWarmContextCacheStore = createStartupWarmContextCacheStore({
+      ref: { mode: "test-only", projectRoot: path.join(workspaceRoot, "other-project"), cacheRoot: workspaceRoot },
+    });
+    const read = startupWarmContextCacheStore.read;
+    const health = startupWarmContextCacheStore.health;
+    startupWarmContextCacheStore.read = async (...args) => { reads++; return read(...args); };
+    startupWarmContextCacheStore.health = async (...args) => { healthChecks++; return health(...args); };
+    const result = await routeSlashCommand("/sidebar snapshot", { cwd: workspaceRoot, startupWarmContextCacheStore });
+    expect(result?.kind).toBe("local");
+    expect(reads).toBe(0);
+    expect(healthChecks).toBe(0);
+    expect(result?.kind === "local" ? result.output : "").toContain("staleness: invalid");
+  });
+
   it("routes compact JSON mode and rejects invalid compact args", async () => {
     const compactCheckpointStore = createCompactLiveCheckpointStore({
       now: () => "2026-05-15T00:00:00.000Z",

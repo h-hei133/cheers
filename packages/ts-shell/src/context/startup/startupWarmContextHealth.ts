@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import {
-  STARTUP_WARM_CONTEXT_CACHE_VERSION,
+  isStartupWarmContextCache,
   projectRootHash,
   sanitizeStartupWarmContextCache,
   startupWarmCacheHasForbiddenContent,
@@ -9,6 +10,8 @@ import {
   type StartupWarmContextCacheMode,
   type StartupWarmContextStaleness,
 } from "./startupWarmContextCache.js";
+
+const MAX_CACHE_BYTES = 256 * 1024;
 
 export interface StartupWarmContextCacheStoreRef {
   readonly mode: StartupWarmContextCacheMode;
@@ -80,11 +83,12 @@ export function readStartupWarmContextCache(
   ref: StartupWarmContextCacheStoreRef,
   options: StartupWarmContextCacheHealthOptions = {},
 ): StartupWarmContextCacheReadResult {
-  if (!storeRefIsUsable(ref)) {
+  ref = normalizeRef(ref);
+  if (ref.mode === "disabled" || !storeRefIsUsable(ref)) {
     return {
       found: false,
       staleness: "unknown",
-      blocker: "Explicit project root and cache root are required.",
+      ...(ref.mode === "disabled" ? {} : { blocker: "Explicit project root and cache root are required." }),
       evidence: [
         "startup-warm-context-store:explicit-roots-required",
         "startup-warm-context-store:no-default-path",
@@ -92,20 +96,13 @@ export function readStartupWarmContextCache(
     };
   }
   const cacheFile = cacheFileFor(ref);
-  if (!fs.existsSync(cacheFile)) {
-    return {
-      found: false,
-      staleness: "unknown",
-      evidence: [
-        "startup-warm-context-store:missing-cache-safe",
-        "startup-warm-context-store:discardable",
-      ],
-    };
-  }
   try {
-    const parsed = JSON.parse(fs.readFileSync(cacheFile, "utf8")) as StartupWarmContextCache;
+    const parsed: unknown = JSON.parse(readCacheFile(cacheFile));
+    if (!isStartupWarmContextCache(parsed) || !matchesProject(parsed, ref)) throw new Error("Invalid cache structure or project identity.");
     const sanitized = sanitizeStartupWarmContextCache(parsed);
+    if (startupWarmCacheHasForbiddenContent(sanitized)) throw new Error("Cache contains unsafe metadata.");
     const staleness = evaluateStaleness(sanitized, options);
+    if (staleness === "invalid") throw new Error("Invalid cache freshness metadata or comparison options.");
     return {
       cache: { ...sanitized, staleness },
       found: true,
@@ -116,10 +113,14 @@ export function readStartupWarmContextCache(
       ],
     };
   } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return {
+      found: false, staleness: "unknown",
+      evidence: ["startup-warm-context-store:missing-cache-safe", "startup-warm-context-store:discardable"],
+    };
     return {
       found: false,
       staleness: "invalid",
-      blocker: error instanceof Error ? error.message : "Invalid startup warm context cache.",
+      blocker: "Startup warm context cache is invalid or unreadable; rebuild the explicit local cache.",
       evidence: ["startup-warm-context-store:invalid-cache"],
     };
   }
@@ -129,6 +130,7 @@ export function writeStartupWarmContextCache(
   ref: StartupWarmContextCacheStoreRef,
   cache: StartupWarmContextCache,
 ): StartupWarmContextCacheWriteResult {
+  ref = normalizeRef(ref);
   if (!storeRefIsWritable(ref)) {
     return {
       written: false,
@@ -139,6 +141,9 @@ export function writeStartupWarmContextCache(
       ],
     };
   }
+  if (!isStartupWarmContextCache(cache) || !matchesProject(cache, ref) || cache.staleness === "invalid") {
+    return { written: false, blocker: "Invalid cache structure or project identity.", evidence: ["startup-warm-context-store:invalid-cache"] };
+  }
   const sanitized = sanitizeStartupWarmContextCache(cache);
   if (startupWarmCacheHasForbiddenContent(sanitized)) {
     return {
@@ -148,8 +153,11 @@ export function writeStartupWarmContextCache(
     };
   }
   const cacheFile = cacheFileFor(ref);
-  fs.mkdirSync(path.dirname(cacheFile), { recursive: true });
-  fs.writeFileSync(cacheFile, `${JSON.stringify(sanitized, null, 2)}\n`, "utf8");
+  try {
+    writeCacheFile(cacheFile, `${JSON.stringify(sanitized, null, 2)}\n`);
+  } catch {
+    return { written: false, blocker: "Startup warm cache write could not be confirmed; inspect the explicit cache path before retrying.", evidence: ["startup-warm-context-store:write-failed"] };
+  }
   return {
     written: true,
     cache: sanitized,
@@ -168,8 +176,16 @@ export function checkStartupWarmContextCacheHealth(
   ref: StartupWarmContextCacheStoreRef,
   options: StartupWarmContextCacheHealthOptions = {},
 ): StartupWarmContextCacheHealth {
+  return projectStartupWarmContextCacheHealth(ref, readStartupWarmContextCache(ref, options));
+}
+
+/** Keep health and displayed content tied to the same disk observation. */
+export function projectStartupWarmContextCacheHealth(
+  ref: StartupWarmContextCacheStoreRef,
+  read: StartupWarmContextCacheReadResult,
+): StartupWarmContextCacheHealth {
   const normalized = normalizeRef(ref);
-  if (!storeRefIsUsable(normalized)) {
+  if (normalized.mode === "disabled" || !storeRefIsUsable(normalized)) {
     return {
       mode: normalized.mode,
       ok: normalized.mode === "disabled",
@@ -183,7 +199,6 @@ export function checkStartupWarmContextCacheHealth(
       ],
     };
   }
-  const read = readStartupWarmContextCache(normalized, options);
   return {
     mode: normalized.mode,
     ok: read.staleness !== "invalid",
@@ -192,9 +207,9 @@ export function checkStartupWarmContextCacheHealth(
     staleness: read.staleness,
     cacheRoot: normalized.cacheRoot,
     cacheFile: cacheFileFor(normalized),
-    detail: read.found
+    detail: read.blocker ?? (read.found
       ? `Startup warm cache is ${read.staleness}.`
-      : "Startup warm cache is missing; this is safe because the cache is discardable.",
+      : "Startup warm cache is missing; this is safe because the cache is discardable."),
     evidence: [
       ...read.evidence,
       "startup-warm-context-health:checked",
@@ -237,23 +252,66 @@ function evaluateStaleness(
   cache: StartupWarmContextCache,
   options: StartupWarmContextCacheHealthOptions,
 ): StartupWarmContextStaleness {
-  if (cache.cacheVersion !== STARTUP_WARM_CONTEXT_CACHE_VERSION) {
-    return "invalid";
-  }
+  const created = Date.parse(cache.createdAt);
+  if (!Number.isFinite(created) || cache.staleness === "invalid") return "invalid";
+  const now = options.nowMs ?? Date.now();
+  if (!Number.isFinite(now) || created > now || (options.ttlMs !== undefined && (!Number.isFinite(options.ttlMs) || options.ttlMs < 0))) return "invalid";
+  if (options.currentSourceSignature !== undefined && (typeof options.currentSourceSignature !== "string" || !options.currentSourceSignature)) return "invalid";
   if (
-    options.currentSourceSignature &&
+    options.currentSourceSignature !== undefined &&
     cache.sourceSummary.sourceSignature !== options.currentSourceSignature
   ) {
     return "stale";
   }
-  if (options.ttlMs !== undefined && options.nowMs !== undefined) {
-    const created = Date.parse(cache.createdAt);
-    if (!Number.isFinite(created)) {
-      return "invalid";
-    }
-    if (options.nowMs - created > options.ttlMs) {
+  if (options.ttlMs !== undefined) {
+    if (now - created > options.ttlMs) {
       return "stale";
     }
   }
-  return "fresh";
+  if (cache.staleness === "stale") return "stale";
+  return options.currentSourceSignature !== undefined ? "fresh" : "unknown";
+}
+
+function matchesProject(cache: StartupWarmContextCache, ref: StartupWarmContextCacheStoreRef): boolean {
+  return cache.projectRef.projectRootHash === projectRootHash(ref.projectRoot!)
+    && (cache.projectRef.projectRoot === undefined || path.resolve(cache.projectRef.projectRoot) === ref.projectRoot);
+}
+
+function readCacheFile(cacheFile: string): string {
+  const fd = fs.openSync(cacheFile, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0) | (fs.constants.O_NONBLOCK ?? 0));
+  try {
+    const stats = fs.fstatSync(fd);
+    if (!stats.isFile() || stats.size > MAX_CACHE_BYTES) throw new Error("Cache is not a bounded regular file.");
+    const bytes = Buffer.alloc(MAX_CACHE_BYTES + 1);
+    let count = 0;
+    while (count < bytes.length) {
+      const read = fs.readSync(fd, bytes, count, bytes.length - count, null);
+      if (read === 0) break;
+      count += read;
+    }
+    if (count > MAX_CACHE_BYTES) throw new Error("Cache exceeds its byte limit.");
+    return bytes.subarray(0, count).toString("utf8");
+  } finally { fs.closeSync(fd); }
+}
+
+function writeCacheFile(cacheFile: string, content: string): void {
+  if (Buffer.byteLength(content) > MAX_CACHE_BYTES) throw new Error("Cache exceeds its byte limit.");
+  fs.mkdirSync(path.dirname(cacheFile), { recursive: true });
+  try {
+    if (!fs.lstatSync(cacheFile).isFile()) throw new Error("Cache destination is not a regular file.");
+  } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+  const temporary = `${cacheFile}.${randomUUID()}.tmp`;
+  let ownedTemporary = false;
+  try {
+    const fd = fs.openSync(temporary, "wx", 0o600);
+    ownedTemporary = true;
+    try { fs.writeFileSync(fd, content, "utf8"); }
+    finally { fs.closeSync(fd); }
+    fs.renameSync(temporary, cacheFile);
+    ownedTemporary = false;
+  } finally {
+    if (ownedTemporary) {
+      try { fs.unlinkSync(temporary); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+    }
+  }
 }
