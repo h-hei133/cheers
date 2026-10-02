@@ -138,6 +138,8 @@ export interface TextFileReadExecutionRequest extends ExecutionRequestMetadata<'
 export interface TextFileWriteExecutionRequest extends ExecutionRequestMetadata<'file.write'> {
   readonly absolutePath: string
   readonly content: string
+  /** Exact text read to compute this edit, including BOM and line endings. */
+  readonly expectedContent?: string
 }
 
 export interface FileListExecutionRequest extends ExecutionRequestMetadata<'file.list'> {

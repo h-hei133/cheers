@@ -594,6 +594,7 @@ export function createCoreToolRegistry(options?: {
         let original = ''
         let originalUnreadable = false
         let finalContent = ''
+        let expectedContent: string | undefined
         const segmentEdits = readSegmentEdits(args)
         // The three ways to say what to change are alternatives, and every
         // combination is refused rather than resolved. Each branch below would
@@ -631,6 +632,7 @@ export function createCoreToolRegistry(options?: {
           // separated out before matching and put back before writing, because a
           // model never types the mark or the carriage returns.
           const { bom, text: content } = splitByteOrderMark(raw)
+          expectedContent = raw
           const lineEnding = detectLineEnding(content)
           original = content
           const replaceRes = replaceManyInContent(
@@ -659,6 +661,7 @@ export function createCoreToolRegistry(options?: {
           // so leaving them in the text makes a pattern that cannot be found, and
           // returning them untouched is the only way the file keeps its style.
           const { bom, text: content } = splitByteOrderMark(raw)
+          expectedContent = raw
           const lineEnding = detectLineEnding(content)
           original = content
           // If the model copied a leading BOM into oldText (or newText), strip it
@@ -686,6 +689,7 @@ export function createCoreToolRegistry(options?: {
               reason: 'Read original content for diff.',
               reportSafeTarget: containment.resolvedPath,
             })
+            expectedContent = original
           } catch {
             originalUnreadable = true
           }
@@ -698,6 +702,7 @@ export function createCoreToolRegistry(options?: {
           operationKind: 'file.write',
           absolutePath: containment.resolvedPath,
           content: finalContent,
+          expectedContent,
           workspaceRoot: context.workspaceRoot,
           authority: TOOL_APPROVED_WRITE_AUTHORITY,
           caller: 'core-tool:edit',

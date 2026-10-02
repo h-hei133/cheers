@@ -534,7 +534,24 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 
 ### 8.4 实施记录
 
-**（本轮为规划轮，零代码改动；施工后由 13 号册标注状态。见 §2 的执行表。）**
+2026-10-02：从 `feat/phase-18` 上已有的条件写入实现继续施工。规划原稿独立保存于
+`b271e40`；执行状态按下表与登记册核对，其余执行项仍待完成。
+
+| 执行项 | 当前证据 | 状态 |
+|---|---|---|
+| W1-1 / `TOL-07` | 三条 edit 输入路径传递未经正规化的原文；持锁快照前与异步快照后各复核一次；外部进程改写、删除、空文件与 BOM/CRLF 回归覆盖 | 已实现，本地验证通过 |
+| W1-2–6 | 非交互命令、JSON 输出、循环提示、日志容量、浏览器关闭结果 | 施工中 |
+| W2–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
+
+W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
+src/runtime/execution/service.test.ts src/runtime/execution/fileLock.test.ts
+src/core/tools/editEngine.test.ts src/core/tools/highValueTools.test.ts
+src/core/security/writeTarget.test.ts`，6 文件 / 89 项通过；`npm run build:ts` 退出 0。
+反向移除两处内容复核后，条件写入套件 8 失败 / 3 通过，恢复后 11 项通过。
+保留现有无条件写入语义；条件写入检测已经观察到的外部改动，不承诺文件系统级原子比较交换。
+对照决策为「原有单文件队列 + 锁内原文比较」；本仓额外覆盖恢复快照的异步等待窗口。
+
+每波末的静态门禁、脚本测试、真实终端验收与远端结果另行补记，不从上述局部结果推定。
 
 ---
 

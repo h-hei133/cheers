@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs'
 import { withFileLock } from './fileLock.js'
+import { FileContentConflictError } from './conflict.js'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { createWorkspaceWriteAuthority } from '../../edit/authority/workspace.js'
@@ -88,11 +89,21 @@ async function writeTextFileUnlocked(request: TextFileWriteExecutionRequest): Pr
   const before = existsSync(request.absolutePath)
     ? authority.readVerifiedFile(relativePath)
     : undefined
+  if (request.expectedContent !== undefined && before !== request.expectedContent) {
+    throw new FileContentConflictError(request.reportSafeTarget)
+  }
   await captureSnapshotBeforeWrite({
     workspaceRoot: request.workspaceRoot,
     relativePath,
     before,
   })
+  // Snapshot persistence yields to other writers. Compare again immediately
+  // before the synchronous write, even if snapshot storage failed. This detects
+  // observed external edits; it is not an atomic filesystem compare-and-swap.
+  if (request.expectedContent !== undefined
+    && authority.readVerifiedFile(relativePath) !== request.expectedContent) {
+    throw new FileContentConflictError(request.reportSafeTarget)
+  }
   if (existsSync(request.absolutePath)) {
     // Existing targets are opened with O_NOFOLLOW and re-verified through the
     // opened descriptor, so a symlink swapped in after the check still loses.
