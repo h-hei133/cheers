@@ -204,11 +204,8 @@ describe("High-Value Modern Built-in Tools Subsystem", () => {
   });
 
   describe("task tool", () => {
-    it("prepares the subagent and reports that nothing was dispatched without a provider", async () => {
-      // No credential is configured in the test environment, so no request is
-      // sent. The tool used to answer "All delegated instructions have been
-      // completed" on the strength of an empty response string — a claim nothing
-      // supported, and one a caller has no way to tell from real work.
+    it("reports failure and an unstarted mode when no runner is available", async () => {
+      // A requested mode is not an effective mode until a runner binds the gate.
       const tool = createTaskToolDefinition();
       const result = await tool.execute(
         {
@@ -223,9 +220,10 @@ describe("High-Value Modern Built-in Tools Subsystem", () => {
       // The report is in `error`: a failed result carries no `output`, so a caller
       // cannot read a success story out of a run that never happened.
       const report = result.error ?? "";
-      expect(report).toContain("Subagent Task Executed");
+      expect(report).toContain("Subagent Task Failed");
       expect(report).toContain("Description**: Analyze dependency tree");
-      expect(report).toContain("PLAN (Read-Only)");
+      expect(report).toContain("**Mode**: `not started`");
+      expect(report).not.toContain("PLAN (Read-Only)");
       expect(report).toContain("was not started");
       expect(report).not.toContain("have been completed");
     });
