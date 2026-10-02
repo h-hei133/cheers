@@ -89,11 +89,24 @@ declareEndpoint("openai-compatible", {
       ? { [input.maxTokensField]: input.maxOutputTokens }
       : {}),
   }),
-  // Already in the shared shape: this wire form is the one everything else was
-  // flattened into, which is why the other readers convert to it.
-  readBody: (body) => (body ?? {}) as CompletedBody,
+  readBody: readBody,
   readStream: (body) => readCompletionStream(body),
 });
+
+/** Preserve explicit refusal even when the provider reports an ordinary stop. */
+function readBody(body: unknown): CompletedBody {
+  const result = (body ?? {}) as CompletedBody;
+  if (!Array.isArray(result.choices)) return result;
+  return {
+    ...result,
+    choices: result.choices.map((choice) => {
+      const refusal = (choice?.message as { refusal?: unknown } | undefined)?.refusal;
+      return typeof refusal === "string" && refusal.trim()
+        ? { ...choice, finish_reason: "refusal" }
+        : choice;
+    }),
+  };
+}
 
 /**
  * One message's content, as this wire takes it.

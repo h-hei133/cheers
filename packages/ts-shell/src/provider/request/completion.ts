@@ -107,11 +107,13 @@ export async function requestSimpleCompletion(
     throw error;
   }
   const choice = endpointShape(kind).readBody(body).choices?.[0];
+  if (REFUSAL.test(choice?.finish_reason ?? "")) {
+    request.onFailure?.("provider_safety_block");
+    return undefined;
+  }
   const text = choice?.message?.content?.trim();
   if (!text) {
-    request.onFailure?.(REFUSAL.test(choice?.finish_reason ?? "")
-      ? "provider_safety_block"
-      : classifyProviderFailure({ insufficientOutput: true }));
+    request.onFailure?.(classifyProviderFailure({ insufficientOutput: true }));
   }
   return text || undefined;
 }

@@ -258,7 +258,7 @@ export function readGoogleBody(body: unknown): CompletedBody {
   const parts = candidate?.content?.parts ?? [];
   const text = parts.map((part) => part.text ?? "").join("");
   const calls = toolCallsFromParts(parts);
-  const finish_reason = mapGoogleFinishReason(candidate?.finishReason);
+  const finish_reason = mapGoogleFinishReason((body as Chunk)?.promptFeedback?.blockReason ?? candidate?.finishReason);
   return {
     choices: [
       {
@@ -482,4 +482,3 @@ export function googleBody(input: {
     ...(tools ? { toolConfig: { functionCallingConfig: { mode: "AUTO" } } } : {}),
   };
 }
-

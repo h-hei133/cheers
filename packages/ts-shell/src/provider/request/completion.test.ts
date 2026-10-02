@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { requestSimpleCompletion } from "./completion.js";
+import { endpointShape } from "../endpoints/index.js";
 
 /**
  * The out-of-band request path.
@@ -28,6 +29,29 @@ function capturingFetch(): {
 }
 
 describe("an out-of-band completion", () => {
+  it.each([
+    ["openai-compatible", { choices: [{ message: { content: null, refusal: "Refused" }, finish_reason: "stop" }] }],
+    ["openai-compatible", { choices: [{ message: { content: "Partial answer", refusal: "Refused" }, finish_reason: "stop" }] }],
+    ["openai-compatible", { choices: [{ message: { content: "Partial answer" }, finish_reason: "content_filter" }] }],
+    ["google-generative-ai", { promptFeedback: { blockReason: "SAFETY" } }],
+    ["google-generative-ai", { promptFeedback: { blockReason: "BLOCKLIST" } }],
+    ["google-vertex", { promptFeedback: { blockReason: "SAFETY" } }],
+    ["anthropic-messages", { content: [{ type: "text", text: "Refused" }], stop_reason: "refusal" }],
+  ] as const)("classifies an explicit %s refusal without returning its body", async (endpoint, body) => {
+    const failure = vi.fn();
+    const before = structuredClone(body);
+    const answer = await requestSimpleCompletion({
+      provider: { headers: {}, baseUrl: "https://example.test", model: "m", endpoint,
+        fetchImpl: (async () => Response.json(body)) as typeof fetch },
+      messages: [{ role: "user", content: "hello" }], onFailure: failure,
+    });
+    expect(answer).toBeUndefined();
+    expect(failure).toHaveBeenCalledOnce();
+    expect(failure).toHaveBeenCalledWith("provider_safety_block");
+    endpointShape(endpoint).readBody(body);
+    expect(body).toEqual(before);
+  });
+
   it("returns the answer text, trimmed", async () => {
     const { fetchImpl } = capturingFetch();
 
