@@ -190,10 +190,13 @@ export function createToolHooks(options: ToolGateOptions): ToolHooks {
       }
       const repeat = doomLoop.recordAndCheck(call.name, args);
       if (repeat.isDoomLoop) {
+        const observation = repeat.cycleLength === 1
+          ? `Tool '${call.name}' was requested ${repeat.repeatCount} consecutive times with identical arguments.`
+          : `A ${repeat.cycleLength}-request pattern repeated ${repeat.repeatCount} times with the same tool names and arguments.`;
         approvals.delete(call.id);
         return {
           block: true,
-          reason: `Warning: Doom Loop detected! Tool '${call.name}' has been repeatedly executed ${repeat.repeatCount} times with identical arguments without state progression. Please try a different approach, refine your parameters, or formulate a final response based on existing observations.`,
+          reason: `Warning: Doom Loop detected! ${observation} This request was blocked. Try different arguments or respond using the available observations.`,
         };
       }
       return undefined;

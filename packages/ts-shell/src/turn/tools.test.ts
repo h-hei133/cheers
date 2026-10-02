@@ -90,10 +90,25 @@ describe("createToolHooks", () => {
 
   it("stops a model that repeats the same call three times", async () => {
     const hooks = createToolHooks(gate({ permissionScope: "allow-all" }));
-    await hooks.beforeToolCall!(call("read", { path: "a" }));
-    await hooks.beforeToolCall!(call("read", { path: "a" }));
+    expect(await hooks.beforeToolCall!(call("read", { path: "a" }))).toBeUndefined();
+    expect(await hooks.beforeToolCall!(call("read", { path: "a" }))).toBeUndefined();
     const third = await hooks.beforeToolCall!(call("read", { path: "a" }));
+    expect(third?.block).toBe(true);
     expect(third?.reason).toContain("Doom Loop detected");
+    expect(third?.reason).toContain("requested 3 consecutive times");
+    expect(third?.reason).not.toContain("state progression");
+    expect(third?.reason).not.toContain("executed");
+  });
+
+  it("describes repeated request patterns without claiming to inspect their results", async () => {
+    const hooks = createToolHooks(gate({ permissionScope: "allow-all" }));
+    for (let index = 0; index < 9; index++) {
+      expect(await hooks.beforeToolCall!(call(index % 2 === 0 ? "read" : "glob", { path: "a" }))).toBeUndefined();
+    }
+    const repeated = await hooks.beforeToolCall!(call("glob", { path: "a" }));
+    expect(repeated?.block).toBe(true);
+    expect(repeated?.reason).toContain("2-request pattern repeated 5 times");
+    expect(repeated?.reason).not.toContain("state progression");
   });
 
   it("does not count denied calls toward the doom loop", async () => {
