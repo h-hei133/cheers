@@ -12,11 +12,11 @@ export function createSubagentRunner(
 ): SubagentRunner {
   return async (input) => {
     const agentMode = subagentMode(parent.agentMode, input.definition.permissionMode, input.agentMode);
-    const gate = { ...parent, agentMode };
+    const gate = { ...parent, workspaceRoot: input.workspace, agentMode };
     const hooks = createToolHooks(gate);
     const result = await runSubagent(input, {
       tools: new Map(adaptTools(tools, gate).map((tool) => [tool.name, tool])),
-      step: (messages, signal, options) => host.step(messages, signal, {}, options),
+      step: (messages, signal, options) => host.step(messages, signal, {}, { ...options, agentMode }),
       beforeToolCall: hooks.beforeToolCall,
       afterToolCall: hooks.afterToolCall,
       defaultMaxSteps: host.defaultMaxSteps,

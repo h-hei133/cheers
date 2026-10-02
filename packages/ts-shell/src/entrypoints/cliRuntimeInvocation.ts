@@ -696,6 +696,7 @@ function createProviderStep(
     workspaceRoot: request.workspaceRoot,
     sessionId: request.sessionId,
     systemPrompt: buildSystemPrompt(request.agentMode, promptContext),
+    systemPromptFor: (agentMode, toolNames) => buildSystemPrompt(agentMode, { ...promptContext, toolNames }),
     tools: toolSchemas(tools),
     catalog,
     // Sampling settings travel with the request, not with the provider: a

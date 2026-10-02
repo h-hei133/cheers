@@ -1264,3 +1264,16 @@ runner把已裁决的allowedTools传给step，step只对绑定的父schema做交
 
 验证：5个唯一套件99项；首轮空数组参数化用例被测试框架展开为undefined，归类harness/setup drift，改为对象行后受影响2套67项通过，其余3套已通过。构建、独立双线APPROVE/CLEAR；撤销关键两处生产修改后4项失败、63通过，源码字节恢复。
 隔离编译运行时与真实工具注册表向本地HTTP服务发4次请求：父委派、子read、子末步、父继续。验证子清单仅5个允许工具、真实文件内容到达模型、末步撤下工具、父清单恢复；没有真实provider调用。
+
+### 子代理执行上下文（W7-30相邻修复）
+
+参考子任务入口把工作目录交给执行进程，而非只写入说明；本实现同意，在现有子工具门设置input.workspace，审批目标与hooks沿同一根路径。生效权限模式也传给共享step，以已有prompt工厂重建模式及工具清单；不再向plan子代理发送父BUILD模式声明。
+会话选定的模型、采样配置与已获准的项目指令继续继承父会话，避免重读worktree中的未信任配置或重新选择provider。子运行的具体目录由runner指令声明；此处不改worktree分配器。后续分配器修复将删除非Git空目录/共享回落，并明确清理失败。
+
+上下文验证：5个唯一套件92项通过，构建、双线独立APPROVE/CLEAR。入口测试最初用global fetch mock未拦截实际自有传输，0请求，归类harness/setup drift；改为本地HTTP服务后7项通过。撤销工作区/模式绑定后2项失败、6通过，源码字节恢复。
+隔离编译运行时调用真实bash，验证pwd、读取及新建文件均在子目录，父目录未产生文件，hooks携带子根；生产入口本地HTTP验证PLAN子请求与BUILD父请求。此验收未经过worktree分配器，也不是实际provider调用。
+
+### worktree分配与释放待修复项
+
+已定位：默认manager在模块加载时绑定process.cwd而非task工作区；非Git分配空临时目录，Git失败返回isIsolated:false的父目录，task仍宣称Git Worktree；拼接`.git`目录不支持linked worktree；removeWorktree吞掉失败后上层仍返回removed。WorktreeCreate在运行try/finally之前也可能绕过释放与Stop。
+定向参考比较：工作树服务拒绝非Git项目，按当前项目工作区传递cwd，以argv执行Git，创建非零退出是明确失败，移除失败会复核仍存在的工作树。计划同意这些决策，保留本项目“有改动则保留、绝不自动合并”的既有规则；不复制外部服务或全局存储结构。后续修复需覆盖分配失败不启动子任务、工作区来源、linked worktree、清理失败不冒充removed及已产生工作的可追溯路径。

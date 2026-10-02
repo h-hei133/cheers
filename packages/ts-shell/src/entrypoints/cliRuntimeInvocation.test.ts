@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { createServer } from "node:http";
+import { createTaskToolDefinition } from "../core/tools/taskTool.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { ProviderCredentialResolution } from "../core/shell/providerCredentials.js";
 import {
@@ -75,6 +77,44 @@ function dependencies(): { deps: CliRuntimeInvocationDependencies; calls: string
 }
 
 describe("CLI runtime invocation", () => {
+  it("rebuilds delegated system mode and tools through the production step factory", async () => {
+    const bodies: Array<{ messages: Array<{ role: string; content: string }> }> = [];
+    const server = createServer(async (request, response) => {
+      let body = "";
+      for await (const chunk of request) body += chunk;
+      bodies.push(JSON.parse(body));
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ choices: [{ message: bodies.length === 1 ? {
+        content: "delegate", tool_calls: [{ id: "dispatch", type: "function", function: { name: "task", arguments: JSON.stringify({
+          description: "review", prompt: "inspect", subagent_type: "code-reviewer",
+        }) } }],
+      } : { content: "done" }, finish_reason: "stop" }] }));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    try {
+      const address = server.address();
+      if (!address || typeof address === "string") throw new Error("No test HTTP port");
+      const { createStep: _createStep, ...deps } = dependencies().deps;
+      const run = await runCliRuntimeInvocation(baseInput({ permissionScope: "allow-all", providerModeEnv: "real",
+        providerCredentialResolution: { ...providerCredentialResolution, baseUrl: `http://127.0.0.1:${address.port}/v1`, model: "test" },
+      }), { ...deps, tools: () => new Map([
+        ["task", createTaskToolDefinition()],
+        ["read", { name: "read", description: "read", argsSchema: {}, execute: async () => ({ success: true, output: "contents" }) }],
+      ]) });
+      await collect(run.events);
+      const systems = bodies.map((body) => body.messages.find((message) => message.role === "system")?.content);
+      expect(systems).toHaveLength(3);
+      expect(systems[0]).toContain("BUILD MODE ACTIVE");
+      expect(systems[1]).toContain("PLAN MODE ACTIVE");
+      expect(systems[1]).not.toContain("BUILD MODE ACTIVE");
+      expect(systems[1]).toContain("real tools (read)");
+      expect(systems[2]).toBe(systems[0]);
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
   it("packages provider mode from the existing CLI environment convention", () => {
     expect(buildCliRuntimeInvocation(baseInput({ providerModeEnv: "synthetic" })).providerMode).toBe("synthetic");
     expect(buildCliRuntimeInvocation(baseInput({ providerModeEnv: "real" })).providerMode).toBe("real");

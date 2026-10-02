@@ -41,7 +41,7 @@ export interface SubagentRunInput {
   readonly agentMode?: "plan" | "build";
   /** What the caller asked the subagent to do. */
   readonly prompt: string;
-  /** Where the subagent works, named in its instruction so it knows its root. */
+  /** Where the subagent works; the host binds tool execution to this root. */
   readonly workspace: string;
   /** Extra context the caller attached, already rendered. */
   readonly context?: string;

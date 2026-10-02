@@ -80,6 +80,8 @@ export interface StepOptions {
   readonly allowTools: boolean;
   /** Restrict the bound tool schemas for this call; an empty list withdraws all tools. */
   readonly allowedTools?: readonly string[];
+  /** Effective mode of a delegated run, established by its tool gate. */
+  readonly agentMode?: "plan" | "build";
   /**
    * Told the request that was sent, as it was sent.
    *
@@ -105,6 +107,8 @@ export interface StepRequest {
   readonly workspaceRoot: string;
   readonly sessionId: string;
   readonly systemPrompt: string;
+  /** Reuse the session's approved instructions with a delegated mode and tool set. */
+  readonly systemPromptFor?: (agentMode: "plan" | "build", toolNames: readonly string[]) => string;
   readonly tools: readonly ToolSchema[];
   readonly temperature?: number;
   readonly topP?: number;
@@ -230,6 +234,9 @@ export function createStepFunction(request: StepRequest): StepFunction {
   return async (messages, signal, listener, options): Promise<AssistantStep> => {
     const allowed = options.allowedTools && new Set(options.allowedTools);
     const tools = allowed ? request.tools.filter((tool) => allowed.has(tool.function.name)) : request.tools;
+    const systemPrompt = options.agentMode && request.systemPromptFor
+      ? request.systemPromptFor(options.agentMode, tools.map((tool) => tool.function.name))
+      : request.systemPrompt;
     // Steps this call returns all come from the same target, so the origin is
     // stamped once on whatever leaves — an answer, a refusal, or an abort —
     // rather than threaded through each builder's signature. A `return` in
@@ -268,7 +275,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
         requestHeaders = endpointShape(endpoint).requestHeaders?.({
           provider: request.provider.provider,
           model: request.provider.model,
-          systemPrompt: request.systemPrompt,
+          systemPrompt,
           messages: bridgeToolResults(
             microcompactMessages(toChatMessages(messages), { keepRecentTurns: 3, maxOutputChars: 1000 }).messages,
             shape.assistantAfterToolResult,
@@ -284,7 +291,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
         }) ?? {};
         payload = endpointTurnBody(endpoint, {
           model: request.provider.model,
-          systemPrompt: request.systemPrompt,
+          systemPrompt,
           messages: withFinalStepNotice(
             bridgeToolResults(
               microcompactMessages(toChatMessages(messages), { keepRecentTurns: 3, maxOutputChars: 1000 }).messages,
