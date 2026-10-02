@@ -37,6 +37,7 @@ export class RotatingFileSink {
   private readonly pid: number;
   private currentFilePath: string = "";
   private currentFileSize: number = 0;
+  private currentPart = 0;
   private initialized: boolean = false;
 
   constructor(options: RotatingFileSinkOptions = {}) {
@@ -134,7 +135,11 @@ export class RotatingFileSink {
   }
 
   private openCurrentStream(): void {
-    this.currentFilePath = this.computeLogPath();
+    const basePath = this.computeLogPath();
+    this.currentPart = orderedLogFiles(this.logDir, basePath, { familyOnly: true }).reduce(
+      (highest, file) => Math.max(highest, Number(/\.log\.(\d+)$/.exec(file)?.[1] ?? 0)), 0,
+    );
+    this.currentFilePath = this.computeLogPath(this.currentPart);
     try {
       if (fs.existsSync(this.currentFilePath)) {
         const stats = fs.statSync(this.currentFilePath);
@@ -149,11 +154,14 @@ export class RotatingFileSink {
 
   private rotate(): void {
     try {
-      let part = 1;
+      // Retention can remove low suffixes. Reusing those holes would put newer
+      // records before older shards whenever filesystem timestamps tie.
+      let part = this.currentPart + 1;
       while (fs.existsSync(this.computeLogPath(part))) {
         part++;
       }
       this.currentFilePath = this.computeLogPath(part);
+      this.currentPart = part;
       this.currentFileSize = 0;
       this.pruneStaleLogs();
     } catch {

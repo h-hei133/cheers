@@ -84,7 +84,8 @@ describe("/log Slash Command Test Suite", () => {
   });
 
   it("tails, exports and clears every part of only the current log family", async () => {
-    sink = new RotatingFileSink({ logDir: tempLogDir, filePrefix: "rotation", pid: 77777, maxFileSizeMb: 0.0003 });
+    // This case exercises a complete family; capacity pruning has its own cases.
+    sink = new RotatingFileSink({ logDir: tempLogDir, filePrefix: "rotation", pid: 77777, maxFileSizeMb: 0.0003, maxFiles: 100 });
     setGlobalRotatingFileSink(sink);
     for (let index = 0; index < 60; index++) sink.write({
       timestamp: "2026-09-30T12:00:00Z", level: "info", traceId: "trace", spanId: "span",

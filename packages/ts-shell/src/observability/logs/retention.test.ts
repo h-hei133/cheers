@@ -53,6 +53,23 @@ describe("log retention", () => {
     expect(fs.existsSync(sink.getCurrentFilePath())).toBe(true);
   });
 
+  it.each([false, true])("keeps chronological tails through pruning and tied timestamps (reopen=%s)", (reopen) => {
+    const options = { logDir: root, filePrefix: prefix, maxFiles: 3, maxFileSizeMb: 0.0001 };
+    let sink = new RotatingFileSink(options);
+    for (let index = 0; index < 18; index++) {
+      if (reopen && index === 9) {
+        sink.flushAndClose();
+        sink = new RotatingFileSink(options);
+      }
+      sink.write({ ...entry, message: `record-${index}` });
+      for (const file of sink.getFiles()) fs.utimesSync(file, 100, 100);
+      const count = Math.min(index + 1, options.maxFiles);
+      expect(sink.getRecentLines(50).map((line) => JSON.parse(line).message))
+        .toEqual(Array.from({ length: count }, (_, offset) => `record-${index - count + 1 + offset}`));
+      expect(sink.getFiles()).toHaveLength(count);
+    }
+  });
+
   it("does not treat a process inspection permission error as proof of exit", () => {
     const uncertain = path.join(root, `${prefix}.2000-01-01.999999997.log`);
     fs.writeFileSync(uncertain, "owner could still be writing");
