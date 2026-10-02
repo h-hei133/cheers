@@ -7,6 +7,7 @@ import { loadCatalog } from "../models/catalogStore.js";
 import { resolveRequestShape } from "../models/requestShape.js";
 import { providerEndpoint } from "../models/catalog.js";
 import { providerFetchFor } from "../../provider/request/fetch.js";
+import { classifyProviderFailure, type ProviderFailureClass } from "../../provider/registry/provider.js";
 
 /** How long a side question may take before it is abandoned. */
 const SIDE_QUESTION_TIMEOUT_MS = 15_000;
@@ -43,6 +44,7 @@ export async function runBtwCommand(
 
   let answer = "";
   let attempted = false;
+  let failure: ProviderFailureClass | undefined;
   const accountAuth = credential ? accountAuthFor(resolution.provider, credential) : undefined;
   if (credential && (credential.apiKey || accountAuth)) {
     attempted = true;
@@ -73,10 +75,13 @@ export async function runBtwCommand(
           ],
           supportsTemperature: shape.supportsTemperature,
           signal: controller.signal,
+          onFailure: (classification) => { failure = classification; },
         })) ?? "";
-    } catch {
-      // A side question that fails is a side question with no answer; the
-      // fallback below says so rather than reporting a transport error.
+    } catch (error) {
+      failure ??= classifyProviderFailure({
+        errorName: error instanceof Error ? error.name : undefined,
+        message: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       clearTimeout(timer);
     }
@@ -87,7 +92,7 @@ export async function runBtwCommand(
     // a user checking their configuration and a user checking their network. A
     // request that went out and failed is not a missing credential.
     answer = attempted
-      ? `Side question noted: "${question}".\n(The provider was asked and did not answer — a failed request or a timeout, not a missing credential.)`
+      ? `Side question noted: "${question}".\n(The provider request returned no answer. Failure: ${failure ?? "provider_output_insufficient"}.)`
       : `Side question noted: "${question}".\n(No provider credential is configured, so nothing was sent.)`;
   }
 
@@ -98,7 +103,7 @@ export async function runBtwCommand(
     answer,
     "",
     "---",
-    "*✨ Note: This exchange was answered out-of-band and is 100% excluded from your main session history.*",
+    "*✨ Note: This exchange is out-of-band and is 100% excluded from your main session history.*",
   ];
 
   return {

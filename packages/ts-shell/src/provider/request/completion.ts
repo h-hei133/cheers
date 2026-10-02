@@ -1,4 +1,6 @@
-import { endpointBody, endpointKind, endpointText, endpointUrl, type EndpointKind } from "../endpoints/index.js";
+import { endpointBody, endpointKind, endpointShape, endpointUrl, type EndpointKind } from "../endpoints/index.js";
+import { classifyProviderFailure, type ProviderFailureClass } from "../registry/provider.js";
+import { REFUSAL } from "../../core/agent/retry.js";
 import type { ChatMessage } from "../../turn/prompt.js";
 
 /**
@@ -48,6 +50,8 @@ export interface SimpleCompletionRequest {
   /** Whether the model accepts a sampling temperature; see `SimpleRequest`. */
   readonly supportsTemperature?: boolean;
   readonly signal?: AbortSignal;
+  /** Report a classification without exposing provider response bodies. */
+  readonly onFailure?: (failure: ProviderFailureClass) => void;
 }
 
 /**
@@ -89,7 +93,25 @@ export async function requestSimpleCompletion(
     ),
     ...(request.signal ? { signal: request.signal } : {}),
   });
-  if (!res.ok) return undefined;
-  const text = endpointText(kind, await res.json());
-  return text?.trim() || undefined;
+  if (!res.ok) {
+    request.onFailure?.(classifyProviderFailure({ status: res.status }));
+    return undefined;
+  }
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      request.onFailure?.(classifyProviderFailure({ message: "invalid response json" }));
+    }
+    throw error;
+  }
+  const choice = endpointShape(kind).readBody(body).choices?.[0];
+  const text = choice?.message?.content?.trim();
+  if (!text) {
+    request.onFailure?.(REFUSAL.test(choice?.finish_reason ?? "")
+      ? "provider_safety_block"
+      : classifyProviderFailure({ insufficientOutput: true }));
+  }
+  return text || undefined;
 }

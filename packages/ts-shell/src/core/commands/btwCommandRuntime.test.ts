@@ -1,16 +1,23 @@
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { runBtwCommand } from "./btwCommandRuntime.js";
 import { loadCatalog } from "../models/catalogStore.js";
 import { providerFetchFor } from "../../provider/request/fetch.js";
+import { resolveProviderCredential } from "../shell/providerCredentials.js";
 
 vi.mock("../../config/runtimeConfig.js", () => ({ getRuntimeConfig: () => ({}) }));
-vi.mock("../shell/providerCredentials.js", () => ({ resolveProviderCredential: () => ({
+vi.mock("../shell/providerCredentials.js", () => ({ resolveProviderCredential: vi.fn(() => ({
   provider: "fixture", model: "m", baseUrl: "https://provider.test",
   credential: { apiKey: "synthetic" },
-}) }));
+})) }));
 vi.mock("../models/catalogStore.js", () => ({ loadCatalog: vi.fn() }));
 vi.mock("../../provider/request/fetch.js", () => ({ providerFetchFor: vi.fn() }));
-afterEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.mocked(resolveProviderCredential).mockReturnValue({
+    provider: "fixture", model: "m", baseUrl: "https://provider.test", credential: { apiKey: "synthetic" },
+  } as never);
+  vi.mocked(loadCatalog).mockReturnValue([{ id: "fixture", name: "Fixture", endpoint: "openai-compatible", models: [{ id: "m", name: "Model" }] }] as never);
+});
+afterEach(() => { vi.clearAllMocks(); vi.useRealTimers(); });
 
 it.each([true, false, undefined])("uses catalog temperature capability %s for side questions", async (supportsTemperature) => {
   vi.mocked(loadCatalog).mockReturnValue([{ id: "fixture", name: "Fixture", endpoint: "google-generative-ai", models: [
@@ -26,4 +33,43 @@ it.each([true, false, undefined])("uses catalog temperature capability %s for si
   expect(bodies).toHaveLength(1);
   if (supportsTemperature === false) expect(bodies[0]?.generationConfig).not.toHaveProperty("temperature");
   else expect(bodies[0]?.generationConfig).toHaveProperty("temperature", 0);
+});
+
+it.each([
+  ["network", "provider_network"],
+  ["refusal", "provider_safety_block"],
+  ["http", "provider_endpoint"],
+  ["empty", "provider_output_insufficient"],
+  ["malformed", "provider_response_malformed"],
+])("reports %s failures without displaying response details", async (scenario, classification) => {
+  vi.mocked(providerFetchFor).mockReturnValue((async () => {
+    if (scenario === "network") throw new TypeError("fetch failed: private-provider-detail");
+    if (scenario === "http") return new Response("private-provider-detail", { status: 400 });
+    if (scenario === "malformed") return new Response("{private-provider-detail", { status: 200 });
+    return Response.json({ choices: [{ message: { content: "" }, finish_reason: scenario === "refusal" ? "content_filter" : "stop" }] });
+  }) as typeof fetch);
+  const result = await runBtwCommand(["question"], { cwd: "/synthetic" });
+  expect(result.output).toContain(`Failure: ${classification}`);
+  expect(result.output).not.toContain("private-provider-detail");
+  expect(result.output).not.toContain("was answered");
+  expect(result.output).not.toContain("No provider credential");
+});
+
+it("reports its own deadline as a timeout and releases the timer", async () => {
+  vi.useFakeTimers();
+  vi.mocked(providerFetchFor).mockReturnValue((async (_url, init) => new Promise((_resolve, reject) => {
+    init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+  })) as typeof fetch);
+  const pending = runBtwCommand(["question"], { cwd: "/synthetic" });
+  await vi.advanceTimersByTimeAsync(15_000);
+  expect((await pending).output).toContain("Failure: provider_timeout");
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it("keeps the missing-credential explanation and sends nothing", async () => {
+  vi.mocked(resolveProviderCredential).mockReturnValue({ provider: "fixture" } as never);
+  const result = await runBtwCommand(["question"], { cwd: "/synthetic" });
+  expect(result.output).toContain("No provider credential is configured, so nothing was sent.");
+  expect(result.output).not.toContain("Failure:");
+  expect(providerFetchFor).not.toHaveBeenCalled();
 });

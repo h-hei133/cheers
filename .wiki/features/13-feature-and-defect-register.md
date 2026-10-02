@@ -1191,7 +1191,11 @@ Phase 16 的 12 号文档已记此项；**本轮确认仍未修**（并补上了
 **不要**把 `content_filter` 从 `isTerminalFinishReason` 里删掉——终止是对的
 （拒答不会再有内容），错的是终止之后没有留痕。
 
-### PRV-04 · `btwCommandRuntime` 的静默吞错 — `OPEN` `P3` `CONFIRMED`
+### PRV-04 · `btwCommandRuntime` 的静默吞错 — `FIXED` `P3` `CONFIRMED`
+
+**2026-10-02 修复**：缺凭据与已尝试请求原已区分；本次补齐失败分类，并保留单次请求的
+HTTP 状态、拒答停因和坏 JSON 分类。33 项定向测试和构建通过，覆盖实际计时器中止与无凭据零请求。
+只显示分类，不回显提供方错误正文。自研修复；以下保留修复前诊断。
 
 `core/commands/btwCommandRuntime.ts:77-81`：
 
