@@ -11,6 +11,7 @@ import { RecordingTerminal } from "../../test-utils/terminalDouble.js";
 import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 import type { OverlayHost, Picker } from "./overlay.js";
 import type { PickerHost } from "./picker/registry.js";
+import type { InteractiveView } from "../../presentation/tui/surface/contract.js";
 
 function build(overrides: { observeEvents?: () => () => void; exit?: (code?: number) => void } = {}): {
   mode: InteractiveMode;
@@ -52,6 +53,46 @@ function build(overrides: { observeEvents?: () => () => void; exit?: (code?: num
 }
 
 describe("session wiring", () => {
+  it.each(["panel", "modal"] as const)("routes actual mouse input to %s rows without applying on click", async (form) => {
+    const { mode, terminal } = build();
+    const host = mode as unknown as { overlay: OverlayHost; view: InteractiveView };
+    const apply = vi.fn(async () => undefined);
+    mode.start();
+    try {
+      host.overlay.open({ title: "Mouse choices", form, empty: "none", apply,
+        load: async () => [{ id: "a", label: "alpha-choice" }, { id: "b", label: "beta-choice" }],
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const frame = host.view.renderFrame({ columns: 80, rows: 24 });
+      const row = frame.rows.findIndex((line) => stripAnsi(line).includes("beta-choice"));
+      expect(row).toBeGreaterThan(0);
+      terminal.input(`\x1b[<0;6;${row + 1}M\x1b[<0;6;${row + 1}m`);
+      expect(apply).not.toHaveBeenCalled();
+      terminal.input("\r");
+      await vi.waitFor(() => expect(apply).toHaveBeenCalledWith(["b"]));
+    } finally { mode.stop(); }
+  });
+
+  it("routes a completion click through selection and Enter acceptance without submission", () => {
+    const { mode, terminal } = build();
+    const host = mode as unknown as { view: InteractiveView; onSubmit(text: string): void };
+    const submit = vi.spyOn(host, "onSubmit").mockImplementation(() => {});
+    mode.start();
+    try {
+      host.view.editor.setText("/m");
+      host.view.suggestions.setItems([{ value: "/model", label: "model-choice" }, { value: "/memory", label: "memory-choice" }]);
+      host.view.setSuggesting(true);
+      const frame = host.view.renderFrame({ columns: 80, rows: 24 });
+      const row = frame.rows.findIndex((line) => stripAnsi(line).includes("memory-choice"));
+      expect(row).toBeGreaterThan(0);
+      terminal.input(`\x1b[<0;6;${row + 1}M\x1b[<0;6;${row + 1}m`);
+      expect(host.view.editor.getText()).toBe("/m");
+      terminal.input("\r");
+      expect(host.view.editor.getText()).toBe("/memory ");
+      expect(submit).not.toHaveBeenCalled();
+    } finally { mode.stop(); }
+  });
+
   it.each([
     ["navigation", "dismiss"], ["navigation", "confirm"],
     ["command", "dismiss"], ["command", "confirm"],

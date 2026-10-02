@@ -7,7 +7,7 @@ import type { Block } from "../transcript/blocks.js";
 import { renderActivity } from "../transcript/live.js";
 import type { SelectionPoint, SelectionSpan } from "../transcript/selection.js";
 import type { ScrollbarGeometry } from "../transcript/viewport.js";
-import { createViewState, type ComposerGeometry, type InteractiveView, type ViewContext, type ViewState } from "./contract.js";
+import { createViewState, type ChoiceRegions, type ComposerGeometry, type InteractiveView, type ViewContext, type ViewState } from "./contract.js";
 import { TranscriptPane } from "./pane.js";
 
 /**
@@ -25,6 +25,7 @@ import { TranscriptPane } from "./pane.js";
 const MIN_TRANSCRIPT_ROWS = 1;
 
 export class InteractiveSurface implements InteractiveView {
+  choiceRegions: ChoiceRegions = {};
   readonly editor: ViewState["editor"];
   readonly pastes: ViewState["pastes"];
   readonly transcript: ViewState["transcript"];
@@ -50,6 +51,7 @@ export class InteractiveSurface implements InteractiveView {
   }
 
   setSuggesting(open: boolean): void {
+    this.choiceRegions = { ...this.choiceRegions, suggestions: undefined };
     this.suggesting = open;
     if (!open) this.suggestions.reset();
   }
@@ -58,6 +60,8 @@ export class InteractiveSurface implements InteractiveView {
     const width = Math.max(8, dimensions.columns);
     const height = Math.max(4, dimensions.rows);
     if (this.context.overlayFullScreen()) {
+      this.choiceRegions = { overlay: { top: 0 } };
+      this.lastComposerGeometry = undefined;
       // A full-screen overlay owns every row, so there is no fixed block to
       // redraw separately.
       return { rows: this.context.overlayRows(width, height), fullScreen: true };
@@ -76,6 +80,16 @@ export class InteractiveSurface implements InteractiveView {
       top: transcriptRows.length + chrome.composerOffset,
       bottom: transcriptRows.length + chrome.composerOffset + chrome.composerRows.length - 1,
       rows: chrome.composerRows,
+    };
+    this.choiceRegions = {
+      overlay: { top: transcriptRows.length + chrome.overlayOffset },
+      ...(this.suggestionsOpen ? {
+        suggestions: {
+          top: transcriptRows.length + chrome.composerOffset + chrome.composerRows.length,
+          height: chrome.suggestionRows,
+          width,
+        },
+      } : {}),
     };
     return {
       rows: [...transcriptRows, ...chrome.rows],
@@ -160,11 +174,14 @@ export class InteractiveSurface implements InteractiveView {
     readonly rows: string[];
     readonly composerOffset: number;
     readonly composerRows: string[];
+    readonly overlayOffset: number;
+    readonly suggestionRows: number;
   } {
     const busy = this.context.busy();
     const maxComposerRows = Math.max(3, Math.min(10, Math.floor(height * 0.35)));
+    const activityRows = renderActivity(this.context.activity(), this.context.now(), width);
     const statusRows = [
-      ...renderActivity(this.context.activity(), this.context.now(), width),
+      ...activityRows,
       ...this.context.overlayRows(width, height),
       renderBand(this.context.facts(), this.context.statusItems(), width),
     ];
@@ -176,16 +193,16 @@ export class InteractiveSurface implements InteractiveView {
       this.context.composerSelection?.(),
     );
     const rows = [...statusRows, ...composerRows];
-    if (this.suggestionsOpen) {
-      rows.push(...this.suggestions.render(width));
-    }
+    const suggestionRows = this.suggestionsOpen ? this.suggestions.render(width) : [];
+    rows.push(...suggestionRows);
+    const geometry = { composerOffset: statusRows.length, composerRows, overlayOffset: activityRows.length, suggestionRows: suggestionRows.length };
     // The search bar takes the hint row rather than adding one: an open search is
     // itself the hint, and the composer above it is where the user's text lives, so
     // taking that row instead would lose whatever they had typed.
     const searchBar = this.context.searchBar?.();
     if (searchBar) {
       rows.push(...renderSearchBar(searchBar, width));
-      return { rows, composerOffset: statusRows.length, composerRows };
+      return { rows, ...geometry };
     }
     rows.push(
       ...renderHints(
@@ -202,6 +219,6 @@ export class InteractiveSurface implements InteractiveView {
         width,
       ),
     );
-    return { rows, composerOffset: statusRows.length, composerRows };
+    return { rows, ...geometry };
   }
 }

@@ -22,6 +22,7 @@ export interface ModalChrome {
   readonly detailRows: number;
   /** Optional extra action hints shown in the footer (e.g. ^D delete · ^R rename). */
   readonly actionHints?: string;
+  readonly onOptionRow?: (row: number, id: string) => void;
 }
 
 /** A full-screen frame exactly `height` rows tall and `width` columns wide. */
@@ -45,7 +46,13 @@ export function renderModal(
       const option = model.visible[index];
       if (!option) break;
       if (index > window.offset) rows.push(edge(inner));
-      rows.push(...optionRows(option, index === model.selectedIndex, chrome, inner));
+      const optionLines = optionRows(option, index === model.selectedIndex, chrome, inner);
+      if (!option.disabled) {
+        for (let row = rows.length; row < Math.min(height, rows.length + optionLines.length); row++) {
+          chrome.onOptionRow?.(row, option.id);
+        }
+      }
+      rows.push(...optionLines);
     }
     if (window.below > 0) rows.push(body(defaultTheme.dim(`↓ ${window.below} more`), inner));
   }

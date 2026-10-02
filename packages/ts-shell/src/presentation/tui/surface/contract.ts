@@ -165,7 +165,13 @@ export interface ViewActions {
  * A surface: composes the frame from host-owned state and answers questions
  * about the geometry of what it last composed.
  */
+export interface ChoiceRegions {
+  readonly overlay?: { readonly top: number };
+  readonly suggestions?: { readonly top: number; readonly height: number; readonly width: number };
+}
+
 export interface InteractiveView extends TerminalFrameProvider {
+  readonly choiceRegions?: ChoiceRegions;
   readonly transcript: Transcript;
   readonly editor: Editor;
   readonly pastes: PasteStore;

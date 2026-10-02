@@ -22,6 +22,8 @@ export interface PanelChrome {
   readonly multiple: boolean;
   /** Hide the match count in the header. */
   readonly hideCount?: boolean;
+  /** Records selectable rows in the frame being rendered. */
+  readonly onOptionRow?: (row: number, id: string) => void;
 }
 
 /** Rows for the panel, fitted to `width` and at most `capacity` tall. */
@@ -46,6 +48,7 @@ export function renderPanel(
   for (let index = window.offset; index < window.offset + window.count; index++) {
     const option = model.visible[index];
     if (!option) break;
+    if (!option.disabled) chrome.onOptionRow?.(rows.length, option.id);
     rows.push(renderRow(option, index === model.selectedIndex, model, chrome, labelWidth, width));
   }
   if (window.below > 0) rows.push(`  ${defaultTheme.dim(`↓ ${window.below} more`)}`);

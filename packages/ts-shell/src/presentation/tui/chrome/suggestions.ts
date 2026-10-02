@@ -80,9 +80,11 @@ export class SuggestionList {
   private selected = 0;
   private offset = 0;
   private moved = false;
+  private renderedItems: readonly Suggestion[] = [];
 
   /** Replace the candidate set, keeping the selection in range. */
   setItems(items: readonly Suggestion[]): void {
+    this.renderedItems = [];
     this.items = items;
     this.selected = Math.min(this.selected, Math.max(0, items.length - 1));
     this.moved = false;
@@ -114,7 +116,19 @@ export class SuggestionList {
     this.scrollToSelection();
   }
 
+  /** Select a row from the visible window without accepting its text. */
+  selectRow(row: number): void {
+    const item = Number.isInteger(row) ? this.renderedItems[row] : undefined;
+    if (!item) return;
+    const index = this.items.indexOf(item);
+    if (index < 0) return;
+    this.selected = index;
+    this.moved = true;
+    this.scrollToSelection();
+  }
+
   reset(): void {
+    this.renderedItems = [];
     this.items = [];
     this.selected = 0;
     this.offset = 0;
@@ -123,6 +137,7 @@ export class SuggestionList {
 
   /** Rows for the visible window, with an overflow count when clipped. */
   render(width: number): string[] {
+    this.renderedItems = this.items.slice(this.offset, this.offset + MAX_VISIBLE);
     if (this.items.length === 0) return [];
     const visible = Math.min(MAX_VISIBLE, this.items.length);
     const labelWidth = Math.min(

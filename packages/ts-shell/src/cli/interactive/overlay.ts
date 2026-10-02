@@ -2,6 +2,7 @@ import { OptionModel, type Option } from "../../presentation/tui/chrome/options.
 import { renderModal, modalBody } from "../../presentation/tui/chrome/modal.js";
 import { renderPanel } from "../../presentation/tui/chrome/panel.js";
 import type { ParsedKeyEvent } from "../../presentation/tui/input/keys.js";
+import type { MouseReport } from "../../presentation/tui/input/mouse.js";
 import { defaultTheme } from "../../presentation/theme/theme.js";
 import { CURSOR_MARKER } from "../../presentation/tui/render/paint.js";
 import { truncateToWidth } from "../../presentation/tui/text/layout.js";
@@ -84,6 +85,8 @@ export class OverlayHost {
   private picker: Picker | undefined;
   private readonly model = new OptionModel();
   private loading = false;
+  private readonly optionRows = new Map<number, string>();
+  private renderedWidth = 0;
 
   // In-TUI modal sub-modes for interactive delete confirmation and rename
   private subMode: "none" | "confirm-delete" | "rename" | "deny-reason" = "none";
@@ -104,6 +107,7 @@ export class OverlayHost {
 
   /** Open `picker`, loading its options in the background. */
   open(picker: Picker): void {
+    this.optionRows.clear();
     this.picker?.previewEnd?.();
     this.picker = picker;
     this.loading = true;
@@ -118,6 +122,7 @@ export class OverlayHost {
       .load()
       .then((options) => {
         if (this.picker !== picker) return;
+        this.optionRows.clear();
         this.model.setOptions(options);
         if (picker.initialSelection) this.model.focus(picker.initialSelection);
       })
@@ -131,6 +136,7 @@ export class OverlayHost {
   }
 
   close(): void {
+    this.optionRows.clear();
     this.picker?.previewEnd?.();
     this.picker = undefined;
     this.subMode = "none";
@@ -143,6 +149,8 @@ export class OverlayHost {
 
   /** Rows for the open picker at the given geometry, or none when closed. */
   render(width: number, height: number): string[] {
+    this.optionRows.clear();
+    this.renderedWidth = width;
     const picker = this.picker;
     if (!picker) return [];
 
@@ -168,6 +176,7 @@ export class OverlayHost {
           title: picker.title,
           empty,
           detailRows: picker.detailRows ?? 2,
+          onOptionRow: (row, id) => this.optionRows.set(row, id),
           ...(actionHints ? { actionHints } : {}),
         },
         width,
@@ -185,10 +194,26 @@ export class OverlayHost {
         empty,
         multiple: picker.multiple === true,
         hideCount: isApproval,
+        onOptionRow: (row, id) => this.optionRows.set(row, id),
       },
       width,
       Math.min(PANEL_ROWS, Math.max(4, height - 6)),
     );
+  }
+
+  /** A picker owns pointer input; a click focuses, and keyboard confirmation applies. */
+  handlePointer(report: MouseReport, top?: number): boolean {
+    if (!this.picker) return false;
+    if (!this.loading && this.subMode === "none" && top !== undefined &&
+        report.kind === "press" && report.button === 0 && !report.shift && !report.alt && !report.ctrl &&
+        report.column >= 0 && report.column < this.renderedWidth) {
+      const id = this.optionRows.get(report.row - top);
+      if (id !== undefined) {
+        this.model.focus(id);
+        this.onChange();
+      }
+    }
+    return true;
   }
 
   private renderConfirmDelete(width: number, height: number): string[] {
@@ -451,11 +476,13 @@ export class OverlayHost {
           this.model.toggle();
           picker.previewChange?.(this.model.chosenIds());
         } else if (!isApprovalPicker) {
+          this.optionRows.clear();
           this.model.appendFilter(" ");
         }
         break;
       case "backspace":
         if (!isApprovalPicker) {
+          this.optionRows.clear();
           this.model.backspaceFilter();
         }
         break;
@@ -475,6 +502,7 @@ export class OverlayHost {
         }
         if (event.text && !event.ctrl && !event.alt) {
           if (!isApprovalPicker) {
+            this.optionRows.clear();
             this.model.appendFilter(event.text);
           }
         } else {
@@ -490,6 +518,7 @@ export class OverlayHost {
     void this.picker
       .load()
       .then((options) => {
+        this.optionRows.clear();
         this.model.setOptions(options);
         this.onChange();
       })

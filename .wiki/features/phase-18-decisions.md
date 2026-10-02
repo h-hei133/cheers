@@ -569,6 +569,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W5小项 / CMD-11 | 未闭合参数保留原文，已完成参数和正常引号解析保留 | 已实现，本地验证通过 |
 | W5小项 / CMD-13 | 配置变更与主题实际应用区分，失败原因及保留主题可见 | 已实现，本地验证通过 |
 | W5小项 / TUI-10 | 共用可视行映射、单元格目标列与历史边界 | 已实现，本地验证通过 |
+| W5小项 / TUI-11 | 全屏picker/补全点击聚焦，仍由键盘确认；弹层捕获完整指针手势 | 已实现，本地验证通过 |
 | W5其余小项、W6–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1163,3 +1164,8 @@ CMD-13（2026-10-02）：对照参考reload在界面显示诊断与失败的决�
 TUI-10（2026-10-02）：采纳参考编辑器的可视行映射/垂直目标列策略，但复用本仓wrapToWidth与字素测量，
 实现放在editor/layout.ts，原Editor移除两个方法，未新增类方法。112项定向测试、构建、APPROVE/CLEAR；
 反向5项失败后逐字恢复，常规/全屏PTY的软换行导航验收通过。
+
+TUI-11（2026-10-02）：采纳子组件优先消费鼠标和按下聚焦的参考决策，选择最小交付范围；
+renderer记录实际行id，surface给出几何，复用OptionModel/SuggestionList，不建立第二个选择系统。
+7文件123项定向测试、构建、APPROVE/CLEAR；撤销7项失败。拖入后释放和无效组合键两条复核发现已修复。
+全屏PTY证明点击不应用，Enter才完成补全或配置保存。regular鼠标仍归终端，编辑器点击定位未纳入。

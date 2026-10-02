@@ -268,6 +268,7 @@ export class InteractiveMode {
       this.state,
     );
     this.pointer = new Pointer({
+      capture: (report) => this.pager.active || this.overlay.handlePointer(report, this.view.choiceRegions?.overlay?.top),
       view: () => this.view,
       rows: () => this.view.contentRows(),
       copy: (text) => this.clipboard.copy(text),

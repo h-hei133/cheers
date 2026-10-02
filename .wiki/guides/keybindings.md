@@ -106,6 +106,11 @@ depend on the available editor and clipboard integration.
 The mouse rows apply to fullscreen mode; in regular mode the terminal owns scrolling and selection.
 Gestures are not action IDs and cannot be rebound in `keybindings.json`.
 
+In a picker or completion list, a left click selects the displayed row. Press Enter to choose or complete it;
+multi-select pickers still use Space to toggle and Enter to apply. Clicks do not apply settings or approve actions.
+An open picker owns pointer input, so it cannot drag or collapse the transcript underneath it.
+The editor supports text selection by dragging; clicking to position its caret is not supported.
+
 <!-- key-gestures:start -->
 | Gesture | Does |
 | :--- | :--- |

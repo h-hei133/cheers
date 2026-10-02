@@ -22,6 +22,8 @@ export interface PointerContext {
   rows(): readonly string[];
   copy(text: string): void;
   redraw(): void;
+  /** An open overlay takes priority over underlying selection and scrolling. */
+  capture?(report: MouseReport): boolean;
 }
 
 function cleanComposerSelection(text: string): string {
@@ -34,6 +36,7 @@ export class Pointer {
   private dragTarget: "transcript" | "composer" | undefined;
   private scrollbarDrag: { readonly grabOffset: number } | undefined;
   private autoScrollTimer: ReturnType<typeof setInterval> | undefined;
+  private choiceGesture = false;
   constructor(private readonly context: PointerContext) {
     this.drag = new DragSelection({ rows: () => context.rows() }, (text) => context.copy(text));
     this.composerDrag = new DragSelection(
@@ -91,6 +94,35 @@ export class Pointer {
 
   /** Handle one report. */
   handle(report: MouseReport): void {
+    if (this.context.capture?.(report)) {
+      this.clearSelection();
+      if (report.kind === "press" || report.kind === "drag") this.choiceGesture = true;
+      if (report.kind === "release") this.choiceGesture = false;
+      this.context.redraw();
+      return;
+    }
+    // A press consumed by a chooser cannot finish as a transcript click, even
+    // when a redraw closes or moves the chooser before release.
+    if (this.choiceGesture && report.kind !== "press") {
+      if (report.kind === "release") this.choiceGesture = false;
+      return;
+    }
+    this.choiceGesture = false;
+    const view = this.context.view();
+    const list = view.suggestionsOpen ? view.choiceRegions?.suggestions : undefined;
+    if (list && report.row >= list.top && report.row < list.top + list.height &&
+        report.column >= 0 && report.column < list.width) {
+      this.clearSelection();
+      if (report.kind === "drag") this.choiceGesture = true;
+      if (report.kind === "press") {
+        this.choiceGesture = true;
+        if (report.button === 0 && !report.shift && !report.alt && !report.ctrl) {
+          view.suggestions.selectRow(report.row - list.top);
+        }
+      }
+      this.context.redraw();
+      return;
+    }
     if (report.kind === "wheel") {
       this.context.view().scroll(report.button * WHEEL_ROWS);
       this.context.redraw();

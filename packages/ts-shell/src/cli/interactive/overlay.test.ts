@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { OverlayHost, type Picker } from "./overlay.js";
 import { parseKeyEvent } from "../../presentation/tui/input/keys.js";
 import type { Option } from "../../presentation/tui/chrome/options.js";
+import { parseMouseReport } from "../../presentation/tui/input/mouse.js";
 
 const options: Option[] = [
   { id: "a", label: "alpha" },
@@ -25,6 +26,67 @@ function host(): { overlay: OverlayHost; changes: () => number } {
 }
 const press = (overlay: OverlayHost, data: string, apply = vi.fn()): boolean =>
   overlay.handleKey(parseKeyEvent(data), apply);
+
+describe("pointer focus", () => {
+  it.each(["panel", "modal"] as const)("selects a rendered %s row but waits for keyboard confirmation", async (form) => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    overlay.open(picker({ form, load: async () => [
+      { id: "a", label: "alpha", detail: "first detail wraps over lines when narrow" },
+      { id: "b", label: "beta", detail: "second detail" },
+    ] }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const rows = overlay.render(40, 20);
+    const row = rows.findIndex((text) => text.includes("beta"));
+    expect(row).toBeGreaterThan(0);
+    const top = 5;
+    expect(overlay.handlePointer(parseMouseReport(`\x1b[<0;5;${top + row + 1}M`)!, top)).toBe(true);
+    expect(overlay.active).toBe(true);
+    expect(apply).not.toHaveBeenCalled();
+    press(overlay, "\r", apply);
+    expect(apply).toHaveBeenCalledWith(expect.anything(), ["b"]);
+  });
+
+  it("ignores headers, disabled rows, and stale rows after filtering", async () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    overlay.open(picker({ load: async () => [...options, { id: "blocked", label: "disabled", disabled: true }] }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    overlay.render(60, 20);
+    overlay.handlePointer(parseMouseReport("\x1b[<0;5;4M")!, 0);
+    overlay.handlePointer(parseMouseReport("\x1b[<0;5;1M")!, 0);
+    press(overlay, "b");
+    // Filtering invalidates the previous row map until the new frame is rendered.
+    overlay.handlePointer(parseMouseReport("\x1b[<0;5;2M")!, 0);
+    press(overlay, "\r", apply);
+    expect(apply).toHaveBeenCalledWith(expect.anything(), ["b"]);
+  });
+
+  it("maps a scrolled panel row to the option actually painted", async () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    overlay.open(picker({ load: async () => Array.from({ length: 25 }, (_, index) => ({ id: `${index}`, label: `choice-${index}` })) }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    for (let index = 0; index < 15; index++) press(overlay, "\x1b[B");
+    const rows = overlay.render(60, 20);
+    const id = /choice-(\d+)/.exec(rows[1]!)![1];
+    overlay.handlePointer(parseMouseReport("\x1b[<0;5;2M")!, 0);
+    press(overlay, "\r", apply);
+    expect(apply).toHaveBeenCalledWith(expect.anything(), [id]);
+  });
+
+  it("keeps painted rows clickable after a key that does nothing", async () => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    overlay.open(picker());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    overlay.render(60, 20);
+    press(overlay, "\x18");
+    overlay.handlePointer(parseMouseReport("\x1b[<0;5;3M")!, 0);
+    press(overlay, "\r", apply);
+    expect(apply).toHaveBeenCalledWith(expect.anything(), ["b"]);
+  });
+});
 
 
 describe("lifecycle", () => {

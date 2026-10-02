@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { Pointer } from "./pointer.js";
 import { parseMouseReport } from "../../presentation/tui/input/mouse.js";
 import type { InteractiveView } from "../../presentation/tui/surface/contract.js";
+import { SuggestionList } from "../../presentation/tui/chrome/suggestions.js";
 
 function build(overrides: Partial<InteractiveView> = {}) {
   const copied: string[] = [];
@@ -35,6 +36,56 @@ function build(overrides: Partial<InteractiveView> = {}) {
 }
 
 describe("pointer drag selection", () => {
+  it("selects a completion row and consumes the rest of its gesture", () => {
+    const suggestions = new SuggestionList();
+    suggestions.setItems(Array.from({ length: 12 }, (_, index) => ({ label: `item-${index}`, value: `${index}` })));
+    for (let index = 0; index < 10; index++) suggestions.step(1);
+    suggestions.render(60);
+    const { pointer, surface, copied } = build({ suggestions, suggestionsOpen: true,
+      choiceRegions: { suggestions: { top: 5, height: 9, width: 60 } } });
+    pointer.handle(parseMouseReport("\x1b[<0;5;7M")!);
+    expect(suggestions.current()?.value).toBe("4");
+    expect(suggestions.chosen).toBe(true);
+    pointer.handle(parseMouseReport("\x1b[<32;5;1M")!);
+    pointer.handle(parseMouseReport("\x1b[<0;5;1m")!);
+    expect(pointer.selection).toBeUndefined();
+    expect(surface.scroll).not.toHaveBeenCalled();
+    expect(surface.blockAtScreenRow).not.toHaveBeenCalled();
+    expect(copied).toEqual([]);
+  });
+
+  it("lets overlays capture wheel and click events before transcript actions", () => {
+    const { surface } = build();
+    let active = true;
+    const pointer = new Pointer({ view: () => surface, rows: () => [], copy: vi.fn(), redraw: vi.fn(), capture: () => active });
+    pointer.handle(parseMouseReport("\x1b[<64;5;2M")!);
+    pointer.handle(parseMouseReport("\x1b[<0;5;2M")!);
+    active = false;
+    pointer.handle(parseMouseReport("\x1b[<0;5;2m")!);
+    expect(surface.scroll).not.toHaveBeenCalled();
+    expect(surface.blockAtScreenRow).not.toHaveBeenCalled();
+    expect(pointer.selection).toBeUndefined();
+  });
+
+  it.each(["completion", "overlay"])("keeps a drag entering %s captured until release outside", (kind) => {
+    const suggestions = new SuggestionList();
+    suggestions.setItems([{ value: "item", label: "item" }]);
+    suggestions.render(60);
+    const { surface } = build({ suggestions, suggestionsOpen: true,
+      choiceRegions: { suggestions: { top: 5, height: 1, width: 60 } } });
+    let overlay = false;
+    const copy = vi.fn();
+    const pointer = new Pointer({ view: () => surface, rows: () => ["transcript"], copy, redraw: vi.fn(), capture: () => overlay });
+    pointer.handle(parseMouseReport("\x1b[<0;3;1M")!);
+    overlay = kind === "overlay";
+    pointer.handle(parseMouseReport("\x1b[<32;3;6M")!);
+    overlay = false;
+    pointer.handle(parseMouseReport("\x1b[<32;3;1M")!);
+    pointer.handle(parseMouseReport("\x1b[<0;3;1m")!);
+    expect(surface.blockAtScreenRow).not.toHaveBeenCalled();
+    expect(copy).not.toHaveBeenCalled();
+  });
+
   it("drags across lines and copies on release", () => {
     const { pointer, copied, redraws } = build();
 

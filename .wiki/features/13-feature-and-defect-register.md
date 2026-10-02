@@ -3148,7 +3148,12 @@ tokenizer（`core/commands/arguments.ts`，Phase 17 W1-1 引入）把撇号当**
 **参考**：`pi/packages/tui/src/components/editor.ts:443-447,1478-1530` 建**可视行映射**
 （`isOnFirstVisualLine` + `moveToVisualLine`），只有到**首个可视行**才翻历史。
 
-### TUI-11 · 指针引擎**点不了** picker/补全/编辑器光标定位 — `OPEN` `P3` `CONFIRMED`
+### TUI-11 · 全屏picker与补全支持点击选中 — `FIXED` `P3` `CONFIRMED`（裁决范围）
+
+**2026-10-02 裁决/实施**：采用最小范围，左键仅聚焦已绘制picker/补全行，Enter确认，多选仍用Space切换；点击不批准操作、不写设置、不提交文本。按现有owner分工，由渲染器提供行映射，surface提供几何，overlay优先接管指针；拖入选择区的手势持续捕获到释放。regular模式未开启鼠标跟踪，编辑器点击定位未实现且不在本轮承诺内。
+7文件123项定向测试、构建及APPROVE/CLEAR；撤销7项失败，源码恢复。独立复核发现的拖入后释放与无效组合键命中表失效均修复并有回归。全屏真实PTY验证补全点击和设置点击，在Enter前配置逐字不变，Enter后才保存，退出0。
+
+以下保留修复前证据：
 
 `cli/interactive/pointer.ts:92-167` 只处理：滚轮、滚动条拖拽、transcript 选区拖拽、composer 拖拽。
 `cli/interactive/overlay.ts`（520 行）**零鼠标处理**（`grep click|mouse` 零命中）——
