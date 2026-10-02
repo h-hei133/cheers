@@ -560,7 +560,8 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W4-15 / PRV-10 | 累计用量随现有 state 写入；锁内增量合并；恢复重建上下文测量 | 已实现，本地验证通过 |
 | W4-16 / SES-06 | 删除旧显示规则和未消费投影；保留历史阻断/写入状态恢复 | 已实现，本地验证通过 |
 | CMD-12 | 来源列表持久化、失败显式显示、移除无实现的搜索承诺 | 已实现，本地验证通过 |
-| W5–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
+| W5-17 / TOL-06 | 明确每文件提交边界和显式恢复入口 | 已实现，本地验证通过 |
+| W5-18–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
 src/runtime/execution/service.test.ts src/runtime/execution/fileLock.test.ts
@@ -849,6 +850,14 @@ CMD-12（2026-10-02）：来源列表由 `core/commands/marketplace/store.ts` �
 W4 收口静态门禁：import cycles（1379 文件、零环）、config（39/39）、declarations（18/18、10/10）、
 Node floor、strict docs 均通过；脚本测试 **40/40**。call reachability 仍 7 项既有 advisory；
 函数 ceiling 仍 7 项，未新增。W5–W8 继续执行，本地未跑全套 TypeScript 或真实提供方。
+
+W5-17 / TOL-06（2026-10-02）：沿用参考的 sequential/partial 决策，仅修正工具承诺和 readiness 说明；
+不同文件独立提交、失败不回滚已提交的其它文件。同文件的多替换仍全匹配后一次写入。
+实际 `/undo` 仅给出最近快照及明确 restore 命令，因此修正裁决中「逐个 /undo 恢复」的简写，
+明确 `/restore` 才执行单条已记录编辑恢复。atomic-rollback 仍 blocked。
+`npm run test:ts -- src/core/tools/highValueTools.test.ts src/edit/result/editCapabilityReadiness.test.ts`
+**2 文件 / 29 项通过**（架构复核也独立通过）；双线 APPROVE / CLEAR。
+撤销工具新增承诺后单项契约测试失败，已精确恢复。未改变执行路径或引入多文件事务。
 
 ## 9. 真实 provider 验证：**已执行**（2026-10-01，中转站 `ai.onyxaxis.org`）
 

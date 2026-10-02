@@ -537,7 +537,7 @@ export function createCoreToolRegistry(options?: {
     },
     {
       name: 'edit',
-      description: 'Edit an existing file: several targeted replacements in one call, or full replacement content.',
+      description: 'Edit an existing file: several targeted replacements in one call, or full replacement content. Each file commits independently; multi-file edits are not atomic. If editing a later file fails, earlier changes remain. Use /undo to inspect the latest snapshot or /restore to explicitly restore individual recorded edits.',
       argsSchema: {
         type: 'object',
         properties: {

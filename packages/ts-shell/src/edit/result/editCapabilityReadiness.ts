@@ -141,6 +141,8 @@ const READINESS: readonly EditCapabilityReadiness[] = [
   blocked("atomic-rollback", [
     "rollbackAtomicityClaim remains false",
     "no transaction rollback executor exists; the implementation was removed by decision",
+    "each file commits independently; failure on a later file leaves earlier changes in place",
+    "/undo inspects the latest snapshot; /restore restores individual recorded edits explicitly",
   ]),
   blocked("default-durable-persistence", [
     "recovery authority requires explicit non-default root",

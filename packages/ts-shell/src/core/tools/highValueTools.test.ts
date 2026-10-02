@@ -10,6 +10,13 @@ import { runTodoCommand } from "../commands/todoCommandRuntime.js";
 import { createDefaultExecutionService } from "../../runtime/execution/service.js";
 import { createCoreToolRegistry } from "./registry.js";
 describe("High-Value Modern Built-in Tools Subsystem", () => {
+  it("states the multi-file failure and explicit recovery boundary in the edit tool contract", () => {
+    const edit = createCoreToolRegistry().get("edit");
+    expect(edit?.description).toContain("Each file commits independently");
+    expect(edit?.description).toContain("multi-file edits are not atomic");
+    expect(edit?.description).toContain("earlier changes remain");
+    expect(edit?.description).toContain("/restore to explicitly restore individual recorded edits");
+  });
   let tempDir: string;
 
   beforeEach(async () => {
