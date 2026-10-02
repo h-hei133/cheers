@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CodingResultSummary } from "../../result/types.js";
-import { deriveStoppedSessionContinuitySurface } from "./stoppedSessionContinuity.js";
+import { deriveStoppedSessionContinuitySurface, buildStoppedSessionFailureHandoffDiagnostic } from "./stoppedSessionContinuity.js";
 
 describe("stopped session continuity", () => {
   it.each(["unknown", "unverified"] as const)(
@@ -196,7 +196,7 @@ describe("stopped session continuity", () => {
     expect(JSON.stringify(result)).not.toContain("status: draft");
   });
 
-  it("preserves discovery edit manifest facts for continue without raw content", () => {
+  it("preserves a structured historical blocker without replaying discovery markers", () => {
     const nextAction = "Confirm exactly one candidate path before any mutation can be considered.";
     const result = makeCodingResult({
       failedFiles: [
@@ -230,15 +230,9 @@ describe("stopped session continuity", () => {
     const surface = deriveStoppedSessionContinuitySurface(result);
 
     expect(surface?.kind).toBe("unsupported-future-edit");
-    expect(surface?.failureHandoffDiagnostic).toContain(
-      "discovery=discovery-edit manifest=discovery-edit-abc123",
-    );
-    expect(surface?.failureHandoffDiagnostic).toContain(
-      "confirmation=required-target-selection",
-    );
-    expect(surface?.failureHandoffDiagnostic).toContain(
-      "mutationAuthority:not-granted",
-    );
+    expect(surface?.failureHandoffDiagnostic).toContain("blocker=unsupported-future-edit");
+    expect(surface?.failureHandoffDiagnostic).toContain(`next=${nextAction.slice(0, -1)}`);
+    expect(surface?.failureHandoffDiagnostic).not.toContain("discovery=");
     expect(JSON.stringify(result)).not.toContain("status: ready");
     expect(JSON.stringify(result)).not.toContain("status: draft");
   });
@@ -484,9 +478,8 @@ describe("stopped session continuity", () => {
     const surface = deriveStoppedSessionContinuitySurface(result);
 
     expect(surface?.kind).toBe("writer-started-unverified");
-    expect(surface?.failureHandoffDiagnostic).toContain(
-      "target-set=target-set-edit transaction=target-set-txn-abc123",
-    );
+    expect(surface?.failureHandoffDiagnostic).toContain("target=src/b.ts");
+    expect(surface?.failureHandoffDiagnostic).not.toContain("target-set=");
     expect(surface?.failureHandoffDiagnostic).toContain("writer-started=yes");
     expect(surface?.failureHandoffDiagnostic).toContain(
       "requires-user-inspection=yes",
@@ -538,172 +531,32 @@ describe("stopped session continuity", () => {
 
     const surface = deriveStoppedSessionContinuitySurface(result);
 
-    expect(surface?.failureHandoffDiagnostic).toContain(
-      "edit-recovery=edit-recovery-apply plan=edit-recovery-abc123",
-    );
+    expect(surface?.failureHandoffDiagnostic).toContain("status=blocked");
+    expect(surface?.failureHandoffDiagnostic).toContain("next=Confirm the snapshot rollback before retrying");
+    expect(surface?.failureHandoffDiagnostic).not.toContain("edit-recovery=");
     expect(surface?.failureHandoffDiagnostic).not.toContain("status: draft");
     expect(surface?.failureHandoffDiagnostic).not.toContain("raw content");
   });
 
-  it("includes provider edit proposal facts in stopped diagnostics", () => {
-    const result = makeCodingResult({
-      failedFiles: [
-        {
-          path: "src/app.ts",
-          reason: "Provider proposal requires review.",
-        },
-      ],
-      continuation: {
-        status: "failed-after-bounded-continuation",
-        attempts: 1,
-        evidence: [
-          "provider-edit proposal=provider-edit-abc123; provider=fake-provider; targets=src/app.ts; readiness=review-only; confirmation=review-required; mutation:not-run; mutationAuthority:not-granted; raw-content-excluded",
-        ],
-      },
-      verification: {
-        status: "blocked",
-        reason: "Provider proposal requires review.",
-        blockerKind: "unknown",
-        nextAction: "Review and confirm exact mapping before handoff.",
-      },
-      evidence: ["provider-edit-result:raw-content-excluded"],
+  it.each([
+    "provider-edit proposal=obsolete", "edit-proposal-apply proposal=obsolete",
+    "edit-repair-proposal id=obsolete", "context-packet obsolete; mutationAuthority=not-granted",
+  ])("keeps structured failure facts without interpreting %s", (marker) => {
+    const original = makeCodingResult({ verification: {
+      status: "failed", reason: "Verification failed", blockerKind: "unknown",
+      nextAction: "Fix the test and rerun verification.",
+    } });
+    const diagnostic = buildStoppedSessionFailureHandoffDiagnostic({
+      ...original,
+      continuation: { status: "failed-after-bounded-continuation", attempts: 1, evidence: [marker] },
     });
-
-    const surface = deriveStoppedSessionContinuitySurface(result);
-
-    expect(surface?.failureHandoffDiagnostic).toContain(
-      "provider-edit=provider-edit proposal=provider-edit-abc123",
-    );
-    expect(surface?.failureHandoffDiagnostic).toContain(
-      "mutationAuthority:not-granted",
-    );
-    expect(surface?.failureHandoffDiagnostic).toContain("raw-content-excluded");
+    expect(diagnostic).toBe(buildStoppedSessionFailureHandoffDiagnostic(original));
+    expect(diagnostic).toContain("status=failed");
+    expect(diagnostic).toContain("blocker=verification-failed");
+    expect(diagnostic).toContain("next=Fix the test and rerun verification");
+    expect(diagnostic).not.toContain("obsolete");
   });
 
-  it("includes proposal review/apply facts in stopped diagnostics", () => {
-    const result = makeCodingResult({
-      failedFiles: [
-        {
-          path: "src/app.ts",
-          reason: "Proposal selection requires confirmation.",
-        },
-      ],
-      continuation: {
-        status: "failed-after-bounded-continuation",
-        attempts: 1,
-        evidence: [
-          "edit-proposal-review proposal=provider-edit-abc123; source=provider; status=ready-for-selection; targets=src/app.ts; readiness=single-target-ready; mutation:not-run; raw-content-excluded",
-          "edit-proposal-apply proposal=provider-edit-abc123; status=unconfirmed-no-write; targets=(none); changed=none; raw-content-excluded",
-          "proposal-hunk-set-apply proposal=provider-edit-abc123; hunkSet=proposal-hunk-set-def; status=preflight-stopped; targets=src/app.ts; hunks=h1; changed=none; failed=src/app.ts; unattempted=none; verification=not-run; recovery=unavailable; raw-content-excluded",
-        ],
-      },
-      verification: {
-        status: "blocked",
-        reason: "Proposal selection requires confirmation.",
-        blockerKind: "unknown",
-        nextAction: "Confirm selected exact hunks before apply.",
-      },
-      evidence: ["edit-proposal-result:raw-content-excluded"],
-    });
-
-    const surface = deriveStoppedSessionContinuitySurface(result);
-
-    expect(surface?.failureHandoffDiagnostic).toContain(
-      "proposal-review=edit-proposal-review proposal=provider-edit-abc123",
-    );
-    expect(surface?.failureHandoffDiagnostic).toContain(
-      "proposal-apply=edit-proposal-apply proposal=provider-edit-abc123",
-    );
-    expect(surface?.failureHandoffDiagnostic).toContain(
-      "proposal-hunk-set=proposal-hunk-set-apply proposal=provider-edit-abc123",
-    );
-    expect(surface?.failureHandoffDiagnostic).toContain("raw-content-excluded");
-  });
-
-  it("includes edit repair context and proposal facts in stopped diagnostics", () => {
-    const result = makeCodingResult({
-      failedFiles: [
-        {
-          path: "src/app.ts",
-          reason: "Verification failed; repair proposal requires review.",
-        },
-      ],
-      continuation: {
-        status: "failed-after-bounded-continuation",
-        attempts: 0,
-        evidence: [
-          "edit-repair-context id=edit-repair-context-abc; status=repair-context-created; sourceTransaction=txn-1; verification=failed; failed=src/app.ts; changed=src/app.ts; mutation:not-run; raw-content-excluded",
-          "edit-repair-proposal id=edit-repair-proposal-def; context=edit-repair-context-abc; targets=src/app.ts; hunks=h1; readiness=exact-single-target; confirmation=review-required; mutation:not-run; mutationAuthority:not-granted; raw-content-excluded",
-        ],
-      },
-      verification: {
-        status: "failed",
-        reason: "Verification failed; repair proposal requires review.",
-        blockerKind: "unknown",
-        nextAction: "Review and confirm exact repair hunks before apply.",
-      },
-      evidence: ["edit-repair-result:raw-content-excluded"],
-    });
-
-    const surface = deriveStoppedSessionContinuitySurface(result);
-
-    expect(surface?.failureHandoffDiagnostic).toContain(
-      "edit-repair-context=edit-repair-context id=edit-repair-context-abc",
-    );
-    expect(surface?.failureHandoffDiagnostic).toContain(
-      "edit-repair-proposal=edit-repair-proposal id=edit-repair-proposal-def",
-    );
-    expect(surface?.failureHandoffDiagnostic).toContain(
-      "mutationAuthority:not-granted",
-    );
-    expect(surface?.failureHandoffDiagnostic).toContain("raw-content-excluded");
-  });
-
-  it("includes targeted context packet and plan facts in stopped diagnostics", () => {
-    const result = makeCodingResult({
-      taskKind: "read-file",
-      failedFiles: [
-        {
-          path: "src/target.ts",
-          reason: "Context packet needs more related reads before planning.",
-        },
-      ],
-      continuation: {
-        status: "failed-after-bounded-continuation",
-        attempts: 1,
-        evidence: [
-          "context-packet ctx_abc123; target=src/target.ts; included=2; omitted=1; confidence=medium; mutationAuthority=not-granted; raw-full-content-excluded",
-          "context-plan ctx_abc123; readiness=needs-more-context; suggestedReads=1; tests=0; mutationAuthority=not-granted",
-          "agent-plan plan_abc123; owner=workspace-file-context; action=context-planning; readiness=needs-more-context; confidence=medium; contextPackets=1; missingFacts=1; suggestedReads=1; mutationAuthority=not-granted; redaction=redacted-and-budgeted",
-          "context-packet:raw-full-content-excluded",
-        ],
-      },
-      verification: {
-        status: "blocked",
-        reason: "Context packet needs more related reads before planning.",
-        blockerKind: "unknown",
-        nextAction: "Read the suggested candidates before planning mutation.",
-      },
-    });
-
-    const surface = deriveStoppedSessionContinuitySurface(result);
-
-    expect(surface?.failureHandoffDiagnostic).toContain(
-      "context-packet=context-packet ctx_abc123",
-    );
-    expect(surface?.failureHandoffDiagnostic).toContain(
-      "context-plan=context-plan ctx_abc123",
-    );
-    expect(surface?.failureHandoffDiagnostic).toContain(
-      "agent-plan=agent-plan plan_abc123",
-    );
-    expect(surface?.failureHandoffDiagnostic).toContain(
-      "mutationAuthority=not-granted",
-    );
-    expect(surface?.failureHandoffDiagnostic).toContain(
-      "raw-full-content-excluded",
-    );
-  });
 });
 
 function makeCodingResult(

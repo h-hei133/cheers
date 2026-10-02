@@ -7,7 +7,6 @@ import {
   deriveActionableFailureContinuity,
   type ActionableFailureContinuity,
 } from "../actionableFailureContinuity.js";
-import { formatContinuationEvidenceParityDetails } from "../continuationEvidenceParity.js";
 
 export type StoppedSessionContinuityKind =
   | "writer-started-unknown"
@@ -197,7 +196,6 @@ export function buildStoppedSessionFailureHandoffDiagnostic(
   if (codingResult.recoverySurface) {
     parts.push("automatic-rollback=no");
   }
-  parts.push(...formatContinuationEvidenceParityDetails(codingResult));
   parts.push(`next=${compactContinuityText(nextFocus, 140).replace(/[.]+$/, "")}`);
   return `${parts.join("; ")}.`;
 }

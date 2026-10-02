@@ -30,7 +30,7 @@ describe("session compact module parity", () => {
     );
   });
 
-  it("compacts context packet and agent-plan summaries without raw content", () => {
+  it("compacts historical blockers without regenerating retired parity labels", () => {
     const compacted = applySessionCompactRetention({
       workingMemory: { sourceTurnCount: 1, summary: [] },
       event: makeCompletedEvent(
@@ -50,10 +50,11 @@ describe("session compact module parity", () => {
     }) as { summary: readonly string[] };
 
     const summary = compacted.summary.join("\n");
-    expect(summary).toContain("context-packet=context-packet ctx_abc");
-    expect(summary).toContain("agent-plan=agent-plan plan_abc");
-    expect(summary).toContain("mutationAuthority=not-granted");
-    expect(summary).toContain("raw-full-content-excluded");
+    expect(summary).toContain("reason=Context packet needs more related reads before planning.");
+    expect(summary).toContain("next=Read suggested candidates before planning mutation");
+    expect(summary).toContain("blocker=unsupported-future-edit");
+    expect(summary).not.toContain("context-packet=context-packet");
+    expect(summary).not.toContain("agent-plan=agent-plan");
     expect(summary).not.toContain("RAW_SECRET_FILE_CONTENT");
   });
 

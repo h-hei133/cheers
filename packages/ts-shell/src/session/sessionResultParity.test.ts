@@ -19,289 +19,33 @@ describe("session result parity", () => {
     expect(projection.doNext).toBe(
       "Re-run and approve escalation for verify command execution.",
     );
-    expect(projection.capabilityArea).toBe("permission-policy");
   });
 
-  it("projects context and agent-plan safe markers for session consumers", () => {
+  it("projects a current stop reason without a legacy coding result", () => {
+    expect(projectSessionResultParity({
+      terminalClassification: "stopped",
+      stopReason: "User denied permission for tool bash",
+    })).toMatchObject({
+      terminalClassification: "stopped",
+      blockerKind: "approval-denied",
+      reason: "User denied permission for tool bash",
+      doNext: expect.stringContaining("approve"),
+    });
+  });
+
+  it("does not turn unproduced evidence prefixes into authority or capability facts", () => {
     const projection = projectSessionResultParity({
       terminalClassification: "stopped",
-      stopReason: "Read suggested candidates before planning mutation.",
       codingResult: makeCodingResult({
-        reason: "Context packet needs more related reads before planning.",
-        nextAction: "Read suggested candidates before planning mutation.",
-        evidence: [
-          "context-packet ctx_abc; target=src/target.ts; included=2; omitted=1; mutationAuthority=not-granted; raw-full-content-excluded",
-          "agent-plan plan_abc; readiness=needs-more-context; confidence=medium; suggestedReads=1; mutationAuthority=not-granted; redaction=redacted-and-budgeted",
-        ],
+        reason: "Review required", nextAction: "Review the requested change.",
+        evidence: ["context-packet ctx; mutationAuthority=not-granted", "claim-ledger:terminal:confirmation-required"],
       }),
     });
-
-    expect(projection.capabilityArea).toBe("agent-loop");
-    expect(projection.mutationAuthority).toBe("not-granted");
-    expect(projection.redactionStatus).toBe("redacted-and-budgeted");
-    expect(projection.suggestedReads).toBe("1");
-    expect(projection.reason).toContain("Context packet needs more related reads");
-  });
-
-  it("projects context graph and test-impact markers for session consumers", () => {
-    const projection = projectSessionResultParity({
-      terminalClassification: "stopped",
-      stopReason: "Read omitted graph candidates before provider planning.",
-      codingResult: makeCodingResult({
-        reason: "Context graph is budget limited.",
-        nextAction: "Read omitted graph candidates before provider planning.",
-        evidence: [
-          "context-graph ctx_graph_abc; root=src/target.ts; nodes=8; included=6; omitted=2; mutationAuthority=not-granted; raw-content-excluded",
-          "test-impact test_impact_abc; graph=ctx_graph_abc; tests=1; commands=2; readiness=ready; mutationAuthority=not-granted",
-          "context-graph-score:readiness:budget-limited",
-        ],
-      }),
+    expect(projection).toEqual({
+      terminalClassification: "stopped", reason: "Review required", doNext: "Review the requested change.",
     });
-
-    expect(projection.capabilityArea).toBe("workspace-file-context");
-    expect(projection.mutationAuthority).toBe("not-granted");
-    expect(projection.redactionStatus).toBe("raw-content-excluded");
-    expect(projection.evidenceMarkers).toContain(
-      "context-graph ctx_graph_abc; root=src/target.ts; nodes=8; included=6; omitted=2; mutationAuthority=not-granted; raw-content-excluded",
-    );
-    expect(projection.evidenceMarkers).toContain(
-      "test-impact test_impact_abc; graph=ctx_graph_abc; tests=1; commands=2; readiness=ready; mutationAuthority=not-granted",
-    );
   });
 
-  it("projects plan quality harness trace and scorecard markers for session consumers", () => {
-    const projection = projectSessionResultParity({
-      terminalClassification: "stopped",
-      stopReason: "Read missing context before provider proposal.",
-      codingResult: makeCodingResult({
-        reason: "Provider proposal blocked by plan quality.",
-        nextAction: "Read missing context before provider proposal.",
-        evidence: [
-          "plan-quality plan_quality_abc; agentPlan=plan_abc; contextPacket=ctx_abc; contextGraph=ctx_graph_abc; level=needs-more-context; score=62; suggestedReads=2; mutationAuthority=not-granted; raw-content-excluded",
-          "harness-trace harness_trace_abc; route=route188; contextPacket=ctx_abc; contextGraph=ctx_graph_abc; agentPlan=plan_abc; planQuality=plan_quality_abc; stages=read,plan; failureClass=missing-context; mutationAuthority=not-granted; raw-content-excluded",
-          "harness-scorecard harness_scorecard_abc; trace=harness_trace_abc; planQuality=plan_quality_abc; context=warn; plan=warn; provider=fail; verification=skip; repair=skip; failureClass=missing-context; mutationAuthority=not-granted; raw-content-excluded",
-        ],
-      }),
-    });
-
-    expect(projection.capabilityArea).toBe("workspace-file-context");
-    expect(projection.mutationAuthority).toBe("not-granted");
-    expect(projection.redactionStatus).toBe("raw-content-excluded");
-    expect(projection.suggestedReads).toBe("2");
-    expect(projection.evidenceMarkers).toEqual(
-      expect.arrayContaining([
-        "plan-quality plan_quality_abc; agentPlan=plan_abc; contextPacket=ctx_abc; contextGraph=ctx_graph_abc; level=needs-more-context; score=62; suggestedReads=2; mutationAuthority=not-granted; raw-content-excluded",
-        "harness-trace harness_trace_abc; route=route188; contextPacket=ctx_abc; contextGraph=ctx_graph_abc; agentPlan=plan_abc; planQuality=plan_quality_abc; stages=read,plan; failureClass=missing-context; mutationAuthority=not-granted; raw-content-excluded",
-        "harness-scorecard harness_scorecard_abc; trace=harness_trace_abc; planQuality=plan_quality_abc; context=warn; plan=warn; provider=fail; verification=skip; repair=skip; failureClass=missing-context; mutationAuthority=not-granted; raw-content-excluded",
-      ]),
-    );
-  });
-
-  it("projects context-aware provider proposal markers for session consumers", () => {
-    const projection = projectSessionResultParity({
-      terminalClassification: "stopped",
-      stopReason: "Review the context-aware provider proposal before handoff.",
-      codingResult: makeCodingResult({
-        reason: "Context-aware provider proposal was created for review.",
-        nextAction: "Review the context-aware provider proposal before handoff.",
-        evidence: [
-          "context-aware-provider proposal=provider-edit-abc; status=review-required-proposal; contextPacket=ctx_abc; agentPlan=plan_abc; mutationAuthority=not-granted; raw-content-excluded",
-          "context-aware-provider-result:mutation:not-run",
-        ],
-      }),
-    });
-
-    expect(projection.capabilityArea).toBe("edit-patch");
-    expect(projection.mutationAuthority).toBe("not-granted");
-    expect(projection.redactionStatus).toBe("raw-content-excluded");
-    expect(projection.evidenceMarkers).toContain(
-      "context-aware-provider-result:mutation:not-run",
-    );
-  });
-
-  it("projects real-provider dry-run markers as provider-model evidence", () => {
-    const projection = projectSessionResultParity({
-      terminalClassification: "stopped",
-      stopReason: "Review and explicitly confirm exact hunks before apply.",
-      codingResult: makeCodingResult({
-        reason: "Provider dry-run produced an exact-ready no-write proposal.",
-        nextAction: "Review and explicitly confirm exact hunks before apply.",
-        evidence: [
-          "real-provider-proposal-dry-run id=real_provider_proposal_dry_run_abc; status=dry-run-exact-ready-no-write; provider=fake-real-provider; providerCalled=true; gate=allow-dry-run; promptAudit=pass; outputValidation=valid-exact-single-target; anchorQuality=exact-ready; proposal=provider-edit-abc; mutationAuthority=not-granted; raw-content-excluded",
-          "provider-prompt-audit:status:pass",
-          "provider-output-validation:status:valid-exact-single-target",
-          "provider-anchor-quality:level:exact-ready",
-        ],
-      }),
-    });
-
-    expect(projection.capabilityArea).toBe("provider-model");
-    expect(projection.mutationAuthority).toBe("not-granted");
-    expect(projection.redactionStatus).toBe("raw-content-excluded");
-    expect(projection.evidenceMarkers).toEqual(
-      expect.arrayContaining([
-        "real-provider-proposal-dry-run id=real_provider_proposal_dry_run_abc; status=dry-run-exact-ready-no-write; provider=fake-real-provider; providerCalled=true; gate=allow-dry-run; promptAudit=pass; outputValidation=valid-exact-single-target; anchorQuality=exact-ready; proposal=provider-edit-abc; mutationAuthority=not-granted; raw-content-excluded",
-        "provider-output-validation:status:valid-exact-single-target",
-        "provider-anchor-quality:level:exact-ready",
-      ]),
-    );
-  });
-
-  it("projects real task loop markers as provider-model evidence", () => {
-    const projection = projectSessionResultParity({
-      terminalClassification: "stopped",
-      stopReason: "Review exact-ready task loop proposal before apply.",
-      codingResult: makeCodingResult({
-        reason: "Task loop produced exact-ready confirmation-required evidence.",
-        nextAction: "Review and explicitly confirm before controlled apply.",
-        evidence: [
-          "real-task-loop-result taskLoop=real_task_loop_abc; providerCalled=true; outputValidation=valid-exact-single-target; anchorQuality=exact-ready; confirmation=required; apply=not-run; verification=not-run; snapshot=not-run; recovery=not-run; mutationScope=none; providerCallDuringApply=false; raw-content-excluded",
-          "claim-ledger claim_ledger_abc; version=v1; source=live-provider; terminal=confirmation-required; result=confirmation-required; liveSuccess=false; notProven=authority,mutation,verification,recovery; provider=proven; proposal=proven; anchor=proven; authority=blocked; mutation=not-run; verification=not-run; recovery=not-run; raw-content-excluded",
-          "claim-ledger:terminal:confirmation-required",
-          "real-task-loop-session:provider-called:true",
-          "real-task-loop-session:output-validation:valid-exact-single-target",
-          "real-task-loop-result:anchor-quality:exact-ready",
-        ],
-      }),
-    });
-
-    expect(projection.capabilityArea).toBe("provider-model");
-    expect(projection.redactionStatus).toBe("raw-content-excluded");
-    expect(projection.evidenceMarkers).toContain(
-      "real-task-loop-result taskLoop=real_task_loop_abc; providerCalled=true; outputValidation=valid-exact-single-target; anchorQuality=exact-ready; confirmation=required; apply=not-run; verification=not-run; snapshot=not-run; recovery=not-run; mutationScope=none; providerCallDuringApply=false; raw-content-excluded",
-    );
-    expect(projection.evidenceMarkers).toContain(
-      "claim-ledger claim_ledger_abc; version=v1; source=live-provider; terminal=confirmation-required; result=confirmation-required; liveSuccess=false; notProven=authority,mutation,verification,recovery; provider=proven; proposal=proven; anchor=proven; authority=blocked; mutation=not-run; verification=not-run; recovery=not-run; raw-content-excluded",
-    );
-    expect(projection.evidenceMarkers).toContain(
-      "claim-ledger:terminal:confirmation-required",
-    );
-  });
-
-  it("projects anchored proposal runtime eval and scorecard markers as provider-model evidence", () => {
-    const projection = projectSessionResultParity({
-      terminalClassification: "stopped",
-      stopReason: "Review and explicitly confirm exact hunks before apply.",
-      codingResult: makeCodingResult({
-        reason: "Anchored proposal runtime produced no-write review evidence.",
-        nextAction: "Review and explicitly confirm exact hunks before apply.",
-        evidence: [
-          "anchored-proposal-eval anchored_proposal_eval_abc; activation=anchored_proposal_activation_abc; dryRun=real_provider_proposal_dry_run_abc; overall=pass; promptAudit=pass; output=pass; anchoring=pass; review=pass; handoff=pass; noWrite=pass; mutationAuthority=not-granted; raw-content-excluded",
-          "anchored-proposal-scorecard anchored_proposal_scorecard_abc; proposal=provider-edit-abc; anchoredProposal=provider-anchored-proposal-abc; dryRun=real_provider_proposal_dry_run_abc; promptAudit=provider_prompt_audit_abc; outputValidation=provider_output_validation_abc; anchorQuality=provider_anchor_quality_abc; exact=1; partial=0; unsupported=0; failureClass=none; noWrite=pass; mutationAuthority=not-granted; raw-content-excluded",
-          "anchored-proposal-runtime:status:runtime-handoff-ready-no-write",
-        ],
-      }),
-    });
-
-    expect(projection.capabilityArea).toBe("provider-model");
-    expect(projection.mutationAuthority).toBe("not-granted");
-    expect(projection.redactionStatus).toBe("raw-content-excluded");
-    expect(projection.evidenceMarkers).toEqual(
-      expect.arrayContaining([
-        "anchored-proposal-eval anchored_proposal_eval_abc; activation=anchored_proposal_activation_abc; dryRun=real_provider_proposal_dry_run_abc; overall=pass; promptAudit=pass; output=pass; anchoring=pass; review=pass; handoff=pass; noWrite=pass; mutationAuthority=not-granted; raw-content-excluded",
-        "anchored-proposal-runtime:status:runtime-handoff-ready-no-write",
-      ]),
-    );
-  });
-
-  it("projects anchored provider smoke quality report markers as provider-model evidence", () => {
-    const projection = projectSessionResultParity({
-      terminalClassification: "stopped",
-      stopReason: "Anchored provider smoke skipped no opt-in.",
-      codingResult: makeCodingResult({
-        reason: "Anchored provider smoke evaluated no-write.",
-        nextAction: "Run fake corpus or explicitly opt in.",
-        evidence: [
-          "anchored-provider-smoke:run:anchored_provider_smoke_abc",
-          "proposal-quality-report:mode:real-provider-smoke",
-          "proposal-quality-report:provider-called:false",
-          "provider-smoke-result:status:real-provider-smoke-skipped-no-opt-in",
-          "provider-smoke-result:mutation-authority:not-granted",
-        ],
-      }),
-    });
-
-    expect(projection.capabilityArea).toBe("provider-model");
-    expect(projection.mutationAuthority).toBe("not-granted");
-    expect(projection.evidenceMarkers).toEqual(
-      expect.arrayContaining([
-        "anchored-provider-smoke:run:anchored_provider_smoke_abc",
-        "provider-smoke-result:status:real-provider-smoke-skipped-no-opt-in",
-      ]),
-    );
-  });
-
-  it("projects live provider smoke normalized evidence as provider-model evidence", () => {
-    const projection = projectSessionResultParity({
-      terminalClassification: "stopped",
-      stopReason: "Live provider smoke skipped because provider was unavailable.",
-      codingResult: makeCodingResult({
-        reason: "Live provider smoke preserved opt-in and remained no-write.",
-        nextAction: "Use fake-ready boundary coverage or configure provider through the approved gate.",
-        evidence: [
-          "live-smoke-evidence:lifecycle:life_from_prompt",
-          "live-provider-smoke-result:provider-called:true",
-          "live-provider-smoke-result:no-write:pass",
-          "live-provider-smoke-result:redaction:raw-content-excluded",
-          "live-provider-smoke-result:mutation-authority:not-granted",
-        ],
-      }),
-    });
-
-    expect(projection.capabilityArea).toBe("provider-model");
-    expect(projection.mutationAuthority).toBe("not-granted");
-    expect(projection.redactionStatus).toBe("raw-content-excluded");
-    expect(projection.evidenceMarkers).toEqual(
-      expect.arrayContaining([
-        "live-smoke-evidence:lifecycle:life_from_prompt",
-        "live-provider-smoke-result:provider-called:true",
-      ]),
-    );
-  });
-
-  it("projects verification repair loop markers for session consumers", () => {
-    const projection = projectSessionResultParity({
-      terminalClassification: "stopped",
-      stopReason: "Review repair proposal and explicitly confirm exact hunks.",
-      codingResult: makeCodingResult({
-        reason: "Verification failed; repair proposal requires review.",
-        nextAction: "Review repair proposal and explicitly confirm exact hunks.",
-        evidence: [
-          "verification-repair-loop id=verification-repair-loop-abc; state=repair-review-required; repairContext=edit-repair-context-def; repairProposal=edit-repair-proposal-def; contextPacket=ctx_abc; agentPlan=plan_abc; verification=failed; runtimeReceipts=1; provider=proposal-only; next=review; raw-content-excluded",
-          "verification-repair-result:mutation-authority:not-granted-until-existing-route",
-        ],
-      }),
-    });
-
-    expect(projection.capabilityArea).toBe("edit-patch");
-    expect(projection.mutationAuthority).toBe("not-granted");
-    expect(projection.redactionStatus).toBe("raw-content-excluded");
-    expect(projection.evidenceMarkers).toContain(
-      "verification-repair-result:mutation-authority:not-granted-until-existing-route",
-    );
-  });
-
-  it("projects verification command markers for session consumers", () => {
-    const projection = projectSessionResultParity({
-      terminalClassification: "stopped",
-      stopReason: "Create a review-gated repair context from the failed test command.",
-      codingResult: makeCodingResult({
-        reason: "Verification command failed.",
-        nextAction: "Create a review-gated repair context from the failed test command.",
-        evidence: [
-          "verification-command id=verification-command-plan-abc:result:failed; plan=verification-command-plan-abc; command=npm test -- --help; outcome=failed; failureClass=test-failed; runtimeReceipts=1; repairEligible=yes; mutationAuthority:not-granted; mutation:not-run; raw-content-excluded",
-          "verification-command-result:mutation:not-run",
-        ],
-      }),
-    });
-
-    expect(projection.capabilityArea).toBe("edit-patch");
-    expect(projection.mutationAuthority).toBe("not-granted");
-    expect(projection.redactionStatus).toBe("raw-content-excluded");
-    expect(projection.evidenceMarkers).toContain(
-      "verification-command-result:mutation:not-run",
-    );
-  });
 });
 
 function makeCodingResult(input: {

@@ -164,114 +164,20 @@ describe("session resume context builder", () => {
     expect(diagnostic).toContain("automatic-rollback=no");
   });
 
-  it("includes confirmed discovery handoff facts in success diagnostics", () => {
+  it.each([
+    "discovery-edit manifest=obsolete", "generated-edit handoff=obsolete",
+    "provider-edit proposal=obsolete", "edit-proposal-apply proposal=obsolete",
+    "context-packet obsolete; mutationAuthority=not-granted",
+  ])("keeps structured success facts without interpreting %s", (marker) => {
+    const original = makeCodingResult();
     const diagnostic = buildSuccessHandoffDiagnostic({
-      ...makeCodingResult(),
-      continuation: {
-        status: "first-pass-success",
-        attempts: 0,
-        evidence: [
-          "discovery-edit manifest=discovery-edit-def456; candidates=src/a.ts; ambiguity=single-candidate; confirmation=confirmed-single-target; mutation:not-run; mutationAuthority:not-granted; raw-content-excluded",
-        ],
-      },
+      ...original,
+      continuation: { status: "first-pass-success", attempts: 0, evidence: [marker] },
     });
-
-    expect(diagnostic).toContain(
-      "discovery=discovery-edit manifest=discovery-edit-def456",
-    );
-    expect(diagnostic).toContain("confirmation=confirmed-single-target");
-    expect(diagnostic).toContain("raw-content-excluded");
-  });
-
-  it("includes generated edit handoff facts in success diagnostics", () => {
-    const diagnostic = buildSuccessHandoffDiagnostic({
-      ...makeCodingResult(),
-      continuation: {
-        status: "first-pass-success",
-        attempts: 0,
-        evidence: [
-          "generated-edit handoff=single-target-handoff; proposal=generated-edit-abc123; changed=src/a.ts; raw-content-excluded",
-        ],
-      },
-    });
-
-    expect(diagnostic).toContain(
-      "generated=generated-edit handoff=single-target-handoff",
-    );
-    expect(diagnostic).toContain("proposal=generated-edit-abc123");
-    expect(diagnostic).toContain("raw-content-excluded");
-  });
-
-  it("includes provider edit proposal facts in success diagnostics", () => {
-    const diagnostic = buildSuccessHandoffDiagnostic({
-      ...makeCodingResult(),
-      continuation: {
-        status: "first-pass-success",
-        attempts: 0,
-        evidence: [
-          "provider-edit proposal=provider-edit-def456; provider=fake-provider; targets=src/a.ts; readiness=exact-single-target; confirmation=confirmed-exact-single-target; mutation:not-run; mutationAuthority:not-granted; raw-content-excluded",
-        ],
-      },
-    });
-
-    expect(diagnostic).toContain(
-      "provider-edit=provider-edit proposal=provider-edit-def456",
-    );
-    expect(diagnostic).toContain("confirmation=confirmed-exact-single-target");
-    expect(diagnostic).toContain("mutationAuthority:not-granted");
-    expect(diagnostic).toContain("raw-content-excluded");
-  });
-
-  it("includes proposal review/apply facts in success diagnostics", () => {
-    const diagnostic = buildSuccessHandoffDiagnostic({
-      ...makeCodingResult(),
-      continuation: {
-        status: "first-pass-success",
-        attempts: 0,
-        evidence: [
-          "edit-proposal-review proposal=provider-edit-def456; source=provider; status=ready-for-selection; targets=src/a.ts; readiness=single-target-ready; mutation:not-run; raw-content-excluded",
-          "edit-proposal-apply proposal=provider-edit-def456; status=single-target-applied; targets=src/a.ts; changed=src/a.ts; raw-content-excluded",
-          "proposal-hunk-set-apply proposal=provider-edit-def456; hunkSet=proposal-hunk-set-abc; status=written; targets=src/a.ts, src/b.ts; hunks=h1, h2; changed=src/a.ts, src/b.ts; failed=none; unattempted=none; verification=passed; recovery=not-needed; raw-content-excluded",
-        ],
-      },
-    });
-
-    expect(diagnostic).toContain(
-      "proposal-review=edit-proposal-review proposal=provider-edit-def456",
-    );
-    expect(diagnostic).toContain(
-      "proposal-apply=edit-proposal-apply proposal=provider-edit-def456",
-    );
-    expect(diagnostic).toContain(
-      "proposal-hunk-set=proposal-hunk-set-apply proposal=provider-edit-def456",
-    );
-    expect(diagnostic).toContain("single-target-applied");
-    expect(diagnostic).toContain("raw-content-excluded");
-  });
-
-  it("includes targeted context packet and plan facts in success diagnostics", () => {
-    const diagnostic = buildSuccessHandoffDiagnostic({
-      ...makeCodingResult(),
-      taskKind: "read-file",
-      changedFiles: [],
-      verifiedFiles: [],
-      continuation: {
-        status: "first-pass-success",
-        attempts: 0,
-        evidence: [
-          "context-packet ctx_def456; target=src/target.ts; included=4; omitted=0; confidence=high; mutationAuthority=not-granted",
-          "context-plan ctx_def456; readiness=ready; suggestedReads=0; tests=1; mutationAuthority=not-granted",
-          "agent-plan plan_def456; owner=workspace-file-context; action=context-planning; readiness=ready; confidence=high; contextPackets=1; missingFacts=0; suggestedReads=0; mutationAuthority=not-granted; redaction=redacted-and-budgeted",
-        ],
-      },
-    });
-
-    expect(diagnostic).toContain(
-      "context-packet=context-packet ctx_def456",
-    );
-    expect(diagnostic).toContain("context-plan=context-plan ctx_def456");
-    expect(diagnostic).toContain("agent-plan=agent-plan plan_def456");
-    expect(diagnostic).toContain("mutationAuthority=not-granted");
+    expect(diagnostic).toBe(buildSuccessHandoffDiagnostic(original));
+    expect(diagnostic).toContain("Success handoff: status=passed");
+    expect(diagnostic).toContain("command=");
+    expect(diagnostic).not.toContain("obsolete");
   });
 
   it("extracts path-like targets for prompt routing", () => {

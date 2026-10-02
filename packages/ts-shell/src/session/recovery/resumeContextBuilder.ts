@@ -5,7 +5,6 @@ import type {
   CodingResultSummary,
 } from "../../result/types.js";
 import { formatPromptContinuityContext } from "../continuityFormatter.js";
-import { formatContinuationEvidenceParityDetails } from "../continuationEvidenceParity.js";
 import type {
   SeedInfluenceDiagnostic,
   SessionContinuitySnapshot,
@@ -395,7 +394,6 @@ export function buildSuccessHandoffDiagnostic(
   if (codingResult.recoverySurface) {
     parts.push("automatic-rollback=no");
   }
-  parts.push(...formatContinuationEvidenceParityDetails(codingResult));
   parts.push(`next=${nextFocus}`);
   return `${parts.join("; ")}.`;
 }

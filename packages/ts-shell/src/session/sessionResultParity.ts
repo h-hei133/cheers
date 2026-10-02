@@ -14,11 +14,6 @@ export interface SessionResultParityProjection {
   readonly blockerKind?: ActionableBlockerKind | string;
   readonly reason?: string;
   readonly doNext?: string;
-  readonly capabilityArea?: string;
-  readonly mutationAuthority?: "not-granted";
-  readonly redactionStatus?: "raw-content-excluded" | "redacted-and-budgeted";
-  readonly suggestedReads?: string;
-  readonly evidenceMarkers: readonly string[];
 }
 
 export function projectSessionResultParity(input: {
@@ -34,15 +29,11 @@ export function projectSessionResultParity(input: {
     ? projectActionableBlockerTerminalDetail(contract)
     : undefined;
   const continuity = deriveActionableFailureContinuity(input.codingResult);
-  const evidence = collectEvidence(input.codingResult);
   const reason = selectSafeReason(input.stopReason, input.codingResult);
   const doNext =
     normalizeText(input.codingResult?.verification.nextAction) ??
     terminalDetail?.doNext ??
     continuity?.nextAction;
-  const capabilityArea = projectCapabilityArea(evidence);
-  const redactionStatus = projectRedactionStatus(evidence);
-  const suggestedReads = extractSuggestedReads(evidence);
 
   return {
     terminalClassification: input.terminalClassification,
@@ -51,13 +42,6 @@ export function projectSessionResultParity(input: {
       : {}),
     ...(reason ? { reason } : {}),
     ...(doNext ? { doNext } : {}),
-    ...(capabilityArea ? { capabilityArea } : {}),
-    ...(evidence.some((entry) => /mutationAuthority[:=]not-granted|mutation-authority:not-granted/i.test(entry))
-      ? { mutationAuthority: "not-granted" as const }
-      : {}),
-    ...(redactionStatus ? { redactionStatus } : {}),
-    ...(suggestedReads ? { suggestedReads } : {}),
-    evidenceMarkers: evidence.filter(isParityEvidenceMarker).slice(0, 12),
   };
 }
 
@@ -71,99 +55,6 @@ function selectSafeReason(
     normalizeText(codingResult?.taskSatisfaction.reasons.find((entry) => entry.trim())) ??
     normalizeText(codingResult?.failureBoundary) ??
     normalizeText(stopReason)
-  );
-}
-
-function collectEvidence(
-  codingResult: CodingResultSummary | undefined,
-): readonly string[] {
-  if (!codingResult) {
-    return [];
-  }
-  return [
-    ...codingResult.evidence,
-    ...codingResult.continuation.evidence,
-    ...codingResult.taskSatisfaction.observedEvidence,
-  ];
-}
-
-function projectCapabilityArea(evidence: readonly string[]): string | undefined {
-  if (
-    evidence.some((entry) =>
-      /^(anchored-proposal|anchored-provider-smoke|live-smoke-evidence|live-provider-smoke-result|proposal-quality-report|provider-smoke-result|real-provider-proposal-dry-run|real-task-loop|claim-ledger|provider-prompt-audit|provider-output-validation|provider-anchor-quality|provider-anchor-|provider-anchored-proposal|provider-anchoring-result)/.test(entry),
-    )
-  ) {
-    return "provider-model";
-  }
-  if (evidence.some((entry) => entry.startsWith("agent-plan"))) {
-    return "agent-loop";
-  }
-  if (
-    evidence.some((entry) =>
-      /^(task-intent|task-read-plan|analysis-brief|task-lifecycle|task-execution-plan|task-lifecycle-trace)/.test(entry),
-    )
-  ) {
-    return "agent-loop";
-  }
-  if (
-    evidence.some(
-      (entry) =>
-        entry.startsWith("context-packet") ||
-        entry.startsWith("context-plan") ||
-        entry.startsWith("context-graph") ||
-        entry.startsWith("code-graph") ||
-        entry.startsWith("test-impact") ||
-        entry.startsWith("plan-quality") ||
-        entry.startsWith("harness-trace") ||
-        entry.startsWith("harness-scorecard"),
-    )
-  ) {
-    return "workspace-file-context";
-  }
-  if (
-    evidence.some((entry) =>
-      /edit|proposal|hunk-set|target-set|rollback|recovery|verification-command/.test(entry),
-    )
-  ) {
-    return "edit-patch";
-  }
-  if (evidence.some((entry) => entry.includes("approval-denied"))) {
-    return "permission-policy";
-  }
-  return undefined;
-}
-
-function projectRedactionStatus(
-  evidence: readonly string[],
-): SessionResultParityProjection["redactionStatus"] | undefined {
-  if (evidence.some((entry) => entry.includes("redacted-and-budgeted"))) {
-    return "redacted-and-budgeted";
-  }
-  if (
-    evidence.some(
-      (entry) =>
-        entry.includes("raw-content-excluded") ||
-        entry.includes("raw-full-content-excluded"),
-    )
-  ) {
-    return "raw-content-excluded";
-  }
-  return undefined;
-}
-
-function extractSuggestedReads(evidence: readonly string[]): string | undefined {
-  for (const entry of evidence) {
-    const match = entry.match(/\bsuggestedReads[=:]([^; ]+)/);
-    if (match?.[1]) {
-      return match[1];
-    }
-  }
-  return undefined;
-}
-
-function isParityEvidenceMarker(entry: string): boolean {
-  return /^(?:actionable-blocker-kind|verify-blocker-kind|context-packet|context-plan|context-graph|code-graph|task-intent|task-read-plan|analysis-brief|task-lifecycle|task-execution-plan|test-impact|plan-quality|plan-quality-gate|harness-trace|harness-scorecard|harness-failure|agent-plan|generated-edit|provider-edit|provider-anchor|provider-anchored-proposal|provider-anchoring-result|anchored-proposal|anchored-provider-smoke|live-smoke-evidence|live-provider-smoke-result|proposal-quality-report|provider-smoke-result|context-aware-provider|real-provider-proposal-dry-run|provider-prompt-audit|provider-output-validation|provider-anchor-quality|real-task-loop-result|real-task-loop-scorecard|real-task-loop-session|real-task-loop-plan|real-task-loop-readback|claim-ledger|edit-proposal|proposal-hunk-set|edit-repair|verification-command|verification-repair|target-set-edit|edit-recovery)/.test(
-    entry,
   );
 }
 

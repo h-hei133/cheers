@@ -558,7 +558,8 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W4-14 / SES-02 缓解 | 同步临界区按本机持有者存活保护，release 校验 token/文件身份，action 不重复执行；仍无 fencing | 已实现，本地验证通过 |
 | W8-38 / SES-09（随 W4） | 空/半写锁 500ms 创建宽限；文件读取错误不夺锁 | 已实现，本地验证通过 |
 | W4-15 / PRV-10 | 累计用量随现有 state 写入；锁内增量合并；恢复重建上下文测量 | 已实现，本地验证通过 |
-| W4-16、CMD-12、W5–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
+| W4-16 / SES-06 | 删除旧显示规则和未消费投影；保留历史阻断/写入状态恢复 | 已实现，本地验证通过 |
+| CMD-12、W5–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
 src/runtime/execution/service.test.ts src/runtime/execution/fileLock.test.ts
@@ -816,6 +817,23 @@ W4-15 / PRV-10（2026-10-02）：参考从持久化条目按 provider/model 聚�
 保留各自用量；两种配置的 JSON 回放各 45 行、退出 0。首次 PTY 脚本未关闭 `/cost` 长输出视图，
 后续输入被视图消费；补发 Esc 并等待提示后通过，无产品修复。前一提交 `ee1842d9` 的
 CI `36977519414` 与 NormProof `36977519368` 已全部成功；本项尚未据此声称远端通过。
+
+W4-16 / SES-06（2026-10-02）：修正「入口恒假」的边界：当前 turn/query 不产出 codingResult，
+历史 transcript 仍可经恢复链读取它。因此移除显示前缀表与专用测试、两个追加调用，以及
+sessionResultParity 中无人消费的 capability/authority/redaction/evidence 派生字段，
+但保留外层成功/失败 handoff、结构化 verification、writer-started/unknown/unverified、检查与 restore 信息。
+同簇评估：actionableFailure 的兼容阻断/下一步解析保留（终端 owner 仍支持同类历史 hints），
+snapshot 保留 verify 提示与安全过滤，仅取消 claim-ledger 的特殊优先级。与参考无同型实现；
+本次为既定退役裁决，不新增替代显示或执行系统。
+
+删除前后实际启动编译 CLI，隔离 home/workspace，以合成提供方完成 query→transcript→重启恢复；
+两个进程退出 0，恢复输出 44 条有效 JSON，未产生 codingResult 或 parity 行。不是 live provider 测试。
+初轮 24 项失败均断言已退役显示表；移除专用表测试，合并重复标签情形为「保留结构化事实、拒绝再生成标签」
+回归，保留旧写入安全测试。8 文件 / 143 项定向测试通过，构建通过；独立复核又发现一条 compact
+旧标签断言，已改为核验阻断原因/下一步与标签缺席。休眠脚本中对已删专用测试的引用一并移除；
+该脚本另有 11 个先前已缺失目标、无 package/CI 调用，不声明其门禁通过。
+补充 compact 4/4 通过（含独立复跑），累计主代理 147 项定向测试通过，双线最终 APPROVE / CLEAR。
+撤销五处退役改动后 15 项失败，精确恢复源字节；脚本语法检查与严格文档漂移门禁通过。
 
 ## 9. 真实 provider 验证：**已执行**（2026-10-01，中转站 `ai.onyxaxis.org`）
 

@@ -25,6 +25,9 @@ export function deriveActionableFailureContinuity(
     return undefined;
   }
 
+  // Historical transcripts can still carry these blocker hints. Unlike the
+  // removed display-only parity table, they preserve a stopped action's reason
+  // and next step, including when older records lack structured verification.
   const evidence = [
     ...codingResult.evidence,
     ...codingResult.continuation.evidence,

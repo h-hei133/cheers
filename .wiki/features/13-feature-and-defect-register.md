@@ -1038,7 +1038,11 @@ fs.writeFileSync(input.layout.metadataPath, JSON.stringify(metadata, null, 2), "
 子代理把它作为独立的 DUR-02 报出。**核实后判定为 SES-02 的重复**——
 同一根因（无 fencing），同一修复（epoch 比对）。本册合并，只留 SES-02 一条。
 
-### SES-06 · 证据 parity / 结果投影的规则**绝大多数匹配不到任何生产者** — `OPEN` `P2` `CONFIRMED`（数字已重算）
+### SES-06 · 证据 parity 显示规则退役 — `FIXED` `P2` `CONFIRMED`（2026-10-02）
+
+删除显示规则表、其专用测试及两个追加调用，保留成功/失败 handoff 格式化器；结果投影去掉无人消费的 evidence 派生字段，快照不再优先 claim-ledger。历史 transcript 仍可含 codingResult，所以保留 actionableFailure 的阻断/下一步兼容解析以及 verify 提示优先级。旧文中「入口恒假」仅适用于当前回合生产链，不能用于否定历史恢复。删除前后均用隔离 CLI 合成提供方回合实际落盘再恢复：正常退出、摘要无 parity；不是 live provider 验证。
+
+以下保留修复前研究事实：
 
 **先给方法**（这决定了数字可信）：
 

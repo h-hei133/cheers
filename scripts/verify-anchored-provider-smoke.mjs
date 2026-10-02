@@ -21,7 +21,6 @@ const focusedTests = [
   'src/evidence/harness/harnessScorecard.test.ts',
   'src/evidence/harness/harnessFailureTaxonomy.test.ts',
   'src/session/sessionResultParity.test.ts',
-  'src/session/continuationEvidenceParity.test.ts',
 ]
 
 // A missing path must fail here rather than be absorbed by the run below. The
