@@ -30,10 +30,11 @@ for (const [name, language] of Object.entries({ bash, c, cpp, csharp, css, diff,
 highlighter.registerAliases(["zsh"], { languageName: "bash" });
 
 const TOKENS: Readonly<Record<string, ThemeColorToken>> = {
-  keyword: "commandFlag", string: "commandString", number: "commandNumber", comment: "muted",
-  title: "toolTitle", built_in: "command", type: "accent", literal: "commandNumber",
-  attr: "filename", attribute: "filename", meta: "dim", regexp: "commandString",
-  addition: "diffAdded", deletion: "diffRemoved", section: "mdHeading", symbol: "command",
+  keyword: "syntaxKeyword", string: "syntaxString", number: "syntaxNumber", comment: "syntaxComment",
+  title: "syntaxFunction", built_in: "syntaxBuiltin", type: "syntaxType", literal: "syntaxNumber",
+  attr: "syntaxVariable", attribute: "syntaxVariable",
+  meta: "syntaxMeta", regexp: "syntaxString", addition: "diffAdded", deletion: "diffRemoved",
+  section: "mdHeading", symbol: "syntaxBuiltin",
 };
 
 const ENTITIES: Readonly<Record<string, string>> = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#x27;": "'", "&#39;": "'" };
@@ -50,7 +51,7 @@ function renderScopes(html: string, theme: Theme): string {
       scopes.pop();
     } else {
       const text = match[0].replace(/&(?:amp|lt|gt|quot|#x27|#39);/g, (entity) => ENTITIES[entity]!);
-      const token = [...scopes].reverse().find((value) => value !== undefined) ?? "text";
+      const token = [...scopes].reverse().find((value) => value !== undefined) ?? "syntaxText";
       // Close color on each line so the next line's border never inherits code styling.
       output += text.split("\n").map((line) => line ? theme.fg(token, line) : "").join("\n");
     }

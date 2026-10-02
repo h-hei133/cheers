@@ -44,7 +44,7 @@ export function renderInline(text: string): string {
     .replace(/\*\*([^*]+)\*\*/g, (_match, body: string) => defaultTheme.bold(body))
     .replace(/(^|[^*])\*([^*\n]+)\*/g, (_match, lead: string, body: string) => `${lead}\x1b[3m${body}\x1b[23m`)
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label: string, href: string) =>
-      `${defaultTheme.fg("mdLink", label)}${defaultTheme.dim(` (${href})`)}`,
+      `${defaultTheme.fg("mdLink", label)}${defaultTheme.fg("mdLinkUrl", ` (${href})`)}`,
     );
 }
 
@@ -72,18 +72,18 @@ export function renderMarkdown(text: string, width: number): string[] {
         ));
         break;
       case "rule":
-        rows.push(defaultTheme.fg("border", "─".repeat(cells)));
+        rows.push(defaultTheme.fg("mdRule", "─".repeat(cells)));
         break;
       case "list": {
         const glyph = /^\d+$/.test(block.marker.replace(/\.$/, "")) ? `${block.marker}` : "•";
         rows.push(...wrapWithIndent(
-          renderInline(block.text), `${block.indent}${defaultTheme.fg("accent", glyph)} `, cells,
+          renderInline(block.text), `${block.indent}${defaultTheme.fg("mdListBullet", glyph)} `, cells,
         ));
         break;
       }
       case "quote":
         rows.push(...wrapWithIndent(
-          defaultTheme.dim(renderInline(block.text)), `${defaultTheme.fg("border", "▏")} `, cells,
+          defaultTheme.fg("mdQuoteText", renderInline(block.text)), `${defaultTheme.fg("mdQuoteBorder", "▏")} `, cells,
         ));
         break;
       default:
@@ -156,15 +156,15 @@ function renderFence(body: readonly string[], language: string, cells: number): 
   }
 
   const label = language ? ` ${language} ` : " code ";
-  const head = defaultTheme.fg("border", `┌${label}${"─".repeat(Math.max(0, cells - visibleWidth(label) - 2))}┐`);
+  const head = defaultTheme.fg("mdCodeBorder", `┌${label}${"─".repeat(Math.max(0, cells - visibleWidth(label) - 2))}┐`);
   const rows = [head];
   const highlighted = highlightCode(body.join("\n"), language);
   for (const line of highlighted.split("\n")) {
     for (const wrapped of wrapToWidth(line, Math.max(1, cells - 4))) {
-      rows.push(`${defaultTheme.fg("border", "│")} ${defaultTheme.fg("text", wrapped)}`);
+      rows.push(`${defaultTheme.fg("mdCodeBorder", "│")} ${defaultTheme.fg("syntaxText", wrapped)}`);
     }
   }
-  rows.push(defaultTheme.fg("border", `└${"─".repeat(Math.max(0, cells - 2))}┘`));
+  rows.push(defaultTheme.fg("mdCodeBorder", `└${"─".repeat(Math.max(0, cells - 2))}┘`));
   return rows;
 }
 

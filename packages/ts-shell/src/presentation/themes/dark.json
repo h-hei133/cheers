@@ -1,6 +1,6 @@
 {
   "name": "dark",
-  "description": "Dark theme (default), aligned with reference color system",
+  "description": "Dark theme (default)",
   "colors": {
     "accent": "#febc38",
     "border": "#3d424a",
@@ -33,6 +33,22 @@
     "selectedBg": "#31363f",
     "statusBandBg": "#303030",
     "scrollbarTrack": "#6c6c6c",
-    "scrollbarThumb": "#c0c0c0"
+    "scrollbarThumb": "#c0c0c0",
+    "syntaxText": "#d4d4d4",
+    "syntaxKeyword": "#178fb9",
+    "syntaxString": "#e5c07b",
+    "syntaxNumber": "#ce9178",
+    "syntaxComment": "#777d88",
+    "syntaxFunction": "#d4d4d4",
+    "syntaxType": "#febc38",
+    "syntaxVariable": "#89d281",
+    "syntaxMeta": "#5f6673",
+    "syntaxBuiltin": "#89d281",
+    "mdLinkUrl": "#5f6673",
+    "mdQuoteText": "#5f6673",
+    "mdQuoteBorder": "#3d424a",
+    "mdListBullet": "#febc38",
+    "mdRule": "#3d424a",
+    "mdCodeBorder": "#3d424a"
   }
 }

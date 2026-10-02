@@ -2,6 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import darkJson from "./dark.json" with { type: "json" };
 import lightJson from "./light.json" with { type: "json" };
+import darkContrast from "./dark-contrast.json" with { type: "json" };
+import lightContrast from "./light-contrast.json" with { type: "json" };
 import { projectDirectories } from "../../core/project/directories.js";
 import { userDataSearchDirsFor } from "../../core/paths/userHome.js";
 
@@ -18,6 +20,8 @@ export type { ThemeConfig } from "./schema.js";
 const builtIn: Record<string, ThemeConfig> = {
   dark: darkJson,
   light: lightJson,
+  "dark-contrast": darkContrast,
+  "light-contrast": lightContrast,
 };
 
 /** Where a user keeps their own themes. */

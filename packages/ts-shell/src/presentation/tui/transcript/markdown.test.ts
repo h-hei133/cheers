@@ -59,16 +59,16 @@ describe("block structure", () => {
     defaultTheme.apply(getDefaultTheme(), "truecolor");
     try {
       const rows = renderMarkdown("```js\n/* first\nsecond */\nconst value = 1234567890;\n```", 18);
-      expect(rows[2]).toContain(defaultTheme.fg("muted", "second */"));
-      expect(rows[3]).toContain(defaultTheme.fg("commandFlag", "const"));
+      expect(rows[2]).toContain(defaultTheme.fg("syntaxComment", "second */"));
+      expect(rows[3]).toContain(defaultTheme.fg("syntaxKeyword", "const"));
       for (const row of rows) expect(visibleWidth(row)).toBeLessThanOrEqual(18);
     } finally {
       defaultTheme.apply(getDefaultTheme(), "none");
     }
   });
 
-  it.each(["", "unknown"])("uses the palette text color for a %s fallback fence", (language) => {
-    defaultTheme.apply({ ...getDefaultTheme(), colors: { ...getDefaultTheme().colors, text: "#123456" } }, "truecolor");
+  it.each(["", "unknown"])("uses the syntax text color for a %s fallback fence", (language) => {
+    defaultTheme.apply({ ...getDefaultTheme(), colors: { ...getDefaultTheme().colors, syntaxText: "#123456" } }, "truecolor");
     try {
       expect(renderMarkdown(`\x60\x60\x60${language}\nplain body\n\x60\x60\x60`, 30)[1])
         .toContain("\x1b[38;2;18;52;86mplain body\x1b[39m");
@@ -177,4 +177,22 @@ describe("diagrams in a fenced block", () => {
     const second = renderMarkdown(CHART, 60);
     expect(second).toEqual(first);
   });
+});
+
+
+it("lets Markdown roles differ from surrounding chrome", () => {
+  const base = getDefaultTheme();
+  defaultTheme.apply({ ...base, colors: { ...base.colors, mdLinkUrl: "#102030", mdQuoteText: "#203040",
+    mdQuoteBorder: "#304050", mdListBullet: "#405060", mdRule: "#506070", mdCodeBorder: "#607080" } }, "truecolor");
+  try {
+    expect(renderInline("[docs](https://example.test)")).toContain(defaultTheme.fg("mdLinkUrl", " (https://example.test)"));
+    const quote = renderMarkdown("> quote", 40).join("\n");
+    expect(quote).toContain(defaultTheme.fg("mdQuoteText", "quote"));
+    expect(quote).toContain(defaultTheme.fg("mdQuoteBorder", "▏"));
+    expect(renderMarkdown("- item", 40)[0]).toContain(defaultTheme.fg("mdListBullet", "•"));
+    expect(renderMarkdown("---", 40)[0]).toBe(defaultTheme.fg("mdRule", "─".repeat(40)));
+    const fence = renderMarkdown("```\nbody\n```", 40);
+    expect(fence[1]).toContain(defaultTheme.fg("mdCodeBorder", "│"));
+    expect(fence[0]).toContain("\x1b[38;2;96;112;128m┌");
+  } finally { defaultTheme.apply(base, "none"); }
 });

@@ -1,6 +1,7 @@
 import { expect, it, vi } from "vitest";
 import { highlightCode } from "./syntax.js";
 import { Theme } from "./theme.js";
+import { parseTheme } from "../themes/schema.js";
 import { getDefaultTheme } from "../themes/index.js";
 import { stripAnsi } from "../tui/text/ansi.js";
 
@@ -22,9 +23,9 @@ it.each([
 
 it("carries multiline lexical context but closes color before each newline", () => {
   const output = highlightCode("/* first\nsecond */\nconst x = 1;", "js", theme).split("\n");
-  expect(output[0]).toBe(theme.fg("muted", "/* first"));
-  expect(output[1]).toBe(theme.fg("muted", "second */"));
-  expect(output[2]).toContain(theme.fg("commandFlag", "const"));
+  expect(output[0]).toBe(theme.fg("syntaxComment", "/* first"));
+  expect(output[1]).toBe(theme.fg("syntaxComment", "second */"));
+  expect(output[2]).toContain(theme.fg("syntaxKeyword", "const"));
 });
 
 it.each(["xml", "js", "python"])("decodes escaped source exactly for %s", (language) => {
@@ -59,6 +60,34 @@ it.each(["none", "16", "256", "truecolor"] as const)("uses the theme's %s encodi
   const palette = new Theme(getDefaultTheme(), mode);
   const output = highlightCode(code, "js", palette);
   expect(stripAnsi(output)).toBe(code);
-  expect(output).toContain(palette.fg("commandFlag", "const"));
+  expect(output).toContain(palette.fg("syntaxKeyword", "const"));
   if (mode === "none") expect(output).toBe(code);
+});
+
+
+it.each([
+  ["syntaxKeyword", "js", "const value = 42;", "const"],
+  ["syntaxString", "js", 'const value = "hello";', '"hello"'],
+  ["syntaxNumber", "js", "const value = 42;", "42"],
+  ["syntaxComment", "js", "/* note */", "/* note */"],
+  ["syntaxFunction", "python", "def run(arg): return True", "run"],
+  ["syntaxType", "c", "int main() {}", "int"],
+  ["syntaxVariable", "json", '{"field": 42}', '"field"'],
+  ["syntaxMeta", "c", "#include <stdio.h>", "#"],
+  ["syntaxBuiltin", "python", "print(42)", "print"],
+  ["syntaxText", "js", "const value = 42;", " value = "],
+] as const)("uses %s independently of command and chrome colors", (token, language, code, word) => {
+  const base = getDefaultTheme();
+  const custom = new Theme({ ...base, colors: { ...base.colors, [token]: "#123456" } }, "truecolor");
+  const output = highlightCode(code, language, custom);
+  expect(stripAnsi(output)).toBe(code);
+  expect(output).toContain(custom.fg(token, word));
+});
+
+
+it("preserves legacy parameter and nested variable colors", () => {
+  const legacy = parseTheme({ colors: { text: "#123456", filename: "#abcdef", commandString: "#778899" } }, "legacy", getDefaultTheme());
+  const palette = new Theme(legacy, "truecolor");
+  expect(highlightCode("def run(arg): return arg", "python", palette)).toContain(palette.fg("text", "arg"));
+  expect(highlightCode('echo "$HOME"', "bash", palette)).toContain(palette.fg("commandString", "$HOME"));
 });

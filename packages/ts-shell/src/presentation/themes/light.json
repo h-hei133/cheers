@@ -33,6 +33,22 @@
     "userMessageBg": "#f9fafb",
     "statusBandBg": "#e5e7eb",
     "scrollbarTrack": "#9ca3af",
-    "scrollbarThumb": "#4b5563"
+    "scrollbarThumb": "#4b5563",
+    "syntaxText": "#111827",
+    "syntaxKeyword": "#2563eb",
+    "syntaxString": "#a16207",
+    "syntaxNumber": "#b45309",
+    "syntaxComment": "#9ca3af",
+    "syntaxFunction": "#0891b2",
+    "syntaxType": "#d97706",
+    "syntaxVariable": "#2563eb",
+    "syntaxMeta": "#6b7280",
+    "syntaxBuiltin": "#d97706",
+    "mdLinkUrl": "#6b7280",
+    "mdQuoteText": "#6b7280",
+    "mdQuoteBorder": "#d1d5db",
+    "mdListBullet": "#d97706",
+    "mdRule": "#d1d5db",
+    "mdCodeBorder": "#d1d5db"
   }
 }

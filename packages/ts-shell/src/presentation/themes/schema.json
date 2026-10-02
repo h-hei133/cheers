@@ -153,6 +153,70 @@
         "scrollbarThumb": {
           "type": "string",
           "description": "A six-digit hex color, ANSI color name, or variable name."
+        },
+        "syntaxText": {
+          "type": "string",
+          "description": "Unscoped code and fallback code blocks."
+        },
+        "syntaxKeyword": {
+          "type": "string",
+          "description": "Code keywords."
+        },
+        "syntaxString": {
+          "type": "string",
+          "description": "String and regular expression literals."
+        },
+        "syntaxNumber": {
+          "type": "string",
+          "description": "Numeric and boolean literals."
+        },
+        "syntaxComment": {
+          "type": "string",
+          "description": "Code comments."
+        },
+        "syntaxFunction": {
+          "type": "string",
+          "description": "Function and declaration names."
+        },
+        "syntaxType": {
+          "type": "string",
+          "description": "Type names."
+        },
+        "syntaxVariable": {
+          "type": "string",
+          "description": "Code attribute names."
+        },
+        "syntaxMeta": {
+          "type": "string",
+          "description": "Preprocessor and other syntax metadata."
+        },
+        "syntaxBuiltin": {
+          "type": "string",
+          "description": "Built-in code symbols."
+        },
+        "mdLinkUrl": {
+          "type": "string",
+          "description": "Markdown link destinations."
+        },
+        "mdQuoteText": {
+          "type": "string",
+          "description": "Markdown blockquote text."
+        },
+        "mdQuoteBorder": {
+          "type": "string",
+          "description": "Markdown blockquote rail."
+        },
+        "mdListBullet": {
+          "type": "string",
+          "description": "Markdown list markers."
+        },
+        "mdRule": {
+          "type": "string",
+          "description": "Markdown horizontal rules."
+        },
+        "mdCodeBorder": {
+          "type": "string",
+          "description": "Fenced code borders and language labels."
         }
       }
     }

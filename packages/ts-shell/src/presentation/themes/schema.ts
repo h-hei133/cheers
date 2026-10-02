@@ -8,6 +8,26 @@ export interface ThemeConfig {
   colors: Record<string, string>;
 }
 
+/** New semantic roles inherit the former role for existing theme files. */
+const INHERITED_TOKENS = {
+  "syntaxText": "text",
+  "syntaxKeyword": "commandFlag",
+  "syntaxString": "commandString",
+  "syntaxNumber": "commandNumber",
+  "syntaxComment": "muted",
+  "syntaxFunction": "toolTitle",
+  "syntaxType": "accent",
+  "syntaxVariable": "filename",
+  "syntaxMeta": "dim",
+  "syntaxBuiltin": "command",
+  "mdLinkUrl": "dim",
+  "mdQuoteText": "dim",
+  "mdQuoteBorder": "border",
+  "mdListBullet": "accent",
+  "mdRule": "border",
+  "mdCodeBorder": "border"
+} as const;
+
 /** Structural validation plus variable resolution; omitted tokens inherit a usable palette. */
 export function parseTheme(parsed: unknown, fallbackName: string, defaults: ThemeConfig): ThemeConfig {
   if (!isRecord(parsed)) throw new Error("Theme must be an object.");
@@ -26,6 +46,9 @@ export function parseTheme(parsed: unknown, fallbackName: string, defaults: Them
   for (const [token, value] of Object.entries(parsed.colors)) {
     if (!Object.hasOwn(schema.properties.colors.properties, token)) throw new Error(`Unknown color token: ${token}`);
     colors[token] = resolveColor(value, vars, resolved);
+  }
+  for (const [token, previous] of Object.entries(INHERITED_TOKENS)) {
+    if (!Object.hasOwn(parsed.colors, token)) colors[token] = colors[previous]!;
   }
   return {
     name: typeof parsed.name === "string" && parsed.name.trim() ? parsed.name.trim() : fallbackName,
