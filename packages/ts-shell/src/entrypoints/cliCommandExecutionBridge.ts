@@ -129,6 +129,7 @@ export async function buildCliCommandExecution(
     });
   const slashResult = await bridge.routeSlashCommand(input.prompt, {
     cwd: input.cwd,
+    interactive: input.interactive,
     projectRoot,
     projectMemoryStore,
     sessionId: input.sessionId,

@@ -2,6 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import { runCliStdinMode } from "../cli/print/stdinBatchModeRunner.js";
 
 describe("CLI stdin mode runner", () => {
+  it("does not consume the rest of a batch after an exit action", async () => {
+    const runPrompt = vi.fn(async () => "exit" as const);
+    await runCliStdinMode({
+      mode: "batch", prompts: ["/exit", "must not run"], pipedInput: null,
+      sessionId: "exit-session", renderLine: vi.fn(), runPrompt,
+    });
+    expect(runPrompt.mock.calls).toEqual([["/exit"]]);
+  });
   it("delegates live stdin stream mode to the existing stream runner", async () => {
     const runStream = vi.fn(async () => {});
 

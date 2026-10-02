@@ -29,6 +29,8 @@ export type CommandKind = 'local' | 'prompt' | 'shell-action'
 
 export interface CommandContext {
   readonly cwd: string
+  /** False for scripted invocations; omitted by callers without a CLI host. */
+  readonly interactive?: boolean
   /**
    * Where this project's own assets live, when the caller knows.
    *
@@ -163,6 +165,9 @@ export interface CommandDefinition {
   readonly name: string
   readonly aliases?: readonly string[]
   readonly kind: CommandKind
+  /** Scripted hosts require explicit support before executing the handler. */
+  readonly supportsNonInteractive?: boolean
+  readonly nonInteractiveReason?: string
   readonly availability?: 'available' | 'hidden'
   readonly enabled?: boolean
   /** One-line summary shown in the command guide and completion list. */

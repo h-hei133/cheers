@@ -9,7 +9,7 @@ export type CliStdinModeRunnerOptions =
       readonly pipedInput: string | null;
       readonly sessionId: string;
       readonly renderLine: (line: string) => void;
-      readonly runPrompt: (prompt: string) => Promise<void>;
+      readonly runPrompt: (prompt: string) => Promise<"exit" | void>;
     };
 
 export async function runCliStdinMode(
@@ -31,6 +31,6 @@ export async function runCliStdinMode(
   }
 
   for (const prompt of options.prompts) {
-    await options.runPrompt(prompt);
+    if (await options.runPrompt(prompt) === "exit") break;
   }
 }

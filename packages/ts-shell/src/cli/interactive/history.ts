@@ -7,6 +7,7 @@ import type { Session } from "../../session/schema/sessionRecord.js";
 import type { WorkspaceRootMode } from "../../session/SessionManager.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { Transcript } from "../../presentation/tui/transcript/container.js";
+import { startNewSession } from "../runtime/session.js";
 
 /**
  * Putting a session's conversation back on screen.
@@ -156,18 +157,6 @@ export function showConversation(target: HistoryTarget): void {
  * re-entry list.
  */
 export function startFreshSession(target: HistoryTarget): void {
-  const previous = target.context.session.id;
-  const created = target.sessionManager.createNew(target.context.projectRoot, {
-    rootMode: target.context.rootMode,
-    requestedWorkspaceRoot: target.context.projectRoot,
-    targetPathBase: target.context.projectRoot,
-    gitRoot: target.context.gitContext.root ?? null,
-  });
-  target.sessionManager.discardIfEmpty(previous);
-  target.context.session = created;
+  startNewSession(target.context, target.sessionManager);
   target.transcript.clear();
-  // A new session has no turns, so this clears rather than restores. It is
-  // still done here: the band would otherwise keep showing the checklist of the
-  // session that was just discarded.
-  replayTodosFromMessages(created.id, []);
 }

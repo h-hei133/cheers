@@ -50,6 +50,7 @@ import { describeCompaction, parseCompactCommand } from "../cli/interactive/comp
 import { getRuntimeConfig } from "../config/runtimeConfig.js";
 import { formatViewModeStatusLines, formatViewModeUpdatedLine } from "./cliDisplayProjection.js";
 import { replayTodosFromMessages } from "../core/commands/todoCommandRuntime.js";
+import { runPrintSessionAction } from "../cli/print/actions.js";
 
 export async function runNonTtyPromptStream(options: {
   sessionManager: SessionManager;
@@ -88,6 +89,7 @@ export async function runNonTtyPromptStream(options: {
   });
 
   let processedCount = 0;
+  let exitRequested = false;
   let turnChain = Promise.resolve();
   let pendingPrompt: {
     lines: string[];
@@ -98,9 +100,10 @@ export async function runNonTtyPromptStream(options: {
   const enqueuePrompt = (prompt: string) => {
     turnChain = turnChain
       .then(async () => {
+        if (exitRequested) return;
         processedCount += 1;
         options.renderer.renderLine(`${contextTag()} > ${prompt}`);
-        await runNonInteractivePrompt({
+        const outcome = await runNonInteractivePrompt({
           prompt,
           sessionManager: options.sessionManager,
           runtimeContext: options.runtimeContext,
@@ -115,6 +118,11 @@ export async function runNonTtyPromptStream(options: {
             options.setActiveNonInteractiveApprovalMode,
           nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
         });
+        if (outcome === "exit") {
+          exitRequested = true;
+          pendingPrompt = null;
+          stdinReader.close();
+        }
       })
       .catch((error) => {
         options.renderer.renderLine(
@@ -135,6 +143,7 @@ export async function runNonTtyPromptStream(options: {
   };
 
   stdinReader.on("line", (line) => {
+    if (exitRequested) return;
     const normalizedLine = line.replace(/^\uFEFF/, "");
     if (pendingPrompt) {
       if (
@@ -216,7 +225,7 @@ export async function runNonInteractivePrompt(options: {
     mode: ApprovalModeObject | undefined,
   ) => void;
   nonInteractiveCliApprovalMode?: "deny" | "allow-once" | "allow-always";
-}): Promise<void> {
+}): Promise<"exit" | void> {
   const trimmedPrompt = options.prompt.trim();
   if (!trimmedPrompt) {
     return;
@@ -270,6 +279,12 @@ export async function runNonInteractivePrompt(options: {
     return;
   }
   if (resolved.kind === "shell-action") {
+    const sessionAction = runPrintSessionAction(resolved.slashResult, {
+      runtimeContext: options.runtimeContext,
+      sessionManager: options.sessionManager,
+      renderLine: (line) => options.renderer.renderLine(line),
+    });
+    if (sessionAction) return sessionAction === "exit" ? "exit" : undefined;
     if (resolved.slashResult.action === "show-view") {
       for (const line of formatViewModeStatusLines({ viewMode: options.sessionRuntime.getViewMode() })) {
         options.renderer.renderLine(line);
@@ -614,7 +629,7 @@ export async function runReplayPromptScript(options: {
     `Replay mode: running ${prompts.length} prompt(s) in live query loop against session ${options.runtimeContext.session.id}.`,
   );
   for (const prompt of prompts) {
-    await runNonInteractivePrompt({
+    const outcome = await runNonInteractivePrompt({
       prompt,
       sessionManager: options.sessionManager,
       runtimeContext: options.runtimeContext,
@@ -629,5 +644,6 @@ export async function runReplayPromptScript(options: {
         options.setActiveNonInteractiveApprovalMode,
       nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
     });
+    if (outcome === "exit") break;
   }
 }

@@ -77,6 +77,18 @@ export async function routeSlashCommand(
     command.availability !== "hidden" &&
     command.enabled !== false
   ) {
+    if (context.interactive === false && command.supportsNonInteractive !== true) {
+      return {
+        kind: "local",
+        output: [
+          "Result",
+          "- Outcome: blocked",
+          "- BlockerKind: command-not-allowlisted",
+          `- Reason: ${command.nonInteractiveReason ?? `/${command.name} does not support non-interactive mode.`}`,
+          "- DoNext: Run this command in an interactive session or use /help for supported commands.",
+        ].join("\n"),
+      };
+    }
     let args: string[];
     try {
       args = command.argumentMode === "raw"

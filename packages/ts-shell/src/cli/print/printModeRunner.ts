@@ -2,7 +2,7 @@ export interface CliPrintModeRunnerOptions {
   readonly prompts: readonly string[];
   readonly writeError: (message: string) => void;
   readonly exit: (code: number) => never;
-  readonly runPrompt: (prompt: string) => Promise<void>;
+  readonly runPrompt: (prompt: string) => Promise<"exit" | void>;
 }
 
 export async function runCliPrintMode(
@@ -16,6 +16,6 @@ export async function runCliPrintMode(
   }
 
   for (const prompt of options.prompts) {
-    await options.runPrompt(prompt);
+    if (await options.runPrompt(prompt) === "exit") break;
   }
 }

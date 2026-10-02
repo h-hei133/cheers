@@ -52,6 +52,11 @@ function createHarness() {
 }
 
 describe("interactive command router", () => {
+  it("returns an exit signal to a scripted host", async () => {
+    const harness = createHarness();
+    expect(await runNonInteractivePrompt({ ...harness.input, prompt: "/exit", printMode: true })).toBe("exit");
+    expect(harness.lines.join("\n")).not.toContain("blocked");
+  });
   it.each([true, false])("persists and restores checklist state in scripted mode (print=%s)", async (printMode) => {
     const harness = createHarness();
     const sessionId = "sess_1234567890abcdef";

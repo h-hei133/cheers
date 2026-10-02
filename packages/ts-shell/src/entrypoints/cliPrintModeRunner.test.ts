@@ -2,6 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import { runCliPrintMode } from "../cli/print/printModeRunner.js";
 
 describe("CLI print mode runner", () => {
+  it("stops consuming prompts after an exit action", async () => {
+    const runPrompt = vi.fn(async () => "exit" as const);
+    await runCliPrintMode({
+      prompts: ["/exit", "must not run"], runPrompt,
+      writeError: vi.fn(), exit: () => { throw new Error("unexpected process exit"); },
+    });
+    expect(runPrompt.mock.calls).toEqual([["/exit"]]);
+  });
   it("preserves the missing-prompt error and exit behavior", async () => {
     const writeError = vi.fn();
     const runPrompt = vi.fn();

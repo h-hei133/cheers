@@ -564,7 +564,13 @@ const [rawName, ...args] = input.slice(1).split(/\s+/).filter(Boolean);
 
 ---
 
-### CMD-04 · 非交互模式下 `/exit` `/clear` `/retry` `/cancel` 一律被拦 — `OPEN` `P2` `CONFIRMED`
+### CMD-04 · 非交互命令支持声明与会话动作 — `FIXED` `P2` `CONFIRMED`
+
+**2026-10-02 修复**：注册表声明 `supportsNonInteractive`，未声明时在运行处理器前拒绝。
+`/exit` 及别名结束输入消费，`/clear` 及别名复用会话生命周期并更新活动会话绑定；
+`/retry`、`/cancel` 的交互依赖与拒绝理由由各命令声明。
+97 项定向测试、2 项真实管道测试、保持上游 stdin 打开的退出验收和构建通过。
+撤销修复后 7 项失败，恢复后通过。以下保留修复前诊断。
 
 `cliRuntimeModule.ts:264-372` 的 shell-action 分支是**硬编码 4 项**允许清单
 （`show-help` / `manage-permissions` / `list-sessions` / `show-workspace`，
