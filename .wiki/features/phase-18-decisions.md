@@ -1285,3 +1285,13 @@ runner把已裁决的allowedTools传给step，step只对绑定的父schema做交
 架构通道另行真实Git验证：状态检查之后写入ignored文件，非force remove仍会删除它。因此本契约是观察结果，不是原子并发保护；await子runner不足以证明脱离控制的后台进程已停止。API注释与文档明确此限制，不以重复status冒充解决竞态；未声称任意并发写入可保留。
 隔离无凭据的编译运行时经真实turn/task注册表、默认manager、Git及read/write/bash验证子目录读写、父文件/HEAD不变、有改动保留、干净目录删除、分配失败不启动子任务、locked worktree清理unverified；退出0。未调用真实provider。上一提交fec423f0的CI 37010035753与Architecture Watch 37010035734均已通过，本提交远端结果另行跟踪。
 静态门禁通过：1396文件零环、39/39配置消费者、18/18 hooks、10/10工厂、Node最低版本与严格文档门禁；文档120项、可达性7项与函数上限7项既有advisory无新增。旧result-contract脚本既有失败仍待session/shell审计处理，本项未重新宣称通过。
+
+
+### W7-32 read内容可见性与去重退役
+
+实际工具链复现4项失败：外部改写并保留mtime；读取之后、记录mtime之前发生改写；父子共享session与目录而子模型没有父模型正文；新会话上下文复用同一session标识。原缓存把文件元数据与模型上下文可见性混为一项事实，返回的“内容仍然有效”没有足够依据。
+定向参考read工具每次调用读取当前字节，再限制行数/字节数，没有以mtime替换内容的分支。采用同一职责边界：删除readCache及registry/CLI的查重、记录、失效接线，继续使用原ExecutionService、路径门、分页/截断/产物机制。不另加内容hash、会话代际或跨子代理缓存协议；重复read会再次消耗上下文，这是明确取舍。
+原Phase12“参考也按mtime去重”的依据未被当前参考实现支持；本次更正该依据，而非把父子上下文缺失缩成亚毫秒风险。原去重返回提示的测试改为精确正文；2项只验证已删除缓存容量的测试归类obsolete scenario，read/edit/write/分页/截断测试保留。startup六模块的持久化审计仍单独继续。
+
+验证：新4项在旧实现上全部失败；修复后8套128项通过，构建通过。隔离无凭据的编译运行时经真实turn/task注册表验证父read→共享目录子read→同mtime外部改写→父read，两个模型均收到对应正文；未调用真实provider。
+独立代码/架构复核最终APPROVE/CLEAR。将registry与原缓存恢复至修复前后，两套测试5失败、18通过；源码字节与删除状态恢复。静态阻断门禁通过：1395文件零环，配置39/39、hooks18/18、工厂10/10、Node floor与docs strict（120项既有advisory）。前一worktree提交e7303863的CI 37013332299与Architecture Watch 37013332066均通过。

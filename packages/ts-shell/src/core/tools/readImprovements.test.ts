@@ -245,25 +245,19 @@ describe("reading a file that has not changed", () => {
       .execute({ path: "target.ts", ...args }, { workspaceRoot: dir, taskId: "t", sessionId } as never);
   }
 
-  it("points at the earlier result rather than repeating the file", async () => {
-    // The second read spends the model's context to tell it what it was already
-    // told, so the answer is a pointer instead of the content.
+  it("returns the requested content on every read", async () => {
     await withFile("line one\nline two\n", async ({ dir, sessionId }) => {
       const first = await read(dir, sessionId);
       expect(first.output).toContain("line one");
 
       const second = await read(dir, sessionId);
       expect(second.success).toBe(true);
-      expect(second.output).toContain("unchanged");
-      expect(second.output).not.toContain("line one");
+      expect(second.output).toBe("line one\nline two\n");
     });
   });
 
   it("returns the content again once the file has changed", async () => {
-    // The pointer must never outlive the content it refers to. The mtime is set
-    // explicitly rather than by writing, because a write and the read before it
-    // can land in the same millisecond, and the test would then be asserting the
-    // clock rather than the check.
+    // A new modification time must expose the new content too.
     await withFile("before\n", async ({ dir, file, sessionId }) => {
       await read(dir, sessionId);
       await fs.writeFile(file, "after\n", "utf8");
@@ -287,10 +281,7 @@ describe("reading a file that has not changed", () => {
   });
 
   it("returns the content again after the file is edited", async () => {
-    // An edit changes the file, so the earlier read is stale. This does not go
-    // through the modification time at all: the edit forgets the entry, which is
-    // what makes it correct even when the write lands in the same millisecond as
-    // the read before it.
+    // The existing edit path must remain visible through the next read.
     await withFile("value = 1\n", async ({ dir, sessionId }) => {
       const registry = createCoreToolRegistry();
       await registry.get("read")!.execute(
