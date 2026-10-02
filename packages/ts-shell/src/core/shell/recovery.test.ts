@@ -390,6 +390,7 @@ describe("shell recovery helpers", () => {
           ok: true,
           session: {
             id: "sess_resume",
+            turns: [],
             projectRoot: "D:/repo",
             status: "active",
             pendingPrompt: "continue me",
@@ -573,6 +574,7 @@ describe("shell recovery helpers", () => {
           ok: true,
           session: {
             id: "sess_success_resume",
+            turns: [],
             projectRoot: "D:/repo",
             status: "active",
             pendingPrompt: "continue verified task",
@@ -924,6 +926,7 @@ describe("shell recovery helpers", () => {
           ok: true,
           session: {
             id: "sess_guarded",
+            turns: [],
             projectRoot: "D:/repo",
             pendingPrompt: "continue me",
           },

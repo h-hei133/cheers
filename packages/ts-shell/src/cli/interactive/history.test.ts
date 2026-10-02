@@ -219,7 +219,7 @@ describe("showing a session", () => {
       transcript,
       sessionManager: {
         getSession: () => undefined,
-        createNew: () => ({ id: "s-new" } as never),
+        createNew: () => ({ id: "s-new", turns: [] } as never),
         discardIfEmpty: () => true,
       },
       context: {

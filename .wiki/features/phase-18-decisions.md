@@ -762,6 +762,10 @@ npm run test:ts -- src/core/tools/readCache.test.ts src/core/tools/highValueTool
 
 静态阻断门禁及 40 项脚本测试通过，既有 7 项函数数量 advisory、120 个无前缀文档源路径 advisory 保留。
 本地未跑完整 TypeScript 套件；本批提交的远端 CI 结果与前批结果分别记录。
+W3 远端头 `1b4d99e1`：NormProof `36975297206` success；CI `36975297210` 为
+4309 passed / 4 failed / 1 skipped。4 个失败均是 history/recovery 测试使用 `as never`
+省略了 Session 必需的 `turns`，生产 Session 创建/加载始终提供数组；补齐夹具后两文件及
+runtimeContext 回归共 46 项通过。该测试修正独立提交，不把前批的远端成功挪用到本批。
 
 W4-14 实施前修正（2026-10-02）：`withFileLock` 的会话临界区全部同步，包含同步 I/O 与
 `Atomics.wait`。参考的定时 heartbeat 依赖异步临界区让出事件循环；直接照搬 `setInterval`
