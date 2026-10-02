@@ -20,12 +20,12 @@ import {
 /** Where a request goes, given the model. */
 export function googlePath(model: string, stream: boolean): string {
   const method = stream ? "streamGenerateContent" : "generateContent";
-  return `/v1beta/models/${encodeURIComponent(model)}:${method}`;
+  return `/v1beta/models/${encodeURIComponent(model)}:${method}${stream ? "?alt=sse" : ""}`;
 }
 
 declareEndpoint("google-generative-ai", {
   // The model is in the path, and the streaming method is a different one.
-  path: (model) => googlePath(model, true),
+  path: (model, stream = true) => googlePath(model, stream),
   headers: (apiKey) => ({ ...(apiKey ? { "x-goog-api-key": apiKey } : {}), "content-type": "application/json" }),
   body: (input) =>
     googleBody({

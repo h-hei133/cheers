@@ -79,9 +79,10 @@ describe("an out-of-band completion", () => {
       messages: [{ role: "user", content: "hello" }],
     });
 
-    expect(requests[0]!.init.headers).toEqual({
-      Authorization: "Bearer resolved-elsewhere",
+    expect(Object.fromEntries(new Headers(requests[0]!.init.headers))).toEqual({
+      authorization: "Bearer resolved-elsewhere",
       "x-account": "acct-1",
+      accept: "application/json",
     });
   });
 

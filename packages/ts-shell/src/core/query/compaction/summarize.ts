@@ -132,9 +132,11 @@ export async function requestCompactionSummary(request: CompactionRequest): Prom
   // as the main one. There is no global-fetch fallback: it is what let a caller
   // keep the unbounded transport without anything failing.
   const fetchImpl = request.fetchImpl;
-  const res = await fetchImpl(endpointUrl(request.provider.baseUrl, endpointKind(request.provider.endpoint), request.provider.model), {
+  const headers = new Headers(request.provider.headers);
+  headers.set("accept", "application/json");
+  const res = await fetchImpl(endpointUrl(request.provider.baseUrl, endpointKind(request.provider.endpoint), request.provider.model, false), {
     method: "POST",
-    headers: request.provider.headers,
+    headers,
     body: JSON.stringify(
       endpointBody(endpointKind(request.provider.endpoint), {
         model: request.provider.model,

@@ -64,7 +64,7 @@ async function readAll(
 describe("the URL and headers", () => {
   it("names the model and the streaming method in the path", () => {
     expect(endpointUrl("https://generativelanguage.test", "google-generative-ai", "gemini-2.5-pro")).toBe(
-      "https://generativelanguage.test/v1beta/models/gemini-2.5-pro:streamGenerateContent",
+      "https://generativelanguage.test/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse",
     );
   });
 

@@ -77,9 +77,11 @@ export async function requestSimpleCompletion(
     .map((message) => message.content)
     .join("\n\n");
   const messages = request.messages.filter((message) => message.role !== "system");
-  const res = await fetchImpl(endpointUrl(request.provider.baseUrl, kind, request.provider.model), {
+  const headers = new Headers(request.provider.headers);
+  headers.set("accept", "application/json");
+  const res = await fetchImpl(endpointUrl(request.provider.baseUrl, kind, request.provider.model, false), {
     method: "POST",
-    headers: request.provider.headers,
+    headers,
     body: JSON.stringify(
       endpointBody(kind, {
         model: request.provider.model,

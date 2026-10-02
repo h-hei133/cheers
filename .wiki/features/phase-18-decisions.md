@@ -195,7 +195,7 @@ ID 冲突本身是待修缺陷，见 W6-23）。**逐一列出，避免再靠减
 |---|---|---|---|---|
 | **25** | **`THM-03` 的剩余两半**（`auto` + 扩充令牌/主题数） | 13 册 `PARTIAL` | 令牌 32 → 对齐参考的规模（pi 56 / oh-my-pi 67）；`auto`（跟随系统外观）当前**声明了但被当 `undefined`**——参考用 OSC 10/11 + DEC 2031 探测。**Photon 17 已明确把这两半「按裁决延期」，但那延期从未落到任何阶段** | 2 个主题 JSON + `themes/index.ts` |
 | **26** | `SES-08`：session 四域逐模块行为审计 | 13 册 `SES-08` + 12 册 §10 | `session/continuation`(16) / `recovery`(11) / `replay`(5) / `export`(4) = **36 个非测试模块**的**行为**正确性（往返、边界、损坏输入降级）。**前置研究 §7.3 只做了可达性**（16/16、10/11、4/5、4/4 可达；两个不可达 `types.ts` 是契约） | 36 模块 |
-| **27** | `PRV-06`：四端点逐字段形状表 + 流边界矩阵 | 13 册 `PRV-06` | (a) 四端点**逐字段**请求形状与参考的对照表；(b) 流解析**完整边界矩阵**（SSE 注释、`\r\n` 边界、无终止帧）；(c) 用量记账跨模型/跨 resume；(d) 超时与取消的**逐路径**覆盖（`provider/request/fetch.ts` 是否被所有路径使用） | 4 协议 |
+| **27** | `PRV-06`：四端点逐字段形状表 + 流边界矩阵（含 Bedrock 单次路径） | 13 册 `PRV-06` | (a) 四端点**逐字段**请求形状与参考的对照表；(b) 流解析**完整边界矩阵**（SSE 注释、`\r\n` 边界、无终止帧）；(c) 用量记账跨模型/跨 resume；(d) 超时与取消的**逐路径**覆盖（`provider/request/fetch.ts` 是否被所有路径使用） | 4 协议 |
 | **28** | `BRW-06`：`receipt/**` 的保证强度 | 13 册 `BRW-06` | 9 个模块 / 1,447 行的**保证强度逐项核验**（`retention.ts` 的预算先扣 tombstone、`lock.ts:140-160` 的 `expiresAt`/`ownerId` 陈旧判定是本仓**正确实现**；但整族未逐项验） | 9 模块 |
 | **29** | `memory/**`(36) + `context/**`(28) **逐模块**审计 | 13 册 §13.2 / §16.4 | 前置研究已覆盖 `CTX-02/06/07/08/09`（含 3 条 P1）；**其余模块的逐模块行为**未做 | 64 模块 |
 | **30** | 子代理递归深度与**工具继承** | 13 册 §13.2 / §16.4 | ⚠️ **主代理本轮初查：工具继承已经接上了**——`core/subagents/runner.ts:135-142` 用 `subagentTools(definition, available)` 过滤并把选中的工具装进 `selected`，`NEVER_GIVEN`（`core/subagents/boundary.ts:17`）剥掉 `task`。**Phase 12/13 的记录（「与参考一致，不改」）需要复核是否仍然成立**；若无缺口，本条降级为「已核实健全，登记留档」 | 2 模块 |
@@ -562,7 +562,8 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | CMD-12 | 来源列表持久化、失败显式显示、移除无实现的搜索承诺 | 已实现，本地验证通过 |
 | W5-17 / TOL-06 | 明确每文件提交边界和显式恢复入口 | 已实现，本地验证通过 |
 | W5-18 / TOL-08 | 有界 TERM/KILL 与 Windows launcher 等待；失败可见、退出等待 pending | 已实现，本地验证通过 |
-| W5-19–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
+| W5-19 / PRV-12、PRV-13 | 两Google端点区分单次/流式方法并对齐Accept与解码 | 已实现，本地验证通过 |
+| W5-20–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
 src/runtime/execution/service.test.ts src/runtime/execution/fileLock.test.ts
@@ -803,6 +804,19 @@ CLI 对资源与进程清理 allSettled 后才退出，失败退出码 1。失�
 函数 ceiling 保留原7项 advisory。撤销宽限和Windows等待后6项失败（伴随1项测试拒绝诊断），源码逐字恢复。
 实际编译CLI：常规PTY /exit 给TERM handler完成flush后退出0；全屏PTY SIGTERM 升级忽略TERM的子进程后退出143；
 JSON /exit退出0、最终复跑20行均可解析，受控子进程均不再运行。未做Windows实机或真实提供方验证。独立代码/架构复核 APPROVE / CLEAR。
+
+
+W5-19 / PRV-12、PRV-13（2026-10-02）：对照底层 SDK 使用独立 generateContent / generateContentStream
+的方法及流式 alt=sse 约定，保留本仓端点 owner 与 googleWire 单一转换器。path 接收 stream 参数，
+默认保持主回合；两个 res.json 调用入口明确选择单次方法并用 Headers 副本设置 JSON Accept。
+认证字段保留、大小写合并，原 provider.headers 不修改；签名层既有 Headers 消费路径兼容。
+旧 Google 流式 URL 测试属于钉住缺陷的预期，改为包含 SSE 参数。
+
+7文件143项首轮定向测试通过，JSON headers改动后的4文件40项（含btw命令）通过，TypeScript构建通过；
+撤销三个关键点后8项矩阵中6项失败，源码逐字恢复。编译模块对本地HTTP服务发送2端点×3入口共6请求，
+URL/Accept/SSE或JSON解码均符合约定。独立复核 APPROVE / CLEAR。传输扩展测试首次因 Date.now 负耗时
+（-3685ms，疑似环境时钟回拨）失败1项；未改源码，单独复跑25项全部通过。未做真实Google提供方验证。
+同型边界：Bedrock简单调用仍固定converse-stream（先前缺口），已登记到W7-27而未混入Google提交。
 
 ### 8.5 主代理在等待复核者期间新增的六处自查（已并入正文）
 

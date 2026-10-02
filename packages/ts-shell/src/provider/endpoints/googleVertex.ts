@@ -75,7 +75,7 @@ declareEndpoint("google-vertex", {
   // The base address carries the account; this adds the model and the method.
   // The streaming form is a different method name, and the query is what asks for
   // events rather than one document.
-  path: (model) => `/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`,
+  path: (model, stream = true) => `/${encodeURIComponent(model)}:${stream ? "streamGenerateContent?alt=sse" : "generateContent"}`,
   // No static credential: a token is fetched per request and added by the
   // transport, which is the only place that sees the request it belongs to.
   headers: () => ({ "content-type": "application/json", accept: "text/event-stream" }),

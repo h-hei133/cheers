@@ -48,8 +48,10 @@ export interface EndpointShape {
    * the body. Some name it in the path — `/model/{id}/converse-stream` — and a
    * protocol that does cannot be expressed as one constant. The protocols that
    * name it in the body ignore the argument and return their constant.
+   * The optional stream flag selects the response method where the API has
+   * separate resources; omitted means streaming, as in a main turn.
    */
-  readonly path: (model: string) => string;
+  readonly path: (model: string, stream?: boolean) => string;
   /**
    * The credential headers this endpoint authenticates with.
    *
@@ -247,8 +249,8 @@ export function endpointKind(configured: string | undefined): EndpointKind | und
  * here rather than letting each caller assemble the URL keeps one place that
  * knows how a base URL and a resource join.
  */
-export function endpointUrl(baseUrl: string, kind: EndpointKind | undefined, model: string): string {
-  return `${baseUrl.replace(/\/+$/, "")}${endpointShape(kind).path(model)}`;
+export function endpointUrl(baseUrl: string, kind: EndpointKind | undefined, model: string, stream = true): string {
+  return `${baseUrl.replace(/\/+$/, "")}${endpointShape(kind).path(model, stream)}`;
 }
 
 /** The body a request with no tools sends. */

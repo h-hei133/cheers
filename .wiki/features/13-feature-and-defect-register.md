@@ -1390,7 +1390,13 @@ T3 修的是**同进程内**换模型后的计价，**没有涉及跨进程**。
 `packet.ts`、两个未用导出。**先确认**没有测试依赖它们的**行为**
 （测试引用不算生产消费者，但删前要知道会动哪些测试）。
 
-### PRV-12 · Google 次要请求使用流式 URL，却按单个 JSON 响应读取 — `OPEN` `P2` `CONFIRMED`
+### PRV-12 · Google 次要请求使用流式 URL，却按单个 JSON 响应读取 — `FIXED` `P2` `CONFIRMED`
+
+**2026-10-02 实施**：端点路径增加单次/流式模式；两个 Google 端点的侧问题与压缩走
+`generateContent` + JSON Accept，主回合走 `streamGenerateContent?alt=sse`，沿用同一内容转换器。
+两端点 × 三调用入口的 URL/响应格式矩阵及本地 HTTP 六请求验收通过；无真实 Google 调用。
+以下保留修复前事实。另确认 `bedrockConverse` 的 simple body/readBody 已存在但 path 固定
+`converse-stream`，是先前同型缺口，纳入 W7-27 的非流式请求审计；本次不宣称所有端点均支持单次方法。
 
 **2026-09-30 新发现，读码确认**：`provider/request/completion.ts` 的
 `requestSimpleCompletion` 与 `core/query/compaction/summarize.ts` 的
@@ -2911,7 +2917,11 @@ grep -n 'errorStep(|failedStep(' turn/step.ts  -> 只有 :429-430 传了 tried
 
 ### 20.1 新增条目（20 条，逐条附证据）
 
-### PRV-13 · `googleGenAI` 主流式路径**缺 `?alt=sse`** — `OPEN` `P1` `CONFIRMED`
+### PRV-13 · `googleGenAI` 主流式路径**缺 `?alt=sse`** — `FIXED` `P1` `CONFIRMED`
+
+**2026-10-02 实施**：与 PRV-12 一起修复；主路径加入 SSE 参数，旧 URL 断言已更新。
+URL 决定响应格式的矩阵能检出缺参数后的空答案，撤销此处及两个单次调用模式后6项失败。
+
 
 **主代理亲验**（决定性）：同一个仓库里的两个 Google 端点**只有 `googleVertex` 带 `?alt=sse`**：
 
