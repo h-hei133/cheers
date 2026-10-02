@@ -565,7 +565,8 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W5-19 / PRV-12、PRV-13 | 两Google端点区分单次/流式方法并对齐Accept与解码 | 已实现，本地验证通过 |
 | W5-20 | 键位参考页、表格漂移检测、重绑定示例与runtime提示入口 | 已实现，本地验证通过 |
 | W5-21 / OBS-03(sidebar) | 正式snapshot入口；旧别名仅单帧快照，默认布局保留 | 已实现，本地验证通过 |
-| W5-22–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
+| W5-22 / CDE-01 | 明确早期候选数不等于当前不可达数或删除配额；链接最终闭包 | 已完成文档修正 |
+| W5小项、W6–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
 src/runtime/execution/service.test.ts src/runtime/execution/fileLock.test.ts
@@ -838,6 +839,9 @@ W5-21 / OBS-03(sidebar)（2026-10-02）：选诚实命名方案，正式入口/s
 加给原默认面板；原始检查点/活动/遮盖处理与分页回归继续通过。事件源仅命令的问题保持OPEN。
 12文件79项定向测试和构建通过；撤销canonical入口及诚实标题后3项失败，源码逐字恢复。
 独立复核APPROVE / CLEAR。常规/全屏PTY分别验证snapshot与watch别名，退出0；JSON三种拼写29行均可解析。
+
+W5-22 / CDE-01（2026-10-02）：登记册标题及注释明确12文件/1,349行仅为历史候选口径，
+以Phase 17 §8.9逐簇删除/转类型/保留决定为准，不制造一个新的最终删除总数。纯文档变更，未跑构建/测试。
 
 ### 8.5 主代理在等待复核者期间新增的六处自查（已并入正文）
 
