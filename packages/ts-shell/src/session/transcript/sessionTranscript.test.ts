@@ -88,6 +88,7 @@ describe("sessionTranscript", () => {
         {
           role: "user",
           content: "[Earlier Path]\nApproach A was rejected because it broke the parser.",
+          metadata: { contextSummary: "branch" },
           timestamp: "2026-05-28T00:00:05.000Z",
         },
       ]);

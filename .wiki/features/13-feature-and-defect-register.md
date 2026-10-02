@@ -604,7 +604,12 @@ Phase 16 的 16-I 已经删掉了「声明为真却从不被读」的 `bridgeSaf
 
 ---
 
-### CMD-06 · 与参考实现的命令缺口 — `OPEN` `P2` `CONFIRMED`
+### CMD-06 · 与参考实现的命令缺口 — `FIXED` `P2` `CONFIRMED`
+
+2026-10-02 / Phase 18 W2-7：增加一等 `/tree` 选择器及脚本 `/tree <entry-id>`，
+复用会话叶切换和分支摘要；`/entries tree` 保持只读。损坏的环/孤儿条目仍可观察，但不可导航。
+同时修复摘要被线程补齐误当作新问题的问题。12 个定向文件 / 158 项通过，构建通过，撤销后 4 项失败。
+下面列出的其他命令仍属于原登记的产品 backlog，本条交付范围为会话树导航。
 
 pi（`packages/coding-agent/src/core/slash-commands.ts:19-44`）有：
 `/tree`（交互式分支树导航）、`/share`、`/bug`、`/import`、`/name`、`/clone`、`/scoped-models`。

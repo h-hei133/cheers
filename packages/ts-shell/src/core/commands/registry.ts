@@ -25,6 +25,7 @@ import { runCostCommand } from "./costCommandRuntime.js";
 import { runUndoCommand } from "./undoCommandRuntime.js";
 import { runExportCommand } from "./exportCommandRuntime.js";
 import { runEntriesCommand } from "./entriesCommandRuntime.js";
+import { runTreeCommand } from "./treeCommandRuntime.js";
 import { runCopyCommand } from "./copyCommandRuntime.js";
 import { runHotkeyCommand } from "./hotkeyCommandRuntime.js";
 import { runRetryCommand } from "./retryCommandRuntime.js";
@@ -169,6 +170,17 @@ export function createCommandRegistry(
       argumentHint: "[preview|execute]",
       getArgumentCompletions: (prefix) => subcommandCompletions("restore", prefix),
       execute: (args, context) => runRestoreLocalCommand(args, context),
+    },
+    {
+      name: "tree",
+      kind: "shell-action",
+      supportsNonInteractive: true,
+      availability: "available",
+      enabled: true,
+      summary: "navigate the session tree, including other branches",
+      group: "session",
+      argumentHint: "[<entry-id>|help]",
+      execute: (args) => runTreeCommand(args),
     },
     {
       name: "entries",

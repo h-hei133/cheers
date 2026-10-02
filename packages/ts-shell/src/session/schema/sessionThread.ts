@@ -1,5 +1,6 @@
 import { freezeDeep } from "../../core/values/freeze.js";
 import type { Session } from "./sessionRecord.js";
+import { isSessionContextMessage } from "./sessionMessage.js";
 
 export type SessionThreadEntryKind = "session-root" | "turn-message";
 
@@ -80,6 +81,7 @@ export function buildLinearSessionThreadSnapshot(
   ];
 
   session.turns.forEach((turn, index) => {
+    if (isSessionContextMessage(turn)) return;
     const order = index + 1;
     // The turn's own id when it has one, matching what catch-up produces, so the
     // two builders cannot name the same turn differently. A turn recorded before
@@ -268,7 +270,7 @@ export function catchUpSessionThread(
       // position, which is the name the linear builder gives it too.
       id: turn.id ?? sessionTurnEntryId(session.id, index + 1),
     }))
-    .filter((candidate) => !known.has(candidate.id));
+    .filter((candidate) => !isSessionContextMessage(candidate.turn) && !known.has(candidate.id));
   if (missing.length === 0) return thread;
 
   const entries = [...thread.entries];

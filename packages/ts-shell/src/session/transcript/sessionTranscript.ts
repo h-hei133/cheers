@@ -199,6 +199,7 @@ export function projectTranscriptMessages(
         {
           role: "user",
           content: `[Context Checkpoint]\n${event.summary}`,
+          metadata: { contextSummary: "compaction" },
           timestamp: event.timestamp,
         },
         ...kept,
@@ -215,6 +216,7 @@ export function projectTranscriptMessages(
           {
             role: "user",
             content: `[Earlier Path]\n${event.summary}`,
+            metadata: { contextSummary: "branch" },
             timestamp: event.timestamp,
           },
         ];

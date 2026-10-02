@@ -141,6 +141,8 @@ export interface ShellActionResult {
     | 'retry-turn'
     | 'clear-session'
     | 'fork-session'
+    | 'navigate-session'
+  readonly entryId?: string
   readonly sessionId?: string
   readonly viewMode?: 'compact' | 'verbose'
   readonly sessionAction?: 'panel' | 'list' | 'switch' | 'current' | 'help'

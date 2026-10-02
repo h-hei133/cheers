@@ -85,3 +85,8 @@ export interface SessionMessage {
     readonly redacted?: boolean;
   };
 }
+
+/** Context rendered from a durable summary is not a newly authored turn. */
+export function isSessionContextMessage(message: SessionMessage): boolean {
+  return message.metadata?.contextSummary === "compaction" || message.metadata?.contextSummary === "branch";
+}

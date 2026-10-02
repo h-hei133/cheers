@@ -14,6 +14,7 @@ import { permissionPicker } from "./permissions.js";
 import { pluginPicker } from "./plugins.js";
 import { restorePicker } from "./restore.js";
 import { rewindPicker } from "./rewind.js";
+import { treePicker } from "./tree.js";
 import { serverPicker } from "./servers.js";
 import { skillPicker } from "./skills.js";
 import { sourcePicker } from "./sources.js";
@@ -83,6 +84,7 @@ const PICKERS: Record<string, PickerFactory> = {
   // Reachable either way: `/back`, or Escape twice on an empty prompt. The
   // gesture is fast once known; the command is how it becomes known.
   back: (host) => rewindPicker({ turns: host.sessionTurns(), rewind: host.rewind }),
+  tree: (host) => treePicker(host.commandContext, host.rewind),
   statusline: (host) =>
     statusItemPicker({
       current: host.statusItems,

@@ -18,6 +18,7 @@ import {
   switchDurableSessionActiveLeaf,
 } from "./store/threadState.js";
 import type { SessionMessage } from "./schema/sessionMessage.js";
+import { isSessionContextMessage } from "./schema/sessionMessage.js";
 import type { Session } from "./schema/sessionRecord.js";
 import type { SessionStateSnapshot } from "./schema/sessionStateSnapshot.js";
 import { buildSessionStateSnapshot } from "./schema/sessionStateSnapshot.js";
@@ -168,7 +169,7 @@ export class SessionManager extends SessionReadSurface {
 
     const onBranch = new Set(target.path.map((entry) => entry.id));
     const abandonedTurns = session.turns.filter(
-      (turn) => turn.id === undefined || !onBranch.has(turn.id),
+      (turn) => !isSessionContextMessage(turn) && (turn.id === undefined || !onBranch.has(turn.id)),
     );
     const summary = summarize && abandonedTurns.length > 0
       ? await summarize(abandonedTurns).catch(() => undefined)

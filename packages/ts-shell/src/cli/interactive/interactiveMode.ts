@@ -48,7 +48,7 @@ import { couldBeFileReference, fileSuggestions } from "./fileSuggestions.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
 import { TurnSink } from "./turnSink.js";
 import { followTheme, type ThemeFollower } from "../../presentation/themes/watch.js";
-import { markContextUnknown } from "../../observability/usageTelemetry.js";
+import { navigateSession, type SessionNavigationResult } from "../runtime/navigation.js";
 
 /**
  * Interactive session host.
@@ -580,6 +580,7 @@ export class InteractiveMode {
     let retrying: string | undefined;
     let clearing = false;
     let opened = false;
+    let navigation: SessionNavigationResult | undefined;
     // `begin` clears the failure flag for the turn that is starting, so whether
     // the *previous* turn failed has to be read before that happens.
     const previousTurnFailed = this.sink.lastTurnFailed;
@@ -614,6 +615,7 @@ export class InteractiveMode {
       if (result.retryRequested) retrying = this.sink.retryTarget(this.lastPrompt, previousTurnFailed);
       if (result.clearRequested) clearing = true;
       if (result.sessionOpened) opened = true;
+      navigation = result.navigation;
     } catch (error) {
       this.state.transcript.append(
         textBlock("error", error instanceof Error ? error.message : String(error), "error"),
@@ -636,9 +638,13 @@ export class InteractiveMode {
         startFreshSession(this.historyTarget());
         this.sink.end(true);
         this.tui.requestRender({ force: true });
-      } else if (opened) {
+      } else if (opened || navigation?.changed) {
         showConversation(this.historyTarget());
         this.tui.requestRender({ force: true });
+      }
+      if (navigation?.changed) {
+        this.state.transcript.append(textBlock("command", navigation.output, "/tree"));
+        if (navigation.draft !== undefined) this.state.editor.setText(navigation.draft);
       }
       this.tui.requestRender();
       const next = retrying ?? this.queue.shift();
@@ -676,6 +682,7 @@ export class InteractiveMode {
 
   /** Hand the choice to the picker that produced it and surface what it reports. */
   private applyPicker(picker: Picker, ids: readonly string[]): void {
+    if (picker.exclusive) this.busy = true;
     void picker
       .apply(ids)
       .then((outcome) => {
@@ -693,7 +700,12 @@ export class InteractiveMode {
           textBlock("error", error instanceof Error ? error.message : String(error), picker.title),
         );
       })
-      .finally(() => this.tui.requestRender());
+      .finally(() => {
+        if (picker.exclusive) this.busy = false;
+        this.tui.requestRender();
+        const next = picker.exclusive ? this.queue.shift() : undefined;
+        if (next !== undefined) void this.run(next);
+      });
   }
 
   /** Everything the pickers need from the session, resolved lazily. */
@@ -729,23 +741,12 @@ export class InteractiveMode {
       sessionTurns: () =>
         this.options.sessionManager.getSession(this.options.runtimeContext.session.id)?.turns ?? [],
       rewind: async (point) => {
-        const dropped = await this.options.sessionManager.revertTo(
-          this.options.runtimeContext.session.id,
-          point.entryId,
-          (abandoned) => this.options.sessionRuntime.summarizeAbandonedTurns(abandoned),
-        );
-        // The conversation was replaced, so the next request's prompt shares
-        // nothing with the last one. Saying so is what keeps the rebuilt prompt
-        // from being read as prompt that should have come from the cache.
-        //
-        markContextUnknown(this.options.runtimeContext.session.id);
-        showConversation(this.historyTarget());
-        this.tui.requestRender({ force: true });
-        // Says how far back, and that the rest is still there. "Went back"
-        // alone left the user asking what the conversation now consisted of.
-        return dropped > 0
-          ? `Went back: this question is at the end of the conversation again, and the ${dropped === 1 ? "turn" : `${dropped} turns`} that followed ${dropped === 1 ? "is" : "are"} kept, not erased. Reopen it from /back.`
-          : "Already at that point in the conversation.";
+        const result = await navigateSession(this.options, point.entryId);
+        if (result.changed) {
+          showConversation(this.historyTarget());
+          this.tui.requestRender({ force: true });
+        }
+        return result.output;
       },
       previewStatusItems: (items) => {
         this.previewItems = items;

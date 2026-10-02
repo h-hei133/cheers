@@ -41,6 +41,7 @@ export function rewindPicker(input: RewindPickerInput): Picker {
   return {
     title: "Ask again from",
     form: "panel",
+    exclusive: true,
     empty: "Nothing to go back to yet — no questions have been asked in this session.",
     async load(): Promise<readonly Option[]> {
       return points.map<Option>((point) => ({

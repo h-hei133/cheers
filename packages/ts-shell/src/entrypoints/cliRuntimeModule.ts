@@ -278,9 +278,10 @@ export async function runNonInteractivePrompt(options: {
     return;
   }
   if (resolved.kind === "shell-action") {
-    const sessionAction = runPrintSessionAction(resolved.slashResult, {
+    const sessionAction = await runPrintSessionAction(resolved.slashResult, {
       runtimeContext: options.runtimeContext,
       sessionManager: options.sessionManager,
+      sessionRuntime: options.sessionRuntime,
       renderLine: (line) => options.renderer.renderLine(line),
     });
     if (sessionAction) return sessionAction === "exit" ? "exit" : undefined;

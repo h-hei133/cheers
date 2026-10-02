@@ -31,6 +31,8 @@ export interface PickerOutcome {
 export interface Picker {
   readonly title: string;
   readonly form: PickerForm;
+  /** Queue new submissions until a conversation-changing selection has settled. */
+  readonly exclusive?: boolean;
   /** Shown when the option set turns out to be empty. */
   readonly empty: string;
   /** True when the picker collects several answers before applying. */

@@ -3,6 +3,7 @@ import type { PromptAttachments } from "../../core/shell/sessionRuntime.js";
 import type { Interface as ReadlineInterface } from "node:readline";
 
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
+import { navigateSession, type SessionNavigationResult } from "../runtime/navigation.js";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
@@ -71,6 +72,7 @@ export interface InteractiveCommandRouterInput {
 
 export interface InteractiveCommandRouterResult {
   readonly turnNumber: number;
+  readonly navigation?: SessionNavigationResult;
   readonly refreshPromptChrome?: boolean;
   readonly refreshMcpGateway?: boolean;
   /** The user asked to leave; the host owns handing the terminal back. */
@@ -170,6 +172,12 @@ export async function routeInteractiveCommand(
 
   if (isShellAction(slashResult, "exit-session")) {
     return { turnNumber: nextTurnNumber, exitRequested: true };
+  }
+
+  if (isShellAction(slashResult, "navigate-session")) {
+    const navigation = await navigateSession(input, slashResult.entryId);
+    if (!navigation.changed) input.renderer.renderLine(navigation.output);
+    return { turnNumber: nextTurnNumber, navigation };
   }
 
   if (isShellAction(slashResult, "clear-session")) {

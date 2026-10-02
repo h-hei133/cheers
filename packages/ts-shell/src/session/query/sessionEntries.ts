@@ -149,6 +149,9 @@ export function readSessionTree(
     mark(node);
   }
 
+  // This repair changes only display edges, never the stored parentId. A forensic
+  // reader must still see damaged entries; sessionThreadPath must reject them for
+  // navigation. Navigation choices retain that distinction and disable these paths.
   // Append order within each level, so two reads of the same session agree.
   const sort = (list: readonly SessionTreeNodeView[]): SessionTreeNodeView[] =>
     [...list]
