@@ -46,6 +46,7 @@ import { couldBeCommand, slashSuggestions } from "./slashSuggestions.js";
 import { couldBeFileReference, fileSuggestions } from "./fileSuggestions.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
 import { TurnSink } from "./turnSink.js";
+import { updateAppearance } from "../../presentation/theme/selection.js";
 import { followTheme, type ThemeFollower } from "../../presentation/themes/watch.js";
 import { navigateSession, type SessionNavigationResult } from "../runtime/navigation.js";
 
@@ -99,7 +100,13 @@ export class InteractiveMode {
   private readonly view: InteractiveSurface;
   /** The transcript, draft, pastes, and completions the surface projects. */
   private readonly state: ViewState;
-  private readonly stdin = new StdinBuffer();
+  private readonly stdin = new StdinBuffer({
+    onAppearance: (appearance) => {
+      if (!updateAppearance(appearance)) return;
+      this.theme.refresh();
+      this.tui.requestRender({ force: true });
+    },
+  });
   private readonly sink: TurnSink;
   private readonly questions: QuestionBridge;
   private readonly readline: ReadlineInterface;

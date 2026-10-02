@@ -1,4 +1,5 @@
-import { applyTheme, currentTheme } from "../../presentation/theme/theme.js";
+import { currentTheme } from "../../presentation/theme/theme.js";
+import { selectTheme, selectedTheme } from "../../presentation/theme/selection.js";
 import { listThemes, loadTheme, themeSource } from "../../presentation/themes/index.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
@@ -21,9 +22,10 @@ export async function runThemeCommand(
   const extraPaths = context.themePaths ?? [];
 
   if (!asked || asked.toLowerCase() === "list") {
-    const names = listThemes(context.cwd, extraPaths);
+    const names = listThemes(context.cwd, extraPaths).filter((name) => name !== "auto");
     const active = currentTheme();
-    const lines = ["### Themes", ""];
+    const auto = selectedTheme() === "auto";
+    const lines = ["### Themes", "", `- \`auto\` — follow terminal appearance${auto ? ` (currently \`${active}\`) **(in use)**` : ""}`];
     for (const name of names) {
       let config;
       try {
@@ -33,7 +35,7 @@ export async function runThemeCommand(
         continue;
       }
       const where = themeSource(name, context.cwd, extraPaths) === "built-in" ? "built in" : "from disk";
-      const mark = name === active ? " **(in use)**" : "";
+      const mark = name === active && selectedTheme() !== "auto" ? " **(in use)**" : "";
       lines.push(`- \`${name}\` — ${config?.description || "no description"} (${where})${mark}`);
     }
     lines.push(
@@ -45,7 +47,7 @@ export async function runThemeCommand(
   }
 
   try {
-    applyTheme(asked, context.cwd, extraPaths);
+    selectTheme(asked, context.cwd, extraPaths);
   } catch (error) {
     // Naming the alternatives is the whole help here: the failure is almost
     // always a typo or a file that was not saved where it was expected.
@@ -53,7 +55,7 @@ export async function runThemeCommand(
       kind: "local",
       output: listThemes(context.cwd, extraPaths).includes(asked)
         ? (error instanceof Error ? error.message : String(error))
-        : `No theme named \`${asked}\`. Available: ${listThemes(context.cwd, extraPaths).join(", ")}.`,
+        : `No theme named \`${asked}\`. Available: auto, ${listThemes(context.cwd, extraPaths).join(", ")}.`,
     };
   }
 
@@ -61,6 +63,8 @@ export async function runThemeCommand(
   // applying it is enough; the caller redraws.
   return {
     kind: "local",
-    output: `Theme set to \`${currentTheme()}\`.`,
+    output: selectedTheme() === "auto"
+      ? `Theme set to \`auto\` (currently \`${currentTheme()}\`); following terminal appearance.`
+      : `Theme set to \`${currentTheme()}\`.`,
   };
 }

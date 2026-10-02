@@ -1,6 +1,7 @@
 import { ESC, ESCAPE_INCOMPLETE, ESCAPE_OVERLONG, resolveEscapeEnd, scalarLength } from "./escape.js";
 import { parseKeyEvent, type ParsedKeyEvent } from "./keys.js";
 import { isMouseSequence, parseMouseReport, type MouseReport } from "./mouse.js";
+import { AppearanceReports } from "./appearance.js";
 
 /**
  * Raw stdin reassembler.
@@ -26,6 +27,7 @@ export type PasteListener = (text: string) => void;
 export type MouseListener = (report: MouseReport) => void;
 
 export interface StdinBufferOptions {
+  readonly onAppearance?: (appearance: "dark" | "light") => void;
   readonly partialHoldMs?: number;
   readonly pasteHoldMs?: number;
   readonly setTimer?: (callback: () => void, delayMs: number) => unknown;
@@ -33,6 +35,8 @@ export interface StdinBufferOptions {
 }
 
 export class StdinBuffer {
+  private readonly appearance: AppearanceReports;
+  private disposed = false;
   private buffer = "";
   private pasting = false;
   private pasteBuffer = "";
@@ -48,6 +52,7 @@ export class StdinBuffer {
   private readonly clearTimer: (handle: unknown) => void;
 
   constructor(options: StdinBufferOptions = {}) {
+    this.appearance = new AppearanceReports(options.onAppearance);
     this.partialHoldMs = options.partialHoldMs ?? PARTIAL_HOLD_MS;
     this.pasteHoldMs = options.pasteHoldMs ?? PASTE_HOLD_MS;
     this.setTimer = options.setTimer ?? ((callback, delayMs) => setTimeout(callback, delayMs));
@@ -70,7 +75,7 @@ export class StdinBuffer {
   }
 
   feed(chunk: string): void {
-    if (!chunk) return;
+    if (this.disposed || !chunk) return;
     this.clearTimer(this.partialTimer);
     this.partialTimer = undefined;
     this.buffer += chunk;
@@ -89,6 +94,9 @@ export class StdinBuffer {
   }
 
   dispose(): void {
+    this.disposed = true;
+    this.buffer = "";
+    this.pasteBuffer = "";
     this.clearTimer(this.partialTimer);
     this.clearTimer(this.pasteTimer);
     this.partialTimer = undefined;
@@ -100,7 +108,7 @@ export class StdinBuffer {
 
   /** Consume every sequence the buffer can complete, leaving any partial behind. */
   private drain(): void {
-    while (this.buffer.length > 0) {
+    while (!this.disposed && this.buffer.length > 0) {
       if (this.pasting) {
         if (!this.consumePaste()) return;
         continue;
@@ -130,8 +138,17 @@ export class StdinBuffer {
         continue;
       }
       const end = resolveEscapeEnd(this.buffer, 0);
+      const restart = this.appearance.restartAt(this.buffer);
+      if (restart > 0 && (end < 0 || restart < end)) {
+        this.buffer = this.buffer.slice(restart);
+        continue;
+      }
       if (end === ESCAPE_INCOMPLETE) return;
       if (end === ESCAPE_OVERLONG) {
+        if (this.appearance.holds(this.buffer)) {
+          this.buffer = this.appearance.bound(this.buffer);
+          continue;
+        }
         this.take(1);
         continue;
       }
@@ -179,6 +196,9 @@ export class StdinBuffer {
    */
   private releasePartial(): void {
     this.partialTimer = undefined;
+    // No timer or unbounded payload remains, and late fragments still belong
+    // to this report. In particular, OSC's terminating BEL is never ctrl+g.
+    if (this.appearance.holds(this.buffer)) return;
     while (this.buffer.length > 0) {
       const before = this.buffer.length;
       if (this.buffer.charCodeAt(0) === 0x1b) {
@@ -194,6 +214,7 @@ export class StdinBuffer {
   private take(length: number): void {
     const sequence = this.buffer.slice(0, length);
     this.buffer = this.buffer.slice(length);
+    if (this.appearance.consume(sequence)) return;
     // A mouse report shares the CSI shape of a keystroke, so it has to be
     // recognised here or it reaches the editor as typed text.
     if (isMouseSequence(sequence)) {

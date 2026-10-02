@@ -387,6 +387,8 @@ first global reset at index 27 of 99 -> background lost mid-row
 
 **2026-09-30 实施**：1d419b15、6ddf40a8：schema、变量解析、逐项诊断和启动错误传播已落地；auto 与扩充主题数量仍按裁决延期。 W3 相关 113/113 通过；独立代码 APPROVE、架构 CLEAR。以下为修复前研究记录。
 
+**2026-10-02 W7-25进展**：auto已接通启动、/theme、/reload与终端外观报告；具名选择不会被覆盖。定向90项、构建、双线复核及两种隔离PTY通过；反向5项失败后恢复。令牌/主题扩充仍待本项后续，保持PARTIAL。
+
 | 维度 | 我方 | pi | oh-my-pi |
 |---|---|---|---|
 | 令牌数 | **32**（`dark.json`/`light.json` 各 32；缺失 0、多余 0） | 56 | 67 |
@@ -3125,7 +3127,7 @@ tokenizer（`core/commands/arguments.ts`，Phase 17 W1-1 引入）把撇号当**
 
 ### CMD-13 · `/reload` 显式报告主题应用失败 — `FIXED` `P3` `CONFIRMED`
 
-**2026-10-02 修复**：命令输出包含主题失败原因与保留的active theme；配置变化与实际应用分开陈述，其他配置仍生效。22项定向测试、构建及双线APPROVE/CLEAR；撤销后1项失败。常规/全屏PTY运行中改为不存在的主题再reload，错误可见且正常退出。auto行为留给W7-25。
+**2026-10-02 修复**：命令输出包含主题失败原因与保留的active theme；配置变化与实际应用分开陈述，其他配置仍生效。22项定向测试、构建及双线APPROVE/CLEAR；撤销后1项失败。常规/全屏PTY运行中改为不存在的主题再reload，错误可见且正常退出。auto已随后由W7-25接通，见THM-03。
 
 以下保留修复前证据：
 

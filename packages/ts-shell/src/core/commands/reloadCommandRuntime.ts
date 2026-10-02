@@ -1,5 +1,6 @@
 import type { RuntimeConfig } from "../../config/runtimeConfig.js";
-import { applyTheme, currentTheme } from "../../presentation/theme/theme.js";
+import { currentTheme } from "../../presentation/theme/theme.js";
+import { selectTheme } from "../../presentation/theme/selection.js";
 import { createComponentLogger } from "../../observability/structuredLogger.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
@@ -49,7 +50,7 @@ export async function runReloadCommand(
   // Applying the theme is what makes the line above true. Reporting a change the
   // screen does not show is worse than not reporting it: it teaches the reader
   // to distrust the command's output.
-  const themeMessage = applyConfiguredTheme(outcome.after.theme, context.cwd);
+  const themeMessage = applyConfiguredTheme(outcome.after.theme, context.cwd, context.themePaths);
   return {
     kind: "local",
     output: [
@@ -69,15 +70,15 @@ export async function runReloadCommand(
 /**
  * Recolor the running surface to the configured theme, and say which one.
  *
- * `auto` and an unset theme are both "leave it alone" rather than a name to
- * apply: the first defers to the terminal, and the second was already resolved
- * at startup. A name that no longer loads is reported as not applied rather than
+ * An unset theme leaves the selection alone; auto follows terminal appearance.
+ * A name that no longer loads is reported as not applied rather than
  * throwing, because a bad theme must not cost the settings that did reload.
  */
-function applyConfiguredTheme(theme: string | undefined, workspaceRoot?: string): string | undefined {
-  if (!theme || theme === "auto") return undefined;
+function applyConfiguredTheme(theme: string | undefined, workspaceRoot?: string, extraPaths: readonly string[] = []): string | undefined {
+  if (!theme) return undefined;
   try {
-    applyTheme(theme, workspaceRoot);
+    selectTheme(theme, workspaceRoot, extraPaths);
+    if (theme === "auto") return `Following terminal appearance (currently \`${currentTheme()}\`).`;
     return `Applied theme \`${currentTheme()}\` to the running surface.`;
   } catch (error) {
     const detail = `Theme '${theme}' could not be applied: ${error instanceof Error ? error.message : String(error)}`;

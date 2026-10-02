@@ -38,7 +38,7 @@ import {
   runInteractiveResumeAction,
 } from "./interactivePromptRunner.js";
 import { describeCompaction, parseCompactCommand } from "./compact.js";
-import { currentTheme } from "../../presentation/theme/theme.js";
+import { defaultTheme } from "../../presentation/theme/theme.js";
 
 export interface InteractiveCommandRouterInput {
   readonly prompt: string;
@@ -112,7 +112,7 @@ export async function routeInteractiveCommand(
   // Which theme is in effect before the command runs. `/theme` and `/reload`
   // both change it, and neither is a special case worth naming here: comparing
   // the name either side covers both, and covers any future command that does.
-  const themeBefore = currentTheme();
+  const themeBefore = defaultTheme.colorRevision;
 
   const resolved = await buildCliCommandExecution({
     prompt: input.prompt,
@@ -139,7 +139,7 @@ export async function routeInteractiveCommand(
       return { before, after };
     },
   });
-  const themeChanged = currentTheme() !== themeBefore;
+  const themeChanged = defaultTheme.colorRevision !== themeBefore;
   if (resolved.kind === "handled") {
     return { turnNumber: nextTurnNumber, ...(themeChanged ? { themeChanged: true } : {}) };
   }

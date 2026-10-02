@@ -2,6 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { selectTheme, selectedTheme, updateAppearance } from "../../presentation/theme/selection.js";
+import { currentTheme } from "../../presentation/theme/theme.js";
 import { runThemeCommand } from "./themeCommandRuntime.js";
 
 /**
@@ -22,6 +24,8 @@ describe("the theme command", () => {
   });
 
   afterEach(() => {
+    selectTheme("dark");
+    updateAppearance("dark");
     fs.rmSync(workspace, { recursive: true, force: true });
     fs.rmSync(named, { recursive: true, force: true });
   });
@@ -81,4 +85,20 @@ describe("the theme command", () => {
     writeTheme(file, "Dark Mode", "#ff00ff");
     expect((await runThemeCommand(["Dark Mode"], { cwd: workspace, themePaths: [file] })).output).toContain("Theme set to `Dark Mode`");
   });
+});
+
+
+it("lists and selects auto without confusing the resolved theme with a named selection", async () => {
+  const context = { cwd: process.cwd() };
+  try {
+    updateAppearance("light");
+    expect((await runThemeCommand(["auto"], context)).output).toContain("currently `light`");
+    expect(selectedTheme()).toBe("auto");
+    const listing = (await runThemeCommand([], context)).output;
+    expect(listing).toMatch(/auto.*in use/);
+    expect(listing).not.toMatch(/^- `light`.*in use/m);
+    await runThemeCommand(["light"], context);
+    updateAppearance("dark");
+    expect(currentTheme()).toBe("light");
+  } finally { selectTheme("dark"); updateAppearance("dark"); }
 });

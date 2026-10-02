@@ -178,8 +178,8 @@ export function themeSourcePath(
   return discoverThemes(workspaceRoot, extraPaths).get(name)?.filePath;
 }
 
-export function getDefaultTheme(): ThemeConfig {
-  return builtIn.dark!;
+export function getDefaultTheme(appearance: "dark" | "light" = "dark"): ThemeConfig {
+  return builtIn[appearance]!;
 }
 
 /** Where a theme came from, for a listing that has to explain precedence. */

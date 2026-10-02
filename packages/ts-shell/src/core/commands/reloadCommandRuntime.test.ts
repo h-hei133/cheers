@@ -1,7 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { runReloadCommand } from "./reloadCommandRuntime.js";
 import { getRuntimeConfig, type RuntimeConfig } from "../../config/runtimeConfig.js";
 import { applyTheme, currentTheme, defaultTheme } from "../../presentation/theme/theme.js";
+
+import { selectTheme, selectedTheme, updateAppearance } from "../../presentation/theme/selection.js";
+
+afterEach(() => { selectTheme("dark"); updateAppearance("dark"); });
 
 /** A context whose settings are replaced in place, as the session does. */
 function contextWith(initial: RuntimeConfig, next?: RuntimeConfig) {
@@ -99,15 +103,18 @@ describe("/reload", () => {
     applyTheme("dark");
   });
 
-  it("leaves the palette alone when the theme is auto", async () => {
-    // `auto` defers to the terminal rather than naming a theme to apply.
+  it("applies auto selection using the last reported appearance", async () => {
+    selectTheme("dark");
+    updateAppearance("light");
     const first = getRuntimeConfig("/tmp/nonexistent-a");
     const second = { ...first, theme: "auto" as const };
     const { context } = contextWith(first, second);
 
     const result = await runReloadCommand([], context);
 
-    expect(result.output).not.toContain("Applied theme");
+    expect(result.output).toContain("Following terminal appearance (currently `light`)");
+    expect(selectedTheme()).toBe("auto");
+    expect(currentTheme()).toBe("light");
   });
 
   it("keeps the reload working when the named theme no longer loads", async () => {

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { drainInput } from "./input/drain.js";
+import { QUERY_APPEARANCE, STOP_APPEARANCE } from "./input/appearance.js";
 import { KeyboardNegotiation, type KeyboardProtocol } from "./input/keyboardProtocol.js";
 import { detectTerminalCapabilities, type TerminalCapabilities } from "./terminalCapabilities.js";
 
@@ -30,6 +31,7 @@ const ENABLE_BRACKETED_PASTE = "\x1b[?2004h";
 
 /** Restores every private mode this driver may have set, in reverse order. */
 const RESTORE_MODES = [
+  STOP_APPEARANCE,
   "\x1b[?1049l", // alternate screen, in case a modal frame was up
   "\x1b[?2026l", // synchronized output
   "\x1b[?7h", // autowrap
@@ -175,6 +177,7 @@ export class Terminal implements TerminalDevice {
     // indistinguishable from the head of a sequence.
     if (this.capabilities.supportsBracketedPaste) {
       this.write(this.keyboard.query);
+      if (process.stdout.isTTY) this.write(QUERY_APPEARANCE);
       this.keyboardTimer = setTimeout(() => this.expireKeyboardNegotiation(), KEYBOARD_REPLY_TIMEOUT_MS);
       this.keyboardTimer.unref?.();
     }
@@ -222,7 +225,7 @@ export class Terminal implements TerminalDevice {
     this.keyboardTimer = undefined;
     this.deferredInput = [];
     // Stop generating reports before waiting for those already in flight.
-    this.writeSync(this.keyboard.stop());
+    this.writeSync(this.keyboard.stop() + STOP_APPEARANCE);
     await drainInput(process.stdin);
   }
 

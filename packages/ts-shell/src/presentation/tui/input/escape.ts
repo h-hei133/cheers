@@ -11,8 +11,8 @@
 export const ESC = "\x1b";
 
 /** A sequence that is complete but longer than any real keypress could be. */
-const MAX_CSI_BYTES = 256;
-const MAX_STRING_BYTES = 4096;
+export const MAX_CSI_BYTES = 256;
+export const MAX_STRING_BYTES = 4096;
 
 export const ESCAPE_INCOMPLETE = -1;
 export const ESCAPE_OVERLONG = -2;

@@ -1,3 +1,5 @@
+import { selectTheme, updateAppearance } from "../../presentation/theme/selection.js";
+import { currentTheme } from "../../presentation/theme/theme.js";
 import { describe, expect, it, vi } from "vitest";
 import { InteractiveMode, type InteractiveModeOptions } from "./interactiveMode.js";
 import { ManualScheduler, RecordingTerminal } from "../../test-utils/terminalDouble.js";
@@ -220,4 +222,26 @@ describe("first painted frame", () => {
     mode.stop();
     expect(terminal.stopped).toBe(true);
   });
+});
+
+
+it.each(["regular", "fullscreen"] as const)("repaints the %s host when a late appearance report arrives", (screen) => {
+  updateAppearance("dark");
+  selectTheme("auto");
+  const { mode, terminal, scheduler } = boot({}, screen);
+  try {
+    mode.start();
+    scheduler.flush();
+    terminal.drain();
+    terminal.input("draft");
+    scheduler.flush();
+    terminal.drain();
+    terminal.input("\x1b[?997;");
+    terminal.input("2n");
+    scheduler.flush();
+    expect(currentTheme()).toBe("light");
+    const output = terminal.drain();
+    expect(stripAnsi(output)).toContain("╰─ draft");
+    expect(stripAnsi(output)).not.toContain("997");
+  } finally { mode.stop(); selectTheme("dark"); updateAppearance("dark"); }
 });

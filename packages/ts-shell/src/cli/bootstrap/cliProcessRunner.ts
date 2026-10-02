@@ -10,7 +10,7 @@ import {
   setGlobalTraceContext,
 } from "../../observability/index.js";
 import { parseCliArgs } from "../../entrypoints/cliArgs.js";
-import { applyTheme } from "../../presentation/theme/theme.js";
+import { selectTheme } from "../../presentation/theme/selection.js";
 import { readDiagramMode } from "../interactive/tuiSettings.js";
 import { setDiagramMode } from "../../presentation/tui/transcript/mermaid.js";
 import { listThemes, themeNamesFromPaths } from "../../presentation/themes/index.js";
@@ -262,7 +262,7 @@ function applyStartupTheme(input: {
   readonly renderer: StreamingRenderer;
 }): void {
   const extraPaths = input.options.themePaths ?? [];
-  const requested = input.options.useTheme ?? (input.configured === "auto" ? undefined : input.configured);
+  const requested = input.options.useTheme ?? input.configured;
   if (!requested) return;
 
   // A named path that contributed nothing is reported before the theme is
@@ -278,7 +278,7 @@ function applyStartupTheme(input: {
   }
 
   try {
-    applyTheme(requested, input.workspaceRoot, extraPaths);
+    selectTheme(requested, input.workspaceRoot, extraPaths);
   } catch (error) {
     input.renderer.renderLine(
       `Could not load theme \`${requested}\`: ${error instanceof Error ? error.message : String(error)}. Using the default. Available: ${listThemes(input.workspaceRoot, extraPaths).join(", ")}.`,

@@ -205,4 +205,10 @@ export function currentTheme(): string {
   return currentThemeName;
 }
 
+/** Automatic appearance uses the bundled pair, independent of named file overrides. */
+export function applyDefaultTheme(appearance: "dark" | "light"): void {
+  defaultTheme.apply(getDefaultTheme(appearance), detectColorMode());
+  currentThemeName = appearance;
+}
+
 export const defaultTheme = new Theme(getDefaultTheme(), detectColorMode());

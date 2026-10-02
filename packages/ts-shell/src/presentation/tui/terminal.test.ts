@@ -1,5 +1,6 @@
 import { PassThrough } from "node:stream";
 import { afterEach, expect, it, vi } from "vitest";
+import { QUERY_APPEARANCE, STOP_APPEARANCE } from "./input/appearance.js";
 import { Terminal } from "./terminal.js";
 
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
@@ -16,7 +17,7 @@ it("disables keyboard reports before draining and restores raw mode only afterwa
   try {
     input.emit("data", "\x1b[?1u");
     const draining = terminal.drainInput();
-    expect(sync).toHaveBeenCalledWith("\x1b[<u");
+    expect(sync).toHaveBeenCalledWith("\x1b[<u" + STOP_APPEARANCE);
     input.emit("data", "\x1b[13;1:3u");
     expect(forwarded).not.toHaveBeenCalled();
     expect(input.setRawMode).not.toHaveBeenCalledWith(false);
@@ -33,4 +34,27 @@ it("disables keyboard reports before draining and restores raw mode only afterwa
     terminal.stop();
     input.destroy();
   }
+});
+
+
+it("queries appearance on each start and disables reports on stop and crash restore", () => {
+  vi.useFakeTimers();
+  const input = Object.assign(new PassThrough(), { isTTY: true, isRaw: false, setRawMode: vi.fn() });
+  vi.spyOn(process, "stdin", "get").mockReturnValue(input as unknown as NodeJS.ReadStream);
+  vi.spyOn(process, "stdout", "get").mockReturnValue(Object.assign(new PassThrough(), { isTTY: true }) as unknown as NodeJS.WriteStream);
+  const terminal = new Terminal({ hasTrueColor: true, has256Color: true, supportsDec2026Sync: true,
+    supportsKittyKeyboard: false, supportsBracketedPaste: true, insideMultiplexer: false });
+  const write = vi.spyOn(terminal, "write").mockImplementation(() => {});
+  const sync = vi.spyOn(terminal, "writeSync").mockImplementation(() => {});
+  try {
+    terminal.start(() => {}, () => {}, () => {});
+    expect(write).toHaveBeenCalledWith(QUERY_APPEARANCE);
+    terminal.stop();
+    expect(sync.mock.lastCall?.[0]).toContain(STOP_APPEARANCE);
+    write.mockClear();
+    terminal.start(() => {}, () => {}, () => {});
+    expect(write).toHaveBeenCalledWith(QUERY_APPEARANCE);
+    terminal.restoreSync();
+    expect(sync.mock.lastCall?.[0]).toContain(STOP_APPEARANCE);
+  } finally { terminal.stop(); input.destroy(); }
 });
