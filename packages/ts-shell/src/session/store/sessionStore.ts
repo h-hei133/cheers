@@ -1,4 +1,5 @@
 import * as fs from "node:fs";
+import { decodeUsageSnapshot } from "../../observability/usage/snapshot.js";
 import type { SessionMetadata } from "../schema/sessionMetadataCodec.js";
 import { projectSessionMetadata } from "../schema/sessionMetadataCodec.js";
 import type { Session } from "../schema/sessionRecord.js";
@@ -152,6 +153,7 @@ export function projectLoadedSession(input: {
     createdAt: metadata.createdAt,
     updatedAt: metadata.updatedAt,
     status: input.state.status,
+    usage: decodeUsageSnapshot(input.state.usage),
     pendingPrompt: input.state.pendingPrompt,
     lastError: input.state.lastError,
     turns: input.turns,

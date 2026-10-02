@@ -1,7 +1,9 @@
 import type { WorkspaceRootMode } from "../store/projectBindingPolicy.js";
 import type { SessionMessage } from "./sessionMessage.js";
+import type { SessionUsageSnapshot } from "../../observability/usage/model.js";
 
 export interface Session {
+  usage?: SessionUsageSnapshot;
   id: string;
   projectRoot: string;
   rootMode?: WorkspaceRootMode;

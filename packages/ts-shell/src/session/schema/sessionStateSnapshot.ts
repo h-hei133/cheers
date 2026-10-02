@@ -10,6 +10,7 @@ import type {
 import { projectDurableStatus } from "../lifecycle/durableStatusProjection.js";
 import type { SessionHarnessState } from "../harness/state.js";
 import type { Session } from "./sessionRecord.js";
+import type { SessionUsageSnapshot } from "../../observability/usage/model.js";
 import {
   buildLinearSessionThreadSnapshot,
   catchUpSessionThread,
@@ -17,6 +18,7 @@ import {
 } from "./sessionThread.js";
 
 export interface SessionStateSnapshot {
+  usage?: SessionUsageSnapshot;
   status: Session["status"];
   projectRoot?: string;
   pendingPrompt?: string;
@@ -59,6 +61,7 @@ export function buildSessionStateSnapshot(
   overrides?: SessionStateSnapshotOverrides,
 ): SessionStateSnapshot {
   return {
+    usage: current?.usage,
     status: session.status,
     projectRoot: session.projectRoot,
     pendingPrompt: session.pendingPrompt,

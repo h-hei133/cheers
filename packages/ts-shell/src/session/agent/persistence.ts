@@ -16,6 +16,7 @@ import {
   readTranscriptEvents,
 } from "../transcript/sessionTranscript.js";
 import { applyAutoCompactRetention } from "./compaction.js";
+import { persistSessionUsage } from "../../observability/usageTelemetry.js";
 
 export function handleAppendQueryEvent(
   store: SessionStoreAccess,
@@ -49,7 +50,9 @@ export function handleApplyQueryEventToState(
       handleBuildSessionStateSnapshot(nextSession, current, overrides),
     applyAutoCompactRetention: (workingMemory, queryEvent) =>
       applyAutoCompactRetention(workingMemory, queryEvent),
-    writeSnapshot: (snapshot) => store.writeJsonFileAtomic(statePath, snapshot),
+    writeSnapshot: (snapshot) => persistSessionUsage(sessionId, snapshot.usage, (usage) => {
+      store.writeJsonFileAtomic(statePath, { ...snapshot, usage });
+    }),
   });
 }
 

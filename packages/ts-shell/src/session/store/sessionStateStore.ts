@@ -12,6 +12,7 @@ import {
   writeJsonFileAtomic,
 } from "./sessionFileStore.js";
 import type { SessionFileLayout } from "./sessionFileLayout.js";
+import { persistSessionUsage } from "../../observability/usageTelemetry.js";
 
 export function readStateSnapshotSafely(
   statePath: string,
@@ -52,6 +53,8 @@ export function writeSessionState(input: {
       current,
       input.overrides,
     );
-    writeJsonFileAtomic(input.layout.statePath, snapshot);
+    persistSessionUsage(input.session.id, current?.usage, (usage) => {
+      writeJsonFileAtomic(input.layout.statePath, { ...snapshot, usage });
+    });
   });
 }

@@ -3,6 +3,7 @@ import type { Session, WorkspaceRootMode } from '../../session/SessionManager.js
 import type { WorkflowGitContext } from '../../workflow/gitContext.js'
 import path from 'node:path'
 import { forgetSessionTodos, replayTodosFromMessages } from '../commands/todoCommandRuntime.js'
+import { restoreSessionUsage } from '../../observability/usageTelemetry.js'
 
 export interface ActiveSessionIdentity {
   readonly sessionId: string
@@ -101,6 +102,7 @@ export function createShellRuntimeContext(input: {
   session: Session
   resumeProvenance?: SessionResumeProvenance;
 }): ShellRuntimeContext {
+  restoreSessionUsage(input.session.id, input.session.usage)
   return {
     cwd: input.cwd,
     originalCwd: input.originalCwd,
@@ -182,6 +184,7 @@ export function applyShellSubstrateTransition(
     })
 
   if (nextSession.id !== context.session.id) {
+    restoreSessionUsage(nextSession.id, nextSession.usage)
     forgetSessionTodos(context.session.id)
     forgetSessionTodos(nextSession.id)
     replayTodosFromMessages(nextSession.id, nextSession.turns)

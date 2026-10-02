@@ -1344,7 +1344,11 @@ as an exhausted account」——**是同一个错误，只是在文案层**）�
 `refused the prompt`），并补上 `refusal`/`guardrail_intervened` 两个端点专有值。
 **两处应当共用同一个判定，而不是各写一份。**
 
-### PRV-10 · 用量遥测**只在内存**，跨 `--resume` 归零 — `OPEN` `P2` `CONFIRMED`
+### PRV-10 · 用量遥测跨会话恢复 — `FIXED` `P2` `CONFIRMED`（2026-10-02）
+
+已在既有 `state.json` 写入路径持久化累计分桶，并在共享启动/切换入口恢复；键保持完整 `provider/model`。锁内合并本进程自上次成功保存后的增量，避免并行写入覆盖及重复累计；无 live 记录保留磁盘值。上下文 footprint 与近期缓存比较历史只属于当前进程，恢复时重新测量。旧会话未记录的用量无法追补，记录到下一次状态写入之间的崩溃窗口仍存在。定向测试、独立复核和实际 PTY/JSON 恢复验收见裁决 §8.4。
+
+以下保留修复前研究事实：
 
 `observability/usageTelemetry.ts:225` 的 `sessionTelemetries` 是
 `Map<string, SessionUsageTelemetry>`。`grep` 在 `session/**` 内

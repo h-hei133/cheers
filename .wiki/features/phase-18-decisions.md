@@ -557,7 +557,8 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W3-13 / CTX-09 | 五处状态持有者增加容量及丢弃标记；外层会话表同样有界，异步注入失去状态后不报告成功 | 已实现，本地验证通过 |
 | W4-14 / SES-02 缓解 | 同步临界区按本机持有者存活保护，release 校验 token/文件身份，action 不重复执行；仍无 fencing | 已实现，本地验证通过 |
 | W8-38 / SES-09（随 W4） | 空/半写锁 500ms 创建宽限；文件读取错误不夺锁 | 已实现，本地验证通过 |
-| W4-15/16、CMD-12、W5–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
+| W4-15 / PRV-10 | 累计用量随现有 state 写入；锁内增量合并；恢复重建上下文测量 | 已实现，本地验证通过 |
+| W4-16、CMD-12、W5–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
 src/runtime/execution/service.test.ts src/runtime/execution/fileLock.test.ts
@@ -799,6 +800,22 @@ SES-09 同域独立修复：空/半写 JSON 的创建宽限为 500ms，小于 1.
 | 6 | 我方 `writeSessionState` 的锁释放 | 逐行确认：`sessionFileStore.ts` 的 `finally` 里是 `fs.rmSync(lockPath, { force: true })`——**无条件删除，未比对 owner** | W4-14 的 (b) 依据成立 |
 
 **这六处是我自己在复核者返回之前发现的**，不依赖复核结论；记在此处以免复核者重复劳动，也便于对照复核者的独立结论。
+
+W4-15 / PRV-10（2026-10-02）：参考从持久化条目按 provider/model 聚合的决定，沿用本仓
+`state.json` 扩展点；累计桶保留完整键，不持久化 live footprint 或 recentRequests。
+原因：压缩/导航后的内存 context reset 可能发生在上一次写入之后，恢复旧测量会制造错误缓存比较。
+两个既有状态写入入口共用 usage owner，在锁内将本地相对上次成功写入/恢复基线的增量加到当前磁盘值；
+写成功才同步 live 与基线，避免同一增量重复计入或另一个进程的总量被覆盖。未激活的读/改写不归零，
+纯 schema builder 只保留当前 snapshot。新增类型/数值解码拒绝损坏记录，桶保持 null prototype。
+旧格式无 usage 仍可加载，但无法追补过去未保存的用量；记录与下一次状态写入间的崩溃窗口不由此关闭。
+
+验证：`npm run test:ts -- src/observability src/session/store/usage.test.ts src/session/store/sessionStore.test.ts src/session/store/threadState.test.ts src/session/schema/sessionStateSnapshot.test.ts src/session/transcript/sessionQueryEventPersistence.test.ts src/session/SessionManager.test.ts src/core/shell/runtimeContext.test.ts src/core/shell/recovery.test.ts src/cli/interactive/history.test.ts src/core/commands/costCommand.test.ts`
+**21 文件 / 227 测试通过**；构建与 import cycles（1379 文件、零环）通过。双线独立复核 APPROVE / CLEAR。
+替换增量合并为全量覆盖并撤销激活恢复后，两个新测试文件均失败（2 tests failed），恢复精确源字节。
+常规/全屏真实 PTY：新进程以 `--session-id` 恢复 **3,000,000 tokens / $0.4200**，A→B→A
+保留各自用量；两种配置的 JSON 回放各 45 行、退出 0。首次 PTY 脚本未关闭 `/cost` 长输出视图，
+后续输入被视图消费；补发 Esc 并等待提示后通过，无产品修复。前一提交 `ee1842d9` 的
+CI `36977519414` 与 NormProof `36977519368` 已全部成功；本项尚未据此声称远端通过。
 
 ## 9. 真实 provider 验证：**已执行**（2026-10-01，中转站 `ai.onyxaxis.org`）
 
