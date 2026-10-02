@@ -78,6 +78,8 @@ export interface StepListener {
 export interface StepOptions {
   /** Whether the model may call tools on this step; the last step may not. */
   readonly allowTools: boolean;
+  /** Restrict the bound tool schemas for this call; an empty list withdraws all tools. */
+  readonly allowedTools?: readonly string[];
   /**
    * Told the request that was sent, as it was sent.
    *
@@ -226,6 +228,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
       ? { ...(request.provider.provider ? { provider: request.provider.provider } : {}), model: request.provider.model }
       : undefined;
   return async (messages, signal, listener, options): Promise<AssistantStep> => {
+    const allowed = options.allowedTools && new Set(options.allowedTools);
+    const tools = allowed ? request.tools.filter((tool) => allowed.has(tool.function.name)) : request.tools;
     // Steps this call returns all come from the same target, so the origin is
     // stamped once on whatever leaves — an answer, a refusal, or an abort —
     // rather than threaded through each builder's signature. A `return` in
@@ -269,7 +273,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
             microcompactMessages(toChatMessages(messages), { keepRecentTurns: 3, maxOutputChars: 1000 }).messages,
             shape.assistantAfterToolResult,
           ),
-          tools: request.tools,
+          tools,
           allowTools: options.allowTools,
           vision: shape.vision,
           temperature: samplingTemperature(request.workspaceRoot, request.temperature ?? 0.7),
@@ -287,9 +291,9 @@ export function createStepFunction(request: StepRequest): StepFunction {
               shape.assistantAfterToolResult,
             ),
             options.allowTools,
-            request.tools.length > 0,
+            tools.length > 0,
           ),
-          tools: request.tools,
+          tools,
           allowTools: options.allowTools,
           vision: shape.vision,
           temperature: samplingTemperature(request.workspaceRoot, request.temperature ?? 0.7),

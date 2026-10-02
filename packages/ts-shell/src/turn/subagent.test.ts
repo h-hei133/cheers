@@ -1,7 +1,9 @@
 import { expect, it, vi } from "vitest";
 import { createSubagentRunner } from "./subagent.js";
 import type { StepFunction } from "./step.js";
+import { createStepFunction } from "./step.js";
 import type { ToolGateOptions } from "./tools.js";
+import { toolSchemas } from "./tools.js";
 import { SubagentLoader } from "../core/subagents/subagentLoader.js";
 import { createTaskToolDefinition } from "../core/tools/taskTool.js";
 
@@ -116,4 +118,33 @@ it("reports cancellation inside a child tool as failed while preserving prior na
   expect(result.error).toContain("the subagent was aborted");
   expect(result.error).toContain("Partial response:\nI started inspecting");
   expect(result.error).not.toContain("Subagent Task Completed");
+});
+
+it("gives the model the executable child tool set without changing the shared parent step", async () => {
+  const read = vi.fn(async () => ({ success: true, output: "file contents" }));
+  const tools = new Map(["read", "write", "task"].map((name) => [name, {
+    name, description: name, argsSchema: {}, execute: name === "read" ? read : vi.fn(),
+  }]));
+  const bodies: Array<{ tools?: Array<{ function: { name: string } }> }> = [];
+  const step = createStepFunction({
+    provider: { headers: {}, baseUrl: "https://provider.test/v1", model: "test" },
+    workspaceRoot: process.cwd(), sessionId: "schemas", systemPrompt: "inspect", tools: toolSchemas(tools),
+    fetchImpl: async (_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({ choices: [{ message: bodies.length === 1 ? {
+        content: "reading", tool_calls: [{ id: "read-1", type: "function", function: { name: "read", arguments: "{}" } }],
+      } : { content: "done" }, finish_reason: "stop" }] }), { headers: { "content-type": "application/json" } });
+    },
+  });
+  const run = createSubagentRunner({ step, defaultMaxSteps: 2 }, tools, {
+    sessionId: "schemas", workspaceRoot: process.cwd(), permissionScope: "allow-all",
+    hooks: { dispatch: async () => ({ decision: "allow" }) } as unknown as ToolGateOptions["hooks"], emit: () => {},
+  });
+  const result = await run({ ...request, definition: { ...reviewer, tools: ["read", "write", "task"], disallowedTools: ["write"] } });
+  expect(result.allowedTools).toEqual(["read"]);
+  expect(bodies[0].tools?.map((tool) => tool.function.name)).toEqual(["read"]);
+  expect(bodies[1].tools).toBeUndefined();
+  expect(read).toHaveBeenCalledOnce();
+  await step([{ role: "user", content: "parent request" }], undefined, {}, { allowTools: true });
+  expect(bodies[2].tools?.map((tool) => tool.function.name)).toEqual(["read", "write", "task"]);
 });

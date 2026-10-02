@@ -34,6 +34,40 @@ function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {
 }
 
 describe("createStepFunction", () => {
+  it.each([{ allowedTools: [] }, { allowedTools: ["unknown"] }])("does not advertise tools or a spent budget for an empty intersection: $allowedTools", async ({ allowedTools }) => {
+    let body: Record<string, unknown> = {};
+    const step = createStepFunction({ ...request,
+      tools: [{ type: "function", function: { name: "read", parameters: {} } }],
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(String(init?.body));
+        return jsonResponse({ choices: [{ message: { content: "answer" }, finish_reason: "stop" }] });
+      },
+    });
+    await step([{ role: "user", content: "inspect" }], undefined, {}, { allowTools: false, allowedTools });
+    expect(body.tools).toBeUndefined();
+    expect(JSON.stringify(body.messages)).not.toContain("cannot call any more tools");
+    await step([{ role: "user", content: "inspect" }], undefined, {}, { allowTools: true, allowedTools });
+    expect(body.tools).toBeUndefined();
+  });
+
+  it("uses the same restricted schemas for endpoint headers and request bodies", async () => {
+    const endpoint = "test-restricted-schemas";
+    const seen: string[][] = [];
+    declareEndpoint(endpoint, {
+      resource: () => "test",
+      requestHeaders: (input) => { seen.push(input.tools.map((tool) => tool.function.name)); return {}; },
+      turnBody: (input) => { seen.push(input.tools.map((tool) => tool.function.name)); return {}; },
+      simpleBody: () => ({}), readBody: () => ({ choices: [{ message: { content: "answer" } }] }),
+      readStream: () => { throw new Error("no stream"); },
+    });
+    const step = createStepFunction({ ...request, provider: { ...request.provider, endpoint },
+      tools: ["read", "write"].map((name) => ({ type: "function", function: { name, parameters: {} } })),
+      fetchImpl: async () => jsonResponse({}),
+    });
+    await step([], undefined, {}, { allowTools: true, allowedTools: ["read", "unknown"] });
+    expect(seen).toEqual([["read"], ["read"]]);
+  });
+
   it.each(["content", "reasoning_content"])("does not retry partial %s at the outer loop", async (channel) => {
     let requests = 0;
     const shown: string[] = [];
