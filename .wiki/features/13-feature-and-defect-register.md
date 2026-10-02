@@ -2378,7 +2378,12 @@ node -e "import('@cheers/ts-shell')"
 
 > 维护者点名：「是否存在没有接入 tui 的功能」。本节单独回答这一问。
 
-### OBS-03 · `/sidebar watch` 是「同步吐 N 帧」而不是实时面板 — `OPEN` `P2` `CONFIRMED`
+### OBS-03 · `/sidebar watch` 是「同步吐 N 帧」而不是实时面板 — `FIXED` `P2` `CONFIRMED`
+
+**2026-10-02 实施**：正式入口为 `/sidebar snapshot`，帮助/补全/标题同步声明单次捕获，命令owner
+只生成一帧。旧 `watch/live` 保留为同一快照的兼容别名，不再列入补全；裸 `/sidebar` 保留原有
+normal布局（不额外添加采集元信息，以免挤掉状态），panel/compact/detail仍为快照的密度变体。
+没有新增定时刷新或分栏容器，OBS-04/sidebar的命令事件源缺口继续OPEN。以下保留修复前事实。
 
 `/sidebar watch`（别名 `/sidebar live`）的整条实现是：
 

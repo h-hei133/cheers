@@ -1056,8 +1056,8 @@ describe("slash router (W4)", () => {
 
     expect(watch?.kind).toBe("local");
     if (watch?.kind === "local") {
-      expect(watch.output).toContain("Sidebar live/watch preview");
-      expect(watch.output).toContain("[Live frame]");
+      expect(watch.output).toContain("Visible agent state snapshot");
+      expect(watch.output).toContain("[Snapshot frame]");
       expect(watch.output).toContain("Frame: #1");
       expect(watch.output).toContain("Compact checkpoint");
       expect(watch.output).toContain("Developer-only sidebar events are hidden by default.");
@@ -1069,8 +1069,8 @@ describe("slash router (W4)", () => {
     expect(snapshot?.kind).toBe("local");
     if (snapshot?.kind === "local") {
       expect(snapshot.output).toContain("Read-only panel of session state");
-      expect(snapshot.output).not.toContain("[Live frame]");
-      expect(snapshot.output).not.toContain("Sidebar live/watch preview");
+      expect(snapshot.output).not.toContain("[Snapshot frame]");
+      expect(snapshot.output).not.toContain("Visible agent state snapshot");
     }
   });
 

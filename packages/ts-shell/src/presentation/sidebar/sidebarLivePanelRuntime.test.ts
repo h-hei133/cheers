@@ -106,8 +106,8 @@ describe("sidebar live panel runtime", () => {
     const frame = runtime.tick();
     const output = renderSidebarLivePanelFrame(frame);
 
-    expect(output).toContain("Sidebar live/watch preview");
-    expect(output).toContain("[Live frame]");
+    expect(output).toContain("Visible agent state snapshot");
+    expect(output).toContain("[Snapshot frame]");
     expect(output).toContain("Frame: #1");
     expect(output).toContain("Events: visible 2; stored 3");
     expect(output).toContain("Route blocker");
@@ -159,11 +159,11 @@ describe("sidebar live panel runtime", () => {
   it("parses and runs the watch command as a bounded read-only command", () => {
     const parsed = parseSidebarLivePanelCommandArgs(["watch"]);
     expect(parsed.contract).toEqual({
-      mode: "watch",
+      mode: "snapshot",
       density: "normal",
       frameCount: 1,
     });
-    expect(parseSidebarLivePanelCommandArgs(["live"]).contract?.mode).toBe("watch");
+    expect(parseSidebarLivePanelCommandArgs(["live"]).contract?.mode).toBe("snapshot");
 
     const result = runSidebarLivePanelCommand({
       snapshot: projectSidebarState({
@@ -175,8 +175,8 @@ describe("sidebar live panel runtime", () => {
       now: () => "2026-05-17T04:00:00.000Z",
     });
 
-    expect(result.output).toContain("Sidebar live/watch preview");
-    expect(result.output).toContain("Live/watch preview: explicit bounded frames");
+    expect(result.output).toContain("Visible agent state snapshot");
+    expect(result.output).toContain("Snapshot captured on request");
     expect(result.output).toContain("Frame: #1");
     expect(result.evidence).toContain("sidebar-live-panel-command-runner:no-provider-call");
     expect(result.evidence).toContain("sidebar-live-panel-command-runner:no-persistence");

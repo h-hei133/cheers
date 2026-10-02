@@ -4,9 +4,9 @@ import type {
 } from "./sidebarPanelModel.js";
 
 export interface SidebarLivePanelCommandContract {
-  readonly mode: "watch";
+  readonly mode: "snapshot";
   readonly density: SidebarPanelDensity;
-  readonly frameCount: number;
+  readonly frameCount: 1;
   readonly budget?: Partial<SidebarPanelBudget>;
 }
 
@@ -24,12 +24,13 @@ export function parseSidebarLivePanelCommandArgs(
   }
   const [mode] = args;
   switch (mode) {
+    case "snapshot":
     case "watch":
     case "live":
       return {
         ok: true,
         contract: {
-          mode: "watch",
+          mode: "snapshot",
           density: "normal",
           frameCount: 1,
         },
@@ -46,12 +47,12 @@ function invalidSidebarLivePanelArgs(value: string): SidebarLivePanelCommandPars
       "Result",
       "- Outcome: blocked",
       "- BlockerKind: invalid-sidebar-live-args",
-      `- Reason: Unsupported /sidebar live argument: ${value || "(empty)"}`,
-      "- DoNext: Use /sidebar watch for the bounded live panel experiment.",
+      `- Reason: Unsupported /sidebar snapshot argument: ${value || "(empty)"}`,
+      "- DoNext: Use /sidebar snapshot to capture the current state once.",
       "",
-      "Supported /sidebar live forms:",
-      "- /sidebar watch   bounded live/watch panel preview",
-      "- /sidebar live    alias for /sidebar watch",
+      "Supported /sidebar snapshot forms:",
+      "- /sidebar snapshot  read-only snapshot; run again to refresh",
+      "- /sidebar watch and /sidebar live are compatibility aliases for the same snapshot.",
     ].join("\n"),
   };
 }

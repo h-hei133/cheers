@@ -44,7 +44,7 @@ const SUBCOMMAND_VALUES = {
   mcp: ["status", "tools", "doctor", "refresh"],
   permissions: ["list", "explain", "revoke", "reset"],
   workspace: ["status", "attach", "recent"],
-  sidebar: ["panel", "compact", "detail", "watch"],
+  sidebar: ["snapshot", "panel", "compact", "detail"],
   browser: ["status", "smoke", "runtime", "preview", "dry-run", "execute", "replay", "repair"],
   restore: ["preview", "execute"],
   brainstorm: ["-i", "-s"],

@@ -4,8 +4,6 @@ import { parseSidebarLivePanelCommandArgs } from "../../presentation/sidebar/sid
 import { runSidebarLivePanelCommand } from "../../presentation/sidebar/sidebarLivePanelCommandRunner.js";
 import { parseSidebarPanelCommandArgs } from "../../presentation/sidebar/sidebarPanelCommandContract.js";
 import { runSidebarPanelCommand } from "../../presentation/sidebar/sidebarPanelCommandRunner.js";
-import { buildSidebarPanel } from "../../presentation/sidebar/sidebarPanelLayout.js";
-import { renderSidebarPanel } from "../../presentation/sidebar/sidebarPanelRenderer.js";
 import { projectSidebarState } from "../../presentation/sidebar/sidebarStateProjection.js";
 import {
   sidebarLiveEventStoreForContext,
@@ -17,10 +15,10 @@ export async function runSidebarLocalCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const liveParsed = args[0] === "watch" || args[0] === "live"
+  const snapshotParsed = ["snapshot", "watch", "live"].includes(args[0] ?? "")
     ? parseSidebarLivePanelCommandArgs(args)
     : undefined;
-  const parsed = liveParsed ?? parseSidebarPanelCommandArgs(args);
+  const parsed = snapshotParsed ?? parseSidebarPanelCommandArgs(args);
   if (!parsed.ok || !parsed.contract) {
     return {
       kind: "local",
@@ -74,9 +72,9 @@ export async function runSidebarLocalCommand(
       localCommands: [
         {
           id: "sidebar",
-          label: "/sidebar",
+          label: "/sidebar snapshot",
           status: "available",
-          summary: "Read-only visible state preview command.",
+          summary: "Read-only session state captured on request.",
           evidence: ["sidebar-command:registered"],
         },
       ],
@@ -84,11 +82,11 @@ export async function runSidebarLocalCommand(
     },
     events: liveEvents.events,
     bridgeDroppedEventCount: liveEvents.droppedEventCount,
-    nextAction: "Use route-specific docs and focused tests to decide the next implementation step.",
+    nextAction: "Run /sidebar snapshot again to refresh the displayed state.",
   });
 
-  if (parsed.contract.mode === "watch") {
-    const watch = runSidebarLivePanelCommand({
+  if (parsed.contract.mode === "snapshot") {
+    const snapshotResult = runSidebarLivePanelCommand({
       snapshot,
       sessionScopeId,
       eventStore: sidebarLiveEventStoreForContext(context),
@@ -96,32 +94,10 @@ export async function runSidebarLocalCommand(
     });
     return {
       kind: "local",
-      output: watch.output,
+      output: snapshotResult.output,
     };
   }
 
-  if (parsed.contract.mode === "panel") {
-    const panel = runSidebarPanelCommand({ snapshot, contract: parsed.contract });
-    return {
-      kind: "local",
-      output: panel.output,
-    };
-  }
-  // The default view: the boxed panel as an interactive overlay, with the
-  // same text as the output for a caller that prints instead of opening
-  // modals. The panel is the structured form of what the state surface says
-  // in prose — bordered, sectioned, width-budgeted — and a full-screen modal
-  // is where the surface already puts a view too structured for the
-  // transcript's wrapping.
-  // The boxed panel replaces the prose preview: it is the same facts, but
-  // sectioned, bordered and width-budgeted — a real view rather than a
-  // disclaimed one. At its standard density it runs past the pager's
-  // threshold, so the interactive surface opens it full-screen with its own
-  // scrolling while the transcript keeps its place; a piped session prints
-  // the same text unchanged.
-  const panel = buildSidebarPanel(snapshot, { density: "normal" });
-  return {
-    kind: "local",
-    output: renderSidebarPanel(panel),
-  };
+  const panel = runSidebarPanelCommand({ snapshot, contract: parsed.contract });
+  return { kind: "local", output: panel.output };
 }

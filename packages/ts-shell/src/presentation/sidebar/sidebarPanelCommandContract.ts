@@ -59,14 +59,14 @@ function invalidSidebarPanelArgs(value: string): SidebarPanelCommandParseResult 
       "- Outcome: blocked",
       "- BlockerKind: invalid-sidebar-args",
       `- Reason: Unsupported /sidebar argument: ${value || "(empty)"}`,
-      "- DoNext: Use /sidebar, /sidebar panel, /sidebar compact, /sidebar detail, or /sidebar watch.",
+      "- DoNext: Use /sidebar, /sidebar panel, /sidebar compact, /sidebar detail, or /sidebar snapshot.",
       "",
       "Supported /sidebar forms:",
-      "- /sidebar          read-only text preview",
+      "- /sidebar snapshot read-only snapshot; run again to refresh",
       "- /sidebar panel    terminal-friendly panel preview",
       "- /sidebar compact  shortest panel view",
       "- /sidebar detail   expanded panel view",
-      "- /sidebar watch    bounded live/watch panel preview",
+      "- /sidebar          snapshot without capture metadata",
     ].join("\n"),
   };
 }

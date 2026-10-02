@@ -102,7 +102,7 @@ export function createSidebarLivePanelRuntime(
       const liveSnapshot = createSidebarStateSnapshot({
         ...snapshot,
         generatedAt: updatedAt,
-        title: "Visible agent state live/watch preview",
+        title: "Visible agent state snapshot",
         recentActivity: projectSidebarActivity({
           snapshot,
           events,
@@ -122,7 +122,7 @@ export function createSidebarLivePanelRuntime(
       });
       const basePanel = buildSidebarPanel(liveSnapshot, { density, budget });
       const panel = createSidebarPanel({
-        title: "Sidebar live/watch preview",
+        title: "Visible agent state snapshot",
         density,
         budget,
         sections: [
@@ -132,7 +132,7 @@ export function createSidebarLivePanelRuntime(
             metadata,
             hasHiddenDeveloperEvents: liveSnapshot.recentActivity?.hasHiddenDeveloperEvents ?? false,
           }),
-          ...basePanel.sections,
+          ...basePanel.sections.filter((section) => section.id !== "header"),
         ],
         warnings: basePanel.warnings,
         evidence: [
@@ -174,7 +174,7 @@ function metadataSection(input: {
   readonly hasHiddenDeveloperEvents: boolean;
 }) {
   const lines: SidebarPanelLine[] = [
-    line("Live/watch preview: explicit bounded frames, not an always-on UI.", "info"),
+    line("Snapshot captured on request; run /sidebar snapshot again to refresh.", "info"),
     line(`Frame: #${input.frameNumber}; updatedAt: ${input.updatedAt}.`, "info"),
     line(
       `Events: visible ${input.metadata.eventCount}; stored ${input.metadata.totalStoredEventCount}; dropped ${input.metadata.droppedEventCount}.`,
@@ -194,7 +194,7 @@ function metadataSection(input: {
   ];
   return createSidebarPanelSection({
     id: "live-frame",
-    title: "Live frame",
+    title: "Snapshot frame",
     lines,
     severity: lines.some((item) => item.severity === "blocked")
       ? "blocked"

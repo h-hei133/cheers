@@ -29,8 +29,7 @@ export function runSidebarLivePanelCommand(
     maxFrameHistory: input.contract.frameCount,
     now: input.now,
   });
-  const frames = Array.from({ length: input.contract.frameCount }, () => runtime.tick());
-  const output = frames.map((frame) => renderSidebarLivePanelFrame(frame)).join("\n");
+  const output = renderSidebarLivePanelFrame(runtime.tick());
   return {
     output,
     evidence: [

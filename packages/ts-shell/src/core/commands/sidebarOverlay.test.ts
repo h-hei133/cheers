@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createCommandRegistry } from "./registry.js";
 import { runSidebarLocalCommand } from "./sidebarCommandRuntime.js";
 import { PAGER_THRESHOLD_ROWS } from "../../presentation/tui/chrome/pager.js";
 import type { CommandContext } from "./types.js";
@@ -33,4 +34,26 @@ describe("/sidebar", () => {
     // the threshold would silently lose that and land as transcript noise.
     expect(result.output.split("\n").length).toBeGreaterThan(PAGER_THRESHOLD_ROWS);
   });
+});
+
+it("aligns sidebar snapshot help, completions and compatibility aliases with a single capture", async () => {
+  const command = createCommandRegistry().get("sidebar")!;
+  expect(command.summary).toContain("snapshot");
+  expect(command.summary).not.toContain("live");
+  expect(command.argumentHint).toContain("snapshot");
+  const completions = command.getArgumentCompletions!("")!.map((item) => item.value);
+  expect(completions).toContain("snapshot");
+  expect(completions).not.toContain("watch");
+  expect(completions).not.toContain("live");
+  for (const args of [["snapshot"], ["watch"], ["live"]]) {
+    const result = await runSidebarLocalCommand(args, context());
+    expect(result.output).toContain("Visible agent state snapshot");
+    expect(result.output).toContain("Snapshot captured on request");
+    expect(result.output).toContain("Frame: #1");
+    expect(result.output).not.toContain("Frame: #2");
+    expect(result.output).not.toContain("live/watch");
+  }
+  const invalid = await runSidebarLocalCommand(["snapshot", "forever"], context());
+  expect(invalid.output).toContain("Outcome: blocked");
+  expect(invalid.output).toContain("/sidebar snapshot");
 });
