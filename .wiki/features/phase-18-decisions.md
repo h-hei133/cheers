@@ -574,6 +574,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W6-24 | 修正浏览器总数与历史分类口径；CTX-08/CDE-01已纠正；PRV-04按W2修复保留FIXED | 已完成文档修正 |
 | W7-25 / THM-03 | auto已落地；48个实用令牌、4套预设及旧主题继承；数字对齐裁决按实际消费者修正 | 已完成，本地验证通过 |
 | W7-30 / W8-34 / SUB-01 | 子运行按父/定义/请求最窄模式建门，报告实际模式；递归task剥除和步数有界验证；同域额外缺口继续处理 | 权限部分已完成，本地验证通过 |
+| W8-40 / TOL-10（随W7-30） | 失败原因及部分答复保留；工具阶段取消和空答复按失败结算；适配器向父模型传递error | 已完成，定向验证通过；旧result-contract脚本仍失败 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1083,7 +1084,7 @@ OAuth 只在「直连上游订阅（Copilot / Anthropic 订阅）」时有意义
 | **37** | `PRV-15` | 把服务器 `requestedDelayMs` 带到 failed step（新字段），`core/agent/loop.ts:178` 的 `retryDelayMs(policy, attempt, undefined)` 改传它 | `pi/.../provider-retry.ts:51-70`（层内消费服务器延迟） | `429` + `Retry-After: 5` ⇒ 首次重试延迟 ≥5s |
 | **38** | `SES-09`（`R10-4`） | 空/不可读锁用**远短**宽限（微秒窗口，建议 ≤5s）；或把获取等待上界提到陈旧阈值之上 | `自研`（`opencode` 的 heartbeat 治的是另一面） | 造零字节锁 ⇒ **不再** 1.2s 超时、也**不**等 60s |
 | **39** | `SES-10` | 中止时**经 event channel 发终止帧**（新增 `query.cancelled` 或让 `lifecycle.cancelled` 走 `eventObservers` 通道） | `pi/.../agent-session.ts:2361-2371`（取消是正常生命周期状态） | `--json` 下中止一回合 ⇒ 事件流**以终止帧结束**；`turn/session.test.ts:114-128` 的旧断言需改 |
-| **40** | `TOL-10` | `task` 工具终态按 `subagentFailure` 判定（有失败即 `success:false`） | `自研`（对照 `pi` 子代理扩展的结果判定） | 注入「步数耗尽但有叙述文本」的子代理 ⇒ 返回 `success:false` 且失败原因可见 |
+| **40** | `TOL-10` | 已完成：`task`终态按失败事实判定，保留部分答复；runner补足工具阶段取消，适配器保留error | 对照子代理扩展的失败结算与独立取消事实 | 步数耗尽但有叙述文本、实际工具阶段取消均返回失败；父模型收到原因 |
 | **41** | `TOL-12` | 读 MCP `annotations.readOnlyHint` 判只读；把 `/tools` 的 `ALLOWED_IN_PLAN` **从门派生**（同一常量） | `gemini-cli/.../policy-engine.ts:610`（按注解决策） | 只读 MCP 工具在 plan 模式**可调用**；`/tools` 的 plan 列与门**逐项一致**（新增一致性测试） |
 | **42** | `TOL-13` | `/tools` 接受当前工具池（含 `mcpTools`/`skills`）或至少读 live 快照 | `自研` | 配 MCP 时 `/tools` 列出的数量与模型实际一致 |
 | **43** | `CMD-09` | `/deep-research` 接模型做查询生成与综述（复用 `/btw` 的侧信道调用样板），或**去掉机制宣称**并改名 | `自研`（`pi` 无对等命令） | 报告正文**不含**「multi-agent tree search」等未做过的机制词 |
@@ -1252,3 +1253,6 @@ SUB-01完成；下一步先闭合同域已登记的task正文/工具schema/工�
 
 正文传递验证：runner与子运行2套22项通过，构建通过；双线独立APPROVE/CLEAR。撤销正文消息后专属断言失败（1失败、10通过），源码字节恢复。首次反向命令的过滤参数被npm拒绝，未进入测试，修正为整套执行后得到上述证据。
 隔离无凭据的编译运行时通过真实turn/task注册表，脚本模型确认收到多行正文；未调用真实provider。正文在runner边界原样传递，模型适配器既有的首尾空白规范化未改变。
+
+TOL-10验证：初轮6套78项通过；独立评审复现工具执行中signal取消但末条模型消息正常、runner仍称成功。对照参考实现独立跟踪取消事实，runner补足启动前与收尾检查，真实工具阶段取消回归加入后6套80项通过。最终双线APPROVE/CLEAR，构建及静态阻断门禁通过（1394文件零环，39/39配置，18/18 hooks，10/10工厂，Node floor，120项既有文档advisory）。撤销三处生产修复后16项失败、59通过，源码字节恢复。
+隔离编译运行时经真实工具注册表验证预算耗尽原因、部分文本和失败事件到达父模型。独立result-contract脚本退出1：两个测试目标已不存在，合成print/replay仍要求旧Action result等输出；readiness子门通过。恢复至本修复前生产源码时复现同组失败，归类为既有harness/setup drift与stale expectation，未削弱断言或把该门算通过；后续session/shell审计需处理其退役路径。无真实provider证据。

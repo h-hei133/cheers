@@ -3031,7 +3031,9 @@ session/store/lockStaleness.ts:29      export const STALE_LOCK_AGE_MS = 60_000
 **参考**：`pi/packages/coding-agent/src/core/agent-session.ts:2361-2371` 把取消当正常生命周期状态报出。
 **方向**：中止时经 `channel` 发一个终止事件（新增 `query.cancelled` 或让 `lifecycle.cancelled` 走通道）。
 
-### TOL-10 · `task` 工具在**子代理失败但产出了文本**时返回 `success: true` — `OPEN` `P2` `CONFIRMED`
+### TOL-10 · `task` 工具在**子代理失败但产出了文本**时返回 `success: true` — `FIXED` `P2` `CONFIRMED`
+
+**2026-10-02修复**：task按失败状态结算，原因与部分答复同时保留；空答复也明确失败。runner检测启动前及工具执行期间中止，turn适配器传递error，父模型与失败事件得到相同事实。80项定向测试、构建和独立双线复核通过；反向16项失败后恢复。隔离编译运行时验证任务正文及预算失败投影；未做真实provider。旧result-contract脚本仍有缺失测试目标和过期合成输出预期，未宣称其通过。以下保留历史定位。
 
 `core/tools/taskTool.ts:170` 记下 `subagentFailure`，但终态只按**文本有无**判定（`:238-240`）：
 

@@ -265,6 +265,17 @@ describe("adaptTools", () => {
     expect(result).toEqual({ output: "hi", isError: false });
   });
 
+  it.each([
+    [{ success: false, error: "request denied" }, "request denied"],
+    [{ success: false, error: "step budget exhausted", output: "partial notes" }, "step budget exhausted\npartial notes"],
+    [{ success: false, error: "request failed", content: "partial content" }, "request failed\npartial content"],
+    [{ success: false }, "Tool failed."],
+  ] as const)("preserves failed tool evidence through adaptation: %j", async (failed, output) => {
+    const definition: ToolDefinition = { ...registry.get("echo")!, execute: async () => failed };
+    const [tool] = adaptTools(new Map([["echo", definition]]), gate());
+    expect(await tool.execute("call_1", {})).toEqual({ output, isError: true });
+  });
+
   it("refuses arguments the model could not be parsed from", () => {
     const [tool] = adaptTools(registry, gate());
     expect(() => tool.prepareArguments!({ [PARSE_ERROR_KEY]: "Unexpected token" })).toThrow(/Malformed JSON arguments/);

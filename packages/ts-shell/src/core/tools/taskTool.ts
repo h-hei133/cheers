@@ -175,10 +175,11 @@ export function createTaskToolDefinition(
             : result.agentMode === "build" ? "BUILD (Standard)" : "not reported by runner";
           allowedTools = result.allowedTools;
           stepsTaken = result.steps;
-          if (result.failed) subagentFailure = result.failure ?? "the subagent failed";
+          if (result.failed) subagentFailure = result.failure?.trim() || "the subagent failed";
+          else if (!result.text.trim()) subagentFailure = "the subagent returned no answer";
         }
       } catch (error) {
-        subagentFailure = error instanceof Error ? error.message : String(error);
+        subagentFailure = (error instanceof Error ? error.message : String(error)).trim() || "the subagent failed";
       } finally {
         if (allocatedWorktree) {
           // Released, not merged. Changes are kept and reported below; the
@@ -211,7 +212,7 @@ export function createTaskToolDefinition(
       }
 
       const lines: string[] = [
-        `# 🤖 Subagent Task Executed (\`${subtaskId}\`)`,
+        `# 🤖 Subagent Task ${subagentFailure ? "Failed" : "Completed"} (\`${subtaskId}\`)`,
         "",
         `- **Agent Type**: \`${agentType}\` (${subagentDef?.source || "dynamic"})`,
         `- **Description**: ${description}`,
@@ -231,21 +232,14 @@ export function createTaskToolDefinition(
           : []),
         "",
         "## Subagent Execution Result:",
-        subagentResponse ||
-          (subagentFailure
-            ? `The subagent could not be run: ${subagentFailure}`
-            : // No provider configured. Saying the work was completed would be a
-              // claim nothing supports — the delegation was prepared and then
-              // never sent.
-              `The subagent was not dispatched: no provider credential is configured, so nothing was sent.`),
+        ...(subagentFailure ? [`Task failed: ${subagentFailure}`, ""] : []),
+        ...(subagentResponse.trim() ? [subagentFailure ? "Partial response:" : "Response:", subagentResponse] : []),
       ];
-      // A subagent that was never reached is a failure, and returning it as a
-      // success is how a caller ends up believing work happened that did not. The
-      // report goes in `error` because that is where a failed result carries its
-      // text; a caller reading `output` sees nothing rather than a success story.
-      return subagentResponse
-        ? approvedResult(lines.join("\n"))
-        : { success: false, error: lines.join("\n") };
+      // Partial narration is not completion evidence. Keep the failed report
+      // in the error field so adapters preserve the result's failure status.
+      return subagentFailure
+        ? { success: false, error: lines.join("\n") }
+        : approvedResult(lines.join("\n"));
     },
   };
 }

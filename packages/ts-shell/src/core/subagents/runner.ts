@@ -139,6 +139,9 @@ export async function runSubagent(
   const available = [...host.tools.keys()];
   const allowed = subagentTools(input.definition, available);
   const maxSteps = subagentMaxSteps(input.definition, host.defaultMaxSteps);
+  if (input.signal?.aborted) {
+    return { text: "", failed: true, failure: "the subagent was aborted", steps: 0, allowedTools: allowed };
+  }
 
   const selected = new Map<string, AgentTool>();
   for (const name of allowed) {
@@ -186,7 +189,10 @@ export async function runSubagent(
     .join("\n\n");
 
   const lastAssistant = [...produced].reverse().find((message) => message.role === "assistant");
-  if (lastAssistant && (lastAssistant.stopReason === "error" || lastAssistant.stopReason === "aborted")) {
+  if (input.signal?.aborted) {
+    // Cancellation may happen in a tool, after the last model message ended normally.
+    failure = "the subagent was aborted";
+  } else if (lastAssistant && (lastAssistant.stopReason === "error" || lastAssistant.stopReason === "aborted")) {
     failure = lastAssistant.errorMessage ?? `the run stopped with reason ${lastAssistant.stopReason}`;
   } else if (steps >= maxSteps && lastAssistant?.tool_calls?.length) {
     // The last step asked for tools and the budget ended there. Reported as a

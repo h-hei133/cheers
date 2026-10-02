@@ -95,3 +95,25 @@ it("does not label an entered runner as unstarted when it throws", async () => {
   expect(result.error).toContain("not reported by runner");
   expect(result.error).not.toContain("not started");
 });
+
+it("reports cancellation inside a child tool as failed while preserving prior narration", async () => {
+  const controller = new AbortController();
+  const execute = vi.fn(async () => {
+    controller.abort();
+    return { success: false, error: "Operation aborted" };
+  });
+  const runSubagent = createSubagentRunner({ defaultMaxSteps: 4, step: async () => ({
+    text: "I started inspecting", toolCalls: [{ id: "child", name: "read", args: {} }], stopReason: "stop",
+  }) }, new Map([["read", { name: "read", description: "read", argsSchema: {}, execute }]]), {
+    sessionId: "abort", workspaceRoot: process.cwd(), permissionScope: "allow-all",
+    hooks: { dispatch: async () => ({ decision: "allow" }) } as unknown as ToolGateOptions["hooks"], emit: () => {},
+  });
+  const result = await createTaskToolDefinition().execute({ description: "inspect", prompt: "inspect files" }, {
+    taskId: "abort", workspaceRoot: process.cwd(), runSubagent, abortSignal: controller.signal,
+  });
+  expect(execute).toHaveBeenCalledOnce();
+  expect(result.success).toBe(false);
+  expect(result.error).toContain("the subagent was aborted");
+  expect(result.error).toContain("Partial response:\nI started inspecting");
+  expect(result.error).not.toContain("Subagent Task Completed");
+});

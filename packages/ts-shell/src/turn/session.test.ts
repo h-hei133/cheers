@@ -499,3 +499,25 @@ it("binds the delegated reviewer mode through the real turn composition", async 
   expect(observed).toContain("Plan mode is active");
   expect(setup.persisted.some((message) => String(message.content).includes("PLAN (Read-Only)"))).toBe(true);
 });
+
+it("delivers a subagent's exhausted budget and partial narration to the parent as failure", async () => {
+  let parentObservation = "";
+  const setup = options({
+    step: scripted([
+      { text: "delegating", toolCalls: [{ id: "dispatch", name: "task", args: { description: "inspect", prompt: "inspect" } }], stopReason: "stop" },
+      (messages) => {
+        parentObservation = String(messages.find((message) => message.role === "tool")?.content);
+        return { text: "Delegation failed.", toolCalls: [], stopReason: "stop" };
+      },
+    ]),
+    subagentHost: { defaultMaxSteps: 1, step: async () => ({
+      text: "I started inspecting", toolCalls: [{ id: "child", name: "read", args: {} }], stopReason: "stop",
+    }) },
+    tools: new Map([["task", createTaskToolDefinition()], ["read", echoTool("read", "file")]]),
+  });
+  const events = await drain(runTurn(setup).events);
+  expect(events.find((event) => event.type === "tool.result" && event.toolName === "task")).toMatchObject({ success: false });
+  expect(parentObservation).toContain("Subagent Task Failed");
+  expect(parentObservation).toContain("all 1 of its steps without finishing");
+  expect(parentObservation).toContain("Partial response:\nI started inspecting");
+});

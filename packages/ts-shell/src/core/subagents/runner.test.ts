@@ -272,3 +272,18 @@ it("delivers the exact delegated task after its definition and attached context"
   expect(seen[0]?.content).toContain("caller context");
   expect(seen[0]?.content).toContain("prior notes");
 });
+
+it("does not ask the model to start an already aborted delegation", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  let called = false;
+  const result = await runSubagent({ definition: { name: "a", description: "d", systemPrompt: "s", source: "builtin" },
+    prompt: "go", workspace: "/work", signal: controller.signal }, {
+    tools: new Map(), defaultMaxSteps: 2, step: async () => {
+      called = true;
+      return { text: "answer", toolCalls: [], stopReason: "stop" };
+    },
+  });
+  expect(result).toMatchObject({ failed: true, steps: 0, failure: "the subagent was aborted" });
+  expect(called).toBe(false);
+});

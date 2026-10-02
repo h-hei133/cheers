@@ -134,7 +134,7 @@ describe("subagent subsystem", () => {
       expect(result.success).toBe(false);
       // A failed result carries its text in `error`, not `output`.
       const report = result.error ?? "";
-      expect(report).toContain("# 🤖 Subagent Task Executed");
+      expect(report).toContain("# 🤖 Subagent Task Failed");
       expect(report).toContain("code-reviewer");
       expect(report).toContain("Review auth tokens");
       expect(report).toContain("was not started");
