@@ -582,7 +582,20 @@ src/browser/sessionManager.integration.test.ts src/core/tools/browserUnified.tes
 正常关闭才报告全部释放；失败关闭继续尝试其余资源，并阻止新建会话直到清理成功。
 进程退出钩子仍为尽力清理，不参与成功证明。
 
-每波末的静态门禁、脚本测试、真实终端验收与远端结果另行补记，不从上述局部结果推定。
+W1 波末（2026-10-02）：`verify:import-cycles`（1356 文件，运行时/类型环均 0）、
+`check:config-consumers`（39/39）、`check:declarations`（18/18 hooks、10/10 factories）、
+`check:node-floor`、`verify:docs-drift:strict` 均退出 0；文档检查保留 120 个已有非前缀源码引用 advisory。
+`test:scripts` 40 项通过；`check:call-reachability` 为 7 个既有 advisory。
+`analyze:module-facades` 报 7 个既有超限模块，未触及这些模块的 W1 不将其宣称为修复。
+使用仓内 `.normproof/normproof-0.1.0.tgz` 执行 `normproof judge`，退出 0：
+循环与未解析导入义务满足，总体仍为 `partial`，函数数量义务报告 6 个模块
+（该工具与 facade gate 的扫描/计数范围不同）。
+
+编译产物真实 PTY 验收：隔离 HOME/USERPROFILE、独立临时 git workspace、合成离线配置；
+regular/fullscreen 两种界面均验证 `/clear` 更换持久会话、todo 不串会话、`/exit` 在终端仍打开时退出 0。
+JSON 模式以 `--replay-file` 指定输入，90 行全部可解析且序号连续，退出 0。
+探针最初两次失败分别是大小写断言错误、误把 TTY stdin 当作 print 输入；修正探针后全部通过，未据此修改产品。
+本波未跑完整 TypeScript 套件、未使用真实提供方；远端 CI 结果另记。
 
 ---
 

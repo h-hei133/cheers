@@ -5465,3 +5465,11 @@ catalog 外的 model 会退回 `DEFAULT_REQUEST_SHAPE`）。
 ①「机制宣称」与「实际机制」对照（`/deep-research` 宣称的机制在实现里找不到）；
 ②「同类端点的差集」（两个 Google 端点一个带 `?alt=sse` 一个不带 ⇒ 直接暴露 `PRV-13`）；
 ③「常量关系」（两处各自正确、合起来矛盾且**无测试钉住**：`SES-09`、`TOL-12`）。
+
+## [2026-10-02] implement | Phase 18 W1 六项修复与本地验收
+
+条件编辑冲突、命令非交互声明、跨回合 JSON 输出、重复请求真实文案、日志轮转数量界限、
+浏览器关闭失败分别独立提交。逐项定向测试和撤销验证通过；波末静态阻断门禁、40 项脚本测试、
+编译产物 regular/fullscreen/JSON 真实 PTY 验收通过。结构审计仍报告既有函数数量 advisory；
+本地未跑完整 TypeScript 套件，远端状态另记。详细证据见
+[裁决 §8.4](features/phase-18-decisions.md#84-实施记录)。W2–W8 继续实施。
