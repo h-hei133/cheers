@@ -10,18 +10,16 @@ import os from "node:os";
  *
  * What this does and does not achieve, stated so the next reader does not
  * over-trust it: it removes the common failure — a dead process blocking
- * forever. It is not mutual exclusion under arbitrary pause. A process frozen
- * past the age threshold (SIGSTOP, a VM pause, a long GC) is declared stale
- * while it still considers itself the owner, and a takeover then has two
- * writers on one state file. There is no fencing token to stop the first from
- * overwriting the second. Callers must not treat recovery as fencing or as
- * proof that another paused writer cannot resume.
+ * forever. A live local owner remains protected across synchronous I/O and
+ * pauses, which cannot run a timer heartbeat. Foreign or unidentifiable owners
+ * still use an age heuristic. There is no fencing token to stop an owner that
+ * was replaced externally from writing; recovery is not distributed exclusion.
  *
  * The checks are heuristics rather than proofs, and the liveness one is the
  * weakest. A PID can be reused by an unrelated process, so `kill(pid, 0)` can
- * report a live owner that has nothing to do with the lock. Two conditions are
- * required together — the hostname must match, and the lock must be old — and
- * when the answer is uncertain the caller waits rather than takes over: a
+ * report a live owner that has nothing to do with the lock. Local dead-owner
+ * recovery requires a matching hostname and an ESRCH result. When a local
+ * liveness probe is uncertain the caller waits rather than takes over: a
  * wrong wait is slow, a wrong takeover is data loss.
  */
 
@@ -43,8 +41,8 @@ export interface StaleLockTakeover {
  * Three readings, in the order that costs least to trust:
  * a lock whose owner's pid is gone (checked only when it was written on this
  * host — a pid from another machine names a process this one cannot ask
- * about); a lock older than the age threshold regardless of what its pid
- * says; and a lock that cannot be read at all *and is older than the threshold*,
+ * about); a foreign/unidentified lock older than the age threshold; and a lock
+ * that cannot be read at all *and is older than the threshold*,
  * which is a file nobody is maintaining.
  *
  * The age requirement on the third is not decoration. The holder creates the
@@ -81,27 +79,29 @@ export function isLockStale(lockPath: string, now: number = Date.now()): StaleLo
     return undefined;
   }
 
-  if (typeof owner?.createdAt === "string") {
-    const created = Date.parse(owner.createdAt);
-    if (Number.isFinite(created) && now - created >= STALE_LOCK_AGE_MS) {
+  if (typeof owner?.pid === "number" && Number.isInteger(owner.pid) && owner.pid > 0 && owner.pid <= 2 ** 31 - 1 && owner.hostname === os.hostname()) {
+    try {
+      process.kill(owner.pid, 0);
+      // Synchronous critical sections cannot run a timer heartbeat. A live
+      // local owner therefore remains protected even when it is paused.
+      return undefined;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ESRCH") return undefined;
       return {
-        reason: "lock-expired",
-        ...(typeof owner.pid === "number" ? { previousPid: owner.pid } : {}),
+        reason: "owner-dead",
+        previousPid: owner.pid,
         hostname: os.hostname(),
         at: new Date(now).toISOString(),
       };
     }
   }
 
-  if (typeof owner?.pid === "number" && owner.hostname === os.hostname()) {
-    try {
-      process.kill(owner.pid, 0);
-      // The owner answered, so the lock is live.
-      return undefined;
-    } catch {
+  if (typeof owner?.createdAt === "string") {
+    const created = Date.parse(owner.createdAt);
+    if (Number.isFinite(created) && now - created >= STALE_LOCK_AGE_MS) {
       return {
-        reason: "owner-dead",
-        previousPid: owner.pid,
+        reason: "lock-expired",
+        ...(typeof owner.pid === "number" ? { previousPid: owner.pid } : {}),
         hostname: os.hostname(),
         at: new Date(now).toISOString(),
       };
@@ -140,6 +140,8 @@ export function takeOverStaleLock(lockPath: string): boolean {
     return false;
   }
   try {
+    // The file may have changed after the caller observed an expired owner.
+    if (!isLockStale(lockPath)) return false;
     fs.rmSync(lockPath, { force: true });
     return true;
   } finally {

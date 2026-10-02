@@ -555,7 +555,8 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W3-11 / R3 / OBS-04、OBS-15 | 标准 stdio JSON-RPC，握手后可用；同一会话复用连接，配置/目录切换释放旧进程；关闭取消等待并拒绝排队调用 | 已实现，本地验证通过 |
 | W3-12 / SES-07 | 切换会话释放旧 todo；两条删除路径均在存储删除成功后释放，同 ID 更新保留 | 已实现，本地验证通过 |
 | W3-13 / CTX-09 | 五处状态持有者增加容量及丢弃标记；外层会话表同样有界，异步注入失去状态后不报告成功 | 已实现，本地验证通过 |
-| W4–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
+| W4-14 / SES-02 缓解 | 同步临界区按本机持有者存活保护，release 校验 token/文件身份，action 不重复执行；仍无 fencing | 已实现，本地验证通过 |
+| W4-15/16、SES-09、CMD-12、W5–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
 src/runtime/execution/service.test.ts src/runtime/execution/fileLock.test.ts
@@ -761,6 +762,19 @@ npm run test:ts -- src/core/tools/readCache.test.ts src/core/tools/highValueTool
 
 静态阻断门禁及 40 项脚本测试通过，既有 7 项函数数量 advisory、120 个无前缀文档源路径 advisory 保留。
 本地未跑完整 TypeScript 套件；本批提交的远端 CI 结果与前批结果分别记录。
+
+W4-14 实施前修正（2026-10-02）：`withFileLock` 的会话临界区全部同步，包含同步 I/O 与
+`Atomics.wait`。参考的定时 heartbeat 依赖异步临界区让出事件循环；直接照搬 `setInterval`
+无法在我方同步临界区续期。逐次写入另建 worker 的成本也与本项最小缓解不符。
+故用「本机仍存活的持有者不按年龄夺锁」替代同线程定时续期，只在本机 PID 明确 ESRCH 时回收，
+其他主机/缺 owner 的锁仍保留年龄兜底；随机 token 与文件身份共同校验 release。
+这是自研的同步边界适配，不宣称分布式锁或 fencing；PID 复用可能造成保守等待。
+同步 action 失败不走获取锁的重试，避免 EEXIST/EPERM 被误当锁竞争而重复执行已部分写入的操作。
+空锁短宽限 SES-09 单独提交。
+W4-14 验证：`npm run test:ts -- src/session/store/sessionFileStore.test.ts src/session/store/lockStaleness.test.ts src/session/SessionManager.test.ts`
+3 文件 / 85 项通过；`npm run build:ts` exit 0。撤销两处 owner 实现后 8 项失败、exit 1，恢复原字节。
+真实子进程 SIGSTOP + 超过年龄阈值的观察仍判本机锁存活；模拟外部替换后 SIGCONT，
+旧持有者 exit 3（ownership lost）且 successor 锁原样保留。独立复核 APPROVE / CLEAR。
 
 ### 8.5 主代理在等待复核者期间新增的六处自查（已并入正文）
 

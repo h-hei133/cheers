@@ -965,6 +965,13 @@ replayTodosFromMessages("S2", [user message "/todo add y"])       ->  []        
 
 ### SES-02 · 陈旧锁夺取**没有 fencing**，被暂停的持有者恢复后可以静默覆盖 — `OPEN` `P2` `CONFIRMED`
 
+2026-10-02 W4-14 缓解：同步临界区不能运行定时 heartbeat，改为本机有效 PID 存活时不按年龄夺锁，
+只有明确 ESRCH 判死，权限不足保守等待；无效 PID 走未知 owner 的年龄规则。
+释放前校验随机 token 与文件身份，接管在取得声明后重新检查 stale。
+action 错误不再触发整个 action 重试。SIGSTOP 实机验证本机旧锁不因年龄过期，
+模拟外部替换后旧持有者退出失败并保留接管者锁。仍无 fencing：外部替换、跨主机和
+检查到删除之间的竞争并未得到原子排除保证，故本条保持 OPEN。以下为修复前证据。
+
 `session/store/lockStaleness.ts:16` 的注释**自己承认**：「There is no fencing token
 to stop the first from …」。年龄阈值 `STALE_LOCK_AGE_MS = 60_000`（`:29`）。
 

@@ -60,54 +60,62 @@ export function withFileLock<T>(lockPath: string, action: () => T): T {
   }
 
   const startedAt = Date.now();
+  let fd: number;
   while (true) {
-    let fd: number | undefined;
     try {
       fd = fs.openSync(lockPath, "wx");
-      try {
-        fs.writeFileSync(
-          fd,
-          JSON.stringify({ pid: process.pid, hostname: os.hostname(), createdAt: new Date().toISOString() }, null, 2),
-          "utf8",
-        );
-        return action();
-      } finally {
-        if (fd !== undefined) {
-          fs.closeSync(fd);
-          fd = undefined;
-        }
-        try {
-          fs.rmSync(lockPath, { force: true });
-        } catch {
-          // ignore lock cleanup race
-        }
-      }
+      break;
     } catch (error) {
-      if (!isTransientLockError(error)) {
-        throw error;
-      }
-      // A lock whose owner is gone would otherwise hold the session until the
-      // timeout, every time, for as long as the file survives. Judged stale on
-      // the evidence in the lock itself and removed before retrying acquisition.
-      const stale = isLockStale(lockPath);
-      if (stale && takeOverStaleLock(lockPath)) {
-        continue;
-      }
-      const elapsed = Date.now() - startedAt;
-      if (elapsed >= STATE_LOCK_TIMEOUT_MS) {
+      if (!isTransientLockError(error)) throw error;
+      if (isLockStale(lockPath) && takeOverStaleLock(lockPath)) continue;
+      if (Date.now() - startedAt >= STATE_LOCK_TIMEOUT_MS) {
         throw new Error(`Session state lock timeout at ${lockPath}`);
       }
       sleepBlocking(STATE_LOCK_RETRY_DELAY_MS);
-    } finally {
-      if (fd !== undefined) {
-        try {
-          fs.closeSync(fd);
-        } catch {
-          // already closed
-        }
-      }
     }
   }
+
+  // Only acquisition is retried. An action may have partially written before
+  // throwing an I/O error with the same code as a lock acquisition failure.
+  const token = randomUUID();
+  let recorded = false;
+  let actionFailed = false;
+  try {
+    fs.writeFileSync(fd, JSON.stringify({ token, pid: process.pid, hostname: os.hostname(), createdAt: new Date().toISOString() }), "utf8");
+    recorded = true;
+    return action();
+  } catch (error) {
+    actionFailed = true;
+    throw error;
+  } finally {
+    try {
+      releaseOwnedLock(lockPath, fd, recorded ? token : undefined);
+    } catch (error) {
+      // Preserve the action's original failure, but never convert an otherwise
+      // successful write into success when ownership or cleanup was lost.
+      if (!actionFailed) throw error;
+    }
+  }
+}
+
+function releaseOwnedLock(lockPath: string, fd: number, token: string | undefined): void {
+  let identity: fs.Stats;
+  try {
+    identity = fs.fstatSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+  const current = fs.lstatSync(lockPath);
+  if (current.dev !== identity.dev || current.ino !== identity.ino || !current.isFile()) {
+    throw new Error(`Session state lock ownership lost at ${lockPath}`);
+  }
+  if (token !== undefined) {
+    const owner: unknown = JSON.parse(fs.readFileSync(lockPath, "utf8"));
+    if (!owner || typeof owner !== "object" || !("token" in owner) || owner.token !== token) {
+      throw new Error(`Session state lock ownership lost at ${lockPath}`);
+    }
+  }
+  fs.rmSync(lockPath, { force: true });
 }
 
 export function writeJsonFileAtomic(filePath: string, payload: unknown): void {

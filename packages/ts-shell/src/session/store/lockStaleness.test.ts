@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { withFileLock, writeJsonFileAtomic } from "./sessionFileStore.js";
 import {
   STALE_LOCK_AGE_MS,
@@ -14,10 +14,8 @@ import {
  * checked here is the recovery: a stale lock is detected, taken over exactly
  * by one contender at a time without leaving an unused notification sidecar.
  *
- * Equally, what is deliberately not claimed here: a lock whose owner is merely
- * paused past the age threshold is still declared stale, and the takeover
- * leaves two writers. That is recorded in the module, not contradicted by a
- * test that would have to assert mutual exclusion the design does not provide.
+ * Local liveness protects synchronous critical sections beyond the age limit.
+ * Foreign-owner recovery is still heuristic and is not a fencing guarantee.
  */
 
 function tempDir(prefix: string): string {
@@ -44,7 +42,7 @@ describe("a lock whose owner is gone", () => {
     }
   });
 
-  it("reports a stale lock that predates the timeout by its age", () => {
+  it("does not expire a live local owner while its event loop cannot renew", () => {
     const root = tempDir("stale-lock-age-");
     try {
       const lockPath = path.join(root, "state.lock");
@@ -54,13 +52,37 @@ describe("a lock whose owner is gone", () => {
         JSON.stringify({ pid: process.pid, hostname: os.hostname(), createdAt: new Date(old).toISOString() }),
       );
 
-      // The owner is this process and very much alive, which is exactly the
-      // case the age exists for: a paused owner cannot answer, and waiting
-      // past the threshold is a decision the threshold makes.
-      expect(isLockStale(lockPath)?.reason).toBe("lock-expired");
+      expect(isLockStale(lockPath)).toBeUndefined();
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it("retains age recovery for a foreign owner and waits on uncertain local liveness", () => {
+    const root = tempDir("lock-owner-");
+    const lockPath = path.join(root, "state.lock");
+    const createdAt = new Date(Date.now() - STALE_LOCK_AGE_MS - 1_000).toISOString();
+    try {
+      fs.writeFileSync(lockPath, JSON.stringify({ pid: process.pid, hostname: "another-host", createdAt }));
+      expect(isLockStale(lockPath)?.reason).toBe("lock-expired");
+      fs.writeFileSync(lockPath, JSON.stringify({ pid: 2 ** 40, hostname: os.hostname(), createdAt }));
+      expect(isLockStale(lockPath)?.reason).toBe("lock-expired");
+      fs.writeFileSync(lockPath, JSON.stringify({ pid: process.pid, hostname: os.hostname(), createdAt }));
+      const probe = vi.spyOn(process, "kill").mockImplementation(() => { throw Object.assign(new Error("not permitted"), { code: "EPERM" }); });
+      try { expect(isLockStale(lockPath)).toBeUndefined(); } finally { probe.mockRestore(); }
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it("rechecks ownership after an earlier stale observation", () => {
+    const root = tempDir("lock-race-");
+    const lockPath = path.join(root, "state.lock");
+    try {
+      fs.writeFileSync(lockPath, JSON.stringify({ pid: 2 ** 31 - 1, hostname: os.hostname() }));
+      expect(isLockStale(lockPath)).toBeDefined();
+      fs.writeFileSync(lockPath, JSON.stringify({ pid: process.pid, hostname: os.hostname() }));
+      expect(takeOverStaleLock(lockPath)).toBe(false);
+      expect(fs.existsSync(lockPath)).toBe(true);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
   });
 
   it("leaves a live lock alone, whichever way it answers", () => {
