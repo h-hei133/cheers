@@ -1,20 +1,11 @@
-import { spawn } from "node:child_process";
-import path from "node:path";
+import { forceProcessTree, terminateProcessTree } from "./termination.js";
 
-/**
- * Cross-Platform Process Tree & Orphan Daemon Manager
- *
- * Implements:
- * 1. Global detached child PID tracking registry
- * 2. Windows taskkill cascade killing (`/F /T /PID <pid>`)
- * 3. POSIX process group cascade killing (`process.kill(-pid, "SIGKILL")`)
- * 4. Automatic signal lifecycle handlers (SIGINT, SIGTERM, SIGHUP, exit)
- */
-
+/** Tracked command process groups. Catchable shutdowns await bounded cleanup. */
 class ProcessTreeManager {
   private static instance?: ProcessTreeManager;
   private readonly trackedPids = new Set<number>();
   private handlersInstalled = false;
+  private readonly pendingKills = new Map<number, Promise<void>>();
 
   // Handlers are installed on first use rather than on construction, because
   // construction happens when the module is imported. Registering signal handlers
@@ -31,12 +22,14 @@ class ProcessTreeManager {
 
   trackPid(pid: number): void {
     this.installSignalHandlers();
-    if (pid && Number.isFinite(pid) && pid > 0) {
+    if (Number.isInteger(pid) && pid > 1 && pid <= 2 ** 31 - 1) {
       this.trackedPids.add(pid);
     }
   }
 
   untrackPid(pid: number): void {
+    // A leader can close while its group still needs escalation.
+    if (this.pendingKills.has(pid) && process.platform !== "win32") return;
     this.trackedPids.delete(pid);
   }
 
@@ -44,43 +37,29 @@ class ProcessTreeManager {
     return this.trackedPids.size;
   }
 
-  killProcessTree(pid: number): void {
-    if (!pid || !Number.isFinite(pid) || pid <= 0) return;
-
-    if (process.platform === "win32") {
-      try {
-        const systemRoot = process.env.SystemRoot ?? "C:\\Windows";
-        const taskkill = path.join(systemRoot, "System32", "taskkill.exe");
-        const child = spawn(taskkill, ["/F", "/T", "/PID", String(pid)], {
-          stdio: "ignore",
-          windowsHide: true,
-        });
-        child.once("error", () => {});
-      } catch {
-        // Best-effort kill on Windows
-      }
-    } else {
-      try {
-        // Kill the whole POSIX process group first
-        process.kill(-pid, "SIGKILL");
-      } catch {
-        try {
-          // Fallback to direct PID kill
-          process.kill(pid, "SIGKILL");
-        } catch {
-          // Process already terminated
-        }
-      }
-    }
-
-    this.untrackPid(pid);
+  killProcessTree(pid: number): Promise<void> {
+    const pending = this.pendingKills.get(pid);
+    if (pending) return pending;
+    const result = terminateProcessTree(pid)
+      .then(() => { this.trackedPids.delete(pid); })
+      .finally(() => { this.pendingKills.delete(pid); });
+    this.pendingKills.set(pid, result);
+    return result;
   }
 
-  killAllTracked(): void {
-    for (const pid of this.trackedPids) {
-      this.killProcessTree(pid);
+  async killAllTracked(): Promise<void> {
+    const pids = new Set([...this.trackedPids, ...this.pendingKills.keys()]);
+    const results = await Promise.allSettled([...pids].map((pid) => this.killProcessTree(pid)));
+    const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+    if (failures.length) throw new AggregateError(failures.map((result) => result.reason), "Tracked process cleanup failed");
+  }
+
+  private forceAllTracked(): void {
+    const pids = process.platform === "win32" ? this.trackedPids
+      : new Set([...this.trackedPids, ...this.pendingKills.keys()]);
+    for (const pid of pids) {
+      try { forceProcessTree(pid); } catch { /* No asynchronous recovery is possible during exit. */ }
     }
-    this.trackedPids.clear();
   }
 
   private installSignalHandlers(): void {
@@ -88,13 +67,13 @@ class ProcessTreeManager {
     this.handlersInstalled = true;
 
     const cleanup = () => {
-      this.killAllTracked();
+      void this.killAllTracked().catch(() => { /* CLI shutdown observes and reports cleanup failures. */ });
     };
 
     process.once("SIGINT", cleanup);
     process.once("SIGTERM", cleanup);
     process.once("SIGHUP", cleanup);
-    process.once("exit", cleanup);
+    process.once("exit", () => this.forceAllTracked());
   }
 }
 
@@ -105,9 +84,9 @@ export function trackChildPid(pid: number): void {
 export function untrackChildPid(pid: number): void {
   processTree.untrackPid(pid);
 }
-export function killProcessTree(pid: number): void {
-  processTree.killProcessTree(pid);
+export function killProcessTree(pid: number): Promise<void> {
+  return processTree.killProcessTree(pid);
 }
-export function killAllTrackedProcesses(): void {
-  processTree.killAllTracked();
+export function killAllTrackedProcesses(): Promise<void> {
+  return processTree.killAllTracked();
 }

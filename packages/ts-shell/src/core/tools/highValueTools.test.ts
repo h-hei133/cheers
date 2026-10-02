@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -8,6 +8,7 @@ import { createTodoToolDefinition } from "./todoTool.js";
 import { createTaskToolDefinition } from "./taskTool.js";
 import { runTodoCommand } from "../commands/todoCommandRuntime.js";
 import { createDefaultExecutionService } from "../../runtime/execution/service.js";
+import { backgroundTasks } from "../shell/background/tasks.js";
 import { createCoreToolRegistry } from "./registry.js";
 describe("High-Value Modern Built-in Tools Subsystem", () => {
   it("states the multi-file failure and explicit recovery boundary in the edit tool contract", () => {
@@ -16,6 +17,24 @@ describe("High-Value Modern Built-in Tools Subsystem", () => {
     expect(edit?.description).toContain("multi-file edits are not atomic");
     expect(edit?.description).toContain("earlier changes remain");
     expect(edit?.description).toContain("/restore to explicitly restore individual recorded edits");
+  });
+  it("waits for a background stop request without claiming observed exit", async () => {
+    let release!: (value: boolean) => void;
+    const spy = vi.spyOn(backgroundTasks, "stop").mockReturnValue(new Promise(resolve => { release = resolve; }));
+    try {
+      const tool = createCoreToolRegistry().get("taskStop")!;
+      let finished = false;
+      const result = tool.execute({ taskId: "bg_test" }, { workspaceRoot: tempDir, taskId: "stop" })
+        .then(value => { finished = true; return value; });
+      await Promise.resolve();
+      expect(finished).toBe(false);
+      release(true);
+      expect(await result).toMatchObject({ success: true, output: expect.stringContaining("Stop requested") });
+      expect((await result).output).not.toContain("Stopped");
+      spy.mockResolvedValue(false);
+      expect(await tool.execute({ taskId: "bg_missing" }, { workspaceRoot: tempDir, taskId: "stop" }))
+        .toMatchObject({ success: false });
+    } finally { spy.mockRestore(); }
   });
   let tempDir: string;
 

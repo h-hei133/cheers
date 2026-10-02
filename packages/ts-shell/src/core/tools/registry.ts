@@ -945,7 +945,7 @@ function createTaskStopToolDefinition(): ToolDefinition {
     async execute(args) {
       const id = typeof args.taskId === 'string' ? args.taskId.trim() : ''
       if (!id) return deniedResult('Error: taskStop needs a taskId.')
-      const stopped = backgroundTasks.stop(id)
+      const stopped = await backgroundTasks.stop(id)
       if (!stopped) {
         const task = backgroundTasks.get(id)
         return deniedResult(
@@ -954,7 +954,7 @@ function createTaskStopToolDefinition(): ToolDefinition {
             : `Error: no background command named '${id}'.`,
         )
       }
-      return approvedResult(`Stopped ${id}.`)
+      return approvedResult(`Stop requested for ${id}. Check taskOutput for the observed result.`)
     },
   }
 }

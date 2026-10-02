@@ -105,7 +105,7 @@ describe("stopping a command", () => {
   it("ends a command that would otherwise run on", async () => {
     const task = backgroundTasks.start({ command: "sleep 30", cwd: await somewhere() });
 
-    expect(backgroundTasks.stop(task.id)).toBe(true);
+    expect(await backgroundTasks.stop(task.id)).toBe(true);
     await until(() => backgroundTasks.get(task.id)?.state !== "running");
     expect(backgroundTasks.get(task.id)!.state).toBe("killed");
   });
@@ -117,7 +117,7 @@ describe("stopping a command", () => {
     const task = backgroundTasks.start({ command: "sh -c 'sleep 30' & sleep 30", cwd: await somewhere() });
     await new Promise((resolve) => setTimeout(resolve, 200));
 
-    backgroundTasks.stop(task.id);
+    await backgroundTasks.stop(task.id);
     await until(() => backgroundTasks.get(task.id)?.state !== "running");
     expect(backgroundTasks.get(task.id)!.state).toBe("killed");
   });
@@ -125,14 +125,14 @@ describe("stopping a command", () => {
   it("refuses a name it does not know rather than reporting success", async () => {
     // A caller that believes it stopped something and did not has a process still
     // running under a name it will not ask about again.
-    expect(backgroundTasks.stop("bg_does_not_exist")).toBe(false);
+    expect(await backgroundTasks.stop("bg_does_not_exist")).toBe(false);
   });
 
   it("reports a command that has already ended", async () => {
     const task = backgroundTasks.start({ command: "exit 0", cwd: await somewhere() });
     await until(() => backgroundTasks.get(task.id)?.state !== "running");
 
-    expect(backgroundTasks.stop(task.id)).toBe(false);
+    expect(await backgroundTasks.stop(task.id)).toBe(false);
   });
 });
 
@@ -141,7 +141,7 @@ describe("what a reader is shown", () => {
     const task = backgroundTasks.start({ command: "sleep 30", cwd: await somewhere() });
 
     expect(renderTask(backgroundTasks.get(task.id)!)).toContain("still running");
-    backgroundTasks.stop(task.id);
+    await backgroundTasks.stop(task.id);
     await until(() => backgroundTasks.get(task.id)?.state !== "running");
   });
 

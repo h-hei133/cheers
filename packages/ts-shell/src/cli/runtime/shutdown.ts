@@ -1,4 +1,5 @@
 import type { EventEmitter } from "node:events";
+import { killAllTrackedProcesses } from "../../core/shell/platform/processTree.js";
 
 /** Keep asynchronous resource cleanup ahead of catchable CLI exits. */
 export function createCliShutdown(input: {
@@ -27,7 +28,14 @@ export function createCliShutdown(input: {
     for (const stream of input.streams ?? []) stream.off("error", onStreamError);
   };
   const close = async (): Promise<void> => {
-    try { await input.close(); }
+    try {
+      const results = await Promise.allSettled([
+        Promise.resolve().then(() => input.close()),
+        killAllTrackedProcesses(),
+      ]);
+      const failure = results.find((result) => result.status === "rejected");
+      if (failure?.status === "rejected") throw failure.reason;
+    }
     finally { if (!exiting) removeHandlers(); }
   };
   const exit = (code = 0): void => {

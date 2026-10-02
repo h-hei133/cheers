@@ -45,7 +45,7 @@
    - *Pi 的精妙设计*：
      - 在 `utils/shell.ts` 维护全局 `trackedDetachedChildPids` 注册表。
      - Windows 下自动调用 `taskkill.exe /F /T /PID <pid>` 级联杀死全进程树。
-     - POSIX 下自动配置 `process.kill(-pid, "SIGKILL")` 杀死全进程组，并在退出钩子中保证 100% 清理。
+     - POSIX 下用 `process.kill(-pid, "SIGKILL")` 向进程组发信号，退出钩子提供尽力清理；不保证回收已脱离进程组的子孙，也不保证父进程被 SIGKILL/OOM 后运行清理。信号发送成功不等于已观察整树退出。
 2. **Stdio 继承句柄防悬挂 (`waitForChildProcess`)**：
    - *Pi 的精妙设计*：引入 `EXIT_STDIO_GRACE_MS = 100` 空闲宽限计时器，防止子进程已退出但孙进程依然占有 stdio 管道导致的永久挂起。
 

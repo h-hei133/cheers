@@ -49,30 +49,51 @@ function collectStreamed(options: {
     let stderr = ''
     let timedOut = false
     let cancelled = false
+    let settled = false
+    let termination: Promise<void> | undefined
+    let timer: ReturnType<typeof setTimeout> | undefined
     const finish = (): void => {
-      if (child.pid) untrackChildPid(child.pid)
+      clearTimeout(timer)
       options.abortSignal?.removeEventListener('abort', onAbort)
     }
+    const fail = (message: string, details: Record<string, unknown> = {}): void => {
+      if (settled) return
+      settled = true
+      finish()
+      reject(Object.assign(new Error(message), {
+        stdout, stderr: stderr || message, timedOut, cancelled, ...details,
+      }))
+    }
     const stop = (): void => {
-      // The group, not just the child: a shell's children outlive it otherwise.
-      if (child.pid) killProcessTree(child.pid)
-      else child.kill('SIGKILL')
+      if (termination || settled) return
+      // Cleanup can fail without a close event. Settle that failure independently
+      // and keep the PID tracked so shutdown can retry it.
+      termination = (child.pid ? killProcessTree(child.pid) : Promise.resolve().then(() => {
+        child.kill('SIGKILL')
+      })).catch((error: unknown) => {
+        const reason = cancelled ? 'Command cancelled' : 'Command timed out'
+        const message = `${reason}; process termination failed and remains unverified: ${error instanceof Error ? error.message : String(error)}`
+        fail(message, { terminationFailed: true, stderr: [stderr, message].filter(Boolean).join('\n') })
+        child.stdout?.destroy()
+        child.stderr?.destroy()
+        child.unref()
+      })
     }
     const onAbort = (): void => {
       cancelled = true
       stop()
     }
     if (child.pid) trackChildPid(child.pid)
-    if (options.abortSignal) {
-      if (options.abortSignal.aborted) onAbort()
-      else options.abortSignal.addEventListener('abort', onAbort, { once: true })
-    }
-    const timer = options.timeoutMs
+    timer = options.timeoutMs
       ? setTimeout(() => {
           timedOut = true
           stop()
         }, options.timeoutMs)
       : undefined
+    if (options.abortSignal) {
+      if (options.abortSignal.aborted) onAbort()
+      else options.abortSignal.addEventListener('abort', onAbort, { once: true })
+    }
     child.stdout?.on('data', (chunk: Buffer) => {
       const text = chunk.toString()
       stdout += text
@@ -83,51 +104,26 @@ function collectStreamed(options: {
       stderr += text
       options.onOutput(text)
     })
-    child.on('error', (error) => {
-      clearTimeout(timer)
-      finish()
-      reject(error)
-    })
+    child.on('error', (error) => fail(error.message))
     child.on('close', (code, signal) => {
-      clearTimeout(timer)
       finish()
-      if (cancelled) {
-        // Marked rather than inferred from the exit code: a killed process
-        // reports whichever signal arrived, and the caller needs to tell "the
-        // user stopped this" apart from "it ran too long" and "it failed".
-        reject(
-          Object.assign(new Error('Command cancelled'), {
-            stdout,
-            stderr: stderr || 'Command cancelled',
-            code,
-            killed: true,
-            cancelled: true,
-            signal,
-          }),
-        )
-        return
-      }
-      if (code === 0) {
+      // Windows retries address a root PID, not a persistent group. Once that
+      // child has closed its PID must not be reused for a later taskkill.
+      if (child.pid && process.platform === 'win32') untrackChildPid(child.pid)
+      // The leader can exit before its descendants. Do not bypass the group's
+      // grace period or hide a failed termination behind the leader's exit 0.
+      void Promise.resolve(termination).then(() => {
+        if (settled) return
+        if (child.pid && process.platform !== 'win32') untrackChildPid(child.pid)
+        if (cancelled || timedOut || code !== 0) {
+          const message = cancelled ? 'Command cancelled' : timedOut ? 'Command timed out'
+            : `Command failed with exit code ${code ?? 'null'}`
+          fail(message, { code, signal })
+          return
+        }
+        settled = true
         resolve({ stdout, stderr })
-        return
-      }
-      // Shaped like the error execFile rejects with, so the catch block that
-      // builds the failure result handles both paths the same way.
-      //
-      // `timedOut` is carried as its own field rather than left to be inferred
-      // from `killed` or the signal name. A process terminated by a signal this
-      // code did not send — an operator's SIGTERM, an OOM SIGKILL — is a failure,
-      // not a timeout, and the signal alone cannot tell the two apart.
-      reject(
-        Object.assign(new Error(`Command failed with exit code ${code ?? 'null'}`), {
-          stdout,
-          stderr: stderr || (timedOut ? 'Command timed out' : ''),
-          code,
-          killed: timedOut,
-          timedOut,
-          signal,
-        }),
-      )
+      })
     })
   })
 }
@@ -171,13 +167,14 @@ export async function executeLocally(options: {
       killed?: boolean
       timedOut?: boolean
       cancelled?: boolean
+      terminationFailed?: boolean
       signal?: string | null
       message?: string
     }
 
     // A stop is reported as the stop it was. Guessing from `killed` alone told a
     // user who cancelled a command that it had timed out.
-    if (execError.cancelled) {
+    if (execError.cancelled && !execError.terminationFailed) {
       return {
         status: 'cancelled',
         exitCode: typeof execError.code === 'number' ? execError.code : null,
@@ -190,7 +187,7 @@ export async function executeLocally(options: {
     // instead reported an operator's `SIGTERM` — or any externally delivered
     // signal — as the command having run too long, which is a different fact and
     // sends the reader looking in the wrong place.
-    if (execError.timedOut) {
+    if (execError.timedOut && !execError.terminationFailed) {
       return {
         status: 'timeout',
         exitCode: typeof execError.code === 'number' ? execError.code : null,

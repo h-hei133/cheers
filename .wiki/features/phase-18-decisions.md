@@ -561,7 +561,8 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W4-16 / SES-06 | 删除旧显示规则和未消费投影；保留历史阻断/写入状态恢复 | 已实现，本地验证通过 |
 | CMD-12 | 来源列表持久化、失败显式显示、移除无实现的搜索承诺 | 已实现，本地验证通过 |
 | W5-17 / TOL-06 | 明确每文件提交边界和显式恢复入口 | 已实现，本地验证通过 |
-| W5-18–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
+| W5-18 / TOL-08 | 有界 TERM/KILL 与 Windows launcher 等待；失败可见、退出等待 pending | 已实现，本地验证通过 |
+| W5-19–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
 src/runtime/execution/service.test.ts src/runtime/execution/fileLock.test.ts
@@ -788,6 +789,20 @@ SES-09 同域独立修复：空/半写 JSON 的创建宽限为 500ms，小于 1.
 等 I/O 读失败不推断死亡，缺身份时任意暂停仍是无 fencing 的已知边界。锁测试 2 文件 / 22 项通过，
 涵盖新建空锁/半写锁实际恢复及精确宽限边界。改回 60s 后 2 项失败，exit 1，恢复原字节。
 独立代码复核 APPROVE、架构 CLEAR；正文与旧注释统一为「恢复启发式」，不把年龄称为死亡证明。
+
+
+W5-18 / TOL-08（2026-10-02）：保留既有执行 owner，进程组管理器只管跟踪/去重，OS 终止适配放在
+`core/shell/platform/termination.ts`。参考 shell 路径使用立即 KILL/不等 taskkill，未解决本条；另一执行
+路径的 TERM→延迟→KILL 决策采纳，但不采用 `child.killed` 判断退出（该字段只表示信号发送）。
+本仓用组存在性观察，1s 后升级；Windows 等待 launcher close，5s 超时失败。所有调用者已迁移为 await；
+CLI 对资源与进程清理 allSettled 后才退出，失败退出码 1。失败目标保留跟踪（Windows root 已 close 则移除旧 PID，不再启动新的 taskkill）；前台清理失败独立结算、
+保留已有输出和触发原因，不依赖可能永不发生的 close。后台只报告 Stop requested。
+不保证逃逸子孙/父进程 SIGKILL 后回收，POSIX Promise 也不宣称整个树已退出，详见登记册 TOL-08。
+
+验证：9文件87项定向测试通过；TypeScript构建、零循环通过，
+函数 ceiling 保留原7项 advisory。撤销宽限和Windows等待后6项失败（伴随1项测试拒绝诊断），源码逐字恢复。
+实际编译CLI：常规PTY /exit 给TERM handler完成flush后退出0；全屏PTY SIGTERM 升级忽略TERM的子进程后退出143；
+JSON /exit退出0、最终复跑20行均可解析，受控子进程均不再运行。未做Windows实机或真实提供方验证。独立代码/架构复核 APPROVE / CLEAR。
 
 ### 8.5 主代理在等待复核者期间新增的六处自查（已并入正文）
 

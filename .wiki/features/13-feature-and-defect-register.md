@@ -1933,25 +1933,24 @@ something to take back」。所以**并非「零回滚能力」**——
 **这与本仓对 `state.json` 的处置（`withFileLock` + owner 记录）是两种标准**，
 值得一次统一判断。
 
-### TOL-08 · 进程树回收：`setsid` 孙进程逃逸、Windows `taskkill` 未 await、父进程被 `SIGKILL` 时全漏 — `OPEN` `P2` `CONFIRMED`
+### TOL-08 · 进程组有界终止；逃逸子孙与父进程 SIGKILL 不保证回收 — `PARTIAL` `P2` `CONFIRMED`
 
-三处独立问题，均已在代码中核实：
+W5-18（2026-10-02）完成本阶段约定的三项：
 
-1. **孙进程逃逸**：`runtime/execution/local.ts:46` 用
-   `detached: process.platform !== 'win32'` 建**新进程组**；
-   `core/shell/platform/processTree.ts:65` 用 `process.kill(-pid, "SIGKILL")` 杀**该组**。
-   ⇒ **任何自己 `setsid()`/`setpgid()` 出去的孙子进程不在组内，会被 init 收养并继续运行。**
-   （这不是疏漏——注释说明 `detached` 正是为了「整棵树可被信号」而加的，
-   但它对**主动脱离进程组**的孙进程无效。）
-2. **Windows 分支未 await**：`processTree.ts:54-58` `spawn(taskkill, [...])` **不 await**，
-   只挂 `child.once("error")`。若 Node 紧接着退出，**taskkill 可能根本没跑**。
-3. **父进程被不可捕获信号终止时**：`process.once("exit")` 处理器**不会执行**，
-   `detached` 的子进程**永久存活**。子代理点出 `SIGKILL`/OOM 这一类。
+1. Windows 等待 `taskkill /F /T /PID` 的退出，最多 5s；启动失败、非零退出、超时均失败。
+2. POSIX 对执行器建立的独立进程组先发 SIGTERM，观察该组最多 1s，仍存在时发 SIGKILL。
+   只把 ESRCH 当作不存在；不退回直接 PID，避免原 leader 退出后误杀复用的 PID。
+   CLI 退出与前台超时/取消、后台 stop 均等待清理请求完成；leader 提前 close 不能跳过升级。
+   清理失败保留尚存目标供退出重试（Windows 根进程一旦观察到 close 即移除旧 PID），执行器即使收不到 close 也会返回明确失败，不无限等待。
+3. **不保证**收回调用 `setsid` / `setpgid` 脱离原组的子孙；**不保证**父进程被 SIGKILL/OOM
+   等不可捕获终止后回收其子孙。没有引入 subreaper、cgroup 或父死亡信号机制。
 
-**方向**：(1) Linux 上考虑 `PR_SET_CHILD_SUBREAPER` 或 cgroup/PID namespace
-（本册标 `INFERENCE`——未验证 Node 是否暴露该能力）；
-(2) `await` taskkill 的结果；(3) 先 `SIGTERM` 再 `SIGKILL`（当前**直接强杀**，
-子进程没有优雅退出的机会）。
+承诺边界：POSIX 清理 Promise 完成表示组已消失或信号序列已发送；**SIGKILL 发送成功不是退出证明**。
+前台执行额外观察直属子进程 close；后台 `taskStop` 只报告请求，状态仍由 child close 更新。
+Node exit 事件只能同步强杀兜底，不执行异步宽限。保留 PARTIAL 表示整树保证没有升级。
+
+本地覆盖 Windows launcher 模拟、真实 POSIX 宽限/升级、超时 handler exit 0、失败无 close、pending
+退出等待。实际编译 CLI 的常规/全屏 PTY 与 JSON 验证了受控子进程清理；**未做 Windows 实机验收**。
 
 ### TOL-09 · `edit/**` 的 12 个运行期死码 —— **已由 CDE-05 覆盖**，不重复登记 — `STALE`
 

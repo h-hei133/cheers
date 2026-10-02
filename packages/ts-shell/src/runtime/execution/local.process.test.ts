@@ -1,0 +1,38 @@
+import { expect, it } from "vitest";
+import { executeLocally } from "./local.js";
+
+it.skipIf(process.platform === "win32").each([false, true])(
+  "allows graceful TERM exit and escalates an ignoring child (ignores: %s)", async ignores => {
+    const controller = new AbortController();
+    let pid: number | undefined;
+    let output = "";
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    const script = [
+      `process.on("SIGTERM", () => { process.stdout.write("TERM\\n"); ${ignores ? "" : 'setTimeout(() => { process.stdout.write("flushed\\n"); process.exit(0); }, 150);'} });`,
+      'setInterval(() => {}, 1000);',
+      'process.stdout.write(`READY:${process.pid}\\n`);',
+    ].join("\n");
+    try {
+      const result = executeLocally({ command: process.execPath, args: ["-e", script], cwd: process.cwd(),
+        abortSignal: controller.signal, onOutput: chunk => {
+          output += chunk;
+          const match = /READY:(\d+)\n/.exec(output);
+          if (match && !controller.signal.aborted) { pid = Number(match[1]); controller.abort(); }
+        },
+      });
+      const value = await Promise.race([result, new Promise<never>((_, reject) => {
+        deadline = setTimeout(() => reject(new Error("child cleanup did not finish")), 5000);
+      })]);
+      expect(value.status).toBe("cancelled");
+      expect(value.stdout).toContain("TERM\n");
+      if (!ignores) {
+        expect(value.stdout).toContain("flushed\n");
+        expect(value.exitCode).toBe(0);
+      } else expect(value.exitCode).toBeNull();
+      expect(() => process.kill(pid!, 0)).toThrow();
+    } finally {
+      clearTimeout(deadline);
+      if (pid) { try { process.kill(-pid, "SIGKILL"); } catch { /* Already reaped. */ } }
+    }
+  },
+);

@@ -61,7 +61,7 @@ export interface BackgroundRunner {
   list(): readonly BackgroundTask[];
   get(id: string): BackgroundTask | undefined;
   /** Stop one, which signals its whole process group. */
-  stop(id: string): boolean;
+  stop(id: string): Promise<boolean>;
   /**
    * Called when a command ends, so the conversation can be told.
    *
@@ -234,10 +234,10 @@ export class TaskRegistry {
    * children outlive it — and they are the ones holding the pipes, which is how a
    * stopped command leaves a caller waiting for output that will never come.
    */
-  stop(id: string): boolean {
+  async stop(id: string): Promise<boolean> {
     const child = this.children.get(id);
     if (!child) return false;
-    if (child.pid) killProcessTree(child.pid);
+    if (child.pid) await killProcessTree(child.pid);
     else child.kill("SIGKILL");
     return true;
   }
