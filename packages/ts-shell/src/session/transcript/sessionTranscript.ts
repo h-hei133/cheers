@@ -9,6 +9,7 @@ import {
   legacyTranscriptEntryId,
   transcriptEventToSessionMessage,
   transcriptVersionOf,
+  TRANSCRIPT_FORMAT_VERSION,
   type TranscriptEvent,
   type TranscriptHeader,
 } from "../sessionEventCodec.js";
@@ -25,6 +26,8 @@ export interface ReadTranscript {
   /** The format the file was written in; 0 when it has no header. */
   readonly version: number;
   readonly events: readonly TranscriptEvent[];
+  readonly unreadableLines: number;
+  readonly warnings: readonly string[];
 }
 
 export function readTranscriptEvents(transcriptPath: string): TranscriptEvent[] {
@@ -42,16 +45,22 @@ export function readTranscriptEvents(transcriptPath: string): TranscriptEvent[] 
  */
 export function readTranscript(transcriptPath: string): ReadTranscript {
   if (!fs.existsSync(transcriptPath)) {
-    return { version: 0, events: [] };
+    return { version: 0, events: [], unreadableLines: 0, warnings: [] };
   }
 
   const events: TranscriptEvent[] = [];
   let header: TranscriptHeader | undefined;
   let lineNumber = 0;
+  let unreadableLines = 0;
+  const warnings = new Set<string>();
   for (const line of fs.readFileSync(transcriptPath, "utf8").split("\n")) {
     if (!line) continue;
     const decoded = classifyTranscriptLine(line);
     if (decoded.kind === "header") {
+      if (header || lineNumber > 0) warnings.add("An unexpected transcript header was found; file provenance is uncertain.");
+      if (!Number.isInteger(decoded.header.version) || decoded.header.version < 0 || decoded.header.version > TRANSCRIPT_FORMAT_VERSION) {
+        warnings.add("The transcript format version is unsupported; only recognized entries are shown.");
+      }
       // Only the first one counts. A second can only come from a concatenated
       // file, and letting it overwrite the real header would report the wrong
       // version for the entries that follow it.
@@ -65,9 +74,12 @@ export function readTranscript(transcriptPath: string): ReadTranscript {
           ? { ...decoded.event, id: legacyTranscriptEntryId(lineNumber) }
           : decoded.event,
       );
+    } else {
+      unreadableLines += 1;
     }
   }
-  return { version: transcriptVersionOf(header), events };
+  if (unreadableLines > 0) warnings.add(`${unreadableLines} unreadable transcript ${unreadableLines === 1 ? "line was" : "lines were"} omitted.`);
+  return { version: transcriptVersionOf(header), events, unreadableLines, warnings: [...warnings] };
 }
 
 /**

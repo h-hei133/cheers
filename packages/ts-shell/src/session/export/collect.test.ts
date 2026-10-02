@@ -7,6 +7,7 @@ import { writeSessionMetadataRecord, writeSessionRecord } from "../store/session
 import { writeSessionState } from "../store/sessionStateStore.js";
 import { appendSessionTurn, appendTranscriptEvent } from "../transcript/sessionTranscript.js";
 import { gatherExport } from "./collect.js";
+import { renderExportHtml } from "./html.js";
 import type { Session } from "../schema/sessionRecord.js";
 
 /**
@@ -86,6 +87,41 @@ describe("gathering a session for export", () => {
     expect(result.payload.leafId).toBeTruthy();
   });
 
+  it("exports a long chronological fallback without nested serialization limits", () => {
+    writeSession([{ role: "user", content: "start" }]);
+    const layout = projectSessionFileLayout({ sessionsDir: createSessionStoreLayout(home).sessionsDir, sessionId });
+    const events = Array.from({ length: 4000 }, (_, index) => ({ type: "message", id: `entry-${index}`, role: "user", content: "short", timestamp: "2026-09-25T00:00:00.000Z" }));
+    fs.writeFileSync(layout.transcriptPath, events.map(event => JSON.stringify(event)).join("\n") + "\n");
+    fs.writeFileSync(layout.statePath, "broken state");
+    const gathered = gatherExport({ sessionId, workspace });
+    expect(gathered.ok).toBe(true);
+    if (!gathered.ok) return;
+    expect(() => renderExportHtml(gathered.payload)).not.toThrow();
+    expect(gathered.payload.warnings).toContain("Branch history is unavailable; showing transcript order.");
+  });
+
+  it("reports skipped malformed lines instead of claiming a complete conversation", () => {
+    writeSession([{ role: "user", content: "readable" }]);
+    const layout = projectSessionFileLayout({ sessionsDir: createSessionStoreLayout(home).sessionsDir, sessionId });
+    fs.appendFileSync(layout.transcriptPath, "{malformed\n");
+    const gathered = gatherExport({ sessionId, workspace });
+    expect(gathered.ok).toBe(true);
+    if (!gathered.ok) return;
+    expect(gathered.payload.warnings).toContain("1 unreadable transcript line was omitted.");
+  });
+
+  it("reports unsupported and duplicate headers without losing readable messages", () => {
+    writeSession([{ role: "user", content: "readable" }]);
+    const layout = projectSessionFileLayout({ sessionsDir: createSessionStoreLayout(home).sessionsDir, sessionId });
+    fs.appendFileSync(layout.transcriptPath, JSON.stringify({ type: "session", id: sessionId, cwd: workspace, timestamp: "t", version: 999 }) + "\n");
+    const result = gatherExport({ sessionId, workspace });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.entries).toHaveLength(1);
+    expect(result.payload.warnings).toContain("An unexpected transcript header was found; file provenance is uncertain.");
+    expect(result.payload.warnings).toContain("The transcript format version is unsupported; only recognized entries are shown.");
+  });
+
   it("gives every tree node a preview so the sidebar reads without the body", () => {
     writeSession([
       { role: "user", content: "explain the health endpoint" },
@@ -125,6 +161,37 @@ describe("gathering a session for export", () => {
     expect(result.ok === false && result.reason).toContain("not found");
   });
 
+  it("scrubs structured credentials and metadata without merging entry identities", () => {
+    writeSession([{ role: "user", content: "start" }]);
+    const layout = projectSessionFileLayout({ sessionsDir: createSessionStoreLayout(home).sessionsDir, sessionId });
+    const events = [
+      { type: "message", id: "token=FAKE_ID_ONE", role: "assistant", timestamp: "token=FAKE_TIME", content: '{"password":"FAKE_JSON_SECRET","keep":"visible"}', origin: { model: "token=FAKE_MODEL", provider: "secret=FAKE_PROVIDER" }, tool_calls: [{ id: "token=FAKE_CALL", type: "function", function: { name: "token=FAKE_NAME", arguments: '{"api_key":"FAKE_ARGUMENT","path":"keep.txt"}' } }] },
+      { type: "message", id: "token=FAKE_ID_TWO", role: "tool", timestamp: "t2", content: "result", tool_call_id: "token=FAKE_CALL" },
+    ];
+    fs.writeFileSync(layout.transcriptPath, events.map(event => JSON.stringify(event)).join("\n") + "\n");
+    fs.writeFileSync(layout.statePath, "{}");
+    const result = gatherExport({ sessionId, workspace: "token=FAKE_WORKSPACE" });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(JSON.stringify(result.payload)).not.toContain("FAKE_");
+    expect(result.payload.entries[0]!.content).toContain('"keep":"visible"');
+    expect(result.payload.entries[0]!.toolCalls![0]!.arguments).toContain('"path":"keep.txt"');
+    expect(result.payload.entries[0]!.id).not.toBe(result.payload.entries[1]!.id);
+    expect(result.payload.entries[0]!.toolCalls![0]!.id).toBe(result.payload.entries[1]!.toolCallId);
+    expect(result.payload.tree[1]!.parentId).toBe(result.payload.tree[0]!.id);
+  });
+
+  it.each([{ entries: {} }, { entries: [null] }, { entries: [{ id: "x" }, { id: "x" }] }])("degrades an invalid branch snapshot: %j", thread => {
+    writeSession([{ role: "user", content: "readable" }]);
+    const layout = projectSessionFileLayout({ sessionsDir: createSessionStoreLayout(home).sessionsDir, sessionId });
+    fs.writeFileSync(layout.statePath, JSON.stringify({ thread }));
+    const result = gatherExport({ sessionId, workspace });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.warnings).toContain("Branch history is unavailable; showing transcript order.");
+    expect(result.payload.entries[0]!.content).toBe("readable");
+  });
+
   it("refuses a session with no conversation recorded", () => {
     // A file with no conversation in it, described as an export of one, is the
     // failure this replaces.
@@ -148,16 +215,12 @@ describe("gathering a session for export", () => {
     expect(result.ok === false && result.reason).toContain("no conversation");
   });
 
-  it("carries a tool result under the call it answers", () => {
-    // The page shows a result inside its call, so it must be reachable by call
-    // id rather than by scanning every entry.
+  it("leaves result association to the selected path in the page", () => {
     writeSession([{ role: "user", content: "ask" }]);
 
     const result = gatherExport({ sessionId, workspace });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    // No tool calls in this session, so the map is present and empty — the
-    // page reads it unconditionally.
-    expect(result.payload.results).toEqual({});
+    expect(result.payload).not.toHaveProperty("results");
   });
 });

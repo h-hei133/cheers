@@ -1389,3 +1389,40 @@ JSON凭据字段/元信息脱敏、损坏数据降级标识、codec嵌套输入�
 `verify:result-contract`保持exit1（旧路径和旧输出断言）；首轮误用旧脚本仓外默认测试路径，随后显式设置
 `CHEERS_SYNTHETIC_HOME`和`CHEERS_TEST_ROOT`为仓内`.tmp/tmp`重跑，失败相同；不把TMPDIR当作该脚本的完整隔离配置。
 前批`4d651202`的CI 37029534144与Architecture Watch 37029534173均成功。
+
+### W7-26 第二批：导出分支与输入边界（2026-10-03）
+
+本批闭合导出已复现的问题；W7-26及36模块逐项审计仍在执行。
+
+| 原owner | 决定与行为 | 验证边界 |
+|---|---|---|
+| export/collect | 单次读取transcript；直接读取持久化thread；source区分缺失、不可读与空会话；重复消息身份拒绝 | 不调用load/catch-up，不改源文件；不同文件仍是独立观察 |
+| export/template | 按选中路径和本次调用关联结果；缺失消息保留断点；同批重复ID不推断归属 | 任一数据降级提示都关闭inline关联，工具结果仍作为消息可见 |
+| export/html | 序列化平面显示边，显示损坏与版本警告；标识符使用一致匿名映射 | 12000节点有效图及fallback可序列化；匿名ID只用于单份HTML |
+| export/htmlRender | 保留既有Markdown/XSS/URL边界，无新渲染框架 | 原26项回归通过；真实浏览器离线页面验收 |
+| query/sessionEntries | 既有图修复保留，遍历和排序改成迭代；导出使用修复后的显示边 | 不改持久化parentId；坏图显示不证明原分支正确 |
+| transcript/validation、output | codec检查消息工具字段、身份及回放消费的query/output/result容器、数组和标量 | 拒绝对象/数组枚举且不做强制转换；不是完整扩展字段schema或证据作者认证 |
+| core/security/redaction | 共用凭据规则处理JSON字符串/数字/布尔/null及相邻shell片段；元信息同样脱敏 | 保留正常正文、代码和相邻JSON字段；不把HTML转义或base64当作脱敏 |
+| exportCommandRuntime | HTML统计实际消息，三格式显示读取诊断；Markdown脱敏；JSONL保留原始entry内容并明确说明 | JSONL不是可安全分享的脱敏格式；旧compaction/branch记录身份保留 |
+
+参考决定：导出参考`core/export-html/index.ts:131/160`使用平面entry与leaf，采纳其避免嵌套序列化的选择；
+不采纳`template.js:842-851`的全局call ID查找。另一导出参考`cli/cmd/export.ts:221-239/289`
+区分原始导出与sanitize模式；本仓沿用已有JSONL原始entry契约，HTML/Markdown使用共用凭据清理。
+入口仍负责命令和写入策略，收集、图投影及显示脱敏留在session/export，没有第二套session加载或执行器。
+
+验证：最初5失败6通过；嵌套输入/脱敏扩展13失败20通过；独立审查补出的缺失调用断点、
+Cookie与逗号后缀、JSON标量、畸形codingResult/turn、shell拼接均有失败复现与修复后断言。
+最终命令`npm run test -w packages/ts-shell -- src/session src/core/security/redaction.test.ts src/core/security/paths.test.ts src/edit/sanitize.test.ts src/core/commands/exportCommandRuntime.test.ts src/core/shell/recovery.test.ts`在仓内TMPDIR运行，
+**69套512项通过，exit0**；构建通过。反转8个既有产品owner后**43失败30通过**，随后逐字节恢复；新增模块保留但旧生产路径不调用。
+双线最终代码APPROVE、架构CLEAR；架构独立113项及最后18项通过，代码独立内存/真实恢复投影探针exit0。
+
+编译产物实际slash命令+隔离Chromium验收通过：持久化分支、重复call ID、JSON凭据脱敏、
+源文件字节不变、筛选与hash重载、损坏数据提示且不推断inline归属、4000消息页面显示，页面错误0、网络请求0。
+首轮浏览器启动因仓内临时路径过长触发Unix socket限制；缩短到仓内共用TMPDIR后通过，没有改变产品代码。
+静态门：1414文件零循环，配置39/39、hooks18/18、工厂10/10、Node floor通过；
+既有docs120、可达性7、函数上限7提示未新增。未跑本地完整TS套件或真实provider。
+`verify:result-contract`显式仓内隔离重跑仍exit1：两处旧测试路径与print/replay旧标记失配，provider readiness子检查通过，留待后续session/shell批次修复。
+第一批提交`5a544c06`的CI 37039154960与Architecture Watch 37039155034均成功。
+
+后续继续continuation根路径替换、锁内状态投影、跨query连续性以及损坏transcript对恢复准入的影响；
+本批只保证已检查记录的读取与导出降级，不宣称所有恢复消费者已消费诊断或实现原子快照。

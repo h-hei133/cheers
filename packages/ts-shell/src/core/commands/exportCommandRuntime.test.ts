@@ -214,5 +214,37 @@ describe("export command", () => {
     expect(payload.entries.length).toBeGreaterThan(0);
     expect(payload.leafId).toBeTruthy();
     expect(payload.tree.length).toBeGreaterThan(0);
+    expect(result.kind === "local" && result.output).toContain(`${payload.entries.length} messages`);
+  });
+
+  it.each(["html", "markdown", "jsonl"])("reports damaged input for %s", async format => {
+    const session = locateExistingSessionLayout(createSessionStoreLayout(home), sessionId);
+    fs.appendFileSync(session.transcriptPath, "{broken\n");
+    const result = await runExportCommand([format, `damaged.${format}`], context());
+    expect(result.kind === "local" && result.output).toContain("1 unreadable transcript line was omitted.");
+    if (format !== "jsonl") expect(fs.readFileSync(path.join(workdir, `damaged.${format}`), "utf8")).toContain("1 unreadable transcript line was omitted.");
+  });
+
+  it.each(["html", "markdown", "jsonl"])("distinguishes missing and unreadable transcripts for %s", async format => {
+    const session = locateExistingSessionLayout(createSessionStoreLayout(home), sessionId);
+    fs.rmSync(session.transcriptPath);
+    const missing = await runExportCommand([format, "missing.out"], context());
+    expect(missing.kind === "local" && missing.output).toContain("transcript is missing");
+    fs.mkdirSync(session.transcriptPath);
+    const unreadable = await runExportCommand([format, "unreadable.out"], context());
+    expect(unreadable.kind === "local" && unreadable.output).toContain("could not be read");
+    expect(fs.readdirSync(workdir)).toEqual([]);
+  });
+
+  it("scrubs Markdown while retaining the explicit raw JSONL contract", async () => {
+    const session = locateExistingSessionLayout(createSessionStoreLayout(home), sessionId);
+    appendTranscriptEvent(session.transcriptPath, createMessageTranscriptEvent({ role: "assistant", content: '{"password":"FAKE_EXPORT_SECRET","keep":"visible"}', timestamp: "t5" }));
+    await runExportCommand(["markdown", "safe.md"], context());
+    const markdown = fs.readFileSync(path.join(workdir, "safe.md"), "utf8");
+    expect(markdown).not.toContain("FAKE_EXPORT_SECRET");
+    expect(markdown).toContain('"keep":"visible"');
+    const raw = await runExportCommand(["jsonl", "raw.jsonl"], context());
+    expect(fs.readFileSync(path.join(workdir, "raw.jsonl"), "utf8")).toContain("FAKE_EXPORT_SECRET");
+    expect(raw.kind === "local" && raw.output).toContain("JSONL preserves raw records");
   });
 });

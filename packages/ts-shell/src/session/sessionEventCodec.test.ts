@@ -124,6 +124,20 @@ describe("a transcript entry round-trips", () => {
 });
 
 describe("a transcript entry that cannot be read", () => {
+  it.each([
+    { type: "message", role: "assistant", content: "", tool_calls: {} },
+    { type: "message", role: "assistant", content: "", tool_calls: [null] },
+    { type: "message", role: "assistant", content: "", tool_calls: [{ id: "a", type: "function", function: { name: "read", arguments: {} } }] },
+    { type: "message", role: "assistant", content: "", origin: { model: {} } },
+    { type: "message", role: "assistant", content: "", id: {} },
+    { type: "query-event", event: { type: "turn.completed", output: null } },
+    { type: "query-event", event: { type: "query.completed", result: null } },
+    { type: "query-event", event: { type: "turn.started", role: "coder", turn: {} } },
+    { type: "query-event", event: { type: "turn.completed", output: { role: "coder", content: "done", codingResult: {} } } },
+    { type: "branch_summary", droppedTurns: 1, abandonedEntryIds: {} },
+  ])("rejects malformed nested input: %j", fields => {
+    expect(decodeTranscriptLineSafe(JSON.stringify({ ...fields, timestamp: "2026-10-03T00:00:00Z" }))).toBeUndefined();
+  });
   it("is refused rather than read as something else", () => {
     // A block of an unknown type is not a message this build understands, and
     // reading it as one would put a shape downstream code does not expect into

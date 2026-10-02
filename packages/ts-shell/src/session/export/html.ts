@@ -1,5 +1,5 @@
 import { renderPage } from "./template.js";
-import type { ExportPayload } from "./collect.js";
+import type { ExportPayload } from "./model.js";
 
 /**
  * A session as one self-contained HTML file.
@@ -28,6 +28,7 @@ export function renderExportHtml(payload: ExportPayload): string {
       `${payload.entries.length} messages`,
       payload.header.workspace,
       payload.header.exportedAt,
+      ...payload.warnings,
     ].join(" · "),
     payloadBase64,
   });

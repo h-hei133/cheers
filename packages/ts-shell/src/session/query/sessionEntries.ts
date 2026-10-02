@@ -104,12 +104,13 @@ export function readSessionTree(
   }
 
   const included = scope ? entries.filter((entry) => scope.has(entry.id)) : entries;
-  const nodes = new Map<string, { entry: SessionThreadEntry; children: SessionTreeNodeView[] }>();
+  type MutableNode = { entry: SessionThreadEntry; children: MutableNode[] };
+  const nodes = new Map<string, MutableNode>();
   for (const entry of included) {
     nodes.set(entry.id, { entry, children: [] });
   }
 
-  const roots: SessionTreeNodeView[] = [];
+  const roots: MutableNode[] = [];
   for (const entry of included) {
     const node = nodes.get(entry.id)!;
     // An entry that names itself as its parent is a root, not its own child. The
@@ -130,10 +131,14 @@ export function readSessionTree(
   // branch is hung from the root instead of being dropped. The first entry in read
   // order is detached from its parent, which is enough to make the rest a path.
   const reachable = new Set<string>();
-  const mark = (node: SessionTreeNodeView): void => {
-    if (reachable.has(node.entry.id)) return;
-    reachable.add(node.entry.id);
-    for (const child of node.children) mark(child);
+  const mark = (node: MutableNode): void => {
+    const pending = [node];
+    while (pending.length > 0) {
+      const current = pending.pop()!;
+      if (reachable.has(current.entry.id)) continue;
+      reachable.add(current.entry.id);
+      for (const child of current.children) pending.push(child);
+    }
   };
   for (const root of roots) mark(root);
 
@@ -153,11 +158,18 @@ export function readSessionTree(
   // reader must still see damaged entries; sessionThreadPath must reject them for
   // navigation. Navigation choices retain that distinction and disable these paths.
   // Append order within each level, so two reads of the same session agree.
-  const sort = (list: readonly SessionTreeNodeView[]): SessionTreeNodeView[] =>
-    [...list]
-      .sort((left, right) => left.entry.order - right.entry.order)
-      .map((node) => ({ entry: node.entry, children: sort(node.children) }));
-  return sort(roots);
+  const lists = [roots];
+  const sorted = new Set<MutableNode>();
+  while (lists.length > 0) {
+    const list = lists.pop()!;
+    list.sort((left, right) => left.entry.order - right.entry.order);
+    for (const node of list) {
+      if (sorted.has(node)) continue;
+      sorted.add(node);
+      lists.push(node.children);
+    }
+  }
+  return roots;
 }
 
 /** Every entry reachable downward from `rootId`, including it. */

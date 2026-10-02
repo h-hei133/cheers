@@ -123,10 +123,7 @@ a { color: var(--user); }
 /**
  * The client.
  *
- * Plain functions over the decoded payload. The tree arrives already nested, so
- * this flattens it for display rather than rebuilding it — the nesting was
- * computed where the session state was, and recomputing it here would be a
- * second opinion about the same fact.
+ * Plain functions over flat display edges, normalized by the session reader.
  */
 export const PAGE_SCRIPT = String.raw`
 (function () {
@@ -142,14 +139,9 @@ export const PAGE_SCRIPT = String.raw`
 
   // Flat rows in display order, each carrying its depth, so the sidebar is a
   // list rather than a nested DOM that has to be walked to filter.
-  function flatten(nodes, depth, out) {
-    (nodes || []).forEach(function (node) {
-      out.push({ node: node, depth: depth });
-      flatten(node.children, depth + 1, out);
-    });
-    return out;
-  }
-  var flat = flatten(data.tree, 0, []);
+  var flat = (data.tree || []).map(function (node) { return { node: node, depth: node.depth || 0 }; });
+  var nodesById = new Map();
+  flat.forEach(function (row) { nodesById.set(row.node.id, row.node); });
 
   var selected = data.leafId || (flat.length ? flat[flat.length - 1].node.id : null);
   var query = '';
@@ -178,7 +170,7 @@ export const PAGE_SCRIPT = String.raw`
       var button = document.createElement('button');
       button.className = 'tree-row';
       button.type = 'button';
-      button.style.paddingLeft = (6 + row.depth * 12) + 'px';
+      button.style.paddingLeft = (6 + Math.min(row.depth, 24) * 12) + 'px';
       if (row.node.id === selected) button.setAttribute('aria-current', 'true');
       var role = document.createElement('span');
       role.className = 'role ' + (row.node.role || '');
@@ -199,15 +191,34 @@ export const PAGE_SCRIPT = String.raw`
   // it rather than only that one message.
   function pathTo(id) {
     var chain = [];
-    var current = byId.get(id);
-    var guard = 0;
-    while (current && guard++ < 10000) {
-      chain.unshift(current);
-      var node = flat.filter(function (r) { return r.node.id === current.id; })[0];
-      var parentId = node && node.node.parentId;
-      current = parentId ? byId.get(parentId) : undefined;
+    var current = nodesById.get(id);
+    var seen = new Set();
+    while (current && !seen.has(current.id)) {
+      seen.add(current.id);
+      var message = byId.get(current.id);
+      if (message) chain.push(message);
+      else if (current.kind === 'turn-message') chain.push(null);
+      current = current.parentId ? nodesById.get(current.parentId) : undefined;
     }
-    return chain;
+    return chain.reverse();
+  }
+
+  function resultsOnPath(chain) {
+    var pending = new Map();
+    var results = new Map();
+    chain.forEach(function (entry) {
+      if (!entry) { pending.clear(); return; }
+      if (entry.role !== 'tool') pending.clear();
+      (entry.toolCalls || []).forEach(function (call) {
+        pending.set(call.id, pending.has(call.id) ? null : call);
+      });
+      if (entry.role === 'tool' && pending.has(entry.toolCallId)) {
+        var call = pending.get(entry.toolCallId);
+        if (call) results.set(call, entry.content);
+        pending.delete(entry.toolCallId);
+      }
+    });
+    return results;
   }
 
   function collapse(container, label) {
@@ -231,7 +242,7 @@ export const PAGE_SCRIPT = String.raw`
     return node;
   }
 
-  function renderTurn(entry) {
+  function renderTurn(entry, results) {
     var turn = el('div', 'turn ' + (entry.role || ''));
     turn.id = 'entry-' + entry.id;
     turn.appendChild(el('div', 'who', entry.role + (entry.timestamp ? ' · ' + entry.timestamp : '')));
@@ -243,7 +254,7 @@ export const PAGE_SCRIPT = String.raw`
       var summary = el('summary', null, 'called ' + call.name);
       details.appendChild(summary);
       details.appendChild(el('div', 'args', call.arguments));
-      var result = (data.results || {})[call.id];
+      var result = results.get(call);
       if (result !== undefined) {
         var output = el('div', 'result', result);
         details.appendChild(output);
@@ -258,11 +269,15 @@ export const PAGE_SCRIPT = String.raw`
     var pane = document.getElementById('conversation');
     pane.textContent = '';
     var chain = pathTo(selected);
-    if (chain.length === 0) {
+    var messages = chain.filter(Boolean);
+    if (messages.length === 0) {
       pane.appendChild(el('p', 'empty', 'This entry has no messages.'));
       return;
     }
-    chain.forEach(function (entry) { pane.appendChild(renderTurn(entry)); });
+    // A degraded source may hide the call that owns a reused ID. Results remain
+    // visible as recorded tool messages; no inline ownership is inferred.
+    var results = (data.warnings || []).length ? new Map() : resultsOnPath(chain);
+    messages.forEach(function (entry) { pane.appendChild(renderTurn(entry, results)); });
     var target = document.getElementById('entry-' + selected);
     if (target) {
       target.scrollIntoView({ block: 'start' });
@@ -293,7 +308,7 @@ export const PAGE_SCRIPT = String.raw`
   });
 
   var fromHash = (location.hash || '').replace(/^#/, '');
-  if (fromHash && byId.has(fromHash)) selected = fromHash;
+  if (fromHash && nodesById.has(fromHash)) selected = fromHash;
   renderSidebar();
   renderConversation();
 })();

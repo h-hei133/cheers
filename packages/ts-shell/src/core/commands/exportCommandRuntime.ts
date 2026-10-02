@@ -2,16 +2,14 @@ import { messageToText } from "../../model-adapters/multimodal.js";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { CommandContext, LocalCommandResult } from "./types.js";
-import {
-  createSessionStoreLayout,
-  locateExistingSessionLayout,
-} from "../../session/store/sessionFileLayout.js";
-import { projectTranscriptMessages, readTranscript } from "../../session/transcript/sessionTranscript.js";
+import { projectTranscriptMessages } from "../../session/transcript/sessionTranscript.js";
 import { createTranscriptHeader, type TranscriptEvent, type TranscriptHeader } from "../../session/sessionEventCodec.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 import { resolveWriteTarget } from "../security/writeTarget.js";
 import { gatherExport } from "../../session/export/collect.js";
 import { renderExportHtml } from "../../session/export/html.js";
+import { readExportSource } from "../../session/export/source.js";
+import { redactExportText } from "../security/redaction.js";
 
 /**
  * /export — write this session's conversation to a file.
@@ -62,14 +60,18 @@ export async function runExportCommand(
       ].join("\n"),
     };
   }
-  const transcript = readSessionTranscript(sessionId);
-  const events = transcript.events;
+  const source = format === "html" ? undefined : readExportSource(sessionId);
+  if (source && !source.ok) return { kind: "local", output: `${source.reason} Nothing was written.` };
+  const transcript = source?.ok ? source.transcript : undefined;
+  const events = transcript?.events ?? [];
   const messages = projectTranscriptMessages(events);
-  if (events.length === 0) {
+  if (format !== "html" && events.length === 0) {
     return {
       kind: "local",
       output: [
-        `Session \`${sessionId}\` has no conversation recorded yet, so there is nothing to export.`,
+        transcript?.unreadableLines
+          ? "The transcript contains no readable entries."
+          : `Session \`${sessionId}\` has no conversation recorded yet, so there is nothing to export.`,
         "",
         "Nothing was written. Ask something first, or `/resume` a session that has a conversation in it.",
       ].join("\n"),
@@ -105,6 +107,8 @@ export async function runExportCommand(
   }
 
   let content: string;
+  let displayedMessages: readonly { readonly role: string }[] = messages;
+  let warnings = transcript?.warnings ?? [];
   if (format === "html") {
     // The page needs the tree as well as the conversation, and the tree lives in
     // the session state rather than the transcript, so this gathers both.
@@ -113,11 +117,14 @@ export async function runExportCommand(
       return { kind: "local", output: `${gathered.reason} Nothing was written.` };
     }
     content = renderExportHtml(gathered.payload);
+    displayedMessages = gathered.payload.entries;
+    warnings = gathered.payload.warnings;
   } else {
     content =
       format === "jsonl"
-        ? asJsonl(events, { version: transcript.version, sessionId, root })
-        : asMarkdown(messages, sessionId, root);
+        ? asJsonl(events, { version: transcript!.version, sessionId, root })
+        : redactExportText(asMarkdown(messages, sessionId, root));
+    if (format === "markdown" && warnings.length > 0) content = `${warnings.map(warning => `> ${warning}`).join("\n")}\n\n${content}`;
   }
   try {
     mkdirSync(path.dirname(target), { recursive: true });
@@ -140,11 +147,13 @@ export async function runExportCommand(
         "- One entry per line, in the order they were recorded.",
         "- Entries carry their own `type` and `id`, so a reader can tell messages",
         "  apart from compaction and branch-summary entries.",
+        "- JSONL preserves raw records, including any credentials. Use HTML or Markdown for credential scrubbing.",
+        ...warnings.map(warning => `- ${warning}`),
       ].join("\n"),
     };
   }
 
-  const counts = tally(messages);
+  const counts = tally(displayedMessages);
   const label = format === "html" ? "HTML" : "Markdown";
   const extra =
     format === "html"
@@ -153,11 +162,12 @@ export async function runExportCommand(
   return {
     kind: "local",
     output: [
-      `Exported ${messages.length} messages to \`${shown}\`.`,
+      `Exported ${displayedMessages.length} messages to \`${shown}\`.`,
       "",
       `- ${counts.user} from you, ${counts.assistant} from the model, ${counts.tool} tool results`,
       `- Format: ${label}`,
       ...extra,
+      ...warnings.map(warning => `- ${warning}`),
     ].join("\n"),
   };
 }
@@ -170,16 +180,6 @@ function parseFormat(value: string | undefined): "markdown" | "jsonl" | "html" |
   if (lowered === "jsonl") return "jsonl";
   if (lowered === "html") return "html";
   return undefined;
-}
-
-/** This session's transcript: its entries in order, and the format it was written in. */
-function readSessionTranscript(sessionId: string): { version: number; events: readonly TranscriptEvent[] } {
-  try {
-    const layout = locateExistingSessionLayout(createSessionStoreLayout(), sessionId);
-    return readTranscript(layout.transcriptPath);
-  } catch {
-    return { version: 0, events: [] };
-  }
 }
 
 /**
@@ -259,7 +259,7 @@ function heading(role: SessionMessage["role"]): string {
 }
 
 /** How many of each kind, so the report is checkable against the file. */
-function tally(messages: readonly SessionMessage[]): {
+function tally(messages: readonly { readonly role: string }[]): {
   readonly user: number;
   readonly assistant: number;
   readonly tool: number;

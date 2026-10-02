@@ -106,7 +106,8 @@ function applySecretRules(value: string): string {
   return value
     .replace(/\/home\/wang\/\.private-agents-real[^\s"'`]*/g, "[redacted-real-provider-home]")
     .replace(/\b(Bearer)\s+[A-Za-z0-9._~+/=-]+/gi, "$1 [redacted]")
-    .replace(/\b(api[_-]?key|token|secret|cookie|authorization|password)\b\s*[:=]\s*\S+/gi, "$1=[redacted]")
+    .replace(/(["'](?:api[_-]?key|token|secret|cookie|authorization|password)["']\s*:\s*)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|(?:-?\d+(?:\.\d+)?(?:e[+-]?\d+)?|true|false|null)(?=\s*[,}\]]))/gi, '$1"[redacted]"')
+    .replace(/\b(api[_-]?key|token|secret|cookie|authorization|password)\b\s*[:=]\s*(?:(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s"']+)+|\S+)/gi, "$1=[redacted]")
     .replace(/\b(sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, "[secret-redacted]")
     .replace(/\bprovider\.env\b[^\n\r]*/gi, "provider.env=[redacted]");
 }

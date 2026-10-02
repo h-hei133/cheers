@@ -1,0 +1,83 @@
+import vm from "node:vm";
+import { describe, expect, it } from "vitest";
+import { PAGE_SCRIPT } from "./template.js";
+
+class Element {
+  children: Element[] = [];
+  listeners = new Map<string, () => void>();
+  className = "";
+  id = "";
+  style: Record<string, string> = {};
+  classList = { add() {}, remove() {}, toggle() { return false; } };
+  scrollHeight = 0;
+  clientHeight = 0;
+  innerHTML = "";
+  private text = "";
+  set textContent(value: string) { this.text = value; this.children = []; }
+  get textContent(): string { return this.text + this.children.map(child => child.textContent).join(""); }
+  appendChild(child: Element) { this.children.push(child); }
+  addEventListener(name: string, action: () => void) { this.listeners.set(name, action); }
+  setAttribute() {}
+  scrollIntoView() {}
+}
+
+function runPage(payload: unknown) {
+  const elements = new Map(["DATA", "tree", "conversation", "filter", "users-only", "toggle-sidebar"].map(id => [id, new Element()]));
+  elements.get("DATA")!.textContent = Buffer.from(JSON.stringify(payload)).toString("base64");
+  vm.runInNewContext(PAGE_SCRIPT, {
+    document: { getElementById: (id: string) => elements.get(id), createElement: () => new Element(), body: new Element() },
+    TextDecoder, Uint8Array, atob: (value: string) => Buffer.from(value, "base64").toString("binary"),
+    location: { hash: "" }, history: { replaceState() {} }, setTimeout() {},
+  });
+  return elements;
+}
+
+const call = (id: string) => ({ id, name: "read", arguments: "{}" });
+const entry = (id: string, role = "assistant", extras: Record<string, unknown> = {}) => ({ id, role, content: id, html: id, ...extras });
+const node = (id: string, parentId?: string) => ({ id, parentId, depth: 0, role: "assistant", kind: "turn-message", preview: id });
+
+describe("exported page branch traversal", () => {
+  it("shows results only when their owning call and result are on the selected path", () => {
+    const elements = runPage({
+      entries: [entry("a", "assistant", { toolCalls: [call("call_0")] }), entry("off", "tool", { toolCallId: "call_0", content: "OTHER_BRANCH_RESULT" }), entry("selected")],
+      tree: [node("a"), node("off", "a"), node("selected", "a")], leafId: "selected", results: { call_0: "OTHER_BRANCH_RESULT" },
+    });
+    expect(elements.get("conversation")!.textContent).not.toContain("OTHER_BRANCH_RESULT");
+  });
+
+  it("keeps repeated call IDs paired to their separate occurrences", () => {
+    const elements = runPage({
+      entries: [entry("a", "assistant", { toolCalls: [call("call_0")] }), entry("b", "tool", { toolCallId: "call_0", content: "FIRST_RESULT" }), entry("c", "assistant", { toolCalls: [call("call_0")] }), entry("d", "tool", { toolCallId: "call_0", content: "SECOND_RESULT" })],
+      tree: [node("a"), node("b", "a"), node("c", "b"), node("d", "c")], leafId: "d", results: { call_0: "SECOND_RESULT" },
+    });
+    const turns = elements.get("conversation")!.children;
+    expect(turns[0]!.textContent).toContain("FIRST_RESULT");
+    expect(turns[0]!.textContent).not.toContain("SECOND_RESULT");
+    expect(turns[2]!.textContent).toContain("SECOND_RESULT");
+  });
+
+  it("walks through nonmessage ancestors and stops on repeated graph nodes", () => {
+    const payload = { entries: [entry("a"), entry("b")], tree: [node("a"), node("bridge", "a"), node("b", "bridge")], leafId: "b" };
+    expect(runPage(payload).get("conversation")!.children).toHaveLength(2);
+    payload.tree[0]!.parentId = "b";
+    expect(runPage(payload).get("conversation")!.children).toHaveLength(2);
+  });
+
+  it("does not claim an inline owner for duplicate IDs in one call batch", () => {
+    const elements = runPage({
+      entries: [entry("a", "assistant", { toolCalls: [call("duplicate"), call("duplicate")] }), entry("b", "tool", { toolCallId: "duplicate", content: "AMBIGUOUS_RESULT" })],
+      tree: [node("a"), node("b", "a")], leafId: "b",
+    });
+    expect(elements.get("conversation")!.children[0]!.textContent).not.toContain("AMBIGUOUS_RESULT");
+    expect(elements.get("conversation")!.children).toHaveLength(2);
+  });
+
+  it("never pairs a result across a missing message or an unlocatable transcript gap", () => {
+    const entries = [entry("a", "assistant", { toolCalls: [call("call_0")] }), entry("b", "tool", { toolCallId: "call_0", content: "NEW_CALL_RESULT" })];
+    const missing = runPage({ entries, tree: [node("a"), node("missing", "a"), node("b", "missing")], leafId: "b" });
+    expect(missing.get("conversation")!.children[0]!.textContent).not.toContain("NEW_CALL_RESULT");
+    const unknown = runPage({ entries, tree: [node("a"), node("b", "a")], leafId: "b", warnings: ["1 unreadable transcript line was omitted."] });
+    expect(unknown.get("conversation")!.children[0]!.textContent).not.toContain("NEW_CALL_RESULT");
+    expect(unknown.get("conversation")!.children).toHaveLength(2);
+  });
+});
