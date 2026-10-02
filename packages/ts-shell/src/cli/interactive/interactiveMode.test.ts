@@ -51,7 +51,10 @@ function build(overrides: { observeEvents?: () => () => void } = {}): {
 }
 
 describe("session wiring", () => {
-  it.each(["dismiss", "confirm"])("opens queued back selectors after navigation and resumes the queue after %s", async (action) => {
+  it.each([
+    ["navigation", "dismiss"], ["navigation", "confirm"],
+    ["command", "dismiss"], ["command", "confirm"],
+  ])("opens queued back selectors after %s and resumes the queue after %s", async (operation, action) => {
     const { mode, terminal } = build();
     const host = mode as unknown as {
       busy: boolean;
@@ -77,7 +80,11 @@ describe("session wiring", () => {
     mode.start();
     try {
       host.applyPicker({ title: "Session tree", form: "modal", empty: "", exclusive: true,
-        load: async () => [], apply: () => navigation,
+        load: async () => [], apply: async () => {
+          await navigation;
+          if (operation === "command") await host.run("/resume missing-synthetic-session");
+          return undefined;
+        },
       }, ["first"]);
       host.queue.push("/back 2", "/help");
       expect(host.busy).toBe(true);

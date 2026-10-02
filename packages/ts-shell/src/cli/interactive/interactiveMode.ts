@@ -149,6 +149,7 @@ export class InteractiveMode {
   private closing = false;
   private readonly alternateScreen: boolean;
   private busy = false;
+  private pickerPending = false;
   private toast?: string;
   /** What the terminal said it can draw, read once from its environment. */
   private readonly imageProtocol = detectImageProtocol();
@@ -641,7 +642,7 @@ export class InteractiveMode {
       const output = this.sink.commandOutput;
       if (output) pageLongOutput(this.pager, output.title, output.block, this.state.transcript);
       this.sink.end();
-      this.busy = false;
+      this.busy = this.pickerPending;
       if (exiting) {
         this.shutdown();
         return;
@@ -659,11 +660,11 @@ export class InteractiveMode {
         if (navigation.draft !== undefined) this.state.editor.setText(navigation.draft);
       }
       this.tui.requestRender();
-      const next = retrying ?? this.queue.shift();
+      const next = this.pickerPending ? undefined : retrying ?? this.queue.shift();
       // The attention pair, when the user asked for it and the turn was long
       // enough that they may have looked away. A queued follow-up keeps the
       // conversation running, so the signal waits for the turn that ends it.
-      if (next === undefined && this.options.runtimeContext.runtimeConfig.attentionOnIdle === true) {
+      if (!this.busy && next === undefined && this.options.runtimeContext.runtimeConfig.attentionOnIdle === true) {
         const tookMs = Date.now() - turnStartedAt;
         if (tookMs >= ATTENTION_AFTER_MS) {
           this.terminal.write(
@@ -694,7 +695,10 @@ export class InteractiveMode {
 
   /** Hand the choice to the picker that produced it and surface what it reports. */
   private applyPicker(picker: Picker, ids: readonly string[]): void {
-    if (picker.exclusive) this.busy = true;
+    if (picker.exclusive) {
+      this.pickerPending = true;
+      this.busy = true;
+    }
     void picker
       .apply(ids)
       .then((outcome) => {
@@ -713,7 +717,10 @@ export class InteractiveMode {
         );
       })
       .finally(() => {
-        if (picker.exclusive) this.busy = false;
+        if (picker.exclusive) {
+          this.pickerPending = false;
+          this.busy = false;
+        }
         this.tui.requestRender();
         const next = picker.exclusive ? this.queue.shift() : undefined;
         if (next !== undefined) void this.run(next);
