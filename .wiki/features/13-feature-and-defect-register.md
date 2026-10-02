@@ -3123,7 +3123,11 @@ tokenizer（`core/commands/arguments.ts`，Phase 17 W1-1 引入）把撇号当**
 而 `pluginCommandRuntime.ts:229-240` 明说「There is no catalogue service behind this」——两处**互相矛盾**
 （`OBS-01` 只修了编造的默认 URL，未涉持久化与这条交叉承诺）。
 
-### CMD-13 · `/reload` 在**输出里**吞掉主题加载失败 — `OPEN` `P3` `CONFIRMED`
+### CMD-13 · `/reload` 显式报告主题应用失败 — `FIXED` `P3` `CONFIRMED`
+
+**2026-10-02 修复**：命令输出包含主题失败原因与保留的active theme；配置变化与实际应用分开陈述，其他配置仍生效。22项定向测试、构建及双线APPROVE/CLEAR；撤销后1项失败。常规/全屏PTY运行中改为不存在的主题再reload，错误可见且正常退出。auto行为留给W7-25。
+
+以下保留修复前证据：
 
 `reloadCommandRuntime.ts:77-87` 的 `applyConfiguredTheme` 捕获异常只 `logger.warn`、返回 `undefined`；
 命令输出只在成功时加「Applied theme …」（`:56`），失败时**用户看不到任何原因**

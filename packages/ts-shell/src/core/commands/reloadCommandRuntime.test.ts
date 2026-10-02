@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { runReloadCommand } from "./reloadCommandRuntime.js";
 import { getRuntimeConfig, type RuntimeConfig } from "../../config/runtimeConfig.js";
-import { applyTheme, defaultTheme } from "../../presentation/theme/theme.js";
+import { applyTheme, currentTheme, defaultTheme } from "../../presentation/theme/theme.js";
 
 /** A context whose settings are replaced in place, as the session does. */
 function contextWith(initial: RuntimeConfig, next?: RuntimeConfig) {
@@ -48,7 +48,7 @@ describe("/reload", () => {
 
     const result = await runReloadCommand([], context);
 
-    expect(result.output).toContain("No settings differ");
+    expect(result.output).toContain("No configuration values changed.");
   });
 
   it("keeps working settings when the new ones cannot be read", async () => {
@@ -113,12 +113,20 @@ describe("/reload", () => {
   it("keeps the reload working when the named theme no longer loads", async () => {
     // A broken theme must not cost the settings that did reload.
     const first = getRuntimeConfig("/tmp/nonexistent-a");
-    const second = { ...first, theme: "no-such-theme" as never };
-    const { context } = contextWith(first, second);
+    const second = { ...first, theme: "no-such-theme", instructionBudgetBytes: 0 };
+    const { context, holder } = contextWith(first, second);
+    const active = currentTheme();
+    const revision = defaultTheme.colorRevision;
 
     const result = await runReloadCommand([], context);
 
     expect(result.output).toContain("Re-read configuration");
     expect(result.output).not.toContain("Applied theme");
+    expect(result.output).toContain("Theme 'no-such-theme' could not be applied: Theme not found");
+    expect(result.output).toContain(`Keeping active theme \`${active}\``);
+    expect(result.output).toContain("Configuration changes:");
+    expect(holder.config.instructionBudgetBytes).toBe(0);
+    expect(currentTheme()).toBe(active);
+    expect(defaultTheme.colorRevision).toBe(revision);
   });
 });

@@ -49,17 +49,17 @@ export async function runReloadCommand(
   // Applying the theme is what makes the line above true. Reporting a change the
   // screen does not show is worse than not reporting it: it teaches the reader
   // to distrust the command's output.
-  const themeApplied = applyConfiguredTheme(outcome.after.theme, context.cwd);
+  const themeMessage = applyConfiguredTheme(outcome.after.theme, context.cwd);
   return {
     kind: "local",
     output: [
       "Re-read configuration.",
       "",
       changed.length > 0
-        ? `Changed:\n${changed.map((line) => `  ${line}`).join("\n")}`
-        : "No settings differ from the ones already in force.",
+        ? `Configuration changes:\n${changed.map((line) => `  ${line}`).join("\n")}`
+        : "No configuration values changed.",
       "",
-      ...(themeApplied ? [`Applied theme \`${themeApplied}\` to the running surface.`] : []),
+      ...(themeMessage ? [themeMessage] : []),
       "Project instructions, skills and hooks are re-read every turn, so they need no reload.",
       "Provider, workspace binding and tool pool changes still need a restart.",
     ].join("\n"),
@@ -78,12 +78,11 @@ function applyConfiguredTheme(theme: string | undefined, workspaceRoot?: string)
   if (!theme || theme === "auto") return undefined;
   try {
     applyTheme(theme, workspaceRoot);
-    return currentTheme();
+    return `Applied theme \`${currentTheme()}\` to the running surface.`;
   } catch (error) {
-    logger.warn(
-      `Theme '${theme}' could not be applied: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return undefined;
+    const detail = `Theme '${theme}' could not be applied: ${error instanceof Error ? error.message : String(error)}`;
+    logger.warn(detail);
+    return `${detail}\nKeeping active theme \`${currentTheme()}\`. Other configuration settings were re-read.`;
   }
 }
 
