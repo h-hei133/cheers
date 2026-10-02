@@ -341,6 +341,19 @@ describe("editing shortcuts", () => {
     expect(surface.editor.getText()).toBe("earlier");
   });
 
+  it("walks every wrapped row of a recalled prompt before changing history", () => {
+    const { press, surface } = build();
+    surface.editor.pushHistory("older");
+    surface.editor.pushHistory("abcdefghij");
+    press("\x1b[A");
+    surface.editor.render(4);
+    press("\x1b[A");
+    press("\x1b[A");
+    expect(surface.editor.getText()).toBe("abcdefghij");
+    press("\x1b[A");
+    expect(surface.editor.getText()).toBe("older");
+  });
+
   it("keeps a draft in progress on up instead of losing it to history", () => {
     const { press, surface } = build();
     surface.editor.pushHistory("earlier");

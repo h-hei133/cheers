@@ -1,5 +1,5 @@
-import { graphemeBoundaries, sliceWithWidth, visibleWidth } from "./text/measure.js";
-import { wrapToWidth } from "./text/layout.js";
+import { sliceWithWidth } from "./text/measure.js";
+import { editorRows, visualCaret, verticalCaret } from "./editor/layout.js";
 import { nextCluster, previousCluster, wordEnd, wordStart } from "./text/motion.js";
 import { CURSOR_MARKER } from "./render/paint.js";
 import { KillRing } from "./editor/killRing.js";
@@ -80,7 +80,9 @@ export class Editor {
    * and the word after it come back together and each word separately undoable —
    * the convention a shell user already has.
    */
-  private lastAction: "kill" | "yank" | "type" | null = null;
+  private lastAction: "kill" | "yank" | "type" | "vertical" | null = null;
+  private lastWidth = Number.MAX_SAFE_INTEGER;
+  private preferredColumn: number | undefined;
   private readonly edits = new EditHistory<EditorSnapshot>(
     (state) => ({ lines: [...state.lines], row: state.row, column: state.column }),
     MAX_UNDO_DEPTH,
@@ -110,18 +112,6 @@ export class Editor {
     this.draft = this.getText();
   }
 
-  /** Clamp `column` to a grapheme boundary of `line`. */
-  private static snapColumn(line: string, column: number): number {
-    if (column <= 0) return 0;
-    if (column >= line.length) return line.length;
-    const boundaries = graphemeBoundaries(line);
-    let snapped = 0;
-    for (const boundary of boundaries) {
-      if (boundary > column) break;
-      snapped = boundary;
-    }
-    return snapped;
-  }
   getText(): string {
     return this.lines.join("\n");
   }
@@ -353,6 +343,18 @@ export class Editor {
 
   /** Move the caret; returns false when the motion had nowhere to go. */
   move(kind: CursorMove): boolean {
+    if (kind === "up" || kind === "down") {
+      if (this.lastAction !== "vertical") this.preferredColumn = undefined;
+      const next = verticalCaret(this.lines, this.lastWidth, this.row, this.column,
+        kind === "up" ? -1 : 1,
+        this.preferredColumn);
+      this.lastAction = "vertical";
+      if (!next) return false;
+      this.row = next.row;
+      this.column = next.column;
+      this.preferredColumn = next.preferred;
+      return true;
+    }
     // A motion ends the run even when it goes nowhere: the key was pressed, and
     // pressing it is what says the cut is finished.
     this.lastAction = null;
@@ -384,16 +386,6 @@ export class Editor {
       case "doc-end":
         this.row = this.lines.length - 1;
         return this.setColumn(this.lines[this.row]!.length);
-      case "up":
-        if (this.row === 0) return false;
-        this.row -= 1;
-        this.column = Editor.snapColumn(this.lines[this.row]!, Math.min(this.column, this.lines[this.row]!.length));
-        return true;
-      default:
-        if (this.row >= this.lines.length - 1) return false;
-        this.row += 1;
-        this.column = Editor.snapColumn(this.lines[this.row]!, Math.min(this.column, this.lines[this.row]!.length));
-        return true;
     }
   }
 
@@ -454,35 +446,20 @@ export class Editor {
   /** Soft-wrapped rows at `width`, carrying the cursor marker when focused. */
   render(width: number, maxRows?: number): string[] {
     const cells = Math.max(1, width);
+    if (cells !== this.lastWidth) this.preferredColumn = undefined;
+    this.lastWidth = cells;
     if (this.lines.length === 1 && this.lines[0] === "" && this.placeholder) {
       const hint = this.placeholder;
       return [this.focused ? `${CURSOR_MARKER}${hint}` : hint];
     }
-    const rendered: string[] = [];
-    let cursorVisualRow = -1;
-    for (let index = 0; index < this.lines.length; index++) {
-      const rows = wrapToWidth(this.lines[index]!, cells);
-      if (index !== this.row) {
-        rendered.push(...rows);
-        continue;
-      }
-      const offset = visibleWidth(this.lines[index]!.slice(0, this.column));
-      let subRow = 0;
-      let remaining = offset;
-      for (let i = 0; i < rows.length; i++) {
-        const rowWidth = visibleWidth(rows[i]!);
-        if (remaining < rowWidth || i === rows.length - 1) {
-          subRow = i;
-          break;
-        }
-        remaining -= rowWidth;
-      }
-      cursorVisualRow = rendered.length + subRow;
-      if (this.focused) {
-        rendered.push(...this.markCursorRow(rows, offset));
-      } else {
-        rendered.push(...rows);
-      }
+    const rows = editorRows(this.lines, cells);
+    const caret = visualCaret(rows, this.row, this.lines[this.row]!, this.column);
+    const cursorVisualRow = caret.index;
+    const rendered = rows.map((entry) => entry.text);
+    if (this.focused) {
+      const text = rendered[caret.index]!;
+      const head = sliceWithWidth(text, 0, caret.column).text;
+      rendered[caret.index] = `${head}${CURSOR_MARKER}${text.slice(head.length)}`;
     }
     if (maxRows === undefined || maxRows <= 0 || rendered.length <= maxRows) {
       this.scrollOffset = 0;
@@ -499,21 +476,6 @@ export class Editor {
     const maxScroll = Math.max(0, rendered.length - maxRows);
     this.scrollOffset = Math.max(0, Math.min(this.scrollOffset, maxScroll));
     return rendered.slice(this.scrollOffset, this.scrollOffset + maxRows);
-  }
-
-  private markCursorRow(rows: readonly string[], offset: number): string[] {
-    const marked = [...rows];
-    let remaining = offset;
-    for (let index = 0; index < marked.length; index++) {
-      const rowWidth = visibleWidth(marked[index]!);
-      if (remaining < rowWidth || index === marked.length - 1) {
-        const head = sliceWithWidth(marked[index]!, 0, remaining).text;
-        marked[index] = `${head}${CURSOR_MARKER}${marked[index]!.slice(head.length)}`;
-        return marked;
-      }
-      remaining -= rowWidth;
-    }
-    return marked;
   }
 
   private setColumn(column: number): boolean {

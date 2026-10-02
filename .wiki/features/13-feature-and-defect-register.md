@@ -3134,7 +3134,11 @@ tokenizer（`core/commands/arguments.ts`，Phase 17 W1-1 引入）把撇号当**
 （warning 只进日志）。`describeChanges` 仍会把 `theme` 列为「已更改」⇒ 屏幕没变、也无解释。
 **方向**：把失败原因写进命令输出（`logger.warn` 对 `--json`/无日志读者不可见）。
 
-### TUI-10 · 编辑器的上/下箭头**只走逻辑行**，忽略软换行 — `OPEN` `P3` `CONFIRMED`
+### TUI-10 · 编辑器上下箭头按可视行导航 — `FIXED` `P3` `CONFIRMED`
+
+**2026-10-02 修复**：渲染与导航共用既有wrapToWidth生成的可视行映射；垂直连续移动保留目标单元格列，短行及宽字符钳制到字素边界，编辑/横移/缩放重置目标列。历史记录只在可视边界参与。112项定向测试、构建和双线APPROVE/CLEAR；撤销5项失败。常规/全屏PTY验证软换行后上移插入仍保留命令前缀，退出0。
+
+以下保留修复前证据：
 
 `presentation/tui/editor.ts:386-390` `move("up")` 以 `this.row`（**逻辑行**）为单位，
 而渲染才软换行（`:454-475` `wrapToWidth`）。

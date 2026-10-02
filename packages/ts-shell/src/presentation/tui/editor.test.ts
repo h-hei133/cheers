@@ -149,6 +149,63 @@ describe("multi-line prompts", () => {
 });
 
 describe("soft wrapping", () => {
+  it("moves through visual rows in both directions", () => {
+    const editor = new Editor();
+    editor.insert("abcdefghij");
+    shown(editor, 4);
+    expect(editor.move("up")).toBe(true);
+    expect(shown(editor, 4)).toEqual(["abcd", "ef|gh", "ij"]);
+    expect(editor.move("up")).toBe(true);
+    expect(shown(editor, 4)).toEqual(["ab|cd", "efgh", "ij"]);
+    expect(editor.move("up")).toBe(false);
+    editor.move("down");
+    editor.move("down");
+    expect(shown(editor, 4)).toEqual(["abcd", "efgh", "ij|"]);
+    expect(editor.move("down")).toBe(false);
+  });
+
+  it("uses word wrapping and preserves the preferred cell column through short rows", () => {
+    const editor = new Editor();
+    editor.setText("abcdefgh\nx\nabcdefgh");
+    shown(editor, 10);
+    editor.move("up");
+    expect(shown(editor, 10)).toEqual(["abcdefgh", "x|", "abcdefgh"]);
+    editor.move("up");
+    expect(shown(editor, 10)).toEqual(["abcdefgh|", "x", "abcdefgh"]);
+    editor.setText("ab cdef ghi");
+    shown(editor, 6);
+    editor.move("up");
+    expect(shown(editor, 6)).toEqual(["ab ", "cde|f ", "ghi"]);
+    editor.move("up");
+    expect(shown(editor, 6)).toEqual(["ab| ", "cdef ", "ghi"]);
+  });
+
+  it("lands on graphemes and stays within a non-final segment", () => {
+    const editor = new Editor();
+    editor.setText("你👩‍💻e\u0301界");
+    shown(editor, 4);
+    editor.move("up");
+    expect(shown(editor, 4)).toEqual(["你|👩‍💻", "e\u0301界"]);
+    editor.move("down");
+    expect(shown(editor, 4)).toEqual(["你👩‍💻", "e\u0301界|"]);
+    editor.move("up");
+    editor.insert("X");
+    expect(editor.getText()).toBe("你X👩‍💻e\u0301界");
+  });
+
+  it("recomputes rows after resize and keeps the caret visible in a clipped viewport", () => {
+    const editor = new Editor();
+    editor.setText("abcdefghijkl");
+    shown(editor, 4);
+    editor.move("up");
+    expect(shown(editor, 4)).toEqual(["abcd", "efg|h", "ijkl"]);
+    shown(editor, 6);
+    editor.move("up");
+    expect(editor.render(6, 1).map((row) => row.split(CURSOR_MARKER).join("|"))).toEqual(["a|bcdef"]);
+    editor.move("down");
+    expect(editor.render(6, 1).map((row) => row.split(CURSOR_MARKER).join("|"))).toEqual(["g|hijkl"]);
+  });
+
   it("wraps a long row and keeps the caret on the row that holds it", () => {
     const editor = new Editor();
     editor.insert("abcdefghij");
