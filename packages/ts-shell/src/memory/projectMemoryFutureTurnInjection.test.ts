@@ -67,6 +67,27 @@ describe("project memory future-turn injection", () => {
     expect(injectionStateStore.get("session:memory-use").injectionStatus).toBe("consumed");
   });
 
+  it("does not claim injection when pending state is evicted during retrieval", async () => {
+    const memoryStore = createProjectMemoryLocalStore({ ref: { mode: "test-only", root: storeRoot } });
+    await seed(memoryStore, [record("pmr:fact", "Project memory requires explicit user opt-in.", "project-fact")]);
+    const states = createProjectMemoryInjectionStateStore({ sessionCapacity: 1 });
+    const pending = states.markPending({ sessionScopeId: "one", sourceCommand: "/memory use", mode: "wake", recordIds: ["pmr:fact"] });
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    const plan = planProjectMemoryFutureTurnInjection({
+      memoryStore: { ...memoryStore, health: async () => { await held; return memoryStore.health(); } },
+      injectionState: pending, markInjected: (input) => states.markInjected(input), markConsumed: (input) => states.markConsumed(input),
+    });
+    states.markPending({ sessionScopeId: "two", sourceCommand: "/memory use", mode: "wake", recordIds: [] });
+    release();
+    const result = await plan;
+    expect(result.shouldInject).toBe(false);
+    expect(result.injectedContext).toBeUndefined();
+    expect(result.updatedInjectionState).toMatchObject({ injectionStatus: "none", incomplete: true });
+    expect(result.evidence).not.toContain("project-memory-future-turn-injection:consumed");
+    expect(states.get("two").injectionStatus).toBe("pending");
+  });
+
   it("stages recall memory, supersedes pending use, and filters invalidated/deleted records", async () => {
     const memoryStore = createProjectMemoryLocalStore({
       ref: { mode: "test-only", root: storeRoot },

@@ -554,7 +554,8 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W2 小项 / `OBS-13` | 命令名与别名共同参与候选，参数补全使用既有别名解析；注册变更使缓存失效 | 已实现，本地验证通过 |
 | W3-11 / R3 / OBS-04、OBS-15 | 标准 stdio JSON-RPC，握手后可用；同一会话复用连接，配置/目录切换释放旧进程；关闭取消等待并拒绝排队调用 | 已实现，本地验证通过 |
 | W3-12 / SES-07 | 切换会话释放旧 todo；两条删除路径均在存储删除成功后释放，同 ID 更新保留 | 已实现，本地验证通过 |
-| W3-13、W4–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
+| W3-13 / CTX-09 | 五处状态持有者增加容量及丢弃标记；外层会话表同样有界，异步注入失去状态后不报告成功 | 已实现，本地验证通过 |
+| W4–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
 src/runtime/execution/service.test.ts src/runtime/execution/fileLock.test.ts
@@ -740,6 +741,26 @@ W3-12（2026-10-02）：沿用既有 todo owner，在 substrate transition 与�
 `SessionManager` 三文件 83 项通过，覆盖正常恢复、同 ID 保留、两条成功删除及失败不清理。
 撤销新增的两处清理后 3 项失败（exit 1），恢复原字节。
 W3-11 推送头 `1e8ce643` 的 CI `36972204423` 与 NormProof `36972204373` 均 success。
+
+W3-13（2026-10-02）：参考 §4.2 的容量 + 丢弃标记方式，在既有 owner 保留行为，
+共享 `core/state/retention.ts` 只负责无 I/O 的有界容器和历史裁剪，不新建执行或持久化系统。
+默认会话 128、读取路径/会话 256、checkpoint 总量 256、注入历史与 review decisions/会话 256；
+累计诊断也以 256 封顶，重复 review 决策 evidence 去重。容量是条目数，不承诺总字节数。
+map 淘汰最近最少写入的条目；review 保留当前候选优先，其后保留历史。只读 miss 不新建会话表。
+删除/clear 不增加丢弃计数；容量淘汰显式增加 `dropped`，`incomplete` 不因下一次正常写入消失。
+外层淘汰后，缺失会话保守显示历史可能不完整，不保留无界 tombstone 表。正常写入流程保持既有权限语义。
+独立复核补齐 `/memory status`/save 的截断显示，及检索期间发生淘汰时的注入结算检查。
+撤销容量限制时五个 owner 测试文件 7 项失败；保留容量但删掉丢弃标记时 8 项失败，均 exit 1，
+随后恢复原字节。W3-12 最新产物 regular/fullscreen PTY 的 A→B→A 清单恢复通过，
+两种配置各 45 行 JSON 回放通过、exit 0；使用隔离 HOME、合成配置，未用真实提供方。
+最终两条独立复核 APPROVE / CLEAR。`npm run build:ts` exit 0；最终定向组 27 文件 / 210 项通过：
+
+```sh
+npm run test:ts -- src/core/tools/readCache.test.ts src/core/tools/highValueTools.test.ts src/context/compact src/memory/projectMemoryReview src/memory/projectMemoryInjection src/memory/projectMemoryFutureTurnInjection.test.ts src/memory/projectMemorySaveCommandRunner.test.ts src/core/commands/slashRouter.test.ts src/core/shell/runtimeContext.test.ts src/core/commands/todoPersistence.test.ts src/session/SessionManager.test.ts
+```
+
+静态阻断门禁及 40 项脚本测试通过，既有 7 项函数数量 advisory、120 个无前缀文档源路径 advisory 保留。
+本地未跑完整 TypeScript 套件；本批提交的远端 CI 结果与前批结果分别记录。
 
 ### 8.5 主代理在等待复核者期间新增的六处自查（已并入正文）
 

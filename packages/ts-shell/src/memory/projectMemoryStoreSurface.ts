@@ -4,8 +4,10 @@ import type {
   ProjectMemoryWriteResult,
 } from "./projectMemoryStoreContract.js";
 import { renderProjectMemoryHealth } from "./store/health.js";
+import type { RetentionState } from "../core/state/retention.js";
 
 export interface ProjectMemoryStoreSurfaceInput {
+  readonly reviewRetention?: RetentionState;
   readonly outcome: "saved" | "blocked" | "status";
   readonly health: ProjectMemoryStoreHealth;
   readonly savedRecords: readonly ProjectMemoryRecord[];
@@ -36,6 +38,7 @@ export function renderProjectMemoryStoreSurface(
     `- Memory written: ${written ? "yes" : "no"}`,
     `- Records saved: ${input.savedRecords.length}`,
     `- Skipped candidates: ${input.skipped.length}`,
+    ...(input.reviewRetention?.incomplete ? [`- Review history: incomplete (${input.reviewRetention.dropped} entries dropped; counts cover retained candidates only)`] : []),
     ...(blockers.length > 0 ? [`- Blockers: ${blockers.join("; ")}`] : []),
     "- Auto-load: no",
     "- Provider/model call: none",

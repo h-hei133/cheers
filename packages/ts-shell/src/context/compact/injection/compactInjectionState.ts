@@ -1,3 +1,7 @@
+import { RetainedMap, retainHistory, retentionCapacity, type RetentionState, type RetentionStatus } from "../../../core/state/retention.js";
+
+export const COMPACT_INJECTION_LIMITS = { sessions: 128, history: 256, diagnostics: 256 } as const;
+
 import type { CompactCheckpointSourceCommand } from "../checkpoint/compactLiveCheckpoint.js";
 
 export type CompactInjectionStatus =
@@ -7,7 +11,7 @@ export type CompactInjectionStatus =
   | "consumed"
   | "invalid";
 
-export interface CompactInjectionState {
+export interface CompactInjectionState extends RetentionState {
   readonly sessionScopeId: string;
   readonly injectionStatus: CompactInjectionStatus;
   readonly checkpointId?: string;
@@ -27,6 +31,7 @@ export interface CompactInjectionState {
 }
 
 export interface CompactInjectionStateStore {
+  retention(): RetentionStatus;
   get(sessionScopeId: string): CompactInjectionState;
   markPending(input: MarkCompactInjectionPendingInput): CompactInjectionState;
   markInjected(input: MarkCompactInjectionInjectedInput): CompactInjectionState;
@@ -36,6 +41,8 @@ export interface CompactInjectionStateStore {
 }
 
 export interface CompactInjectionStateStoreOptions {
+  readonly sessionCapacity?: number;
+  readonly historyCapacity?: number;
   readonly now?: () => string;
 }
 
@@ -67,16 +74,24 @@ export interface MarkCompactInjectionInvalidInput {
 export function createCompactInjectionStateStore(
   options: CompactInjectionStateStoreOptions = {},
 ): CompactInjectionStateStore {
-  const states = new Map<string, CompactInjectionState>();
+  const states = new RetainedMap<string, CompactInjectionState>(options.sessionCapacity ?? COMPACT_INJECTION_LIMITS.sessions);
+  const historyCapacity = retentionCapacity(options.historyCapacity ?? COMPACT_INJECTION_LIMITS.history);
   const now = options.now ?? (() => new Date().toISOString());
   const get = (sessionScopeId: string): CompactInjectionState =>
-    states.get(sessionScopeId) ?? emptyState(sessionScopeId);
+    states.get(sessionScopeId) ?? { ...emptyState(sessionScopeId), incomplete: states.retention().incomplete };
   const set = (state: CompactInjectionState): CompactInjectionState => {
-    states.set(state.sessionScopeId, state);
-    return state;
+    const history = retainHistory(state.supersededCheckpointIds, historyCapacity, state.dropped);
+    const warnings = retainHistory([...state.warnings].reverse(), COMPACT_INJECTION_LIMITS.diagnostics, history.dropped);
+    const evidence = retainHistory([...state.evidence].reverse(), COMPACT_INJECTION_LIMITS.diagnostics, warnings.dropped);
+    const retained = { ...state, supersededCheckpointIds: history.items,
+      warnings: [...warnings.items].reverse(), evidence: [...evidence.items].reverse(),
+      dropped: evidence.dropped, incomplete: state.incomplete || evidence.incomplete };
+    states.set(state.sessionScopeId, retained);
+    return retained;
   };
 
   return {
+    retention: () => states.retention(),
     get,
     markPending(input) {
       const previous = get(input.sessionScopeId);
@@ -92,6 +107,8 @@ export function createCompactInjectionStateStore(
       return set({
         sessionScopeId: input.sessionScopeId,
         injectionStatus: "pending",
+        dropped: previous.dropped,
+        incomplete: previous.incomplete,
         checkpointId: input.checkpointId,
         createdAt: input.createdAt ?? now(),
         injectionCount: 0,
@@ -159,6 +176,7 @@ export function createCompactInjectionStateStore(
     },
     markInvalid(input) {
       const previous = get(input.sessionScopeId);
+      if (input.checkpointId && previous.checkpointId !== input.checkpointId) return previous;
       return set({
         ...previous,
         sessionScopeId: input.sessionScopeId,
@@ -179,7 +197,7 @@ export function createCompactInjectionStateStore(
     },
     clear(sessionScopeId) {
       const state = emptyState(sessionScopeId);
-      states.set(sessionScopeId, state);
+      states.delete(sessionScopeId);
       return state;
     },
   };
@@ -206,6 +224,8 @@ function emptyState(sessionScopeId: string): CompactInjectionState {
   return {
     sessionScopeId,
     injectionStatus: "none",
+    dropped: 0,
+    incomplete: false,
     injectionCount: 0,
     supersededCheckpointIds: [],
     warnings: [],

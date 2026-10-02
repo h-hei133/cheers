@@ -1,4 +1,7 @@
 import type { ProjectMemoryCandidate } from "./projectMemoryCandidate.js";
+import { RetainedMap, retainHistory, retentionCapacity, type RetentionState, type RetentionStatus } from "../core/state/retention.js";
+
+export const MEMORY_REVIEW_LIMITS = { sessions: 128, decisions: 256 } as const;
 
 export type ProjectMemoryReviewDecision =
   | "pending"
@@ -20,7 +23,7 @@ export interface ProjectMemoryReviewEntry {
   readonly evidence: readonly string[];
 }
 
-export interface ProjectMemoryReviewState {
+export interface ProjectMemoryReviewState extends RetentionState {
   readonly reviewSessionId: string;
   readonly latestCandidates: readonly ProjectMemoryCandidate[];
   readonly approvedCandidates: readonly ProjectMemoryReviewEntry[];
@@ -34,6 +37,7 @@ export interface ProjectMemoryReviewState {
 }
 
 export interface ProjectMemoryReviewStateStore {
+  retention(): RetentionStatus;
   get(reviewSessionId: string): ProjectMemoryReviewState;
   updateCandidates(input: UpdateProjectMemoryReviewCandidatesInput): ProjectMemoryReviewState;
   approve(input: DecideProjectMemoryCandidateInput): ProjectMemoryReviewState;
@@ -41,6 +45,8 @@ export interface ProjectMemoryReviewStateStore {
 }
 
 export interface ProjectMemoryReviewStateStoreOptions {
+  readonly sessionCapacity?: number;
+  readonly decisionCapacity?: number;
   readonly now?: () => string;
 }
 
@@ -61,18 +67,25 @@ export interface DecideProjectMemoryCandidateInput {
 export function createProjectMemoryReviewStateStore(
   options: ProjectMemoryReviewStateStoreOptions = {},
 ): ProjectMemoryReviewStateStore {
-  const states = new Map<string, ProjectMemoryReviewState>();
+  const states = new RetainedMap<string, ProjectMemoryReviewState>(options.sessionCapacity ?? MEMORY_REVIEW_LIMITS.sessions);
+  const capacity = retentionCapacity(options.decisionCapacity ?? MEMORY_REVIEW_LIMITS.decisions);
   const now = options.now ?? (() => new Date().toISOString());
 
   const set = (state: ProjectMemoryReviewState): ProjectMemoryReviewState => {
-    states.set(state.reviewSessionId, state);
-    return state;
+    const history = retainHistory(state.decisions, capacity, state.dropped);
+    const ids = new Set(history.items.map((entry) => entry.candidateId));
+    const retained = buildState(state.reviewSessionId,
+      state.latestCandidates.filter((candidate) => ids.has(candidate.candidateId)).slice(0, capacity),
+      history.items, history.dropped, state.incomplete || history.incomplete);
+    states.set(state.reviewSessionId, retained);
+    return retained;
   };
 
   const get = (reviewSessionId: string): ProjectMemoryReviewState =>
-    states.get(reviewSessionId) ?? emptyProjectMemoryReviewState(reviewSessionId);
+    states.get(reviewSessionId) ?? { ...emptyProjectMemoryReviewState(reviewSessionId), incomplete: states.retention().incomplete };
 
   return {
+    retention: () => states.retention(),
     get,
     updateCandidates(input) {
       const previous = get(input.reviewSessionId);
@@ -112,7 +125,7 @@ export function createProjectMemoryReviewStateStore(
         }
         return entryForCandidate(candidate, input.sourceCommand);
       });
-      return set(buildState(input.reviewSessionId, input.candidates, [...current, ...carried]));
+      return set(buildState(input.reviewSessionId, input.candidates, [...current, ...carried], previous.dropped, previous.incomplete));
     },
     approve(input) {
       return set(applyDecision(get(input.reviewSessionId), input, "approved", now));
@@ -148,15 +161,15 @@ function applyDecision(
       decidedAt: input.decidedAt ?? now(),
       reason: input.reason ?? (decision === "approved" ? "Approved for session review only." : "Rejected for session review only."),
       sourceCommand: input.sourceCommand,
-      evidence: [
+      evidence: unique([
         ...entry.evidence,
         `project-memory-review-state:${decision}`,
         "project-memory-review-state:session-scoped-only",
         "project-memory-review-state:no-persistence",
-      ],
+      ]),
     };
   });
-  return buildState(state.reviewSessionId, state.latestCandidates, entries);
+  return buildState(state.reviewSessionId, state.latestCandidates, entries, state.dropped, state.incomplete);
 }
 
 function entryForCandidate(
@@ -213,8 +226,12 @@ function buildState(
   reviewSessionId: string,
   latestCandidates: readonly ProjectMemoryCandidate[],
   decisions: readonly ProjectMemoryReviewEntry[],
+  dropped = 0,
+  incomplete = false,
 ): ProjectMemoryReviewState {
   return {
+    dropped,
+    incomplete,
     reviewSessionId,
     latestCandidates,
     approvedCandidates: decisions.filter((entry) => entry.decision === "approved"),

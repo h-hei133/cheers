@@ -18,6 +18,7 @@ export function renderProjectMemoryInjectionSurface(
     `- Outcome: ${input.outcome}`,
     ...(input.blocker ? [`- BlockerKind: memory-use-blocked`, `- Reason: ${safeLine(input.blocker)}`] : []),
     `- Injection status: ${input.state.injectionStatus}`,
+    ...(input.state.incomplete ? [`- Injection history: incomplete (${input.state.dropped} entries dropped; older session state may be unavailable)`] : []),
     `- Injection id: ${input.state.memoryInjectionId ?? "none"}`,
     `- Mode: ${input.state.mode ?? "none"}`,
     `- Query: ${input.state.query ? safeLine(input.state.query) : "none"}`,

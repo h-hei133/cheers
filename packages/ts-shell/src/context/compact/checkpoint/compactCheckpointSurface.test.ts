@@ -8,6 +8,10 @@ import {
 } from "./compactLiveCheckpoint.js";
 
 describe("compact checkpoint surface", () => {
+  it("reports retained-history loss even when the latest checkpoint was evicted", () => {
+    expect(formatCompactCheckpointStatus(undefined, undefined, { capacity: 1, size: 1, dropped: 2, incomplete: true }))
+      .toContain("Checkpoint history: incomplete (2 checkpoints dropped)");
+  });
   it("renders missing and existing checkpoint status without exposing packet content", () => {
     expect(formatCompactCheckpointStatus(undefined)).toContain(
       "- Latest: none",

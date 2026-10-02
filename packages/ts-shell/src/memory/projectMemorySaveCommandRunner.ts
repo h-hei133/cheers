@@ -230,6 +230,7 @@ function buildResult(input: {
     writeResults: input.writeResults,
     skipped: input.skipped,
     output: renderProjectMemoryStoreSurface({
+      reviewRetention: input.state,
       outcome: input.outcome,
       health: input.health,
       savedRecords: input.savedRecords,

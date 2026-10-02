@@ -44,6 +44,7 @@ export function renderProjectMemoryReviewSurface(
     "- Cross-session loading performed: no",
     "- Provider/model call: none",
     `- Review session: ${input.state.reviewSessionId}`,
+    ...(input.state.incomplete ? [`- Review history: incomplete (${input.state.dropped} entries dropped; older session state may be unavailable)`] : []),
     `- Quality: ${input.quality.qualityStatus}`,
     `- Total candidates: ${input.state.latestCandidates.length}`,
     `- Pending candidates: ${pending.length}`,

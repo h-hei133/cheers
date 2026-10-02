@@ -1,14 +1,21 @@
 import type { CompactLiveCheckpoint } from "./compactLiveCheckpoint.js";
 import type { CompactInjectionState } from "../injection/compactInjectionState.js";
+import type { RetentionStatus } from "../../../core/state/retention.js";
 
 export function formatCompactCheckpointStatus(
   checkpoint: CompactLiveCheckpoint | undefined,
   injectionState?: CompactInjectionState,
+  retention?: RetentionStatus,
 ): string {
+  const history = [
+    ...(retention?.incomplete ? [`- Checkpoint history: incomplete (${retention.dropped} checkpoints dropped)`] : []),
+    ...(injectionState?.incomplete ? [`- Injection history: incomplete (${injectionState.dropped} entries dropped; older session state may be unavailable)`] : []),
+  ];
   if (!checkpoint) {
     return [
       "Compact checkpoint",
       "- Latest: none",
+      ...history,
       "- Future-turn adapter: not-ready",
       "- Injection status: no checkpoint",
       "- Next action: Run /compact to create a live checkpoint.",
@@ -18,6 +25,7 @@ export function formatCompactCheckpointStatus(
   return [
     "Compact checkpoint",
     "- Latest: exists",
+    ...history,
     `- Checkpoint id: ${checkpoint.checkpointId}`,
     `- Created at: ${checkpoint.createdAt}`,
     `- Status: ${checkpoint.status}`,

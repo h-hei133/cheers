@@ -1,5 +1,8 @@
 import type { CompactContinuityPacket } from "../continuity/compactContinuityPacket.js";
 import type { CompactCommandRunResult } from "../command/compactCommandRunner.js";
+import { RetainedMap, type RetentionStatus } from "../../../core/state/retention.js";
+
+export const COMPACT_CHECKPOINT_CAPACITY = 256;
 
 export type CompactCheckpointSourceCommand = "/compact" | "/handoff" | "internal";
 export type CompactCheckpointStatus =
@@ -40,6 +43,7 @@ export interface CompactLiveCheckpoint {
 }
 
 export interface CompactLiveCheckpointStore {
+  retention(): RetentionStatus;
   getLatest(sessionScopeId: string): CompactLiveCheckpoint | undefined;
   getById(checkpointId: string): CompactLiveCheckpoint | undefined;
   updateLatest(input: UpdateCompactLiveCheckpointInput): CompactLiveCheckpoint;
@@ -56,6 +60,7 @@ export interface UpdateCompactLiveCheckpointInput {
 }
 
 export interface CompactLiveCheckpointStoreOptions {
+  readonly capacity?: number;
   readonly now?: () => string;
   readonly nextId?: () => string;
 }
@@ -64,7 +69,7 @@ export function createCompactLiveCheckpointStore(
   options: CompactLiveCheckpointStoreOptions = {},
 ): CompactLiveCheckpointStore {
   const latestBySession = new Map<string, string>();
-  const checkpointsById = new Map<string, CompactLiveCheckpoint>();
+  const checkpointsById = new RetainedMap<string, CompactLiveCheckpoint>(options.capacity ?? COMPACT_CHECKPOINT_CAPACITY);
   let counter = 0;
   const now = options.now ?? (() => new Date().toISOString());
   const nextId =
@@ -75,7 +80,14 @@ export function createCompactLiveCheckpointStore(
     });
 
   const write = (checkpoint: CompactLiveCheckpoint): CompactLiveCheckpoint => {
-    checkpointsById.set(checkpoint.checkpointId, checkpoint);
+    const replaced = checkpointsById.get(checkpoint.checkpointId);
+    if (replaced && latestBySession.get(replaced.sessionScopeId) === checkpoint.checkpointId) {
+      latestBySession.delete(replaced.sessionScopeId);
+    }
+    const evicted = checkpointsById.set(checkpoint.checkpointId, checkpoint);
+    if (evicted && latestBySession.get(evicted[1].sessionScopeId) === evicted[0]) {
+      latestBySession.delete(evicted[1].sessionScopeId);
+    }
     if (checkpoint.status === "created") {
       latestBySession.set(checkpoint.sessionScopeId, checkpoint.checkpointId);
     }
@@ -83,6 +95,7 @@ export function createCompactLiveCheckpointStore(
   };
 
   return {
+    retention: () => checkpointsById.retention(),
     getLatest(sessionScopeId) {
       const latestId = latestBySession.get(sessionScopeId);
       if (!latestId) {
@@ -143,6 +156,7 @@ export function createCompactLiveCheckpointStore(
       if (!checkpoint) {
         return undefined;
       }
+      if (checkpoint.status === "superseded") return checkpoint;
       const superseded = {
         ...checkpoint,
         status: "superseded" as const,

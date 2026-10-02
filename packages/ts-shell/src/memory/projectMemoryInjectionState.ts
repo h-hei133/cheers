@@ -1,3 +1,7 @@
+import { RetainedMap, retainHistory, retentionCapacity, type RetentionState, type RetentionStatus } from "../core/state/retention.js";
+
+export const MEMORY_INJECTION_LIMITS = { sessions: 128, history: 256, diagnostics: 256 } as const;
+
 export type ProjectMemoryInjectionStatus =
   | "none"
   | "pending"
@@ -14,7 +18,7 @@ export interface ProjectMemoryInjectionWarning {
   readonly message: string;
 }
 
-export interface ProjectMemoryInjectionState {
+export interface ProjectMemoryInjectionState extends RetentionState {
   readonly sessionScopeId: string;
   readonly injectionStatus: ProjectMemoryInjectionStatus;
   readonly memoryInjectionId?: string;
@@ -34,6 +38,7 @@ export interface ProjectMemoryInjectionState {
 }
 
 export interface ProjectMemoryInjectionStateStore {
+  retention(): RetentionStatus;
   get(sessionScopeId: string): ProjectMemoryInjectionState;
   markPending(input: MarkProjectMemoryInjectionPendingInput): ProjectMemoryInjectionState;
   markInjected(input: MarkProjectMemoryInjectionInjectedInput): ProjectMemoryInjectionState;
@@ -43,6 +48,8 @@ export interface ProjectMemoryInjectionStateStore {
 }
 
 export interface ProjectMemoryInjectionStateStoreOptions {
+  readonly sessionCapacity?: number;
+  readonly historyCapacity?: number;
   readonly now?: () => string;
   readonly nextId?: () => string;
 }
@@ -79,17 +86,25 @@ export interface MarkProjectMemoryInjectionInvalidInput {
 export function createProjectMemoryInjectionStateStore(
   options: ProjectMemoryInjectionStateStoreOptions = {},
 ): ProjectMemoryInjectionStateStore {
-  const states = new Map<string, ProjectMemoryInjectionState>();
+  const states = new RetainedMap<string, ProjectMemoryInjectionState>(options.sessionCapacity ?? MEMORY_INJECTION_LIMITS.sessions);
+  const historyCapacity = retentionCapacity(options.historyCapacity ?? MEMORY_INJECTION_LIMITS.history);
   const now = options.now ?? (() => new Date().toISOString());
   const nextId = options.nextId ?? (() => `pmi:${cryptoRandomId()}`);
   const get = (sessionScopeId: string): ProjectMemoryInjectionState =>
-    states.get(sessionScopeId) ?? emptyState(sessionScopeId);
+    states.get(sessionScopeId) ?? { ...emptyState(sessionScopeId), incomplete: states.retention().incomplete };
   const set = (state: ProjectMemoryInjectionState): ProjectMemoryInjectionState => {
-    states.set(state.sessionScopeId, state);
-    return state;
+    const history = retainHistory(state.supersededInjectionIds, historyCapacity, state.dropped);
+    const warnings = retainHistory([...state.warnings].reverse(), MEMORY_INJECTION_LIMITS.diagnostics, history.dropped);
+    const evidence = retainHistory([...state.evidence].reverse(), MEMORY_INJECTION_LIMITS.diagnostics, warnings.dropped);
+    const retained = { ...state, supersededInjectionIds: history.items,
+      warnings: [...warnings.items].reverse(), evidence: [...evidence.items].reverse(),
+      dropped: evidence.dropped, incomplete: state.incomplete || evidence.incomplete };
+    states.set(state.sessionScopeId, retained);
+    return retained;
   };
 
   return {
+    retention: () => states.retention(),
     get,
     markPending(input) {
       const previous = get(input.sessionScopeId);
@@ -110,6 +125,8 @@ export function createProjectMemoryInjectionStateStore(
       return set({
         sessionScopeId: input.sessionScopeId,
         injectionStatus: "pending",
+        dropped: previous.dropped,
+        incomplete: previous.incomplete,
         memoryInjectionId,
         sourceCommand: input.sourceCommand,
         mode: input.mode,
@@ -170,6 +187,7 @@ export function createProjectMemoryInjectionStateStore(
     },
     markInvalid(input) {
       const previous = get(input.sessionScopeId);
+      if (input.memoryInjectionId && previous.memoryInjectionId !== input.memoryInjectionId) return previous;
       return set({
         ...previous,
         sessionScopeId: input.sessionScopeId,
@@ -184,7 +202,7 @@ export function createProjectMemoryInjectionStateStore(
     },
     clear(sessionScopeId) {
       const state = emptyState(sessionScopeId);
-      states.set(sessionScopeId, state);
+      states.delete(sessionScopeId);
       return state;
     },
   };
@@ -197,6 +215,8 @@ function emptyState(sessionScopeId: string): ProjectMemoryInjectionState {
   return {
     sessionScopeId,
     injectionStatus: "none",
+    dropped: 0,
+    incomplete: false,
     recordIds: [],
     supersededInjectionIds: [],
     warnings: [],

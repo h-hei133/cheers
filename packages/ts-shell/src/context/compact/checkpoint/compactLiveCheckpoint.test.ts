@@ -9,6 +9,28 @@ import {
 } from "./compactLiveCheckpoint.js";
 
 describe("compact live checkpoint", () => {
+  it("bounds retained checkpoints and clears evicted session pointers", () => {
+    const store = createCompactLiveCheckpointStore({ capacity: 2 });
+    const result = runCompactCommand({ mode: "render", source: "session" });
+    const update = (sessionScopeId: string) => store.updateLatest({ sessionScopeId, sourceCommand: "/compact", result });
+    const first = update("first");
+    update("second");
+    expect(store.retention()).toMatchObject({ size: 2, dropped: 0, incomplete: false });
+    const latest = update("second");
+    expect(store.getById(first.checkpointId)).toBeUndefined();
+    expect(store.getLatest("first")).toBeUndefined();
+    expect(store.getLatest("second")).toBe(latest);
+    expect(store.retention()).toMatchObject({ size: 2, dropped: 1, incomplete: true });
+    for (let i = 0; i < 20; i++) update(`session-${i}`);
+    expect(store.retention().size).toBe(2);
+    expect(store.getLatest("second")).toBeUndefined();
+    for (let i = 0; i < 20; i++) {
+      store.updateLatest({ sessionScopeId: `reuse-${i}`, checkpointId: "reused", sourceCommand: "/compact", result });
+      if (i > 0) expect(store.getLatest(`reuse-${i - 1}`)).toBeUndefined();
+    }
+    expect(store.getLatest("reuse-19")?.checkpointId).toBe("reused");
+  });
+
   it("creates latest session-scoped checkpoint and preserves compact-safe facts", () => {
     const store = createCompactLiveCheckpointStore({
       now: () => "2026-05-15T00:00:00.000Z",

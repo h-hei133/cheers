@@ -45,8 +45,9 @@ export async function runCompactLocalCommand(
     // describes the compactions that actually happened rather than implying this
     // preview made one.
     const sessionScopeId = compactSessionScopeId(context);
+    const checkpointStore = context.compactCheckpointStore ?? DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE;
     const existingCheckpoint = getLatestCompactCheckpoint(
-      context.compactCheckpointStore ?? DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE,
+      checkpointStore,
       sessionScopeId,
     );
     const existingInjection = (
@@ -54,8 +55,8 @@ export async function runCompactLocalCommand(
     ).get(sessionScopeId);
     const outputLines: string[] = [
       formatCompactSessionSurface(result, await readProjectMemoryHealth(context.projectMemoryStore)),
-      ...(existingCheckpoint
-        ? [formatCompactCheckpointStatus(existingCheckpoint, existingInjection)]
+      ...(existingCheckpoint || checkpointStore.retention().incomplete || existingInjection.incomplete
+        ? [formatCompactCheckpointStatus(existingCheckpoint, existingInjection, checkpointStore.retention())]
         : []),
     ];
 

@@ -137,14 +137,20 @@ export async function planProjectMemoryFutureTurnInjection(
     ]);
   }
 
-  input.markInjected?.({
+  const injected = input.markInjected?.({
     sessionScopeId: state.sessionScopeId,
     memoryInjectionId: state.memoryInjectionId,
   });
+  if (injected && (injected.memoryInjectionId !== state.memoryInjectionId || injected.injectionStatus !== "injected")) {
+    return skip(injected, "memory-injection-state-changed", "Pending memory injection changed or was evicted during retrieval.", baseEvidence);
+  }
   const updatedInjectionState = input.markConsumed({
     sessionScopeId: state.sessionScopeId,
     memoryInjectionId: state.memoryInjectionId,
   });
+  if (updatedInjectionState.memoryInjectionId !== state.memoryInjectionId || updatedInjectionState.injectionStatus !== "consumed") {
+    return skip(updatedInjectionState, "memory-injection-state-changed", "Pending memory injection changed or was evicted during retrieval.", baseEvidence);
+  }
   return {
     shouldInject: true,
     injectedContext: budget.context,

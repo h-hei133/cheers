@@ -1,4 +1,5 @@
 import { stat } from 'node:fs/promises'
+import { RetainedMap } from '../state/retention.js'
 
 /**
  * What a read handed the model, so a second identical read can say so instead.
@@ -20,12 +21,13 @@ interface SeenRead {
   readonly modifiedMs: number;
 }
 
-const seenBySession = new Map<string, Map<string, SeenRead>>()
+export const READ_CACHE_LIMITS = { sessions: 128, filesPerSession: 256 } as const
+const seenBySession = new RetainedMap<string, RetainedMap<string, SeenRead>>(READ_CACHE_LIMITS.sessions)
 
-function sessionCache(sessionId: string): Map<string, SeenRead> {
+function sessionCache(sessionId: string): RetainedMap<string, SeenRead> {
   const existing = seenBySession.get(sessionId)
   if (existing) return existing
-  const created = new Map<string, SeenRead>()
+  const created = new RetainedMap<string, SeenRead>(READ_CACHE_LIMITS.filesPerSession)
   seenBySession.set(sessionId, created)
   return created
 }
@@ -53,7 +55,7 @@ export async function alreadySeen(
   absolutePath: string,
   request: { readonly offset: number; readonly limit: number },
 ): Promise<boolean> {
-  const seen = sessionCache(sessionId).get(absolutePath)
+  const seen = seenBySession.get(sessionId)?.get(absolutePath)
   if (!seen) return false
   if (seen.offset !== request.offset || seen.limit !== request.limit) return false
   try {
@@ -69,7 +71,9 @@ export function rememberRead(
   absolutePath: string,
   seen: SeenRead,
 ): void {
-  sessionCache(sessionId).set(absolutePath, seen)
+  const cache = sessionCache(sessionId)
+  cache.set(absolutePath, seen)
+  seenBySession.set(sessionId, cache)
 }
 
 /**
@@ -80,7 +84,7 @@ export function rememberRead(
  * answered with a pointer to the content from before it.
  */
 export function forgetRead(sessionId: string, absolutePath: string): void {
-  sessionCache(sessionId).delete(absolutePath)
+  seenBySession.get(sessionId)?.delete(absolutePath)
 }
 
 /**
@@ -92,4 +96,8 @@ export function forgetRead(sessionId: string, absolutePath: string): void {
  */
 export function forgetSessionReads(sessionId: string): void {
   seenBySession.delete(sessionId)
+}
+
+export function readCacheRetention(sessionId: string) {
+  return { sessions: seenBySession.retention(), files: seenBySession.get(sessionId)?.retention() }
 }
