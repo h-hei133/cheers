@@ -1,3 +1,4 @@
+import type { CoreMcpGateway } from "../../core/mcp/gateway.js";
 import { messageToText } from "../../model-adapters/multimodal.js";
 import type { Interface as ReadlineInterface } from "node:readline";
 import process from "node:process";
@@ -185,6 +186,7 @@ function buildCompactionWiring(input: {
 
 export function createCliSessionRuntime(input: {
   readonly sessionManager: SessionManager;
+  readonly mcpGateway?: CoreMcpGateway;
   readonly renderer: StreamingRenderer;
   readonly runtimeContext: ShellRuntimeContext;
   readonly options: CliOptions;
@@ -461,6 +463,7 @@ export function createCliSessionRuntime(input: {
           : allTurns;
 
       return streamCliRuntimePrompt({
+    mcpGateway: input.mcpGateway,
         // Carried so the tool pool honours disabledTools / hiddenToolPrefixes.
         runtimeConfig: input.runtimeContext.runtimeConfig,
         prompt,

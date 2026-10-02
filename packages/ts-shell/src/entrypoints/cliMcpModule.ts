@@ -13,9 +13,9 @@ import {
 
 export type CliMcpAction = "status" | "tools" | "doctor" | "refresh";
 
-export type CliMcpGateway = Pick<CoreMcpGateway, "snapshot" | "refresh">;
+export type CliMcpGateway = Pick<CoreMcpGateway, "snapshot" | "refresh"> & Partial<Pick<CoreMcpGateway, "close" | "syncWorkspace">>;
 
-export function createCliMcpGateway(cwd: string): CoreMcpGateway {
+export function createCliMcpGateway(cwd: string | (() => string)): CoreMcpGateway {
   return new CoreMcpGateway(cwd);
 }
 

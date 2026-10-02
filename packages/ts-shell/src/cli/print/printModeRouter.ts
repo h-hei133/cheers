@@ -36,6 +36,7 @@ export async function runCliPrintModeRouter(
   input: RunCliPrintModeRouterInput,
 ): Promise<boolean> {
   const runtimeInput = {
+    mcpGateway: input.bootstrapRuntime.mcpGateway,
     sessionManager: input.bootstrapRuntime.sessionManager,
     runtimeContext: input.bootstrapRuntime.runtimeContext,
     renderer: input.bootstrapRuntime.renderer,

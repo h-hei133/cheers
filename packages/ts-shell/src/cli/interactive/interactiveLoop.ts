@@ -41,13 +41,25 @@ export interface InteractiveLoopInput {
   readonly setActiveNonInteractiveApprovalMode: (mode: ApprovalModeObject | undefined) => void;
   /** Theme paths this run was started with, so `/theme` can still select them. */
   readonly themePaths?: readonly string[];
-  readonly exit?: (code?: number) => never;
+  readonly exit?: (code?: number) => void;
 }
 
 export async function runInteractiveLoop(input: InteractiveLoopInput): Promise<void> {
   const stdin = input.stdin ?? process.stdin;
   const stdout = input.stdout ?? process.stdout;
-  const exit = input.exit ?? ((code?: number) => process.exit(code) as never);
+  const terminate = input.exit ?? ((code?: number) => process.exit(code));
+  let exiting = false;
+  const exit = (code = 0): void => {
+    if (exiting) return;
+    exiting = true;
+    void Promise.resolve().then(() => input.initialMcpGateway.close?.()).then(
+      () => terminate(code),
+      () => {
+        input.renderer.renderLine("MCP connection cleanup failed; process exit was not verified.");
+        terminate(1);
+      },
+    );
+  };
 
   if (!supportsFullScreenSurface(stdin, stdout)) {
     await runLineLoop({

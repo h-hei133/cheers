@@ -8,6 +8,12 @@ export interface McpToolDescriptor {
   readonly qualifiedName: string
   readonly description: string
   readonly inputSchema?: Record<string, unknown>
+  readonly annotations?: {
+    readonly readOnlyHint?: boolean
+    readonly destructiveHint?: boolean
+    readonly idempotentHint?: boolean
+    readonly openWorldHint?: boolean
+  }
 }
 
 export interface McpServerConfig {

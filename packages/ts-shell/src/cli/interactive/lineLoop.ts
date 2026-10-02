@@ -35,7 +35,7 @@ export interface LineLoopOptions {
   readonly initialMcpGateway: CliMcpGateway;
   readonly setReadline: (readline: ReadlineInterface | null) => void;
   readonly setActiveNonInteractiveApprovalMode: (mode: ApprovalModeObject | undefined) => void;
-  readonly exit: (code?: number) => never;
+  readonly exit: (code?: number) => void;
 }
 
 /** Run until stdin closes, resolving once the loop has finished. */
@@ -72,7 +72,7 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
   });
 
   let turnNumber = 0;
-  let mcpGateway = options.initialMcpGateway;
+  const mcpGateway = options.initialMcpGateway;
   let chain = Promise.resolve();
 
   input.prompt();
@@ -105,7 +105,7 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
         input.close();
         return;
       }
-      if (result.refreshMcpGateway) mcpGateway = options.initialMcpGateway;
+      if (result.refreshMcpGateway) await mcpGateway.syncWorkspace?.();
       if (result.refreshPromptChrome) {
         refreshInteractivePromptChrome({
           readline: input,

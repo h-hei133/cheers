@@ -1,3 +1,4 @@
+import type { CoreMcpGateway } from "../core/mcp/gateway.js";
 import type { PromptAttachments } from "../core/shell/sessionRuntime.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -53,6 +54,7 @@ import { runPrintSessionAction } from "../cli/print/actions.js";
 
 export async function runNonTtyPromptStream(options: {
   sessionManager: SessionManager;
+  mcpGateway?: CoreMcpGateway;
   runtimeContext: ShellRuntimeContext;
   renderer: StreamingRenderer;
   sessionRuntime: ShellSessionRuntime;
@@ -105,6 +107,7 @@ export async function runNonTtyPromptStream(options: {
         const outcome = await runNonInteractivePrompt({
           prompt,
           sessionManager: options.sessionManager,
+          mcpGateway: options.mcpGateway,
           runtimeContext: options.runtimeContext,
           renderer: options.renderer,
           sessionRuntime: options.sessionRuntime,
@@ -205,6 +208,7 @@ export async function runNonTtyPromptStream(options: {
 export async function runNonInteractivePrompt(options: {
   prompt: string;
   sessionManager: SessionManager;
+  mcpGateway?: CoreMcpGateway;
   runtimeContext: ShellRuntimeContext;
   renderer: StreamingRenderer;
   sessionRuntime: ShellSessionRuntime;
@@ -341,12 +345,17 @@ export async function runNonInteractivePrompt(options: {
     }
 
     if (resolved.slashResult.action === "show-mcp") {
-      await runCliMcpCommand({
-        renderer: options.renderer,
-        gateway: createCliMcpGateway(options.runtimeContext.cwd),
-        mcpAction: resolved.slashResult.mcpAction,
-        mcpTarget: resolved.slashResult.mcpTarget,
-      });
+      const gateway = options.mcpGateway ?? createCliMcpGateway(options.runtimeContext.cwd);
+      try {
+        await runCliMcpCommand({
+          renderer: options.renderer,
+          gateway,
+          mcpAction: resolved.slashResult.mcpAction,
+          mcpTarget: resolved.slashResult.mcpTarget,
+        });
+      } finally {
+        if (!options.mcpGateway) await gateway.close();
+      }
       return;
     }
 
@@ -590,6 +599,7 @@ export async function executeResolvedPromptTurn(options: {
 export async function runReplayPromptScript(options: {
   replayFile: string;
   sessionManager: SessionManager;
+  mcpGateway?: CoreMcpGateway;
   runtimeContext: ShellRuntimeContext;
   renderer: StreamingRenderer;
   sessionRuntime: ShellSessionRuntime;
@@ -628,6 +638,7 @@ export async function runReplayPromptScript(options: {
     const outcome = await runNonInteractivePrompt({
       prompt,
       sessionManager: options.sessionManager,
+      mcpGateway: options.mcpGateway,
       runtimeContext: options.runtimeContext,
       renderer: options.renderer,
       sessionRuntime: options.sessionRuntime,

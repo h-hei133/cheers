@@ -30,6 +30,7 @@ export async function runCliReplayMode(
 ): Promise<void> {
   await runReplayPromptScript({
     replayFile: input.replayFile,
+    mcpGateway: input.bootstrapRuntime.mcpGateway,
     sessionManager: input.bootstrapRuntime.sessionManager,
     runtimeContext: input.bootstrapRuntime.runtimeContext,
     renderer: input.bootstrapRuntime.renderer,

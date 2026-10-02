@@ -1,6 +1,4 @@
-import { CoreMcpClient } from "./client.js";
 import {
-  type McpConfigLoadError,
   isMcpConfigLoadError,
   loadMcpConfigs,
 } from "./config.js";
@@ -102,131 +100,121 @@ function describeUnavailableServer(
 }
 
 export class CoreMcpGateway {
-  private readonly workspaceRoot: string;
+  private workspaceRoot: string;
   private readonly connectionManager = new CoreMcpConnectionManager();
-  private readonly clientCache = new Map<string, CoreMcpClient>();
+  private queue: Promise<unknown> = Promise.resolve();
+  private closed = false;
+  private closing?: Promise<void>;
 
-  constructor(workspaceRoot: string) {
-    this.workspaceRoot = workspaceRoot;
+  constructor(private readonly root: string | (() => string)) {
+    this.workspaceRoot = typeof root === "string" ? root : root();
   }
 
   loadConfigs(): Record<string, ScopedMcpServerConfig> {
     return loadMcpConfigs(this.workspaceRoot, !projectTrust.isProjectUntrusted(this.workspaceRoot));
   }
 
-  async snapshot(): Promise<McpClientSnapshot> {
-    const configs = this.loadConfigsOrBlock();
-    const clients = await this.connectionManager.connectAll(configs);
-    this.pruneClientCache(clients);
-    const tools = [];
+  snapshot(): Promise<McpClientSnapshot> {
+    return this.run(async () => this.readSnapshot(await this.prepare()));
+  }
 
-    for (const clientState of clients) {
-      if (clientState.type !== "connected") {
-        continue;
+  refresh(target: string = "all"): Promise<McpClientSnapshot> {
+    return this.run(async () => {
+      const configs = await this.prepare();
+      const name = target.trim();
+      if (name && name.toLowerCase() !== "all" && !configs[name]) {
+        throw unknownServer(name);
       }
+      await this.connectionManager.close(!name || name.toLowerCase() === "all" ? undefined : name);
+      return this.readSnapshot(configs);
+    });
+  }
 
-      const client = new CoreMcpClient(clientState.name, clientState.config);
-      this.clientCache.set(clientState.name, client);
-      tools.push(...(await client.listTools()));
+  invokeTool(serverName: string, toolName: string, args: Record<string, unknown>): Promise<McpToolCallResult> {
+    return this.run(async () => {
+      const configs = await this.prepare();
+      const config = configs[serverName];
+      if (!config) throw unknownServer(serverName);
+      const client = this.connectionManager.get(serverName, config, this.workspaceRoot);
+      const state = await client.connect();
+      if (state.type !== "connected") throw this.createUnavailableServerBlockedError(state);
+      const liveTools = await client.listTools();
+      if (!liveTools.some(tool => tool.toolName === toolName)) {
+        throw new McpGatewayBlockedError({
+          message: "MCP tool " + toolName + " is unavailable on server " + serverName,
+          blockerKind: "unknown", mcpFailureClass: "tool-unavailable",
+          doNext: "Run /mcp refresh " + serverName + " and retry with a visible MCP tool.",
+        });
+      }
+      return client.invokeTool(toolName, args);
+    });
+  }
+
+  /** Called after a shell root transition, also checked on every request. */
+  syncWorkspace(): Promise<void> {
+    return this.run(() => this.synchronizeWorkspace());
+  }
+
+  close(): Promise<void> {
+    this.closed = true;
+    return this.closing ??= Promise.all([this.connectionManager.shutdown(), this.queue]).then(() => {});
+  }
+
+  private run<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.closed) return Promise.reject(new Error("MCP gateway is closed"));
+    const result = this.queue.then(() => {
+      if (this.closed) throw new Error("MCP gateway is closed");
+      return operation();
+    });
+    this.queue = result.catch(() => {});
+    return result;
+  }
+
+  private async synchronizeWorkspace(): Promise<void> {
+    const next = typeof this.root === "string" ? this.root : this.root();
+    if (next === this.workspaceRoot) return;
+    await this.connectionManager.close();
+    this.workspaceRoot = next;
+  }
+
+  private async prepare(): Promise<Record<string, ScopedMcpServerConfig>> {
+    await this.synchronizeWorkspace();
+    let configs: Record<string, ScopedMcpServerConfig>;
+    try {
+      configs = this.loadConfigs();
+    } catch (error) {
+      await this.connectionManager.close();
+      if (!isMcpConfigLoadError(error)) throw error;
+      throw new McpGatewayBlockedError({
+        message: error.message,
+        blockerKind: "environment-not-ready", mcpFailureClass: "config",
+        doNext: error.doNext,
+      });
     }
+    await this.connectionManager.reconcile(configs);
+    return configs;
+  }
 
+  private async readSnapshot(configs: Record<string, ScopedMcpServerConfig>): Promise<McpClientSnapshot> {
+    const clients: McpConnectionState[] = [];
+    const tools: McpClientSnapshot["tools"] = [];
+    for (const [name, config] of Object.entries(configs)) {
+      const client = this.connectionManager.get(name, config, this.workspaceRoot);
+      let state = await client.connect();
+      if (state.type === "connected") {
+        try {
+          tools.push(...await client.listTools());
+        } catch (error) {
+          await this.connectionManager.close(name);
+          state = { type: "failed", name, config, error: classifyMcpFailure({
+            failureClass: "protocol",
+            detail: error instanceof Error ? error.message : String(error),
+          }).safeDetail };
+        }
+      }
+      clients.push(state);
+    }
     return { clients, tools };
-  }
-
-  async refresh(target: string = "all"): Promise<McpClientSnapshot> {
-    const normalizedTarget = target.trim();
-    const configs = this.loadConfigsOrBlock();
-    if (
-      normalizedTarget &&
-      normalizedTarget.toLowerCase() !== "all" &&
-      !configs[normalizedTarget]
-    ) {
-      throw new McpGatewayBlockedError({
-        message: `Unknown MCP server: ${normalizedTarget}`,
-        blockerKind: "unknown",
-        mcpFailureClass: "tool-unavailable",
-        doNext:
-          "Run /mcp status to list configured servers, then retry with a valid server name.",
-      });
-    }
-
-    if (!normalizedTarget || normalizedTarget.toLowerCase() === "all") {
-      this.clientCache.clear();
-    } else {
-      this.clientCache.delete(normalizedTarget);
-    }
-
-    return this.snapshot();
-  }
-
-  async invokeTool(
-    serverName: string,
-    toolName: string,
-    args: Record<string, unknown>,
-  ): Promise<McpToolCallResult> {
-    const configs = this.loadConfigsOrBlock();
-    const config = configs[serverName];
-    if (!config) {
-      this.clientCache.delete(serverName);
-      throw new McpGatewayBlockedError({
-        message: `Unknown MCP server: ${serverName}`,
-        blockerKind: "unknown",
-        mcpFailureClass: "tool-unavailable",
-        doNext:
-          "Run /mcp status to list configured servers, then retry with a valid server name.",
-      });
-    }
-
-    const candidate = this.clientCache.get(serverName);
-    const client =
-      candidate && this.isSameConfig(candidate.config, config)
-        ? candidate
-        : new CoreMcpClient(serverName, config);
-
-    const connectionState = await client.connect();
-    if (connectionState.type !== "connected") {
-      this.clientCache.delete(serverName);
-      throw this.createUnavailableServerBlockedError(connectionState);
-    }
-
-    this.clientCache.set(serverName, client);
-    const liveTools = await client.listTools();
-    if (!liveTools.some((tool) => tool.toolName === toolName)) {
-      throw new McpGatewayBlockedError({
-        message: `MCP tool ${toolName} is unavailable on server ${serverName}`,
-        blockerKind: "unknown",
-        mcpFailureClass: "tool-unavailable",
-        doNext: `Run /mcp refresh ${serverName} and retry with a visible MCP tool.`,
-      });
-    }
-
-    return client.invokeTool(toolName, args);
-  }
-
-  private pruneClientCache(states: readonly McpConnectionState[]): void {
-    const connectedServers = new Set(
-      states
-        .filter(
-          (
-            state,
-          ): state is Extract<McpConnectionState, { type: "connected" }> =>
-            state.type === "connected",
-        )
-        .map((state) => state.name),
-    );
-
-    for (const serverName of this.clientCache.keys()) {
-      if (!connectedServers.has(serverName)) {
-        this.clientCache.delete(serverName);
-      }
-    }
-  }
-
-  private isSameConfig(
-    left: ScopedMcpServerConfig,
-    right: ScopedMcpServerConfig,
-  ): boolean {
-    return JSON.stringify(left) === JSON.stringify(right);
   }
 
   private createUnavailableServerBlockedError(
@@ -234,33 +222,20 @@ export class CoreMcpGateway {
   ): McpGatewayBlockedError {
     const description = describeMcpConnectionState(state);
     return new McpGatewayBlockedError({
-      message: description.reason ?? `MCP server ${state.name} is unavailable`,
+      message: description.reason ?? "MCP server " + state.name + " is unavailable",
       blockerKind: "environment-not-ready",
       mcpFailureClass: failureClassForConnectionState(state),
       doNext: description.doNext,
     });
   }
+}
 
-  private loadConfigsOrBlock(): Record<string, ScopedMcpServerConfig> {
-    try {
-      return this.loadConfigs();
-    } catch (error) {
-      if (isMcpConfigLoadError(error)) {
-        this.clientCache.clear();
-        throw this.createConfigBlockedError(error);
-      }
-      throw error;
-    }
-  }
-
-  private createConfigBlockedError(error: McpConfigLoadError): McpGatewayBlockedError {
-    return new McpGatewayBlockedError({
-      message: error.message,
-      blockerKind: "environment-not-ready",
-      mcpFailureClass: "config",
-      doNext: error.doNext,
-    });
-  }
+function unknownServer(name: string): McpGatewayBlockedError {
+  return new McpGatewayBlockedError({
+    message: "Unknown MCP server: " + name,
+    blockerKind: "unknown", mcpFailureClass: "tool-unavailable",
+    doNext: "Run /mcp status to list configured servers, then retry with a valid server name.",
+  });
 }
 
 function failureClassForConnectionState(

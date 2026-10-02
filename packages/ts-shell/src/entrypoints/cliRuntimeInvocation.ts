@@ -65,6 +65,7 @@ export interface CliRuntimeInvocationInput {
   /** Images that travelled with the prompt; see `PromptAttachments`. */
   readonly attachments?: PromptAttachments;
   readonly workspaceRoot: string;
+  readonly mcpGateway?: CoreMcpGateway;
   readonly signal: AbortSignal;
   readonly maxTurns: number;
   readonly escalationPromptHandler: (prompt: EscalationPrompt) => Promise<EscalationResponse>;
@@ -149,11 +150,24 @@ export async function runCliRuntimeInvocation(
   input: CliRuntimeInvocationInput,
   dependencies: CliRuntimeInvocationDependencies = defaultDependencies,
 ): Promise<CliRuntimeInvocationResult> {
-  const request = buildCliRuntimeInvocation(input);
-  if (request.providerMode === "real") {
-    return deferUntilReady(request, dependencies);
+  const gateway = input.mcpGateway ?? new CoreMcpGateway(input.workspaceRoot);
+  const request = buildCliRuntimeInvocation({ ...input, mcpGateway: gateway });
+  try {
+    const run = request.providerMode === "real"
+      ? await deferUntilReady(request, dependencies)
+      : await startTurn(request, dependencies);
+    if (input.mcpGateway) return run;
+    return {
+      ...run,
+      events: (async function* () {
+        try { yield* run.events; }
+        finally { await gateway.close(); }
+      })(),
+    };
+  } catch (error) {
+    if (!input.mcpGateway) await gateway.close();
+    throw error;
   }
-  return startTurn(request, dependencies);
 }
 
 /**
@@ -306,7 +320,7 @@ async function mcpToolsForRun(
   request: CliRuntimeInvocationRequest,
 ): Promise<{ tools: readonly McpToolDescriptor[]; gateway: CoreMcpGateway } | undefined> {
   if (request.runtimeConfig?.enableMcpTools !== true) return undefined;
-  const gateway = new CoreMcpGateway(request.workspaceRoot);
+  const gateway = request.mcpGateway!;
   try {
     const snapshot = await gateway.snapshot();
     // Servers that failed to connect are named here for the same reason a skill

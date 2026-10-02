@@ -85,7 +85,7 @@ export interface InteractiveModeOptions {
     handler: ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>) | undefined,
   ) => void;
   readonly setActiveNonInteractiveApprovalMode?: (mode: ApprovalModeObject | undefined) => void;
-  readonly exit?: (code?: number) => never;
+  readonly exit?: (code?: number) => void;
   /** Theme paths this run was started with, so `/theme` can still select them. */
   readonly themePaths?: readonly string[];
   /** Output device; defaults to the process terminal. */
@@ -206,7 +206,7 @@ export class InteractiveMode {
       // does not.
       onReload: () => this.tui.requestRender({ force: true }),
     });
-    this.tui.setDisconnectHandler(() => this.stop());
+    this.tui.setDisconnectHandler(() => { void this.shutdown(); });
     // A command that ends while nobody is looking is announced through the queue
     // a follow-up already uses, rather than through a mechanism of its own: the
     // model should learn about it the same way it learns about anything else the
@@ -283,7 +283,7 @@ export class InteractiveMode {
       ask: (question) => this.onQuestion(question),
       settle: () => this.onQuestionSettled(),
     });
-    this.readline = this.questions.asReadline(() => this.stop());
+    this.readline = this.questions.asReadline(() => { void this.shutdown(); });
     this.options.setReadline?.(this.readline);
     this.options.setInteractiveApprovalPrompt?.((prompt) => this.promptApproval(prompt));
     this.tui.setFrameProvider(this.view);
@@ -621,6 +621,7 @@ export class InteractiveMode {
         refreshKeybindings: () => this.preferences.reload(),
       });
       this.turnNumber = result.turnNumber;
+      if (result.refreshMcpGateway) await this.options.initialMcpGateway.syncWorkspace?.();
       // `/theme` and `/reload` both change which file is worth following, and the
       // watcher would otherwise keep repainting for the theme that was replaced.
       if (result.themeChanged) this.theme.refresh();
@@ -857,7 +858,7 @@ export class InteractiveMode {
     // paste or mouse events. Detach dispatch before yielding to the drain.
     this.stdin.dispose();
     try {
-      await this.terminal.drainInput?.();
+      if (this.terminal.drainInput) await this.terminal.drainInput();
     } catch {
       // A disconnected terminal must still reach synchronous cleanup.
     }

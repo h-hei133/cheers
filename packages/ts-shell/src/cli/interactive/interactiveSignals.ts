@@ -14,7 +14,7 @@ export function installInteractiveSignalHandlers(input: {
   readonly sessionRuntime: ShellSessionRuntime;
   readonly renderer: StreamingRenderer;
   readonly runtimeContext: ShellRuntimeContext;
-  readonly exit: (code?: number) => never;
+  readonly exit: (code?: number) => void;
 }): void {
   input.process.on("SIGINT", () => {
     handleShellSigint({
@@ -32,7 +32,7 @@ export function installInteractiveCloseHandler(input: {
   readonly sessionRuntime: ShellSessionRuntime;
   readonly renderer: StreamingRenderer;
   readonly runtimeContext: ShellRuntimeContext;
-  readonly exit: (code?: number) => never;
+  readonly exit: (code?: number) => void;
 }): void {
   input.readline.on("close", () => {
     handleShellClose({

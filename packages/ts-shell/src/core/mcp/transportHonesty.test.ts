@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { CoreMcpClient } from "./client.js";
 import { classifyUnknownMcpFailure } from "./errorTaxonomy.js";
@@ -69,10 +70,12 @@ describe("a server on a transport this build does not implement", () => {
     const client = new CoreMcpClient("local", {
       transport: "stdio",
       command: process.execPath,
-      args: ["-e", "process.exit(0)"],
+      args: [path.resolve("src/core/mcp/fixtures/mockMcpServer.mjs")],
       scope: "user",
     });
-    await expect(client.connect()).resolves.toMatchObject({ type: "connected" });
+    try {
+      await expect(client.connect()).resolves.toMatchObject({ type: "connected" });
+    } finally { await client.close(); }
   });
 
   it("still reports a missing command as its own failure", async () => {

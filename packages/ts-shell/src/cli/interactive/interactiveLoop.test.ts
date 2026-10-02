@@ -17,7 +17,7 @@ describe("interactive loop", () => {
       stdin,
       stdout,
       process: processEvents,
-      sessionManager: {} as never,
+      sessionManager: { sessionExists: () => false } as never,
       renderer: new StreamingRenderer(),
       runtimeContext: {
         cwd: "/tmp/project-alpha",
@@ -31,6 +31,7 @@ describe("interactive loop", () => {
       getPermissionScope: () => "ask",
         getCurrentRunController: () => null,
         observeEvents: () => () => undefined,
+        terminate: () => undefined,
       } as never,
       logger: {
         error: () => undefined,
@@ -42,9 +43,7 @@ describe("interactive loop", () => {
         capturedReadline = readline;
       },
       setActiveNonInteractiveApprovalMode: () => undefined,
-      exit: ((code?: number) => {
-        throw new Error(`unexpected exit ${code ?? ""}`.trim());
-      }) as never,
+      exit: () => undefined,
     });
 
     // The host owns raw stdin, so downstream command routers get a readline

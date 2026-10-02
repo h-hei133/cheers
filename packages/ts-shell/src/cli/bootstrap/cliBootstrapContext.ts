@@ -1,3 +1,4 @@
+import type { CoreMcpGateway } from "../../core/mcp/gateway.js";
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import type {
   ShellBootstrapResult,
@@ -14,7 +15,6 @@ import { getWorkflowGitContext } from "../../workflow/gitContext.js";
 import type { CliOptions } from "../options/cliOptions.js";
 import {
   createCliMcpGateway,
-  type CliMcpGateway,
 } from "../../entrypoints/cliMcpModule.js";
 import {
   resolveTargetProjectRoot,
@@ -45,7 +45,7 @@ export interface CliBootstrapRuntimeContext extends CliRootContext {
   >;
   readonly bootstrap: ShellBootstrapResult;
   readonly runtimeContext: ShellRuntimeContext;
-  readonly mcpGateway: CliMcpGateway;
+  readonly mcpGateway: CoreMcpGateway;
 }
 
 export interface CreateCliRootContextInput {
@@ -157,7 +157,7 @@ export function createCliBootstrapRuntimeContext(
     }
   })();
   const runtimeContext = bootstrap.context;
-  const mcpGateway = createCliMcpGateway(runtimeContext.cwd);
+  const mcpGateway = createCliMcpGateway(() => runtimeContext.cwd);
 
   return {
     ...input.rootContext,

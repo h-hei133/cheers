@@ -12,7 +12,7 @@ import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 import type { OverlayHost, Picker } from "./overlay.js";
 import type { PickerHost } from "./picker/registry.js";
 
-function build(overrides: { observeEvents?: () => () => void } = {}): {
+function build(overrides: { observeEvents?: () => () => void; exit?: (code?: number) => void } = {}): {
   mode: InteractiveMode;
   renderer: StreamingRenderer;
   readline: { current: unknown };
@@ -43,6 +43,7 @@ function build(overrides: { observeEvents?: () => () => void } = {}): {
     approvalTrustPolicy: {} as unknown as ApprovalTrustPolicy,
     initialMcpGateway: {} as unknown as CliMcpGateway,
     terminal,
+    exit: overrides.exit,
     setReadline: (value) => {
       readline.current = value;
     },
@@ -167,9 +168,11 @@ describe("session wiring", () => {
     expect(released).toBe(1);
   });
   it("cleans up host resources when the terminal disconnects", () => {
-    const { mode, renderer, readline, terminal } = build();
+    const exit = vi.fn();
+    const { mode, renderer, readline, terminal } = build({ exit });
     mode.start();
     terminal.disconnect();
+    expect(exit).toHaveBeenCalledWith(0);
     expect(terminal.stopped).toBe(true);
     expect(renderer.captured).toBe(false);
     const readlineInterface = readline.current;

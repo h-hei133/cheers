@@ -5482,3 +5482,14 @@ catalog 外的 model 会退回 `DEFAULT_REQUEST_SHAPE`）。
 最新构建 regular/fullscreen 真实 PTY 与两组 JSON 回放通过；定向回归、静态阻断门禁和
 40 项脚本测试通过。保留已有结构 advisory，本地未跑全套 TypeScript 测试，未调用真实提供方。
 逐项提交与撤销证据见[裁决 §8.4](features/phase-18-decisions.md#84-实施记录)；后续继续 W3–W8。
+
+## [2026-10-02] implement | Phase 18 W3 标准 MCP 协议与连接生命周期
+
+R3 按维护者授权选标准协议，使用官方 SDK 接通 stdio JSON-RPC。命令与 prompt 共享会话网关，
+配置/目录变化关闭旧进程，工具调用未知结果不重放，退出取消等待并观察进程关闭。
+独立复核发现并修复分页元数据、退出队列和 SDK 取消监听累积问题，最终 APPROVE / CLEAR。
+72 项定向回归、撤销验证、静态门禁通过；regular/fullscreen/JSON 及 PTY 断连、SIGTERM
+实际进程验收通过。断连验收捕获并补修输出流 EIO 中断清理的问题，退出失败码在清理后保留。
+W2 远端固定延时测试失败已单独修复为 74913e7。
+详细证据和限制见 [裁决 §8.4](features/phase-18-decisions.md#84-实施记录)。
+W3 的 todo 生命周期和缓存上限以及 W4–W8 继续实施。

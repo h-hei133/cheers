@@ -13,6 +13,7 @@ import {
 describe("core MCP gateway (W3)", () => {
   let fakeHomeDir = "";
   let workspaceRoot = "";
+  const gateways: CoreMcpGateway[] = [];
   const originalUserProfile = process.env.USERPROFILE;
   const originalHome = process.env.HOME;
 
@@ -27,7 +28,8 @@ describe("core MCP gateway (W3)", () => {
     process.env.HOME = fakeHomeDir;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await Promise.all(gateways.splice(0).map(gateway => gateway.close()));
     if (originalUserProfile === undefined) delete process.env.USERPROFILE;
     else process.env.USERPROFILE = originalUserProfile;
     if (originalHome === undefined) delete process.env.HOME;
@@ -80,6 +82,7 @@ describe("core MCP gateway (W3)", () => {
     expect(() => loadMcpConfigs(workspaceRoot, true)).toThrow(McpConfigLoadError);
 
     const gateway = new CoreMcpGateway(workspaceRoot);
+    gateways.push(gateway);
     await expect(gateway.snapshot()).rejects.toMatchObject({
       blockerKind: "environment-not-ready",
       doNext: `Fix or remove ${configPath}, then run /mcp refresh all.`,
@@ -123,6 +126,7 @@ describe("core MCP gateway (W3)", () => {
     );
 
     const gateway = new CoreMcpGateway(workspaceRoot);
+    gateways.push(gateway);
     const snapshot = await gateway.snapshot();
 
     expect(snapshot.clients).toHaveLength(1);
@@ -157,6 +161,7 @@ describe("core MCP gateway (W3)", () => {
     );
 
     const gateway = new CoreMcpGateway(workspaceRoot);
+    gateways.push(gateway);
     const snapshot = await gateway.snapshot();
 
     expect(snapshot.tools).toHaveLength(1);
@@ -194,6 +199,7 @@ describe("core MCP gateway (W3)", () => {
     );
 
     const gateway = new CoreMcpGateway(workspaceRoot);
+    gateways.push(gateway);
     await gateway.snapshot();
 
     fs.writeFileSync(
@@ -263,6 +269,7 @@ describe("core MCP gateway (W3)", () => {
     );
 
     const gateway = new CoreMcpGateway(workspaceRoot);
+    gateways.push(gateway);
     await gateway.snapshot();
 
     fs.writeFileSync(
@@ -325,6 +332,7 @@ describe("core MCP gateway (W3)", () => {
     );
 
     const gateway = new CoreMcpGateway(workspaceRoot);
+    gateways.push(gateway);
     await gateway.snapshot();
 
     await expect(gateway.refresh("stdioEcho")).resolves.toMatchObject({

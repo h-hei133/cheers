@@ -1987,7 +1987,10 @@ something to take back」。所以**并非「零回滚能力」**——
 这是**低成本、高可发现性收益**的一条；比对每个事件都补一个内建 hook 更务实
 （内建 hook 各有自己的产品判断，不该为了对称而加）。
 
-### OBS-04 · MCP 网关**每个 prompt 重建一次** → 每个 stdio server 每次 `listTools` 起一个子进程 — `OPEN` `P2` `CONFIRMED`
+### OBS-04 · MCP 网关**每个 prompt 重建一次** → 每个 stdio server 每次 `listTools` 起一个子进程 — `FIXED` `P2` `CONFIRMED`
+
+**2026-10-02 更新**：已由 Phase 18 W3-11 修复：命令和 prompt 共享会话网关，配置/目录变化关闭旧连接，退出观察直接子进程回收。
+验证和限制见 [Phase 18 §8.4](phase-18-decisions.md#84-实施记录)。以下为修复前证据。
 
 **链路**（主代理逐跳核实）：
 
@@ -3106,7 +3109,10 @@ picker（`/back`、`/model`、`/resume`…）与补全列表**纯键盘**，点�
 `newlineKeyFor`（`:81-85`）逻辑正确（legacy→`ctrl+j`、否则 `shift+enter`），只是结果无人显示。
 **方向**：要么在空提示里显示，要么删掉该字段与传参链。
 
-### OBS-15 · MCP stdio 客户端用**自定义信封**，无法与真实 MCP server 互操作 — `OPEN` `P1` `CONFIRMED`
+### OBS-15 · MCP stdio 客户端用**自定义信封**，无法与真实 MCP server 互操作 — `FIXED` `P1` `CONFIRMED`
+
+**2026-10-02 更新**：已由 Phase 18 R3/W3-11 修复：标准 JSON-RPC 握手、分页工具目录和调用接入官方 SDK，保留失败分类和结果校验。
+验证和限制见 [Phase 18 §8.4](phase-18-decisions.md#84-实施记录)。以下为修复前证据。
 
 `core/mcp/client.ts:44-55` 自述（原文）：写 `{"action":"list-tools"}` / `{"action":"invoke-tool"}`，
 「A real protocol client writes JSON-RPC 2.0 (`tools/list`, `tools/call`), so **this cannot talk to a

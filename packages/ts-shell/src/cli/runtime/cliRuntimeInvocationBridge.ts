@@ -1,3 +1,4 @@
+import type { CoreMcpGateway } from "../../core/mcp/gateway.js";
 import type { PromptAttachments } from "../../core/shell/sessionRuntime.js";
 import type { QueryEvent } from "../../core/query/runtime/events.js";
 import type { ProviderCredentialResolution } from "../../core/shell/providerCredentials.js";
@@ -14,6 +15,7 @@ import type { RuntimeConfig } from "../../config/runtimeConfig.js";
 
 export function streamCliRuntimePrompt(input: {
   readonly prompt: string;
+  readonly mcpGateway?: CoreMcpGateway;
   /** Images that travelled with the prompt; see `PromptAttachments`. */
   readonly attachments?: PromptAttachments;
   readonly sessionId: string;
@@ -45,6 +47,7 @@ export function streamCliRuntimePrompt(input: {
   // reads start after the snapshot either way, so the promise is folded in
   // here rather than pushed into every caller's signature.
   const started = runCliRuntimeInvocation({
+    mcpGateway: input.mcpGateway,
     sessionId: input.sessionId,
     prompt: input.prompt,
     ...(input.attachments ? { attachments: input.attachments } : {}),

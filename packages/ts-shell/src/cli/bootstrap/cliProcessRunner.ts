@@ -1,3 +1,4 @@
+import { createCliShutdown } from "../runtime/shutdown.js";
 import type { Interface as ReadlineInterface } from "node:readline";
 import type { ReadStream } from "node:tty";
 
@@ -123,110 +124,122 @@ export async function runCliProcess(
   const resolvedCredential =
     providerRuntimeBridge.resolveCredentialSnapshot();
   const mcpGateway = bootstrapRuntime.mcpGateway;
+  const shutdown = createCliShutdown({
+    close: () => mcpGateway.close(), process: input.process, exit: input.exit, writeError: input.writeError,
+    streams: [input.stdin, input.process.stdout, input.process.stderr],
+    handleInterrupt: options.printMode === true || options.jsonEvents === true || !input.stdin.isTTY,
+  });
 
-  const stdinPromptCapture = await captureCliStdinPrompts({
-    options,
-    stdin: input.stdin,
-  });
-  time("stdin captured");
-  projectAndRenderCliStartupSurface({
-    options,
-    stdin: input.stdin,
-    stdout: input.process.stdout,
-    cliModePlan: stdinPromptCapture.cliModePlan,
-    stdinTransportMode: stdinPromptCapture.stdinTransportMode,
-    nonInteractivePromptCount:
-      stdinPromptCapture.nonInteractivePrompts.length,
-    launchCwd: input.launchCwd,
-    bootstrapRuntime,
-    providerCredentialResolution: resolvedCredential,
-    providerModeEnv: providerRuntimeBridge.providerModeEnv(),
-  });
-  time("startup surface rendered");
-  logCliBootstrapSessionInitialized({ logger, bootstrapRuntime });
-  // Started and not waited on, so the first frame is never behind a network
-  // call. Only for an interactive session: a scripted run has nobody to read a
-  // notice, and asking on its behalf would be traffic with no reader.
-  if (!options.printMode) {
-    void checkForUpdate({
-      env: process.env,
-      configuredOffline: runtimeContext.runtimeConfig.offline === true,
-    }).then((result) => {
-      const notice = formatUpdateNotice(result);
-      if (notice) renderer.renderLine(`\n${notice}\n`);
+  try {
+    const stdinPromptCapture = await captureCliStdinPrompts({
+      options,
+      stdin: input.stdin,
     });
+    time("stdin captured");
+    projectAndRenderCliStartupSurface({
+      options,
+      stdin: input.stdin,
+      stdout: input.process.stdout,
+      cliModePlan: stdinPromptCapture.cliModePlan,
+      stdinTransportMode: stdinPromptCapture.stdinTransportMode,
+      nonInteractivePromptCount:
+        stdinPromptCapture.nonInteractivePrompts.length,
+      launchCwd: input.launchCwd,
+      bootstrapRuntime,
+      providerCredentialResolution: resolvedCredential,
+      providerModeEnv: providerRuntimeBridge.providerModeEnv(),
+    });
+    time("startup surface rendered");
+    logCliBootstrapSessionInitialized({ logger, bootstrapRuntime });
+    // Started and not waited on, so the first frame is never behind a network
+    // call. Only for an interactive session: a scripted run has nobody to read a
+    // notice, and asking on its behalf would be traffic with no reader.
+    if (!options.printMode) {
+      void checkForUpdate({
+        env: process.env,
+        configuredOffline: runtimeContext.runtimeConfig.offline === true,
+      }).then((result) => {
+        const notice = formatUpdateNotice(result);
+        if (notice) renderer.renderLine(`\n${notice}\n`);
+      });
+    }
+
+    let readline: ReadlineInterface | null = null;
+    let interactiveApprovalPrompt:
+      | ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>)
+      | undefined;
+
+    const sessionRuntime = createCliSessionRuntime({
+      mcpGateway,
+      sessionManager,
+      renderer,
+      runtimeContext,
+      options,
+      approvalTrustPolicy,
+      approvalModeState,
+      providerRuntimeBridge,
+      getReadline: () => readline,
+      isStdinTty: () => Boolean(input.stdin.isTTY),
+      // Reported as present only once the interactive surface has actually
+      // installed a handler. Handing over a fallback closure here would make the
+      // approval bridge treat every run as interactive and skip the
+      // non-interactive policy path entirely. The getter is read at prompt time
+      // because the interactive surface installs its handler after this runtime
+      // is built.
+      getPromptInteractiveApproval: () => interactiveApprovalPrompt,
+    });
+    if (bootstrapRuntime.writeJsonEvent) {
+      sessionRuntime.observeEvents(bootstrapRuntime.writeJsonEvent);
+    }
+
+    const handledPrintMode = await runCliPrintModeRouter({
+      cliModePlan: stdinPromptCapture.cliModePlan,
+      options,
+      nonInteractivePrompts: stdinPromptCapture.nonInteractivePrompts,
+      pipedInput: stdinPromptCapture.pipedInput,
+      bootstrapRuntime,
+      sessionRuntime,
+      logger,
+      writeError: input.writeError,
+      exit: input.exit,
+      setActiveNonInteractiveApprovalMode: (mode) => {
+        approvalModeState.set(mode);
+      },
+      approvalTrustPolicy,
+    });
+    if (handledPrintMode) {
+      await shutdown.close();
+      return;
+    }
+
+    await runInteractiveLoop({
+      stdin: input.stdin,
+      stdout: input.process.stdout,
+      process: input.process,
+      sessionManager,
+      renderer,
+      runtimeContext,
+      sessionRuntime,
+      logger,
+      approvalTrustPolicy,
+      fallbackSessionId: recoveryCandidate?.id,
+      initialMcpGateway: mcpGateway,
+      setReadline: (nextReadline) => {
+        readline = nextReadline;
+      },
+      setInteractiveApprovalPrompt: (handler) => {
+        interactiveApprovalPrompt = handler;
+      },
+      setActiveNonInteractiveApprovalMode: (mode) => {
+        approvalModeState.set(mode);
+      },
+      ...(options.themePaths ? { themePaths: options.themePaths } : {}),
+      exit: shutdown.exit,
+    });
+  } catch (error) {
+    await shutdown.close();
+    throw error;
   }
-
-  let readline: ReadlineInterface | null = null;
-  let interactiveApprovalPrompt:
-    | ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>)
-    | undefined;
-
-  const sessionRuntime = createCliSessionRuntime({
-    sessionManager,
-    renderer,
-    runtimeContext,
-    options,
-    approvalTrustPolicy,
-    approvalModeState,
-    providerRuntimeBridge,
-    getReadline: () => readline,
-    isStdinTty: () => Boolean(input.stdin.isTTY),
-    // Reported as present only once the interactive surface has actually
-    // installed a handler. Handing over a fallback closure here would make the
-    // approval bridge treat every run as interactive and skip the
-    // non-interactive policy path entirely. The getter is read at prompt time
-    // because the interactive surface installs its handler after this runtime
-    // is built.
-    getPromptInteractiveApproval: () => interactiveApprovalPrompt,
-  });
-  if (bootstrapRuntime.writeJsonEvent) {
-    sessionRuntime.observeEvents(bootstrapRuntime.writeJsonEvent);
-  }
-
-  const handledPrintMode = await runCliPrintModeRouter({
-    cliModePlan: stdinPromptCapture.cliModePlan,
-    options,
-    nonInteractivePrompts: stdinPromptCapture.nonInteractivePrompts,
-    pipedInput: stdinPromptCapture.pipedInput,
-    bootstrapRuntime,
-    sessionRuntime,
-    logger,
-    writeError: input.writeError,
-    exit: input.exit,
-    setActiveNonInteractiveApprovalMode: (mode) => {
-      approvalModeState.set(mode);
-    },
-    approvalTrustPolicy,
-  });
-  if (handledPrintMode) {
-    return;
-  }
-
-  await runInteractiveLoop({
-    stdin: input.stdin,
-    stdout: input.process.stdout,
-    process: input.process,
-    sessionManager,
-    renderer,
-    runtimeContext,
-    sessionRuntime,
-    logger,
-    approvalTrustPolicy,
-    fallbackSessionId: recoveryCandidate?.id,
-    initialMcpGateway: mcpGateway,
-    setReadline: (nextReadline) => {
-      readline = nextReadline;
-    },
-    setInteractiveApprovalPrompt: (handler) => {
-      interactiveApprovalPrompt = handler;
-    },
-    setActiveNonInteractiveApprovalMode: (mode) => {
-      approvalModeState.set(mode);
-    },
-    ...(options.themePaths ? { themePaths: options.themePaths } : {}),
-    exit: (code?: number) => input.exit(code ?? 0),
-  });
 }
 
 /**

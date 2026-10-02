@@ -8,7 +8,7 @@ export function handleShellSigint(input: {
   renderer: StreamingRenderer;
   runtimeContext: ShellRuntimeContext;
   readline?: Pick<Interface, "close">;
-  exit: (code: number) => never;
+  exit: (code: number) => void;
 }): void {
   if (input.sessionRuntime.getCurrentRunController()) {
     input.renderer.renderLine("\nCancellation requested by user (Ctrl+C).");
@@ -34,7 +34,7 @@ export function handleShellClose(input: {
    * Optional: surfaces that call this without an exit hook (and tests) must not be
    * forced to terminate the process. Absent means "close the session, keep running".
    */
-  exit?: (code: number) => never;
+  exit?: (code: number) => void;
   /** Used only to ask whether the session survived being closed. */
   sessionManager?: { sessionExists(sessionId: string): boolean };
 }): void {
