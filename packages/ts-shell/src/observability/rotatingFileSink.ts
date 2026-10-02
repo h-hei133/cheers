@@ -8,6 +8,8 @@ export interface RotatingFileSinkOptions {
   readonly logDir?: string;
   readonly maxFileSizeMb?: number;
   readonly maxHistoryDays?: number;
+  /** Includes the current file; foreign live process logs may exceed the limit. */
+  readonly maxFiles?: number;
   readonly filePrefix?: string;
   readonly pid?: number;
 }
@@ -22,14 +24,15 @@ export interface RotatingFileSinkOptions {
 const LEGACY_FILE_PREFIXES = ["coding-agent"] as const;
 
 /**
- * High-performance, non-blocking rotating file sink for structured logs.
+ * Rotating file sink for structured logs.
  * Segregates logs by process PID and date: <prefix>.<DATE>.<PID>.log.
- * Cleans up stale logs older than maxHistoryDays while actively protecting running PIDs.
+ * Bounds history by age and count while preserving other processes' live logs.
  */
 export class RotatingFileSink {
   private readonly logDir: string;
   private readonly maxFileSizeBytes: number;
   private readonly maxHistoryDays: number;
+  private readonly maxFiles: number;
   private readonly filePrefix: string;
   private readonly pid: number;
   private currentFilePath: string = "";
@@ -42,6 +45,10 @@ export class RotatingFileSink {
     this.logDir = options.logDir ?? (configuredDir || defaultDir);
     this.maxFileSizeBytes = (options.maxFileSizeMb ?? 5) * 1024 * 1024;
     this.maxHistoryDays = options.maxHistoryDays ?? 7;
+    this.maxFiles = options.maxFiles ?? 20;
+    if (!Number.isSafeInteger(this.maxFiles) || this.maxFiles < 1) {
+      throw new RangeError("maxFiles must be a positive safe integer.");
+    }
     this.filePrefix = options.filePrefix ?? "cheers";
     this.pid = options.pid ?? process.pid;
   }
@@ -111,8 +118,8 @@ export class RotatingFileSink {
       if (!fs.existsSync(this.logDir)) {
         fs.mkdirSync(this.logDir, { recursive: true });
       }
-      this.pruneStaleLogs();
       this.openCurrentStream();
+      this.pruneStaleLogs();
       this.initialized = true;
     } catch {
       // Fallback
@@ -148,45 +155,44 @@ export class RotatingFileSink {
       }
       this.currentFilePath = this.computeLogPath(part);
       this.currentFileSize = 0;
+      this.pruneStaleLogs();
     } catch {
       // Fallback
     }
   }
 
   private pruneStaleLogs(): void {
+    const prefixes = new Set<string>([this.filePrefix, ...LEGACY_FILE_PREFIXES]);
+    const now = Date.now();
+    const maxAgeMs = this.maxHistoryDays * 24 * 60 * 60 * 1000;
+    const retained: { file: string; removable: boolean }[] = [];
+    const livePids = new Map<number, boolean>();
+    for (const file of orderedLogFiles(this.logDir, this.currentFilePath)) {
+      const match = /^(.+)\.(\d{4}-\d{2}-\d{2})\.(\d+)\.log(?:\.\d+)?$/.exec(path.basename(file));
+      if (!match || !prefixes.has(match[1]!)) continue;
+      const pid = Number(match[3]);
+      if (pid !== this.pid && !livePids.has(pid)) livePids.set(pid, this.isProcessActive(pid));
+      // Our closed shards are reclaimable even while this process stays alive.
+      // Other processes do not expose their active path, so retain their files.
+      const removable = file !== this.currentFilePath && !livePids.get(pid);
+      if (removable && now - Date.parse(match[2]!) > maxAgeMs && this.removeLog(file)) continue;
+      retained.push({ file, removable });
+    }
+
+    // The next append may create the current path; reserve its slot now.
+    let excess = retained.length + Number(!fs.existsSync(this.currentFilePath)) - this.maxFiles;
+    for (const { file, removable } of retained) {
+      if (excess <= 0) break;
+      if (removable && this.removeLog(file)) excess--;
+    }
+  }
+
+  private removeLog(file: string): boolean {
     try {
-      const files = fs.readdirSync(this.logDir);
-      // Every prefix a log file may carry, current first. A file written under an
-      // earlier name is still this tool's log, and pruning only the current prefix
-      // would leave those on disk forever — the retention bound would stop
-      // applying to exactly the files that are already oldest.
-      const prefixes = [this.filePrefix, ...LEGACY_FILE_PREFIXES];
-      const pattern = new RegExp(
-        `^(?:${prefixes.join("|")})\\.(\\d{4}-\\d{2}-\\d{2})\\.(\\d+)\\.log(?:\\.\\d+)?$`,
-      );
-      const now = Date.now();
-      const maxAgeMs = this.maxHistoryDays * 24 * 60 * 60 * 1000;
-
-      for (const file of files) {
-        const match = file.match(pattern);
-        if (!match) continue;
-
-        const [, dateStr, pidStr] = match;
-        const filePid = parseInt(pidStr, 10);
-
-        // Protect currently active running processes
-        if (this.isProcessActive(filePid)) {
-          continue;
-        }
-
-        const fileDate = new Date(dateStr).getTime();
-        if (now - fileDate > maxAgeMs) {
-          const fullPath = path.join(this.logDir, file);
-          fs.unlinkSync(fullPath);
-        }
-      }
-    } catch {
-      // Non-critical pruning failure
+      fs.unlinkSync(file);
+      return true;
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === "ENOENT";
     }
   }
 
@@ -195,8 +201,9 @@ export class RotatingFileSink {
     try {
       process.kill(pid, 0);
       return true;
-    } catch {
-      return false;
+    } catch (error) {
+      // Permission or inspection failures are not evidence that a writer exited.
+      return (error as NodeJS.ErrnoException).code !== "ESRCH";
     }
   }
 }
