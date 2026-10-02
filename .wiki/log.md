@@ -5312,3 +5312,156 @@ features/phase-17-decisions.md §8.7–8.11；新发现的次要 Google 请求�
 
 随后远端构建通过；7 项测试失败归因于缺少 Chromium 和 ripgrep。
 CI 补充对应原生测试依赖，使用锁定版本安装器，保留原有测试和断言。
+
+## [2026-10-01] plan | Phase 18 规划：29 号文档未完成项的设计级研究 + 裁决 + 三方证伪复核
+
+**输入**：13 号登记册当前 **23 条唯一 `OPEN`** —— 机械统计与 `git show 44eebfd5:`（Phase 17
+规划时点）对照后确认：**21 条从未被任何阶段规划过**、1 条为 Phase 17 之后新登记的 `PRV-12`、
+1 条为 Phase 17 裁决后**保持 OPEN** 的 `SES-02`；另加 `12-gap-and-debt-research-2.md` §10 的四项未覆盖面。
+**零代码改动**（`git status` 只多出两份新文档）。
+
+**顺带补上 Phase 17 的一处记账缺口**：`phase-17-decisions.md` §1.2 写「移出（更后阶段）22 项」，
+但**通篇没有枚举这 22 项**。本文用「规划时点 OPEN 集合 − decisions 全文出现过的 ID 集合」重算，
+净 **21 条**，清单已显式列出，供后续阶段直接引用。
+
+**交付**：
+- `features/phase-18-pre-research.md`（~1,000 行）——每条给出我方缺口（`path:line`）、
+  参考机制（`repo/path:line` + 引文，或 `NOT-FOUND`）、判定、可实施方向；
+  另补做 12 号 §10 的两项边界（浏览器四分类重算、键位双向 diff）。
+- `features/phase-18-decisions.md`（~620 行）——**33 个交付项 / 7 波**，
+  另 **4 项明确不做**（附理由）、**2 项待裁决**、**0 项等待外部输入**（真实 provider 验证已于同日实机执行，见下一条日志）。
+
+**收尾时自查发现一处统计盲区，补入 W7（9 项）**：初稿只统计 13 号册的 `OPEN` 条目，
+于是漏了三类——**`THM-03` 标 `PARTIAL`**（Phase 17 只做了一半，「按裁决延期」的那半
+从未落到任何阶段）、**`SES-08`/`PRV-06`/`BRW-06` 三条按设计不带状态标记的「未逐一核验的面」**、
+以及散落在 13 号册 §13.2/§16.4/§18 散文里的五项（`memory/**`+`context/**` 逐模块、
+`core/shell` 审计、`context/startup` 行为验证、子代理递归与工具继承、TLS/HTTP2 流边界）。
+教训记入文档：**「统计 OPEN」不等于「统计未完成」**。
+其中 W7-30（子代理工具继承）主代理初查即发现**可能已健全**——
+`core/subagents/runner.ts:135-142` 已用 `subagentTools()` 过滤装配，`NEVER_GIVEN` 剥掉 `task`。
+
+**派遣**：研究 5 个子代理（并发 5，`vsllm/glm-5.3-api:max`，**全部成功返回**——
+无 `content_filter`、无 402，与 Phase 16/17 不同）；复核 3 个证伪式子代理（并发 3）。
+**主代理逐条复验**全部载重断言，并**更正了三处引用行号**（`crash-log.ts` 常量 `:18-19`、
+`nested-tool-calls.ts` 位置与行号、`truncate.ts:11-12`）。
+
+**六项关键发现（主代理亲验）**：
+`TOL-07` 是参考侧唯一明确更优的执行安全项（opencode 在锁内 `sameBytes` 比对 →
+`StaleContentError`；**跨进程防护靠写时比较而非锁**，我方有队列缺比较）；
+`CMD-04` 的判定位置是四方里唯一放在派发处 if 链的（Claude Code 用 per-command 声明字段）；
+`CMD-06` 是「功能在、入口无」（我方 `rewind` 宿主与 pi 的 `navigateTree` 同构，缺一等入口）；
+`SES-02` 的 fencing **在所有参考里都 `NOT-FOUND`**（opencode 的 `staleMs` 与我方同为 60_000）；
+`OBS-04`(MCP) 比登记册**更严重**（每 prompt = 1 + 工具调用数 × 2 个子进程）；
+`LOP-01` 的阈值 3 与 opencode 相同、**不是缺陷**，唯一缺陷是消息宣称了未做过的判断。
+
+**复核结果**：25 条断言 **correct 21 / partly-wrong 4 / wrong 0 / unverifiable 0**。
+**没有 `wrong`**，但有 **2 条 `partly-wrong` 推翻了我的依据**（判决不变）：
+① `CTX-08` 的面数——登记册的「6」把自己标 ✅ 的对照行算进缺陷侧，我的「5」其表格只列 4 行，
+复核者按口径拆开 ⇒ 定稿 **4 同型 + 3 部分派生 + 1 模型面**；
+② `ok: true` 分布代理——我写「23 模块、全在夹具侧」，实为 **25 模块、2 个在模型侧真实路径上**
+⇒ 该依据被删，判决改由「定位裁决」支撑（教训：**同一字面量在不同定位下含义相反**）。
+复核者还**加重了 3 条**：`OBS-04` 的 spawn 公式、`SES-07` 的第二条绕过路径
+（`sessionLifecycleWrites.ts:214` 的 `discardIfEmpty` 直连 `store.deleteSession`）、
+`SES-06` 的活轨调用点（格式化器仍在用，要删的是**恒空的规则表**）。
+复核者**独立复现**：`CLI-01` 的 0 行 JSON/105 行输出、`CMD-04` 的命令拦截、
+`CTX-02` 两面自相矛盾陈述、**人工构造父子环**后两函数给出相反结论、键位两表零漂移（71/71 通过）。
+
+**登记册待回写（施工轮执行，本轮仅记录）**：`BRW-00` 的 `164` → `167`
+（差额 3 = Phase 17 `8adc76f9` 以 **rename** 从 `core/harness/` 迁入 `browser/smoke/`）；
+`CTX-08` 的「6 个 surface」→ 三分类计数；`PRV-04` 改 `PARTIAL`；
+§12 的不可达数字加口径说明；**`OBS-03`/`OBS-04` 编号冲突**（§10 与 §11bis 各一组，
+违反 §0.1「编号永不复用」）改 §11bis 为 `OBS-11`/`OBS-12`。
+
+**真实 provider 验证**：维护者将在本轮后提供中转站 URL + key。已登记为**待办**（不是裁决），
+写明三条前提（需要哪些协议路径）、两条**给 URL/key 也解除不了的**（`M3` Device Code、
+`M6` 订阅 OAuth、16-L Bedrock 端到端），以及两条实操约束（CLI 无 `--base-url`/`--model`；
+catalog 外的 model 会退回 `DEFAULT_REQUEST_SHAPE`）。
+
+## [2026-10-01] verify | **真实 provider 首次跑通**：中转站探测 + 两条 [INFERENCE] 解除 + 端到端工具回合
+
+维护者提供中转站 `https://ai.onyxaxis.org/v1` + `ONY_API_KEY`（已在该用户的环境变量中）。
+
+**探测（curl 直测，写进 `phase-18-decisions.md` §9）**：
+`GET /v1/models` **200**（17 个模型）；`POST /v1/chat/completions` **200**（含 `stream:true` 的 SSE）；
+`POST /v1/messages`（Anthropic 原生）**200**；`/v1beta/models/*:streamGenerateContent` 与 `:generateContent`
+**405 method not allowed** ⇒ **Google 原生不可用**。
+
+**两条 `[INFERENCE]` 的实测结论**：
+`D2`（Anthropic `budget_tokens` 缺失是否 400）——**本中转站返回 200，不 400**；
+`D4`（reasoning 模型是否拒 `temperature`）——**本中转站返回 200，不拒**。
+⚠️ **但不能据此宣称「不需要修」**：中转站做了协议适配，可能吞掉上游的严格校验；
+两条的**我方修复必要性不变**（对齐 API 契约），只是「在本测试环境下不表现为错误」。
+`D3`（`thinkingSignature` 往返）、token 估算误差、`PRV-12` **未解除**
+（`PRV-12` 且**无法**解除——本中转站不支持 Google 原生路径）。
+
+**仓库门禁实测**：`CHEERS_REAL_PROVIDER_SMOKE=1` + 隔离 HOME/TEST_ROOT 下
+`verify:provider-readiness:real` 两项 **`[pass]`**。
+**另跑通两个真实端到端回合**：纯文本 `PONG`；以及**工具调用**——
+临时 git 工作区里 `read note.txt` → 返回正确内容、`Outcome: success`、exit 0。
+**这是本仓第一次用真实（非合成）端点跑通多步工具回合。**
+
+**凭据处置**：只写入 `~/.cheers/config.json`（`chmod 600`），**未进入仓库任何文件**
+（`git status` 确认只有 `.wiki/` 的 5 个文件）。用 `openai-compatible` provider +
+`endpointShape(undefined)` 回落 `DEFAULT_ENDPOINT_KIND`，**无需改 catalog**。
+
+**关于 OAuth（维护者问）**：**中转站不该走 OAuth**——它的价值就是免 OAuth。
+`core/auth/oauth/{deviceCode,subscription}.ts` 都已实现（Phase 13 T2/T3），
+但那是**直连上游订阅**的路线，与本中转站是两条独立路线；
+若维护者要直连订阅，用 `/connect login` 起 device-code 流程即可，**无需把密钥交给代理**。
+
+## [2026-10-01] review | Phase 18 复核轮：**修正 4 条裁决 + 新增 20 条缺陷 + 驳回 8 条子代理断言**
+
+**输入**：`phase-18-pre-research.md` §1–§11 与 `phase-18-decisions.md` §1–§9（W1–W7 的 33 项裁决）。
+**目标**：证伪裁决、补上「文档没有涉及」的代码面（demo 级实现、slash 命令可靠性、TUI 缺口、未接入功能）。
+
+**派遣**：3 个只读探索子代理（`google-antigravity/gemini-3.8-flash:high`，并发 3，**3/3 返回**
+11m59s / 15m51s / 16m27s）——分域为 `ExSessionState`（session/provider/observability）、
+`ExCoreCtx`（core/context/memory/tools/subagents）、`ExTuiCommands`（TUI/slash/CLI）。
+`ExTuiCommands` 事后补问时上游 **400**（`GenerateContentRequest.tools[0]…missing field`），
+其结论由主代理自行复验。
+
+**主代理逐条亲验**（读码 / `grep` / 实机 / 数值模拟），**驳回 8 条**、**修正 4 条裁决**、**新增 20 条**：
+
+**四条裁决修正（本轮核心）**：
+1. **`W7-30`（子代理工具继承）由「可能已健全」翻转为「有真缺陷」**——工具**继承**确健全
+   （`core/subagents/boundary.ts:44-51`），但**权限模式不继承**：`subagentLoader.ts:13,22,39` 声明的
+   `permissionMode:"plan"` 在 `taskTool.ts:82` **只用于拼展示串**，实际门用**会话**的 `agentMode`
+   （`runner.ts:117-140` ← `turn/session.ts:191`）。⇒ build 会话派 `code-reviewer`（工具含 `bash`）
+   **以 build 门执行**，显示却写「PLAN (Read-Only)」。登记 `SUB-01`。
+2. **`W5-19`（`PRV-12`）范围扩大**——新增 `PRV-13`：`googleGenAI.ts:28` 主流式 `path` **缺 `?alt=sse`**
+   （同仓 `googleVertex.ts:78` **有**），而 `dataOf`/`isEventStream` 只认 SSE ⇒ Google 主流式回合
+   **静默空答案**。且 `googleGenAI.test.ts:65-67` **把错 URL 钉进了测试**。与 `PRV-12` 同根因，一次修。
+3. **`W3-11`（`OBS-04` MCP）前提缺失**——新增 `OBS-15`：`core/mcp/client.ts:44-55` 自述用自定义信封
+   （`{"action":"list-tools"}`）而非 JSON-RPC 2.0，「**cannot talk to a third-party server**」。
+   ⇒ 即便修好连接复用也连不上任何真实 MCP server。**须先裁决协议**（新增 `R3`）。
+4. **`W4-14`（`SES-02`）补第三条**——新增 `SES-09`：锁获取超时 **1.2s** ≪ 陈旧阈值 **60s**
+   （`sessionFileStore.ts:9` vs `lockStaleness.ts:29`）⇒ 崩溃留下的零字节锁使该会话写入**硬失败 60s**。
+   续期与 owner 校验都治不了已死持有者的空锁。
+
+**其余 16 条新增**：`PRV-14`（SSE 多行 `data:` 应 `join("\n")`，同仓 `turn/completion.ts:563` 是对的）、
+`PRV-15`（`Retry-After` 在 provider→turn 边界被丢，`loop.ts:178` 恒传 `undefined`）、
+`SES-10`（中止回合不发终止事件 ⇒ `--json` 流无终止帧）、`TOL-10`（`task` 在子代理失败但有文本时
+返回 `success:true`）、`TOL-11`（`grep` 快路径 `execFileSync` 阻塞事件循环）、
+`TOL-12`（plan 模式**无条件拦**所有 MCP 工具；`/tools` 的表与门已漂移）、
+`TOL-13`（`/tools` 列静态注册表，隐藏生效的 MCP 工具与技能）、
+`CMD-09`（`/deep-research` 无模型，却宣称「多智能体树搜索」）、`CMD-10`（`/review` 硬编码清单不调模型）、
+`CMD-11`（撇号令整条命令参数**硬失败**——实机 `/btw what's…`）、`CMD-12`（`/marketplace` 只在内存且
+交叉承诺矛盾）、`CMD-13`（`/reload` 输出里吞主题失败）、`TUI-10`（箭头只走逻辑行，忽略软换行）、
+`TUI-11`（指针点不了 picker/补全）、`OBS-13`（别名不参与补全）、`OBS-14`（`newlineKey` 已接线但从不渲染）。
+
+**被驳回的 8 条**（含 1 条**不存在的函数名** `retrySentRequest`、2 条读错调用链、
+2 条没验证复原逻辑）记入 13 号册 §20.3。**规律**：**否定式断言（「从未被调用」「丢参数」）必须自己再 grep 一遍**。
+
+**交付**：
+- `phase-18-decisions.md` **§10**（裁决修正 4 条 + **W8 新增 11 项 + 8 小项** + **R3 待裁决** + 驳回记录 + 复核后附计数）；
+  `§1.2` 与 frontmatter 同步更新。
+- `phase-18-pre-research.md` **§12**（本文结论未推翻；新增事实表 20 条 + **新 demo 判据** 3 条 + 未覆盖项）；
+  frontmatter 同步。
+- `13-feature-and-defect-register.md` **§20**（20 条新条目，逐条附证据 + §20.2 裁决修正表 + §20.3 驳回表 +
+  §20.4 方法论）；frontmatter 同步。
+- **零代码改动**（`git status` 仅 `.wiki/`）。
+
+**三条新 demo 判据**（记入前置研究 §12.5）：
+①「机制宣称」与「实际机制」对照（`/deep-research` 宣称的机制在实现里找不到）；
+②「同类端点的差集」（两个 Google 端点一个带 `?alt=sse` 一个不带 ⇒ 直接暴露 `PRV-13`）；
+③「常量关系」（两处各自正确、合起来矛盾且**无测试钉住**：`SES-09`、`TOL-12`）。

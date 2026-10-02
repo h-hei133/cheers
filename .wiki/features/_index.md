@@ -1800,3 +1800,160 @@ Zero items skipped; every one committed separately with its own revert verificat
 brief 把证据门槛写死（无 `file:line` 的 `wrong` 无效、探针返回空必须换方法复核），
 且要求复核者**自己跑探针**——`CTX-06` 的 EACCES 与 `OBS-06` 的归档泄漏
 都由复核者独立复现，不是读码推断。
+
+---
+
+## 23. Phase 18 规划：前置研究与裁决（**2026-10-01**）
+
+> 文档：[`phase-18-pre-research.md`](phase-18-pre-research.md)（参考实现机制研究）、
+> [`phase-18-decisions.md`](phase-18-decisions.md)（**33 个交付项 / 7 波 / 2 项待裁决 / 4 项明确不做**）。
+> **零代码改动。** 输入是 13 号登记册当前 **23 条唯一 OPEN**
+> （其中 21 条从未被任何阶段规划过 + 1 条 Phase 17 之后新登记 `PRV-12` + 1 条裁决保持 OPEN 的 `SES-02`）
+> 加 `12-gap-and-debt-research-2.md` §10 的四项未覆盖面。
+
+### 23.1 与 Phase 17 的关系
+
+Phase 17 把 13 号册的 **12 条 P1 全部纳入**并实施了 38 个交付项。
+本文档处理**剩下的 P2/P3 与两条从未被规划的域**，并**顺带补上 Phase 17 的一个文档缺口**：
+
+**§1.2 声称「移出（更后阶段）22 项」，但那份裁决通篇没有枚举这 22 项。**
+本文用「规划时点 OPEN 集合 − decisions 全文出现过的 ID 集合」重算，
+把清单显式列出（`phase-18-pre-research.md` §0.1），净 **21 条**。
+
+### 23.2 六波与规模
+
+| 波 | 主题 | 项数 |
+|---|---|---|
+| **W1** | 单点高收益与错误承诺 | 6 |
+| **W2** | 会话树入口与命令面收口 | 4 |
+| **W3** | 进程级状态的生命周期 | 3 |
+| **W4** | 原子性与持久化 | 3 |
+| **W5** | 文档与自研修复 | 6 |
+| **W6** | 登记册自身的修正 | 2 |
+| **W7** | 跨轮次遗留的审计债务（**2026-10-01 补入**） | 9 |
+| **合计** | | **33**（+ 4 明确不做 + 2 待裁决 + 0 待外部输入） |
+
+### 23.3 前置研究的六项关键发现（全部主代理亲验）
+
+1. **`TOL-07` 是「参考侧唯一明确更优」的执行安全项**：
+   `opencode/packages/core/src/file-mutation.ts:144-157` 在**锁内**重读并逐字节比较
+   （`sameBytes` → `StaleContentError`），而 `pi` 与我方**都不做**。
+   关键领悟：opencode 的锁**同样是进程内的** ⇒ **跨进程防护靠的是写时比较，不是锁**；
+   我方有「进程内队列」这一半、缺「写时比较」那一半。
+2. **`CMD-04` 的判定位置是四方里唯一的**：Claude Code 用 **per-command 声明字段**
+   （`types/command.ts:76` + `main.tsx:2622` 唯一过滤点），gemini 由**返回类型**决定，
+   pi/opencode 的内建命令在非交互路径上**根本不存在**；只有我方把判定写在**派发处的 if 链**里。
+3. **`CMD-06` 是「功能在、入口无」**：我方的 `rewind` 宿主
+   （`interactiveMode.ts:731-750`：叶重指 + 分支摘要 + 提示放回）与 pi 的
+   `session.navigateTree`（`agent-session.ts:3866`）**同构**，缺的只是一等命令入口与非交互形式。
+4. **`SES-02` 的 fencing 在所有参考里都 `NOT-FOUND`**：`proper-lockfile` 只有 mtime staleness +
+   续期 + `ECOMPROMISED`；opencode 的 `staleMs` 与我方**同为 60_000**，token 只管 release。
+   ⇒ 我方「no fencing」的自白即行业水准；真实差距只是**续期**与 **release owner 校验**两条。
+5. **`OBS-04`(MCP) 比登记册更严重**：`core/mcp/client.ts:198` 的 `spawn` 在 `callStdioWithRetry` 内，
+   `listTools` 与 `invokeTool` **都**走它；且 `gateway.ts:186` 的 `invokeTool` 每次先跑一次 `listTools`
+   ⇒ **每 prompt = 1 + 工具调用数 × 2** 个子进程。pi 是**会话生命周期持有一条长连接**。
+6. **`LOP-01` 的阈值不是缺陷**：opencode 的 `DOOM_LOOP_THRESHOLD` **同为 3**；
+   唯一确认的缺陷是**消息宣称了它没有做过的判断**（`without state progression`），
+   参考要么不宣称（opencode 转用户裁决）、要么真正读了结果（gemini 的诊断 LLM）。
+
+### 23.4 复核结果：4 条 `partly-wrong`、**0 条 `wrong`**
+
+3 个证伪式复核者，**25 条断言：correct 21 / partly-wrong 4 / wrong 0 / unverifiable 0**。
+**本轮没有推翻主代理**（Phase 17 有 1 条），但 **4 条 `partly-wrong` 中有 2 条推翻了我的依据**：
+
+- **`CTX-08` 的面数**：登记册的「6」把自己标 ✅ 的对照行算进了缺陷侧，而我写的「5」其表格只列了 4 行。
+  复核者按口径拆开 ⇒ 定稿为 **4 个同型 + 3 个部分派生 + 1 个模型面**。
+- **`ok: true` 分布代理**：我写「23 个模块、全部在夹具侧」，实为 **25 个模块、其中 2 个在模型侧
+  真实执行路径上**（`sessionManager`、`playwrightRuntime`）。⇒ 该依据被**删除**，
+  判决改由「定位裁决」支撑。教训：**同一个字面量在不同定位下含义相反**，拿它当 demo 判据是「只看了一层」。
+- 另两条只纠正引文精度（`rollback` 的 38/26/12 分解）与成本理由（`SES-02` 的「与迁移」半站不住）。
+
+**复核者还加重了 3 条**（缺口比我写的更大）：`OBS-04` 的 spawn 公式、
+`SES-07` 的**第二条绕过路径**（`sessionLifecycleWrites.ts:214` 的 `discardIfEmpty` 直连 `store.deleteSession`）、
+`SES-06` 的活轨调用点（格式化器仍在用，要删的是恒空的规则表）。
+
+**复核者独立复现的证据**：`CLI-01` 的 0 行 JSON / 105 行输出、
+`CMD-04` 的命令拦截、`CTX-02` 的两面自相矛盾陈述、**人工构造父子环**后
+`readSessionTree` 与 `sessionThreadPath` 给出**相反结论**、键位两表零漂移（71/71 通过）。
+
+### 23.4b W7：一处统计盲区（本轮自查发现）
+
+**初稿只统计 13 号册的 `OPEN` 条目，于是漏了 9 项**：
+
+- **`THM-03` 标 `PARTIAL`**（Phase 17 只做了 schema+校验，`auto` 与扩充令牌「按裁决延期」——
+  那个延期**从未落到任何阶段**）⇒ **`PARTIAL` 不是 `OPEN`，被筛选跳过**。
+- **`SES-08` / `PRV-06` / `BRW-06` 三条「未逐一核验的面」按设计不带状态标记** ⇒ 同样被跳过。
+- 另有 5 项散落在 13 号册 §13.2 / §16.4 / §18 的散文里
+  （`memory/**`+`context/**` 逐模块、`core/shell` 审计、`context/startup` 行为验证、
+  子代理递归与工具继承、TLS/HTTP2 流边界）。
+
+**教训**：**「统计 OPEN」不等于「统计未完成」**——`PARTIAL`、无状态标记的「未核验」条目、
+以及散文里的「仍然未覆盖」列表，三者都要单独数。已补入 **W7（9 项）**。
+
+**其中一项主代理初查就已推翻**：`W7-30`（子代理工具继承）——`core/subagents/runner.ts:135-142`
+已经在用 `subagentTools(definition, available)` 过滤并装配工具，
+`NEVER_GIVEN`（`core/subagents/boundary.ts:17`）剥掉 `task`。⇒ 该项可能直接降级为「已核实健全」。
+
+### 23.5 真实 provider 验证：**已执行**（2026-10-01）
+
+维护者提供中转站 `https://ai.onyxaxis.org/v1` + `ONY_API_KEY`。探测结论：
+**OpenAI 兼容 ✅ / Anthropic 原生 ✅ / Google 原生 ❌（405）**。
+实测解除两条 `[INFERENCE]`（`D2` `budget_tokens`、`D4` temperature —— **本中转站都不触发 400**，
+但**不能据此说不必修**：中转站做了协议适配，官方端点仍未知）；
+`PRV-12` **无法验证**（Google 路径 405）。
+
+**仓库门禁实际通过**：`verify:provider-readiness:real` 两项 `[pass]`；
+另跑通两个**真实**端到端回合——纯文本 `PONG` 与**工具调用**（`read note.txt` → 正确内容，
+`Outcome: success`，exit 0）。**这是本仓第一次用真实端点跑通多步工具回合。**
+
+凭据只写入 `~/.cheers/config.json`（`chmod 600`），**未进入仓库**。
+
+**关于 OAuth**：中转站**不该**走 OAuth（它的价值就是免 OAuth）；
+`deviceCode.ts` 与 `subscription.ts` 都已实现，但那是**直连上游订阅**的路线，
+与本中转站是两条独立路线。
+
+### 23.5b 真实 provider 验证：原始待办记录（已作废）
+
+**维护者将在本轮之后提供中转站 URL + key。** 文档已把该项登记为**待办**（不是裁决），
+并写明三条**前提**（需要哪些协议路径）、两条**给 URL/key 也解除不了的**（`M3` Device Code、
+`M6` 订阅 OAuth、16-L Bedrock 端到端），以及两条实操约束（CLI 无 `--base-url`/`--model`；
+catalog 外的 model 会退回 `DEFAULT_REQUEST_SHAPE`）。
+
+---
+
+## 24. Phase 18 复核轮：裁决修正 + W8 新增（**2026-10-01**）
+
+> 文档：[`phase-18-decisions.md`](phase-18-decisions.md) **§10**、
+> [`phase-18-pre-research.md`](phase-18-pre-research.md) **§12**、
+> [`13-feature-and-defect-register.md`](13-feature-and-defect-register.md) **§20**。
+> **零代码改动。** 3 个探索子代理（`google-antigravity/gemini-3.8-flash:high`，并发 3，3/3 返回）
+> 分域证伪 Phase 18 的裁决并搜索「文档没有涉及」的 demo 面；主代理逐条亲验。
+
+### 24.1 结果一览
+
+| 项目 | 数量 |
+|---|---|
+| **裁决修正** | **4**（`W7-30` 翻转为缺陷、`W5-19` 扩大范围、`W3-11` 前提缺失、`W4-14` 补第三条） |
+| **新增登记条目** | **20**（13 号册 §20.1；含 **2 条 P1**） |
+| **新增交付项** | **W8：11 项 + 8 小项**（`phase-18-decisions.md` §10.2/§10.3） |
+| **新增待裁决** | **R3**（MCP 协议互操作） |
+| **驳回的子代理断言** | **8**（13 号册 §20.3，含 1 条不存在的函数名） |
+
+### 24.2 两条 P1
+
+- **`PRV-13`**：`googleGenAI.ts:28` 主流式 `path` **缺 `?alt=sse`**（同仓 `googleVertex.ts:78` 有）
+  ⇒ Google AI Studio 主流式回合**静默空答案**；`googleGenAI.test.ts:65-67` 把错 URL 钉进了测试。
+- **`OBS-15`**：`core/mcp/client.ts:44-55` 用**自定义信封**而非 JSON-RPC 2.0，
+  代码自述「**cannot talk to a third-party server**」⇒ MCP 连不上真实生态（`R3` 待裁决）。
+
+### 24.3 三条新的 demo 判据（比「`ok:true` 分布」更有辨识力）
+
+1. **机制宣称 vs 实际机制**：命令帮助/报告正文的机制词在实现里找不到对应（`/deep-research` 的「多智能体」）。
+2. **同类端点的差集**：同仓两个 Google 端点，一个带 `?alt=sse` 一个不带 ⇒ 直接暴露缺陷。
+3. **常量关系**：两处各自正确、合起来矛盾且**无测试钉住**（`SES-09` 的 `1.2s vs 60s`、`TOL-12` 的两张表）。
+
+### 24.4 方法论
+
+**否定式断言（「从未被调用」「丢参数」）必须自己再 grep 一遍**——
+本轮 8 条驳回里 4 条属此类，含 1 条**不存在的函数名**（`retrySentRequest`）、
+1 条**读错调用链**（`/compact` 其实在两个入口都被拦截）、1 条**没验证复原逻辑**（CRLF）。

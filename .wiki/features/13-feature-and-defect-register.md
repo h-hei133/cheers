@@ -3,9 +3,9 @@ title: "功能与缺陷登记册：持续维护的能力缺口与缺陷总账"
 category: article
 sources: [12-gap-and-debt-research-2, repo-probes-2026-09-29, reference-survey-2026-09-29]
 created: 2026-09-29
-updated: 2026-09-30
+updated: 2026-10-01
 tags: [features, gap-analysis, register, defects, tui, browser, session, provider, memory, dead-code]
-summary: "长期维护的登记册，不是某一阶段的前置研究。登记每一处 demo 级实现、已核实缺陷、接线中断、缺失能力、TUI 体验不足与死代码，每条给出证据等级、参考实现的对应位置与修复方向。与 08/11/12 的关系：那三份是某一轮的盘点与设计，读完即归档；本册是持续更新的总账，新发现追加而不重写。第一版覆盖 TUI 表面、主题与色彩、slash 命令面、浏览器栈、会话持久化、provider 协议、上下文与记忆、工具与执行、平台集成、CLI 与发布面、死代码可达性十一类。"
+summary: "长期维护的登记册，不是某一阶段的前置研究。登记每一处 demo 级实现、已核实缺陷、接线中断、缺失能力、TUI 体验不足与死代码，每条给出证据等级、参考实现的对应位置与修复方向。与 08/11/12 的关系：那三份是某一轮的盘点与设计，读完即归档；本册是持续更新的总账，新发现追加而不重写。第一版覆盖 TUI 表面、主题与色彩、slash 命令面、浏览器栈、会话持久化、provider 协议、上下文与记忆、工具与执行、平台集成、CLI 与发布面、死代码可达性十一类。§20 为 Phase 18 复核轮新增的 20 条（含 2 条 P1：Google 主流式缺 ?alt=sse、MCP 客户端连不上真实 server）。"
 confidence: high
 ---
 
@@ -71,12 +71,41 @@ confidence: high
 
 ---
 
-## 0.4 当前实施状态（2026-09-30）
+## 0.4 当前实施状态（2026-10-01）
 
 Phase 17 的 38 个交付项已逐项实施或完成候选保留裁决，另完成浏览器守卫及钩子文档。
 完整提交、定向/反向验证和独立复核见 [phase-17-decisions.md](phase-17-decisions.md) §8。
-下方仍为 OPEN 的其他登记项不自动纳入本阶段；锁 fencing、扩展宿主、分栏侧栏和真实提供方验证
-继续遵循已有独立裁决。新增 PRV-12 明确记录次要 Google 请求协议不一致。
+
+**Phase 18 已规划（零代码改动）**：13 号册剩下的 **23 条唯一 OPEN** 中的 21 条
+（从未被任何阶段规划过的那些）+ 新登记的 `PRV-12`，加 12 号 §10 的未覆盖面，
+已做成 **24 个交付项 / 6 波 / 4 项明确不做 / 2 项待裁决**：
+见 [phase-18-pre-research.md](phase-18-pre-research.md) 与 [phase-18-decisions.md](phase-18-decisions.md)。
+其中 `SES-02` 经 Phase 18 复核确认「fencing 在所有参考实现里都 `NOT-FOUND`」，
+按 Phase 17 §5-3 的裁决**保持 OPEN**（本阶段只补续期与 release owner 校验两条廉价缓解）。
+
+**Phase 18 记录的五处待回写更正**（施工轮执行，本轮不改本册的条目行）：
+`BRW-00` 的模块数 `164` → `167`（差额 3 = Phase 17 `8adc76f9` 以 rename 从 `core/harness/`
+迁入 `browser/smoke/` 的三模块，表未随之更新）；`CTX-08` 的「6 个 surface」
+→ **4 个同型缺陷 + 3 个部分派生 + 1 个模型可见提示面**（原计数把标 ✅ 的对照行算进了缺陷侧）；
+`PRV-04` → `PARTIAL`（`attempted` 标志已在 `4429a89c` 区分「请求失败」与「凭据缺失」，
+剩余缺口只是**不区分失败类别**）；§12 的不可达数字加口径说明；
+以及 **`OBS-03`/`OBS-04` 的编号冲突**——§10（MCP/钩子）与 §11bis（sidebar）各有一组同号条目，
+违反 §0.1「编号一经分配永不复用」，应把 §11bis 的两条改为 `OBS-11`/`OBS-12`。
+
+**真实 provider 验证**：**已于 2026-10-01 实机执行**（中转站 `ai.onyxaxis.org`）——
+`verify:provider-readiness:real` 两项 `[pass]`，并首次用**真实**端点跑通多步工具回合；
+`D2`（Anthropic `budget_tokens`）与 `D4`（reasoning 模型拒 `temperature`）两条 `[INFERENCE]`
+在本中转站**均不触发**（但**不能**据此说不必修——中转站做了协议适配）。
+完整探测、限定与未解除项见 `phase-18-decisions.md` §9。
+锁 fencing、扩展宿主、分栏侧栏继续遵循已有独立裁决。
+
+**Phase 18 收尾时发现的一处统计盲区（本册自身的记账问题）**：
+只统计 `OPEN` 条目会漏掉三类未完成项——**`THM-03` 标的是 `PARTIAL`**（不是 `OPEN`，
+Phase 17 只做了一半，另一半「按裁决延期」从未落到任何阶段）、
+**`SES-08`/`PRV-06`/`BRW-06` 三条「未逐一核验的面」按设计不带状态标记**、
+以及 §13.2/§16.4/§18 散文里的「仍然未覆盖」列表。
+⇒ **「统计 `OPEN`」不等于「统计未完成」**。这 9 项已补入
+`phase-18-decisions.md` 的 **W7**；本册对应条目的状态与措辞待施工轮回写。
 
 ## 1. 本轮方法
 
@@ -2783,3 +2812,307 @@ grep -n 'errorStep(|failedStep(' turn/step.ts  -> 只有 :429-430 传了 tried
 **三次都是「只看了一层就断言这一层的行为」。**
 本册把这条写进方法论，因为它比任何单条缺陷都更值得记住——
 **而三次都是子代理指出来之后我才发现的**，这本身说明复核机制在起作用。
+
+---
+
+## 20. Phase 18 复核轮：3 个探索子代理 + 主代理逐条亲验（2026-10-01）
+
+> 模型 `google-antigravity/gemini-3.8-flash:high`（`.omp/config.yml`），并发 3，**3/3 返回**
+> （11m59s / 15m51s / 16m27s；`ExTuiCommands` 事后补问时上游 400，其结论由主代理自行复验）。
+> **复核对象**：Phase 18 的裁决（`phase-18-decisions.md` W1–W7）与「文档没有涉及」的代码面。
+> **纪律**：子代理每条载重断言由主代理在 HEAD 上重跑 `grep`/读码/模拟；被**驳回**的记入 §20.3。
+
+### 20.1 新增条目（20 条，逐条附证据）
+
+### PRV-13 · `googleGenAI` 主流式路径**缺 `?alt=sse`** — `OPEN` `P1` `CONFIRMED`
+
+**主代理亲验**（决定性）：同一个仓库里的两个 Google 端点**只有 `googleVertex` 带 `?alt=sse`**：
+
+```
+provider/endpoints/googleGenAI.ts:21-24  googlePath(model, stream) -> `/v1beta/models/${m}:${stream ? "streamGenerateContent" : "generateContent"}`
+provider/endpoints/googleGenAI.ts:28    path: (model) => googlePath(model, true)          ← 生产唯一入口，stream 恒 true
+provider/endpoints/googleVertex.ts:78   path: (model) => `/${m}:streamGenerateContent?alt=sse`   ← 同类端点，带
+```
+
+`googleWire.ts:437-444` 的 `dataOf()` 只取 `data:` 行；`turn/completion.ts:182` 的
+`isEventStream` 只认 `content-type: text/event-stream`。**缺 `alt=sse` 时 Google 返回
+`application/json` 的 JSON 数组**（非 SSE）：`isEventStream` 判否 → `readGoogleBody(array)`
+读 `(array).candidates` → `undefined` → **空文本、无 finish_reason、无报错**。
+⇒ Google AI Studio 的**主流式回合静默产出空答案**。
+
+**参考**：`gemini-cli/packages/core/src/code_assist/server.ts:478-482` `params: { alt: 'sse' }`——
+这是 Google 官方 SSE 约定。我方 `googleVertex` 自己就遵守。
+
+**现状测试反向钉错了 URL**：`googleGenAI.test.ts:65-67` 断言路径**不含** `?alt=sse`。
+
+**与 `PRV-12` 的关系**：`PRV-12` 记的是**次要请求**（`/btw`、`summarize`）用流式 URL 却按单 JSON 读；
+本条是**主流式路径**本身错。**同一根因**（端点未区分「单次 / 流式」，且流式 URL 缺 SSE 参数），
+施工时应一次修：`path` 加 `?alt=sse`（流式）+ 接出 `googlePath(model, false)`（非流式）+ 修该测试。
+**无法在中转站验证**（Google 路径 405，见 `phase-18-decisions.md` §9）。
+
+### PRV-14 · SSE 多行 `data:` 用 `join("")` 而非 `join("\n")` — `OPEN` `P3` `CONFIRMED`
+
+W3C SSE：一个事件的多条 `data:` 行必须用 `\n` 连接。我方两处用空串，一处正确：
+
+```
+provider/endpoints/anthropicMessages.ts:622-631  parseEvent ... .map(l => l.slice(5).trim()).join("")
+provider/endpoints/googleWire.ts:437-444          dataOf    ... 同款 join("")
+turn/completion.ts:558-563                         eventData ... parts.join("\n")   ← 正确的那一处
+```
+
+**参考**：`pi/packages/ai/src/api/anthropic-messages.ts:409` `data: state.data.join("\n")`；
+`gemini-cli/.../server.ts:510` `bufferedLines.join('\n')`。
+
+**实际影响**：Anthropic/Google 现实中每个事件的 JSON 都在单行，**当前不触发**；但这是
+**同一线格式在同一仓被解析成两种**——正是 `anthropicMessages.ts:455-460` 自己写下的那条教训
+（「the same wire format parsed two ways, and only one of them right」）。属**标准符合性**缺陷。
+**并入 `W7-27` 的流边界矩阵**（施工轮）。
+
+### PRV-15 · `Retry-After` 在「provider 层 → turn 层」边界被丢弃 — `OPEN` `P2` `CONFIRMED`
+
+**主代理亲验**：`turn/step.ts:409-413` 从响应头取 `requestedDelayMs`，
+`:443-449` 在**本层**重试时用它（`retryDelayMs(retry, attempt, requestedDelayMs)`），
+但**耗尽后返回的 step 不带它**（`:427-437` `failedStep(refusal, "", refusalClass, tried)`）。
+`core/agent/loop.ts:178` 的**外层**重试调用 `retryDelayMs(policy, attempt, undefined)`——**恒传 `undefined`**。
+
+**默认配置下这条必然发生**：`DEFAULT_PROVIDER_RETRIES = 0`（`core/agent/retry.ts:41`），
+所以 provider 层**从不**重试；`Provider HTTP 429: …` 一律交给 turn 层，turn 层用
+**指数退避**（base 2s）**无视服务器要求的等待**。服务器说 `Retry-After: 30`，我们 2s 后重试。
+
+**参考**：`pi/packages/ai/src/utils/provider-retry.ts:51-70` 在同一层内读 `retry-after-ms`/`retry-after`
+并把服务器延迟喂给退避 sleep；超过 `maxRetryDelayMs`（默认 60s）则**直接失败并报出**该秒数。
+⇒ 我方是把「哪一层重试」分开了，却没把「服务器给的延迟」跨层传下去。
+
+**撤销验证**：响应 `429` + `Retry-After: 5` ⇒ turn 层首次重试延迟**≥ 5s**（当前为 ~2s）。
+
+### SES-09 · 锁**获取超时（1.2s）≪ 陈旧判定阈值（60s）**，崩溃后的空锁造成 60s 硬失败 — `OPEN` `P2` `CONFIRMED`
+
+```
+session/store/sessionFileStore.ts:9    const STATE_LOCK_TIMEOUT_MS = 1200
+session/store/lockStaleness.ts:29      export const STALE_LOCK_AGE_MS = 60_000
+```
+
+进程在 `openSync(lockPath,"wx")` 与 `writeFileSync(...)` 之间被杀 ⇒ 留下**零字节锁**。
+`isLockStale` 对「读不出 owner」的文件只有 mtime ≥ 60s 才判陈旧（`lockStaleness.ts:73-82`）；
+而获取循环 1.2s 就 `throw new Error("Session state lock timeout …")`（`sessionFileStore.ts:97-99`）。
+⇒ **崩溃后该会话的每一次写入 60 秒内都硬失败**，期间既不能等待接管、也不能自愈。
+
+**对照**：opencode 的 `staleMs` 同为 60_000，但它有 **heartbeat 续期**（`flock.ts:262-265`）
+让「活跃」持有者不被误判；我方两项缓解已在 `W4-14` 计划中（续期 + release owner 校验），
+**但都治不了「已死持有者的空锁」**。这一条是**新的**：两个常量**彼此不一致**。
+**方向**：空/不可读锁用**远短**的宽限（写入紧跟创建，窗口是微秒级），
+或把获取循环的等待上界提到 `STALE_LOCK_AGE_MS` 之上以便真正接管。与 `W4-14` 同批施工。
+
+### SES-10 · 中止的中止回合**不发终止事件** ⇒ 事件流无终止帧 — `OPEN` `P2` `CONFIRMED`
+
+`turn/session.ts:343,356,441` 在 `signal.aborted` 时**直接 return / 静默放弃**，
+`drive()` 从不 `push` 终止事件（`query.completed`/`query.failed` 只在 `:436`/`:421` 发）。
+`turn/session.test.ts:114-128` 把这一行为**钉死**（`ends quietly when interrupted`：无 failed、无 completed）。
+
+**消费端**：`core/shell/sessionRuntime.ts:346-347` `if (!sawTerminalEvent) throw …`；
+捕获分支（`:368-381`）在 `signal.aborted` 时补记 `lifecycle.cancelled`——但那是
+`sessionManager.appendQueryEvent`（写会话），**不经过 `eventObservers` 通道**（`:308`）。
+⇒ `--json` 的 `createJsonEventWriter`（`cliRuntimeModule.ts:498-502`）在中止时**看不到任何终止帧**，
+流只是「结束」。消费者无法区分「被中止」与「崩了」。
+
+**交互面为什么看不出**：`cliRuntimeModule.ts:525-533` 用 `shellState === "interrupted"` 兜住并渲染
+「cancelled」；异常被当**控制流**用。功能不坏，**契约坏**（JSON 事件流的终止帧承诺）。
+**参考**：`pi/packages/coding-agent/src/core/agent-session.ts:2361-2371` 把取消当正常生命周期状态报出。
+**方向**：中止时经 `channel` 发一个终止事件（新增 `query.cancelled` 或让 `lifecycle.cancelled` 走通道）。
+
+### TOL-10 · `task` 工具在**子代理失败但产出了文本**时返回 `success: true` — `OPEN` `P2` `CONFIRMED`
+
+`core/tools/taskTool.ts:170` 记下 `subagentFailure`，但终态只按**文本有无**判定（`:238-240`）：
+
+```ts
+return subagentResponse ? approvedResult(lines.join("\n")) : { success: false, error: lines.join("\n") }
+```
+
+`core/subagents/runner.ts:181-190` 会在两种情况设 `failed`：末步 `error`/`aborted`，
+或**步数耗尽且末步仍在要工具**——**两者都可能已经产出叙述文本** ⇒ `subagentResponse` 非空 ⇒
+`approvedResult`（`toolResultLifecycle.ts:142-149` 恒 `success:true`），失败原因只在无文本时才显示。
+⇒ 模型读到「Subagent Task Executed」+ `success:true`，**失败被叙述掩盖**。
+
+**方向**：终态按 `subagentFailure` 判定（有失败即 `success:false`，失败原因进 `error`/正文），
+与 `AGENTS.md`「不要把未核实的结果藏在成功样的状态后面」一致。
+
+### TOL-11 · `grep` 的 ripgrep 快路径 `execFileSync` **阻塞事件循环** — `OPEN` `P3` `CONFIRMED`
+
+`core/tools/grepRipgrep.ts:208` `execFileSync(binary, args, { maxBuffer: 256*1024*1024, … })`——
+**同步**、**无 timeout**、**无 `AbortSignal`**；`ripgrepArgs`（`:105-125`）也不传 `-m/--max-count`。
+大仓搜索期间 TUI 不重绘、不可中断，直到结果全部缓冲进 256MB 上限。
+
+**参考**：`pi/packages/coding-agent/src/core/tools/grep.ts:4,168` `spawn(rgPath, args, …)` 异步流式。
+**方向**：异步 `spawn` + 流式解析 + 传 signal/timeout + `--max-count`。标 `自研`（我方快路径设计）。
+
+### TOL-12 · plan 模式**无条件拦掉所有 MCP 工具**；且 `/tools` 的列表与门不一致 — `OPEN` `P2` `CONFIRMED`
+
+`turn/tools.ts:70-72` 的 `PLAN_MODE_TOOLS = {read,glob,grep,lsp,web_fetch,web_search,ask,todo}`——
+MCP 工具名形如 `mcp__server__tool`，**永不命中** ⇒ plan 模式下所有 MCP 工具被拦，
+**包括只读的**（MCP 有 `annotations.readOnlyHint` 可用，未读）。
+`core/query/toolPolicy.ts:108-118` 的 `else` 分支同样把未知工具一律判 `execute`（非只读）。
+
+同时 **两处列表已经漂移**：
+`core/commands/toolsCommandRuntime.ts:24-35` 的 `ALLOWED_IN_PLAN` 含 `task`、`browser`，
+而门 `PLAN_MODE_TOOLS` **不含 `task`**（`browser` 另有 `READ_ONLY_BROWSER_ACTIONS` 分支）——
+⇒ `/tools` 打印 `| task | allowed |`，但 plan 模式下发 `task` 会被**门拦掉**。
+`newCommands.test.ts:20-27` 只断言了 `write/read/bash` 三行，**没钉住这张表的完整性**。
+**参考**：`gemini-cli/packages/core/src/policy/policy-engine.ts:610` 的 `check(toolCall, …, toolAnnotations?, …)`——
+按工具注解而非硬编码名单决策。
+**方向**：读 MCP 注解判只读；把 `/tools` 的列表**从门派生**（同一常量），并加一条一致性测试。
+
+### TOL-13 · `/tools` 列的是**静态注册表**，隐藏生效的 MCP 工具与技能 — `OPEN` `P3` `CONFIRMED`
+
+`toolsCommandRuntime.ts:41` `createCoreToolRegistry()` **不带参数** ⇒ 无 `mcpTools`、无 `skills`
+（生产装配在 `entrypoints/cliRuntimeInvocation.ts:485-490` 才注入）。
+⇒ 配了 MCP 的用户看到的工具数**少于**模型实际拥有的。
+（**注意**：`lsp` **是**真实注册的工具——`core/tools/lsp.ts:28`、`registry.ts:757`，
+「幽灵 lsp」的说法**不成立**，见 §20.3。）
+
+### CMD-09 · `/deep-research` 是**无模型**的抓取+模板，却宣称「多智能体树搜索」 — `OPEN` `P2` `CONFIRMED`
+
+`core/research/deepResearcher.ts` 全链路无任何模型调用：`generateSerpQueries`（字符串拼接）→
+web search/fetch → `extractLearningsFromContent`（`:168-183` 按标点切句）→
+`claimVoter.ts:33-36`（**Jaccard 词元重叠 ≥ 0.25** 聚类）→ `reportGenerator.ts`（模板）。
+命令帮助（`deepResearchCommandRuntime.ts:12-14`）与报告正文（`reportGenerator.ts:29`）
+都写「multi-agent tree search / cross-source consensus voting」——**「多智能体」不实**。
+**参考**：`pi` 无此命令（`NOT-FOUND`）。**方向**：接模型做查询生成与综述（`/btw` 已有侧信道模型调用的样板），
+或改名并去掉伪造的机制宣称。
+
+### CMD-10 · `/review` 是**硬编码清单 + 原始 diff**，不调模型 — `OPEN` `P2` `CONFIRMED`
+
+`core/commands/reviewCommandRuntime.ts:8-72`：`execSync` 取 `git status`/`git diff`（截断 5000 字符），
+接一段**固定 4 条**的「Reviewer Checklist」（`:63-69`）。**没有任何模型调用**。
+同仓的 `/commit`（`commitCommandRuntime`）走的是**读暂存 diff → 构造 prompt 回合**的正路。
+⇒ `/review` 输出的是任何读者不看 diff 也能写出的模板。
+**方向**：对齐 `/commit`——把 diff 交给模型做评审。
+
+### CMD-11 · 引号未闭合（含英文撇号）令整条命令参数**硬失败** — `OPEN` `P2` `CONFIRMED`
+
+**实机复现**：`printf "/btw what's the difference\n"` ⇒
+`Invalid /btw arguments: Unclosed single quote in command arguments.`（`slashRouter.ts:85-88`）。
+tokenizer（`core/commands/arguments.ts`，Phase 17 W1-1 引入）把撇号当**未闭合单引号**，
+拒绝整条命令。英文自然语言里撇号极常见（`what's`、`don't`、`it's`），
+`/btw`、`/commit`、`/brainstorm` 等自由文本命令**都可能受影响**。
+**参考**：`pi` 的 CLI 层 `--` 终止符（`cli/args.ts:82`）是另一回事；斜杠层无先例（`NOT-FOUND`）。
+**方向**：未闭合引号**回落为字面文本**（shell 的做法）或给出可恢复提示，而非整条失败。
+
+### CMD-12 · `/marketplace` 只存在内存；帮助还指向 `/plugin search` 而后者自称无目录服务 — `OPEN` `P3` `CONFIRMED`
+
+`marketplaceCommandRuntime.ts:10` `let marketplaceSources: MarketplaceSource[] = []`——模块级数组，
+`grep writeFile|persist` **零命中** ⇒ 重启即丢，而输出说「successfully registered」。
+同子系统 `pluginCommandRuntime.ts:110` **有**持久化（`CHEERS_PLUGINS_FILE`）。
+且 `marketplaceCommandRuntime.ts:52-54` 宣传 `/plugin search <keyword>`，
+而 `pluginCommandRuntime.ts:229-240` 明说「There is no catalogue service behind this」——两处**互相矛盾**
+（`OBS-01` 只修了编造的默认 URL，未涉持久化与这条交叉承诺）。
+
+### CMD-13 · `/reload` 在**输出里**吞掉主题加载失败 — `OPEN` `P3` `CONFIRMED`
+
+`reloadCommandRuntime.ts:77-87` 的 `applyConfiguredTheme` 捕获异常只 `logger.warn`、返回 `undefined`；
+命令输出只在成功时加「Applied theme …」（`:56`），失败时**用户看不到任何原因**
+（warning 只进日志）。`describeChanges` 仍会把 `theme` 列为「已更改」⇒ 屏幕没变、也无解释。
+**方向**：把失败原因写进命令输出（`logger.warn` 对 `--json`/无日志读者不可见）。
+
+### TUI-10 · 编辑器的上/下箭头**只走逻辑行**，忽略软换行 — `OPEN` `P3` `CONFIRMED`
+
+`presentation/tui/editor.ts:386-390` `move("up")` 以 `this.row`（**逻辑行**）为单位，
+而渲染才软换行（`:454-475` `wrapToWidth`）。
+`cli/interactive/keymap.ts:329-348` 的 `recallOrMove`：`move` 返回 false 时，
+**非空草稿**跳行首（`:339-343`）、**空/已在浏览**则**翻历史**。
+⇒ 光标在某个长逻辑行的**第二个可视行**上按上键，不会在可视行间上移，而是跳行首/翻历史。
+**参考**：`pi/packages/tui/src/components/editor.ts:443-447,1478-1530` 建**可视行映射**
+（`isOnFirstVisualLine` + `moveToVisualLine`），只有到**首个可视行**才翻历史。
+
+### TUI-11 · 指针引擎**点不了** picker/补全/编辑器光标定位 — `OPEN` `P3` `CONFIRMED`
+
+`cli/interactive/pointer.ts:92-167` 只处理：滚轮、滚动条拖拽、transcript 选区拖拽、composer 拖拽。
+`cli/interactive/overlay.ts`（520 行）**零鼠标处理**（`grep click|mouse` 零命中）——
+picker（`/back`、`/model`、`/resume`…）与补全列表**纯键盘**，点击会落到下层拖拽。
+**参考**：`pi/packages/tui/src/components/mouse-region.ts` + `settings-list.ts:202-213`
+（左键点选）+ 消息组件用 `MouseRegion` 做折叠切换（`assistant-message.ts:164`）。
+**产品决定**：做到什么程度（本次仅登记）。
+
+### OBS-13 · 斜杠命令**别名不参与补全** — `OPEN` `P3` `CONFIRMED`
+
+`cli/interactive/slashSuggestions.ts:15-19` 的 `candidates()` 只映射 `/${command.name}`，
+**丢弃 `aliases`**；`:26` 的 `argumentSuggestions` 用 `/${entry.name}` **精确匹配**，
+别名打头取不到参数补全。实机模拟：`/qu`（`exit` 的别名 `quit`）无候选；`/where re`（`workspace` 别名）无参数候选。
+注册表本身解析别名正常（`entrypoints/slashCommandRegistry.ts:107`，`getSlashCommand` 查 aliases）⇒
+**命令能跑、补全不认**。**参考**：`pi` 的内建命令**无别名**（`NOT-FOUND`）⇒ 属 `自研` 完善。
+
+### OBS-14 · 提示行的 `newlineKey` **已接线但从不渲染** — `OPEN` `P3` `CONFIRMED`
+
+`presentation/tui/chrome/hints.ts:26` 定义 `HintContext.newlineKey`，
+`presentation/tui/surface/view.ts:198` 传入（`interactiveMode.ts:241` 由 `newlineKeyFor(...)` 产出），
+但 `transientHint()`/`renderHints()`（`:36-78`）**从不读它** ⇒ 死数据流。
+`newlineKeyFor`（`:81-85`）逻辑正确（legacy→`ctrl+j`、否则 `shift+enter`），只是结果无人显示。
+**方向**：要么在空提示里显示，要么删掉该字段与传参链。
+
+### OBS-15 · MCP stdio 客户端用**自定义信封**，无法与真实 MCP server 互操作 — `OPEN` `P1` `CONFIRMED`
+
+`core/mcp/client.ts:44-55` 自述（原文）：写 `{"action":"list-tools"}` / `{"action":"invoke-tool"}`，
+「A real protocol client writes JSON-RPC 2.0 (`tools/list`, `tools/call`), so **this cannot talk to a
+third-party server**」。夹具 `core/mcp/fixtures/mockMcpServer.mjs:9` 同样只说这套自定义协议。
+⇒ **任何真实 MCP server（playwright-mcp、github-mcp…）都接不上**。
+`callStdioWithRetry`（`:175-186`）还只重试**一次**（`maxRetryAttempts` 字段写 3）。
+`loadMcpConfigs` 只接受无参数的 `command`/`args`（`SUPPORTED_TRANSPORTS = {stdio}`）。
+
+**参考**：`pi/packages/mcp/src/protocol/jsonrpc.ts:4` `jsonrpc: "2.0"` + 完整 `initialize`/`tools/list`/`tools/call`
++ 传输层（`transports/stdio.ts`）；`pi` 的 MCP 连接由会话生命周期持有（`W3-11` 已引用）。
+
+**判定**：代码**诚实声明**了这是「有意范围」而非疏漏——但对一个**企业级 agent 产品**而言，
+MCP 不能连真实 server 是**能力缺口**而非「记录项」。⇒ 记为 `OPEN P1`，**须维护者裁决**：
+(a) 实现 JSON-RPC 2.0（帧协议、握手、通知）——一次性较大，但可一次接上整个 MCP 生态；
+(b) 维持现状，但 `/mcp doctor` 必须**明确声明**「本构建只能连自带夹具协议」。
+**这一条 `phase-18-decisions.md` 完全没有涉及**（`W3-11` 只谈连接复用）。
+
+### SUB-01 · 子代理定义里的 `permissionMode` **只用于显示**，不进工具门 — `OPEN` `P2` `CONFIRMED`
+
+`subagentLoader.ts:13,22,39` 三个内置定义声明 `permissionMode: "plan"`（Explore / Plan / code-reviewer）。
+`core/tools/taskTool.ts:82` 只用它拼**展示字符串**（`"PLAN (Read-Only)"`）；
+真正生效的门 `runSubagent`（`core/subagents/runner.ts:117-140`）接收的是
+`gateOptionsFor(options)`（`turn/session.ts:191`），其中 `agentMode: options.agentMode`
+——**会话的模式**，与定义无关。⇒ 在 **build 模式会话**里派 `code-reviewer`
+（`tools: [read,grep,glob,lsp,bash]`、`disallowedTools: [write,edit]`），
+它拿到的是 **build 门**⇒ **可用 `bash` 执行改动**，而声明与展示都写着「PLAN (Read-Only)」。
+**参考**：`gemini-cli/packages/core/src/policy/policy-engine.ts:610` 的 `check(…, subagent?, …)`
+按子代理上下文决策。**方向**：把 `definition.permissionMode` 穿进 `runSubagent` 建门
+（`agentMode: definition.permissionMode ?? 会话模式`）。
+**这一条直接推翻 `phase-18-decisions.md` `W7-30` 的裁决**（见 §20.2）。
+
+### 20.2 对 Phase 18 裁决的**修正**（本轮核心产出）
+
+| 位置 | 原裁决 | 修正 | 依据 |
+|---|---|---|---|
+| **`W7-30`（子代理工具继承）** | 「⚠️ 工具继承**已经接上了**… 若无缺口，本条降级为『已核实健全』」 | **`PARTLY-WRONG`**。**工具继承确实健全**（`subagentTools` + `NEVER_GIVEN` 成立）；但**权限模式继承缺失**——`permissionMode` 是**展示专用**，plan 模式**不生效**（`SUB-01`）。⇒ W7-30 不但不能降级，反而**升级为真缺陷** | §20.1 `SUB-01`；`taskTool.ts:82` vs `runner.ts:117-140` |
+| **`W5-19`（`PRV-12`）** | 由端点所有者区分「单次 / 流式」 | **范围扩大**：主线（流式）各自也错——`googleGenAI` 缺 `?alt=sse`，主回合静默空答案（`PRV-13`）。**两条同根因，一起修**；且要改 `googleGenAI.test.ts:65-67` 这个**钉错 URL 的测试** | §20.1 `PRV-13`；`googleVertex.ts:78` 对照 |
+| **`W3-11`（`OBS-04` MCP 网关）** | 「挂到会话 runtime、以 workspaceRoot 为键」 | **不完整**：即便按此修，仍连不上任何真实 MCP server（`OBS-15`）。**须先裁决协议**，否则优化的是一个只能连夹具的通道 | §20.1 `OBS-15` |
+| **`W1-4`（`LOP-01`）** | 删「without state progression」 | **成立**（主代理复验 `turn/tools.ts:196` 逐字仍在；检测器输入只有 `toolName/argsHash/timestamp`）。**补充**：检测器**有** `findRepeatingCycle`（`doomLoopDetector.ts:18,58,91`，`cycleThreshold` 5）⇒ 登记册「只比参数」的措辞应收窄（`phase-18-decisions.md` §8.3.2 已记，此处确认） | 主代理读码 |
+| **`W4-14`（`SES-02` 缓解）** | 续期 + release owner 校验 | **补充第三条**：`SES-09` 的「空锁 60s 阻塞」是**同域另一条**（两常量互斥），应并入本项施工 | §20.1 `SES-09` |
+| **`W1-2`（`CMD-04`）** | 四个命令被「interactive-only」拦 | **成立**（主代理实机 `/exit` 复现；判定确在派发处 if 链 `cliRuntimeModule.ts:272-390`，`CommandDefinition` 无该字段）。**但注意 `CMD-11`**：同在 `slashRouter` 一层的引号解析会**整条拒绝**含撇号的命令 | 主代理实机 + 读码 |
+
+### 20.3 复核中**被驳回**的 8 条（记此以防重报）
+
+> 子代理会**幻觉**：函数名、行号、影响面都可能错。以下每条主代理都重跑过。
+
+| # | 子代理断言 | 主代理实测 | 处置 |
+|---|---|---|---|
+| 1 | `sendSentRequest` 有「`retrySentRequest` 丢弃 signal」 | **`retrySentRequest` 不存在**（grep 零命中）；`sentRequest.ts:62-66` **确实**传了 `{ signal }` | **驳回** |
+| 2 | `RotatingFileSink.flushAndClose` 从不被调用 ⇒ 退出丢日志 | 写入是 `fs.appendFileSync`（`:69`）**同步**；`flushAndClose` 只置标志（`:103-105`），**无缓冲可丢** | **驳回** |
+| 3 | `editEngine` 的 `lineRangeSpan` 在 CRLF 上留孤立 `\r` | `registry.ts:634-646,666-677` 先 `toUnixLines`、后 `withLineEnding` 复原；主代理**模拟全路径**得完全正确的 CRLF 往返；`editEngine` 无其他生产调用者 | **驳回** |
+| 4 | `/undo` 推荐的 `--all` 会「恢复整个 authority」 | `defaultAuthorityId` 含 `Date.now()+random`（`editSnapshot.ts:190`）⇒ **每次快照一个独立命名空间**，`--all` 命中的就是那一次写入 | **驳回** |
+| 5 | `/tools` 列了「幽灵 `lsp` 工具」 | `core/tools/lsp.ts:28` 真实注册（`registry.ts:757`） | **驳回**（但「隐藏 MCP/技能」成立，见 `TOL-13`） |
+| 6 | `/compact` 与压实引擎「完全断开」 | 裸 `/compact` 在**两个入口**都被拦截：`interactiveCommandRouter.ts:100-108`、`cliRuntimeModule.ts:229-238` ⇒ `compactHistory` → 真实 `compactSessionHistory`；命令注册表只管 `preview/render/json` 工件形式 | **驳回** |
+| 7 | `splitBucketKey` 把含斜杠的模型名切错 | `usageTelemetry.ts:141-152` 的注释**明确**约定「provider 是首个 `/` 之前」；仅当 **provider 为空且模型含 `/`** 才歧义（可达性低） | **驳回**（记为已知取舍） |
+| 8 | `CMD-06`/`CMD-03` 裁决 `PARTLY-WRONG`（补问时上游 400，未给理由） | 主代理独立复验：`opensPicker`（`picker/registry.ts:101-108`）确要求**行内无空白**；实机 `/back 2` ⇒ `Unknown slash command: /back`；rewind 宿主（`interactiveMode.ts:731-750`）确为叶重指+摘要+放回 | **无法证实**；按主代理复验，裁决**维持** |
+
+### 20.4 本轮的方法论收获
+
+1. **子代理的「P1」有一半经不起亲验**：本轮 3 个子代理共报 ~20 条，主代理**驳回 8 条**
+   （含 1 条不存在的函数名、2 条读错调用链、2 条没验证复原逻辑）。
+   **规律**：凡是「某处从未被调用」「某处丢参数」这类**否定式**断言，**必须自己再 grep 一遍**。
+2. **同一个字面量在不同定位下含义相反**（承 §7.1 的教训）：`ok:true` 在真实路径是正确、
+   在夹具才可疑；本轮 `success:true`（`TOL-10`）亦然——**定位**决定含义。
+3. **「常量对不上」是新一类**：`SES-09` 的 `1.2s vs 60s` 与 `TOL-12` 的
+   「`ALLOWED_IN_PLAN` vs `PLAN_MODE_TOOLS`」都是**两处各自正确、合起来错**，
+   且**没有任何测试钉住它们的关系**。建议在施工轮为这类加**一致性测试**。
