@@ -556,7 +556,8 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W3-12 / SES-07 | 切换会话释放旧 todo；两条删除路径均在存储删除成功后释放，同 ID 更新保留 | 已实现，本地验证通过 |
 | W3-13 / CTX-09 | 五处状态持有者增加容量及丢弃标记；外层会话表同样有界，异步注入失去状态后不报告成功 | 已实现，本地验证通过 |
 | W4-14 / SES-02 缓解 | 同步临界区按本机持有者存活保护，release 校验 token/文件身份，action 不重复执行；仍无 fencing | 已实现，本地验证通过 |
-| W4-15/16、SES-09、CMD-12、W5–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
+| W8-38 / SES-09（随 W4） | 空/半写锁 500ms 创建宽限；文件读取错误不夺锁 | 已实现，本地验证通过 |
+| W4-15/16、CMD-12、W5–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
 src/runtime/execution/service.test.ts src/runtime/execution/fileLock.test.ts
@@ -779,6 +780,10 @@ W4-14 验证：`npm run test:ts -- src/session/store/sessionFileStore.test.ts sr
 3 文件 / 85 项通过；`npm run build:ts` exit 0。撤销两处 owner 实现后 8 项失败、exit 1，恢复原字节。
 真实子进程 SIGSTOP + 超过年龄阈值的观察仍判本机锁存活；模拟外部替换后 SIGCONT，
 旧持有者 exit 3（ownership lost）且 successor 锁原样保留。独立复核 APPROVE / CLEAR。
+SES-09 同域独立修复：空/半写 JSON 的创建宽限为 500ms，小于 1.2s 获取等待；EACCES/EIO
+等 I/O 读失败不推断死亡，缺身份时任意暂停仍是无 fencing 的已知边界。锁测试 2 文件 / 22 项通过，
+涵盖新建空锁/半写锁实际恢复及精确宽限边界。改回 60s 后 2 项失败，exit 1，恢复原字节。
+独立代码复核 APPROVE、架构 CLEAR；正文与旧注释统一为「恢复启发式」，不把年龄称为死亡证明。
 
 ### 8.5 主代理在等待复核者期间新增的六处自查（已并入正文）
 

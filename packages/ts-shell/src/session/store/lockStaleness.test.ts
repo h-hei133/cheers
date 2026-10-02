@@ -1,10 +1,17 @@
 import fs from "node:fs";
+import { readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
+
+vi.mock("node:fs", async () => {
+  const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
+  return { ...actual, readFileSync: vi.fn(actual.readFileSync) };
+});
 import { withFileLock, writeJsonFileAtomic } from "./sessionFileStore.js";
 import {
   STALE_LOCK_AGE_MS,
+  INCOMPLETE_LOCK_AGE_MS,
   isLockStale,
   takeOverStaleLock,
 } from "./lockStaleness.js";
@@ -196,13 +203,39 @@ describe("withFileLock with a stale lock on disk", () => {
 });
 
 describe("a lock that is being acquired", () => {
+  it.each(["EACCES", "EIO"])("does not infer dead ownership from %s on an old lock", (code) => {
+    const root = tempDir("unreadable-lock-");
+    const lockPath = path.join(root, "state.lock");
+    try {
+      fs.writeFileSync(lockPath, "{}");
+      const old = new Date(Date.now() - STALE_LOCK_AGE_MS * 2);
+      fs.utimesSync(lockPath, old, old);
+      vi.mocked(readFileSync).mockImplementationOnce(() => { throw Object.assign(new Error("read failed"), { code }); });
+      expect(isLockStale(lockPath)).toBeUndefined();
+      expect(fs.existsSync(lockPath)).toBe(true);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it.each(["", '{"pid":'])("recovers incomplete metadata within acquisition timeout: %j", (content) => {
+    const root = tempDir("incomplete-lock-");
+    const lockPath = path.join(root, "state.lock");
+    try {
+      fs.writeFileSync(lockPath, content);
+      const modified = fs.statSync(lockPath).mtimeMs;
+      expect(isLockStale(lockPath, modified + INCOMPLETE_LOCK_AGE_MS - 1)).toBeUndefined();
+      expect(isLockStale(lockPath, modified + INCOMPLETE_LOCK_AGE_MS)?.reason).toBe("lock-unreadable");
+      expect(withFileLock(lockPath, () => "recovered")).toBe("recovered");
+      expect(fs.readdirSync(root)).toEqual([]);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
   it("is not stale while it is still being written", () => {
     // The holder creates the file and then writes its record into it. In that
     // window the file exists, is empty, and cannot be parsed — and a reader that
     // treated that as proof of a dead owner would take the lock away from a
     // process midway through acquiring it, leaving two writers on one state
-    // file. The window is microseconds; requiring age is what makes it matter
-    // not at all.
+    // file. A short grace protects ordinary acquisition, without claiming to
+    // distinguish a crash from an arbitrarily paused, unidentified owner.
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-lock-"));
     const lockPath = path.join(directory, "state.lock");
 
@@ -215,10 +248,8 @@ describe("a lock that is being acquired", () => {
     fs.rmSync(directory, { recursive: true, force: true });
   });
 
-  it("is recovered once it is old, because then nobody is writing it", () => {
-    // The other half: an unreadable lock that has been sitting there is a file
-    // nobody is maintaining, and refusing to take it over would block the
-    // session forever — which is the failure the takeover exists to remove.
+  it("recovers old incomplete metadata using the creation grace", () => {
+    // Recover common crash residue; age alone does not prove nobody is writing.
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-lock-"));
     const lockPath = path.join(directory, "state.lock");
     fs.writeFileSync(lockPath, "");

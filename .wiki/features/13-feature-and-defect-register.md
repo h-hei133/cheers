@@ -2963,7 +2963,11 @@ turn/completion.ts:558-563                         eventData ... parts.join("\n"
 
 **撤销验证**：响应 `429` + `Retry-After: 5` ⇒ turn 层首次重试延迟**≥ 5s**（当前为 ~2s）。
 
-### SES-09 · 锁**获取超时（1.2s）≪ 陈旧判定阈值（60s）**，崩溃后的空锁造成 60s 硬失败 — `OPEN` `P2` `CONFIRMED`
+### SES-09 · 锁**获取超时（1.2s）≪ 陈旧判定阈值（60s）**，崩溃后的空锁造成 60s 硬失败 — `FIXED` `P2` `CONFIRMED`（2026-10-02）
+
+空/半写 JSON 使用 500ms 创建宽限，可在 1.2s 获取等待内恢复；新建锁不立即接管。
+只有 SyntaxError 进入该路径，EACCES/EIO 等读取失败不推断持有者死亡。
+身份尚未写入前任意暂停仍无法与崩溃区分，宽限是启发式而非 fencing。以下保留原定位证据。
 
 ```
 session/store/sessionFileStore.ts:9    const STATE_LOCK_TIMEOUT_MS = 1200

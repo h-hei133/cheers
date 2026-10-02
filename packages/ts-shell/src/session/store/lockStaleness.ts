@@ -26,6 +26,9 @@ import os from "node:os";
 /** How old a lock must be before its owner is presumed gone. */
 export const STALE_LOCK_AGE_MS = 60_000;
 
+/** Allow metadata creation to finish, while recovering a crash within the acquisition timeout. */
+export const INCOMPLETE_LOCK_AGE_MS = 500;
+
 /** The observation that makes a lock eligible for recovery. */
 export interface StaleLockTakeover {
   readonly reason: "owner-dead" | "lock-expired" | "lock-unreadable";
@@ -42,35 +45,27 @@ export interface StaleLockTakeover {
  * a lock whose owner's pid is gone (checked only when it was written on this
  * host — a pid from another machine names a process this one cannot ask
  * about); a foreign/unidentified lock older than the age threshold; and a lock
- * that cannot be read at all *and is older than the threshold*,
- * which is a file nobody is maintaining.
+ * with incomplete JSON older than a short creation grace. Filesystem read
+ * failures provide no evidence of owner death and are never taken over.
  *
- * The age requirement on the third is not decoration. The holder creates the
- * lock and then writes its record into it, so a lock that cannot be read may be
- * one that is being acquired right now; taking it over in that window leaves two
- * writers on one state file. Age is what separates "nobody is writing this" from
- * "somebody is writing this".
+ * The creation grace avoids immediate takeover between creating a lock and
+ * writing its metadata. Age is a recovery heuristic, not proof of owner death:
+ * a holder paused before recording its identity can still outlive the grace.
  */
 export function isLockStale(lockPath: string, now: number = Date.now()): StaleLockTakeover | undefined {
   let owner: { readonly pid?: number; readonly hostname?: string; readonly createdAt?: string } | undefined;
   try {
     const raw = fs.readFileSync(lockPath, "utf8");
     owner = JSON.parse(raw) as typeof owner;
-  } catch {
-    // Unreadable is a distinct case from missing: missing means nobody holds the
-    // lock, unreadable means somebody wrote something the format does not
-    // recognize.
-    //
-    // It is only a reason to take over once the file is old. The holder creates
-    // the lock and then writes its record, so between those two steps the file
-    // exists, is empty, and is unreadable — and a reader that took that as proof
-    // of a dead owner would take the lock away from a process that is midway
-    // through acquiring it. Both would then hold it and both would write the
-    // state. The window is microseconds; the age threshold is what makes it
-    // irrelevant rather than a race.
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) return undefined;
+    // Empty/partial metadata can be a crash between create and write. The grace
+    // is shorter than acquisition timeout, but still avoids immediate takeover
+    // during ordinary creation. It cannot identify an owner paused before its
+    // metadata was written; this remains an unfenced recovery heuristic.
     try {
       const stat = fs.statSync(lockPath);
-      if (now - stat.mtimeMs >= STALE_LOCK_AGE_MS) {
+      if (now - stat.mtimeMs >= INCOMPLETE_LOCK_AGE_MS) {
         return { reason: "lock-unreadable", hostname: os.hostname(), at: new Date(now).toISOString() };
       }
     } catch {
