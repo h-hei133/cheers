@@ -59,7 +59,7 @@ export function projectSessionNavigation(
       ...(unavailable ? { unavailable } : {}),
     });
     for (const child of [...node.children].reverse()) {
-      pending.push({ node: child, depth: depth + 1, parentId: node.entry.id, valid });
+      pending.push({ node: child, depth: depth + 1, parentId: node.entry.id, valid: unavailable === undefined });
     }
   }
   return points;

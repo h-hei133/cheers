@@ -35,9 +35,17 @@ describe("session navigation projection", () => {
       entries: [
         { id: "u", kind: "turn-message", role: "user", order: 0 },
         { id: "missing", parentId: "u", kind: "turn-message", role: "assistant", order: 1 },
+        { id: "child", parentId: "missing", kind: "turn-message", role: "user", order: 2 },
+        { id: "sibling", parentId: "u", kind: "turn-message", role: "user", order: 3 },
       ],
-    }, [{ id: "u", role: "user", content: "First line\n  second line" }]);
+    }, [
+      { id: "u", role: "user", content: "First line\n  second line" },
+      { id: "child", role: "user", content: "Readable child" },
+      { id: "sibling", role: "user", content: "Healthy branch" },
+    ]);
     expect(points[0]).toMatchObject({ label: "user: First line second line", prompt: "First line\n  second line" });
     expect(points[1]?.unavailable).toBe("message unavailable");
+    expect(points[2]?.unavailable).toBe("broken ancestry");
+    expect(points[3]?.unavailable).toBeUndefined();
   });
 });

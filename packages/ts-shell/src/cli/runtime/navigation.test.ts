@@ -104,6 +104,24 @@ describe("session tree navigation", () => {
     expect(fs.readFileSync(layout.statePath)).toEqual(before);
   });
 
+  it("refuses a readable descendant of a missing message without writing a new branch", async () => {
+    const { input, session, turns, summarize, layout } = harness();
+    const events = fs.readFileSync(layout.transcriptPath, "utf8").trim().split("\n")
+      .filter((line) => JSON.parse(line).id !== turns[0]!.id);
+    fs.writeFileSync(layout.transcriptPath, `${events.join("\n")}\n`);
+    const beforeState = fs.readFileSync(layout.statePath);
+    const beforeTranscript = fs.readFileSync(layout.transcriptPath);
+    const rewind = vi.fn();
+    const picker = treePicker({ sessionId: session.id, cwd: root }, rewind);
+    expect((await picker.load()).find((option) => option.id === turns[2]!.id)?.disabled).toBe(true);
+    await picker.apply([turns[2]!.id!]);
+    expect(rewind).not.toHaveBeenCalled();
+    await expect(navigateSession(input, turns[2]!.id!)).rejects.toThrow("broken ancestry");
+    expect(summarize).not.toHaveBeenCalled();
+    expect(fs.readFileSync(layout.statePath)).toEqual(beforeState);
+    expect(fs.readFileSync(layout.transcriptPath)).toEqual(beforeTranscript);
+  });
+
   it("refuses navigation during a running turn before invoking the writer", async () => {
     const { input, turns, summarize, layout } = harness();
     const before = fs.readFileSync(layout.statePath);
