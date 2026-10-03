@@ -38,6 +38,7 @@ describe("session usage persistence seams", () => {
     // The real query owner, with only its path/storage adapter supplied here.
     const store = {
       load, statePath: () => layout.statePath,
+      transcriptPath: () => layout.transcriptPath,
       withSessionStateLock: (_id: string, write: () => void) => withSessionStateLock(layout, write),
       readStateSnapshotSafely: read, writeJsonFileAtomic,
     } as unknown as SessionStoreAccess;

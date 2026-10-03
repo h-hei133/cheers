@@ -1691,3 +1691,10 @@ compact结果组连同eventId/entryId保存或替换，chat、审批及计数更
 
 第十批7f1e2d0d的CI 37104585807与Architecture Watch 37104585806均成功。
 本批仅闭合已列续接来源场景；不声称跨进程事务、操作性replay隔离或36模块完整审计完成。W7-26继续。
+
+
+### W7-26 第十一批CI适配器修正（2026-10-03）
+
+`e17f899f`的Architecture Watch 37107169853通过；CI 37107169849为526套通过、1套失败，4807项通过、1失败、1跳过。
+唯一失败为usage持久化测试的强制类型转换适配器未实现transcriptPath；生产SessionStoreAccess已有此方法。
+给测试补入既有layout.transcriptPath，保留全部用量断言；隔离运行该测试1套1项通过。归类为确定性的测试适配器缺口，不是提供方、环境或第十二批变更引入的失败。
