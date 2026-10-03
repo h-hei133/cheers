@@ -1,8 +1,22 @@
 import { describe, expect, it } from 'vitest'
+import path from 'node:path'
 import { forgetSessionTodos, getSessionTodos, setSessionTodos } from '../commands/todoCommandRuntime.js'
 import { applyShellSubstrateTransition, createSessionRootMismatchDiagnostic, createShellRuntimeContext, createWorkspaceAttachSwitchDiagnostic, resolveRootBindingDiagnostics, switchActiveSession } from './runtimeContext.js'
 
 describe('shell runtime context', () => {
+  it('keeps case-distinct binding diagnostics on case-sensitive platforms', () => {
+    const projectRoot = path.resolve('CaseRoot')
+    const distinctRoot = path.resolve('caseroot')
+    const diagnostics = resolveRootBindingDiagnostics({
+      projectRoot, rootMode: 'git-root', requestedWorkspaceRoot: distinctRoot,
+      targetPathBase: distinctRoot, gitRoot: projectRoot,
+      gitContext: { insideGit: true, root: projectRoot, branch: 'main', isClean: true },
+    })
+    const codes = diagnostics.map(diagnostic => diagnostic.code)
+    expect(codes.includes('root-binding-target-base-mismatch')).toBe(process.platform !== 'win32')
+    expect(codes.includes('root-binding-git-auto-upgrade')).toBe(process.platform !== 'win32')
+  })
+
   it('switches active session atomically', () => {
     const context = createShellRuntimeContext({
       cwd: 'D:/repo',

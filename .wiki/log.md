@@ -5800,3 +5800,9 @@ next上下文沿用snapshot已有准入，seed摘要读回formatter实际键，�
 修复Git隐含helper自动准入、授权目标大小写/空白碰撞、allow-once泄漏及预存once未消耗。拒绝匹配保留命令空白兼容和真实文件路径规范化；旧有损授权需重新确认。新增[38模块Shell审计](features/phase-18-shell-audit.md)，其余Shell问题继续执行。
 最终19套217项与CLI构建通过，独立APPROVE/CLEAR；反转五个行为模块62失败89通过，随后精确恢复。四次普通/全屏编译PTY覆盖一次授权及allow-always的不同文件目标，拒绝后无额外写入，终态/持久化一致。
 静态阻断门及judge阻断义务通过，advisory仍partial。一次Node/V8原生崩溃exit134不计通过，最终单worker重跑通过。未调用真实provider，旧result-contract与test:scripts本批未跑。56df129c两项远端检查均成功。
+
+
+## [2026-10-03] fix | Phase 18 W7-31 根目录大小写绑定
+
+三个Shell比较函数在非Windows保留大小写，CaseRoot/caseroot不能隐式共享会话；明确迁移沿用既有rebind并重建目标绑定。5套56项、CLI构建与独立APPROVE/CLEAR通过；反转三个owner后5失败22通过，精确恢复。
+普通/全屏编译PTY确认错误根拒绝时无模型请求，显式迁移后实际批准写入只到新根，绑定与终态持久化一致。静态阻断门及judge阻断义务通过，既有advisory保留。未进行真实provider或Windows运行，词法比较的可移植性限制见Shell审计。

@@ -57,7 +57,8 @@ function isFailedResume(
 }
 
 function normalizePathForCompare(value: string): string {
-  return path.resolve(value).toLowerCase();
+  const resolved = path.resolve(value);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
 }
 
 function isEquivalentOrNestedProjectRoot(

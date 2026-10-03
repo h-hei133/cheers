@@ -197,6 +197,44 @@ describe('shell bootstrap', () => {
     )
   })
 
+  it.skipIf(process.platform === 'win32').each(['caseroot', 'caseroot/nested'])(
+    'rejects case-distinct requested root %s without migration', requestedName => {
+      const sessionManager = new SessionManager()
+      const source = path.join(fakeHome, 'CaseRoot')
+      const destination = path.join(fakeHome, requestedName)
+      fs.mkdirSync(source, { recursive: true })
+      fs.mkdirSync(destination, { recursive: true })
+      const session = sessionManager.createNew(source)
+      expect(() => bootstrapShellRuntime({
+        cwd: destination, runtimeConfig: getRuntimeConfig(destination),
+        gitContext: getWorkflowGitContext(destination), sessionManager,
+        renderer: new StreamingRenderer(), requestedSessionId: session.id,
+        emitLifecycleMessages: false,
+      })).toThrowError(expect.objectContaining({ code: 'session-root-mismatch' }))
+      expect(sessionManager.resume(session.id).projectRoot).toBe(source)
+    })
+
+  it.skipIf(process.platform === 'win32')('performs an explicit case-distinct root migration', () => {
+    const sessionManager = new SessionManager()
+    const source = path.join(fakeHome, 'CaseRoot')
+    const destination = path.join(fakeHome, 'caseroot')
+    fs.mkdirSync(source, { recursive: true })
+    fs.mkdirSync(destination, { recursive: true })
+    const session = sessionManager.createNew(source)
+    const result = bootstrapShellRuntime({
+      cwd: destination, requestedWorkspaceRoot: destination, runtimeConfig: getRuntimeConfig(destination),
+      gitContext: getWorkflowGitContext(destination), sessionManager,
+      renderer: new StreamingRenderer(), requestedSessionId: session.id,
+      allowSessionRootMigration: true, emitLifecycleMessages: false,
+    })
+    expect(result.context.projectRoot).toBe(destination)
+    expect(result.context.cwd).toBe(destination)
+    expect(result.context.targetPathBase).toBe(destination)
+    expect(result.context.session.projectRoot).toBe(destination)
+    expect(new SessionManager().resume(session.id).projectRoot).toBe(destination)
+    expect(result.lifecycleNotices.join('\n')).toContain('with migrated project root')
+  })
+
   it.each([false, true])('rebuilds workspace binding for the migrated destination, git: %s', git => {
     const sessionManager = new SessionManager()
     const oldRoot = fs.mkdtempSync(path.join(fakeHome, 'old-bound-'))

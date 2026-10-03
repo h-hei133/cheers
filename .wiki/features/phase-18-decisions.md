@@ -578,7 +578,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W7-32 | read每次返回正文；startup结构/身份/有界读写、freshness与命令投影已修复；保留默认禁用 | 已完成，定向验证与隔离验收通过 |
 | W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
 | W7-26 / SES-08 | 回放、导出、迁移、恢复准入、检查点、字段优先级与历史写入观察已核验；后续转W7-31 | 已完成；原36模块行为矩阵闭合，保证边界与历史数据限制见审计表 |
-| W7-31 | [38模块Shell审计](phase-18-shell-audit.md)；首批修复审批身份、once生命周期和Git helper准入 | 进行中；根绑定、终态、compact注入、readiness、连接选择及background仍待完成 |
+| W7-31 | [38模块Shell审计](phase-18-shell-audit.md)；首批修复审批身份、once生命周期和Git helper准入 | 进行中；根绑定已修复；终态、compact注入、readiness、连接选择及background仍待完成 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1802,3 +1802,12 @@ seed/fragment回归证明历史格式消费及往返，不证明当前真实工�
 验证异常分类：最早两项失败因真实registry创建审计目录而与fixture目录断言冲突，改为精确检查文件集合；另一次9套42项报告通过后Node/V8原生崩溃exit134，不计为成功，最终单worker重跑覆盖全部相关套件。旧result-contract脚本与test:scripts本批未跑，前者仍作为W7-31债务。
 所有本批测试使用仓内独立HOME/USERPROFILE/TMPDIR、CHEERS_SYNTHETIC_HOME、CHEERS_TEST_ROOT与npm cache；不使用真实provider配置。56df129c的CI 37115159213与Architecture Watch 37115159216均已成功。
 W7-31仍未完成，继续处理审计表中的根绑定、取消终态、compact注入、readiness/凭据选择、background及直接行为断言缺口。
+
+
+### W7-31 第二批：大小写不同的根目录绑定（2026-10-03）
+
+`bootstrap`、`runtimeContext`、`startupSurfaceRenderer`原先统一小写比较，Linux上CaseRoot/caseroot被误认同根，`--migrate-session-root`也成为no-op。现仅Windows折叠，保留三个既有owner及SessionManager迁移流程。对照session cwd的resolved原始大小写相等决策；不引入文件系统探测或symlink别名重写。
+隔离`npm run test -w packages/ts-shell -- --threads=false src/core/shell/bootstrap.test.ts src/core/shell/runtimeContext.test.ts src/core/shell/startupSurfaceRenderer.test.ts src/session/continuation/sessionProjectRootRebind.test.ts src/session/continuation/sessionRootRebase.test.ts`：5套56项、exit0；`npm run build:cli` exit0。独立APPROVE/CLEAR，代码审查另3套27项通过。反转三个owner为5失败22通过，随后精确恢复。
+最终编译普通/全屏PTY先以不同大小写根请求同一session，两次都拒绝且零模型请求；显式迁移后每次2个本地HTTP请求，审批前无文件、批准后只写新根、重开绑定正确、终态success与来源一致。产物.tmp/root-case-pty-rqhj08xe，双模式exit0。
+静态阻断门和judge阻断义务通过，已有advisory保留；无真实provider，旧result-contract及test:scripts未跑。当前比较按host策略，非Windows大小写不敏感文件系统可能仍需显式迁移，不声称真实Windows验收。
+首批0428c2cc已推送；Architecture Watch 37118672620成功，CI 37118672630仍执行。W7-31继续取消终态、compact注入和其余Shell项目。

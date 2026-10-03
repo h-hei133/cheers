@@ -10,7 +10,7 @@ W7-31仍在执行。首批聚焦审批，其余已复现问题按下表继续修
 |---|---|---|
 | `approvalPromptRenderer.ts` | prompt事实和audit投影；approvalPromptBridge测试 | 所列路径源码核对，无新缺陷 |
 | `approvalTrustPolicy.ts` | 项目范围、精确目标、加载、列表和撤销；同名测试 | 首批修复大小写/空白碰撞及旧键复用；保留旧授权管理能力 |
-| `bootstrap.ts` | 显式会话与workspace兼容性；同名测试 | 已复现Linux大小写不同根被视为同根，迁移成为no-op，待修复 |
+| `bootstrap.ts` | 显式会话与workspace兼容性；同名测试 | 第二批修复非Windows大小写比较；peer/nested拒绝、显式迁移和重新打开通过 |
 | `compaction.ts` | 手动/自动复用、hooks、取消、切片、检查点；同名测试 | 所列路径源码核对，无新缺陷 |
 | `continueShellActionRuntime.ts` | resume/continue权限与恢复资格；同名测试 | 复用W7-26恢复证据 |
 | `interactiveApprovalWiring.ts` | 当前回答与后续授权分离；同名测试 | 首批移除allow-once的后续缓存写入 |
@@ -20,7 +20,7 @@ W7-31仍在执行。首批聚焦审批，其余已复现问题按下表继续修
 | `providerReadiness.ts` | readiness请求与实际adapter认证一致 | 已复现原生消息端点探测错误使用Bearer；合成HTTP证据，待修复 |
 | `recovery.ts` | 恢复准入与当前分支证据 | 复用W7-26恢复证据 |
 | `restoreSurfaceSummary.ts` | authority和无成功噪声；同名测试 | 所列路径源码核对，无新缺陷 |
-| `runtimeContext.ts` | workspace/session/recovery身份 | 根比较的大小写问题与bootstrap关联，待修复 |
+| `runtimeContext.ts` | workspace/session/recovery身份 | 第二批修复大小写比较；target-base/requested诊断覆盖 |
 | `sessionEventSurface.ts` | runtime prose/digest；runtime/boundary测试 | success字段必填；未确认新的投影缺陷 |
 | `sessionFutureTurnProjection.ts` | compact注入在真实prompt提交后消耗 | 已复现durable prompt barrier失败前提前消耗，待修复 |
 | `sessionPersistenceProjection.ts` | runtime持久化适配；runtime/boundary测试 | 所列路径源码核对，无新缺陷 |
@@ -31,7 +31,7 @@ W7-31仍在执行。首批聚焦审批，其余已复现问题按下表继续修
 | `sessionTerminalState.ts` | terminal累计与输出 | 与runtime提前打印默认success关联，待修复 |
 | `shellActionBridge.ts` | command router判定与blocked文本 | 未找到直接symbol测试；保留断言缺口 |
 | `signalHandlers.ts` | SIGINT、idle close及恢复提示 | SIGINT已有测试；idle close/保留提示仍需核验 |
-| `startupSurfaceRenderer.ts` | 启动与workspace身份诊断 | 与根大小写比较关联；直接surface测试待补 |
+| `startupSurfaceRenderer.ts` | 启动与workspace身份诊断 | 第二批增加直接surface测试，大小写不同根不再显示同根 |
 | `stateMachine.ts` | 状态转换；同名测试 | 当前调用方busy串行化路径已核对 |
 | `turnBoundarySurface.ts` | 回合边界和fallback；同名测试 | 所列formatter路径已核对 |
 
@@ -67,3 +67,10 @@ log/show也可能调用签名或内容转换helper。因此这些命令在ask/ac
 
 旧result-contract脚本仍需修复：测试路径已移动、历史测试名失效，synthetic echo不能作为read/write工具证据。
 本表中的待修复和断言缺口都仍属于W7-31后续工作。
+
+
+## 第二批根目录身份
+
+三个既有比较函数只在Windows折叠大小写，其他平台保留`path.resolve`的原始大小写。沿用现有拒绝、显式迁移和绑定重建流程，不引入另一个根管理器。
+参考实现对session cwd采用保留大小写的resolved equality；本仓保留已有Windows兼容政策。比较仍是词法规则，不探测磁盘大小写策略或symlink别名，大小写不敏感的非Windows文件系统可能需要显式迁移。
+5套56项与CLI构建通过，独立APPROVE/CLEAR；反转三个owner后5失败22通过，逐字节恢复。双模式编译PTY证明未授权迁移先拒绝且无模型请求；明确迁移后模型和实际审批写入使用新根，旧根不写入，持久化绑定/终态来源一致。产物.tmp/root-case-pty-rqhj08xe。
