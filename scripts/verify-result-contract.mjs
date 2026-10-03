@@ -4,212 +4,94 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import {
-  ensureDirIfNeeded,
-  getSyntheticHome,
-  getTestRoot,
-} from './support/testPaths.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const tsShellRoot = path.join(repoRoot, 'packages', 'ts-shell')
-const vitestPath = firstExistingPath([
-  path.join(tsShellRoot, 'node_modules', 'vitest', 'vitest.mjs'),
-  path.join(repoRoot, 'node_modules', 'vitest', 'vitest.mjs'),
-])
-const tsxCliPath = path.join(repoRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs')
-const cliEntryPath = path.join(tsShellRoot, 'src', 'entrypoints', 'cli.tsx')
-const syntheticHome = getSyntheticHome()
-const projectRoot = path.join(getTestRoot(), 'result-contract-gate')
-const fixturePath = `${projectRoot}/fixture.txt`
-const replayPath = `${projectRoot}/replay.txt`
 
-const successResultMarkers = [
-  'Result',
-  'Outcome: success',
-  'Action result',
-  'Task: read-file',
-  'Verification: not-requested',
-  `Read result for ${fixturePath}:`,
-  'result contract fixture line 1',
+export const contractSuites = [
+  'src/result/terminal/truth.test.ts',
+  'src/turn/session.test.ts',
+  'src/core/shell/sessionRuntime.test.ts',
+  'src/core/shell/providerReadiness.test.ts',
+  'src/cli/interactive/turnSink.test.ts',
+  'src/cli/print/result.test.ts',
 ]
 
-function firstExistingPath(candidates) {
-  return candidates.find((candidate) => fs.existsSync(candidate)) ?? candidates[0]
-}
-
-function run(command, args, options = {}) {
-  return new Promise((resolve) => {
-    const env = {}
-    for (const [key, value] of Object.entries({ ...process.env, ...(options.env ?? {}) })) {
-      if (typeof value === 'string') env[key] = value
+// A successful runner exit alone also permits empty or skipped selections.
+export function verifyContractReport(report, expectedFiles) {
+  if (report?.success !== true || report.numFailedTests !== 0 || !(report.numPassedTests > 0)) {
+    throw new Error('Runner did not report passing contract tests')
+  }
+  for (const file of expectedFiles) {
+    const suite = report.testResults?.find(candidate =>
+      typeof candidate.name === 'string' && path.resolve(candidate.name) === path.resolve(file))
+    if (!suite || suite.status !== 'passed' || !Array.isArray(suite.assertionResults) || suite.assertionResults.length === 0) {
+      throw new Error(`Missing or unsuccessful contract suite: ${file}`)
     }
-    const child = spawn(command, args, {
-      cwd: options.cwd ?? repoRoot,
-      env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      shell: false,
+    if (suite.assertionResults.some(assertion => assertion.status !== 'passed')) {
+      throw new Error(`Contract suite contains unpassed assertions: ${file}`)
+    }
+  }
+}
+
+function isolatedEnvironment(home, tmp, root) {
+  const env = {}
+  for (const key of ['PATH', 'SystemRoot', 'WINDIR', 'COMSPEC', 'PATHEXT', 'LANG']) {
+    if (process.env[key]) env[key] = process.env[key]
+  }
+  return { ...env, HOME: home, USERPROFILE: home, TMPDIR: tmp, TMP: tmp, TEMP: tmp,
+    CHEERS_SYNTHETIC_HOME: home, CHEERS_TEST_ROOT: root, CHEERS_REAL_HOME: '',
+    CHEERS_PROVIDER_MODE: 'synthetic', NO_COLOR: '1' }
+}
+
+function runTests(vitestPath, reportPath, env) {
+  return new Promise(resolve => {
+    const child = spawn(process.execPath, [vitestPath, 'run', ...contractSuites,
+      '--threads', 'false', '--reporter=json', '--outputFile', reportPath], {
+      cwd: tsShellRoot, env, stdio: ['ignore', 'pipe', 'pipe'], shell: false,
     })
-    let stdout = ''
-    let stderr = ''
+    let output = Buffer.alloc(0)
     let timedOut = false
-    const timer = setTimeout(() => {
-      timedOut = true
-      child.kill('SIGKILL')
-    }, options.timeoutMs ?? 240000)
-
-    child.stdout.on('data', (chunk) => {
-      stdout += chunk.toString()
-    })
-    child.stderr.on('data', (chunk) => {
-      stderr += chunk.toString()
-    })
-    child.on('error', (error) => {
+    const capture = chunk => { output = Buffer.concat([output, chunk]).subarray(-128 * 1024) }
+    child.stdout.on('data', capture)
+    child.stderr.on('data', capture)
+    child.on('error', error => capture(Buffer.from(error.message)))
+    const timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL') }, 240000)
+    child.on('close', code => {
       clearTimeout(timer)
-      resolve({ code: -1, timedOut: false, stdout, stderr: `${stderr}${error.message}`, output: `${stdout}${stderr}${error.message}` })
-    })
-    child.on('close', (code) => {
-      clearTimeout(timer)
-      resolve({ code: code ?? -1, timedOut, stdout, stderr, output: `${stdout}${stderr}` })
+      resolve({ code, timedOut, output })
     })
   })
-}
-
-function printStep(name, status, detail = '') {
-  const suffix = detail ? ` - ${detail}` : ''
-  console.log(`[${status}] ${name}${suffix}`)
-}
-
-function summarizeOutput(output) {
-  return output
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .slice(-14)
-    .join('\n')
-}
-
-async function runFocusedTest(name, file, pattern, timeoutMs = 180000) {
-  const result = await run(process.execPath, [vitestPath, 'run', file, '-t', pattern], {
-    cwd: tsShellRoot,
-    env: {
-      HOME: syntheticHome,
-      USERPROFILE: syntheticHome,
-      CHEERS_PROVIDER_MODE: 'synthetic',
-    },
-    timeoutMs,
-  })
-  if (result.code !== 0 || result.timedOut) {
-    printStep(name, 'product-regression', result.timedOut ? 'timed out' : `exit=${result.code}`)
-    console.log(summarizeOutput(result.output))
-    return false
-  }
-  printStep(name, 'pass')
-  return true
-}
-
-function assertMarkers(output, markers, label) {
-  const missing = markers.filter((marker) => !output.includes(marker))
-  if (missing.length > 0) {
-    printStep(label, 'product-regression', `missing=${missing.join(' | ')}`)
-    return false
-  }
-  printStep(label, 'pass')
-  return true
-}
-
-function writeFixtures() {
-  fs.mkdirSync(projectRoot, { recursive: true })
-  fs.writeFileSync(
-    fixturePath,
-    ['result contract fixture line 1', 'result contract fixture line 2'].join('\n'),
-    'utf8',
-  )
-  fs.writeFileSync(
-    replayPath,
-    `read the first line from ${fixturePath}\n`,
-    'utf8',
-  )
-}
-
-async function runSyntheticPrintReplayContract() {
-  if (!fs.existsSync(syntheticHome)) {
-    printStep('synthetic-home', 'config-failure', `${syntheticHome} missing`)
-    return { ok: false, code: 3 }
-  }
-  writeFixtures()
-
-  const env = {
-    HOME: syntheticHome,
-    USERPROFILE: syntheticHome,
-    CHEERS_PROVIDER_MODE: 'synthetic',
-  }
-  const printResult = await run(process.execPath, [
-    tsxCliPath,
-    cliEntryPath,
-    '--project',
-    projectRoot,
-    '--print',
-    `read the first line from ${fixturePath}`,
-  ], { cwd: tsShellRoot, env, timeoutMs: 240000 })
-  if (printResult.code !== 0 || printResult.timedOut) {
-    printStep('result-contract-synthetic-print', 'product-regression', printResult.timedOut ? 'timed out' : `exit=${printResult.code}`)
-    console.log(summarizeOutput(printResult.output))
-    return { ok: false, code: 1 }
-  }
-  const printOk = assertMarkers(printResult.output, successResultMarkers, 'result-contract-synthetic-print')
-
-  const replayResult = await run(process.execPath, [
-    tsxCliPath,
-    cliEntryPath,
-    '--project',
-    projectRoot,
-    '--replay-file',
-    replayPath,
-  ], { cwd: tsShellRoot, env, timeoutMs: 240000 })
-  if (replayResult.code !== 0 || replayResult.timedOut) {
-    printStep('result-contract-synthetic-replay', 'product-regression', replayResult.timedOut ? 'timed out' : `exit=${replayResult.code}`)
-    console.log(summarizeOutput(replayResult.output))
-    return { ok: false, code: 1 }
-  }
-  const replayOk = assertMarkers(replayResult.output, [...successResultMarkers, 'Replay mode: running 1 prompt(s)'], 'result-contract-synthetic-replay')
-  return { ok: printOk && replayOk, code: printOk && replayOk ? 0 : 1 }
 }
 
 async function main() {
-  console.log('gate name=result-contract')
-  console.log('mode=hard')
-  console.log('status taxonomy: pass=0 product-regression=1 provider-network-inconclusive=2 config-failure=3')
-  console.log(`repo=${repoRoot}`)
-  console.log(`synthetic HOME=${syntheticHome}`)
-  const homeCreated = ensureDirIfNeeded(syntheticHome)
-  console.log(`homeCreated=${homeCreated}`)
-
-  const checks = []
-  checks.push(await runFocusedTest(
-    'result-mapper-terminal-contract-tests',
-    'src/core/query/mapping/mapper.test.ts',
-    'preserves explicit terminalClassification when provided|falls back to reason-based classification when terminalClassification is missing|keeps successful edits successful when verification is blocked|still stops when verification is blocked without an applied edit|maps verification failure to a stopped terminal result|maps hard tool failures to an error terminal result|maps insufficient evidence without mutation to a stopped terminal result',
-  ))
-  checks.push(await runFocusedTest(
-    'query-terminal-classification-tests',
-    'src/core/query/runtime/engine.test.ts',
-    'executes planner -> coder -> reviewer through the core query loop|exposes explicit terminal stop reasons for invalid handoff|terminates with stopped_error after retry budget is exhausted',
-  ))
-  checks.push(await runFocusedTest(
-    'provider-readiness-terminal-result-test',
-    'src/core/shell/providerReadiness.test.ts',
-    'maps readiness failure into a unified stopped_error terminal event',
-  ))
-
-  const cliGate = await runSyntheticPrintReplayContract()
-  if (cliGate.code === 3) process.exit(3)
-  checks.push(cliGate.ok)
-
-  const ok = checks.every(Boolean)
-  printStep('result-contract-hard-gate', ok ? 'pass' : 'product-regression')
-  process.exit(ok ? 0 : 1)
+  const files = contractSuites.map(file => path.join(tsShellRoot, file))
+  for (const file of files) {
+    if (!fs.existsSync(file)) throw new Error(`Contract suite does not exist: ${file}`)
+  }
+  const vitestPath = [tsShellRoot, repoRoot]
+    .map(root => path.join(root, 'node_modules', 'vitest', 'vitest.mjs'))
+    .find(file => fs.existsSync(file))
+  if (!vitestPath) throw new Error('Vitest is not installed')
+  const tmpRoot = path.join(repoRoot, '.tmp')
+  fs.mkdirSync(tmpRoot, { recursive: true })
+  const root = fs.mkdtempSync(path.join(tmpRoot, 'result-contract-'))
+  const home = path.join(root, 'home')
+  const tmp = path.join(root, 'tmp')
+  fs.mkdirSync(home)
+  fs.mkdirSync(tmp)
+  const reportPath = path.join(root, 'tests.json')
+  console.log(`gate=result-contract artifacts=${root}`)
+  const result = await runTests(vitestPath, reportPath, isolatedEnvironment(home, tmp, root))
+  fs.writeFileSync(path.join(root, 'runner.log'), result.output)
+  if (result.code !== 0 || result.timedOut) {
+    throw new Error(`Contract runner failed: exit=${result.code} timeout=${result.timedOut}; see runner.log`)
+  }
+  const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'))
+  verifyContractReport(report, files)
+  console.log(`[pass] result-contract: ${files.length} suites, ${report.numPassedTests} tests`)
 }
 
-main().catch((error) => {
-  console.error(error)
-  process.exit(1)
-})
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch(error => { console.error(error.message); process.exitCode = 1 })
+}

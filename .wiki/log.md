@@ -5857,3 +5857,12 @@ ca48aab2两项远端检查均成功。
 编译CLI混合终端验证空/保留会话0/1条提示与磁盘一致，无provider。
 静态阻断门与judge阻断义务满足，整体advisory仍partial；W7-31最后剩旧result-contract脚本债务。
 d0a8d7d7两项远端检查均成功。
+
+
+## [2026-10-04] test | Phase 18 W7-31 结果门禁与审计完成
+
+结果门禁改用当前六套件及逐断言JSON证据；真实源码CLI+本地HTTP覆盖print/replay、审批读写和准入拒绝，磁盘/终态一致。
+6套136项、43项脚本、构建及静态阻断门通过；撤销检查1失败2通过，精确恢复并复跑。
+独立APPROVE，架构建议的非空source ID断言已补并复核CLEAR。无真实provider，源码CLI证据不代替安装产物。
+eaab164d远端CI因旧mock缺sessionExists失败，本批修复并验证2项；其Architecture Watch通过。
+38模块所列行为及旧门禁债务闭合，W7-31完成，按顺序继续W7-27及剩余项目。

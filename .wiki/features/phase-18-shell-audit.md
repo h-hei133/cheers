@@ -2,7 +2,7 @@
 
 基线 `56df129c`：`core/shell/` 根目录26个、子目录12个生产模块，共38个；原计划37个为旧清单。
 路径相对 `packages/ts-shell/src/core/shell/`。本表记录具体判据和缺口；源码核对不等于完整运行验证。
-W7-31仍在执行。首批聚焦审批，其余已复现问题按下表继续修复，不把局部审查结论扩展到整个Shell。
+W7-31已完成本表38模块的所列行为审计与旧结果门禁修复。结论限于表中判据及下文保证边界。
 
 ## 根目录（26）
 
@@ -191,3 +191,28 @@ terminate/exit/resume各2次，SIGINT监听器残留；且未传sessionManager�
 均exit0，磁盘metadata与提示一致；产物.tmp/line-close-nz63oe6y，无provider请求。
 静态阻断门与judge阻断义务通过，1436文件零环，旧advisory保留、judge整体partial。
 原38模块审计的直接行为缺口至此闭合；W7-31仍等待旧result-contract脚本债务修复。
+
+
+## 第九批结果门禁与审计完成
+
+旧脚本失败归类为harness/setup drift：两个测试路径已迁移，名称过滤会漏跑，synthetic echo没有执行声称验证的read工具。
+保留现有npm入口，改跑六个当前owner套件，并检查JSON报告：每个指定文件必须存在、至少一条断言、全部passed；缺失、空套件、跳过与失败均拒绝。
+参考测试采用隔离会话和结构化协议事实；本批同意这两项决策，进一步通过真实源码CLI子进程与本地HTTP替身执行工具，不扩展产品synthetic模式。
+每轮生成仓内唯一HOME/tmp及新报告；环境使用白名单，runner日志上限128KiB，不读取真实provider配置。
+
+新增print/replay读、批准写、拒绝写和readiness拒绝五场景。随机文件内容必须进入真实tool结果及下一次模型请求；
+写入必须与审批、磁盘字节一致；终态sourceEntryId必须关联非空assistant ID。
+拒绝写后模型仍返回成功文字，持久化finalOutput保留它，但terminal/surface仍为stopped；readiness失败是error且模型请求和工具调用均为零。
+这是tsx源码CLI证据，不代替编译或安装产物验收；第八批已有混合终端编译CLI证据，本批不重记为新验收。
+
+`npm run verify:result-contract` exit0：6套136项，最终报告.tmp/result-contract-Ma59Uk/tests.json；
+`node --test scripts/verify-result-contract.test.mjs` 3/3，`npm run test:scripts` 43/43，构建与全部静态阻断门通过。
+撤掉未通过断言检查后脚本测试1失败2通过；逐字节恢复后门禁136项和脚本3项再次通过。
+独立代码审查APPROVE；架构复核提出ID相等可能同时undefined，已增加非空ID断言并复跑，架构复核CLEAR。
+NormProof exit0，阻断义务满足，整体因既有advisory仍partial。
+
+测试驱动首轮4个print超时是stdin未关闭；关闭后两项新预期不符，依现行owner修正为readiness分类error、拒绝后的模型文字从finalOutput断言，未改产品行为。
+第八批eaab164d的CI37141669601失败：537套通过、1套失败，5056通过、1失败、1跳过；原因是interactiveLoop旧mock缺sessionExists而关闭抛错。
+本批补齐mock并断言一次exit及SIGINT清理，2项定向通过；Architecture Watch37141669607成功。
+
+W7-31至此完成；后续27→29→33及剩余W8继续。原生摘要的流模式问题仍归W7-27，未计为本批通过。

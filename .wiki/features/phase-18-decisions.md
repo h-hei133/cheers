@@ -578,7 +578,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W7-32 | read每次返回正文；startup结构/身份/有界读写、freshness与命令投影已修复；保留默认禁用 | 已完成，定向验证与隔离验收通过 |
 | W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
 | W7-26 / SES-08 | 回放、导出、迁移、恢复准入、检查点、字段优先级与历史写入观察已核验；后续转W7-31 | 已完成；原36模块行为矩阵闭合，保证边界与历史数据限制见审计表 |
-| W7-31 | [38模块Shell审计](phase-18-shell-audit.md)；首批修复审批身份、once生命周期和Git helper准入 | 进行中；审批、根绑定、终态、compact注入、readiness及连接选择已修复；background、platform与直接断言已完成；旧result-contract脚本待修复 |
+| W7-31 | [38模块Shell审计](phase-18-shell-audit.md)；审批、根绑定、准入、后台输出、Shell选择与关闭均有行为证据 | 已完成；所列行为矩阵及旧result-contract门禁债务闭合，保证边界见审计表 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1929,3 +1929,15 @@ lineLoop只安装一次并传入实际会话查询；活动SIGINT取消语义不
 初轮不支持的测试matcher已改为精确calls断言，再复现产品红测；未放宽验证。
 W7-31的38模块直接行为矩阵已闭合，旧result-contract仍需修复，未将任务提前标完成。
 第七批d0a8d7d7的CI 37140252338与Architecture Watch 37140252418均成功。
+
+
+### W7-31 第九批：结果门禁及审计完成（2026-10-04）
+
+保留npm入口，旧路径/名称过滤和合成echo markers改为六个当前套件及逐断言JSON核验。
+隔离会话与结构化协议事实沿用参考的决策；真实源码CLI经本地HTTP执行五种读写/拒绝/准入场景，交叉核验随机内容、磁盘、审批和非空终态来源。
+模型成功文字不能提升拒绝终态；readiness失败保持error，非流式print/replay不冒充PTY/安装产物证据。
+门禁6套136项、脚本43项、build:cli与静态阻断门通过；撤销检查1失败2通过，精确恢复后136与3项复跑通过。
+独立APPROVE，架构发现source ID可能同时缺失的断言漏洞已补非空检查并复核CLEAR；无产品代码或真实provider配置变更。
+首轮stdin未关闭引起4超时，随后两项预期按现行error分类及finalOutput承载修正，未削弱拒绝/不写入判据。
+eaab164d远端CI37141669601唯一失败为旧interactiveLoop mock缺sessionExists，本批补齐且2项通过；Architecture Watch37141669607成功。
+W7-31完成，继续27→29→33及剩余W8；Phase 18未完成。细节见Shell审计第九批。

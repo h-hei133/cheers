@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import type { Interface as ReadlineInterface } from "node:readline";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { runInteractiveLoop } from "./interactiveLoop.js";
 import { StreamingRenderer } from "../../presentation/terminal/streaming.js";
@@ -63,11 +63,13 @@ describe("interactive loop", () => {
     const stdin = new PassThrough();
     const processEvents = new EventEmitter() as NodeJS.Process;
     let capturedReadline: ReadlineInterface | null = null;
+    const sessionExists = vi.fn(() => false);
+    const exit = vi.fn();
     const loop = runInteractiveLoop({
       stdin: stdin as unknown as NodeJS.ReadStream,
       stdout: new PassThrough() as unknown as NodeJS.WriteStream,
       process: processEvents,
-      sessionManager: {} as never,
+      sessionManager: { sessionExists } as never,
       renderer: new StreamingRenderer(),
       runtimeContext: {
         cwd: "/tmp/project-beta",
@@ -91,7 +93,7 @@ describe("interactive loop", () => {
         capturedReadline = readline;
       },
       setActiveNonInteractiveApprovalMode: () => undefined,
-      exit: (() => undefined) as never,
+      exit,
     });
 
     stdin.end();
@@ -99,5 +101,8 @@ describe("interactive loop", () => {
     // A real readline drives the line loop, so question() comes from node itself.
     expect(capturedReadline).not.toBeNull();
     expect(typeof capturedReadline?.question).toBe("function");
+    expect(sessionExists.mock.calls).toEqual([["sess_abcdef0123456789"]]);
+    expect(exit.mock.calls).toEqual([[0]]);
+    expect(processEvents.listenerCount("SIGINT")).toBe(0);
   });
 });
