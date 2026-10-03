@@ -1,37 +1,34 @@
 import { describe, expect, it } from "vitest";
-import type { QueryCompletionTranscriptEvent } from "./truth.js";
+import type { ContinuityTerminalFacts } from "./truth.js";
 import { selectContinuityTerminalSource } from "./truth.js";
 
 describe("selectContinuityTerminalSource", () => {
   it("does not let query-level success upgrade a coding-level stopped result", () => {
-    const codingStopped = makeCompletion("stopped", "stopped_error");
-    const querySuccess = makeCompletion("success", "completed");
+    const codingStopped: ContinuityTerminalFacts = { terminalClassification: "stopped", terminalReason: "stopped_error" };
+    const querySuccess: ContinuityTerminalFacts = { terminalClassification: "success", terminalReason: "completed" };
 
     expect(
       selectContinuityTerminalSource({
-        lastQueryCompletion: querySuccess,
-        lastCodingCompletion: codingStopped,
+        query: querySuccess,
+        coding: codingStopped,
       }),
     ).toBe(codingStopped);
   });
-});
 
-function makeCompletion(
-  terminalClassification: "success" | "stopped",
-  terminalReason: "completed" | "stopped_error",
-): QueryCompletionTranscriptEvent {
-  return {
-    type: "query-event",
-    timestamp: "2026-01-01T00:00:00.000Z",
-    event: {
-      type: "query.completed",
-      result: {
-        status: terminalClassification === "success" ? "success" : "stopped",
-        response: "",
-        terminalClassification,
-        terminalReason,
-        sharedContext: {},
-      },
-    },
-  } as QueryCompletionTranscriptEvent;
-}
+  it("does not upgrade an unknown retained result to query success", () => {
+    const coding = {};
+    expect(selectContinuityTerminalSource({ query: { terminalClassification: "success" }, coding })).toBe(coding);
+  });
+
+  it("keeps a newer query error visible", () => {
+    const query: ContinuityTerminalFacts = { terminalClassification: "error", terminalReason: "stopped_error" };
+    expect(selectContinuityTerminalSource({ query, coding: {} })).toBe(query);
+  });
+
+  it("uses retained facts when the query has no terminal classification", () => {
+    const coding: ContinuityTerminalFacts = { terminalClassification: "stopped" };
+    expect(selectContinuityTerminalSource({ coding })).toBe(coding);
+    expect(selectContinuityTerminalSource({ query: {}, coding })).toBe(coding);
+    expect(selectContinuityTerminalSource({})).toBeUndefined();
+  });
+});

@@ -1,12 +1,12 @@
 import type { CodingResultSummary } from "../../result/types.js";
-import type { QueryCompletionTranscriptEvent } from "../../result/terminal/truth.js";
+import type { ContinuityTerminalFacts } from "../../result/terminal/truth.js";
 import { compactContinuityText } from "../sessionContinuityModule.js";
 import type { TranscriptEvent } from "../sessionEventCodec.js";
 
 export function projectSessionUnresolvedItems(input: {
   readonly sessionLastError?: string;
   readonly lastRunErrorEvent?: Extract<TranscriptEvent, { type: "lifecycle" }>;
-  readonly continuityTerminalSource?: QueryCompletionTranscriptEvent;
+  readonly continuityTerminalSource?: ContinuityTerminalFacts;
   readonly lastCodingResult?: CodingResultSummary;
 }): {
   readonly lastFailure?: string;
@@ -16,22 +16,22 @@ export function projectSessionUnresolvedItems(input: {
   const lastFailure =
     input.sessionLastError?.trim() ||
     input.lastRunErrorEvent?.detail?.trim() ||
-    input.continuityTerminalSource?.event.result.stopReason?.trim();
+    input.continuityTerminalSource?.stopReason?.trim();
   if (lastFailure) {
     unresolvedItems.push(`last-error:${lastFailure}`);
   }
   if (
-    input.continuityTerminalSource?.event.result.terminalClassification &&
-    input.continuityTerminalSource.event.result.terminalClassification !==
+    input.continuityTerminalSource?.terminalClassification &&
+    input.continuityTerminalSource.terminalClassification !==
       "success"
   ) {
     unresolvedItems.push(
-      `terminal:${input.continuityTerminalSource.event.result.terminalClassification} (${input.continuityTerminalSource.event.result.terminalReason})`,
+      `terminal:${input.continuityTerminalSource.terminalClassification} (${input.continuityTerminalSource.terminalReason})`,
     );
-    if (input.continuityTerminalSource.event.result.stopReason?.trim()) {
+    if (input.continuityTerminalSource.stopReason?.trim()) {
       unresolvedItems.push(
         `stop-reason:${compactContinuityText(
-          input.continuityTerminalSource.event.result.stopReason,
+          input.continuityTerminalSource.stopReason,
           180,
         )}`,
       );

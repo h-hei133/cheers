@@ -5,18 +5,19 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CodingResultSummary } from "../../result/types.js";
 import { SessionManager } from "../SessionManager.js";
 import type { Session } from "../schema/sessionRecord.js";
+import type { SessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
 import type { TranscriptEvent } from "../sessionEventCodec.js";
 import { buildSessionRecoverySnapshot } from "../recovery/sessionRecoverySnapshot.js";
 import { buildSessionContinuitySnapshot } from "./sessionContinuitySnapshot.js";
 
 const timestamp = "2026-10-03T00:00:00.000Z";
 
-function fixture(result?: CodingResultSummary) {
+function fixture(result?: CodingResultSummary, memory?: unknown) {
   const session: Session = {
     id: "snapshot", projectRoot: "/workspace", status: "completed", createdAt: timestamp, updatedAt: timestamp,
     turns: [{ role: "user", content: "current request" }, { role: "assistant", content: "current answer" }],
   };
-  const stateSnapshot = { status: "completed" as const, workingMemory: {
+  const stateSnapshot: SessionStateSnapshot = { status: "completed", workingMemory: memory ?? {
     continuity: {
       lastActionHandoffSummary: "old action", lastFailureHandoffDiagnostic: "old failure",
       lastSuccessHandoffDiagnostic: "old success", lastSeedInfluence: "verify-signal",
@@ -92,6 +93,51 @@ describe("session continuity snapshot sources", () => {
     expect(snapshot.lastSeedInfluenceHandoffSummary).toBe(influence
       ? "Seed influence: target-carryover from edit-file on current.txt."
       : undefined);
+  });
+
+  it("uses the retained coding checkpoint when the remaining transcript only has chat", () => {
+    const input = fixture({ ...codingResult(), taskKind: "chat", evidence: ["seedInfluence=verify-signal"] }, {
+      continuity: {
+        lastTaskKind: "edit-file", lastTerminalClassification: "stopped", lastTerminalReason: "stopped_error",
+        lastFailure: "retained coding failure", lastFailureHandoffDiagnostic: "retained failure handoff",
+        lastWriterStarted: true, lastWriteEffect: "unknown", lastWriteRequiresUserInspection: true,
+        lastWriteEffectTarget: "retained.txt", lastSeedInfluence: "target-carryover",
+      },
+    });
+    const snapshot = buildSessionContinuitySnapshot(input);
+    expect(snapshot).toMatchObject({
+      lastTaskKind: "edit-file", lastTerminalClassification: "stopped", lastTerminalReason: "stopped_error",
+      lastFailure: "retained coding failure", lastWriteEffect: "unknown", lastWriteEffectTarget: "retained.txt",
+      lastSeedInfluence: "target-carryover", lastFailureHandoffDiagnostic: "retained failure handoff",
+    });
+    expect(snapshot.lastSuccessHandoffDiagnostic).toBeUndefined();
+    expect(snapshot.lastVerificationStatus).toBeUndefined();
+    expect(snapshot.recentVerifiedFiles).toEqual([]);
+  });
+
+  it.each([
+    { continuity: { lastWriterStarted: true, lastWriteEffect: "unknown", lastWriteEffectTarget: "retained.txt" } },
+    { summary: ["- last-writer-started: yes", "- last-write-effect: unknown", "- last-write-effect-target: retained.txt"] },
+    { continuity: { lastTaskKind: "unsupported", lastTerminalClassification: "completed", lastTerminalReason: 42,
+      lastWriterStarted: true, lastWriteEffect: "unknown", lastWriteEffectTarget: "retained.txt" } },
+  ])("does not upgrade a legacy checkpoint with unknown terminal state using chat success (%j)", (memory) => {
+    const snapshot = buildSessionContinuitySnapshot(fixture({ ...codingResult(), taskKind: "chat" }, memory));
+    expect(snapshot.lastWriteEffect).toBe("unknown");
+    expect(snapshot.lastTaskKind).toBeUndefined();
+    expect(snapshot.lastTerminalClassification).toBeUndefined();
+    expect(snapshot.lastTerminalReason).toBeUndefined();
+    expect(snapshot.lastSuccessHandoffDiagnostic).toBeUndefined();
+    expect(snapshot.lastVerificationStatus).toBeUndefined();
+  });
+
+  it("uses the current chat result when the stored checkpoint is also chat", () => {
+    const snapshot = buildSessionContinuitySnapshot(fixture({ ...codingResult(), taskKind: "chat" }, {
+      continuity: { lastTaskKind: "chat", lastTerminalClassification: "stopped", lastFailure: "previous chat failure" },
+    }));
+    expect(snapshot.lastTaskKind).toBe("chat");
+    expect(snapshot.lastTerminalClassification).toBe("success");
+    expect(snapshot.lastFailure).toBeUndefined();
+    expect(snapshot.lastVerificationStatus).toBe("passed");
   });
 
   it("takes displayed messages from the selected session path", () => {

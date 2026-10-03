@@ -11,6 +11,7 @@ function completion(failed: boolean, taskKind: CodingResultSummary["taskKind"] =
     status: failed ? "stopped_error" : "completed",
     terminalClassification: failed ? "stopped" : "success",
     terminalReason: failed ? "stopped_error" : "completed",
+    ...(failed ? { stopReason: "current failure" } : {}),
     transcript: [], sharedContext: { sessionId: "retention", initialPrompt: "work", notes: [], handoffs: [] },
     finalOutput: failed ? "current failure" : "current success",
     codingResult: {
@@ -45,6 +46,9 @@ describe("compact result replacement", () => {
     expect(next.continuity.lastActionHandoffSummary).toBeUndefined();
     expect(next.continuity.lastWriteEffect).toBeUndefined();
     expect(next.continuity.lastWriteEffectTarget).toBeUndefined();
+    expect(next.continuity.lastTerminalClassification).toBe("success");
+    expect(next.continuity.lastTerminalReason).toBe("completed");
+    expect(next.continuity.lastFailure).toBeUndefined();
     expect(next.summary.join("\n")).not.toContain("failed.txt");
     expect(next.summary).toContain("- custom: retain");
     expect(next.sourceTurnCount).toBe(2);
@@ -136,6 +140,43 @@ describe("compact result replacement", () => {
       expect(snapshot.lastSuccessHandoffDiagnostic).toContain("verified.txt");
       expect(snapshot.lastFailureHandoffDiagnostic).toBeUndefined();
       expect(snapshot.lastWriteEffect).toBeUndefined();
+    } finally {
+      vi.unstubAllEnvs();
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it.each([true, false])("reopens a retained coding checkpoint across a chat-only transcript (failed=%s)", (failed) => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "retention-chat-home-"));
+    vi.stubEnv("HOME", home);
+    vi.stubEnv("USERPROFILE", home);
+    try {
+      const manager = new SessionManager();
+      const session = manager.createNew();
+      const sessionDir = manager.getSessionDirPath(session.id);
+      const statePath = path.join(sessionDir, "state.json");
+      const state = JSON.parse(fs.readFileSync(statePath, "utf8"));
+      state.workingMemory = { sourceTurnCount: 11, summary: [] };
+      fs.writeFileSync(statePath, JSON.stringify(state));
+      manager.appendQueryEvent(session.id, { type: "query.completed", result: completion(failed) });
+      const stored = JSON.parse(fs.readFileSync(statePath, "utf8")).workingMemory.continuity;
+      const transcriptPath = path.join(sessionDir, "transcript.jsonl");
+      const header = fs.readFileSync(transcriptPath, "utf8").split("\n")[0];
+      fs.writeFileSync(transcriptPath, `${header}\n`);
+      new SessionManager().appendQueryEvent(session.id, { type: "query.completed", result: completion(false, "chat") });
+      expect(JSON.parse(fs.readFileSync(statePath, "utf8")).workingMemory.continuity).toEqual(stored);
+      const reopened = new SessionManager();
+      expect(reopened.getTranscriptEvents(session.id).filter((event) => event.type === "query-event")).toHaveLength(1);
+      const snapshot = reopened.buildContinuitySnapshot(session.id);
+      expect(snapshot.lastTaskKind).toBe("edit-file");
+      expect(snapshot.lastTerminalClassification).toBe(failed ? "stopped" : "success");
+      expect(snapshot.lastTerminalReason).toBe(failed ? "stopped_error" : "completed");
+      expect(snapshot.lastFailure).toBe(failed ? "current failure" : undefined);
+      expect(snapshot.lastWriteEffect).toBe(failed ? "unknown" : undefined);
+      expect(snapshot.lastWriteRequiresUserInspection).toBe(failed ? true : undefined);
+      expect(snapshot.lastSuccessHandoffDiagnostic).toBe(stored.lastSuccessHandoffDiagnostic);
+      expect(snapshot.lastVerificationStatus).toBeUndefined();
+      expect(snapshot.recentVerifiedFiles).toEqual([]);
     } finally {
       vi.unstubAllEnvs();
       fs.rmSync(home, { recursive: true, force: true });

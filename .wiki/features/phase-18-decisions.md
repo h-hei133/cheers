@@ -577,7 +577,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W8-40 / TOL-10（随W7-30） | 失败原因及部分答复保留；工具阶段取消和空答复按失败结算；适配器向父模型传递error | 已完成，定向验证通过；旧result-contract脚本仍失败 |
 | W7-32 | read每次返回正文；startup结构/身份/有界读写、freshness与命令投影已修复；保留默认禁用 | 已完成，定向验证与隔离验收通过 |
 | W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
-| W7-26 / SES-08 | 回放、导出、根迁移、摘要来源、重复读取及compact检查点更新已分批修复；完整逐模块审计继续 | 执行中，第八批定向验证与双模式PTY通过 |
+| W7-26 / SES-08 | 回放、导出、根迁移、摘要来源、重复读取及compact检查点更新已分批修复；完整逐模块审计继续 | 执行中，第九批摘要来源验证通过，模型上下文接线及完整审计继续 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1605,3 +1605,28 @@ src/result/terminal`：**21套247项通过，exit0**；构建、独立代码APPR
 复审另发现既有读取缺口：结构化编码历史被裁剪、只剩chat事件时，snapshot reader可能忽略已保留的非chat检查点。
 本批只验证检查点生产/保留及无结构化日志时的fallback，不将其扩写为chat-only日志恢复通过；该读取缺口接续修复。
 旧result-contract的已记录失败未重跑或改记通过。第七批`c765904c`的CI 37100058819与Architecture Watch 37100058822均成功。
+
+
+### W7-26 第九批：chat-only日志的检查点读取（2026-10-03）
+
+编码query事件被裁剪而只剩chat时，原snapshot将chat当作当前编码结果，屏蔽保留的检查点并可能显示聊天成功。
+初始17项回归3失败14通过，属于product behavior drift。现在compact生产与snapshot读取共用continuation/source的来源选择：
+chat不能替换非chat或未知旧检查点，所有结果派生字段在选定来源后投影，避免混入chat的seed、验证或成功诊断。
+检查点同时保存任务类型、终态分类、原因和停止说明；替换时整组清除旧值。旧格式或无效类型保持未知，查询成功不会把未知升级为成功；较新查询错误仍可显示。
+
+延续已检查的会话参考`buildContextEntries`/`buildSessionProjection`的检查点来源与后续路径原则；本仓非chat结果组的替换策略没有直接对应实现，属于自研适配。
+未证明较旧非chat日志与较新compact之间的顺序，也未解决完整branch/query归属、历史未知写入消解或损坏记录准入。
+
+`npm run test -w packages/ts-shell -- src/session src/result/terminal`：70套577项通过；含真实生产检查点、裁剪旧事件、追加chat、落盘重开。
+构建、静态阻断门、40项脚本测试、独立APPROVE/CLEAR通过。反转5个产品文件后7失败24通过，随后逐字节恢复。
+1421文件零循环，可达性及函数上限各7条既有提示；judge exit0且所有阻断义务满足，整体partial来自advisory。
+旧`verify:result-contract`重跑exit1：两处测试路径缺失及print/replay旧预期仍失败，没有改记通过。
+
+隔离编译SessionManager检查保留的unknown写入与stopped终态。常规/全屏PTY各2次本地HTTP脚本模型请求，
+完成提示、工具请求、审批后实际写入、结算与落盘，均exit0；这只证明普通执行流程与已检查snapshot并存。
+首轮额外模型上下文断言失败：`cli/runtime/cliSessionRuntimeFactory.ts`的runPrompt忽略continuityState，
+HTTP请求没有保留的结果事实。失败脚本及请求记录保留在本地验收产物；不将双模式执行通过表述成连续性上下文已经交付模型。
+该消费者缺口接续修复，W7-26未完成。
+
+第八批c586ea16的Architecture Watch 37101567508成功；CI 37101567632失败：525套通过、1套失败，4770项通过、1失败、1跳过。
+唯一失败为浏览器缓存并发CLI写入场景返回blocked而测试期望passed。本地定向重跑1失败5跳过，实际failed而非远端blocked；原因待进一步归类，不能视为同因复现或本批通过证据。

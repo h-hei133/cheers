@@ -64,6 +64,11 @@ export function applySessionCompactRetention(input: {
       ...(queryCompleted?.result.codingResult ? {
         result: {
           taskKind: queryCompleted.result.codingResult.taskKind,
+          terminal: {
+            terminalClassification: queryCompleted.result.terminalClassification,
+            terminalReason: queryCompleted.result.terminalReason,
+            stopReason: queryCompleted.result.stopReason,
+          },
           actionHandoffSummary,
           writeContinuity: stoppedSessionContinuity?.writeContinuity,
           seedInfluence: input.seedInfluence,

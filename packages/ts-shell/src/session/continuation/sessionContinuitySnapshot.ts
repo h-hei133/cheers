@@ -42,6 +42,7 @@ import { projectSessionRequestScopeContinuity } from "../approval/sessionRequest
 import { extractSeedInfluenceFromQueryResult } from "./sessionSeedInfluence.js";
 import { projectSessionToolContinuity } from "./sessionToolContinuity.js";
 import { projectSessionUnresolvedItems } from "./sessionUnresolvedItems.js";
+import { readStoredResultSource, shouldReplaceStoredResult } from "./source.js";
 
 export function buildSessionContinuitySnapshot(input: {
   readonly session: Session;
@@ -59,7 +60,12 @@ export function buildSessionContinuitySnapshot(input: {
     "run-error",
   );
   const lastQueryCompletion = findLastQueryCompletionEvent(transcriptEvents);
-  const lastCodingCompletion = findLastCodingCompletionEvent(transcriptEvents);
+  const codingCompletion = findLastCodingCompletionEvent(transcriptEvents);
+  const candidateResult = codingCompletion?.event.result.codingResult;
+  const storedResult = readStoredResultSource(stateSnapshot?.workingMemory);
+  const useStoredResult = storedResult !== undefined && (!candidateResult ||
+    !shouldReplaceStoredResult(storedResult, candidateResult.taskKind));
+  const lastCodingCompletion = useStoredResult ? undefined : codingCompletion;
   const lastCodingResult = lastCodingCompletion?.event.result.codingResult;
   const recentCodingResults = collectRecentCodingResults(transcriptEvents, 4);
   const readContinuity = projectSessionReadContinuity(lastCodingResult);
@@ -75,8 +81,8 @@ export function buildSessionContinuitySnapshot(input: {
   });
   const lastStoppedSessionContinuity =
     deriveStoppedSessionContinuitySurface(lastCodingResult);
-  // A structured result is a complete observation, including absent optional
-  // fields. Compact checkpoints are a fallback only when that result is gone.
+  // Select the complete result group before projecting optional fields. A chat
+  // result cannot replace a retained coding checkpoint or unknown legacy result.
   const handoffMemory = lastCodingResult ? undefined : stateSnapshot?.workingMemory;
   const lastWriteContinuity =
     lastStoppedSessionContinuity?.writeContinuity ??
@@ -86,7 +92,7 @@ export function buildSessionContinuitySnapshot(input: {
     extractActionHandoffSummaryFromMemory(handoffMemory);
   const lastSeedInfluence =
     extractSeedInfluenceFromQueryResult(
-      (lastCodingCompletion ?? lastQueryCompletion)?.event.result,
+      useStoredResult ? undefined : (lastCodingCompletion ?? lastQueryCompletion)?.event.result,
     ) ?? extractSeedInfluenceFromMemory(handoffMemory);
   const lastSeedInfluenceHandoffSummary =
     buildSeedInfluenceHandoffSummary(
@@ -115,8 +121,8 @@ export function buildSessionContinuitySnapshot(input: {
       })
     : extractTaskStateFromMemory(stateSnapshot?.workingMemory);
   const continuityTerminalSource = selectContinuityTerminalSource({
-    lastQueryCompletion,
-    lastCodingCompletion,
+    query: lastQueryCompletion?.event.result ?? recoverySnapshot,
+    coding: useStoredResult ? storedResult.terminal : lastCodingCompletion?.event.result,
   });
   // Loaded turns already reflect the selected branch and compaction. Recovery
   // may add a missing pending prompt, but its raw history is not a display path.
@@ -149,14 +155,10 @@ export function buildSessionContinuitySnapshot(input: {
     projectRoot: session.projectRoot,
     lastUserIntent,
     lastAssistantOutput: findLastTurnContent(selectedTurns, "assistant"),
-    lastTerminalClassification:
-      continuityTerminalSource?.event.result.terminalClassification ??
-      recoverySnapshot.terminalClassification,
-    lastTerminalReason:
-      continuityTerminalSource?.event.result.terminalReason ??
-      recoverySnapshot.terminalReason,
+    lastTerminalClassification: continuityTerminalSource?.terminalClassification,
+    lastTerminalReason: continuityTerminalSource?.terminalReason,
     lastFailure: unresolvedProjection.lastFailure,
-    lastTaskKind: lastCodingResult?.taskKind,
+    lastTaskKind: useStoredResult ? storedResult.taskKind : lastCodingResult?.taskKind,
     ...(lastCodingResult?.lastActionResultSeed
       ? { lastActionResultSeed: lastCodingResult.lastActionResultSeed }
       : {}),

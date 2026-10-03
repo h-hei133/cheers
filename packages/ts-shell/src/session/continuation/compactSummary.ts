@@ -2,7 +2,9 @@ import type { CodingResultSummary, CodingWriteEffect } from "../../result/types.
 import type { QueryRuntimeHarnessState } from "../../core/query/runtime/harness.js";
 import type { QueryRuntimeTaskState } from "../../core/query/runtime/taskState.js";
 import { encodeSessionHarnessState } from "../harness/state.js";
-import { hasResultSummary, mergeContinuitySummaryEntries } from "./summaryFormatter.js";
+import { mergeContinuitySummaryEntries } from "./summaryFormatter.js";
+import type { ContinuityTerminalFacts } from "../../result/terminal/truth.js";
+import { readStoredResultSource, RESULT_FIELDS, shouldReplaceStoredResult } from "./source.js";
 import type { ApprovalAuditMemoryState } from "../sessionContinuityTypes.js";
 
 export type CompactContinuitySeedInfluence =
@@ -22,6 +24,7 @@ export interface CompactContinuityWriteState {
 /** Optional fields belong to one complete result, including their absence. */
 export interface CompactContinuityResult {
   readonly taskKind: CodingResultSummary["taskKind"];
+  readonly terminal?: ContinuityTerminalFacts;
   readonly actionHandoffSummary?: string;
   readonly writeContinuity?: CompactContinuityWriteState;
   readonly seedInfluence?: CompactContinuitySeedInfluence;
@@ -61,7 +64,9 @@ export function buildCompactContinuitySummary(
   if (input.approvalAuditHistory.length > 0) {
     continuity.lastApprovalHistory = input.approvalAuditHistory;
   }
-  const replaceResult = shouldReplaceResult(continuity, input.result, input.summary);
+  const replaceResult = input.result !== undefined && shouldReplaceStoredResult(
+    readStoredResultSource({ continuity, summary: input.summary }), input.result.taskKind,
+  );
   if (replaceResult && input.result) applyResult(continuity, input.result);
   if (input.harness) {
     continuity.harnessState = encodeSessionHarnessState(input.harness);
@@ -76,27 +81,12 @@ export function buildCompactContinuitySummary(
   };
 }
 
-const RESULT_FIELDS = [
-  "lastTaskKind", "lastActionHandoffSummary", "lastWriterStarted", "lastWriteEffect",
-  "lastWriteRequiresUserInspection", "lastWriteEffectTarget", "lastSeedInfluence",
-  "lastSeedInfluenceHandoffSummary", "lastFailureHandoffDiagnostic", "lastSuccessHandoffDiagnostic", "taskState",
-] as const;
-
-function shouldReplaceResult(
-  continuity: Record<string, unknown>,
-  result: CompactContinuityResult | undefined,
-  summary: unknown,
-): boolean {
-  if (!result) return false;
-  if (result.taskKind !== "chat" || continuity.lastTaskKind === "chat") return true;
-  // Match the continuity reader's non-chat preference. A legacy checkpoint
-  // without a task kind may hold unresolved writes, so chat cannot replace it.
-  return !RESULT_FIELDS.some((key) => continuity[key] !== undefined) && !hasResultSummary(summary);
-}
-
 function applyResult(continuity: Record<string, unknown>, input: CompactContinuityResult): void {
   for (const key of RESULT_FIELDS) delete continuity[key];
   continuity.lastTaskKind = input.taskKind;
+  if (input.terminal?.terminalClassification) continuity.lastTerminalClassification = input.terminal.terminalClassification;
+  if (input.terminal?.terminalReason) continuity.lastTerminalReason = input.terminal.terminalReason;
+  if (input.terminal?.stopReason) continuity.lastFailure = input.terminal.stopReason;
   if (input.actionHandoffSummary) {
     continuity.lastActionHandoffSummary = input.actionHandoffSummary;
   }
