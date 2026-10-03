@@ -5793,3 +5793,10 @@ next上下文沿用snapshot已有准入，seed摘要读回formatter实际键，�
 原36模块所列判据闭合，W7-26完成。被外部删除的原始证据无法重建，历史观察没有显式结算语义；旧result-contract脚本债务转W7-31。35f6a2c1两项远端检查成功，Phase 18其余任务继续。
 
 第十六批最终普通/全屏PTY直接验证HTTP模型收到历史unknown、已解决失败消失及审批写入结算；两模式exit0，无真实provider。静态阻断门和judge阻断义务通过，整体advisory仍partial。
+
+
+## [2026-10-03] fix | Phase 18 W7-31 首批审批边界
+
+修复Git隐含helper自动准入、授权目标大小写/空白碰撞、allow-once泄漏及预存once未消耗。拒绝匹配保留命令空白兼容和真实文件路径规范化；旧有损授权需重新确认。新增[38模块Shell审计](features/phase-18-shell-audit.md)，其余Shell问题继续执行。
+最终19套217项与CLI构建通过，独立APPROVE/CLEAR；反转五个行为模块62失败89通过，随后精确恢复。四次普通/全屏编译PTY覆盖一次授权及allow-always的不同文件目标，拒绝后无额外写入，终态/持久化一致。
+静态阻断门及judge阻断义务通过，advisory仍partial。一次Node/V8原生崩溃exit134不计通过，最终单worker重跑通过。未调用真实provider，旧result-contract与test:scripts本批未跑。56df129c两项远端检查均成功。

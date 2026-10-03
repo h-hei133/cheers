@@ -50,11 +50,10 @@ export function buildScope(prompt: EscalationPrompt): {
 } {
   const toolName = prompt.context.toolName.trim().toLowerCase();
   const operation = prompt.context.operation.trim().toLowerCase();
-  const target = prompt.context.target.trim();
-  const normalizedTarget = target.toLowerCase();
+  const target = prompt.context.target;
 
-  // For bash commands, scope must be exact command signature to prevent wildcard escalation backdoors
-  const scopeKey = `${toolName}:${operation}:cmd:${normalizedTarget}`;
+  // A new namespace prevents lossy legacy keys from authorizing a different target.
+  const scopeKey = `${toolName}:${operation}:exact:${target}`;
   const scopeLabel = `${toolName}/${operation}(${target})`;
   return {
     toolName,

@@ -680,7 +680,7 @@ export function createCoreToolRegistry(options?: {
     createGrepToolDefinition(executionService),
     {
       name: 'bash',
-      description: 'Execute shell commands (including full Git operations: git status, git diff, git log, git commit, etc.). Safe read-only commands (git status, git diff, etc.) are permitted in plan mode. Set runInBackground for a command that outlives this turn; read it back with taskOutput and end it with taskStop.',
+      description: 'Execute shell commands, including Git operations. Plan mode permits classified inspection commands such as git branch --show-current and git rev-parse --show-toplevel. Git status, diff, log, and show require approval because repository configuration can run helpers. Set runInBackground for a command that outlives this turn; read it back with taskOutput and end it with taskStop.',
       argsSchema: {
         type: 'object',
         properties: {

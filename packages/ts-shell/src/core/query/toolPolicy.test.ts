@@ -13,11 +13,22 @@ describe("toolPolicy", () => {
   });
 
   it("allows read-only bash commands without escalation", () => {
-    for (const cmd of ["git status", "git diff", "ls -la", "pwd", "cat file.txt"]) {
+    for (const cmd of ["git branch --show-current", "git rev-parse --show-toplevel", "ls -la", "pwd", "cat file.txt"]) {
       const result = evaluateToolPermissionScope("bash", { command: cmd }, "ask");
       expect(result.requiresEscalation).toBe(false);
       expect(result.operation).toBe("read");
     }
+  });
+
+  it.each(["write", "edit"])("preserves exact %s target bytes", tool => {
+    for (const target of ["File.txt", "file.txt", "File.txt ", " File.txt"]) {
+      expect(evaluateToolPermissionScope(tool, { path: target }, "ask").target).toBe(target);
+      expect(evaluateToolPermissionScope(tool, { path: target }, "accept-edits", "/repo").target).toBe(target);
+    }
+  });
+
+  it("preserves exact shell command bytes", () => {
+    expect(evaluateToolPermissionScope("bash", { command: " npm test " }, "ask").target).toBe(" npm test ");
   });
 
   it("requires escalation for write and edit in ask mode", () => {
@@ -107,6 +118,22 @@ describe("toolPolicy", () => {
 describe("a refusal nothing overrides", () => {
   const rules = [{ tool: "bash", pattern: "rm -rf" }];
 
+  it.each(["ask", "accept-edits", "allow-all"] as const)("keeps command padding from bypassing a refusal in %s", scope => {
+    const target = " \t touch denied-marker \n";
+    const result = evaluateToolPermissionScope("bash", { command: target }, scope, "/workspace", [
+      { tool: "bash", pattern: "touch " },
+    ]);
+    expect(result.denied).toBe(true);
+    expect(result.requiresEscalation).toBe(false);
+    expect(result.target).toBe(target);
+    const relative = " ./danger-helper ";
+    const relativeResult = evaluateToolPermissionScope("bash", { command: relative }, scope, "/workspace", [
+      { tool: "bash", pattern: "danger-helper" },
+    ]);
+    expect(relativeResult.denied).toBe(true);
+    expect(relativeResult.target).toBe(relative);
+  });
+
   it("refuses the call in every scope", () => {
     // The point of the rule. `allow-all` allows what approval governs; a rule the
     // user wrote is not something a scope can answer away, or the rule would be
@@ -180,6 +207,16 @@ describe("a refusal nothing overrides", () => {
     expect(denied("./src/secrets/key.ts")).toBe(true);
     expect(denied("src/other/../secrets/key.ts")).toBe(true);
     expect(denied("src/public/key.ts")).toBeFalsy();
+  });
+
+  it.each(["read", "write", "edit"])("normalizes known %s paths for refusal without losing target bytes", tool => {
+    for (const target of ["./protected/file ", "protected/other/../file ", "./protected/my file"]) {
+      const result = evaluateToolPermissionScope(tool, { path: target }, "allow-all", "/workspace", [
+        { tool, pattern: "protected/" },
+      ]);
+      expect(result.denied).toBe(true);
+      expect(result.target).toBe(target);
+    }
   });
 
   it("still compares a bash command as written", () => {

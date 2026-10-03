@@ -51,16 +51,23 @@ it.each([
 });
 
 it("allows read-only commands through the existing plan policy", async () => {
-  const { run, execute } = harness({}, "git status");
+  const { run, execute } = harness({}, "git branch --show-current");
   expect((await run(request)).agentMode).toBe("plan");
   expect(execute).toHaveBeenCalledTimes(1);
 });
 
 it("preserves parent refusal rules in the new child gate", async () => {
-  const { run, execute, observations } = harness({ denyRules: [{ tool: "bash" }] }, "git status");
+  const { run, execute, observations } = harness({ denyRules: [{ tool: "bash" }] }, "git branch --show-current");
   await run(request);
   expect(execute).not.toHaveBeenCalled();
   expect(observations.join("\n")).toMatch(/denied|blocked|refused/i);
+});
+
+it.each(["git status", "git diff", "git show HEAD", "git log -n 5"])("blocks helper-capable %s in a plan child", async command => {
+  const { run, execute, observations } = harness({}, command);
+  expect((await run(request)).agentMode).toBe("plan");
+  expect(execute).not.toHaveBeenCalled();
+  expect(observations.join("\n")).toContain("Plan mode is active");
 });
 
 it("does not turn a bypass definition into approval authority", async () => {

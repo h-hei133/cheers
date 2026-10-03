@@ -49,7 +49,7 @@ describe("applyInteractiveApprovalDecisionWiring", () => {
     }
   });
 
-  it("stores one-shot cache for interactive allow-once decisions", () => {
+  it("does not store future authority for interactive allow-once decisions", () => {
     const rememberAllowOnce = vi.fn();
     const rememberAllowAlways = vi.fn();
     const trustPolicy = {
@@ -65,15 +65,12 @@ describe("applyInteractiveApprovalDecisionWiring", () => {
       trustPolicy,
     });
 
-    expect(rememberAllowOnce).toHaveBeenCalledTimes(1);
-    expect(rememberAllowOnce).toHaveBeenCalledWith(
-      "d:/test|bash:spawn:process:node",
-    );
+    expect(rememberAllowOnce).not.toHaveBeenCalled();
     expect(rememberAllowAlways).not.toHaveBeenCalled();
     expect(result.persistedGrant).toBeUndefined();
   });
 
-  it("writes allow-once cache that is consumed exactly once", () => {
+  it("leaves no consumable grant after applying the current allow-once answer", () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "interactive-once-"));
     tempDirs.push(tempDir);
     const policyPath = path.join(tempDir, "approval-policy.json");
@@ -88,8 +85,7 @@ describe("applyInteractiveApprovalDecisionWiring", () => {
       trustPolicy,
     });
 
-    expect(trustPolicy.hasAllowOnce(evaluation.cacheKey)).toBe(true);
-    expect(trustPolicy.consumeAllowOnce(evaluation.cacheKey)).toBe(true);
+    expect(trustPolicy.hasAllowOnce(evaluation.cacheKey)).toBe(false);
     expect(trustPolicy.consumeAllowOnce(evaluation.cacheKey)).toBe(false);
   });
 

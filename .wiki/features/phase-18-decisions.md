@@ -578,6 +578,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W7-32 | read每次返回正文；startup结构/身份/有界读写、freshness与命令投影已修复；保留默认禁用 | 已完成，定向验证与隔离验收通过 |
 | W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
 | W7-26 / SES-08 | 回放、导出、迁移、恢复准入、检查点、字段优先级与历史写入观察已核验；后续转W7-31 | 已完成；原36模块行为矩阵闭合，保证边界与历史数据限制见审计表 |
+| W7-31 | [38模块Shell审计](phase-18-shell-audit.md)；首批修复审批身份、once生命周期和Git helper准入 | 进行中；根绑定、终态、compact注入、readiness、连接选择及background仍待完成 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1780,3 +1781,24 @@ seed/fragment回归证明历史格式消费及往返，不证明当前真实工�
 
 第十六批最终普通/全屏编译PTY各2次本地HTTP请求：模型opening含历史unknown和来源、无已解决失败及错误重试指令；命令型partial seed同样正确回退passed。审批前无文件、批准后实际写入、终态来源与最终assistant消息匹配；无合成continuity用户提示。产物.tmp/history-pty-srmq1gzu，两模式exit0。
 静态阻断门通过，1428文件零循环；7项可达性提示与120项docs-source-drift提示保持。NormProof exit0且所有阻断义务满足，整体advisory仍partial。
+
+
+### W7-31 首批：精确审批、一次性授权与拒绝优先级（2026-10-03）
+
+当前Shell清单为26个根模块加12个子目录模块，共38个，完整判据和未闭合项见[Shell审计](phase-18-shell-audit.md)。
+目标是消除真实工具执行前的审批绕过。对照参考实现的原始命令权限资源、未匹配询问、once只完成当前请求和always才持久化的决策；保留现有handler、工具hooks、registry与execution路径。
+
+- Git branch创建及diff/show/log输出选项不再仅凭子命令被判read-only。status/diff实测可调用external diff、fsmonitor、clean filter，固定禁用若干helper仍不完整；这些命令及log/show要求审批，plan拒绝，branch/rev-parse仅正向参数集合自动准入。工具描述同步更新。
+- producer和store保留命令/文件目标原始大小写及空白，exact命名空间拒绝旧有损键静默复用；旧授权仍可查看/撤销。真实write/edit回归证明末尾空格、前导空格、大小写变化不能借用已有授权。
+- allow-once只回答当前等待请求，scope自动回答不留下下一次缓存；非交互式预存once只在实际选中时消耗。显式deny不消耗未用授权。
+- 拒绝规则独立于exact键：命令兼容trim后前缀/相对路径比较；已知文件目标即使含空白也按路径解析dot组件。三种scope下拒绝优先，原始目标仍完整返回。
+
+最终命令：隔离环境下`npm run test -w packages/ts-shell -- --threads=false`，指定approval/evaluator、approvalTrustPolicy、interactiveApprovalWiring、approvalPromptBridge、approvalExecution、turn/tools、toolPolicy、turn/subagent，以及approval/deny、session/approval、permissionRequestMemoryCodec、legacyPermissionRebase、cli/approval、osSandbox、toolPolicyResult对应测试。19套217项通过、exit0；`npm run build:cli` exit0。
+独立代码审查APPROVE、架构CLEAR；代码审查另跑3套49项、exit0。反转五个行为owner到HEAD后62失败89通过，随后逐字节恢复（.tmp/approval-reversal.log）。
+
+最终编译普通/全屏PTY各自完成两类验收：一次批准后同目标再询问，第二次拒绝后文件不变；allow-always后末尾空格的不同文件仍再询问并拒绝。四次运行均exit0，实际HTTP请求各3次，审批前无写入、终态stopped、持久化来源匹配。产物为.tmp/approval-pty-fjx64y_e与.tmp/approval-target-pty-u2adrhtz。
+静态阻断门通过：1429文件零循环、config/declarations/node-floor通过；7个reachability与120个docs-source advisory保留。打包judge exit0，阻断义务满足，整体advisory verdict仍partial。
+
+验证异常分类：最早两项失败因真实registry创建审计目录而与fixture目录断言冲突，改为精确检查文件集合；另一次9套42项报告通过后Node/V8原生崩溃exit134，不计为成功，最终单worker重跑覆盖全部相关套件。旧result-contract脚本与test:scripts本批未跑，前者仍作为W7-31债务。
+所有本批测试使用仓内独立HOME/USERPROFILE/TMPDIR、CHEERS_SYNTHETIC_HOME、CHEERS_TEST_ROOT与npm cache；不使用真实provider配置。56df129c的CI 37115159213与Architecture Watch 37115159216均已成功。
+W7-31仍未完成，继续处理审计表中的根绑定、取消终态、compact注入、readiness/凭据选择、background及直接行为断言缺口。

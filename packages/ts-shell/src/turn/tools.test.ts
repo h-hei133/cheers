@@ -36,12 +36,23 @@ function call(name: string, args: Record<string, unknown> = {}) {
 }
 
 describe("createToolHooks", () => {
+  it.each(["git status", "git diff", "git show HEAD", "git log -n 5", "git branch new-branch", "git diff --output=written.patch", "git show --output=written.patch"])(
+    "blocks %s in plan mode and requires an explicit answer in ask mode", async command => {
+      const plan = createToolHooks(gate({ agentMode: "plan", permissionScope: "allow-all" }));
+      expect((await plan.beforeToolCall!(call("bash", { command })))?.block).toBe(true);
+      const handler = vi.fn(async (prompt: { id: string }) => ({ promptId: prompt.id, decision: "deny" as const, respondedAt: 1 }));
+      const setup = gate({ agentMode: "build", permissionScope: "ask", escalationPromptHandler: handler });
+      expect((await createToolHooks(setup).beforeToolCall!(call("bash", { command })))?.block).toBe(true);
+      expect(handler).toHaveBeenCalledOnce();
+      expect(setup.dispatched).not.toContain("PreToolUse");
+    });
+
   it("blocks mutation in plan mode but lets read-only shell commands through", async () => {
     const hooks = createToolHooks(gate({ agentMode: "plan", permissionScope: "allow-all" }));
     const blocked = await hooks.beforeToolCall!(call("write", { path: "a" }));
     expect(blocked?.block).toBe(true);
     expect(blocked?.reason).toContain("Plan mode is active");
-    expect(await hooks.beforeToolCall!(call("bash", { command: "git status" }))).toBeUndefined();
+    expect(await hooks.beforeToolCall!(call("bash", { command: "git branch --show-current" }))).toBeUndefined();
   });
 
   it("blocks subagent dispatch and mutating browser actions in plan mode", async () => {

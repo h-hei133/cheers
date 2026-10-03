@@ -47,10 +47,12 @@ export const READ_ONLY_BROWSER_ACTIONS: Record<string, true> = {
  * compared as written, because those are not resolved against the workspace and
  * rewriting them would compare a rule against something the tool never runs.
  */
-function normalizedPathTarget(target: string, workspaceRoot: string): string {
-  if (target === "" || target.startsWith("(")) return target;
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target)) return target;
-  if (/[\s|&;<>$`()]/.test(target)) return target;
+function normalizedPathTarget(target: string, workspaceRoot: string, isFileTarget: boolean): string {
+  if (!isFileTarget) {
+    if (target === "" || target.startsWith("(")) return target;
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(target)) return target;
+    if (/[\s|&;<>$`()]/.test(target)) return target;
+  }
   const root = path.resolve(workspaceRoot);
   const resolved = path.resolve(root, target);
   return resolved === root ? target : path.relative(root, resolved) || target;
@@ -74,11 +76,11 @@ export function evaluateToolPermissionScope(
     isReadOnly = true;
   } else if (toolName === "write" || toolName === "edit") {
     operation = "write";
-    const rawPath = typeof safeArgs.path === "string" ? safeArgs.path.trim() : "";
+    const rawPath = typeof safeArgs.path === "string" ? safeArgs.path : "";
     target = rawPath || "(unspecified path)";
     isReadOnly = false;
   } else if (toolName === "bash") {
-    const cmd = typeof safeArgs.command === "string" ? safeArgs.command.trim() : "";
+    const cmd = typeof safeArgs.command === "string" ? safeArgs.command : "";
     target = cmd || "bash";
     if (isReadOnlyBashCommand(cmd)) {
       operation = "read";
@@ -129,7 +131,9 @@ export function evaluateToolPermissionScope(
   // costs nothing and is not something a user would think to defend against.
   const denied =
     matchDenyRule(denyRules, toolName, target) ??
-    matchDenyRule(denyRules, toolName, normalizedPathTarget(target, workspaceRoot));
+    (toolName === "bash" ? matchDenyRule(denyRules, toolName, target.trim()) : undefined) ??
+    matchDenyRule(denyRules, toolName, normalizedPathTarget(toolName === "bash" ? target.trim() : target, workspaceRoot,
+      ["read", "write", "edit"].includes(toolName) && typeof safeArgs.path === "string"));
   if (denied) {
     return {
       requiresEscalation: false,
@@ -165,8 +169,8 @@ export function evaluateToolPermissionScope(
     // Process spawns, shell commands (including bash rm), and network operations
     // must always require user escalation.
     if ((toolName === "write" || toolName === "edit") && (operation === "write" || operation === "delete")) {
-      const rawPath = typeof safeArgs.path === "string" ? safeArgs.path.trim() : "";
-      if (!rawPath) {
+      const rawPath = typeof safeArgs.path === "string" ? safeArgs.path : "";
+      if (!rawPath.trim()) {
         return {
           requiresEscalation: true,
           operation,

@@ -68,47 +68,14 @@ export function isReadOnlyBashCommand(command: string): boolean {
   if (!trimmed) return false;
 
   // Disallow shell chaining operators, subshells, substitutions, and redirections
-  if (/[;&|><`$]/.test(trimmed) || trimmed.includes("\n")) {
+  if (/[;&|><`$\\\'"(){}*?\[\]#\x00-\x1f\x7f]/.test(trimmed)) {
     return false;
   }
 
   const parts = trimmed.split(/\s+/);
-  const binary = parts[0]?.toLowerCase();
+  const binary = parts[0];
 
-  if (binary === "git") {
-    const sub = parts[1]?.toLowerCase();
-    if (!sub) return false;
-
-    // Safe read-only git subcommands
-    if (sub === "status" || sub === "diff" || sub === "show" || sub === "rev-parse") {
-      return true;
-    }
-
-    if (sub === "log") {
-      // Disallow flags that write output
-      const hasWriteFlag = parts.some((p) => p.startsWith("--output") || p.startsWith("-o"));
-      return !hasWriteFlag;
-    }
-
-    if (sub === "branch") {
-      // Disallow mutating branch flags (-d, -D, -m, -M, -c, -C)
-      const hasMutatingFlag = parts.some(
-        (p) =>
-          p === "-d" ||
-          p === "-D" ||
-          p === "-m" ||
-          p === "-M" ||
-          p === "-c" ||
-          p === "-C" ||
-          p === "--delete" ||
-          p === "--move" ||
-          p === "--copy",
-      );
-      return !hasMutatingFlag;
-    }
-
-    return false;
-  }
+  if (binary === "git") return isReadOnlyGitCommand(parts.slice(1));
 
   // Standard read-only inspection commands (POSIX + Windows)
   if (
@@ -129,6 +96,37 @@ export function isReadOnlyBashCommand(command: string): boolean {
   return false;
 }
 
+// Worktree inspection can invoke configured filters/fsmonitor, while diff and
+// history rendering can run external diff, textconv or signature helpers. Those
+// commands require approval even when their arguments look read-only.
+const READ_ONLY_GIT_FLAGS: Readonly<Record<string, ReadonlySet<string>>> = {
+  "rev-parse": new Set(["--git-dir", "--git-common-dir", "--absolute-git-dir", "--show-toplevel", "--show-prefix", "--show-cdup", "--is-inside-work-tree", "--is-bare-repository", "--verify", "--short", "--abbrev-ref", "--symbolic-full-name"]),
+  branch: new Set(["--list", "-a", "--all", "-r", "--remotes", "-v", "-vv", "--verbose", "--show-current", "--no-color", "--color=never"]),
+};
+
+/** Unrecognized syntax must go through approval; do not guess from a subcommand name. */
+function isReadOnlyGitCommand(parts: readonly string[]): boolean {
+  const subcommand = parts[0] ?? "";
+  const flags = Object.hasOwn(READ_ONLY_GIT_FLAGS, subcommand) ? READ_ONLY_GIT_FLAGS[subcommand] : undefined;
+  if (!flags) return false;
+  const args = parts.slice(1);
+  const separator = args.indexOf("--");
+  const listOption = args.indexOf("--list");
+  const listsBranches = listOption >= 0 && (separator < 0 || listOption < separator);
+  let pathsOnly = false;
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index]!;
+    if (arg === "--") { pathsOnly = true; continue; }
+    if (!pathsOnly && arg.startsWith("-")) {
+      if (flags.has(arg)) continue;
+      return false;
+    }
+    // A branch name without explicit --list creates a branch, even after flags.
+    if (subcommand === "branch" && !listsBranches) return false;
+  }
+  return true;
+}
+
 export function evaluatePermission(input: {
   readonly scope: string;
   readonly toolName: string;
@@ -142,7 +140,7 @@ export function evaluatePermission(input: {
     (input.toolName === "bash" && isReadOnlyBashCommand(input.selector));
 
   // Plan mode enforcement:
-  // Read-only tools (and read-only bash commands like git status/diff) are allowed freely.
+  // Read-only tools (and read-only bash commands like git branch --show-current) are allowed freely.
   // Write/destructive tools are hard-blocked with an explicit explanation.
   if (input.agentMode === "plan") {
     if (isReadOnly) {

@@ -75,6 +75,40 @@ describe("ApprovalTrustPolicy", () => {
     expect(missDifferentProject.matchedGrant).toBeUndefined();
   });
 
+  it.each(["rm Foo", "node --eval Process", "write CaseSensitive.txt"])("keeps case-distinct commands separate after reload: %s", target => {
+    const policy = new ApprovalTrustPolicy(policyPath);
+    policy.rememberAllowAlways(buildPrompt(target), tempDir);
+    const reopened = new ApprovalTrustPolicy(policyPath);
+    expect(reopened.evaluate(buildPrompt(target), tempDir).matchedGrant).toBeDefined();
+    expect(reopened.evaluate(buildPrompt(target.toLowerCase()), tempDir).matchedGrant).toBeUndefined();
+    const exact = policy.evaluate(buildPrompt(target), tempDir);
+    const other = policy.evaluate(buildPrompt(target.toLowerCase()), tempDir);
+    policy.rememberAllowOnce(exact.cacheKey);
+    expect(policy.consumeAllowOnce(other.cacheKey)).toBe(false);
+    expect(policy.consumeAllowOnce(exact.cacheKey)).toBe(true);
+  });
+
+  it("does not reinterpret a lossy legacy command key as exact approval", () => {
+    const legacy = { projectRoot: normalizeExpectedProjectRoot(tempDir), toolName: "bash", operation: "spawn",
+      scopeKey: "bash:spawn:cmd:rm foo", scopeLabel: "bash/spawn(rm Foo)", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" };
+    fs.writeFileSync(policyPath, JSON.stringify({ grants: [legacy] }));
+    const policy = new ApprovalTrustPolicy(policyPath);
+    expect(policy.evaluate(buildPrompt("rm foo"), tempDir).matchedGrant).toBeUndefined();
+    expect(policy.evaluate(buildPrompt("rm Foo"), tempDir).matchedGrant).toBeUndefined();
+    expect(policy.listGrants()).toHaveLength(1);
+    expect(policy.revokeGrant(tempDir, "1").removed).toBe(1);
+  });
+
+  it("preserves exact file target bytes for write grants", () => {
+    const policy = new ApprovalTrustPolicy(policyPath);
+    const prompt = { ...buildPrompt("unused"), context: { toolName: "write", operation: "write", target: "File.txt " } };
+    policy.rememberAllowAlways(prompt, tempDir);
+    for (const target of ["File.txt", "file.txt "]) {
+      expect(policy.evaluate({ ...prompt, context: { ...prompt.context, target } }, tempDir).matchedGrant).toBeUndefined();
+    }
+    expect(policy.evaluate(prompt, tempDir).matchedGrant).toBeDefined();
+  });
+
   it("provides user-facing explanation for repeated prompts", () => {
     const policy = new ApprovalTrustPolicy(policyPath);
     const project = path.join(tempDir, "project-x");

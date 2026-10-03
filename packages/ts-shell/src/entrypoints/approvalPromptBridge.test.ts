@@ -3,6 +3,8 @@ import { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import type { EscalationPrompt } from "../core/shell/approval/contract.js";
 import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
 import { createCliEscalationPromptHandler } from "./cliApprovalModule.js";
+import { createToolHooks } from "../turn/tools.js";
+import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import {
   createApprovalResponse,
   formatApprovalConflictResolutionLine,
@@ -244,6 +246,51 @@ describe("approval prompt bridge", () => {
 });
 
 describe("createCliEscalationPromptHandler with promptInteractiveApproval", () => {
+  it("consumes a staged grant only when it authorizes the noninteractive request", async () => {
+    const policy = new ApprovalTrustPolicy();
+    const prompt = createPrompt();
+    const key = policy.evaluate(prompt, "/noninteractive-once").cacheKey;
+    policy.rememberAllowOnce(key);
+    let explicit: "deny" | undefined = "deny";
+    const handler = createCliEscalationPromptHandler(createRenderer(), null, () => "compact", policy,
+      () => "/noninteractive-once", () => explicit);
+    expect((await handler(prompt)).decision).toBe("deny");
+    expect(policy.hasAllowOnce(key)).toBe(true);
+    explicit = undefined;
+    expect((await handler(prompt)).decision).toBe("allow-once");
+    expect(policy.hasAllowOnce(key)).toBe(false);
+    expect((await handler({ ...prompt, id: "second" })).decision).toBe("deny");
+  });
+
+  it("applies allow-once only to the current tool call, then asks for the next payload", async () => {
+    const policy = new ApprovalTrustPolicy();
+    const interactive = vi.fn().mockResolvedValueOnce("allow-once").mockResolvedValueOnce("deny");
+    const handler = createCliEscalationPromptHandler(createRenderer(), null, () => "compact", policy,
+      () => "/once-boundary", undefined, undefined, undefined, () => "ask", interactive);
+    const hooks = createToolHooks({ sessionId: "once", workspaceRoot: "/once-boundary", permissionScope: "ask",
+      hooks: { dispatch: async () => ({ decision: "allow" }) } as unknown as HookDispatcher,
+      escalationPromptHandler: handler, emit() {},
+    });
+    const first = { id: "write-one", name: "write", args: { path: "target.txt", content: "first" } };
+    const second = { id: "write-two", name: "write", args: { path: "target.txt", content: "second" } };
+    expect(await hooks.beforeToolCall!({ assistantMessage: { role: "assistant", content: "" }, call: first, args: first.args })).toBeUndefined();
+    expect((await hooks.beforeToolCall!({ assistantMessage: { role: "assistant", content: "" }, call: second, args: second.args }))?.block).toBe(true);
+    expect(interactive).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retain a one-shot grant after the session scope becomes ask", async () => {
+    const policy = new ApprovalTrustPolicy();
+    let scope: "allow-all" | "ask" = "allow-all";
+    const interactive = vi.fn().mockResolvedValue("deny");
+    const handler = createCliEscalationPromptHandler(createRenderer(), null, () => "compact", policy,
+      () => "/scope-boundary", undefined, undefined, undefined, () => scope, interactive);
+    const prompt = createPrompt();
+    expect((await handler(prompt)).decision).toBe("allow-once");
+    scope = "ask";
+    expect((await handler({ ...prompt, id: "next-request" })).decision).toBe("deny");
+    expect(interactive).toHaveBeenCalledOnce();
+  });
+
   function uniquePrompt(tag: string): EscalationPrompt {
     return {
       id: `approval_prompt_${tag}`,

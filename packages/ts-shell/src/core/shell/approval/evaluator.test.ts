@@ -6,14 +6,28 @@ import {
 
 describe("Approval Evaluator & Read-Only Command Classifier", () => {
   describe("isReadOnlyBashCommand", () => {
-    it("identifies read-only git commands correctly", () => {
-      expect(isReadOnlyBashCommand("git status")).toBe(true);
-      expect(isReadOnlyBashCommand("git status --short")).toBe(true);
-      expect(isReadOnlyBashCommand("git diff")).toBe(true);
-      expect(isReadOnlyBashCommand("git diff HEAD~1")).toBe(true);
-      expect(isReadOnlyBashCommand("git log -n 5")).toBe(true);
-      expect(isReadOnlyBashCommand("git show HEAD")).toBe(true);
-      expect(isReadOnlyBashCommand("git branch -a")).toBe(true);
+    it.each([
+      "git branch new-branch", "git branch -l new-branch", "git branch --set-upstream-to=main topic",
+      "git branch --unset-upstream", "git branch --edit-description", "git branch -Dold", "git branch --del old", "git branch new -- --list",
+      "git diff --output=written.patch", "git diff --output written.patch", "git show --output=written.patch",
+      "git log --output=written.patch", "git diff --ext-diff", "git show --textconv", "git diff --output-indicator-new=X",
+      "git diff '--output=written.patch'", "git diff --outp\\ut=written.patch", "git status\rwhoami", "GIT status", "git constructor", "git __proto__",
+    ])("requires approval for mutating or unclassified syntax: %s", command => {
+      expect(isReadOnlyBashCommand(command)).toBe(false);
+      expect(evaluatePermission({ scope: "/project", toolName: "bash", selector: command, grants: [], agentMode: "plan" }).behavior).toBe("deny");
+    });
+
+    it.each(["git branch", "git branch --list topic", "git branch --show-current", "git rev-parse --show-toplevel"])(
+      "preserves explicit inspection forms: %s", command => expect(isReadOnlyBashCommand(command)).toBe(true));
+
+    it.each([
+      "git status", "git status --short", "git diff", "git diff HEAD~1",
+      "git diff --no-ext-diff --no-textconv", "git diff --cached",
+      "git -c core.fsmonitor=false status --short",
+      "git -c core.fsmonitor=false diff --no-ext-diff --no-textconv",
+      "git log -n 5", "git show HEAD",
+    ])("requires approval for commands with implicit helpers: %s", command => {
+      expect(isReadOnlyBashCommand(command)).toBe(false);
     });
 
     it("identifies standard inspection commands", () => {
@@ -46,25 +60,25 @@ describe("Approval Evaluator & Read-Only Command Classifier", () => {
     });
 
     it("allows safe read-only git commands via bash in plan mode", () => {
-      const statusEval = evaluatePermission({
+      const branchEval = evaluatePermission({
         scope: "/project",
         toolName: "bash",
-        selector: "git status -s",
+        selector: "git branch --show-current",
         grants: [],
         agentMode: "plan",
       });
-      expect(statusEval.behavior).toBe("allow");
-      expect(statusEval.granted).toBe(true);
+      expect(branchEval.behavior).toBe("allow");
+      expect(branchEval.granted).toBe(true);
 
-      const diffEval = evaluatePermission({
+      const rootEval = evaluatePermission({
         scope: "/project",
         toolName: "bash",
-        selector: "git diff src/",
+        selector: "git rev-parse --show-toplevel",
         grants: [],
         agentMode: "plan",
       });
-      expect(diffEval.behavior).toBe("allow");
-      expect(diffEval.granted).toBe(true);
+      expect(rootEval.behavior).toBe("allow");
+      expect(rootEval.granted).toBe(true);
     });
 
     it("denies mutating bash commands in plan mode", () => {

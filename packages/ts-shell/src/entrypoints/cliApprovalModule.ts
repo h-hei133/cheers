@@ -203,7 +203,6 @@ export function createCliEscalationPromptHandler(
         decisionSource: "session-scope",
         lines: [`- Session permission scope is \`${scopeLabel(scope)}\`: ${scopeMeaning(scope)}.`],
       });
-      trustPolicy.rememberAllowOnce(evaluation.cacheKey);
       emitApprovalAudit({
         channel: "interactive",
         decision: scopeDecision,
@@ -288,6 +287,7 @@ export function createCliEscalationPromptHandler(
         );
       }
       if (nonInteractiveDecisionPlan.source === "allow-once-cache") {
+        trustPolicy.consumeAllowOnce(evaluation.cacheKey);
         trustPolicy.recordLastHit({
           source: "allow-once-cache",
           projectRoot,

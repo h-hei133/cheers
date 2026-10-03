@@ -21,11 +21,7 @@ export function applyInteractiveApprovalDecisionWiring(input: {
   readonly evaluation: ApprovalEvaluation;
   readonly trustPolicy: ApprovalTrustPolicy;
 }): InteractiveApprovalWiringResult {
-  if (input.decision === "allow-once") {
-    input.trustPolicy.rememberAllowOnce(input.evaluation.cacheKey);
-    return {};
-  }
-
+  // The caller returns allow-once to the waiting request; it is not a future grant.
   if (input.decision === "allow-always") {
     return {
       persistedGrant: input.trustPolicy.rememberAllowAlways(
@@ -37,4 +33,3 @@ export function applyInteractiveApprovalDecisionWiring(input: {
 
   return {};
 }
-
