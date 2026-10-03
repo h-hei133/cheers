@@ -5828,3 +5828,13 @@ readiness复用所选endpoint资源与认证规则，与实际生成共享catalo
 原生压缩首轮失败归入W7-27：simple body发stream:true而摘要读取JSON；未将原生压缩计为成功。
 judge阻断义务满足、整体仍partial；W7-31剩余background/platform/直接断言与脚本债务继续。
 前两提交2265b3b、30ec3d3e的CI与Architecture Watch均成功，详见Shell审计与裁决记录。
+
+
+## [2026-10-04] fix | Phase 18 W7-31 后台输出结算
+
+后台输出改为UTF-8字节有界尾部、单次exclusive spill与反压；失败立即清除可读路径。
+进程关闭先释放控制句柄，日志关闭后才通知；最近100条完成记录保留，运行中任务与文件不删除。
+5套53项、构建及独立APPROVE/CLEAR通过；反转两个owner后8失败5通过，恢复后复跑通过。
+普通/全屏PTY确认审批前不启动、完成通知的完整文件可读与终态来源一致，无真实provider。
+静态阻断门与judge阻断义务通过，整体advisory仍partial。idle完成通知继续沿用下一回合队列，存储慢会延迟结算。
+W7-31剩余platform、直接断言及旧脚本继续；63053ae9两项远端检查均成功。

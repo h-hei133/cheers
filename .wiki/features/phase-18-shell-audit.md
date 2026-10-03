@@ -49,8 +49,8 @@ W7-31仍在执行。首批聚焦审批，其余已复现问题按下表继续修
 | `approval/evaluator.ts` | read-only准入与未知语法拒绝 | 首批修复branch创建/output/helper绕过；保守正向语法集合 |
 | `approval/deny.ts` | 拒绝优先于scope和自动放行；同名测试 | 所列匹配/解析已核对；首批补真实producer的空白目标拒绝回归 |
 | `approval/store.ts` | 精确授权身份、旧键隔离、重载/撤销 | 首批保留原始目标，使用exact命名空间 |
-| `background/output.ts` | 内存上限、spill失败与backpressure | 已确认无spill时buffer无界、忽略backpressure、错误重开丢前缀，待修复 |
-| `background/tasks.ts` | output路径真实、结束前完成spill | 已确认sink失败后旧路径及spill关闭前发布完成，待修复 |
+| `background/output.ts` | 内存上限、spill失败与backpressure | 第六批修复：只保留UTF-8字节有界tail、单次exclusive spill，失败移除路径，反压等待与close结算覆盖 |
+| `background/tasks.ts` | output路径真实、结束前完成spill | 第六批修复：动态路径、两管道暂停/恢复与独立解码；close后通知，最近100条完成记录，运行中不淘汰 |
 
 ## 首批审批决策与保证边界
 
@@ -130,3 +130,29 @@ judge exit0，阻断义务满足，整体仍partial。
 原生simple body沿用stream:true，既有requestCompactionSummary却调用res.json()。
 这属于现存W7-27协议字段/流边界缺口，转该任务处理；本批原生PTY不再执行压缩，不把该路径计为通过。
 W7-31继续background、platform、直接行为断言与旧result-contract脚本债务。
+
+
+## 第六批后台输出与任务结算
+
+OutputSink移除重复buffer，首次溢出前由tail提供完整前缀；始终按UTF-8字节截尾并避开字符中间。
+文件只尝试一次，以唯一名称exclusive创建；失败后永久移除可读路径，不把后续片段伪称完整输出。
+append遇到反压返回等待，TaskRegistry暂停两条管道，drain/error/close后恢复；
+stdout/stderr各自持续解码，分片多字节字符不互相污染。
+
+进程关闭即删除控制句柄并untrack PID，随后等待日志close；结束状态与通知只在文件结算后发布。
+运行中的路径投影实时读取sink，异步失败无需再来一块输出就能清除旧路径。
+最近100条完成记录按完成顺序保留；运行中任务不淘汰，历史文件不删除，旧完成ID可能查不到。
+沿用既有owner与执行入口；参考比较采用字节尾部、先关闭再读取文件及有界任务历史决策，没有复制代码。
+
+5套53项、build:ts与独立APPROVE/CLEAR通过；反转两个owner后8失败5通过，精确恢复并最终复跑。
+新增慢/失败stream、独立UTF-8管道、完成记录上限与真实子进程大输出回调读取测试。
+静态阻断门通过，1433文件零环，旧reachability7/ceiling7/docs-source120保留；
+judge exit0且阻断义务满足，总体仍partial。
+
+普通/全屏编译PTY各4次本地HTTP请求，审批前无子进程标记；
+完成通知到达模型时完整280012字节日志可读，最终消息来源匹配；产物.tmp/background-pty-5r1lnx3j，均exit0。
+idle通知沿用既有队列，在下一次用户回合后投递，本批未改变其调度。
+最初PTY驱动发了字面换行转义，另一次误等idle自动回合；两者均为测试适配问题，修正驱动后通过。
+单测初轮两处fs mock未拦截命名导入、一次resume微任务时序断言不当；改为模块mock与实际恢复条件同步，未降低行为断言。
+慢存储仍会拖慢输出生产与完成通知；无磁盘额度/运行中任务并发上限，不声称无限资源场景。
+W7-31继续platform与直接行为缺口、旧result-contract脚本。

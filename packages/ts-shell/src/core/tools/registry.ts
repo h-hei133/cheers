@@ -853,7 +853,7 @@ function createTaskOutputToolDefinition(): ToolDefinition {
       type: 'object',
       properties: {
         taskId: { type: 'string', description: 'The identifier the background command was started under.' },
-        all: { type: 'boolean', description: 'List every background command instead of one.' },
+        all: { type: 'boolean', description: 'List running commands and the most recent 100 completions instead of one.' },
       },
     },
     async execute(args) {

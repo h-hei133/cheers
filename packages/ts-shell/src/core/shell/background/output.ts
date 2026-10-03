@@ -1,5 +1,6 @@
 import { createWriteStream, mkdirSync, type WriteStream } from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 
 /**
  * What a command printed, kept in memory up to a limit and on disk past it.
@@ -15,10 +16,10 @@ import path from "node:path";
  * few lines costs nothing but the string it printed.
  */
 
-/** A command's output, bounded in memory and complete on disk. */
+/** A command's bounded tail and optional complete spill file. */
 export interface OutputSink {
-  /** Add what the command just printed. */
-  append(text: string): void;
+  /** Add decoded output. Pause the producer until a returned promise settles. */
+  append(text: string): Promise<void> | void;
   /** The end of the output, which is what a reader is shown. */
   readonly tail: string;
   /** Whether anything was kept out of memory. */
@@ -45,39 +46,28 @@ export interface OutputSinkOptions {
 }
 
 export function createOutputSink(options: OutputSinkOptions): OutputSink {
+  if (!Number.isSafeInteger(options.limitBytes) || options.limitBytes < 0) {
+    throw new Error("Output limit must be a non-negative safe integer");
+  }
   let tail = "";
   let truncated = false;
   let spillPath: string | undefined;
   let stream: WriteStream | undefined;
   let closing: Promise<void> | undefined;
-  /**
-   * Everything read so far, kept only until the limit is passed.
-   *
-   * Up to the limit this is the same text as `tail`, so holding both costs
-   * nothing; past it the buffer is released and the file takes over. Keeping it
-   * is what lets the file be opened late and still begin at the beginning —
-   * spilling from the moment of overflow would lose everything before it.
-   */
-  let buffered: string[] = [];
+  let spillAttempted = false;
+  let closed = false;
 
   const openSpill = (): void => {
-    if (!options.spillDirectory || stream) return;
+    if (spillAttempted || !options.spillDirectory) return;
+    spillAttempted = true;
     try {
       mkdirSync(options.spillDirectory, { recursive: true });
-      spillPath = path.join(
-        options.spillDirectory,
-        `${options.label}-${Date.now().toString(36)}-${process.pid}.log`,
-      );
-      const opened = createWriteStream(spillPath, { flags: "w" });
-      // A file that cannot be written is not worth failing a command over: the
-      // tail is still kept, and the notice then says the excess was dropped.
-      opened.on("error", () => {
-        stream = undefined;
-        spillPath = undefined;
-      });
-      for (const chunk of buffered) opened.write(chunk);
-      buffered = [];
+      const candidate = path.join(options.spillDirectory, `${options.label}-${randomUUID()}.log`);
+      const opened = createWriteStream(candidate, { flags: "wx" });
       stream = opened;
+      // A failed spill can never again promise the complete prefix.
+      opened.on("error", () => { spillPath = undefined; });
+      opened.once("open", () => { if (!opened.destroyed) spillPath = candidate; });
     } catch {
       stream = undefined;
       spillPath = undefined;
@@ -85,51 +75,59 @@ export function createOutputSink(options: OutputSinkOptions): OutputSink {
   };
 
   return {
-    append(text: string): void {
+    append(text: string): Promise<void> | void {
+      if (closed) throw new Error("Cannot append to closed output");
       if (!text) return;
       const combined = tail + text;
-      if (combined.length <= options.limitBytes && !stream) {
-        tail = combined;
-        buffered.push(text);
-        return;
+      const bytes = Buffer.from(combined);
+      const firstOverflow = !truncated && bytes.length > options.limitBytes;
+      if (firstOverflow) openSpill();
+      truncated ||= bytes.length > options.limitBytes;
+      let start = Math.max(0, bytes.length - options.limitBytes);
+      // Never start the tail inside a multi-byte character.
+      while (start < bytes.length && (bytes[start]! & 0xc0) === 0x80) start++;
+      tail = bytes.subarray(start).toString("utf8");
+
+      const active = stream;
+      if (!active || active.destroyed) return;
+      try {
+        // Before overflow, tail held the entire prefix; no second buffer is needed.
+        if (!active.write(firstOverflow ? combined : text)) return waitForDrain(active);
+      } catch {
+        spillPath = undefined;
+        active.destroy();
       }
-
-      if (stream) {
-        stream.write(text);
-      } else {
-        // First time past the limit: the buffer still holds the whole beginning,
-        // which is what makes the file complete rather than a continuation.
-        buffered.push(text);
-        openSpill();
-      }
-
-      truncated = true;
-      tail = combined.slice(combined.length - options.limitBytes);
     },
 
-    get tail(): string {
-      return tail;
-    },
-
-    get truncated(): boolean {
-      return truncated;
-    },
-
-    get spillPath(): string | undefined {
-      return spillPath;
-    },
+    get tail(): string { return tail; },
+    get truncated(): boolean { return truncated; },
+    get spillPath(): string | undefined { return spillPath; },
 
     close(): Promise<void> {
+      closed = true;
       closing ??= new Promise<void>((resolve) => {
         const active = stream;
-        stream = undefined;
-        if (!active) {
-          resolve();
-          return;
-        }
-        active.end(() => resolve());
+        if (!active || active.closed) { resolve(); return; }
+        // Close follows finish/error and confirms that no more file work remains.
+        active.once("close", resolve);
+        active.end();
       });
       return closing;
     },
   };
+}
+
+/** Drain, failure and closure all release a paused producer. */
+function waitForDrain(stream: WriteStream): Promise<void> {
+  return new Promise(resolve => {
+    const done = (): void => {
+      stream.off("drain", done);
+      stream.off("error", done);
+      stream.off("close", done);
+      resolve();
+    };
+    stream.once("drain", done);
+    stream.once("error", done);
+    stream.once("close", done);
+  });
 }

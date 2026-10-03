@@ -578,7 +578,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W7-32 | read每次返回正文；startup结构/身份/有界读写、freshness与命令投影已修复；保留默认禁用 | 已完成，定向验证与隔离验收通过 |
 | W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
 | W7-26 / SES-08 | 回放、导出、迁移、恢复准入、检查点、字段优先级与历史写入观察已核验；后续转W7-31 | 已完成；原36模块行为矩阵闭合，保证边界与历史数据限制见审计表 |
-| W7-31 | [38模块Shell审计](phase-18-shell-audit.md)；首批修复审批身份、once生命周期和Git helper准入 | 进行中；审批、根绑定、终态、compact注入、readiness及连接选择已修复；background、platform、直接断言与旧脚本待完成 |
+| W7-31 | [38模块Shell审计](phase-18-shell-audit.md)；首批修复审批身份、once生命周期和Git helper准入 | 进行中；审批、根绑定、终态、compact注入、readiness及连接选择已修复；background已修复；platform、直接断言与旧脚本待完成 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1875,3 +1875,24 @@ memory仅一次及终态来源。无真实provider调用或配置访问。
 第三批2265b3b的CI 37132112387/Architecture Watch 37132112369，
 第四批30ec3d3e的CI 37133598680/Architecture Watch 37133598681均成功。
 W7-31与后续W7/W8仍在执行，Phase 18未完成。
+
+
+### W7-31 第六批：后台输出与任务保留（2026-10-04）
+
+既有sink改为字节有界tail、单次exclusive spill、反压等待与关闭结算；原前缀不再被隐形buffer无限保留，
+失败不重开也不继续公布旧路径。Registry暂停两条管道，分别解码UTF-8；
+进程关闭先释放PID控制，日志关闭后才发布完成。保留最近100个完成任务，活跃任务与磁盘文件不淘汰。
+taskOutput描述同步说明保留范围，完成通知不再声称该工具能返回超出tail的全文。
+参考决策为有界decoded tail、关闭文件后消费结果、有限后台历史及exclusive文件创建；保留现有模块与执行路径。
+
+隔离定向output/tasks/settlement/backgroundTools/interactiveMode共5套53项、build:ts通过；
+两owner反转8失败5通过，精确恢复后最终定向复跑。独立代码APPROVE、架构CLEAR，
+后者指出的关闭后PID控制窗口已修复并保留stop拒绝回归。代码复核首轮服务限流，重试后完成独立审查。
+静态阻断门通过、1433文件零环；旧reachability7/ceiling7/docs-source120保留；judge exit0、总体partial而阻断义务满足。
+
+普通/全屏PTY各4次本地HTTP，审批前无启动标记，结束通知携带的完整日志可立即读，终态消息来源一致；
+产物.tmp/background-pty-5r1lnx3j。驱动按既有idle队列规则在下一用户回合后接收通知，不声称自动启动回合。
+两次PTY失败源于驱动转义与调度假设；单测mock和同步问题已修正，详见Shell审计。
+无真实provider配置访问；慢存储会延迟完成，无新增磁盘额度或活跃任务并发额度。
+旧result-contract脚本未在此批运行或修复；W7-31继续platform、直接行为断言，然后27→29→33/W8。
+第五批63053ae9的CI 37136729912与Architecture Watch 37136729939均成功。

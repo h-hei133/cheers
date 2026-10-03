@@ -14,10 +14,11 @@
 
 import { spawn, type ChildProcess } from "node:child_process";
 import { trackChildPid, untrackChildPid, killProcessTree } from "../platform/processTree.js";
-import { createOutputSink, type OutputSink } from "./output.js";
+import { createOutputSink } from "./output.js";
 
 /** How much of a command's output is kept. */
 const OUTPUT_BYTES = 64 * 1024;
+const COMPLETED_TASK_LIMIT = 100;
 
 /** One running command. */
 export interface BackgroundTask {
@@ -58,7 +59,9 @@ export interface BackgroundRunner {
     readonly env?: Readonly<Record<string, string>>;
     readonly shell?: { readonly command: string; readonly args: readonly string[] };
   }): BackgroundTask;
+  /** Running tasks and the most recently completed 100 tasks. */
   list(): readonly BackgroundTask[];
+  /** Older completed tasks are evicted from memory; their spill files remain. */
   get(id: string): BackgroundTask | undefined;
   /** Stop one, which signals its whole process group. */
   stop(id: string): Promise<boolean>;
@@ -123,6 +126,17 @@ export class TaskRegistry {
     return this.tasks.get(id);
   }
 
+  private retain(task: BackgroundTask): void {
+    // Move completions behind older completions, regardless of start order.
+    this.tasks.delete(task.id);
+    this.tasks.set(task.id, task);
+    let excess = [...this.tasks.values()].filter(entry => entry.state !== "running").length - COMPLETED_TASK_LIMIT;
+    for (const [id, entry] of this.tasks) {
+      if (excess <= 0) break;
+      if (entry.state !== "running") { this.tasks.delete(id); excess--; }
+    }
+  }
+
   start(input: {
     readonly command: string;
     readonly cwd: string;
@@ -166,7 +180,7 @@ export class TaskRegistry {
         output: "",
         failure: error instanceof Error ? error.message : String(error),
       };
-      this.tasks.set(id, failed);
+      this.retain(failed);
       return failed;
     }
 
@@ -190,39 +204,46 @@ export class TaskRegistry {
       ...(this.spillDirectory ? { spillDirectory: this.spillDirectory } : {}),
     });
     const append = (text: string): void => {
-      sink.append(text);
+      const pending = sink.append(text);
+      if (pending) {
+        child.stdout?.pause();
+        child.stderr?.pause();
+        void pending.then(() => { child.stdout?.resume(); child.stderr?.resume(); });
+      }
       task = {
         ...task,
         output: sink.tail,
         ...(sink.truncated ? { outputTruncated: true } : {}),
-        ...(sink.spillPath ? { outputPath: sink.spillPath } : {}),
+        get outputPath() { return sink.spillPath; },
       };
       this.tasks.set(id, task);
     };
-    child.stdout?.on("data", (chunk: Buffer) => append(chunk.toString()));
-    child.stderr?.on("data", (chunk: Buffer) => append(chunk.toString()));
+    // Each pipe has its own streaming decoder, including split UTF-8 sequences.
+    child.stdout?.setEncoding("utf8").on("data", append);
+    child.stderr?.setEncoding("utf8").on("data", append);
 
     // A child that cannot be spawned reports both an error and a close, so the
     // ending is recorded once: a caller told twice would run its follow-up
     // twice, and the second notice would arrive after the task was already gone.
     let ended = false;
-    const finish = (state: "exited" | "killed", code: number | null): void => {
+    const finish = async (state: "exited" | "killed", code: number | null): Promise<void> => {
       if (ended) return;
       ended = true;
-      void sink.close();
-      const finished: BackgroundTask = { ...task, state, exitCode: code ?? undefined };
-      this.tasks.set(id, finished);
       this.children.delete(id);
       if (child.pid) untrackChildPid(child.pid);
+      await sink.close();
+      const finished: BackgroundTask = { ...task, state, exitCode: code ?? undefined, output: sink.tail, outputTruncated: sink.truncated, outputPath: sink.spillPath };
+      this.retain(finished);
       // Told once. A caller that missed it can still see the finished state by
       // asking, so a listener that arrives late loses nothing.
       for (const listener of this.listeners) listener(finished);
     };
     child.on("error", (error) => {
+      task = { ...task, failure: error.message };
       append(`\n${error.message}\n`);
-      finish("exited", null);
+      void finish("exited", null);
     });
-    child.on("close", (code, signal) => finish(signal ? "killed" : "exited", code));
+    child.on("close", (code, signal) => { void finish(signal ? "killed" : "exited", code); });
 
     return task;
   }
@@ -291,5 +312,5 @@ export function renderTask(task: BackgroundTask): string {
  * only other way to get it is a second tool call.
  */
 export function renderTaskNotice(task: Parameters<typeof renderTask>[0]): string {
-  return `A background command finished.\n\n${renderTask(task)}\n\nRead the full output with taskOutput if you need more than the tail.`;
+  return `A background command finished.\n\n${renderTask(task)}\n\nUse taskOutput to inspect retained task results.`;
 }
