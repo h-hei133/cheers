@@ -1,6 +1,9 @@
 import path from "node:path";
-import { rebaseLegacyPermissionRootsInWorkingMemory } from "../../core/paths/legacyRootRebase.js";
+import { collectLegacyPermissionRoots, normalizePathIdentity } from "./roots.js";
+export { detectLegacyPermissionRootCandidate } from "./roots.js";
 import { normalizeProjectRootKey } from "../store/projectBindingPolicy.js";
+import { rebasePathValues } from "./rebase.js";
+import { isRecord } from "../../core/values/record.js";
 
 export interface ProjectRootRebaseProjection {
   readonly workingMemory: unknown;
@@ -15,7 +18,7 @@ export function projectRootRebase(input: {
   readonly previousRoot: string;
   readonly nextRoot: string;
 }): ProjectRootRebaseProjection {
-  const rebasedValue = rebaseProjectRootInValue(
+  const rebasedValue = rebasePathValues(
     input.value,
     input.previousRoot,
     input.nextRoot,
@@ -24,6 +27,8 @@ export function projectRootRebase(input: {
     workingMemory: rebaseApprovalAuditCacheKeyRoot(
       rebasedValue,
       input.nextRoot,
+      input.previousRoot,
+      input.value,
     ),
   };
 }
@@ -33,195 +38,25 @@ export function normalizeLegacyPermissionWorkingMemory(input: {
   readonly sessionProjectRoot: string;
 }): unknown {
   const normalizedProjectRoot = path.resolve(input.sessionProjectRoot);
-  const rebasedWorkingMemory = rebaseLegacyPermissionRootsInWorkingMemory(
-    input.workingMemory,
-    normalizedProjectRoot,
-  );
+  const roots = collectLegacyPermissionRoots(input);
+  if (roots.length > 1) return input.workingMemory;
+  const previousRoot = roots[0];
+  const rebasedWorkingMemory = previousRoot
+    ? rebasePathValues(input.workingMemory, previousRoot, normalizedProjectRoot)
+    : input.workingMemory;
   return rebaseApprovalAuditCacheKeyRoot(
     rebasedWorkingMemory,
     normalizedProjectRoot,
+    previousRoot,
+    input.workingMemory,
   );
-}
-
-export function detectLegacyPermissionRootCandidate(input: {
-  readonly workingMemory: unknown;
-  readonly sessionProjectRoot: string;
-}): string | undefined {
-  const { workingMemory, sessionProjectRoot } = input;
-  if (
-    !workingMemory ||
-    typeof workingMemory !== "object" ||
-    Array.isArray(workingMemory)
-  ) {
-    return undefined;
-  }
-
-  const root = workingMemory as Record<string, unknown>;
-  const continuity =
-    root.continuity &&
-    typeof root.continuity === "object" &&
-    !Array.isArray(root.continuity)
-      ? (root.continuity as Record<string, unknown>)
-      : undefined;
-
-  const summaryEntries = Array.isArray(root.summary)
-    ? root.summary.filter((entry): entry is string => typeof entry === "string")
-    : [];
-
-  const candidates = new Map<string, string>();
-  const addRootCandidate = (value: unknown): void => {
-    if (typeof value !== "string") {
-      return;
-    }
-    const trimmed = value.trim();
-    if (!trimmed || trimmed.toLowerCase() === "unknown") {
-      return;
-    }
-    if (!trimmed.includes(path.sep) && !/^[a-zA-Z]:[\\/]/.test(trimmed)) {
-      return;
-    }
-    const resolved = normalizeProjectRootKey(trimmed);
-    if (!resolved || resolved === normalizeProjectRootKey(sessionProjectRoot)) {
-      return;
-    }
-    if (!candidates.has(resolved)) {
-      candidates.set(resolved, path.resolve(trimmed));
-    }
-  };
-  const addCacheKeyCandidate = (value: unknown): void => {
-    if (typeof value !== "string") {
-      return;
-    }
-    const cacheKey = value.trim();
-    const divider = cacheKey.indexOf("|");
-    if (divider <= 0) {
-      return;
-    }
-    addRootCandidate(cacheKey.slice(0, divider));
-  };
-
-  const approvalAudit =
-    root.approvalAudit &&
-    typeof root.approvalAudit === "object" &&
-    !Array.isArray(root.approvalAudit)
-      ? (root.approvalAudit as Record<string, unknown>)
-      : undefined;
-  if (approvalAudit) {
-    addRootCandidate(approvalAudit.projectRoot);
-    addCacheKeyCandidate(approvalAudit.cacheKey);
-  }
-
-  if (Array.isArray(root.approvalAuditHistory)) {
-    for (const entry of root.approvalAuditHistory) {
-      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-        continue;
-      }
-      const record = entry as Record<string, unknown>;
-      addRootCandidate(record.projectRoot);
-      addCacheKeyCandidate(record.cacheKey);
-    }
-  }
-
-  if (continuity) {
-    addRootCandidate(continuity.lastApprovalProjectRoot);
-    addRootCandidate(continuity.lastRequestScopeProjectRoot);
-    addRootCandidate(continuity.lastPermissionRequestProjectRoot);
-    addCacheKeyCandidate(continuity.lastApprovalCacheKey);
-    addCacheKeyCandidate(continuity.lastRequestScopeCacheKey);
-    addCacheKeyCandidate(continuity.lastPermissionRequestCacheKey);
-  }
-
-  for (const line of summaryEntries) {
-    const parsed = line.match(/^-?\s*([^:]+):\s*(.+)$/);
-    if (!parsed) {
-      continue;
-    }
-    const key = parsed[1]?.trim().toLowerCase();
-    const value = parsed[2]?.trim();
-    if (!key || !value) {
-      continue;
-    }
-    if (
-      key === "last-approval-project-root" ||
-      key === "last-request-scope-project-root" ||
-      key === "last-permission-request-project-root"
-    ) {
-      addRootCandidate(value);
-    }
-    if (
-      key === "last-approval-cache-key" ||
-      key === "last-request-scope-cache-key" ||
-      key === "last-permission-request-cache-key"
-    ) {
-      addCacheKeyCandidate(value);
-    }
-  }
-
-  if (candidates.size !== 1) {
-    return undefined;
-  }
-  return [...candidates.values()][0];
-}
-
-function rebaseProjectRootInValue(
-  value: unknown,
-  previousRoot: string,
-  nextRoot: string,
-): unknown {
-  if (typeof value === "string") {
-    return replaceProjectRootInText(value, previousRoot, nextRoot);
-  }
-
-  if (Array.isArray(value)) {
-    return value.map((entry) =>
-      rebaseProjectRootInValue(entry, previousRoot, nextRoot),
-    );
-  }
-
-  if (value && typeof value === "object") {
-    const rebasedEntries = Object.entries(value).map(([key, entry]) => [
-      key,
-      rebaseProjectRootInValue(entry, previousRoot, nextRoot),
-    ]);
-    return Object.fromEntries(rebasedEntries);
-  }
-
-  return value;
-}
-
-function replaceProjectRootInText(
-  input: string,
-  previousRoot: string,
-  nextRoot: string,
-): string {
-  const previousForward = previousRoot.replaceAll("\\", "/");
-  const previousBackward = previousRoot.replaceAll("/", "\\");
-  const nextForward = nextRoot.replaceAll("\\", "/");
-  const nextBackward = nextRoot.replaceAll("/", "\\");
-  const variants: Array<[pattern: string, replacement: string]> = [
-    [previousRoot, nextRoot],
-    [previousRoot.toLowerCase(), nextRoot.toLowerCase()],
-    [previousRoot.toUpperCase(), nextRoot.toUpperCase()],
-    [previousForward, nextForward],
-    [previousForward.toLowerCase(), nextForward.toLowerCase()],
-    [previousForward.toUpperCase(), nextForward.toUpperCase()],
-    [previousBackward, nextBackward],
-    [previousBackward.toLowerCase(), nextBackward.toLowerCase()],
-    [previousBackward.toUpperCase(), nextBackward.toUpperCase()],
-  ];
-  let output = input;
-  for (const [pattern, replacement] of variants) {
-    if (!pattern) {
-      continue;
-    }
-    output = output.split(pattern).join(replacement);
-  }
-  return output;
 }
 
 function rebaseApprovalAuditCacheKeyRoot(
   value: unknown,
   nextProjectRoot: string,
+  previousRoot?: string,
+  originalValue: unknown = value,
 ): unknown {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return value;
@@ -240,20 +75,28 @@ function rebaseApprovalAuditCacheKeyRoot(
     if (dividerIndex <= 0 || dividerIndex === cacheKey.length - 1) {
       return undefined;
     }
+    const cacheRoot = normalizePathIdentity(cacheKey.slice(0, dividerIndex), true);
+    const fromPreviousRoot = previousRoot && cacheRoot === normalizePathIdentity(previousRoot, true);
+    const fromCurrentRoot = cacheRoot === normalizePathIdentity(nextProjectRoot, true);
+    if (!cacheRoot || (!fromPreviousRoot && !fromCurrentRoot)) return undefined;
     const cacheSuffix = cacheKey.slice(dividerIndex + 1).trim();
     if (!cacheSuffix) {
       return undefined;
     }
-    return `${normalizedCacheKeyRoot}|${cacheSuffix}`;
+    return `${normalizedCacheKeyRoot}|${rebasePathValues(cacheSuffix, previousRoot ?? nextProjectRoot, normalizedCacheKeyRoot, {
+      ignoreCase: true,
+      ...(fromCurrentRoot ? { preserveRoot: nextProjectRoot } : {}),
+    })}`;
   };
 
-  const rewriteCacheKeyObject = (input: unknown): unknown => {
+  const rewriteCacheKeyObject = (input: unknown, original: unknown): unknown => {
     if (!input || typeof input !== "object" || Array.isArray(input)) {
       return input;
     }
     const obj = input as Record<string, unknown>;
     let nextObj: Record<string, unknown> = obj;
-    const normalizedCacheKey = normalizeCacheKey(obj.cacheKey);
+    const sourceKey = isRecord(original) ? original.cacheKey : obj.cacheKey;
+    const normalizedCacheKey = normalizeCacheKey(sourceKey) ?? (typeof sourceKey === "string" ? sourceKey : undefined);
     if (normalizedCacheKey && normalizedCacheKey !== obj.cacheKey) {
       nextObj = { ...nextObj, cacheKey: normalizedCacheKey };
     }
@@ -261,17 +104,21 @@ function rebaseApprovalAuditCacheKeyRoot(
   };
 
   const root = value as Record<string, unknown>;
+  // Read cache paths from the original records: the general path pass may have
+  // inserted a destination that itself contains the old root.
+  const originalRoot = isRecord(originalValue) ? originalValue : root;
   let nextRoot: Record<string, unknown> = root;
 
-  const rebasedApprovalAudit = rewriteCacheKeyObject(root.approvalAudit);
+  const rebasedApprovalAudit = rewriteCacheKeyObject(root.approvalAudit, originalRoot.approvalAudit);
   if (rebasedApprovalAudit !== root.approvalAudit) {
     nextRoot = { ...nextRoot, approvalAudit: rebasedApprovalAudit };
   }
 
   if (Array.isArray(root.approvalAuditHistory)) {
     let changed = false;
-    const rebasedHistory = root.approvalAuditHistory.map((entry) => {
-      const rebasedEntry = rewriteCacheKeyObject(entry);
+    const originalHistory = Array.isArray(originalRoot.approvalAuditHistory) ? originalRoot.approvalAuditHistory : [];
+    const rebasedHistory = root.approvalAuditHistory.map((entry, index) => {
+      const rebasedEntry = rewriteCacheKeyObject(entry, originalHistory[index]);
       if (rebasedEntry !== entry) {
         changed = true;
       }
@@ -288,6 +135,7 @@ function rebaseApprovalAuditCacheKeyRoot(
     !Array.isArray(nextRoot.continuity)
   ) {
     const continuity = nextRoot.continuity as Record<string, unknown>;
+    const originalContinuity = isRecord(originalRoot.continuity) ? originalRoot.continuity : continuity;
     let nextContinuity: Record<string, unknown> = continuity;
     const continuityKeys = [
       "lastApprovalCacheKey",
@@ -295,7 +143,8 @@ function rebaseApprovalAuditCacheKeyRoot(
       "lastPermissionRequestCacheKey",
     ] as const;
     for (const key of continuityKeys) {
-      const normalized = normalizeCacheKey(continuity[key]);
+      const sourceKey = originalContinuity[key];
+      const normalized = normalizeCacheKey(sourceKey) ?? (typeof sourceKey === "string" ? sourceKey : undefined);
       if (normalized && normalized !== continuity[key]) {
         nextContinuity = { ...nextContinuity, [key]: normalized };
       }
@@ -378,9 +227,10 @@ function rebaseApprovalAuditCacheKeyRoot(
     }
     if (Array.isArray(continuity.lastApprovalHistory)) {
       let historyChanged = false;
+      const originalHistory = Array.isArray(originalContinuity.lastApprovalHistory) ? originalContinuity.lastApprovalHistory : [];
       const rebasedContinuityHistory = continuity.lastApprovalHistory.map(
-        (entry) => {
-          const rebasedEntry = rewriteCacheKeyObject(entry);
+        (entry, index) => {
+          const rebasedEntry = rewriteCacheKeyObject(entry, originalHistory[index]);
           if (rebasedEntry !== entry) {
             historyChanged = true;
           }
@@ -399,30 +249,28 @@ function rebaseApprovalAuditCacheKeyRoot(
     }
   }
 
-  return nextRoot === root
-    ? value
-    : {
-        ...nextRoot,
-        summary: rebaseCacheKeysInSummaryEntries(
-          nextRoot.summary,
-          normalizedCacheKeyRoot,
-        ),
-      };
+  const summary = rebaseCacheKeysInSummaryEntries(nextRoot.summary, originalRoot.summary, normalizeCacheKey);
+  if (summary !== nextRoot.summary) {
+    nextRoot = { ...nextRoot, summary };
+  }
+  return nextRoot;
 }
 
 function rebaseCacheKeysInSummaryEntries(
   summaryValue: unknown,
-  normalizedCacheKeyRoot: string,
+  originalSummary: unknown,
+  normalizeCacheKey: (value: unknown) => string | undefined,
 ): unknown {
   if (!Array.isArray(summaryValue)) {
     return summaryValue;
   }
   let changed = false;
-  const nextSummary = summaryValue.map((entry) => {
+  const nextSummary = summaryValue.map((entry, index) => {
     if (typeof entry !== "string") {
       return entry;
     }
-    const line = entry.trim();
+    const originalEntry = Array.isArray(originalSummary) ? originalSummary[index] : undefined;
+    const line = (typeof originalEntry === "string" ? originalEntry : entry).trim();
     const normalizedLine =
       line.startsWith("- ") || line.startsWith("* ")
         ? line.slice(2).trim()
@@ -440,16 +288,13 @@ function rebaseCacheKeysInSummaryEntries(
       return entry;
     }
     const valuePart = normalizedLine.slice(colonIndex + 1).trim();
-    const dividerIndex = valuePart.indexOf("|");
-    if (dividerIndex <= 0 || dividerIndex === valuePart.length - 1) {
-      return entry;
+    const rebased = normalizeCacheKey(valuePart);
+    if (!rebased) {
+      const restored = typeof originalEntry === "string" ? originalEntry : entry;
+      changed ||= restored !== entry;
+      return restored;
     }
-    const suffix = valuePart.slice(dividerIndex + 1).trim();
-    if (!suffix) {
-      return entry;
-    }
-    const rebased = `${normalizedCacheKeyRoot}|${suffix}`;
-    if (rebased === valuePart) {
+    if (entry.slice(entry.indexOf(":") + 1).trim() === rebased) {
       return entry;
     }
     changed = true;

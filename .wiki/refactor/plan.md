@@ -565,7 +565,7 @@ judge 注释自述「a miss lowers a count rather than raising one」——
 
 - **Step 5 成果 +8 名被证实达标**：`artifacts/workflow/model.ts`(2)、`context/discovery/scan.ts`(1)、
   `context/readWindowContinuation.ts`(3)、`core/commands/connectCommandRuntime.ts`(9)、
-  `core/paths/legacyRootRebase.ts`(15)、`core/shell/approvalTrustPolicy.ts`(14)、
+  历史根目录模块(15；现职责在 `session/continuation/roots.ts` 与 `session/continuation/rebase.ts`)、`core/shell/approvalTrustPolicy.ts`(14)、
   `daemon/client.ts`(4)、`tools/toolBatchDispatch.ts`(1) —— **全部 ≤20，实测判定**。
   历史 deferral 是当时真实的，现已由后续拆分与搬迁自然达成；按协议**追加**修正行而非删除原文。
 - **`SessionManager.ts` 记 `fix`**：3 批拆分（删 4 个零调用成员 → 抽 `sessionLifecycleWrites.ts`

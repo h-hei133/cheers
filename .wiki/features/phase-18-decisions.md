@@ -1436,3 +1436,49 @@ Architecture Watch 37049055051通过。唯一失败是旧export用例未创建�
 仓内TMPDIR复验同时暴露review夹具向上发现父仓库的环境依赖；只给该用例建立独立Git根，保留原断言。
 最终`npm run test -w packages/ts-shell -- src/core/commands/slashCommandsModern.test.ts src/core/commands/exportCommandRuntime.test.ts --reporter=dot`
 在仓内TMPDIR运行，2套26项通过（exit0）。本次仅改测试与记录，不包含continuation进行中的产品变更。
+
+### W7-26 第三批：根路径迁移与锁内旧权限修复（2026-10-03）
+
+本批闭合已复现的根路径和值迁移问题；W7-26及原36模块审计仍未完成。
+旧实现会在目标包含原根时反复替换，改动同名前缀目录和嵌入路径，丢失普通路径的大小写，
+并把冲突缓存命名空间直接改为当前根。锁前计算的旧workingMemory还可能覆盖锁内更新或重新写回已删除状态。
+
+实施决定：
+
+- 活跃根候选检测只有session一个生产消费者，迁入`session/continuation/roots.ts`；
+  共用值迁移归`session/continuation/rebase.ts`，删除原core模块及无调用者的文件系统推断函数。
+  原projection保留检测器的薄导出，不建立core到session依赖或第二套候选实现。
+- 只在原字符串上做一次替换，迭代处理JSON形状数据，保留共享引用及未改动输入；
+  普通路径保持目标大小写，Windows根按其身份折叠。组件边界、完整绝对路径和配对引号阻止兄弟目录及嵌入路径误改。
+  父目录逐步越出原根时保留原文；空白、冒号和竖线不自动当作路径结束。含糊自然语言允许保守地保持不变。
+- 缓存命名空间和target按原始记录处理：只接纳已知previous/current根，外来缓存连同原空白保留。
+  当前namespace仍修复旧target，并保护已经迁移的嵌套target；较长候选不满足边界或包含性时，
+  在同一次原文匹配里回退较短有效根，不重新扫描插入文本。audit/history、continuity/history和summary共用该规则。
+- POSIX展示根区分大小写，缓存小写根只能确认已知根，不能把`/Old`与`/old`合并。
+  多个旧根候选使整份memory原样返回，不补默认字段、不写磁盘；既有多根测试要求重分配cache key的断言归类为错误契约预期，
+  改为验证原根、原key及状态文件字节全部保留。
+- 锁前只判定是否需要修复，锁内重读最新状态；缺失、memory已删除、根已改变或新memory无需迁移时不写。
+  返回实际最新状态，不复活旧内容，不覆盖较新的终结状态及错误字段。
+
+对照决定：路径参考`core/src/fs-util.ts:270`用relative拒绝绝对结果和`..`越界，采纳组件包含性而非字符串前缀；
+会话参考的`core/tools/path-utils.ts`负责解析与存在性，无存储值根迁移实现。
+本批保留本仓的值投影设计并自研迁移，不把文件系统解析函数复制成存储修复。
+256组父组件组合与path.posix.relative逐前缀对照，反转后旧生产实现的相关用例失败。
+
+复审补出引号、空白/冒号、父目录越界、当前namespace中的旧target，以及最长候选遮蔽三类目标；均保留回归。
+父组件检查从每个匹配重扫余文改为单次组件预处理和二分查询，避免重复路径文本的二次方工作。
+本机85KB/5000项探针由约1052ms降至代码复审的8.84ms；这是本地观察，不是通用延迟保证。
+最新候选回退回归先6失败54通过（exit1），修复后3套67项通过。
+
+最终`npm run test -w packages/ts-shell -- src/session src/core/paths`在仓内TMPDIR运行，
+**67套510项通过，exit0**；构建通过。反转3个原生产owner后**17失败7通过**，随后逐字节恢复。
+独立代码APPROVE（67项和18项额外断言）、架构CLEAR（68项和6项额外断言）。
+仓内隔离编译产物实际SessionManager/文件store验收通过：嵌套目的地、路径边界、重开与transcript字节不变、
+旧权限持久化及幂等、真实锁内删除/换根不复活、冲突POSIX根不写；另16组显式/自动混合缓存场景覆盖独立/嵌套目的地。
+静态门通过：1417文件零循环、配置39/39、hooks18/18、工厂10/10、Node floor；既有可达性7、函数上限7提示未新增。
+文档严格门通过，既有120条source advisory未增加；打包judge退出0，阻断义务全部满足，函数上限advisory使整体verdict仍为partial。
+未跑本地完整TS套件或真实provider。
+
+本批不提供文件系统/symlink授权或metadata/state跨文件事务；显式rebind失败次序、恢复摘要与跨query连续性、
+损坏transcript恢复准入仍继续审计。旧result-contract的缺失测试路径及过期输出断言仍待修复，未改记为通过。
+前一夹具提交`40ab9a96`的CI 37053389823与Architecture Watch 37053389815均成功。

@@ -877,7 +877,6 @@ describe("SessionManager", () => {
     const legacyRootB = "D:\\legacy-b";
     const legacyCacheKeyA = `${legacyRootA.toLowerCase()}|bash:spawn:process:npm`;
     const legacyCacheKeyB = `${legacyRootB.toLowerCase()}|bash:spawn:process:npm`;
-    const expectedCacheKey = `${projectRoot.toLowerCase()}|bash:spawn:process:npm`;
     fs.writeFileSync(
       statePath,
       JSON.stringify(
@@ -922,8 +921,10 @@ describe("SessionManager", () => {
       "utf8",
     );
 
+    const beforeBytes = fs.readFileSync(statePath);
     const snapshot = manager.buildContinuitySnapshot(session.id);
-    expect(snapshot.lastApprovalCacheKey).toBe(expectedCacheKey);
+    expect(fs.readFileSync(statePath)).toEqual(beforeBytes);
+    expect(snapshot.lastApprovalCacheKey).toBe(legacyCacheKeyA);
     expect(snapshot.lastApprovalProjectRoot).toBe(legacyRootA);
 
     const afterState = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
@@ -933,11 +934,11 @@ describe("SessionManager", () => {
       };
     };
     expect(afterState.workingMemory?.approvalAudit?.cacheKey).toBe(
-      expectedCacheKey,
+      legacyCacheKeyA,
     );
     expect(afterState.workingMemory?.approvalAudit?.projectRoot).toBe(legacyRootA);
     expect(afterState.workingMemory?.approvalAuditHistory?.[0]?.cacheKey).toBe(
-      expectedCacheKey,
+      legacyCacheKeyB,
     );
     expect(afterState.workingMemory?.approvalAuditHistory?.[0]?.projectRoot).toBe(
       legacyRootB,

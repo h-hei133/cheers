@@ -131,4 +131,90 @@ describe("projectRootRebaseProjection", () => {
       }),
     ).toBeUndefined();
   });
+
+  it("rewrites each original root once and excludes siblings and embedded prefixes", () => {
+    const value = { target: "/repo/a.ts", sibling: "/repo-other/a.ts", embedded: "/outer/repo/a.ts", summary: "read /repo/a.ts; target:/repo/b.ts" };
+    expect(projectRootRebase({ value, previousRoot: "/repo", nextRoot: "/repo/worktree" }).workingMemory).toEqual({
+      target: "/repo/worktree/a.ts", sibling: value.sibling, embedded: value.embedded,
+      summary: "read /repo/worktree/a.ts; target:/repo/worktree/b.ts",
+    });
+    expect(value.target).toBe("/repo/a.ts");
+  });
+
+  it("keeps destination case and handles legacy permission paths through the same boundary", () => {
+    const result = normalizeLegacyPermissionWorkingMemory({
+      sessionProjectRoot: "/Repo/Next", workingMemory: {
+        approvalAudit: { projectRoot: "/repo", cacheKey: "/repo|read:target:/repo/a.ts" },
+        target: "/repo/a.ts", sibling: "/repo-other/a.ts", embedded: "/outer/repo/a.ts",
+      },
+    }) as Record<string, unknown>;
+    expect(result.target).toBe("/Repo/Next/a.ts");
+    expect(result.sibling).toBe("/repo-other/a.ts");
+    expect(result.embedded).toBe("/outer/repo/a.ts");
+    expect(result.approvalAudit).toMatchObject({ cacheKey: "/repo/next|read:target:/repo/next/a.ts" });
+  });
+
+  it("normalizes cache-key roots in a summary without other permission fields", () => {
+    const result = projectRootRebase({ previousRoot: "/old", nextRoot: "/Next", value: {
+      summary: ["- last-approval-cache-key: /old|read:target:/old/a.ts", "Edited /old/a.ts"],
+    } }).workingMemory;
+    expect(result).toEqual({ summary: ["- last-approval-cache-key: /next|read:target:/next/a.ts", "Edited /Next/a.ts"] });
+  });
+
+  it("does not reprocess a newly inserted destination while normalizing cache keys", () => {
+    const cacheKey = "/repo|read:target:/repo/a.ts";
+    const result = projectRootRebase({ previousRoot: "/repo", nextRoot: "/repo/next", value: {
+      approvalAudit: { cacheKey }, approvalAuditHistory: [{ cacheKey }],
+      continuity: { lastApprovalCacheKey: cacheKey, lastApprovalHistory: [{ cacheKey }] },
+      summary: [`- last-approval-cache-key: ${cacheKey}`],
+    } }).workingMemory;
+    const expected = "/repo/next|read:target:/repo/next/a.ts";
+    expect(result).toMatchObject({
+      approvalAudit: { cacheKey: expected }, approvalAuditHistory: [{ cacheKey: expected }],
+      continuity: { lastApprovalCacheKey: expected, lastApprovalHistory: [{ cacheKey: expected }] },
+      summary: [`- last-approval-cache-key: ${expected}`],
+    });
+  });
+
+  it("preserves cache scopes outside an explicitly relocated root", () => {
+    const cacheKey = "/other|read:target:/old/a";
+    const value = { approvalAudit: { cacheKey }, continuity: { lastApprovalCacheKey: cacheKey }, summary: [`- last-approval-cache-key: ${cacheKey}`] };
+    expect(projectRootRebase({ value, previousRoot: "/old", nextRoot: "/new" }).workingMemory).toMatchObject(value);
+  });
+
+  it.each([
+    { approvalAudit: { projectRoot: "/first" }, summary: ["- last-approval-cache-key: /second|read"] },
+    { approvalAudit: { projectRoot: "/Old", cacheKey: "/old|read" }, continuity: { lastApprovalProjectRoot: "/old", lastApprovalCacheKey: "/old|read" } },
+    { continuity: { lastApprovalProjectRoot: "/first", lastRequestScopeProjectRoot: "/second", lastApprovalCacheKey: "/first|read" } },
+  ])("preserves all memory when legacy root identity is ambiguous: %j", workingMemory => {
+    expect(normalizeLegacyPermissionWorkingMemory({ workingMemory, sessionProjectRoot: "/new" })).toBe(workingMemory);
+    expect(detectLegacyPermissionRootCandidate({ workingMemory, sessionProjectRoot: "/new" })).toBeUndefined();
+  });
+
+  it.each([
+    ["/new", "/old/a.ts", "/new/a.ts"],
+    ["/old/next", "/old/a.ts", "/old/next/a.ts"],
+    ["/old/next", "/old/next-other/a.ts", "/old/next/next-other/a.ts"],
+    ["/old/next", "/old/next.txt", "/old/next/next.txt"],
+    ["/old/next", "/old/next/../a.ts", "/old/next/next/../a.ts"],
+  ])("repairs old targets in current cache namespaces without moving current targets again: %s %s", (nextRoot, oldTarget, expectedTarget) => {
+    const mixedKey = `${nextRoot}|read:target:${oldTarget}`;
+    const currentKey = `${nextRoot}|read:target:${nextRoot}/b.ts`;
+    const value = { approvalAudit: { projectRoot: "/old", cacheKey: mixedKey },
+      approvalAuditHistory: [{ cacheKey: currentKey }],
+      continuity: { lastApprovalProjectRoot: "/old", lastApprovalCacheKey: mixedKey },
+      summary: [`- last-approval-cache-key: ${mixedKey}`],
+    };
+    for (const result of [
+      projectRootRebase({ value, previousRoot: "/old", nextRoot }).workingMemory,
+      normalizeLegacyPermissionWorkingMemory({ workingMemory: value, sessionProjectRoot: nextRoot }),
+    ]) {
+      expect(result).toMatchObject({
+        approvalAudit: { projectRoot: nextRoot, cacheKey: `${nextRoot}|read:target:${expectedTarget}` },
+        approvalAuditHistory: [{ cacheKey: currentKey }],
+        continuity: { lastApprovalCacheKey: `${nextRoot}|read:target:${expectedTarget}` },
+        summary: [`- last-approval-cache-key: ${nextRoot}|read:target:${expectedTarget}`],
+      });
+    }
+  });
 });

@@ -30,16 +30,12 @@ export function normalizeLegacyPermissionStateForSession(input: {
     return input.snapshot;
   }
 
-  let normalizedSnapshot: SessionStateSnapshot = {
-    ...input.snapshot,
-    projectRoot: input.session.projectRoot,
-    workingMemory: normalizedWorkingMemory,
-  };
+  let normalizedSnapshot: SessionStateSnapshot | undefined = input.snapshot;
 
   input.withStateLock(input.session.id, () => {
     const latest = input.readLatestSnapshot();
-    if (!latest?.workingMemory) {
-      input.writeSnapshot(normalizedSnapshot);
+    normalizedSnapshot = latest;
+    if (!latest?.workingMemory || latest.projectRoot !== input.snapshot?.projectRoot) {
       return;
     }
     const rebasedLatestWorkingMemory = normalizeLegacyPermissionWorkingMemory({
@@ -47,10 +43,6 @@ export function normalizeLegacyPermissionStateForSession(input: {
       sessionProjectRoot: input.session.projectRoot,
     });
     if (rebasedLatestWorkingMemory === latest.workingMemory) {
-      normalizedSnapshot = {
-        ...latest,
-        projectRoot: input.session.projectRoot,
-      };
       return;
     }
     normalizedSnapshot = {
