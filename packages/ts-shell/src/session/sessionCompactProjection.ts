@@ -1,10 +1,8 @@
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { QueryRuntimeHarnessState } from "../core/query/runtime/harness.js";
-import type { QueryRuntimeTaskState } from "../core/query/runtime/taskState.js";
-import type { SeedInfluenceDiagnostic } from "./sessionContinuityTypes.js";
 import type {
   CompactContinuityApprovalAudit,
-  CompactContinuityWriteState,
+  CompactContinuityResult,
 } from "./continuation/compactSummary.js";
 import type { CompactRetentionPlanInput } from "./continuation/retentionPlanner.js";
 
@@ -15,14 +13,8 @@ export interface SessionCompactProjectionInput {
   readonly now: string;
   readonly approvalAudit?: CompactContinuityApprovalAudit;
   readonly approvalAuditHistory: readonly CompactContinuityApprovalAudit[];
-  readonly actionHandoffSummary?: string;
-  readonly writeContinuity?: CompactContinuityWriteState;
-  readonly seedInfluence?: SeedInfluenceDiagnostic;
-  readonly seedInfluenceHandoffSummary?: string;
-  readonly failureHandoffDiagnostic?: string;
-  readonly successHandoffDiagnostic?: string;
+  readonly result?: CompactContinuityResult;
   readonly harness?: QueryRuntimeHarnessState;
-  readonly taskState?: QueryRuntimeTaskState;
 }
 
 export function projectCompactRetentionPlanInput(
@@ -35,23 +27,7 @@ export function projectCompactRetentionPlanInput(
     now: input.now,
     ...(input.approvalAudit ? { approvalAudit: input.approvalAudit } : {}),
     approvalAuditHistory: input.approvalAuditHistory,
-    ...(input.actionHandoffSummary
-      ? { actionHandoffSummary: input.actionHandoffSummary }
-      : {}),
-    ...(input.writeContinuity
-      ? { writeContinuity: input.writeContinuity }
-      : {}),
-    ...(input.seedInfluence ? { seedInfluence: input.seedInfluence } : {}),
-    ...(input.seedInfluenceHandoffSummary
-      ? { seedInfluenceHandoffSummary: input.seedInfluenceHandoffSummary }
-      : {}),
-    ...(input.failureHandoffDiagnostic
-      ? { failureHandoffDiagnostic: input.failureHandoffDiagnostic }
-      : {}),
-    ...(input.successHandoffDiagnostic
-      ? { successHandoffDiagnostic: input.successHandoffDiagnostic }
-      : {}),
+    ...(input.result ? { result: input.result } : {}),
     ...(input.harness ? { harness: input.harness } : {}),
-    ...(input.taskState ? { taskState: input.taskState } : {}),
   };
 }

@@ -61,20 +61,18 @@ export function applySessionCompactRetention(input: {
       now: input.now,
       ...(approvalAudit ? { approvalAudit } : {}),
       approvalAuditHistory,
-      ...(actionHandoffSummary ? { actionHandoffSummary } : {}),
-      ...(stoppedSessionContinuity?.writeContinuity
-        ? { writeContinuity: stoppedSessionContinuity.writeContinuity }
-        : {}),
-      ...(input.seedInfluence ? { seedInfluence: input.seedInfluence } : {}),
-      ...(seedInfluenceHandoffSummary ? { seedInfluenceHandoffSummary } : {}),
-      ...(stoppedSessionContinuity?.failureHandoffDiagnostic
-        ? {
-            failureHandoffDiagnostic:
-              stoppedSessionContinuity.failureHandoffDiagnostic,
-          }
-        : {}),
-      ...(successHandoffDiagnostic ? { successHandoffDiagnostic } : {}),
-      ...(taskState ? { taskState } : {}),
+      ...(queryCompleted?.result.codingResult ? {
+        result: {
+          taskKind: queryCompleted.result.codingResult.taskKind,
+          actionHandoffSummary,
+          writeContinuity: stoppedSessionContinuity?.writeContinuity,
+          seedInfluence: input.seedInfluence,
+          seedInfluenceHandoffSummary,
+          failureHandoffDiagnostic: stoppedSessionContinuity?.failureHandoffDiagnostic,
+          successHandoffDiagnostic,
+          taskState,
+        },
+      } : {}),
     }),
   );
 }

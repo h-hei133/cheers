@@ -39,17 +39,20 @@ describe("buildCompactContinuitySummary", () => {
           recordedAt: "2026-05-12T00:00:00.000Z",
         },
       ],
-      actionHandoffSummary: "Action handoff: edit-file target=src/a.ts.",
-      writeContinuity: {
-        writerStarted: true,
-        writeEffect: "unknown",
-        requiresUserInspection: true,
-        target: "src/b.ts",
+      result: {
+        taskKind: "edit-file",
+        actionHandoffSummary: "Action handoff: edit-file target=src/a.ts.",
+        writeContinuity: {
+          writerStarted: true,
+          writeEffect: "unknown",
+          requiresUserInspection: true,
+          target: "src/b.ts",
+        },
+        seedInfluence: "target-carryover",
+        seedInfluenceHandoffSummary: "Seed handoff: target carried over.",
+        failureHandoffDiagnostic:
+          "Failure handoff: status=blocked; blocker=partial-mutation-failed.",
       },
-      seedInfluence: "target-carryover",
-      seedInfluenceHandoffSummary: "Seed handoff: target carried over.",
-      failureHandoffDiagnostic:
-        "Failure handoff: status=blocked; blocker=partial-mutation-failed.",
     });
 
     expect(result.continuity).toMatchObject({
@@ -100,12 +103,16 @@ describe("buildCompactContinuitySummary", () => {
       summary: undefined,
       continuity: undefined,
       approvalAuditHistory: [],
-      successHandoffDiagnostic:
-        "Success handoff: status=passed; verified=src/a.ts,src/b.ts.",
+      result: {
+        taskKind: "edit-file",
+        successHandoffDiagnostic:
+          "Success handoff: status=passed; verified=src/a.ts,src/b.ts.",
+      },
     });
 
     expect(result.approvalAuditHistory).toBeUndefined();
     expect(result.continuity).toEqual({
+      lastTaskKind: "edit-file",
       lastSuccessHandoffDiagnostic:
         "Success handoff: status=passed; verified=src/a.ts,src/b.ts.",
     });

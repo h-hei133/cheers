@@ -1,8 +1,8 @@
-import type { CodingWriteEffect } from "../../result/types.js";
+import type { CodingResultSummary, CodingWriteEffect } from "../../result/types.js";
 import type { QueryRuntimeHarnessState } from "../../core/query/runtime/harness.js";
 import type { QueryRuntimeTaskState } from "../../core/query/runtime/taskState.js";
 import { encodeSessionHarnessState } from "../harness/state.js";
-import { mergeContinuitySummaryEntries } from "./summaryFormatter.js";
+import { hasResultSummary, mergeContinuitySummaryEntries } from "./summaryFormatter.js";
 import type { ApprovalAuditMemoryState } from "../sessionContinuityTypes.js";
 
 export type CompactContinuitySeedInfluence =
@@ -19,19 +19,25 @@ export interface CompactContinuityWriteState {
   readonly target?: string;
 }
 
-export interface CompactContinuitySummaryInput {
-  readonly summary: unknown;
-  readonly continuity: unknown;
-  readonly approvalAudit?: CompactContinuityApprovalAudit;
-  readonly approvalAuditHistory: readonly CompactContinuityApprovalAudit[];
+/** Optional fields belong to one complete result, including their absence. */
+export interface CompactContinuityResult {
+  readonly taskKind: CodingResultSummary["taskKind"];
   readonly actionHandoffSummary?: string;
   readonly writeContinuity?: CompactContinuityWriteState;
   readonly seedInfluence?: CompactContinuitySeedInfluence;
   readonly seedInfluenceHandoffSummary?: string;
   readonly failureHandoffDiagnostic?: string;
   readonly successHandoffDiagnostic?: string;
-  readonly harness?: QueryRuntimeHarnessState;
   readonly taskState?: QueryRuntimeTaskState;
+}
+
+export interface CompactContinuitySummaryInput {
+  readonly summary: unknown;
+  readonly continuity: unknown;
+  readonly approvalAudit?: CompactContinuityApprovalAudit;
+  readonly approvalAuditHistory: readonly CompactContinuityApprovalAudit[];
+  readonly result?: CompactContinuityResult;
+  readonly harness?: QueryRuntimeHarnessState;
 }
 
 export interface CompactContinuitySummary {
@@ -55,6 +61,42 @@ export function buildCompactContinuitySummary(
   if (input.approvalAuditHistory.length > 0) {
     continuity.lastApprovalHistory = input.approvalAuditHistory;
   }
+  const replaceResult = shouldReplaceResult(continuity, input.result, input.summary);
+  if (replaceResult && input.result) applyResult(continuity, input.result);
+  if (input.harness) {
+    continuity.harnessState = encodeSessionHarnessState(input.harness);
+  }
+
+  return {
+    continuity,
+    summary: mergeContinuitySummaryEntries(input.summary, continuity, { preserveResult: !replaceResult }),
+    ...(input.approvalAuditHistory.length > 0
+      ? { approvalAuditHistory: input.approvalAuditHistory }
+      : {}),
+  };
+}
+
+const RESULT_FIELDS = [
+  "lastTaskKind", "lastActionHandoffSummary", "lastWriterStarted", "lastWriteEffect",
+  "lastWriteRequiresUserInspection", "lastWriteEffectTarget", "lastSeedInfluence",
+  "lastSeedInfluenceHandoffSummary", "lastFailureHandoffDiagnostic", "lastSuccessHandoffDiagnostic", "taskState",
+] as const;
+
+function shouldReplaceResult(
+  continuity: Record<string, unknown>,
+  result: CompactContinuityResult | undefined,
+  summary: unknown,
+): boolean {
+  if (!result) return false;
+  if (result.taskKind !== "chat" || continuity.lastTaskKind === "chat") return true;
+  // Match the continuity reader's non-chat preference. A legacy checkpoint
+  // without a task kind may hold unresolved writes, so chat cannot replace it.
+  return !RESULT_FIELDS.some((key) => continuity[key] !== undefined) && !hasResultSummary(summary);
+}
+
+function applyResult(continuity: Record<string, unknown>, input: CompactContinuityResult): void {
+  for (const key of RESULT_FIELDS) delete continuity[key];
+  continuity.lastTaskKind = input.taskKind;
   if (input.actionHandoffSummary) {
     continuity.lastActionHandoffSummary = input.actionHandoffSummary;
   }
@@ -84,20 +126,9 @@ export function buildCompactContinuitySummary(
   if (input.successHandoffDiagnostic) {
     continuity.lastSuccessHandoffDiagnostic = input.successHandoffDiagnostic;
   }
-  if (input.harness) {
-    continuity.harnessState = encodeSessionHarnessState(input.harness);
-  }
   if (input.taskState) {
     continuity.taskState = input.taskState;
   }
-
-  return {
-    continuity,
-    summary: mergeContinuitySummaryEntries(input.summary, continuity),
-    ...(input.approvalAuditHistory.length > 0
-      ? { approvalAuditHistory: input.approvalAuditHistory }
-      : {}),
-  };
 }
 
 function applyApprovalAuditContinuity(

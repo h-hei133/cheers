@@ -1,6 +1,24 @@
+const RESULT_KEYS = new Set([
+  "last-action-handoff-summary", "last-seed-influence", "last-seed-influence-handoff-summary",
+  "last-writer-started", "last-write-effect", "last-write-requires-user-inspection", "last-write-effect-target",
+  "last-failure-handoff-diagnostic", "last-success-handoff-diagnostic",
+]);
+
+function summaryKey(entry: string): string {
+  const normalized = entry.trim().replace(/^-\s+/, "");
+  const separator = normalized.indexOf(":");
+  return separator > 0 ? normalized.slice(0, separator).trim().toLowerCase() : "";
+}
+
+export function hasResultSummary(summaryValue: unknown): boolean {
+  return Array.isArray(summaryValue) && summaryValue.some((entry) =>
+    typeof entry === "string" && RESULT_KEYS.has(summaryKey(entry)));
+}
+
 export function mergeContinuitySummaryEntries(
   summaryValue: unknown,
   continuity: Record<string, unknown>,
+  options: { readonly preserveResult: boolean },
 ): readonly string[] {
   const existingEntries = Array.isArray(summaryValue)
     ? summaryValue.filter((entry): entry is string => typeof entry === "string")
@@ -10,27 +28,15 @@ export function mergeContinuitySummaryEntries(
     if (!trimmed) {
       return false;
     }
-    const normalized = trimmed.startsWith("- ")
-      ? trimmed.slice(2).trim()
-      : trimmed;
-    const separator = normalized.indexOf(":");
-    if (separator <= 0) {
+    const key = summaryKey(entry);
+    if (!key) {
       return true;
     }
-    const key = normalized.slice(0, separator).trim().toLowerCase();
     return (
       !key.startsWith("last-approval-") &&
       !key.startsWith("last-request-scope-") &&
       !key.startsWith("last-permission-request-") &&
-      key !== "last-action-handoff-summary" &&
-      key !== "last-seed-influence" &&
-      key !== "last-seed-influence-handoff-summary" &&
-      key !== "last-writer-started" &&
-      key !== "last-write-effect" &&
-      key !== "last-write-requires-user-inspection" &&
-      key !== "last-write-effect-target" &&
-      key !== "last-failure-handoff-diagnostic" &&
-      key !== "last-success-handoff-diagnostic"
+      (!RESULT_KEYS.has(key) || options.preserveResult)
     );
   });
   const approvalPairs: Array<[string, string]> = [];
@@ -133,8 +139,9 @@ export function mergeContinuitySummaryEntries(
     continuity.lastSuccessHandoffDiagnostic,
   );
 
+  const projectedKeys = new Set(approvalPairs.map(([key]) => key));
   return [
-    ...preservedEntries,
+    ...preservedEntries.filter((entry) => !projectedKeys.has(summaryKey(entry))),
     ...approvalPairs.map(([key, value]) => `- ${key}: ${value}`),
   ];
 }

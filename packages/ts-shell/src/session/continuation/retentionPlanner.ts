@@ -1,10 +1,8 @@
 import type { QueryEvent } from "../../core/query/runtime/events.js";
-import type { QueryRuntimeTaskState } from "../../core/query/runtime/taskState.js";
 import {
   buildCompactContinuitySummary,
   type CompactContinuityApprovalAudit,
-  type CompactContinuitySeedInfluence,
-  type CompactContinuityWriteState,
+  type CompactContinuityResult,
 } from "./compactSummary.js";
 
 export interface CompactRetentionPlanInput {
@@ -14,13 +12,7 @@ export interface CompactRetentionPlanInput {
   readonly now: string;
   readonly approvalAudit?: CompactContinuityApprovalAudit;
   readonly approvalAuditHistory: readonly CompactContinuityApprovalAudit[];
-  readonly actionHandoffSummary?: string;
-  readonly writeContinuity?: CompactContinuityWriteState;
-  readonly seedInfluence?: CompactContinuitySeedInfluence;
-  readonly seedInfluenceHandoffSummary?: string;
-  readonly failureHandoffDiagnostic?: string;
-  readonly successHandoffDiagnostic?: string;
-  readonly taskState?: QueryRuntimeTaskState;
+  readonly result?: CompactContinuityResult;
 }
 
 export function applyCompactRetentionPlan(
@@ -46,7 +38,6 @@ export function applyCompactRetentionPlan(
 
   if (
     !turnCompleted ||
-    root.compacted === true ||
     nextTurnCount < input.turnThreshold
   ) {
     return root;
@@ -57,23 +48,7 @@ export function applyCompactRetentionPlan(
     continuity: root.continuity,
     ...(input.approvalAudit ? { approvalAudit: input.approvalAudit } : {}),
     approvalAuditHistory: input.approvalAuditHistory,
-    ...(input.actionHandoffSummary
-      ? { actionHandoffSummary: input.actionHandoffSummary }
-      : {}),
-    ...(input.writeContinuity
-      ? { writeContinuity: input.writeContinuity }
-      : {}),
-    ...(input.seedInfluence ? { seedInfluence: input.seedInfluence } : {}),
-    ...(input.seedInfluenceHandoffSummary
-      ? { seedInfluenceHandoffSummary: input.seedInfluenceHandoffSummary }
-      : {}),
-    ...(input.failureHandoffDiagnostic
-      ? { failureHandoffDiagnostic: input.failureHandoffDiagnostic }
-      : {}),
-    ...(input.successHandoffDiagnostic
-      ? { successHandoffDiagnostic: input.successHandoffDiagnostic }
-      : {}),
-    ...(input.taskState ? { taskState: input.taskState } : {}),
+    result: input.result,
   });
   if (compactSummary.approvalAuditHistory) {
     root.approvalAuditHistory = compactSummary.approvalAuditHistory;

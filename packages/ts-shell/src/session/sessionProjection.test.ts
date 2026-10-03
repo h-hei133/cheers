@@ -228,8 +228,11 @@ describe("session substrate projections", () => {
         turnThreshold: 12,
         now: "2026-05-19T00:00:00.000Z",
         approvalAuditHistory: [],
-        actionHandoffSummary: "Resumed from edit-file on src/a.ts.",
-        seedInfluence: "target-carryover",
+        result: {
+          taskKind: "edit-file",
+          actionHandoffSummary: "Resumed from edit-file on src/a.ts.",
+          seedInfluence: "target-carryover",
+        },
       }),
     ).toEqual({
       workingMemory: { sourceTurnCount: 1 },
@@ -237,8 +240,11 @@ describe("session substrate projections", () => {
       turnThreshold: 12,
       now: "2026-05-19T00:00:00.000Z",
       approvalAuditHistory: [],
-      actionHandoffSummary: "Resumed from edit-file on src/a.ts.",
-      seedInfluence: "target-carryover",
+      result: {
+        taskKind: "edit-file",
+        actionHandoffSummary: "Resumed from edit-file on src/a.ts.",
+        seedInfluence: "target-carryover",
+      },
     });
   });
 

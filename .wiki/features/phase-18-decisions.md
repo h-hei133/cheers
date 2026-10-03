@@ -577,7 +577,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W8-40 / TOL-10（随W7-30） | 失败原因及部分答复保留；工具阶段取消和空答复按失败结算；适配器向父模型传递error | 已完成，定向验证通过；旧result-contract脚本仍失败 |
 | W7-32 | read每次返回正文；startup结构/身份/有界读写、freshness与命令投影已修复；保留默认禁用 | 已完成，定向验证与隔离验收通过 |
 | W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
-| W7-26 / SES-08 | 回放、导出、根值迁移、显式迁移失败次序、工作区绑定、摘要来源及重复读取已分批修复；完整逐模块审计继续 | 执行中，第七批定向验证与双模式PTY通过 |
+| W7-26 / SES-08 | 回放、导出、根迁移、摘要来源、重复读取及compact检查点更新已分批修复；完整逐模块审计继续 | 执行中，第八批定向验证与双模式PTY通过 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1581,3 +1581,27 @@ src/result/terminal`：**21套247项通过，exit0**；构建、独立代码APPR
 常规/全屏PTY各2次本地HTTP脚本模型请求，均完成提示、工具请求、审批后实际写入、结算与落盘，exit0，无真实provider。
 静态阻断门通过，1419文件零循环；既有可达性和函数上限各7条提示未增加。旧result-contract的第六批失败未改记通过。
 完整branch/query结果归属、compact更新与损坏记录准入等继续审计，W7-26未完成。
+
+### W7-26 第八批：compact结果检查点更新（2026-10-03）
+
+原retention planner在首次compacted后永久跳过结果更新；summary builder则把新结果没有的可选字段继续从旧对象保留。
+6项初始回归4失败2通过，属于product behavior drift。现每次达到阈值后的query完成都会更新检查点；
+结果派生字段作为一次完整投影传递，替换时先移除整组旧字段，包括action/write/seed/diagnostic/taskState。
+审批记录、独立上下文和其他非结果字段不因结果替换而删除。
+
+对照会话参考的`buildContextEntries`与`buildSessionProjection`：选取最新compaction并保留后续路径条目，
+不把首次检查点永久当成当前状态。采纳持续更新和较新权威结果覆盖旧检查点；本仓结构化handoff组与非chat选择规则
+没有直接对应实现，替换准入为**自研**。检查点存储lastTaskKind，使chat之间可更新，但后续chat不覆盖已有非chat结果；
+旧检查点缺少类型时保守保留，未携带结构化结果的完成事件也不清空旧结果。纯文本旧字段仅在结果被替换时清除；
+未替换时保留，已有结构化字段优先于重复文本，避免将旧文本重新投影为新事实。
+
+最终`npm run test -w packages/ts-shell -- src/session`：**69套566项通过，exit0**，包含10项新增结果替换/保留回归及
+真实文件落盘重开、仅剩旧格式检查点时的读取；构建、40项脚本测试与独立APPROVE/CLEAR通过。
+反转5个产品owner后8失败2通过，随后逐字节恢复。常规/全屏PTY各2次本地HTTP脚本模型请求，验证第12次失败检查点
+在第13次成功结果后更新，再完成提示、工具请求、审批后实际写入、结算与落盘，均exit0；无真实provider。
+静态门通过，1420文件零循环；可达性和函数上限各7条既有提示未增加。
+
+范围限制：替换当前结果检查点不证明更早的未知写入已解决；完整历史损坏跟踪与branch/query归属仍待审计。
+复审另发现既有读取缺口：结构化编码历史被裁剪、只剩chat事件时，snapshot reader可能忽略已保留的非chat检查点。
+本批只验证检查点生产/保留及无结构化日志时的fallback，不将其扩写为chat-only日志恢复通过；该读取缺口接续修复。
+旧result-contract的已记录失败未重跑或改记通过。第七批`c765904c`的CI 37100058819与Architecture Watch 37100058822均成功。

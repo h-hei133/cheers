@@ -33,14 +33,17 @@ describe("applyCompactRetentionPlan", () => {
       turnThreshold: 2,
       now: "2026-05-13T00:00:00.000Z",
       approvalAuditHistory: [],
-      actionHandoffSummary: "Resumed from edit-file on src/a.ts.",
-      writeContinuity: {
-        writerStarted: false,
-        target: "src/a.ts, src/b.ts, src/c.ts",
+      result: {
+        taskKind: "edit-file",
+        actionHandoffSummary: "Resumed from edit-file on src/a.ts.",
+        writeContinuity: {
+          writerStarted: false,
+          target: "src/a.ts, src/b.ts, src/c.ts",
+        },
+        seedInfluence: "target-carryover",
+        failureHandoffDiagnostic:
+          "Failure handoff: status=blocked; target=src/a.ts, src/b.ts, src/c.ts.",
       },
-      seedInfluence: "target-carryover",
-      failureHandoffDiagnostic:
-        "Failure handoff: status=blocked; target=src/a.ts, src/b.ts, src/c.ts.",
     });
 
     expect(result).toMatchObject({
