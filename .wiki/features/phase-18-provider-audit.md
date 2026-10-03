@@ -137,7 +137,8 @@ session/store/usage.test.ts经实际query/state owner及文件锁写盘、载入
 
 ## 剩余闭合清单
 
-1. 缓存刷新：签名、协议输出上限、结束后取消/重新调度、用量记录。参考刷新复用模型transport、
+1. 缓存刷新：invocation到turn接线、签名、协议输出上限及用量记录。生命周期runner已在第五批验证，
+   当前生产invocation缺少转交runner；须与其余协议修复一起接通。参考刷新复用模型transport、
    最大输出1、无自动重试、校验当前run后记账并重新调度；本仓保留已捕获请求前缀的选择，需逐条对齐其他约束。
 2. 最终流/timeout/cancel矩阵及上述用量恢复套件验收，明确transport时限与认证准备时限的区别。
 
@@ -174,3 +175,26 @@ simple没有视觉能力参数，也走文字fallback。旧图片正例显式声
 每场单请求、query.completed、来源ID与助手消息一致；证据.tmp/bedrock-limits-pty-2ewkgtwt。
 仅合成凭据和本地HTTP，不证明真实云模型、TLS/HTTP2、完整认证来源或单文件可执行产物。
 a86e1936的CI37152898216与Architecture Watch37152898231均成功；W7-27按上方剩余清单继续。
+
+
+## 缓存刷新生命周期（第五批，仅runner）
+
+参考刷新在发送前后校验当前run，只有同一run能重新调度；并在预定触发时刻后保留半个到期余量作为调度期限。
+本仓采用相同决策，保留捕获原请求前缀与现有经济性判断：clear递增generation，旧timer/await不能覆盖新计时器；
+新前缀与转idle取消旧请求，stop及streaming模式settled永久停止当前runner，晚到通知不能重启。
+这是每次新run创建新runner的现有调用方式；idle模式仍允许等待用户。刷新失败后可继续安排的既有策略保留。
+调度期限只约束迟到timer是否可发送，不是网络完成期限，也不涵盖签名准备时限。
+
+定向cacheWarm/cacheEconomics/compaction wiring/session四套61项通过；生产runner反转8失败/11通过，精确恢复后61项复跑通过。
+build:cli、静态阻断门及43项脚本通过；独立代码APPROVE、架构CLEAR。定向证据.tmp/warming-lifecycle-1abln8m4。
+
+普通PTY未能启动首次刷新，不能作为通过证据。原始证据.tmp/warming-lifecycle-pty-o81se_b2，
+诊断.tmp/warming-lifecycle-pty-y62fxq2z显示runner拿到idle/价格/TTL，但从未收到noteRequest/noteSettled；
+源码确认cliRuntimeInvocationBridge传入cacheWarming，而entrypoints/cliRuntimeInvocation.ts没有声明或转交runTurn。
+诊断只在编译文件中加入报告mode/价格/TTL的临时日志，完成后按字节恢复；未使用真实配置或provider。
+当前缓存生命周期正确性只在runner与定向套件中成立，不宣称CLI端到端刷新已闭合。
+
+暂不单独接通漏掉的字段，以免在签名/协议正文/用量尚未修复时开启后台请求；这四项在剩余清单同一闭合批处理。
+本批没有修改默认模式、联网策略、签名、正文转换或用量owner；W7-27继续。
+
+52adc005的CI37154669450和Architecture Watch37154669449均成功。

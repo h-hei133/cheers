@@ -91,6 +91,8 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
 
   let timer: NodeJS.Timeout | undefined;
   let controller: AbortController | undefined;
+  let generation = 0;
+  let stopped = false;
   /**
    * When the current phase began.
    *
@@ -112,6 +114,7 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
   let lastSent: SentRequest | undefined;
 
   const clear = (): void => {
+    generation += 1;
     // The guard is not redundant here: the body also drops the reference and
     // aborts the in-flight request, so the timer is only part of it.
     if (timer !== undefined) {
@@ -132,12 +135,14 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
   const ageLimit = (): number =>
     phase === "idle" ? MAX_IDLE_AGE_MS : MAX_STREAMING_AGE_MS;
 
-  const fire = async (): Promise<void> => {
+  const fire = async (expectedGeneration: number, deadline: number): Promise<void> => {
+    if (stopped || generation !== expectedGeneration) return;
+    timer = undefined;
     nextRefreshAt = undefined;
     const started = phaseStartedAt;
     // The session outlived its welcome: a run left open, or a person who walked
     // away. Both are reasons to stop spending rather than to keep refreshing.
-    if (started === undefined || now() - started > ageLimit()) {
+    if (started === undefined || now() - started > ageLimit() || now() > deadline) {
       clear();
       return;
     }
@@ -148,6 +153,7 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
       phase,
     });
     options.onDecision?.(decision);
+    if (stopped || generation !== expectedGeneration) return;
     if (decision.action !== "warm") {
       // Declined on economics. Nothing else will change that for this prefix, so
       // there is no point staying armed.
@@ -169,13 +175,13 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
       // reporting: nothing the user did caused it, and nothing they can do
       // would fix it.
     }
-    // Re-armed rather than one-shot: a window that has been refreshed starts
-    // again, and the session is still running.
-    schedule();
+    // A completion from an old prefix or phase must not replace a newer timer
+    // or restart a stopped session, even if the transport ignored cancellation.
+    if (!stopped && generation === expectedGeneration) schedule();
   };
 
   const schedule = (): void => {
-    if (mode === "off") return;
+    if (stopped || mode === "off" || lastSent === undefined) return;
     const ttl = ttlMs();
     if (ttl === undefined) return;
     const delay = cacheWarmingDelayMs(ttl);
@@ -185,8 +191,11 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
 
     if (timer !== undefined) clearTimeout(timer);
     nextRefreshAt = now() + delay;
+    // Keep half the pre-expiry margin for dispatch after a delayed timer fires.
+    const deadline = nextRefreshAt + Math.floor((ttl - delay) / 2);
+    const expectedGeneration = generation;
     timer = setTimeout(() => {
-      void fire();
+      void fire(expectedGeneration, deadline);
     }, delay);
     // A pending refresh must not be the reason the process stays alive: the
     // session it belongs to is what holds it open.
@@ -195,23 +204,27 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
 
   return {
     noteRequest(promptTokens: number, sent: SentRequest): void {
-      if (mode === "off") return;
+      if (stopped || mode === "off") return;
+      clear();
       latestTokens = Math.max(0, Math.floor(promptTokens));
       lastSent = sent;
+      if (phase === "idle") phaseStartedAt = now();
       phaseStartedAt ??= now();
       phase = "streaming";
       schedule();
     },
 
     noteSettled(): void {
-      if (mode === "off") return;
+      if (stopped || mode === "off") return;
       // Only the mode that opted into waiting keeps going. The default stops
       // here, because refreshing for a person who may not return is a bet this
       // does not make on their behalf.
       if (mode !== "idle") {
+        stopped = true;
         clear();
         return;
       }
+      clear();
       phase = "idle";
       // The waiting phase starts its own clock, so a long run does not spend the
       // idle budget before the user has stopped working.
@@ -220,6 +233,7 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
     },
 
     stop(): void {
+      stopped = true;
       clear();
     },
 

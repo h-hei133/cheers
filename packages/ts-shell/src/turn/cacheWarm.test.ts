@@ -220,3 +220,127 @@ describe("the cache warming runner", () => {
     }
   });
 });
+
+
+describe("cache warming lifecycle", () => {
+  it.each(["stop", "settle"])("does not rearm after %s during a refresh", async (action) => {
+    vi.useFakeTimers();
+    try {
+      let finish!: () => void;
+      let signal!: AbortSignal;
+      const refresh = vi.fn(async (_sent, currentSignal) => {
+        signal = currentSignal;
+        await new Promise<void>((resolve) => { finish = resolve; });
+      });
+      const runner = createCacheWarmingRunner({ mode: "streaming", ...priced, refresh });
+      runner.noteRequest(200_000, sent);
+      await vi.advanceTimersByTimeAsync(270_000);
+      if (action === "stop") runner.stop(); else runner.noteSettled();
+      expect(signal.aborted).toBe(true);
+      finish();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(runner.status().nextRefreshAt).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(refresh).toHaveBeenCalledTimes(1);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it.each(["resolve", "reject"])("keeps the newer request schedule when old refreshes %s", async (outcome) => {
+    vi.useFakeTimers();
+    try {
+      let finish!: () => void;
+      let signal!: AbortSignal;
+      const refresh = vi.fn(async (_sent, currentSignal) => {
+        if (refresh.mock.calls.length > 1) return;
+        signal = currentSignal;
+        await new Promise<void>((resolve, reject) => { finish = outcome === "resolve" ? resolve : () => reject(new Error("late")); });
+      });
+      const runner = createCacheWarmingRunner({ mode: "streaming", ...priced, refresh });
+      runner.noteRequest(200_000, sent);
+      await vi.advanceTimersByTimeAsync(270_000);
+      const newer = { ...sent, body: JSON.stringify({ model: "m", messages: [{ role: "user", content: "new prompt" }] }) };
+      runner.noteRequest(200_000, newer);
+      const due = runner.status().nextRefreshAt;
+      expect(signal.aborted).toBe(true);
+      await vi.advanceTimersByTimeAsync(1_000);
+      finish();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(runner.status().nextRefreshAt).toBe(due);
+      await vi.advanceTimersByTimeAsync(269_000);
+      expect(refresh).toHaveBeenCalledTimes(2);
+      expect(refresh.mock.calls[1][0]).toBe(newer);
+      runner.stop();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("cannot restart a stopped runner with a late request notification", async () => {
+    vi.useFakeTimers();
+    try {
+      const refresh = vi.fn(async () => {});
+      const runner = createCacheWarmingRunner({ mode: "idle", ...priced, refresh });
+      runner.noteRequest(500_000, sent);
+      runner.stop();
+      runner.noteRequest(500_000, sent);
+      runner.noteSettled();
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(refresh).not.toHaveBeenCalled();
+      expect(runner.status().nextRefreshAt).toBeUndefined();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("keeps the idle phase schedule when the streaming refresh finishes late", async () => {
+    vi.useFakeTimers();
+    try {
+      let finish!: () => void;
+      let signal!: AbortSignal;
+      const refresh = vi.fn(async (_sent, currentSignal) => {
+        if (refresh.mock.calls.length > 1) return;
+        signal = currentSignal;
+        await new Promise<void>((resolve) => { finish = resolve; });
+      });
+      const runner = createCacheWarmingRunner({ mode: "idle", ...priced, refresh });
+      runner.noteRequest(500_000, sent);
+      await vi.advanceTimersByTimeAsync(270_000);
+      runner.noteSettled();
+      const due = runner.status().nextRefreshAt;
+      expect(signal.aborted).toBe(true);
+      await vi.advanceTimersByTimeAsync(1_000);
+      finish();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(runner.status().nextRefreshAt).toBe(due);
+      await vi.advanceTimersByTimeAsync(269_000);
+      expect(refresh).toHaveBeenCalledTimes(2);
+      runner.stop();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("rechecks ownership after reporting a warming decision", async () => {
+    vi.useFakeTimers();
+    try {
+      const refresh = vi.fn(async () => {});
+      const runner = createCacheWarmingRunner({
+        mode: "streaming", ...priced, refresh,
+        onDecision: () => runner.stop(),
+      });
+      runner.noteRequest(200_000, sent);
+      await vi.advanceTimersByTimeAsync(270_000);
+      expect(refresh).not.toHaveBeenCalled();
+      expect(runner.status().nextRefreshAt).toBeUndefined();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("declines a timer that fires after its refresh margin", async () => {
+    vi.useFakeTimers();
+    try {
+      let clock = 0;
+      const refresh = vi.fn(async () => {});
+      const runner = createCacheWarmingRunner({ mode: "streaming", ...priced, refresh, now: () => clock });
+      runner.noteRequest(200_000, sent);
+      // The timer was due at 270s; half the 30s expiry margin has been missed.
+      clock = 286_000;
+      await vi.advanceTimersByTimeAsync(270_000);
+      expect(refresh).not.toHaveBeenCalled();
+      expect(runner.status().nextRefreshAt).toBeUndefined();
+    } finally { vi.useRealTimers(); }
+  });
+});
