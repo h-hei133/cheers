@@ -302,11 +302,19 @@ export async function* readCompletionStream(
   // A host that closes without a blank line after its last event leaves it in the
   // buffer. Dropping it costs whatever that event carried, which on a short answer
   // is the answer.
+  buffer += decoder.decode();
   if (!ended && buffer.trim().length > 0) {
-    yield* absorb(buffer, state).fragments;
+    const step = absorb(buffer, state);
+    yield* step.fragments;
+    ended = step.ended;
+    settled ||= step.settled;
   }
   const tail = flushHeld(state);
   if (tail) yield { kind: "text", text: tail };
+
+  if (!ended && !settled) {
+    throw new Error("Provider stream ended before it reported the message was complete");
+  }
 
   if (TRACE_STREAMS) {
     traceStream(

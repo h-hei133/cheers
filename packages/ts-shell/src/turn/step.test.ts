@@ -68,14 +68,17 @@ describe("createStepFunction", () => {
     expect(seen).toEqual([["read"], ["read"]]);
   });
 
-  it.each(["content", "reasoning_content"])("does not retry partial %s at the outer loop", async (channel) => {
+  it.each([
+    ["content", "error"], ["reasoning_content", "error"],
+    ["content", "eof"], ["reasoning_content", "eof"],
+  ])("does not retry partial %s after %s at the outer loop", async (channel, ending) => {
     let requests = 0;
     const shown: string[] = [];
     const step = createStepFunction({ ...request, fetchImpl: async () => {
       requests++;
       return new Response(new ReadableStream<Uint8Array>({ start(controller) {
         controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { [channel]: "already seen" } }] })}\n\n`));
-        setTimeout(() => controller.error(new Error("connection lost")), 5);
+        setTimeout(() => ending === "eof" ? controller.close() : controller.error(new Error("connection lost")), 5);
       } }), { headers: { "content-type": "text/event-stream" } });
     } });
     const produced = await runAgentLoop([{ role: "user", content: "hello" }], [], {
@@ -95,6 +98,20 @@ describe("createStepFunction", () => {
     }) });
     const result = await step([], undefined, {}, { allowTools: true });
     expect(result).toMatchObject({ text: "partial answer", stopReason: "error", retriesExhausted: true });
+  });
+
+  it.each([
+    ["openai-compatible", { choices: [{ delta: { tool_calls: [{ index: 0, id: "c1", function: { name: "read", arguments: '{"path":"a"}' } }] } }] }],
+    ["anthropic-messages", { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "c1", name: "read", input: { path: "a" } } }],
+    ["google-generative-ai", { candidates: [{ content: { parts: [{ functionCall: { name: "read", args: { path: "a" }, id: "c1" } }] } }] }],
+  ] as const)("does not admit tools from an incomplete %s stream", async (endpoint, payload) => {
+    const step = createStepFunction({ ...request, provider: { ...request.provider, endpoint },
+      fetchImpl: async () => new Response(`data: ${JSON.stringify(payload)}\n\n`, { headers: { "content-type": "text/event-stream" } }),
+    });
+    const result = await step([], undefined, {}, { allowTools: true });
+    expect(result.stopReason).toBe("error");
+    expect(result.errorMessage).toMatch(/stream ended/i);
+    expect(result.toolCalls).toEqual([]);
   });
 
   it("reports a cancelled request as an aborted step, not a network failure", async () => {

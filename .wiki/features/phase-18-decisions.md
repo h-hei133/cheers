@@ -579,6 +579,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
 | W7-26 / SES-08 | 回放、导出、迁移、恢复准入、检查点、字段优先级与历史写入观察已核验；后续转W7-31 | 已完成；原36模块行为矩阵闭合，保证边界与历史数据限制见审计表 |
 | W7-31 | [38模块Shell审计](phase-18-shell-audit.md)；审批、根绑定、准入、后台输出、Shell选择与关闭均有行为证据 | 已完成；所列行为矩阵及旧result-contract门禁债务闭合，保证边界见审计表 |
+| W7-27 | [Provider审计](phase-18-provider-audit.md)；单次响应、多行SSE、重试延迟和EOF完成证据 | 执行中；逐字段、用量、超时取消矩阵继续 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1986,3 +1987,14 @@ HTTP step在provider重试预算为零时仍把Retry-After解析值带入Assista
 六场景均exit0，失败/取消持久化不冒充success；产物.tmp/retry-pty-_rpwngja，无真实provider。
 初次PTY在超上限场景等待了错误的query.completed；核对现行失败投影为query.failed/lifecycle.error，按真实失败事件与error输出复跑通过。
 本批完成W8-37并独立提交；W7-27其余字段、流生命周期、用量及超时矩阵继续。7509788d的CI37146300145与Architecture Watch37146300152均成功。
+
+
+### W7-27 第二批：EOF完成证据（2026-10-04）
+
+四协议不再把无结束信号的EOF当成成功；保留现有sentinel/finish兼容与两秒usage宽限。
+原生消息尾帧及尾部error被读取，Google提前停止释放body；缺终态的工具不准入，已显示正文/思考不重试。
+九套260项、build:cli、静态阻断门、43项脚本通过；四owner撤销19失败93通过，精确恢复复跑。
+独立APPROVE/CLEAR；编译CLI三协议双模式12个HTTP/PTY场景通过，部分失败与成功终态来源正确。
+首轮驱动把Google provider注册名写错，归类为harness问题并修正；未使用真实provider。
+详见Provider审计表；本批不证明TLS/HTTP2或单文件可执行产物，W7-27其余矩阵继续。
+2f44a914两项远端检查成功；NormProof阻断义务满足、整体advisory仍partial。

@@ -231,7 +231,7 @@ describe("reading the answer", () => {
     const result = await readAll(
       sseStream(
         { candidates: [{ content: { parts: [{ text: "why", thought: true, thoughtSignature: "SIG" }] } }] },
-        { candidates: [{ content: { parts: [{ text: "answer" }] } }] },
+        { candidates: [{ content: { parts: [{ text: "answer" }] }, finishReason: "STOP" }] },
       ),
     );
 
@@ -244,7 +244,7 @@ describe("reading the answer", () => {
     const result = await readAll(
       sseStream({
         candidates: [
-          { content: { parts: [{ functionCall: { name: "read", args: { path: "a" }, id: "c1" } }] } },
+          { content: { parts: [{ functionCall: { name: "read", args: { path: "a" }, id: "c1" } }] }, finishReason: "STOP" },
         ],
       }),
     );
@@ -260,7 +260,7 @@ describe("reading the answer", () => {
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: "ok" }] } }] })}\r\n\r\n`),
+          encoder.encode(`data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: "ok" }] }, finishReason: "STOP" }] })}\r\n\r\n`),
         );
         controller.close();
       },
@@ -300,7 +300,7 @@ describe("reading the answer", () => {
 
   it("reports usage under the names every other protocol uses", async () => {
     const generator = endpointShape("google-generative-ai").readStream(
-      sseStream({ candidates: [{ content: { parts: [{ text: "x" }] } }], usageMetadata: { promptTokenCount: 5, candidatesTokenCount: 2 } }),
+      sseStream({ candidates: [{ content: { parts: [{ text: "x" }] }, finishReason: "STOP" }], usageMetadata: { promptTokenCount: 5, candidatesTokenCount: 2 } }),
     );
     let step = await generator.next();
     while (step.done !== true) step = await generator.next();

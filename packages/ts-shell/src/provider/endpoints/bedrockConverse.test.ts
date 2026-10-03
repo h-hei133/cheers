@@ -366,6 +366,25 @@ describe("reading the answer", () => {
     ).rejects.toThrow(/before it reported the message was complete/);
   });
 
+  it.each([false, true])("rejects EOF without messageStop even when messageStart is absent (content=%s)", async content => {
+    const stream = endpointShape("bedrock-converse-stream").readStream(streamOf(...(content
+      ? [event("contentBlockDelta", { contentBlockIndex: 0, delta: { text: "partial" } })] : [])));
+    if (content) expect(await stream.next()).toEqual({ done: false, value: { kind: "text", text: "partial" } });
+    await expect(stream.next()).rejects.toThrow(/before it reported the message was complete/);
+  });
+
+  it("accepts a messageStop without messageStart and retains following usage", async () => {
+    const stream = endpointShape("bedrock-converse-stream").readStream(streamOf(
+      event("contentBlockDelta", { contentBlockIndex: 0, delta: { text: "complete" } }),
+      event("messageStop", { stopReason: "end_turn" }),
+      event("metadata", { usage: { inputTokens: 9, outputTokens: 2 } }),
+    ));
+    expect((await stream.next()).value).toEqual({ kind: "text", text: "complete" });
+    expect(await stream.next()).toMatchObject({ done: true, value: {
+      finishReason: "stop", message: { content: "complete" }, usage: { prompt_tokens: 9, completion_tokens: 2 },
+    } });
+  });
+
   it("reports a failure the provider sent in band", async () => {
     // The transport succeeded, so this is the only place the failure is visible.
     const bytes = (() => {

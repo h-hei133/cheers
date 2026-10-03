@@ -384,7 +384,6 @@ async function* readConverseStream(
   let finishReason: string | undefined;
   let usage: StreamedCompletion["usage"];
   const calls = new Map<number, { id: string; name: string; args: string }>();
-  let sawMessageStart = false;
   let sawMessageStop = false;
 
   for await (const message of readEventStream(body)) {
@@ -407,10 +406,6 @@ async function* readConverseStream(
     if (!event) continue;
     const type = message.headers[":event-type"];
 
-    if (type === "messageStart") {
-      sawMessageStart = true;
-      continue;
-    }
     if (type === "contentBlockStart") {
       const start = event.start as { toolUse?: { toolUseId?: string; name?: string } } | undefined;
       if (start?.toolUse) {
@@ -458,8 +453,8 @@ async function* readConverseStream(
     }
   }
 
-  if (sawMessageStart && !sawMessageStop) {
-    // A stream that started and never finished is a truncated answer, and saying
+  if (!sawMessageStop) {
+    // A stream without completion evidence is a truncated answer, and saying
     // so beats returning the part that arrived as though it were the whole thing.
     throw new Error("Provider stream ended before it reported the message was complete");
   }

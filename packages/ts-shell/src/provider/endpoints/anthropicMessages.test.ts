@@ -271,6 +271,7 @@ describe("reading this endpoint's stream", () => {
       sseStream(
         event({ type: "content_block_delta", index: 0, delta: { type: "thinking_delta", thinking: "hmm" } }),
         event({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "answer" } }),
+        event({ type: "message_stop" }),
       ),
     );
 

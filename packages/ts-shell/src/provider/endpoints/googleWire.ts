@@ -301,12 +301,9 @@ export async function* readGoogleStream(
   let usage: StreamedCompletion["usage"];
   let blocked: string | undefined;
   const calls: Array<{ id: string; name: string; args: string }> = [];
-  const iterator = (body as unknown as AsyncIterable<Uint8Array>)[Symbol.asyncIterator]();
-
-  for (;;) {
-    const chunk = await iterator.next();
-    if (chunk.done === true) break;
-    buffer += decoder.decode(chunk.value, { stream: true });
+  // Async iteration releases the body when the consumer stops after a fragment.
+  for await (const chunk of body as unknown as AsyncIterable<Uint8Array>) {
+    buffer += decoder.decode(chunk, { stream: true });
 
     for (;;) {
       const boundary = findEventBoundary(buffer);
@@ -361,6 +358,7 @@ export async function* readGoogleStream(
   // A host that closes without a blank line after its last event leaves it in
   // the buffer. Dropping it costs whatever that event carried, which on a short
   // answer is the answer — the same tail the OpenAI-compatible reader flushes.
+  buffer += decoder.decode();
   if (buffer.trim().length > 0) {
     const payload = dataOf(buffer);
     if (payload !== undefined) {
@@ -397,6 +395,10 @@ export async function* readGoogleStream(
         // A partial or malformed tail is skipped like any other bad frame.
       }
     }
+  }
+
+  if (finishReason === undefined) {
+    throw new Error("Provider stream ended before it reported the message was complete");
   }
 
   return {

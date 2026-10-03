@@ -438,7 +438,6 @@ export async function* readAnthropicStream(
   let reasoningRedacted = false;
   let finishReason: string | undefined;
   let usage: ProviderUsage | undefined;
-  let sawMessageStart = false;
   let sawMessageStop = false;
   let streamFailure: string | undefined;
   const calls = new Map<number, { id: string; name: string; args: string }>();
@@ -484,9 +483,6 @@ export async function* readAnthropicStream(
           onRedacted: () => (reasoningRedacted = true),
         }),
       );
-      if (event.type === "message_start") {
-        sawMessageStart = true;
-      }
       if (event.type === "message_stop") {
         sawMessageStop = true;
       }
@@ -519,7 +515,14 @@ export async function* readAnthropicStream(
         // and has nothing to tell the user that anything went wrong.
         throw new Error(`Stream interrupted: ${error instanceof Error ? error.message : String(error)}`);
       }
-      if (chunk.done) break;
+      if (chunk.done) {
+        // A complete final JSON event may arrive without its blank separator.
+        buffer += decoder.decode() + "\n\n";
+        const drained = drain();
+        for (const fragment of drained.fragments) yield fragment;
+        if (streamFailure) throw new Error(`Provider reported an error mid-stream: ${streamFailure}`);
+        break;
+      }
   
       buffer += decoder.decode(chunk.value, { stream: true });
       const drained = drain();
@@ -540,12 +543,12 @@ export async function* readAnthropicStream(
       function: { name: call.name, arguments: call.args || "{}" },
     }));
 
-  // A stream that began and then stopped without ever saying why. Either signal
+  // Every stream must report completion, even if it omitted message_start. Either signal
   // counts as having finished: `stop_reason` is the model's own word for it and
   // `message_stop` is the transport's, and a host in front of the API may send
   // one without the other. Requiring both would fail requests that were
   // answered, so a stream that reported either is left alone.
-  if (sawMessageStart && finishReason === undefined && !sawMessageStop) {
+  if (finishReason === undefined && !sawMessageStop) {
     throw new Error("Provider stream ended before it reported the message was complete");
   }
 

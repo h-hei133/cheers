@@ -280,7 +280,7 @@ describe("hosts that disagree with the wire contract", () => {
 
   it("reads a final event the host never terminated with a blank line", async () => {
     const { deltas, result } = await collect(
-      streamOf(chunk({ content: "first" }), 'data: {"choices":[{"delta":{"content":"last"}}]}'),
+      streamOf(chunk({ content: "first" }), 'data: {"choices":[{"delta":{"content":"last"},"finish_reason":"stop"}]}'),
     );
 
     expect(deltas).toEqual(["first", "last"]);
