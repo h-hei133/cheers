@@ -44,6 +44,7 @@ import { projectSessionToolContinuity } from "./sessionToolContinuity.js";
 import { projectSessionUnresolvedItems } from "./sessionUnresolvedItems.js";
 import { readStoredResultSource, shouldReplaceStoredResult } from "./source.js";
 import { continuityBranchScope, latestContinuityFailure, selectBranchResultMemory, storedResultIsNewer } from "./branch.js";
+import { projectHistoricalWriteInspection } from "./inspection.js";
 
 export function buildSessionContinuitySnapshot(input: {
   readonly session: Session;
@@ -161,7 +162,7 @@ export function buildSessionContinuitySnapshot(input: {
     continuityTerminalSource,
     lastCodingResult,
   });
-  const unresolvedItems = [...unresolvedProjection.unresolvedItems, ...(resultOrderUnknown
+  const unresolvedItems = [...projectHistoricalWriteInspection(transcriptEvents), ...unresolvedProjection.unresolvedItems, ...(resultOrderUnknown
     ? ["Continuity result order unavailable; inspect current files before relying on historical verification."] : [])];
   const freshnessHistoryCount =
     recentCodingResults.length +

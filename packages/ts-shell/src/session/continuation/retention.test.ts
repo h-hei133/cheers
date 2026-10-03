@@ -38,6 +38,61 @@ function retain(workingMemory: unknown, result: OrchestrationResult, now = "2026
 }
 
 describe("compact result replacement", () => {
+  it.each([
+    { writeEffect: "unknown", sameTarget: false }, { writeEffect: "unverified", sameTarget: false },
+    { writeEffect: "unknown", sameTarget: true }, { writeEffect: "unverified", sameTarget: true },
+  ] as const)("keeps historical $writeEffect records after checkpoint replacement (sameTarget=$sameTarget)", async ({ writeEffect, sameTarget }) => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "inspection-retention-"));
+    vi.stubEnv("HOME", home);
+    vi.stubEnv("USERPROFILE", home);
+    try {
+      const manager = new SessionManager();
+      const session = manager.createNew();
+      let promptId = "";
+      for (let turn = 0; turn < 12; turn++) {
+        manager.persistUserPromptBarrier(session.id, `work ${turn}`);
+        if (turn === 0) promptId = manager.getSession(session.id)!.turns.at(-1)!.id!;
+        manager.addTurn(session.id, { role: "assistant", content: `answer ${turn}` });
+        const base = completion(turn === 0);
+        const result = turn === 0 ? { ...base, codingResult: { ...base.codingResult!,
+          lastActionResultSeed: { ...base.codingResult!.lastActionResultSeed!, writeEffect } } }
+          : sameTarget ? { ...base, codingResult: { ...base.codingResult!, changedFiles: ["failed.txt"], verifiedFiles: ["failed.txt"],
+            changeSet: { ...base.codingResult!.changeSet, attemptedFiles: ["failed.txt"], changedFiles: ["failed.txt"] } } } : base;
+        manager.appendQueryEvent(session.id, { type: "query.completed", result });
+        if (turn === 0) manager.saveError(session.id, "current failure");
+        else manager.saveCompleted(session.id);
+      }
+      const answerId = manager.getSession(session.id)!.turns.at(-1)!.id!;
+      const original = manager.getTranscriptEvents(session.id).find(event => event.type === "query-event" &&
+        event.event.type === "query.completed" && event.event.result.codingResult?.lastActionResultSeed?.writeEffect === writeEffect)!;
+      const state = JSON.parse(fs.readFileSync(path.join(manager.getSessionDirPath(session.id), "state.json"), "utf8"));
+      expect(state.workingMemory).toMatchObject({ sourceTurnCount: 12, compacted: true });
+      expect(state.workingMemory.continuity.lastWriteEffect).toBeUndefined();
+      const reopened = new SessionManager();
+      const snapshot = reopened.buildContinuitySnapshot(session.id);
+      expect(snapshot.lastTerminalClassification).toBe("success");
+      expect(snapshot.lastVerificationStatus).toBe("passed");
+      expect(snapshot.lastWriteEffect).toBeUndefined();
+      expect(snapshot.lastFailureHandoffDiagnostic).toBeUndefined();
+      expect(snapshot.unresolvedItems.join("\n")).toContain(`historical-write: ${writeEffect}`);
+      expect(snapshot.unresolvedItems.join("\n")).toContain("failed.txt");
+      expect(snapshot.unresolvedItems.join("\n")).toContain(original.id);
+      expect(reopened.buildPromptContinuityContext(session.id, "next")).toContain(`historical-write: ${writeEffect}`);
+      reopened.appendCompactionEntry(session.id, { summary: "Earlier conversation compacted", firstKeptEntryId: answerId, keptMessages: 1 });
+      const compacted = new SessionManager();
+      expect(compacted.getSession(session.id)!.turns.some(turn => turn.content === "answer 0")).toBe(false);
+      expect(compacted.getTranscriptEvents(session.id).some(event => event.id === original.id)).toBe(true);
+      expect(compacted.buildContinuitySnapshot(session.id).unresolvedItems.join("\n")).toContain(`historical-write: ${writeEffect}`);
+      await reopened.revertTo(session.id, promptId);
+      expect(new SessionManager().buildContinuitySnapshot(session.id).unresolvedItems.join("\n")).not.toContain("historical-write:");
+      await reopened.revertTo(session.id, answerId);
+      expect(new SessionManager().buildContinuitySnapshot(session.id).unresolvedItems.join("\n")).toContain(`historical-write: ${writeEffect}`);
+    } finally {
+      vi.unstubAllEnvs();
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it("refreshes a completed checkpoint and clears obsolete optional failure and write facts", () => {
     const first = retain({ summary: ["- custom: retain"] }, completion(true));
     const next = retain(first, completion(false), "2026-10-03T00:01:00.000Z");

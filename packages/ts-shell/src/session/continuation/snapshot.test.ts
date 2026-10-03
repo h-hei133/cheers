@@ -10,6 +10,10 @@ import { buildLinearSessionThreadSnapshot } from "../schema/sessionThread.js";
 import type { TranscriptEvent } from "../sessionEventCodec.js";
 import { buildSessionRecoverySnapshot } from "../recovery/sessionRecoverySnapshot.js";
 import { buildSessionContinuitySnapshot } from "./sessionContinuitySnapshot.js";
+import { extractSeedInfluenceFromQueryResult } from "./sessionSeedInfluence.js";
+import { projectSessionToolContinuity } from "./sessionToolContinuity.js";
+import { projectSessionUnresolvedItems } from "./sessionUnresolvedItems.js";
+import { resumeShellSession } from "../../core/shell/recovery.js";
 
 const timestamp = "2026-10-03T00:00:00.000Z";
 
@@ -52,6 +56,52 @@ function codingResult(failed = false): CodingResultSummary {
 }
 
 describe("session continuity snapshot sources", () => {
+  it("excludes uncertain history whose source is not on the selected path", () => {
+    const input = fixture({ ...codingResult(true), lastActionResultSeed: { actionKind: "edit-file", target: "discarded.ts",
+      changedFiles: [], verifiedFiles: [], writerStarted: true, writeEffect: "unknown" } }, {});
+    const event = input.transcriptEvents[0]!;
+    input.transcriptEvents[0] = { ...event, sourceEntryId: "missing-source" } as TranscriptEvent;
+    expect(buildSessionContinuitySnapshot(input).unresolvedItems.join("\n")).not.toContain("historical-write:");
+  });
+
+  it.each([0, 1, 2, 3])("uses the first valid seed source at priority %s", (priority) => {
+    const sources = [0, 1, 2, 3].map(index => index < priority
+      ? ["seedInfluence=invalid"] : [index === priority ? "seedInfluence=target-carryover" : "seedInfluence=verify-signal"]);
+    const coding = codingResult();
+    expect(extractSeedInfluenceFromQueryResult({
+      status: "completed", terminalClassification: "success", terminalReason: "completed", transcript: [],
+      finalOutput: "done", sharedContext: { sessionId: "test", initialPrompt: "request", notes: sources[0], handoffs: [] },
+      codingResult: { ...coding, evidence: sources[1], continuation: { ...coding.continuation, evidence: sources[2] },
+        repair: { ...coding.repair, notes: sources[3] } },
+    })).toBe("target-carryover");
+  });
+
+  it("keeps the final tool provenance whole when optional fields are absent", () => {
+    const projection = projectSessionToolContinuity({ ...codingResult(), provenance: { toolExecutions: [
+      { kind: "executed-failed", source: "tool-result-metadata", toolName: "write", legacySuccess: false,
+        taskId: "old-task", failureBoundary: "old-failure" },
+      { kind: "executed-succeeded", source: "tool-result-metadata", toolName: "read", legacySuccess: true },
+    ] } });
+    expect(projection).toMatchObject({ lastToolExecutionProvenanceKind: "executed-succeeded", lastToolExecutionProvenanceToolName: "read" });
+    expect(projection.lastToolExecutionProvenanceTaskId).toBeUndefined();
+    expect(projection.lastToolExecutionFailureBoundary).toBeUndefined();
+  });
+
+  it.each([
+    [" session failure ", " lifecycle failure ", "session failure"],
+    ["  ", " lifecycle failure ", "lifecycle failure"],
+    ["  ", "  ", "terminal reason"],
+  ])("selects error precedence while retaining the separate stop reason (%s, %s)", (sessionLastError, detail, expected) => {
+    const projection = projectSessionUnresolvedItems({ sessionLastError,
+      lastRunErrorEvent: { type: "lifecycle", timestamp, event: "run-error", detail },
+      continuityTerminalSource: { terminalClassification: "stopped", terminalReason: "stopped_error", stopReason: " terminal reason " },
+    });
+    expect(projection.lastFailure).toBe(expected);
+    expect(projection.unresolvedItems).toEqual([
+      `last-error:${expected}`, "terminal:stopped (stopped_error)", "stop-reason:terminal reason",
+    ]);
+  });
+
   it("does not fill absent current-result fields from an older checkpoint", () => {
     const snapshot = buildSessionContinuitySnapshot(fixture(codingResult()));
     expect(snapshot.lastSuccessHandoffDiagnostic).toContain("current.txt");
@@ -231,6 +281,36 @@ describe("stored session continuity messages", () => {
     vi.stubEnv("USERPROFILE", home);
     return new SessionManager();
   }
+
+  it("does not ask recovery to fix an already resolved known file failure", async () => {
+    const manager = createManager();
+    const session = manager.createNew();
+    for (const failed of [true, false]) {
+      manager.persistUserPromptBarrier(session.id, failed ? "edit current.txt" : "retry current.txt");
+      manager.addTurn(session.id, { role: "assistant", content: failed ? "failed" : "verified" });
+      const envelope = fixture({ ...codingResult(failed), changedFiles: failed ? [] : ["current.txt"] }).transcriptEvents[0]!;
+      if (envelope.type !== "query-event" || envelope.event.type !== "query.completed") throw new Error("Expected completion");
+      manager.appendQueryEvent(session.id, { type: "query.completed", result: { ...envelope.event.result,
+        status: failed ? "stopped_error" : "completed", terminalClassification: failed ? "error" : "success",
+        terminalReason: failed ? "stopped_error" : "completed" } });
+      if (failed) manager.saveError(session.id, "current failure");
+      else manager.saveCompleted(session.id);
+    }
+    manager.persistUserPromptBarrier(session.id, "continue the task");
+    manager.saveInterrupted(session.id, "prompt");
+    const reopened = new SessionManager();
+    expect(reopened.buildContinuitySnapshot(session.id).recentFailedFiles).toEqual([]);
+    const resumed = await resumeShellSession({ requestedSessionId: session.id, sessionManager: reopened,
+      runtimeContext: { projectRoot: session.projectRoot, session: { id: "other" },
+        activeSession: { sessionId: "other" }, runtimeConfig: { maxTurns: 6 } } as never,
+      renderer: { renderLine() {} } as never,
+    });
+    expect(resumed.resumed && resumed.autoResume).toBeTruthy();
+    if (!resumed.resumed || !resumed.autoResume) throw new Error("Expected pending recovery");
+    expect(resumed.autoResume.prompt).toContain("verified-files: current.txt");
+    expect(resumed.autoResume.prompt).not.toContain("failed-files:");
+    expect(resumed.autoResume.prompt).not.toContain("fixing the failed file operation");
+  });
 
   it("uses structured handoff facts after persistence and reopening", () => {
     const manager = createManager();

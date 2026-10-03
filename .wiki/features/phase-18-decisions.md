@@ -193,7 +193,7 @@ W6-23已把侧栏重复编号改为OBS-11/OBS-12；本表按更正后的24个唯
 | # | 条目 | 来源 | 形态 | 规模 |
 |---|---|---|---|---|
 | **25** | **`THM-03` 的剩余两半**（`auto` + 扩充令牌/主题数） | 13 册原`PARTIAL`，现`FIXED` | 已完成：auto跟随终端报告；32→48个有实际消费者的令牌；2→4套预设。原数字规模对齐已按本节末实施裁决修正，详见§8.4与W7-25记录 | 原主题owner与两个新增预设 |
-| **26** | `SES-08`：session 四域逐模块行为审计 | 13 册 `SES-08` + 12 册 §10 | `session/continuation`(16) / `recovery`(11) / `replay`(5) / `export`(4) = **36 个非测试模块**的**行为**正确性（往返、边界、损坏输入降级）。**前置研究 §7.3 只做了可达性**（16/16、10/11、4/5、4/4 可达；两个不可达 `types.ts` 是契约） | 36 模块 |
+| **26** | `SES-08`：session 四域逐模块行为审计 | 13 册 `SES-08` + 12 册 §10 | **已完成，判据与保证边界见phase-18-session-audit.md。** `session/continuation`(16) / `recovery`(11) / `replay`(5) / `export`(4) = **36 个非测试模块**的**行为**正确性（往返、边界、损坏输入降级）。**前置研究 §7.3 只做了可达性**（16/16、10/11、4/5、4/4 可达；两个不可达 `types.ts` 是契约） | 36 模块 |
 | **27** | `PRV-06`：四端点逐字段形状表 + 流边界矩阵（含 Bedrock 单次路径） | 13 册 `PRV-06` | (a) 四端点**逐字段**请求形状与参考的对照表；(b) 流解析**完整边界矩阵**（SSE 注释、`\r\n` 边界、无终止帧）；(c) 用量记账跨模型/跨 resume；(d) 超时与取消的**逐路径**覆盖（`provider/request/fetch.ts` 是否被所有路径使用） | 4 协议 |
 | **28** | `BRW-06`：`receipt/**` 的保证强度 | 13 册 `BRW-06` | 已完成：九模块逐项核验并修复权限、无副作用查询、锁、完整日志隔离、嵌套准入及结果投影；原过期锁“正确实现”判断已推翻，保证边界见本项实施记录 | 9 模块 |
 | **29** | `memory/**`(36) + `context/**`(28) **逐模块**审计 | 13 册 §13.2 / §16.4 | 前置研究已覆盖 `CTX-02/06/07/08/09`（含 3 条 P1）；**其余模块的逐模块行为**未做 | 64 模块 |
@@ -577,7 +577,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W8-40 / TOL-10（随W7-30） | 失败原因及部分答复保留；工具阶段取消和空答复按失败结算；适配器向父模型传递error | 已完成，定向验证通过；旧result-contract脚本仍失败 |
 | W7-32 | read每次返回正文；startup结构/身份/有界读写、freshness与命令投影已修复；保留默认禁用 | 已完成，定向验证与隔离验收通过 |
 | W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
-| W7-26 / SES-08 | 回放、导出、根迁移、摘要来源、重复读取及compact检查点更新已分批修复；完整逐模块审计继续 | 执行中，第十五批新会话保留与恢复选择已验证，逐模块审计继续 |
+| W7-26 / SES-08 | 回放、导出、迁移、恢复准入、检查点、字段优先级与历史写入观察已核验；后续转W7-31 | 已完成；原36模块行为矩阵闭合，保证边界与历史数据限制见审计表 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1762,3 +1762,21 @@ seed/fragment回归证明历史格式消费及往返，不证明当前真实工�
 首次全屏驱动等待未被增量重画的提示文字而超时，落盘状态已completed；改用对应回合持久化计数与pending清除判定结算后通过，未修改产品满足驱动。所有测试及PTY均使用仓内隔离HOME/USERPROFILE/TMPDIR和专用合成目录，无真实provider配置。NormProof exit0且阻断义务满足，整体advisory仍partial；旧result-contract和test:scripts本批未重跑。
 
 第十四批8b920aaf的CI 37112529831和Architecture Watch 37112529822均成功。W7-26继续：已确认较新同文件验证成功后旧失败仍残留的缺陷；历史unknown写入及其余字段优先级仍需闭合。
+
+
+### W7-26 第十六批：已知失败解除与历史写入观察（2026-10-03）
+
+已知失败聚合原来只追加：同一文件后来changed、verified且验证passed，恢复提示仍同时列verified和failed并要求重试。最新优先扫描现在记录逐路径的较新成功，只抑制旧的已知失败；较新失败、无关路径、缺少修改或验证、unverified条目和unknown/inspection事实不被清除。路径只做trim，不引入大小写/真实路径归一化。seed明确非passed状态也阻止解除；复审发现只有command、没有可选status的seed被误判为矛盾，改为沿用顶层passed并增加回归。
+
+参考文件跟踪以工具调用收集路径，不足以证明写入或验证成功，未照搬该判据；快照差异及工具结算分别依赖对应消息/调用身份。本仓沿用自己的changed/verified/失败证据定义，仅按同一路径比较。公开resume回归确认旧failed-files及错误重试指令消失，未改变current结果的其他字段。
+
+历史unknown/unverified是独立问题：当前compact结果必须整组替换，不能把A字段混到B。现有原始日志为append-only，实际消息压缩只改变加载视图；参考同样将保留的选中路径与压缩模型上下文分开。新inspection投影复用既有写入事实解释器，扫描全部已准入query日志，把记录总数及最新3条带来源的历史观察前置到unresolvedItems。后续同文件或无关文件成功不被解释为已链接的历史结算；B自己的终态、验证、taskState及lastWrite字段保持原值，不加新持久化账本。
+
+补齐四类helper直接断言：seed四来源冲突和无效回退；最后tool provenance无taskId/failureBoundary不补旧值；session/lifecycle/stopReason的非空优先级及独立stopReason；结构化false/none覆盖旧unknown标记。初始已知失败回归1失败12通过，历史回归2失败13通过。
+
+最终29套424项及build:cli通过；独立代码APPROVE、架构CLEAR。两个既有owner反转7失败67通过后逐字节恢复。12轮检查点后历史记录超出recent-4仍可见；四组unknown/unverified与同/异目标成功序列另调用appendCompactionEntry，证明旧消息离开加载视图时原始事件及检查提示保留，并覆盖重开和分支切走/切回。新增压缩断言首次误用不存在的loadSession方法，归类为测试适配器错误，改用真实getSession接口后通过，未改产品接口。
+
+全部验证使用仓内隔离HOME/USERPROFILE/TMPDIR及专用合成目录，无真实provider配置。原始事件若已被外部或旧数据处理删除，且唯一旧compact结果又被替换，本次无法重建消失事实；没有历史写入显式结算协议，观察不等于当前失败或授权。旧result-contract失败和test:scripts本批未重跑。原36模块逐项行为矩阵至此闭合，W7-26完成，按裁决继续W7-31→27→29→33及剩余W8项。第十五批35f6a2c1的CI 37113652433和Architecture Watch 37113652454均成功。
+
+第十六批最终普通/全屏编译PTY各2次本地HTTP请求：模型opening含历史unknown和来源、无已解决失败及错误重试指令；命令型partial seed同样正确回退passed。审批前无文件、批准后实际写入、终态来源与最终assistant消息匹配；无合成continuity用户提示。产物.tmp/history-pty-srmq1gzu，两模式exit0。
+静态阻断门通过，1428文件零循环；7项可达性提示与120项docs-source-drift提示保持。NormProof exit0且所有阻断义务满足，整体advisory仍partial。

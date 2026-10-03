@@ -1,8 +1,19 @@
 import { describe, expect, it } from "vitest";
 import type { CodingResultSummary } from "../../result/types.js";
-import { deriveStoppedSessionContinuitySurface, buildStoppedSessionFailureHandoffDiagnostic } from "./stoppedSessionContinuity.js";
+import { deriveStoppedSessionContinuitySurface, buildStoppedSessionFailureHandoffDiagnostic, buildStoppedSessionWriteContinuity } from "./stoppedSessionContinuity.js";
 
 describe("stopped session continuity", () => {
+  it.each([false, true])("keeps explicit writer=%s and inspection=false over legacy unknown markers", writerStarted => {
+    const result = makeCodingResult({
+      evidence: ["writer-started-no-success", "write-effect:unknown", "user-inspection-required"],
+      lastActionResultSeed: { actionKind: "edit-file", target: "current.ts", changedFiles: [], verifiedFiles: [],
+        writerStarted, writeEffect: "none", requiresUserInspection: false },
+    });
+    expect(buildStoppedSessionWriteContinuity(result)).toEqual({ writerStarted,
+      ...(writerStarted ? { writeEffect: "none" } : {}), requiresUserInspection: false, target: "current.ts" });
+    expect(deriveStoppedSessionContinuitySurface(result)?.kind).not.toBe("writer-started-unknown");
+  });
+
   it.each(["unknown", "unverified"] as const)(
     "keeps writer-started %s write effect actionable without success",
     (writeEffect) => {
