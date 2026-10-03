@@ -121,6 +121,8 @@ describe("reading a streamed completion", () => {
     expect(isEventStream({ headers: new Headers({ "content-type": "text/event-stream" }), body })).toBe(true);
     expect(isEventStream({ headers: new Headers({ "content-type": "application/json" }), body })).toBe(false);
     expect(isEventStream({ headers: new Headers({ "content-type": "text/event-stream" }), body: null })).toBe(false);
+    expect(isEventStream({ headers: new Headers({ "content-type": "application/vnd.amazon.eventstream" }), body })).toBe(true);
+    expect(isEventStream({ headers: new Headers({ "content-type": "application/vnd.amazon.eventstream" }), body: null })).toBe(false);
   });
 });
 

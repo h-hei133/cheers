@@ -1,7 +1,7 @@
 # Phase 18 Provider 行为审计
 
 W7-27包含四端点逐字段请求表、流边界、跨模型/resume用量与逐路径超时取消四项。
-当前只闭合下列已验证切片；字段表、调用路径和用量矩阵继续，W7-27未完成。
+当前只闭合下列已验证切片；字段已逐项对照，缓存刷新和最终流/调用路径/用量矩阵继续，W7-27未完成。
 源码路径相对 `packages/ts-shell/src/`。
 
 ## 已完成切片
@@ -12,6 +12,7 @@ W7-27包含四端点逐字段请求表、流边界、跨模型/resume用量与�
 | 多行SSE | `provider/endpoints/sse.test.ts`；提交7509788d | data行保留换行、单个可选空格、LF/CRLF/CR和字节分块；保留坏帧跳过政策 |
 | 服务端重试间隔 | `turn/retry.test.ts`；提交2f44a914 | 跨层提示、上限、无上限长等待分段、取消和无双重重试 |
 | EOF完成证据 | 下表及 `provider/endpoints/termination.test.ts` | 缺结束信号不能变成成功；已显示文本保留、工具不准入 |
+| Bedrock能力与二进制分流 | `provider/endpoints/bedrockConverse.test.ts`、`turn/step.test.ts`及第四批证据 | vision门槛、预算裁剪、真实binary MIME交端点reader |
 
 ## EOF与尾帧
 
@@ -87,7 +88,7 @@ summarize、sentRequest、cacheWarm、signature、bedrockConverse九套件：136
 W7-27的逐字段表、用量与其余transport/取消边界继续，缓存刷新尚未闭合。
 
 
-## 逐字段请求对照（基线73d896bd，源码核对）
+## 逐字段请求对照（基线73d896bd，第四批修正B两项）
 
 输入集合取自provider/endpoints/kinds.ts的TurnRequest和SimpleRequest；下表覆盖全部18个TurnRequest字段。
 “无wire字段”表示协议不消费该选项或调用者已处理，不意味着字段丢失。
@@ -101,13 +102,13 @@ W7-27的逐字段表、用量与其余transport/取消边界继续，缓存刷�
 | messages | 角色保留，转换content图片 | system移出，tool_use/tool_result，合并同角色 | assistant→model，functionCall/functionResponse，成组结果 | toolUse/toolResult、合并同角色 | 参考同样执行协议转换；本仓结果/权限来源仍归现有turn层 |
 | tools | tools.function及tool_choice:auto | input_schema，最后工具加缓存标记 | functionDeclarations及AUTO | toolSpec.inputSchema.json及auto | 参考工具选择更丰富；本仓契约仅布尔允许，不增加未承诺选择模式 |
 | allowTools | false或无工具时省略schemas | false或无工具时省略schemas | false时省略工具和配置 | 历史已有工具但本轮不允许时保留仅供历史校验、说明要求勿调用的placeholder | 参考也处理历史工具要求；本仓沿用已有placeholder策略 |
-| vision | false转文字描述；true转image_url | false转描述；true原生图片块 | false转描述；true支持的inlineData | 当前未消费vision，支持MIME直接发图片 | B未消费本仓vision能力契约，与其余三端点不一致，列入本表剩余修复 |
+| vision | false转文字描述；true转image_url | false转描述；true原生图片块 | false转描述；true支持的inlineData | 仅true保留支持MIME图片，否则共享文字fallback | B缺口已在第四批修复并验证；simple同样按false处理 |
 | temperature | supportsTemperature允许且无thinkingLevelName时发送 | 同O，且输入存在时发送 | supportsTemperature允许且输入存在时发送 | supportsTemperature允许且无thinkingLevelName时发送 | 能力约束与协议约束应共同成立；已有正反测试 |
 | supportsTemperature | false省略temperature | false省略temperature | false省略temperature | false省略temperature | 与参考按模型能力控制一致 |
 | topP | top_p | top_p | generationConfig.topP | inferenceConfig.topP | 参考所读主builder未全部暴露topP；本仓已有选项保留，不因此删除 |
 | maxOutputTokens | 按maxTokensField写入，未设省略 | max_tokens，默认4096 | generationConfig.maxOutputTokens，未设省略 | inferenceConfig.maxTokens，默认4096 | 参考取模型默认或显式上限；本仓主调用先解析模型上限，simple默认保留 |
 | thinkingLevelName | reasoningEffort允许时写reasoning_effort；也抑制温度 | 开启预算式thinking；不直接发level字符串 | 无wire字段 | 仅抑制温度 | 参考也按模型映射；本仓未承诺完整adaptive/level协议，保留预算式能力范围 |
-| thinkingBudgetTokens | 无wire字段 | 最多max_tokens减1024，小于1024则不启用 | thinkingConfig.thinkingBudget与includeThoughts | additionalModelRequestFields.thinking.budget_tokens，当前无上限裁剪 | B与参考“预算须留答案空间”的约束不一致，列入剩余修复 |
+| thinkingBudgetTokens | 无wire字段 | 最多max_tokens减1024，小于1024则不启用 | thinkingConfig.thinkingBudget与includeThoughts | additionalModelRequestFields.thinking.budget_tokens，最多输出上限减1024，低于1024省略 | B第四批修复；保留caller上限，与本仓A一致 |
 | allowEmptySignature | 无wire字段 | 决定空签名reasoning是否作为thinking回传 | 无wire字段 | 无wire字段 | 参考有同名兼容决策；不跨协议套用 |
 | systemRole | 首条system/developer | 无wire字段 | 无wire字段 | 无wire字段 | 参考同样仅在相应协议映射；其他协议system位置固定 |
 | reasoningEffort | 允许发送level | level由调用者筛选后传入 | 无wire字段 | level由调用者筛选后传入 | turn/step在解析能力后选择level；保留原分层 |
@@ -124,7 +125,7 @@ O buildParams的model/messages/stream/usage/maxTokens/temperature/tools；
 A buildParams的system/messages/tools/max_tokens/thinking兼容；
 G buildParams的contents/systemInstruction/generationConfig/toolConfig/thinking；
 B commandInput与simple入口的inferenceConfig、toolConfig和预算裁剪。
-表中两处B差异尚未通过修复和反转验证，不能把源码表等同四协议行为全部通过。
+表中两处B差异已修复并有反转验证；其他字段的源码对照仍不等同四协议全部行为验证。
 
 ## 用量与恢复证据定位
 
@@ -136,11 +137,40 @@ session/store/usage.test.ts经实际query/state owner及文件锁写盘、载入
 
 ## 剩余闭合清单
 
-1. 表内B的vision能力门槛、thinking预算与输出上限约束。
-2. 缓存刷新：签名、协议输出上限、结束后取消/重新调度、用量记录。参考刷新复用模型transport、
+1. 缓存刷新：签名、协议输出上限、结束后取消/重新调度、用量记录。参考刷新复用模型transport、
    最大输出1、无自动重试、校验当前run后记账并重新调度；本仓保留已捕获请求前缀的选择，需逐条对齐其他约束。
-3. 最终流/timeout/cancel矩阵及上述用量恢复套件验收，明确transport时限与认证准备时限的区别。
+2. 最终流/timeout/cancel矩阵及上述用量恢复套件验收，明确transport时限与认证准备时限的区别。
 
 W7-27完成前按此有限清单推进；W7-29和W7-33仍在后续执行位。
 
 73d896bd的CI37151663744及Architecture Watch37151663719均成功。当前逐字段表补充仅改文档，未重跑build/tests。
+
+
+## Bedrock能力约束与二进制响应分流（第四批）
+
+主回合step确实从catalog传入vision和thinking预算；原adapter忽略前者且未经约束发送后者。
+修复后仅vision===true发送图片字节，否则复用formatNonVisionFallback，保留相邻文本及图片位置；
+simple没有视觉能力参数，也走文字fallback。旧图片正例显式声明vision=true；旧预算正例把输出上限设为8192，原预算4096断言不变。
+这些fixture过去隐含了不符合能力契约的输入，按合同修正输入而不删除场景。
+
+参考单次入口先调整预算和上限，再把预算裁到maxTokens-1024；采纳“给答案留1024”的决策，
+但不提高本仓caller ceiling，沿既有Anthropic适配器的上限优先规则；裁剪后不足1024就省略thinking。
+参考所读图片builder直接转换图片，本仓则有明确vision=false契约，因此采用本仓共享fallback。
+消息转换移到provider/endpoints/bedrock/messages.ts，端点注册/调用接口不变；两owner函数名数为15/6，原21超限已消除。
+
+首次普通PTY中，本地服务器收到正确字段并返回合法application/vnd.amazon.eventstream，
+主回合却按JSON读取，导致网络错误和重试。这是真实分流缺陷，证据.tmp/bedrock-limits-pty-f421u_8p；
+参考流入口由SDK直接迭代response.stream，本仓沿用现有endpoint.readStream，仅补识别binary MIME。
+新增真实二进制帧step正反用例：messageStop完成成功；缺结束帧保留已显示文字、失败且单次请求。
+
+隔离HOME定向6套170项通过：bedrockConverse、step、completion、requestShape、multimodal、simple。
+字段owner反转12失败/91通过；binary增量修复前及反转均3失败/91通过。两次精确恢复，最终复跑170项通过。
+构建CLI和43项脚本通过，独立代码APPROVE/架构CLEAR。
+静态图1443模块无环；超函数上限advisory由7降6，其他reachability7/docs-source120未变；NormProof exit0、整体仍partial。
+定向证据.tmp/bedrock-limits-ah2i0nk4。
+
+普通/全屏Node运行dist/cli.js各覆盖vision=false/true且上限4096、vision=false且上限512，共6场景exit0。
+本地服务核对实际图片字节/文字fallback、3072预算/小上限无thinking，再返回合法二进制结束帧。
+每场单请求、query.completed、来源ID与助手消息一致；证据.tmp/bedrock-limits-pty-2ewkgtwt。
+仅合成凭据和本地HTTP，不证明真实云模型、TLS/HTTP2、完整认证来源或单文件可执行产物。
+a86e1936的CI37152898216与Architecture Watch37152898231均成功；W7-27按上方剩余清单继续。

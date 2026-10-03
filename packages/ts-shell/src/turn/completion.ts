@@ -178,10 +178,11 @@ const MAX_HELD = 256;
 /** Keys never merged into tool arguments, whatever the host sends. */
 const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
-/** Whether a response body is a server-sent event stream we can read. */
+/** Whether a response carries events for the selected endpoint's stream reader. */
 export function isEventStream(response: { readonly headers: Headers; readonly body: unknown }): boolean {
   const type = response.headers.get("content-type") ?? "";
-  return type.includes("text/event-stream") && response.body !== null;
+  return (type.includes("text/event-stream") || type.includes("application/vnd.amazon.eventstream"))
+    && response.body !== null;
 }
 
 /**

@@ -6,6 +6,7 @@ import { createStepFunction, emptyAnswerExplanation, CONTEXT_OVERFLOW_PREFIX, is
 import { getSessionUsage, resetSessionUsage } from "../observability/usageTelemetry.js";
 import { writeProjectState } from "../core/state/projectState.js";
 import { declareEndpoint } from "../provider/endpoints/index.js";
+import { crc32 } from "../provider/aws/eventStream.js";
 import { runAgentLoop } from "../core/agent/loop.js";
 
 /**
@@ -772,6 +773,84 @@ describe("createStepFunction", () => {
       expect(bodies[0]).toContain("reasoning_effort");
       expect(bodies[1]).not.toContain("reasoning_effort");
       expect(result.stopReason).toBe("stop");
+    } finally {
+      fs.rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("Bedrock catalog capability routing", () => {
+  it.each([true, false])("routes binary event streams and requires completion %s", async (complete) => {
+    const frame = (name: string, payload: unknown): Uint8Array => {
+      const encoder = new TextEncoder();
+      const headers: number[] = [];
+      for (const [key, value] of [[":message-type", "event"], [":event-type", name]]) {
+        const k = encoder.encode(key); const v = encoder.encode(value);
+        headers.push(k.length, ...k, 7, v.length >> 8, v.length & 255, ...v);
+      }
+      const data = encoder.encode(JSON.stringify(payload));
+      const bytes = new Uint8Array(16 + headers.length + data.length);
+      const view = new DataView(bytes.buffer);
+      view.setUint32(0, bytes.length); view.setUint32(4, headers.length);
+      view.setUint32(8, crc32(bytes.subarray(0, 8)));
+      bytes.set(headers, 12); bytes.set(data, 12 + headers.length);
+      view.setUint32(bytes.length - 4, crc32(bytes.subarray(0, bytes.length - 4)));
+      return bytes;
+    };
+    let calls = 0;
+    const fragments: string[] = [];
+    const step = createStepFunction({
+      ...request,
+      provider: { ...request.provider, endpoint: "bedrock-converse-stream" },
+      retry: { enabled: true, maxRetries: 2, baseDelayMs: 1, maxDelayMs: 1 },
+      fetchImpl: async () => {
+        calls++;
+        return new Response(new ReadableStream({ start(controller) {
+          controller.enqueue(frame("contentBlockDelta", { contentBlockIndex: 0, delta: { text: "visible" } }));
+          if (complete) controller.enqueue(frame("messageStop", { stopReason: "end_turn" }));
+          controller.close();
+        } }), { headers: { "content-type": "application/vnd.amazon.eventstream" } });
+      },
+    });
+    const result = await step([{ role: "user", content: "hi" }], undefined, { onText: (text) => fragments.push(text) }, { allowTools: false });
+    expect(calls).toBe(1);
+    expect(fragments).toEqual(["visible"]);
+    expect(result.stopReason).toBe(complete ? "stop" : "error");
+    if (!complete) expect(result.errorMessage).toContain("stream ended");
+  });
+
+  it.each([false, true])("honors catalog vision %s and the selected output ceiling", async (vision) => {
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "step-bedrock-"));
+    try {
+      fs.mkdirSync(path.join(workspace, ".agents"));
+      writeProjectState(workspace, { thinkingEffort: "high" });
+      let body: Record<string, unknown> = {};
+      const step = createStepFunction({
+        ...request,
+        workspaceRoot: workspace,
+        provider: { ...request.provider, provider: "bedrock", endpoint: "bedrock-converse-stream" },
+        maxOutputTokens: 4096,
+        catalog: [{
+          id: "bedrock", label: "Bedrock", runtime: "openai-compatible", auth: "api-key",
+          models: [{ id: "m", contextWindow: 128000, maxTokens: 8192, vision, reasoning: true }],
+        }],
+        fetchImpl: async (_url, init) => {
+          body = JSON.parse(String(init?.body));
+          return jsonResponse({ output: { message: { content: [{ text: "ok" }] } } });
+        },
+      });
+      const result = await step([{ role: "user", content: [
+        { type: "text", text: "look at this" },
+        { type: "image", mimeType: "image/png", data: "aW1hZ2U=" },
+      ] }], undefined, {}, { allowTools: false });
+      expect(result.stopReason).toBe("stop");
+      expect(body.inferenceConfig).toEqual({ maxTokens: 4096 });
+      expect(body.additionalModelRequestFields).toEqual({ thinking: { type: "enabled", budget_tokens: 3072 } });
+      expect(body.messages).toEqual([{ role: "user", content: [
+        { text: "look at this" },
+        vision ? { image: { format: "png", source: { bytes: "aW1hZ2U=" } } }
+          : { text: "[Image: image/png (0KB) - non-vision fallback]" },
+      ] }]);
     } finally {
       fs.rmSync(workspace, { recursive: true, force: true });
     }

@@ -19,14 +19,14 @@ import { readEventStream, type EventMessage } from "../aws/eventStream.js";
 import { resolveCredentials } from "../aws/credentials.js";
 import { signAwsRequest } from "../aws/signature.js";
 import type { RequestSigner } from "../request/fetch.js";
-import type { ChatMessage } from "../../turn/prompt.js";
+import { convertMessages, type WireMessage } from "./bedrock/messages.js";
 import type { CompletedBody, StreamFragment, StreamedCompletion } from "../../turn/completion.js";
 
 /**
  * The declaration sent when a request shows tool history but offers no tools.
  *
- * Named so that it cannot collide with a real tool: it is never callable, because
- * the model is told to answer in text, and it exists only to satisfy a validation
+ * The model is instructed to answer in text rather than call it. Execution
+ * eligibility remains the turn layer's responsibility; this satisfies a validation
  * rule that has no "none" spelling.
  */
 const PLACEHOLDER_TOOL_NAME = "__no_tools__";
@@ -38,189 +38,6 @@ const PLACEHOLDER_TOOL = {
     inputSchema: { json: { type: "object", properties: {} } },
   },
 };
-
-/** A block in a user turn. */
-type UserBlock =
-  | { readonly text: string }
-  | { readonly image: { readonly format: string; readonly source: { readonly bytes: string } } }
-  | { readonly toolResult: { readonly toolUseId: string; readonly content: ReadonlyArray<{ text: string }>; readonly status: "success" | "error" } };
-
-/** A block in an assistant turn. */
-type AssistantBlock =
-  | { readonly text: string }
-  | { readonly toolUse: { readonly toolUseId: string; readonly name: string; readonly input: unknown } }
-  | { readonly reasoningContent: { readonly reasoningText: { readonly text: string; readonly signature?: string } } };
-
-interface WireMessage {
-  readonly role: "user" | "assistant";
-  readonly content: ReadonlyArray<UserBlock | AssistantBlock>;
-}
-
-/**
- * The conversation in this protocol's shape.
- *
- * Turns are merged rather than emitted one per message. The protocol takes
- * alternating turns whose content is a list of blocks, so a tool's result and
- * anything the user said in the same turn belong in one entry — emitting them
- * separately would produce two user turns in a row, which is not a shape it
- * accepts.
- */
-function convertMessages(messages: readonly ChatMessage[]): WireMessage[] {
-  const wire: WireMessage[] = [];
-
-  const pushUser = (block: UserBlock): void => {
-    const previous = wire[wire.length - 1];
-    if (previous && previous.role === "user") {
-      wire[wire.length - 1] = { role: "user", content: [...previous.content, block] };
-      return;
-    }
-    wire.push({ role: "user", content: [block] });
-  };
-
-  for (const message of messages) {
-    if (message.role === "system") continue;
-
-    if (message.role === "tool") {
-      pushUser({
-        toolResult: {
-          toolUseId: message.tool_call_id ?? "",
-          content: [{ text: textOf(message.content) }],
-          // The conversation carries no success marker, so every result is
-          // reported as one. The text is where a failure is described, and
-          // claiming the opposite of what the text says would be worse than
-          // repeating it.
-          status: "success",
-        },
-      });
-      continue;
-    }
-
-    if (message.role === "user") {
-      pushUserBlocks(pushUser, message.content);
-      continue;
-    }
-
-    const blocks: AssistantBlock[] = [];
-    // Signed reasoning goes first, because that is the order it was produced in
-    // and the order this protocol expects it back. A turn carrying a tool call
-    // has to bring the signed block that preceded it.
-    if (message.reasoning?.text && message.reasoning.signature) {
-      blocks.push({
-        reasoningContent: {
-          reasoningText: { text: message.reasoning.text, signature: message.reasoning.signature },
-        },
-      });
-    }
-    const text = textOf(message.content);
-    if (text) blocks.push({ text });
-    for (const call of message.tool_calls ?? []) {
-      blocks.push({
-        toolUse: {
-          toolUseId: call.id,
-          name: call.function.name,
-          input: safeParse(call.function.arguments),
-        },
-      });
-    }
-    if (blocks.length > 0) {
-      const previous = wire[wire.length - 1];
-      if (previous && previous.role === "assistant") {
-        wire[wire.length - 1] = { role: "assistant", content: [...previous.content, ...blocks] };
-      } else {
-        wire.push({ role: "assistant", content: blocks });
-      }
-    }
-  }
-  return wire;
-}
-
-type PushUser = (block: UserBlock) => void;
-
-/** The text of a message whose content may be a string or a list of blocks. */
-function textOf(content: ChatMessage["content"]): string {
-  if (typeof content === "string") return content;
-  if (!content) return "";
-  return content.map((block) => (block.type === "text" ? block.text : "")).join("");
-}
-
-/**
- * A user message's blocks in this protocol's shape.
- *
- * Text stays text and an image stays an image: flattening to text here would
- * send a request the model reads as a description of a picture it cannot see,
- * and the picture would never arrive. A block this code does not recognize is
- * carried as its text rather than dropped, so an unknown shape costs the
- * picture rather than the words beside it.
- */
-function pushUserBlocks(pushUser: PushUser, content: ChatMessage["content"]): void {
-  if (typeof content === "string") {
-    if (content) pushUser({ text: content });
-    return;
-  }
-  if (!content) return;
-  for (const block of content) {
-    if (block.type === "text") {
-      if (block.text) pushUser({ text: block.text });
-      continue;
-    }
-    if (block.type === "image") {
-      const format = imageFormat(block.mimeType);
-      if (!format) {
-        // Named rather than silently sent: the API would reject the whole
-        // request and blame a field the user never set, so the reason the
-        // picture is missing is stated where the picture would have been.
-        pushUser({ text: `[an image of type ${block.mimeType} cannot be sent to this model]` });
-        continue;
-      }
-      pushUser({
-        image: {
-          format,
-          source: { bytes: block.data },
-        },
-      });
-      continue;
-    }
-    const fallback: string = (block as { readonly text?: string }).text ?? "";
-    if (fallback) pushUser({ text: fallback });
-  }
-}
-
-/** The four formats this protocol accepts, and nothing else. */
-const CONVERSE_IMAGE_FORMATS: Record<string, true> = {
-  png: true,
-  jpeg: true,
-  gif: true,
-  webp: true,
-};
-
-/**
- * The format name this protocol expects, or nothing for a type it cannot carry.
- *
- * Reading the MIME subtype as the format sent values the API rejects:
- * `image/svg+xml` became the format `svg+xml`, and the request then failed with
- * a validation error naming a field the user never set. The picture was lost
- * either way, but the error did not say that was what happened.
- *
- * A type nobody recorded is sent as PNG, which is what every image used to be
- * sent as. A type this protocol cannot carry returns nothing, so the caller can
- * say so instead of the API refusing the whole request.
- */
-function imageFormat(mimeType: string | undefined): string | undefined {
-  if (!mimeType) return "png";
-  const subtype = mimeType.split("/")[1]?.toLowerCase();
-  if (!subtype) return "png";
-  if (subtype === "jpg") return "jpeg";
-  return CONVERSE_IMAGE_FORMATS[subtype] === true ? subtype : undefined;
-}
-
-/** Arguments as an object, falling back to an empty one for text that is not JSON. */
-function safeParse(arguments_: string): unknown {
-  try {
-    return arguments_ ? JSON.parse(arguments_) : {};
-  } catch {
-    return {};
-  }
-}
 
 /** Whether anything in the conversation refers to a tool. */
 function mentionsTools(messages: readonly WireMessage[]): boolean {
@@ -264,7 +81,11 @@ function toolConfigFor(input: {
  * request without one is rejected rather than given a sensible limit.
  */
 function converseBody(input: TurnRequest): Record<string, unknown> {
-  const messages = convertMessages(input.messages);
+  const messages = convertMessages(input.messages, input.vision);
+  const maxTokens = input.maxOutputTokens ?? 4096;
+  // Keep the requested output ceiling and reserve room for the answer. A budget
+  // below 1024 is rejected by the model, so small ceilings get no thinking.
+  const budget = Math.min(input.thinkingBudgetTokens ?? 0, maxTokens - 1024);
   const toolConfig = toolConfigFor({
     tools: input.tools,
     allowTools: input.allowTools,
@@ -275,7 +96,7 @@ function converseBody(input: TurnRequest): Record<string, unknown> {
     messages,
     ...(input.systemPrompt.trim() !== "" ? { system: [{ text: input.systemPrompt }] } : {}),
     inferenceConfig: {
-      maxTokens: input.maxOutputTokens ?? 4_096,
+      maxTokens,
       // Only stated when the model takes one: a reasoning model rejects the field.
       ...(input.supportsTemperature !== false && input.thinkingLevelName === undefined
         ? { temperature: input.temperature }
@@ -283,13 +104,11 @@ function converseBody(input: TurnRequest): Record<string, unknown> {
       ...(input.topP !== undefined ? { topP: input.topP } : {}),
     },
     // Thinking is a model-level request, not a sampling setting: it travels in
-    // the protocol's own fields, and only when the run configured a budget.
-    // Sending it unasked would turn on reasoning for a model the caller wanted
-    // fast, and omitting it when asked would silently drop the setting.
-    ...(input.thinkingBudgetTokens !== undefined
+    // the protocol's own fields when the configured budget fits the output cap.
+    ...(budget >= 1024
       ? {
           additionalModelRequestFields: {
-            thinking: { type: "enabled", budget_tokens: input.thinkingBudgetTokens },
+            thinking: { type: "enabled", budget_tokens: budget },
           },
         }
       : {}),

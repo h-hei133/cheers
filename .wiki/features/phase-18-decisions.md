@@ -579,7 +579,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
 | W7-26 / SES-08 | 回放、导出、迁移、恢复准入、检查点、字段优先级与历史写入观察已核验；后续转W7-31 | 已完成；原36模块行为矩阵闭合，保证边界与历史数据限制见审计表 |
 | W7-31 | [38模块Shell审计](phase-18-shell-audit.md)；审批、根绑定、准入、后台输出、Shell选择与关闭均有行为证据 | 已完成；所列行为矩阵及旧result-contract门禁债务闭合，保证边界见审计表 |
-| W7-27 | [Provider审计](phase-18-provider-audit.md)；单次响应、多行SSE、重试延迟和EOF完成证据 | 执行中；逐字段、用量、超时取消矩阵继续 |
+| W7-27 | [Provider审计](phase-18-provider-audit.md)；单次响应、SSE/EOF、重试、摘要签名和Bedrock字段/二进制分流 | 执行中；缓存刷新及最终用量/超时取消矩阵继续 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -2008,3 +2008,13 @@ HTTP step在provider重试预算为零时仍把Retry-After解析值带入Assista
 九套136项、构建、静态阻断门与43项脚本通过；caller撤销10失败3通过、端口撤销1失败30通过，精确恢复最终复跑。
 独立APPROVE/CLEAR。双模式编译PTY的/btw与/compact共四请求签名独立验证、摘要落盘，exit0，无真实provider。
 4e6290c8两项远端检查成功；NormProof整体advisory仍partial。完整字段、用量及其余路径矩阵继续，见Provider审计。
+
+
+### W7-27 第四批：Bedrock能力与二进制分流（2026-10-04）
+
+vision=false复用文字fallback；thinking预算最多为caller上限减1024，低于1024省略，不提高输出上限。
+消息转换拆到bedrock/messages.ts，两个owner函数名15/6；旧21超限消除。参考预算留答案空间的决定，保留本仓caller ceiling优先。
+实际PTY揭示binary MIME被当JSON解析；补isEventStream分流，复用原端点reader。原失败保留，不归咎驱动。
+定向6套170项、构建、静态阻断门和43项脚本通过；字段反转12失败91通过，分流反转3失败91通过，精确恢复后170项再通过。
+独立APPROVE/CLEAR；双模式编译JS CLI本地HTTP共6场景验证字段和合法binary完成、单次请求与来源一致，无真实provider。
+证据及参考差异见Provider审计第四批。a86e1936两项远端检查成功；W7-27剩余缓存刷新、最终流/timeout/cancel与usage继续。

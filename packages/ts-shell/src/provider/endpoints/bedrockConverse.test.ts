@@ -138,7 +138,7 @@ describe("the request body", () => {
   it("declares a placeholder tool when the history shows one but none is offered", () => {
     // The protocol rejects a request whose history carries a tool call or result
     // unless it also carries a tool configuration, and it has no way to say
-    // "none". The placeholder is never callable: the model is told to answer.
+    // "none". The placeholder description tells the model to answer in text.
     const body = endpointTurnBody("bedrock-converse-stream", {
       ...BASE,
       allowTools: false,
@@ -188,6 +188,7 @@ describe("a message with an image", () => {
     // description of a picture it cannot see. The picture has to arrive.
     const body = endpointTurnBody("bedrock-converse-stream", {
       ...BASE,
+      vision: true,
       messages: [
         {
           role: "user",
@@ -209,6 +210,7 @@ describe("a message with an image", () => {
   it("maps a JPEG MIME type to the format name this protocol expects", () => {
     const body = endpointTurnBody("bedrock-converse-stream", {
       ...BASE,
+      vision: true,
       messages: [
         {
           role: "user",
@@ -227,6 +229,7 @@ describe("a message with an image", () => {
     // The picture is still lost, but the reason is where the picture was.
     const body = endpointTurnBody("bedrock-converse-stream", {
       ...BASE,
+      vision: true,
       messages: [
         {
           role: "user",
@@ -256,6 +259,7 @@ describe("a message with an image", () => {
     ] as const) {
       const body = endpointTurnBody("bedrock-converse-stream", {
         ...BASE,
+        vision: true,
         messages: [{ role: "user", content: [{ type: "image", mimeType, data: "aW1hZ2U=" }] }],
       });
       const messages = body.messages as ReadonlyArray<{ content: ReadonlyArray<Record<string, unknown>> }>;
@@ -267,6 +271,7 @@ describe("a message with an image", () => {
   it("carries the text beside the image, which flattening would have dropped", () => {
     const body = endpointTurnBody("bedrock-converse-stream", {
       ...BASE,
+      vision: true,
       messages: [
         {
           role: "user",
@@ -284,7 +289,9 @@ describe("a message with an image", () => {
   it("carries a thinking budget in the protocol's own field, not the sampling settings", () => {
     const body = endpointTurnBody("bedrock-converse-stream", {
       ...BASE,
+      vision: true,
       thinkingBudgetTokens: 4096,
+      maxOutputTokens: 8192,
     }) as { additionalModelRequestFields?: { thinking?: { type: string; budget_tokens: number } } };
     expect(body.additionalModelRequestFields?.thinking).toEqual({ type: "enabled", budget_tokens: 4096 });
   });
@@ -292,6 +299,52 @@ describe("a message with an image", () => {
   it("omits the thinking field when no budget was configured", () => {
     const body = endpointTurnBody("bedrock-converse-stream", BASE) as { additionalModelRequestFields?: unknown };
     expect(body.additionalModelRequestFields).toBeUndefined();
+  });
+});
+
+describe("request capability limits", () => {
+  it.each([false, undefined])("describes images when vision is %s", (vision) => {
+    const input = {
+      ...BASE,
+      vision,
+      messages: [{ role: "user", content: [
+        { type: "text", text: "look at this" },
+        { type: "image", mimeType: "image/png", data: "aW1hZ2U=" },
+      ] }],
+    } as TurnRequest;
+    const body = endpointTurnBody("bedrock-converse-stream", input);
+    expect(body.messages).toEqual([{ role: "user", content: [
+      { text: "look at this" },
+      { text: "[Image: image/png (0KB) - non-vision fallback]" },
+    ] }]);
+    expect(JSON.stringify(body)).not.toContain("aW1hZ2U=");
+  });
+
+  it("describes an image-only simple request without an empty message", () => {
+    const body = endpointShape("bedrock-converse-stream").body({
+      model: BASE.model,
+      messages: [{ role: "user", content: [{ type: "image", mimeType: "image/png", data: "aW1hZ2U=" }] }],
+    });
+    expect(body.messages).toEqual([{ role: "user", content: [
+      { text: "[Image: image/png (0KB) - non-vision fallback]" },
+    ] }]);
+  });
+
+  it.each([
+    [4096, 16384, 3072],
+    [undefined, 16384, 3072],
+    [8192, 2048, 2048],
+    [2048, 16384, 1024],
+    [2047, 16384, undefined],
+    [512, 16384, undefined],
+    [4096, 0, undefined],
+    [4096, 1023, undefined],
+  ])("fits thinking into ceiling %s with requested budget %s", (maxOutputTokens, thinkingBudgetTokens, budget) => {
+    const body = endpointTurnBody("bedrock-converse-stream", { ...BASE, maxOutputTokens, thinkingBudgetTokens });
+    expect((body.inferenceConfig as { maxTokens: number }).maxTokens).toBe(maxOutputTokens ?? 4096);
+    expect(body.additionalModelRequestFields).toEqual(budget === undefined ? undefined : {
+      thinking: { type: "enabled", budget_tokens: budget },
+    });
   });
 });
 
