@@ -1956,3 +1956,15 @@ W7-31完成，继续27→29→33及剩余W8；Phase 18未完成。细节见Shell
 PTY初次断言错误要求摘要位于最后user消息；请求证据确认它位于历史checkpoint，当前user承载注入标记，随后按两个实际来源断言通过。
 NormProof阻断义务满足、整体advisory仍partial。W7-27逐字段表、完整流边界、用量与逐路径超时/取消审计继续，Phase18未完成。
 W7-31提交9d4a4cbf的CI37143499101与Architecture Watch37143499107均成功。
+
+
+### W8-36 / PRV-14：SSE多行数据（随W7-27，2026-10-04）
+
+两个原生文本协议的data解码改为按CRLF/CR/LF分行，只去冒号后的一个可选空格，再以换行连接。
+对照参考的decodeSseLine/flushSseEvent，这三项决策全部一致；保留现有坏JSON忽略政策，不借此扩展完整SSE生命周期承诺。
+新增8项逐字节回归覆盖中文、三种换行、合法多行JSON及无效字符串不能跨行拼成未发送的文本；基线与撤销均4失败4通过。
+两个owner精确恢复后，6套161项在新隔离HOME连续两遍通过；build:cli、静态阻断门和43项脚本通过，独立APPROVE/CLEAR。
+首次复跑1失败160通过归测试隔离：两个thinking fixture没有项目标记，仓内TMPDIR让状态写到父项目；各加.agents根标记后连续通过。
+普通/全屏编译PTY使用CRLF多行HTTP事件，伪拼接文本未入终端/会话，原生compact、拒绝/取消/重试及终态来源均通过；产物.tmp/sse-pty-3e8fia14，无真实provider。
+本批完成W8-36并独立提交；EOF/终止帧、完整形状与超时用量矩阵仍属W7-27后续，不记为已完成。
+b805f63e的CI37144756195与Architecture Watch37144756229均成功。

@@ -563,6 +563,7 @@ describe("createStepFunction", () => {
     // `max_completion_tokens` failed on an otherwise correct request.
     const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "step-shape-"));
     try {
+      fs.mkdirSync(path.join(workspace, ".agents"));
       writeProjectState(workspace, { thinkingEffort: "high" });
       let body: Record<string, unknown> = {};
       const step = createStepFunction({
@@ -727,6 +728,7 @@ describe("createStepFunction", () => {
     // set for the field to be sent at all, so this runs in its own workspace.
     const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "step-effort-"));
     try {
+      fs.mkdirSync(path.join(workspace, ".agents"));
       writeProjectState(workspace, { thinkingEffort: "high" });
       const bodies: string[] = [];
       const step = createStepFunction({

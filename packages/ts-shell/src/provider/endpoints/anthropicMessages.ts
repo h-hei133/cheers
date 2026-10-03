@@ -623,10 +623,10 @@ function findEventBoundary(buffer: string): { readonly at: number; readonly widt
 
 function parseEvent(raw: string): AnthropicEvent | undefined {
   const data = raw
-    .split("\n")
+    .split(/\r\n|\r|\n/)
     .filter((line) => line.startsWith("data:"))
-    .map((line) => line.slice(5).trim())
-    .join("");
+    .map((line) => line.slice(5).replace(/^ /, ""))
+    .join("\n");
   if (!data || data === "[DONE]") return undefined;
   try {
     return JSON.parse(data) as AnthropicEvent;

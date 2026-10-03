@@ -437,10 +437,10 @@ function findEventBoundary(buffer: string): { readonly at: number; readonly widt
 /** The `data:` payload of one event, or nothing when it carries none. */
 function dataOf(raw: string): string | undefined {
   const data = raw
-    .split(/\r?\n/)
+    .split(/\r\n|\r|\n/)
     .filter((line) => line.startsWith("data:"))
-    .map((line) => line.slice(5).trim())
-    .join("");
+    .map((line) => line.slice(5).replace(/^ /, ""))
+    .join("\n");
   return data === "" ? undefined : data;
 }
 
