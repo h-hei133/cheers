@@ -122,6 +122,17 @@ describe("the credential on the wire", () => {
 });
 
 describe("choosing which credential to authorize with", () => {
+  it("keeps native version headers with a subscription bearer token", () => {
+    const result = providerAuthorization({
+      endpoint: "anthropic-messages",
+      accountAuth: { type: "subscription", accessToken: "subscription-token", refreshToken: "refresh", expiresAt: Date.now() + 60_000 },
+    });
+    const headers = new Headers(result.headers);
+    expect(headers.get("authorization")).toBe("Bearer subscription-token");
+    expect(headers.get("anthropic-version")).toBe("2023-06-01");
+    expect(headers.has("x-api-key")).toBe(false);
+  });
+
   it("refuses a credential the provider did not issue", () => {
     // The stored `type` says which flow issued the token. Without this check a
     // Google token could be sent to OpenAI simply because the config names both.

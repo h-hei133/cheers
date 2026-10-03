@@ -41,6 +41,9 @@ export type EndpointKind = string;
 
 /** What one endpoint needs to say about itself. */
 export interface EndpointShape {
+  /** An optional model-list resource at the same base URL. Absent means the
+   * generation endpoint has no generic readiness probe; the request owns validation. */
+  readonly modelsPath?: string;
   /**
    * The resource appended to a base URL, given the model this request is for.
    *

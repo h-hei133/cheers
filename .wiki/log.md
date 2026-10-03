@@ -5817,3 +5817,14 @@ compact与memory在barrier/readiness/启动hook之后、kernel准入前才消耗
 
 修复显式provider被其他活动连接遮蔽：先匹配provider，再复用现有fallback，保留凭据优先级与端点/模型配对。
 3套38项与构建通过；反转后4失败12通过并精确恢复，独立APPROVE/CLEAR。双模式编译PTY验证HTTP地址/合成认证来自匹配连接，并保留准入与一次注入断言。未访问真实provider，Shell剩余项继续。
+
+
+## [2026-10-04] fix | Phase 18 W7-31 准入探测协议
+
+readiness复用所选endpoint资源与认证规则，与实际生成共享catalog快照、地址和续期凭据；
+签名端点不再被缺静态key或虚构model-list阻断。取消不重试，清理失败保留HTTP分类。
+6套86项、构建、静态阻断门和40项脚本测试通过；8文件反转10失败29通过，精确恢复后复跑通过。
+独立APPROVE/CLEAR，兼容与原生各普通/全屏PTY通过本批准入路径，无真实provider访问。
+原生压缩首轮失败归入W7-27：simple body发stream:true而摘要读取JSON；未将原生压缩计为成功。
+judge阻断义务满足、整体仍partial；W7-31剩余background/platform/直接断言与脚本债务继续。
+前两提交2265b3b、30ec3d3e的CI与Architecture Watch均成功，详见Shell审计与裁决记录。

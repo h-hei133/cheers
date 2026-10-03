@@ -1,6 +1,9 @@
 import type { RuntimeProvider } from "../../config/runtimeConfig.js";
 import type { AccountAuthConfig } from "../../config/runtimeConfig.js";
 import { createProviderFetchFromEnv } from "../../provider/request/fetch.js";
+import { DEFAULT_ENDPOINT_KIND, endpointShape, type EndpointKind } from "../../provider/endpoints/index.js";
+import { providerAuthorization } from "../../provider/request/authorization.js";
+import { BUILTIN_PROVIDERS, providerEndpoint } from "../models/catalog.js";
 import type { ProviderRegistryProjection } from "../../provider/registry/provider.js";
 import type { QueryEvent } from "../query/runtime/events.js";
 import { buildUnavailableResult } from "../tools/toolPolicyResult.js";
@@ -8,19 +11,6 @@ import { redactProviderFailureDetail } from "./providerFailureRedaction.js";
 import { getProviderApiKeyEnvVarName } from "./providerCredentials.js";
 import { needsUserEndpoint, providerFacts } from "../providers/facts.js";
 
-/**
- * Where a provider is reached when nothing configured one.
- *
- * Per provider rather than one shared default: the two endpoint kinds live at
- * different hosts, so a single fallback would send one of them to the other's
- * address. A provider with no entry here still needs a configured base URL, and
- * readiness says so rather than guessing.
- */
-const DEFAULT_BASE_URLS: Partial<Record<RuntimeProvider, string>> = {
-  openai: "https://api.openai.com/v1",
-  anthropic: "https://api.anthropic.com/v1",
-};
-const DEFAULT_PROVIDER_BASE_URL = DEFAULT_BASE_URLS.openai!;
 const DEFAULT_PROVIDER_NETWORK_RECONNECT_ATTEMPTS = 5;
 
 export type ProviderReadinessFailureKind =
@@ -48,6 +38,9 @@ export interface ProviderReadinessCheckOptions {
   readonly accountAuth?: AccountAuthConfig;
   readonly baseUrl?: string;
   readonly model?: string;
+  /** The same catalog selection the subsequent model request will use. */
+  readonly endpoint?: EndpointKind;
+  readonly signal?: AbortSignal;
 }
 
 export interface ProviderReadinessMetadataProjection {
@@ -99,11 +92,14 @@ export async function checkRealProviderReadiness(
   options: ProviderReadinessCheckOptions = {},
 ): Promise<ProviderReadinessCheckResult> {
   const provider = options.provider ?? "openai";
+  options.signal?.throwIfAborted();
+  const endpoint = options.endpoint ?? providerEndpoint(BUILTIN_PROVIDERS, provider);
+  const shape = endpointShape(endpoint);
 
   const envVarName = getProviderApiKeyEnvVarName(provider);
   const apiKey = (options.apiKey ?? process.env[envVarName] ?? "").trim();
   const accountAccess = options.accountAuth?.accessToken?.trim();
-  if (!apiKey && !accountAccess) {
+  if (!apiKey && !accountAccess && !shape.signer) {
     return {
       ok: false,
       failure: providerUnavailableFailure(
@@ -135,13 +131,13 @@ export async function checkRealProviderReadiness(
     return { ok: true };
   }
 
-  if (provider === "openai" && accountAccess) {
+  if (provider === "openai" && accountAccess && (endpoint ?? DEFAULT_ENDPOINT_KIND) === DEFAULT_ENDPOINT_KIND) {
     // OpenAI account-auth follows the codex backend auth path, not /v1/models.
     // Let runtime adapter do the real call.
     return { ok: true };
   }
 
-  if (provider === "google" && accountAccess) {
+  if (provider === "google" && accountAccess && (endpoint ?? DEFAULT_ENDPOINT_KIND) === DEFAULT_ENDPOINT_KIND) {
     // Google account-auth tokens are consumed by the provider adapter and may
     // use non-/models readiness semantics depending on configured endpoint.
     return { ok: true };
@@ -149,13 +145,11 @@ export async function checkRealProviderReadiness(
 
   const fetchImpl = options.fetchImpl ?? createProviderFetchFromEnv();
   const timeoutMs = options.timeoutMs ?? 5000;
-  const baseUrl = normalizeBaseUrl(
-    options.baseUrl ?? DEFAULT_BASE_URLS[provider] ?? DEFAULT_PROVIDER_BASE_URL,
-  );
+  const baseUrl = normalizeBaseUrl(options.baseUrl ?? BUILTIN_PROVIDERS.find(entry => entry.id === provider)?.baseUrl ?? "");
   const model = options.model?.trim();
 
-  if (needsUserEndpoint(provider)) {
-    if (!options.baseUrl?.trim()) {
+  if (!baseUrl || needsUserEndpoint(provider)) {
+    if (!baseUrl) {
       return {
         ok: false,
         failure: providerUnavailableFailure(
@@ -178,6 +172,12 @@ export async function checkRealProviderReadiness(
     }
   }
 
+  // Regional/account-scoped generation hosts need not offer model listing.
+  // A signer is resolved on the actual request, not by sending its credentials
+  // to an invented resource. This is admission, not proof of authentication.
+  if (!shape.modelsPath) return { ok: true };
+  const headers = providerAuthorization({ apiKey, accountAuth: options.accountAuth, endpoint }).headers;
+
   const reconnectAttempts: string[] = [];
   for (
     let attempt = 1;
@@ -185,16 +185,21 @@ export async function checkRealProviderReadiness(
     attempt += 1
   ) {
     const controller = new AbortController();
+    const onAbort = (): void => controller.abort(options.signal?.reason);
+    options.signal?.addEventListener("abort", onAbort, { once: true });
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const response = await fetchImpl(`${baseUrl}/models`, {
+      options.signal?.throwIfAborted();
+      const response = await fetchImpl(`${baseUrl}${shape.modelsPath}`, {
         method: "GET",
-        headers: {
-          authorization: `Bearer ${accountAccess || apiKey}`,
-        },
+        headers,
         signal: controller.signal,
       });
+      // Readiness needs the status only. Cleanup failure must not replace an
+      // already received HTTP result; explicit caller cancellation still wins.
+      await response.body?.cancel().catch(() => undefined);
+      options.signal?.throwIfAborted();
 
       if (response.status === 401 || response.status === 403) {
         return {
@@ -218,6 +223,7 @@ export async function checkRealProviderReadiness(
 
       return { ok: true };
     } catch (error) {
+      options.signal?.throwIfAborted();
       const message = error instanceof Error ? error.message : String(error);
       const isAbortError =
         error instanceof Error && error.name.toLowerCase().includes("abort");
@@ -251,6 +257,7 @@ export async function checkRealProviderReadiness(
       };
     } finally {
       clearTimeout(timeout);
+      options.signal?.removeEventListener("abort", onAbort);
     }
   }
 

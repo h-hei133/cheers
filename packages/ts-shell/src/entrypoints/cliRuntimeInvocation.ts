@@ -14,7 +14,7 @@ import { registerDeclaredHooks, type HookApprovalRequest } from "../core/hooks/r
 import { createCoreToolRegistry } from "../core/tools/registry.js";
 import { filterVisibleToolNames } from "../core/tools/prefilter.js";
 import { loadCatalog } from "../core/models/catalogStore.js";
-import { providerEndpoint } from "../core/models/catalog.js";
+import { providerEndpoint, type CatalogProvider } from "../core/models/catalog.js";
 import type { AccountAuthConfig, RuntimeConfig } from "../config/runtimeConfig.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { buildSystemPrompt, type SystemPromptContext } from "../turn/prompt.js";
@@ -41,7 +41,7 @@ import {
   providerFetchFromTimeouts,
   providerTimeoutsFrom,
 } from "../provider/request/fetch.js";
-import { endpointShape } from "../provider/endpoints/index.js";
+import { DEFAULT_ENDPOINT_KIND, endpointShape } from "../provider/endpoints/index.js";
 import { accountAuthFor, providerAuthorization, renewAccountAuthIfExpiring } from "../provider/request/authorization.js";
 import { persistRenewedAccountAuth } from "../core/auth/providerAuthRuntime.js";
 import type {
@@ -89,6 +89,8 @@ export interface CliRuntimeInvocationInput {
 }
 
 export interface CliRuntimeInvocationRequest extends Omit<CliRuntimeInvocationInput, "providerModeEnv"> {
+  /** One catalog snapshot for readiness and every step in this invocation. */
+  readonly providerCatalog?: readonly CatalogProvider[];
   readonly providerMode: ProviderMode;
 }
 
@@ -241,12 +243,28 @@ function deferUntilReady(
       });
       return;
     }
+    const catalog = loadCatalog();
+    const resolution = request.providerCredentialResolution;
+    request = {
+      ...request,
+      providerCatalog: catalog,
+      providerCredentialResolution: {
+        ...resolution,
+        baseUrl: resolution.baseUrl ?? resolution.credential?.baseUrl ?? catalog.find(entry => entry.id === resolution.provider)?.baseUrl,
+        ...(renewed.accountAuth && resolution.credential ? {
+          credential: { ...resolution.credential, accountAuth: renewed.accountAuth },
+        } : {}),
+      },
+    };
     const readiness = await dependencies.checkProviderReadiness({
       provider: request.providerCredentialResolution.provider,
-      apiKey: request.providerCredentialResolution.credential?.apiKey,
-      accountAuth: renewed.accountAuth ?? request.providerCredentialResolution.credential?.accountAuth,
+      apiKey: request.providerCredentialResolution.credential?.apiKey ?? "",
+      accountAuth: request.providerCredentialResolution.credential?.accountAuth,
       baseUrl: request.providerCredentialResolution.baseUrl,
       model: request.providerCredentialResolution.model,
+      endpoint: providerEndpoint(catalog, request.providerCredentialResolution.provider) ?? DEFAULT_ENDPOINT_KIND,
+      signal: request.signal,
+      fetchImpl: providerFetch(request.runtimeConfig),
     });
     if (readiness.ok === false) {
       yield dependencies.createReadinessTerminalEvent({
@@ -667,7 +685,7 @@ function createProviderStep(
   // Read once for the whole step function, not once per use: loading the
   // catalogue touches the filesystem, and a run that reloaded it mid-turn could
   // change request shape between two steps of the same answer.
-  const catalog = loadCatalog();
+  const catalog = request.providerCatalog ?? loadCatalog();
   const endpoint = providerEndpoint(catalog, resolution.provider);
   return createStepFunction({
     provider: {

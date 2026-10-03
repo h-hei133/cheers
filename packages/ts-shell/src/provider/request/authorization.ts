@@ -108,6 +108,7 @@ export function providerAuthorization(input: {
   if (account) {
     const headers: Record<string, string> = {
       ...BASE_HEADERS,
+      ...(input.endpoint ? endpointShape(input.endpoint).headers() : {}),
       Authorization: `Bearer ${account.accessToken}`,
     };
     // The account-scoped endpoint rejects a token whose account is not named.

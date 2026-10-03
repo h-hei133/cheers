@@ -578,7 +578,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W7-32 | read每次返回正文；startup结构/身份/有界读写、freshness与命令投影已修复；保留默认禁用 | 已完成，定向验证与隔离验收通过 |
 | W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
 | W7-26 / SES-08 | 回放、导出、迁移、恢复准入、检查点、字段优先级与历史写入观察已核验；后续转W7-31 | 已完成；原36模块行为矩阵闭合，保证边界与历史数据限制见审计表 |
-| W7-31 | [38模块Shell审计](phase-18-shell-audit.md)；首批修复审批身份、once生命周期和Git helper准入 | 进行中；根绑定已修复；终态、compact注入、readiness、连接选择及background仍待完成 |
+| W7-31 | [38模块Shell审计](phase-18-shell-audit.md)；首批修复审批身份、once生命周期和Git helper准入 | 进行中；审批、根绑定、终态、compact注入、readiness及连接选择已修复；background、platform、直接断言与旧脚本待完成 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1852,3 +1852,26 @@ CLI/env key与匹配连接端点/模型配对，匹配账号连接的优先级�
 独立代码APPROVE、架构CLEAR；普通/全屏编译PTY用另一provider的活动连接加显式--provider，
 服务器断言实际请求地址与合成认证均来自匹配连接，并完成拒绝/阻断/取消后重试和一次上下文注入。
 产物.tmp/connection-pty-adbsriyo；未访问真实provider或真实配置。W7-31剩余项保持未完成。
+
+
+### W7-31 第五批：探测与生成的协议一致性（2026-10-04）
+
+复用endpoint描述和authorization，按所选协议请求model-list资源；catalog提供默认地址，
+不向通用回退主机发送区域/账号凭据。签名端点无model-list时只准入，由实际transport验证。
+探测与生成持有同一catalog快照和续期凭据；自定义原生协议保留账号版本头并执行其声明的探测。
+取消退出重试，清理响应体失败不改变已知HTTP分类。参考采用协议自己的key/Bearer语义与请求验证边界，未复制代码或增加第二套认证器。
+
+隔离定向6套86项及build:ts通过；8文件反转10失败29通过后精确恢复，最终86项通过。
+独立APPROVE/CLEAR；审查发现的响应体清理错误已修复，200/401/403回归覆盖。
+静态阻断门及40项脚本测试通过，1432文件零循环；旧reachability7、ceiling7、docs-source120保留。
+judge exit0、所有阻断义务满足，总体advisory仍partial。旧verify:result-contract未在此批运行或修复。
+
+兼容协议普通/全屏PTY（.tmp/admission-pty-jxazndlj）与原生协议普通/全屏PTY
+（.tmp/readiness-pty-bhbuf8mv）均exit0；后者服务器核对原生资源与认证头，验证失败重试、
+memory仅一次及终态来源。无真实provider调用或配置访问。
+原生初轮/compact因stream:true与res.json()不匹配失败，属于既有simple-body/compaction契约缺陷；
+保留证据.tmp/readiness-pty-wm7w0wmn并转W7-27，与已登记的签名端点simple-call问题一并处理。
+当前原生PTY不包含压缩成功证明，兼容侧继续覆盖压缩。
+第三批2265b3b的CI 37132112387/Architecture Watch 37132112369，
+第四批30ec3d3e的CI 37133598680/Architecture Watch 37133598681均成功。
+W7-31与后续W7/W8仍在执行，Phase 18未完成。

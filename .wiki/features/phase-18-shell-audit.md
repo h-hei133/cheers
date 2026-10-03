@@ -17,7 +17,7 @@ W7-31仍在执行。首批聚焦审批，其余已复现问题按下表继续修
 | `printPromptInput.ts` | stdin capture与CLI输入传递 | 未找到直接symbol测试；保留transport断言缺口 |
 | `providerCredentials.ts` | CLI选择的provider对应连接 | 第四批修复：活动连接先匹配显式provider再进入原fallback；端点、模型、账号及key优先级回归与双模式PTY通过 |
 | `providerFailureRedaction.ts` | 未知错误的路径/token脱敏；同名测试 | 所列路径源码核对，无新缺陷 |
-| `providerReadiness.ts` | readiness请求与实际adapter认证一致 | 已复现原生消息端点探测错误使用Bearer；合成HTTP证据，待修复 |
+| `providerReadiness.ts` | readiness请求与实际adapter认证一致 | 第五批修复：按catalog协议使用资源与认证；探测/生成共享快照和续期凭据，双模式原生HTTP/PTY通过 |
 | `recovery.ts` | 恢复准入与当前分支证据 | 复用W7-26恢复证据 |
 | `restoreSurfaceSummary.ts` | authority和无成功噪声；同名测试 | 所列路径源码核对，无新缺陷 |
 | `runtimeContext.ts` | workspace/session/recovery身份 | 第二批修复大小写比较；target-base/requested诊断覆盖 |
@@ -105,3 +105,28 @@ W7-31的凭据/readiness协议、background、platform与直接断言缺口继�
 普通/全屏编译PTY使用另一provider的活动连接及显式--provider，验证实际HTTP请求仅到匹配连接端点、使用其合成凭据和模型，
 并保留前批拒绝/阻断/取消/重试/一次注入/终态来源断言；产物.tmp/connection-pty-adbsriyo。
 readiness协议与剩余Shell项仍未完成。
+
+
+## 第五批准入探测协议
+
+readiness复用现有endpoint声明的可选modelsPath与authorization头，默认地址来自catalog；
+同一次invocation的探测与生成共享catalog快照、base URL及续期后的账号凭据。
+原生消息使用版本头与key，账号令牌保留版本头；原生生成协议不再被provider标签上的账号免探测规则跳过。
+显式取消立即退出，不消耗网络重试；响应体清理失败保留已收到的HTTP分类。
+区域/账号签名端点没有通用model-list资源时只准入，签名与认证由实际请求验证；
+探测通过不证明生成权限或模型可用，也不声称真实provider认证通过。
+
+定向6套86项、build:ts及40项脚本测试通过。反转8个生产文件后10失败29通过，精确恢复并复跑86项通过。
+独立代码APPROVE、架构CLEAR；双方指出的body.cancel错误覆盖HTTP分类问题已修复并补200/401/403回归。
+静态阻断门通过，1432文件零循环；reachability7、ceiling7与docs-source120为既有advisory；
+judge exit0，阻断义务满足，整体仍partial。
+
+普通/全屏兼容协议PTY保留compact与memory的拒绝/阻断/取消后重试、一次注入和终态来源断言；
+产物.tmp/admission-pty-jxazndlj。原生协议双模式PTY核对真实HTTP路径、认证头、memory保留与一次注入，
+以及拒绝/阻断/取消无模型请求、成功终态来源；产物.tmp/readiness-pty-bhbuf8mv，均exit0。
+全部使用本地合成HTTP与隔离home，未访问真实provider配置。
+
+原生PTY首次尝试/compact失败（.tmp/readiness-pty-wm7w0wmn）：
+原生simple body沿用stream:true，既有requestCompactionSummary却调用res.json()。
+这属于现存W7-27协议字段/流边界缺口，转该任务处理；本批原生PTY不再执行压缩，不把该路径计为通过。
+W7-31继续background、platform、直接行为断言与旧result-contract脚本债务。

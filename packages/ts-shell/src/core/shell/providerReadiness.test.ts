@@ -4,8 +4,112 @@ import {
   createProviderReadinessTerminalEvent,
 } from "./providerReadiness.js";
 import { redactProviderFailureDetail } from "./providerFailureRedaction.js";
+import { DEFAULT_ENDPOINT_KIND } from "../../provider/endpoints/index.js";
 
 describe("provider readiness boundary", () => {
+  it.each([
+    { provider: "anthropic" as const, url: "https://api.anthropic.com/v1/models", header: "x-api-key" },
+    { provider: "google-ai" as const, url: "https://generativelanguage.googleapis.com/v1beta/models", header: "x-goog-api-key" },
+  ])("uses the protocol resource and authentication for $provider", async ({ provider, url, header }) => {
+    const calls: string[] = [];
+    let cancelled = false;
+    const result = await checkRealProviderReadiness({
+      provider, apiKey: "test-key",
+      fetchImpl: async (input, init) => {
+        calls.push(String(input));
+        const headers = new Headers(init?.headers);
+        expect(headers.get(header)).toBe("test-key");
+        expect(headers.has("authorization")).toBe(false);
+        if (provider === "anthropic") expect(headers.get("anthropic-version")).toBe("2023-06-01");
+        return new Response(new ReadableStream({ cancel() { cancelled = true; } }));
+      },
+    });
+    expect(result).toEqual({ ok: true });
+    expect(calls).toEqual([url]);
+    expect(cancelled).toBe(true);
+  });
+
+  it("uses the selected catalog protocol instead of inferring it from a provider label", async () => {
+    const result = await checkRealProviderReadiness({
+      provider: "anthropic", endpoint: DEFAULT_ENDPOINT_KIND, apiKey: "test-key", baseUrl: "https://gateway.invalid/v1",
+      fetchImpl: async (input, init) => {
+        expect(String(input)).toBe("https://gateway.invalid/v1/models");
+        const headers = new Headers(init?.headers);
+        expect(headers.get("authorization")).toBe("Bearer test-key");
+        expect(headers.has("x-api-key")).toBe(false);
+        return new Response("ok");
+      },
+    });
+    expect(result).toEqual({ ok: true });
+  });
+
+  it.each(["bedrock", "vertex"] as const)("leaves signed %s generation validation to its request transport", async provider => {
+    expect(await checkRealProviderReadiness({
+      provider, apiKey: "", baseUrl: "https://generation.invalid/account/models", model: "model",
+      fetchImpl: async () => { throw new Error("No model-list resource at this generation host"); },
+    })).toEqual({ ok: true });
+  });
+
+  it("probes a selected native protocol even when the provider supports account-auth admission", async () => {
+    let calls = 0;
+    const result = await checkRealProviderReadiness({
+      provider: "openai", endpoint: "anthropic-messages", apiKey: "", baseUrl: "https://gateway.invalid/v1",
+      accountAuth: { type: "openai-chatgpt-account", accessToken: "account-token", refreshToken: "refresh", expiresAt: Date.now() + 60_000 },
+      fetchImpl: async (input, init) => {
+        calls++;
+        expect(String(input)).toBe("https://gateway.invalid/v1/models");
+        const headers = new Headers(init?.headers);
+        expect(headers.get("authorization")).toBe("Bearer account-token");
+        expect(headers.get("anthropic-version")).toBe("2023-06-01");
+        expect(headers.has("x-api-key")).toBe(false);
+        return new Response("ok");
+      },
+    });
+    expect(result).toEqual({ ok: true });
+    expect(calls).toBe(1);
+  });
+
+  it.each([200, 401, 403])("preserves HTTP %s when releasing an errored response body fails", async status => {
+    let calls = 0;
+    const result = await checkRealProviderReadiness({
+      apiKey: "test-key",
+      fetchImpl: async () => {
+        calls++;
+        return new Response(new ReadableStream({ start(controller) { controller.error(new Error("network body reset")); } }), { status });
+      },
+    });
+    if (status === 200) expect(result).toEqual({ ok: true });
+    else expect(result).toMatchObject({ ok: false, failure: { kind: "auth" } });
+    expect(calls).toBe(1);
+  });
+
+  it("does not send a scoped credential to a fallback host when its endpoint is absent", async () => {
+    const result = await checkRealProviderReadiness({
+      provider: "vertex", apiKey: "",
+      fetchImpl: async () => { throw new Error("No configured account host"); },
+    });
+    expect(result).toMatchObject({ ok: false, failure: { kind: "missing-config" } });
+  });
+
+  it("does not retry an explicit cancellation during a readiness request", async () => {
+    const controller = new AbortController();
+    const reason = new Error("cancelled by user");
+    let calls = 0;
+    const pending = checkRealProviderReadiness({
+      provider: "anthropic", apiKey: "test-key", signal: controller.signal,
+      fetchImpl: async (_input, init) => {
+        calls++;
+        return new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true });
+          controller.abort(reason);
+        });
+      },
+    });
+    await expect(pending).rejects.toBe(reason);
+    expect(calls).toBe(1);
+    await expect(checkRealProviderReadiness({ apiKey: "test-key", signal: controller.signal })).rejects.toBe(reason);
+  });
+
   it("classifies missing key into actionable readiness failure", async () => {
     const result = await checkRealProviderReadiness({
       provider: "openai",
@@ -242,9 +346,7 @@ describe("provider readiness boundary", () => {
       model: "deepseek-ai/DeepSeek-V3",
       fetchImpl: async (input, init) => {
         requests.push(String(input));
-        expect(init?.headers).toMatchObject({
-          authorization: "Bearer test-key",
-        });
+        expect(new Headers(init?.headers).get("authorization")).toBe("Bearer test-key");
         return new Response("ok", { status: 200 });
       },
     });

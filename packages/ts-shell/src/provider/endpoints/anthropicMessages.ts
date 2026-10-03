@@ -754,6 +754,7 @@ function mapStopReason(reason: string): string {
 declareEndpoint("anthropic-messages", {
   // The model travels in the body, so the path is the same for every one.
   path: () => "/messages",
+  modelsPath: "/models",
   headers: (apiKey) => anthropicHeaders(apiKey),
   // Copilot serves Claude models through this protocol, and its gateway wants
   // the same metadata on these turns as on chat-completions ones.

@@ -274,6 +274,7 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
     label: "OpenAI",
     runtime: "openai",
     auth: "api-key",
+    baseUrl: "https://api.openai.com/v1",
     envVar: "OPENAI_API_KEY",
     // The reasoning models reject `max_tokens` and the `system` role outright:
     // the request has to carry `max_completion_tokens` and address the

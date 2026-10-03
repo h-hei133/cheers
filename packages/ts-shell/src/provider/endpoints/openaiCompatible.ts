@@ -25,6 +25,7 @@ const PATH = "/chat/completions";
 declareEndpoint("openai-compatible", {
   // The model travels in the body, so the path is the same for every one.
   path: () => PATH,
+  modelsPath: "/models",
   headers: (apiKey) => ({ ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) }),
   requestHeaders: copilotRequestHeaders,
   body: (input) => ({
