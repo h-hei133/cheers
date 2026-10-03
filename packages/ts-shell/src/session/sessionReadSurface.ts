@@ -163,13 +163,22 @@ export abstract class SessionReadSurface extends SessionLifecycleWrites {
     const statePath = this.host.store.statePath(sessionId);
     const stateSnapshot = this.normalizeLegacyPermissionStateForSession(
       session,
-      this.host.store.readStateSnapshotSafely(statePath),
+      this.host.store.readStateSnapshotRequired(statePath),
     );
+    if (!stateSnapshot) {
+      throw new Error(`Session state unavailable after continuity normalization at ${statePath}`);
+    }
+    const transcriptEvents = this.getTranscriptEvents(sessionId);
     return buildSessionContinuitySnapshot({
       session,
       stateSnapshot,
-      recoverySnapshot: this.getRecoverySnapshot(sessionId),
-      transcriptEvents: this.getTranscriptEvents(sessionId),
+      recoverySnapshot: buildRecoverySnapshotForSession({
+        sessionId,
+        session,
+        state: stateSnapshot,
+        transcriptEvents,
+      }),
+      transcriptEvents,
       approvalHistoryLimit: this.host.approvalAuditHistoryLimit,
     });
   }

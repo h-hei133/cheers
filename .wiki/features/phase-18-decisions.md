@@ -577,7 +577,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W8-40 / TOL-10（随W7-30） | 失败原因及部分答复保留；工具阶段取消和空答复按失败结算；适配器向父模型传递error | 已完成，定向验证通过；旧result-contract脚本仍失败 |
 | W7-32 | read每次返回正文；startup结构/身份/有界读写、freshness与命令投影已修复；保留默认禁用 | 已完成，定向验证与隔离验收通过 |
 | W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
-| W7-26 / SES-08 | 回放、导出、根值迁移、显式迁移失败次序、工作区绑定及摘要来源已分批修复；完整逐模块审计继续 | 执行中，第六批定向验证与双模式PTY通过 |
+| W7-26 / SES-08 | 回放、导出、根值迁移、显式迁移失败次序、工作区绑定、摘要来源及重复读取已分批修复；完整逐模块审计继续 | 执行中，第七批定向验证与双模式PTY通过 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1563,3 +1563,21 @@ NormProof exit0，阻断义务满足，整体仍因既有函数上限提示为pa
 及print/replay过期预期，不记为通过。第五批`0245fb92`的CI 37097269144与Architecture Watch 37097269145均成功。
 
 W7-26继续：snapshot重复读取、完整branch/query结果归属、compact更新与损坏记录准入尚待逐项审计，未声明完整审计通过。
+
+### W7-26 第七批：摘要入口复用观察输入（2026-10-03）
+
+`buildContinuitySnapshot`已有session和state后仍调用`getRecoverySnapshot`再次load，并重复读取transcript。
+两项生产manager回归复现了后一次pendingPrompt覆盖已观察提示、后一次日志使已观察失败丢失，原实现2失败3通过。
+原read surface现把同一session、规范化state及一次显式transcript观察传给恢复与续接builder；恢复准备用切片处理，
+不修改共享输入。初始state必须可读；锁内规范化发现删除时直接失败，不以旧state兜底。
+
+对照会话参考的`buildSessionProjection`及`buildSessionContext`：从同一entries/path派生各投影并复用结果，
+采纳输入复用原则。参考没有本仓metadata/state分离格式，本批组合逻辑为**自研**，复用原recovery builder。
+不承诺store.load内部的多个文件读取是原子快照，也不借此声明branch/query结果归属已解决。
+
+`npm run test -w packages/ts-shell -- src/session/continuation src/session/recovery src/session/SessionManager.test.ts
+src/result/terminal`：**21套247项通过，exit0**；构建、独立代码APPROVE和架构CLEAR。
+反转read surface后2失败3通过，逐字节恢复。隔离编译manager验收确认一次顶层load及一次显式日志读取；
+常规/全屏PTY各2次本地HTTP脚本模型请求，均完成提示、工具请求、审批后实际写入、结算与落盘，exit0，无真实provider。
+静态阻断门通过，1419文件零循环；既有可达性和函数上限各7条提示未增加。旧result-contract的第六批失败未改记通过。
+完整branch/query结果归属、compact更新与损坏记录准入等继续审计，W7-26未完成。

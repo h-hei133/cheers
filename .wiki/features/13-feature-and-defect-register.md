@@ -1121,6 +1121,8 @@ W3-12 在 substrate transition 更换会话 ID 时释放旧表，并补齐 `disc
 4套128项、构建、双线APPROVE/CLEAR及双模式PTY通过，反转3项失败后恢复。
 第六批修复结构化结果与旧compact handoff混用、seed跨completion错配及显示消息绕过选中分支；合成摘要不充当用户请求。
 20套242项、构建、双线APPROVE/CLEAR及双模式PTY审批回合通过，反转13项失败后逐字节恢复。
+第七批复用摘要入口已观察的session/state/transcript，移除恢复二次load和显式日志重复读取；规范化后状态消失则失败。
+21套247项、构建、双线APPROVE/CLEAR及双模式PTY通过，反转2项失败后恢复；不承诺底层跨文件原子快照。
 恢复摘要、跨query连续性与损坏记录准入继续审计，完整审计尚未闭合；详见Phase18裁决的W7-26分批记录。
 
 ## 7. Provider 与协议（`PRV`）
