@@ -78,6 +78,23 @@ describe("rebindSessionProjectRootContinuity", () => {
     expect(test.order).toEqual([]);
   });
 
+  it.each([false, true])("invalidates location-specific bindings only when the root changes: %s", unchanged => {
+    const test = fixture();
+    Object.assign(test.stored.metadata, {
+      rootMode: "git-root", gitRoot: test.original.projectRoot,
+      targetPathBase: test.original.projectRoot,
+      requestedWorkspaceRoot: path.join(test.original.projectRoot, "entry"),
+    });
+    if (unchanged) test.input.nextProjectRoot = test.original.projectRoot;
+    const rebound = rebindSessionProjectRootContinuity(test.input);
+    const metadata = projectSessionMetadata(rebound);
+    expect(metadata.targetPathBase).toBe(test.input.nextProjectRoot);
+    expect(metadata.requestedWorkspaceRoot).toBe(unchanged ? path.join(test.original.projectRoot, "entry") : test.input.nextProjectRoot);
+    expect(Object.hasOwn(metadata, "rootMode")).toBe(unchanged);
+    expect(Object.hasOwn(metadata, "gitRoot")).toBe(unchanged);
+    expect(test.input.session).toEqual(test.original);
+  });
+
   it.each([undefined, null, [], "state", {}, { status: "unknown" }, { status: "active", projectRoot: 1 }])(
     "rejects missing or malformed state without creating a replacement: %j", state => {
       const test = fixture();

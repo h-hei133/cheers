@@ -1117,7 +1117,9 @@ W3-12 在 substrate transition 更换会话 ID 时释放旧表，并补齐 `disc
 67套510项、隔离编译SessionManager/store验收通过，反转17项失败后逐字节恢复，双线APPROVE/CLEAR。
 第四批修复显式rebind的写入次序、锁内补偿及失败状态；恢复以原metadata为依据，避免旧记录从state补根后误报已提交。
 67套548项、构建、双线APPROVE/CLEAR及常规/全屏PTY审批写入落盘通过，反转34项失败后恢复。
-workspace绑定字段、恢复摘要、跨query连续性与损坏记录准入继续审计，完整审计尚未闭合；详见Phase18裁决的W7-26分批记录。
+第五批修复迁移后旧workspace绑定残留，复用原启动和切换入口发现目标Git状态；同根绑定保持。
+4套128项、构建、双线APPROVE/CLEAR及双模式PTY通过，反转3项失败后恢复。
+恢复摘要、跨query连续性与损坏记录准入继续审计，完整审计尚未闭合；详见Phase18裁决的W7-26分批记录。
 
 ## 7. Provider 与协议（`PRV`）
 

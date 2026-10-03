@@ -577,7 +577,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W8-40 / TOL-10（随W7-30） | 失败原因及部分答复保留；工具阶段取消和空答复按失败结算；适配器向父模型传递error | 已完成，定向验证通过；旧result-contract脚本仍失败 |
 | W7-32 | read每次返回正文；startup结构/身份/有界读写、freshness与命令投影已修复；保留默认禁用 | 已完成，定向验证与隔离验收通过 |
 | W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
-| W7-26 / SES-08 | 回放、导出、根值迁移及显式迁移失败次序已分批修复；完整逐模块审计继续 | 执行中，第四批定向验证与双模式PTY通过 |
+| W7-26 / SES-08 | 回放、导出、根值迁移、显式迁移失败次序及工作区绑定已分批修复；完整逐模块审计继续 | 执行中，第五批定向验证与双模式PTY通过 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1512,3 +1512,26 @@ bootstrap旧夹具在仓内TMPDIR向上继承父Git根，前序基线9失败；�
 本批不承诺跨文件崩溃事务或非合作并发写入保护。已发现旧workspace绑定字段在迁移后仍保留，另批修复；
 恢复摘要、跨query连续性与损坏记录准入仍待审计，W7-26未完成。旧result-contract脚本的已记录失败本批未重跑或改记通过。
 前一`62ae97ef`的CI 37092763488与Architecture Watch 37092763482均成功。
+
+### W7-26 第五批：迁移后的工作区绑定（2026-10-03）
+
+第四批相邻检查发现：带完整metadata的会话迁移后仍保留旧targetPathBase、requestedWorkspaceRoot、
+rootMode和gitRoot。启动虽使用新projectRoot，仍会显示旧基准及错误Git状态，产生绑定不一致诊断。
+新回归在原实现上3失败1通过，属于product behavior drift，不修改原有根绑定契约。
+
+定向对照会话参考的`forkFrom`：解析目标cwd，按目标生成位置header，保留历史内容。
+采纳目的地位置独立重建；本仓显式migration保留会话ID，不采用参考的新会话分叉语义。
+参考没有本仓四个绑定字段，对应失效投影为**自研**：仅根身份改变时把请求根/目标基准设为新根，
+删除旧rootMode/gitRoot，由现有bootstrap和会话切换入口发现目标Git状态，bootstrap负责持久化补全。
+不得把缺失gitRoot改为null：两者分别表示尚未发现与已确认无Git。相同根迁移保留现有绑定。
+这组投影参加第四批同一metadata提交及失败补偿，没有新增文件系统探测层或迁移协议。
+
+`npm run test -w packages/ts-shell -- src/core/shell/bootstrap.test.ts src/core/shell/runtimeContext.test.ts
+src/session/continuation/sessionProjectRootRebind.test.ts src/session/SessionManager.test.ts`
+在仓内TMPDIR运行，**4套128项通过，exit0**；构建通过。反转单个产品owner后3失败1通过、39过滤，源码逐字节恢复。
+独立代码APPROVE、架构CLEAR；架构复核独立运行4项通过。常规/全屏PTY分别验证Git→普通目录与普通目录→Git，
+均完成输入、模型工具请求、审批后写入、收尾和落盘，exit0；旧根无新文件，五个绑定字段均正确。
+各2次本地HTTP脚本模型请求，无真实provider。静态门通过，脚本测试40/40，文档严格门通过；既有advisory保持。
+
+第四批提交`55f2c813`的CI 37096214392与Architecture Watch 37096214446均成功。
+W7-26仍待恢复摘要、跨query连续性及损坏记录准入等逐模块闭合；之后按31→27→29→33顺序继续。

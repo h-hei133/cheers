@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { execFileSync } from 'node:child_process'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getRuntimeConfig } from '../../config/runtimeConfig.js'
 import { StreamingRenderer } from '../../presentation/terminal/streaming.js'
@@ -194,6 +195,44 @@ describe('shell bootstrap', () => {
     expect(path.resolve(sessionManager.resume(session.id).projectRoot)).toBe(
       path.resolve(projectB),
     )
+  })
+
+  it.each([false, true])('rebuilds workspace binding for the migrated destination, git: %s', git => {
+    const sessionManager = new SessionManager()
+    const oldRoot = fs.mkdtempSync(path.join(fakeHome, 'old-bound-'))
+    const newRoot = fs.mkdtempSync(path.join(fakeHome, 'new-bound-'))
+    const requestedRoot = path.join(newRoot, 'nested')
+    fs.mkdirSync(requestedRoot)
+    if (git) execFileSync('git', ['init', '--quiet', newRoot])
+    const session = sessionManager.createNew(oldRoot, {
+      rootMode: git ? 'direct' : 'git-root',
+      requestedWorkspaceRoot: path.join(oldRoot, 'entry'),
+      targetPathBase: oldRoot,
+      gitRoot: git ? null : oldRoot,
+    })
+    const result = bootstrapShellRuntime({
+      cwd: requestedRoot,
+      launchCwd: requestedRoot,
+      requestedWorkspaceRoot: requestedRoot,
+      runtimeConfig: getRuntimeConfig(requestedRoot),
+      gitContext: getWorkflowGitContext(requestedRoot),
+      sessionManager,
+      renderer: new StreamingRenderer(),
+      requestedSessionId: session.id,
+      allowSessionRootMigration: true,
+      emitLifecycleMessages: false,
+    })
+    const binding = {
+      projectRoot: git ? newRoot : requestedRoot,
+      targetPathBase: git ? newRoot : requestedRoot,
+      requestedWorkspaceRoot: requestedRoot,
+      rootMode: git ? 'git-root' : 'direct',
+      gitRoot: git ? newRoot : null,
+    }
+    expect(result.context).toMatchObject(binding)
+    expect(result.context.session).toMatchObject(binding)
+    expect(sessionManager.getSession(session.id)).toMatchObject(binding)
+    expect(result.context.rootBindingDiagnostics.some(item => item.code.endsWith('mismatch'))).toBe(false)
   })
 
   it('resumes project current session by default when no --session-id is provided', () => {

@@ -62,6 +62,14 @@ export function rebindSessionProjectRootContinuity(input: RebindInput): Session 
         pendingPrompt: current.pendingPrompt,
         lastError: current.lastError,
       };
+      if (normalizePathIdentity(latest.projectRoot) !== normalizePathIdentity(projection.projectRoot)) {
+        nextSession.requestedWorkspaceRoot = projection.projectRoot;
+        nextSession.targetPathBase = projection.projectRoot;
+        // These describe the old filesystem. Existing runtime entrypoints
+        // discover and persist the destination's actual Git binding.
+        delete nextSession.rootMode;
+        delete nextSession.gitRoot;
+      }
       try {
         input.writeStateSnapshot(nextState);
       } catch (error) {
