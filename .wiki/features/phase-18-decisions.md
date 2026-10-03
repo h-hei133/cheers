@@ -577,6 +577,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W8-40 / TOL-10（随W7-30） | 失败原因及部分答复保留；工具阶段取消和空答复按失败结算；适配器向父模型传递error | 已完成，定向验证通过；旧result-contract脚本仍失败 |
 | W7-32 | read每次返回正文；startup结构/身份/有界读写、freshness与命令投影已修复；保留默认禁用 | 已完成，定向验证与隔离验收通过 |
 | W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
+| W7-26 / SES-08 | 回放、导出、根值迁移及显式迁移失败次序已分批修复；完整逐模块审计继续 | 执行中，第四批定向验证与双模式PTY通过 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1482,3 +1483,32 @@ Architecture Watch 37049055051通过。唯一失败是旧export用例未创建�
 本批不提供文件系统/symlink授权或metadata/state跨文件事务；显式rebind失败次序、恢复摘要与跨query连续性、
 损坏transcript恢复准入仍继续审计。旧result-contract的缺失测试路径及过期输出断言仍待修复，未改记为通过。
 前一夹具提交`40ab9a96`的CI 37053389823与Architecture Watch 37053389815均成功。
+
+### W7-26 第四批：显式迁移失败次序（2026-10-03）
+
+旧实现先改调用者和metadata，再获取state锁；锁、读取或state写入失败时会留下不一致记录。
+现由原continuation owner在锁内读取最新记录、验证身份和根、准备副本，依次写state与metadata，
+两者完成后才返回新Session并选择新项目。失败明确区分unchanged、restored、partial、committed；
+锁释放或选择失败不把已提交记录说成未写入，也不在锁外回滚。
+
+对照决定：会话文件参考的`_setSessionFile`拒绝覆盖非空损坏文件，采纳失败前验证并保留记录；
+文件写入参考的`writeIfUnchanged`锁内重读比较，且明确多文件写入需报告partial，采纳这两个边界。
+本仓metadata/state分离，参考没有对应补偿协议；本批观察后补偿为**自研**，保留原单文件原子写入和锁。
+仅当原metadata未变、state等于本次候选时恢复旧state，之后回读验证；外来内容或不可读结果保持partial。
+
+复核发现旧metadata缺根时，完整Session会从state补根；相同时间戳还会让未写metadata被误认为committed。
+已把原始metadata读取收归现有store函数，普通load复用该函数；恢复直接比较原记录，不重读transcript。
+真实文件回归覆盖metadata写前/写后报错、恢复失败、缺根旧记录和相同时间戳。旧观察路径先1失败5通过，
+修复后六种情况全通过。独立代码APPROVE、架构CLEAR；架构复核另独立运行这六项通过。
+
+最终`npm run test -w packages/ts-shell -- src/session src/core/shell/bootstrap.test.ts`在仓内TMPDIR运行，
+**67套548项通过，exit0**；构建通过。反转3个产品owner后**34失败1通过、69过滤**，随后逐字节恢复。
+bootstrap旧夹具在仓内TMPDIR向上继承父Git根，前序基线9失败；加Git发现上界后通过，属于harness/setup drift。
+常规/全屏真实PTY各完成迁移、输入、工具请求、审批、写入、收尾与落盘，均exit0；各2次本地HTTP脚本模型请求，
+审批前无文件，审批后只写新根，metadata/state和transcript一致。首次验收误要求TUI显示被隐藏的启动提示，
+改读实际存储根后通过，未改产品显示策略。无真实provider调用。
+
+静态门通过：1417文件零循环、配置39/39、hooks18/18、工厂10/10、Node floor；可达性和函数上限各7条既有提示未增加。
+本批不承诺跨文件崩溃事务或非合作并发写入保护。已发现旧workspace绑定字段在迁移后仍保留，另批修复；
+恢复摘要、跨query连续性与损坏记录准入仍待审计，W7-26未完成。旧result-contract脚本的已记录失败本批未重跑或改记通过。
+前一`62ae97ef`的CI 37092763488与Architecture Watch 37092763482均成功。

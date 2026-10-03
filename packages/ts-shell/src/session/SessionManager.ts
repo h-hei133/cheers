@@ -35,6 +35,7 @@ import {
   createSessionWithId,
 } from "./store/sessionCreation.js";
 import { SessionStoreAccess } from "./store/sessionStoreAccess.js";
+import { readSessionMetadataRecord } from "./store/sessionStore.js";
 import {
   projectSessionReentrySummary,
   type SessionReentrySummary,
@@ -48,7 +49,7 @@ import type {
 import { type WorkspaceRootMode } from "./store/projectBindingPolicy.js";
 import { applySessionWorkspaceBinding } from "./store/sessionProjectBinding.js";
 import { SessionReadSurface } from "./sessionReadSurface.js";
-import { rebindSessionProjectRootContinuity } from "./continuation/sessionProjectRootRebind.js";
+import { rebindSessionProjectRootContinuity, SessionRootRebindError } from "./continuation/sessionProjectRootRebind.js";
 import {
   buildRecoverySnapshotForSession,
   evaluateRecoveryTrustBoundaryForSession,
@@ -364,17 +365,21 @@ export class SessionManager extends SessionReadSurface {
       session,
       nextProjectRoot,
       updatedAt: new Date().toISOString(),
+      readSession: () => this.host.store.load(session.id),
+      readMetadata: readSessionMetadataRecord.bind(undefined, this.host.store.metadataPath(session.id)),
       writeSessionMetadata: (nextSession) =>
         this.host.store.writeSessionMetadata(nextSession),
       withStateLock: (targetSessionId, update) =>
         this.host.store.withSessionStateLock(targetSessionId, update),
-      readStateSnapshot: () => this.host.store.readStateSnapshotSafely(statePath),
-      buildStateSnapshot: (nextSession, current) =>
-        this.buildSessionStateSnapshot(nextSession, current),
+      readStateSnapshot: () => this.host.store.readStateSnapshotRequired(statePath),
       writeStateSnapshot: (snapshot) =>
         this.host.store.writeJsonFileAtomic(statePath, snapshot),
     });
-    this.setCurrentSessionForProject(rebound.projectRoot, rebound.id);
+    try {
+      this.setCurrentSessionForProject(rebound.projectRoot, rebound.id);
+    } catch (error) {
+      throw new SessionRootRebindError("committed", "selection", error);
+    }
     return rebound;
   }
 

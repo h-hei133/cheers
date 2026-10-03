@@ -58,6 +58,13 @@ export function writeSessionMetadataRecord(input: {
   writeJsonFileAtomic(input.layout.metadataPath, metadata);
 }
 
+export function readSessionMetadataRecord(metadataPath: string): SessionMetadata | undefined {
+  return readJsonFileWithRetry<SessionMetadata>(metadataPath, {
+    required: true,
+    parseErrorDetail: "Failed to load session metadata",
+  });
+}
+
 export function deleteSessionRecord(input: {
   readonly sessionId: string;
   readonly layout: Pick<SessionFileLayout, "sessionDir">;
@@ -82,13 +89,7 @@ export function loadSessionRecord(input: {
   }
 
   try {
-    const metadata = readJsonFileWithRetry<SessionMetadata>(
-      input.layout.metadataPath,
-      {
-        required: true,
-        parseErrorDetail: `Failed to load session ${input.sessionId}`,
-      },
-    );
+    const metadata = readSessionMetadataRecord(input.layout.metadataPath);
     const state = readStateSnapshotRequired(input.layout.statePath);
     // Which branch is in view is a question about the thread, so the thread
     // answers it. Without a thread — a session recorded before any of this

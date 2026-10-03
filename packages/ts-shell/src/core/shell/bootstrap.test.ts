@@ -19,9 +19,12 @@ describe('shell bootstrap', () => {
     fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-bootstrap-'))
     process.env.USERPROFILE = fakeHome
     process.env.HOME = fakeHome
+    // Repository-local TMPDIR must not make these independent projects inherit its Git root.
+    vi.stubEnv('GIT_CEILING_DIRECTORIES', fakeHome)
   })
 
   afterEach(() => {
+    vi.unstubAllEnvs()
     if (originalUserProfile === undefined) delete process.env.USERPROFILE
     else process.env.USERPROFILE = originalUserProfile
     if (originalHome === undefined) delete process.env.HOME

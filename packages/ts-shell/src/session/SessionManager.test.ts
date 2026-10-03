@@ -311,6 +311,107 @@ describe("SessionManager", () => {
     expect(afterState.workingMemory?.summary?.[0]?.includes(newRoot)).toBe(true);
   });
 
+  it.each(["lock", "state"] as const)("preserves stored records when root migration fails at %s", stage => {
+    const manager = new SessionManager();
+    const oldRoot = path.join(fakeHome, "old-project");
+    const newRoot = path.join(fakeHome, "new-project");
+    const session = manager.createNew(oldRoot);
+    const sessionDir = manager.getSessionDirPath(session.id);
+    const paths = ["metadata.json", "state.json", "transcript.jsonl"].map(name => path.join(sessionDir, name));
+    const originalBytes = paths.map(file => fs.readFileSync(file));
+    const failure = vi.spyOn(SessionStoreAccess.prototype, stage === "lock" ? "withSessionStateLock" : "writeJsonFileAtomic")
+      .mockImplementationOnce(() => { throw new Error("migration unavailable"); });
+    try {
+      let error: unknown;
+      try { manager.rebindSessionProjectRoot(session.id, newRoot); } catch (caught) { error = caught; }
+      expect(error).toMatchObject({ outcome: "unchanged", stage: stage === "lock" ? "prepare" : "state" });
+      expect(paths.map(file => fs.readFileSync(file))).toEqual(originalBytes);
+      expect(manager.getSession(session.id).projectRoot).toBe(oldRoot);
+      expect(manager.getCurrentSessionForProject(newRoot)).toBeNull();
+    } finally {
+      failure.mockRestore();
+    }
+  });
+
+  it("reports committed session records when the new project selection cannot be saved", () => {
+    const manager = new SessionManager();
+    const oldRoot = path.join(fakeHome, "old-project");
+    const newRoot = path.join(fakeHome, "new-project");
+    const session = manager.createNew(oldRoot);
+    const select = vi.spyOn(manager, "setCurrentSessionForProject")
+      .mockImplementationOnce(() => { throw new Error("selection unavailable"); });
+    try {
+      let error: unknown;
+      try { manager.rebindSessionProjectRoot(session.id, newRoot); } catch (caught) { error = caught; }
+      expect(error).toMatchObject({ outcome: "committed", stage: "selection" });
+      expect(manager.getSession(session.id).projectRoot).toBe(newRoot);
+      const state = JSON.parse(fs.readFileSync(path.join(manager.getSessionDirPath(session.id), "state.json"), "utf8"));
+      expect(state.projectRoot).toBe(newRoot);
+      expect(manager.getCurrentSessionForProject(newRoot)).toBeNull();
+    } finally {
+      select.mockRestore();
+    }
+  });
+
+  it.each([
+    ["before", false], ["after", false], ["restore-failed", false],
+    ["before", true], ["after", true], ["restore-failed", true],
+  ] as const)(
+    "observes real stored records when the metadata write fails: %s, legacy root: %s", (stage, legacyRoot) => {
+      const manager = new SessionManager();
+      const oldRoot = path.join(fakeHome, "old-project");
+      const newRoot = path.join(fakeHome, "new-project");
+      const session = manager.createNew(oldRoot);
+      manager.persistUserPromptBarrier(session.id, "keep this pending prompt");
+      manager.saveInterrupted(session.id);
+      const sessionDir = manager.getSessionDirPath(session.id);
+      const files = ["metadata.json", "state.json", "transcript.jsonl"].map(name => path.join(sessionDir, name));
+      if (legacyRoot) {
+        const metadata = JSON.parse(fs.readFileSync(files[0], "utf8"));
+        delete metadata.projectRoot;
+        fs.writeFileSync(files[0], JSON.stringify(metadata));
+      }
+      const originalBytes = files.map(file => fs.readFileSync(file));
+      // A rootless legacy record and a same-millisecond timestamp must not make
+      // a state-derived Session projection look like a committed metadata write.
+      const clock = vi.spyOn(Date.prototype, "toISOString")
+        .mockReturnValue(JSON.parse(originalBytes[0].toString()).updatedAt);
+      const writeMetadata = SessionStoreAccess.prototype.writeSessionMetadata;
+      const writeState = SessionStoreAccess.prototype.writeJsonFileAtomic;
+      const metadata = vi.spyOn(SessionStoreAccess.prototype, "writeSessionMetadata")
+        .mockImplementationOnce(function (next) {
+          if (stage === "after") writeMetadata.call(this, next);
+          throw new Error("metadata write failed");
+        });
+      const state = vi.spyOn(SessionStoreAccess.prototype, "writeJsonFileAtomic");
+      if (stage === "restore-failed") {
+        state.mockImplementationOnce(writeState).mockImplementationOnce(() => { throw new Error("restore failed"); });
+      }
+      try {
+        let error: unknown;
+        try { manager.rebindSessionProjectRoot(session.id, newRoot); } catch (caught) { error = caught; }
+        expect(error).toMatchObject({
+          outcome: stage === "before" ? "restored" : stage === "after" ? "committed" : "partial",
+          stage: "metadata",
+        });
+        const storedMetadata = JSON.parse(fs.readFileSync(files[0], "utf8"));
+        const storedState = JSON.parse(fs.readFileSync(files[1], "utf8"));
+        expect(storedMetadata.projectRoot).toBe(stage === "after" ? newRoot : legacyRoot ? undefined : oldRoot);
+        expect(storedState).toMatchObject({
+          projectRoot: stage === "before" ? oldRoot : newRoot,
+          status: "interrupted", pendingPrompt: "keep this pending prompt",
+        });
+        expect(fs.readFileSync(files[2])).toEqual(originalBytes[2]);
+        if (stage === "before") expect(files.map(file => fs.readFileSync(file))).toEqual(originalBytes);
+        expect(manager.getCurrentSessionForProject(newRoot)).toBeNull();
+      } finally {
+        metadata.mockRestore();
+        state.mockRestore();
+        clock.mockRestore();
+      }
+    },
+  );
+
   it("rebinds approval audit cache-key root during project-root migration", () => {
     const manager = new SessionManager();
     const oldRoot = fs.mkdtempSync(path.join(fakeHome, "approval-old-"));
