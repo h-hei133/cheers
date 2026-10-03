@@ -577,7 +577,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W8-40 / TOL-10（随W7-30） | 失败原因及部分答复保留；工具阶段取消和空答复按失败结算；适配器向父模型传递error | 已完成，定向验证通过；旧result-contract脚本仍失败 |
 | W7-32 | read每次返回正文；startup结构/身份/有界读写、freshness与命令投影已修复；保留默认禁用 | 已完成，定向验证与隔离验收通过 |
 | W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
-| W7-26 / SES-08 | 回放、导出、根值迁移、显式迁移失败次序及工作区绑定已分批修复；完整逐模块审计继续 | 执行中，第五批定向验证与双模式PTY通过 |
+| W7-26 / SES-08 | 回放、导出、根值迁移、显式迁移失败次序、工作区绑定及摘要来源已分批修复；完整逐模块审计继续 | 执行中，第六批定向验证与双模式PTY通过 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1535,3 +1535,31 @@ src/session/continuation/sessionProjectRootRebind.test.ts src/session/SessionMan
 
 第四批提交`55f2c813`的CI 37096214392与Architecture Watch 37096214446均成功。
 W7-26仍待恢复摘要、跨query连续性及损坏记录准入等逐模块闭合；之后按31→27→29→33顺序继续。
+
+### W7-26 第六批：续接摘要来源（2026-10-03）
+
+当前结构化结果缺少可选字段时，旧实现会从compact memory补入旧成功、旧失败、旧写入和seed事实；
+消息还优先取自原始恢复日志，绕过已选分支。首轮6项回归5失败1通过，属于product behavior drift。
+现由原snapshot owner把结构化结果视为完整观察，缺失字段保持缺失；无结构化结果时保留旧checkpoint兼容。
+seed影响与所选编码结果取自同一次completion，不再套用后续聊天的标记。
+
+定向对照会话参考的`buildSessionPath`、`buildContextEntries`与`buildSessionProjection`：沿选中祖先路径投影，
+较新的compaction覆盖旧摘要来源。采纳选中路径和权威来源优先原则；本仓分离的handoff字段没有直接对应实现，
+fallback准入修复为**自研**。显示消息使用已加载的session.turns，复用已有contextSummary分类排除合成摘要；
+只有replay明确补出待恢复提示时才使用durable pendingPrompt。历史查询结果的非chat优先策略本批未改。
+
+独立审查发现并修复两个边界：分支/压缩摘要不能被当成用户请求，insertedPromptMessage不能使后续原始用户消息
+冒充被补出的提示。代码APPROVE、架构CLEAR，架构方独立内存探针通过。真实文件测试覆盖结构化结果落盘重开、
+含/不含摘要的分支回退及中断提示恢复。
+
+`npm run test -w packages/ts-shell -- src/session/continuation/snapshot.test.ts src/session/SessionManager.test.ts
+src/session/continuation src/session/recovery src/result/terminal`：**20套242项通过，exit0**；构建和40项脚本测试通过。
+反转snapshot产品文件后**13失败1通过**，随后逐字节恢复。常规/全屏PTY各2次本地HTTP脚本模型请求，完成提示、
+工具请求、审批、实际写入、结算与落盘，均exit0；请求包含选中消息，不含废弃消息或旧handoff字段。
+首次PTY夹具缺少codec必填数组而被拒绝，修正夹具并增加落盘回归后通过；未改准入规则，无真实provider调用。
+
+静态门通过：1418文件零循环、配置39/39、hooks18/18、工厂10/10、Node floor；可达性和函数上限各7条既有提示。
+NormProof exit0，阻断义务满足，整体仍因既有函数上限提示为partial。旧result-contract重跑exit1，仍是两处失效测试路径
+及print/replay过期预期，不记为通过。第五批`0245fb92`的CI 37097269144与Architecture Watch 37097269145均成功。
+
+W7-26继续：snapshot重复读取、完整branch/query结果归属、compact更新与损坏记录准入尚待逐项审计，未声明完整审计通过。

@@ -1,4 +1,3 @@
-import { messageToText } from "../../model-adapters/multimodal.js";
 import { selectContinuityTerminalSource } from "../../result/terminal/truth.js";
 import {
   decodeQueryRuntimeTaskState,
@@ -24,6 +23,7 @@ import {
 import type { TranscriptEvent } from "../sessionEventCodec.js";
 import type { RecoverySnapshot } from "../recovery/sessionRecoverySnapshot.js";
 import type { Session } from "../schema/sessionRecord.js";
+import { isSessionContextMessage } from "../schema/sessionMessage.js";
 import type { SessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
 import type { SessionContinuitySnapshot } from "../sessionContinuityTypes.js";
 import { deriveStoppedSessionContinuitySurface } from "./stoppedSessionContinuity.js";
@@ -75,30 +75,34 @@ export function buildSessionContinuitySnapshot(input: {
   });
   const lastStoppedSessionContinuity =
     deriveStoppedSessionContinuitySurface(lastCodingResult);
+  // A structured result is a complete observation, including absent optional
+  // fields. Compact checkpoints are a fallback only when that result is gone.
+  const handoffMemory = lastCodingResult ? undefined : stateSnapshot?.workingMemory;
   const lastWriteContinuity =
     lastStoppedSessionContinuity?.writeContinuity ??
-    extractWriteContinuityFromMemory(stateSnapshot?.workingMemory);
+    extractWriteContinuityFromMemory(handoffMemory);
   const lastActionHandoffSummary =
     buildActionHandoffSummary(lastCodingResult?.lastActionResultSeed) ??
-    extractActionHandoffSummaryFromMemory(stateSnapshot?.workingMemory);
+    extractActionHandoffSummaryFromMemory(handoffMemory);
   const lastSeedInfluence =
-    extractSeedInfluenceFromQueryResult(lastQueryCompletion?.event.result) ??
-    extractSeedInfluenceFromMemory(stateSnapshot?.workingMemory);
+    extractSeedInfluenceFromQueryResult(
+      (lastCodingCompletion ?? lastQueryCompletion)?.event.result,
+    ) ?? extractSeedInfluenceFromMemory(handoffMemory);
   const lastSeedInfluenceHandoffSummary =
     buildSeedInfluenceHandoffSummary(
       lastCodingResult?.lastActionResultSeed,
       lastSeedInfluence,
     ) ??
-    extractSeedInfluenceHandoffSummaryFromMemory(stateSnapshot?.workingMemory);
+    extractSeedInfluenceHandoffSummaryFromMemory(handoffMemory);
   const lastFailureHandoffDiagnostic =
     lastStoppedSessionContinuity?.failureHandoffDiagnostic ??
-    extractFailureHandoffDiagnosticFromMemory(stateSnapshot?.workingMemory);
+    extractFailureHandoffDiagnosticFromMemory(handoffMemory);
   const lastActionableFailure =
     lastStoppedSessionContinuity?.actionableFailure ??
     deriveActionableFailureContinuity(lastCodingResult);
   const lastSuccessHandoffDiagnostic =
     buildSuccessHandoffDiagnostic(lastCodingResult) ??
-    extractSuccessHandoffDiagnosticFromMemory(stateSnapshot?.workingMemory);
+    extractSuccessHandoffDiagnosticFromMemory(handoffMemory);
   const taskState = lastCodingResult
     ? projectQueryRuntimeTaskStateFromResult({
         source: "replay",
@@ -114,9 +118,15 @@ export function buildSessionContinuitySnapshot(input: {
     lastQueryCompletion,
     lastCodingCompletion,
   });
-  const lastUserIntent =
-    messageToText(recoverySnapshot.lastUserMessage?.content) ??
-    findLastTurnContent(session.turns, "user");
+  // Loaded turns already reflect the selected branch and compaction. Recovery
+  // may add a missing pending prompt, but its raw history is not a display path.
+  const selectedTurns = session.turns.filter((turn) => !isSessionContextMessage(turn));
+  const repairedPrompt = recoverySnapshot.repairSummary.insertedPromptMessage
+    ? recoverySnapshot.pendingPrompt
+    : undefined;
+  const lastUserIntent = repairedPrompt?.trim()
+    ? repairedPrompt
+    : findLastTurnContent(selectedTurns, "user");
   const mutationContinuity = projectSessionMutationContinuity({
     lastCodingResult,
     recentCodingResults,
@@ -138,9 +148,7 @@ export function buildSessionContinuitySnapshot(input: {
     sessionId: session.id,
     projectRoot: session.projectRoot,
     lastUserIntent,
-    lastAssistantOutput:
-      messageToText(recoverySnapshot.lastAssistantMessage?.content) ??
-      findLastTurnContent(session.turns, "assistant"),
+    lastAssistantOutput: findLastTurnContent(selectedTurns, "assistant"),
     lastTerminalClassification:
       continuityTerminalSource?.event.result.terminalClassification ??
       recoverySnapshot.terminalClassification,

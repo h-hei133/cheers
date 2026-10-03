@@ -5709,3 +5709,10 @@ task按失败事实结算，保留原因与部分答复；runner补足工具阶�
 
 根改变时重设请求根与路径基准，清除旧Git判定，由原入口发现并补全目标绑定；同根保留。4套128项、构建、独立APPROVE/CLEAR及两种PTY完整审批回合通过，覆盖Git与普通目录双向迁移；反转3项失败后恢复，脚本40项通过。
 第四批55f2c813的CI 37096214392和Architecture Watch 37096214446均成功。恢复摘要、跨query连续性及损坏记录准入继续审计，W7-26未宣称完成。
+
+## [2026-10-03] fix | Phase 18 W7-26 续接摘要来源第六批
+
+结构化结果不再从旧compact补入缺失handoff/write事实，seed取自同一次completion；显示消息使用选中路径，排除合成摘要，恢复提示直接取durable pendingPrompt。
+20套242项、构建、独立APPROVE/CLEAR及常规/全屏PTY完整审批回合通过；反转13项失败后逐字节恢复，脚本40项通过。
+PTY首轮因夹具缺codec必填字段失败，补全并增加落盘回归后通过，未放宽产品准入。旧result-contract重跑仍exit1，完整query归属、compact更新及损坏记录审计继续。
+第五批0245fb92的CI 37097269144与Architecture Watch 37097269145成功。无真实provider，W7-26未完成。
