@@ -14,9 +14,23 @@ export function installInteractiveSignalHandlers(input: {
   readonly sessionRuntime: ShellSessionRuntime;
   readonly renderer: StreamingRenderer;
   readonly runtimeContext: ShellRuntimeContext;
+  readonly sessionManager: { sessionExists(sessionId: string): boolean };
   readonly exit: (code?: number) => void;
 }): void {
-  input.process.on("SIGINT", () => {
+  let closing = false;
+  const close = (): void => {
+    if (closing) return;
+    closing = true;
+    try {
+      handleShellClose({ ...input, readline: input.readline ?? undefined });
+    } finally {
+      input.process.off("SIGINT", interrupt);
+      input.readline?.off("close", close);
+    }
+  };
+  const interrupt = (): void => {
+    if (closing) return;
+    if (!input.sessionRuntime.getCurrentRunController()) { close(); return; }
     handleShellSigint({
       sessionRuntime: input.sessionRuntime,
       renderer: input.renderer,
@@ -24,23 +38,7 @@ export function installInteractiveSignalHandlers(input: {
       readline: input.readline ?? undefined,
       exit: input.exit,
     });
-  });
-}
-
-export function installInteractiveCloseHandler(input: {
-  readonly readline: ReadlineInterface;
-  readonly sessionRuntime: ShellSessionRuntime;
-  readonly renderer: StreamingRenderer;
-  readonly runtimeContext: ShellRuntimeContext;
-  readonly exit: (code?: number) => void;
-}): void {
-  input.readline.on("close", () => {
-    handleShellClose({
-      sessionRuntime: input.sessionRuntime,
-      renderer: input.renderer,
-      runtimeContext: input.runtimeContext,
-      readline: input.readline ?? undefined,
-      exit: input.exit,
-    });
-  });
+  };
+  input.process.on("SIGINT", interrupt);
+  input.readline?.on("close", close);
 }

@@ -14,7 +14,7 @@ W7-31仍在执行。首批聚焦审批，其余已复现问题按下表继续修
 | `compaction.ts` | 手动/自动复用、hooks、取消、切片、检查点；同名测试 | 所列路径源码核对，无新缺陷 |
 | `continueShellActionRuntime.ts` | resume/continue权限与恢复资格；同名测试 | 复用W7-26恢复证据 |
 | `interactiveApprovalWiring.ts` | 当前回答与后续授权分离；同名测试 | 首批移除allow-once的后续缓存写入 |
-| `printPromptInput.ts` | stdin capture与CLI输入传递 | 未找到直接symbol测试；保留transport断言缺口 |
+| `printPromptInput.ts` | stdin capture与CLI输入传递 | 第八批补直接测试：BOM/CRLF、空输入、显式prompt顺序、注释政策、transport优先级与fence/literal边界 |
 | `providerCredentials.ts` | CLI选择的provider对应连接 | 第四批修复：活动连接先匹配显式provider再进入原fallback；端点、模型、账号及key优先级回归与双模式PTY通过 |
 | `providerFailureRedaction.ts` | 未知错误的路径/token脱敏；同名测试 | 所列路径源码核对，无新缺陷 |
 | `providerReadiness.ts` | readiness请求与实际adapter认证一致 | 第五批修复：按catalog协议使用资源与认证；探测/生成共享快照和续期凭据，双模式原生HTTP/PTY通过 |
@@ -29,8 +29,8 @@ W7-31仍在执行。首批聚焦审批，其余已复现问题按下表继续修
 | `sessionStateSurface.ts` | session命令与stopped continuation；同名测试 | 复用既有truthfulness与恢复证据 |
 | `sessionTerminalEvidence.ts` | 终态coding evidence投影 | 历史fixture有覆盖；当前turn/projection不产生codingResult，不作为当前工具写入证明 |
 | `sessionTerminalState.ts` | terminal累计与输出 | 第三批由runtime在调用渲染前验证terminal；另修复交互TurnSink漏显stopped完成事件 |
-| `shellActionBridge.ts` | command router判定与blocked文本 | 未找到直接symbol测试；保留断言缺口 |
-| `signalHandlers.ts` | SIGINT、idle close及恢复提示 | SIGINT已有测试；idle close/保留提示仍需核验 |
+| `shellActionBridge.ts` | command router判定与blocked文本 | 第八批补动作身份与resume/continue区分、非交互blocked投影及无success断言 |
+| `signalHandlers.ts` | SIGINT、idle close及恢复提示 | 第八批补retention顺序与嵌入式close；行模式统一SIGINT/EOF关闭，检查真实保留状态并移除监听器 |
 | `startupSurfaceRenderer.ts` | 启动与workspace身份诊断 | 第二批增加直接surface测试，大小写不同根不再显示同根 |
 | `stateMachine.ts` | 状态转换；同名测试 | 当前调用方busy串行化路径已核对 |
 | `turnBoundarySurface.ts` | 回合边界和fallback；同名测试 | 所列formatter路径已核对 |
@@ -172,3 +172,22 @@ Windows候选使用平台路径及where结果；Unix使用which结果，所有�
 产物.tmp/platform-pty-c6ibh9s7，两模式exit0；初轮驱动未关闭status详情视图而停在视图，补上esc后通过。
 Windows为确定性mock测试，未进行真实Windows/WSL运行；可执行文件存在不证明发行版或命令成功，
 同步PATH查找有超时但仍有检测成本。其余直接行为断言及旧result-contract脚本继续处理。
+
+
+## 第八批直接行为覆盖与行模式关闭
+
+补齐printPromptInput和shellActionBridge直接契约测试，覆盖输入归属、BOM/CRLF、空行/注释、
+显式prompt顺序、多行fence/literal、动作身份与blocked投影；不改变这些模块行为。
+signalHandlers测试明确先terminate、再查询retention、最后渲染resume与退出；嵌入式close不退出host。
+
+既有行模式分别安装SIGINT和readline.close处理器。编译基线复现idle SIGINT触发同步close重入：
+terminate/exit/resume各2次，SIGINT监听器残留；且未传sessionManager，已删除会话仍显示resume。
+现由原interactiveSignals持有一个关闭guard，lineLoop安装一次并传入真实manager；
+关闭后删除自己的监听器，活动回合SIGINT仍走既有取消语义。参考采用先置关闭guard、按实际会话格式化恢复提示的决策。
+
+7套46项、build:ts与独立APPROVE/CLEAR通过；两生产文件反转后3项失败，精确恢复后定向复跑。
+初轮测试误用了本仓旧Vitest不支持的matcher，改为精确calls断言后确认3项行为回归均红，再修复产品。
+混合终端编译CLI（TTY stdin、pipe stdout）覆盖真实行模式：空会话删除且0条resume，保留会话1条resume，
+均exit0，磁盘metadata与提示一致；产物.tmp/line-close-nz63oe6y，无provider请求。
+静态阻断门与judge阻断义务通过，1436文件零环，旧advisory保留、judge整体partial。
+原38模块审计的直接行为缺口至此闭合；W7-31仍等待旧result-contract脚本债务修复。

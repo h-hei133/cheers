@@ -10,7 +10,7 @@ import type { SessionManager } from "../../session/SessionManager.js";
 import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
 import { buildInteractivePromptChrome, refreshInteractivePromptChrome } from "./promptChrome.js";
-import { installInteractiveCloseHandler, installInteractiveSignalHandlers } from "./interactiveSignals.js";
+import { installInteractiveSignalHandlers } from "./interactiveSignals.js";
 
 /**
  * Line-oriented interactive loop for a session without a real terminal.
@@ -61,13 +61,7 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
     sessionRuntime: options.sessionRuntime,
     renderer: options.renderer,
     runtimeContext: options.runtimeContext,
-    exit: options.exit,
-  });
-  installInteractiveCloseHandler({
-    readline: input,
-    sessionRuntime: options.sessionRuntime,
-    renderer: options.renderer,
-    runtimeContext: options.runtimeContext,
+    sessionManager: options.sessionManager,
     exit: options.exit,
   });
 

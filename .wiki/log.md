@@ -5847,3 +5847,13 @@ W7-31剩余platform、直接断言及旧脚本继续；63053ae9两项远端检�
 双模式PTY确认无效选择不调用模型、任意登录shell未执行，后续审批后台命令与日志/终态一致。
 静态阻断门与judge阻断义务满足，总体advisory仍partial。Windows仅mock验证，旧脚本与直接行为缺口继续。
 ca48aab2两项远端检查均成功。
+
+
+## [2026-10-04] fix | Phase 18 W7-31 行模式退出与直接行为测试
+
+补齐输入transport、shell action及idle close直接断言。行模式统一SIGINT/EOF关闭，避免同步重入；
+传入会话查询，已删除会话不再显示resume，自己的监听器关闭后移除。
+7套46项、构建及独立APPROVE/CLEAR通过；两owner反转3失败，恢复后复跑。
+编译CLI混合终端验证空/保留会话0/1条提示与磁盘一致，无provider。
+静态阻断门与judge阻断义务满足，整体advisory仍partial；W7-31最后剩旧result-contract脚本债务。
+d0a8d7d7两项远端检查均成功。

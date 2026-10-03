@@ -578,7 +578,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W7-32 | read每次返回正文；startup结构/身份/有界读写、freshness与命令投影已修复；保留默认禁用 | 已完成，定向验证与隔离验收通过 |
 | W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
 | W7-26 / SES-08 | 回放、导出、迁移、恢复准入、检查点、字段优先级与历史写入观察已核验；后续转W7-31 | 已完成；原36模块行为矩阵闭合，保证边界与历史数据限制见审计表 |
-| W7-31 | [38模块Shell审计](phase-18-shell-audit.md)；首批修复审批身份、once生命周期和Git helper准入 | 进行中；审批、根绑定、终态、compact注入、readiness及连接选择已修复；background与platform已修复；直接断言与旧脚本待完成 |
+| W7-31 | [38模块Shell审计](phase-18-shell-audit.md)；首批修复审批身份、once生命周期和Git helper准入 | 进行中；审批、根绑定、终态、compact注入、readiness及连接选择已修复；background、platform与直接断言已完成；旧result-contract脚本待修复 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1913,3 +1913,19 @@ taskOutput描述同步说明保留范围，完成通知不再声称该工具能�
 Windows只做确定性候选测试，没有真实Windows/WSL验收；存在可执行文件不证明运行环境完整。
 第六批ca48aab2的CI 37138807330与Architecture Watch 37138807377均成功。
 W7-31继续直接行为测试与旧脚本，再按顺序推进后续任务。
+
+
+### W7-31 第八批：直接行为断言与行模式退出（2026-10-04）
+
+新增printPromptInput/shellActionBridge直接契约覆盖及idle close保留顺序测试。
+编译基线的两类行模式处理器在idle SIGINT时同步重入，重复terminate/exit/resume且残留监听器，
+缺少manager还会给已删除会话恢复提示。复用interactiveSignals增加统一关闭guard，
+lineLoop只安装一次并传入实际会话查询；活动SIGINT取消语义不变，core默认契约未扩张。
+参考采纳关闭幂等guard与按会话实际状态决定恢复提示，未创建新生命周期系统。
+
+7套46项、build:ts及独立APPROVE/CLEAR通过；两个生产owner反转3失败，恢复后复跑。
+混合终端编译CLI覆盖真正的行模式，空/保留会话分别0/1条resume提示，磁盘状态一致、exit0；
+产物.tmp/line-close-nz63oe6y，无provider调用。静态阻断门与judge阻断义务满足，1436文件零环，总体仍partial。
+初轮不支持的测试matcher已改为精确calls断言，再复现产品红测；未放宽验证。
+W7-31的38模块直接行为矩阵已闭合，旧result-contract仍需修复，未将任务提前标完成。
+第七批d0a8d7d7的CI 37140252338与Architecture Watch 37140252418均成功。

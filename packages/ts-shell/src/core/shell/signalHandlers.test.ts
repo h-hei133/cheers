@@ -1,7 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { handleShellSigint } from "./signalHandlers.js";
+import { handleShellClose, handleShellSigint } from "./signalHandlers.js";
 
 describe("shell signal handlers", () => {
+  it.each([true, false])("checks retention after termination before rendering resume (kept=%s)", kept => {
+    const events: string[] = [];
+    handleShellClose({
+      sessionRuntime: { terminate: (id: string) => events.push(`terminate:${id}`) } as never,
+      runtimeContext: { session: { id: "saved" } } as never,
+      renderer: { renderLine: (line: string) => events.push(line) } as never,
+      readline: { close: () => events.push("close") },
+      sessionManager: { sessionExists: id => { events.push(`exists:${id}`); return kept; } },
+      exit: code => events.push(`exit:${code}`),
+    });
+    expect(events).toEqual(["terminate:saved", "close", "exists:saved", kept ? "\n  --resume saved\n" : "", "exit:0"]);
+  });
+
+  it("supports embedded close without terminating the host", () => {
+    const events: string[] = [];
+    handleShellClose({
+      sessionRuntime: { terminate: () => events.push("terminated") } as never,
+      runtimeContext: { session: { id: "saved" } } as never,
+      renderer: { renderLine: () => events.push("rendered") } as never,
+      sessionManager: { sessionExists: () => false },
+    });
+    expect(events).toEqual(["terminated", "rendered"]);
+  });
+
   it("requests interruption without prompting before the turn closes", () => {
     const events: string[] = [];
     const controller = new AbortController();
