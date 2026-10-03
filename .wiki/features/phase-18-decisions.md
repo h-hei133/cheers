@@ -577,7 +577,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W8-40 / TOL-10（随W7-30） | 失败原因及部分答复保留；工具阶段取消和空答复按失败结算；适配器向父模型传递error | 已完成，定向验证通过；旧result-contract脚本仍失败 |
 | W7-32 | read每次返回正文；startup结构/身份/有界读写、freshness与命令投影已修复；保留默认禁用 | 已完成，定向验证与隔离验收通过 |
 | W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
-| W7-26 / SES-08 | 回放、导出、根迁移、摘要来源、重复读取及compact检查点更新已分批修复；完整逐模块审计继续 | 执行中，第十二批操作性恢复分支归属已验证，逐模块审计继续 |
+| W7-26 / SES-08 | 回放、导出、根迁移、摘要来源、重复读取及compact检查点更新已分批修复；完整逐模块审计继续 | 执行中，第十三批续接与历史格式兼容已验证，逐模块审计继续 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1721,3 +1721,18 @@ compact结果组连同eventId/entryId保存或替换，chat、审批及计数更
 所有本批测试/验收使用仓内隔离HOME/USERPROFILE/TMPDIR及专用合成目录，无真实provider配置。本批不重跑已有失败的result-contract或test:scripts，不将旧失败改记通过。上一独立CI适配器修复7c34d0fd的CI 37108774969与Architecture Watch 37108774974均成功。
 
 保证不涵盖跨文件事务、并发writer fencing或缺失中间执行事件的精确复原。无来源分支事件保守排除，必要时重新执行而非继承无法证明的工具/审批状态。W7-26继续，逐模块清单见phase-18-session-audit.md；next续接、seed文本往返、历史读取字段顺序、历史unknown写入和导出长输出等仍未闭合。
+
+
+### W7-26 第十三批：续接判定与历史格式兼容（2026-10-03）
+
+逐模块审计的三个确定性缺陷均已补入回归：snapshot接受有任务上下文的next，但context拒绝；formatter写出的last-seed-influence读不回；read-fragment只收齐四字段就结束反向扫描，较早的fingerprint、source window及ranges因字段顺序丢失。修复前10失败60通过。
+
+context现在复用snapshot已有的pathless续接判定，保留无任务历史及显式其他路径的拒绝条件。模型入口仍依据原始用户输入判定，不依据注入历史。seed按有效结构化值、formatter键、旧bare/seedInfluence=格式依次读取，仅允许原三个枚举；片段扫描保留最新有效字段规则，收齐全部八字段才提前结束。
+
+参考上下文投影以规范化来源生成最终模型消息，采纳同一选择策略贯穿消费者的原则；本仓seed和fragment文本为自身历史兼容格式，无直接对等参考实现，本次修复由本地formatter/reader契约约束，没有引入新的标记生产者或第二套连续性机制。
+
+18套248项及build:cli通过，独立APPROVE/CLEAR；三个产品owner反转10失败60通过后逐字节恢复。普通/全屏编译PTY输入next，各2次本地HTTP模型请求，直接验证选中unknown写入事实交付模型、审批前无写入、审批后实际写入、结算及消息来源落盘，无合成continuity用户提示，无真实provider配置。全部测试与PTY使用仓内完整隔离目录。
+
+seed/fragment回归证明历史格式消费及往返，不证明当前真实工具会生成这些字段。W7-26仍在执行；历史unknown写入、其余字段优先级与导出长输出等按审计矩阵继续，不把此批记为36模块全量完成。第十二批49dc51e9的Architecture Watch 37110368332与CI 37110368330均成功。旧result-contract失败未重跑或改记通过。
+
+第十三批静态阻断门通过，1426文件零循环；NormProof exit0且全部阻断义务满足，整体advisory verdict仍为partial，docs-source-drift仍有120项非阻断提示。

@@ -246,4 +246,16 @@ describe("SessionManager module boundary facades", () => {
       }),
     );
   });
+
+  it.each([0, 1, 2, 3, 4, 5, 6, 7])("reads all fragment fields independently of ordering (rotation %s)", rotation => {
+    const evidence = ["read-fragment-fingerprint:" + "a".repeat(64),
+      "read-fragment-source-window-start:0", "read-fragment-source-window-end:20",
+      "read-fragment-ranges:2-3;7-8", "read-fragment-start:2", "read-fragment-end:8",
+      "read-fragment-line-indexes:2,3,7,8", "repair-read-filter:function-definitions"];
+    const reordered = [...evidence.slice(rotation), ...evidence.slice(0, rotation)];
+    const expected = { start: 2, end: 8, sourceWindowStart: 0, sourceWindowEnd: 20,
+      ranges: ["2-3", "7-8"], lineIndexes: [2, 3, 7, 8], filter: "function-definitions", fingerprint: "a".repeat(64) };
+    expect(extractLastReadFragment(reordered)).toEqual(expected);
+    expect(extractLastReadFragment(reordered.reverse())).toEqual(expected);
+  });
 });

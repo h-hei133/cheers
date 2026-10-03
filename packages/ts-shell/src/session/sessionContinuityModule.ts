@@ -202,7 +202,11 @@ export function extractLastReadFragment(
       start !== undefined &&
       end !== undefined &&
       lineIndexes !== undefined &&
-      filter !== undefined
+      filter !== undefined &&
+      ranges !== undefined &&
+      sourceWindowStart !== undefined &&
+      sourceWindowEnd !== undefined &&
+      fingerprint !== undefined
     ) {
       break;
     }

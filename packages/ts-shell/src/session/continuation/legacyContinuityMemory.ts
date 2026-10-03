@@ -127,7 +127,8 @@ export function extractSeedInfluenceFromMemory(
   if (fromContinuity) {
     return fromContinuity;
   }
-  return extractSeedInfluenceFromStrings(getSummaryEntries(workingMemory));
+  return parseSeedInfluence(extractSummaryValue(workingMemory, "last-seed-influence")) ??
+    extractSeedInfluenceFromStrings(getSummaryEntries(workingMemory));
 }
 
 export function extractSeedInfluenceHandoffSummaryFromMemory(

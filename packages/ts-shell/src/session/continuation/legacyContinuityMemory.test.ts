@@ -4,8 +4,21 @@ import {
   extractSeedInfluenceFromMemory,
   extractWriteContinuityFromMemory,
 } from "./legacyContinuityMemory.js";
+import { mergeContinuitySummaryEntries } from "./summaryFormatter.js";
 
 describe("legacyContinuityMemory", () => {
+  it.each(["target-carryover", "verify-signal", "ignored-explicit-target"])("reads %s after a summary-only round trip", influence => {
+    const summary = mergeContinuitySummaryEntries([], { lastSeedInfluence: influence }, { preserveResult: false });
+    expect(summary).toContain(`- last-seed-influence: ${influence}`);
+    expect(extractSeedInfluenceFromMemory({ summary })).toBe(influence);
+    expect(extractSeedInfluenceFromMemory({ summary, continuity: { lastSeedInfluence: "verify-signal" } })).toBe("verify-signal");
+  });
+
+  it("preserves old seed encodings and rejects unknown summary values", () => {
+    expect(extractSeedInfluenceFromMemory({ summary: ["seedInfluence=target-carryover"] })).toBe("target-carryover");
+    expect(extractSeedInfluenceFromMemory({ summary: ["verify-signal"] })).toBe("verify-signal");
+    expect(extractSeedInfluenceFromMemory({ summary: ["- last-seed-influence: made-up"] })).toBeUndefined();
+  });
   it("preserves structured continuity fields before summary fallbacks", () => {
     const memory = {
       continuity: {

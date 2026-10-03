@@ -108,6 +108,10 @@ describe("session resume context builder", () => {
     expect(
       shouldAutoAttachPathlessContinuation("next in src/other.ts", withContext),
     ).toBe(false);
+    expect(buildSessionResumeSnapshot({ currentPrompt: "next", snapshot: withContext })).toBe(withContext);
+    expect(buildSessionResumeContext({ currentPrompt: "next", snapshot: withContext })).toContain("src/a.ts");
+    expect(buildSessionResumeContext({ currentPrompt: "next", snapshot: withoutContext })).toBeUndefined();
+    expect(buildSessionResumeContext({ currentPrompt: "next in src/other.ts", snapshot: withContext })).toBeUndefined();
   });
 
   it("projects action-result and seed-influence handoff text", () => {

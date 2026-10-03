@@ -100,7 +100,7 @@ describe("shell session runtime (W5)", () => {
     ]);
   });
 
-  it.each(["continue task", "calculate 7 plus 3"])("injects compact context once and selects continuity from the raw request (%s)", async (firstPrompt) => {
+  it.each(["continue task", "next", "calculate 7 plus 3"])("injects compact context once and selects continuity from the raw request (%s)", async (firstPrompt) => {
     const calls: string[] = [];
     const promptsSeenByModel: string[] = [];
     const contextsSeenByModel: Array<string | undefined> = [];
@@ -159,6 +159,7 @@ describe("shell session runtime (W5)", () => {
         buildContinuitySnapshot() {
           return {
             sessionId: "sess_runtime_compact", projectRoot: process.cwd(), lastTaskKind: "edit-file",
+            lastUserIntent: "inspect current.txt",
             lastWriteEffect: "unknown", lastWriteRequiresUserInspection: true,
             recentChangedFiles: [], recentTargetFiles: [], recentVerifiedFiles: [], recentFailedFiles: [],
             lastRepairNotes: [], lastContinuationEvidence: [], lastTaskSatisfactionReasons: [], unresolvedItems: [],
@@ -217,7 +218,7 @@ describe("shell session runtime (W5)", () => {
     expect(promptsSeenByModel[0]).toContain("arbitrary-broad-apply-patch");
     expect(promptsSeenByModel[0]).toContain(`<user_request>\n${firstPrompt}`);
     expect(promptsSeenByModel[0]).toContain("Continue runtime integration.");
-    if (firstPrompt === "continue task") expect(contextsSeenByModel[0]).toContain("last-write-effect: unknown");
+    if (firstPrompt === "continue task" || firstPrompt === "next") expect(contextsSeenByModel[0]).toContain("last-write-effect: unknown");
     else expect(contextsSeenByModel[0]).toBeUndefined();
     expect(contextsSeenByModel[1]).toContain("last-write-effect: unknown");
     expect(promptsSeenByModel[0]).not.toContain("RAW_MUTATION_CONTENT");

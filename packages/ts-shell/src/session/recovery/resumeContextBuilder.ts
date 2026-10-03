@@ -17,7 +17,8 @@ export function buildSessionResumeContext(input: {
   readonly currentPrompt: string;
   readonly snapshot: SessionContinuitySnapshot;
 }): string | undefined {
-  if (!isContinuationPrompt(input.currentPrompt)) {
+  if (!isContinuationPrompt(input.currentPrompt) &&
+    !shouldAutoAttachPathlessContinuation(input.currentPrompt, input.snapshot)) {
     return undefined;
   }
 

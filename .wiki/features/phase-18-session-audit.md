@@ -1,32 +1,32 @@
 # Phase 18 会话边界行为审计
 
 基准清单：`b271e40b` 下 continuation 16、recovery 11、replay 5、export 4，共36个生产模块。
-当前已提交基线：`7c34d0fd`；第十二批恢复修复的本地证据见实施裁决。路径均相对 `packages/ts-shell/src/session/`。
+当前已提交基线：`49dc51e9`；第十三批的本地证据见实施裁决。路径均相对 `packages/ts-shell/src/session/`。
 “已核对”指实现与所列断言一致，不代表任意输入下无缺陷；缺口必须闭合后才可宣布W7-26完成。
-前十二批证据见 [实施裁决](phase-18-decisions.md)。第十一批实际运行29套384项，不含本表新发现的全部边界。
+前十三批证据见 [实施裁决](phase-18-decisions.md)。第十一批实际运行29套384项，不含本表新发现的全部边界。
 
 ## continuation（16）
 
 | 原模块 | 行为判据 / 具体证据 | 审计状态 |
 |---|---|---|
 | `continuation/compactSummary.ts` | 当前结果整组替换，chat不改旧来源；`continuation/retention.test.ts`、`continuation/snapshot.test.ts` | 单结果已核对；unknown A之后成功B，A的历史未解决事实仍缺持续性保证 |
-| `continuation/legacyContinuityMemory.ts` | 结构化字段优先、false保留、summary-only兼容；同名测试 | 缺陷：formatter生成的last-seed-influence文本读不回 |
+| `continuation/legacyContinuityMemory.ts` | 结构化字段优先、false保留、summary-only兼容；同名测试 | 第十三批三枚举formatter→summary-only→reader回归通过，结构化优先及旧格式保留 |
 | `continuation/legacyPermissionRebase.ts` | 锁内重读，不复活删除状态或覆盖较新根/终态；同名测试 | 所列竞争边界已核对 |
 | `continuation/projectRootRebaseProjection.ts` | 组件边界与原字符串一次迁移；同名测试、`continuation/rebase.test.ts` | 所列值迁移边界已核对，不承诺文件系统事务 |
 | `continuation/retentionPlanner.ts` | 阈值前计数、阈值后每次完成更新；同名测试、retention测试 | 更新已核对；undefined workingMemory直接返回，新session初始化契约待明确 |
 | `continuation/sessionContinuitySnapshot.ts` | 先准入分支再选结果；未知顺序不作确定性投影；snapshot测试 | 第十一批限定场景通过；历史unknown写入仍待审计 |
 | `continuation/sessionMutationContinuity.ts` | planned/changed/verified分离、历史目标限量去重；`mutationContinuityState.test.ts` | 基本场景已核对；重复失败顺序和成功解除旧失败规则待验收 |
 | `continuation/sessionProjectRootRebind.ts` | 最新锁内状态、写入次序、失败观察与补偿；同名测试 | 第三至五批限定场景通过，无跨文件崩溃事务保证 |
-| `continuation/sessionPromptContinuity.ts` | snapshot和模型context对同一续接词保持一致；同名测试、resumeContextBuilder测试 | 缺陷：next接受snapshot但不交付model context |
-| `continuation/sessionReadContinuity.ts` | 读取当前结果的完整fragment/staged字段；`sessionManagerBoundary.test.ts` | 缺陷：解析提前break，合法字段重排丢fingerprint/source-window/ranges |
+| `continuation/sessionPromptContinuity.ts` | snapshot和模型context对同一续接词保持一致；同名测试、resumeContextBuilder测试 | 第十三批统一准入，runtime与双模式PTY验证next；无历史/新路径不自动附带 |
+| `continuation/sessionReadContinuity.ts` | 读取当前结果的完整fragment/staged字段；`sessionManagerBoundary.test.ts` | 第十三批八字段重排/反序回归通过，保留每字段最新有效值 |
 | `continuation/sessionRootRebase.ts` | 根解析和memory迁移使用同一目标；同名测试与rebind集成 | 薄组合已核对；空目的地由调用边界拒绝 |
 | `continuation/sessionSeedInfluence.ts` | 同次completion的notes/evidence/continuation/repair诊断来源；同名测试 | 当前首个有效标记优先，四来源冲突优先级尚缺验收 |
 | `continuation/sessionToolContinuity.ts` | 最后provenance整组投影，不补前一个缺失字段；SessionManager测试 | 缺两个provenance、后者无failureBoundary的直接验收 |
 | `continuation/sessionUnresolvedItems.ts` | 仅汇总已准入错误/终态/验证失败；snapshot测试 | 分支间接覆盖通过；同次error/stopReason冲突优先级待验收 |
 | `continuation/stoppedSessionContinuity.ts` | unknown/unverified写入要求检查，拒绝与执行失败分开；同名测试 | 单结果边界已核对；结构化false/none与旧标记冲突待验收 |
-| `continuation/summaryFormatter.ts` | 旧结果文本整组替换，保留独立文本，结构化值覆盖；compactSummary/retention测试 | 合并已核对；seed文本与legacy reader往返缺陷同上 |
+| `continuation/summaryFormatter.ts` | 旧结果文本整组替换，保留独立文本，结构化值覆盖；compactSummary/retention测试 | 合并已核对；第十三批seed三枚举文本往返通过 |
 
-上述三个具体缺陷由独立隔离纯函数探针复现（命令exit0仅表示诊断执行成功）。
+上述三个具体缺陷先由独立隔离探针复现，再以checked-in回归及第十三批修复闭合。
 当前真实CLI的turn/projection完成结果没有codingResult；未找到生产端生成历史read-fragment、seedInfluence、toolExecutions字段的写入点。
 相关手工结果与长会话fixture证明兼容消费/持久化，不证明真实工具会生成这些字段。
 
@@ -36,7 +36,7 @@
 |---|---|---|
 | `recovery/projectContextSummary.ts` | 项目聚合计数、最新会话ID/时间/标题一致；`sessionRecoverySelection.test.ts` | 已读基本断言；最新会话无标题时是否残留旧标题待验收 |
 | `recovery/recoveryTrustBoundary.ts` | 拒绝原因与修复提示保持明确；`sessionProjection.test.ts` | 薄投影已核对，不赋予恢复权限 |
-| `recovery/resumeContextBuilder.ts` | 续接/反思筛选、边界摘要、原始请求判定；同名测试、runtime/invocation及PTY | 第十/十一批交付路径通过；next不一致待修复 |
+| `recovery/resumeContextBuilder.ts` | 续接/反思筛选、边界摘要、原始请求判定；同名测试、runtime/invocation及PTY | 第十/十一/十三批交付路径通过；next沿用pathless准入 |
 | `recovery/sessionLifecycleReadModel.ts` | 最新运行内配对，不跨query复用同taskId；同名测试 | 运行范围及选中分支准入已核对；scope/branch回归覆盖同taskId隔离 |
 | `recovery/sessionLifecycleReconciliation.ts` | 已有resolution优先，未解决项按denied/failed补偿，不伪造成功；同名测试 | 调用者已改用同份scoped transcript；函数及shell恢复断言通过 |
 | `recovery/sessionRecoveryRuntime.ts` | snapshot、准入、补偿沿owner委派；SessionManager与reconciliation测试 | 薄边界与scoped snapshot/补偿调用已核对 |
