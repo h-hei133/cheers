@@ -50,6 +50,19 @@ describe("compact future-turn injection planner", () => {
       sourceCommand: "/compact",
     });
 
+    const pending = injectionStore.get("session:sess-inject");
+    const prepared = planCompactFutureTurnInjection({
+      mode: "prepare", checkpoint, injectionState: pending,
+      markInjected: (input) => injectionStore.markInjected(input),
+      markConsumed: (input) => injectionStore.markConsumed(input),
+      markInvalid: (input) => injectionStore.markInvalid(input),
+    });
+    expect(prepared.shouldInject).toBe(true);
+    expect(prepared.evidence).toContain("compact-future-turn-injection:prepared");
+    expect(prepared.evidence).not.toContain("compact-future-turn-injection:consumed");
+    expect(prepared.evidence).not.toContain("compact-future-turn-injection:injected-once");
+    expect(injectionStore.get("session:sess-inject")).toBe(pending);
+
     const first = planCompactFutureTurnInjection({
       checkpoint,
       injectionState: injectionStore.get("session:sess-inject"),
@@ -188,6 +201,17 @@ describe("compact future-turn injection planner", () => {
         },
       },
     };
+
+    const pending = injectionStore.get("session:sess-quality-fail");
+    const prepared = planCompactFutureTurnInjection({
+      mode: "prepare", checkpoint: badCheckpoint, injectionState: pending,
+      markConsumed: (input) => injectionStore.markConsumed(input),
+      markInvalid: (input) => injectionStore.markInvalid(input),
+    });
+    expect(prepared.shouldInject).toBe(false);
+    expect(prepared.invalidationReason).toBeTruthy();
+    expect(prepared.updatedInjectionState).toBe(pending);
+    expect(injectionStore.get("session:sess-quality-fail")).toBe(pending);
 
     const plan = planCompactFutureTurnInjection({
       checkpoint: badCheckpoint,

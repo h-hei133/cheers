@@ -16,6 +16,7 @@ import type { RuntimeConfig } from "../../config/runtimeConfig.js";
 export function streamCliRuntimePrompt(input: {
   readonly prompt: string;
   readonly continuityContext?: string;
+  readonly onPromptAccepted?: () => void;
   readonly mcpGateway?: CoreMcpGateway;
   /** Images that travelled with the prompt; see `PromptAttachments`. */
   readonly attachments?: PromptAttachments;
@@ -51,6 +52,7 @@ export function streamCliRuntimePrompt(input: {
     mcpGateway: input.mcpGateway,
     sessionId: input.sessionId,
     prompt: input.prompt,
+    ...(input.onPromptAccepted ? { onPromptAccepted: input.onPromptAccepted } : {}),
     ...(input.continuityContext ? { continuityContext: input.continuityContext } : {}),
     ...(input.attachments ? { attachments: input.attachments } : {}),
     workspaceRoot: input.workspaceRoot,

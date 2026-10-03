@@ -3,6 +3,7 @@ import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 import { TurnSink } from "./turnSink.js";
 import { Transcript } from "../../presentation/tui/transcript/container.js";
 import type { QueryEvent } from "../../core/query/runtime/events.js";
+import { createProviderReadinessCliTerminalEvent } from "../../entrypoints/providerReadinessCliSurface.js";
 
 const WIDTH = 60;
 
@@ -113,6 +114,49 @@ describe("tool lifecycle", () => {
 });
 
 describe("failure and interruption", () => {
+  it("renders a readiness refusal even when no query or assistant message started", () => {
+    const { sink, transcript, rows } = build();
+    sink.begin("turn", "inspect notes");
+    sink.handleEvent(createProviderReadinessCliTerminalEvent({
+      sessionId: "stopped", prompt: "inspect notes", stopReason: "Authentication was rejected. Check the selected account.",
+    }));
+    sink.end();
+    expect(rows()).toContain("Authentication was rejected.");
+    expect(transcript.all().map(block => block.kind)).toEqual(["error"]);
+    expect(sink.lastTurnFailed).toBe(true);
+    expect(sink.retryTarget("inspect notes", sink.lastTurnFailed)).toBe("inspect notes");
+  });
+
+  it.each(["stopped_cycle", "stopped_max_turns", "stopped_invalid_handoff", "stopped_not_proven", "stopped_error"] as const)(
+    "shows a stopped completion as a notice, preserving partial output: %s", status => {
+      const { sink, transcript, rows } = build();
+      sink.begin("turn", "inspect notes");
+      sink.chunk("Partial answer");
+      const event = createProviderReadinessCliTerminalEvent({ sessionId: "stopped", prompt: "inspect notes", stopReason: "Approval denied." });
+      if (event.type !== "query.completed") throw new Error("Expected terminal event");
+      sink.handleEvent({ ...event, result: { ...event.result, status, terminalReason: status, terminalClassification: "stopped" } });
+      sink.end();
+      expect(rows()).toContain("Partial answer");
+      expect(rows()).toContain("Approval denied.");
+      expect(transcript.all().map(block => block.kind)).toEqual(["assistant", "notice"]);
+      expect(sink.lastTurnFailed).toBe(true);
+    },
+  );
+
+  it("does not add a success footer or duplicate an already reported failure", () => {
+    const { sink, transcript } = build();
+    const event = createProviderReadinessCliTerminalEvent({ sessionId: "stopped", prompt: "inspect notes", stopReason: "Refused." });
+    if (event.type !== "query.completed") throw new Error("Expected terminal event");
+    sink.begin("turn", "inspect notes");
+    sink.handleEvent({ ...event, result: { ...event.result, status: "completed", terminalReason: "completed", terminalClassification: "success" } });
+    expect(transcript.all()).toHaveLength(0);
+    expect(sink.lastTurnFailed).toBe(false);
+    sink.handleEvent({ type: "query.failed", error: "Refused." });
+    sink.handleEvent(event);
+    sink.end();
+    expect(transcript.all()).toHaveLength(1);
+  });
+
   it("records a runtime error as its own block", () => {
     const { sink, rows } = build();
     sink.begin("turn", "turn");

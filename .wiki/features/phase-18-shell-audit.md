@@ -22,13 +22,13 @@ W7-31仍在执行。首批聚焦审批，其余已复现问题按下表继续修
 | `restoreSurfaceSummary.ts` | authority和无成功噪声；同名测试 | 所列路径源码核对，无新缺陷 |
 | `runtimeContext.ts` | workspace/session/recovery身份 | 第二批修复大小写比较；target-base/requested诊断覆盖 |
 | `sessionEventSurface.ts` | runtime prose/digest；runtime/boundary测试 | success字段必填；未确认新的投影缺陷 |
-| `sessionFutureTurnProjection.ts` | compact注入在真实prompt提交后消耗 | 已复现durable prompt barrier失败前提前消耗，待修复 |
+| `sessionFutureTurnProjection.ts` | compact与memory注入在实际kernel准入后消耗 | 第三批修复：prepare不改状态，准入前检查两类generation后同步消耗；失败重试、替换与驱逐通过 |
 | `sessionPersistenceProjection.ts` | runtime持久化适配；runtime/boundary测试 | 所列路径源码核对，无新缺陷 |
 | `sessionPrintOutputProjection.ts` | stopped输出和默认opt-in；同名测试 | 所列路径源码核对，无新缺陷 |
-| `sessionRuntime.ts` | 取消终态、prompt barrier、未来回合注入 | 已复现缺terminal时先打印success，以及barrier前消耗注入，待修复 |
+| `sessionRuntime.ts` | 取消终态、prompt barrier、未来回合注入 | 第三批修复：缺terminal先拒绝再渲染；barrier/readiness/hooks未准入不消耗；双模式PTY通过 |
 | `sessionStateSurface.ts` | session命令与stopped continuation；同名测试 | 复用既有truthfulness与恢复证据 |
 | `sessionTerminalEvidence.ts` | 终态coding evidence投影 | 历史fixture有覆盖；当前turn/projection不产生codingResult，不作为当前工具写入证明 |
-| `sessionTerminalState.ts` | terminal累计与输出 | 与runtime提前打印默认success关联，待修复 |
+| `sessionTerminalState.ts` | terminal累计与输出 | 第三批由runtime在调用渲染前验证terminal；另修复交互TurnSink漏显stopped完成事件 |
 | `shellActionBridge.ts` | command router判定与blocked文本 | 未找到直接symbol测试；保留断言缺口 |
 | `signalHandlers.ts` | SIGINT、idle close及恢复提示 | SIGINT已有测试；idle close/保留提示仍需核验 |
 | `startupSurfaceRenderer.ts` | 启动与workspace身份诊断 | 第二批增加直接surface测试，大小写不同根不再显示同根 |
@@ -74,3 +74,22 @@ log/show也可能调用签名或内容转换helper。因此这些命令在ask/ac
 三个既有比较函数只在Windows折叠大小写，其他平台保留`path.resolve`的原始大小写。沿用现有拒绝、显式迁移和绑定重建流程，不引入另一个根管理器。
 参考实现对session cwd采用保留大小写的resolved equality；本仓保留已有Windows兼容政策。比较仍是词法规则，不探测磁盘大小写策略或symlink别名，大小写不敏感的非Windows文件系统可能需要显式迁移。
 5套56项与CLI构建通过，独立APPROVE/CLEAR；反转三个owner后5失败22通过，逐字节恢复。双模式编译PTY证明未授权迁移先拒绝且无模型请求；明确迁移后模型和实际审批写入使用新根，旧根不写入，持久化绑定/终态来源一致。产物.tmp/root-case-pty-rqhj08xe。
+
+## 第三批准入与停止结果
+
+准备上下文只读取现有store；durable prompt barrier、readiness与两个启动hook完成，且未取消后，
+既有turn入口在kernel.prompt前同步接纳。两个generation先全部核对，再消耗或标记无效；
+同ID重置、检查点替换、异步检索期间驱逐均拒绝旧准备结果，保留当前pending供重试。
+state/get与checkpoint/getLatest的对象身份契约已明确，未增加另一套store或执行器。
+入核后的模型失败不会重新注入，runtime reentry不消费为下一正常回合暂存的上下文。
+
+无terminal的流先进入错误/中断结算，不渲染默认success。
+PTY还证明既有交互层漏显readiness的stopped_error：事件已持久化但屏幕为空。
+TurnSink现显示实际stopReason，保留partial answer、error/notice分类和显式retry，正常成功无额外footer。
+参考采用的是启动检查后再取待注入消息、终态错误与部分正文分开显示的顺序；没有复制代码。
+
+最终14套201项、CLI构建、静态门与40项脚本测试通过；联合反转6个生产owner后28失败80通过，随后逐字节恢复并复跑。
+独立代码APPROVE/架构CLEAR。普通/全屏编译PTY验证readiness拒绝、真实hook block、启动中取消均无模型请求，
+成功重试携带两类上下文且仅一次，持久化终态来源正确；产物.tmp/admission-pty-ahbsjr4f。
+保证限于现有同步进程内store，不承诺跨进程/跨store落盘事务；hook dispatcher既有异常处理政策不变。
+W7-31的凭据/readiness协议、background、platform与直接断言缺口继续处理，旧result-contract脚本仍未修复。

@@ -32,6 +32,8 @@ export interface CompactInjectionState extends RetentionState {
 
 export interface CompactInjectionStateStore {
   retention(): RetentionStatus;
+  /** Retained states keep their identity until replaced or evicted. Every change,
+   * including rearming the same checkpoint, returns a new read-only generation. */
   get(sessionScopeId: string): CompactInjectionState;
   markPending(input: MarkCompactInjectionPendingInput): CompactInjectionState;
   markInjected(input: MarkCompactInjectionInjectedInput): CompactInjectionState;

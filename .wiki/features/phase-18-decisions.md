@@ -1811,3 +1811,32 @@ W7-31仍未完成，继续处理审计表中的根绑定、取消终态、compac
 最终编译普通/全屏PTY先以不同大小写根请求同一session，两次都拒绝且零模型请求；显式迁移后每次2个本地HTTP请求，审批前无文件、批准后只写新根、重开绑定正确、终态success与来源一致。产物.tmp/root-case-pty-rqhj08xe，双模式exit0。
 静态阻断门和judge阻断义务通过，已有advisory保留；无真实provider，旧result-contract及test:scripts未跑。当前比较按host策略，非Windows大小写不敏感文件系统可能仍需显式迁移，不声称真实Windows验收。
 首批0428c2cc已推送；Architecture Watch 37118672620成功，CI 37118672630仍执行。W7-31继续取消终态、compact注入和其余Shell项目。
+
+### W7-31 第三批：请求准入、一次注入与停止结果显示（2026-10-03）
+
+沿用原注入planner/store与CLI→turn链路，增加只读prepare和同步accept。
+durable prompt barrier、readiness、SessionStart/UserPromptSubmit检查通过且未取消之后，
+在kernel.prompt前核对compact状态/检查点与memory状态generation，全部有效才消费或标记无效。
+同ID重新暂存、检查点替换、异步检索期间驱逐均拒绝旧结果；失败保留当前pending供重试。
+接纳只执行一次，模型后续失败不重复注入；runtime reentry不消费下一正常回合的暂存上下文。
+旧planner直接调用的消费行为保留；generation对象身份契约写入既有store接口。
+
+参考比较：本地参考的会话prompt先验证模型/凭据、完成启动扩展，再取pending next-turn消息，
+交互终态把错误/取消与已生成正文分开显示。采纳顺序与显示语义；本仓保留durable barrier与独立注入store，未复制代码。
+
+无terminal的空流、非终态流与取消流现先失败/中断，再决定输出，不再打印默认success。
+实际PTY另揭示TurnSink忽略stopped query.completed，导致readiness已拒绝并落盘但交互屏幕为空。
+同一停止结果投影现保留error/notice分类、partial answer、stopReason与显式retry；成功结果不添footer。
+
+验证：在仓内隔离HOME/USERPROFILE/TMPDIR执行定向14套201项与build:ts，均exit0。
+联合反转6个生产owner后28失败80通过（含6项停止显示回归），逐字节恢复后完整定向复跑通过。
+静态门：1431文件值/类型图零环、config39/39、hooks18/18、factories10/10、Node地板通过；
+reachability7与function-ceiling7为既有advisory。test:scripts 40/40通过。
+独立代码与架构复核APPROVE/CLEAR；预设评审服务不可用后由两个独立同会话模型子代理完成，未以作者自评替代。
+普通/全屏编译PTY通过真实hook阻断/取消、readiness拒绝、成功重试、两类上下文仅一次、终态消息来源匹配；
+仅调用本地合成HTTP服务，产物.tmp/admission-pty-ahbsjr4f。首轮PTY失败归因于上述真实显示缺陷，未降低断言。
+
+保证限于当前同步进程内store；不承诺跨进程注入持久化事务，也未改变dispatcher既有的hook handler异常政策。
+旧result-contract脚本债务未在此批修复；W7-31其余已登记项及后续27→29→33/W8保持未完成。
+第二批ebbcb7a8的CI 37119359176和Architecture Watch 37119359119已成功。
+提交前docs严格门通过（0 dangling、旧120 source advisory）；内置judge exit0，图无环和无未解析specifier两义务满足，函数上限旧advisory使总体仍partial。

@@ -130,9 +130,11 @@ describe("the project memory chain", () => {
       prompt: "what should I do next?",
     });
 
-    expect(prompt).toContain("<project_memory_context>");
-    expect(prompt).toContain("conventional commits");
-    expect(prompt).toContain("what should I do next?");
+    expect(prompt.prompt).toContain("<project_memory_context>");
+    expect(prompt.prompt).toContain("conventional commits");
+    expect(prompt.prompt).toContain("what should I do next?");
+    expect(injectionStateStore.get(`session:${sessionId}`).injectionStatus).toBe("pending");
+    prompt.accept();
 
     // Consumed, so the next turn does not repeat it: the mode is per-turn by
     // design, and a state left at pending would inject the same block again
@@ -159,7 +161,10 @@ describe("the project memory chain", () => {
       prompt: "hello",
     });
 
-    expect(prompt).toBe("hello");
+    expect(prompt.prompt).toBe("hello");
+    expect(injectionStateStore.get(`session:${sessionId}`).injectionStatus).toBe("pending");
+    prompt.accept();
+    expect(injectionStateStore.get(`session:${sessionId}`).injectionStatus).toBe("invalid");
   });
 });
 

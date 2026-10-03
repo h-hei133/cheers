@@ -372,7 +372,7 @@ export function createCliSessionRuntime(input: {
         });
       });
     },
-    runPrompt: (prompt, signal, _runtimeSeed, _continuityState, attachments, continuityContext): PromptRun => {
+    runPrompt: (prompt, signal, _runtimeSeed, _continuityState, attachments, continuityContext, onPromptAccepted): PromptRun => {
       const resolvedCredential =
         input.providerRuntimeBridge.resolveCredentialSnapshot();
       const sessionId = input.runtimeContext.session.id;
@@ -465,6 +465,7 @@ export function createCliSessionRuntime(input: {
         runtimeConfig: input.runtimeContext.runtimeConfig,
         prompt,
         ...(continuityContext ? { continuityContext } : {}),
+        ...(onPromptAccepted ? { onPromptAccepted } : {}),
         ...(attachments ? { attachments } : {}),
         sessionId,
         workspaceRoot: input.runtimeContext.cwd,

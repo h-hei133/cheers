@@ -13,6 +13,8 @@ export interface CompactFutureTurnInjectionPlan {
   readonly shouldInject: boolean;
   readonly injectedContext?: string;
   readonly updatedInjectionState: CompactInjectionState;
+  /** A prepared invalidation, applied only if this generation is admitted. */
+  readonly invalidationReason?: string;
   readonly warnings: readonly {
     readonly id: string;
     readonly message: string;
@@ -21,6 +23,8 @@ export interface CompactFutureTurnInjectionPlan {
 }
 
 export interface PlanCompactFutureTurnInjectionInput {
+  /** Prepare context and dispositions without changing injection state. */
+  readonly mode?: "prepare";
   readonly checkpoint?: CompactLiveCheckpoint;
   readonly previousCheckpoint?: CompactLiveCheckpoint;
   readonly injectionState: CompactInjectionState;
@@ -54,13 +58,8 @@ export function planCompactFutureTurnInjection(
     return skip(input.injectionState, "no-checkpoint", "No compact checkpoint exists.", baseEvidence);
   }
   if (input.checkpoint.status !== "created") {
-    const updated =
-      input.markInvalid?.({
-        sessionScopeId: input.injectionState.sessionScopeId,
-        checkpointId: input.checkpoint.checkpointId,
-        reason: `Checkpoint status is ${input.checkpoint.status}.`,
-      }) ?? input.injectionState;
-    return skip(updated, "checkpoint-not-created", "Compact checkpoint is not active.", baseEvidence);
+    return invalid(input, "checkpoint-not-created", "Compact checkpoint is not active.", baseEvidence,
+      [], `Checkpoint status is ${input.checkpoint.status}.`);
   }
   if (
     input.injectionState.injectionStatus !== "pending" ||
@@ -81,18 +80,13 @@ export function planCompactFutureTurnInjection(
     injectionState: input.injectionState,
   });
   if (merge.mergeStatus === "fail") {
-    const updated =
-      input.markInvalid?.({
-        sessionScopeId: input.injectionState.sessionScopeId,
-        checkpointId: input.checkpoint.checkpointId,
-        reason: merge.blockers.map((blocker) => blocker.message).join("; "),
-      }) ?? input.injectionState;
-    return skip(
-      updated,
+    return invalid(
+      input,
       "compact-merge-quality-failed",
       "Compact checkpoint merge policy rejected injection.",
       [...baseEvidence, ...merge.evidence],
       [...merge.warnings, ...merge.blockers],
+      merge.blockers.map((blocker) => blocker.message).join("; "),
     );
   }
   const mergedCandidate = mergeWarningsIntoCandidate(candidate, merge);
@@ -107,46 +101,39 @@ export function planCompactFutureTurnInjection(
     expectRecoverySummary: hasRecoverySummary(input.checkpoint),
   });
   if (quality.qualityStatus === "fail") {
-    const updated =
-      input.markInvalid?.({
-        sessionScopeId: input.injectionState.sessionScopeId,
-        checkpointId: input.checkpoint.checkpointId,
-        reason: quality.blockers.map((blocker) => blocker.message).join("; "),
-      }) ?? input.injectionState;
-    return skip(
-      updated,
+    return invalid(
+      input,
       "compact-continuity-quality-failed",
       "Compact continuity quality checks rejected injection.",
       [...baseEvidence, ...merge.evidence, ...quality.evidence],
       [...mergedCandidate.warnings, ...quality.warnings, ...quality.blockers],
+      quality.blockers.map((blocker) => blocker.message).join("; "),
     );
   }
   const budget = applyCompactInjectedContextBudget(formattedContext, {
     maxChars: input.maxInjectedContextChars,
   });
   if (containsUnsafeContent(budget.context)) {
-    const updated =
-      input.markInvalid?.({
-        sessionScopeId: input.injectionState.sessionScopeId,
-        checkpointId: input.checkpoint.checkpointId,
-        reason: "Budgeted injected context contained unsafe raw-looking content.",
-      }) ?? input.injectionState;
-    return skip(
-      updated,
+    return invalid(
+      input,
       "unsafe-budgeted-context",
       "Budgeted injected context was rejected.",
       [...baseEvidence, ...merge.evidence, ...quality.evidence, ...budget.evidence],
       [...mergedCandidate.warnings, ...quality.warnings, ...budget.warnings],
+      "Budgeted injected context contained unsafe raw-looking content.",
     );
   }
-  input.markInjected?.({
-    sessionScopeId: input.injectionState.sessionScopeId,
-    checkpointId: input.checkpoint.checkpointId,
-  });
-  const updatedInjectionState = input.markConsumed({
-    sessionScopeId: input.injectionState.sessionScopeId,
-    checkpointId: input.checkpoint.checkpointId,
-  });
+  let updatedInjectionState = input.injectionState;
+  if (input.mode !== "prepare") {
+    input.markInjected?.({
+      sessionScopeId: input.injectionState.sessionScopeId,
+      checkpointId: input.checkpoint.checkpointId,
+    });
+    updatedInjectionState = input.markConsumed({
+      sessionScopeId: input.injectionState.sessionScopeId,
+      checkpointId: input.checkpoint.checkpointId,
+    });
+  }
 
   return {
     shouldInject: true,
@@ -163,9 +150,29 @@ export function planCompactFutureTurnInjection(
       ...merge.evidence,
       ...quality.evidence,
       ...budget.evidence,
-      "compact-future-turn-injection:injected-once",
-      "compact-future-turn-injection:consumed",
+      ...(input.mode === "prepare" ? ["compact-future-turn-injection:prepared"] : [
+        "compact-future-turn-injection:injected-once",
+        "compact-future-turn-injection:consumed",
+      ]),
     ],
+  };
+}
+
+function invalid(
+  input: PlanCompactFutureTurnInjectionInput,
+  id: string,
+  message: string,
+  evidence: readonly string[],
+  warnings: readonly { readonly id: string; readonly message: string }[] = [],
+  reason = message,
+): CompactFutureTurnInjectionPlan {
+  const updated = input.mode === "prepare" ? input.injectionState : input.markInvalid?.({
+    sessionScopeId: input.injectionState.sessionScopeId,
+    checkpointId: input.checkpoint?.checkpointId,
+    reason,
+  }) ?? input.injectionState;
+  return { ...skip(updated, id, message, evidence, warnings),
+    ...(input.mode === "prepare" ? { invalidationReason: reason } : {}),
   };
 }
 

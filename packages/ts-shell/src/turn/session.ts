@@ -62,6 +62,8 @@ export interface TurnOptions {
   readonly prompt: string;
   /** Historical context for this run; never persisted as a new user prompt. */
   readonly continuityContext?: string;
+  /** Commit prepared prompt context after startup checks, immediately before kernel entry. */
+  readonly onPromptAccepted?: () => void;
   /**
    * Images the user attached to this prompt.
    *
@@ -303,24 +305,32 @@ export function runTurn(options: TurnOptions): TurnRun {
       // the contract by accident.
       ...(options.sessionPath !== undefined ? { sessionPath: options.sessionPath } : {}),
     });
-    await options.hooks.dispatch({
+    const started = await options.hooks.dispatch({
       eventName: "SessionStart",
       sessionId: options.sessionId,
       workspaceRoot: options.workspaceRoot,
       timestamp: new Date().toISOString(),
       resumed: options.history.length > 0,
     });
-    await options.hooks.dispatch({
+    if (started.decision === "block" || started.decision === "retry") {
+      throw new Error(`SessionStart hook ${started.decision}: ${started.reason || started.feedback || "Prompt admission refused."}`);
+    }
+    if (options.signal.aborted) return;
+    const submitted = await options.hooks.dispatch({
       eventName: "UserPromptSubmit",
       sessionId: options.sessionId,
       workspaceRoot: options.workspaceRoot,
       timestamp: new Date().toISOString(),
       prompt: options.prompt,
     });
+    if (submitted.decision === "block" || submitted.decision === "retry") {
+      throw new Error(`UserPromptSubmit hook ${submitted.decision}: ${submitted.reason || submitted.feedback || "Prompt admission refused."}`);
+    }
     if (options.signal.aborted) return;
     const onAbort = (): void => core.abort();
     options.signal.addEventListener("abort", onAbort, { once: true });
     try {
+      options.onPromptAccepted?.();
       await core.prompt(opening);
       // Input that arrived as the run was ending is still owed a run: the
       // kernel restarts from its queues rather than leaving them behind.

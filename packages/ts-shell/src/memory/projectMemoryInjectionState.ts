@@ -39,6 +39,8 @@ export interface ProjectMemoryInjectionState extends RetentionState {
 
 export interface ProjectMemoryInjectionStateStore {
   retention(): RetentionStatus;
+  /** Retained states keep their identity until replaced or evicted. Every change,
+   * including rearming the same records, returns a new read-only generation. */
   get(sessionScopeId: string): ProjectMemoryInjectionState;
   markPending(input: MarkProjectMemoryInjectionPendingInput): ProjectMemoryInjectionState;
   markInjected(input: MarkProjectMemoryInjectionInjectedInput): ProjectMemoryInjectionState;

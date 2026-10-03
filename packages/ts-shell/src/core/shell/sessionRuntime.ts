@@ -63,6 +63,7 @@ export interface SessionRuntimeDependencies {
     continuityState?: SessionContinuitySnapshot,
     attachments?: PromptAttachments,
     continuityContext?: string,
+    onPromptAccepted?: () => void,
   ) => PromptRun;
   readonly compactCheckpointStore?: CompactLiveCheckpointStore;
   readonly compactInjectionStateStore?: CompactInjectionStateStore;
@@ -267,13 +268,13 @@ export class ShellSessionRuntime {
               : undefined;
       }
 
-      const promptForModel = !options?.runtimeSeed
+      const preparedPrompt = !options?.runtimeSeed
         ? await buildPromptWithFutureTurnInjections({
             deps: this.deps,
             sessionId,
             prompt,
           })
-        : prompt;
+        : undefined;
       // Classify the submitted request, before any injected historical text can
       // supply a continuation cue of its own.
       const continuityContext = continuityState
@@ -299,12 +300,13 @@ export class ShellSessionRuntime {
       }
 
       const run = this.deps.runPrompt(
-        promptForModel,
+        preparedPrompt?.prompt ?? prompt,
         signal,
         options?.runtimeSeed,
         continuityState,
         options?.attachments,
         continuityContext,
+        preparedPrompt?.accept,
       );
       const events = Symbol.asyncIterator in run ? run : run.events;
       this.currentInput = Symbol.asyncIterator in run ? undefined : run.input;
@@ -341,6 +343,10 @@ export class ShellSessionRuntime {
         }
       }
 
+      if (!sawTerminalEvent) {
+        throw new Error("Query runtime ended without a terminal event");
+      }
+
       if (!structuredOutput) {
         renderSessionTerminalSurface({
           renderer: this.deps.renderer,
@@ -351,10 +357,6 @@ export class ShellSessionRuntime {
           startedRendering,
           continuityState,
         });
-      }
-
-      if (!sawTerminalEvent) {
-        throw new Error("Query runtime ended without a terminal event");
       }
 
       if (terminalState.terminalStatus === "completed") {

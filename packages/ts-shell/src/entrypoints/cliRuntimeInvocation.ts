@@ -64,6 +64,7 @@ export interface CliRuntimeInvocationInput {
   readonly prompt: string;
   /** Selected historical facts for this continuation, separate from user intent. */
   readonly continuityContext?: string;
+  readonly onPromptAccepted?: () => void;
   /** Images that travelled with the prompt; see `PromptAttachments`. */
   readonly attachments?: PromptAttachments;
   readonly workspaceRoot: string;
@@ -544,6 +545,7 @@ async function startTurn(
     // nothing true to report.
     ...sessionPathOption(request.sessionId),
     prompt: request.prompt,
+    ...(request.onPromptAccepted ? { onPromptAccepted: request.onPromptAccepted } : {}),
     ...(request.continuityContext ? { continuityContext: request.continuityContext } : {}),
     ...(request.attachments ? { attachments: request.attachments } : {}),
     workspaceRoot: request.workspaceRoot,

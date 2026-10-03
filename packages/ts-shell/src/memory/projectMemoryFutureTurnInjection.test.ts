@@ -45,6 +45,19 @@ describe("project memory future-turn injection", () => {
     expect(staged.outcome).toBe("staged");
     expect(staged.output).toContain("Future-turn injection: explicit staged use only");
 
+    const pending = injectionStateStore.get("session:memory-use");
+    const prepared = await planProjectMemoryFutureTurnInjection({
+      mode: "prepare", memoryStore, injectionState: pending,
+      markInjected: (input) => injectionStateStore.markInjected(input),
+      markConsumed: (input) => injectionStateStore.markConsumed(input),
+      markInvalid: (input) => injectionStateStore.markInvalid(input),
+    });
+    expect(prepared.shouldInject).toBe(true);
+    expect(prepared.evidence).toContain("project-memory-future-turn-injection:prepared");
+    expect(prepared.evidence).not.toContain("project-memory-future-turn-injection:consumed");
+    expect(prepared.evidence).not.toContain("project-memory-future-turn-injection:injected-once");
+    expect(injectionStateStore.get("session:memory-use")).toBe(pending);
+
     const first = await planProjectMemoryFutureTurnInjection({
       memoryStore,
       injectionState: injectionStateStore.get("session:memory-use"),

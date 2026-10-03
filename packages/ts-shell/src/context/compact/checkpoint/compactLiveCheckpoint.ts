@@ -44,6 +44,8 @@ export interface CompactLiveCheckpoint {
 
 export interface CompactLiveCheckpointStore {
   retention(): RetentionStatus;
+  /** Reads return the retained read-only object; an update replaces its identity
+   * even when the checkpoint ID is reused, so prepared consumers can detect it. */
   getLatest(sessionScopeId: string): CompactLiveCheckpoint | undefined;
   getById(checkpointId: string): CompactLiveCheckpoint | undefined;
   updateLatest(input: UpdateCompactLiveCheckpointInput): CompactLiveCheckpoint;

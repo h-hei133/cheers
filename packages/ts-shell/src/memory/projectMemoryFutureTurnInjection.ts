@@ -23,11 +23,14 @@ export interface ProjectMemoryFutureTurnInjectionPlan {
   readonly shouldInject: boolean;
   readonly injectedContext?: string;
   readonly updatedInjectionState: ProjectMemoryInjectionState;
+  readonly invalidationReason?: string;
   readonly warnings: readonly { readonly id: string; readonly message: string }[];
   readonly evidence: readonly string[];
 }
 
 export interface PlanProjectMemoryFutureTurnInjectionInput {
+  /** Prepare context and dispositions without changing injection state. */
+  readonly mode?: "prepare";
   readonly memoryStore?: ProjectMemoryStore;
   readonly injectionState: ProjectMemoryInjectionState;
   readonly markInjected?: (input: {
@@ -137,19 +140,22 @@ export async function planProjectMemoryFutureTurnInjection(
     ]);
   }
 
-  const injected = input.markInjected?.({
-    sessionScopeId: state.sessionScopeId,
-    memoryInjectionId: state.memoryInjectionId,
-  });
-  if (injected && (injected.memoryInjectionId !== state.memoryInjectionId || injected.injectionStatus !== "injected")) {
-    return skip(injected, "memory-injection-state-changed", "Pending memory injection changed or was evicted during retrieval.", baseEvidence);
-  }
-  const updatedInjectionState = input.markConsumed({
-    sessionScopeId: state.sessionScopeId,
-    memoryInjectionId: state.memoryInjectionId,
-  });
-  if (updatedInjectionState.memoryInjectionId !== state.memoryInjectionId || updatedInjectionState.injectionStatus !== "consumed") {
-    return skip(updatedInjectionState, "memory-injection-state-changed", "Pending memory injection changed or was evicted during retrieval.", baseEvidence);
+  let updatedInjectionState = state;
+  if (input.mode !== "prepare") {
+    const injected = input.markInjected?.({
+      sessionScopeId: state.sessionScopeId,
+      memoryInjectionId: state.memoryInjectionId,
+    });
+    if (injected && (injected.memoryInjectionId !== state.memoryInjectionId || injected.injectionStatus !== "injected")) {
+      return skip(injected, "memory-injection-state-changed", "Pending memory injection changed or was evicted during retrieval.", baseEvidence);
+    }
+    updatedInjectionState = input.markConsumed({
+      sessionScopeId: state.sessionScopeId,
+      memoryInjectionId: state.memoryInjectionId,
+    });
+    if (updatedInjectionState.memoryInjectionId !== state.memoryInjectionId || updatedInjectionState.injectionStatus !== "consumed") {
+      return skip(updatedInjectionState, "memory-injection-state-changed", "Pending memory injection changed or was evicted during retrieval.", baseEvidence);
+    }
   }
   return {
     shouldInject: true,
@@ -166,8 +172,10 @@ export async function planProjectMemoryFutureTurnInjection(
       ...merge.evidence,
       ...quality.evidence,
       ...budget.evidence,
-      "project-memory-future-turn-injection:injected-once",
-      "project-memory-future-turn-injection:consumed",
+      ...(input.mode === "prepare" ? ["project-memory-future-turn-injection:prepared"] : [
+        "project-memory-future-turn-injection:injected-once",
+        "project-memory-future-turn-injection:consumed",
+      ]),
     ],
   };
 }
@@ -179,13 +187,15 @@ function invalid(
   evidence: readonly string[],
   extraWarnings: readonly { readonly id: string; readonly message: string }[] = [],
 ): ProjectMemoryFutureTurnInjectionPlan {
-  const updated =
+  const updated = input.mode === "prepare" ? input.injectionState :
     input.markInvalid?.({
       sessionScopeId: input.injectionState.sessionScopeId,
       memoryInjectionId: input.injectionState.memoryInjectionId,
       reason: message,
     }) ?? input.injectionState;
-  return skip(updated, id, message, evidence, extraWarnings);
+  return { ...skip(updated, id, message, evidence, extraWarnings),
+    ...(input.mode === "prepare" ? { invalidationReason: message } : {}),
+  };
 }
 
 function skip(

@@ -5806,3 +5806,9 @@ next上下文沿用snapshot已有准入，seed摘要读回formatter实际键，�
 
 三个Shell比较函数在非Windows保留大小写，CaseRoot/caseroot不能隐式共享会话；明确迁移沿用既有rebind并重建目标绑定。5套56项、CLI构建与独立APPROVE/CLEAR通过；反转三个owner后5失败22通过，精确恢复。
 普通/全屏编译PTY确认错误根拒绝时无模型请求，显式迁移后实际批准写入只到新根，绑定与终态持久化一致。静态阻断门及judge阻断义务通过，既有advisory保留。未进行真实provider或Windows运行，词法比较的可移植性限制见Shell审计。
+
+## [2026-10-03] fix | Phase 18 W7-31 请求准入与停止结果
+
+compact与memory在barrier/readiness/启动hook之后、kernel准入前才消耗；generation替换/驱逐拒绝旧准备结果，失败重试与runtime reentry保留pending。无terminal不再打印默认success。PTY复现并修复交互层漏显stopped完成事件，保留部分正文、错误分类与显式retry。
+14套201项、CLI构建、静态门与40项脚本测试通过；反转6个owner后28失败80通过，精确恢复并复跑。独立APPROVE/CLEAR。普通/全屏编译PTY通过拒绝/阻断/取消不调用模型、重试两类上下文仅一次及终态来源一致；仅本地合成HTTP服务。
+保证限于进程内同步store，旧hook异常政策未改。W7-31剩余项及W7/W8后续任务继续，旧result-contract脚本未修。ebbcb7a8的CI与Architecture Watch均成功；详见[Shell审计](features/phase-18-shell-audit.md)。

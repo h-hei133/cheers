@@ -22,24 +22,63 @@ export interface SessionFutureTurnProjectionDependencies {
   readonly projectMemoryStore?: ProjectMemoryStore;
 }
 
+interface InjectionEffect {
+  readonly isCurrent: () => boolean;
+  readonly apply: () => void;
+}
+
+interface PreparedComponent {
+  readonly prompt: string;
+  readonly effect?: InjectionEffect;
+}
+
+export interface PreparedSessionPrompt {
+  readonly prompt: string;
+  /** Validate all prepared generations and consume them at kernel admission. */
+  readonly accept: () => void;
+}
+
 export async function buildPromptWithFutureTurnInjections(input: {
   deps: SessionFutureTurnProjectionDependencies;
   sessionId: string;
   prompt: string;
-}): Promise<string> {
-  const compactInjectedPrompt = buildPromptWithCompactInjection(input);
-  return buildPromptWithProjectMemoryInjection({
+}): Promise<PreparedSessionPrompt> {
+  const compact = buildPromptWithCompactInjection(input);
+  const memory = await buildPromptWithProjectMemoryInjection({
     deps: input.deps,
     sessionId: input.sessionId,
-    prompt: compactInjectedPrompt,
+    prompt: compact.prompt,
   });
+  const effects = [compact.effect, memory.effect].filter(
+    (effect): effect is InjectionEffect => effect !== undefined,
+  );
+  // Memory retrieval is asynchronous. Neither component may have been replaced
+  // while it ran, even by rearming the same compact checkpoint.
+  assertCurrent(effects);
+  let accepted = false;
+  return {
+    prompt: memory.prompt,
+    accept() {
+      if (accepted) return;
+      // Validate both generations before either synchronous state transition.
+      assertCurrent(effects);
+      for (const effect of effects) effect.apply();
+      accepted = true;
+    },
+  };
+}
+
+function assertCurrent(effects: readonly InjectionEffect[]): void {
+  if (effects.some(effect => !effect.isCurrent())) {
+    throw new Error("Prepared prompt context changed before admission; retry the prompt to use the current context.");
+  }
 }
 
 function buildPromptWithCompactInjection(input: {
   deps: SessionFutureTurnProjectionDependencies;
   sessionId: string;
   prompt: string;
-}): string {
+}): PreparedComponent {
   const sessionScopeId = compactSessionScopeId(input.sessionId);
   const checkpointStore =
     input.deps.compactCheckpointStore ?? DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE;
@@ -55,78 +94,76 @@ function buildPromptWithCompactInjection(input: {
     ? checkpointStore.getById(injectionState.supersededCheckpointIds[0])
     : undefined;
   const plan = planCompactFutureTurnInjection({
+    mode: "prepare",
     checkpoint,
     previousCheckpoint,
     injectionState,
-    markInjected: ({ sessionScopeId: scopeId, checkpointId }) =>
-      injectionStateStore.markInjected({
-        sessionScopeId: scopeId,
-        checkpointId,
-      }),
-    markConsumed: ({ sessionScopeId: scopeId, checkpointId }) =>
-      injectionStateStore.markConsumed({
-        sessionScopeId: scopeId,
-        checkpointId,
-      }),
-    markInvalid: ({ sessionScopeId: scopeId, checkpointId, reason }) =>
-      injectionStateStore.markInvalid({
-        sessionScopeId: scopeId,
-        checkpointId,
-        reason,
-      }),
+    markConsumed: injectionStateStore.markConsumed,
   });
-  if (!plan.shouldInject || !plan.injectedContext) {
-    return input.prompt;
-  }
-  return [
-    plan.injectedContext,
-    "",
-    "<user_request>",
-    input.prompt,
-    "</user_request>",
-  ].join("\n");
+  const prompt = plan.shouldInject && plan.injectedContext
+    ? [plan.injectedContext, "", "<user_request>", input.prompt, "</user_request>"].join("\n")
+    : input.prompt;
+  const effect = checkpoint && injectionState.checkpointId === checkpoint.checkpointId &&
+    (plan.shouldInject || plan.invalidationReason)
+    ? {
+        isCurrent: () => injectionStateStore.get(sessionScopeId) === injectionState &&
+          getLatestCompactCheckpoint(checkpointStore, sessionScopeId) === checkpoint,
+        apply: () => {
+          const target = { sessionScopeId, checkpointId: checkpoint.checkpointId };
+          if (plan.invalidationReason) {
+            injectionStateStore.markInvalid({ ...target, reason: plan.invalidationReason });
+          } else {
+            injectionStateStore.markConsumed(target);
+          }
+        },
+      }
+    : undefined;
+  return { prompt, effect };
 }
 
 async function buildPromptWithProjectMemoryInjection(input: {
   deps: SessionFutureTurnProjectionDependencies;
   sessionId: string;
   prompt: string;
-}): Promise<string> {
+}): Promise<PreparedComponent> {
   const sessionScopeId = compactSessionScopeId(input.sessionId);
   const injectionStateStore =
     input.deps.projectMemoryInjectionStateStore ??
     DEFAULT_PROJECT_MEMORY_INJECTION_STATE_STORE;
   const injectionState = injectionStateStore.get(sessionScopeId);
   const plan = await planProjectMemoryFutureTurnInjection({
+    mode: "prepare",
     memoryStore: input.deps.projectMemoryStore,
     injectionState,
-    markInjected: ({ sessionScopeId: scopeId, memoryInjectionId }) =>
-      injectionStateStore.markInjected({
-        sessionScopeId: scopeId,
-        memoryInjectionId,
-      }),
-    markConsumed: ({ sessionScopeId: scopeId, memoryInjectionId }) =>
-      injectionStateStore.markConsumed({
-        sessionScopeId: scopeId,
-        memoryInjectionId,
-      }),
-    markInvalid: ({ sessionScopeId: scopeId, memoryInjectionId, reason }) =>
-      injectionStateStore.markInvalid({
-        sessionScopeId: scopeId,
-        memoryInjectionId,
-        reason,
-      }),
+    markConsumed: injectionStateStore.markConsumed,
   });
+  const memoryInjectionId = injectionState.memoryInjectionId;
+  const effect = memoryInjectionId && (plan.shouldInject || plan.invalidationReason)
+    ? {
+        isCurrent: () => injectionStateStore.get(sessionScopeId) === injectionState,
+        apply: () => {
+          const target = { sessionScopeId, memoryInjectionId };
+          if (plan.invalidationReason) {
+            injectionStateStore.markInvalid({ ...target, reason: plan.invalidationReason });
+          } else {
+            injectionStateStore.markConsumed(target);
+          }
+        },
+      }
+    : undefined;
   if (!plan.shouldInject || !plan.injectedContext) {
-    return input.prompt;
+    return { prompt: input.prompt, effect };
   }
   if (input.prompt.includes("\n\n<user_request>")) {
-    return input.prompt.replace(
-      "\n\n<user_request>",
-      `\n\n${plan.injectedContext}\n\n<user_request>`,
-    );
+    return {
+      prompt: input.prompt.replace(
+        "\n\n<user_request>",
+        `\n\n${plan.injectedContext}\n\n<user_request>`,
+      ),
+      effect,
+    };
   }
-  return [plan.injectedContext, "", input.prompt].join("\n");
+  return { prompt: [plan.injectedContext, "", input.prompt].join("\n"), effect };
 }
 
 function compactSessionScopeId(sessionId: string): string {

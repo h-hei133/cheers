@@ -254,6 +254,21 @@ export class TurnSink implements RendererSink {
         this.label = event.role === "planner" ? "planning" : "working";
         this.onChange();
         return;
+      case "query.completed":
+        // A completed event can carry a refusal before any model message exists.
+        // Keep stopped results visible and eligible for an explicit retry.
+        if (event.result.status !== "completed" && !this.failed) {
+          this.finalizeAssistant();
+          this.failed = true;
+          this.transcript.append({
+            kind: event.result.terminalClassification === "error" ? "error" : "notice",
+            title: event.result.terminalClassification === "error" ? "error" : "stopped",
+            text: event.result.stopReason || event.result.status,
+            finalized: true,
+          });
+          this.onChange();
+        }
+        return;
       case "lifecycle.cancelled":
       case "lifecycle.error":
       case "query.failed":

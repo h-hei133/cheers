@@ -441,6 +441,8 @@ describe("session runtime boundary facades", () => {
       sessionId: "sess_future_boundary",
       prompt: "continue work",
     });
+    expect(compactInjectionStateStore.get("session:sess_future_boundary").injectionStatus).toBe("pending");
+    injectedPrompt.accept();
     const secondPrompt = await buildPromptWithFutureTurnInjections({
       deps: {
         compactCheckpointStore,
@@ -450,11 +452,11 @@ describe("session runtime boundary facades", () => {
       prompt: "continue again",
     });
 
-    expect(injectedPrompt).toContain("<compact_v2_injected_context>");
-    expect(injectedPrompt).toContain("<user_request>\ncontinue work");
-    expect(injectedPrompt).not.toContain("RAW_SECRET_FILE_CONTENT");
-    expect(injectedPrompt).not.toContain("sk-secret-output");
-    expect(secondPrompt).toBe("continue again");
+    expect(injectedPrompt.prompt).toContain("<compact_v2_injected_context>");
+    expect(injectedPrompt.prompt).toContain("<user_request>\ncontinue work");
+    expect(injectedPrompt.prompt).not.toContain("RAW_SECRET_FILE_CONTENT");
+    expect(injectedPrompt.prompt).not.toContain("sk-secret-output");
+    expect(secondPrompt.prompt).toBe("continue again");
     expect(
       compactInjectionStateStore.get("session:sess_future_boundary"),
     ).toEqual(

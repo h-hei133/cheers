@@ -3,9 +3,10 @@ import { describe, expect, it } from "vitest";
 import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
 
 /** A synthetic run, which starts its turn without a readiness wait. */
-function start(overrides: { readonly providerModeEnv?: string } = {}) {
+function start(overrides: { readonly providerModeEnv?: string; readonly onPromptAccepted?: () => void } = {}) {
   return streamCliRuntimePrompt({
     prompt: "hello",
+    onPromptAccepted: overrides.onPromptAccepted,
     sessionId: "sess_bridge",
     workspaceRoot: process.cwd(),
     signal: new AbortController().signal,
@@ -22,6 +23,14 @@ function start(overrides: { readonly providerModeEnv?: string } = {}) {
 }
 
 describe("CLI runtime invocation bridge", () => {
+  it("forwards admission to the kernel exactly once", async () => {
+    let accepted = 0;
+    const run = start({ onPromptAccepted: () => { accepted++; } });
+    expect(accepted).toBe(0);
+    for await (const _event of run.events) { /* drain the real synthetic turn */ }
+    expect(accepted).toBe(1);
+  });
+
   it("packages provider mode from the provider bridge and returns an input handle", async () => {
     const result = start();
     expect(typeof result.input?.steer).toBe("function");

@@ -182,7 +182,8 @@ describe("shell session runtime (W5)", () => {
         renderLine() {},
         renderChunk() {},
       } as never,
-      runPrompt: async function* (prompt, _signal, _seed, _snapshot, _attachments, context) {
+      runPrompt: async function* (prompt, _signal, _seed, _snapshot, _attachments, context, accept) {
+        accept?.();
         promptsSeenByModel.push(prompt);
         contextsSeenByModel.push(context);
         yield {
@@ -330,7 +331,8 @@ describe("shell session runtime (W5)", () => {
         renderLine() {},
         renderChunk() {},
       } as never,
-      runPrompt: async function* (prompt) {
+      runPrompt: async function* (prompt, _signal, _seed, _snapshot, _attachments, _context, accept) {
+        accept?.();
         promptsSeenByModel.push(prompt);
         yield {
           type: "query.completed",
@@ -445,7 +447,8 @@ describe("shell session runtime (W5)", () => {
         renderLine() {},
         renderChunk() {},
       } as never,
-      runPrompt: async function* (prompt) {
+      runPrompt: async function* (prompt, _signal, _seed, _snapshot, _attachments, _context, accept) {
+        accept?.();
         promptsSeenByModel.push(prompt);
         yield {
           type: "query.completed",
@@ -3569,8 +3572,9 @@ describe("shell session runtime (W5)", () => {
     }
   });
 
-  it("fails defensively when the prompt stream ends without a terminal event", async () => {
+  it.each(["empty", "nonterminal", "cancelled"])("never renders success when a %s stream ends without a terminal event", async (kind) => {
     const calls: string[] = [];
+    const rendered: string[] = [];
     const runtime = new ShellSessionRuntime({
       sessionManager: {
         markRunStarted() {},
@@ -3583,20 +3587,27 @@ describe("shell session runtime (W5)", () => {
         saveCompleted(sessionId: string) {
           calls.push(`completed:${sessionId}`);
         },
-        saveInterrupted() {},
+        saveInterrupted(sessionId: string) {
+          calls.push(`interrupted:${sessionId}`);
+        },
         saveError(sessionId: string, error: string) {
           calls.push(`error:${sessionId}:${error}`);
         },
         saveTerminated() {},
       } as never,
-      renderer: { renderLine() {}, renderChunk() {} } as never,
+      renderer: {
+        renderLine(line: string) { rendered.push(line); },
+        renderChunk(chunk: string) { rendered.push(chunk); },
+      } as never,
       runPrompt: async function* () {
+        if (kind === "empty") return;
         yield {
           type: "query.started",
           sessionId: "sess_missing_terminal",
           prompt: "hello",
         };
         yield { type: "turn.started", role: "planner", turn: 1 };
+        if (kind === "cancelled") runtime.cancelCurrentRun();
       },
     });
 
@@ -3605,7 +3616,11 @@ describe("shell session runtime (W5)", () => {
     ).rejects.toThrow("Query runtime ended without a terminal event");
     expect(calls).toEqual([
       "barrier:sess_missing_terminal:hello",
-      "error:sess_missing_terminal:Query runtime ended without a terminal event",
+      kind === "cancelled"
+        ? "interrupted:sess_missing_terminal"
+        : "error:sess_missing_terminal:Query runtime ended without a terminal event",
     ]);
+    expect(rendered.join("\n")).not.toMatch(/Outcome: success|Result\n|completed successfully/);
+    expect(runtime.getState()).toBe(kind === "cancelled" ? "interrupted" : "error");
   });
 });
