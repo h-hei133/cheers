@@ -43,6 +43,7 @@ import { extractSeedInfluenceFromQueryResult } from "./sessionSeedInfluence.js";
 import { projectSessionToolContinuity } from "./sessionToolContinuity.js";
 import { projectSessionUnresolvedItems } from "./sessionUnresolvedItems.js";
 import { readStoredResultSource, shouldReplaceStoredResult } from "./source.js";
+import { continuityBranchScope, latestContinuityFailure, selectBranchResultMemory, storedResultIsNewer } from "./branch.js";
 
 export function buildSessionContinuitySnapshot(input: {
   readonly session: Session;
@@ -54,28 +55,41 @@ export function buildSessionContinuitySnapshot(input: {
   const session = input.session;
   const stateSnapshot = input.stateSnapshot;
   const recoverySnapshot = input.recoverySnapshot;
-  const transcriptEvents = input.transcriptEvents;
-  const lastRunErrorEvent = findLastLifecycleEvent(
-    transcriptEvents,
-    "run-error",
-  );
+  const scope = continuityBranchScope(stateSnapshot?.thread, input.transcriptEvents);
+  const transcriptEvents = input.transcriptEvents.filter(event => event.type === "query-event"
+    ? scope.admitsEntry(event.sourceEntryId) : event.type !== "lifecycle" || scope.allowLegacy);
+  const resultMemory = selectBranchResultMemory(stateSnapshot?.workingMemory, stateSnapshot?.thread, input.transcriptEvents);
+  const allowGlobalFallback = scope.allowGlobalFallback && resultMemory === stateSnapshot?.workingMemory;
+  const approvalMemory = allowGlobalFallback ? stateSnapshot?.workingMemory : undefined;
   const lastQueryCompletion = findLastQueryCompletionEvent(transcriptEvents);
   const codingCompletion = findLastCodingCompletionEvent(transcriptEvents);
   const candidateResult = codingCompletion?.event.result.codingResult;
-  const storedResult = readStoredResultSource(stateSnapshot?.workingMemory);
+  const storedCandidate = readStoredResultSource(resultMemory);
+  const storedOrder = storedResultIsNewer(resultMemory, codingCompletion, stateSnapshot?.thread, transcriptEvents);
+  const terminalOrder = storedResultIsNewer(resultMemory, lastQueryCompletion, stateSnapshot?.thread, transcriptEvents);
+  const failure = latestContinuityFailure(transcriptEvents);
+  const failureOrder = storedResultIsNewer(resultMemory, failure?.entry, stateSnapshot?.thread, transcriptEvents);
+  const resultOrderUnknown = storedCandidate !== undefined && (
+    (candidateResult !== undefined && shouldReplaceStoredResult(storedCandidate, candidateResult.taskKind) && storedOrder === undefined) ||
+    (lastQueryCompletion !== undefined && lastQueryCompletion.event.result.terminalClassification !== "success" && terminalOrder === undefined) ||
+    (failure !== undefined && failureOrder === undefined));
+  const allowTerminalFallback = allowGlobalFallback && !storedCandidate && !lastQueryCompletion && !resultOrderUnknown;
+  const lastRunErrorEvent = allowTerminalFallback ? findLastLifecycleEvent(transcriptEvents, "run-error") : undefined;
+  const storedResult = resultOrderUnknown ? undefined : storedCandidate;
   const useStoredResult = storedResult !== undefined && (!candidateResult ||
+    storedOrder === true ||
     !shouldReplaceStoredResult(storedResult, candidateResult.taskKind));
-  const lastCodingCompletion = useStoredResult ? undefined : codingCompletion;
+  const lastCodingCompletion = useStoredResult || resultOrderUnknown ? undefined : codingCompletion;
   const lastCodingResult = lastCodingCompletion?.event.result.codingResult;
-  const recentCodingResults = collectRecentCodingResults(transcriptEvents, 4);
+  const recentCodingResults = resultOrderUnknown ? [] : collectRecentCodingResults(transcriptEvents, 4);
   const readContinuity = projectSessionReadContinuity(lastCodingResult);
   const requestScopeContinuity = projectSessionRequestScopeContinuity({
     evidence: lastCodingResult?.continuation.evidence,
-    workingMemory: stateSnapshot?.workingMemory,
+    workingMemory: approvalMemory,
     sessionProjectRoot: session.projectRoot,
   });
   const approvalContinuity = projectSessionApprovalContinuity({
-    workingMemory: stateSnapshot?.workingMemory,
+    workingMemory: approvalMemory,
     lastCodingResult,
     historyLimit: input.approvalHistoryLimit,
   });
@@ -83,7 +97,7 @@ export function buildSessionContinuitySnapshot(input: {
     deriveStoppedSessionContinuitySurface(lastCodingResult);
   // Select the complete result group before projecting optional fields. A chat
   // result cannot replace a retained coding checkpoint or unknown legacy result.
-  const handoffMemory = lastCodingResult ? undefined : stateSnapshot?.workingMemory;
+  const handoffMemory = lastCodingResult || !storedResult ? undefined : resultMemory;
   const lastWriteContinuity =
     lastStoppedSessionContinuity?.writeContinuity ??
     extractWriteContinuityFromMemory(handoffMemory);
@@ -92,7 +106,7 @@ export function buildSessionContinuitySnapshot(input: {
     extractActionHandoffSummaryFromMemory(handoffMemory);
   const lastSeedInfluence =
     extractSeedInfluenceFromQueryResult(
-      useStoredResult ? undefined : (lastCodingCompletion ?? lastQueryCompletion)?.event.result,
+      useStoredResult || resultOrderUnknown ? undefined : (lastCodingCompletion ?? lastQueryCompletion)?.event.result,
     ) ?? extractSeedInfluenceFromMemory(handoffMemory);
   const lastSeedInfluenceHandoffSummary =
     buildSeedInfluenceHandoffSummary(
@@ -119,15 +133,18 @@ export function buildSessionContinuitySnapshot(input: {
           reasons: ["session continuity coding result accepted"],
         }),
       })
-    : extractTaskStateFromMemory(stateSnapshot?.workingMemory);
+    : extractTaskStateFromMemory(handoffMemory);
+  const queryFailure = storedCandidate && failureOrder === true ? undefined : failure?.error;
   const continuityTerminalSource = selectContinuityTerminalSource({
-    query: lastQueryCompletion?.event.result ?? recoverySnapshot,
+    query: resultOrderUnknown ? undefined : queryFailure ? { terminalClassification: "error", terminalReason: "stopped_error", stopReason: queryFailure }
+      : useStoredResult && terminalOrder === true
+        ? undefined : lastQueryCompletion?.event.result ?? (allowTerminalFallback ? recoverySnapshot : undefined),
     coding: useStoredResult ? storedResult.terminal : lastCodingCompletion?.event.result,
   });
   // Loaded turns already reflect the selected branch and compaction. Recovery
   // may add a missing pending prompt, but its raw history is not a display path.
   const selectedTurns = session.turns.filter((turn) => !isSessionContextMessage(turn));
-  const repairedPrompt = recoverySnapshot.repairSummary.insertedPromptMessage
+  const repairedPrompt = allowGlobalFallback && recoverySnapshot.repairSummary.insertedPromptMessage
     ? recoverySnapshot.pendingPrompt
     : undefined;
   const lastUserIntent = repairedPrompt?.trim()
@@ -139,16 +156,18 @@ export function buildSessionContinuitySnapshot(input: {
     lastUserIntent,
   });
   const unresolvedProjection = projectSessionUnresolvedItems({
-    sessionLastError: session.lastError,
+    sessionLastError: resultOrderUnknown ? undefined : queryFailure ?? (allowTerminalFallback ? session.lastError : undefined),
     lastRunErrorEvent,
     continuityTerminalSource,
     lastCodingResult,
   });
+  const unresolvedItems = [...unresolvedProjection.unresolvedItems, ...(resultOrderUnknown
+    ? ["Continuity result order unavailable; inspect current files before relying on historical verification."] : [])];
   const freshnessHistoryCount =
     recentCodingResults.length +
     mutationContinuity.recentFailedFiles.length +
     (lastCodingResult?.continuation.evidence.length ?? 0) +
-    unresolvedProjection.unresolvedItems.length;
+    unresolvedItems.length;
 
   return {
     sessionId: session.id,
@@ -296,7 +315,7 @@ export function buildSessionContinuitySnapshot(input: {
     lastTaskSatisfactionReasons: (
       lastCodingResult?.taskSatisfaction.reasons ?? []
     ).slice(0, 6),
-    unresolvedItems: unresolvedProjection.unresolvedItems,
+    unresolvedItems,
     ...(freshnessHistoryCount > 0 ? { freshnessHistoryCount } : {}),
   };
 }

@@ -2,6 +2,7 @@ import type { QueryEvent } from "../../core/query/runtime/events.js";
 import { SESSION_APPROVAL_AUDIT_HISTORY_LIMIT } from "../approval/sessionApprovalMemory.js";
 import { extractSeedInfluenceFromQueryResult } from "../continuation/sessionSeedInfluence.js";
 import { applySessionCompactRetention } from "../sessionCompactModule.js";
+import type { ContinuitySource } from "../continuation/branch.js";
 
 export const AUTO_COMPACT_TURN_THRESHOLD = 12;
 export const DEFAULT_APPROVAL_AUDIT_HISTORY_LIMIT = SESSION_APPROVAL_AUDIT_HISTORY_LIMIT;
@@ -13,11 +14,13 @@ export function applyAutoCompactRetention(
     readonly turnThreshold?: number;
     readonly historyLimit?: number;
     readonly now?: string;
+    readonly source?: ContinuitySource;
   },
 ): unknown {
   return applySessionCompactRetention({
     workingMemory,
     event,
+    source: options?.source,
     turnThreshold: options?.turnThreshold ?? AUTO_COMPACT_TURN_THRESHOLD,
     historyLimit: options?.historyLimit ?? DEFAULT_APPROVAL_AUDIT_HISTORY_LIMIT,
     now: options?.now ?? new Date().toISOString(),

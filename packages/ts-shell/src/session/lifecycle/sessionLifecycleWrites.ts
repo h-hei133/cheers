@@ -233,8 +233,8 @@ export abstract class SessionLifecycleWrites {
     });
   }
 
-  appendQueryEvent(sessionId: string, event: QueryEvent): void {
-    handleAppendQueryEvent(this.host.store, sessionId, event);
+  appendQueryEvent(sessionId: string, event: QueryEvent, source?: { readonly entryId?: string }): void {
+    handleAppendQueryEvent(this.host.store, sessionId, event, source);
   }
 
   appendCompactionEntry(

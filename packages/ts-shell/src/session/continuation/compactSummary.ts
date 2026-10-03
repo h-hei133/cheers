@@ -6,6 +6,7 @@ import { mergeContinuitySummaryEntries } from "./summaryFormatter.js";
 import type { ContinuityTerminalFacts } from "../../result/terminal/truth.js";
 import { readStoredResultSource, RESULT_FIELDS, shouldReplaceStoredResult } from "./source.js";
 import type { ApprovalAuditMemoryState } from "../sessionContinuityTypes.js";
+import type { ContinuitySource } from "./branch.js";
 
 export type CompactContinuitySeedInfluence =
   | "target-carryover"
@@ -23,6 +24,7 @@ export interface CompactContinuityWriteState {
 
 /** Optional fields belong to one complete result, including their absence. */
 export interface CompactContinuityResult {
+  readonly source?: ContinuitySource;
   readonly taskKind: CodingResultSummary["taskKind"];
   readonly terminal?: ContinuityTerminalFacts;
   readonly actionHandoffSummary?: string;
@@ -84,6 +86,7 @@ export function buildCompactContinuitySummary(
 function applyResult(continuity: Record<string, unknown>, input: CompactContinuityResult): void {
   for (const key of RESULT_FIELDS) delete continuity[key];
   continuity.lastTaskKind = input.taskKind;
+  if (input.source) continuity.resultSource = input.source;
   if (input.terminal?.terminalClassification) continuity.lastTerminalClassification = input.terminal.terminalClassification;
   if (input.terminal?.terminalReason) continuity.lastTerminalReason = input.terminal.terminalReason;
   if (input.terminal?.stopReason) continuity.lastFailure = input.terminal.stopReason;

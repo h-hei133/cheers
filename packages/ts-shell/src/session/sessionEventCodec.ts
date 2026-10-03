@@ -102,7 +102,7 @@ export type TranscriptEvent =
       timestamp: string;
       detail?: string;
     }
-  | { type: "query-event"; id?: string; event: QueryEvent; timestamp: string }
+  | { type: "query-event"; id?: string; sourceEntryId?: string; event: QueryEvent; timestamp: string }
   | CompactionTranscriptEntry
   | BranchSummaryTranscriptEntry;
 
@@ -227,10 +227,12 @@ export function createLifecycleTranscriptEvent(input: {
 export function createQueryTranscriptEvent(input: {
   readonly event: QueryEvent;
   readonly timestamp: string;
+  readonly sourceEntryId?: string;
 }): Extract<TranscriptEvent, { type: "query-event" }> {
   return {
     type: "query-event",
     id: createTranscriptEntryId("qevt"),
+    ...(input.sourceEntryId !== undefined ? { sourceEntryId: input.sourceEntryId } : {}),
     event: input.event,
     timestamp: input.timestamp,
   };

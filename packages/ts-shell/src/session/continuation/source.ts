@@ -4,6 +4,7 @@ import type { ContinuityTerminalFacts } from "../../result/terminal/truth.js";
 import { hasResultSummary } from "./summaryFormatter.js";
 
 export const RESULT_FIELDS = [
+  "resultSource",
   "lastTaskKind", "lastTerminalClassification", "lastTerminalReason", "lastFailure",
   "lastActionHandoffSummary", "lastWriterStarted", "lastWriteEffect", "lastWriteRequiresUserInspection",
   "lastWriteEffectTarget", "lastSeedInfluence", "lastSeedInfluenceHandoffSummary",
@@ -18,7 +19,7 @@ export interface StoredResultSource {
 export function readStoredResultSource(workingMemory: unknown): StoredResultSource | undefined {
   if (!isRecord(workingMemory)) return undefined;
   const continuity = isRecord(workingMemory.continuity) ? workingMemory.continuity : {};
-  if (!RESULT_FIELDS.some((key) => continuity[key] !== undefined) && !hasResultSummary(workingMemory.summary)) {
+  if (!RESULT_FIELDS.some((key) => key !== "resultSource" && continuity[key] !== undefined) && !hasResultSummary(workingMemory.summary)) {
     return undefined;
   }
   return {

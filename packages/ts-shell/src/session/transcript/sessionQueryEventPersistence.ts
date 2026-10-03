@@ -13,9 +13,10 @@ import { isDuplicateDurableResolutionEvent } from "../recovery/sessionLifecycleR
 export function appendSessionQueryEvent(input: {
   readonly event: QueryEvent;
   readonly timestamp: string;
+  readonly sourceEntryId?: string;
   readonly transcriptEvents: readonly TranscriptEvent[];
   readonly appendTranscriptEvent: (event: TranscriptEvent) => void;
-  readonly applyQueryEventToState: (event: QueryEvent) => void;
+  readonly applyQueryEventToState: (event: QueryEvent, envelope: Extract<TranscriptEvent, { type: "query-event" }>) => void;
 }): void {
   if (
     isDuplicateDurableResolutionEvent({
@@ -26,13 +27,13 @@ export function appendSessionQueryEvent(input: {
     return;
   }
 
-  input.appendTranscriptEvent(
-    createQueryTranscriptEvent({
+  const envelope = createQueryTranscriptEvent({
       event: input.event,
       timestamp: input.timestamp,
-    }),
-  );
-  input.applyQueryEventToState(input.event);
+      sourceEntryId: input.sourceEntryId,
+    });
+  input.appendTranscriptEvent(envelope);
+  input.applyQueryEventToState(input.event, envelope);
 }
 
 export function applySessionQueryEventToState(input: {
@@ -48,6 +49,7 @@ export function applySessionQueryEventToState(input: {
   readonly applyAutoCompactRetention: (
     workingMemory: unknown,
     event: QueryEvent,
+    current: SessionStateSnapshot | undefined,
   ) => unknown;
   readonly writeSnapshot: (snapshot: SessionStateSnapshot) => void;
 }): void {
@@ -56,6 +58,7 @@ export function applySessionQueryEventToState(input: {
     const nextWorkingMemory = input.applyAutoCompactRetention(
       current?.workingMemory,
       input.event,
+      current,
     );
     const snapshot = input.buildSessionStateSnapshot(input.session, current, {
       pendingLifecycle: applyLifecycleEventToIndex(

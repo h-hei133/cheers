@@ -17,20 +17,26 @@ import {
 } from "../transcript/sessionTranscript.js";
 import { applyAutoCompactRetention } from "./compaction.js";
 import { persistSessionUsage } from "../../observability/usageTelemetry.js";
+import { continuityBranchScope, selectBranchResultMemory } from "../continuation/branch.js";
 
 export function handleAppendQueryEvent(
   store: SessionStoreAccess,
   sessionId: string,
   event: QueryEvent,
+  source?: { readonly entryId?: string },
 ): void {
+  const state = store.readStateSnapshotSafely(store.statePath(sessionId));
   appendSessionQueryEvent({
     event,
+    // An explicitly unavailable producer source must not fall back to a cursor
+    // that may have moved while the run was awaiting output.
+    sourceEntryId: source ? source.entryId ?? "" : state?.thread?.activeLeafId,
     timestamp: new Date().toISOString(),
     transcriptEvents: handleGetTranscriptEvents(store, sessionId),
     appendTranscriptEvent: (transcriptEvent) =>
       handleAppendTranscriptEvent(store, sessionId, transcriptEvent),
-    applyQueryEventToState: (queryEvent) =>
-      handleApplyQueryEventToState(store, sessionId, queryEvent),
+    applyQueryEventToState: (queryEvent, envelope) =>
+      handleApplyQueryEventToState(store, sessionId, queryEvent, envelope),
   });
 }
 
@@ -38,6 +44,7 @@ export function handleApplyQueryEventToState(
   store: SessionStoreAccess,
   sessionId: string,
   event: QueryEvent,
+  envelope?: Extract<TranscriptEvent, { type: "query-event" }>,
 ): void {
   const session = store.load(sessionId);
   const statePath = store.statePath(sessionId);
@@ -48,8 +55,17 @@ export function handleApplyQueryEventToState(
     readCurrentState: () => store.readStateSnapshotSafely(statePath),
     buildSessionStateSnapshot: (nextSession, current, overrides) =>
       handleBuildSessionStateSnapshot(nextSession, current, overrides),
-    applyAutoCompactRetention: (workingMemory, queryEvent) =>
-      applyAutoCompactRetention(workingMemory, queryEvent),
+    applyAutoCompactRetention: (workingMemory, queryEvent, current) => {
+      const events = handleGetTranscriptEvents(store, sessionId);
+      const selectedMemory = selectBranchResultMemory(workingMemory, current?.thread, events);
+      if (!continuityBranchScope(current?.thread, events).admitsEntry(envelope?.sourceEntryId)) return selectedMemory;
+      return applyAutoCompactRetention(
+        selectedMemory,
+        queryEvent,
+        { source: envelope?.id && envelope.sourceEntryId !== undefined
+          ? { eventId: envelope.id, entryId: envelope.sourceEntryId } : undefined },
+      );
+    },
     writeSnapshot: (snapshot) => persistSessionUsage(sessionId, snapshot.usage, (usage) => {
       store.writeJsonFileAtomic(statePath, { ...snapshot, usage });
     }),

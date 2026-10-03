@@ -51,7 +51,7 @@ export interface PromptAttachments {
  */
 export type PromptRun =
   | AsyncIterable<QueryEvent>
-  | { readonly events: AsyncIterable<QueryEvent>; readonly input?: TurnInput };
+  | { readonly events: AsyncIterable<QueryEvent>; readonly input?: TurnInput; readonly sourceEntryId?: () => string | undefined };
 
 export interface SessionRuntimeDependencies {
   readonly sessionManager: SessionManager;
@@ -220,6 +220,7 @@ export class ShellSessionRuntime {
     let enteredQueryPhase = false;
     const eventDigest: RuntimeEventDigest = createRuntimeEventDigest();
     const structuredOutput = !printMode && this.eventObservers.size > 0;
+    let sourceEntryId: (() => string | undefined) | undefined;
 
     try {
       const continuityBuilder = (
@@ -307,12 +308,13 @@ export class ShellSessionRuntime {
       );
       const events = Symbol.asyncIterator in run ? run : run.events;
       this.currentInput = Symbol.asyncIterator in run ? undefined : run.input;
+      sourceEntryId = Symbol.asyncIterator in run ? undefined : run.sourceEntryId;
       for await (const event of events) {
         if (!enteredQueryPhase) {
           enteredQueryPhase = true;
           this.deps.sessionManager.markTurnActive(sessionId);
         }
-        this.deps.sessionManager.appendQueryEvent(sessionId, event);
+        this.deps.sessionManager.appendQueryEvent(sessionId, event, sourceEntryId ? { entryId: sourceEntryId() } : undefined);
         updateRuntimeEventDigest(eventDigest, event);
         for (const observer of this.eventObservers) observer(event);
         if (!structuredOutput) {
@@ -377,7 +379,7 @@ export class ShellSessionRuntime {
         this.deps.sessionManager.appendQueryEvent(sessionId, {
           type: "lifecycle.cancelled",
           reason: "AbortSignal triggered during shell session runtime",
-        });
+        }, { entryId: sourceEntryId?.() });
         this.deps.sessionManager.saveInterrupted(
           sessionId,
           enteredQueryPhase ? "turn" : "prompt",
@@ -391,7 +393,7 @@ export class ShellSessionRuntime {
         this.deps.sessionManager.appendQueryEvent(sessionId, {
           type: "lifecycle.error",
           error: errorSave.error,
-        });
+        }, { entryId: sourceEntryId?.() });
         this.deps.sessionManager.saveError(
           sessionId,
           errorSave.error,

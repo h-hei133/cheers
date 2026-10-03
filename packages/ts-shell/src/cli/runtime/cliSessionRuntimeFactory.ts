@@ -11,6 +11,7 @@ import {
 } from "../../core/shell/sessionRuntime.js";
 import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { SessionManager } from "../../session/SessionManager.js";
+import { createTranscriptEntryId } from "../../session/sessionEventCodec.js";
 import type { CliOptions } from "../options/cliOptions.js";
 import {
   createCliApprovalEscalationBridge,
@@ -457,7 +458,8 @@ export function createCliSessionRuntime(input: {
           ? allTurns.slice(0, -1)
           : allTurns;
 
-      return streamCliRuntimePrompt({
+      let sourceEntryId = allTurns.at(-1)?.id;
+      const run = streamCliRuntimePrompt({
     mcpGateway: input.mcpGateway,
         // Carried so the tool pool honours disabledTools / hiddenToolPrefixes.
         runtimeConfig: input.runtimeContext.runtimeConfig,
@@ -473,7 +475,11 @@ export function createCliSessionRuntime(input: {
         interactiveAsk: (questions) =>
           promptInteractiveQuestions(input.getReadline(), questions),
         historyMessages,
-        onTurnMessage: (message) => input.sessionManager.addTurn(sessionId, message),
+        onTurnMessage: (message) => {
+          const id = message.id ?? createTranscriptEntryId("turn");
+          input.sessionManager.addTurn(sessionId, { ...message, id });
+          sourceEntryId = id;
+        },
         compaction,
         cacheWarming,
         providerCredentialResolution: resolvedCredential,
@@ -488,6 +494,7 @@ export function createCliSessionRuntime(input: {
             }
           : {}),
       });
+      return { ...run, sourceEntryId: () => sourceEntryId };
     },
   });
   return sessionRuntime;

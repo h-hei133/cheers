@@ -13,6 +13,7 @@ import {
 } from "./recovery/resumeContextBuilder.js";
 import { projectCompactRetentionPlanInput } from "./sessionCompactProjection.js";
 import type { SeedInfluenceDiagnostic } from "./sessionContinuityTypes.js";
+import type { ContinuitySource } from "./continuation/branch.js";
 
 export function applySessionCompactRetention(input: {
   readonly workingMemory: unknown;
@@ -21,6 +22,7 @@ export function applySessionCompactRetention(input: {
   readonly historyLimit: number;
   readonly now: string;
   readonly seedInfluence?: SeedInfluenceDiagnostic;
+  readonly source?: ContinuitySource;
 }): unknown {
   const queryCompleted =
     input.event.type === "query.completed" ? input.event : undefined;
@@ -63,6 +65,7 @@ export function applySessionCompactRetention(input: {
       approvalAuditHistory,
       ...(queryCompleted?.result.codingResult ? {
         result: {
+          source: input.source,
           taskKind: queryCompleted.result.codingResult.taskKind,
           terminal: {
             terminalClassification: queryCompleted.result.terminalClassification,

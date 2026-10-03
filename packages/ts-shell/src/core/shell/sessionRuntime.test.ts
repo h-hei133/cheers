@@ -16,6 +16,28 @@ import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalSt
 import { ShellSessionRuntime } from "./sessionRuntime.js";
 
 describe("shell session runtime (W5)", () => {
+  it.each([false, true])("keeps runtime failure attribution explicit (run exists=%s)", async (runExists) => {
+    const recorded: unknown[] = [];
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        persistUserPromptBarrier() {}, markTurnActive() {}, saveError() {},
+        appendQueryEvent(_sessionId: string, _event: unknown, source: unknown) { recorded.push(source); },
+      } as never,
+      renderer: { renderLine() {}, renderChunk() {} } as never,
+      runPrompt: () => {
+        if (!runExists) throw new Error("setup failed before producer exists");
+        return {
+          sourceEntryId: () => "producing-message",
+          events: (async function* () { yield { type: "query.failed" as const, error: "producer failed" }; })(),
+        };
+      },
+    });
+    await expect(runtime.executePrompt("session", "request")).rejects.toThrow(runExists ? "producer failed" : "setup failed");
+    expect(recorded).toEqual(runExists
+      ? [{ entryId: "producing-message" }, { entryId: "producing-message" }]
+      : [{ entryId: undefined }]);
+  });
+
   it("moves through a successful prompt execution lifecycle", async () => {
     const calls: string[] = [];
     const runtime = new ShellSessionRuntime({

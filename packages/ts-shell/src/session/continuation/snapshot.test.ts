@@ -6,6 +6,7 @@ import type { CodingResultSummary } from "../../result/types.js";
 import { SessionManager } from "../SessionManager.js";
 import type { Session } from "../schema/sessionRecord.js";
 import type { SessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
+import { buildLinearSessionThreadSnapshot } from "../schema/sessionThread.js";
 import type { TranscriptEvent } from "../sessionEventCodec.js";
 import { buildSessionRecoverySnapshot } from "../recovery/sessionRecoverySnapshot.js";
 import { buildSessionContinuitySnapshot } from "./sessionContinuitySnapshot.js";
@@ -153,6 +154,47 @@ describe("session continuity snapshot sources", () => {
     expect(buildSessionContinuitySnapshot(fixture())).toMatchObject({ lastUserIntent: "current request", lastAssistantOutput: "current answer" });
   });
 
+  it.each(["completion", "failure"])("keeps a newer compact result ahead of an older %s", (kind) => {
+    const input = fixture(codingResult(true), { continuity: { lastTaskKind: "edit-file", lastTerminalClassification: "success",
+      lastSuccessHandoffDiagnostic: "newer checkpoint", resultSource: { eventId: "missing-new", entryId: "new" } } });
+    input.session.turns = [{ id: "old", role: "assistant", content: "older" }, { id: "new", role: "assistant", content: "newer" }];
+    input.stateSnapshot.thread = buildLinearSessionThreadSnapshot(input.session);
+    const entry = input.transcriptEvents[0]!;
+    if (entry.type !== "query-event") throw new Error("Expected query event");
+    input.transcriptEvents = [{ ...entry, id: "old-event", sourceEntryId: "old", ...(kind === "failure"
+      ? { event: { type: "query.failed" as const, error: "older failure" } } : {}) }];
+    input.session.lastError = "older global error";
+    input.recoverySnapshot = { ...input.recoverySnapshot, terminalClassification: "error", terminalReason: "stopped_error", stopReason: "older recovery error" };
+    const snapshot = buildSessionContinuitySnapshot(input);
+    expect(snapshot.lastSuccessHandoffDiagnostic).toBe("newer checkpoint");
+    expect(snapshot.lastTerminalClassification).toBe("success");
+    expect(snapshot.lastFailure).toBeUndefined();
+    expect(snapshot.lastVerificationStatus).toBeUndefined();
+  });
+
+  it.each(["completion", "failure", "chat-error", "plain-stopped"])("reports unknown ordering for a compact checkpoint and %s at the same boundary", (kind) => {
+    const input = fixture(codingResult(), { continuity: { lastTaskKind: "edit-file", lastTerminalClassification: "success",
+      lastSuccessHandoffDiagnostic: "unordered checkpoint", resultSource: { eventId: "missing-event", entryId: "same" } } });
+    input.session.turns = [{ id: "same", role: "assistant", content: "same boundary" }];
+    input.stateSnapshot.thread = buildLinearSessionThreadSnapshot(input.session);
+    const entry = input.transcriptEvents[0]!;
+    if (entry.type !== "query-event") throw new Error("Expected query event");
+    input.transcriptEvents = [{ ...entry, id: "surviving-event", sourceEntryId: "same", ...(kind === "failure"
+      ? { event: { type: "query.failed" as const, error: "unordered failure" } } : {}) }];
+    if (kind === "chat-error" && entry.event.type === "query.completed") input.transcriptEvents = [{ ...entry,
+      id: "surviving-chat", sourceEntryId: "same", event: { ...entry.event, result: { ...entry.event.result,
+        terminalClassification: "error", terminalReason: "stopped_error", codingResult: { ...codingResult(), taskKind: "chat" } } } }];
+    if (kind === "plain-stopped" && entry.event.type === "query.completed") input.transcriptEvents = [{ ...entry,
+      id: "surviving-plain", sourceEntryId: "same", event: { ...entry.event, result: { ...entry.event.result,
+        terminalClassification: "stopped", terminalReason: "stopped_not_proven", codingResult: undefined } } }];
+    const snapshot = buildSessionContinuitySnapshot(input);
+    expect(snapshot.lastSuccessHandoffDiagnostic).toBeUndefined();
+    expect(snapshot.lastTerminalClassification).toBeUndefined();
+    expect(snapshot.lastVerificationStatus).toBeUndefined();
+    expect(snapshot.recentVerifiedFiles).toEqual([]);
+    expect(snapshot.unresolvedItems).toContain("Continuity result order unavailable; inspect current files before relying on historical verification.");
+  });
+
   it("uses a repaired pending prompt without inventing a current assistant answer", () => {
     const input = fixture();
     input.session.turns = [];
@@ -237,5 +279,159 @@ describe("stored session continuity messages", () => {
     const snapshot = reopened.buildContinuitySnapshot(session.id);
     expect(snapshot.lastUserIntent).toBe("pending request");
     expect(snapshot.lastAssistantOutput).toBeUndefined();
+  });
+
+  it("keeps result facts on the selected branch after reverting and reopening", async () => {
+    const manager = createManager();
+    const session = manager.createNew();
+    let selectedAnswer: string | undefined;
+    for (const branch of ["selected", "abandoned"]) {
+      manager.addTurn(session.id, { role: "user", content: `${branch} request` });
+      manager.appendQueryEvent(session.id, { type: "query.started", sessionId: session.id, prompt: `${branch} request` });
+      manager.addTurn(session.id, { role: "assistant", content: `${branch} answer` });
+      const completion = fixture({ ...codingResult(), verifiedFiles: [`${branch}.txt`] }).transcriptEvents[0]!;
+      if (completion.type !== "query-event") throw new Error("Expected completion");
+      manager.appendQueryEvent(session.id, completion.event);
+      if (branch === "selected") selectedAnswer = manager.getSession(session.id)!.turns.at(-1)!.id!;
+    }
+    expect(await manager.revertTo(session.id, selectedAnswer!)).toBe(2);
+    const snapshot = new SessionManager().buildContinuitySnapshot(session.id);
+    expect(snapshot.lastAssistantOutput).toBe("selected answer");
+    expect(snapshot.recentVerifiedFiles).toEqual(["selected.txt"]);
+    expect(snapshot.lastSuccessHandoffDiagnostic).toContain("selected.txt");
+    expect(JSON.stringify(snapshot)).not.toContain("abandoned.txt");
+  });
+
+  function complete(manager: SessionManager, sessionId: string, result = codingResult()) {
+    const envelope = fixture(result).transcriptEvents[0]!;
+    if (envelope.type !== "query-event") throw new Error("Expected completion");
+    manager.appendQueryEvent(sessionId, envelope.event);
+  }
+
+  function updateMemory(manager: SessionManager, sessionId: string, workingMemory: unknown) {
+    const statePath = path.join(manager.getSessionDirPath(sessionId), "state.json");
+    const state = JSON.parse(fs.readFileSync(statePath, "utf8"));
+    fs.writeFileSync(statePath, JSON.stringify({ ...state, workingMemory }));
+  }
+
+  it("excludes an answer's result when rewinding to its initiating prompt", async () => {
+    const manager = createManager();
+    const session = manager.createNew();
+    manager.addTurn(session.id, { role: "user", content: "original request" });
+    const promptId = manager.getSession(session.id)!.turns.at(-1)!.id!;
+    manager.addTurn(session.id, { role: "assistant", content: "discarded answer" });
+    complete(manager, session.id);
+    await manager.revertTo(session.id, promptId);
+    const snapshot = new SessionManager().buildContinuitySnapshot(session.id);
+    expect(snapshot.lastUserIntent).toBe("original request");
+    expect(snapshot.lastTaskKind).toBeUndefined();
+    expect(snapshot.lastVerificationStatus).toBeUndefined();
+    expect(snapshot.lastTerminalClassification).toBeUndefined();
+    expect(snapshot.recentVerifiedFiles).toEqual([]);
+  });
+
+  it("does not revive abandoned errors, pending prompts, approval or text memory", async () => {
+    const manager = createManager();
+    const session = manager.createNew();
+    manager.addTurn(session.id, { role: "user", content: "selected request" });
+    manager.addTurn(session.id, { role: "assistant", content: "selected answer" });
+    const selectedId = manager.getSession(session.id)!.turns.at(-1)!.id!;
+    manager.addTurn(session.id, { role: "user", content: "abandoned request" });
+    manager.markRunStarted(session.id, "abandoned pending");
+    manager.appendQueryEvent(session.id, { type: "query.failed", error: "abandoned failure" });
+    manager.saveError(session.id, "abandoned global failure");
+    updateMemory(manager, session.id, {
+      summary: ["- last-action-handoff-summary: abandoned action", "- last-seed-influence: verify-signal"],
+      continuity: { lastTaskKind: "edit-file", lastRequestScopeLabel: "abandoned scope", lastRequestScopeCacheKey: "abandoned cache",
+        lastApprovalDecision: "allow", lastApprovalScope: "abandoned approval", lastApprovalProjectRoot: session.projectRoot,
+        lastApprovalCacheKey: "abandoned cache", lastApprovalDecisionSource: "user", lastApprovalPersistent: true,
+        lastWriteEffect: "verified", lastSuccessHandoffDiagnostic: "abandoned success" },
+    });
+    await manager.revertTo(session.id, selectedId);
+    const snapshot = new SessionManager().buildContinuitySnapshot(session.id);
+    expect(snapshot.lastUserIntent).toBe("selected request");
+    expect(snapshot.lastFailure).toBeUndefined();
+    expect(snapshot.lastTerminalClassification).toBeUndefined();
+    expect(snapshot.lastActionHandoffSummary).toBeUndefined();
+    expect(snapshot.lastSeedInfluence).toBeUndefined();
+    expect(snapshot.lastApprovalHistory).toEqual([]);
+    expect(JSON.stringify(snapshot)).not.toContain("abandoned");
+  });
+
+  it("preserves selected query errors after reopening a branch", async () => {
+    const manager = createManager();
+    const session = manager.createNew();
+    manager.addTurn(session.id, { role: "user", content: "selected request" });
+    const selectedId = manager.getSession(session.id)!.turns.at(-1)!.id!;
+    manager.appendQueryEvent(session.id, { type: "query.failed", error: "selected failure" });
+    manager.addTurn(session.id, { role: "user", content: "abandoned request" });
+    complete(manager, session.id);
+    await manager.revertTo(session.id, selectedId);
+    expect(new SessionManager().buildContinuitySnapshot(session.id)).toMatchObject({
+      lastFailure: "selected failure", lastTerminalClassification: "error", lastTerminalReason: "stopped_error",
+    });
+  });
+
+  it("does not restore an explicitly unattributed failure through linear state or lifecycle fallbacks", () => {
+    const manager = createManager();
+    const session = manager.createNew();
+    manager.addTurn(session.id, { role: "user", content: "request" });
+    manager.appendQueryEvent(session.id, { type: "query.failed", error: "unattributed error" }, {});
+    manager.saveError(session.id, "unattributed error");
+    const snapshot = new SessionManager().buildContinuitySnapshot(session.id);
+    expect(snapshot.lastFailure).toBeUndefined();
+    expect(snapshot.lastTerminalClassification).toBeUndefined();
+    expect(JSON.stringify(snapshot)).not.toContain("unattributed error");
+  });
+
+  it("retains a selected compact source through chat and excludes it after rewinding", async () => {
+    const manager = createManager();
+    const session = manager.createNew();
+    manager.addTurn(session.id, { role: "user", content: "coding request" });
+    const promptId = manager.getSession(session.id)!.turns.at(-1)!.id!;
+    manager.addTurn(session.id, { role: "assistant", content: "coding answer" });
+    const answerId = manager.getSession(session.id)!.turns.at(-1)!.id!;
+    updateMemory(manager, session.id, { sourceTurnCount: 11 });
+    complete(manager, session.id);
+    const statePath = path.join(manager.getSessionDirPath(session.id), "state.json");
+    const source = JSON.parse(fs.readFileSync(statePath, "utf8")).workingMemory.continuity.resultSource;
+    expect(source).toMatchObject({ entryId: answerId });
+    manager.addTurn(session.id, { role: "user", content: "hello" });
+    manager.addTurn(session.id, { role: "assistant", content: "hi" });
+    complete(manager, session.id, { ...codingResult(), taskKind: "chat", verifiedFiles: [] });
+    manager.appendQueryEvent(session.id, { type: "query.started", sessionId: session.id, prompt: "another" });
+    expect(JSON.parse(fs.readFileSync(statePath, "utf8")).workingMemory.continuity.resultSource).toEqual(source);
+    const transcriptPath = path.join(manager.getSessionDirPath(session.id), "transcript.jsonl");
+    const lines = fs.readFileSync(transcriptPath, "utf8").split("\n").filter(line => !line.includes(source.eventId));
+    fs.writeFileSync(transcriptPath, lines.join("\n"));
+    await manager.revertTo(session.id, answerId);
+    expect(new SessionManager().buildContinuitySnapshot(session.id).lastSuccessHandoffDiagnostic).toContain("current.txt");
+    await manager.revertTo(session.id, promptId);
+    expect(new SessionManager().buildContinuitySnapshot(session.id).lastSuccessHandoffDiagnostic).toBeUndefined();
+  });
+
+  it("admits a selected chat checkpoint before applying non-chat preservation", async () => {
+    const manager = createManager();
+    const session = manager.createNew();
+    manager.addTurn(session.id, { role: "user", content: "fork here" });
+    const promptId = manager.getSession(session.id)!.turns.at(-1)!.id!;
+    manager.addTurn(session.id, { role: "assistant", content: "abandoned code" });
+    updateMemory(manager, session.id, { sourceTurnCount: 11 });
+    complete(manager, session.id);
+    const abandonedId = manager.getSession(session.id)!.turns.at(-1)!.id!;
+    await manager.revertTo(session.id, promptId);
+    manager.addTurn(session.id, { role: "assistant", content: "selected chat" });
+    const selectedId = manager.getSession(session.id)!.turns.at(-1)!.id!;
+    complete(manager, session.id, { ...codingResult(), taskKind: "chat", verifiedFiles: [] });
+    const statePath = path.join(manager.getSessionDirPath(session.id), "state.json");
+    const checkpoint = JSON.parse(fs.readFileSync(statePath, "utf8")).workingMemory.continuity;
+    expect(checkpoint).toMatchObject({ lastTaskKind: "chat", resultSource: { entryId: selectedId } });
+    const late = fixture(codingResult()).transcriptEvents[0]!;
+    if (late.type !== "query-event") throw new Error("Expected completion");
+    manager.appendQueryEvent(session.id, late.event, { entryId: abandonedId });
+    expect(JSON.parse(fs.readFileSync(statePath, "utf8")).workingMemory.continuity).toEqual(checkpoint);
+    manager.appendQueryEvent(session.id, late.event, {});
+    expect(JSON.parse(fs.readFileSync(statePath, "utf8")).workingMemory.continuity).toEqual(checkpoint);
+    expect(new SessionManager().buildContinuitySnapshot(session.id).lastTaskKind).toBe("chat");
   });
 });
