@@ -1941,3 +1941,18 @@ W7-31的38模块直接行为矩阵已闭合，旧result-contract仍需修复，�
 首轮stdin未关闭引起4超时，随后两项预期按现行error分类及finalOutput承载修正，未削弱拒绝/不写入判据。
 eaab164d远端CI37141669601唯一失败为旧interactiveLoop mock缺sessionExists，本批补齐且2项通过；Architecture Watch37141669607成功。
 W7-31完成，继续27→29→33及剩余W8；Phase 18未完成。细节见Shell审计第九批。
+
+
+### W7-27 首批：单次请求的响应格式（2026-10-04）
+
+原生消息simple body固定stream:true，签名会话simple URL固定converse-stream，两者都与已有JSON消费者冲突。
+端点owner现显式输出stream:false或/converse；主turn仍默认stream，simple消息同时保留supportsTemperature能力约束。
+参考实现的决策是请求模式和reader配对；本仓同意该不变量，但保留现有单次JSON消费路径，不把摘要改成第二套流式编排。
+官方消息SDK的非流式参数与签名会话API的/converse定义补足单次路径依据。既有认证头、最终URL签名和signal传递均保留。
+
+7套114项、build:cli与静态阻断门通过，test:scripts43项通过；两owner撤销后5失败2通过，逐字节恢复并复跑114项。
+独立APPROVE/CLEAR。普通/全屏编译PTY均验证原生compact生成并持久化checkpoint，下一次实际HTTP请求收到摘要及一次注入，拒绝/取消/重试与终态来源保持正确。
+产物.tmp/simple-pty-2whpgm10，两模式exit0，无真实provider访问。签名会话仅合成transport验证，本批不声称真实云服务运行。
+PTY初次断言错误要求摘要位于最后user消息；请求证据确认它位于历史checkpoint，当前user承载注入标记，随后按两个实际来源断言通过。
+NormProof阻断义务满足、整体advisory仍partial。W7-27逐字段表、完整流边界、用量与逐路径超时/取消审计继续，Phase18未完成。
+W7-31提交9d4a4cbf的CI37143499101与Architecture Watch37143499107均成功。

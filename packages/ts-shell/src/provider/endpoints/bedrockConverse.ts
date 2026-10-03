@@ -346,7 +346,7 @@ async function bedrockSigner(): Promise<RequestSigner | undefined> {
 
 declareEndpoint("bedrock-converse-stream", {
   // This protocol names the model in the URL, which is why the path is a function.
-  path: (model) => `/model/${encodeURIComponent(model)}/converse-stream`,
+  path: (model, stream = true) => `/model/${encodeURIComponent(model)}/${stream ? "converse-stream" : "converse"}`,
   // Signing happens at the transport, because a signature covers the body and the
   // body does not exist here. These are the headers that are always true.
   headers: () => ({ "content-type": "application/json", accept: "application/vnd.amazon.eventstream" }),

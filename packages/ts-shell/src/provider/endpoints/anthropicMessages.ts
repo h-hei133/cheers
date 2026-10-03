@@ -70,6 +70,8 @@ export interface AnthropicRequestInput {
   readonly messages: readonly ChatMessage[];
   readonly tools: readonly ToolSchema[];
   readonly allowTools: boolean;
+  /** Simple requests consume one JSON response; main turns stream by default. */
+  readonly stream?: boolean;
   /**
    * Whether this model accepts image blocks.
    *
@@ -129,7 +131,7 @@ export function anthropicRequestBody(input: AnthropicRequestInput): Record<strin
     // Required by the API. The caller's ceiling wins when it set one, because a
     // value that fits one model truncates another.
     max_tokens: input.maxOutputTokens ?? DEFAULT_MAX_TOKENS,
-    stream: true,
+    stream: input.stream ?? true,
     messages: convertMessages(input.messages, input.vision, input.allowEmptySignature === true),
   };
 
@@ -766,6 +768,8 @@ declareEndpoint("anthropic-messages", {
       messages: input.messages,
       tools: [],
       allowTools: false,
+      stream: false,
+      ...(input.supportsTemperature !== undefined ? { supportsTemperature: input.supportsTemperature } : {}),
       ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
       ...(input.maxOutputTokens !== undefined ? { maxOutputTokens: input.maxOutputTokens } : {}),
     }),

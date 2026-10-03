@@ -5866,3 +5866,12 @@ d0a8d7d7两项远端检查均成功。
 独立APPROVE，架构建议的非空source ID断言已补并复核CLEAR。无真实provider，源码CLI证据不代替安装产物。
 eaab164d远端CI因旧mock缺sessionExists失败，本批修复并验证2项；其Architecture Watch通过。
 38模块所列行为及旧门禁债务闭合，W7-31完成，按顺序继续W7-27及剩余项目。
+
+
+## [2026-10-04] fix | Phase 18 W7-27 单次请求格式
+
+原生消息simple关闭流式，签名单次路径选择converse；主回合仍流式，温度能力传递补齐。
+7套114项、构建、静态阻断门和43项脚本通过，独立APPROVE/CLEAR；两owner反转5失败2通过，精确恢复复跑。
+普通/全屏编译PTY的原生compact、持久化及下一轮HTTP上下文通过，无真实provider；签名路径仅合成验证。
+首次PTY对摘要消息位置预期错误，核对真实请求后按历史checkpoint及当前注入标记分别断言。
+9d4a4cbf两项远端检查成功。W7-27其余矩阵及后续任务继续。
