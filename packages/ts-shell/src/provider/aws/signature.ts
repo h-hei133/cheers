@@ -30,7 +30,7 @@ export interface AwsCredentials {
 /** Everything a signature is computed over. */
 export interface SignatureInput {
   readonly method: string;
-  /** Hostname only. It becomes the `host` header and part of the signed text. */
+  /** HTTP authority, including a non-default port; signed as the `host` header. */
   readonly host: string;
   /** The path, before canonicalization. */
   readonly path: string;

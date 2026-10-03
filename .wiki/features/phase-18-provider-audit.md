@@ -45,3 +45,43 @@ build:cli、静态阻断门及43项脚本通过；NormProof exit0，整体adviso
 这不是单文件可执行产物、真实provider、TLS/HTTP2或云签名验收，也不是完整SSE规范验证；W7-33仍单独执行。
 
 上批2f44a914的CI37147699694及Architecture Watch37147699715均成功。
+
+
+## 摘要与旁路调用的签名（第三批）
+
+核对实际调用方后发现：主回合已用签名transport，而/btw、手动和自动压缩、回退摘要只接有超时的裸transport，
+且API key/account门槛会拒绝由端点signer自行取凭据的请求。参考的直接调用和摘要复用同一端点认证准备；
+采纳此边界，复用现有providerFetchForEndpoint，不增加认证算法或另一个摘要实现。
+Signer存在只允许尝试，失败仍由调用方返回错误；缺少baseUrl/model的压缩保持拒绝。
+
+| 路径 | 当前transport / 取消 | 本批证据或剩余范围 |
+|---|---|---|
+| 主回合 | cliRuntimeInvocation的providerFetchForEndpoint；调用者signal与读完释放 | 原接线保留 |
+| /btw | providerFetchForEndpoint；15秒命令计时器 | 真实loopback证明最后URL/body已交signer；缺key仍可签名，signer失败无HTTP/成功答案 |
+| 手动/自动历史压缩及回合前缀摘要 | 同一buildCompactionWiring内共享签名transport；转交signal | 四回调均覆盖，无key与有key两个场景 |
+| 回退后的摘要 | 每次请求创建签名transport | 缺key可签名；仍无外部取消参数，受transport时限约束 |
+| 缓存刷新 | 原有bounded transport及runner signal | 本批保留原key/account准入；签名与body上限处理尚待单独核验 |
+| 公共模型目录刷新 | modelCommandRuntime直接fetch；8秒AbortSignal | 公共目录元数据，不是模型生成；只做源码分类 |
+
+签名端点放行会间接使共用target向cache warmer提供价格/TTL。独立架构审查指出这一扩大；
+已在warmingTarget保留旧key/account门槛，避免本批开启新的未签名后台请求。允许联网、显式TTL和价格的回归覆盖该边界。
+
+编译HTTP/PTY首次失败定位为真实签名缺陷：adapter使用hostname，线上Host包含非默认端口；
+独立HMAC重算证明仅移除Host端口就匹配旧签名。对照官方SDK的Host/authority构造后改传url.host，
+region仍从url.hostname提取。参考固定版本：
+https://github.com/aws/aws-sdk-js-v3/blob/v3.758.0/packages/middleware-host-header/src/index.ts
+（本地证据 `.tmp/admission-validation/aws-host-header.ts`）。标准默认端口由URL归一化保持不变。
+
+最终 `npm run test -w packages/ts-shell -- --threads=false` 加compaction wiring、btw、fetch、completion、
+summarize、sentRequest、cacheWarm、signature、bedrockConverse九套件：136项、exit0；build:cli通过。
+两caller owner撤销10失败/3通过；端口修复单独撤销1失败/30通过；均精确恢复后最终复跑。
+独立APPROVE/CLEAR；静态阻断门与43项脚本通过；NormProof exit0、整体advisory仍partial。
+定向证据 `.tmp/signing-c8qyinug`。
+
+普通/全屏编译CLI各执行/btw和/compact，本地服务用合成凭据独立重算四个实际请求的HMAC，
+所有签名含随机端口的Host、最终converse路径和JSON正文；答案可见，压缩checkpoint持久化，进程exit0。
+产物 `.tmp/signing-pty-2h0j75nm`；没有真实provider、云凭据或云服务请求。
+这证明本地实际HTTP签名与摘要路径，不证明云端可用性、全部认证来源或Vertex真实签名链。
+
+4e6290c8的CI37148884120及Architecture Watch37148884066均成功。
+W7-27的逐字段表、用量与其余transport/取消边界继续，缓存刷新尚未闭合。

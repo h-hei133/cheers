@@ -471,6 +471,20 @@ describe("a failure that arrives in the stream", () => {
 });
 
 describe("the bedrock signer", () => {
+  it("signs the authority including a gateway's non-default port", async () => {
+    const saved = { ...process.env };
+    Object.assign(process.env, { AWS_ACCESS_KEY_ID: "PORT_KEY", AWS_SECRET_ACCESS_KEY: "synthetic-secret" });
+    try {
+      const shape = endpointShape("bedrock-converse-stream");
+      const signer = await shape.signer!();
+      const signed = await signer!({ url: "https://gateway.test:8443/model/m1/converse", method: "POST", headers: {}, body: "{}" });
+      expect(signed.host).toBe("gateway.test:8443");
+    } finally {
+      for (const name of ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]) delete process.env[name];
+      Object.assign(process.env, saved);
+    }
+  });
+
   it("derives the signing region from the host when the host names one", async () => {
     const saved = { ...process.env };
     Object.assign(process.env, {

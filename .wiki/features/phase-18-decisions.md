@@ -1998,3 +1998,13 @@ HTTP step在provider重试预算为零时仍把Retry-After解析值带入Assista
 首轮驱动把Google provider注册名写错，归类为harness问题并修正；未使用真实provider。
 详见Provider审计表；本批不证明TLS/HTTP2或单文件可执行产物，W7-27其余矩阵继续。
 2f44a914两项远端检查成功；NormProof阻断义务满足、整体advisory仍partial。
+
+
+### W7-27 第三批：摘要与旁路端点签名（2026-10-04）
+
+/btw与手动/自动/前缀/回退摘要复用主回合既有签名transport；由signer取凭据的端点不再要求静态key。
+独立审查发现的cache warm间接准入扩大已修复，仍保留旧门槛；其自身签名/body审计继续。
+真实本地HTTP HMAC验收发现Host遗漏非默认端口，核对官方SDK后改为签名完整authority，region解析不变。
+九套136项、构建、静态阻断门与43项脚本通过；caller撤销10失败3通过、端口撤销1失败30通过，精确恢复最终复跑。
+独立APPROVE/CLEAR。双模式编译PTY的/btw与/compact共四请求签名独立验证、摘要落盘，exit0，无真实provider。
+4e6290c8两项远端检查成功；NormProof整体advisory仍partial。完整字段、用量及其余路径矩阵继续，见Provider审计。

@@ -332,7 +332,7 @@ async function bedrockSigner(): Promise<RequestSigner | undefined> {
     const credentials = await resolveCredentials();
     return signAwsRequest({
       method: request.method,
-      host: url.hostname,
+      host: url.host,
       path: url.pathname,
       ...(url.search ? { query: url.search.slice(1) } : {}),
       headers: request.headers,

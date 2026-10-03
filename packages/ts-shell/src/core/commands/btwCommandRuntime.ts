@@ -6,7 +6,8 @@ import { requestSimpleCompletion } from "../../provider/request/completion.js";
 import { loadCatalog } from "../models/catalogStore.js";
 import { resolveRequestShape } from "../models/requestShape.js";
 import { providerEndpoint } from "../models/catalog.js";
-import { providerFetchFor } from "../../provider/request/fetch.js";
+import { providerFetchForEndpoint } from "../../provider/request/fetch.js";
+import { endpointShape } from "../../provider/endpoints/index.js";
 import { classifyProviderFailure, type ProviderFailureClass } from "../../provider/registry/provider.js";
 
 /** How long a side question may take before it is abandoned. */
@@ -41,16 +42,16 @@ export async function runBtwCommand(
   const runtimeConfig = getRuntimeConfig(context.cwd);
   const resolution = resolveProviderCredential({ runtimeConfig });
   const credential = resolution.credential;
+  const catalog = loadCatalog();
+  const endpoint = providerEndpoint(catalog, resolution.provider);
 
   let answer = "";
   let attempted = false;
   let failure: ProviderFailureClass | undefined;
   const accountAuth = credential ? accountAuthFor(resolution.provider, credential) : undefined;
-  if (credential && (credential.apiKey || accountAuth)) {
+  if (credential?.apiKey || accountAuth || endpointShape(endpoint).signer) {
     attempted = true;
-    const catalog = loadCatalog();
-    const endpoint = providerEndpoint(catalog, resolution.provider);
-    const model = resolution.model ?? credential.model ?? "";
+    const model = resolution.model ?? credential?.model ?? "";
     const shape = resolveRequestShape(catalog, resolution.provider, model, undefined);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), SIDE_QUESTION_TIMEOUT_MS);
@@ -59,15 +60,15 @@ export async function runBtwCommand(
         (await requestSimpleCompletion({
           provider: {
             headers: providerAuthorization({
-              apiKey: credential.apiKey,
+              apiKey: credential?.apiKey,
               ...(accountAuth ? { accountAuth } : {}),
               ...(endpoint ? { endpoint } : {}),
             }).headers,
-            baseUrl: resolution.baseUrl ?? credential.baseUrl ?? "",
+            baseUrl: resolution.baseUrl ?? credential?.baseUrl ?? "",
             model,
             providerId: resolution.provider,
             ...(endpoint ? { endpoint } : {}),
-            fetchImpl: providerFetchFor(runtimeConfig),
+            fetchImpl: providerFetchForEndpoint(runtimeConfig, endpoint, endpointShape),
           },
           messages: [
             { role: "system", content: SIDE_QUESTION_SYSTEM_PROMPT },

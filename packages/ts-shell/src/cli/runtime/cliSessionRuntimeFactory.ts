@@ -26,11 +26,11 @@ import { recordCompactionCheckpoint } from "../../context/compact/checkpoint/com
 import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalStore.js";
 import type { InteractiveApprovalResult } from "../interactive/picker/approval.js";
 import { requestCompactionSummary, type CompactionProvider as SummaryProvider } from "../../core/query/compaction/summarize.js";
-import { providerFetchFromTimeouts, providerTimeoutsFrom } from "../../provider/request/fetch.js";
+import { providerFetchForEndpoint, providerFetchFromTimeouts, providerTimeoutsFrom } from "../../provider/request/fetch.js";
 import { accountAuthFor, providerAuthorization, renewAccountAuthIfExpiring } from "../../provider/request/authorization.js";
 import { catalogModel, providerEndpoint } from "../../core/models/catalog.js";
 import { resolveRequestShape } from "../../core/models/requestShape.js";
-import type { EndpointKind } from "../../provider/endpoints/kinds.js";
+import { endpointShape, type EndpointKind } from "../../provider/endpoints/index.js";
 import { projectMemoryRootFor } from "../../memory/projectMemoryRoot.js";
 import { createCacheWarmingRunner, type CacheWarmingRunner } from "../../turn/cacheWarm.js";
 import { resolveCacheWarmingMode } from "../../core/models/cacheEconomics.js";
@@ -114,6 +114,7 @@ function buildCompactionWiring(input: {
 }): CompactionWiring {
   const provider = input.provider;
   const runtimeConfig = input.runtimeContext.runtimeConfig;
+  const fetchImpl = providerFetchForEndpoint(runtimeConfig, provider.endpoint, endpointShape);
   // Resolved per model rather than read from one global number: the catalog
   // knows each model's window, and using a single value compacted a million-token
   // model at sixty-four thousand.
@@ -164,7 +165,7 @@ function buildCompactionWiring(input: {
         // The same deadlines as the main request. A summarization that hangs is
         // as fatal to a turn as an answer that hangs, and harder to notice: the
         // conversation looks idle rather than broken.
-        fetchImpl: providerFetchFromTimeouts(providerTimeoutsFrom(runtimeConfig)),
+        fetchImpl,
         messages: toCompactionMessages(request.messages),
         previousSummary: request.previousSummary,
         instructions: request.instructions,
@@ -176,7 +177,7 @@ function buildCompactionWiring(input: {
     summarizeTurnPrefix: (messages, signal) =>
       requestCompactionSummary({
         provider,
-        fetchImpl: providerFetchFromTimeouts(providerTimeoutsFrom(runtimeConfig)),
+        fetchImpl,
         messages: toCompactionMessages(messages),
         prompt: TURN_PREFIX_COMPACTION_PROMPT,
         signal,
@@ -227,10 +228,8 @@ export function createCliSessionRuntime(input: {
    * The provider both compaction paths summarize with, or nothing when none is
    * configured.
    *
-   * The guard asks whether a credential exists, not whether an API key does. It
-   * used to read `apiKey` alone and require it, so an account login produced no
-   * provider here at all and `/compact` answered "No credential for provider" to a
-   * user who had just signed in successfully.
+   * Authentication may be a static key, an account token, or an endpoint signer
+   * that resolves credentials at dispatch. A signer needs no key in this snapshot.
    *
    * The renewal runs on the explicit paths because they are request paths of their
    * own: `/compact` and the abandoned-turn summary do not pass through the
@@ -241,15 +240,14 @@ export function createCliSessionRuntime(input: {
   const compactionTarget = () => {
     const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
     const credential = resolved.credential;
-    if (!credential) return undefined;
-    const accountAuth = accountAuthFor(resolved.provider, credential);
-    if (!credential.apiKey && !accountAuth) return undefined;
-    const baseUrl = resolved.baseUrl ?? credential.baseUrl;
-    const model = resolved.model ?? credential.model;
+    const accountAuth = accountAuthFor(resolved.provider, credential ?? {});
+    if (!credential?.apiKey && !accountAuth && !endpointShape(endpointFor(resolved.provider)).signer) return undefined;
+    const baseUrl = resolved.baseUrl ?? credential?.baseUrl;
+    const model = resolved.model ?? credential?.model;
     if (!baseUrl || !model) return undefined;
     return {
       provider: resolved.provider,
-      apiKey: credential.apiKey,
+      apiKey: credential?.apiKey,
       accountAuth,
       baseUrl,
       model,
@@ -367,7 +365,7 @@ export function createCliSessionRuntime(input: {
           // The third of the three summarisers, and the one that was missed: it kept
           // the global fetch, so a `/back` whose summary stalled waited forever with
           // no deadline and no abort signal. Same wiring as its two siblings.
-          fetchImpl: providerFetchFromTimeouts(providerTimeoutsFrom(input.runtimeContext.runtimeConfig)),
+          fetchImpl: providerFetchForEndpoint(input.runtimeContext.runtimeConfig, provider.endpoint, endpointShape),
           messages: toCompactionMessages(messages),
         });
       });
@@ -385,7 +383,11 @@ export function createCliSessionRuntime(input: {
       const activeProvider = compactionProvider();
       // The prices and the cache window belong to the model, so they are read
       // from the catalogue entry this run is talking to.
-      const warmingTarget = compactionTarget();
+      // The replay transport still uses static credentials. Allowing signed
+      // summaries must not opt these targets into unsigned background refreshes.
+      const warmingTarget = resolvedCredential.credential?.apiKey ||
+        accountAuthFor(resolvedCredential.provider, resolvedCredential.credential ?? {})
+        ? compactionTarget() : undefined;
       const warmingModel = warmingTarget
         ? catalogModel(catalog, warmingTarget.provider, warmingTarget.model)
         : undefined;

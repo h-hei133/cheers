@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { runBtwCommand } from "./btwCommandRuntime.js";
 import { loadCatalog } from "../models/catalogStore.js";
-import { providerFetchFor } from "../../provider/request/fetch.js";
+import { providerFetchForEndpoint } from "../../provider/request/fetch.js";
 import { resolveProviderCredential } from "../shell/providerCredentials.js";
 
 vi.mock("../../config/runtimeConfig.js", () => ({ getRuntimeConfig: () => ({}) }));
@@ -10,7 +10,7 @@ vi.mock("../shell/providerCredentials.js", () => ({ resolveProviderCredential: v
   credential: { apiKey: "synthetic" },
 })) }));
 vi.mock("../models/catalogStore.js", () => ({ loadCatalog: vi.fn() }));
-vi.mock("../../provider/request/fetch.js", () => ({ providerFetchFor: vi.fn() }));
+vi.mock("../../provider/request/fetch.js", () => ({ providerFetchForEndpoint: vi.fn() }));
 beforeEach(() => {
   vi.mocked(resolveProviderCredential).mockReturnValue({
     provider: "fixture", model: "m", baseUrl: "https://provider.test", credential: { apiKey: "synthetic" },
@@ -24,7 +24,7 @@ it.each([true, false, undefined])("uses catalog temperature capability %s for si
     { id: "m", name: "Model", compat: { supportsTemperature } },
   ] }] as never);
   const bodies: Record<string, unknown>[] = [];
-  vi.mocked(providerFetchFor).mockReturnValue((async (_url, init) => {
+  vi.mocked(providerFetchForEndpoint).mockReturnValue((async (_url, init) => {
     bodies.push(JSON.parse(String(init?.body)));
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "answer" }] } }] }), { status: 200 });
   }) as typeof fetch);
@@ -42,7 +42,7 @@ it.each([
   ["empty", "provider_output_insufficient"],
   ["malformed", "provider_response_malformed"],
 ])("reports %s failures without displaying response details", async (scenario, classification) => {
-  vi.mocked(providerFetchFor).mockReturnValue((async () => {
+  vi.mocked(providerFetchForEndpoint).mockReturnValue((async () => {
     if (scenario === "network") throw new TypeError("fetch failed: private-provider-detail");
     if (scenario === "http") return new Response("private-provider-detail", { status: 400 });
     if (scenario === "malformed") return new Response("{private-provider-detail", { status: 200 });
@@ -57,7 +57,7 @@ it.each([
 
 it("reports its own deadline as a timeout and releases the timer", async () => {
   vi.useFakeTimers();
-  vi.mocked(providerFetchFor).mockReturnValue((async (_url, init) => new Promise((_resolve, reject) => {
+  vi.mocked(providerFetchForEndpoint).mockReturnValue((async (_url, init) => new Promise((_resolve, reject) => {
     init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
   })) as typeof fetch);
   const pending = runBtwCommand(["question"], { cwd: "/synthetic" });
@@ -71,5 +71,5 @@ it("keeps the missing-credential explanation and sends nothing", async () => {
   const result = await runBtwCommand(["question"], { cwd: "/synthetic" });
   expect(result.output).toContain("No provider credential is configured, so nothing was sent.");
   expect(result.output).not.toContain("Failure:");
-  expect(providerFetchFor).not.toHaveBeenCalled();
+  expect(providerFetchForEndpoint).not.toHaveBeenCalled();
 });
