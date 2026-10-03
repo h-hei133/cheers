@@ -5838,3 +5838,12 @@ judge阻断义务满足、整体仍partial；W7-31剩余background/platform/直�
 普通/全屏PTY确认审批前不启动、完成通知的完整文件可读与终态来源一致，无真实provider。
 静态阻断门与judge阻断义务通过，整体advisory仍partial。idle完成通知继续沿用下一回合队列，存储慢会延迟结算。
 W7-31剩余platform、直接断言及旧脚本继续；63053ae9两项远端检查均成功。
+
+
+## [2026-10-04] fix | Phase 18 W7-31 Shell可用性
+
+实际可执行bash/sh与经校验的PATH结果取代任意登录SHELL；强制选择不可用时保留旧状态，诊断明确当前进程scope。
+5套54项、构建及独立APPROVE/CLEAR通过；4文件反转8失败9通过，精确恢复后复跑。
+双模式PTY确认无效选择不调用模型、任意登录shell未执行，后续审批后台命令与日志/终态一致。
+静态阻断门与judge阻断义务满足，总体advisory仍partial。Windows仅mock验证，旧脚本与直接行为缺口继续。
+ca48aab2两项远端检查均成功。

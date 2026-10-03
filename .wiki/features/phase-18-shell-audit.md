@@ -40,8 +40,8 @@ W7-31仍在执行。首批聚焦审批，其余已复现问题按下表继续修
 | 模块 | 判据 / 证据 | 当前状态 |
 |---|---|---|
 | `platform/types.ts` | 纯环境/backend契约，无执行权限 | 源码核对 |
-| `platform/shellDetector.ts` | shell存在性及类型准确性 | WATCH：不存在的绝对SHELL被标available，任意shell标bash/POSIX；待核验修复 |
-| `platform/shellManager.ts` | backend生命周期 | WATCH：进程静态状态与session表述不一致；待核验 |
+| `platform/shellDetector.ts` | shell存在性及类型准确性 | 第七批修复：已知bash/sh与校验后的PATH；任意登录SHELL不决定执行，缺失/目录/不可执行均不可用 |
+| `platform/shellManager.ts` | backend生命周期 | 第七批明确当前进程scope；显式选择先验证可用性，失败不改变原选择或声称切换成功 |
 | `platform/processTree.ts` | PID边界、去重、pending、all-settled；同名测试 | 复用W7-30有界清理契约证据 |
 | `platform/termination.ts` | 进程组TERM/grace/KILL及Windows launcher观察；同名测试 | 复用W7-30有界清理契约证据 |
 | `approval/contract.ts` | prompt/decision/response显式契约 | 源码核对，无隐含执行授权 |
@@ -156,3 +156,19 @@ idle通知沿用既有队列，在下一次用户回合后投递，本批未改�
 单测初轮两处fs mock未拦截命名导入、一次resume微任务时序断言不当；改为模块mock与实际恢复条件同步，未降低行为断言。
 慢存储仍会拖慢输出生产与完成通知；无磁盘额度/运行中任务并发上限，不声称无限资源场景。
 W7-31继续platform与直接行为缺口、旧result-contract脚本。
+
+
+## 第七批可执行Shell选择
+
+已知bash路径、PATH中的bash、已知sh/PATH sh按顺序核验，任意登录SHELL不再被标成bash执行。
+Windows候选使用平台路径及where结果；Unix使用which结果，所有候选验证实际文件，Unix再检查执行权限。
+强制选择不可用时保持原状态，/shell返回不可用而非切换成功；状态显示可用性与当前进程scope。
+保留原ShellManager静态owner和registry launch/sandbox路径；参考采用验证实际shell、已知bash优先及sh回退决策。
+
+5套54项与build:ts通过；4文件反转8失败9通过，逐字节恢复后复跑。
+独立APPROVE/CLEAR；静态阻断门通过，1433文件零环，旧advisory保留；judge阻断义务满足，总体partial。
+普通/全屏PTY用会写错误标记的任意登录SHELL，验证它从未执行；
+/shell use wsl在Linux本地拒绝且无模型请求，随后实际审批后台命令、完整日志及终态来源均通过。
+产物.tmp/platform-pty-c6ibh9s7，两模式exit0；初轮驱动未关闭status详情视图而停在视图，补上esc后通过。
+Windows为确定性mock测试，未进行真实Windows/WSL运行；可执行文件存在不证明发行版或命令成功，
+同步PATH查找有超时但仍有检测成本。其余直接行为断言及旧result-contract脚本继续处理。

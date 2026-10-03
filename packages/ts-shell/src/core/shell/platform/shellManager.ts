@@ -3,7 +3,7 @@ import { ShellDetector } from "./shellDetector.js";
 
 /**
  * Shell Manager
- * Tracks and controls the active execution shell backend for the agent session.
+ * Tracks the active execution shell backend for the current process.
  */
 export class ShellManager {
   private static forcedBackend: ShellBackendKind = "auto";
@@ -13,8 +13,10 @@ export class ShellManager {
   }
 
   public static setBackend(backend: ShellBackendKind): PlatformEnvironment {
+    const selected = ShellDetector.detectEnvironment(backend);
+    if (!selected.isAvailable) throw new Error(`Shell backend '${selected.activeBackend}' is unavailable: ${selected.executionPath}`);
     this.forcedBackend = backend;
-    return this.getActiveEnvironment();
+    return selected;
   }
 
   public static resetToAuto(): PlatformEnvironment {
@@ -30,7 +32,9 @@ export class ShellManager {
       `**Host Platform**: \`${env.platform}\` (${env.arch})`,
       `**Active Shell Backend**: \`${env.activeBackend}\` ${env.isAutoDetected ? "*(auto-detected)*" : "*(manually configured)*"}`,
       `**Executable Path**: \`${env.executionPath}\``,
-      `**POSIX Compatibility Mode**: ${env.isPosixCompatible ? "🟢 POSIX Compliant" : "🟡 PowerShell / Native Windows"}`,
+      `**Executable Available**: ${env.isAvailable ? "yes" : "no"}`,
+      "**Selection Scope**: current process",
+      `**Command Syntax**: ${env.isPosixCompatible ? "POSIX shell" : env.isAvailable ? "PowerShell" : "unavailable"}`,
       "",
       "### Detected Shell Backends:",
     ];

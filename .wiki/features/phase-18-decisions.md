@@ -578,7 +578,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W7-32 | read每次返回正文；startup结构/身份/有界读写、freshness与命令投影已修复；保留默认禁用 | 已完成，定向验证与隔离验收通过 |
 | W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
 | W7-26 / SES-08 | 回放、导出、迁移、恢复准入、检查点、字段优先级与历史写入观察已核验；后续转W7-31 | 已完成；原36模块行为矩阵闭合，保证边界与历史数据限制见审计表 |
-| W7-31 | [38模块Shell审计](phase-18-shell-audit.md)；首批修复审批身份、once生命周期和Git helper准入 | 进行中；审批、根绑定、终态、compact注入、readiness及连接选择已修复；background已修复；platform、直接断言与旧脚本待完成 |
+| W7-31 | [38模块Shell审计](phase-18-shell-audit.md)；首批修复审批身份、once生命周期和Git helper准入 | 进行中；审批、根绑定、终态、compact注入、readiness及连接选择已修复；background与platform已修复；直接断言与旧脚本待完成 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1896,3 +1896,20 @@ taskOutput描述同步说明保留范围，完成通知不再声称该工具能�
 无真实provider配置访问；慢存储会延迟完成，无新增磁盘额度或活跃任务并发额度。
 旧result-contract脚本未在此批运行或修复；W7-31继续platform、直接行为断言，然后27→29→33/W8。
 第五批63053ae9的CI 37136729912与Architecture Watch 37136729939均成功。
+
+
+### W7-31 第七批：Shell发现与选择事实（2026-10-04）
+
+已知bash/sh及校验后的PATH结果决定执行，不把任意登录SHELL按bash解释。
+缺失、目录、不可执行候选均不可用，Windows不再预设PowerShell存在；
+强制选择先验证再保存，失败保持旧选择。状态明确进程scope，继续走既有launch/sandbox。
+参考采用实际可执行候选与bash→PATH→sh顺序；没有新增shell生命周期或第二执行器。
+
+5套54项、build:ts及独立APPROVE/CLEAR通过；4文件反转8失败9通过，精确恢复并复跑。
+静态阻断门与judge阻断义务通过，1433文件零环、旧advisory保留，总体仍partial。
+普通/全屏PTY用会写错误标记的任意登录shell验证其未执行；不可用wsl选择本地拒绝，
+后续bash审批、真实后台输出与终态来源一致，产物.tmp/platform-pty-c6ibh9s7。
+初轮驱动未关闭status详情视图，修正交互步骤后通过。
+Windows只做确定性候选测试，没有真实Windows/WSL验收；存在可执行文件不证明运行环境完整。
+第六批ca48aab2的CI 37138807330与Architecture Watch 37138807377均成功。
+W7-31继续直接行为测试与旧脚本，再按顺序推进后续任务。

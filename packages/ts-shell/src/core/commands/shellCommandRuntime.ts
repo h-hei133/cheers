@@ -34,11 +34,15 @@ export async function runShellCommand(
       };
     }
 
-    const updated = ShellManager.setBackend(target);
-    return {
-      kind: "local",
-      output: `Active shell backend switched to \`${updated.activeBackend}\` (\`${updated.executionPath}\`).`,
-    };
+    try {
+      const updated = ShellManager.setBackend(target);
+      return {
+        kind: "local",
+        output: `Active shell backend switched to \`${updated.activeBackend}\` (\`${updated.executionPath}\`).`,
+      };
+    } catch (error) {
+      return { kind: "local", output: `${error instanceof Error ? error.message : String(error)}. Selection was not changed.` };
+    }
   }
 
   if (subCommand === "auto" || subCommand === "reset") {

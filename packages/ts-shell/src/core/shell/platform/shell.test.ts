@@ -1,11 +1,23 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
 import { ShellDetector } from "./shellDetector.js";
 import { ShellManager } from "./shellManager.js";
 import { runShellCommand } from "../../commands/shellCommandRuntime.js";
 import { routeSlashCommand } from "../../commands/slashRouter.js";
 
+const { locate } = vi.hoisted(() => ({ locate: vi.fn() }));
+vi.mock("node:child_process", async () => ({
+  ...await vi.importActual<typeof import("node:child_process")>("node:child_process"), execFileSync: locate,
+}));
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); locate.mockReset(); });
+
 describe("Cross-Platform Shell Adaptation Test Suite", () => {
   beforeEach(() => {
+    vi.spyOn(os, "platform").mockReturnValue("win32");
+    vi.spyOn(fs, "statSync").mockReturnValue({ isFile: () => true } as fs.Stats);
+    vi.spyOn(fs, "accessSync").mockImplementation(() => {});
+    locate.mockReturnValue("");
     ShellManager.resetToAuto();
   });
 
@@ -109,5 +121,61 @@ describe("Cross-Platform Shell Adaptation Test Suite", () => {
       const routedPlatform = await routeSlashCommand("/platform", { cwd: process.cwd() });
       expect(routedPlatform?.kind).toBe("local");
     });
+  });
+});
+
+describe("executable shell selection", () => {
+  beforeEach(() => {
+    vi.spyOn(os, "platform").mockReturnValue("linux");
+    vi.spyOn(fs, "statSync").mockImplementation(candidate => {
+      if (candidate === "/bin/bash" || candidate === "/bin/sh") return { isFile: () => true } as fs.Stats;
+      throw new Error("not found");
+    });
+    vi.spyOn(fs, "accessSync").mockImplementation(() => {});
+    locate.mockReturnValue("");
+    ShellManager.resetToAuto();
+  });
+
+  it.each(["/missing/bash", "/usr/bin/fish", "/bin/zsh"])("does not turn login shell %s into the bash backend", login => {
+    vi.stubEnv("SHELL", login);
+    const env = ShellDetector.detectEnvironment();
+    expect(env).toMatchObject({ activeBackend: "bash", executionPath: "/bin/bash", isAvailable: true, isPosixCompatible: true });
+  });
+
+  it("falls back to an executable sh when bash is not executable", () => {
+    vi.spyOn(fs, "accessSync").mockImplementation(candidate => { if (candidate !== "/bin/sh") throw new Error("not executable"); });
+    expect(ShellDetector.detectEnvironment()).toMatchObject({ executionPath: "/bin/sh", isAvailable: true });
+  });
+
+  it("does not call a directory an executable and reports absence truthfully", () => {
+    vi.spyOn(fs, "statSync").mockReturnValue({ isFile: () => false } as fs.Stats);
+    expect(ShellDetector.detectEnvironment()).toMatchObject({ isAvailable: false, isPosixCompatible: false });
+    expect(ShellManager.formatStatusReport()).toContain("**Executable Available**: no");
+  });
+
+  it("rejects an unavailable forced backend without changing the current selection", async () => {
+    const before = ShellManager.getActiveEnvironment();
+    const result = await runShellCommand(["use", "wsl"], { cwd: process.cwd() });
+    expect(result.output).toContain("unavailable");
+    expect(result.output).toContain("Selection was not changed");
+    expect(result.output).not.toContain("switched");
+    expect(ShellManager.getActiveEnvironment()).toEqual(before);
+    expect(ShellManager.formatStatusReport()).toContain("**Selection Scope**: current process");
+  });
+
+  it("checks PATH results before selecting a shell", () => {
+    vi.spyOn(fs, "statSync").mockImplementation(candidate => {
+      if (candidate === "/opt/bin/bash") return { isFile: () => true } as fs.Stats;
+      throw new Error("not found");
+    });
+    locate.mockImplementation((_tool, [name]) => name === "bash" ? "/gone/bash\n/opt/bin/bash\n" : "");
+    expect(ShellDetector.detectEnvironment()).toMatchObject({ executionPath: "/opt/bin/bash", isAvailable: true });
+    expect(locate).toHaveBeenCalledWith("which", ["bash"], expect.objectContaining({ timeout: 1000 }));
+  });
+
+  it("does not assume PowerShell exists on Windows", () => {
+    vi.spyOn(os, "platform").mockReturnValue("win32");
+    vi.spyOn(fs, "statSync").mockImplementation(() => { throw new Error("not found"); });
+    expect(ShellDetector.detectEnvironment()).toMatchObject({ activeBackend: "powershell", isAvailable: false, isPosixCompatible: false });
   });
 });

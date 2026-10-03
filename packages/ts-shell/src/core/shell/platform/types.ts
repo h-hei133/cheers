@@ -22,6 +22,8 @@ export interface PlatformEnvironment {
   readonly activeBackend: ShellBackendKind;
   readonly detectedShells: readonly DetectedShell[];
   readonly executionPath: string;
+  /** The executable exists and is launchable; this does not prove a WSL distro or command succeeds. */
+  readonly isAvailable: boolean;
   readonly isPosixCompatible: boolean;
   readonly isAutoDetected: boolean;
 }
