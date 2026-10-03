@@ -77,6 +77,34 @@ function dependencies(): { deps: CliRuntimeInvocationDependencies; calls: string
 }
 
 describe("CLI runtime invocation", () => {
+  it.each([false, true])("carries historical continuity without changing user intent or persisted turns (image=%s)", async (withImage) => {
+    const { deps } = dependencies();
+    const recorded: unknown[] = [];
+    const observed: string[] = [];
+    const image = { type: "image" as const, data: "aGVsbG8=", mimeType: "image/png" };
+    const prompt = "Continue and inspect the previous target";
+    const context = "Session continuity context:\n- last-write-effect: unknown\n- last-write-requires-user-inspection: yes";
+    const run = await runCliRuntimeInvocation(baseInput({
+      prompt, continuityContext: context, onTurnMessage: (message) => recorded.push(message),
+      ...(withImage ? { attachments: { images: [image] } } : {}),
+    }), {
+      ...deps,
+      createStep: () => async (messages) => {
+        observed.push(JSON.stringify(messages));
+        if (withImage) expect(messages.at(-1)?.content).toContainEqual(image);
+        else expect(typeof messages.at(-1)?.content).toBe("string");
+        return { text: "ready to inspect", toolCalls: [], stopReason: "stop" };
+      },
+    });
+    const events = await collect(run.events);
+    expect(observed[0]).toContain("last-write-effect: unknown");
+    expect(observed[0]).toContain("last-write-requires-user-inspection: yes");
+    expect(observed[0]).toContain(prompt);
+    expect(observed[0].match(/Session continuity context:/g)).toHaveLength(1);
+    expect(events[0]).toMatchObject({ type: "query.started", prompt });
+    expect(recorded).toEqual([{ role: "assistant", content: "ready to inspect" }]);
+  });
+
   it("rebuilds delegated system mode and tools through the production step factory", async () => {
     const bodies: Array<{ messages: Array<{ role: string; content: string }> }> = [];
     const server = createServer(async (request, response) => {

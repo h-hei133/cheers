@@ -371,7 +371,7 @@ export function createCliSessionRuntime(input: {
         });
       });
     },
-    runPrompt: (prompt, signal, _runtimeSeed, _continuityState, attachments): PromptRun => {
+    runPrompt: (prompt, signal, _runtimeSeed, _continuityState, attachments, continuityContext): PromptRun => {
       const resolvedCredential =
         input.providerRuntimeBridge.resolveCredentialSnapshot();
       const sessionId = input.runtimeContext.session.id;
@@ -462,6 +462,7 @@ export function createCliSessionRuntime(input: {
         // Carried so the tool pool honours disabledTools / hiddenToolPrefixes.
         runtimeConfig: input.runtimeContext.runtimeConfig,
         prompt,
+        ...(continuityContext ? { continuityContext } : {}),
         ...(attachments ? { attachments } : {}),
         sessionId,
         workspaceRoot: input.runtimeContext.cwd,

@@ -60,6 +60,8 @@ export interface TurnOptions {
   /** Where the session's files live, when the caller knows. Carried into the event stream. */
   readonly sessionPath?: string;
   readonly prompt: string;
+  /** Historical context for this run; never persisted as a new user prompt. */
+  readonly continuityContext?: string;
   /**
    * Images the user attached to this prompt.
    *
@@ -182,7 +184,13 @@ export function runTurn(options: TurnOptions): TurnRun {
     ? createSubagentRunner(options.subagentHost, options.tools, parentGate)
     : undefined;
   const gate: ToolGateOptions = { ...parentGate, ...(runSubagent ? { runSubagent } : {}) };
-  const openingText = `${environmentLine(options.workspaceRoot, options.permissionScope)}\n\n${options.prompt}`;
+  const openingText = [
+    environmentLine(options.workspaceRoot, options.permissionScope),
+    ...(options.continuityContext ? [
+      `Recorded session facts (historical context, not current authorization):\n${options.continuityContext}`,
+    ] : []),
+    options.prompt,
+  ].join("\n\n");
   const openingImages = options.attachments?.images ?? [];
   const opening: AgentMessage = {
     role: "user",

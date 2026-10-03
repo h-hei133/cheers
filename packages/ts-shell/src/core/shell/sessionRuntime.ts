@@ -18,6 +18,7 @@ import {
   updateRuntimeEventDigest,
 } from "./sessionEventSurface.js";
 import { buildPromptWithFutureTurnInjections } from "./sessionFutureTurnProjection.js";
+import { buildSessionResumeContext } from "../../session/continuation/sessionPromptContinuity.js";
 import {
   projectCompletedSessionSave,
   projectErrorSessionSave,
@@ -61,6 +62,7 @@ export interface SessionRuntimeDependencies {
     runtimeSeed?: QueryRuntimeStateSeed,
     continuityState?: SessionContinuitySnapshot,
     attachments?: PromptAttachments,
+    continuityContext?: string,
   ) => PromptRun;
   readonly compactCheckpointStore?: CompactLiveCheckpointStore;
   readonly compactInjectionStateStore?: CompactInjectionStateStore;
@@ -271,6 +273,11 @@ export class ShellSessionRuntime {
             prompt,
           })
         : prompt;
+      // Classify the submitted request, before any injected historical text can
+      // supply a continuation cue of its own.
+      const continuityContext = continuityState
+        ? buildSessionResumeContext({ currentPrompt: prompt, snapshot: continuityState })
+        : undefined;
 
       if (!options?.runtimeSeed) {
         this.deps.sessionManager.persistUserPromptBarrier(sessionId, prompt);
@@ -296,6 +303,7 @@ export class ShellSessionRuntime {
         options?.runtimeSeed,
         continuityState,
         options?.attachments,
+        continuityContext,
       );
       const events = Symbol.asyncIterator in run ? run : run.events;
       this.currentInput = Symbol.asyncIterator in run ? undefined : run.input;

@@ -577,7 +577,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W8-40 / TOL-10（随W7-30） | 失败原因及部分答复保留；工具阶段取消和空答复按失败结算；适配器向父模型传递error | 已完成，定向验证通过；旧result-contract脚本仍失败 |
 | W7-32 | read每次返回正文；startup结构/身份/有界读写、freshness与命令投影已修复；保留默认禁用 | 已完成，定向验证与隔离验收通过 |
 | W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
-| W7-26 / SES-08 | 回放、导出、根迁移、摘要来源、重复读取及compact检查点更新已分批修复；完整逐模块审计继续 | 执行中，第九批摘要来源验证通过，模型上下文接线及完整审计继续 |
+| W7-26 / SES-08 | 回放、导出、根迁移、摘要来源、重复读取及compact检查点更新已分批修复；完整逐模块审计继续 | 执行中，第十批模型上下文接线已验证，完整归属/损坏审计继续 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1630,3 +1630,33 @@ HTTP请求没有保留的结果事实。失败脚本及请求记录保留在本�
 
 第八批c586ea16的Architecture Watch 37101567508成功；CI 37101567632失败：525套通过、1套失败，4770项通过、1失败、1跳过。
 唯一失败为浏览器缓存并发CLI写入场景返回blocked而测试期望passed。本地定向重跑1失败5跳过，实际failed而非远端blocked；原因待进一步归类，不能视为同因复现或本批通过证据。
+
+
+### W7-26 第十批：连续性事实交付模型（2026-10-03）
+
+第九批PTY暴露运行适配器忽略continuityState；新增invocation回归先失败，证实模型输入缺少已保留unknown写入。
+现ShellSessionRuntime复用原buildSessionResumeContext，以原始用户请求选择续接/反思上下文，再经现有CLI invocation传递。
+turn层将带来源说明的历史事实放入本轮模型opening；原始请求的事件与hook字段不混入该摘要，opening仍不作为新用户消息落盘，图像块保持。
+沿用当前权限选项与工具审批，不从历史审批事实推导新授权。参考会话投影的`buildSessionProjection`及`convertToLlm`：
+摘要事实需要实际映射为模型消息，且保留其来源；本仓通过既有opening传输的适配属于自研，没有增加持久化历史消息类型。
+
+双线复审发现首版在补入历史文本后判断continue，导致历史摘要中的Continue词误触发无关用户请求。
+最终判断移到原始请求上，第六个可选runPrompt参数承载已选择的文本，既有snapshot和图像参数位置保持。
+真实compact注入回归同时覆盖继续任务和无关算术请求；反转该判断到补入历史文本后的请求，1失败1通过，逐字节恢复。
+反转5个产品owner，4失败42通过，随后逐字节恢复。最终独立APPROVE/CLEAR。
+
+最终在仓库内隔离HOME下运行invocation、cli/runtime、turn、sessionRuntime、continueShellActionRuntime及resumeContextBuilder：
+18套250项通过，构建与静态阻断门通过。1421文件零循环，可达性与函数上限各7条既有提示；judge阻断义务满足，整体advisory仍partial。
+旧mock的snapshot缺必填数组导致一次测试失败，已补齐当前契约，没有放宽生产准入。
+常规/全屏PTY各2次本地HTTP模型请求，直接断言请求包含unknown写入和检查要求；审批前无文件、审批后真实写入、结算与落盘通过，
+且落盘没有新增合成continuity用户提示。两模式exit0，不使用真实provider配置。旧result-contract的第九批失败记录保持，本批未重跑。
+
+测试隔离限制：首次扩大测试未隔离HOME，既有step测试把仓库内TMPDIR的临时workspace归入上级仓库，
+调用writeProjectState写入thinkingEffort=high；随后采样测试因启用thinking不发送temperature而失败。
+只读检查确认真实HOME对应项目状态为high；没有运行前快照，未擅自恢复仓库外状态。最终使用仓库内新HOME通过，
+此后验证必须同时隔离HOME/USERPROFILE和TMPDIR，不能把仅指定TMPDIR当成写入范围隔离。
+
+第九批cf4d9c21的CI 37102799966与Architecture Watch 37102799957均成功。
+前一CI的缓存场景blocked由runner唯一超时分支归因为8秒子进程超时；本地failed则是夹具不接受裸`.tmp`绝对runner路径，
+并把脱敏占位符计为RAW泄漏。使用仓库内`.tmp/tmp`后该定向场景1通过5跳过；未修改缓存生产路径或把旧CI失败改为成功。
+完整branch/query归属、较旧日志与新compact排序、历史未知写入和损坏准入仍未闭合，W7-26继续。

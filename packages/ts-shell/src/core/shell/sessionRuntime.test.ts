@@ -78,9 +78,10 @@ describe("shell session runtime (W5)", () => {
     ]);
   });
 
-  it("injects pending compact context into the next normal prompt exactly once", async () => {
+  it.each(["continue task", "calculate 7 plus 3"])("injects compact context once and selects continuity from the raw request (%s)", async (firstPrompt) => {
     const calls: string[] = [];
     const promptsSeenByModel: string[] = [];
+    const contextsSeenByModel: Array<string | undefined> = [];
     const compactCheckpointStore = createCompactLiveCheckpointStore({
       now: () => "2026-05-15T00:00:00.000Z",
       nextId: () => "checkpoint-runtime",
@@ -133,6 +134,14 @@ describe("shell session runtime (W5)", () => {
       compactCheckpointStore,
       compactInjectionStateStore,
       sessionManager: {
+        buildContinuitySnapshot() {
+          return {
+            sessionId: "sess_runtime_compact", projectRoot: process.cwd(), lastTaskKind: "edit-file",
+            lastWriteEffect: "unknown", lastWriteRequiresUserInspection: true,
+            recentChangedFiles: [], recentTargetFiles: [], recentVerifiedFiles: [], recentFailedFiles: [],
+            lastRepairNotes: [], lastContinuationEvidence: [], lastTaskSatisfactionReasons: [], unresolvedItems: [],
+          };
+        },
         persistUserPromptBarrier(sessionId: string, prompt: string) {
           calls.push(`barrier:${sessionId}:${prompt}`);
         },
@@ -150,8 +159,9 @@ describe("shell session runtime (W5)", () => {
         renderLine() {},
         renderChunk() {},
       } as never,
-      runPrompt: async function* (prompt) {
+      runPrompt: async function* (prompt, _signal, _seed, _snapshot, _attachments, context) {
         promptsSeenByModel.push(prompt);
+        contextsSeenByModel.push(context);
         yield {
           type: "query.completed",
           result: {
@@ -171,11 +181,11 @@ describe("shell session runtime (W5)", () => {
       },
     });
 
-    await runtime.executePrompt("sess_runtime_compact", "continue task");
+    await runtime.executePrompt("sess_runtime_compact", firstPrompt);
     await runtime.executePrompt("sess_runtime_compact", "continue again");
 
     expect(calls).toEqual([
-      "barrier:sess_runtime_compact:continue task",
+      `barrier:sess_runtime_compact:${firstPrompt}`,
       "completed:sess_runtime_compact",
       "barrier:sess_runtime_compact:continue again",
       "completed:sess_runtime_compact",
@@ -183,7 +193,11 @@ describe("shell session runtime (W5)", () => {
     expect(promptsSeenByModel[0]).toContain("<compact_v2_injected_context>");
     expect(promptsSeenByModel[0]).toContain("authority-runtime");
     expect(promptsSeenByModel[0]).toContain("arbitrary-broad-apply-patch");
-    expect(promptsSeenByModel[0]).toContain("<user_request>\ncontinue task");
+    expect(promptsSeenByModel[0]).toContain(`<user_request>\n${firstPrompt}`);
+    expect(promptsSeenByModel[0]).toContain("Continue runtime integration.");
+    if (firstPrompt === "continue task") expect(contextsSeenByModel[0]).toContain("last-write-effect: unknown");
+    else expect(contextsSeenByModel[0]).toBeUndefined();
+    expect(contextsSeenByModel[1]).toContain("last-write-effect: unknown");
     expect(promptsSeenByModel[0]).not.toContain("RAW_MUTATION_CONTENT");
     expect(promptsSeenByModel[0]).not.toContain("RAW_RECOVERY_CONTENT");
     expect(promptsSeenByModel[0]).not.toContain("sk-secret-output");
@@ -811,9 +825,11 @@ describe("shell session runtime (W5)", () => {
         buildPromptContinuitySnapshot(sessionId: string, prompt: string) {
           calls.push(`continuity:${sessionId}:${prompt}`);
           return {
+            sessionId,
             projectRoot: "D:/Test/continuity",
-            trustBoundary: "session-boundary",
-            sessionFocusSummary: "recent-target-files: ./continuity_demo.py",
+            recentChangedFiles: [], recentTargetFiles: ["./continuity_demo.py"],
+            recentVerifiedFiles: [], recentFailedFiles: [], lastRepairNotes: [],
+            lastContinuationEvidence: [], lastTaskSatisfactionReasons: [], unresolvedItems: [],
           };
         },
         markRunStarted() {},

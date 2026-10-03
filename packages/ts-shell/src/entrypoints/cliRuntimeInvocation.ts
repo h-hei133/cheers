@@ -62,6 +62,8 @@ type ProviderMode = "synthetic" | "real";
 export interface CliRuntimeInvocationInput {
   readonly sessionId: string;
   readonly prompt: string;
+  /** Selected historical facts for this continuation, separate from user intent. */
+  readonly continuityContext?: string;
   /** Images that travelled with the prompt; see `PromptAttachments`. */
   readonly attachments?: PromptAttachments;
   readonly workspaceRoot: string;
@@ -542,6 +544,7 @@ async function startTurn(
     // nothing true to report.
     ...sessionPathOption(request.sessionId),
     prompt: request.prompt,
+    ...(request.continuityContext ? { continuityContext: request.continuityContext } : {}),
     ...(request.attachments ? { attachments: request.attachments } : {}),
     workspaceRoot: request.workspaceRoot,
     agentMode: request.agentMode,
