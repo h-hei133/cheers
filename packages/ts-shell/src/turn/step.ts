@@ -441,11 +441,12 @@ export function createStepFunction(request: StepRequest): StepFunction {
           // failure with no retry at all, which is worse than the doubling this
           // exists to prevent.
           const tried = retry.maxRetries > 0;
-          return stamp(
-            refusalClass
+          return stamp({
+            ...(refusalClass
               ? failedStep(refusal, "", refusalClass, tried)
-              : errorStep(refusal, tried),
-          );
+              : errorStep(refusal, tried)),
+            ...(requestedDelayMs !== undefined ? { requestedDelayMs } : {}),
+          });
         }
         // The server named a wait longer than this run will take, so it is not
         // worth asking again now. Reported rather than slept through: the number

@@ -3,6 +3,7 @@ import type { ProviderFailureClass } from "../../provider/registry/provider.js";
 import { flushMetrics, recordCount, recordTiming } from "../../observability/metrics.js";
 import type { AgentMessage, AgentStopReason } from "./state.js";
 import {
+  exceedsRetryCeiling,
   isRetryableFailure,
   resolveRetryPolicy,
   retryDelayMs,
@@ -45,6 +46,8 @@ export interface AssistantStep {
    * and one per layer.
    */
   readonly retriesExhausted?: boolean;
+  /** Server-requested wait, carried when this loop owns the remaining retries. */
+  readonly requestedDelayMs?: number;
   /**
    * The working out this step came with, and the provider's signature over it.
    *
@@ -173,9 +176,13 @@ async function retryStep(
     if (!isRetryableFailure(step.stopReason, step.errorMessage)) return step;
     attempt += 1;
     if (attempt > policy.maxRetries) return step;
+    if (exceedsRetryCeiling(policy, step.requestedDelayMs)) {
+      const seconds = Math.ceil(step.requestedDelayMs! / 1000);
+      return { ...step, errorMessage: `Provider asked for a ${seconds}s wait before retrying, which is longer than this run will wait. ${step.errorMessage ?? ""}`.trim() };
+    }
 
     recordCount("provider.retries", 1);
-    const delayMs = retryDelayMs(policy, attempt, undefined);
+    const delayMs = retryDelayMs(policy, attempt, step.requestedDelayMs);
     await emit({ type: "retry_scheduled", attempt, maxAttempts: policy.maxRetries, delayMs });
     if (!(await waitBeforeRetry(delayMs, signal))) return step;
     await emit({ type: "retry_attempt_start", attempt });

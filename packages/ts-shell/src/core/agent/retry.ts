@@ -8,9 +8,9 @@
  *
  * Two layers retry, and they are separate because they see different facts:
  *
- *   - The provider layer sees the HTTP status and the response headers, so it is
- *     the only one that can honour a server's own `Retry-After`. It retries one
- *     request and knows nothing about the conversation.
+ *   - The provider layer sees the HTTP status and the response headers, so it reads
+ *     the server's `Retry-After` and either retries or passes the requested delay
+ *     to the turn layer. It knows nothing about the conversation.
  *   - The turn layer sees the finished step's failure text, and runs between
  *     steps, so it can retry after the context has been reshaped — compaction
  *     being the case that matters.
@@ -156,7 +156,7 @@ export function retryDelayMs(
   attempt: number,
   requestedMs: number | undefined,
 ): number {
-  if (requestedMs !== undefined) return Math.min(requestedMs, policy.maxDelayMs);
+  if (requestedMs !== undefined) return policy.maxDelayMs === 0 ? requestedMs : Math.min(requestedMs, policy.maxDelayMs);
   const doubled = policy.baseDelayMs * 2 ** Math.max(0, attempt - 1);
   const finite = Number.isSafeInteger(doubled) ? doubled : Number.MAX_SAFE_INTEGER;
   // Up to a quarter off, which is enough to separate clients that started
@@ -195,10 +195,19 @@ export function waitBeforeRetry(delayMs: number, signal: AbortSignal | undefined
   const promise = new Promise<boolean>((settle) => {
     resolve = settle;
   });
-  const timer = setTimeout(() => {
-    signal?.removeEventListener("abort", onAbort);
-    resolve(true);
-  }, delayMs);
+  let remaining = delayMs;
+  let timer: ReturnType<typeof setTimeout>;
+  const schedule = (): void => {
+    // Node turns a delay above the signed 32-bit timer range into 1ms. An
+    // uncapped server wait must stay a wait, and remain cancellable between chunks.
+    const chunk = Math.min(remaining, 2 ** 31 - 1);
+    timer = setTimeout(() => {
+      remaining -= chunk;
+      if (remaining > 0) { schedule(); return; }
+      signal?.removeEventListener("abort", onAbort);
+      resolve(true);
+    }, chunk);
+  };
   // Not `once` alone: the listener has to come off when the timer wins too, or
   // every retry leaves one behind for the life of the process.
   const onAbort = (): void => {
@@ -206,6 +215,7 @@ export function waitBeforeRetry(delayMs: number, signal: AbortSignal | undefined
     resolve(false);
   };
   signal?.addEventListener("abort", onAbort, { once: true });
+  schedule();
   return promise;
 }
 

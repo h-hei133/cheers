@@ -1968,3 +1968,21 @@ W7-31提交9d4a4cbf的CI37143499101与Architecture Watch37143499107均成功。
 普通/全屏编译PTY使用CRLF多行HTTP事件，伪拼接文本未入终端/会话，原生compact、拒绝/取消/重试及终态来源均通过；产物.tmp/sse-pty-3e8fia14，无真实provider。
 本批完成W8-36并独立提交；EOF/终止帧、完整形状与超时用量矩阵仍属W7-27后续，不记为已完成。
 b805f63e的CI37144756195与Architecture Watch37144756229均成功。
+
+
+### W8-37 / PRV-15：跨层重试延迟（随W7-27，2026-10-04）
+
+HTTP step在provider重试预算为零时仍把Retry-After解析值带入AssistantStep.requestedDelayMs；
+默认负责重试的turn loop消费它，超等待上限时停止并保留原错误，已耗尽provider预算仍不触发第二层重试。
+该字段只在step内传递，显式构造的持久化AgentMessage不携带它。继续复用现有解析、可重试判定和等待owner。
+参考重试实现的服务器提示优先、超上限拒绝、0表示无服务器等待上限、可取消等待全部采用；保留本仓双层责任，不引入重复重试。
+
+审查发现maxDelayMs=0直接把长等待传入Node定时器会溢出成1ms；同owner现分段至多2^31-1ms，剩余等待可取消。
+新增跨step+loop测试覆盖seconds/ms优先/date、上限、无上限、长计时器、跨段取消与provider耗尽。
+5套135项、build:cli、静态阻断门及43项脚本通过；三owner撤销7失败2通过，精确恢复后135项通过。
+独立代码审查由REQUEST CHANGES转APPROVE，架构由WATCH转CLEAR；长等待与取消回归验证了修正。
+
+普通/全屏编译CLI经本地HTTP实测第一次重试分别5.009/5.010秒；取消、90秒超上限均只发一次请求。
+六场景均exit0，失败/取消持久化不冒充success；产物.tmp/retry-pty-_rpwngja，无真实provider。
+初次PTY在超上限场景等待了错误的query.completed；核对现行失败投影为query.failed/lifecycle.error，按真实失败事件与error输出复跑通过。
+本批完成W8-37并独立提交；W7-27其余字段、流生命周期、用量及超时矩阵继续。7509788d的CI37146300145与Architecture Watch37146300152均成功。
