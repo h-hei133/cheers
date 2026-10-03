@@ -41,7 +41,7 @@ export function projectRecentProjectContexts(input: {
       sessionCount: current.sessionCount + 1,
       recoverableCount: current.recoverableCount + (reentryRecoverable ? 1 : 0),
       lastSessionTitle:
-        shouldReplaceLast && summary.title ? summary.title : current.lastSessionTitle,
+        shouldReplaceLast ? summary.title : current.lastSessionTitle,
     });
   }
 

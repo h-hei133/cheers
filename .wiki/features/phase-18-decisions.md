@@ -577,7 +577,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W8-40 / TOL-10（随W7-30） | 失败原因及部分答复保留；工具阶段取消和空答复按失败结算；适配器向父模型传递error | 已完成，定向验证通过；旧result-contract脚本仍失败 |
 | W7-32 | read每次返回正文；startup结构/身份/有界读写、freshness与命令投影已修复；保留默认禁用 | 已完成，定向验证与隔离验收通过 |
 | W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
-| W7-26 / SES-08 | 回放、导出、根迁移、摘要来源、重复读取及compact检查点更新已分批修复；完整逐模块审计继续 | 执行中，第十四批导出长输出已验证，逐模块审计继续 |
+| W7-26 / SES-08 | 回放、导出、根迁移、摘要来源、重复读取及compact检查点更新已分批修复；完整逐模块审计继续 | 执行中，第十五批新会话保留与恢复选择已验证，逐模块审计继续 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1749,3 +1749,16 @@ seed/fragment回归证明历史格式消费及往返，不证明当前真实工�
 本批仅改变导出显示，不改变原消息、分支配对、脱敏或权限。无ResizeObserver的旧浏览器仍可在打开卡片时检测高度，但不保证已打开卡片自动响应尺寸变化；无外部资源依赖。第十三批d3dcca9c的CI 37111182072与Architecture Watch 37111182078均成功。W7-26其余continuation/recovery矩阵项继续，未宣布36模块完整审计完成。
 
 第十四批模板owner反转后2失败20通过，原文件逐字节恢复。静态阻断门通过，1426文件零循环；NormProof exit0且全部阻断义务满足，整体advisory verdict仍为partial，docs-source-drift仍有120项非阻断提示。
+
+
+### W7-26 第十五批：新会话检查点与恢复选择（2026-10-03）
+
+全新SessionManager的workingMemory未初始化，retentionPlanner直接返回，导致没有审批历史的会话即使完成12轮也不建立检查点。只对undefined初始化空对象，既有null、数组及其他异常值不被覆盖，分支来源准入顺序保持。参考压缩判据由上下文用量和设置驱动，不依赖审批状态；本次只解除意外初始化耦合，未引入token压缩器或第二套状态。
+
+项目聚合的最新会话ID/时间/标题整体更新，最新无标题时不借用旧标题；带项目根的恢复建议复用无根路径已有的interrupted/error资格判据。正常生产者会给标题默认值并拒绝completed恢复，因此两项helper修复不被描述为已证实可达的自动恢复绕过。丢弃pending来源的会话仍可手动恢复上下文，但autoResumeReady保持false。
+
+最终16套225项、build:cli及静态阻断门通过；1426文件零循环，7项可达性提示保持。独立代码APPROVE、架构CLEAR。三个产品owner反转后6失败24通过，逐文件字节恢复。普通/全屏编译PTY各跑12轮无审批对话，检查sourceTurnCount=12及compacted=true；第13轮明确写入仍等待批准，然后验证实际文件及终态持久化，两模式均exit0、各14次本地HTTP请求。产物为.tmp/retention-pty-bxz5qgip。
+
+首次全屏驱动等待未被增量重画的提示文字而超时，落盘状态已completed；改用对应回合持久化计数与pending清除判定结算后通过，未修改产品满足驱动。所有测试及PTY均使用仓内隔离HOME/USERPROFILE/TMPDIR和专用合成目录，无真实provider配置。NormProof exit0且阻断义务满足，整体advisory仍partial；旧result-contract和test:scripts本批未重跑。
+
+第十四批8b920aaf的CI 37112529831和Architecture Watch 37112529822均成功。W7-26继续：已确认较新同文件验证成功后旧失败仍残留的缺陷；历史unknown写入及其余字段优先级仍需闭合。

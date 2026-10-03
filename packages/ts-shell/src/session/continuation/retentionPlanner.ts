@@ -18,15 +18,15 @@ export interface CompactRetentionPlanInput {
 export function applyCompactRetentionPlan(
   input: CompactRetentionPlanInput,
 ): unknown {
-  if (
-    !input.workingMemory ||
+  if (input.workingMemory !== undefined && (
+    input.workingMemory === null ||
     typeof input.workingMemory !== "object" ||
     Array.isArray(input.workingMemory)
-  ) {
+  )) {
     return input.workingMemory;
   }
 
-  const root = { ...(input.workingMemory as Record<string, unknown>) };
+  const root = { ...((input.workingMemory ?? {}) as Record<string, unknown>) };
   const previousEventCount = normalizeCount(root.sourceEventCount);
   const previousTurnCount = normalizeCount(root.sourceTurnCount);
   const turnCompleted = input.event.type === "query.completed";

@@ -4,6 +4,19 @@ import type { OrchestrationResult } from "../../result/types.js";
 import { applyCompactRetentionPlan } from "./retentionPlanner.js";
 
 describe("applyCompactRetentionPlan", () => {
+  it("initializes counters for absent memory without requiring approval history", () => {
+    const result = applyCompactRetentionPlan({ workingMemory: undefined,
+      event: makeQueryCompletedEvent(), turnThreshold: 2, now: "2026-05-13T00:00:00.000Z", approvalAuditHistory: [] });
+    expect(result).toMatchObject({ sourceEventCount: 1, sourceTurnCount: 1 });
+    const compacted = applyCompactRetentionPlan({ workingMemory: result,
+      event: makeQueryCompletedEvent(), turnThreshold: 2, now: "2026-05-13T00:00:01.000Z", approvalAuditHistory: [] });
+    expect(compacted).toMatchObject({ sourceEventCount: 2, sourceTurnCount: 2, compacted: true });
+  });
+
+  it.each([null, [], "invalid", 42])("does not overwrite malformed existing memory %j", workingMemory => {
+    expect(applyCompactRetentionPlan({ workingMemory, event: makeQueryCompletedEvent(),
+      turnThreshold: 1, now: "2026-05-13T00:00:00.000Z", approvalAuditHistory: [] })).toBe(workingMemory);
+  });
   it("updates source counters without compacting before the turn threshold", () => {
     const result = applyCompactRetentionPlan({
       workingMemory: { sourceEventCount: 2, sourceTurnCount: 1 },

@@ -1,9 +1,9 @@
 # Phase 18 会话边界行为审计
 
 基准清单：`b271e40b` 下 continuation 16、recovery 11、replay 5、export 4，共36个生产模块。
-当前已提交基线：`d3dcca9c`；第十四批的本地证据见实施裁决。路径均相对 `packages/ts-shell/src/session/`。
+当前已提交基线：`8b920aaf`；第十五批的本地证据见实施裁决。路径均相对 `packages/ts-shell/src/session/`。
 “已核对”指实现与所列断言一致，不代表任意输入下无缺陷；缺口必须闭合后才可宣布W7-26完成。
-前十四批证据见 [实施裁决](phase-18-decisions.md)。第十一批实际运行29套384项，不含本表新发现的全部边界。
+前十五批证据见 [实施裁决](phase-18-decisions.md)。第十一批实际运行29套384项，不含本表新发现的全部边界。
 
 ## continuation（16）
 
@@ -13,9 +13,9 @@
 | `continuation/legacyContinuityMemory.ts` | 结构化字段优先、false保留、summary-only兼容；同名测试 | 第十三批三枚举formatter→summary-only→reader回归通过，结构化优先及旧格式保留 |
 | `continuation/legacyPermissionRebase.ts` | 锁内重读，不复活删除状态或覆盖较新根/终态；同名测试 | 所列竞争边界已核对 |
 | `continuation/projectRootRebaseProjection.ts` | 组件边界与原字符串一次迁移；同名测试、`continuation/rebase.test.ts` | 所列值迁移边界已核对，不承诺文件系统事务 |
-| `continuation/retentionPlanner.ts` | 阈值前计数、阈值后每次完成更新；同名测试、retention测试 | 更新已核对；undefined workingMemory直接返回，新session初始化契约待明确 |
+| `continuation/retentionPlanner.ts` | 阈值前计数、阈值后每次完成更新；同名测试、retention测试 | 第十五批仅初始化undefined，异常已有值不改；fresh SessionManager及双模式12轮CLI检查点通过 |
 | `continuation/sessionContinuitySnapshot.ts` | 先准入分支再选结果；未知顺序不作确定性投影；snapshot测试 | 第十一批限定场景通过；历史unknown写入仍待审计 |
-| `continuation/sessionMutationContinuity.ts` | planned/changed/verified分离、历史目标限量去重；`mutationContinuityState.test.ts` | 基本场景已核对；重复失败顺序和成功解除旧失败规则待验收 |
+| `continuation/sessionMutationContinuity.ts` | planned/changed/verified分离、历史目标限量去重；`mutationContinuityState.test.ts` | 已确认较新同文件changed+verified且验证通过仍残留旧失败，修复及重复/顺序边界待验收 |
 | `continuation/sessionProjectRootRebind.ts` | 最新锁内状态、写入次序、失败观察与补偿；同名测试 | 第三至五批限定场景通过，无跨文件崩溃事务保证 |
 | `continuation/sessionPromptContinuity.ts` | snapshot和模型context对同一续接词保持一致；同名测试、resumeContextBuilder测试 | 第十三批统一准入，runtime与双模式PTY验证next；无历史/新路径不自动附带 |
 | `continuation/sessionReadContinuity.ts` | 读取当前结果的完整fragment/staged字段；`sessionManagerBoundary.test.ts` | 第十三批八字段重排/反序回归通过，保留每字段最新有效值 |
@@ -34,13 +34,13 @@
 
 | 原模块 | 行为判据 / 具体证据 | 审计状态 |
 |---|---|---|
-| `recovery/projectContextSummary.ts` | 项目聚合计数、最新会话ID/时间/标题一致；`sessionRecoverySelection.test.ts` | 已读基本断言；最新会话无标题时是否残留旧标题待验收 |
+| `recovery/projectContextSummary.ts` | 项目聚合计数、最新会话ID/时间/标题一致；`sessionRecoverySelection.test.ts` | 第十五批两个输入顺序通过，最新无标题不借用旧标题；正常生产者目前默认ID |
 | `recovery/recoveryTrustBoundary.ts` | 拒绝原因与修复提示保持明确；`sessionProjection.test.ts` | 薄投影已核对，不赋予恢复权限 |
 | `recovery/resumeContextBuilder.ts` | 续接/反思筛选、边界摘要、原始请求判定；同名测试、runtime/invocation及PTY | 第十/十一/十三批交付路径通过；next沿用pathless准入 |
 | `recovery/sessionLifecycleReadModel.ts` | 最新运行内配对，不跨query复用同taskId；同名测试 | 运行范围及选中分支准入已核对；scope/branch回归覆盖同taskId隔离 |
 | `recovery/sessionLifecycleReconciliation.ts` | 已有resolution优先，未解决项按denied/failed补偿，不伪造成功；同名测试 | 调用者已改用同份scoped transcript；函数及shell恢复断言通过 |
 | `recovery/sessionRecoveryRuntime.ts` | snapshot、准入、补偿沿owner委派；SessionManager与reconciliation测试 | 薄边界与scoped snapshot/补偿调用已核对 |
-| `recovery/sessionRecoverySelection.ts` | interrupted/error才建议恢复，根偏好及拒绝理由明确；`sessionRecoverySelection.test.ts` | 已读断言；带根筛选与无根筛选的一致性仍需核对 |
+| `recovery/sessionRecoverySelection.ts` | interrupted/error才建议恢复，根偏好及拒绝理由明确；`sessionRecoverySelection.test.ts` | 第十五批带根/无根统一资格；拒绝active/completed/terminated，手动上下文恢复不等于自动执行 |
 | `recovery/sessionRecoverySnapshot.ts` | 选中分支决定消息、pending、terminal、task/harness来源，修复不能复活弃用提示 | 第十二批branch/scope回归通过；含新分支、回切、缺失提示、错误来源及旧harness拒绝 |
 | `recovery/sessionResume.ts` | 激活已准入对象；拒绝不依赖可选block；失败不改变调用对象；同名测试 | 第一批限定场景已核对，根迁移由外层owner负责 |
 | `recovery/sessionResumeEligibility.ts` | stopped/indeterminate明确拒绝；auto仅有有效pending及中断证据；同名测试 | 线性及分支snapshot准入已核对；废弃提示不auto，新提示仍可恢复 |

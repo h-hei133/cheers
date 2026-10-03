@@ -38,7 +38,7 @@ export function selectSuggestedRecoverySessionId(input: {
       preferredProjectRoot,
     }).find(
       (summary) =>
-        summary.recoverable &&
+        isRecoverableReentrySummary(summary) &&
         summary.projectRoot.trim() === preferredProjectRoot,
     )?.id ?? null
   );

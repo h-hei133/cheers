@@ -16,6 +16,20 @@ import type {
 } from "./SessionManager.js";
 
 describe("sessionRecoverySelection", () => {
+  it.each([false, true])("keeps the newest title with its session identity (reverse=%s)", reverse => {
+    const summaries = [summary({ id: "old", title: "old title", updatedAt: "2026-01-01T00:00:00.000Z" }),
+      summary({ id: "new", updatedAt: "2026-01-02T00:00:00.000Z" })];
+    const contexts = projectRecentProjectContexts({ summaries: reverse ? summaries.reverse() : summaries });
+    expect(contexts[0]).toMatchObject({ lastSessionId: "new", lastUpdatedAt: "2026-01-02T00:00:00.000Z", sessionCount: 2 });
+    expect(contexts[0]?.lastSessionTitle).toBeUndefined();
+  });
+
+  it.each(["active", "completed", "terminated"] as const)("rejects %s despite recoverable=true with and without a preferred root", status => {
+    const summaries = [summary({ id: "ineligible", status, recoverable: true })];
+    expect(selectSuggestedRecoverySessionId({ summaries })).toBeNull();
+    expect(selectSuggestedRecoverySessionId({ summaries, preferredProjectRoot: "/repo/default" })).toBeNull();
+  });
+
   it("projects recent project contexts without creating success state", () => {
     expect(projectRecentProjectContexts({
       summaries: [

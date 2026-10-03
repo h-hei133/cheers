@@ -30,6 +30,8 @@ describe("selected branch recovery", () => {
     const reopened = new SessionManager();
     expect(reopened.getRecoverySnapshot(session.id).pendingPrompt).toBeUndefined();
     expect(reopened.describeSessionReentry(session.id).autoResumeReady).toBe(false);
+    expect(reopened.getSuggestedRecoverySession()?.id).toBe(session.id);
+    expect(reopened.getSuggestedRecoverySession({ preferredProjectRoot: session.projectRoot })?.id).toBe(session.id);
     expect(JSON.stringify(reopened.getReplayPlan(session.id).replayMessages)).not.toContain("abandoned pending request");
   });
 

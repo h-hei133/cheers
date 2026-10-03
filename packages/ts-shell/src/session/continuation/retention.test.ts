@@ -146,6 +146,36 @@ describe("compact result replacement", () => {
     }
   });
 
+  it("starts checkpoint retention in a fresh session without approval memory", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "fresh-retention-"));
+    vi.stubEnv("HOME", home);
+    vi.stubEnv("USERPROFILE", home);
+    try {
+      const manager = new SessionManager();
+      const session = manager.createNew();
+      const statePath = path.join(manager.getSessionDirPath(session.id), "state.json");
+      expect(JSON.parse(fs.readFileSync(statePath, "utf8")).workingMemory).toBeUndefined();
+      for (let index = 0; index < 12; index++) {
+        manager.persistUserPromptBarrier(session.id, `request ${index}`);
+        manager.addTurn(session.id, { role: "assistant", content: `answer ${index}` });
+        const result = completion(index === 11);
+        manager.appendQueryEvent(session.id, { type: "query.completed", result });
+        if (index === 11) manager.saveError(session.id, "current failure", {
+          terminalClassification: result.terminalClassification, terminalReason: result.terminalReason,
+        });
+        else manager.saveCompleted(session.id);
+      }
+      const memory = JSON.parse(fs.readFileSync(statePath, "utf8")).workingMemory;
+      expect(memory).toMatchObject({ sourceTurnCount: 12, compacted: true,
+        continuity: { lastWriteEffect: "unknown" } });
+      expect(memory.approvalAuditHistory).toBeUndefined();
+      expect(new SessionManager().buildContinuitySnapshot(session.id).lastWriteEffect).toBe("unknown");
+    } finally {
+      vi.unstubAllEnvs();
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it.each([true, false])("reopens a retained coding checkpoint across a chat-only transcript (failed=%s)", (failed) => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "retention-chat-home-"));
     vi.stubEnv("HOME", home);
