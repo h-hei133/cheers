@@ -78,6 +78,25 @@ async function executeAutoResumePrompt(
 }
 
 describe("shell recovery helpers", () => {
+  it("does not use raw session pending text rejected by the recovery snapshot", async () => {
+    let builtSeed = false;
+    const result = await resumeShellSession({
+      requestedSessionId: "sess_resume",
+      runtimeContext: createRuntimeContext(),
+      renderer: { renderLine() {} } as never,
+      sessionManager: {
+        sessionExists: () => true,
+        tryResume: () => ({ ok: true, session: { id: "sess_resume", projectRoot: "D:/repo",
+          status: "interrupted", turns: [], pendingPrompt: "discarded request" } }),
+        getSessionResumeEligibility: () => ({ autoResumeReady: true }),
+        getRecoverySnapshot: () => ({ pendingLifecycle: { pendingApprovals: {}, pendingTools: {}, taskStates: {} } }),
+        buildRuntimeStateSeed: () => { builtSeed = true; throw new Error("unowned pending prompt reached runtime"); },
+      } as never,
+    });
+    expect(result).toEqual({ resumed: true, autoResume: null, disposition: "partially-resumable" });
+    expect(builtSeed).toBe(false);
+  });
+
   it("resolves session reference by unique id prefix", () => {
     const resolved = resolveSessionReference({
       reference: "sess_fix_auth",

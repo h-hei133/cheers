@@ -260,7 +260,7 @@ describe("stored session continuity messages", () => {
     const selectedAnswer = manager.getSession(session.id)!.turns[1]!.id!;
     expect(await manager.revertTo(session.id, selectedAnswer, summary ? async () => summary : undefined)).toBe(2);
     const reopened = new SessionManager();
-    expect(reopened.getRecoverySnapshot(session.id).lastAssistantMessage?.content).toBe("abandoned answer");
+    expect(reopened.getRecoverySnapshot(session.id).lastAssistantMessage?.content).toBe("selected answer");
     expect(reopened.buildContinuitySnapshot(session.id)).toMatchObject({
       lastUserIntent: "selected request", lastAssistantOutput: "selected answer",
     });

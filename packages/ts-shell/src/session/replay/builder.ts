@@ -43,6 +43,9 @@ export interface ReplayTranscriptRepairContext {
   readonly state: ReplayTranscriptState;
   readonly pendingPrompt?: string;
   readonly updatedAt: string;
+  readonly allowInterruptionRepair?: boolean;
+  readonly pendingRunStart?: number;
+  readonly pendingPromptEntryId?: string;
 }
 
 export interface ReplayPreparation {
@@ -90,7 +93,7 @@ export function prepareReplayTranscript(
   events: readonly TranscriptEvent[],
   context: ReplayTranscriptRepairContext,
 ): ReplayPreparation {
-  const runStart = latestTranscriptRunStart(events);
+  const runStart = Math.max(latestTranscriptRunStart(events), context.pendingRunStart ?? 0);
   const history = events.slice(0, runStart);
   const repaired = events.slice(runStart);
   const baseTimestamp = new Date(context.updatedAt).getTime();
@@ -98,11 +101,22 @@ export function prepareReplayTranscript(
   let insertedPromptMessage = false;
   let insertedQueryStarted = false;
   let insertedRunInterrupted = false;
+  let insertedRunStarted = false;
 
   const nextSyntheticTimestamp = (): string => {
     syntheticOffset += 1;
     return new Date(baseTimestamp + syntheticOffset).toISOString();
   };
+
+  // The durable prompt barrier proves a new run even if its start line was lost.
+  // Keep that boundary in the returned stream for every downstream read model.
+  if (context.pendingRunStart !== undefined && context.pendingPrompt &&
+    !repaired.some(event => startsTranscriptScope(event))) {
+    repaired.unshift({ type: "lifecycle", event: "run-started",
+      sourceEntryId: context.pendingPromptEntryId, detail: context.pendingPrompt,
+      timestamp: nextSyntheticTimestamp() });
+    insertedRunStarted = true;
+  }
 
   if (context.pendingPrompt) {
     const normalizedPrompt = context.pendingPrompt.trim();
@@ -171,7 +185,7 @@ export function prepareReplayTranscript(
   ).length;
 
   const withoutInterruptedTerminalQueries =
-    context.state.status === "interrupted"
+    context.allowInterruptionRepair !== false && context.state.status === "interrupted"
       ? repaired.filter(
           (event): boolean =>
             event.type !== "query-event" ||
@@ -185,7 +199,7 @@ export function prepareReplayTranscript(
       event.type === "lifecycle" && event.event === "run-interrupted",
   );
 
-  if (context.state.status === "interrupted" && !hasRunInterrupted) {
+  if (context.allowInterruptionRepair !== false && context.state.status === "interrupted" && !hasRunInterrupted) {
     withoutInterruptedTerminalQueries.push({
       type: "lifecycle",
       event: "run-interrupted",
@@ -201,8 +215,9 @@ export function prepareReplayTranscript(
       insertedPromptMessage,
       insertedQueryStarted,
       strippedInterruptedTerminalEvents:
-        context.state.status === "interrupted" ? interruptedTerminalQueries : 0,
+        context.allowInterruptionRepair !== false && context.state.status === "interrupted" ? interruptedTerminalQueries : 0,
       insertedRunInterrupted,
+      ...(insertedRunStarted ? { insertedRunStarted: true } : {}),
       ignoredDuplicateTurnStarts: 0,
       ignoredUnpairedTurnCompletions: 0,
       ignoredRoleMismatchedTurnCompletions: 0,

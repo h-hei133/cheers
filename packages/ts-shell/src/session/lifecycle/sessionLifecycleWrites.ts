@@ -224,7 +224,7 @@ export abstract class SessionLifecycleWrites {
     const snapshot = this.host.readRecoverySnapshot(sessionId);
     return reconcilePendingLifecycleForSession({
       snapshot,
-      transcriptEvents: this.host.readTranscriptEvents(sessionId),
+      transcriptEvents: snapshot.transcriptEvents,
       applyQueryEventToState: (event) =>
         this.applyQueryEventToState(sessionId, event),
       appendQueryEvent: (event) => this.appendQueryEvent(sessionId, event),

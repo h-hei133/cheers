@@ -577,7 +577,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W8-40 / TOL-10（随W7-30） | 失败原因及部分答复保留；工具阶段取消和空答复按失败结算；适配器向父模型传递error | 已完成，定向验证通过；旧result-contract脚本仍失败 |
 | W7-32 | read每次返回正文；startup结构/身份/有界读写、freshness与命令投影已修复；保留默认禁用 | 已完成，定向验证与隔离验收通过 |
 | W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
-| W7-26 / SES-08 | 回放、导出、根迁移、摘要来源、重复读取及compact检查点更新已分批修复；完整逐模块审计继续 | 执行中，第十一批续接结果分支归属已验证，逐模块审计继续 |
+| W7-26 / SES-08 | 回放、导出、根迁移、摘要来源、重复读取及compact检查点更新已分批修复；完整逐模块审计继续 | 执行中，第十二批操作性恢复分支归属已验证，逐模块审计继续 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1698,3 +1698,26 @@ compact结果组连同eventId/entryId保存或替换，chat、审批及计数更
 `e17f899f`的Architecture Watch 37107169853通过；CI 37107169849为526套通过、1套失败，4807项通过、1失败、1跳过。
 唯一失败为usage持久化测试的强制类型转换适配器未实现transcriptPath；生产SessionStoreAccess已有此方法。
 给测试补入既有layout.transcriptPath，保留全部用量断言；隔离运行该测试1套1项通过。归类为确定性的测试适配器缺口，不是提供方、环境或第十二批变更引入的失败。
+
+
+### W7-26 第十二批：操作性恢复的分支归属（2026-10-03）
+
+回退会话后，原全局pendingPrompt仍可安排废弃请求自动执行；新增落盘回归先失败。恢复owner现在先按选中祖先路径准入消息、查询、生命周期及状态，再进行缺失记录修复。参考会话投影同样以选中祖先链为上下文边界；本仓独立的pending、query及harness状态没有直接对应实现，来源校验和修复协议为自研。
+
+提示屏障把实际用户消息ID与pendingPrompt一起持久化；读取使用同一份state观察，要求来源为最新选中用户消息，已有日志必须与角色及文本一致。缺失原始消息可由有效durable来源修复；旧无来源入口清空旧stamp，终态保存清空提示及stamp。分支切走再切回仍可恢复原提示，新分支的新提示也可恢复。
+
+全局interrupted状态不再删除选中分支终态或凭空补入中断。pending来源不能认证旧harness或全局终态；补偿查询使用相同scoped transcript，废弃分支上同taskId结算不能关闭当前工具。shell不再从raw runtime session补回被拒绝的提示；continuity复用已准入且修复的提示。
+
+独立复审发现并修正两个缺失记录边界：索引须在移除空assistant记录后计算；缺失起点时，durable提示屏障支持的合成run-started须留在返回流中，保证生命周期与runtime seed也看见新回合边界。该修复仅在内存中生成，并通过insertedRunStarted报告，不伪造durable执行或写入结论。
+
+验证：21套237项，加continue/reentry/selection/codec/retention消费者5套44项，累计26套281项通过；build:cli通过。第一轮expanded测试的missing prompt顺序失败属于产品缺口，已修复；shell新增断言漏写返回中的autoResume/disposition属于新测试预期不完整，补齐精确断言。保留线性不完整日志中的未索引消息，但不让它们认证旧执行事实。
+
+静态阻断门通过，1426个文件零依赖循环；7项可达性提示保持，docs-source-drift有120项非阻断提示。NormProof exit0且所有blocking obligations满足，整体advisory verdict仍为partial。
+
+独立代码APPROVE、架构CLEAR。13个既有产品owner反转后26失败27通过，逐文件字节恢复确认。反转脚本首次路径计数和Python变量错误均在源码写入前终止，修正脚本后完成正式反转。
+
+编译CLI普通/全屏PTY各覆盖废弃提示和新选中提示，共4场景，均exit0、各2次本地HTTP脚本模型请求。废弃提示的/continue不触发模型，随后显式指令正常运行；选中提示的/continue正常执行。均验证审批前无文件、审批后实际写入、终态落盘及最终assistant消息来源；模型请求排除废弃提示，无合成continuity用户消息。首次验收未关闭命令输出pager而超时，修正终端驱动后通过，产品行为未因夹具改动。
+
+所有本批测试/验收使用仓内隔离HOME/USERPROFILE/TMPDIR及专用合成目录，无真实provider配置。本批不重跑已有失败的result-contract或test:scripts，不将旧失败改记通过。上一独立CI适配器修复7c34d0fd的CI 37108774969与Architecture Watch 37108774974均成功。
+
+保证不涵盖跨文件事务、并发writer fencing或缺失中间执行事件的精确复原。无来源分支事件保守排除，必要时重新执行而非继承无法证明的工具/审批状态。W7-26继续，逐模块清单见phase-18-session-audit.md；next续接、seed文本往返、历史读取字段顺序、历史unknown写入和导出长输出等仍未闭合。

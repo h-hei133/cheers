@@ -46,6 +46,7 @@ export function persistSessionUserPromptBarrier(input: {
   input.appendTranscriptEvent(
     createLifecycleTranscriptEvent({
       event: "run-started",
+      sourceEntryId: nextMessage.id,
       timestamp: input.timestamp,
       detail: input.prompt,
     }),
@@ -55,6 +56,7 @@ export function persistSessionUserPromptBarrier(input: {
   input.writeSessionMetadata(input.session);
   input.writeSessionState(input.session, {
     runPhase: "prompt-persisted",
+    pendingPromptEntryId: nextMessage.id,
     interruptedKind: undefined,
     terminalReason: undefined,
     terminalClassification: undefined,

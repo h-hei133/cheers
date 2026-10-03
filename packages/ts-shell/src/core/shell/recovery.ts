@@ -294,9 +294,7 @@ export async function resumeShellSession(input: {
   const recoverySnapshot = input.sessionManager.getRecoverySnapshot(
     input.runtimeContext.session.id,
   );
-  const pendingPrompt =
-    input.runtimeContext.session.pendingPrompt ??
-    recoverySnapshot.pendingPrompt;
+  const pendingPrompt = recoverySnapshot.pendingPrompt;
 
   if (
     recoverySnapshot.interruptedKind === "turn" ||

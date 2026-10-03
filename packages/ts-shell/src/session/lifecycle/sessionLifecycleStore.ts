@@ -65,6 +65,7 @@ export function markSessionRunStarted(
   );
   callbacks.writeSessionMetadata(session);
   callbacks.writeSessionState(session, {
+    pendingPromptEntryId: undefined,
     terminalReason: undefined,
     terminalClassification: undefined,
     lastContinuationReason: undefined,

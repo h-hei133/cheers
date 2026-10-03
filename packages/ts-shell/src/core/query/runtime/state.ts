@@ -49,6 +49,7 @@ export type QueryRuntimeRecoveryBoundary =
   | 'mid-turn-reentry'
 
 export interface QueryRuntimeRepairSummary {
+  readonly insertedRunStarted?: boolean
   readonly insertedPromptMessage: boolean
   readonly insertedQueryStarted: boolean
   readonly strippedInterruptedTerminalEvents: number

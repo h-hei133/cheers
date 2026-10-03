@@ -23,6 +23,7 @@ import {
 import { deriveLifecycleIndexFromTranscript } from "./sessionLifecycleReadModel.js";
 export type { RecoverySnapshot } from "./types.js";
 import type { RecoverySnapshot } from "./types.js";
+import { recoveryPendingRunStart, recoveryTaskMemory, selectedRecoveryTerminal, selectRecoveryScope } from "./scope.js";
 
 export function buildSessionRecoverySnapshot(input: {
   readonly sessionId: string;
@@ -30,12 +31,17 @@ export function buildSessionRecoverySnapshot(input: {
   readonly state: SessionStateSnapshot;
   readonly transcriptEvents: readonly TranscriptEvent[];
 }): RecoverySnapshot {
+  const scope = selectRecoveryScope(input);
+  const normalizedEvents = normalizeReplayTranscriptEvents(scope.transcriptEvents);
   const replayPreparation = prepareReplayTranscript(
-    normalizeReplayTranscriptEvents(input.transcriptEvents),
+    normalizedEvents,
     {
       sessionId: input.sessionId,
-      state: input.state,
-      pendingPrompt: input.session.pendingPrompt,
+      state: scope.state,
+      pendingPrompt: scope.pendingPrompt,
+      allowInterruptionRepair: scope.allowInterruptionRepair,
+      pendingRunStart: recoveryPendingRunStart(scope.state, normalizedEvents),
+      pendingPromptEntryId: scope.state.pendingPromptEntryId,
       updatedAt: input.session.updatedAt,
     },
   );
@@ -56,23 +62,27 @@ export function buildSessionRecoverySnapshot(input: {
   const lastAssistantMessage = [...messageEvents]
     .reverse()
     .find((event) => event.role === "assistant");
-  const harnessState = decodeSnapshotHarnessState(input.state);
+  const memory = recoveryTaskMemory(scope.state.workingMemory, scope.useLegacyState);
+  const harnessState = decodeSnapshotHarnessState({ ...scope.state, workingMemory: memory,
+    harness: scope.useLegacyState ? input.state.harness : undefined });
+  const terminal = scope.useLegacyState ? input.state : selectedRecoveryTerminal(transcriptEvents);
 
   return {
-    pendingPrompt: input.session.pendingPrompt,
-    runPhase: input.state.runPhase,
-    interruptedKind: input.state.interruptedKind,
-    durableStatus: input.state.durableStatus,
-    terminalReason: input.state.terminalReason,
-    terminalClassification: input.state.terminalClassification,
-    lastContinuationReason: input.state.lastContinuationReason,
+    pendingPrompt: scope.pendingPrompt,
+    runPhase: scope.state.runPhase,
+    interruptedKind: scope.state.interruptedKind,
+    durableStatus: terminal.durableStatus,
+    terminalReason: terminal.terminalReason,
+    terminalClassification: terminal.terminalClassification,
+    lastContinuationReason: scope.useLegacyState ? input.state.lastContinuationReason : undefined,
+    lastError: terminal.lastError,
     pendingLifecycle: readModelLifecycle,
     repairSummary: replayPreparation.repairSummary,
     ...(harnessState.status === "accepted"
       ? { harness: harnessState.harness }
       : {}),
-    ...(decodeCompactTaskState(input.state.workingMemory)
-      ? { taskState: decodeCompactTaskState(input.state.workingMemory) }
+    ...(decodeCompactTaskState(memory)
+      ? { taskState: decodeCompactTaskState(memory) }
       : {}),
     lastUserMessage,
     lastAssistantMessage,

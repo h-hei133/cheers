@@ -63,7 +63,7 @@ export function projectSessionReentrySummary(input: {
     updatedAt: session.updatedAt,
     pendingPrompt: recoverySnapshot.pendingPrompt,
     runPhase: recoverySnapshot.runPhase,
-    lastError: session.lastError,
+    lastError: recoverySnapshot.lastError,
     durableStatus: recoverySnapshot.durableStatus,
     terminalReason: recoverySnapshot.terminalReason,
     terminalClassification: recoverySnapshot.terminalClassification,

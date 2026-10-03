@@ -98,6 +98,7 @@ export type TranscriptEvent =
   | {
       type: "lifecycle";
       id?: string;
+      sourceEntryId?: string;
       event: TranscriptLifecycleEventName;
       timestamp: string;
       detail?: string;
@@ -214,10 +215,12 @@ export function createLifecycleTranscriptEvent(input: {
   readonly event: TranscriptLifecycleEventName;
   readonly timestamp: string;
   readonly detail?: string;
+  readonly sourceEntryId?: string;
 }): Extract<TranscriptEvent, { type: "lifecycle" }> {
   return {
     type: "lifecycle",
     id: createTranscriptEntryId("evt"),
+    ...(input.sourceEntryId !== undefined ? { sourceEntryId: input.sourceEntryId } : {}),
     event: input.event,
     timestamp: input.timestamp,
     ...(input.detail !== undefined ? { detail: input.detail } : {}),

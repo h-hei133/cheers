@@ -22,6 +22,7 @@ export interface SessionStateSnapshot {
   status: Session["status"];
   projectRoot?: string;
   pendingPrompt?: string;
+  pendingPromptEntryId?: string;
   lastError?: string;
   workingMemory?: unknown;
   durableStatus?: "success" | "stopped" | "error";
@@ -45,6 +46,7 @@ export type SessionStateSnapshotOverrides = Partial<
   Pick<
     SessionStateSnapshot,
     | "runPhase"
+    | "pendingPromptEntryId"
     | "interruptedKind"
     | "terminalReason"
     | "terminalClassification"
@@ -65,6 +67,9 @@ export function buildSessionStateSnapshot(
     status: session.status,
     projectRoot: session.projectRoot,
     pendingPrompt: session.pendingPrompt,
+    pendingPromptEntryId: session.pendingPrompt === undefined ? undefined
+      : overrides && Object.prototype.hasOwnProperty.call(overrides, "pendingPromptEntryId")
+        ? overrides.pendingPromptEntryId : current?.pendingPromptEntryId,
     lastError: session.lastError,
     runPhase:
       overrides && Object.prototype.hasOwnProperty.call(overrides, "runPhase")

@@ -17,11 +17,13 @@ export function continuityBranchScope(thread: SessionThreadSnapshot | undefined,
   const entries = new Set(selected?.path.map(entry => entry.id));
   const admitsEntry = (entryId: unknown): boolean => typeof entryId === "string" && entryId.length > 0 &&
     selected?.resolved === true && entries.has(entryId);
-  const allowLegacy = !events.some(event => event.type === "branch_summary") &&
+  const allowUnindexedMessages = !events.some(event => event.type === "branch_summary") &&
     (!thread || (selected?.resolved === true && thread.branches.length === 0 &&
-      thread.entries.every(entry => entries.has(entry.id)) && events.every(event =>
-        event.type !== "message" || isSessionContextMessage(event) || (event.id !== undefined && entries.has(event.id)))));
+      thread.entries.every(entry => entries.has(entry.id))));
+  const allowLegacy = allowUnindexedMessages && (!thread || events.every(event =>
+    event.type !== "message" || isSessionContextMessage(event) || (event.id !== undefined && entries.has(event.id))));
   return {
+    allowUnindexedMessages,
     allowLegacy,
     allowGlobalFallback: allowLegacy && events.every(event => event.type !== "query-event" ||
       event.sourceEntryId === undefined || admitsEntry(event.sourceEntryId)),

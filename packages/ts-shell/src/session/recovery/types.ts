@@ -12,6 +12,7 @@ import type { TranscriptEvent } from "../sessionEventCodec.js";
 
 export interface RecoverySnapshot {
   readonly pendingPrompt?: string;
+  readonly lastError?: string;
   readonly runPhase?: "idle" | "prompt-persisted" | "turn-active";
   readonly interruptedKind?: "prompt" | "turn";
   readonly durableStatus?: "success" | "stopped" | "error";

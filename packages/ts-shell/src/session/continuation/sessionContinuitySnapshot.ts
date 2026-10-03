@@ -142,9 +142,9 @@ export function buildSessionContinuitySnapshot(input: {
     coding: useStoredResult ? storedResult.terminal : lastCodingCompletion?.event.result,
   });
   // Loaded turns already reflect the selected branch and compaction. Recovery
-  // may add a missing pending prompt, but its raw history is not a display path.
+  // admits a pending prompt against the selected branch before repairing it.
   const selectedTurns = session.turns.filter((turn) => !isSessionContextMessage(turn));
-  const repairedPrompt = allowGlobalFallback && recoverySnapshot.repairSummary.insertedPromptMessage
+  const repairedPrompt = recoverySnapshot.repairSummary.insertedPromptMessage
     ? recoverySnapshot.pendingPrompt
     : undefined;
   const lastUserIntent = repairedPrompt?.trim()

@@ -1,0 +1,66 @@
+# Phase 18 会话边界行为审计
+
+基准清单：`b271e40b` 下 continuation 16、recovery 11、replay 5、export 4，共36个生产模块。
+当前已提交基线：`7c34d0fd`；第十二批恢复修复的本地证据见实施裁决。路径均相对 `packages/ts-shell/src/session/`。
+“已核对”指实现与所列断言一致，不代表任意输入下无缺陷；缺口必须闭合后才可宣布W7-26完成。
+前十二批证据见 [实施裁决](phase-18-decisions.md)。第十一批实际运行29套384项，不含本表新发现的全部边界。
+
+## continuation（16）
+
+| 原模块 | 行为判据 / 具体证据 | 审计状态 |
+|---|---|---|
+| `continuation/compactSummary.ts` | 当前结果整组替换，chat不改旧来源；`continuation/retention.test.ts`、`continuation/snapshot.test.ts` | 单结果已核对；unknown A之后成功B，A的历史未解决事实仍缺持续性保证 |
+| `continuation/legacyContinuityMemory.ts` | 结构化字段优先、false保留、summary-only兼容；同名测试 | 缺陷：formatter生成的last-seed-influence文本读不回 |
+| `continuation/legacyPermissionRebase.ts` | 锁内重读，不复活删除状态或覆盖较新根/终态；同名测试 | 所列竞争边界已核对 |
+| `continuation/projectRootRebaseProjection.ts` | 组件边界与原字符串一次迁移；同名测试、`continuation/rebase.test.ts` | 所列值迁移边界已核对，不承诺文件系统事务 |
+| `continuation/retentionPlanner.ts` | 阈值前计数、阈值后每次完成更新；同名测试、retention测试 | 更新已核对；undefined workingMemory直接返回，新session初始化契约待明确 |
+| `continuation/sessionContinuitySnapshot.ts` | 先准入分支再选结果；未知顺序不作确定性投影；snapshot测试 | 第十一批限定场景通过；历史unknown写入仍待审计 |
+| `continuation/sessionMutationContinuity.ts` | planned/changed/verified分离、历史目标限量去重；`mutationContinuityState.test.ts` | 基本场景已核对；重复失败顺序和成功解除旧失败规则待验收 |
+| `continuation/sessionProjectRootRebind.ts` | 最新锁内状态、写入次序、失败观察与补偿；同名测试 | 第三至五批限定场景通过，无跨文件崩溃事务保证 |
+| `continuation/sessionPromptContinuity.ts` | snapshot和模型context对同一续接词保持一致；同名测试、resumeContextBuilder测试 | 缺陷：next接受snapshot但不交付model context |
+| `continuation/sessionReadContinuity.ts` | 读取当前结果的完整fragment/staged字段；`sessionManagerBoundary.test.ts` | 缺陷：解析提前break，合法字段重排丢fingerprint/source-window/ranges |
+| `continuation/sessionRootRebase.ts` | 根解析和memory迁移使用同一目标；同名测试与rebind集成 | 薄组合已核对；空目的地由调用边界拒绝 |
+| `continuation/sessionSeedInfluence.ts` | 同次completion的notes/evidence/continuation/repair诊断来源；同名测试 | 当前首个有效标记优先，四来源冲突优先级尚缺验收 |
+| `continuation/sessionToolContinuity.ts` | 最后provenance整组投影，不补前一个缺失字段；SessionManager测试 | 缺两个provenance、后者无failureBoundary的直接验收 |
+| `continuation/sessionUnresolvedItems.ts` | 仅汇总已准入错误/终态/验证失败；snapshot测试 | 分支间接覆盖通过；同次error/stopReason冲突优先级待验收 |
+| `continuation/stoppedSessionContinuity.ts` | unknown/unverified写入要求检查，拒绝与执行失败分开；同名测试 | 单结果边界已核对；结构化false/none与旧标记冲突待验收 |
+| `continuation/summaryFormatter.ts` | 旧结果文本整组替换，保留独立文本，结构化值覆盖；compactSummary/retention测试 | 合并已核对；seed文本与legacy reader往返缺陷同上 |
+
+上述三个具体缺陷由独立隔离纯函数探针复现（命令exit0仅表示诊断执行成功）。
+当前真实CLI的turn/projection完成结果没有codingResult；未找到生产端生成历史read-fragment、seedInfluence、toolExecutions字段的写入点。
+相关手工结果与长会话fixture证明兼容消费/持久化，不证明真实工具会生成这些字段。
+
+## recovery（11）与 replay（5）
+
+| 原模块 | 行为判据 / 具体证据 | 审计状态 |
+|---|---|---|
+| `recovery/projectContextSummary.ts` | 项目聚合计数、最新会话ID/时间/标题一致；`sessionRecoverySelection.test.ts` | 已读基本断言；最新会话无标题时是否残留旧标题待验收 |
+| `recovery/recoveryTrustBoundary.ts` | 拒绝原因与修复提示保持明确；`sessionProjection.test.ts` | 薄投影已核对，不赋予恢复权限 |
+| `recovery/resumeContextBuilder.ts` | 续接/反思筛选、边界摘要、原始请求判定；同名测试、runtime/invocation及PTY | 第十/十一批交付路径通过；next不一致待修复 |
+| `recovery/sessionLifecycleReadModel.ts` | 最新运行内配对，不跨query复用同taskId；同名测试 | 运行范围及选中分支准入已核对；scope/branch回归覆盖同taskId隔离 |
+| `recovery/sessionLifecycleReconciliation.ts` | 已有resolution优先，未解决项按denied/failed补偿，不伪造成功；同名测试 | 调用者已改用同份scoped transcript；函数及shell恢复断言通过 |
+| `recovery/sessionRecoveryRuntime.ts` | snapshot、准入、补偿沿owner委派；SessionManager与reconciliation测试 | 薄边界与scoped snapshot/补偿调用已核对 |
+| `recovery/sessionRecoverySelection.ts` | interrupted/error才建议恢复，根偏好及拒绝理由明确；`sessionRecoverySelection.test.ts` | 已读断言；带根筛选与无根筛选的一致性仍需核对 |
+| `recovery/sessionRecoverySnapshot.ts` | 选中分支决定消息、pending、terminal、task/harness来源，修复不能复活弃用提示 | 第十二批branch/scope回归通过；含新分支、回切、缺失提示、错误来源及旧harness拒绝 |
+| `recovery/sessionResume.ts` | 激活已准入对象；拒绝不依赖可选block；失败不改变调用对象；同名测试 | 第一批限定场景已核对，根迁移由外层owner负责 |
+| `recovery/sessionResumeEligibility.ts` | stopped/indeterminate明确拒绝；auto仅有有效pending及中断证据；同名测试 | 线性及分支snapshot准入已核对；废弃提示不auto，新提示仍可恢复 |
+| `recovery/types.ts` | RecoverySnapshot只声明恢复事实与边界 | 构建及恢复消费者通过；lastError取scoped终态 |
+| `replay/builder.ts` | 最新query内repair/pair，漂移降级、保留消息结构、拒绝stale队列；同名测试 | 第十二批按选中路径输入，缺失起点向所有读模型保留修复边界；builder/seed回归通过 |
+| `replay/sessionReplayFacade.ts` | 单一builder、normalize/repair幂等、sentinel语义保持；同名测试 | 薄委派已核对，第十二批通过scoped输入和修复起点消除已知来源缺口 |
+| `replay/sessionReplayRuntime.ts` | replay plan和seed参数不变地委派 | 源码与SessionManager/replay测试已核对 |
+| `replay/sessionRuntimeSeed.ts` | seed只由既有builder生成，无第二恢复实现 | 薄委派已核对，第十二批通过scoped输入和修复起点消除已知来源缺口 |
+| `replay/types.ts` | repair context与plan消息/提示/sentinel表达一致 | 构建及facade测试通过 |
+
+第十二批闭合已复现的操作性恢复来源缺口：26套281项、双线审查及4场景PTY通过。缺失中间执行日志保守降级，不承诺精确重建。selection/project聚合、continuation及export仍按本表继续逐项核验，不能以此宣布36模块完整审计完成。
+
+## export（4）
+
+| 原模块 | 行为判据 / 具体证据 | 审计状态 |
+|---|---|---|
+| `export/collect.ts` | 单次只读收集、消息/树身份连接、输入失败分类、脱敏保留关联；同名测试及exportCommandRuntime测试 | 已核对；缺重复message ID的直接checked-in回归 |
+| `export/html.ts` | 自包含文档、UTF-8和头部转义、flat edges无深递归；graph/collect/command测试 | gathered-payload契约已核对；base64并非脱敏 |
+| `export/htmlRender.ts` | 支持的Markdown子集转义并拒绝可执行URL；同名测试 | 已核对；不承诺完整CommonMark嵌套等价 |
+| `export/template.ts` | 选中路径、call occurrence配对、缺口隔离、filter/hash与长输出交互；同名测试及前次浏览器验收 | 缺陷：detached DOM时测高度始终0；max-height也在测量后才加，Show more不初始化 |
+
+导出长输出必须追加真实浏览器验收：连接并打开长结果卡，验证折叠高度与Show more，再展开并验证Show less。
+现有VM模拟高度固定为0；此前4000消息浏览器验收使用短输出，不能覆盖该交互。

@@ -37,6 +37,8 @@ describe("sessionPromptBarrier", () => {
       "lifecycle",
       "message",
     ]);
+    expect(transcript[0]).toMatchObject({ sourceEntryId: session.turns[0]!.id });
+    expect(states[0]?.pendingPromptEntryId).toBe(session.turns[0]!.id);
     expect(states[0]).toEqual(
       expect.objectContaining({
         runPhase: "prompt-persisted",
