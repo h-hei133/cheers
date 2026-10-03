@@ -8,28 +8,55 @@ class Element {
   className = "";
   id = "";
   style: Record<string, string> = {};
-  classList = { add() {}, remove() {}, toggle() { return false; } };
-  scrollHeight = 0;
-  clientHeight = 0;
+  parentNode?: Element;
+  open = false;
+  connected = false;
+  layoutHeight?: number;
+  classList = {
+    add: (name: string) => { if (!this.className.split(" ").includes(name)) this.className += " " + name; },
+    remove: (name: string) => { this.className = this.className.split(" ").filter(value => value !== name).join(" "); },
+    toggle: (name: string) => {
+      const present = this.className.split(" ").includes(name);
+      if (present) this.classList.remove(name); else this.classList.add(name);
+      return !present;
+    },
+  };
+  get isConnected(): boolean { return this.connected || this.parentNode?.isConnected === true; }
+  get scrollHeight(): number { return this.isConnected && this.parentNode?.open ? this.layoutHeight ?? this.textContent.split("\n").length * 20 : 0; }
+  get clientHeight(): number { return this.className.split(" ").includes("collapsed") ? Math.min(144, this.scrollHeight) : this.scrollHeight; }
+  get nextSibling(): Element | undefined { return this.parentNode?.children[this.parentNode.children.indexOf(this) + 1]; }
   innerHTML = "";
   private text = "";
   set textContent(value: string) { this.text = value; this.children = []; }
   get textContent(): string { return this.text + this.children.map(child => child.textContent).join(""); }
-  appendChild(child: Element) { this.children.push(child); }
+  appendChild(child: Element) { this.children.push(child); child.parentNode = this; }
+  insertBefore(child: Element, next?: Element) {
+    const index = next ? this.children.indexOf(next) : this.children.length;
+    this.children.splice(index, 0, child);
+    child.parentNode = this;
+  }
   addEventListener(name: string, action: () => void) { this.listeners.set(name, action); }
   setAttribute() {}
   scrollIntoView() {}
 }
 
 function runPage(payload: unknown) {
+  const observed = new Set<Element>();
+  let resized: ((entries: { target: Element }[]) => void) | undefined;
   const elements = new Map(["DATA", "tree", "conversation", "filter", "users-only", "toggle-sidebar"].map(id => [id, new Element()]));
+  elements.get("conversation")!.connected = true;
   elements.get("DATA")!.textContent = Buffer.from(JSON.stringify(payload)).toString("base64");
   vm.runInNewContext(PAGE_SCRIPT, {
     document: { getElementById: (id: string) => elements.get(id), createElement: () => new Element(), body: new Element() },
     TextDecoder, Uint8Array, atob: (value: string) => Buffer.from(value, "base64").toString("binary"),
     location: { hash: "" }, history: { replaceState() {} }, setTimeout() {},
+    ResizeObserver: class {
+      constructor(callback: typeof resized) { resized = callback; }
+      observe(target: Element) { observed.add(target); }
+      disconnect() { observed.clear(); }
+    },
   });
-  return elements;
+  return Object.assign(elements, { resize: () => resized?.([...observed].map(target => ({ target }))) });
 }
 
 const call = (id: string) => ({ id, name: "read", arguments: "{}" });
@@ -37,6 +64,59 @@ const entry = (id: string, role = "assistant", extras: Record<string, unknown> =
 const node = (id: string, parentId?: string) => ({ id, parentId, depth: 0, role: "assistant", kind: "turn-message", preview: id });
 
 describe("exported page branch traversal", () => {
+  it("adds a control when an open short result overflows after layout changes", () => {
+    const elements = runPage({
+      entries: [entry("a", "assistant", { toolCalls: [call("call_0")] }),
+        entry("b", "tool", { toolCallId: "call_0", content: "wrapped text" })],
+      tree: [node("a"), node("b", "a")], leafId: "b",
+    });
+    const details = elements.get("conversation")!.children[0]!.children.find(child => child.className === "call")!;
+    details.open = true;
+    details.listeners.get("toggle")!();
+    expect(details.children.filter(child => child.className === "expand")).toHaveLength(0);
+    const output = details.children.find(child => child.className.split(" ").includes("result"))!;
+    output.layoutHeight = 600;
+    elements.resize();
+    expect(details.children.filter(child => child.className === "expand")).toHaveLength(1);
+    expect(output.clientHeight).toBeLessThan(output.scrollHeight);
+    elements.resize();
+    expect(details.children.filter(child => child.className === "expand")).toHaveLength(1);
+  });
+
+  it.each([1, 30])("measures a mounted open result and preserves expansion across reopen (%s lines)", lines => {
+    const elements = runPage({
+      entries: [entry("a", "assistant", { toolCalls: [call("call_0")] }),
+        entry("b", "tool", { toolCallId: "call_0", content: Array.from({ length: lines }, () => "result line").join("\n") })],
+      tree: [node("a"), node("b", "a")], leafId: "b",
+    });
+    const details = elements.get("conversation")!.children[0]!.children.find(child => child.className === "call")!;
+    expect(details.children.filter(child => child.className === "expand")).toHaveLength(0);
+    details.open = true;
+    details.listeners.get("toggle")?.();
+    const output = details.children.find(child => child.className.split(" ").includes("result"))!;
+    const buttons = details.children.filter(child => child.className === "expand");
+    if (lines === 1) {
+      expect(buttons).toHaveLength(0);
+      expect(output.className).not.toContain("collapsed");
+      return;
+    }
+    expect(buttons).toHaveLength(1);
+    expect(output.clientHeight).toBeLessThan(output.scrollHeight);
+    expect(buttons[0]!.textContent).toBe("Show more");
+    buttons[0]!.listeners.get("click")!();
+    expect(output.clientHeight).toBe(output.scrollHeight);
+    expect(buttons[0]!.textContent).toBe("Show less");
+    details.open = false;
+    details.listeners.get("toggle")?.();
+    details.open = true;
+    details.listeners.get("toggle")?.();
+    expect(details.children.filter(child => child.className === "expand")).toHaveLength(1);
+    expect(output.className).not.toContain("collapsed");
+    buttons[0]!.listeners.get("click")!();
+    expect(buttons[0]!.textContent).toBe("Show more");
+    expect(output.clientHeight).toBeLessThan(output.scrollHeight);
+  });
+
   it("shows results only when their owning call and result are on the selected path", () => {
     const elements = runPage({
       entries: [entry("a", "assistant", { toolCalls: [call("call_0")] }), entry("off", "tool", { toolCallId: "call_0", content: "OTHER_BRANCH_RESULT" }), entry("selected")],

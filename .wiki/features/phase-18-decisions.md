@@ -577,7 +577,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W8-40 / TOL-10（随W7-30） | 失败原因及部分答复保留；工具阶段取消和空答复按失败结算；适配器向父模型传递error | 已完成，定向验证通过；旧result-contract脚本仍失败 |
 | W7-32 | read每次返回正文；startup结构/身份/有界读写、freshness与命令投影已修复；保留默认禁用 | 已完成，定向验证与隔离验收通过 |
 | W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
-| W7-26 / SES-08 | 回放、导出、根迁移、摘要来源、重复读取及compact检查点更新已分批修复；完整逐模块审计继续 | 执行中，第十三批续接与历史格式兼容已验证，逐模块审计继续 |
+| W7-26 / SES-08 | 回放、导出、根迁移、摘要来源、重复读取及compact检查点更新已分批修复；完整逐模块审计继续 | 执行中，第十四批导出长输出已验证，逐模块审计继续 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -1736,3 +1736,16 @@ context现在复用snapshot已有的pathless续接判定，保留无任务历史
 seed/fragment回归证明历史格式消费及往返，不证明当前真实工具会生成这些字段。W7-26仍在执行；历史unknown写入、其余字段优先级与导出长输出等按审计矩阵继续，不把此批记为36模块全量完成。第十二批49dc51e9的Architecture Watch 37110368332与CI 37110368330均成功。旧result-contract失败未重跑或改记通过。
 
 第十三批静态阻断门通过，1426文件零循环；NormProof exit0且全部阻断义务满足，整体advisory verdict仍为partial，docs-source-drift仍有120项非阻断提示。
+
+
+### W7-26 第十四批：导出长输出交互（2026-10-03）
+
+导出页在details尚未挂载/打开时读取尺寸，且在overflow检查之后才设置max-height，导致长工具输出没有Show more。新增回归1失败20通过；实际编译导出命令生成的HTML在Chromium中同样找不到按钮，证明不是VM布局模拟问题。补充重复message ID的collect拒绝与原文件不变回归，既有产品拒绝逻辑无需改动。
+
+参考导出按行数生成预览与完整内容。本仓保留已有CSS高度上限及单份文本，以覆盖长单行自动换行：挂载并首次打开后先应用高度上限再测量，短输出移除折叠，长输出创建一次切换按钮。复审指出窗口/侧栏缩窄后的新overflow缺口，进一步用单一ResizeObserver检查尚无控件的当前输出；视图重建时disconnect并替换WeakMap，已创建控件保留用户展开选择。
+
+最终5套66项及build:cli通过；独立APPROVE/CLEAR。编译slash导出与Chromium验收覆盖长多行、长换行单行、短输出、Show more→Show less→收起、重复打开、窗口及侧栏尺寸变化，0页面错误/0网络请求。观察器触发布局变化未在这组浏览器场景产生ResizeObserver错误。无真实provider，HOME/USERPROFILE/TMPDIR及合成目录均在仓内。
+
+本批仅改变导出显示，不改变原消息、分支配对、脱敏或权限。无ResizeObserver的旧浏览器仍可在打开卡片时检测高度，但不保证已打开卡片自动响应尺寸变化；无外部资源依赖。第十三批d3dcca9c的CI 37111182072与Architecture Watch 37111182078均成功。W7-26其余continuation/recovery矩阵项继续，未宣布36模块完整审计完成。
+
+第十四批模板owner反转后2失败20通过，原文件逐字节恢复。静态阻断门通过，1426文件零循环；NormProof exit0且全部阻断义务满足，整体advisory verdict仍为partial，docs-source-drift仍有120项非阻断提示。

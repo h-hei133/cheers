@@ -146,6 +146,13 @@ export const PAGE_SCRIPT = String.raw`
   var selected = data.leafId || (flat.length ? flat[flat.length - 1].node.id : null);
   var query = '';
   var usersOnly = false;
+  var outputChecks = new WeakMap();
+  var outputResize = typeof ResizeObserver === 'function' ? new ResizeObserver(function (entries) {
+    entries.forEach(function (entry) {
+      var check = outputChecks.get(entry.target);
+      if (check) check();
+    });
+  }) : null;
 
   function matches(row) {
     if (usersOnly && row.node.role !== 'user') return false;
@@ -222,8 +229,11 @@ export const PAGE_SCRIPT = String.raw`
   }
 
   function collapse(container, label) {
-    if (container.scrollHeight <= container.clientHeight + 4) return;
     container.classList.add('collapsed');
+    if (container.scrollHeight <= container.clientHeight + 4) {
+      container.classList.remove('collapsed');
+      return false;
+    }
     var button = document.createElement('button');
     button.className = 'expand';
     button.type = 'button';
@@ -233,6 +243,7 @@ export const PAGE_SCRIPT = String.raw`
       button.textContent = collapsed ? label : 'Show less';
     });
     container.parentNode.insertBefore(button, container.nextSibling);
+    return true;
   }
 
   function el(tag, className, text) {
@@ -258,7 +269,15 @@ export const PAGE_SCRIPT = String.raw`
       if (result !== undefined) {
         var output = el('div', 'result', result);
         details.appendChild(output);
-        collapse(output, 'Show more');
+        var measured = false;
+        var checkOutput = function () {
+          // Layout is available only after this card is mounted and opened.
+          if (!details.isConnected || !details.open || measured) return;
+          measured = collapse(output, 'Show more');
+        };
+        details.addEventListener('toggle', checkOutput);
+        outputChecks.set(output, checkOutput);
+        if (outputResize) outputResize.observe(output);
       }
       turn.appendChild(details);
     });
@@ -266,6 +285,8 @@ export const PAGE_SCRIPT = String.raw`
   }
 
   function renderConversation() {
+    if (outputResize) outputResize.disconnect();
+    outputChecks = new WeakMap();
     var pane = document.getElementById('conversation');
     pane.textContent = '';
     var chain = pathTo(selected);

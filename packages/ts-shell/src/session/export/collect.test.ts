@@ -122,6 +122,18 @@ describe("gathering a session for export", () => {
     expect(result.payload.warnings).toContain("The transcript format version is unsupported; only recognized entries are shown.");
   });
 
+  it("rejects duplicate message identities without changing the source", () => {
+    writeSession([{ role: "user", content: "readable" }]);
+    const layout = projectSessionFileLayout({ sessionsDir: createSessionStoreLayout(home).sessionsDir, sessionId });
+    const lines = fs.readFileSync(layout.transcriptPath, "utf8").trimEnd().split("\n");
+    const message = lines.find(line => JSON.parse(line).type === "message")!;
+    fs.appendFileSync(layout.transcriptPath, message + "\n");
+    const before = fs.readFileSync(layout.transcriptPath);
+    expect(gatherExport({ sessionId, workspace })).toEqual({ ok: false,
+      reason: "The transcript has duplicate message identities; branch associations are ambiguous." });
+    expect(fs.readFileSync(layout.transcriptPath)).toEqual(before);
+  });
+
   it("gives every tree node a preview so the sidebar reads without the body", () => {
     writeSession([
       { role: "user", content: "explain the health endpoint" },

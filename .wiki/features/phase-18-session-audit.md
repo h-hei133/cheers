@@ -1,9 +1,9 @@
 # Phase 18 会话边界行为审计
 
 基准清单：`b271e40b` 下 continuation 16、recovery 11、replay 5、export 4，共36个生产模块。
-当前已提交基线：`49dc51e9`；第十三批的本地证据见实施裁决。路径均相对 `packages/ts-shell/src/session/`。
+当前已提交基线：`d3dcca9c`；第十四批的本地证据见实施裁决。路径均相对 `packages/ts-shell/src/session/`。
 “已核对”指实现与所列断言一致，不代表任意输入下无缺陷；缺口必须闭合后才可宣布W7-26完成。
-前十三批证据见 [实施裁决](phase-18-decisions.md)。第十一批实际运行29套384项，不含本表新发现的全部边界。
+前十四批证据见 [实施裁决](phase-18-decisions.md)。第十一批实际运行29套384项，不含本表新发现的全部边界。
 
 ## continuation（16）
 
@@ -57,10 +57,9 @@
 
 | 原模块 | 行为判据 / 具体证据 | 审计状态 |
 |---|---|---|
-| `export/collect.ts` | 单次只读收集、消息/树身份连接、输入失败分类、脱敏保留关联；同名测试及exportCommandRuntime测试 | 已核对；缺重复message ID的直接checked-in回归 |
+| `export/collect.ts` | 单次只读收集、消息/树身份连接、输入失败分类、脱敏保留关联；同名测试及exportCommandRuntime测试 | 已核对；第十四批增加重复message ID拒绝及原文件不变回归 |
 | `export/html.ts` | 自包含文档、UTF-8和头部转义、flat edges无深递归；graph/collect/command测试 | gathered-payload契约已核对；base64并非脱敏 |
 | `export/htmlRender.ts` | 支持的Markdown子集转义并拒绝可执行URL；同名测试 | 已核对；不承诺完整CommonMark嵌套等价 |
-| `export/template.ts` | 选中路径、call occurrence配对、缺口隔离、filter/hash与长输出交互；同名测试及前次浏览器验收 | 缺陷：detached DOM时测高度始终0；max-height也在测量后才加，Show more不初始化 |
+| `export/template.ts` | 选中路径、call occurrence配对、缺口隔离、filter/hash与长输出交互；同名测试及前次浏览器验收 | 第十四批修复并验证挂载/打开后的测量，真实浏览器覆盖长输出、展开收起及尺寸变化 |
 
-导出长输出必须追加真实浏览器验收：连接并打开长结果卡，验证折叠高度与Show more，再展开并验证Show less。
-现有VM模拟高度固定为0；此前4000消息浏览器验收使用短输出，不能覆盖该交互。
+第十四批浏览器验收闭合长输出交互缺口，VM回归增加挂载/打开状态及尺寸变化。此前4000消息验收继续只用于深树/长日志边界；不将其挪用为长输出交互证据。
