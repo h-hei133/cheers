@@ -15,7 +15,7 @@ W7-31仍在执行。首批聚焦审批，其余已复现问题按下表继续修
 | `continueShellActionRuntime.ts` | resume/continue权限与恢复资格；同名测试 | 复用W7-26恢复证据 |
 | `interactiveApprovalWiring.ts` | 当前回答与后续授权分离；同名测试 | 首批移除allow-once的后续缓存写入 |
 | `printPromptInput.ts` | stdin capture与CLI输入传递 | 未找到直接symbol测试；保留transport断言缺口 |
-| `providerCredentials.ts` | CLI选择的provider对应连接 | 已复现active连接属于其他provider时遮蔽匹配连接，待修复 |
+| `providerCredentials.ts` | CLI选择的provider对应连接 | 第四批修复：活动连接先匹配显式provider再进入原fallback；端点、模型、账号及key优先级回归与双模式PTY通过 |
 | `providerFailureRedaction.ts` | 未知错误的路径/token脱敏；同名测试 | 所列路径源码核对，无新缺陷 |
 | `providerReadiness.ts` | readiness请求与实际adapter认证一致 | 已复现原生消息端点探测错误使用Bearer；合成HTTP证据，待修复 |
 | `recovery.ts` | 恢复准入与当前分支证据 | 复用W7-26恢复证据 |
@@ -93,3 +93,15 @@ TurnSink现显示实际stopReason，保留partial answer、error/notice分类和
 成功重试携带两类上下文且仅一次，持久化终态来源正确；产物.tmp/admission-pty-ahbsjr4f。
 保证限于现有同步进程内store，不承诺跨进程/跨store落盘事务；hook dispatcher既有异常处理政策不变。
 W7-31的凭据/readiness协议、background、platform与直接断言缺口继续处理，旧result-contract脚本仍未修复。
+
+## 第四批显式提供方的连接选择
+
+显式CLI provider与活动连接冲突时，原选择器先锁定该连接、随后丢弃profile，跳过本来存在的同provider备用连接。
+现于活动连接筛选时排除冲突，随后复用原fallback排序。未显式选择时仍以活动连接为准；
+匹配的活动连接仍优先于更新备用连接；CLI/env key沿用匹配连接端点与模型，账号优先级不变。
+不存在匹配凭据时仍缺失，不能借用其他provider的key、端点或模型。
+参考采用显式provider先限定候选集合的语义；本仓保留原连接状态/账号/时间排序，没有新增选择器。
+3套38项与构建通过；撤销后4失败12通过，逐字节恢复。独立APPROVE/CLEAR。
+普通/全屏编译PTY使用另一provider的活动连接及显式--provider，验证实际HTTP请求仅到匹配连接端点、使用其合成凭据和模型，
+并保留前批拒绝/阻断/取消/重试/一次注入/终态来源断言；产物.tmp/connection-pty-adbsriyo。
+readiness协议与剩余Shell项仍未完成。

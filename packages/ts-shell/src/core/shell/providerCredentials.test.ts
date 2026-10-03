@@ -29,6 +29,48 @@ function createRuntimeConfig(): RuntimeConfig {
 }
 
 describe("provider credential resolution", () => {
+  it.each([
+    { active: "other", selected: "openai" as const, key: "recent-key", base: "recent" },
+    { active: "older", selected: "openai" as const, key: "older-key", base: "older" },
+    { active: "missing", selected: "openai" as const, key: "recent-key", base: "recent" },
+    { active: "other", selected: undefined, key: "other-key", base: "other" },
+  ])("binds credentials and endpoint to the selected provider ($active / $selected)", ({ active, selected, key, base }) => {
+    const result = resolveProviderCredential({
+      runtimeConfig: {
+        ...createRuntimeConfig(),
+        activeProviderConnectionId: active,
+        providerConnections: [
+          { id: "other", provider: "anthropic", apiKey: "other-key", baseUrl: "https://other.invalid/v1", model: "other-model", authType: "api-key", status: "connected", createdAt: "2026-01-01", updatedAt: "2026-01-03" },
+          { id: "older", provider: "openai", apiKey: "older-key", baseUrl: "https://older.invalid/v1", model: "older-model", authType: "api-key", status: "connected", createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+          { id: "recent", provider: "openai", apiKey: "recent-key", baseUrl: "https://recent.invalid/v1", model: "recent-model", authType: "api-key", status: "connected", createdAt: "2026-01-01", updatedAt: "2026-01-02" },
+        ],
+      },
+      cliProvider: selected,
+      env: {},
+    });
+    expect(result).toMatchObject({
+      provider: selected ?? "anthropic", baseUrl: `https://${base}.invalid/v1`, model: `${base}-model`,
+      credential: { source: "connection", apiKey: key, baseUrl: `https://${base}.invalid/v1`, model: `${base}-model` },
+    });
+  });
+
+  it.each([undefined, "cli-key"])("keeps a matching fallback endpoint with an explicit key (%s)", cliApiKey => {
+    const result = resolveProviderCredential({
+      runtimeConfig: {
+        ...createRuntimeConfig(), activeProviderConnectionId: "other",
+        providerConnections: [
+          { id: "other", provider: "anthropic", apiKey: "other-key", baseUrl: "https://other.invalid/v1", authType: "api-key", status: "connected", createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+          { id: "selected", provider: "openai", apiKey: "stored-key", baseUrl: "https://selected.invalid/v1", model: "selected-model", authType: "api-key", status: "connected", createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+        ],
+      },
+      cliProvider: "openai", cliApiKey, env: { OPENAI_API_KEY: "env-key" },
+    });
+    expect(result.credential).toMatchObject({
+      apiKey: cliApiKey ?? "env-key", source: cliApiKey ? "cli" : "env",
+      baseUrl: "https://selected.invalid/v1", model: "selected-model",
+    });
+  });
+
   it("uses cli explicit credential first", () => {
     const result = resolveProviderCredential({
       runtimeConfig: createRuntimeConfig(),
@@ -152,6 +194,38 @@ describe("provider credential resolution", () => {
     expect(result.credential?.authMode).toBe("account-auth");
     expect(result.credential?.accountAuth?.type).toBe("openai-chatgpt-account");
     expect(result.credential?.apiKey).toBeUndefined();
+  });
+
+  it("uses matching account auth when the active connection belongs to another provider", () => {
+    const accountAuth = {
+      type: "openai-chatgpt-account" as const, accessToken: "test-access", refreshToken: "test-refresh",
+      expiresAt: Date.now() + 3600_000, accountId: "test-account",
+    };
+    const result = resolveProviderCredential({
+      runtimeConfig: {
+        ...createRuntimeConfig(), activeProviderConnectionId: "other",
+        providerConnections: [
+          { id: "other", provider: "anthropic", apiKey: "other-key", authType: "api-key", status: "connected", createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+          { id: "selected", provider: "openai", accountAuth: { openai: accountAuth }, authType: "account-auth", status: "connected", createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+        ],
+      },
+      cliProvider: "openai", env: { OPENAI_API_KEY: "env-key" },
+    });
+    expect(result.credential).toMatchObject({ source: "connection", authMode: "account-auth", accountAuth });
+    expect(result.credential?.apiKey).toBeUndefined();
+  });
+
+  it("keeps a missing provider credential missing instead of borrowing another connection", () => {
+    const result = resolveProviderCredential({
+      runtimeConfig: {
+        ...createRuntimeConfig(), providerCredentials: {}, activeProviderConnectionId: "other",
+        providerConnections: [
+          { id: "other", provider: "anthropic", apiKey: "other-key", baseUrl: "https://other.invalid/v1", model: "other-model", authType: "api-key", status: "connected", createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+        ],
+      },
+      cliProvider: "openai", env: {},
+    });
+    expect(result).toEqual({ provider: "openai", expectedEnvVarName: "OPENAI_API_KEY", baseUrl: undefined, model: undefined });
   });
 
   it("returns missing credential with provider-specific env var hint", () => {

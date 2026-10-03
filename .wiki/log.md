@@ -5812,3 +5812,8 @@ next上下文沿用snapshot已有准入，seed摘要读回formatter实际键，�
 compact与memory在barrier/readiness/启动hook之后、kernel准入前才消耗；generation替换/驱逐拒绝旧准备结果，失败重试与runtime reentry保留pending。无terminal不再打印默认success。PTY复现并修复交互层漏显stopped完成事件，保留部分正文、错误分类与显式retry。
 14套201项、CLI构建、静态门与40项脚本测试通过；反转6个owner后28失败80通过，精确恢复并复跑。独立APPROVE/CLEAR。普通/全屏编译PTY通过拒绝/阻断/取消不调用模型、重试两类上下文仅一次及终态来源一致；仅本地合成HTTP服务。
 保证限于进程内同步store，旧hook异常政策未改。W7-31剩余项及W7/W8后续任务继续，旧result-contract脚本未修。ebbcb7a8的CI与Architecture Watch均成功；详见[Shell审计](features/phase-18-shell-audit.md)。
+
+## [2026-10-03] fix | Phase 18 W7-31 显式提供方连接
+
+修复显式provider被其他活动连接遮蔽：先匹配provider，再复用现有fallback，保留凭据优先级与端点/模型配对。
+3套38项与构建通过；反转后4失败12通过并精确恢复，独立APPROVE/CLEAR。双模式编译PTY验证HTTP地址/合成认证来自匹配连接，并保留准入与一次注入断言。未访问真实provider，Shell剩余项继续。

@@ -1840,3 +1840,15 @@ reachability7与function-ceiling7为既有advisory。test:scripts 40/40通过。
 旧result-contract脚本债务未在此批修复；W7-31其余已登记项及后续27→29→33/W8保持未完成。
 第二批ebbcb7a8的CI 37119359176和Architecture Watch 37119359119已成功。
 提交前docs严格门通过（0 dangling、旧120 source advisory）；内置judge exit0，图无环和无未解析specifier两义务满足，函数上限旧advisory使总体仍partial。
+
+### W7-31 第四批：显式提供方连接选择（2026-10-03）
+
+活动连接筛选增加显式provider匹配条件，避免选中另一provider后丢弃profile并跳过可用的匹配fallback。
+沿用已有候选排序与凭据优先级：无显式provider仍采用活动连接，匹配活动连接优先，
+CLI/env key与匹配连接端点/模型配对，匹配账号连接的优先级保留；无匹配凭据仍返回缺失。
+参考对照为先按显式provider收窄候选再解析；本仓只修改原选择条件，没有复制或增加平行能力。
+
+定向3套38项、build:ts通过；撤销该条件后4失败12通过，逐字节恢复。
+独立代码APPROVE、架构CLEAR；普通/全屏编译PTY用另一provider的活动连接加显式--provider，
+服务器断言实际请求地址与合成认证均来自匹配连接，并完成拒绝/阻断/取消后重试和一次上下文注入。
+产物.tmp/connection-pty-adbsriyo；未访问真实provider或真实配置。W7-31剩余项保持未完成。

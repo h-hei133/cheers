@@ -46,7 +46,8 @@ export function resolveProviderCredential(
   const activeConnection =
     input.runtimeConfig.providerConnections.find(
       (connection) =>
-        connection.id === input.runtimeConfig.activeProviderConnectionId,
+        connection.id === input.runtimeConfig.activeProviderConnectionId &&
+        (input.cliProvider === undefined || connection.provider === input.cliProvider),
     ) ??
     pickFallbackConnection(
       input.runtimeConfig.providerConnections,
