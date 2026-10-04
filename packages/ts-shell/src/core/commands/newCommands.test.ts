@@ -8,6 +8,16 @@ import { runCommitCommand } from "./commitCommandRuntime.js";
 import { runThinkingCommand, getThinkingEffort } from "./thinkingCommandRuntime.js";
 
 describe("/tools", () => {
+  it("uses the supplied pool for details and preserves case-sensitive MCP names", async () => {
+    const tool = { name: "mcp__notes__Read", description: "Read a note.", argsSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
+      mcpAnnotations: { readOnlyHint: true }, execute: async () => ({ success: true }) };
+    const context = { cwd: process.cwd(), getToolPool: async () => new Map([[tool.name, tool]]) };
+    const detail = await runToolsCommand([tool.name], context);
+    expect(detail.output).toContain("### `mcp__notes__Read`");
+    expect(detail.output).toContain("| `id` | string | yes |");
+    expect(detail.output).toContain("Plan mode: allowed");
+    expect((await runToolsCommand(["write"], context)).output).toContain("No tool named");
+  });
   it("lists the registry rather than a hand-kept list of names", async () => {
     const result = await runToolsCommand([], { cwd: process.cwd() });
 

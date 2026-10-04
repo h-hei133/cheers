@@ -6,6 +6,7 @@ import process from "node:process";
 import * as readline from "node:readline";
 import type { QueryRuntimeStateSeed } from "../core/query/runtime/state.js";
 import { runResumeLikeShellAction } from "../core/shell/continueShellActionRuntime.js";
+import { toolPoolFor } from "../cli/runtime/tools.js";
 import {
   isFenceLine,
   opensMultilineLiteralPrompt,
@@ -260,6 +261,7 @@ export async function runNonInteractivePrompt(options: {
     renderer: options.renderer,
     printMode: options.printMode,
     interactive: false,
+    getToolPool: toolPoolFor(options.runtimeContext, options.mcpGateway),
     sessionId: options.runtimeContext.session.id,
     onTurnMessage: (message) => options.sessionManager.addTurn(options.runtimeContext.session.id, message),
     ...(options.runtimeContext.skillOptions

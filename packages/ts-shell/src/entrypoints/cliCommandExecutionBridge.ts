@@ -5,6 +5,7 @@ import { createProjectMemoryLocalStore } from "../memory/projectMemoryLocalStore
 import { projectMemoryRootFor } from "../memory/projectMemoryRoot.js";
 import type { ProjectMemoryStore } from "../memory/projectMemoryStoreContract.js";
 import type { RuntimeConfig } from "../config/runtimeConfig.js";
+import type { CommandContext } from "../core/commands/types.js";
 import { createBrowserCliExecutionBridge } from "../browser/cliExecutionBridge.js";
 import { loadBrowserCliExecutorInjectionFromEnv } from "../browser/cliExecutorInjection.js";
 import { loadBrowserReceiptCacheManifestFromEnv } from "../browser/receipt/manifest.js";
@@ -82,6 +83,7 @@ export interface BuildCliCommandExecutionInput {
   readonly modifierKeysReported?: boolean;
   /** How `/reload` re-reads the session's configuration. Absent off-session. */
   readonly refreshRuntimeConfig?: () => { readonly before: RuntimeConfig; readonly after: RuntimeConfig };
+  readonly getToolPool?: CommandContext["getToolPool"];
 }
 
 export interface CliCommandExecutionBridge {
@@ -138,6 +140,7 @@ export async function buildCliCommandExecution(
     modifierKeysReported: input.modifierKeysReported,
     keyGuide: input.keyGuide,
     refreshRuntimeConfig: input.refreshRuntimeConfig,
+    getToolPool: input.getToolPool,
     compactCheckpointStore: input.compactCheckpointStore,
     compactInjectionStateStore: input.compactInjectionStateStore,
     browserReceiptCacheStore,

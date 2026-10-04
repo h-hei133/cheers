@@ -9,6 +9,9 @@ import { runCliRuntimeInvocation, type CliRuntimeInvocationInput } from "../../e
 import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import { HookDispatcher } from "../../core/hooks/hookDispatcher.js";
+import { toolPoolFor } from "./tools.js";
+import { runToolsCommand } from "../../core/commands/toolsCommandRuntime.js";
+import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 
 let root: string;
 let log: string;
@@ -51,6 +54,41 @@ afterEach(async () => {
   await gateway.close();
   vi.unstubAllEnvs();
   fs.rmSync(root, { recursive: true, force: true });
+});
+
+it("shows exactly the model pool, including skills and MCP, then reflects changed configuration", async () => {
+  const snapshot = vi.spyOn(gateway, "snapshot");
+  const skill = path.join(root, "SKILL.md");
+  fs.writeFileSync(skill, "---\nname: inspect-fixture\ndescription: Inspect this test fixture\n---\nRead the fixture.\n");
+  const runtimeConfig = { ...input().runtimeConfig!, allowedTools: ["read", "skill", "mcp__local__echo_message"],
+    disabledTools: [], hiddenToolPrefixes: [] };
+  const context = { cwd: root, projectRoot: root, runtimeConfig, skillOptions: { skillPaths: [skill], noSkills: true } } as ShellRuntimeContext;
+  const getToolPool = toolPoolFor(context, gateway);
+  const report = await runToolsCommand([], { cwd: root, getToolPool });
+  let names: string[] = [];
+  const run = await runCliRuntimeInvocation({ ...input(), runtimeConfig, skillOptions: context.skillOptions,
+    providerModeEnv: "real", mcpGateway: gateway,
+  }, { checkProviderReadiness: async () => ({ ok: true }), hooks: new HookDispatcher(),
+    createStep: (_request, tools) => {
+      names = [...tools.keys()].sort();
+      return async () => ({ text: "finished", toolCalls: [], stopReason: "stop" });
+    },
+  });
+  for await (const _event of run.events) { /* Complete normal gateway ownership. */ }
+  expect(names).toEqual(["mcp__local__echo_message", "read", "skill"]);
+  const listed = report.output.split("\n").flatMap(line => line.match(/^\| `([^`]+)` \|/)?.[1] ?? []).sort();
+  expect(listed).toEqual(names);
+  expect(report.output).toContain("### Tools (3)");
+  expect(starts()).toHaveLength(1);
+  expect(alive(starts()[0]!)).toBe(true);
+  context.runtimeConfig = { ...runtimeConfig, disabledTools: ["skill"], hiddenToolPrefixes: ["mcp__"] };
+  const filtered = await runToolsCommand([], { cwd: root, getToolPool });
+  expect(filtered.output).toContain("### Tools (1)");
+  expect(filtered.output).not.toContain("| `skill`");
+  expect(filtered.output).not.toContain("| `mcp__");
+  context.runtimeConfig = { ...runtimeConfig, allowedTools: [], enableMcpTools: false };
+  expect((await runToolsCommand([], { cwd: root, getToolPool })).output).toContain("### Tools (0)");
+  expect(snapshot).toHaveBeenCalledTimes(3);
 });
 
 it.each(["allow-once", "deny"] as const)("runs an annotated plan MCP call only after %s", async decision => {

@@ -1088,10 +1088,10 @@ OAuth 只在「直连上游订阅（Copilot / Anthropic 订阅）」时有意义
 | **36** | `PRV-14` | 两处 `data:` 多行连接改 `join("\n")`（`anthropicMessages.ts:622-631`、`googleWire.ts:437-444`） | `pi/.../anthropic-messages.ts:409`；`gemini-cli/.../server.ts:510`；**同仓正确处** `turn/completion.ts:563` | 合成多行 `data:` 事件 ⇒ 解码后含 `\n` 且 JSON 可解析 |
 | **37** | `PRV-15` | 把服务器 `requestedDelayMs` 带到 failed step（新字段），`core/agent/loop.ts:178` 的 `retryDelayMs(policy, attempt, undefined)` 改传它 | `pi/.../provider-retry.ts:51-70`（层内消费服务器延迟） | `429` + `Retry-After: 5` ⇒ 首次重试延迟 ≥5s |
 | **38** | `SES-09`（`R10-4`） | 空/不可读锁用**远短**宽限（微秒窗口，建议 ≤5s）；或把获取等待上界提到陈旧阈值之上 | `自研`（`opencode` 的 heartbeat 治的是另一面） | 造零字节锁 ⇒ **不再** 1.2s 超时、也**不**等 60s |
-| **39** | `SES-10` | **本地完成，远端待验证**：既有`lifecycle.cancelled`在shell结算后发给eventObservers；非交互信号退出等待cancelAndWait | 对照会话abort等待idle与公开事件广播 | 编译CLI三种信号均收到唯一取消终态，部分正文与来源持久化、连接关闭；turn内部契约无需新增同义事件 |
+| **39** | `SES-10` | **已完成**：既有`lifecycle.cancelled`在shell结算后发给eventObservers；非交互信号退出等待cancelAndWait。Node最低版本兼容修复后d0f7dfe2两项远端检查成功 | 对照会话abort等待idle与公开事件广播 | 编译CLI三种信号均收到唯一取消终态，部分正文与来源持久化、连接关闭；turn内部契约无需新增同义事件 |
 | **40** | `TOL-10` | 已完成：`task`终态按失败事实判定，保留部分答复；runner补足工具阶段取消，适配器保留error | 对照子代理扩展的失败结算与独立取消事实 | 步数耗尽但有叙述文本、实际工具阶段取消均返回失败；父模型收到原因 |
-| **41** | `TOL-12` | **本地完成，远端待验证**：严格布尔MCP只读标注只解除plan禁止，仍经过权限；/tools与执行共用toolPolicy | 对照标注准入后仍ask_user的策略 | 真实stdio夹具仅批准时调用；全部内置工具展示与参数门一致；主回合/子代理接线回归 |
-| **42** | `TOL-13` | `/tools` 接受当前工具池（含 `mcpTools`/`skills`）或至少读 live 快照 | `自研` | 配 MCP 时 `/tools` 列出的数量与模型实际一致 |
+| **41** | `TOL-12` | **已完成**：严格布尔MCP只读标注只解除plan禁止，仍经过权限；/tools与执行共用toolPolicy。d0f7dfe2两项远端检查成功 | 对照标注准入后仍ask_user的策略 | 真实stdio夹具仅批准时调用；全部内置工具展示与参数门一致；主回合/子代理接线回归 |
+| **42** | `TOL-13` | **本地完成，远端待验证**：模型与/tools共用catalog，按当前技能/MCP快照及配置过滤；三种命令入口接通 | 对照启用工具和全部定义的区别，保留当前按调用发现的生命周期 | 编译CLI列表与实际HTTP模型schema一致，含MCP/skill；动态过滤、空白名单与连接关闭回归 |
 | **43** | `CMD-09` | `/deep-research` 接模型做查询生成与综述（复用 `/btw` 的侧信道调用样板），或**去掉机制宣称**并改名 | `自研`（`pi` 无对等命令） | 报告正文**不含**「multi-agent tree search」等未做过的机制词 |
 | **44** | `CMD-10` | `/review` 对齐 `/commit`：读 diff → 构造 prompt 回合，交模型评审 | `自研`（对照同仓 `/commit`） | `/review` 触发一次模型回合；不再打印固定清单 |
 
@@ -2109,3 +2109,26 @@ CLI invocation经过真实stdio JSON-RPC夹具，仅批准时产生tools/call，
 首次直接从仓根启动Vitest造成MCP相对夹具路径错误；无项目主题用例则继承仓库祖先标记。
 前者修正驱动工作目录，后者在该用例显式模拟无根标记，保留原行为断言，不修改产品目录发现策略。
 静态阻断门、43项脚本和NormProof阻断义务通过，整体advisory仍partial。远端验证待完成；本批无PTY或独立审查结论。
+
+### W8-42 / TOL-13：当前工具池展示（2026-10-04）
+
+把原模型入口的技能发现、MCP快照与工具过滤迁入`core/tools/catalog.ts`，模型与命令共用该owner。
+CLI通过延迟getToolPool连接交互、管道和print命令入口，每次检查读取当前runtimeConfig、skillOptions与项目根。
+复用已有gateway；仅在没有host gateway且显式启用MCP时创建临时gateway，并在读取后关闭。
+命令只检查工具，不调用execute；禁用MCP不请求snapshot，空allowedTools保持空池。
+
+目标核验后对照参考会话的getActiveToolNames与getAllTools：前者来自实际模型工具，后者是完整定义，二者不能混称。
+本仓选择复用下一次调用的构建规则与当前snapshot，不新增常驻缓存，也不承诺检查后外部配置/服务器再变化时仍一致。
+技能表现为既有skill工具和可加载目录，不把每个技能伪造为独立工具；MCP名称保持大小写，详情来自当前池。
+未注入CLI上下文的独立命令调用仍可查看默认registry，这是兼容回退，不是已连接服务器的声明。
+
+新测试对比命令列表和模型池，验证技能、MCP、禁用项、隐藏前缀、空白名单及配置替换；
+三种命令入口均读取当前池。编译CLI通过真实stdio夹具与本地HTTP，确认两边均为同样三个工具，
+/tools没有模型请求或tools/call，两个进程的MCP均正常关闭；未访问真实provider。
+初次CLI夹具继承仓库项目根，修正为独立Git根后通过，未修改产品根判定。
+五处生产接线反转并重建后六条回归全部失败；精确恢复、重建后六条通过，证据`.tmp/tools-catalog-check/`。
+
+前批d0f7dfe2的CI37213593791与Architecture Watch37213593777均成功，W8-39兼容修复与W8-41远端验证闭合。
+最终明确路径Node20.3下12套120项通过，CLI构建、静态阻断门、43项脚本通过；NormProof阻断义务满足、整体advisory仍partial。
+技能无项目根旧用例在仓内临时目录继承外层.git，改为用例内显式模拟无根标记后复跑全部120项，不改变产品发现策略。
+本批无PTY或独立审查结论，远端验证待完成；W7-33认证门禁条件和W8其他未完项保持未完成。

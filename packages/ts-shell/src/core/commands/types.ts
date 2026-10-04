@@ -22,6 +22,7 @@ import type { BrowserActionCache } from '../../browser/actionCache.js'
 import type { BrowserReceiptCacheStore } from '../../browser/receipt/store.js'
 import type { BrowserPublicReadOnlyWebSmokeConfig } from '../../browser/smoke/config.js'
 import type { RuntimeConfig } from "../../config/runtimeConfig.js"
+import type { ToolDefinition } from "../../tools/types.js"
 import type { SidebarEventSink } from '../../presentation/sidebar/sidebarEventSink.js'
 import type { SidebarLiveEventStore } from '../../presentation/sidebar/sidebarLiveEventStore.js'
 
@@ -29,6 +30,8 @@ export type CommandKind = 'local' | 'prompt' | 'shell-action'
 
 export interface CommandContext {
   readonly cwd: string
+  /** Current configured pool, resolved on demand by the CLI host. */
+  readonly getToolPool?: () => Promise<ReadonlyMap<string, ToolDefinition>>
   /** False for scripted invocations; omitted by callers without a CLI host. */
   readonly interactive?: boolean
   /**

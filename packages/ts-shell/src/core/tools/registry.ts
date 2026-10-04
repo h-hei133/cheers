@@ -277,7 +277,7 @@ async function runGitCommand(
 
 export function createCoreToolRegistry(options?: {
   mcpTools?: readonly McpToolDescriptor[]
-  mcpGateway?: CoreMcpGateway
+  mcpGateway?: Pick<CoreMcpGateway, 'invokeTool'>
   browserRuntimeStatus?: PwRuntimeStatus
   executionService?: ExecutionService
   /**

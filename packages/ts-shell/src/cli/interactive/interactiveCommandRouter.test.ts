@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 
 import { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
@@ -52,6 +56,24 @@ function createHarness() {
 }
 
 describe("interactive command router", () => {
+  it.each(["interactive", "piped", "print"])("lists current tools in the %s command path", async mode => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "command-tools-"));
+    const harness = createHarness();
+    const snapshot = vi.fn(async () => ({ clients: [], tools: [{ serverName: "fixture", toolName: "Read",
+      qualifiedName: "mcp__fixture__Read", description: "Read a fixture", annotations: { readOnlyHint: true } }] }));
+    Object.assign(harness.input.runtimeContext, { cwd: root, projectRoot: root, skillOptions: { noSkills: true },
+      runtimeConfig: { ...getRuntimeConfig(root), enableMcpTools: true, allowedTools: ["mcp__fixture__Read"] } });
+    harness.input.mcpGateway = { snapshot, refresh: snapshot } as never;
+    try {
+      if (mode === "interactive") await routeInteractiveCommand({ ...harness.input, prompt: "/tools" });
+      else await runNonInteractivePrompt({ ...harness.input, prompt: "/tools", printMode: mode === "print" });
+      expect(harness.lines.join("\n")).toContain("### Tools (1)");
+      expect(harness.lines.join("\n")).toContain("| `mcp__fixture__Read` | allowed |");
+      expect(snapshot).toHaveBeenCalledOnce();
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
   it("returns an exit signal to a scripted host", async () => {
     const harness = createHarness();
     expect(await runNonInteractivePrompt({ ...harness.input, prompt: "/exit", printMode: true })).toBe("exit");

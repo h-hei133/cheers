@@ -17,13 +17,13 @@ import type { ToolDefinition } from "../../tools/types.js";
 
 export async function runToolsCommand(
   args: string[],
-  _context: CommandContext,
+  context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const registry = createCoreToolRegistry();
-  const wanted = args[0]?.toLowerCase();
+  const registry = context.getToolPool ? await context.getToolPool() : createCoreToolRegistry();
+  const wanted = args[0];
 
   if (wanted) {
-    const tool = registry.get(wanted);
+    const tool = registry.get(wanted) ?? registry.get(wanted.toLowerCase());
     if (!tool) {
       return {
         kind: "local",

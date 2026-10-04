@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SkillLoader } from "./skillLoader.js";
 
 describe("skill discovery", () => {
@@ -71,7 +71,15 @@ describe("skill discovery", () => {
       "utf8",
     );
 
-    expect([...new SkillLoader(inner).load().keys()]).toEqual([]);
+    // Keep this no-project scenario independent of a TMPDIR inside a repository.
+    const exists = fs.existsSync;
+    const marker = vi.spyOn(fs, "existsSync").mockImplementation(file =>
+      path.basename(String(file)) === ".git" ? false : exists(file));
+    try {
+      expect([...new SkillLoader(inner).load().keys()]).toEqual([]);
+    } finally {
+      marker.mockRestore();
+    }
   });
 
   it("finds skills grouped into subdirectories, not only at the top level", () => {

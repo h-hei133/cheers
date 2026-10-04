@@ -3,6 +3,7 @@ import type { PromptAttachments } from "../../core/shell/sessionRuntime.js";
 import type { Interface as ReadlineInterface } from "node:readline";
 
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
+import { toolPoolFor } from "../runtime/tools.js";
 import { navigateSession, type SessionNavigationResult } from "../runtime/navigation.js";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
@@ -128,6 +129,7 @@ export async function routeInteractiveCommand(
     ...(input.runtimeContext.themePaths ? { themePaths: input.runtimeContext.themePaths } : {}),
     modifierKeysReported: input.modifierKeysReported,
     keyGuide: input.keyGuide,
+    getToolPool: toolPoolFor(input.runtimeContext, input.mcpGateway),
     // The settings live on the context this session carries, so replacing them in
     // place is what makes `/reload` take effect for the rest of the session rather
     // than only for the turn that ran it.
