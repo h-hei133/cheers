@@ -3108,7 +3108,9 @@ MCP 工具名形如 `mcp__server__tool`，**永不命中** ⇒ plan 模式下所
 （**注意**：`lsp` **是**真实注册的工具——`core/tools/lsp.ts:28`、`registry.ts:757`，
 「幽灵 lsp」的说法**不成立**，见 §20.3。）
 
-### CMD-09 · `/deep-research` 是**无模型**的抓取+模板，却宣称「多智能体树搜索」 — `OPEN` `P2` `CONFIRMED`
+### CMD-09 · `/deep-research` 是**无模型**的抓取+模板，却宣称「多智能体树搜索」 — `LOCAL-FIXED` `P2` `CONFIRMED`
+
+2026-10-05：改为 `/web-research` 资料收集，旧命令兼容；删除投票与伪验证，失败/空内容分别呈现。本地验证完成，远端待验证；当前实现见[命令说明](../wiki/theses/deep-research-command-architecture.md)。下文保留发现时依据。
 
 `core/research/deepResearcher.ts` 全链路无任何模型调用：`generateSerpQueries`（字符串拼接）→
 web search/fetch → `extractLearningsFromContent`（`:168-183` 按标点切句）→

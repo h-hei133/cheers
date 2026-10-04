@@ -1,46 +1,28 @@
 import type { CommandContext, LocalCommandResult } from "./types.js";
-import { DeepResearcher } from "../research/deepResearcher.js";
+import { collectSources } from "../research/collector.js";
+import { renderCollection } from "../research/renderer.js";
 
-/**
- * /deep-research command
- * Conducts multi-agent tree-search research across technical documentation,
- * cross-checks sources via claim consensus voting, and outputs a cited report.
- */
+/** The old command name remains supported as a compatibility alias. */
 export async function runDeepResearchCommand(
   args: string[],
-  _context: CommandContext,
+  context: CommandContext,
 ): Promise<LocalCommandResult> {
   const topic = args.join(" ").trim();
-
   if (!topic || topic === "--help" || topic === "-h") {
-    return {
-      kind: "local",
-      output: [
-        "# Deep Technical Research (/deep-research)",
-        "",
-        "Investigates complex technical questions, libraries, protocols, or architecture trade-offs",
-        "by executing recursive breadth x depth tree searches and cross-source consensus voting.",
-        "",
-        "Usage:",
-        "- `/deep-research <technical topic or question>`",
-        "",
-        "Examples:",
-        "- `/deep-research Node.js permission model changes between v20 and v22`",
-        "- `/deep-research WAF bypass and stealth anti-detection techniques in Playwright`",
-        "- `/deep-research Embedded vector database options in TypeScript compared`",
-      ].join("\n"),
-    };
+    return { kind: "local", output: [
+      "# Web Source Collection (/web-research)",
+      "",
+      "Collects public web excerpts using two fixed search queries and at most six distinct URLs.",
+      "No model synthesis or factual verification is performed. Search and fetch failures are reported.",
+      "",
+      "Usage: `/web-research <topic or question>`",
+      "Example: `/web-research Node.js permission model changes between v20 and v22`",
+      "Compatibility aliases: /deep-research, /research, /deep",
+    ].join("\n") };
   }
-
-  const report = await DeepResearcher.research({
-    topic,
-    breadth: 2,
-    depth: 1, // fast bounded execution for interactive CLI
-    maxConcurrency: 2,
+  const report = await collectSources(topic, {
+    taskId: "web-research",
+    workspaceRoot: context.cwd,
   });
-
-  return {
-    kind: "local",
-    output: report.reportMarkdown,
-  };
+  return { kind: "local", output: renderCollection(report) };
 }
