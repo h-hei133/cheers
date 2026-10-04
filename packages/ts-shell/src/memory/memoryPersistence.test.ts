@@ -27,6 +27,34 @@ function setup(content: string) {
   return { file, store };
 }
 
+it.each([
+  { safety: "unsafe " },
+  { safety: "unsafe" },
+  { candidateKind: "unknown-kind" },
+  { candidateKind: "__proto__" },
+  { retentionClass: "unknown-retention" },
+  { source: "unknown-source" },
+  { invalidatedBySourceCommand: "/unrecognized" },
+])("rejects invalid record policy values %j while retaining valid lines", async policy => {
+  const content = `${JSON.stringify(record)}\n${JSON.stringify({ ...record, id: "two", ...policy })}\n`;
+  const { file, store } = setup(content);
+  expect((await store.list()).records.map(entry => entry.id)).toEqual(["one"]);
+  expect(await store.health()).toMatchObject({ readable: true, writable: false, ok: false, recordCount: 1 });
+  expect((await store.write({ record: { ...record, id: "three" }, storeRef: store.ref })).written).toBe(false);
+  expect(fs.readFileSync(file, "utf8")).toBe(content);
+});
+
+it.each([{ safety: "unsafe " }, { candidateKind: "unknown-kind" }, { evidence: null }])(
+  "refuses invalid records at the write boundary: %j", async invalid => {
+    const content = `${JSON.stringify(record)}\n`;
+    const { file, store } = setup(content);
+    const result = await store.write({ record: { ...record, id: "two", ...invalid } as ProjectMemoryRecord, storeRef: store.ref });
+    expect(result).toMatchObject({ written: false, skipped: false });
+    expect(result.evidence).toContain("project-memory-local-store:invalid-record");
+    expect(fs.readFileSync(file, "utf8")).toBe(content);
+  },
+);
+
 it.each(["NOT_JSON", "null", "[]", "{}", '{"id":'])
   ("recovers valid lines around %s and preserves bytes for every mutation", async (bad) => {
     const content = `${JSON.stringify(record)}\n${bad}\n${JSON.stringify({ ...record, id: "two" })}\n{`;

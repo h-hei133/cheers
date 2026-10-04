@@ -4,6 +4,7 @@ import type {
 } from "./projectMemoryRetrieval.js";
 import type { ProjectMemoryRecord } from "./projectMemoryStoreContract.js";
 import type { ProjectMemoryWakeupPreview } from "./projectMemoryWakeup.js";
+import { memoryRecordIsInjectable } from "./memoryValidation.js";
 
 export type ProjectMemoryFutureTurnMode = "wake" | "recall";
 export type ProjectMemoryFutureTurnAdapterStatus =
@@ -77,7 +78,7 @@ function candidateFromRecords(input: {
   readonly evidence: readonly string[];
   readonly warnings: readonly { readonly id: string; readonly message: string }[];
 }): ProjectMemoryFutureTurnCandidateContext {
-  const safeRecords = input.records.filter((record) => !record.invalidatedAt);
+  const safeRecords = input.records.filter(memoryRecordIsInjectable);
   const redactions = unique(safeRecords.flatMap((record) => record.redactions));
   const serialized = safeRecords.map(recordSummary).join("\n");
   const blocked = containsUnsafeContent(serialized);
@@ -116,8 +117,8 @@ function candidateFromRecords(input: {
     },
     recordIds: safeRecords.map((record) => record.id),
     excludedRecords: input.records
-      .filter((record) => record.invalidatedAt)
-      .map((record) => `${record.id}:invalidated`),
+      .filter((record) => !memoryRecordIsInjectable(record))
+      .map((record) => `${record.id}:${record.invalidatedAt ? "invalidated" : "policy-excluded"}`),
     redactions,
     warnings: [
       ...input.warnings,

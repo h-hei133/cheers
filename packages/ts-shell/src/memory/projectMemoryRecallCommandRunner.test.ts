@@ -24,6 +24,30 @@ describe("project memory recall command runner", () => {
     fs.rmSync(storeRoot, { recursive: true, force: true });
   });
 
+  it("breaks equal relevance by actual creation time across date boundaries", async () => {
+    const store = createProjectMemoryLocalStore({ ref: { mode: "test-only", root: storeRoot } });
+    await seed(store, Array.from({ length: 6 }, (_, index) => record(
+      `day-${index + 1}`, "The same project fact.", "project-fact", `2026-10-0${index + 1}T00:00:00Z`,
+    )));
+    const result = await retrieveProjectMemoryRecords(store, { maxResults: 6 });
+    expect(result.matches.map(match => match.record.id)).toEqual(["day-6", "day-5", "day-4", "day-3", "day-2", "day-1"]);
+  });
+
+  it("selects wake sections before applying their result limits", async () => {
+    const store = createProjectMemoryLocalStore({ ref: { mode: "test-only", root: storeRoot } });
+    await seed(store, [
+      record("stable", "Keep the checked project fact.", "project-fact", "2025-01-01T00:00:00Z"),
+      record("decision", "Keep the checked project decision.", "capability-state", "2025-01-01T00:00:00Z"),
+      ...Array.from({ length: 30 }, (_, index) => record(
+        `a-transient-${index}`, "A temporary session fact.", "transient-session-fact", "2025-01-01T00:00:00Z", "session-scoped-only",
+      )),
+    ]);
+    const preview = await buildProjectMemoryWakeupPreview(store);
+    expect(preview.totalRecords).toBe(32);
+    expect(preview.l0.records.map(entry => entry.id)).toEqual(["stable"]);
+    expect(preview.l1.records.map(entry => entry.id)).toEqual(["decision"]);
+  });
+
   it("recalls a saved approved project fact with deterministic local ranking", async () => {
     const memoryStore = createProjectMemoryLocalStore({
       ref: { mode: "test-only", root: storeRoot },

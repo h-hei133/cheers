@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { writeTextFileAtomic } from "../session/store/sessionFileStore.js";
+import { withMemoryStoreLock } from "./store/transaction.js";
 import type {
   ProjectMemoryListResult,
   ProjectMemoryLifecycleTombstone,
@@ -25,6 +27,7 @@ import {
 import {
   entryTargetsRecord,
   foldProjectMemoryEntries,
+  isMemoryRecord,
   readEntriesSync,
   recordsFileFor,
 } from "./memoryPersistence.js";
@@ -99,7 +102,12 @@ function writeRecord(
       "Explicit local memory store root is required.",
     );
   }
-  const recordsFile = recordsFileFor(ref);
+  if (!isMemoryRecord(request.record)) {
+    return blocked(
+      "project-memory-local-store:invalid-record",
+      "Memory record does not satisfy the local store contract.",
+    );
+  }
   if (recordHasForbiddenContent(request.record)) {
     return blocked(
       "project-memory-local-store:forbidden-content",
@@ -107,51 +115,42 @@ function writeRecord(
     );
   }
   try {
-    fs.mkdirSync(path.dirname(recordsFile), { recursive: true });
+    return withMemoryStoreLock(ref, (lockedRef) => {
+      const snapshot = readEntriesSync(lockedRef);
+      if (snapshot.diagnostics.length) return blocked("project-memory-local-store:damaged", snapshot.diagnostics.join(" "));
+      const records = foldProjectMemoryEntries(snapshot.entries, {});
+      if (records.some((record) => record.id === request.record.id)) {
+        return {
+          record: request.record,
+          written: false,
+          skipped: true,
+          blocker: "Record already exists in the explicit local memory store.",
+          evidence: [
+            "project-memory-local-store:duplicate-skipped",
+            "project-memory-local-store:no-auto-load",
+          ],
+        };
+      }
+      fs.appendFileSync(recordsFileFor(lockedRef), `${snapshot.appendPrefix}${JSON.stringify(request.record)}\n`, { encoding: "utf8", mode: 0o600 });
+      return {
+        record: request.record,
+        written: true,
+        skipped: false,
+        evidence: [
+          "project-memory-local-store:jsonl-append",
+          "project-memory-local-store:explicit-local",
+          "project-memory-local-store:no-vector-db",
+          "project-memory-local-store:no-auto-load",
+          "project-memory-local-store:no-provider-call",
+        ],
+      };
+    });
   } catch (error) {
-    // A read-only checkout is a normal thing to work in. The write is refused
-    // with the reason rather than thrown, so a memory that cannot be recorded
-    // reports that instead of taking the session down with it.
     return blocked(
       "project-memory-local-store:write-unavailable",
-      `Memory store is not writable at ${recordsFile}: ${error instanceof Error ? error.message : String(error)}`,
+      `Memory store is not writable at ${recordsFileFor(ref)}: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  const snapshot = readEntriesSync(ref);
-  if (snapshot.diagnostics.length) return blocked("project-memory-local-store:damaged", snapshot.diagnostics.join(" "));
-  const records = foldProjectMemoryEntries(snapshot.entries, {});
-  if (records.some((record) => record.id === request.record.id)) {
-    return {
-      record: request.record,
-      written: false,
-      skipped: true,
-      blocker: "Record already exists in the explicit local memory store.",
-      evidence: [
-        "project-memory-local-store:duplicate-skipped",
-        "project-memory-local-store:no-auto-load",
-      ],
-    };
-  }
-  try {
-    fs.appendFileSync(recordsFile, `${snapshot.appendPrefix}${JSON.stringify(request.record)}\n`, "utf8");
-  } catch (error) {
-    return blocked(
-      "project-memory-local-store:write-unavailable",
-      `Memory store is not writable at ${recordsFile}: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-  return {
-    record: request.record,
-    written: true,
-    skipped: false,
-    evidence: [
-      "project-memory-local-store:jsonl-append",
-      "project-memory-local-store:explicit-local",
-      "project-memory-local-store:no-vector-db",
-      "project-memory-local-store:no-auto-load",
-      "project-memory-local-store:no-provider-call",
-    ],
-  };
 }
 
 function invalidateRecord(
@@ -169,70 +168,70 @@ function invalidateRecord(
       ],
     };
   }
-  const recordsFile = recordsFileFor(ref);
-  const snapshot = readEntriesSync(ref);
-  if (snapshot.diagnostics.length) return { invalidated: false, skipped: false, blocker: snapshot.diagnostics.join(" "), evidence: ["project-memory-local-store:damaged"] };
-  const existing = foldProjectMemoryEntries(snapshot.entries, { includeInvalidated: true }).find(
-    (record) => record.id === request.recordId,
-  );
-  if (!existing) {
-    return {
-      invalidated: false,
-      skipped: false,
-      blocker: `Unknown project memory record id: ${request.recordId}`,
-      evidence: [
-        "project-memory-local-store:invalidate-missing-record",
-        "project-memory-local-store:no-auto-cleanup",
-      ],
-    };
-  }
-  if (existing.invalidatedAt) {
-    return {
-      record: existing,
-      invalidated: false,
-      skipped: true,
-      blocker: "Record is already invalidated.",
-      evidence: [
-        "project-memory-local-store:already-invalidated",
-        "project-memory-local-store:no-auto-cleanup",
-      ],
-    };
-  }
-  const tombstone: ProjectMemoryLifecycleTombstone = {
-    entryKind: "project-memory-lifecycle",
-    version: 1,
-    recordId: request.recordId,
-    operation: "invalidate",
-    createdAt: request.invalidatedAt,
-    sourceCommand: request.sourceCommand,
-    reason: sanitizeLifecycleReason(request.reason),
-  };
   try {
-    fs.mkdirSync(path.dirname(recordsFile), { recursive: true });
-    fs.appendFileSync(recordsFile, `${snapshot.appendPrefix}${JSON.stringify(tombstone)}\n`, "utf8");
+    return withMemoryStoreLock(ref, (lockedRef) => {
+      const snapshot = readEntriesSync(lockedRef);
+      if (snapshot.diagnostics.length) return { invalidated: false, skipped: false, blocker: snapshot.diagnostics.join(" "), evidence: ["project-memory-local-store:damaged"] };
+      const existing = foldProjectMemoryEntries(snapshot.entries, { includeInvalidated: true }).find(
+        (record) => record.id === request.recordId,
+      );
+      if (!existing) {
+        return {
+          invalidated: false,
+          skipped: false,
+          blocker: `Unknown project memory record id: ${request.recordId}`,
+          evidence: [
+            "project-memory-local-store:invalidate-missing-record",
+            "project-memory-local-store:no-auto-cleanup",
+          ],
+        };
+      }
+      if (existing.invalidatedAt) {
+        return {
+          record: existing,
+          invalidated: false,
+          skipped: true,
+          blocker: "Record is already invalidated.",
+          evidence: [
+            "project-memory-local-store:already-invalidated",
+            "project-memory-local-store:no-auto-cleanup",
+          ],
+        };
+      }
+      const tombstone: ProjectMemoryLifecycleTombstone = {
+        entryKind: "project-memory-lifecycle",
+        version: 1,
+        recordId: request.recordId,
+        operation: "invalidate",
+        createdAt: request.invalidatedAt,
+        sourceCommand: request.sourceCommand,
+        reason: sanitizeLifecycleReason(request.reason),
+      };
+      fs.appendFileSync(recordsFileFor(lockedRef), `${snapshot.appendPrefix}${JSON.stringify(tombstone)}\n`, { encoding: "utf8", mode: 0o600 });
+      return {
+        record: {
+          ...existing,
+          invalidatedAt: request.invalidatedAt,
+          invalidationReason: tombstone.reason,
+          invalidatedBySourceCommand: request.sourceCommand,
+        },
+        invalidated: true,
+        skipped: false,
+        evidence: [
+          "project-memory-local-store:invalidate-append-tombstone",
+          "project-memory-local-store:explicit-user-action",
+          "project-memory-local-store:no-provider-call",
+        ],
+      };
+    });
   } catch (error) {
     return {
       invalidated: false,
       skipped: false,
-      blocker: `Memory store is not writable at ${recordsFile}: ${error instanceof Error ? error.message : String(error)}`,
+      blocker: `Memory store is not writable at ${recordsFileFor(ref)}: ${error instanceof Error ? error.message : String(error)}`,
       evidence: ["project-memory-local-store:invalidate-unavailable"],
     };
   }
-  return {
-    record: {
-      ...existing,
-      invalidatedAt: request.invalidatedAt,
-      invalidationReason: tombstone.reason,
-      invalidatedBySourceCommand: request.sourceCommand,
-    },
-    invalidated: true,
-    skipped: false,
-    evidence: [
-      "project-memory-local-store:invalidate-append-tombstone",
-      "project-memory-local-store:explicit-user-action",
-      "project-memory-local-store:no-provider-call",
-    ],
-  };
 }
 
 function deleteRecord(
@@ -251,64 +250,63 @@ function deleteRecord(
       ],
     };
   }
-  const recordsFile = recordsFileFor(ref);
-  const snapshot = readEntriesSync(ref);
-  if (snapshot.diagnostics.length) return { recordId: request.recordId, deleted: false, skipped: false, blocker: snapshot.diagnostics.join(" "), evidence: ["project-memory-local-store:damaged"] };
-  const entries = snapshot.entries;
-  const existing = foldProjectMemoryEntries(entries, {
-    includeInvalidated: true,
-  }).find((record) => record.id === request.recordId);
-  if (!existing) {
-    return {
-      recordId: request.recordId,
-      deleted: false,
-      skipped: false,
-      blocker: `Unknown project memory record id: ${request.recordId}`,
-      evidence: [
-        "project-memory-local-store:delete-missing-record",
-        "project-memory-local-store:no-auto-cleanup",
-      ],
-    };
-  }
-  const retained = entries.filter(
-    (entry) => !entryTargetsRecord(entry, request.recordId),
-  );
-  const tombstone: ProjectMemoryLifecycleTombstone = {
-    entryKind: "project-memory-lifecycle",
-    version: 1,
-    recordId: request.recordId,
-    operation: "delete",
-    createdAt: request.deletedAt,
-    sourceCommand: request.sourceCommand,
-    reason: sanitizeLifecycleReason(request.reason),
-  };
-  let payload: string;
   try {
-    fs.mkdirSync(path.dirname(recordsFile), { recursive: true });
-    payload = [...retained, tombstone].map((entry) => JSON.stringify(entry)).join("\n");
-    fs.writeFileSync(recordsFile, `${payload}\n`, "utf8");
+    return withMemoryStoreLock(ref, (lockedRef) => {
+      const snapshot = readEntriesSync(lockedRef);
+      if (snapshot.diagnostics.length) return { recordId: request.recordId, deleted: false, skipped: false, blocker: snapshot.diagnostics.join(" "), evidence: ["project-memory-local-store:damaged"] };
+      const entries = snapshot.entries;
+      const existing = foldProjectMemoryEntries(entries, {
+        includeInvalidated: true,
+      }).find((record) => record.id === request.recordId);
+      if (!existing) {
+        return {
+          recordId: request.recordId,
+          deleted: false,
+          skipped: false,
+          blocker: `Unknown project memory record id: ${request.recordId}`,
+          evidence: [
+            "project-memory-local-store:delete-missing-record",
+            "project-memory-local-store:no-auto-cleanup",
+          ],
+        };
+      }
+      const retained = entries.filter(
+        (entry) => !entryTargetsRecord(entry, request.recordId),
+      );
+      const tombstone: ProjectMemoryLifecycleTombstone = {
+        entryKind: "project-memory-lifecycle",
+        version: 1,
+        recordId: request.recordId,
+        operation: "delete",
+        createdAt: request.deletedAt,
+        sourceCommand: request.sourceCommand,
+        reason: sanitizeLifecycleReason(request.reason),
+      };
+      const payload = [...retained, tombstone].map((entry) => JSON.stringify(entry)).join("\n");
+      writeTextFileAtomic(recordsFileFor(lockedRef), `${payload}\n`, 0o600);
+      return {
+        recordId: request.recordId,
+        deleted: true,
+        skipped: false,
+        deletedAt: request.deletedAt,
+        evidence: [
+          "project-memory-local-store:delete-rewrite-with-tombstone",
+          "project-memory-local-store:record-content-removed",
+          "project-memory-local-store:explicit-user-action",
+          "project-memory-local-store:no-provider-call",
+          "project-memory-local-store:no-auto-cleanup",
+        ],
+      };
+    });
   } catch (error) {
     return {
       recordId: request.recordId,
       deleted: false,
       skipped: false,
-      blocker: `Memory store is not writable at ${recordsFile}: ${error instanceof Error ? error.message : String(error)}`,
+      blocker: `Memory store is not writable at ${recordsFileFor(ref)}: ${error instanceof Error ? error.message : String(error)}`,
       evidence: ["project-memory-local-store:delete-unavailable"],
     };
   }
-  return {
-    recordId: request.recordId,
-    deleted: true,
-    skipped: false,
-    deletedAt: request.deletedAt,
-    evidence: [
-      "project-memory-local-store:delete-rewrite-with-tombstone",
-      "project-memory-local-store:record-content-removed",
-      "project-memory-local-store:explicit-user-action",
-      "project-memory-local-store:no-provider-call",
-      "project-memory-local-store:no-auto-cleanup",
-    ],
-  };
 }
 
 function readRecords(

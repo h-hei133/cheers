@@ -6,6 +6,17 @@ import { evaluateProjectMemoryCandidateQuality } from "./projectMemoryCandidateQ
 import { renderProjectMemoryCandidateSurface } from "./projectMemoryCandidateSurface.js";
 
 describe("project memory candidate extraction", () => {
+  it.each([
+    ["用户偏好中文输出", "用户偏好英文输出"],
+    ["Keep a stable project guideline. ".repeat(5) + "alpha", "Keep a stable project guideline. ".repeat(5) + "beta"],
+  ])("keeps distinct complete summaries as distinct candidates: %s", (first, second) => {
+    const input = { explicitUserPreferenceFacts: [first, second].map(summary => ({ summary, explicit: true, evidence: ["user-preference"] })) };
+    const candidates = extractProjectMemoryCandidates(input);
+    expect(candidates.map(candidate => candidate.summary)).toEqual([first, second]);
+    expect(new Set(candidates.map(candidate => candidate.candidateId)).size).toBe(2);
+    expect(extractProjectMemoryCandidates(input)).toEqual(candidates);
+  });
+
   it("extracts capability, blocked decision, route decision, validation, and explicit preference candidates", () => {
     const compact = runCompactCommand({
       mode: "render",

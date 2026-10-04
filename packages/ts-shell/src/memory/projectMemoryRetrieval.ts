@@ -124,7 +124,6 @@ function scoreRecord(
     score += 2;
     reasons.push("safe-record");
   }
-  score += recencyScore(record.createdAt);
   return { record, score, reasons: unique(reasons) };
 }
 
@@ -150,11 +149,17 @@ function compareMatches(
   if (right.score !== left.score) {
     return right.score - left.score;
   }
-  const created = right.record.createdAt.localeCompare(left.record.createdAt);
-  if (created !== 0) {
+  return compareMemoryRecordRecency(left.record, right.record);
+}
+
+export function compareMemoryRecordRecency(left: ProjectMemoryRecord, right: ProjectMemoryRecord): number {
+  const leftTime = Date.parse(left.createdAt);
+  const rightTime = Date.parse(right.createdAt);
+  const created = (Number.isFinite(rightTime) ? rightTime : -Infinity) - (Number.isFinite(leftTime) ? leftTime : -Infinity);
+  if (created) {
     return created;
   }
-  return left.record.id.localeCompare(right.record.id);
+  return left.id.localeCompare(right.id);
 }
 
 function hasQueryMatch(match: ProjectMemoryRetrievalMatch): boolean {
@@ -201,14 +206,6 @@ function boundedMaxResults(value: number | undefined): number {
     return DEFAULT_MAX_RESULTS;
   }
   return Math.max(1, Math.min(MAX_RESULT_LIMIT, Math.trunc(value ?? DEFAULT_MAX_RESULTS)));
-}
-
-function recencyScore(createdAt: string): number {
-  const timestamp = Date.parse(createdAt);
-  if (!Number.isFinite(timestamp)) {
-    return 0;
-  }
-  return Math.min(4, Math.max(0, Math.floor(timestamp / 86_400_000) % 5));
 }
 
 function unique(values: readonly string[]): readonly string[] {

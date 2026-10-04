@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { promises as fs } from "node:fs";
+import fsSync from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import {
@@ -62,12 +63,19 @@ describe("instruction file discovery", () => {
       "loose/AGENTS.md": "the loose directory",
     });
 
-    const loaded = loadInstructionFiles({
-      cwd: path.join(outer, "loose"),
-      homeDir: path.join(outer, "no-home"),
-    });
-
-    expect(loaded.files.map((file) => file.content)).toEqual(["the loose directory"]);
+    // Keep this marker-free scenario valid when TMPDIR is inside a checkout.
+    const exists = fsSync.existsSync;
+    const markers = vi.spyOn(fsSync, "existsSync").mockImplementation(file =>
+      path.basename(String(file)) === ".git" ? false : exists(file));
+    try {
+      const loaded = loadInstructionFiles({
+        cwd: path.join(outer, "loose"),
+        homeDir: path.join(outer, "no-home"),
+      });
+      expect(loaded.files.map((file) => file.content)).toEqual(["the loose directory"]);
+    } finally {
+      markers.mockRestore();
+    }
   });
 
   it("takes the first candidate present in a directory, in priority order", async () => {

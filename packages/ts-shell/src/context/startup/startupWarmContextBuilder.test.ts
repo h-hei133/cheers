@@ -80,18 +80,18 @@ describe("startup warm context builder", () => {
       const invalidated = record("pmr:invalid-store", "Invalidated store memory must be absent.");
       const deleted = record("pmr:deleted-store", "Deleted store memory must be absent.");
       for (const item of [active, invalidated, deleted]) {
-        await memoryStore.write({ storeRef: memoryStore.ref, record: item });
+        expect((await memoryStore.write({ storeRef: memoryStore.ref, record: item })).written).toBe(true);
       }
-      await memoryStore.invalidate?.({
+      expect((await memoryStore.invalidate!({
         recordId: invalidated.id,
         invalidatedAt: "2026-05-16T00:01:00.000Z",
         sourceCommand: "/memory",
-      });
-      await memoryStore.delete?.({
+      })).invalidated).toBe(true);
+      expect((await memoryStore.delete!({
         recordId: deleted.id,
         deletedAt: "2026-05-16T00:02:00.000Z",
         sourceCommand: "/memory",
-      });
+      })).deleted).toBe(true);
 
       const result = await buildStartupWarmContext({
         projectRoot: "/workspace/app",
@@ -120,12 +120,12 @@ function record(
     createdAt: "2026-05-16T00:00:00.000Z",
     candidateId: `pmc:${id}`,
     candidateKind: "project-fact",
-    retentionClass: "project-memory-candidate",
+    retentionClass: "project-scoped-candidate",
     approvedAt: "2026-05-16T00:00:00.000Z",
     approvedBySourceCommand: "/memory",
     memoryText,
     evidence: ["test:memory"],
-    source: "compact-handoff",
+    source: "compact-packet",
     routeReferences: [],
     safety: "safe",
     redactions: [],

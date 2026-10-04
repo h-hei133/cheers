@@ -23,6 +23,30 @@ describe("project memory future-turn injection", () => {
     fs.rmSync(storeRoot, { recursive: true, force: true });
   });
 
+  it.each<Partial<ProjectMemoryRecord>>([
+    { safety: "needs-review" },
+    { retentionClass: "never-remember" },
+    { candidateKind: "rejected" },
+  ])("does not promote excluded record policy to safe injection: %j", async policy => {
+    const memoryStore = createProjectMemoryLocalStore({ ref: { mode: "test-only", root: storeRoot } });
+    await seed(memoryStore, [record("pending-policy", "This fact is not approved for model context.", "project-fact", policy)]);
+    const states = createProjectMemoryInjectionStateStore();
+    const staged = await runProjectMemoryUseCommand({
+      request: normalizeProjectMemoryUseCommandRequest({ mode: "recall", query: "fact" }),
+      sessionScopeId: "policy", memoryStore, injectionStateStore: states,
+    });
+    expect(staged.outcome).toBe("staged");
+    const plan = await planProjectMemoryFutureTurnInjection({
+      memoryStore, injectionState: states.get("policy"),
+      markInjected: input => states.markInjected(input),
+      markConsumed: input => states.markConsumed(input),
+      markInvalid: input => states.markInvalid(input),
+    });
+    expect(plan.shouldInject).toBe(false);
+    expect(states.get("policy").injectionStatus).toBe("invalid");
+    expect(plan.injectedContext).toBeUndefined();
+  });
+
   it("stages wake-up memory and injects it once", async () => {
     const memoryStore = createProjectMemoryLocalStore({
       ref: { mode: "test-only", root: storeRoot },

@@ -8,6 +8,38 @@ import type {
   ProjectMemoryStoreRef,
 } from "./projectMemoryStoreContract.js";
 import { projectMemoryStoreRefIsWritable } from "./projectMemoryStoreContract.js";
+import type {
+  ProjectMemoryCandidateKind,
+  ProjectMemoryCandidateSource,
+  ProjectMemoryRetentionClass,
+} from "./projectMemoryCandidate.js";
+
+const RECORD_KINDS: Record<ProjectMemoryCandidateKind, true> = {
+  "project-fact": true,
+  "project-structure": true,
+  "capability-state": true,
+  "route-decision": true,
+  "user-preference-candidate": true,
+  "validation-pattern": true,
+  "restore/recovery-boundary": true,
+  "blocked-by-design-decision": true,
+  "transient-session-fact": true,
+  rejected: true,
+};
+const RETENTION_CLASSES: Record<ProjectMemoryRetentionClass, true> = {
+  "project-scoped-candidate": true,
+  "session-scoped-only": true,
+  "user-memory-candidate": true,
+  "never-remember": true,
+};
+const RECORD_SOURCES: Record<ProjectMemoryCandidateSource, true> = {
+  "compact-packet": true,
+  "context-projection": true,
+  "route-handoff": true,
+  "validation-evidence": true,
+  "user-stated-preference": true,
+  "system-derived": true,
+};
 
 export type ProjectMemoryStoreEntry =
   | ProjectMemoryRecord
@@ -67,16 +99,25 @@ function isStoreEntry(value: unknown): value is ProjectMemoryStoreEntry {
   if (!["id", "candidateId", "candidateKind", "retentionClass", "approvedAt", "memoryText", "source", "safety"]
     .every((key) => typeof entry[key] === "string")) return false;
   if (entry.approvedBySourceCommand !== "/memory") return false;
+  if ((entry.safety !== "safe" && entry.safety !== "needs-review")
+    || !Object.hasOwn(RECORD_KINDS, entry.candidateKind as string)
+    || !Object.hasOwn(RETENTION_CLASSES, entry.retentionClass as string)
+    || !Object.hasOwn(RECORD_SOURCES, entry.source as string)) return false;
   if (!["evidence", "routeReferences", "redactions"].every((key) =>
     Array.isArray(entry[key]) && (entry[key] as unknown[]).every((item) => typeof item === "string"))) return false;
   if (!["sourcePacket", "invalidatedAt", "invalidationReason", "invalidatedBySourceCommand"]
     .every((key) => entry[key] === undefined || typeof entry[key] === "string")) return false;
+  if (entry.invalidatedBySourceCommand !== undefined && entry.invalidatedBySourceCommand !== "/memory") return false;
   if (entry.structuredFact !== undefined) {
     if (!entry.structuredFact || typeof entry.structuredFact !== "object" || Array.isArray(entry.structuredFact)) return false;
     const fact = entry.structuredFact as Record<string, unknown>;
     if (!["subject", "predicate", "object"].every((key) => fact[key] === undefined || typeof fact[key] === "string")) return false;
   }
   return true;
+}
+
+export function isMemoryRecord(value: unknown): value is ProjectMemoryRecord {
+  return isStoreEntry(value) && !isLifecycleTombstone(value);
 }
 
 export function foldProjectMemoryEntries(

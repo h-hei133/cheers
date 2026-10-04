@@ -1,5 +1,13 @@
 import type { ProjectMemoryRecord } from "./projectMemoryStoreContract.js";
 
+/** Stored/recalled records still have to qualify for model-facing use. */
+export function memoryRecordIsInjectable(record: ProjectMemoryRecord): boolean {
+  return !record.invalidatedAt
+    && record.safety === "safe"
+    && record.retentionClass !== "never-remember"
+    && record.candidateKind !== "rejected";
+}
+
 export function recordHasForbiddenContent(record: ProjectMemoryRecord): boolean {
   const values = [
     record.memoryText,

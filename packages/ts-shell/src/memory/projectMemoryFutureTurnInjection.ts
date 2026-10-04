@@ -18,6 +18,7 @@ import type {
   ProjectMemoryStore,
 } from "./projectMemoryStoreContract.js";
 import { buildProjectMemoryWakeupPreview } from "./projectMemoryWakeup.js";
+import { memoryRecordIsInjectable } from "./memoryValidation.js";
 
 export interface ProjectMemoryFutureTurnInjectionPlan {
   readonly shouldInject: boolean;
@@ -238,9 +239,7 @@ async function buildCurrentCandidate(input: {
         injectionId: input.state.memoryInjectionId ?? "project-memory-pending",
         wakeup,
       }),
-      selectedRecords: [...wakeup.l0.records, ...wakeup.l1.records].filter(
-        (record) => !record.invalidatedAt,
-      ),
+      selectedRecords: [...wakeup.l0.records, ...wakeup.l1.records].filter(memoryRecordIsInjectable),
     };
   }
   const retrieval = await retrieveProjectMemoryRecords(input.memoryStore, {
@@ -254,7 +253,7 @@ async function buildCurrentCandidate(input: {
     }),
     selectedRecords: retrieval.matches
       .map((match) => match.record)
-      .filter((record) => !record.invalidatedAt),
+      .filter(memoryRecordIsInjectable),
   };
 }
 

@@ -2,7 +2,8 @@ import type {
   ProjectMemoryRecord,
   ProjectMemoryStore,
 } from "./projectMemoryStoreContract.js";
-import { retrieveProjectMemoryRecords } from "./projectMemoryRetrieval.js";
+import { compareMemoryRecordRecency } from "./projectMemoryRetrieval.js";
+import { memoryRecordIsInjectable } from "./memoryValidation.js";
 
 export interface ProjectMemoryWakeupSection {
   readonly title: string;
@@ -26,10 +27,8 @@ const MAX_L1_RECORDS = 8;
 export async function buildProjectMemoryWakeupPreview(
   store: ProjectMemoryStore,
 ): Promise<ProjectMemoryWakeupPreview> {
-  const retrieval = await retrieveProjectMemoryRecords(store, {
-    maxResults: 20,
-  });
-  const records = retrieval.matches.map((match) => match.record);
+  const list = await store.list();
+  const records = list.records.filter(memoryRecordIsInjectable);
   const l0 = records
     .filter(isL0Record)
     .sort(compareWakeRecords)
@@ -47,7 +46,7 @@ export async function buildProjectMemoryWakeupPreview(
       title: "L1-like essential project story",
       records: l1,
     },
-    totalRecords: retrieval.totalRecords,
+    totalRecords: list.records.length,
     autoInjected: false,
     startupCache: "not-enabled",
     providerCall: "none",
@@ -56,7 +55,7 @@ export async function buildProjectMemoryWakeupPreview(
       "project-memory-wakeup:auto-injection-disabled",
     ],
     evidence: [
-      ...retrieval.evidence,
+      ...list.evidence,
       "project-memory-wakeup:deterministic-preview",
       "project-memory-wakeup:no-provider-call",
       "project-memory-wakeup:no-persistence-write",
@@ -88,11 +87,7 @@ function compareWakeRecords(left: ProjectMemoryRecord, right: ProjectMemoryRecor
   if (priority !== 0) {
     return priority;
   }
-  const created = right.createdAt.localeCompare(left.createdAt);
-  if (created !== 0) {
-    return created;
-  }
-  return left.id.localeCompare(right.id);
+  return compareMemoryRecordRecency(left, right);
 }
 
 function wakePriority(record: ProjectMemoryRecord): number {

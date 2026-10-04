@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 export type ProjectMemoryCandidateKind =
   | "project-fact"
   | "project-structure"
@@ -83,7 +85,7 @@ export function projectMemoryCandidateId(
     "pmc",
     kind,
     source,
-    slug(summary).slice(0, 72) || "candidate",
+    createHash("sha256").update(summary.trim()).digest("hex").slice(0, 24),
   ].join(":");
 }
 
@@ -100,13 +102,6 @@ export function dedupeProjectMemoryCandidates(
     result.push(candidate);
   }
   return result;
-}
-
-function slug(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
 }
 
 function unique(values: readonly string[]): readonly string[] {

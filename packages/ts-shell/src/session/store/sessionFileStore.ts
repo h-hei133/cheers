@@ -119,17 +119,21 @@ function releaseOwnedLock(lockPath: string, fd: number, token: string | undefine
 }
 
 export function writeJsonFileAtomic(filePath: string, payload: unknown): void {
+  writeTextFileAtomic(filePath, JSON.stringify(payload, null, 2));
+}
+
+/** Publishes complete contents without truncating the current file on failure. */
+export function writeTextFileAtomic(filePath: string, content: string, mode?: number): void {
   const directory = path.dirname(filePath);
   if (!fs.existsSync(directory)) {
     fs.mkdirSync(directory, { recursive: true });
   }
 
   const tempPath = `${filePath}.tmp-${process.pid}-${randomUUID()}`;
-  const serialized = JSON.stringify(payload, null, 2);
-  const tempFd = fs.openSync(tempPath, "wx");
+  const tempFd = fs.openSync(tempPath, "wx", mode);
   try {
     try {
-      fs.writeFileSync(tempFd, serialized, "utf8");
+      fs.writeFileSync(tempFd, content, "utf8");
       fs.fsyncSync(tempFd);
     } finally {
       fs.closeSync(tempFd);
