@@ -8,6 +8,7 @@ import { CoreMcpGateway } from "../../core/mcp/gateway.js";
 import { runCliRuntimeInvocation, type CliRuntimeInvocationInput } from "../../entrypoints/cliRuntimeInvocation.js";
 import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
+import { HookDispatcher } from "../../core/hooks/hookDispatcher.js";
 
 let root: string;
 let log: string;
@@ -50,6 +51,24 @@ afterEach(async () => {
   await gateway.close();
   vi.unstubAllEnvs();
   fs.rmSync(root, { recursive: true, force: true });
+});
+
+it.each(["allow-once", "deny"] as const)("runs an annotated plan MCP call only after %s", async decision => {
+  const approve = vi.fn(async (prompt: { id: string }) => ({ promptId: prompt.id, decision, respondedAt: 1 }));
+  const run = await runCliRuntimeInvocation({ ...input(), providerModeEnv: "real", agentMode: "plan",
+    permissionScope: "ask", escalationPromptHandler: approve, mcpGateway: gateway,
+  }, {
+    checkProviderReadiness: async () => ({ ok: true }), hooks: new HookDispatcher(),
+    createStep: () => async messages => messages.some(message => message.role === "tool")
+      ? { text: "finished", toolCalls: [], stopReason: "stop" }
+      : { text: "", toolCalls: [{ id: "lookup", name: "mcp__local__echo_message", args: { message: "plan-check" } }], stopReason: "stop" },
+  });
+  const events = [];
+  for await (const event of run.events) events.push(event);
+  expect(approve, JSON.stringify(events)).toHaveBeenCalledOnce();
+  const calls = fs.readFileSync(log, "utf8").trim().split("\n").map(line => JSON.parse(line)).filter(event => event.event === "tools/call");
+  expect(calls).toHaveLength(decision === "allow-once" ? 1 : 0);
+  expect(events.find(event => event.type === "tool.result")).toMatchObject({ success: decision === "allow-once" });
 });
 
 it("shares the command gateway across two prompt bridges without per-turn shutdown", async () => {

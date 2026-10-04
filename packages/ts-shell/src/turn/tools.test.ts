@@ -3,6 +3,8 @@ import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import type { AgentMessage } from "../core/agent/state.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { adaptTools, createToolHooks, PARSE_ERROR_KEY, type ToolGateOptions } from "./tools.js";
+import { createCoreToolRegistry } from "../core/tools/registry.js";
+import { runToolsCommand } from "../core/commands/toolsCommandRuntime.js";
 
 /**
  * The gate decides what a tool call may do before the kernel runs it. Each
@@ -36,6 +38,44 @@ function call(name: string, args: Record<string, unknown> = {}) {
 }
 
 describe("createToolHooks", () => {
+  it.each([true, false, undefined, "true"])("uses only a boolean MCP read-only hint for plan eligibility (%s)", async hint => {
+    const tools = createCoreToolRegistry({ mcpTools: [{ serverName: "notes", toolName: "lookup", qualifiedName: "notes__lookup",
+      description: "Find notes", annotations: { readOnlyHint: hint as boolean } }] });
+    const hooks = createToolHooks(gate({ agentMode: "plan", permissionScope: "allow-all" }), tools);
+    const result = await hooks.beforeToolCall!(call("notes__lookup"));
+    expect(Boolean(result?.block)).toBe(hint !== true);
+  });
+
+  it("still asks permission for an eligible MCP tool and respects refusal", async () => {
+    const tools = createCoreToolRegistry({ mcpTools: [{ serverName: "notes", toolName: "lookup", qualifiedName: "notes__lookup",
+      description: "Find notes", annotations: { readOnlyHint: true } }] });
+    const handler = vi.fn(async (prompt: { id: string }) => ({ promptId: prompt.id, decision: "deny" as const, respondedAt: 1 }));
+    const hooks = createToolHooks(gate({ agentMode: "plan", permissionScope: "ask", escalationPromptHandler: handler }), tools);
+    expect((await hooks.beforeToolCall!(call("notes__lookup")))?.block).toBe(true);
+    expect(handler).toHaveBeenCalledOnce();
+    const unattended = createToolHooks(gate({ agentMode: "plan", permissionScope: "ask" }), tools);
+    expect((await unattended.beforeToolCall!(call("notes__lookup")))?.reason).toContain("no interactive handler");
+  });
+
+  it("shows the same plan eligibility that the execution gate enforces for every built-in", async () => {
+    const report = await runToolsCommand([], { cwd: process.cwd() });
+    const hooks = createToolHooks(gate({ agentMode: "plan", permissionScope: "allow-all" }));
+    for (const tool of createCoreToolRegistry().values()) {
+      const row = report.output.split("\n").find(line => line.startsWith(`| \`${tool.name}\` |`));
+      expect(row).toBeDefined();
+      const mode = row!.split(" | ")[1];
+      const args = tool.name === "bash" ? { command: "pwd" } : tool.name === "browser" ? { action: "observe" } : {};
+      const result = await hooks.beforeToolCall!(call(tool.name, args));
+      expect(Boolean(result?.block), tool.name).toBe(mode === "blocked");
+      if (mode === "read-only") {
+        const mutation = tool.name === "bash" ? { command: "rm file" } : { action: "click" };
+        expect((await hooks.beforeToolCall!(call(tool.name, mutation)))?.block).toBe(true);
+      }
+    }
+    expect(report.output).toContain("| `task` | blocked |");
+    expect(report.output).toContain("| `browser` | read-only |");
+  });
+
   it.each(["git status", "git diff", "git show HEAD", "git log -n 5", "git branch new-branch", "git diff --output=written.patch", "git show --output=written.patch"])(
     "blocks %s in plan mode and requires an explicit answer in ask mode", async command => {
       const plan = createToolHooks(gate({ agentMode: "plan", permissionScope: "allow-all" }));

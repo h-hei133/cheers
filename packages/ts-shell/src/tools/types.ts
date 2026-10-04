@@ -51,6 +51,8 @@ export interface ToolDefinition {
   readonly name: string
   readonly description: string
   readonly argsSchema: Record<string, unknown>
+  /** Server-declared capability hints; these never replace permission checks. */
+  readonly mcpAnnotations?: { readonly readOnlyHint: boolean }
   execute(
     args: Record<string, unknown>,
     context: ToolExecutionContext,

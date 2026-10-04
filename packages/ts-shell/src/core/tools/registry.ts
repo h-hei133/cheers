@@ -728,6 +728,7 @@ export function createCoreToolRegistry(options?: {
       name: tool.qualifiedName,
       description: `[MCP:${tool.serverName}] ${tool.description}`,
       argsSchema: tool.inputSchema ?? { type: 'object' },
+      mcpAnnotations: { readOnlyHint: tool.annotations?.readOnlyHint === true },
       async execute(args, _context) {
         if (!options?.mcpGateway) {
           // A tool without its gateway is a registration mistake, and the

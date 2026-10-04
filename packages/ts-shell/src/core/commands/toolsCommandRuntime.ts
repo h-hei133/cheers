@@ -1,5 +1,7 @@
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { createCoreToolRegistry } from "../tools/registry.js";
+import { toolPlanMode } from "../query/toolPolicy.js";
+import type { ToolDefinition } from "../../tools/types.js";
 
 /**
  * /tools — what the model can actually do this turn.
@@ -12,27 +14,6 @@ import { createCoreToolRegistry } from "../tools/registry.js";
  * Plan mode is shown per tool rather than described in prose, because "read-only
  * tools are allowed" is not checkable and this is.
  */
-
-/**
- * Tools plan mode permits.
- *
- * This mirrors the gate in the agent loop. It is duplicated deliberately rather
- * than exported from there: the loop's copy is the one that decides, and a display
- * that imported it would be able to drift only by being wrong about a name, which
- * the test catches.
- */
-const ALLOWED_IN_PLAN = new Set([
-  "read",
-  "glob",
-  "grep",
-  "lsp",
-  "browser",
-  "web_fetch",
-  "web_search",
-  "ask",
-  "todo",
-  "task",
-]);
 
 export async function runToolsCommand(
   args: string[],
@@ -49,12 +30,12 @@ export async function runToolsCommand(
         output: `No tool named \`${wanted}\`. \`/tools\` lists the ${registry.size} there are.`,
       };
     }
-    return { kind: "local", output: detail(tool.name, tool.description, tool.argsSchema) };
+    return { kind: "local", output: detail(tool) };
   }
 
   const rows = [...registry.values()]
     .sort((left, right) => left.name.localeCompare(right.name))
-    .map((tool) => `| \`${tool.name}\` | ${plan(tool.name)} | ${firstSentence(tool.description)} |`);
+    .map((tool) => `| \`${tool.name}\` | ${toolPlanMode(tool.name, tool)} | ${firstSentence(tool.description)} |`);
 
   return {
     kind: "local",
@@ -65,22 +46,17 @@ export async function runToolsCommand(
       "| :--- | :--- | :--- |",
       ...rows,
       "",
-      "`/tools <name>` shows one tool's arguments. Plan mode blocks anything that can change the workspace; `bash` is allowed there only for commands that read.",
+      "`/tools <name>` shows one tool's arguments. Plan mode permits only read-only `bash` commands and `browser` actions. Eligible tools still require the session's permissions and approval.",
     ].join("\n"),
   };
 }
 
-/** Whether plan mode lets this tool run, in the words the band uses. */
-function plan(name: string): string {
-  if (ALLOWED_IN_PLAN.has(name)) return "allowed";
-  return name === "bash" ? "read-only" : "blocked";
-}
-
 /** One tool in full: what it does and what it takes. */
-function detail(name: string, description: string, schema: Record<string, unknown>): string {
+function detail(tool: ToolDefinition): string {
+  const { name, description, argsSchema: schema } = tool;
   const properties = schema.properties;
   const required = new Set(Array.isArray(schema.required) ? (schema.required as string[]) : []);
-  const lines = [`### \`${name}\``, "", description.trim(), "", `- Plan mode: ${plan(name)}`, ""];
+  const lines = [`### \`${name}\``, "", description.trim(), "", `- Plan mode: ${toolPlanMode(name, tool)}`, ""];
 
   if (!properties || typeof properties !== "object") {
     lines.push("It takes no arguments.");

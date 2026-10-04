@@ -203,7 +203,7 @@ export function runTurn(options: TurnOptions): TurnRun {
         ? openingText
         : [{ type: "text" as const, text: openingText }, ...openingImages],
   };
-  const hooks = createToolHooks(gate);
+  const hooks = createToolHooks(gate, options.tools);
   /**
    * The request as it last went out, kept so a refresh can replay it.
    *

@@ -2,9 +2,8 @@ import type { PermissionScope } from "../cli/approval/permissionScope.js";
 import type { AgentTool, AgentToolResult, ToolHooks } from "../core/agent/tools.js";
 import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import { DoomLoopDetector } from "../core/query/doomLoopDetector.js";
-import { buildToolEscalationPrompt, evaluateToolPermissionScope, READ_ONLY_BROWSER_ACTIONS } from "../core/query/toolPolicy.js";
+import { buildToolEscalationPrompt, evaluateToolPermissionScope, planModeBlock } from "../core/query/toolPolicy.js";
 import type { DenyRule } from "../core/shell/approval/deny.js";
-import { isReadOnlyBashCommand } from "../core/shell/approval/evaluator.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { AskQuestion } from "../core/tools/ask.js";
 import type { EscalationPrompt, EscalationResponse } from "../core/shell/approval/contract.js";
@@ -65,11 +64,6 @@ export interface ToolGateOptions {
    */
   readonly denyRules?: readonly DenyRule[];
 }
-
-/** Tools a planning session may call: the ones that only look. */
-const PLAN_MODE_TOOLS: Record<string, true> = {
-  read: true, glob: true, grep: true, lsp: true, web_fetch: true, web_search: true, ask: true, todo: true,
-};
 
 /** Key the step runner uses to carry an argument parse failure into the call. */
 export const PARSE_ERROR_KEY = "__parseError";
@@ -156,12 +150,12 @@ async function executeTool(
  * feedback (a compile error after an edit, say) is attached to the result so
  * the model reads it with the output it belongs to.
  */
-export function createToolHooks(options: ToolGateOptions): ToolHooks {
+export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<string, ToolDefinition>): ToolHooks {
   const doomLoop = new DoomLoopDetector(3);
   const approvals = new Map<string, { operation: string; decision: string }>();
   return {
     beforeToolCall: async ({ call, args }, signal) => {
-      const planBlock = planModeBlock(options.agentMode, call.name, args);
+      const planBlock = planModeBlock(options.agentMode, call.name, args, tools?.get(call.name));
       if (planBlock) return { block: true, reason: planBlock };
       const permission = await askPermission(call.id, call.name, args, options, signal);
       if (permission.blocked) return { block: true, reason: permission.blocked };
@@ -245,13 +239,6 @@ export function createToolHooks(options: ToolGateOptions): ToolHooks {
       return output === result.output ? undefined : { output };
     },
   };
-}
-
-function planModeBlock(agentMode: "plan" | "build" | undefined, toolName: string, args: Record<string, unknown>): string | undefined {
-  if (agentMode !== "plan" || PLAN_MODE_TOOLS[toolName]) return undefined;
-  if (toolName === "bash" && typeof args.command === "string" && isReadOnlyBashCommand(args.command)) return undefined;
-  if (toolName === "browser" && typeof args.action === "string" && READ_ONLY_BROWSER_ACTIONS[args.action.toLowerCase().trim()]) return undefined;
-  return `Blocked: Plan mode is active. Tool '${toolName}' ${toolName === "bash" ? "with non-read-only command " : ""}is not permitted in plan mode. Switch to build mode via /build to execute modifications or commands.`;
 }
 
 /**

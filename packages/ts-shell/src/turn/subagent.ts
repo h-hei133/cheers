@@ -13,7 +13,7 @@ export function createSubagentRunner(
   return async (input) => {
     const agentMode = subagentMode(parent.agentMode, input.definition.permissionMode, input.agentMode);
     const gate = { ...parent, workspaceRoot: input.workspace, agentMode };
-    const hooks = createToolHooks(gate);
+    const hooks = createToolHooks(gate, tools);
     const result = await runSubagent(input, {
       tools: new Map(adaptTools(tools, gate).map((tool) => [tool.name, tool])),
       step: (messages, signal, options) => host.step(messages, signal, {}, { ...options, agentMode }),

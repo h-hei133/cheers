@@ -1090,7 +1090,7 @@ OAuth 只在「直连上游订阅（Copilot / Anthropic 订阅）」时有意义
 | **38** | `SES-09`（`R10-4`） | 空/不可读锁用**远短**宽限（微秒窗口，建议 ≤5s）；或把获取等待上界提到陈旧阈值之上 | `自研`（`opencode` 的 heartbeat 治的是另一面） | 造零字节锁 ⇒ **不再** 1.2s 超时、也**不**等 60s |
 | **39** | `SES-10` | **本地完成，远端待验证**：既有`lifecycle.cancelled`在shell结算后发给eventObservers；非交互信号退出等待cancelAndWait | 对照会话abort等待idle与公开事件广播 | 编译CLI三种信号均收到唯一取消终态，部分正文与来源持久化、连接关闭；turn内部契约无需新增同义事件 |
 | **40** | `TOL-10` | 已完成：`task`终态按失败事实判定，保留部分答复；runner补足工具阶段取消，适配器保留error | 对照子代理扩展的失败结算与独立取消事实 | 步数耗尽但有叙述文本、实际工具阶段取消均返回失败；父模型收到原因 |
-| **41** | `TOL-12` | 读 MCP `annotations.readOnlyHint` 判只读；把 `/tools` 的 `ALLOWED_IN_PLAN` **从门派生**（同一常量） | `gemini-cli/.../policy-engine.ts:610`（按注解决策） | 只读 MCP 工具在 plan 模式**可调用**；`/tools` 的 plan 列与门**逐项一致**（新增一致性测试） |
+| **41** | `TOL-12` | **本地完成，远端待验证**：严格布尔MCP只读标注只解除plan禁止，仍经过权限；/tools与执行共用toolPolicy | 对照标注准入后仍ask_user的策略 | 真实stdio夹具仅批准时调用；全部内置工具展示与参数门一致；主回合/子代理接线回归 |
 | **42** | `TOL-13` | `/tools` 接受当前工具池（含 `mcpTools`/`skills`）或至少读 live 快照 | `自研` | 配 MCP 时 `/tools` 列出的数量与模型实际一致 |
 | **43** | `CMD-09` | `/deep-research` 接模型做查询生成与综述（复用 `/btw` 的侧信道调用样板），或**去掉机制宣称**并改名 | `自研`（`pi` 无对等命令） | 报告正文**不含**「multi-agent tree search」等未做过的机制词 |
 | **44** | `CMD-10` | `/review` 对齐 `/commit`：读 diff → 构造 prompt 回合，交模型评审 | `自研`（对照同仓 `/commit`） | `/review` 触发一次模型回合；不再打印固定清单 |
@@ -2074,4 +2074,38 @@ f2ee3c17的CI37171187869和Architecture Watch37171187862均成功。W7-27完成�
 
 W7-29的0f2b552b两项远端检查成功并收口；W7-33当前门禁auth失败，保证范围见Provider审计。
 Phase18仍有W8其余条目与真实传输验收未完成。
-Node20.3编译CLI三信号测试另行通过，见`.tmp/cancellation-check/node20.log`。
+原标称Node20.3的编译CLI三信号测试实际运行于Node24；该版本声明撤回，明确路径的重新验证见下节。
+
+### W8-39补验：Node最低版本与主题资源（2026-10-04）
+
+8d1fd664的CI37211647799失败：5307通过、3失败、1跳过，三失败均为新增编译CLI取消测试。
+失败发生在主题JSON的`with { type: "json" }`导入，Node20.3解析阶段即退出，与取消结算代码无关。
+此前标称Node20.3的`npm exec --package=node@20.3.0 -- node ...`实际启动本机v24.15.0；
+因此撤回那条本地Node20.3通过声明。现在使用下载到仓内的明确二进制路径，并先确认`--version`为v20.3.0。
+
+主题assets owner集中原生JSON加载，静态require供打包器内嵌，Node ESM使用createRequire回退；
+不改主题数据、Node版本下限、构建脚本或包脚本。参考原生资源解析及独立可执行资源处理后自研该兼容接线。
+单纯createRequire版本曾在二进制中缺少dark.json，未作为完成结果；最终同时覆盖原生Node与打包资源。
+明确Node20.3的旧编译产物三项失败，修复重建后三项通过；独立二进制在隔离目录完成`--version`与`/theme list`，四套预设均存在。
+证据在`.tmp/node-floor/`；W8-39最终远端验证随新提交继续。
+
+### W8-41 / TOL-12：MCP plan准入与展示共源（2026-10-04）
+
+registry保留MCP的严格布尔readOnlyHint，主回合和子代理把同一个工具池交给工具门。
+缺失、false或字符串true不能解除plan禁止；true只改变plan资格，不跳过既有permissionScope、用户拒绝和PreToolUse。
+工具池之外的工具与子代理未继承工具仍不能执行。
+
+目标核验后定向比较本地策略参考的`policy/policies/plan.toml:82-93`：标注只读的MCP覆盖plan拒绝，
+但决策仍为ask_user；非交互不能靠提示自授权。本仓沿用既有显式权限scope，ask时需实际批准，无handler仍拒绝。
+把plan资格与参数检查收回既有toolPolicy owner，删除turn与/tools两份清单。
+/tools的task改为blocked，browser与bash显示read-only，且明确仍受会话权限限制。
+当前/tools工具池仍是默认registry；动态MCP、skills和配置过滤属于紧接着的W8-42，不在本项冒充完成。
+
+测试覆盖严格布尔准入、批准/拒绝、无handler、全部内置工具展示与实际门一致、主回合与子代理接线；
+CLI invocation经过真实stdio JSON-RPC夹具，仅批准时产生tools/call，模型step为合成注入，无真实provider。
+两处新夹具错误（缺mcp__前缀、未给子代理继承工具）修正后通过，未放宽产品继承规则。
+七生产文件反转后7失败3通过，字节恢复后10条新增回归通过；证据`.tmp/tools-plan-check/`。
+明确路径Node20.3、正确包工作目录下最终16套244项全部通过，CLI构建与独立二进制构建/主题列表验收通过。
+首次直接从仓根启动Vitest造成MCP相对夹具路径错误；无项目主题用例则继承仓库祖先标记。
+前者修正驱动工作目录，后者在该用例显式模拟无根标记，保留原行为断言，不修改产品目录发现策略。
+静态阻断门、43项脚本和NormProof阻断义务通过，整体advisory仍partial。远端验证待完成；本批无PTY或独立审查结论。

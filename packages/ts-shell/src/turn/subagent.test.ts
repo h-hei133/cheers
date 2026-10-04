@@ -31,6 +31,21 @@ function harness(overrides: Partial<ToolGateOptions> = {}, command = "printf cha
 const reviewer = new SubagentLoader().getSubagent("code-reviewer", false)!;
 const request = { definition: reviewer, prompt: "review", workspace: process.cwd() };
 
+it("keeps MCP read-only eligibility in the delegated plan gate", async () => {
+  const execute = vi.fn(async () => ({ success: true, output: "found note" }));
+  const tools = new Map([["notes__lookup", { name: "notes__lookup", description: "find notes", argsSchema: {},
+    mcpAnnotations: { readOnlyHint: true }, execute }]]);
+  const step: StepFunction = async messages => messages.some(message => message.role === "tool")
+    ? { text: "finished", toolCalls: [], stopReason: "stop" }
+    : { text: "", toolCalls: [{ id: "lookup", name: "notes__lookup", args: {} }], stopReason: "stop" };
+  const run = createSubagentRunner({ step, defaultMaxSteps: 3 }, tools, {
+    sessionId: "session", workspaceRoot: process.cwd(), agentMode: "plan", permissionScope: "allow-all",
+    hooks: { dispatch: async () => ({ decision: "allow" }) } as unknown as ToolGateOptions["hooks"], emit: () => {},
+  });
+  expect((await run({ ...request, definition: { ...reviewer, tools: ["notes__lookup"] } })).agentMode).toBe("plan");
+  expect(execute).toHaveBeenCalledOnce();
+});
+
 it("build dispatches a reviewer with a real plan gate and reports its effective mode", async () => {
   const { run, execute, observations } = harness();
   const result = await createTaskToolDefinition().execute({ description: "review", prompt: "inspect files",

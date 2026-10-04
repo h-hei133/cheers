@@ -17,6 +17,16 @@ import { recordSessionUsage, resetSessionUsage } from "../observability/usageTel
 
 const quietHooks = { dispatch: async () => ({ decision: "allow" as const }) } as unknown as HookDispatcher;
 
+it("carries registered MCP hints into the turn's plan gate", async () => {
+  const execute = vi.fn(async () => ({ success: true, output: "found note" }));
+  const setup = options({ agentMode: "plan", tools: new Map([["notes__lookup", {
+    ...echoTool("notes__lookup", "found note"), mcpAnnotations: { readOnlyHint: true }, execute,
+  }]]), step: scripted([{ text: "", toolCalls: [{ id: "lookup", name: "notes__lookup", args: {} }], stopReason: "stop" }]) });
+  const events = await drain(runTurn(setup).events);
+  expect(execute).toHaveBeenCalledOnce();
+  expect(events.find(event => event.type === "tool.result")).toMatchObject({ success: true, output: "found note" });
+});
+
 function echoTool(name: string, output: string): ToolDefinition {
   return {
     name,
