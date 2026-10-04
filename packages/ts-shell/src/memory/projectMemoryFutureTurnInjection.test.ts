@@ -70,6 +70,18 @@ describe("project memory future-turn injection", () => {
     expect(staged.output).toContain("Future-turn injection: explicit staged use only");
 
     const pending = injectionStateStore.get("session:memory-use");
+    for (const maxInjectedContextChars of [0, 100]) {
+      const deferred = await planProjectMemoryFutureTurnInjection({
+        memoryStore, injectionState: pending, maxInjectedContextChars,
+        markInjected: input => injectionStateStore.markInjected(input),
+        markConsumed: input => injectionStateStore.markConsumed(input),
+        markInvalid: input => injectionStateStore.markInvalid(input),
+      });
+      expect(deferred.shouldInject).toBe(false);
+      expect(deferred.injectedContext).toBeUndefined();
+      expect(deferred.warnings.map(warning => warning.id)).toContain("memory-injection-budget-insufficient");
+      expect(injectionStateStore.get("session:memory-use")).toBe(pending);
+    }
     const prepared = await planProjectMemoryFutureTurnInjection({
       mode: "prepare", memoryStore, injectionState: pending,
       markInjected: (input) => injectionStateStore.markInjected(input),
@@ -395,6 +407,8 @@ describe("project memory future-turn injection", () => {
 
     expect(plan.shouldInject).toBe(true);
     expect(plan.injectedContext?.match(/Duplicate wake record/g)?.length).toBe(1);
+    expect(plan.injectedContext!.length).toBeLessThanOrEqual(1600);
+    expect(plan.injectedContext!.endsWith("</project_memory_context>")).toBe(true);
     expect(plan.warnings.map((warning) => warning.id)).toContain("duplicate-memory-records-deduped");
     expect(plan.warnings.map((warning) => warning.id)).toContain("project-memory-injected-context-over-budget");
     expect(plan.injectedContext).toContain("- Automatic memory injection: no.");

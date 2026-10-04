@@ -51,6 +51,18 @@ describe("compact future-turn injection planner", () => {
     });
 
     const pending = injectionStore.get("session:sess-inject");
+    for (const maxInjectedContextChars of [0, 100]) {
+      const deferred = planCompactFutureTurnInjection({
+        checkpoint, injectionState: pending, maxInjectedContextChars,
+        markInjected: input => injectionStore.markInjected(input),
+        markConsumed: input => injectionStore.markConsumed(input),
+        markInvalid: input => injectionStore.markInvalid(input),
+      });
+      expect(deferred.shouldInject).toBe(false);
+      expect(deferred.injectedContext).toBeUndefined();
+      expect(deferred.warnings.map(warning => warning.id)).toContain("compact-injection-budget-insufficient");
+      expect(injectionStore.get("session:sess-inject")).toBe(pending);
+    }
     const prepared = planCompactFutureTurnInjection({
       mode: "prepare", checkpoint, injectionState: pending,
       markInjected: (input) => injectionStore.markInjected(input),

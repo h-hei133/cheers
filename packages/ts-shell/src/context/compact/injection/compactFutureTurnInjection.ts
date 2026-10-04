@@ -113,6 +113,11 @@ export function planCompactFutureTurnInjection(
   const budget = applyCompactInjectedContextBudget(formattedContext, {
     maxChars: input.maxInjectedContextChars,
   });
+  if (!budget.fits) {
+    return skip(input.injectionState, "compact-injection-budget-insufficient",
+      "Compact context cannot fit the budget with its required safety content; it remains pending.",
+      [...baseEvidence, ...budget.evidence], budget.warnings);
+  }
   if (containsUnsafeContent(budget.context)) {
     return invalid(
       input,

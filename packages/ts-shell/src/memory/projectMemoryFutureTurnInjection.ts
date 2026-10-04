@@ -131,6 +131,11 @@ export async function planProjectMemoryFutureTurnInjection(
   const budget = applyProjectMemoryInjectedContextBudget(formattedContext, {
     maxChars: input.maxInjectedContextChars,
   });
+  if (!budget.fits) {
+    return skip(state, "memory-injection-budget-insufficient",
+      "Memory context cannot fit the budget with its required safety content; it remains pending.",
+      [...baseEvidence, ...budget.evidence], budget.warnings);
+  }
   if (containsUnsafeContent(budget.context)) {
     return invalid(input, "unsafe-injected-context", "Formatted project memory context contained unsafe raw-looking content.", [
       ...baseEvidence,

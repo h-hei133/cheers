@@ -1,3 +1,5 @@
+import { fitContextLines } from "../../budget/lines.js";
+
 export interface CompactInjectedContextBudgetOptions {
   readonly maxChars?: number;
   readonly maxListItems?: number;
@@ -5,6 +7,7 @@ export interface CompactInjectedContextBudgetOptions {
 
 export interface CompactInjectedContextBudgetResult {
   readonly context: string;
+  readonly fits: boolean;
   readonly estimatedSize: number;
   readonly originalSize: number;
   readonly overBudget: boolean;
@@ -23,7 +26,8 @@ export function applyCompactInjectedContextBudget(
   context: string,
   options: CompactInjectedContextBudgetOptions = {},
 ): CompactInjectedContextBudgetResult {
-  const maxChars = options.maxChars ?? DEFAULT_MAX_CHARS;
+  const requestedMax = options.maxChars ?? DEFAULT_MAX_CHARS;
+  const maxChars = Number.isFinite(requestedMax) ? Math.max(0, Math.floor(requestedMax)) : 0;
   const maxListItems = options.maxListItems ?? DEFAULT_MAX_LIST_ITEMS;
   const dedupedLines = dedupeLines(context.split("\n"));
   const listCappedLines = capListItems(dedupedLines, maxListItems);
@@ -31,6 +35,7 @@ export function applyCompactInjectedContextBudget(
   if (listCappedContext.length <= maxChars) {
     return {
       context: listCappedContext,
+      fits: true,
       estimatedSize: listCappedContext.length,
       originalSize: context.length,
       overBudget: context.length > maxChars,
@@ -51,30 +56,16 @@ export function applyCompactInjectedContextBudget(
     };
   }
 
-  const critical = listCappedLines.filter(isCriticalLine);
-  const remaining = listCappedLines.filter((line) => !isCriticalLine(line));
-  const kept: string[] = [];
-  for (const line of [...listCappedLines.slice(0, 2), ...critical, ...remaining]) {
-    if (kept.includes(line)) {
-      continue;
-    }
-    const next = [...kept, line].join("\n");
-    if (next.length > maxChars && !isCriticalLine(line)) {
-      continue;
-    }
-    kept.push(line);
-  }
-  if (!kept.includes("</compact_v2_injected_context>")) {
-    kept.push("- Budget: non-critical lines omitted; critical safety facts preserved.");
-    kept.push("</compact_v2_injected_context>");
-  }
-  const budgeted = kept.join("\n");
+  const fitted = fitContextLines(listCappedLines, maxChars, isCriticalLine,
+    "- Budget: additional entries omitted; required safety content preserved.");
+  const budgeted = fitted.context;
   return {
     context: budgeted,
+    fits: fitted.fits,
     estimatedSize: budgeted.length,
     originalSize: context.length,
     overBudget: true,
-    omittedLineCount: listCappedLines.length - kept.length,
+    omittedLineCount: dedupedLines.length - listCappedLines.length + fitted.omittedLineCount,
     warnings: [
       {
         id: "compact-injected-context-over-budget",
@@ -85,7 +76,7 @@ export function applyCompactInjectedContextBudget(
       "compact-injected-context-budget:deduped",
       "compact-injected-context-budget:list-capped",
       "compact-injected-context-budget:over-budget-trimmed",
-      "compact-injected-context-budget:critical-facts-preserved",
+      fitted.fits ? "compact-injected-context-budget:critical-facts-preserved" : "compact-injected-context-budget:insufficient-capacity",
     ],
   };
 }

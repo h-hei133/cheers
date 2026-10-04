@@ -1,7 +1,7 @@
 # Phase 18 记忆与上下文行为审计
 
 W7-29仍在执行。本批只闭合存储事务、候选身份、检索排序和显式注入准入；
-不以定向测试通过代替全部模块的行为审计。当前非测试模块为memory 38、context 28；
+不以定向测试通过代替全部模块的行为审计。当前非测试模块为memory 38、context 29；
 裁决中的36+28是历史数量，本批开始时为37+28，新增一个存储事务owner。
 以下源码路径相对 `packages/ts-shell/src/`。
 
@@ -89,3 +89,24 @@ W7-29仍在执行。本批只闭合存储事务、候选身份、检索排序和
 `.tmp/memory-quality-reversal-gu84bmpl`、`.tmp/memory-nodefloor-ELXa6w`。
 本批未运行新的PTY或真实provider验收；审批/保存接线由真实slashRouter测试覆盖，第一批PTY不作为本批审批证据。
 主代理复核，未取得独立审查结论。W7-29仍未完成，注入质量与剩余owner的逐模块映射继续。
+
+
+## 第三批：注入预算与边界（2026-10-04）
+
+记忆和compact预算器原先让关键行无条件突破maxChars，并在超限后把结束标记移动到部分正文之前。
+`context/budget/lines.ts`现在共用线性行选择逻辑：预留必需行和裁剪说明的容量，
+其余完整行按原顺序保留；结束标记不重排。无容量保留必需内容时返回fits=false和空context。
+两个planner在消费状态之前检查fits，拒绝该次注入并保留pending，后续足够预算仍可使用。
+保留各owner已有关键行分类和列表上限，不引入另一套注入状态；context新增一个生产模块，现为29个。
+
+定向参考`core/tools/truncate.ts:78-140`：首行已超限时返回空内容和明确标志，
+只收集完整且不超限的行。采用“放不下就显式拒绝”和完整行边界；不同点是本仓沿用字符预算，
+需要优先预留既有关键行，不能照搬该工具输出的字节前缀截断。共享预算测试覆盖两种格式、
+无效/微小上限、超大关键行、原顺序、闭合标记及显式裁剪说明；两个planner测试验证pending不被消费。
+
+隔离环境memory/context/slashRouter共38套268项通过，CLI构建通过；四个owner撤销后17失败15通过，
+逐字节恢复后三套32项通过。最终行选择实现移除重复字符串拼接，八套41项再通过。
+静态阻断门和43项脚本测试通过，职责上限六项既有advisory；独立审查与新PTY未执行。
+证据位于`.tmp/context-budget-final-ZXhOA7`、`.tmp/context-budget-reversal-hdb8uag7`和
+`.tmp/context-budget-linear-hIZcZO`。预算拒绝由planner返回显式warning，未宣称整个回合失败。
+W7-29仍需完成其余模块行为映射；本批不以预算测试代替整体上下文正确性。
