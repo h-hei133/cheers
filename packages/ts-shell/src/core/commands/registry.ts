@@ -334,7 +334,7 @@ export function createCommandRegistry(
     {
       name: "review",
       aliases: ["audit", "check"],
-      kind: "local",
+      kind: "prompt",
       supportsNonInteractive: true,
       availability: "available",
       enabled: true,

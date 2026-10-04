@@ -3120,7 +3120,9 @@ web search/fetch → `extractLearningsFromContent`（`:168-183` 按标点切句�
 **参考**：`pi` 无此命令（`NOT-FOUND`）。**方向**：接模型做查询生成与综述（`/btw` 已有侧信道模型调用的样板），
 或改名并去掉伪造的机制宣称。
 
-### CMD-10 · `/review` 是**硬编码清单 + 原始 diff**，不调模型 — `OPEN` `P2` `CONFIRMED`
+### CMD-10 · `/review` 是**硬编码清单 + 原始 diff**，不调模型 — `LOCAL-FIXED` `P2` `CONFIRMED`
+
+2026-10-05：改为prompt回合，异步读两份diff，失败明确停止；合成模型编译CLI确认有变更一次请求/干净树零请求。本地验证完成，远端待验证，下文保留发现时依据。
 
 `core/commands/reviewCommandRuntime.ts:8-72`：`execSync` 取 `git status`/`git diff`（截断 5000 字符），
 接一段**固定 4 条**的「Reviewer Checklist」（`:63-69`）。**没有任何模型调用**。

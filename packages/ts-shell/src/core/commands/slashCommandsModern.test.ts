@@ -35,10 +35,11 @@ describe("Modern Slash Commands Subsystem", () => {
     expect(result).toMatchObject({ action: "clear-session" });
   });
 
-  it("/review outputs clean tree status and diff report", async () => {
+  it("/review answers locally for a clean tree", async () => {
     execFileSync("git", ["init", "--quiet", tempDir]);
     const result = await runReviewCommand(["focus on tests"], { cwd: tempDir, sessionId: "sess_1" });
     expect(result.kind).toBe("local");
+    if (result.kind !== "local") throw new Error("Expected local clean status");
     expect(result.output).toContain("Working tree clean");
   });
 
