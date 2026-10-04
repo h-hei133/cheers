@@ -110,3 +110,36 @@ W7-29仍在执行。本批只闭合存储事务、候选身份、检索排序和
 证据位于`.tmp/context-budget-final-ZXhOA7`、`.tmp/context-budget-reversal-hdb8uag7`和
 `.tmp/context-budget-linear-hIZcZO`。预算拒绝由planner返回显式warning，未宣称整个回合失败。
 W7-29仍需完成其余模块行为映射；本批不以预算测试代替整体上下文正确性。
+
+
+## 第四批：源码事实身份与解析边界（2026-10-04）
+
+`context/acquisition/code/source.ts`原来把路径、factId与展示摘要都裁成220字符，
+并压缩路径中的连续空格。两个长路径/ID或不同空格文件名会被错误合并，目标筛选可能使用另一文件的事实。
+现路径和ID保留完整身份，仅展示摘要裁剪；保留既有反斜杠分隔符归一，不新增文件访问。
+新增断言覆盖长前缀碰撞、ID选择、连续空格、空证据过滤、冻结结果和不从成功诊断文字制造事实。
+
+目标检查后定向对照参考`core/tools/path-utils.ts:48-58`：路径解析保留完整路径，并优先使用原本存在的文件。
+采用身份不使用展示摘要截断的边界；本仓此层只是事实匹配，不复制文件探测、Unicode候选查找或cwd解析。
+反转source owner后2失败2通过，字节恢复后4项通过。
+
+`context/graph/ast/parser.test.ts`补8项直接断言：TSX声明/导入/位置、扩展名、JSON无符号及残缺TS容错。
+这些测试仅证明当前TS/JS语法提取入口；其他语言仍是基于行的声明提示，不能宣称完整AST、语义引用或准确嵌套关系。
+没有为了扩大测试数量重写解析器或更改工具能力承诺。
+
+隔离context、core/tools/lsp和session/harness/state共27套136项、build:cli、静态阻断门与43项脚本通过。
+原始证据`.tmp/context-identity-ILbPED`与`.tmp/source-identity-reversal.log`。本批无新PTY或独立审查结论。
+771e0c21的主CI 37207619451已成功，架构检查37207619453成功；cf994879主CI仍在运行，未记为通过。
+
+### 剩余审计的固定范围
+
+后续只完成既定W7-29的模块映射与必要反例，不继续扩大相邻功能：
+
+| 待收口部分 | 已有入口 | 尚需确认的内容 |
+|---|---|---|
+| 候选提取与评审呈现 | candidateExtractor、reviewCommandRunner、saveCommandRunner测试 | 逐字段来源与派生状态，审核/保存/持久化边界一致 |
+| 注入质量、合并与命令契约 | futureTurnInjection、injectionState、Chain、slashRouter测试 | 空结果、损坏读取、替换与消费的分支映射，不以文件存在作通过证据 |
+| compact来源与呈现 | compact各直接测试及既有会话审计 | 全部owner的输入来源、未知状态、摘要与恢复边界 |
+| startup、指令、选择 | startupWarmContextHealth、importExpansion、projectInstructions、selection/model测试 | 复用W7-32等既有证据并逐模块映射，明确启发式能力范围 |
+
+W7-29仍未完成；源码身份修复和解析直接测试不替代上述完整审计。

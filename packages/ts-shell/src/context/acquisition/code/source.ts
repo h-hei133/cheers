@@ -26,8 +26,8 @@ export function normalizeRuntimeSourceFacts(
   for (const fact of facts) {
     const path = compactPath(fact.path)
     const summary = compact(fact.summary)
-    const factId = compact(fact.factId || `source:${path}`)
-    if (!factId || !path || !summary) continue
+    const factId = (fact.factId || `source:${path}`).trim()
+    if (!factId || !path.trim() || !summary) continue
     byId.set(factId, Object.freeze({
       factId,
       path,
@@ -44,7 +44,7 @@ export function sourceFactsForTargets(input: {
   readonly sourceFactIds?: readonly string[]
 }): readonly RuntimeSourceFact[] {
   const targetSet = new Set(input.targetFiles.map(compactPath).filter(Boolean))
-  const factIdSet = new Set((input.sourceFactIds ?? []).map(compact).filter(Boolean))
+  const factIdSet = new Set((input.sourceFactIds ?? []).map(value => value.trim()).filter(Boolean))
   return normalizeRuntimeSourceFacts(input.facts).filter((fact) =>
     factIdSet.has(fact.factId) || targetSet.has(fact.path)
   )
@@ -55,5 +55,5 @@ function compact(value: string): string {
 }
 
 function compactPath(value: string): string {
-  return value.replace(/\\/g, '/').replace(/\s+/g, ' ').trim().slice(0, 220)
+  return value.replace(/\\/g, '/')
 }
