@@ -80,14 +80,14 @@ describe("sending a captured request again", () => {
   it("reports a refusal rather than raising it", async () => {
     // Nothing the user did caused it and nothing they could do would fix it.
     const { impl } = recorder(false);
-    await expect(sendSentRequest(sent, undefined, impl)).resolves.toBe(false);
+    await expect(sendSentRequest(sent, undefined, impl)).resolves.toBeUndefined();
   });
 
   it("reports a network failure rather than raising it", async () => {
     const impl = (async () => {
       throw new Error("offline");
     }) as unknown as typeof fetch;
-    await expect(sendSentRequest(sent, undefined, impl)).resolves.toBe(false);
+    await expect(sendSentRequest(sent, undefined, impl)).resolves.toBeUndefined();
   });
 
   it("refuses to re-send a body it cannot read", async () => {
@@ -95,7 +95,7 @@ describe("sending a captured request again", () => {
     // not refreshing at all.
     const { calls, impl } = recorder();
     const broken: SentRequest = { ...sent, body: "not json" };
-    await expect(sendSentRequest(broken, undefined, impl)).resolves.toBe(false);
+    await expect(sendSentRequest(broken, undefined, impl)).resolves.toBeUndefined();
     expect(calls).toHaveLength(0);
   });
 
@@ -103,7 +103,8 @@ describe("sending a captured request again", () => {
     const { calls, impl } = recorder();
     const controller = new AbortController();
     await sendSentRequest(sent, controller.signal, impl);
-    expect(calls[0].init.signal).toBe(controller.signal);
+    expect(calls[0].init.signal).toBeDefined();
+    expect(calls[0].init.signal?.aborted).toBe(true);
   });
 
   it("reads the answer so the provider finishes the turn", async () => {
@@ -112,8 +113,8 @@ describe("sending a captured request again", () => {
     let read = false;
     const impl = (async () => {
       const response = new Response("{}", { status: 200 });
-      const original = response.text.bind(response);
-      response.text = async () => {
+      const original = response.json.bind(response);
+      response.json = async () => {
         read = true;
         return original();
       };
@@ -122,4 +123,102 @@ describe("sending a captured request again", () => {
     await sendSentRequest(sent, undefined, impl);
     expect(read).toBe(true);
   });
+});
+
+
+describe("protocol cache refresh", () => {
+  it.each([
+    ["openai-compatible", { max_tokens: 4096 }, { max_tokens: 1 }],
+    ["openai-compatible", { max_completion_tokens: 4096, reasoning_effort: "high" }, { max_completion_tokens: 1, reasoning_effort: "high" }],
+    ["anthropic-messages", { max_tokens: 4096 }, { max_tokens: 1 }],
+    ["google-generative-ai", { generationConfig: { maxOutputTokens: 4096, temperature: 0.2 } }, { generationConfig: { maxOutputTokens: 1, temperature: 0.2 } }],
+    ["google-vertex", { generationConfig: { topP: 0.5 } }, { generationConfig: { maxOutputTokens: 1, topP: 0.5 } }],
+    ["bedrock-converse-stream", { inferenceConfig: { maxTokens: 4096, temperature: 0.2 } }, { inferenceConfig: { maxTokens: 1, temperature: 0.2 } }],
+  ])("lowers only the %s output ceiling", async (endpoint, original, expected) => {
+    const { calls, impl } = recorder();
+    const prefix = { messages: [{ role: "user", content: "cached bytes" }], tools: [{ name: "tool" }], system: "system" };
+    const captured = { ...sent, endpoint, reasoning: false, body: JSON.stringify({ ...prefix, ...original }) };
+    await sendSentRequest(captured, undefined, impl);
+    expect(JSON.parse(String(calls[0]?.init.body))).toEqual({ ...prefix, ...expected });
+    expect(captured.body).toBe(JSON.stringify({ ...prefix, ...original }));
+  });
+
+  it.each([
+    ["anthropic-messages", { thinking: { type: "enabled", budget_tokens: 2048 } }],
+    ["bedrock-converse-stream", { additionalModelRequestFields: { thinking: { type: "enabled", budget_tokens: 2048 } } }],
+    ["google-generative-ai", { generationConfig: { thinkingConfig: { thinkingBudget: 2048 } } }],
+    ["google-vertex", { generationConfig: { thinkingConfig: { thinkingBudget: -1 } } }],
+  ])("does not invalidate a budgeted thinking prefix on %s", async (endpoint, body) => {
+    const { calls, impl } = recorder();
+    await sendSentRequest({ ...sent, endpoint, body: JSON.stringify(body) }, undefined, impl);
+    expect(calls).toEqual([]);
+  });
+
+  it.each(["null", "[]", "42"])("refuses non-object body %s without throwing", async (body) => {
+    const { calls, impl } = recorder();
+    await expect(sendSentRequest({ ...sent, body }, undefined, impl)).resolves.toBeUndefined();
+    expect(calls).toEqual([]);
+  });
+
+  it("returns usage only after a complete stream and releases the request", async () => {
+    let signal: AbortSignal | undefined;
+    const impl = (async (_url, init) => {
+      signal = init?.signal ?? undefined;
+      return new Response('data: {"choices":[{"delta":{},"finish_reason":"length"}],"usage":{"prompt_tokens":100,"completion_tokens":1}}\n\ndata: [DONE]\n\n', { headers: { "content-type": "text/event-stream" } });
+    }) as typeof fetch;
+    expect(await sendSentRequest(sent, undefined, impl)).toEqual({ prompt_tokens: 100, completion_tokens: 1 });
+    expect(signal?.aborted).toBe(true);
+  });
+});
+
+
+it.each([undefined, true])("does not assume Google default thinking is disabled (reasoning=%s)", async reasoning => {
+  const { calls, impl } = recorder();
+  await sendSentRequest({ ...sent, endpoint: "google-generative-ai", reasoning, body: JSON.stringify({ contents: [], generationConfig: {} }) }, undefined, impl);
+  expect(calls).toEqual([]);
+});
+
+it("replays Google with explicitly disabled thinking and preserves that setting", async () => {
+  const { calls, impl } = recorder();
+  await sendSentRequest({ ...sent, endpoint: "google-generative-ai", reasoning: true,
+    body: JSON.stringify({ contents: [], generationConfig: { thinkingConfig: { thinkingBudget: 0 } } }),
+  }, undefined, impl);
+  expect(JSON.parse(String(calls[0]?.init.body)).generationConfig).toEqual({ thinkingConfig: { thinkingBudget: 0 }, maxOutputTokens: 1 });
+});
+
+it("does not admit usage from an unfinished stream", async () => {
+  const impl = (async () => new Response('data: {"choices":[{"delta":{"content":"partial"}}],"usage":{"prompt_tokens":100}}\n\n', { headers: { "content-type": "text/event-stream" } })) as typeof fetch;
+  expect(await sendSentRequest(sent, undefined, impl)).toBeUndefined();
+});
+
+it.each([false, true])("does not admit refused response usage (stream=%s)", async stream => {
+  const choice = { message: { content: "" }, delta: {}, finish_reason: "content_filter" };
+  const body = { choices: [choice], usage: { prompt_tokens: 100, completion_tokens: 1 } };
+  const impl = (async () => new Response(stream ? `data: ${JSON.stringify(body)}\n\ndata: [DONE]\n\n` : JSON.stringify(body), {
+    headers: { "content-type": stream ? "text/event-stream" : "application/json" },
+  })) as typeof fetch;
+  expect(await sendSentRequest(sent, undefined, impl)).toBeUndefined();
+});
+
+it.each([false, true])("rejects usage when transport ignores cancellation (stream=%s)", async stream => {
+  const controller = new AbortController();
+  const body = { choices: [{ message: { content: "x" }, delta: { content: "x" }, finish_reason: "stop" }], usage: { prompt_tokens: 100 } };
+  const impl = (async () => {
+    controller.abort();
+    return new Response(stream ? `data: ${JSON.stringify(body)}\n\ndata: [DONE]\n\n` : JSON.stringify(body), {
+      headers: { "content-type": stream ? "text/event-stream" : "application/json" },
+    });
+  }) as typeof fetch;
+  expect(await sendSentRequest(sent, controller.signal, impl)).toBeUndefined();
+});
+
+it.each([
+  ["anthropic-messages", { content: [], stop_reason: "refusal", usage: { input_tokens: 100, output_tokens: 1 } }],
+  ["google-generative-ai", { candidates: [{ content: { parts: [] }, finishReason: "SAFETY" }], usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 1 } }],
+  ["google-vertex", { candidates: [{ content: { parts: [] }, finishReason: "SAFETY" }], usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 1 } }],
+  ["bedrock-converse-stream", { output: { message: { content: [] } }, stopReason: "guardrail_intervened", usage: { inputTokens: 100, outputTokens: 1 } }],
+  ["bedrock-converse-stream", { output: { message: { content: [] } }, stopReason: "content_filtered", usage: { inputTokens: 100, outputTokens: 1 } }],
+])("does not admit rejected native JSON usage on %s", async (endpoint, body) => {
+  const impl = (async () => new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } })) as typeof fetch;
+  expect(await sendSentRequest({ ...sent, endpoint, reasoning: false }, undefined, impl)).toBeUndefined();
 });

@@ -34,7 +34,7 @@ import { endpointShape, type EndpointKind } from "../../provider/endpoints/index
 import { projectMemoryRootFor } from "../../memory/projectMemoryRoot.js";
 import { createCacheWarmingRunner, type CacheWarmingRunner } from "../../turn/cacheWarm.js";
 import { resolveCacheWarmingMode } from "../../core/models/cacheEconomics.js";
-import { sendSentRequest } from "../../provider/request/sentRequest.js";
+import { cacheRefreshFor } from "./cache.js";
 import { allowsSelfInitiatedRequests } from "../../core/network/policy.js";
 import { persistRenewedAccountAuth } from "../../core/auth/providerAuthRuntime.js";
 import { TURN_PREFIX_COMPACTION_PROMPT } from "../../core/query/compaction/summarizer.js";
@@ -282,7 +282,7 @@ export function createCliSessionRuntime(input: {
   };
 
   /** The same, with an expiring account token replaced before the request is built. */
-  const renewedCompactionProvider = async (): Promise<CompactionProvider | undefined> => {
+  const renewedProvider = async (): Promise<CompactionProvider | undefined> => {
     const target = compactionTarget();
     if (!target) return undefined;
     const renewed = await renewAccountAuthIfExpiring({
@@ -323,7 +323,7 @@ export function createCliSessionRuntime(input: {
       ref: { mode: "explicit-local", root: projectMemoryRootFor(input.runtimeContext.projectRoot) },
     }),
     compactHistory: (sessionId, signal, instructions) => {
-      return renewedCompactionProvider().then((provider) => {
+      return renewedProvider().then((provider) => {
         if (!provider) {
           const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
           return {
@@ -358,7 +358,7 @@ export function createCliSessionRuntime(input: {
       });
     },
     summarizeAbandonedTurns: (messages) => {
-      return renewedCompactionProvider().then((provider) => {
+      return renewedProvider().then((provider) => {
         if (!provider) return undefined;
         return requestCompactionSummary({
           provider,
@@ -383,11 +383,7 @@ export function createCliSessionRuntime(input: {
       const activeProvider = compactionProvider();
       // The prices and the cache window belong to the model, so they are read
       // from the catalogue entry this run is talking to.
-      // The replay transport still uses static credentials. Allowing signed
-      // summaries must not opt these targets into unsigned background refreshes.
-      const warmingTarget = resolvedCredential.credential?.apiKey ||
-        accountAuthFor(resolvedCredential.provider, resolvedCredential.credential ?? {})
-        ? compactionTarget() : undefined;
+      const warmingTarget = compactionTarget();
       const warmingModel = warmingTarget
         ? catalogModel(catalog, warmingTarget.provider, warmingTarget.model)
         : undefined;
@@ -412,13 +408,17 @@ export function createCliSessionRuntime(input: {
         // Replays the request that went out. Rebuilding it here would produce a
         // different prefix, and a different prefix is a cache miss at the full
         // write price — the opposite of what a refresh is for.
-        refresh: async (sent, signal) => {
-          await sendSentRequest(
-            sent,
-            signal,
-            providerFetchFromTimeouts(providerTimeoutsFrom(input.runtimeContext.runtimeConfig)),
-          );
-        },
+        ...cacheRefreshFor({ sessionId, runtimeConfig: input.runtimeContext.runtimeConfig,
+          ...(activeProvider ? { provider: activeProvider } : {}),
+          renewHeaders: async () => (await renewedProvider())?.headers,
+          isCurrent: () => {
+            const target = compactionTarget();
+            return input.runtimeContext.session.id === sessionId &&
+              input.sessionManager.getSession(sessionId)?.turns.at(-1)?.id === sourceEntryId &&
+              target?.provider === warmingTarget?.provider && target?.model === warmingTarget?.model &&
+              target?.baseUrl === warmingTarget?.baseUrl;
+          },
+        }),
       });
       previousCacheWarming = cacheWarming;
 

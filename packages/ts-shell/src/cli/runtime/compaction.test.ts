@@ -67,7 +67,7 @@ beforeEach(async () => {
     received.push({ path: request.url!, body: JSON.parse(Buffer.concat(chunks).toString()),
       signature: request.headers["x-test-signature"] as string | undefined, accept: request.headers.accept });
     response.writeHead(200, { "content-type": "application/json" });
-    response.end(JSON.stringify({ output: { message: { content: [{ text: "SUMMARY_ANSWER" }] } }, stopReason: "end_turn" }));
+    response.end(JSON.stringify({ output: { message: { content: [{ text: "SUMMARY_ANSWER" }] } }, stopReason: "end_turn", usage: { inputTokens: 20, outputTokens: 1, cacheReadInputTokens: 80, totalTokens: 101 } }));
   });
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
   baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -124,17 +124,14 @@ it.each([true, false])("signs automatic history and prefix summaries (apiKey=%s)
   expect(received.map(request => request.signature)).toEqual(["signed-1", "signed-2"]);
 });
 
-it.each([true, false])("preserves background refresh eligibility separately from signed summaries (apiKey=%s)", withKey => {
+it.each([true, false])("allows signed background refresh eligibility without a static key (apiKey=%s)", withKey => {
   fixture.config.offline = false;
   runtime(withKey).runPrompt("hello", new AbortController().signal);
   const options = vi.mocked(createCacheWarmingRunner).mock.calls[0]![0];
   expect(options.mode).toBe("streaming");
   expect(fixture.compaction).toBeDefined();
-  if (withKey) expect(options.promptCache).toEqual({ short: 300 });
-  else {
-    expect(options.promptCache).toBeUndefined();
-    expect(options.cost).toBeUndefined();
-  }
+  expect(options.promptCache).toEqual({ short: 300 });
+  expect(options.cost).toBeDefined();
   expect(received).toEqual([]);
 });
 
@@ -159,4 +156,22 @@ it.each(["baseUrl", "model"])("does not summarize a signer target missing %s", a
   deps.runPrompt("hello", new AbortController().signal);
   expect(fixture.compaction).toBeUndefined();
   expect(received).toEqual([]);
+});
+
+
+it.each([true, false])("replays a signed captured request with the final ceiling (apiKey=%s)", async withKey => {
+  fixture.config.offline = false;
+  runtime(withKey).runPrompt("hello", new AbortController().signal);
+  const options = vi.mocked(createCacheWarmingRunner).mock.calls[0]![0];
+  const sent = { endpoint: "test-signed-summary", url: `${baseUrl}/model/fixture-model/converse-stream`,
+    headers: { "content-type": "application/json" }, requestHeaders: { "x-captured": "preserved" },
+    body: JSON.stringify({ messages: [{ role: "user", content: [{ text: "prefix" }] }], inferenceConfig: { maxTokens: 4096 } }),
+  };
+  expect(options.canRefresh?.(sent)).toBe(true);
+  const usage = await options.refresh(sent, new AbortController().signal);
+  expect(usage).toMatchObject({ prompt_tokens: 20, completion_tokens: 1, cache_read_input_tokens: 80 });
+  expect(signed).toHaveLength(1);
+  expect(JSON.parse(signed[0]!.body!).inferenceConfig).toEqual({ maxTokens: 1 });
+  expect(signed[0]!.headers["x-captured"]).toBe("preserved");
+  expect(received[0]).toMatchObject({ path: "/model/fixture-model/converse-stream", signature: "signed-1" });
 });

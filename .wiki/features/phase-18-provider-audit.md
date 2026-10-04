@@ -1,7 +1,7 @@
 # Phase 18 Provider 行为审计
 
 W7-27包含四端点逐字段请求表、流边界、跨模型/resume用量与逐路径超时取消四项。
-当前只闭合下列已验证切片；字段已逐项对照，缓存刷新和最终流/调用路径/用量矩阵继续，W7-27未完成。
+字段已逐项对照，缓存刷新与用量恢复已验证；最终流/调用路径矩阵继续，W7-27未完成。
 源码路径相对 `packages/ts-shell/src/`。
 
 ## 已完成切片
@@ -13,6 +13,7 @@ W7-27包含四端点逐字段请求表、流边界、跨模型/resume用量与�
 | 服务端重试间隔 | `turn/retry.test.ts`；提交2f44a914 | 跨层提示、上限、无上限长等待分段、取消和无双重重试 |
 | EOF完成证据 | 下表及 `provider/endpoints/termination.test.ts` | 缺结束信号不能变成成功；已显示文本保留、工具不准入 |
 | Bedrock能力与二进制分流 | `provider/endpoints/bedrockConverse.test.ts`、`turn/step.test.ts`及第四批证据 | vision门槛、预算裁剪、真实binary MIME交端点reader |
+| 缓存刷新与用量 | `provider/request/sentRequest.test.ts`、`turn/cacheWarm.test.ts`、`session/store/usage.test.ts`及第六批证据 | 协议准入、当前请求计量、认证更新、后台记账与只写usage；不包含已取消请求的全部账单 |
 
 ## EOF与尾帧
 
@@ -133,14 +134,13 @@ B commandInput与simple入口的inferenceConfig、toolConfig和预算裁剪。
 observability/usage/persistence.test.ts覆盖顺序模拟多写入者的增量合并、写失败不确认、恢复不覆盖未flush值、损坏拒绝；
 session/store/usage.test.ts经实际query/state owner及文件锁写盘、载入、激活与切换，验证300→310及原provider桶100→110，
 恢复后不复用旧prompt gauge；session/compactionUsage.test.ts验证gauge只影响阈值、不改变历史切点。
-本次只核对这些现有测试及owner位置，尚未作为W7-27最终用量验收重跑；不追加同义fixture。
+这些owner套件已在第六批与四协议JSON/流式用量一起复跑；算术与恢复证据见该批记录。
 
 ## 剩余闭合清单
 
-1. 缓存刷新：invocation到turn接线、签名、协议输出上限及用量记录。生命周期runner已在第五批验证，
-   当前生产invocation缺少转交runner；须与其余协议修复一起接通。参考刷新复用模型transport、
-   最大输出1、无自动重试、校验当前run后记账并重新调度；本仓保留已捕获请求前缀的选择，需逐条对齐其他约束。
-2. 最终流/timeout/cancel矩阵及上述用量恢复套件验收，明确transport时限与认证准备时限的区别。
+1. 最终流/timeout/cancel逐路径矩阵，明确transport时限与认证准备时限的区别。
+
+缓存刷新接线、签名transport、协议输出上限及用量恢复已在第六批闭合。
 
 W7-27完成前按此有限清单推进；W7-29和W7-33仍在后续执行位。
 
@@ -198,3 +198,51 @@ build:cli、静态阻断门及43项脚本通过；独立代码APPROVE、架构CL
 本批没有修改默认模式、联网策略、签名、正文转换或用量owner；W7-27继续。
 
 52adc005的CI37154669450和Architecture Watch37154669449均成功。
+
+
+## 缓存刷新接线、协议与用量（第六批）
+
+invocation现在把runner转交turn；每个step用局部捕获请求和本次onRequestUsage配对，
+只有成功且未取消、有正输入计量的响应才能开启缓存窗口。新step先用零计量使旧prefix失效，
+runner清timer/取消进行中刷新但允许后续有效请求重新准入；缺用量、拒绝与截断不借用旧session gauge。
+分支、会话、模型或base URL变化使当前run失效；捕获端点还须与已准备transport的端点一致。
+
+参考在当前run校验后复用模型transport，以最大输出1、无自动重试请求刷新，只为非error/nonaborted结果记账。
+本仓采纳这些决策，保留捕获原wire前缀的实现；协议拥有兼容性和输出控制的位置：
+
+| 协议 | 重放准入与输出控制 |
+|---|---|
+| OpenAI兼容 | 降低原有max_tokens或max_completion_tokens；原请求未带上限时保留已解析catalog字段选择 |
+| Anthropic消息 | max_tokens=1；拒绝enabled thinking，避免改预算破坏缓存键或突破一token成本假设 |
+| Google生成及托管端点 | generationConfig.maxOutputTokens=1；仅显式thinkingBudget=0或无预算且catalog明确reasoning=false时准入；默认、自动及正预算不猜测为关闭 |
+| Bedrock Converse | inferenceConfig.maxTokens=1；拒绝enabled thinking，保留其余配置；JSON与binary共用原生结束原因映射 |
+
+Provider认证头和endpoint requestHeaders分别捕获；每次刷新复用既有认证准备器，整体替换旧认证集合，
+再保留该请求的gateway元数据，避免API key与account模式切换留下旧键。最终正文仍经过既有signer，
+包括仅有signer而无静态key的配置。签名本地HTTP测试核对最终嵌套上限、URL及header；认证等待后重新检查取消和run身份。
+HTTP成功不等于刷新成功：reader须完成；归一化拒绝原因和取消结果不进入usage。
+评审发现并修复Bedrock JSON遗漏stopReason，原生guardrail/content_filtered拒绝现在能到达相同准入检查。
+
+provider/response/usage.ts统一前台与后台计量。兼容协议及Google的prompt包含缓存命中，先减cache；
+原生消息及Bedrock的input与cache分开，不重复相减。Google输出包含candidate与thoughts；
+缺省总量包含输入、输出、cache read/write，context gauge包含完整输入。后台累计账单与请求数，
+保留最后前台gauge、消息数、模型桶指针及cache比较历史。
+session/store/usage.ts复用state锁、必需快照读取和原子写入，仅合并usage；不伪造terminal/transcript事件。
+缺失/损坏state不重建；写失败保留未确认增量，后续正常写入仍可flush。
+
+初始协议/接线红测12失败21通过、用量/生命周期红测5失败98通过。
+评审补充反例11失败110通过；原生JSON拒绝红测2失败3通过（其余按筛选未运行）。
+五项持久化旧预期遗漏每次cacheRead=5，按exclusive input的新总量合同修正算术；
+两写入者增量、失败后重写、旧快照及prototype-key断言保留。
+最终隔离HOME的14套337项通过，CLI构建及43项脚本通过，独立代码APPROVE/架构CLEAR。
+三组源码反转分别13失败93通过、11失败46通过、15失败89通过；均在finally逐字节恢复，恢复后337项复跑通过。
+定向证据.tmp/warming-transport-ixs4oumq；静态图1448文件无环，NormProof阻断义务满足、总体partial，函数上限6与reachability7条既有advisory保留。
+
+普通/全屏Node运行dist/cli.js本地HTTP各完成两次主请求。首轮刷新延迟5秒期间提交第二个问题：
+旧prefix各仅一次刷新，新prefix各观察到5次刷新；等待旧响应返回后核对的快照各已准入4次后台用量。
+快照总量1,002,054，精确匹配两次前台及4次后台；旧响应使用不同计量，未混入账单。
+后台期间state除usage外逐字段不变，transcript逐项不变；/context仍报告前台500,000/2,000,000 tokens，退出均为0。
+证据.tmp/warming-transport-pty-5w56gfke。仅合成凭据和本地HTTP，不证明真实云服务、TLS/HTTP2、全部认证来源或单文件可执行产物。
+取消/失效请求可能已产生提供方费用，本地只接纳当前且成功完成的用量，不宣称完整外部账单对账。
+
+c4eb2bd4的CI37155585391和Architecture Watch37155585399均成功。W7-27继续上方最后一项矩阵，Phase18未完成。

@@ -1,3 +1,4 @@
+import type { CacheWarmingRunner } from "../turn/cacheWarm.js";
 import type { PromptAttachments } from "../core/shell/sessionRuntime.js";
 import * as fs from "node:fs";
 import type { ProviderCredentialResolution } from "../core/shell/providerCredentials.js";
@@ -79,6 +80,7 @@ export interface CliRuntimeInvocationInput {
   readonly historyMessages?: readonly SessionMessage[];
   readonly onTurnMessage?: (message: SessionMessage) => void;
   readonly compaction?: CompactionSetup;
+  readonly cacheWarming?: CacheWarmingRunner;
   readonly providerModeEnv?: string;  /** Tool visibility: disabledTools / hiddenToolPrefixes are applied from here. */
   readonly runtimeConfig?: RuntimeConfig;
   /** Skill loading the run was started with: named paths, and discovery off. */
@@ -578,6 +580,7 @@ async function startTurn(
     hooks,
     maxSteps: request.maxTurns,
     compaction,
+    ...(request.cacheWarming ? { cacheWarming: request.cacheWarming } : {}),
     signal: request.signal,
     // Read once per run: a policy that changed mid-run would make the number of
     // retries depend on when the config was reloaded rather than on what the

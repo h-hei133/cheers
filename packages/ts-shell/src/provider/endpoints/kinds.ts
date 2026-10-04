@@ -95,6 +95,11 @@ export interface EndpointShape {
    * have.
    */
   readonly turnBody: (input: TurnRequest) => Record<string, unknown>;
+  /** Lower only output controls for a captured prefix; absent means not replayable. */
+  readonly refreshBody?: (body: Record<string, unknown>, model: {
+    readonly reasoning?: boolean;
+    readonly maxTokensField?: TurnRequest["maxTokensField"];
+  }) => Record<string, unknown> | undefined;
   /** Gateway metadata derived from the provider and conversation. */
   readonly requestHeaders?: (input: TurnRequest) => Record<string, string>;
   /** A complete, non-streamed answer, flattened to the shape both kinds share. */

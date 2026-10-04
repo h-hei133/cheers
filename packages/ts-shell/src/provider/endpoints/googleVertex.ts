@@ -1,3 +1,4 @@
+import { googleRefreshBody } from "./googleWire.js";
 /**
  * The Google Vertex endpoint.
  *
@@ -106,6 +107,7 @@ declareEndpoint("google-vertex", {
       ...(input.thinkingBudgetTokens !== undefined ? { thinkingBudgetTokens: input.thinkingBudgetTokens } : {}),
       supportsTemperature: input.supportsTemperature,
     }) as never,
+  refreshBody: googleRefreshBody,
   readBody: readGoogleBody,
   readStream: readGoogleStream,
 });

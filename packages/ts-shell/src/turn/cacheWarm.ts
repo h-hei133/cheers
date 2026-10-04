@@ -1,3 +1,4 @@
+import type { ProviderUsage } from "./completion.js";
 import {
   cacheWarmingDelayMs,
   evaluateCacheWarming,
@@ -62,7 +63,12 @@ export interface CacheWarmingOptions {
    * Supplied rather than built here because sending is a model call, and this
    * module has no business knowing how to reach a provider.
    */
-  readonly refresh: (sent: SentRequest, signal: AbortSignal) => Promise<void>;
+  readonly refresh: (sent: SentRequest, signal: AbortSignal) => Promise<ProviderUsage | void>;
+  /** A prefix whose output controls cannot be lowered must remain unscheduled. */
+  readonly canRefresh?: (sent: SentRequest) => boolean;
+  readonly isCurrent?: () => boolean;
+  /** Successful usage belongs to this generation only, never a replaced request. */
+  readonly onUsage?: (usage: ProviderUsage) => void;
   /** Told what was decided, so a surface can explain a session that is quiet. */
   readonly onDecision?: (decision: CacheWarmingDecision, stopReason?: string) => void;
   /** The clock, injectable so a test does not have to wait out a window. */
@@ -139,6 +145,7 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
     if (stopped || generation !== expectedGeneration) return;
     timer = undefined;
     nextRefreshAt = undefined;
+    if (options.isCurrent?.() === false) { clear(); return; }
     const started = phaseStartedAt;
     // The session outlived its welcome: a run left open, or a person who walked
     // away. Both are reasons to stop spending rather than to keep refreshing.
@@ -154,6 +161,7 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
     });
     options.onDecision?.(decision);
     if (stopped || generation !== expectedGeneration) return;
+    if (options.isCurrent?.() === false) { clear(); return; }
     if (decision.action !== "warm") {
       // Declined on economics. Nothing else will change that for this prefix, so
       // there is no point staying armed.
@@ -169,7 +177,10 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
 
     controller = new AbortController();
     try {
-      await options.refresh(sent, controller.signal);
+      const usage = await options.refresh(sent, controller.signal);
+      if (stopped || generation !== expectedGeneration) return;
+      if (options.isCurrent?.() === false) { clear(); return; }
+      if (usage) options.onUsage?.(usage);
     } catch {
       // A refresh that failed is a refresh that did not happen. It is not worth
       // reporting: nothing the user did caused it, and nothing they can do
@@ -206,6 +217,10 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
     noteRequest(promptTokens: number, sent: SentRequest): void {
       if (stopped || mode === "off") return;
       clear();
+      if (!Number.isFinite(promptTokens) || promptTokens <= 0 || options.canRefresh?.(sent) === false) {
+        lastSent = undefined;
+        return;
+      }
       latestTokens = Math.max(0, Math.floor(promptTokens));
       lastSent = sent;
       if (phase === "idle") phaseStartedAt = now();

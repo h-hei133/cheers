@@ -22,7 +22,7 @@ describe("durable usage", () => {
     restoreSessionUsage(A, JSON.parse(JSON.stringify(saved)));
     const resumed = getSessionUsage(A);
     expect(Object.keys(resumed.byModel)).toEqual(["first/org/model", "second/org/model"]);
-    expect(totalTokens(resumed)).toBe(300);
+    expect(totalTokens(resumed)).toBe(310);
     expect(resumed.toolCallsCount).toBe(2);
     expect(resumed.lastPromptTokens).toBe(0);
     expect(resumed.lastPromptMessageCount).toBe(0);
@@ -30,8 +30,8 @@ describe("durable usage", () => {
     expect(saved).not.toHaveProperty("lastPromptTokens");
     record(A, 20);
     persistSessionUsage(A, saved, (next) => { saved = next; });
-    expect(saved?.byModel["first/org/model"]?.totalTokens).toBe(120);
-    expect(saved?.byModel["second/org/model"]?.totalTokens).toBe(200);
+    expect(saved?.byModel["first/org/model"]?.totalTokens).toBe(130);
+    expect(saved?.byModel["second/org/model"]?.totalTokens).toBe(205);
   });
 
   it("keeps disk totals when live telemetry is absent, including after a cost read", () => {
@@ -52,13 +52,13 @@ describe("durable usage", () => {
     record(B, 20);
     persistSessionUsage(B, disk, write);
     persistSessionUsage(A, disk, write);
-    expect(disk?.byModel["first/org/model"]?.totalTokens).toBe(130);
+    expect(disk?.byModel["first/org/model"]?.totalTokens).toBe(145);
     persistSessionUsage(A, disk, write);
     persistSessionUsage(B, disk, write);
-    expect(disk?.byModel["first/org/model"]?.totalTokens).toBe(130);
+    expect(disk?.byModel["first/org/model"]?.totalTokens).toBe(145);
     record(A, 5);
     persistSessionUsage(A, disk, write);
-    expect(disk?.byModel["first/org/model"]?.totalTokens).toBe(135);
+    expect(disk?.byModel["first/org/model"]?.totalTokens).toBe(155);
     expect(disk?.turnsCount).toBe(4);
     expect(disk?.toolCallsCount).toBe(4);
   });
@@ -69,7 +69,7 @@ describe("durable usage", () => {
     let disk: SessionUsageSnapshot | undefined;
     persistSessionUsage(A, undefined, (next) => { disk = next; });
     persistSessionUsage(A, disk, (next) => { disk = next; });
-    expect(disk?.byModel["first/org/model"]?.totalTokens).toBe(100);
+    expect(disk?.byModel["first/org/model"]?.totalTokens).toBe(105);
   });
 
   it("does not restore a stale snapshot over unflushed live usage", () => {
@@ -78,8 +78,8 @@ describe("durable usage", () => {
     persistSessionUsage(A, undefined, (next) => { disk = next; });
     record(A, 20);
     restoreSessionUsage(A, disk);
-    expect(totalTokens(getSessionUsage(A))).toBe(120);
-    expect(getSessionUsage(A).lastPromptTokens).toBe(20);
+    expect(totalTokens(getSessionUsage(A))).toBe(130);
+    expect(getSessionUsage(A).lastPromptTokens).toBe(25);
   });
 
   it("decodes prototype-like keys as own buckets", () => {
@@ -88,7 +88,7 @@ describe("durable usage", () => {
     persistSessionUsage(A, undefined, (next) => { disk = next; });
     restoreSessionUsage(B, JSON.parse(JSON.stringify(disk)));
     record(B, 5, "", "__proto__");
-    expect(getSessionUsage(B).byModel["__proto__"]?.totalTokens).toBe(15);
+    expect(getSessionUsage(B).byModel["__proto__"]?.totalTokens).toBe(25);
     expect(Object.getPrototypeOf(getSessionUsage(B).byModel)).toBeNull();
     expect(Object.prototype).not.toHaveProperty("totalTokens");
   });

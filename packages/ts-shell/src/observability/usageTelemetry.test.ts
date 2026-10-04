@@ -202,3 +202,17 @@ describe("estimateUsageCost", () => {
     expect(cost).toBeCloseTo(3, 6);
   });
 });
+
+
+it("records background spend without replacing the live context or cache comparison", () => {
+  resetSessionUsage(SESSION);
+  recordSessionUsage(SESSION, { provider: "one", model: "live", promptTokens: 100, promptMessageCount: 4 });
+  const prior = structuredClone(getSessionUsage(SESSION));
+  recordSessionUsage(SESSION, { provider: "two", model: "background", promptTokens: 5, completionTokens: 1, cacheReadTokens: 200 }, { affectsContext: false });
+  const usage = getSessionUsage(SESSION);
+  expect(usage.byModel["two/background"]).toMatchObject({ promptTokens: 5, completionTokens: 1, cacheReadTokens: 200, totalTokens: 206 });
+  expect(usage.lastPromptTokens).toBe(100);
+  expect(usage.lastPromptMessageCount).toBe(4);
+  expect(usage.lastBucketKey).toBe(prior.lastBucketKey);
+  expect(usage.recentRequests).toEqual(prior.recentRequests);
+});

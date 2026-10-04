@@ -23,6 +23,26 @@ const priced = {
 };
 
 describe("the cache warming runner", () => {
+  it.each([0, Number.NaN, Number.POSITIVE_INFINITY])("invalidates a prefix with %s input tokens without permanently stopping", async tokens => {
+    vi.useFakeTimers();
+    try {
+      const refresh = vi.fn(async () => {});
+      const runner = createCacheWarmingRunner({ mode: "idle", ...priced, refresh });
+      runner.noteRequest(500000, sent);
+      expect(runner.status().nextRefreshAt).toBeDefined();
+      runner.noteRequest(tokens, sent);
+      runner.noteSettled();
+      expect(runner.status().nextRefreshAt).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(300000);
+      expect(refresh).not.toHaveBeenCalled();
+      runner.noteRequest(500000, sent);
+      expect(runner.status().nextRefreshAt).toBeDefined();
+      runner.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("sends nothing when it is switched off", async () => {
     const refresh = vi.fn(async () => {});
     const runner = createCacheWarmingRunner({ mode: "off", ...priced, refresh });
@@ -343,4 +363,51 @@ describe("cache warming lifecycle", () => {
       expect(runner.status().nextRefreshAt).toBeUndefined();
     } finally { vi.useRealTimers(); }
   });
+});
+
+
+it.each([false, true])("records refresh usage only while its request remains current (stopped=%s)", async (stopped) => {
+  vi.useFakeTimers();
+  try {
+    let finish!: (usage: { prompt_tokens: number }) => void;
+    const onUsage = vi.fn();
+    const runner = createCacheWarmingRunner({ mode: "idle", ...priced, onUsage,
+      refresh: async () => new Promise<{ prompt_tokens: number }>(resolve => { finish = resolve; }),
+    });
+    runner.noteRequest(500000, sent);
+    await vi.advanceTimersByTimeAsync(270000);
+    if (stopped) runner.stop();
+    finish({ prompt_tokens: 500000 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onUsage.mock.calls).toEqual(stopped ? [] : [[{ prompt_tokens: 500000 }]]);
+    runner.stop();
+  } finally { vi.useRealTimers(); }
+});
+
+it("does not arm a request whose prefix cannot be refreshed", () => {
+  const runner = createCacheWarmingRunner({ mode: "idle", ...priced, canRefresh: () => false, refresh: async () => {} });
+  runner.noteRequest(500000, sent);
+  runner.noteSettled();
+  expect(runner.status().nextRefreshAt).toBeUndefined();
+  runner.stop();
+});
+
+
+it("discards refresh usage after a branch or model change", async () => {
+  vi.useFakeTimers();
+  try {
+    let current = true;
+    let finish!: (usage: { prompt_tokens: number }) => void;
+    const onUsage = vi.fn();
+    const runner = createCacheWarmingRunner({ mode: "idle", ...priced, onUsage, isCurrent: () => current,
+      refresh: async () => new Promise<{ prompt_tokens: number }>(resolve => { finish = resolve; }),
+    });
+    runner.noteRequest(500000, sent);
+    await vi.advanceTimersByTimeAsync(270000);
+    current = false;
+    finish({ prompt_tokens: 500000 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onUsage).not.toHaveBeenCalled();
+    expect(runner.status().nextRefreshAt).toBeUndefined();
+  } finally { vi.useRealTimers(); }
 });

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
@@ -6,7 +6,8 @@ import type { ToolDefinition } from "../tools/types.js";
 import { createTaskToolDefinition } from "../core/tools/taskTool.js";
 import { runTurn, type TurnOptions } from "./session.js";
 import type { StepFunction } from "./step.js";
-import { CONTEXT_OVERFLOW_PREFIX } from "./step.js";
+import { CONTEXT_OVERFLOW_PREFIX, createStepFunction } from "./step.js";
+import { recordSessionUsage, resetSessionUsage } from "../observability/usageTelemetry.js";
 
 /**
  * The turn is where the kernel's lifecycle meets the shell's contract. These
@@ -61,6 +62,45 @@ async function drain(events: AsyncIterable<QueryEvent>): Promise<QueryEvent[]> {
 }
 
 describe("runTurn", () => {
+  it("invalidates a metered prefix before a later step that reports no usage", async () => {
+    const cacheWarming = { noteRequest: vi.fn(), noteSettled: vi.fn(), stop: vi.fn(), status: () => ({ mode: "idle" as const }) };
+    const first = { url: "https://fixture.test", headers: {}, body: "first" };
+    const second = { ...first, body: "second" };
+    let calls = 0;
+    const step: StepFunction = async (_messages, _signal, _listener, options) => {
+      calls += 1;
+      options.onRequestSent?.(calls === 1 ? first : second);
+      if (calls === 1) {
+        options.onRequestUsage?.({ prompt_tokens: 500000 });
+        return { text: "", toolCalls: [{ id: "read_1", name: "read", args: {} }], stopReason: "stop" };
+      }
+      return { text: "done", toolCalls: [], stopReason: "stop" };
+    };
+    await drain(runTurn(options({ step, cacheWarming, tools: new Map([["read", echoTool("read", "read")]]) })).events);
+    expect(cacheWarming.noteRequest.mock.calls).toEqual([[500000, first], [0, first]]);
+  });
+
+  it.each(["unmetered", "unfinished", "refused"])("does not warm a %s response using the previous context gauge", async kind => {
+    const sessionId = `warming-${kind}`;
+    const cacheWarming = { noteRequest: vi.fn(), noteSettled: vi.fn(), stop: vi.fn(), status: () => ({ mode: "idle" as const }) };
+    recordSessionUsage(sessionId, { model: "fixture", promptTokens: 500000 });
+    const body = { choices: [{ message: { content: "answer" }, finish_reason: kind === "refused" ? "content_filter" : "stop" }],
+      ...(kind === "refused" ? { usage: { prompt_tokens: 500000 } } : {}),
+    };
+    const step = createStepFunction({ provider: { provider: "fixture", model: "fixture", baseUrl: "https://fixture.test", headers: {} },
+      sessionId, workspaceRoot: process.cwd(), systemPrompt: "", tools: [],
+      fetchImpl: async () => new Response(kind === "unfinished" ? 'data: {"choices":[{"delta":{"content":"partial"}}],"usage":{"prompt_tokens":500000}}\n\n' : JSON.stringify(body), {
+        headers: { "content-type": kind === "unfinished" ? "text/event-stream" : "application/json" },
+      }),
+    });
+    try {
+      await drain(runTurn(options({ sessionId, step, cacheWarming, retry: { maxRetries: 0 } })).events);
+      expect(cacheWarming.noteRequest).not.toHaveBeenCalled();
+    } finally {
+      resetSessionUsage(sessionId);
+    }
+  });
+
   it("streams the answer and reports a completed run", async () => {
     const setup = options();
     const events = await drain(runTurn(setup).events);

@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createServer } from "node:http";
+import { recordSessionUsage, resetSessionUsage } from "../observability/usageTelemetry.js";
 import { createTaskToolDefinition } from "../core/tools/taskTool.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { ProviderCredentialResolution } from "../core/shell/providerCredentials.js";
@@ -77,6 +78,25 @@ function dependencies(): { deps: CliRuntimeInvocationDependencies; calls: string
 }
 
 describe("CLI runtime invocation", () => {
+  it("delivers captured requests and settlement to the warming runner", async () => {
+    const cacheWarming = { noteRequest: vi.fn(), noteSettled: vi.fn(), stop: vi.fn(), status: () => ({ mode: "idle" as const }) };
+    const sent = { url: "https://local.test", headers: {}, body: "{}" };
+    resetSessionUsage("sess_123");
+    const run = await runCliRuntimeInvocation(baseInput({ cacheWarming }), {
+      ...dependencies().deps,
+      createStep: () => async (_messages, _signal, _listener, options) => {
+        options.onRequestSent?.(sent);
+        recordSessionUsage("sess_123", { promptTokens: 100, model: "fixture" });
+        options.onRequestUsage?.({ prompt_tokens: 100 });
+        return { text: "done", toolCalls: [], stopReason: "stop" };
+      },
+    });
+    await collect(run.events);
+    expect(cacheWarming.noteRequest).toHaveBeenCalledWith(100, sent);
+    expect(cacheWarming.noteSettled).toHaveBeenCalledOnce();
+    resetSessionUsage("sess_123");
+  });
+
   it.each([false, true])("carries historical continuity without changing user intent or persisted turns (image=%s)", async (withImage) => {
     const { deps } = dependencies();
     const recorded: unknown[] = [];

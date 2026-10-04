@@ -175,6 +175,11 @@ declareEndpoint("bedrock-converse-stream", {
   signer: () => bedrockSigner(),
   body: (input: SimpleRequest) => converseBody(simpleAsTurn(input)),
   turnBody: converseBody,
+  refreshBody: (body) => {
+    const fields = body.additionalModelRequestFields as { thinking?: { type?: string } } | undefined;
+    if (fields?.thinking?.type === "enabled") return undefined;
+    return { ...body, inferenceConfig: { ...(body.inferenceConfig as object), maxTokens: 1 } };
+  },
   readBody: readConverseBody,
   readStream: readConverseStream,
 });
@@ -183,7 +188,9 @@ declareEndpoint("bedrock-converse-stream", {
 function readConverseBody(body: unknown): CompletedBody {
   const output = (body as { output?: { message?: { content?: ReadonlyArray<{ text?: string }> } } })?.output;
   const text = (output?.message?.content ?? []).map((block) => block.text ?? "").join("");
-  return { choices: [{ message: { content: text } }] };
+  return { choices: [{ message: { content: text }, finish_reason: mapConverseStopReason((body as { stopReason?: string })?.stopReason) }],
+    usage: converseUsage((body as { usage?: ConverseUsage })?.usage),
+  };
 }
 
 /**
@@ -260,14 +267,11 @@ async function* readConverseStream(
       continue;
     }
     if (type === "metadata") {
-      const tokens = event.usage as { inputTokens?: number; outputTokens?: number } | undefined;
+      const tokens = event.usage as ConverseUsage | undefined;
       if (tokens) {
         // Named the way every other protocol names them, so a reader of usage
         // does not have to know which endpoint answered.
-        usage = {
-          prompt_tokens: tokens.inputTokens ?? 0,
-          completion_tokens: tokens.outputTokens ?? 0,
-        };
+        usage = converseUsage(tokens);
       }
     }
   }
@@ -367,3 +371,23 @@ function parsePayload(message: EventMessage): Record<string, unknown> | undefine
 }
 
 export type { EndpointShape };
+
+interface ConverseUsage {
+  readonly inputTokens?: number;
+  readonly outputTokens?: number;
+  readonly cacheReadInputTokens?: number;
+  readonly cacheWriteInputTokens?: number;
+  readonly totalTokens?: number;
+}
+
+/** Converse reports ordinary input separately from cache reads and writes. */
+function converseUsage(usage: ConverseUsage | undefined): CompletedBody["usage"] {
+  if (!usage) return undefined;
+  return {
+    prompt_tokens: usage.inputTokens ?? 0,
+    completion_tokens: usage.outputTokens ?? 0,
+    cache_read_input_tokens: usage.cacheReadInputTokens ?? 0,
+    cache_creation_input_tokens: usage.cacheWriteInputTokens ?? 0,
+    ...(usage.totalTokens !== undefined ? { total_tokens: usage.totalTokens } : {}),
+  };
+}

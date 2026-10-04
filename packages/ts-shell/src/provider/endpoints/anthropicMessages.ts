@@ -799,6 +799,12 @@ declareEndpoint("anthropic-messages", {
       ...(input.supportsTemperature !== undefined ? { supportsTemperature: input.supportsTemperature } : {}),
       ...(input.thinkingBudgetTokens !== undefined ? { thinkingBudgetTokens: input.thinkingBudgetTokens } : {}),
     }),
+  refreshBody: (body) => {
+    // A different budget changes the message cache key; retaining it defeats
+    // the one-token cost bound. Only non-budgeted requests can be replayed.
+    if ((body.thinking as { type?: string } | undefined)?.type === "enabled") return undefined;
+    return { ...body, max_tokens: 1 };
+  },
   readBody: (body) => readAnthropicBody(body),
   readStream: (body) => readAnthropicStream(body),
 });

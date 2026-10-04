@@ -1,3 +1,4 @@
+import { writeSessionUsage } from "./usage.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -72,4 +73,35 @@ describe("session usage persistence seams", () => {
     switchActiveSession(context, load());
     expect(totalTokens(getSessionUsage(ID))).toBe(310);
   });
+});
+
+
+it("flushes background accounting without rewriting lifecycle, branch or transcript state", () => {
+  const layout = projectSessionFileLayout({ sessionsDir: directory, sessionId: ID });
+  const session: Session = { id: ID, projectRoot: directory, createdAt: "now", updatedAt: "now", status: "active", turns: [] };
+  writeSessionRecord({ session, layout });
+  recordSessionUsage(ID, { provider: "one", model: "main", promptTokens: 100, promptMessageCount: 3 });
+  writeSessionState({ session, layout });
+  const before = JSON.parse(fs.readFileSync(layout.statePath, "utf8"));
+  recordSessionUsage(ID, { provider: "two", model: "warm", promptTokens: 5, cacheReadTokens: 200, completionTokens: 1 }, { affectsContext: false });
+  writeSessionUsage(ID, layout);
+  const after = JSON.parse(fs.readFileSync(layout.statePath, "utf8"));
+  expect({ ...after, usage: before.usage }).toEqual(before);
+  expect(after.usage.byModel["two/warm"].totalTokens).toBe(206);
+  expect(getSessionUsage(ID).lastPromptTokens).toBe(100);
+  writeSessionUsage(ID, layout);
+  expect(JSON.parse(fs.readFileSync(layout.statePath, "utf8"))).toEqual(after);
+  resetSessionUsage(ID);
+  activate(loadSessionRecord({ sessionId: ID, layout, cwd: directory }));
+  expect(totalTokens(getSessionUsage(ID))).toBe(306);
+});
+
+it.each(["missing", "corrupt"])("does not reconstruct %s state to persist background usage", (kind) => {
+  const layout = projectSessionFileLayout({ sessionsDir: directory, sessionId: ID });
+  fs.mkdirSync(layout.sessionDir, { recursive: true });
+  if (kind === "corrupt") fs.writeFileSync(layout.statePath, "broken");
+  recordSessionUsage(ID, { provider: "two", model: "warm", promptTokens: 5 }, { affectsContext: false });
+  expect(() => writeSessionUsage(ID, layout)).toThrow();
+  if (kind === "missing") expect(fs.existsSync(layout.statePath)).toBe(false);
+  else expect(fs.readFileSync(layout.statePath, "utf8")).toBe("broken");
 });

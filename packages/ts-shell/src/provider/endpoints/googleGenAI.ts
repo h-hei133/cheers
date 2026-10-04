@@ -1,3 +1,4 @@
+import { googleRefreshBody } from "./googleWire.js";
 /**
  * The Google AI Studio endpoint.
  *
@@ -53,6 +54,7 @@ declareEndpoint("google-generative-ai", {
       ...(input.thinkingBudgetTokens !== undefined ? { thinkingBudgetTokens: input.thinkingBudgetTokens } : {}),
       supportsTemperature: input.supportsTemperature,
     }) as never,
+  refreshBody: googleRefreshBody,
   readBody: readGoogleBody,
   readStream: readGoogleStream,
 });

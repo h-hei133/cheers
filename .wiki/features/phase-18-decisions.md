@@ -579,7 +579,7 @@ source-claudecode/main.tsx:2622         const commandsHeadless = ... commands.fi
 | W7-28 / BRW-06 | receipt保证审计闭合；有界读取、合作锁、日志隔离、tombstone与命令状态已验证 | 已完成，定向验证与隔离进程验收通过 |
 | W7-26 / SES-08 | 回放、导出、迁移、恢复准入、检查点、字段优先级与历史写入观察已核验；后续转W7-31 | 已完成；原36模块行为矩阵闭合，保证边界与历史数据限制见审计表 |
 | W7-31 | [38模块Shell审计](phase-18-shell-audit.md)；审批、根绑定、准入、后台输出、Shell选择与关闭均有行为证据 | 已完成；所列行为矩阵及旧result-contract门禁债务闭合，保证边界见审计表 |
-| W7-27 | [Provider审计](phase-18-provider-audit.md)；单次响应、SSE/EOF、重试、摘要签名和Bedrock字段/二进制分流 | 执行中；缓存刷新及最终用量/超时取消矩阵继续 |
+| W7-27 | [Provider审计](phase-18-provider-audit.md)；单次响应、SSE/EOF、重试、签名、字段、缓存刷新与用量恢复 | 执行中；最终流/超时取消逐路径矩阵继续 |
 | W7–W8 | 按 §2、§10 的完整执行表继续；合并重复问题但保留各项验收证据 | 待完成 |
 
 W1-1：`npm run test:ts -- src/runtime/execution/conditionalWrite.test.ts
@@ -2026,3 +2026,17 @@ runner取消/结束后不再被旧await重新调度，新前缀与idle阶段转�
 参考现有run身份校验与调度deadline，保留当前失败后继续及经济性策略。四套61项、构建、静态阻断门及43项脚本通过；反转8失败11通过并精确恢复复跑，独立APPROVE/CLEAR。
 普通PTY发现现有invocation未把runner转交turn，首次刷新未启动；本批不宣称CLI验收成功，诊断和原始证据见Provider审计第五批。
 缺失接线与签名/协议正文/用量放在同一后续批修复，避免仅接线便启用未闭合的后台请求；W7-27仍进行中。
+
+
+### W7-27 第六批：缓存刷新与用量闭合（2026-10-04）
+
+invocation接入runner，每次成功step以本请求的用量准入；新step使旧prefix失效，无计量或失败不能借旧gauge刷新。
+各endpoint拥有一token重放规则，保留catalog输出字段，拒绝预算式thinking；Google须证明thinking关闭。
+刷新复用认证准备和最终body签名，整体替换认证头、保留gateway元数据，拒绝端点错配、过期run与取消结果。
+Bedrock JSON补原生拒绝原因映射。共享计量区分inclusive与exclusive input，补cache和Google thoughts；
+后台只累计费用和请求数，不改前台context/cache比较，持锁合并usage且不新增会话事件。
+
+14套337项、CLI构建与43项脚本通过，独立APPROVE/CLEAR。三组反转13/11/15项失败，精确恢复后337项复跑通过。
+普通/全屏编译CLI本地HTTP验证旧延迟刷新取消、新prefix持续刷新、后台4次用量持久化与500,000 context gauge不变；均exit0。
+NormProof阻断义务满足、整体仍partial；细节、失败分类、算术和保证范围见Provider审计第六批。
+c4eb2bd4两项远端检查成功。W7-27只剩最终流/timeout/cancel逐路径矩阵，再继续W7-29、W7-33和剩余W8。

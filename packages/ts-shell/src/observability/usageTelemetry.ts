@@ -126,6 +126,7 @@ export function recordSessionUsage(
     cacheReadTokens?: number;
     cacheWriteTokens?: number;
   },
+  options: { readonly affectsContext?: boolean } = {},
 ): void {
   const existing = sessionTelemetries.get(sessionId) ?? emptyTelemetry();
   // A report that does not name a model belongs to whichever one last answered:
@@ -137,7 +138,8 @@ export function recordSessionUsage(
 
   const pTokens = usage.promptTokens ?? 0;
   const cTokens = usage.completionTokens ?? 0;
-  const tTokens = usage.totalTokens ?? pTokens + cTokens;
+  const promptTotal = pTokens + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0);
+  const tTokens = usage.totalTokens ?? promptTotal + cTokens;
 
   // Accumulated into the bucket for the model that answered this request, so a
   // session that switched models keeps each model's tokens under its own rate.
@@ -164,13 +166,13 @@ export function recordSessionUsage(
 
   // Session-level fields that are not per-model: the context gauge describes the
   // conversation, not the model that last read it.
-  if (pTokens > 0) {
-    existing.lastPromptTokens = pTokens;
+  if (options.affectsContext !== false && promptTotal > 0) {
+    existing.lastPromptTokens = promptTotal;
     existing.lastPromptMessageCount = usage.promptMessageCount ?? 0;
   }
   existing.turnsCount += 1;
   existing.toolCallsCount += usage.toolCallsCount ?? 0;
-  existing.lastBucketKey = key;
+  if (options.affectsContext !== false) existing.lastBucketKey = key;
   existing.lastUpdated = Date.now();
 
   // The per-request view, which the buckets cannot provide: they sum, and cache
@@ -178,8 +180,7 @@ export function recordSessionUsage(
   const cacheRead = usage.cacheReadTokens ?? 0;
   const cacheWrite = usage.cacheWriteTokens ?? 0;
   const previous = existing.recentRequests.at(-1);
-  const promptTotal = pTokens + cacheRead + cacheWrite;
-  if (promptTotal > 0) {
+  if (options.affectsContext !== false && promptTotal > 0) {
     pushHistory(existing, {
       promptTokens: promptTotal,
       cacheReadTokens: cacheRead,

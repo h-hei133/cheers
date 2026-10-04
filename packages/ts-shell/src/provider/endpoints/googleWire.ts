@@ -210,6 +210,9 @@ export interface Chunk {
   readonly usageMetadata?: {
     readonly promptTokenCount?: number;
     readonly candidatesTokenCount?: number;
+    readonly cachedContentTokenCount?: number;
+    readonly thoughtsTokenCount?: number;
+    readonly totalTokenCount?: number;
   };
   readonly promptFeedback?: { readonly blockReason?: string; readonly blockReasonMessage?: string };
 }
@@ -255,11 +258,13 @@ function toolCallsFromParts(parts: readonly GooglePart[]): Array<{ id: string; n
 /** The answer out of a non-streamed response. */
 export function readGoogleBody(body: unknown): CompletedBody {
   const candidate = (body as Chunk)?.candidates?.[0];
+  const usage = googleUsage((body as Chunk)?.usageMetadata);
   const parts = candidate?.content?.parts ?? [];
   const text = parts.map((part) => part.text ?? "").join("");
   const calls = toolCallsFromParts(parts);
   const finish_reason = mapGoogleFinishReason((body as Chunk)?.promptFeedback?.blockReason ?? candidate?.finishReason);
   return {
+    ...(usage ? { usage } : {}),
     choices: [
       {
         message: {
@@ -329,10 +334,7 @@ export async function* readGoogleStream(
       const candidate = parsed.candidates?.[0];
       if (candidate?.finishReason) finishReason = mapGoogleFinishReason(candidate.finishReason);
       if (parsed.usageMetadata) {
-        usage = {
-          prompt_tokens: parsed.usageMetadata.promptTokenCount ?? 0,
-          completion_tokens: parsed.usageMetadata.candidatesTokenCount ?? 0,
-        };
+        usage = googleUsage(parsed.usageMetadata);
       }
 
       calls.push(...toolCallsFromParts(candidate?.content?.parts ?? []));
@@ -372,10 +374,7 @@ export async function* readGoogleStream(
         const candidate = parsed.candidates?.[0];
         if (candidate?.finishReason) finishReason = mapGoogleFinishReason(candidate.finishReason);
         if (parsed.usageMetadata) {
-          usage = {
-            prompt_tokens: parsed.usageMetadata.promptTokenCount ?? 0,
-            completion_tokens: parsed.usageMetadata.candidatesTokenCount ?? 0,
-          };
+          usage = googleUsage(parsed.usageMetadata);
         }
         calls.push(...toolCallsFromParts(candidate?.content?.parts ?? []));
         for (const part of candidate?.content?.parts ?? []) {
@@ -482,5 +481,24 @@ export function googleBody(input: {
     // turn may call a tool, and a mode the provider chose would be that decision
     // made somewhere else.
     ...(tools ? { toolConfig: { functionCallingConfig: { mode: "AUTO" } } } : {}),
+  };
+}
+
+/** Keep the captured prefix and all sampling fields while bounding refresh output. */
+export function googleRefreshBody(body: Record<string, unknown>, model: { readonly reasoning?: boolean }): Record<string, unknown> | undefined {
+  const config = body.generationConfig as Record<string, unknown> | undefined;
+  const thinking = config?.thinkingConfig as { thinkingBudget?: number } | undefined;
+  if (thinking?.thinkingBudget !== 0 && (thinking?.thinkingBudget !== undefined || model.reasoning !== false)) return undefined;
+  return { ...body, generationConfig: { ...config, maxOutputTokens: 1 } };
+}
+
+/** Input includes cache reads; output includes separately reported thinking. */
+function googleUsage(usage: Chunk["usageMetadata"]): CompletedBody["usage"] {
+  if (!usage) return undefined;
+  return {
+    prompt_tokens: usage.promptTokenCount ?? 0,
+    completion_tokens: (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0),
+    prompt_tokens_details: { cached_tokens: usage.cachedContentTokenCount ?? 0 },
+    ...(usage.totalTokenCount !== undefined ? { total_tokens: usage.totalTokenCount } : {}),
   };
 }

@@ -1,3 +1,5 @@
+import { catalogModel } from "../core/models/catalog.js";
+import { usageFromProvider } from "../provider/response/usage.js";
 import type { AgentToolCall } from "../core/agent/tools.js";
 import type { AgentMessage, AgentStopReason } from "../core/agent/state.js";
 import type { AssistantStep } from "../core/agent/loop.js";
@@ -92,6 +94,8 @@ export interface StepOptions {
    * the prompt cached — has to be handed the request itself.
    */
   readonly onRequestSent?: (sent: SentRequest) => void;
+  /** Usage reported by this response, independent of any previous context gauge. */
+  readonly onRequestUsage?: (usage: ProviderUsage) => void;
 }
 
 /** The model side of the kernel: the next assistant step for a context. */
@@ -387,8 +391,12 @@ export function createStepFunction(request: StepRequest): StepFunction {
           if (attemptResponse.ok) {
             response = attemptResponse;
             options.onRequestSent?.({
+              endpoint,
+              maxTokensField: shape.maxTokensField,
+              reasoning: catalogModel(request.catalog ?? [], request.provider.provider ?? "", request.provider.model)?.reasoning,
               url: endpointUrl(request.provider.baseUrl, endpoint, request.provider.model),
-              headers: { ...request.provider.headers, ...requestHeaders },
+              headers: request.provider.headers,
+              requestHeaders,
               body: JSON.stringify(payload),
             });
             releaseAfterRead = releaseStream;
@@ -474,13 +482,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
         const completion = await readCompletion(response, watched, endpoint);
         const usage = completion.usage;
         if (usage) {
-          const cache = cacheTokensFromUsage(usage);
           recordSessionUsage(request.sessionId, {
-            promptTokens: usage.prompt_tokens,
-            completionTokens: usage.completion_tokens,
-            totalTokens: usage.total_tokens,
-            cacheReadTokens: cache.cacheReadTokens,
-            cacheWriteTokens: cache.cacheWriteTokens,
+            ...usageFromProvider(usage),
             model: request.provider.model,
             // Recorded with the bucket, not looked up later: a provider switch must
             // not reprice tokens that were already spent at the old provider's rate.
@@ -489,6 +492,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
             // a later reader add whatever the conversation gained since.
             promptMessageCount: messages.length + 1,
           });
+          options.onRequestUsage?.(usage);
         }
         const completed = toStep(completion, watched);
         return stamp(shownAnything && completed.stopReason === "error"
@@ -680,26 +684,6 @@ function abortedStep(shown: string): AssistantStep {
   return { text: shown, toolCalls: [], stopReason: "aborted", errorMessage: "Operation aborted" };
 }
 
-/**
- * Cache traffic, however the provider chose to report it.
- *
- * OpenAI-compatible hosts nest it under `prompt_tokens_details.cached_tokens`;
- * Anthropic-shaped ones report `cache_read_input_tokens` and
- * `cache_creation_input_tokens` at the top level. Both mean the same thing, and
- * the difference is the provider's, not the session's — so it is flattened once
- * here rather than at every reader.
- */
-function cacheTokensFromUsage(usage: ProviderUsage): {
-  readonly cacheReadTokens: number;
-  readonly cacheWriteTokens: number;
-} {
-  const read = usage.prompt_tokens_details?.cached_tokens ?? usage.cache_read_input_tokens ?? 0;
-  const write = usage.cache_creation_input_tokens ?? 0;
-  return {
-    cacheReadTokens: Number.isFinite(read) ? read : 0,
-    cacheWriteTokens: Number.isFinite(write) ? write : 0,
-  };
-}
 
 function errorStep(message: string, retriesExhausted = false): AssistantStep {
   return {

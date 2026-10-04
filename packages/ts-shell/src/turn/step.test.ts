@@ -8,6 +8,7 @@ import { writeProjectState } from "../core/state/projectState.js";
 import { declareEndpoint } from "../provider/endpoints/index.js";
 import { crc32 } from "../provider/aws/eventStream.js";
 import { runAgentLoop } from "../core/agent/loop.js";
+import { sendSentRequest, type SentRequest } from "../provider/request/sentRequest.js";
 
 /**
  * The step is the only place a provider is spoken to. What matters here is
@@ -35,6 +36,25 @@ function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {
 }
 
 describe("createStepFunction", () => {
+  it.each(["max_tokens", "max_completion_tokens"] as const)("retains the catalog's %s field when the original ceiling is absent", async maxTokensField => {
+    let captured: SentRequest | undefined;
+    const step = createStepFunction({ ...request, provider: { ...request.provider, provider: "fixture" },
+      catalog: [{ id: "fixture", models: [{ id: "m", compat: { maxTokensField } }] }],
+      fetchImpl: async () => jsonResponse({ choices: [{ message: { content: "answer" }, finish_reason: "stop" }] }),
+    });
+    await step([], undefined, {}, { allowTools: false, onRequestSent: sent => { captured = sent; } });
+    expect(captured).toBeDefined();
+    const original = JSON.parse(captured!.body);
+    expect(original.max_tokens).toBeUndefined();
+    expect(original.max_completion_tokens).toBeUndefined();
+    let replay: Record<string, unknown> = {};
+    await sendSentRequest(captured!, undefined, async (_url, init) => {
+      replay = JSON.parse(String(init?.body));
+      return jsonResponse({});
+    });
+    expect(replay).toEqual({ ...original, [maxTokensField]: 1 });
+  });
+
   it.each([{ allowedTools: [] }, { allowedTools: ["unknown"] }])("does not advertise tools or a spent budget for an empty intersection: $allowedTools", async ({ allowedTools }) => {
     let body: Record<string, unknown> = {};
     const step = createStepFunction({ ...request,
@@ -340,6 +360,8 @@ describe("createStepFunction", () => {
     // traffic is per model, so it is read from the bucket for the model that
     // answered rather than from a session-level field.
     expect(getSessionUsage("sess_cache_openai").byModel.m?.cacheReadTokens).toBe(768);
+    expect(getSessionUsage("sess_cache_openai").byModel.m?.promptTokens).toBe(232);
+    expect(getSessionUsage("sess_cache_openai").lastPromptTokens).toBe(1000);
     resetSessionUsage("sess_cache_openai");
   });
 
@@ -365,6 +387,9 @@ describe("createStepFunction", () => {
     const usage = getSessionUsage("sess_cache_anthropic");
     expect(usage.byModel.m?.cacheReadTokens).toBe(512);
     expect(usage.byModel.m?.cacheWriteTokens).toBe(256);
+    expect(usage.byModel.m?.promptTokens).toBe(1000);
+    expect(usage.lastPromptTokens).toBe(1768);
+    expect(usage.byModel.m?.totalTokens).toBe(1778);
     resetSessionUsage("sess_cache_anthropic");
   });
 

@@ -20,7 +20,7 @@ import { concludeRun, TurnProjection } from "./projection.js";
 import { EventChannel } from "./stream.js";
 import { isOverflowFailure, type StepFunction } from "./step.js";
 import { adaptTools, createToolHooks, type ToolGateOptions } from "./tools.js";
-import { getSessionUsage } from "../observability/usageTelemetry.js";
+import { usageFromProvider } from "../provider/response/usage.js";
 import type { SentRequest } from "../provider/request/sentRequest.js";
 import { createSubagentRunner } from "./subagent.js";
 import type { DenyRule } from "../core/shell/approval/deny.js";
@@ -225,8 +225,13 @@ export function runTurn(options: TurnOptions): TurnRun {
     ),
     beforeToolCall: hooks.beforeToolCall,
     afterToolCall: hooks.afterToolCall,
-    streamStep: (messages, signal) =>
-      options.step(
+    streamStep: async (messages, signal) => {
+      // A new request replaces the old prefix even if it fails or reports no usage.
+      if (lastSentRequest) options.cacheWarming?.noteRequest(0, lastSentRequest);
+      lastSentRequest = undefined;
+      let sentRequest: SentRequest | undefined;
+      let inputTokens = 0;
+      const step = await options.step(
         messages,
         signal,
         {
@@ -239,10 +244,21 @@ export function runTurn(options: TurnOptions): TurnRun {
           // Kept so a refresh can replay it. Captured at the step, because that
           // is the only place the request exists in the shape it was sent.
           onRequestSent: (sent) => {
-            lastSentRequest = sent;
+            sentRequest = sent;
+            inputTokens = 0;
+          },
+          onRequestUsage: (usage) => {
+            const counted = usageFromProvider(usage);
+            inputTokens = counted.promptTokens + counted.cacheReadTokens + counted.cacheWriteTokens;
           },
         },
-      ),
+      );
+      if (!signal?.aborted && step.stopReason !== "error" && step.stopReason !== "aborted" && sentRequest && inputTokens > 0) {
+        lastSentRequest = sentRequest;
+        options.cacheWarming?.noteRequest(inputTokens, sentRequest);
+      }
+      return step;
+    },
     shouldStopAfterStep: () => projection.stepCount >= options.maxSteps,
     prepareNextStep: options.compaction
       ? createCompactionStep(options.compaction.policy, {
@@ -275,24 +291,8 @@ export function runTurn(options: TurnOptions): TurnRun {
       forget(steering, text) || forget(followUps, text);
     }
     if (event.type === "message_end" && event.message !== opening) persist(options.onMessage, event.message);
-    // A step that reported usage is a request that completed, which is the only
-    // moment a cache window starts.
-    if (event.type === "turn_end") noteWarmingRequest();
     for (const projected of projection.project(event)) channel.push(projected);
   });
-
-  // The turn is the only place that knows a request happened and how large it
-  // was, so it is the only place that can tell the warmer when a window starts.
-  // Reported from the usage the provider returned, not from an estimate: an
-  // estimate of the wrong size would schedule the refresh against the wrong
-  // window.
-  const noteWarmingRequest = (): void => {
-    if (!options.cacheWarming || !lastSentRequest) return;
-    const usage = getSessionUsage(options.sessionId);
-    if (usage.lastPromptTokens > 0) {
-      options.cacheWarming.noteRequest(usage.lastPromptTokens, lastSentRequest);
-    }
-  };
 
   let overflowRecovered = false;
   const drive = async (): Promise<void> => {
