@@ -73,3 +73,25 @@
 
 当前运行时压缩不删除原始query事件。若外部工具或历史数据已删除事件，且后续结果又替换了唯一compact检查点，本次无法重建消失事实，不新增未经设计的持久化账本或声称具备历史结算协议。
 兼容结果字段的合成测试不证明现行工具生产这些历史字段。原有跨文件事务、合作writer和浏览器支持边界保持。旧result-contract脚本的失效目标和预期留到W7-31修复，不记为本项通过。
+
+
+## 完成审计补充：拆分后的十个职责模块（2026-10-05）
+
+原矩阵以规划时36模块为基线。当前四域实际为continuation 21、recovery 12、replay 5、export 8，共46个非测试模块；
+以下十个新增/拆分owner此前虽有实现与回归，却没有独立矩阵行。本轮逐个读源码并核对现有测试入口，补齐清单；不是新增产品行为。
+
+| 模块 | 具体判据 | 当前证据 |
+|---|---|---|
+| `continuation/inspection.ts` | 只统计已开始且unknown/unverified的历史写入；全部计数、最多三条详情，不覆盖当前终态 | `inspection.test.ts` 的not-started排除、全量计数及无ID时间来源 |
+| `continuation/branch.ts` | 来源必须属于选中路径；失配结果按整个字段组移除；分支归属不明不能当全局事实 | `branch.test.ts`、`snapshot.test.ts` 的缺失消息/来源/新旧checkpoint；`recovery/branch.test.ts` |
+| `continuation/source.ts` | 结果字段白名单与枚举准入；未知旧任务结果不能被chat覆盖 | `snapshot.test.ts` 的非法枚举、旧任务/聊天优先级和存储checkpoint |
+| `continuation/rebase.ts` | 原字符串只替换一次；路径边界、父级逃逸、长短根回退；深/共享/环对象不原地改动 | `rebase.test.ts`、`sessionRootRebase.test.ts`；替换文本不会被重扫 |
+| `continuation/roots.ts` | POSIX显示根区分大小写；Windows及缓存身份按既有规则归一；多旧根不得猜测 | `projectRootRebaseProjection.test.ts`、`legacyPermissionRebase.test.ts` 的多根、缓存根和混合目标 |
+| `recovery/scope.ts` | pending仅接受当前分支最后一个用户源，冲突文本/多来源拒绝；未认证旧harness不恢复；终态来自所选运行 | `scope.test.ts`、`branch.test.ts` 的pending来源、祖先顺序与跨分支隔离 |
+| `export/model.ts` | 平坦树节点与条目关联契约，叶ID可空，警告独立；无执行行为 | `collect.test.ts`、`graph.test.ts`、`template.test.ts` 的生产者/消费者契约；已编译CI |
+| `export/graph.ts` | 畸形线程降级、迭代遍历长链、显示边修复不修改持久线程、未连接消息保留 | `graph.test.ts` 的长链/循环/缺失叶；`collect.test.ts` |
+| `export/source.ts` | 区分不存在、缺transcript及读取失败；读取一次并保留诊断 | `collect.test.ts` 通过真实临时会话测试缺失/损坏来源 |
+| `export/sanitize.ts` | 不透明ID以稳定别名保持关联，元数据脱敏；正文/参数先由collect脱敏，再统一组装 | `collect.test.ts`、`template.test.ts` 的敏感ID/元数据/调用关联与HTML安全 |
+
+证据：c8146b40的CI 37216205149已成功（557文件、5339通过、1既有跳过）；该提交至8a998664没有改动上述四域。
+该CI只证明其实际断言，不扩大原审计的原子性、损坏历史可恢复性或认证范围。当前46模块均在原矩阵或本补充中具名。
