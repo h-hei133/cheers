@@ -1,4 +1,5 @@
 import http from "node:http";
+import net from "node:net";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -105,6 +106,56 @@ describe("providerTimeoutsFrom", () => {
 });
 
 describe("a request against a provider that never answers", () => {
+  it("bounds a connection whose TLS handshake never completes", async () => {
+    const sockets = new Set<net.Socket>();
+    const server = net.createServer(socket => {
+      sockets.add(socket);
+      socket.on("close", () => sockets.delete(socket));
+      socket.on("error", () => {});
+    });
+    await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+    try {
+      const fetchImpl = createProviderFetchFromEnv({ env: {}, timeouts: { connectTimeoutMs: 300 } });
+      const url = `https://127.0.0.1:${(server.address() as AddressInfo).port}`;
+      await expect(fetchImpl(url)).rejects.toMatchObject({ cause: { code: "UND_ERR_CONNECT_TIMEOUT" } });
+    } finally {
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
+  });
+
+  it("times out a body that stops delivering bytes after its headers", async () => {
+    const server = http.createServer((_request, response) => {
+      response.writeHead(200, { "content-type": "text/plain" });
+      response.write("partial");
+    });
+    servers.push(server);
+    await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+    const fetchImpl = createProviderFetchFromEnv({ env: {}, timeouts: { bodyTimeoutMs: 300 } });
+    const response = await fetchImpl(`http://127.0.0.1:${(server.address() as AddressInfo).port}`);
+    expect(response.status).toBe(200);
+    await expect(response.text()).rejects.toMatchObject({ cause: { code: "UND_ERR_BODY_TIMEOUT" } });
+  });
+
+  it("cancels a pending response body and closes its HTTP connection", async () => {
+    let closed!: () => void;
+    const connectionClosed = new Promise<void>(resolve => { closed = resolve; });
+    const server = http.createServer((_request, response) => {
+      response.on("close", closed);
+      response.writeHead(200, { "content-type": "text/plain" });
+      response.write("partial");
+    });
+    servers.push(server);
+    await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+    const controller = new AbortController();
+    const fetchImpl = createProviderFetchFromEnv({ env: {} });
+    const response = await fetchImpl(`http://127.0.0.1:${(server.address() as AddressInfo).port}`, { signal: controller.signal });
+    const body = response.text();
+    controller.abort();
+    await expect(body).rejects.toMatchObject({ name: "AbortError" });
+    await connectionClosed;
+  });
+
   it("gives up at the configured deadline instead of waiting forever", async () => {
     const url = await startSilentServer();
     const fetchImpl = createProviderFetchFromEnv({

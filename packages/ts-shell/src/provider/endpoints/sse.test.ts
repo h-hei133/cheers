@@ -18,8 +18,10 @@ async function read(endpoint: string, wire: string): Promise<StreamedCompletion>
   return next.value;
 }
 
-describe.each(["anthropic-messages", "google-generative-ai"])("%s SSE data lines", endpoint => {
-  const payload = (text: string) => endpoint === "anthropic-messages"
+describe.each(["openai-compatible", "anthropic-messages", "google-generative-ai", "google-vertex"])("%s SSE data lines", endpoint => {
+  const payload = (text: string) => endpoint === "openai-compatible"
+    ? { choices: [{ delta: { content: text }, finish_reason: "stop" }] }
+    : endpoint === "anthropic-messages"
     ? { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } }
     : { candidates: [{ content: { parts: [{ text }] }, finishReason: "STOP" }] };
   const terminal = endpoint === "anthropic-messages" ? { type: "message_delta", delta: { stop_reason: "end_turn" } } : {};
@@ -41,4 +43,18 @@ describe.each(["anthropic-messages", "google-generative-ai"])("%s SSE data lines
     expect(result.message.content).toBe("valid");
     expect(result.finishReason).toBe("stop");
   });
+});
+
+it.each(["anthropic-messages", "google-generative-ai", "google-vertex"])("retains an independent usage event after %s completion", async endpoint => {
+  const events = endpoint === "anthropic-messages" ? [
+    { type: "message_start", message: { usage: { input_tokens: 100 } } },
+    { type: "message_delta", delta: { stop_reason: "end_turn" } },
+    { type: "message_delta", usage: { output_tokens: 7 } },
+  ] : [
+    { candidates: [{ finishReason: "STOP" }] },
+    { usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 4, thoughtsTokenCount: 3 } },
+  ];
+  const result = await read(endpoint, events.map(event => `data: ${JSON.stringify(event)}\n\n`).join(""));
+  expect(result.finishReason).toBe("stop");
+  expect(result.usage).toMatchObject({ prompt_tokens: 100, completion_tokens: 7 });
 });

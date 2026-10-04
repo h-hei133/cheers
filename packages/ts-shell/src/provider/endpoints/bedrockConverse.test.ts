@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { endpointShape, endpointTurnBody, endpointUrl } from "./index.js";
 import { crc32 } from "../aws/eventStream.js";
 import type { TurnRequest } from "./kinds.js";
@@ -436,6 +436,19 @@ describe("reading the answer", () => {
     expect(await stream.next()).toMatchObject({ done: true, value: {
       finishReason: "stop", message: { content: "complete" }, usage: { prompt_tokens: 9, completion_tokens: 2 },
     } });
+  });
+
+  it("decodes fragmented UTF-8 and releases a body when its consumer stops", async () => {
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({ start(controller) {
+      const bytes = event("contentBlockDelta", { contentBlockIndex: 0, delta: { text: "Hello 世界" } });
+      for (const byte of bytes) controller.enqueue(Uint8Array.of(byte));
+    }, cancel });
+    const stream = endpointShape("bedrock-converse-stream").readStream(body);
+    expect(await stream.next()).toEqual({ done: false, value: { kind: "text", text: "Hello 世界" } });
+    await stream.return(undefined as never);
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(body.locked).toBe(false);
   });
 
   it("reports a failure the provider sent in band", async () => {

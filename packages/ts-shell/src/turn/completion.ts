@@ -195,32 +195,6 @@ const FINISH_GRACE_MS = 2_000;
 const GRACE_EXPIRED = Symbol("finish-grace-expired");
 
 /**
- * The next chunk, or a marker when nothing arrives within the grace window.
- *
- * The abandoned `next()` is left to settle on its own; its rejection is caught
- * so a stream that fails after the answer is complete cannot surface as an
- * unhandled error.
- */
-async function nextWithGrace(
-  iterator: AsyncIterator<Uint8Array>,
-  graceMs: number,
-): Promise<IteratorResult<Uint8Array> | typeof GRACE_EXPIRED> {
-  const pending = iterator.next();
-  pending.catch(() => undefined);
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      pending,
-      new Promise<typeof GRACE_EXPIRED>((resolve) => {
-        timer = setTimeout(() => resolve(GRACE_EXPIRED), graceMs);
-      }),
-    ]);
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-/**
  * Whether to narrate the shape of each stream frame.
  *
  * For diagnosing a host whose stream never finishes: the question is always
@@ -258,17 +232,19 @@ export async function* readCompletionStream(
     usage: undefined,
   };
   const decoder = new TextDecoder();
-  const iterator = (body as unknown as AsyncIterable<Uint8Array>)[Symbol.asyncIterator]();
+  const reader = body.getReader();
   let buffer = "";
   let ended = false;
   let settled = false;
+  let graceDeadline: Promise<typeof GRACE_EXPIRED> | undefined;
+  let graceTimer: ReturnType<typeof setTimeout> | undefined;
 
   try {
     for (;;) {
       // Once the answer is complete, an event carrying usage may still be on its
       // way, so the wait is bounded rather than indefinite — a host holding the
       // connection open must not hold the turn open with it.
-      const chunk = settled ? await nextWithGrace(iterator, FINISH_GRACE_MS) : await iterator.next();
+      const chunk = graceDeadline ? await Promise.race([graceDeadline, reader.read()]) : await reader.read();
       if (chunk === GRACE_EXPIRED) {
         traceStream("stopped: grace window expired");
         break;
@@ -289,15 +265,24 @@ export async function* readCompletionStream(
           ended = true;
           break;
         }
-        if (step.settled) settled = true;
+        if (step.settled && !settled) {
+          settled = true;
+          // One deadline for the completed answer: heartbeats, repeated finish
+          // reasons and late usage must not extend its grace period.
+          graceDeadline = new Promise((resolve) => {
+            graceTimer = setTimeout(() => resolve(GRACE_EXPIRED), FINISH_GRACE_MS);
+          });
+        }
       }
       if (ended) break;
     }
   } finally {
-    // Released on every exit, including the grace expiry: `for await` does this
-    // itself, and doing the read by hand means doing it here. A body left open
-    // holds its connection, and a held connection outlives the turn.
-    void Promise.resolve(iterator.return?.(undefined)).catch(() => undefined);
+    clearTimeout(graceTimer);
+    // Cancel the owned reader directly; an iterator.return() would wait behind
+    // the pending read that lost the grace race. Release the lock even when an
+    // underlying cancellation callback takes longer to settle.
+    void reader.cancel().catch(() => undefined);
+    reader.releaseLock();
   }
 
   // A host that closes without a blank line after its last event leaves it in the

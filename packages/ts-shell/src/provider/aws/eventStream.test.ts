@@ -142,10 +142,10 @@ describe("reading a stream", () => {
   });
 
   it("reads a message split at every possible point", async () => {
-    const whole = frame([text(":event-type", "byte-by-byte")], [9]);
+    const whole = frame([text(":event-type", "byte-by-byte 世界")], [9]);
     const pieces = [...whole].map((byte) => new Uint8Array([byte]));
 
-    expect(await collect(streamOf(...pieces))).toEqual(["byte-by-byte"]);
+    expect(await collect(streamOf(...pieces))).toEqual(["byte-by-byte 世界"]);
   });
 
   it("refuses a stream that ends mid-message", async () => {

@@ -324,6 +324,40 @@ describe("chat-template markers that leak into visible text", () => {
 });
 
 describe("a stream that ends without its sentinel", () => {
+  it.each(["silent", "heartbeat", "repeated finish"])("bounds the grace window and releases the reader with %s traffic", async traffic => {
+    vi.useFakeTimers();
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    let ticker: ReturnType<typeof setInterval> | undefined;
+    let pending: ReturnType<typeof collect> | undefined;
+    const cancel = vi.fn(() => { clearInterval(ticker); });
+    try {
+      const encoder = new TextEncoder();
+      const body = new ReadableStream<Uint8Array>({ start(source) {
+        controller = source;
+        source.enqueue(encoder.encode(chunk({ content: "Answer" })));
+        source.enqueue(encoder.encode(chunk({}, { finish_reason: "stop" })));
+        if (traffic !== "silent") ticker = setInterval(() => {
+          source.enqueue(encoder.encode(traffic === "heartbeat" ? ": heartbeat\n\n" : chunk({}, { finish_reason: "stop" })));
+        }, 200);
+      }, cancel });
+      let completed = false;
+      pending = collect(body).then(value => { completed = true; return value; });
+      await vi.advanceTimersByTimeAsync(1999);
+      expect(completed).toBe(false);
+      await vi.advanceTimersByTimeAsync(2);
+      expect(completed).toBe(true);
+      expect((await pending).result.message.content).toBe("Answer");
+      expect(cancel).toHaveBeenCalledOnce();
+      expect(body.locked).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      clearInterval(ticker);
+      try { controller.close(); } catch { /* The completed reader already canceled it. */ }
+      await pending?.catch(() => undefined);
+      vi.useRealTimers();
+    }
+  });
+
   /** A body that yields the given events and then stays open, never closing. */
   function openStream(...events: string[]): ReadableStream<Uint8Array> {
     const encoder = new TextEncoder();

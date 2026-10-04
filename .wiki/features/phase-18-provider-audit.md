@@ -1,7 +1,7 @@
 # Phase 18 Provider 行为审计
 
 W7-27包含四端点逐字段请求表、流边界、跨模型/resume用量与逐路径超时取消四项。
-字段已逐项对照，缓存刷新与用量恢复已验证；最终流/调用路径矩阵继续，W7-27未完成。
+四项已完成有界审计；最终流/调用路径矩阵和认证准备限制见第七批，W7-27完成。
 源码路径相对 `packages/ts-shell/src/`。
 
 ## 已完成切片
@@ -14,6 +14,7 @@ W7-27包含四端点逐字段请求表、流边界、跨模型/resume用量与�
 | EOF完成证据 | 下表及 `provider/endpoints/termination.test.ts` | 缺结束信号不能变成成功；已显示文本保留、工具不准入 |
 | Bedrock能力与二进制分流 | `provider/endpoints/bedrockConverse.test.ts`、`turn/step.test.ts`及第四批证据 | vision门槛、预算裁剪、真实binary MIME交端点reader |
 | 缓存刷新与用量 | `provider/request/sentRequest.test.ts`、`turn/cacheWarm.test.ts`、`session/store/usage.test.ts`及第六批证据 | 协议准入、当前请求计量、认证更新、后台记账与只写usage；不包含已取消请求的全部账单 |
+| 流与超时取消矩阵 | 第七批及 `turn/completion.test.ts`、`provider/request/fetch.test.ts` | 首个finish后固定宽限、主动释放reader；逐路径区分HTTP时限、认证准备与调用者取消 |
 
 ## EOF与尾帧
 
@@ -136,13 +137,13 @@ session/store/usage.test.ts经实际query/state owner及文件锁写盘、载入
 恢复后不复用旧prompt gauge；session/compactionUsage.test.ts验证gauge只影响阈值、不改变历史切点。
 这些owner套件已在第六批与四协议JSON/流式用量一起复跑；算术与恢复证据见该批记录。
 
-## 剩余闭合清单
+## 闭合范围
 
-1. 最终流/timeout/cancel逐路径矩阵，明确transport时限与认证准备时限的区别。
+最终流/timeout/cancel逐路径矩阵在第七批闭合，明确transport时限与认证准备时限的区别。
 
 缓存刷新接线、签名transport、协议输出上限及用量恢复已在第六批闭合。
 
-W7-27完成前按此有限清单推进；W7-29和W7-33仍在后续执行位。
+W7-27按上述有限范围完成；W7-29和W7-33仍在后续执行位。此结论不等于所有路径均有完整操作期限。
 
 73d896bd的CI37151663744及Architecture Watch37151663719均成功。当前逐字段表补充仅改文档，未重跑build/tests。
 
@@ -246,3 +247,70 @@ session/store/usage.ts复用state锁、必需快照读取和原子写入，仅�
 取消/失效请求可能已产生提供方费用，本地只接纳当前且成功完成的用量，不宣称完整外部账单对账。
 
 c4eb2bd4的CI37155585391和Architecture Watch37155585399均成功。W7-27继续上方最后一项矩阵，Phase18未完成。
+
+
+## 最终流与超时取消矩阵（第七批）
+
+审查复现OpenAI reader在每个chunk后重设两秒宽限：持续心跳或重复finish会无限延长已完成答案；
+静默宽限到期时，iterator.return排在未完成next后，返回结果时仍未cancel且body保持锁定。
+现由原reader直接持有ReadableStream reader，首个finish只建立一次deadline，后续字节不能续期；
+退出时直接cancel并释放lock，不等待可能很慢的底层cancel回调。仍允许固定窗口内的晚到usage。
+
+对照参考的结束后继续读取usage、须有结束证据两项决策；其所读实现未提供相同两秒宽限。
+本仓保留已有兼容窗口并固定其上限，沿用现有二进制reader的资源所有权做法，不新增流抽象。
+
+### 流边界
+
+| 边界 | 覆盖与保证 | 证据 |
+|---|---|---|
+| 注释、空帧、LF/CRLF/CR、跨字节分隔与UTF-8 | OpenAI、Anthropic、Google及Vertex别名的SSE矩阵；合法多行JSON保留换行，非法字符串不能拼接为未发送内容 | sse 19项；既有协议reader套件 |
+| 结束、EOF与尾帧 | 保留第二批各协议终止证据、缺失时失败、尾部error和不准入工具的规则 | termination 23项、completion 34项、Anthropic 46项、Google 32项 |
+| finish后usage | 原生消息与两个Google端点的独立usage帧；OpenAI窗口内晚到usage；Bedrock停止后metadata | sse、completion、bedrockConverse |
+| finish后持续连接 | 静默、心跳、重复finish均在首个finish后两秒结束；cancel一次、lock释放、无残留timer | completion三项新增回归，1999ms未完成/2001ms完成 |
+| 二进制分块与提前退出 | UTF-8正文和header逐字节输入，CRC/截断继续由原reader判定；消费者return后cancel一次并解锁 | bedrockConverse 43项、eventStream 14项 |
+
+### 超时与取消路径
+
+生成transport默认connect30秒、headers120秒、body120秒。body是字节间不活动上限，
+不是总时长；这些时限也不覆盖进入base fetch之前await的准备工作。
+
+| 路径 | HTTP与额外期限 | 取消及明确限制 | 证据owner |
+|---|---|---|---|
+| 主回合 | endpoint共享fetch；重试可延长总耗时，无whole-turn deadline | caller及每attempt释放signal | turn/step、stepStream、retry；provider/request/fetch |
+| Readiness | 共享fetch；每attempt5秒，最多5次网络尝试 | caller取消重抛，响应body取消；没有model-list资源的signer端点仅做准入检查 | core/shell/providerReadiness |
+| 公共catalog刷新 | global fetch，10秒operation timer | 独立公共元数据路径，不走生成transport | core/models/catalogRefresh |
+| 公共model列表 | global fetch，8秒timeout | 无caller取消参数 | core/commands/modelCommandRuntime |
+| /btw | 共享签名fetch，15秒timer | 无外部caller signal | core/commands/btwCommandRuntime |
+| 手动/自动压缩及prefix摘要 | 共享签名fetch，无额外总期限 | 传入signal；手动renewal先于可取消部分 | cli/runtime/compaction、core/shell/compaction、session/compaction |
+| 回退后的摘要 | renewal后共享签名fetch，仅HTTP阶段时限 | 无caller signal | core/query/compaction/summarize |
+| 缓存刷新 | 共享签名fetch；调度年龄门不等于in-flight deadline | renewal前后检查，generation取消；过期/取消结果不记成功用量 | turn/cacheWarm、provider/request/sentRequest |
+
+认证准备仍有这些边界：account renewal使用共享有界HTTP，但exchange不消费可选caller signal；
+withRequestSigner在dispatch前等待signer，接口没有signal/deadline。
+Bedrock resolveCredentials与Vertex accessToken也未从endpoint构造获得共享transport或signal。
+AWS process/SSO来源上限30秒，container/IMDS每请求1秒；Google metadata两秒；
+生产signer路径的AWS STS与Google token exchange使用global fetch，没有显式应用期限。
+文件系统/crypto准备同样没有取消契约。这些是审计限制，不把本批扩成认证核心重写。
+
+共享transport新增真实本地socket用例：TCP接入但TLS握手不完成，断言UND_ERR_CONNECT_TIMEOUT；
+headers后body停滞，断言UND_ERR_BODY_TIMEOUT；取消待读body，断言AbortError及服务端连接关闭。
+现有headers timeout测试保留。此证据不证明真实提供方TLS/HTTP2成功路径。
+
+### 验证与结论
+
+隔离HOME的直接5套138项和调用方15套315项通过，build:cli exit0。
+只撤回completion生产owner后三项固定宽限回归全部失败，另31项按名称过滤未运行；
+finally逐字节恢复后直接138项复跑通过。独立代码APPROVE、架构CLEAR。
+证据 `.tmp/provider-matrix-wa225n71`；审核结论明确保留上述认证和操作期限限制。
+所有要求的静态门exit0，test:scripts43项通过；NormProof阻断义务满足、整体partial。
+既有advisory为函数上限6模块、可达性7模块、文档source路径120项；本批没有把advisory写成全仓无缺口。
+
+普通/全屏编译JS CLI经本地HTTP各执行心跳与body停滞，共四场景、exit0。
+心跳分别2.040/2.041秒完成，独立晚到usage持久化为1207 tokens（fresh1000/cache200/output7）；
+配置bodyTimeout300ms后，停滞分别0.986/0.977秒失败，保留部分文本、仅一次请求、无成功事件。
+300ms是配置值，实际观察反映transport定时器调度，未把它宣称为精确墙钟保证。
+四场景均连接关闭、终态sourceEntryId非空且匹配助手消息。
+产物 `.tmp/stream-matrix-pty-mld6qzpm`，仅合成凭据/本地HTTP；未运行真实provider或单文件可执行产物。
+
+f2ee3c17的CI37171187869与Architecture Watch37171187862均成功。
+W7-27完成四项有界审计；继续W7-29、W7-33及剩余W8，Phase18未完成。

@@ -5930,3 +5930,13 @@ a86e1936两项远端检查成功。W7-27继续缓存刷新与最终流/超时取
 统一cache/thoughts计量，后台仅持锁合并usage，保留前台context及会话事件。14套337项、构建与43项脚本通过，独立APPROVE/CLEAR。
 三组反转13/11/15项失败，精确恢复后337项复跑。双模式编译CLI本地HTTP确认旧刷新不重启、后台4次用量落盘和500,000前台gauge不变，无真实provider。
 静态阻断图义务满足，judge整体advisory仍partial；c4eb2bd4两项远端检查成功。W7-27最终流/超时取消矩阵继续，详情见Provider审计。
+
+
+## [2026-10-04] fix | Phase 18 W7-27 流期限与审计完成
+
+首个finish固定两秒宽限，直接取消并释放reader；心跳不能拖住已完成回合。补齐SSE/二进制与真实socket超时取消矩阵。
+直接138项、调用方315项与CLI构建通过；反转三项失败、精确恢复后138项通过，独立APPROVE/CLEAR。
+双模式编译CLI四个本地HTTP场景确认晚到用量、失败保留正文、无重试、关闭连接与正确终态来源，无真实provider。
+静态门与43项脚本通过；NormProof阻断义务满足、整体advisory仍partial。
+Provider审计列出认证准备、无caller取消及整体期限限制；W7-27有界审计完成，继续W7-29、W7-33和剩余W8。
+f2ee3c17两项远端检查成功；详细证据见Provider审计第七批。
