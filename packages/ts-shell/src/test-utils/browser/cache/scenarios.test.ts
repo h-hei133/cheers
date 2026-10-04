@@ -40,7 +40,7 @@ describe("browser cache multiprocess scenario examples", () => {
       now: () => "2026-05-17T02:00:00.000Z",
     });
 
-    expect(result.status).toBe("passed");
+    expect(result.status, renderBrowserCacheMultiprocessReport(result)).toBe("passed");
     expect(result.assertions.processCount).toBe(3);
     expect(result.integrity.status).not.toBe("corrupted");
     expect(result.integrity.status).not.toBe("unsafe");

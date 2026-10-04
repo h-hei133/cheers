@@ -116,6 +116,29 @@ describe("project memory future-turn injection", () => {
     expect(injectionStateStore.get("session:memory-use").injectionStatus).toBe("consumed");
   });
 
+  it("refuses a selected snapshot when lifecycle reread observes its deletion", async () => {
+    const memoryStore = createProjectMemoryLocalStore({ ref: { mode: "test-only", root: storeRoot } });
+    await seed(memoryStore, [record("pmr:race", "Removed memory must not reach the model.", "project-fact")]);
+    const states = createProjectMemoryInjectionStateStore();
+    await runProjectMemoryUseCommand({
+      request: parseProjectMemoryUseCommandArgs(["use"]), sessionScopeId: "race", memoryStore, injectionStateStore: states,
+    });
+    const get = memoryStore.get.bind(memoryStore);
+    memoryStore.get = async id => {
+      expect((await memoryStore.delete!({ recordId: id, deletedAt: "2026-10-04", sourceCommand: "/memory" })).deleted).toBe(true);
+      return get(id);
+    };
+    const plan = await planProjectMemoryFutureTurnInjection({
+      memoryStore, injectionState: states.get("race"),
+      markInjected: input => states.markInjected(input), markConsumed: input => states.markConsumed(input),
+      markInvalid: input => states.markInvalid(input),
+    });
+    expect(plan.shouldInject).toBe(false);
+    expect(plan.injectedContext).toBeUndefined();
+    expect(states.get("race").injectionStatus).toBe("invalid");
+    expect((await memoryStore.list()).records).toEqual([]);
+  });
+
   it("does not claim injection when pending state is evicted during retrieval", async () => {
     const memoryStore = createProjectMemoryLocalStore({ ref: { mode: "test-only", root: storeRoot } });
     await seed(memoryStore, [record("pmr:fact", "Project memory requires explicit user opt-in.", "project-fact")]);

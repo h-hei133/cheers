@@ -47,6 +47,14 @@ export function planProjectMemoryInjectionMerge(
   const filteredRecordIds = input.pendingRecordLifecycle
     .filter((record) => record.status !== "active")
     .map((record) => `${record.recordId}:${record.status}`);
+  const staleSelected = input.pendingRecordLifecycle.some(record =>
+    record.status !== "active" && input.candidate.recordIds.includes(record.recordId));
+  if (staleSelected) {
+    blockers.push({
+      id: "selected-memory-changed-during-read",
+      message: "A selected memory record was invalidated or deleted during retrieval; stage memory again before use.",
+    });
+  }
   const newRecordIds = input.candidate.recordIds.filter(
     (recordId) => !input.injectionState.recordIds.includes(recordId),
   );

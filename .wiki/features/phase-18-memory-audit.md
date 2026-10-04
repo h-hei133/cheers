@@ -1,7 +1,7 @@
 # Phase 18 记忆与上下文行为审计
 
-W7-29仍在执行。本批只闭合存储事务、候选身份、检索排序和显式注入准入；
-不以定向测试通过代替全部模块的行为审计。当前非测试模块为memory 38、context 29；
+W7-29的67模块有界审计与本地修复验证已完成，最终批次远端验证待完成。
+以下五批与逐模块矩阵记录实际覆盖和保证限制，不声称穷尽所有分支。当前非测试模块为memory 38、context 29；
 裁决中的36+28是历史数量，本批开始时为37+28，新增一个存储事务owner。
 以下源码路径相对 `packages/ts-shell/src/`。
 
@@ -143,3 +143,107 @@ W7-29仍需完成其余模块行为映射；本批不以预算测试代替整体
 | startup、指令、选择 | startupWarmContextHealth、importExpansion、projectInstructions、selection/model测试 | 复用W7-32等既有证据并逐模块映射，明确启发式能力范围 |
 
 W7-29仍未完成；源码身份修复和解析直接测试不替代上述完整审计。
+
+
+## 逐模块职责与验证入口（第五批）
+
+本表完整覆盖当前38个memory和29个context生产模块。验证入口列是实际运行过的测试，不意味着每个分支都穷尽。
+前四批缺陷、下述并发读取修复与明确能力限制共同构成本轮有界审计；远端交付仍需按精确提交核验。
+路径相对`packages/ts-shell/src/`。
+
+| 模块 | 验证入口 | 核对边界 |
+|---|---|---|
+| `context/acquisition/code/source.ts` | `context/acquisition/code/source.test.ts` | 完整身份匹配；无显式来源不制造事实 |
+| `context/budget/lines.ts` | `context/budget/lines.test.ts` | 线性保序选择，必需内容和裁剪标记纳入上限 |
+| `context/compact/checkpoint/compactCheckpointSurface.ts` | `context/compact/checkpoint/compactCheckpointSurface.test.ts` | 状态与注入状态分别展示，不升级失效或缺失 |
+| `context/compact/checkpoint/compactLiveCheckpoint.ts` | `context/compact/checkpoint/compactLiveCheckpoint.test.ts` | 当前/历史、替换/清理、容量淘汰与跨会话索引 |
+| `context/compact/checkpoint/compactionCheckpoint.ts` | `core/query/compaction.test.ts` | 真实压缩流程生成checkpoint并标pending；摘要仍由原压缩流程拥有 |
+| `context/compact/command/compactCommandContract.ts` | `context/compact/command/compactCommandContract.test.ts` | 模式、参数、原文输入拒绝与显式请求契约 |
+| `context/compact/command/compactCommandRunner.ts` | `context/compact/command/compactCommandRunner.test.ts` | 构建packet/候选/呈现，无模型调用或持久化 |
+| `context/compact/continuity/compactContinuityPacket.ts` | `context/compact/continuity/routeContinuityHandoff.test.ts` | 来源投影与packet形状；能力/恢复边界保守，验证只来自输入证据 |
+| `context/compact/continuity/compactContinuityQuality.ts` | `context/compact/continuity/compactContinuityQuality.test.ts` | 来源、内容与恢复声明质量检查；大小仅提示，硬预算由budget拥有 |
+| `context/compact/continuity/routeContinuityHandoff.ts` | `context/compact/continuity/routeContinuityHandoff.test.ts` | 来源投影与packet形状；能力/恢复边界保守，验证只来自输入证据 |
+| `context/compact/delivery/compactHandoffRenderer.ts` | `context/compact/delivery/compactHandoffRenderer.test.ts` | 不把缺失验证、恢复预览或能力候选呈现为已执行 |
+| `context/compact/delivery/compactSessionSurface.ts` | `context/compact/delivery/compactSessionSurface.test.ts` | 会话紧凑呈现保留变更、失败、验证和下一步 |
+| `context/compact/injection/compactFutureTurnAdapter.ts` | `context/compact/injection/compactFutureTurnAdapter.test.ts` | 候选/合并/格式/预算/准备/消费各有职责；第三批补硬预算与pending保留 |
+| `context/compact/injection/compactFutureTurnInjection.ts` | `context/compact/injection/compactFutureTurnInjection.test.ts` | 候选/合并/格式/预算/准备/消费各有职责；第三批补硬预算与pending保留 |
+| `context/compact/injection/compactInjectedContextBudget.ts` | `context/compact/injection/compactInjectedContextBudget.test.ts` | 候选/合并/格式/预算/准备/消费各有职责；第三批补硬预算与pending保留 |
+| `context/compact/injection/compactInjectedContextFormatter.ts` | `context/compact/injection/compactInjectedContextFormatter.test.ts` | 候选/合并/格式/预算/准备/消费各有职责；第三批补硬预算与pending保留 |
+| `context/compact/injection/compactInjectionMergePolicy.ts` | `context/compact/injection/compactInjectionMergePolicy.test.ts` | 候选/合并/格式/预算/准备/消费各有职责；第三批补硬预算与pending保留 |
+| `context/compact/injection/compactInjectionState.ts` | `context/compact/injection/compactInjectionState.test.ts` | 候选/合并/格式/预算/准备/消费各有职责；第三批补硬预算与pending保留 |
+| `context/compact/policy/compactRedactionPolicy.ts` | `context/compact/policy/compactRedactionPolicy.test.ts` | packet递归字段/显式secret脱敏；不是任意外部循环对象的通用序列化器 |
+| `context/graph/ast/parser.ts` | `context/graph/ast/parser.test.ts` | TS/JS声明语法提取；其他语言仅声明提示，非语义语言服务 |
+| `context/instructions/importExpansion.ts` | `context/instructions/importExpansion.test.ts` | 项目边界、符号链接、循环/深度、代码示例与缺失文件降级 |
+| `context/instructions/projectInstructions.ts` | `context/instructions/projectInstructions.test.ts` | 层级发现、优先级、预算和包装边界；不替换系统提示 |
+| `context/selection/model.ts` | `context/selection/model.test.ts` | 必需目标缺失阻断；选择成功不等于任务成功 |
+| `context/startup/startupWarmCommandContract.ts` | `context/startup/startupWarmCommandRunner.test.ts` | status只观察；rebuild显式配置；写入与读后验证分别报告 |
+| `context/startup/startupWarmCommandRunner.ts` | `context/startup/startupWarmCommandRunner.test.ts` | status只观察；rebuild显式配置；写入与读后验证分别报告 |
+| `context/startup/startupWarmContextBuilder.ts` | `context/startup/startupWarmContextBuilder.test.ts` | 缺来源保留missing；过滤失效/删除记忆，不执行自动注入 |
+| `context/startup/startupWarmContextCache.ts` | `context/startup/startupWarmContextHealth.test.ts` | 显式项目绑定、有限普通文件、字段投影、原子替换与fresh/stale/invalid/unknown |
+| `context/startup/startupWarmContextHealth.ts` | `context/startup/startupWarmContextHealth.test.ts` | 显式项目绑定、有限普通文件、字段投影、原子替换与fresh/stale/invalid/unknown |
+| `context/startup/startupWarmContextSurface.ts` | `context/startup/startupWarmCommandRunner.test.ts` | status只观察；rebuild显式配置；写入与读后验证分别报告 |
+| `memory/memoryPersistence.ts` | `memory/memoryPersistence.test.ts` | 记录准入、损坏行可读与拒写；显式存储契约 |
+| `memory/memoryValidation.ts` | `memory/memoryPersistence.test.ts` | 记录准入、损坏行可读与拒写；显式存储契约 |
+| `memory/projectMemoryCandidate.ts` | `memory/projectMemoryCandidateExtractor.test.ts` | 候选来源、完整文本身份、分类、拒绝与预览不写入 |
+| `memory/projectMemoryCandidateExtractor.ts` | `memory/projectMemoryCandidateExtractor.test.ts` | 候选来源、完整文本身份、分类、拒绝与预览不写入 |
+| `memory/projectMemoryCandidateQuality.ts` | `memory/projectMemoryCandidateExtractor.test.ts` | 候选来源、完整文本身份、分类、拒绝与预览不写入 |
+| `memory/projectMemoryCandidateSurface.ts` | `memory/projectMemoryCandidateExtractor.test.ts` | 候选来源、完整文本身份、分类、拒绝与预览不写入 |
+| `memory/projectMemoryConflictDetection.ts` | `memory/projectMemoryConflictDetection.test.ts` | 元组冲突阻断；词面矛盾仅警告 |
+| `memory/projectMemoryDeleteCommandContract.ts` | `memory/projectMemoryDeleteCommandRunner.test.ts` | 明确记录ID；不存在/不支持拒绝；删除与失效结果驱动呈现 |
+| `memory/projectMemoryDeleteCommandRunner.ts` | `memory/projectMemoryDeleteCommandRunner.test.ts` | 明确记录ID；不存在/不支持拒绝；删除与失效结果驱动呈现 |
+| `memory/projectMemoryDeleteSurface.ts` | `memory/projectMemoryDeleteCommandRunner.test.ts` | 明确记录ID；不存在/不支持拒绝；删除与失效结果驱动呈现 |
+| `memory/projectMemoryFutureTurnAdapter.ts` | `memory/projectMemoryFutureTurnInjection.test.ts` | 显式staging、重新读取、冲突/质量拒绝、单次消费、过滤与正文脱敏 |
+| `memory/projectMemoryFutureTurnInjection.ts` | `memory/projectMemoryFutureTurnInjection.test.ts` | 显式staging、重新读取、冲突/质量拒绝、单次消费、过滤与正文脱敏 |
+| `memory/projectMemoryInjectedContextBudget.ts` | `context/budget/lines.test.ts` | 字符上限、完整行、闭合标记及无法容纳时拒绝 |
+| `memory/projectMemoryInjectedContextFormatter.ts` | `memory/projectMemoryFutureTurnInjection.test.ts` | 显式staging、重新读取、冲突/质量拒绝、单次消费、过滤与正文脱敏 |
+| `memory/projectMemoryInjectionMergePolicy.ts` | `memory/projectMemoryFutureTurnInjection.test.ts` | 显式staging、重新读取、冲突/质量拒绝、单次消费、过滤与正文脱敏 |
+| `memory/projectMemoryInjectionQuality.ts` | `memory/projectMemoryFutureTurnInjection.test.ts` | 显式staging、重新读取、冲突/质量拒绝、单次消费、过滤与正文脱敏 |
+| `memory/projectMemoryInjectionState.ts` | `memory/projectMemoryInjectionState.test.ts` | 会话隔离、替换、容量淘汰和消费状态 |
+| `memory/projectMemoryInjectionSurface.ts` | `memory/projectMemoryFutureTurnInjection.test.ts` | 显式staging、重新读取、冲突/质量拒绝、单次消费、过滤与正文脱敏 |
+| `memory/projectMemoryInvalidation.ts` | `memory/projectMemoryDeleteCommandRunner.test.ts` | 明确记录ID；不存在/不支持拒绝；删除与失效结果驱动呈现 |
+| `memory/projectMemoryLocalStore.ts` | `memory/memoryPersistence.test.ts` | 记录准入、损坏行可读与拒写；显式存储契约 |
+| `memory/projectMemoryRecallCommandContract.ts` | `memory/projectMemoryRecallCommandRunner.test.ts` | 查询/筛选、真实时间排序、分层上限、预览不注入 |
+| `memory/projectMemoryRecallCommandRunner.ts` | `memory/projectMemoryRecallCommandRunner.test.ts` | 查询/筛选、真实时间排序、分层上限、预览不注入 |
+| `memory/projectMemoryRecallSurface.ts` | `memory/projectMemoryRecallCommandRunner.test.ts` | 查询/筛选、真实时间排序、分层上限、预览不注入 |
+| `memory/projectMemoryRetrieval.ts` | `memory/projectMemoryRecallCommandRunner.test.ts` | 查询/筛选、真实时间排序、分层上限、预览不注入 |
+| `memory/projectMemoryReviewCommandContract.ts` | `memory/projectMemoryReviewCommandRunner.test.ts` | 批准/拒绝仅改审核状态；呈现不宣称落盘 |
+| `memory/projectMemoryReviewCommandRunner.ts` | `memory/projectMemoryReviewCommandRunner.test.ts` | 批准/拒绝仅改审核状态；呈现不宣称落盘 |
+| `memory/projectMemoryReviewState.ts` | `memory/projectMemoryReviewState.test.ts` | 完整候选变化使批准失效；有界历史不复活旧授权 |
+| `memory/projectMemoryReviewSurface.ts` | `memory/projectMemoryReviewCommandRunner.test.ts` | 批准/拒绝仅改审核状态；呈现不宣称落盘 |
+| `memory/projectMemoryRoot.ts` | `memory/projectMemoryChain.test.ts` | 项目独立存储路径，真实桥接到保存/读取/注入 |
+| `memory/projectMemorySaveCommandContract.ts` | `memory/projectMemorySaveCommandRunner.test.ts` | 批准、质量、持久保留范围三者同时满足才写入；失败与部分结果可见 |
+| `memory/projectMemorySaveCommandRunner.ts` | `memory/projectMemorySaveCommandRunner.test.ts` | 批准、质量、持久保留范围三者同时满足才写入；失败与部分结果可见 |
+| `memory/projectMemoryStoreContract.ts` | `memory/memoryPersistence.test.ts` | 记录准入、损坏行可读与拒写；显式存储契约 |
+| `memory/projectMemoryStoreSurface.ts` | `memory/projectMemorySaveCommandRunner.test.ts` | 批准、质量、持久保留范围三者同时满足才写入；失败与部分结果可见 |
+| `memory/projectMemoryUseCommandContract.ts` | `memory/projectMemoryFutureTurnInjection.test.ts` | 显式staging、重新读取、冲突/质量拒绝、单次消费、过滤与正文脱敏 |
+| `memory/projectMemoryUseCommandRunner.ts` | `memory/projectMemoryFutureTurnInjection.test.ts` | 显式staging、重新读取、冲突/质量拒绝、单次消费、过滤与正文脱敏 |
+| `memory/projectMemoryWakeup.ts` | `memory/projectMemoryRecallCommandRunner.test.ts` | 查询/筛选、真实时间排序、分层上限、预览不注入 |
+| `memory/store/health.ts` | `memory/store/health.test.ts` | disabled/readable/degraded/writable派生与安全失败投影 |
+| `memory/store/transaction.ts` | `memory/store/transaction.test.ts` | 同物理路径共锁、锁内读取、失败保存原数据；另有六进程竞争测试 |
+
+## 第五批：生命周期再观察与有界审计收口（2026-10-04）
+
+候选快照读取后，生命周期重读若已看到选中记录删除或失效，旧实现只报告过滤却仍保留候选正文。
+merge owner现在拒绝该次注入并标记invalid，要求重新staging；不把旧正文送给模型。
+参考事实生命周期维护的显式失效边界，本仓用现有生命周期重读自研阻断，不引入事务快照系统。
+保证止于最后一次观察，不承诺跨进程原子快照或阻止观察之后的变更。
+
+43套292项（memory、context及slash/LSP/harness/compaction消费者）与CLI构建通过；
+回归在修复前失败，反转owner后1失败13通过，精确恢复后14项通过。
+静态循环、配置消费者、声明、Node floor门及43项脚本通过。证据：
+`.tmp/memory-audit-final-BoYbdp/test.log`、`.tmp/memory-lifecycle-reversal-gzx5aq_e/`。
+本批无新PTY或独立审查结论，第一批双模式CLI证据不升级为本批重测。
+
+ff0a64f1的CI37209101513及Architecture Watch37209101489均成功。
+此前cf994879的CI37208426674唯一失败为浏览器并发CLI场景；没有证据证明记忆改动导致，也没有证明根因已修复。
+测试断言增加既有安全报告以便以后保留失败分类，不放宽成功要求。
+本地诊断首次失败为清单拒绝runner路径：仓内`.tmp/`不满足既有`/tmp/`或`/temp/`检查；
+这是本地隔离设置问题，不能据此归因旧CI。最终批次远端验证仍待完成。
+
+审计范围固定为上表67模块及其消费者：存储/审批/质量/检索/注入、源码事实/解析、预算/compact与startup。
+保留追加写崩溃原子性、启发式非TS解析、字符预算及最后观察之后竞态等已列限制；不扩大为无边界清理。
+
+最终本地补验：将TMPDIR设为仓内`.tmp/browser-cache-diagnostic-JHNMxu/tmp/`后，
+浏览器并发断言1项通过（另5项未选择），证据`valid-path.log`；同目录记录失败设置与诊断，未改产品策略。
+`verify:docs-drift:strict`通过（120条非阻断源码引用提示），`git diff --check`通过。
+本批调用`normproof judge`因当前PATH无该可执行文件而未运行；不借用旧结果冒充本批通过。
