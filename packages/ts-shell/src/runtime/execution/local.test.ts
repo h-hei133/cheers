@@ -78,3 +78,15 @@ it("forgets a Windows root after a late close following failed termination", asy
     expect(untrackChildPid).toHaveBeenCalledWith(12345);
   } finally { Object.defineProperty(process, "platform", platform); }
 });
+
+it("can deliver stdout without retaining output or mixing stderr into the consumer", async () => {
+  const child = childProcess();
+  const chunks: Buffer[] = [];
+  const result = executeLocally({ command: "test", args: [], cwd: ".", captureOutput: false,
+    onStdout: chunk => chunks.push(chunk) });
+  child.stdout.write("source data");
+  child.stderr.write("diagnostic data");
+  child.emit("close", 0, null);
+  expect(await result).toMatchObject({ status: "completed", stdout: "", stderr: "" });
+  expect(Buffer.concat(chunks).toString()).toBe("source data");
+});

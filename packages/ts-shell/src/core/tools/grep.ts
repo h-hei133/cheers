@@ -94,19 +94,24 @@ export function createGrepToolDefinition(
       // milliseconds for `rg`. The walk stays as the fallback rather than being
       // deleted, so a machine without ripgrep still searches — the same
       // degradation the compared implementations use for native dependencies.
-      const viaRipgrep = searchWithRipgrep({
+      const viaRipgrep = await searchWithRipgrep({
         pattern: rawPattern,
         searchPath: searchSubPath,
         ...(globFilter ? { glob: globFilter } : {}),
         ignoreCase,
         limit,
         workspaceRoot: context.workspaceRoot,
+        abortSignal: context.abortSignal,
       });
       if (viaRipgrep.ok) {
         return await reportGrepMatches(
           viaRipgrep.matches.map((match) => formatRipgrepMatch(match, 500)),
           context.workspaceRoot,
         );
+      }
+
+      if (context.abortSignal?.aborted || viaRipgrep.reason !== "not-installed") {
+        return deniedResult(`Search stopped: ${context.abortSignal?.aborted ? "cancelled" : viaRipgrep.reason}.`);
       }
 
       let regex: RegExp;
@@ -129,6 +134,7 @@ export function createGrepToolDefinition(
         reportSafeTarget: context.workspaceRoot,
       });
 
+      if (context.abortSignal?.aborted) return deniedResult("Search stopped: cancelled.");
       const targetFiles = allFiles.filter((file) => {
         if (searchSubPath && !file.startsWith(searchSubPath)) {
           return false;
@@ -143,6 +149,7 @@ export function createGrepToolDefinition(
       let totalMatches = 0;
 
       for (const relPath of targetFiles) {
+        if (context.abortSignal?.aborted) return deniedResult("Search stopped: cancelled.");
         if (totalMatches >= limit) {
           break;
         }
@@ -171,6 +178,7 @@ export function createGrepToolDefinition(
         }
       }
 
+      if (context.abortSignal?.aborted) return deniedResult("Search stopped: cancelled.");
       return await reportGrepMatches(results, context.workspaceRoot);
     },
   };

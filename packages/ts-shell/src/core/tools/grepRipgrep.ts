@@ -1,4 +1,5 @@
-import { execFileSync } from "node:child_process";
+import { StringDecoder } from "node:string_decoder";
+import { executeLocally } from "../../runtime/execution/local.js";
 import path from "node:path";
 import { truncateLineWidth } from "./truncation.js";
 
@@ -54,7 +55,10 @@ export type RipgrepUnavailable =
   /** The requested search path resolves outside the workspace root. */
   | "outside-workspace"
   /** `rg` ran and failed in a way that is not "no matches". */
-  | "failed";
+  | "failed"
+  | "cancelled"
+  | "timeout"
+  | "output-limit";
 
 export type RipgrepOutcome =
   | { readonly ok: true; readonly matches: readonly RipgrepMatch[] }
@@ -69,6 +73,8 @@ export interface RipgrepSearchInput {
   readonly limit: number;
   /** Workspace root, used as the working directory so paths come back relative. */
   readonly workspaceRoot: string;
+  readonly abortSignal?: AbortSignal;
+  readonly timeoutMs?: number;
 }
 
 /**
@@ -80,20 +86,20 @@ export interface RipgrepSearchInput {
  */
 let resolvedBinary: string | undefined | null = null;
 
-export function resolveRipgrepBinary(): string | undefined {
-  if (resolvedBinary !== null) return resolvedBinary;
+async function resolveRipgrepBinary(input: RipgrepSearchInput): Promise<string | Exclude<RipgrepOutcome, { ok: true }>> {
+  if (resolvedBinary !== null) return resolvedBinary ?? { ok: false, reason: "not-installed" };
   for (const candidate of ["rg", "ripgrep"]) {
-    try {
-      execFileSync(candidate, ["--version"], { stdio: "ignore", windowsHide: true });
+    const result = await executeLocally({ command: candidate, args: ["--version"],
+      cwd: input.workspaceRoot, timeoutMs: Math.min(input.timeoutMs ?? 2000, 2000),
+      abortSignal: input.abortSignal, captureOutput: false });
+    if (result.status === "cancelled" || result.status === "timeout") return { ok: false, reason: result.status };
+    if (result.status === "completed") {
       resolvedBinary = candidate;
       return candidate;
-    } catch {
-      // Not this one. Trying the next is cheaper than reporting a failure the
-      // caller would have to interpret.
     }
   }
   resolvedBinary = undefined;
-  return undefined;
+  return { ok: false, reason: "not-installed" };
 }
 
 /** Reset the memoised lookup. For tests that change what is on PATH. */
@@ -118,7 +124,7 @@ export function ripgrepArgs(input: RipgrepSearchInput): readonly string[] {
   // a search that reports a hit inside a file the fallback would never read is a
   // divergence, and the size cap exists to keep a minified bundle or a data dump
   // from being read into memory.
-  args.push("--max-filesize", `${MAX_SEARCHED_FILE_BYTES}`);
+  args.push("--max-filesize", `${MAX_SEARCHED_FILE_BYTES}`, "--max-count", `${Math.max(1, Math.ceil(input.limit))}`);
   // `--` so a pattern beginning with `-` is read as a pattern.
   args.push("--", input.pattern, input.searchPath === "" ? "." : input.searchPath);
   return args;
@@ -153,7 +159,7 @@ export function parseRipgrepJson(output: string, limit: number): readonly Ripgre
       // is right: one unreadable record is not a reason to lose the rest.
       continue;
     }
-    if (record.type !== "match") continue;
+    if (!record || typeof record !== "object" || record.type !== "match") continue;
     const path = record.data?.path?.text;
     const text = record.data?.lines?.text;
     const lineNumber = record.data?.line_number;
@@ -183,56 +189,63 @@ export function formatRipgrepMatch(match: RipgrepMatch, maxLineWidth: number): s
 /**
  * Run one ripgrep search.
  *
- * Never throws: a missing binary and a failed run are both answers the caller
- * acts on by falling back, and an exception would make the common case (no
- * ripgrep installed) look like a bug.
+ * A missing binary permits the existing file-walk fallback. A failed or stopped
+ * native search is reported as such, even if some matches arrived before it.
  */
-export function searchWithRipgrep(input: RipgrepSearchInput): RipgrepOutcome {
-  const binary = resolveRipgrepBinary();
-  if (!binary) return { ok: false, reason: "not-installed" };
-
-  // Containment is checked here rather than left to the caller. `path` is
-  // model-supplied, and a search path like `foo/../../elsewhere` resolves outside
-  // the workspace: the tool would then read files the session was never given
-  // access to, and report them as if they were in the workspace. The in-process
-  // walk refuses these by accident (it matches the path as a string prefix), so
-  // without this check the fast path would be the less safe of the two — the
-  // opposite of what a fallback should be.
+export async function searchWithRipgrep(input: RipgrepSearchInput): Promise<RipgrepOutcome> {
+  if (input.abortSignal?.aborted) return { ok: false, reason: "cancelled" };
   const root = path.resolve(input.workspaceRoot);
   const target = input.searchPath === "" ? root : path.resolve(root, input.searchPath);
-  if (target !== root && !target.startsWith(root + path.sep)) {
-    return { ok: false, reason: "outside-workspace" };
-  }
+  if (target !== root && !target.startsWith(root + path.sep)) return { ok: false, reason: "outside-workspace" };
+  const binary = await resolveRipgrepBinary(input);
+  if (typeof binary !== "string") return binary;
+  return streamSearch(binary, input);
+}
 
-  try {
-    const stdout = execFileSync(binary, [...ripgrepArgs(input)], {
-      cwd: input.workspaceRoot,
-      encoding: "utf8",
-      windowsHide: true,
-      // stderr is captured rather than inherited: a search path that does not
-      // exist makes ripgrep print its own complaint, and forwarding that would
-      // put ripgrep's wording into a session that never mentions ripgrep. The
-      // failure is handled below, in the tool's own terms.
-      stdio: ["ignore", "pipe", "pipe"],
-      // A broad pattern over a large repository produces megabytes of JSON, and
-      // the default buffer would fail on exactly the searches this exists to
-      // make fast. The caller's limit still decides how much is kept.
-      maxBuffer: 256 * 1024 * 1024,
-    });
-    return { ok: true, matches: parseRipgrepJson(stdout, input.limit) };
-  } catch (error) {
-    // Exit 1 means "ran correctly, found nothing" — an empty answer, not a
-    // failure. Anything else (2, a spawn error, a buffer overflow) is a reason
-    // to let the in-process walk answer instead.
-    const failure = error as { status?: number | null; stdout?: string; message?: string };
-    if (failure.status === 1) return { ok: true, matches: [] };
-    if (typeof failure.stdout === "string" && failure.stdout !== "") {
-      return { ok: true, matches: parseRipgrepJson(failure.stdout, input.limit) };
+async function streamSearch(binary: string, input: RipgrepSearchInput): Promise<RipgrepOutcome> {
+  const controller = new AbortController();
+  const onAbort = (): void => controller.abort();
+  input.abortSignal?.addEventListener("abort", onAbort, { once: true });
+  if (input.abortSignal?.aborted) controller.abort();
+  const decoder = new StringDecoder("utf8");
+  const matches: RipgrepMatch[] = [];
+  let pending = "";
+  let limitReached = false;
+  let oversized = false;
+  // A JSON record can expand escaped characters, but never buffer an unbounded line.
+  const recordLimit = MAX_SEARCHED_FILE_BYTES * 6 + 64 * 1024;
+  const consume = (chunk: Buffer): void => {
+    if (controller.signal.aborted) return;
+    pending += decoder.write(chunk);
+    let end: number;
+    while ((end = pending.indexOf("\n")) >= 0) {
+      if (end > recordLimit) { oversized = true; controller.abort(); break; }
+      const line = pending.slice(0, end);
+      pending = pending.slice(end + 1);
+      // Retain only display-width text, not every full matching source line.
+      for (const match of parseRipgrepJson(line, 1)) {
+        matches.push({ ...match, line: truncateLineWidth(match.line, 500) });
+      }
+      if (matches.length >= input.limit) { limitReached = true; controller.abort(); break; }
     }
-    return {
-      ok: false,
-      reason: "failed",
-      detail: failure.message ?? "ripgrep exited without a result",
-    };
+    if (pending.length > recordLimit) { oversized = true; controller.abort(); }
+    if (controller.signal.aborted) pending = "";
+  };
+  try {
+    const result = await executeLocally({ command: binary, args: [...ripgrepArgs(input)],
+      cwd: input.workspaceRoot, abortSignal: controller.signal, timeoutMs: input.timeoutMs ?? 30_000,
+      captureOutput: false, onStdout: consume });
+    if (input.abortSignal?.aborted) return { ok: false, reason: "cancelled" };
+    if (oversized) return { ok: false, reason: "output-limit" };
+    if (result.status === "timeout") return { ok: false, reason: "timeout" };
+    // Limit termination is only successful after the execution owner confirms cancellation.
+    if (limitReached && result.status === "cancelled") return { ok: true, matches };
+    if (result.status === "completed" || (result.status === "failed" && result.exitCode === 1)) {
+      if (pending.trim()) return { ok: false, reason: "failed" };
+      return { ok: true, matches };
+    }
+    return { ok: false, reason: "failed" };
+  } finally {
+    input.abortSignal?.removeEventListener("abort", onAbort);
   }
 }

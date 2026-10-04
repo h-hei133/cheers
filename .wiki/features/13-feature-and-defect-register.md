@@ -3075,7 +3075,9 @@ return subagentResponse ? approvedResult(lines.join("\n")) : { success: false, e
 **方向**：终态按 `subagentFailure` 判定（有失败即 `success:false`，失败原因进 `error`/正文），
 与 `AGENTS.md`「不要把未核实的结果藏在成功样的状态后面」一致。
 
-### TOL-11 · `grep` 的 ripgrep 快路径 `execFileSync` **阻塞事件循环** — `OPEN` `P3` `CONFIRMED`
+### TOL-11 · `grep` 的 ripgrep 快路径 `execFileSync` **阻塞事件循环** — `LOCAL-FIXED` `P3` `CONFIRMED`
+
+2026-10-05：探测/搜索复用异步执行器；流式解析、限量终止、超时和取消已接通，仅未安装时回退。本地8套51项及编译CLI验证通过，远端待验证；下文保留发现时依据。
 
 `core/tools/grepRipgrep.ts:208` `execFileSync(binary, args, { maxBuffer: 256*1024*1024, … })`——
 **同步**、**无 timeout**、**无 `AbortSignal`**；`ripgrepArgs`（`:105-125`）也不传 `-m/--max-count`。

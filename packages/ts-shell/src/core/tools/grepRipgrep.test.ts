@@ -145,12 +145,12 @@ describe("ripgrep-backed grep", () => {
   });
 
   describe("workspace containment", () => {
-    it("refuses a search path that resolves outside the workspace", () => {
+    it("refuses a search path that resolves outside the workspace", async () => {
       // `path` is model-supplied and the leading-separator strip does not remove a
       // traversal in the middle, so `foo/../../elsewhere` resolved outside the
       // root and the fast path read files the session was never given access to.
       // Refusing here is what keeps the fast path no less safe than the walk.
-      const outcome = searchWithRipgrep({
+      const outcome = await searchWithRipgrep({
         ...base,
         pattern: "secret",
         searchPath: "foo/../../elsewhere",
@@ -160,10 +160,10 @@ describe("ripgrep-backed grep", () => {
       if (outcome.ok === false) expect(outcome.reason).toBe("outside-workspace");
     });
 
-    it("accepts a search path that stays inside the workspace", () => {
+    it("accepts a search path that stays inside the workspace", async () => {
       // Reaches the real `rg`, so the assertion is on the refusal reason rather
       // than on a match: what matters is that containment did not reject it.
-      const outcome = searchWithRipgrep({
+      const outcome = await searchWithRipgrep({
         ...base,
         pattern: "needle",
         searchPath: "src",

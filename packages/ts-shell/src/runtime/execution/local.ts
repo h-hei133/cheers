@@ -29,6 +29,9 @@ function collectStreamed(options: {
   onOutput: (chunk: string) => void
   abortSignal?: AbortSignal
   env?: Readonly<Record<string, string>>
+  /** Consume stdout separately; capture can be disabled for bounded stream consumers. */
+  onStdout?: (chunk: Buffer) => void
+  captureOutput?: boolean
 }): Promise<{ stdout: string; stderr: string }> {
   // Built by hand rather than with `Promise.withResolvers`, which needs Node 22:
   // this package declares `>=20.3.0` and `check:node-floor` enforces it.
@@ -96,12 +99,13 @@ function collectStreamed(options: {
     }
     child.stdout?.on('data', (chunk: Buffer) => {
       const text = chunk.toString()
-      stdout += text
+      if (options.captureOutput !== false) stdout += text
+      options.onStdout?.(chunk)
       options.onOutput(text)
     })
     child.stderr?.on('data', (chunk: Buffer) => {
       const text = chunk.toString()
-      stderr += text
+      if (options.captureOutput !== false) stderr += text
       options.onOutput(text)
     })
     child.on('error', (error) => fail(error.message))
@@ -145,6 +149,9 @@ export async function executeLocally(options: {
   onOutput?: (chunk: string) => void
   abortSignal?: AbortSignal
   env?: Readonly<Record<string, string>>
+  /** Consume stdout separately; capture can be disabled for bounded stream consumers. */
+  onStdout?: (chunk: Buffer) => void
+  captureOutput?: boolean
 }): Promise<NormalizedExecutionResult> {
   const childPromise = collectStreamed({
     ...options,
