@@ -86,7 +86,7 @@ function structuredFactKey(record: ProjectMemoryRecord): string | undefined {
   if (!subject || !predicate) {
     return undefined;
   }
-  return `${record.candidateKind}:${subject}:${predicate}`;
+  return JSON.stringify([record.candidateKind, subject, predicate]);
 }
 
 function normalizeStructuredObject(value: string | undefined): string | undefined {
@@ -123,12 +123,13 @@ function firstRouteReference(record: ProjectMemoryRecord): string | undefined {
 }
 
 function extractClearStatus(value: string): string | undefined {
-  const normalized = value.toLowerCase();
-  if (/\b(enabled|available|default|implemented|complete)\b/.test(normalized)) {
-    return "enabled";
-  }
-  if (/\b(disabled|blocked|deferred|non-default|not enabled|not available)\b/.test(normalized)) {
-    return "disabled";
-  }
-  return undefined;
+  const normalized = value.toLowerCase().replace(
+    /\b(?:not\s+(?:enabled|available|default|implemented|complete)|non-default)\b/g,
+    "disabled",
+  );
+  const enabled = /\b(enabled|available|default|implemented|complete)\b/.test(normalized);
+  const disabled = /\b(disabled|blocked|deferred)\b/.test(normalized);
+  // Mixed statements may describe different capabilities or historical states.
+  // This lexical hint must not pretend to resolve their meaning.
+  return enabled === disabled ? undefined : enabled ? "enabled" : "disabled";
 }

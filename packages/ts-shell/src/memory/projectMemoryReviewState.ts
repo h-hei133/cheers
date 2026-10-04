@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from "node:util";
 import type { ProjectMemoryCandidate } from "./projectMemoryCandidate.js";
 import { RetainedMap, retainHistory, retentionCapacity, type RetentionState, type RetentionStatus } from "../core/state/retention.js";
 
@@ -112,7 +113,7 @@ export function createProjectMemoryReviewStateStore(
         if (
           existing &&
           existing.decision !== "superseded" &&
-          existing.candidate.summary === candidate.summary
+          isDeepStrictEqual(existing.candidate, candidate)
         ) {
           return {
             ...existing,

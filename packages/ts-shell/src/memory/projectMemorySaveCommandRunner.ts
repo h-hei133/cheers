@@ -147,7 +147,7 @@ function selectApprovedEntries(
       : {
           entries: [],
           skipped,
-          blocker: "No approved safe memory candidates are available to save.",
+          blocker: "No approved memory candidates meet durable retention and quality requirements.",
         };
   }
 
@@ -163,7 +163,7 @@ function selectApprovedEntries(
     return {
       entries: [],
       skipped: [`${entry.candidateId}:${entry.decision}`],
-      blocker: `Candidate ${entry.candidateId} is ${entry.decision} and cannot be saved.`,
+      blocker: `Candidate ${entry.candidateId} is ${entry.decision} and does not meet approved durable-memory requirements.`,
     };
   }
   return { entries: [entry], skipped: [] };
@@ -173,8 +173,10 @@ function isSaveEligible(entry: ProjectMemoryReviewEntry): boolean {
   return (
     entry.decision === "approved" &&
     entry.candidate.safety === "safe" &&
-    entry.candidate.retentionClass !== "never-remember" &&
-    entry.candidate.candidateKind !== "rejected"
+    (entry.candidate.retentionClass === "project-scoped-candidate" ||
+      entry.candidate.retentionClass === "user-memory-candidate") &&
+    entry.candidate.candidateKind !== "rejected" &&
+    evaluateProjectMemoryCandidateQuality([entry.candidate]).qualityStatus !== "reject"
   );
 }
 

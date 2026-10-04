@@ -30,6 +30,39 @@ describe("project memory save command runner", () => {
     fs.rmSync(storeRoot, { recursive: true, force: true });
   });
 
+  it.each([
+    { evidence: [] },
+    { reason: "RAW_FILE_CONTENT" },
+    { candidateKind: "transient-session-fact" as const },
+    { retentionClass: "session-scoped-only" as const },
+  ])("refuses approved candidates that cannot be durably saved: %j", async change => {
+    const value = { ...safeCandidate(), ...change };
+    reviewStore.updateCandidates({ reviewSessionId: "quality", candidates: [value], sourceCommand: "/memory" });
+    reviewStore.approve({ reviewSessionId: "quality", candidateId: value.candidateId, sourceCommand: "/memory" });
+    const memoryStore = createProjectMemoryLocalStore({ ref: { mode: "test-only", root: storeRoot } });
+    const result = await runProjectMemorySaveCommand({
+      request: parseProjectMemorySaveCommandArgs(["save", "approved"]), reviewSessionId: "quality",
+      candidates: [value], reviewStore, memoryStore,
+    });
+    expect(result.outcome).toBe("blocked");
+    expect(result.writeResults).toEqual([]);
+    expect(fs.existsSync(path.join(storeRoot, "project-memory.jsonl"))).toBe(false);
+  });
+
+  it("saves eligible approvals when another candidate fails quality", async () => {
+    const good = safeCandidate();
+    const bad = { ...safeCandidate("Missing evidence."), evidence: [] };
+    reviewStore.updateCandidates({ reviewSessionId: "mixed", candidates: [good, bad], sourceCommand: "/memory" });
+    for (const value of [good, bad]) reviewStore.approve({ reviewSessionId: "mixed", candidateId: value.candidateId, sourceCommand: "/memory" });
+    const result = await runProjectMemorySaveCommand({
+      request: parseProjectMemorySaveCommandArgs(["save", "approved"]), reviewSessionId: "mixed", candidates: [good, bad],
+      reviewStore, memoryStore: createProjectMemoryLocalStore({ ref: { mode: "test-only", root: storeRoot } }),
+    });
+    expect(result.savedRecords.map(value => value.candidateId)).toEqual([good.candidateId]);
+    expect(result.quality.qualityStatus).toBe("reject");
+    expect(result.skipped).toContain(`${bad.candidateId}:approved`);
+  });
+
   it("saves an approved safe candidate to an explicit local JSONL store", async () => {
     const safe = safeCandidate();
     reviewStore.updateCandidates({
@@ -196,8 +229,9 @@ describe("project memory save command runner", () => {
     });
 
     expect(result.outcome).toBe("blocked");
-    expect(result.writeResults.every((write) => write.written === false)).toBe(true);
-    expect(result.output).toContain("Memory record contains raw content");
+    expect(result.writeResults).toEqual([]);
+    expect(result.quality.qualityStatus).toBe("reject");
+    expect(result.output).toContain("durable retention and quality requirements");
     expect(fs.existsSync(path.join(storeRoot, "project-memory.jsonl"))).toBe(false);
   });
 

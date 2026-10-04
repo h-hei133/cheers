@@ -13,6 +13,24 @@ const candidate = (id: number) => createProjectMemoryCandidate({
 });
 
 describe("memory review retention", () => {
+  it.each([
+    { evidence: ["new evidence"] },
+    { retentionClass: "user-memory-candidate" as const },
+    { safety: "needs-review" as const },
+    { reason: "Changed justification" },
+    { redactions: ["removed detail"] },
+  ])("requires review again when the approved candidate changes: %j", change => {
+    const store = createProjectMemoryReviewStateStore();
+    const original = candidate(0);
+    const update = (value: typeof original) => store.updateCandidates({ reviewSessionId: "one", candidates: [value], sourceCommand: "/memory" });
+    update(original);
+    store.approve({ reviewSessionId: "one", candidateId: original.candidateId, sourceCommand: "/memory" });
+    expect(update({ ...original, evidence: [...original.evidence] }).approvedCandidates).toHaveLength(1);
+    const refreshed = update({ ...original, ...change });
+    expect(refreshed.approvedCandidates).toEqual([]);
+    expect(refreshed.decisions[0].decidedAt).toBeUndefined();
+  });
+
   it("projects incomplete review history through memory status", async () => {
     const result = await runProjectMemorySaveCommand({
       request: parseProjectMemorySaveCommandArgs(["status"]), reviewSessionId: "one", candidates: [candidate(0), candidate(1), candidate(2)],

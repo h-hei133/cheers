@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { createRequire } from "node:module";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -25,7 +26,7 @@ it("serializes independent writers, duplicate saves and deletes without losing r
     const ready: Promise<void>[] = [];
     const results: Array<{ written: boolean; skipped: boolean }> = [];
     for (let index = 0; index < 6; index++) {
-      const child = spawn(process.execPath, ["--import", "tsx", "--input-type=module", "--eval", `
+      const child = spawn(process.execPath, [createRequire(import.meta.url).resolve("tsx/cli"), "--eval", `
         import assert from "node:assert/strict";
         import { createProjectMemoryLocalStore } from ${JSON.stringify(new URL("../projectMemoryLocalStore.ts", import.meta.url).href)};
         const store = createProjectMemoryLocalStore({ ref: ${JSON.stringify(store.ref)} });
