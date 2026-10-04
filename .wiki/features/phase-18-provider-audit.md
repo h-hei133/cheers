@@ -314,3 +314,16 @@ finally逐字节恢复后直接138项复跑通过。独立代码APPROVE、架构
 
 f2ee3c17的CI37171187869与Architecture Watch37171187862均成功。
 W7-27完成四项有界审计；继续W7-29、W7-33及剩余W8，Phase18未完成。
+
+## W7-33：真实传输前置检查（2026-10-04）
+
+通过既有`verify-real-provider-readiness-smoke.mjs`显式opt-in门禁复核当前条件，
+设置独立HOME/USERPROFILE/TMPDIR/CHEERS_TEST_ROOT和规定的CHEERS_REAL_HOME；未手动读取、打印或复制真实配置。
+外层只输出固定状态标签，不落盘provider响应正文或凭据。结果为
+`[auth] real-provider-readiness-cli`、`[auth] real-provider-readiness-smoke-gate`，exit3。
+这是门禁的认证失败分类，不足以区分失效凭据、端点认证差异与配置接线，不据此修改provider/auth核心。
+
+§9曾可用的两条路径不等于当前可用；Google与签名端点也没有新的可用证据。
+readiness本身只检查普通调用，尚不能证明TLS/HTTP2协商、断流、取消或四端点真实流边界。
+W7-33保留未完成：先恢复可通过的显式认证门禁，再补真实传输边界验收；
+本地HTTP及合成帧测试不升级成这项完成证据。继续不依赖该外部条件的W8任务。

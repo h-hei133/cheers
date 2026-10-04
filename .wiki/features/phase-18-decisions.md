@@ -196,11 +196,11 @@ W6-23已把侧栏重复编号改为OBS-11/OBS-12；本表按更正后的24个唯
 | **26** | `SES-08`：session 四域逐模块行为审计 | 13 册 `SES-08` + 12 册 §10 | **已完成，判据与保证边界见phase-18-session-audit.md。** `session/continuation`(16) / `recovery`(11) / `replay`(5) / `export`(4) = **36 个非测试模块**的**行为**正确性（往返、边界、损坏输入降级）。**前置研究 §7.3 只做了可达性**（16/16、10/11、4/5、4/4 可达；两个不可达 `types.ts` 是契约） | 36 模块 |
 | **27** | `PRV-06`：四端点逐字段形状表 + 流边界矩阵（含 Bedrock 单次路径） | 13 册 `PRV-06` | **已完成有界审计，详见phase-18-provider-audit.md。** (a) 四端点逐字段请求对照；(b) SSE/二进制流边界；(c) 跨模型/resume与后台用量；(d) 逐路径超时取消矩阵。认证准备、无caller signal与缺整体期限的路径明确保留为保证限制 | 4 协议 |
 | **28** | `BRW-06`：`receipt/**` 的保证强度 | 13 册 `BRW-06` | 已完成：九模块逐项核验并修复权限、无副作用查询、锁、完整日志隔离、嵌套准入及结果投影；原过期锁“正确实现”判断已推翻，保证边界见本项实施记录 | 9 模块 |
-| **29** | `memory/**` + `context/**` **逐模块**审计 | 13 册 §13.2 / §16.4 | **本地有界审计完成，最终批次远端验证待完成**：存储、审批、质量、检索、生命周期注入、预算、源码事实及startup；67模块矩阵与保证限制见phase-18-memory-audit.md | 历史64；当前38+29模块 |
+| **29** | `memory/**` + `context/**` **逐模块**审计 | 13 册 §13.2 / §16.4 | **已完成有界审计**：存储、审批、质量、检索、生命周期注入、预算、源码事实及startup；67模块矩阵与保证限制见phase-18-memory-audit.md。0f2b552b两项远端检查成功 | 历史64；当前38+29模块 |
 | **30** | 子代理递归深度与**工具继承** | 13 册 §13.2 / §16.4 | 已完成：单层递归和工具交集已核验；修复权限、正文、模型schema、执行工作区与worktree生命周期。清理仅保证保留检查时可见改动，要求写入方已停止；后台并发写入限制见本项实施记录 | 原runner、工具门与worktree owner |
 | **31** | `core/shell`(37) 完整审计 | 13 册 §13.2 | 13 册 §13.2 明确记「`core/shell` 仍部分未覆盖」（补做轮只覆盖了内核循环）。**37 个非测试模块** | 37 模块 |
 | **32** | `context/startup/**` + 原read去重的行为审计 | 13 册 §18 | 已完成：read去重退役；startup六模块验证输入、项目绑定、fresh/stale/invalid/unknown及失败状态，缺失来源不再以占位文字冒充 | 六模块及现有命令/侧栏消费者 |
-| **33** | provider 四端点**真实**流边界（TLS/HTTP2 层） | 13 册 §16.4 / §18 | 合成块覆盖了帧级；**TLS/HTTP2 层未覆盖**。⚠️ **凭据已就位**（§9 已跑通 openai 兼容与 Anthropic 原生两条路径）⇒ **OpenAI 兼容侧现在即可执行**；Anthropic 原生侧需给 `anthropic` provider 另配 baseUrl；**Google 侧该中转站不支持（405）**，需另一家 | 4 协议（本轮可执行 2/4） |
+| **33** | provider 四端点**真实**流边界（TLS/HTTP2 层） | 13 册 §16.4 / §18 | **未完成**。§9为历史可用证据；2026-10-04显式readiness门禁返回auth、exit3，当前不能宣称两端点可用。TLS/HTTP2与四协议真实流边界仍须独立验收；见Provider审计W7-33记录 | 4 协议；当前可执行数量未确认 |
 
 **波内顺序建议**：**25 → 30 → 32 → 28 → 26 → 31 → 27 → 29 → 33**。
 理由：25（`THM-03`）是**唯一有状态标记的真遗漏**，最该先闭；
@@ -1088,7 +1088,7 @@ OAuth 只在「直连上游订阅（Copilot / Anthropic 订阅）」时有意义
 | **36** | `PRV-14` | 两处 `data:` 多行连接改 `join("\n")`（`anthropicMessages.ts:622-631`、`googleWire.ts:437-444`） | `pi/.../anthropic-messages.ts:409`；`gemini-cli/.../server.ts:510`；**同仓正确处** `turn/completion.ts:563` | 合成多行 `data:` 事件 ⇒ 解码后含 `\n` 且 JSON 可解析 |
 | **37** | `PRV-15` | 把服务器 `requestedDelayMs` 带到 failed step（新字段），`core/agent/loop.ts:178` 的 `retryDelayMs(policy, attempt, undefined)` 改传它 | `pi/.../provider-retry.ts:51-70`（层内消费服务器延迟） | `429` + `Retry-After: 5` ⇒ 首次重试延迟 ≥5s |
 | **38** | `SES-09`（`R10-4`） | 空/不可读锁用**远短**宽限（微秒窗口，建议 ≤5s）；或把获取等待上界提到陈旧阈值之上 | `自研`（`opencode` 的 heartbeat 治的是另一面） | 造零字节锁 ⇒ **不再** 1.2s 超时、也**不**等 60s |
-| **39** | `SES-10` | 中止时**经 event channel 发终止帧**（新增 `query.cancelled` 或让 `lifecycle.cancelled` 走 `eventObservers` 通道） | `pi/.../agent-session.ts:2361-2371`（取消是正常生命周期状态） | `--json` 下中止一回合 ⇒ 事件流**以终止帧结束**；`turn/session.test.ts:114-128` 的旧断言需改 |
+| **39** | `SES-10` | **本地完成，远端待验证**：既有`lifecycle.cancelled`在shell结算后发给eventObservers；非交互信号退出等待cancelAndWait | 对照会话abort等待idle与公开事件广播 | 编译CLI三种信号均收到唯一取消终态，部分正文与来源持久化、连接关闭；turn内部契约无需新增同义事件 |
 | **40** | `TOL-10` | 已完成：`task`终态按失败事实判定，保留部分答复；runner补足工具阶段取消，适配器保留error | 对照子代理扩展的失败结算与独立取消事实 | 步数耗尽但有叙述文本、实际工具阶段取消均返回失败；父模型收到原因 |
 | **41** | `TOL-12` | 读 MCP `annotations.readOnlyHint` 判只读；把 `/tools` 的 `ALLOWED_IN_PLAN` **从门派生**（同一常量） | `gemini-cli/.../policy-engine.ts:610`（按注解决策） | 只读 MCP 工具在 plan 模式**可调用**；`/tools` 的 plan 列与门**逐项一致**（新增一致性测试） |
 | **42** | `TOL-13` | `/tools` 接受当前工具池（含 `mcpTools`/`skills`）或至少读 live 快照 | `自研` | 配 MCP 时 `/tools` 列出的数量与模型实际一致 |
@@ -2051,3 +2051,27 @@ SSE矩阵补齐两个兼容入口及晚到usage，二进制补UTF-8与提前退�
 仅本地HTTP与合成凭据。逐路径矩阵明确HTTP不活动时限、额外timer与caller取消；认证准备和无整体deadline的限制不被写成已消除。
 静态门与43项脚本通过；NormProof阻断义务满足、整体advisory仍partial，详情见Provider审计第七批。
 f2ee3c17的CI37171187869和Architecture Watch37171187862均成功。W7-27完成有界审计，继续W7-29→W7-33及剩余W8；Phase18未完成。
+
+### W8-39 / SES-10：取消事件与非交互退出（2026-10-04）
+
+采用既有`lifecycle.cancelled`，不新增同义`query.cancelled`类型：shell先记录事件、保存interrupted与清理运行句柄，
+再向eventObservers发布同一事件。JSON订阅者因此收到唯一取消终止帧，正文和sourceEntryId仍由原持久化路径保存。
+编译CLI验收发现SIGINT等退出原先直接关闭资源，未取消当前回合；启动接线复用`cancelAndWait()`，
+先等回合结算，再关闭gateway及完成进程退出。原turn内部安静结束的契约不变，shell负责公共终态。
+
+目标核验后定向比较本地参考`core/agent-session.ts`的abort→waitForIdle与公开事件广播，
+及`modes/rpc/rpc-mode.ts`的await abort后回执：采用结算完成再对外确认，不复制其事件schema或signal特殊分支。
+差异是本仓三种可捕获信号走同一既有资源清理入口；不可捕获终止、永不响应取消的外部hook不在保证范围。
+两条shell回归先失败；补退出接线前，JSON CLI已有部分正文但没有取消帧。
+
+最终8套132项与CLI构建通过，覆盖原print/replay成功、拒绝、readiness失败及三种信号取消。
+编译入口直接子进程验证SIGINT/SIGTERM/SIGHUP退出130/143/129、唯一取消事件、无成功/失败混淆、
+部分正文持久化、sourceEntryId对应助手消息、单次请求且连接关闭。测试要求先构建，与CI顺序一致。
+初始SIGHUP测试经加载器包装进程无法准确传递信号，归为测试驱动问题；直接编译入口三项通过。
+两生产owner反转并重建后五项全部失败，字节恢复、重建后132项复跑通过。
+静态阻断门与43项脚本通过；NormProof阻断义务满足、整体partial，既有六项职责上限提示保留。
+证据在`.tmp/cancellation-check/`；本批无PTY或独立审查结论，远端验证待完成。
+
+W7-29的0f2b552b两项远端检查成功并收口；W7-33当前门禁auth失败，保证范围见Provider审计。
+Phase18仍有W8其余条目与真实传输验收未完成。
+Node20.3编译CLI三信号测试另行通过，见`.tmp/cancellation-check/node20.log`。

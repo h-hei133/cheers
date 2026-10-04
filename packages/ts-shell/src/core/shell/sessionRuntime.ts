@@ -377,11 +377,13 @@ export class ShellSessionRuntime {
       this.currentInput = undefined;
       return terminalState.finalOutput;
     } catch (error) {
+      let cancellation: Extract<QueryEvent, { type: "lifecycle.cancelled" }> | undefined;
       if (signal.aborted) {
-        this.deps.sessionManager.appendQueryEvent(sessionId, {
+        cancellation = {
           type: "lifecycle.cancelled",
           reason: "AbortSignal triggered during shell session runtime",
-        }, { entryId: sourceEntryId?.() });
+        };
+        this.deps.sessionManager.appendQueryEvent(sessionId, cancellation, { entryId: sourceEntryId?.() });
         this.deps.sessionManager.saveInterrupted(
           sessionId,
           enteredQueryPhase ? "turn" : "prompt",
@@ -405,6 +407,9 @@ export class ShellSessionRuntime {
       }
       this.currentRunController = null;
       this.currentInput = undefined;
+      if (cancellation) {
+        for (const observer of this.eventObservers) observer(cancellation);
+      }
       throw error;
     }
   }

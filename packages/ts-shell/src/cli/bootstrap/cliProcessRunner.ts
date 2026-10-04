@@ -124,8 +124,12 @@ export async function runCliProcess(
   const resolvedCredential =
     providerRuntimeBridge.resolveCredentialSnapshot();
   const mcpGateway = bootstrapRuntime.mcpGateway;
+  let cancelRun: (() => Promise<void>) | undefined;
   const shutdown = createCliShutdown({
-    close: () => mcpGateway.close(), process: input.process, exit: input.exit, writeError: input.writeError,
+    close: async () => {
+      await cancelRun?.();
+      await mcpGateway.close();
+    }, process: input.process, exit: input.exit, writeError: input.writeError,
     streams: [input.stdin, input.process.stdout, input.process.stderr],
     handleInterrupt: options.printMode === true || options.jsonEvents === true || !input.stdin.isTTY,
   });
@@ -188,6 +192,7 @@ export async function runCliProcess(
       // is built.
       getPromptInteractiveApproval: () => interactiveApprovalPrompt,
     });
+    cancelRun = () => sessionRuntime.cancelAndWait();
     if (bootstrapRuntime.writeJsonEvent) {
       sessionRuntime.observeEvents(bootstrapRuntime.writeJsonEvent);
     }

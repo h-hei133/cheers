@@ -16,6 +16,35 @@ import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalSt
 import { ShellSessionRuntime } from "./sessionRuntime.js";
 
 describe("shell session runtime (W5)", () => {
+  it.each([false, true])("publishes one cancellation terminal event after settlement (entered turn=%s)", async enteredTurn => {
+    const recorded: unknown[] = [];
+    const observed: unknown[] = [];
+    const settled: string[] = [];
+    const runtime = new ShellSessionRuntime({
+      sessionManager: {
+        persistUserPromptBarrier() {}, markTurnActive() {},
+        appendQueryEvent(_id: string, event: unknown) { recorded.push(event); },
+        saveInterrupted(_id: string, kind: string) { settled.push(kind); },
+      } as never,
+      renderer: { renderLine() {}, renderChunk() {} } as never,
+      runPrompt: async function* () {
+        if (enteredTurn) yield { type: "message.delta" as const, role: "coder" as const, delta: "partial" };
+        runtime.cancelCurrentRun();
+      },
+    });
+    runtime.observeEvents(event => {
+      observed.push(event);
+      if (event.type === "lifecycle.cancelled") {
+        expect(settled).toEqual([enteredTurn ? "turn" : "prompt"]);
+        expect(runtime.getState()).toBe("interrupted");
+      }
+    });
+    await expect(runtime.executePrompt("cancelled", "request")).rejects.toThrow("without a terminal event");
+    expect(observed).toEqual(recorded);
+    expect(observed.at(-1)).toEqual({ type: "lifecycle.cancelled", reason: "AbortSignal triggered during shell session runtime" });
+    expect(observed).toHaveLength(enteredTurn ? 2 : 1);
+  });
+
   it.each([false, true])("keeps runtime failure attribution explicit (run exists=%s)", async (runExists) => {
     const recorded: unknown[] = [];
     const runtime = new ShellSessionRuntime({

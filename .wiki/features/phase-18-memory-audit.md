@@ -1,6 +1,6 @@
 # Phase 18 记忆与上下文行为审计
 
-W7-29的67模块有界审计与本地修复验证已完成，最终批次远端验证待完成。
+W7-29的67模块有界审计已完成，最终代码批次0f2b552b的本地和远端验证均完成。
 以下五批与逐模块矩阵记录实际覆盖和保证限制，不声称穷尽所有分支。当前非测试模块为memory 38、context 29；
 裁决中的36+28是历史数量，本批开始时为37+28，新增一个存储事务owner。
 以下源码路径相对 `packages/ts-shell/src/`。
@@ -246,4 +246,6 @@ ff0a64f1的CI37209101513及Architecture Watch37209101489均成功。
 最终本地补验：将TMPDIR设为仓内`.tmp/browser-cache-diagnostic-JHNMxu/tmp/`后，
 浏览器并发断言1项通过（另5项未选择），证据`valid-path.log`；同目录记录失败设置与诊断，未改产品策略。
 `verify:docs-drift:strict`通过（120条非阻断源码引用提示），`git diff --check`通过。
-本批调用`normproof judge`因当前PATH无该可执行文件而未运行；不借用旧结果冒充本批通过。
+首次直接调用`normproof judge`因当前PATH无该可执行文件而未运行。
+随后按CI使用仓内打包版本执行，exit0：阻断义务全部满足，整体仍partial，六个既有职责上限提示保留。
+0f2b552b的CI37210285445及Architecture Watch37210285417均成功，W7-29完成有界审计。
