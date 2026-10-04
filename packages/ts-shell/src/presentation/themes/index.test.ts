@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { listThemes, loadTheme, themeNamesFromPaths, themeSource } from "./index.js";
 
 /**
@@ -126,7 +126,16 @@ describe("theme discovery", () => {
       colors: { text: "#000000" },
     });
 
-    expect(listThemes(inner)).not.toContain("outside");
+    // TMPDIR may itself be inside a repository. Model the required absence of
+    // root markers without depending on the host's directory ancestry.
+    const exists = fs.existsSync;
+    const marker = vi.spyOn(fs, "existsSync").mockImplementation(file =>
+      path.basename(String(file)) === ".git" ? false : exists(file));
+    try {
+      expect(listThemes(inner)).not.toContain("outside");
+    } finally {
+      marker.mockRestore();
+    }
   });
 });
 

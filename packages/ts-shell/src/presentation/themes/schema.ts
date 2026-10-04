@@ -1,4 +1,4 @@
-import schema from "./schema.json" with { type: "json" };
+import { schema } from "./assets.js";
 import { COLOR_NAMES } from "../theme/color.js";
 import { isRecord } from "../../core/values/record.js";
 

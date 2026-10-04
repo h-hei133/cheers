@@ -1,4 +1,4 @@
-import schema from "../themes/schema.json" with { type: "json" };
+import { schema } from "../themes/assets.js";
 
 export type ThemeColorToken = keyof typeof schema.properties.colors.properties;
 
