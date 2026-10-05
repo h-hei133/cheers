@@ -423,3 +423,15 @@ SAFE-02 继续推进，尚未完成。`f1b01f84` 的 CI `37329604006` 和 Archit
 - 验证：Linux、Node 20.3、仓内隔离 HOME/USERPROFILE/TMPDIR/CHEERS_TEST_ROOT 下，execution、core/tools、artifact 与 turn/tools 共 38 文件/371 项通过，`build:ts` 通过。服务退回按路径直接读取时 7 失败/2 通过；artifact 缓存去掉 session 身份时 2 失败/6 通过；恢复吞掉 write/edit 预读错误时 2 失败/4 通过。每次恢复精确字节，最终重新构建并复跑 371 项通过。
 - 编译模块隔离探针经实际 kernel→工具适配→执行服务验证同 ID 的两会话各读自身产物、缺失会话拒绝，以及打开后文件移出工作区时零内容读取并关闭句柄；模型请求为零。此为编译模块证据，不称 CLI/PTY 或真实 provider 验收。
 - import-cycles、config-consumers、declarations、node-floor 通过；NormProof 图义务 satisfied、函数数量仍为 6 项既有 advisory，整体 partial。尚未取得本批独立审查或非 Linux 文件句柄证据：其他平台当前只有文件身份/路径复查，不承诺同等的描述符路径保证。SAFE-02 的 grep 原生/回退、目录枚举、写入最终对象的拒绝检查及剩余竞态仍待核实和收口，不能由本批文本读取证据代替。
+
+
+### 8.4 SAFE-04 — grep 路径原义与缺失二进制回退（2026-10-05）
+
+SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批 `45558cb5` 的 CI `37333505937` 已核实 completed/success，Architecture Watch `37333505919` 已成功，本批提交的远端结果另行核对。
+
+- [grep](../../packages/ts-shell/src/core/tools/grep.ts) 保留路径原文，包括点开头和首尾空白；统一 canonical containment、拒绝规则与文件类型检查，支持工作区内部绝对路径、内部符号链接和单文件目标。回退匹配完整路径或目录边界，搜索 src 不再包含 src-other；读取经现有执行服务的已核验句柄，传入逐文件拒绝与取消信号。
+- [原生搜索](../../packages/ts-shell/src/core/tools/grepRipgrep.ts) 在探测二进制前检查目标，并在异步探测后复查。仅可执行文件确实不存在时回退；启动权限错误、非零退出、缺失脚本解释器均返回失败。执行 owner 保留 spawnErrorCode，与进程退出码分开，不按错误文案猜测。使用 which 4.0.0（ISC，Node ^16.13.0 || >=18.0.0）解析 PATH/PATHEXT，开发类型 @types/which 3.0.4，避免重写平台可执行文件查找。
+- 定向比较沿 [19 号研究 §3.4](19-tools-maturity-and-multifile-edit.md#34-grep保持路径原义) 检查参考的搜索入口、路径包装与 normalize/resolve 实现：认同先解析和检查目标、保留点前缀、不默认 trim；不引入其 Unicode 空白或 @ 前缀改写。参考缺失二进制时下载或报错，本项目保留既有本地 walk 回退。研究中的“trim 后输入”裁决修正为原样输入，避免改指另一个合法文件。
+- 验证：Node 20.3、仓内隔离 HOME/USERPROFILE/TMPDIR/CHEERS_TEST_ROOT 下，execution、core/tools、artifact 与 turn/tools 共 39 文件/381 项通过，build:ts 通过。新增 10 项路径与启动错误回归；恢复前导字符剥离时 4 失败/6 通过，恢复宽泛目录前缀匹配时 1 失败/9 通过，恢复所有探测失败都回退时 3 失败/7 通过；精确字节恢复后重建并复跑 381 项通过。
+- 编译模块隔离探针核实原生路径零 walk、缺失二进制恰一次 walk，二者均搜索 .hidden 而不混入 hidden，并拒绝损坏的原生程序；模型请求为零。此证据不等于 CLI/PTY、Windows 或真实 provider 验收。
+- import-cycles、config-consumers、declarations、node-floor 通过；NormProof 两项图义务 satisfied，整体 partial 仍来自 6 项既有函数上限 advisory。原生搜索尚未提供逐文件 deny 与完整竞态防护；目录枚举、最终写入对象及非 Linux 句柄保证继续归 SAFE-02，未取得独立审查或跨平台运行证据。

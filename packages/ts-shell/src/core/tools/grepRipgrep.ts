@@ -1,6 +1,9 @@
 import { StringDecoder } from "node:string_decoder";
 import { executeLocally } from "../../runtime/execution/local.js";
 import path from "node:path";
+import { realpathSync, statSync } from 'node:fs';
+import { verifyPathContainment } from '../security/pathJail.js';
+import which from 'which';
 import { truncateLineWidth } from "./truncation.js";
 
 /**
@@ -89,6 +92,7 @@ let resolvedBinary: string | undefined | null = null;
 async function resolveRipgrepBinary(input: RipgrepSearchInput): Promise<string | Exclude<RipgrepOutcome, { ok: true }>> {
   if (resolvedBinary !== null) return resolvedBinary ?? { ok: false, reason: "not-installed" };
   for (const candidate of ["rg", "ripgrep"]) {
+    if (input.abortSignal?.aborted) return { ok: false, reason: 'cancelled' };
     const result = await executeLocally({ command: candidate, args: ["--version"],
       cwd: input.workspaceRoot, timeoutMs: Math.min(input.timeoutMs ?? 2000, 2000),
       abortSignal: input.abortSignal, captureOutput: false });
@@ -97,6 +101,12 @@ async function resolveRipgrepBinary(input: RipgrepSearchInput): Promise<string |
       resolvedBinary = candidate;
       return candidate;
     }
+    if (result.spawnErrorCode !== 'ENOENT') return { ok: false, reason: 'failed' };
+    // ENOENT can also mean an installed script has a missing interpreter.
+    // Only the absence of the executable itself permits the fallback walk.
+    try {
+      if (which.sync(candidate, { nothrow: true })) return { ok: false, reason: 'failed' };
+    } catch { return { ok: false, reason: 'failed' }; }
   }
   resolvedBinary = undefined;
   return { ok: false, reason: "not-installed" };
@@ -196,9 +206,20 @@ export async function searchWithRipgrep(input: RipgrepSearchInput): Promise<Ripg
   if (input.abortSignal?.aborted) return { ok: false, reason: "cancelled" };
   const root = path.resolve(input.workspaceRoot);
   const target = input.searchPath === "" ? root : path.resolve(root, input.searchPath);
-  if (target !== root && !target.startsWith(root + path.sep)) return { ok: false, reason: "outside-workspace" };
+  const checked = verifyPathContainment(target, root);
+  if (!checked.allowed) return { ok: false, reason: 'outside-workspace' };
+  try {
+    const stat = statSync(checked.resolvedPath);
+    if (!stat.isFile() && !stat.isDirectory()) return { ok: false, reason: 'failed' };
+    const canonicalRoot = realpathSync(root);
+    input = { ...input, workspaceRoot: canonicalRoot, searchPath: path.relative(canonicalRoot, checked.resolvedPath) };
+  } catch { return { ok: false, reason: 'failed' }; }
   const binary = await resolveRipgrepBinary(input);
   if (typeof binary !== "string") return binary;
+  const currentTarget = path.resolve(input.workspaceRoot, input.searchPath);
+  const current = verifyPathContainment(currentTarget, input.workspaceRoot);
+  if (!current.allowed) return { ok: false, reason: 'outside-workspace' };
+  if (current.resolvedPath !== currentTarget) return { ok: false, reason: 'failed' };
   return streamSearch(binary, input);
 }
 

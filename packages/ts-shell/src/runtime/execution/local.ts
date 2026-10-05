@@ -108,7 +108,9 @@ function collectStreamed(options: {
       if (options.captureOutput !== false) stderr += text
       options.onOutput(text)
     })
-    child.on('error', (error) => fail(error.message))
+    child.on('error', (error: NodeJS.ErrnoException) => fail(error.message, {
+      ...(typeof error.code === 'string' ? { spawnErrorCode: error.code } : {}),
+    }))
     child.on('close', (code, signal) => {
       finish()
       // Windows retries address a root PID, not a persistent group. Once that
@@ -177,6 +179,7 @@ export async function executeLocally(options: {
       terminationFailed?: boolean
       signal?: string | null
       message?: string
+      spawnErrorCode?: string
     }
 
     // A stop is reported as the stop it was. Guessing from `killed` alone told a
@@ -208,6 +211,7 @@ export async function executeLocally(options: {
       exitCode: typeof execError.code === 'number' ? execError.code : null,
       stdout: execError.stdout ?? '',
       stderr: execError.stderr || execError.message || 'Command failed',
+      ...(execError.spawnErrorCode ? { spawnErrorCode: execError.spawnErrorCode } : {}),
     }
   }
 }

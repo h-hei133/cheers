@@ -26,10 +26,12 @@
     "picomatch": "^4.0.7",
     "playwright-core": "^1.60.0",
     "typescript": "^5.2.0",
-    "undici": "^7.18.2"
+    "undici": "^7.18.2",
+    "which": "4.0.0"
   },
   "devDependencies": {
     "@types/picomatch": "^4.0.3",
+    "@types/which": "3.0.4",
     "tsx": "^4.0.0",
     "vitest": "^0.34.0"
   }

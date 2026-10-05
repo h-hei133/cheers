@@ -1,4 +1,5 @@
 import { promises as fs } from "node:fs";
+import { realpathSync } from "node:fs";
 import path from "node:path";
 import { approvedResult, deniedResult } from "./toolResultLifecycle.js";
 import type { ToolDefinition, ToolExecutionResult } from "../../tools/types.js";
@@ -6,6 +7,7 @@ import type { ExecutionAuthority, ExecutionService } from "../../runtime/executi
 import { truncateLineWidth, truncateHead } from "./truncation.js";
 import { ArtifactManager } from "../session/artifactManager.js";
 import { matchesGlob } from "./globMatch.js";
+import { resolveWorkspaceToolTarget } from './permissionContext.js';
 import {
   MAX_SEARCHED_FILE_BYTES,
   formatRipgrepMatch,
@@ -62,30 +64,23 @@ export function createGrepToolDefinition(
         return deniedResult("Error: Pattern parameter is required for grep.");
       }
 
-      const searchSubPath =
-        typeof args.path === "string" ? args.path.trim().replace(/^[./\\]+/, "") : "";
+      if (context.abortSignal?.aborted) return deniedResult('Search stopped: cancelled.');
+      let searchSubPath: string;
+      try {
+        const target = resolveWorkspaceToolTarget({ path: typeof args.path === 'string' && args.path !== '' ? args.path : '.' }, 'path', context.workspaceRoot);
+        context.assertFileAccess?.(target);
+        searchSubPath = path.relative(realpathSync(context.workspaceRoot), target).split(path.sep).join('/');
+        const stat = await fs.stat(target);
+        if (!stat.isFile() && !stat.isDirectory()) return deniedResult('Search target must be a file or directory.');
+      } catch {
+        return deniedResult('Search path is unavailable, denied, or outside the workspace.');
+      }
       const globFilter = typeof args.glob === "string" ? args.glob.trim() : "";
       const ignoreCase = Boolean(args.ignoreCase);
       const limit =
         typeof args.limit === "number" && args.limit > 0
           ? Math.min(args.limit, 500)
           : DEFAULT_GREP_LIMIT;
-
-      // Checked here so both search paths refuse the same input for the same
-      // reason. Stripping leading separators is not enough on its own: `foo/../../x`
-      // has none, and resolves outside the workspace. Without this the tool read
-      // files the session was never given access to and reported them as if they
-      // were in the workspace — the fast path did, while the walk refused by
-      // accident, which is the wrong way round for a fallback.
-      if (searchSubPath !== "") {
-        const root = path.resolve(context.workspaceRoot);
-        const target = path.resolve(root, searchSubPath);
-        if (target !== root && !target.startsWith(root + path.sep)) {
-          return deniedResult(
-            `Error: path '${searchSubPath}' resolves outside the workspace root. Search paths must stay inside it.`,
-          );
-        }
-      }
 
       // ripgrep first, when it is installed. It is what the implementations we
       // compared against run, and the reason is measurable: the in-process walk
@@ -136,7 +131,7 @@ export function createGrepToolDefinition(
 
       if (context.abortSignal?.aborted) return deniedResult("Search stopped: cancelled.");
       const targetFiles = allFiles.filter((file) => {
-        if (searchSubPath && !file.startsWith(searchSubPath)) {
+        if (searchSubPath && file !== searchSubPath && !file.startsWith(searchSubPath + '/')) {
           return false;
         }
         if (globFilter && !matchesGlob(file, globFilter)) {
@@ -159,7 +154,12 @@ export function createGrepToolDefinition(
           if (!stat.isFile() || stat.size > MAX_SEARCHED_FILE_BYTES) {
             continue;
           }
-          const content = await fs.readFile(fullPath, "utf8");
+          const content = await executionService.readTextFile({
+            operationKind: 'file.read', absolutePath: fullPath, workspaceRoot: context.workspaceRoot,
+            authority: TOOL_APPROVED_READ_AUTHORITY, caller: 'core-tool:grep',
+            reason: 'Read an approved search candidate.', reportSafeTarget: fullPath,
+            assertFileAccess: context.assertFileAccess, abortSignal: context.abortSignal,
+          });
           const lines = content.split("\n");
 
           for (let i = 0; i < lines.length; i++) {

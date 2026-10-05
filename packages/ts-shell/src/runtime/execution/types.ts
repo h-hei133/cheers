@@ -12,6 +12,8 @@ export interface NormalizedExecutionResult {
   readonly exitCode: number | null
   readonly stdout: string
   readonly stderr: string
+  /** OS error when the process could not be spawned; not an exit status. */
+  readonly spawnErrorCode?: string
   readonly failureKind?: 'sandbox_preflight' | 'execution_failure' | 'timeout' | 'cancelled'
 }
 

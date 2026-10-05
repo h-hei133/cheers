@@ -75,7 +75,7 @@ confidence: mixed
 
 ### 3.4 `grep`：保持路径原义
 
-[grep.ts](../../packages/ts-shell/src/core/tools/grep.ts) 的前导字符剥离正则误改 `.hidden`。修复应保留 trim 后的输入，按实际路径语义 resolve，再做 canonical containment 与权限检查；不能将绝对外部路径剥成工作区内路径，也不能把 `../` 改成看似安全的路径。原稿声称 glob 已采用“更窄的剥前缀正则”不实：[glob.ts](../../packages/ts-shell/src/core/tools/glob.ts) 仅 trim。
+[grep.ts](../../packages/ts-shell/src/core/tools/grep.ts) 的前导字符剥离正则误改 `.hidden`。修复应保留原始输入（包括有意义的首尾空白），按实际路径语义 resolve，再做 canonical containment 与权限检查；不能将绝对外部路径剥成工作区内路径，也不能把 `../` 改成看似安全的路径。原稿声称 glob 已采用“更窄的剥前缀正则”不实：[glob.ts](../../packages/ts-shell/src/core/tools/glob.ts) 仅 trim。
 
 原生 rg 与 fallback 对 `.hidden`、`./.hidden`、绝对路径、Windows 路径及符号链接使用同一目标解析规则。忽略文件、排序与资源预算的差异要明确，而非静默更换搜索范围。
 
