@@ -1,11 +1,13 @@
 import { resumeSyntax, forkSyntax, treeSyntax, entriesSyntax } from "../../../core/commands/navigation/syntax.js";
+import { mcpSyntax } from "../../../core/commands/mcp/syntax.js";
+import { permissionsSyntax } from "../../../core/commands/permissions/syntax.js";
 import { scanCommandArgs } from "../../../core/commands/arguments.js";
 import { completionToken, completionEdit, quoteCompletion } from "../completion.js";
 import { getSlashInvocation } from "../../../entrypoints/slashCommandRegistry.js";
 import type { DraftSnapshot } from "../../../presentation/tui/editor/replacement.js";
 import { matchSuggestions, type Suggestion } from "../../../presentation/tui/chrome/suggestions.js";
 
-export type CatalogKind = "theme" | "skill" | "tools" | "session" | "entry" | "tree" | "thread";
+export type CatalogKind = "theme" | "skill" | "tools" | "session" | "entry" | "tree" | "thread" | "mcp" | "grant";
 
 export function catalogRequest(snapshot: DraftSnapshot) {
   const token = completionToken(snapshot.text, snapshot.cursor);
@@ -20,6 +22,13 @@ export function catalogRequest(snapshot: DraftSnapshot) {
     if (preceding.length && !(preceding.length === 1 && preceding[0] === "--")) return undefined;
     if (all.length > (all[0]?.value === "--" ? 2 : 1)) return undefined;
     kind = name;
+  } else if (name === "mcp" || name === "permissions") {
+    const syntax = name === "mcp" ? mcpSyntax : permissionsSyntax;
+    const action = syntax.actions.find(item => item.name === preceding[0]?.toLowerCase() || item.aliases?.includes(preceding[0]?.toLowerCase() ?? ""));
+    if (name === "permissions" && action?.name !== "revoke") return undefined;
+    if (!action?.parameters?.length || preceding.length > 2 || (preceding.length === 2 && preceding[1] !== "--")) return undefined;
+    if (all.length > (preceding[1] === "--" ? 3 : 2)) return undefined;
+    kind = name === "mcp" ? "mcp" : "grant";
   } else {
     kind = navigationKind(name, preceding, token.value, all.length);
   }
@@ -32,7 +41,7 @@ export function catalogRequest(snapshot: DraftSnapshot) {
 
 export function catalogSuggestions(request: NonNullable<ReturnType<typeof catalogRequest>>, items: readonly Suggestion[]) {
   return matchSuggestions(request.token.value, [...request.fixed, ...items]).slice(0, 100).map(item =>
-    completionEdit(item, request.snapshot, request.token.from, request.token.to, (item.value.startsWith("-") && request.token.before.length === 1 ? "-- " : "") + quoteCompletion(item.value, request.token.prefix)));
+    completionEdit(item, request.snapshot, request.token.from, request.token.to, (item.value.startsWith("-") && !request.token.before.some(token => token.value === "--") ? "-- " : "") + quoteCompletion(item.value, request.token.prefix)));
 }
 
 function navigationKind(name: string | undefined, preceding: readonly string[], current: string, count: number): CatalogKind | undefined {

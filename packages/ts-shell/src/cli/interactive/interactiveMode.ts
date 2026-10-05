@@ -280,7 +280,7 @@ export class InteractiveMode {
     this.catalogs = new CatalogController({
       identity: () => catalogIdentity(this.options.runtimeContext, this.options.themePaths) + this.options.sessionRuntime.getPermissionScope() + this.options.sessionRuntime.getAgentMode(),
       draft: () => this.state.editor.snapshot(),
-      load: createCatalogLoader(() => this.options.runtimeContext, this.options.initialMcpGateway, this.options.themePaths ?? [], this.options.sessionManager),
+      load: createCatalogLoader(() => this.options.runtimeContext, this.options.initialMcpGateway, this.options.themePaths ?? [], this.options.sessionManager, this.options.approvalTrustPolicy),
       publish: (items, status) => {
         if (this.stopped) return;
         this.completionStatus = status;

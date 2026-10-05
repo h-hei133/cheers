@@ -825,3 +825,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - fullscreen 探针首次用通用文本匹配到了会话摘要，导致过早发送 Tab；改为等待菜单专属文本后两模式通过，没有改变产品等待时序来迎合探针。import cycles/config consumers/declarations/node floor 通过；NormProof 无环与导入解析 satisfied，既有 5 个函数数量 advisory 保留。
 - e64f75ab 的 CI 37385544106 和 Architecture Watch 37385544101 均成功。708c3ceb 的 Architecture Watch 37386714984 成功，CI 37386715107 查询时仍运行，缓存期限修复尚不计远端成功。
 - CMD-04 的 memory/grants/MCP/连接/文件目录等其余目录、外部目录版本事件与底层取消继续；CMD-03 其余声明及 Phase 19 整体未完成。
+
+### 8.41 CMD-04：MCP 名称与授权稳定键目录
+
+- mcp tools/doctor/diagnose/refresh/reconnect 的合法 server 位置接入配置 owner；读取当前 cwd 的用户/项目合并目录，沿用项目显式不信任过滤与项目覆盖优先级。候选只包含完整名称、作用域和 configured/disabled 状态，不展示 command/args/url，也不把 configured 表示成 connected。
+- 名称补全不调用 gateway.snapshot/refresh，因为 snapshot 会尝试连接服务；本批使用 loadMcpConfigs 的只读结果。对照参考按合法子命令读取配置名称并按能力筛选的决定，本项目保留 disabled 名称用于 tools/doctor/refresh 的既有诊断语义，没有新增连接、认证或执行路径。
+- permissions revoke/remove 复用当前 ApprovalTrustPolicy 的项目授权读取，候选接受 grant.key 而非易变序号。沿用现有权限选择器相同的标签、范围和稳定 selector；Tab 不撤销，实际 Enter 仍交给原命令 owner。候选展示后加入另一条授权，原 selector 仍只移除原目标，其他项目记录保留。
+- 修复动态实体在带 action 位置接受 dash-leading 名称时缺少 -- 的边界；现在无已有 -- 才插入，引用空格名称完整保留。非法 action、多余目标和错误 flags 不读取目录。
+- Linux、Node 20.3 隔离环境 10 文件/101 项和 build:ts 通过。撤掉项目不信任过滤、把稳定键改为序号的反转分别触发断言失败，逐字节恢复后组合 101 项再次通过。真实 regular/fullscreen CLI 显示禁用服务名称和授权候选，Tab 前后 MCP 配置与授权文件字节保持、授权 mtime 不变，Enter 才撤销目标，退出码均为 0。探针最初等待旧 cmd 键格式，修正为实际 owner 生成的键后通过。
+- import cycles/config consumers/declarations/node floor 通过；NormProof 全图无环与导入解析 satisfied，既有 5 个函数数量 advisory 保留。7db76ae1 Architecture Watch 37387926527 成功，CI 37387926802 查询时仍运行；708c3ceb CI 37386715107 与 Architecture Watch 37386714984 均已成功，源码缓存期限修复获得该 SHA 的远端通过证据，原两次失败不改写。
+- CMD-04 仍有 memory、连接、路径及其余目录接线、完整外部版本事件和底层取消。§8.38 tools 目录仍使用会建立连接的 gateway.snapshot，不应把该路径描述为纯配置读取或据此宣称完整副作用边界已验收；后续应复用当前工具池快照并核查冷目录读取。Phase 19 整体继续。
