@@ -581,3 +581,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 已针对只读参考检查最终结果替换、审批独立渲染以及 hook 更新保留结果字段的具体决策；参考代码本身不能证明其所有模型路径都没有审批文字。本项目额外选择保留 hook 异常前的副作用证据。反转批准前缀、终稿替换、metadata 合并、缺失终稿流兜底均触发失败。首次仅移除对象展开未破坏后续显式 metadata 合并，因此不是有效反转；改为撤销实际 metadata 保留后测试失败。源文件逐字节恢复。
 - 本地 13 文件 258 项通过，覆盖 turn session、工具内核、审批、TUI 正文/失败/截断/差异块；Node 20.3 构建通过。真实构建 CLI 接合成本地 provider，执行一次无害 bash 输出并发送下一次模型请求：2 次请求、1 条纯工具消息，无批准前缀，审批事件保留；独立真实 PTY 渲染检查终稿只出现一次且审批状态独立。两者不是外部 provider 或完整交互模式验收。
 - import cycles/config consumers/declarations/node floor 与 docs strict 通过；docs 保留 120 个既有非阻断 source-reference advisory。NormProof 阻断义务通过，6 个既有函数数目 advisory 未消失。当前新提交的远端结果尚待验证；SAFE-07 的 5a3e4f9b 架构检查 37357237700 已成功，CI 37357237670 也已成功。SAFE-02 和后续 Phase 19 批次继续，不称全阶段完成。
+
+### 8.19 CMD-01：命令调用身份与目录一致性
+
+- 保留调度 registry 为事实源，`core/commands/invocation.ts` 生成统一调用描述：name、commandName、invocation、kind、group、summary、参数提示与候选。现有 58 个调度命令加交互 `/back` 为 59 个主项；56 个真实同义 alias 与 2 个独立 named invocation 合计仍为 117 个可解析名称。
+- `/recall`、`/retain` 从同义 alias 列表移到同一 memory owner 的 invocations，分别展示 `<query>`/`<statement>`，不继承 `/memory` 的动作候选。调度保留 resolved.name 作为 rawCommandName；同义 alias 的实际拼写也保留，包括既有历史来源字段。
+- display registry、CLI 参数识别、补全、未知命令提示和 picker 查找共用调用描述。同义 `/models`、`/sessions`、`/providers`、`/skills` 等打开对应 picker；带参数时仍走原命令。空查询展示主项与独立调用，不列重复 alias；非空查询仍可找到并插入原 alias，`/?` 也可补全。文本帮助包含独立调用。
+- 扩展注册检查全部主名、alias 和独立调用的冲突与名称合法性；保存不可变快照，调用方修改原 aliases 不会改写已注册事实。注册/移除同时失效 CLI 名称与默认/过滤补全缓存。这里验证既有动态注册 API 的目录行为，不把尚未实现的扩展执行器或技能/模板异步枚举称为完成；后者仍按 CMD-04/ECO owner 接线。
+- 定向读取参考命令 popup 的空查询隐藏同义 alias、非空保留调用方式决策；本项目不将独立 memory 调用隐藏成同义名称。反转 raw invocation、picker alias 映射、全名称冲突校验、缓存失效四组均使对应测试失败，源文件逐字节恢复。
+- Node 20.3 下 10 文件 222 项与构建通过。真实 CLI PTY 在 regular/fullscreen 两种模式均验证 `/model` 与 `/models` 打开同一 Model chooser，`/recall`、`/retain` 保持各自 Usage，正常退出，无模型调用。首次全屏探针等待已存在提示的重复绘制而超时；按增量帧重新同步后两种模式均通过，没有为测试改变产品行为。
+- import cycles/config consumers/declarations/node floor 通过；call reachability 保留 7 个既有 advisory，NormProof 阻断义务通过且保留 6 个既有函数数目 advisory。新提交远端结果待核对；SAFE-08 的 f0eb595c 两项检查 37359462720/37359595760 已成功。CMD-02/03/04、SAFE-02 与其余批次继续。

@@ -619,7 +619,11 @@ export function createCommandRegistry(
     },
     {
       name: "memory",
-      aliases: ["mem", "recall", "retain"],
+      aliases: ["mem"],
+      invocations: [
+        { name: "recall", summary: "search retained memory facts", argumentHint: "<query>" },
+        { name: "retain", summary: "retain a memory statement", argumentHint: "<statement>" },
+      ],
       kind: "local",
       supportsNonInteractive: true,
       availability: "available",

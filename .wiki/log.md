@@ -6145,3 +6145,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-06] fix | Phase 19 SAFE-07 browser 共用动作取消/期限与串行序列，取消实际关闭资源并继续处理迟到句柄；活动、副作用、取消及清理证据分开报告，失败观察不报空页面成功。浏览器域 344 项与后续真实 Chromium 针对验证通过，三组反转有效；Node 20.3 构建和静态阻断门通过。详见 features/phase-19-decisions.md §8.17，Phase 19 整体仍未完成。
 
 ## [2026-10-06] fix | Phase 19 SAFE-08 审批保留结构化事实、不污染模型正文；工具终稿替换流式预览，缺失终稿保留流，失败、artifact 和 hook metadata 不因结果更新丢失。258 项相关测试、Node 20.3 构建、四组有效反转、合成本地 provider 的构建 CLI 请求与真实 PTY 渲染检查通过。详见 features/phase-19-decisions.md §8.18；SAFE-02 与其余阶段任务仍未完成。
+
+## [2026-10-06] fix | Phase 19 CMD-01 统一命令 invocation 元数据，同义 alias 复用 picker，独立 recall/retain 保留 rawName 与各自参数提示；帮助/CLI/补全共享目录，扩展全部名称冲突拒绝并及时失效缓存。222 项测试、Node 20.3 构建、四组反转与 regular/fullscreen 真实 PTY 验证通过。f0eb595c 两项远端检查成功；本批与后续任务边界见 features/phase-19-decisions.md §8.19。

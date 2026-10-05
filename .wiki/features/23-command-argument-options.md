@@ -343,3 +343,7 @@ candidate ID、record ID 和 query 是不同参数种类，动态 provider 不�
 | 终端 | 普通/完整/分片 paste、CRLF、满宽行末、resize/overlay/suspend 恢复；字符和字节正确之外，真实 Windows Terminal 像素现象单独验收。 |
 
 测试应验证用户行为并做反向变更检查：恢复旧的 from-only 替换、去掉版本守卫、丢 raw invocation、把 delete 并入 invalidate、将候选接受改为自动执行时，对应测试必须失败。通过局部候选测试不能代替 Goal/Model 等运行时能力的验收。
+
+### CMD-01 实施记录（2026-10-06）
+
+前文 58 个 aliases 是审计时口径。当前 58 个调度主命令与 `/back` 保留；将两种非同义 memory 调用单独声明后，为 56 个同义 alias、2 个 named invocation，总调用名称仍为 117。统一 invocation 描述已用于调度、帮助、CLI 名称识别、补全与 picker，同义 alias 共用 picker，独立调用保留原 rawName 与参数提示。扩展名称冲突与缓存失效有回归验证。222 项相关测试、Node 20.3 构建、四组反转及 regular/fullscreen 真实 PTY 验证通过；范围、证据与后续 CMD-02/03/04 边界见 [Phase 19 决策 §8.19](phase-19-decisions.md#819-cmd-01命令调用身份与目录一致性)。

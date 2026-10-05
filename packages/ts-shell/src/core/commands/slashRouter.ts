@@ -1,8 +1,9 @@
+import { commandInvocations, resolveCommandInvocation } from "./invocation.js";
 import { createCommandRegistry } from "./registry.js";
 import { resolveSkillCatalog } from "../skills/skillCatalog.js";
 import { TemplateLoader } from "../prompts/templateLoader.js";
 import { expandSkill, expandTemplate } from "../prompts/expansion.js";
-import type { CommandContext, CommandExecutionResult } from "./types.js";
+import type { CommandContext, CommandExecutionResult, CommandDefinition } from "./types.js";
 import { tokenizeCommandArgs } from "./arguments.js";
 
 export async function routeSlashCommand(
@@ -66,11 +67,8 @@ export async function routeSlashCommand(
   }
 
   const registry = createCommandRegistry(context.cwd);
-  const command =
-    registry.get(rawName) ??
-    Array.from(registry.values()).find((entry) =>
-      entry.aliases?.includes(rawName),
-    );
+  const resolved = resolveCommandInvocation([...registry.values()], rawName);
+  const command = resolved ? registry.get(resolved.commandName) : undefined;
 
   if (
     command &&
@@ -100,7 +98,7 @@ export async function routeSlashCommand(
     }
     return command.execute(args, {
       ...context,
-      rawCommandName: rawName,
+      rawCommandName: resolved!.name,
       rawCommandArgs,
     });
   }
@@ -126,21 +124,11 @@ export async function routeSlashCommand(
 
 function buildUnknownSlashOutput(
   rawName: string,
-  registry: ReadonlyMap<string, { aliases?: readonly string[] }>,
+  registry: ReadonlyMap<string, CommandDefinition>,
 ): string {
-  const knownCommands = Array.from(registry.keys()).sort();
-  const maybeMatches = knownCommands.filter((name) =>
-    name.startsWith(rawName.toLowerCase()),
-  );
-  const aliasMatches = Array.from(registry.entries())
-    .filter(([, entry]) =>
-      (entry.aliases ?? []).some((alias) =>
-        alias.startsWith(rawName.toLowerCase()),
-      ),
-    )
-    .map(([name]) => name);
-
-  const uniqueHints = Array.from(new Set([...maybeMatches, ...aliasMatches]));
+  const uniqueHints = [...registry.values()].flatMap(commandInvocations)
+    .filter(invocation => invocation.name.startsWith(rawName.toLowerCase()))
+    .map(invocation => invocation.name);
   const hintLine =
     uniqueHints.length > 0
       ? `Did you mean: ${uniqueHints

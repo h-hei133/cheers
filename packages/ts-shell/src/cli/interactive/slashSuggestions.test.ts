@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { slashSuggestions } from "./slashSuggestions.js";
-import { listSlashCommands, getSlashCommand, registerSlashCommand } from "../../entrypoints/slashCommandRegistry.js";
+import { listSlashInvocations, getSlashCommand, registerSlashCommand } from "../../entrypoints/slashCommandRegistry.js";
 
 describe("command completions", () => {
   it("offers nothing for ordinary prose", () => {
     expect(slashSuggestions("how do I build this")).toBeNull();
   });
 
-  it("offers every registered command for a bare slash", () => {
-    const names = new Set(listSlashCommands().flatMap((command) => [command.name, ...(command.aliases ?? [])]));
+  it("offers each distinct invocation without synonymous aliases for a bare slash", () => {
+    const names = new Set(listSlashInvocations().filter(invocation => invocation.kind !== "alias").map(invocation => invocation.name));
     expect(slashSuggestions("/")).toHaveLength(names.size);
   });
 
-  it("only ever offers commands the router dispatches", () => {
+  it("only offers known command invocations", () => {
     // A hand-maintained list drifts and ends up advertising commands that fail.
     for (const suggestion of slashSuggestions("/") ?? []) {
       expect(getSlashCommand(suggestion.value)).toBeDefined();
@@ -134,4 +134,27 @@ describe("command completions", () => {
     expect(matches).not.toBeNull();
     expect(matches?.some((match) => match.value === "powershell")).toBe(true);
   });
+});
+
+
+it("preserves independent recall/retain invocations and does not borrow memory subcommands", () => {
+  expect(slashSuggestions("/recall ")).toBeNull();
+  expect(slashSuggestions("/retain ")).toBeNull();
+  expect(slashSuggestions("/recall")?.[0]).toMatchObject({ value: "/recall", detail: "search retained memory facts <query>" });
+  expect(slashSuggestions("/mem ")).toEqual(slashSuggestions("/memory "));
+  expect(slashSuggestions("/quit")?.[0]?.value).toBe("/quit");
+  expect(slashSuggestions("/")?.some(item => item.value === "/quit")).toBe(false);
+  expect(slashSuggestions("/?")?.[0]?.value).toBe("/?");
+});
+
+
+it("refreshes default and filtered candidates for named extension invocations", () => {
+  slashSuggestions("/");
+  const remove = registerSlashCommand({ name: "fixture", aliases: ["fixture-alias"], invocations: [{ name: "fixture-special", summary: "separate action" }], group: "workflow", summary: "fixture" });
+  try {
+    expect(slashSuggestions("/")?.some(item => item.value === "/fixture-special")).toBe(true);
+    expect(slashSuggestions("/fixture-alias")?.[0]?.value).toBe("/fixture-alias");
+  } finally { remove(); }
+  expect(slashSuggestions("/fixture-special")).toBeNull();
+  expect(slashSuggestions("/")?.some(item => item.value.startsWith("/fixture"))).toBe(false);
 });

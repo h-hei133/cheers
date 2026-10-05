@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   getSlashCommand,
+  getSlashInvocation,
+  listSlashInvocations,
+  registerSlashCommand,
   isKnownSlashCommand,
   listSlashCommands,
   renderSessionCommandMap,
@@ -55,7 +58,7 @@ describe("slash command registry CLI surface", () => {
   });
 
   it("describes no command the registry does not have", () => {
-    const names = new Set(listSlashCommands().map((command) => command.name));
+    const names = new Set(listSlashInvocations().map((command) => command.name));
     const advertised = capture(renderUserHelp)
       .flatMap((line) => line.match(/(?<=\s|^)\/[a-z-]+/g) ?? [])
       .map((token) => token.slice(1));
@@ -67,4 +70,29 @@ describe("slash command registry CLI surface", () => {
     expect(lines).toContain("shift+tab");
     expect(lines).toContain("ctrl+j");
   });
+});
+
+
+it("enumerates builtins, the interactive entry, aliases, and distinct invocations", () => {
+  expect(listSlashCommands()).toHaveLength(59);
+  expect(listSlashInvocations()).toHaveLength(117);
+  expect(getSlashInvocation("/models")).toMatchObject({ name: "models", commandName: "model", invocation: "/models", kind: "alias" });
+  expect(getSlashInvocation("/RECALL")).toMatchObject({ name: "recall", commandName: "memory", invocation: "/recall", kind: "named", argumentHint: "<query>" });
+  expect(capture(renderUserHelp).join("\n")).toContain("/recall");
+});
+
+it.each(["model", "models", "recall", "back"])("rejects an extension alias that shadows %s", (alias) => {
+  expect(() => registerSlashCommand({ name: "fixture", aliases: [alias], group: "workflow", summary: "fixture" })).toThrow(/already registered/);
+  expect(getSlashCommand("fixture")).toBeUndefined();
+});
+
+it("owns extension names and drops all invocation lookups on removal", () => {
+  const aliases = ["fixture-alias"];
+  const remove = registerSlashCommand({ name: "fixture", aliases, group: "workflow", summary: "fixture", invocations: [{ name: "fixture-special", summary: "special", argumentHint: "<text>" }] });
+  try {
+    aliases.push("models");
+    expect(getSlashInvocation("models")?.commandName).toBe("model");
+    expect(getSlashInvocation("fixture-special")?.kind).toBe("named");
+  } finally { remove(); }
+  for (const name of ["fixture", "fixture-alias", "fixture-special"]) expect(getSlashInvocation(name)).toBeUndefined();
 });

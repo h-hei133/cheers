@@ -43,6 +43,11 @@ describe("slash router (W4)", () => {
     fs.rmSync(workspaceRoot, { recursive: true, force: true });
   });
 
+  it.each(["recall", "retain", "RECALL", "RETAIN"])("preserves raw %s invocation semantics", async (name) => {
+    const result = await routeSlashCommand(`/${name}`, { cwd: workspaceRoot });
+    expect(result).toMatchObject({ kind: "local", output: expect.stringContaining(`Usage: \`/${name.toLowerCase()} <`) });
+  });
+
   it("passes a quoted theme name as one argument", async () => {
     const result = await routeSlashCommand('/theme "Dark Mode"', { cwd: workspaceRoot });
     expect(result).toMatchObject({ kind: "local", output: expect.stringContaining("`Dark Mode`") });

@@ -1,6 +1,6 @@
 import path from "node:path";
 import { RUNTIME_PROVIDERS, isRuntimeProvider } from "../config/runtimeConfig.js";
-import { listSlashCommands, subscribeSlashCommands } from "./slashCommandRegistry.js";
+import { listSlashInvocations, subscribeSlashCommands } from "./slashCommandRegistry.js";
 import type {
   CliArgParseError,
   CliArgParseResult,
@@ -56,17 +56,7 @@ const VALUE_FLAGS = new Set([
  * which is why every command with an argument was read as a path.
  */
 function commandNames(): Set<string> {
-  const names = new Set<string>();
-  // The same list the help and the completion menu show, which is what a user
-  // may therefore type: it includes the picker-only commands the registry has
-  // no entry for, and `/back` is one of them.
-  for (const command of listSlashCommands()) {
-    names.add(command.name.toLowerCase());
-    for (const alias of command.aliases ?? []) {
-      names.add(alias.toLowerCase());
-    }
-  }
-  return names;
+  return new Set(listSlashInvocations().map(invocation => invocation.name));
 }
 
 /**

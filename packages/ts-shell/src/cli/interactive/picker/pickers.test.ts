@@ -7,7 +7,7 @@ import { copyPicker } from "./copy.js";
 import { restorePicker } from "./restore.js";
 import { sourcePicker } from "./sources.js";
 import { approvalPicker } from "./approval.js";
-import { opensPicker } from "./registry.js";
+import { opensPicker, pickerFor, type PickerHost } from "./registry.js";
 import { Transcript } from "../../../presentation/tui/transcript/container.js";
 import { textBlock } from "../../../presentation/tui/transcript/blocks.js";
 
@@ -20,6 +20,24 @@ describe("which commands open a chooser", () => {
       expect(opensPicker(command)).toBe(true);
     },
   );
+
+  it.each(["/models", "/sessions", "/session", "/providers", "/plugins", "/skills", "/cp", "/approval-policy"])("opens the same chooser for synonymous %s", (command) => {
+    expect(opensPicker(command)).toBe(true);
+    expect(opensPicker(`${command} argument`)).toBe(false);
+  });
+
+  it.each(["/recall", "/retain"])("does not turn independent %s into a picker", (command) => {
+    expect(opensPicker(command)).toBe(false);
+  });
+
+  it("constructs the same model chooser for its alias", async () => {
+    const host = { commandContext: CONTEXT } as PickerHost;
+    const canonical = pickerFor("/model", host)!;
+    const alias = pickerFor("/models", host)!;
+    expect(alias.title).toBe(canonical.title);
+    expect(alias.form).toBe(canonical.form);
+    expect(await alias.load()).toEqual(await canonical.load());
+  });
 
   it("leaves a command with arguments to run as typed", () => {
     expect(opensPicker("/restore execute --all")).toBe(false);

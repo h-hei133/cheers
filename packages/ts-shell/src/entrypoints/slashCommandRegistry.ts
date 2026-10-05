@@ -1,3 +1,4 @@
+import { commandInvocations, resolveCommandInvocation, type CommandInvocation } from "../core/commands/invocation.js";
 import { listVisibleCommands } from "../core/commands/registry.js";
 import type { CommandDefinition } from "../core/commands/types.js";
 
@@ -14,6 +15,7 @@ export interface SlashCommandLineRenderer {
 export interface SlashCommandSpec {
   readonly name: string;
   readonly aliases?: readonly string[];
+  readonly invocations?: CommandDefinition["invocations"];
   readonly group:
     | "session"
     | "context"
@@ -39,6 +41,7 @@ function project(command: CommandDefinition): SlashCommandSpec {
   return {
     name: command.name,
     ...(command.aliases ? { aliases: command.aliases } : {}),
+    ...(command.invocations ? { invocations: command.invocations } : {}),
     group: command.group,
     summary: command.summary,
     ...(command.argumentHint ? { argumentHint: command.argumentHint } : {}),
@@ -85,11 +88,20 @@ export function listSlashCommands(): readonly SlashCommandSpec[] {
 }
 
 export function registerSlashCommand(command: SlashCommandSpec): () => void {
-  if (getSlashCommand(command.name)) throw new Error(`Slash command already registered: ${command.name}`);
-  extensions.push(command);
+  // Own the registered snapshot so outside mutation cannot bypass invalidation.
+  const registered = Object.freeze({
+    ...command,
+    aliases: command.aliases ? Object.freeze([...new Set(command.aliases)]) : undefined,
+    invocations: command.invocations ? Object.freeze(command.invocations.map(value => Object.freeze({ ...value }))) : undefined,
+  });
+  for (const invocation of commandInvocations(registered)) {
+    if (!/^(?:[a-z0-9][a-z0-9:._-]*|\?)$/.test(invocation.name)) throw new Error(`Invalid slash command name: ${invocation.name}`);
+    if (getSlashInvocation(invocation.name)) throw new Error(`Slash command already registered: ${invocation.name}`);
+  }
+  extensions.push(registered);
   for (const listener of listeners) listener(allCommands());
   return () => {
-    const index = extensions.indexOf(command);
+    const index = extensions.indexOf(registered);
     if (index < 0) return;
     extensions.splice(index, 1);
     for (const listener of listeners) listener(allCommands());
@@ -102,9 +114,18 @@ export function subscribeSlashCommands(listener: (commands: readonly SlashComman
   return () => listeners.delete(listener);
 }
 
+export function listSlashInvocations(): readonly CommandInvocation[] {
+  return allCommands().flatMap(commandInvocations);
+}
+
+export function getSlashInvocation(name: string): CommandInvocation | undefined {
+  return resolveCommandInvocation(allCommands(), name);
+}
+
 export function getSlashCommand(name: string): SlashCommandSpec | undefined {
-  const normalized = name.replace(/^\//, "").trim().toLowerCase();
-  return allCommands().find((command) => command.name === normalized || command.aliases?.includes(normalized));
+  const commands = allCommands();
+  const invocation = resolveCommandInvocation(commands, name);
+  return commands.find(command => command.name === invocation?.commandName);
 }
 
 export function isKnownSlashCommand(name: string): boolean {
@@ -155,7 +176,7 @@ const GROUP_TITLES: Record<SlashCommandSpec["group"], string> = {
  * one that does.
  */
 export function renderUserHelp(renderer: SlashCommandLineRenderer): void {
-  const commands = allCommands();
+  const commands = listSlashInvocations().filter(invocation => invocation.kind !== "alias");
   const width = longestName(commands);
   renderer.renderLine("\nSlash commands");
   for (const group of Object.keys(GROUP_TITLES) as SlashCommandSpec["group"][]) {
@@ -177,7 +198,7 @@ export function renderUserHelp(renderer: SlashCommandLineRenderer): void {
 }
 
 /** Longest command name, so summaries line up in one column. */
-function longestName(commands: readonly SlashCommandSpec[]): number {
+function longestName(commands: readonly { readonly name: string }[]): number {
   let longest = 0;
   for (const command of commands) longest = Math.max(longest, command.name.length);
   return longest;

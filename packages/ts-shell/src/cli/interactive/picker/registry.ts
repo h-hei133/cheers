@@ -1,3 +1,4 @@
+import { getSlashInvocation } from "../../../entrypoints/slashCommandRegistry.js";
 import type { ApprovalTrustPolicy } from "../../../core/shell/approvalTrustPolicy.js";
 import type { CommandContext } from "../../../core/commands/types.js";
 import type { CliMcpGateway } from "../../../entrypoints/cliMcpModule.js";
@@ -97,7 +98,8 @@ const PICKERS: Record<string, PickerFactory> = {
 /** Arguments belong to the picker when that command explicitly accepts them. */
 export function pickerFor(command: string, host: PickerHost): Picker | undefined {
   const [first = "", ...rest] = command.trim().split(/\s+/);
-  const name = first.replace(/^\//, "").toLowerCase();
+  const invocation = getSlashInvocation(first);
+  const name = invocation?.kind === "named" ? invocation.name : invocation?.commandName ?? "";
   return Object.hasOwn(PICKERS, name) ? PICKERS[name]!(host, rest.join(" ")) : undefined;
 }
 
@@ -105,6 +107,7 @@ export function pickerFor(command: string, host: PickerHost): Picker | undefined
 export function opensPicker(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed.startsWith("/")) return false;
-  const name = trimmed.slice(1).split(/\s+/)[0]!.toLowerCase();
+  const invocation = getSlashInvocation(trimmed.slice(1).split(/\s+/)[0]!);
+  const name = invocation?.kind === "named" ? invocation.name : invocation?.commandName ?? "";
   return Object.hasOwn(PICKERS, name) && (name === "back" || !/\s/.test(trimmed));
 }

@@ -166,9 +166,18 @@ export interface CommandArgumentCompletion {
   readonly detail?: string
 }
 
+/** A distinct invocation handled by the same owner, not a synonymous alias. */
+export interface NamedCommandInvocation {
+  readonly name: string
+  readonly summary: string
+  readonly argumentHint?: string
+  readonly getArgumentCompletions?: (argumentPrefix: string) => readonly CommandArgumentCompletion[] | null
+}
+
 export interface CommandDefinition {
   readonly name: string
   readonly aliases?: readonly string[]
+  readonly invocations?: readonly NamedCommandInvocation[]
   readonly kind: CommandKind
   /** Scripted hosts require explicit support before executing the handler. */
   readonly supportsNonInteractive?: boolean

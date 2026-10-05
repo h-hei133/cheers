@@ -420,9 +420,9 @@ describe("a command registered after the first parse", () => {
     const before = expectParsed(["/probe-late", "arg"]);
     const registered = registerSlashCommand({
       name: "probe-late",
-      kind: "local",
+      group: "workflow",
       summary: "a command registered during a session",
-    } as unknown as Parameters<typeof registerSlashCommand>[0]);
+    });
     try {
       const after = expectParsed(["/probe-late", "arg"]);
 
@@ -435,4 +435,19 @@ describe("a command registered after the first parse", () => {
       registered();
     }
   });
+});
+
+
+it("reserves distinct invocation names and releases dynamic names after removal", () => {
+  for (const name of ["recall", "retain"]) {
+    const parsed = expectParsed([`/${name}`, "text"]);
+    expect(parsed.options.projectPath).toBeUndefined();
+    expect(parsed.options.promptArg).toBe(`/${name} text`);
+  }
+  expectParsed(["/fixture-special", "text"]);
+  const remove = registerSlashCommand({ name: "fixture", group: "workflow", summary: "fixture", invocations: [{ name: "fixture-special", summary: "special" }] });
+  try {
+    expect(expectParsed(["/fixture-special", "text"]).options.promptArg).toBe("/fixture-special text");
+  } finally { remove(); }
+  expect(expectParsed(["/fixture-special", "text"]).options.projectPath).toBe("/fixture-special");
 });
