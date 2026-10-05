@@ -142,6 +142,8 @@ export interface TextFileReadExecutionRequest extends ExecutionRequestMetadata<'
 }
 
 export interface TextFileWriteExecutionRequest extends ExecutionRequestMetadata<'file.write'> {
+  readonly assertFileAccess?: (absolutePath: string) => void
+  readonly abortSignal?: AbortSignal
   readonly absolutePath: string
   readonly content: string
   /** Exact text read to compute this edit, including BOM and line endings. */

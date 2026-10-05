@@ -457,6 +457,8 @@ export function createCoreToolRegistry(options?: {
           }
           await executionService.writeTextFile({
             operationKind: 'file.write',
+            assertFileAccess: context.assertFileAccess,
+            abortSignal: context.abortSignal,
             absolutePath: containment.resolvedPath,
             content,
             workspaceRoot: context.workspaceRoot,
@@ -632,6 +634,8 @@ export function createCoreToolRegistry(options?: {
 
         await executionService.writeTextFile({
           operationKind: 'file.write',
+          assertFileAccess: context.assertFileAccess,
+          abortSignal: context.abortSignal,
           absolutePath: containment.resolvedPath,
           content: finalContent,
           expectedContent,

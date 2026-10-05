@@ -53,8 +53,8 @@ export interface WorkspaceWriteAuthority {
   readonly validateCreateTarget: (
     relativePath: string,
   ) => WorkspaceCreateTargetAuthority;
-  readonly writeFile: (relativePath: string, content: string) => void;
-  readonly createFileExclusive: (relativePath: string, content: string) => void;
+  readonly writeFile: (relativePath: string, content: string, assertFileAccess?: (absolutePath: string) => void) => void;
+  readonly createFileExclusive: (relativePath: string, content: string, assertFileAccess?: (absolutePath: string) => void) => void;
   readonly moveFileExclusive: (sourcePath: string, targetPath: string) => void;
   readonly deleteFile: (relativePath: string) => void;
 }
@@ -262,24 +262,28 @@ export function createWorkspaceWriteAuthority(
     },
     validateWriteTarget,
     validateCreateTarget,
-    writeFile: (relativePath, content) => {
+    writeFile: (relativePath, content, assertFileAccess) => {
       const handle = openVerifiedFile(relativePath, fs.constants.O_WRONLY);
       if (handle.ok === false) {
         throw new Error(handle.failure.message);
       }
       try {
+        const actualPath = realpathForOpenDescriptor(handle.fd);
+        if (!actualPath) throw new Error('Write target descriptor is unavailable.');
+        assertFileAccess?.(actualPath);
         fs.ftruncateSync(handle.fd, 0);
         fs.writeFileSync(handle.fd, content, { encoding: "utf8" });
       } finally {
         fs.closeSync(handle.fd);
       }
     },
-    createFileExclusive: (relativePath, content) => {
+    createFileExclusive: (relativePath, content, assertFileAccess) => {
       const target = validateCreateTarget(relativePath);
       if (target.ok === false) {
         throw new Error(target.message);
       }
 
+      assertFileAccess?.(path.join(target.parentRealPath, path.basename(target.absolutePath)));
       let fd: number;
       try {
         fd = fs.openSync(
@@ -305,6 +309,9 @@ export function createWorkspaceWriteAuthority(
         if (descriptorFailure) {
           throw new Error(descriptorFailure.message);
         }
+        const actualPath = realpathForOpenDescriptor(fd);
+        if (!actualPath) throw new Error('Create target descriptor is unavailable.');
+        assertFileAccess?.(actualPath);
         fs.writeFileSync(fd, content, { encoding: "utf8" });
       } finally {
         fs.closeSync(fd);
@@ -539,7 +546,7 @@ function pathStaysInsideWorkspace(
 ): boolean {
   const relative = path.relative(workspaceRoot, absolutePath);
   return (
-    relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative)
+    relative !== "" && (relative !== ".." && !relative.startsWith(`..${path.sep}`)) && !path.isAbsolute(relative)
   );
 }
 
@@ -548,5 +555,5 @@ function pathStaysInsideOrIsWorkspace(
   absolutePath: string,
 ): boolean {
   const relative = path.relative(workspaceRoot, absolutePath);
-  return !relative.startsWith("..") && !path.isAbsolute(relative);
+  return (relative !== ".." && !relative.startsWith(`..${path.sep}`)) && !path.isAbsolute(relative);
 }

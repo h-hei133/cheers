@@ -435,3 +435,16 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 验证：Node 20.3、仓内隔离 HOME/USERPROFILE/TMPDIR/CHEERS_TEST_ROOT 下，execution、core/tools、artifact 与 turn/tools 共 39 文件/381 项通过，build:ts 通过。新增 10 项路径与启动错误回归；恢复前导字符剥离时 4 失败/6 通过，恢复宽泛目录前缀匹配时 1 失败/9 通过，恢复所有探测失败都回退时 3 失败/7 通过；精确字节恢复后重建并复跑 381 项通过。
 - 编译模块隔离探针核实原生路径零 walk、缺失二进制恰一次 walk，二者均搜索 .hidden 而不混入 hidden，并拒绝损坏的原生程序；模型请求为零。此证据不等于 CLI/PTY、Windows 或真实 provider 验收。
 - import-cycles、config-consumers、declarations、node-floor 通过；NormProof 两项图义务 satisfied，整体 partial 仍来自 6 项既有函数上限 advisory。原生搜索尚未提供逐文件 deny 与完整竞态防护；目录枚举、最终写入对象及非 Linux 句柄保证继续归 SAFE-02，未取得独立审查或跨平台运行证据。
+
+
+### 8.5 SAFE-02 — 最终写入拒绝与取消检查（2026-10-06，进行中）
+
+本批补齐 write/edit 到写入执行服务及文件 authority 的拒绝与取消接线，不将 SAFE-02 标为完成。上一批 grep 提交 `b57b0052` 已推送，Architecture Watch `37336646995` 已成功，CI `37336646967` 最近查询仍 in_progress，未计为通过。
+
+- [写入服务](../../packages/ts-shell/src/runtime/execution/service.ts) 在创建父目录前检查 canonical containment、逐文件拒绝及预取消；目录创建和快照持久化返回后再次检查。已有文件在 [文件 authority](../../packages/ts-shell/src/edit/authority/workspace.ts) 打开并核验描述符后，以实际对象路径检查策略，再截断与写入，拒绝时始终关闭句柄。创建路径在排他打开前及打开后分别检查，不再只依赖工具预读时的检查。
+- [工具接线](../../packages/ts-shell/src/core/tools/registry.ts) 将 assertFileAccess 与 abortSignal 传到最终写入请求；保留现有锁、精确 expectedContent 比较及快照机制。authority 使用核验后的 canonical workspace，支持符号链接工作区根；完整父目录段判断允许 ..notes 等普通文件名，不将其当作目录逃逸。
+- 定向比较：按 [19 号研究](19-tools-maturity-and-multifile-edit.md) 实读参考写工具的 mutation queue、目录创建和写入流程；采用“异步操作完成后检查取消，未结束前不释放锁”的决定。参考的可注入 mkdir/writeFile 没有本项目的最终对象拒绝契约，本批保留现有描述符 authority 并接入策略，不复制直接按路径写入实现。
+- 验证：Linux、Node 20.3、仓内隔离 HOME/USERPROFILE/TMPDIR/CHEERS_TEST_ROOT，execution、core/tools、edit、turn/tools、sandbox 和工具策略共 53 文件/455 项通过，build:ts 通过。新增 10 项覆盖创建前拒绝/取消、外部父目录链接零新建目录、快照后取消/拒绝、打开后目标改名到拒绝路径、write/edit 接线、双点文件名与链接工作区。初轮 mock 未保留快照模块辅助导出，修正测试 setup；并行环境中 fd 可被其他线程复用，关闭断言改为核对实际 close 调用，保留内容不变与拒绝断言。
+- 反转：移除快照后及最终写入策略接线时 2 失败/8 通过；移除描述符路径拒绝时 1 失败/9 通过。反转后源码精确字节恢复，最终组合套件通过。编译模块隔离探针验证拒绝写入保留原文、预取消零目录创建、edit 预读后拒绝最终写入、合法嵌套文件写入；模型请求为零，不称 CLI/PTY 验收。
+- import-cycles、config-consumers、declarations、node-floor 通过；NormProof 图义务 satisfied，整体 partial 仍为 6 项既有函数上限 advisory。旧 workspace-safety 脚本引用的 sandbox/runtime 测试路径与场景已不存在，未把该旧门禁当作通过；本批运行当前 sandbox 套件及真实编译工具拒绝探针，旧综合 CLI 门禁迁移仍待处理。
+- 限制：目录创建仍为按路径操作，不能承诺父目录替换竞态下零副作用；排他创建后才发生拒绝时可能留下空文件，不盲目 unlink 以免删除第三方替换目标。快照读取的最终对象策略、原生 grep 的逐文件拒绝、目录遍历及非 Linux 描述符支持仍需收口。新增检查缩小了风险窗口，不构成跨进程原子授权或 SAFE-02 完成证据。未取得独立审查、PTY 或非 Linux 运行证据。

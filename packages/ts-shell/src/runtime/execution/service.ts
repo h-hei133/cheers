@@ -2,7 +2,8 @@ import { promises as fs } from 'node:fs'
 import { withFileLock } from './fileLock.js'
 import { FileContentConflictError } from './conflict.js'
 import { readTextFile } from './read.js'
-import { existsSync } from 'node:fs'
+import { verifyPathContainment } from '../../core/security/pathJail.js'
+import { existsSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import { createWorkspaceWriteAuthority } from '../../edit/authority/workspace.js'
 import { buildEditSnapshotStoreConfig } from '../../edit/recovery/editSnapshot.js'
@@ -71,16 +72,27 @@ export function createDefaultExecutionService(): ExecutionService {
  * filesystem without passing through it.
  */
 async function writeTextFileUnlocked(request: TextFileWriteExecutionRequest): Promise<void> {
-  const relativePath = path.relative(request.workspaceRoot, request.absolutePath)
+  request.abortSignal?.throwIfAborted()
+  const canonicalRoot = realpathSync(request.workspaceRoot)
+  const relativePath = path.relative(canonicalRoot, verifyPathContainment(request.absolutePath, request.workspaceRoot).resolvedPath)
   // A target outside the workspace root cannot be expressed as a relative path,
   // so the authority refuses it rather than writing through.
-  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+  if (relativePath === '..' || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath)) {
     throw new Error(
       `Refuse to write outside the selected workspace: ${request.reportSafeTarget}`,
     )
   }
-  const authority = createWorkspaceWriteAuthority(request.workspaceRoot)
+  const checkAccess = (target: string): void => {
+    request.abortSignal?.throwIfAborted()
+    const initial = verifyPathContainment(target, request.workspaceRoot)
+    const checked = initial.allowed ? initial : verifyPathContainment(target, canonicalRoot)
+    if (!checked.allowed) throw new Error('Write target is outside the selected workspace.')
+    request.assertFileAccess?.(checked.resolvedPath)
+  }
+  checkAccess(request.absolutePath)
+  const authority = createWorkspaceWriteAuthority(canonicalRoot)
   await fs.mkdir(path.dirname(request.absolutePath), { recursive: true })
+  checkAccess(request.absolutePath)
   // Record what the file held before the write, so /undo and /restore have
   // something to take back. Captured under the same authority the write uses: a
   // snapshot of a target the write would refuse is worse than none, because it
@@ -96,6 +108,7 @@ async function writeTextFileUnlocked(request: TextFileWriteExecutionRequest): Pr
     relativePath,
     before,
   })
+  checkAccess(request.absolutePath)
   // Snapshot persistence yields to other writers. Compare again immediately
   // before the synchronous write, even if snapshot storage failed. This detects
   // observed external edits; it is not an atomic filesystem compare-and-swap.
@@ -106,10 +119,10 @@ async function writeTextFileUnlocked(request: TextFileWriteExecutionRequest): Pr
   if (existsSync(request.absolutePath)) {
     // Existing targets are opened with O_NOFOLLOW and re-verified through the
     // opened descriptor, so a symlink swapped in after the check still loses.
-    authority.writeFile(relativePath, request.content)
+    authority.writeFile(relativePath, request.content, checkAccess)
     return
   }
-  authority.createFileExclusive(relativePath, request.content)
+  authority.createFileExclusive(relativePath, request.content, checkAccess)
 }
 
 async function captureSnapshotBeforeWrite(input: {
