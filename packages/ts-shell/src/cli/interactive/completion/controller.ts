@@ -50,7 +50,7 @@ export class CatalogController {
     const epoch = this.epoch;
     const abort = new AbortController();
     this.abort = abort;
-    this.options.publish([], "Loading command entries…");
+    this.options.publish(catalogSuggestions(request, []), "Loading command entries…");
     this.delay = setTimeout(() => {
       this.deadline = setTimeout(() => {
         abort.abort();

@@ -1,3 +1,4 @@
+import { navigationCatalog, type SessionCatalog } from "./navigation.js";
 import { listThemes } from "../../../presentation/themes/index.js";
 import { resolveSkillCatalog } from "../../../core/skills/skillCatalog.js";
 import { toolPoolFor } from "../../runtime/tools.js";
@@ -12,7 +13,11 @@ export function catalogIdentity(context: ShellRuntimeContext, themePaths: readon
 }
 
 async function readCatalog(kind: CatalogKind, context: ShellRuntimeContext, gateway: CliMcpGateway,
-  themePaths: readonly string[]): Promise<readonly Suggestion[]> {
+  themePaths: readonly string[], manager?: SessionCatalog): Promise<readonly Suggestion[]> {
+  if (kind === "session" || kind === "entry" || kind === "tree" || kind === "thread") {
+    if (!manager) throw new Error("Session catalog unavailable");
+    return navigationCatalog(kind, context, manager);
+  }
   if (kind === "theme") return [...new Set(["auto", ...listThemes(context.cwd, themePaths)])].map(value => ({ value, label: value, detail: "Select theme" }));
   if (kind === "skill") {
     const skills = resolveSkillCatalog({ workspaceRoot: context.cwd, ...context.skillOptions }).skills;
@@ -25,14 +30,14 @@ async function readCatalog(kind: CatalogKind, context: ShellRuntimeContext, gate
 }
 
 /** Reuse a pending catalog read across changing prefixes; cancellation only detaches the waiter. */
-export function createCatalogLoader(context: () => ShellRuntimeContext, gateway: CliMcpGateway, themePaths: readonly string[]) {
+export function createCatalogLoader(context: () => ShellRuntimeContext, gateway: CliMcpGateway, themePaths: readonly string[], manager?: SessionCatalog) {
   let pending: { key: string; task: Promise<readonly Suggestion[]> } | undefined;
   const load = async (kind: CatalogKind, signal: AbortSignal): Promise<readonly Suggestion[]> => {
     signal.throwIfAborted();
     const current = context();
     const key = catalogIdentity(current, themePaths) + kind;
     if (!pending || pending.key !== key) {
-      const task = readCatalog(kind, current, gateway, themePaths);
+      const task = readCatalog(kind, current, gateway, themePaths, manager);
       pending = { key, task };
       void task.finally(() => { if (pending?.task === task) pending = undefined; }).catch(() => {});
     }

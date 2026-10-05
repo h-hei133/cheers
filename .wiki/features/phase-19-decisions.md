@@ -815,3 +815,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 缓存失败报告新增每进程 durationMs/deadlineMs/exit/signal/timedOut，继续不输出原始进程内容。Linux、Node 20.3 下 5 文件/20 项通过，build:ts 通过；忽略 SIGTERM 的独立真实进程被升级终止，仍报告 timedOut 且非成功退出。移除强制升级的反转触发失败，测试夹具自行结束以避免残留进程，恢复后组合通过。
 - import cycles/config consumers/declarations/node floor 与 docs drift 阻断门通过，NormProof 无环/导入可解析 satisfied；既有 5 个函数数量及 7 个 call reachability advisory 保留。没有改 CI 工作流、package scripts 或通过跳过并发场景绕过失败。此轮是本地重现与修复证据，远端是否解决仍以新提交 CI 为准；dfb81fce/f1109ed9 原失败不改写。
 - 41af8323 两项远端检查成功；e64f75ab Architecture Watch 37385544101 成功，CI 37385544106 查询时仍运行。Phase 19 其余 CMD-03/04 与后续批次继续。
+
+### 8.40 CMD-04：会话与条目动态目录
+
+- resume/session/sessions、fork、tree 与 entries 的合法目标位置从导航 owner 语法识别；list/current/help 等固定动作及多余参数不触发目录读取。保留静态动作候选，加载目录时不会暂时丢掉 switch/here/help 等已有入口。
+- session 复用 SessionManager 的近期会话读取，标题用于匹配、完整 ID 用于接受；entries 使用真实 transcript event ID，entries tree 使用线程节点 ID，tree 仅提供现有只读导航查询认为可导航的节点。没有新增切换、恢复或持久化路径。
+- 复用 §8.38 的每表面缓存、草稿/上下文身份守卫与主动重绘；实际输入层把当前 SessionManager 传入目录 owner。候选读取前后持久化会话元数据、线程状态与转录的字节及 mtime 保持不变。参考声明驱动合法位置和异步候选的决定继续沿用。
+- Linux、Node 20.3 隔离环境 8 文件/98 项及 build:ts 通过。把会话 ID 截断并移除不可导航过滤的反转使两条具体断言失败，逐字节恢复后组合 98 项再次通过。真实 regular/fullscreen CLI 按标题补全完整会话 ID，Tab 后当前会话指针不变，Enter 后切换到目标；随后 tree 接受该会话的完整条目 ID，退出码均为 0。
+- fullscreen 探针首次用通用文本匹配到了会话摘要，导致过早发送 Tab；改为等待菜单专属文本后两模式通过，没有改变产品等待时序来迎合探针。import cycles/config consumers/declarations/node floor 通过；NormProof 无环与导入解析 satisfied，既有 5 个函数数量 advisory 保留。
+- e64f75ab 的 CI 37385544106 和 Architecture Watch 37385544101 均成功。708c3ceb 的 Architecture Watch 37386714984 成功，CI 37386715107 查询时仍运行，缓存期限修复尚不计远端成功。
+- CMD-04 的 memory/grants/MCP/连接/文件目录等其余目录、外部目录版本事件与底层取消继续；CMD-03 其余声明及 Phase 19 整体未完成。
