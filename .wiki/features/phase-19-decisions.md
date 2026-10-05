@@ -399,3 +399,13 @@ SAFE-01 已实现并完成本地验证；其余 75 项仍未完成。§7.4 为�
 - 反转：[新增回归](../../packages/ts-shell/src/core/tools/arguments.test.ts) 在移除 prepare 校验时 1 失败/15 通过；移除 write/edit 直接校验时 11 失败/5 通过。测试服务已替换为无副作用实现；每次反转后校验精确字节恢复，最终重建并重跑上述 574 项通过。
 - 编译产物：仓内隔离探针经实际 kernel→审批→内置 writer 调用，5 类非法 write 内容均零审批、零 pre-use hook、BOM/CRLF 文件字节不变；合法空字符串经一次批准写成空文件。探针使用编译模块，不称 CLI/PTY 或真实模型验收；无真实 provider 请求。
 - 门禁：import-cycles、config-consumers、declarations、node-floor、docs-drift strict 均 exit 0；docs 保留 120 项既有 advisory。模块上限检查没有新增越界；NormProof unresolved-specifier 与 cycle 义务 satisfied，整体 partial 来自 6 个既有函数数量 advisory。未取得本批独立审查、PTY、真实外部服务或发布证据；W7-33 保留原状态。
+
+### 8.2 SAFE-02 — LSP 路径与文件拒绝规则（2026-10-05，进行中）
+
+本批仅完成 SAFE-02 的 LSP 入口与共享路径策略修复，**不将 SAFE-02 标为完成**。尚需核实并修复 grep、目录枚举、artifact 读取及实际打开对象在路径变化下的边界；当前路径预检不等于消除打开时竞态。SAFE-01 功能提交 `673e6cde` 已推送，其 Architecture Watch `37327553038` 已成功，CI `37327553032` 本轮查询仍在执行测试，未计为通过。
+
+- [LSP](../../packages/ts-shell/src/core/tools/lsp.ts) 的全部五种操作对显式 filePath 先做 workspace containment；hover 删除直接同步读盘，所有读取经同一个 readSource 与执行服务；工作区扫描对每个返回路径再次检查，外部绝对路径、父目录逃逸和稳定的外部符号链接均在服务读取前拒绝。文件名空白保留，不再 trim 后改指另一个文件。
+- [路径策略](../../packages/ts-shell/src/core/tools/permissionContext.ts) 派生请求原文、read selector 去除后的文件路径、规范化绝对/相对路径和 canonical 路径供 deny 匹配。保留原始规则匹配，增加 LSP filePath 与内部符号链接最终目标匹配；artifact URI 不伪装成工作区路径。turn 向工具提供逐文件拒绝检查，LSP 扫描消费它，不能用一次 workspaceSymbol 调用绕过指定文件的拒绝规则。
+- 定向比较基于 [19 号研究 §3.2](19-tools-maturity-and-multifile-edit.md)：实读参考只读目标的 realpath 校验与读取接线。同意先校验 canonical containment、以通过检查的 canonical 路径打开、执行阶段重新核验，保留用户请求名称用于展示；本批实现前两项和 LSP 每次读取前的重新核验，打开后的身份校验仍未完成。路径边界采用完整 `..` 路径段比较，修正 `..notes` 被误当父目录的缺陷；不按字符串前缀猜父目录。
+- 新回归覆盖全部五操作的三类逃逸、hover 真实服务接线、空白文件名、显式/扫描路径的 canonical deny、read selector 和 artifact 规则独立性、合法双点开头文件。Node 20.3、仓内隔离 HOME/USERPROFILE/TMPDIR/CHEERS_TEST_ROOT 下 32 文件/419 项通过，`build:ts` 通过。移除 workspace target 围栏时 7 失败/11 通过；移除 LSP 逐文件拒绝检查时 1 失败/17 通过；精确字节恢复后重建并复跑 419 项通过。
+- import-cycles、config-consumers、declarations、node-floor 通过；NormProof 两项图义务 satisfied，整体仍为 6 项既有函数上限 advisory 导致 partial。未取得新增独立审查、PTY、真实提供方或跨平台文件句柄证据，后续批次不得以本节替代这些验收。

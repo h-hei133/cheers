@@ -61,7 +61,7 @@ export function verifyPathContainment(
 
   // Check simple prefix containment first
   const relative = path.relative(normalizedWorkspace, resolvedTarget);
-  const isDirectlyContained = !relative.startsWith("..") && !path.isAbsolute(relative);
+  const isDirectlyContained = relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 
   if (!isDirectlyContained && resolvedTarget !== normalizedWorkspace) {
     return {
@@ -84,7 +84,7 @@ export function verifyPathContainment(
         ? fs.realpathSync(normalizedWorkspace)
         : normalizedWorkspace;
       const realRelative = path.relative(realWorkspace, realTarget);
-      const isRealContained = !realRelative.startsWith("..") && !path.isAbsolute(realRelative);
+      const isRealContained = realRelative !== ".." && !realRelative.startsWith(`..${path.sep}`) && !path.isAbsolute(realRelative);
 
       if (!isRealContained && realTarget !== realWorkspace) {
         return {

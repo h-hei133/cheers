@@ -4,6 +4,7 @@ import type { EscalationPrompt } from "../shell/approval/contract.js";
 import { isReadOnlyBashCommand } from "../shell/approval/evaluator.js";
 import { matchDenyRule, type DenyRule } from "../shell/approval/deny.js";
 import type { ToolDefinition } from "../../tools/types.js";
+import { filePolicyTargets } from "../tools/permissionContext.js";
 
 export interface ToolPermissionEvaluation {
   readonly requiresEscalation: boolean;
@@ -92,7 +93,7 @@ export function evaluateToolPermissionScope(
 
   if (READ_ONLY_TOOLS[toolName]) {
     operation = "read";
-    target = String(safeArgs.path ?? safeArgs.pattern ?? safeArgs.query ?? safeArgs.url ?? toolName);
+    target = String(safeArgs.path ?? safeArgs.filePath ?? safeArgs.pattern ?? safeArgs.query ?? safeArgs.url ?? toolName);
     isReadOnly = true;
   } else if (toolName === "write" || toolName === "edit") {
     operation = "write";
@@ -153,7 +154,9 @@ export function evaluateToolPermissionScope(
     matchDenyRule(denyRules, toolName, target) ??
     (toolName === "bash" ? matchDenyRule(denyRules, toolName, target.trim()) : undefined) ??
     matchDenyRule(denyRules, toolName, normalizedPathTarget(toolName === "bash" ? target.trim() : target, workspaceRoot,
-      ["read", "write", "edit"].includes(toolName) && typeof safeArgs.path === "string"));
+      ["read", "write", "edit"].includes(toolName) && typeof safeArgs.path === "string")) ??
+    filePolicyTargets(toolName, safeArgs, workspaceRoot)
+      .map(candidate => matchDenyRule(denyRules, toolName, candidate)).find(Boolean);
   if (denied) {
     return {
       requiresEscalation: false,

@@ -1,8 +1,11 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createLspToolDefinition } from "./lsp.js";
+import { createDefaultExecutionService } from '../../runtime/execution/service.js';
+import { adaptTools } from '../../turn/tools.js';
+import { evaluateToolPermissionScope } from '../query/toolPolicy.js';
 
 const workspaces: string[] = [];
 
@@ -32,6 +35,67 @@ function executionService(files: readonly string[]) {
   } as never;
 }
 describe("lsp symbol scanning", () => {
+  it.each(['hover', 'documentSymbol', 'definition', 'references', 'workspaceSymbol'])(
+    'refuses external targets for %s before touching the execution service', async operation => {
+      const workspaceRoot = workspaceWith({ 'inside.ts': 'export const visible = 1;' });
+      const outside = workspaceWith({ 'secret.ts': 'export const confidential = 1;' });
+      fs.symlinkSync(outside, path.join(workspaceRoot, 'escape'), 'dir');
+      const service = createDefaultExecutionService();
+      const read = vi.spyOn(service, 'readTextFile');
+      const list = vi.spyOn(service, 'listFilesRecursive');
+      const tool = createLspToolDefinition(service);
+      for (const filePath of [path.join(outside, 'secret.ts'), path.relative(workspaceRoot, path.join(outside, 'secret.ts')), 'escape/secret.ts']) {
+        const result = await tool.execute({ operation, filePath, symbol: 'confidential' }, { workspaceRoot, taskId: 'escape' });
+        expect(result.success).toBe(false);
+        expect(JSON.stringify(result)).not.toContain('export const confidential');
+      }
+      expect(read).not.toHaveBeenCalled();
+      expect(list).not.toHaveBeenCalled();
+    });
+
+  it('reads hover through the execution service and preserves filename whitespace', async () => {
+    const workspaceRoot = workspaceWith({ ' module.ts ': 'export const wanted = 1;', 'module.ts': 'export const wrong = 1;' });
+    const service = createDefaultExecutionService();
+    const read = vi.spyOn(service, 'readTextFile');
+    const tool = createLspToolDefinition(service);
+    const result = await tool.execute({ operation: 'hover', filePath: ' module.ts ', symbol: 'wanted' }, { workspaceRoot, taskId: 'hover' });
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('wanted');
+    expect(read).toHaveBeenCalledWith(expect.objectContaining({ absolutePath: path.join(workspaceRoot, ' module.ts ') }));
+  });
+
+  it('applies canonical deny rules to explicit paths and each scanned file', async () => {
+    const workspaceRoot = workspaceWith({ 'private/hidden.ts': 'export const guarded = 1;', 'public.ts': 'export const visible = 1;' });
+    fs.symlinkSync(path.join(workspaceRoot, 'private/hidden.ts'), path.join(workspaceRoot, 'alias.ts'));
+    const service = createDefaultExecutionService();
+    vi.spyOn(service, 'listFilesRecursive').mockResolvedValue(['public.ts', 'private/hidden.ts', 'alias.ts']);
+    const read = vi.spyOn(service, 'readTextFile');
+    const definition = createLspToolDefinition(service);
+    const denyRules = [{ tool: 'lsp', pattern: 'private/' }];
+    const options = { workspaceRoot, sessionId: 'scan', permissionScope: 'allow-all' as const, denyRules,
+      hooks: { dispatch: async () => ({ decision: 'allow' }) } as never, emit: () => {} };
+    const [tool] = adaptTools(new Map([['lsp', definition]]), options);
+    expect(evaluateToolPermissionScope('lsp', { filePath: 'alias.ts' }, 'allow-all', workspaceRoot, denyRules).denied).toBe(true);
+    const denied = await tool.execute('explicit', { operation: 'hover', filePath: 'alias.ts' });
+    expect(denied.isError).toBe(true);
+    expect(read).not.toHaveBeenCalled();
+    const scan = await tool.execute('scan', { operation: 'workspaceSymbol', symbol: 'guarded' });
+    expect(scan.output).not.toContain('hidden.ts');
+    expect(scan.output).not.toContain('constant guarded');
+    expect(read.mock.calls.map(([input]) => input.absolutePath)).toEqual([path.join(workspaceRoot, 'public.ts')]);
+  });
+
+  it('rejects a scan entry whose symlink escapes the workspace', async () => {
+    const workspaceRoot = workspaceWith({});
+    const outside = workspaceWith({ 'secret.ts': 'export const concealed = 1;' });
+    fs.symlinkSync(path.join(outside, 'secret.ts'), path.join(workspaceRoot, 'alias.ts'));
+    const service = createDefaultExecutionService();
+    vi.spyOn(service, 'listFilesRecursive').mockResolvedValue(['alias.ts', path.join(outside, 'secret.ts')]);
+    const read = vi.spyOn(service, 'readTextFile');
+    const result = await createLspToolDefinition(service).execute({ operation: 'definition', symbol: 'concealed' }, { workspaceRoot, taskId: 'scan' });
+    expect(result.output).not.toContain('constant concealed');
+    expect(read).not.toHaveBeenCalled();
+  });
   it("reports AST symbols including methods and generators with their spans", async () => {
     const workspaceRoot = workspaceWith({
       "src/example.ts": [

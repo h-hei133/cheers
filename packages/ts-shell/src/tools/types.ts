@@ -6,6 +6,8 @@ export interface ToolExecutionContext {
   readonly sessionId?: string
   readonly correlationId?: string
   readonly abortSignal?: AbortSignal
+  /** Recheck path-specific denial for each actual file, including scan results. */
+  readonly assertFileAccess?: (absolutePath: string) => void
   /**
    * What a command this tool runs should know about the session it runs in.
    *

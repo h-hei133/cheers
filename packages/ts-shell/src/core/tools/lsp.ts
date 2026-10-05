@@ -1,12 +1,11 @@
-import * as fsSync from "node:fs";
-import { promises as fs } from "node:fs";
 import path from "node:path";
 import { approvedResult, deniedResult } from "./toolResultLifecycle.js";
-import type { ToolDefinition } from "../../tools/types.js";
+import type { ToolDefinition, ToolExecutionContext } from "../../tools/types.js";
 import type { ExecutionService } from "../../runtime/execution/service.js";
 import { parseSourceSymbols, detectLanguageFromPath } from "../../context/graph/ast/parser.js";
 import ts from "typescript";
 import { TOOL_APPROVED_READ_AUTHORITY } from "./grep.js";
+import { resolveWorkspaceToolTarget } from "./permissionContext.js";
 
 /**
  * /lsp tool
@@ -59,15 +58,23 @@ export function createLspToolDefinition(
         return deniedResult("Error: operation parameter is required for lsp.");
       }
 
-      const filePath = typeof args.filePath === "string" ? args.filePath.trim() : "";
+      const filePath = typeof args.filePath === "string" ? args.filePath : "";
       const symbolQuery = typeof args.symbol === "string" ? args.symbol.trim() : "";
+      if (filePath) {
+        try {
+          const target = resolveWorkspaceToolTarget({ filePath }, 'filePath', context.workspaceRoot);
+          context.assertFileAccess?.(target);
+        } catch {
+          return deniedResult('LSP file path is outside the workspace or denied by policy.');
+        }
+      }
 
       if (op === "documentSymbol") {
         if (!filePath) {
           return deniedResult("Error: filePath parameter is required for documentSymbol operation.");
         }
         try {
-          const content = await readSource(executionService, context.workspaceRoot, filePath);
+          const content = await readSource(executionService, context, filePath);
           const parsed = parseSourceSymbols(filePath, content);
           const symbols = parsed.symbols.map(
             (symbol) =>
@@ -106,7 +113,7 @@ export function createLspToolDefinition(
         for (const relative of targetFiles) {
           if (matches.length >= 100) break;
           try {
-            const content = await readSource(executionService, context.workspaceRoot, relative);
+            const content = await readSource(executionService, context, relative);
             const parsed = parseSourceSymbols(relative, content);
             for (const symbol of parsed.symbols) {
               if (symbol.name !== query && symbol.qualifiedName !== query) continue;
@@ -160,16 +167,8 @@ export function createLspToolDefinition(
         if (!filePath) {
           return deniedResult("Error: filePath parameter is required for hover operation.");
         }
-        const resolvedPath = path.isAbsolute(filePath)
-          ? filePath
-          : path.join(context.workspaceRoot, filePath);
-
-        if (!fsSync.existsSync(resolvedPath)) {
-          return deniedResult(`File not found for hover: ${filePath}`);
-        }
-
         try {
-          const content = fsSync.readFileSync(resolvedPath, "utf8");
+          const content = await readSource(executionService, context, filePath);
           const parseResult = parseSourceSymbols(filePath, content);
           const matchedSymbol = parseResult.symbols.find(
             (s) => s.name === symbolQuery || s.qualifiedName === symbolQuery,
@@ -237,14 +236,15 @@ function identifierUses(
 
 async function readSource(
   executionService: ExecutionService,
-  workspaceRoot: string,
+  context: ToolExecutionContext,
   relativePath: string,
 ): Promise<string> {
-  const target = path.resolve(workspaceRoot, relativePath);
+  const target = resolveWorkspaceToolTarget({ path: relativePath }, 'path', context.workspaceRoot);
+  context.assertFileAccess?.(target);
   return executionService.readTextFile({
     operationKind: "file.read",
     absolutePath: target,
-    workspaceRoot,
+    workspaceRoot: context.workspaceRoot,
     authority: TOOL_APPROVED_READ_AUTHORITY,
     caller: "core-tool:lsp",
     reason: "Read an approved source file for code intelligence.",

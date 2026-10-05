@@ -130,6 +130,12 @@ async function executeTool(
       abortSignal: signal,
       interactiveAsk: options.interactiveAsk,
       sessionId: options.sessionId,
+      assertFileAccess: (absolutePath) => {
+        const decision = evaluateToolPermissionScope(tool.name,
+          { ...args, path: absolutePath, filePath: absolutePath }, options.permissionScope,
+          options.workspaceRoot, options.denyRules);
+        if (decision.denied) throw new Error(decision.reason);
+      },
       ...(options.commandEnv ? { commandEnv: options.commandEnv } : {}),
       ...(options.runSubagent ? { runSubagent: options.runSubagent } : {}),
       // A tool that reports progress passes it on; one that does not is
