@@ -30,7 +30,8 @@ async function readCatalog(kind: CatalogKind, context: ShellRuntimeContext, gate
     const skills = resolveSkillCatalog({ workspaceRoot: context.cwd, ...context.skillOptions }).skills;
     return [...skills.values()].map(skill => ({ value: skill.name, label: skill.name, detail: skill.description }));
   }
-  const snapshot = context.runtimeConfig.enableMcpTools ? await gateway.snapshot() : undefined;
+  const snapshot = context.runtimeConfig.enableMcpTools ? gateway.peekSnapshot?.() : undefined;
+  if (context.runtimeConfig.enableMcpTools && !snapshot) throw new Error("Tool catalog unavailable");
   if (snapshot?.clients.some(client => client.type !== "connected")) throw new Error("Tool catalog unavailable");
   const tools = await toolPoolFor(context, snapshot ? { snapshot: async () => snapshot } : gateway)();
   return [...tools.values()].map(tool => ({ value: tool.name, label: tool.name, detail: tool.description.split("\n")[0]?.slice(0, 160) }));

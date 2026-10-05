@@ -1,10 +1,24 @@
 import { CoreMcpClient } from "./client.js";
-import type { ScopedMcpServerConfig } from "./types.js";
+import type { McpClientSnapshot, ScopedMcpServerConfig } from "./types.js";
 
 /** Owns all live connections; callers serialize config reconciliation and use. */
 export class CoreMcpConnectionManager {
   private closed = false;
   private readonly clients = new Map<string, CoreMcpClient>();
+
+  peekSnapshot(configs: Record<string, ScopedMcpServerConfig>): McpClientSnapshot | undefined {
+    if (this.closed) return undefined;
+    const snapshot: McpClientSnapshot = { clients: [], tools: [] };
+    for (const [name, config] of Object.entries(configs)) {
+      const client = this.clients.get(name);
+      if (!client || JSON.stringify(client.config) !== JSON.stringify(config)) return undefined;
+      const tools = client.peekTools();
+      if (!tools) return undefined;
+      snapshot.clients.push({ type: "connected", name, config: structuredClone(config) });
+      snapshot.tools.push(...tools);
+    }
+    return snapshot;
+  }
 
   async reconcile(configs: Record<string, ScopedMcpServerConfig>): Promise<void> {
     for (const [name, client] of this.clients) {

@@ -118,6 +118,13 @@ export class CoreMcpGateway {
     return this.run(async () => this.readSnapshot(await this.prepare()));
   }
 
+  /** Read existing catalogs only; workspace reconciliation belongs to explicit operations. */
+  peekSnapshot(): McpClientSnapshot | undefined {
+    const currentRoot = typeof this.root === "string" ? this.root : this.root();
+    if (this.closed || currentRoot !== this.workspaceRoot) return undefined;
+    return this.connectionManager.peekSnapshot(this.loadConfigs());
+  }
+
   refresh(target: string = "all"): Promise<McpClientSnapshot> {
     return this.run(async () => {
       const configs = await this.prepare();

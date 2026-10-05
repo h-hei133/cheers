@@ -835,3 +835,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Linux、Node 20.3 隔离环境 10 文件/101 项和 build:ts 通过。撤掉项目不信任过滤、把稳定键改为序号的反转分别触发断言失败，逐字节恢复后组合 101 项再次通过。真实 regular/fullscreen CLI 显示禁用服务名称和授权候选，Tab 前后 MCP 配置与授权文件字节保持、授权 mtime 不变，Enter 才撤销目标，退出码均为 0。探针最初等待旧 cmd 键格式，修正为实际 owner 生成的键后通过。
 - import cycles/config consumers/declarations/node floor 通过；NormProof 全图无环与导入解析 satisfied，既有 5 个函数数量 advisory 保留。7db76ae1 Architecture Watch 37387926527 成功，CI 37387926802 查询时仍运行；708c3ceb CI 37386715107 与 Architecture Watch 37386714984 均已成功，源码缓存期限修复获得该 SHA 的远端通过证据，原两次失败不改写。
 - CMD-04 仍有 memory、连接、路径及其余目录接线、完整外部版本事件和底层取消。§8.38 tools 目录仍使用会建立连接的 gateway.snapshot，不应把该路径描述为纯配置读取或据此宣称完整副作用边界已验收；后续应复用当前工具池快照并核查冷目录读取。Phase 19 整体继续。
+
+### 8.42 CMD-04：工具补全复用已加载 MCP 目录
+
+- 修正 §8.38 的 tools 补全直接调用 gateway.snapshot 而建立 MCP 连接的问题。client 在完整 tools/list 成功后保存工具描述副本，peekTools 只返回尚存活、未关闭且完整读取的目录；重新连接或开始重新读取时清除旧副本。返回克隆结果，调用方无法修改 owner 的已加载目录。
+- connectionManager 只检查现有 client 与当前配置一致性；gateway.peekSnapshot 校验当前 workspace、关闭状态并沿用配置/信任读取。冷目录、配置变化、连接断开与项目切换返回 unavailable，不隐式连接、刷新或关闭进程；真实空配置返回空快照。配置损坏仍是读取失败，未冒充成功空目录。
+- tools 候选通过 peekSnapshot 交给既有 toolPoolFor 的可见性过滤，不把无目录时的 core-only 列表冒充完整成功。显式 /mcp refresh 或实际请求可以加载目录，下一次补全复用它。对照参考从当前已加载工具定义投影名称与描述的决定，没有引入另一套连接生命周期。
+- Linux、Node 20.3 下 16 文件/137 项及 build:ts 通过，包含实际 MCP 子进程、断连不重连、配置/信任/项目变化、克隆隔离、工具过滤与转发。恢复补全调用连接式 snapshot 的反转失败，逐字节恢复后组合套件通过。首次组合命令包含不存在的 catalog.test.ts，实际运行 123 项；随后明确加入现存 prefilter/mcpForwarding 测试，最终为上述 137 项，不把未找到的路径当作覆盖。
+- regular/fullscreen 真实 CLI 冷补全报告 unavailable 且无服务进程日志；显式 refresh 后有真实目录，候选和 Tab 前后协议日志字节不变，两模式 exit 0。探针首次等待的完整候选名被菜单截断，改等待菜单中的描述后通过，接受完整工具名仍单独验证。
+- import cycles/config consumers/declarations/node floor 通过；NormProof 无环与导入解析 satisfied，既有 5 个函数数量 advisory 保留。3eca2fd0 Architecture Watch 37388577673 成功，CI 37388578273 查询时仍运行；7db76ae1 CI 37387926802 仍待终态。
+- 本批消除了候选读取触发 MCP 握手/tools-list 的路径；菜单已有 15 秒成功缓存与显式失效机制，完整外部目录/连接事件版本化仍待实现，不能将 client 活跃性检查等同于实时菜单刷新。CMD-04 其余目录、CMD-03 其余声明及 Phase 19 后续批次继续。

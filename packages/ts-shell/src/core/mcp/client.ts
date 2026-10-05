@@ -22,6 +22,7 @@ export class CoreMcpClient {
   private closing?: Promise<void>;
   private readonly abort = new AbortController();
   private catalog?: McpToolCatalog;
+  private listedTools?: McpToolDescriptor[];
 
   constructor(
     readonly name: string,
@@ -44,6 +45,7 @@ export class CoreMcpClient {
   }
 
   private async open(): Promise<McpConnectionState> {
+    this.listedTools = undefined;
     await this.disposeTransport();
     const client = new Client({ name: "cheers", version: packageVersion() ?? "unknown" }, {
       capabilities: {}, enforceStrictCapabilities: true,
@@ -75,9 +77,11 @@ export class CoreMcpClient {
   }
 
   async listTools(): Promise<McpToolDescriptor[]> {
+    this.listedTools = undefined;
     const client = await this.requireClient();
     if (!client.getServerCapabilities()?.tools) {
       this.catalog = new McpToolCatalog([]);
+      this.listedTools = [];
       return [];
     }
     const tools: McpToolDescriptor[] = [];
@@ -103,6 +107,7 @@ export class CoreMcpClient {
         cursor = result.nextCursor;
         if (cursor === undefined) {
           this.catalog = new McpToolCatalog(metadata);
+          this.listedTools = structuredClone(tools);
           return tools;
         }
         if (!cursor || cursors.has(cursor)) throw new Error("MCP tool catalog repeated an invalid cursor");
@@ -112,6 +117,12 @@ export class CoreMcpClient {
     } catch (error) {
       throw protocolFailure(error, "protocol");
     }
+  }
+
+  /** Inspect only a live, fully read catalog; never connect or issue tools/list. */
+  peekTools(): McpToolDescriptor[] | undefined {
+    return !this.closed && this.connected && this.listedTools !== undefined
+      ? structuredClone(this.listedTools) : undefined;
   }
 
   async invokeTool(toolName: string, args: Record<string, unknown>): Promise<McpToolCallResult> {
