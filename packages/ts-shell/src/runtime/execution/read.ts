@@ -20,10 +20,12 @@ function workspaceTarget(target: string, requestedRoot: string, realRoot: string
 
 /** Read bytes from the verified handle, never by reopening its pathname. */
 export async function readTextFile(request: TextFileReadExecutionRequest): Promise<string> {
-  return withVerifiedReadFile(request, handle => handle.readFile({ encoding: 'utf8', signal: request.abortSignal }))
+  return withVerifiedReadTarget(request, 'file', handle => handle.readFile({ encoding: 'utf8', signal: request.abortSignal }))
 }
 
-async function withVerifiedReadFile<T>(request: TextFileReadExecutionRequest, consume: (handle: FileHandle) => Promise<T>): Promise<T> {
+type ReadTarget = Pick<TextFileReadExecutionRequest, 'absolutePath' | 'workspaceRoot' | 'artifactDirectory' | 'assertFileAccess' | 'abortSignal'>
+
+export async function withVerifiedReadTarget<T>(request: ReadTarget, kind: 'file' | 'directory', consume: (handle: FileHandle, verify: () => Promise<void>) => Promise<T>): Promise<T> {
   request.abortSignal?.throwIfAborted()
   const workspace = realpathSync(request.workspaceRoot)
   const root = request.artifactDirectory
@@ -31,25 +33,26 @@ async function withVerifiedReadFile<T>(request: TextFileReadExecutionRequest, co
   const target = contained(workspaceTarget(request.absolutePath, request.workspaceRoot, workspace), root)
   request.assertFileAccess?.(target)
   const before = statSync(target, { bigint: true })
-  if (!before.isFile()) throw new Error('Read target must be a regular file.')
-  const handle = await fs.open(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0))
+  if (kind === 'file' ? !before.isFile() : !before.isDirectory()) throw new Error(`Read target must be a ${kind === 'file' ? 'regular file' : 'directory'}.`)
+  const handle = await fs.open(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0) | (kind === 'directory' ? (constants.O_DIRECTORY ?? 0) : 0))
   try {
     request.abortSignal?.throwIfAborted()
     const opened = await handle.stat({ bigint: true })
-    if (!opened.isFile() || !sameFile(before, opened)) {
+    if ((kind === 'file' ? !opened.isFile() : !opened.isDirectory()) || !sameFile(before, opened)) {
       throw new Error('Read target changed while opening the file.')
     }
-    // Linux exposes the opened object, including parent-directory replacements.
-    // Other platforms retain the identity and pathname rechecks below; their
-    // descriptor-path guarantee requires separate native platform evidence.
-    const actual = process.platform === 'linux' ? await fs.realpath(`/proc/self/fd/${handle.fd}`) : await fs.realpath(target)
-    if (contained(actual, root) !== target || realpathSync(request.workspaceRoot) !== workspace
-      || !sameFile(opened, statSync(target, { bigint: true }))) {
-      throw new Error('Read target changed after validation.')
+    const verify = async (): Promise<void> => {
+      // Only Linux exposes the actual open object through this interface.
+      const actual = process.platform === 'linux' ? await fs.realpath(`/proc/self/fd/${handle.fd}`) : await fs.realpath(target)
+      if (contained(actual, root) !== target || realpathSync(request.workspaceRoot) !== workspace
+        || !sameFile(opened, statSync(target, { bigint: true }))) {
+        throw new Error('Read target changed after validation.')
+      }
+      request.assertFileAccess?.(actual)
+      request.abortSignal?.throwIfAborted()
     }
-    request.assertFileAccess?.(actual)
-    request.abortSignal?.throwIfAborted()
-    return await consume(handle)
+    await verify()
+    return await consume(handle, verify)
   } catch (error) {
     // A disappearing opened file is a failed read, not evidence that a writer
     // may treat its pre-read as an initially absent target.
@@ -68,7 +71,7 @@ export async function withVerifiedReadFiles<T>(requests: readonly TextFileReadEx
   const handles: FileHandle[] = []
   async function openNext(index: number): Promise<T> {
     if (index < requests.length) {
-      return withVerifiedReadFile(requests[index]!, async handle => {
+      return withVerifiedReadTarget(requests[index]!, 'file', async handle => {
         handles.push(handle)
         return openNext(index + 1)
       })

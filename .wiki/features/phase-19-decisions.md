@@ -498,3 +498,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 验证：Linux、Node 20.3、隔离环境下 execution/core-tools/turn-tools 共 41 文件/406 项通过，build:ts 通过。新增打开后、spawn 前替换同名路径的真实原生测试，返回原核验文件内容而非替换标记；移除绑定时 2 失败/8 通过。新增生命周期测试覆盖后续打开失败、消费者失败及打开后续输入期间将早先文件移出工作区，均不消费未核验对象并关闭所有句柄。源码精确恢复后最终组合套件通过。
 - 编译模块探针经实际工具→读取 owner→执行器→原生程序，确认 fd 继承和同名替换内容未读入，模型请求为零。import-cycles/config-consumers/declarations/node-floor 通过；NormProof 无阻断项，函数上限仍为 6 项既有 advisory。上一提交 `f34dad31` 的 CI `37342093096` 已核实成功。
 - SAFE-02 仍进行中：句柄固定对象不提供内容不可变快照，也不撤销子进程已经继承的对象能力；文件内容的并发原地修改仍可影响读取。候选枚举的内部忽略文件访问、目录/创建竞态、未带文件策略的兼容直接调用及非 Linux 正文搜索仍未获得同等保证。未取得独立审查、PTY 或非 Linux 运行证据。
+
+
+### 8.11 SAFE-02 — Linux 目录描述符枚举（2026-10-06，进行中）
+
+- [读取 owner](../../packages/ts-shell/src/runtime/execution/read.ts) 共用文件/目录的 containment、类型、bigint 身份、拒绝、取消及句柄关闭机制，向消费者提供再次核验入口。[目录 owner](../../packages/ts-shell/src/runtime/execution/directory.ts) 在 Linux 打开目录描述符，通过 /proc/self/fd 枚举，返回名称前再次核验；[共享遍历](../../packages/ts-shell/src/runtime/execution/fileWalk.ts) 的 walk 和直接目录列表消费此入口，未新增平行遍历系统。
+- 其他平台保留 canonical 路径、类型、前后身份与策略检查分支，不要求它们通过 /proc 或打开目录句柄；该分支不声称具备 Linux 的实际枚举对象保证。遍历选项类型移到现有 [执行契约](../../packages/ts-shell/src/runtime/execution/types.ts)，fileWalk 原导出保持兼容，避免实现依赖经类型文件回到自身。
+- 对照前述目录工具的路径/类型预检与 readdir 流程，保留单层列表和共享忽略语义；直接按路径枚举不能解决检查后替换，本批复用已建立的描述符策略，未将参考的普通路径调用当作竞态保证。
+- Linux、Node 20.3、隔离环境下 execution/core-tools/turn-tools 共 42 文件/412 项通过，build:ts 通过。6 项新增覆盖内部/外部链接、打开后目录移出、枚举前同名路径替换、枚举后取消、常规文件拒绝，以及非 Linux 路径分支的模拟接线。平台分支模拟不是实际 macOS/Windows 验收。
+- 反转为按原路径 readdir 时，原本只枚举 public.txt 的测试读到替换目录 PRIVATE_NAME，1 失败/4 通过；源码精确恢复后组合套件通过。编译模块探针也核实实际枚举来自已打开目录，目录变动后拒绝返回过期列表；模型请求为零。import-cycles/config-consumers/declarations/node-floor 通过，NormProof 无阻断项，整体 partial 仍为 6 项既有函数数量 advisory。
+- SAFE-02 仍未完成：walk 在目录枚举之外读取忽略文件的路径、原生候选枚举内部访问、创建目录/文件的副作用竞态，以及其他平台的实际对象保证仍待处理。Linux 描述符枚举不提供整棵目录树的事务快照。未取得独立审查、PTY 或非 Linux 实机证据。

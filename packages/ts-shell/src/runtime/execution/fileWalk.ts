@@ -29,6 +29,8 @@
 import { promises as fs, realpathSync, type Dirent } from 'node:fs'
 import { verifyPathContainment } from '../../core/security/pathJail.js'
 import path from 'node:path'
+import { readDirectory } from './directory.js'
+import type { FileWalkOptions } from './types.js'
 import ignore, { type Ignore } from 'ignore'
 import {
   IGNORE_FILE_NAMES,
@@ -48,14 +50,7 @@ import {
  */
 const PRUNED_DIRECTORIES = ['node_modules', '.git', 'dist', '.normproof'] as const
 
-export interface FileWalkOptions {
-  readonly assertFileAccess?: (absolutePath: string) => void
-  readonly abortSignal?: AbortSignal
-  /** Directory names never entered, replacing the default set. */
-  readonly pruneDirectories?: readonly string[]
-  /** Whether ignore rules are honoured at all. Default true. */
-  readonly respectIgnore?: boolean
-}
+export type { FileWalkOptions } from './types.js'
 
 /** Policy checks use canonical targets; cancellation is never an omitted entry. */
 function checkedPath(root: string, target: string, options?: FileWalkOptions): string {
@@ -115,7 +110,7 @@ async function listViaWalk(
     }
     let entries: Dirent[]
     try {
-      entries = await fs.readdir(checkedPath(root, absolute, options), { withFileTypes: true })
+      entries = await readDirectory(root, checkedPath(root, absolute, options), options)
       checkedPath(root, absolute, options)
     } catch {
       options?.abortSignal?.throwIfAborted()
@@ -231,7 +226,7 @@ export async function listDirectoryEntries(
   const initial = verifyPathContainment(directory, root)
   const resolvedDirectory = checkedPath(resolvedRoot, initial.resolvedPath, options)
 
-  const dirents = await fs.readdir(resolvedDirectory, { withFileTypes: true })
+  const dirents = await readDirectory(resolvedRoot, resolvedDirectory, options)
   checkedPath(resolvedRoot, resolvedDirectory, options)
   const candidates = dirents.filter((entry) => !pruned.includes(entry.name)
     && visiblePath(resolvedRoot, path.join(resolvedDirectory, entry.name), options))

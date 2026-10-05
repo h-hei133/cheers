@@ -1,4 +1,11 @@
-import type { FileWalkOptions } from './fileWalk.js'
+export interface FileWalkOptions {
+  readonly assertFileAccess?: (absolutePath: string) => void
+  readonly abortSignal?: AbortSignal
+  /** Directory names never entered, replacing the default set. */
+  readonly pruneDirectories?: readonly string[]
+  /** Whether ignore rules are honoured at all. Default true. */
+  readonly respectIgnore?: boolean
+}
 
 /**
  * What a command run reports, before it is given an execution path and a receipt.
