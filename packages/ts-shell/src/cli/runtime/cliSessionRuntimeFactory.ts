@@ -475,8 +475,8 @@ export function createCliSessionRuntime(input: {
         maxTurns: input.runtimeContext.runtimeConfig.maxTurns,
         escalationPromptHandler,
         permissionScope: sessionRuntime.getPermissionScope(),
-        interactiveAsk: (questions) =>
-          promptInteractiveQuestions(input.getReadline(), questions),
+        interactiveAsk: (questions, askSignal) =>
+          promptInteractiveQuestions(input.getReadline(), questions, askSignal),
         historyMessages,
         onTurnMessage: (message) => {
           const id = message.id ?? createTranscriptEntryId("turn");

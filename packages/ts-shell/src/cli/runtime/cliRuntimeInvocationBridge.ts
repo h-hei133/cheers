@@ -4,7 +4,7 @@ import type { QueryEvent } from "../../core/query/runtime/events.js";
 import type { ProviderCredentialResolution } from "../../core/shell/providerCredentials.js";
 import type { EscalationPrompt, EscalationResponse } from "../../core/shell/approval/contract.js";
 import type { PermissionScope } from "../approval/permissionScope.js";
-import type { AskQuestion } from "../../core/tools/ask.js";
+import type { InteractiveAsk } from "../../core/tools/ask/contract.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 import { runCliRuntimeInvocation, type CliRuntimeInvocationResult } from "../../entrypoints/cliRuntimeInvocation.js";
 import type { CompactionSetup } from "../../turn/session.js";
@@ -28,7 +28,7 @@ export function streamCliRuntimePrompt(input: {
   readonly providerCredentialResolution: ProviderCredentialResolution;
   readonly agentMode: "plan" | "build";
   readonly permissionScope?: PermissionScope;
-  readonly interactiveAsk?: (questions: AskQuestion[]) => Promise<Record<string, string>>;
+  readonly interactiveAsk?: InteractiveAsk;
   readonly historyMessages?: readonly SessionMessage[];
   readonly onTurnMessage?: (message: SessionMessage) => void;
   readonly compaction?: CompactionSetup;

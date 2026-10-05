@@ -15,7 +15,7 @@ confidence: mixed
 
 本计划以 Cheers 的 28ff98cee8c4dd63e6752452f73a362ed3559ae3 为源码基线。输入为 [14 的问题与隔离探针](14-user-experience-research.md)、经本轮修订的 15–24，以及 [复核记录](verification-15-21.md)。当前用户要求高于早期研究的建议和 Phase 18 的延期决定；同一问题以本文和本轮明确用户答复为准。
 
-**本轮交付是研究纠错与规划。下面的任务全部尚未实施、未验收。** 不修改产品源码、配置、依赖、脚本或构建，不因形成计划就宣布修复，也不据此发布或合并代码。
+**规划形成时，下面的任务全部尚未实施、未验收。** 随后按用户授权进入实施；当前进展与验证边界见 §8，未列为已实施的任务仍待完成，不能因形成计划就宣布功能完成。
 
 [Phase 18 验收表](phase-18-acceptance.md) 的 W7-33 仍沿用“认证前置失败、四端点真实 TLS/HTTP2 矩阵未完成”的历史状态；本轮未重跑。它不阻塞无关的本地设计与实现，却仍是涉及这些端点的发布验收缺口。不得把它改写成 Phase 19 已通过或已取消。
 
@@ -527,3 +527,14 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Linux、Node 20.3、隔离 HOME/USERPROFILE/TMPDIR/CHEERS_TEST_ROOT/GIT_CEILING_DIRECTORIES 下 ignoreRules、fileWalk、listAccess 与 skill 共 4 文件/38 项通过，build:ts 通过。两条真实 Git 回归测试分别覆盖列表和忽略查询，核对结果及零执行标记；移除两处禁用参数时 2 失败/6 通过，均实际生成标记，源码精确恢复后上述组合套件通过。
 - import-cycles/config-consumers/declarations/node-floor 通过。没有新增模块依赖；未取得本批独立审查、CLI/PTY 或非 Linux 运行证据。
 - SAFE-02 仍进行中：另一个隔离原生探针确认搜索工具会跟随工作区外的 .ignore 符号链接，其内部忽略配置访问尚未解决；Git 内部元数据读取、创建副作用竞态及跨平台实际对象保证也不由本批覆盖。
+
+
+### 8.14 SAFE-03 — 问答来源与终态（2026-10-06，本地实现与验证）
+
+- [ask 工具](../../packages/ts-shell/src/core/tools/ask.ts) 与 [结果投影](../../packages/ts-shell/src/core/tools/ask/result.ts) 为每题保留 user/none 来源，仅接受本题自有且非空的明确答案；原文空白保留，不把缺答填成推荐项。汇总 answered、partial、unanswered、cancelled、unavailable、error，只有完整回答标记 success；已有答案在部分回答、取消或界面错误时仍返回。推荐项只在提问 UI 展示，问答不授予后续执行权限。
+- 新 [回调契约](../../packages/ts-shell/src/core/tools/ask/contract.ts) 携带响应状态、答案记录与取消信号，贯通现有 session/turn/CLI 适配；旧 AskQuestion/AskOption 导出保留。内部回调现在返回结构化响应，裸答案映射不再满足契约。直接工具入口复用 schema 验证，并拒绝重复/空 ID、空问题和不存在的推荐索引；不静默丢弃无效题目。
+- [交互适配](../../packages/ts-shell/src/cli/interactive/interactiveAskBridge.ts) 不再将空输入自动选为推荐项，数字选项要求完整十进制字符串，1junk/1.5 保留为自由文本；问题 ID 不 trim，原型名称使用自有字段记录。[终端桥](../../packages/ts-shell/src/cli/interactive/questionBridge.ts) 支持 readline 的 signal 参数与关闭/中断事件，取消移除待答 UI 和监听器，不继续下一题；用 parent-abort/user-cancelled/input-closed 安全原因码区分父信号、用户中断和输入关闭，不输出任意异常或信号原文；既有无 signal 确认调用仍在放弃时收到拒绝。新提问不能覆盖已存在的待答确认。
+- 定向对照参考的交互 selector/input：取消与关闭返回无选择，显式 signal 监听负责退出并移除界面；采用这一决定，沿本项目 readline/全屏桥完成，不引入第二交互引擎。原有测试把自动选择推荐项视为正确，按本阶段裁决分类为 stale expectation，替换为明确来源及取消反例，未以旧测试定义产品契约。
+- Linux、Node 20.3、隔离环境下 ask、交互桥、终端宿主、信号、调用适配、工具 gate、参数校验与权限共 9 文件/131 项通过，build:ts 通过。六种状态经真实工具适配器验证，后续 write 在没有执行审批时仍被拒绝。反转答案兜底 5 失败/16 通过；反转空输入推荐 1 失败/16 通过；反转中断为 n 时 3 失败/14 通过，包含不能结束后续问题的超时反例。每组源码精确恢复后最终组合套件通过。
+- 编译模块经真实 PTY/readline 提问：先显式选择第二项，再留空或 Ctrl-C，分别得到 partial/cancelled，均保留第一项用户答案且第二项 source=none；子进程 exit 0，模型请求为零。这是工具与终端适配探针，不是完整模型驱动 CLI 会话验收。import-cycles/config-consumers/declarations/node-floor 通过；NormProof 无阻断项，两项图义务 satisfied，整体 partial 仍来自 6 项既有函数数量 advisory。未取得独立审查或非 Linux 实机证据。
+- SAFE-02 继续保留原生内部访问、创建竞态与跨平台缺口；本批推进同一 W1 的独立问答任务，没有将这些缺口改称完成。其余 Phase 19 批次仍待执行。

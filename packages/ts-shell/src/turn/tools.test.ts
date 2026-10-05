@@ -1,3 +1,4 @@
+import { createAskToolDefinition } from '../core/tools/ask.js';
 import { describe, expect, it, vi } from "vitest";
 import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import type { AgentMessage } from "../core/agent/state.js";
@@ -371,3 +372,26 @@ it.each(["ask", "accept-edits"] as const)("requires live approval to stop a task
   expect(prompts[0]).toMatchObject({ context: { toolName: "taskStop", operation: "execute" } });
   expect(blocked?.block).toBe(true);
 });
+
+
+it.each(['answered', 'partial', 'unanswered', 'cancelled', 'unavailable', 'error'] as const)(
+  'preserves ask %s through the tool adapter without granting write permission', async status => {
+    const setup = gate({ permissionScope: 'ask', interactiveAsk: async () => ({
+      status: status === 'answered' || status === 'partial' || status === 'unanswered' ? 'completed' : status,
+      answers: status === 'answered' ? { first: 'yes', second: 'yes' }
+        : status === 'partial' || status === 'cancelled' ? { first: 'yes' } : {},
+    }) });
+    const [tool] = adaptTools(new Map([['ask', createAskToolDefinition()]]), setup);
+    const args = { questions: [{ id: 'first', question: 'Proceed?' }, { id: 'second', question: 'Details?' }] };
+    const result = await tool.execute('ask-status', args);
+    expect(result.isError).toBe(status !== 'answered');
+    expect(result.metadata?.ask).toMatchObject({ status });
+    expect(result.output).toContain(`# Questions: ${status}`);
+    if (status === 'partial' || status === 'cancelled') expect(result.output).toContain('**User answer**: yes');
+    const hooks = createToolHooks(setup);
+    await hooks.afterToolCall!({ ...call('ask', args), result, isError: result.isError! });
+    expect(setup.dispatched).toContain(status === 'answered' ? 'PostToolUse' : 'PostToolUseFailure');
+    const write = await hooks.beforeToolCall!(call('write', { path: 'not-approved.txt', content: 'no' }));
+    expect(write?.block).toBe(true);
+    expect(setup.events).not.toContainEqual(expect.objectContaining({ type: 'approval.resolved', outcome: 'approved' }));
+  });

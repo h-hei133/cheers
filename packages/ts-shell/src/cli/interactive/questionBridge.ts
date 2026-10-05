@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import type { Interface as ReadlineInterface } from "node:readline";
 
 /**
@@ -18,7 +19,7 @@ export interface QuestionHandlers {
 }
 
 export class QuestionBridge {
-  private pending: { readonly question: string; readonly resolve: (answer: string) => void } | undefined;
+  private pending: { readonly question: string; readonly resolve: (answer: string) => void; readonly cleanup: () => void; readonly cancel?: () => void } | undefined;
   private readonly handlers: QuestionHandlers;
 
   constructor(handlers: QuestionHandlers) {
@@ -38,14 +39,16 @@ export class QuestionBridge {
     const pending = this.pending;
     if (!pending) return false;
     this.pending = undefined;
+    pending.cleanup();
     pending.resolve(text);
     this.handlers.settle();
     return true;
   }
 
-  /** Resolve any pending question as declined, for shutdown or interruption. */
+  /** Cancel signal-aware questions; legacy confirmation callers receive a refusal. */
   abandon(): void {
-    this.answer("n");
+    if (this.pending?.cancel) this.pending.cancel();
+    else this.answer("n");
   }
 
   /**
@@ -54,22 +57,33 @@ export class QuestionBridge {
    */
   asReadline(onClose: () => void): ReadlineInterface {
     const bridge = this;
-    return {
-      question(query: string, callback: (answer: string) => void): void {
+    const events = new EventEmitter();
+    return Object.assign(events, {
+      question(query: string, options: { signal?: AbortSignal } | ((answer: string) => void), callback?: (answer: string) => void): void {
+        if (bridge.pending) throw new Error('A question is already pending.');
+        const signal = typeof options === 'function' ? undefined : options.signal;
+        const resolve = typeof options === 'function' ? options : callback!;
+        if (signal?.aborted) return;
         const text = query.trim();
-        bridge.pending = { question: text, resolve: callback };
-        bridge.handlers.ask(text);
+        const cleanup = (): void => signal?.removeEventListener('abort', abort);
+        const abort = (): void => {
+          if (bridge.pending?.resolve !== resolve) return;
+          bridge.pending = undefined;
+          cleanup();
+          bridge.handlers.settle();
+        };
+        bridge.pending = { question: text, resolve, cleanup,
+          ...(signal ? { cancel: () => { events.emit('SIGINT'); abort(); } } : {}) };
+        signal?.addEventListener('abort', abort, { once: true });
+        try { bridge.handlers.ask(text); }
+        catch (error) { abort(); throw error; }
       },
-      close: onClose,
+      close: () => { events.emit('close'); bridge.abandon(); onClose(); },
       prompt: () => {},
       setPrompt: () => {},
       pause: () => {},
       resume: () => {},
-      on: () => undefined,
-      off: () => undefined,
-      once: () => undefined,
-      removeListener: () => undefined,
       write: () => {},
-    } as unknown as ReadlineInterface;
+    }) as unknown as ReadlineInterface;
   }
 }

@@ -1,24 +1,16 @@
-import { approvedResult, deniedResult } from "./toolResultLifecycle.js";
+import { deniedResult } from "./toolResultLifecycle.js";
 import type { ToolDefinition } from "../../tools/types.js";
-
-export interface AskOption {
-  label: string;
-  description?: string;
-}
-
-export interface AskQuestion {
-  id: string;
-  question: string;
-  options?: AskOption[];
-  recommended?: number;
-}
+import { validateToolArguments } from './arguments.js';
+import type { AskQuestion, AskResponse } from './ask/contract.js';
+import { askResult } from './ask/result.js';
+export type { AskOption, AskQuestion } from './ask/contract.js';
 
 /**
  * /ask tool
  * Prompts user with structured multiple-choice questions or confirmations during task execution.
  */
 export function createAskToolDefinition(): ToolDefinition {
-  return {
+  const definition: ToolDefinition = {
     name: "ask",
     description:
       "Ask the user structured questions, present multiple-choice architectural options, or request user confirmation during execution.",
@@ -27,6 +19,7 @@ export function createAskToolDefinition(): ToolDefinition {
       properties: {
         questions: {
           type: "array",
+          minItems: 1,
           items: {
             type: "object",
             properties: {
@@ -45,7 +38,8 @@ export function createAskToolDefinition(): ToolDefinition {
                 description: "Available choices for the user",
               },
               recommended: {
-                type: "number",
+                type: "integer",
+                minimum: 0,
                 description: "0-based index of recommended option",
               },
             },
@@ -57,64 +51,34 @@ export function createAskToolDefinition(): ToolDefinition {
       required: ["questions"],
     },
     async execute(args, context) {
-      const questions = args.questions as AskQuestion[] | undefined;
-      if (!questions || !Array.isArray(questions) || questions.length === 0) {
-        return deniedResult("Error: questions array is required for ask tool.");
+      try {
+        validateToolArguments(definition.argsSchema, args);
+      } catch {
+        return deniedResult('Invalid ask questions.');
       }
-
-      if (typeof context?.interactiveAsk === "function") {
-        const valid = questions.filter(
-          (q): q is AskQuestion => !!q && typeof q === "object" && typeof q.id === "string" && typeof q.question === "string",
-        );
-        if (valid.length === 0) {
-          return deniedResult("Error: questions array contains no valid question entries.");
+      const questions = args.questions as AskQuestion[];
+      const ids = new Set<string>();
+      for (const question of questions) {
+        if (!question.id.trim() || !question.question.trim() || ids.has(question.id)
+          || (question.recommended !== undefined && !question.options?.[question.recommended])) {
+          return deniedResult('Invalid or duplicate question ID, empty question, or unavailable recommendation.');
         }
-        try {
-          const userAnswers = await context.interactiveAsk(valid);
-          if (userAnswers && Object.keys(userAnswers).length > 0) {
-            const formatted = valid
-              .map((q) => {
-                const rawDecision = userAnswers[q.id];
-                const chosen =
-                  (rawDecision && rawDecision.trim()) ||
-                  (q.recommended !== undefined && q.options?.[q.recommended]
-                    ? q.options[q.recommended].label
-                    : "No answer provided");
-                return `### Question [${q.id}]: ${q.question}\n- **User Decision**: ${chosen}`;
-              })
-              .join("\n\n");
-            return approvedResult(`# User Decisions Received\n\n${formatted}`);
-          }
-        } catch {
-          // Fallback to autonomous mode if interactive ask fails or is cancelled
-        }
+        ids.add(question.id);
       }
-      const formattedQuestions: string[] = [];
-      questions.forEach((q, idx) => {
-        if (!q || typeof q !== "object") return;
-        const qId = typeof q.id === "string" ? q.id : `q_${idx + 1}`;
-        const qText = typeof q.question === "string" ? q.question : "Unspecified question";
-        formattedQuestions.push(`### Question ${idx + 1} [${qId}]: ${qText}`);
-        if (Array.isArray(q.options) && q.options.length > 0) {
-          q.options.forEach((opt, optIdx) => {
-            if (!opt || typeof opt !== "object") return;
-            const label = typeof opt.label === "string" ? opt.label : `Option ${optIdx + 1}`;
-            const isRec = q.recommended === optIdx ? " (Recommended)" : "";
-            formattedQuestions.push(
-              `  - **[${optIdx + 1}] ${label}**${isRec}${opt.description ? `: ${opt.description}` : ""}`,
-            );
-          });
+      if (context.abortSignal?.aborted) return askResult(questions, { status: 'cancelled', answers: {}, cancellationReason: 'parent-abort' });
+      if (!context.interactiveAsk) return askResult(questions, { status: 'unavailable', answers: {} });
+      try {
+        const response: AskResponse = await context.interactiveAsk(questions, context.abortSignal);
+        if (!response || !['completed', 'cancelled', 'unavailable', 'error'].includes(response.status)
+          || !response.answers || typeof response.answers !== 'object' || Array.isArray(response.answers)) {
+          return askResult(questions, { status: 'error', answers: {} });
         }
-        formattedQuestions.push("");
-      });
-      const output = [
-        "# User Decision & Clarification Requested",
-        "",
-        ...formattedQuestions,
-        "> *Status: Autonomous execution mode - selected default recommended choices to prevent blocking.*",
-      ].join("\n");
-
-      return approvedResult(output);
+        return askResult(questions, context.abortSignal?.aborted ? { ...response, status: 'cancelled', cancellationReason: 'parent-abort' } : response);
+      } catch {
+        return askResult(questions, { status: context.abortSignal?.aborted ? 'cancelled' : 'error', answers: {},
+          ...(context.abortSignal?.aborted ? { cancellationReason: 'parent-abort' as const } : {}) });
+      }
     },
   };
+  return definition;
 }

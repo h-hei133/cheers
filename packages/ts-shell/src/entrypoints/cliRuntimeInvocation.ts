@@ -7,7 +7,7 @@ import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { EscalationPrompt, EscalationResponse } from "../core/shell/approval/contract.js";
 import { createProviderReadinessCliTerminalEvent } from "./providerReadinessCliSurface.js";
 import type { PermissionScope } from "../cli/approval/permissionScope.js";
-import type { AskQuestion } from "../core/tools/ask.js";
+import type { InteractiveAsk } from "../core/tools/ask/contract.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
 import { defaultHookDispatcher, type HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import { setupBuiltinVerificationHooks } from "../core/hooks/builtin/index.js";
@@ -73,7 +73,7 @@ export interface CliRuntimeInvocationInput {
   readonly providerCredentialResolution: ProviderCredentialResolution;
   readonly agentMode: "plan" | "build";
   readonly permissionScope?: PermissionScope;
-  readonly interactiveAsk?: (questions: AskQuestion[]) => Promise<Record<string, string>>;
+  readonly interactiveAsk?: InteractiveAsk;
   readonly historyMessages?: readonly SessionMessage[];
   readonly onTurnMessage?: (message: SessionMessage) => void;
   readonly compaction?: CompactionSetup;

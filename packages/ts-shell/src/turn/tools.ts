@@ -5,7 +5,7 @@ import { DoomLoopDetector } from "../core/query/doomLoopDetector.js";
 import { buildToolEscalationPrompt, evaluateToolPermissionScope, planModeBlock } from "../core/query/toolPolicy.js";
 import type { DenyRule } from "../core/shell/approval/deny.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
-import type { AskQuestion } from "../core/tools/ask.js";
+import type { InteractiveAsk } from "../core/tools/ask/contract.js";
 import type { EscalationPrompt, EscalationResponse } from "../core/shell/approval/contract.js";
 import type { ToolDefinition } from "../tools/types.js";
 import type { SubagentRunner } from "../core/subagents/runner.js";
@@ -39,7 +39,7 @@ export interface ToolGateOptions {
   readonly permissionScope?: PermissionScope;
   readonly hooks: HookDispatcher;
   readonly escalationPromptHandler?: (prompt: EscalationPrompt) => Promise<EscalationResponse>;
-  readonly interactiveAsk?: (questions: AskQuestion[]) => Promise<Record<string, string>>;
+  readonly interactiveAsk?: InteractiveAsk;
   /** Approval events, so a card can say it is waiting and how it was answered. */
   readonly emit: (event: QueryEvent) => void;
   /**

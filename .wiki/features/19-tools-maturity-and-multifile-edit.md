@@ -37,7 +37,7 @@ confidence: mixed
 | `browser` | 八个基本动作：open/observe/click/type/select/hover/press/close；工具入口与会话管理器未完整传递取消 | 动作生命周期取消、截图多模态、标签页、上传下载、弹窗与网络策略，见 §3.8、§3.10 |
 | `todo` | 会话任务清单及持久化回放 | 勾选状态与行为完成证据分开；不由 `done` 自动证明任务成功 |
 | `task` | 前台子代理委派，可选 worktree、权限交集、递归限制；不同于 bash 的后台进程句柄 | 主子共享预算与 deadline、完整轨迹、只读委派准入；并发策略由通用调度契约承担 |
-| `ask` | 未答项会填推荐项并标为用户选择；异常与无交互降级会产生成功式表述 | answered/partial/unanswered/cancelled/unavailable/error 的真实来源与结果，见 §3.3 |
+| `ask` | 已按 Phase 19 区分回答来源与六种结果，空答不选择推荐项，中断保留已答项 | 本地实现与验证见 [裁决 §8.14](phase-19-decisions.md)；跨平台实机与远端结果另核对 |
 | `taskOutput` | 读取当前进程内后台命令表；保留最多 100 条完成项 | 超时、输出预算、句柄失效与重启后的不可连接状态如实呈现；不把内存表称为持久恢复 |
 | `taskStop` | 返回 `Stop requested` 并提示查询 `taskOutput`；后台任务以 `close` 事件结算 | 当前请求语义诚实。若增加等待退出，要区分请求、已退出、期限到、部分清理、未知；逃逸后代和跨重启另有边界 |
 
@@ -68,6 +68,8 @@ confidence: mixed
 跨仓扫描路径与所有显式 filePath 路径都必须验收。已获单独授权的 artifact 或其他读域使用其自身 authority，不能被错误塞入“所有读取只能来自 workspace”的规则。
 
 ### 3.3 `ask`：用户回答、推荐与错误分开
+
+2026-10-06：此项已完成本地实现、131 项相关测试及真实 PTY 适配探针；详细证据与限制见 [Phase 19 §8.14](phase-19-decisions.md)。
 
 输出必须保留每题的回答来源，并汇总为 answered、partial、unanswered、cancelled、unavailable 或 error。推荐项只在 UI 中提示；缺答、关闭面板、非交互环境或回调异常都不能变为用户选择，也不能触发后续写入授权。
 

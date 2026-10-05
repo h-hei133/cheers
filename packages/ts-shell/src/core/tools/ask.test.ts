@@ -1,102 +1,106 @@
-import { describe, expect, it, vi } from "vitest";
-import { createAskToolDefinition } from "./ask.js";
+import { describe, expect, it, vi } from 'vitest';
+import { createAskToolDefinition } from './ask.js';
+import type { AskResponse } from './ask/contract.js';
 
-describe("ask tool", () => {
-  it("uses interactiveAsk when provided in context", async () => {
-    const askTool = createAskToolDefinition();
-    const interactiveAsk = vi.fn().mockResolvedValue({
-      approach: "Option B",
-    });
+const questions = [
+  { id: 'first', question: 'Format?', options: [{ label: 'JSON' }, { label: 'YAML' }], recommended: 1 },
+  { id: 'second', question: 'Notes?' },
+];
+const context = { taskId: 'ask-test', workspaceRoot: '/workspace' };
 
-    const result = await askTool.execute(
-      {
-        questions: [
-          {
-            id: "approach",
-            question: "Which approach should we take?",
-            options: [{ label: "Option A" }, { label: "Option B" }],
-            recommended: 0,
-          },
-        ],
-      },
-      {
-        taskId: "task_1",
-        workspaceRoot: "/workspace",
-        interactiveAsk,
-      },
-    );
+async function run(response: AskResponse) {
+  return createAskToolDefinition().execute({ questions }, { ...context, interactiveAsk: async () => response });
+}
 
-    expect(interactiveAsk).toHaveBeenCalledOnce();
+describe('ask answer provenance', () => {
+  it('preserves every submitted answer exactly', async () => {
+    const result = await run({ status: 'completed', answers: { first: 'JSON', second: '  keep this  ' } });
     expect(result.success).toBe(true);
-    expect(result.output).toContain("### Question [approach]: Which approach should we take?");
-    expect(result.output).toContain("- **User Decision**: Option B");
-    expect(result.output).not.toContain("Autonomous execution mode");
+    expect(result.metadata?.ask).toEqual({ status: 'answered', responses: [
+      { id: 'first', source: 'user', answer: 'JSON' }, { id: 'second', source: 'user', answer: '  keep this  ' },
+    ] });
+    expect(result.output).toContain('**User answer**:   keep this  ');
   });
 
-  it("falls back to recommended options when interactiveAsk is not provided", async () => {
-    const askTool = createAskToolDefinition();
-
-    const result = await askTool.execute(
-      {
-        questions: [
-          {
-            id: "approach",
-            question: "Which approach should we take?",
-            options: [{ label: "Option A" }, { label: "Option B" }],
-            recommended: 0,
-          },
-        ],
-      },
-      {
-        taskId: "task_2",
-        workspaceRoot: "/workspace",
-      },
-    );
-
-    expect(result.success).toBe(true);
-    expect(result.output).toContain("Autonomous execution mode");
-    expect(result.output).toContain("[1] Option A** (Recommended)");
-  });
-
-  it("rejects empty or invalid questions array", async () => {
-    const askTool = createAskToolDefinition();
-    const result = await askTool.execute({ questions: [] }, { taskId: "task_3", workspaceRoot: "/workspace" });
+  it('keeps partial answers without substituting recommendations', async () => {
+    const result = await run({ status: 'completed', answers: { second: 'note' } });
     expect(result.success).toBe(false);
-    expect(result.error).toContain("questions array is required");
+    expect(result.metadata?.ask).toEqual({ status: 'partial', responses: [
+      { id: 'first', source: 'none' }, { id: 'second', source: 'user', answer: 'note' },
+    ] });
+    expect(result.output).toContain('No answer submitted.');
+    expect(result.output).not.toContain('YAML');
   });
 
-  it("falls back to recommended option or placeholder when user provides empty answer", async () => {
-    const askTool = createAskToolDefinition();
-    const interactiveAsk = vi.fn().mockResolvedValue({
-      q_rec: "   ",
-      q_none: "",
+  it.each([{}, { first: '', second: '   ' }, { unrelated: 'yes' }, Object.create({ first: 'yes' })])(
+    'treats blank, missing, foreign and inherited answers as unanswered', async answers => {
+      const result = await run({ status: 'completed', answers });
+      expect(result.success).toBe(false);
+      expect(result.metadata?.ask).toMatchObject({ status: 'unanswered' });
+      expect(result.output).not.toContain('User answer');
+      expect(result.output).not.toContain('YAML');
     });
 
-    const result = await askTool.execute(
-      {
-        questions: [
-          {
-            id: "q_rec",
-            question: "Choose format?",
-            options: [{ label: "JSON" }, { label: "YAML" }],
-            recommended: 1,
-          },
-          {
-            id: "q_none",
-            question: "Any thoughts?",
-            options: [],
-          },
-        ],
-      },
-      {
-        taskId: "task_4",
-        workspaceRoot: "/workspace",
-        interactiveAsk,
-      },
-    );
+  it.each(['cancelled', 'unavailable', 'error'] as const)('retains explicit answers when response is %s', async status => {
+    const result = await run({ status, answers: { first: 'JSON' } });
+    expect(result.success).toBe(false);
+    expect(result.metadata?.ask).toMatchObject({ status });
+    expect(result.output).toContain('**User answer**: JSON');
+    expect(result.output).not.toContain('YAML');
+  });
 
-    expect(result.success).toBe(true);
-    expect(result.output).toContain("### Question [q_rec]: Choose format?\n- **User Decision**: YAML");
-    expect(result.output).toContain("### Question [q_none]: Any thoughts?\n- **User Decision**: No answer provided");
+  it('reports unavailable without an interaction callback', async () => {
+    const result = await createAskToolDefinition().execute({ questions }, context);
+    expect(result.success).toBe(false);
+    expect(result.metadata?.ask).toMatchObject({ status: 'unavailable' });
+    expect(result.output).not.toContain('selected default');
+  });
+
+  it('reports callback failures without exposing error contents', async () => {
+    const result = await createAskToolDefinition().execute({ questions }, { ...context,
+      interactiveAsk: async () => { throw new Error('PRIVATE_CALLBACK_ERROR'); },
+    });
+    expect(result.success).toBe(false);
+    expect(result.metadata?.ask).toMatchObject({ status: 'error' });
+    expect(JSON.stringify(result)).not.toContain('PRIVATE_CALLBACK_ERROR');
+  });
+
+  it('pre-cancellation does not open the UI', async () => {
+    const controller = new AbortController();
+    controller.abort('PRIVATE_ABORT_REASON');
+    const interactiveAsk = vi.fn();
+    const result = await createAskToolDefinition().execute({ questions }, { ...context, interactiveAsk, abortSignal: controller.signal });
+    expect(interactiveAsk).not.toHaveBeenCalled();
+    expect(result.metadata?.ask).toMatchObject({ status: 'cancelled', cancellationReason: 'parent-abort' });
+    expect(JSON.stringify(result)).not.toContain('PRIVATE_ABORT_REASON');
+  });
+
+  it('passes cancellation to the callback and does not report completion after cancellation', async () => {
+    const controller = new AbortController();
+    const result = await createAskToolDefinition().execute({ questions }, { ...context, abortSignal: controller.signal,
+      interactiveAsk: async (_questions, signal) => {
+        expect(signal).toBe(controller.signal);
+        controller.abort();
+        return { status: 'completed', answers: { first: 'JSON' } };
+      },
+    });
+    expect(result.success).toBe(false);
+    expect(result.metadata?.ask).toMatchObject({ status: 'cancelled' });
+    expect(result.output).toContain('**User answer**: JSON');
+  });
+
+  it.each([[], [{ id: 'same', question: 'A' }, { id: 'same', question: 'B' }],
+    [{ id: ' ', question: 'A' }], [{ id: 'x', question: ' ' }],
+    [{ id: 'x', question: 'A', recommended: 0 }], [{ id: 'x', question: 'A', recommended: 0.5 }],
+    [{ id: 'x', question: 'A', options: [{ label: 7 }] }]])('rejects invalid input before prompting', async invalid => {
+    const interactiveAsk = vi.fn();
+    const result = await createAskToolDefinition().execute({ questions: invalid }, { ...context, interactiveAsk });
+    expect(result.success).toBe(false);
+    expect(interactiveAsk).not.toHaveBeenCalled();
+  });
+
+  it('does not accept an invalid callback payload as decisions', async () => {
+    const result = await run({ status: 'completed', answers: null } as unknown as AskResponse);
+    expect(result.metadata?.ask).toMatchObject({ status: 'error' });
   });
 });

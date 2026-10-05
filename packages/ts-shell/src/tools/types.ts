@@ -1,3 +1,4 @@
+import type { InteractiveAsk } from '../core/tools/ask/contract.js'
 import type { SubagentRunner } from '../core/subagents/runner.js'
 
 export interface ToolExecutionContext {
@@ -31,14 +32,7 @@ export interface ToolExecutionContext {
    * faking a completion.
    */
   readonly runSubagent?: SubagentRunner
-  readonly interactiveAsk?: (
-    questions: Array<{
-      id: string
-      question: string
-      options?: Array<{ label: string; description?: string }>
-      recommended?: number
-    }>,
-  ) => Promise<Record<string, string>>
+  readonly interactiveAsk?: InteractiveAsk
 }
 
 export interface ToolExecutionResult {
