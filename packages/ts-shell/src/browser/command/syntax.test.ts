@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { parseBrowserCommandArgs } from "../commandContract.js";
 import { parseBrowserReplayCommandArgs } from "../replayCommandContract.js";
 import { parseBrowserSelfHealingCommandArgs } from "../selfHealingCommandContract.js";
-import { browserCompletions } from "./syntax.js";
+import { browserCompletions } from "./completion.js";
 import { runBrowserLocalCommand } from "../../core/commands/browserCommandRuntime.js";
 import * as runner from "../commandRunner.js";
 import * as smoke from "../smoke/runner.js";

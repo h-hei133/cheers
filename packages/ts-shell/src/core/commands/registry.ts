@@ -1,4 +1,5 @@
-import { browserSyntax, browserCompletions } from "../../browser/command/syntax.js";
+import { browserSyntax } from "../../browser/command/syntax.js";
+import { browserCompletions } from "../../browser/command/completion.js";
 import { connectSyntax, connectCompletions } from "./connect/syntax.js";
 import { loopSyntax, loopArgumentCompletions } from "./loop/syntax.js";
 import { brainstormSyntax } from "./brainstorm/syntax.js";

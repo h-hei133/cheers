@@ -757,3 +757,5 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Linux、Node 20.3 隔离环境 68 文件/377 项通过，1 文件/9 项既有集成测试跳过，build:ts 通过。分别恢复旧顶层/action/replay/repair parser 的四组反转均产生解析或精确目标断言失败；逐字节恢复后组合套件通过。套件曾输出 exit listener 数量警告，本批未改变监听器生命周期或据此宣称已修复。
 - 真实 regular/fullscreen CLI 对非法 smoke/runtime/cache/repair/navigate 输入报告 blocked，指定 manifest 字节与 mtime 不变，两模式 exit 0、无模型请求。未据此声称覆盖额外环境下的真实浏览器集成。import cycles/config consumers/declarations/node floor 通过；7 个 call reachability 与 5 个 NormProof 函数数量既有 advisory 保留，阻断义务通过。
 - 462b2b92 Architecture Watch 37380581074 成功，CI 37380581115 尚待终态。CMD-03 的 compact、多项零参数与自由文本/实体目录、CMD-04、SAFE-02 以及阶段整体仍未完成。
+
+- §8.34 补充：1ce014d1 的 NormProof 阻断义务通过，但详细报告另有全依赖图环 advisory（actionContract → command/syntax → syntax/projection → commands/types → browser 类型）。常规 import-cycles 未报告此混合类型依赖环。已把 browser 补全投影移至 command/completion，纯 syntax 不依赖投影；重跑 NormProof 明确 source_graph_is_acyclic 与 imports resolve 均 satisfied，保留原 5 个函数数量 advisory。该发现不能当作原提交无环证据。
