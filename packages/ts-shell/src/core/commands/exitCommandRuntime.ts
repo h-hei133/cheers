@@ -1,3 +1,4 @@
+import { rejectArguments } from "./syntax/empty.js";
 import type { CommandContext, CommandExecutionResult } from "./types.js";
 
 /**
@@ -9,6 +10,8 @@ import type { CommandContext, CommandExecutionResult } from "./types.js";
  * prompt lands in the middle of the leftover paint. Only the host knows how to
  * hand the terminal back, so only the host does it.
  */
-export function runExitCommand(_context: CommandContext): CommandExecutionResult {
+export function runExitCommand(_context: CommandContext, args: string[] = []): CommandExecutionResult {
+  const invalid = rejectArguments("exit", args);
+  if (invalid) return invalid;
   return { kind: "shell-action", action: "exit-session" };
 }

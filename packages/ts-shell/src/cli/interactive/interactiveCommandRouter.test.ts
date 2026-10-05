@@ -138,6 +138,16 @@ describe("interactive command router", () => {
     expect(harness.lines.join("\n")).not.toContain("Condensed");
   });
 
+  it.each(["/clear --preview", "/reset other-session", "/exit later", "/quit --no", "/retry changed-prompt", "/reload --preview"])("keeps the interactive session intact for invalid control input %s", async prompt => {
+    const harness = createHarness();
+    const result = await routeInteractiveCommand({ ...harness.input, prompt });
+    expect(result.clearRequested).toBeUndefined();
+    expect(result.exitRequested).toBeUndefined();
+    expect(result.retryRequested).toBeUndefined();
+    expect(harness.lines.join("\n")).toContain("Invalid /");
+    expect(result.turnNumber).toBe(0);
+  });
+
   it("routes /cd workspace navigation commands out of normal prompt execution", async () => {
     const harness = createHarness();
 

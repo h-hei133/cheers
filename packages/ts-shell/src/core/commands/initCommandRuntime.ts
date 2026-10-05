@@ -1,3 +1,4 @@
+import { rejectArguments } from "./syntax/empty.js";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { CommandContext, LocalCommandResult } from "./types.js";
@@ -7,9 +8,11 @@ import type { CommandContext, LocalCommandResult } from "./types.js";
  * Scans project manifests to inspect frameworks, package managers, and test commands, proposing a tailored AGENTS.md / CLAUDE.md.
  */
 export async function runInitCommand(
-  _args: string[],
+  args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
+  const invalid = rejectArguments("init", args);
+  if (invalid) return invalid;
   const root = context.cwd || process.cwd();
   const detected: string[] = [];
   let packageManager = "npm";

@@ -1,4 +1,5 @@
-import type { CommandContext, ShellActionResult } from "./types.js";
+import { rejectArguments } from "./syntax/empty.js";
+import type { CommandContext, CommandExecutionResult } from "./types.js";
 
 /**
  * /clear (aliases: /reset, /cls) — start over.
@@ -12,6 +13,8 @@ import type { CommandContext, ShellActionResult } from "./types.js";
  * screen with nothing on it. Nothing is written here, because anything written
  * here would be the residue.
  */
-export function runClearCommand(_args: string[], _context: CommandContext): ShellActionResult {
+export function runClearCommand(args: string[], _context: CommandContext): CommandExecutionResult {
+  const invalid = rejectArguments("clear", args);
+  if (invalid) return invalid;
   return { kind: "shell-action", action: "clear-session" };
 }

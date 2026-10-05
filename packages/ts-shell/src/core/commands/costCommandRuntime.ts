@@ -1,3 +1,4 @@
+import { rejectArguments } from "./syntax/empty.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import {
   estimateSessionCost,
@@ -32,9 +33,11 @@ import { resolveModelCost } from "../models/window.js";
  * which is worse than reporting nothing, because it looks like a measurement.
  */
 export async function runCostCommand(
-  _args: string[],
+  args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
+  const invalid = rejectArguments("cost", args);
+  if (invalid) return invalid;
   const sessionId = context.sessionId ?? "";
   const telemetry = sessionId ? getSessionUsage(sessionId) : undefined;
   const buckets = telemetry ? usageBuckets(telemetry) : [];

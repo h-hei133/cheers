@@ -1,3 +1,4 @@
+import { rejectArguments } from "./syntax/empty.js";
 import type { RuntimeConfig } from "../../config/runtimeConfig.js";
 import { currentTheme } from "../../presentation/theme/theme.js";
 import { selectTheme } from "../../presentation/theme/selection.js";
@@ -22,9 +23,11 @@ const logger = createComponentLogger("reload");
  * what is and is not refreshed.
  */
 export async function runReloadCommand(
-  _args: string[],
+  args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
+  const invalid = rejectArguments("reload", args);
+  if (invalid) return invalid;
   if (!context.refreshRuntimeConfig) {
     return {
       kind: "local",

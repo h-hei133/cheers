@@ -771,3 +771,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - import cycles/config consumers/declarations/node floor 通过。NormProof 详细报告 source_graph_is_acyclic 与 imports resolve 均 satisfied，既有 5 个函数数量和 7 个 call reachability advisory 保留。
 - 300ea7a4 的 CI 37379100643、0bb9d3ed 的 CI 37379835922、462b2b92 的 CI 37380581115 均成功，对应 Architecture Watch 亦成功。dfb81fce 的 Architecture Watch 37381706985 成功，CI 37381706966 在本次查询时仍运行；不把它计为通过。
 - 本批未统一非交互默认真实压缩（PAR-01），也未完成 CMD-03 的剩余零参数/自由文本/实体目录、CMD-04、SAFE-02 或 Phase 19 整体。
+
+
+### 8.36 CMD-03：无参数命令的动作边界
+
+- diagnose/cancel/pwd/help/exit/clear/reload/init/cost/undo/retry/hotkey/context/timings 共 14 个入口复用 syntax/empty 的无参数契约校验。未知 flags、boolean 赋值、位置参数及 -- 后的额外参数被拒绝，不再静默忽略后读取状态或发出动作。裸命令保持现有能力，单独 -- 仅结束选项且不添加动作参数。
+- clear/retry/exit/cancel 的直接入口拒绝非法参数后返回 local 诊断，不发出清空、重试、退出或取消动作；reload 在 refreshRuntimeConfig 之前拒绝。registry 将 exit/diagnose 的完整参数传入 owner，不在中央注册表积累安全判断。undo 的 --hard/--discard 既有退役迁移说明继续保留，其余无效参数不读取恢复记录。
+- 结合先前参考 CLI 明确拒绝非法选项/保留 -- 字面边界和声明驱动候选的比较，复用共享 parser；无参数命令不凭空生成参数候选，也不添加新的确认流程。本批只修复输入边界，不扩展 init 写入或 undo 执行能力。
+- Linux、Node 20.3 隔离环境 17 文件/292 项与 build:ts 通过。测试用禁止属性读取的 context 验证拒绝发生在状态读取之前，并直接验证动作入口和 reload 零调用。取消共享守卫的反转使动作/刷新/交互结果断言失败；逐字节恢复后 292 项再次通过。
+- 真实 regular/fullscreen CLI 输入 10 组非法命令，均报告 Invalid，会话指针字节、工作区标记字节及 mtime 不变，进程继续运行，最终合法 exit 退出码为 0。import cycles/config consumers/declarations/node floor 通过；NormProof 详细报告无环与导入可解析均 satisfied，既有 5 个函数数量、7 个 call reachability advisory 保留。
+- f1109ed9 的 Architecture Watch 37382653798 成功，CI 37382653783 在本次查询时仍运行。CMD-03 剩余自由文本/实体目录、CMD-04、PAR-01、SAFE-02 与 Phase 19 整体继续，不以无参数入口验证覆盖后续能力。

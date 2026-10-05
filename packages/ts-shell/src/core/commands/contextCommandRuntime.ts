@@ -1,3 +1,4 @@
+import { rejectArguments } from "./syntax/empty.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import { loadCatalog } from "../models/catalogStore.js";
@@ -28,9 +29,11 @@ import { createCoreToolRegistry } from "../tools/registry.js";
 const BAR_WIDTH = 32;
 
 export async function runContextCommand(
-  _args: string[],
+  args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
+  const invalid = rejectArguments("context", args);
+  if (invalid) return invalid;
   const sessionId = context.sessionId ?? "";
   const telemetry = sessionId ? getSessionUsage(sessionId) : undefined;
   // The window and reserve the compaction engine actually works to. Read from

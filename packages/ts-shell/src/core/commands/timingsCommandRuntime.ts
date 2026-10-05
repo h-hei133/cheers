@@ -1,3 +1,4 @@
+import { rejectArguments } from "./syntax/empty.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { formatTimingReport } from "../../observability/startupTiming.js";
 
@@ -11,8 +12,10 @@ import { formatTimingReport } from "../../observability/startupTiming.js";
  * none — never a plausible-looking zero.
  */
 export async function runTimingsCommand(
-  _args: string[],
+  args: string[],
   _context: CommandContext,
 ): Promise<LocalCommandResult> {
+  const invalid = rejectArguments("timings", args);
+  if (invalid) return invalid;
   return { kind: "local", output: formatTimingReport() };
 }

@@ -1,3 +1,4 @@
+import { rejectArguments } from "./syntax/empty.js";
 import { execSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -38,6 +39,8 @@ export async function runUndoCommand(
     };
   }
 
+  const invalid = rejectArguments("undo", args);
+  if (invalid) return invalid;
   const latest = latestEdit(context.cwd);
   if (!latest) {
     return {

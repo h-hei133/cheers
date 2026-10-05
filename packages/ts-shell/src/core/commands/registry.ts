@@ -111,7 +111,7 @@ export function createCommandRegistry(
       enabled: true,
       summary: "repo-aware diagnosis and next action",
       group: "diagnostics",
-      execute: (_args, context) => runDiagnoseCommand(context),
+      execute: (args, context) => runDiagnoseCommand(context, args),
     },
     {
       name: "compact",
@@ -338,7 +338,7 @@ export function createCommandRegistry(
       enabled: true,
       summary: "gracefully exit session and restore terminal",
       group: "session",
-      execute: async (_args, context) => runExitCommand(context),
+      execute: async (args, context) => runExitCommand(context, args),
     },
     {
       name: "permissions",

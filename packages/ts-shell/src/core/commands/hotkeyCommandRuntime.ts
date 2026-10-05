@@ -1,3 +1,4 @@
+import { rejectArguments } from "./syntax/empty.js";
 import { renderKeyGuide } from "../../presentation/tui/chrome/keys.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
@@ -10,9 +11,11 @@ import type { CommandContext, LocalCommandResult } from "./types.js";
  * for the user to discover by pressing.
  */
 export async function runHotkeyCommand(
-  _args: string[],
+  args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
+  const invalid = rejectArguments("hotkey", args);
+  if (invalid) return invalid;
   return {
     kind: "local",
     output: renderKeyGuide(context.modifierKeysReported === true, context.keyGuide),

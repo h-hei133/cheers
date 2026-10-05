@@ -1,4 +1,5 @@
-import type { CommandContext, ShellActionResult } from "./types.js";
+import { rejectArguments } from "./syntax/empty.js";
+import type { CommandContext, CommandExecutionResult } from "./types.js";
 
 /**
  * /retry — run the last turn again.
@@ -13,8 +14,10 @@ import type { CommandContext, ShellActionResult } from "./types.js";
  * fire when there is nothing to retry.
  */
 export async function runRetryCommand(
-  _args: string[],
+  args: string[],
   _context: CommandContext,
-): Promise<ShellActionResult> {
+): Promise<CommandExecutionResult> {
+  const invalid = rejectArguments("retry", args);
+  if (invalid) return invalid;
   return { kind: "shell-action", action: "retry-turn" };
 }
