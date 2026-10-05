@@ -855,3 +855,14 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 首次测试假设 /auth 是当前别名，但实际 registry 未注册；归类为测试假设错误，改为未知命令不读取目录，未新增兼容入口。旧帮助仍有历史 /auth set 提示，本批未据此扩大产品语法。
 - regular/fullscreen 真实 CLI 都按标签接受完整引用 ID，Tab 后配置字节与 mtime 不变，Enter 才切换指定连接，合成 key 未出现在终端输出，两模式 exit 0。import cycles/config consumers/declarations/node floor 通过；NormProof 无环/导入解析 satisfied，既有 5 个函数数量 advisory 保留。
 - 7db76ae1 的 CI 37387926802 与 Architecture Watch 37387926527 均成功。3eca2fd0、52dae49c 的 Architecture Watch 均成功，CI 37388578273、37389139511 查询时仍运行。CMD-04 记忆/文件目录及外部版本事件、CMD-03 其余声明与阶段后续批次继续。
+
+### 8.44 CMD-04：记忆记录与审批候选目录
+
+- memory delete/invalidate 接入项目本地 store 的只读列表，删除可选择失效记录、invalidate 只列活动记录；缺文件返回空目录且不创建目录，损坏记录诊断返回 unavailable。候选只显示稳定 ID、种类和状态，没有展开记忆正文。
+- approve/reject/save 从当前会话最新 compact checkpoint 复用原提取器，并只读默认 review store。复用 review owner 的初始决定规则，批准位置不列 unsafe；保存位置只列与最新候选逐字段一致的现有 approved 条目，旧 ID 对应的内容/证据变化不能复用旧批准。保留显式 save approved 固定候选。
+- 目录不调用会 updateCandidates 的 review runner，不批准、拒绝、持久化或暂存未来注入。recall/use/add 与顶层 recall/retain 保持查询/自由文本位置，不把它们转换为实体 ID。候选接受仍走同一草稿快照编辑边界；具体保存资格、store 写权限继续由原 save owner 决定。
+- 沿用参考项目声明驱动合法参数位置、已加载状态只读投影的决定；本项目的记录/候选生命周期仍由现有 memory owner 承担，没有创建第二套审批或存储系统。
+- Linux、Node 20.3 隔离环境 13 文件/173 项和 build:ts 通过。反转去掉审批内容一致性、让 invalidate 列出失效记录后断言失败，逐字节恢复后组合通过。测试直接验证审批对象身份不变、updateCandidates 零调用、记录文件字节及 mtime 不变。
+- regular/fullscreen 真实 CLI 以进程内合成检查点和隔离记录文件验证 approve/save/delete 的完整 ID 接受；显式 Enter 仅批准，保存和删除位置 Tab 后未写记忆文件，两模式 exit 0。检查点由测试预加载器使用真实 packet/提取器建立，不把该探针计作压缩请求生成检查点的完整验收。
+- import cycles/config consumers/declarations/node floor 通过；NormProof 无环及导入解析 satisfied，既有 5 个函数数量 advisory 保留。3eca2fd0 与 52dae49c 的 CI/Architecture Watch 均成功；3308f1c5 Architecture Watch 37389522694 成功，CI 37389522700 查询时仍运行。
+- CMD-04 文件/目录位置、model/workflow 统一生命周期与完整外部版本事件尚待完成；CMD-03 其余声明及 Phase 19 后续批次继续。

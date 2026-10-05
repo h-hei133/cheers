@@ -2,6 +2,7 @@ import { navigationCatalog, type SessionCatalog } from "./navigation.js";
 import { serverCatalog } from "./servers.js";
 import { grantCatalog, type GrantCatalog } from "./grants.js";
 import { connectionCatalog } from "./connections.js";
+import { memoryCatalog } from "./memory.js";
 import { listThemes } from "../../../presentation/themes/index.js";
 import { resolveSkillCatalog } from "../../../core/skills/skillCatalog.js";
 import { toolPoolFor } from "../../runtime/tools.js";
@@ -19,6 +20,7 @@ async function readCatalog(kind: CatalogKind, context: ShellRuntimeContext, gate
   themePaths: readonly string[], manager?: SessionCatalog, policy?: GrantCatalog): Promise<readonly Suggestion[]> {
   if (kind === "mcp") return serverCatalog(context.cwd);
   if (kind === "connection") return connectionCatalog();
+  if (kind === "record" || kind === "invalidatable" || kind === "candidate" || kind === "approvable" || kind === "approved") return memoryCatalog(kind, context);
   if (kind === "grant") {
     if (!policy) throw new Error("Grant catalog unavailable");
     return grantCatalog(context.projectRoot, policy);

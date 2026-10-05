@@ -193,7 +193,7 @@ function entryForCandidate(
   };
 }
 
-function initialDecision(candidate: ProjectMemoryCandidate): ProjectMemoryReviewDecision {
+export function initialDecision(candidate: ProjectMemoryCandidate): ProjectMemoryReviewDecision {
   if (
     candidate.safety === "unsafe" ||
     candidate.retentionClass === "never-remember" ||

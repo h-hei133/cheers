@@ -2,13 +2,15 @@ import { resumeSyntax, forkSyntax, treeSyntax, entriesSyntax } from "../../../co
 import { mcpSyntax } from "../../../core/commands/mcp/syntax.js";
 import { permissionsSyntax } from "../../../core/commands/permissions/syntax.js";
 import { connectSyntax } from "../../../core/commands/connect/syntax.js";
+import { memorySyntax } from "../../../memory/commands/syntax.js";
+import type { MemoryCatalogKind } from "./memory.js";
 import { scanCommandArgs } from "../../../core/commands/arguments.js";
 import { completionToken, completionEdit, quoteCompletion } from "../completion.js";
 import { getSlashInvocation } from "../../../entrypoints/slashCommandRegistry.js";
 import type { DraftSnapshot } from "../../../presentation/tui/editor/replacement.js";
 import { matchSuggestions, type Suggestion } from "../../../presentation/tui/chrome/suggestions.js";
 
-export type CatalogKind = "theme" | "skill" | "tools" | "session" | "entry" | "tree" | "thread" | "mcp" | "grant" | "connection";
+export type CatalogKind = "theme" | "skill" | "tools" | "session" | "entry" | "tree" | "thread" | "mcp" | "grant" | "connection" | MemoryCatalogKind;
 
 export function catalogRequest(snapshot: DraftSnapshot) {
   const token = completionToken(snapshot.text, snapshot.cursor);
@@ -23,20 +25,23 @@ export function catalogRequest(snapshot: DraftSnapshot) {
     if (preceding.length && !(preceding.length === 1 && preceding[0] === "--")) return undefined;
     if (all.length > (all[0]?.value === "--" ? 2 : 1)) return undefined;
     kind = name;
-  } else if (name === "mcp" || name === "permissions" || name === "connect") {
-    const syntax = name === "mcp" ? mcpSyntax : name === "connect" ? connectSyntax : permissionsSyntax;
+  } else if (name === "mcp" || name === "permissions" || name === "connect" || name === "memory") {
+    const syntax = name === "mcp" ? mcpSyntax : name === "connect" ? connectSyntax : name === "memory" ? memorySyntax : permissionsSyntax;
     const action = syntax.actions.find(item => item.name === preceding[0]?.toLowerCase() || item.aliases?.includes(preceding[0]?.toLowerCase() ?? ""));
     if (name === "permissions" && action?.name !== "revoke") return undefined;
     if (name === "connect" && action?.name !== "use" && action?.name !== "logout") return undefined;
+    const memoryKind = action?.name === "delete" ? "record" : action?.name === "invalidate" ? "invalidatable" : action?.name === "approve" ? "approvable" : action?.name === "reject" ? "candidate" : action?.name === "save" ? "approved" : undefined;
+    if (name === "memory" && (!memoryKind || command.value.toLowerCase() !== "/memory")) return undefined;
     if (!action?.parameters?.length || preceding.length > 2 || (preceding.length === 2 && preceding[1] !== "--")) return undefined;
     if (all.length > (preceding[1] === "--" ? 3 : 2)) return undefined;
-    kind = name === "mcp" ? "mcp" : name === "connect" ? "connection" : "grant";
+    kind = name === "mcp" ? "mcp" : name === "connect" ? "connection" : name === "memory" ? memoryKind : "grant";
   } else {
     kind = navigationKind(name, preceding, token.value, all.length);
   }
   if (!kind || (!preceding.includes("--") && token.value.startsWith("-"))) return undefined;
   const prefix = snapshot.text.slice(command.to, snapshot.cursor).trimStart();
-  const fixed = invocation?.getArgumentCompletions?.(prefix) ?? [];
+  const fixed = [...(invocation?.getArgumentCompletions?.(prefix) ?? []),
+    ...(kind === "approved" ? [{ value: "approved", label: "approved", detail: "save all approved candidates" }] : [])];
   return { kind, token, snapshot, fixed };
 
 }
