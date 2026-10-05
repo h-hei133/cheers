@@ -686,3 +686,14 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Linux、Node 20.3 隔离环境 11 文件/213 项通过，构建通过。恢复旧 shell handlers 和旧权限 runner 两组反转均产生对应行为断言失败，源码恢复后组合套件通过。真实 regular/fullscreen CLI 的非法输入保持授权文件字节和 mtime 不变，默认 reset 保留另一个项目，显式 reset all 清空剩余，两模式 exit 0、无模型请求。
 - import cycles/config consumers/declarations/node floor 通过；call reachability 7 个既有 advisory，NormProof 阻断义务通过且保留 5 个既有函数数量 advisory。上一提交 0b76ddb4 的 Architecture Watch 37375146977 成功，CI 37375146972 最近仍在测试步骤，尚不计通过。
 - CMD-03 全量表、动态目录、CMD-04、SAFE-02 与其余 Phase 19 任务仍未完成。
+
+
+### 8.28 CMD-03：诊断命令参数与归档零写校验
+
+- log/metrics/report/crash 各自拥有 syntax 定义；执行、registry 提示与候选消费同源参数，删除 log 独立词表。log 保留默认 tail 30、纯数字简写、path/export/clear/help；metrics 默认聚合最近 2000 条 metric 记录，参数命名为 records，避免暗示原始日志行数。两者只接受正的安全整数，拒绝小数、指数、Infinity、NaN、零、负数及尾随垃圾，不再默认化或截断。
+- report 对未知/重复/boolean 赋值 flags 与额外目标先拒绝，再读取诊断数据或写归档；支持 `--` 后字面 dash-leading 路径。保留既有用户数据目录默认目标、外部绝对路径策略、共享脱敏器与 ZIP 内容，不引入另一套归档或写策略。log 的目标与当前日志族保护仍由既有 sink 执行；本批没有改变其外部路径策略。
+- crash 只接受一次 boolean --stack；额外参数拒绝。原测试要求 extra 与 --stack 共存，归类为旧预期，改为验证合法 flag 的真实 stack 输出，并增加 extra/unknown/重复/赋值拒绝。首轮另发现 log help 被误拒绝，属于本批回归，已恢复明确 help 动作与同源帮助，未放宽未知动作。
+- 共享 parser 自动识别唯一无名动作的直接参数形式；补全在合法直接路径后提供 flags，拒绝多余路径后候选且不越过 --。无名且无参数动作不再生成空方括号提示。定向对照参考 CLI 的缺值/枚举显式错误决定，继续使用本项目已有严格 parser，不复制入口解析器。
+- Linux、Node 20.3 隔离环境 12 文件/231 项通过，build:ts 通过。四组恢复旧 handler 的反转均为行为断言失败，源码逐字节恢复后组合套件通过。真实 regular/fullscreen CLI 的非法 report 输入保持目标字节与 mtime 不变且不写默认归档，合法字面路径写出 ZIP，两模式 exit 0、无模型请求。
+- import cycles/config consumers/declarations/node floor 通过；call reachability 7 个既有 advisory，NormProof 0 个阻断义务未满足、5 个既有函数数量 advisory。1863db35 的 Architecture Watch 37376481017 成功，CI 37376481131 最近为 in_progress；0b76ddb4 的 CI 37375146972 最近仍在测试，均未计通过。
+- CMD-03 其余全量表与动态目录、CMD-04、SAFE-02 和阶段其余任务继续，未标记整体完成。

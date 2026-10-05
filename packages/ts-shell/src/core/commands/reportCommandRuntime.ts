@@ -1,3 +1,6 @@
+import { reportSyntax } from "./report/syntax.js";
+import { parseSyntax } from "./syntax/parse.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { CommandContext, LocalCommandResult } from "./types.js";
@@ -39,8 +42,10 @@ export async function runReportCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const allowOutside = args.includes("--outside");
-  const requested = args.find((arg) => !arg.startsWith("-"));
+  const syntax = parseSyntax(reportSyntax, args);
+  if (!syntax.ok) return { kind: "local", output: `Invalid /report arguments: ${syntax.reason}\n${syntaxHelp(reportSyntax)}` };
+  const allowOutside = syntax.flags.has("outside");
+  const requested = syntax.args[0];
 
   // A path the user named is judged; the command's own default is not, because a
   // name this command chose cannot be a typo. The default lives in the user data

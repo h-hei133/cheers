@@ -387,3 +387,8 @@ resume/fork/tree/entries 使用共享导航语法，拒绝多余参数与非法 
 ### CMD-03 工作区与运行时动作实施记录（2026-10-06）
 
 workspace/cd、mcp、permissions、view 以领域语法驱动执行、提示与固定候选，多余参数在交接之前拒绝；权限 runner 独立拒绝非法 reset scope。213 项、构建、两组反转与两模式真实 CLI 授权文件/范围验证通过，详见 [决策 §8.27](phase-19-decisions.md#827-cmd-03workspacemcppermissionsview-动作边界)。动态目录及全量表继续。
+
+
+### CMD-03 诊断命令实施记录（2026-10-06）
+
+log/metrics/report/crash 统一语法、提示与 flags 候选，非法数字/多余参数/未知 flags 在日志清理或归档写入之前拒绝；保留 log help/数字简写、metric 记录计数与 report 既有目标策略。231 项、构建、四组反转与两模式真实 CLI 验证，见 [决策 §8.28](phase-19-decisions.md#828-cmd-03诊断命令参数与归档零写校验)。全量表和动态目录继续。

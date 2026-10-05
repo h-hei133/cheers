@@ -25,7 +25,6 @@ function prefixFilter(
  * so these lists come from the handler's own accepted set.
  */
 const SUBCOMMAND_VALUES = {
-  log: ["tail", "path", "export", "clear"],
   goal: ["pause", "resume", "complete", "clear"],
   workflow: ["list", "run", "status"],
   marketplace: ["list", "add", "remove", "rm", "delete"],

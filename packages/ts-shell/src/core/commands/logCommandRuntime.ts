@@ -1,3 +1,6 @@
+import { logSyntax } from "./log/syntax.js";
+import { parseSyntax } from "./syntax/parse.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import * as path from "node:path";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { getGlobalRotatingFileSink } from "../../observability/rotatingFileSink.js";
@@ -15,7 +18,9 @@ export async function runLogCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const subCommand = (args[0] || "tail").toLowerCase();
+  const syntax = parseSyntax(logSyntax, args[0] && /^\d+$/.test(args[0]) ? ["tail", ...args] : args);
+  if (!syntax.ok) return { kind: "local", output: `Invalid /log arguments: ${syntax.reason}\n${syntaxHelp(logSyntax)}` };
+  const subCommand = syntax.action.name;
   const sink = getGlobalRotatingFileSink();
   const currentPath = sink.getCurrentFilePath();
 
@@ -26,8 +31,8 @@ export async function runLogCommand(
     };
   }
 
-  if (subCommand === "tail" || !isNaN(Number(subCommand))) {
-    const limit = !isNaN(Number(subCommand)) ? Number(subCommand) : Number(args[1]) || 30;
+  if (subCommand === "tail") {
+    const limit = Number(syntax.args[0] ?? 30);
     const lines = sink.getRecentLines(limit);
 
     if (lines.length === 0) {
@@ -67,7 +72,7 @@ export async function runLogCommand(
 
   if (subCommand === "export") {
     const targetPath =
-      path.resolve(context.cwd, args[1] || `cheers-debug-${Date.now()}.jsonl`);
+      path.resolve(context.cwd, syntax.args[0] ?? `cheers-debug-${Date.now()}.jsonl`);
     try {
       if (sink.exportTo(targetPath) === 0) {
         return {
@@ -104,12 +109,6 @@ export async function runLogCommand(
 
   return {
     kind: "local",
-    output: [
-      "# 📖 /log Command Reference",
-      "- `/log tail [N]`: Display the last N structured log entries (default: 30)",
-      "- `/log path`: Display active session log path and logging directory",
-      "- `/log export [destination]`: Export current session logs for diagnostics",
-      "- `/log clear`: Clear current log family",
-    ].join("\n"),
+    output: `# 📖 /log Command Reference\n${syntaxHelp(logSyntax)}`,
   };
 }

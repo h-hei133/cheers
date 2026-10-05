@@ -1,3 +1,6 @@
+import { metricsSyntax } from "./metrics/syntax.js";
+import { parseSyntax } from "./syntax/parse.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import { orderedLogFiles, tailLines } from "../../observability/logs/files.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { getGlobalRotatingFileSink } from "../../observability/rotatingFileSink.js";
@@ -41,7 +44,9 @@ export async function runMetricsCommand(
   args: string[],
   _context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const limit = Number(args[0]) > 0 ? Number(args[0]) : 2000;
+  const syntax = parseSyntax(metricsSyntax, args);
+  if (!syntax.ok) return { kind: "local", output: `Invalid /metrics arguments: ${syntax.reason}\n${syntaxHelp(metricsSyntax)}` };
+  const limit = Number(syntax.args[0] ?? 2000);
   const sink = getGlobalRotatingFileSink();
   const parsed = readMetricLines(sink.getLogDir(), sink.getCurrentFilePath(), limit);
 

@@ -1,3 +1,6 @@
+import { crashSyntax } from "./crash/syntax.js";
+import { parseSyntax } from "./syntax/parse.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { crashLogPath, MAX_CRASH_AGE_MS, MAX_CRASH_RECORDS, readCrashLog, readRecentCrashes } from "../../observability/crashLog.js";
 
@@ -16,15 +19,12 @@ export async function runCrashCommand(
   args: string[],
   _context: CommandContext,
 ): Promise<LocalCommandResult> {
+  const syntax = parseSyntax(crashSyntax, args);
+  if (!syntax.ok) return { kind: "local", output: `Invalid /crash arguments: ${syntax.reason}\n${syntaxHelp(crashSyntax)}` };
   const filePath = crashLogPath();
   const records = readRecentCrashes(filePath);
   const heldBack = readCrashLog(filePath).length - records.length;
-  // Checked once, and by presence rather than position: `args[0] === "--stack"`
-  // reads the flag only when it comes first, so `/crash --stack` worked and
-  // `/crash --stack extra` silently printed no stacks while also suppressing the
-  // hint that says how to get them — the reader was told nothing and offered
-  // nothing.
-  const wantsStack = args.includes("--stack");
+  const wantsStack = syntax.flags.has("stack");
 
   if (records.length === 0) {
     return {

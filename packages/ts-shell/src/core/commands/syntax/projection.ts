@@ -13,7 +13,8 @@ function actionUsage(action: CommandAction, enumerate = false): string {
 }
 
 export function syntaxHint(syntax: CommandSyntax): string {
-  return `[${syntax.actions.filter(action => action.name || action.parameters?.length).map(action => actionUsage(action)).join("|")}]${flagUsage(syntax)}`;
+  const actions = syntax.actions.filter(action => action.name || action.parameters?.length).map(action => actionUsage(action)).join("|");
+  return `${actions ? `[${actions}]` : ""}${flagUsage(syntax)}`.trim();
 }
 
 export function syntaxHelp(syntax: CommandSyntax): string {
@@ -49,7 +50,7 @@ export function syntaxCompletions(syntax: CommandSyntax, prefix: string): readon
     }
     const parsed = parseFlags(syntax.flags, before.map(token => token.value));
     if (!parsed.ok) return null;
-    if (query.startsWith("-") || (query === "" && parsed.args.length > 0)) {
+    if (query.startsWith("-") || (query === "" && (parsed.args.length > 0 || (syntax.actions.length === 1 && syntax.actions[0]?.name === "")))) {
       if (parsed.args.length && !parseSyntax(syntax, before.map(token => token.value)).ok) return null;
       const matches = syntax.flags.filter(flag => flag.suggest !== false && !parsed.flags.has(flag.name) && !flag.conflicts?.some(name => parsed.flags.has(name)) && !(flag.conflictsWithArguments && parsed.args.length > 1))
         .flatMap(flag => [flag.name, ...(query ? flag.aliases ?? [] : [])].map(name => ({ value: `--${name}`, label: `--${name}`, detail: flag.summary })))

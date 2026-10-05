@@ -54,13 +54,10 @@ describe("runCrashCommand", () => {
     expect(result.output).toContain("Add `--stack`");
   });
 
-  it("shows the stacks when the flag is present, wherever it appears", async () => {
-    // The flag was read positionally, so `/crash --stack extra` printed no
-    // stacks while also suppressing the hint that says how to get them: the
-    // reader got neither the trace nor the way to ask for it.
+  it("shows the stacks with an explicit valid flag", async () => {
     recordCrash({ kind: "uncaught-exception", error: new Error("boom"), cwd: "/work" });
 
-    const result = await runCrashCommand(["extra", "--stack"], context);
+    const result = await runCrashCommand(["--stack"], context);
     expect(result.output).toContain("```");
     expect(result.output).toContain("boom");
     // And the hint is gone, because the request was already answered.

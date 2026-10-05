@@ -1,3 +1,7 @@
+import { crashSyntax } from "./crash/syntax.js";
+import { reportSyntax } from "./report/syntax.js";
+import { metricsSyntax } from "./metrics/syntax.js";
+import { logSyntax } from "./log/syntax.js";
 import { workspaceSyntax, cdSyntax } from "./workspace/syntax.js";
 import { mcpSyntax } from "./mcp/syntax.js";
 import { permissionsSyntax } from "./permissions/syntax.js";
@@ -754,8 +758,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "tail, locate, export, or clear the structured session log",
       group: "workspace",
-      argumentHint: "[tail|path|export|clear]",
-      getArgumentCompletions: (prefix) => subcommandCompletions("log", prefix),
+      argumentHint: syntaxHint(logSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(logSyntax, prefix),
       execute: (args, context) => runLogCommand(args, context),
     },
     {
@@ -767,7 +771,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "list the recent runs that ended by falling over",
       group: "workspace",
-      argumentHint: "[--stack]",
+      argumentHint: syntaxHint(crashSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(crashSyntax, prefix),
       execute: (args, context) => runCrashCommand(args, context),
     },
     {
@@ -788,7 +793,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "tool calls, timings, retries and compactions this session recorded",
       group: "workspace",
-      argumentHint: "[lines]",
+      argumentHint: syntaxHint(metricsSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(metricsSyntax, prefix),
       execute: (args, context) => runMetricsCommand(args, context),
     },
     {
@@ -799,7 +805,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "write a scrubbed environment and crash report to attach to a bug report",
       group: "workspace",
-      argumentHint: "[path]",
+      argumentHint: syntaxHint(reportSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(reportSyntax, prefix),
       execute: (args, context) => runReportCommand(args, context),
     },
   ];
