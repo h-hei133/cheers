@@ -1,13 +1,14 @@
 import { resumeSyntax, forkSyntax, treeSyntax, entriesSyntax } from "../../../core/commands/navigation/syntax.js";
 import { mcpSyntax } from "../../../core/commands/mcp/syntax.js";
 import { permissionsSyntax } from "../../../core/commands/permissions/syntax.js";
+import { connectSyntax } from "../../../core/commands/connect/syntax.js";
 import { scanCommandArgs } from "../../../core/commands/arguments.js";
 import { completionToken, completionEdit, quoteCompletion } from "../completion.js";
 import { getSlashInvocation } from "../../../entrypoints/slashCommandRegistry.js";
 import type { DraftSnapshot } from "../../../presentation/tui/editor/replacement.js";
 import { matchSuggestions, type Suggestion } from "../../../presentation/tui/chrome/suggestions.js";
 
-export type CatalogKind = "theme" | "skill" | "tools" | "session" | "entry" | "tree" | "thread" | "mcp" | "grant";
+export type CatalogKind = "theme" | "skill" | "tools" | "session" | "entry" | "tree" | "thread" | "mcp" | "grant" | "connection";
 
 export function catalogRequest(snapshot: DraftSnapshot) {
   const token = completionToken(snapshot.text, snapshot.cursor);
@@ -22,13 +23,14 @@ export function catalogRequest(snapshot: DraftSnapshot) {
     if (preceding.length && !(preceding.length === 1 && preceding[0] === "--")) return undefined;
     if (all.length > (all[0]?.value === "--" ? 2 : 1)) return undefined;
     kind = name;
-  } else if (name === "mcp" || name === "permissions") {
-    const syntax = name === "mcp" ? mcpSyntax : permissionsSyntax;
+  } else if (name === "mcp" || name === "permissions" || name === "connect") {
+    const syntax = name === "mcp" ? mcpSyntax : name === "connect" ? connectSyntax : permissionsSyntax;
     const action = syntax.actions.find(item => item.name === preceding[0]?.toLowerCase() || item.aliases?.includes(preceding[0]?.toLowerCase() ?? ""));
     if (name === "permissions" && action?.name !== "revoke") return undefined;
+    if (name === "connect" && action?.name !== "use" && action?.name !== "logout") return undefined;
     if (!action?.parameters?.length || preceding.length > 2 || (preceding.length === 2 && preceding[1] !== "--")) return undefined;
     if (all.length > (preceding[1] === "--" ? 3 : 2)) return undefined;
-    kind = name === "mcp" ? "mcp" : "grant";
+    kind = name === "mcp" ? "mcp" : name === "connect" ? "connection" : "grant";
   } else {
     kind = navigationKind(name, preceding, token.value, all.length);
   }

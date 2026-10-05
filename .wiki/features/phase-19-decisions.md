@@ -845,3 +845,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - regular/fullscreen 真实 CLI 冷补全报告 unavailable 且无服务进程日志；显式 refresh 后有真实目录，候选和 Tab 前后协议日志字节不变，两模式 exit 0。探针首次等待的完整候选名被菜单截断，改等待菜单中的描述后通过，接受完整工具名仍单独验证。
 - import cycles/config consumers/declarations/node floor 通过；NormProof 无环与导入解析 satisfied，既有 5 个函数数量 advisory 保留。3eca2fd0 Architecture Watch 37388577673 成功，CI 37388578273 查询时仍运行；7db76ae1 CI 37387926802 仍待终态。
 - 本批消除了候选读取触发 MCP 握手/tools-list 的路径；菜单已有 15 秒成功缓存与显式失效机制，完整外部目录/连接事件版本化仍待实现，不能将 client 活跃性检查等同于实时菜单刷新。CMD-04 其余目录、CMD-03 其余声明及 Phase 19 后续批次继续。
+
+### 8.43 CMD-04：连接 ID 动态目录
+
+- connect use/activate/logout/remove/rm 的合法目标位置读取同一用户级配置 owner，并复用 normalizeConnections。候选按标签匹配、接受完整连接 ID；同 provider 多条连接不会被压成 provider 名而选中第一条。登录/set 的 provider 固定候选继续由原 syntax 提供，密钥/端点位置不触发连接目录。
+- 菜单仅投影 ID、标签、provider 和 saved 状态，不携带 apiKey、baseUrl、accountAuth 等字段，也不把已保存 connected 状态当作实时连通验证。底层读取仍解析用户配置文件，未声称完全不接触配置中的凭据字段；本轮所有验证使用隔离合成配置，未读取真实 provider 目录。
+- 沿用此前参考中合法动作位置先于目录查询、已加载/已保存身份元数据投影的决定，复用共享生命周期和现有连接 owner，没有新增认证或 provider 切换路径。候选读取不写配置、不登录、不切换、不删除。
+- Linux、Node 20.3 隔离环境 10 文件/135 项及 build:ts 通过，覆盖同 provider 精确选择/删除、标签与带空格 ID、凭据字段不进入候选、配置字节/mtime 不变、缺配置与损坏配置区分。把候选 ID 退为 provider 的反转导致断言失败，逐字节恢复后组合套件通过。
+- 首次测试假设 /auth 是当前别名，但实际 registry 未注册；归类为测试假设错误，改为未知命令不读取目录，未新增兼容入口。旧帮助仍有历史 /auth set 提示，本批未据此扩大产品语法。
+- regular/fullscreen 真实 CLI 都按标签接受完整引用 ID，Tab 后配置字节与 mtime 不变，Enter 才切换指定连接，合成 key 未出现在终端输出，两模式 exit 0。import cycles/config consumers/declarations/node floor 通过；NormProof 无环/导入解析 satisfied，既有 5 个函数数量 advisory 保留。
+- 7db76ae1 的 CI 37387926802 与 Architecture Watch 37387926527 均成功。3eca2fd0、52dae49c 的 Architecture Watch 均成功，CI 37388578273、37389139511 查询时仍运行。CMD-04 记忆/文件目录及外部版本事件、CMD-03 其余声明与阶段后续批次继续。
