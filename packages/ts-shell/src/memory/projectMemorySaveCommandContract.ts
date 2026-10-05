@@ -1,3 +1,5 @@
+import { memorySaveSyntax } from "./commands/syntax.js";
+import { parseSyntax } from "../core/commands/syntax/parse.js";
 export type ProjectMemorySaveCommandMode = "save-one" | "save-approved" | "status";
 
 export interface ProjectMemorySaveCommandRequest {
@@ -18,32 +20,12 @@ export class ProjectMemorySaveCommandContractError extends Error {
   }
 }
 
-export function parseProjectMemorySaveCommandArgs(
-  args: readonly string[],
-): ProjectMemorySaveCommandRequest {
-  const [mode, target] = args;
-  if (mode === "status") {
-    return normalizeProjectMemorySaveCommandRequest({ mode: "status" });
-  }
-  if (mode !== "save") {
-    throw new ProjectMemorySaveCommandContractError(
-      "memory-save-unknown-mode",
-      `Unknown memory save mode: ${mode ?? "not provided"}`,
-    );
-  }
-  if (!target) {
-    throw new ProjectMemorySaveCommandContractError(
-      "memory-save-missing-target",
-      "Save requires a candidate id or approved.",
-    );
-  }
-  if (target === "approved") {
-    return normalizeProjectMemorySaveCommandRequest({ mode: "save-approved" });
-  }
-  return normalizeProjectMemorySaveCommandRequest({
-    mode: "save-one",
-    candidateId: target,
-  });
+export function parseProjectMemorySaveCommandArgs(args: readonly string[]): ProjectMemorySaveCommandRequest {
+  const parsed = parseSyntax(memorySaveSyntax, args);
+  if (!parsed.ok) throw new ProjectMemorySaveCommandContractError("memory-save-invalid-arguments", parsed.reason);
+  if (parsed.action.name === "status") return normalizeProjectMemorySaveCommandRequest({ mode: "status" });
+  const target = parsed.args[0]!;
+  return normalizeProjectMemorySaveCommandRequest(target === "approved" ? { mode: "save-approved" } : { mode: "save-one", candidateId: target });
 }
 
 export function normalizeProjectMemorySaveCommandRequest(input: {

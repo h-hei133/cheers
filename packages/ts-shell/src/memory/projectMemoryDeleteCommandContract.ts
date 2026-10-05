@@ -1,3 +1,5 @@
+import { memoryLifecycleSyntax } from "./commands/syntax.js";
+import { parseSyntax } from "../core/commands/syntax/parse.js";
 import { normalizeProjectMemoryLifecycleRecordId } from "./projectMemoryInvalidation.js";
 
 export type ProjectMemoryDeleteCommandMode = "invalidate" | "delete";
@@ -22,27 +24,10 @@ export class ProjectMemoryDeleteCommandContractError extends Error {
   }
 }
 
-export function parseProjectMemoryDeleteCommandArgs(
-  args: readonly string[],
-): ProjectMemoryDeleteCommandRequest {
-  const [rawMode, rawRecordId, ...rest] = args;
-  if (rawMode !== "invalidate" && rawMode !== "delete") {
-    throw new ProjectMemoryDeleteCommandContractError(
-      "memory-delete-unknown-mode",
-      `Unknown memory lifecycle mode: ${rawMode ?? "not provided"}`,
-    );
-  }
-  if (!rawRecordId) {
-    throw new ProjectMemoryDeleteCommandContractError(
-      "memory-delete-missing-record-id",
-      `Usage: /memory ${rawMode} <record-id> [reason...]`,
-    );
-  }
-  return normalizeProjectMemoryDeleteCommandRequest({
-    mode: rawMode,
-    recordId: rawRecordId,
-    reason: rest.join(" "),
-  });
+export function parseProjectMemoryDeleteCommandArgs(args: readonly string[]): ProjectMemoryDeleteCommandRequest {
+  const parsed = parseSyntax(memoryLifecycleSyntax, args);
+  if (!parsed.ok) throw new ProjectMemoryDeleteCommandContractError("memory-delete-invalid-arguments", parsed.reason);
+  return normalizeProjectMemoryDeleteCommandRequest({ mode: parsed.action.name as ProjectMemoryDeleteCommandMode, recordId: parsed.args[0]!, reason: parsed.args.slice(1).join(" ") });
 }
 
 export function normalizeProjectMemoryDeleteCommandRequest(input: {

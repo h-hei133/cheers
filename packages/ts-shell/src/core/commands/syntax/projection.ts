@@ -8,7 +8,7 @@ function actionUsage(action: CommandAction): string {
   return [action.name, ...(action.parameters ?? []).map(parameter => {
     const label = parameter.name + (parameter.rest ? "..." : "");
     return parameter.required ? `<${label}>` : `[${label}]`;
-  })].filter(Boolean).join(" ");
+  })].filter(Boolean).join(" ") + flagUsage(action);
 }
 
 export function syntaxHint(syntax: CommandSyntax): string {
@@ -19,7 +19,7 @@ export function syntaxHelp(syntax: CommandSyntax): string {
   return "Usage: " + syntax.actions.map(action => `/${syntax.name}${action.name ? " " : ""}${actionUsage(action)}`).join(" | ") + flagUsage(syntax);
 }
 
-function flagUsage(syntax: CommandSyntax): string {
+function flagUsage(syntax: Pick<CommandSyntax, "flags">): string {
   return (syntax.flags ?? []).map(flag => ` [--${flag.name}${flag.kind === "text" ? ` <${flag.values?.join("|") ?? "value"}>` : ""}]`).join("");
 }
 
@@ -29,6 +29,9 @@ export function syntaxCompletions(syntax: CommandSyntax, prefix: string): readon
   const current = /\s$/.test(prefix) ? undefined : tokens.at(-1);
   const before = current ? tokens.slice(0, -1) : tokens;
   const query = (current?.value ?? "").toLowerCase();
+  const first = before[0]?.value.toLowerCase();
+  const action = syntax.actions.find(item => item.name === first || item.aliases?.includes(first ?? ""));
+  if (action?.flags) syntax = { ...syntax, flags: [...(syntax.flags ?? []), ...action.flags] };
   if (syntax.flags) {
     if (before.some(token => token.value === "--")) return null;
     const last = before.at(-1)?.value;
@@ -42,7 +45,7 @@ export function syntaxCompletions(syntax: CommandSyntax, prefix: string): readon
     if (!parsed.ok) return null;
     if (query.startsWith("-") || (query === "" && parsed.args.length > 0)) {
       if (parsed.args.length && !parseSyntax(syntax, before.map(token => token.value)).ok) return null;
-      const matches = syntax.flags.filter(flag => flag.suggest !== false && !parsed.flags.has(flag.name) && !flag.conflicts?.some(name => parsed.flags.has(name)))
+      const matches = syntax.flags.filter(flag => flag.suggest !== false && !parsed.flags.has(flag.name) && !flag.conflicts?.some(name => parsed.flags.has(name)) && !(flag.conflictsWithArguments && parsed.args.length > 1))
         .flatMap(flag => [flag.name, ...(query ? flag.aliases ?? [] : [])].map(name => ({ value: `--${name}`, label: `--${name}`, detail: flag.summary })))
         .filter(candidate => candidate.value.startsWith(query));
       return matches.length ? matches : null;

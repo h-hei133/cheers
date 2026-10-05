@@ -14,12 +14,18 @@ function validValue(parameter: CommandParameter, value: string): boolean {
 
 /** Validate before the owner reads or changes state; never coerce an unknown action. */
 export function parseSyntax<Action extends CommandAction>(syntax: CommandSyntax<Action>, input: readonly string[]): SyntaxResult<Action> {
-  const options = syntax.flags ? parseFlags(syntax.flags, input) : { ok: true as const, args: input, flags: new Map<string, string | true>() };
+  const first = input[0]?.toLowerCase();
+  const initial = syntax.actions.find(item => item.name === first || item.aliases?.includes(first ?? ""));
+  const definitions = initial?.flags ? [...(syntax.flags ?? []), ...initial.flags] : syntax.flags;
+  const options = definitions ? parseFlags(definitions, input) : { ok: true as const, args: input, flags: new Map<string, string | true>() };
   if (!options.ok) return options;
   const name = options.args.length ? options.args[0]!.toLowerCase() : syntax.defaultAction;
   const action = syntax.actions.find(item => item.name === name || item.aliases?.includes(name ?? ""));
   if (!action) return { ok: false, reason: "Unknown action." };
   const args = options.args.slice(1);
+  if (args.length && definitions?.some(flag => flag.conflictsWithArguments && options.flags.has(flag.name))) {
+    return { ok: false, reason: "Option conflicts with positional arguments." };
+  }
   let position = 0;
   for (const parameter of action.parameters ?? []) {
     const values = parameter.rest ? args.slice(position) : args.slice(position, position + 1);

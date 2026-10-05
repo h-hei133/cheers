@@ -1,3 +1,6 @@
+import { memorySyntax } from "../../memory/commands/syntax.js";
+import { parseSyntax } from "./syntax/parse.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import {
   getLatestCompactCheckpoint,
   DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE,
@@ -46,7 +49,7 @@ import type { MemoryCategory } from "../memory/types.js";
  * Unified memory engine:
  * 1. Coordinates ProjectMemoryReview lifecycle (review, save, recall, wake, use, invalidate, delete).
  * 2. Emits real-time telemetry to sidebar.
- * 3. Supports QuadMemory bank extensions (/memory stats, /memory add).
+ * 3. Supports retained fact inspection and explicit retention.
  */
 export async function runMemoryCommand(
   args: string[],
@@ -55,7 +58,7 @@ export async function runMemoryCommand(
   const rawCmd = (context.rawCommandName ?? "").replace(/^\//, "").toLowerCase();
   const sub = args[0]?.toLowerCase();
 
-  // If invoked via aliases such as /recall <query> or /retain <statement>
+  // Named invocations retain their independent free-text payload.
   if (rawCmd === "recall") {
     const query = args.join(" ").trim();
     if (!query) {
@@ -76,7 +79,10 @@ export async function runMemoryCommand(
     return { kind: "local", output };
   }
 
-  // Explicit QuadMemory Stats/Inspect
+  const parsed = parseSyntax(memorySyntax, args);
+  if (!parsed.ok) return { kind: "local", output: formatMemoryReviewCommandError(new ProjectMemoryReviewCommandContractError("memory-command-invalid-arguments", parsed.reason)) };
+
+  // Retained fact storage inspection.
   if (sub === "inspect" || sub === "stats") {
     const statsOutput = await executeMemoryInspect();
     const localResult: LocalCommandResult = {
@@ -91,7 +97,7 @@ export async function runMemoryCommand(
     return localResult;
   }
 
-  // Explicit QuadMemory Add/Retain
+  // Explicit fact retention.
   if (sub === "add" || sub === "retain") {
     const statement = args.slice(1).join(" ").trim();
     if (!statement) {
@@ -130,6 +136,9 @@ export async function runMemoryLocalCommand(
   context: CommandContext,
 ): Promise<LocalCommandResult> {
   try {
+    const parsed = parseSyntax(memorySyntax, args);
+    if (!parsed.ok) throw new ProjectMemoryReviewCommandContractError("memory-command-invalid-arguments", parsed.reason);
+    args = args.length ? [args[0]!.toLowerCase(), ...args.slice(1)] : [];
     const reviewSessionId = memoryReviewSessionScopeId(context);
     const compactStore =
       context.compactCheckpointStore ?? DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE;
@@ -283,6 +292,7 @@ function formatMemoryReviewCommandError(error: unknown): string {
     "- Memory written: no",
     "- Auto-load: no",
     "- Auto-injected: no",
-    "- DoNext: Retry with /memory, /memory approve <candidate-id>, /memory reject <candidate-id>, /memory save <candidate-id>, /memory recall <query>, /memory wake, /memory use, /memory use <query>, /memory invalidate <record-id>, /memory delete <record-id>, or /memory status.",
+    "- DoNext: Inspect /memory and retry with a supported action.",
+    syntaxHelp(memorySyntax),
   ].join("\n");
 }

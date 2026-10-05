@@ -626,3 +626,15 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Linux、Node 20.3、隔离环境 11 文件/240 项通过，build:ts 通过。恢复旧 export parser、恢复旧 restore parser、开放确认候选、去掉空参数 Enter 守卫四组反转均失败；源码逐字节恢复后组合测试通过。真实 regular/fullscreen CLI 的非法 export/restore 参数保持目标文件字节与 mtime 不变；`/restore execute ` 明确报告 explicit-execute-intent-required，未创建 ledger，两模式 exit 0、无模型请求。
 - import cycles/config consumers/declarations/node floor 通过；call reachability 7 个、NormProof 函数数量 5 个既有 advisory 不变，阻断义务通过。CMD-02 的 3fe750c7 CI 37364227880 成功；Architecture Watch 37364227869 失败的 annotation 明确为 hosted runner 多次未领取任务（runner_id=0、steps=[]），属于基础设施未执行，不计通过。b456a484 Architecture Watch 37365764084 成功，CI 37365764189 最近为 in_progress。
 - CMD-03 仍未完成：累计迁移 trust/todo/thinking/export/restore，model/memory 及全量表其余语法、动态实体目录仍待实施。SAFE-02 与其余 Phase 19 任务继续；本批未替代 EDIT-03 的完整 undo/恢复产品流程。
+
+
+### 8.23 CMD-03：memory 动作目录、契约与筛选校验
+
+- [memory/commands/syntax](../../packages/ts-shell/src/memory/commands/syntax.ts) 由 memory owner 声明 inspect/stats、add/retain、list/review、approve/reject、recall/search、wake、use、invalidate、delete、save/status；既有五组契约解析器与 registry/help/completion 消费同一组定义，删除旧独立 memory 词表。共享语法支持动作专属 flags 及其与位置参数的互斥关系，approve 不接受 reject 的 --unsafe，指定 candidate 后不再建议 --all-safe。
+- 顶层 `/recall`、`/retain` 在解释子动作之前保留独立 free-text 路径；`/memory add` 文本中的 flag 形状不被通用解析器改写。review 的 --all-safe/--unsafe 及既有 bare selector 保留；混用 candidate 与批量 selector 拒绝。wake/save/status/list/inspect 的多余参数、未知 flags 和非法 selector 不再被忽略；入口和直接调用的契约解析器均验证。
+- delete 与 invalidate 继续进入各自 runner 操作；approve 只改变 review 状态，save 才执行批准候选持久化；use 继续为下一正常 turn 暂存，未改成即时注入或 record-ID 激活。复用既有执行器、审查状态与存储，没有新增 memory 系统。
+- recall 的 kind/retention/source 校验共用 [candidate 枚举](../../packages/ts-shell/src/memory/projectMemoryCandidate.ts)，[存储记录校验](../../packages/ts-shell/src/memory/memoryPersistence.ts) 也消费这些值；保留对继承名称和未知值的拒绝。limit 必须为 1–20 的整数，拒绝截断、默认化或静默夹取非法值，重复筛选拒绝；普通含冒号的 query 不作为未知 flag 误拆。
+- 定向对照参考 CLI 的参数值校验与 end-of-options，以及参考 memory 的独立按 ID 更新/删除、未找到记录时显式失败：采用明确动作/参数与失败边界，本项目额外保留失效标记、审批和暂存等现有独立语义。行为由既有 lifecycle/save/use runner 测试与新增入口测试共同验证，不以菜单名称代替运行时证据。
+- Linux、Node 20.3、隔离环境 20 文件/286 项通过（含 memory 并发、持久化、review/save/recall/delete/use 与交互接线），build:ts 通过。恢复旧入口、save/review/recall 契约四组反转均失败；源码逐字节恢复后组合测试通过。真实 regular/fullscreen CLI 返回非法输入 blocked / Memory written: no；无记录的 use 明确无自动注入，两模式 exit 0、无模型请求。use 的长结果打开阅读面板，初始探针错误等待输入框/未变化标题；按实际面板关闭后重绘的输入框同步后通过，未改产品来迁就探针。
+- import cycles/config consumers/declarations/node floor 通过；call reachability 7 个既有 advisory、NormProof 5 个既有函数数量 advisory，阻断义务通过。b456a484 两项远端检查 37365764189/37365764084 已成功；9d709ef4 两项 37367388417/37367388611 均因 hosted runner 多次未领取而没有运行步骤，不计通过。
+- CMD-03 与阶段整体仍未完成：candidate/record 动态实体、筛选值补全属于后续目录接线；model 默认仍写全局配置，必须与会话覆盖/恢复一起实改；其余全量表、CMD-04、SAFE-02 与其他批次继续。

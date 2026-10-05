@@ -1,3 +1,6 @@
+import { PROJECT_MEMORY_KINDS, PROJECT_MEMORY_RETENTIONS, PROJECT_MEMORY_SOURCES } from "./projectMemoryCandidate.js";
+import { memoryRecallSyntax } from "./commands/syntax.js";
+import { parseSyntax } from "../core/commands/syntax/parse.js";
 import type {
   ProjectMemoryCandidateKind,
   ProjectMemoryCandidateSource,
@@ -29,34 +32,12 @@ export class ProjectMemoryRecallCommandContractError extends Error {
   }
 }
 
-export function parseProjectMemoryRecallCommandArgs(
-  args: readonly string[],
-): ProjectMemoryRecallCommandRequest {
-  const [rawMode, ...rest] = args;
-  if (rawMode !== "recall" && rawMode !== "search" && rawMode !== "wake") {
-    throw new ProjectMemoryRecallCommandContractError(
-      "memory-recall-unknown-mode",
-      `Unknown memory recall mode: ${rawMode ?? "not provided"}`,
-    );
-  }
-  if (rawMode === "wake") {
-    return normalizeProjectMemoryRecallCommandRequest({ mode: "wake" });
-  }
-  const parsed = parseRecallArgs(rest);
-  if (!parsed.query) {
-    throw new ProjectMemoryRecallCommandContractError(
-      "memory-recall-missing-query",
-      "Recall/search requires a query.",
-    );
-  }
-  return normalizeProjectMemoryRecallCommandRequest({
-    mode: rawMode,
-    query: parsed.query,
-    candidateKind: parsed.candidateKind,
-    retentionClass: parsed.retentionClass,
-    source: parsed.source,
-    maxResults: parsed.maxResults,
-  });
+export function parseProjectMemoryRecallCommandArgs(args: readonly string[]): ProjectMemoryRecallCommandRequest {
+  const parsed = parseSyntax(memoryRecallSyntax, args);
+  if (!parsed.ok) throw new ProjectMemoryRecallCommandContractError("memory-recall-invalid-arguments", parsed.reason);
+  if (parsed.action.name === "wake") return normalizeProjectMemoryRecallCommandRequest({ mode: "wake" });
+  const filters = parseRecallArgs(parsed.args);
+  return normalizeProjectMemoryRecallCommandRequest({ mode: args[0]!.toLowerCase() as ProjectMemoryRecallCommandMode, ...filters });
 }
 
 export function normalizeProjectMemoryRecallCommandRequest(input: {
@@ -73,6 +54,11 @@ export function normalizeProjectMemoryRecallCommandRequest(input: {
       "memory-recall-missing-query",
       "Recall/search requires a query.",
     );
+  }
+  if ((input.candidateKind !== undefined && !PROJECT_MEMORY_KINDS.some(value => value === input.candidateKind)) ||
+      (input.retentionClass !== undefined && !PROJECT_MEMORY_RETENTIONS.some(value => value === input.retentionClass)) ||
+      (input.source !== undefined && !PROJECT_MEMORY_SOURCES.some(value => value === input.source))) {
+    throw new ProjectMemoryRecallCommandContractError("memory-recall-invalid-filter", "Unknown recall filter value.");
   }
   return {
     mode: input.mode,
@@ -101,11 +87,18 @@ function parseRecallArgs(args: readonly string[]): {
   readonly maxResults?: number;
 } {
   const queryParts: string[] = [];
+  const seen = new Set<string>();
   let candidateKind: ProjectMemoryCandidateKind | undefined;
   let retentionClass: ProjectMemoryRetentionClass | undefined;
   let source: ProjectMemoryCandidateSource | undefined;
   let maxResults: number | undefined;
   for (const arg of args) {
+    const separator = arg.indexOf(":");
+    const key = separator < 0 ? "" : arg.slice(0, separator);
+    if (["kind", "retention", "source", "limit"].includes(key)) {
+      if (seen.has(key)) throw new ProjectMemoryRecallCommandContractError("memory-recall-repeated-filter", "A recall filter cannot be repeated.");
+      seen.add(key);
+    }
     if (arg.startsWith("kind:")) {
       candidateKind = arg.slice("kind:".length) as ProjectMemoryCandidateKind;
     } else if (arg.startsWith("retention:")) {
@@ -113,7 +106,9 @@ function parseRecallArgs(args: readonly string[]): {
     } else if (arg.startsWith("source:")) {
       source = arg.slice("source:".length) as ProjectMemoryCandidateSource;
     } else if (arg.startsWith("limit:")) {
-      maxResults = Number(arg.slice("limit:".length));
+      const value = arg.slice("limit:".length);
+      if (!/^\d+$/.test(value)) throw new ProjectMemoryRecallCommandContractError("memory-recall-invalid-limit", "Limit must be an integer from 1 to 20.");
+      maxResults = Number(value);
     } else {
       queryParts.push(arg);
     }
@@ -128,8 +123,9 @@ function parseRecallArgs(args: readonly string[]): {
 }
 
 function boundedMaxResults(value: number | undefined): number {
-  if (!Number.isFinite(value)) {
-    return 5;
+  if (value === undefined) return 5;
+  if (!Number.isSafeInteger(value) || value < 1 || value > 20) {
+    throw new ProjectMemoryRecallCommandContractError("memory-recall-invalid-limit", "Limit must be an integer from 1 to 20.");
   }
-  return Math.max(1, Math.min(20, Math.trunc(value ?? 5)));
+  return value;
 }

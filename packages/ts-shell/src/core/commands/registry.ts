@@ -1,3 +1,4 @@
+import { memorySyntax } from "../../memory/commands/syntax.js";
 import { exportSyntax } from "./export/syntax.js";
 import { restoreSyntax } from "./restore/syntax.js";
 import { syntaxHint, syntaxCompletions } from "./syntax/projection.js";
@@ -637,8 +638,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "inspect, search, retain, or invalidate persistent memory facts",
       group: "session",
-      argumentHint: "[inspect|add|recall|use|invalidate|save|review]",
-      getArgumentCompletions: (prefix) => subcommandCompletions("memory", prefix),
+      argumentHint: syntaxHint(memorySyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(memorySyntax, prefix),
       execute: (args, context) => runMemoryCommand(args, context),
     },
     {

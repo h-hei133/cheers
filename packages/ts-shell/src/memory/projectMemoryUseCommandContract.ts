@@ -1,3 +1,5 @@
+import { memoryUseSyntax } from "./commands/syntax.js";
+import { parseSyntax } from "../core/commands/syntax/parse.js";
 export type ProjectMemoryUseCommandMode = "wake" | "recall";
 
 export interface ProjectMemoryUseCommandRequest {
@@ -19,21 +21,11 @@ export class ProjectMemoryUseCommandContractError extends Error {
   }
 }
 
-export function parseProjectMemoryUseCommandArgs(
-  args: readonly string[],
-): ProjectMemoryUseCommandRequest {
-  const [rawMode, ...rest] = args;
-  if (rawMode !== "use") {
-    throw new ProjectMemoryUseCommandContractError(
-      "memory-use-unknown-mode",
-      `Unknown memory use mode: ${rawMode ?? "not provided"}`,
-    );
-  }
-  const query = rest.join(" ").replace(/\s+/g, " ").trim();
-  return normalizeProjectMemoryUseCommandRequest({
-    mode: query ? "recall" : "wake",
-    query: query || undefined,
-  });
+export function parseProjectMemoryUseCommandArgs(args: readonly string[]): ProjectMemoryUseCommandRequest {
+  const parsed = parseSyntax(memoryUseSyntax, args);
+  if (!parsed.ok) throw new ProjectMemoryUseCommandContractError("memory-use-invalid-arguments", parsed.reason);
+  const query = parsed.args.join(" ").replace(/\s+/g, " ").trim();
+  return normalizeProjectMemoryUseCommandRequest({ mode: query ? "recall" : "wake", query: query || undefined });
 }
 
 export function normalizeProjectMemoryUseCommandRequest(input: {

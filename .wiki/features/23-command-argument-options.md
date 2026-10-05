@@ -362,3 +362,8 @@ trust/todo/thinking 已由领域 syntax 同时驱动运行时校验、帮助和�
 ### CMD-03 flags 实施记录（2026-10-06）
 
 export/restore 已迁移到领域语法与原生严格 flags 解析，覆盖格式别名、文件路径、选项值/重复/互斥和 end-of-options；restore 的执行确认不由候选提供。空参数位置 Enter 不再接受默认 flag，完整导出命令不会被补入 --outside。240 项组合测试、四组反转、Node 20.3 构建和两模式真实 CLI 验证通过，详见 [Phase 19 决策 §8.22](phase-19-decisions.md#822-cmd-03exportrestore-严格-flags-与确认隔离)。其余全量表继续。
+
+
+### CMD-03 memory 实施记录（2026-10-06）
+
+memory owner 的动作定义已用于入口、五组契约解析、帮助和补全，保留独立 named invocation 与 delete/invalidate、approve/save、use 暂存语义。非法额外参数、动作 flags、selector、筛选枚举和 limit 拒绝；存储与 query 共用候选类型枚举。286 项组合测试、四组反转、Node 20.3 构建及两模式真实 CLI 验证通过，范围见 [Phase 19 决策 §8.23](phase-19-decisions.md#823-cmd-03memory-动作目录契约与筛选校验)。动态实体/筛选候选和 model 会话覆盖等继续，未标记 CMD-03 完成。

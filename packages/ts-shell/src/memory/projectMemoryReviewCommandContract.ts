@@ -1,3 +1,5 @@
+import { memoryReviewSyntax } from "./commands/syntax.js";
+import { parseSyntax } from "../core/commands/syntax/parse.js";
 export type ProjectMemoryReviewCommandMode =
   | "list"
   | "review"
@@ -26,40 +28,18 @@ export class ProjectMemoryReviewCommandContractError extends Error {
   }
 }
 
-export function parseProjectMemoryReviewCommandArgs(
-  args: readonly string[],
-): ProjectMemoryReviewCommandRequest {
-  const [rawMode, ...rest] = args;
-  const mode = parseMode(rawMode);
-  if (!rawMode || rawMode.startsWith("--")) {
-    return normalizeProjectMemoryReviewCommandRequest({
-      mode: "list",
-      allSafe: false,
-      rejectUnsafe: false,
-    });
+export function parseProjectMemoryReviewCommandArgs(args: readonly string[]): ProjectMemoryReviewCommandRequest {
+  const parsed = parseSyntax(memoryReviewSyntax, args);
+  if (!parsed.ok) throw new ProjectMemoryReviewCommandContractError("memory-review-invalid-arguments", parsed.reason);
+  const mode = parsed.action.name as ProjectMemoryReviewCommandMode;
+  const [selector, ...reason] = parsed.args;
+  const allSafe = parsed.flags.has("all-safe") || selector === "all-safe";
+  const rejectUnsafe = parsed.flags.has("unsafe") || selector === "unsafe";
+  const candidateId = selector === "all-safe" || selector === "unsafe" ? undefined : selector;
+  if ((candidateId && (allSafe || rejectUnsafe)) || (allSafe && rejectUnsafe)) {
+    throw new ProjectMemoryReviewCommandContractError("memory-review-conflicting-selectors", "Choose one candidate or one bulk selector.");
   }
-  if (mode === "list" || mode === "review" || mode === "status") {
-    return normalizeProjectMemoryReviewCommandRequest({
-      mode,
-      allSafe: false,
-      rejectUnsafe: false,
-    });
-  }
-
-  const allSafe = rest.includes("--all-safe") || rest.includes("all-safe");
-  const rejectUnsafe = rest.includes("--unsafe") || rest.includes("unsafe");
-  const candidateId = rest.find((arg) => !arg.startsWith("--") && arg !== "all-safe" && arg !== "unsafe");
-  const reasonParts = candidateId
-    ? rest.slice(rest.indexOf(candidateId) + 1).filter((arg) => !arg.startsWith("--"))
-    : [];
-
-  return normalizeProjectMemoryReviewCommandRequest({
-    mode,
-    candidateId,
-    allSafe,
-    rejectUnsafe,
-    reason: reasonParts.join(" ") || undefined,
-  });
+  return normalizeProjectMemoryReviewCommandRequest({ mode, candidateId, allSafe, rejectUnsafe, reason: reason.join(" ") || undefined });
 }
 
 export function normalizeProjectMemoryReviewCommandRequest(input: {
@@ -105,24 +85,4 @@ export function normalizeProjectMemoryReviewCommandRequest(input: {
       "project-memory-review-command-contract:no-provider-call",
     ],
   };
-}
-
-function parseMode(rawMode: string | undefined): ProjectMemoryReviewCommandMode {
-  if (!rawMode || rawMode.startsWith("--")) {
-    return "list";
-  }
-  const normalized = rawMode.toLowerCase();
-  if (
-    normalized === "list" ||
-    normalized === "review" ||
-    normalized === "approve" ||
-    normalized === "reject" ||
-    normalized === "status"
-  ) {
-    return normalized;
-  }
-  throw new ProjectMemoryReviewCommandContractError(
-    "memory-review-unknown-mode",
-    `Unknown /memory mode: ${rawMode}`,
-  );
 }

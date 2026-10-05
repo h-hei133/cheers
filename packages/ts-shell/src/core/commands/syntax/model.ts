@@ -11,6 +11,7 @@ export interface CommandAction {
   readonly aliases?: readonly string[];
   readonly summary: string;
   readonly parameters?: readonly CommandParameter[];
+  readonly flags?: readonly CommandFlag[];
 }
 
 export interface CommandFlag {
@@ -20,6 +21,7 @@ export interface CommandFlag {
   readonly summary: string;
   readonly values?: readonly string[];
   readonly conflicts?: readonly string[];
+  readonly conflictsWithArguments?: boolean;
   /** Confirmation tokens must be typed explicitly, never supplied by completion. */
   readonly suggest?: boolean;
 }

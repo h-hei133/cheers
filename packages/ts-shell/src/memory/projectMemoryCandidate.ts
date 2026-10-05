@@ -1,32 +1,38 @@
 import { createHash } from "node:crypto";
 
-export type ProjectMemoryCandidateKind =
-  | "project-fact"
-  | "project-structure"
-  | "capability-state"
-  | "route-decision"
-  | "user-preference-candidate"
-  | "validation-pattern"
-  | "restore/recovery-boundary"
-  | "blocked-by-design-decision"
-  | "transient-session-fact"
-  | "rejected";
+export const PROJECT_MEMORY_KINDS = [
+  "project-fact",
+  "project-structure",
+  "capability-state",
+  "route-decision",
+  "user-preference-candidate",
+  "validation-pattern",
+  "restore/recovery-boundary",
+  "blocked-by-design-decision",
+  "transient-session-fact",
+  "rejected",
+] as const;
+export type ProjectMemoryCandidateKind = typeof PROJECT_MEMORY_KINDS[number];
 
-export type ProjectMemoryRetentionClass =
-  | "project-scoped-candidate"
-  | "session-scoped-only"
-  | "user-memory-candidate"
-  | "never-remember";
+export const PROJECT_MEMORY_RETENTIONS = [
+  "project-scoped-candidate",
+  "session-scoped-only",
+  "user-memory-candidate",
+  "never-remember",
+] as const;
+export type ProjectMemoryRetentionClass = typeof PROJECT_MEMORY_RETENTIONS[number];
 
 export type ProjectMemoryCandidateConfidence = "high" | "medium" | "low";
 
-export type ProjectMemoryCandidateSource =
-  | "compact-packet"
-  | "context-projection"
-  | "route-handoff"
-  | "validation-evidence"
-  | "user-stated-preference"
-  | "system-derived";
+export const PROJECT_MEMORY_SOURCES = [
+  "compact-packet",
+  "context-projection",
+  "route-handoff",
+  "validation-evidence",
+  "user-stated-preference",
+  "system-derived",
+] as const;
+export type ProjectMemoryCandidateSource = typeof PROJECT_MEMORY_SOURCES[number];
 
 export type ProjectMemoryCandidateSafety = "safe" | "needs-review" | "unsafe";
 
