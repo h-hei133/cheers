@@ -10,6 +10,7 @@ import type { EscalationPrompt, EscalationResponse } from "../core/shell/approva
 import type { ToolDefinition } from "../tools/types.js";
 import type { SubagentRunner } from "../core/subagents/runner.js";
 import { neutraliseForDisplay } from "../core/text/safety.js";
+import { validateToolArguments } from "../core/tools/arguments.js";
 
 /** A tool definition in the shape a chat completion request takes. */
 export interface ToolSchema {
@@ -91,7 +92,11 @@ export function adaptTools(
 ): readonly AgentTool[] {
   return [...tools.values()].map((tool) => ({
     name: tool.name,
-    prepareArguments: (args) => prepareArguments(tool.name, args),
+    prepareArguments: (args) => {
+      const prepared = prepareArguments(tool.name, args);
+      validateToolArguments(tool.argsSchema, prepared);
+      return prepared;
+    },
     execute: (toolCallId, args, signal, onUpdate) =>
       executeTool(tool, toolCallId, args, signal, options, onUpdate),
   }));
@@ -118,6 +123,7 @@ async function executeTool(
   onUpdate?: (partialResult: unknown) => void,
 ): Promise<AgentToolResult> {
   try {
+    validateToolArguments(tool.argsSchema, args);
     const result = await tool.execute(args, {
       workspaceRoot: options.workspaceRoot,
       taskId: toolCallId,

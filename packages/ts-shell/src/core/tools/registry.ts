@@ -38,6 +38,7 @@ import type { PwRuntimeStatus } from '../../browser/playwrightRuntime.js'
 import type { McpToolDescriptor } from '../mcp/types.js'
 import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
 import { resolveToolTarget } from './permissionContext.js'
+import { validateToolArguments } from './arguments.js'
 import { approvedResult, deniedResult, runtimeErrorResult } from './toolResultLifecycle.js'
 import type { ToolExecutionResult } from '../../tools/types.js'
 import { networkNotice, planSandboxedCommand, readSandboxRules } from '../../sandbox/osSandbox.js'
@@ -58,34 +59,6 @@ const TOOL_APPROVED_COMMAND_AUTHORITY: ExecutionAuthority = {
   mode: 'command-allowlisted',
   source: 'tool-runtime-approval',
   reason: 'ToolRuntime allowlist and process permission checks passed before ExecutionService was called.',
-}
-
-/**
- * The `edits` argument, when it was given in a usable shape.
- *
- * Returns nothing rather than throwing for an absent or empty list so the
- * caller can fall through to the other two forms. A list that is present but
- * malformed throws, because "I passed edits and it did something else" is worse
- * than being told the shape was wrong.
- */
-function readSegmentEdits(args: Record<string, unknown>): Array<{ oldText: string; newText: string }> | undefined {
-  if (args.edits === undefined) return undefined
-  if (!Array.isArray(args.edits)) {
-    throw new Error("'edits' must be an array of { oldText, newText } objects.")
-  }
-  if (args.edits.length === 0) {
-    throw new Error("'edits' was empty. Provide at least one replacement, or omit it.")
-  }
-  return args.edits.map((entry, index) => {
-    if (!entry || typeof entry !== 'object') {
-      throw new Error(`edits[${index}] must be an object with 'oldText' and 'newText'.`)
-    }
-    const segment = entry as Record<string, unknown>
-    if (typeof segment.oldText !== 'string' || typeof segment.newText !== 'string') {
-      throw new Error(`edits[${index}] needs both 'oldText' and 'newText' as strings.`)
-    }
-    return { oldText: segment.oldText, newText: segment.newText }
-  })
 }
 
 function inferFailureKind(result: {
@@ -449,13 +422,14 @@ export function createCoreToolRegistry(options?: {
       async execute(args, context) {
         // The read decides the write, so both sit under one lock: taking it
         // only for the write would let two edits read the same original.
+        validateToolArguments(this.argsSchema, args)
         return withFileLock(resolveToolTarget(args, 'path', context.workspaceRoot), async () => {
           const target = resolveToolTarget(args, 'path', context.workspaceRoot)
           const containment = verifyPathContainment(target, context.workspaceRoot)
           if (!containment.allowed) {
             throw new Error(containment.reason ?? `Target '${target}' is outside workspace jail.`)
           }
-          const content = typeof args.content === 'string' ? args.content : ''
+          const content = args.content as string
           const relPath = path.relative(context.workspaceRoot, containment.resolvedPath)
           let original = ''
           let originalUnreadable = false
@@ -509,6 +483,7 @@ export function createCoreToolRegistry(options?: {
           },
           edits: {
             type: 'array',
+            minItems: 1,
             description:
               'Targeted replacements, applied as one edit or none. Each is matched against the original file, not against the result of the previous one, and they must not overlap — merge nearby changes into one edit instead.',
             items: {
@@ -535,11 +510,17 @@ export function createCoreToolRegistry(options?: {
           },
         },
         required: ['path'],
+        oneOf: [
+          { required: ['content'], not: { anyOf: [{ required: ['edits'] }, { required: ['oldText'] }, { required: ['newText'] }, { required: ['replaceAll'] }] } },
+          { required: ['edits'], not: { anyOf: [{ required: ['content'] }, { required: ['oldText'] }, { required: ['newText'] }, { required: ['replaceAll'] }] } },
+          { required: ['oldText', 'newText'], not: { anyOf: [{ required: ['content'] }, { required: ['edits'] }] } },
+        ],
       },
       async execute(args, context) {
         // Read-modify-write under one lock. The read is what decides the write,
         // so locking only the write would still let two edits read the same
         // original and lose the first one's change without an error.
+        validateToolArguments(this.argsSchema, args)
         return withFileLock(resolveToolTarget(args, 'path', context.workspaceRoot), async () => {
         const target = resolveToolTarget(args, 'path', context.workspaceRoot)
         const containment = verifyPathContainment(target, context.workspaceRoot)
@@ -552,29 +533,7 @@ export function createCoreToolRegistry(options?: {
         let originalUnreadable = false
         let finalContent = ''
         let expectedContent: string | undefined
-        const segmentEdits = readSegmentEdits(args)
-        // The three ways to say what to change are alternatives, and every
-        // combination is refused rather than resolved. Each branch below would
-        // otherwise win silently over the others, and the call would report
-        // success for an edit that dropped part of what was asked for — the one
-        // outcome a caller has no way to notice.
-        const hasLegacyPair = typeof args.oldText === 'string' || typeof args.newText === 'string'
-        if (segmentEdits && typeof args.content === 'string') {
-          throw new Error("Provide either 'content' or 'edits', not both.")
-        }
-        if (segmentEdits && hasLegacyPair) {
-          throw new Error("Provide either 'edits' or 'oldText'/'newText', not both.")
-        }
-        // `replaceAll` describes the single-replacement form, which the segments
-        // path does not consult. Accepting it here would leave the caller
-        // believing every occurrence was replaced when only the first of each
-        // segment was.
-        if (segmentEdits && args.replaceAll !== undefined) {
-          throw new Error("'replaceAll' applies to the single-replacement form; name each occurrence in 'edits' instead.")
-        }
-        if (hasLegacyPair && typeof args.content === 'string') {
-          throw new Error("Provide either 'content' or 'oldText'/'newText', not both.")
-        }
+        const segmentEdits = args.edits as Array<{ oldText: string; newText: string }> | undefined
         if (segmentEdits) {
           const raw = await executionService.readTextFile({
             operationKind: 'file.read',

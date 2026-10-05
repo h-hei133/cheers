@@ -385,3 +385,17 @@ TUI 必须覆盖 regular/fullscreen 的真实 PTY；用户 WSL/Windows 前端的
 修订后计划复核与研究复核均返回批准，先前不可用的专用审查路由和未返回的命令专项复核均未计为通过。主要补正包含实际 request attempt/辅助摘要准入、未知用量与暂停、fresh/桌面职责、trust 原型继承值与命令事实；详见复核记录 §6。
 
 实际运行 docs-drift strict 与 git diff --check，均 exit 0；strict 保留 120 条既有非阻断源码路径 advisory。另对 13 份文档核对 788 个本地链接、292 个行号锚点、3 个标题锚点及表格/围栏/空白；53 项命令映射全部指向有效任务。没有运行 build/产品测试、真实 provider、commit、push 或新 CI。
+
+## 8. 实施证据
+
+### 8.1 SAFE-01 — 工具参数实际校验（2026-10-05）
+
+SAFE-01 已实现并完成本地验证；其余 75 项仍未完成。§7.4 为规划轮历史证据，不代表本节之后的施工状态。计划基线已提交为 `25d891d2`；本批功能提交及远端检查另行核对，不将本地通过当作 CI 或 Phase 19 整体验收。
+
+- Owner：[参数校验](../../packages/ts-shell/src/core/tools/arguments.ts) 使用 Ajv 8.20.0 与 ajv-formats 3.0.1（MIT，已有依赖树中的库，现声明为直接依赖）；校验 draft-07/2019-09/2020-12 的类型、必填、成员、范围、格式与组合。未知/无效 schema、未解析引用、异步 schema 拒绝执行；不远程加载引用、不强转、不填默认值、不删除参数。按 schema 内容缓存，动态 schema 改变后重新编译。
+- 顺序：[turn 适配](../../packages/ts-shell/src/turn/tools.ts) 在 kernel 的 prepareArguments 阶段校验，先于审批及 PreToolUse；实际调用前再次校验。write/edit 直接入口共用同一校验器，在文件锁/读取/writer 之前拒绝。显式 `content: ""` 仍有效；edit 三种形式的互斥及非空 edits 数组纳入声明 schema，删除重复的手写形状与互斥检查。
+- 定向对照：按 [19 号研究 §3.1](19-tools-maturity-and-multifile-edit.md#31-write运行时-schema-与精确前置状态) 所指工具验证链，实读参考验证函数与循环的准备阶段。同意“声明 schema 实际校验且先于 before-tool hook”；不采用其参数强转与错误回显原始参数的行为，理由是本阶段明确禁止非字符串文件内容被替换成其他内容，且诊断不得泄露输入。错误只报告约束类别，不回显输入值。
+- 验证：Node 20.3.0、仓内隔离 HOME/USERPROFILE/TMPDIR/CHEERS_TEST_ROOT 下 `npm run test:ts -- src/core/tools src/core/agent src/turn`，40 文件/574 项通过；同版本 `npm run build:ts` 通过。初轮非隔离环境有一条既有 sampling 测试失败（temperature 字段缺失），隔离环境原样通过，未修改 provider 实现或该测试。五条原有 edit 报错文案断言按 schema 错误更新，拒绝和文件不变断言保留。
+- 反转：[新增回归](../../packages/ts-shell/src/core/tools/arguments.test.ts) 在移除 prepare 校验时 1 失败/15 通过；移除 write/edit 直接校验时 11 失败/5 通过。测试服务已替换为无副作用实现；每次反转后校验精确字节恢复，最终重建并重跑上述 574 项通过。
+- 编译产物：仓内隔离探针经实际 kernel→审批→内置 writer 调用，5 类非法 write 内容均零审批、零 pre-use hook、BOM/CRLF 文件字节不变；合法空字符串经一次批准写成空文件。探针使用编译模块，不称 CLI/PTY 或真实模型验收；无真实 provider 请求。
+- 门禁：import-cycles、config-consumers、declarations、node-floor、docs-drift strict 均 exit 0；docs 保留 120 项既有 advisory。模块上限检查没有新增越界；NormProof unresolved-specifier 与 cycle 义务 satisfied，整体 partial 来自 6 个既有函数数量 advisory。未取得本批独立审查、PTY、真实外部服务或发布证据；W7-33 保留原状态。

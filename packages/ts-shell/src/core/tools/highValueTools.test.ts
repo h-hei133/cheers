@@ -336,7 +336,7 @@ describe("concurrent edits of one file", () => {
         { path: "target.txt", content: "wholesale", edits: [{ oldText: "ALPHA", newText: "AAA" }] },
         context,
       ),
-    ).rejects.toThrow(/not both/);
+    ).rejects.toThrow('Invalid tool arguments: not constraint failed.');
     expect(await fs.readFile(path.join(dir, "target.txt"), "utf8")).toBe("ALPHA\nBETA\n");
   });
 
@@ -344,7 +344,7 @@ describe("concurrent edits of one file", () => {
     const tool = editTool();
     const context = { workspaceRoot: dir, taskId: "t" } as never;
 
-    await expect(tool.execute({ path: "target.txt", edits: [] }, context)).rejects.toThrow(/empty/);
+    await expect(tool.execute({ path: "target.txt", edits: [] }, context)).rejects.toThrow('Invalid tool arguments: minItems constraint failed.');
   });
 
   it("refuses an edit that names both segments and a single replacement", async () => {
@@ -359,7 +359,7 @@ describe("concurrent edits of one file", () => {
         { path: "target.txt", edits: [{ oldText: "ALPHA", newText: "AAA" }], oldText: "BETA", newText: "BBB" },
         context,
       ),
-    ).rejects.toThrow(/not both/);
+    ).rejects.toThrow('Invalid tool arguments: not constraint failed.');
     expect(await fs.readFile(path.join(dir, "target.txt"), "utf8")).toBe("ALPHA\nBETA\n");
   });
 
@@ -374,7 +374,7 @@ describe("concurrent edits of one file", () => {
         { path: "target.txt", content: "wholesale", oldText: "BETA", newText: "BBB" },
         context,
       ),
-    ).rejects.toThrow(/not both/);
+    ).rejects.toThrow('Invalid tool arguments: not constraint failed.');
     expect(await fs.readFile(path.join(dir, "target.txt"), "utf8")).toBe("ALPHA\nBETA\n");
   });
 
@@ -389,7 +389,7 @@ describe("concurrent edits of one file", () => {
         { path: "target.txt", edits: [{ oldText: "ALPHA", newText: "AAA" }], replaceAll: true },
         context,
       ),
-    ).rejects.toThrow(/replaceAll/);
+    ).rejects.toThrow('Invalid tool arguments: not constraint failed.');
     expect(await fs.readFile(path.join(dir, "target.txt"), "utf8")).toBe("ALPHA\nBETA\n");
   });
 });
