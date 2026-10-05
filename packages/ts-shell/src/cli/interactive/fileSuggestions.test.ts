@@ -1,3 +1,4 @@
+import { Editor } from "../../presentation/tui/editor.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -107,6 +108,19 @@ describe("file references", () => {
   });
 
   describe("suggestions for a draft", () => {
+    it("completes a quoted file in the middle without duplicating quotes or dropping prose", async () => {
+      fs.writeFileSync(path.join(workspace, "my file.ts"), "x");
+      await warmWorkspaceFiles(workspace);
+      const editor = new Editor();
+      editor.setText('查看 @"my f"  后缀👩‍💻');
+      editor.move("doc-start");
+      for (let count = 0; count < 9; count++) editor.move("right");
+      const candidate = fileSuggestions(editor.getText(), workspace, editor.snapshot())?.[0];
+      expect(candidate?.value).toBe("@my file.ts");
+      expect(editor.replace(candidate!.edit!)).toBe(true);
+      expect(editor.getText()).toBe('查看 @"my file.ts"  后缀👩‍💻');
+    });
+
     it("names where the accepted value starts, so it replaces only the reference", async () => {
       await warmWorkspaceFiles(workspace);
       const suggestions = fileSuggestions("please read @model", workspace);
@@ -114,7 +128,7 @@ describe("file references", () => {
       expect(suggestions?.[0]).toMatchObject({
         value: "@src/core/model.ts",
         // Accepting must not delete "please read ".
-        from: 12,
+        edit: { from: 12, to: 18 },
       });
     });
 

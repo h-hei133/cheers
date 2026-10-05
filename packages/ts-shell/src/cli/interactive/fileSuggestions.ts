@@ -1,3 +1,5 @@
+import { completionToken, completionEdit, quoteCompletion } from "./completion.js";
+import type { DraftSnapshot } from "../../presentation/tui/editor/replacement.js";
 import { listWorkspaceFiles } from "../../runtime/execution/fileWalk.js";
 import type { Suggestion } from "../../presentation/tui/chrome/suggestions.js";
 
@@ -104,11 +106,10 @@ export async function warmWorkspaceFiles(root: string): Promise<void> {
  * credentials — and offering a file list there would be noise over ordinary text.
  * The same reasoning as the command draft rule, applied to the other sigil.
  */
-export function fileReferenceAt(draft: string): { readonly query: string; readonly start: number } | null {
-  const match = /(^|\s)@([^\s@]*)$/.exec(draft);
-  if (!match) return null;
-  const start = match.index + match[1]!.length;
-  return { query: match[2]!, start };
+export function fileReferenceAt(draft: string, cursor = draft.length): { readonly query: string; readonly start: number } | null {
+  const token = completionToken(draft, cursor);
+  if (!token.prefix.startsWith("@") || token.value.slice(1).includes("@")) return null;
+  return { query: token.value.slice(1), start: token.from };
 }
 
 /**
@@ -124,13 +125,15 @@ export function couldBeFileReference(draft: string): boolean {
 }
 
 /** Candidates for the file reference in `draft`, or nothing when there is none. */
-export function fileSuggestions(draft: string, root: string): Suggestion[] | null {
-  const reference = fileReferenceAt(draft);
+export function fileSuggestions(draft: string, root: string, snapshot: DraftSnapshot = { text: draft, cursor: draft.length, revision: 0 }): Suggestion[] | null {
+  const reference = fileReferenceAt(draft, snapshot.cursor);
   if (!reference) return null;
   const ranked = rankFiles(reference.query, workspaceFiles(root));
   if (ranked.length === 0) return null;
   // Accepting replaces the reference, not the sentence it sits in.
-  return ranked.map((suggestion) => ({ ...suggestion, from: reference.start }));
+  const token = completionToken(draft, snapshot.cursor);
+  return ranked.map(suggestion => completionEdit(suggestion, snapshot, token.from, token.to,
+    quoteCompletion(suggestion.value.slice(1), token.prefix, "@")));
 }
 
 /**

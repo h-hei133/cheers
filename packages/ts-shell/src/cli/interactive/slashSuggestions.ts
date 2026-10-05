@@ -1,3 +1,5 @@
+import { completionToken, completionEdit, quoteCompletion } from "./completion.js";
+import type { DraftSnapshot } from "../../presentation/tui/editor/replacement.js";
 import type { Suggestion } from "../../presentation/tui/chrome/suggestions.js";
 import { matchSuggestions } from "../../presentation/tui/chrome/suggestions.js";
 import {
@@ -32,22 +34,19 @@ function candidates(includeAliases: boolean): readonly Suggestion[] {
   return includeAliases ? cached : defaults!;
 }
 
-function argumentSuggestions(draft: string): Suggestion[] | null {
-  const match = /^(\/[^\s]+)\s+(.*)$/.exec(draft.trimStart());
-  if (!match) return null;
-  const command = getSlashInvocation(match[1]!);
-  const values = command?.getArgumentCompletions?.(match[2]);
-  // The provider already filtered by prefix; matchSuggestions would re-filter
-  // with the whole argument text as query, which breaks multi-word arguments.
-  return values && values.length > 0 ? [...values] : null;
-}
-
-export function slashSuggestions(draft: string): Suggestion[] | null {
-  const trimmed = draft.trimStart();
-  return argumentSuggestions(trimmed) ??
-    (COMMAND_DRAFT.test(trimmed)
-      ? ((matches) => (matches.length > 0 ? matches : null))(matchSuggestions(trimmed, candidates(trimmed !== "/")))
-      : null);
+export function slashSuggestions(draft: string, snapshot: DraftSnapshot = { text: draft, cursor: draft.length, revision: 0 }): Suggestion[] | null {
+  const token = completionToken(draft, snapshot.cursor);
+  if (token.before.length === 0 && COMMAND_DRAFT.test(token.prefix)) {
+    const matches = matchSuggestions(token.prefix, candidates(token.prefix !== "/"));
+    return matches.length ? matches.map(candidate => completionEdit(candidate, snapshot, token.from, token.to)) : null;
+  }
+  const command = token.before[0];
+  if (!command || !COMMAND_DRAFT.test(draft.slice(command.from, command.to))) return null;
+  const invocation = getSlashInvocation(command.value);
+  const prefix = [...token.before.slice(1).map(item => item.value), token.value].join(" ");
+  const values = invocation?.getArgumentCompletions?.(prefix);
+  return values?.length ? values.map(candidate => completionEdit(candidate, snapshot, token.from, token.to,
+    quoteCompletion(candidate.value, token.prefix))) : null;
 }
 /**
  * A draft that is a command name being typed and nothing else.

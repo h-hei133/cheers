@@ -377,24 +377,22 @@ function consumeSuggestionKey(event: ParsedKeyEvent, context: KeymapContext): bo
     actions.redraw();
     return true;
   }
-  // Tab always completes. Enter completes only when a candidate was actively
-  // selected; otherwise it submits, so typing a whole command still sends on the
-  // first press.
+  const chosen = view.suggestions.current();
+  const snapshot = view.editor.snapshot();
+  const edit = chosen?.edit;
+  const written = edit ? snapshot.text.slice(edit.from, edit.to) : "";
+  const insertion = edit ? (edit.to === edit.snapshot.text.length ? edit.text.slice(0, -1) : edit.text) : "";
+  const incomplete = edit !== undefined && (written.startsWith("/")
+    ? written.toLowerCase() !== insertion.toLowerCase()
+    : written !== insertion);
   const accepts = action === "tui.input.tab" ||
-    (action === "tui.input.submit" && view.suggestions.chosen);
+    (action === "tui.input.submit" && (view.suggestions.chosen || incomplete));
   if (accepts) {
-    const chosen = view.suggestions.current();
     if (!chosen) return false;
-    // A candidate that names where it starts replaces just that part of the
-    // draft; one that does not is the whole draft, which is what a command name
-    // typed on its own is.
-    if (chosen.from !== undefined) {
-      const draft = view.editor.getText();
-      view.editor.setDraftText(`${draft.slice(0, chosen.from)}${chosen.value} `);
-    } else {
-      view.editor.setText(`${chosen.value} `);
-    }
+    // A stale or unbound candidate must never edit or fall through to submit.
+    if (chosen.edit) view.editor.replace(chosen.edit);
     view.setSuggesting(false);
+    actions.syncSuggestions(true);
     actions.redraw();
     return true;
   }

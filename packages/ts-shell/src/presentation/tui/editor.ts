@@ -3,7 +3,7 @@ import { editorRows, visualCaret, verticalCaret } from "./editor/layout.js";
 import { nextCluster, previousCluster, wordEnd, wordStart } from "./text/motion.js";
 import { CURSOR_MARKER } from "./render/paint.js";
 import { KillRing } from "./editor/killRing.js";
-import { EditHistory } from "./editor/editHistory.js";
+import { EditorBuffer } from "./editor/buffer.js";
 import { YankPlacement } from "./editor/yank.js";
 
 /**
@@ -30,30 +30,14 @@ export type CursorMove =
 
 export type KillTarget = "line-end" | "line-start" | "word-left";
 
-interface EditorSnapshot {
-  readonly lines: readonly string[];
-  readonly row: number;
-  readonly column: number;
-}
-
-const MAX_UNDO_DEPTH = 100;
 const MAX_KILL_RING = 16;
 
-export class Editor {
+export class Editor extends EditorBuffer {
   /** Set by the host when this editor owns keyboard focus. */
   focused = true;
   /** Hint shown in place of an empty first row. */
   placeholder = "";
-  /**
-   * Optional matcher for tokens that delete as one unit — an attachment chip,
-   * say. The host owns what the tokens are; the editor only asks "does a token
-   * end right here, and where does it start?" before a plain cluster delete.
-   */
-  atomicTokenStart?: (line: string, column: number) => number | undefined;
 
-  private lines: string[] = [""];
-  private row = 0;
-  private column = 0;
   private readonly killRing = new KillRing(MAX_KILL_RING);
   private readonly yanks = new YankPlacement({
     read: () => ({ lines: this.lines, row: this.row, column: this.column }),
@@ -63,30 +47,9 @@ export class Editor {
       this.column = next.column;
     },
   });
-  /**
-   * The last thing that changed the text, for deciding whether the next change
-   * continues it.
-   *
-   * A cut continues the previous cut only if nothing happened in between, and a
-   * yank-pop only replaces a yank that is still the last thing done. Comparing
-   * caret positions instead — which is what this replaced — says "unchanged" when
-   * the user moved away and came back, or typed and deleted their way to the same
-   * spot, so a cut would silently join a ring entry from an unrelated edit and a
-   * yank-pop would reach back into a yank that had already been overwritten.
-   *
-   * Typed characters are the third case. Consecutive word characters are one undo
-   * step, so a word typed letter by letter comes back in one press rather than
-   * one press per letter. Whitespace ends the run, which is what makes the space
-   * and the word after it come back together and each word separately undoable —
-   * the convention a shell user already has.
-   */
-  private lastAction: "kill" | "yank" | "type" | "vertical" | null = null;
+
   private lastWidth = Number.MAX_SAFE_INTEGER;
   private preferredColumn: number | undefined;
-  private readonly edits = new EditHistory<EditorSnapshot>(
-    (state) => ({ lines: [...state.lines], row: state.row, column: state.column }),
-    MAX_UNDO_DEPTH,
-  );
   private readonly history: string[] = [];
   private historyIndex = -1;
   private draft = "";
@@ -97,7 +60,6 @@ export class Editor {
    * rather than written back over the history it came from.
    */
   private browsing = false;
-  private scrollOffset = 0;
 
   /** Whether the caret sits on a recalled history entry. */
   get browsingHistory(): boolean {
@@ -105,31 +67,11 @@ export class Editor {
   }
 
   /** Leave history-browsing: the current text becomes the in-progress draft. */
-  private adoptAsDraft(): void {
+  protected adoptAsDraft(): void {
     if (!this.browsing) return;
     this.browsing = false;
     this.historyIndex = -1;
     this.draft = this.getText();
-  }
-
-  getText(): string {
-    return this.lines.join("\n");
-  }
-
-
-  setText(text: string): void {
-    this.saveUndo();
-    this.lastAction = null;
-    this.lines = text.length > 0 ? text.split("\n") : [""];
-    this.row = this.lines.length - 1;
-    this.column = this.lines[this.row]!.length;
-    this.scrollOffset = 0;
-  }
-
-  /** Programmatic text replacement that also adopts the text as the draft. */
-  setDraftText(text: string): void {
-    this.setText(text);
-    this.adoptAsDraft();
   }
 
   clear(): void {
@@ -141,99 +83,6 @@ export class Editor {
     this.historyIndex = -1;
     this.browsing = false;
     this.scrollOffset = 0;
-  }
-
-  /** Insert literal text, expanding tabs and splitting embedded newlines. */
-  insert(text: string): void {
-    if (!text) return;
-    this.adoptAsDraft();
-    // A run of word characters is one undo step. Whitespace starts a new one, and
-    // so does any non-word character, so the unit a user gets back is the word
-    // they typed rather than an arbitrary slice of keystrokes.
-    const continuesWord = this.lastAction === "type" && isWordCharacter(text);
-    if (!continuesWord) this.saveUndo();
-    this.lastAction = isWordCharacter(text) ? "type" : null;
-    const clean = text.replace(/\t/g, "  ").replace(/\r\n?/g, "\n");
-    const line = this.lines[this.row]!;
-    const before = line.slice(0, this.column);
-    const after = line.slice(this.column);
-    const parts = clean.split("\n");
-    if (parts.length === 1) {
-      this.lines[this.row] = before + parts[0] + after;
-      this.column = before.length + parts[0]!.length;
-      return;
-    }
-    const last = parts[parts.length - 1]!;
-    this.lines.splice(this.row, 1, before + parts[0], ...parts.slice(1, -1), last + after);
-    this.row += parts.length - 1;
-    this.column = last.length;
-  }
-
-  /** Split the current line at the cursor, as Shift+Enter does. */
-  newline(): void {
-    this.adoptAsDraft();
-    this.saveUndo();
-    this.lastAction = null;
-    const line = this.lines[this.row]!;
-    this.lines.splice(this.row, 1, line.slice(0, this.column), line.slice(this.column));
-    this.row += 1;
-    this.column = 0;
-  }
-
-  backspace(): void {
-    if (this.column > 0) {
-      this.adoptAsDraft();
-      this.saveUndo();
-      this.lastAction = null;
-      const line = this.lines[this.row]!;
-      const start = this.atomicStart(line) ?? previousCluster(line, this.column);
-      this.lines[this.row] = line.slice(0, start) + line.slice(this.column);
-      this.column = start;
-      return;
-    }
-    if (this.row === 0) return;
-    this.adoptAsDraft();
-    this.saveUndo();
-    this.lastAction = null;
-    const previous = this.lines[this.row - 1]!;
-    this.column = previous.length;
-    this.lines[this.row - 1] = previous + this.lines[this.row]!;
-    this.lines.splice(this.row, 1);
-    this.row -= 1;
-  }
-
-  deleteForward(): void {
-    const line = this.lines[this.row]!;
-    if (this.column < line.length) {
-      this.adoptAsDraft();
-      this.saveUndo();
-      this.lastAction = null;
-      const end = this.atomicEnd(line) ?? nextCluster(line, this.column);
-      this.lines[this.row] = line.slice(0, this.column) + line.slice(end);
-      return;
-    }
-    if (this.row >= this.lines.length - 1) return;
-    this.adoptAsDraft();
-    this.saveUndo();
-    this.lastAction = null;
-    this.lines[this.row] = line + this.lines[this.row + 1]!;
-    this.lines.splice(this.row + 1, 1);
-  }
-
-  /** Start of an atomic token ending at the caret, if the host recognises one. */
-  private atomicStart(line: string): number | undefined {
-    return this.atomicTokenStart?.(line, this.column);
-  }
-
-  /** End of an atomic token starting at the caret, if the host recognises one. */
-  private atomicEnd(line: string): number | undefined {
-    const matcher = this.atomicTokenStart;
-    if (!matcher || line.length === 0) return undefined;
-    // Search forward from the caret for a token whose start is the caret.
-    for (let look = this.column; look < line.length; look = nextCluster(line, look)) {
-      if (matcher(line, look) === this.column) return look;
-    }
-    return undefined;
   }
 
   /**
@@ -318,31 +167,9 @@ export class Editor {
     return true;
   }
 
-  undo(): boolean {
-    const previous = this.edits.back({ lines: this.lines, row: this.row, column: this.column });
-    if (previous === undefined) return false;
-    this.restore(previous);
-    return true;
-  }
-
-  /** Take back the last undo. */
-  redo(): boolean {
-    const next = this.edits.forward({ lines: this.lines, row: this.row, column: this.column });
-    if (next === undefined) return false;
-    this.restore(next);
-    return true;
-  }
-
-  private restore(snapshot: EditorSnapshot): void {
-    this.lines = [...snapshot.lines];
-    this.row = snapshot.row;
-    this.column = snapshot.column;
-    // The draft has been replaced wholesale, so whatever ran before it is over.
-    this.lastAction = null;
-  }
-
   /** Move the caret; returns false when the motion had nowhere to go. */
   move(kind: CursorMove): boolean {
+    this.revision += 1;
     if (kind === "up" || kind === "down") {
       if (this.lastAction !== "vertical") this.preferredColumn = undefined;
       const next = verticalCaret(this.lines, this.lastWidth, this.row, this.column,
@@ -484,23 +311,4 @@ export class Editor {
     return changed;
   }
 
-
-
-
-
-  private saveUndo(): void {
-    this.edits.record({ lines: this.lines, row: this.row, column: this.column });
-  }
-}
-
-/**
- * Whether this inserted text continues a word.
- *
- * A single word character extends the run; anything else — a space, punctuation, a
- * newline, or a paste of several characters — starts a new undo step. Pasted text
- * is one step because it arrived as one action, and splitting it would make undo
- * take back a paste in pieces.
- */
-function isWordCharacter(text: string): boolean {
-  return text.length === 1 && /\w/.test(text);
 }

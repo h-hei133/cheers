@@ -1,3 +1,4 @@
+import { completionEdit } from "./completion.js";
 import { describe, expect, it, vi } from "vitest";
 import { InteractiveMode } from "./interactiveMode.js";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
@@ -80,7 +81,7 @@ describe("session wiring", () => {
     mode.start();
     try {
       host.view.editor.setText("/m");
-      host.view.suggestions.setItems([{ value: "/model", label: "model-choice" }, { value: "/memory", label: "memory-choice" }]);
+      host.view.suggestions.setItems([{ value: "/model", label: "model-choice" }, { value: "/memory", label: "memory-choice" }].map(candidate => completionEdit(candidate, host.view.editor.snapshot(), 0, 2)));
       host.view.setSuggesting(true);
       const frame = host.view.renderFrame({ columns: 80, rows: 24 });
       const row = frame.rows.findIndex((line) => stripAnsi(line).includes("memory-choice"));
@@ -89,6 +90,7 @@ describe("session wiring", () => {
       expect(host.view.editor.getText()).toBe("/m");
       terminal.input("\r");
       expect(host.view.editor.getText()).toBe("/memory ");
+      expect(host.view.suggestions.current()?.value).toBe("inspect");
       expect(submit).not.toHaveBeenCalled();
     } finally { mode.stop(); }
   });

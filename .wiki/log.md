@@ -6147,3 +6147,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-06] fix | Phase 19 SAFE-08 审批保留结构化事实、不污染模型正文；工具终稿替换流式预览，缺失终稿保留流，失败、artifact 和 hook metadata 不因结果更新丢失。258 项相关测试、Node 20.3 构建、四组有效反转、合成本地 provider 的构建 CLI 请求与真实 PTY 渲染检查通过。详见 features/phase-19-decisions.md §8.18；SAFE-02 与其余阶段任务仍未完成。
 
 ## [2026-10-06] fix | Phase 19 CMD-01 统一命令 invocation 元数据，同义 alias 复用 picker，独立 recall/retain 保留 rawName 与各自参数提示；帮助/CLI/补全共享目录，扩展全部名称冲突拒绝并及时失效缓存。222 项测试、Node 20.3 构建、四组反转与 regular/fullscreen 真实 PTY 验证通过。f0eb595c 两项远端检查成功；本批与后续任务边界见 features/phase-19-decisions.md §8.19。
+
+## [2026-10-06] fix | Phase 19 CMD-02 补全使用原始区间和草稿/光标 revision，保留前后缀、原空白与引号路径；Tab/未完成 Enter 只接受，完整命令保留一次 Enter，接受后重算参数列表。268 项组合测试、四类反转、Node 20.3 构建及 regular/fullscreen 真实 PTY 通过，函数数量 advisory 从 6 降至 5。详见 features/phase-19-decisions.md §8.20；CMD-03/04、SAFE-02 与其余任务继续。

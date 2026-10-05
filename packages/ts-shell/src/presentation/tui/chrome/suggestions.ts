@@ -1,6 +1,7 @@
 import { defaultTheme } from "../../theme/theme.js";
 import { padToWidth, truncateToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
+import type { DraftEdit } from "../editor/replacement.js";
 
 /**
  * Completion candidates below the prompt.
@@ -16,15 +17,8 @@ export interface Suggestion {
   readonly value: string;
   readonly label: string;
   readonly detail?: string;
-  /**
-   * Where in the draft the accepted value starts, counted from the beginning.
-   *
-   * A candidate replaces what is being written, not the whole draft: accepting a
-   * file reference three words into a sentence must not delete the sentence.
-   * Absent means the candidate is the whole draft, which is what a command name
-   * typed on its own is.
-   */
-  readonly from?: number;
+  /** Snapshot-bound replacement; unbound display candidates cannot be accepted. */
+  readonly edit?: DraftEdit;
 }
 
 const MAX_VISIBLE = 8;

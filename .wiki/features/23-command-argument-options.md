@@ -347,3 +347,8 @@ candidate ID、record ID 和 query 是不同参数种类，动态 provider 不�
 ### CMD-01 实施记录（2026-10-06）
 
 前文 58 个 aliases 是审计时口径。当前 58 个调度主命令与 `/back` 保留；将两种非同义 memory 调用单独声明后，为 56 个同义 alias、2 个 named invocation，总调用名称仍为 117。统一 invocation 描述已用于调度、帮助、CLI 名称识别、补全与 picker，同义 alias 共用 picker，独立调用保留原 rawName 与参数提示。扩展名称冲突与缓存失效有回归验证。222 项相关测试、Node 20.3 构建、四组反转及 regular/fullscreen 真实 PTY 验证通过；范围、证据与后续 CMD-02/03/04 边界见 [Phase 19 决策 §8.19](phase-19-decisions.md#819-cmd-01命令调用身份与目录一致性)。
+
+
+### CMD-02 实施记录（2026-10-06）
+
+原始区间、光标/草稿 revision 校验已接入命令、参数与文件候选；编辑保留前后缀、空白、引号路径和 Unicode grapheme，接受候选不执行，完整命令保留一次 Enter。组合 268 项、四类反转、Node 20.3 构建及两种终端模式真实 PTY 已验证。详见 [Phase 19 决策 §8.20](phase-19-decisions.md#820-cmd-02原草稿范围补全与接受语义)。CMD-03 语义校验与 CMD-04 异步目录身份仍待实施。

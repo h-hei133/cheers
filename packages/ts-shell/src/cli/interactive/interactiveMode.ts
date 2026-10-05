@@ -520,17 +520,20 @@ export class InteractiveMode {
    * History recall is excluded, so the arrows keep working on a recalled prompt.
    */
   private syncSuggestions(mayOpen: boolean): void {
-    const draft = this.state.editor.getText();
+    const snapshot = this.state.editor.snapshot();
+    const draft = snapshot.text;
     // Files first: an `@` reference is unambiguous, while a leading slash could
     // still become either a command or a path.
     const matches =
-      fileSuggestions(draft, this.options.runtimeContext.projectRoot) ??
-      slashSuggestions(draft);
+      fileSuggestions(draft, this.options.runtimeContext.projectRoot, snapshot) ??
+      slashSuggestions(draft, snapshot);
     if (!matches) {
       this.view.setSuggesting(false);
       return;
     }
-    const couldStillBecomeSomething = couldBeCommand(draft) || couldBeFileReference(draft);
+    const prefix = draft.slice(0, snapshot.cursor);
+    const couldStillBecomeSomething = couldBeCommand(prefix) || couldBeFileReference(prefix) ||
+      (matches[0]?.edit?.from ?? 0) > 0;
     if (!mayOpen && !this.view.suggestionsOpen && !couldStillBecomeSomething) return;
     this.state.suggestions.setItems(matches);
     this.view.setSuggesting(true);

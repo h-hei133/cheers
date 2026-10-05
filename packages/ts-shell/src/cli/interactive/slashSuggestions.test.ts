@@ -26,7 +26,7 @@ describe("command completions", () => {
   it("completes aliases and resolves their argument candidates through the registry", () => {
     expect(slashSuggestions("/qu")?.[0]?.value).toBe("/quit");
     expect(slashSuggestions("/qu")?.[0]?.detail).toContain("alias of /exit");
-    expect(slashSuggestions("/where re")).toEqual(slashSuggestions("/workspace re"));
+    expect(slashSuggestions("/where re")?.map(item => item.value)).toEqual(slashSuggestions("/workspace re")?.map(item => item.value));
     expect(slashSuggestions("/WHERE re")?.[0]?.value).toBe("recent");
   });
 
@@ -141,7 +141,7 @@ it("preserves independent recall/retain invocations and does not borrow memory s
   expect(slashSuggestions("/recall ")).toBeNull();
   expect(slashSuggestions("/retain ")).toBeNull();
   expect(slashSuggestions("/recall")?.[0]).toMatchObject({ value: "/recall", detail: "search retained memory facts <query>" });
-  expect(slashSuggestions("/mem ")).toEqual(slashSuggestions("/memory "));
+  expect(slashSuggestions("/mem ")?.map(item => item.value)).toEqual(slashSuggestions("/memory ")?.map(item => item.value));
   expect(slashSuggestions("/quit")?.[0]?.value).toBe("/quit");
   expect(slashSuggestions("/")?.some(item => item.value === "/quit")).toBe(false);
   expect(slashSuggestions("/?")?.[0]?.value).toBe("/?");

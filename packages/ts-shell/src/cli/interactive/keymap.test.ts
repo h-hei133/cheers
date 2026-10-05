@@ -1,3 +1,5 @@
+import { completionEdit } from "./completion.js";
+import { slashSuggestions } from "./slashSuggestions.js";
 import { describe, expect, it, vi } from "vitest";
 import { routeKey, type KeymapActions } from "./keymap.js";
 import { InteractiveSurface } from "../../presentation/tui/surface/view.js";
@@ -258,6 +260,42 @@ describe("interruption", () => {
 });
 
 describe("completion interception", () => {
+  it("accepts an incomplete command on Enter without submitting it", () => {
+    const { press, surface, actions } = build();
+    surface.editor.setText("/res");
+    const candidate = slashSuggestions("/res", surface.editor.snapshot())!.find(item => item.value === "/reset")!;
+    surface.suggestions.setItems([candidate]);
+    surface.setSuggesting(true);
+    press("\r");
+    expect(surface.editor.getText()).toBe("/reset ");
+    expect(actions.submit).not.toHaveBeenCalled();
+    expect(actions.syncSuggestions).toHaveBeenCalledWith(true);
+  });
+
+  it("rejects a stale candidate and consumes Enter without submitting", () => {
+    const { press, surface, actions } = build();
+    surface.editor.setText("/res");
+    surface.suggestions.setItems(slashSuggestions("/res", surface.editor.snapshot())!);
+    surface.editor.move("left");
+    surface.editor.move("right");
+    surface.setSuggesting(true);
+    press("\r");
+    expect(surface.editor.getText()).toBe("/res");
+    expect(actions.submit).not.toHaveBeenCalled();
+  });
+
+  it("Tab applies an argument range without submitting or dropping a suffix", () => {
+    const { press, surface, actions } = build();
+    surface.editor.setText("/thinking lo  中文");
+    surface.editor.move("doc-start");
+    for (let count = 0; count < 12; count++) surface.editor.move("right");
+    surface.suggestions.setItems(slashSuggestions(surface.editor.getText(), surface.editor.snapshot())!);
+    surface.setSuggesting(true);
+    press("\t");
+    expect(surface.editor.getText()).toBe("/thinking low  中文");
+    expect(actions.submit).not.toHaveBeenCalled();
+  });
+
   it("navigates the list instead of moving the caret", () => {
     const { press, surface } = build();
     surface.suggestions.setItems([
@@ -271,29 +309,29 @@ describe("completion interception", () => {
 
   it("accepts the selection on tab and closes the list", () => {
     const { press, surface } = build();
-    surface.suggestions.setItems([{ value: "/model", label: "/model" }]);
+    surface.suggestions.setItems([completionEdit({ value: "/model", label: "/model" }, surface.editor.snapshot(), 0, 0)]);
     surface.setSuggesting(true);
     press("\t");
     expect(surface.editor.getText()).toBe("/model ");
     expect(surface.suggestionsOpen).toBe(false);
   });
 
-  it("submits on enter when no candidate was chosen", () => {
+  it.each(["/help", "/HELP"])("submits complete %s on enter when no candidate was chosen", (command) => {
     // Typing a whole command must send on the first Enter; requiring a second
     // press because a menu happens to be open is the bug this guards.
     const { press, surface, actions } = build();
-    for (const char of "/help") press(char);
-    surface.suggestions.setItems([{ value: "/help", label: "/help" }]);
+    for (const char of command) press(char);
+    surface.suggestions.setItems(slashSuggestions(surface.editor.getText(), surface.editor.snapshot())!);
     surface.setSuggesting(true);
     press("\r");
-    expect(actions.submit).toHaveBeenCalledWith("/help");
+    expect(actions.submit).toHaveBeenCalledWith(command);
   });
 
   it("accepts the selection on enter once the user has navigated the list", () => {
     const { press, surface, actions } = build();
     surface.suggestions.setItems([
       { value: "/model", label: "/model" },
-      { value: "/mode", label: "/mode" },
+      completionEdit({ value: "/mode", label: "/mode" }, surface.editor.snapshot(), 0, 0),
     ]);
     surface.setSuggesting(true);
     press("\x1b[B");

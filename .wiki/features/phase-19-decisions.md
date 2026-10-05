@@ -591,3 +591,14 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 定向读取参考命令 popup 的空查询隐藏同义 alias、非空保留调用方式决策；本项目不将独立 memory 调用隐藏成同义名称。反转 raw invocation、picker alias 映射、全名称冲突校验、缓存失效四组均使对应测试失败，源文件逐字节恢复。
 - Node 20.3 下 10 文件 222 项与构建通过。真实 CLI PTY 在 regular/fullscreen 两种模式均验证 `/model` 与 `/models` 打开同一 Model chooser，`/recall`、`/retain` 保持各自 Usage，正常退出，无模型调用。首次全屏探针等待已存在提示的重复绘制而超时；按增量帧重新同步后两种模式均通过，没有为测试改变产品行为。
 - import cycles/config consumers/declarations/node floor 通过；call reachability 保留 7 个既有 advisory，NormProof 阻断义务通过且保留 6 个既有函数数目 advisory。新提交远端结果待核对；SAFE-08 的 f0eb595c 两项检查 37359462720/37359595760 已成功。CMD-02/03/04、SAFE-02 与其余批次继续。
+
+
+### 8.20 CMD-02：原草稿范围补全与接受语义
+
+- 补全候选携带原始 UTF-16 `[from,to)`、草稿全文、光标和单调 revision。编辑器在应用前核对快照与 grapheme 边界，保留前后缀、Tab、多空格、换行和 CJK；移动后返回原位、编辑后撤销也使旧候选失效。单次替换是一项撤销操作，光标落在插入文本末端，历史条目只作为新草稿采用。
+- [editor/buffer](../../packages/ts-shell/src/presentation/tui/editor/buffer.ts) 承接已有文本修改与撤销职责，[replacement](../../packages/ts-shell/src/presentation/tui/editor/replacement.ts) 负责快照/范围验证；原 editor 保留移动、历史、剪切和渲染。复用现有 grapheme 分段且每次边界检查仅扫描一次，移除原 editor 超过函数上限的问题，未建立第二套编辑器。
+- 命令与文件补全仅查询光标之前的 token 内容，替换完整当前 token；共用原命令参数 scanner 的位置结果，执行侧旧 tokenize 接口保持不变。引号文件和参数编码后保持单个解码值，不重复闭合引号；只有原文结尾才补一个分隔空格，已有分隔符不重写。
+- Tab 只接受候选；Enter 接受未完成候选而不提交，完整 `/help`（含大小写变体）保留单次 Enter 提交。接受后重新计算参数列表，未绑定/过期候选不修改草稿。目录、workspace/session 身份及异步结果失效属于 CMD-04，完整参数合法性/词表修正属于 CMD-03，不能由本批局部输入检查代替。
+- 定向对照参考终端补全：同意保留后缀、单独返回光标、避免重复闭合引号和单步撤销；不采用其 slash 补全后继续提交的分支，原因是本项目明确要求 `/res` 的候选接受不得执行 `/reset`。前缀/后缀、revision、grapheme、Enter 四类反转均实际触发失败，源码逐字节恢复。
+- Linux、Node 20.3、隔离环境组合测试 10 文件/268 项通过；边界扫描调整后 66 项再次通过，构建通过。真实 regular/fullscreen PTY 验证 `/thinking l` 第一次 Enter 仅补全、第二次才执行，完整 `/help` 一次打开帮助，两模式 exit 0、无模型请求。首轮 PTY 等待了不存在的 Commands 标题，实际帮助已打开；改为等待实际 chooser 标记后通过。没有真实 Windows Terminal 像素验收。
+- import cycles/config consumers/declarations/node floor 通过；call reachability 保留 7 个既有 advisory，NormProof 阻断义务通过，函数数量 advisory 从 6 降至 5。前批 c23570b5 的 CI 37361881459 与 Architecture Watch 37361881308 已成功。本批远端结果仍需按新提交核验；SAFE-02 和其余阶段任务仍未完成。
