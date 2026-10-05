@@ -6046,3 +6046,50 @@ c8146b40两项远端通过（557文件/5339通过/1跳过）；8a998664两项远
 可达性门实际检查906模块，保持7项advisory；未把旧历史候选数作为最终删除量。旧result-contract债务已在W7-31第九批处理，历史失败记录保留。
 本批仅文档，未重复构建/测试，也没有新增独立审查或真实提供方证据。W7-33仍为auth/exit3，四端点真实TLS/HTTP2矩阵未完成；等待既有安全配置渠道恢复认证。
 本次docs strict、diff check及推送前静态阻断门通过；bed97496的CI 37218193877和Architecture Watch 37218193870成功。本次文档提交远端状态另核对。
+
+## [2026-10-05] research | 用户体验与默认工具能力研究
+
+新增 features/14-user-experience-research.md，逐项记录用户体验反馈、当前源码、隔离探针及 pi/oh-my-pi/Codex 对照。确认 slash 别名膨胀、前缀 Enter 状态、resume 选择保留、审批正文混层，以及 write 参数、lsp 读取边界、ask 默认决定、grep 点目录、网络工具取消/错误输出和配置接线等缺口。
+WSL 下 npm start 三次正常退出，输入框出现约 2.48–5.38 秒；确认内部计时不覆盖整个启动过程。合成会话验证分支持久化和界面对话数据更新，未将其提升为用户现场视觉验收。首轮 5.4k 不能与仅工具 schema 的 3,063 粗估直接比较，也不能据此推断上游追加提示。
+本轮仅研究和文档，未改源码、未调用真实 provider、未重跑构建或测试套件。粘贴残影及现场回退显示仍待复现；W7-33 保留 auth/exit3 和真实四端点验收未完成状态。
+docs strict 与 diff check 通过；strict 仍报告 120 个非阻断源码引用 advisory。新文单独核对 109 个本地链接、90 个行号锚点，均有效；临时探针目录已清理。
+
+## [2026-10-05] research | 用户体验解决方案设计（15–21）
+
+14 号研究只核实问题与现状；本轮新增 7 份研究/设计文档补齐方案，全部零代码改动、未施工：[15 深度研究命令设计]、[16 Composer Shape 与配色]、[17 状态线与面板]、[18 输入/Slash/启动/上下文]、[19 工具成熟度与多文件编辑]、[20 配置系统]、[21 会话恢复/撤销/回退]，另 [verification-15-21] 对承载结论逐条复核。
+关键结论：15 判定深度研究缺口在协议与命令形态（local→prompt 型）而非执行平面；16 把 oh-my-pi 的 claude 形态定为新增默认并给 dark 令牌级对照；17 澄清状态带行本恒渲染、用户所见"不显示"实为内容受 usage 门控；18 发现 regular 模式 `mainScreen` 不剥离 `CURSOR_MARKER` 的候选根因；19/20/21 分别给审批噪声分离、配置 schema/溯源、选区归零与会话作用域撤销方案。
+子代理上游模型本轮先后不可用（`vsllm` 返回 403 account_verification_required、另一路由 TLS 证书错误），第 16 号文档与第 21 号文档补全、以及全部复核改由父代理完成；复核发现 18 号把字符估算写成"精确 token 账单"一处，已按原口径修正为估算。
+本轮仅文档，未改源码、未调用真实 provider、未跑构建/测试。所有设计均未施工；粘贴残影现场根因、启动旧版本对照、W7-33 认证门禁与四端点真实 TLS/HTTP2 验收仍未闭合。
+
+## [2026-10-05] research | 用户体验方案第二轮：用户裁决落地
+
+用户对 15–21 做出裁决并追加要求，三份文档由三个子代理扩写（模型已恢复），仍零代码改动、未施工。
+16 号：配色定稿为方案 A「精确一致」（覆盖全部 48 令牌 + WCAG 实算，剩余 syntaxBuiltin/mdQuoteText 两项小裁决）；八种 Composer Shape 逐形态可行性 + 中性命名（默认形态用 claude 几何但命名 default，pi→padded-rules，产品 id 不含他项目名）；输入框左右留白按 codex 做法（LIVE_PREFIX_COLS=2，gutter 在文本矩形外，拖选复制无空白；codex 全仓不开鼠标捕获，选区为终端原生）。
+15 号：新增开源调研（7 仓、GitHub API 实测星数，含 jina 唯一真对抗 evaluator）、论文/软件双模、对抗性核验三层设计（自反驳→红队子代理→置信标签，零第二执行平面）、命令面恢复 /deep-research；并澄清历史——被删实现是无模型确定性搜索管线，claimVoter 是 Jaccard 词元聚类，"多智能体/共识投票"只存在于 a06c617d 论文与报告模板文本，从未在代码里。
+17 号：新增命令输出/面板着色设计（语义角色→既有令牌，零新令牌；缺口在正文行 renderInline 只处理行内标记）。
+21 号：resume 行为按用户裁决改为 current 指针（打开即指向当前 session 并在面板标出，替代"归零"）。
+本轮仅文档：docs strict exit 0（docs_dangling=0，120 条既有 advisory），diff check 通过，工作区仅文档 + 既有 .gitignore 改动。
+
+## [2026-10-05] research | Slash 命令后续参数选项补研（第三轮）
+
+用户追问：带参数的 slash 命令（如 /goal）如何给用户显示后续选项；此前未专门研究。父代理实测 slashSuggestions 管道并新增 18 号 §9。
+实测：`/goal`（裸）只给命令与别名（符合预期）；`/goal `（带空格）确实弹出 `pause/resume/complete/clear`，但四项 detail 全空（subcommandCompletions 未传 description）、输入不匹配前缀（如 `s`）返回 null 直接关窗、且选中后整行被覆写（slashSuggestions 未设 from → keymap setText("pause ") 吞掉 /goal 前缀）。
+对照：oh-my-pi 声明式 SubcommandDef(name/description/usage) 派生带尾空格的补全值、下拉描述与行内幽灵提示；codex 无参数下拉层。
+记录开放产品决策：/goal 词表 Cheers 现为 pause/resume/complete/clear，用户期望 set/resume/drop/pause/show/budget（源自自主 Goal Mode），不私自扩表。
+本轮仅文档；docs strict 与 diff check 通过，工作区仅文档 + 既有 .gitignore 改动。
+
+## [2026-10-05] research | Slash 命令功能对齐（第三轮扩研）
+
+用户澄清：不只是 /goal，所有带参数命令都要显示后续选项，并把命令功能向参考实现对齐。新增三份研究（零代码改动、未施工）。
+22 命令清单对齐：双侧程序化提取（Cheers 58 vs 参考 85 顶层/212 动作）；exact 23 / renamed 15 / ours-only 20；缺失 51 条（high10/med19/low22）+ 三阶段路线。
+23 全命令参数选项：58 条全量审计——43 条接受参数、26 条有 provider、19 条参数型命令无 provider、16 条词表与 handler 脱节；声明式 SubcommandDefinition + 逐命令目标词表 + 5 项开放裁决（含 /goal 词表）。
+24 共有命令功能对齐：20 条双侧共有命令逐条差距 + 缺口分级 + 5 项语义冲突裁决（/undo 写盘、/compact 假压缩、/model 全局持久化等）。
+父代理复核：命令计数（58/43/26/25）、compact 非交互不压缩、undo 只描述不写盘、/goal 词表差异均经源码核对属实；22 号 Phase A 的 /rename 与 /wt 是**提议新增**（Cheers 无此命令，但底层 SessionManager.renameSession 与 core/workflow/gitWorktreeManager 已存在），非既有命令。
+本轮仅文档；docs strict 与 diff check 通过，工作区仅文档 + 既有 .gitignore 改动。
+
+## [2026-10-05] review | 新增研究复审与 Phase 19 规划
+
+基于源码 28ff98cee8c4dd63e6752452f73a362ed3559ae3，直接修订 15–24 与 verification-15-21，更新 14 下游表及 features 索引；前述研究日志保留为历史，错误计数和早期建议以本次正文为准。纠正命令数量/同名等价、已有 picker/plan/session 能力、配色与默认前景、字符估算、配置/网络/恢复过度保证，并补记 /trust 原型继承值可绕过动作枚举的源码缺陷。
+用户已裁定完整自主 goal、未填预算无累计 token cap、显式 cap 统一约束主子代理/顾问/重试；完整 Git、实时顾问、安全分析、公共商店与远程协作全部入 Phase 19；undo 以最近已提交 operation 为单位，model 默认当前会话且 --global 才改默认，三项派生色按所选值。其余技术决定已明确，形成 [phase-19-decisions](features/phase-19-decisions.md)：16 批、76 项，53 个无词法交集命令全部映射；包含实际 attempt/辅助摘要准入、持久恢复、独立桌面/工作流/语音/录制任务。
+两路修订后独立上下文复核在修正发现后批准文档范围；专用审查路由 503 和另一未返回审查均未计为通过，非跨模型认证。docs strict 与 diff check 实际通过；strict 仍有 120 条既有非阻断 advisory。13 份文档的 788 个本地链接、292 个行号及 3 个标题锚点有效，表格/围栏/空白、任务 ID 与映射检查通过，详见 [复核记录](features/verification-15-21.md) §6。
+仅文档改动；未实施 Phase 19 功能，未跑 build/产品测试、真实 provider、提交、推送或本次 CI。用户终端视觉、真实用量和 W7-33 四端点外部验收仍未取得新证据；保留原有 .gitignore 与历史日志改动。
