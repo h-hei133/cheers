@@ -225,3 +225,7 @@ Codex [approvals.rs](../../../codex/codex-rs/tui/src/history_cell/approvals.rs) 
 #### SAFE-07 实施记录（2026-10-06）
 
 browser 工具整次动作共用取消与期限，启动阶段和后续操作重新检查；取消通过实际关闭资源停止浏览器工作。迟到资源继续回收，底层未结束不释放动作序列；关闭失败或超时分别保留 failed/unknown，允许显式 close 重试。动作副作用与清理结果独立记录，观察失败不再当作空页面成功。已完成本地单元、真实 Chromium 挂起导航/提交取消及反转检查；具体证据与未覆盖边界见 [Phase 19 决策 §8.17](phase-19-decisions.md#817-safe-07浏览器动作取消与清理证据)。上传下载与标签页能力仍归 TOOL-04。
+
+#### SAFE-08 实施记录（2026-10-06）
+
+§5.1 是修复前状态。当前审批事实保留在 metadata/events，成功审批不再装饰模型正文；TUI 审批与失败提示分别渲染，终稿替换预览，缺失终稿保留有效流，显式空串保持空串。结果 hook 不丢原 metadata/副作用证据，也不把失败改成成功。已验证无终稿、重复终稿、交错调用、失败/partial、artifact、diff 与截断，并完成合成本地 provider 的实际 CLI 请求检查及 PTY 渲染。证据及限制见 [Phase 19 决策 §8.18](phase-19-decisions.md#818-safe-08工具正文审批与终稿分离)。

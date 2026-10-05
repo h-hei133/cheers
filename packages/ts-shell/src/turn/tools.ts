@@ -1,5 +1,5 @@
 import type { PermissionScope } from "../cli/approval/permissionScope.js";
-import type { AgentTool, AgentToolResult, ToolHooks } from "../core/agent/tools.js";
+import { boundText, TOOL_OUTPUT_LIMIT, type AgentTool, type AgentToolResult, type ToolHooks } from "../core/agent/tools.js";
 import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import { DoomLoopDetector } from "../core/query/doomLoopDetector.js";
 import { buildToolEscalationPrompt, evaluateToolPermissionScope, planModeBlock } from "../core/query/toolPolicy.js";
@@ -122,6 +122,7 @@ async function executeTool(
   options: ToolGateOptions,
   onUpdate?: (partialResult: unknown) => void,
 ): Promise<AgentToolResult> {
+  let streamed = "";
   try {
     validateToolArguments(tool.argsSchema, args);
     const result = await tool.execute(args, {
@@ -140,17 +141,20 @@ async function executeTool(
       ...(options.runSubagent ? { runSubagent: options.runSubagent } : {}),
       // A tool that reports progress passes it on; one that does not is
       // unaffected, since the callback only fires if the tool calls it.
-      ...(onUpdate ? { onOutput: (chunk: string) => onUpdate(chunk) } : {}),
+      onOutput: (chunk: string) => {
+        streamed = (streamed + chunk).slice(0, TOOL_OUTPUT_LIMIT + 1);
+        onUpdate?.(chunk);
+      },
     });
-    const output = result.output || result.content;
+    const output = result.output ?? result.content ?? (streamed ? boundText(streamed) : undefined);
     return {
-      output: result.success ? output || "Success"
+      output: result.success ? output ?? "Success"
         : [result.error, output].filter(Boolean).join("\n") || "Tool failed.",
       isError: !result.success,
       ...(result.metadata ? { metadata: result.metadata } : {}),
     };
   } catch (error) {
-    return { output: `Tool execution error: ${error instanceof Error ? error.message : String(error)}`, isError: true };
+    return { output: [streamed ? boundText(streamed) : "", `Tool execution error: ${error instanceof Error ? error.message : String(error)}`].filter(Boolean).join("\n"), isError: true };
   }
 }
 
@@ -213,9 +217,6 @@ export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<st
       const approval = approvals.get(call.id);
       approvals.delete(call.id);
       let output = result.output;
-      if (approval && !isError) {
-        output = `[User approved ${approval.operation} operation (${approval.decision})]\n${output}`;
-      }
       // A call that failed is announced as a failure. Sending it on
       // `PostToolUse` alone would make the event name mean "a call finished",
       // and a hook watching for breakage would have to re-derive the outcome
@@ -248,7 +249,11 @@ export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<st
         // character cannot forge extra lines or repaint the transcript.
         output = `${output}\n\n[Verification feedback]\n${neutraliseForDisplay(decision.feedback)}`;
       }
-      return output === result.output ? undefined : { output };
+      if (output === result.output && !approval) return undefined;
+      return {
+        ...(output === result.output ? {} : { output }),
+        ...(approval ? { metadata: { approval } } : {}),
+      };
     },
   };
 }

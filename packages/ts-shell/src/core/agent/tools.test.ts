@@ -385,6 +385,24 @@ describe("executeToolBatch", () => {
     expect(batch.terminate).toBe(false);
   });
 
+  it.each(["feedback", "throw"])("preserves failed result and artifact metadata through an after hook %s", async (mode) => {
+    const tools = [makeTool({ execute: async () => ({
+      output: "partial write; artifact: recovery.txt", isError: true,
+      metadata: { artifact: "recovery.txt", status: "partial" },
+    }) })];
+    const { emit, events } = collect();
+    const batch = await executeToolBatch(tools, assistantMessage(), [makeCall()], {
+      afterToolCall: async () => {
+        if (mode === "throw") throw new Error("verification unavailable");
+        return { output: "partial write; artifact: recovery.txt\nfeedback", isError: false, metadata: { approval: "allow-once" } };
+      },
+    }, "sequential", undefined, emit);
+    expect(batch.messages[0].content).toContain("artifact: recovery.txt");
+    expect(batch.messages[0].metadata).toMatchObject({ artifact: "recovery.txt", status: "partial" });
+    expect(events).toContainEqual(expect.objectContaining({ type: "tool_execution_end", isError: true }));
+    if (mode === "feedback") expect(batch.messages[0].metadata?.approval).toBe("allow-once");
+  });
+
   it("emits message events for each tool result", async () => {
     const tools = [makeTool()];
     const { events, emit } = collect();

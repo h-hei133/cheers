@@ -60,6 +60,7 @@ export interface AfterToolCallContext {
 }
 
 export interface AfterToolCallUpdate {
+  readonly metadata?: Record<string, unknown>;
   readonly output?: string;
   readonly isError?: boolean;
   readonly terminate?: boolean;
@@ -315,13 +316,16 @@ async function finalizeExecutedCall(
       return executed;
     }
     return {
+      ...executed,
+      ...(update.metadata ? { metadata: { ...executed.metadata, ...update.metadata } } : {}),
       output: update.output ?? executed.output,
-      isError: update.isError ?? executed.isError,
+      isError: executed.isError || update.isError === true,
       terminate: update.terminate ?? executed.terminate,
     };
   } catch (error) {
     return {
-      output: `Tool result hook error: ${error instanceof Error ? error.message : String(error)}`,
+      ...executed,
+      output: `${executed.output}\n\nTool result hook error: ${error instanceof Error ? error.message : String(error)}`,
       isError: true,
     };
   }

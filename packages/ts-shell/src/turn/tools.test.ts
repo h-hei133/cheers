@@ -125,7 +125,7 @@ describe("createToolHooks", () => {
     ]);
   });
 
-  it("annotates an approved result with the decision that allowed it", async () => {
+  it("records approval separately from the model result", async () => {
     const setup = gate({
       permissionScope: "ask",
       escalationPromptHandler: async (prompt) => ({ promptId: prompt.id, decision: "allow-once", respondedAt: 1 }),
@@ -134,7 +134,9 @@ describe("createToolHooks", () => {
     const context = call("write", { path: "a" });
     expect(await hooks.beforeToolCall!(context)).toBeUndefined();
     const after = await hooks.afterToolCall!({ ...context, result: { output: "wrote a", isError: false }, isError: false });
-    expect(after?.output).toBe("[User approved write operation (allow-once)]\nwrote a");
+    expect(after?.output).toBeUndefined();
+    expect(after?.metadata).toEqual({ approval: { operation: "write", decision: "allow-once" } });
+    expect(setup.events).toContainEqual({ type: "approval.resolved", toolName: "write", taskId: "call_write", outcome: "approved" });
     // An approval round trip is reported as a request and then as a tool call, so
     // a hook can observe both the decision being asked for and what ran.
     expect(setup.dispatched).toEqual(["PermissionRequest", "PreToolUse", "PostToolUse"]);
@@ -395,3 +397,34 @@ it.each(['answered', 'partial', 'unanswered', 'cancelled', 'unavailable', 'error
     expect(write?.block).toBe(true);
     expect(setup.events).not.toContainEqual(expect.objectContaining({ type: 'approval.resolved', outcome: 'approved' }));
   });
+
+
+it.each([undefined, "", "canonical"])("preserves stream fallback and explicit final %j through tool adaptation", async (output) => {
+  const definition: ToolDefinition = {
+    name: "stream", description: "test", argsSchema: { type: "object", properties: {} },
+    execute: async (_args, context) => {
+      context.onOutput?.("first ");
+      context.onOutput?.("second");
+      return { success: true, output };
+    },
+  };
+  const [tool] = adaptTools(new Map([["stream", definition]]), gate());
+  const result = await tool.execute("stream", {});
+  expect(result.output).toBe(output ?? "first second");
+  expect(result.isError).toBe(false);
+});
+
+
+it("keeps streamed evidence when the tool throws", async () => {
+  const definition: ToolDefinition = {
+    name: "stream", description: "test", argsSchema: { type: "object", properties: {} },
+    execute: async (_args, context) => {
+      context.onOutput?.("artifact: partial.txt");
+      throw new Error("interrupted");
+    },
+  };
+  const [tool] = adaptTools(new Map([["stream", definition]]), gate());
+  const result = await tool.execute("stream", {});
+  expect(result.isError).toBe(true);
+  expect(result.output).toBe("artifact: partial.txt\nTool execution error: interrupted");
+});

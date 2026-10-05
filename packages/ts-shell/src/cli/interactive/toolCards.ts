@@ -11,6 +11,7 @@ import type { Transcript } from "../../presentation/tui/transcript/container.js"
  */
 /** How many lines of live output a running card keeps on screen. */
 const LIVE_OUTPUT_LINES = 40;
+const LIVE_OUTPUT_CHARS = 16_000;
 
 export class ToolCards {
   private readonly cards = new Map<string, Block>();
@@ -37,11 +38,11 @@ export class ToolCards {
     this.onChange();
   }
 
-  /** Add a line to an open card — an approval pause, a progress note. */
-  note(taskId: string, note: string): void {
+  /** Approval belongs to the card state, never to the tool's output. */
+  approval(taskId: string, state: "awaiting" | "approved" | "denied"): void {
     const block = this.cards.get(taskId);
     if (!block) return;
-    this.transcript.setText(block, block.text ? `${block.text}\n${note}` : note);
+    block.approval = state;
     this.onChange();
   }
 
@@ -50,22 +51,18 @@ export class ToolCards {
    *
    * Kept in the card's body while the call is still open, so a long command shows
    * something as it goes rather than only once it is over. The final result
-   * replaces nothing: `finish` appends what it has, and the body is already
-   * carrying the same text.
+   * replaces the preview when present; absent final output retains the preview.
    */
   append(taskId: string, chunk: string): void {
     const block = this.cards.get(taskId);
     if (!block) return;
-    const text = chunk.replace(/\s+$/, "");
-    if (!text) return;
-    this.transcript.setText(block, block.text ? `${block.text}\n${text}` : text);
-    // A card the user opened to watch should keep showing the latest output, not
-    // grow past the view. The body is clipped here rather than at finish, because
-    // while running there is no "full output" to point at yet.
-    const lines = block.text.split("\n");
-    if (lines.length > LIVE_OUTPUT_LINES) {
-      this.transcript.setText(block, lines.slice(-LIVE_OUTPUT_LINES).join("\n"));
-    }
+    if (!chunk) return;
+    // Transport chunks are fragments, not lines. Preserve whitespace and joins.
+    const text = block.text + chunk;
+    const lines = text.split("\n");
+    const clipped = lines.slice(-LIVE_OUTPUT_LINES).join("\n").slice(-LIVE_OUTPUT_CHARS);
+    if (clipped.length < text.length) block.previewTruncated = true;
+    this.transcript.setText(block, clipped);
     this.onChange();
   }
 
@@ -95,12 +92,14 @@ export class ToolCards {
     const block = this.cards.get(taskId);
     if (!block) return;
     block.status = success ? "ok" : "failed";
-    const body = (output ?? (success ? "" : failureReason ?? "")).replace(/\s+$/, "");
-    if (body) {
-      this.transcript.setText(block, block.text ? `${block.text}\n${body}` : body);
-      splitFencedDiff(block, this.transcript);
-      this.transcript.setCollapsed(block, success);
+    if (block.approval === "awaiting") block.approval = "interrupted";
+    if (output !== undefined) {
+      this.transcript.setText(block, output);
+      block.previewTruncated = false;
     }
+    block.failureReason = success ? undefined : failureReason;
+    splitFencedDiff(block, this.transcript);
+    this.transcript.setCollapsed(block, success);
     block.finalized = true;
     this.cards.delete(taskId);
     this.onChange();

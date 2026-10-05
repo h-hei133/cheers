@@ -35,6 +35,10 @@ export interface Block {
   /** Unified diff rendered below the body, for edit-shaped tools. */
   diff?: string;
   status?: ToolStatus;
+  /** Approval and failure evidence are independent of business output. */
+  approval?: "awaiting" | "approved" | "denied" | "interrupted";
+  failureReason?: string;
+  previewTruncated?: boolean;
   /** False while the block may still change, which blocks retirement. */
   finalized: boolean;
   /**
@@ -205,9 +209,16 @@ function renderTool(block: Block, width: number): readonly string[] {
   const detail = rawDetail ? ` ${formatToolDetail(block.title, rawDetail)}` : "";
   const body = block.text.replace(/\s+$/, "");
 
-  // Folded only once the call is over. While it is running the body holds status notes.
+  const notes = [
+    block.approval ? (block.approval === "awaiting" ? "awaiting approval" : `approval ${block.approval}`) : "",
+    block.failureReason && !body.includes(block.failureReason) ? block.failureReason : "",
+    block.previewTruncated ? "[Live preview truncated]" : "",
+  ].filter(Boolean);
+
+  // Approval is rendered independently from the output in either view.
   if (block.collapsed === true) {
     const rows = [`${GUTTER}${glyph} ${name}${detail}`];
+    for (const note of notes) rows.push(...wrapToWidth(defaultTheme.dim(note), width));
     if (block.diff) {
       rows.push(...renderDiff(block.diff, width - BODY_INDENT.length).map((row) => `${BODY_INDENT}${row}`));
     } else if (body) {
@@ -224,6 +235,11 @@ function renderTool(block: Block, width: number): readonly string[] {
   const fill = Math.max(0, inner - visibleWidth(headTitle));
   const topBar = defaultTheme.fg("border", "╭") + headTitle + defaultTheme.fg("border", `${"─".repeat(fill)}╮`);
   const rows: string[] = [topBar];
+  for (const note of notes) {
+    for (const wrapped of wrapToWidth(note, inner - 2)) {
+      rows.push(`${defaultTheme.fg("border", "│")} ${padToWidth(defaultTheme.dim(wrapped), inner - 2)} ${defaultTheme.fg("border", "│")}`);
+    }
+  }
 
   if (block.detail) {
     const formattedCmd = block.title === "bash" ? formatCommandLine(block.detail) : defaultTheme.fg("filename", block.detail);

@@ -230,10 +230,10 @@ export class TurnSink implements RendererSink {
         this.openTool(event.toolName, event.taskId, event.args);
         return;
       case "approval.requested":
-        this.tools.note(event.taskId, "awaiting approval");
+        this.tools.approval(event.taskId, "awaiting");
         return;
       case "approval.resolved":
-        this.tools.note(event.taskId, `approval ${event.outcome}`);
+        this.tools.approval(event.taskId, event.outcome);
         return;
       case "tool.output":
         this.bufferToolOutput(event.taskId, event.chunk);

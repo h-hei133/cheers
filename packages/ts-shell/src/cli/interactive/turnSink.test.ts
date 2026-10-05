@@ -478,7 +478,7 @@ describe("live output from a running tool", () => {
       toolName: "bash",
       taskId: "c1",
       success: true,
-      output: "c19",
+      // No canonical final body: preserve the buffered stream.
     } as QueryEvent);
     const card = transcript.last();
     // c0 repaints immediately and c19 arrives on the result, so neither would
