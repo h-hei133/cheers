@@ -134,7 +134,7 @@ describe("High-Value Modern Built-in Tools Subsystem", () => {
   });
 
   describe("ask tool", () => {
-    it("renders structured multiple-choice questions cleanly", async () => {
+    it("reports unavailable without fabricating a recommended answer", async () => {
       const tool = createAskToolDefinition();
       const result = await tool.execute(
         {
@@ -153,11 +153,12 @@ describe("High-Value Modern Built-in Tools Subsystem", () => {
         { workspaceRoot: tempDir, taskId: "task-1" },
       );
 
-      expect(result.success).toBe(true);
-      expect(result.output).toContain("User Decision & Clarification Requested");
-      expect(result.output).toContain("Question 1 [db_choice]: Which database backend should be configured?");
-      expect(result.output).toContain("[1] SQLite** (Recommended): Embedded zero-config database");
-      expect(result.output).toContain("[2] PostgreSQL**: Full relational database server");
+      expect(result.success).toBe(false);
+      expect(result.metadata?.ask).toEqual({ status: 'unavailable', responses: [{ id: 'db_choice', source: 'none' }] });
+      expect(result.output).toContain("Question [db_choice]: Which database backend should be configured?");
+      expect(result.output).toContain('No answer submitted.');
+      expect(result.output).not.toContain('User Decision');
+      expect(result.output).not.toContain('SQLite');
     });
 
     it("handles missing questions array gracefully", async () => {
@@ -165,7 +166,7 @@ describe("High-Value Modern Built-in Tools Subsystem", () => {
       const result = await tool.execute({ questions: [] }, { workspaceRoot: tempDir, taskId: "task-1" });
       expect(result.success).toBe(false);
       const err = result.error || result.output;
-      expect(err).toContain("questions array is required");
+      expect(err).toBe("Invalid ask questions.");
     });
   });
 
