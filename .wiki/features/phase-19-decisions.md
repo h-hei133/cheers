@@ -549,3 +549,15 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Linux、Node 20.3、隔离环境下网络 owner、工具、研究 collector 和 turn gate 共 6 文件/120 项通过，build:ts 通过。新增真实本地 HTTP 测试确认停滞正文超时后连接关闭、gzip 解码超限拒绝、持续 429 正文取消及秘密标记不进入模型/hook、正常文本保留。测试只将 transport 目的地导向合成服务，未修改产品公共 URL 策略，不构成真实公网/DNS/TLS 验收。初轮一个新测试的语法错误按 harness/setup 修正后通过。
 - 反转本地 deadline 时 4 项失败；取消错误体保护反转时 12 项失败；恢复任意原始异常消息投影时 4 项失败。使用测试名称过滤，其他场景未运行而非被豁免；每次源码精确恢复后最终组合套件通过。import-cycles/config-consumers/declarations/node-floor 通过；NormProof 两项图义务 satisfied、无阻断项，整体 partial 仍来自 6 项既有函数数量 advisory。没有独立审查、PTY、真实 provider 或非 Linux 证据。
 - SAFE-05 尚未完整完成：当前 fetch 对正文自动解压，已限制声明长度与实际解码字节，但没有独立观测无 Content-Length 时的压缩传输字节；同步解析只在前后检查取消，不能声称可在同步解析中抢占。连接级计量与 SAFE-06 的 DNS 审核绑定、搜索重定向目标/凭据策略需在网络连接 owner 继续落实；SAFE-02 的既有边界亦保留。
+
+
+### 8.16 SAFE-05/06 — 公共网络连接与压缩计量（2026-10-06，本地实现与验证）
+
+- [地址准入](../../packages/ts-shell/src/core/network/address.ts) 在任何连接前解析并审核全部 A/AAAA 返回值，拒绝混合公私地址、空结果、错误 family、URL credentials 及非公共字面地址；socket lookup 只返回该次审核的副本，不重新解析。[连接 owner](../../packages/ts-shell/src/core/network/connection.ts) 使用 Node HTTP/HTTPS，禁用池复用与隐式代理/重定向，保留原 URL 的 Host 与 TLS servername，显式保持证书校验，响应头限制 16 KiB。工具不再各自直接 fetch，没有新增第二个模型 provider 或命令执行路径。
+- [共享地址策略](../../packages/ts-shell/src/core/security/egressGuard.ts) 保留现有 hostname 分类，新增严格公共地址准入，复用 Node BlockList 拒绝文档、基准测试、多播、保留段与 IPv6 转换地址；IPv6 仅准入当前全局单播前缀中的非特殊地址，IPv4-mapped 目标继续按 IPv4 审核。浏览器已有的 localhost 类别政策不受此新公共连接准入改变。
+- [正文流](../../packages/ts-shell/src/core/network/body.ts) 在解压前计算传输字节，并限制每层解压输出；支持 gzip、deflate、br 和最多三层声明编码，未知或损坏编码失败。通过字节背压、pipeline 销毁与既有 [响应消费](../../packages/ts-shell/src/core/network/response.ts) 完成取消和文本限额，补齐 §8.15 无 Content-Length 时压缩字节不可见的问题。错误/重定向响应在 headers 阶段终止，不进入解压器或正文消费者。
+- [重定向 owner](../../packages/ts-shell/src/core/network/redirect.ts) 共用五跳上限与原始总期限，每跳重新准入并绑定地址。网页允许无凭据的公共跳转；搜索限定配置来源的同一 origin，禁止凭据/query body 跨域或降级发送。301/302 POST 与 303 切换 GET 时清除正文及正文相关头，307/308 保持方法和正文。DNS 系统调用本身可能继续，但取消会立即停止等待、移除监听，迟到解析不能启动连接。
+- 定向对照参考 HTTP hook 的 guarded lookup：全部 DNS 结果审核后，直接作为连接 lookup 的返回值，避免检查后再次解析；采纳此绑定决定。本项目公共 web 拒绝 loopback，与允许本地 hook 的参考策略不同；另一个参考的预检注明连接时再次解析，未采用其作为安全终点。继续使用成熟 Node HTTP/TLS/压缩流，不复制自定义网络栈或引入新的 IP 解析依赖。
+- Linux、Node 20.3、隔离环境下网络 owner、web 工具、研究 collector、工具 gate 和原 hostname 策略共 10 文件/217 项通过，build:ts 通过。真实本地 HTTP/TLS/IPv6 测试覆盖 Host/SNI、主机名不符和不受信任证书拒绝、压缩流、socket lookup 与取消；独立 DNS 测试覆盖公私混合、审核后不重查、预取消零 DNS 和迟到结果零连接。TLS 证书/私钥是提交在 [测试资源](../../packages/ts-shell/src/test-utils/network/README.md) 中的公开合成 fixture，仅测试 adapter 注入信任与本地地址，不改产品信任/公共地址政策。
+- 五组反转分别造成 2/1/2/1/3 项失败：只看首个地址、审核后再次解析、关闭 TLS 验证、移除原始传输限额、放开搜索跨域。源码精确恢复后最终 217 项通过。初轮 DNS 表驱动测试因数组被 it.each 展开而未正确传递空集，按 harness/setup 改为具名字段，保留全部反例。import-cycles/config-consumers/declarations/node-floor 通过，NormProof 两项图义务 satisfied、无阻断项，整体 partial 仍为 6 项既有函数数量 advisory。
+- 前两次提交 `255c618f`、`e85623ca` 的 CI 均已确认失败，原因是 highValueTools 遗漏的两条旧 ask 预期；它们不是网络失败。修订后的问答测试与原 ask 套件 48 项通过，修复单独提交 `c077169`。本批尚无新提交的远端成功结果、独立审查、完整模型驱动 CLI、真实公网或非 Linux 运行证据；不能用本地网络证明关闭 Phase 19 整体任务。SAFE-02 剩余边界与后续任务继续。

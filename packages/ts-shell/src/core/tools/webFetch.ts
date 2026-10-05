@@ -1,9 +1,9 @@
-import { NetworkError, httpError } from '../network/error.js';
-import { requestScope, type RequestScope } from '../network/request.js';
+import { httpError } from '../network/error.js';
+import { requestScope } from '../network/request.js';
 import { discardResponse, readResponseText } from '../network/response.js';
 import { webFailure } from './web/result.js';
 import { approvedResult, deniedResult } from "./toolResultLifecycle.js";
-import { blockedHostReason } from "../security/egressGuard.js";
+import { requestWithRedirects } from "../network/redirect.js";
 import type { ToolDefinition } from "../../tools/types.js";
 
 const DEFAULT_FETCH_TIMEOUT_MS = 20_000;
@@ -20,17 +20,6 @@ const MAX_OUTPUT_CHARS = 10_000;
  * is ever a truncation.
  */
 const MAX_BODY_BYTES = 5 * 1024 * 1024;
-
-/**
- * How many redirects are followed, and why each one is re-checked.
- *
- * Followed at all because a documentation link that moved is a normal thing to
- * fetch. Re-checked because the address rule has to apply to where the request
- * actually goes: a public URL that redirects to `169.254.169.254` is a public URL
- * by the first check and a metadata read by the second, and only following the
- * chain by hand lets the second one happen.
- */
-const MAX_REDIRECTS = 5;
 
 /**
  * Cleanly convert HTML string into readable Markdown/plain text
@@ -113,36 +102,6 @@ const BROWSER_HEADERS = {
   "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7",
 } as const;
 
-/** URL policy is applied separately to each redirect target. */
-function checkUrl(url: string): void {
-  let parsed: URL;
-  try { parsed = new URL(url); } catch { throw new NetworkError('denied'); }
-  if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password
-    || blockedHostReason(parsed.hostname)) throw new NetworkError('denied');
-}
-
-async function fetchFollowingCheckedRedirects(url: string, scope: RequestScope): Promise<{ response: Response; finalUrl: string }> {
-  let current = url;
-  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    scope.check();
-    checkUrl(current);
-    const response = await fetch(current, { method: 'GET', headers: BROWSER_HEADERS, redirect: 'manual', signal: scope.signal });
-    try { scope.check(); } catch (error) { discardResponse(response); throw error; }
-    if ([301, 302, 303, 307, 308].includes(response.status)) {
-      discardResponse(response);
-      if (hop === MAX_REDIRECTS) throw new NetworkError('redirect_limit');
-      const location = response.headers.get('location');
-      if (!location) throw new NetworkError('invalid_response');
-      try { current = new URL(location, current).toString(); }
-      catch { throw new NetworkError('invalid_response'); }
-      continue;
-    }
-    if (!response.ok) { discardResponse(response); throw httpError(response.status); }
-    return { response, finalUrl: current };
-  }
-  throw new NetworkError('redirect_limit');
-}
-
 export function createWebFetchToolDefinition(): ToolDefinition {
   return {
     name: "web_fetch",
@@ -179,7 +138,8 @@ export function createWebFetchToolDefinition(): ToolDefinition {
 
       const scope = requestScope(timeoutMs, context.abortSignal);
       try {
-        const { response, finalUrl } = await fetchFollowingCheckedRedirects(rawUrl, scope);
+        const { response, finalUrl } = await requestWithRedirects(rawUrl, { method: 'GET', headers: BROWSER_HEADERS, maxBytes: MAX_BODY_BYTES }, scope, 'public');
+        if (!response.ok) { discardResponse(response); throw httpError(response.status); }
         const contentType = response.headers.get('content-type') || '';
         const rawBody = await readResponseText(response, scope, MAX_BODY_BYTES);
         scope.check();

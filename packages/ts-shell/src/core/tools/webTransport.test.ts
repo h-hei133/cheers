@@ -6,9 +6,19 @@ import { createWebSearchToolDefinition } from './webSearch.js';
 import { adaptTools, createToolHooks } from '../../turn/tools.js';
 import type { HookDispatcher } from '../hooks/hookDispatcher.js';
 
-const nativeFetch = globalThis.fetch;
+const transport = vi.hoisted(() => ({ url: '' }));
+vi.mock('../network/address.js', async () => ({
+  ...await vi.importActual<typeof import('../network/address.js')>('../network/address.js'),
+  publicLookup: async () => (_host: string, options: { all?: boolean }, callback: (...args: unknown[]) => void) => {
+    if (options.all) callback(null, [{ address: '127.0.0.1', family: 4 }]);
+    else callback(null, '127.0.0.1', 4);
+  },
+}));
+vi.mock('../network/connection.js', async () => {
+  const actual = await vi.importActual<typeof import('../network/connection.js')>('../network/connection.js');
+  return { ...actual, requestPublic: (_url: string, init: import('../network/connection.js').PublicRequest, scope: import('../network/request.js').RequestScope) => actual.requestPublic(transport.url, init, scope) };
+});
 let server: Server;
-let base: string;
 let handle: (response: ServerResponse) => void;
 const context = { workspaceRoot: '/workspace', taskId: 'local-http' };
 
@@ -18,9 +28,8 @@ beforeEach(async () => {
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('Missing local fixture address');
-  base = `http://127.0.0.1:${address.port}`;
-  // Redirect only the test transport to our fixture; product public-URL policy remains active.
-  vi.stubGlobal('fetch', (_url: string, init: RequestInit) => nativeFetch(base, init));
+  transport.url = `http://fixture.example:${address.port}`;
+
 });
 
 afterEach(async () => {

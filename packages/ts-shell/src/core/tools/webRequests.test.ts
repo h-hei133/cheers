@@ -2,6 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createWebFetchToolDefinition } from './webFetch.js';
 import { createWebSearchToolDefinition } from './webSearch.js';
 
+const transport = vi.hoisted(() => ({ request: vi.fn() }));
+vi.mock('../network/connection.js', () => ({ requestPublic: (url: string, init: object, scope: { check(): void; signal: AbortSignal }) => {
+  scope.check();
+  return transport.request(url, { ...init, signal: scope.signal });
+} }));
+
 const context = { workspaceRoot: '/workspace', taskId: 'web-test' };
 const sources = ['fetch', 'exa', 'tavily', 'keyless'] as const;
 type Source = typeof sources[number];
@@ -21,11 +27,11 @@ function body(status: number, bytes = 10, declared?: number) {
 }
 
 beforeEach(() => { vi.stubEnv('EXA_API_KEY', ''); vi.stubEnv('TAVILY_API_KEY', ''); });
-afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); });
+afterEach(() => { transport.request.mockReset(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe.each(sources)('%s network boundary', source => {
   it('pre-cancellation issues zero requests', async () => {
-    const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+    const fetch = vi.fn(); transport.request.mockImplementation(fetch);
     const controller = new AbortController(); controller.abort('PRIVATE_ABORT');
     const result = await select(source).execute(args(source), { ...context, abortSignal: controller.signal });
     expect(fetch).not.toHaveBeenCalled();
@@ -38,7 +44,7 @@ describe.each(sources)('%s network boundary', source => {
     const fetch = vi.fn((_url, init) => new Promise((_resolve, reject) => {
       init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true });
     }));
-    vi.stubGlobal('fetch', fetch);
+    transport.request.mockImplementation(fetch);
     const parent = new AbortController();
     const pending = select(source).execute(args(source), { ...context, abortSignal: parent.signal });
     await vi.advanceTimersByTimeAsync(20_000);
@@ -49,7 +55,7 @@ describe.each(sources)('%s network boundary', source => {
   it.each([[429, 'rate_limited'], [403, 'denied'], [500, 'http_error']] as const)(
     'discards HTTP %s without reading or leaking its body', async (status, code) => {
       const response = body(status, 10_000_000);
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response.response));
+      transport.request.mockImplementation(vi.fn().mockResolvedValue(response.response));
       const result = await select(source).execute(args(source), context);
       expect(result.success).toBe(false);
       expect(result.metadata?.network).toEqual({ source, code, status });
@@ -59,14 +65,14 @@ describe.each(sources)('%s network boundary', source => {
   it.each(['declared', 'streamed'] as const)('cancels a %s oversized success', async mode => {
     const bytes = (source === 'fetch' ? 5 : 2) * 1024 * 1024 + 1;
     const response = body(200, bytes, mode === 'declared' ? bytes : 1);
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response.response));
+    transport.request.mockImplementation(vi.fn().mockResolvedValue(response.response));
     const result = await select(source).execute(args(source), context);
     expect(result.metadata?.network).toMatchObject({ source, code: 'response_limit' });
     expect(response.cancel).toHaveBeenCalledOnce();
     expect(response.pull).toHaveBeenCalledTimes(mode === 'declared' ? 0 : 1);
   });
   it('does not expose native transport exception contents', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('PRIVATE_TRANSPORT https://secret.test/token')));
+    transport.request.mockImplementation(vi.fn().mockRejectedValue(new Error('PRIVATE_TRANSPORT https://secret.test/token')));
     const result = await select(source).execute(args(source), context);
     expect(result.metadata?.network).toMatchObject({ source, code: 'network_error' });
     expect(JSON.stringify(result)).not.toMatch(/PRIVATE_TRANSPORT|secret.test/);
@@ -75,7 +81,7 @@ describe.each(sources)('%s network boundary', source => {
 
 it('cancels a redirect response before checking the next URL', async () => {
   const response = body(302); response.response.headers.set('location', 'http://127.0.0.1/PRIVATE_PATH');
-  const fetch = vi.fn().mockResolvedValue(response.response); vi.stubGlobal('fetch', fetch);
+  const fetch = vi.fn().mockResolvedValue(response.response); transport.request.mockImplementation(fetch);
   const result = await select('fetch').execute(args('fetch'), context);
   expect(result.metadata?.network).toMatchObject({ code: 'denied' });
   expect(fetch).toHaveBeenCalledOnce(); expect(response.cancel).toHaveBeenCalledOnce();
@@ -89,7 +95,7 @@ it('shares the original deadline across redirect and body reads', async () => {
   let resolveFirst!: (response: Response) => void;
   const fetch = vi.fn().mockImplementationOnce(() => new Promise<Response>(resolve => { resolveFirst = resolve; }))
     .mockResolvedValueOnce(new Response(new ReadableStream({ cancel }, { highWaterMark: 0 })));
-  vi.stubGlobal('fetch', fetch);
+  transport.request.mockImplementation(fetch);
   const pending = select('fetch').execute({ ...args('fetch'), timeoutMs: 100 }, context);
   await vi.advanceTimersByTimeAsync(90); resolveFirst(response.response);
   await vi.advanceTimersByTimeAsync(10);
@@ -99,7 +105,7 @@ it('shares the original deadline across redirect and body reads', async () => {
 
 it.each(['exa', 'tavily'] as const)('validates and bounds %s results', async source => {
   const results = Array.from({ length: 12 }, (_, i) => ({ title: `title${i}` + 'a'.repeat(600), url: 'https://example.com/' + 'b'.repeat(2100), content: 'c'.repeat(2000), highlights: ['d'.repeat(2000)] }));
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ results }))));
+  transport.request.mockImplementation(vi.fn().mockResolvedValue(new Response(JSON.stringify({ results }))));
   const result = await select(source).execute({ query: 'test', numResults: 2 }, context);
   expect(result.success).toBe(true); expect(result.metadata?.truncated).toBe(true);
   expect(result.output).toContain('Search results truncated');
@@ -109,7 +115,7 @@ it.each(['exa', 'tavily'] as const)('validates and bounds %s results', async sou
 
 it.each(['exa', 'tavily'] as const)('refuses malformed %s responses without exposing values', async source => {
   for (const raw of ['PRIVATE_INVALID_JSON', '{}', '{"results":null}', '{"results":[{"title":7,"text":"PRIVATE_VALUE"}]}', '['.repeat(40) + '0' + ']'.repeat(40)]) {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(raw)));
+    transport.request.mockImplementation(vi.fn().mockResolvedValue(new Response(raw)));
     const result = await select(source).execute(args(source), context);
     expect(result.metadata?.network).toMatchObject({ code: 'invalid_response' });
     expect(JSON.stringify(result)).not.toContain('PRIVATE_');
@@ -117,7 +123,27 @@ it.each(['exa', 'tavily'] as const)('refuses malformed %s responses without expo
 });
 
 it('preserves keyless HTML result parsing', async () => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<div class="result"><a class="result__a" href="https://example.com">Title</a><span class="result__snippet">Useful text</span></div>')));
+  transport.request.mockImplementation(vi.fn().mockResolvedValue(new Response('<div class="result"><a class="result__a" href="https://example.com">Title</a><span class="result__snippet">Useful text</span></div>')));
   const result = await select('keyless').execute(args('keyless'), context);
   expect(result.success).toBe(true); expect(result.output).toContain('Title'); expect(result.output).toContain('Useful text');
+});
+
+it.each(['exa', 'tavily', 'keyless'] as const)('never sends %s credentials or query bodies across redirect origins', async source => {
+  const response = body(307); response.response.headers.set('location', 'https://other.example/collect');
+  const request = vi.fn().mockResolvedValue(response.response); transport.request.mockImplementation(request);
+  const result = await select(source).execute(args(source), context);
+  expect(result.metadata?.network).toMatchObject({ source, code: 'denied' });
+  expect(request).toHaveBeenCalledOnce(); expect(response.cancel).toHaveBeenCalledOnce();
+});
+
+it.each([303, 307])('follows same-origin HTTP %s with correct POST body semantics', async status => {
+  const response = body(status); response.response.headers.set('location', '/next');
+  const request = vi.fn().mockResolvedValueOnce(response.response).mockResolvedValueOnce(new Response('{"results":[]}'));
+  transport.request.mockImplementation(request);
+  const result = await select('exa').execute(args('exa'), context);
+  expect(result.success).toBe(true); expect(request).toHaveBeenCalledTimes(2);
+  const init = request.mock.calls[1]![1];
+  expect(init.method).toBe(status === 303 ? 'GET' : 'POST');
+  if (status === 303) { expect(init.body).toBeUndefined(); expect(init.headers['Content-Type']).toBeUndefined(); }
+  else { expect(init.body).toContain('question'); expect(init.headers['Content-Type']).toBe('application/json'); }
 });

@@ -83,6 +83,8 @@ confidence: mixed
 
 ### 3.5 网络：父取消、总期限、DNS 与连接地址
 
+2026-10-06：公共工具现已在 Node 连接 lookup 中绑定完整 DNS 审核结果，保留 TLS 原主机验证，并按重定向来源约束凭据；本地验证与限制见 [Phase 19 §8.16](phase-19-decisions.md)。
+
 `web_fetch` 必须在发起 DNS/网络动作前检查已取消状态；`web_search` 的父 signal 和自身 deadline 同时生效。可使用 `AbortSignal.any`，该 API 自 Node **20.3.0** 可用，符合仓库 Node floor；不是新增 floor 缺陷。重试、重定向、正文读取与解析应共用总 deadline，不能每次重试重置预算。
 
 [egressGuard.ts](../../packages/ts-shell/src/core/security/egressGuard.ts) 现有 hostname 策略是资产，仍缺少 DNS 与连接级防护。新增网络连接 owner 应：
@@ -97,7 +99,7 @@ confidence: mixed
 
 ### 3.6 搜索响应：错误不含正文，成功有界读取
 
-2026-10-06：已接通父取消与本地总期限、错误体零消费、安全错误投影、解码字节限额和搜索结构/字段限制，120 项相关测试通过；独立压缩传输计量及连接级边界仍待处理，见 [Phase 19 §8.15](phase-19-decisions.md)。
+2026-10-06：已接通父取消与本地总期限、错误体零消费、安全错误投影、解码字节限额和搜索结构/字段限制，120 项相关测试通过；随后在 §8.16 补齐独立压缩传输计量与连接绑定；远端及跨平台状态另核对，见 [Phase 19 §8.15–8.16](phase-19-decisions.md)。
 
 非 2xx 错误只输出安全的 provider 标识、HTTP status、稳定错误分类及经过允许列表验证的 request id。不得将响应正文片段放入模型、终端、日志或 artifact；`await res.text()` 后 slice 再去 HTML 标签既先全量读入，也不能可靠删除 secret。使用已有 [redaction.ts](../../packages/ts-shell/src/core/security/redaction.ts) 与 [reportText.ts](../../packages/ts-shell/src/core/security/reportText.ts) 的安全投影纪律，网络 owner 仍须从源头避免收集错误体。
 

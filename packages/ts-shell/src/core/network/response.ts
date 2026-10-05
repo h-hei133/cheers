@@ -6,7 +6,7 @@ export function discardResponse(response: Response): void {
   void response.body?.cancel().catch(() => undefined);
 }
 
-/** Limits bytes delivered by fetch (decoded bytes when transport decompresses). */
+/** Limits response-stream bytes, after any transport decompression. */
 export async function readResponseText(response: Response, scope: RequestScope, maxBytes: number): Promise<string> {
   const declared = response.headers.get('content-length');
   if (declared !== null && /^\d+$/.test(declared) && Number(declared) > maxBytes) {

@@ -1,4 +1,4 @@
-import { isIP } from "node:net";
+import { BlockList, isIP } from "node:net";
 
 /**
  * Which hosts are not publicly routable, and why.
@@ -45,9 +45,9 @@ import { isIP } from "node:net";
  * hostname, without resolving it. A public name that resolves to a private
  * address is not caught here, and neither is a name that changes what it resolves
  * to between the check and the connection. A caller that must be safe against
- * those needs to re-check after connecting, which is why `blockedHostReason`
+ * those must bind reviewed addresses to socket lookup, which is why `blockedHostReason`
  * reports the rule that fired rather than only that one did: a caller that
- * cannot re-check should say which limit it accepted, and a caller deciding by
+ * cannot bind addresses should say which limit it accepted, and a caller deciding by
  * class needs `classifyBlockedHost` rather than a sentence to match on.
  *
  * The list above describes the refusing policy. `blockedBrowserHostReason`
@@ -320,4 +320,27 @@ function expandIpv4Mapped(groups: readonly number[]): number[] | undefined {
 /** Whether `hostname` is one a request must not be sent to by default. */
 export function isBlockedHost(hostname: string): boolean {
   return blockedHostReason(hostname) !== undefined;
+}
+
+const specialAddresses = new BlockList();
+for (const [address, prefix] of [
+  ['192.0.0.0', 24], ['192.0.2.0', 24], ['192.88.99.0', 24], ['198.18.0.0', 15],
+  ['198.51.100.0', 24], ['203.0.113.0', 24], ['224.0.0.0', 4], ['240.0.0.0', 4],
+] as const) specialAddresses.addSubnet(address, prefix, 'ipv4');
+for (const [address, prefix] of [
+  ['2001::', 23], ['2001:db8::', 32], ['2002::', 16], ['3fff::', 20],
+] as const) specialAddresses.addSubnet(address, prefix, 'ipv6');
+const globalIpv6 = new BlockList();
+globalIpv6.addSubnet('2000::', 3, 'ipv6');
+
+/** Strict public-web address admission; browser localhost policy is unchanged. */
+export function isPublicAddress(address: string): boolean {
+  if (address.includes('%') || blockedHostReason(address)) return false;
+  const family = isIP(address);
+  if (family === 4) return !specialAddresses.check(address, 'ipv4');
+  if (family !== 6) return false;
+  const groups = expandIpv6(address)!;
+  const mapped = expandIpv4Mapped(groups);
+  if (mapped) return groups[5] === 0xffff && isPublicAddress(mapped.join('.'));
+  return globalIpv6.check(address, 'ipv6') && !specialAddresses.check(address, 'ipv6');
 }

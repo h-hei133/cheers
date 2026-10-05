@@ -1,3 +1,4 @@
+import { requestWithRedirects } from '../network/redirect.js';
 import { httpError } from '../network/error.js';
 import { requestScope, type RequestScope } from '../network/request.js';
 import { discardResponse, readResponseText } from '../network/response.js';
@@ -79,15 +80,15 @@ async function searchWithDuckDuckGo(
   formData.append("b", "");
   formData.append("kl", "us-en");
 
-  const res = await fetch("https://html.duckduckgo.com/html/", {
+  const { response: res } = await requestWithRedirects("https://html.duckduckgo.com/html/", {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
     },
     body: formData.toString(),
-    signal: scope.signal,
-  });
+    maxBytes: MAX_SEARCH_BODY_BYTES,
+  }, scope, 'same-origin');
 
   if (!res.ok) { discardResponse(res); throw httpError(res.status); }
   const html = await readResponseText(res, scope, MAX_SEARCH_BODY_BYTES);
@@ -135,7 +136,7 @@ async function searchWithExa(
   scope: RequestScope,
 ): Promise<SearchResults> {
   scope.check();
-  const res = await fetch("https://api.exa.ai/search", {
+  const { response: res } = await requestWithRedirects("https://api.exa.ai/search", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -148,8 +149,8 @@ async function searchWithExa(
       useAutoprompt: true,
       highlights: { numSentences: 2 },
     }),
-    signal: scope.signal,
-  });
+    maxBytes: MAX_SEARCH_BODY_BYTES,
+  }, scope, 'same-origin');
   if (!res.ok) { discardResponse(res); throw httpError(res.status); }
   return parseSearchResults(await readResponseText(res, scope, MAX_SEARCH_BODY_BYTES), 'exa', numResults);
 }
@@ -161,7 +162,7 @@ async function searchWithTavily(
   scope: RequestScope,
 ): Promise<SearchResults> {
   scope.check();
-  const res = await fetch("https://api.tavily.com/search", {
+  const { response: res } = await requestWithRedirects("https://api.tavily.com/search", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -174,8 +175,8 @@ async function searchWithTavily(
       search_depth: "basic",
       include_answer: false,
     }),
-    signal: scope.signal,
-  });
+    maxBytes: MAX_SEARCH_BODY_BYTES,
+  }, scope, 'same-origin');
   if (!res.ok) { discardResponse(res); throw httpError(res.status); }
   return parseSearchResults(await readResponseText(res, scope, MAX_SEARCH_BODY_BYTES), 'tavily', numResults);
 }
