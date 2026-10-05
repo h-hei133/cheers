@@ -1,3 +1,6 @@
+import { syntaxHelp } from "../../core/commands/syntax/projection.js";
+import { sidebarPanelSyntax, sidebarSyntax } from "./syntax.js";
+import { parseSyntax } from "../../core/commands/syntax/parse.js";
 import type {
   SidebarPanelBudget,
   SidebarPanelDensity,
@@ -20,35 +23,10 @@ export interface SidebarPanelCommandParseResult {
 export function parseSidebarPanelCommandArgs(
   args: readonly string[],
 ): SidebarPanelCommandParseResult {
-  if (args.length === 0) {
-    return {
-      ok: true,
-      contract: { mode: "preview", density: "normal" },
-    };
-  }
-  if (args.length > 1) {
-    return invalidSidebarPanelArgs(args.join(" "));
-  }
-  const [mode] = args;
-  switch (mode) {
-    case "panel":
-      return {
-        ok: true,
-        contract: { mode: "panel", density: "normal" },
-      };
-    case "compact":
-      return {
-        ok: true,
-        contract: { mode: "panel", density: "compact" },
-      };
-    case "detail":
-      return {
-        ok: true,
-        contract: { mode: "panel", density: "detail" },
-      };
-    default:
-      return invalidSidebarPanelArgs(mode ?? "");
-  }
+  const parsed = parseSyntax(sidebarPanelSyntax, args);
+  if (!parsed.ok) return invalidSidebarPanelArgs(parsed.reason);
+  const action = parsed.action.name;
+  return { ok: true, contract: { mode: action === "" ? "preview" : "panel", density: action === "compact" || action === "detail" ? action : "normal" } };
 }
 
 function invalidSidebarPanelArgs(value: string): SidebarPanelCommandParseResult {
@@ -61,12 +39,7 @@ function invalidSidebarPanelArgs(value: string): SidebarPanelCommandParseResult 
       `- Reason: Unsupported /sidebar argument: ${value || "(empty)"}`,
       "- DoNext: Use /sidebar, /sidebar panel, /sidebar compact, /sidebar detail, or /sidebar snapshot.",
       "",
-      "Supported /sidebar forms:",
-      "- /sidebar snapshot read-only snapshot; run again to refresh",
-      "- /sidebar panel    terminal-friendly panel preview",
-      "- /sidebar compact  shortest panel view",
-      "- /sidebar detail   expanded panel view",
-      "- /sidebar          snapshot without capture metadata",
+      syntaxHelp(sidebarSyntax),
     ].join("\n"),
   };
 }

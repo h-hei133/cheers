@@ -697,3 +697,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Linux、Node 20.3 隔离环境 12 文件/231 项通过，build:ts 通过。四组恢复旧 handler 的反转均为行为断言失败，源码逐字节恢复后组合套件通过。真实 regular/fullscreen CLI 的非法 report 输入保持目标字节与 mtime 不变且不写默认归档，合法字面路径写出 ZIP，两模式 exit 0、无模型请求。
 - import cycles/config consumers/declarations/node floor 通过；call reachability 7 个既有 advisory，NormProof 0 个阻断义务未满足、5 个既有函数数量 advisory。1863db35 的 Architecture Watch 37376481017 成功，CI 37376481131 最近为 in_progress；0b76ddb4 的 CI 37375146972 最近仍在测试，均未计通过。
 - CMD-03 其余全量表与动态目录、CMD-04、SAFE-02 和阶段其余任务继续，未标记整体完成。
+
+
+### 8.29 CMD-03：workflow/warmup/sidebar 同源契约
+
+- workflow 的 list/templates、run/start、status 由 core/workflow/syntax 定义；未知动作/flags/多余参数在信任读取与定义执行之前拒绝。有效 run 仍由既有工作流 runner 执行，保留项目信任限制及实际步骤结果，不以补全接受替代执行证据。
+- startup owner 的 warmup status/rebuild 与 sidebar owner 的 panel/compact/detail/snapshot/watch/live 接入现有 parser；共享定义驱动 registry 提示/候选与错误帮助，移除三份独立词表。兼容别名 watch/live 明确描述为单次快照，不暗示持续监听；panel 密度与 snapshot 单帧契约保持。动作采用共享大小写规则，空字符串非法输入不再被当成默认 status。
+- 对照参考命令目录从 subcommand 定义生成候选/描述/usage 的决定，本项目进一步让执行 parser 消费同一声明；没有移植其他项目的工作流执行器或增加第二套 sidebar 状态。
+- Linux、Node 20.3 隔离环境 20 文件/236 项通过，build:ts 通过。恢复旧 workflow handler 后，非法额外参数实际执行了夹具中的写文件步骤；warmup/sidebar 旧契约也各使对应共享动作断言失败。逐字节恢复后组合测试通过。真实 regular/fullscreen CLI 非法 workflow 无标记文件，合法 start 执行同一定义并写出标记；warmup/sidebar 多余参数 blocked，两模式 exit 0、无模型请求。
+- import cycles/config consumers/declarations/node floor 通过；call reachability 7 个既有 advisory，NormProof 阻断义务通过、5 个既有函数数量 advisory。3d1b6fec Architecture Watch 37377064741 成功，其 CI 尚待终态。
+- 0b76ddb4 CI 37375146972 失败：5861 项通过、1 项失败、1 项跳过。唯一失败是 CLI baseline 仍用未引用的多词会话标题，与 §8.26 单参数标题契约不一致；按旧测试输入更新为引用标题，保留切换目标、摘要和无歧义断言，更新后隔离环境 CLI baseline 全部 40 项通过（调用参数被 npm 消费而实际运行了整个 baseline 文件，故按实际范围记录）。CMD-03 全量表、动态目录、CMD-04、SAFE-02 和阶段其余任务仍继续。

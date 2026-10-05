@@ -26,13 +26,10 @@ function prefixFilter(
  */
 const SUBCOMMAND_VALUES = {
   goal: ["pause", "resume", "complete", "clear"],
-  workflow: ["list", "run", "status"],
   marketplace: ["list", "add", "remove", "rm", "delete"],
   plugin: ["list", "add", "remove", "search", "enable", "disable"],
   connect: ["status", "list", "presets", "login", "set", "use", "logout", "help"],
   compact: ["preview", "render", "json"],
-  warmup: ["status", "rebuild"],
-  sidebar: ["snapshot", "panel", "compact", "detail"],
   browser: ["status", "smoke", "runtime", "preview", "dry-run", "execute", "replay", "repair"],
   brainstorm: ["-i", "-s"],
 } as const;

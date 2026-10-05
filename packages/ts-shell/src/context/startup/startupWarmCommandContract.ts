@@ -1,3 +1,6 @@
+import { warmupSyntax } from "./syntax.js";
+import { parseSyntax } from "../../core/commands/syntax/parse.js";
+import { syntaxHelp } from "../../core/commands/syntax/projection.js";
 export type StartupWarmCommandMode = "status" | "rebuild";
 
 export interface StartupWarmCommandRequest {
@@ -18,27 +21,13 @@ export class StartupWarmCommandContractError extends Error {
 export function parseStartupWarmCommandArgs(
   args: readonly string[],
 ): StartupWarmCommandRequest {
-  const [first, ...rest] = args;
-  if (rest.length > 0) {
+  const parsed = parseSyntax(warmupSyntax, args);
+  if (!parsed.ok) {
     throw new StartupWarmCommandContractError(
-      "startup-warm-command:too-many-args",
-      "Use /warmup, /warmup status, or /warmup rebuild.",
+      args.length > 1 ? "startup-warm-command:too-many-args" : "startup-warm-command:unknown-mode",
+      `${parsed.reason} ${syntaxHelp(warmupSyntax)}`,
     );
   }
-  if (!first || first === "status") {
-    return {
-      mode: "status",
-      evidence: ["startup-warm-command:status"],
-    };
-  }
-  if (first === "rebuild") {
-    return {
-      mode: "rebuild",
-      evidence: ["startup-warm-command:rebuild-explicit"],
-    };
-  }
-  throw new StartupWarmCommandContractError(
-    "startup-warm-command:unknown-mode",
-    `Unknown /warmup mode: ${first}`,
-  );
+  const mode = parsed.action.name === "rebuild" ? "rebuild" : "status";
+  return { mode, evidence: [mode === "rebuild" ? "startup-warm-command:rebuild-explicit" : "startup-warm-command:status"] };
 }

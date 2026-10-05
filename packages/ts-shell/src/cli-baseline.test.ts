@@ -2318,7 +2318,7 @@ describe("CLI streaming baseline (T3)", () => {
         "--project",
         projectRoot,
         "--print",
-        "/sessions switch unique needle",
+        '/sessions switch "unique needle"',
       ],
       {
         cwd: repoRoot,

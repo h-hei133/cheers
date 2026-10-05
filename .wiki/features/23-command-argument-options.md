@@ -392,3 +392,8 @@ workspace/cd、mcp、permissions、view 以领域语法驱动执行、提示与�
 ### CMD-03 诊断命令实施记录（2026-10-06）
 
 log/metrics/report/crash 统一语法、提示与 flags 候选，非法数字/多余参数/未知 flags 在日志清理或归档写入之前拒绝；保留 log help/数字简写、metric 记录计数与 report 既有目标策略。231 项、构建、四组反转与两模式真实 CLI 验证，见 [决策 §8.28](phase-19-decisions.md#828-cmd-03诊断命令参数与归档零写校验)。全量表和动态目录继续。
+
+
+### CMD-03 工作流与状态面板实施记录（2026-10-06）
+
+workflow/warmup/sidebar 执行契约、提示与候选共享领域声明；workflow 多余参数拒绝后不执行，sidebar watch/live 如实描述单次快照。236 项、构建、三组反转与两模式真实 CLI 验证，见 [决策 §8.29](phase-19-decisions.md#829-cmd-03workflowwarmupsidebar-同源契约)。动态目录与其余命令继续。

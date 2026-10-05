@@ -1,3 +1,5 @@
+import { sidebarSyntax } from "../../presentation/sidebar/syntax.js";
+import { parseSyntax } from "./syntax/parse.js";
 import { getLatestCompactCheckpoint } from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
 import path from "node:path";
 import { projectStartupWarmContextCacheHealth } from "../../context/startup/startupWarmContextHealth.js";
@@ -17,7 +19,8 @@ export async function runSidebarLocalCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const snapshotParsed = ["snapshot", "watch", "live"].includes(args[0] ?? "")
+  const action = parseSyntax(sidebarSyntax, args);
+  const snapshotParsed = action.ok && action.action.name === "snapshot"
     ? parseSidebarLivePanelCommandArgs(args)
     : undefined;
   const parsed = snapshotParsed ?? parseSidebarPanelCommandArgs(args);

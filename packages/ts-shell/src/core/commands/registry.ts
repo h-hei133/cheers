@@ -1,3 +1,6 @@
+import { workflowSyntax } from "../workflow/syntax.js";
+import { sidebarSyntax } from "../../presentation/sidebar/syntax.js";
+import { warmupSyntax } from "../../context/startup/syntax.js";
 import { crashSyntax } from "./crash/syntax.js";
 import { reportSyntax } from "./report/syntax.js";
 import { metricsSyntax } from "./metrics/syntax.js";
@@ -125,8 +128,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "prebuild the startup context cache for this project",
       group: "context",
-      argumentHint: "[status|rebuild]",
-      getArgumentCompletions: (prefix) => subcommandCompletions("warmup", prefix),
+      argumentHint: syntaxHint(warmupSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(warmupSyntax, prefix),
       execute: (args, context) => runWarmupLocalCommand(args, context),
     },
     {
@@ -149,8 +152,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "a snapshot of session state, tools, and checkpoints; run again to refresh",
       group: "workspace",
-      argumentHint: "[snapshot|panel|compact|detail]",
-      getArgumentCompletions: (prefix) => subcommandCompletions("sidebar", prefix),
+      argumentHint: syntaxHint(sidebarSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(sidebarSyntax, prefix),
       execute: (args, context) => runSidebarLocalCommand(args, context),
     },
     {
@@ -669,8 +672,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "inspect, run, or cancel multi-stage agentic workflows and DAG tasks",
       group: "workflow",
-      argumentHint: "[list|run|status]",
-      getArgumentCompletions: (prefix) => subcommandCompletions("workflow", prefix),
+      argumentHint: syntaxHint(workflowSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(workflowSyntax, prefix),
       execute: (args, context) => runWorkflowCommand(args, context),
     },
     {

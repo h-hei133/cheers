@@ -6165,3 +6165,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 - 2026-10-06：Phase 19 CMD-03 workspace/cd、MCP、permissions、view 领域语法与固定候选接线，修复非法 reset scope 静默清除项目授权。213 项、构建、两组反转与 regular/fullscreen CLI 零写/范围检查通过，见 [决策 §8.27](features/phase-19-decisions.md#827-cmd-03workspacemcppermissionsview-动作边界)。阶段目标继续。
 
 - 2026-10-06：Phase 19 CMD-03 log/metrics/report/crash 严格参数与同源提示接线，拒绝非法数字、未知 flags 和被忽略的多余目标；231 项、构建、四组反转与两模式 CLI 归档零写/字面路径验证通过，见 [决策 §8.28](features/phase-19-decisions.md#828-cmd-03诊断命令参数与归档零写校验)。阶段目标继续。
+
+- 2026-10-06：Phase 19 CMD-03 workflow/warmup/sidebar 同源契约与补全接线，workflow 多余参数不再执行；236 项、构建、三组反转及两模式真实 CLI 验证通过，详见 [决策 §8.29](features/phase-19-decisions.md#829-cmd-03workflowwarmupsidebar-同源契约)。导航批次远端唯一失败为 CLI 标题输入未加引号，按既定单参数语法修正测试，未计远端通过。

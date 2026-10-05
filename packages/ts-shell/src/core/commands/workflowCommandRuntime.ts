@@ -1,3 +1,6 @@
+import { workflowSyntax } from "../workflow/syntax.js";
+import { parseSyntax } from "./syntax/parse.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import path from "node:path";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { definitionExample, listWorkflowNames, readWorkflow, workflowsDir } from "../workflow/definition.js";
@@ -26,17 +29,18 @@ export async function runWorkflowCommand(
   /** Whether this project may supply commands. Defaults to reading the trust store. */
   projectAllowed?: boolean,
 ): Promise<LocalCommandResult> {
+  const parsed = parseSyntax(workflowSyntax, args);
+  if (!parsed.ok) return { kind: "local", output: `Invalid /workflow arguments: ${parsed.reason}${parsed.reason === "Missing name." ? " Which workflow?" : ""}\n${syntaxHelp(workflowSyntax)}` };
   const root = context.cwd;
   const allowed = projectAllowed ?? !projectTrust.isProjectUntrusted(root);
-  const subCommand = args[0]?.toLowerCase();
+  const subCommand = parsed.action.name;
 
-  if (subCommand === "list" || subCommand === "templates") {
+  if (subCommand === "list") {
     return { kind: "local", output: renderList(root) };
   }
 
-  if (subCommand === "run" || subCommand === "start") {
-    const name = args[1];
-    if (!name) return { kind: "local", output: "Which workflow? `/workflow list` shows what this project has." };
+  if (subCommand === "run") {
+    const name = parsed.args[0]!;
     return { kind: "local", output: await execute(root, name, allowed) };
   }
 
@@ -53,7 +57,7 @@ export async function runWorkflowCommand(
 
   return {
     kind: "local",
-    output: "Usage: `/workflow list` · `/workflow run <name>` · `/workflow status`",
+    output: syntaxHelp(workflowSyntax),
   };
 }
 
