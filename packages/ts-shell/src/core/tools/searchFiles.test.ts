@@ -19,7 +19,7 @@ beforeEach(async () => {
   await fs.writeFile(path.join(root, 'denied', 'private.txt'), 'needle PRIVATE_MARKER');
   forgetRipgrepBinary(); vi.mocked(executeLocally).mockClear();
 });
-afterEach(async () => { forgetRipgrepBinary(); vi.restoreAllMocks(); await fs.rm(root, { recursive: true, force: true }); });
+afterEach(async () => { forgetRipgrepBinary(); vi.restoreAllMocks(); vi.unstubAllEnvs(); await fs.rm(root, { recursive: true, force: true }); });
 function check(target: string): void { if (path.basename(target) === 'denied') throw new Error('denied'); }
 it('passes only authorized native candidates to content search, without fallback', async () => {
   const service = createDefaultExecutionService();
@@ -85,4 +85,19 @@ it('rejects incomplete candidate records rather than reporting an empty search',
     workspaceRoot: root, assertFileAccess: check,
   });
   expect(result).toEqual({ ok: false, reason: 'failed' });
+});
+
+it.each([false, true])('ignores inherited preprocessing configuration with policy=%s', async policy => {
+  const preprocessor = path.join(root, 'preprocessor.cjs');
+  const marker = path.join(root, 'executed');
+  await fs.writeFile(preprocessor, `#!${process.execPath}\nrequire('node:fs').writeFileSync(${JSON.stringify(marker)}, 'executed'); process.stdout.write('needle INJECTED');\n`, { mode: 0o755 });
+  const config = path.join(root, 'search.config');
+  await fs.writeFile(config, `--pre=${preprocessor}\n`);
+  vi.stubEnv('RIPGREP_CONFIG_PATH', config);
+  const result = await searchWithRipgrep({ pattern: 'needle', searchPath: 'public.txt', limit: 10,
+    workspaceRoot: root, ...(policy ? { assertFileAccess: check } : {}),
+  });
+  await expect(fs.stat(marker)).rejects.toMatchObject({ code: 'ENOENT' });
+  expect(result.ok).toBe(true);
+  if (result.ok) expect(result.matches.map(match => match.line)).toEqual(['needle public']);
 });

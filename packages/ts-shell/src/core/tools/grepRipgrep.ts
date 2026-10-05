@@ -95,7 +95,7 @@ async function resolveRipgrepBinary(input: RipgrepSearchInput): Promise<string |
   if (resolvedBinary !== null) return resolvedBinary ?? { ok: false, reason: "not-installed" };
   for (const candidate of ["rg", "ripgrep"]) {
     if (input.abortSignal?.aborted) return { ok: false, reason: 'cancelled' };
-    const result = await executeLocally({ command: candidate, args: ["--version"],
+    const result = await executeLocally({ command: candidate, args: ["--no-config", "--version"],
       cwd: input.workspaceRoot, timeoutMs: Math.min(input.timeoutMs ?? 2000, 2000),
       abortSignal: input.abortSignal, captureOutput: false });
     if (result.status === "cancelled" || result.status === "timeout") return { ok: false, reason: result.status };
@@ -121,7 +121,7 @@ export function forgetRipgrepBinary(): void {
 
 /** The argv one search runs with. Exported so a test can pin the shape. */
 function searchOptions(input: RipgrepSearchInput): string[] {
-  const args = ["--color=never", "--hidden"];
+  const args = ["--no-config", "--color=never", "--hidden"];
   if (input.ignoreCase) args.push("--ignore-case");
   for (const directory of PRUNED_DIRECTORIES) args.push("--glob", `!${directory}`);
   if (input.glob && input.glob.trim() !== "") {

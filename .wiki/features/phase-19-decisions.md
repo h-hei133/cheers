@@ -478,3 +478,12 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 验证：Linux、Node 20.3、仓内隔离环境下 execution/core-tools/turn-tools 共 41 文件/400 项通过，build:ts 通过。7 项新增测试检查正文进程 argv 不含拒绝文件、全拒绝零正文进程、点目录和原生忽略、输出到达时撤回策略、长列表分批无丢失、超大枚举终止和残缺枚举失败。移除目标/祖先拒绝检查时 4 失败/3 通过，精确恢复后最终组合套件通过。
 - 编译模块探针经实际内置 grep 与原生程序验证公开内容可搜索、拒绝目录内容不输出、回退 walk 次数为零；模型请求为零。import-cycles/config-consumers/declarations/node-floor 通过；NormProof 无阻断项，6 项既有函数上限 advisory 保持，整体 partial。未取得本批独立审查、PTY 或非 Linux 运行证据。
 - 上批 `6e339370` 的 Architecture Watch `37339975289` 已成功，CI `37339974843` 最近查询仍 in_progress。SAFE-02 仍未完成：本批是稳定目标下的原生逐文件准入，候选检查与子进程打开之间尚存在竞态，原生内部忽略配置读取仍不受回调约束；输出复查不能证明子进程从未读取随后被替换的拒绝对象。目录/创建竞态及非 Linux 文件身份边界仍待完成。
+
+
+### 8.9 SAFE-02 — 原生搜索隐式配置隔离（2026-10-06，进行中）
+
+- [原生搜索参数](../../packages/ts-shell/src/core/tools/grepRipgrep.ts) 的版本探测、候选枚举和正文搜索统一传入 --no-config。继承的 RIPGREP_CONFIG_PATH 不再改变工具行为或启用逐文件预处理命令；工作区忽略文件语义仍保留，此项不等于禁止原生内部读取忽略文件。
+- 定向核实当前原生工具 --help：--no-config 明确忽略 RIPGREP_CONFIG_PATH；--pre 会为每个输入文件启动指定程序。已检查的参考 grep 参数构造没有该隔离选项，本项目不继承这项隐式进程配置行为，依据是工具授权只覆盖声明的搜索，不包含配置隐藏的预处理执行。
+- Node 20.3、隔离环境下原生 grep 路径/流式/参数/候选共 4 文件/47 项通过，build:ts 通过。两项新增真实原生进程测试分别覆盖有/无文件策略，合成配置指定仅向 fixture 写标记的预处理器；正常搜索保留原文且零标记文件。移除 --no-config 时两项均因标记文件实际生成失败（2 失败/7 通过），精确恢复后 47 项通过。最初无扩展名 fixture 受模块格式影响，改为明确 .cjs，确保反转证明真实执行而非仅启动错误。
+- import-cycles/config-consumers/declarations/node-floor 通过。此次未改模块依赖关系或引入新依赖；未取得本批独立审查、PTY 或跨平台证据。
+- 后续隔离条件实测：本机 /usr/bin/bwrap 存在，最小只读 bind、网络隔离及 true 命令 exit 0。当前 [sandbox owner](../../packages/ts-shell/src/sandbox/osSandbox.ts) 将工作区可写挂载，面向 shell，不能直接当作只读候选文件隔离；需要在该 owner 内明确候选文件及实际打开对象边界后再接线。仅 launcher 可运行不构成 SAFE-02 完成证据，目录/创建竞态和非 Linux 文件身份支持继续待完成。
