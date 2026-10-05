@@ -90,6 +90,7 @@ export function createGrepToolDefinition(
       // deleted, so a machine without ripgrep still searches — the same
       // degradation the compared implementations use for native dependencies.
       const viaRipgrep = await searchWithRipgrep({
+        assertFileAccess: context.assertFileAccess,
         pattern: rawPattern,
         searchPath: searchSubPath,
         ...(globFilter ? { glob: globFilter } : {}),

@@ -468,3 +468,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 反转移除实际路径拒绝回调时 6 失败/2 通过，精确恢复后上述组合套件通过。编译模块探针分别在非 Git 与 Git 合成工作区运行真实 read/glob，均隐藏拒绝目录及其内容并保留公开文件；模型请求为零。import-cycles/config-consumers/declarations/node-floor 通过；NormProof 无阻断项，整体 partial 仍来自 6 项既有函数数量 advisory。
 - `81fe8dcc` 的 CI `37338065230` 已核实成功；快照提交 `30c26b7a` 的 Architecture Watch `37338755126` 成功，CI `37338755092` 最近查询仍 in_progress。未取得本批独立审查、PTY 或跨平台运行证据。
 - SAFE-02 仍未完成：原生 Git 内部读取忽略配置尚不受逐文件回调控制，同步子进程不能即时响应取消；原生 grep 内容搜索仍缺逐文件 deny。目录及忽略文件目前依赖路径复查，不能承诺实际打开目录身份在竞态中不变；创建副作用与非 Linux 描述符问题继续保留。当前证据证明稳定目标下的权限接线，不是完整文件系统隔离证明。
+
+
+### 8.8 SAFE-02 — 原生搜索逐文件准入（2026-10-06，进行中）
+
+- [原生 grep](../../packages/ts-shell/src/core/tools/grepRipgrep.ts) 在调用上下文携带文件策略时，先通过原生 --files/--null 枚举候选，再交给 [候选 owner](../../packages/ts-shell/src/core/tools/searchFiles.ts) 核验常规文件、canonical containment、目标及祖先目录拒绝规则。正文搜索仅传入允许的明确文件列表；全部拒绝时不启动正文搜索。未提供文件策略的兼容直接调用保留原路径搜索，不能把它们宣称为已受额外 deny 约束。
+- 使用现有执行 owner 流式收集 NUL 分隔名称，处理跨块 UTF-8，候选输出上限 16 MiB，超限停止并返回 output-limit，残缺记录返回失败。允许列表按保守的 16,000 字节 argv 大小分批，枚举与后续搜索共用总 deadline；每批启动前再核验，保留结果前及返回前重新核验，策略撤回后的正文不输出。仅缺失二进制仍允许原有 walk 回退。
+- 定向比较沿 [19 号研究](19-tools-maturity-and-multifile-edit.md) 实读参考 grep 的参数构造和流式 JSON 读取：保留原生 --hidden/glob、-- 分隔模式/路径及 JSON 行处理；参考直接以目录启动搜索，没有同等逐文件回调契约，本批扩展为原生候选加明确文件搜索，不重写匹配器或换成逐文件 JavaScript 正则。枚举和匹配共用同一个参数 owner，避免两处 glob/大小语义漂移。
+- 验证：Linux、Node 20.3、仓内隔离环境下 execution/core-tools/turn-tools 共 41 文件/400 项通过，build:ts 通过。7 项新增测试检查正文进程 argv 不含拒绝文件、全拒绝零正文进程、点目录和原生忽略、输出到达时撤回策略、长列表分批无丢失、超大枚举终止和残缺枚举失败。移除目标/祖先拒绝检查时 4 失败/3 通过，精确恢复后最终组合套件通过。
+- 编译模块探针经实际内置 grep 与原生程序验证公开内容可搜索、拒绝目录内容不输出、回退 walk 次数为零；模型请求为零。import-cycles/config-consumers/declarations/node-floor 通过；NormProof 无阻断项，6 项既有函数上限 advisory 保持，整体 partial。未取得本批独立审查、PTY 或非 Linux 运行证据。
+- 上批 `6e339370` 的 Architecture Watch `37339975289` 已成功，CI `37339974843` 最近查询仍 in_progress。SAFE-02 仍未完成：本批是稳定目标下的原生逐文件准入，候选检查与子进程打开之间尚存在竞态，原生内部忽略配置读取仍不受回调约束；输出复查不能证明子进程从未读取随后被替换的拒绝对象。目录/创建竞态及非 Linux 文件身份边界仍待完成。

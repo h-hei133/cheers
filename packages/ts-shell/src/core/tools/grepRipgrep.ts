@@ -3,6 +3,7 @@ import { executeLocally } from "../../runtime/execution/local.js";
 import path from "node:path";
 import { realpathSync, statSync } from 'node:fs';
 import { verifyPathContainment } from '../security/pathJail.js';
+import { collectSearchFiles, permittedSearchFile, searchFileBatches } from './searchFiles.js';
 import which from 'which';
 import { truncateLineWidth } from "./truncation.js";
 
@@ -68,6 +69,7 @@ export type RipgrepOutcome =
   | { readonly ok: false; readonly reason: RipgrepUnavailable; readonly detail?: string };
 
 export interface RipgrepSearchInput {
+  readonly assertFileAccess?: (target: string) => void;
   readonly pattern: string;
   /** Directory to search, relative to the workspace root. */
   readonly searchPath: string;
@@ -118,8 +120,8 @@ export function forgetRipgrepBinary(): void {
 }
 
 /** The argv one search runs with. Exported so a test can pin the shape. */
-export function ripgrepArgs(input: RipgrepSearchInput): readonly string[] {
-  const args = ["--json", "--line-number", "--color=never", "--hidden"];
+function searchOptions(input: RipgrepSearchInput): string[] {
+  const args = ["--color=never", "--hidden"];
   if (input.ignoreCase) args.push("--ignore-case");
   for (const directory of PRUNED_DIRECTORIES) args.push("--glob", `!${directory}`);
   if (input.glob && input.glob.trim() !== "") {
@@ -134,9 +136,14 @@ export function ripgrepArgs(input: RipgrepSearchInput): readonly string[] {
   // a search that reports a hit inside a file the fallback would never read is a
   // divergence, and the size cap exists to keep a minified bundle or a data dump
   // from being read into memory.
-  args.push("--max-filesize", `${MAX_SEARCHED_FILE_BYTES}`, "--max-count", `${Math.max(1, Math.ceil(input.limit))}`);
+  args.push("--max-filesize", `${MAX_SEARCHED_FILE_BYTES}`);
+  return args;
+}
+
+export function ripgrepArgs(input: RipgrepSearchInput, files?: readonly string[]): readonly string[] {
+  const args = ["--json", "--line-number", ...searchOptions(input), "--max-count", `${Math.max(1, Math.ceil(input.limit))}`];
   // `--` so a pattern beginning with `-` is read as a pattern.
-  args.push("--", input.pattern, input.searchPath === "" ? "." : input.searchPath);
+  args.push("--", input.pattern, ...(files ?? [input.searchPath === "" ? "." : input.searchPath]));
   return args;
 }
 /** One ripgrep JSON record, as far as this needs to understand it. */
@@ -220,10 +227,30 @@ export async function searchWithRipgrep(input: RipgrepSearchInput): Promise<Ripg
   const current = verifyPathContainment(currentTarget, input.workspaceRoot);
   if (!current.allowed) return { ok: false, reason: 'outside-workspace' };
   if (current.resolvedPath !== currentTarget) return { ok: false, reason: 'failed' };
-  return streamSearch(binary, input);
+  if (!input.assertFileAccess) return streamSearch(binary, input);
+  const deadline = Date.now() + (input.timeoutMs ?? 30_000);
+  const listed = await collectSearchFiles({ binary,
+    args: ['--files', '--null', ...searchOptions(input), '--', input.searchPath || '.'],
+    workspaceRoot: input.workspaceRoot, assertFileAccess: input.assertFileAccess,
+    abortSignal: input.abortSignal, timeoutMs: input.timeoutMs,
+  });
+  if (!listed.ok) return listed;
+  const matches: RipgrepMatch[] = [];
+  for (const batch of searchFileBatches(listed.files)) {
+    if (input.abortSignal?.aborted) return { ok: false, reason: 'cancelled' };
+    const allowed = batch.filter((file) => permittedSearchFile(input.workspaceRoot, file, input.assertFileAccess!) === file);
+    if (!allowed.length) continue;
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) return { ok: false, reason: 'timeout' };
+    const result = await streamSearch(binary, { ...input, timeoutMs: remaining, limit: input.limit - matches.length }, allowed);
+    if (!result.ok) return result;
+    matches.push(...result.matches);
+    if (matches.length >= input.limit) break;
+  }
+  return { ok: true, matches: matches.filter((match) => permittedSearchFile(input.workspaceRoot, match.path, input.assertFileAccess!) !== undefined) };
 }
 
-async function streamSearch(binary: string, input: RipgrepSearchInput): Promise<RipgrepOutcome> {
+async function streamSearch(binary: string, input: RipgrepSearchInput, files?: readonly string[]): Promise<RipgrepOutcome> {
   const controller = new AbortController();
   const onAbort = (): void => controller.abort();
   input.abortSignal?.addEventListener("abort", onAbort, { once: true });
@@ -245,6 +272,10 @@ async function streamSearch(binary: string, input: RipgrepSearchInput): Promise<
       pending = pending.slice(end + 1);
       // Retain only display-width text, not every full matching source line.
       for (const match of parseRipgrepJson(line, 1)) {
+        if (input.assertFileAccess) {
+          const allowed = permittedSearchFile(input.workspaceRoot, match.path, input.assertFileAccess);
+          if (allowed === undefined || !files?.includes(allowed)) continue;
+        }
         matches.push({ ...match, line: truncateLineWidth(match.line, 500) });
       }
       if (matches.length >= input.limit) { limitReached = true; controller.abort(); break; }
@@ -253,7 +284,7 @@ async function streamSearch(binary: string, input: RipgrepSearchInput): Promise<
     if (controller.signal.aborted) pending = "";
   };
   try {
-    const result = await executeLocally({ command: binary, args: [...ripgrepArgs(input)],
+    const result = await executeLocally({ command: binary, args: [...ripgrepArgs(input, files)],
       cwd: input.workspaceRoot, abortSignal: controller.signal, timeoutMs: input.timeoutMs ?? 30_000,
       captureOutput: false, onStdout: consume });
     if (input.abortSignal?.aborted) return { ok: false, reason: "cancelled" };

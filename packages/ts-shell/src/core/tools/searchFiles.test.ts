@@ -1,0 +1,88 @@
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { executeLocally } from '../../runtime/execution/local.js';
+import { createDefaultExecutionService } from '../../runtime/execution/service.js';
+import { createGrepToolDefinition } from './grep.js';
+import { forgetRipgrepBinary, searchWithRipgrep } from './grepRipgrep.js';
+import { collectSearchFiles, searchFileBatches } from './searchFiles.js';
+vi.mock('../../runtime/execution/local.js', async () => {
+  const actual = await vi.importActual<typeof import('../../runtime/execution/local.js')>('../../runtime/execution/local.js');
+  return { ...actual, executeLocally: vi.fn(actual.executeLocally) };
+});
+let root: string;
+beforeEach(async () => {
+  root = await fs.mkdtemp(path.join(os.tmpdir(), 'search-files-'));
+  await fs.mkdir(path.join(root, 'denied'));
+  await fs.writeFile(path.join(root, 'public.txt'), 'needle public');
+  await fs.writeFile(path.join(root, 'denied', 'private.txt'), 'needle PRIVATE_MARKER');
+  forgetRipgrepBinary(); vi.mocked(executeLocally).mockClear();
+});
+afterEach(async () => { forgetRipgrepBinary(); vi.restoreAllMocks(); await fs.rm(root, { recursive: true, force: true }); });
+function check(target: string): void { if (path.basename(target) === 'denied') throw new Error('denied'); }
+it('passes only authorized native candidates to content search, without fallback', async () => {
+  const service = createDefaultExecutionService();
+  const walk = vi.spyOn(service, 'listFilesRecursive');
+  const result = await createGrepToolDefinition(service).execute({ pattern: 'needle' }, {
+    workspaceRoot: root, taskId: 'test', assertFileAccess: check,
+  });
+  expect(result.success).toBe(true);
+  expect(result.output).toContain('needle public');
+  expect(result.output).not.toContain('PRIVATE_MARKER');
+  expect(walk).not.toHaveBeenCalled();
+  const searches = vi.mocked(executeLocally).mock.calls.map(([input]) => input).filter(input => input.args?.includes('--json'));
+  expect(searches).toHaveLength(1);
+  const args = searches[0]!.args!;
+  expect(args.slice(args.indexOf('--') + 2)).toEqual(['public.txt']);
+});
+it('does not spawn a content search when every candidate is denied', async () => {
+  const result = await searchWithRipgrep({ pattern: 'needle', searchPath: '', limit: 10, workspaceRoot: root,
+    assertFileAccess: target => { if (target !== root) throw new Error('denied'); },
+  });
+  expect(result).toEqual({ ok: true, matches: [] });
+  expect(vi.mocked(executeLocally).mock.calls.some(([input]) => input.args?.includes('--json'))).toBe(false);
+});
+it('retains dot paths and native ignore rules with an active file policy', async () => {
+  await fs.mkdir(path.join(root, '.hidden'));
+  await fs.writeFile(path.join(root, '.hidden', 'file.txt'), 'needle dot');
+  await fs.writeFile(path.join(root, '.ignore'), 'public.txt\n');
+  const result = await searchWithRipgrep({ pattern: 'needle', searchPath: '', limit: 10, workspaceRoot: root, assertFileAccess: check });
+  expect(result.ok).toBe(true);
+  if (result.ok) expect(result.matches.map(match => match.path)).toEqual(['.hidden/file.txt']);
+});
+it('rechecks policy before retaining native output', async () => {
+  const actual = await vi.importActual<typeof import('../../runtime/execution/local.js')>('../../runtime/execution/local.js');
+  let revoked = false;
+  vi.mocked(executeLocally).mockImplementation(input => actual.executeLocally(input.args?.includes('--json') ? {
+    ...input, onStdout: chunk => { revoked = true; input.onStdout?.(chunk); },
+  } : input));
+  try {
+    const result = await searchWithRipgrep({ pattern: 'needle', searchPath: 'public.txt', limit: 10, workspaceRoot: root,
+      assertFileAccess: () => { if (revoked) throw new Error('denied'); },
+    });
+    expect(result).toEqual({ ok: true, matches: [] });
+  } finally { vi.mocked(executeLocally).mockImplementation(actual.executeLocally); }
+});
+it('batches long candidate lists without dropping paths', () => {
+  const files = Array.from({ length: 1000 }, (_, i) => `folder-${i}/` + 'a'.repeat(100));
+  const batches = searchFileBatches(files);
+  expect(batches.length).toBeGreaterThan(1);
+  expect(batches.flat()).toEqual(files);
+  for (const batch of batches) expect(batch.reduce((size, file) => size + Buffer.byteLength(file) + 3, 0)).toBeLessThanOrEqual(16_000);
+});
+
+it('stops an oversized native candidate stream', async () => {
+  const result = await collectSearchFiles({ binary: process.execPath,
+    args: ['-e', 'process.stdout.write("x".repeat(17 * 1024 * 1024))'],
+    workspaceRoot: root, assertFileAccess: check,
+  });
+  expect(result).toEqual({ ok: false, reason: 'output-limit' });
+});
+it('rejects incomplete candidate records rather than reporting an empty search', async () => {
+  const result = await collectSearchFiles({ binary: process.execPath,
+    args: ['-e', 'process.stdout.write("public.txt")'],
+    workspaceRoot: root, assertFileAccess: check,
+  });
+  expect(result).toEqual({ ok: false, reason: 'failed' });
+});
