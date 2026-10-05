@@ -133,6 +133,10 @@ export interface CommandExecutionRequest {
 
 export interface TextFileReadExecutionRequest extends ExecutionRequestMetadata<'file.read'> {
   readonly absolutePath: string
+  /** Narrows workspace access to the calling artifact store; never widens it. */
+  readonly artifactDirectory?: string
+  readonly assertFileAccess?: (absolutePath: string) => void
+  readonly abortSignal?: AbortSignal
 }
 
 export interface TextFileWriteExecutionRequest extends ExecutionRequestMetadata<'file.write'> {

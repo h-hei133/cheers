@@ -46,6 +46,7 @@ function continuationNotice(
 export interface DirectoryListingRequest {
   readonly absolutePath: string
   readonly workspaceRoot: string
+  readonly sessionId?: string
   /** The path as the caller wrote it, used in the continuation hint. */
   readonly displayPath: string
   readonly offset?: number
@@ -103,7 +104,7 @@ export async function formatDirectoryListing(
   if (truncated.truncated) {
     // Spilled rather than dropped: the rest is reachable by reading the file
     // instead of re-listing a narrower path.
-    const artifact = await ArtifactManager.getShared(request.workspaceRoot).save(
+    const artifact = await ArtifactManager.getShared(request.workspaceRoot, request.sessionId).save(
       lines.join('\n'),
       'read',
     )

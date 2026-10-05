@@ -106,7 +106,7 @@ export function createGrepToolDefinition(
       if (viaRipgrep.ok) {
         return await reportGrepMatches(
           viaRipgrep.matches.map((match) => formatRipgrepMatch(match, 500)),
-          context.workspaceRoot,
+          context.workspaceRoot, context.sessionId,
         );
       }
 
@@ -179,7 +179,7 @@ export function createGrepToolDefinition(
       }
 
       if (context.abortSignal?.aborted) return deniedResult("Search stopped: cancelled.");
-      return await reportGrepMatches(results, context.workspaceRoot);
+      return await reportGrepMatches(results, context.workspaceRoot, context.sessionId);
     },
   };
 }
@@ -195,6 +195,7 @@ export function createGrepToolDefinition(
 async function reportGrepMatches(
   matches: readonly string[],
   workspaceRoot: string,
+  sessionId?: string,
 ): Promise<ToolExecutionResult> {
   if (matches.length === 0) {
     return approvedResult("No matches found for the pattern.");
@@ -205,7 +206,7 @@ async function reportGrepMatches(
   let outputText = truncated.content;
 
   if (truncated.truncated) {
-    const artifactManager = ArtifactManager.getShared(workspaceRoot);
+    const artifactManager = ArtifactManager.getShared(workspaceRoot, sessionId);
     const artifact = await artifactManager.save(rawResult, "grep");
     outputText += `\n\n[Showing ${truncated.shownLines} of ${matches.length} matches (${Math.round(truncated.shownBytes / 1024)}KB). Full grep output spilled to: ${artifact.uri}]`;
   }

@@ -93,7 +93,7 @@ export function createGlobToolDefinition(
       if (truncated.truncated) {
         // Spilled rather than dropped, so nothing matched is unreachable — the
         // model can read the rest instead of re-running a narrower search.
-        const artifactManager = ArtifactManager.getShared(context.workspaceRoot)
+        const artifactManager = ArtifactManager.getShared(context.workspaceRoot, context.sessionId)
         const artifact = await artifactManager.save(raw, 'glob')
         notices.push(
           `${Math.round(truncated.shownBytes / 1024)}KB limit reached, showing ${truncated.shownLines} of ${filtered.length} matches. Full list written to ${artifact.uri}`,

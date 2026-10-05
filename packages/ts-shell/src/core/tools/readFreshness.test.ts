@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createCoreToolRegistry } from "./registry.js";
 import { createDefaultExecutionService } from "../../runtime/execution/service.js";
 import { createSubagentRunner } from "../../turn/subagent.js";
@@ -12,6 +12,16 @@ beforeEach(async () => {
   await fs.writeFile(path.join(workspaceRoot, "file.txt"), "before\n");
 });
 afterEach(async () => { await fs.rm(workspaceRoot, { recursive: true, force: true }); });
+
+it.each(['write', 'edit'])('does not turn a %s pre-read refusal into an approved write', async name => {
+  const execution = createDefaultExecutionService();
+  const write = vi.fn();
+  const tool = createCoreToolRegistry({ executionService: { ...execution, writeTextFile: write } }).get(name)!;
+  await expect(tool.execute({ path: 'file.txt', content: 'must not write' }, { workspaceRoot, taskId: 'denied',
+    assertFileAccess: () => { throw new Error('path denied'); } })).rejects.toThrow('path denied');
+  expect(write).not.toHaveBeenCalled();
+  expect(await fs.readFile(path.join(workspaceRoot, 'file.txt'), 'utf8')).toBe('before\n');
+});
 
 it("returns current content when an external write preserves the mtime", async () => {
   const file = path.join(workspaceRoot, "file.txt");

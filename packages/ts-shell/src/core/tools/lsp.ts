@@ -244,6 +244,8 @@ async function readSource(
   return executionService.readTextFile({
     operationKind: "file.read",
     absolutePath: target,
+    assertFileAccess: context.assertFileAccess,
+    abortSignal: context.abortSignal,
     workspaceRoot: context.workspaceRoot,
     authority: TOOL_APPROVED_READ_AUTHORITY,
     caller: "core-tool:lsp",

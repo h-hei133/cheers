@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs'
 import { withFileLock } from './fileLock.js'
 import { FileContentConflictError } from './conflict.js'
+import { readTextFile } from './read.js'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { createWorkspaceWriteAuthority } from '../../edit/authority/workspace.js'
@@ -38,9 +39,7 @@ import type {
 
 export function createDefaultExecutionService(): ExecutionService {
   return {
-    readTextFile(request) {
-      return fs.readFile(request.absolutePath, 'utf8')
-    },
+    readTextFile,
     async writeTextFile(request) {
       // Held across the whole write, and taken by anyone who writes. A caller
       // that read first then wrote through here has its read covered too, as

@@ -409,3 +409,17 @@ SAFE-01 已实现并完成本地验证；其余 75 项仍未完成。§7.4 为�
 - 定向比较基于 [19 号研究 §3.2](19-tools-maturity-and-multifile-edit.md)：实读参考只读目标的 realpath 校验与读取接线。同意先校验 canonical containment、以通过检查的 canonical 路径打开、执行阶段重新核验，保留用户请求名称用于展示；本批实现前两项和 LSP 每次读取前的重新核验，打开后的身份校验仍未完成。路径边界采用完整 `..` 路径段比较，修正 `..notes` 被误当父目录的缺陷；不按字符串前缀猜父目录。
 - 新回归覆盖全部五操作的三类逃逸、hover 真实服务接线、空白文件名、显式/扫描路径的 canonical deny、read selector 和 artifact 规则独立性、合法双点开头文件。Node 20.3、仓内隔离 HOME/USERPROFILE/TMPDIR/CHEERS_TEST_ROOT 下 32 文件/419 项通过，`build:ts` 通过。移除 workspace target 围栏时 7 失败/11 通过；移除 LSP 逐文件拒绝检查时 1 失败/17 通过；精确字节恢复后重建并复跑 419 项通过。
 - import-cycles、config-consumers、declarations、node-floor 通过；NormProof 两项图义务 satisfied，整体仍为 6 项既有函数上限 advisory 导致 partial。未取得新增独立审查、PTY、真实提供方或跨平台文件句柄证据，后续批次不得以本节替代这些验收。
+
+### 8.3 SAFE-02 — 文本读取句柄与 artifact 范围（2026-10-05，进行中）
+
+SAFE-02 继续推进，尚未完成。`f1b01f84` 的 CI `37329604006` 和 Architecture Watch `37329603966` 本轮均已核实成功；`673e6cde` 自己的旧 CI 查询仍为 in_progress，不能伪填其结果。本批未用旧提交的通过替代新改动证据。
+
+- [执行服务](../../packages/ts-shell/src/runtime/execution/service.ts) 的文本读取委派给同域 [read](../../packages/ts-shell/src/runtime/execution/read.ts)：核验 workspace/canonical 目标、常规文件和精确 bigint 文件身份，以 no-follow/nonblocking 标志打开，再核对已打开对象及拒绝策略，最后从同一个句柄读出内容并始终关闭。Linux 通过描述符实际路径核验父目录替换；没有重新按路径打开来取字节。预取消零打开，打开后取消/身份变化/拒绝均停止内容读取。BOM/CRLF 原样保留。
+- read/LSP 及 write/edit 的预读均传递取消和逐文件拒绝检查。write/edit 仅对文件不存在保留创建路径；其他预读拒绝、取消和错误不再被吞掉后继续写入。已打开文件消失与最初文件不存在分开，前者不得成为创建分支的依据。
+- [artifact 存储](../../packages/ts-shell/src/core/session/artifactManager.ts) 删除全局单实例，按 canonical workspace 与 session ID 复用；read、bash、glob、grep、目录输出与后台任务的既有产物目录接线传入会话身份。仅解析数字 ID，暂存文件、歧义 ID、越界符号链接或被替换的目录不解析为产物。读取请求显式携带 artifact 目录，但它只能收窄 workspace 范围，不能授予外部文件访问。
+- 存储构造不再创建目录，保存前检查目录边界；恢复实例扫描已有编号，发布使用排他链接而不覆盖同名历史文件。删除失败后直写与伪成功回退，实际发布失败即失败；暂存文件清理为 best effort，不能声称磁盘故障时一定无残留。工具标签仅用于有界安全文件名，会话 ID 必须是单段有效身份。
+- 兼容：没有 session ID 的调用仍使用原 default 目录；现有产物文件保留。具备明确 session ID 的调用不自动回退到无归属的旧 default 产物，以免相同数字 ID 读错来源；旧数据仍可经明确的工作区文件路径访问。产物 ID 不是内容签名或跨进程写入所有权证明，本批不增加这类保证。
+- 定向对照：沿 [19 号研究](19-tools-maturity-and-multifile-edit.md) 读取参考的 canonical 读取与 artifact 协议/存储实现。同意“按已检查的真实目标读取”“优先绑定调用会话”“数字 ID 与发布失败真实呈现”；不采用跨其他活动会话目录继续查找的回退，以保持本任务的会话范围。参考的暂存发布与保留旧文件决策在本实现中使用现有 TypeScript 文件系统能力完成，没有新增执行平面。
+- 验证：Linux、Node 20.3、仓内隔离 HOME/USERPROFILE/TMPDIR/CHEERS_TEST_ROOT 下，execution、core/tools、artifact 与 turn/tools 共 38 文件/371 项通过，`build:ts` 通过。服务退回按路径直接读取时 7 失败/2 通过；artifact 缓存去掉 session 身份时 2 失败/6 通过；恢复吞掉 write/edit 预读错误时 2 失败/4 通过。每次恢复精确字节，最终重新构建并复跑 371 项通过。
+- 编译模块隔离探针经实际 kernel→工具适配→执行服务验证同 ID 的两会话各读自身产物、缺失会话拒绝，以及打开后文件移出工作区时零内容读取并关闭句柄；模型请求为零。此为编译模块证据，不称 CLI/PTY 或真实 provider 验收。
+- import-cycles、config-consumers、declarations、node-floor 通过；NormProof 图义务 satisfied、函数数量仍为 6 项既有 advisory，整体 partial。尚未取得本批独立审查或非 Linux 文件句柄证据：其他平台当前只有文件身份/路径复查，不承诺同等的描述符路径保证。SAFE-02 的 grep 原生/回退、目录枚举、写入最终对象的拒绝检查及剩余竞态仍待核实和收口，不能由本批文本读取证据代替。

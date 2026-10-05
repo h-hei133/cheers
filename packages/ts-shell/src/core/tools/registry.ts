@@ -162,7 +162,7 @@ async function runCommandTool(
     ...(context.commandEnv ? { env: context.commandEnv } : {}),
     ...(context.onOutput ? { onOutput: context.onOutput } : {}),
   })
-  const artifactManager = ArtifactManager.getShared(context.workspaceRoot)
+  const artifactManager = ArtifactManager.getShared(context.workspaceRoot, context.sessionId)
   const isOk = result.status === 'completed' && result.exitCode === 0
   const rawOutput = isOk
     ? (result.stdout || 'Command completed with no output')
@@ -288,7 +288,7 @@ export function createCoreToolRegistry(options?: {
       async execute(args, context) {
         const rawPath = typeof args.path === 'string' ? args.path : ''
         const selector = parsePathSelector(rawPath)
-        const artifactManager = ArtifactManager.getShared(context.workspaceRoot)
+        const artifactManager = ArtifactManager.getShared(context.workspaceRoot, context.sessionId)
         let target = selector.cleanPath
         let isArtifact = target.startsWith('artifact://')
         let rawContent = ''
@@ -300,7 +300,10 @@ export function createCoreToolRegistry(options?: {
           }
           rawContent = await executionService.readTextFile({
             operationKind: 'file.read',
+            assertFileAccess: context.assertFileAccess,
+            abortSignal: context.abortSignal,
             absolutePath: resolvedArtifact,
+            artifactDirectory: artifactManager.directory,
             workspaceRoot: context.workspaceRoot,
             authority: TOOL_APPROVED_READ_AUTHORITY,
             caller: 'core-tool:read:artifact',
@@ -324,6 +327,7 @@ export function createCoreToolRegistry(options?: {
                 absolutePath: containment.resolvedPath,
                 workspaceRoot: context.workspaceRoot,
                 displayPath: selector.cleanPath,
+                sessionId: context.sessionId,
                 offset: typeof args.offset === 'number' ? args.offset : undefined,
                 limit: typeof args.limit === 'number' ? args.limit : undefined,
               }),
@@ -350,6 +354,8 @@ export function createCoreToolRegistry(options?: {
           // this model, or that an external writer left the bytes unchanged.
           rawContent = await executionService.readTextFile({
             operationKind: 'file.read',
+            assertFileAccess: context.assertFileAccess,
+            abortSignal: context.abortSignal,
             absolutePath: containment.resolvedPath,
             workspaceRoot: context.workspaceRoot,
             authority: TOOL_APPROVED_READ_AUTHORITY,
@@ -436,6 +442,8 @@ export function createCoreToolRegistry(options?: {
           try {
             original = await executionService.readTextFile({
               operationKind: 'file.read',
+              assertFileAccess: context.assertFileAccess,
+              abortSignal: context.abortSignal,
               absolutePath: containment.resolvedPath,
               workspaceRoot: context.workspaceRoot,
               authority: TOOL_APPROVED_READ_AUTHORITY,
@@ -443,7 +451,8 @@ export function createCoreToolRegistry(options?: {
               reason: 'Read original content for diff.',
               reportSafeTarget: containment.resolvedPath,
             })
-          } catch {
+          } catch (error) {
+            if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error
             originalUnreadable = true
           }
           await executionService.writeTextFile({
@@ -537,6 +546,8 @@ export function createCoreToolRegistry(options?: {
         if (segmentEdits) {
           const raw = await executionService.readTextFile({
             operationKind: 'file.read',
+            assertFileAccess: context.assertFileAccess,
+            abortSignal: context.abortSignal,
             absolutePath: containment.resolvedPath,
             workspaceRoot: context.workspaceRoot,
             authority: TOOL_APPROVED_READ_AUTHORITY,
@@ -565,6 +576,8 @@ export function createCoreToolRegistry(options?: {
         } else if (typeof args.oldText === 'string' && typeof args.newText === 'string') {
           const raw = await executionService.readTextFile({
             operationKind: 'file.read',
+            assertFileAccess: context.assertFileAccess,
+            abortSignal: context.abortSignal,
             absolutePath: containment.resolvedPath,
             workspaceRoot: context.workspaceRoot,
             authority: TOOL_APPROVED_READ_AUTHORITY,
@@ -598,6 +611,8 @@ export function createCoreToolRegistry(options?: {
           try {
             original = await executionService.readTextFile({
               operationKind: 'file.read',
+              assertFileAccess: context.assertFileAccess,
+              abortSignal: context.abortSignal,
               absolutePath: containment.resolvedPath,
               workspaceRoot: context.workspaceRoot,
               authority: TOOL_APPROVED_READ_AUTHORITY,
@@ -606,7 +621,8 @@ export function createCoreToolRegistry(options?: {
               reportSafeTarget: containment.resolvedPath,
             })
             expectedContent = original
-          } catch {
+          } catch (error) {
+            if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error
             originalUnreadable = true
           }
           finalContent = args.content
@@ -758,7 +774,7 @@ function startBackgroundCommand(
   // so the file a reader is pointed at sits with the ones the foreground tools
   // write rather than in a directory of its own.
   TaskRegistry.getShared().spillDirectory = ArtifactManager.getShared(
-    context.workspaceRoot,
+    context.workspaceRoot, context.sessionId,
   ).directory;
   if (!command.trim()) {
     return deniedResult('Error: No command provided to execute.', { status: 'failed', exitCode: 1 })
