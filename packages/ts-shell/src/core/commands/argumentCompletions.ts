@@ -34,7 +34,6 @@ const SUBCOMMAND_VALUES = {
   connect: ["status", "list", "presets", "login", "set", "use", "logout", "help"],
   compact: ["preview", "render", "json"],
   warmup: ["status", "rebuild"],
-  resume: ["list", "current", "switch", "help", "panel", "ls", "active", "use"],
   mcp: ["status", "tools", "doctor", "refresh"],
   permissions: ["list", "explain", "revoke", "reset"],
   workspace: ["status", "attach", "recent"],

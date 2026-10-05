@@ -13,11 +13,14 @@ function actionUsage(action: CommandAction, enumerate = false): string {
 }
 
 export function syntaxHint(syntax: CommandSyntax): string {
-  return `[${syntax.actions.filter(action => action.name).map(action => actionUsage(action)).join("|")}]${flagUsage(syntax)}`;
+  return `[${syntax.actions.filter(action => action.name || action.parameters?.length).map(action => actionUsage(action)).join("|")}]${flagUsage(syntax)}`;
 }
 
 export function syntaxHelp(syntax: CommandSyntax): string {
-  return "Usage: " + syntax.actions.map(action => `/${syntax.name}${action.name ? " " : ""}${actionUsage(action, true)}`).join(" | ") + flagUsage(syntax);
+  return "Usage: " + syntax.actions.map(action => {
+    const usage = actionUsage(action, true);
+    return `/${syntax.name}${usage ? " " : ""}${usage}`;
+  }).join(" | ") + flagUsage(syntax);
 }
 
 function flagUsage(syntax: Pick<CommandSyntax, "flags">): string {

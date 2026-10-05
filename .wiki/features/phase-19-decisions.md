@@ -664,3 +664,15 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Linux、Node 20.3、隔离环境组合 14 文件/258 项通过，build:ts 通过；真实 regular/fullscreen CLI 验证非法 shell/settings/fast/statusline 输入拒绝，已有 fast 与状态栏配置的字节/mtime 不变，合法 model,cost 保存，两模式 exit 0、无模型请求。旧错误文案断言按安全错误类别更新；新增 co 前缀测试初始漏写合法 context 候选，修正为同时验证 context/cost，未缩减产品候选。
 - import cycles/config consumers/declarations/node floor 通过；call reachability 7 个与 NormProof 函数数量 5 个既有 advisory 不变，阻断义务通过。49e688c2 Architecture Watch 37372368971 已成功，CI 37372368967 最近为 queued，未计通过。
 - CMD-03 仍未完成：其余命令语法及动态目录继续，CMD-04、SAFE-02 和 Phase 19 后续批次继续；没有以本批四条命令的验证覆盖全量表。
+
+
+### 8.26 CMD-03：会话导航动作校验与同源帮助
+
+- [navigation/syntax](../../packages/ts-shell/src/core/commands/navigation/syntax.ts) 声明 resume/fork/tree/entries 的动作、别名与位置参数。resume 的普通对象模式表已删除，constructor/__proto__/toString 仅作为普通会话引用进入既有解析器，不再变成继承来的 sessionAction。多余参数、未知 flags 与缺失 fork 目标返回本地错误，不生成切换/复制动作。
+- resume/switch 保留实际执行器支持的 ID、前缀、标题与 last/latest 引用，带空格的标题须为单个引号参数。fork 则保持直接 session ID 或 here 的语义，对路径分隔符、点目录等非法 ID 在动作生成前拒绝。不能把两种引用模型统一为只允许 ID：初步校验曾过窄，经执行层对照后已修正并补标题回归。
+- tree 的合法单个 entry-id 仍由既有导航器处理；entries 的独占 cursor、tree 子树与 unknown-cursor 行为不变，但所有参数先校验，再读取 transcript/thread。帮助可在没有活跃会话时读取。对应 registry 候选、hint 和会话命令地图消费同一语法，增加 fork 与 here 候选；未伪造动态 session/entry IDs。
+- 共享帮助支持默认动作的位置参数，确保 `/fork <session-id|here>` 等输出包含命令与参数间隔。短 hint 也包含直接引用形式；删除原 resume 补全词表及手写会话动作地图，保留关于标题引号和 fork/tree 差异的语义说明。
+- 定向对照参考交互入口：裸 resume/fork/tree 分别打开明确选择器，没有把任意后缀自动视为同一动作。本项目保留已有显式 ID/title 接口，以严格参数校验和明确 shell-action handoff 达成同样的动作边界，不照搬其只支持裸命令的接口。
+- Linux、Node 20.3、隔离环境组合 13 文件/257 项通过，build:ts 通过。旧 resume/entries/tree handler 三组反转均失败，源码逐字节恢复后组合测试再次通过。真实 regular/fullscreen CLI 验证非法 fork 不创建新 session，非法 resume/tree/entries 参数不改变当前会话指针，两模式 exit 0、无模型请求。
+- import cycles/config consumers/declarations/node floor 通过；call reachability 与 NormProof 既有 advisory 不作为完成证据。49e688c2 的 CI 37372368967 失败但 steps=[]，annotation 明确为 hosted runner 多次未领取任务；其 Architecture Watch 37372368971 成功。b05da528 的 Architecture Watch 37373559916 成功，CI 37373559892 最近 queued，未计通过。
+- CMD-03 尚未完成：动态 session/entry、memory 实体/筛选目录及其余命令表继续；CMD-04、SAFE-02 与阶段后续批次仍开放。本批不改变会话恢复安全边界、文件恢复或真实模型调用流程。

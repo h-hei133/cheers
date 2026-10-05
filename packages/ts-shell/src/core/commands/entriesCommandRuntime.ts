@@ -1,3 +1,5 @@
+import { entriesSyntax, parseNavigationArgs } from "./navigation/syntax.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { createSessionStoreLayout, locateExistingSessionLayout } from "../../session/store/sessionFileLayout.js";
 import { readTranscriptEvents } from "../../session/transcript/sessionTranscript.js";
@@ -73,21 +75,17 @@ export async function runEntriesCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
+  const parsed = parseNavigationArgs(entriesSyntax, args);
+  if (!parsed.ok) return { kind: "local", output: `Invalid /entries arguments: ${parsed.reason}\n${syntaxHelp(entriesSyntax)}` };
+  if (parsed.action.name === "help") return { kind: "local", output: `${syntaxHelp(entriesSyntax)}\n${HELP}` };
   const sessionId = context.sessionId;
-  if (!sessionId) {
-    return { kind: "local", output: "No session to read: this command needs a live session." };
-  }
-  const [first, second] = args;
-
-  if (first === "help" || first === "--help") {
-    return { kind: "local", output: HELP };
-  }
-
-  if (first === "tree") {
+  if (!sessionId) return { kind: "local", output: "No session to read: this command needs a live session." };
+  const first = parsed.args[0];
+  if (parsed.action.name === "tree") {
     const snapshot = threadFor(sessionId, context.cwd);
     if (!snapshot) return { kind: "local", output: emptySession(sessionId) };
-    const tree = readSessionTree(snapshot.entries, second);
-    if (tree === "unknown-cursor") return { kind: "local", output: unknownCursor(second!) };
+    const tree = readSessionTree(snapshot.entries, first);
+    if (tree === "unknown-cursor") return { kind: "local", output: unknownCursor(first!) };
     if (tree.length === 0) return { kind: "local", output: emptySession(sessionId) };
     const lines = ["### Session tree", "", `Leaf: \`${snapshot.activeLeafId ?? "none"}\``, ""];
     const render = (nodes: typeof tree, depth: number): void => {

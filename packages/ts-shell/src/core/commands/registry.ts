@@ -1,3 +1,4 @@
+import { resumeSyntax, forkSyntax, treeSyntax, entriesSyntax, navigationCompletions } from "./navigation/syntax.js";
 import { shellSyntax } from "./shell/syntax.js";
 import { fastSyntax } from "./fast/syntax.js";
 import { statuslineSyntax, statuslineCompletions } from "./statusline/syntax.js";
@@ -190,7 +191,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "navigate the session tree, including other branches",
       group: "session",
-      argumentHint: "[<entry-id>|help]",
+      argumentHint: syntaxHint(treeSyntax),
+      getArgumentCompletions: (prefix) => navigationCompletions(treeSyntax, prefix),
       execute: (args) => runTreeCommand(args),
     },
     {
@@ -201,7 +203,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "read this session's entries, optionally after a cursor",
       group: "session",
-      argumentHint: "[<entry-id>|tree [<entry-id>]|help]",
+      argumentHint: syntaxHint(entriesSyntax),
+      getArgumentCompletions: (prefix) => navigationCompletions(entriesSyntax, prefix),
       execute: (args, context) => runEntriesCommand(args, context),
     },
     {
@@ -213,8 +216,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "pick, inspect, switch, or continue a session",
       group: "session",
-      argumentHint: "[list|current|switch|help]",
-      getArgumentCompletions: (prefix) => subcommandCompletions("resume", prefix),
+      argumentHint: syntaxHint(resumeSyntax),
+      getArgumentCompletions: (prefix) => navigationCompletions(resumeSyntax, prefix),
       execute: (args, context) => runResumeCommand(args, context),
     },
     {
@@ -225,7 +228,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "continue one session's conversation in a second, new session",
       group: "session",
-      argumentHint: "[here|sessionId]",
+      argumentHint: syntaxHint(forkSyntax),
+      getArgumentCompletions: (prefix) => navigationCompletions(forkSyntax, prefix),
       execute: (args, context) => runResumeCommand(["fork", ...args], context),
     },
     {

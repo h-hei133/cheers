@@ -1,3 +1,5 @@
+import { resumeSyntax, forkSyntax } from "../core/commands/navigation/syntax.js";
+import { syntaxHelp } from "../core/commands/syntax/projection.js";
 import { commandInvocations, resolveCommandInvocation, type CommandInvocation } from "../core/commands/invocation.js";
 import { listVisibleCommands } from "../core/commands/registry.js";
 import type { CommandDefinition } from "../core/commands/types.js";
@@ -141,19 +143,9 @@ export function renderSessionCommandMap(
   renderer.renderLine(
     compact ? "Session command map:" : "\nSession command map",
   );
-  renderer.renderLine(
-    "- /resume              open the session surface (interactive panel in TTY; overview in print/non-TTY).",
-  );
-  renderer.renderLine("- /resume current      inspect the active session.");
-  renderer.renderLine(
-    "- /resume list         inspect recent sessions for this project.",
-  );
-  renderer.renderLine(
-    "- /resume switch <id|prefix|title|last> switch active session and project context.",
-  );
-  renderer.renderLine(
-    "- /resume [id|prefix|title|last] resume the best recoverable context.",
-  );
+  renderer.renderLine(syntaxHelp(resumeSyntax));
+  renderer.renderLine(syntaxHelp(forkSyntax));
+  renderer.renderLine("Quote a multi-word session title. Fork creates a separate session; tree navigation stays in the current session.");
   if (includeHelpHint) {
     renderer.renderLine("- /help                show full command guide.");
   }

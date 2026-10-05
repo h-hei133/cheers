@@ -6159,3 +6159,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 - 2026-10-06：Phase 19 CMD-03 model 会话选择与恢复、显式全局保存、动作语法和目录位置校验完成本批实现；退出清理保留显式模型偏好，刷新保留启动限制。337 项测试、构建、反转与 regular/fullscreen 重启验证，详见 [决策 §8.24](features/phase-19-decisions.md#824-cmd-03model-会话选择恢复与严格语法)；CMD-03 与阶段整体未完成。
 
 - 2026-10-06：Phase 19 CMD-03 shell/statusline/settings/fast 接入共享语法与合法参数位置补全，修正 fast 能力与失败文案；258 项、构建、反转和两模式真实 CLI 验证，见 [决策 §8.25](features/phase-19-decisions.md#825-cmd-03shellstatuslinesettingsfast-参数与候选)。阶段整体仍未完成。
+
+- 2026-10-06：Phase 19 CMD-03 会话导航参数/固定候选与同源帮助接线，修复 resume 模式表继承属性与多余参数被忽略；257 项、构建、反转及两模式真实 CLI 验证，详见 [决策 §8.26](features/phase-19-decisions.md#826-cmd-03会话导航动作校验与同源帮助)。阶段目标继续。

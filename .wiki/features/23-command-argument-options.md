@@ -377,3 +377,8 @@ memory owner 的动作定义已用于入口、五组契约解析、帮助和补�
 ### CMD-03 偏好命令实施记录（2026-10-06）
 
 shell/statusline/settings/fast 已由 owner syntax 驱动执行、帮助与候选。共享有限参数按合法位置枚举；状态项支持逗号 token 补全，settings 不枚举未实现的键，fast 如实描述温度与存储失败。258 项组合测试、构建、四组反转和两模式真实 CLI 验证通过，详见 [决策 §8.25](phase-19-decisions.md#825-cmd-03shellstatuslinesettingsfast-参数与候选)。其余全量表及 CMD-04 待续。
+
+
+### CMD-03 会话导航实施记录（2026-10-06）
+
+resume/fork/tree/entries 使用共享导航语法，拒绝多余参数与非法 flags，修复对象继承属性被当成模式的问题。保留标题/前缀引用与 fork here、entries 独占游标语义，帮助和固定候选同源。257 项组合测试、构建、三组反转和两模式真实 CLI 验证，见 [决策 §8.26](phase-19-decisions.md#826-cmd-03会话导航动作校验与同源帮助)；动态实体目录及其余全量表仍待完成。

@@ -35,15 +35,12 @@ describe("slash command registry CLI surface", () => {
       renderSessionCommandMap(renderer, { compact: true }),
     );
 
-    expect(lines).toEqual([
-      "Session command map:",
-      "- /resume              open the session surface (interactive panel in TTY; overview in print/non-TTY).",
-      "- /resume current      inspect the active session.",
-      "- /resume list         inspect recent sessions for this project.",
-      "- /resume switch <id|prefix|title|last> switch active session and project context.",
-      "- /resume [id|prefix|title|last] resume the best recoverable context.",
-      "- /help                show full command guide.",
-    ]);
+    expect(lines[0]).toBe("Session command map:");
+    expect(lines[1]).toContain("/resume switch [id|prefix|title|last]");
+    expect(lines[1]).toContain("/resume fork <session-id|here>");
+    expect(lines[2]).toBe("Usage: /fork <session-id|here>");
+    expect(lines[3]).toContain("Quote a multi-word session title");
+    expect(lines.at(-1)).toContain("/help");
   });
 
   it("generates the guide from the registry, so it cannot drift from it", () => {
