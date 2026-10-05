@@ -417,3 +417,8 @@ loop 严格次数范围与示例候选同源，删除缺失 gate 时隐式 npm t
 ### CMD-03 connect 实施记录（2026-10-06）
 
 connect 统一动作/flags/互斥与直接写入函数校验，provider 候选按合法位置生成，凭据值不补全；非法输入在配置写入或认证调用之前拒绝。264 项、构建、反转及两模式真实 CLI 验证，见 [决策 §8.33](phase-19-decisions.md#833-cmd-03connect-登录与连接动作校验)。动态连接 ID 与其余任务继续。
+
+
+### CMD-03 browser 实施记录（2026-10-06）
+
+browser 顶层/action/replay-cache/repair 使用领域分层语法，拒绝额外参数，保留精确目标，confirm 不补全且保持独立审批。377 项通过、9 项既有集成跳过，构建、四组反转及两模式 CLI 验证通过，见 [决策 §8.34](phase-19-decisions.md#834-cmd-03browser-分层语法与确认隔离)。其余语法和动态目录继续。

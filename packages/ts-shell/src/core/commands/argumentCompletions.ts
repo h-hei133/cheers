@@ -26,7 +26,6 @@ function prefixFilter(
  */
 const SUBCOMMAND_VALUES = {
   compact: ["preview", "render", "json"],
-  browser: ["status", "smoke", "runtime", "preview", "dry-run", "execute", "replay", "repair"],
 } as const;
 
 export type EnumerableCommand = keyof typeof SUBCOMMAND_VALUES;

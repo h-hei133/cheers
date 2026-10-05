@@ -1,3 +1,6 @@
+import { browserSyntax } from "./command/syntax.js";
+import { parseSyntax } from "../core/commands/syntax/parse.js";
+import { syntaxHelp } from "../core/commands/syntax/projection.js";
 import { parseBrowserPreviewActionArgs, type BrowserActionContract } from "./actionContract.js";
 import {
   parseBrowserExecutionCommandArgs,
@@ -29,6 +32,9 @@ export interface BrowserCommandParseResult {
 }
 
 export function parseBrowserCommandArgs(args: readonly string[]): BrowserCommandParseResult {
+  const syntax = parseSyntax(browserSyntax, args);
+  if (!syntax.ok) return invalidBrowserArgs(syntax.reason);
+  args = [syntax.action.name, ...syntax.args];
   if (args.length === 0 || (args.length === 1 && args[0] === "status")) {
     return {
       ok: true,
@@ -128,26 +134,7 @@ function invalidBrowserArgs(value: string): BrowserCommandParseResult {
       `- Reason: Unsupported /browser argument: ${value || "(empty)"}`,
       "- DoNext: Use /browser, /browser status, /browser runtime status, /browser preview <action>, /browser dry-run <action>, /browser execute <action>, /browser replay <receipt-id>, or /browser repair status.",
       "",
-      "Supported /browser forms:",
-      "- /browser",
-      "- /browser status",
-      "- /browser runtime status",
-      "- /browser preview navigate <url>",
-      "- /browser preview extract <goal>",
-      "- /browser preview click <target>",
-      "- /browser preview type <target> <text>",
-      "- /browser dry-run navigate <url>",
-      "- /browser dry-run extract <goal>",
-      "- /browser dry-run click <target>",
-      "- /browser dry-run type <target> <text>",
-      "- /browser execute navigate <url>",
-      "- /browser execute observe",
-      "- /browser execute extract <goal>",
-      "- /browser smoke",
-      "- /browser replay status",
-      "- /browser replay <receipt-id>",
-      "- /browser repair status",
-      "- /browser repair apply <proposal-id> --confirm",
+      syntaxHelp(browserSyntax),
     ].join("\n"),
   };
 }

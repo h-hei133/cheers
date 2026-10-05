@@ -1,3 +1,4 @@
+import { parseReplayArgs } from "./command/syntax.js";
 import { sanitizeBrowserText } from "./capabilityModel.js";
 
 export type BrowserReplayCommandMode =
@@ -22,50 +23,11 @@ export type BrowserReplayCommandParseResult =
 export function parseBrowserReplayCommandArgs(
   args: readonly string[],
 ): BrowserReplayCommandParseResult {
-  if (args.length === 0 || args[0] === "status") {
-    return { ok: true, request: { mode: "status", sourceCommand: "/browser replay" } };
-  }
-  if (args[0] === "cache") {
-    if (args.length === 1 || args[1] === "status") {
-      return { ok: true, request: { mode: "cache-status", sourceCommand: "/browser replay" } };
-    }
-    if (args[1] === "compact" || args[1] === "repair") {
-      return {
-        ok: true,
-        request: {
-          mode: args[1] === "compact" ? "cache-compact" : "cache-repair",
-          sourceCommand: "/browser replay",
-        },
-      };
-    }
-    if (args[1] === "invalidate" || args[1] === "delete") {
-      const receiptId = sanitizeBrowserText(args.slice(2).join(" "), 180);
-      if (!receiptId) {
-        return invalid("Missing browser receipt id.");
-      }
-      return {
-        ok: true,
-        request: {
-          mode: args[1] === "invalidate" ? "cache-invalidate" : "cache-delete",
-          receiptId,
-          sourceCommand: "/browser replay",
-        },
-      };
-    }
-    return invalid("Unsupported browser replay cache command.");
-  }
-  const receiptId = sanitizeBrowserText(args.join(" "), 180);
-  if (!receiptId) {
-    return invalid("Missing browser receipt id.");
-  }
-  return {
-    ok: true,
-    request: {
-      mode: "replay",
-      receiptId,
-      sourceCommand: "/browser replay",
-    },
-  };
+  const { cache, parsed } = parseReplayArgs(args);
+  if (!parsed.ok) return invalid(parsed.reason);
+  const action = parsed.action.name;
+  const mode = cache ? `cache-${action}` as BrowserReplayCommandMode : action === "status" ? "status" : "replay";
+  return { ok: true, request: { mode, ...(parsed.args[0] ? { receiptId: parsed.args[0] } : {}), sourceCommand: "/browser replay" } };
 }
 
 function invalid(reason: string): BrowserReplayCommandParseResult {

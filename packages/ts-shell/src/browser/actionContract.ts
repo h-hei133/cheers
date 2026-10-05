@@ -1,3 +1,5 @@
+import { actionSyntax } from "./command/syntax.js";
+import { parseSyntax } from "../core/commands/syntax/parse.js";
 import {
   browserActionRiskForKind,
   sanitizeBrowserText,
@@ -54,13 +56,10 @@ export function createBrowserActionContract(
 export function parseBrowserPreviewActionArgs(
   args: readonly string[],
 ): BrowserActionContractParseResult {
-  const [kind, ...rest] = args;
-  if (!kind) {
-    return invalidBrowserPreview("Missing preview action.");
-  }
-  if (!isBrowserActionKind(kind)) {
-    return invalidBrowserPreview(`Unsupported browser action: ${kind}`);
-  }
+  const parsed = parseSyntax(actionSyntax, args);
+  if (!parsed.ok) return invalidBrowserPreview(parsed.reason);
+  const kind = parsed.action.name as BrowserActionKind;
+  const rest = parsed.args;
   switch (kind) {
     case "navigate": {
       const url = rest[0];
@@ -174,24 +173,6 @@ function invalidBrowserPreview(reason: string): BrowserActionContractParseResult
       "- DoNext: Use /browser preview navigate <url>, extract <goal>, click <target>, or type <target> <text>.",
     ].join("\n"),
   };
-}
-
-function isBrowserActionKind(value: string): value is BrowserActionKind {
-  return [
-    "status",
-    "navigate",
-    "click",
-    "type",
-    "extract",
-    "observe",
-    "wait",
-    "screenshot",
-    "download",
-    "upload",
-    "auth",
-    "payment",
-    "destructive",
-  ].includes(value);
 }
 
 function sanitizeOptional(value: string | undefined): string | undefined {

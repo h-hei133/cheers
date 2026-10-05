@@ -1,3 +1,4 @@
+import { browserSyntax, browserCompletions } from "../../browser/command/syntax.js";
 import { connectSyntax, connectCompletions } from "./connect/syntax.js";
 import { loopSyntax, loopArgumentCompletions } from "./loop/syntax.js";
 import { brainstormSyntax } from "./brainstorm/syntax.js";
@@ -145,8 +146,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "inspect the guarded browser capability and its receipts",
       group: "workspace",
-      argumentHint: "[status|smoke|preview|execute|replay|repair]",
-      getArgumentCompletions: (prefix) => subcommandCompletions("browser", prefix),
+      argumentHint: syntaxHint(browserSyntax),
+      getArgumentCompletions: browserCompletions,
       execute: (args, context) => runBrowserLocalCommand(args, context),
     },
     {

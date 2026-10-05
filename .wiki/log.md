@@ -6175,3 +6175,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 - 2026-10-06：Phase 19 CMD-03 loop 严格次数/缺失 gate 拒绝并保留原始 shell 语法，245 项、构建、反转和两模式 CLI 零执行验证通过。43db5468 两项远端检查成功；本批范围及未完成执行接线见 [决策 §8.32](features/phase-19-decisions.md#832-cmd-03loop-次数与原始-gate-参数)。
 
 - 2026-10-06：Phase 19 CMD-03 connect 同源语法、认证 flags 互斥和直接写入函数守卫完成本批接线，264 项、构建、反转与两模式 CLI 零写/合成 key 保存验证通过。a30053cc 两项远端检查成功；见 [决策 §8.33](features/phase-19-decisions.md#833-cmd-03connect-登录与连接动作校验)。阶段目标继续。
+
+- 2026-10-06：Phase 19 CMD-03 browser 分层语法与补全接线，拒绝被忽略的额外参数，保留完整 receipt/proposal/manifest，确认不由补全附送。377 项通过、9 项既有集成跳过，构建、四组反转及两模式 CLI 验证见 [决策 §8.34](features/phase-19-decisions.md#834-cmd-03browser-分层语法与确认隔离)。阶段目标继续。

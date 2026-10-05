@@ -747,3 +747,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 对照参考 CLI 的缺值/枚举诊断与 -- 字面参数决定，复用本项目严格 parser；没有复制认证流程。Linux、Node 20.3 隔离环境 14 文件/264 项通过，build:ts 通过。恢复旧 handler 与其 parser 的反转产生认证流程被调用、非法输入写成功及直接调用校验的行为断言失败；逐字节恢复后组合套件通过。
 - 真实 regular/fullscreen CLI 的非法组合与额外参数保持配置字节及 mtime 不变，合法 inline 合成 key 保存成功，两模式 exit 0、无模型请求。新增测试曾错写既有激活成功文案，按实际 Active connection switched 修正，未改产品输出或弱化状态断言。
 - import cycles/config consumers/declarations/node floor 通过；7 个 call reachability 与 5 个 NormProof 函数数量既有 advisory 保留，阻断义务通过。a30053cc 的 CI 37378532481 与 Architecture Watch 37378532495 均成功；0bb9d3ed Architecture Watch 37379835823 成功，CI 37379835922 尚待终态。CMD-03 其余命令/动态连接 ID、CMD-04、SAFE-02 与 Phase 19 整体仍未完成。
+
+
+### 8.34 CMD-03：browser 分层语法与确认隔离
+
+- browser/command/syntax 按顶层、action、replay/cache、repair 的既有 owner 分支定义语法；四组契约 parser、registry 提示与分层补全消费同源定义，删除独立 browser 词表和 actionKind 私有字符串判定。smoke/runtime/status、cache status/compact/repair 的多余参数及 navigate 多 URL 不再被忽略。
+- replay receipt 与 repair proposal/manifest 保留完整输入，不再把多个参数拼成 ID 或截断长 ID/路径到另一个目标。repair 严格识别 manifest/confirm，缺值、重复、boolean 赋值和额外 proposal 参数拒绝；userConfirmed 只由实际 confirm 输入产生，候选永不提供 --confirm。执行审批、能力阻断与缺目标风险仍由既有 policy/runner 负责。
+- 补全沿 preview/dry-run/execute action、replay cache、repair apply 分层；runtime 的 status 值来自定义。原有受策略阻断的 action 仍可检查，其候选说明明确为 policy-blocked，不暗示拥有执行能力。对照参考声明式子命令生成候选/描述的决定，复用共享机制并按本项目分层组合，没有新建浏览器执行器。
+- Linux、Node 20.3 隔离环境 68 文件/377 项通过，1 文件/9 项既有集成测试跳过，build:ts 通过。分别恢复旧顶层/action/replay/repair parser 的四组反转均产生解析或精确目标断言失败；逐字节恢复后组合套件通过。套件曾输出 exit listener 数量警告，本批未改变监听器生命周期或据此宣称已修复。
+- 真实 regular/fullscreen CLI 对非法 smoke/runtime/cache/repair/navigate 输入报告 blocked，指定 manifest 字节与 mtime 不变，两模式 exit 0、无模型请求。未据此声称覆盖额外环境下的真实浏览器集成。import cycles/config consumers/declarations/node floor 通过；7 个 call reachability 与 5 个 NormProof 函数数量既有 advisory 保留，阻断义务通过。
+- 462b2b92 Architecture Watch 37380581074 成功，CI 37380581115 尚待终态。CMD-03 的 compact、多项零参数与自由文本/实体目录、CMD-04、SAFE-02 以及阶段整体仍未完成。
