@@ -727,3 +727,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - CommandFlag 增加显式 short 字段，原生 parseArgs 处理短选项；候选从相同定义生成短/长形式并遵守重复与冲突限制。定向对照参考 CLI 的 -- 后字面参数与短帮助选项决定，复用既有 parser，不增加独立 flags 系统。
 - Linux、Node 20.3 隔离环境 14 文件/242 项通过，build:ts 通过。恢复旧 goal/brainstorm handler 两组反转使失败结果、未知/冲突 flags 和字面正文断言失败；逐字节恢复后组合套件通过。真实 regular/fullscreen CLI 验证多词目标、done、非法 brainstorm 零模型请求和真实失败写入报告，两模式 exit 0。
 - import cycles/config consumers/declarations/node floor 通过；7 个 call reachability 与 5 个 NormProof 函数数量既有 advisory 保留，阻断义务通过。a30053cc Architecture Watch 37378532495 成功，CI 37378532481 尚待终态；43db5468 CI 37377909797 也尚未完成。CMD-03 的 loop 原始命令/预算、connect/browser/compact、其余命令及动态目录继续；CMD-04、SAFE-02 与阶段整体未完成。
+
+
+### 8.32 CMD-03：loop 次数与原始 gate 参数
+
+- loop owner 定义次数范围、默认值与示例候选，registry 提示和入口共用；共享 integer 参数支持 maximum。次数只接受 1–10 的安全整数，拒绝 parseInt 截断、小数、指数、非有限值、负数及越界，旧静默夹取 99 到 10 的测试改为明确拒绝。3/5/10 只是建议值，7 等其他合法值仍接受。
+- 只有次数而没有 gate 时拒绝，删除隐式 npm test；非法输入在 preflight 之前返回 local，不执行用户未明确提供的命令。仅解读原始文本的第一个 token，余下交给 shell 语法，保留引用参数、注释与 here-document，不重新 tokenize shell 正文。带数字开头的 token 属于次数位置；需要以此开头的 shell gate 可显式先给合法次数。
+- 通知说明次数是请求给模型的修复次数，实际强制边界仍为运行时 turn budget。此批未实现 AUTO 共享预算/自主调度，也没有把原有 preflight child_process.exec 或 workflow runner 接到统一 execution service；这两处既有执行路径偏差需在后续执行接线中修正，不能把参数范围校验计作执行预算完成。
+- 沿用此前参考 CLI 的原始参数/-- 语义比较，本命令有 shell 独立语法，故只解析前导次数，不把 gate 的 flags 送入普通选项 parser。Linux、Node 20.3 隔离环境 14 文件/245 项通过，build:ts 通过；恢复旧 handler 的反转使非法数字、缺失 gate 与通知断言失败，逐字节恢复后组合套件通过。
+- 真实 regular/fullscreen CLI 输入非法次数和仅次数时未生成执行标记；带引用参数的合法 gate 通过，两模式 exit 0、无模型请求。import cycles/config consumers/declarations/node floor 通过；7 个 call reachability 与 5 个 NormProof 函数数量既有 advisory 保留，阻断义务通过。
+- 43db5468 的 CI 37377909797 与 Architecture Watch 37377909807 均成功，标题测试修正取得远端证据。300ea7a4 Architecture Watch 37379100679 成功，CI 37379100643 尚待终态。CMD-03 剩余语法/动态目录、CMD-04、SAFE-02 和 Phase 19 整体继续。

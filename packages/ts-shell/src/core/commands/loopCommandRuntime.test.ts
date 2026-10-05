@@ -34,12 +34,12 @@ describe("aiming a repair loop at a gate", () => {
     }
   });
 
-  it("takes a leading number as the attempt budget and caps it", async () => {
+  it("takes a leading integer as the attempt budget and rejects an oversized request", async () => {
     const asked = await runLoopCommand(["3", "exit 1"], CONTEXT);
     const capped = await runLoopCommand(["99", "exit 1"], CONTEXT);
 
     if (asked.kind === "prompt") expect(asked.prompt).toContain("at most 3 attempts");
-    if (capped.kind === "prompt") expect(capped.prompt).toContain("at most 10 attempts");
+    expect(capped).toMatchObject({ kind: "local", output: expect.stringContaining("Invalid /loop arguments") });
   });
 
   it("treats a bare command as the gate, with the default budget", async () => {

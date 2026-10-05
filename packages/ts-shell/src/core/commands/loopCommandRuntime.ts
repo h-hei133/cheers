@@ -1,3 +1,5 @@
+import { loopSyntax, parseLoopArgs, MAX_ATTEMPTS } from "./loop/syntax.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import { exec } from "node:child_process";
 import type { CommandContext, CommandExecutionResult } from "./types.js";
 
@@ -19,9 +21,6 @@ import type { CommandContext, CommandExecutionResult } from "./types.js";
  * only advisory should not be described as enforced.
  */
 
-/** Most attempts worth asking for; beyond this the failure is not the kind a loop fixes. */
-const MAX_ATTEMPTS = 10;
-const DEFAULT_ATTEMPTS = 5;
 /** How long the pre-flight run may take before the gate is reported as hanging. */
 const GATE_TIMEOUT_MS = 120_000;
 /** How much gate output travels into the prompt. */
@@ -33,7 +32,9 @@ export async function runLoopCommand(
 ): Promise<CommandExecutionResult> {
   if (args.length === 0) return { kind: "local", output: usage() };
 
-  const { attempts, gate } = parse(args, context.rawCommandArgs);
+  const parsed = parseLoopArgs(args, context.rawCommandArgs);
+  if (!parsed.ok) return { kind: "local", output: `Invalid /loop arguments: ${parsed.reason}\n${syntaxHelp(loopSyntax)}` };
+  const { attempts, gate } = parsed;
   const cwd = context.cwd || process.cwd();
   const outcome = await runGate(gate, cwd);
 
@@ -51,21 +52,9 @@ export async function runLoopCommand(
   const how = outcome.timedOut ? "did not finish in time" : `exited ${outcome.exitCode ?? "non-zero"}`;
   return {
     kind: "prompt",
-    notice: `\`${gate}\` ${how}. Repairing, at most ${attempts} ${attempts === 1 ? "attempt" : "attempts"}.`,
+    notice: `\`${gate}\` ${how}. Requesting at most ${attempts} ${attempts === 1 ? "attempt" : "attempts"}; the runtime turn budget remains the enforced bound.`,
     prompt: repairPrompt(gate, cwd, attempts, outcome),
   };
-}
-
-/** The attempt budget and the gate command, in either order of appearance. */
-function parse(args: string[], source?: string): { readonly attempts: number; readonly gate: string } {
-  const prefix = source?.match(/^(?:"(\d+)"|'(\d+)'|(\d+))(?=\s|$)\s*/);
-  const leading = Number.parseInt(source === undefined ? args[0] ?? "" : prefix?.slice(1).find(Boolean) ?? "", 10);
-  const hasCount = Number.isFinite(leading) && leading > 0;
-  const attempts = hasCount ? Math.min(leading, MAX_ATTEMPTS) : DEFAULT_ATTEMPTS;
-  const gate = (source === undefined
-    ? (hasCount ? args.slice(1) : args).join(" ")
-    : hasCount ? source.slice(prefix![0].length) : source).trim() || "npm test";
-  return { attempts, gate };
 }
 
 interface GateOutcome {
@@ -149,6 +138,7 @@ function tail(text: string): string {
 function usage(): string {
   return [
     "### /loop",
+    syntaxHelp(loopSyntax),
     "",
     "Runs a verification command; if it fails, starts a repair loop with the failure already in hand.",
     "",

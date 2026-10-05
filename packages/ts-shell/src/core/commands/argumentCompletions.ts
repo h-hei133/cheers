@@ -40,12 +40,3 @@ export function subcommandCompletions(
   const matches = prefixFilter(SUBCOMMAND_VALUES[command], prefix);
   return matches.length > 0 ? matches : null;
 }
-
-/** `/loop [attempts] <gate>` — only the leading count is enumerable. */
-export function loopArgumentCompletions(
-  prefix: string,
-): readonly CommandArgumentCompletion[] | null {
-  if (/\s/.test(prefix)) return null;
-  const matches = prefixFilter(["3", "5", "10"], prefix, "attempts");
-  return matches.length > 0 ? matches : null;
-}

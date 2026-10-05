@@ -407,3 +407,8 @@ plugin/marketplace 共享动作、别名与参数定义，拒绝被忽略的额�
 ### CMD-03 目标与设计提示实施记录（2026-10-06）
 
 goal 保留单 token 动作与多词正文差异，保存失败不再虚报内存成功；brainstorm 严格短/长 flags、冲突与 -- 字面正文接入共享定义。242 项、构建、两组反转和两模式 CLI 验证，见 [决策 §8.31](phase-19-decisions.md#831-cmd-03goal-自由文本与-brainstorm-flags)。loop 执行预算与其余命令/动态目录继续。
+
+
+### CMD-03 loop 实施记录（2026-10-06）
+
+loop 严格次数范围与示例候选同源，删除缺失 gate 时隐式 npm test，保留原始 shell 文本并如实描述次数与强制 turn budget 的差异。245 项、构建、反转与两模式真实 CLI 验证，见 [决策 §8.32](phase-19-decisions.md#832-cmd-03loop-次数与原始-gate-参数)。实际共享预算和统一 execution service 接线仍待完成。

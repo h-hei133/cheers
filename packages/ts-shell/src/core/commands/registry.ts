@@ -1,3 +1,4 @@
+import { loopSyntax, loopArgumentCompletions } from "./loop/syntax.js";
 import { brainstormSyntax } from "./brainstorm/syntax.js";
 import { goalSyntax } from "./goal/syntax.js";
 import { marketplaceSyntax } from "./marketplace/syntax.js";
@@ -29,7 +30,6 @@ import { todoSyntax } from "./todo/syntax.js";
 import { thinkingSyntax } from "./thinking/syntax.js";
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import {
-  loopArgumentCompletions,
   subcommandCompletions,
 } from "./argumentCompletions.js";
 import { runBrowserLocalCommand } from "./browserCommandRuntime.js";
@@ -566,7 +566,7 @@ export function createCommandRegistry(
       enabled: true,
       summary: "run autonomous edit-and-verify loops until test pass",
       group: "workflow",
-      argumentHint: "[attempts] <gate-command>",
+      argumentHint: syntaxHint(loopSyntax),
       argumentMode: "raw",
       getArgumentCompletions: loopArgumentCompletions,
       execute: (args, context) => runLoopCommand(args, context),

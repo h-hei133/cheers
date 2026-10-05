@@ -10,7 +10,7 @@ function validValue(parameter: CommandParameter, value: string): boolean {
   if (parameter.kind === "text") return value.trim().length > 0;
   if (!/^\d+$/.test(value)) return false;
   const number = Number(value);
-  return Number.isSafeInteger(number) && number >= (parameter.minimum ?? 0);
+  return Number.isSafeInteger(number) && number >= (parameter.minimum ?? 0) && number <= (parameter.maximum ?? Number.MAX_SAFE_INTEGER);
 }
 
 /** Validate before the owner reads or changes state; never coerce an unknown action. */
