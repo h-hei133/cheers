@@ -1,7 +1,12 @@
+import { entitySyntax } from "./syntax/entity.js";
+import { parseSyntax } from "./syntax/parse.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { createCoreToolRegistry } from "../tools/registry.js";
 import { toolPlanMode } from "../query/toolPolicy.js";
 import type { ToolDefinition } from "../../tools/types.js";
+
+export const toolsSyntax = entitySyntax("tools");
 
 /**
  * /tools — what the model can actually do this turn.
@@ -19,8 +24,10 @@ export async function runToolsCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
+  const parsed = parseSyntax(toolsSyntax, args);
+  if (!parsed.ok) return { kind: "local", output: `Invalid /tools arguments: ${parsed.reason}\n${syntaxHelp(toolsSyntax)}` };
   const registry = context.getToolPool ? await context.getToolPool() : createCoreToolRegistry();
-  const wanted = args[0];
+  const wanted = parsed.args[0];
 
   if (wanted) {
     const tool = registry.get(wanted) ?? registry.get(wanted.toLowerCase());

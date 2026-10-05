@@ -12,7 +12,7 @@ export async function runWorkspaceShellAction(args: string[], _context: CommandC
 }
 
 export async function runCdShellAction(args: string[], _context: CommandContext): Promise<CommandExecutionResult> {
-  const parsed = parseSyntax(cdSyntax, ["", ...args]);
+  const parsed = parseSyntax(cdSyntax, args);
   if (!parsed.ok) return { kind: "local", output: `Invalid /cd arguments: ${parsed.reason}\n${syntaxHelp(cdSyntax)}` };
   const target = parsed.args[0];
   return target ? { kind: "shell-action", action: "show-workspace", workspaceAction: "attach", workspaceTarget: target }

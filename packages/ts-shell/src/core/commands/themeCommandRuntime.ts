@@ -1,7 +1,12 @@
+import { entitySyntax } from "./syntax/entity.js";
+import { parseSyntax } from "./syntax/parse.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import { currentTheme } from "../../presentation/theme/theme.js";
 import { selectTheme, selectedTheme } from "../../presentation/theme/selection.js";
 import { listThemes, loadTheme, themeSource } from "../../presentation/themes/index.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
+
+export const themeSyntax = entitySyntax("theme");
 
 /**
  * /theme — choose the palette the surface renders in.
@@ -16,7 +21,9 @@ export async function runThemeCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const asked = args[0]?.trim();
+  const parsed = parseSyntax(themeSyntax, args);
+  if (!parsed.ok) return { kind: "local", output: `Invalid /theme arguments: ${parsed.reason}\n${syntaxHelp(themeSyntax)}` };
+  const asked = parsed.args[0];
   // The paths `--theme` named, so a theme loaded at startup is listed, loadable
   // and switchable here rather than only for the first frame.
   const extraPaths = context.themePaths ?? [];

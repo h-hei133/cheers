@@ -1,6 +1,11 @@
+import { entitySyntax } from "./syntax/entity.js";
+import { parseSyntax } from "./syntax/parse.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import { type Skill } from "../skills/skillLoader.js";
 import { resolveSkillCatalog } from "../skills/skillCatalog.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
+
+export const skillSyntax = entitySyntax("skill");
 
 /**
  * /skill — the instructions this project and this user have written down.
@@ -13,6 +18,8 @@ export async function runSkillCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
+  const parsed = parseSyntax(skillSyntax, args);
+  if (!parsed.ok) return { kind: "local", output: `Invalid /skill arguments: ${parsed.reason}\n${syntaxHelp(skillSyntax)}` };
   // The same catalog the prompt path and `/skill:` resolve through, so the list
   // read here is the list the model was given — a skill named with `--skill`
   // appears, and an untrusted project's skills do not.
@@ -21,7 +28,7 @@ export async function runSkillCommand(
     ...(context.skillOptions?.skillPaths ? { skillPaths: context.skillOptions.skillPaths } : {}),
     ...(context.skillOptions?.noSkills ? { noSkills: true } : {}),
   }).skills;
-  const wanted = args[0]?.trim();
+  const wanted = parsed.args[0];
   if (!wanted) return { kind: "local", output: listSkills([...skills.values()]) };
 
   const skill = skills.get(wanted) ?? findLoosely(skills, wanted);

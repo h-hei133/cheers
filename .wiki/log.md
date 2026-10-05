@@ -6181,3 +6181,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 - 2026-10-06：Phase 19 CMD-03 compact 同源语法与交互守卫，非法预览 flags 不再触发真实压缩；重复元数据按序保留，移除最后的固定动作词表。284 项、构建、两组反转和 regular/fullscreen CLI 验证通过，详见 [决策 §8.35](features/phase-19-decisions.md#835-cmd-03compact-语法与真实压缩入口守卫)。PAR-01 与阶段整体仍未完成。
 
 - 2026-10-06：Phase 19 CMD-03 的 14 个无参数命令接入共享校验，阻止非法参数触发 clear/retry/exit/cancel 或配置刷新。292 项、构建、反转及 regular/fullscreen 会话指针不变验证通过，详见 [决策 §8.36](features/phase-19-decisions.md#836-cmd-03无参数命令的动作边界)。其余目录与阶段任务继续。
+
+- 2026-10-06：Phase 19 CMD-03 theme/skill/tools 单实体校验与提示同源，空名称/额外参数拒绝且不切主题。283 项、构建、反转和两模式 CLI 验证通过，见 [决策 §8.37](features/phase-19-decisions.md#837-cmd-03themeskilltools-的单实体参数)。较早 dfb81fce 的 CI 有一个浏览器并发子进程超时；独立 6 项复跑通过，根因仍未确认，阶段目标继续。

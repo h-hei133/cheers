@@ -15,7 +15,7 @@ function validValue(parameter: CommandParameter, value: string): boolean {
 
 /** Validate before the owner reads or changes state; never coerce an unknown action. */
 export function parseSyntax<Action extends CommandAction>(syntax: CommandSyntax<Action>, input: readonly string[], partial = false): SyntaxResult<Action> {
-  if (syntax.actions.length === 1 && syntax.actions[0]?.name === "" && input[0] !== "") input = ["", ...input];
+  if (syntax.actions.length === 1 && syntax.actions[0]?.name === "") input = ["", ...input];
   const first = input[0]?.toLowerCase();
   const initial = syntax.actions.find(item => item.name.toLowerCase() === first || item.aliases?.some(alias => alias.toLowerCase() === first));
   const definitions = initial?.flags ? [...(syntax.flags ?? []), ...initial.flags] : syntax.flags;

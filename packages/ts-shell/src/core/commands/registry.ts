@@ -45,7 +45,7 @@ import { runExitCommand } from "./exitCommandRuntime.js";
 import { runClearCommand } from "./clearCommandRuntime.js";
 import { runReviewCommand } from "./reviewCommandRuntime.js";
 import { runReloadCommand } from "./reloadCommandRuntime.js";
-import { runThemeCommand } from "./themeCommandRuntime.js";
+import { runThemeCommand, themeSyntax } from "./themeCommandRuntime.js";
 import { runSettingsCommand } from "./settingsCommandRuntime.js";
 import { runStatuslineCommand } from "./statuslineCommandRuntime.js";
 import { runTrustCommand } from "./trustCommandRuntime.js";
@@ -58,7 +58,7 @@ import { runTreeCommand } from "./treeCommandRuntime.js";
 import { runCopyCommand } from "./copyCommandRuntime.js";
 import { runHotkeyCommand } from "./hotkeyCommandRuntime.js";
 import { runRetryCommand } from "./retryCommandRuntime.js";
-import { runSkillCommand } from "./skillCommandRuntime.js";
+import { runSkillCommand, skillSyntax } from "./skillCommandRuntime.js";
 import { runGoalCommand } from "./goalCommandRuntime.js";
 import { runLoopCommand } from "./loopCommandRuntime.js";
 import { runTodoCommand } from "./todoCommandRuntime.js";
@@ -73,7 +73,7 @@ import { runDeepResearchCommand } from "./deepResearchCommandRuntime.js";
 import { runBrainstormCommand } from "./brainstormCommandRuntime.js";
 import { runCommitCommand } from "./commitCommandRuntime.js";
 import { runThinkingCommand } from "./thinkingCommandRuntime.js";
-import { runToolsCommand } from "./toolsCommandRuntime.js";
+import { runToolsCommand, toolsSyntax } from "./toolsCommandRuntime.js";
 import { runShellCommand } from "./shellCommandRuntime.js";
 import { runLogCommand } from "./logCommandRuntime.js";
 import { runCrashCommand } from "./crashCommandRuntime.js";
@@ -435,7 +435,7 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       summary: "list the available themes, or switch to one",
-      argumentHint: "[name]",
+      argumentHint: syntaxHint(themeSyntax),
       group: "workspace",
       execute: (args, context) => runThemeCommand(args, context),
     },
@@ -508,7 +508,7 @@ export function createCommandRegistry(
       enabled: true,
       summary: "the written-down ways of working this project and this user have",
       group: "workspace",
-      argumentHint: "[skill-name]",
+      argumentHint: syntaxHint(skillSyntax),
       execute: (args, context) => runSkillCommand(args, context),
     },
     {
@@ -714,7 +714,7 @@ export function createCommandRegistry(
       enabled: true,
       summary: "list available tools or inspect one in detail",
       group: "diagnostics",
-      argumentHint: "[tool-name]",
+      argumentHint: syntaxHint(toolsSyntax),
       execute: (args, context) => runToolsCommand(args, context),
     },
     {

@@ -13,6 +13,9 @@ function actionUsage(action: CommandAction, enumerate = false): string {
 }
 
 export function syntaxHint(syntax: CommandSyntax): string {
+  if (syntax.actions.length === 1 && syntax.actions[0]?.name === "") {
+    return (actionUsage(syntax.actions[0]) + flagUsage(syntax)).trim();
+  }
   const actions = syntax.actions.filter(action => action.name || action.parameters?.length).map(action => actionUsage(action)).join("|");
   return `${actions ? `[${actions}]` : ""}${flagUsage(syntax)}`.trim();
 }

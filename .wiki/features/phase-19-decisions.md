@@ -781,3 +781,14 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Linux、Node 20.3 隔离环境 17 文件/292 项与 build:ts 通过。测试用禁止属性读取的 context 验证拒绝发生在状态读取之前，并直接验证动作入口和 reload 零调用。取消共享守卫的反转使动作/刷新/交互结果断言失败；逐字节恢复后 292 项再次通过。
 - 真实 regular/fullscreen CLI 输入 10 组非法命令，均报告 Invalid，会话指针字节、工作区标记字节及 mtime 不变，进程继续运行，最终合法 exit 退出码为 0。import cycles/config consumers/declarations/node floor 通过；NormProof 详细报告无环与导入可解析均 satisfied，既有 5 个函数数量、7 个 call reachability advisory 保留。
 - f1109ed9 的 Architecture Watch 37382653798 成功，CI 37382653783 在本次查询时仍运行。CMD-03 剩余自由文本/实体目录、CMD-04、PAR-01、SAFE-02 与 Phase 19 整体继续，不以无参数入口验证覆盖后续能力。
+
+
+### 8.37 CMD-03：theme/skill/tools 的单实体参数
+
+- 三个命令 owner 声明并消费共享 entitySyntax，registry 从相同定义生成参数提示。多余名称、未知 flags、空名称在目录读取/工具池请求/主题选择之前拒绝；不再只取首参数后忽略其余输入。带空格的引用名称和 -- 后的 dash-leading 名称保持完整；实际名称查找继续由原目录负责。
+- 新边界测试发现共享 parseSyntax 把显式空字符串误认作内部默认动作标记，导致空名称执行列表读取。归类为 product behavior drift，单默认动作现在始终在内部添加标记，唯一手动添加的 cd 调用点改传原始 args；多动作 goal/compact/replay 的显式分派保持。单默认动作的提示去除重复外层方括号，实体提示恢复为 [name]。
+- 对照参考声明驱动参数提示、合法位置先于目录访问的决定，复用现有 parser 与目录 owner；未增加每键磁盘扫描或独立实体缓存。动态 theme/skill/tools 候选仍需 CMD-04 的会话/项目/启用状态快照，不能以本批语法修复宣称完成。
+- Linux、Node 20.3 隔离环境 17 文件/283 项和 build:ts 通过。将主题输入退回只取首项的反转导致未切主题断言失败，恢复后组合套件再次通过。regular/fullscreen 真实 CLI 拒绝非法实体输入，dark 仍为活动主题，会话指针及工作区标记不变，退出码为 0。探针首次误匹配已被 renderer 去掉的 Markdown 反引号，按实际渲染文本修正后通过，未改产品输出。
+- import cycles/config consumers/declarations/node floor 通过，NormProof 详细报告无环/导入可解析均 satisfied；既有 5 个函数数量、7 个 call reachability advisory 保留。
+- dfb81fce 的 CI 37381706966 已失败：唯一失败是 browser cache multiprocess concurrent execute writes 中 1 个子进程超时（2 passed/1 blocked/1 timedOut）。当前隔离环境独立复跑 scenarios.test.ts 的 6 项通过，但尚不能确认远端超时根因，未将原失败计作成功。b0829c90 的 Architecture Watch 37383202296 成功，CI 37383202315 查询时仍运行。
+- CMD-03 其余自由文本声明/动态实体，CMD-04、PAR-01、SAFE-02 及阶段整体继续。
