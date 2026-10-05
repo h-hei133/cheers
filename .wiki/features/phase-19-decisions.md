@@ -792,3 +792,16 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - import cycles/config consumers/declarations/node floor 通过，NormProof 详细报告无环/导入可解析均 satisfied；既有 5 个函数数量、7 个 call reachability advisory 保留。
 - dfb81fce 的 CI 37381706966 已失败：唯一失败是 browser cache multiprocess concurrent execute writes 中 1 个子进程超时（2 passed/1 blocked/1 timedOut）。当前隔离环境独立复跑 scenarios.test.ts 的 6 项通过，但尚不能确认远端超时根因，未将原失败计作成功。b0829c90 的 Architecture Watch 37383202296 成功，CI 37383202315 查询时仍运行。
 - CMD-03 其余自由文本声明/动态实体，CMD-04、PAR-01、SAFE-02 及阶段整体继续。
+
+
+### 8.38 CMD-04：首批动态目录与候选请求生命周期
+
+- interactive/completion 分离 request、catalog、controller：仅 theme/skill/tools 的合法实体位置读取动态目录，支持 skills 别名，普通文本及额外参数不触发。原静态 slashSuggestions 保持同步；当前输入层接收动态结果后主动重绘，不要求再按一次键。
+- 目录复用 themes、resolveSkillCatalog 与实际 toolPoolFor owner，保留外部主题路径、noSkills/skillPaths/信任过滤、MCP 和 allowed/disabled/hidden 工具过滤。MCP 不可用时报告目录 unavailable，不把缺少 MCP 的核心工具列表冒充完整成功；异常正文不进入候选状态。候选读取不触发选择、安装、认证或写入。
+- 每个表面持有缓存，身份包括 cwd/project/session、技能选项、主题路径、工具启用/可见性以及会话权限/模式；每次输入取消旧发布，命令提交/返回、选择器完成、权限/模式改变和退出失效缓存。显式刷新也断开刷新前的进行中读取复用。75ms 防抖、1500ms 等待上限、5000 目录候选上限与 100 个显示候选；成功缓存 15 秒、失败缓存 3 秒，查询变化复用目录，慢工具快照读取在相同身份下复用。
+- 发布同时校验请求 epoch、上下文身份、草稿 revision/文本/光标，迟到结果和超时后的成功不安装。状态分开显示 loading/no matching entries/unavailable/timed out。接受沿用 snapshot-bound edit，空格名称自动引用，dash-leading 名称必要时插入 --；Tab 只接受不执行。
+- 对照参考 autocomplete 的 Awaitable 回调和 signal 传播，以及合法动作位置先于实体查询的决定；本项目用每表面 controller 承接现有同步键盘路径，没有让每键等待远端目录。取消当前候选等待/发布已有直接测试；底层 MCP owner 暂无 AbortSignal 读取接口，不能据此声称物理终止了其底层工作。
+- Linux、Node 20.3 隔离环境 8 文件/139 项与 build:ts 通过，覆盖迟到结果、光标/项目切换、取消/超时、上限、失效、禁用技能、工具可见性、进行中读取复用、实际输入层主动重绘及 Tab 不执行。移除版本守卫的反转触发迟到发布断言失败，恢复后组合通过。真实 regular/fullscreen CLI 自动展示外部 Night Harbor 主题和用户技能，Tab 保留引用名称且未执行，Enter 才选择/读取，工作区标记不变、退出码 0。
+- import cycles/config consumers/declarations/node floor 通过；NormProof 全图无环及导入解析 satisfied，既有 5 个函数数量、7 个 call reachability advisory 保留。
+- b0829c90 的 CI 37383202315 与 Architecture Watch 37383202296 均成功。f1109ed9 的 CI 37382653783 失败于相同 browser cache concurrent CLI 场景（1 passed/2 blocked/2 timedOut）；原 dfb81fce 的超时根因仍未确认，后续绿灯不覆盖此前失败。41af8323 Architecture Watch 37384091517 成功，CI 37384091556 查询时仍运行。
+- CMD-04 仍未完成：session/entry、memory record/candidate、grants、MCP servers、连接及文件/目录位置等尚未接入本生命周期，外部目录变动目前通过显式操作失效或 TTL 刷新而非完整版本事件；底层 MCP 可取消读取亦待处理。CMD-03 自由文本提示及其余 Phase 19 任务继续。

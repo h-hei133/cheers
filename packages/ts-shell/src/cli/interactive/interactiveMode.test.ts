@@ -54,6 +54,20 @@ function build(overrides: { observeEvents?: () => () => void; exit?: (code?: num
 }
 
 describe("session wiring", () => {
+  it("publishes a loaded theme menu without another key and accepts without submission", async () => {
+    const { mode, terminal } = build();
+    const host = mode as unknown as { view: InteractiveView; onSubmit(text: string): void };
+    const submit = vi.spyOn(host, "onSubmit").mockImplementation(() => {});
+    mode.start();
+    try {
+      terminal.input("/theme dark-c");
+      await vi.waitFor(() => expect(host.view.suggestions.current()?.value).toBe("dark-contrast"));
+      terminal.input("\t");
+      expect(host.view.editor.getText()).toBe("/theme dark-contrast ");
+      expect(submit).not.toHaveBeenCalled();
+    } finally { mode.stop(); }
+  });
+
   it.each(["panel", "modal"] as const)("routes actual mouse input to %s rows without applying on click", async (form) => {
     const { mode, terminal } = build();
     const host = mode as unknown as { overlay: OverlayHost; view: InteractiveView };

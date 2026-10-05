@@ -1,3 +1,5 @@
+import { CatalogController } from "./completion/controller.js";
+import { catalogIdentity, createCatalogLoader } from "./completion/catalog.js";
 import { refreshShellRuntimeConfig } from "../../core/shell/runtimeContext.js";
 import { messageToText } from "../../model-adapters/multimodal.js";
 import { backgroundTasks, renderTaskNotice } from "../../core/shell/background/tasks.js";
@@ -158,6 +160,8 @@ export class InteractiveMode {
   private busy = false;
   private pickerPending = false;
   private toast?: string;
+  private completionStatus?: string;
+  private readonly catalogs: CatalogController;
   /** What the terminal said it can draw, read once from its environment. */
   private readonly imageProtocol = detectImageProtocol();
   private tick: ReturnType<typeof setInterval> | undefined;
@@ -254,7 +258,7 @@ export class InteractiveMode {
           this.pager.active ? this.pager.render(width, height) : this.overlay.render(width, height),
         selection: () => this.pointer.selection,
         composerSelection: () => this.pointer.composerSelection,
-        toast: () => this.toast,
+        toast: () => this.toast ?? this.completionStatus,
         searchBar: () => {
           // Built before asking: the count and the position only exist once the
           // query has been matched against the rows that are on screen.
@@ -273,6 +277,18 @@ export class InteractiveMode {
       },
       this.state,
     );
+    this.catalogs = new CatalogController({
+      identity: () => catalogIdentity(this.options.runtimeContext, this.options.themePaths) + this.options.sessionRuntime.getPermissionScope() + this.options.sessionRuntime.getAgentMode(),
+      draft: () => this.state.editor.snapshot(),
+      load: createCatalogLoader(() => this.options.runtimeContext, this.options.initialMcpGateway, this.options.themePaths ?? []),
+      publish: (items, status) => {
+        if (this.stopped) return;
+        this.completionStatus = status;
+        this.state.suggestions.setItems(items);
+        this.view.setSuggesting(items.length > 0);
+        this.tui.requestRender();
+      },
+    });
     this.pointer = new Pointer({
       capture: (report) => this.pager.active || this.overlay.handlePointer(report, this.view.choiceRegions?.overlay?.top),
       view: () => this.view,
@@ -383,6 +399,7 @@ export class InteractiveMode {
     if (this.tick) clearInterval(this.tick);
     this.tick = undefined;
     this.theme.stop();
+    this.catalogs.invalidate();
     this.releaseEvents?.();
     this.releaseEvents = undefined;
     // The registry outlives this surface, so the subscription has to be given
@@ -402,6 +419,8 @@ export class InteractiveMode {
 
 
   private onKey(event: Parameters<typeof routeKey>[0]): void {
+    this.catalogs.cancel();
+    this.completionStatus = undefined;
     // An open picker owns the keyboard: it needs the arrows, Enter, Escape, and
     // every printable character for its filter.
     // The pager owns every key while it is up, including Escape.
@@ -523,6 +542,8 @@ export class InteractiveMode {
   private syncSuggestions(mayOpen: boolean): void {
     const snapshot = this.state.editor.snapshot();
     const draft = snapshot.text;
+    this.completionStatus = undefined;
+    if (this.catalogs.update(snapshot)) return;
     // Files first: an `@` reference is unambiguous, while a leading slash could
     // still become either a command or a path.
     const matches =
@@ -548,6 +569,8 @@ export class InteractiveMode {
     attachments?: { readonly images: readonly ImageContent[] },
   ): void {
     this.toast = undefined;
+    this.completionStatus = undefined;
+    this.catalogs.invalidate();
     appendPromptHistory(this.options.runtimeContext.projectRoot, text);
     if (this.questions.answer(text)) {
       this.tui.requestRender();
@@ -630,6 +653,7 @@ export class InteractiveMode {
           this.options.setActiveNonInteractiveApprovalMode ?? (() => {}),
         refreshKeybindings: () => this.preferences.reload(),
       });
+      this.catalogs.invalidate();
       this.turnNumber = result.turnNumber;
       if (result.refreshMcpGateway) await this.options.initialMcpGateway.syncWorkspace?.();
       // `/theme` and `/reload` both change which file is worth following, and the
@@ -728,6 +752,7 @@ export class InteractiveMode {
         );
       })
       .finally(() => {
+        this.catalogs.invalidate();
         if (picker.exclusive) {
           this.pickerPending = false;
           this.busy = false;
@@ -830,6 +855,9 @@ export class InteractiveMode {
    * changed mid-thought without abandoning the draft.
    */
   private cycleAgentMode(): void {
+    this.catalogs.invalidate();
+    this.completionStatus = undefined;
+    this.view.setSuggesting(false);
     const next = this.options.sessionRuntime.getAgentMode() === "plan" ? "build" : "plan";
     this.options.sessionRuntime.setAgentMode(next);
     this.tui.requestRender();
@@ -841,6 +869,9 @@ export class InteractiveMode {
    * per press turned a quick toggle into clutter.
    */
   private cyclePermissionScope(): void {
+    this.catalogs.invalidate();
+    this.completionStatus = undefined;
+    this.view.setSuggesting(false);
     const next = nextScope(this.options.sessionRuntime.getPermissionScope());
     this.options.sessionRuntime.setPermissionScope(next);
     this.tui.requestRender();

@@ -6183,3 +6183,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 - 2026-10-06：Phase 19 CMD-03 的 14 个无参数命令接入共享校验，阻止非法参数触发 clear/retry/exit/cancel 或配置刷新。292 项、构建、反转及 regular/fullscreen 会话指针不变验证通过，详见 [决策 §8.36](features/phase-19-decisions.md#836-cmd-03无参数命令的动作边界)。其余目录与阶段任务继续。
 
 - 2026-10-06：Phase 19 CMD-03 theme/skill/tools 单实体校验与提示同源，空名称/额外参数拒绝且不切主题。283 项、构建、反转和两模式 CLI 验证通过，见 [决策 §8.37](features/phase-19-decisions.md#837-cmd-03themeskilltools-的单实体参数)。较早 dfb81fce 的 CI 有一个浏览器并发子进程超时；独立 6 项复跑通过，根因仍未确认，阶段目标继续。
+
+- 2026-10-06：Phase 19 CMD-04 theme/skill/tools 首批动态目录接入输入层，具备缓存、防抖、迟到拒绝与主动重绘，Tab 不执行。139 项、构建、反转及 regular/fullscreen 外部主题/技能验证通过，见 [决策 §8.38](features/phase-19-decisions.md#838-cmd-04首批动态目录与候选请求生命周期)。其余目录与底层取消继续；较早两次浏览器并发 CI 超时仍待根因确认。
