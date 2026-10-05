@@ -1,3 +1,5 @@
+import { marketplaceSyntax } from "./marketplace/syntax.js";
+import { pluginSyntax } from "./plugin/syntax.js";
 import { workflowSyntax } from "../workflow/syntax.js";
 import { sidebarSyntax } from "../../presentation/sidebar/syntax.js";
 import { warmupSyntax } from "../../context/startup/syntax.js";
@@ -629,8 +631,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "manage and discover plugin marketplace sources",
       group: "workflow",
-      argumentHint: "[list|add|remove]",
-      getArgumentCompletions: (prefix) => subcommandCompletions("marketplace", prefix),
+      argumentHint: syntaxHint(marketplaceSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(marketplaceSyntax, prefix),
       execute: (args, context) => runMarketplaceCommand(args, context),
     },
     {
@@ -642,8 +644,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "record, list, enable, or disable extension registrations",
       group: "workflow",
-      argumentHint: "[list|add|remove|search|enable|disable]",
-      getArgumentCompletions: (prefix) => subcommandCompletions("plugin", prefix),
+      argumentHint: syntaxHint(pluginSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(pluginSyntax, prefix),
       execute: (args, context) => runPluginCommand(args, context),
     },
     {

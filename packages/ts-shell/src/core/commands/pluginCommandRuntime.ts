@@ -2,7 +2,11 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import type { CommandContext, LocalCommandResult } from "./types.js";
-import { resolveUserDataFile, userDataDir } from "../../core/paths/userHome.js"
+import { pluginSyntax } from "./plugin/syntax.js";
+import { parseSyntax } from "./syntax/parse.js";
+import { syntaxHelp } from "./syntax/projection.js";
+import { getInstalledPlugins, getPluginStoragePath, savePersistedPlugins, withPluginRegistry, type InstalledPlugin } from "./plugin/store.js";
+export { getInstalledPlugins, resetInstalledPlugins, type InstalledPlugin, type PluginOrigin } from "./plugin/store.js";
 
 /**
  * Extension registry.
@@ -13,32 +17,6 @@ import { resolveUserDataFile, userDataDir } from "../../core/paths/userHome.js"
  * a manifest; this build does not execute extensions, and the output says so
  * rather than implying a capability arrived.
  */
-
-export type PluginOrigin = "path" | "package";
-
-export interface InstalledPlugin {
-  readonly name: string;
-  readonly version: string;
-  enabled: boolean;
-  /** Where the extension resolves from: a local directory, or a package name. */
-  readonly source: PluginOrigin;
-  /** The path or package spec exactly as given. */
-  readonly spec: string;
-  readonly description?: string;
-  /** False until the spec has been resolved on disk. */
-  readonly resolved: boolean;
-}
-
-function getPluginStoragePath(): string {
-  const customPath = process.env.CHEERS_PLUGINS_FILE?.trim();
-  if (customPath) return customPath;
-  return resolveUserDataFile("plugins.json");
-}
-
-/** Nothing is registered until the user registers it. */
-function getDefaultPlugins(): InstalledPlugin[] {
-  return [];
-}
 
 /**
  * Resolve a spec to a manifest without fetching anything.
@@ -72,6 +50,9 @@ function describeSpec(spec: string, cwd: string): InstalledPlugin | { readonly e
       version?: string;
       description?: string;
     };
+    if (!manifest || (manifest.name !== undefined && (typeof manifest.name !== "string" || !manifest.name.trim())) ||
+      (manifest.version !== undefined && typeof manifest.version !== "string") ||
+      (manifest.description !== undefined && typeof manifest.description !== "string")) return { error: "Extension manifest fields must be strings." };
     return {
       name: normalizePluginName(manifest.name ?? path.basename(root)),
       version: manifest.version ?? "0.0.0",
@@ -84,44 +65,6 @@ function describeSpec(spec: string, cwd: string): InstalledPlugin | { readonly e
   } catch {
     return { error: `\`${manifestPath}\` is not readable JSON, so there is nothing to register.` };
   }
-}
-
-function loadPersistedPlugins(): InstalledPlugin[] {
-  const filePath = getPluginStoragePath();
-  try {
-    if (fs.existsSync(filePath)) {
-      const data = fs.readFileSync(filePath, "utf8");
-      return JSON.parse(data) as InstalledPlugin[];
-    }
-  } catch {
-    // Fallback
-  }
-
-  return getDefaultPlugins();
-}
-
-function savePersistedPlugins(plugins: InstalledPlugin[]): void {
-  const filePath = getPluginStoragePath();
-  try {
-    const dir = path.dirname(filePath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(filePath, JSON.stringify(plugins, null, 2), "utf8");
-  } catch {
-    // Non-blocking
-  }
-}
-
-let cachedPlugins: InstalledPlugin[] = loadPersistedPlugins();
-
-export function getInstalledPlugins(): readonly InstalledPlugin[] {
-  return cachedPlugins;
-}
-
-export function resetInstalledPlugins(): void {
-  cachedPlugins = getDefaultPlugins();
-  savePersistedPlugins(cachedPlugins);
 }
 
 function normalizePluginName(name: string): string {
@@ -140,7 +83,18 @@ export async function runPluginCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const subCommand = args[0]?.toLowerCase();
+  const parsed = parseSyntax(pluginSyntax, args);
+  if (!parsed.ok) return { kind: "local", output: `Invalid /plugin arguments: ${parsed.reason}\n${syntaxHelp(pluginSyntax)}` };
+  try {
+    const run = (plugins: InstalledPlugin[]) => runPluginAction([parsed.action.name, ...parsed.args], context, plugins);
+    return ["add", "remove", "enable", "disable"].includes(parsed.action.name) ? withPluginRegistry(run) : run(getInstalledPlugins());
+  } catch {
+    return { kind: "local", output: "Extension registry operation failed. The requested change was not confirmed saved." };
+  }
+}
+
+function runPluginAction(args: readonly string[], context: CommandContext, cachedPlugins: InstalledPlugin[]): LocalCommandResult {
+  const subCommand = args[0];
 
   if (!subCommand || subCommand === "list" || subCommand === "ls") {
     if (cachedPlugins.length === 0) {
@@ -181,7 +135,7 @@ export async function runPluginCommand(
     return { kind: "local", output: lines.join("\n") };
   }
 
-  if (subCommand === "install" || subCommand === "add") {
+  if (subCommand === "add") {
     const spec = args[1]?.trim();
     if (!spec) {
       return {
@@ -226,7 +180,7 @@ export async function runPluginCommand(
     };
   }
 
-  if (subCommand === "search" || subCommand === "find") {
+  if (subCommand === "search") {
     return {
       kind: "local",
       output: [
@@ -240,7 +194,7 @@ export async function runPluginCommand(
     };
   }
 
-  if (subCommand === "uninstall" || subCommand === "rm" || subCommand === "remove") {
+  if (subCommand === "remove") {
     const pluginName = args[1];
     if (!pluginName) {
       return {

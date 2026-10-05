@@ -707,3 +707,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Linux、Node 20.3 隔离环境 20 文件/236 项通过，build:ts 通过。恢复旧 workflow handler 后，非法额外参数实际执行了夹具中的写文件步骤；warmup/sidebar 旧契约也各使对应共享动作断言失败。逐字节恢复后组合测试通过。真实 regular/fullscreen CLI 非法 workflow 无标记文件，合法 start 执行同一定义并写出标记；warmup/sidebar 多余参数 blocked，两模式 exit 0、无模型请求。
 - import cycles/config consumers/declarations/node floor 通过；call reachability 7 个既有 advisory，NormProof 阻断义务通过、5 个既有函数数量 advisory。3d1b6fec Architecture Watch 37377064741 成功，其 CI 尚待终态。
 - 0b76ddb4 CI 37375146972 失败：5861 项通过、1 项失败、1 项跳过。唯一失败是 CLI baseline 仍用未引用的多词会话标题，与 §8.26 单参数标题契约不一致；按旧测试输入更新为引用标题，保留切换目标、摘要和无歧义断言，更新后隔离环境 CLI baseline 全部 40 项通过（调用参数被 npm 消费而实际运行了整个 baseline 文件，故按实际范围记录）。CMD-03 全量表、动态目录、CMD-04、SAFE-02 和阶段其余任务仍继续。
+
+
+### 8.30 CMD-03：生态命令语法与注册表持久化结果
+
+- plugin/marketplace 各自由领域 syntax 声明动作、真实别名和必选参数，registry 提示与固定候选同源；额外参数、未知 flags 在登记/删除/启停之前拒绝。plugin install/uninstall/find、marketplace ls/rm/delete 保留，search 的自由文本 query 继续返回目录服务尚不可用的解释，不虚构搜索结果。
+- 检查发现旧 plugin 保存吞掉错误、修改模块级缓存后仍报成功。现 plugin/store 拥有类型、读取、锁和原子发布，兼容入口只 re-export；每次读取当前文件，所有修改在既有文件锁中读取并写入，删除模块级缓存与静默保存失败。不存在文件是空注册表，损坏 JSON/结构拒绝而不覆盖；manifest 字段先校验字符串。失败报告 requested change not confirmed saved，不返回 registered/marked 成功。
+- 对照参考设置存储的锁内重读再更新决定，复用本项目已有 withFileLock/writeJsonFileAtomic，而非新增锁或缓存系统。注册仍仅记录地址/manifest；没有下载、加载代码或实现目录搜索，生态运行能力仍由后续批次负责。
+- Linux、Node 20.3 隔离环境 14 文件/248 项通过（含 picker 接线），build:ts 通过。恢复旧 plugin/marketplace handler 两组反转使额外参数、失败写入和外部状态读取断言失败。初次 fs.renameSync 故障 mock 没有命中模块，归为测试注入边界问题；改为既有原子写入函数注入，验证每种修改失败后文件与后续读取均不变。
+- 真实 regular/fullscreen CLI 验证非法禁用/删除零写，合法 disable 持久化，损坏注册表不会被下一次 add 覆盖；两模式 exit 0、无模型请求。import cycles/config consumers/declarations/node floor 通过；7 个 call reachability 与 5 个 NormProof 函数数量既有 advisory 保留，阻断义务通过。
+- 1863db35 CI 37376481131 失败（5882 通过、1 失败、1 跳过），唯一失败仍为 §8.29 已修正的多词标题测试输入；43db5468 Architecture Watch 37377909807 成功，CI 37377909797 尚待终态。CMD-03 其余语法/动态目录、CMD-04、SAFE-02 与阶段其余任务仍未完成。

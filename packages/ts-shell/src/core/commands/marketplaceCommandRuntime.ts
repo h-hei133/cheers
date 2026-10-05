@@ -1,3 +1,6 @@
+import { marketplaceSyntax } from "./marketplace/syntax.js";
+import { parseSyntax } from "./syntax/parse.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
 import { addMarketplaceSource, getMarketplaceSources, removeMarketplaceSource } from "./marketplace/store.js";
@@ -11,8 +14,10 @@ export async function runMarketplaceCommand(
   args: string[],
   _context: CommandContext,
 ): Promise<LocalCommandResult> {
+  const parsed = parseSyntax(marketplaceSyntax, args);
+  if (!parsed.ok) return { kind: "local", output: `Invalid /marketplace arguments: ${parsed.reason}\n${syntaxHelp(marketplaceSyntax)}` };
   try {
-    return runMarketplaceAction(args);
+    return runMarketplaceAction([parsed.action.name, ...parsed.args]);
   } catch (error) {
     return { kind: "local", output: `Marketplace source operation failed: ${error instanceof Error ? error.message : "storage unavailable"}` };
   }

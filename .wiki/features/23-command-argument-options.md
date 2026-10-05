@@ -397,3 +397,8 @@ log/metrics/report/crash 统一语法、提示与 flags 候选，非法数字/�
 ### CMD-03 工作流与状态面板实施记录（2026-10-06）
 
 workflow/warmup/sidebar 执行契约、提示与候选共享领域声明；workflow 多余参数拒绝后不执行，sidebar watch/live 如实描述单次快照。236 项、构建、三组反转与两模式真实 CLI 验证，见 [决策 §8.29](phase-19-decisions.md#829-cmd-03workflowwarmupsidebar-同源契约)。动态目录与其余命令继续。
+
+
+### CMD-03 生态命令实施记录（2026-10-06）
+
+plugin/marketplace 共享动作、别名与参数定义，拒绝被忽略的额外参数；plugin 注册表移除模块缓存和静默保存失败，采用锁内重读与原子写入。248 项、构建、两组反转和两模式真实 CLI 验证，见 [决策 §8.30](phase-19-decisions.md#830-cmd-03生态命令语法与注册表持久化结果)。动态目录和实际生态运行能力仍待对应后续任务。
