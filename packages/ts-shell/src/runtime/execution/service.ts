@@ -48,8 +48,15 @@ export function createDefaultExecutionService(): ExecutionService {
       // of defence, not the whole guarantee.
       return withFileLock(request.absolutePath, () => writeTextFileUnlocked(request))
     },
-    listFilesRecursive(request) {
-      return listWorkspaceFiles(request.absoluteRoot, request.walkOptions)
+    async listFilesRecursive(request) {
+      request.abortSignal?.throwIfAborted()
+      const checked = verifyPathContainment(request.absoluteRoot, request.workspaceRoot)
+      if (!checked.allowed) throw new Error('Listing root is outside the workspace.')
+      return listWorkspaceFiles(checked.resolvedPath, {
+        ...request.walkOptions,
+        assertFileAccess: request.assertFileAccess ?? request.walkOptions?.assertFileAccess,
+        abortSignal: request.abortSignal ?? request.walkOptions?.abortSignal,
+      })
     },
     runCommand(request) {
       return runCommand(request)

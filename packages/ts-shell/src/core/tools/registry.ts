@@ -324,6 +324,8 @@ export function createCoreToolRegistry(options?: {
           if (stats?.isDirectory()) {
             return approvedResult(
               await formatDirectoryListing({
+                assertFileAccess: context.assertFileAccess,
+                abortSignal: context.abortSignal,
                 absolutePath: containment.resolvedPath,
                 workspaceRoot: context.workspaceRoot,
                 displayPath: selector.cleanPath,

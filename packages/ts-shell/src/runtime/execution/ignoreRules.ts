@@ -137,7 +137,8 @@ export function listIgnoredViaGit(
  * any depth below the declaring directory, while one containing a slash is
  * anchored there. `prefix` is empty at the root and `a/b/` below it.
  */
-export function addIgnoreFile(matcher: Ignore, file: string, prefix: string): void {
+export function addIgnoreFile(matcher: Ignore, file: string, prefix: string, allowed?: (file: string) => boolean): void {
+  if (allowed && !allowed(file)) return
   let content: string
   try {
     content = readFileSync(file, 'utf8')
@@ -175,7 +176,7 @@ export function addIgnoreFile(matcher: Ignore, file: string, prefix: string): vo
  * ignore files are folded in with that directory's prefix relative to `root`,
  * exactly as the walk does when it descends.
  */
-export function matcherForDirectory(root: string, target: string): Ignore {
+export function matcherForDirectory(root: string, target: string, allowed?: (file: string) => boolean): Ignore {
   const matcher = ignore({ ignorecase: false })
   const relative = path.relative(root, target)
   const segments =
@@ -185,13 +186,13 @@ export function matcherForDirectory(root: string, target: string): Ignore {
   let prefix = ''
   for (const segment of segments) {
     for (const name of IGNORE_FILES) {
-      addIgnoreFile(matcher, path.join(current, name), prefix)
+      addIgnoreFile(matcher, path.join(current, name), prefix, allowed)
     }
     current = path.join(current, segment)
     prefix = `${prefix}${segment}/`
   }
   for (const name of IGNORE_FILES) {
-    addIgnoreFile(matcher, path.join(current, name), prefix)
+    addIgnoreFile(matcher, path.join(current, name), prefix, allowed)
   }
   return matcher
 }

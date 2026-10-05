@@ -26,7 +26,8 @@
  * their sources say rather than what is worth reading.
  */
 
-import { promises as fs, type Dirent } from 'node:fs'
+import { promises as fs, realpathSync, type Dirent } from 'node:fs'
+import { verifyPathContainment } from '../../core/security/pathJail.js'
 import path from 'node:path'
 import ignore, { type Ignore } from 'ignore'
 import {
@@ -48,10 +49,36 @@ import {
 const PRUNED_DIRECTORIES = ['node_modules', '.git', 'dist', '.normproof'] as const
 
 export interface FileWalkOptions {
+  readonly assertFileAccess?: (absolutePath: string) => void
+  readonly abortSignal?: AbortSignal
   /** Directory names never entered, replacing the default set. */
   readonly pruneDirectories?: readonly string[]
   /** Whether ignore rules are honoured at all. Default true. */
   readonly respectIgnore?: boolean
+}
+
+/** Policy checks use canonical targets; cancellation is never an omitted entry. */
+function checkedPath(root: string, target: string, options?: FileWalkOptions): string {
+  options?.abortSignal?.throwIfAborted()
+  const checked = verifyPathContainment(target, root)
+  if (!checked.allowed) throw new Error('Directory target is outside the workspace.')
+  options?.assertFileAccess?.(checked.resolvedPath)
+  return checked.resolvedPath
+}
+
+function visiblePath(root: string, target: string, options?: FileWalkOptions): boolean {
+  options?.abortSignal?.throwIfAborted()
+  try {
+    let current = checkedPath(root, target, options)
+    while (current !== root && path.dirname(current) !== current) {
+      current = path.dirname(current)
+      checkedPath(root, current, options)
+    }
+    return true
+  } catch {
+    options?.abortSignal?.throwIfAborted()
+    return false
+  }
 }
 
 /**
@@ -65,6 +92,7 @@ async function listViaWalk(
   root: string,
   pruned: readonly string[],
   respectIgnore: boolean,
+  options?: FileWalkOptions,
 ): Promise<readonly string[]> {
   const matcher = ignore({ ignorecase: false })
   const found: string[] = []
@@ -73,25 +101,30 @@ async function listViaWalk(
   // requires, and the form callers want back.
   const relativeOf = (absolute: string): string | null => {
     const relative = path.relative(root, absolute)
-    if (relative === '' || relative.startsWith('..') || path.isAbsolute(relative)) return null
+    if (relative === '' || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) return null
     return relative.split(path.sep).join('/')
   }
 
   async function visit(absolute: string, prefix: string): Promise<void> {
+    if (!visiblePath(root, absolute, options)) return
     if (respectIgnore) {
       for (const name of IGNORE_FILE_NAMES) {
-        addIgnoreFile(matcher, path.join(absolute, name), prefix)
+        const file = path.join(absolute, name)
+        if (visiblePath(root, file, options)) addIgnoreFile(matcher, file, prefix)
       }
     }
     let entries: Dirent[]
     try {
-      entries = await fs.readdir(absolute, { withFileTypes: true })
+      entries = await fs.readdir(checkedPath(root, absolute, options), { withFileTypes: true })
+      checkedPath(root, absolute, options)
     } catch {
+      options?.abortSignal?.throwIfAborted()
       return
     }
     for (const entry of entries) {
       if (pruned.includes(entry.name)) continue
       const full = path.join(absolute, entry.name)
+      if (!visiblePath(root, full, options)) continue
       const relative = relativeOf(full)
       if (relative === null) continue
       if (entry.isDirectory()) {
@@ -125,7 +158,14 @@ export async function listWorkspaceFiles(
 ): Promise<readonly string[]> {
   const pruned = options?.pruneDirectories ?? PRUNED_DIRECTORIES
   const respectIgnore = options?.respectIgnore ?? true
-  const resolved = path.resolve(root)
+  options?.abortSignal?.throwIfAborted()
+  checkedPath(path.resolve(root), path.resolve(root), options)
+  let resolved: string
+  try { resolved = realpathSync(root) } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return []
+    throw error
+  }
+  checkedPath(resolved, resolved, options)
 
   if (respectIgnore) {
     const viaGit = listWorkspaceFilesViaGit(resolved)
@@ -134,12 +174,13 @@ export async function listWorkspaceFiles(
       // removed, because a repository need not ignore the directories that hold
       // no source.
       return viaGit.filter((entry) =>
-        !entry.split('/').some((segment) => pruned.includes(segment)),
+        !entry.split('/').some((segment) => pruned.includes(segment))
+        && visiblePath(resolved, path.resolve(resolved, entry), options),
       )
     }
   }
 
-  return listViaWalk(resolved, pruned, respectIgnore)
+  return listViaWalk(resolved, pruned, respectIgnore, options)
 }
 
 /** One direct entry of a directory, as a listing should present it. */
@@ -185,11 +226,15 @@ export async function listDirectoryEntries(
 ): Promise<DirectoryListing> {
   const pruned = options?.pruneDirectories ?? PRUNED_DIRECTORIES
   const respectIgnore = options?.respectIgnore ?? true
-  const resolvedRoot = path.resolve(root)
-  const resolvedDirectory = path.resolve(directory)
+  options?.abortSignal?.throwIfAborted()
+  const resolvedRoot = realpathSync(root)
+  const initial = verifyPathContainment(directory, root)
+  const resolvedDirectory = checkedPath(resolvedRoot, initial.resolvedPath, options)
 
   const dirents = await fs.readdir(resolvedDirectory, { withFileTypes: true })
-  const candidates = dirents.filter((entry) => !pruned.includes(entry.name))
+  checkedPath(resolvedRoot, resolvedDirectory, options)
+  const candidates = dirents.filter((entry) => !pruned.includes(entry.name)
+    && visiblePath(resolvedRoot, path.join(resolvedDirectory, entry.name), options))
   let omittedCount = dirents.length - candidates.length
 
   // Names are what git is asked about; paths are what the matcher needs.
@@ -201,13 +246,14 @@ export async function listDirectoryEntries(
     : new Set<string>()
   const matcher =
     respectIgnore && ignored === null
-      ? matcherForDirectory(resolvedRoot, resolvedDirectory)
+      ? matcherForDirectory(resolvedRoot, resolvedDirectory, (file) => visiblePath(resolvedRoot, file, options))
       : null
   const relative = path.relative(resolvedRoot, resolvedDirectory)
   const prefix = relative === '' ? '' : `${relative.split(path.sep).join('/')}/`
 
   const entries: DirectoryEntry[] = []
   for (const entry of candidates) {
+    if (!visiblePath(resolvedRoot, path.join(resolvedDirectory, entry.name), options)) { omittedCount++; continue }
     const isDirectory = await resolveIsDirectory(resolvedDirectory, entry)
     let excluded = false
     if (ignored !== null) {

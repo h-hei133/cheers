@@ -457,3 +457,14 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Linux、Node 20.3、仓内隔离环境下 execution/core-tools/edit/turn-tools 共 51 文件/426 项通过，build:ts 通过。新增两项在首次快照读取和条件复查打开后，将文件改名到拒绝路径，验证拒绝、零正文读取、关闭句柄与正确的快照调用次数。移除两处策略接线时 2 失败/10 通过，精确恢复后组合套件通过。
 - 编译模块探针经真实写入服务与 authority 验证打开后改名到拒绝目标时零正文读取、无快照产物、原文不变；模型请求为零。import-cycles/config-consumers/declarations/node-floor 通过，NormProof 无阻断项，仍有 6 项既有函数数量 advisory。未运行独立审查、PTY、跨平台验收。
 - 上批 `81fe8dcc` 已推送，Architecture Watch `37338065442` 成功，CI `37338065230` 最近查询仍 in_progress。SAFE-02 仍进行中：目录枚举、原生搜索逐文件拒绝、创建竞态及非 Linux 描述符边界未由本批解决。
+
+
+### 8.7 SAFE-02 — 目录输出与遍历策略接线（2026-10-06，进行中）
+
+- [遍历 owner](../../packages/ts-shell/src/runtime/execution/fileWalk.ts) 接收逐路径拒绝与取消信号。显式目录在 readdir 前后核验范围与策略；候选输出核验 canonical 目标及祖先目录，外部符号链接和拒绝目录后代不输出。walk 进入子目录前检查，在读取本地忽略文件前检查；[ignore owner](../../packages/ts-shell/src/runtime/execution/ignoreRules.ts) 的目录 matcher 也接收相同过滤。
+- [执行服务](../../packages/ts-shell/src/runtime/execution/service.ts) 拒绝工作区外枚举根并返回拒绝的 Promise；glob、LSP、grep 回退传入检查与取消，read 目录列表接入相同选项。[目录呈现](../../packages/ts-shell/src/core/tools/directoryListing.ts) 将省略原因写为 ignore 或 access rules，避免将权限隐藏误报为纯忽略规则。保留缺失目录返回空列表的既有约定，其他错误不据此伪装为缺失；..notes 等合法名称不再按父目录前缀排除。
+- 定向比较沿 [19 号研究](19-tools-maturity-and-multifile-edit.md) 检查参考目录工具的路径解析、存在/类型检查、readdir 与逐条 stat；保留本项目共享遍历/忽略 owner，未新增平行列表系统。参考没有本批逐路径 deny 契约，不能把其直接 readdir 当作权限围栏。本批继续保留原生 Git 的忽略与 tracked 语义，对结果再检查，不退回一个不同语义的枚举器。
+- 验证：Linux、Node 20.3、仓内隔离环境下 execution/core-tools/turn-tools 共 40 文件/393 项通过，build:ts 通过。新增 8 项覆盖有/无 Git 的拒绝文件、拒绝目录后代、内外部链接、外部枚举根、预取消/拒绝零 readdir、walk 不进入拒绝目录或读拒绝忽略文件、read/glob 实际接线及双点文件名。最初 fixture 位于父仓库内，被父 Git 忽略规则覆盖，移至隔离 TMPDIR 后验证两条真实分支；未改产品忽略语义来适应 fixture。
+- 反转移除实际路径拒绝回调时 6 失败/2 通过，精确恢复后上述组合套件通过。编译模块探针分别在非 Git 与 Git 合成工作区运行真实 read/glob，均隐藏拒绝目录及其内容并保留公开文件；模型请求为零。import-cycles/config-consumers/declarations/node-floor 通过；NormProof 无阻断项，整体 partial 仍来自 6 项既有函数数量 advisory。
+- `81fe8dcc` 的 CI `37338065230` 已核实成功；快照提交 `30c26b7a` 的 Architecture Watch `37338755126` 成功，CI `37338755092` 最近查询仍 in_progress。未取得本批独立审查、PTY 或跨平台运行证据。
+- SAFE-02 仍未完成：原生 Git 内部读取忽略配置尚不受逐文件回调控制，同步子进程不能即时响应取消；原生 grep 内容搜索仍缺逐文件 deny。目录及忽略文件目前依赖路径复查，不能承诺实际打开目录身份在竞态中不变；创建副作用与非 Linux 描述符问题继续保留。当前证据证明稳定目标下的权限接线，不是完整文件系统隔离证明。

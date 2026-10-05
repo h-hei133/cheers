@@ -151,6 +151,8 @@ export interface TextFileWriteExecutionRequest extends ExecutionRequestMetadata<
 }
 
 export interface FileListExecutionRequest extends ExecutionRequestMetadata<'file.list'> {
+  readonly assertFileAccess?: (absolutePath: string) => void
+  readonly abortSignal?: AbortSignal
   readonly absoluteRoot: string
   /**
    * How the walk decides what to include.

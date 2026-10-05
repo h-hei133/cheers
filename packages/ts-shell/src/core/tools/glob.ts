@@ -62,6 +62,8 @@ export function createGlobToolDefinition(
       const pattern = (typeof args.pattern === 'string' ? args.pattern.trim() : '') || '*'
       const files = await executionService.listFilesRecursive({
         operationKind: 'file.list',
+        assertFileAccess: context.assertFileAccess,
+        abortSignal: context.abortSignal,
         absoluteRoot: context.workspaceRoot,
         workspaceRoot: context.workspaceRoot,
         authority: TOOL_APPROVED_READ_AUTHORITY,

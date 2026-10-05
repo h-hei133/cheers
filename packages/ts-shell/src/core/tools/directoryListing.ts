@@ -44,6 +44,8 @@ function continuationNotice(
 }
 
 export interface DirectoryListingRequest {
+  readonly assertFileAccess?: (absolutePath: string) => void
+  readonly abortSignal?: AbortSignal
   readonly absolutePath: string
   readonly workspaceRoot: string
   readonly sessionId?: string
@@ -66,6 +68,7 @@ export async function formatDirectoryListing(
   const listing = await listDirectoryEntries(
     request.workspaceRoot,
     request.absolutePath,
+    { assertFileAccess: request.assertFileAccess, abortSignal: request.abortSignal },
   )
   const entries = listing.entries
   const shownPath = displayDirectoryPath(request)
@@ -75,7 +78,7 @@ export async function formatDirectoryListing(
     // model that is told "empty" when entries exist will conclude the workspace
     // does not hold what it is looking for.
     if (listing.omittedCount > 0) {
-      return `Directory ${shownPath} holds no entries that this tool may show (${listing.omittedCount} omitted by the ignore rules).`
+      return `Directory ${shownPath} holds no entries that this tool may show (${listing.omittedCount} omitted by ignore or access rules).`
     }
     return `Directory ${shownPath} is empty.`
   }
@@ -113,7 +116,7 @@ export async function formatDirectoryListing(
     body += continuationNotice(shownPath, page.length, entries.length, endIndex + 1)
   }
   if (listing.omittedCount > 0) {
-    body += `\n[${listing.omittedCount} ${listing.omittedCount === 1 ? 'entry' : 'entries'} omitted by the ignore rules]`
+    body += `\n[${listing.omittedCount} ${listing.omittedCount === 1 ? 'entry' : 'entries'} omitted by ignore or access rules]`
   }
   return body
 }

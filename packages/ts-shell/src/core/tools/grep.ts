@@ -121,6 +121,8 @@ export function createGrepToolDefinition(
 
       const allFiles = await executionService.listFilesRecursive({
         operationKind: "file.list",
+        assertFileAccess: context.assertFileAccess,
+        abortSignal: context.abortSignal,
         absoluteRoot: context.workspaceRoot,
         workspaceRoot: context.workspaceRoot,
         authority: TOOL_APPROVED_READ_AUTHORITY,

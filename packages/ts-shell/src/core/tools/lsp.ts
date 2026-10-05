@@ -100,6 +100,8 @@ export function createLspToolDefinition(
         const query = symbolQuery || (filePath ? path.basename(filePath, path.extname(filePath)) : "");
         const allFiles = await executionService.listFilesRecursive({
           operationKind: "file.list",
+          assertFileAccess: context.assertFileAccess,
+          abortSignal: context.abortSignal,
           absoluteRoot: context.workspaceRoot,
           workspaceRoot: context.workspaceRoot,
           authority: TOOL_APPROVED_READ_AUTHORITY,
