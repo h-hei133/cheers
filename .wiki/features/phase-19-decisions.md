@@ -518,3 +518,12 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Linux、Node 20.3、隔离环境下 execution/core-tools/turn-tools 共 43 文件/418 项通过，build:ts 通过；强化接线断言后 focused 6 项再次通过。新增覆盖打开后替换零读取、读前路径替换仍读原句柄且拒绝应用过期规则、嵌套否定规则、目录列表句柄接线、取消传播及外部忽略文件链接。反转回直接路径读取时 4 失败/2 通过，源码精确恢复后 focused suite 通过。
 - 编译工具探针通过实际 read 目录路径验证外部 .ignore 链接不能隐藏公开文件；模型请求为零。import-cycles/config-consumers/declarations/node-floor 通过，NormProof 无阻断项，整体 partial 仍来自 6 项既有函数上限 advisory。上一提交 `692b3faa` 的 Architecture Watch `37345053846` 已成功，CI `37345053821` 最近查询仍 in_progress。
 - SAFE-02 仍进行中：原生候选枚举与 Git 内部忽略配置读取、创建副作用竞态及跨平台实际对象保证尚未解决。忽略文件缺失、不可读或拒绝时不应用该文件规则，取消仍传播；此行为不能替代对候选文件本身的 deny 检查。未取得独立审查、PTY 或其他平台实机证据。
+
+
+### 8.13 SAFE-02 — Git 只读查询禁用文件监视程序（2026-10-06，进行中）
+
+- [忽略规则 owner](../../packages/ts-shell/src/runtime/execution/ignoreRules.ts) 的 ls-files 与 check-ignore 调用显式设置 core.fsmonitor=false，避免读取文件列表/忽略规则时执行仓库配置的监视程序；保留 tracked 与 ignored 结果语义。
+- 合成仓库原生探针证实默认查询会执行配置的程序，显式禁用后不执行且查询成功。已检查的参考工具相关目录未找到 fsmonitor 隔离先例，不宣称参考已经解决该问题；本批依据原生行为证据收窄隐式执行权限。
+- Linux、Node 20.3、隔离 HOME/USERPROFILE/TMPDIR/CHEERS_TEST_ROOT/GIT_CEILING_DIRECTORIES 下 ignoreRules、fileWalk、listAccess 与 skill 共 4 文件/38 项通过，build:ts 通过。两条真实 Git 回归测试分别覆盖列表和忽略查询，核对结果及零执行标记；移除两处禁用参数时 2 失败/6 通过，均实际生成标记，源码精确恢复后上述组合套件通过。
+- import-cycles/config-consumers/declarations/node-floor 通过。没有新增模块依赖；未取得本批独立审查、CLI/PTY 或非 Linux 运行证据。
+- SAFE-02 仍进行中：另一个隔离原生探针确认搜索工具会跟随工作区外的 .ignore 符号链接，其内部忽略配置访问尚未解决；Git 内部元数据读取、创建副作用竞态及跨平台实际对象保证也不由本批覆盖。

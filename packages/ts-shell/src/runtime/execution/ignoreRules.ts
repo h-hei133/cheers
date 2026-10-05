@@ -81,7 +81,7 @@ export const IGNORE_FILE_NAMES = IGNORE_FILES
 export function listWorkspaceFilesViaGit(root: string): readonly string[] | null {
   const result = spawnSync(
     'git',
-    ['-C', root, 'ls-files', '--cached', '--others', '--exclude-standard'],
+    ['-c', 'core.fsmonitor=false', '-C', root, 'ls-files', '--cached', '--others', '--exclude-standard'],
     { encoding: 'utf8', shell: false, timeout: GIT_TIMEOUT_MS, maxBuffer: GIT_MAX_BUFFER_BYTES },
   )
   if (result.error || result.status !== 0) {
@@ -111,7 +111,7 @@ export function listIgnoredViaGit(
   names: readonly string[],
 ): ReadonlySet<string> | null {
   if (names.length === 0) return new Set()
-  const result = spawnSync('git', ['-C', directory, 'check-ignore', '--stdin'], {
+  const result = spawnSync('git', ['-c', 'core.fsmonitor=false', '-C', directory, 'check-ignore', '--stdin'], {
     input: `${names.join('\n')}\n`,
     encoding: 'utf8',
     shell: false,

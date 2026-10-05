@@ -2,8 +2,9 @@ import fs, { promises as fsp } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import ignore from 'ignore'
+import { execFileSync } from 'node:child_process'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { loadDirectoryMatcher, loadIgnoreFile } from './ignoreRules.js'
+import { loadDirectoryMatcher, loadIgnoreFile, listIgnoredViaGit, listWorkspaceFilesViaGit } from './ignoreRules.js'
 import { listDirectoryEntries } from './fileWalk.js'
 
 let root: string
@@ -87,4 +88,24 @@ it('does not load patterns from an external ignore-file symlink', async () => {
   const matcher = ignore()
   await loadIgnoreFile(matcher, file, '', workspace)
   expect(matcher.ignores('PRIVATE_PATTERN')).toBe(false)
+})
+
+it.each(['files', 'ignore'])('does not execute configured filesystem monitors during %s queries', query => {
+  execFileSync('git', ['init', '-q', workspace])
+  fs.writeFileSync(path.join(workspace, 'tracked.txt'), 'tracked')
+  fs.writeFileSync(path.join(workspace, '.gitignore'), '*.tmp\n')
+  fs.writeFileSync(path.join(workspace, 'hidden.tmp'), 'hidden')
+  execFileSync('git', ['-C', workspace, 'add', 'tracked.txt'])
+  const marker = path.join(root, 'monitor-ran')
+  const monitor = path.join(root, 'monitor.cjs')
+  fs.writeFileSync(monitor, `#!${process.execPath}\nrequire('node:fs').writeFileSync(${JSON.stringify(marker)}, 'ran'); process.stdout.write('token\\0');\n`, { mode: 0o755 })
+  execFileSync('git', ['-C', workspace, 'config', 'core.fsmonitor', monitor])
+  if (query === 'files') {
+    const files = listWorkspaceFilesViaGit(workspace)
+    expect(files).toContain('tracked.txt')
+    expect(files).not.toContain('hidden.tmp')
+  } else {
+    expect(listIgnoredViaGit(workspace, ['tracked.txt', 'hidden.tmp'])).toEqual(new Set(['hidden.tmp']))
+  }
+  expect(fs.existsSync(marker)).toBe(false)
 })
