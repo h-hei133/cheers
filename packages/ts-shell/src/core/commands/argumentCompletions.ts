@@ -25,7 +25,6 @@ function prefixFilter(
  * so these lists come from the handler's own accepted set.
  */
 const SUBCOMMAND_VALUES = {
-  connect: ["status", "list", "presets", "login", "set", "use", "logout", "help"],
   compact: ["preview", "render", "json"],
   browser: ["status", "smoke", "runtime", "preview", "dry-run", "execute", "replay", "repair"],
 } as const;

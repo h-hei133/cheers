@@ -125,34 +125,6 @@ export function buildConnectionId(provider: RuntimeProvider): string {
   return `${provider}-${Date.now().toString(36)}`;
 }
 
-export function parseArgsWithFlags(args: string[]): {
-  positionals: string[];
-  flags: Record<string, string | boolean>;
-} {
-  const positionals: string[] = [];
-  const flags: Record<string, string | boolean> = {};
-
-  for (let index = 0; index < args.length; index += 1) {
-    const token = args[index];
-    if (!token.startsWith("--")) {
-      positionals.push(token);
-      continue;
-    }
-
-    const key = token.slice(2).trim().toLowerCase();
-    const next = args[index + 1];
-    if (!next || next.startsWith("--")) {
-      flags[key] = true;
-      continue;
-    }
-
-    flags[key] = next;
-    index += 1;
-  }
-
-  return { positionals, flags };
-}
-
 export function parseFlagValue(value?: string | boolean): string | undefined {
   if (typeof value !== "string") {
     return undefined;

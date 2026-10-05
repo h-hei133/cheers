@@ -1,3 +1,5 @@
+import { connectSyntax, parseConnectArgs } from "./connect/syntax.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import {
   readUserRuntimeConfigFile,
   writeUserRuntimeConfigFile,
@@ -17,7 +19,6 @@ import {
   normalizeBaseUrl,
   normalizeConnections,
   normalizeOptional,
-  parseArgsWithFlags,
   parseFlagValue,
   resolveProviderTarget,
 } from "./connect/preset.js";
@@ -71,7 +72,10 @@ export async function runConnectCommand(
   args: string[],
   _context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const [action, ...rest] = args;
+  const parsed = parseConnectArgs(args);
+  if (!parsed.ok) return { kind: "local", output: `Invalid /connect arguments: ${parsed.reason}\n${syntaxHelp(connectSyntax)}` };
+  const action = parsed.action.name;
+  const rest = args.slice(1);
   if (!action || action === "help") {
     return { kind: "local", output: getConnectHelpText() };
   }
@@ -107,7 +111,9 @@ export async function runConnectCommand(
 }
 
 export async function addConnection(args: string[]): Promise<string> {
-  const parsed = parseArgsWithFlags(args);
+  const syntax = parseConnectArgs(["login", ...args]);
+  if (!syntax.ok) return `Invalid /connect arguments: ${syntax.reason}\n${syntaxHelp(connectSyntax)}`;
+  const parsed = { positionals: syntax.args, flags: Object.fromEntries(syntax.flags) };
   const target = resolveProviderTarget(parsed.positionals[0]);
   if (!target) {
     return [
@@ -197,6 +203,9 @@ export async function addConnection(args: string[]): Promise<string> {
 }
 
 export async function addConnectionFromLegacyAuthSet(args: string[]): Promise<string> {
+  const syntax = parseConnectArgs(["set", ...args]);
+  if (!syntax.ok) return `Invalid /connect arguments: ${syntax.reason}\n${syntaxHelp(connectSyntax)}`;
+  args = [...syntax.args];
   const provider = normalizeOptional(args[0]);
   const apiKey = normalizeOptional(args[1]);
   const baseUrl = normalizeOptional(args[2]);
@@ -209,7 +218,7 @@ export async function addConnectionFromLegacyAuthSet(args: string[]): Promise<st
     ].join("\n");
   }
 
-  const forwardedArgs: string[] = [provider, "--api-key", apiKey];
+  const forwardedArgs: string[] = [provider, `--api-key=${apiKey}`];
   if (baseUrl) {
     forwardedArgs.push("--base-url", baseUrl);
   }
@@ -226,6 +235,9 @@ export async function addConnectionFromLegacyAuthSet(args: string[]): Promise<st
 }
 
 export function activateConnection(args: string[]): string {
+  const syntax = parseConnectArgs(["use", ...args]);
+  if (!syntax.ok) return `Invalid /connect arguments: ${syntax.reason}\n${syntaxHelp(connectSyntax)}`;
+  args = [...syntax.args];
   const target = args[0]?.trim();
   if (!target) {
     return "Usage: /connect use <connection-id|provider>";
@@ -267,6 +279,9 @@ export function activateConnection(args: string[]): string {
 }
 
 export function removeConnection(args: string[]): string {
+  const syntax = parseConnectArgs(["logout", ...args]);
+  if (!syntax.ok) return `Invalid /connect arguments: ${syntax.reason}\n${syntaxHelp(connectSyntax)}`;
+  args = [...syntax.args];
   const target = args[0]?.trim();
   if (!target) {
     return "Usage: /connect logout <connection-id|provider>";

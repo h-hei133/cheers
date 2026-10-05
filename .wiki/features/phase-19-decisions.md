@@ -737,3 +737,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 沿用此前参考 CLI 的原始参数/-- 语义比较，本命令有 shell 独立语法，故只解析前导次数，不把 gate 的 flags 送入普通选项 parser。Linux、Node 20.3 隔离环境 14 文件/245 项通过，build:ts 通过；恢复旧 handler 的反转使非法数字、缺失 gate 与通知断言失败，逐字节恢复后组合套件通过。
 - 真实 regular/fullscreen CLI 输入非法次数和仅次数时未生成执行标记；带引用参数的合法 gate 通过，两模式 exit 0、无模型请求。import cycles/config consumers/declarations/node floor 通过；7 个 call reachability 与 5 个 NormProof 函数数量既有 advisory 保留，阻断义务通过。
 - 43db5468 的 CI 37377909797 与 Architecture Watch 37377909807 均成功，标题测试修正取得远端证据。300ea7a4 Architecture Watch 37379100679 成功，CI 37379100643 尚待终态。CMD-03 剩余语法/动态目录、CMD-04、SAFE-02 和 Phase 19 整体继续。
+
+
+### 8.33 CMD-03：connect 登录与连接动作校验
+
+- connect owner 声明 help/status/list/presets/login/set/use/activate/logout/remove/rm、参数和动作专属 flags；入口、四个直接导出的写入函数、帮助、registry 提示与固定候选消费同一语法。删除宽松 parseArgsWithFlags 与独立词表，未知/重复/boolean 赋值/额外参数在认证或配置写入之前拒绝。
+- API key、account、browser 登录方式互斥；account/browser 不再静默忽略 base-url/model，label 仍允许。key 与 api-key 归为同一选项，重复别名拒绝；支持 inline 值。set 兼容路径转发 key 使用 inline 形式以保留 dash-leading 值；use/logout/set 消费解析后的字面参数，支持 -- 边界。错误只返回参数类别，不回显输入凭据。
+- provider/preset 候选来自现有 CONNECT_PRESETS 与真实兼容别名，仅在 login/set 的 provider 位置生成；凭据值不提供候选，认证方式与覆盖选项互斥后不再建议。实际 auth 支持与状态仍由既有认证 owner 判断；本批未改 provider/auth 核心，也未访问真实配置。
+- 对照参考 CLI 的缺值/枚举诊断与 -- 字面参数决定，复用本项目严格 parser；没有复制认证流程。Linux、Node 20.3 隔离环境 14 文件/264 项通过，build:ts 通过。恢复旧 handler 与其 parser 的反转产生认证流程被调用、非法输入写成功及直接调用校验的行为断言失败；逐字节恢复后组合套件通过。
+- 真实 regular/fullscreen CLI 的非法组合与额外参数保持配置字节及 mtime 不变，合法 inline 合成 key 保存成功，两模式 exit 0、无模型请求。新增测试曾错写既有激活成功文案，按实际 Active connection switched 修正，未改产品输出或弱化状态断言。
+- import cycles/config consumers/declarations/node floor 通过；7 个 call reachability 与 5 个 NormProof 函数数量既有 advisory 保留，阻断义务通过。a30053cc 的 CI 37378532481 与 Architecture Watch 37378532495 均成功；0bb9d3ed Architecture Watch 37379835823 成功，CI 37379835922 尚待终态。CMD-03 其余命令/动态连接 ID、CMD-04、SAFE-02 与 Phase 19 整体仍未完成。

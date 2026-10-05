@@ -1,3 +1,5 @@
+import { connectSyntax } from "./syntax.js";
+import { syntaxHelp } from "../syntax/projection.js";
 import {
   readUserRuntimeConfigFile,
   type ProviderConnectionConfig,
@@ -180,6 +182,7 @@ export function renderReadinessGuidance(input: {
 
 export function getConnectHelpText(): string {
   return [
+    syntaxHelp(connectSyntax),
     "Provider connect and onboarding commands",
     "/connect status|list",
     "/connect presets",

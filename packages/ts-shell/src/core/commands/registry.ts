@@ -1,3 +1,4 @@
+import { connectSyntax, connectCompletions } from "./connect/syntax.js";
 import { loopSyntax, loopArgumentCompletions } from "./loop/syntax.js";
 import { brainstormSyntax } from "./brainstorm/syntax.js";
 import { goalSyntax } from "./goal/syntax.js";
@@ -169,8 +170,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "provider connection management",
       group: "diagnostics",
-      argumentHint: "[status|login|set|use|logout]",
-      getArgumentCompletions: (prefix) => subcommandCompletions("connect", prefix),
+      argumentHint: syntaxHint(connectSyntax),
+      getArgumentCompletions: connectCompletions,
       execute: (args, context) => runConnectCommand(args, context),
     },
     {

@@ -412,3 +412,8 @@ goal 保留单 token 动作与多词正文差异，保存失败不再虚报内�
 ### CMD-03 loop 实施记录（2026-10-06）
 
 loop 严格次数范围与示例候选同源，删除缺失 gate 时隐式 npm test，保留原始 shell 文本并如实描述次数与强制 turn budget 的差异。245 项、构建、反转与两模式真实 CLI 验证，见 [决策 §8.32](phase-19-decisions.md#832-cmd-03loop-次数与原始-gate-参数)。实际共享预算和统一 execution service 接线仍待完成。
+
+
+### CMD-03 connect 实施记录（2026-10-06）
+
+connect 统一动作/flags/互斥与直接写入函数校验，provider 候选按合法位置生成，凭据值不补全；非法输入在配置写入或认证调用之前拒绝。264 项、构建、反转及两模式真实 CLI 验证，见 [决策 §8.33](phase-19-decisions.md#833-cmd-03connect-登录与连接动作校验)。动态连接 ID 与其余任务继续。
