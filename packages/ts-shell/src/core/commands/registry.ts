@@ -1,3 +1,7 @@
+import { workspaceSyntax, cdSyntax } from "./workspace/syntax.js";
+import { mcpSyntax } from "./mcp/syntax.js";
+import { permissionsSyntax } from "./permissions/syntax.js";
+import { viewSyntax } from "./view/syntax.js";
 import { resumeSyntax, forkSyntax, treeSyntax, entriesSyntax, navigationCompletions } from "./navigation/syntax.js";
 import { shellSyntax } from "./shell/syntax.js";
 import { fastSyntax } from "./fast/syntax.js";
@@ -263,8 +267,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "inspect or switch project/workdir binding",
       group: "workspace",
-      argumentHint: "[status|attach|recent]",
-      getArgumentCompletions: (prefix) => subcommandCompletions("workspace", prefix),
+      argumentHint: syntaxHint(workspaceSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(workspaceSyntax, prefix),
       execute: (args, context) => runWorkspaceShellAction(args, context),
     },
     {
@@ -275,7 +279,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "quick attach by path",
       group: "workspace",
-      argumentHint: "<path>",
+      argumentHint: syntaxHint(cdSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(cdSyntax, prefix),
       execute: (args, context) => runCdShellAction(args, context),
     },
     {
@@ -296,8 +301,8 @@ export function createCommandRegistry(
       enabled: runtimeConfig.enableMcpTools,
       summary: "inspect and recover MCP state",
       group: "diagnostics",
-      argumentHint: "[status|tools|doctor|refresh]",
-      getArgumentCompletions: (prefix) => subcommandCompletions("mcp", prefix),
+      argumentHint: syntaxHint(mcpSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(mcpSyntax, prefix),
       execute: (args, context) => runMcpShellAction(args, context),
     },
     {
@@ -331,8 +336,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "inspect trust policy state",
       group: "diagnostics",
-      argumentHint: "[list|explain|revoke|reset]",
-      getArgumentCompletions: (prefix) => subcommandCompletions("permissions", prefix),
+      argumentHint: syntaxHint(permissionsSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(permissionsSyntax, prefix),
       execute: (args, context) => runPermissionsShellAction(args, context),
     },
     {
@@ -405,9 +410,9 @@ export function createCommandRegistry(
       availability: "available",
       enabled: true,
       summary: "inspect or switch between user and developer output",
-      argumentHint: "[status|user|developer]",
+      argumentHint: syntaxHint(viewSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(viewSyntax, prefix),
       group: "workspace",
-      getArgumentCompletions: (prefix) => subcommandCompletions("view", prefix),
       execute: (args, context) => runViewShellAction(args, context),
     },
     {

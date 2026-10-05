@@ -26,7 +26,6 @@ function prefixFilter(
  */
 const SUBCOMMAND_VALUES = {
   log: ["tail", "path", "export", "clear"],
-  view: ["status", "user", "developer"],
   goal: ["pause", "resume", "complete", "clear"],
   workflow: ["list", "run", "status"],
   marketplace: ["list", "add", "remove", "rm", "delete"],
@@ -34,9 +33,6 @@ const SUBCOMMAND_VALUES = {
   connect: ["status", "list", "presets", "login", "set", "use", "logout", "help"],
   compact: ["preview", "render", "json"],
   warmup: ["status", "rebuild"],
-  mcp: ["status", "tools", "doctor", "refresh"],
-  permissions: ["list", "explain", "revoke", "reset"],
-  workspace: ["status", "attach", "recent"],
   sidebar: ["snapshot", "panel", "compact", "detail"],
   browser: ["status", "smoke", "runtime", "preview", "dry-run", "execute", "replay", "repair"],
   brainstorm: ["-i", "-s"],

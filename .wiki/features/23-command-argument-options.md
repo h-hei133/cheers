@@ -382,3 +382,8 @@ shell/statusline/settings/fast 已由 owner syntax 驱动执行、帮助与候�
 ### CMD-03 会话导航实施记录（2026-10-06）
 
 resume/fork/tree/entries 使用共享导航语法，拒绝多余参数与非法 flags，修复对象继承属性被当成模式的问题。保留标题/前缀引用与 fork here、entries 独占游标语义，帮助和固定候选同源。257 项组合测试、构建、三组反转和两模式真实 CLI 验证，见 [决策 §8.26](phase-19-decisions.md#826-cmd-03会话导航动作校验与同源帮助)；动态实体目录及其余全量表仍待完成。
+
+
+### CMD-03 工作区与运行时动作实施记录（2026-10-06）
+
+workspace/cd、mcp、permissions、view 以领域语法驱动执行、提示与固定候选，多余参数在交接之前拒绝；权限 runner 独立拒绝非法 reset scope。213 项、构建、两组反转与两模式真实 CLI 授权文件/范围验证通过，详见 [决策 §8.27](phase-19-decisions.md#827-cmd-03workspacemcppermissionsview-动作边界)。动态目录及全量表继续。

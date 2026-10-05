@@ -1,3 +1,5 @@
+import { parsePermissionsArgs, permissionsSyntax } from "../core/commands/permissions/syntax.js";
+import { syntaxHelp } from "../core/commands/syntax/projection.js";
 import path from "node:path";
 import { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
 import { StreamingRenderer } from "../presentation/terminal/streaming.js";
@@ -14,6 +16,11 @@ export function runCliPermissionCommand(input: {
   readonly permissionSelector?: string;
 }): void {
   const permissionAction = input.permissionAction ?? "list";
+  const parsed = parsePermissionsArgs([permissionAction, ...(input.permissionSelector === undefined ? [] : [input.permissionSelector])]);
+  if (!parsed.ok) {
+    input.renderer.renderLine(`Invalid /permissions arguments: ${parsed.reason}\n${syntaxHelp(permissionsSyntax)}`);
+    return;
+  }
   if (permissionAction === "list") {
     renderPermissionsList(input.renderer, input.trustPolicy, input.projectRoot);
     return;

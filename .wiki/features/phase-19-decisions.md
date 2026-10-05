@@ -676,3 +676,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Linux、Node 20.3、隔离环境组合 13 文件/257 项通过，build:ts 通过。旧 resume/entries/tree handler 三组反转均失败，源码逐字节恢复后组合测试再次通过。真实 regular/fullscreen CLI 验证非法 fork 不创建新 session，非法 resume/tree/entries 参数不改变当前会话指针，两模式 exit 0、无模型请求。
 - import cycles/config consumers/declarations/node floor 通过；call reachability 与 NormProof 既有 advisory 不作为完成证据。49e688c2 的 CI 37372368967 失败但 steps=[]，annotation 明确为 hosted runner 多次未领取任务；其 Architecture Watch 37372368971 成功。b05da528 的 Architecture Watch 37373559916 成功，CI 37373559892 最近 queued，未计通过。
 - CMD-03 尚未完成：动态 session/entry、memory 实体/筛选目录及其余命令表继续；CMD-04、SAFE-02 与阶段后续批次仍开放。本批不改变会话恢复安全边界、文件恢复或真实模型调用流程。
+
+
+### 8.27 CMD-03：workspace/MCP/permissions/view 动作边界
+
+- workspace/cd、mcp、permissions、view 分别由 core/commands 下的领域 syntax/command 模块拥有；原 shellActionRuntime 保留兼容导出，registry 提示与固定候选消费同一语法，删除独立词表。未知动作、flags、多余参数在 shell action 交接前拒绝。路径、server 与 grant label 保留大小写及引号中的空格；多词目标必须引用，`--` 后允许字面 dash-leading 路径。
+- permissions 的 reset/clear 只接受省略或显式 all。直接 CLI runner 也先校验，修复 reset typo 静默清除当前项目授权的问题；默认项目范围和显式全部范围各自保留，revoke 仍消费既有稳定 scope/label/index 选择器，没有新增授权或确认语义。
+- MCP 保留 tools、doctor/diagnose、refresh/reconnect 及可选单 server；view 保留 user/compact、developer/verbose/dev。定向对照参考命令补全先识别合法 MCP 动作再查询目录的决定，本批只接入合法语法和固定候选，动态 server/path/grant 目录另续。
+- Linux、Node 20.3 隔离环境 11 文件/213 项通过，构建通过。恢复旧 shell handlers 和旧权限 runner 两组反转均产生对应行为断言失败，源码恢复后组合套件通过。真实 regular/fullscreen CLI 的非法输入保持授权文件字节和 mtime 不变，默认 reset 保留另一个项目，显式 reset all 清空剩余，两模式 exit 0、无模型请求。
+- import cycles/config consumers/declarations/node floor 通过；call reachability 7 个既有 advisory，NormProof 阻断义务通过且保留 5 个既有函数数量 advisory。上一提交 0b76ddb4 的 Architecture Watch 37375146977 成功，CI 37375146972 最近仍在测试步骤，尚不计通过。
+- CMD-03 全量表、动态目录、CMD-04、SAFE-02 与其余 Phase 19 任务仍未完成。
