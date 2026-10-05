@@ -805,3 +805,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - import cycles/config consumers/declarations/node floor 通过；NormProof 全图无环及导入解析 satisfied，既有 5 个函数数量、7 个 call reachability advisory 保留。
 - b0829c90 的 CI 37383202315 与 Architecture Watch 37383202296 均成功。f1109ed9 的 CI 37382653783 失败于相同 browser cache concurrent CLI 场景（1 passed/2 blocked/2 timedOut）；原 dfb81fce 的超时根因仍未确认，后续绿灯不覆盖此前失败。41af8323 Architecture Watch 37384091517 成功，CI 37384091556 查询时仍运行。
 - CMD-04 仍未完成：session/entry、memory record/candidate、grants、MCP servers、连接及文件/目录位置等尚未接入本生命周期，外部目录变动目前通过显式操作失效或 TTL 刷新而非完整版本事件；底层 MCP 可取消读取亦待处理。CMD-03 自由文本提示及其余 Phase 19 任务继续。
+
+
+### 8.39 验证修复：浏览器缓存并发源码 CLI 期限
+
+- 对 §8.37/38 两次远端失败进一步定位：test-utils/browser/cache 夹具把完整 Node/TSX 源码 CLI 启动与执行限制为 8 秒，包含冷转译。单 CPU、TSX_DISABLE_CACHE=1、隔离 HOME/USERPROFILE 的三进程相同场景中，放宽探针期限后源码进程均成功但各耗时 13.08–13.15 秒；已构建 CLI 为 4.25–4.30 秒。恢复 8 秒则三进程全部在约 8.24 秒 timedOut、无输出且缓存为空，复现同类失败。这是源码测试启动期限不足的直接证据，不是缓存写入失败的证据。
+- 仅把该缓存夹具默认进程期限调到 20 秒，三条包含多进程/多阶段的场景外层期限调整到 45 秒；显式 timeoutMs 仍可覆盖。浏览器 external runner 原有至少 1200ms 动作期限、缓存锁、安全断言与产品默认均未修改。修复后同一单 CPU 冷源码实验三进程分别 12.73/12.77/12.91 秒正常退出，无 timeout；重复同键记录仍报告既有 integrity warning，不伪称全健康。
+- 测试进程 owner 原先只发 SIGTERM，忽略信号的子进程会一直等待。对照参考子进程超时强制终止与关闭管道的决定，harness 现在先终止、250ms 后升级 SIGKILL；POSIX 仅向新建的子进程组发信号，Windows 仍针对直接子进程，未宣称覆盖 Windows 子孙树清理。处理 stdin 提前关闭错误，并区分直接命令/TSX 执行证据。
+- 缓存失败报告新增每进程 durationMs/deadlineMs/exit/signal/timedOut，继续不输出原始进程内容。Linux、Node 20.3 下 5 文件/20 项通过，build:ts 通过；忽略 SIGTERM 的独立真实进程被升级终止，仍报告 timedOut 且非成功退出。移除强制升级的反转触发失败，测试夹具自行结束以避免残留进程，恢复后组合通过。
+- import cycles/config consumers/declarations/node floor 与 docs drift 阻断门通过，NormProof 无环/导入可解析 satisfied；既有 5 个函数数量及 7 个 call reachability advisory 保留。没有改 CI 工作流、package scripts 或通过跳过并发场景绕过失败。此轮是本地重现与修复证据，远端是否解决仍以新提交 CI 为准；dfb81fce/f1109ed9 原失败不改写。
+- 41af8323 两项远端检查成功；e64f75ab Architecture Watch 37385544101 成功，CI 37385544106 查询时仍运行。Phase 19 其余 CMD-03/04 与后续批次继续。

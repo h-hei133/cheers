@@ -100,7 +100,9 @@ export function createBrowserCacheMultiprocessFixture(input: {
           projectPath,
           homeDir,
           env,
-          timeoutMs: step.timeoutMs ?? 8000,
+          // Cold source CLI startup includes transpilation; three concurrent writers
+          // take about 13s on one CPU before completing the cache operation.
+          timeoutMs: step.timeoutMs ?? 20000,
         }),
       };
     },

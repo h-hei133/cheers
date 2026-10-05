@@ -90,14 +90,31 @@ export async function runAgentCliProcess(
       cwd: spec.cwd,
       env: materializeEnv(spec.env),
       shell: false,
+      detached: process.platform !== "win32",
       stdio: ["pipe", "pipe", "pipe"],
     });
     let stdout = "";
     let stderr = "";
     let timedOut = false;
+    let escalation: ReturnType<typeof setTimeout> | undefined;
+    const terminate = (signal: NodeJS.Signals): void => {
+      if (!child.pid) return;
+      try {
+        if (process.platform !== "win32") process.kill(-child.pid, signal);
+        else child.kill(signal);
+      } catch {
+        // The process may have exited between the deadline and the signal.
+      }
+    };
     const timeout = setTimeout(() => {
       timedOut = true;
-      child.kill("SIGTERM");
+      terminate("SIGTERM");
+      escalation = setTimeout(() => {
+        terminate("SIGKILL");
+        child.stdin?.destroy();
+        child.stdout?.destroy();
+        child.stderr?.destroy();
+      }, 250);
     }, spec.timeoutMs);
 
     child.stdout?.on("data", (data) => {
@@ -106,12 +123,14 @@ export async function runAgentCliProcess(
     child.stderr?.on("data", (data) => {
       stderr += data.toString();
     });
+    child.stdin?.on("error", () => {});
     child.stdin?.end(spec.stdin ?? "");
     child.on("error", (error) => {
       stderr += error.message;
     });
     child.on("close", (exitCode, signal) => {
       clearTimeout(timeout);
+      clearTimeout(escalation);
       resolve({
         spec,
         exitCode,
@@ -122,7 +141,7 @@ export async function runAgentCliProcess(
         evidence: [
           "agent-cli-process:spawned",
           "agent-cli-process:no-provider-env",
-          "agent-cli-process:node-tsx-cli",
+          spec.args[0] === tsxCliPath ? "agent-cli-process:node-tsx-cli" : "agent-cli-process:direct-command",
         ],
         warnings: timedOut ? ["agent-cli-process:timeout"] : [],
         redactions: ["provider-env", "secret-looking-env"],

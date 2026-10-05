@@ -48,7 +48,7 @@ describe("browser cache multiprocess scenario examples", () => {
     expect(assertBrowserCacheStressSafe(result)).toEqual([]);
     expect(renderBrowserCacheMultiprocessReport(result)).toContain("Persistence: explicit only");
     expect(cacheText(fixture)).not.toContain("RAW_");
-  }, 20000);
+  }, 45000);
 
   it("runs status and replay while a real lock-holder process simulates an in-flight write", async () => {
     const fixture = track(createBrowserCacheMultiprocessFixture({ runnerDelayMs: 80 }));
@@ -98,7 +98,7 @@ describe("browser cache multiprocess scenario examples", () => {
     expect(result.integrity.status).not.toBe("unsafe");
     expect(result.integrity.status).not.toBe("corrupted");
     expect(assertBrowserCacheStressSafe(result)).toEqual([]);
-  }, 20000);
+  }, 45000);
 
   it("blocks busy and stale locks while preserving uncertain log bytes", async () => {
     const fixture = track(createBrowserCacheMultiprocessFixture());
@@ -166,7 +166,7 @@ describe("browser cache multiprocess scenario examples", () => {
     expect(cacheText(fixture)).toBe(originalCache);
     expect(repair.assertions.rawLeakCount).toBe(0);
     expect(assertBrowserCacheStressSafe(repair)).toEqual(["unsafe-cache-records"]);
-  }, 20000);
+  }, 45000);
 
   it("renders a concise report without raw child-process output", async () => {
     const fixture = track(createBrowserCacheMultiprocessFixture());

@@ -8,6 +8,7 @@ export function renderBrowserCacheMultiprocessReport(result: BrowserCacheStressR
     `- Processes: ${result.assertions.processCount}`,
     `- Roles: ${Array.from(new Set(result.processes.map((process) => process.role))).join(", ") || "none"}`,
     `- Exit summary: passed=${result.assertions.passedCount} blocked=${result.assertions.blockedCount} failed=${result.assertions.failedCount} timedOut=${result.assertions.timedOutCount}`,
+    ...result.processes.map((entry, index) => `- Process ${index + 1}: role=${entry.role} durationMs=${entry.durationMs} deadlineMs=${entry.process.spec.timeoutMs} exit=${entry.exitCode ?? "none"} signal=${entry.signal ?? "none"} timedOut=${entry.timedOut}`),
     `- Lock: ${result.lock.status}${result.lock.operation ? `/${result.lock.operation}` : ""}`,
     `- Integrity: ${result.integrity.status}`,
     `- Records: valid=${result.integrity.validRecordCount} active=${result.integrity.activeCount} replayable=${result.integrity.replayableCount}`,

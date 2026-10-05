@@ -70,6 +70,7 @@ describe("browser cache multiprocess report", () => {
     } satisfies BrowserCacheStressResult);
 
     expect(report).toContain("Processes: 1");
+    expect(report).toContain("durationMs=10 deadlineMs=10 exit=0 signal=none timedOut=false");
     expect(report).toContain("Provider/model call: none");
     expect(report).not.toContain("RAW_SECRET");
   });
