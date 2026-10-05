@@ -34,7 +34,8 @@ it('passes only authorized native candidates to content search, without fallback
   const searches = vi.mocked(executeLocally).mock.calls.map(([input]) => input).filter(input => input.args?.includes('--json'));
   expect(searches).toHaveLength(1);
   const args = searches[0]!.args!;
-  expect(args.slice(args.indexOf('--') + 2)).toEqual(['public.txt']);
+  expect(args.slice(args.indexOf('--') + 2)).toEqual(process.platform === 'linux' ? ['/proc/self/fd/3'] : ['public.txt']);
+  if (process.platform === 'linux') expect(searches[0]!.readDescriptors).toHaveLength(1);
 });
 it('does not spawn a content search when every candidate is denied', async () => {
   const result = await searchWithRipgrep({ pattern: 'needle', searchPath: '', limit: 10, workspaceRoot: root,
@@ -100,4 +101,21 @@ it.each([false, true])('ignores inherited preprocessing configuration with polic
   await expect(fs.stat(marker)).rejects.toMatchObject({ code: 'ENOENT' });
   expect(result.ok).toBe(true);
   if (result.ok) expect(result.matches.map(match => match.line)).toEqual(['needle public']);
+});
+
+it('searches the verified file rather than a replacement installed before spawn', async () => {
+  if (process.platform !== 'linux') return;
+  const actual = await vi.importActual<typeof import('../../runtime/execution/local.js')>('../../runtime/execution/local.js');
+  vi.mocked(executeLocally).mockImplementation(async input => {
+    if (input.args?.includes('--json')) {
+      await fs.rename(path.join(root, 'public.txt'), path.join(root, 'original.txt'));
+      await fs.writeFile(path.join(root, 'public.txt'), 'needle REPLACEMENT_MARKER');
+    }
+    return actual.executeLocally(input);
+  });
+  try {
+    const result = await searchWithRipgrep({ pattern: 'needle', searchPath: 'public.txt', limit: 10, workspaceRoot: root, assertFileAccess: check });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.matches).toEqual([{ path: 'public.txt', lineNumber: 1, line: 'needle public' }]);
+  } finally { vi.mocked(executeLocally).mockImplementation(actual.executeLocally); }
 });

@@ -1,5 +1,6 @@
 import { constants, promises as fs, realpathSync, statSync, type BigIntStats } from 'node:fs'
 import { verifyPathContainment } from '../../core/security/pathJail.js'
+import type { FileHandle } from 'node:fs/promises'
 import type { TextFileReadExecutionRequest } from './types.js'
 
 function contained(target: string, root: string): string {
@@ -19,6 +20,10 @@ function workspaceTarget(target: string, requestedRoot: string, realRoot: string
 
 /** Read bytes from the verified handle, never by reopening its pathname. */
 export async function readTextFile(request: TextFileReadExecutionRequest): Promise<string> {
+  return withVerifiedReadFile(request, handle => handle.readFile({ encoding: 'utf8', signal: request.abortSignal }))
+}
+
+async function withVerifiedReadFile<T>(request: TextFileReadExecutionRequest, consume: (handle: FileHandle) => Promise<T>): Promise<T> {
   request.abortSignal?.throwIfAborted()
   const workspace = realpathSync(request.workspaceRoot)
   const root = request.artifactDirectory
@@ -44,7 +49,7 @@ export async function readTextFile(request: TextFileReadExecutionRequest): Promi
     }
     request.assertFileAccess?.(actual)
     request.abortSignal?.throwIfAborted()
-    return await handle.readFile({ encoding: 'utf8', signal: request.abortSignal })
+    return await consume(handle)
   } catch (error) {
     // A disappearing opened file is a failed read, not evidence that a writer
     // may treat its pre-read as an initially absent target.
@@ -55,4 +60,34 @@ export async function readTextFile(request: TextFileReadExecutionRequest): Promi
   } finally {
     await handle.close()
   }
+}
+
+/** Linux descriptor inputs stay open until their command settles. */
+export async function withVerifiedReadFiles<T>(requests: readonly TextFileReadExecutionRequest[], consume: (handles: readonly FileHandle[]) => Promise<T>): Promise<T> {
+  if (process.platform !== 'linux') throw new Error('Descriptor input binding is unavailable on this platform.')
+  const handles: FileHandle[] = []
+  async function openNext(index: number): Promise<T> {
+    if (index < requests.length) {
+      return withVerifiedReadFile(requests[index]!, async handle => {
+        handles.push(handle)
+        return openNext(index + 1)
+      })
+    }
+    // Opening later files yields; recheck earlier descriptors before giving them to a child.
+    for (let i = 0; i < handles.length; i++) {
+      const request = requests[i]!
+      request.abortSignal?.throwIfAborted()
+      const actual = await fs.realpath(`/proc/self/fd/${handles[i]!.fd}`)
+      const target = realpathSync(request.absolutePath)
+      const workspace = realpathSync(request.workspaceRoot)
+      const allowedRoot = request.artifactDirectory ? contained(realpathSync(request.artifactDirectory), workspace) : workspace
+      if (contained(actual, allowedRoot) !== target
+        || !sameFile(await handles[i]!.stat({ bigint: true }), statSync(target, { bigint: true }))) {
+        throw new Error('Read target changed before command execution.')
+      }
+      request.assertFileAccess?.(actual)
+    }
+    return consume(handles)
+  }
+  return openNext(0)
 }

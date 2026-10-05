@@ -1,4 +1,5 @@
 import { StringDecoder } from "node:string_decoder";
+import { withVerifiedReadFiles } from '../../runtime/execution/read.js';
 import { executeLocally } from "../../runtime/execution/local.js";
 import path from "node:path";
 import { realpathSync, statSync } from 'node:fs';
@@ -251,6 +252,27 @@ export async function searchWithRipgrep(input: RipgrepSearchInput): Promise<Ripg
 }
 
 async function streamSearch(binary: string, input: RipgrepSearchInput, files?: readonly string[]): Promise<RipgrepOutcome> {
+  if (files && process.platform === 'linux') {
+    const deadline = Date.now() + (input.timeoutMs ?? 30_000);
+    try {
+      return await withVerifiedReadFiles(files.map(file => ({
+        operationKind: 'file.read', absolutePath: path.resolve(input.workspaceRoot, file), workspaceRoot: input.workspaceRoot,
+        authority: { mode: 'read-only', source: 'tool-runtime-approval', reason: 'Read approved native search candidates.' },
+        caller: 'core-tool:grep', reason: 'Bind native search to verified file descriptors.', reportSafeTarget: file,
+        assertFileAccess: input.assertFileAccess, abortSignal: input.abortSignal,
+      })), handles => {
+        const remaining = deadline - Date.now();
+        return remaining <= 0 ? Promise.resolve({ ok: false, reason: 'timeout' } as const)
+          : streamOutput(binary, { ...input, timeoutMs: remaining }, files, handles.map(handle => handle.fd));
+      });
+    } catch { return { ok: false, reason: input.abortSignal?.aborted ? 'cancelled' : 'failed' }; }
+  }
+  return streamOutput(binary, input, files);
+}
+
+async function streamOutput(binary: string, input: RipgrepSearchInput, files?: readonly string[], readDescriptors?: readonly number[]): Promise<RipgrepOutcome> {
+  const descriptorPaths = readDescriptors?.map((_, index) => `/proc/self/fd/${index + 3}`);
+  const sourcePaths = new Map(descriptorPaths?.map((file, index) => [file, files![index]!]));
   const controller = new AbortController();
   const onAbort = (): void => controller.abort();
   input.abortSignal?.addEventListener("abort", onAbort, { once: true });
@@ -271,7 +293,10 @@ async function streamSearch(binary: string, input: RipgrepSearchInput, files?: r
       const line = pending.slice(0, end);
       pending = pending.slice(end + 1);
       // Retain only display-width text, not every full matching source line.
-      for (const match of parseRipgrepJson(line, 1)) {
+      for (const parsed of parseRipgrepJson(line, 1)) {
+        const source = descriptorPaths ? sourcePaths.get(parsed.path) : parsed.path;
+        if (source === undefined) continue;
+        const match = { ...parsed, path: source };
         if (input.assertFileAccess) {
           const allowed = permittedSearchFile(input.workspaceRoot, match.path, input.assertFileAccess);
           if (allowed === undefined || !files?.includes(allowed)) continue;
@@ -284,7 +309,10 @@ async function streamSearch(binary: string, input: RipgrepSearchInput, files?: r
     if (controller.signal.aborted) pending = "";
   };
   try {
-    const result = await executeLocally({ command: binary, args: [...ripgrepArgs(input, files)],
+    const args = readDescriptors
+      ? [...ripgrepArgs({ ...input, glob: undefined }, descriptorPaths)] : [...ripgrepArgs(input, files)];
+    if (readDescriptors) args.unshift('--no-ignore', '--no-mmap');
+    const result = await executeLocally({ command: binary, args, readDescriptors,
       cwd: input.workspaceRoot, abortSignal: controller.signal, timeoutMs: input.timeoutMs ?? 30_000,
       captureOutput: false, onStdout: consume });
     if (input.abortSignal?.aborted) return { ok: false, reason: "cancelled" };

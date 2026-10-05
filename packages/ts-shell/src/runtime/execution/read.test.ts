@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import { promises as fsp } from 'node:fs'
+import { withVerifiedReadFiles } from './read.js'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -135,5 +136,37 @@ describe('verified text reads', () => {
     expect(await service.readTextFile(request('artifacts/0.log', { artifactDirectory: directory }))).toBe('artifact bytes')
     await expect(service.readTextFile(request(undefined, { artifactDirectory: directory }))).rejects.toThrow('outside')
     await expect(service.readTextFile(request('../outside/file.txt', { artifactDirectory: outside }))).rejects.toThrow('outside')
+  })
+})
+
+describe('verified command inputs', () => {
+  it.each(['later-open', 'consumer'])('closes earlier handles after %s failure', async failure => {
+    const open = fsp.open
+    const handles: Awaited<ReturnType<typeof fsp.open>>[] = []
+    vi.spyOn(fsp, 'open').mockImplementation(async (...args) => {
+      const handle = await open(...args)
+      handles.push(handle)
+      return handle
+    })
+    const consume = vi.fn(async () => { throw new Error('consumer failed') })
+    await expect(withVerifiedReadFiles(failure === 'later-open' ? [request(), request('missing')] : [request()], consume)).rejects.toThrow()
+    if (failure === 'later-open') expect(consume).not.toHaveBeenCalled()
+    expect(handles.length).toBeGreaterThan(0)
+    expect(handles.every(handle => handle.fd === -1)).toBe(true)
+  })
+  it('rechecks earlier objects after opening later inputs', async () => {
+    fs.writeFileSync(path.join(workspace, 'second.txt'), 'second')
+    const open = fsp.open
+    const handles: Awaited<ReturnType<typeof fsp.open>>[] = []
+    vi.spyOn(fsp, 'open').mockImplementation(async (...args) => {
+      const handle = await open(...args)
+      handles.push(handle)
+      if (handles.length === 2) fs.renameSync(path.join(workspace, 'source/file.txt'), path.join(outside, 'moved.txt'))
+      return handle
+    })
+    const consume = vi.fn(async () => 'unexpected')
+    await expect(withVerifiedReadFiles([request(), request('second.txt')], consume)).rejects.toThrow()
+    expect(consume).not.toHaveBeenCalled()
+    expect(handles.every(handle => handle.fd === -1)).toBe(true)
   })
 })

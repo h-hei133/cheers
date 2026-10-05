@@ -32,6 +32,8 @@ function collectStreamed(options: {
   /** Consume stdout separately; capture can be disabled for bounded stream consumers. */
   onStdout?: (chunk: Buffer) => void
   captureOutput?: boolean
+  /** Already verified read descriptors inherited as child fd 3 and above. */
+  readDescriptors?: readonly number[]
 }): Promise<{ stdout: string; stderr: string }> {
   // Built by hand rather than with `Promise.withResolvers`, which needs Node 22:
   // this package declares `>=20.3.0` and `check:node-floor` enforces it.
@@ -39,6 +41,7 @@ function collectStreamed(options: {
     const child = spawn(options.command, options.args, {
       cwd: options.cwd,
       windowsHide: true,
+      ...(options.readDescriptors ? { stdio: ['ignore', 'pipe', 'pipe', ...options.readDescriptors] as import('node:child_process').StdioOptions } : {}),
       // Only when the caller named one: passing `env: undefined` is the same as
       // inheriting, but stating that explicitly reads as if it were chosen.
       ...(options.env ? { env: options.env as NodeJS.ProcessEnv } : {}),
@@ -154,6 +157,8 @@ export async function executeLocally(options: {
   /** Consume stdout separately; capture can be disabled for bounded stream consumers. */
   onStdout?: (chunk: Buffer) => void
   captureOutput?: boolean
+  /** Already verified read descriptors inherited as child fd 3 and above. */
+  readDescriptors?: readonly number[]
 }): Promise<NormalizedExecutionResult> {
   const childPromise = collectStreamed({
     ...options,

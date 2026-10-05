@@ -68,7 +68,7 @@ export function searchFileBatches(files: readonly string[]): readonly string[][]
   let length = 0;
   for (const file of files) {
     const size = Buffer.byteLength(file) + 3;
-    if (batch.length && length + size > 16_000) { batches.push(batch); batch = []; length = 0; }
+    if (batch.length && (length + size > 16_000 || batch.length >= 64)) { batches.push(batch); batch = []; length = 0; }
     batch.push(file); length += size;
   }
   if (batch.length) batches.push(batch);
