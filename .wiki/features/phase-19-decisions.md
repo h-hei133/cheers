@@ -508,3 +508,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Linux、Node 20.3、隔离环境下 execution/core-tools/turn-tools 共 42 文件/412 项通过，build:ts 通过。6 项新增覆盖内部/外部链接、打开后目录移出、枚举前同名路径替换、枚举后取消、常规文件拒绝，以及非 Linux 路径分支的模拟接线。平台分支模拟不是实际 macOS/Windows 验收。
 - 反转为按原路径 readdir 时，原本只枚举 public.txt 的测试读到替换目录 PRIVATE_NAME，1 失败/4 通过；源码精确恢复后组合套件通过。编译模块探针也核实实际枚举来自已打开目录，目录变动后拒绝返回过期列表；模型请求为零。import-cycles/config-consumers/declarations/node-floor 通过，NormProof 无阻断项，整体 partial 仍为 6 项既有函数数量 advisory。
 - SAFE-02 仍未完成：walk 在目录枚举之外读取忽略文件的路径、原生候选枚举内部访问、创建目录/文件的副作用竞态，以及其他平台的实际对象保证仍待处理。Linux 描述符枚举不提供整棵目录树的事务快照。未取得独立审查、PTY 或非 Linux 实机证据。
+
+
+### 8.12 SAFE-02 — 运行时忽略文件读取（2026-10-06，进行中）
+
+- [忽略规则 owner](../../packages/ts-shell/src/runtime/execution/ignoreRules.ts) 增加运行时句柄读取入口，复用 [读取 owner](../../packages/ts-shell/src/runtime/execution/read.ts) 的实际目标核验、拒绝、取消及关闭机制，读取后再次核验，只有有效内容才加入 matcher。[遍历 owner](../../packages/ts-shell/src/runtime/execution/fileWalk.ts) 的 walk 与非 Git 目录 matcher 接入此入口，不再直接按路径 readFileSync 忽略文件。
+- 同步 discovery 接口保留，两个入口共用原有规则解析与祖先来源序列，不复制匹配器或改变 negation/prefix 规则；此前目录分段前缀误把 ..notes 当作父目录的问题在共享来源序列中按完整路径段处理。本批不宣称保留的同步 discovery 路径也具备描述符核验。
+- 设计沿前述 canonical 读取对照的“实际使用已核验对象”决定：忽略文件内容同样是读取操作，不能因它影响过滤而绕过文件权限。沿用现有 ignore 库和规则重写，不另造规则系统；原生 Git/ripgrep 自行读取规则的行为仍与本批 TypeScript loader 分开验收。
+- Linux、Node 20.3、隔离环境下 execution/core-tools/turn-tools 共 43 文件/418 项通过，build:ts 通过；强化接线断言后 focused 6 项再次通过。新增覆盖打开后替换零读取、读前路径替换仍读原句柄且拒绝应用过期规则、嵌套否定规则、目录列表句柄接线、取消传播及外部忽略文件链接。反转回直接路径读取时 4 失败/2 通过，源码精确恢复后 focused suite 通过。
+- 编译工具探针通过实际 read 目录路径验证外部 .ignore 链接不能隐藏公开文件；模型请求为零。import-cycles/config-consumers/declarations/node-floor 通过，NormProof 无阻断项，整体 partial 仍来自 6 项既有函数上限 advisory。上一提交 `692b3faa` 的 Architecture Watch `37345053846` 已成功，CI `37345053821` 最近查询仍 in_progress。
+- SAFE-02 仍进行中：原生候选枚举与 Git 内部忽略配置读取、创建副作用竞态及跨平台实际对象保证尚未解决。忽略文件缺失、不可读或拒绝时不应用该文件规则，取消仍传播；此行为不能替代对候选文件本身的 deny 检查。未取得独立审查、PTY 或其他平台实机证据。

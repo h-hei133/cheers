@@ -34,10 +34,10 @@ import type { FileWalkOptions } from './types.js'
 import ignore, { type Ignore } from 'ignore'
 import {
   IGNORE_FILE_NAMES,
-  addIgnoreFile,
+  loadIgnoreFile,
   listIgnoredViaGit,
   listWorkspaceFilesViaGit,
-  matcherForDirectory,
+  loadDirectoryMatcher,
 } from './ignoreRules.js'
 
 /**
@@ -105,7 +105,7 @@ async function listViaWalk(
     if (respectIgnore) {
       for (const name of IGNORE_FILE_NAMES) {
         const file = path.join(absolute, name)
-        if (visiblePath(root, file, options)) addIgnoreFile(matcher, file, prefix)
+        if (visiblePath(root, file, options)) await loadIgnoreFile(matcher, file, prefix, root, options)
       }
     }
     let entries: Dirent[]
@@ -241,7 +241,9 @@ export async function listDirectoryEntries(
     : new Set<string>()
   const matcher =
     respectIgnore && ignored === null
-      ? matcherForDirectory(resolvedRoot, resolvedDirectory, (file) => visiblePath(resolvedRoot, file, options))
+      ? await loadDirectoryMatcher(resolvedRoot, resolvedDirectory, { ...options, assertFileAccess: (file) => {
+        if (!visiblePath(resolvedRoot, file, options)) throw new Error('Ignore file is unavailable or denied.')
+      } })
       : null
   const relative = path.relative(resolvedRoot, resolvedDirectory)
   const prefix = relative === '' ? '' : `${relative.split(path.sep).join('/')}/`

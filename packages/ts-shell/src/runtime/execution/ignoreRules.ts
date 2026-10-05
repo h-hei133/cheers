@@ -2,6 +2,8 @@ import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import ignore, { type Ignore } from 'ignore'
+import { withVerifiedReadTarget } from './read.js'
+import type { FileWalkOptions } from './types.js'
 
 /**
  * The repository's own ignore rules, as one question with one answer.
@@ -145,6 +147,10 @@ export function addIgnoreFile(matcher: Ignore, file: string, prefix: string, all
   } catch {
     return
   }
+  addIgnoreContent(matcher, content, prefix)
+}
+
+function addIgnoreContent(matcher: Ignore, content: string, prefix: string): void {
   const patterns: string[] = []
   for (const raw of content.split(/\r?\n/)) {
     const trimmed = raw.trim()
@@ -178,22 +184,48 @@ export function addIgnoreFile(matcher: Ignore, file: string, prefix: string, all
  */
 export function matcherForDirectory(root: string, target: string, allowed?: (file: string) => boolean): Ignore {
   const matcher = ignore({ ignorecase: false })
-  const relative = path.relative(root, target)
-  const segments =
-    relative === '' || relative.startsWith('..') ? [] : relative.split(path.sep)
+  for (const source of ignoreSources(root, target)) addIgnoreFile(matcher, source.file, source.prefix, allowed)
+  return matcher
+}
 
+function ignoreSources(root: string, target: string): { file: string; prefix: string }[] {
+  const relative = path.relative(root, target)
+  const segments = relative === '' || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)
+    ? [] : relative.split(path.sep)
+  const sources: { file: string; prefix: string }[] = []
   let current = root
   let prefix = ''
-  for (const segment of segments) {
-    for (const name of IGNORE_FILES) {
-      addIgnoreFile(matcher, path.join(current, name), prefix, allowed)
+  for (const segment of [...segments, undefined]) {
+    for (const name of IGNORE_FILES) sources.push({ file: path.join(current, name), prefix })
+    if (segment !== undefined) {
+      current = path.join(current, segment)
+      prefix = `${prefix}${segment}/`
     }
-    current = path.join(current, segment)
-    prefix = `${prefix}${segment}/`
   }
-  for (const name of IGNORE_FILES) {
-    addIgnoreFile(matcher, path.join(current, name), prefix, allowed)
+  return sources
+}
+
+/** Runtime ignore rules are read from the same verified handles as source files. */
+export async function loadIgnoreFile(matcher: Ignore, file: string, prefix: string, root: string, options?: FileWalkOptions): Promise<void> {
+  let content: string
+  try {
+    content = await withVerifiedReadTarget({ absolutePath: file, workspaceRoot: root,
+      assertFileAccess: options?.assertFileAccess, abortSignal: options?.abortSignal,
+    }, 'file', async (handle, verify) => {
+      const value = await handle.readFile({ encoding: 'utf8', signal: options?.abortSignal })
+      await verify()
+      return value
+    })
+  } catch {
+    options?.abortSignal?.throwIfAborted()
+    return
   }
+  addIgnoreContent(matcher, content, prefix)
+}
+
+export async function loadDirectoryMatcher(root: string, target: string, options?: FileWalkOptions): Promise<Ignore> {
+  const matcher = ignore({ ignorecase: false })
+  for (const source of ignoreSources(root, target)) await loadIgnoreFile(matcher, source.file, source.prefix, root, options)
   return matcher
 }
 
