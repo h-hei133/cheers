@@ -25,7 +25,6 @@ function prefixFilter(
  * so these lists come from the handler's own accepted set.
  */
 const SUBCOMMAND_VALUES = {
-  fast: ["on", "off", "toggle", "enable", "disable"],
   log: ["tail", "path", "export", "clear"],
   view: ["status", "user", "developer"],
   goal: ["pause", "resume", "complete", "clear"],
@@ -42,8 +41,6 @@ const SUBCOMMAND_VALUES = {
   sidebar: ["snapshot", "panel", "compact", "detail"],
   browser: ["status", "smoke", "runtime", "preview", "dry-run", "execute", "replay", "repair"],
   brainstorm: ["-i", "-s"],
-  shell: ["status", "use", "auto"],
-  statusline: ["list", "use"],
 } as const;
 
 export type EnumerableCommand = keyof typeof SUBCOMMAND_VALUES;
@@ -54,16 +51,6 @@ export function subcommandCompletions(
   prefix: string,
 ): readonly CommandArgumentCompletion[] | null {
   const matches = prefixFilter(SUBCOMMAND_VALUES[command], prefix);
-  return matches.length > 0 ? matches : null;
-}
-
-/** `/shell use <backend>` — the second token enumerates backends. */
-export function shellArgumentCompletions(
-  prefix: string,
-): readonly CommandArgumentCompletion[] | null {
-  const space = prefix.indexOf(" ");
-  if (space < 0) return subcommandCompletions("shell", prefix);
-  const matches = prefixFilter(["bash", "git-bash", "powershell", "wsl", "auto"], prefix.slice(space + 1));
   return matches.length > 0 ? matches : null;
 }
 

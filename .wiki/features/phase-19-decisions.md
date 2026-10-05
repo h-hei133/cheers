@@ -651,3 +651,16 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Linux、Node 20.3、隔离环境组合 23 文件/337 项通过，含 session manager、runtime/request bridge、交互与 print 接线；build:ts 通过。真实 regular/fullscreen CLI 验证默认切换的全局文件字节与 mtime 不变、非法 --global=false 拒绝、显式全局写入；退出后改全局默认并以 --session-id 重启，原会话模型仍恢复，两模式 exit 0，无模型请求。初始探针把短 status 误当 viewer，并在 fullscreen 等待未重绘的输入提示；修正探针等待实际结果，未改产品迁就同步。初次真实退出失败则是产品清理缺陷，已用上述修复和回归验证。
 - import cycles/config consumers/declarations/node floor 通过；NormProof 阻断义务通过，保留 5 个既有函数数量 advisory。上一批 f66cf4c4 的 CI 37370095444 与 Architecture Watch 37370095429 已成功。本批远端结果须按新提交核验。
 - **CMD-03 与 Phase 19 仍未完成**：其余命令全量表、memory 动态实体/筛选目录、CMD-04 目录身份和异步失效、SAFE-02 等继续。此批未宣称覆盖真实 provider 调用、真实 Windows Terminal 像素验收或跨文件崩溃原子性。
+
+
+### 8.25 CMD-03：shell/statusline/settings/fast 参数与候选
+
+- 四条命令分别由 [shell](../../packages/ts-shell/src/core/commands/shell/syntax.ts)、[statusline](../../packages/ts-shell/src/core/commands/statusline/syntax.ts)、[settings](../../packages/ts-shell/src/core/commands/settings/syntax.ts)、[fast](../../packages/ts-shell/src/core/commands/fast/syntax.ts) owner 定义合法动作、别名与参数，handler/help/registry 消费同源定义，删除对应独立补全词表和 shell 的首空格启发式。
+- 共享参数增加有限 values 约束，[parameters](../../packages/ts-shell/src/core/commands/syntax/parameters.ts) 在验证已完成参数后仅为下一个合法位置生成枚举候选；补全使用允许缺失尾部必选参数的前缀验证，执行仍要求完整参数。动作比较兼容大小写，但输出保留 attentionOnIdle 的规范拼写。hint 保持短参数名，完整帮助可展开有限值。
+- shell 的 backend 类型与语法共用领域 SHELL_BACKENDS，保留 diag/info、set、reset 以及大小写兼容。未知 backend、额外参数或 flags 在调用 ShellManager 前拒绝；status/auto 后不再建议 backend。真实后端可用性仍由既有 manager 判断，枚举候选不代表机器已安装该 backend。
+- statusline 从现有 STATUS_ITEMS 取得合法 ID，保留空格/逗号选择、目录顺序与去重；空列表成员、未知 ID、list 多余参数拒绝且不写配置。补全支持当前 token 中 model,co，候选保留 model, 前缀并排除已选项。引号参数经 router 仍以一个 argv 值送入 owner 校验，不通过回显非法文本来证明这一点。
+- settings 只枚举并解释 attentionOnIdle/offline，拒绝其他键和附加值，不冒充通用设置写入器。fast 保留 on/off/toggle、enable/disable/1/0；拒绝多余输入，注册说明改为温度偏好，不再承诺模型服务等级或低延迟。存储失败明确写入未验证，不再声称已启用且仅在进程内生效；本批未改写既有 project state 存储机制。
+- 定向对照参考补全的声明式动作定义、仅在合法 server-name 动作之后枚举实体的决定，采用同样的位置约束；本项目进一步共用执行参数枚举与前缀验证。四个旧 handler 分别反转均使新增测试失败，源码逐字节恢复。
+- Linux、Node 20.3、隔离环境组合 14 文件/258 项通过，build:ts 通过；真实 regular/fullscreen CLI 验证非法 shell/settings/fast/statusline 输入拒绝，已有 fast 与状态栏配置的字节/mtime 不变，合法 model,cost 保存，两模式 exit 0、无模型请求。旧错误文案断言按安全错误类别更新；新增 co 前缀测试初始漏写合法 context 候选，修正为同时验证 context/cost，未缩减产品候选。
+- import cycles/config consumers/declarations/node floor 通过；call reachability 7 个与 NormProof 函数数量 5 个既有 advisory 不变，阻断义务通过。49e688c2 Architecture Watch 37372368971 已成功，CI 37372368967 最近为 queued，未计通过。
+- CMD-03 仍未完成：其余命令语法及动态目录继续，CMD-04、SAFE-02 和 Phase 19 后续批次继续；没有以本批四条命令的验证覆盖全量表。

@@ -1,3 +1,6 @@
+import { fastSyntax } from "./fast/syntax.js";
+import { syntaxHelp } from "./syntax/projection.js";
+import { parseSyntax } from "./syntax/parse.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { readProjectState, writeProjectState } from "../state/projectState.js";
 
@@ -31,8 +34,10 @@ export async function runFastCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
+  const parsed = parseSyntax(fastSyntax, args);
+  if (!parsed.ok) return { kind: "local", output: `Invalid /fast arguments: ${parsed.reason}\n${syntaxHelp(fastSyntax)}` };
   const root = context.cwd;
-  const asked = args[0]?.toLowerCase();
+  const asked = parsed.action.name;
   const current = isFastModeEnabled(root);
 
   const wanted =
@@ -51,10 +56,10 @@ export async function runFastCommand(
         "### Fast mode",
         "",
         `- Currently \`${current ? "on" : "off"}\` for this project`,
-        `- On: temperature ${FAST_TEMPERATURE}, so answers are more direct and arrive sooner`,
+        `- On: temperature ${FAST_TEMPERATURE}, for a lower sampling preference`,
         "- Which model answers does not change — use `/model` for that",
         "",
-        "`/fast on` · `/fast off` · `/fast toggle`",
+        syntaxHelp(fastSyntax),
       ].join("\n"),
     };
   }
@@ -67,9 +72,8 @@ export async function runFastCommand(
   return {
     kind: "local",
     output: [
-      headline,
-      "",
-      "It could not be written to disk, so it will be lost when this process ends.",
+      "Fast sampling preference could not be saved. Write outcome is unverified.",
+      "Run /fast to inspect the current stored preference.",
     ].join("\n"),
   };
 }

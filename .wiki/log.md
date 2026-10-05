@@ -6157,3 +6157,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-06] fix | Phase 19 CMD-03 memory 入口与五组契约共用领域动作，拒绝被忽略的额外参数/非法 selector/筛选值，保留独立删除、失效、审批、保存与暂存语义。286 项测试、四组反转、Node 20.3 构建和两模式 CLI 验证通过。9d709ef4 远端任务因 hosted runner 未领取而未执行；详见 features/phase-19-decisions.md §8.23。其余语法及阶段任务继续。
 
 - 2026-10-06：Phase 19 CMD-03 model 会话选择与恢复、显式全局保存、动作语法和目录位置校验完成本批实现；退出清理保留显式模型偏好，刷新保留启动限制。337 项测试、构建、反转与 regular/fullscreen 重启验证，详见 [决策 §8.24](features/phase-19-decisions.md#824-cmd-03model-会话选择恢复与严格语法)；CMD-03 与阶段整体未完成。
+
+- 2026-10-06：Phase 19 CMD-03 shell/statusline/settings/fast 接入共享语法与合法参数位置补全，修正 fast 能力与失败文案；258 项、构建、反转和两模式真实 CLI 验证，见 [决策 §8.25](features/phase-19-decisions.md#825-cmd-03shellstatuslinesettingsfast-参数与候选)。阶段整体仍未完成。

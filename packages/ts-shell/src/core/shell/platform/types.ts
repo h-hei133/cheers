@@ -6,7 +6,8 @@
 
 export type PlatformKind = "linux" | "darwin" | "win32";
 
-export type ShellBackendKind = "bash" | "git-bash" | "powershell" | "wsl" | "auto";
+export const SHELL_BACKENDS = ["bash", "git-bash", "powershell", "wsl", "auto"] as const;
+export type ShellBackendKind = (typeof SHELL_BACKENDS)[number];
 
 export interface DetectedShell {
   readonly kind: ShellBackendKind;

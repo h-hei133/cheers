@@ -1,7 +1,8 @@
+import * as statuslineSyntax from "./statusline/syntax.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createCompactLiveCheckpointStore,
   getLatestCompactCheckpoint,
@@ -60,8 +61,12 @@ describe("slash router (W4)", () => {
   });
 
   it("keeps a quoted status item intact through validation", async () => {
-    const result = await routeSlashCommand('/statusline use "a b"', { cwd: workspaceRoot });
-    expect(result).toMatchObject({ kind: "local", output: expect.stringContaining("Not a status item: `a b`.") });
+    const parse = vi.spyOn(statuslineSyntax, "parseStatuslineArgs");
+    try {
+      const result = await routeSlashCommand('/statusline use "a b"', { cwd: workspaceRoot });
+      expect(result).toMatchObject({ kind: "local", output: expect.stringContaining("Invalid /statusline arguments: Invalid item.") });
+      expect(parse).toHaveBeenCalledWith(["use", "a b"]);
+    } finally { parse.mockRestore(); }
   });
 
   it.each(['/cd "unfinished', "/cd 'unfinished"])("keeps an unfinished path literal: %s", async (source) => {

@@ -1,3 +1,7 @@
+import { shellSyntax } from "./shell/syntax.js";
+import { fastSyntax } from "./fast/syntax.js";
+import { statuslineSyntax, statuslineCompletions } from "./statusline/syntax.js";
+import { settingsSyntax } from "./settings/syntax.js";
 import { modelArgumentCompletions } from "./model/completion.js";
 import { modelSyntax } from "./model/syntax.js";
 import { memorySyntax } from "../../memory/commands/syntax.js";
@@ -10,7 +14,6 @@ import { thinkingSyntax } from "./thinking/syntax.js";
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import {
   loopArgumentCompletions,
-  shellArgumentCompletions,
   subcommandCompletions,
 } from "./argumentCompletions.js";
 import { runBrowserLocalCommand } from "./browserCommandRuntime.js";
@@ -373,8 +376,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "choose which facts the status band keeps in view",
       group: "workspace",
-      argumentHint: "[list|use <item...>]",
-      getArgumentCompletions: (prefix) => subcommandCompletions("statusline", prefix),
+      argumentHint: syntaxHint(statuslineSyntax),
+      getArgumentCompletions: statuslineCompletions,
       execute: (args, context) => runStatuslineCommand(args, context),
     },
     {
@@ -387,7 +390,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "open the settings panel, or name what a setting does",
       group: "workspace",
-      argumentHint: "[setting]",
+      argumentHint: syntaxHint(settingsSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(settingsSyntax, prefix),
       execute: (args, context) => runSettingsCommand(args, context),
     },
     {
@@ -571,10 +575,10 @@ export function createCommandRegistry(
       supportsNonInteractive: true,
       availability: "available",
       enabled: true,
-      summary: "toggle low-latency fast model tier on or off",
+      summary: "inspect or change the sampling temperature preference",
       group: "workflow",
-      argumentHint: "[on|off|toggle]",
-      getArgumentCompletions: (prefix) => subcommandCompletions("fast", prefix),
+      argumentHint: syntaxHint(fastSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(fastSyntax, prefix),
       execute: (args, context) => runFastCommand(args, context),
     },
     {
@@ -728,8 +732,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "inspect or switch the shell backend this session runs commands with",
       group: "workspace",
-      argumentHint: "[status|use|auto]",
-      getArgumentCompletions: shellArgumentCompletions,
+      argumentHint: syntaxHint(shellSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(shellSyntax, prefix),
       execute: (args, context) => runShellCommand(args, context),
     },
     {

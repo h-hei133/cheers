@@ -1,3 +1,5 @@
+import { statuslineSyntax, parseStatuslineArgs } from "./statusline/syntax.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import {
   DEFAULT_STATUS_ITEMS,
   STATUS_ITEMS,
@@ -22,41 +24,12 @@ export async function runStatuslineCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const [verb, ...rest] = args;
-
-  if (!verb || verb === "list") {
+  const parsed = parseStatuslineArgs(args);
+  if (!parsed.ok) return { kind: "local", output: `Invalid /statusline arguments: ${parsed.reason}\n${syntaxHelp(statuslineSyntax)}` };
+  if (parsed.action.name === "list") {
     return { kind: "local", output: renderItemCatalogue(readStatusItems(statusRoot(context))) };
   }
-
-  if (verb !== "use") {
-    return {
-      kind: "local",
-      output: `\`/statusline\` takes \`list\` or \`use <item...>\`; \`${verb}\` is neither. Run \`/statusline list\` for the ids.`,
-    };
-  }
-
-  const requested = rest
-    .flatMap((value) => value.split(","))
-    .map((value) => value.trim())
-    .filter(Boolean);
-
-  if (requested.length === 0) {
-    return {
-      kind: "local",
-      output: "Name at least one item, e.g. `/statusline use model,cost`. Run `/statusline list` for the ids.",
-    };
-  }
-
-  // An unknown id is a typo, and a typo silently dropped leaves the user
-  // reading a band that does not contain what they asked for. Refusing the
-  // whole write keeps the saved value equal to what was typed — or to nothing.
-  const unknown = requested.filter((value) => !VALID_IDS.includes(value as StatusItemId));
-  if (unknown.length > 0) {
-    return {
-      kind: "local",
-      output: `Not a status item: ${unknown.map((value) => `\`${value}\``).join(", ")}. Valid items: ${VALID_IDS.join(", ")}.`,
-    };
-  }
+  const requested = parsed.args;
 
   // Order follows the catalogue rather than the typing, so the band reads the
   // same way whoever wrote it, and duplicates cannot occupy two slots.

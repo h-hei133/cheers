@@ -4,6 +4,7 @@ export interface CommandParameter {
   readonly required?: boolean;
   readonly rest?: boolean;
   readonly minimum?: number;
+  readonly values?: readonly string[];
 }
 
 export interface CommandAction {

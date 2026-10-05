@@ -80,8 +80,8 @@ describe("Cross-Platform Shell Adaptation Test Suite", () => {
     it("rejects invalid shell backends cleanly", async () => {
       const res = await runShellCommand(["use", "invalid-shell"], { cwd: process.cwd() });
       expect(res.kind).toBe("local");
-      expect(res.output).toContain("Invalid shell backend: 'invalid-shell'");
-      expect(res.output).toContain("Supported options:");
+      expect(res.output).toContain("Invalid /shell arguments: Invalid backend.");
+      expect(res.output).toContain("bash|git-bash|powershell|wsl|auto");
     });
 
     it("handles subcommand aliases (diag, info, reset, set)", async () => {

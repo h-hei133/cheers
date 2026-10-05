@@ -1,3 +1,6 @@
+import { settingsSyntax } from "./settings/syntax.js";
+import { syntaxHelp } from "./syntax/projection.js";
+import { parseSyntax } from "./syntax/parse.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
 /**
@@ -14,7 +17,9 @@ export async function runSettingsCommand(
   args: string[],
   _context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const which = args[0]?.trim();
+  const parsed = parseSyntax(settingsSyntax, args);
+  if (!parsed.ok) return { kind: "local", output: `Invalid /settings arguments: ${parsed.reason}\n${syntaxHelp(settingsSyntax)}` };
+  const which = parsed.action.name;
   if (which === "attentionOnIdle") {
     return {
       kind: "local",

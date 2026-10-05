@@ -372,3 +372,8 @@ memory owner 的动作定义已用于入口、五组契约解析、帮助和补�
 ### CMD-03 model 实施记录（2026-10-06）
 
 默认选择已改为会话持久化，显式 --global 才保存全局默认。请求/状态/chooser/恢复采用同一连接绑定投影，空会话清理保留显式选择，启动参数覆盖不因刷新丢失。严格动作语法与合法位置 catalog 候选已接入；337 项组合测试、构建、六组反转与两模式真实退出/重启探针通过，范围及限制见 [Phase 19 决策 §8.24](phase-19-decisions.md#824-cmd-03model-会话选择恢复与严格语法)。全量表及 CMD-04 仍未完成。
+
+
+### CMD-03 偏好命令实施记录（2026-10-06）
+
+shell/statusline/settings/fast 已由 owner syntax 驱动执行、帮助与候选。共享有限参数按合法位置枚举；状态项支持逗号 token 补全，settings 不枚举未实现的键，fast 如实描述温度与存储失败。258 项组合测试、构建、四组反转和两模式真实 CLI 验证通过，详见 [决策 §8.25](phase-19-decisions.md#825-cmd-03shellstatuslinesettingsfast-参数与候选)。其余全量表及 CMD-04 待续。

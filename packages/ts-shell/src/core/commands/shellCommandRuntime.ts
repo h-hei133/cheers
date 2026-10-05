@@ -1,3 +1,6 @@
+import { shellSyntax } from "./shell/syntax.js";
+import { syntaxHelp } from "./syntax/projection.js";
+import { parseSyntax } from "./syntax/parse.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { ShellManager } from "../shell/platform/shellManager.js";
 import type { ShellBackendKind } from "../shell/platform/types.js";
@@ -10,7 +13,9 @@ export async function runShellCommand(
   args: string[],
   _context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const subCommand = args[0]?.toLowerCase();
+  const parsed = parseSyntax(shellSyntax, args.map(value => value.toLowerCase()));
+  if (!parsed.ok) return { kind: "local", output: `Invalid /shell arguments: ${parsed.reason}\n${syntaxHelp(shellSyntax)}` };
+  const subCommand = parsed.action.name;
 
   if (!subCommand || subCommand === "status" || subCommand === "diag" || subCommand === "info") {
     return {
@@ -20,19 +25,7 @@ export async function runShellCommand(
   }
 
   if (subCommand === "use" || subCommand === "set") {
-    const target = args[1]?.toLowerCase() as ShellBackendKind;
-    const validBackends: ShellBackendKind[] = ["bash", "git-bash", "powershell", "wsl", "auto"];
-
-    if (!target || !validBackends.includes(target)) {
-      return {
-        kind: "local",
-        output: [
-          `Invalid shell backend: '${args[1] || ""}'.`,
-          `Supported options: ${validBackends.map((b) => `\`${b}\``).join(", ")}.`,
-          "Example: `/shell use powershell`",
-        ].join("\n"),
-      };
-    }
+    const target = parsed.args[0] as ShellBackendKind;
 
     try {
       const updated = ShellManager.setBackend(target);
@@ -53,13 +46,5 @@ export async function runShellCommand(
     };
   }
 
-  return {
-    kind: "local",
-    output: [
-      "Usage:",
-      "- `/shell` or `/shell status` : Inspect cross-platform shell diagnostics",
-      "- `/shell use <bash|git-bash|powershell|wsl>` : Switch active shell backend",
-      "- `/shell auto` : Reset to automatic platform detection",
-    ].join("\n"),
-  };
+  return { kind: "local", output: syntaxHelp(shellSyntax) };
 }
