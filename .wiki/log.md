@@ -6169,3 +6169,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 - 2026-10-06：Phase 19 CMD-03 workflow/warmup/sidebar 同源契约与补全接线，workflow 多余参数不再执行；236 项、构建、三组反转及两模式真实 CLI 验证通过，详见 [决策 §8.29](features/phase-19-decisions.md#829-cmd-03workflowwarmupsidebar-同源契约)。导航批次远端唯一失败为 CLI 标题输入未加引号，按既定单参数语法修正测试，未计远端通过。
 
 - 2026-10-06：Phase 19 CMD-03 plugin/marketplace 语法与候选同源，plugin 注册表锁内读取/原子写入并明确失败，避免虚假缓存成功和覆盖损坏状态。248 项、构建、两组反转及两模式 CLI 验证通过，见 [决策 §8.30](features/phase-19-decisions.md#830-cmd-03生态命令语法与注册表持久化结果)。阶段目标继续。
+
+- 2026-10-06：Phase 19 CMD-03 goal/brainstorm 同源语法，保留多词目标并修正保存失败文案；brainstorm 严格 flags 不再丢弃未知参数或保存意图。242 项、构建、两组反转及两模式 CLI 验证通过，见 [决策 §8.31](features/phase-19-decisions.md#831-cmd-03goal-自由文本与-brainstorm-flags)。阶段目标继续。

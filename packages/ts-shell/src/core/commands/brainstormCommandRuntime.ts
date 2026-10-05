@@ -1,3 +1,6 @@
+import { brainstormSyntax } from "./brainstorm/syntax.js";
+import { parseSyntax } from "./syntax/parse.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import type { CommandContext, CommandExecutionResult } from "./types.js";
 import path from "node:path";
 
@@ -25,7 +28,10 @@ export async function runBrainstormCommand(
   args: string[],
   context: CommandContext,
 ): Promise<CommandExecutionResult> {
-  const { flags, challenge } = parse(args);
+  const parsed = parseSyntax(brainstormSyntax, args);
+  if (!parsed.ok) return { kind: "local", output: `Invalid /brainstorm arguments: ${parsed.reason}\n${syntaxHelp(brainstormSyntax)}` };
+  const flags = parsed.flags;
+  const challenge = parsed.args.join(" ").trim();
 
   if (!challenge || flags.has("help")) {
     return { kind: "local", output: usage() };
@@ -46,20 +52,6 @@ export async function runBrainstormCommand(
       ? `${explorationPrompt(challenge)}\n\n${savingInstruction(challenge, context.cwd)}`
       : explorationPrompt(challenge),
   };
-}
-
-/** Flags and the challenge text, which is everything that is not a flag. */
-function parse(args: string[]): { readonly flags: Set<string>; readonly challenge: string } {
-  const flags = new Set<string>();
-  const words: string[] = [];
-  for (const arg of args) {
-    if (arg === "-i" || arg === "--interactive") flags.add("interactive");
-    else if (arg === "-s" || arg === "--save") flags.add("save");
-    else if (arg === "-h" || arg === "--help") flags.add("help");
-    else if (arg.startsWith("-")) flags.add(arg.replace(/^-+/, ""));
-    else words.push(arg);
-  }
-  return { flags, challenge: words.join(" ").trim() };
 }
 
 /**
@@ -141,6 +133,7 @@ function slug(challenge: string): string {
 function usage(): string {
   return [
     "### /brainstorm",
+    syntaxHelp(brainstormSyntax),
     "",
     "Design exploration for one problem: approaches that differ in kind, the trade-offs between them, and a recommendation that says what would overturn it.",
     "",

@@ -8,7 +8,7 @@ type FlagResult =
 /** Strict native option parsing, with canonical aliases and duplicate detection. */
 export function parseFlags(definitions: readonly CommandFlag[], input: readonly string[]): FlagResult {
   const names = new Map(definitions.flatMap(flag => [flag.name, ...(flag.aliases ?? [])].map(name => [name, flag] as const)));
-  const options = Object.fromEntries([...names].map(([name, flag]) => [name, { type: flag.kind === "text" ? "string" as const : "boolean" as const }]));
+  const options = Object.fromEntries([...names].map(([name, flag]) => [name, { type: flag.kind === "text" ? "string" as const : "boolean" as const, ...(name === flag.name && flag.short ? { short: flag.short } : {}) }]));
   try {
     const parsed = parseArgs({ args: [...input], options, strict: true, allowPositionals: true, tokens: true });
     const flags = new Map<string, string | true>();

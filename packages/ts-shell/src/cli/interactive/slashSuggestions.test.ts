@@ -111,7 +111,10 @@ describe("command completions", () => {
   });
 
   it("hints goal arguments", () => {
-    expect(slashSuggestions("/goal")?.[0]?.detail).toContain("<goal instruction>");
+    const detail = slashSuggestions("/goal")?.[0]?.detail;
+    expect(detail).toContain("[objective...]");
+    expect(detail).toContain("pause");
+    expect(detail).toContain("complete");
   });
 
   it("offers statusline and names the grammar it actually accepts", () => {

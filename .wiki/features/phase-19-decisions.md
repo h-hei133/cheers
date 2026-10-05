@@ -717,3 +717,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Linux、Node 20.3 隔离环境 14 文件/248 项通过（含 picker 接线），build:ts 通过。恢复旧 plugin/marketplace handler 两组反转使额外参数、失败写入和外部状态读取断言失败。初次 fs.renameSync 故障 mock 没有命中模块，归为测试注入边界问题；改为既有原子写入函数注入，验证每种修改失败后文件与后续读取均不变。
 - 真实 regular/fullscreen CLI 验证非法禁用/删除零写，合法 disable 持久化，损坏注册表不会被下一次 add 覆盖；两模式 exit 0、无模型请求。import cycles/config consumers/declarations/node floor 通过；7 个 call reachability 与 5 个 NormProof 函数数量既有 advisory 保留，阻断义务通过。
 - 1863db35 CI 37376481131 失败（5882 通过、1 失败、1 跳过），唯一失败仍为 §8.29 已修正的多词标题测试输入；43db5468 Architecture Watch 37377909807 成功，CI 37377909797 尚待终态。CMD-03 其余语法/动态目录、CMD-04、SAFE-02 与阶段其余任务仍未完成。
+
+
+### 8.31 CMD-03：goal 自由文本与 brainstorm flags
+
+- goal 的 pause/resume/complete/done/clear 与自由文本声明同源；只有单个保留 token 才是状态动作，以 pause 等词开头的多词目标仍为正文，正文中的 --word 不被解释为选项。registry 提示与别名候选来自语法，原提示测试改为检查目标文本及真实动作，不再要求仅有必填目标的旧提示。
+- goal 保存失败原文错误声称目标已设定且会在进程结束后丢失，但实现没有对应内存状态。现报告 change not confirmed persisted，不以成功标题掩盖失败；项目状态存储的非原子写与并发问题未在本批解决，不能据失败文案宣称跨进程原子性。
+- brainstorm 采用共享严格 flags；支持 interactive/i、save/s、help/h，拒绝未知、重复、boolean 赋值及 interactive/save 冲突。两模式此前混用会静默丢弃保存意图，现明确拒绝。`--` 后保留字面 flag 形状正文，save 仍只是带写入要求的模型 prompt，未创建文件或声称写入成功。
+- CommandFlag 增加显式 short 字段，原生 parseArgs 处理短选项；候选从相同定义生成短/长形式并遵守重复与冲突限制。定向对照参考 CLI 的 -- 后字面参数与短帮助选项决定，复用既有 parser，不增加独立 flags 系统。
+- Linux、Node 20.3 隔离环境 14 文件/242 项通过，build:ts 通过。恢复旧 goal/brainstorm handler 两组反转使失败结果、未知/冲突 flags 和字面正文断言失败；逐字节恢复后组合套件通过。真实 regular/fullscreen CLI 验证多词目标、done、非法 brainstorm 零模型请求和真实失败写入报告，两模式 exit 0。
+- import cycles/config consumers/declarations/node floor 通过；7 个 call reachability 与 5 个 NormProof 函数数量既有 advisory 保留，阻断义务通过。a30053cc Architecture Watch 37378532495 成功，CI 37378532481 尚待终态；43db5468 CI 37377909797 也尚未完成。CMD-03 的 loop 原始命令/预算、connect/browser/compact、其余命令及动态目录继续；CMD-04、SAFE-02 与阶段整体未完成。

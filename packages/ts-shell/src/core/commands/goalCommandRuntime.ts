@@ -1,3 +1,5 @@
+import { goalSyntax, parseGoalArgs } from "./goal/syntax.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import {
   readProjectState,
@@ -35,9 +37,11 @@ export async function runGoalCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
+  const parsed = parseGoalArgs(args);
+  if (!parsed.ok) return { kind: "local", output: `Invalid /goal arguments: ${parsed.reason}\n${syntaxHelp(goalSyntax)}` };
   const root = context.cwd;
   const current = getActiveSessionGoal(root);
-  const subCommand = args.length === 1 ? args[0]?.toLowerCase() : undefined;
+  const subCommand = parsed.action.name;
 
   if (args.length === 0) {
     if (!current) {
@@ -46,7 +50,7 @@ export async function runGoalCommand(
         output: [
           "No objective set for this project.",
           "",
-          "Usage: `/goal <objective>` · `/goal pause` · `/goal resume` · `/goal complete` · `/goal clear`",
+          syntaxHelp(goalSyntax),
         ].join("\n"),
       };
     }
@@ -88,7 +92,7 @@ export async function runGoalCommand(
     };
   }
 
-  const objective = args.join(" ").trim();
+  const objective = parsed.args.join(" ").trim();
   if (!objective) return { kind: "local", output: "An objective needs some words." };
   const written = setActiveSessionGoal(root, {
     objective,
@@ -108,7 +112,7 @@ export async function runGoalCommand(
 function movePhase(subCommand: string | undefined): GoalPhase | undefined {
   if (subCommand === "pause") return "paused";
   if (subCommand === "resume") return "active";
-  if (subCommand === "complete" || subCommand === "done") return "complete";
+  if (subCommand === "complete") return "complete";
   return undefined;
 }
 
@@ -120,9 +124,5 @@ function movePhase(subCommand: string | undefined): GoalPhase | undefined {
  */
 function report(written: string | undefined, success: string): string {
   if (written) return success;
-  return [
-    success.split("\n")[0],
-    "",
-    "It could not be written to disk, so it will be lost when this process ends.",
-  ].join("\n");
+  return "Could not save the objective change. The requested state was not confirmed persisted.";
 }

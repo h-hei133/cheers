@@ -25,11 +25,9 @@ function prefixFilter(
  * so these lists come from the handler's own accepted set.
  */
 const SUBCOMMAND_VALUES = {
-  goal: ["pause", "resume", "complete", "clear"],
   connect: ["status", "list", "presets", "login", "set", "use", "logout", "help"],
   compact: ["preview", "render", "json"],
   browser: ["status", "smoke", "runtime", "preview", "dry-run", "execute", "replay", "repair"],
-  brainstorm: ["-i", "-s"],
 } as const;
 
 export type EnumerableCommand = keyof typeof SUBCOMMAND_VALUES;

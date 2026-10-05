@@ -16,6 +16,7 @@ export interface CommandAction {
 }
 
 export interface CommandFlag {
+  readonly short?: string;
   readonly name: string;
   readonly aliases?: readonly string[];
   readonly kind: "boolean" | "text";

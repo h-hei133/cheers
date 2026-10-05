@@ -1,3 +1,5 @@
+import { brainstormSyntax } from "./brainstorm/syntax.js";
+import { goalSyntax } from "./goal/syntax.js";
 import { marketplaceSyntax } from "./marketplace/syntax.js";
 import { pluginSyntax } from "./plugin/syntax.js";
 import { workflowSyntax } from "../workflow/syntax.js";
@@ -550,8 +552,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "manage active goal state machine and prevent goal drift",
       group: "workflow",
-      argumentHint: "<goal instruction>",
-      getArgumentCompletions: (prefix) => subcommandCompletions("goal", prefix),
+      argumentHint: syntaxHint(goalSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(goalSyntax, prefix),
       execute: (args, context) => runGoalCommand(args, context),
     },
     {
@@ -737,8 +739,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "multi-perspective design exploration and anti-pattern red-teaming",
       group: "workflow",
-      argumentHint: "[-i] [-s] <problem>",
-      getArgumentCompletions: (prefix) => subcommandCompletions("brainstorm", prefix),
+      argumentHint: syntaxHint(brainstormSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(brainstormSyntax, prefix),
       execute: (args, context) => runBrainstormCommand(args, context),
     },
     {
