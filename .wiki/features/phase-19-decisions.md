@@ -448,3 +448,12 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 反转：移除快照后及最终写入策略接线时 2 失败/8 通过；移除描述符路径拒绝时 1 失败/9 通过。反转后源码精确字节恢复，最终组合套件通过。编译模块隔离探针验证拒绝写入保留原文、预取消零目录创建、edit 预读后拒绝最终写入、合法嵌套文件写入；模型请求为零，不称 CLI/PTY 验收。
 - import-cycles、config-consumers、declarations、node-floor 通过；NormProof 图义务 satisfied，整体 partial 仍为 6 项既有函数上限 advisory。旧 workspace-safety 脚本引用的 sandbox/runtime 测试路径与场景已不存在，未把该旧门禁当作通过；本批运行当前 sandbox 套件及真实编译工具拒绝探针，旧综合 CLI 门禁迁移仍待处理。
 - 限制：目录创建仍为按路径操作，不能承诺父目录替换竞态下零副作用；排他创建后才发生拒绝时可能留下空文件，不盲目 unlink 以免删除第三方替换目标。快照读取的最终对象策略、原生 grep 的逐文件拒绝、目录遍历及非 Linux 描述符支持仍需收口。新增检查缩小了风险窗口，不构成跨进程原子授权或 SAFE-02 完成证据。未取得独立审查、PTY 或非 Linux 运行证据。
+
+
+### 8.6 SAFE-02 — 写前快照实际读取对象（2026-10-06，进行中）
+
+- [文件 authority](../../packages/ts-shell/src/edit/authority/workspace.ts) 的 readVerifiedFile 接收可选实际路径检查；打开并核验句柄后，在读取正文前调用，检查失败直接传播并关闭句柄。只把原有正文 IO 错误保留为 undefined，拒绝/取消不被 catch 转成“没有旧内容”。[写入服务](../../packages/ts-shell/src/runtime/execution/service.ts) 的首次快照读取和持久化后的 expectedContent 复查均传入同一检查。
+- 沿 [19 号研究](19-tools-maturity-and-multifile-edit.md) 再次定向检查参考只读目标解析：授权评估与执行之间可能发生符号链接替换，执行必须重新解析并验证。同意实际使用前复验；本项目在已有句柄 authority 内完成，不增加另一个快照读取系统。保留未传检查参数的其他 authority 调用兼容性，不将它们也宣称为已接入逐文件策略。
+- Linux、Node 20.3、仓内隔离环境下 execution/core-tools/edit/turn-tools 共 51 文件/426 项通过，build:ts 通过。新增两项在首次快照读取和条件复查打开后，将文件改名到拒绝路径，验证拒绝、零正文读取、关闭句柄与正确的快照调用次数。移除两处策略接线时 2 失败/10 通过，精确恢复后组合套件通过。
+- 编译模块探针经真实写入服务与 authority 验证打开后改名到拒绝目标时零正文读取、无快照产物、原文不变；模型请求为零。import-cycles/config-consumers/declarations/node-floor 通过，NormProof 无阻断项，仍有 6 项既有函数数量 advisory。未运行独立审查、PTY、跨平台验收。
+- 上批 `81fe8dcc` 已推送，Architecture Watch `37338065442` 成功，CI `37338065230` 最近查询仍 in_progress。SAFE-02 仍进行中：目录枚举、原生搜索逐文件拒绝、创建竞态及非 Linux 描述符边界未由本批解决。

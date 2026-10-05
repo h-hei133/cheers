@@ -45,7 +45,7 @@ export type WorkspaceCreateTargetAuthority =
 
 export interface WorkspaceWriteAuthority {
   readonly readFile: (absolutePath: string) => string | undefined;
-  readonly readVerifiedFile: (relativePath: string) => string | undefined;
+  readonly readVerifiedFile: (relativePath: string, assertFileAccess?: (absolutePath: string) => void) => string | undefined;
   readonly directoryExists: (absolutePath: string) => boolean;
   readonly validateWriteTarget: (
     relativePath: string,
@@ -247,15 +247,22 @@ export function createWorkspaceWriteAuthority(
         return false;
       }
     },
-    readVerifiedFile: (relativePath) => {
+    readVerifiedFile: (relativePath, assertFileAccess) => {
       const handle = openVerifiedFile(relativePath, fs.constants.O_RDONLY);
       if (handle.ok === false) {
         return undefined;
       }
       try {
-        return fs.readFileSync(handle.fd, "utf8");
-      } catch {
-        return undefined;
+        if (assertFileAccess) {
+          const actualPath = realpathForOpenDescriptor(handle.fd);
+          if (!actualPath) throw new Error('Read target descriptor is unavailable.');
+          assertFileAccess(actualPath);
+        }
+        try {
+          return fs.readFileSync(handle.fd, "utf8");
+        } catch {
+          return undefined;
+        }
       } finally {
         fs.closeSync(handle.fd);
       }

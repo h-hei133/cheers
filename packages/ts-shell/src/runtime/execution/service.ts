@@ -98,7 +98,7 @@ async function writeTextFileUnlocked(request: TextFileWriteExecutionRequest): Pr
   // snapshot of a target the write would refuse is worse than none, because it
   // reads as recoverable.
   const before = existsSync(request.absolutePath)
-    ? authority.readVerifiedFile(relativePath)
+    ? authority.readVerifiedFile(relativePath, checkAccess)
     : undefined
   if (request.expectedContent !== undefined && before !== request.expectedContent) {
     throw new FileContentConflictError(request.reportSafeTarget)
@@ -113,7 +113,7 @@ async function writeTextFileUnlocked(request: TextFileWriteExecutionRequest): Pr
   // before the synchronous write, even if snapshot storage failed. This detects
   // observed external edits; it is not an atomic filesystem compare-and-swap.
   if (request.expectedContent !== undefined
-    && authority.readVerifiedFile(relativePath) !== request.expectedContent) {
+    && authority.readVerifiedFile(relativePath, checkAccess) !== request.expectedContent) {
     throw new FileContentConflictError(request.reportSafeTarget)
   }
   if (existsSync(request.absolutePath)) {

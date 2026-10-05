@@ -120,3 +120,29 @@ it('accepts a canonical tool target under a symlink workspace root', async () =>
   })
   expect(fs.readFileSync(target, 'utf8')).toBe('new')
 })
+
+it.each([1, 2])('rejects the actual object before snapshot/condition read %i', async (readNumber) => {
+  fs.writeFileSync(target, 'original')
+  const moved = path.join(workspace, 'denied.txt')
+  const open = fs.openSync
+  const read = vi.spyOn(fs, 'readFileSync')
+  const close = vi.spyOn(fs, 'closeSync')
+  let reads = 0
+  let descriptor = -1
+  vi.spyOn(fs, 'openSync').mockImplementation((...args: Parameters<typeof fs.openSync>) => {
+    const fd = open(...args)
+    if (args[0] === target && ++reads === readNumber) {
+      descriptor = fd
+      fs.renameSync(target, moved)
+      read.mockClear()
+    }
+    return fd
+  })
+  await expect(createDefaultExecutionService().writeTextFile(request({ expectedContent: 'original',
+    assertFileAccess: (actual) => { if (actual === moved) throw new Error('denied') },
+  }))).rejects.toThrow('denied')
+  expect(read).not.toHaveBeenCalledWith(descriptor, 'utf8')
+  expect(close).toHaveBeenCalledWith(descriptor)
+  expect(captureRecoveryAuthorityRecord).toHaveBeenCalledTimes(readNumber - 1)
+  expect(fs.readFileSync(moved, 'utf8')).toBe('original')
+})
