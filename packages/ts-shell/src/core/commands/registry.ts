@@ -1,3 +1,7 @@
+import { syntaxHint, syntaxCompletions } from "./syntax/projection.js";
+import { trustSyntax } from "./trust/syntax.js";
+import { todoSyntax } from "./todo/syntax.js";
+import { thinkingSyntax } from "./thinking/syntax.js";
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import {
   loopArgumentCompletions,
@@ -413,7 +417,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "show or set what this project is allowed to contribute",
       group: "context",
-      argumentHint: "[status|on|off|session]",
+      argumentHint: syntaxHint(trustSyntax),
+      getArgumentCompletions: prefix => syntaxCompletions(trustSyntax, prefix),
       execute: (args, context) => runTrustCommand(args, context),
     },
     {
@@ -547,8 +552,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "manage structured task checklist and view progress",
       group: "workflow",
-      argumentHint: "[list|add|start|done|clear]",
-      getArgumentCompletions: (prefix) => subcommandCompletions("todo", prefix),
+      argumentHint: syntaxHint(todoSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(todoSyntax, prefix),
       // The checklist belongs to a session, so the session travels with the
       // call. Without it the command answers with a freshly allocated list that
       // nobody reads, and reports success while the session's own list is
@@ -691,8 +696,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "inspect or set reasoning effort for the next turn",
       group: "diagnostics",
-      argumentHint: "[low|medium|high|off]",
-      getArgumentCompletions: (prefix) => subcommandCompletions("thinking", prefix),
+      argumentHint: syntaxHint(thinkingSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(thinkingSyntax, prefix),
       execute: (args, context) => runThinkingCommand(args, context),
     },
     {

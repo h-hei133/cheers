@@ -602,3 +602,15 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 定向对照参考终端补全：同意保留后缀、单独返回光标、避免重复闭合引号和单步撤销；不采用其 slash 补全后继续提交的分支，原因是本项目明确要求 `/res` 的候选接受不得执行 `/reset`。前缀/后缀、revision、grapheme、Enter 四类反转均实际触发失败，源码逐字节恢复。
 - Linux、Node 20.3、隔离环境组合测试 10 文件/268 项通过；边界扫描调整后 66 项再次通过，构建通过。真实 regular/fullscreen PTY 验证 `/thinking l` 第一次 Enter 仅补全、第二次才执行，完整 `/help` 一次打开帮助，两模式 exit 0、无模型请求。首轮 PTY 等待了不存在的 Commands 标题，实际帮助已打开；改为等待实际 chooser 标记后通过。没有真实 Windows Terminal 像素验收。
 - import cycles/config consumers/declarations/node floor 通过；call reachability 保留 7 个既有 advisory，NormProof 阻断义务通过，函数数量 advisory 从 6 降至 5。前批 c23570b5 的 CI 37361881459 与 Architecture Watch 37361881308 已成功。本批远端结果仍需按新提交核验；SAFE-02 和其余阶段任务仍未完成。
+
+
+### 8.21 CMD-03：trust/todo/thinking 首批共享语法与写入边界
+
+- 新增 [syntax model](../../packages/ts-shell/src/core/commands/syntax/model.ts)、[parse](../../packages/ts-shell/src/core/commands/syntax/parse.ts)、[projection](../../packages/ts-shell/src/core/commands/syntax/projection.ts)，由 trust/todo/thinking 各自的 syntax 定义提供动作、真实别名、说明及位置参数约束。handler 在读取/修改状态之前消费同一语法；registry 仅投影 hint 和候选，帮助不再手写这些命令的动作列表。删除旧 argumentCompletions 内 todo/thinking 词表。
+- trust 动作通过明确数组匹配，不再查询普通对象的继承属性。constructor、__proto__、未知动作及任意多余参数拒绝，不调用 setter；[存储入口](../../packages/ts-shell/src/core/security/projectTrust.ts) 再独立验证实际字符串枚举，非法 JS 值不能绕过 TypeScript 声明覆盖原 untrusted 记录。此批没有宣称修复损坏信任文件处理、跨进程锁或持久化失败报告。
+- todo start/done/complete 必须接收一个正的安全整数 ID；1junk、小数、指数、符号、越界整数及额外参数均拒绝，检查单不变。complete 保留为真实 done 别名。add 的自由文本不被当成 flag，语法解析器不改写原参数数组；handler 保留原有文本拼接语义。
+- thinking 拒绝未知动作与多余参数，off/auto/none 共用同一“移除 effort 偏好”动作；不宣称禁止 provider 推理。旧测试要求回显非法 level 文案，按新的安全错误契约改为约束类别与合法 usage，继续断言状态未改变。
+- 对照参考声明式 subcommand 的单源描述和候选派生，采用这一决定并把运行时校验也接入；其候选构造只处理一级动作，后续多级参数合法性仍需由本项目解析器逐项实现。对照参考信任模块的字符串枚举验证，采用显式值比较；另外在本项目 setter 直接设边界，不能仅依赖调用端类型声明。参考对损坏配置拒绝保存的决定已注意到，属于后续存储完整性工作，未以本批枚举守卫冒充完成。
+- Linux、Node 20.3、隔离环境下 8 文件/177 项通过，build:ts 通过。恢复旧 trust handler、移除 setter 枚举守卫、恢复 parseInt 接受、删除额外参数拒绝四组反转均失败；逐字节恢复后组合套件再次通过。真实 regular/fullscreen CLI 先记录 untrusted，再输入 constructor/__proto__/on extra/session extra/status extra，文件内容与 mtime 均不变，两模式 exit 0、无模型请求。
+- import cycles/config consumers/declarations/node floor 通过；call reachability 7 个既有 advisory，NormProof 阻断义务通过且保留 5 个既有函数数量 advisory。前批 3fe750c7 的 CI 37364227880 最近为 in_progress、Architecture Watch 37364227869 为 queued，不计成功。
+- **CMD-03 尚未完成**：本批只迁移上述三条命令；23 号全量表其余命令、flags、多级语法、动态实体及 model/export/memory/restore 的语义仍待处理。CMD-04、SAFE-02 和其余 Phase 19 任务继续。

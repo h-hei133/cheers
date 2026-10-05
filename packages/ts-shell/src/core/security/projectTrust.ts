@@ -3,7 +3,12 @@ import path from "node:path";
 import os from "node:os";
 import { resolveUserDataFile, userDataDir } from "../../core/paths/userHome.js"
 
-export type ProjectTrustLevel = "trusted" | "untrusted" | "session-only";
+const TRUST_LEVELS = ["trusted", "untrusted", "session-only"] as const;
+export type ProjectTrustLevel = typeof TRUST_LEVELS[number];
+
+function isProjectTrustLevel(value: unknown): value is ProjectTrustLevel {
+  return typeof value === "string" && TRUST_LEVELS.some(level => level === value);
+}
 
 export interface ProjectTrustRecord {
   readonly trustLevel: ProjectTrustLevel;
@@ -83,6 +88,7 @@ export class ProjectTrustStore {
   }
 
   setProjectTrust(workspaceRoot: string, level: ProjectTrustLevel): void {
+    if (!isProjectTrustLevel(level)) throw new TypeError("Invalid project trust level.");
     const normalized = identifyProject(workspaceRoot);
     if (level === "session-only") {
       this.sessionTrusts.add(normalized);

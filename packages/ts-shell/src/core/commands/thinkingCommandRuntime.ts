@@ -1,3 +1,6 @@
+import { thinkingSyntax } from "./thinking/syntax.js";
+import { parseSyntax } from "./syntax/parse.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import {
   readProjectState,
@@ -18,7 +21,6 @@ import {
  * a property of the work rather than of the process that happens to be running.
  */
 
-const TIERS: readonly ThinkingEffort[] = ["low", "medium", "high"];
 
 /** The effort recorded for this project, or none. */
 export function getThinkingEffort(workspaceRoot: string): ThinkingEffort | undefined {
@@ -29,11 +31,13 @@ export async function runThinkingCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
+  const parsed = parseSyntax(thinkingSyntax, args);
+  if (!parsed.ok) return { kind: "local", output: `Invalid /thinking arguments: ${parsed.reason}\n${syntaxHelp(thinkingSyntax)}` };
   const root = context.cwd;
   const current = getThinkingEffort(root);
-  const asked = args[0]?.toLowerCase();
+  const tier = parsed.action.effort;
 
-  if (!asked) {
+  if (tier === undefined) {
     return {
       kind: "local",
       output: [
@@ -43,28 +47,20 @@ export async function runThinkingCommand(
           ? `- Asking for \`${current}\` reasoning effort on every request in this project`
           : "- Not asking for any particular effort — the provider decides",
         "",
-        `\`/thinking low\` · \`/thinking medium\` · \`/thinking high\` · \`/thinking off\``,
+        syntaxHelp(thinkingSyntax),
         "",
         "Providers that do not implement the field ignore it; one that rejects it has it dropped and the turn retried without it.",
       ].join("\n"),
     };
   }
 
-  if (asked === "off" || asked === "auto" || asked === "none") {
+  if (tier === null) {
     return {
       kind: "local",
       output: report(
         writeProjectState(root, { thinkingEffort: null }),
         "Not asking for a particular effort any more.",
       ),
-    };
-  }
-
-  const tier = TIERS.find((candidate) => candidate === asked);
-  if (!tier) {
-    return {
-      kind: "local",
-      output: `\`${asked}\` is not a level. Use ${TIERS.map((value) => `\`${value}\``).join(", ")}, or \`off\`.`,
     };
   }
 

@@ -27,10 +27,8 @@ function prefixFilter(
  */
 const SUBCOMMAND_VALUES = {
   model: ["use", "list", "status", "help"],
-  thinking: ["low", "medium", "high", "off"],
   fast: ["on", "off", "toggle", "enable", "disable"],
   log: ["tail", "path", "export", "clear"],
-  todo: ["list", "add", "start", "done", "clear"],
   view: ["status", "user", "developer"],
   goal: ["pause", "resume", "complete", "clear"],
   workflow: ["list", "run", "status"],

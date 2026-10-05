@@ -1,5 +1,8 @@
+import { trustSyntax } from "./trust/syntax.js";
+import { parseSyntax } from "./syntax/parse.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import path from "node:path";
-import { projectTrust, type ProjectTrustLevel } from "../security/projectTrust.js";
+import { projectTrust } from "../security/projectTrust.js";
 import { neutraliseForDisplay } from "../text/safety.js";
 import { loadHookDeclarations } from "../hooks/config.js";
 import { hookFingerprint } from "../hooks/trust.js";
@@ -21,33 +24,11 @@ export async function runTrustCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
+  const parsed = parseSyntax(trustSyntax, args);
+  if (!parsed.ok) return { kind: "local", output: `Invalid /trust arguments: ${parsed.reason}\n${syntaxHelp(trustSyntax)}` };
   const root = path.resolve(context.cwd || process.cwd());
-  const action = (args[0] ?? "").trim().toLowerCase();
-
-  if (action === "" || action === "status") {
-    return { kind: "local", output: describeTrust(root) };
-  }
-
-  const levels: Record<string, ProjectTrustLevel> = {
-    on: "trusted",
-    off: "untrusted",
-    session: "session-only",
-  };
-  const level = levels[action];
-  if (!level) {
-    return {
-      kind: "local",
-      output: [
-        `Unknown /trust argument '${action}'.`,
-        "",
-        "Usage:",
-        "  /trust                  show what this project may contribute and the current decision",
-        "  /trust on               allow this project's MCP servers, hooks and workflow steps",
-        "  /trust off              refuse them (the default)",
-        "  /trust session          allow them until this session ends",
-      ].join("\n"),
-    };
-  }
+  const level = parsed.action.level;
+  if (level === undefined) return { kind: "local", output: describeTrust(root) };
 
   const before = describeTrust(root);
   projectTrust.setProjectTrust(root, level);

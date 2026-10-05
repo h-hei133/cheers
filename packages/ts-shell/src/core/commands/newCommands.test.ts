@@ -183,7 +183,8 @@ describe("/thinking", () => {
   it("refuses a level it does not have", async () => {
     const result = await runThinkingCommand(["maximum"], { cwd: workspace });
 
-    expect(result.output).toContain("`maximum` is not a level");
+    expect(result.output).toContain("Invalid /thinking arguments: Unknown action.");
+    expect(result.output).toContain("/thinking low");
     expect(getThinkingEffort(workspace)).toBeUndefined();
   });
 });

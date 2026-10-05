@@ -352,3 +352,8 @@ candidate ID、record ID 和 query 是不同参数种类，动态 provider 不�
 ### CMD-02 实施记录（2026-10-06）
 
 原始区间、光标/草稿 revision 校验已接入命令、参数与文件候选；编辑保留前后缀、空白、引号路径和 Unicode grapheme，接受候选不执行，完整命令保留一次 Enter。组合 268 项、四类反转、Node 20.3 构建及两种终端模式真实 PTY 已验证。详见 [Phase 19 决策 §8.20](phase-19-decisions.md#820-cmd-02原草稿范围补全与接受语义)。CMD-03 语义校验与 CMD-04 异步目录身份仍待实施。
+
+
+### CMD-03 首批实施记录（2026-10-06）
+
+trust/todo/thinking 已由领域 syntax 同时驱动运行时校验、帮助和候选；trust 命令与存储双重拒绝非法枚举，todo 拒绝 1junk 等非法稳定 ID，thinking 保留 auto/none 兼容关系并拒绝额外参数。177 项组合测试、四组反转、Node 20.3 构建和两种终端模式真实 CLI 验证通过。完整范围与剩余项见 [Phase 19 决策 §8.21](phase-19-decisions.md#821-cmd-03trusttodothinking-首批共享语法与写入边界)；其余全量表尚未迁移，不标记 CMD-03 完成。

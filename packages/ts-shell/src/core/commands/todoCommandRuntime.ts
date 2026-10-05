@@ -1,3 +1,6 @@
+import { todoSyntax } from "./todo/syntax.js";
+import { parseSyntax } from "./syntax/parse.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 
@@ -15,7 +18,7 @@ export interface TodoItem {
  * session asked last, which is fine for one and wrong for two.
  */
 const listsBySession = new Map<string, { readonly items: TodoItem[]; nextId: number }>();
-const USAGE = "Usage: /todo list | /todo add <task> | /todo start <id> | /todo done <id> | /todo clear";
+const USAGE = syntaxHelp(todoSyntax);
 
 /**
  * This session's list.
@@ -74,9 +77,11 @@ export async function runTodoCommand(
   _context: CommandContext,
   sessionId?: string,
 ): Promise<LocalCommandResult> {
+  const parsed = parseSyntax(todoSyntax, args);
+  if (!parsed.ok) return { kind: "local", output: `Invalid /todo arguments: ${parsed.reason}\n${USAGE}` };
   const sessionTodoList = getSessionTodos(sessionId);
-  const firstArg = args[0]?.toLowerCase();
-  if (args.length === 0 || (firstArg === "list" && args.length === 1)) {
+  const firstArg = parsed.action.name;
+  if (firstArg === "list") {
     if (sessionTodoList.length === 0) {
       return {
         kind: "local",
@@ -103,10 +108,7 @@ export async function runTodoCommand(
     };
   }
 
-  if ((firstArg === "list" || firstArg === "clear") && args.length !== 1) {
-    return { kind: "local", output: USAGE };
-  }
-  if (firstArg === "clear" && args.length === 1) {
+  if (firstArg === "clear") {
     if (sessionId) setSessionTodos(sessionId, []);
     return {
       kind: "local",
@@ -115,10 +117,7 @@ export async function runTodoCommand(
     };
   }
   if (firstArg === "add") {
-    const text = args.slice(1).join(" ").trim();
-    if (!text) {
-      return { kind: "local", output: "Usage: /todo add <task description>" };
-    }
+    const text = parsed.args.join(" ").trim();
     const list = sessionList(sessionId);
     const item: TodoItem = {
       id: list.nextId++,
@@ -133,11 +132,8 @@ export async function runTodoCommand(
     };
   }
 
-  if (firstArg === "done" || firstArg === "complete") {
-    const targetId = parseInt(args[1], 10);
-    if (isNaN(targetId)) {
-      return { kind: "local", output: "Usage: /todo done <id> (e.g. /todo done 1)" };
-    }
+  if (firstArg === "done") {
+    const targetId = Number(parsed.args[0]);
     const item = sessionTodoList.find((t) => t.id === targetId);
     if (!item) {
       return { kind: "local", output: `Task #${targetId} not found.` };
@@ -151,10 +147,7 @@ export async function runTodoCommand(
   }
 
   if (firstArg === "start") {
-    const targetId = parseInt(args[1], 10);
-    if (isNaN(targetId)) {
-      return { kind: "local", output: "Usage: /todo start <id> (e.g. /todo start 1)" };
-    }
+    const targetId = Number(parsed.args[0]);
     const item = sessionTodoList.find((t) => t.id === targetId);
     if (!item) {
       return { kind: "local", output: `Task #${targetId} not found.` };
