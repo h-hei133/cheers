@@ -1,14 +1,15 @@
+import { httpError } from '../network/error.js';
+import { requestScope, type RequestScope } from '../network/request.js';
+import { discardResponse, readResponseText } from '../network/response.js';
+import { webFailure, type WebSource } from './web/result.js';
+import { boundSearchResults, parseSearchResults, type SearchResultItem, type SearchResults } from './web/search.js';
 import { approvedResult, deniedResult } from "./toolResultLifecycle.js";
 import type { ToolDefinition } from "../../tools/types.js";
 
 const DEFAULT_NUM_RESULTS = 5;
 const MAX_SEARCH_OUTPUT_CHARS = 10_000;
 
-interface SearchResultItem {
-  readonly title: string;
-  readonly url: string;
-  readonly snippet: string;
-}
+const MAX_SEARCH_BODY_BYTES = 2 * 1024 * 1024;
 
 export function formatSearchResults(query: string, results: readonly SearchResultItem[]): string {
   if (!results || results.length === 0) {
@@ -70,9 +71,9 @@ function unwrapResultUrl(href: string): string | undefined {
 async function searchWithDuckDuckGo(
   query: string,
   numResults: number,
-  signal?: AbortSignal,
-): Promise<SearchResultItem[]> {
-  const effectiveSignal = signal ?? AbortSignal.timeout(15_000);
+  scope: RequestScope,
+): Promise<SearchResults> {
+  scope.check();
   const formData = new URLSearchParams();
   formData.append("q", query);
   formData.append("b", "");
@@ -85,14 +86,12 @@ async function searchWithDuckDuckGo(
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
     },
     body: formData.toString(),
-    signal: effectiveSignal,
+    signal: scope.signal,
   });
 
-  if (!res.ok) {
-    throw new Error(`DuckDuckGo returned HTTP ${res.status}`);
-  }
-
-  const html = await res.text();
+  if (!res.ok) { discardResponse(res); throw httpError(res.status); }
+  const html = await readResponseText(res, scope, MAX_SEARCH_BODY_BYTES);
+  scope.check();
   const results: SearchResultItem[] = [];
 
   const blockRe =
@@ -120,21 +119,22 @@ async function searchWithDuckDuckGo(
       snippet: snippetText,
     });
 
-    if (results.length >= numResults) {
+    if (results.length > numResults) {
       break;
     }
   }
 
-  return results;
+  scope.check();
+  return boundSearchResults(results, numResults);
 }
 
 async function searchWithExa(
   query: string,
   apiKey: string,
   numResults: number,
-  signal?: AbortSignal,
-): Promise<SearchResultItem[]> {
-  const effectiveSignal = signal ?? AbortSignal.timeout(20_000);
+  scope: RequestScope,
+): Promise<SearchResults> {
+  scope.check();
   const res = await fetch("https://api.exa.ai/search", {
     method: "POST",
     headers: {
@@ -148,35 +148,19 @@ async function searchWithExa(
       useAutoprompt: true,
       highlights: { numSentences: 2 },
     }),
-    signal: effectiveSignal,
+    signal: scope.signal,
   });
-  if (!res.ok) {
-    throw new Error(`Exa API returned ${res.status}: ${await res.text()}`);
-  }
-
-  const data = (await res.json()) as {
-    results?: Array<{
-      title?: string;
-      url?: string;
-      highlights?: string[];
-      text?: string;
-    }>;
-  };
-
-  return (data.results || []).map((r) => ({
-    title: r.title || "Untitled",
-    url: r.url || "",
-    snippet: r.highlights?.join(" ") || r.text?.slice(0, 300) || "",
-  }));
+  if (!res.ok) { discardResponse(res); throw httpError(res.status); }
+  return parseSearchResults(await readResponseText(res, scope, MAX_SEARCH_BODY_BYTES), 'exa', numResults);
 }
 
 async function searchWithTavily(
   query: string,
   apiKey: string,
   numResults: number,
-  signal?: AbortSignal,
-): Promise<SearchResultItem[]> {
-  const effectiveSignal = signal ?? AbortSignal.timeout(20_000);
+  scope: RequestScope,
+): Promise<SearchResults> {
+  scope.check();
   const res = await fetch("https://api.tavily.com/search", {
     method: "POST",
     headers: {
@@ -190,36 +174,21 @@ async function searchWithTavily(
       search_depth: "basic",
       include_answer: false,
     }),
-    signal: effectiveSignal,
+    signal: scope.signal,
   });
-  if (!res.ok) {
-    throw new Error(`Tavily API returned ${res.status}: ${await res.text()}`);
-  }
-
-  const data = (await res.json()) as {
-    results?: Array<{
-      title?: string;
-      url?: string;
-      content?: string;
-    }>;
-  };
-
-  return (data.results || []).map((r) => ({
-    title: r.title || "Untitled",
-    url: r.url || "",
-    snippet: r.content?.slice(0, 300) || "",
-  }));
+  if (!res.ok) { discardResponse(res); throw httpError(res.status); }
+  return parseSearchResults(await readResponseText(res, scope, MAX_SEARCH_BODY_BYTES), 'tavily', numResults);
 }
 
 /**
  * /web_search tool
- * Resilient multi-provider web search with keyless DuckDuckGo HTML fallback.
+ * Configured web search provider selection with a keyless HTML default.
  */
 export function createWebSearchToolDefinition(): ToolDefinition {
   return {
     name: "web_search",
     description:
-      "Search the public web for real-time information, documentation, libraries, and technical references. Automatically uses Exa/Tavily if configured, or keyless DuckDuckGo fallback.",
+      "Search the public web for real-time information, documentation, libraries, and technical references. Uses Exa/Tavily when configured, or keyless DuckDuckGo otherwise. Requests are not automatically retried or switched after failure.",
     argsSchema: {
       type: "object",
       properties: {
@@ -241,36 +210,32 @@ export function createWebSearchToolDefinition(): ToolDefinition {
       }
 
       const numResults =
-        typeof args.numResults === "number" && args.numResults > 0
+        typeof args.numResults === "number" && Number.isFinite(args.numResults) && args.numResults >= 1
           ? Math.min(Math.floor(args.numResults), 10)
           : DEFAULT_NUM_RESULTS;
 
       const exaKey = process.env.EXA_API_KEY;
       const tavilyKey = process.env.TAVILY_API_KEY;
 
+      const source: WebSource = exaKey ? 'exa' : tavilyKey ? 'tavily' : 'keyless';
+      const scope = requestScope(source === 'keyless' ? 15_000 : 20_000, context.abortSignal);
       try {
-        let results: SearchResultItem[] = [];
-
-        if (exaKey) {
-          results = await searchWithExa(query, exaKey, numResults, context.abortSignal);
-        } else if (tavilyKey) {
-          results = await searchWithTavily(query, tavilyKey, numResults, context.abortSignal);
-        } else {
-          // Free, keyless DuckDuckGo HTML search fallback
-          try {
-            results = await searchWithDuckDuckGo(query, numResults, context.abortSignal);
-          } catch (ddgErr) {
-            return deniedResult(
-              `Web search failed (DuckDuckGo keyless fallback error: ${ddgErr instanceof Error ? ddgErr.message : String(ddgErr)}).\n` +
-              `To enable AI-native search providers, set EXA_API_KEY or TAVILY_API_KEY. You can also use web_fetch to inspect specific URLs directly.`,
-            );
-          }
-        }
-
-        return approvedResult(formatSearchResults(query, results));
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return deniedResult(`Web search error for "${query}": ${msg}`);
+        scope.check();
+        const results = exaKey ? await searchWithExa(query, exaKey, numResults, scope)
+          : tavilyKey ? await searchWithTavily(query, tavilyKey, numResults, scope)
+          : await searchWithDuckDuckGo(query, numResults, scope);
+        scope.check();
+        const output = formatSearchResults(query, results.items)
+          + (results.truncated ? '\n\n[Search results truncated to the requested count or display field limits.]' : '');
+        scope.check();
+        return approvedResult(output, {
+          network: { source }, truncated: results.truncated || output.length > MAX_SEARCH_OUTPUT_CHARS,
+        });
+      } catch (error) {
+        try { scope.check(); } catch (stopped) { return webFailure(source, stopped); }
+        return webFailure(source, error);
+      } finally {
+        scope.dispose();
       }
     },
   };

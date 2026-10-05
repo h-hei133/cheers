@@ -538,3 +538,14 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Linux、Node 20.3、隔离环境下 ask、交互桥、终端宿主、信号、调用适配、工具 gate、参数校验与权限共 9 文件/131 项通过，build:ts 通过。六种状态经真实工具适配器验证，后续 write 在没有执行审批时仍被拒绝。反转答案兜底 5 失败/16 通过；反转空输入推荐 1 失败/16 通过；反转中断为 n 时 3 失败/14 通过，包含不能结束后续问题的超时反例。每组源码精确恢复后最终组合套件通过。
 - 编译模块经真实 PTY/readline 提问：先显式选择第二项，再留空或 Ctrl-C，分别得到 partial/cancelled，均保留第一项用户答案且第二项 source=none；子进程 exit 0，模型请求为零。这是工具与终端适配探针，不是完整模型驱动 CLI 会话验收。import-cycles/config-consumers/declarations/node-floor 通过；NormProof 无阻断项，两项图义务 satisfied，整体 partial 仍来自 6 项既有函数数量 advisory。未取得独立审查或非 Linux 实机证据。
 - SAFE-02 继续保留原生内部访问、创建竞态与跨平台缺口；本批推进同一 W1 的独立问答任务，没有将这些缺口改称完成。其余 Phase 19 批次仍待执行。
+
+
+### 8.15 SAFE-05 — 网络期限、正文消费与错误投影（2026-10-06，进行中）
+
+- [请求 owner](../../packages/ts-shell/src/core/network/request.ts) 将父取消与本地期限同时接入，检查预取消并在 finally 清理定时器/监听器；同一期限覆盖网页重定向、正文与解析前后，不因收到父 signal 而取消本地超时。[正文 owner](../../packages/ts-shell/src/core/network/response.ts) 复用此前抓取限额职责，按声明长度及 fetch 交付的解码字节限制，使用有界增长缓冲区，超限或中断取消正文并释放 reader，不等待可能停滞的清理 Promise。
+- [网页工具](../../packages/ts-shell/src/core/tools/webFetch.ts) 删除旧内联正文读取实现，错误/重定向体不消费且请求取消；每跳继续检查 URL，拒绝 URL credentials，不回显 URL、Location、statusText 或异常正文。[搜索工具](../../packages/ts-shell/src/core/tools/webSearch.ts) 三条后端路径共用读取限额 2 MiB，网页保留 5 MiB；非成功响应只投影固定来源、HTTP status 与稳定错误码，区分 cancelled、timeout、rate_limited、denied、http_error、network_error、response_limit、invalid_response 和 redirect_limit。错误体不进入模型消息或 hook 记录，不靠先读再脱敏。
+- [搜索响应](../../packages/ts-shell/src/core/tools/web/search.ts) 在 JSON.parse 前限制结构深度至 32，再复用现有 schema 校验；结果数不超过请求数，标题/URL/摘要分别限制 512/2048/1000 字符，裁剪状态同时进入正文和 metadata。保留配置选择顺序与正常 HTML/JSON 结果；说明没有自动重试/failover，未把配置级选择改称请求容灾。
+- 定向对照参考 HTTP 管理请求的总期限/父信号组合、重试前取消废弃正文，以及搜索共享 reader 的字节限额与取消决定；采用相同资源生命周期原则。参考仍会有界读取部分错误体，本项目按本阶段契约完全不消费错误体。未调整模型 provider/auth 实现或包依赖，没有复制另一个传输系统。
+- Linux、Node 20.3、隔离环境下网络 owner、工具、研究 collector 和 turn gate 共 6 文件/120 项通过，build:ts 通过。新增真实本地 HTTP 测试确认停滞正文超时后连接关闭、gzip 解码超限拒绝、持续 429 正文取消及秘密标记不进入模型/hook、正常文本保留。测试只将 transport 目的地导向合成服务，未修改产品公共 URL 策略，不构成真实公网/DNS/TLS 验收。初轮一个新测试的语法错误按 harness/setup 修正后通过。
+- 反转本地 deadline 时 4 项失败；取消错误体保护反转时 12 项失败；恢复任意原始异常消息投影时 4 项失败。使用测试名称过滤，其他场景未运行而非被豁免；每次源码精确恢复后最终组合套件通过。import-cycles/config-consumers/declarations/node-floor 通过；NormProof 两项图义务 satisfied、无阻断项，整体 partial 仍来自 6 项既有函数数量 advisory。没有独立审查、PTY、真实 provider 或非 Linux 证据。
+- SAFE-05 尚未完整完成：当前 fetch 对正文自动解压，已限制声明长度与实际解码字节，但没有独立观测无 Content-Length 时的压缩传输字节；同步解析只在前后检查取消，不能声称可在同步解析中抢占。连接级计量与 SAFE-06 的 DNS 审核绑定、搜索重定向目标/凭据策略需在网络连接 owner 继续落实；SAFE-02 的既有边界亦保留。

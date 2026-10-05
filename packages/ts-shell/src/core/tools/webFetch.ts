@@ -1,3 +1,7 @@
+import { NetworkError, httpError } from '../network/error.js';
+import { requestScope, type RequestScope } from '../network/request.js';
+import { discardResponse, readResponseText } from '../network/response.js';
+import { webFailure } from './web/result.js';
 import { approvedResult, deniedResult } from "./toolResultLifecycle.js";
 import { blockedHostReason } from "../security/egressGuard.js";
 import type { ToolDefinition } from "../../tools/types.js";
@@ -109,136 +113,34 @@ const BROWSER_HEADERS = {
   "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7",
 } as const;
 
-type FetchOutcome =
-  | { readonly ok: true; readonly response: Response; readonly finalUrl: string }
-  | { readonly ok: false; readonly reason: string };
-
-/**
- * Whether a URL may be requested, and why not when it may not.
- *
- * Parsed rather than prefix-matched. A string test on `http://` accepts
- * `http://[::1]/` and `http://169.254.169.254/` equally, and the address is the
- * part that decides.
- */
-function refuseUrl(url: string): string | undefined {
+/** URL policy is applied separately to each redirect target. */
+function checkUrl(url: string): void {
   let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return `Error: ${url} is not a valid URL`;
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    return `Error: refusing to fetch ${parsed.protocol}// — only http and https are allowed`;
-  }
-  const reason = blockedHostReason(parsed.hostname);
-  if (reason) {
-    return `Error: refusing to fetch ${url} — ${parsed.hostname} is a ${reason}. This tool reaches the public web only.`;
-  }
-  return undefined;
+  try { parsed = new URL(url); } catch { throw new NetworkError('denied'); }
+  if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password
+    || blockedHostReason(parsed.hostname)) throw new NetworkError('denied');
 }
 
-/**
- * Fetch `url`, following redirects one at a time so each hop is checked.
- *
- * `redirect: "manual"` is what makes that possible: with the default the runtime
- * follows the chain internally and the only URL the guard ever sees is the first
- * one, which is exactly the URL an attacker does not need to control.
- */
-async function fetchFollowingCheckedRedirects(
-  url: string,
-  signal: AbortSignal,
-): Promise<FetchOutcome> {
+async function fetchFollowingCheckedRedirects(url: string, scope: RequestScope): Promise<{ response: Response; finalUrl: string }> {
   let current = url;
-  for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
-    const refusal = refuseUrl(current);
-    if (refusal) return { ok: false, reason: refusal };
-
-    const response = await fetch(current, {
-      method: "GET",
-      headers: BROWSER_HEADERS,
-      redirect: "manual",
-      signal,
-    });
-
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get("location");
-      if (!location) {
-        return { ok: false, reason: `HTTP ${response.status} from ${current} carried no Location` };
-      }
-      if (hop === MAX_REDIRECTS) {
-        return {
-          ok: false,
-          reason: `Error: ${url} redirected more than ${MAX_REDIRECTS} times; refusing to follow further`,
-        };
-      }
-      // Relative locations are resolved against the URL that named them.
-      current = new URL(location, current).toString();
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    scope.check();
+    checkUrl(current);
+    const response = await fetch(current, { method: 'GET', headers: BROWSER_HEADERS, redirect: 'manual', signal: scope.signal });
+    try { scope.check(); } catch (error) { discardResponse(response); throw error; }
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      discardResponse(response);
+      if (hop === MAX_REDIRECTS) throw new NetworkError('redirect_limit');
+      const location = response.headers.get('location');
+      if (!location) throw new NetworkError('invalid_response');
+      try { current = new URL(location, current).toString(); }
+      catch { throw new NetworkError('invalid_response'); }
       continue;
     }
-
-    if (!response.ok) {
-      return {
-        ok: false,
-        reason: `HTTP ${response.status} ${response.statusText} fetching ${current}`,
-      };
-    }
-    return { ok: true, response, finalUrl: current };
+    if (!response.ok) { discardResponse(response); throw httpError(response.status); }
+    return { response, finalUrl: current };
   }
-  return { ok: false, reason: `Error: too many redirects fetching ${url}` };
-}
-
-/**
- * Read a body up to `MAX_BODY_BYTES`, then stop and say so.
- *
- * Streamed rather than `response.text()` because the length is only knowable
- * after the fact otherwise: the whole body is already in memory by the time the
- * limit could be applied, and the limit exists to prevent exactly that. The
- * declared `Content-Length` is checked first to avoid reading at all when the
- * server has already said the answer, and it is not trusted on its own because a
- * server may omit it or understate it.
- */
-async function readBoundedBody(
-  response: Response,
-): Promise<{ readonly ok: true; readonly text: string } | { readonly ok: false; readonly reason: string }> {
-  const declared = Number(response.headers.get("content-length") ?? "");
-  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
-    return {
-      ok: false,
-      reason: `Error: response declares ${declared} bytes, past the ${MAX_BODY_BYTES}-byte read limit`,
-    };
-  }
-
-  const stream = response.body;
-  if (!stream) return { ok: true, text: "" };
-
-  const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
-  let read = 0;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (!value) continue;
-      read += value.byteLength;
-      if (read > MAX_BODY_BYTES) {
-        return {
-          ok: false,
-          reason: `Error: response exceeded the ${MAX_BODY_BYTES}-byte read limit; refused rather than truncated`,
-        };
-      }
-      chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-
-  const joined = new Uint8Array(read);
-  let offset = 0;
-  for (const chunk of chunks) {
-    joined.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return { ok: true, text: new TextDecoder().decode(joined) };
+  throw new NetworkError('redirect_limit');
 }
 
 export function createWebFetchToolDefinition(): ToolDefinition {
@@ -271,29 +173,17 @@ export function createWebFetchToolDefinition(): ToolDefinition {
       }
 
       const timeoutMs =
-        typeof args.timeoutMs === "number" && args.timeoutMs > 0
+        typeof args.timeoutMs === "number" && Number.isFinite(args.timeoutMs) && args.timeoutMs > 0
           ? Math.min(args.timeoutMs, 60_000)
           : DEFAULT_FETCH_TIMEOUT_MS;
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-      const onAbort = () => controller.abort();
-
-      if (context.abortSignal) {
-        context.abortSignal.addEventListener("abort", onAbort, { once: true });
-      }
-
+      const scope = requestScope(timeoutMs, context.abortSignal);
       try {
-        const fetched = await fetchFollowingCheckedRedirects(rawUrl, controller.signal);
-        if (!fetched.ok) return deniedResult(fetched.reason);
-
-        const { response, finalUrl } = fetched;
-        const contentType = response.headers.get("content-type") || "";
-        const body = await readBoundedBody(response);
-        if (!body.ok) return deniedResult(body.reason);
-
+        const { response, finalUrl } = await fetchFollowingCheckedRedirects(rawUrl, scope);
+        const contentType = response.headers.get('content-type') || '';
+        const rawBody = await readResponseText(response, scope, MAX_BODY_BYTES);
+        scope.check();
         const rawUrlForName = finalUrl;
-        const rawBody = body.text;
 
         let formattedContent: string;
         if (
@@ -306,10 +196,11 @@ export function createWebFetchToolDefinition(): ToolDefinition {
           formattedContent = htmlToMarkdown(rawBody);
         }
 
+        scope.check();
         const notRendered = "no readable text was extracted";
         if (!formattedContent.trim()) {
           return approvedResult(
-            `[Fetched ${rawUrlForName} successfully, but ${notRendered}]`,
+            `[Fetched successfully, but ${notRendered}]`,
           );
         }
 
@@ -320,17 +211,12 @@ export function createWebFetchToolDefinition(): ToolDefinition {
             `\n\n[Content truncated to ${MAX_OUTPUT_CHARS} characters. Full length: ${formattedContent.length}]`;
         }
 
-        return approvedResult(output);
-      } catch (err) {
-        clearTimeout(timeoutId);
-        const errorMsg =
-          err instanceof Error ? err.message : String(err);
-        return deniedResult(`Web fetch failed for ${rawUrl}: ${errorMsg}`);
+        return approvedResult(output, { network: { source: 'fetch' }, truncated: formattedContent.length > MAX_OUTPUT_CHARS });
+      } catch (error) {
+        try { scope.check(); } catch (stopped) { return webFailure('fetch', stopped); }
+        return webFailure('fetch', error);
       } finally {
-        clearTimeout(timeoutId);
-        if (context.abortSignal) {
-          context.abortSignal.removeEventListener("abort", onAbort);
-        }
+        scope.dispose();
       }
     },
   };

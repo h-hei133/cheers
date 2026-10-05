@@ -97,6 +97,8 @@ confidence: mixed
 
 ### 3.6 搜索响应：错误不含正文，成功有界读取
 
+2026-10-06：已接通父取消与本地总期限、错误体零消费、安全错误投影、解码字节限额和搜索结构/字段限制，120 项相关测试通过；独立压缩传输计量及连接级边界仍待处理，见 [Phase 19 §8.15](phase-19-decisions.md)。
+
 非 2xx 错误只输出安全的 provider 标识、HTTP status、稳定错误分类及经过允许列表验证的 request id。不得将响应正文片段放入模型、终端、日志或 artifact；`await res.text()` 后 slice 再去 HTML 标签既先全量读入，也不能可靠删除 secret。使用已有 [redaction.ts](../../packages/ts-shell/src/core/security/redaction.ts) 与 [reportText.ts](../../packages/ts-shell/src/core/security/reportText.ts) 的安全投影纪律，网络 owner 仍须从源头避免收集错误体。
 
 成功响应按流读取并限制压缩后/解压后字节、结果数与字段长度，达到上限即取消 body；解析前后验证结构和嵌套深度，明确 truncated/invalid_response。搜索结果、网页和论文文本全部是不可信证据，不成为系统指令。配置选择、限流退避、重试和 failover 是否发生必须可观测，不能把当前配置级选择描述为自动容灾。
