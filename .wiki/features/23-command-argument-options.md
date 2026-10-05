@@ -4,7 +4,7 @@ category: article
 sources:
   - repo-audit-2026-10-05
   - packages/ts-shell/src/core/commands/registry.ts
-  - packages/ts-shell/src/core/commands/argumentCompletions.ts
+  - packages/ts-shell/src/core/commands/syntax/projection.ts
   - packages/ts-shell/src/cli/interactive/slashSuggestions.ts
   - packages/ts-shell/src/presentation/tui/chrome/suggestions.ts
   - packages/ts-shell/src/cli/interactive/keymap.ts
@@ -49,7 +49,7 @@ confidence: high
 ### 2.1 审计方法与分类口径
 审计对象为 Cheers 的命令调度与注册中枢：
 - **注册表入口**：[packages/ts-shell/src/core/commands/registry.ts](../../packages/ts-shell/src/core/commands/registry.ts)（共注册 58 条命令，含 `diagnose` 至 `report`）；
-- **补全字典层**：[packages/ts-shell/src/core/commands/argumentCompletions.ts](../../packages/ts-shell/src/core/commands/argumentCompletions.ts)（硬编码 `SUBCOMMAND_VALUES` 字典与专用动态 Provider）；
+- **补全字典层**：历史 argumentCompletions（当时为硬编码 `SUBCOMMAND_VALUES` 字典与专用动态 Provider；现已由领域 syntax 与[共享投影](../../packages/ts-shell/src/core/commands/syntax/projection.ts)取代）；
 - **执行处理器层**：各命令对应的独立运行模块 `packages/ts-shell/src/core/commands/*CommandRuntime.ts` 及 `shellActionRuntime.ts`。
 
 **判定分类口径**：
@@ -422,3 +422,8 @@ connect 统一动作/flags/互斥与直接写入函数校验，provider 候选�
 ### CMD-03 browser 实施记录（2026-10-06）
 
 browser 顶层/action/replay-cache/repair 使用领域分层语法，拒绝额外参数，保留精确目标，confirm 不补全且保持独立审批。377 项通过、9 项既有集成跳过，构建、四组反转及两模式 CLI 验证通过，见 [决策 §8.34](phase-19-decisions.md#834-cmd-03browser-分层语法与确认隔离)。其余语法和动态目录继续。
+
+
+### CMD-03 compact 实施记录（2026-10-06）
+
+compact 契约、交互压缩入口与候选共享领域语法，非法 preview 赋值和未知 flags 不再触发真实压缩；重复约束保留，元数据与指令分离，旧固定词表已删除。284 项、构建、两组反转及两模式真实 CLI 验证通过，见 [决策 §8.35](phase-19-decisions.md#835-cmd-03compact-语法与真实压缩入口守卫)。PAR-01 默认压缩接线、剩余语法与动态目录继续。

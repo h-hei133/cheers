@@ -10,7 +10,13 @@ describe("compact command parsing", () => {
 
   it("carries focus instructions", () => {
     expect(parseCompactCommand("/compact keep the migration plan")).toEqual({ instructions: "keep the migration plan" });
-    expect(parseCompactCommand("/compact --verbose keep it")).toEqual({ instructions: "keep it" });
+    expect(parseCompactCommand("/compact -- --verbose keep it")).toEqual({ instructions: "--verbose keep it" });
+    expect(parseCompactCommand('/compact "keep the plan"')).toEqual({ instructions: "keep the plan" });
+  });
+
+  it.each(["--preview=false", "--json=false", "--render=false", "--verbose keep it", "--goal preview", "--source manual", "--preview --json", "--constraint", "-x"])("never compacts option input %s", args => {
+    expect(parseCompactCommand(`/compact ${args}`)).toBeUndefined();
+    expect(parseCompactCommand(`/handoff ${args}`)).toBeUndefined();
   });
 
   it("leaves the handoff artifact forms and other commands alone", () => {

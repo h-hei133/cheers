@@ -1,3 +1,4 @@
+import { parseCompactSyntax } from "./syntax.js";
 import type { RecoverySurfaceSummary } from "../../../edit/recovery/recoverySurfaceProjection.js";
 import type { ContextStateProjectionInput } from "../../../core/context/model/contextStateProjection.js";
 
@@ -95,39 +96,29 @@ export function parseCompactCommandArgs(
   args: readonly string[],
   defaults: CompactCommandRequestInput = {},
 ): CompactCommandRequest {
-  const options = parseOptions(args);
-  if (options.has("execute") || options.has("persist") || options.has("memory")) {
+  const optionNames = args.slice(0, args.indexOf("--") < 0 ? args.length : args.indexOf("--"))
+    .filter(arg => arg.startsWith("--")).map(arg => arg.slice(2).split("=")[0]);
+  const rejectedOptions = new Set(optionNames);
+  if (rejectedOptions.has("execute") || rejectedOptions.has("persist") || rejectedOptions.has("memory")) {
     throw new CompactCommandContractError(
       "compact-command-mutating-flag",
       "/compact is preview-only and cannot execute recovery, persist memory, or write state.",
     );
   }
   if (
-    options.has("raw") ||
-    options.has("raw-content") ||
-    options.has("raw-recovery-content")
+    rejectedOptions.has("raw") ||
+    rejectedOptions.has("raw-content") ||
+    rejectedOptions.has("raw-recovery-content")
   ) {
     throw new CompactCommandContractError(
       "compact-command-raw-content-rejected",
       "/compact does not accept raw content fields.",
     );
   }
-  if (options.has("preview") && options.has("json")) {
-    throw new CompactCommandContractError(
-      "compact-command-mode-conflict",
-      "Cannot specify both --preview and --json.",
-    );
-  }
-  const positional = args.filter((arg) => !arg.startsWith("--"));
-  let mode: CompactCommandMode = defaults.mode ?? "render";
-  const firstPos = positional[0]?.toLowerCase();
-  if (firstPos === "preview" || firstPos === "render" || firstPos === "json") {
-    mode = firstPos;
-  } else if (options.has("json")) {
-    mode = "json";
-  } else if (options.has("preview")) {
-    mode = "preview";
-  }
+  const parsed = parseCompactSyntax(args);
+  if (!parsed.ok) throw new CompactCommandContractError("compact-command-invalid-arguments", parsed.reason);
+  const options = parsed.values;
+  const mode: CompactCommandMode = parsed.mode ?? defaults.mode ?? "render";
   const source =
     parseSource(optionValue(options.get("source"))) ?? defaults.source ?? "session";
   const includeJson = mode === "json" || defaults.includeJson === true;
@@ -145,7 +136,6 @@ export function parseCompactCommandArgs(
       ...stripUndefined({
         objective:
           optionValue(options.get("goal")) ??
-          optionValue(options.get("objective")) ??
           defaults.taskGoal?.objective,
         constraints: [
           ...(defaults.taskGoal?.constraints ?? []),
@@ -153,7 +143,6 @@ export function parseCompactCommandArgs(
         ],
         nextAction:
           optionValue(options.get("next")) ??
-          optionValue(options.get("next-action")) ??
           defaults.taskGoal?.nextAction,
       }),
     },
@@ -162,17 +151,14 @@ export function parseCompactCommandArgs(
       ...stripUndefined({
         routeId:
           optionValue(options.get("route-id")) ??
-          optionValue(options.get("route")) ??
           defaults.routeInfo?.routeId,
         name:
           optionValue(options.get("route-name")) ??
-          optionValue(options.get("name")) ??
           defaults.routeInfo?.name,
         currentPhase:
           optionValue(options.get("phase")) ?? defaults.routeInfo?.currentPhase,
         nextAction:
           optionValue(options.get("next")) ??
-          optionValue(options.get("next-action")) ??
           defaults.routeInfo?.nextAction,
       }),
     },
@@ -181,12 +167,10 @@ export function parseCompactCommandArgs(
       ...stripUndefined({
         projectRoot:
           optionValue(options.get("project-root")) ??
-          optionValue(options.get("cwd")) ??
           defaults.projectInfo?.projectRoot,
         branch: optionValue(options.get("branch")) ?? defaults.projectInfo?.branch,
         baseCommit:
           optionValue(options.get("base")) ??
-          optionValue(options.get("base-commit")) ??
           defaults.projectInfo?.baseCommit,
       }),
     },
@@ -249,35 +233,6 @@ export function normalizeCompactCommandRequest(
   };
 }
 
-function parseMode(
-  positionalMode: string | undefined,
-  options: ReadonlyMap<string, readonly (string | true)[]>,
-  fallback: CompactCommandMode | undefined,
-): CompactCommandMode {
-  const flagModes = [
-    options.has("preview") ? "preview" : undefined,
-    options.has("render") ? "render" : undefined,
-    options.has("json") ? "json" : undefined,
-  ].filter(Boolean);
-  if (flagModes.length > 1) {
-    throw new CompactCommandContractError(
-      "compact-command-incompatible-flags",
-      "Choose only one compact mode: preview, render, or json.",
-    );
-  }
-  const explicit = flagModes[0] ?? positionalMode?.trim().toLowerCase();
-  if (!explicit) {
-    return fallback ?? "render";
-  }
-  if (explicit === "preview" || explicit === "render" || explicit === "json") {
-    return explicit;
-  }
-  throw new CompactCommandContractError(
-    "compact-command-invalid-mode",
-    `Unsupported compact mode: ${explicit}.`,
-  );
-}
-
 function parseSource(value: string | undefined): CompactCommandSource | undefined {
   if (!value) {
     return undefined;
@@ -300,43 +255,6 @@ function rejectRawTopLevelFields(input: Record<string, unknown>): void {
       );
     }
   }
-}
-
-function parseOptions(args: readonly string[]): Map<string, readonly (string | true)[]> {
-  const options = new Map<string, Array<string | true>>();
-  const add = (key: string, value: string | true): void => {
-    const existing = options.get(key);
-    if (existing) {
-      existing.push(value);
-    } else {
-      options.set(key, [value]);
-    }
-  };
-
-  for (let index = 0; index < args.length; index += 1) {
-    const raw = args[index];
-    if (!raw.startsWith("--")) {
-      continue;
-    }
-    const normalized = raw.slice(2);
-    const inline = normalized.indexOf("=");
-    if (inline !== -1) {
-      add(
-        normalized.slice(0, inline).trim().toLowerCase(),
-        normalized.slice(inline + 1).trim(),
-      );
-      continue;
-    }
-    const key = normalized.trim().toLowerCase();
-    const next = args[index + 1];
-    if (next && !next.startsWith("--")) {
-      add(key, next);
-      index += 1;
-    } else {
-      add(key, true);
-    }
-  }
-  return options;
 }
 
 function optionValue(values: readonly (string | true)[] | undefined): string | undefined {

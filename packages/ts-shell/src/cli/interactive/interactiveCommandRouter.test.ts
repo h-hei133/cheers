@@ -128,6 +128,16 @@ describe("interactive command router", () => {
     expect(result.turnNumber).toBe(0);
   });
 
+  it.each(["--preview=false", "--render=false", "--json=false", "--verbose keep it", "preview --json", "--constraint", "--source invalid"])("blocks invalid compact arguments without touching history: %s", async args => {
+    const harness = createHarness();
+    const compactHistory = vi.fn();
+    Object.assign(harness.input.sessionRuntime, { compactHistory });
+    await routeInteractiveCommand({ ...harness.input, prompt: `/compact ${args}` });
+    expect(compactHistory).not.toHaveBeenCalled();
+    expect(harness.lines.join("\n")).toContain("Outcome: blocked");
+    expect(harness.lines.join("\n")).not.toContain("Condensed");
+  });
+
   it("routes /cd workspace navigation commands out of normal prompt execution", async () => {
     const harness = createHarness();
 

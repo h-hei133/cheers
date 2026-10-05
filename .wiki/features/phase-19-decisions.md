@@ -759,3 +759,15 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 462b2b92 Architecture Watch 37380581074 成功，CI 37380581115 尚待终态。CMD-03 的 compact、多项零参数与自由文本/实体目录、CMD-04、SAFE-02 以及阶段整体仍未完成。
 
 - §8.34 补充：1ce014d1 的 NormProof 阻断义务通过，但详细报告另有全依赖图环 advisory（actionContract → command/syntax → syntax/projection → commands/types → browser 类型）。常规 import-cycles 未报告此混合类型依赖环。已把 browser 补全投影移至 command/completion，纯 syntax 不依赖投影；重跑 NormProof 明确 source_graph_is_acyclic 与 imports resolve 均 satisfied，保留原 5 个函数数量 advisory。该发现不能当作原提交无环证据。
+
+
+### 8.35 CMD-03：compact 语法与真实压缩入口守卫
+
+- compact owner 的 syntax 统一声明 preview/render/json、自由指令和元数据 flags，契约、交互路由与 registry 提示/候选共享定义；删除最后一份固定动作词表 argumentCompletions。补全投影独立于纯语法，避免通过 commands/types 引入混合类型依赖环。
+- 修复 /compact --preview=false、--json=false、--render=false 或未知 flags 被静默丢弃后进入 compactHistory 的风险。交互路径只有合法的裸命令/自由指令进入真实压缩；元数据和只读形式交给 artifact 路径，非法输入报告 blocked。旧 --verbose 静默丢弃测试归类为 stale expectation，改为无压缩调用断言；显式 -- 后的内容作为字面指令保留。
+- 共享 flags 支持显式 repeatable，其他选项仍拒绝重复及重复别名；constraint 按输入顺序保留，模式冲突、boolean 赋值、未知/缺值和无效 source 拒绝。元数据值不再冒充位置模式或 Custom instructions，例如 --goal json 不会选择 JSON 输出。已选择位置模式后不再补入冲突的模式 flags。
+- 对照参考 CLI 的 -- 字面余参、缺值与枚举拒绝决定，复用本项目 parser；重复值是 compact 既有契约，未把多个约束压成最后一个值。既有 preview/render/json 不生成 checkpoint、不暂存下一轮注入的行为保持。
+- Linux、Node 20.3 隔离环境 30 文件/284 项通过，build:ts 通过；恢复旧交互 parser 和旧 artifact 契约的两组反转分别触发无压缩调用/非法参数拒绝断言失败，逐字节恢复后组合套件及构建通过。regular/fullscreen 真实 CLI 拒绝六组非法参数、接受重复 constraint 预览，未输出 Condensed，工作区标记字节及 mtime 不变，两模式 exit 0；历史压缩未调用的直接证据来自路由测试。
+- import cycles/config consumers/declarations/node floor 通过。NormProof 详细报告 source_graph_is_acyclic 与 imports resolve 均 satisfied，既有 5 个函数数量和 7 个 call reachability advisory 保留。
+- 300ea7a4 的 CI 37379100643、0bb9d3ed 的 CI 37379835922、462b2b92 的 CI 37380581115 均成功，对应 Architecture Watch 亦成功。dfb81fce 的 Architecture Watch 37381706985 成功，CI 37381706966 在本次查询时仍运行；不把它计为通过。
+- 本批未统一非交互默认真实压缩（PAR-01），也未完成 CMD-03 的剩余零参数/自由文本/实体目录、CMD-04、SAFE-02 或 Phase 19 整体。

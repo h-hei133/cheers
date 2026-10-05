@@ -2,7 +2,7 @@ import type { CommandAction, CommandParameter, CommandSyntax } from "./model.js"
 import { parseFlags } from "./flags.js";
 
 export type SyntaxResult<Action> =
-  | { readonly ok: true; readonly action: Action; readonly args: readonly string[]; readonly flags: ReadonlyMap<string, string | true> }
+  | { readonly ok: true; readonly action: Action; readonly args: readonly string[]; readonly values: ReadonlyMap<string, readonly (string | true)[]>; readonly flags: ReadonlyMap<string, string | true> }
   | { readonly ok: false; readonly reason: string };
 
 function validValue(parameter: CommandParameter, value: string): boolean {
@@ -19,7 +19,7 @@ export function parseSyntax<Action extends CommandAction>(syntax: CommandSyntax<
   const first = input[0]?.toLowerCase();
   const initial = syntax.actions.find(item => item.name.toLowerCase() === first || item.aliases?.some(alias => alias.toLowerCase() === first));
   const definitions = initial?.flags ? [...(syntax.flags ?? []), ...initial.flags] : syntax.flags;
-  const options = definitions ? parseFlags(definitions, input) : { ok: true as const, args: input, flags: new Map<string, string | true>() };
+  const options = definitions ? parseFlags(definitions, input) : { ok: true as const, args: input, flags: new Map<string, string | true>(), values: new Map<string, readonly (string | true)[]>() };
   if (!options.ok) return options;
   const name = options.args.length ? options.args[0]!.toLowerCase() : syntax.defaultAction;
   const action = syntax.actions.find(item => item.name.toLowerCase() === name || item.aliases?.some(alias => alias.toLowerCase() === name));
@@ -38,5 +38,5 @@ export function parseSyntax<Action extends CommandAction>(syntax: CommandSyntax<
     position += values.length;
   }
   if (position !== args.length) return { ok: false, reason: "Unexpected arguments." };
-  return { ok: true, action, args, flags: options.flags };
+  return { ok: true, action, args, flags: options.flags, values: options.values };
 }

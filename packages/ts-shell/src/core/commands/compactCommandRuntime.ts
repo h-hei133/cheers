@@ -1,3 +1,4 @@
+import { parseCompactSyntax } from "../../context/compact/command/syntax.js";
 import {
   CompactCommandContractError,
   parseCompactCommandArgs,
@@ -19,12 +20,6 @@ export async function runCompactLocalCommand(
   context: CommandContext,
 ): Promise<LocalCommandResult> {
   try {
-    const nonFlagArgs = args.filter((a) => !a.startsWith("--"));
-    const firstArg = nonFlagArgs[0]?.toLowerCase();
-    const instructionArgs = (firstArg === "preview" || firstArg === "render" || firstArg === "json")
-      ? nonFlagArgs.slice(1)
-      : nonFlagArgs;
-    const customInstructions = instructionArgs.join(" ").trim();
     const request = parseCompactCommandArgs(args, {
       projectInfo: {
         projectRoot: context.cwd,
@@ -34,6 +29,8 @@ export async function runCompactLocalCommand(
         nextAction: "Use the compact handoff to continue the session explicitly.",
       },
     });
+    const parsed = parseCompactSyntax(args);
+    const customInstructions = parsed.ok ? parsed.args.join(" ").trim() : "";
     const result = runCompactCommand(request);
     // The handoff forms write an artifact; they do not condense anything. They
     // used to create a live checkpoint and stage it for injection as well, so

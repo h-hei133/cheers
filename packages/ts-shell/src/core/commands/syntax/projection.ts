@@ -52,7 +52,7 @@ export function syntaxCompletions(syntax: CommandSyntax, prefix: string): readon
     if (!parsed.ok) return null;
     if (query.startsWith("-") || (query === "" && (parsed.args.length > 0 || (syntax.actions.length === 1 && syntax.actions[0]?.name === "")))) {
       if (parsed.args.length && !parseSyntax(syntax, before.map(token => token.value)).ok) return null;
-      const matches = syntax.flags.filter(flag => flag.suggest !== false && !parsed.flags.has(flag.name) && !flag.conflicts?.some(name => parsed.flags.has(name)) && !(flag.conflictsWithArguments && parsed.args.length > 1))
+      const matches = syntax.flags.filter(flag => flag.suggest !== false && (flag.repeatable || !parsed.flags.has(flag.name)) && !flag.conflicts?.some(name => parsed.flags.has(name)) && !(flag.conflictsWithArguments && parsed.args.length > 1))
         .flatMap(flag => [`--${flag.name}`, ...(query ? (flag.aliases ?? []).map(name => `--${name}`) : []), ...(query && flag.short ? [`-${flag.short}`] : [])].map(value => ({ value, label: value, detail: flag.summary })))
         .filter(candidate => candidate.value.startsWith(query));
       return matches.length ? matches : null;

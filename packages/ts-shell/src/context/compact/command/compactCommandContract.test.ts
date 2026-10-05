@@ -45,6 +45,23 @@ describe("compact command contract", () => {
     );
   });
 
+  it.each([
+    ["--preview=false"], ["--render=false"], ["--json=false"], ["--unknown"],
+    ["--constraint"], ["--source", "other"], ["--goal", "a", "--objective", "b"],
+    ["preview", "--json"], ["render", "--render"], ["--preview", "--render"],
+  ])("rejects malformed artifact arguments %j", (...args) => {
+    expect(() => parseCompactCommandArgs(args)).toThrow(CompactCommandContractError);
+  });
+
+  it("keeps repeated constraints and consumes metadata values separately from instructions", () => {
+    const request = parseCompactCommandArgs(["--goal", "json", "--constraint", "first", "--constraint=second", "--source", "manual"]);
+    expect(request.mode).toBe("render");
+    expect(request.source).toBe("manual");
+    expect(request.taskGoal).toMatchObject({ objective: "json", constraints: ["first", "second"] });
+    expect(parseCompactCommandArgs(["--render"]).mode).toBe("render");
+    expect(parseCompactCommandArgs(["--", "--execute"]).mode).toBe("render");
+  });
+
   it("rejects raw top-level fields while allowing nested fields to be redacted downstream", () => {
     expect(() =>
       normalizeCompactCommandRequest({

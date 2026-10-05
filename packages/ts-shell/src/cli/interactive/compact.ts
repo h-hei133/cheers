@@ -1,3 +1,5 @@
+import { tokenizeCommandArgs } from "../../core/commands/arguments.js";
+import { parseCompactSyntax } from "../../context/compact/command/syntax.js";
 import type { CompactionOutcome } from "../../core/shell/compaction.js";
 
 /**
@@ -8,29 +10,22 @@ import type { CompactionOutcome } from "../../core/shell/compaction.js";
  * the command registry, which writes artifacts rather than changing the context.
  */
 
-const HANDOFF_FORMS = new Set(["preview", "render", "json"]);
-
 export interface CompactRequest {
   readonly instructions?: string;
 }
 
 export function parseCompactCommand(prompt: string): CompactRequest | undefined {
-  const parts = prompt.trim().split(/\s+/);
-  const name = parts[0]?.toLowerCase();
-  if (name !== "/compact" && name !== "/handoff") return undefined;
-  const rest = parts.slice(1);
-  const positional = rest.filter((part) => !part.startsWith("--"));
-  // Both spellings of a handoff form count. The command parses `preview` as a
-  // positional *and* `--preview` as a flag — `parseCompactCommandArgs` accepts
-  // either, and the argument hint advertises `[preview|render|json]`. Reading
-  // only the positional meant `--preview` was taken for focus instructions and
-  // condensed the history, which is the opposite of a read-only form.
-  if (positional[0] && HANDOFF_FORMS.has(positional[0].toLowerCase())) return undefined;
-  if (rest.some((part) => part.startsWith("--") && HANDOFF_FORMS.has(part.slice(2).toLowerCase()))) {
+  const match = /^\s*\/(compact|handoff)(?:\s+([\s\S]*))?$/i.exec(prompt.trim());
+  if (!match) return undefined;
+  try {
+    const parsed = parseCompactSyntax(tokenizeCommandArgs(match[2] ?? ""));
+    // Invalid or artifact arguments belong to the registry's read-only path.
+    if (!parsed.ok || parsed.artifact) return undefined;
+    const instructions = parsed.args.join(" ").trim();
+    return instructions ? { instructions } : {};
+  } catch {
     return undefined;
   }
-  const instructions = positional.join(" ").trim();
-  return instructions ? { instructions } : {};
 }
 
 /** What to tell the user about a compaction, one fact per line. */

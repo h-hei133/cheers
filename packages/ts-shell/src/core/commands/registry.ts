@@ -32,9 +32,8 @@ import { trustSyntax } from "./trust/syntax.js";
 import { todoSyntax } from "./todo/syntax.js";
 import { thinkingSyntax } from "./thinking/syntax.js";
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
-import {
-  subcommandCompletions,
-} from "./argumentCompletions.js";
+import { compactCompletions } from "../../context/compact/command/completion.js";
+import { compactSyntax } from "../../context/compact/command/syntax.js";
 import { runBrowserLocalCommand } from "./browserCommandRuntime.js";
 import { runCompactLocalCommand } from "./compactCommandRuntime.js";
 import { runConnectCommand } from "./connectCommandRuntime.js";
@@ -123,8 +122,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "condense earlier turns into a checkpoint to free context",
       group: "context",
-      argumentHint: "[preview|render|json]",
-      getArgumentCompletions: (prefix) => subcommandCompletions("compact", prefix),
+      argumentHint: syntaxHint(compactSyntax),
+      getArgumentCompletions: (prefix) => compactCompletions(prefix),
       execute: (args, context) => runCompactLocalCommand(args, context),
     },
     {

@@ -6177,3 +6177,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 - 2026-10-06：Phase 19 CMD-03 connect 同源语法、认证 flags 互斥和直接写入函数守卫完成本批接线，264 项、构建、反转与两模式 CLI 零写/合成 key 保存验证通过。a30053cc 两项远端检查成功；见 [决策 §8.33](features/phase-19-decisions.md#833-cmd-03connect-登录与连接动作校验)。阶段目标继续。
 
 - 2026-10-06：Phase 19 CMD-03 browser 分层语法与补全接线，拒绝被忽略的额外参数，保留完整 receipt/proposal/manifest，确认不由补全附送。377 项通过、9 项既有集成跳过，构建、四组反转及两模式 CLI 验证见 [决策 §8.34](features/phase-19-decisions.md#834-cmd-03browser-分层语法与确认隔离)。阶段目标继续。
+
+- 2026-10-06：Phase 19 CMD-03 compact 同源语法与交互守卫，非法预览 flags 不再触发真实压缩；重复元数据按序保留，移除最后的固定动作词表。284 项、构建、两组反转和 regular/fullscreen CLI 验证通过，详见 [决策 §8.35](features/phase-19-decisions.md#835-cmd-03compact-语法与真实压缩入口守卫)。PAR-01 与阶段整体仍未完成。
