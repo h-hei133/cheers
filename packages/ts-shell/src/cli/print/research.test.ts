@@ -20,18 +20,43 @@ it("prints source excerpts through the built CLI with synthetic web responses", 
     await fs.mkdir(workspace);
     await fs.writeFile(preload, `
       const fs = require("node:fs");
-      globalThis.fetch = async (url) => {
+      const { Readable } = require("node:stream");
+      const { EventEmitter } = require("node:events");
+      // The production web transport owns native sockets now. Keep this CLI
+      // fixture synthetic at that boundary; never fall through to public DNS.
+      require("node:dns/promises").lookup = async () => [{ address: "93.184.216.34", family: 4 }];
+      const response = (url) => {
         fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(String(url)) + "\\n");
-        if (String(url) === "https://html.duckduckgo.com/html/") return new Response(
+        if (String(url) === "https://html.duckduckgo.com/html/") return [200,
           '<div class="result"><a class="result__a" href="https://docs.example/ok">Doc</a></div>' +
           '<div class="result"><a class="result__a" href="https://docs.example/failed">Failure</a></div>'
-        );
-        if (String(url) === "https://docs.example/ok") return new Response(
-          "Synthetic documentation preserves explicit permission boundaries.", { headers: { "content-type": "text/markdown" } }
-        );
-        if (String(url) === "https://docs.example/failed") return new Response("SECRET_RESPONSE", { status: 503 });
+        ];
+        if (String(url) === "https://docs.example/ok") return [200,
+          "Synthetic documentation preserves explicit permission boundaries."
+        ];
+        if (String(url) === "https://docs.example/failed") return [503, "SECRET_RESPONSE"];
         throw new Error("Unexpected network request");
       };
+      const request = (url, _options, callback) => {
+        const outgoing = new EventEmitter();
+        outgoing.end = () => {
+          queueMicrotask(() => {
+            try {
+              const [status, body] = response(url);
+              const incoming = Readable.from([Buffer.from(body)]);
+              incoming.statusCode = status;
+              incoming.rawHeaders = ["content-type", "text/html"];
+              incoming.headers = { "content-type": "text/html" };
+              callback(incoming);
+            } catch (error) { outgoing.emit("error", error); }
+          });
+        };
+        return outgoing;
+      };
+      require("node:http").request = request;
+      require("node:https").request = request;
+      globalThis.fetch = async () => { throw new Error("Unexpected fetch transport"); };
+      require("node:module").syncBuiltinESMExports();
     `);
     const env: NodeJS.ProcessEnv = {};
     for (const key of ["PATH", "SystemRoot", "WINDIR", "LANG"]) env[key] = process.env[key];
@@ -44,7 +69,7 @@ it("prints source excerpts through the built CLI with synthetic web responses", 
       child.child.stdin?.end();
       const { stdout, stderr } = await child;
       expect(stdout, stdout + stderr).toContain("# Web Source Collection: runtime permissions");
-      expect(stdout).toContain("Synthetic documentation preserves explicit permission boundaries.");
+      expect(stdout, stdout + stderr).toContain("Synthetic documentation preserves explicit permission boundaries.");
       expect(stdout).toContain("1 pages with excerpts; 1 fetches failed");
       expect(stdout).not.toMatch(/SECRET_RESPONSE|cross-verified|multi-agent tree search/i);
     }

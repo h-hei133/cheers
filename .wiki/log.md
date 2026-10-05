@@ -6139,3 +6139,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-06] test | SAFE-03 远端 CI 发现 highValueTools 中遗漏的两条旧 ask 预期；255c618f 与 e85623ca 的 CI 均失败，不能计为通过。两条失败分别要求无交互成功/默认项展示和旧参数错误文案，按已裁决契约归为 stale expectation；改为 unavailable、source=none、无虚构答案及当前 schema 错误断言。highValueTools 与 ask 共 48 项本地通过，远端结果仍需新提交验证。
 
 ## [2026-10-06] fix | Phase 19 SAFE-05/06 公共工具通过 Node HTTP/HTTPS 将审核过的全部 DNS 结果绑定到 socket lookup，保留 TLS Host/SNI 与证书校验；原始压缩字节及每层解压均有界，搜索凭据不跨来源重定向。217 项相关测试、Node 20.3 构建及五组反转通过，含本地真实 HTTP/TLS/IPv6。前两次 CI 的旧 ask 预期失败另以 c077169 修正；本批远端、独立审查和非 Linux 证据仍未取得，见 features/phase-19-decisions.md §8.16。
+
+## [2026-10-06] test | ee520741 的架构检查通过，但 CI 37353961629 失败（5604 通过、2 失败、1 跳过）。研究命令夹具仍替换 fetch，而网页工具已改用原生 HTTP；按 harness/setup drift 修正到合成 DNS/HTTP 流边界，保持请求次数、摘录、失败计数与敏感响应不泄露断言。该内置 CLI 测试已通过。另一项缓存多进程超时本地原测试 6 项通过，暂按环境相关待远端复核，不改产品实现或放宽断言。
