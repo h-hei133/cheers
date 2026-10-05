@@ -1,3 +1,4 @@
+import { refreshShellRuntimeConfig } from "../core/shell/runtimeContext.js";
 import type { CoreMcpGateway } from "../core/mcp/gateway.js";
 import type { PromptAttachments } from "../core/shell/sessionRuntime.js";
 import fs from "node:fs";
@@ -48,7 +49,6 @@ import { runCliSessionCommand, switchRuntimeSessionProjectContext } from "./cliS
 import { runCliWorkspaceCommand } from "./cliWorkspaceModule.js";
 import { renderUserHelp, renderSessionCommandMap } from "./slashCommandRegistry.js";
 import { describeCompaction, parseCompactCommand } from "../cli/interactive/compact.js";
-import { getRuntimeConfig } from "../config/runtimeConfig.js";
 import { formatViewModeStatusLines, formatViewModeUpdatedLine } from "./cliDisplayProjection.js";
 import { replayTodosFromMessages } from "../core/commands/todoCommandRuntime.js";
 import { runPrintSessionAction } from "../cli/print/actions.js";
@@ -274,10 +274,7 @@ export async function runNonInteractivePrompt(options: {
     // session and the same one-shot configuration read, so `/reload` must mean
     // the same thing there rather than reporting that it cannot help.
     refreshRuntimeConfig: () => {
-      const before = options.runtimeContext.runtimeConfig;
-      const after = getRuntimeConfig(options.runtimeContext.cwd);
-      options.runtimeContext.runtimeConfig = after;
-      return { before, after };
+      return refreshShellRuntimeConfig(options.runtimeContext);
     },
   });
   if (resolved.kind === "handled") {

@@ -1,4 +1,3 @@
-import { loadCatalog } from "../models/catalogStore.js";
 import type { CommandArgumentCompletion } from "./types.js";
 
 /**
@@ -26,7 +25,6 @@ function prefixFilter(
  * so these lists come from the handler's own accepted set.
  */
 const SUBCOMMAND_VALUES = {
-  model: ["use", "list", "status", "help"],
   fast: ["on", "off", "toggle", "enable", "disable"],
   log: ["tail", "path", "export", "clear"],
   view: ["status", "user", "developer"],
@@ -66,24 +64,6 @@ export function shellArgumentCompletions(
   const space = prefix.indexOf(" ");
   if (space < 0) return subcommandCompletions("shell", prefix);
   const matches = prefixFilter(["bash", "git-bash", "powershell", "wsl", "auto"], prefix.slice(space + 1));
-  return matches.length > 0 ? matches : null;
-}
-
-/** `/model use …` — provider/model pairs from the local catalogue snapshot. */
-export function modelArgumentCompletions(
-  prefix: string,
-): readonly CommandArgumentCompletion[] | null {
-  const space = prefix.indexOf(" ");
-  if (space < 0) return subcommandCompletions("model", prefix);
-  const target = prefix.slice(space + 1).trim().toLowerCase();
-  const pairs = loadCatalog().flatMap((provider) =>
-    provider.models.map((model) => `${provider.id}/${model.id}`),
-  );
-  if (pairs.length === 0) return null;
-  const matches = pairs
-    .filter((pair) => pair.toLowerCase().includes(target))
-    .slice(0, 50)
-    .map((pair) => ({ value: pair, label: pair }));
   return matches.length > 0 ? matches : null;
 }
 

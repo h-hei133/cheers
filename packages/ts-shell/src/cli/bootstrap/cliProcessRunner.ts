@@ -103,6 +103,7 @@ export async function runCliProcess(
     runtimeContext,
   } = bootstrapRuntime;
   const providerRuntimeBridge = createCliProviderRuntimeBridge({
+    currentSession: () => ({ id: runtimeContext.session.id, projectRoot: runtimeContext.projectRoot }),
     projectRoot: runtimeContext.projectRoot,
     options,
   });

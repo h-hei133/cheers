@@ -1,4 +1,6 @@
-import type { RuntimeConfig } from '../../config/runtimeConfig.js'
+import { projectSessionModel } from "../../session/model/projection.js";
+import { getRuntimeConfig } from "../../config/runtimeConfig.js";
+import type { RuntimeConfig, RuntimeConfigOverrides } from '../../config/runtimeConfig.js'
 import type { Session, WorkspaceRootMode } from '../../session/SessionManager.js'
 import type { WorkflowGitContext } from '../../workflow/gitContext.js'
 import path from 'node:path'
@@ -41,6 +43,8 @@ export interface ShellRuntimeContext {
    * Everything else this context holds is fixed for the session.
    */
   runtimeConfig: RuntimeConfig
+  /** Explicit launch flags must survive settings reloads and session switches. */
+  runtimeConfigOverrides?: RuntimeConfigOverrides
   /**
    * How this run was asked to load skills.
    *
@@ -123,7 +127,7 @@ export function createShellRuntimeContext(input: {
         gitRoot: input.gitRoot,
         gitContext: input.gitContext,
       }),
-    runtimeConfig: input.runtimeConfig,
+    runtimeConfig: projectSessionModel(input.runtimeConfig, input.session.id),
     ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
     ...(input.themePaths ? { themePaths: input.themePaths } : {}),
     gitContext: input.gitContext,
@@ -136,6 +140,14 @@ export function createShellRuntimeContext(input: {
       ? { resumeProvenance: input.resumeProvenance }
       : {}),
   }
+}
+
+/** Reload defaults, then apply the current session's durable model preference. */
+export function refreshShellRuntimeConfig(context: ShellRuntimeContext): { before: RuntimeConfig; after: RuntimeConfig } {
+  const before = context.runtimeConfig;
+  const after = projectSessionModel(getRuntimeConfig(context.cwd, context.runtimeConfigOverrides), context.session.id);
+  context.runtimeConfig = after;
+  return { before, after };
 }
 
 export function switchActiveSession(
@@ -184,6 +196,7 @@ export function applyShellSubstrateTransition(
     })
 
   if (nextSession.id !== context.session.id) {
+    context.runtimeConfig = projectSessionModel(getRuntimeConfig(nextCwd, context.runtimeConfigOverrides), nextSession.id)
     restoreSessionUsage(nextSession.id, nextSession.usage)
     forgetSessionTodos(context.session.id)
     forgetSessionTodos(nextSession.id)

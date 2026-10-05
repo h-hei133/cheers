@@ -132,8 +132,8 @@ describe("model command runtime", () => {
     expect(error.output).toContain("connection setup is in error state");
   });
 
-  it("updates active model and persists to active connection", async () => {
-    const result = await runModelCommand(["use", "gpt-5.4"], {
+  it("updates the global default only with the explicit flag", async () => {
+    const result = await runModelCommand(["use", "gpt-5.4", "--global"], {
       cwd: workspaceRoot,
     });
     expect(result.kind).toBe("local");

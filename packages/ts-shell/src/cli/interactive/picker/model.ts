@@ -1,3 +1,4 @@
+import { projectSessionModel } from "../../../session/model/projection.js";
 import { runModelCommand } from "../../../core/commands/modelCommandRuntime.js";
 import { readUserRuntimeConfigFile } from "../../../config/runtimeConfig.js";
 import { normalizeConnections } from "../../../core/commands/connect/preset.js";
@@ -24,7 +25,7 @@ export function modelPicker(context: CommandContext): Picker {
     form: "panel",
     empty: "No providers in the catalogue.",
     async load(): Promise<readonly Option[]> {
-      const config = readUserRuntimeConfigFile();
+      const config = projectSessionModel(readUserRuntimeConfigFile(), context.sessionId);
       const connections = normalizeConnections(config);
       const connected = new Set<string>(connections.map((connection) => connection.provider));
       const activeId = config.activeProviderConnectionId?.trim();

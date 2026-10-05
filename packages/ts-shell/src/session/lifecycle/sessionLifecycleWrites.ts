@@ -211,6 +211,8 @@ export abstract class SessionLifecycleWrites {
       return false;
     }
     if (sessionHasConversation(session)) return false;
+    // An explicit model choice is durable user state even before the first turn.
+    if (this.host.store.readStateSnapshotSafely(this.host.store.statePath(sessionId))?.modelSelection) return false;
     const projectRoot = session.projectRoot;
     this.host.store.deleteSession(sessionId);
     forgetSessionTodos(sessionId);

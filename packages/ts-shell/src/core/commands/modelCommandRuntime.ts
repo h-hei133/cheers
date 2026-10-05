@@ -1,4 +1,5 @@
 import {
+  RUNTIME_PROVIDERS,
   readUserRuntimeConfigFile,
   writeUserRuntimeConfigFile,
   type ProviderConnectionConfig,
@@ -6,7 +7,10 @@ import {
   type RuntimeProvider,
 } from "../../config/runtimeConfig.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
-import { parseArgsWithFlags } from "./connect/preset.js";
+import { parseModelArgs, modelSyntax } from "./model/syntax.js";
+import { syntaxHelp } from "./syntax/projection.js";
+import { projectSessionModel } from "../../session/model/projection.js";
+import { writeSessionModel } from "../../session/model/state.js";
 import { defaultHookDispatcher } from "../hooks/hookDispatcher.js";
 import { loadCatalog, ensureUserCatalog, userCatalogPath } from "../models/catalogStore.js";
 import { refreshCatalog } from "../models/catalogRefresh.js";
@@ -43,12 +47,15 @@ export async function runModelCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const [action, ...rest] = args;
+  const parsed = parseModelArgs(args);
+  if (!parsed.ok) return { kind: "local", output: `Invalid model arguments: ${parsed.reason}\n${getModelHelpText()}` };
+  const action = parsed.action.name;
+  const rest = [...parsed.args];
   if (!action) {
-    return { kind: "local", output: renderCatalogView() };
+    return { kind: "local", output: renderCatalogView(context.sessionId) };
   }
   if (action === "status") {
-    return { kind: "local", output: renderModelStatus() };
+    return { kind: "local", output: renderModelStatus(context.sessionId) };
   }
   if (action === "refresh") {
     const result = await refreshCatalog();
@@ -72,11 +79,11 @@ export async function runModelCommand(
   }
 
   if (action === "list" || action === "ls") {
-    return { kind: "local", output: await listModels(rest) };
+    return { kind: "local", output: await listModels(rest, parsed.flags.has("refresh"), context.sessionId) };
   }
 
   if (action === "use" || action === "set") {
-    return { kind: "local", output: await setModel(rest, context) };
+    return { kind: "local", output: await setModel(rest, context, parsed.flags.has("global")) };
   }
   if (action === "help" || action === "--help" || action === "-h") {
     return {
@@ -85,23 +92,7 @@ export async function runModelCommand(
     };
   }
 
-  if (action.startsWith("-")) {
-    return {
-      kind: "local",
-      output: [
-        `Unknown flag '${action}'.`,
-        "Usage:",
-        "- `/model` or `/model status` : Inspect active model and provider",
-        "- `/model list` : List all available models",
-        "- `/model <model-name>` : Switch model directly",
-      ].join("\n"),
-    };
-  }
-  const [modelArg] = args;
-  if (!modelArg) {
-    return { kind: "local", output: renderModelStatus() };
-  }
-  return { kind: "local", output: await setModel(args, context) };
+  return { kind: "local", output: getModelHelpText() };
 }
 /**
  * The catalogue, with this session's connection state folded in.
@@ -110,8 +101,8 @@ export async function runModelCommand(
  * models together — the old bare form answered "what am I using", which is
  * `/model status`.
  */
-function renderCatalogView(): string {
-  const config = readUserRuntimeConfigFile();
+function renderCatalogView(sessionId?: string): string {
+  const config = projectSessionModel(readUserRuntimeConfigFile(), sessionId);
   const connections = normalizeConnections(config);
   const activeId = config.activeProviderConnectionId?.trim();
   const active = connections.find((item) => item.id === activeId);
@@ -127,8 +118,8 @@ function renderCatalogView(): string {
   });
 }
 
-function renderModelStatus(): string {
-  const config = readUserRuntimeConfigFile();
+function renderModelStatus(sessionId?: string): string {
+  const config = projectSessionModel(readUserRuntimeConfigFile(), sessionId);
   const connections = normalizeConnections(config);
   const activeId = config.activeProviderConnectionId?.trim();
   const activeConnection = connections.find((item) => item.id === activeId);
@@ -247,8 +238,8 @@ export interface ModelCatalog {
  * text. Shares the provider, auth, and fallback resolution with `/model list` so
  * the two can never offer different models.
  */
-export async function readModelCatalog(refresh = false): Promise<ModelCatalog> {
-  const config = readUserRuntimeConfigFile();
+export async function readModelCatalog(refresh = false, sessionId?: string): Promise<ModelCatalog> {
+  const config = projectSessionModel(readUserRuntimeConfigFile(), sessionId);
   const connections = normalizeConnections(config);
   const activeId = config.activeProviderConnectionId?.trim();
   const activeConnection = connections.find((item) => item.id === activeId);
@@ -266,10 +257,10 @@ export async function readModelCatalog(refresh = false): Promise<ModelCatalog> {
   return { provider, models: fallbackModelsForProvider(provider, authType), active, offline: true };
 }
 
-async function listModels(args: string[]): Promise<string> {
-  const parsed = parseArgsWithFlags(args);
-  const providerHint = normalizeProvider(parsed.positionals[0]);
-  const config = readUserRuntimeConfigFile();
+async function listModels(args: string[], refresh: boolean, sessionId?: string): Promise<string> {
+  const providerHint = normalizeProvider(args[0]);
+  if (args[0] && !providerHint) return "Unknown provider. Use /model to inspect the catalogue.";
+  const config = projectSessionModel(readUserRuntimeConfigFile(), sessionId);
   const connections = normalizeConnections(config);
   const activeId = config.activeProviderConnectionId?.trim();
   const activeConnection = connections.find((item) => item.id === activeId);
@@ -283,7 +274,6 @@ async function listModels(args: string[]): Promise<string> {
     return renderOpenAIAccountAuthModelList(activeModel);
   }
 
-  const refresh = parsed.flags.refresh === true;
   const modelsFromApi = await fetchModelsFromModelsDev(provider, refresh);
   if (modelsFromApi.length === 0) {
     const fallback = fallbackModelsForProvider(provider, authType);
@@ -309,7 +299,7 @@ async function listModels(args: string[]): Promise<string> {
   ].join("\n");
 }
 
-async function setModel(args: string[], context?: CommandContext): Promise<string> {
+async function setModel(args: string[], context: CommandContext, global: boolean): Promise<string> {
   const target = args[0]?.trim();
   if (!target) {
     return "Usage: /model use <provider>/<model>, or /model use <model> to keep the current provider.";
@@ -329,7 +319,8 @@ async function setModel(args: string[], context?: CommandContext): Promise<strin
   const activeId = config.activeProviderConnectionId?.trim();
   const activeConnection = connections.find((item) => item.id === activeId);
   const provider = activeConnection?.provider ?? config.provider ?? "openai";
-  const fromModel = config.providerCredentials?.[provider]?.model || "default";
+  const effective = projectSessionModel(config, context.sessionId);
+  const fromModel = effective.providerConnections?.find(item => item.id === activeId)?.model ?? effective.providerCredentials?.[provider]?.model ?? "default";
 
   // Dispatch PreModelSwitch Hook
   const preDecision = await defaultHookDispatcher.dispatch({
@@ -393,14 +384,26 @@ async function setModel(args: string[], context?: CommandContext): Promise<strin
       },
     },
   };
-  const configPath = writeUserRuntimeConfigFile(next);
-
-  // The session carries the settings it started with, and this command has just
-  // changed one of them on disk. Without re-reading, the token budgets resolved
-  // per model would keep answering from the model that was active at startup —
-  // the new model's window comes from the provider bridge and does update, so the
-  // two would disagree in a way nothing reports.
-  context?.refreshRuntimeConfig?.();
+  if (!context.sessionId && !global) return "Model switch blocked: an active session is required.";
+  if (context.sessionId) {
+    try {
+      writeSessionModel(context.sessionId, { connectionId: activeId, provider, model });
+    } catch {
+      return "Model switch failed: session preference write outcome is unverified. Global defaults were not changed.";
+    }
+  }
+  let configPath: string | undefined;
+  if (global) {
+    try {
+      configPath = writeUserRuntimeConfigFile(next);
+    } catch {
+      context.refreshRuntimeConfig?.();
+      return context.sessionId
+        ? `Session model switched to ${model}, but saving the global default failed. Global write outcome is unverified.`
+        : "Saving the global model default failed. Global write outcome is unverified.";
+    }
+  }
+  context.refreshRuntimeConfig?.();
 
   // Dispatch PostModelSwitch Hook
   await defaultHookDispatcher.dispatch({
@@ -416,7 +419,8 @@ async function setModel(args: string[], context?: CommandContext): Promise<strin
     `Model switched to ${model}.`,
     `Provider: ${provider}`,
     `Connection: ${activeId}`,
-    `Stored at: ${configPath}`,
+    context.sessionId ? "Scope: current session (saved for resume)." : "Scope: global default.",
+    ...(configPath ? [`Global default stored at: ${configPath}`] : []),
   ].join("\n");
 }
 
@@ -480,33 +484,10 @@ function fallbackModelsForProvider(
 }
 
 function normalizeProvider(input?: string): RuntimeProvider | undefined {
-  const normalized = input?.trim().toLowerCase();
-  if (!normalized) {
-    return undefined;
-  }
-  if (normalized === "openai") {
-    return "openai";
-  }
-  if (normalized === "anthropic") {
-    return "anthropic";
-  }
-  if (
-    normalized === "openai-compatible" ||
-    normalized === "siliconflow" ||
-    normalized === "openai_compatible"
-  ) {
-    return "openai-compatible";
-  }
-  if (normalized === "google" || normalized === "gemini") {
-    return "google";
-  }
-  if (normalized === "antigravity") {
-    return "antigravity";
-  }
-  if (normalized === "claudecode") {
-    return "claudecode";
-  }
-  return undefined;
+  const value = input?.trim().toLowerCase();
+  const normalized = value === "siliconflow" || value === "openai_compatible" ? "openai-compatible"
+    : value === "gemini" ? "google" : value;
+  return RUNTIME_PROVIDERS.find(provider => provider === normalized);
 }
 
 function normalizeConnections(config: RuntimeConfigFile): ProviderConnectionConfig[] {
@@ -542,18 +523,5 @@ function normalizeBaseUrl(baseUrl?: string): string | undefined {
 }
 
 function getModelHelpText(): string {
-  return [
-    "Model selection commands",
-    "/model",
-    "/model status",
-    "/model list [provider] [--refresh]",
-    "/model use <model-id>",
-    "",
-    "Examples:",
-    "- /model list",
-    "- /model list openai --refresh",
-    "- /model list google",
-    "- /model use gpt-5.4",
-  ].join("\n");
+  return `Model selection commands\n${syntaxHelp(modelSyntax)}\n/model <model-id> [--global]\nDefault: current session, saved for resume. --global also changes the global default.`;
 }
-

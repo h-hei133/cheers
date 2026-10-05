@@ -1,3 +1,4 @@
+import { refreshShellRuntimeConfig } from "../../core/shell/runtimeContext.js";
 import { messageToText } from "../../model-adapters/multimodal.js";
 import { backgroundTasks, renderTaskNotice } from "../../core/shell/background/tasks.js";
 import type { Interface as ReadlineInterface } from "node:readline";
@@ -741,6 +742,7 @@ export class InteractiveMode {
   private pickerHost(): PickerHost {
     return {
       commandContext: {
+        refreshRuntimeConfig: () => refreshShellRuntimeConfig(this.options.runtimeContext),
         cwd: this.options.runtimeContext.cwd,
         sessionId: this.options.runtimeContext.session.id,
         ...(this.options.runtimeContext.skillOptions

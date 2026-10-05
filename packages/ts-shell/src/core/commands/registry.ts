@@ -1,3 +1,5 @@
+import { modelArgumentCompletions } from "./model/completion.js";
+import { modelSyntax } from "./model/syntax.js";
 import { memorySyntax } from "../../memory/commands/syntax.js";
 import { exportSyntax } from "./export/syntax.js";
 import { restoreSyntax } from "./restore/syntax.js";
@@ -8,7 +10,6 @@ import { thinkingSyntax } from "./thinking/syntax.js";
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import {
   loopArgumentCompletions,
-  modelArgumentCompletions,
   shellArgumentCompletions,
   subcommandCompletions,
 } from "./argumentCompletions.js";
@@ -162,7 +163,7 @@ export function createCommandRegistry(
       enabled: true,
       summary: "inspect and switch active model",
       group: "diagnostics",
-      argumentHint: "use <provider/model>",
+      argumentHint: syntaxHint(modelSyntax),
       getArgumentCompletions: modelArgumentCompletions,
       execute: (args, context) => runModelCommand(args, context),
     },

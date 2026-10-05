@@ -1,3 +1,4 @@
+import { projectSessionModel } from "../../session/model/projection.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import { resolveProviderCredential } from "../shell/providerCredentials.js";
@@ -39,7 +40,7 @@ export async function runBtwCommand(
     };
   }
 
-  const runtimeConfig = getRuntimeConfig(context.cwd);
+  const runtimeConfig = projectSessionModel(getRuntimeConfig(context.cwd), context.sessionId);
   const resolution = resolveProviderCredential({ runtimeConfig });
   const credential = resolution.credential;
   const catalog = loadCatalog();

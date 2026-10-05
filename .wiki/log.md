@@ -6155,3 +6155,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-06] fix | Phase 19 CMD-03 export/restore 共用严格 flags 定义，拒绝未知/缺值/重复/冲突输入，保留字面文件名与独立恢复确认；空参数 Enter 不补入默认高亮 flag。240 项测试、四组反转、Node 20.3 构建和两模式 CLI 零写探针通过。3fe750c7 CI 已成功，其架构任务因 hosted runner 未领取而未执行；详见 features/phase-19-decisions.md §8.22。CMD-03 全量表及其余任务继续。
 
 ## [2026-10-06] fix | Phase 19 CMD-03 memory 入口与五组契约共用领域动作，拒绝被忽略的额外参数/非法 selector/筛选值，保留独立删除、失效、审批、保存与暂存语义。286 项测试、四组反转、Node 20.3 构建和两模式 CLI 验证通过。9d709ef4 远端任务因 hosted runner 未领取而未执行；详见 features/phase-19-decisions.md §8.23。其余语法及阶段任务继续。
+
+- 2026-10-06：Phase 19 CMD-03 model 会话选择与恢复、显式全局保存、动作语法和目录位置校验完成本批实现；退出清理保留显式模型偏好，刷新保留启动限制。337 项测试、构建、反转与 regular/fullscreen 重启验证，详见 [决策 §8.24](features/phase-19-decisions.md#824-cmd-03model-会话选择恢复与严格语法)；CMD-03 与阶段整体未完成。

@@ -1,8 +1,8 @@
+import { refreshShellRuntimeConfig } from "../../core/shell/runtimeContext.js";
 import type { KeyBinding } from "../../presentation/tui/chrome/keys.js";
 import type { PromptAttachments } from "../../core/shell/sessionRuntime.js";
 import type { Interface as ReadlineInterface } from "node:readline";
 
-import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import { toolPoolFor } from "../runtime/tools.js";
 import { navigateSession, type SessionNavigationResult } from "../runtime/navigation.js";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
@@ -134,11 +134,9 @@ export async function routeInteractiveCommand(
     // place is what makes `/reload` take effect for the rest of the session rather
     // than only for the turn that ran it.
     refreshRuntimeConfig: () => {
-      const before = input.runtimeContext.runtimeConfig;
-      const after = getRuntimeConfig(input.runtimeContext.cwd);
-      input.runtimeContext.runtimeConfig = after;
+      const result = refreshShellRuntimeConfig(input.runtimeContext);
       input.refreshKeybindings?.();
-      return { before, after };
+      return result;
     },
   });
   const themeChanged = defaultTheme.colorRevision !== themeBefore;

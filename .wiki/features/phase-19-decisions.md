@@ -638,3 +638,16 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Linux、Node 20.3、隔离环境 20 文件/286 项通过（含 memory 并发、持久化、review/save/recall/delete/use 与交互接线），build:ts 通过。恢复旧入口、save/review/recall 契约四组反转均失败；源码逐字节恢复后组合测试通过。真实 regular/fullscreen CLI 返回非法输入 blocked / Memory written: no；无记录的 use 明确无自动注入，两模式 exit 0、无模型请求。use 的长结果打开阅读面板，初始探针错误等待输入框/未变化标题；按实际面板关闭后重绘的输入框同步后通过，未改产品来迁就探针。
 - import cycles/config consumers/declarations/node floor 通过；call reachability 7 个既有 advisory、NormProof 5 个既有函数数量 advisory，阻断义务通过。b456a484 两项远端检查 37365764189/37365764084 已成功；9d709ef4 两项 37367388417/37367388611 均因 hosted runner 多次未领取而没有运行步骤，不计通过。
 - CMD-03 与阶段整体仍未完成：candidate/record 动态实体、筛选值补全属于后续目录接线；model 默认仍写全局配置，必须与会话覆盖/恢复一起实改；其余全量表、CMD-04、SAFE-02 与其他批次继续。
+
+
+### 8.24 CMD-03：model 会话选择、恢复与严格语法
+
+- [model syntax](../../packages/ts-shell/src/core/commands/model/syntax.ts) 声明 status/refresh/config/list/ls/use/set/help 及兼容帮助别名，直接 ID 规范化为 use。动作专属 --refresh/--global、额外参数、重复选项和 boolean 赋值在读写/网络动作之前校验；未知 list provider 拒绝。帮助、registry hint 与 [completion](../../packages/ts-shell/src/core/commands/model/completion.ts) 消费相同语法，删除原一级词表与按第一个空格猜测模型位置的逻辑。status/help/config/refresh 后不建议模型，list 只建议可识别 provider，use/set 与直接目标位置使用本地 catalog。
+- 默认模型切换写入现有 session state 的 modelSelection，仅存 connectionId/provider/model，无凭据。[state](../../packages/ts-shell/src/session/model/state.ts) 复用已有锁与原子写入，锁内读取现存快照并保留其他字段；snapshot builder 保留选择。不存在或损坏的会话不得借此重建，全局配置不随默认切换写入。
+- [projection](../../packages/ts-shell/src/session/model/projection.ts) 只覆盖匹配连接与 provider 的模型。请求 bridge 动态读取当前会话身份；正常请求、压缩等既有 bridge 消费者及独立 btw 路径采用会话模型。启动、会话切换、配置刷新、模型状态与 chooser 使用同一投影，不更改其他会话，也不把凭据复制到会话。连接切换后原模型偏好保留但不套到不同连接上。
+- 显式 --global 先保存当前会话（如果存在），再调用既有全局配置写入；第二步失败报告“会话已切换、全局写入未验证”，不伪称双文件原子提交。全局配置既有多进程 lost-update 窗口未在此批解决。会话写入失败不尝试全局保存；没有会话的调用必须显式 --global 才允许改默认。
+- 真实退出/重启探针发现只执行 model 命令的会话被空会话清理删除。现 [lifecycle](../../packages/ts-shell/src/session/lifecycle/sessionLifecycleWrites.ts) 保留具有显式模型选择的会话，普通空会话仍清理。切换/刷新同时保留启动时传入的 allowedTools、offline、instructionBudgetBytes 与显式 hook opt-in；这些覆盖沿用既有配置解析语义。
+- 定向对照参考实现的“会话模型持久化、只有显式 persist 才更新全局默认”决定，采用相同范围分离。本项目偏好属于会话状态，不引入第二套会话事件存储；分支历史回退到过去模型不是本批承诺。默认全局写入、请求 bridge、snapshot 保留、候选位置四组反转实际失败，另补退出清理与启动限制两组反转；源码逐字节恢复。
+- Linux、Node 20.3、隔离环境组合 23 文件/337 项通过，含 session manager、runtime/request bridge、交互与 print 接线；build:ts 通过。真实 regular/fullscreen CLI 验证默认切换的全局文件字节与 mtime 不变、非法 --global=false 拒绝、显式全局写入；退出后改全局默认并以 --session-id 重启，原会话模型仍恢复，两模式 exit 0，无模型请求。初始探针把短 status 误当 viewer，并在 fullscreen 等待未重绘的输入提示；修正探针等待实际结果，未改产品迁就同步。初次真实退出失败则是产品清理缺陷，已用上述修复和回归验证。
+- import cycles/config consumers/declarations/node floor 通过；NormProof 阻断义务通过，保留 5 个既有函数数量 advisory。上一批 f66cf4c4 的 CI 37370095444 与 Architecture Watch 37370095429 已成功。本批远端结果须按新提交核验。
+- **CMD-03 与 Phase 19 仍未完成**：其余命令全量表、memory 动态实体/筛选目录、CMD-04 目录身份和异步失效、SAFE-02 等继续。此批未宣称覆盖真实 provider 调用、真实 Windows Terminal 像素验收或跨文件崩溃原子性。

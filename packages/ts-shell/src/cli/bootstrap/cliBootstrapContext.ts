@@ -1,5 +1,5 @@
 import type { CoreMcpGateway } from "../../core/mcp/gateway.js";
-import { getRuntimeConfig } from "../../config/runtimeConfig.js";
+import { getRuntimeConfig, type RuntimeConfigOverrides } from "../../config/runtimeConfig.js";
 import type {
   ShellBootstrapResult,
 } from "../../core/shell/bootstrap.js";
@@ -62,18 +62,7 @@ export function createCliRootContext(
   );
   const gitContext = getWorkflowGitContext(runtimeBaseDir);
   const workspaceRoot = gitContext.root ?? runtimeBaseDir;
-  const runtimeConfig = getRuntimeConfig(workspaceRoot, {
-    // Zero is the loader's opt-out, so the flag needs no separate path through
-    // the prompt builder.
-    instructionBudgetBytes: input.options.noContextFiles ? 0 : undefined,
-    allowUntrustedHooks: input.options.dangerouslyBypassHookTrust === true ? true : undefined,
-    // The flag wins over the file, and only when it was given: `undefined`
-    // leaves the configured value in place.
-    offline: input.options.offline === true ? true : undefined,
-    // Passed through only when the flag named something: an empty array here
-    // would mean "offer no tools at all", which is not what an absent flag says.
-    allowedTools: input.options.allowedTools,
-  });
+  const runtimeConfig = getRuntimeConfig(workspaceRoot, configOverrides(input.options));
   return {
     runtimeBaseDir,
     gitContext,
@@ -157,6 +146,7 @@ export function createCliBootstrapRuntimeContext(
     }
   })();
   const runtimeContext = bootstrap.context;
+  runtimeContext.runtimeConfigOverrides = configOverrides(input.options);
   const mcpGateway = createCliMcpGateway(() => runtimeContext.cwd);
 
   return {
@@ -185,4 +175,19 @@ export function logCliBootstrapSessionInitialized(
     sessionId: input.bootstrapRuntime.runtimeContext.session.id,
     phases: input.bootstrapRuntime.bootstrap.phases.join(" -> "),
   });
+}
+
+function configOverrides(options: CliOptions): RuntimeConfigOverrides {
+  return {
+    // Zero is the loader's opt-out, so the flag needs no separate path through
+    // the prompt builder.
+    instructionBudgetBytes: options.noContextFiles ? 0 : undefined,
+    allowUntrustedHooks: options.dangerouslyBypassHookTrust === true ? true : undefined,
+    // The flag wins over the file, and only when it was given: `undefined`
+    // leaves the configured value in place.
+    offline: options.offline === true ? true : undefined,
+    // Passed through only when the flag named something: an empty array here
+    // would mean "offer no tools at all", which is not what an absent flag says.
+    allowedTools: options.allowedTools,
+  };
 }
