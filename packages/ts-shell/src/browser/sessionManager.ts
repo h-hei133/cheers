@@ -1,3 +1,5 @@
+import { BrowserActions, type BrowserActionContext, type BrowserOperation } from "./session/action.js";
+import { ResourceCleanup, initializationSettled } from "./session/cleanup.js";
 import { importPwRuntime, type PwBrowser, type PwBrowserContext, type PwPage } from "./playwrightRuntime.js";
 import {
   STEALTH_LAUNCH_ARGS,
@@ -21,6 +23,7 @@ export interface ObservedPageState {
   readonly title: string;
   readonly elements: readonly BrowserElementRef[];
   readonly outline: string;
+  readonly failure?: BrowserSessionFailure;
 }
 
 /**
@@ -38,6 +41,7 @@ export interface BrowserSessionFailure {
   readonly nextAction: string;
   /** The classified host refusal, when the URL was the problem. */
   readonly refusal?: BrowserUrlRefusal;
+  readonly cleanup?: "failed" | "unknown";
 }
 
 /**
@@ -114,6 +118,8 @@ function classifyLaunchFailure(message: string): BrowserSessionFailure {
 }
 
 class BrowserSessionManager {
+  private readonly cleanup = new ResourceCleanup();
+  private readonly actions = new BrowserActions();
   private browser: PwBrowser | null = null;
   private context: PwBrowserContext | null = null;
   private currentPage: PwPage | null = null;
@@ -146,8 +152,19 @@ class BrowserSessionManager {
    * the failure is recorded so the caller that arrives after it gets the reason
    * instead of a second launch attempt with the same outcome.
    */
+  run<T>(context: BrowserActionContext, operation: () => Promise<T>, interrupt = false): Promise<BrowserOperation<T>> {
+    // A close request must remain available while cancelled work has not settled.
+    if (interrupt && !context.signal?.aborted && (context.deadline === undefined || context.deadline > Date.now())) {
+      this.actions.scope?.cancel("session-close");
+      return new BrowserActions().run(context, operation, () => this.closeResources());
+    }
+    return this.actions.run(context, operation, () => this.closeResources());
+  }
+
   async getOrCreatePage(): Promise<PwPage | null> {
+    this.actions.scope?.check();
     if (this.closePromise) await this.closePromise;
+    this.actions.scope?.check();
     if (this.sessionFailure?.kind === "close-failed") return null;
     if (this.currentPage) return this.currentPage;
     if (this.initPromise) return this.initPromise;
@@ -156,12 +173,14 @@ class BrowserSessionManager {
       try {
         if (this.dependencies.launchPage) {
           this.currentPage = await this.dependencies.launchPage();
+          this.actions.scope?.check();
           return this.currentPage;
         }
         // Imported through the module that already resolves the package, rather
         // than a second copy of the import dance. It reports which package
         // answered and what evidence it has, which the failure path reuses.
         const imported = await importPwRuntime();
+        this.actions.scope?.check();
         if (!imported.ok || !imported.module.chromium) {
           this.sessionFailure = {
             kind: "not-launched",
@@ -176,6 +195,7 @@ class BrowserSessionManager {
           args: [...STEALTH_LAUNCH_ARGS],
           ignoreDefaultArgs: [...STEALTH_IGNORE_DEFAULT_ARGS],
         });
+        this.actions.scope?.check();
         this.context = await this.browser.newContext({
           userAgent: DEFAULT_USER_AGENT,
           viewport: DEFAULT_VIEWPORT,
@@ -183,21 +203,26 @@ class BrowserSessionManager {
           timezoneId: "America/New_York",
           serviceWorkers: "block",
         });
+        this.actions.scope?.check();
         // Install before any page exists, including a popup's first request.
         // Service workers are disabled because they can bypass routing.
         await this.installRequestGuard(this.context);
+        this.actions.scope?.check();
         // Every page and popup also inherits the preload.
         const stealthScript = buildStealthPreloadScript();
         await this.context.addInitScript?.(stealthScript);
+        this.actions.scope?.check();
 
         this.currentPage = await this.context.newPage();
+        this.actions.scope?.check();
+        const launchedPage = this.currentPage;
         // A crashed or closed page must not stay as the handle every later call
         // uses, or the session keeps answering from a page that is gone.
         this.currentPage.on("close", () => {
-          this.currentPage = null;
+          if (this.currentPage === launchedPage) this.currentPage = null;
         });
         this.currentPage.on("crash", () => {
-          this.currentPage = null;
+          if (this.currentPage === launchedPage) this.currentPage = null;
         });
 
         if (!this.cleanupRegistered) {
@@ -235,6 +260,7 @@ class BrowserSessionManager {
     policy: BrowserOriginPolicy = readBrowserOriginPolicy(),
     timeoutMs = 20_000,
   ): Promise<BrowserOpenResult> {
+    this.actions.scope?.check();
     // Recorded before the page exists, so the guard it installs judges the
     // page's own requests by the policy this caller named.
     this.requestPolicy = policy;
@@ -255,6 +281,7 @@ class BrowserSessionManager {
     this.elementRefs.clear();
     this.requestFailure = null;
     const page = await this.getOrCreatePage();
+    this.actions.scope?.check();
     if (!page) {
       return { ok: false, url, failure: this.sessionFailure ?? {
         kind: "not-launched",
@@ -264,7 +291,9 @@ class BrowserSessionManager {
     }
 
     try {
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+      const navigate = () => page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+      if (this.actions.scope) await this.actions.scope.perform(navigate);
+      else await navigate();
     } catch (error) {
       return {
         ok: false,
@@ -281,6 +310,7 @@ class BrowserSessionManager {
     // first one. A page that answers with a redirect has moved the session to an
     // address nobody admitted, and it has to be judged before anything is read
     // from it.
+    this.actions.scope?.check();
     const landed = this.readPageUrl();
     const redirectAdmission = admitBrowserRedirect(url, landed, policy);
     if (!redirectAdmission.allowed && redirectAdmission.refusal) {
@@ -301,21 +331,31 @@ class BrowserSessionManager {
 
     this.currentUrl = landed || url;
     this.currentTitle = await page.title().catch(() => this.currentUrl);
+    this.actions.scope?.check();
     return { ok: true, url: this.currentUrl, title: this.currentTitle };
   }
 
   /** Observe page and build the ref tree the model acts on. */
   async observe(): Promise<ObservedPageState> {
+    this.actions.scope?.check();
+    let failure: BrowserSessionFailure | undefined;
     this.elementRefs.clear();
     const elements: BrowserElementRef[] = [];
     const outlineLines: string[] = [];
 
     const page = await this.getOrCreatePage();
+    this.actions.scope?.check();
     if (page) {
       this.currentUrl = this.readPageUrl() || this.currentUrl;
-      this.currentTitle = (await page.title().catch(() => this.currentTitle)) || this.currentTitle;
+      try {
+        this.currentTitle = (await page.title()) || this.currentTitle;
+      } catch {
+        failure = { kind: "action-failed", reason: "The page title could not be observed.", nextAction: "Retry observation before acting on page elements." };
+      }
     }
 
+    this.actions.scope?.check();
+    if (!page) failure = this.sessionFailure ?? { kind: "not-launched", reason: "No browser page is available.", nextAction: "Open a page first." };
     outlineLines.push(`Page URL: ${this.currentUrl}`, `Page Title: ${this.currentTitle}`);
     if (this.requestFailure) {
       outlineLines.push(`Request guard: ${this.requestFailure.reason}`, this.requestFailure.nextAction);
@@ -360,6 +400,7 @@ class BrowserSessionManager {
           return items;
         });
 
+        this.actions.scope?.check();
         rawElements.forEach((el, index) => {
           const ref = `e${index + 1}`;
           this.elementRefs.set(ref, el.selector);
@@ -367,12 +408,13 @@ class BrowserSessionManager {
           outlineLines.push(`- [ref=${ref}] ${el.role} "${el.name}" (selector: ${el.selector})`);
         });
       } catch {
-        // A page that cannot be evaluated has no element list, which the message
-        // below says rather than a fabricated one.
+        failure = { kind: "action-failed", reason: "The page could not be observed.", nextAction: "Retry observation before acting on page elements." };
       }
     }
 
-    if (elements.length === 0) {
+    this.actions.scope?.check();
+    if (failure) outlineLines.push(failure.reason);
+    else if (elements.length === 0) {
       outlineLines.push("(No interactive elements found on the current page)");
     }
 
@@ -381,6 +423,7 @@ class BrowserSessionManager {
       title: this.currentTitle,
       elements,
       outline: outlineLines.join("\n"),
+      failure,
     };
   }
 
@@ -444,6 +487,8 @@ class BrowserSessionManager {
     verb: string,
     act: (page: PwPage, selector: string) => Promise<void>,
   ): Promise<BrowserActionResult> {
+    this.actions.scope?.check();
+    if (this.sessionFailure?.kind === "close-failed") return { ok: false, failure: this.sessionFailure };
     const selector = this.resolveSelector(target);
     // A page the caller never opened is not a failure of this action, and
     // launching a browser to answer it is worse than saying so: the launch
@@ -462,7 +507,8 @@ class BrowserSessionManager {
       };
     }
     try {
-      await act(page, selector);
+      if (this.actions.scope) await this.actions.scope.perform(() => act(page, selector));
+      else await act(page, selector);
       return { ok: true, output: `${verb} '${target}' (selector: ${selector}).` };
     } catch (error) {
       return {
@@ -501,6 +547,8 @@ class BrowserSessionManager {
   }
 
   async pressKey(key: string): Promise<BrowserActionResult> {
+    this.actions.scope?.check();
+    if (this.sessionFailure?.kind === "close-failed") return { ok: false, failure: this.sessionFailure };
     // Same rule as the element actions: no page means nothing to press a key
     // into, and launching a browser to discover that spends seconds proving it.
     const page = this.currentPage;
@@ -515,7 +563,8 @@ class BrowserSessionManager {
       };
     }
     try {
-      await page.keyboard.press(key);
+      if (this.actions.scope) await this.actions.scope.perform(() => page.keyboard.press(key));
+      else await page.keyboard.press(key);
       return { ok: true, output: `Pressed key '${key}'.` };
     } catch (error) {
       return {
@@ -534,7 +583,16 @@ class BrowserSessionManager {
     if (this.closePromise) return this.closePromise;
     const closing = (async () => {
       // A launch already in progress owns resources this close must observe.
-      if (this.initPromise) await this.initPromise;
+      if (this.initPromise && !await initializationSettled(this.initPromise)) {
+        // Keep observing the launch: its eventual handles still belong to us.
+        void this.initPromise.then(() => this.closeResources()).catch(() => {});
+        this.sessionFailure = {
+          kind: "close-failed", cleanup: "unknown",
+          reason: "Browser initialization has not settled; cleanup is unconfirmed.",
+          nextAction: "Retry close before starting another browser action.",
+        };
+        return { ok: false as const, failure: this.sessionFailure };
+      }
       return this.closeResources();
     })();
     this.closePromise = closing;
@@ -550,14 +608,16 @@ class BrowserSessionManager {
     const resources = [
       ["currentPage", "page"], ["context", "context"], ["browser", "browser"],
     ] as const;
+    let unknown = false;
     for (const [key, label] of resources) {
       const resource = this[key];
       if (!resource) continue;
-      try {
-        await resource.close();
+      const outcome = await this.cleanup.close(resource);
+      if (outcome === "closed") {
         if (this[key] === resource) this[key] = null;
-      } catch (error) {
-        failures.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
+      } else {
+        unknown ||= outcome === "unknown";
+        failures.push(`${label}: ${outcome}`);
       }
     }
     this.elementRefs.clear();
@@ -565,7 +625,8 @@ class BrowserSessionManager {
     if (failures.length > 0) {
       this.sessionFailure = {
         kind: "close-failed",
-        reason: `Browser cleanup failed for ${failures.join("; ")}.`,
+        reason: `Browser cleanup incomplete for ${failures.join("; ")}.`,
+        cleanup: unknown ? "unknown" : "failed",
         nextAction: "Retry the close action before opening another browser session.",
       };
       return { ok: false, failure: this.sessionFailure };

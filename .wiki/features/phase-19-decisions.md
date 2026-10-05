@@ -561,3 +561,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Linux、Node 20.3、隔离环境下网络 owner、web 工具、研究 collector、工具 gate 和原 hostname 策略共 10 文件/217 项通过，build:ts 通过。真实本地 HTTP/TLS/IPv6 测试覆盖 Host/SNI、主机名不符和不受信任证书拒绝、压缩流、socket lookup 与取消；独立 DNS 测试覆盖公私混合、审核后不重查、预取消零 DNS 和迟到结果零连接。TLS 证书/私钥是提交在 [测试资源](../../packages/ts-shell/src/test-utils/network/README.md) 中的公开合成 fixture，仅测试 adapter 注入信任与本地地址，不改产品信任/公共地址政策。
 - 五组反转分别造成 2/1/2/1/3 项失败：只看首个地址、审核后再次解析、关闭 TLS 验证、移除原始传输限额、放开搜索跨域。源码精确恢复后最终 217 项通过。初轮 DNS 表驱动测试因数组被 it.each 展开而未正确传递空集，按 harness/setup 改为具名字段，保留全部反例。import-cycles/config-consumers/declarations/node-floor 通过，NormProof 两项图义务 satisfied、无阻断项，整体 partial 仍为 6 项既有函数数量 advisory。
 - 前两次提交 `255c618f`、`e85623ca` 的 CI 均已确认失败，原因是 highValueTools 遗漏的两条旧 ask 预期；它们不是网络失败。修订后的问答测试与原 ask 套件 48 项通过，修复单独提交 `c077169`。本批尚无新提交的远端成功结果、独立审查、完整模型驱动 CLI、真实公网或非 Linux 运行证据；不能用本地网络证明关闭 Phase 19 整体任务。SAFE-02 剩余边界与后续任务继续。
+
+### 8.17 SAFE-07：浏览器动作取消与清理证据
+
+- 所属路径为 `browser/session/` 的动作作用域和清理器、现有 session manager 与 browser 工具适配。整个 open→observe 共用父信号、30 秒总期限及 taskId；经理公开 run 上下文也接受绝对 deadline。工具预取消零启动/导航/输入/关闭；启动每个异步阶段结束后重新检查取消，迟到句柄仍回收。
+- 同一会话串行动作。取消立即关闭已获得资源，再等待底层调用并回收迟到资源；调用方最多等待 4 秒清理确认，底层未结束时返回 unknown 并继续占用序列。排队调用独立取消，不关闭前一调用的页面。显式 close 可越过动作序列请求停止，保留清理重试入口。
+- 清理按资源保留进行中的 close promise；每个资源最多观察 1 秒，超时不是关闭证明，仍尝试剩余 context/browser。失败可重试、挂起不重复发起 close、迟到完成可在重试时确认。初始化未结束的 close 也有界，并继续负责迟到句柄。不添加新的浏览器进程实现或 PID 强杀路径。
+- 结果分别报告 activity=not-started/started/completed、effect=none/possible/confirmed、state=completed/cancelled/error、cleanup=not-needed/complete/failed/unknown。effect 的 confirmed 表示浏览器 API 已确认该动作，不代表远端业务事务完成；取消从不宣称外部副作用回滚。观察失败携带明确失败，不再伪装为空元素成功。失败清理阻止继续使用残留页面；旧页面事件只能清空自身句柄。
+- 对照只读参考的浏览器启动/关闭实现：启动取消仍负责已获得资源、关闭共享进行中请求、观察真实结束且保留清理错误。参考拥有原生子进程可升级终止，本项目通过现有浏览器接口关闭，无法证明终止时保留 unknown；不照搬第二执行实现。三个反转（取消检查、主动关闭、超时伪装关闭）均触发失败，原文件逐字节恢复。
+- 本地证据：浏览器域与 highValueTools 等 344 项通过（当时真实浏览器 9 项因缺失所需版本跳过）；随后在仓库内隔离安装对应 Chromium，最终 7 文件 60 项通过且无跳过，包括真实挂起导航断连和服务器已收到提交后取消。包含显式 close 失败元数据断言。真实提交测试允许驱动确认点击或拒绝导航等待两种结束方式，但必须保留可能/已确认副作用与服务端请求计数。
+- Node 20.3 构建、import cycles/config consumers/declarations/node floor 通过；NormProof 阻断义务通过，仍有 6 个既有函数数目 advisory。未执行独立审查、真实模型驱动交互或非 Linux 验证；SAFE-02 缺口、TOOL-04 上传下载与其余批次不因此关闭。上一提交 ee520741 的 CI 有两项失败，研究夹具已另以 0436d974 修正，缓存多进程超时仍待远端复核。

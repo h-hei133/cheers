@@ -31,9 +31,23 @@ describe.skipIf(!canLaunch)("browser session against real Chromium", () => {
   let privateOrigin: string;
   let otherRequests = 0;
   let workerRequests = 0;
+  let effectRequests = 0;
+  let requestSeen: (() => void) | undefined;
+  let connectionClosed: (() => void) | undefined;
 
   beforeAll(async () => {
     server = createServer((req, res) => {
+      if (req.url === "/stalled" || req.url === "/effect") {
+        if (req.url === "/effect") effectRequests++;
+        res.once("close", () => connectionClosed?.());
+        requestSeen?.();
+        return;
+      }
+      if (req.url === "/form") {
+        res.writeHead(200, { "content-type": "text/html" });
+        res.end("<form method='post' action='/effect'><button id='submit'>Submit</button></form>");
+        return;
+      }
       if (req.url === "/") {
         res.writeHead(200, { "content-type": "text/html" });
         res.end("<html><head><title>Local Page</title></head><body><h1>Hello</h1><button id='go'>Go</button></body></html>");
@@ -111,6 +125,46 @@ describe.skipIf(!canLaunch)("browser session against real Chromium", () => {
       expect(state.elements.length).toBeGreaterThan(0);
       expect(state.outline).toContain("Hello");
     } finally {
+      await manager.closeSession();
+    }
+  });
+
+  it("cancels an actual stalled navigation and observes connection closure", async () => {
+    const manager = new BrowserSessionManager();
+    const controller = new AbortController();
+    const seen = new Promise<void>((resolve) => { requestSeen = resolve; });
+    const closed = new Promise<void>((resolve) => { connectionClosed = resolve; });
+    try {
+      const pending = manager.run({ signal: controller.signal }, () => manager.openUrl(`${origin}/stalled`, openPolicy));
+      await seen;
+      controller.abort();
+      expect(await pending).toMatchObject({ status: "cancelled", evidence: { effect: "possible", cleanup: "complete" } });
+      await closed;
+    } finally {
+      requestSeen = undefined;
+      connectionClosed = undefined;
+      await manager.closeSession();
+    }
+  });
+
+  it("retains a submitted server effect after cancelling the waiting click", async () => {
+    const manager = new BrowserSessionManager();
+    const controller = new AbortController();
+    const seen = new Promise<void>((resolve) => { requestSeen = resolve; });
+    const before = effectRequests;
+    try {
+      expect((await manager.openUrl(`${origin}/form`, openPolicy)).ok).toBe(true);
+      const pending = manager.run({ signal: controller.signal }, () => manager.click("#submit"));
+      await seen;
+      controller.abort();
+      const result = await pending;
+      expect(result).toMatchObject({ status: "cancelled", evidence: { cleanup: "complete" } });
+      // Drivers may acknowledge the dispatched click as the page closes, or
+      // reject its navigation wait. Neither outcome erases the server effect.
+      expect(["possible", "confirmed"]).toContain(result.evidence.effect);
+      expect(effectRequests).toBe(before + 1);
+    } finally {
+      requestSeen = undefined;
       await manager.closeSession();
     }
   });

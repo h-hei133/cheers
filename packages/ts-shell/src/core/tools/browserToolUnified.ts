@@ -65,91 +65,110 @@ export function createUnifiedBrowserToolDefinition(): ToolDefinition {
         return deniedResult("Error: action parameter is required for browser tool.");
       }
 
-      const policy = readBrowserOriginPolicy();
+      const operation = await defaultBrowserSessionManager.run(
+        { signal: context.abortSignal, taskId: context.taskId },
+        async () => {
+          const policy = readBrowserOriginPolicy();
 
-      switch (action) {
-        case "open": {
-          const url = typeof args.url === "string" ? args.url.trim() : "";
-          if (!url) {
-            return deniedResult("Error: url parameter is required for 'open' action.");
+          switch (action) {
+            case "open": {
+              const url = typeof args.url === "string" ? args.url.trim() : "";
+              if (!url) {
+                return deniedResult("Error: url parameter is required for 'open' action.");
+              }
+              const opened = await defaultBrowserSessionManager.openUrl(url, policy);
+              if (!opened.ok) {
+                return deniedResult(await renderFailure(opened.failure!));
+              }
+              const state = await defaultBrowserSessionManager.observe();
+              if (state.failure) return deniedResult(await renderFailure(state.failure));
+              return approvedResult(
+                `# Navigated to \`${opened.url}\` (Title: "${opened.title ?? ""}")\n\n${state.outline}`,
+              );
+            }
+
+            case "observe": {
+              const state = await defaultBrowserSessionManager.observe();
+              if (state.failure) return deniedResult(await renderFailure(state.failure));
+              if (state.elements.length === 0 && state.url === "about:blank") {
+                // Nothing has been opened, so the honest answer is that there is no
+                // page rather than an empty element list from a blank one.
+                return deniedResult(await renderFailure(
+                  {
+                    kind: "not-launched",
+                    reason: "No page has been opened yet, so there is nothing to observe.",
+                    nextAction: 'Run `browser` with `action: "open"` and a URL first.',
+                  },
+                ));
+              }
+              return approvedResult(`# Browser Page State (\`${state.url}\`)\n\n${state.outline}`);
+            }
+
+            case "click": {
+              const selector = typeof args.selector === "string" ? args.selector.trim() : "";
+              if (!selector) {
+                return deniedResult("Error: selector parameter (e.g. 'e1' or CSS selector) is required for 'click' action.");
+              }
+              return runBrowserAction(defaultBrowserSessionManager.click(selector));
+            }
+
+            case "type": {
+              const selector = typeof args.selector === "string" ? args.selector.trim() : "";
+              const text = typeof args.text === "string" ? args.text : "";
+              if (!selector) {
+                return deniedResult("Error: selector parameter is required for 'type' action.");
+              }
+              return runBrowserAction(defaultBrowserSessionManager.type(selector, text));
+            }
+
+            case "select": {
+              const selector = typeof args.selector === "string" ? args.selector.trim() : "";
+              const value = typeof args.value === "string" ? args.value : "";
+              if (!selector || !value) {
+                return deniedResult("Error: selector and value parameters are required for 'select' action.");
+              }
+              return runBrowserAction(defaultBrowserSessionManager.selectOption(selector, value));
+            }
+
+            case "hover": {
+              const selector = typeof args.selector === "string" ? args.selector.trim() : "";
+              if (!selector) {
+                return deniedResult("Error: selector parameter is required for 'hover' action.");
+              }
+              return runBrowserAction(defaultBrowserSessionManager.hover(selector));
+            }
+
+            case "press": {
+              const key = typeof args.key === "string" ? args.key.trim() : "";
+              if (!key) {
+                return deniedResult("Error: key parameter is required for 'press' action.");
+              }
+              return runBrowserAction(defaultBrowserSessionManager.pressKey(key));
+            }
+
+            case "close": {
+              return runBrowserAction(defaultBrowserSessionManager.closeSession());
+            }
+
+            default:
+              return deniedResult(
+                `Error: Unsupported browser action '${action}'. Supported actions: open, observe, click, type, select, hover, press, close.`,
+              );
           }
-          const opened = await defaultBrowserSessionManager.openUrl(url, policy);
-          if (!opened.ok) {
-            return deniedResult(await renderFailure(opened.failure!));
-          }
-          const state = await defaultBrowserSessionManager.observe();
-          return approvedResult(
-            `# Navigated to \`${opened.url}\` (Title: "${opened.title ?? ""}")\n\n${state.outline}`,
-          );
-        }
-
-        case "observe": {
-          const state = await defaultBrowserSessionManager.observe();
-          if (state.elements.length === 0 && state.url === "about:blank") {
-            // Nothing has been opened, so the honest answer is that there is no
-            // page rather than an empty element list from a blank one.
-            return deniedResult(await renderFailure(
-              {
-                kind: "not-launched",
-                reason: "No page has been opened yet, so there is nothing to observe.",
-                nextAction: 'Run `browser` with `action: "open"` and a URL first.',
-              },
-            ));
-          }
-          return approvedResult(`# Browser Page State (\`${state.url}\`)\n\n${state.outline}`);
-        }
-
-        case "click": {
-          const selector = typeof args.selector === "string" ? args.selector.trim() : "";
-          if (!selector) {
-            return deniedResult("Error: selector parameter (e.g. 'e1' or CSS selector) is required for 'click' action.");
-          }
-          return runBrowserAction(defaultBrowserSessionManager.click(selector));
-        }
-
-        case "type": {
-          const selector = typeof args.selector === "string" ? args.selector.trim() : "";
-          const text = typeof args.text === "string" ? args.text : "";
-          if (!selector) {
-            return deniedResult("Error: selector parameter is required for 'type' action.");
-          }
-          return runBrowserAction(defaultBrowserSessionManager.type(selector, text));
-        }
-
-        case "select": {
-          const selector = typeof args.selector === "string" ? args.selector.trim() : "";
-          const value = typeof args.value === "string" ? args.value : "";
-          if (!selector || !value) {
-            return deniedResult("Error: selector and value parameters are required for 'select' action.");
-          }
-          return runBrowserAction(defaultBrowserSessionManager.selectOption(selector, value));
-        }
-
-        case "hover": {
-          const selector = typeof args.selector === "string" ? args.selector.trim() : "";
-          if (!selector) {
-            return deniedResult("Error: selector parameter is required for 'hover' action.");
-          }
-          return runBrowserAction(defaultBrowserSessionManager.hover(selector));
-        }
-
-        case "press": {
-          const key = typeof args.key === "string" ? args.key.trim() : "";
-          if (!key) {
-            return deniedResult("Error: key parameter is required for 'press' action.");
-          }
-          return runBrowserAction(defaultBrowserSessionManager.pressKey(key));
-        }
-
-        case "close": {
-          return runBrowserAction(defaultBrowserSessionManager.closeSession());
-        }
-
-        default:
-          return deniedResult(
-            `Error: Unsupported browser action '${action}'. Supported actions: open, observe, click, type, select, hover, press, close.`,
-          );
+        },
+        action === "close",
+      );
+      const evidence = action === "close" && operation.status === "completed"
+        ? { ...operation.evidence, cleanup: operation.value.success ? "complete" : operation.value.metadata?.browserCleanup ?? "failed" }
+        : operation.evidence;
+      const metadata = { browserAction: evidence };
+      if (operation.status !== "completed") {
+        return deniedResult(
+          `Browser action ${operation.status}. Activity: ${operation.evidence.activity}; effects: ${operation.evidence.effect}; cleanup: ${operation.evidence.cleanup}. External effects are not rolled back.`,
+          metadata,
+        );
       }
+      return { ...operation.value, metadata: { ...operation.value.metadata, ...metadata } };
     },
   };
 }
@@ -165,7 +184,7 @@ export function createUnifiedBrowserToolDefinition(): ToolDefinition {
 async function runBrowserAction(action: Promise<BrowserActionResult>): Promise<ToolExecutionResult> {
   const result = await action;
   if (!result.ok) {
-    return deniedResult(await renderFailure(result.failure));
+    return deniedResult(await renderFailure(result.failure), result.failure.cleanup ? { browserCleanup: result.failure.cleanup } : undefined);
   }
   return approvedResult(result.output);
 }

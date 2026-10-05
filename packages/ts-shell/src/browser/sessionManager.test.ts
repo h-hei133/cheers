@@ -53,6 +53,52 @@ describe("browser context request guard", () => {
     expect(close).toHaveBeenCalledTimes(2);
   });
 
+  it("bounds a hung page close, attempts the remaining resources, and observes late completion on retry", async () => {
+    const result = await setup();
+    let finish!: () => void;
+    result.closePage.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
+    vi.useFakeTimers();
+    try {
+      const closing = result.manager.closeSession();
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(await closing).toMatchObject({ ok: false, failure: { kind: "close-failed", cleanup: "unknown" } });
+      expect(result.closeContext).toHaveBeenCalledTimes(1);
+      expect(result.closeBrowser).toHaveBeenCalledTimes(1);
+      expect(await result.manager.openUrl("http://localhost/")).toMatchObject({ ok: false, failure: { cleanup: "unknown" } });
+      const retry = result.manager.closeSession();
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(await retry).toMatchObject({ ok: false, failure: { cleanup: "unknown" } });
+      expect(result.closePage).toHaveBeenCalledTimes(1);
+      finish();
+      expect(await result.manager.closeSession()).toMatchObject({ ok: true });
+      expect(result.closePage).toHaveBeenCalledTimes(1);
+    } finally {
+      finish?.();
+      vi.useRealTimers();
+    }
+  });
+
+  it("retains late close rejection and retries without exposing the thrown message", async () => {
+    const result = await setup();
+    let reject!: (error: Error) => void;
+    result.closePage.mockImplementationOnce(() => new Promise<void>((_resolve, fail) => { reject = fail; }));
+    vi.useFakeTimers();
+    try {
+      const closing = result.manager.closeSession();
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(await closing).toMatchObject({ ok: false, failure: { cleanup: "unknown" } });
+      reject(new Error("private-page-secret"));
+      await vi.advanceTimersByTimeAsync(0);
+      result.closePage.mockRejectedValueOnce(new Error("private-page-secret"));
+      const retry = await result.manager.closeSession();
+      expect(retry).toMatchObject({ ok: false, failure: { cleanup: "failed" } });
+      expect(JSON.stringify(retry)).not.toContain("private-page-secret");
+      expect(await result.manager.closeSession()).toMatchObject({ ok: true });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("collects every close failure while attempting every resource", async () => {
     const result = await setup();
     result.closePage.mockRejectedValueOnce(new Error("page failed"));
