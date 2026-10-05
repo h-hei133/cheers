@@ -196,6 +196,24 @@ describe("export command", () => {
     expect(fs.existsSync(out)).toBe(false);
   });
 
+  it.each([
+    ["--typo"], ["--outside=false"], ["--outside", "--outside"], ["extra.md"],
+  ])("refuses invalid export arguments %j without overwriting the destination", async (...extra) => {
+    const destination = path.join(workdir, "keep.md");
+    fs.writeFileSync(destination, "UNCHANGED");
+    const before = fs.statSync(destination).mtimeMs;
+    const result = await runExportCommand(["markdown", "keep.md", ...extra], context());
+    expect(result.output).toContain("Invalid /export arguments:");
+    expect(fs.readFileSync(destination, "utf8")).toBe("UNCHANGED");
+    expect(fs.statSync(destination).mtimeMs).toBe(before);
+  });
+
+  it("exports to a flag-shaped filename only after the explicit separator", async () => {
+    const result = await runExportCommand(["md", "--", "--outside"], context());
+    expect(result.output).toContain("Exported");
+    expect(fs.readFileSync(path.join(workdir, "--outside"), "utf8")).toContain("# Conversation");
+  });
+
   it("writes a self-contained html page", async () => {
     const result = await runExportCommand(["html", "page.html"], context());
 

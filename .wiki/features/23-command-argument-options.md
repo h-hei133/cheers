@@ -357,3 +357,8 @@ candidate ID、record ID 和 query 是不同参数种类，动态 provider 不�
 ### CMD-03 首批实施记录（2026-10-06）
 
 trust/todo/thinking 已由领域 syntax 同时驱动运行时校验、帮助和候选；trust 命令与存储双重拒绝非法枚举，todo 拒绝 1junk 等非法稳定 ID，thinking 保留 auto/none 兼容关系并拒绝额外参数。177 项组合测试、四组反转、Node 20.3 构建和两种终端模式真实 CLI 验证通过。完整范围与剩余项见 [Phase 19 决策 §8.21](phase-19-decisions.md#821-cmd-03trusttodothinking-首批共享语法与写入边界)；其余全量表尚未迁移，不标记 CMD-03 完成。
+
+
+### CMD-03 flags 实施记录（2026-10-06）
+
+export/restore 已迁移到领域语法与原生严格 flags 解析，覆盖格式别名、文件路径、选项值/重复/互斥和 end-of-options；restore 的执行确认不由候选提供。空参数位置 Enter 不再接受默认 flag，完整导出命令不会被补入 --outside。240 项组合测试、四组反转、Node 20.3 构建和两模式真实 CLI 验证通过，详见 [Phase 19 决策 §8.22](phase-19-decisions.md#822-cmd-03exportrestore-严格-flags-与确认隔离)。其余全量表继续。

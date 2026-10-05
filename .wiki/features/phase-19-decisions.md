@@ -614,3 +614,15 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Linux、Node 20.3、隔离环境下 8 文件/177 项通过，build:ts 通过。恢复旧 trust handler、移除 setter 枚举守卫、恢复 parseInt 接受、删除额外参数拒绝四组反转均失败；逐字节恢复后组合套件再次通过。真实 regular/fullscreen CLI 先记录 untrusted，再输入 constructor/__proto__/on extra/session extra/status extra，文件内容与 mtime 均不变，两模式 exit 0、无模型请求。
 - import cycles/config consumers/declarations/node floor 通过；call reachability 7 个既有 advisory，NormProof 阻断义务通过且保留 5 个既有函数数量 advisory。前批 3fe750c7 的 CI 37364227880 最近为 in_progress、Architecture Watch 37364227869 为 queued，不计成功。
 - **CMD-03 尚未完成**：本批只迁移上述三条命令；23 号全量表其余命令、flags、多级语法、动态实体及 model/export/memory/restore 的语义仍待处理。CMD-04、SAFE-02 和其余 Phase 19 任务继续。
+
+
+### 8.22 CMD-03：export/restore 严格 flags 与确认隔离
+
+- [flags](../../packages/ts-shell/src/core/commands/syntax/flags.ts) 复用 Node 原生严格 parseArgs，按领域定义识别 boolean/text、inline 值、别名、重复和冲突选项；支持显式 `--` 结束选项解析且不修改输入数组。原生错误包含 argv，返回时仅报告错误类别。没有 flags 定义的自由文本命令保留原参数路径，不把 prose 中的 `--word` 当选项。
+- [export syntax](../../packages/ts-shell/src/core/commands/export/syntax.ts) 统一 markdown/md、jsonl、html、可选文件路径及 --outside。删除独立 format parser 与旧 jsonl-only 词表；未知选项、boolean 赋值、重复 flag、额外路径在读取会话或写目标之前拒绝。`md -- --outside` 明确表示工作区中的文件名，未授予外部写权限。
+- [restore syntax](../../packages/ts-shell/src/core/commands/restore/syntax.ts) 声明 preview/execute、record/records、all、ledger/workspace/authority 的兼容别名及执行/确认/dry-run flags。替换跳过未知项的旧 parser；缺值、重复别名、all 与 record 冲突、非法确认值、空/重复 record ID 拒绝且不调用恢复 runner。保留默认 preview 与显式执行确认两层条件，dry-run 仍禁止写入。
+- 帮助与候选来自同一语法；已用/冲突选项不再建议。确认 flags --execute/--confirm 及其确认值不由补全提供。新增 flags 候选暴露了空参数位置 Enter 会接受默认高亮项的问题：现仅有已输入的未完成 token 才隐式接受，空位置直接提交当前命令；Tab 和主动选择仍只编辑草稿。回归明确断言 `/export markdown ` 不被添入 --outside。
+- 对照参考 CLI 的“复制输入、支持 --key=value、-- 之后为字面参数、boolean 不吞后续值”决定，采用相同语义；本项目交由 Node 原生 parser 实现严格类型/未知项拒绝，再增加重复及互斥校验。未复制其入口解析器或扩大执行授权。
+- Linux、Node 20.3、隔离环境 11 文件/240 项通过，build:ts 通过。恢复旧 export parser、恢复旧 restore parser、开放确认候选、去掉空参数 Enter 守卫四组反转均失败；源码逐字节恢复后组合测试通过。真实 regular/fullscreen CLI 的非法 export/restore 参数保持目标文件字节与 mtime 不变；`/restore execute ` 明确报告 explicit-execute-intent-required，未创建 ledger，两模式 exit 0、无模型请求。
+- import cycles/config consumers/declarations/node floor 通过；call reachability 7 个、NormProof 函数数量 5 个既有 advisory 不变，阻断义务通过。CMD-02 的 3fe750c7 CI 37364227880 成功；Architecture Watch 37364227869 失败的 annotation 明确为 hosted runner 多次未领取任务（runner_id=0、steps=[]），属于基础设施未执行，不计通过。b456a484 Architecture Watch 37365764084 成功，CI 37365764189 最近为 in_progress。
+- CMD-03 仍未完成：累计迁移 trust/todo/thinking/export/restore，model/memory 及全量表其余语法、动态实体目录仍待实施。SAFE-02 与其余 Phase 19 任务继续；本批未替代 EDIT-03 的完整 undo/恢复产品流程。

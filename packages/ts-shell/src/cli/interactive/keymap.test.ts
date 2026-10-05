@@ -260,6 +260,17 @@ describe("interruption", () => {
 });
 
 describe("completion interception", () => {
+  it("does not add a suggested flag on Enter after a complete command", () => {
+    const { press, surface, actions } = build();
+    surface.editor.setText("/export markdown ");
+    surface.suggestions.setItems(slashSuggestions(surface.editor.getText(), surface.editor.snapshot())!);
+    expect(surface.suggestions.current()?.value).toBe("--outside");
+    surface.setSuggesting(true);
+    press("\r");
+    expect(actions.submit).toHaveBeenCalledWith("/export markdown");
+    expect(actions.submit).not.toHaveBeenCalledWith(expect.stringContaining("--outside"));
+  });
+
   it("accepts an incomplete command on Enter without submitting it", () => {
     const { press, surface, actions } = build();
     surface.editor.setText("/res");

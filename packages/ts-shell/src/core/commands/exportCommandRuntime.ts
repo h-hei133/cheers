@@ -1,3 +1,6 @@
+import { exportSyntax } from "./export/syntax.js";
+import { parseSyntax } from "./syntax/parse.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import { messageToText } from "../../model-adapters/multimodal.js";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -33,33 +36,18 @@ export async function runExportCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
+  const parsed = parseSyntax(exportSyntax, args);
+  if (!parsed.ok) return {
+    kind: "local",
+    output: `${parsed.reason === "Unknown action." ? "Unknown export format." : `Invalid /export arguments: ${parsed.reason}`} Nothing was written.\n${syntaxHelp(exportSyntax)}`,
+  };
   const root = context.cwd || process.cwd();
   const sessionId = context.sessionId;
   if (!sessionId) {
     return { kind: "local", output: "No session to export: this command needs a live session." };
   }
-
-  // `--outside` states an intent to write past the workspace. It is read before
-  // the format so that `--outside` in the destination's position cannot be
-  // mistaken for a filename.
-  const allowOutside = args.includes("--outside");
-  const positional = args.filter((arg) => !arg.startsWith("--"));
-  const format = parseFormat(positional[0]);
-  if (format === undefined) {
-    // Refused rather than defaulted. This used to fall through to markdown, so
-    // `/export html out.html` wrote markdown into a file named `.html` — which a
-    // browser then parses as markup, executing anything script-shaped the
-    // session ever contained. A wrong format is a mistake worth reporting, and
-    // the report is what stops the file from being created at all.
-    return {
-      kind: "local",
-      output: [
-        `Unknown export format \`${positional[0]}\`. Nothing was written.`,
-        "",
-        "Formats: `markdown` (default), `jsonl`, `html`.",
-      ].join("\n"),
-    };
-  }
+  const allowOutside = parsed.flags.has("outside");
+  const format = parsed.action.name;
   const source = format === "html" ? undefined : readExportSource(sessionId);
   if (source && !source.ok) return { kind: "local", output: `${source.reason} Nothing was written.` };
   const transcript = source?.ok ? source.transcript : undefined;
@@ -78,7 +66,7 @@ export async function runExportCommand(
     };
   }
 
-  const requested = positional[1];
+  const requested = parsed.args[0];
   // Judged only when the user named a destination. The command's own default
   // cannot be a typo, and running it through a policy meant for a name someone
   // chose would refuse the ordinary case of exporting with no argument.
@@ -170,16 +158,6 @@ export async function runExportCommand(
       ...warnings.map(warning => `- ${warning}`),
     ].join("\n"),
   };
-}
-
-/** The three formats this command writes, or nothing for anything else. */
-function parseFormat(value: string | undefined): "markdown" | "jsonl" | "html" | undefined {
-  if (value === undefined) return "markdown";
-  const lowered = value.toLowerCase();
-  if (lowered === "markdown" || lowered === "md") return "markdown";
-  if (lowered === "jsonl") return "jsonl";
-  if (lowered === "html") return "html";
-  return undefined;
 }
 
 /**

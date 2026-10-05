@@ -1,3 +1,5 @@
+import { exportSyntax } from "./export/syntax.js";
+import { restoreSyntax } from "./restore/syntax.js";
 import { syntaxHint, syntaxCompletions } from "./syntax/projection.js";
 import { trustSyntax } from "./trust/syntax.js";
 import { todoSyntax } from "./todo/syntax.js";
@@ -171,8 +173,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "preview or execute guarded recovery authority restore",
       group: "session",
-      argumentHint: "[preview|execute]",
-      getArgumentCompletions: (prefix) => subcommandCompletions("restore", prefix),
+      argumentHint: syntaxHint(restoreSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(restoreSyntax, prefix),
       execute: (args, context) => runRestoreLocalCommand(args, context),
     },
     {
@@ -465,8 +467,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "export session history as markdown or jsonl",
       group: "session",
-      argumentHint: "[jsonl] [dest-path]",
-      getArgumentCompletions: (prefix) => subcommandCompletions("export", prefix),
+      argumentHint: syntaxHint(exportSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(exportSyntax, prefix),
       execute: (args, context) => runExportCommand(args, context),
     },
     {

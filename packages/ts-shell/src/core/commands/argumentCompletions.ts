@@ -44,9 +44,7 @@ const SUBCOMMAND_VALUES = {
   workspace: ["status", "attach", "recent"],
   sidebar: ["snapshot", "panel", "compact", "detail"],
   browser: ["status", "smoke", "runtime", "preview", "dry-run", "execute", "replay", "repair"],
-  restore: ["preview", "execute"],
   brainstorm: ["-i", "-s"],
-  export: ["jsonl"],
   shell: ["status", "use", "auto"],
   statusline: ["list", "use"],
 } as const;

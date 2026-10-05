@@ -1,7 +1,8 @@
 import type { CommandAction, CommandParameter, CommandSyntax } from "./model.js";
+import { parseFlags } from "./flags.js";
 
 export type SyntaxResult<Action> =
-  | { readonly ok: true; readonly action: Action; readonly args: readonly string[] }
+  | { readonly ok: true; readonly action: Action; readonly args: readonly string[]; readonly flags: ReadonlyMap<string, string | true> }
   | { readonly ok: false; readonly reason: string };
 
 function validValue(parameter: CommandParameter, value: string): boolean {
@@ -13,10 +14,12 @@ function validValue(parameter: CommandParameter, value: string): boolean {
 
 /** Validate before the owner reads or changes state; never coerce an unknown action. */
 export function parseSyntax<Action extends CommandAction>(syntax: CommandSyntax<Action>, input: readonly string[]): SyntaxResult<Action> {
-  const name = input.length ? input[0]!.toLowerCase() : syntax.defaultAction;
+  const options = syntax.flags ? parseFlags(syntax.flags, input) : { ok: true as const, args: input, flags: new Map<string, string | true>() };
+  if (!options.ok) return options;
+  const name = options.args.length ? options.args[0]!.toLowerCase() : syntax.defaultAction;
   const action = syntax.actions.find(item => item.name === name || item.aliases?.includes(name ?? ""));
   if (!action) return { ok: false, reason: "Unknown action." };
-  const args = input.slice(1);
+  const args = options.args.slice(1);
   let position = 0;
   for (const parameter of action.parameters ?? []) {
     const values = parameter.rest ? args.slice(position) : args.slice(position, position + 1);
@@ -27,5 +30,5 @@ export function parseSyntax<Action extends CommandAction>(syntax: CommandSyntax<
     position += values.length;
   }
   if (position !== args.length) return { ok: false, reason: "Unexpected arguments." };
-  return { ok: true, action, args };
+  return { ok: true, action, args, flags: options.flags };
 }

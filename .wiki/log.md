@@ -6151,3 +6151,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-06] fix | Phase 19 CMD-02 补全使用原始区间和草稿/光标 revision，保留前后缀、原空白与引号路径；Tab/未完成 Enter 只接受，完整命令保留一次 Enter，接受后重算参数列表。268 项组合测试、四类反转、Node 20.3 构建及 regular/fullscreen 真实 PTY 通过，函数数量 advisory 从 6 降至 5。详见 features/phase-19-decisions.md §8.20；CMD-03/04、SAFE-02 与其余任务继续。
 
 ## [2026-10-06] fix | Phase 19 CMD-03 首批将 trust/todo/thinking 接入领域共享语法，删除重复词表；trust 原型动作和非法存储枚举零写，todo 严格稳定 ID，thinking 拒绝额外参数。177 项测试、四组反转、Node 20.3 构建及 regular/fullscreen CLI 文件不变验证通过。详见 features/phase-19-decisions.md §8.21；CMD-03 全量表及其余任务继续。
+
+## [2026-10-06] fix | Phase 19 CMD-03 export/restore 共用严格 flags 定义，拒绝未知/缺值/重复/冲突输入，保留字面文件名与独立恢复确认；空参数 Enter 不补入默认高亮 flag。240 项测试、四组反转、Node 20.3 构建和两模式 CLI 零写探针通过。3fe750c7 CI 已成功，其架构任务因 hosted runner 未领取而未执行；详见 features/phase-19-decisions.md §8.22。CMD-03 全量表及其余任务继续。

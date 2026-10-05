@@ -1,6 +1,8 @@
 import type { CommandArgumentCompletion } from "../types.js";
 import { scanCommandArgs } from "../arguments.js";
 import type { CommandAction, CommandSyntax } from "./model.js";
+import { parseFlags } from "./flags.js";
+import { parseSyntax } from "./parse.js";
 
 function actionUsage(action: CommandAction): string {
   return [action.name, ...(action.parameters ?? []).map(parameter => {
@@ -10,18 +12,43 @@ function actionUsage(action: CommandAction): string {
 }
 
 export function syntaxHint(syntax: CommandSyntax): string {
-  return `[${syntax.actions.filter(action => action.name).map(action => actionUsage(action)).join("|")}]`;
+  return `[${syntax.actions.filter(action => action.name).map(action => actionUsage(action)).join("|")}]${flagUsage(syntax)}`;
 }
 
 export function syntaxHelp(syntax: CommandSyntax): string {
-  return "Usage: " + syntax.actions.map(action => `/${syntax.name}${action.name ? " " : ""}${actionUsage(action)}`).join(" | ");
+  return "Usage: " + syntax.actions.map(action => `/${syntax.name}${action.name ? " " : ""}${actionUsage(action)}`).join(" | ") + flagUsage(syntax);
+}
+
+function flagUsage(syntax: CommandSyntax): string {
+  return (syntax.flags ?? []).map(flag => ` [--${flag.name}${flag.kind === "text" ? ` <${flag.values?.join("|") ?? "value"}>` : ""}]`).join("");
 }
 
 /** Fixed actions and their real aliases; free text and IDs have no invented candidates. */
 export function syntaxCompletions(syntax: CommandSyntax, prefix: string): readonly CommandArgumentCompletion[] | null {
   const tokens = scanCommandArgs(prefix, true);
-  if (tokens.length > 1 || (tokens.length === 1 && /\s$/.test(prefix))) return null;
-  const query = (tokens[0]?.value ?? "").toLowerCase();
+  const current = /\s$/.test(prefix) ? undefined : tokens.at(-1);
+  const before = current ? tokens.slice(0, -1) : tokens;
+  const query = (current?.value ?? "").toLowerCase();
+  if (syntax.flags) {
+    if (before.some(token => token.value === "--")) return null;
+    const last = before.at(-1)?.value;
+    const awaiting = syntax.flags.find(flag => flag.kind === "text" && [flag.name, ...(flag.aliases ?? [])].some(name => last === `--${name}`));
+    if (awaiting) {
+      if (awaiting.suggest === false) return null;
+      const values = awaiting.values?.filter(value => value.startsWith(query)).map(value => ({ value, label: value, detail: awaiting.summary }));
+      return values?.length ? values : null;
+    }
+    const parsed = parseFlags(syntax.flags, before.map(token => token.value));
+    if (!parsed.ok) return null;
+    if (query.startsWith("-") || (query === "" && parsed.args.length > 0)) {
+      if (parsed.args.length && !parseSyntax(syntax, before.map(token => token.value)).ok) return null;
+      const matches = syntax.flags.filter(flag => flag.suggest !== false && !parsed.flags.has(flag.name) && !flag.conflicts?.some(name => parsed.flags.has(name)))
+        .flatMap(flag => [flag.name, ...(query ? flag.aliases ?? [] : [])].map(name => ({ value: `--${name}`, label: `--${name}`, detail: flag.summary })))
+        .filter(candidate => candidate.value.startsWith(query));
+      return matches.length ? matches : null;
+    }
+    if (parsed.args.length) return null;
+  } else if (before.length) return null;
   const matches = syntax.actions.flatMap(action => [action.name, ...(query ? action.aliases ?? [] : [])]
     .filter(name => name && name.startsWith(query))
     .map(name => ({ value: name, label: name, detail: action.summary })));

@@ -382,7 +382,7 @@ function consumeSuggestionKey(event: ParsedKeyEvent, context: KeymapContext): bo
   const edit = chosen?.edit;
   const written = edit ? snapshot.text.slice(edit.from, edit.to) : "";
   const insertion = edit ? (edit.to === edit.snapshot.text.length ? edit.text.slice(0, -1) : edit.text) : "";
-  const incomplete = edit !== undefined && (written.startsWith("/")
+  const incomplete = edit !== undefined && written.length > 0 && (written.startsWith("/")
     ? written.toLowerCase() !== insertion.toLowerCase()
     : written !== insertion);
   const accepts = action === "tui.input.tab" ||

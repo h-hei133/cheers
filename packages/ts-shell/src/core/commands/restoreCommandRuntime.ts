@@ -1,3 +1,6 @@
+import { restoreSyntax } from "./restore/syntax.js";
+import { parseSyntax } from "./syntax/parse.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import {
   runRestoreCommand,
 } from "../../edit/recovery/restoreCommandRunner.js";
@@ -23,7 +26,13 @@ export async function runRestoreLocalCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const request = parseRestoreCommandArgs(args, context);
+  let request: RestoreCommandRequest;
+  try {
+    request = parseRestoreCommandArgs(args, context);
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+    return { kind: "local", output: `Invalid /restore arguments: ${error.message} Nothing was written.\n${syntaxHelp(restoreSyntax)}` };
+  }
   const result = await runRestoreCommand(request);
   return {
     kind: "local",
@@ -35,38 +44,27 @@ export function parseRestoreCommandArgs(
   args: readonly string[],
   context: CommandContext,
 ): RestoreCommandRequest {
-  const mode = args[0]?.trim().toLowerCase() === "execute" ? "execute" : "preview";
-  const optionArgs =
-    args[0]?.trim().toLowerCase() === "preview" ||
-    args[0]?.trim().toLowerCase() === "execute"
-      ? args.slice(1)
-      : args;
-  const options = parseOptions(optionArgs);
+  const parsed = parseSyntax(restoreSyntax, args);
+  if (!parsed.ok) throw new SyntaxError(parsed.reason);
+  const mode = parsed.action.name === "execute" ? "execute" : "preview";
+  const options = parsed.flags;
   const records =
-    optionValue(options.get("record")) ?? optionValue(options.get("records"));
+    optionValue(options.get("record"));
   const all = options.has("all");
   const ledgerRoot =
-    optionValue(options.get("ledger-root")) ?? optionValue(options.get("ledger"));
+    optionValue(options.get("ledger-root"));
   const workspaceRoot =
     optionValue(options.get("workspace-root")) ??
-    optionValue(options.get("workspace")) ??
     context.cwd;
   const authorityId =
-    optionValue(options.get("authority-id")) ??
-    optionValue(options.get("authority")) ??
-    optionValue(options.get("route-id")) ??
-    optionValue(options.get("route"));
+    optionValue(options.get("authority-id"));
+  const recordIds = records?.split(",").map(record => record.trim());
+  if (recordIds && (recordIds.some(record => !record) || new Set(recordIds).size !== recordIds.length)) {
+    throw new SyntaxError("Record IDs must be nonempty and unique.");
+  }
   const recordSelection: RestoreCommandRecordSelection | undefined = all
     ? { kind: "all" }
-    : records
-      ? {
-          kind: "records",
-          recordIds: records
-            .split(",")
-            .map((record) => record.trim())
-            .filter(Boolean),
-        }
-      : undefined;
+    : recordIds ? { kind: "records", recordIds } : undefined;
 
   return {
     mode,
@@ -136,34 +134,6 @@ function fileSection(title: string, entries: readonly string[]): string[] {
 
 function pathOf(file: { readonly workspaceRelativePath: string }): string {
   return file.workspaceRelativePath;
-}
-
-function parseOptions(args: readonly string[]): Map<string, string | true> {
-  const options = new Map<string, string | true>();
-  for (let index = 0; index < args.length; index += 1) {
-    const raw = args[index];
-    if (!raw.startsWith("--")) {
-      continue;
-    }
-    const normalized = raw.slice(2);
-    const inline = normalized.indexOf("=");
-    if (inline !== -1) {
-      options.set(
-        normalized.slice(0, inline).trim().toLowerCase(),
-        normalized.slice(inline + 1).trim(),
-      );
-      continue;
-    }
-    const key = normalized.trim().toLowerCase();
-    const next = args[index + 1];
-    if (next && !next.startsWith("--")) {
-      options.set(key, next);
-      index += 1;
-    } else {
-      options.set(key, true);
-    }
-  }
-  return options;
 }
 
 function optionValue(value: string | true | undefined): string | undefined {
