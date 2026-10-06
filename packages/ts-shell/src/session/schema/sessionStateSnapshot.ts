@@ -20,6 +20,7 @@ import {
 
 export interface SessionStateSnapshot {
   modelSelection?: SessionModelSelection;
+  modelRevision?: string;
   usage?: SessionUsageSnapshot;
   status: Session["status"];
   projectRoot?: string;
@@ -67,6 +68,7 @@ export function buildSessionStateSnapshot(
   return {
     usage: current?.usage,
     modelSelection: current?.modelSelection,
+    modelRevision: current?.modelRevision,
     status: session.status,
     projectRoot: session.projectRoot,
     pendingPrompt: session.pendingPrompt,

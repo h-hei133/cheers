@@ -6264,3 +6264,6 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-06] feat | Phase 19 CFG-04 接通 31 项分组搜索、user/project 范围、暂存详情和显式 Apply，复用并发字段保存及有效快照。审查修复状态项 ID、限制建议与异步步骤输入逸出，并保留普通独占操作的输入排队。16 组有效反转、恢复后 89 项、最终构建和两模式实际 CLI 保存/下一请求/范围/输入归属验证通过，独立 APPROVE/CLEAR；见 features/phase-19-decisions.md §8.74。CFG-01 剩余 policy、CFG-05 和完整 Phase 19 继续。
 
 ## [2026-10-06] test | f9b008a6 远端完整套件暴露 btwCommandRuntime 的整模块配置 mock 缺少 CONFIG_FIELDS；改为保留真实导出的局部 mock，原行为断言不变，13 项通过、独立代码复审 APPROVE。原 CI 失败保留，见 features/phase-19-decisions.md §8.74 补充。
+
+
+## [2026-10-06] fix | Phase 19 CFG-05 模型选择增加显式会话基线与 revision、锁内准入/连接复核、写后完整核验和受控结果；修复裸菜单遗漏准入与空凭据身份导致连续选择失败。13 组有效反转、恢复后 45 项、最终定向 55 项、构建与两模式实际 CLI 未保存/重试请求模型验证通过，独立 APPROVE/CLEAR；见 features/phase-19-decisions.md §8.75。model/effort 共同更新、全局分步失败协调与完整阶段目标继续。

@@ -1,6 +1,7 @@
 import { CatalogController } from "./completion/controller.js";
 import { catalogIdentity, createCatalogLoader } from "./completion/catalog.js";
 import { refreshShellRuntimeConfig } from "../../core/shell/runtimeContext.js";
+import { configurationAdmission } from '../../core/shell/configuration.js';
 import { messageToText } from "../../model-adapters/multimodal.js";
 import { backgroundTasks, renderTaskNotice } from "../../core/shell/background/tasks.js";
 import type { Interface as ReadlineInterface } from "node:readline";
@@ -772,6 +773,8 @@ export class InteractiveMode {
   private pickerHost(): PickerHost {
     return {
       commandContext: {
+        admission: configurationAdmission(this.options.runtimeContext),
+        projectRoot: this.options.runtimeContext.projectRoot,
         runtimeConfig: this.options.runtimeContext.runtimeConfig,
         refreshRuntimeConfig: () => refreshShellRuntimeConfig(this.options.runtimeContext),
         cwd: this.options.runtimeContext.cwd,

@@ -1,20 +1,15 @@
-import { configurationApplicationNotice } from "./configuration.js";
-import { ConfigWriteError } from '../../config/outcome.js';
+import { setModel } from "./model/selection.js";
 import {
   RUNTIME_PROVIDERS,
   readUserRuntimeConfigFile,
-  readRuntimeConfigEditAt, getUserRuntimeConfigPath,
-  writeUserRuntimeConfigFile,
   type ProviderConnectionConfig,
-  type RuntimeConfigFile, type RuntimeConfig,
+  type RuntimeConfig,
   type RuntimeProvider,
 } from "../../config/runtimeConfig.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { parseModelArgs, modelSyntax } from "./model/syntax.js";
 import { syntaxHelp } from "./syntax/projection.js";
 import { projectSessionModel } from "../../session/model/projection.js";
-import { writeSessionModel } from "../../session/model/state.js";
-import { defaultHookDispatcher } from "../hooks/hookDispatcher.js";
 import { loadCatalog, ensureUserCatalog, userCatalogPath } from "../models/catalogStore.js";
 import { refreshCatalog } from "../models/catalogRefresh.js";
 import { renderCatalog } from "../models/catalogSurface.js";
@@ -302,133 +297,6 @@ async function listModels(args: string[], refresh: boolean, context: CommandCont
   ].join("\n");
 }
 
-async function setModel(args: string[], context: CommandContext, global: boolean): Promise<string> {
-  const target = args[0]?.trim();
-  if (!target) {
-    return "Usage: /model use <provider>/<model>, or /model use <model> to keep the current provider.";
-  }
-  // A `provider/model` target names both; a bare name keeps the active provider.
-  // Model ids can themselves contain slashes, so only a leading segment that is a
-  // known provider is read as one.
-  const separator = target.indexOf("/");
-  const prefix = separator > 0 ? target.slice(0, separator) : undefined;
-  const namedProvider = prefix && loadCatalog().some((entry) => entry.id === prefix) ? prefix : undefined;
-  const model = namedProvider ? target.slice(separator + 1) : target;
-  if (namedProvider && !model) {
-    return `\`${namedProvider}\` has no models listed. Name one: /model use ${namedProvider}/<model>.`;
-  }
-  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
-  const config = edit.values;
-  const connections = normalizeConnections(config);
-  const activeId = config.activeProviderConnectionId?.trim();
-  const activeConnection = connections.find((item) => item.id === activeId);
-  const provider = activeConnection?.provider ?? config.provider ?? "openai";
-  const effective = projectSessionModel(config, context.sessionId);
-  const fromModel = effective.providerConnections?.find(item => item.id === activeId)?.model ?? effective.providerCredentials?.[provider]?.model ?? "default";
-
-  // Dispatch PreModelSwitch Hook
-  const preDecision = await defaultHookDispatcher.dispatch({
-    eventName: "PreModelSwitch",
-    sessionId: context?.sessionId || "model-switch",
-    workspaceRoot: context?.cwd || process.cwd(),
-    timestamp: new Date().toISOString(),
-    fromModel,
-    toModel: model,
-  });
-
-  if (preDecision && preDecision.decision === "block") {
-    return `Model switch blocked by hook policy: ${preDecision.reason || "Switch not allowed."}`;
-  }
-  if (!activeId) {
-    return "No active connection. Run /connect login ... first.";
-  }
-  if (!activeConnection) {
-    return `Active connection not found: ${activeId}`;
-  }
-  // Switching model and switching provider are different acts with different
-  // consequences — the second needs a credential — so a target naming a provider
-  // that is not the active one is refused rather than half-applied.
-  if (namedProvider && namedProvider !== activeConnection.provider) {
-    return [
-      `\`${model}\` belongs to \`${namedProvider}\`, and the active connection is \`${activeConnection.provider}\`.`,
-      "",
-      `Connect that provider first: /connect login ${namedProvider} --api-key <key>`,
-      "Then switch to it with /connect use <connection-id>.",
-    ].join("\n");
-  }
-
-  if (
-    activeConnection.provider === "openai" &&
-    activeConnection.authType === "account-auth" &&
-    !accountAuthModelFacts().allowed.includes(model)
-  ) {
-    return [
-      `Model "${model}" is not supported for OpenAI account-auth.`,
-      "Allowed models:",
-      ...accountAuthModelFacts().allowed.map((item) => `- ${item}`),
-      "Tip: run /model list to inspect allowed account-auth models.",
-    ].join("\n");
-  }
-
-  const updatedAt = new Date().toISOString();
-  const nextConnections = connections.map((item) =>
-    item.id === activeId ? { ...item, model, updatedAt } : item,
-  );
-  const activeProvider = activeConnection.provider;
-  const next: RuntimeConfigFile = {
-    ...config,
-    provider: activeProvider,
-    activeProviderConnectionId: activeId,
-    providerConnections: nextConnections,
-    providerCredentials: {
-      ...(config.providerCredentials ?? {}),
-      [provider]: {
-        ...(config.providerCredentials?.[provider] ?? {}),
-        model,
-      },
-    },
-  };
-  if (!context.sessionId && !global) return "Model switch blocked: an active session is required.";
-  if (context.sessionId) {
-    try {
-      writeSessionModel(context.sessionId, { connectionId: activeId, provider, model });
-    } catch {
-      return "Model switch failed: session preference write outcome is unverified. Global defaults were not changed.";
-    }
-  }
-  let configPath: string | undefined;
-  if (global) {
-    try {
-      configPath = writeUserRuntimeConfigFile(next, edit);
-    } catch (error) {
-      const applicationNotice = configurationApplicationNotice(context);
-      if (error instanceof ConfigWriteError) return `${context.sessionId ? `Session model preference saved for ${model}. ` : ''}${error.message}${applicationNotice ? ` ${applicationNotice}` : ''}`;
-      return context.sessionId
-        ? `Session model switched to ${model}, but saving the global default failed. Global write outcome is unverified.`
-        : "Saving the global model default failed. Global write outcome is unverified.";
-    }
-  }
-  const applicationNotice = configurationApplicationNotice(context);
-  if (applicationNotice) return `Model preference saved for ${model}. ${applicationNotice}`;
-
-  // Dispatch PostModelSwitch Hook
-  await defaultHookDispatcher.dispatch({
-    eventName: "PostModelSwitch",
-    sessionId: context?.sessionId || "model-switch",
-    workspaceRoot: context?.cwd || process.cwd(),
-    timestamp: new Date().toISOString(),
-    fromModel,
-    toModel: model,
-  });
-
-  return [
-    `Model switched to ${model}.`,
-    `Provider: ${provider}`,
-    `Connection: ${activeId}`,
-    context.sessionId ? "Scope: current session (saved for resume)." : "Scope: global default.",
-    ...(configPath ? [`Global default stored at: ${configPath}`] : []),
-  ].join("\n");
-}
 
 async function fetchModelsFromModelsDev(
   provider: RuntimeProvider,

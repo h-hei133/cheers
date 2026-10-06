@@ -1222,3 +1222,17 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - import cycles/config consumers/declarations/node floor/docs strict/diff 检查通过；最终 NormProof 阻断义务满足、整体仍为 partial，既有四个函数数量与 120 个文档来源 advisory 不视为已修复。此前 056a2ffa 与 0b6fec59 的 CI/Architecture Watch 均已成功，本批远端结果按新提交另核对。完整 CFG-01 trust/模型能力 policy、账户刷新代际竞态、CFG-05 和 Phase 19 十六批/七十六项总体目标继续。
 
 §8.74 CI 补充：f9b008a6 的 Architecture Watch 37437275427 成功，CI 37437275426 失败。完整套件 647 文件/6597 项通过、1 项跳过，唯一失败文件为 btwCommandRuntime.test.ts 的模块加载：旧整模块 mock 只导出 getRuntimeConfig，共享命令目录经 settings 新增的 CONFIG_FIELDS 读取缺失。改为保留真实导出的局部 mock，原 side-question 参数、隐私和失败归因断言不变，隔离 Node 20.3 下该文件 13 项通过，独立代码复审 APPROVE。原远端失败仍保留，新提交另核对。
+
+
+### 8.75 CFG-05：会话模型选择基线、准入与持久化核验
+
+- session/model 在异步选择前捕获不可变基线，锁内校验选择、modelRevision 和项目绑定；每次真实变化写入新的选择 revision，生命周期保存保留它，A→B→A 也使旧请求失效。同值选择不写文件或更换 revision；并发新增的提示、usage 等状态按锁内重读保留，不从旧完整快照覆盖。
+- 复用既有原子 writer 和文件锁，采用仅恢复明确死亡本机 owner 的规则；写前再读当前快照，写后重新读取完整结果。拒绝缺失、损坏和非法状态，不重建已删除会话。受控错误区分 unchanged、unknown、persisted 与独立 cleanupFailed，原始 I/O/状态内容不进入命令输出；未核验会话保存不继续写全局默认或发布成功 hook。
+- 模型修改行为从兼容命令文件移入 model/selection owner。选择使用已接受的 fromModel；对照当前 loader 归一化后的活动连接和 provider credential 身份，允许会话 model 覆盖及派生时间变化，但拒绝相同 ID 的认证、端点或凭据替换。项目绑定与命令明确提供的 projectRoot 不一致也拒绝。
+- PreModelSwitch 后复核准入；会话 writer 接受同步 boolean guard，在实际取得锁后、包括 no-op 分支之前复核准入、raw 活动连接和凭据，避免锁等待扩大竞态窗口。裸 /model 菜单从实际 InteractiveMode host 捕获同一 configurationAdmission 和 projectRoot；会话切换、信任变化或工作区变化不能由菜单遗漏参数绕过。
+- 定向比较参考模型切换的可用性先验、显式默认保存、模型选择后处理 reasoning 的决定。采用变更前检查与显式范围，不照搬先修改内存再追加独立记录的次序。本批加强现有 model-only 路径，尚未接入 model/effort 一致候选；也不宣称两个文件的崩溃原子性、远端模型一定可用或完整 CFG-05。
+- 独立审查依次发现菜单未传准入、相同 ID 身份替换、锁等待期间复核缺失，均补实测回归。归一化修复又暴露仅含 model 的会话凭据槽与不存在槽不等价，连续选择回归在第二次选择明确失败；现已将空身份统一为空，连续选择和同值重选可用。两路最终复审 APPROVE/CLEAR。
+- 验证：第一次三文件组合 42 通过/3 失败，分别为 null 被既有必需读取器归类 read-failed 的预期差异，以及两个未命中的清理故障注入；调整夹具为真实锁 token 替换，保留状态/隐私断言后通过。较早扩大组合 13 文件/132 项通过，最终归一化修复后 4 文件/55 项与 Node 20.3 构建通过。声明 gate 只匹配双引号 eventName，恢复原写法后通过，未改门禁脚本。
+- 13 组反转均由行为断言检出，覆盖选择版本/绑定、完整核验、生命周期保留、清理失败、锁内 guard、异步基线、连接身份、菜单准入及空身份等；四个产品文件逐字节恢复后 3 文件/45 项通过。首次生命周期反转引入 undefined，先被完整序列化核验挡住，未计为有效断言反转；改为合法 JSON null 后由保留提示的断言检出。
+- regular/fullscreen 构建 CLI 各经本地合成 HTTP 两次请求：在实际 session writer 调用点注入“返回但未保存”后，/model --global 报 verification-failed，用户配置与会话选择不变，下一请求仍为 base-model；移除故障后 session-only 保存成功，下一请求为 session-model，退出保留 modelRevision，合成凭据不在终端或会话选择中。首轮合成服务漏 GET 就绪接口，产生 HTTP 501；补齐夹具接口后通过，未改产品 readiness。
+- 本批 import cycles/config consumers/declarations/node floor/docs strict/diff 检查通过，NormProof 阻断义务满足、整体 partial，四项既有函数数量和 120 项文档来源 advisory 保留。原 f9b008a6 CI 失败及独立夹具修复见 §8.74 补充；107126aa 的 Architecture Watch 37438947968 成功，CI 37438947980 最近取得的状态仍为 in_progress。--global 的会话与配置写入仍是分步操作，其后半失败可能留下已保存会话选择，现有部分结果报告继续保留；后续需要与 effort/capability 一起完成 CFG-05，CFG-01 信任/能力 policy、账户刷新代际安全与 Phase 19 其余目标继续。
