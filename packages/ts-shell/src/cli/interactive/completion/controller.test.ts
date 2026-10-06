@@ -90,3 +90,26 @@ it("caches each path directory separately while sharing basename prefixes", asyn
   expect(h.publish.mock.lastCall?.[0].map((item: Suggestion) => item.value)).toEqual(["two/another/"]);
   h.controller.invalidate();
 });
+
+it("refreshes active directory events but never reopens cancelled drafts or accepts disposed observers", async () => {
+  const h = harness();
+  const changes: Array<() => void> = [];
+  const closes: Array<ReturnType<typeof vi.fn>> = [];
+  Object.assign(h.load, { observe: vi.fn((_kind, _query, changed: () => void) => {
+    changes.push(changed); const close = vi.fn(); closes.push(close); return close;
+  }) });
+  h.change("/cd a"); h.controller.update(h.draft()); await vi.advanceTimersByTimeAsync(75);
+  h.pending[0]!([{ value: "alpha/", label: "alpha/" }]); await vi.advanceTimersByTimeAsync(0);
+  changes[0]!();
+  expect(h.publish.mock.lastCall?.[1]).toBe("Loading command entries…");
+  await vi.advanceTimersByTimeAsync(75);
+  h.pending[1]!([{ value: "another/", label: "another/" }]); await vi.advanceTimersByTimeAsync(0);
+  expect(h.publish.mock.lastCall?.[0].map((item: Suggestion) => item.value)).toEqual(["another/"]);
+  h.controller.cancel(); h.publish.mockClear(); changes[0]!();
+  await vi.advanceTimersByTimeAsync(75); expect(h.publish).not.toHaveBeenCalled();
+  h.controller.invalidate(); expect(closes[0]).toHaveBeenCalledOnce();
+  h.controller.update(h.draft()); await vi.advanceTimersByTimeAsync(75);
+  h.publish.mockClear(); changes[0]!();
+  expect(h.publish).not.toHaveBeenCalled();
+  h.controller.invalidate();
+});

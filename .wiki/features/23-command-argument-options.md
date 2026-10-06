@@ -470,3 +470,7 @@ cd/workspace 目录及 report/export 文件位置接入一级异步目录读取�
 ### CMD-04 model/workflow 生命周期实施记录（2026-10-06）
 
 模型/可运行 workflow 目录接入统一 controller，移除同步模型实体读取；workflow 显示标题匹配接受实际文件名，候选读取不执行。258 项、构建、循环图反转及两模式真实 CLI 验证通过，见 [决策 §8.46](phase-19-decisions.md#846-cmd-04modelworkflow-统一目录生命周期)。完整版本事件与其余参数审计继续。
+
+### CMD-04 外部目录事件实施记录（2026-10-06）
+
+路径、模型目录及 workflow 文件变更接入有界监听与 controller 失效，当前草稿可在不按键时刷新，Esc 后事件不重开菜单。158 项、构建、取消反转及两模式真实 CLI 外部变更验证通过，见 [决策 §8.47](phase-19-decisions.md#847-cmd-04首批外部目录变更事件)。其他来源版本与嵌套目录事件继续。

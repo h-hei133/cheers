@@ -6201,3 +6201,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 - 2026-10-06：Phase 19 CMD-04 接入目录/文件参数补全，支持引用目录连续输入、分目录缓存和有界只读枚举。235 项、构建、反转及 regular/fullscreen 验证通过，见 [决策 §8.45](features/phase-19-decisions.md#845-cmd-04文件与目录路径补全)。3308f1c5、712eaa73 两项远端检查成功，阶段目标继续。
 
 - 2026-10-06：Phase 19 CMD-04 model/workflow 目录统一候选生命周期，保留模型显式选择和 workflow Tab 零执行。258 项、构建、反转及 regular/fullscreen 验证通过，见 [决策 §8.46](features/phase-19-decisions.md#846-cmd-04modelworkflow-统一目录生命周期)。阶段目标继续。
+
+- 2026-10-06：Phase 19 CMD-04 首批路径/model/workflow 外部变更事件接入，不按键刷新当前候选且取消后不重开。158 项、构建、反转与两模式真实 CLI 验证通过，见 [决策 §8.47](features/phase-19-decisions.md#847-cmd-04首批外部目录变更事件)。01425cae 两项远端检查成功，阶段目标继续。

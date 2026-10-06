@@ -7,12 +7,16 @@ export function pathDirectory(value: string): string {
   return value.slice(0, index + 1);
 }
 
+export function resolveCatalogDirectory(root: string, prefix: string, directoriesOnly: boolean): string {
+  const home = process.env.HOME ?? process.env.USERPROFILE;
+  const expanded = !directoriesOnly && prefix.startsWith("~/") && home ? path.join(home, prefix.slice(2)) : prefix;
+  return path.resolve(root, expanded || ".");
+}
+
 /** One directory, bounded and cancellable between entries; never traverse a tree. */
 export async function pathCatalog(root: string, prefix: string, directoriesOnly: boolean, signal: AbortSignal): Promise<readonly Suggestion[]> {
   signal.throwIfAborted();
-  const home = process.env.HOME ?? process.env.USERPROFILE;
-  const expanded = !directoriesOnly && prefix.startsWith("~/") && home ? path.join(home, prefix.slice(2)) : prefix;
-  const directory = path.resolve(root, expanded || ".");
+  const directory = resolveCatalogDirectory(root, prefix, directoriesOnly);
   const handle = await fs.opendir(directory);
   const items: Suggestion[] = [];
   let count = 0;

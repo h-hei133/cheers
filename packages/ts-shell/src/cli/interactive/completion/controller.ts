@@ -5,7 +5,10 @@ import { catalogRequest, catalogSuggestions, type CatalogKind } from "./request.
 interface Options {
   readonly identity: () => string;
   readonly draft: () => DraftSnapshot;
-  readonly load: ((kind: CatalogKind, signal: AbortSignal, query?: string) => Promise<readonly Suggestion[]>) & { invalidate?: () => void };
+  readonly load: ((kind: CatalogKind, signal: AbortSignal, query?: string) => Promise<readonly Suggestion[]>) & {
+    invalidate?: () => void;
+    observe?: (kind: CatalogKind, query: string | undefined, changed: () => void) => (() => void) | undefined;
+  };
   readonly publish: (items: readonly Suggestion[], status?: string) => void;
 }
 interface Cache { readonly items?: readonly Suggestion[]; readonly error?: string; readonly expires: number }
@@ -18,10 +21,14 @@ export class CatalogController {
   private deadline?: ReturnType<typeof setTimeout>;
   private identity = "";
   private readonly cache = new Map<string, Cache>();
+  private readonly observers = new Map<string, () => void>();
+  private observerEpoch = 0;
+  private active?: { key: string; snapshot: DraftSnapshot; identity: string };
 
   constructor(private readonly options: Options) {}
 
   cancel(): void {
+    this.active = undefined;
     this.epoch++;
     this.abort?.abort();
     this.abort = undefined;
@@ -30,8 +37,11 @@ export class CatalogController {
   }
 
   invalidate(): void {
+    this.observerEpoch++;
     this.cancel();
     this.cache.clear();
+    for (const close of this.observers.values()) close();
+    this.observers.clear();
     this.options.load.invalidate?.();
   }
 
@@ -40,8 +50,11 @@ export class CatalogController {
     const request = catalogRequest(snapshot);
     if (!request) return false;
     const identity = this.options.identity();
-    if (identity !== this.identity) { this.cache.clear(); this.identity = identity; }
-    const cached = this.cache.get(JSON.stringify([request.kind, request.query]));
+    if (identity !== this.identity) { this.invalidate(); this.identity = identity; }
+    const key = JSON.stringify([request.kind, request.query]);
+    this.active = { key, snapshot, identity };
+    this.observe(request, key);
+    const cached = this.cache.get(key);
     if (cached && cached.expires > Date.now()) {
       const matches = catalogSuggestions(request, cached.items ?? []);
       this.options.publish(matches, cached.error ?? (matches.length ? undefined : "No matching entries."));
@@ -67,6 +80,26 @@ export class CatalogController {
       });
     }, 75);
     return true;
+  }
+
+  private observe(request: NonNullable<ReturnType<typeof catalogRequest>>, key: string): void {
+    if (this.observers.has(key)) return;
+    const generation = this.observerEpoch;
+    let disposed = false;
+    const close = this.options.load.observe?.(request.kind, request.query, () => {
+      if (disposed || generation !== this.observerEpoch) return;
+      this.cache.delete(key);
+      const active = this.active;
+      if (!active || active.key !== key || !this.current(this.epoch, active.identity, active.snapshot)) return;
+      this.options.load.invalidate?.();
+      this.update(active.snapshot);
+    });
+    if (!close) return;
+    this.observers.set(key, () => { disposed = true; close(); });
+    if (this.observers.size > 64) {
+      const oldest = this.observers.keys().next().value!;
+      this.observers.get(oldest)!(); this.observers.delete(oldest); this.cache.delete(oldest);
+    }
   }
 
   private current(epoch: number, identity: string, snapshot: DraftSnapshot): boolean {

@@ -888,3 +888,14 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - regular/fullscreen 真实 CLI 读取用户模型 overlay、Tab 后无刷新，Enter 选择会话模型；workflow 按显示标题接受带空格的文件名，Tab 后定义不变且执行标记不存在，两模式 exit 0。初次探针缺少活动连接，实际命令拒绝；补齐隔离合成连接后通过，未更改产品认证要求。
 - import cycles/config consumers/declarations/node floor 通过；NormProof 全图无环/导入解析 satisfied，既有 5 个函数数量 advisory 保留。01425cae Architecture Watch 37391742802 成功，CI 37391742312 查询时仍运行。
 - CMD-04 仍需完整目录/连接版本事件及剩余参数审计。目录 owner 的同步解析不能被 AbortSignal 物理打断，本轮不以取消发布测试声称全部底层读取可中止。CMD-03 与 Phase 19 其余批次未完成。
+
+### 8.47 CMD-04：首批外部目录变更事件
+
+- controller 为已查询目录持有最多 64 组可释放监听，路径目录、model/provider 的用户与刷新缓存文件、workflow 定义目录和信任文件接入变更失效。事件只清对应缓存；当前仍在补全同一来源、身份与草稿一致时取消旧请求并重读，其他来源只失效缓存，不抢占输入。
+- 取消清理 active 发布资格，Esc 后的事件不能重开菜单。项目/会话切换、显式 invalidate 与退出关闭监听；被释放观察者通过代次与 disposed 守卫拒绝迟到事件。缓存暂未展示时仍可失效，避免下次使用旧目录。
+- 文件监听从目标及其父目录处理条目变化与目录替换，目标不存在时监听最近现存父目录，创建后重新绑定；单文件的原子替换同样重新读取。监听不递归遍历工作区，句柄 persistent=false，读取路径解析与路径目录查询共用一个函数。
+- 对照参考文件事件处理只刷新已加载目录、增删使父目录失效的决定，复用本项目 controller，没有增加全工作区索引。监听不可用/出错时关闭句柄并保留既有 TTL/显式刷新退路；不声称所有平台和挂载都支持即时文件事件。
+- Linux、Node 20.3 隔离环境 12 文件/158 项与 build:ts 通过，覆盖不存在目标创建、目录替换、模型文件原子替换、取消不重开、释放后迟到事件拒绝。移除取消时 active 清理的反转失败，逐字节恢复后组合通过。
+- regular/fullscreen 真实 CLI 在没有新增按键时响应目录增删、用户模型目录创建和原子替换；Esc 后继续外部写入未重新打开候选，两模式 exit 0。探针的文件变更仅用于隔离合成工作区与 HOME，没有模型请求。
+- import cycles/config consumers/declarations/node floor 通过；NormProof 无环/导入解析 satisfied，既有 5 个函数数量 advisory 保留。01425cae 两项远端检查均成功；086fe2c5 Architecture Watch 37392574377 成功，CI 37392574729 查询时仍运行。
+- CMD-04 全部来源事件尚未完成：theme/skill 的嵌套目录、会话/记忆/授权/连接 owner 版本与 MCP 连接状态仍需接线，底层同步读取取消限制保留；其余参数与 Phase 19 后续任务继续。
