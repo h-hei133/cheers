@@ -2,6 +2,8 @@ import { freezeDeep } from '../core/values/freeze.js';
 import type { RuntimeConfig, RuntimeConfigOverrides } from './runtimeConfig.js';
 import { sameValue } from './values.js';
 import { configRestartRequired } from './application.js';
+import { CONFIG_FIELDS } from './runtimeConfig.js';
+import { displayOrigins } from './provenance/projection.js';
 
 export interface ConfigBinding {
   readonly workspaceRoot: string;
@@ -53,7 +55,9 @@ export class ConfigState {
   recordDisplay(applied: Pick<RuntimeConfig, 'tui' | 'tuiMode' | 'theme'>): void {
     this.retireBackground();
     this.generation++;
-    this.publication = freezeDeep({ ...this.publication, revision: this.publication.revision + 1, config: { ...this.publication.config, ...applied } });
+    const config = this.publication.config;
+    this.publication = freezeDeep({ ...this.publication, revision: this.publication.revision + 1,
+      config: { ...config, ...applied, configProvenance: displayOrigins(config, applied, config.configProvenance, CONFIG_FIELDS) } });
   }
 
   begin(binding: ConfigBinding): ConfigTicket {
@@ -86,7 +90,9 @@ export class ConfigState {
       this.reject(['Configuration resource application outcome is unverified.'], true);
       return this.result('application-unverified', before);
     }
-    const config = { ...candidate, tui: this.publication.config.tui, tuiMode: this.publication.config.tuiMode };
+    const installed = this.publication.config;
+    const config = { ...candidate, tui: installed.tui, tuiMode: installed.tuiMode,
+      configProvenance: { ...candidate.configProvenance, tui: installed.configProvenance.tui, tuiMode: installed.configProvenance.tuiMode } };
     this.publication = freezeDeep({ revision: this.publication.revision + 1, config, requested: candidate,
       binding: structuredClone(actual), admissionBlocked: false, diagnostics: candidate.configDiagnostics });
     return this.result('applied', before);

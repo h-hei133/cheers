@@ -58,7 +58,7 @@ export function settingsPicker(host: SettingsHost): Picker {
             id: `${toggle.key}:${value}`,
             label: `${toggle.label} — ${value ? 'on' : 'off'}`,
             detail: `${value ? toggle.onText : toggle.offText}. ${toggle.describe}. Enter saves this choice.`,
-            note: `Current ${current.effective ? 'on' : 'off'} · user ${current.stored === undefined ? 'unset' : current.stored ? 'on' : 'off'}`,
+            note: `Current ${current.effective ? 'on' : 'off'} · user ${current.stored === undefined ? 'unset' : current.stored ? 'on' : 'off'} · ${current.source}`,
             selected: current.effective === value,
           });
         }

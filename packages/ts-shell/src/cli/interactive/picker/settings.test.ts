@@ -6,7 +6,7 @@ import { stripAnsi } from '../../../presentation/tui/text/ansi.js';
 function host() {
   const save = vi.fn(async () => 'Saved to your user configuration. Effective for the next operation.');
   return { save, openSettings: () => ({ save, values: {
-    attentionOnIdle: { effective: true, stored: false }, offline: { effective: false, stored: undefined },
+    attentionOnIdle: { effective: true, stored: false, source: 'override' }, offline: { effective: false, stored: undefined, source: 'default' },
   } }) };
 }
 
@@ -15,7 +15,7 @@ describe('settings picker', () => {
     const h = host(); const picker = settingsPicker(h);
     const options = await picker.load();
     expect(picker.title).toContain('save to user configuration');
-    expect(options.find(item => item.id === 'attentionOnIdle:true')).toMatchObject({ selected: true, note: 'Current on · user off' });
+    expect(options.find(item => item.id === 'attentionOnIdle:true')).toMatchObject({ selected: true, note: 'Current on · user off · override' });
     expect(options.find(item => item.id === 'attentionOnIdle:false')?.selected).toBe(false);
     expect(h.save).not.toHaveBeenCalled();
   });
@@ -24,8 +24,8 @@ describe('settings picker', () => {
     await Promise.resolve(); await Promise.resolve();
     const rows = overlay.render(width, 24).map(stripAnsi);
     expect(rows.filter(row => row.includes('Attention on idle'))).toHaveLength(2);
-    for (const row of rows.filter(row => row.includes('Attention on idle'))) expect(row).toContain('Current on · user off');
-    for (const row of rows.filter(row => row.includes('Offline'))) expect(row).toContain('Current off · user unset');
+    for (const row of rows.filter(row => row.includes('Attention on idle'))) expect(row).toContain('Current on · user off · override');
+    for (const row of rows.filter(row => row.includes('Offline'))) expect(row).toContain('Current off · user unset · default');
     overlay.close();
   });
   it('only saves on apply and preserves the host application outcome', async () => {

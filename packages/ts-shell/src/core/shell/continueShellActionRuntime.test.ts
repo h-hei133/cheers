@@ -1,3 +1,4 @@
+import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -24,7 +25,7 @@ function createRuntimeContext(session: Session): ShellRuntimeContext {
     gitRoot: "D:/repo",
     rootBindingDiagnostics: [],
     runtimeConfig: {
-      configValidation: { valid: true, securityBlocked: false }, configDiagnostics: [],
+      ...getRuntimeConfig("D:/repo"),
       provider: "openai",
       maxTurns: 6,
       disabledTools: [],

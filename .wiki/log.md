@@ -6256,3 +6256,6 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-06] test | e044f2b3 远端完整套件发现五文件/七项旧配置上下文与 provider bridge 夹具未更新；修正为真实 factory/publication/refresh 接口，原行为断言保留。受影响 82 项通过，独立代码复审 APPROVE；原 CI 失败不以本地绿灯改写。见 features/phase-19-decisions.md §8.71 补充。
 
 ## [2026-10-06] fix | Phase 19 CFG-04 现有设置开关捕获菜单基线，确认后保存并核验所选字段，再报告实际应用/覆盖状态；attentionOnIdle 的文件→快照→终端提醒链路接通，offline 显示复用真实网络策略。13 组反转及恢复后 30 项通过，regular/fullscreen 的实际短/长回合序列验证通过，独立复审 APPROVE/CLEAR。见 features/phase-19-decisions.md §8.72；高级参数、完整来源和保存范围 UI 继续。
+
+
+## [2026-10-06] feat | Phase 19 CFG-01/04 配置来源树随不可变有效快照发布，覆盖嵌套/合并/派生/会话来源并隔离安装与待重启偏好；现有设置面板显示来源，字段生效与敏感 policy 汇入 registry。11 组有效反转、恢复后 18 项和两模式实际 CLI 来源/重载/零请求验证通过，独立 APPROVE/CLEAR；见 features/phase-19-decisions.md §8.73。高级设置编辑与完整 Phase 19 继续。

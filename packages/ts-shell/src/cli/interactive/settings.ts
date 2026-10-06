@@ -7,6 +7,7 @@ export type SettingKey = 'attentionOnIdle' | 'offline';
 export interface SettingValue {
   readonly effective: boolean;
   readonly stored: boolean | undefined;
+  readonly source: string;
 }
 export interface SettingsDraft {
   readonly values: Readonly<Record<SettingKey, SettingValue>>;
@@ -15,6 +16,11 @@ export interface SettingsDraft {
 
 function effective(context: ShellRuntimeContext, key: SettingKey): boolean {
   return key === 'offline' ? isOffline({ configuredOffline: context.runtimeConfig.offline }) : context.runtimeConfig[key] === true;
+}
+
+function source(context: ShellRuntimeContext, key: SettingKey): string {
+  if (key === 'offline' && process.env[OFFLINE_ENV] !== undefined) return 'environment';
+  return context.runtimeConfig.configProvenance[key]?.sources.join(' + ') || 'unavailable';
 }
 
 function applicationNotice(context: ShellRuntimeContext, key: SettingKey, value: boolean): string {
@@ -30,8 +36,8 @@ export function openSettings(context: ShellRuntimeContext, onApplied: () => void
   const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
   const substrate = context.configuration.substrateRevision;
   const values = {
-    attentionOnIdle: { effective: context.runtimeConfig.attentionOnIdle === true, stored: edit.values.attentionOnIdle },
-    offline: { effective: effective(context, 'offline'), stored: edit.values.offline },
+    attentionOnIdle: { effective: context.runtimeConfig.attentionOnIdle === true, stored: edit.values.attentionOnIdle, source: source(context, 'attentionOnIdle') },
+    offline: { effective: effective(context, 'offline'), stored: edit.values.offline, source: source(context, 'offline') },
   };
   let consumed = false;
   return {

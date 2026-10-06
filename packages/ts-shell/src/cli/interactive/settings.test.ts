@@ -39,13 +39,13 @@ it('loads the default, project, user and explicit launch notification preference
 it('saves and publishes the chosen preference, retaining unrelated concurrent edits and JSONC trivia', async () => {
   fs.writeFileSync(file, '// user preferences\n{"offline":false,"maxTurns":12,}\n');
   const context = runtime(); const applied = vi.fn(); const draft = openSettings(context, applied);
-  expect(draft.values.attentionOnIdle).toEqual({ effective: false, stored: undefined });
+  expect(draft.values.attentionOnIdle).toEqual({ effective: false, stored: undefined, source: 'default' });
   fs.writeFileSync(file, '// user preferences\n{"offline":false,"maxTurns":13,}\n');
   expect(await draft.save('attentionOnIdle', true)).toContain('Effective for the next operation');
   expect(context.runtimeConfig.attentionOnIdle).toBe(true);
   expect(context.runtimeConfig.maxTurns).toBe(13);
   expect(fs.readFileSync(file, 'utf8')).toContain('// user preferences');
-  expect(openSettings(context, applied).values.attentionOnIdle).toEqual({ effective: true, stored: true });
+  expect(openSettings(context, applied).values.attentionOnIdle).toEqual({ effective: true, stored: true, source: 'user' });
   expect(getRuntimeConfig(root).attentionOnIdle).toBe(true); expect(applied).toHaveBeenCalledOnce();
 });
 
@@ -63,6 +63,7 @@ it('reports saved but launch-overridden settings separately from the effective v
   const notice = await openSettings(context, vi.fn()).save('attentionOnIdle', true);
   expect(notice).toContain('keeps its launch override');
   expect(context.runtimeConfig.attentionOnIdle).toBe(false);
+  expect(openSettings(context, vi.fn()).values.attentionOnIdle.source).toBe('override');
   expect(getRuntimeConfig(root).attentionOnIdle).toBe(true);
 });
 
@@ -80,6 +81,7 @@ it.each([['0', true, false], ['1', false, true]] as const)('reports the actual o
   vi.stubEnv('CHEERS_OFFLINE', env);
   const context = runtime(); const draft = openSettings(context, vi.fn());
   expect(draft.values.offline.effective).toBe(expected);
+  expect(draft.values.offline.source).toBe('environment');
   const notice = await draft.save('offline', chosen);
   expect(notice).toContain('CHEERS_OFFLINE environment override'); expect(notice).not.toContain('Effective for');
   expect(getRuntimeConfig(root).offline).toBe(chosen);
@@ -101,7 +103,7 @@ it('keeps accepted settings after invalid reload and distinguishes persistence f
   expect(context.runtimeConfig.attentionOnIdle).toBe(false);
   fs.writeFileSync(file, '{"attentionOnIdle":true}');
   const draft = openSettings(context, applied);
-  expect(draft.values.attentionOnIdle).toEqual({ effective: false, stored: true });
+  expect(draft.values.attentionOnIdle).toEqual({ effective: false, stored: true, source: 'default' });
   fs.writeFileSync(getProjectConfigPath(root), '{broken');
   const notice = await draft.save('attentionOnIdle', true);
   expect(notice).toContain('Saved to your user configuration'); expect(notice).toContain('not applied (rejected)');

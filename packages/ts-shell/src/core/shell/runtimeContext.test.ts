@@ -1,3 +1,4 @@
+import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import { describe, expect, it } from 'vitest'
 import path from 'node:path'
 import { forgetSessionTodos, getSessionTodos, setSessionTodos } from '../commands/todoCommandRuntime.js'
@@ -26,7 +27,7 @@ describe('shell runtime context', () => {
       targetPathBase: 'D:/repo',
       gitRoot: 'D:/repo',
       runtimeConfig: {
-        configValidation: { valid: true, securityBlocked: false }, configDiagnostics: [],
+        ...getRuntimeConfig("D:/repo"),
         provider: 'openai',
         maxTurns: 6,
         disabledTools: [],
@@ -88,7 +89,7 @@ describe('shell runtime context', () => {
       targetPathBase: 'D:/repo',
       gitRoot: 'D:/repo',
       runtimeConfig: {
-        configValidation: { valid: true, securityBlocked: false }, configDiagnostics: [],
+        ...getRuntimeConfig("D:/repo"),
         provider: 'openai',
         maxTurns: 6,
         disabledTools: [],
@@ -152,7 +153,7 @@ describe('shell runtime context', () => {
       targetPathBase: 'D:/repo',
       gitRoot: 'D:/repo',
       runtimeConfig: {
-        configValidation: { valid: true, securityBlocked: false }, configDiagnostics: [],
+        ...getRuntimeConfig("D:/repo"),
         provider: 'openai',
         maxTurns: 6,
         disabledTools: [],

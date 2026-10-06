@@ -8,6 +8,8 @@ import { ConfigDocumentError } from "./syntax.js";
 import { readConfigEdit, persistConfigEdit, type ConfigEdit } from "./persistence.js";
 import { normalizeConnectionId } from "./values.js";
 import { loadConfigLayers, validateRawConfig } from "./layers.js";
+import type { ConfigProvenance } from './provenance/model.js';
+import { projectConfigOrigins } from './provenance/projection.js';
 
 /**
  * Token budgets for one model.
@@ -132,6 +134,8 @@ export interface ProviderConnectionConfig {
 }
 
 export interface RuntimeConfig {
+  /** Value-free origin trees published with the settings they describe. */
+  readonly configProvenance: ConfigProvenance;
   /** Structured acceptance facts; diagnostic wording never decides publication. */
   readonly configValidation: { readonly valid: boolean; readonly securityBlocked: boolean };
   readonly provider: RuntimeProvider;
@@ -399,9 +403,9 @@ export interface RuntimeConfigFile {
   providerBodyTimeoutMs?: number;
 }
 
-const CONFIG_FIELDS = createConfigFields(RUNTIME_PROVIDERS) satisfies Record<keyof RuntimeConfigFile | "allowUntrustedHooks", ConfigField>;
+export const CONFIG_FIELDS = createConfigFields(RUNTIME_PROVIDERS) satisfies Record<keyof RuntimeConfigFile | "allowUntrustedHooks", ConfigField>;
 
-const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
+const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources" | "configProvenance"> = {
   configValidation: { valid: true, securityBlocked: false },
   provider: "openai",
   maxTurns: 15,
@@ -489,7 +493,7 @@ export function getRuntimeConfig(
   const provider = merged.provider ?? DEFAULT_CONFIG.provider;
   const maxTurns = merged.maxTurns ?? DEFAULT_CONFIG.maxTurns;
 
-  return {
+  const config: Omit<RuntimeConfig, 'configProvenance'> = {
     configValidation: { valid: layer.valid, securityBlocked: layer.blocked },
     provider,
     maxTurns,
@@ -552,6 +556,7 @@ export function getRuntimeConfig(
     configDiagnostics: dedupeDiagnostics(diagnostics),
     configSources: sources,
   };
+  return { ...config, configProvenance: projectConfigOrigins(layer.values, config, layer.origins, CONFIG_FIELDS) };
 }
 
 /**

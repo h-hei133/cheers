@@ -1194,3 +1194,16 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - regular/fullscreen 构建 CLI 各使用隔离目录与本地合成 HTTP：从实际 /settings 开启；短请求零提醒；30.5 秒响应产生一次提醒序列；关闭后另一 30.5 秒响应不提醒。均为三次请求、exit 0，配置注释保留，合成秘密不输出。regular 首次探针未接受 80 列真实换行，确认落盘和输出后修正空白匹配并单独复跑通过，未修改产品。只证明序列发送，没有 OS 通知展示证据。
 - Linux、Node 20.3 隔离环境最终 15 文件/265 项通过，包含前批 CI 暴露的五个夹具文件；build:ts 通过。import cycles、config consumers、declarations、Node floor、docs strict 与 diff 检查通过；NormProof 阻断义务满足但整体仍为 partial，既有四项函数数量及 120 项文档来源 advisory 保留。夹具修正单独提交为 75c27c1a，本批代码与远端 CI 另按实际 SHA 核对。
 - CFG-04 的高级参数搜索/分组、完整 provenance、可选 project 保存范围与 pending/restart 展示继续，两个现有开关不代表完整设置系统。CFG-01 完整信任/模型能力 policy、CFG-05、账户刷新身份竞态和其余 Phase 19 任务保持开放。
+
+
+### 8.73 CFG-01/04：随有效快照发布的配置来源基础
+
+- config/provenance 按 schema 构造无值来源树，覆盖固定对象叶子、数组条目与开放 map 的位置条目。来源标签包含 default/project/user/environment/override、derived、session、runtime 和 safety；不保存原值、动态模型键、连接 ID、endpoint、环境变量名或凭据。环境插值仅记布尔标记，转义美元符号不误报为环境来源。
+- 普通字段保持 user-first；TUI 按叶子保持 project-first，空 project statusItems 仍回退。安全 allow 交集、deny 累积、禁用集合与 false 限制记录合并贡献和遮蔽；非法值/禁止来源记受控原因，安全阻断产生独立 safety 来源。来源投影不决定值，不能绕过原验证和合并规则。
+- 领域归一化后的值与来源一起投影；自动补出的连接认证类型、状态和时间记 derived，保留的输入归一化记 normalized。模型会话覆盖只标记匹配连接与 provider 的 model 叶子，凭据仍保持原来源。开放 map 位置仅对应同一份快照，不能当作跨 revision 的稳定 ID。
+- ConfigState 将来源和数据一并冻结/发布；磁盘编辑与拒绝候选不会改写 last-good 来源。tui/tuiMode 待重启偏好的来源与当前安装配置分离，显式安装的显示变化标记 runtime 并保留未变叶子。这里描述配置输入及安装记录，不冒充渲染器归一化后的全部视觉默认值。
+- 字段生效时机和敏感级别并入现有字段 registry；删除重复的生效时机表。个人来源约束与敏感级别分别声明，个人专属的 cacheWarming 不因来源限制被误分类为秘密。现有设置面板显示有效来源，offline 继续按实际网络 policy 展示环境覆盖，保存范围仍明确为 user。
+- 对照参考中 runtime/overlay/project/global 来源查询、有效环境值与可编辑文件值分离的决策；保留本产品不同字段的既有优先级，不采用单一最高层查询冒充安全集合和嵌套来源。值合并与来源合并需要同步演进，本批用同一加载路径和反转回归保护这一维护边界。
+- 验证：来源/配置/保存/会话覆盖/恢复/启动及面板组合 15 文件/243 项通过；初轮 22 项失败来自三个旧 shell 测试文件缺少新配置元数据的手造对象，改为复用真实 loader，保留原行为断言。Node 20.3 构建、import cycles/config consumers/declarations/node floor/docs strict 通过；NormProof 阻断义务满足，整体 verdict 仍为 partial，既有函数和文档 advisory 未被宣称解决。
+- 11 组有效反转覆盖普通遮蔽、TUI、限制贡献、开放 map 隐私、derived、会话覆盖、安装来源、环境引用、安全来源和面板来源；七个产品文件逐字节恢复，恢复后 2 文件/18 项通过。两个初始反转先触发测试解引用错误，不计为有效证据；调整断言顺序/可选访问后全部由行为断言检出。
+- regular/fullscreen 构建 CLI 在隔离 home/workspace 和本地合成 endpoint 下验证：打开面板不发 provider 请求；编辑磁盘后仍显示已接受来源，/reload 后显示新来源，环境覆盖可见，合成凭据未显示，退出均为 0。独立审查 APPROVE/CLEAR；高级字段编辑、分组搜索、可选 project 目标、pending/restart 详情面板仍继续，不能把本来源基础称作完整 CFG-04。完整 trust/模型能力校验、凭据刷新代际竞态、CFG-05 与 Phase 19 其他任务保持开放。

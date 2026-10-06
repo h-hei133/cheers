@@ -1,3 +1,4 @@
+import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -19,7 +20,7 @@ function createRuntimeContext(): ShellRuntimeContext {
     targetPathBase: "D:/repo",
     gitRoot: "D:/repo",
     runtimeConfig: {
-      configValidation: { valid: true, securityBlocked: false }, configDiagnostics: [],
+      ...getRuntimeConfig("D:/repo"),
       provider: "openai",
       maxTurns: 6,
       disabledTools: [],
@@ -282,7 +283,7 @@ describe("shell recovery helpers", () => {
       targetPathBase: "D:/repo",
       gitRoot: "D:/repo",
       runtimeConfig: {
-        configValidation: { valid: true, securityBlocked: false }, configDiagnostics: [],
+        ...getRuntimeConfig("D:/repo"),
         provider: "openai",
         maxTurns: 6,
         disabledTools: [],
@@ -383,7 +384,7 @@ describe("shell recovery helpers", () => {
       targetPathBase: "D:/repo",
       gitRoot: "D:/repo",
       runtimeConfig: {
-        configValidation: { valid: true, securityBlocked: false }, configDiagnostics: [],
+        ...getRuntimeConfig("D:/repo"),
         provider: "openai",
         maxTurns: 6,
         disabledTools: [],
