@@ -16,6 +16,7 @@ import {
   createSessionStoreLayout,
   ensureSessionStoreLayout,
   locateExistingSessionLayout,
+  projectSessionFileLayout,
   validateSessionId,
   type SessionFileLayout,
   type SessionStoreLayout,
@@ -71,7 +72,10 @@ export class SessionStoreAccess {
     return locateExistingSessionLayout(this.storeLayout, sessionId).metadataPath;
   }
 
-  transcriptPath(sessionId: string): string {
+  transcriptPath(sessionId: string, onSource?: (target: string) => void): string {
+    for (const sessionsDir of this.storeLayout.sessionsSearchDirs) {
+      onSource?.(projectSessionFileLayout({ sessionsDir, sessionId }).sessionDir);
+    }
     return locateExistingSessionLayout(this.storeLayout, sessionId).transcriptPath;
   }
 
@@ -136,7 +140,7 @@ export class SessionStoreAccess {
     });
   }
 
-  listSessions(): Session[] {
+  listSessions(onSource?: (target: string) => void): Session[] {
     // Every directory that may hold sessions, so a listing does not hide the ones
     // written before the directory was renamed. Ids are unique, so an id present
     // in more than one directory is one session, read from the first that has it.
@@ -149,6 +153,7 @@ export class SessionStoreAccess {
         warningState: this.listWarningState,
         warn: (message) => console.warn(message),
         skipSessionIds: seen,
+        onSource,
       })) {
         seen.add(session.id);
         sessions.push(session);

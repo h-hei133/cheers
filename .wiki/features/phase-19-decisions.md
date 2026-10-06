@@ -948,3 +948,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - regular/fullscreen 真实 CLI 在无新按键时响应内存批准/拒绝、检查点清除，Esc 后不重开，持久化记录字节及 mtime 不变，两模式 exit 0。探针用隔离预加载器建立真实 packet/checkpoint，通过测试控制文件触发进程内 owner 调用；控制文件轮询仅在夹具中，不作为产品实现，也不将其计作真实 provider 压缩验收。
 - import cycles/config consumers/declarations/node floor 通过；NormProof 全图无环/导入解析 satisfied，既有 5 个函数数量 advisory 保留。4a86f8af CI 37394996509 与 Architecture Watch 37394996510、ce228211 CI 37394466624 与 Architecture Watch 37394466969 均成功；60908649 Architecture Watch 37395620099 成功，CI 37395619977 查询时仍运行。
 - CMD-04 会话导航、MCP 连接状态及间接配置事件仍待完成；剩余参数审计和 Phase 19 后续任务继续。
+
+### 8.53 CMD-04：会话与导航读取来源事件
+
+- SessionReadSurface/list store 接受可选来源回调，由原有目录遍历报告存储根及会话子目录；补全不用额外扫描。回调发生在最近会话截断前，因此监听上限内未展示会话的标题/更新时间变化也能使列表失效；新目录创建后重新读取并绑定其元数据。
+- entry 通过 manager 的真实存储布局观察所有已知候选会话目录；tree/thread 沿原导航 query 的布局报告来源，捕获 metadata、state 与 transcript 变化。覆盖当前目录副本优先于旧目录会话的情况，没有改变 owner 的来源选择或会话恢复行为。manager 构造时固定的搜索目录语义保留。
+- 将技能目录已验证的有界路径监听管理提取为共享 observation，技能与四类会话目录各自保留订阅和最多 256 个目标，换树/释放逻辑继续复用。沿用参考文件事件只刷新已查询来源的决定，超限或平台不支持时保留 TTL/显式失效，没有建立后台全会话索引。
+- Linux、Node 20.3 隔离环境最终 22 文件/260 项与 build:ts 通过，包含完整 SessionManager 78 项、列表/导航 query、技能回归和观察上限测试。初次提取遗漏 path import 导致构建失败，补齐后构建通过；没有将失败运行计作通过。
+- 移除列表子目录来源回调后，已有会话标题和新会话后续标题刷新两组断言失败，逐字节恢复后组合通过。新增专项验证旧目录转录被当前目录副本覆盖后候选更新。regular/fullscreen 真实 CLI 无新按键响应跨进程标题修改、会话删除和当前导航树追加消息，Esc 后不重开，两模式 exit 0。
+- import cycles/config consumers/declarations/node floor 通过；NormProof 无环/导入解析 satisfied，最终报告为 4 个函数数量 advisory；SessionStoreAccess 在新增回调参数后不再被报告，但其方法未减少，本批不据此宣称历史超限已修复，计数差异留作检查器边界。60908649 CI 37395619977 与 Architecture Watch 37395620099 均成功；980fca15 Architecture Watch 37396452028 成功，CI 37396451943 查询时仍运行。一次 GitHub 查询 EOF 后原查询重试成功，未重启 CI。
+- CMD-04 的 MCP 连接状态和间接配置事件仍需完成；全参数审计、同步读取取消限制与 Phase 19 后续任务继续。

@@ -73,8 +73,8 @@ export abstract class SessionReadSurface extends SessionLifecycleWrites {
    * A run interrupted with a prompt still pending, or one that ended in a
    * terminal state, is unfinished or diagnosable work and stays offered.
    */
-  protected listRealSessions(): Session[] {
-    return this.listSessions().filter((session) => sessionHasReentrySurface(session));
+  protected listRealSessions(onSource?: (target: string) => void): Session[] {
+    return this.listSessions(onSource).filter((session) => sessionHasReentrySurface(session));
   }
 
   /** The stored record, or undefined when it is gone or unreadable. */
@@ -109,8 +109,8 @@ export abstract class SessionReadSurface extends SessionLifecycleWrites {
     this.host.store.clearCurrentSessionForProject(projectRoot);
   }
 
-  listSessions(): Session[] {
-    return this.host.store.listSessions();
+  listSessions(onSource?: (target: string) => void): Session[] {
+    return this.host.store.listSessions(onSource);
   }
 
   /**
@@ -119,8 +119,8 @@ export abstract class SessionReadSurface extends SessionLifecycleWrites {
    * A session nobody said anything in is not one of them — offering it would put a
    * row in the chooser for every time the CLI was opened.
    */
-  listRecentSessions(limit: number = 5): Session[] {
-    return this.listRealSessions().slice(0, limit);
+  listRecentSessions(limit: number = 5, onSource?: (target: string) => void): Session[] {
+    return this.listRealSessions(onSource).slice(0, limit);
   }
 
   deleteSession(sessionId: string): void {
@@ -130,7 +130,8 @@ export abstract class SessionReadSurface extends SessionLifecycleWrites {
     forgetSessionTodos(sessionId);
   }
 
-  getTranscriptEvents(sessionId: string): TranscriptEvent[] {
+  getTranscriptEvents(sessionId: string, onSource?: (target: string) => void): TranscriptEvent[] {
+    if (onSource) this.host.store.transcriptPath(sessionId, onSource);
     return handleGetTranscriptEvents(this.host.store, sessionId);
   }
 

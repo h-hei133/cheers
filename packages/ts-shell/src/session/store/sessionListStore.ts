@@ -1,4 +1,5 @@
 import * as fs from "node:fs";
+import path from "node:path";
 import type { Session } from "../schema/sessionRecord.js";
 import {
   formatListSessionsFailureWarning,
@@ -23,7 +24,9 @@ export function listSessionRecords(input: {
    * loading and discarding keeps a duplicate from being reported as unreadable.
    */
   readonly skipSessionIds?: ReadonlySet<string>;
+  readonly onSource?: (target: string) => void;
 }): Session[] {
+  input.onSource?.(input.sessionsDir);
   try {
     const entries = fs.readdirSync(input.sessionsDir, { withFileTypes: true });
     const sessions: Session[] = [];
@@ -33,6 +36,7 @@ export function listSessionRecords(input: {
       if (!entry.isDirectory()) {
         continue;
       }
+      input.onSource?.(path.join(input.sessionsDir, entry.name));
       if (input.skipSessionIds?.has(entry.name)) {
         continue;
       }

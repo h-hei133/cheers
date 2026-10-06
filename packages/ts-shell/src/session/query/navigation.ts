@@ -1,7 +1,7 @@
 import { messageToText } from "../../model-adapters/multimodal.js";
 import type { SessionMessage } from "../schema/sessionMessage.js";
 import type { SessionThreadSnapshot } from "../schema/sessionThread.js";
-import { createSessionStoreLayout, locateExistingSessionLayout } from "../store/sessionFileLayout.js";
+import { createSessionStoreLayout, locateExistingSessionLayout, projectSessionFileLayout } from "../store/sessionFileLayout.js";
 import { loadSessionRecord } from "../store/sessionStore.js";
 import { readSessionThreadSnapshot } from "../store/threadState.js";
 import { readTranscriptEvents } from "../transcript/sessionTranscript.js";
@@ -18,11 +18,13 @@ export interface SessionNavigationPoint {
 }
 
 /** Read every branch, including messages outside the active conversation. */
-export function readSessionNavigation(sessionId: string, cwd: string): {
+export function readSessionNavigation(sessionId: string, cwd: string, onSource?: (target: string) => void): {
   readonly thread: SessionThreadSnapshot;
   readonly points: readonly SessionNavigationPoint[];
 } {
-  const layout = locateExistingSessionLayout(createSessionStoreLayout(), sessionId);
+  const store = createSessionStoreLayout();
+  for (const sessionsDir of store.sessionsSearchDirs) onSource?.(projectSessionFileLayout({ sessionsDir, sessionId }).sessionDir);
+  const layout = locateExistingSessionLayout(store, sessionId);
   const session = loadSessionRecord({ sessionId, layout, cwd });
   const thread = readSessionThreadSnapshot({ session, layout });
   const messages = readTranscriptEvents(layout.transcriptPath).flatMap((event) => {
