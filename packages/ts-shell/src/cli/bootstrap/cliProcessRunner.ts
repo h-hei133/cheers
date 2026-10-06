@@ -154,7 +154,7 @@ export async function runCliProcess(
       providerCredentialResolution: resolvedCredential,
       providerModeEnv: providerRuntimeBridge.providerModeEnv(),
     });
-    time("startup surface rendered");
+    time("startup surface prepared");
     logCliBootstrapSessionInitialized({ logger, bootstrapRuntime });
     // Started and not waited on, so the first frame is never behind a network
     // call. Only for an interactive session: a scripted run has nobody to read a

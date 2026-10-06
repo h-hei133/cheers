@@ -225,20 +225,20 @@ doc 14 历史样本中，从 `npm start` 到终端出现输入框为 **2,482–5
 
 根目录 `start` 转发到工作区，后者通过 `tsx src/entrypoints/cli.tsx` 启动源码。可确认存在包装启动、运行时转译/依赖加载、bootstrap、交互初始化和渲染阶段；每个阶段耗时待测。本研究初版的“每进程 150–300ms”“包装链 800–1,200ms”“转译超过 2,500ms”没有对应分段证据，撤回。WSL2 使用 Linux 内核，不能描述为 Linux 内核模拟层。
 
-### 5.2 `/timings` 的测量边界
+### 5.2 施工前 `/timings` 的测量边界
 
-[startupTiming.ts](../../packages/ts-shell/src/observability/startupTiming.ts#L15) 的 `PROCESS_START` 是该模块求值时的 `Date.now()`，不是 OS 启动或 Node 进程零点。[cliProcessRunner.ts](../../packages/ts-shell/src/cli/bootstrap/cliProcessRunner.ts#L22) 自身也导入此模块；仅凭 [cli.tsx](../../packages/ts-shell/src/entrypoints/cli.tsx) 的静态 import 书写次序，不能断言整棵依赖图耗时均排除在外。
+施工前 [startupTiming.ts](../../packages/ts-shell/src/observability/startupTiming.ts) 的 `PROCESS_START` 是该模块求值时的 `Date.now()`，不是 OS 启动或 Node 进程零点。[cliProcessRunner.ts](../../packages/ts-shell/src/cli/bootstrap/cliProcessRunner.ts) 自身也导入此模块；仅凭 [cli.tsx](../../packages/ts-shell/src/entrypoints/cli.tsx) 的静态 import 书写次序，不能断言整棵依赖图耗时均排除在外。现已按 §5.5 改为运行时单调时钟。
 
 现有 `arguments parsed`、`runtime bootstrapped`、`stdin captured`、`startup surface rendered` 标记不能表达输入框首帧已经绘制。`tui.start()` 在 [engine.ts](../../packages/ts-shell/src/presentation/tui/render/engine.ts#L141) 只安排渲染；在其返回后打点只能证明启动请求已发出，不能证明首次 paint/write 已完成，更不能证明终端像素已显示。
 
-### 5.3 计时决定（待施工）
+### 5.3 计时决定（已按 §5.5 施工）
 
 1. 记录 `performance.timeOrigin` 或 `process.uptime()` 推导的进程时间基准；这仍不覆盖父 npm 包装进程的耗时。打点模块必须轻量。
 2. 分别记录 bootstrap 完成、输入监听就绪、首次布局完成、首次终端写入完成。渲染完成事件由实际 paint/write 路径发出，并分别覆盖 regular/fullscreen。
 3. 外部 PTY 从启动命令前计时，等真实启动提示符与可交互状态；单独记录终端可见首帧的观测口径。不能把 `terminal.write` 返回等同于用户已看见像素。
 4. 更新检查只有在 trace 证明占据关键路径时才能归因；禁用计时的开销需测量，不承诺数学意义的零损耗。
 
-### 5.4 固定环境基准矩阵（待执行）
+### 5.4 固定环境基准矩阵
 
 | 组别 | 启动方式 | 比较目的 |
 |---|---|---|
@@ -247,7 +247,25 @@ doc 14 历史样本中，从 `npm start` 到终端出现输入框为 **2,482–5
 | C | 直接运行现有预编译 JS 产物 | 比较转译与产物加载差异 |
 | D | 现有 `build:exe` 产物 | 比较单文件分发入口；历史约 7 倍仅作线索 |
 
-在同一主机、相同隔离配置、固定 provider 模式、冷/暖缓存分组下重复采样，记录中位数、分位数及失败样本。与前序稳定提交对比时必须固定环境与起止事件。本次未重新运行该矩阵。
+在同一主机、相同隔离配置、固定 provider 模式下重复采样，记录中位数、分位数及失败样本。应用临时缓存首次/重复使用与操作系统冷缓存分开；未经系统缓存控制不称 cold boot。与前序稳定提交对比时必须固定环境与起止事件。2026-10-07 矩阵见 §5.5。
+
+### 5.5 UI-07 启动事件与入口矩阵（2026-10-07）
+
+- 计时改用 `performance.now()` 的运行时单调起点，首个 modules-loaded 间隔包含计时模块求值之前的时间；父 npm/tsx 包装耗时仍归外部探针。每项同时给出距前事件间隔和进程累计时间，明确不是各模块独占 CPU 时间，系统墙钟跳变不改变间隔。
+- 实际 terminal 安装 stdin listener/取得 raw mode 后报告 input ready；deferred input 在 enable 后才报告。首次有效布局由 render engine 报告；regular/fullscreen painter 均将首次 frame write 的回调交给设备，仅 stdout 成功回调报告完成。stop/restart 撤销旧 frame 观察，控制序列写入、排队 start、零尺寸和失败写入均不冒充首帧完成。输出流完成不等于终端像素可见。
+- `CHEERS_TIMING` 未等于 `1` 时不采时钟、不安装观察回调。独立架构审查检出 engine 中条件表达式里的命名 callback 令函数数 20→21；回调归属和撤销移入 render owner 的 `startup.ts`，engine 恢复 20，无第二个绘制宿主。最终 Node 20.3 构建与 122 项通过，独立 APPROVE/CLEAR，反转与具体证据见 [主裁决 §8.100](phase-19-decisions.md#8100-ui-07启动计时的实际事件边界)。
+- 实际 PTY 共 50 场：两种模式 × npm/tsx/JS/exe/关闭计时的 JS × 5 次；每组首次使用独立 TMPDIR，再复用该临时缓存四次，每场全新 HOME/项目/数据根。固定 synthetic/offline、120×60、同配置，50 场全部退出 0、配置不变、无模型 message。探针分别记录进程启动前→VT 提示符，以及输入探针文字出现在 composer；它不是 Windows 或真实前端像素证据。
+
+| 入口 | regular 提示符中位数 / P95 ms | fullscreen 提示符中位数 / P95 ms | regular / fullscreen 输入回显中位数 ms |
+|---|---:|---:|---:|
+| npm start | 2121 / 2215 | 2088 / 2143 | 2164 / 2130 |
+| 直接 tsx | 1550 / 1575 | 1552 / 1563 | 1594 / 1594 |
+| 预编译 JS | 894 / 910 | 882 / 938 | 937 / 925 |
+| 单文件 executable | 410 / 412 | 411 / 419 | 451 / 453 |
+| JS，计时关闭 | 898 / 908 | 915 / 1006 | 940 / 959 |
+
+- 表格仅重复缓存四场，P95 使用 nearest-rank（本样本量即最大值）；操作系统缓存未控制。关闭/开启计时样本重叠且顺序运行有噪声，不能据此宣称零开销或将负差当优化。该矩阵是当前入口对比，没有对前提交声称提速。证据 `.tmp/sm-642699446` 含首场、每次屏幕/记录及 summary。初轮失败分别是过长 TMPDIR 导致 tsx Unix socket 路径冲突、VT 夹具未处理 private DSR；缩短仓库内路径并补齐既有屏幕桩后重跑，无产品迁就。
+- 实际请求上下文尺寸/来源账目仍待后续 UI-07 工作，首帧计时不代表其完成。
 
 ## 6. 问题五：首轮约 5.4k 上下文的口径与来源
 

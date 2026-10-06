@@ -14,10 +14,8 @@ import { time } from "../observability/startupTiming.js";
 // assembling itself.
 installCrashRecorder({ cwd: process.cwd() });
 
-// The first mark is the module graph finishing its load, not the process
-// starting: `startupTiming.ts` is imported after several other modules, so the
-// number is what is left of the load rather than all of it. Named for what it
-// measures rather than for the moment it is called.
+// The elapsed clock includes runtime startup and this entrypoint's dependency
+// evaluation, regardless of when the timing module itself was imported.
 time("modules loaded");
 runCliProcess({
   args: process.argv.slice(2),

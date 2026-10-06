@@ -1539,3 +1539,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 
 - 五项静态 gates、43 项 script tests 与 NormProof 0 blocking 通过，见 `.tmp/report-replay-gates-misb452s`。既有五项函数计数 advisory（含算术变量误判）及 120 项文档来源 advisory 保留。
 - 独立代码 APPROVE，启动修复后追加 37+5+16 项通过；架构 CLEAR，独立 14 文件/215 项、最终 delta 5 文件/69 项及导出/恶意时间/删除探针通过，见 `.tmp/report-architecture-5tV1CP`。普通及混合依赖图均无环，新增模块未超函数上限；既有 SessionManager 21、SessionStoreAccess 23 保留，不将已有超限描述为全库合规。
+
+### 8.100 UI-07：启动计时的实际事件边界
+
+- [startupTiming](../../packages/ts-shell/src/observability/startupTiming.ts)使用运行时 `performance.now()` 单调起点，首个间隔覆盖模块导入前的启动时间；报告保留 delta/elapsed，明确间隔并非独占耗时、父 launcher 不在进程计时内。原 startup-surface 标记改为 prepared，避免将非 TUI 启动投影说成首帧已画出。参考计时模块的 opt-in gate/命名空间组织，但不沿用首个 mark 才 reset 导致漏掉最早区间的决定。
+- TUI 提供可选 input-ready/first-layout/first-write 观察，真实输入 listener 安装和 deferred enable、有效布局、stdout 成功 callback 分别发出。两个 painter 都传递写入回调；[FrameStartup](../../packages/ts-shell/src/presentation/tui/render/startup.ts)拥有一次性回调及 stop/restart 撤销，不让旧写入污染新启动。未启用计时不安装这些观察。没有将 stream callback 当作像素确认或性能提升证明。
+- 最终 Node 20.3 构建和 7 文件/122 项通过，见 `.tmp/startup-check-ax4w0yv0`；既有 build:exe 成功生成本机产物，见 `.tmp/startup-exe-final-wsdbxctx`，未更改 package scripts/build 行为。三组有效反转覆盖进程起点、写入时机和 deferred input，恢复后 60 项；抽取 owner 后再反转最终写入回调，恢复后 51 项，见 `.tmp/phase19-config/report-replay-reversals/1791329364359423483`、`1791329559311131575`。源码副本均逐字节/SHA-256 恢复。
+- 独立代码 APPROVE（116 项，owner 抽取后 51 项），架构 CLEAR（79 项/4 文件与 import-cycle gate），见 `.tmp/timing-architecture-CryAID`。审查识别条件表达式内 callback 导致 engine 超过 20；职责移入 render/startup 后 engine 保持 20→20，terminal 既有字段箭头计数未增长。
+- 两模式实际 npm/tsx/JS/exe 各五次，以及关闭计时 JS 各五次，共 50 场全部通过，见 `.tmp/sm-642699446`。每次从外部启动前到 VT prompt、再到 composer 输入回显分别计时；内部 listener/layout/write 顺序正确，配置不变、零模型 message。重复四场的提示符中位数 regular/fullscreen：npm 2121/2088ms、tsx 1550/1552ms、JS 894/882ms、exe 410/411ms。关闭计时 JS 为 898/915ms，不能宣称零开销；冷/暖应用缓存、未控制 OS 缓存、P95 与早期夹具失败详见 [研究18 §5.5](18-input-slash-startup-context.md#55-ui-07-启动事件与入口矩阵2026-10-07)。没有声称本批比旧提交更快。
+- 上批 `a8774cfa` 已推送，Architecture Watch 37546372288 成功；CI 37546372317 当前仍运行。本批远端按新 SHA 核实。UI-07 的实际请求上下文账目及完整 Phase 19 继续，Windows 像素/真实 IME 仍未验证。
+- 五项静态 gates、43 项 script tests 与 NormProof 0 blocking 通过，见 `.tmp/startup-gates-zjry1oxl`；既有五项函数计数 advisory 和 120 项文档来源 advisory 保留。

@@ -12,6 +12,7 @@ import {
   type ViewportSize,
 } from "./frame.js";
 import { MainScreenPainter } from "./mainScreen.js";
+import { FrameStartup } from './startup.js';
 import {
   cursorPaint,
   cursorTarget,
@@ -99,6 +100,7 @@ export class TUI {
   private overlayScreen = false;
   private readonly inputListeners = new Set<(data: string) => void>();
   private disconnectHandler?: () => void;
+  private startup?: FrameStartup;
 
   private handleDisconnect = (): void => {
     if (this.disconnectHandler) {
@@ -141,7 +143,9 @@ export class TUI {
   start(options?: TuiStartOptions): void {
     this.started = true;
     this.stopped = false;
-    this.beginTerminal({ deferInput: options?.deferInput === true });
+    this.startup?.cancel();
+    this.startup = options?.onFirstLayout || options?.onFirstWrite ? new FrameStartup(options) : undefined;
+    this.beginTerminal({ deferInput: options?.deferInput === true, onInputReady: options?.onInputReady });
     this.alternateScreen = options?.useAlternateScreen !== false;
     this.enterScreen();
     this.setMouseTracking(this.alternateScreen);
@@ -259,6 +263,7 @@ export class TUI {
 
   stop(options?: TuiStopOptions): void {
     if (!this.started || this.stopped) return;
+    this.startup?.cancel();
     this.stopped = true;
     this.started = false;
     this.scheduler.clearTimeout(this.frameTimer);
@@ -320,6 +325,7 @@ export class TUI {
     const dimensions = this.terminal.getDimensions();
     if (dimensions.columns <= 0 || dimensions.rows <= 0) return;
     const frame = this.provider.renderFrame(dimensions, this.mainScreen ? "document" : "viewport");
+    const onWritten = this.startup?.beginFrame();
     const overlayScreen = !!this.mainScreen && frame.fullScreen === true;
     if (overlayScreen !== this.overlayScreen) {
       // Keep the main painter and its cursor account: leaving the alternate
@@ -337,9 +343,9 @@ export class TUI {
       // document is passed rather than the viewport, because there is no
       // viewport here — rows that do not fit are history, not something to
       // scroll to.
-      this.mainScreen.paint(frame.rows, frame.chromeRows ?? []);
+      this.mainScreen.paint(frame.rows, frame.chromeRows ?? [], onWritten);
     } else {
-      this.paint(frame.rows, dimensions);
+      this.paint(frame.rows, dimensions, onWritten);
     }
     this.lastFrameCostMs = this.scheduler.now() - startedAt;
   }
@@ -361,7 +367,7 @@ export class TUI {
     this.requestRender({ force: true });
   }
 
-  private paint(source: readonly string[], dimensions: ViewportSize): void {
+  private paint(source: readonly string[], dimensions: ViewportSize, onWritten?: () => void): void {
     const width = Math.max(1, dimensions.columns);
     const height = Math.max(1, dimensions.rows);
     const force = this.forceNextFrame;
@@ -404,7 +410,7 @@ export class TUI {
     buffer += this.evictOffscreenImages(visible);
     buffer += cursorPaint(cursorTarget(source, 0, height), 0);
     buffer += paintEnd(this.terminal.capabilities.supportsDec2026Sync);
-    this.terminal.write(buffer);
+    this.terminal.write(buffer, onWritten);
 
     this.window = rows;
     this.lastWidth = width;

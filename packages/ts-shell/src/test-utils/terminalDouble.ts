@@ -38,8 +38,9 @@ export class RecordingTerminal implements TerminalDevice {
     return this.pending;
   }
 
-  write(data: string): void {
+  write(data: string, onWritten?: () => void): void {
     this.writes.push(data);
+    onWritten?.();
   }
 
   start(

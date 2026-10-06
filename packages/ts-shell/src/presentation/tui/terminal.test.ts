@@ -5,6 +5,35 @@ import { Terminal } from "./terminal.js";
 
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
 
+it.each([false, true])('reports installed input only after enablement with deferred=%s', deferInput => {
+  vi.useFakeTimers();
+  const input = Object.assign(new PassThrough(), { isTTY: true, isRaw: false, setRawMode: vi.fn() });
+  vi.spyOn(process, 'stdin', 'get').mockReturnValue(input as unknown as NodeJS.ReadStream);
+  const terminal = new Terminal(); const ready = vi.fn(() => {
+    expect(input.listenerCount('data')).toBeGreaterThan(0);
+    expect(input.setRawMode).toHaveBeenCalledWith(true);
+  });
+  vi.spyOn(terminal, 'write').mockImplementation(() => {});
+  vi.spyOn(terminal, 'writeSync').mockImplementation(() => {});
+  try {
+    terminal.start(() => {}, () => {}, () => {}, { deferInput, onInputReady: ready });
+    expect(ready).toHaveBeenCalledTimes(deferInput ? 0 : 1);
+    terminal.enableInput(); terminal.enableInput(); expect(ready).toHaveBeenCalledOnce();
+  } finally { terminal.stop(); input.destroy(); }
+});
+
+it('marks successful stream completion only when its callback succeeds', () => {
+  const callbacks: Array<(error?: Error | null) => void> = [];
+  vi.spyOn(process.stdout, 'write').mockImplementation((_data, callback: unknown) => {
+    callbacks.push(callback as (error?: Error | null) => void); return true;
+  });
+  const terminal = new Terminal(); const written = vi.fn();
+  terminal.write('first frame', written); expect(written).not.toHaveBeenCalled();
+  callbacks[0]!(new Error('write failed')); expect(written).not.toHaveBeenCalled();
+  terminal.write('second frame', written); callbacks[1]!(); expect(written).toHaveBeenCalledOnce();
+  expect(terminal.getPendingOutputBytes()).toBe(0);
+});
+
 it("disables keyboard reports before draining and restores raw mode only afterward", async () => {
   vi.useFakeTimers();
   const input = Object.assign(new PassThrough(), { isTTY: true, isRaw: false, setRawMode: vi.fn() });

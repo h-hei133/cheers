@@ -42,6 +42,12 @@ export interface TerminalFrameProvider {
 }
 
 export interface TuiStartOptions {
+  /** The device has installed its interactive input listener. */
+  readonly onInputReady?: () => void;
+  /** The first valid frame has finished layout, before terminal painting. */
+  readonly onFirstLayout?: () => void;
+  /** The output stream completed the first frame write; not a pixel acknowledgement. */
+  readonly onFirstWrite?: () => void;
   /** Paint without taking over stdin, so cooked-mode echo stays usable. */
   readonly deferInput?: boolean;
   /**

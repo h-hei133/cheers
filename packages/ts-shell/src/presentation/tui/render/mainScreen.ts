@@ -37,7 +37,7 @@ import { cursorTarget, paintBegin, paintEnd, prepareRows } from "./paint.js";
 
 /** Everything this needs from the terminal, so a double can stand in for one. */
 export interface MainScreenDevice {
-  write(data: string): void;
+  write(data: string, onWritten?: () => void): void;
   getDimensions(): { readonly columns: number; readonly rows: number };
   capabilities: { readonly supportsDec2026Sync: boolean };
 }
@@ -89,7 +89,7 @@ export class MainScreenPainter {
    * the tail of the content that is still visible, and the fixed block, are
    * rewritten in place.
    */
-  paint(rows: readonly string[], chromeRows: readonly string[]): void {
+  paint(rows: readonly string[], chromeRows: readonly string[], onWritten?: () => void): void {
     if (!this.started) return;
     const dimensions = this.device.getDimensions();
     const height = Math.max(1, dimensions.rows);
@@ -249,7 +249,7 @@ export class MainScreenPainter {
       buffer += SHOW_CURSOR;
     }
     buffer += paintEnd(this.device.capabilities.supportsDec2026Sync);
-    this.device.write(buffer);
+    this.device.write(buffer, onWritten);
 
     this.visibleContent = onScreenContent;
     this.scrolled = newScrolled;

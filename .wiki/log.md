@@ -6329,3 +6329,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-07] feat | Phase 19 UI-06 既有 JSON cli.output 增加版本化报告，保留兼容文本、事件顺序和事实状态；输出边界统一快照并移除控制序列。64 项、Node 20.3 构建、两组反转/恢复后 20 项与编译 CLI 的回合前后/显式 print 验证通过，见 features/phase-19-decisions.md §8.98。持久语义重放及完整阶段继续。
 
 ## [2026-10-07] feat | Phase 19 UI-06 报告持久为 ancestry 注释，恢复/fork/export 保留语义且不进入模型上下文，失败与未核验保存分开。实际 PTY 揭示并修复启动历史遗漏，两模式同 session 重启与 resize 通过，零 provider 请求。最终 120 项、Node 20.3 构建及七组有效反转证据见 features/phase-19-decisions.md §8.99；前两 SHA 的 sidebar 旧断言 CI 失败已分类修正，远端按新 SHA 跟踪。UI-07 与完整阶段继续。
+
+## [2026-10-07] feat | Phase 19 UI-07 启动计时改为进程单调时钟，分别记录真实输入监听、首布局和输出流完成，两 painter 共用可撤销的首帧观察。122 项、Node 20.3/本机 executable 构建、有效反转及独立 APPROVE/CLEAR 通过；两模式五入口组合共 50 场启动/输入探针通过，入口对比和缓存/像素/开销边界见 features/phase-19-decisions.md §8.100。实际请求上下文账目与完整阶段继续。

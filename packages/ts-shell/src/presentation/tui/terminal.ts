@@ -43,6 +43,7 @@ const RESTORE_MODES = [
 ].join("");
 
 export interface TerminalStartOptions {
+  readonly onInputReady?: () => void;
   /** Leave stdin in cooked mode; {@link Terminal.enableInput} takes it over later. */
   readonly deferInput?: boolean;
 }
@@ -61,7 +62,7 @@ export interface TerminalDevice {
   readonly keyboardProtocol?: KeyboardProtocol;
   getDimensions(): { readonly columns: number; readonly rows: number };
   getPendingOutputBytes(): number;
-  write(data: string): void;
+  write(data: string, onWritten?: () => void): void;
   start(
     onInput: InputHandler,
     onResize: ResizeHandler,
@@ -86,6 +87,7 @@ export class Terminal implements TerminalDevice {
   private pendingBytes = 0;
   private keyboardTimer: NodeJS.Timeout | undefined;
   private deferredInput: string[] = [];
+  private inputReady?: () => void;
 
   private onInput: InputHandler = () => {};
   private onResize: ResizeHandler = () => {};
@@ -162,6 +164,7 @@ export class Terminal implements TerminalDevice {
     this.onResize = onResize;
     this.onDisconnect = onDisconnect;
     this.inputEnabled = options?.deferInput !== true;
+    this.inputReady = options?.onInputReady;
 
     process.stdout.on("resize", this.handleResize);
     if (!process.stdin.isTTY) return;
@@ -172,6 +175,9 @@ export class Terminal implements TerminalDevice {
     process.stdin.on("end", this.handleEnd);
     process.stdin.on("close", this.handleEnd);
     process.stdin.resume();
+    if (this.inputEnabled) {
+      const ready = this.inputReady; this.inputReady = undefined; ready?.();
+    }
     // Ask for modifier reporting before the first keystroke: without it the
     // terminal cannot express Shift+Enter at all, and a bare Escape is
     // indistinguishable from the head of a sequence.
@@ -199,6 +205,9 @@ export class Terminal implements TerminalDevice {
     if (this.inputEnabled) return;
     this.inputEnabled = true;
     this.takeRawMode();
+    if (this.started && process.stdin.isTTY) {
+      const ready = this.inputReady; this.inputReady = undefined; ready?.();
+    }
     const buffered = this.deferredInput;
     this.deferredInput = [];
     for (const chunk of buffered) this.onInput(chunk);
@@ -207,6 +216,7 @@ export class Terminal implements TerminalDevice {
   stop(): void {
     if (!this.started) return;
     this.started = false;
+    this.inputReady = undefined;
     if (this.keyboardTimer) clearTimeout(this.keyboardTimer);
     this.keyboardTimer = undefined;
     process.off("exit", this.handleExit);
@@ -235,7 +245,7 @@ export class Terminal implements TerminalDevice {
     this.releaseRawMode();
   }
 
-  write(data: string): void {
+  write(data: string, onWritten?: () => void): void {
     if (this.disconnected || data.length === 0) return;
     const bytes = Buffer.byteLength(data, "utf8");
     if (this.pendingBytes + bytes > MAX_BACKLOG_BYTES) {
@@ -243,8 +253,9 @@ export class Terminal implements TerminalDevice {
       return;
     }
     this.pendingBytes += bytes;
-    process.stdout.write(data, () => {
+    process.stdout.write(data, (error) => {
       this.pendingBytes = Math.max(0, this.pendingBytes - bytes);
+      if (!error) onWritten?.();
     });
   }
 

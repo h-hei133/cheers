@@ -1,5 +1,5 @@
 import { ENABLE_MOUSE, DISABLE_MOUSE } from '../input/mouse.js';
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { TUI } from "./engine.js";
 import { CURSOR_MARKER } from "./paint.js";
 import type { FrameLayout, TerminalFramePlan, TerminalFrameProvider, ViewportSize } from "./frame.js";
@@ -37,6 +37,34 @@ function boot(): {
 }
 
 describe("keeping the terminal's own screen", () => {
+  it.each([false, true])('reports first layout and actual stream completion separately in alternate=%s', useAlternateScreen => {
+    const { tui, terminal, scheduler } = boot();
+    const layout = vi.fn(); const written = vi.fn(); const completions: Array<() => void> = [];
+    vi.spyOn(terminal, 'write').mockImplementation((data, callback?: () => void) => {
+      terminal.writes.push(data); if (callback) completions.push(callback);
+    });
+    tui.start({ useAlternateScreen, onFirstLayout: layout, onFirstWrite: written });
+    expect(layout).not.toHaveBeenCalled(); expect(written).not.toHaveBeenCalled();
+    scheduler.flush();
+    expect(layout).toHaveBeenCalledOnce(); expect(written).not.toHaveBeenCalled();
+    expect(completions).toHaveLength(1);
+    completions[0]!(); expect(written).toHaveBeenCalledOnce();
+    tui.renderNow(); expect(layout).toHaveBeenCalledOnce(); expect(completions).toHaveLength(1);
+    tui.stop();
+  });
+
+  it('does not report invalid layouts or an obsolete write after restarting the renderer', () => {
+    const { tui, terminal } = boot(); const oldWrite = vi.fn(); const nextWrite = vi.fn(); const layout = vi.fn();
+    const completions: Array<() => void> = [];
+    vi.spyOn(terminal, 'write').mockImplementation((_data, callback?: () => void) => { if (callback) completions.push(callback); });
+    tui.start({ onFirstLayout: layout, onFirstWrite: oldWrite });
+    terminal.columns = 0; tui.renderNow(); expect(layout).not.toHaveBeenCalled();
+    terminal.columns = 40; tui.renderNow(); expect(layout).toHaveBeenCalledOnce();
+    tui.stop(); tui.start({ onFirstWrite: nextWrite });
+    completions[0]!(); expect(oldWrite).not.toHaveBeenCalled(); expect(nextWrite).not.toHaveBeenCalled();
+    tui.renderNow(); completions[1]!(); expect(nextWrite).toHaveBeenCalledOnce(); tui.stop();
+  });
+
   it("borrows a screen for paging and resumes history without duplicating it", () => {
     const { tui, terminal, provider } = boot();
     tui.start({ useAlternateScreen: false });

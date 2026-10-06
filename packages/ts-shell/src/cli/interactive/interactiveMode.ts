@@ -39,6 +39,7 @@ import { InputPreferences } from "./inputPreferences.js";
 import { QuestionBridge } from "./questionBridge.js";
 import { readAmbientFacts } from "./ambientFacts.js";
 import { appendConversation, showConversation, startFreshSession, type HistoryTarget } from "./history.js";
+import { startupObservers } from '../../observability/startupTiming.js';
 import { Pager, pageLongOutput } from "../../presentation/tui/chrome/pager.js";
 import { TranscriptSearch } from "../../presentation/tui/transcript/searchState.js";
 import { routeSearchKey, styleSearchRow } from "../../presentation/tui/transcript/searchHost.js";
@@ -402,6 +403,7 @@ export class InteractiveMode {
     // the private screen.
     this.tui.start({
       useAlternateScreen: this.alternateScreen,
+      ...startupObservers(),
     });
     // After the first frame, not before it: the first paint decides what the
     // surface looks like, and a reload landing in the middle of it would be
