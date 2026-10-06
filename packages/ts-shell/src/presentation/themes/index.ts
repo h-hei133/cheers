@@ -3,6 +3,8 @@ import path from "node:path";
 import { dark as darkJson, light as lightJson, darkContrast, lightContrast } from "./assets.js";
 import { projectDirectories } from "../../core/project/directories.js";
 import { userDataSearchDirsFor } from "../../core/paths/userHome.js";
+import { projectTrust } from "../../core/security/trust/store.js";
+import { identifyProject } from "../../core/security/trust/identity.js";
 
 import { parseTheme, type ThemeConfig } from "./schema.js";
 export type { ThemeConfig } from "./schema.js";
@@ -36,12 +38,36 @@ interface DiscoveredTheme {
 
 /** Discovery roots in load order, including directories that do not exist yet. */
 export function themeDirectories(workspaceRoot: string): readonly string[] {
+  return themeRoots(workspaceRoot).map(root => root.directory);
+}
+
+/** Metadata observation is not permission to read a palette. Keep lexical routes
+ * so replacing a workspace, .agents, or themes link invalidates discovery too. */
+export function themeWatchDirectories(workspaceRoot: string): readonly string[] {
+  const routes = new Set([...projectDirectories(workspaceRoot), ...projectDirectories(identifyProject(workspaceRoot))]);
+  const lexical = [...routes].flatMap(directory =>
+    [directory, path.join(directory, '.agents'), path.join(directory, ...PROJECT_THEME_PATH)]);
+  return [...new Set([...themeDirectories(workspaceRoot), ...lexical])];
+}
+
+function themeRoots(workspaceRoot: string): readonly { directory: string; project: boolean }[] {
   const userDirs = userDataSearchDirsFor(process.env.USERPROFILE ?? process.env.HOME ?? "")
     .map(directory => path.join(directory, THEME_DIRECTORY));
-  const projectDirs = projectDirectories(workspaceRoot)
+  const projectDirs = projectDirectories(identifyProject(workspaceRoot))
     .map(directory => path.join(directory, ...PROJECT_THEME_PATH))
+    .map(directory => identifyProject(directory))
+    .filter(directory => projectTrust.isProjectTrusted(directory))
     .reverse();
-  return [...userDirs, ...projectDirs];
+  return [...userDirs.map(directory => ({ directory, project: false })),
+    ...projectDirs.map(directory => ({ directory, project: true }))];
+}
+
+/** Authorization and the read use the same resolved path, including directory links. */
+function trustedThemePath(filePath: string): string | undefined {
+  try {
+    const canonical = fs.realpathSync(filePath);
+    return projectTrust.isProjectTrusted(canonical) && fs.realpathSync(canonical) === canonical ? canonical : undefined;
+  } catch { return undefined; }
 }
 
 /**
@@ -66,24 +92,29 @@ function discoverThemes(
   extraPaths: readonly string[] = [],
 ): Map<string, DiscoveredTheme> {
   const found = new Map<string, DiscoveredTheme>();
+  const automatic = new Map<string, DiscoveredTheme>();
+  const revision = projectTrust.revision();
 
-  // The user's directory first, then every project directory from the outermost
-  // in. Later wins, so a project overrides the user and a nearer project
-  // directory overrides a farther one — the same precedence the instruction and
-  // skill readers use.
-  for (const directory of themeDirectories(workspaceRoot)) {
-    for (const theme of readThemeDirectory(directory)) {
-      found.set(theme.name, theme);
+  // Preserve the existing load order within each layer. Automatic project
+  // resources require their own trust; an explicit CLI path remains user input.
+  for (const { directory, project } of themeRoots(workspaceRoot)) {
+    for (const theme of readThemeDirectory(directory, project)) {
+      (project ? automatic : found).set(theme.name, theme);
     }
   }
   // A named path may be one file or a directory of them, which is the shape the
   // reference uses: the file is the common case while developing a theme, and
   // the directory is how a theme collection is shared.
+  const explicit = new Map<string, DiscoveredTheme>();
   for (const entry of extraPaths) {
     for (const theme of readThemePath(entry)) {
-      found.set(theme.name, theme);
+      explicit.set(theme.name, theme);
     }
   }
+  if (projectTrust.revision() === revision) {
+    for (const [name, theme] of automatic) found.set(name, theme);
+  }
+  for (const [name, theme] of explicit) found.set(name, theme);
   return found;
 }
 
@@ -123,10 +154,13 @@ function readThemeFile(filePath: string): DiscoveredTheme {
 }
 
 /** Every readable theme file in one directory, ignoring anything malformed. */
-function readThemeDirectory(directory: string): DiscoveredTheme[] {
+function readThemeDirectory(directory: string, project = false): DiscoveredTheme[] {
+  const revision = project ? projectTrust.revision() : undefined;
+  const root = project ? trustedThemePath(directory) : directory;
+  if (!root) return [];
   let entries: fs.Dirent[];
   try {
-    entries = fs.readdirSync(directory, { withFileTypes: true });
+    entries = fs.readdirSync(root, { withFileTypes: true });
   } catch {
     return [];
   }
@@ -134,9 +168,14 @@ function readThemeDirectory(directory: string): DiscoveredTheme[] {
   const themes: DiscoveredTheme[] = [];
   for (const entry of entries) {
     if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
-    const theme = readThemeFile(path.join(directory, entry.name));
+    const candidate = path.join(root, entry.name);
+    const filePath = project ? trustedThemePath(candidate) : candidate;
+    if (!filePath) continue;
+    const theme = readThemeFile(filePath);
+    if (project && trustedThemePath(filePath) !== filePath) continue;
     if (theme) themes.push(theme);
   }
+  if (project && (projectTrust.revision() !== revision || trustedThemePath(root) !== root)) return [];
   return themes;
 }
 

@@ -6,6 +6,7 @@ import { currentTheme } from "../../../presentation/theme/theme.js";
 import { selectedTheme } from "../../../presentation/theme/selection.js";
 import type { ShellRuntimeContext } from "../../../core/shell/runtimeContext.js";
 import type { CliMcpGateway } from "../../../entrypoints/cliMcpModule.js";
+import { projectTrust } from "../../../core/security/trust/store.js";
 
 let root: string;
 const stops: Array<() => void> = [];
@@ -20,6 +21,7 @@ afterEach(() => {
 });
 
 it.each(["user", "project", "extra-file", "extra-directory"])("observes %s theme creation, metadata edits and removal without applying it", async source => {
+  if (source === "project") projectTrust.setProjectTrust(root, "session-only");
   const directory = source === "user" ? path.join(root, ".cheers", "themes")
     : source === "project" ? path.join(root, ".agents", "themes") : path.join(root, "custom");
   const file = path.join(directory, "fixture.json");

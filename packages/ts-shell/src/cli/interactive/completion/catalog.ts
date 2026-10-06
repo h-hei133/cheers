@@ -23,6 +23,22 @@ export function catalogIdentity(context: ShellRuntimeContext, themePaths: readon
     themePaths, context.runtimeConfig.enableMcpTools, context.runtimeConfig.allowedTools, context.runtimeConfig.disabledTools, context.runtimeConfig.hiddenToolPrefixes]);
 }
 
+/** Trust and directory-link changes can change which automatic roots are eligible. */
+function observeThemes(context: ShellRuntimeContext, themePaths: readonly string[], changed: () => void): () => void {
+  let stopped = false;
+  let close: Array<() => void> = [];
+  const attach = () => {
+    close.forEach(stop => stop());
+    close = catalogSources('theme', { cwd: context.cwd, projectRoot: context.projectRoot, themePaths })
+      .map(target => observeDirectory(target, () => {
+        if (stopped) return;
+        attach(); changed();
+      }));
+  };
+  attach();
+  return () => { stopped = true; close.forEach(stop => stop()); close = []; };
+}
+
 async function readCatalog(kind: CatalogKind, context: ShellRuntimeContext, gateway: CliMcpGateway,
   themePaths: readonly string[], manager?: SessionCatalog, policy?: GrantCatalog, onSource?: (target: string) => void): Promise<readonly Suggestion[]> {
   if (kind === "mcp") return serverCatalog(context.cwd);
@@ -81,6 +97,7 @@ export function createCatalogLoader(context: () => ShellRuntimeContext, gateway:
       const observer = navigation.get(kind);
       if (observer) return observer.observe(changed);
       const current = context();
+      if (kind === "theme") return observeThemes(current, themePaths, changed);
       if (kind === "candidate" || kind === "approvable" || kind === "approved") return observeMemoryCatalog(current.session.id, changed);
       const targets = catalogSources(kind, { cwd: current.cwd, projectRoot: current.projectRoot, themePaths, grantPath: policy?.sourcePath }, query);
       const close = targets.map(target => observeDirectory(target, changed));

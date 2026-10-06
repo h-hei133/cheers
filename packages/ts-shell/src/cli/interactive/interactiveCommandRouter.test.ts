@@ -12,7 +12,7 @@ import { runNonInteractivePrompt } from "../../entrypoints/cliRuntimeModule.js";
 import { forgetSessionTodos } from "../../core/commands/todoCommandRuntime.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 
-function createHarness() {
+function createHarness(root = "/tmp/project-alpha") {
   const lines: string[] = [];
   let agentMode: "plan" | "build" = "build";
   let viewMode: "compact" | "verbose" = "compact";
@@ -28,10 +28,10 @@ function createHarness() {
         addTurn: (_id: string, message: SessionMessage) => turns.push(structuredClone(message)),
       } as never,
       runtimeContext: {
-        runtimeConfig: getRuntimeConfig("/tmp/project-alpha"),
-        configuration: new ConfigState(getRuntimeConfig("/tmp/project-alpha"), configurationBinding({ projectRoot: "/tmp/project-alpha", session: { id: "sess_1234567890abcdef" } })),
-        cwd: "/tmp/project-alpha",
-        projectRoot: "/tmp/project-alpha",
+        runtimeConfig: getRuntimeConfig(root),
+        configuration: new ConfigState(getRuntimeConfig(root), configurationBinding({ projectRoot: root, session: { id: "sess_1234567890abcdef" } })),
+        cwd: root,
+        projectRoot: root,
         session: { id: "sess_1234567890abcdef" },
       } as never,
       renderer: {
@@ -62,7 +62,7 @@ function createHarness() {
 describe("interactive command router", () => {
   it.each(["interactive", "piped", "print"])("lists current tools in the %s command path", async mode => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "command-tools-"));
-    const harness = createHarness();
+    const harness = createHarness(root);
     const snapshot = vi.fn(async () => ({ clients: [], tools: [{ serverName: "fixture", toolName: "Read",
       qualifiedName: "mcp__fixture__Read", description: "Read a fixture", annotations: { readOnlyHint: true } }] }));
     Object.assign(harness.input.runtimeContext, { cwd: root, projectRoot: root, skillOptions: { noSkills: true },

@@ -5,7 +5,7 @@ sources: [user-experience-report-2026-10-05, current-source-28ff98ce, isolated-p
 created: 2026-10-05
 updated: 2026-10-06
 tags: [research, configuration, schema, validation, provenance, settings, registry]
-summary: "Phase 19 已实施字段验证与信任策略、来源追踪、JSONC 原文编辑、基线字段补丁、绑定身份的 revision reload、高级 settings 和终端提醒。资源信任、跨字段能力及凭据代际保护继续。"
+summary: "Phase 19 已实施字段及项目主题信任策略、来源追踪、JSONC 原文编辑、基线字段补丁、绑定身份的 revision reload、高级 settings 和终端提醒。其他资源边界、跨字段能力及凭据代际保护继续。"
 confidence: high
 ---
 
@@ -298,3 +298,9 @@ regular/fullscreen CLI 均经本地合成 HTTP 的短回合、开启后的真实
 [Phase 19 §8.78](phase-19-decisions.md#878-cfg-01字段信任过滤与配置身份绑定)已将 trust 条件接入 registry 和 loader：肯定信任才允许 required 项目字段；明确安全字段及禁用/收紧例外保留原合并顺序。首次加载与 reload 携带捕获的 canonical root/revision，Settings 区分已保存与信任未启用，启动提示使用最终快照。
 
 这取代 §8.9 中“getRuntimeConfig 尚未接入字段条件”的状态。未建立信任的项目不能再自动提供成本、上下文、执行模式扩展或主题选择；用户配置与明确启动参数继续生效。其他资源的 undecided 行为未在本批统一，尤其项目主题资产仍可覆盖同名默认主题，不能据字段过滤宣称资源隔离完成。跨字段能力验证、凭据代际保护和阶段其余任务继续。
+
+### 8.11 项目主题资源信任
+
+[Phase 19 §8.79](phase-19-decisions.md#879-cfg-01项目主题资源的肯定信任与观察路径)已将自动主题发现绑定到实际目录/文件的肯定信任，子目录授权不放行祖先资源或链接外部目标；全部读取结束后核对信任版本，变化时只丢弃自动项目结果，个人和显式 CLI 路径仍可用。补全跟踪信任来源及 lexical/canonical 项目目录链，动态重绑新目标。
+
+此项关闭 §8.10 中默认主题仍会被未授权项目资产覆盖的缺口。成功配置刷新更新调色板和 follower；失败准备保持既有 last-good 与准入阻断语义，不宣称外部撤销即时移除已经渲染的颜色。主题历史优先级差异另行处理，其他资源兼容规则、完整跨字段能力和账户刷新代际安全仍继续。

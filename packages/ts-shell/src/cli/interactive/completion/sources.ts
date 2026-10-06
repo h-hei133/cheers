@@ -3,7 +3,7 @@ import { getUserRuntimeConfigPath } from "../../../config/runtimeConfig.js";
 import { userCatalogPath, catalogCachePath } from "../../../core/models/catalogStore.js";
 import { resolveUserDataFile, userDataSearchDirs } from "../../../core/paths/userHome.js";
 import { workflowsDir } from "../../../core/workflow/definition.js";
-import { themeDirectories } from "../../../presentation/themes/index.js";
+import { themeWatchDirectories } from "../../../presentation/themes/index.js";
 import { resolveCatalogDirectory } from "./paths.js";
 import type { CatalogKind } from "./request.js";
 import { memoryCatalogStore } from "./memory.js";
@@ -29,7 +29,8 @@ export function catalogSources(kind: CatalogKind, sources: Sources, query?: stri
   }
   if (kind === "grant") return grantPath ? [grantPath] : [];
   if (kind === "record" || kind === "invalidatable") return [memoryCatalogStore(projectRoot).ref.recordsFile!];
-  if (kind === "theme") return [...new Set([...themeDirectories(cwd), ...themePaths].map(target => path.resolve(target)))];
+  if (kind === "theme") return [...new Set([...themeWatchDirectories(cwd), ...themePaths,
+    ...userFiles(resolveUserDataFile("trust.json"))].map(target => path.resolve(target)))];
   if (kind === "file" || kind === "directory") return [resolveCatalogDirectory(cwd, query ?? "", kind === "directory")];
   if (kind === "connection") return userFiles(getUserRuntimeConfigPath());
   if (kind === "model" || kind === "provider") return userFiles(userCatalogPath(), catalogCachePath());

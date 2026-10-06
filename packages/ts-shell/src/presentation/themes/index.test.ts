@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { listThemes, loadTheme, themeNamesFromPaths, themeSource } from "./index.js";
+import { projectTrust } from "../../core/security/trust/store.js";
 
 /**
  * Where themes come from.
@@ -21,9 +22,11 @@ describe("theme discovery", () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), "themes-"));
     home = path.join(root, "home");
     fs.mkdirSync(home, { recursive: true });
+    vi.stubEnv("HOME", home); vi.stubEnv("USERPROFILE", home);
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     fs.rmSync(root, { recursive: true, force: true });
   });
 
@@ -37,6 +40,7 @@ describe("theme discovery", () => {
   });
 
   it("finds a theme in the project's own directory", () => {
+    projectTrust.setProjectTrust(root, "session-only");
     fs.mkdirSync(path.join(root, ".git"), { recursive: true });
     writeTheme(path.join(root, ".agents", "themes"), "ocean.json", {
       name: "ocean",
@@ -50,6 +54,7 @@ describe("theme discovery", () => {
   });
 
   it("falls back to the file name when the theme does not name itself", () => {
+    projectTrust.setProjectTrust(root, "session-only");
     fs.mkdirSync(path.join(root, ".git"), { recursive: true });
     writeTheme(path.join(root, ".agents", "themes"), "sunset.json", {
       colors: { text: "#221100" },
@@ -59,6 +64,7 @@ describe("theme discovery", () => {
   });
 
   it("lets a project theme shadow a bundled one of the same name", () => {
+    projectTrust.setProjectTrust(root, "session-only");
     // So a user can adjust `dark` without losing the original: deleting their
     // file restores it.
     fs.mkdirSync(path.join(root, ".git"), { recursive: true });
@@ -79,6 +85,7 @@ describe("theme discovery", () => {
   });
 
   it("lists invalid themes but reports why they cannot be selected", () => {
+    projectTrust.setProjectTrust(root, "session-only");
     // A broken palette is a broken theme, not a broken session.
     fs.mkdirSync(path.join(root, ".git"), { recursive: true });
     const dir = path.join(root, ".agents", "themes");
@@ -97,6 +104,7 @@ describe("theme discovery", () => {
   });
 
   it("fills in the tokens a theme does not name", () => {
+    projectTrust.setProjectTrust(root, "session-only");
     // A theme defining only `accent` used to be rendered with the renderer's
     // per-token fallback for everything else — a hardcoded white for text, which
     // is unreadable on a light terminal, from a file that looked valid.
@@ -116,6 +124,7 @@ describe("theme discovery", () => {
   });
 
   it("does not read a theme directory above a directory that is not a project", () => {
+    projectTrust.setProjectTrust(root, "session-only");
     // The same boundary the instruction reader uses: without a root marker the
     // chain above is part of no project.
     const outer = path.join(root, "not-a-project");
