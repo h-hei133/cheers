@@ -466,3 +466,7 @@ connect use/logout 及其动作别名接入同源连接目录，标签匹配接�
 ### CMD-04 路径目录实施记录（2026-10-06）
 
 cd/workspace 目录及 report/export 文件位置接入一级异步目录读取与分目录缓存；目录接受不补空格且光标留在引号内，可继续下一层。235 项、构建、反转和两模式真实 CLI 路径零写验证通过，见 [决策 §8.45](phase-19-decisions.md#845-cmd-04文件与目录路径补全)。model/workflow 生命周期及完整外部版本事件继续。
+
+### CMD-04 model/workflow 生命周期实施记录（2026-10-06）
+
+模型/可运行 workflow 目录接入统一 controller，移除同步模型实体读取；workflow 显示标题匹配接受实际文件名，候选读取不执行。258 项、构建、循环图反转及两模式真实 CLI 验证通过，见 [决策 §8.46](phase-19-decisions.md#846-cmd-04modelworkflow-统一目录生命周期)。完整版本事件与其余参数审计继续。

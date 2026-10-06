@@ -4,6 +4,8 @@ import { grantCatalog, type GrantCatalog } from "./grants.js";
 import { connectionCatalog } from "./connections.js";
 import { memoryCatalog } from "./memory.js";
 import { pathCatalog } from "./paths.js";
+import { modelCatalog } from "./models.js";
+import { workflowCatalog } from "./workflows.js";
 import { listThemes } from "../../../presentation/themes/index.js";
 import { resolveSkillCatalog } from "../../../core/skills/skillCatalog.js";
 import { toolPoolFor } from "../../runtime/tools.js";
@@ -21,6 +23,8 @@ async function readCatalog(kind: CatalogKind, context: ShellRuntimeContext, gate
   themePaths: readonly string[], manager?: SessionCatalog, policy?: GrantCatalog): Promise<readonly Suggestion[]> {
   if (kind === "mcp") return serverCatalog(context.cwd);
   if (kind === "connection") return connectionCatalog();
+  if (kind === "model" || kind === "provider") return modelCatalog(kind);
+  if (kind === "workflow") return workflowCatalog(context.cwd);
   if (kind === "record" || kind === "invalidatable" || kind === "candidate" || kind === "approvable" || kind === "approved") return memoryCatalog(kind, context);
   if (kind === "grant") {
     if (!policy) throw new Error("Grant catalog unavailable");

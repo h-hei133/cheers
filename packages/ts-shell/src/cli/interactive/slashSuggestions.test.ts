@@ -67,10 +67,8 @@ describe("command completions", () => {
     expect(slashSuggestions("/help ")).toBeNull();
   });
 
-  it("offers model pairs after the use subcommand", () => {
-    const matches = slashSuggestions("/model use anthropic/");
-    expect(matches).not.toBeNull();
-    expect(matches?.some((match) => match.value.startsWith("anthropic/"))).toBe(true);
+  it("leaves model entity lookup to the asynchronous surface", () => {
+    expect(slashSuggestions("/model use anthropic/")).toBeNull();
   });
 
   it("offers the model subcommands before a target is typed", () => {

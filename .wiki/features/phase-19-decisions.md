@@ -877,3 +877,14 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - regular/fullscreen 真实 CLI 从带空格目录连续接受到 child 目录，report 文件目标 Tab 后已有文件字节和 mtime 不变，两模式 exit 0。探针首次未剥离光标控制标记，修正终端清理后通过，未改产品行为来迎合等待条件。
 - import cycles/config consumers/declarations/node floor 通过；NormProof 全图无环与导入解析 satisfied，既有 5 个函数数量 advisory 保留。3308f1c5 与 712eaa73 的 CI/Architecture Watch 均成功。
 - CMD-04 仍需 model/workflow 统一生命周期及完整外部版本事件，其他路径型参数按各 owner 语义继续审计；本批没有宣称全命令目录与 Phase 19 整体完成。
+
+### 8.46 CMD-04：model/workflow 统一目录生命周期
+
+- model 的同步 owner 补全仅保留动作/别名/flags；移除同步 loadCatalog 与前缀扫描，模型 ID 和 list provider 进入同一每表面 controller。直接 ID、use/set、list/ls 位置沿 parseModelArgs 校验，status/help/config/refresh、多余目标与非法 flags 不触发目录读取。
+- 模型目录继续复用 shipped/cache/user 三层合并，不刷新网络、不创建用户文件；provider 列表保留命令支持的 runtime providers。原 owner 对损坏 overlay 的 shipped fallback 行为未改，未声称候选独立报告这类错误。目录展示不意味着已认证或可立即切换，实际连接/会话持久化仍由 setModel 负责。
+- workflow run/start 候选复用当前 cwd 的 listWorkflowNames/readWorkflow 与 DAGResolver，只提供解析通过、依赖图有效的文件名；显示名称可匹配但接受真实文件名，避免显示 title 与文件 stem 不同导致无法运行。显式不信任项目报告目录 unavailable，不执行步骤或创建 run 记录；读取上限为 5000 个定义名称。
+- 沿用参考项目从当前工具/目录定义投影候选、合法参数位置先于读取的决定，统一缓存/失效/草稿校验与主动重绘；没有新增模型刷新器或 workflow 执行器。现有 workflow 底层执行边界的后续工作仍按阶段计划推进。
+- Linux、Node 20.3 隔离环境最终 18 文件/258 项与 build:ts 通过，覆盖会话模型选择、目录形状/可达性、workflow runner、输入层与候选生命周期。初次命令包含三个旧测试路径，实际仅运行 192 项；随后明确加入现存 workflow/catalog/selection 测试得到最终数字。循环依赖过滤反转触发目录断言失败，逐字节恢复后组合通过。
+- regular/fullscreen 真实 CLI 读取用户模型 overlay、Tab 后无刷新，Enter 选择会话模型；workflow 按显示标题接受带空格的文件名，Tab 后定义不变且执行标记不存在，两模式 exit 0。初次探针缺少活动连接，实际命令拒绝；补齐隔离合成连接后通过，未更改产品认证要求。
+- import cycles/config consumers/declarations/node floor 通过；NormProof 全图无环/导入解析 satisfied，既有 5 个函数数量 advisory 保留。01425cae Architecture Watch 37391742802 成功，CI 37391742312 查询时仍运行。
+- CMD-04 仍需完整目录/连接版本事件及剩余参数审计。目录 owner 的同步解析不能被 AbortSignal 物理打断，本轮不以取消发布测试声称全部底层读取可中止。CMD-03 与 Phase 19 其余批次未完成。

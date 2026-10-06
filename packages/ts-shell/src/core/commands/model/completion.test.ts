@@ -12,12 +12,9 @@ it("projects actions and aliases from the executable syntax", () => {
 it.each(["status ", "help ", "config ", "refresh ", "use first extra ", "use --unknown "])("does not offer models after %s", prefix => {
   expect(values(prefix)).toEqual([]);
 });
-it("offers model pairs at direct and explicit positions, preserving provider list semantics", () => {
-  expect(values("use openai/").length).toBeGreaterThan(0);
-  expect(values("openai/")).toEqual(values("use openai/"));
-  expect(values("SET openai/")).toEqual(values("use openai/"));
-  expect(values("list open")).toContain("openai");
-  expect(values("list open").every(value => !value.includes("/"))).toBe(true);
+it("keeps flags synchronous and delegates entities to the surface", () => {
+  expect(values("use openai/")).toEqual([]);
+  expect(values("list open")).toEqual([]);
   expect(values("use chosen --g")).toEqual(["--global"]);
   expect(values("chosen --g")).toEqual(["--global"]);
   expect(values("use chosen --global ")).toEqual([]);
