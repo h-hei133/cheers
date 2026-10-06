@@ -1,3 +1,6 @@
+import type { ReportLine, ReportSpan } from "../../../core/commands/report/contract.js";
+import { createReport, span } from "../../../core/commands/report/projection.js";
+
 /**
  * The keys this surface binds, in one place.
  *
@@ -92,38 +95,37 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   { keys: ["shift+drag"], does: "hand the drag to the terminal instead", group: "pointer" },
 ];
 
-const GROUP_TITLES: Record<KeyGroup, string> = {
-  moving: "Moving",
-  editing: "Editing",
-  sending: "Sending",
-  session: "Session",
-  pointer: "Mouse",
+const GROUPS: Record<KeyGroup, string> = {
+  moving: 'Moving', editing: 'Editing', sending: 'Sending', session: 'Session', pointer: 'Mouse',
 };
 
-/**
- * The whole table as Markdown, grouped, with the keys a terminal may not deliver
- * marked as such rather than silently listed alongside ones that always work.
- */
-export function renderKeyGuide(negotiated: boolean, resolved: readonly KeyBinding[] = KEY_BINDINGS): string {
-  const lines: string[] = [];
-  for (const group of Object.keys(GROUP_TITLES) as KeyGroup[]) {
-    const bindings = resolved.filter((binding) => binding.group === group);
-    if (bindings.length === 0) continue;
-    lines.push(`### ${GROUP_TITLES[group]}`, "", "| Key | Does |", "| :--- | :--- |");
-    for (const binding of bindings) {
-      const keys = binding.keys.map((key) => {
-        const requiresProtocol = binding.negotiatedKeys?.includes(key) ?? binding.negotiated;
-        const caveat = requiresProtocol && !negotiated ? " *(not reported)*" : "";
-        return `\`${key}\`${caveat}`;
-      }).join(" / ") || "*(unbound)*";
-      lines.push(`| ${keys} | ${binding.does} |`);
-    }
-    lines.push("");
+/** The effective bindings, including unbound actions and terminal caveats. */
+export function keyReport(negotiated: boolean, bindings: readonly KeyBinding[]) {
+  const lines: ReportLine[] = [];
+  for (const group of Object.keys(GROUPS) as KeyGroup[]) {
+    const entries = bindings.filter(binding => binding.group === group);
+    if (entries.length === 0) continue;
+    lines.push({ kind: 'heading', spans: [span(GROUPS[group], 'heading')] });
+    for (const binding of entries) lines.push({ kind: 'columns', cells: [keySpans(binding, negotiated), [span(binding.does)]] });
+    lines.push({ kind: 'space' });
   }
-  lines.push(
-    negotiated
-      ? "This terminal reports modified keys."
-      : "This terminal does not report modified keys; use an unmarked alternative where available.",
-  );
-  return lines.join("\n");
+  lines.push({ kind: 'text', spans: [span(negotiated ? 'This terminal reports modified keys.'
+    : 'This terminal does not report modified keys; use an unmarked alternative where available.', negotiated ? 'text' : 'warning')] });
+  return createReport({ title: 'Keyboard and mouse', columns: [{ label: 'Key', minWidth: 18 }, { label: 'Does', minWidth: 24 }], lines,
+    facts: { modifierKeysReported: negotiated, bindings: bindings.map(binding => ({ group: binding.group, action: binding.does,
+      keys: binding.keys.map(key => ({ key, requiresProtocol: requiresProtocol(binding, key),
+        status: requiresProtocol(binding, key) && !negotiated ? 'not-reported' : 'bound' })) })) },
+  });
+}
+
+function requiresProtocol(binding: KeyBinding, key: string): boolean {
+  return binding.negotiatedKeys?.includes(key) ?? binding.negotiated ?? false;
+}
+
+function keySpans(binding: KeyBinding, negotiated: boolean): ReportSpan[] {
+  if (binding.keys.length === 0) return [span('(unbound)', 'warning')];
+  return binding.keys.flatMap((key, index) => [
+    ...(index === 0 ? [] : [span(' / ')]), span(key, 'key'),
+    ...(requiresProtocol(binding, key) && !negotiated ? [span(' (not reported)', 'warning')] : []),
+  ]);
 }

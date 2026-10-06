@@ -5,7 +5,7 @@ sources: [user-experience-report-2026-10-05, user-coloring-request-2026-10-05, c
 created: 2026-10-05
 updated: 2026-10-07
 tags: [research, tui, status-band, panels, slash-commands, pickers, coloring]
-summary: "Phase 19 设计与进展：UI-05 已接通独立窗口来源、未知/已报告零用量和费用估算；主题/形态预览已交付。结构化报告、自适应阅读器与 help 两步填入已接通，其他报告迁移继续；历史首帧与终端归因保留边界。"
+summary: "Phase 19 设计与进展：UI-05 已接通独立窗口来源、未知/已报告零用量和费用估算；主题/形态预览已交付。结构化报告、自适应阅读器、help 两步填入及 cost/hotkey 已接通，其他报告迁移继续；历史首帧与终端归因保留边界。"
 confidence: mixed
 ---
 
@@ -354,3 +354,11 @@ bridge 不在 runtime 的 output 生成阶段包色，也不把渲染字符串�
 - 通用 inline panel 最多 8 个选项，标题/footer/溢出另计，消费 Surface 扣除实际 composer、提示和 activity 后的可用行数。极短帧保持边界与关闭提示。命令使用既有 command 色槽，筛选 terms 与显示标签分离；更新选项保留仍存在的焦点。
 - Overlay 拥有动态订阅生命周期；相同 picker 实例关闭重开时，以打开代际隔离旧 load 与 publication，并在选择、取消或替换后解除订阅。两模式 actual CLI 验证 canonical/命名入口、100→40 列、两次提交与退出；全部 0 provider 请求、配置逐字节不变。详细审查/测试/反转证据见 [主裁决 §8.94](phase-19-decisions.md#894-ui-06可搜索帮助与两步命令提交)。
 - 保留带参及 print 的既有命令路径；本批没有宣称其他报告迁移、CLI JSON 或持久语义重放完成。
+
+
+## 11. UI-06 费用与快捷键报告（2026-10-07）
+
+- `/cost` 已进入 version 1 报告链路。命令先取一次已接受的 catalog，所有历史 provider/model bucket 在同一快照下估算；没有 host publication 的调用者才读原目录。报告明确使用当前接受的费率，不声称重建历史账单。模型同名不同 provider 仍分表，来源和机器可读 facts 与纯文本同源。
+- 复用既有费用计算与零费用支持判定，total-only 或未计价 cache 不再得到虚假的零总价。有已计价部分时保留金额并标 partial，未分类/未计价项明确排除；完整分类且适用费率为零时仍显示已支持的零估算。极小正费用统一显示 `<$0.0001`，不会四舍五入为看似免费。缓存差额只在 cache-read 费率已知时计算，并说明是估算重叠及费率差，不是账单；保留窗口中真实请求数与 reset/gap entry 数分开。
+- `/hotkey` 使用原有键位模块中的 `keyReport()`，已解析的 override、unbound、模式限制与逐键 modified-key caveat 保留；key 和 warning 是独立 spans。旧 Markdown 拼接器已移除，纯文本从报告模型生成。生产者留在既有 TUI 键位 owner，未增加 core 指向 presentation 的新类型依赖。
+- 147 项组合、Node 20.3 构建、六组有效反转/恢复后 34 项及独立 APPROVE/CLEAR 通过；实际 CLI、无 ANSI print 与详细证据见 [主裁决 §8.95](phase-19-decisions.md#895-ui-06费用与快捷键的语义报告)。tools/diagnose/sidebar/metrics、CLI 结构化报告 JSON 与持久语义重放继续；完整阶段未完成。

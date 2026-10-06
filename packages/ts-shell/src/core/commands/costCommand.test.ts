@@ -1,11 +1,16 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCostCommand } from "./costCommandRuntime.js";
 import { recordSessionUsage, resetSessionUsage } from "../../observability/usageTelemetry.js";
 import { writeCatalogCache } from "../models/catalogStore.js";
 import type { CommandContext } from "./types.js";
+import * as catalogStore from "../models/catalogStore.js";
+import { getRuntimeConfig } from "../../config/runtimeConfig.js";
+import { reportText } from "./report/projection.js";
+import { renderReport } from "../../presentation/tui/report/renderer.js";
+import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 
 /**
  * `/cost` renders one table per model.
@@ -31,6 +36,7 @@ function contextFor(sessionId: string, cwd: string): CommandContext {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const dir of tempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
   if (originalUserProfile === undefined) delete process.env.USERPROFILE;
   else process.env.USERPROFILE = originalUserProfile;
@@ -39,6 +45,65 @@ afterEach(() => {
 });
 
 describe("runCostCommand", () => {
+  it('keeps a positive cache estimate visible below four decimal places', async () => {
+    const session = 'tiny-cache'; resetSessionUsage(session);
+    for (let index = 0; index < 2; index++) recordSessionUsage(session, { provider: 'priced', model: 'meter', promptTokens: 1025 });
+    vi.spyOn(catalogStore, 'loadCatalog').mockReturnValue([{ id: 'priced', models: [{ id: 'meter', cost: { promptPerMTok: 0.001, completionPerMTok: 1, cacheReadPerMTok: 0 } }] }]);
+    const result = await runCostCommand([], { cwd: workspace(), sessionId: session });
+    expect(result.output).toContain('Estimated extra cost against a cache read: <$0.0001');
+    expect(result.output).not.toContain('$0.0000');
+    const cache = result.report!.facts.cache as { waste: { totals: { missedCost: number } } };
+    expect(cache.waste.totals.missedCost).toBeGreaterThan(0);
+    expect(cache.waste.totals.missedCost).toBeCloseTo(0.000001025, 12);
+  });
+
+  it('uses one accepted catalog for every provider bucket and retains report provenance', async () => {
+    const session = 'cost-accepted'; resetSessionUsage(session);
+    recordSessionUsage(session, { provider: 'a', model: 'same', promptTokens: 1_000_000 });
+    recordSessionUsage(session, { provider: 'b', model: 'same', promptTokens: 2_000_000 });
+    const disk = vi.spyOn(catalogStore, 'loadCatalog').mockReturnValue([{ id: 'a', models: [{ id: 'same', cost: { promptPerMTok: 99, completionPerMTok: 99 } }] }]);
+    const read = vi.fn(() => ({ config: getRuntimeConfig(), catalog: [
+      { id: 'a', models: [{ id: 'same', cost: { promptPerMTok: 1, completionPerMTok: 2 } }] },
+      { id: 'b', models: [{ id: 'same', cost: { promptPerMTok: 3, completionPerMTok: 4 } }] },
+    ] }));
+    const result = await runCostCommand([], { cwd: workspace(), sessionId: session, readConfiguration: read });
+    expect(read).toHaveBeenCalledOnce(); expect(disk).not.toHaveBeenCalled();
+    expect(result.report?.facts).toMatchObject({ recordedTokens: 3_000_000, estimate: { usd: 7, everyRatePublished: true }, models: [
+      { key: 'a/same', estimate: { usd: 1 }, rateSource: 'published' }, { key: 'b/same', estimate: { usd: 6 }, rateSource: 'published' },
+    ] });
+    expect(result.output).toBe(reportText(result.report!));
+    expect(JSON.stringify(result.report)).not.toContain('\\u001b');
+    const narrow = stripAnsi(renderReport(result.report!, 30).join('\n'));
+    expect(narrow).toContain('Estimated USD: $6.0000'); expect(narrow).toContain('b/same');
+  });
+
+  it.each([
+    { name: 'total-only', usage: { totalTokens: 42 }, rates: { promptPerMTok: 1, completionPerMTok: 2 }, usd: null, coverage: 'partial' },
+    { name: 'unpriced-cache', usage: { cacheReadTokens: 42 }, rates: { promptPerMTok: 1, completionPerMTok: 2 }, usd: null, coverage: 'partial' },
+    { name: 'published-free', usage: { promptTokens: 42 }, rates: { promptPerMTok: 0, completionPerMTok: 0 }, usd: 0, coverage: 'complete' },
+    { name: 'partial-subtotal', usage: { promptTokens: 1_000_000, cacheReadTokens: 100_000 }, rates: { promptPerMTok: 1, completionPerMTok: 2 }, usd: 1, coverage: 'partial' },
+  ])('keeps $name distinct from an unsupported zero estimate', async ({ name, usage, rates, usd, coverage }) => {
+    resetSessionUsage(name); recordSessionUsage(name, { ...usage, provider: 'priced', model: 'meter' });
+    vi.spyOn(catalogStore, 'loadCatalog').mockReturnValue([{ id: 'priced', models: [{ id: 'meter', cost: rates }] }]);
+    const result = await runCostCommand([], { cwd: workspace(), sessionId: name });
+    expect(result.report?.facts.estimate).toMatchObject({ usd, coverage });
+    if (usd === null) { expect(result.output).toContain('unknown'); expect(result.output).not.toContain('$0.0000'); }
+    else expect(result.output).toContain(`$${usd.toFixed(4)}`);
+    if (name === 'partial-subtotal') {
+      expect(result.output).toContain('unknown');
+      expect(result.report?.facts.models).toMatchObject([{ estimate: { usd: 1, unpricedTokens: 100_000, coverage: 'partial' } }]);
+    }
+  });
+
+  it('does not price cache comparisons when the cache-read rate is missing', async () => {
+    const session = 'cache-unpriced'; resetSessionUsage(session);
+    for (let index = 0; index < 2; index++) recordSessionUsage(session, { provider: 'priced', model: 'meter', promptTokens: 99_999, cacheWriteTokens: 1 });
+    vi.spyOn(catalogStore, 'loadCatalog').mockReturnValue([{ id: 'priced', models: [{ id: 'meter', cost: { promptPerMTok: 3, completionPerMTok: 15 } }] }]);
+    const result = await runCostCommand([], { cwd: workspace(), sessionId: session });
+    expect(result.output).toContain('Prompt cache hit rate: 0.0%'); expect(result.output).not.toContain('Estimated extra cost');
+    expect(result.report?.facts.cache).toMatchObject({ waste: { totals: { missCount: 0 } } });
+  });
+
   it("says there is nothing to count when nothing was recorded", async () => {
     const session = "sess_cost_empty";
     resetSessionUsage(session);
@@ -47,16 +112,14 @@ describe("runCostCommand", () => {
   });
 
   it("names the model when only one answered", async () => {
-    // The single-model output has to stay as it was: this change was about
-    // attribution, not about reformatting the common case.
     const session = "sess_cost_one";
     resetSessionUsage(session);
     recordSessionUsage(session, { promptTokens: 1_000_000, completionTokens: 0, model: "solo" });
 
     const result = await runCostCommand([], contextFor(session, workspace()));
-    expect(result.output).toContain("Model `solo`");
+    expect(result.output).toContain("Model solo");
     expect(result.output).toContain("1,000,000 tokens");
-    expect(result.output).toContain("**$0.1400**");
+    expect(result.output).toContain("$0.1400");
     // No session total row: with one model it would repeat the table's own total.
     expect(result.output).not.toContain("Session total");
   });
@@ -69,12 +132,12 @@ describe("runCostCommand", () => {
 
     const result = await runCostCommand([], contextFor(session, workspace()));
     expect(result.output).toContain("2 models");
-    expect(result.output).toContain("**`cheap`**");
-    expect(result.output).toContain("**`dear`**");
+    expect(result.output).toContain("#### cheap");
+    expect(result.output).toContain("#### dear");
     // Each model's own figure, and the sum.
-    expect(result.output).toContain("**$0.1400**");
-    expect(result.output).toContain("**$0.2800**");
-    expect(result.output).toContain("Session total: $0.4200");
+    expect(result.output).toContain("$0.1400");
+    expect(result.output).toContain("$0.2800");
+    expect(result.output).toContain("Session total estimate: $0.4200");
     // The session-level token figure is the sum across buckets.
     expect(result.output).toContain("3,000,000 tokens");
   });
@@ -89,7 +152,7 @@ describe("runCostCommand", () => {
     recordSessionUsage(session, { promptTokens: 9_000_000, completionTokens: 0, model: "large" });
 
     const result = await runCostCommand([], contextFor(session, workspace()));
-    const sections = result.output.split(/\*\*`(small|large)`\*\*/).filter(Boolean);
+    const sections = result.output.split(/#### (small|large) ·/).filter(Boolean);
     // sections: ["...header...", "large", "...large body...", "small", "...small body..."]
     const bodyOf = (model: string): string => {
       const index = sections.indexOf(model);

@@ -6318,3 +6318,6 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 
 
 ## [2026-10-07] feat | Phase 19 UI-06 help 改为共享注册表驱动的可搜索面板，别名填规范命令、独立命名入口保留语义，首次 Enter 仅填入、再次提交才执行；通用 panel 最多 8 项并消费真实剩余屏高，动态订阅受打开代际保护。223 项组合及构建、六组有效反转/恢复后 87 项、两模式实际 CLI 零 provider 请求验证通过，独立 APPROVE/CLEAR；见 features/phase-19-decisions.md §8.94。其他报告迁移与完整 Phase 19 继续。
+
+
+## [2026-10-07] feat | Phase 19 UI-06 cost/hotkey 迁移到共享语义报告，费用按一次 accepted catalog 区分 provider/model、unknown/partial/已支持零与极小正数；快捷键保留有效绑定和逐键终端警告。147 项及构建、六组反转/恢复后 34 项、两模式 actual CLI 与无 ANSI print、独立 APPROVE/CLEAR 通过；见 features/phase-19-decisions.md §8.95。tools 等报告与完整 Phase 19 继续。

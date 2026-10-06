@@ -79,14 +79,20 @@ describe("CLI command execution bridge", () => {
   });
 
   it("passes the live keyboard guide through to the hotkey command", async () => {
-    const output = renderer();
+    const output = new StreamingRenderer();
+    const transcript = new Transcript();
+    const sink = new TurnSink(transcript, () => {});
+    sink.begin('command', '/hotkey'); output.setSink(sink);
     await buildCliCommandExecution({
-      prompt: "/hotkey", cwd: "/workspace", renderer: output as StreamingRenderer,
+      prompt: "/hotkey", cwd: "/workspace", renderer: output,
       printMode: false, interactive: true, modifierKeysReported: true,
       keyGuide: [{ keys: ["ctrl+r"], does: "Retry the last prompt", group: "session" }],
     });
-    expect(output.lines.join("\n")).toContain("`ctrl+r`");
-    expect(output.lines.join("\n")).not.toContain("`f5`");
+    sink.end();
+    const report = transcript.all().find(block => block.kind === 'command' && block.report)?.report;
+    expect(report?.facts.bindings).toMatchObject([{ keys: [{ key: 'ctrl+r', status: 'bound' }], action: 'Retry the last prompt' }]);
+    expect(reportText(report!)).toContain('ctrl+r');
+    expect(reportText(report!)).not.toContain('f5');
   });
 
   it("renders local slash command output with interactive spacing", async () => {

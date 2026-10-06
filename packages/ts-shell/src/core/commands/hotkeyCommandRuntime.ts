@@ -1,5 +1,6 @@
 import { rejectArguments } from "./syntax/empty.js";
-import { renderKeyGuide } from "../../presentation/tui/chrome/keys.js";
+import { KEY_BINDINGS, keyReport } from "../../presentation/tui/chrome/keys.js";
+import { reportText } from "./report/projection.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
 /**
@@ -16,8 +17,10 @@ export async function runHotkeyCommand(
 ): Promise<LocalCommandResult> {
   const invalid = rejectArguments("hotkey", args);
   if (invalid) return invalid;
+  const report = keyReport(context.modifierKeysReported === true, context.keyGuide ?? KEY_BINDINGS);
   return {
     kind: "local",
-    output: renderKeyGuide(context.modifierKeysReported === true, context.keyGuide),
+    output: reportText(report),
+    report,
   };
 }

@@ -87,7 +87,7 @@ export function totalTokens(telemetry: SessionUsageTelemetry): number {
 export function estimateSessionCost(
   telemetry: SessionUsageTelemetry,
   rateFor: (provider: string, model: string) => ModelCostRates | undefined,
-): { readonly cost: number; readonly everyRatePublished: boolean; readonly zeroCostSupported: boolean } {
+): { readonly cost: number; readonly everyRatePublished: boolean; readonly zeroCostSupported: boolean; readonly fullyAllocated: boolean } {
   let cost = 0;
   let everyRatePublished = true;
   let allocated = true;
@@ -108,7 +108,7 @@ export function estimateSessionCost(
   }
   // A total-only report supplies no category prices. Zero is supportable only
   // when actual recorded tokens have a complete allocation and published rates.
-  return { cost, everyRatePublished, zeroCostSupported: cost === 0 && recorded > 0 && allocated && everyRatePublished };
+  return { cost, everyRatePublished, fullyAllocated: allocated, zeroCostSupported: cost === 0 && recorded > 0 && allocated && everyRatePublished };
 }
 
 
