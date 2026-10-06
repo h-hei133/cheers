@@ -291,7 +291,9 @@ it('carries semantic reports to the TUI while print and plain sinks retain the s
   expect(transcript.all()).toHaveLength(1);
   expect(transcript.last()).toMatchObject({ text: output, report });
   expect(transcript.last()!.text).not.toContain('\x1b');
-  const lines: string[] = []; renderer.setSink({ line: text => lines.push(text), chunk: () => {} });
+  const lines: string[] = []; const reports: unknown[] = [];
+  renderer.setSink({ line: (text, semantic) => { lines.push(text); reports.push(semantic); }, chunk: () => {} });
   await buildCliCommandExecution({ prompt: '/context', cwd: process.cwd(), renderer, printMode: true, interactive: false }, bridge(result));
   expect(lines).toEqual([output]);
+  expect(reports).toEqual([report]);
 });

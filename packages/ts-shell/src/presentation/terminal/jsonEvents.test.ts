@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createJsonEventWriter, type JsonStreamEvent } from "./jsonEvents.js";
+import type { CommandReport } from '../../core/commands/report/contract.js';
+import { reportText } from '../../core/commands/report/projection.js';
 
 /**
  * The shape of the event stream, which is a published contract.
@@ -40,6 +42,27 @@ function collect(): { readonly lines: string[]; readonly write: (event: JsonStre
 }
 
 describe("the event stream line", () => {
+  it('carries safe report facts and derives compatible text from the same snapshot', () => {
+    const { lines, write } = collect();
+    const report: CommandReport = { version: 1, title: '\x1b[31mInventory\x1b[0m',
+      columns: [{ label: 'Value', minWidth: 8, align: 'right' }],
+      lines: [{ kind: 'columns', cells: [[{ text: 'unknown\x1b]0;title\x07', role: 'warning' }]] }],
+      facts: { status: 'unavailable', clean: null, count: 0, label: '\x1b[31mred\x1b[0m', source: 'fixture\tvalue' } };
+    write({ type: 'cli.output', text: 'stale output must not win', report });
+    write({ type: 'cli.output', text: 'next\n' });
+    const first = readLine(lines[0]!);
+    const facts = asObject(first.facts, 'facts');
+    const semantic = facts.report as CommandReport;
+    expect(semantic.version).toBe(1);
+    expect(semantic.title).toBe('Inventory');
+    expect(semantic.facts).toEqual({ status: 'unavailable', clean: null, count: 0, label: 'red', source: 'fixture\\u0009value' });
+    expect(semantic.lines).toEqual([{ kind: 'columns', cells: [[{ text: 'unknown', role: 'warning' }]] }]);
+    expect(facts.text).toBe(`${reportText(semantic)}\n`);
+    expect(JSON.stringify(facts)).not.toMatch(/\\u001b|\x1b/i);
+    expect(first.truthfulness).toEqual({ observationOnly: true, terminalSuccessClaim: false });
+    expect(readLine(lines[1]!)).toMatchObject({ order: 2, facts: { text: 'next\n' } });
+    expect(asObject(readLine(lines[1]!).facts, 'facts')).not.toHaveProperty('report');
+  });
   it("preserves command text without promoting it to a success claim", () => {
     const { lines, write } = collect();
     write({ type: "cli.output", text: 'line one\n"line two"\n' });

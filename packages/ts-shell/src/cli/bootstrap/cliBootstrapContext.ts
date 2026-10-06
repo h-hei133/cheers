@@ -91,7 +91,7 @@ export function createCliBootstrapRuntimeContext(
     : undefined;
   if (writeJsonEvent) {
     renderer.setSink({
-      line: (text) => writeJsonEvent({ type: "cli.output", text: `${text}\n` }),
+      line: (text, report) => writeJsonEvent({ type: "cli.output", text: `${text}\n`, ...(report ? { report } : {}) }),
       chunk: (text) => writeJsonEvent({ type: "cli.output", text }),
     });
   }

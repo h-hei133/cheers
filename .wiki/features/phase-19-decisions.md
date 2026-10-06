@@ -1517,3 +1517,12 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 上批 `0bf26920` 的 Architecture Watch 37533912603 成功，CI 37533912579 失败：三个文件/五项未迁移的文本及 renderer 测试夹具。现 `turn/tools` 从 facts 检查真实 plan gate，print 保留精确工具池/零执行断言，router 使用单参数 renderReport 并验证 interactive/print 分流；独立补充复审 77 项通过。一次组合运行加载了修正前的双参数 mock，172/173 通过；上述最终 173 项已完整重跑。旧 CI 失败保留，本批远端证据按新 SHA 跟踪。
 - CLI 结构化报告 JSON、持久语义重放、UI-07 及完整 Phase 19 继续；Windows 像素与真实 IME 仍未验证。
 - 五项静态 gates、43 项 script tests 和 NormProof 0 blocking 通过，见 `.tmp/state-report-gates-noy2pk7d`；既有五项函数计数 advisory（含算术变量误判）及 120 项文档来源 advisory 保留。
+
+### 8.98 UI-06：既有 JSON 事件流保留报告语义
+
+- [JSON output](../../packages/ts-shell/src/presentation/terminal/jsonEvents.ts)在现有 `cli.output` 增加可选 `report`，保留 `run-event-stream.v1`、连续 order、兼容 text 和 observation-only/非成功声明。报告自己的 version 为 1；原无报告事件不新增空字段，也不改 query-event。未新增 CLI 开关、第二个 writer 或输出协议。
+- [command bridge](../../packages/ts-shell/src/entrypoints/cliCommandExecutionBridge.ts)在 interactive、piped、print 均交付语义报告，普通 sink/终端仍收到同一纯文本。[bootstrap sink](../../packages/ts-shell/src/cli/bootstrap/cliBootstrapContext.ts)将可选 report 交给原 JSON writer；writer 从受控不可变快照重新生成文本和事实，避免调用者的旧文本或原始控制序列污染 JSON。数字、null、单位、来源与状态无需解析 TTY 行；ANSI/OSC 清理不受 FORCE_COLOR 影响。
+- 定向比较 [print event 输出](../../../pi/packages/coding-agent/src/modes/print-mode.ts)与 [JSON event projection](../../../pi/packages/coding-agent/src/modes/json-event.ts)，采用输出边界投影语义事件的职责安排，保留本项目兼容文本和单一事件序号。模型回合期间仍抑制重复 prose，恢复后命令继续同一个流。
+- Node 20.3 构建及 8 文件/64 项通过，包含编译 CLI 的 stdin/显式 `--print --json`、模型回合前后七类报告、完整事实/文本等价、连续序号与 FORCE_COLOR=3 无 ANSI；原工具零执行、结果与取消回归也通过，见 `.tmp/report-json-nr_1vs8p`。此前首轮 63 项通过，增补显式 print 场景后完整重跑。
+- 两组反转撤回非交互报告交接与安全快照，均触发行为断言；隔离源码副本逐字节/SHA-256 恢复后 20 项通过，见 `.tmp/phase19-config/report-json-reversals/1791325412082291649`。本批不新增报告持久化或伪称语义重放完成；该任务、UI-07 与完整 Phase 19 继续。
+- 独立代码 APPROVE（53 项及编译 CLI 的 plain/JSON print/JSON piped 精确文本比对），架构 CLEAR（52 项、稳定源码 hash、普通及混合依赖图无环、函数数未增），见 `.tmp/json-handoff-architecture-8R5GzA`。五项静态 gates、43 项 script tests 与 NormProof 0 blocking 通过，既有 advisory 保留，见 `.tmp/report-json-gates-95es7n9w`。上批 `94b09ca2` 的 Architecture Watch 37539820770 已成功，CI 37539820676 当前仍运行；本批远端按新 SHA 跟踪。

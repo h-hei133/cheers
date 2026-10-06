@@ -377,3 +377,8 @@ bridge 不在 runtime 的 output 生成阶段包色，也不把渲染字符串�
 - `/metrics` 沿用跨进程/会话日志，以每文件 512KiB 尾部和请求样本数为界；名称/单位/tags 的共享身份避免 count/ms 混合，timing 加权平均，坏行忽略，健康分片在局部读失败后仍可报告。来源、范围、partial/unavailable 和数值溢出保留在正文与 facts。
 - `/sidebar` 的有界脱敏模型直接投影语义报告，保留完整逻辑行与来源，使用原 Pager 换行/搜索；snapshot/manual refresh 语义及一次 tick 不变。禁用内容检查覆盖 facts，旧 box 仅保留原直接消费者。
 - 173 项、Node 20.3 构建、六组有效反转/恢复后 21 项、独立 APPROVE/CLEAR 及两模式 actual CLI/无 ANSI print 通过，完整证据和上批 CI 夹具修正见 [主裁决 §8.97](phase-19-decisions.md#897-ui-06诊断指标与侧栏状态报告)。CLI JSON 和持久语义重放继续，完整阶段目标未完成。
+
+## 14. UI-06 JSON 报告边界（2026-10-07）
+
+- 现有 `--json` 的 `cli.output` 兼容文本旁携带可选 version 1 报告，保留事件 schema、顺序与非成功声明。输出边界从同一安全快照生成 text/report，稳定数值、unknown/null、来源与单位不靠解析屏幕；FORCE_COLOR 不影响 JSON 无 ANSI。
+- interactive、piped 和 print 共用 renderReport，普通文本 sink 保留纯文本。模型回合前后使用原单一 JSON writer，未新增开关或协议。64 项、编译 CLI 和两组有效反转/恢复后 20 项见 [主裁决 §8.98](phase-19-decisions.md#898-ui-06既有-json-事件流保留报告语义)。持久语义重放继续，完整 UI-06 和阶段目标未完成。

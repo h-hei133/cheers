@@ -6325,3 +6325,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-07] feat | Phase 19 UI-06 tools inspection: bare /tools browses the filtered runtime pool and opens read-only semantic detail; direct/print paths share report facts; stale reports and input holds follow overlay revisions; queued catalog failures remain distinct from empty results. Node 20.3 build and 182 tests, six effective reversals with 39 restored tests, independent APPROVE/CLEAR, regular/fullscreen actual CLI and ANSI-free print passed with zero provider requests. See phase-19-decisions.md §8.96; remaining reports, JSON/replay and full Phase 19 continue.
 
 ## [2026-10-07] feat | Phase 19 UI-06 diagnose/metrics/sidebar 接入语义报告，保留 Git 未核验状态、完整计数、指标单位与局部读失败、侧栏脱敏快照。173 项、Node 20.3 构建、六组反转/恢复后 21 项、独立 APPROVE/CLEAR 及两模式实际 CLI/无 ANSI print 通过。修正上一 tools CI 的三文件/五项兼容夹具，原远端失败不改写；见 features/phase-19-decisions.md §8.97。JSON、持久语义重放与完整阶段继续。
+
+## [2026-10-07] feat | Phase 19 UI-06 既有 JSON cli.output 增加版本化报告，保留兼容文本、事件顺序和事实状态；输出边界统一快照并移除控制序列。64 项、Node 20.3 构建、两组反转/恢复后 20 项与编译 CLI 的回合前后/显式 print 验证通过，见 features/phase-19-decisions.md §8.98。持久语义重放及完整阶段继续。

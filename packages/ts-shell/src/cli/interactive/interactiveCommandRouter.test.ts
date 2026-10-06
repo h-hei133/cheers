@@ -78,8 +78,8 @@ describe("interactive command router", () => {
       else await runNonInteractivePrompt({ ...harness.input, prompt: "/tools", printMode: mode === "print" });
       expect(harness.lines.join("\n")).toContain("### Tools (1)");
       expect(harness.lines.join("\n")).toContain("| mcp__fixture__Read | allowed |");
-      expect(harness.reports).toHaveLength(mode === 'interactive' ? 1 : 0);
-      if (mode === 'interactive') expect(harness.reports[0]?.facts.tools).toMatchObject([{ name: 'mcp__fixture__Read', planMode: 'allowed' }]);
+      expect(harness.reports).toHaveLength(1);
+      expect(harness.reports[0]?.facts.tools).toMatchObject([{ name: 'mcp__fixture__Read', planMode: 'allowed' }]);
       expect(snapshot).toHaveBeenCalledOnce();
     } finally {
       fs.rmSync(root, { recursive: true, force: true });

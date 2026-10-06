@@ -1,4 +1,6 @@
 import type { QueryEvent } from "../../core/query/runtime/events.js";
+import type { CommandReport } from '../../core/commands/report/contract.js';
+import { createReport, reportText } from '../../core/commands/report/projection.js';
 
 /**
  * A run's events, written as they happen.
@@ -18,6 +20,8 @@ const SCHEMA_VERSION = "run-event-stream.v1";
 export type JsonStreamEvent = QueryEvent | {
   readonly type: "cli.output";
   readonly text: string;
+  /** Optional versioned semantics; text remains the compatible complete output. */
+  readonly report?: CommandReport;
 };
 
 export interface JsonEventStreamLine {
@@ -46,6 +50,12 @@ export interface JsonEventStreamLine {
 export function createJsonEventWriter(write: (line: string) => void): (event: JsonStreamEvent) => void {
   let order = 0;
   return (event: JsonStreamEvent): void => {
+    // This is an output boundary: derive both representations from one safe
+    // snapshot, even when a caller bypasses StreamingRenderer.
+    if (event.type === 'cli.output' && event.report) {
+      const report = createReport(event.report);
+      event = { ...event, report, text: `${reportText(report)}\n` };
+    }
     order += 1;
     const turnId = "turn" in event && typeof event.turn === "number" ? `turn:${event.turn}` : undefined;
     const toolCallId = "taskId" in event && typeof event.taskId === "string" ? event.taskId : undefined;
