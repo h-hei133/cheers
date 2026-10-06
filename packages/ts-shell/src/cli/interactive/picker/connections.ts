@@ -26,7 +26,8 @@ export function connectionPicker(context: CommandContext): Picker {
     form: "panel",
     empty: "No providers available.",
     async load(): Promise<readonly Option[]> {
-      const config = context.runtimeConfig ?? readUserRuntimeConfigFile();
+      const publication = context.readConfiguration?.();
+      const config = publication?.config ?? context.runtimeConfig ?? readUserRuntimeConfigFile();
       const connections = normalizeConnections(config);
       const activeId = config.activeProviderConnectionId?.trim();
       const known = new Set<string>(connections.map((connection) => connection.provider));
@@ -51,7 +52,7 @@ export function connectionPicker(context: CommandContext): Picker {
         });
       }
       const offered = new Set<string>(CONNECT_PRESETS.map((preset) => preset.id));
-      for (const provider of loadCatalog()) {
+      for (const provider of publication?.catalog ?? loadCatalog()) {
         if (offered.has(provider.id)) continue;
         rows.push({
           id: `login:${provider.id}`,
@@ -74,7 +75,7 @@ export function connectionPicker(context: CommandContext): Picker {
       if (preset) return { draft: `/connect login ${target} --api-key ` };
       // A catalogue provider has no preset, but everything a login needs is in the
       // catalogue: the request shape, the endpoint, and a model to start on.
-      const provider = loadCatalog().find((candidate) => candidate.id === target);
+      const provider = (context.readConfiguration?.().catalog ?? loadCatalog()).find((candidate) => candidate.id === target);
       if (!provider) return undefined;
       const parts = [`/connect login ${provider.runtime}`];
       if (provider.baseUrl) parts.push(`--base-url ${provider.baseUrl}`);

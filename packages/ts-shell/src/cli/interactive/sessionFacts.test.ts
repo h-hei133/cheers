@@ -3,9 +3,11 @@ import os from "node:os";
 import { activeModelName, readStatusFacts, shortenPath } from "./sessionFacts.js";
 import { recordSessionUsage, resetSessionUsage } from "../../observability/usageTelemetry.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
+import type { RuntimeConfig } from "../../config/runtimeConfig.js";
+import { withConfiguration } from "../../test-utils/configuration.js";
 
-function context(sessionId: string): ShellRuntimeContext {
-  return {
+function context(sessionId: string, overrides: Partial<RuntimeConfig> = {}): ShellRuntimeContext {
+  return withConfiguration({
     projectRoot: "/workspace/app",
     session: { id: sessionId },
     gitContext: { branch: "main" },
@@ -14,8 +16,9 @@ function context(sessionId: string): ShellRuntimeContext {
       providerCredentials: { openai: { model: "opus-5" } },
       contextWindow: 200_000,
       agentMode: "build",
+      ...overrides,
     },
-  } as unknown as ShellRuntimeContext;
+  } as unknown as ShellRuntimeContext);
 }
 
 describe("path shortening", () => {
@@ -34,8 +37,7 @@ describe("model name", () => {
   });
 
   it("falls back to the provider when no model is configured", () => {
-    const bare = context("s1");
-    (bare.runtimeConfig as { providerCredentials: unknown }).providerCredentials = {};
+    const bare = context("s1", { providerCredentials: {} });
     expect(activeModelName(bare)).toBe("openai");
   });
 });
@@ -74,8 +76,7 @@ describe("status facts", () => {
     // Whether a mode is worth a segment is a presentation decision, so the facts
     // report it either way.
     expect(readStatusFacts(context("s3")).agentMode).toBe("build");
-    const planning = context("s4");
-    (planning.runtimeConfig as { agentMode: string }).agentMode = "plan";
+    const planning = context("s4", { agentMode: "plan" });
     expect(readStatusFacts(planning).agentMode).toBe("plan");
   });
 });

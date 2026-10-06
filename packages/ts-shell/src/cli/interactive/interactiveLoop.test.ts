@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { runInteractiveLoop } from "./interactiveLoop.js";
 import { StreamingRenderer } from "../../presentation/terminal/streaming.js";
+import { withConfiguration } from "../../test-utils/configuration.js";
 
 describe("interactive loop", () => {
   it("uses the full-screen host and its readline stand-in on a real terminal", async () => {
@@ -19,13 +20,13 @@ describe("interactive loop", () => {
       process: processEvents,
       sessionManager: { sessionExists: () => false } as never,
       renderer: new StreamingRenderer(),
-      runtimeContext: {
+      runtimeContext: withConfiguration({
         cwd: "/tmp/project-alpha",
         projectRoot: "/tmp/project-alpha",
         session: { id: "sess_1234567890abcdef" },
         runtimeConfig: { provider: "openai", providerCredentials: {}, contextWindow: 64000, configDiagnostics: [] },
         gitContext: { branch: "main" },
-      } as never,
+      } as never),
       sessionRuntime: {
         getAgentMode: () => "build",
       getPermissionScope: () => "ask",
@@ -71,13 +72,13 @@ describe("interactive loop", () => {
       process: processEvents,
       sessionManager: { sessionExists } as never,
       renderer: new StreamingRenderer(),
-      runtimeContext: {
+      runtimeContext: withConfiguration({
         cwd: "/tmp/project-beta",
         projectRoot: "/tmp/project-beta",
         session: { id: "sess_abcdef0123456789" },
         runtimeConfig: { provider: "openai", providerCredentials: {}, contextWindow: 64000, configDiagnostics: [] },
         gitContext: { branch: "main" },
-      } as never,
+      } as never),
       sessionRuntime: {
         getAgentMode: () => "build",
       getPermissionScope: () => "ask",

@@ -15,6 +15,8 @@ import { runBtwCommand } from './btwCommandRuntime.js';
 import { runContextCommand } from './contextCommandRuntime.js';
 import { runModelCommand } from './modelCommandRuntime.js';
 import { modelPicker } from '../../cli/interactive/picker/model.js';
+import { connectionPicker } from '../../cli/interactive/picker/connections.js';
+import { activeModelName, readStatusFacts, readWelcomeState } from '../../cli/interactive/sessionFacts.js';
 import { createCatalogLoader, catalogIdentity } from '../../cli/interactive/completion/catalog.js';
 import { buildCliCommandExecution } from '../../entrypoints/cliCommandExecutionBridge.js';
 import type { StreamingRenderer } from '../../presentation/terminal/streaming.js';
@@ -41,8 +43,9 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { re
 function catalog(extra = 'accepted-only', window = 16000) {
   fs.writeFileSync(userCatalogPath(), JSON.stringify({ providers: {
     google: { endpoint: 'openai-compatible', models: [
-      { id: 'chosen', contextWindow: window, maxTokens: 2048, compat: { supportsTemperature: false } }, { id: extra },
+      { id: 'chosen', contextWindow: window, maxTokens: 2048, cost: { promptPerMTok: window / 1000, completionPerMTok: 0 }, compat: { supportsTemperature: false } }, { id: extra },
     ] },
+    custom: { runtime: 'openai-compatible', baseUrl: `https://${extra}.invalid`, models: [{ id: extra }] },
   } }));
 }
 function fixture() {
@@ -64,6 +67,14 @@ it('keeps menus, completion, and context on the accepted catalogue until success
   const identity = catalogIdentity(shell);
   catalog('pending-only', 24000);
   recordSessionUsage(shell.session.id, { promptTokens: 1000, completionTokens: 10, provider: 'google', model: 'chosen' });
+  const facts = readStatusFacts(shell);
+  expect(facts).toMatchObject({ provider: 'google', model: 'chosen', contextWindow: 16000 });
+  expect(facts.costUsd).toBeCloseTo(0.016);
+  expect(activeModelName(shell)).toBe('chosen');
+  expect(readWelcomeState(shell, undefined, false).model).toBe('chosen');
+  const connections = connectionPicker(context);
+  expect((await connections.load()).find(row => row.id === 'login:custom')?.detail).toContain('accepted-only');
+  expect((await connections.apply(['login:custom']))?.draft).toContain('--model accepted-only');
   const report = await runContextCommand([], context);
   expect(report.output).toContain('of 16,000 tokens');
   expect(report.output).toContain('15,000 free before the 0-token reserve');
@@ -79,12 +90,18 @@ it('keeps menus, completion, and context on the accepted catalogue until success
   fs.writeFileSync(file, JSON.stringify({ ...settings, maxOutputTokens: 3000 }));
   expect(refreshShellRuntimeConfig(shell).status).toBe('rejected');
   expect((await runModelCommand(['list'], context)).output).toContain('accepted-only');
+  expect(readStatusFacts(shell)).toMatchObject({ contextWindow: 16000, costUsd: facts.costUsd });
+  expect((await connections.apply(['login:custom']))?.draft).toContain('--model accepted-only');
   fs.writeFileSync(file, JSON.stringify(settings));
   expect(refreshShellRuntimeConfig(shell).status).toBe('applied');
   expect(catalogIdentity(shell)).not.toBe(identity);
   expect((await runModelCommand(['list'], context)).output).toContain('pending-only');
   expect((await loader('model', new AbortController().signal)).map(row => row.value)).toContain('google/pending-only');
   expect((await runContextCommand([], context)).output).toContain('of 24,000 tokens');
+  expect(readStatusFacts(shell)).toMatchObject({ contextWindow: 24000 });
+  expect(readStatusFacts(shell).costUsd).toBeCloseTo(0.024);
+  expect((await connections.load()).find(row => row.id === 'login:custom')?.detail).toContain('pending-only');
+  expect((await connections.apply(['login:custom']))?.draft).toContain('--model pending-only');
 });
 
 it('uses the host credential and one accepted configuration for a side question through the command bridge', async () => {

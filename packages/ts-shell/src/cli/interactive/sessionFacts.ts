@@ -1,12 +1,11 @@
-import { loadCatalog } from "../../core/models/catalogStore.js";
-import { resolveContextWindow } from "../../core/models/window.js";
+import { resolveContextWindow, resolveModelCost } from "../../core/models/window.js";
+import { resolveProviderCredential } from "../../core/shell/providerCredentials.js";
 import path from "node:path";
 import os from "node:os";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { StatusFacts } from "../../presentation/tui/chrome/items.js";
 import type { WelcomeState } from "../../presentation/tui/chrome/welcome.js";
 import { estimateSessionCost, getSessionUsage, totalTokens } from "../../observability/usageTelemetry.js";
-import { resolveModelCost } from "../../core/models/window.js";
 import { getSessionTodos } from "../../core/commands/todoCommandRuntime.js";
 
 /**
@@ -25,18 +24,18 @@ export function shortenPath(target: string): string {
   return target;
 }
 
-/** Model identifier configured for the active provider. */
+/** Model identifier selected for requests by this host. */
 export function activeModelName(context: ShellRuntimeContext): string {
-  const config = context.runtimeConfig;
-  return config.providerCredentials?.[config.provider]?.model ?? config.provider;
+  const config = context.configuration.current.config;
+  const active = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
+  return active.model ?? active.provider;
 }
 
 /**
  * Facts the status band can draw from.
  *
- * `agentMode` comes from the caller rather than the resolved configuration: the
- * configuration does not carry it, and the live value is the one Shift+Tab
- * changes.
+ * The live `agentMode` changed by Shift+Tab takes precedence over the accepted
+ * configuration's default.
  */
 export interface LiveStatusFacts {
   readonly agentMode?: string;
@@ -51,23 +50,24 @@ export function readStatusFacts(
   context: ShellRuntimeContext,
   live: LiveStatusFacts = {},
 ): StatusFacts {
+  const { config, catalog } = context.configuration.current;
+  const active = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
   const usage = getSessionUsage(context.session.id);
   // Summed across the models that answered, each at the rate published for the
   // provider that served it. A session that switched models — or providers — spent
   // tokens at more than one price, and the status band must not show the newest
   // rate applied to all of them. Resolving against the active provider would do
   // exactly that.
-  const catalog = loadCatalog();
   const { cost } = estimateSessionCost(usage, (provider, model) =>
     resolveModelCost(catalog, provider, model),
   );
   return {
-    model: activeModelName(context),
-    provider: context.runtimeConfig.provider,
+    model: active.model ?? active.provider,
+    provider: active.provider,
     branch: context.gitContext.branch ?? undefined,
     directory: shortenPath(context.projectRoot || path.resolve(".")),
     sessionId: context.session.id,
-    agentMode: live.agentMode ?? context.runtimeConfig.agentMode ?? "build",
+    agentMode: live.agentMode ?? config.agentMode ?? "build",
     permissionScope: live.permissionScope ?? "ask",
     worktreeDirty: context.gitContext.isClean === null ? undefined : !context.gitContext.isClean,
     queued: live.queued,
@@ -81,10 +81,10 @@ export function readStatusFacts(
           // The gauge's denominator has to be the same window compaction uses,
           // or the percentage it shows describes a limit nothing enforces.
           contextWindow: resolveContextWindow({
-            catalog: loadCatalog(),
-            provider: context.runtimeConfig.provider,
-            model: activeModelName(context),
-            configured: context.runtimeConfig.contextWindow,
+            catalog,
+            provider: active.provider,
+            model: active.model,
+            configured: config.contextWindow,
           }).window,
         }
       : {}),

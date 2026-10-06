@@ -1358,3 +1358,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 最终构建 CLI 在 regular/fullscreen 各完成三次侧问与一次非交互侧问，共 8 次本地合成 HTTP；服务端核验 CLI key 和实际模型，失败 reload 后继续 1024 输出限制，成功 reload 后改为 512，窗口及模型列表也只在成功后更新。本地服务收到零目录 GET，命令测试另验证默认列表零 fetch；全部退出为 0，终端无合成凭据。首轮探针错误期待未配置的 temperature 出现在请求，并把 fullscreen 的旧重绘文字当作新命令结果；修正为当前命令回显后同步及既有无 temperature 契约后通过，未据探针错误改产品。
 - 两条独立审查最终代码 APPROVE、架构 CLEAR。代码审查独立执行三项 provider 列表探针、原失败 UI 测试和 diff 检查；架构审查独立验证混合图零环及函数数量，组合套件/构建/PTY 来自主代理。五项静态 gate、43 项 gate 脚本测试和 diff 检查通过；NormProof 图与解析义务满足、阻断项为零，整体 partial 仍保留四项既有函数数量 advisory，strict docs 的 120 项既有来源 advisory 未在本批修复。
 - 此项关闭上述命令、模型 picker 和补全的目录消费缺口；状态栏 sessionFacts 与连接 picker 的目录读取仍独立，主题历史优先级、其他资源策略以及完整 Phase 19 十六批/七十六项继续。当前证据不覆盖外部 provider 服务或目录持久化 owner 的所有网络/存储边界。
+
+### 8.84 CFG-01/UI-05：状态栏与连接选择器消费已接受目录
+
+- [状态事实](../../packages/ts-shell/src/cli/interactive/sessionFacts.ts)一次捕获已接受配置和目录，复用 host 的实际 provider/model 解析；欢迎界面、状态模型、窗口分母和按历史 provider/model 估算的费用使用该状态。删除每次绘制中的两次目录重读，磁盘编辑或失败 reload 不再提前改变窗口/费率。Shift+Tab 的实时模式仍优先于已接受默认值，没有用最近模型的价格重算其他模型的用量。
+- [连接 picker](../../packages/ts-shell/src/cli/interactive/picker/connections.ts)的列表和登录草稿读取已接受目录。提交时重新读取当前 publication，生成可编辑草稿；激活连接仍委派原命令 owner，选中目录项不直接登录或保存凭据。定向参考运行时模型注册表及 footer 从实际会话模型取得窗口的决策，保留本项目已有 usage 与连接持久化边界。
+- 扩展既有跨 reload 集成用例，核对实际 CLI 目标、窗口、费用 0.016→0.024、连接目录及草稿；87 项相关测试和另行运行的 interactiveLoop 2 项均通过。审查独立复现 fullscreen 退出时旧夹具缺少 publication 的未处理异常，使用既有真实 ConfigState 测试 helper 修复，原命令重跑退出 0。新增夹具初版把模型名误当 provider 摘要字段、把远程费率字段误当内部字段，均按已有契约修正并保留精确断言。
+- Node 20.3 构建通过；3 组有效反转分别覆盖状态目标、状态目录和连接草稿，隔离副本逐字节/SHA-256 恢复，恢复后 4 项通过。第一轮反转因替换标记匹配两处，在变异前拒绝执行，不计有效证据。独立代码最终 APPROVE、架构 CLEAR；架构独立检查混合图零环和函数上限，代码独立重跑 loop 两项并确认无未处理异常。
+- regular/fullscreen 实际构建 CLI 各发送一次本地合成模型请求和一次既有 readiness GET。VT 屏幕状态确认欢迎界面显示实际模型，已记录 1000 prompt tokens 时为 1.0k/16k 6%；目录编辑和拒绝 reload 后保持原窗口，成功后改为 1.0k/24k 4%。退出均为 0、终端不含合成凭据。探针先修正 readiness GET 的错误零请求预期，再用屏幕状态处理 fullscreen 不重绘未变化行，并仅过滤模拟器不支持的设备状态查询；未修改产品渲染路径。
+- 五项静态 gate、43 项脚本测试与 diff 检查通过；NormProof 图和解析义务满足、阻断项为零，四项既有函数数量 advisory 与 120 项文档来源 advisory 保留。前批 99c2192d 的 Architecture Watch 37492493447 已成功，CI 37492493436 在记录时仍运行；本批远端状态按新 SHA 另查，不能以本地或前批绿灯代替。
+- 此项取代 §8.83 中状态栏和连接 picker 目录尚未统一的状态。费用仍为目录费率估算，不是账单；完整 UI-05 的压缩后 usage 未知性/费用标识、主题历史优先级、其他资源策略及整个 Phase 19 继续。
