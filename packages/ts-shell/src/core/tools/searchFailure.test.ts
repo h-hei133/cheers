@@ -1,0 +1,83 @@
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { executeLocally } from '../../runtime/execution/local.js'
+import { createDefaultExecutionService } from '../../runtime/execution/service.js'
+import { createGrepToolDefinition } from './grep.js'
+import { forgetRipgrepBinary, searchWithRipgrep } from './grepRipgrep.js'
+
+vi.mock('../../runtime/execution/local.js', () => ({ executeLocally: vi.fn() }))
+
+let root: string
+beforeEach(() => {
+  root = fs.mkdtempSync(path.join(os.tmpdir(), 'search-failure-'))
+  fs.writeFileSync(path.join(root, 'public.txt'), 'needle')
+  forgetRipgrepBinary()
+  vi.mocked(executeLocally).mockReset()
+})
+afterEach(() => { forgetRipgrepBinary(); vi.restoreAllMocks(); fs.rmSync(root, { recursive: true, force: true }) })
+
+const stages = ['probe', 'candidates', 'contents'] as const
+type Stage = typeof stages[number]
+const success = { status: 'completed' as const, exitCode: 0, stdout: '', stderr: '' }
+
+function injectFailure(stage: Stage, trigger: 'none' | 'parent' | 'limit', controller: AbortController): void {
+  vi.mocked(executeLocally).mockImplementation(async input => {
+    const current = input.args.includes('--version') ? 'probe' : input.args.includes('--files') ? 'candidates' : 'contents'
+    if (current === 'candidates') input.onStdout?.(Buffer.from('public.txt\0'))
+    if (current !== stage) return success
+    if (trigger === 'parent') controller.abort()
+    if (trigger === 'limit') {
+      if (stage === 'candidates') input.onStdout?.(Buffer.alloc(17 * 1024 * 1024, 120))
+      else input.onStdout?.(Buffer.from(JSON.stringify({ type: 'match', data: {
+        path: { text: input.readDescriptors ? '/proc/self/fd/3' : 'public.txt' },
+        lines: { text: 'needle\n' }, line_number: 1,
+      } }) + '\n'))
+      expect(input.abortSignal?.aborted).toBe(true)
+    }
+    return { status: 'failed', exitCode: 1, failureKind: 'execution_failure', stdout: '', stderr: 'PRIVATE_DIAGNOSTIC' }
+  })
+}
+
+it.each(stages.flatMap(stage => ['none', 'parent'].map(trigger => [stage, trigger] as const)))(
+  'keeps %s execution failure ahead of %s cancellation and exit-one success', async (stage, trigger) => {
+    const controller = new AbortController()
+    injectFailure(stage, trigger as 'none' | 'parent', controller)
+    expect(await searchWithRipgrep({ pattern: 'needle', searchPath: '', limit: 1,
+      workspaceRoot: root, assertFileAccess: () => {}, abortSignal: controller.signal,
+    })).toEqual({ ok: false, reason: 'execution-failure' })
+    expect(executeLocally).toHaveBeenCalledTimes(stages.indexOf(stage) + 1)
+  },
+)
+
+it.each(['candidates', 'contents'] as const)('does not hide failed cleanup behind the %s limit', async stage => {
+  const controller = new AbortController()
+  injectFailure(stage, 'limit', controller)
+  expect(await searchWithRipgrep({ pattern: 'needle', searchPath: '', limit: 1,
+    workspaceRoot: root, assertFileAccess: () => {}, abortSignal: controller.signal,
+  })).toEqual({ ok: false, reason: 'execution-failure' })
+})
+
+it.each(stages)('reports %s cleanup failure at the tool boundary even after parent cancellation', async stage => {
+  const controller = new AbortController()
+  injectFailure(stage, 'parent', controller)
+  const service = createDefaultExecutionService()
+  const fallback = vi.spyOn(service, 'listFilesRecursive')
+  const result = await createGrepToolDefinition(service).execute({ pattern: 'needle' }, {
+    workspaceRoot: root, taskId: 'fixture', assertFileAccess: () => {}, abortSignal: controller.signal,
+  })
+  expect(result.success).toBe(false)
+  expect(result.error).toBe('Search stopped: execution failed; process cleanup could not be verified.')
+  expect(JSON.stringify(result)).not.toContain('PRIVATE_DIAGNOSTIC')
+  expect(fallback).not.toHaveBeenCalled()
+})
+
+it('does not cache an unverified probe as an installed or absent executable', async () => {
+  injectFailure('probe', 'none', new AbortController())
+  const input = { pattern: 'needle', searchPath: '', limit: 1, workspaceRoot: root }
+  expect(await searchWithRipgrep(input)).toEqual({ ok: false, reason: 'execution-failure' })
+  vi.mocked(executeLocally).mockReset().mockResolvedValue(success)
+  expect(await searchWithRipgrep(input)).toEqual({ ok: true, matches: [] })
+  expect(vi.mocked(executeLocally).mock.calls[0]![0].args).toContain('--version')
+})

@@ -61,6 +61,8 @@ export type RipgrepUnavailable =
   | "outside-workspace"
   /** `rg` ran and failed in a way that is not "no matches". */
   | "failed"
+  /** The execution owner could not verify input delivery or process cleanup. */
+  | "execution-failure"
   | "cancelled"
   | "timeout"
   | "output-limit";
@@ -99,6 +101,7 @@ async function resolveRipgrepBinary(input: RipgrepSearchInput): Promise<string |
     const result = await executeLocally({ command: candidate, args: ["--no-config", "--version"],
       cwd: input.workspaceRoot, timeoutMs: Math.min(input.timeoutMs ?? 2000, 2000),
       abortSignal: input.abortSignal, captureOutput: false });
+    if (result.failureKind === 'execution_failure') return { ok: false, reason: 'execution-failure' };
     if (result.status === "cancelled" || result.status === "timeout") return { ok: false, reason: result.status };
     if (result.status === "completed") {
       resolvedBinary = candidate;
@@ -315,6 +318,9 @@ async function streamOutput(binary: string, input: RipgrepSearchInput, files?: r
     const result = await executeLocally({ command: binary, args, readDescriptors,
       cwd: input.workspaceRoot, abortSignal: controller.signal, timeoutMs: input.timeoutMs ?? 30_000,
       captureOutput: false, onStdout: consume });
+    // Failed cleanup stays visible even when a match limit or cancellation
+    // prompted the stop. Exit one alone only proves an ordinary empty search.
+    if (result.failureKind === 'execution_failure') return { ok: false, reason: 'execution-failure' };
     if (input.abortSignal?.aborted) return { ok: false, reason: "cancelled" };
     if (oversized) return { ok: false, reason: "output-limit" };
     if (result.status === "timeout") return { ok: false, reason: "timeout" };

@@ -25,7 +25,7 @@ export function permittedSearchFile(root: string, file: string, check: (target: 
 export async function collectSearchFiles(input: {
   binary: string; args: readonly string[]; workspaceRoot: string;
   assertFileAccess: (target: string) => void; abortSignal?: AbortSignal; timeoutMs?: number;
-}): Promise<{ ok: true; files: readonly string[] } | { ok: false; reason: 'failed' | 'cancelled' | 'timeout' | 'output-limit' }> {
+}): Promise<{ ok: true; files: readonly string[] } | { ok: false; reason: 'failed' | 'execution-failure' | 'cancelled' | 'timeout' | 'output-limit' }> {
   const controller = new AbortController();
   const onAbort = (): void => controller.abort();
   input.abortSignal?.addEventListener('abort', onAbort, { once: true });
@@ -51,6 +51,7 @@ export async function collectSearchFiles(input: {
         }
       },
     });
+    if (result.failureKind === 'execution_failure') return { ok: false, reason: 'execution-failure' };
     if (input.abortSignal?.aborted) return { ok: false, reason: 'cancelled' };
     if (oversized) return { ok: false, reason: 'output-limit' };
     if (result.status === 'timeout') return { ok: false, reason: 'timeout' };

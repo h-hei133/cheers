@@ -106,6 +106,10 @@ export function createGrepToolDefinition(
         );
       }
 
+      if (viaRipgrep.reason === 'execution-failure') {
+        return deniedResult('Search stopped: execution failed; process cleanup could not be verified.');
+      }
+
       if (context.abortSignal?.aborted || viaRipgrep.reason !== "not-installed") {
         return deniedResult(`Search stopped: ${context.abortSignal?.aborted ? "cancelled" : viaRipgrep.reason}.`);
       }
