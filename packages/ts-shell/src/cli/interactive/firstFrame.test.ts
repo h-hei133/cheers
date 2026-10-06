@@ -36,6 +36,7 @@ function boot(
       runtimeConfig: {
         provider: "openai",
         providerCredentials: { openai: { model: "opus-5" } },
+        configDiagnostics: [],
         contextWindow: 200_000,
         agentMode: "build",
         tuiMode,

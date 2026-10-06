@@ -1,4 +1,4 @@
-import { getRuntimeConfig, readRuntimeConfigEditAt, getUserRuntimeConfigPath, writeUserRuntimeConfigFile, type RuntimeConfigFile, type ProviderConnectionConfig, type ProviderCredentialConfig } from '../../../config/runtimeConfig.js';
+import { getRuntimeConfig, readRuntimeConfigEditAt, getUserRuntimeConfigPath, writeUserRuntimeConfigFile, type RuntimeConfig, type RuntimeConfigFile, type ProviderConnectionConfig, type ProviderCredentialConfig } from '../../../config/runtimeConfig.js';
 import path from 'node:path';
 import { ConfigWriteError } from '../../../config/outcome.js';
 import { inspectConfigConstraints } from '../../../config/constraints.js';
@@ -48,6 +48,9 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   const loaded = getRuntimeConfig(context.projectRoot ?? context.cwd);
   if (!loaded.configValidation.valid) return 'Model switch blocked: the stored configuration is invalid. Correct it and reload before selecting a model.';
   const effective = context.runtimeConfig ?? projectSessionModel(loaded, context.sessionId);
+  if (!matchesRequestProvider(context, loaded, provider) || !matchesRequestProvider(context, effective, provider)) {
+    return 'Model switch blocked: the request provider differs from the saved active connection. Select a matching connection with /connect use, or restart without the provider override.';
+  }
   const current = currentModelPreference(effective, context.projectRoot ?? context.cwd);
   const fromModel = current.model ?? 'default';
   model ??= current.model;
@@ -122,6 +125,7 @@ async function selectModel(args: string[], context: CommandContext, global: bool
     const currentCatalog = loadCatalog();
     if (context.admission?.() || !sameValue(catalogModel(currentCatalog, provider, model), candidate)) return false;
     const currentConfig = getRuntimeConfig(context.projectRoot ?? context.cwd);
+    if (!matchesRequestProvider(context, currentConfig, provider)) return false;
     if (providerEndpoint(currentCatalog, provider) !== endpoint || !currentConfig.configValidation.valid
       || !sameValue([currentConfig.maxOutputTokens, currentConfig.contextWindow, currentConfig.reserveTokens, currentConfig.modelTokenBudgets, currentConfig.retryBaseDelayMs, currentConfig.retryMaxDelayMs],
         [loaded.maxOutputTokens, loaded.contextWindow, loaded.reserveTokens, loaded.modelTokenBudgets, loaded.retryBaseDelayMs, loaded.retryMaxDelayMs])) return false;
@@ -193,6 +197,10 @@ async function selectModel(args: string[], context: CommandContext, global: bool
 
 function sessionFailure(error: unknown): string {
   return `Model switch failed: session preference ${error instanceof SessionModelWriteError ? error.message : 'write outcome is unverified.'} Global defaults were not changed.`;
+}
+
+function matchesRequestProvider(context: CommandContext, config: RuntimeConfig, provider: string): boolean {
+  return !context.resolveConfigTarget || context.resolveConfigTarget(config).provider === provider;
 }
 
 function connectionIdentity(connection: ProviderConnectionConfig | undefined): object | undefined {

@@ -275,6 +275,7 @@ export async function runNonInteractivePrompt(options: {
     // session and the same one-shot configuration read, so `/reload` must mean
     // the same thing there rather than reporting that it cannot help.
     runtimeConfig: options.runtimeContext.runtimeConfig,
+    resolveConfigTarget: options.runtimeContext.resolveConfigTarget,
     admission: configurationAdmission(options.runtimeContext),
     refreshRuntimeConfig: () => {
       return refreshShellRuntimeConfig(options.runtimeContext);

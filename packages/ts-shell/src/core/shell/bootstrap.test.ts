@@ -11,6 +11,7 @@ import { bootstrapShellRuntime } from './bootstrap.js'
 import { SessionBootstrapError } from './bootstrap.js'
 import { forgetSessionTodos, getSessionTodos } from '../commands/todoCommandRuntime.js'
 import { projectTrust } from '../security/trust/store.js'
+import { renderStartupSurface } from './startupSurfaceRenderer.js'
 
 describe('shell bootstrap', () => {
   const originalUserProfile = process.env.USERPROFILE
@@ -40,13 +41,16 @@ describe('shell bootstrap', () => {
     if (change === 'revoke') projectTrust.setProjectTrust(workspace, 'trusted');
     const runtimeConfig = getRuntimeConfig(workspace);
     projectTrust.setProjectTrust(workspace, change === 'grant' ? 'trusted' : 'untrusted');
+    const renderer = new StreamingRenderer(); const lines: string[] = [];
+    vi.spyOn(renderer, 'renderLine').mockImplementation(line => { lines.push(line); });
     const result = bootstrapShellRuntime({ cwd: workspace, runtimeConfig, gitContext: getWorkflowGitContext(workspace),
-      sessionManager: new SessionManager(), renderer: new StreamingRenderer(), emitLifecycleMessages: false });
+      sessionManager: new SessionManager(), renderer });
     expect(result.context.runtimeConfig.maxTurns).toBe(change === 'grant' ? 77 : 15);
-    expect(result.lifecycleNotices.filter(line => line.startsWith('Warning: ')))
+    expect(lines.filter(line => line.startsWith('Warning: ')))
       .toEqual(result.context.runtimeConfig.configDiagnostics.map(line => `Warning: ${line}`));
-    expect(result.lifecycleNotices.join(' ').includes('trust-denied')).toBe(change === 'revoke');
-    expect(result.lifecycleNotices.join(' ')).not.toContain('trust-not-established');
+    expect(lines.join(' ').includes('trust-denied')).toBe(change === 'revoke');
+    expect(lines.join(' ')).not.toContain('trust-not-established');
+    expect(result.lifecycleNotices.some(line => line.startsWith('Warning: '))).toBe(false);
   });
 
   it('reports diagnostics from the final resumed project instead of the input child project', () => {
@@ -54,11 +58,19 @@ describe('shell bootstrap', () => {
     fs.writeFileSync(path.join(workspace, '.cheers.json'), '{"maxTurns":77}');
     fs.writeFileSync(path.join(child, '.cheers.json'), '{"theme":"PRIVATE_THEME"}');
     const manager = new SessionManager(); const session = manager.createNew(workspace);
+    const renderer = new StreamingRenderer(); const lines: string[] = [];
+    vi.spyOn(renderer, 'renderLine').mockImplementation(line => { lines.push(line); });
     const result = bootstrapShellRuntime({ cwd: child, requestedSessionId: session.id, runtimeConfig: getRuntimeConfig(child),
-      gitContext: getWorkflowGitContext(child), sessionManager: manager, renderer: new StreamingRenderer(), emitLifecycleMessages: false });
+      gitContext: getWorkflowGitContext(child), sessionManager: manager, renderer, emitLifecycleMessages: false });
     expect(result.context.projectRoot).toBe(workspace);
-    const warnings = result.lifecycleNotices.filter(line => line.startsWith('Warning: '));
-    expect(warnings).toEqual(result.context.runtimeConfig.configDiagnostics.map(line => `Warning: ${line}`));
+    expect(lines).toEqual([]);
+    expect(result.lifecycleNotices.at(-1)).toBe(`Resumed session ${session.id}`);
+    renderStartupSurface(renderer, { runtimeContext: result.context, sessionManager: manager,
+      lifecycleNotices: result.lifecycleNotices, provider: 'openai', maxTurns: 15,
+      executionPath: 'ts-local', stdinTransportMode: 'stream-live' });
+    expect(lines).toContain(`- Session lifecycle: Resumed session ${session.id}`);
+    const warnings = lines.filter(line => line.startsWith('- Warning: '));
+    expect(warnings).toEqual(result.context.runtimeConfig.configDiagnostics.map(line => `- Warning: ${line}`));
     expect(warnings.join(' ')).toContain('maxTurns'); expect(warnings.join(' ')).not.toContain('theme');
   });
 

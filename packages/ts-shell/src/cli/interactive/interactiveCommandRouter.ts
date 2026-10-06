@@ -135,6 +135,7 @@ export async function routeInteractiveCommand(
     // place is what makes `/reload` take effect for the rest of the session rather
     // than only for the turn that ran it.
     runtimeConfig: input.runtimeContext.runtimeConfig,
+    resolveConfigTarget: input.runtimeContext.resolveConfigTarget,
     admission: configurationAdmission(input.runtimeContext),
     refreshRuntimeConfig: () => {
       const result = refreshShellRuntimeConfig(input.runtimeContext);

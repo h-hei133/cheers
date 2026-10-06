@@ -145,6 +145,9 @@ export function renderStartupSurface(
   if (lifecycleNotice) {
     renderer.renderLine(`- Session lifecycle: ${lifecycleNotice}`);
   }
+  for (const diagnostic of input.runtimeContext.runtimeConfig.configDiagnostics) {
+    renderer.renderLine(`- Warning: ${diagnostic}`);
+  }
   if (input.recoveryCandidate && input.recoveryCandidateSummary) {
     renderer.renderLine(
       `- Recovery hint: /resume or --session-id ${input.recoveryCandidate.id} (${input.recoveryCandidateSummary.resumeDisposition})`,

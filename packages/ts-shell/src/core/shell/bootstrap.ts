@@ -321,8 +321,10 @@ export function bootstrapShellRuntime(input: {
   });
   // Resolution can replace the input snapshot after a trust or workspace change.
   // Diagnostics describe the settings actually published for the final session.
-  for (const diagnostic of context.runtimeConfig.configDiagnostics) {
-    emitLifecycleMessage(`Warning: ${diagnostic}`);
+  if (input.emitLifecycleMessages !== false) {
+    for (const diagnostic of context.runtimeConfig.configDiagnostics) {
+      input.renderer.renderLine(`Warning: ${diagnostic}`);
+    }
   }
   return { phases, lifecycleNotices, context };
 }

@@ -102,6 +102,8 @@ export interface CommandContext {
    * session to refresh, and `/reload` says so instead of pretending.
    */
   readonly runtimeConfig?: RuntimeConfig
+  /** Resolve the request provider using the host's explicit selection inputs. */
+  readonly resolveConfigTarget?: (config: RuntimeConfig) => { readonly provider: string }
   readonly admission?: () => string | undefined
   readonly refreshRuntimeConfig?: () => import('../../config/application.js').ConfigReloadResult
 }

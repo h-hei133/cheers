@@ -30,7 +30,7 @@ function build(overrides: { observeEvents?: () => () => void; exit?: (code?: num
       projectRoot: "/workspace",
       session: { id: "sess_1" },
       gitContext: { branch: "main" },
-      runtimeConfig: { provider: "openai", providerCredentials: {}, contextWindow: 64_000 },
+      runtimeConfig: { provider: "openai", providerCredentials: {}, contextWindow: 64_000, configDiagnostics: [] },
     } as unknown as ShellRuntimeContext,
     sessionRuntime: {
       observeEvents: overrides.observeEvents ?? (() => () => {}),

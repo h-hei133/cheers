@@ -6,7 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SessionManager } from "../SessionManager.js";
 import { getRuntimeConfig, getUserRuntimeConfigPath, readUserRuntimeConfigFile, writeUserRuntimeConfigFile } from "../../config/runtimeConfig.js";
 import { runModelCommand } from "../../core/commands/modelCommandRuntime.js";
-import { createCliProviderRuntimeBridge } from "../../cli/provider/cliProviderRuntimeBridge.js";
+import { createCliProviderRuntimeBridge, resolveCliCredential } from "../../cli/provider/cliProviderRuntimeBridge.js";
 import { createShellRuntimeContext, refreshShellRuntimeConfig, switchActiveSession } from "../../core/shell/runtimeContext.js";
 import { createSessionStoreLayout, locateExistingSessionLayout } from "../store/sessionFileLayout.js";
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from "./state.js";
@@ -15,6 +15,8 @@ import { writeSessionState } from "../store/sessionStateStore.js";
 import * as configStore from "../../config/runtimeConfig.js";
 import * as files from '../store/sessionFileStore.js';
 import { defaultHookDispatcher } from '../../core/hooks/hookDispatcher.js';
+import { buildCliCommandExecution } from '../../entrypoints/cliCommandExecutionBridge.js';
+import type { StreamingRenderer } from '../../presentation/terminal/streaming.js';
 
 let home: string;
 let manager: SessionManager;
@@ -28,6 +30,67 @@ beforeEach(() => {
   manager = new SessionManager();
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(home, { recursive: true, force: true }); });
+
+function addAlternateConnection(active = false) {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, ...(active ? { provider: 'google' as const, activeProviderConnectionId: 'alternate' } : {}),
+    providerConnections: [...edit.values.providerConnections!, { id: 'alternate', provider: 'google', authType: 'api-key',
+      apiKey: 'synthetic-alternate-key', model: 'alternate-base', createdAt: '2026-01-01', updatedAt: '2026-01-01' }] }, edit);
+}
+
+it.each(['/model new', '/model openai/new --global', '/model google/new', '/thinking high --global'])(
+  'rejects a different request provider before hooks or writes through the command bridge: %s', async prompt => {
+    addAlternateConnection();
+    const session = manager.createNew(home);
+    const config = fs.readFileSync(getUserRuntimeConfigPath());
+    const statePath = locateExistingSessionLayout(createSessionStoreLayout(), session.id).statePath;
+    const state = fs.readFileSync(statePath);
+    const hooks = vi.spyOn(defaultHookDispatcher, 'dispatch');
+    const lines: string[] = [];
+    const runtimeConfig = getRuntimeConfig(home);
+    expect(resolveCliCredential(runtimeConfig, { provider: 'google' }, {}).model).toBe('alternate-base');
+    const result = await buildCliCommandExecution({ prompt, cwd: home, projectRoot: home, sessionId: session.id,
+      runtimeConfig, resolveConfigTarget: config => resolveCliCredential(config, { provider: 'google' }, {}),
+      interactive: true, printMode: false, renderer: { renderLine: (line: string) => lines.push(line) } as StreamingRenderer });
+    expect(result.kind).toBe('handled');
+    expect(lines.join(' ')).toContain('request provider differs');
+    expect(lines.join(' ')).not.toMatch(/synthetic-alternate-key|Model switched|preference saved/i);
+    expect(hooks).not.toHaveBeenCalled();
+    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(config);
+    expect(fs.readFileSync(statePath)).toEqual(state);
+  });
+
+it('allows an explicit request provider after selecting its matching saved connection', async () => {
+  addAlternateConnection(true);
+  const session = manager.createNew(home);
+  const runtimeConfig = getRuntimeConfig(home);
+  const resolveConfigTarget = (config: typeof runtimeConfig) => resolveCliCredential(config, { provider: 'google' }, {});
+  const result = await runModelCommand(['google/new', '--global'], { cwd: home, projectRoot: home, sessionId: session.id,
+    runtimeConfig, resolveConfigTarget });
+  expect(result.output).toContain('Model switched to new');
+  const saved = readUserRuntimeConfigFile();
+  expect(saved.providerConnections?.find(item => item.id === 'fixture')?.model).toBe('base-model');
+  expect(readSessionModel(session.id)).toMatchObject({ connectionId: 'alternate', provider: 'google', model: 'new' });
+  expect(resolveConfigTarget(projectSessionModel(getRuntimeConfig(home), session.id)).model).toBe('new');
+});
+
+it('rejects a request provider change during the model hook before committing either store', async () => {
+  addAlternateConnection();
+  const session = manager.createNew(home);
+  const config = fs.readFileSync(getUserRuntimeConfigPath());
+  const statePath = locateExistingSessionLayout(createSessionStoreLayout(), session.id).statePath;
+  const state = fs.readFileSync(statePath);
+  let provider: 'openai' | 'google' = 'openai';
+  vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+    if (event.eventName === 'PreModelSwitch') provider = 'google';
+    return undefined;
+  });
+  const result = await runModelCommand(['new', '--global'], { cwd: home, projectRoot: home, sessionId: session.id,
+    resolveConfigTarget: config => resolveCliCredential(config, { provider }, {}) });
+  expect(result.output).toContain('conflict: this attempt did not write');
+  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(config);
+  expect(fs.readFileSync(statePath)).toEqual(state);
+});
 
 it("persists a session-only selection through lifecycle writes, restart and session switching", async () => {
   const one = manager.createNew(home); const two = manager.createNew(home);

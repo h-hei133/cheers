@@ -345,6 +345,9 @@ export class InteractiveMode {
           width,
         ),
     });
+    for (const diagnostic of this.options.runtimeContext.runtimeConfig.configDiagnostics) {
+      this.state.transcript.append(textBlock("notice", `Warning: ${diagnostic}`));
+    }
     // A tab among many needs to say which conversation it holds. The title is
     // session and project — the two things that identify a conversation — and
     // it is written once, here: the terminal owns it after that.
@@ -776,6 +779,7 @@ export class InteractiveMode {
         admission: configurationAdmission(this.options.runtimeContext),
         projectRoot: this.options.runtimeContext.projectRoot,
         runtimeConfig: this.options.runtimeContext.runtimeConfig,
+        resolveConfigTarget: this.options.runtimeContext.resolveConfigTarget,
         refreshRuntimeConfig: () => refreshShellRuntimeConfig(this.options.runtimeContext),
         cwd: this.options.runtimeContext.cwd,
         sessionId: this.options.runtimeContext.session.id,

@@ -1332,3 +1332,16 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - regular/fullscreen 实际构建 CLI 各三种场景，共 18 次本地合成 HTTP：明确 Allow once 前文件不存在，批准后真实工具写入；无效 reload/目录变化保留旧请求限制；会话模型切换与预留生效；无效启动零请求、修正 reload 后恢复；显式 provider 覆盖按实际目标校验。六场退出均为 0，终端无合成凭据；这些是隔离本地适配器证据，不是外部 provider 验证。
 - 本批暂不关闭 CFG-05 既有 `/model` 与不同 CLI `--provider` 的选择/会话投影不一致：命令仍依据原活动连接，不能仅替换 provider 字符串。需把实际连接目标贯穿命令及会话投影，或在保存前明确拒绝。`/btw`、`/context` 与模型浏览也仍独立读取目录，本批快照保证只覆盖上述请求和压缩路径。主题历史优先级、其他资源策略和 Phase 19 十六批/七十六项总体目标继续。
 - 前批 8a56ed01 的 CI 37452056597、Architecture Watch 37452056622，以及 f12c4c57 的 CI 37448147913、Architecture Watch 37448147983 均已按完整 SHA 核实成功；本批远端结果另按新提交查询。
+
+
+### 8.82 CFG-05：请求 provider 与模型保存目标一致；启动诊断不覆盖恢复通知
+
+- [模型选择](../../packages/ts-shell/src/core/commands/model/selection.ts)通过既有 host resolver 同时核对存储配置和已接受配置。CLI provider 与保存的活动连接不一致时，`/model`、`/thinking` 在 hook 和写入之前明确拒绝；异步 hook 后在提交前再次核对。regular/fullscreen 的命令及 picker、非交互入口共用接线，不复制凭据解析逻辑。选择匹配连接后可正常保存会话覆盖及显式全局默认。
+- 保留活动连接作用域：该修复不使 `/model` 隐式切换 provider/账户；先 `/connect use <connection-id>` 或移除启动 provider override。定向对照成熟参考的“验证目标认证后再改模型、会话与显式全局保存分开”，采用本项目已有连接与会话 owner，没有新存储。
+- 上一提交 c81b1a7860a985b33f1a396524e939da7bc877cb 的 CI 37459846993 为失败：658 文件/6844 项通过、1 项跳过，唯一失败是 resume 连续性提示；Architecture Watch 37459847146 成功。本地复现同一文件 39 通过/1 失败，确认为产品展示回归：配置警告追加到生命周期列表，使只取末条的启动界面丢失恢复提示。
+- [bootstrap](../../packages/ts-shell/src/core/shell/bootstrap.ts)保留纯生命周期通知；诊断继续来自最终接受的配置，在对应输出 host 单独显示。[启动界面](../../packages/ts-shell/src/core/shell/startupSurfaceRenderer.ts)同时保留恢复通知和全部诊断，终端 host 将诊断加入现有 transcript。capture-batch 仍按既有规则抑制启动界面，不宣称每次 print 都显示警告。定向比较参考的诊断独立展示，未改变会话恢复逻辑。
+- 验证：Node 20.3 相关组合 10 文件/201 项通过；原 CI resume 用例单独通过（其余 39 项由命令选择器排除，没有修改或跳过源码测试）。5 组有效反转分别覆盖请求目标、hook 后重验、命令接线、生命周期污染和诊断显示；隔离副本 4 个产品文件逐字节恢复，恢复后 2 文件/56 项通过。扩大验证的 22 项初始失败属于两处旧 UI 夹具缺少必需 configDiagnostics，补齐数组后通过，未增加产品兜底或削弱断言。
+- Node 20.3 构建通过；NormProof 图与解析义务满足，整体 partial 保留四项既有函数数量 advisory。独立代码最终 APPROVE、架构 CLEAR；专用角色启动失败未视为批准，随后两名独立通用代理分别完成代码和架构审查。代码审查独立复现夹具失败并查 diff，架构审查独立运行环和函数数量分析，其余执行证据来自主代理。
+- 最终构建 CLI 的 regular/fullscreen 各拒绝三次不匹配模型/effort 操作，拒绝时配置与会话 state 原文不变、零请求；切换匹配连接后按 base-model→session-model→global-model 各发送三次本地合成 HTTP，另一连接不变。两种模式均显示启动配置警告；两个非交互调用也在零网络、零配置改动下拒绝。退出均为 0，终端不含合成凭据。regular 首轮诊断探针误用贪婪 OSC 清除规则，吞掉窗口标题之后的输出；只修正探针解析，原始终端字节已包含诊断，重跑通过。
+- 最终五项静态 gate、43 项门禁脚本测试及 diff 检查通过；strict docs 的 120 项既有来源 advisory 保留。本批远端状态按新提交另行查询，不能用上一 Architecture Watch 的绿灯覆盖。
+- 本批关闭上述错误保存与恢复通知缺口。`/btw`、`/context`、模型浏览的目录发布一致性，主题历史优先级、其他资源策略及 Phase 19 十六批/七十六项整体交付继续；没有据本批窄范围验证宣布整个阶段完成。
