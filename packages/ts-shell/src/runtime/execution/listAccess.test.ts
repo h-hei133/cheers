@@ -34,7 +34,7 @@ it.each([false, true])('filters denied and escaped entries with git=%s', async (
   expect(files).toEqual(['public.txt'])
 })
 it('refuses an external listing root before enumerating', async () => {
-  const read = vi.spyOn(fs.promises, 'readdir')
+  const read = vi.spyOn(fs.promises, 'opendir')
   await expect(createDefaultExecutionService().listFilesRecursive({
     operationKind: 'file.list', absoluteRoot: root, workspaceRoot: workspace,
     authority: { mode: 'read-only', source: 'tool-runtime-approval', reason: 'test' },
@@ -43,8 +43,8 @@ it('refuses an external listing root before enumerating', async () => {
   await expect(listDirectoryEntries(workspace, root)).rejects.toThrow('outside')
   expect(read).not.toHaveBeenCalled()
 })
-it('rejects denied and pre-cancelled directories before readdir', async () => {
-  const read = vi.spyOn(fs.promises, 'readdir')
+it('rejects denied and pre-cancelled directories before opendir', async () => {
+  const read = vi.spyOn(fs.promises, 'opendir')
   await expect(listDirectoryEntries(workspace, workspace, { assertFileAccess: () => { throw new Error('denied') } })).rejects.toThrow('denied')
   const controller = new AbortController(); controller.abort()
   await expect(listDirectoryEntries(workspace, workspace, { abortSignal: controller.signal })).rejects.toThrow()
@@ -56,7 +56,7 @@ it('does not descend into denied directories or read denied ignore files in the 
   fs.writeFileSync(path.join(denied, 'private.txt'), 'private')
   fs.writeFileSync(path.join(workspace, '.ignore'), '*.txt')
   const read = vi.spyOn(fs, 'readFileSync')
-  const dirs = vi.spyOn(fs.promises, 'readdir')
+  const dirs = vi.spyOn(fs.promises, 'opendir')
   const files = await listWorkspaceFiles(workspace, { assertFileAccess: (target) => {
     check(target)
     if (path.basename(target) === '.ignore') throw new Error('denied')

@@ -1064,3 +1064,16 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - regular/fullscreen 构建 CLI 通过本地合成 HTTP 各五次请求，provider 收到两页正确正文、巨型行和扫描上限提示；实际文件句柄读量分别为 16KiB、16KiB、64KiB、8MiB，没有 readFile，全数关闭，两模式 exit 0。合成配置及 runtime home 均隔离，未使用真实凭据。
 - TOOL-01 仍待目录/glob 遍历预算与取消的完整验收；SAFE-02 的原生隐式读取、创建竞态与非 Linux 实际对象保证仍开放。协作式期限不承诺抢占挂起的内核/NFS 调用，也不承诺并发修改下的一致快照。Phase 19 的 16 批/76 项总体目标继续。此前 f525b059 与 b856d602 的 CI/Architecture Watch 已成功；56afcb32 Architecture Watch 已成功，其 CI 最近已取得的状态仍为 in_progress，后续一次查询遇到网络 EOF，不计通过。本批远端结果另按新提交核对。
 - 五项静态门禁与 diff 检查通过；NormProof 阻断义务满足，仍保留四个既有函数数量 advisory 和 docs strict 的 120 个既有非阻断来源路径 advisory。
+
+
+### 8.64 TOOL-01：单目录增量枚举与资源上限
+
+- directory owner 从一次性 readdir 改为 opendir 增量读取，原生预取固定 32 项，保留最多一万条名称和 1MiB UTF-8 名称字节，使用协作式 5 秒期限。达到上限时先观察必要的一个额外条目以区别精确边界与超限；返回显式不完整错误，不把部分名称数组当作完整列表。
+- Linux 目录流通过已核验 FileHandle 的 proc 路径打开，定期及结束前复核目标，目录流和外层句柄分别释放；其他平台仍保留路径/身份复查，不声称同等描述符隔离。opendir 的文件系统顺序在返回前按 UTF-8 字节排序，保留原 readdir 的 libuv 顺序，以及 listing owner 原有目录优先排序、忽略与权限规则。
+- 比较参考目录读取的排序、目录后缀和输出截断决策，保留这些呈现语义；参考方案仍一次性收集名称，不满足本任务内存界，因此使用本项目目录 owner 的增量读取。没有新增遍历平面或改动原生 Git 查询语义。预算和新目录流清理失败用显式类型穿过回退遍历，不能变为“没有匹配”。
+- 独立审查发现取消先于 typed cleanup 传播会隐藏关闭失败，修正优先级后，取消与关闭失败同时发生的真实 registry/glob 回归要求保留 cleanup。复审代码 APPROVE、架构 CLEAR。另发现外层 verified FileHandle.close() 的既有未分类异常仍可能被旧回退 catch 吞掉或覆盖内层异常；此项留给读取 owner 的下一批修复，本批不宣称全链清理失败已闭合。
+- Linux、Node 20.3 隔离环境最终 13 文件/147 项及 build:ts 通过，包含目录权限/替换、忽略、read/glob/grep、执行服务和启动文件补全。模拟百万条来源验证只调用 Dir.read 10001 次；真实目录流取消后 ERR_DIR_CLOSED。新增关闭断言最初将同步抛错误当 Promise 拒绝，按 Node API 修正捕获方式，保留精确错误码断言；组合测试出现 exit listener 数量警告，未改产品监听器或放宽阈值，尚未定位其来源。
+- 条目数、名称字节、期限、关闭、字节排序、上层传播、清理优先级、最终身份校验八组反转均产生断言失败，源文件逐字节恢复后 19 项通过。最后一次身份校验用读取中途替换路径且本页立即结束的场景验证，不能由下一轮周期校验代替。
+- regular/fullscreen 构建 CLI 各四次本地合成 HTTP 请求。包含 10020 项的真实目录由启动预热、read、回退 glob 分别触及，每个目录流只调用 Dir.read 10001 次并关闭；provider 收到明确限额错误，随后小文件仍正确返回，两模式 exit 0。夹具起初只预计两个工具读取，栈定位额外调用来自 warmWorkspaceFiles 后改为明确断言三类调用；没有将额外工作静默忽略。
+- 本批只完成单目录资源界；整棵目录树的累计数量/深度/期限、忽略文件读量、原生隐式读取和外层句柄失败仍需推进，TOOL-01、SAFE-02 与 Phase 19 整体继续。56afcb32 的 CI/Architecture Watch 已成功；fe5e5978 Architecture Watch 成功，CI 37417292877 最近仍在执行，本批远端结果另按新提交核对。
+- 五项静态门禁及 diff 检查通过；NormProof 阻断义务满足，四个既有函数数量 advisory 和 docs strict 的 120 个既有非阻断来源路径 advisory 保留。

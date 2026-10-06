@@ -7,22 +7,35 @@ interface DirectoryReadOptions {
   readonly abortSignal?: AbortSignal
 }
 
+const MAX_ENTRIES = 10_000
+const MAX_NAME_BYTES = 1024 * 1024
+const TIMEOUT_MS = 5_000
+
+export class DirectoryReadError extends Error {
+  constructor(readonly reason: 'entries' | 'bytes' | 'deadline' | 'cleanup') {
+    const detail = reason === 'cleanup' ? ''
+      : { entries: '10,000-entry limit', bytes: '1MiB name limit', deadline: 'read deadline' }[reason]
+    super(reason === 'cleanup' ? 'Directory listing failed: directory handle cleanup could not be verified.'
+      : `Directory listing stopped at the ${detail}; no complete listing is available. Read a smaller directory.`)
+    this.name = 'DirectoryReadError'
+  }
+}
+
 /** Enumerate the verified directory, then recheck before releasing its names. */
 export async function readDirectory(root: string, directory: string, options?: DirectoryReadOptions): Promise<Dirent[]> {
-  if (process.platform !== 'linux') return readDirectoryByPath(root, directory, options)
+  const deadline = performance.now() + TIMEOUT_MS
+  if (process.platform !== 'linux') return readDirectoryByPath(root, directory, deadline, options)
   return withVerifiedReadTarget({
     absolutePath: directory, workspaceRoot: root,
     assertFileAccess: options?.assertFileAccess, abortSignal: options?.abortSignal,
   }, 'directory', async (handle, verify) => {
     const target = `/proc/self/fd/${handle.fd}`
-    const entries = await fs.readdir(target, { withFileTypes: true })
-    await verify()
-    return entries
+    return collectEntries(target, deadline, verify, options?.abortSignal)
   })
 }
 
 /** Platforms without proc descriptors retain path checks, without claiming descriptor isolation. */
-async function readDirectoryByPath(root: string, directory: string, options?: DirectoryReadOptions): Promise<Dirent[]> {
+async function readDirectoryByPath(root: string, directory: string, deadline: number, options?: DirectoryReadOptions): Promise<Dirent[]> {
   options?.abortSignal?.throwIfAborted()
   const workspace = realpathSync(root)
   const checked = verifyPathContainment(directory, root)
@@ -32,13 +45,47 @@ async function readDirectoryByPath(root: string, directory: string, options?: Di
   const before = await fs.stat(target, { bigint: true })
   if (!before.isDirectory()) throw new Error('Read target must be a directory.')
   options?.abortSignal?.throwIfAborted()
-  const entries = await fs.readdir(target, { withFileTypes: true })
-  const after = await fs.stat(target, { bigint: true })
-  if (realpathSync(root) !== workspace || realpathSync(directory) !== target
-    || !after.isDirectory() || before.dev !== after.dev || before.ino !== after.ino) {
-    throw new Error('Directory changed while reading.')
+  const verify = async (): Promise<void> => {
+    const after = await fs.stat(target, { bigint: true })
+    if (realpathSync(root) !== workspace || realpathSync(directory) !== target
+      || !after.isDirectory() || before.dev !== after.dev || before.ino !== after.ino) {
+      throw new Error('Directory changed while reading.')
+    }
+    options?.assertFileAccess?.(target)
+    options?.abortSignal?.throwIfAborted()
   }
-  options?.assertFileAccess?.(target)
-  options?.abortSignal?.throwIfAborted()
-  return entries
+  return collectEntries(target, deadline, verify, options?.abortSignal)
+}
+
+/** Keep the native prefetch buffer and retained names bounded independently of output pagination. */
+async function collectEntries(target: string, deadline: number, verify: () => Promise<void>, signal?: AbortSignal): Promise<Dirent[]> {
+  const check = (): void => {
+    signal?.throwIfAborted()
+    if (performance.now() >= deadline) throw new DirectoryReadError('deadline')
+  }
+  check()
+  const directory = await fs.opendir(target, { bufferSize: 32 })
+  try {
+    const entries: Dirent[] = []
+    let nameBytes = 0
+    while (true) {
+      check()
+      if (entries.length % 32 === 0) { await verify(); check() }
+      const entry = await directory.read()
+      check()
+      if (!entry) break
+      if (entries.length >= MAX_ENTRIES) throw new DirectoryReadError('entries')
+      nameBytes += Buffer.byteLength(entry.name)
+      if (nameBytes > MAX_NAME_BYTES) throw new DirectoryReadError('bytes')
+      entries.push(entry)
+    }
+    // readdir used libuv's byte-order sorting; opendir exposes filesystem order.
+    entries.sort((left, right) => Buffer.compare(Buffer.from(left.name), Buffer.from(right.name)))
+    await verify()
+    check()
+    return entries
+  } finally {
+    try { await directory.close() }
+    catch { throw new DirectoryReadError('cleanup') }
+  }
 }
