@@ -1,6 +1,8 @@
+import { ConfigWriteError } from '../../config/outcome.js';
 import {
   RUNTIME_PROVIDERS,
   readUserRuntimeConfigFile,
+  readRuntimeConfigEditAt, getUserRuntimeConfigPath,
   writeUserRuntimeConfigFile,
   type ProviderConnectionConfig,
   type RuntimeConfigFile,
@@ -314,7 +316,8 @@ async function setModel(args: string[], context: CommandContext, global: boolean
   if (namedProvider && !model) {
     return `\`${namedProvider}\` has no models listed. Name one: /model use ${namedProvider}/<model>.`;
   }
-  const config = readUserRuntimeConfigFile();
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const config = edit.values;
   const connections = normalizeConnections(config);
   const activeId = config.activeProviderConnectionId?.trim();
   const activeConnection = connections.find((item) => item.id === activeId);
@@ -395,9 +398,10 @@ async function setModel(args: string[], context: CommandContext, global: boolean
   let configPath: string | undefined;
   if (global) {
     try {
-      configPath = writeUserRuntimeConfigFile(next);
-    } catch {
+      configPath = writeUserRuntimeConfigFile(next, edit);
+    } catch (error) {
       context.refreshRuntimeConfig?.();
+      if (error instanceof ConfigWriteError) return `${context.sessionId ? `Session model switched to ${model}. ` : ''}${error.message}`;
       return context.sessionId
         ? `Session model switched to ${model}, but saving the global default failed. Global write outcome is unverified.`
         : "Saving the global model default failed. Global write outcome is unverified.";

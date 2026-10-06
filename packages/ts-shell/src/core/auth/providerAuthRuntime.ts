@@ -1,4 +1,5 @@
-import { AccountAuthConfig, type GoogleAccountAuthConfig, type OpenAIAccountAuthConfig, type ProviderConnectionConfig, readUserRuntimeConfigFile, type RuntimeConfigFile, type RuntimeProvider, writeUserRuntimeConfigFile } from "../../config/runtimeConfig.js";
+import { ConfigWriteError } from '../../config/outcome.js';
+import { AccountAuthConfig, type GoogleAccountAuthConfig, type OpenAIAccountAuthConfig, type ProviderConnectionConfig, readRuntimeConfigEditAt, getUserRuntimeConfigPath, type RuntimeConfigFile, type RuntimeProvider, writeUserRuntimeConfigFile } from "../../config/runtimeConfig.js";
 import { providerFacts } from "../providers/facts.js";
 import { openAIProviderAuthContract } from "../commands/openaiAccountAuth.js";
 import { googleProviderAuthContract } from "../commands/googleAccountAuth.js";
@@ -90,6 +91,7 @@ export async function runProviderAccountAuthLogin(input: {
       `Stored at: ${summary.configPath}`,
     ].join("\n");
   } catch (error) {
+    if (error instanceof ConfigWriteError) throw error;
     const configPath = persistConnectionPatch({
       patchKind: "mark-error",
       connectionId,
@@ -144,7 +146,8 @@ function persistConnectedAccountAuth(input: {
   readonly authorizeUrl: string;
   readonly callbackUrl: string;
 }): ProviderAccountAuthConnectionSummary {
-  const latest = readUserRuntimeConfigFile();
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const latest = edit.values;
   const updatedAt = new Date().toISOString();
   const nextConnections = normalizeConnections(latest).map((connection) =>
     connection.id === input.connectionId
@@ -179,7 +182,7 @@ function persistConnectedAccountAuth(input: {
       },
     },
   };
-  const configPath = writeUserRuntimeConfigFile(next);
+  const configPath = writeUserRuntimeConfigFile(next, edit);
   return {
     connectionId: input.connectionId,
     provider: input.provider,
@@ -208,7 +211,8 @@ export function persistRenewedAccountAuth(input: {
   readonly provider: RuntimeProvider;
   readonly accountAuth: AccountAuthConfig;
 }): boolean {
-  const latest = readUserRuntimeConfigFile();
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const latest = edit.values;
   const accountAuth = toProviderAccountAuthConfig(input.provider, input.accountAuth);
   const updatedAt = new Date().toISOString();
   let changed = false;
@@ -239,7 +243,7 @@ export function persistRenewedAccountAuth(input: {
       ...(latest.providerCredentials ?? {}),
       ...(nextCredentials ? { [input.provider]: nextCredentials } : {}),
     },
-  });
+  }, edit);
   return true;
 }
 
@@ -248,7 +252,8 @@ function persistConnectionPatch(input: {
   readonly connectionId: string;
   readonly pendingConnection?: ProviderConnectionConfig;
 }): string {
-  const latest = readUserRuntimeConfigFile();
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const latest = edit.values;
   if (input.patchKind === "insert-pending" && input.pendingConnection) {
     return writeUserRuntimeConfigFile({
       ...latest,
@@ -256,7 +261,7 @@ function persistConnectionPatch(input: {
         input.pendingConnection,
         ...normalizeConnections(latest),
       ],
-    });
+    }, edit);
   }
 
   const nextConnections = normalizeConnections(latest).map((connection) =>
@@ -271,7 +276,7 @@ function persistConnectionPatch(input: {
   return writeUserRuntimeConfigFile({
     ...latest,
     providerConnections: nextConnections,
-  });
+  }, edit);
 }
 
 function normalizeConnections(config: RuntimeConfigFile): ProviderConnectionConfig[] {

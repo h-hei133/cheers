@@ -1146,3 +1146,19 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - regular/fullscreen 构建 CLI 各使用本地合成 HTTP 完成受拒绝的 write，再实际执行 connect use second。配置包含 BOM、CRLF、注释、尾逗号、环境占位符、1e2 和 -0；逐字节比较证明只改变活动连接 ID 与第二条连接 updatedAt，其余原文保留。项目配置和工作区 marker 不变，合成秘密不进入终端，两模式 exit 0；未访问真实提供方配置。
 - 单次本机成本探针（Node 20.3、276903 字节/36002 节点、10 次均值）中，原 JSON.parse 加结构检查约 5.52ms，JSONC 完整预检/解析/检查约 13.91ms，首次导入 syntax 模块约 14.80ms。这只刻画该进程与夹具，不代表完整 CLI 冷启动或跨平台性能；固定输入/编辑预算仍是工作上界。
 - 安装依赖时出现既有 undici 7.18.2 的 engines >=20.18.1 与当前 Node 20.3 不一致警告；本批未改该依赖、Node floor 或构建脚本，当前 Node 20.3 实测结果如上，不宣称解决依赖声明差异。import cycles/config consumers/declarations/node floor/docs strict 通过；NormProof 阻断义务满足，既有四个函数数量 advisory 和 120 个文档来源 advisory 不变。前批 d93c7a60 的 CI 37423264223 与 Architecture Watch 37423264273 均已成功；本批提交另查。CFG-01 的完整来源/信任/生效 policy、CFG-03/04/05、SAFE-02 与其余 Phase 19 任务继续。
+
+
+### 8.70 CFG-03：基线字段补丁、跨进程锁与保存结果
+
+- [persistence](../../packages/ts-shell/src/config/persistence.ts) 持有显式、深冻结的 raw 编辑基线，记录目标路径、原文字节摘要或缺失状态；所有配置 writer 必须携带同一目标的基线。调用方给出的顶层局部值先覆盖基线，再推导真正变化，旧完整快照中的未改字段不再覆盖其他终端的值或复活其删除。未经确认的基线和错目标在 writer 前拒绝，不通过对象 spread 暗带版本。
+- [conflict](../../packages/ts-shell/src/config/conflict.ts) 在锁内重读当前文档后做三方合并：普通对象叶子可独立变化，父对象的创建、删除或类型替换发生冲突时不复活旧结构；普通数组整体比较。每个 provider 凭据对象与每条连接记录整体保护，避免混合不同凭据代际；连接数组只有三方均为相同顺序的唯一 ID 时允许不同记录合并，并发成员增删或重排保守拒绝。已经完全等于所请求值的变化允许无操作重试。
+- 活动连接同时检查引用与 provider 一致性，不再静默清掉第三方的新选择。连接/凭据修改依赖活动选择时，外部切换使旧请求冲突；选择另一条已有连接时，其整条记录必须仍等于基线或完整请求值。ID 比较复用运行时去空白语义，空 ID 按未选择处理，未编辑的原始拼写保留。
+- 复用 [withFileLock](../../packages/ts-shell/src/session/store/sessionFileStore.ts) 与原子文本 writer；配置指定 local-dead 恢复策略，仅同机 PID 明确不存在时接管。读取与接管复查均遵循该策略，活进程、未知/异机 owner 和未完整写入的锁不能仅凭年龄被移除。既有会话消费者保留原默认恢复规则；清理观察者不会覆盖原始动作错误。
+- 锁内完成 raw/schema 校验、三方合并和 JSONC 原文编辑，再检查当前精确文本/不存在状态；writer 返回后重新读取并核对最终字节。无变化保持 mtime。安全错误只携带受控代码：[outcome](../../packages/ts-shell/src/config/outcome.ts) 区分 unchanged（本次未调用配置 writer）、unknown（writer 已开始但最终内容未核验）和 persisted（内容已核验但锁清理失败），同时保留清理失败事实。成功返回仍兼容既有配置路径接口。
+- connect、账户认证持久化、model、TUI 设置调用点均显式传递基线。model 在异步 PreModelSwitch 前捕获基线，hook 期间不丢失其他设置，也不把活动连接变化后的保存报告成成功；已有会话保存成功/全局失败仍分别报告。两种登录流程遇到配置保存异常时不再补写 error 状态；状态栏仅在保存成功后更新正式显示值。
+- 定向对照参考设置管理器“记录修改字段、锁内读取当前文件后更新”的决定；没有复制其缺失文件先读后锁、直接覆盖文本与忙等待。这里保留已有有界 JSONC 编辑/原子 writer，并增加显式冲突及核验状态；字段差异、strict owner、前后核验、异步基线和登录补偿相关反转均触发行为失败。
+- 独立审查发现并修复三项问题：模型 hook 期间切换同 provider 的活动连接导致成功报告失真；重复的已落盘选择被误判冲突；带空白/空 ID 的既有合法配置无法保存无关设置。修复后两路复审返回 APPROVE/CLEAR；代码审查者另外执行六个只读值探针，未将主代理组合测试作为独立执行证据。
+- Linux、Node 20.3 隔离环境最终 19 文件/317 项与 build:ts 通过；包含真实双进程不同字段、缺失文件创建和同字段互斥、strict owner、精确原文及登录异常测试。13 组有效反转后源码逐字节恢复，恢复后 7 文件/142 项通过。首轮组合失败为旧夹具依赖隐式清除悬空指针，改为明确清除；首轮反转探针只接受 AssertionError 而拒绝预期配置异常，修正的是探针判定规则。
+- regular/fullscreen 实际 CLI 使用独立 HOME 与本地合成 HTTP：受限写入被拒绝；本机活锁使 /connect use 超时且报告本次未写入，配置字节不变；释放锁后重试仅修改活动 ID 与所选连接时间。BOM/CRLF/注释/尾逗号/占位符/1e2/-0 保留，秘密未输出，项目与目标标记不变，两模式 exit 0。
+- 保证限于参与同一路径锁协议的 writer。检查与 rename 之间仍存在非参与编辑器窗口，未宣称原子 CAS；父路径别名、多机文件系统和目录 fsync/断电持久性没有新增保证。未知/残缺锁可能持续阻断，需要确认 owner 后人工处理；不会冒险自动回收。账户 token 刷新仍沿用 provider 范围与网络返回后读取的基线，旧网络响应覆盖新登录的身份问题未由本批解决。
+- CFG-03 的 last-good revision reload、候选发布与立即/下一轮/重启应用边界继续；CFG-01 的完整来源/信任 policy、CFG-04/05、SAFE-02 与其余 Phase 19 任务仍开放。import cycles/config consumers/declarations/node floor/docs strict 与 43 项脚本测试通过；NormProof 阻断义务满足，既有四项函数数量 advisory 与 120 项文档来源 advisory 不变。此前 76d4a7d7 的 Architecture Watch 37425003854 与 CI 37425003674 均已成功；本批提交与 CI 另查，不能据本地验证宣布整项或阶段完成。

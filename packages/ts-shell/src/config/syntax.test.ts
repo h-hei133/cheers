@@ -1,3 +1,4 @@
+import { readRuntimeConfigEditAt } from "./runtimeConfig.js";
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -29,7 +30,7 @@ describe('configuration source syntax', () => {
   ])('rejects damaged or ambiguous documents without overwriting them: %s', content => {
     fs.writeFileSync(file, content);
     expect(getRuntimeConfig(root).allowedTools).toEqual([]);
-    expect(() => writeUserRuntimeConfigFile({ maxTurns: 4 })).toThrow();
+    expect(() => writeUserRuntimeConfigFile({ maxTurns: 4 }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()))).toThrow();
     expect(fs.readFileSync(file, 'utf8')).toBe(content);
   });
 
@@ -52,7 +53,7 @@ describe('configuration source syntax', () => {
   it('changes only the requested scalar while preserving comments, BOM, CRLF and placeholders', () => {
     const before = '\uFEFF{\r\n  // preferences\r\n  "theme" : "dark", /* sibling */ "unknown": { "keep": 1e2 },\r\n  "providerCredentials": { "openai": { "apiKey": "${MISSING_SYNTAX_SECRET}" } },\r\n}\r\n';
     fs.writeFileSync(file, before);
-    writeUserRuntimeConfigFile({ theme: 'light' });
+    writeUserRuntimeConfigFile({ theme: 'light' }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
     expect(fs.readFileSync(file, 'utf8')).toBe(before.replace('"dark"', '"light"'));
     expect(readUserRuntimeConfigFile().providerCredentials?.openai?.apiKey).toBe('${MISSING_SYNTAX_SECRET}');
   });
@@ -61,7 +62,7 @@ describe('configuration source syntax', () => {
     const before = '{"providerConnections":[/* first */{"id":"a","provider":"openai","label":"old"},/* second */{"id":"b","provider":"openai"}],"tui":{"diagrams":"off",/* status */"statusItems":["model"]}}';
     fs.writeFileSync(file, before);
     const config = readUserRuntimeConfigFile();
-    writeUserRuntimeConfigFile({ ...config, providerConnections: config.providerConnections!.map(connection => connection.id === 'a' ? { ...connection, label: 'new' } : connection) });
+    writeUserRuntimeConfigFile({ ...config, providerConnections: config.providerConnections!.map(connection => connection.id === 'a' ? { ...connection, label: 'new' } : connection) }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
     expect(fs.readFileSync(file, 'utf8')).toBe(before.replace('"old"', '"new"'));
   });
 
@@ -69,17 +70,17 @@ describe('configuration source syntax', () => {
     const before = '{ "theme":"dark", "unknown": 1e2 }\n';
     fs.writeFileSync(file, before); fs.utimesSync(file, new Date(0), new Date(0));
     const mtime = fs.statSync(file).mtimeMs;
-    writeUserRuntimeConfigFile(readUserRuntimeConfigFile());
+    writeUserRuntimeConfigFile(readUserRuntimeConfigFile(), readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
     expect(fs.readFileSync(file, 'utf8')).toBe(before);
     expect(fs.statSync(file).mtimeMs).toBe(mtime);
   });
 
   it('saves inserted and deleted fields as valid JSONC, preserving unaffected fields', () => {
     fs.writeFileSync(file, '{/* header */"theme":"dark",/* retained */"unknown":7,}');
-    writeUserRuntimeConfigFile({ maxTurns: 22 });
+    writeUserRuntimeConfigFile({ maxTurns: 22 }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
     expect(readUserRuntimeConfigFile()).toMatchObject({ theme: 'dark', maxTurns: 22 });
     expect(fs.readFileSync(file, 'utf8')).toContain('/* retained */');
-    writeUserRuntimeConfigFile({ theme: undefined });
+    writeUserRuntimeConfigFile({ theme: undefined }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
     expect(readUserRuntimeConfigFile().theme).toBeUndefined();
     expect(readUserRuntimeConfigFile().maxTurns).toBe(22);
   });
@@ -87,7 +88,7 @@ describe('configuration source syntax', () => {
   it.each(['', '// only a comment', '/* comment */'])('keeps an empty present document distinct from absence: %s', content => {
     fs.writeFileSync(file, content);
     expect(getRuntimeConfig(root).allowedTools).toEqual([]);
-    expect(() => writeUserRuntimeConfigFile({ maxTurns: 10 })).toThrow();
+    expect(() => writeUserRuntimeConfigFile({ maxTurns: 10 }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()))).toThrow();
     expect(fs.readFileSync(file, 'utf8')).toBe(content);
   });
 
@@ -95,7 +96,7 @@ describe('configuration source syntax', () => {
     const before = Buffer.concat([Buffer.from('{"unknown":"'), Buffer.from([0xff]), Buffer.from('"}')]);
     fs.writeFileSync(file, before);
     expect(getRuntimeConfig(root).configDiagnostics.join(' ')).toContain('invalid-utf8');
-    expect(() => writeUserRuntimeConfigFile({ theme: 'light' })).toThrow();
+    expect(() => writeUserRuntimeConfigFile({ theme: 'light' }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()))).toThrow();
     expect(fs.readFileSync(file)).toEqual(before);
   });
 
@@ -106,7 +107,7 @@ describe('configuration source syntax', () => {
 
   it('removes nested keys and supports explicit empty object replacement', () => {
     fs.writeFileSync(file, '{"tui":{"diagrams":"off", "statusItems":["model"]},"theme":"dark"}');
-    writeUserRuntimeConfigFile({ tui: {} });
+    writeUserRuntimeConfigFile({ tui: {} }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
     expect(readUserRuntimeConfigFile()).toEqual({ tui: {}, theme: 'dark' });
   });
 
@@ -114,7 +115,7 @@ describe('configuration source syntax', () => {
     const before = '{"providerConnections":[{"id":"a",/* belongs to a */"provider":"openai"},{"id":"b","provider":"openai"}]}';
     fs.writeFileSync(file, before);
     const connections = readUserRuntimeConfigFile().providerConnections!;
-    writeUserRuntimeConfigFile({ providerConnections: [...connections].reverse() });
+    writeUserRuntimeConfigFile({ providerConnections: [...connections].reverse() }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
     expect(readUserRuntimeConfigFile().providerConnections?.map(connection => connection.id)).toEqual(['b', 'a']);
     expect(fs.readFileSync(file, 'utf8')).not.toContain('belongs to a');
   });
@@ -124,13 +125,13 @@ describe('configuration source syntax', () => {
     const next = Object.fromEntries(Object.keys(unknown).map(key => [key, 1]));
     fs.writeFileSync(file, JSON.stringify({ unknown }));
     const before = fs.readFileSync(file);
-    expect(() => writeUserRuntimeConfigFile({ unknown: next } as never)).toThrow(/resource-limit/);
+    expect(() => writeUserRuntimeConfigFile({ unknown: next } as never, readRuntimeConfigEditAt(getUserRuntimeConfigPath()))).toThrow(/resource-limit/);
     expect(fs.readFileSync(file)).toEqual(before);
     const large = { padding: 'x'.repeat(900000), unknown };
     fs.writeFileSync(file, JSON.stringify(large));
     const largeBefore = fs.readFileSync(file);
     const ten = { ...unknown, ...Object.fromEntries(Object.keys(unknown).slice(0, 10).map(key => [key, 1])) };
-    expect(() => writeUserRuntimeConfigFile({ unknown: ten } as never)).toThrow(/resource-limit/);
+    expect(() => writeUserRuntimeConfigFile({ unknown: ten } as never, readRuntimeConfigEditAt(getUserRuntimeConfigPath()))).toThrow(/resource-limit/);
     expect(fs.readFileSync(file)).toEqual(largeBefore);
   });
 
@@ -142,10 +143,10 @@ describe('configuration source syntax', () => {
     const before = '{"unknown":-0,"theme":"dark"}';
     fs.writeFileSync(file, before); fs.utimesSync(file, new Date(0), new Date(0));
     const mtime = fs.statSync(file).mtimeMs;
-    writeUserRuntimeConfigFile(readUserRuntimeConfigFile());
+    writeUserRuntimeConfigFile(readUserRuntimeConfigFile(), readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
     expect(fs.readFileSync(file, 'utf8')).toBe(before);
     expect(fs.statSync(file).mtimeMs).toBe(mtime);
-    writeUserRuntimeConfigFile({ theme: 'light' });
+    writeUserRuntimeConfigFile({ theme: 'light' }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
     expect(fs.readFileSync(file, 'utf8')).toBe(before.replace('"dark"', '"light"'));
   });
 
@@ -155,21 +156,21 @@ describe('configuration source syntax', () => {
     ['{/* header */"theme":"dark",/* tail */}', '{/* header *//* tail */}'],
   ])('deletes a property/separator while retaining surrounding comments', (before, after) => {
     fs.writeFileSync(file, before);
-    writeUserRuntimeConfigFile({ theme: undefined });
+    writeUserRuntimeConfigFile({ theme: undefined }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
     expect(fs.readFileSync(file, 'utf8')).toBe(after);
     expect(getRuntimeConfig(root).allowedTools).toBeUndefined();
   });
 
   it('does not associate reordered identity-less records with old comments', () => {
     fs.writeFileSync(file, '{"denyRules":[{/* bash only */"tool":"bash"},{"tool":"write"}]}');
-    writeUserRuntimeConfigFile({ denyRules: [{ tool: 'write' }, { tool: 'bash' }] });
+    writeUserRuntimeConfigFile({ denyRules: [{ tool: 'write' }, { tool: 'bash' }] }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
     expect(readUserRuntimeConfigFile().denyRules).toEqual([{ tool: 'write' }, { tool: 'bash' }]);
     expect(fs.readFileSync(file, 'utf8')).not.toContain('bash only');
   });
 
   it('does not carry ID comments across primitive slots in mixed arrays', () => {
     fs.writeFileSync(file, '{"unknown":[{/* identity a */"id":"a"},1]}');
-    writeUserRuntimeConfigFile({ unknown: [1, { id: 'a' }] } as never);
+    writeUserRuntimeConfigFile({ unknown: [1, { id: 'a' }] } as never, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
     expect(fs.readFileSync(file, 'utf8')).not.toContain('identity a');
   });
 });

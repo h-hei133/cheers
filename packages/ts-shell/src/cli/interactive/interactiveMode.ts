@@ -28,7 +28,7 @@ import type { StreamingRenderer } from "../../presentation/terminal/streaming.js
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import { replaceLiteral } from "../../presentation/tui/pastes.js";
-import { readUserRuntimeConfigFile, writeUserRuntimeConfigFile } from "../../config/runtimeConfig.js";
+import { readRuntimeConfigEditAt, getUserRuntimeConfigPath, readUserRuntimeConfigFile, writeUserRuntimeConfigFile } from "../../config/runtimeConfig.js";
 import { InteractiveSurface } from "../../presentation/tui/surface/view.js";
 import { createViewState, type ViewState } from "../../presentation/tui/surface/contract.js";
 import { approvalPicker, type InteractiveApprovalResult } from "./picker/approval.js";
@@ -806,8 +806,8 @@ export class InteractiveMode {
         this.tui.requestRender();
       },
       saveStatusItems: async (items) => {
-        this.statusItems = items;
         const written = writeStatusItems(this.options.runtimeContext.projectRoot, items);
+        this.statusItems = items;
         return written.scope === "project"
           ? `Status band items saved to ${written.path} (this project's file, which wins over your own)`
           : `Status band items saved to ${written.path}`;
@@ -817,8 +817,8 @@ export class InteractiveMode {
       readSetting: (key) =>
         (readUserRuntimeConfigFile() as Record<string, unknown>)[key] === true,
       saveSetting: async (key, value) => {
-        const existing = readUserRuntimeConfigFile() as Record<string, unknown>;
-        writeUserRuntimeConfigFile({ ...existing, [key]: value });
+        const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+        writeUserRuntimeConfigFile({ ...edit.values, [key]: value }, edit);
       },
     };
   }

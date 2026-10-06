@@ -1,3 +1,4 @@
+import { readRuntimeConfigEditAt } from "./runtimeConfig.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -395,7 +396,7 @@ describe("runtime config", () => {
           model: "deepseek-ai/DeepSeek-V3",
         },
       },
-    });
+    }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
 
     const config = getRuntimeConfig(fakeRoot);
     expect(config.provider).toBe("openai-compatible");
@@ -432,7 +433,7 @@ describe("runtime config", () => {
           model: "deepseek-ai/DeepSeek-V4-Flash",
         },
       },
-    });
+    }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
 
     const config = getRuntimeConfig(fakeRoot);
     expect(config.provider).toBe("openai-compatible");
@@ -456,7 +457,7 @@ describe("runtime config", () => {
           model: "deepseek-ai/DeepSeek-V3",
         },
       },
-    });
+    }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
 
     expect(fs.existsSync(configPath)).toBe(true);
     const loaded = readUserRuntimeConfigFile();
@@ -505,26 +506,21 @@ describe("runtime config", () => {
   });
 
   it("does not lose a concurrent edit made between read and write", async () => {
-    // Two sessions can both resolve settings, then both write. The second write
-    // used to clobber the first wholesale, so a model chosen in one session
-    // vanished when the other saved a theme. The write has to merge over what is
-    // on disk now rather than replace it with what was read earlier.
+    // An unchanged field in an old snapshot must not undo another writer's deletion.
     const configPath = getUserRuntimeConfigPath();
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
     fs.writeFileSync(configPath, JSON.stringify({ maxTurns: 5 }), "utf8");
     fs.writeFileSync(configPath, JSON.stringify({ maxTurns: 7, theme: "light" }), "utf8");
 
-    const first = readUserRuntimeConfigFile();
-    // Another session writes between this read and this session's save. Its
-    // `maxTurns` is what this session also knows and sets; `theme` is a field
-    // this session never touched, and the merge is what keeps it.
+    const edit = readRuntimeConfigEditAt(configPath);
+    const first = edit.values;
     fs.writeFileSync(configPath, JSON.stringify({ maxTurns: 5 }), "utf8");
-    writeUserRuntimeConfigFile({ ...first, maxTurns: 5, provider: "anthropic" });
+    writeUserRuntimeConfigFile({ ...first, maxTurns: 5, provider: "anthropic" }, edit);
 
     const merged = readUserRuntimeConfigFile();
     expect(merged.provider).toBe("anthropic");
     expect(merged.maxTurns).toBe(5);
-    expect(merged.theme).toBe("light");
+    expect(merged.theme).toBeUndefined();
   });
 
   it("leaves the config intact when the process dies mid-write", () => {
@@ -543,7 +539,7 @@ describe("runtime config", () => {
     // write mechanism leaves behind, not that fs can be interrupted.
     // The assertion is that a real write leaves no such window: after it, the
     // file parses, and no temp file is left next to it.
-    writeUserRuntimeConfigFile({ maxTurns: 9 });
+    writeUserRuntimeConfigFile({ maxTurns: 9 }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
 
     const merged = readUserRuntimeConfigFile();
     expect(merged.maxTurns).toBe(9);

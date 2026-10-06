@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import { randomUUID } from "node:crypto";
 import os from "node:os";
 import * as path from "node:path";
-import { isLockStale, takeOverStaleLock } from "./lockStaleness.js";
+import { isLockStale, takeOverStaleLock, type LockRecovery } from "./lockStaleness.js";
 
 const STATE_IO_MAX_ATTEMPTS = 6;
 const STATE_IO_RETRY_DELAY_MS = 12;
@@ -53,7 +53,13 @@ export function readJsonFileWithRetry<T>(
   return undefined;
 }
 
-export function withFileLock<T>(lockPath: string, action: () => T): T {
+export interface FileLockOptions {
+  readonly recovery?: LockRecovery;
+  /** Observe cleanup failure even when the action's primary error takes priority. */
+  readonly onReleaseError?: () => void;
+}
+
+export function withFileLock<T>(lockPath: string, action: () => T, options: FileLockOptions = {}): T {
   const directory = path.dirname(lockPath);
   if (!fs.existsSync(directory)) {
     fs.mkdirSync(directory, { recursive: true });
@@ -67,7 +73,7 @@ export function withFileLock<T>(lockPath: string, action: () => T): T {
       break;
     } catch (error) {
       if (!isTransientLockError(error)) throw error;
-      if (isLockStale(lockPath) && takeOverStaleLock(lockPath)) continue;
+      if (isLockStale(lockPath, Date.now(), options.recovery) && takeOverStaleLock(lockPath, options.recovery)) continue;
       if (Date.now() - startedAt >= STATE_LOCK_TIMEOUT_MS) {
         throw new Error(`Session state lock timeout at ${lockPath}`);
       }
@@ -93,6 +99,7 @@ export function withFileLock<T>(lockPath: string, action: () => T): T {
     } catch (error) {
       // Preserve the action's original failure, but never convert an otherwise
       // successful write into success when ownership or cleanup was lost.
+      try { options.onReleaseError?.(); } catch { /* An observer must not replace the primary error. */ }
       if (!actionFailed) throw error;
     }
   }

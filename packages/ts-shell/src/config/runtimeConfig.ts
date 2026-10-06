@@ -2,11 +2,11 @@ import os from "node:os";
 import path from "node:path";
 import { resolveUserDataFile, userDataDir } from "../core/paths/userHome.js"
 import { type DenyRule } from "../core/shell/approval/deny.js"
-import { writeTextFileAtomic } from "../session/store/sessionFileStore.js"
 import { createConfigFields, type ConfigField } from "./fields.js";
-import { readConfigDocument, readConfigSnapshot } from "./document.js";
+import { readConfigDocument } from "./document.js";
 import { ConfigDocumentError } from "./syntax.js";
-import { patchConfigDocument } from "./patch.js";
+import { readConfigEdit, persistConfigEdit, type ConfigEdit } from "./persistence.js";
+import { normalizeConnectionId } from "./values.js";
 import { loadConfigLayers, validateRawConfig } from "./layers.js";
 
 /**
@@ -616,65 +616,32 @@ function dedupeDiagnostics(messages: readonly string[]): string[] {
   return [...new Set(messages)];
 }
 
-/**
- * Write one config file back, merging over what is on disk now.
- *
- * The merge is not a lock: it narrows the window between read and replace, and
- * the rename below is what makes a single writer's own landing safe. A
- * cross-process lock is deliberately absent for the user file — the loss it
- * would guard is a setting the user can set again, while a lock file that
- * survived a crash would block every later write for reasons that read as a
- * broken config.
- */
+/** Capture raw, immutable values and the revision used by a later field patch. */
+export function readRuntimeConfigEditAt(configPath: string): ConfigEdit<RuntimeConfigFile> {
+  return readConfigEdit(configPath, CONFIG_FIELDS);
+}
+
+/** Save only changes against the required baseline; conflicts never overwrite newer fields. */
 export function writeRuntimeConfigFileAt(
   configPath: string,
   config: RuntimeConfigFile,
+  baseline: ConfigEdit<RuntimeConfigFile>,
 ): string {
-
-  // Merge over what is on disk now, not over what the caller read earlier.
-  // Two sessions resolving settings and both saving used to have the second
-  // replace the first wholesale — a model chosen in one vanished when the
-  // other saved a theme — because the save wrote back a stale snapshot. Reading
-  // here, inside the write, narrows the window between read and replace; it
-  // does not close it, and a cross-process lock is deliberately not added: the
-  // loss it guards is a setting the user set by hand, recoverable by setting it
-  // again, and a lock file that survives a crash would block every later write
-  // for reasons that read as a broken config.
-  const snapshot = readConfigSnapshot(configPath);
-  const onDisk = snapshot?.values ?? {};
-  validateRawConfig(onDisk, CONFIG_FIELDS);
-  const merged = { ...onDisk, ...config } as RuntimeConfigFile;
-  validateRawConfig(merged, CONFIG_FIELDS);
-  // An active-connection pointer has to name a connection in the list that
-  // lands on disk, whichever side contributed each half. Keeping an id whose
-  // record was just replaced leaves every reader reporting a connection that
-  // does not exist, and the pointer is meaningless without its record.
-  const connections = (merged.providerConnections ?? []) as ReadonlyArray<{ id?: string }>;
-  const activeId = merged.activeProviderConnectionId?.trim();
-  if (activeId !== undefined && !connections.some((c) => c.id === activeId)) {
-    delete merged.activeProviderConnectionId;
-  }
-  // Written through the same temp-and-rename the session store uses, so a
-  // write interrupted mid-flight leaves the last whole config rather than a
-  // truncated file every later read rejects. The merge above is not a lock:
-  // the rename is what makes the single writer's own landing safe, and the
-  // lost-update window the comment above accepts is unchanged by it.
-  const text = patchConfigDocument(snapshot, merged as Record<string, unknown>);
-  if (text !== snapshot?.text) writeTextFileAtomic(configPath, text);
-  return configPath;
+  return persistConfigEdit(configPath, config, baseline, CONFIG_FIELDS);
 }
 
-/** Persist to the user's config file, returning the path written. */
-export function writeUserRuntimeConfigFile(config: RuntimeConfigFile): string {
-  return writeRuntimeConfigFileAt(getUserRuntimeConfigPath(), config);
+/** Persist to the user's config file after validating its edit baseline. */
+export function writeUserRuntimeConfigFile(config: RuntimeConfigFile, baseline: ConfigEdit<RuntimeConfigFile>): string {
+  return writeRuntimeConfigFileAt(getUserRuntimeConfigPath(), config, baseline);
 }
 
-/** Persist to the project's config file, returning the path written. */
+/** Persist to the project's config file after validating its edit baseline. */
 export function writeProjectRuntimeConfigFile(
   rootDir: string,
   config: RuntimeConfigFile,
+  baseline: ConfigEdit<RuntimeConfigFile>,
 ): string {
-  return writeRuntimeConfigFileAt(getProjectConfigPath(rootDir), config);
+  return writeRuntimeConfigFileAt(getProjectConfigPath(rootDir), config, baseline);
 }
 
 function normalizeProviderCredentials(
@@ -848,11 +815,6 @@ function normalizeBaseUrl(baseUrl?: string): string | undefined {
   }
 
   return trimmed.replace(/\/+$/, "");
-}
-
-function normalizeConnectionId(value?: string): string | undefined {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : undefined;
 }
 
 function getRuntimeConfigHomeDir(): string {

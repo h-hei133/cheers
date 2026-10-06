@@ -6247,3 +6247,6 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-06] fix | Phase 19 CFG-01 首批字段验证与来源合并接线，项目不能覆盖个人连接或读取环境秘密，非法安全配置在 overrides 后阻断工具。258 项、构建、十二组有效反转与两模式六场景实际 CLI 拒绝写入/秘密不输出通过；审查发现的落盘大小不一致已修正并取得独立 APPROVE/CLEAR，见 features/phase-19-decisions.md §8.68。配置 revision/JSONC/并发补丁/通知与阶段其余任务继续。
 
 ## [2026-10-06] fix | Phase 19 CFG-02 接入有界 JSONC parser 和原文差异编辑，保留 BOM/CRLF/占位符/未编辑 token，拒绝重复键与不完整候选。审查发现的删除注释、数组身份与负零问题修复后获 APPROVE/CLEAR；287 项、构建、十二组反转及两模式实际 CLI 精确落盘验证通过，见 features/phase-19-decisions.md §8.69。并发补丁/revision/通知与阶段整体继续。
+
+
+## [2026-10-06] fix | Phase 19 CFG-03 配置保存要求显式基线，锁内三方字段合并及前后原文核验，错误区分未写/未知/已核验但清理失败；模型异步选择依赖与登录补写分支已保护。317 项、构建、13 组反转、两模式真实 CLI 锁超时/重试验证通过，审查发现的选择和 ID 兼容问题修复后获 APPROVE/CLEAR。见 features/phase-19-decisions.md §8.70；revision reload 和阶段整体继续。

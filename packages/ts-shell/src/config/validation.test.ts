@@ -1,3 +1,4 @@
+import { readRuntimeConfigEditAt } from "./runtimeConfig.js";
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -103,7 +104,7 @@ describe('configuration validation boundary', () => {
     expect(config.allowedTools).toEqual([]);
     expect(matchDenyRule(config.denyRules, 'bash', 'anything')).toBeDefined();
     expect(config.configDiagnostics.join(' ')).not.toContain('secret-value');
-    expect(() => writeUserRuntimeConfigFile({ theme: 'dark' })).toThrow();
+    expect(() => writeUserRuntimeConfigFile({ theme: 'dark' }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()))).toThrow();
     expect(fs.readFileSync(userPath, 'utf8')).toBe(content);
   });
 
@@ -125,10 +126,10 @@ describe('configuration validation boundary', () => {
 
   it('preserves unknown fields and references on writes and rejects invalid patches before writing', () => {
     user({ unknown: { retained: true }, providerCredentials: { openai: { apiKey: '${CONFIG_TEST_MISSING}' } } });
-    writeUserRuntimeConfigFile({ theme: 'custom' } as RuntimeConfigFile);
+    writeUserRuntimeConfigFile({ theme: 'custom' } as RuntimeConfigFile, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
     expect(JSON.parse(fs.readFileSync(userPath, 'utf8'))).toEqual({ unknown: { retained: true }, providerCredentials: { openai: { apiKey: '${CONFIG_TEST_MISSING}' } }, theme: 'custom' });
     const before = fs.readFileSync(userPath, 'utf8');
-    expect(() => writeUserRuntimeConfigFile({ providerConnections: 'secret-value' } as unknown as RuntimeConfigFile)).toThrow();
+    expect(() => writeUserRuntimeConfigFile({ providerConnections: 'secret-value' } as unknown as RuntimeConfigFile, readRuntimeConfigEditAt(getUserRuntimeConfigPath()))).toThrow();
     expect(fs.readFileSync(userPath, 'utf8')).toBe(before);
   });
 
@@ -157,21 +158,21 @@ describe('configuration validation boundary', () => {
     const before = fs.readFileSync(userPath);
     expect(before.length).toBeLessThan(1024 * 1024);
     expect(getRuntimeConfig(root).allowedTools).toBeUndefined();
-    writeUserRuntimeConfigFile({ theme: 'custom' });
+    writeUserRuntimeConfigFile({ theme: 'custom' }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
     expect(fs.readFileSync(userPath).length).toBeLessThan(1024 * 1024);
     expect(readUserRuntimeConfigFile()).toMatchObject(document);
     const patched = fs.readFileSync(userPath);
-    expect(() => writeUserRuntimeConfigFile({ theme: 'x'.repeat(6000) })).toThrow(/resource-limit/);
+    expect(() => writeUserRuntimeConfigFile({ theme: 'x'.repeat(6000) }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()))).toThrow(/resource-limit/);
     expect(fs.readFileSync(userPath)).toEqual(patched);
     const newPath = path.join(root, 'new-config.json');
-    expect(() => writeRuntimeConfigFileAt(newPath, document as RuntimeConfigFile)).toThrow(/resource-limit/);
+    expect(() => writeRuntimeConfigFileAt(newPath, document as RuntimeConfigFile, readRuntimeConfigEditAt(newPath))).toThrow(/resource-limit/);
     expect(fs.existsSync(newPath)).toBe(false);
   });
 
   it('accepts an explicit current version and retains it through saving', () => {
     user({ schemaVersion: 1, theme: 'custom' });
     expect(getRuntimeConfig(root).configDiagnostics).toEqual([]);
-    writeUserRuntimeConfigFile({ maxTurns: 20 });
+    writeUserRuntimeConfigFile({ maxTurns: 20 }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
     expect(readUserRuntimeConfigFile()).toMatchObject({ schemaVersion: 1, maxTurns: 20 });
   });
 

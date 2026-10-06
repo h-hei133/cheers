@@ -1,3 +1,4 @@
+import { readRuntimeConfigEditAt } from "../../config/runtimeConfig.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -21,7 +22,7 @@ beforeEach(() => {
   writeUserRuntimeConfigFile({ provider: "openai", activeProviderConnectionId: "fixture", providerConnections: [{
     id: "fixture", provider: "openai", authType: "api-key", apiKey: "synthetic-key", model: "base-model",
     createdAt: "2026-01-01", updatedAt: "2026-01-01", status: "connected",
-  }] });
+  }] }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
   manager = new SessionManager();
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(home, { recursive: true, force: true }); });

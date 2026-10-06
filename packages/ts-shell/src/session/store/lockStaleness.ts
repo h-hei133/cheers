@@ -29,6 +29,9 @@ export const STALE_LOCK_AGE_MS = 60_000;
 /** Allow metadata creation to finish, while recovering a crash within the acquisition timeout. */
 export const INCOMPLETE_LOCK_AGE_MS = 500;
 
+/** Config writes wait on unidentified owners rather than guessing from age. */
+export type LockRecovery = 'heuristic' | 'local-dead';
+
 /** The observation that makes a lock eligible for recovery. */
 export interface StaleLockTakeover {
   readonly reason: "owner-dead" | "lock-expired" | "lock-unreadable";
@@ -52,13 +55,14 @@ export interface StaleLockTakeover {
  * writing its metadata. Age is a recovery heuristic, not proof of owner death:
  * a holder paused before recording its identity can still outlive the grace.
  */
-export function isLockStale(lockPath: string, now: number = Date.now()): StaleLockTakeover | undefined {
+export function isLockStale(lockPath: string, now: number = Date.now(), recovery: LockRecovery = 'heuristic'): StaleLockTakeover | undefined {
   let owner: { readonly pid?: number; readonly hostname?: string; readonly createdAt?: string } | undefined;
   try {
     const raw = fs.readFileSync(lockPath, "utf8");
     owner = JSON.parse(raw) as typeof owner;
   } catch (error) {
     if (!(error instanceof SyntaxError)) return undefined;
+    if (recovery === 'local-dead') return undefined;
     // Empty/partial metadata can be a crash between create and write. The grace
     // is shorter than acquisition timeout, but still avoids immediate takeover
     // during ordinary creation. It cannot identify an owner paused before its
@@ -91,6 +95,7 @@ export function isLockStale(lockPath: string, now: number = Date.now()): StaleLo
     }
   }
 
+  if (recovery === 'local-dead') return undefined;
   if (typeof owner?.createdAt === "string") {
     const created = Date.parse(owner.createdAt);
     if (Number.isFinite(created) && now - created >= STALE_LOCK_AGE_MS) {
@@ -125,7 +130,7 @@ export function isLockStale(lockPath: string, now: number = Date.now()): StaleLo
  * succeeds is the only one that removes the lock, which is what stops a
  * takeover from racing itself.
  */
-export function takeOverStaleLock(lockPath: string): boolean {
+export function takeOverStaleLock(lockPath: string, recovery: LockRecovery = 'heuristic'): boolean {
   const claim = `${lockPath}.takeover`;
   try {
     fs.mkdirSync(claim);
@@ -136,7 +141,7 @@ export function takeOverStaleLock(lockPath: string): boolean {
   }
   try {
     // The file may have changed after the caller observed an expired owner.
-    if (!isLockStale(lockPath)) return false;
+    if (!isLockStale(lockPath, Date.now(), recovery)) return false;
     fs.rmSync(lockPath, { force: true });
     return true;
   } finally {

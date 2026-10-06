@@ -1,3 +1,4 @@
+import { readRuntimeConfigEditAt } from "../../../config/runtimeConfig.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -10,7 +11,7 @@ let root: string;
 const browser = vi.fn(); const account = vi.fn();
 beforeEach(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), "connect-syntax-")); vi.stubEnv("HOME", root); vi.stubEnv("USERPROFILE", root);
-  writeUserRuntimeConfigFile({ provider: "openai" });
+  writeUserRuntimeConfigFile({ provider: "openai" }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
   browser.mockReset(); account.mockReset();
   __setConnectBrowserFlowRunnerForTest(browser); __setOpenAIAccountAuthRunnerForTest(account);
 });

@@ -1,7 +1,10 @@
+import { readRuntimeConfigEditAt } from "../../config/runtimeConfig.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as configStore from '../../config/runtimeConfig.js';
+import { ConfigWriteError } from '../../config/outcome.js';
 import {
   getUserRuntimeConfigPath,
   writeUserRuntimeConfigFile,
@@ -32,6 +35,7 @@ describe("connect command runtime", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     if (originalHome === undefined) delete process.env.USERPROFILE;
     else process.env.USERPROFILE = originalHome;
     if (originalUnixHome === undefined) delete process.env.HOME;
@@ -81,6 +85,28 @@ describe("connect command runtime", () => {
     );
   });
 
+  it.each([
+    ['--browser', 'unknown'], ['--browser', 'persisted'],
+    ['--account', 'unknown'], ['--account', 'persisted'],
+  ] as const)('preserves %s persistence outcome %s without marking credentials as failed', async (mode, state) => {
+    __setConnectBrowserFlowRunnerForTest(async () => ({ apiKey: 'synthetic-browser-key' }));
+    __setOpenAIAccountAuthRunnerForTest(async () => ({
+      accessToken: 'synthetic-access', refreshToken: 'synthetic-refresh', expiresAt: Date.now() + 3600000,
+      authorizeUrl: 'https://example.invalid/authorize', callbackUrl: 'http://localhost/callback',
+    }));
+    const save = configStore.writeUserRuntimeConfigFile;
+    let calls = 0;
+    const spy = vi.spyOn(configStore, 'writeUserRuntimeConfigFile').mockImplementation((value, baseline) => {
+      calls++;
+      if (calls !== 2) return save(value, baseline);
+      if (state === 'persisted') save(value, baseline);
+      throw new ConfigWriteError(state === 'persisted' ? 'lock-failed' : 'write-failed', state);
+    });
+    await expect(runConnectCommand(['login', 'openai', mode], { cwd: workspaceRoot })).rejects.toMatchObject({ state });
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(configStore.readUserRuntimeConfigFile().providerConnections?.[0]?.status).toBe(state === 'persisted' ? 'connected' : 'pending');
+  });
+
   it("explains config status versus live provider readiness", async () => {
     await runConnectCommand(
       ["login", "siliconflow", "--api-key", "sk-siliconflow-test"],
@@ -122,7 +148,7 @@ describe("connect command runtime", () => {
           updatedAt: "2026-01-01T00:00:00.000Z",
         },
       ],
-    });
+    }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
 
     const result = await runConnectCommand(["status"], { cwd: workspaceRoot });
 
@@ -145,7 +171,7 @@ describe("connect command runtime", () => {
           updatedAt: "2026-01-01T00:00:00.000Z",
         },
       ],
-    });
+    }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
 
     const result = await runConnectCommand(["status"], { cwd: workspaceRoot });
 
@@ -169,7 +195,7 @@ describe("connect command runtime", () => {
           updatedAt: "2026-01-01T00:00:00.000Z",
         },
       ],
-    });
+    }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
 
     const result = await runConnectCommand(["status"], { cwd: workspaceRoot });
 
@@ -193,7 +219,7 @@ describe("connect command runtime", () => {
           updatedAt: "2026-01-01T00:00:00.000Z",
         },
       ],
-    });
+    }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
 
     const pending = await runConnectCommand(["status"], { cwd: workspaceRoot });
     expect(pending.output).toContain("connection setup is pending");
@@ -212,7 +238,7 @@ describe("connect command runtime", () => {
           updatedAt: "2026-01-01T00:00:00.000Z",
         },
       ],
-    });
+    }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
 
     const error = await runConnectCommand(["status"], { cwd: workspaceRoot });
     expect(error.output).toContain("connection setup is in error state");

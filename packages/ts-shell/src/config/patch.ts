@@ -1,32 +1,12 @@
 import { applyEdits, createScanner, findNodeAtLocation, modify, parseTree, SyntaxKind, type Edit, type JSONPath } from 'jsonc-parser';
 import { type ConfigSnapshot, serializeConfigDocument } from './document.js';
 import { CONFIG_MAX_BYTES, ConfigDocumentError, configParserText, parseConfigText } from './syntax.js';
+import { isRecord as record } from '../core/values/record.js';
+import { sameValue, sameArraySlots } from './values.js';
 
 const MAX_EDITS = 128;
 const MAX_EDIT_BYTES = 8 * 1024 * 1024;
 interface Change { path: JSONPath; value: unknown }
-
-function record(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function sameArraySlots(before: unknown[], after: unknown[]): boolean {
-  const ids = new Set<string>();
-  return before.length === after.length && before.every((value, index) => {
-    const next = after[index];
-    if (!record(value) || !record(next) || typeof value.id !== 'string' || value.id !== next.id || ids.has(value.id)) return false;
-    ids.add(value.id);
-    return true;
-  });
-}
-
-/** JSON treats both zero spellings as the same value; keep the original token. */
-function sameValue(before: unknown, after: unknown): boolean {
-  if (before === after) return true;
-  if (Array.isArray(before) && Array.isArray(after)) return before.length === after.length && before.every((value, index) => sameValue(value, after[index]));
-  if (record(before) && record(after)) return Object.keys(before).length === Object.keys(after).length && Object.keys(before).every(key => Object.hasOwn(after, key) && sameValue(before[key], after[key]));
-  return false;
-}
 
 /** Object removal is explicit; moving identities replaces the whole array. */
 function changes(before: unknown, after: unknown, path: JSONPath, result: Change[]): void {

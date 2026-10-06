@@ -1,7 +1,6 @@
 import {
   getRuntimeConfig,
-  readProjectRuntimeConfigFile,
-  readUserRuntimeConfigFile,
+  readRuntimeConfigEditAt, getProjectConfigPath, getUserRuntimeConfigPath,
   writeProjectRuntimeConfigFile,
   writeUserRuntimeConfigFile,
 } from "../../config/runtimeConfig.js";
@@ -48,23 +47,25 @@ export function writeStatusItems(
   workspaceRoot: string,
   items: readonly StatusItemId[],
 ): StatusItemsWrite {
-  const project = readProjectRuntimeConfigFile(workspaceRoot);
+  const projectEdit = readRuntimeConfigEditAt(getProjectConfigPath(workspaceRoot));
+  const project = projectEdit.values;
   if (project.tui?.statusItems?.length) {
     return {
       path: writeProjectRuntimeConfigFile(workspaceRoot, {
         ...project,
         tui: { ...project.tui, statusItems: items },
-      }),
+      }, projectEdit),
       scope: "project",
     };
   }
 
-  const existing = readUserRuntimeConfigFile();
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const existing = edit.values;
   return {
     path: writeUserRuntimeConfigFile({
       ...existing,
       tui: { ...existing.tui, statusItems: items },
-    }),
+    }, edit),
     scope: "user",
   };
 }

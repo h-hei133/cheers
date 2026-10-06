@@ -1,7 +1,9 @@
+import { readRuntimeConfigEditAt } from "../../config/runtimeConfig.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { defaultHookDispatcher } from '../hooks/hookDispatcher.js';
 import { getUserRuntimeConfigPath } from "../../config/runtimeConfig.js";
 import { writeUserRuntimeConfigFile } from "../../config/runtimeConfig.js";
 import { runConnectCommand } from "./connectCommandRuntime.js";
@@ -29,6 +31,7 @@ describe("model command runtime", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     if (originalHome === undefined) delete process.env.USERPROFILE;
     else process.env.USERPROFILE = originalHome;
     if (originalUnixHome === undefined) delete process.env.HOME;
@@ -46,9 +49,47 @@ describe("model command runtime", () => {
     expect(result.output).toContain("npm run verify:provider-readiness");
   });
 
+  it('keeps the baseline captured before an asynchronous model hook', async () => {
+    const file = getUserRuntimeConfigPath();
+    writeUserRuntimeConfigFile({ theme: 'dark' }, readRuntimeConfigEditAt(file));
+    vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+      if (event.eventName === 'PreModelSwitch') {
+        const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+        fs.writeFileSync(file, JSON.stringify({ ...raw, theme: 'light' }));
+      }
+      return undefined;
+    });
+    const result = await runModelCommand(['use', 'new-model', '--global'], { cwd: workspaceRoot });
+    expect(result.output).toContain('Global default stored at');
+    const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+    expect(saved.theme).toBe('light');
+    expect(saved.providerConnections[0].model).toBe('new-model');
+  });
+
+  it('reports conflict when an awaited hook changes the active connection', async () => {
+    const file = getUserRuntimeConfigPath();
+    const base = readRuntimeConfigEditAt(file);
+    const connections = [...base.values.providerConnections!, { id: 'other', provider: 'openai' as const, model: 'other-model' }];
+    writeUserRuntimeConfigFile({ providerConnections: connections }, base);
+    let external: string;
+    vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+      if (event.eventName === 'PreModelSwitch') {
+        const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+        external = JSON.stringify({ ...raw, activeProviderConnectionId: 'other' });
+        fs.writeFileSync(file, external);
+      }
+      return undefined;
+    });
+    const result = await runModelCommand(['use', 'new-model', '--global'], { cwd: workspaceRoot });
+    expect(result.output).toContain('conflict: this attempt did not write');
+    expect(result.output).not.toContain('Global default stored at');
+    expect(fs.readFileSync(file, 'utf8')).toBe(external!);
+  });
+
   it("explains missing active connection", async () => {
     writeUserRuntimeConfigFile({
       provider: "openai",
+      activeProviderConnectionId: undefined,
       providerConnections: [
         {
           id: "openai-test",
@@ -61,7 +102,7 @@ describe("model command runtime", () => {
           updatedAt: "2026-01-01T00:00:00.000Z",
         },
       ],
-    });
+    }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
 
     const result = await runModelCommand(["status"], { cwd: workspaceRoot });
 
@@ -85,7 +126,7 @@ describe("model command runtime", () => {
           updatedAt: "2026-01-01T00:00:00.000Z",
         },
       ],
-    });
+    }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
 
     const result = await runModelCommand(["status"], { cwd: workspaceRoot });
 
@@ -108,7 +149,7 @@ describe("model command runtime", () => {
           updatedAt: "2026-01-01T00:00:00.000Z",
         },
       ],
-    });
+    }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
 
     const pending = await runModelCommand(["status"], { cwd: workspaceRoot });
     expect(pending.output).toContain("connection setup is pending");
@@ -126,7 +167,7 @@ describe("model command runtime", () => {
           updatedAt: "2026-01-01T00:00:00.000Z",
         },
       ],
-    });
+    }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
 
     const error = await runModelCommand(["status"], { cwd: workspaceRoot });
     expect(error.output).toContain("connection setup is in error state");

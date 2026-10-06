@@ -1,7 +1,8 @@
+import { ConfigWriteError } from '../../config/outcome.js';
 import { connectSyntax, parseConnectArgs } from "./connect/syntax.js";
 import { syntaxHelp } from "./syntax/projection.js";
 import {
-  readUserRuntimeConfigFile,
+  readRuntimeConfigEditAt, getUserRuntimeConfigPath,
   writeUserRuntimeConfigFile,
   type ProviderConnectionConfig,
   type RuntimeConfigFile,
@@ -169,7 +170,8 @@ export async function addConnection(args: string[]): Promise<string> {
     updatedAt: now,
   };
 
-  const userConfig = readUserRuntimeConfigFile();
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const userConfig = edit.values;
   const connections = normalizeConnections(userConfig);
   const nextConnections = [connection, ...connections];
   const next: RuntimeConfigFile = {
@@ -187,7 +189,7 @@ export async function addConnection(args: string[]): Promise<string> {
       },
     },
   };
-  const configPath = writeUserRuntimeConfigFile(next);
+  const configPath = writeUserRuntimeConfigFile(next, edit);
 
   return [
     `Connected provider ${target.provider}.`,
@@ -243,7 +245,8 @@ export function activateConnection(args: string[]): string {
     return "Usage: /connect use <connection-id|provider>";
   }
 
-  const userConfig = readUserRuntimeConfigFile();
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const userConfig = edit.values;
   const connections = normalizeConnections(userConfig);
   if (connections.length === 0) {
     return "No saved connections. Use /connect login first.";
@@ -268,7 +271,7 @@ export function activateConnection(args: string[]): string {
     activeProviderConnectionId: selected.id,
     providerConnections: nextConnections,
   };
-  const configPath = writeUserRuntimeConfigFile(next);
+  const configPath = writeUserRuntimeConfigFile(next, edit);
 
   return [
     `Active connection switched to ${selected.id}.`,
@@ -287,7 +290,8 @@ export function removeConnection(args: string[]): string {
     return "Usage: /connect logout <connection-id|provider>";
   }
 
-  const userConfig = readUserRuntimeConfigFile();
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const userConfig = edit.values;
   const connections = normalizeConnections(userConfig);
   const existing =
     connections.find((connection) => connection.id === target) ??
@@ -311,7 +315,7 @@ export function removeConnection(args: string[]): string {
         ? (nextConnections[0]?.provider ?? userConfig.provider)
         : userConfig.provider,
   };
-  const configPath = writeUserRuntimeConfigFile(next);
+  const configPath = writeUserRuntimeConfigFile(next, edit);
 
   return [
     `Disconnected provider connection ${existing.id}.`,
@@ -327,7 +331,8 @@ export async function runBrowserAssistedCaptureConnection(
   labelFlag?: string | boolean,
 ): Promise<string> {
   const now = new Date().toISOString();
-  const userConfig = readUserRuntimeConfigFile();
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const userConfig = edit.values;
   const connectionId = buildConnectionId(target.provider);
   const connectionLabel =
     normalizeOptional(parseFlagValue(labelFlag)) ??
@@ -348,7 +353,7 @@ export async function runBrowserAssistedCaptureConnection(
   writeUserRuntimeConfigFile({
     ...userConfig,
     providerConnections: [pendingConnection, ...normalizeConnections(userConfig)],
-  });
+  }, edit);
 
   try {
     const browserResult = await browserFlowRunner({
@@ -358,7 +363,8 @@ export async function runBrowserAssistedCaptureConnection(
       defaultModel: target.defaultModel,
     });
 
-    const latest = readUserRuntimeConfigFile();
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    const latest = edit.values;
     const latestConnections = normalizeConnections(latest);
     const updatedAt = new Date().toISOString();
     const nextConnections = latestConnections.map((connection) =>
@@ -398,7 +404,7 @@ export async function runBrowserAssistedCaptureConnection(
         },
       },
     };
-    const configPath = writeUserRuntimeConfigFile(next);
+    const configPath = writeUserRuntimeConfigFile(next, edit);
 
     return [
       `Browser-assisted local credential capture completed for ${target.provider}.`,
@@ -414,7 +420,9 @@ export async function runBrowserAssistedCaptureConnection(
       `Stored at: ${configPath}`,
     ].join("\n");
   } catch (error) {
-    const latest = readUserRuntimeConfigFile();
+    if (error instanceof ConfigWriteError) throw error;
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    const latest = edit.values;
     const latestConnections = normalizeConnections(latest);
     const updatedAt = new Date().toISOString();
     const nextConnections = latestConnections.map((connection) =>
@@ -429,7 +437,7 @@ export async function runBrowserAssistedCaptureConnection(
     const configPath = writeUserRuntimeConfigFile({
       ...latest,
       providerConnections: nextConnections,
-    });
+    }, edit);
     return [
       `Browser-assisted local credential capture failed for ${target.provider}.`,
       `Connection ID: ${connectionId}`,
