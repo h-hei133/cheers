@@ -6223,3 +6223,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-06] fix | Phase 19 CMD-03 recall/retain 独立文本语法接线，修复引号、反斜杠和空白被分词改写，空正文零操作。199 项、构建、两组反转与两模式真实 CLI 验证通过；既有事实库存储边界见 features/phase-19-decisions.md §8.56。上一文本批次续接复验并取得独立 APPROVE/CLEAR，已推送 8b6d8dbe；整体目标继续。
 
 ## [2026-10-06] fix | Phase 19 CMD-03/04 动态实体位置复用 owner 完整语法，修复 mem 别名和 ID 后有原因时的候选，删除重复参数数量判断。290 项、构建、三组反转及 regular/fullscreen 实际 CLI 零保存/删除与审批原因验证通过，见 features/phase-19-decisions.md §8.57。目录取消与阶段后续任务继续。
+
+## [2026-10-06] fix | Phase 19 SAFE-02 Git 列表和忽略查询使用 NUL 路径协议，修复特殊文件名与冒号 pathspec 导致的遗漏/误判。79 项、Node 20.3 构建、三组有效反转及编译工具读/枚举/拒绝探针通过，独立 APPROVE/CLEAR；见 features/phase-19-decisions.md §8.58。原生隐式读取与阶段其余任务继续。

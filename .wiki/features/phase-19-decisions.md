@@ -1002,3 +1002,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 恢复别名过滤、后缀数量拒绝、占位值碰撞三组反转均产生断言失败，所有源文件逐字节恢复后 30 项通过。regular/fullscreen 实际 CLI 验证别名与 ID 后已有原因，Tab 零保存/删除；明确提交审批后实际 review state 的 reason 为原说明，记录文件字节及 mtime 不变，两模式 exit 0。初次探针退出失败是夹具在光标位于中间时只用 Ctrl+U、留下后缀，改为先移行尾再清空后通过，没有改产品删除行为。
 - import cycles/config consumers/declarations/node floor 通过。前两批 `8b6d8dbe`、`ba2a983a` 的 Architecture Watch 均成功，CI `37410873853`、`37411329520` 查询时仍在测试阶段；本批远端结果需对应新提交另查。同步目录读取的抢占取消、间接来源变更、SAFE-02 与其余阶段任务仍需推进。
 - docs drift strict 与 diff 检查通过；NormProof 图无环/导入解析满足，四个既有函数数量 advisory 保留。独立代码审查 APPROVE、架构 CLEAR；适配器仅面向当前接受非空文本的首个实体参数，后续若引入严格 ID 或改写参数的 parser，需重新验证位置契约，不能靠特殊占位值绕过校验。
+
+### 8.58 SAFE-02：Git 枚举与忽略判断保留文件名原义
+
+- 共享忽略 owner 的 ls-files 改用 NUL 输出，check-ignore 使用 NUL 输入/输出，消除 Git 引号转义及换行拆分导致的错误路径。中文、引号、Tab、换行和反斜杠到达遍历和 deny 检查时保留原名，core.quotePath 设置不再改变结果。
+- 定向对照参考快照 owner 的 NUL 路径协议和冒号前缀保护决定：以 `./` 保护 check-ignore 的冒号开头文件名，并按输入映射回原名，同时保留调用方本来提供的 `./`。不采用参考的忽略 index 选项，本项目已跟踪文件继续可见；原有 fsmonitor 禁用、超时、输出上限与失败回退保留。
+- 真实 Git 新增用例先复现 5 失败/8 通过；修复后 Linux、Node 20.3 隔离环境 6 文件/79 项及 build:ts 通过。覆盖 tracked/untracked、嵌套目录作用域、quotePath 两种设置、带换行的非忽略名字、冒号/pathspec 字面量、目录遗漏计数及精确目标 deny。列表分隔、忽略分隔、冒号保护三组反转均产生断言失败，源码逐字节恢复后 13 项通过。
+- 编译工具注册表探针通过 glob、目录 read 和六种特殊文件名的直接 read，拒绝目标仍被拒绝，模型请求为零。首次探针把直接 owner 抛出的拒绝误当作结构化结果，按真实入口契约改为断言拒绝异常后通过，未改产品行为。本批不涉及终端交互，未重复 PTY，也没有非 Linux 实机证据。
+- import cycles/config consumers/declarations/node floor 通过；NormProof 两项图义务满足，四个既有函数数量 advisory 保留。`8b6d8dbe` 与 `ba2a983a` 的 CI/Architecture Watch 均已成功；`779948d6` Architecture Watch 成功，CI `37412100764` 查询时仍在运行。本批远端结果另按新提交核对。
+- SAFE-02 仍开放：原生 Git/搜索内部配置读取、创建副作用竞态和跨平台实际对象保证尚未解决；本批修复路径传输，不把候选过滤等同于原生读取隔离。CMD-03/04 复核与其余 Phase 19 任务继续。
+- 两条独立审查给出代码 APPROVE、架构 CLEAR，核对恢复后的源文件 SHA256；均明确未重复父任务的测试与构建，没有把隐式读取缺口计为已解决。

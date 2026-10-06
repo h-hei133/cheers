@@ -5,7 +5,7 @@ import ignore from 'ignore'
 import { execFileSync } from 'node:child_process'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { loadDirectoryMatcher, loadIgnoreFile, listIgnoredViaGit, listWorkspaceFilesViaGit } from './ignoreRules.js'
-import { listDirectoryEntries } from './fileWalk.js'
+import { listDirectoryEntries, listWorkspaceFiles } from './fileWalk.js'
 
 let root: string
 let workspace: string
@@ -108,4 +108,71 @@ it.each(['files', 'ignore'])('does not execute configured filesystem monitors du
     expect(listIgnoredViaGit(workspace, ['tracked.txt', 'hidden.tmp'])).toEqual(new Set(['hidden.tmp']))
   }
   expect(fs.existsSync(marker)).toBe(false)
+})
+
+const literalNames = [
+  'space name', '中文', '[brackets]',
+  ...(process.platform === 'win32' ? [] : ['quote"name', 'tab\tname', 'line\nname', 'back\\slash']),
+]
+
+it.each(['true', 'false'])('preserves tracked and untracked Git paths with core.quotePath=%s', quotePath => {
+  execFileSync('git', ['init', '-q', workspace])
+  execFileSync('git', ['-C', workspace, 'config', 'core.quotePath', quotePath])
+  fs.writeFileSync(path.join(workspace, '.gitignore'), '*.tmp\n')
+  const nested = path.join(workspace, 'nested')
+  fs.mkdirSync(nested)
+  const tracked = literalNames.map(name => `tracked-${name}.tmp`)
+  const untracked = literalNames.map(name => `untracked-${name}.txt`)
+  for (const name of [...tracked, ...untracked, 'ignored.tmp']) fs.writeFileSync(path.join(nested, name), 'content')
+  execFileSync('git', ['--literal-pathspecs', '-C', nested, 'add', '-f', '--', ...tracked])
+
+  expect([...(listWorkspaceFilesViaGit(nested) ?? [])].sort()).toEqual([...tracked, ...untracked].sort())
+})
+
+it('checks literal ignore records without interpreting quotes or splitting embedded newlines', () => {
+  execFileSync('git', ['init', '-q', workspace])
+  fs.writeFileSync(path.join(workspace, '.gitignore'), '*.tmp\n')
+  fs.writeFileSync(path.join(workspace, 'tracked.tmp'), 'tracked')
+  execFileSync('git', ['-C', workspace, 'add', '-f', 'tracked.tmp'])
+  const ignored = literalNames.map(name => `${name}.tmp`)
+  const visible = ['tracked.tmp', 'public.txt', ...(process.platform === 'win32' ? [] : ['hidden.tmp\npublic.txt', '"quoted.tmp"'])]
+
+  expect(listIgnoredViaGit(workspace, [...ignored, ...visible])).toEqual(new Set(ignored))
+  expect(listIgnoredViaGit(workspace, visible)).toEqual(new Set())
+})
+
+it('checks leading-colon names as literal paths without changing ordinary wildcard names', () => {
+  execFileSync('git', ['init', '-q', workspace])
+  fs.writeFileSync(path.join(workspace, '.gitignore'), '*.tmp\n')
+  const ignored = [':secret.tmp', './:secret.tmp', ':(literal)secret.tmp', '*secret.tmp', '[secret].tmp']
+  expect(listIgnoredViaGit(workspace, [...ignored, ':public.txt', './:explicit.tmp'])).toEqual(new Set([...ignored, './:explicit.tmp']))
+})
+
+it('applies ignore and deny policies to the exact names returned by Git', async () => {
+  execFileSync('git', ['init', '-q', workspace])
+  fs.writeFileSync(path.join(workspace, '.gitignore'), '*.tmp\n')
+  const visible = literalNames.map(name => `${name}.txt`)
+  const ignored = literalNames.map(name => `${name}.tmp`)
+  const denied = visible.pop()!
+  for (const name of [...visible, ...ignored, denied]) fs.writeFileSync(path.join(workspace, name), 'content')
+  const checked: string[] = []
+  const options = { assertFileAccess: (target: string) => {
+    checked.push(target)
+    if (target === path.join(workspace, denied)) throw new Error('Denied fixture file')
+  } }
+
+  const files = await listWorkspaceFiles(workspace, options)
+  const listing = await listDirectoryEntries(workspace, workspace, options)
+  const names = listing.entries.map(entry => entry.name)
+  for (const name of visible) {
+    expect(files).toContain(name)
+    expect(names).toContain(name)
+    expect(checked).toContain(path.join(workspace, name))
+  }
+  for (const name of [...ignored, denied]) {
+    expect(files).not.toContain(name)
+    expect(names).not.toContain(name)
+  }
+  expect(checked).toContain(path.join(workspace, denied))
+  expect(listing.omittedCount).toBe(ignored.length + 2) // ignored files, denied file, .git
 })

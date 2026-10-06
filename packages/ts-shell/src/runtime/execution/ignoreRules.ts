@@ -81,16 +81,15 @@ export const IGNORE_FILE_NAMES = IGNORE_FILES
 export function listWorkspaceFilesViaGit(root: string): readonly string[] | null {
   const result = spawnSync(
     'git',
-    ['-c', 'core.fsmonitor=false', '-C', root, 'ls-files', '--cached', '--others', '--exclude-standard'],
+    ['-c', 'core.fsmonitor=false', '-C', root, 'ls-files', '-z', '--cached', '--others', '--exclude-standard'],
     { encoding: 'utf8', shell: false, timeout: GIT_TIMEOUT_MS, maxBuffer: GIT_MAX_BUFFER_BYTES },
   )
   if (result.error || result.status !== 0) {
     return null
   }
-  return (result.stdout || '')
-    .split('\n')
-    .filter((line) => line !== '')
-    .map((line) => line.split(path.sep).join('/'))
+  // Git already uses forward slashes. NUL records bypass filename quoting and
+  // preserve whitespace, backslashes and embedded newlines as literal names.
+  return (result.stdout || '').split('\0').filter((name) => name !== '')
 }
 
 /**
@@ -111,8 +110,11 @@ export function listIgnoredViaGit(
   names: readonly string[],
 ): ReadonlySet<string> | null {
   if (names.length === 0) return new Set()
-  const result = spawnSync('git', ['-c', 'core.fsmonitor=false', '-C', directory, 'check-ignore', '--stdin'], {
-    input: `${names.join('\n')}\n`,
+  // check-ignore rejects leading-colon pathspec syntax, even with NUL input.
+  // A relative prefix makes those names literal; retain the caller's spelling.
+  const paths = names.map((name) => name.startsWith(':') ? `./${name}` : name)
+  const result = spawnSync('git', ['-c', 'core.fsmonitor=false', '-C', directory, 'check-ignore', '--stdin', '-z'], {
+    input: `${paths.join('\0')}\0`,
     encoding: 'utf8',
     shell: false,
     timeout: GIT_TIMEOUT_MS,
@@ -120,12 +122,8 @@ export function listIgnoredViaGit(
   })
   if (result.error || result.status === 128) return null
   if (result.status !== 0 && result.status !== 1) return null
-  return new Set(
-    (result.stdout || '')
-      .split('\n')
-      .filter((line) => line !== '')
-      .map((line) => line.split(path.sep).join('/')),
-  )
+  const ignored = new Set((result.stdout || '').split('\0').filter((name) => name !== ''))
+  return new Set(names.filter((_, index) => ignored.has(paths[index]!)))
 }
 
 /**
