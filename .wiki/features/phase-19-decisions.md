@@ -992,3 +992,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - **既有存储边界**：core/memory 的 MemoryStore 是进程内 Map，FactArbiter 按事实语义裁剪首尾空白。本批保证调用边界正文不被 shell 解码，未改变该存储归一化，也不把退出观察快照当作持久化或跨项目隔离证据。其持久化/隔离与现有 project memory owner 的一致性需要专项核查，不能再建立重复存储实现。
 - import cycles/config consumers/declarations/node floor 通过。`8b6d8dbe` 已推送，Architecture Watch `37410873846` 成功，CI `37410873853` 查询时仍执行；本批远端结果需对应新提交另查。CMD-03/04 全量动态位置、取消边界、SAFE-02 缺口与后续 Phase 19 任务继续。
 - docs drift strict 与 diff 检查通过；NormProof 阻断义务满足，四个既有函数数量 advisory 保留。两条独立审查分别给出代码 APPROVE、架构 CLEAR，均明确验收的是命令到 owner 的正文交付，不是存储逐字节保真或重启持久化。
+
+### 8.57 CMD-03/04：实体位置复用完整领域语法
+
+- 动态候选按 invocation 身份区分真正别名和独立调用，修复 `/mem` 丢失记忆记录/审批候选的问题；`/recall`、`/retain` 保留自己的文本语义，不进入项目记忆动作目录。
+- 补全 position 适配器使用唯一占位值调用 owner parser，验证光标前后完整参数并确认正在编辑首个实体参数；记忆、MCP、连接、授权、workflow、会话导航、路径与模型共用。删除导航和动作目录的手写参数数量限制；已有合法 reason 后缀不再阻断 ID 补全。占位值与已有输入不相同，避免把正文中的同名字符串误判成当前实体位置。
+- 定向比较参考按命令注册对象委派参数候选、按动作语义筛选实体来源的决定；保持该职责分工，以本项目 parser 处理别名、完整后缀及 `--`，不复制参考的前缀切分/词数判断。模型和会话仍使用各自的解析适配，完整动作名继续优先于实体查询。
+- Linux、Node 20.3 隔离环境 24 文件/290 项及 build:ts 通过，涵盖完整 completion 目录、输入替换与领域语法。初次 26 项新增测试中 15 项复现缺陷；组合测试暴露 fork 单动作语法接错解析适配，修正后通过。`/mcp -- tools` 的旧“不补全”断言与运行时合法语法不符，改为接受；未知 flags、冲突批量审批、额外目标和 reason 位置仍拒绝实体查询。
+- 恢复别名过滤、后缀数量拒绝、占位值碰撞三组反转均产生断言失败，所有源文件逐字节恢复后 30 项通过。regular/fullscreen 实际 CLI 验证别名与 ID 后已有原因，Tab 零保存/删除；明确提交审批后实际 review state 的 reason 为原说明，记录文件字节及 mtime 不变，两模式 exit 0。初次探针退出失败是夹具在光标位于中间时只用 Ctrl+U、留下后缀，改为先移行尾再清空后通过，没有改产品删除行为。
+- import cycles/config consumers/declarations/node floor 通过。前两批 `8b6d8dbe`、`ba2a983a` 的 Architecture Watch 均成功，CI `37410873853`、`37411329520` 查询时仍在测试阶段；本批远端结果需对应新提交另查。同步目录读取的抢占取消、间接来源变更、SAFE-02 与其余阶段任务仍需推进。
+- docs drift strict 与 diff 检查通过；NormProof 图无环/导入解析满足，四个既有函数数量 advisory 保留。独立代码审查 APPROVE、架构 CLEAR；适配器仅面向当前接受非空文本的首个实体参数，后续若引入严格 ID 或改写参数的 parser，需重新验证位置契约，不能靠特殊占位值绕过校验。

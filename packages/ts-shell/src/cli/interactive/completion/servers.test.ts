@@ -17,10 +17,10 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { re
 function request(text: string) { return catalogRequest({ text, cursor: text.length, revision: 1 }); }
 
 describe("MCP server candidate positions", () => {
-  it.each(["/mcp tools ", "/mcp doctor f", "/mcp diagnose ", "/mcp refresh ", "/mcp reconnect ", "/mcp tools -- -"])("accepts %s", text => {
+  it.each(["/mcp tools ", "/mcp doctor f", "/mcp diagnose ", "/mcp refresh ", "/mcp reconnect ", "/mcp tools -- -", "/mcp -- tools "])("accepts %s", text => {
     expect(request(text)?.kind).toBe("mcp");
   });
-  it.each(["/mcp ", "/mcp status ", "/mcp unknown ", "/mcp tools first extra", "/mcp tools --bad ", "/mcp tools first ", "/mcp -- tools "])("does not query for %s", text => {
+  it.each(["/mcp ", "/mcp status ", "/mcp unknown ", "/mcp tools first extra", "/mcp tools --bad ", "/mcp tools first "])("does not query for %s", text => {
     expect(request(text)).toBeUndefined();
   });
   it("quotes full names and protects dash-leading targets after an action", () => {

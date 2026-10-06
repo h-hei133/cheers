@@ -1,13 +1,13 @@
 import { RUNTIME_PROVIDERS } from "../../../config/runtimeConfig.js";
 import { loadCatalog } from "../../../core/models/catalogStore.js";
 import { modelSyntax, parseModelArgs } from "../../../core/commands/model/syntax.js";
+import { firstParameter } from "./position.js";
 import type { Suggestion } from "../../../presentation/tui/chrome/suggestions.js";
 
 export function modelKind(before: readonly string[], current: string, after: readonly string[]): "model" | "provider" | undefined {
   if (!before.length && modelSyntax.actions.some(action => action.name && (action.name === current.toLowerCase() || action.aliases?.includes(current.toLowerCase())))) return undefined;
-  const placeholder = "completion-model";
-  const parsed = parseModelArgs([...before, placeholder, ...after]);
-  if (!parsed.ok || parsed.args[0] !== placeholder) return undefined;
+  const parsed = firstParameter(parseModelArgs, before, after);
+  if (!parsed) return undefined;
   return parsed.action.name === "use" ? "model" : parsed.action.name === "list" ? "provider" : undefined;
 }
 

@@ -1,4 +1,5 @@
-import { resumeSyntax, forkSyntax, treeSyntax, entriesSyntax } from "../../../core/commands/navigation/syntax.js";
+import { resumeSyntax, forkSyntax, treeSyntax, entriesSyntax, parseNavigationArgs } from "../../../core/commands/navigation/syntax.js";
+import { parseSyntax } from "../../../core/commands/syntax/parse.js";
 import { mcpSyntax } from "../../../core/commands/mcp/syntax.js";
 import { permissionsSyntax } from "../../../core/commands/permissions/syntax.js";
 import { connectSyntax } from "../../../core/commands/connect/syntax.js";
@@ -7,6 +8,7 @@ import type { MemoryCatalogKind } from "./memory.js";
 import { pathKind } from "./pathRequest.js";
 import { pathDirectory } from "./paths.js";
 import { modelKind } from "./models.js";
+import { firstParameter } from "./position.js";
 import { workflowSyntax } from "../../../core/workflow/syntax.js";
 import { scanCommandArgs } from "../../../core/commands/arguments.js";
 import { completionToken, completionEdit, quoteCompletion } from "../completion.js";
@@ -21,29 +23,30 @@ export function catalogRequest(snapshot: DraftSnapshot) {
   const command = token.before[0];
   if (!command || !/^\/[A-Za-z0-9:._?-]+$/.test(snapshot.text.slice(command.from, command.to))) return undefined;
   const invocation = getSlashInvocation(command.value);
+  if (!invocation || invocation.kind === "named") return undefined;
   const name = invocation?.commandName;
   const preceding = token.before.slice(1).map(item => item.value);
   const all = scanCommandArgs(snapshot.text, true).slice(1);
+  const following = all.filter(item => item.from >= token.to && item.from > snapshot.cursor).map(item => item.value);
   let kind: CatalogKind | undefined;
   if (name === "theme" || name === "skill" || name === "tools") {
     if (preceding.length && !(preceding.length === 1 && preceding[0] === "--")) return undefined;
     if (all.length > (all[0]?.value === "--" ? 2 : 1)) return undefined;
     kind = name;
   } else if (name === "model") {
-    kind = modelKind(preceding, token.value, all.filter(item => item.from >= token.to && item.from > snapshot.cursor).map(item => item.value));
+    kind = modelKind(preceding, token.value, following);
   } else if (name === "mcp" || name === "permissions" || name === "connect" || name === "memory" || name === "workflow") {
     const syntax = name === "mcp" ? mcpSyntax : name === "connect" ? connectSyntax : name === "memory" ? memorySyntax : name === "workflow" ? workflowSyntax : permissionsSyntax;
-    const action = syntax.actions.find(item => item.name === preceding[0]?.toLowerCase() || item.aliases?.includes(preceding[0]?.toLowerCase() ?? ""));
+    const parsed = firstParameter(input => parseSyntax(syntax, input), preceding, following);
+    const action = parsed?.action;
     if (name === "permissions" && action?.name !== "revoke") return undefined;
     if (name === "connect" && action?.name !== "use" && action?.name !== "logout") return undefined;
     if (name === "workflow" && action?.name !== "run") return undefined;
     const memoryKind = action?.name === "delete" ? "record" : action?.name === "invalidate" ? "invalidatable" : action?.name === "approve" ? "approvable" : action?.name === "reject" ? "candidate" : action?.name === "save" ? "approved" : undefined;
-    if (name === "memory" && (!memoryKind || command.value.toLowerCase() !== "/memory")) return undefined;
-    if (!action?.parameters?.length || preceding.length > 2 || (preceding.length === 2 && preceding[1] !== "--")) return undefined;
-    if (all.length > (preceding[1] === "--" ? 3 : 2)) return undefined;
+    if (!parsed || (name === "memory" && !memoryKind)) return undefined;
     kind = name === "mcp" ? "mcp" : name === "connect" ? "connection" : name === "memory" ? memoryKind : name === "workflow" ? "workflow" : "grant";
   } else {
-    kind = pathKind(name, preceding, all.filter(item => item.from >= token.to && item.from > snapshot.cursor).map(item => item.value)) ?? navigationKind(name, preceding, token.value, all.length);
+    kind = pathKind(name, preceding, following) ?? navigationKind(name, preceding, token.value, following);
   }
   if (!kind || (!preceding.includes("--") && token.value.startsWith("-"))) return undefined;
   const prefix = snapshot.text.slice(command.to, snapshot.cursor).trimStart();
@@ -64,17 +67,13 @@ export function catalogSuggestions(request: NonNullable<ReturnType<typeof catalo
   });
 }
 
-function navigationKind(name: string | undefined, preceding: readonly string[], current: string, count: number): CatalogKind | undefined {
+function navigationKind(name: string | undefined, preceding: readonly string[], current: string, following: readonly string[]): CatalogKind | undefined {
   const syntax = name === "resume" ? resumeSyntax : name === "fork" ? forkSyntax : name === "tree" ? treeSyntax : name === "entries" ? entriesSyntax : undefined;
   if (!syntax) return undefined;
-  const before = preceding.filter(value => value !== "--");
-  if (preceding.some(value => value.startsWith("-") && value !== "--") || preceding.filter(value => value === "--").length > 1) return undefined;
-  const action = preceding[0] === "--" ? undefined : syntax.actions.find(item => item.name && (item.name === before[0]?.toLowerCase() || item.aliases?.includes(before[0]?.toLowerCase() ?? "")));
-  const currentAction = !before.length && syntax.actions.some(item => item.name && (item.name === current.toLowerCase() || item.aliases?.includes(current.toLowerCase())));
-  if (currentAction && !preceding.includes("--")) return undefined;
-  if (before.length && (!action || !action.parameters?.length || before.length !== 1)) return undefined;
-  if (count > (action ? 2 : 1) + (preceding.includes("--") ? 1 : 0)) return undefined;
+  if (!preceding.length && syntax.actions.some(item => item.name && (item.name === current.toLowerCase() || item.aliases?.includes(current.toLowerCase())))) return undefined;
+  const parsed = firstParameter(input => name === "fork" ? parseSyntax(syntax, input) : parseNavigationArgs(syntax, input), preceding, following);
+  if (!parsed) return undefined;
   if (name === "resume" || name === "fork") return "session";
   if (name === "tree") return "tree";
-  return action?.name === "tree" ? "thread" : "entry";
+  return parsed.action.name === "tree" ? "thread" : "entry";
 }
