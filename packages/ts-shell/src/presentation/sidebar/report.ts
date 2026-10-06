@@ -17,7 +17,7 @@ export function sidebarReport(panel: SidebarPanel, frame?: SidebarLivePanelFrame
   }
   const report = createReport({ title: panel.title, lines,
     facts: { source: 'session-state-snapshot', panelVersion: panel.panelVersion, density: panel.density,
-      safety: { ...panel.safety }, budget: { ...panel.budget },
+      safety: { ...panel.safety, scope: 'snapshot-calculation', history: 'managed-by-command-host' }, budget: { ...panel.budget },
       sections: panel.sections.map(section => ({ id: section.id, title: section.title, severity: section.severity,
         lines: section.lines.map(item => ({ text: item.text, severity: item.severity,
           sourceId: item.sourceId ? sanitizePanelText(item.sourceId) : null })) })),

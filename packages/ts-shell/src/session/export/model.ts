@@ -8,6 +8,7 @@ export interface ExportEntry {
   readonly toolCallId?: string;
   readonly origin?: { readonly provider?: string; readonly model: string };
   readonly timestamp?: string;
+  readonly sourceEntryId?: string;
 }
 
 export interface ExportTreeNode {

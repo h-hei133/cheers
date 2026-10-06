@@ -1034,7 +1034,8 @@ describe("slash router (W4)", () => {
 
     expect(panel?.kind).toBe("local");
     if (panel?.kind === "local") {
-      expect(panel.output).toContain("[Recent activity]");
+      expect(panel.output).toContain("#### Recent activity");
+      expect(panel.report?.facts.source).toBe('session-state-snapshot');
       expect(panel.output).toContain("Memory saved");
       expect(panel.output).toContain("Read-only panel of session state");
       expect(panel.output).toContain("No provider/model calls");
@@ -1043,11 +1044,11 @@ describe("slash router (W4)", () => {
     expect(compact?.kind).toBe("local");
     if (compact?.kind === "local") {
       expect(compact.output.split("\n").length).toBeLessThanOrEqual(28);
-      expect(compact.output).toContain("[Next]");
+      expect(compact.output).toContain("#### Next");
     }
     expect(detail?.kind).toBe("local");
     if (detail?.kind === "local") {
-      expect(detail.output).toContain("[Boundary]");
+      expect(detail.output).toContain("#### Boundary");
     }
     expect(invalid?.kind).toBe("local");
     if (invalid?.kind === "local") {
@@ -1097,19 +1098,23 @@ describe("slash router (W4)", () => {
     expect(watch?.kind).toBe("local");
     if (watch?.kind === "local") {
       expect(watch.output).toContain("Visible agent state snapshot");
-      expect(watch.output).toContain("[Snapshot frame]");
+      expect(watch.output).toContain("#### Snapshot frame");
+      expect(watch.report?.facts.frame).toMatchObject({ number: 1 });
       expect(watch.output).toContain("Frame: #1");
       expect(watch.output).toContain("Compact checkpoint");
       expect(watch.output).toContain("Developer-only sidebar events are hidden by default.");
       expect(watch.output).not.toContain("developer-only raw event");
-      expect(watch.output.split("\n").length).toBeLessThanOrEqual(42);
+      expect(watch.report?.facts.budget).toMatchObject({ maxSections: 12, maxActivityItems: 5 });
+      expect(watch.report?.facts.sections).toBeInstanceOf(Array);
+      expect((watch.report!.facts.sections as readonly unknown[]).length).toBeLessThanOrEqual(12);
       expect(watch.output).not.toContain("State preview only: no actual sidebar UI exists yet.");
     }
 
     expect(snapshot?.kind).toBe("local");
     if (snapshot?.kind === "local") {
       expect(snapshot.output).toContain("Read-only panel of session state");
-      expect(snapshot.output).not.toContain("[Snapshot frame]");
+      expect(snapshot.report?.facts.frame).toBeNull();
+      expect(snapshot.output).not.toContain("#### Snapshot frame");
       expect(snapshot.output).not.toContain("Visible agent state snapshot");
     }
   });

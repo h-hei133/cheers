@@ -8,6 +8,7 @@ import type { WorkspaceRootMode } from "../../session/SessionManager.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { Transcript } from "../../presentation/tui/transcript/container.js";
 import { startNewSession } from "../runtime/session.js";
+import type { SessionReport } from '../../session/reports/model.js';
 
 /**
  * Putting a session's conversation back on screen.
@@ -30,8 +31,10 @@ export interface RestoredHistory {
 }
 
 /** Blocks for a session's conversation, oldest first, bounded. */
-export function restoreConversation(turns: readonly SessionMessage[]): RestoredHistory {
+export function restoreConversation(turns: readonly SessionMessage[], reports: readonly SessionReport[] = []): RestoredHistory {
   const blocks: Block[] = [];
+  const reportGroups = groupReports(turns, reports);
+  blocks.push(...(reportGroups.get(undefined) ?? []));
   const toolBlocksById = new Map<string, Block>();
   const respondedToolIds = new Set<string>();
   for (const turn of turns) {
@@ -84,6 +87,7 @@ export function restoreConversation(turns: readonly SessionMessage[]): RestoredH
         }
       }
     }
+    if (turn.id) blocks.push(...(reportGroups.get(turn.id) ?? []));
   }
 
   for (const [callId, toolBlock] of toolBlocksById) {
@@ -128,14 +132,19 @@ export interface HistoryTarget {
 export function showConversation(target: HistoryTarget): void {
   const session = target.sessionManager.getSession(target.context.session.id);
   if (!session) return;
+  target.transcript.clear();
+  appendConversation(target, session);
+}
+
+/** Startup keeps its welcome and diagnostics while using the same history projection. */
+export function appendConversation(target: Pick<HistoryTarget, 'transcript' | 'editor'>, session: Session): void {
   // The checklist belongs to the session being shown, and switching to a
   // session is the moment to say so. Doing it here rather than at each command
   // that can switch is what makes `/resume`, the sessions panel, a fork, and a
   // rewind all correct: they establish a session by calling this, and a session
   // that is being shown is a session whose checklist has just been restored.
-  replayTodosFromMessages(target.context.session.id, session.turns);
-  const restored = restoreConversation(session.turns);
-  target.transcript.clear();
+  replayTodosFromMessages(session.id, session.turns);
+  const restored = restoreConversation(session.turns, session.reports);
   if (restored.omitted > 0) {
     target.transcript.append(
       textBlock("notice", `${restored.omitted} earlier messages are not shown.`),
@@ -159,4 +168,18 @@ export function showConversation(target: HistoryTarget): void {
 export function startFreshSession(target: HistoryTarget): void {
   startNewSession(target.context, target.sessionManager);
   target.transcript.clear();
+}
+
+/** Older retained observations precede the visible turns; messages keep their own order. */
+function groupReports(turns: readonly SessionMessage[], reports: readonly SessionReport[]): Map<string | undefined, Block[]> {
+  const visible = new Set(turns.map(turn => turn.id));
+  const groups = new Map<string | undefined, Block[]>();
+  for (const saved of reports) {
+    const anchor = visible.has(saved.sourceEntryId) ? saved.sourceEntryId : undefined;
+    const title = `Saved report · ${saved.timestamp}`;
+    const block = { ...textBlock('command', saved.text, title), ...(saved.report ? { report: saved.report } : {}) };
+    const list = groups.get(anchor) ?? [];
+    list.push(block); groups.set(anchor, list);
+  }
+  return groups;
 }

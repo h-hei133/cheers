@@ -54,6 +54,7 @@ export function readJsonFileWithRetry<T>(
 }
 
 export interface FileLockOptions {
+  readonly createParent?: boolean;
   readonly recovery?: LockRecovery;
   /** Observe cleanup failure even when the action's primary error takes priority. */
   readonly onReleaseError?: () => void;
@@ -61,7 +62,7 @@ export interface FileLockOptions {
 
 export function withFileLock<T>(lockPath: string, action: () => T, options: FileLockOptions = {}): T {
   const directory = path.dirname(lockPath);
-  if (!fs.existsSync(directory)) {
+  if (!fs.existsSync(directory) && options.createParent !== false) {
     fs.mkdirSync(directory, { recursive: true });
   }
 

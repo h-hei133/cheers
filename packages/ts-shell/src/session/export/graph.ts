@@ -7,6 +7,24 @@ export function projectExportTree(value: unknown, entries: readonly ExportEntry[
   readonly leafId: string | null;
   readonly warnings: readonly string[];
 } {
+  const tree = buildTree(value, entries.filter(entry => entry.sourceEntryId === undefined));
+  const byId = new Map(tree.nodes.map(node => [node.id, node]));
+  const nodes = [...tree.nodes]; const warnings = new Set(tree.warnings);
+  for (const entry of entries) {
+    if (entry.sourceEntryId === undefined) continue;
+    const parent = byId.get(entry.sourceEntryId);
+    if (!parent) warnings.add('Some report observations have unavailable source entries and are shown separately.');
+    nodes.push({ id: entry.id, ...(parent ? { parentId: parent.id } : {}), depth: parent ? parent.depth + 1 : 0,
+      role: 'command', kind: 'command-output', preview: previewFor(entry, 'command'), timestamp: entry.timestamp });
+  }
+  return { ...tree, nodes, warnings: [...warnings] };
+}
+
+function buildTree(value: unknown, entries: readonly ExportEntry[]): {
+  readonly nodes: readonly ExportTreeNode[];
+  readonly leafId: string | null;
+  readonly warnings: readonly string[];
+} {
   const snapshot = readableThread(value) ? value : undefined;
   const tree = snapshot && readSessionTree(snapshot.entries);
   if (!tree || tree === "unknown-cursor" || tree.length === 0) {

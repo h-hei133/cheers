@@ -211,7 +211,7 @@ function footerSection(snapshot: SidebarStateSnapshot): SidebarPanelSection {
     id: "footer",
     title: "Boundary",
     lines: [
-      line("No provider/model calls, persistence, dynamic discovery, schema change, or automatic injection.", "info"),
+      line("No provider/model calls, state mutation, dynamic discovery, or automatic injection. Session history may retain this report.", "info"),
       line(`Redactions: ${snapshot.redactions.length > 0 ? snapshot.redactions.join(", ") : "none"}`, "info"),
     ],
   });

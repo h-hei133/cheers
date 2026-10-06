@@ -207,8 +207,8 @@ export class SessionStoreAccess {
     return readStateSnapshotRequired(statePath);
   }
 
-  withSessionStateLock<T>(sessionId: string, action: () => T): T {
-    return withSessionStateLock(locateExistingSessionLayout(this.storeLayout, sessionId), action);
+  withSessionStateLock<T>(sessionId: string, action: () => T, options?: { readonly requireExisting?: boolean }): T {
+    return withSessionStateLock(locateExistingSessionLayout(this.storeLayout, sessionId), action, options);
   }
 
   writeJsonFileAtomic(filePath: string, payload: unknown): void {

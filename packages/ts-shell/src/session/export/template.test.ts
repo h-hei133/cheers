@@ -64,6 +64,18 @@ const entry = (id: string, role = "assistant", extras: Record<string, unknown> =
 const node = (id: string, parentId?: string) => ({ id, parentId, depth: 0, role: "assistant", kind: "turn-message", preview: id });
 
 describe("exported page branch traversal", () => {
+  it('shows ancestor report observations by default without changing tool-result pairing', () => {
+    const entries = [entry('a', 'assistant', { toolCalls: [call('call_0')] }),
+      entry('b', 'tool', { toolCallId: 'call_0', content: 'PAIRED_RESULT' }),
+      entry('report', 'command', { sourceEntryId: 'a' })];
+    const tree = [node('a'), node('b', 'a'), { ...node('report', 'a'), kind: 'command-output' }];
+    const shown = runPage({ entries, tree, leafId: 'b' }).get('conversation')!.children;
+    expect(shown.map(child => child.id)).toEqual(['entry-a', 'entry-report', 'entry-b']);
+    expect(shown[0]!.textContent).toContain('PAIRED_RESULT');
+    const reportOnly = runPage({ entries: [entry('report', 'command', { sourceEntryId: 'root' })],
+      tree: [{ ...node('root'), kind: 'session-root' }, { ...node('report', 'root'), kind: 'command-output' }], leafId: 'root' });
+    expect(reportOnly.get('conversation')!.children.map(child => child.id)).toEqual(['entry-report']);
+  });
   it("adds a control when an open short result overflows after layout changes", () => {
     const elements = runPage({
       entries: [entry("a", "assistant", { toolCalls: [call("call_0")] }),

@@ -41,6 +41,7 @@ import {
 } from "./interactivePromptRunner.js";
 import { describeCompaction, parseCompactCommand } from "./compact.js";
 import { defaultTheme } from "../../presentation/theme/theme.js";
+import { reportWriter } from '../output/reports.js';
 
 export interface InteractiveCommandRouterInput {
   readonly prompt: string;
@@ -126,6 +127,7 @@ export async function routeInteractiveCommand(
     interactive: true,
     sessionId: input.runtimeContext.session.id,
     onTurnMessage: (message) => input.sessionManager.addTurn(input.runtimeContext.session.id, message),
+    onReport: reportWriter(input.sessionManager, input.runtimeContext.session.id),
     ...(input.runtimeContext.skillOptions ? { skillOptions: input.runtimeContext.skillOptions } : {}),
     ...(input.runtimeContext.themePaths ? { themePaths: input.runtimeContext.themePaths } : {}),
     modifierKeysReported: input.modifierKeysReported,

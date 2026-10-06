@@ -1,4 +1,5 @@
 import * as fs from "node:fs";
+import { selectSessionReports } from '../reports/projection.js';
 import { decodeUsageSnapshot } from "../../observability/usage/snapshot.js";
 import type { SessionMetadata } from "../schema/sessionMetadataCodec.js";
 import { projectSessionMetadata } from "../schema/sessionMetadataCodec.js";
@@ -104,18 +105,27 @@ export function loadSessionRecord(input: {
     const branchPath = threadPath?.resolved === true
       ? threadPath.path.map((entry) => entry.id)
       : undefined;
+    const events = readTranscriptEvents(input.layout.transcriptPath);
     const turns = projectBranchMessages(
-      readTranscriptEvents(input.layout.transcriptPath),
+      events,
       branchPath,
       state.thread?.entries.map((entry) => entry.id),
     );
 
-    return projectLoadedSession({
+    const session = projectLoadedSession({
       metadata,
       state,
       turns,
       cwd: input.cwd,
     });
+    const reports = selectSessionReports(events, session.id, state.thread);
+    if (events.some(event => event.type === 'command-output')) session.hasReportHistory = true;
+    if (reports.length) {
+      session.reports = reports;
+      const timestamp = reports.at(-1)!.timestamp;
+      if (Date.parse(timestamp) > Date.parse(session.updatedAt)) session.updatedAt = timestamp;
+    }
+    return session;
   } catch (error) {
     throw new Error(
       `Failed to load session ${input.sessionId}: ${error instanceof Error ? error.message : String(error)}`,

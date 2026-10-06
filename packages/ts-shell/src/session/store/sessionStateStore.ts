@@ -37,8 +37,9 @@ export function readStateSnapshotRequired(statePath: string): SessionStateSnapsh
 export function withSessionStateLock<T>(
   layout: Pick<SessionFileLayout, "stateLockPath">,
   action: () => T,
+  options?: { readonly requireExisting?: boolean },
 ): T {
-  return withFileLock(layout.stateLockPath, action);
+  return withFileLock(layout.stateLockPath, action, { createParent: !options?.requireExisting });
 }
 
 export function writeSessionState(input: {

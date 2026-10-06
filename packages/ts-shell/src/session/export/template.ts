@@ -202,12 +202,27 @@ export const PAGE_SCRIPT = String.raw`
     var seen = new Set();
     while (current && !seen.has(current.id)) {
       seen.add(current.id);
-      var message = byId.get(current.id);
-      if (message) chain.push(message);
-      else if (current.kind === 'turn-message') chain.push(null);
+      chain.push(current);
       current = current.parentId ? nodesById.get(current.parentId) : undefined;
     }
-    return chain.reverse();
+    var result = [];
+    var reportsBySource = new Map();
+    (data.entries || []).forEach(function (entry) {
+      if (entry.sourceEntryId === undefined) return;
+      var reports = reportsBySource.get(entry.sourceEntryId) || [];
+      reports.push(entry); reportsBySource.set(entry.sourceEntryId, reports);
+    });
+    chain.reverse().forEach(function (node) {
+      if (node.kind === 'command-output') {
+        if (!seen.has(node.parentId) && byId.has(node.id)) result.push(byId.get(node.id));
+        return;
+      }
+      var message = byId.get(node.id);
+      if (message) result.push(message);
+      else if (node.kind === 'turn-message') result.push(null);
+      (reportsBySource.get(node.id) || []).forEach(function (report) { result.push(report); });
+    });
+    return result;
   }
 
   function resultsOnPath(chain) {
@@ -215,6 +230,7 @@ export const PAGE_SCRIPT = String.raw`
     var results = new Map();
     chain.forEach(function (entry) {
       if (!entry) { pending.clear(); return; }
+      if (entry.role === 'command') return;
       if (entry.role !== 'tool') pending.clear();
       (entry.toolCalls || []).forEach(function (call) {
         pending.set(call.id, pending.has(call.id) ? null : call);

@@ -8,6 +8,11 @@ function plain(value: string): string {
     char => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`);
 }
 
+/** Stored fallback text keeps line breaks, but no terminal controls. */
+export function plainReportText(value: string): string {
+  return stripVTControlCharacters(value).split('\n').map(plain).join('\n');
+}
+
 export function span(text: string | number, role: ReportRole = 'text'): ReportSpan {
   return { text: plain(String(text)), role };
 }
@@ -15,10 +20,12 @@ export function span(text: string | number, role: ReportRole = 'text'): ReportSp
 /** Detached immutable snapshot: later producer edits cannot stale render caches. */
 export function createReport(input: Omit<CommandReport, 'version'>): CommandReport {
   return freezeDeep({ version: 1 as const, title: plain(input.title),
-    ...(input.columns ? { columns: input.columns.map(column => ({ ...column, label: plain(column.label) })) } : {}),
+    ...(input.columns ? { columns: input.columns.map(column => ({ label: plain(column.label), minWidth: column.minWidth,
+      ...(column.align ? { align: column.align } : {}) })) } : {}),
     lines: input.lines.map(line => line.kind === 'space' ? { kind: 'space' as const }
-      : line.kind === 'columns' ? { ...line, cells: line.cells.map(cell => cell.map(item => span(item.text, item.role))) }
-      : { ...line, spans: line.spans.map(item => span(item.text, item.role)) }),
+      : line.kind === 'columns' ? { kind: line.kind, cells: line.cells.map(cell => cell.map(item => span(item.text, item.role))) }
+      : { kind: line.kind, spans: line.spans.map(item => span(item.text, item.role)),
+        ...(line.kind === 'text' && line.bullet !== undefined ? { bullet: line.bullet } : {}) }),
     facts: Object.fromEntries(Object.entries(input.facts).map(([key, value]) => [plain(key), copyValue(value)])),
   });
 }
@@ -36,17 +43,25 @@ export function spanText(spans: readonly ReportSpan[]): string {
 }
 
 /** Markdown-compatible text, without terminal capabilities or control sequences. */
-export function reportText(report: CommandReport): string {
-  const rows = [`### ${report.title}`, ''];
+export function reportText(report: CommandReport, maxBytes = Infinity): string {
+  const rows: string[] = []; let bytes = 0;
+  const append = (...lines: string[]): void => {
+    for (const line of lines) {
+      bytes += Buffer.byteLength(line, 'utf8') + 1;
+      if (bytes > maxBytes) throw new RangeError('Report text exceeds its limit.');
+      rows.push(line);
+    }
+  };
+  append(`### ${report.title}`, '');
   let table = false;
   for (const line of report.lines) {
     if (line.kind === 'columns') {
       if (!table && report.columns) {
-        rows.push(`| ${report.columns.map(column => column.label).join(' | ')} |`,
+        append(`| ${report.columns.map(column => column.label).join(' | ')} |`,
           `| ${report.columns.map(column => column.align === 'right' ? '---:' : ':---').join(' | ')} |`);
       }
-      rows.push(`| ${line.cells.map(spanText).join(' | ')} |`);
-    } else rows.push(lineText(line));
+      append(`| ${line.cells.map(spanText).join(' | ')} |`);
+    } else append(lineText(line));
     table = line.kind === 'columns';
   }
   return rows.join('\n').replace(/\n+$/, '');

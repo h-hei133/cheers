@@ -12,6 +12,8 @@ import { SESSION_APPROVAL_AUDIT_HISTORY_LIMIT } from "./approval/sessionApproval
 import { type TranscriptEvent } from "./sessionEventCodec.js";
 import { appendBranchSummaryEvent } from "./transcript/sessionTranscript.js";
 import { appendTranscriptEvent, readTranscriptEvents } from "./transcript/sessionTranscript.js";
+import { sessionRootEntryId, buildLinearSessionThreadSnapshot } from './schema/sessionThread.js';
+import { forkThread } from './branch/fork.js';
 import { sessionThreadPath } from "./schema/sessionThread.js";
 import {
   readSessionThreadSnapshot,
@@ -248,6 +250,9 @@ export class SessionManager extends SessionReadSurface {
       throw new Error(`Cannot fork: session ${sessionId} does not exist`);
     }
     const source = this.host.store.load(sessionId);
+    const sourceThread = this.host.store.readStateSnapshotRequired(this.host.store.statePath(sessionId)).thread
+      ?? buildLinearSessionThreadSnapshot(source);
+    if (!sessionThreadPath(sourceThread).resolved) throw new Error('Cannot fork: session ancestry is unavailable.');
     const events = readTranscriptEvents(this.host.store.transcriptPath(sessionId));
     const forked = createSession({
       callbacks: this.createSessionCreationCallbacks(),
@@ -259,9 +264,11 @@ export class SessionManager extends SessionReadSurface {
     });
     const transcriptPath = this.host.store.transcriptPath(forked.id);
     for (const event of events) {
-      appendTranscriptEvent(transcriptPath, event);
+      appendTranscriptEvent(transcriptPath, event.type === 'command-output' && event.sourceEntryId === sessionRootEntryId(source.id)
+        ? { ...event, sourceEntryId: sessionRootEntryId(forked.id) } : event);
     }
-    return forked;
+    this.host.store.writeSessionState(forked, { thread: forkThread(sourceThread, source.id, forked.id) });
+    return this.host.store.load(forked.id);
   }
 
   resume(sessionId: string, projectRoot?: string): Session {
@@ -341,7 +348,7 @@ export class SessionManager extends SessionReadSurface {
       preferredProjectRoot: input?.preferredProjectRoot,
       limit: 20,
     });
-    const withContent = summaries.find((summary) => summary.hasConversation === true);
+    const withContent = summaries.find((summary) => summary.hasConversation === true || summary.hasReportHistory === true);
     return withContent ? this.host.store.load(withContent.id) : null;
   }
 

@@ -154,9 +154,37 @@ export function appendTranscriptEvent(
   transcriptPath: string,
   event: TranscriptEvent,
   header?: { readonly sessionId: string; readonly timestamp: string; readonly cwd: string },
+  options?: { readonly requireExisting?: boolean },
 ): void {
+  if (options?.requireExisting) {
+    appendExistingEvent(transcriptPath, event);
+    return;
+  }
   ensureTranscriptHeader(transcriptPath, header);
   fs.appendFileSync(transcriptPath, `${encodeTranscriptEvent(event)}\n`, "utf8");
+}
+
+/** Preserve an interrupted tail and verify the appended record through the same file handle. */
+function appendExistingEvent(transcriptPath: string, event: TranscriptEvent): void {
+  const fd = fs.openSync(transcriptPath, fs.constants.O_RDWR | fs.constants.O_APPEND);
+  try {
+    const before = fs.fstatSync(fd); const last = Buffer.alloc(1);
+    if (before.size) fs.readSync(fd, last, 0, 1, before.size - 1);
+    const record = Buffer.from(`${encodeTranscriptEvent(event)}\n`, 'utf8');
+    const separator = before.size && last[0] !== 10 ? Buffer.from('\n') : Buffer.alloc(0);
+    fs.appendFileSync(fd, separator.length ? Buffer.concat([separator, record]) : record);
+    const end = fs.fstatSync(fd).size; const actual = Buffer.alloc(record.length);
+    let offset = 0;
+    while (offset < actual.length) {
+      const read = fs.readSync(fd, actual, offset, actual.length - offset, end - actual.length + offset);
+      if (!read) throw new Error('Transcript append could not be verified.');
+      offset += read;
+    }
+    const current = fs.statSync(transcriptPath);
+    if (!actual.equals(record) || current.ino !== before.ino || current.dev !== before.dev) {
+      throw new Error('Transcript append could not be verified.');
+    }
+  } finally { fs.closeSync(fd); }
 }
 
 /**

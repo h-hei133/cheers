@@ -382,3 +382,9 @@ bridge 不在 runtime 的 output 生成阶段包色，也不把渲染字符串�
 
 - 现有 `--json` 的 `cli.output` 兼容文本旁携带可选 version 1 报告，保留事件 schema、顺序与非成功声明。输出边界从同一安全快照生成 text/report，稳定数值、unknown/null、来源与单位不靠解析屏幕；FORCE_COLOR 不影响 JSON 无 ANSI。
 - interactive、piped 和 print 共用 renderReport，普通文本 sink 保留纯文本。模型回合前后使用原单一 JSON writer，未新增开关或协议。64 项、编译 CLI 和两组有效反转/恢复后 20 项见 [主裁决 §8.98](phase-19-decisions.md#898-ui-06既有-json-事件流保留报告语义)。持久语义重放继续，完整 UI-06 和阶段目标未完成。
+
+## 15. UI-06 持久报告与会话恢复（2026-10-07）
+
+- 报告作为带时间的 `command-output` 注释追加到现有 transcript，绑定当时的 ancestry cursor；后代继承，独立于模型消息和上下文。正文、语义和 fallback 有尺寸界限，未知语义版本降级安全文本，持久时间戳不直接进入终端。保存失败与未核验结果明确提示，不伪称已保存，也不重建已删除的会话。
+- 当前分支选择报告，隐藏分支历史仍阻止空会话丢弃；仅报告会话可由裸 resume 找到。fork 保留 thread 并重映射根注释，HTML export 默认展示祖先报告，命令注释不成为模型回合或损坏节点。恢复沿用合计 60 blocks 的上限，按当前主题渲染语义。
+- 启动和会话切换共用 history 投影，保留欢迎、诊断、prompt history 与 checklist。实际 regular/fullscreen 退出并重启同 session 后恢复报告、窄屏重排通过，零 provider 请求/模型消息、配置不变；完整验证、七组有效反转、旧 CI 失败及修正分类见 [主裁决 §8.99](phase-19-decisions.md#899-ui-06持久报告分支注释与启动恢复)。UI-07 与完整 Phase 19 继续，真实 IME/Windows 像素仍无验收证据。

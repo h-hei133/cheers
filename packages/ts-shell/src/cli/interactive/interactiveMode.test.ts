@@ -66,6 +66,29 @@ function build(overrides: { observeEvents?: () => () => void; exit?: (code?: num
 }
 
 describe("session wiring", () => {
+  it.each([false, true])('restores saved reports in the first frame with message history=%s', withMessages => {
+    const { mode } = build();
+    const host = mode as unknown as { view: InteractiveView; sink: { begin(): void }; options: { runtimeContext: ShellRuntimeContext } };
+    const context = host.options.runtimeContext;
+    const report = createReport({ title: 'Saved observation', lines: [{ kind: 'text', spans: [span('Retained report body')] }], facts: { count: 3 } });
+    context.session.turns = withMessages ? [{ id: 'user-one', role: 'user', content: 'Earlier user request' }] : [];
+    context.session.reports = [{ id: 'report-one', sourceEntryId: withMessages ? 'user-one' : 'sess_1:root',
+      timestamp: '2026-10-07T00:00:00.000Z', text: 'Retained report body', report }];
+    context.runtimeConfig.configDiagnostics.push('Retained startup warning');
+    const begin = vi.spyOn(host.sink, 'begin');
+    mode.start();
+    try {
+      const frame = stripAnsi(host.view.renderFrame({ columns: 100, rows: 40 }).rows.join('\n'));
+      expect(frame).toContain('Cheers'); expect(frame).toContain('Saved report');
+      expect(frame).toContain('Retained report body'); expect(frame).toContain('Retained startup warning');
+      expect(host.view.transcript.all().find(block => block.report)?.report).toBe(report);
+      expect(host.view.transcript.all().filter(block => block.kind === 'user')).toHaveLength(withMessages ? 1 : 0);
+      if (withMessages) expect(frame).toContain('Earlier user request');
+      expect(begin).not.toHaveBeenCalled();
+      expect(context.session.turns).toHaveLength(withMessages ? 1 : 0);
+    } finally { mode.stop(); }
+  });
+
   it('preserves safe load failure in the queued tools chooser', async () => {
     const { mode } = build();
     const host = mode as unknown as { overlay: OverlayHost; openPicker(command: string, queued: boolean): void; pickerHost(): PickerHost };
@@ -97,7 +120,8 @@ describe("session wiring", () => {
       await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 24).join('\n'))).toContain(tool.name));
       terminal.input('\r\x1b[200~transition paste\x1b[201~');
       await vi.waitFor(() => expect(host.pager.active).toBe(true));
-      const block = host.view.transcript.last()!;
+      const block = host.view.transcript.all().find(item => item.report)!;
+      expect(host.view.transcript.last()?.text).toBe('Report shown; it was not saved to session history.');
       expect(block.report?.facts.name).toBe(tool.name); expect(block.text).toContain('Visible metadata.');
       expect(block.collapsed).toBe(true); expect(catalog).toHaveBeenCalledTimes(2);
       expect(host.overlay.active).toBe(false); expect(begin).not.toHaveBeenCalled(); expect(tool.execute).not.toHaveBeenCalled();

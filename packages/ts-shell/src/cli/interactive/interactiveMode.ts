@@ -2,7 +2,6 @@ import { CatalogController } from "./completion/controller.js";
 import { catalogIdentity, createCatalogLoader } from "./completion/catalog.js";
 import { refreshShellRuntimeConfig } from "../../core/shell/runtimeContext.js";
 import { configurationAdmission } from '../../core/shell/configuration.js';
-import { messageToText } from "../../model-adapters/multimodal.js";
 import { backgroundTasks, renderTaskNotice } from "../../core/shell/background/tasks.js";
 import type { Interface as ReadlineInterface } from "node:readline";
 import path from "node:path";
@@ -39,7 +38,7 @@ import { routeKey } from "./keymap.js";
 import { InputPreferences } from "./inputPreferences.js";
 import { QuestionBridge } from "./questionBridge.js";
 import { readAmbientFacts } from "./ambientFacts.js";
-import { showConversation, startFreshSession, type HistoryTarget } from "./history.js";
+import { appendConversation, showConversation, startFreshSession, type HistoryTarget } from "./history.js";
 import { Pager, pageLongOutput } from "../../presentation/tui/chrome/pager.js";
 import { TranscriptSearch } from "../../presentation/tui/transcript/searchState.js";
 import { routeSearchKey, styleSearchRow } from "../../presentation/tui/transcript/searchHost.js";
@@ -52,6 +51,7 @@ import { couldBeCommand, slashArgumentHint, slashSuggestions } from "./slashSugg
 import { couldBeFileReference } from "./fileSuggestions.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
 import { TurnSink } from "./turnSink.js";
+import { reportWriter, reportSaveNotice } from '../output/reports.js';
 import { updateAppearance } from "../../presentation/theme/selection.js";
 import { followTheme, type ThemeFollower } from "../../presentation/themes/watch.js";
 import { themePreferences } from "../../presentation/theme/preview.js";
@@ -202,11 +202,6 @@ export class InteractiveMode {
       this.tui.requestRender();
     });
     this.statusItems = readStatusItems(options.runtimeContext.projectRoot, options.runtimeContext.runtimeConfig);
-    // The checklist travels with the session, and every path that puts a
-    // conversation on screen — opening, resuming, forking, rewinding — restores
-    // it through `showConversation`. A session opened for the first time has no
-    // turns to restore from, so there is nothing to do here that the first
-    // frame will not have already had done.
     this.clipboard = new Clipboard({
       cwd: options.runtimeContext.cwd,
       sessionId: options.runtimeContext.session.id,
@@ -337,10 +332,6 @@ export class InteractiveMode {
     };
     const diskHistory = loadPromptHistory(options.runtimeContext.projectRoot);
     this.state.editor.loadHistory(diskHistory);
-    const sessionTurns = options.runtimeContext.session.turns
-      ?.filter((t) => t.role === "user" && messageToText(t.content).trim())
-      .map((t) => messageToText(t.content).trim()) ?? [];
-    this.state.editor.loadHistory(sessionTurns);
   }
 
   start(): void {
@@ -360,6 +351,8 @@ export class InteractiveMode {
           width,
         ),
     });
+    const session = this.options.runtimeContext.session;
+    if (session.turns?.length || session.reports?.length) appendConversation(this.state, session);
     for (const diagnostic of this.options.runtimeContext.runtimeConfig.configDiagnostics) {
       this.state.transcript.append(textBlock("notice", `Warning: ${diagnostic}`));
     }
@@ -761,6 +754,7 @@ export class InteractiveMode {
   /** Hand the choice to the picker that produced it and surface what it reports. */
   private applyPicker(picker: Picker, ids: readonly string[]): void {
     const revision = this.overlay.revision;
+    const persistReport = reportWriter(this.options.sessionManager, this.options.runtimeContext.session.id);
     if (picker.holdInput) this.pickerInputPending.set(revision, (this.pickerInputPending.get(revision) ?? 0) + 1);
     if (picker.exclusive) {
       this.pickerPending = true;
@@ -777,6 +771,8 @@ export class InteractiveMode {
           const block = { ...textBlock('command', reportText(outcome.report), picker.title), report: outcome.report };
           this.state.transcript.append(block);
           pageLongOutput(this.pager, outcome.report.title, block, this.state.transcript);
+          const notice = reportSaveNotice(persistReport(outcome.report));
+          if (notice) this.state.transcript.append(textBlock('notice', notice));
         }
         if (outcome?.draft && !this.stopped && this.overlay.revision === revision) {
           // Insertion requires another explicit submission. Usage is only a

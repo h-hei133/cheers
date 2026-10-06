@@ -1,7 +1,8 @@
 /** Plain, versioned command output. Presentation alone assigns terminal styles. */
-export type ReportRole = 'text' | 'command' | 'argument' | 'flag' | 'key' | 'path'
-  | 'number' | 'unit' | 'muted' | 'emphasis' | 'subtle' | 'heading' | 'code' | 'warning' | 'error' | 'success'
-  | 'context-normal' | 'context-elevated' | 'context-high' | 'context-critical';
+export const REPORT_ROLES = ['text', 'command', 'argument', 'flag', 'key', 'path',
+  'number', 'unit', 'muted', 'emphasis', 'subtle', 'heading', 'code', 'warning', 'error', 'success',
+  'context-normal', 'context-elevated', 'context-high', 'context-critical'] as const;
+export type ReportRole = typeof REPORT_ROLES[number];
 
 export interface ReportSpan {
   readonly text: string;

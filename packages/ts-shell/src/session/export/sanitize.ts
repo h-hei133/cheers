@@ -21,6 +21,7 @@ export function sanitizeExport(payload: ExportPayload): ExportPayload {
     },
     entries: payload.entries.map(entry => ({
       ...entry, id: identity(entry.id), timestamp: optionalText(entry.timestamp),
+      ...(entry.sourceEntryId === undefined ? {} : { sourceEntryId: identity(entry.sourceEntryId) }),
       toolCallId: entry.toolCallId === undefined ? undefined : identity(entry.toolCallId),
       toolCalls: entry.toolCalls?.map(call => ({ ...call, id: identity(call.id), name: redactExportText(call.name) })),
       origin: entry.origin === undefined ? undefined : { provider: optionalText(entry.origin.provider), model: redactExportText(entry.origin.model) },

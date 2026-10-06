@@ -45,6 +45,7 @@ export interface SessionReentrySummary {
    * keeping. This is what tells the two apart.
    */
   readonly hasConversation: boolean;
+  readonly hasReportHistory?: boolean;
 }
 
 export function projectSessionReentrySummary(input: {
@@ -91,6 +92,7 @@ export function projectSessionReentrySummary(input: {
     blockedReason: trustBoundary.block?.reason,
     blockedDetail: trustBoundary.block?.detail,
     hasConversation: sessionHasConversation(session),
+    ...(session.hasReportHistory ? { hasReportHistory: true } : {}),
   };
 }
 
@@ -110,6 +112,7 @@ export function sessionHasConversation(session: Session): boolean {
  * session with nothing said and nothing pending is not.
  */
 export function sessionHasReentrySurface(session: Session): boolean {
+  if (session.hasReportHistory) return true;
   if (sessionHasConversation(session)) return true;
   if (session.pendingPrompt?.trim()) return true;
   return session.status !== "active";

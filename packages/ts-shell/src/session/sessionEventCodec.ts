@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { SessionMessage, SessionToolCall } from "./schema/sessionMessage.js";
 import { isReadableTranscriptEvent } from "./transcript/validation.js";
+import type { ReportTranscriptEntry } from './reports/model.js';
 export type TranscriptLifecycleEventName =
   | "run-started"
   | "run-interrupted"
@@ -105,6 +106,7 @@ export type TranscriptEvent =
     }
   | { type: "query-event"; id?: string; sourceEntryId?: string; event: QueryEvent; timestamp: string }
   | CompactionTranscriptEntry
+  | ReportTranscriptEntry
   | BranchSummaryTranscriptEntry;
 
 /**

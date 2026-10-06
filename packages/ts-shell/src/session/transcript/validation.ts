@@ -49,6 +49,8 @@ function queryEvent(value: unknown): boolean {
 export function isReadableTranscriptEvent(value: unknown): boolean {
   if (!record(value) || typeof value.timestamp !== "string" || !optionalString(value.id) || value.id === "") return false;
   switch (value.type) {
+    case "command-output": return typeof value.text === 'string' &&
+      typeof value.sourceEntryId === 'string' && value.sourceEntryId.length > 0;
     case "message": return message(value);
     case "lifecycle": return typeof value.event === "string" && optionalString(value.detail);
     case "query-event": return queryEvent(value.event);

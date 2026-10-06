@@ -27,6 +27,8 @@ import type { CompactInjectionStateStore } from "../context/compact/injection/co
 import type { CompactLiveCheckpointStore } from "../context/compact/checkpoint/compactLiveCheckpoint.js";
 import type { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
+import type { ReportWriter } from '../session/reports/model.js';
+import { reportSaveNotice } from '../cli/output/reports.js';
 
 type SlashRouteResult = Awaited<ReturnType<typeof routeSlashCommand>>;
 
@@ -55,6 +57,7 @@ export interface BuildCliCommandExecutionInput {
   readonly interactive: boolean;
   readonly sessionId?: string;
   readonly onTurnMessage?: (message: SessionMessage) => void;
+  readonly onReport?: ReportWriter;
   /**
    * How this run was asked to load skills.
    *
@@ -169,6 +172,10 @@ export async function buildCliCommandExecution(
     }
     if (slashResult.report) input.renderer.renderReport(slashResult.report);
     else input.renderer.renderLine(input.printMode ? slashResult.output : `\n${slashResult.output}\n`);
+    if (slashResult.report && input.onReport) {
+      const notice = reportSaveNotice(input.onReport(slashResult.report));
+      if (notice) input.renderer.renderLine(notice);
+    }
     return { kind: "handled" };
   }
 

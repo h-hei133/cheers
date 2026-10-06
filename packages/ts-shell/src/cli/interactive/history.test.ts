@@ -203,7 +203,7 @@ describe("showing a session", () => {
     showConversation({
       transcript,
       sessionManager: {
-        getSession: () => ({ turns } as never),
+        getSession: () => ({ id: "s-shown", turns } as never),
         createNew: () => ({ id: "new" } as never),
         discardIfEmpty: () => true,
       },

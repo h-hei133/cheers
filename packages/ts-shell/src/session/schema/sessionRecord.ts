@@ -1,6 +1,7 @@
 import type { WorkspaceRootMode } from "../store/projectBindingPolicy.js";
 import type { SessionMessage } from "./sessionMessage.js";
 import type { SessionUsageSnapshot } from "../../observability/usage/model.js";
+import type { SessionReport } from '../reports/model.js';
 
 export interface Session {
   usage?: SessionUsageSnapshot;
@@ -24,6 +25,10 @@ export interface Session {
   updatedAt: string;
   status: "active" | "interrupted" | "completed" | "error" | "terminated";
   turns: SessionMessage[];
+  /** Read-only observations; excluded from model messages and runtime lifecycle. */
+  reports?: readonly SessionReport[];
+  /** Includes annotations on other branches, so a rewind cannot make data disposable. */
+  hasReportHistory?: boolean;
   pendingPrompt?: string;
   lastError?: string;
 }

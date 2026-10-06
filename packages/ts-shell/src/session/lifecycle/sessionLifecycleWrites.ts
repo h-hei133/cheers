@@ -47,6 +47,8 @@ import { appendCompactionEvent } from "../transcript/sessionTranscript.js";
 import { reconcilePendingLifecycleForSession } from "../recovery/sessionRecoveryRuntime.js";
 import type { RecoverySnapshot } from "../recovery/sessionRecoverySnapshot.js";
 import { sessionHasConversation } from "../presentation/sessionReentrySurface.js";
+import { captureReportWriter } from '../reports/persistence.js';
+import type { ReportWriter } from '../reports/model.js';
 
 const sessionLogger = createComponentLogger("SessionManager");
 
@@ -103,6 +105,10 @@ export abstract class SessionLifecycleWrites {
 
   addTurn(sessionId: string, message: SessionMessage): void {
     handleAddTurn(this.createSessionLifecycleCallbacks(), sessionId, message);
+  }
+
+  captureReportWriter(sessionId: string): ReportWriter {
+    return captureReportWriter(this.host.store, sessionId);
   }
 
   recordApprovalAuditDecision(
@@ -210,7 +216,7 @@ export abstract class SessionLifecycleWrites {
       sessionLogger.warn("Failed to load session for discard check", { sessionId, error: error instanceof Error ? error.message : String(error) });
       return false;
     }
-    if (sessionHasConversation(session)) return false;
+    if (sessionHasConversation(session) || session.hasReportHistory) return false;
     // An explicit model choice is durable user state even before the first turn.
     if (this.host.store.readStateSnapshotSafely(this.host.store.statePath(sessionId))?.modelSelection) return false;
     const projectRoot = session.projectRoot;
