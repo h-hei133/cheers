@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
+import { createStateChanges } from "../core/state/changes.js";
 import type { ProjectMemoryCandidate } from "./projectMemoryCandidate.js";
 import { RetainedMap, retainHistory, retentionCapacity, type RetentionState, type RetentionStatus } from "../core/state/retention.js";
 
@@ -38,6 +39,7 @@ export interface ProjectMemoryReviewState extends RetentionState {
 }
 
 export interface ProjectMemoryReviewStateStore {
+  subscribe?(reviewSessionId: string, changed: () => void): () => void;
   retention(): RetentionStatus;
   get(reviewSessionId: string): ProjectMemoryReviewState;
   updateCandidates(input: UpdateProjectMemoryReviewCandidatesInput): ProjectMemoryReviewState;
@@ -69,6 +71,7 @@ export function createProjectMemoryReviewStateStore(
   options: ProjectMemoryReviewStateStoreOptions = {},
 ): ProjectMemoryReviewStateStore {
   const states = new RetainedMap<string, ProjectMemoryReviewState>(options.sessionCapacity ?? MEMORY_REVIEW_LIMITS.sessions);
+  const changes = createStateChanges();
   const capacity = retentionCapacity(options.decisionCapacity ?? MEMORY_REVIEW_LIMITS.decisions);
   const now = options.now ?? (() => new Date().toISOString());
 
@@ -78,7 +81,8 @@ export function createProjectMemoryReviewStateStore(
     const retained = buildState(state.reviewSessionId,
       state.latestCandidates.filter((candidate) => ids.has(candidate.candidateId)).slice(0, capacity),
       history.items, history.dropped, state.incomplete || history.incomplete);
-    states.set(state.reviewSessionId, retained);
+    const evicted = states.set(state.reviewSessionId, retained);
+    changes.notify(state.reviewSessionId, evicted?.[0]);
     return retained;
   };
 
@@ -86,6 +90,7 @@ export function createProjectMemoryReviewStateStore(
     states.get(reviewSessionId) ?? { ...emptyProjectMemoryReviewState(reviewSessionId), incomplete: states.retention().incomplete };
 
   return {
+    subscribe: changes.subscribe,
     retention: () => states.retention(),
     get,
     updateCandidates(input) {

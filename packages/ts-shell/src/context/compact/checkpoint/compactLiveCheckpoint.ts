@@ -1,6 +1,7 @@
 import type { CompactContinuityPacket } from "../continuity/compactContinuityPacket.js";
 import type { CompactCommandRunResult } from "../command/compactCommandRunner.js";
 import { RetainedMap, type RetentionStatus } from "../../../core/state/retention.js";
+import { createStateChanges } from "../../../core/state/changes.js";
 
 export const COMPACT_CHECKPOINT_CAPACITY = 256;
 
@@ -43,6 +44,7 @@ export interface CompactLiveCheckpoint {
 }
 
 export interface CompactLiveCheckpointStore {
+  subscribe?(sessionScopeId: string, changed: () => void): () => void;
   retention(): RetentionStatus;
   /** Reads return the retained read-only object; an update replaces its identity
    * even when the checkpoint ID is reused, so prepared consumers can detect it. */
@@ -71,6 +73,7 @@ export function createCompactLiveCheckpointStore(
   options: CompactLiveCheckpointStoreOptions = {},
 ): CompactLiveCheckpointStore {
   const latestBySession = new Map<string, string>();
+  const changes = createStateChanges();
   const checkpointsById = new RetainedMap<string, CompactLiveCheckpoint>(options.capacity ?? COMPACT_CHECKPOINT_CAPACITY);
   let counter = 0;
   const now = options.now ?? (() => new Date().toISOString());
@@ -93,10 +96,12 @@ export function createCompactLiveCheckpointStore(
     if (checkpoint.status === "created") {
       latestBySession.set(checkpoint.sessionScopeId, checkpoint.checkpointId);
     }
+    changes.notify(checkpoint.sessionScopeId, replaced?.sessionScopeId, evicted?.[1].sessionScopeId);
     return checkpoint;
   };
 
   return {
+    subscribe: changes.subscribe,
     retention: () => checkpointsById.retention(),
     getLatest(sessionScopeId) {
       const latestId = latestBySession.get(sessionScopeId);
@@ -151,6 +156,7 @@ export function createCompactLiveCheckpointStore(
         ],
       };
       checkpointsById.set(latestId, cleared);
+      changes.notify(sessionScopeId);
       return cleared;
     },
     markSuperseded(checkpointId) {
@@ -171,6 +177,7 @@ export function createCompactLiveCheckpointStore(
       if (latestBySession.get(checkpoint.sessionScopeId) === checkpointId) {
         latestBySession.delete(checkpoint.sessionScopeId);
       }
+      changes.notify(checkpoint.sessionScopeId);
       return superseded;
     },
   };

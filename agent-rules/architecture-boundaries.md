@@ -73,6 +73,8 @@ Do not reintroduce a second language for performance. Execution latency is domin
 
 ## Common Areas
 
+- `packages/ts-shell/src/core/state/`: domain-neutral bounded retention and scoped change notifications; feature owners keep their state transitions and payloads.
+
 - `packages/ts-shell/src/entrypoints/`: executable entrypoints and compatibility re-exports only; reusable CLI contracts belong under `packages/ts-shell/src/cli/`.
 - Current owners for new edit/result logic include `packages/ts-shell/src/edit/`, `packages/ts-shell/src/edit/patch/`, `packages/ts-shell/src/edit/result/`, `packages/ts-shell/src/verification/`, `packages/ts-shell/src/repair/`, and `packages/ts-shell/src/result/`.
 - `packages/ts-shell/src/core/query/`: generic query and result mapping; project feature-specific state into generic result shapes before handing it to query-level mappers.

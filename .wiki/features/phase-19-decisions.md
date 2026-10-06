@@ -938,3 +938,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 移除 grant/record/invalidatable 来源监听后三组事件断言均失败，逐字节恢复后组合通过。regular/fullscreen 真实 CLI 无新按键响应外部授权和记录变化，授权 Tab 不写文件、记忆正文未进入终端、Esc 后不重开，两模式 exit 0。
 - import cycles/config consumers/declarations/node floor 通过；NormProof 全图无环与导入解析 satisfied，既有 5 个函数数量 advisory 保留。32598f7e CI 37394082538 与 Architecture Watch 37394082553、b40344b5 CI 37393613562 与 Architecture Watch 37393613204 均成功；4a86f8af Architecture Watch 37394996510 成功，CI 37394996509 仍运行。
 - CMD-04 会话目录、内存审批/检查点、MCP 连接状态和间接配置事件尚未全部完成；剩余参数审计及 Phase 19 后续批次继续。
+
+### 8.52 CMD-04：内存审批与检查点状态通知
+
+- checkpoint 与 memory review store 提供可释放的会话范围订阅；owner 完成写入后派发失效信号，补全 candidate/approvable/approved 接入同一 controller。没有增加轮询、持久化事件日志或第二份审批状态，读取仍使用原 store。
+- core/state 的共享通知器仅保留有订阅的待通知范围，微任务合并同一范围重复更新；释放取消待派发回调，重复释放不会删除后来的订阅。观察者异常不改变已经完成的 owner 写入结果。对照参考会话事件的订阅/释放决定，并针对本项目同步 store 的批量变更使用写后合并通知。
+- checkpoint 新建、跨会话复用 ID、容量淘汰、清除与 supersede 通知所有受影响范围；审批更新/批准/拒绝和会话淘汰通知对应 review scope。特别覆盖旧会话候选消失，不能只通知新写入会话而留下已淘汰批准的菜单缓存。
+- Linux、Node 20.3 隔离环境 25 文件/198 项与 build:ts 通过，含 owner 保留策略、scope 隔离、释放、观察者异常与真实 loader 的批准/清除投影。移除审批通知及 checkpoint 的旧会话通知后三组断言失败，逐字节恢复后组合通过。
+- regular/fullscreen 真实 CLI 在无新按键时响应内存批准/拒绝、检查点清除，Esc 后不重开，持久化记录字节及 mtime 不变，两模式 exit 0。探针用隔离预加载器建立真实 packet/checkpoint，通过测试控制文件触发进程内 owner 调用；控制文件轮询仅在夹具中，不作为产品实现，也不将其计作真实 provider 压缩验收。
+- import cycles/config consumers/declarations/node floor 通过；NormProof 全图无环/导入解析 satisfied，既有 5 个函数数量 advisory 保留。4a86f8af CI 37394996509 与 Architecture Watch 37394996510、ce228211 CI 37394466624 与 Architecture Watch 37394466969 均成功；60908649 Architecture Watch 37395620099 成功，CI 37395619977 查询时仍运行。
+- CMD-04 会话导航、MCP 连接状态及间接配置事件仍待完成；剩余参数审计和 Phase 19 后续任务继续。

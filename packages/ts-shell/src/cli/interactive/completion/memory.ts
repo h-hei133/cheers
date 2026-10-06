@@ -13,6 +13,13 @@ export function memoryCatalogStore(projectRoot: string) {
   return createProjectMemoryLocalStore({ ref: { mode: "explicit-local", root: projectMemoryRootFor(projectRoot) } });
 }
 
+export function observeMemoryCatalog(sessionId: string, changed: () => void): () => void {
+  const scope = `session:${sessionId}`;
+  const checkpoint = DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE.subscribe?.(scope, changed);
+  const review = DEFAULT_PROJECT_MEMORY_REVIEW_STATE_STORE.subscribe?.(scope, changed);
+  return () => { checkpoint?.(); review?.(); };
+}
+
 /** Queries and review mutations stay in command owners; candidates only expose stable IDs. */
 export async function memoryCatalog(kind: MemoryCatalogKind, context: ShellRuntimeContext): Promise<readonly Suggestion[]> {
   if (kind === "record" || kind === "invalidatable") {

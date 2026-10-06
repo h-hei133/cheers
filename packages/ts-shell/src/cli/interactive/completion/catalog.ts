@@ -2,7 +2,7 @@ import { navigationCatalog, type SessionCatalog } from "./navigation.js";
 import { serverCatalog } from "./servers.js";
 import { grantCatalog, type GrantCatalog } from "./grants.js";
 import { connectionCatalog } from "./connections.js";
-import { memoryCatalog } from "./memory.js";
+import { memoryCatalog, observeMemoryCatalog } from "./memory.js";
 import { pathCatalog } from "./paths.js";
 import { observeDirectory } from "./watch.js";
 import { catalogSources } from "./sources.js";
@@ -67,6 +67,7 @@ export function createCatalogLoader(context: () => ShellRuntimeContext, gateway:
     observe: (kind: CatalogKind, query: string | undefined, changed: () => void) => {
       if (kind === "skill") return skills.observe(changed);
       const current = context();
+      if (kind === "candidate" || kind === "approvable" || kind === "approved") return observeMemoryCatalog(current.session.id, changed);
       const targets = catalogSources(kind, { cwd: current.cwd, projectRoot: current.projectRoot, themePaths, grantPath: policy?.sourcePath }, query);
       if (!targets.length) return undefined;
       const close = targets.map(target => observeDirectory(target, changed));
