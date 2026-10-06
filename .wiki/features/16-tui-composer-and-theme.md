@@ -445,3 +445,11 @@ Settings 聚焦时显示真实 composer，暂存不写配置，Apply 即时发�
 字符串样式组合中，显式默认开启使用终端等效的完整组 39;39/49;49，与普通 closing reset 区分。中间 wrapper 和布局保留完整组，最终 paint 才归并。这样保留现有字符串 API 并正确恢复多层前景、背景及 reset；不要在后续样式包装之前新增 ANSI 归一化。
 
 29 文件/442 项、构建和四组反转通过，独立 APPROVE/CLEAR；五场实际 CLI 的四种颜色能力与四套主题切换验证了历史代码块重绘。详情见 [Phase 19 §8.89](phase-19-decisions.md)。主题 Settings 预览/取消/Apply、一切真实输入法及 Windows 像素验收仍继续。
+
+## 21. Settings 主题预览实施
+
+Theme 菜单复用既有主题发现与信任/显式路径策略；初始聚焦已接受主题，聚焦时重绘真实界面，Enter 暂存、Apply 保存。失败保留待选值并恢复已接受外观；取消、换菜单和退出均结束预览。不可用主题显示安全说明，不暂存失败预览。
+
+[selection](../../packages/ts-shell/src/presentation/theme/selection.ts) 区分 accepted intent 与可撤销 preview。成功接受主题递增 generation，即使同名也使旧回调失效；取消恢复内存 colors/name/mode 快照并递增色彩 revision。显式预览不被外观报告覆盖，auto 预览跟随报告，已接受 auto 的取消使用最新报告。预览暂停文件 follower，目标解析与已排队 reload 同时受约束；退出先关闭 overlay，再最终停止监听。
+
+两模式实际 CLI 的预览/暂存零写、取消恢复和 Apply 已验证；定向测试、四组反转及独立 APPROVE/CLEAR 见 [Phase 19 §8.90](phase-19-decisions.md)。真实输入法与 Windows 像素证据仍缺，完整 Phase 19 继续。

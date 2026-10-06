@@ -112,6 +112,14 @@ export class Theme {
     return () => { this.mode = mode; this.name = name; this.colors = colors; this.revision += 1; };
   }
 
+  /** Restore these exact colors without consulting files that may have changed. */
+  snapshot(): () => void {
+    const colors = new Map(this.colors);
+    const name = this.name;
+    const mode = this.mode;
+    return () => { this.mode = mode; this.name = name; this.colors = colors; this.revision += 1; };
+  }
+
   /** Changes whenever the palette does, for caches keyed on the colors. */
   get colorRevision(): number {
     return this.revision;
@@ -173,8 +181,6 @@ export class Theme {
 
 }
 
-let currentThemeName = "dark";
-
 export function getTheme(
   name: string,
   workspaceRoot?: string,
@@ -207,13 +213,12 @@ export function prepareTheme(name: string, workspaceRoot?: string, extraPaths: r
   if (!config) {
     throw new Error(`Theme not found: ${name}`);
   }
-  const commit = defaultTheme.prepare(config, detectColorMode());
-  return () => { commit(); currentThemeName = config.name; };
+  return defaultTheme.prepare(config, detectColorMode());
 }
 
 /** The theme currently in effect. */
 export function currentTheme(): string {
-  return currentThemeName;
+  return defaultTheme.name;
 }
 
 /** Automatic appearance uses the bundled pair, independent of named file overrides. */
@@ -222,8 +227,7 @@ export function applyDefaultTheme(appearance: "dark" | "light"): void {
 }
 
 export function prepareDefaultTheme(appearance: "dark" | "light"): () => void {
-  const commit = defaultTheme.prepare(getDefaultTheme(appearance), detectColorMode());
-  return () => { commit(); currentThemeName = appearance; };
+  return defaultTheme.prepare(getDefaultTheme(appearance), detectColorMode());
 }
 
 export const defaultTheme = new Theme(getDefaultTheme(), detectColorMode());

@@ -52,6 +52,7 @@ import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
 import { TurnSink } from "./turnSink.js";
 import { updateAppearance } from "../../presentation/theme/selection.js";
 import { followTheme, type ThemeFollower } from "../../presentation/themes/watch.js";
+import { themePreferences } from "../../presentation/theme/preview.js";
 import { navigateSession, type SessionNavigationResult } from "../runtime/navigation.js";
 
 /**
@@ -417,6 +418,7 @@ export class InteractiveMode {
     this.stopped = true;
     if (this.tick) clearInterval(this.tick);
     this.tick = undefined;
+    this.overlay.close();
     this.theme.stop();
     this.catalogs.invalidate();
     this.releaseEvents?.();
@@ -836,6 +838,12 @@ export class InteractiveMode {
         this.tui.requestRender();
       },
       previewComposerShape: this.composerPreference.propose,
+      themes: themePreferences({
+        workspaceRoot: this.options.runtimeContext.projectRoot,
+        extraPaths: this.options.themePaths,
+        follower: this.theme,
+        redraw: () => this.tui.requestRender({ force: true }),
+      }),
       saveStatusItems: async (items) => {
         const written = writeStatusItems(this.options.runtimeContext.projectRoot, items);
         this.statusItems = items;

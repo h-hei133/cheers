@@ -1424,3 +1424,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Node 20.3 隔离组合 29 文件/442 项、构建、静态门、43 项 script tests 通过。NormProof 0 blocking，四个既有函数数 advisory 保持；strict docs 120 个既有 source advisory 保持。四组反转撤回默认 scope 区分、旧代码角色继承、fallback 新角色及 model 新角色，均触发断言失败并逐字节恢复；恢复后 66 项通过。独立代码 APPROVE（113 项与 3645 个组合色槽探针），架构 CLEAR（105 项、依赖与责任上限检查）。
 - 实际构建 CLI 使用隔离 HOME、受控本地 provider 和每场一次请求，分别运行 regular/truecolor 及 fullscreen/truecolor、256、16、none。四套主题切换后，历史 unknown fence 的颜色状态按主题变化并回到 dark，配置文件原文不变，五场均退出 0。truecolor 的代码颜色依次为 9cdcfe/111827/ffffff/000000/9cdcfe；低色模式按既有降色规则，none 始终默认。此证据是 VT 色槽与输出状态，不等于任意用户终端对比度认证。首轮 PTY 的 light-contrast 预期误写为 111111，核对内建既有 000000 后修正探针；无产品修补。
 - 本批完成 palette/default/inheritance/fallback 主链。主题在 Settings 内的实际预览、取消与 Apply 一致性继续，真实 IME/Windows 像素和完整 Phase 19 保持进行中。UI-03 `3297c375` 的 Architecture Watch 37509026666 已成功，CI 37509026653 记录时仍在运行；本批远端状态另按 SHA 核实。
+
+### 8.90 UI-04：Settings 主题预览与可撤销生命周期
+
+- Settings 的 Theme 现在列出 auto、内建和可发现的自定义主题，初始聚焦已接受选择；沿用现有主题发现、项目信任、个人历史目录与显式 themePaths 顺序。键盘/指针聚焦改变共享调色板，历史消息也随真实 surface 重绘。Enter 仅暂存，Apply 才进入既有配置保存/确认路径；失败保留待选值和准确说明，重试才重取 baseline，不新增主题配置存储。
+- `presentation/theme/selection` 持有已接受 intent 与单调 generation，preview lease 只占用显示状态。每次成功接受选择都同步撤销 lease，包括同名选择；菜单创建时捕获的 revision 也阻止尚未开始预览的旧回调复活。准备失败不变更已接受值或当前颜色，取消从内存快照恢复 colors/name/mode 并增加 colorRevision，不重读可能已删除/损坏的文件。
+- 外观报告始终被记住：显式预览保持固定，auto 预览跟随报告；从已接受 auto 取消时解析最新外观。预览开始暂停 follower，refresh/目标解析与排队 reload 都受活动预览约束；取消/新接受选择恢复适当监听。独立双线审查共同发现 shutdown 残留，现已在最终 follower.stop 前关闭 overlay；退出后旧回调不会重新启动监听。
+- 对照既有参考的当前主题聚焦、selection-change 预览以及确认/取消分离；本产品保留明确的暂存/Apply、信任与配置优先级，并增加文件失效、同名新确认和异步生命周期保护。Theme 和 InteractiveMode 均保持 20 个函数名上限，控制器通过注入 follower/redraw 接入，不把生命周期逻辑继续堆入主交互类。
+- Node 20.3 隔离组合 16 文件/247 项及构建通过；shutdown 修复后相关 4 文件/67 项与最终构建通过。import cycles、config consumers、declarations、Node floor、strict docs 和 43 项 script tests 通过；NormProof 0 blocking、四个既有函数数 advisory，strict docs 保留 120 个既有 source advisory。代码独立 APPROVE、架构 CLEAR。四组有效反转覆盖快照恢复、接受代际、排队 reload 和初始聚焦，副本逐字节/SHA-256 恢复后 13 项通过。首轮代际反转发现测试只在 end 后断言、可能漏掉短暂旧预览；补上 end 前颜色断言后有效检出，无产品变更。
+- 实际构建 CLI 在 regular/fullscreen、隔离 HOME 与受控本地 provider 下各一次请求，验证历史代码颜色 dark→light 预览/暂存→取消 dark、再次 Apply light、预览 dark→取消 light；逐阶段文件原文比较证明预览与暂存零写，Apply 后文件为 light，两场退出 0。该证据不替代真实 IME/Windows 像素。验收记录：`.tmp/preview-validation-cw344pef`、`.tmp/preview-final-ax3dqih7`、`.tmp/phase19-config/theme-preview-reversals/1791312313394797980`、`.tmp/phase19-config/theme-preview-pty-1791312131253884979`。
+- UI-03 `3297c375` 的 CI 37509026653、Watch 37509026666，以及 palette `d7814f61` 的 CI 37511212735、Watch 37511212854 均已按提交核实成功。本批远端证据另按新 SHA 核实；UI-05 状态事实/费用标签及其余 Phase 19 交付继续，完整目标未完成。

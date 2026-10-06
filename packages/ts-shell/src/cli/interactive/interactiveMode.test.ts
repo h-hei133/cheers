@@ -15,6 +15,8 @@ import type { OverlayHost, Picker } from "./overlay.js";
 import type { PickerHost } from "./picker/registry.js";
 import type { InteractiveView } from "../../presentation/tui/surface/contract.js";
 import * as fileWalk from "../../runtime/execution/fileWalk.js";
+import { currentTheme } from '../../presentation/theme/theme.js';
+import { isThemePreviewActive, selectTheme } from '../../presentation/theme/selection.js';
 
 function build(overrides: { observeEvents?: () => () => void; exit?: (code?: number) => void } = {}): {
   mode: InteractiveMode;
@@ -56,6 +58,20 @@ function build(overrides: { observeEvents?: () => () => void; exit?: (code?: num
 }
 
 describe("session wiring", () => {
+  it('ends an active theme preview before stopping its follower', async () => {
+    selectTheme('dark'); const { mode } = build();
+    const host = mode as unknown as { overlay: OverlayHost; pickerHost(): PickerHost; theme: { refresh(): void; stop(): void } };
+    const refresh = vi.spyOn(host.theme, 'refresh'); const stop = vi.spyOn(host.theme, 'stop');
+    const lease = host.pickerHost().themes!.begin();
+    host.overlay.open({ title: 'Theme preview', form: 'panel', empty: '', load: async () => [{ id: 'light', label: 'Light' }],
+      apply: async () => undefined, previewChange: () => { lease.show('light'); }, previewEnd: lease.end });
+    await Promise.resolve(); await Promise.resolve(); expect(currentTheme()).toBe('light');
+    mode.stop(); expect(currentTheme()).toBe('dark'); expect(isThemePreviewActive()).toBe(false);
+    expect(refresh.mock.invocationCallOrder.at(-1)).toBeLessThan(stop.mock.invocationCallOrder.at(-1)!);
+    refresh.mockClear(); selectTheme('light'); expect(lease.show('dark')).toBe(false); lease.end();
+    expect(refresh).not.toHaveBeenCalled(); selectTheme('dark');
+  });
+
   it("loads file references only on demand and accepts the async quoted candidate without submission", async () => {
     const walk = vi.spyOn(fileWalk, "listWorkspaceFiles").mockResolvedValue(['my file.ts']);
     const { mode, terminal } = build();

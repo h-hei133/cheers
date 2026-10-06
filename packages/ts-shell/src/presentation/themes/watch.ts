@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createComponentLogger } from "../../observability/structuredLogger.js";
 import { applyTheme, currentTheme } from "../theme/theme.js";
-import { selectedTheme } from "../theme/selection.js";
+import { isThemePreviewActive, selectedTheme } from "../theme/selection.js";
 import { themeSourcePath } from "./index.js";
 
 /**
@@ -68,7 +68,7 @@ export function createThemeReloader(target: ThemeWatchTarget, onReload: () => vo
   const applyNow = (): void => {
     // The theme may have been switched since this was scheduled, in which case
     // the file this knows about is no longer the one on screen.
-    if (selectedTheme() === "auto" || currentTheme() !== target.name) return;
+    if (isThemePreviewActive() || selectedTheme() === "auto" || currentTheme() !== target.name) return;
     try {
       if (!fs.existsSync(target.filePath)) return;
       applyTheme(target.name, target.workspaceRoot, target.extraPaths);
@@ -176,7 +176,7 @@ export function resolveThemeTarget(
   extraPaths?: readonly string[],
 ): ThemeWatchTarget | undefined {
   const name = currentTheme();
-  if (!name || selectedTheme() === "auto") return undefined;
+  if (!name || isThemePreviewActive() || selectedTheme() === "auto") return undefined;
   const root = workspaceRoot ?? process.cwd();
   const paths = extraPaths ?? [];
   const filePath = themeSourcePath(name, root, paths);
