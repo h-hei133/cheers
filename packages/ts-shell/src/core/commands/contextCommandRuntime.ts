@@ -45,28 +45,33 @@ export async function runContextCommand(
   // here is the number in force. Asking the credential resolver for the active
   // model is what makes this per-model rather than one global value.
   const active = context.resolveConfigTarget?.(runtimeConfig) ?? resolveProviderCredential({ runtimeConfig });
-  const window = resolveContextWindow({
+  const resolution = resolveContextWindow({
     catalog: publication?.catalog ?? loadCatalog(),
     provider: active.provider,
     model: active.model,
     configured: runtimeConfig.contextWindow,
-  }).window;
+  });
+  const window = resolution.window;
+  const windowDetails = [
+    `- Window: ${window.toLocaleString()} tokens (${resolution.source === 'default' ? 'assumed default' : resolution.source})`,
+    ...(resolution.warning ? [`- Warning: ${resolution.warning}`] : []),
+  ];
   const reserve = resolveTokenBudget(runtimeConfig.modelTokenBudgets, active.provider, active.model, "reserveTokens", runtimeConfig.reserveTokens, DEFAULT_RESERVE_TOKENS);
   const registry = context.getToolPool ? await context.getToolPool() : createCoreToolRegistry();
   const blocked = context.admission?.();
   if (blocked) return { kind: "local", output: blocked };
   const schemaTokens = toolSchemaTokens(registry);
 
-  if (!telemetry || telemetry.lastPromptTokens <= 0) {
+  if (!telemetry || telemetry.lastPromptTokens === undefined) {
     return {
       kind: "local",
       output: [
         "### Context window",
         "",
-        `- Window: ${window.toLocaleString()} tokens`,
+        ...windowDetails,
         `- Current tool schema estimate: ~${schemaTokens.toLocaleString()} tokens (${registry.size} tools)`,
         "",
-        "No request has been sent in this session yet, so there is nothing measured to report. Ask something and run this again.",
+        "Current prompt usage is unknown. No provider measurement is available for this context.",
       ].join("\n"),
     };
   }
@@ -83,6 +88,7 @@ export async function runContextCommand(
     output: [
       "### Context window",
       "",
+      ...windowDetails,
       `- ${bar(used, reserve, window)}  ${percent(used, window)} used`,
       `- Last request carried ${used.toLocaleString()} of ${window.toLocaleString()} tokens; ${free.toLocaleString()} free before the ${reserve.toLocaleString()}-token reserve`,
       "",

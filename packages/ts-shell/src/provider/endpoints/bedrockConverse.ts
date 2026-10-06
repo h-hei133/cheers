@@ -388,10 +388,10 @@ interface ConverseUsage {
 function converseUsage(usage: ConverseUsage | undefined): CompletedBody["usage"] {
   if (!usage) return undefined;
   return {
-    prompt_tokens: usage.inputTokens ?? 0,
-    completion_tokens: usage.outputTokens ?? 0,
-    cache_read_input_tokens: usage.cacheReadInputTokens ?? 0,
-    cache_creation_input_tokens: usage.cacheWriteInputTokens ?? 0,
+    prompt_tokens: usage.inputTokens,
+    completion_tokens: usage.outputTokens,
+    cache_read_input_tokens: usage.cacheReadInputTokens,
+    cache_creation_input_tokens: usage.cacheWriteInputTokens,
     ...(usage.totalTokens !== undefined ? { total_tokens: usage.totalTokens } : {}),
   };
 }

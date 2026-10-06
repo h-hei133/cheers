@@ -1,10 +1,10 @@
 import { catalogModel } from "../core/models/catalog.js";
-import { usageFromProvider } from "../provider/response/usage.js";
+import { hasUsage, usageFromProvider } from "../provider/response/usage.js";
 import type { AgentToolCall } from "../core/agent/tools.js";
 import type { AgentMessage, AgentStopReason } from "../core/agent/state.js";
 import type { AssistantStep } from "../core/agent/loop.js";
 import { parseJsonWithRepair } from "../model-adapters/jsonRepair.js";
-import { recordSessionUsage } from "../observability/usageTelemetry.js";
+import { clearContextUsage, markContextUnknown, recordSessionUsage } from "../observability/usageTelemetry.js";
 import { samplingTemperature } from "../core/commands/fastCommandRuntime.js";
 import { captureThinkingPreference } from '../core/models/preference.js';
 import { effortOutputFailure } from '../provider/endpoints/effort.js';
@@ -404,6 +404,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
             },
           );
           if (attemptResponse.ok) {
+            clearContextUsage(request.sessionId);
             response = attemptResponse;
             options.onRequestSent?.({
               endpoint,
@@ -497,7 +498,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
       try {
         const completion = await readCompletion(response, watched, endpoint);
         const usage = completion.usage;
-        if (usage) {
+        if (hasUsage(usage)) {
           recordSessionUsage(request.sessionId, {
             ...usageFromProvider(usage),
             model: request.provider.model,
@@ -507,14 +508,15 @@ export function createStepFunction(request: StepRequest): StepFunction {
             // The provider counted the prompt it was sent; the message count lets
             // a later reader add whatever the conversation gained since.
             promptMessageCount: messages.length + 1,
-          });
+          }, { promptMeasured: typeof usage.prompt_tokens === 'number' && Number.isFinite(usage.prompt_tokens) && usage.prompt_tokens >= 0 });
           options.onRequestUsage?.(usage);
-        }
+        } else markContextUnknown(request.sessionId, 'usage-gap');
         const completed = toStep(completion, watched);
         return stamp(shownAnything && completed.stopReason === "error"
           ? { ...completed, retriesExhausted: true }
           : completed);
       } catch (error) {
+        markContextUnknown(request.sessionId, 'usage-gap');
         if (signal?.aborted) return stamp(abortedStep(shown));
         const detail = error instanceof Error ? error.message : String(error);
         if (!shownAnything && !REFUSAL.test(detail) && streamAttempts < retry.maxRetries && /socket|connection|network|fetch|terminated|unexpected eof/i.test(detail)) {

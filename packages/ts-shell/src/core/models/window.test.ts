@@ -3,8 +3,21 @@ import type { CatalogProvider } from './catalog.js'
 import {
   DEFAULT_CONTEXT_WINDOW,
   resolveContextWindow,
+  resolveModelCost,
   resolveTokenBudget,
 } from './window.js'
+
+it('does not borrow another provider rate when an unpriced model shares its id', () => {
+  const rate = { promptPerMTok: 1, completionPerMTok: 2 };
+  const models = [
+    { id: 'unpriced', models: [{ id: 'shared' }] },
+    { id: 'priced', models: [{ id: 'shared', cost: rate }] },
+  ];
+  expect(resolveModelCost(models, 'unpriced', 'shared')).toBeUndefined();
+  expect(resolveModelCost(models, 'compatible', 'shared')).toBeUndefined();
+  expect(resolveModelCost(models, 'priced', 'shared')).toEqual(rate);
+  expect(resolveModelCost(models.slice(1), 'compatible', 'shared')).toEqual(rate);
+});
 
 const catalog: readonly CatalogProvider[] = [
   {

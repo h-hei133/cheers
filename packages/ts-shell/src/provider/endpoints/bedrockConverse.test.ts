@@ -408,6 +408,15 @@ describe("reading the answer", () => {
     expect((step.value as { usage?: unknown }).usage).toMatchObject({ prompt_tokens: 7, completion_tokens: 3 });
   });
 
+  it.each([undefined, 0])('preserves prompt count presence: %s', async inputTokens => {
+    const stream = endpointShape('bedrock-converse-stream').readStream(streamOf(
+      event('messageStart', { role: 'assistant' }), event('metadata', { usage: { inputTokens, outputTokens: 2 } }),
+      event('messageStop', { stopReason: 'end_turn' }),
+    ));
+    let step = await stream.next(); while (!step.done) step = await stream.next();
+    expect((step.value as { usage?: { prompt_tokens?: number } }).usage?.prompt_tokens).toBe(inputTokens);
+  });
+
   it("refuses a stream that started and never finished", async () => {
     // A truncated answer returned as though it were whole is the failure being
     // avoided: the caller cannot tell the difference from the text alone.

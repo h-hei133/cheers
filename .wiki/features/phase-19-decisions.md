@@ -1434,3 +1434,14 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Node 20.3 隔离组合 16 文件/247 项及构建通过；shutdown 修复后相关 4 文件/67 项与最终构建通过。import cycles、config consumers、declarations、Node floor、strict docs 和 43 项 script tests 通过；NormProof 0 blocking、四个既有函数数 advisory，strict docs 保留 120 个既有 source advisory。代码独立 APPROVE、架构 CLEAR。四组有效反转覆盖快照恢复、接受代际、排队 reload 和初始聚焦，副本逐字节/SHA-256 恢复后 13 项通过。首轮代际反转发现测试只在 end 后断言、可能漏掉短暂旧预览；补上 end 前颜色断言后有效检出，无产品变更。
 - 实际构建 CLI 在 regular/fullscreen、隔离 HOME 与受控本地 provider 下各一次请求，验证历史代码颜色 dark→light 预览/暂存→取消 dark、再次 Apply light、预览 dark→取消 light；逐阶段文件原文比较证明预览与暂存零写，Apply 后文件为 light，两场退出 0。该证据不替代真实 IME/Windows 像素。验收记录：`.tmp/preview-validation-cw344pef`、`.tmp/preview-final-ax3dqih7`、`.tmp/phase19-config/theme-preview-reversals/1791312313394797980`、`.tmp/phase19-config/theme-preview-pty-1791312131253884979`。
 - UI-03 `3297c375` 的 CI 37509026653、Watch 37509026666，以及 palette `d7814f61` 的 CI 37511212735、Watch 37511212854 均已按提交核实成功。本批远端证据另按新 SHA 核实；UI-05 状态事实/费用标签及其余 Phase 19 交付继续，完整目标未完成。
+
+
+### 8.91 UI-05：状态窗口、用量与费用的事实边界
+
+- sessionFacts 始终从已接受配置/目录及实际 provider 解析窗口，独立投影 source/warning。状态未知显示 `?/64k`，配置/假定分别标 `config`/`assumed`，配置 warning 提供 `! /context`；详情保留完整来源/警告。已报告计量继续使用 50/70/90 风险阈值，未改默认状态项。
+- usage owner 以 `undefined` 区分未知与明确报告的 0；fresh/reset/resume 不保留旧当前计量，但保留累计账目。前台响应接受后立即清除 gauge，缺失/空/null/仅输出报告和读取失败不能留用旧 prompt。有效计量与后台 `affectsContext:false` 维持各自边界；新 `usage-gap` 断开 cache 对比而不伪称压缩，不给缺失报告增加空账目。
+- 共享 raw usage presence 判断与 Google/Bedrock 映射保留字段缺失，避免 adapter 提前补零；accounting normalization 仍归原 owner。费用状态显式 `est`，不完整公开费率标 `assumed rates`，仅承诺已记录用量估算。公开零费率只有在实际 token 有完整分类时支持零费用；total-only 计量不能伪装零账单。模型价格 fallback 统计所有同名 claimant，未定价 provider 不借另一个 provider 的费率。
+- 定向对照参考 footer 的独立窗口、压缩后 unknown 及 provider-scoped 价格查询，保留本项目已接受目录、费用分类和累计账目。独立审查发现空 usage 计数、total-only 零费用和 null 读取风险，已修复并强化成功结果断言。代码最终 APPROVE、架构 CLEAR；runtime factory 的宽口径 AST 计数仍为既有 28（基线同为 28），本批仅改未知判断、未增函数，不声称所有 touched module 在任何口径下均低于 20。
+- Node 20.3 隔离扩大组合 21 文件/386 项通过；最终实现修复后 8 文件/228 项、独立架构最终 11 文件/255 项通过，最后 null/success 夹具另获独立 82 项与 5 项定向验证。最终构建、import cycles、config consumers、declarations、Node floor、strict docs 和 43 项 script tests 通过；NormProof 0 blocking，四个既有函数数及 120 项文档来源 advisory 保留。六组反转覆盖窗口独立、接受后清除、wire 缺失、空 usage、零费用分类和价格身份，全部实际触发断言；隔离副本逐字节/SHA-256 恢复，恢复后 164 项通过。
+- regular/fullscreen 实际构建 CLI 使用隔离 HOME 和本地受控 provider，逐阶段 VT 屏幕核对 fresh `?/64k` → `9.0k/64k 14%` → 缺失 unknown → `0/64k 0%` → 压缩 unknown → `2.0k/64k 3%` → session overlay 关闭恢复 → 退出并重启同一真实 session 后 unknown。每场 4 次前台请求、2 次辅助请求，累计费用保留，配置逐字节不变，两次进程均退出 0。初轮夹具先后误用不存在的 session-id 创建、超出模型预算以及错误面板标题；修正夹具后通过，未改产品迁就预期。证据：`.tmp/status-reviewed-18s2080j`、`.tmp/ui05-architecture-final-yfgDN0`、`.tmp/status-gates-t1_g8g3e`、`.tmp/phase19-config/status-reversals/1791314734778917743`、`.tmp/phase19-config/status-pty-1791314874430689256`。
+- UI-04 `c7f8bda1` 的 CI 37514125290、Architecture Watch 37514125323 均按 SHA 核实成功；本批远端证据另按新提交核实。UI-06 报告/面板及其余 Phase 19 继续；Windows 前端像素与真实 IME 证据仍缺，完整目标保持进行中。

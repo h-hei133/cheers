@@ -68,7 +68,7 @@ it('keeps menus, completion, and context on the accepted catalogue until success
   catalog('pending-only', 24000);
   recordSessionUsage(shell.session.id, { promptTokens: 1000, completionTokens: 10, provider: 'google', model: 'chosen' });
   const facts = readStatusFacts(shell);
-  expect(facts).toMatchObject({ provider: 'google', model: 'chosen', contextWindow: 16000 });
+  expect(facts).toMatchObject({ provider: 'google', model: 'chosen', contextWindow: 16000, contextWindowSource: 'catalog', costRates: 'catalog' });
   expect(facts.costUsd).toBeCloseTo(0.016);
   expect(activeModelName(shell)).toBe('chosen');
   expect(readWelcomeState(shell, undefined, false).model).toBe('chosen');

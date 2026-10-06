@@ -76,7 +76,17 @@ describe("status items", () => {
 
   it("omits cost until something has been spent", () => {
     expect(renderStatusItem("cost", facts)).toBeUndefined();
-    expect(stripAnsi(renderStatusItem("cost", { ...facts, costUsd: 0.0142 }) ?? "")).toBe("$0.0142");
+    expect(stripAnsi(renderStatusItem("cost", { ...facts, costUsd: 0.0142 }) ?? "")).toBe("est $0.0142");
+    expect(stripAnsi(renderStatusItem("cost", { ...facts, costUsd: 0.0142, costRates: 'assumed' }) ?? "")).toBe("est $0.0142 assumed rates");
+    expect(stripAnsi(renderStatusItem('cost', { ...facts, costUsd: 0, costRates: 'catalog' })!)).toBe('est $0.0000');
+  });
+
+  it('distinguishes the same window value by source, keeps unknown usage unknown, and points to warnings', () => {
+    const window = { ...facts, contextWindow: 64_000 };
+    expect(stripAnsi(renderStatusItem('context', { ...window, contextWindowSource: 'catalog' })!)).toBe('?/64k');
+    expect(stripAnsi(renderStatusItem('context', { ...window, contextWindowSource: 'default' })!)).toBe('?/64k assumed');
+    expect(stripAnsi(renderStatusItem('context', { ...window, contextWindowSource: 'config' })!)).toBe('?/64k config');
+    expect(stripAnsi(renderStatusItem('context', { ...window, contextWindowSource: 'config', contextWarning: 'Over advertised capacity' })!)).toBe('?/64k config ! /context');
   });
 
   it("always shows the agent mode, because a key toggles it", () => {

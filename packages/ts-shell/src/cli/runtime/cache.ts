@@ -3,7 +3,7 @@ import type { CacheWarmingOptions } from "../../turn/cacheWarm.js";
 import { canRefreshSentRequest, sendSentRequest, type SentRequest } from "../../provider/request/sentRequest.js";
 import { providerFetchForEndpoint } from "../../provider/request/fetch.js";
 import { DEFAULT_ENDPOINT_KIND, endpointShape } from "../../provider/endpoints/index.js";
-import { usageFromProvider } from "../../provider/response/usage.js";
+import { hasUsage, usageFromProvider } from "../../provider/response/usage.js";
 import { recordSessionUsage } from "../../observability/usageTelemetry.js";
 import { writeSessionUsage } from "../../session/store/usage.js";
 import { createComponentLogger } from "../../observability/structuredLogger.js";
@@ -33,7 +33,7 @@ export function cacheRefreshFor(input: {
       return sendSentRequest({ ...sent, headers: renewed }, signal, fetchImpl);
     },
     onUsage: (usage) => {
-      if (!provider) return;
+      if (!provider || !hasUsage(usage)) return;
       recordSessionUsage(input.sessionId, {
         ...usageFromProvider(usage), provider: provider.providerId, model: provider.model,
       }, { affectsContext: false });

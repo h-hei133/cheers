@@ -3,6 +3,7 @@ import {
   estimateSessionCost,
   estimateUsageCost,
   getSessionUsage,
+  markContextUnknown,
   recordSessionUsage,
   resetSessionUsage,
   totalTokens,
@@ -10,6 +11,7 @@ import {
   USAGE_RATES,
   type ModelCostRates,
 } from "./usageTelemetry.js";
+import { findCacheWaste } from './cacheWaste.js';
 
 /**
  * Usage is bucketed by model.
@@ -24,6 +26,17 @@ import {
 const SESSION = "sess_bucket_test";
 
 afterEach(() => resetSessionUsage(SESSION));
+
+it('breaks cache comparison across an unmeasured request without claiming a context rebuild', () => {
+  recordSessionUsage(SESSION, { model: 'm', promptTokens: 9000, cacheReadTokens: 1000 });
+  markContextUnknown(SESSION, 'usage-gap');
+  recordSessionUsage(SESSION, { model: 'm', promptTokens: 10000, cacheReadTokens: 0 });
+  const history = getSessionUsage(SESSION).recentRequests;
+  const rates = () => ({ promptPerMTok: 1, completionPerMTok: 2, cacheReadPerMTok: 0.1 });
+  expect(history.map(entry => entry.kind)).toEqual(['request', 'usage-gap', 'request']);
+  expect(findCacheWaste(history, rates).totals.missCount).toBe(0);
+  expect(findCacheWaste(history.filter(entry => entry.kind === 'request'), rates).totals.missCount).toBe(1);
+});
 
 describe("bucketing", () => {
   it("keeps each model's tokens under its own bucket", () => {
@@ -84,6 +97,13 @@ describe("bucketing", () => {
 });
 
 describe("estimateSessionCost", () => {
+  it('does not turn total-only reports into a supported zero bill, but preserves published free rates', () => {
+    recordSessionUsage(SESSION, { model: 'm', totalTokens: 42 }, { promptMeasured: false });
+    expect(estimateSessionCost(getSessionUsage(SESSION), () => ({ promptPerMTok: 1, completionPerMTok: 2 })).zeroCostSupported).toBe(false);
+    resetSessionUsage(SESSION);
+    recordSessionUsage(SESSION, { model: 'm', promptTokens: 42 });
+    expect(estimateSessionCost(getSessionUsage(SESSION), () => ({ promptPerMTok: 0, completionPerMTok: 0 })).zeroCostSupported).toBe(true);
+  });
   it("prices each model at its own rate", () => {
     // One million prompt tokens at $1/M and one at $10/M is $11, not $20 and not $2.
     recordSessionUsage(SESSION, { promptTokens: 1_000_000, completionTokens: 0, model: "cheap" });

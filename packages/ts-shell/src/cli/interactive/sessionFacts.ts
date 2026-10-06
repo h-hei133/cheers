@@ -13,8 +13,8 @@ import { getSessionTodos } from "../../core/commands/todoCommandRuntime.js";
  *
  * The band must never invent a value: every field either reflects real runtime
  * state or is omitted. Token usage comes from recorded provider usage, so the
- * context gauge stays absent until a real request has been accounted for rather
- * than showing a placeholder zero.
+ * used amount stays unknown until a provider measurement is available. The
+ * window is resolved independently, with its configuration or catalog source.
  */
 
 /** Home-relative path, so a long project root still fits the band. */
@@ -58,9 +58,10 @@ export function readStatusFacts(
   // tokens at more than one price, and the status band must not show the newest
   // rate applied to all of them. Resolving against the active provider would do
   // exactly that.
-  const { cost } = estimateSessionCost(usage, (provider, model) =>
+  const { cost, everyRatePublished, zeroCostSupported } = estimateSessionCost(usage, (provider, model) =>
     resolveModelCost(catalog, provider, model),
   );
+  const window = resolveContextWindow({ catalog, provider: active.provider, model: active.model, configured: config.contextWindow });
   return {
     model: active.model ?? active.provider,
     provider: active.provider,
@@ -73,24 +74,16 @@ export function readStatusFacts(
     queued: live.queued,
     peers: live.peers,
     openTodos: getSessionTodos(context.session.id).filter((todo) => todo.status !== "done").length,
-    // Absent until a real request has been accounted for: a zeroed gauge is a
-    // fabricated fact, not a neutral one.
-    ...(usage.lastPromptTokens > 0
-      ? {
-          contextUsed: usage.lastPromptTokens,
-          // The gauge's denominator has to be the same window compaction uses,
-          // or the percentage it shows describes a limit nothing enforces.
-          contextWindow: resolveContextWindow({
-            catalog,
-            provider: active.provider,
-            model: active.model,
-            configured: config.contextWindow,
-          }).window,
-        }
-      : {}),
+    // The denominator is the same resolution compaction uses, even when its
+    // numerator is unknown after startup, restoration, or context replacement.
+    contextWindow: window.window,
+    contextWindowSource: window.source,
+    contextWarning: window.warning,
+    ...(usage.lastPromptTokens !== undefined ? { contextUsed: usage.lastPromptTokens } : {}),
     ...(totalTokens(usage) > 0 ? { sessionTokens: totalTokens(usage) } : {}),
     ...(usage.turnsCount > 0 ? { turns: usage.turnsCount } : {}),
-    ...(cost > 0 ? { costUsd: cost } : {}),
+    ...(cost > 0 || zeroCostSupported
+      ? { costUsd: cost, costRates: everyRatePublished ? 'catalog' : 'assumed' } as const : {}),
   };
 }
 

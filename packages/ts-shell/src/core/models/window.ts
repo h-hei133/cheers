@@ -119,10 +119,8 @@ export function resolveModelCost(
     ?.models.find((candidate) => candidate.id === model)?.cost
   if (direct !== undefined) return direct
 
-  const claims = catalog
-    .map((candidate) => candidate.models.find((entry) => entry.id === model)?.cost)
-    .filter((cost): cost is ModelCostRates => cost !== undefined)
-  return claims.length === 1 ? claims[0] : undefined
+  const claims = catalog.flatMap(candidate => candidate.models.filter(entry => entry.id === model))
+  return claims.length === 1 ? claims[0]?.cost : undefined
 }
 
 /**

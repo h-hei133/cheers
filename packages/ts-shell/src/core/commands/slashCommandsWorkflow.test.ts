@@ -156,7 +156,7 @@ describe("Phase 5 High-Level Workflow Commands Subsystem", () => {
       // The old version fell back to a literal 2,500-token footprint and split it
       // 35/1200/remainder under a heading that called the numbers measured.
       expect(result.kind).toBe("local");
-      expect(result.output).toContain("No request has been sent in this session yet");
+      expect(result.output).toContain("Current prompt usage is unknown");
       expect(result.output).toContain("64,000 tokens");
       expect(result.output).toMatch(/Current tool schema estimate: ~\d/);
     });

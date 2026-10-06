@@ -24,7 +24,7 @@ describe("durable usage", () => {
     expect(Object.keys(resumed.byModel)).toEqual(["first/org/model", "second/org/model"]);
     expect(totalTokens(resumed)).toBe(310);
     expect(resumed.toolCallsCount).toBe(2);
-    expect(resumed.lastPromptTokens).toBe(0);
+    expect(resumed.lastPromptTokens).toBeUndefined();
     expect(resumed.lastPromptMessageCount).toBe(0);
     expect(resumed.recentRequests).toEqual([]);
     expect(saved).not.toHaveProperty("lastPromptTokens");

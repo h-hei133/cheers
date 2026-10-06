@@ -87,10 +87,14 @@ export function totalTokens(telemetry: SessionUsageTelemetry): number {
 export function estimateSessionCost(
   telemetry: SessionUsageTelemetry,
   rateFor: (provider: string, model: string) => ModelCostRates | undefined,
-): { readonly cost: number; readonly everyRatePublished: boolean } {
+): { readonly cost: number; readonly everyRatePublished: boolean; readonly zeroCostSupported: boolean } {
   let cost = 0;
   let everyRatePublished = true;
+  let allocated = true;
+  let recorded = 0;
   for (const [key, bucket] of Object.entries(telemetry.byModel)) {
+    recorded += bucket.totalTokens;
+    allocated &&= bucket.totalTokens === bucket.promptTokens + bucket.completionTokens + bucket.cacheReadTokens + bucket.cacheWriteTokens;
     const { provider, model } = splitBucketKey(key);
     const published = rateFor(provider, model);
     // A published rate that omits the cache prices is not a published rate for a
@@ -102,7 +106,9 @@ export function estimateSessionCost(
     if (!published || cacheUnpriced) everyRatePublished = false;
     cost += estimateUsageCost(bucket, published ?? USAGE_RATES);
   }
-  return { cost, everyRatePublished };
+  // A total-only report supplies no category prices. Zero is supportable only
+  // when actual recorded tokens have a complete allocation and published rates.
+  return { cost, everyRatePublished, zeroCostSupported: cost === 0 && recorded > 0 && allocated && everyRatePublished };
 }
 
 
@@ -126,7 +132,7 @@ export function recordSessionUsage(
     cacheReadTokens?: number;
     cacheWriteTokens?: number;
   },
-  options: { readonly affectsContext?: boolean } = {},
+  options: { readonly affectsContext?: boolean; readonly promptMeasured?: boolean } = {},
 ): void {
   const existing = sessionTelemetries.get(sessionId) ?? emptyTelemetry();
   // A report that does not name a model belongs to whichever one last answered:
@@ -139,6 +145,7 @@ export function recordSessionUsage(
   const pTokens = usage.promptTokens ?? 0;
   const cTokens = usage.completionTokens ?? 0;
   const promptTotal = pTokens + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0);
+  const promptMeasured = options.promptMeasured ?? (usage.promptTokens !== undefined && Number.isFinite(usage.promptTokens) && usage.promptTokens >= 0);
   const tTokens = usage.totalTokens ?? promptTotal + cTokens;
 
   // Accumulated into the bucket for the model that answered this request, so a
@@ -166,9 +173,9 @@ export function recordSessionUsage(
 
   // Session-level fields that are not per-model: the context gauge describes the
   // conversation, not the model that last read it.
-  if (options.affectsContext !== false && promptTotal > 0) {
-    existing.lastPromptTokens = promptTotal;
-    existing.lastPromptMessageCount = usage.promptMessageCount ?? 0;
+  if (options.affectsContext !== false) {
+    existing.lastPromptTokens = promptMeasured ? promptTotal : undefined;
+    existing.lastPromptMessageCount = promptMeasured ? usage.promptMessageCount ?? 0 : 0;
   }
   existing.turnsCount += 1;
   existing.toolCallsCount += usage.toolCallsCount ?? 0;
@@ -180,9 +187,9 @@ export function recordSessionUsage(
   const cacheRead = usage.cacheReadTokens ?? 0;
   const cacheWrite = usage.cacheWriteTokens ?? 0;
   const previous = existing.recentRequests.at(-1);
-  if (options.affectsContext !== false && promptTotal > 0) {
+  if (options.affectsContext !== false) {
     pushHistory(existing, {
-      promptTokens: promptTotal,
+      promptTokens: promptMeasured ? promptTotal : 0,
       cacheReadTokens: cacheRead,
       cacheWriteTokens: cacheWrite,
       bucketKey: key,
@@ -190,7 +197,7 @@ export function recordSessionUsage(
       // Sticky: once any request reported cache activity, a later request that
       // reports none is a total miss rather than a provider that cannot cache.
       reportedCache: (previous?.reportedCache ?? false) || cacheRead + cacheWrite > 0,
-      kind: "request",
+      kind: promptMeasured ? "request" : "usage-gap",
     });
   }
 
@@ -210,7 +217,7 @@ function emptyTelemetry(): SessionUsageTelemetry {
     // Null-prototyped: bucket keys come from model ids, and an inherited property
     // would be mistaken for a bucket.
     byModel: Object.create(null) as Record<string, ModelUsageBucket>,
-    lastPromptTokens: 0,
+    lastPromptTokens: undefined,
     lastPromptMessageCount: 0,
     turnsCount: 0,
     toolCallsCount: 0,
@@ -224,26 +231,25 @@ export function getSessionUsage(sessionId: string): SessionUsageTelemetry {
   return sessionTelemetries.get(sessionId) ?? emptyTelemetry();
 }
 
-/**
- * Note that the conversation was rebuilt.
- *
- * Two things follow from that, and they are the same fact seen twice. The live
- * context footprint goes absent, because the last request's prompt size
- * describes a conversation that no longer exists. And the next request starts a
- * new segment for cache accounting, because its prompt shares nothing with the
- * one before it — comparing them would count the whole rebuilt prompt as
- * something that should have been read from cache.
- *
- * One function rather than two because every caller means both: a place that
- * rebuilds the context has to say so to everything that was reasoning about the
- * old one, and a caller that updated only half of that would be wrong in a way
- * nothing would report.
- */
-export function markContextUnknown(sessionId: string): void {
+/** An accepted request has no current measurement until its usage arrives. */
+export function clearContextUsage(sessionId: string): void {
   const existing = sessionTelemetries.get(sessionId);
   if (!existing) return;
-  existing.lastPromptTokens = 0;
+  existing.lastPromptTokens = undefined;
   existing.lastPromptMessageCount = 0;
+}
+
+/**
+ * Note that context was rebuilt or an accepted request lacked prompt usage.
+ *
+ * Both invalidate the live measurement and break cache comparison continuity.
+ * The history retains the reason; missing usage never claims that compaction
+ * happened, and neither event adds measured tokens or requests to the totals.
+ */
+export function markContextUnknown(sessionId: string, kind: 'context-reset' | 'usage-gap' = 'context-reset'): void {
+  const existing = sessionTelemetries.get(sessionId);
+  if (!existing) return;
+  clearContextUsage(sessionId);
   pushHistory(existing, {
     promptTokens: 0,
     cacheReadTokens: 0,
@@ -253,7 +259,7 @@ export function markContextUnknown(sessionId: string): void {
     // Carried forward rather than set: a rebuild says nothing about whether the
     // provider caches, so it must not erase what was already learned about that.
     reportedCache: existing.recentRequests.at(-1)?.reportedCache ?? false,
-    kind: "context-reset",
+    kind,
   });
 }
 

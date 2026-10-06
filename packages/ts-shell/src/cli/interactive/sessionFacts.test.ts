@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import os from "node:os";
 import { activeModelName, readStatusFacts, shortenPath } from "./sessionFacts.js";
-import { recordSessionUsage, resetSessionUsage } from "../../observability/usageTelemetry.js";
+import { recordSessionUsage, resetSessionUsage, markContextUnknown, getSessionUsage, restoreSessionUsage } from "../../observability/usageTelemetry.js";
+import { renderStatusItem } from '../../presentation/tui/chrome/items.js';
+import { stripAnsi } from '../../presentation/tui/text/ansi.js';
+import { runContextCommand } from '../../core/commands/contextCommandRuntime.js';
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { RuntimeConfig } from "../../config/runtimeConfig.js";
 import { withConfiguration } from "../../test-utils/configuration.js";
@@ -43,14 +46,41 @@ describe("model name", () => {
 });
 
 describe("status facts", () => {
-  it("omits the context gauge until real usage is recorded", () => {
+  it("keeps the configured window visible while fresh usage remains unknown", () => {
     // Reporting 0% before any request has been accounted for is a fabricated fact.
     resetSessionUsage("fresh");
     const state = readStatusFacts(context("fresh"));
     expect(state.contextUsed).toBeUndefined();
-    expect(state.contextWindow).toBeUndefined();
+    expect(state.contextWindow).toBe(200_000);
+    expect(state.contextWindowSource).toBe('config');
+    expect(stripAnsi(renderStatusItem('context', state)!)).toBe('?/200k config');
     expect(state.costUsd).toBeUndefined();
     expect(state.sessionTokens).toBeUndefined();
+  });
+
+  it('retains totals across context reset and resume without reviving the old prompt size', async () => {
+    const id = 'status-reset'; resetSessionUsage(id);
+    const runtime = context(id, { contextWindow: undefined });
+    recordSessionUsage(id, { promptTokens: 9000, completionTokens: 100 });
+    const totals = structuredClone(getSessionUsage(id)); markContextUnknown(id);
+    for (const resumed of [false, true]) {
+      if (resumed) { resetSessionUsage(id); restoreSessionUsage(id, totals); }
+      const facts = readStatusFacts(runtime);
+      expect(facts.contextUsed).toBeUndefined(); expect(facts.contextWindowSource).toBe('default');
+      expect(facts.contextWarning).toContain('assuming 64000'); expect(facts.sessionTokens).toBe(9100);
+      expect(stripAnsi(renderStatusItem('context', facts)!)).toBe('?/64k assumed');
+      expect(stripAnsi(renderStatusItem('cost', facts)!)).toContain('est $');
+      expect(facts.costRates).toBe('assumed');
+      const report = await runContextCommand([], { cwd: runtime.projectRoot, sessionId: id, runtimeConfig: runtime.runtimeConfig,
+        readConfiguration: () => runtime.configuration.current, getToolPool: async () => new Map() });
+      expect(report.output).toContain('Current prompt usage is unknown');
+      expect(report.output).toContain('(assumed default)'); expect(report.output).toContain('Warning:');
+      expect(report.output).not.toContain('No request has been sent');
+    }
+    recordSessionUsage(id, { promptTokens: 0, completionTokens: 1 });
+    expect(readStatusFacts(runtime).contextUsed).toBe(0);
+    expect(stripAnsi(renderStatusItem('context', readStatusFacts(runtime))!)).toBe('0/64k assumed 0%');
+    resetSessionUsage(id);
   });
 
   it("uses the latest request's prompt size as the live footprint", () => {

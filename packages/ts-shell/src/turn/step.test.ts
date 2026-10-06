@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createStepFunction, emptyAnswerExplanation, CONTEXT_OVERFLOW_PREFIX, isContextOverflow } from "./step.js";
-import { getSessionUsage, resetSessionUsage } from "../observability/usageTelemetry.js";
+import { getSessionUsage, resetSessionUsage, recordSessionUsage, totalTokens } from "../observability/usageTelemetry.js";
 import { writeProjectState } from "../core/state/projectState.js";
 import { declareEndpoint } from "../provider/endpoints/index.js";
 import { crc32 } from "../provider/aws/eventStream.js";
@@ -36,6 +36,28 @@ function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {
 }
 
 describe("createStepFunction", () => {
+  it.each([
+    { usage: undefined, expected: undefined },
+    { usage: null, expected: undefined },
+    { usage: {}, expected: undefined },
+    { usage: { completion_tokens: 3 }, expected: undefined },
+    { usage: { prompt_tokens: 0, completion_tokens: 3 }, expected: 0 },
+  ])('replaces the previous context measurement with the current usage presence: $expected', async ({ usage, expected }) => {
+    const id = 'status-step'; resetSessionUsage(id);
+    recordSessionUsage(id, { promptTokens: 1000, completionTokens: 10, model: 'm' });
+    const step = createStepFunction({ ...request, sessionId: id, fetchImpl: async () =>
+      jsonResponse({ choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }], usage }),
+    });
+    expect(await step([{ role: 'user', content: 'next' }], undefined, {}, { allowTools: false })).toMatchObject({ stopReason: 'stop', text: 'ok' });
+    const telemetry = getSessionUsage(id);
+    expect(telemetry.lastPromptTokens).toBe(expected);
+    expect(totalTokens(telemetry)).toBe(usage?.completion_tokens ? 1013 : 1010);
+    expect(telemetry.turnsCount).toBe(usage?.completion_tokens ? 2 : 1);
+    expect(telemetry.recentRequests.filter(entry => entry.kind === 'context-reset')).toHaveLength(0);
+    expect(telemetry.recentRequests.at(-1)?.kind).toBe(expected === undefined ? 'usage-gap' : 'request');
+    resetSessionUsage(id);
+  });
+
   it('rejects output above the model ceiling before sending and preserves an admissible explicit cap', async () => {
     const sent: Record<string, unknown>[] = [];
     const create = (maxOutputTokens: number) => createStepFunction({ ...request, maxOutputTokens,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { endpointShape } from "../endpoints/index.js";
 import { crc32 } from "../aws/eventStream.js";
-import { usageFromProvider } from "./usage.js";
+import { hasUsage, usageFromProvider } from "./usage.js";
 
 function binary(name: string, payload: unknown): Uint8Array {
   const encoder = new TextEncoder();
@@ -39,6 +39,10 @@ const cases = [
 ];
 
 describe.each(cases)("$endpoint usage", ({ endpoint, body, events, expected }) => {
+  it('does not turn an empty wire usage object into reported zero', () => {
+    const empty = { ...body, usage: {}, usageMetadata: {} };
+    expect(hasUsage(endpointShape(endpoint).readBody(empty).usage)).toBe(false);
+  });
   it("counts single-response billing categories without double charging cache", () => {
     expect(usageFromProvider(endpointShape(endpoint).readBody(body).usage!)).toEqual(expected);
   });

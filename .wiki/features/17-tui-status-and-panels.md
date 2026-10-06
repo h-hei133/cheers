@@ -3,9 +3,9 @@ title: "17：状态栏常显与面板化重设计研究"
 category: article
 sources: [user-experience-report-2026-10-05, user-coloring-request-2026-10-05, current-source-28ff98ce, historical-band-probe-2026-10-05, pi, oh-my-pi, codex, 14-user-experience-research]
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-07
 tags: [research, tui, status-band, panels, slash-commands, pickers, coloring]
-summary: "Phase 19 待实施设计：正常会话状态持续可见且保留窗口/用量来源；共享命令投影驱动 help、picker 和报告；结构化 spans/columns 在 presentation 上色，文本/JSON/存储无 ANSI；纠正首帧归因、命令计数、TERM=dumb、context 阈值与算例。历史 F17 探针未在本轮重跑。"
+summary: "Phase 19 设计与进展：UI-05 已接通独立窗口来源、未知/已报告零用量和费用估算；主题/形态预览已交付。结构化报告、只读面板及逐命令迁移继续；历史首帧与终端归因保留边界。"
 confidence: mixed
 ---
 
@@ -13,7 +13,7 @@ confidence: mixed
 
 ## 1. 范围与口径
 
-用户要求状态信息持续可见，slash 命令拥有可浏览的面板、清晰结构与文本着色。本文将这些要求转成 **Phase 19 待实施方案**。本次只审查修正文档；未修改产品源码、测试、配置或 package scripts，未运行动态 PTY。
+用户要求状态信息持续可见，slash 命令拥有可浏览的面板、清晰结构与文本着色。本文将这些要求转成 **Phase 19 实施方案**。2026-10-05 的研究仅审查文档；2026-10-07 已交付状态事实及主题/形态预览，见 §7 和主裁决进展。其余报告与面板迁移继续。
 
 基线为 `feat/phase-18` @ `28ff98ce`。§5 保留早先 F17 探针的历史记录，不把它们当作本次重跑证据；尤其撤回 F17-05 对 `TERM=dumb` 的错误归因。
 
@@ -39,9 +39,9 @@ confidence: mixed
 
 [firstFrame.test.ts](../../packages/ts-shell/src/cli/interactive/firstFrame.test.ts#L135) 中模型/分支字符串断言可能同时命中欢迎块与状态带，不能独自证明 band 位置；后续验收应按行或布局角色断言。
 
-### 2.3 当前事实门闸
+### 2.3 研究基线的事实门闸
 
-[readStatusFacts](../../packages/ts-shell/src/cli/interactive/sessionFacts.ts#L50) 的相关逻辑为：
+研究基线的 [readStatusFacts](../../packages/ts-shell/src/cli/interactive/sessionFacts.ts) 曾使用以下门闸；UI-05 已按 §7 替换，代码片段仅说明历史问题：
 
 ```ts
 ...(usage.lastPromptTokens > 0
@@ -192,7 +192,7 @@ canonical/alias 先收敛，否则相同命令不同拼写会进入不同面板�
 3. 接入主题/形态预览、只读报告 host、help 填入 composer；逐命令迁移 context/cost/tools/hotkey/diagnose/sidebar/metrics。
 4. 语义设置按 Apply 生效；恢复和其他写操作面板接各 owner 的授权/执行/证据链。大型功能全部在 Phase 19 分批交付，不因面板工作量而删减。
 
-D1–D6、结构化 spans/columns、只读报告生命周期、help 两步提交、纯视觉预览、语义设置 Apply 均为本次技术决定。所有代码仍待实施；不能把这份文档视作功能完成。
+D1–D6、结构化 spans/columns、只读报告生命周期、help 两步提交、纯视觉预览、语义设置 Apply 均为技术决定。D1–D6 主链和主题/形态预览进展见 §7；不能把局部交付视作全部面板功能完成。
 
 ## 5. 历史验证记录与撤回项
 
@@ -319,3 +319,13 @@ bridge 不在 runtime 的 output 生成阶段包色，也不把渲染字符串�
 | 存储与重放 | output/session/export 无 ANSI；theme revision 后报告重渲染；旧文本兼容 |
 
 本轮没有执行这些验证；before/after 与算例为静态设计。后续测试应断言纯文本模型与角色结构，不能只 stripAnsi 后看起来相同而漏掉持久化污染或错误角色。
+
+
+## 7. UI-05 实施进展（2026-10-07）
+
+- 状态 producer 始终从已接受配置/目录和实际 provider 解析窗口；未知用量显示 `?/64k`，配置与 fallback 分别标 `config`/`assumed`，配置警告提供 `! /context`。详情保留来源与 warning，已报告比例继续使用 50/70/90 阈值，默认状态项不变。
+- 当前 prompt 计量以 `undefined` 表示未知，显式报告零保留为零。请求响应被接受后先清除旧计量；缺失、空、null 或仅输出计量不伪造 prompt 零。压缩/恢复后累计 token 与费用保留，当前 prompt 等待新报告；后台请求不覆盖前台 gauge。缺失计量单独断开 cache 历史比较，不伪称发生压缩。
+- 费用显示 `est`，无完整公开费率时标 `assumed rates`，仅描述已记录用量的估算。零费用需要实际 token、完整分类和公开适用费率；total-only 报告不显示伪零。不同 provider 的同名模型不借用另一模型价格。
+- regular/fullscreen 实际构建 CLI 均通过 fresh → 正数 → 缺失 → 零 → 压缩未知 → 新计量 → session overlay 恢复 → 退出并恢复同一 session；每场 4 次前台请求，累计费用保留，配置原文不变，进程退出 0。此前探针错误来自创建 session 的参数、输出预算和面板标题假设，已修正测试夹具，没有以改产品绕过。
+- 最终修复后定向 228 项、独立架构组合 255 项通过，Node 20.3 构建通过；六组反转均检出回归，恢复后 164 项通过。独立代码 APPROVE、架构 CLEAR，静态门禁与脚本测试通过；完整证据见 [主裁决 §8.91](phase-19-decisions.md#891-ui-05状态窗口用量与费用的事实边界)。
+- UI-06 的结构化报告、只读 host、搜索/分页及逐命令迁移继续；Windows 像素和真实 IME 仍未验证，不据隔离 VT 结果宣布完整 UI 或 Phase 19 验收完成。

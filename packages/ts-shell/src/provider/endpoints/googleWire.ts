@@ -496,9 +496,10 @@ export function googleRefreshBody(body: Record<string, unknown>, model: { readon
 function googleUsage(usage: Chunk["usageMetadata"]): CompletedBody["usage"] {
   if (!usage) return undefined;
   return {
-    prompt_tokens: usage.promptTokenCount ?? 0,
-    completion_tokens: (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0),
-    prompt_tokens_details: { cached_tokens: usage.cachedContentTokenCount ?? 0 },
+    prompt_tokens: usage.promptTokenCount,
+    completion_tokens: usage.candidatesTokenCount === undefined && usage.thoughtsTokenCount === undefined
+      ? undefined : (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0),
+    prompt_tokens_details: { cached_tokens: usage.cachedContentTokenCount },
     ...(usage.totalTokenCount !== undefined ? { total_tokens: usage.totalTokenCount } : {}),
   };
 }

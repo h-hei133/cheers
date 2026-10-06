@@ -6306,3 +6306,6 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-07] feat | Phase 19 UI-04 落实 dark 精确配色、54-token 集合、显式终端默认与嵌套样式、旧主题角色继承及真实 status/code fallback 消费。442 项、Node 20.3 构建、4 组反转和五场实际 CLI 颜色能力/主题重绘验证通过，独立 APPROVE/CLEAR；见 features/phase-19-decisions.md §8.89。主题 Settings 预览与完整阶段验收继续。
 
 ## [2026-10-07] feat | Phase 19 UI-04 接通 Settings 主题真实预览、暂存/Apply、失败保留与快照取消，代际撤销保护同名新确认和旧回调，auto 外观与 follower 协同。审查修复退出残留；247 项组合、修复后 67 项、Node 20.3 构建、4 组反转及两模式实际 CLI 零写/保存/恢复通过，独立 APPROVE/CLEAR，见 features/phase-19-decisions.md §8.90。上一 palette CI 已成功，UI-05 与完整阶段目标继续。
+
+
+## [2026-10-07] fix | Phase 19 UI-05 窗口来源独立于用量，保留未知/显式零与压缩恢复边界，费用标估算并拒绝 total-only 伪零和跨 provider 借价。最终修复后 228 项、独立 255 项、Node 20.3 构建、六组反转及恢复后 164 项通过；两模式实际 CLI 完成缺失/零/压缩/overlay/同 session 重启验证，独立 APPROVE/CLEAR，见 features/phase-19-decisions.md §8.91。UI-06 与完整阶段目标继续。

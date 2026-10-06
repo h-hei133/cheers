@@ -1,5 +1,6 @@
 import { defaultTheme } from "../../theme/theme.js";
 import { formatTokens } from "../transcript/live.js";
+import type { WindowSource } from '../../../core/models/window.js';
 
 /**
  * Status item vocabulary.
@@ -35,8 +36,12 @@ export interface StatusFacts {
   readonly directory?: string;
   readonly contextUsed?: number;
   readonly contextWindow?: number;
+  readonly contextWindowSource?: WindowSource;
+  readonly contextWarning?: string;
   readonly sessionTokens?: number;
+  /** Estimate for recorded usage, never a claim of complete billing. */
   readonly costUsd?: number;
+  readonly costRates?: 'catalog' | 'assumed';
   readonly turns?: number;
   readonly agentMode?: string;
   /** How much the session may do before it has to ask. */
@@ -65,9 +70,9 @@ export const STATUS_ITEMS: readonly StatusItem[] = [
   { id: "permission-scope", label: "permissions", describe: "how much a turn may do without asking" },
   { id: "branch", label: "branch", describe: "current git branch" },
   { id: "directory", label: "directory", describe: "project root, home-relative" },
-  { id: "context", label: "context", describe: "context window used, as tokens and percent" },
-  { id: "session-tokens", label: "tokens", describe: "total tokens this session" },
-  { id: "cost", label: "cost", describe: "estimated session spend" },
+  { id: "context", label: "context", describe: "last reported prompt and window; /context explains sources and warnings" },
+  { id: "session-tokens", label: "tokens", describe: "recorded tokens this session" },
+  { id: "cost", label: "cost", describe: "estimated spend from recorded usage; /cost explains rates" },
   { id: "turns", label: "turns", describe: "turns completed this session" },
   { id: "todos", label: "todos", describe: "open todo entries" },
   { id: "worktree", label: "worktree", describe: "whether the working tree is dirty" },
@@ -134,7 +139,7 @@ export function renderStatusItem(id: StatusItemId, facts: StatusFacts): string |
     case "session-tokens":
       return facts.sessionTokens ? defaultTheme.dim(`${formatTokens(facts.sessionTokens)} tok`) : undefined;
     case "cost":
-      return facts.costUsd && facts.costUsd > 0 ? defaultTheme.dim(`$${facts.costUsd.toFixed(4)}`) : undefined;
+      return facts.costUsd !== undefined ? defaultTheme.dim(`est $${facts.costUsd.toFixed(4)}${facts.costRates === 'assumed' ? ' assumed rates' : ''}`) : undefined;
     case "turns":
       return facts.turns ? defaultTheme.dim(`${facts.turns} turn${facts.turns === 1 ? "" : "s"}`) : undefined;
     case "todos":
@@ -146,9 +151,13 @@ export function renderStatusItem(id: StatusItemId, facts: StatusFacts): string |
 
 /** Context gauge, coloured by how close the window is to full. */
 function renderContext(facts: StatusFacts): string | undefined {
-  if (facts.contextUsed === undefined || !facts.contextWindow) return undefined;
+  if (!facts.contextWindow) return undefined;
+  const source = facts.contextWindowSource === 'default' ? ' assumed' : facts.contextWindowSource === 'config' ? ' config' : '';
+  const warning = facts.contextWarning && facts.contextWindowSource !== 'default' ? ' ! /context' : '';
+  const window = `${formatTokens(facts.contextWindow)}${source}${warning}`;
+  if (facts.contextUsed === undefined) return defaultTheme.fg('statusLineContext', `?/${window}`);
   const percent = Math.min(100, Math.round((facts.contextUsed / facts.contextWindow) * 100));
-  const text = `${formatTokens(facts.contextUsed)}/${formatTokens(facts.contextWindow)} ${percent}%`;
+  const text = `${formatTokens(facts.contextUsed)}/${window} ${percent}%`;
   const tier = CONTEXT_TIERS.find((entry) => percent >= entry.at);
   return defaultTheme.fg(tier?.token ?? "statusLineContext", text);
 }

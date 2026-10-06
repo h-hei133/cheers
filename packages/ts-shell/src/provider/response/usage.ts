@@ -1,5 +1,12 @@
 import type { ProviderUsage } from "../../turn/completion.js";
 
+/** Raw presence must be checked before missing billing categories become zero. */
+export function hasUsage(usage: ProviderUsage | undefined): usage is ProviderUsage {
+  return usage != null && [usage.prompt_tokens, usage.completion_tokens, usage.total_tokens,
+    usage.cache_read_input_tokens, usage.cache_creation_input_tokens, usage.prompt_tokens_details?.cached_tokens]
+    .some(value => typeof value === 'number' && Number.isFinite(value) && value >= 0);
+}
+
 /** Exclusive billing categories shared by foreground and background requests. */
 export function usageFromProvider(usage: ProviderUsage) {
   const cacheReadTokens = count(usage.cache_read_input_tokens ?? usage.prompt_tokens_details?.cached_tokens);

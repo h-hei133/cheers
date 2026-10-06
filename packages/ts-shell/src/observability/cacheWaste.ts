@@ -121,15 +121,9 @@ export function findCacheWaste(
   let previous: Comparable | undefined;
 
   for (const entry of history) {
-    if (entry.kind === "context-reset") {
-      // The conversation was rebuilt, so this request's prompt shares nothing
-      // with the last one. Comparing them would count the entire rebuilt prompt
-      // as something that should have been cached.
-      //
-      // A reset carries no tokens, and `comparable` below would reject it for
-      // that alone — the chain would break either way. This check is the one that
-      // says why: the two cases are not the same thing, even where they happen to
-      // have the same effect today.
+    if (entry.kind !== "request") {
+      // A rebuild or unmeasured request breaks continuity. Neither can establish
+      // what the next request should have read from cache.
       previous = undefined;
       continue;
     }

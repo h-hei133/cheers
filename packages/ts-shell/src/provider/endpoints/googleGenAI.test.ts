@@ -216,6 +216,15 @@ describe("the request body", () => {
   });
 
 describe("reading the answer", () => {
+  it.each([undefined, 0])('preserves prompt count presence: %s', async promptTokenCount => {
+    const generator = endpointShape('google-generative-ai').readStream(sseStream({
+      candidates: [{ content: { parts: [{ text: 'ok' }] }, finishReason: 'STOP' }],
+      usageMetadata: { promptTokenCount, candidatesTokenCount: 2 },
+    }));
+    let step = await generator.next(); while (!step.done) step = await generator.next();
+    expect((step.value as { usage?: { prompt_tokens?: number } }).usage?.prompt_tokens).toBe(promptTokenCount);
+  });
+
   it("joins the text of the chunks", async () => {
     const result = await readAll(
       sseStream(

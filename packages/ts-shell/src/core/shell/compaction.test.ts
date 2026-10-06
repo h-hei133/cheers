@@ -58,7 +58,7 @@ describe("session compaction", () => {
     expect(requests).toHaveLength(1);
     expect(requests[0]!.messages).toHaveLength(8);
     expect(target.entries).toEqual([{ summary: "checkpoint summary", keptMessages: 3 }]);
-    expect(getSessionUsage("sess_compact").lastPromptTokens).toBe(0);
+    expect(getSessionUsage("sess_compact").lastPromptTokens).toBeUndefined();
     // Summed across the per-model buckets: the session total is derived, not stored.
     expect(totalTokens(getSessionUsage("sess_compact"))).toBe(9_100);
   });

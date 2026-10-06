@@ -165,7 +165,7 @@ function buildCompactionWiring(input: {
       // when no request has reported usage yet.
       measureContextTokens: (messages) => {
         const usage = getSessionUsage(input.sessionId);
-        if (usage.lastPromptTokens <= 0) return undefined;
+        if (usage.lastPromptTokens === undefined) return undefined;
         return usage.lastPromptTokens + estimateTokens(messages.slice(usage.lastPromptMessageCount));
       },
     },
