@@ -1376,3 +1376,15 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Node 20.3 定向 5 文件/53 项及构建通过；2 组反转分别撤回目录顺序和公共 HOME 解析，都触发对应行为断言，隔离源码逐字节/SHA-256 恢复，恢复后 16 项通过。代码独立 APPROVE、架构 CLEAR，后者独立检查普通及混合图均零环、模块 14 个 function-like names。五项静态 gate、43 项脚本测试和 diff 检查通过；NormProof 阻断项为零，四项函数数量及 120 项文档来源既有 advisory 保留。
 - regular/fullscreen 构建 CLI 均验证当前主题颜色、编辑后 follower 重载、历史文件编辑不覆盖当前主题、无效当前文件 reload 拒绝并保留调色板、删除后 reload 切到历史颜色；两场均使用空 USERPROFILE 与隔离 HOME，退出 0，配置原文不变，没有发起模型操作。首轮 regular 探针只检查最后一段同名命令回显，遗漏了随后历史重绘前已经输出的成功结果；改为匹配本次语义结果后通过。该重绘序列仍作为 UI-01 待查案例，不据原始颜色字节宣称整个终端画面连续性已验证。
 - 此项关闭前述“主题历史优先级”缺口。完整 UI-04 的调色板/默认色/角色、UI-01 的重绘与 marker、其他资源策略及 Phase 19 全部交付仍继续。上一 6e53eb4e 的 Architecture Watch 37494932214 已成功，CI 37494932207 在记录时仍运行；新提交的远端状态另按 SHA 核实。
+
+
+### 8.86 UI-01：regular 内部 marker 消费与相对 caret 账本
+
+- [主屏 painter](../../packages/ts-shell/src/presentation/tui/render/mainScreen.ts)复用共享行准备与帧控制：移除全部内部 marker、裁剪宽度、关闭样式和 hyperlink，绘制期间隐藏光标并禁用 autowrap，结束后恢复 autowrap。仅从可见内容与高度裁剪后的 chrome 定位 caret，通过原相对移动账本保存实际光标行，后续追加、重绘和外部程序交接沿用该行。没有把全屏绝对寻址移入 regular。
+- 定向比较本地参考的可见 viewport marker 查找与视觉列宽计算，保留本项目终端 scrollback owner。独立代码审查发现首版每次按键解析全部历史行，万行样式文本无 I/O 探针约 236 ms/帧；修正为仅准备新增与可见行后，同一独立探针约 0.61 ms/帧（旧 HEAD 约 0.15 ms），性能阻断解除。这些数字不代表完整 UI/终端端到端延迟。
+- 组合 8 文件/234 项通过；最终性能修正后独立重跑两份 renderer 套件 67 项通过。3 组反转覆盖 marker 剥除、caret 定位和最终行账本，全部触发行为断言；隔离源码副本逐字节/SHA-256 恢复，恢复后 19 项通过。原有屏幕替身不完整模拟 autowrap/reflow，因此另用实际 CLI VT 屏幕验证，未把字节断言当作实机像素证据。
+- 最终 Node 20.3 构建 CLI 的 regular/fullscreen 均通过普通输入、光标左移、中间粘贴、分片中文粘贴、宽字素位置、100×30→60×12→100×30、满行末列和历史追加后的草稿定位，终端无内部 marker。两种模式的主题重绘后成功 reload 结果仍在 VT 屏幕，继续输入 caret 正确，补足 §8.85 原始输出序列的屏幕观察。overlay/恢复与外部输出交接由 renderer 测试覆盖，没有声称已运行外部编辑器实机矩阵。
+- 首轮 fullscreen 完成 caret 检查及终端退出序列后，进程等待超过 15 秒；未确认原因。随后相同流程和满行补充流程各次均约 0.09 秒退出、状态 0，未为该偶发超时修改产品退出路径。探针均为隔离 HOME、synthetic provider，未访问真实 provider 配置。
+- 独立代码最终 APPROVE、架构 CLEAR；代码独立运行基准与 renderer 套件，架构独立验证普通/混合依赖图及函数数量。最终构建、五项静态 gate、43 项门禁脚本测试与 diff 检查通过；NormProof 阻断项为零，四项既有函数数量 advisory 和 120 项文档来源 advisory 保留。
+- UI-01 的确定性 marker/caret 缺陷已修复；Windows Terminal 逐帧录制、真实 IME 及用户现场残影归因仍缺证据。终端历史 reflow、其余 W4 与全部 Phase 19 继续，不据本批宣布完整 UI-01 或阶段验收完成。
+- 前两批 99c2192d 的 CI 37492493436/Architecture Watch 37492493447、6e53eb4e 的 CI 37494932207/Architecture Watch 37494932214 已按 SHA 核实成功。0ef70a34 的 Architecture Watch 37497039715 成功，CI 37497040158 在本次记录时仍运行；本批提交另按新 SHA 跟踪。

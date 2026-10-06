@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MainScreenPainter, type MainScreenDevice } from "./mainScreen.js";
+import { CURSOR_MARKER } from "./paint.js";
 
 /**
  * Painting to the terminal's own screen.
@@ -29,6 +30,8 @@ class Screen {
   write(data: string): void {
     for (let index = 0; index < data.length; index++) {
       const rest = data.slice(index);
+      const hyperlink = /^\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/.exec(rest);
+      if (hyperlink) { index += hyperlink[0].length - 1; continue; }
       // Private modes are written `\x1b[?...` and must be matched too, or their
       // bytes leak into the rows the assertions read.
       const escape = /^\x1b\[[?]?(\d*)([A-Za-z])/.exec(rest);
@@ -71,6 +74,7 @@ class Screen {
   private applySequence(count: number, final: string): void {
     if (final === "A") this.row = Math.max(0, this.row - count);
     else if (final === "B") this.row += count;
+    else if (final === "C") this.column = Math.min(this.columns - 1, this.column + count);
     else if (final === "K") this.rows[this.row] = "";
     else if (final === "J") for (let r = this.row; r < this.height; r++) this.rows[r] = "";
     else if (final === "h" || final === "l") this.started = true;
@@ -124,9 +128,54 @@ class Screen {
   get cursorScreenRow(): number {
     return this.row;
   }
+
+  get cursorScreenColumn(): number { return this.column; }
 }
 
 describe("MainScreenPainter", () => {
+  it("keeps the caret account through scrolling, appends, and external output", () => {
+    const terminal = new Screen(40, 6);
+    const painter = new MainScreenPainter(terminal.asDevice());
+    painter.start();
+    const rows = ['one', 'two', 'three', 'four', 'five', 'six'];
+    const chrome = [`> he${CURSOR_MARKER}llo`, 'help'];
+    for (let count = 1; count <= rows.length; count++) {
+      painter.paint([...rows.slice(0, count), ...chrome], chrome);
+      expect(terminal.cursorScreenRow).toBe(Math.min(count, 4));
+      expect(terminal.cursorScreenColumn).toBe(4);
+      expect(terminal.allLines().filter(line => line === '> hello')).toHaveLength(1);
+      expect(terminal.allLines().join('')).not.toContain(CURSOR_MARKER);
+    }
+    painter.leaveForExternalOutput();
+    terminal.write('external\r\n');
+    painter.resumeAfterExternalOutput();
+    const resumed = [`> hell${CURSOR_MARKER}o`, 'help'];
+    painter.paint([...rows, ...resumed], resumed);
+    expect(terminal.cursorScreenColumn).toBe(6);
+    expect(terminal.allLines().filter(line => line === 'external')).toHaveLength(1);
+    for (const row of rows) expect(terminal.allLines().filter(line => line === row)).toHaveLength(1);
+    expect(terminal.allLines().filter(line => line === '> hello')).toHaveLength(1);
+  });
+
+  it("strips every marker and clamps a full-width caret after resize", () => {
+    const writes: string[] = [];
+    let width = 8;
+    const painter = new MainScreenPainter({ write: data => writes.push(data),
+      getDimensions: () => ({ columns: width, rows: 4 }), capabilities: { supportsDec2026Sync: false } });
+    painter.start();
+    painter.paint([`hidden${CURSOR_MARKER}`, 'two', 'three', 'four', `12345678${CURSOR_MARKER}`], [`12345678${CURSOR_MARKER}`]);
+    expect(writes.join('')).not.toContain(CURSOR_MARKER);
+    expect(writes.join('')).toContain('\x1b[7C\x1b[?25h');
+    writes.length = 0; width = 4;
+    painter.paint(['hidden', 'two', 'three', 'four', `1234${CURSOR_MARKER}`], [`1234${CURSOR_MARKER}`]);
+    expect(writes.join('')).toContain('\x1b[3C\x1b[?25h');
+    expect(writes.join('')).toContain('\x1b[?7l');
+    writes.length = 0;
+    painter.paint(['hidden', 'two', 'three', 'four', 'none'], ['none']);
+    expect(writes.join('')).toContain('\x1b[?25l');
+    expect(writes.join('')).not.toContain('\x1b[?25h');
+  });
+
   it("puts content in the scrollback, not merely on screen", () => {
     // The property the mode exists for: after the session ends the conversation
     // is still there to scroll back through.

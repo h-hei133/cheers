@@ -33,6 +33,8 @@
  * than trusting the account.
  */
 
+import { cursorTarget, paintBegin, paintEnd, prepareRows } from "./paint.js";
+
 /** Everything this needs from the terminal, so a double can stand in for one. */
 export interface MainScreenDevice {
   write(data: string): void;
@@ -40,16 +42,9 @@ export interface MainScreenDevice {
   capabilities: { readonly supportsDec2026Sync: boolean };
 }
 
-const SYNC_BEGIN = "\x1b[?2026h";
-const SYNC_END = "\x1b[?2026l";
 const SHOW_CURSOR = "\x1b[?25h";
 const ERASE_LINE = "\x1b[2K";
 const ERASE_TO_END_OF_SCREEN = "\x1b[J";
-/** Begin synchronized output where the terminal supports it, so a frame lands whole. */
-const beginFrame = (device: MainScreenDevice): string =>
-  device.capabilities.supportsDec2026Sync ? SYNC_BEGIN : "";
-const endFrame = (device: MainScreenDevice): string =>
-  device.capabilities.supportsDec2026Sync ? SYNC_END : "";
 
 export class MainScreenPainter {
   /**
@@ -98,6 +93,7 @@ export class MainScreenPainter {
     if (!this.started) return;
     const dimensions = this.device.getDimensions();
     const height = Math.max(1, dimensions.rows);
+    const width = Math.max(1, dimensions.columns);
 
     // `content` is the document minus the fixed block at its end. The block is
     // subtracted by count rather than by identity: a caller may pass rows whose
@@ -109,7 +105,7 @@ export class MainScreenPainter {
     // Reading that as "no block to remove" left the block in the content, which
     // was appended to the scrollback and then drawn again below — the prompt
     // twice, permanently, on the very first frame of every session.
-    const content = rows.length >= chromeRows.length
+    const rawContent = rows.length >= chromeRows.length
       ? rows.slice(0, rows.length - chromeRows.length)
       : rows;
 
@@ -117,7 +113,8 @@ export class MainScreenPainter {
     // push the cursor above the top of the screen while this still believes it
     // is at the block's last row, and every later move would be computed from a
     // row that no longer exists.
-    const fixed = chromeRows.length > height ? chromeRows.slice(chromeRows.length - height) : chromeRows;
+    const rawFixed = chromeRows.length > height ? chromeRows.slice(chromeRows.length - height) : chromeRows;
+    const fixed = prepareRows(rawFixed, width);
     // The screen holds the fixed block plus whatever content fits above it. When
     // the block is taller than the screen there is no room for content at all.
     const contentCapacity = Math.max(0, height - fixed.length);
@@ -130,10 +127,12 @@ export class MainScreenPainter {
     // screen (rewritable), and the two are separated by how many rows the
     // screen can hold below the fixed block.
     const writtenTotal = this.scrolled + this.visibleContent.length;
-    const appendRows = content.length > writtenTotal ? content.slice(writtenTotal) : [];
-    const overflow = Math.max(0, content.length - contentCapacity);
+    // Immutable scrollback is never painted again. Only prepare rows that can
+    // be written this frame, so typing does not parse the entire transcript.
+    const appendRows = rawContent.length > writtenTotal ? prepareRows(rawContent.slice(writtenTotal), width) : [];
+    const overflow = Math.max(0, rawContent.length - contentCapacity);
     const newScrolled = Math.max(this.scrolled, overflow);
-    const onScreenContent = content.length > newScrolled ? content.slice(newScrolled) : [];
+    const onScreenContent = rawContent.length > newScrolled ? prepareRows(rawContent.slice(newScrolled), width) : [];
 
     // The previous frame's on-screen rows, adjusted for anything that scrolled
     // out during this one. The two lists compared below both cover only rows
@@ -162,7 +161,7 @@ export class MainScreenPainter {
       return delta > 0 ? `\x1b[${delta}B\r` : `\x1b[${-delta}A\r`;
     };
 
-    let buffer = beginFrame(this.device);
+    let buffer = paintBegin(this.device.capabilities.supportsDec2026Sync);
     if (appendRows.length > 0) {
       // Appending happens at the bottom of the content, which means stepping
       // over the fixed block to reach it. `writtenTotal` is that bottom, and it
@@ -240,7 +239,16 @@ export class MainScreenPainter {
       if (fixed.length > 0) cursor = newScrolled + onScreenContent.length + fixed.length - 1;
     }
 
-    buffer += endFrame(this.device);
+    // Only visible rows can own the caret. Moving through the same account is
+    // essential: the next append, redraw or suspension starts from this row.
+    const caret = cursorTarget([...rawContent.slice(newScrolled), ...rawFixed], 0, height);
+    if (caret) {
+      buffer += move(newScrolled + caret.row);
+      const column = Math.min(width - 1, caret.column);
+      if (column > 0) buffer += `\x1b[${column}C`;
+      buffer += SHOW_CURSOR;
+    }
+    buffer += paintEnd(this.device.capabilities.supportsDec2026Sync);
     this.device.write(buffer);
 
     this.visibleContent = onScreenContent;

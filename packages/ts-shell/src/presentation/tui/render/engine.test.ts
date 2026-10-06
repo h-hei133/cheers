@@ -353,6 +353,26 @@ describe("steady-state repaint", () => {
 });
 
 describe("the cursor", () => {
+  it("consumes markers across the regular screen, borrowed overlay, and restored editor", () => {
+    const { tui, terminal, provider } = boot();
+    const chrome = [`prompt${CURSOR_MARKER}more`, 'hint'];
+    provider.rows = ['history']; provider.chrome = chrome;
+    tui.start({ useAlternateScreen: false }); tui.renderNow();
+    const initial = terminal.drain();
+    expect(initial).not.toContain(CURSOR_MARKER);
+    expect(initial).toContain('\x1b[6C\x1b[?25h');
+    provider.fullScreen = true; provider.chrome = []; provider.rows = [`overlay${CURSOR_MARKER}`];
+    tui.renderNow(); const overlay = terminal.drain();
+    expect(overlay).not.toContain(CURSOR_MARKER);
+    expect(overlay).toContain('\x1b[1;8H');
+    provider.fullScreen = false; provider.rows = ['history']; provider.chrome = chrome;
+    tui.renderNow(); const restored = terminal.drain();
+    expect(restored).not.toContain(CURSOR_MARKER);
+    expect(restored).not.toContain('history');
+    expect(restored).toContain('\x1b[6C\x1b[?25h');
+    tui.stop();
+  });
+
   it("pins the cursor where the frame marks it", () => {
     const { tui, terminal, scheduler, provider } = boot();
     provider.rows = ["no cursor", `pre${CURSOR_MARKER}post`];

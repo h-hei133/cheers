@@ -50,8 +50,8 @@ confidence: high
    ```
    它在插入点嵌入了一个零宽转义序列 `CURSOR_MARKER = "\x1b_c\x07"`（APC 序列）。
    在全屏渲染 [paint.ts](../../packages/ts-shell/src/presentation/tui/render/paint.ts#L65) 中，`prepareRows` 将 `CURSOR_MARKER` 剥离，输出给终端的字符是纯净的 `╰─ Hello`；然后 `cursorTarget` 计算出 marker 处的绝对屏幕列号，并在帧末尾通过 `cursorPaint` 写入 `\x1b[row;colH\x1b[?25h` 将硬件光标放置在该处。
-3. **已确认的 regular 模式缺陷**：
-   [engine.ts](../../packages/ts-shell/src/presentation/tui/render/engine.ts#L321) 将 regular 正常界面交给 [mainScreen.ts](../../packages/ts-shell/src/presentation/tui/render/mainScreen.ts#L97)，该路径没有统一消费内部 marker，也没有把编辑器 caret 位置接入主屏渲染器的相对行、scrollback、暂停与恢复账本。regular 中的 fullscreen overlay 仍走另一条 paint 分支，不能把这一结论扩展到所有 regular 输出。
+3. **已确认并修复的 regular 模式缺陷**：
+   [engine.ts](../../packages/ts-shell/src/presentation/tui/render/engine.ts) 将 regular 正常界面交给 [mainScreen.ts](../../packages/ts-shell/src/presentation/tui/render/mainScreen.ts)。原路径没有消费内部 marker 或保存编辑器 caret 的相对行。Phase 19 现已复用共享行准备和帧控制，只处理新增及可见行，并把可见 caret 接入原 scrollback、重绘、暂停与恢复账本。regular 中的 fullscreen overlay 继续使用原全屏分支；验证与尚缺的实机证据见 §3.5。
 4. **尚未归因的用户现象**：
    Windows Terminal 字体、光标形状、栅格化和刷新时序均可作为对照变量；本仓源码不能证明 DirectWrite、glyph overhang 或双缓冲行为导致了本次像素残影。`WT_SESSION` 当前已被 [terminalCapabilities.ts](../../packages/ts-shell/src/presentation/tui/terminalCapabilities.ts#L32) 用作 DEC 2026 同步输出能力条件，因此“默认打开同步即可修好”也没有证据。
 
@@ -94,11 +94,19 @@ if (layoutLine.hasCursor && layoutLine.cursorPos !== undefined) {
 3. **显示模式对照**：
    对比 `tuiMode: "fullscreen"` 与 `tuiMode: "regular"`，分别验证 marker 是否泄漏、caret 定位是否准确及像素现象是否复现，三项结果独立记录。
 
-### 3.4 改造方案设计（已裁决，待施工）
+### 3.4 改造方案设计（账本修复已实施，实机对照待验收）
 
 1. **先修复内部 marker 与 caret 账本**：regular 主屏路径必须消费内部 marker，并把 caret 映射到其相对行、scrollback、重绘、暂停/恢复流程。不能直接搬入 fullscreen 的绝对 `cursorPaint` 调用，否则可能破坏主屏行账本。两种模式和 overlay 都应证明终端字节不包含内部 marker。
 2. **再比较软件光标**：作为终端兼容性候选方案评估；需覆盖行末新增 cell、CJK/emoji 字素、换行、选区和 IME 定位。只有真实终端前后对照才能证明用户现象改善。
 3. **保留能力判断**：沿用已存在的同步输出能力判定和显式开关，用开启/关闭对照定位问题，不把无能力终端一律强制开启。
+
+### 3.5 Phase 19 实施证据
+
+- regular 只在可见内容和裁剪后的 chrome 中寻找 caret，通过原相对移动函数定位并保存实际光标行；移除全部 marker，关闭行样式和 hyperlink，绘制期间禁用 autowrap，帧结束恢复。无 caret 时隐藏光标，退出和外部程序交接恢复显示。
+- 组合 8 文件/234 项通过；最终性能修正后两份 renderer 套件由独立审查重跑，67 项通过。三组反转分别撤回 marker 剥除、caret 定位和最终行账本，均触发行为断言，隔离源码副本逐字节恢复。单元屏幕替身只覆盖所需控制序列，不代表完整终端 reflow。
+- 实际 Node 20.3 构建 CLI 在 regular/fullscreen 的 VT 屏幕中验证普通输入、中间粘贴、分片中文粘贴、宽字素 caret、窗口缩小/放大、满行末列及历史追加后输入，原始输出不含内部 marker。主题重绘后成功 reload 结果仍可见，继续输入时 caret 正确；这为先前原始输出顺序异常补充了屏幕证据，不证明所有历史重排均正确。
+- 独立代码审查发现首版每帧准备全部历史行的性能回归。改为只准备新增和可见行后，同一万行样式文本的无 I/O 探针由约 236 ms/帧降至 0.61 ms/帧；该数字不含真实终端或完整布局开销。
+- 本批没有 Windows Terminal 逐帧像素录制、字体/光标形状对照或真实 IME 证据，不能据 Linux PTY 字节和 VT 屏幕推断用户现场残影根因已解决。regular 的终端历史 reflow 仍由终端处理。
 
 ## 4. 问题二与问题三：Slash 候选 Enter 补全与别名膨胀治理
 
