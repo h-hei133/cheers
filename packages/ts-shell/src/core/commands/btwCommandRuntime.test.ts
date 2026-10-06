@@ -5,7 +5,10 @@ import { providerFetchForEndpoint } from "../../provider/request/fetch.js";
 import { resolveProviderCredential } from "../shell/providerCredentials.js";
 import { routeSlashCommand } from "./slashRouter.js";
 
-vi.mock("../../config/runtimeConfig.js", () => ({ getRuntimeConfig: () => ({}) }));
+vi.mock("../../config/runtimeConfig.js", async () => ({
+  ...await vi.importActual<typeof import('../../config/runtimeConfig.js')>('../../config/runtimeConfig.js'),
+  getRuntimeConfig: () => ({}),
+}));
 vi.mock("../shell/providerCredentials.js", () => ({ resolveProviderCredential: vi.fn(() => ({
   provider: "fixture", model: "m", baseUrl: "https://provider.test",
   credential: { apiKey: "synthetic" },

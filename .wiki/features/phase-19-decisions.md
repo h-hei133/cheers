@@ -1220,3 +1220,5 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 验证：较早扩大组合 75 文件/1085 项通过，其后 holdInput 收窄的受影响组合 4 文件/85 项通过，控制字符用例 1 文件/3 项通过。旧命令补全断言只列两个设置，按 registry 更新期望并保留非法参数拒绝；未用旧扩大组合代替最终增量验证。16 组有效反转均由断言检出，五个产品文件逐字节恢复后 5 文件/89 项通过。最终 Node 20.3 构建通过。
 - 最终 regular/fullscreen 构建 CLI 各发一次本地合成 HTTP 请求：暂存/取消配置字节不变；Apply temperature 0.3 后真实下一请求携带 0.3；明确 project 目标只改项目 diagram，用户配置不变且显示重启要求；注释保留、合成秘密未输出、退出 0。同块连续键入/粘贴哨兵未逸出菜单，过渡期零请求。
 - import cycles/config consumers/declarations/node floor/docs strict/diff 检查通过；最终 NormProof 阻断义务满足、整体仍为 partial，既有四个函数数量与 120 个文档来源 advisory 不视为已修复。此前 056a2ffa 与 0b6fec59 的 CI/Architecture Watch 均已成功，本批远端结果按新提交另核对。完整 CFG-01 trust/模型能力 policy、账户刷新代际竞态、CFG-05 和 Phase 19 十六批/七十六项总体目标继续。
+
+§8.74 CI 补充：f9b008a6 的 Architecture Watch 37437275427 成功，CI 37437275426 失败。完整套件 647 文件/6597 项通过、1 项跳过，唯一失败文件为 btwCommandRuntime.test.ts 的模块加载：旧整模块 mock 只导出 getRuntimeConfig，共享命令目录经 settings 新增的 CONFIG_FIELDS 读取缺失。改为保留真实导出的局部 mock，原 side-question 参数、隐私和失败归因断言不变，隔离 Node 20.3 下该文件 13 项通过，独立代码复审 APPROVE。原远端失败仍保留，新提交另核对。
