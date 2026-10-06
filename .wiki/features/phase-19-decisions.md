@@ -1179,3 +1179,18 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - import cycles、config consumers（40/40）、declarations（18 hooks/11 factories）、Node floor 与 docs strict 通过，43 项脚本测试通过。NormProof 阻断义务满足，整体 verdict 仍为 partial；既有四项函数数量 advisory 与 120 项文档来源 advisory 保留，没有把 advisory 当作全量架构通过。
 - CFG-03 的并发字段保存与版本 reload 验收已覆盖；完整来源/trust policy、模型能力交叉检查、CFG-04 settings/attentionOnIdle、CFG-05、SAFE-02 和其余 Phase 19 任务继续。前批 aabd4c1e 的 CI 37427035177 与 Architecture Watch 37427035249 均已成功；本批提交与远端结果另核，阶段总目标保持进行中。
 - 随后核对 e044f2b3：Architecture Watch 37430924121 成功，CI 37430924138 完整套件为 6539 通过、7 失败、1 跳过并有 1 个关联未处理错误，不能视为通过。五个漏入本地组合的测试文件仍手写旧上下文或调用旧 provider bridge 接口；已改用真实配置/context 工厂、publication 和模型保存后的刷新回调，保留原有历史、用量、恢复、会话模型与工具目录断言。修正后五文件/82 项通过，独立代码复审 APPROVE；新提交远端结果继续按 SHA 核对。
+
+
+### 8.72 CFG-04：现有设置开关保存应用与终端提醒
+
+- attentionOnIdle 补齐 RuntimeConfigFile、字段 schema、默认 false、project/user/显式 override 投影与 next-operation 生效定义。CLI 参数没有新增开关；现有 settings 和配置文件可设置，启动 override 接口保留明确优先级。非法类型使 reload 拒绝并保留 last-good，未用 truthy 字符串开启通知。
+- [settings](../../packages/ts-shell/src/cli/interactive/settings.ts) 将既有持久化与发布 owner 适配给面板：打开时捕获用户文件不可变编辑基线；浏览、过滤和取消不写入；Enter 只接受一个精确合法选项，消费一次；会话/工作区转换后旧菜单失效。保存只提交所选字段，保留无关并发编辑和 JSONC 原文，不另建存储或锁。
+- 面板固定显示“保存到用户配置”，同时显示当前实际值与用户文件值，当前行的选择光标不冒充已生效标记。两项状态使用已有右侧固定 note，真实 OverlayHost 在 80/120 列验证不被长说明挤掉。offline 复用网络 owner 的 isOffline，包含 CHEERS_OFFLINE 双向覆盖；本批没有改变环境优先级或 offline 的网络语义。
+- 保存结果与应用分开。writer 的 unchanged/unknown/persisted-cleanup-failed 结果保留；成功返回后另读所选字段核验，随后才发布。若用户选中的值等于打开时基线，writer 可能保留其他终端的新值，这时报告所选值未确认且不刷新，不谎称保存成功。只有实际环境/冻结启动 override 能解释差异时才显示覆盖原因；其他差异提示配置已变化。发布拒绝或资源应用未知继续明确报告，不声称回滚。
+- 交互宿主在每次操作开始捕获通知偏好，进行中的操作不会因 token 刷新等配置发布改变本次提醒决定。至少 30000ms、无等待队列、无待确认阻塞且终端未停止时，复用既有 BEL 与 OSC 777；默认关闭。保留“操作结束”语义和已有 editor 草稿规则，不把错误、中断或序列输出称为任务成功/桌面已展示。
+- 定向对照参考的通知 registry/领域消费和 schema→设置面板适配，采用“当前消费事实与可写文件值分开、通知由生命周期 owner 决定”的决定；保留本项目默认 false、30 秒阈值与队列条件。未移植默认开启、额外通知协议或另一套设置/终端宿主。
+- 两路独立审查发现并修复基线相同选择误报保存、把环境覆盖遗漏为有效值和常见宽度截断状态三项问题。对应回归包括并发选择保留、无法核验的读取错误、环境覆盖两方向和真实面板渲染；最终代码 APPROVE、架构 CLEAR。代码审查者独立执行了 80/120 列渲染探针，未把主代理测试当作其独立运行。
+- 十三组反转覆盖文件输入/投影、菜单基线、所选字段核验、真实网络策略、发布接线、旧绑定、有效显示、状态可见性、操作快照、30 秒、队列和终端生命周期，均产生断言失败。五份源码逐字节恢复并核对摘要后，3 文件/30 项通过。初次选择器参数化用例错误地展开数组，修正为对象夹具，未添加容错放行。
+- regular/fullscreen 构建 CLI 各使用隔离目录与本地合成 HTTP：从实际 /settings 开启；短请求零提醒；30.5 秒响应产生一次提醒序列；关闭后另一 30.5 秒响应不提醒。均为三次请求、exit 0，配置注释保留，合成秘密不输出。regular 首次探针未接受 80 列真实换行，确认落盘和输出后修正空白匹配并单独复跑通过，未修改产品。只证明序列发送，没有 OS 通知展示证据。
+- Linux、Node 20.3 隔离环境最终 15 文件/265 项通过，包含前批 CI 暴露的五个夹具文件；build:ts 通过。import cycles、config consumers、declarations、Node floor、docs strict 与 diff 检查通过；NormProof 阻断义务满足但整体仍为 partial，既有四项函数数量及 120 项文档来源 advisory 保留。夹具修正单独提交为 75c27c1a，本批代码与远端 CI 另按实际 SHA 核对。
+- CFG-04 的高级参数搜索/分组、完整 provenance、可选 project 保存范围与 pending/restart 展示继续，两个现有开关不代表完整设置系统。CFG-01 完整信任/模型能力 policy、CFG-05、账户刷新身份竞态和其余 Phase 19 任务保持开放。

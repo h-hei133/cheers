@@ -42,6 +42,7 @@ export function createConfigFields(providers: readonly string[]) {
     modelTokenBudgets: field({ type: 'object', propertyNames: nameSchema, additionalProperties: objectSchema({ reserveTokens: countSchema, keepRecentTokens: countSchema }) }),
     instructionBudgetBytes: field(countSchema, withOverride),
     offline: field(booleanSchema, withOverride),
+    attentionOnIdle: field(booleanSchema, withOverride),
     allowUntrustedHooks: field(booleanSchema, ['override'], 'replace', true),
     // Idle warming can spend money without a new prompt; only a personal choice enables it.
     cacheWarming: field(enumSchema(['off', 'streaming', 'idle']), personal),

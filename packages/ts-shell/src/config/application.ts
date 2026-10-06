@@ -10,7 +10,7 @@ const application = {
   hiddenToolPrefixes: 'next operation', denyRules: 'next operation', enableMcpTools: 'next operation',
   temperature: 'next operation', topP: 'next operation', maxOutputTokens: 'next operation',
   contextWindow: 'next operation', reserveTokens: 'next operation', modelTokenBudgets: 'next operation',
-  instructionBudgetBytes: 'next operation', offline: 'next operation', cacheWarming: 'next operation',
+  instructionBudgetBytes: 'next operation', offline: 'next operation', attentionOnIdle: 'next operation', cacheWarming: 'next operation',
   agentMode: 'next operation', theme: 'immediate', tuiMode: 'restart', tui: 'restart',
   retryEnabled: 'next operation', retryMaxRetries: 'next operation', providerRetryMaxRetries: 'next operation',
   retryBaseDelayMs: 'next operation', retryMaxDelayMs: 'next operation', steeringMode: 'next operation',

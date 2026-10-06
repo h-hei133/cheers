@@ -5,7 +5,7 @@ sources: [user-experience-report-2026-10-05, current-source-28ff98ce, isolated-p
 created: 2026-10-05
 updated: 2026-10-06
 tags: [research, configuration, schema, validation, provenance, settings, registry]
-summary: "复核配置路径、分层差异与通知接线；Phase 19 已实施字段验证、JSONC 原文编辑、基线字段补丁及 last-good revision reload，区分立即/下一操作/重启与安全撤销。完整来源/信任 policy、settings UI、通知和配置门禁继续。"
+summary: "复核配置路径、分层差异与通知接线；Phase 19 已实施字段验证、JSONC 原文编辑、基线字段补丁、last-good revision reload 及现有设置开关到终端提醒的闭环。完整来源/信任 policy、高级 settings UI 和配置门禁继续。"
 confidence: high
 ---
 
@@ -249,3 +249,12 @@ CFG-01 首批实现和证据见 [Phase 19 §8.68](phase-19-decisions.md#868-cfg-
 固定快照不冻结授权：会话/工作区/信任变化或安全阻断会使工具、审批后的 hook、实际签名后 HTTP 派发和 MCP 连接/发现/调用重新检查准入。信任 revision 是失效标记，不替代授权。每次发布、拒绝或绑定转换都会终止旧后台预热；成功 token 刷新也可能使预热暂停到下一操作，这是当前保守边界。
 
 此进展取代 §8.2 中 reload 尚未完成的状态。CFG-03 的字段补丁与版本发布本批已验证；不扩展为跨文件资源事务、凭据代际安全或完整来源 UI 的保证。账户刷新仍按 provider 范围保存、网络返回后取基线，旧响应覆盖新登录的竞态仍待修复。CFG-01 完整 provenance/trust 与模型能力检查、CFG-04 settings/attentionOnIdle、CFG-05 和 Phase 19 其他任务继续。
+
+
+### 8.4 现有设置开关与终端提醒
+
+实施与证据见 [Phase 19 §8.72](phase-19-decisions.md#872-cfg-04现有设置开关保存应用与终端提醒)。attentionOnIdle 已接入文件 schema、默认 false、project/user/override 投影和下一操作时机。实际交互宿主捕获操作开始时的开关，达到 30 秒且没有待运行队列、没有阻塞操作、终端仍活动时才发送既有 BEL 与 OSC 777。保持当前“操作结束”语义，未把中止或失败称作任务成功；没有新增 editor 必须为空的条件。
+
+现有两个设置开关显示当前有效值、用户文件值及固定用户保存范围，80/120 列实际面板均保持状态可见。打开菜单捕获编辑基线，Enter 才提交一个精确选择；退出、浏览和过滤不写入。保存后核对所选字段，再触发配置发布；保存、未核验、拒绝应用及覆盖分别报告。offline 的有效值复用网络 owner，包含 CHEERS_OFFLINE 对配置的双向覆盖，不从磁盘值推断实际网络行为。
+
+regular/fullscreen CLI 均经本地合成 HTTP 的短回合、开启后的真实长回合、关闭后的真实长回合验证，只证明终端序列，没有验证操作系统实际通知。此记录完成现有开关链路，取代早期 attentionOnIdle 投影缺失的状态；高级参数搜索/分组、可选 project 保存范围、完整来源与 pending/restart 面板仍属于 CFG-04 后续工作，不以两个开关冒充完整设置系统。

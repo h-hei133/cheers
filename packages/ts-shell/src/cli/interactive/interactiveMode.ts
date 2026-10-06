@@ -28,7 +28,7 @@ import type { StreamingRenderer } from "../../presentation/terminal/streaming.js
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import { replaceLiteral } from "../../presentation/tui/pastes.js";
-import { readRuntimeConfigEditAt, getUserRuntimeConfigPath, readUserRuntimeConfigFile, writeUserRuntimeConfigFile } from "../../config/runtimeConfig.js";
+import { openSettings } from "./settings.js";
 import { InteractiveSurface } from "../../presentation/tui/surface/view.js";
 import { createViewState, type ViewState } from "../../presentation/tui/surface/contract.js";
 import { approvalPicker, type InteractiveApprovalResult } from "./picker/approval.js";
@@ -614,6 +614,7 @@ export class InteractiveMode {
     // When the turn began, so an idle signal can say how long the work took
     // rather than firing on every turn however brief.
     const turnStartedAt = Date.now();
+    const attentionEnabled = this.options.runtimeContext.runtimeConfig.attentionOnIdle === true;
     // The elapsed time is computed at paint time, and paints are driven by events.
     // Between two events there are none, so without a clock of its own the timer
     // sits at whatever it read when the turn began.
@@ -696,7 +697,7 @@ export class InteractiveMode {
       // The attention pair, when the user asked for it and the turn was long
       // enough that they may have looked away. A queued follow-up keeps the
       // conversation running, so the signal waits for the turn that ends it.
-      if (!this.busy && next === undefined && this.options.runtimeContext.runtimeConfig.attentionOnIdle === true) {
+      if (!this.stopped && !this.busy && next === undefined && attentionEnabled) {
         const tookMs = Date.now() - turnStartedAt;
         if (tookMs >= ATTENTION_AFTER_MS) {
           this.terminal.write(
@@ -814,14 +815,7 @@ export class InteractiveMode {
           ? `Status band items saved to ${written.path} (this project's file, which wins over your own)`
           : `Status band items saved to ${written.path}`;
       },
-      // The toggles the settings panel flips live in the user's config file,
-      // which is where the rest of their settings already are.
-      readSetting: (key) =>
-        (readUserRuntimeConfigFile() as Record<string, unknown>)[key] === true,
-      saveSetting: async (key, value) => {
-        const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
-        writeUserRuntimeConfigFile({ ...edit.values, [key]: value }, edit);
-      },
+      openSettings: () => openSettings(this.options.runtimeContext, () => this.theme.refresh()),
     };
   }
 

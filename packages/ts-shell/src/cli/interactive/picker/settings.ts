@@ -1,12 +1,10 @@
 import type { Option } from "../../../presentation/tui/chrome/options.js";
 import type { Picker, PickerOutcome } from "../overlay.js";
+import type { SettingKey, SettingsDraft } from "../settings.js";
 
 /** What the settings picker needs from its host. */
 export interface SettingsHost {
-  /** The stored value of a toggle, or its default when nothing is stored. */
-  readSetting(key: "attentionOnIdle" | "offline"): boolean;
-  /** Persist a toggle; the host owns where that lives. */
-  saveSetting(key: "attentionOnIdle" | "offline", value: boolean): Promise<void>;
+  openSettings(): SettingsDraft;
 }
 
 /**
@@ -20,7 +18,7 @@ export interface SettingsHost {
 
 /** One setting the panel can show and change. */
 interface ToggleSetting {
-  readonly key: "attentionOnIdle" | "offline";
+  readonly key: SettingKey;
   readonly label: string;
   readonly describe: string;
   readonly onText: string;
@@ -31,7 +29,7 @@ const TOGGLES: readonly ToggleSetting[] = [
   {
     key: "attentionOnIdle",
     label: "Attention on idle",
-    describe: "Bell and desktop notification when a long turn finishes",
+    describe: "Bell and notification sequence after a long operation; desktop display depends on your terminal",
     onText: "on — signal after 30s turns",
     offText: "off — never signal",
   },
@@ -45,37 +43,34 @@ const TOGGLES: readonly ToggleSetting[] = [
 ];
 
 export function settingsPicker(host: SettingsHost): Picker {
+  let draft: SettingsDraft | undefined;
   return {
-    title: "Settings",
+    title: "Settings — save to user configuration",
     form: "panel",
-    empty: "No settings available.",
+    empty: "Settings could not be loaded. Check your configuration and retry.",
     async load(): Promise<readonly Option[]> {
+      draft = host.openSettings();
       const options: Option[] = [];
       for (const toggle of TOGGLES) {
-        const current = host.readSetting(toggle.key);
+        const current = draft.values[toggle.key];
         for (const value of [true, false]) {
           options.push({
             id: `${toggle.key}:${value}`,
-            label: `${toggle.label} — ${value ? toggle.onText : toggle.offText}`,
-            detail: toggle.describe,
-            selected: current === value,
+            label: `${toggle.label} — ${value ? 'on' : 'off'}`,
+            detail: `${value ? toggle.onText : toggle.offText}. ${toggle.describe}. Enter saves this choice.`,
+            note: `Current ${current.effective ? 'on' : 'off'} · user ${current.stored === undefined ? 'unset' : current.stored ? 'on' : 'off'}`,
+            selected: current.effective === value,
           });
         }
       }
       return options;
     },
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
-      // One row per toggle is what the multiple form means here; taking the
-      // last-seen keeps a careless double-tick from silently winning.
-      const written: string[] = [];
-      for (const toggle of TOGGLES) {
-        const chosen = ids.find((id) => id.startsWith(`${toggle.key}:`));
-        if (chosen === undefined) continue;
-        const value = chosen.endsWith(":true");
-        await host.saveSetting(toggle.key, value);
-        written.push(`${toggle.label}: ${value ? "on" : "off"}`);
-      }
-      return { note: written.length > 0 ? `Settings saved — ${written.join(", ")}\nRestart or /reload applies them to the next run.` : undefined };
+      if (!draft || ids.length !== 1) return undefined;
+      const toggle = TOGGLES.find(item => ids[0] === `${item.key}:true` || ids[0] === `${item.key}:false`);
+      if (!toggle) return undefined;
+      const note = await draft.save(toggle.key, ids[0] === `${toggle.key}:true`);
+      return { note: `${toggle.label}: ${note}` };
     },
   };
 }

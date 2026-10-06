@@ -21,7 +21,7 @@ import { skillPicker } from "./skills.js";
 import { sourcePicker } from "./sources.js";
 import { sessionPicker } from "./session.js";
 import { statusItemPicker } from "./statusItems.js";
-import { settingsPicker } from "./settings.js";
+import { settingsPicker, type SettingsHost } from "./settings.js";
 
 /**
  * Which commands open a chooser.
@@ -32,7 +32,7 @@ import { settingsPicker } from "./settings.js";
  * free of session plumbing.
  */
 
-export interface PickerHost {
+export interface PickerHost extends SettingsHost {
   readonly commandContext: CommandContext;
   readonly transcript: Transcript;
   readonly sessionManager: SessionManager;
@@ -52,10 +52,6 @@ export interface PickerHost {
   sessionTurns(): readonly SessionMessage[];
   /** Drop everything after a chosen point, leaving the workspace alone. */
   rewind(point: RewindPoint): Promise<string | undefined>;
-  /** The stored value of a settings toggle, or its default. */
-  readSetting(key: "attentionOnIdle" | "offline"): boolean;
-  /** Persist a settings toggle; the host owns where that lives. */
-  saveSetting(key: "attentionOnIdle" | "offline", value: boolean): Promise<void>;
 }
 
 type PickerFactory = (host: PickerHost, argument?: string) => Picker;

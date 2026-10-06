@@ -217,8 +217,8 @@ export interface RuntimeConfig {
   readonly offline?: boolean;
   /**
    * Signal when a turn finishes while the user is elsewhere: a bell, plus a
-   * desktop notification the terminal forwards. Off unless a flag says
-   * otherwise — attention grabbing is a preference, not a default.
+   * notification sequence for terminals that support it. Disabled by default;
+   * emitting the sequence does not prove that the desktop displayed it.
    */
   readonly attentionOnIdle?: boolean;
   /**
@@ -381,6 +381,7 @@ export interface RuntimeConfigFile {
   modelTokenBudgets?: Record<string, ModelTokenBudget>;
   instructionBudgetBytes?: number;
   offline?: boolean;
+  attentionOnIdle?: boolean;
   cacheWarming?: "off" | "streaming" | "idle";
   agentMode?: "plan" | "build";
   theme?: string;
@@ -419,6 +420,7 @@ const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
   instructionBudgetBytes: 32 * 1024,
   allowUntrustedHooks: false,
   offline: false,
+  attentionOnIdle: false,
   cacheWarming: "streaming",
   agentMode: "build",
   theme: "dark",
@@ -461,6 +463,7 @@ const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
  * in rather than read here so the config layer stays free of argument parsing.
  */
 export interface RuntimeConfigOverrides {
+  readonly attentionOnIdle?: boolean;
   readonly theme?: string;
   readonly instructionBudgetBytes?: number
   /** Skip self-initiated requests; `undefined` leaves the configured value. */
@@ -526,6 +529,7 @@ export function getRuntimeConfig(
       merged.instructionBudgetBytes ??
       DEFAULT_CONFIG.instructionBudgetBytes,
     offline: merged.offline ?? DEFAULT_CONFIG.offline,
+    attentionOnIdle: merged.attentionOnIdle ?? DEFAULT_CONFIG.attentionOnIdle,
     cacheWarming: merged.cacheWarming ?? DEFAULT_CONFIG.cacheWarming,
     // The registry accepts this exemption only from validated CLI overrides.
     // A malformed security document also suppresses the exemption.
