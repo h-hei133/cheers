@@ -34,6 +34,16 @@ interface DiscoveredTheme {
   readonly filePath: string;
 }
 
+/** Discovery roots in load order, including directories that do not exist yet. */
+export function themeDirectories(workspaceRoot: string): readonly string[] {
+  const userDirs = userDataSearchDirsFor(process.env.USERPROFILE ?? process.env.HOME ?? "")
+    .map(directory => path.join(directory, THEME_DIRECTORY));
+  const projectDirs = projectDirectories(workspaceRoot)
+    .map(directory => path.join(directory, ...PROJECT_THEME_PATH))
+    .reverse();
+  return [...userDirs, ...projectDirs];
+}
+
 /**
  * Themes on disk, from the user's directory, the project's, and any path the
  * user named on the command line.
@@ -61,13 +71,7 @@ function discoverThemes(
   // in. Later wins, so a project overrides the user and a nearer project
   // directory overrides a farther one — the same precedence the instruction and
   // skill readers use.
-  const userDirs = userDataSearchDirsFor(process.env.USERPROFILE ?? process.env.HOME ?? "")
-    .map((directory) => path.join(directory, THEME_DIRECTORY));
-  const projectDirs = projectDirectories(workspaceRoot)
-    .map((directory) => path.join(directory, ...PROJECT_THEME_PATH))
-    .reverse();
-
-  for (const directory of [...userDirs, ...projectDirs]) {
+  for (const directory of themeDirectories(workspaceRoot)) {
     for (const theme of readThemeDirectory(directory)) {
       found.set(theme.name, theme);
     }

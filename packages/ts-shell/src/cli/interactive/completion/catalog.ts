@@ -68,7 +68,7 @@ export function createCatalogLoader(context: () => ShellRuntimeContext, gateway:
   return Object.assign(load, {
     invalidate: () => { pending = undefined; },
     observe: (kind: CatalogKind, query: string | undefined, changed: () => void) => {
-      const targets = catalogSources(kind, context().cwd, query);
+      const targets = catalogSources(kind, context().cwd, query, themePaths);
       if (!targets.length) return undefined;
       const close = targets.map(target => observeDirectory(target, changed));
       return () => close.forEach(stop => stop());

@@ -3,6 +3,7 @@ import { getUserRuntimeConfigPath } from "../../../config/runtimeConfig.js";
 import { userCatalogPath, catalogCachePath } from "../../../core/models/catalogStore.js";
 import { resolveUserDataFile, userDataSearchDirs } from "../../../core/paths/userHome.js";
 import { workflowsDir } from "../../../core/workflow/definition.js";
+import { themeDirectories } from "../../../presentation/themes/index.js";
 import { resolveCatalogDirectory } from "./paths.js";
 import type { CatalogKind } from "./request.js";
 
@@ -11,7 +12,8 @@ function userFiles(...files: string[]): string[] {
   return userDataSearchDirs().flatMap(directory => files.map(file => path.join(directory, path.basename(file))));
 }
 
-export function catalogSources(kind: CatalogKind, cwd: string, query?: string): readonly string[] {
+export function catalogSources(kind: CatalogKind, cwd: string, query?: string, themePaths: readonly string[] = []): readonly string[] {
+  if (kind === "theme") return [...new Set([...themeDirectories(cwd), ...themePaths].map(target => path.resolve(target)))];
   if (kind === "file" || kind === "directory") return [resolveCatalogDirectory(cwd, query ?? "", kind === "directory")];
   if (kind === "connection") return userFiles(getUserRuntimeConfigPath());
   if (kind === "model" || kind === "provider") return userFiles(userCatalogPath(), catalogCachePath());

@@ -909,3 +909,12 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - regular/fullscreen 真实 CLI 在不新增按键时响应外部连接替换、模型当前文件覆盖旧来源与删除回退；Tab 后配置字节及 mtime 不变，合成 key 未出现在终端，Esc 后事件未重开菜单，两模式 exit 0。
 - import cycles/config consumers/declarations/node floor 与 docs drift 阻断规则通过；NormProof 全图无环及导入解析 satisfied，既有 5 个函数数量 advisory 保留。086fe2c5 的 CI 37392574729 与 Architecture Watch 37392574377 均成功；b40344b5 Architecture Watch 37393613204 成功，CI 37393613562 查询时仍运行。
 - CMD-04 的 theme/skill 嵌套目录、会话/记忆/授权 owner 与 MCP 状态事件仍未完成，其余参数审计和 Phase 19 后续批次继续。
+
+### 8.49 CMD-04：主题发现来源事件
+
+- theme owner 导出同一发现目录序列，原 discovery 直接复用；补全监听用户目录、项目目录链与命令行额外文件/目录。保留既有加载顺序和错误主题诊断，不复制主题扫描或改变主题选择。
+- 监听覆盖缺失目录逐层创建、JSON 内容名称修改、原子替换、删除和重建；候选路径去重，沿共享 controller 的缓存、草稿/身份校验和退出释放。参考主题发现中单层 JSON 文件与显式来源路径的做法；既有当前主题热重载仍负责实际外观应用，候选读取不应用主题。
+- Linux、Node 20.3 隔离环境 18 文件/205 项与 build:ts 通过，覆盖四类来源和已有主题加载/热重载测试。移除主题来源监听后四组事件断言失败；反转还暴露测试 cleanup 对缺失 stop 的假设，修正清理并删除隔离夹具残留，恢复产品代码后组合通过。
+- regular/fullscreen 真实 CLI 在无新按键时响应主题创建、名称编辑、删除、重建，Esc 后外部修改不重开菜单，两模式 exit 0。测试另核对只读查询前后的主题选择、配置字节和 mtime 不变。
+- import cycles/config consumers/declarations/node floor 通过，NormProof 无环/导入解析 satisfied，既有 5 个函数数量 advisory 保留。32598f7e Architecture Watch 37394082553 成功，CI 37394082538 查询时仍运行；b40344b5 CI 37393613562 亦待终态。
+- 技能目录检查确认存在递归分组、manifest 停止下探、ignore 与信任语义，后续事件路径应由同一发现过程提供，不另造递归扫描器。技能及会话/记忆/授权/MCP 状态事件、剩余参数与 Phase 19 后续任务继续；不把本批主题单层监听计为递归技能完成。
