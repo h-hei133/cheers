@@ -2,8 +2,10 @@ import { CONFIG_MAX_BYTES, ConfigDocumentError, inspectConfigDocument } from './
 import { readConfigDocument } from './document.js';
 import { type ConfigFields, type ConfigSource, type MergePolicy, tuiFields } from './fields.js';
 import { ConfigReferenceError, resolveConfigReferences } from './references.js';
-import { type ConfigOrigin, rejectOrigin, replaceOrigin, traceValue } from './provenance/model.js';
+import { type ConfigOrigin, origin, rejectOrigin, replaceOrigin, traceValue } from './provenance/model.js';
 import { mergeOrigin } from './provenance/merge.js';
+import { configTrustRejection } from './trust.js';
+import type { TrustDecision } from '../core/security/trust/model.js';
 
 export interface ConfigLayer {
   readonly values: Record<string, unknown>;
@@ -38,7 +40,7 @@ function mergeValue(previous: unknown, value: unknown, policy: MergePolicy): unk
   }
 }
 
-function validateTui(value: unknown, source: ConfigSource, layer: ConfigLayer): unknown {
+function validateTui(value: unknown, source: ConfigSource, layer: ConfigLayer, trust: TrustDecision): unknown {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
   const result: Record<string, unknown> = {};
   for (const [key, child] of Object.entries(value)) {
@@ -49,13 +51,20 @@ function validateTui(value: unknown, source: ConfigSource, layer: ConfigLayer): 
       layer.origins.tui = rejectOrigin(layer.origins.tui, source, `invalid-${key}`);
       layer.diagnostics.push(diagnostic(source, `tui.${key}`, 'invalid-value'));
     }
-    else result[key] = child;
+    else {
+      const reason = source === 'project' ? configTrustRejection(field, child, trust) : undefined;
+      if (reason) {
+        const previous = layer.origins.tui ?? origin('default');
+        layer.origins.tui = { ...previous, children: { ...previous.children, [key]: rejectOrigin(previous.children?.[key], source, reason) } };
+        layer.diagnostics.push(diagnostic(source, `tui.${key}`, reason));
+      } else result[key] = child;
+    }
   }
   return result;
 }
 
 /** Source rejection precedes all environment access; only validated data is merged. */
-export function applyConfigLayer(layer: ConfigLayer, raw: Record<string, unknown>, source: ConfigSource, fields: ConfigFields): void {
+export function applyConfigLayer(layer: ConfigLayer, raw: Record<string, unknown>, source: ConfigSource, fields: ConfigFields, trust: TrustDecision): void {
   const budget = { bytes: 0 };
   for (const [key, rawValue] of Object.entries(raw)) {
     if (rawValue === undefined) continue;
@@ -66,12 +75,18 @@ export function applyConfigLayer(layer: ConfigLayer, raw: Record<string, unknown
       layer.diagnostics.push(diagnostic(source, key, 'source-not-allowed')); continue;
     }
     let value: unknown = rawValue;
-    if (field.merge === 'tui') value = validateTui(value, source, layer);
+    if (field.merge === 'tui') value = validateTui(value, source, layer, trust);
     if (!field.validate(value)) {
       layer.valid = false;
       layer.blocked ||= field.security;
       layer.origins[key] = rejectOrigin(layer.origins[key], source, 'invalid-value');
       layer.diagnostics.push(diagnostic(source, key, 'invalid-value', field.security));
+      continue;
+    }
+    const trustRejection = source === 'project' ? configTrustRejection(field, value, trust) : undefined;
+    if (trustRejection) {
+      layer.origins[key] = rejectOrigin(layer.origins[key], source, trustRejection);
+      layer.diagnostics.push(diagnostic(source, key, trustRejection));
       continue;
     }
     const incoming = traceValue(value, field.schema, source);
@@ -92,13 +107,13 @@ export function applyConfigLayer(layer: ConfigLayer, raw: Record<string, unknown
   }
 }
 
-export function loadConfigLayers(paths: readonly { path: string; source: 'project' | 'user' }[], overrides: unknown, fields: ConfigFields): ConfigLayer & { sources: string[] } {
+export function loadConfigLayers(paths: readonly { path: string; source: 'project' | 'user' }[], overrides: unknown, fields: ConfigFields, trust: TrustDecision): ConfigLayer & { sources: string[] } {
   const layer: ConfigLayer & { sources: string[] } = { values: {}, origins: {}, diagnostics: [], blocked: false, valid: true, sources: [] };
   for (const candidate of paths) {
     try {
       const document = readConfigDocument(candidate.path);
       if (document === undefined) continue;
-      applyConfigLayer(layer, document, candidate.source, fields);
+      applyConfigLayer(layer, document, candidate.source, fields, trust);
       layer.sources.push(candidate.path);
     } catch (error) {
       layer.valid = false;
@@ -109,11 +124,11 @@ export function loadConfigLayers(paths: readonly { path: string; source: 'projec
     }
   }
   const rawMaxTurns = process.env.CHEERS_MAX_TURNS;
-  if (rawMaxTurns) applyConfigLayer(layer, { maxTurns: Number(rawMaxTurns) }, 'environment', fields);
+  if (rawMaxTurns) applyConfigLayer(layer, { maxTurns: Number(rawMaxTurns) }, 'environment', fields, trust);
   if (overrides !== undefined) {
     try {
       inspectConfigDocument(overrides);
-      applyConfigLayer(layer, overrides, 'override', fields);
+      applyConfigLayer(layer, overrides, 'override', fields, trust);
     } catch {
       layer.valid = false;
       layer.blocked = true;

@@ -6,6 +6,7 @@ import { refreshShellRuntimeConfig, type ShellRuntimeContext } from '../../core/
 import { isOffline, OFFLINE_ENV } from '../../core/network/policy.js';
 import { readDiagramMode, readStatusItems } from './tuiSettings.js';
 import { currentTheme } from '../../presentation/theme/theme.js';
+import { configTrustNotice } from '../../config/trust.js';
 
 export interface SettingValue {
   readonly effective: unknown;
@@ -14,6 +15,7 @@ export interface SettingValue {
   readonly source: string;
   readonly requestedSource: string;
   readonly restartRequired: boolean;
+  readonly projectTrustNotice?: string;
 }
 export interface SettingsDraft {
   readonly scope: SettingsScope;
@@ -37,7 +39,16 @@ function source(context: ShellRuntimeContext, setting: SettingDefinition, reques
   return !requested && label !== 'default' && !sameValue(effective(context, setting), settingValue(context.runtimeConfig, setting)) ? `derived from ${label}` : label;
 }
 
-function applicationNotice(context: ShellRuntimeContext, setting: SettingDefinition, value: unknown): string {
+function projectTrustNotice(context: ShellRuntimeContext, setting: SettingDefinition): string | undefined {
+  const [root, leaf] = setting.path;
+  const trace = context.configuration.current.requested.configProvenance[root];
+  const reasons = [...(trace?.rejected ?? []), ...(leaf ? trace?.children?.[leaf]?.rejected ?? [] : [])];
+  return reasons.filter(item => item.source === 'project').map(item => configTrustNotice(item.reason)).find(Boolean);
+}
+
+function applicationNotice(context: ShellRuntimeContext, setting: SettingDefinition, value: unknown, scope: SettingsScope): string {
+  const trustNotice = scope === 'project' && value !== undefined ? projectTrustNotice(context, setting) : undefined;
+  if (trustNotice) return `The project value is not active. ${trustNotice} Use /trust to inspect the decision.`;
   const actual = effective(context, setting);
   const requested = settingValue(context.configuration.current.requested, setting);
   if (setting.policy.application === 'restart' && !sameValue(settingValue(context.runtimeConfig, setting), requested)) return 'Saved display preference is pending installation. Restart required.';
@@ -61,7 +72,8 @@ export function openSettings(context: ShellRuntimeContext, onApplied: () => void
   const values = Object.fromEntries(definitions.map(setting => {
     const actual = effective(context, setting); const requested = settingValue(context.configuration.current.requested, setting);
     return [setting.key, { effective: actual, requested, stored: settingValue(edit.values, setting), source: source(context, setting),
-      requestedSource: source(context, setting, true), restartRequired: setting.policy.application === 'restart' && !sameValue(settingValue(context.runtimeConfig, setting), requested) }];
+      requestedSource: source(context, setting, true), projectTrustNotice: projectTrustNotice(context, setting),
+      restartRequired: setting.policy.application === 'restart' && !sameValue(settingValue(context.runtimeConfig, setting), requested) }];
   }));
   let consumed = false;
   return {
@@ -86,7 +98,7 @@ export function openSettings(context: ShellRuntimeContext, onApplied: () => void
         const result = refreshShellRuntimeConfig(context);
         if (result.status !== 'applied') return `${saved} Configuration was not applied (${result.status}).${result.admissionBlocked ? ' New actions are blocked until a valid configuration is loaded.' : ''}`;
         onApplied();
-        return `${saved} ${applicationNotice(context, setting, value)}`;
+        return `${saved} ${applicationNotice(context, setting, value, scope)}`;
       } catch { return `${saved} Configuration application outcome is unverified.`; }
     },
   };

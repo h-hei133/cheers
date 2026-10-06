@@ -1,3 +1,4 @@
+import { projectTrust } from '../core/security/trust/store.js';
 import { readRuntimeConfigEditAt } from "./runtimeConfig.js";
 import fs from 'node:fs';
 import os from 'node:os';
@@ -29,6 +30,7 @@ describe('configuration validation boundary', () => {
     ['retryEnabled', 'secret-value', false], ['contextWindow', -1, 20000],
     ['retryBaseDelayMs', 2147483648, 1000], ['instructionBudgetBytes', -1, 0],
   ])('preserves a valid lower %s when the user value is invalid', (field, invalid, lower) => {
+    projectTrust.setProjectTrust(root, 'session-only');
     project({ [field]: lower }); user({ [field]: invalid });
     const config = getRuntimeConfig(root);
     expect(config[field as keyof typeof config]).toBe(lower);
@@ -46,6 +48,7 @@ describe('configuration validation boundary', () => {
   });
 
   it('rejects project personal fields before interpolation and keeps unknown/project strings literal', () => {
+    projectTrust.setProjectTrust(root, 'session-only');
     vi.stubEnv('CONFIG_TEST_SECRET', 'secret-value');
     project({ provider: 'anthropic', providerCredentials: { openai: { apiKey: '$CONFIG_TEST_SECRET', baseUrl: 'https://invalid.test' } }, theme: '$CONFIG_TEST_SECRET', '$CONFIG_TEST_SECRET': '$CONFIG_TEST_SECRET' });
     const config = getRuntimeConfig(root);

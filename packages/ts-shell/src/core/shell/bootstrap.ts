@@ -128,14 +128,6 @@ export function bootstrapShellRuntime(input: {
   const requestedProjectRoot = input.gitContext.root ?? input.cwd;
   const requestedRootMode = resolveWorkspaceRootMode(input.gitContext);
 
-  // Said before anything else, because a config file that could not be read
-  // explains everything that follows: the settings it held are simply not in
-  // effect, and without this line the only symptom is a product that ignores
-  // what the user wrote.
-  for (const diagnostic of input.runtimeConfig.configDiagnostics) {
-    emitLifecycleMessage(`Warning: ${diagnostic}`);
-  }
-
   const session = (() => {
     if (!input.requestedSessionId) {
       // Two kinds of run, two answers.
@@ -308,10 +300,7 @@ export function bootstrapShellRuntime(input: {
     "interactive-shell-ready",
   );
 
-  return {
-    phases,
-    lifecycleNotices,
-    context: createShellRuntimeContext({
+  const context = createShellRuntimeContext({
       cwd: boundProjectRoot,
       originalCwd,
       projectRoot: boundProjectRoot,
@@ -326,8 +315,13 @@ export function bootstrapShellRuntime(input: {
       ...(input.themePaths ? { themePaths: input.themePaths } : {}),
       gitContext: boundGitContext,
       session,
-    }),
-  };
+  });
+  // Resolution can replace the input snapshot after a trust or workspace change.
+  // Diagnostics describe the settings actually published for the final session.
+  for (const diagnostic of context.runtimeConfig.configDiagnostics) {
+    emitLifecycleMessage(`Warning: ${diagnostic}`);
+  }
+  return { phases, lifecycleNotices, context };
 }
 
 /**

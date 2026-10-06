@@ -1269,3 +1269,18 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 上一 07ac99fd 的 Architecture Watch 37442106195 成功，但完整 CI 37442105264 失败：648 文件/6682 项通过、1 项跳过，3 文件/7 项失败集中在旧 thinking 持久化接口、显示文本及新增 effort/global 补全预期；此失败不由本地窄测试改写。修正与新提交远端结果单独记录。CFG-01 逐字段信任 policy、账户刷新身份竞态和 Phase 19 十六批/七十六项整体继续。
 
 §8.76 CI 修正补充：07ac99fd 的三文件/七项失败均为模型/effort 契约更新遗漏的测试迁移：newCommands 仍导入已移除的 getThinkingEffort、无 session 上下文却预期项目级保存，并预期 provider 静默忽略；两个补全文件仍期待旧 flags。改用真实隔离配置和 SessionManager，断言保存后恢复、同项目另一会话不变、全局字节不变、null provider-decides 与非法输入零保存；精确补全文本增加 global/effort，并检查 effort 值和已完成位置无候选。6 文件/120 项组合（含模型与新信任用例）通过，独立代码复审 APPROVE。没有修改产品行为或将原远端失败改写成通过，新提交 CI 另行核对。
+
+### 8.78 CFG-01：字段信任过滤与配置身份绑定
+
+- [fields](../../packages/ts-shell/src/config/fields.ts)为所有输入声明 projectTrust，默认 required；safe 仅含 schema 元数据、已有单调工具限制、提醒开关、受控 TUI 值。预算、采样、上下文、队列、超时和主题选择需要肯定信任；保留 instructionBudgetBytes:0、offline:true、agentMode:plan、retryEnabled:false 与两层 retry count:0 的禁用/收紧语义，不能因过滤回到更宽默认。个人 provider/连接/cacheWarming 与 CLI-only hook override 的来源禁令继续优先，不因 trusted 放开。
+- [layers](../../packages/ts-shell/src/config/layers.ts)接收显式信任决定，没有默认 trusted 分支；合法来源先校验，再执行字段信任过滤，用户/environment/冻结启动 override 保持原规则。信任拒绝只忽略项目值，不把其余有效用户/默认配置判为无效；非法安全输入仍在 overrides 后阻断工具。普通 user-first、限制交并/deny/disable、TUI 叶子 project-first 与空列表后备保持不变。
+- TUI 子字段各自消费 policy，拒绝原因跟随对应 provenance 叶子，即使最终来自用户后备也不丢失。受控诊断区分 trust-not-established、trust-denied、trust-unavailable，不回显原值、未知键或信任文件内容。未建立信任的项目现在不会自动提供上述 required 字段；可通过 /trust 查看并明确选择持久或本进程信任。保存项目偏好不自动建立信任。
+- [trust 绑定](../../packages/ts-shell/src/config/trust.ts)在读取时保存 canonical workspace、信任 revision 与决定。解析一次项目根后，判断和项目配置路径共用该根；不分别通过可变别名取得身份、授权和配置。首次 context 遇到旧信任或最终恢复目录不同会重新加载，并使用候选捕获的身份绑定，不能把较新的 revision 贴到旧值上。
+- 重载在资源准备前及发布前核对候选自身绑定，ticket/live 身份检查继续保留。别名在开始/读取/结束之间发生 B→A→B 也不能将 A 的配置发布给 B；已接受目录身份变化会阻断旧操作和新操作，直到有效重载。启动诊断来自最终发布 context，信任授予/撤销和 child→parent 恢复都不再输出被丢弃输入快照的提示。
+- Settings 保留明确 user/project 范围和可核验原文保存；信任过滤后报告“已保存、项目值未启用”，即使值恰好等于当前默认、模式或主题也不称已应用。详情显示项目值未启用及原因；后续肯定信任+有效 reload 才转为项目来源。
+- 定向对照成熟参考的未信任项目设置排除与信任变化重读，采用明确项目权威和重新构造快照的决定；保留本项目字段级安全例外及既有合并顺序。首次读取、选择器保存和重载均使用现有配置/会话 owner，没有另造存储或执行路径。
+- 独立审查发现并修复：初始快照被标上后来的身份、保存值等于默认时误报启用、TUI 叶子 policy 未消费、重载候选别名 ABA、启动旧诊断、loader 内别名解析不一致。最终代码 APPROVE、架构 CLEAR；审查为静态检查，没有将主代理测试描述为独立运行。
+- 验证：扩大组合 55 文件/790 项通过；最后 canonical/绑定修正后 5 文件/81 项通过。首次组合 18 项失败是旧合并/来源夹具未建立项目授权，已仅在对应场景显式授予进程信任，原预期不削弱，未批量默认信任所有测试。16 组有效反转覆盖肯定信任、默认 required、安全例外、缺失区分、loader 接线、TUI policy/来源、初始绑定/目录/revision、已接受目录、重载候选、启动诊断、保存反馈及 canonical 判断/读取；8 个产品文件逐字节恢复，恢复后 3 文件/62 项通过。
+- 最终 Node 20.3 构建及五项静态 gate/diff 检查通过；NormProof 阻断义务满足，整体 partial，四项既有函数数量和 120 项文档来源 advisory 保留。最终 regular/fullscreen 构建 CLI 各三次本地合成 HTTP：未授权→授权→撤销的 temperature 为 0.7→0.2→0.7，输出 cap 为 4096→2222→4096；零指令预算始终阻止夹具正文进入请求，工具始终只提供 read，用户配置字节不变、合成凭据不输出，退出 0。
+- 边界：这批约束项目配置值，未把其他资源的 undecided 兼容规则改成肯定信任门槛。已识别 [主题发现](../../packages/ts-shell/src/presentation/themes/index.ts)仍允许项目主题文件覆盖同名内置/用户主题，因此过滤 config.theme 不等于隔离所有项目主题资产；该资源 owner 问题留待独立修复。不宣称目录/文件系统原子快照、外部文件编辑即时取消或跨文件事务。账户刷新身份竞态、剩余能力交叉验证及 Phase 19 十六批/七十六项总体继续。
+- 信任前置 cefce882 与上一 CI 修正 0d4e51c1 已推送；0d4e51c1 的 Architecture Watch 37444445554 成功，CI 37444445566 最后查询仍 in_progress。07ac99fd 的原 CI 失败记录保留；本批新提交和远端结果另按实际 SHA 核对。

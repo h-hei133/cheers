@@ -1,7 +1,5 @@
-import { projectSessionModel } from "../../session/model/projection.js";
-import { getRuntimeConfig } from "../../config/runtimeConfig.js";
-import { ConfigState, type ConfigReloadResult } from '../../config/state.js';
-import { configurationBinding, refreshConfiguration } from './configuration.js';
+import { type ConfigState, type ConfigReloadResult } from '../../config/state.js';
+import { configurationBinding, initialConfiguration, refreshConfiguration } from './configuration.js';
 import type { RuntimeConfig, RuntimeConfigOverrides } from '../../config/runtimeConfig.js'
 import type { Session, WorkspaceRootMode } from '../../session/SessionManager.js'
 import type { WorkflowGitContext } from '../../workflow/gitContext.js'
@@ -111,7 +109,7 @@ export function createShellRuntimeContext(input: {
   resumeProvenance?: SessionResumeProvenance;
 }): ShellRuntimeContext {
   restoreSessionUsage(input.session.id, input.session.usage)
-  const configuration = new ConfigState(projectSessionModel(input.runtimeConfig, input.session.id), configurationBinding(input));
+  const configuration = initialConfiguration(input);
   return {
     cwd: input.cwd,
     originalCwd: input.originalCwd,

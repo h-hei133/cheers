@@ -1,3 +1,4 @@
+import { projectTrust } from '../core/security/trust/store.js';
 import { readRuntimeConfigEditAt } from "./runtimeConfig.js";
 import fs from "node:fs";
 import os from "node:os";
@@ -69,6 +70,7 @@ describe("runtime config", () => {
   });
 
   it("keeps every declared optional field that a config file sets", () => {
+    projectTrust.setProjectTrust(fakeRoot, 'session-only');
     const configPath = path.join(fakeRoot, ".cheers.json");
     fs.writeFileSync(
       configPath,
@@ -110,6 +112,7 @@ describe("runtime config", () => {
   });
 
   it("takes the retry settings a config file sets", () => {
+    projectTrust.setProjectTrust(fakeRoot, 'session-only');
     fs.writeFileSync(
       path.join(fakeRoot, ".cheers.json"),
       JSON.stringify({
@@ -139,6 +142,7 @@ describe("runtime config", () => {
   });
 
   it("takes the queue delivery a config file asks for", () => {
+    projectTrust.setProjectTrust(fakeRoot, 'session-only');
     fs.writeFileSync(
       path.join(fakeRoot, ".cheers.json"),
       JSON.stringify({ steeringMode: "all", followUpMode: "all" }),
@@ -224,6 +228,7 @@ describe("runtime config", () => {
   });
 
   it("says nothing when every config file reads cleanly", () => {
+    projectTrust.setProjectTrust(fakeRoot, 'session-only');
     fs.writeFileSync(path.join(fakeRoot, ".cheers.json"), JSON.stringify({ maxTurns: 7 }), "utf8");
     expect(getRuntimeConfig(fakeRoot).configDiagnostics).toEqual([]);
   });
@@ -276,6 +281,7 @@ describe("runtime config", () => {
   });
 
   it("does not carry a config key whose value nothing reads", () => {
+    projectTrust.setProjectTrust(fakeRoot, 'session-only');
     // A key that survives onto the resolved config is a promise the runtime
     // does not keep: the user sets it, and nothing happens. A config file that
     // still carries a removed key must load without error and must not put the
@@ -472,6 +478,7 @@ describe("runtime config", () => {
   });
 
   it("tolerates UTF-8 BOM in config file", () => {
+    projectTrust.setProjectTrust(fakeRoot, 'session-only');
     const configPath = path.join(fakeRoot, ".cheers.json");
     fs.writeFileSync(
       configPath,

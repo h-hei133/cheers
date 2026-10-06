@@ -10,6 +10,7 @@ import { getWorkflowGitContext } from '../../workflow/gitContext.js'
 import { bootstrapShellRuntime } from './bootstrap.js'
 import { SessionBootstrapError } from './bootstrap.js'
 import { forgetSessionTodos, getSessionTodos } from '../commands/todoCommandRuntime.js'
+import { projectTrust } from '../security/trust/store.js'
 
 describe('shell bootstrap', () => {
   const originalUserProfile = process.env.USERPROFILE
@@ -32,6 +33,34 @@ describe('shell bootstrap', () => {
     else process.env.HOME = originalHome
     fs.rmSync(fakeHome, { recursive: true, force: true })
   })
+
+  it.each(['grant', 'revoke'])('reports final configuration diagnostics after trust changes before bootstrap: %s', change => {
+    const workspace = path.join(fakeHome, 'workspace'); fs.mkdirSync(workspace);
+    fs.writeFileSync(path.join(workspace, '.cheers.json'), '{"maxTurns":77}');
+    if (change === 'revoke') projectTrust.setProjectTrust(workspace, 'trusted');
+    const runtimeConfig = getRuntimeConfig(workspace);
+    projectTrust.setProjectTrust(workspace, change === 'grant' ? 'trusted' : 'untrusted');
+    const result = bootstrapShellRuntime({ cwd: workspace, runtimeConfig, gitContext: getWorkflowGitContext(workspace),
+      sessionManager: new SessionManager(), renderer: new StreamingRenderer(), emitLifecycleMessages: false });
+    expect(result.context.runtimeConfig.maxTurns).toBe(change === 'grant' ? 77 : 15);
+    expect(result.lifecycleNotices.filter(line => line.startsWith('Warning: ')))
+      .toEqual(result.context.runtimeConfig.configDiagnostics.map(line => `Warning: ${line}`));
+    expect(result.lifecycleNotices.join(' ').includes('trust-denied')).toBe(change === 'revoke');
+    expect(result.lifecycleNotices.join(' ')).not.toContain('trust-not-established');
+  });
+
+  it('reports diagnostics from the final resumed project instead of the input child project', () => {
+    const workspace = path.join(fakeHome, 'workspace'); const child = path.join(workspace, 'child'); fs.mkdirSync(child, { recursive: true });
+    fs.writeFileSync(path.join(workspace, '.cheers.json'), '{"maxTurns":77}');
+    fs.writeFileSync(path.join(child, '.cheers.json'), '{"theme":"PRIVATE_THEME"}');
+    const manager = new SessionManager(); const session = manager.createNew(workspace);
+    const result = bootstrapShellRuntime({ cwd: child, requestedSessionId: session.id, runtimeConfig: getRuntimeConfig(child),
+      gitContext: getWorkflowGitContext(child), sessionManager: manager, renderer: new StreamingRenderer(), emitLifecycleMessages: false });
+    expect(result.context.projectRoot).toBe(workspace);
+    const warnings = result.lifecycleNotices.filter(line => line.startsWith('Warning: '));
+    expect(warnings).toEqual(result.context.runtimeConfig.configDiagnostics.map(line => `Warning: ${line}`));
+    expect(warnings.join(' ')).toContain('maxTurns'); expect(warnings.join(' ')).not.toContain('theme');
+  });
 
   it('returns ordered bootstrap phases and runtime context', () => {
     const sessionManager = new SessionManager()

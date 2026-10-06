@@ -1,3 +1,4 @@
+import { projectTrust } from '../core/security/trust/store.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -21,6 +22,7 @@ function user(value: unknown) { fs.writeFileSync(file, JSON.stringify(value)); }
 function project(value: unknown) { fs.writeFileSync(path.join(root, '.cheers.json'), JSON.stringify(value)); }
 
 it('explains defaults, ordinary precedence, environment and frozen launch overrides', () => {
+    projectTrust.setProjectTrust(root, 'session-only');
   project({ maxTurns: 10, theme: 'project', offline: false });
   user({ maxTurns: 20, theme: 'user' }); vi.stubEnv('CHEERS_MAX_TURNS', '30');
   const config = getRuntimeConfig(root, { theme: 'launch' }); const trace = config.configProvenance;
@@ -57,6 +59,7 @@ it('retains all security collection constraints and per-item contributors', () =
 });
 
 it('explains rejected sources and invalid values without including arbitrary keys or input contents', () => {
+    projectTrust.setProjectTrust(root, 'session-only');
   project({ providerConnections: [{ id: 'private-id', provider: 'openai', apiKey: '$PRIVATE_VARIABLE' }], maxTurns: 12 });
   user({ maxTurns: 'private-value', 'private-unknown-key': 'private-value' });
   const config = getRuntimeConfig(root); const trace = config.configProvenance;

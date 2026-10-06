@@ -3,6 +3,9 @@ import { getRuntimeConfig, type RuntimeConfigOverrides } from '../../config/runt
 import { projectSessionModel } from '../../session/model/projection.js';
 import { prepareThemeSelection } from '../../presentation/theme/selection.js';
 import { projectTrust } from '../security/projectTrust.js';
+import { identifyProject } from '../security/trust/identity.js';
+import { configTrustMatches } from '../../config/trust.js';
+import type { RuntimeConfig } from '../../config/runtimeConfig.js';
 
 interface ConfigurationContext {
   readonly configuration: ConfigState;
@@ -13,8 +16,19 @@ interface ConfigurationContext {
 }
 
 export function configurationBinding(context: Omit<ConfigurationContext, 'configuration'>): ConfigBinding {
-  return { workspaceRoot: context.projectRoot, sessionId: context.session.id,
+  return { workspaceRoot: identifyProject(context.projectRoot), sessionId: context.session.id,
     trustRevision: projectTrust.revision(), overrides: context.runtimeConfigOverrides ?? {} };
+}
+
+/** Initial values retain the identity used to filter them, including across resume. */
+export function initialConfiguration(context: Omit<ConfigurationContext, 'configuration'> & { readonly runtimeConfig: RuntimeConfig }): ConfigState {
+  let candidate = context.runtimeConfig;
+  if (!candidate.configTrust || !configTrustMatches(candidate.configTrust, context.projectRoot, projectTrust.revision())) {
+    candidate = getRuntimeConfig(context.projectRoot, context.runtimeConfigOverrides);
+  }
+  const binding = { ...configurationBinding(context), workspaceRoot: candidate.configTrust.workspaceRoot,
+    trustRevision: candidate.configTrust.revision };
+  return new ConfigState(projectSessionModel(candidate, context.session.id), binding);
 }
 
 /** Ordinary settings stay pinned; safety revocation and substrate changes do not. */
@@ -24,7 +38,7 @@ export function configurationAdmission(context: ConfigurationContext): () => str
   return () => {
     if (context.configuration.current.admissionBlocked) return 'Configuration safety validation failed; reload a valid configuration before starting new actions.';
     const actual = configurationBinding(context);
-    if (context.configuration.current.binding.trustRevision !== actual.trustRevision) {
+    if (context.configuration.current.binding.trustRevision !== actual.trustRevision || context.configuration.current.binding.workspaceRoot !== actual.workspaceRoot) {
       return 'Project trust changed; reload configuration before starting new actions.';
     }
     if (substrate !== context.configuration.substrateRevision || binding.workspaceRoot !== actual.workspaceRoot || binding.sessionId !== actual.sessionId || binding.trustRevision !== actual.trustRevision) {
@@ -39,9 +53,17 @@ export function refreshConfiguration(context: ConfigurationContext): ConfigReloa
   const state = context.configuration;
   const ticket = state.begin(configurationBinding(context));
   const candidate = projectSessionModel(getRuntimeConfig(context.projectRoot, context.runtimeConfigOverrides), context.session.id);
+  const loadedBinding = configurationBinding(context);
+  if (!configTrustMatches(candidate.configTrust, loadedBinding.workspaceRoot, loadedBinding.trustRevision)) {
+    return state.rejectCandidate(ticket, loadedBinding, ['Project trust or workspace changed while reading configuration; reload again.']);
+  }
   if (!candidate.configValidation.valid) return state.publish(ticket, candidate, configurationBinding(context));
   let apply: (() => void) | undefined;
   try { if (candidate.theme) apply = prepareThemeSelection(candidate.theme, context.projectRoot, context.themePaths); }
   catch { return state.rejectCandidate(ticket, configurationBinding(context), ['Configured theme could not be prepared; current settings and theme were retained.']); }
-  return state.publish(ticket, candidate, configurationBinding(context), apply);
+  const actual = configurationBinding(context);
+  if (!configTrustMatches(candidate.configTrust, actual.workspaceRoot, actual.trustRevision)) {
+    return state.rejectCandidate(ticket, actual, ['Project trust or workspace changed while preparing configuration; reload again.']);
+  }
+  return state.publish(ticket, candidate, actual, apply);
 }

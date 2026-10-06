@@ -1,3 +1,4 @@
+import { projectTrust } from '../../core/security/trust/store.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -139,6 +140,7 @@ it('validates advanced numbers before writing and applies a valid request settin
 });
 
 it('keeps project targeting explicit and reports ordinary user precedence', async () => {
+    projectTrust.setProjectTrust(root, 'session-only');
   fs.writeFileSync(file, '{"maxTurns":20}'); const context = runtime();
   const draft = openSettings(context, vi.fn(), 'project');
   expect(await draft.save('maxTurns', 10)).toContain('follows user policy');
@@ -166,12 +168,27 @@ it('saves one nested display leaf and retains concurrent sibling changes and com
 });
 
 it('removes only the selected stored field and exposes the remaining project value', async () => {
+    projectTrust.setProjectTrust(root, 'session-only');
   fs.writeFileSync(file, '{"maxTurns":20,"offline":true}');
   fs.writeFileSync(getProjectConfigPath(root), '{"maxTurns":8}'); const context = runtime();
   expect(await openSettings(context, vi.fn()).save('maxTurns', undefined)).toContain('Saved to your user');
   expect(configFiles.readUserRuntimeConfigFile()).toEqual({ offline: true });
   expect(context.runtimeConfig.maxTurns).toBe(8);
   expect(openSettings(context, vi.fn()).values.maxTurns).toMatchObject({ effective: 8, source: 'project', stored: undefined });
+});
+
+it.each([{ key: 'maxTurns', value: 15 }, { key: 'theme', value: 'dark' }, { key: 'agentMode', value: 'build' }])('reports saved but inactive project $key even when the fallback value is equal', async ({ key, value }) => {
+  const context = runtime();
+  const notice = await openSettings(context, vi.fn(), 'project').save(key, value);
+  expect(notice).toContain('Saved to your project configuration');
+  expect(notice).toContain('The project value is not active');
+  expect(notice).toContain('trust has not been established');
+  expect(notice).not.toMatch(/Applied to|Effective for|Saved default mode/);
+  expect(JSON.parse(fs.readFileSync(getProjectConfigPath(root), 'utf8'))[key]).toBe(value);
+  expect(openSettings(context, vi.fn(), 'project').values[key].projectTrustNotice).toContain('trust has not been established');
+  projectTrust.setProjectTrust(root, 'trusted');
+  expect(refreshShellRuntimeConfig(context).status).toBe('applied');
+  expect(context.runtimeConfig.configProvenance[key].sources).toEqual(['project']);
 });
 
 it.each(['providerConnections', 'providerCredentials', 'allowUntrustedHooks', 'unknown'])('excludes %s from generic editing', async key => {

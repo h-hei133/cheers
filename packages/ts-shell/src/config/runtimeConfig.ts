@@ -8,6 +8,7 @@ import { ConfigDocumentError } from "./syntax.js";
 import { readConfigEdit, persistConfigEdit, type ConfigEdit } from "./persistence.js";
 import { normalizeConnectionId } from "./values.js";
 import { loadConfigLayers, validateRawConfig } from "./layers.js";
+import { captureConfigTrust, type ConfigTrustBinding } from './trust.js';
 import type { ConfigProvenance } from './provenance/model.js';
 import { projectConfigOrigins } from './provenance/projection.js';
 
@@ -140,6 +141,7 @@ export interface ProviderConnectionConfig {
 export interface RuntimeConfig {
   /** Value-free origin trees published with the settings they describe. */
   readonly configProvenance: ConfigProvenance;
+  readonly configTrust: ConfigTrustBinding;
   /** Structured acceptance facts; diagnostic wording never decides publication. */
   readonly configValidation: { readonly valid: boolean; readonly securityBlocked: boolean };
   readonly provider: RuntimeProvider;
@@ -409,7 +411,7 @@ export interface RuntimeConfigFile {
 
 export const CONFIG_FIELDS = createConfigFields(RUNTIME_PROVIDERS) satisfies Record<keyof RuntimeConfigFile | "allowUntrustedHooks", ConfigField>;
 
-const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources" | "configProvenance"> = {
+const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources" | "configProvenance" | "configTrust"> = {
   configValidation: { valid: true, securityBlocked: false },
   provider: "openai",
   maxTurns: 15,
@@ -486,10 +488,11 @@ export function getRuntimeConfig(
   rootDir: string = process.cwd(),
   overrides?: RuntimeConfigOverrides,
 ): RuntimeConfig {
+  const configTrust = captureConfigTrust(rootDir);
   const layer = loadConfigLayers([
-    { path: getProjectConfigPath(rootDir), source: "project" },
+    { path: getProjectConfigPath(configTrust.workspaceRoot), source: "project" },
     { path: getUserConfigPath(), source: "user" },
-  ], overrides, CONFIG_FIELDS);
+  ], overrides, CONFIG_FIELDS, configTrust.decision);
   // Every accepted field has passed its registry schema before this projection.
   const merged = layer.values as RuntimeConfigFile & RuntimeConfigOverrides;
   const diagnostics = layer.diagnostics;
@@ -498,6 +501,7 @@ export function getRuntimeConfig(
   const maxTurns = merged.maxTurns ?? DEFAULT_CONFIG.maxTurns;
 
   const config: Omit<RuntimeConfig, 'configProvenance'> = {
+    configTrust,
     configValidation: { valid: layer.valid, securityBlocked: layer.blocked },
     provider,
     maxTurns,

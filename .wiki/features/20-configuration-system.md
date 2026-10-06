@@ -5,7 +5,7 @@ sources: [user-experience-report-2026-10-05, current-source-28ff98ce, isolated-p
 created: 2026-10-05
 updated: 2026-10-06
 tags: [research, configuration, schema, validation, provenance, settings, registry]
-summary: "复核配置路径、分层差异与通知接线；Phase 19 已实施字段验证、JSONC 原文编辑、基线字段补丁、last-good revision reload 及现有设置开关到终端提醒的闭环。完整来源/信任 policy、高级 settings UI 和配置门禁继续。"
+summary: "Phase 19 已实施字段验证与信任策略、来源追踪、JSONC 原文编辑、基线字段补丁、绑定身份的 revision reload、高级 settings 和终端提醒。资源信任、跨字段能力及凭据代际保护继续。"
 confidence: high
 ---
 
@@ -292,3 +292,9 @@ regular/fullscreen CLI 均经本地合成 HTTP 的短回合、开启后的真实
 [Phase 19 §8.77](phase-19-decisions.md#877-cfg-01-前置统一项目信任判定与可核验保存)统一 trusted/untrusted/undecided/unavailable；不可读来源不回退到旧允许，进程授权随持久来源变化或读取失败失效，保存只有完整核验后才刷新配置。允许记录不随替换链接迁移，拒绝保留原路径边界；配置准入同时核对已接受 publication 的信任版本。
 
 此项只是字段过滤的可靠前置。当前 getRuntimeConfig 尚未接入字段 trust 条件，启动没有肯定信任确认；undecided 与明确拒绝必须继续分别说明。下一步按字段保留安全声明和收紧值，不能把所有非 security 字段都视为安全，也不能过滤 plan、零指令预算或 offline:true 后回落到更宽默认。
+
+### 8.10 字段信任策略与一致项目身份
+
+[Phase 19 §8.78](phase-19-decisions.md#878-cfg-01字段信任过滤与配置身份绑定)已将 trust 条件接入 registry 和 loader：肯定信任才允许 required 项目字段；明确安全字段及禁用/收紧例外保留原合并顺序。首次加载与 reload 携带捕获的 canonical root/revision，Settings 区分已保存与信任未启用，启动提示使用最终快照。
+
+这取代 §8.9 中“getRuntimeConfig 尚未接入字段条件”的状态。未建立信任的项目不能再自动提供成本、上下文、执行模式扩展或主题选择；用户配置与明确启动参数继续生效。其他资源的 undecided 行为未在本批统一，尤其项目主题资产仍可覆盖同名默认主题，不能据字段过滤宣称资源隔离完成。跨字段能力验证、凭据代际保护和阶段其余任务继续。

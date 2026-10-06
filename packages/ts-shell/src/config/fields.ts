@@ -12,51 +12,53 @@ export interface ConfigField {
   readonly security: boolean;
   readonly application: ConfigApplication;
   readonly sensitivity: 'public' | 'personal';
+  readonly projectTrust: 'safe' | 'required' | readonly (string | number | boolean)[];
 }
 export type ConfigFields = Readonly<Record<string, ConfigField>>;
 const ajv = new Ajv({ allErrors: false, strict: true });
 ajv.addKeyword({ keyword: 'environment', schemaType: 'boolean', valid: true });
 
-function field(schema: AnySchemaObject, sources: readonly ConfigSource[] = ['project', 'user'], merge: MergePolicy = 'replace', security = false, metadata: Partial<Pick<ConfigField, 'application' | 'sensitivity'>> = {}): ConfigField {
+function field(schema: AnySchemaObject, sources: readonly ConfigSource[] = ['project', 'user'], merge: MergePolicy = 'replace', security = false, metadata: Partial<Pick<ConfigField, 'application' | 'sensitivity' | 'projectTrust'>> = {}): ConfigField {
   return { schema, validate: ajv.compile(schema), sources, merge, security,
-    application: metadata.application ?? 'next operation', sensitivity: metadata.sensitivity ?? 'public' };
+    application: metadata.application ?? 'next operation', sensitivity: metadata.sensitivity ?? 'public', projectTrust: metadata.projectTrust ?? 'required' };
 }
 
 /** Every accepted input has one schema and source/merge policy, including CLI-only input. */
 export function createConfigFields(providers: readonly string[]) {
   const personal: ConfigSource[] = ['user'];
   const withOverride: ConfigSource[] = ['project', 'user', 'override'];
+  const safe = { projectTrust: 'safe' } as const;
   return {
-    schemaVersion: field({ const: 1 }, undefined, 'replace', false, { application: 'metadata' }),
+    schemaVersion: field({ const: 1 }, undefined, 'replace', false, { ...safe, application: 'metadata' }),
     provider: field(enumSchema(providers), personal, 'replace', false, { sensitivity: 'personal' }),
     providerCredentials: field(objectSchema(Object.fromEntries(providers.map(provider => [provider, credentialSchema]))), personal, 'replace', false, { sensitivity: 'personal' }),
     providerConnections: field(listSchema(connectionSchema(providers)), personal, 'replace', false, { sensitivity: 'personal' }),
     activeProviderConnectionId: field(textSchema, personal, 'replace', false, { sensitivity: 'personal' }),
     maxTurns: field(positiveSchema, ['project', 'user', 'environment']),
-    allowedTools: field(listSchema(nameSchema), withOverride, 'intersect', true),
-    disabledTools: field(listSchema(nameSchema), undefined, 'union', true),
-    hiddenToolPrefixes: field(listSchema(nameSchema), undefined, 'union', true),
-    denyRules: field(listSchema(objectSchema({ tool: nameSchema, pattern: textSchema }, ['tool'])), undefined, 'deny', true),
-    enableMcpTools: field(booleanSchema, undefined, 'disable', true),
+    allowedTools: field(listSchema(nameSchema), withOverride, 'intersect', true, safe),
+    disabledTools: field(listSchema(nameSchema), undefined, 'union', true, safe),
+    hiddenToolPrefixes: field(listSchema(nameSchema), undefined, 'union', true, safe),
+    denyRules: field(listSchema(objectSchema({ tool: nameSchema, pattern: textSchema }, ['tool'])), undefined, 'deny', true, safe),
+    enableMcpTools: field(booleanSchema, undefined, 'disable', true, safe),
     temperature: field({ type: 'number' }),
     topP: field({ type: 'number', minimum: 0, maximum: 1 }),
     maxOutputTokens: field(positiveSchema),
     contextWindow: field(positiveSchema),
     reserveTokens: field(countSchema),
     modelTokenBudgets: field({ type: 'object', propertyNames: nameSchema, additionalProperties: objectSchema({ reserveTokens: countSchema, keepRecentTokens: countSchema }) }),
-    instructionBudgetBytes: field(countSchema, withOverride),
-    offline: field(booleanSchema, withOverride),
-    attentionOnIdle: field(booleanSchema, withOverride),
+    instructionBudgetBytes: field(countSchema, withOverride, 'replace', false, { projectTrust: [0] }),
+    offline: field(booleanSchema, withOverride, 'replace', false, { projectTrust: [true] }),
+    attentionOnIdle: field(booleanSchema, withOverride, 'replace', false, safe),
     allowUntrustedHooks: field(booleanSchema, ['override'], 'replace', true),
     // Idle warming can spend money without a new prompt; only a personal choice enables it.
     cacheWarming: field(enumSchema(['off', 'streaming', 'idle']), personal),
-    agentMode: field(enumSchema(['plan', 'build'])),
+    agentMode: field(enumSchema(['plan', 'build']), undefined, 'replace', false, { projectTrust: ['plan'] }),
     theme: field(nameSchema, withOverride, 'replace', false, { application: 'immediate' }),
-    tuiMode: field(enumSchema(['regular', 'fullscreen']), undefined, 'replace', false, { application: 'restart' }),
-    tui: field(objectSchema(tuiSchemas), undefined, 'tui', false, { application: 'restart' }),
-    retryEnabled: field(booleanSchema),
-    retryMaxRetries: field(countSchema),
-    providerRetryMaxRetries: field(countSchema),
+    tuiMode: field(enumSchema(['regular', 'fullscreen']), undefined, 'replace', false, { ...safe, application: 'restart' }),
+    tui: field(objectSchema(tuiSchemas), undefined, 'tui', false, { ...safe, application: 'restart' }),
+    retryEnabled: field(booleanSchema, undefined, 'replace', false, { projectTrust: [false] }),
+    retryMaxRetries: field(countSchema, undefined, 'replace', false, { projectTrust: [0] }),
+    providerRetryMaxRetries: field(countSchema, undefined, 'replace', false, { projectTrust: [0] }),
     retryBaseDelayMs: field(delaySchema),
     retryMaxDelayMs: field(delaySchema),
     steeringMode: field(enumSchema(['one-at-a-time', 'all'])),
@@ -67,4 +69,4 @@ export function createConfigFields(providers: readonly string[]) {
   };
 }
 
-export const tuiFields = Object.fromEntries(Object.entries(tuiSchemas).map(([key, schema]) => [key, field(schema)]));
+export const tuiFields = Object.fromEntries(Object.entries(tuiSchemas).map(([key, schema]) => [key, field(schema, undefined, 'replace', false, { projectTrust: 'safe' })]));
