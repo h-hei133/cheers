@@ -6,13 +6,15 @@ import { freezeDeep } from '../../core/values/freeze.js';
 import { sameValue } from '../../config/values.js';
 import { SessionModelWriteError, type ModelWriteState } from './outcome.js';
 
+import { isThinkingPreference, type ThinkingPreference } from '../../core/models/effort.js';
 import type { SessionModelSelection } from "./contract.js";
 
 export function decodeSessionModel(value: unknown): SessionModelSelection | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const candidate = value as Record<string, unknown>;
   if (![candidate.connectionId, candidate.provider, candidate.model].every(item => typeof item === "string" && item.trim().length > 0)) return undefined;
-  return { connectionId: (candidate.connectionId as string).trim(), provider: (candidate.provider as string).trim(), model: (candidate.model as string).trim() };
+  if (Object.hasOwn(candidate, 'thinkingEffort') && !isThinkingPreference(candidate.thinkingEffort)) return undefined;
+  return { ...(candidate.thinkingEffort !== undefined ? { thinkingEffort: candidate.thinkingEffort as ThinkingPreference } : {}), connectionId: (candidate.connectionId as string).trim(), provider: (candidate.provider as string).trim(), model: (candidate.model as string).trim() };
 }
 
 function layoutFor(sessionId: string) {
@@ -57,11 +59,30 @@ export function readSessionModelEdit(sessionId: string): SessionModelEdit {
 }
 
 /** Merge only the selection under the existing lock, then verify the whole snapshot. */
-export function writeSessionModel(sessionId: string, selection: SessionModelSelection, baseline: SessionModelEdit, beforeCommit?: () => boolean): void {
-  const modelSelection = decodeSessionModel(selection);
-  if (!modelSelection || !(baseline instanceof ModelEdit) || baseline.sessionId !== sessionId) throw new SessionModelWriteError('invalid', 'unchanged');
+class ModelReceipt {
+  constructor(readonly before: SessionModelEdit, readonly after: SessionModelEdit, readonly changed: boolean) { freezeDeep(this); }
+}
+export type SessionModelReceipt = ModelReceipt;
+
+export function writeSessionModel(sessionId: string, selection: SessionModelSelection, baseline: SessionModelEdit, beforeCommit?: () => boolean): SessionModelReceipt {
+  const decoded = decodeSessionModel(selection);
+  if (!decoded) throw new SessionModelWriteError('invalid', 'unchanged');
+  return commitModel(sessionId, decoded, baseline, beforeCommit);
+}
+
+/** A no-op has no rollback authority. A restoration receives its own fresh revision. */
+export function restoreSessionModel(receipt: SessionModelReceipt): 'restored' | 'unchanged' {
+  if (!(receipt instanceof ModelReceipt)) throw new SessionModelWriteError('invalid', 'unchanged');
+  if (!receipt.changed) return 'unchanged';
+  commitModel(receipt.after.sessionId, receipt.before.selection, receipt.after);
+  return 'restored';
+}
+
+function commitModel(sessionId: string, modelSelection: SessionModelSelection | undefined, baseline: SessionModelEdit, beforeCommit?: () => boolean): SessionModelReceipt {
+  if (!(baseline instanceof ModelEdit) || baseline.sessionId !== sessionId) throw new SessionModelWriteError('invalid', 'unchanged');
   const layout = layoutFor(sessionId);
   if (layout.statePath !== baseline.statePath) throw new SessionModelWriteError('conflict', 'unchanged');
+  let receipt = new ModelReceipt(baseline, baseline, false);
   let state: ModelWriteState = 'unchanged';
   let code: 'read-failed' | 'lock-failed' | 'write-failed' | 'verification-failed' = 'lock-failed';
   let cleanupFailed = false;
@@ -73,15 +94,19 @@ export function writeSessionModel(sessionId: string, selection: SessionModelSele
         || !sameValue(current.modelSelection, baseline.selection)) throw new SessionModelWriteError('conflict', 'unchanged');
       if (beforeCommit && !beforeCommit()) throw new SessionModelWriteError('conflict', 'unchanged');
       if (sameValue(current.modelSelection, modelSelection)) { code = 'lock-failed'; return; }
-      const next = { ...current, modelSelection, modelRevision: randomUUID() };
+      const next = { ...current, modelRevision: randomUUID() };
+      if (modelSelection === undefined) delete next.modelSelection;
+      else next.modelSelection = modelSelection;
       if (!sameValue(requiredState(layout.statePath), current)) throw new SessionModelWriteError('conflict', 'unchanged');
       state = 'unknown'; code = 'write-failed';
       writeJsonFileAtomic(layout.statePath, next);
       code = 'verification-failed';
       if (!sameValue(requiredState(layout.statePath), next)) throw new SessionModelWriteError('verification-failed', 'unknown');
+      receipt = new ModelReceipt(baseline, new ModelEdit(sessionId, layout.statePath, next.projectRoot, next.modelSelection, next.modelRevision), true);
       state = 'persisted'; code = 'lock-failed';
     }, { recovery: 'local-dead', onReleaseError: () => { cleanupFailed = true; } });
   } catch (error) {
     throw new SessionModelWriteError(error instanceof SessionModelWriteError ? error.code : code, state, cleanupFailed);
   }
+  return receipt;
 }

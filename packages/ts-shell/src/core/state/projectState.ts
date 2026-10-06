@@ -32,7 +32,8 @@ export interface StoredGoal {
 }
 
 /** How much reasoning to ask the provider for, or nothing to leave it to decide. */
-export type ThinkingEffort = "low" | "medium" | "high";
+import type { ThinkingLevel as ThinkingEffort } from '../models/effort.js';
+export type { ThinkingLevel as ThinkingEffort } from '../models/effort.js';
 
 export interface ProjectState {
   readonly goal?: StoredGoal | null;

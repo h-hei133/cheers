@@ -1,4 +1,4 @@
-import type { ThinkingEffort } from "../../state/projectState.js";
+import type { ThinkingLevel as ThinkingEffort } from "../../models/effort.js";
 import type { CommandAction, CommandSyntax } from "../syntax/model.js";
 
 interface ThinkingAction extends CommandAction {
@@ -8,6 +8,7 @@ interface ThinkingAction extends CommandAction {
 export const thinkingSyntax: CommandSyntax<ThinkingAction> = {
   name: "thinking",
   defaultAction: "",
+  flags: [{ name: "global", kind: "boolean", summary: "also change the global default" }],
   actions: [
     { name: "", summary: "show the current effort preference" },
     { name: "low", summary: "request low reasoning effort", effort: "low" },

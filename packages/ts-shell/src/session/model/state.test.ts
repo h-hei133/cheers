@@ -6,7 +6,7 @@ import { SessionManager } from '../SessionManager.js';
 import { createSessionStoreLayout, locateExistingSessionLayout } from '../store/sessionFileLayout.js';
 import { writeSessionState } from '../store/sessionStateStore.js';
 import * as files from '../store/sessionFileStore.js';
-import { readSessionModel, readSessionModelEdit, writeSessionModel } from './state.js';
+import { readSessionModel, readSessionModelEdit, writeSessionModel, restoreSessionModel } from './state.js';
 import { SessionModelWriteError } from './outcome.js';
 
 let home: string;
@@ -130,4 +130,61 @@ it.each([false, true])('checks the synchronous commit guard under lock, includin
   expect(() => writeSessionModel(session.id, choice(), edit, guard)).toThrowError(expect.objectContaining({ code: 'conflict', state: 'unchanged' }));
   expect(guard).toHaveBeenCalledOnce(); expect(write).not.toHaveBeenCalled();
   expect(fs.readFileSync(target.statePath)).toEqual(before);
+});
+
+
+it('restores the complete pair with a fresh revision and preserves unrelated lifecycle state', () => {
+  const session = manager.createNew(home);
+  writeSessionModel(session.id, { ...choice('a'), thinkingEffort: null }, readSessionModelEdit(session.id));
+  const stale = readSessionModelEdit(session.id);
+  const receipt = writeSessionModel(session.id, { ...choice('b'), thinkingEffort: 'high' }, stale);
+  session.pendingPrompt = 'preserve during compensation';
+  writeSessionState({ session, layout: layout(session.id) });
+  expect(restoreSessionModel(receipt)).toBe('restored');
+  expect(readSessionModel(session.id)).toEqual({ ...choice('a'), thinkingEffort: null });
+  expect(readSessionModelEdit(session.id).revision).not.toBe(stale.revision);
+  expect(readSessionModelEdit(session.id).revision).not.toBe(receipt.after.revision);
+  expect(JSON.parse(fs.readFileSync(layout(session.id).statePath, 'utf8')).pendingPrompt).toBe(session.pendingPrompt);
+  expect(() => writeSessionModel(session.id, choice('stale'), stale)).toThrowError(expect.objectContaining({ code: 'conflict' }));
+});
+
+it('restores absence without reviving a stale baseline', () => {
+  const session = manager.createNew(home); const before = readSessionModelEdit(session.id);
+  const receipt = writeSessionModel(session.id, { ...choice(), thinkingEffort: 'medium' }, before);
+  restoreSessionModel(receipt);
+  expect(readSessionModel(session.id)).toBeUndefined();
+  expect(readSessionModelEdit(session.id).revision).toEqual(expect.any(String));
+  expect(() => writeSessionModel(session.id, choice('stale'), before)).toThrowError(expect.objectContaining({ code: 'conflict' }));
+});
+
+it.each(['newer', 'aba', 'rebind', 'deleted'])('does not compensate over %s state', mode => {
+  const session = manager.createNew(home);
+  const selected = { ...choice(), thinkingEffort: 'high' as const };
+  const receipt = writeSessionModel(session.id, selected, readSessionModelEdit(session.id));
+  if (mode === 'newer' || mode === 'aba') writeSessionModel(session.id, choice('newer'), readSessionModelEdit(session.id));
+  if (mode === 'aba') writeSessionModel(session.id, selected, readSessionModelEdit(session.id));
+  const file = layout(session.id).statePath;
+  if (mode === 'rebind') fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), projectRoot: home + '/elsewhere' }));
+  if (mode === 'deleted') fs.rmSync(file);
+  const before = fs.existsSync(file) ? fs.readFileSync(file) : undefined;
+  expect(() => restoreSessionModel(receipt)).toThrowError(SessionModelWriteError);
+  expect(fs.existsSync(file) ? fs.readFileSync(file) : undefined).toEqual(before);
+});
+
+it('a no-op receipt cannot roll back a newer preference', () => {
+  const session = manager.createNew(home);
+  writeSessionModel(session.id, choice(), readSessionModelEdit(session.id));
+  const receipt = writeSessionModel(session.id, choice(), readSessionModelEdit(session.id));
+  writeSessionModel(session.id, choice('winner'), readSessionModelEdit(session.id));
+  const before = fs.readFileSync(layout(session.id).statePath);
+  expect(() => restoreSessionModel(receipt)).not.toThrow();
+  expect(restoreSessionModel(receipt)).toBe('unchanged');
+  expect(fs.readFileSync(layout(session.id).statePath)).toEqual(before);
+});
+
+it.each([false, 'maximum', 4, {}])('rejects malformed saved effort %j', thinkingEffort => {
+  const session = manager.createNew(home); const file = layout(session.id).statePath;
+  const value = { ...JSON.parse(fs.readFileSync(file, 'utf8')), modelSelection: { ...choice(), thinkingEffort } };
+  fs.writeFileSync(file, JSON.stringify(value));
+  expect(() => readSessionModelEdit(session.id)).toThrowError(expect.objectContaining({ code: 'invalid' }));
 });

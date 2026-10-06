@@ -1223,3 +1223,85 @@ it("never retries a streamed safety rejection even when its detail mentions a ne
   expect(result.stopReason).toBe("error");
   expect(requests).toBe(1);
 });
+
+
+it('keeps a captured legacy effort across project edits, retries and later steps', async () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'effort-capture-'));
+  fs.mkdirSync(path.join(workspace, '.agents'));
+  try {
+    writeProjectState(workspace, { thinkingEffort: 'low' });
+    const bodies: Record<string, unknown>[] = [];
+    const step = createStepFunction({ ...request, workspaceRoot: workspace,
+      retry: { enabled: true, maxRetries: 1, baseDelayMs: 1, maxDelayMs: 1 },
+      fetchImpl: async (_url, init) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        writeProjectState(workspace, { thinkingEffort: 'high' });
+        return bodies.length === 1 ? jsonResponse({}, { ok: false, status: 503 }) : jsonResponse({ choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }] });
+      },
+    });
+    await step([], undefined, {}, { allowTools: false });
+    await step([], undefined, {}, { allowTools: false });
+    expect(bodies.map(body => body.reasoning_effort)).toEqual(['low', 'low', 'low']);
+  } finally { fs.rmSync(workspace, { recursive: true, force: true }); }
+});
+
+it('does not silently drop an explicit effort or disclose a rejecting response body', async () => {
+  const bodies: Record<string, unknown>[] = [];
+  const step = createStepFunction({ ...request, thinkingEffort: 'high', fetchImpl: async (_url, init) => {
+    bodies.push(JSON.parse(String(init?.body)));
+    return jsonResponse({ error: 'reasoning_effort unsupported SENSITIVE_SERVER_DETAIL' }, { ok: false, status: 400 });
+  } });
+  const result = await step([], undefined, {}, { allowTools: false });
+  expect(JSON.stringify(result)).toContain('Provider rejected the selected reasoning effort');
+  expect(JSON.stringify(result)).not.toContain('SENSITIVE_SERVER_DETAIL');
+  expect(bodies).toHaveLength(1); expect(bodies[0].reasoning_effort).toBe('high');
+});
+
+it.each([{ reasoning: false }, { compat: { reasoningEffort: false } }, { thinkingLevelMap: { high: null } }])('rejects explicit unsupported effort before HTTP: %j', facts => {
+  let calls = 0;
+  const step = createStepFunction({ ...request, thinkingEffort: 'high', catalog: [{ id: 'vendor', models: [{ id: 'm', ...facts }] }], fetchImpl: async () => { calls++; return jsonResponse({}); } });
+  return step([], undefined, {}, { allowTools: false }).then(result => {
+    expect(JSON.stringify(result)).toContain('does not support'); expect(calls).toBe(0);
+  });
+});
+
+it('sends the mapped explicit level and treats null as provider decides despite legacy fallback', async () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'effort-null-'));
+  fs.mkdirSync(path.join(workspace, '.agents'));
+  try {
+    writeProjectState(workspace, { thinkingEffort: 'low' });
+    const bodies: Record<string, unknown>[] = [];
+    for (const thinkingEffort of ['high', null] as const) {
+      const step = createStepFunction({ ...request, workspaceRoot: workspace, thinkingEffort,
+        catalog: [{ id: 'vendor', models: [{ id: 'm', thinkingLevelMap: { high: 'xhigh' } }] }],
+        fetchImpl: async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return jsonResponse({ choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }] }); },
+      });
+      await step([], undefined, {}, { allowTools: false });
+    }
+    expect(bodies.map(body => body.reasoning_effort)).toEqual(['xhigh', undefined]);
+  } finally { fs.rmSync(workspace, { recursive: true, force: true }); }
+});
+
+
+it.each(['anthropic-messages', 'bedrock-converse-stream'])('rejects explicit effort with a small %s output cap before HTTP', async endpoint => {
+  let calls = 0;
+  const step = createStepFunction({ ...request, provider: { ...request.provider, endpoint }, thinkingEffort: 'high', maxOutputTokens: 1500,
+    catalog: [{ id: 'vendor', models: [{ id: 'm', reasoning: true }] }], fetchImpl: async () => { calls++; return jsonResponse({}); },
+  });
+  const result = await step([], undefined, {}, { allowTools: false });
+  expect(result.errorMessage).toContain('output limit must be at least 2048'); expect(calls).toBe(0);
+});
+
+it.each(['google-generative-ai', 'google-vertex', 'bedrock-converse-stream'])('carries explicit budget for an unknown custom model over %s', async endpoint => {
+  let body: any;
+  const step = createStepFunction({ ...request, provider: { ...request.provider, endpoint, model: 'custom-unlisted' }, thinkingEffort: 'low', maxOutputTokens: 4096,
+    catalog: [], fetchImpl: async (_url, init) => {
+      body = JSON.parse(String(init?.body));
+      return jsonResponse(endpoint === 'bedrock-converse-stream' ? { output: { message: { role: 'assistant', content: [{ text: 'ok' }] } }, stopReason: 'end_turn' }
+        : { candidates: [{ content: { parts: [{ text: 'ok' }] }, finishReason: 'STOP' }] });
+    },
+  });
+  const result = await step([], undefined, {}, { allowTools: false });
+  expect(result.text).toBe('ok');
+  expect(endpoint === 'bedrock-converse-stream' ? body.additionalModelRequestFields.thinking.budget_tokens : body.generationConfig.thinkingConfig.thinkingBudget).toBe(2048);
+});

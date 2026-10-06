@@ -29,6 +29,9 @@ import type { CompletedBody, StreamFragment, StreamedCompletion } from "../../tu
  * eligibility remains the turn layer's responsibility; this satisfies a validation
  * rule that has no "none" spelling.
  */
+const MIN_THINKING_BUDGET_TOKENS = 1024;
+const MIN_ANSWER_TOKENS = 1024;
+
 const PLACEHOLDER_TOOL_NAME = "__no_tools__";
 
 const PLACEHOLDER_TOOL = {
@@ -85,7 +88,7 @@ function converseBody(input: TurnRequest): Record<string, unknown> {
   const maxTokens = input.maxOutputTokens ?? 4096;
   // Keep the requested output ceiling and reserve room for the answer. A budget
   // below 1024 is rejected by the model, so small ceilings get no thinking.
-  const budget = Math.min(input.thinkingBudgetTokens ?? 0, maxTokens - 1024);
+  const budget = Math.min(input.thinkingBudgetTokens ?? 0, maxTokens - MIN_ANSWER_TOKENS);
   const toolConfig = toolConfigFor({
     tools: input.tools,
     allowTools: input.allowTools,
@@ -105,7 +108,7 @@ function converseBody(input: TurnRequest): Record<string, unknown> {
     },
     // Thinking is a model-level request, not a sampling setting: it travels in
     // the protocol's own fields when the configured budget fits the output cap.
-    ...(budget >= 1024
+    ...(budget >= MIN_THINKING_BUDGET_TOKENS
       ? {
           additionalModelRequestFields: {
             thinking: { type: "enabled", budget_tokens: budget },
@@ -164,6 +167,7 @@ async function bedrockSigner(): Promise<RequestSigner | undefined> {
 }
 
 declareEndpoint("bedrock-converse-stream", {
+  minimumThinkingOutputTokens: MIN_THINKING_BUDGET_TOKENS + MIN_ANSWER_TOKENS,
   // This protocol names the model in the URL, which is why the path is a function.
   path: (model, stream = true) => `/model/${encodeURIComponent(model)}/${stream ? "converse-stream" : "converse"}`,
   // Signing happens at the transport, because a signature covers the body and the

@@ -119,11 +119,11 @@ it("reports a partial result when the session save succeeds and the global save 
   vi.spyOn(configStore, "writeUserRuntimeConfigFile").mockImplementation(() => { throw new Error("sensitive fixture error"); });
   const refreshRuntimeConfig = vi.fn();
   const result = await runModelCommand(["use", "new", "--global"], { cwd: home, sessionId: session.id, refreshRuntimeConfig });
-  expect(result.output).toContain("Session model switched to new, but saving the global default failed");
+  expect(result.output).toContain("Session preference saved and verified. Global write outcome is unverified.");
   expect(result.output).not.toContain("sensitive fixture error");
   expect(readSessionModel(session.id)?.model).toBe("new");
   expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(original);
-  expect(refreshRuntimeConfig).toHaveBeenCalledOnce();
+  expect(refreshRuntimeConfig).not.toHaveBeenCalled();
 });
 
 it("rejects damaged session state without replacing it or writing global defaults", async () => {
@@ -272,7 +272,7 @@ it('allows sequential selections and a no-op after a model-only session overlay 
       runtimeConfig: context.runtimeConfig, refreshRuntimeConfig: () => refreshShellRuntimeConfig(context) });
     expect(result.output).toContain(`Model switched to ${model}`);
     expect(context.runtimeConfig.providerConnections[0]?.model).toBe(model);
-    expect(context.runtimeConfig.providerCredentials.openai).toEqual({ model });
+    expect(context.runtimeConfig.providerCredentials.openai).toEqual({ model, thinkingEffort: null });
     expect(readSessionModel(session.id)?.model).toBe(model);
     if (before.selection?.model === model) expect(readSessionModelEdit(session.id).revision).toBe(before.revision);
   }

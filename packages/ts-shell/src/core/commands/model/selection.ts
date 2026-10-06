@@ -3,31 +3,38 @@ import path from 'node:path';
 import { ConfigWriteError } from '../../../config/outcome.js';
 import { sameValue } from '../../../config/values.js';
 import { projectSessionModel } from '../../../session/model/projection.js';
-import { readSessionModelEdit, writeSessionModel, type SessionModelEdit } from '../../../session/model/state.js';
+import { readSessionModelEdit, writeSessionModel, type SessionModelEdit, type SessionModelReceipt } from '../../../session/model/state.js';
 import { SessionModelWriteError } from '../../../session/model/outcome.js';
 import { defaultHookDispatcher } from '../../hooks/hookDispatcher.js';
 import { loadCatalog } from '../../models/catalogStore.js';
 import { providerFacts } from '../../providers/facts.js';
 import { configurationApplicationNotice } from '../configuration.js';
+import { currentModelPreference } from './preference.js';
+import { globalModelFailure } from './outcome.js';
+import { effortCapability } from '../../models/capability.js';
+import { endpointShape } from '../../../provider/endpoints/index.js';
+import { effortOutputFailure } from '../../../provider/endpoints/effort.js';
+import { catalogModel, providerEndpoint } from '../../models/catalog.js';
+import type { ThinkingPreference } from '../../models/effort.js';
 import type { CommandContext } from '../types.js';
 
-export async function setModel(args: string[], context: CommandContext, global: boolean): Promise<string> {
-  try { return await selectModel(args, context, global); }
+export async function setModel(args: string[], context: CommandContext, global: boolean, requestedEffort?: ThinkingPreference): Promise<string> {
+  try { return await selectModel(args, context, global, requestedEffort); }
   catch { return 'Model selection outcome is unverified. Inspect saved session and global preferences before retrying.'; }
 }
 
-async function selectModel(args: string[], context: CommandContext, global: boolean): Promise<string> {
+async function selectModel(args: string[], context: CommandContext, global: boolean, requestedEffort?: ThinkingPreference): Promise<string> {
   const target = args[0]?.trim();
-  if (!target) {
+  if (!target && requestedEffort === undefined) {
     return "Usage: /model use <provider>/<model>, or /model use <model> to keep the current provider.";
   }
   // A `provider/model` target names both; a bare name keeps the active provider.
   // Model ids can themselves contain slashes, so only a leading segment that is a
   // known provider is read as one.
-  const separator = target.indexOf("/");
-  const prefix = separator > 0 ? target.slice(0, separator) : undefined;
+  const separator = target?.indexOf("/") ?? -1;
+  const prefix = separator > 0 ? target!.slice(0, separator) : undefined;
   const namedProvider = prefix && loadCatalog().some((entry) => entry.id === prefix) ? prefix : undefined;
-  const model = namedProvider ? target.slice(separator + 1) : target;
+  let model: string | undefined = namedProvider ? target!.slice(separator + 1) : target;
   if (namedProvider && !model) {
     return `\`${namedProvider}\` has no models listed. Name one: /model use ${namedProvider}/<model>.`;
   }
@@ -37,8 +44,24 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   const activeId = config.activeProviderConnectionId?.trim();
   const activeConnection = connections.find((item) => item.id.trim() === activeId);
   const provider = activeConnection?.provider ?? config.provider ?? "openai";
-  const effective = context.runtimeConfig ?? projectSessionModel(config, context.sessionId);
-  const fromModel = effective.providerConnections?.find(item => item.id.trim() === activeId)?.model ?? effective.providerCredentials?.[provider]?.model ?? "default";
+  const loaded = getRuntimeConfig(context.projectRoot ?? context.cwd);
+  if (!loaded.configValidation.valid) return 'Model switch blocked: the stored configuration is invalid. Correct it and reload before selecting a model.';
+  const effective = context.runtimeConfig ?? projectSessionModel(loaded, context.sessionId);
+  const current = currentModelPreference(effective, context.projectRoot ?? context.cwd);
+  const fromModel = current.model ?? 'default';
+  model ??= current.model;
+  if (!model) return 'Model switch blocked: no concrete model is selected. Select one with /model use <model> before changing effort.';
+  const thinkingEffort = requestedEffort === undefined ? current.thinkingEffort : requestedEffort;
+  const catalog = loadCatalog();
+  const capability = effortCapability(catalog, provider, model, thinkingEffort);
+  const candidate = catalogModel(catalog, provider, model);
+  const endpoint = providerEndpoint(catalog, provider);
+  // Publication reloads this cap; startup overrides currently declare no output limit.
+  const budgetFailure = thinkingEffort === null ? undefined : effortOutputFailure(endpointShape(endpoint), loaded.maxOutputTokens ?? candidate?.maxTokens);
+  if (budgetFailure) return `Model switch blocked: ${budgetFailure}`;
+  const capabilityNotice = !candidate ? 'Model catalogue entry is unavailable; capability is unverified. Use /model refresh or /model config. Remote availability is not verified.'
+    : capability === 'unverified' ? 'Effort capability is unverified in the model catalogue. Use /model refresh or /model config to update metadata; remote availability is not verified.' : undefined;
+  if (capability === 'unsupported') return 'Model switch blocked: this model does not support the selected reasoning effort. Choose another level or --effort auto.';
   if (!activeId) {
     return "No active connection. Run /connect login ... first.";
   }
@@ -46,8 +69,6 @@ async function selectModel(args: string[], context: CommandContext, global: bool
     return `Active connection not found: ${activeId}`;
   }
   if (context.admission?.()) return 'Model switch blocked: session, workspace or configuration admission changed.';
-  const loaded = getRuntimeConfig(context.projectRoot ?? context.cwd);
-  if (!loaded.configValidation.valid) return 'Model switch blocked: the stored configuration is invalid. Correct it and reload before selecting a model.';
   if (context.runtimeConfig && (effective.activeProviderConnectionId?.trim() !== activeId
     || !sameValue(connectionIdentity(effective.providerConnections?.find(item => item.id.trim() === activeId)), connectionIdentity(loaded.providerConnections.find(item => item.id === activeId)))
     || !sameValue(credentialIdentity(effective.providerCredentials?.[provider]), credentialIdentity(loaded.providerCredentials[provider])))) {
@@ -95,7 +116,8 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   // An asynchronous hook cannot authorize a choice based on replaced credentials
   // or a different active connection. Unrelated field edits remain independent.
   const beforeCommit = (): boolean => {
-    if (context.admission?.()) return false;
+    if (context.admission?.() || !sameValue(catalogModel(loadCatalog(), provider, model), candidate)) return false;
+    if (providerEndpoint(loadCatalog(), provider) !== endpoint || (thinkingEffort !== null && getRuntimeConfig(context.projectRoot ?? context.cwd).maxOutputTokens !== loaded.maxOutputTokens)) return false;
     const latest = readRuntimeConfigEditAt(edit.path).values;
     return latest.activeProviderConnectionId === config.activeProviderConnectionId && latest.provider === config.provider
       && sameValue(latest.providerConnections?.find(item => item.id.trim() === activeId), activeConnection)
@@ -104,7 +126,7 @@ async function selectModel(args: string[], context: CommandContext, global: bool
 
   const updatedAt = new Date().toISOString();
   const nextConnections = connections.map((item) =>
-    item.id.trim() === activeId ? { ...item, model, updatedAt } : item,
+    item.id.trim() === activeId ? { ...item, model, thinkingEffort, updatedAt } : item,
   );
   const activeProvider = activeConnection.provider;
   const next: RuntimeConfigFile = {
@@ -116,13 +138,14 @@ async function selectModel(args: string[], context: CommandContext, global: bool
       ...(config.providerCredentials ?? {}),
       [provider]: {
         ...(config.providerCredentials?.[provider] ?? {}),
-        model,
+        model, thinkingEffort,
       },
     },
   };
+  let receipt: SessionModelReceipt | undefined;
   if (context.sessionId) {
     try {
-      writeSessionModel(context.sessionId, { connectionId: activeId, provider, model }, sessionEdit!, beforeCommit);
+      receipt = writeSessionModel(context.sessionId, { connectionId: activeId, provider, model, thinkingEffort }, sessionEdit!, beforeCommit);
     } catch (error) {
       return sessionFailure(error);
     }
@@ -133,15 +156,11 @@ async function selectModel(args: string[], context: CommandContext, global: bool
       if (!beforeCommit()) throw new ConfigWriteError('conflict', 'unchanged');
       configPath = writeUserRuntimeConfigFile(next, edit);
     } catch (error) {
-      const applicationNotice = configurationApplicationNotice(context);
-      if (error instanceof ConfigWriteError) return `${context.sessionId ? `Session model preference saved for ${model}. ` : ''}${error.message}${applicationNotice ? ` ${applicationNotice}` : ''}`;
-      return context.sessionId
-        ? `Session model switched to ${model}, but saving the global default failed. Global write outcome is unverified.`
-        : "Saving the global model default failed. Global write outcome is unverified.";
+      return globalModelFailure(error, receipt);
     }
   }
   const applicationNotice = configurationApplicationNotice(context);
-  if (applicationNotice) return `Model preference saved for ${model}. ${applicationNotice}`;
+  if (applicationNotice) return [`Model preference saved for ${model}; reasoning effort: ${thinkingEffort ?? "auto (provider decides)"}.`, capabilityNotice, applicationNotice].filter(Boolean).join("\n");
 
   // Dispatch PostModelSwitch Hook
   await defaultHookDispatcher.dispatch({
@@ -155,6 +174,8 @@ async function selectModel(args: string[], context: CommandContext, global: bool
 
   return [
     `Model switched to ${model}.`,
+    `Reasoning effort: ${thinkingEffort ?? "auto (provider decides)"}.`,
+    ...(capabilityNotice ? [capabilityNotice] : []),
     `Provider: ${provider}`,
     `Connection: ${activeId}`,
     context.sessionId ? "Scope: current session (saved for resume)." : "Scope: global default.",
@@ -168,12 +189,12 @@ function sessionFailure(error: unknown): string {
 
 function connectionIdentity(connection: ProviderConnectionConfig | undefined): object | undefined {
   if (!connection) return undefined;
-  const { model, createdAt, updatedAt, label, ...identity } = connection;
+  const { model, thinkingEffort, createdAt, updatedAt, label, ...identity } = connection;
   return identity;
 }
 
 function credentialIdentity(credential: ProviderCredentialConfig | undefined): object | undefined {
   if (!credential) return undefined;
-  const { model, ...identity } = credential;
+  const { model, thinkingEffort, ...identity } = credential;
   return Object.keys(identity).length ? identity : undefined;
 }

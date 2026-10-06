@@ -250,3 +250,8 @@ Cheers 已有 [picker 注册器](../../packages/ts-shell/src/cli/interactive/pic
 本轮只做源码事实、引用路径、数量、映射及文档差异核对，没有运行 build/tests、PTY、外部账户操作或真实 Provider。文档修正不等于功能已修复。
 
 实施后每组必须具备正常/非法输入、交互与非交互、busy/cancel、持久化/恢复、并发/过期状态和真实失败结果证据。关键参考决定需要反转测试：如 preview 不压缩、session model 不改全局、raw alias 不变义、过期 hunk 不暂存、undo 不覆盖后续编辑、共享会话不自动授写权限、显式 cap 不被并发请求突破。按 owner 做 focused 验证，再按跨域风险扩展，不能以单个正常样例宣称生产就绪。
+
+
+## 8. 模型与 thinking 实施补充
+
+[Phase 19 §8.76](phase-19-decisions.md#876-cfg-05模型与-effort-联合选择请求快照与全局失败补偿)已将 model/effort 接入同一会话记录与能力校验，`/thinking` 默认保存到会话，`--global` 显式修改默认；auto/off/none 均表示 provider 决定。已知不支持明确拒绝，目录缺项视为能力未验证并保留自定义 ID，不能把本地目录缺失当作远端不存在。保存与生效分开报告，global 明确未写可按 revision 补偿，未知结果仍需检查并 reload。该进展不代表本研究的其他 parity 项已全部完成。

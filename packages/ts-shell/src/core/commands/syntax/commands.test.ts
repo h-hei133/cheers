@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProjectTrustStore, projectTrust } from "../../security/projectTrust.js";
 import { runTrustCommand } from "../trustCommandRuntime.js";
 import { runTodoCommand, getSessionTodos, forgetSessionTodos } from "../todoCommandRuntime.js";
-import { runThinkingCommand, getThinkingEffort } from "../thinkingCommandRuntime.js";
+import { runThinkingCommand } from "../thinkingCommandRuntime.js";
 import { routeSlashCommand } from "../slashRouter.js";
 import { createCommandRegistry } from "../registry.js";
 import { trustSyntax } from "../trust/syntax.js";
@@ -13,10 +13,18 @@ import { todoSyntax } from "../todo/syntax.js";
 import { thinkingSyntax } from "../thinking/syntax.js";
 import { parseSyntax } from "./parse.js";
 
+import { SessionManager } from '../../../session/SessionManager.js';
+import { readSessionModel } from '../../../session/model/state.js';
+import { getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../config/runtimeConfig.js';
 let root: string;
+function thinkingContext() {
+  vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root);
+  writeUserRuntimeConfigFile({ provider: 'openai', activeProviderConnectionId: 'test', providerConnections: [{ id: 'test', provider: 'openai', authType: 'api-key', apiKey: 'synthetic', model: 'custom-model', createdAt: '2026-01-01', updatedAt: '2026-01-01' }] }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+  return { cwd: root, sessionId: new SessionManager().createNew(root).id };
+}
 beforeEach(() => { root = fs.mkdtempSync(path.join(os.tmpdir(), "command-syntax-")); });
 afterEach(() => {
-  vi.restoreAllMocks();
+  vi.restoreAllMocks(); vi.unstubAllEnvs();
   forgetSessionTodos(root);
   fs.rmSync(root, { recursive: true, force: true });
 });
@@ -71,17 +79,19 @@ describe("state-changing argument validation", () => {
     expect(getSessionTodos(root)).toEqual([{ id: 1, text: "--flag is task prose", status: "done" }]);
   });
 
-  it.each(["high extra", "off extra", "low --global", "maximum"])("rejects thinking %s before state changes", async text => {
-    await runThinkingCommand(["medium"], { cwd: root });
-    const result = await runThinkingCommand(text.split(" "), { cwd: root });
+  it.each(["high extra", "off extra", "low --unknown", "maximum"])("rejects thinking %s before state changes", async text => {
+    const context = thinkingContext();
+    await runThinkingCommand(["medium"], context);
+    const result = await runThinkingCommand(text.split(" "), context);
     expect(result.output).toContain("Invalid /thinking arguments:");
-    expect(getThinkingEffort(root)).toBe("medium");
+    expect(readSessionModel(context.sessionId)?.thinkingEffort).toBe("medium");
   });
 
   it.each(["off", "auto", "none"])("keeps thinking %s as the same removal of an effort preference", async action => {
-    await runThinkingCommand(["medium"], { cwd: root });
-    await runThinkingCommand([action], { cwd: root });
-    expect(getThinkingEffort(root)).toBeUndefined();
+    const context = thinkingContext();
+    await runThinkingCommand(["medium"], context);
+    await runThinkingCommand([action], context);
+    expect(readSessionModel(context.sessionId)?.thinkingEffort).toBeNull();
   });
 });
 

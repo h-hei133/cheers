@@ -41,6 +41,8 @@ export type EndpointKind = string;
 
 /** What one endpoint needs to say about itself. */
 export interface EndpointShape {
+  /** Smallest output cap that can hold a thinking budget and an answer. */
+  readonly minimumThinkingOutputTokens?: number;
   /** An optional model-list resource at the same base URL. Absent means the
    * generation endpoint has no generic readiness probe; the request owns validation. */
   readonly modelsPath?: string;

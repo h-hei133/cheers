@@ -151,9 +151,8 @@ export interface ModelRequestShape {
  * stores. A model may name them differently, which is what `thinkingLevelMap`
  * is for — the level is the choice, the mapping is how it is said.
  */
-export const THINKING_LEVELS = ["low", "medium", "high"] as const;
-
-export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
+export { THINKING_LEVELS, type ThinkingLevel } from './effort.js';
+import type { ThinkingLevel } from './effort.js';
 
 /** Prices per million tokens, as the model publishes them. */
 export interface ModelCostRates {

@@ -6,7 +6,10 @@ import type { AssistantStep } from "../core/agent/loop.js";
 import { parseJsonWithRepair } from "../model-adapters/jsonRepair.js";
 import { recordSessionUsage } from "../observability/usageTelemetry.js";
 import { samplingTemperature } from "../core/commands/fastCommandRuntime.js";
-import { getThinkingEffort } from "../core/commands/thinkingCommandRuntime.js";
+import { captureThinkingPreference } from '../core/models/preference.js';
+import { effortOutputFailure } from '../provider/endpoints/effort.js';
+import { effortCapability } from '../core/models/capability.js';
+import type { ThinkingPreference } from '../core/models/effort.js';
 import { microcompactMessages } from "../core/query/microCompact.js";
 import { isEventStream, type ProviderUsage, type StreamedToolCall } from "./completion.js";
 import { DEFAULT_ENDPOINT_KIND, endpointKind, endpointShape, endpointTurnBody, endpointUrl, type EndpointKind } from "../provider/endpoints/index.js";
@@ -107,6 +110,8 @@ export type StepFunction = (
 ) => Promise<AssistantStep>;
 
 export interface StepRequest {
+  readonly thinkingEffort?: ThinkingPreference;
+  readonly thinkingEffortExplicit?: boolean;
   readonly provider: ProviderTarget;
   readonly workspaceRoot: string;
   readonly sessionId: string;
@@ -224,6 +229,8 @@ function withFinalStepNotice(
 
 export function createStepFunction(request: StepRequest): StepFunction {
   let effortAccepted = true;
+  const captured = captureThinkingPreference(request.workspaceRoot, request.thinkingEffort);
+  const explicitEffort = request.thinkingEffortExplicit ?? captured.thinkingEffortExplicit;
   const fetchImpl = request.fetchImpl ?? fetch;
   const retry = resolveRetryPolicy("provider", request.retry ?? {});
   // The model identity travels with every step this function returns, so a
@@ -249,7 +256,10 @@ export function createStepFunction(request: StepRequest): StepFunction {
     const stamp = (step: AssistantStep): AssistantStep => (origin ? { ...step, origin } : step);
     let streamAttempts = 0;
     for (;;) {
-      const effort = effortAccepted ? getThinkingEffort(request.workspaceRoot) : undefined;
+      const effort = effortAccepted ? captured.thinkingEffort ?? undefined : undefined;
+      if (explicitEffort && effort && effortCapability(request.catalog ?? [], request.provider.provider ?? '', request.provider.model, effort) === 'unsupported') {
+        return stamp(errorStep('The selected model does not support this reasoning effort. Select another level or use /thinking auto.'));
+      }
       // Resolved per attempt rather than once, because the shape depends on the
       // level, and a refused `reasoning_effort` is answered by rebuilding the
       // request without it.
@@ -276,6 +286,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
       let payload: Record<string, unknown>;
       let requestHeaders: Readonly<Record<string, string>> = {};
       try {
+        const budgetFailure = explicitEffort && effort ? effortOutputFailure(endpointShape(endpoint), request.maxOutputTokens ?? shape.maxOutputCeiling) : undefined;
+        if (budgetFailure) return stamp(errorStep(budgetFailure));
         requestHeaders = endpointShape(endpoint).requestHeaders?.({
           provider: request.provider.provider,
           model: request.provider.model,
@@ -409,7 +421,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
           if (isContextOverflow(detail)) {
             return stamp(errorStep(`${CONTEXT_OVERFLOW_PREFIX}${detail.slice(0, 200)}`));
           }
-          if (effort && /reasoning_effort/i.test(detail)) {
+          if (effort && /reasoning_effort|thinking|reasoning.*(?:effort|budget)/i.test(detail) && attemptResponse.status >= 400 && attemptResponse.status < 500 && attemptResponse.status !== 429) {
+            if (explicitEffort) return stamp(errorStep('Provider rejected the selected reasoning effort. The preference was preserved. Select another level or use /thinking auto.'));
             dropEffort = true;
             break;
           }

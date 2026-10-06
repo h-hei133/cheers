@@ -26,12 +26,12 @@ export function projectConfigOrigins(raw: Record<string, unknown>, effective: ob
 }
 
 /** Session model attribution names only fixed provider slots and numeric connection positions. */
-export function sessionModelOrigins(provenance: ConfigProvenance, connectionIndex: number, provider: string): ConfigProvenance {
+export function sessionModelOrigins(provenance: ConfigProvenance, connectionIndex: number, provider: string, hasEffort = false): ConfigProvenance {
   const result = { ...provenance };
   for (const [key, childKey] of [['providerConnections', String(connectionIndex)], ['providerCredentials', provider]]) {
     const parent = result[key] ?? origin('default'); const child = parent.children?.[childKey] ?? origin('default');
     const model = replaceOrigin(child.children?.model, origin('session'));
-    const children = { ...child.children, model };
+    const children = { ...child.children, model, ...(hasEffort ? { thinkingEffort: replaceOrigin(child.children?.thinkingEffort, origin('session')) } : {}) };
     const updated = { ...child, children, sources: sourcesOf(Object.values(children)) };
     const siblings = { ...parent.children, [childKey]: updated };
     result[key] = { ...parent, children: siblings, sources: sourcesOf(Object.values(siblings)) };

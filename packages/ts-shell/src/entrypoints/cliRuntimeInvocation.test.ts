@@ -1,3 +1,8 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { writeProjectState } from '../core/state/projectState.js';
+import * as turnSession from '../turn/session.js';
 import { describe, expect, it, vi } from "vitest";
 import { createServer } from "node:http";
 import * as authorization from '../provider/request/authorization.js';
@@ -296,4 +301,27 @@ describe("CLI runtime invocation", () => {
     expect(events.at(-1)?.type).toBe("query.completed");
     expect(run.input?.pending()).toEqual({ steering: [], followUps: [] });
   });
+});
+
+
+it.each([undefined, 'medium', null] as const)('captures effort %s before readiness and shares it with step and command environment', async preference => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'invocation-effort-'));
+  fs.mkdirSync(path.join(workspace, '.agents'));
+  const turn = vi.spyOn(turnSession, 'runTurn');
+  try {
+    writeProjectState(workspace, { thinkingEffort: 'low' });
+    let captured: import('./cliRuntimeInvocation.js').CliRuntimeInvocationRequest | undefined;
+    const run = await runCliRuntimeInvocation(baseInput({ workspaceRoot: workspace,
+      providerCredentialResolution: { ...providerCredentialResolution, model: 'captured-model', ...(preference !== undefined ? { thinkingEffort: preference } : {}) },
+    }), { ...dependencies().deps,
+      checkProviderReadiness: async () => { writeProjectState(workspace, { thinkingEffort: 'high' }); return { ok: true }; },
+      createStep: request => { captured = request; return async () => ({ text: 'done', toolCalls: [], stopReason: 'stop' }); },
+    });
+    await collect(run.events);
+    const level = preference === undefined ? 'low' : preference;
+    expect(captured?.thinkingEffort).toBe(level);
+    expect(captured?.thinkingEffortExplicit).toBe(preference !== undefined);
+    expect(turn.mock.calls.at(-1)?.[0].commandEnv?.CHEERS_REASONING_LEVEL).toBe(level ?? undefined);
+    expect(turn.mock.calls.at(-1)?.[0].commandEnv?.CHEERS_MODEL).toBe('captured-model');
+  } finally { turn.mockRestore(); fs.rmSync(workspace, { recursive: true, force: true }); }
 });

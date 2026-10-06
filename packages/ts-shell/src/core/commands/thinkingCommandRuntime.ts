@@ -1,80 +1,24 @@
-import { thinkingSyntax } from "./thinking/syntax.js";
-import { parseSyntax } from "./syntax/parse.js";
-import { syntaxHelp } from "./syntax/projection.js";
-import type { CommandContext, LocalCommandResult } from "./types.js";
-import {
-  readProjectState,
-  writeProjectState,
-  type ThinkingEffort,
-} from "../state/projectState.js";
+import { thinkingSyntax } from './thinking/syntax.js';
+import { parseSyntax } from './syntax/parse.js';
+import { syntaxHelp } from './syntax/projection.js';
+import { setModel } from './model/selection.js';
+import { currentModelPreference } from './model/preference.js';
+import { getRuntimeConfig } from '../../config/runtimeConfig.js';
+import { projectSessionModel } from '../../session/model/projection.js';
+import type { CommandContext, LocalCommandResult } from './types.js';
 
-/**
- * /thinking — how much reasoning to ask the provider for.
- *
- * This sends `reasoning_effort` on the request, which is the OpenAI-compatible
- * spelling most hosts accept. It is a request, not a guarantee: a provider that
- * does not implement the field ignores it, and one that rejects it has the field
- * dropped and the turn retried without it. What is not claimed is a token budget —
- * the field takes a level, and the provider decides what a level costs.
- *
- * The tier is kept per project, because how much thinking a piece of work wants is
- * a property of the work rather than of the process that happens to be running.
- */
-
-
-/** The effort recorded for this project, or none. */
-export function getThinkingEffort(workspaceRoot: string): ThinkingEffort | undefined {
-  return readProjectState(workspaceRoot).thinkingEffort ?? undefined;
-}
-
-export async function runThinkingCommand(
-  args: string[],
-  context: CommandContext,
-): Promise<LocalCommandResult> {
+export async function runThinkingCommand(args: string[], context: CommandContext): Promise<LocalCommandResult> {
   const parsed = parseSyntax(thinkingSyntax, args);
-  if (!parsed.ok) return { kind: "local", output: `Invalid /thinking arguments: ${parsed.reason}\n${syntaxHelp(thinkingSyntax)}` };
-  const root = context.cwd;
-  const current = getThinkingEffort(root);
-  const tier = parsed.action.effort;
-
-  if (tier === undefined) {
-    return {
-      kind: "local",
-      output: [
-        "### Thinking",
-        "",
-        current
-          ? `- Asking for \`${current}\` reasoning effort on every request in this project`
-          : "- Not asking for any particular effort — the provider decides",
-        "",
-        syntaxHelp(thinkingSyntax),
-        "",
-        "Providers that do not implement the field ignore it; one that rejects it has it dropped and the turn retried without it.",
-      ].join("\n"),
-    };
-  }
-
-  if (tier === null) {
-    return {
-      kind: "local",
-      output: report(
-        writeProjectState(root, { thinkingEffort: null }),
-        "Not asking for a particular effort any more.",
-      ),
-    };
-  }
-
-  return {
-    kind: "local",
-    output: report(
-      writeProjectState(root, { thinkingEffort: tier }),
-      `Asking for \`${tier}\` reasoning effort from the next turn.`,
-    ),
-  };
-}
-
-/** The outcome, with the failure named when the choice could not be kept. */
-function report(written: string | undefined, success: string): string {
-  if (written) return success;
-  return [success, "", "It could not be written to disk, so it will be lost when this process ends."].join("\n");
+  if (!parsed.ok) return { kind: 'local', output: `Invalid /thinking arguments: ${parsed.reason}\n${syntaxHelp(thinkingSyntax)}` };
+  if (parsed.action.effort !== undefined) return { kind: 'local', output: await setModel([], context, parsed.flags.has('global'), parsed.action.effort) };
+  if (parsed.flags.has('global')) return { kind: 'local', output: 'Choose an effort before --global.' };
+  const effective = context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
+  const current = currentModelPreference(effective, context.projectRoot ?? context.cwd);
+  return { kind: 'local', output: [
+    `Thinking effort: ${current.thinkingEffort ?? 'auto (provider decides)'}.`,
+    `Model: ${current.model ?? "not selected"}.`,
+    current.thinkingEffortExplicit ? 'Using the accepted session or connection preference.' : 'Using the legacy project fallback; select a level to save it in this session.',
+    'Explicit effort is preserved if the provider rejects it; choose auto to leave the decision to the provider.',
+    syntaxHelp(thinkingSyntax),
+  ].join('\n') };
 }

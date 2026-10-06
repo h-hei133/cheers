@@ -112,10 +112,13 @@ export interface ProviderAccountAuthConfig {
   readonly subscription?: SubscriptionAccountAuthConfig;
 }
 
+import type { ThinkingPreference } from '../core/models/effort.js';
+
 export interface ProviderCredentialConfig {
   readonly apiKey?: string;
   readonly baseUrl?: string;
   readonly model?: string;
+  readonly thinkingEffort?: ThinkingPreference;
   readonly accountAuth?: ProviderAccountAuthConfig;
 }
 
@@ -127,6 +130,7 @@ export interface ProviderConnectionConfig {
   readonly apiKey?: string;
   readonly baseUrl?: string;
   readonly model?: string;
+  readonly thinkingEffort?: ThinkingPreference;
   readonly accountAuth?: ProviderAccountAuthConfig;
   readonly status?: "connected" | "pending" | "error";
   readonly createdAt: string;
@@ -675,11 +679,13 @@ function normalizeProviderCredentials(
       provider,
       credentials[provider]?.accountAuth,
     );
-    if (apiKey || baseUrl || model || accountAuth) {
+    const thinkingEffort = credentials[provider]?.thinkingEffort;
+    if (apiKey || baseUrl || model || accountAuth || thinkingEffort !== undefined) {
       normalized[provider] = {
         ...(apiKey ? { apiKey } : {}),
         ...(baseUrl ? { baseUrl } : {}),
         ...(model ? { model } : {}),
+        ...(thinkingEffort !== undefined ? { thinkingEffort } : {}),
         ...(accountAuth ? { accountAuth } : {}),
       };
     }
@@ -735,6 +741,7 @@ function normalizeProviderConnections(
       ...(apiKey ? { apiKey } : {}),
       ...(baseUrl ? { baseUrl } : {}),
       ...(model ? { model } : {}),
+      ...(connection.thinkingEffort !== undefined ? { thinkingEffort: connection.thinkingEffort } : {}),
       ...(accountAuth ? { accountAuth } : {}),
       status:
         connection.status === "pending" || connection.status === "error"

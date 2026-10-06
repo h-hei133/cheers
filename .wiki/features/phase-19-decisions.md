@@ -1236,3 +1236,20 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 13 组反转均由行为断言检出，覆盖选择版本/绑定、完整核验、生命周期保留、清理失败、锁内 guard、异步基线、连接身份、菜单准入及空身份等；四个产品文件逐字节恢复后 3 文件/45 项通过。首次生命周期反转引入 undefined，先被完整序列化核验挡住，未计为有效断言反转；改为合法 JSON null 后由保留提示的断言检出。
 - regular/fullscreen 构建 CLI 各经本地合成 HTTP 两次请求：在实际 session writer 调用点注入“返回但未保存”后，/model --global 报 verification-failed，用户配置与会话选择不变，下一请求仍为 base-model；移除故障后 session-only 保存成功，下一请求为 session-model，退出保留 modelRevision，合成凭据不在终端或会话选择中。首轮合成服务漏 GET 就绪接口，产生 HTTP 501；补齐夹具接口后通过，未改产品 readiness。
 - 本批 import cycles/config consumers/declarations/node floor/docs strict/diff 检查通过，NormProof 阻断义务满足、整体 partial，四项既有函数数量和 120 项文档来源 advisory 保留。原 f9b008a6 CI 失败及独立夹具修复见 §8.74 补充；107126aa 的 Architecture Watch 37438947968 成功，CI 37438947980 最近取得的状态仍为 in_progress。--global 的会话与配置写入仍是分步操作，其后半失败可能留下已保存会话选择，现有部分结果报告继续保留；后续需要与 effort/capability 一起完成 CFG-05，CFG-01 信任/能力 policy、账户刷新代际安全与 Phase 19 其余目标继续。
+
+
+### 8.76 CFG-05：模型与 effort 联合选择、请求快照与全局失败补偿
+
+- [effort 声明](../../packages/ts-shell/src/core/models/effort.ts)、[能力 policy](../../packages/ts-shell/src/core/models/capability.ts)与现有 selection owner 共用 low/medium/high/null。`/model use <model> --effort <level|auto>` 和 `/thinking <level|off|auto|none>` 联合校验并保存完整 model/effort，会话默认、显式 `--global` 才修改用户默认。auto/off/none 表示 provider 决定，不代表关闭推理。没有具体模型时 effort-only 操作明确拒绝，不把显示占位词保存为模型 ID；旧空白连接 ID 经真实 loader 归一化。
+- 可选 effort 进入连接、provider profile、session record 的 schema/normalizer/projection/provenance。同一记录中的 null 阻止下层继承，只有缺值继续读取连接、profile 和旧项目 effort。旧项目状态仅作操作开始时捕获的兼容后备，新命令不再写项目状态；恢复和切换会话保持独立。凭据身份比较排除 model/effort 偏好，完整凭据不进入会话选择。
+- 已知 reasoning:false、compat 拒绝或 level map 的 null 在写前拒绝；不同 wire 名称仍是合法映射。目录没有模型只能说明未验证，不能证明不存在，因此保留自定义 ID 并显示目录刷新/配置提示；包括 provider-decides 选择与未立即应用的结果。异步 hook 后、状态锁内复核模型元数据、endpoint、输出上限与原有连接/准入依赖，迟到候选不能覆盖新选择。
+- 协议声明自己的最小 reasoning 输出需求，[预算校验](../../packages/ts-shell/src/provider/endpoints/effort.ts)在选择和实际请求前共用。预算型 endpoint 的未知模型也得到预算；输出 cap 无法容纳预算时拒绝显式 effort，不抬高 cap、不静默删除 thinking。预算仍可在合法 cap 内收窄，不宣称某个 level 必然消耗固定 token。选择校验使用即将重新加载发布的 cap；已接受 4096/磁盘 1500 与反向变化均有回归，支持的启动 overrides 保留。
+- invocation 在 readiness/异步续期之前捕获 effort；主请求、重试、后续 step 和命令环境使用同一捕获。显式 effort 遭 provider 拒绝时保留偏好并给受控失败，不删除 effort 重发；旧项目后备保留既有兼容重试。委派复用同一 step，预热使用实际捕获 payload；旁路问答与压缩保持已有 provider-decides 的简单请求语义，不额外继承主会话 effort。
+- [会话写入 receipt](../../packages/ts-shell/src/session/model/state.ts)区分已核验实际变更和 no-op。global 明确未写时，按当前 revision/root/完整 pair 检查后恢复本次会话变更，合并无关生命周期字段并生成新 revision；no-op 无补偿权限。较新选择、ABA、重绑和删除阻止恢复；global 未知或已核验但清理失败不猜测回滚，也不刷新发布 unresolved 状态。两个文件之间仍不具备崩溃原子性，部分/未知结果保持可见。
+- 定向比较参考模型控制中的 auth/capability 先验、显式全局保存与 auto 独立状态。采用其范围与配置状态区分；本契约对已知不支持的 level 明确拒绝，不采用静默选择邻近 level。参考中的顺序保存不作为跨文件原子性的证据。
+- 验证：扩大组合 24 文件/526 项通过；最后 publication-cap 修复后 2 文件/55 项通过，最终 Node 20.3 构建通过；19 组有效反转全部触发断言，8 个产品文件逐字节恢复，恢复后 4 文件/142 项通过。反转覆盖 null、投影、能力、目录、捕获、拒绝、输出 cap、未知模型预算/提示、具体模型、receipt revision/no-op/ABA 与 global 补偿。初版 fresh-revision 反转制造 undefined 被保存核验提前拦截，不计有效；改为合法旧 revision 后由断言检测。no-op 反转初次是未包裹的受控异常，增加明确“不抛异常”契约断言后才计入。
+- 测试过程分类：新增临时 workspace 缺 .agents 根标记导致隔离 home 内项目后备污染，已补标记并换新隔离 home；重试参数与新增参数表展开错误属于夹具问题，修正后保留原行为断言。独立审查修复未知模型+null 漏提示、effort-only 占位模型、预算型未知模型遗漏、过小 cap 遗漏与 accepted/publication cap 混用，最终 APPROVE/CLEAR。
+- regular/fullscreen 构建 CLI 各五次实际本地 HTTP：模拟 session writer 返回但未保存，下一请求仍使用原模型；成功 session high 发 xhigh；服务端拒绝后没有删除 effort 重发；auto 请求省略 effort；显式 global low 同时进入默认记录和下一请求。已知不支持组合保持两份保存状态，revision 退出后保留，终端与会话不含合成凭据，受控失败不输出合成响应详情。初版探针误把 session 路径限定在测试 data 目录，改为隔离根实际 session 布局后通过，未修改产品路径。
+- 先前 ffcbf09c 的 CI 37439272856 与 Architecture Watch 37439272847 均成功；107126aa 的 CI 37438947980 与 Architecture Watch 37438947968 也均成功。原 f9b008a6 CI 失败记录仍保留。本批远端按新提交核对；CFG-01 完整信任/能力 policy、账户刷新身份竞态及 Phase 19 十六批/七十六项总体目标继续。
+
+§8.76 门禁补充：最终 import cycles/config consumers/declarations/node floor/docs strict/diff 检查通过；NormProof 阻断义务满足、整体 partial，四项既有函数数量 advisory 与 120 项文档来源 advisory 保留。

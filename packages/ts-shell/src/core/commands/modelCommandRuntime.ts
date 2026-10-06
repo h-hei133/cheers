@@ -1,3 +1,4 @@
+import { parseEffortFlag } from "./model/preference.js";
 import { setModel } from "./model/selection.js";
 import {
   RUNTIME_PROVIDERS,
@@ -81,7 +82,7 @@ export async function runModelCommand(
   }
 
   if (action === "use" || action === "set") {
-    return { kind: "local", output: await setModel(rest, context, parsed.flags.has("global")) };
+    return { kind: "local", output: await setModel(rest, context, parsed.flags.has("global"), parseEffortFlag(parsed.flags.get("effort"))) };
   }
   if (action === "help" || action === "--help" || action === "-h") {
     return {

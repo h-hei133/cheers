@@ -1,3 +1,4 @@
+import { preferredEffort, type ThinkingPreference } from '../models/effort.js';
 import { accountAuthKey, providerFacts } from "../providers/facts.js";
 import { vertexBaseUrl, vertexTarget } from "../../provider/endpoints/googleVertex.js";
 import type {
@@ -31,6 +32,7 @@ export interface ProviderCredentialResolutionInput {
 }
 
 export interface ProviderCredentialResolution {
+  readonly thinkingEffort?: ThinkingPreference;
   readonly provider: RuntimeProvider;
   readonly credential?: ResolvedProviderCredential;
   readonly expectedEnvVarName: string;
@@ -87,9 +89,13 @@ export function resolveProviderCredential(
     input.cliModel ?? activeConnectionProfile?.model ?? configProfile?.model,
   );
 
+  const thinkingEffort = preferredEffort(activeConnectionProfile, configProfile);
+  const preference = thinkingEffort !== undefined ? { thinkingEffort } : {};
+
   const cliApiKey = input.cliApiKey?.trim();
   if (cliApiKey) {
     return {
+      ...preference,
       provider,
       expectedEnvVarName,
       baseUrl,
@@ -109,6 +115,7 @@ export function resolveProviderCredential(
   const activeConnectionAuthType = activeConnectionProfile?.authType;
   if (connectionAccountAuth && activeConnectionAuthType === "account-auth") {
     return {
+      ...preference,
       provider,
       expectedEnvVarName,
       baseUrl,
@@ -128,6 +135,7 @@ export function resolveProviderCredential(
   const envApiKey = env[expectedEnvVarName]?.trim();
   if (envApiKey) {
     return {
+      ...preference,
       provider,
       expectedEnvVarName,
       baseUrl,
@@ -147,6 +155,7 @@ export function resolveProviderCredential(
   const connectionApiKey = activeConnectionProfile?.apiKey?.trim();
   if (connectionApiKey) {
     return {
+      ...preference,
       provider,
       expectedEnvVarName,
       baseUrl,
@@ -165,6 +174,7 @@ export function resolveProviderCredential(
 
   if (connectionAccountAuth) {
     return {
+      ...preference,
       provider,
       expectedEnvVarName,
       baseUrl,
@@ -186,6 +196,7 @@ export function resolveProviderCredential(
   if (configAccountAuth) {
     const normalizedAccountAuthModel = normalizeAccountAuthModel(provider, model);
     return {
+      ...preference,
       provider,
       expectedEnvVarName,
       baseUrl,
@@ -204,6 +215,7 @@ export function resolveProviderCredential(
 
   if (configApiKey) {
     return {
+      ...preference,
       provider,
       expectedEnvVarName,
       baseUrl,
@@ -220,7 +232,7 @@ export function resolveProviderCredential(
     };
   }
 
-  return { provider, expectedEnvVarName, baseUrl, model };
+  return { ...preference, provider, expectedEnvVarName, baseUrl, model };
 }
 
 export function getProviderApiKeyEnvVarName(provider: RuntimeProvider): string {

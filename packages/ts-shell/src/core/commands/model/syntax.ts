@@ -9,7 +9,7 @@ export const modelSyntax: CommandSyntax = {
     { name: "refresh", summary: "refresh the model catalogue", flags: [] },
     { name: "config", summary: "prepare the user catalogue file", flags: [] },
     { name: "list", aliases: ["ls"], summary: "list models", parameters: [{ name: "provider", kind: "text" }], flags: [{ name: "refresh", kind: "boolean", summary: "refresh the catalogue" }] },
-    { name: "use", aliases: ["set"], summary: "switch the session model", parameters: [{ name: "model-id", kind: "text", required: true }], flags: [{ name: "global", kind: "boolean", summary: "also change the global default" }] },
+    { name: "use", aliases: ["set"], summary: "switch the session model", parameters: [{ name: "model-id", kind: "text", required: true }], flags: [{ name: "global", kind: "boolean", summary: "also change the global default" }, { name: "effort", kind: "text", values: ["low", "medium", "high", "auto", "off", "none"], summary: "select model and reasoning effort together" }] },
     { name: "help", aliases: ["--help", "-h"], summary: "show model command usage" },
   ],
 };

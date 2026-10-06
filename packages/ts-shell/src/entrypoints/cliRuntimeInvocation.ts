@@ -50,7 +50,8 @@ import type { RuntimeProvider } from "../config/runtimeConfig.js";
 import { createSyntheticStep } from "../turn/synthetic.js";
 import { commandEnvironment } from "../runtime/execution/commandEnvironment.js";
 import { createSessionStoreLayout, locateExistingSessionLayout } from "../session/store/sessionFileLayout.js";
-import { getThinkingEffort } from "../core/commands/thinkingCommandRuntime.js";
+import { captureThinkingPreference } from '../core/models/preference.js';
+import type { ThinkingPreference } from '../core/models/effort.js';
 import { toolSchemas } from "../turn/tools.js";
 import { runSubagent, type SubagentRunner } from "../core/subagents/runner.js";
 import { adaptTools } from "../turn/tools.js";
@@ -99,6 +100,8 @@ export interface CliRuntimeInvocationRequest extends Omit<CliRuntimeInvocationIn
   /** One catalog snapshot for readiness and every step in this invocation. */
   readonly providerCatalog?: readonly CatalogProvider[];
   readonly providerMode: ProviderMode;
+  readonly thinkingEffort?: ThinkingPreference;
+  readonly thinkingEffortExplicit?: boolean;
 }
 
 export interface CliRuntimeInvocationResult {
@@ -148,7 +151,7 @@ function syntheticToolIntent() {
 export function buildCliRuntimeInvocation(input: CliRuntimeInvocationInput): CliRuntimeInvocationRequest {
   const providerMode: ProviderMode = input.providerModeEnv === "synthetic" ? "synthetic" : "real";
   const { providerModeEnv: _providerModeEnv, ...request } = input;
-  return { ...request, providerMode };
+  return { ...request, ...captureThinkingPreference(input.workspaceRoot, input.providerCredentialResolution.thinkingEffort), providerMode };
 }
 
 /**
@@ -544,12 +547,7 @@ function commandEnvironmentFor(request: CliRuntimeInvocationRequest): Record<str
   if (resolution.provider) facts.provider = resolution.provider;
   if (resolution.model) facts.model = resolution.model;
 
-  try {
-    const effort = getThinkingEffort(request.workspaceRoot);
-    if (effort) facts.reasoningLevel = effort;
-  } catch {
-    // No recorded level means the provider decides; nothing to report.
-  }
+  if (request.thinkingEffort) facts.reasoningLevel = request.thinkingEffort;
 
   return commandEnvironment(process.env, facts) as Record<string, string>;
 }
@@ -637,6 +635,8 @@ function createProviderStep(
     sessionId: request.sessionId,
     systemPrompt: buildSystemPrompt(request.agentMode, promptContext),
     systemPromptFor: (agentMode, toolNames) => buildSystemPrompt(agentMode, { ...promptContext, toolNames }),
+    thinkingEffort: request.thinkingEffort,
+    thinkingEffortExplicit: request.thinkingEffortExplicit,
     tools: toolSchemas(tools),
     catalog,
     // Sampling settings travel with the request, not with the provider: a

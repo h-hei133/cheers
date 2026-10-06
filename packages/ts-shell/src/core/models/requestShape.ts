@@ -137,7 +137,7 @@ export function resolveRequestShape(
   if (!entry) {
     return {
       ...DEFAULT_REQUEST_SHAPE,
-      ...(level ? { thinkingLevelName: level } : {}),
+      ...(level ? { thinkingLevelName: level, thinkingBudgetTokens: THINKING_BUDGET_TOKENS[level] } : {}),
     };
   }
 
