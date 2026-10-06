@@ -3,8 +3,8 @@ import { parseSyntax } from "./syntax/parse.js";
 import { syntaxHelp } from "./syntax/projection.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { createCoreToolRegistry } from "../tools/registry.js";
-import { toolPlanMode } from "../query/toolPolicy.js";
-import type { ToolDefinition } from "../../tools/types.js";
+import { toolReport, toolsReport } from "./tools/report.js";
+import { reportText } from "./report/projection.js";
 
 export const toolsSyntax = entitySyntax("tools");
 
@@ -26,7 +26,7 @@ export async function runToolsCommand(
 ): Promise<LocalCommandResult> {
   const parsed = parseSyntax(toolsSyntax, args);
   if (!parsed.ok) return { kind: "local", output: `Invalid /tools arguments: ${parsed.reason}\n${syntaxHelp(toolsSyntax)}` };
-  const registry = context.getToolPool ? await context.getToolPool() : createCoreToolRegistry();
+  const registry = await readToolPool(context);
   const wanted = parsed.args[0];
 
   if (wanted) {
@@ -37,70 +37,15 @@ export async function runToolsCommand(
         output: `No tool named \`${wanted}\`. \`/tools\` lists the ${registry.size} there are.`,
       };
     }
-    return { kind: "local", output: detail(tool) };
+    const report = toolReport(tool);
+    return { kind: "local", output: reportText(report), report };
   }
 
-  const rows = [...registry.values()]
-    .sort((left, right) => left.name.localeCompare(right.name))
-    .map((tool) => `| \`${tool.name}\` | ${toolPlanMode(tool.name, tool)} | ${firstSentence(tool.description)} |`);
-
-  return {
-    kind: "local",
-    output: [
-      `### Tools (${registry.size})`,
-      "",
-      "| Tool | Plan mode | What it does |",
-      "| :--- | :--- | :--- |",
-      ...rows,
-      "",
-      "`/tools <name>` shows one tool's arguments. Plan mode permits only read-only `bash` commands and `browser` actions. Eligible tools still require the session's permissions and approval.",
-    ].join("\n"),
-  };
+  const report = toolsReport(registry);
+  return { kind: "local", output: reportText(report), report };
 }
 
-/** One tool in full: what it does and what it takes. */
-function detail(tool: ToolDefinition): string {
-  const { name, description, argsSchema: schema } = tool;
-  const properties = schema.properties;
-  const required = new Set(Array.isArray(schema.required) ? (schema.required as string[]) : []);
-  const lines = [`### \`${name}\``, "", description.trim(), "", `- Plan mode: ${toolPlanMode(name, tool)}`, ""];
-
-  if (!properties || typeof properties !== "object") {
-    lines.push("It takes no arguments.");
-    return lines.join("\n");
-  }
-  lines.push("| Argument | Type | Required |", "| :--- | :--- | :--- |");
-  for (const [key, value] of Object.entries(properties as Record<string, unknown>)) {
-    const shape = value && typeof value === "object" ? (value as { type?: unknown }) : {};
-    const type = typeof shape.type === "string" ? shape.type : "any";
-    lines.push(`| \`${key}\` | ${type} | ${required.has(key) ? "yes" : "no"} |`);
-  }
-  return lines.join("\n");
-}
-
-/**
- * The first sentence of a description, so the table stays one row per tool.
- *
- * An abbreviation is not a sentence end. Cutting at the first ". " turned
- * "matching a path pattern (e.g. *.ts)" into "matching a path pattern (e.g." —
- * technically the first period, and useless as a description.
- */
-function firstSentence(description: string): string {
-  const flat = description.replace(/\s+/g, " ").trim();
-  let from = 0;
-  for (;;) {
-    const stop = flat.indexOf(". ", from);
-    if (stop < 0) break;
-    if (!ABBREVIATION.test(flat.slice(0, stop + 1))) return trim(flat.slice(0, stop + 1));
-    from = stop + 2;
-  }
-  return trim(flat);
-}
-
-/** Abbreviations whose period is not the end of a sentence. */
-const ABBREVIATION = /\b(?:e\.g|i\.e|etc|vs|cf|no)\.$/i;
-
-/** Short enough for one table row. */
-function trim(text: string): string {
-  return text.length > 110 ? `${text.slice(0, 109)}…` : text;
+/** Commands and choosers inspect the same current pool; neither executes it. */
+export async function readToolPool(context: CommandContext) {
+  return context.getToolPool ? context.getToolPool() : createCoreToolRegistry();
 }

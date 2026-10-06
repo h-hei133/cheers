@@ -6321,3 +6321,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 
 
 ## [2026-10-07] feat | Phase 19 UI-06 cost/hotkey 迁移到共享语义报告，费用按一次 accepted catalog 区分 provider/model、unknown/partial/已支持零与极小正数；快捷键保留有效绑定和逐键终端警告。147 项及构建、六组反转/恢复后 34 项、两模式 actual CLI 与无 ANSI print、独立 APPROVE/CLEAR 通过；见 features/phase-19-decisions.md §8.95。tools 等报告与完整 Phase 19 继续。
+
+## [2026-10-07] feat | Phase 19 UI-06 tools inspection: bare /tools browses the filtered runtime pool and opens read-only semantic detail; direct/print paths share report facts; stale reports and input holds follow overlay revisions; queued catalog failures remain distinct from empty results. Node 20.3 build and 182 tests, six effective reversals with 39 restored tests, independent APPROVE/CLEAR, regular/fullscreen actual CLI and ANSI-free print passed with zero provider requests. See phase-19-decisions.md §8.96; remaining reports, JSON/replay and full Phase 19 continue.

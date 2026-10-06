@@ -16,8 +16,8 @@ describe("/tools", () => {
       mcpAnnotations: { readOnlyHint: true }, execute: async () => ({ success: true }) };
     const context = { cwd: process.cwd(), getToolPool: async () => new Map([[tool.name, tool]]) };
     const detail = await runToolsCommand([tool.name], context);
-    expect(detail.output).toContain("### `mcp__notes__Read`");
-    expect(detail.output).toContain("| `id` | string | yes |");
+    expect(detail.output).toContain("### mcp__notes__Read");
+    expect(detail.output).toContain("| id | string | yes |");
     expect(detail.output).toContain("Plan mode: allowed");
     expect((await runToolsCommand(["write"], context)).output).toContain("No tool named");
   });
@@ -26,13 +26,13 @@ describe("/tools", () => {
 
     expect(result.output).toMatch(/### Tools \(\d+\)/);
     for (const name of ["bash", "read", "write", "edit", "glob", "grep"]) {
-      expect(result.output).toContain(`\`${name}\``);
+      expect(result.output).toContain(`| ${name} |`);
     }
   });
 
   it("says which tools plan mode blocks, per tool rather than in prose", async () => {
     const result = await runToolsCommand([], { cwd: process.cwd() });
-    const row = (name: string) => result.output.split("\n").find((line) => line.startsWith(`| \`${name}\``)) ?? "";
+    const row = (name: string) => result.output.split("\n").find((line) => line.startsWith(`| ${name} |`)) ?? "";
 
     expect(row("write")).toContain("blocked");
     expect(row("read")).toContain("allowed");
@@ -42,8 +42,8 @@ describe("/tools", () => {
   it("shows one tool's arguments and which are required", async () => {
     const result = await runToolsCommand(["bash"], { cwd: process.cwd() });
 
-    expect(result.output).toContain("### `bash`");
-    expect(result.output).toContain("| `command` | string | yes |");
+    expect(result.output).toContain("### bash");
+    expect(result.output).toContain("| command | string | yes |");
   });
 
   it("does not cut a description at an abbreviation's full stop", async () => {

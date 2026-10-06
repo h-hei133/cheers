@@ -10,6 +10,7 @@ import type { Transcript } from "../../../presentation/tui/transcript/container.
 import type { Picker } from "../overlay.js";
 import { connectionPicker } from "./connections.js";
 import { helpPicker } from "./help.js";
+import { toolsPicker } from "./tools.js";
 import { copyPicker } from "./copy.js";
 import { modelPicker } from "./model.js";
 import { permissionPicker } from "./permissions.js";
@@ -59,6 +60,7 @@ type PickerFactory = (host: PickerHost, argument?: string) => Picker;
 
 const PICKERS: Record<string, PickerFactory> = {
   help: () => helpPicker(),
+  tools: (host) => toolsPicker(host.commandContext),
   model: (host) => modelPicker(host.commandContext),
   copy: (host) => copyPicker(host.transcript, host.commandContext),
   resume: (host) =>

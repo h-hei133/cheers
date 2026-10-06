@@ -8,6 +8,7 @@ import { CURSOR_MARKER } from "../../presentation/tui/render/paint.js";
 import { truncateToWidth } from "../../presentation/tui/text/layout.js";
 import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 import { InputForm, type PickerInput } from './picker/input.js';
+import type { CommandReport } from '../../core/commands/report/contract.js';
 
 /**
  * The active picker.
@@ -21,6 +22,8 @@ import { InputForm, type PickerInput } from './picker/input.js';
 export type PickerForm = "panel" | "modal";
 
 export interface PickerOutcome {
+  /** Read-only documentation to retain in the transcript and open for reading. */
+  readonly report?: CommandReport;
   /** Continue a staged interaction in this same overlay without writing. */
   readonly next?: Picker;
   /** Text to append to the transcript. */
@@ -45,6 +48,8 @@ export interface Picker {
   readonly initialFilter?: string;
   /** Shown when the option set turns out to be empty. */
   readonly empty: string;
+  /** Safe failure text when loading fails, distinct from a successful empty set. */
+  readonly loadError?: string;
   readonly footer?: string;
   /** True when the picker collects several answers before applying. */
   readonly multiple?: boolean;
@@ -94,6 +99,7 @@ export class OverlayHost {
   private picker: Picker | undefined;
   private model = new OptionModel();
   private loading = false;
+  private loadFailed = false;
   private unsubscribe: (() => void) | undefined;
   private readonly optionRows = new Map<number, string>();
   private renderedWidth = 0;
@@ -127,6 +133,7 @@ export class OverlayHost {
     this.picker?.previewEnd?.();
     this.picker = picker;
     this.loading = true;
+    this.loadFailed = false;
     this.subMode = "none";
     this.subTargetId = undefined;
     this.subTargetLabel = undefined;
@@ -153,7 +160,10 @@ export class OverlayHost {
         else unsubscribe?.();
       })
       .catch(() => {
-        if (this.picker === picker && this.generation === generation) this.model.setOptions([]);
+        if (this.picker === picker && this.generation === generation) {
+          this.loadFailed = true;
+          this.model.setOptions([]);
+        }
       })
       .finally(() => {
         if (this.picker === picker && this.generation === generation) this.loading = false;
@@ -194,7 +204,7 @@ export class OverlayHost {
     if (this.subMode === "deny-reason") {
       return this.renderDenyReason(width, height);
     }
-    const empty = this.loading ? "loading…" : picker.empty;
+    const empty = this.loading ? "loading…" : this.loadFailed ? picker.loadError ?? picker.empty : picker.empty;
     const actionHints =
       picker.onDelete || picker.onRename
         ? `${picker.onDelete ? "^D delete" : ""}  ${picker.onRename ? "^R rename" : ""}`.trim()

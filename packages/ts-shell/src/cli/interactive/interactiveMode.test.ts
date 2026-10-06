@@ -20,6 +20,11 @@ import * as fileWalk from "../../runtime/execution/fileWalk.js";
 import { currentTheme } from '../../presentation/theme/theme.js';
 import { isThemePreviewActive, selectTheme } from '../../presentation/theme/selection.js';
 import { helpPicker } from './picker/help.js';
+import { toolsPicker } from './picker/tools.js';
+import * as toolCatalog from '../../core/tools/catalog.js';
+import { createReport, span } from '../../core/commands/report/projection.js';
+import type { PickerOutcome } from './overlay.js';
+import { configurationBinding } from '../../core/shell/configuration.js';
 
 function build(overrides: { observeEvents?: () => () => void; exit?: (code?: number) => void } = {}): {
   mode: InteractiveMode;
@@ -61,6 +66,70 @@ function build(overrides: { observeEvents?: () => () => void; exit?: (code?: num
 }
 
 describe("session wiring", () => {
+  it('preserves safe load failure in the queued tools chooser', async () => {
+    const { mode } = build();
+    const host = mode as unknown as { overlay: OverlayHost; openPicker(command: string, queued: boolean): void; pickerHost(): PickerHost };
+    const original = host.pickerHost();
+    vi.spyOn(host, 'pickerHost').mockReturnValue({ ...original, commandContext: { ...original.commandContext,
+      getToolPool: async () => { throw new Error('PRIVATE_RESPONSE_BODY'); } } });
+    mode.start();
+    try {
+      host.openPicker('/tools', true);
+      await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 24).join('\n'))).toContain('Tool catalog unavailable. Reopen /tools to retry.'));
+      expect(stripAnsi(host.overlay.render(100, 24).join('\n'))).not.toContain('PRIVATE_RESPONSE_BODY');
+      expect(stripAnsi(host.overlay.render(100, 24).join('\n'))).not.toContain('No matching tools');
+    } finally { mode.stop(); }
+  });
+
+  it('inspects the host tool pool through the real picker and retains a copyable report without taking the turn sink', async () => {
+    const tool = { name: 'only_visible_tool', description: 'Visible metadata.', argsSchema: { type: 'object' }, execute: vi.fn() };
+    const catalog = vi.spyOn(toolCatalog, 'loadToolCatalog').mockResolvedValue({ skills: new Map(), tools: new Map([[tool.name, tool]]) });
+    const { mode, terminal } = build();
+    const host = mode as unknown as { overlay: OverlayHost; view: InteractiveView; pager: Pager; pickerHost(): PickerHost; sink: { begin(): void }; onSubmit(text: string): void; options: { runtimeContext: ShellRuntimeContext } };
+    // This test crosses admission, unlike the minimal presentation fixtures.
+    const context = host.options.runtimeContext; const binding = configurationBinding(context);
+    context.configuration.publish(context.configuration.begin(binding), context.configuration.current.config, binding);
+    const begin = vi.spyOn(host.sink, 'begin'); const submit = vi.spyOn(host, 'onSubmit').mockImplementation(() => {});
+    mode.start();
+    try {
+      host.view.editor.setText('original draft');
+      host.overlay.open(toolsPicker(host.pickerHost().commandContext));
+      await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 24).join('\n'))).toContain(tool.name));
+      terminal.input('\r\x1b[200~transition paste\x1b[201~');
+      await vi.waitFor(() => expect(host.pager.active).toBe(true));
+      const block = host.view.transcript.last()!;
+      expect(block.report?.facts.name).toBe(tool.name); expect(block.text).toContain('Visible metadata.');
+      expect(block.collapsed).toBe(true); expect(catalog).toHaveBeenCalledTimes(2);
+      expect(host.overlay.active).toBe(false); expect(begin).not.toHaveBeenCalled(); expect(tool.execute).not.toHaveBeenCalled();
+      expect(host.view.editor.getText()).toBe('original draft'); expect(submit).not.toHaveBeenCalled();
+      terminal.input('\x1b'); await vi.waitFor(() => expect(host.pager.active).toBe(false));
+      expect(host.view.editor.getText()).toBe('original draft');
+    } finally { mode.stop(); catalog.mockRestore(); }
+  });
+
+  it.each(['replaced', 'question', 'stopped'] as const)('discards a delayed report after %s', async state => {
+    const { mode, terminal } = build();
+    const host = mode as unknown as { overlay: OverlayHost; pager: Pager; view: InteractiveView;
+      applyPicker(picker: Picker, ids: readonly string[]): void; onQuestion(text: string): void };
+    let resolve!: (value: PickerOutcome) => void;
+    const pending = new Promise<PickerOutcome>(done => { resolve = done; });
+    const report = createReport({ title: 'stale report', lines: [{ kind: 'text', spans: [span('stale body')] }], facts: {} });
+    mode.start();
+    try {
+      host.applyPicker({ title: 'Tools', form: 'panel', empty: '', holdInput: true, load: async () => [], apply: () => pending }, ['read']);
+      if (state === 'replaced') host.overlay.open(helpPicker());
+      else if (state === 'question') {
+        host.onQuestion('Answer required');
+        terminal.input('typed\x1b[200~ pasted\x1b[201~');
+        expect(host.view.editor.getText()).toBe('typed pasted');
+      }
+      else mode.stop();
+      resolve({ report }); await new Promise(done => setTimeout(done, 0));
+      expect(host.pager.active).toBe(false);
+      expect(host.view.transcript.all().some(block => block.report === report)).toBe(false);
+    } finally { mode.stop(); }
+  });
+
   it.each([['/models', '/model ', undefined, '/model'], ['/recall', '/recall ', '<query>', '/recall '], ['/exit', '/exit ', undefined, '/exit']])(
     'inserts the help choice %s and executes only on a second explicit submission', async (filter, command, usage, submitted) => {
       const exit = vi.fn(); const { mode, terminal } = build({ exit });

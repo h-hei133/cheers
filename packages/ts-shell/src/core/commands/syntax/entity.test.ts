@@ -32,9 +32,9 @@ describe("named entity command boundaries", () => {
     const getToolPool = vi.fn(async () => new Map([[tool.name, tool], [dashed.name, dashed]]));
     const context = { cwd: process.cwd(), getToolPool };
     const quoted = await routeSlashCommand('/tools "Fixture Tool"', context);
-    expect(quoted).toMatchObject({ kind: "local", output: expect.stringContaining("### `Fixture Tool`") });
+    expect(quoted).toMatchObject({ kind: "local", output: expect.stringContaining("### Fixture Tool") });
     const literal = await routeSlashCommand("/tools -- --fixture", context);
-    expect(literal).toMatchObject({ kind: "local", output: expect.stringContaining("### `--fixture`") });
+    expect(literal).toMatchObject({ kind: "local", output: expect.stringContaining("### --fixture") });
     getToolPool.mockClear();
     await runToolsCommand(["Fixture Tool", "extra"], context);
     expect(getToolPool).not.toHaveBeenCalled();

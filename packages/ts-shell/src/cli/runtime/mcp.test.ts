@@ -81,7 +81,7 @@ it("shows exactly the model pool, including skills and MCP, then reflects change
   });
   for await (const _event of run.events) { /* Complete normal gateway ownership. */ }
   expect(names).toEqual(["mcp__local__echo_message", "read", "skill"]);
-  const listed = report.output.split("\n").flatMap(line => line.match(/^\| `([^`]+)` \|/)?.[1] ?? []).sort();
+  const listed = (report.report!.facts.tools as { name: string }[]).map(tool => tool.name).sort();
   expect(listed).toEqual(names);
   expect(report.output).toContain("### Tools (3)");
   expect(starts()).toHaveLength(1);
@@ -89,8 +89,9 @@ it("shows exactly the model pool, including skills and MCP, then reflects change
   configuration.publish(configuration.begin(binding), { ...runtimeConfig, disabledTools: ["skill"], hiddenToolPrefixes: ["mcp__"] }, binding);
   const filtered = await runToolsCommand([], { cwd: root, getToolPool });
   expect(filtered.output).toContain("### Tools (1)");
-  expect(filtered.output).not.toContain("| `skill`");
-  expect(filtered.output).not.toContain("| `mcp__");
+  expect(filtered.report!.facts.tools).toMatchObject([{ name: 'read' }]);
+  expect(filtered.output).not.toContain("| skill |");
+  expect(filtered.output).not.toContain("| mcp__");
   configuration.publish(configuration.begin(binding), { ...runtimeConfig, allowedTools: [], enableMcpTools: false }, binding);
   expect((await runToolsCommand([], { cwd: root, getToolPool })).output).toContain("### Tools (0)");
   expect(snapshot).toHaveBeenCalledTimes(3);

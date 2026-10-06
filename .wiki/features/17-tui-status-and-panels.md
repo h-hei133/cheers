@@ -362,3 +362,11 @@ bridge 不在 runtime 的 output 生成阶段包色，也不把渲染字符串�
 - 复用既有费用计算与零费用支持判定，total-only 或未计价 cache 不再得到虚假的零总价。有已计价部分时保留金额并标 partial，未分类/未计价项明确排除；完整分类且适用费率为零时仍显示已支持的零估算。极小正费用统一显示 `<$0.0001`，不会四舍五入为看似免费。缓存差额只在 cache-read 费率已知时计算，并说明是估算重叠及费率差，不是账单；保留窗口中真实请求数与 reset/gap entry 数分开。
 - `/hotkey` 使用原有键位模块中的 `keyReport()`，已解析的 override、unbound、模式限制与逐键 modified-key caveat 保留；key 和 warning 是独立 spans。旧 Markdown 拼接器已移除，纯文本从报告模型生成。生产者留在既有 TUI 键位 owner，未增加 core 指向 presentation 的新类型依赖。
 - 147 项组合、Node 20.3 构建、六组有效反转/恢复后 34 项及独立 APPROVE/CLEAR 通过；实际 CLI、无 ANSI print 与详细证据见 [主裁决 §8.95](phase-19-decisions.md#895-ui-06费用与快捷键的语义报告)。tools/diagnose/sidebar/metrics、CLI 结构化报告 JSON 与持久语义重放继续；完整阶段未完成。
+
+
+## 12. UI-06 工具列表与详情（2026-10-07）
+
+- `/tools` 使用现有 picker 浏览当前过滤后的工具池，Enter 明确打开只读报告；选择前重新读取并检查精确名称，工具消失时报告不可用，不触发执行或权限批准。裸命令与带参/print 读取相同工具来源，MCP 发现仍归既有显式目录查询。
+- 列表和详情使用共享报告 projection，参数名称、类型、必填和描述可在窄屏堆叠；资格取已有 Plan policy，permissions/approval 仍单独要求。详情只投影文档字段，不暴露 execute 或参数默认值。正文全文与语义 facts 在 transcript 折叠后仍可复制，报告通过既有 Pager 阅读，没有第二个宿主。
+- 输入归属按 overlay 代际持有，问题或新请求接管时旧异步详情不再阻塞输入或重新打开；目录失败由 Overlay 状态显示安全错误，排队包装与重试同样保留失败/空结果区别。182 项、六组有效反转/恢复后 39 项、独立 APPROVE/CLEAR 与两模式 actual CLI/print 证据见 [主裁决 §8.96](phase-19-decisions.md#896-ui-06工具列表到只读详情)。
+- diagnose/sidebar/metrics、CLI JSON 与持久语义重放仍在后续工作中，本节不代表完整 UI-06 或 Phase 19 完成。

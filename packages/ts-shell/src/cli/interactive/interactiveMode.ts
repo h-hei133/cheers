@@ -24,6 +24,8 @@ import { Pointer } from "./pointer.js";
 import { TUI } from "../../presentation/tui/render/engine.js";
 import { processTerminal, type TerminalDevice } from "../../presentation/tui/terminal.js";
 import { textBlock } from "../../presentation/tui/transcript/blocks.js";
+import { reportText } from '../../core/commands/report/projection.js';
+import { toolPoolFor } from '../runtime/tools.js';
 import type { RenderScheduler } from "../../presentation/tui/render/frame.js";
 import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { SessionManager } from "../../session/SessionManager.js";
@@ -162,7 +164,7 @@ export class InteractiveMode {
   private readonly alternateScreen: boolean;
   private busy = false;
   private pickerPending = false;
-  private pickerInputPending = 0;
+  private readonly pickerInputPending = new Map<number, number>();
   private toast?: string;
   private completionStatus?: string;
   private readonly catalogs: CatalogController;
@@ -375,7 +377,7 @@ export class InteractiveMode {
     });
     this.stdin.onPaste((text) => {
       if (this.pager.handlePaste(text)) { this.tui.requestRender(); return; }
-      if (this.overlay.handlePaste(text) || this.pickerInputPending > 0) return;
+      if (this.overlay.handlePaste(text) || this.pickerInputPending.has(this.overlay.revision)) return;
       // A paste while the full-screen editor is up belongs to it, whole; a paste
       // into the prompt is held aside once it is long enough to bury the draft.
       // Pasting the same thing twice in quick succession means "show it in full":
@@ -443,7 +445,7 @@ export class InteractiveMode {
 
 
   private onKey(event: Parameters<typeof routeKey>[0]): void {
-    if (this.pickerInputPending > 0 && !this.overlay.active) return;
+    if (this.pickerInputPending.has(this.overlay.revision) && !this.overlay.active) return;
     this.catalogs.cancel();
     this.completionStatus = undefined;
     // An open picker owns the keyboard: it needs the arrows, Enter, Escape, and
@@ -536,6 +538,7 @@ export class InteractiveMode {
   /** Publish a runtime question as a transcript block and retarget the prompt. */
   private onQuestion(question: string): void {
     this.pager.close();
+    this.overlay.close();
     this.state.transcript.append(textBlock("notice", question));
     this.state.editor.placeholder = "Answer above, then press Enter";
     this.tui.requestRender();
@@ -632,6 +635,7 @@ export class InteractiveMode {
     attachments?: { readonly images: readonly ImageContent[] },
   ): Promise<void> {
     this.pager.close();
+    this.overlay.close();
     // Queued input reaches this same dispatch point after the current operation
     // settles. A chooser still needs confirmation, even if its command waited.
     if (opensPicker(text)) {
@@ -757,7 +761,7 @@ export class InteractiveMode {
   /** Hand the choice to the picker that produced it and surface what it reports. */
   private applyPicker(picker: Picker, ids: readonly string[]): void {
     const revision = this.overlay.revision;
-    if (picker.holdInput) this.pickerInputPending++;
+    if (picker.holdInput) this.pickerInputPending.set(revision, (this.pickerInputPending.get(revision) ?? 0) + 1);
     if (picker.exclusive) {
       this.pickerPending = true;
       this.busy = true;
@@ -768,6 +772,11 @@ export class InteractiveMode {
         if (outcome?.next && !this.stopped && this.overlay.revision === revision) this.overlay.open(outcome.next);
         if (outcome?.note) {
           this.state.transcript.append(textBlock("command", outcome.note, picker.title));
+        }
+        if (outcome?.report && !this.stopped && this.overlay.revision === revision) {
+          const block = { ...textBlock('command', reportText(outcome.report), picker.title), report: outcome.report };
+          this.state.transcript.append(block);
+          pageLongOutput(this.pager, outcome.report.title, block, this.state.transcript);
         }
         if (outcome?.draft && !this.stopped && this.overlay.revision === revision) {
           // Insertion requires another explicit submission. Usage is only a
@@ -783,7 +792,11 @@ export class InteractiveMode {
         );
       })
       .finally(() => {
-        if (picker.holdInput) this.pickerInputPending--;
+        if (picker.holdInput) {
+          const pending = (this.pickerInputPending.get(revision) ?? 1) - 1;
+          if (pending) this.pickerInputPending.set(revision, pending);
+          else this.pickerInputPending.delete(revision);
+        }
         this.catalogs.invalidate();
         if (picker.exclusive) {
           this.pickerPending = false;
@@ -804,6 +817,7 @@ export class InteractiveMode {
         runtimeConfig: this.options.runtimeContext.runtimeConfig,
         resolveConfigTarget: this.options.runtimeContext.resolveConfigTarget,
         readConfiguration: () => this.options.runtimeContext.configuration.current,
+        getToolPool: toolPoolFor(this.options.runtimeContext, this.options.initialMcpGateway),
         refreshRuntimeConfig: () => refreshShellRuntimeConfig(this.options.runtimeContext),
         cwd: this.options.runtimeContext.cwd,
         sessionId: this.options.runtimeContext.session.id,
