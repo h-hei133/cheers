@@ -1,6 +1,20 @@
 import { expect, it } from "vitest";
 import { executeLocally } from "./local.js";
 
+it('delivers literal stdin bytes and closes the stream, including empty input', async () => {
+  for (const input of ['', '中文\0quote"\ttab\nline\\end']) {
+    const result = await executeLocally({ command: process.execPath,
+      args: ['-e', 'process.stdin.pipe(process.stdout)'], cwd: process.cwd(), input, timeoutMs: 1000 });
+    expect(result).toMatchObject({ status: 'completed', stdout: input });
+  }
+});
+
+it('handles a child that exits before consuming its stdin without an unhandled pipe error', async () => {
+  const result = await executeLocally({ command: process.execPath,
+    args: ['-e', 'process.exit(1)'], cwd: process.cwd(), input: 'x'.repeat(2 * 1024 * 1024), timeoutMs: 1000 });
+  expect(result).toMatchObject({ status: 'failed', exitCode: 1 });
+});
+
 it.skipIf(process.platform === "win32").each([false, true])(
   "allows graceful TERM exit and escalates an ignoring child (ignores: %s)", async ignores => {
     const controller = new AbortController();

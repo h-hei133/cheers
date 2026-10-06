@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process'
+import { executeLocally } from './local.js'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import ignore, { type Ignore } from 'ignore'
@@ -32,11 +33,9 @@ import type { FileWalkOptions } from './types.js'
 /**
  * How long git may take before the caller gives up on it.
  *
- * These calls are synchronous, so a git that never returns takes the session with
- * it — no prompt, no output, nothing to cancel. On a network mount or a very large
- * repository that is not hypothetical. The budget is generous because a legitimate
- * listing of a big repository is not fast, and stopping the wait only costs the
- * faster path: the in-process matcher answers the same question.
+ * Runtime queries can be cancelled through the execution owner. Discovery still
+ * has a synchronous compatibility call, so both paths also need a finite budget.
+ * A timeout discards the native answer and permits the existing matcher fallback.
  */
 const GIT_TIMEOUT_MS = 10_000
 
@@ -78,18 +77,72 @@ export const IGNORE_FILE_NAMES = IGNORE_FILES
  * worktree, a submodule and a `GIT_DIR` override all answer differently to a
  * directory scan.
  */
-export function listWorkspaceFilesViaGit(root: string): readonly string[] | null {
-  const result = spawnSync(
-    'git',
-    ['-c', 'core.fsmonitor=false', '-C', root, 'ls-files', '-z', '--cached', '--others', '--exclude-standard'],
-    { encoding: 'utf8', shell: false, timeout: GIT_TIMEOUT_MS, maxBuffer: GIT_MAX_BUFFER_BYTES },
-  )
-  if (result.error || result.status !== 0) {
-    return null
-  }
+export async function listWorkspaceFilesViaGit(root: string, abortSignal?: AbortSignal): Promise<readonly string[] | null> {
+  const output = await runGit(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], undefined, abortSignal)
+  if (output === null) return null
   // Git already uses forward slashes. NUL records bypass filename quoting and
   // preserve whitespace, backslashes and embedded newlines as literal names.
-  return (result.stdout || '').split('\0').filter((name) => name !== '')
+  return output.split('\0').filter((name) => name !== '')
+}
+
+function gitArgs(directory: string, args: readonly string[]): string[] {
+  return ['-c', 'core.fsmonitor=false', '-C', directory, ...args]
+}
+
+/** Runtime queries share the command runner's process-tree cancellation. */
+async function runGit(directory: string, args: readonly string[], input?: string, abortSignal?: AbortSignal): Promise<string | null> {
+  abortSignal?.throwIfAborted()
+  directory = path.resolve(directory)
+  const controller = new AbortController()
+  const onAbort = (): void => controller.abort()
+  abortSignal?.addEventListener('abort', onAbort, { once: true })
+  const chunks: Buffer[] = []
+  let outputBytes = 0
+  let totalBytes = 0
+  let oversized = false
+  try {
+    const result = await executeLocally({ command: 'git', args: gitArgs(directory, args), cwd: directory,
+      input, abortSignal: controller.signal, timeoutMs: GIT_TIMEOUT_MS, captureOutput: false,
+      onStdout: chunk => {
+        if (controller.signal.aborted) return
+        outputBytes += chunk.length
+        if (outputBytes > GIT_MAX_BUFFER_BYTES) { oversized = true; controller.abort(); return }
+        chunks.push(chunk)
+      },
+      onOutput: chunk => {
+        totalBytes += Buffer.byteLength(chunk)
+        if (totalBytes > GIT_MAX_BUFFER_BYTES) { oversized = true; controller.abort() }
+      },
+    })
+    // Unverified execution must remain a failure even when cancellation or an
+    // output limit prompted the stop. A fallback cannot prove that cleanup ran.
+    if (result.failureKind === 'execution_failure') {
+      throw new Error('Git query failed: input delivery or process cleanup could not be verified.')
+    }
+    abortSignal?.throwIfAborted()
+    if (oversized || (result.status !== 'completed'
+      && !(args[0] === 'check-ignore' && result.status === 'failed' && result.exitCode === 1 && !result.failureKind))) return null
+    return Buffer.concat(chunks).toString('utf8')
+  } finally { abortSignal?.removeEventListener('abort', onAbort) }
+}
+
+function literalGitPaths(names: readonly string[]): string[] {
+  // check-ignore rejects leading-colon pathspec syntax, even with NUL input.
+  return names.map((name) => name.startsWith(':') ? `./${name}` : name)
+}
+
+function ignoredNames(names: readonly string[], paths: readonly string[], output: string): ReadonlySet<string> {
+  const ignored = new Set(output.split('\0').filter((name) => name !== ''))
+  return new Set(names.filter((_, index) => ignored.has(paths[index]!)))
+}
+
+/** Async runtime counterpart of the synchronous discovery query below. */
+export async function loadIgnoredViaGit(directory: string, names: readonly string[], abortSignal?: AbortSignal): Promise<ReadonlySet<string> | null> {
+  abortSignal?.throwIfAborted()
+  if (names.length === 0) return new Set()
+  const paths = literalGitPaths(names)
+  const output = await runGit(directory, ['check-ignore', '--stdin', '-z'], `${paths.join('\0')}\0`, abortSignal)
+  return output === null ? null : ignoredNames(names, paths, output)
 }
 
 /**
@@ -110,10 +163,8 @@ export function listIgnoredViaGit(
   names: readonly string[],
 ): ReadonlySet<string> | null {
   if (names.length === 0) return new Set()
-  // check-ignore rejects leading-colon pathspec syntax, even with NUL input.
-  // A relative prefix makes those names literal; retain the caller's spelling.
-  const paths = names.map((name) => name.startsWith(':') ? `./${name}` : name)
-  const result = spawnSync('git', ['-c', 'core.fsmonitor=false', '-C', directory, 'check-ignore', '--stdin', '-z'], {
+  const paths = literalGitPaths(names)
+  const result = spawnSync('git', gitArgs(directory, ['check-ignore', '--stdin', '-z']), {
     input: `${paths.join('\0')}\0`,
     encoding: 'utf8',
     shell: false,
@@ -122,8 +173,7 @@ export function listIgnoredViaGit(
   })
   if (result.error || result.status === 128) return null
   if (result.status !== 0 && result.status !== 1) return null
-  const ignored = new Set((result.stdout || '').split('\0').filter((name) => name !== ''))
-  return new Set(names.filter((_, index) => ignored.has(paths[index]!)))
+  return ignoredNames(names, paths, result.stdout || '')
 }
 
 /**

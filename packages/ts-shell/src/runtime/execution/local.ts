@@ -29,6 +29,8 @@ function collectStreamed(options: {
   onOutput: (chunk: string) => void
   abortSignal?: AbortSignal
   env?: Readonly<Record<string, string>>
+  /** Literal stdin content; an explicit empty string still sends EOF. */
+  input?: string
   /** Consume stdout separately; capture can be disabled for bounded stream consumers. */
   onStdout?: (chunk: Buffer) => void
   captureOutput?: boolean
@@ -41,7 +43,9 @@ function collectStreamed(options: {
     const child = spawn(options.command, options.args, {
       cwd: options.cwd,
       windowsHide: true,
-      ...(options.readDescriptors ? { stdio: ['ignore', 'pipe', 'pipe', ...options.readDescriptors] as import('node:child_process').StdioOptions } : {}),
+      ...(options.readDescriptors || options.input !== undefined ? {
+        stdio: [options.input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe', ...(options.readDescriptors ?? [])] as import('node:child_process').StdioOptions,
+      } : {}),
       // Only when the caller named one: passing `env: undefined` is the same as
       // inheriting, but stating that explicitly reads as if it were chosen.
       ...(options.env ? { env: options.env as NodeJS.ProcessEnv } : {}),
@@ -55,6 +59,7 @@ function collectStreamed(options: {
     let stderr = ''
     let timedOut = false
     let cancelled = false
+    let inputFailed = false
     let settled = false
     let termination: Promise<void> | undefined
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -80,6 +85,7 @@ function collectStreamed(options: {
         const reason = cancelled ? 'Command cancelled' : 'Command timed out'
         const message = `${reason}; process termination failed and remains unverified: ${error instanceof Error ? error.message : String(error)}`
         fail(message, { terminationFailed: true, stderr: [stderr, message].filter(Boolean).join('\n') })
+        child.stdin?.destroy()
         child.stdout?.destroy()
         child.stderr?.destroy()
         child.unref()
@@ -114,6 +120,14 @@ function collectStreamed(options: {
     child.on('error', (error: NodeJS.ErrnoException) => fail(error.message, {
       ...(typeof error.code === 'string' ? { spawnErrorCode: error.code } : {}),
     }))
+    if (options.input !== undefined && child.stdin) {
+      // A command may exit before consuming its input. Let its exit status
+      // report that outcome instead of crashing on the pipe's EPIPE event.
+      child.stdin.on('error', (error: NodeJS.ErrnoException) => {
+        if (error.code !== 'EPIPE') inputFailed = true
+      })
+      child.stdin.end(options.input)
+    }
     child.on('close', (code, signal) => {
       finish()
       // Windows retries address a root PID, not a persistent group. Once that
@@ -124,10 +138,10 @@ function collectStreamed(options: {
       void Promise.resolve(termination).then(() => {
         if (settled) return
         if (child.pid && process.platform !== 'win32') untrackChildPid(child.pid)
-        if (cancelled || timedOut || code !== 0) {
+        if (cancelled || timedOut || inputFailed || code !== 0) {
           const message = cancelled ? 'Command cancelled' : timedOut ? 'Command timed out'
-            : `Command failed with exit code ${code ?? 'null'}`
-          fail(message, { code, signal })
+            : inputFailed ? 'Command input could not be delivered' : `Command failed with exit code ${code ?? 'null'}`
+          fail(message, { code, signal, inputFailed })
           return
         }
         settled = true
@@ -154,6 +168,8 @@ export async function executeLocally(options: {
   onOutput?: (chunk: string) => void
   abortSignal?: AbortSignal
   env?: Readonly<Record<string, string>>
+  /** Literal stdin content; an explicit empty string still sends EOF. */
+  input?: string
   /** Consume stdout separately; capture can be disabled for bounded stream consumers. */
   onStdout?: (chunk: Buffer) => void
   captureOutput?: boolean
@@ -182,6 +198,7 @@ export async function executeLocally(options: {
       timedOut?: boolean
       cancelled?: boolean
       terminationFailed?: boolean
+      inputFailed?: boolean
       signal?: string | null
       message?: string
       spawnErrorCode?: string
@@ -217,6 +234,7 @@ export async function executeLocally(options: {
       stdout: execError.stdout ?? '',
       stderr: execError.stderr || execError.message || 'Command failed',
       ...(execError.spawnErrorCode ? { spawnErrorCode: execError.spawnErrorCode } : {}),
+      ...(execError.terminationFailed || execError.inputFailed ? { failureKind: 'execution_failure' as const } : {}),
     }
   }
 }

@@ -4,7 +4,7 @@ import path from 'node:path'
 import ignore from 'ignore'
 import { execFileSync } from 'node:child_process'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { loadDirectoryMatcher, loadIgnoreFile, listIgnoredViaGit, listWorkspaceFilesViaGit } from './ignoreRules.js'
+import { loadDirectoryMatcher, loadIgnoreFile, loadIgnoredViaGit, listIgnoredViaGit, listWorkspaceFilesViaGit } from './ignoreRules.js'
 import { listDirectoryEntries, listWorkspaceFiles } from './fileWalk.js'
 
 let root: string
@@ -90,7 +90,7 @@ it('does not load patterns from an external ignore-file symlink', async () => {
   expect(matcher.ignores('PRIVATE_PATTERN')).toBe(false)
 })
 
-it.each(['files', 'ignore'])('does not execute configured filesystem monitors during %s queries', query => {
+it.each(['files', 'ignore', 'discovery'])('does not execute configured filesystem monitors during %s queries', async query => {
   execFileSync('git', ['init', '-q', workspace])
   fs.writeFileSync(path.join(workspace, 'tracked.txt'), 'tracked')
   fs.writeFileSync(path.join(workspace, '.gitignore'), '*.tmp\n')
@@ -101,9 +101,11 @@ it.each(['files', 'ignore'])('does not execute configured filesystem monitors du
   fs.writeFileSync(monitor, `#!${process.execPath}\nrequire('node:fs').writeFileSync(${JSON.stringify(marker)}, 'ran'); process.stdout.write('token\\0');\n`, { mode: 0o755 })
   execFileSync('git', ['-C', workspace, 'config', 'core.fsmonitor', monitor])
   if (query === 'files') {
-    const files = listWorkspaceFilesViaGit(workspace)
+    const files = await listWorkspaceFilesViaGit(workspace)
     expect(files).toContain('tracked.txt')
     expect(files).not.toContain('hidden.tmp')
+  } else if (query === 'ignore') {
+    expect(await loadIgnoredViaGit(workspace, ['tracked.txt', 'hidden.tmp'])).toEqual(new Set(['hidden.tmp']))
   } else {
     expect(listIgnoredViaGit(workspace, ['tracked.txt', 'hidden.tmp'])).toEqual(new Set(['hidden.tmp']))
   }
@@ -115,7 +117,16 @@ const literalNames = [
   ...(process.platform === 'win32' ? [] : ['quote"name', 'tab\tname', 'line\nname', 'back\\slash']),
 ]
 
-it.each(['true', 'false'])('preserves tracked and untracked Git paths with core.quotePath=%s', quotePath => {
+it('resolves relative runtime Git directories exactly once', async () => {
+  execFileSync('git', ['init', '-q', workspace])
+  fs.writeFileSync(path.join(workspace, '.gitignore'), '*.tmp\n')
+  fs.writeFileSync(path.join(workspace, 'public.txt'), 'public')
+  const relative = path.relative(process.cwd(), workspace)
+  expect(await listWorkspaceFilesViaGit(relative)).toContain('public.txt')
+  expect(await loadIgnoredViaGit(relative, ['hidden.tmp', 'public.txt'])).toEqual(new Set(['hidden.tmp']))
+})
+
+it.each(['true', 'false'])('preserves tracked and untracked Git paths with core.quotePath=%s', async quotePath => {
   execFileSync('git', ['init', '-q', workspace])
   execFileSync('git', ['-C', workspace, 'config', 'core.quotePath', quotePath])
   fs.writeFileSync(path.join(workspace, '.gitignore'), '*.tmp\n')
@@ -126,10 +137,10 @@ it.each(['true', 'false'])('preserves tracked and untracked Git paths with core.
   for (const name of [...tracked, ...untracked, 'ignored.tmp']) fs.writeFileSync(path.join(nested, name), 'content')
   execFileSync('git', ['--literal-pathspecs', '-C', nested, 'add', '-f', '--', ...tracked])
 
-  expect([...(listWorkspaceFilesViaGit(nested) ?? [])].sort()).toEqual([...tracked, ...untracked].sort())
+  expect([...(await listWorkspaceFilesViaGit(nested) ?? [])].sort()).toEqual([...tracked, ...untracked].sort())
 })
 
-it('checks literal ignore records without interpreting quotes or splitting embedded newlines', () => {
+it.each([listIgnoredViaGit, loadIgnoredViaGit])('checks literal ignore records without interpreting quotes or splitting embedded newlines (%#)', async query => {
   execFileSync('git', ['init', '-q', workspace])
   fs.writeFileSync(path.join(workspace, '.gitignore'), '*.tmp\n')
   fs.writeFileSync(path.join(workspace, 'tracked.tmp'), 'tracked')
@@ -137,15 +148,15 @@ it('checks literal ignore records without interpreting quotes or splitting embed
   const ignored = literalNames.map(name => `${name}.tmp`)
   const visible = ['tracked.tmp', 'public.txt', ...(process.platform === 'win32' ? [] : ['hidden.tmp\npublic.txt', '"quoted.tmp"'])]
 
-  expect(listIgnoredViaGit(workspace, [...ignored, ...visible])).toEqual(new Set(ignored))
-  expect(listIgnoredViaGit(workspace, visible)).toEqual(new Set())
+  expect(await query(workspace, [...ignored, ...visible])).toEqual(new Set(ignored))
+  expect(await query(workspace, visible)).toEqual(new Set())
 })
 
-it('checks leading-colon names as literal paths without changing ordinary wildcard names', () => {
+it.each([listIgnoredViaGit, loadIgnoredViaGit])('checks leading-colon names as literal paths without changing ordinary wildcard names (%#)', async query => {
   execFileSync('git', ['init', '-q', workspace])
   fs.writeFileSync(path.join(workspace, '.gitignore'), '*.tmp\n')
   const ignored = [':secret.tmp', './:secret.tmp', ':(literal)secret.tmp', '*secret.tmp', '[secret].tmp']
-  expect(listIgnoredViaGit(workspace, [...ignored, ':public.txt', './:explicit.tmp'])).toEqual(new Set([...ignored, './:explicit.tmp']))
+  expect(await query(workspace, [...ignored, ':public.txt', './:explicit.tmp'])).toEqual(new Set([...ignored, './:explicit.tmp']))
 })
 
 it('applies ignore and deny policies to the exact names returned by Git', async () => {

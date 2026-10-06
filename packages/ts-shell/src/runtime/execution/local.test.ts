@@ -11,7 +11,7 @@ vi.mock("../../core/shell/platform/processTree.js", () => ({
 }));
 function childProcess() {
   const child = Object.assign(new EventEmitter(), {
-    pid: 12345, stdout: new PassThrough(), stderr: new PassThrough(), kill: vi.fn(), unref: vi.fn(),
+    pid: 12345, stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(), kill: vi.fn(), unref: vi.fn(),
   });
   vi.mocked(spawn).mockReturnValue(child as never);
   return child;
@@ -48,7 +48,7 @@ it.each(["timeout", "cancel"])("settles %s cleanup failure without a close event
   const child = childProcess();
   vi.mocked(killProcessTree).mockRejectedValue(new Error("permission denied"));
   const controller = new AbortController();
-  const result = executeLocally({ command: "test", args: [], cwd: ".", timeoutMs: 100, abortSignal: controller.signal });
+  const result = executeLocally({ command: "test", args: [], cwd: ".", timeoutMs: 100, abortSignal: controller.signal, input: 'x'.repeat(65536) });
   child.stdout.write("work done before stop");
   child.stderr.write("existing diagnostic");
   if (reason === "cancel") controller.abort();
@@ -60,6 +60,7 @@ it.each(["timeout", "cancel"])("settles %s cleanup failure without a close event
   expect(untrackChildPid).not.toHaveBeenCalled();
   expect(child.unref).toHaveBeenCalled();
   expect(child.stdout.destroyed).toBe(true);
+  expect(child.stdin.destroyed).toBe(true);
 });
 
 it("forgets a Windows root after a late close following failed termination", async () => {
@@ -89,4 +90,12 @@ it("can deliver stdout without retaining output or mixing stderr into the consum
   child.emit("close", 0, null);
   expect(await result).toMatchObject({ status: "completed", stdout: "", stderr: "" });
   expect(Buffer.concat(chunks).toString()).toBe("source data");
+});
+
+it('does not report exit zero as success when stdin delivery fails', async () => {
+  const child = childProcess();
+  const result = executeLocally({ command: 'test', args: [], cwd: '.', input: 'payload' });
+  child.stdin.emit('error', Object.assign(new Error('I/O failure'), { code: 'EIO' }));
+  child.emit('close', 0, null);
+  expect(await result).toMatchObject({ status: 'failed', exitCode: 0, failureKind: 'execution_failure' });
 });

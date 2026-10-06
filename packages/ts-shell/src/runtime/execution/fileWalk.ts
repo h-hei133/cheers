@@ -35,7 +35,7 @@ import ignore, { type Ignore } from 'ignore'
 import {
   IGNORE_FILE_NAMES,
   loadIgnoreFile,
-  listIgnoredViaGit,
+  loadIgnoredViaGit,
   listWorkspaceFilesViaGit,
   loadDirectoryMatcher,
 } from './ignoreRules.js'
@@ -163,7 +163,7 @@ export async function listWorkspaceFiles(
   checkedPath(resolved, resolved, options)
 
   if (respectIgnore) {
-    const viaGit = listWorkspaceFilesViaGit(resolved)
+    const viaGit = await listWorkspaceFilesViaGit(resolved, options?.abortSignal)
     if (viaGit !== null) {
       // git already applied its own ignore rules; the pruned names are still
       // removed, because a repository need not ignore the directories that hold
@@ -234,9 +234,10 @@ export async function listDirectoryEntries(
 
   // Names are what git is asked about; paths are what the matcher needs.
   const ignored = respectIgnore
-    ? listIgnoredViaGit(
+    ? await loadIgnoredViaGit(
         resolvedDirectory,
         candidates.map((entry) => entry.name),
+        options?.abortSignal,
       )
     : new Set<string>()
   const matcher =
