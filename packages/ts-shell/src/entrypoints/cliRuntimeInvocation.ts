@@ -89,6 +89,8 @@ export interface CliRuntimeInvocationInput {
   readonly cacheWarming?: CacheWarmingRunner;
   readonly providerModeEnv?: string;  /** Tool visibility: disabledTools / hiddenToolPrefixes are applied from here. */
   readonly runtimeConfig?: RuntimeConfig;
+  /** The model catalogue accepted with this operation's configuration. */
+  readonly providerCatalog?: readonly CatalogProvider[];
   /** Skill loading the run was started with: named paths, and discovery off. */
   readonly skillOptions?: {
     readonly skillPaths?: readonly string[];
@@ -97,8 +99,6 @@ export interface CliRuntimeInvocationInput {
 }
 
 export interface CliRuntimeInvocationRequest extends Omit<CliRuntimeInvocationInput, "providerModeEnv"> {
-  /** One catalog snapshot for readiness and every step in this invocation. */
-  readonly providerCatalog?: readonly CatalogProvider[];
   readonly providerMode: ProviderMode;
   readonly thinkingEffort?: ThinkingPreference;
   readonly thinkingEffortExplicit?: boolean;
@@ -218,7 +218,7 @@ function deferUntilReady(
     }
     assertAdmission(request.admission);
     request.signal.throwIfAborted();
-    const catalog = loadCatalog();
+    const catalog = request.providerCatalog ?? loadCatalog();
     const resolution = request.providerCredentialResolution;
     request = {
       ...request,

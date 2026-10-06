@@ -13,6 +13,11 @@ export interface CliProviderRuntimeBridge {
   readonly realProviderSmokeOptIn: () => boolean;
 }
 
+/** Configuration validation and request dispatch resolve the same target. */
+export function resolveCliCredential(runtimeConfig: RuntimeConfig, options: Pick<CliOptions, 'provider' | 'apiKey'>, env: NodeJS.ProcessEnv = process.env): ProviderCredentialResolution {
+  return resolveProviderCredential({ runtimeConfig, cliProvider: options.provider, cliApiKey: options.apiKey, env });
+}
+
 export function createCliProviderRuntimeBridge(input: {
   readonly runtimeConfig: () => RuntimeConfig;
   readonly options: Pick<CliOptions, "provider" | "apiKey">;
@@ -21,12 +26,7 @@ export function createCliProviderRuntimeBridge(input: {
   const env = input.env ?? process.env;
   return {
     resolveCredentialSnapshot: () => {
-      return resolveProviderCredential({
-        runtimeConfig: input.runtimeConfig(),
-        cliProvider: input.options.provider,
-        cliApiKey: input.options.apiKey,
-        env,
-      });
+      return resolveCliCredential(input.runtimeConfig(), input.options, env);
     },
     providerModeEnv: () => env.CHEERS_PROVIDER_MODE,
     realProviderSmokeOptIn: () =>

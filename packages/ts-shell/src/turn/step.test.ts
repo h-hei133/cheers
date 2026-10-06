@@ -36,6 +36,22 @@ function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {
 }
 
 describe("createStepFunction", () => {
+  it('rejects output above the model ceiling before sending and preserves an admissible explicit cap', async () => {
+    const sent: Record<string, unknown>[] = [];
+    const create = (maxOutputTokens: number) => createStepFunction({ ...request, maxOutputTokens,
+      provider: { ...request.provider, provider: 'fixture' },
+      catalog: [{ id: 'fixture', models: [{ id: 'm', maxTokens: 2048 }] }],
+      fetchImpl: async (_url, init) => {
+        sent.push(JSON.parse(String(init?.body)));
+        return jsonResponse({ choices: [{ message: { content: 'answer' }, finish_reason: 'stop' }] });
+      },
+    });
+    expect(await create(2049)([], undefined, {}, { allowTools: false })).toMatchObject({ stopReason: 'error', errorMessage: expect.stringContaining('model output limit') });
+    expect(sent).toEqual([]);
+    expect(await create(2048)([], undefined, {}, { allowTools: false })).toMatchObject({ stopReason: 'stop' });
+    expect(sent).toHaveLength(1); expect(sent[0]?.max_tokens).toBe(2048);
+  });
+
   it.each(["max_tokens", "max_completion_tokens"] as const)("retains the catalog's %s field when the original ceiling is absent", async maxTokensField => {
     let captured: SentRequest | undefined;
     const step = createStepFunction({ ...request, provider: { ...request.provider, provider: "fixture" },

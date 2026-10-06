@@ -233,6 +233,23 @@ describe("CLI runtime invocation", () => {
     expect(events.some((entry) => entry.type === "message.delta" && entry.delta === "real answer")).toBe(true);
   });
 
+  it('keeps the accepted catalogue through readiness and every step', async () => {
+    const catalog = [{ id: 'openai', endpoint: 'anthropic-messages', models: [{ id: 'captured-model', contextWindow: 64_000 }] }];
+    const { deps } = dependencies();
+    const readiness = vi.fn(async (input: Parameters<CliRuntimeInvocationDependencies['checkProviderReadiness']>[0]) => {
+      expect(input.endpoint).toBe('anthropic-messages');
+      return { ok: true } as const;
+    });
+    const step = vi.fn((request: Parameters<CliRuntimeInvocationDependencies['createStep']>[0]) => {
+      expect(request.providerCatalog).toBe(catalog);
+      return deps.createStep(request);
+    });
+    await collect((await runCliRuntimeInvocation(baseInput({ providerModeEnv: 'real', providerCatalog: catalog }), {
+      ...deps, checkProviderReadiness: readiness, createStep: step,
+    })).events);
+    expect(readiness).toHaveBeenCalledTimes(1); expect(step).toHaveBeenCalledTimes(1);
+  });
+
   it("preserves real-provider readiness stop before the turn starts", async () => {
     const { deps, calls } = dependencies();
     const failingDeps: CliRuntimeInvocationDependencies = {

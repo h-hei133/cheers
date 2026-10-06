@@ -1318,3 +1318,17 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - import cycles/config consumers/declarations/node floor 与 43 项 gate 脚本测试通过；NormProof 阻断义务满足、整体 partial，四个既有函数数量 advisory 保留。本批新提交/远端结果另按实际 SHA 核对。此项关闭 §8.70/8.71 所述迟到续期响应按 provider 覆盖新身份的缺口；完整跨字段能力、主题历史优先级、其余资源策略及 Phase 19 十六批/七十六项总体目标继续。
 
 §8.80 门禁补充：最终五项静态 gate 与 diff 检查通过；strict docs 仍报告 120 项既有文档来源 advisory，不视为已修复。
+
+### 8.81 CFG-01：跨字段预算校验与模型目录共同发布
+
+- [配置约束](../../packages/ts-shell/src/config/constraints.ts)在会话模型投影后检查重试延迟关系、模型输出上限、解析后的上下文空间、provider/model 预算键与已知非活动模型的预留、显式 effort 能力和 endpoint 最小输出预算。首次约束失败阻断请求；普通 reload 失败保留已接受配置与目录，修正后可重新发布。
+- 复用既有窗口和预算解析顺序：模型覆盖优先于全局值，零预留有效；输出上限与压缩预留分别校验，不相加、不强制相等，也不增加任意全局输出上限。显式 contextWindow 高于目录值仍允许并提示远端支持未核实；keepRecentTokens 继续在消费时裁剪，设置原值不被改写。未知容量、无效预算键与不支持的采样诊断不回显模型标识或配置值。
+- [模型限制](../../packages/ts-shell/src/core/models/limits.ts)同时用于候选配置和主请求；超过已声明输出上限的请求在 headers/body/network 前拒绝。模型选择在任何持久化前检查同一约束，异步 hook 后重读配置及一次目录并重验全部预算模型，避免非活动模型容量变化绕过保存检查。
+- 配置验证和 CLI dispatch 共用实际凭据选择顺序，包括显式 provider、CLI key、环境与账户模型规范化；CLI secret 不进入发布绑定。配置与不可变目录由 [ConfigState](../../packages/ts-shell/src/config/state.ts)共同发布。主请求 readiness/step、自动与手动压缩、prefix/遗留摘要及对应缓存续期捕获当次已接受目录，成功 reload 后的新操作使用新目录，旧操作保持其快照。
+- 定向对照本地参考的 provider/model 预算命名空间、模型覆盖优先级、输出与压缩预留分离以及模型输出 ceiling；保留本项目显式窗口覆盖与近期历史裁剪契约。参考基于估算的上下文裁剪不作为精确序列化请求或精确 token 保证。
+- 独立审查修复 endpoint effort 最小预算遗漏、hook 后非活动模型遗漏、CLI/env 身份选择差异及压缩目录寿命不一致。最终代码 APPROVE；架构 WATCH，无本批新增阻断。代码审查独立运行 effort 探针与 diff 检查，架构审查独立运行 import-cycle gate；以下套件、构建和 PTY 是主代理证据。
+- 验证：Node 20.3 扩大组合 27 文件/494 项通过，构建通过。9 组反向验证在隔离源码副本中均触发行为断言，7 个产品文件逐字节及 SHA-256 恢复，工作区源码未临时修改；恢复后 4 文件/126 项通过。初版 DEFAULT_CONFIG 未导出、provenance 属性名称与 stop reason 预期错误已分别修正，未通过弱化断言隐藏失败。
+- 最终 NormProof 发现普通 runtime/type-only 分图门禁未报告的混合依赖环。将不变的 ConfigReloadResult 移到既有 application owner，保留原导出，命令类型不再依赖 ConfigState；修复后两项图义务均满足、整体 partial 仅剩四个既有函数数量 advisory。类型调整后的 10 文件/173 项与 Node 20.3 构建通过，代码复审 APPROVE、架构复审 WATCH（仅既有 provider 选择限制）。五项静态 gate、43 项 gate 脚本测试和 diff 检查通过；120 项既有文档来源 advisory 保留。
+- regular/fullscreen 实际构建 CLI 各三种场景，共 18 次本地合成 HTTP：明确 Allow once 前文件不存在，批准后真实工具写入；无效 reload/目录变化保留旧请求限制；会话模型切换与预留生效；无效启动零请求、修正 reload 后恢复；显式 provider 覆盖按实际目标校验。六场退出均为 0，终端无合成凭据；这些是隔离本地适配器证据，不是外部 provider 验证。
+- 本批暂不关闭 CFG-05 既有 `/model` 与不同 CLI `--provider` 的选择/会话投影不一致：命令仍依据原活动连接，不能仅替换 provider 字符串。需把实际连接目标贯穿命令及会话投影，或在保存前明确拒绝。`/btw`、`/context` 与模型浏览也仍独立读取目录，本批快照保证只覆盖上述请求和压缩路径。主题历史优先级、其他资源策略和 Phase 19 十六批/七十六项总体目标继续。
+- 前批 8a56ed01 的 CI 37452056597、Architecture Watch 37452056622，以及 f12c4c57 的 CI 37448147913、Architecture Watch 37448147983 均已按完整 SHA 核实成功；本批远端结果另按新提交查询。

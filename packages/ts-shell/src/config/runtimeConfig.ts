@@ -143,7 +143,7 @@ export interface RuntimeConfig {
   readonly configProvenance: ConfigProvenance;
   readonly configTrust: ConfigTrustBinding;
   /** Structured acceptance facts; diagnostic wording never decides publication. */
-  readonly configValidation: { readonly valid: boolean; readonly securityBlocked: boolean };
+  readonly configValidation: { readonly valid: boolean; readonly securityBlocked: boolean; readonly constraintsBlocked?: boolean };
   readonly provider: RuntimeProvider;
   readonly maxTurns: number;
   /**
@@ -411,7 +411,7 @@ export interface RuntimeConfigFile {
 
 export const CONFIG_FIELDS = createConfigFields(RUNTIME_PROVIDERS) satisfies Record<keyof RuntimeConfigFile | "allowUntrustedHooks", ConfigField>;
 
-const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources" | "configProvenance" | "configTrust"> = {
+export const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources" | "configProvenance" | "configTrust"> = {
   configValidation: { valid: true, securityBlocked: false },
   provider: "openai",
   maxTurns: 15,

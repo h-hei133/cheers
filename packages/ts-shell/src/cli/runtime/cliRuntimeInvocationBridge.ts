@@ -12,6 +12,7 @@ import { pendingTurnInput } from "../../turn/pendingInput.js";
 import type { CacheWarmingRunner } from "../../turn/cacheWarm.js";
 import type { CliProviderRuntimeBridge } from "../provider/cliProviderRuntimeBridge.js";
 import type { RuntimeConfig } from "../../config/runtimeConfig.js";
+import type { CatalogProvider } from "../../core/models/catalog.js";
 
 export function streamCliRuntimePrompt(input: {
   readonly admission?: CliRuntimeInvocationInput['admission'];
@@ -38,6 +39,7 @@ export function streamCliRuntimePrompt(input: {
   readonly providerRuntimeBridge: CliProviderRuntimeBridge;
   /** Tool visibility: disabledTools / hiddenToolPrefixes come from here. */
   readonly runtimeConfig?: RuntimeConfig;
+  readonly providerCatalog?: readonly CatalogProvider[];
   /** Keeping this run's prompt cached between requests, when it does. */
   readonly cacheWarming?: CacheWarmingRunner;
   /** Skill loading the run was started with: named paths, and discovery off. */
@@ -74,6 +76,7 @@ export function streamCliRuntimePrompt(input: {
     ...(input.compaction ? { compaction: input.compaction } : {}),
     providerModeEnv: input.providerRuntimeBridge.providerModeEnv(),
     ...(input.runtimeConfig ? { runtimeConfig: input.runtimeConfig } : {}),
+    ...(input.providerCatalog ? { providerCatalog: input.providerCatalog } : {}),
     ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
     ...(input.cacheWarming ? { cacheWarming: input.cacheWarming } : {}),
   });

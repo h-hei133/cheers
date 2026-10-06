@@ -103,7 +103,7 @@ export interface CommandContext {
    */
   readonly runtimeConfig?: RuntimeConfig
   readonly admission?: () => string | undefined
-  readonly refreshRuntimeConfig?: () => import('../../config/state.js').ConfigReloadResult
+  readonly refreshRuntimeConfig?: () => import('../../config/application.js').ConfigReloadResult
 }
 
 export interface LocalCommandResult {

@@ -1,6 +1,7 @@
 import { getRuntimeConfig, readRuntimeConfigEditAt, getUserRuntimeConfigPath, writeUserRuntimeConfigFile, type RuntimeConfigFile, type ProviderConnectionConfig, type ProviderCredentialConfig } from '../../../config/runtimeConfig.js';
 import path from 'node:path';
 import { ConfigWriteError } from '../../../config/outcome.js';
+import { inspectConfigConstraints } from '../../../config/constraints.js';
 import { sameValue } from '../../../config/values.js';
 import { projectSessionModel } from '../../../session/model/projection.js';
 import { readSessionModelEdit, writeSessionModel, type SessionModelEdit, type SessionModelReceipt } from '../../../session/model/state.js';
@@ -62,6 +63,8 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   const capabilityNotice = !candidate ? 'Model catalogue entry is unavailable; capability is unverified. Use /model refresh or /model config. Remote availability is not verified.'
     : capability === 'unverified' ? 'Effort capability is unverified in the model catalogue. Use /model refresh or /model config to update metadata; remote availability is not verified.' : undefined;
   if (capability === 'unsupported') return 'Model switch blocked: this model does not support the selected reasoning effort. Choose another level or --effort auto.';
+  const constraints = inspectConfigConstraints(loaded, { provider, model, thinkingEffort }, catalog);
+  if (constraints.errors.length) return `Model switch blocked: ${constraints.errors.join(' ')}`;
   if (!activeId) {
     return "No active connection. Run /connect login ... first.";
   }
@@ -116,8 +119,13 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   // An asynchronous hook cannot authorize a choice based on replaced credentials
   // or a different active connection. Unrelated field edits remain independent.
   const beforeCommit = (): boolean => {
-    if (context.admission?.() || !sameValue(catalogModel(loadCatalog(), provider, model), candidate)) return false;
-    if (providerEndpoint(loadCatalog(), provider) !== endpoint || (thinkingEffort !== null && getRuntimeConfig(context.projectRoot ?? context.cwd).maxOutputTokens !== loaded.maxOutputTokens)) return false;
+    const currentCatalog = loadCatalog();
+    if (context.admission?.() || !sameValue(catalogModel(currentCatalog, provider, model), candidate)) return false;
+    const currentConfig = getRuntimeConfig(context.projectRoot ?? context.cwd);
+    if (providerEndpoint(currentCatalog, provider) !== endpoint || !currentConfig.configValidation.valid
+      || !sameValue([currentConfig.maxOutputTokens, currentConfig.contextWindow, currentConfig.reserveTokens, currentConfig.modelTokenBudgets, currentConfig.retryBaseDelayMs, currentConfig.retryMaxDelayMs],
+        [loaded.maxOutputTokens, loaded.contextWindow, loaded.reserveTokens, loaded.modelTokenBudgets, loaded.retryBaseDelayMs, loaded.retryMaxDelayMs])) return false;
+    if (inspectConfigConstraints(currentConfig, { provider, model, thinkingEffort }, currentCatalog).errors.length) return false;
     const latest = readRuntimeConfigEditAt(edit.path).values;
     return latest.activeProviderConnectionId === config.activeProviderConnectionId && latest.provider === config.provider
       && sameValue(latest.providerConnections?.find(item => item.id.trim() === activeId), activeConnection)

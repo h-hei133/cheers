@@ -5,6 +5,10 @@ import { prepareThemeSelection } from '../../presentation/theme/selection.js';
 import { projectTrust } from '../security/projectTrust.js';
 import { identifyProject } from '../security/trust/identity.js';
 import { configTrustMatches } from '../../config/trust.js';
+import { constrainRuntimeConfig, type ConfigModelTarget } from '../../config/constraints.js';
+import { loadCatalog } from '../models/catalogStore.js';
+import type { CatalogProvider } from '../models/catalog.js';
+import { resolveProviderCredential } from './providerCredentials.js';
 import type { RuntimeConfig } from '../../config/runtimeConfig.js';
 
 interface ConfigurationContext {
@@ -12,6 +16,7 @@ interface ConfigurationContext {
   readonly projectRoot: string;
   readonly session: { readonly id: string };
   readonly runtimeConfigOverrides?: RuntimeConfigOverrides;
+  readonly resolveConfigTarget?: (config: RuntimeConfig) => ConfigModelTarget;
   readonly themePaths?: readonly string[];
 }
 
@@ -28,7 +33,14 @@ export function initialConfiguration(context: Omit<ConfigurationContext, 'config
   }
   const binding = { ...configurationBinding(context), workspaceRoot: candidate.configTrust.workspaceRoot,
     trustRevision: candidate.configTrust.revision };
-  return new ConfigState(projectSessionModel(candidate, context.session.id), binding);
+  const catalog = loadCatalog();
+  return new ConfigState(validateCandidate(candidate, context, catalog), binding, catalog);
+}
+
+function validateCandidate(config: RuntimeConfig, context: Pick<ConfigurationContext, 'session' | 'resolveConfigTarget'>, catalog: readonly CatalogProvider[]): RuntimeConfig {
+  const candidate = projectSessionModel(config, context.session.id);
+  const target = context.resolveConfigTarget?.(candidate) ?? resolveProviderCredential({ runtimeConfig: candidate });
+  return constrainRuntimeConfig(candidate, target, catalog);
 }
 
 /** Ordinary settings stay pinned; safety revocation and substrate changes do not. */
@@ -52,7 +64,8 @@ export function configurationAdmission(context: ConfigurationContext): () => str
 export function refreshConfiguration(context: ConfigurationContext): ConfigReloadResult {
   const state = context.configuration;
   const ticket = state.begin(configurationBinding(context));
-  const candidate = projectSessionModel(getRuntimeConfig(context.projectRoot, context.runtimeConfigOverrides), context.session.id);
+  const catalog = loadCatalog();
+  const candidate = validateCandidate(getRuntimeConfig(context.projectRoot, context.runtimeConfigOverrides), context, catalog);
   const loadedBinding = configurationBinding(context);
   if (!configTrustMatches(candidate.configTrust, loadedBinding.workspaceRoot, loadedBinding.trustRevision)) {
     return state.rejectCandidate(ticket, loadedBinding, ['Project trust or workspace changed while reading configuration; reload again.']);
@@ -65,5 +78,5 @@ export function refreshConfiguration(context: ConfigurationContext): ConfigReloa
   if (!configTrustMatches(candidate.configTrust, actual.workspaceRoot, actual.trustRevision)) {
     return state.rejectCandidate(ticket, actual, ['Project trust or workspace changed while preparing configuration; reload again.']);
   }
-  return state.publish(ticket, candidate, actual, apply);
+  return state.publish(ticket, candidate, actual, apply, catalog);
 }

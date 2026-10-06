@@ -1,9 +1,12 @@
 import { freezeDeep } from '../core/values/freeze.js';
 import type { RuntimeConfig, RuntimeConfigOverrides } from './runtimeConfig.js';
 import { sameValue } from './values.js';
-import { configRestartRequired } from './application.js';
+import { configRestartRequired, type ConfigReloadResult } from './application.js';
 import { CONFIG_FIELDS } from './runtimeConfig.js';
 import { displayOrigins } from './provenance/projection.js';
+import type { CatalogProvider } from '../core/models/catalog.js';
+
+export type { ConfigReloadResult } from './application.js';
 
 export interface ConfigBinding {
   readonly workspaceRoot: string;
@@ -14,6 +17,7 @@ export interface ConfigBinding {
 
 export interface ConfigPublication {
   readonly revision: number;
+  readonly catalog: readonly CatalogProvider[];
   readonly config: RuntimeConfig;
   readonly requested: RuntimeConfig;
   readonly binding: ConfigBinding;
@@ -25,16 +29,6 @@ class ConfigTicket {
   constructor(readonly owner: ConfigState, readonly generation: number, readonly binding: ConfigBinding) {}
 }
 
-export interface ConfigReloadResult {
-  readonly restartRequired: readonly string[];
-  readonly status: 'applied' | 'rejected' | 'superseded' | 'application-unverified';
-  readonly before: RuntimeConfig;
-  readonly after: RuntimeConfig;
-  readonly revision: number;
-  readonly admissionBlocked: boolean;
-  readonly diagnostics: readonly string[];
-}
-
 /** One owner for accepted settings, candidate ordering and live security admission. */
 export class ConfigState {
   private background = new AbortController();
@@ -42,9 +36,9 @@ export class ConfigState {
   private generation = 0;
   private publication: ConfigPublication;
 
-  constructor(config: RuntimeConfig, binding: ConfigBinding) {
-    this.publication = freezeDeep({ revision: 0, config, requested: config, binding: structuredClone(binding),
-      admissionBlocked: config.configValidation.securityBlocked, diagnostics: config.configDiagnostics });
+  constructor(config: RuntimeConfig, binding: ConfigBinding, catalog: readonly CatalogProvider[] = []) {
+    this.publication = freezeDeep({ revision: 0, config, requested: config, catalog: structuredClone(catalog), binding: structuredClone(binding),
+      admissionBlocked: config.configValidation.securityBlocked || config.configValidation.constraintsBlocked === true, diagnostics: config.configDiagnostics });
   }
 
   get current(): ConfigPublication { return this.publication; }
@@ -73,7 +67,7 @@ export class ConfigState {
       admissionBlocked: true, diagnostics: ['Configuration must be validated for the new session binding.'] });
   }
 
-  publish(ticket: ConfigTicket, candidate: RuntimeConfig, actual: ConfigBinding, applyPrepared?: () => void): ConfigReloadResult {
+  publish(ticket: ConfigTicket, candidate: RuntimeConfig, actual: ConfigBinding, applyPrepared?: () => void, catalog: readonly CatalogProvider[] = this.publication.catalog): ConfigReloadResult {
     const before = this.publication.requested;
     if (!this.consume(ticket, actual)) {
       return this.result('superseded', before);
@@ -93,7 +87,7 @@ export class ConfigState {
     const installed = this.publication.config;
     const config = { ...candidate, tui: installed.tui, tuiMode: installed.tuiMode,
       configProvenance: { ...candidate.configProvenance, tui: installed.configProvenance.tui, tuiMode: installed.configProvenance.tuiMode } };
-    this.publication = freezeDeep({ revision: this.publication.revision + 1, config, requested: candidate,
+    this.publication = freezeDeep({ revision: this.publication.revision + 1, config, requested: candidate, catalog: structuredClone(catalog),
       binding: structuredClone(actual), admissionBlocked: false, diagnostics: candidate.configDiagnostics });
     return this.result('applied', before);
   }

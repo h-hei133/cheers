@@ -11,10 +11,13 @@ import type { SessionRuntimeDependencies } from "../../core/shell/sessionRuntime
 import type { CompactionSetup } from "../../turn/session.js";
 import type { RequestSigner } from "../../provider/request/fetch.js";
 import { createCacheWarmingRunner } from "../../turn/cacheWarm.js";
+import { loadCatalog } from '../../core/models/catalogStore.js';
 
 const fixture = vi.hoisted(() => ({
   deps: undefined as SessionRuntimeDependencies | undefined,
   compaction: undefined as CompactionSetup | undefined,
+  invocation: undefined as CliRuntimeInvocationInput | undefined,
+  configuration: undefined as ConfigState | undefined,
   resolution: {} as Record<string, unknown>,
   config: { providerConnectTimeoutMs: 1000, providerHeadersTimeoutMs: 1000, providerBodyTimeoutMs: 1000, offline: true },
 }));
@@ -34,6 +37,7 @@ vi.mock("../../core/shell/sessionRuntime.js", () => ({ ShellSessionRuntime: clas
 } }));
 vi.mock("../approval/cliApprovalEscalationBridge.js", () => ({ createCliApprovalEscalationBridge: () => vi.fn() }));
 vi.mock("./cliRuntimeInvocationBridge.js", () => ({ streamCliRuntimePrompt: (input: CliRuntimeInvocationInput) => {
+  fixture.invocation = input;
   fixture.compaction = input.prepareProviderResources?.(input.providerCredentialResolution).compaction ?? input.compaction;
   return { events: [] };
 } }));
@@ -85,8 +89,9 @@ function runtime(withKey: boolean) {
     ...(withKey ? { credential: { apiKey: "synthetic", model: "fixture-model", baseUrl } } : {}),
   };
   const context = { cwd: process.cwd(), projectRoot: process.cwd(), session: { id: "signed-summary" },
-    runtimeConfig: structuredClone({ ...fixture.config, configValidation: { valid: true, securityBlocked: false }, configDiagnostics: [] }) };
-  const configuration = new ConfigState(context.runtimeConfig as never, configurationBinding(context));
+    runtimeConfig: structuredClone({ ...fixture.config, configProvenance: {}, configValidation: { valid: true, securityBlocked: false }, configDiagnostics: [] }) };
+  const configuration = new ConfigState(context.runtimeConfig as never, configurationBinding(context), loadCatalog());
+  fixture.configuration = configuration;
   createCliSessionRuntime({
     runtimeContext: { ...context, configuration },
     providerRuntimeBridge: { resolveCredentialSnapshot: () => fixture.resolution },
@@ -128,6 +133,23 @@ it.each([true, false])("signs automatic history and prefix summaries (apiKey=%s)
   await fixture.compaction!.summarizeTurnPrefix!([], new AbortController().signal);
   expect(signed).toHaveLength(2);
   expect(received.map(request => request.signature)).toEqual(["signed-1", "signed-2"]);
+});
+
+it('uses one accepted catalogue per operation for requests and compaction after reload', () => {
+  const deps = runtime(true);
+  deps.runPrompt('before reload', new AbortController().signal);
+  const original = fixture.compaction!;
+  const configuration = fixture.configuration!;
+  const before = configuration.current;
+  expect(original.policy.contextWindow).toBe(10_000);
+  expect(fixture.invocation?.providerCatalog).toBe(before.catalog);
+  const catalog = structuredClone(before.catalog);
+  (catalog[0]!.models[0] as { contextWindow: number }).contextWindow = 64_000;
+  configuration.publish(configuration.begin(before.binding), before.config, before.binding, undefined, catalog);
+  deps.runPrompt('after reload', new AbortController().signal);
+  expect(fixture.compaction!.policy.contextWindow).toBe(64_000);
+  expect(fixture.invocation?.providerCatalog).toBe(configuration.current.catalog);
+  expect(original.policy.contextWindow).toBe(10_000);
 });
 
 it.each([true, false])("allows signed background refresh eligibility without a static key (apiKey=%s)", withKey => {

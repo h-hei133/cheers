@@ -9,6 +9,7 @@ import { samplingTemperature } from "../core/commands/fastCommandRuntime.js";
 import { captureThinkingPreference } from '../core/models/preference.js';
 import { effortOutputFailure } from '../provider/endpoints/effort.js';
 import { effortCapability } from '../core/models/capability.js';
+import { outputLimitFailure } from '../core/models/limits.js';
 import type { ThinkingPreference } from '../core/models/effort.js';
 import { microcompactMessages } from "../core/query/microCompact.js";
 import { isEventStream, type ProviderUsage, type StreamedToolCall } from "./completion.js";
@@ -286,6 +287,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
       let payload: Record<string, unknown>;
       let requestHeaders: Readonly<Record<string, string>> = {};
       try {
+        const outputFailure = outputLimitFailure(request.maxOutputTokens ?? shape.maxOutputCeiling, shape.maxOutputCeiling);
+        if (outputFailure) return stamp(errorStep(outputFailure));
         const budgetFailure = explicitEffort && effort ? effortOutputFailure(endpointShape(endpoint), request.maxOutputTokens ?? shape.maxOutputCeiling) : undefined;
         if (budgetFailure) return stamp(errorStep(budgetFailure));
         requestHeaders = endpointShape(endpoint).requestHeaders?.({

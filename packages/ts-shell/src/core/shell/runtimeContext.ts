@@ -1,6 +1,7 @@
 import { type ConfigState, type ConfigReloadResult } from '../../config/state.js';
 import { configurationBinding, initialConfiguration, refreshConfiguration } from './configuration.js';
 import type { RuntimeConfig, RuntimeConfigOverrides } from '../../config/runtimeConfig.js'
+import type { ConfigModelTarget } from '../../config/constraints.js';
 import type { Session, WorkspaceRootMode } from '../../session/SessionManager.js'
 import type { WorkflowGitContext } from '../../workflow/gitContext.js'
 import path from 'node:path'
@@ -46,6 +47,7 @@ export interface ShellRuntimeContext {
   readonly configuration: ConfigState
   /** Explicit launch flags must survive settings reloads and session switches. */
   readonly runtimeConfigOverrides?: RuntimeConfigOverrides
+  readonly resolveConfigTarget?: (config: RuntimeConfig) => ConfigModelTarget
   /**
    * How this run was asked to load skills.
    *
@@ -99,6 +101,7 @@ export function createShellRuntimeContext(input: {
   rootBindingDiagnostics?: readonly RootBindingDiagnostic[]
   runtimeConfig: RuntimeConfig
   runtimeConfigOverrides?: RuntimeConfigOverrides
+  resolveConfigTarget?: (config: RuntimeConfig) => ConfigModelTarget
   skillOptions?: {
     readonly skillPaths?: readonly string[]
     readonly noSkills?: boolean
@@ -132,6 +135,7 @@ export function createShellRuntimeContext(input: {
       }),
     configuration,
     runtimeConfigOverrides: configuration.current.binding.overrides,
+    resolveConfigTarget: input.resolveConfigTarget,
     get runtimeConfig() { return configuration.current.config; },
     ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
     ...(input.themePaths ? { themePaths: input.themePaths } : {}),

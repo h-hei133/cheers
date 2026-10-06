@@ -48,7 +48,6 @@ import { recordCount } from "../../observability/metrics.js";
 import { estimateTokens } from "../../session/context.js";
 import { KEEP_RECENT_TOKENS, type CompactionPolicy, type SummarizeHistory, type SummarizeTurnPrefix } from "../../session/compaction.js";
 import { DEFAULT_RESERVE_TOKENS } from "../../session/context.js";
-import { loadCatalog } from "../../core/models/catalogStore.js";
 import type { CatalogProvider } from "../../core/models/catalog.js";
 import { resolveContextWindow, resolveTokenBudget } from "../../core/models/window.js";
 import { createComponentLogger } from "../../observability/structuredLogger.js";
@@ -219,13 +218,6 @@ export function createCliSessionRuntime(input: {
 }): ShellSessionRuntime {
   const isStdinTty = input.isStdinTty ?? (() => Boolean(process.stdin.isTTY));
   /**
-   * The catalogue for this session, read once.
-   *
-   * Every turn resolves the model's window from it, and `loadCatalog` reads two
-   * files synchronously on each call, so reading it per turn would put two file
-   * reads on the path that decides whether to compact.
-   */
-  /**
    * The runner the current run is using, so the next run can retire it.
    *
    * Held here rather than on the runner because it is the factory that knows a
@@ -233,8 +225,6 @@ export function createCliSessionRuntime(input: {
    */
   let previousCacheWarming: CacheWarmingRunner | undefined;
   let releaseCacheListener: (() => void) | undefined;
-
-  const catalog = loadCatalog()
 
   /**
    * The provider both compaction paths summarize with, or nothing when none is
@@ -249,10 +239,10 @@ export function createCliSessionRuntime(input: {
    * token would be carried into a summarization request and come back as a provider
    * refusal. The turn's own path has already renewed by the time it gets here.
    */
-  const compactionTarget = (resolved: ProviderCredentialResolution) => {
+  const compactionTarget = (resolved: ProviderCredentialResolution, catalog: readonly CatalogProvider[]) => {
     const credential = resolved.credential;
     const accountAuth = accountAuthFor(resolved.provider, credential ?? {});
-    if (!credential?.apiKey && !accountAuth && !endpointShape(endpointFor(resolved.provider)).signer) return undefined;
+    if (!credential?.apiKey && !accountAuth && !endpointShape(endpointFor(resolved.provider, catalog)).signer) return undefined;
     const baseUrl = resolved.baseUrl ?? credential?.baseUrl;
     const model = resolved.model ?? credential?.model;
     if (!baseUrl || !model) return undefined;
@@ -266,12 +256,12 @@ export function createCliSessionRuntime(input: {
   };
 
   /** The endpoint kind a provider is reached through, when the catalog names one. */
-  const endpointFor = (provider: string): EndpointKind | undefined =>
+  const endpointFor = (provider: string, catalog: readonly CatalogProvider[]): EndpointKind | undefined =>
     providerEndpoint(catalog, provider);
 
   /** The provider the turn's own compaction summarizes with. */
-  const compactionProvider = (resolved: ProviderCredentialResolution): CompactionProvider | undefined => {
-    const target = compactionTarget(resolved);
+  const compactionProvider = (resolved: ProviderCredentialResolution, catalog: readonly CatalogProvider[]): CompactionProvider | undefined => {
+    const target = compactionTarget(resolved, catalog);
     if (!target) return undefined;
     // Resolved from the catalogue the way the turn resolves it, so a model
     // that rejects a temperature does not get one in its summary request
@@ -282,20 +272,20 @@ export function createCliSessionRuntime(input: {
       headers: providerAuthorization({
         apiKey: target.apiKey,
         accountAuth: target.accountAuth,
-        ...(endpointFor(target.provider) ? { endpoint: endpointFor(target.provider) } : {}),
+        ...(endpointFor(target.provider, catalog) ? { endpoint: endpointFor(target.provider, catalog) } : {}),
       }).headers,
       baseUrl: target.baseUrl,
       model: target.model,
       providerId: target.provider,
-      ...(endpointFor(target.provider) ? { endpoint: endpointFor(target.provider) } : {}),
+      ...(endpointFor(target.provider, catalog) ? { endpoint: endpointFor(target.provider, catalog) } : {}),
       supportsTemperature: shape.supportsTemperature,
     };
   };
 
   /** The same, with an expiring account token replaced before the request is built. */
-  const renewedProvider = async (resolved: ProviderCredentialResolution, config: RuntimeConfig, admission: Admission, reportFailure = true): Promise<ProviderRenewal> => {
+  const renewedProvider = async (resolved: ProviderCredentialResolution, config: RuntimeConfig, admission: Admission, catalog: readonly CatalogProvider[], reportFailure = true): Promise<ProviderRenewal> => {
     assertAdmission(admission);
-    const target = compactionTarget(resolved);
+    const target = compactionTarget(resolved, catalog);
     if (!target) return {};
     const renewed = await renewStoredAccount({
       workspaceRoot: input.runtimeContext.projectRoot,
@@ -313,13 +303,13 @@ export function createCliSessionRuntime(input: {
       headers: providerAuthorization({
         apiKey: target.apiKey,
         accountAuth: renewed.accountAuth ?? target.accountAuth,
-        ...(endpointFor(target.provider) ? { endpoint: endpointFor(target.provider) } : {}),
+        ...(endpointFor(target.provider, catalog) ? { endpoint: endpointFor(target.provider, catalog) } : {}),
       }).headers,
       baseUrl: target.baseUrl,
       model: target.model,
       providerId: target.provider,
       supportsTemperature: resolveRequestShape(catalog, target.provider, target.model, undefined).supportsTemperature,
-      ...(endpointFor(target.provider) ? { endpoint: endpointFor(target.provider) } : {}),
+      ...(endpointFor(target.provider, catalog) ? { endpoint: endpointFor(target.provider, catalog) } : {}),
     } };
   };
   const reportCredentialPublication = () => {
@@ -344,11 +334,11 @@ export function createCliSessionRuntime(input: {
     }),
     compactHistory: (sessionId, signal, instructions) => {
       signal.throwIfAborted();
-      const config = input.runtimeContext.runtimeConfig;
+      const { config, catalog } = input.runtimeContext.configuration.current;
       const workspaceRoot = input.runtimeContext.projectRoot;
       const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
       const admission = configurationAdmission(input.runtimeContext);
-      return renewedProvider(resolved, config, admission, false).then(({ provider, failure }) => {
+      return renewedProvider(resolved, config, admission, catalog, false).then(({ provider, failure }) => {
         if (!provider) {
           return {
             status: "failed" as const,
@@ -384,10 +374,10 @@ export function createCliSessionRuntime(input: {
       });
     },
     summarizeAbandonedTurns: (messages) => {
-      const config = input.runtimeContext.runtimeConfig;
+      const { config, catalog } = input.runtimeContext.configuration.current;
       const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
       const admission = configurationAdmission(input.runtimeContext);
-      return renewedProvider(resolved, config, admission).then(({ provider }) => {
+      return renewedProvider(resolved, config, admission, catalog).then(({ provider }) => {
         assertAdmission(admission);
         if (!provider) return undefined;
         return requestCompactionSummary({
@@ -403,6 +393,7 @@ export function createCliSessionRuntime(input: {
     runPrompt: (prompt, signal, _runtimeSeed, _continuityState, attachments, continuityContext, onPromptAccepted): PromptRun => {
       const publication = input.runtimeContext.configuration.current;
       const config = publication.config;
+      const catalog = publication.catalog;
       const backgroundSignal = input.runtimeContext.configuration.backgroundSignal;
       const admission = configurationAdmission(input.runtimeContext);
       const resolvedCredential =
@@ -416,10 +407,10 @@ export function createCliSessionRuntime(input: {
       previousCacheWarming?.stop();
       previousCacheWarming = undefined;
       const prepareProviderResources = (resolved: ProviderCredentialResolution) => {
-        const activeProvider = compactionProvider(resolved);
+        const activeProvider = compactionProvider(resolved, catalog);
         // The prices and the cache window belong to the model, so they are read
         // from the catalogue entry this run is talking to.
-        const warmingTarget = compactionTarget(resolved);
+        const warmingTarget = compactionTarget(resolved, catalog);
         const warmingModel = warmingTarget
           ? catalogModel(catalog, warmingTarget.provider, warmingTarget.model)
           : undefined;
@@ -446,7 +437,7 @@ export function createCliSessionRuntime(input: {
           // write price — the opposite of what a refresh is for.
           ...cacheRefreshFor({ sessionId, runtimeConfig: config, admission,
             ...(activeProvider ? { provider: activeProvider } : {}),
-            renewHeaders: async () => (await renewedProvider(resolved, config, admission)).provider?.headers,
+            renewHeaders: async () => (await renewedProvider(resolved, config, admission, catalog)).provider?.headers,
             isCurrent: () => {
               return !admission() && input.runtimeContext.configuration.current === publication &&
                 input.runtimeContext.session.id === sessionId &&
@@ -505,6 +496,7 @@ export function createCliSessionRuntime(input: {
         mcpGateway: input.mcpGateway,
         // Carried so the tool pool honours disabledTools / hiddenToolPrefixes.
         runtimeConfig: config,
+        providerCatalog: catalog,
         prompt,
         ...(continuityContext ? { continuityContext } : {}),
         ...(onPromptAccepted ? { onPromptAccepted } : {}),

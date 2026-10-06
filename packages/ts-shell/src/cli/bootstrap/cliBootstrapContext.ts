@@ -14,6 +14,7 @@ import type { StructuredLogger } from "../../observability/index.js";
 import { SessionManager } from "../../session/SessionManager.js";
 import { getWorkflowGitContext } from "../../workflow/gitContext.js";
 import type { CliOptions } from "../options/cliOptions.js";
+import { resolveCliCredential } from '../provider/cliProviderRuntimeBridge.js';
 import {
   createCliMcpGateway,
 } from "../../entrypoints/cliMcpModule.js";
@@ -118,6 +119,7 @@ export function createCliBootstrapRuntimeContext(
         launchCwd: input.launchCwd,
         runtimeConfig: input.rootContext.runtimeConfig,
         runtimeConfigOverrides: configOverrides(input.options),
+        resolveConfigTarget: config => resolveCliCredential(config, input.options),
         ...(input.options.skillPaths || input.options.noSkills
           ? {
               skillOptions: {
