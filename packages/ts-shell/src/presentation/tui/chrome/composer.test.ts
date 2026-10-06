@@ -20,12 +20,12 @@ describe("prompt block", () => {
     expect(rows[1]).not.toContain("╰─");
   });
 
-  it("emits no trailing padding, so a copied region has no runs of spaces", () => {
+  it("keeps two padding cells around source text within the real width", () => {
     const editor = new Editor();
     editor.insert("你好");
     for (const row of renderComposer(editor, idle, 40)) {
       expect(visibleWidth(row)).toBeLessThanOrEqual(40);
-      expect(stripAnsi(row)).toBe(stripAnsi(row).trimEnd());
+      expect(stripAnsi(row)).toBe("╰─   你好  ");
     }
   });
 
@@ -35,8 +35,8 @@ describe("prompt block", () => {
     expect(renderComposer(editor, idle, 40).join("")).toContain(CURSOR_MARKER);
   });
 
-  it("reserves the cue width from the text budget", () => {
-    expect(composerTextWidth(40)).toBe(37);
+  it("reserves the cue and both padding sides from the text budget", () => {
+    expect(composerTextWidth(40)).toBe(33);
   });
 
   it("bounds composer output to maxRows and tracks cursor", () => {

@@ -1,11 +1,23 @@
 import { wrapSegments } from "../text/layout.js";
-import { lineCells, sliceWithWidth, visibleWidth, type LineCell } from "../text/measure.js";
+import { lineCells, visibleWidth, type LineCell } from "../text/measure.js";
+import type { SourceCell } from "../composer/contract.js";
 
-interface VisualRow {
+export interface VisualRow {
   readonly text: string;
   readonly row: number;
   readonly start: number;
   readonly width: number;
+  readonly cells: readonly SourceCell[];
+  readonly sourceStart: number;
+  readonly sourceEnd: number;
+  readonly breakAfter: "soft" | "logical" | "none";
+}
+
+export interface EditorLayout {
+  readonly source: string;
+  readonly sourceRevision: number;
+  readonly viewportStart: number;
+  readonly rows: readonly (VisualRow & { readonly rendered: string })[];
 }
 
 const TAB_CELLS = 2;
@@ -24,15 +36,38 @@ function* editorCells(line: string): Generator<LineCell> {
 /** One cell map shared by rendering and vertical navigation. */
 export function editorRows(lines: readonly string[], width: number): VisualRow[] {
   const rows: VisualRow[] = [];
+  let sourceOffset = 0;
   for (let row = 0; row < lines.length; row++) {
-    const text = displayText(lines[row]!);
-    const segments = wrapSegments(editorCells(lines[row]!), width);
-    for (const segment of segments) {
+    const cells = [...editorCells(lines[row]!)];
+    const segments = wrapSegments(cells, width);
+    let cellIndex = 0;
+    let column = 0;
+    for (let index = 0; index < segments.length; index++) {
+      const segment = segments[index]!;
+      const sourceStart = sourceOffset;
+      const mapped: SourceCell[] = [];
+      let text = "";
+      for (; cellIndex < cells.length; cellIndex++) {
+        const cell = cells[cellIndex]!;
+        if (column >= segment.start + segment.width && cell.width > 0) break;
+        const start = sourceOffset;
+        sourceOffset += cell.prefix.length + cell.cluster.length;
+        const rendered = cell.cluster === "\t" ? " ".repeat(Math.min(TAB_CELLS, width))
+          : cell.width > width ? "�" : cell.cluster;
+        text += cell.prefix + rendered;
+        if (cell.cluster) mapped.push({
+          columnStart: column - segment.start,
+          columnEnd: column - segment.start + Math.min(cell.width, width),
+          sourceStart: start, sourceEnd: sourceOffset,
+        });
+        column += cell.width;
+      }
       rows.push({
-        ...segment, row,
-        text: segments.length === 1 ? text : sliceWithWidth(text, segment.start, segment.width).text,
+        ...segment, row, text, cells: mapped, sourceStart, sourceEnd: sourceOffset,
+        breakAfter: index < segments.length - 1 ? "soft" : row < lines.length - 1 ? "logical" : "none",
       });
     }
+    sourceOffset += 1;
   }
   return rows;
 }

@@ -194,11 +194,11 @@ describe("soft wrapping", () => {
   it("treats a tab wider than the viewport as one row with one source character", () => {
     const editor = new Editor();
     editor.insert("\tX");
-    expect(shown(editor, 1)).toEqual(["  ", "X|"]);
+    expect(shown(editor, 1)).toEqual([" ", "X|"]);
     editor.move("doc-start");
     expect(editor.move("down")).toBe(true);
     expect(editor.snapshot().cursor).toBe(1);
-    expect(shown(editor, 1)).toEqual(["  ", "|X"]);
+    expect(shown(editor, 1)).toEqual([" ", "|X"]);
     expect(editor.move("up")).toBe(true);
     expect(editor.snapshot().cursor).toBe(0);
   });

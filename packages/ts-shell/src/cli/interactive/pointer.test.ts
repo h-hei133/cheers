@@ -1,8 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
+import { Editor } from "../../presentation/tui/editor.js";
+import { layoutComposer } from "../../presentation/tui/composer/layout.js";
 import { Pointer } from "./pointer.js";
 import { parseMouseReport } from "../../presentation/tui/input/mouse.js";
 import type { InteractiveView } from "../../presentation/tui/surface/contract.js";
 import { SuggestionList } from "../../presentation/tui/chrome/suggestions.js";
+
+function composerGeometry(text: string, top = 10, width = 40) {
+  const editor = new Editor(); editor.setText(text);
+  const layout = layoutComposer(editor, { busy: false }, width);
+  return { top, bottom: top + layout.height - 1, rows: layout.rows.map(row => row.rendered), layout };
+}
 
 function build(overrides: Partial<InteractiveView> = {}) {
   const copied: string[] = [];
@@ -122,7 +130,7 @@ describe("pointer drag selection", () => {
 
   it("scrolls view automatically when dragging near the top or bottom edges", () => {
     const { pointer, surface } = build({
-      composerGeometry: () => ({ top: 15, bottom: 16, rows: [] }),
+      composerGeometry: () => composerGeometry("one\ntwo", 15),
     });
     pointer.handle(parseMouseReport("\x1b[<0;11;6M")!);
     expect(pointer.selection).toBeDefined();
@@ -206,13 +214,45 @@ describe("pointer scrollbar interaction", () => {
 });
 
 describe("pointer composer drag selection", () => {
+  it.each([false, true])("copies exact source through wraps and whitespace (reverse=%s)", reverse => {
+    const source = "  ╰─ keep\t end  \n\n    next ❯  ";
+    const geometry = composerGeometry(source, 10, 16);
+    const { pointer, copied } = build({ composerGeometry: () => geometry });
+    const start = { row: geometry.top, column: 0 };
+    const end = { row: geometry.bottom, column: 15 };
+    const [from, to] = reverse ? [end, start] : [start, end];
+    const event = { button: 0, shift: false, alt: false, ctrl: false };
+    pointer.handle({ ...event, ...from, kind: "press" });
+    pointer.handle({ ...event, ...to, kind: "drag" });
+    expect(pointer.composerSelection).toEqual({ sourceRevision: geometry.layout.sourceRevision, start: 0, end: source.length });
+    pointer.handle({ ...event, ...to, kind: "release" });
+    expect(copied).toEqual([source]);
+  });
+
+  it("copies whitespace-only source and cancels a drag whose geometry or revision changes", () => {
+    let geometry = composerGeometry("  \t  ");
+    const { pointer, copied, surface } = build({ composerGeometry: () => geometry });
+    const event = { button: 0, shift: false, alt: false, ctrl: false, row: 10 };
+    pointer.handle({ ...event, column: 0, kind: "press" });
+    pointer.handle({ ...event, column: 39, kind: "release" });
+    expect(copied).toEqual(["  \t  "]);
+    pointer.handle({ ...event, column: 0, kind: "press" });
+    geometry = composerGeometry("changed text", 10, 16);
+    pointer.handle({ ...event, column: 12, kind: "drag" });
+    pointer.handle({ ...event, column: 12, kind: "release" });
+    expect(pointer.composerSelection).toBeUndefined();
+    expect(copied).toEqual(["  \t  "]);
+    expect(surface.blockAtScreenRow).not.toHaveBeenCalled();
+    pointer.handle({ ...event, column: 5, kind: "press" });
+    geometry = composerGeometry("changed text", 9, 40);
+    pointer.handle({ ...event, column: 12, kind: "release" });
+    expect(copied).toHaveLength(1);
+  });
+
   it("drags across composer rows and copies draft text on release", () => {
-    const compRows = [
-      "╰─ line 1 of input draft",
-      "line 2 of input draft",
-    ];
+    const geometry = composerGeometry("line 1 of input draft\nline 2 of input draft");
     const { pointer, copied, redraws } = build({
-      composerGeometry: () => ({ top: 10, bottom: 11, rows: compRows }),
+      composerGeometry: () => geometry,
     });
 
     // Press at row 10 (screen row 10, 1-based is 11), col 0 (1-based is 1)
@@ -232,9 +272,9 @@ describe("pointer composer drag selection", () => {
   });
 
   it("clears composer selection on single click without drag", () => {
-    const compRows = ["╰─ draft text"];
+    const geometry = composerGeometry("draft text");
     const { pointer } = build({
-      composerGeometry: () => ({ top: 10, bottom: 10, rows: compRows }),
+      composerGeometry: () => geometry,
     });
 
     // Make selection

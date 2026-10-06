@@ -318,6 +318,7 @@ export class TUI {
     }
     const startedAt = this.scheduler.now();
     const dimensions = this.terminal.getDimensions();
+    if (dimensions.columns <= 0 || dimensions.rows <= 0) return;
     const frame = this.provider.renderFrame(dimensions, this.mainScreen ? "document" : "viewport");
     const overlayScreen = !!this.mainScreen && frame.fullScreen === true;
     if (overlayScreen !== this.overlayScreen) {
@@ -355,6 +356,7 @@ export class TUI {
   }
 
   private onResize(): void {
+    this.provider?.invalidateLayout?.();
     this.requestRender({ force: true });
   }
 

@@ -11,6 +11,7 @@ import { Transcript } from "../transcript/container.js";
 import type { TurnActivity } from "../transcript/live.js";
 import type { SelectionPoint, SelectionSpan } from "../transcript/selection.js";
 import type { ScrollbarGeometry } from "../transcript/viewport.js";
+import type { ComposerLayout, SourceSelection } from "../composer/contract.js";
 
 /**
  * The seam between the interactive host and its stateful presentation surface.
@@ -67,7 +68,7 @@ export interface ViewContext {
   /** Transient status notification (e.g. clipboard copy feedback). */
   toast?(): string | undefined;
   /** Active mouse selection within the composer / input box. */
-  composerSelection?(): SelectionSpan | undefined;
+  composerSelection?(): SourceSelection | undefined;
   /** What an open search should show in the bar, or nothing when none is open. */
   searchBar?(): { readonly query: string; readonly matchCount: number; readonly currentNumber: number } | undefined;
   /** Inline-image protocol the terminal speaks, or nothing when it does not. */
@@ -164,7 +165,7 @@ export interface ViewActions {
  * about the geometry of what it last composed.
  */
 export interface ChoiceRegions {
-  readonly overlay?: { readonly top: number };
+  readonly overlay?: { readonly top: number; readonly height?: number; readonly visibleTop?: number };
   readonly suggestions?: { readonly top: number; readonly height: number; readonly width: number };
 }
 
@@ -222,4 +223,5 @@ export interface ComposerGeometry {
   readonly top: number;
   readonly bottom: number;
   readonly rows: readonly string[];
+  readonly layout: ComposerLayout;
 }

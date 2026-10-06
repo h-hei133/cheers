@@ -1,5 +1,5 @@
 import { sliceWithWidth } from "./text/measure.js";
-import { editorRows, visualCaret, verticalCaret } from "./editor/layout.js";
+import { editorRows, visualCaret, verticalCaret, type EditorLayout } from "./editor/layout.js";
 import { nextCluster, previousCluster, wordEnd, wordStart } from "./text/motion.js";
 import { CURSOR_MARKER } from "./render/paint.js";
 import { KillRing } from "./editor/killRing.js";
@@ -272,25 +272,32 @@ export class Editor extends EditorBuffer {
 
   /** Soft-wrapped rows at `width`, carrying the cursor marker when focused. */
   render(width: number, maxRows?: number): string[] {
-    const cells = Math.max(1, width);
+    return this.layout(width, maxRows).rows.map((row) => row.rendered);
+  }
+
+  /** Source mapping and caret-follow viewport shared by every editor surface. */
+  layout(width: number, maxRows?: number): EditorLayout {
+    const snapshot = this.snapshot();
+    const empty = { source: snapshot.text, sourceRevision: snapshot.revision, viewportStart: this.scrollOffset, rows: [] };
+    const cells = Math.max(0, Math.floor(width));
+    if (cells === 0 || (maxRows !== undefined && maxRows <= 0)) return empty;
     if (cells !== this.lastWidth) this.preferredColumn = undefined;
     this.lastWidth = cells;
-    if (this.lines.length === 1 && this.lines[0] === "" && this.placeholder) {
-      const hint = this.placeholder;
-      return [this.focused ? `${CURSOR_MARKER}${hint}` : hint];
-    }
     const rows = editorRows(this.lines, cells);
     const caret = visualCaret(rows, this.row, this.lines[this.row]!, this.column);
     const cursorVisualRow = caret.index;
-    const rendered = rows.map((entry) => entry.text);
-    if (this.focused) {
-      const text = rendered[caret.index]!;
-      const head = sliceWithWidth(text, 0, caret.column).text;
-      rendered[caret.index] = `${head}${CURSOR_MARKER}${text.slice(head.length)}`;
+    const rendered = rows.map((entry) => ({ ...entry, rendered: entry.text }));
+    if (snapshot.text === "" && this.placeholder) {
+      rendered[0]!.rendered = sliceWithWidth(this.placeholder, 0, cells).text;
     }
-    if (maxRows === undefined || maxRows <= 0 || rendered.length <= maxRows) {
+    if (this.focused) {
+      const text = rendered[caret.index]!.rendered;
+      const head = sliceWithWidth(text, 0, caret.column).text;
+      rendered[caret.index]!.rendered = `${head}${CURSOR_MARKER}${text.slice(head.length)}`;
+    }
+    if (maxRows === undefined || rendered.length <= maxRows) {
       this.scrollOffset = 0;
-      return rendered;
+      return { ...empty, viewportStart: 0, rows: rendered };
     }
 
     if (cursorVisualRow >= 0) {
@@ -302,7 +309,7 @@ export class Editor extends EditorBuffer {
     }
     const maxScroll = Math.max(0, rendered.length - maxRows);
     this.scrollOffset = Math.max(0, Math.min(this.scrollOffset, maxScroll));
-    return rendered.slice(this.scrollOffset, this.scrollOffset + maxRows);
+    return { ...empty, viewportStart: this.scrollOffset, rows: rendered.slice(this.scrollOffset, this.scrollOffset + maxRows) };
   }
 
   private setColumn(column: number): boolean {

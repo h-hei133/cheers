@@ -28,6 +28,8 @@ export type { SelectionPoint, SelectionSpan } from "../../presentation/tui/trans
 export interface ScreenText {
   /** Painted rows of the whole screen, top row first. */
   rows(): readonly string[];
+  /** An owner with source mappings can copy its source without transcript cleanup. */
+  extract?(anchor: SelectionPoint, focus: SelectionPoint, options: { readonly kind?: "drag" | "unit" }): string | undefined;
 }
 
 export class DragSelection {
@@ -86,7 +88,7 @@ export class DragSelection {
       this.clear();
       return false;
     }
-    const text = extractSelection(this.screen.rows(), span.from, span.to);
+    const text = this.extract(span.from, span.to, this.granularity !== "character");
     this.clear();
     if (text) {
       this.copy(text);
@@ -169,12 +171,7 @@ export class DragSelection {
         const focus = this.granularity === "character" ? coord : this.focus ?? coord;
         this.focus = focus;
         const unit = this.granularity !== "character";
-        const text = extractSelection(
-          this.screen.rows(),
-          anchor,
-          focus,
-          unit ? { kind: "unit" } : {},
-        );
+        const text = this.extract(anchor, focus, unit);
         if (!text) {
           // Nothing was selected, which is what a plain click looks like. The drag
           // ends; the click run does not, so the next press can complete a double
@@ -188,5 +185,12 @@ export class DragSelection {
       default:
         return false;
     }
+  }
+
+  private extract(anchor: SelectionPoint, focus: SelectionPoint, unit: boolean): string | undefined {
+    const options = unit ? { kind: "unit" as const } : {};
+    return this.screen.extract
+      ? this.screen.extract(anchor, focus, options)
+      : extractSelection(this.screen.rows(), anchor, focus, options);
   }
 }

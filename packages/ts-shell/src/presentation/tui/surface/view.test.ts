@@ -1,8 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { stripAnsi } from "../text/ansi.js";
+import { visibleWidth } from "../text/measure.js";
+import { CURSOR_MARKER } from "../render/paint.js";
 import type { Block } from "../transcript/blocks.js";
 import { createViewState, type ViewContext } from "./contract.js";
 import { InteractiveSurface } from "./view.js";
+import { TUI } from "../render/engine.js";
+import { ManualScheduler, RecordingTerminal } from "../../../test-utils/terminalDouble.js";
+import { Pointer } from "../../../cli/interactive/pointer.js";
 
 /** Facts a test can change between frames; the surface reads them at paint time. */
 interface Facts {
@@ -62,6 +67,24 @@ function frame(view: InteractiveSurface, size = SIZE): string[] {
 }
 
 describe("the document a main-screen frame reports", () => {
+  it("retains written history through one-row and unavailable terminal sizes", () => {
+    const { view } = surface();
+    for (let index = 0; index < 20; index++) view.transcript.append({ kind: "notice", text: `history-${index}`, finalized: true });
+    const terminal = new RecordingTerminal();
+    const scheduler = new ManualScheduler();
+    const tui = new TUI(terminal, scheduler); tui.setFrameProvider(view);
+    tui.start({ useAlternateScreen: false }); scheduler.flush(); terminal.drain();
+    terminal.rows = 1; terminal.resize(); scheduler.flush(); terminal.drain();
+    terminal.rows = 10; terminal.resize(); scheduler.flush();
+    expect(terminal.drain()).not.toMatch(/history-\d/);
+    terminal.rows = 0; terminal.columns = 0; terminal.resize(); scheduler.flush();
+    expect(terminal.drain()).toBe("");
+    terminal.rows = 10; terminal.columns = 40; terminal.resize(); scheduler.flush();
+    expect(terminal.drain()).not.toMatch(/history-\d/);
+    expect(view.composerGeometry()).toBeUndefined();
+    tui.stop();
+  });
+
   it("ends with the fixed block, the same way the composed rows do", () => {
     // The main screen splits the block off the document's tail by count. A
     // document that omitted it told the painter the block was content, so the
@@ -123,6 +146,65 @@ describe("the document a main-screen frame reports", () => {
 });
 
 describe("frame composition", () => {
+  it("cancels drag geometry immediately on resize before the scheduled frame", () => {
+    const { view } = surface(); view.editor.setText("  draft with source  ");
+    const terminal = new RecordingTerminal(); const scheduler = new ManualScheduler();
+    const tui = new TUI(terminal, scheduler); tui.setFrameProvider(view);
+    tui.start(); scheduler.flush();
+    const copy = vi.fn();
+    const pointer = new Pointer({ view: () => view, rows: () => view.contentRows(), copy, redraw: () => tui.requestRender() });
+    const row = view.composerGeometry()!.top;
+    const event = { row, button: 0, shift: false, alt: false, ctrl: false };
+    pointer.handle({ ...event, column: 5, kind: "press" });
+    pointer.handle({ ...event, column: 12, kind: "drag" });
+    expect(pointer.composerSelection).toBeDefined();
+    terminal.columns = 20; terminal.resize();
+    expect(view.composerGeometry()).toBeUndefined();
+    pointer.handle({ ...event, column: 12, kind: "release" });
+    expect(copy).not.toHaveBeenCalled();
+    scheduler.flush(); expect(view.composerGeometry()!.layout.width).toBe(20);
+    tui.stop();
+  });
+
+  it("keeps draft and caret within small physical dimensions alongside suggestions and status", () => {
+    const { view, live } = surface();
+    live.activity = { startedAt: 0, label: "working", tokens: 0, cancelling: false };
+    live.busy = true;
+    live.overlay = ["panel header", "panel item", "panel end"];
+    view.editor.setText("中\t👩‍💻long\n  draft  \nlast");
+    view.suggestions.setItems(Array.from({ length: 12 }, (_, index) => ({ label: `item-${index}`, value: `${index}` })));
+    view.setSuggesting(true);
+    for (const columns of [80, 40, 20, 8, 4, 2, 1]) {
+      for (const rows of [8, 4, 2, 1]) {
+        const plan = view.renderFrame({ columns, rows });
+        expect(plan.rows).toHaveLength(rows);
+        expect(plan.rows.every(row => visibleWidth(row) <= columns)).toBe(true);
+        const geometry = view.composerGeometry()!;
+        expect(geometry.top).toBeGreaterThanOrEqual(0);
+        expect(geometry.bottom).toBeLessThan(rows);
+        const caretRow = plan.rows.find(row => row.includes(CURSOR_MARKER));
+        expect(caretRow).toBeDefined();
+        expect(visibleWidth(caretRow!.split(CURSOR_MARKER)[0]!)).toBeLessThan(columns);
+      }
+    }
+    expect(view.renderFrame({ columns: 0, rows: 4 }).rows).toEqual([]);
+    expect(view.composerGeometry()).toBeUndefined();
+  });
+
+  it("invalidates source hit testing before a changed draft or fullscreen overlay is redrawn", () => {
+    const { view, live } = surface();
+    view.editor.setText("before"); frame(view);
+    expect(view.composerGeometry()).toBeDefined();
+    view.editor.insert("!");
+    expect(view.composerGeometry()).toBeUndefined();
+    frame(view); expect(view.composerGeometry()).toBeDefined();
+    live.fullScreen = true;
+    expect(view.composerGeometry()).toBeUndefined();
+    frame(view); live.fullScreen = false;
+    expect(view.composerGeometry()).toBeUndefined();
+    frame(view); expect(view.composerGeometry()!.layout.source).toBe("before!");
+  });
+
   it("composes the transcript, band, prompt, and hint row into one frame", () => {
     const { view } = surface({ ambient: () => ({ openTodos: 2, peerSessions: 0 }) });
     view.transcript.append({ kind: "user", text: "what is the plan?", finalized: true });
@@ -131,7 +213,7 @@ describe("frame composition", () => {
     expect(rows).toHaveLength(12);
     expect(rows.join("\n")).toContain("what is the plan?");
     expect(rows.join("\n")).toContain("the-model");
-    expect(rows.join("\n")).toContain("╰─ follow-up");
+    expect(rows.join("\n")).toContain("╰─   follow-up");
     expect(rows[rows.length - 1]).toContain("2 open todos");
   });
 
@@ -142,7 +224,7 @@ describe("frame composition", () => {
     view.setSuggesting(true);
     expect(view.suggestionsOpen).toBe(true);
     const rows = frame(view, { columns: 60, rows: 12 });
-    const prompt = rows.findIndex((row) => row.includes("╰─ /mo"));
+    const prompt = rows.findIndex((row) => row.includes("╰─   /mo"));
     const candidate = rows.findIndex((row) => row.includes("/mode"));
     const hint = rows.findIndex((row) => row.includes("tab complete"));
     expect(prompt).toBeGreaterThan(-1);
@@ -198,7 +280,7 @@ describe("frame composition", () => {
     const rows = frame(view);
     const geometry = view.composerGeometry();
     expect(geometry).toBeDefined();
-    expect(rows[geometry!.top]).toContain("╰─ draft");
+    expect(rows[geometry!.top]).toContain("╰─   draft");
     expect(geometry!.bottom).toBeGreaterThanOrEqual(geometry!.top);
     expect(geometry!.rows.map(stripAnsi).join("\n")).toContain("draft");
   });

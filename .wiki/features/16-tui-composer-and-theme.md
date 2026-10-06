@@ -324,7 +324,7 @@ export interface ComposerLayout {
 
 ### 12.2 当前复制缺口
 
-当前 composer 使用带 cue 的渲染行与屏幕列切片；`cleanComposerSelection` 去 cue，通用 selection 清洗还会 trim/dedent 并为屏幕行插换行。这会丢失真实缩进/尾空格，也可能把软折行变成原文换行。换一个 cue 正则或统一 offset 都不能解决该问题。
+基线 composer 使用带 cue 的渲染行与屏幕列切片；`cleanComposerSelection` 去 cue，通用 selection 清洗会 trim/dedent 并为屏幕行插换行。Phase 19 §8.87 已删除此 composer 清洗路径，改为源文映射；通用 transcript 的旧复制策略不在本批改动。八形态集成仍待 UI-03。
 
 ### 12.3 布局与选择管线
 
@@ -417,3 +417,13 @@ export interface ComposerLayout {
 ## 15. 本次审查证据边界
 
 本次以目标源码、参考源码、JSON 集合与指定色对算术审查文案，撤回旧版令牌计数、复制平移、原生选择保证和“输入只截断不滚动”的错误。未运行构建、测试、动态 PTY 或真实输入法；所有产品改变仍是 Phase 19 待实施任务。
+
+
+## 18. UI-02 源文布局实施
+
+- [composer](../../packages/ts-shell/src/presentation/tui/composer/contract.ts)定义逐行 source/cell/viewport/revision 契约；[布局](../../packages/ts-shell/src/presentation/tui/composer/layout.ts)复用 editor 的同一软折行与 caret-follow viewport。[投影](../../packages/ts-shell/src/presentation/tui/composer/projection.ts)将包含式鼠标端点转换为半开源文区间，复制直接取 source.slice，选区高亮复用同一映射。
+- 现有 band 输入接通左右各 2 cells，续行保留 gutter 的等宽占位。窄窗先减少装饰，再对称缩减 padding；宽度 0 不产生输入行。物理一列容不下宽字素时使用一个占位显示 cell，tab 使用一个空格，映射仍指向完整原字素/tab；这是显示退化，不改写源文。八形态、default 切换、Settings 选择及预览尚未在此批实现。
+- Pointer 保留现有单击/双击/拖动手势，只替换 composer 提取策略。revision、源文和几何不匹配时取消旧拖选；resize 事件同步使 hit-test 失效，之后才排队重绘。源文变化和 fullscreen overlay 接管也立即停止旧输入命中。
+- surface 使用真实宽高，缩减 status/hints/suggestions 以保留输入，候选项按剩余高度维持所选身份和点击映射。regular 即使只剩一行仍交付完整 document 给 painter；物理尺寸为零时 engine 不绘制，恢复后不重新追加旧历史。regular 未启用应用鼠标捕获，意外鼠标报告不作用于文档坐标；原生终端拖选不在精确源文保证内。
+- 实际 Node 20.3 CLI 在两种模式通过输入、插入/分片中文粘贴、resize 与历史后草稿定位。fullscreen 的正向拖选和 resize 后反向拖选，OSC 52 解码与隔离原生命令 stdin 都严格等于 45 字节源文。未使用系统真实剪贴板；OSC 52 字节不等同于真实终端已更新剪贴板。Windows 像素、真实 IME、八形态验收继续。
+- 两路独立代码 APPROVE、架构 CLEAR；四组反转撤回源文提取、保留空白、resize 失效和零容量 document 保留，均触发行为断言，隔离源码副本逐字节/SHA-256 恢复。完整记录与测试数量见 [Phase 19 §8.87](phase-19-decisions.md)。

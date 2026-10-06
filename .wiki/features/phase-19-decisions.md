@@ -1388,3 +1388,16 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 独立代码最终 APPROVE、架构 CLEAR；代码独立运行基准与 renderer 套件，架构独立验证普通/混合依赖图及函数数量。最终构建、五项静态 gate、43 项门禁脚本测试与 diff 检查通过；NormProof 阻断项为零，四项既有函数数量 advisory 和 120 项文档来源 advisory 保留。
 - UI-01 的确定性 marker/caret 缺陷已修复；Windows Terminal 逐帧录制、真实 IME 及用户现场残影归因仍缺证据。终端历史 reflow、其余 W4 与全部 Phase 19 继续，不据本批宣布完整 UI-01 或阶段验收完成。
 - 前两批 99c2192d 的 CI 37492493436/Architecture Watch 37492493447、6e53eb4e 的 CI 37494932207/Architecture Watch 37494932214 已按 SHA 核实成功。0ef70a34 的 Architecture Watch 37497039715 成功，CI 37497040158 在本次记录时仍运行；本批提交另按新 SHA 跟踪。
+
+
+### 8.87 UI-02：共享源文布局、输入留白与精确应用选择
+
+- 新增 [composer 契约](../../packages/ts-shell/src/presentation/tui/composer/contract.ts)、[布局](../../packages/ts-shell/src/presentation/tui/composer/layout.ts)与[选择投影](../../packages/ts-shell/src/presentation/tui/composer/projection.ts)。editor 的同一 wrapSegments 路径输出字素/tab cells、全局 UTF-16 source 边界、逻辑/软换行、revision 和 viewport；render 保留原入口并委派共同 layout，未创建第二套换行或编辑器。
+- 当前 band 输入左右各保留 2 cells，续行对齐；窄窗按真实空间减少装饰和对称 padding，零宽不产生输入行。单列容不下完整宽字素时显示单 cell 占位，tab 显示一格，复制仍返回完整原字素/tab，不把显示退化写回 source。chrome/composer 只保留薄入口，八形态和默认形态配置属于后续 UI-03。
+- Pointer 复用 DragSelection 手势，增加 owner 提取策略并删除 cue 正则清洗；composer 复制直接截取 source 区间，保留缩进、尾空白、tab、连续空行与用户输入的 cue 字符，软折行不新增换行。高亮从同一范围映射回真实 source cells，不高亮布局 padding；源文/revision/几何变化会取消旧拖选。
+- surface 使用真实宽高和输入实际行数，候选列表按可用高度保住所选身份与点击映射。独立审查发现 resize 到排队重绘之间旧几何仍可命中，以及 regular 一行窗口省略 document 导致恢复后重复追加历史；前者通过 engine 同步 invalidateLayout 修复，后者保留完整 document，并在零物理尺寸时跳过绘制。两个实际 TUI+Surface 回归分别断言过期 release 零复制和历史不重新追加。
+- 定向参考文本区与 gutter/reserve 分开布局及统一 band 几何，复制保证由本项目 source 映射实现。regular 不开启应用鼠标捕获，document 不暴露输入命中几何，意外鼠标报告被忽略；普通终端原生选择仍归终端控制，不能据 fullscreen 应用复制测试宣称 regular 原生拖选已去掉布局字符。
+- 最终 Node 20.3 扩大组合 14 文件/362 项通过，构建通过。4 组有效反转分别撤回源文提取、保留空白、resize 失效和 document 保留，全部触发行为断言；隔离源码副本逐字节/SHA-256 恢复，恢复后 42 项通过。初版新增候选测试误把 void selectRow 当 boolean，改为核对实际选中身份后通过；未改变产品 API 或放松身份断言。
+- 实际构建 CLI 的 regular/fullscreen 均通过普通输入、中间与分片中文粘贴、宽字素 caret、resize 和历史后输入，终端无 marker，退出均为 0。fullscreen 正向拖选及 20→40 列后的反向拖选，OSC 52 解码和隔离 wl-copy stdin 均严格等于同一 45 字节源文；未触及真实桌面剪贴板。探针首轮局部函数名遮蔽 Python select 模块，在启动等待前失败，仅修正探针名字后完成验证。
+- 独立代码 APPROVE、架构 CLEAR；代码独立运行 109 项相关测试及最终 surface/engine 75 项并复验历史，架构独立运行两项 resize/history 回归和普通/混合图检查。最终五项静态 gate、43 项门禁脚本测试、diff 检查通过；NormProof 图与解析义务满足、阻断项为零，四项既有函数数量及 120 项文档来源 advisory 保留。
+- 本批完成当前 band 的 source/cell/viewport 主链，UI-03 八形态、共享 IME 尾、真实预览与持久选择继续；Windows 前端像素/真实 IME 证据未取得，完整 UI/Phase 19 验收继续。前批 475de67a 的 CI 37499480267 和 Architecture Watch 37499480342、0ef70a34 的 CI 37497040158 和 Architecture Watch 37497039715 均已按 SHA 核实成功；本批远端状态另按新提交跟踪。

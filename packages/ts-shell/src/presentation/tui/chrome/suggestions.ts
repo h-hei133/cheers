@@ -130,10 +130,14 @@ export class SuggestionList {
   }
 
   /** Rows for the visible window, with an overflow count when clipped. */
-  render(width: number): string[] {
-    this.renderedItems = this.items.slice(this.offset, this.offset + MAX_VISIBLE);
-    if (this.items.length === 0) return [];
-    const visible = Math.min(MAX_VISIBLE, this.items.length);
+  render(width: number, maxRows = MAX_VISIBLE + 1): string[] {
+    const capacity = Math.max(0, Math.floor(maxRows));
+    const showCount = capacity > 1 && this.items.length > Math.min(MAX_VISIBLE, capacity);
+    const visible = Math.min(MAX_VISIBLE, this.items.length, capacity - Number(showCount));
+    if (visible <= 0) { this.renderedItems = []; return []; }
+    this.offset = Math.max(0, Math.min(this.offset, this.selected, this.items.length - visible));
+    if (this.selected >= this.offset + visible) this.offset = this.selected - visible + 1;
+    this.renderedItems = this.items.slice(this.offset, this.offset + visible);
     const labelWidth = Math.min(
       24,
       Math.max(...this.items.map((item) => visibleWidth(item.label))) + 2,
@@ -145,7 +149,7 @@ export class SuggestionList {
       rows.push(this.renderRow(item, index === this.selected, labelWidth, width));
     }
     const hidden = this.items.length - visible;
-    if (hidden > 0) rows.push(defaultTheme.dim(`    ↓ ${hidden} more`));
+    if (hidden > 0 && showCount) rows.push(defaultTheme.dim(truncateToWidth(`    ↓ ${hidden} more`, width)));
     return rows;
   }
 

@@ -292,7 +292,12 @@ export class InteractiveMode {
       },
     });
     this.pointer = new Pointer({
-      capture: (report) => this.pager.active || this.overlay.handlePointer(report, this.view.choiceRegions?.overlay?.top),
+      capture: (report) => {
+        const region = this.view.choiceRegions?.overlay;
+        const top = region && report.row >= (region.visibleTop ?? region.top) &&
+          (region.height === undefined || report.row < region.top + region.height) ? region.top : undefined;
+        return this.pager.active || this.overlay.handlePointer(report, top);
+      },
       view: () => this.view,
       rows: () => this.view.contentRows(),
       copy: (text) => this.clipboard.copy(text),
@@ -357,7 +362,9 @@ export class InteractiveMode {
       ),
     );
     this.stdin.onKey((event) => this.onKey(event));
-    this.stdin.onMouse((report) => this.pointer.handle(report));
+    this.stdin.onMouse((report) => {
+      if (this.alternateScreen || this.pager.active || this.overlay.fullScreen) this.pointer.handle(report);
+    });
     this.stdin.onPaste((text) => {
       if (this.overlay.handlePaste(text) || this.pickerInputPending > 0) return;
       // A paste while the full-screen editor is up belongs to it, whole; a paste

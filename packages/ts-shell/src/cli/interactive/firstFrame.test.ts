@@ -99,7 +99,7 @@ describe("transcript search ownership", () => {
       terminal.input("draft");
       scheduler.flush();
       const typed = stripAnsi(terminal.drain());
-      expect(typed).toContain("╰─ draft");
+      expect(typed).toContain("╰─   draft");
       expect(typed).not.toContain("find:");
     } finally {
       mode.stop();
@@ -118,7 +118,7 @@ describe("transcript search ownership", () => {
       const searched = stripAnsi(terminal.drain());
       expect(searched).toContain("find: Cheers");
       expect(searched).not.toContain("requires fullscreen mode");
-      expect(searched).not.toContain("╰─ Cheers");
+      expect(searched).not.toContain("╰─   Cheers");
     } finally {
       mode.stop();
     }
@@ -243,7 +243,7 @@ it.each(["regular", "fullscreen"] as const)("repaints the %s host when a late ap
     scheduler.flush();
     expect(currentTheme()).toBe("light");
     const output = terminal.drain();
-    expect(stripAnsi(output)).toContain("╰─ draft");
+    expect(stripAnsi(output)).toContain("╰─   draft");
     expect(stripAnsi(output)).not.toContain("997");
   } finally { mode.stop(); selectTheme("dark"); updateAppearance("dark"); }
 });

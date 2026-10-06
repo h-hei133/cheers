@@ -35,6 +35,8 @@ export interface TerminalFramePlan {
 }
 
 export interface TerminalFrameProvider {
+  /** Discard hit-test coordinates as soon as terminal geometry changes. */
+  invalidateLayout?(): void;
   /** Compose one decorated layout; a direct caller defaults to a viewport. */
   renderFrame(dimensions: ViewportSize, layout?: FrameLayout): TerminalFramePlan;
 }

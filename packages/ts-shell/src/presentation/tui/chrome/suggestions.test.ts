@@ -38,6 +38,23 @@ describe("ranking", () => {
 });
 
 describe("selection", () => {
+  it("keeps the selected identity visible and clickable when the row budget shrinks", () => {
+    const list = new SuggestionList();
+    list.setItems(Array.from({ length: 12 }, (_, index) => ({ label: `item-${index}`, value: `${index}` })));
+    list.step(-1);
+    const rows = list.render(20, 2);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toContain("item-11");
+    list.selectRow(0);
+    expect(list.current()?.value).toBe("11");
+    list.selectRow(1);
+    expect(list.current()?.value).toBe("11");
+    expect(list.render(1, 1).every(row => visibleWidth(row) <= 1)).toBe(true);
+    expect(list.render(20, 0)).toEqual([]);
+    list.selectRow(0);
+    expect(list.current()?.value).toBe("11");
+  });
+
   it("wraps at both ends", () => {
     const list = new SuggestionList();
     list.setItems(commands);

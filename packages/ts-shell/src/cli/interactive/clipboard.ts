@@ -4,9 +4,8 @@ import { runCopyCommand, setClipboardSink } from "../../core/commands/copyComman
  * Clipboard side of the interactive surface.
  *
  * Every copy goes through here, so the transcript records what was taken and
- * there is one path rather than several that can drift. The terminal keeps its
- * own selection: a drag is the terminal's, which is why the rendered rows carry
- * no trailing padding for it to hand over.
+ * there is one path rather than several that can drift. Application selections
+ * pass source text here; native selection remains controlled by the terminal.
  */
 
 export interface ClipboardContext {

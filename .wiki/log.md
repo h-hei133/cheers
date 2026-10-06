@@ -6295,3 +6295,6 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 
 
 ## [2026-10-07] fix | Phase 19 UI-01 regular 消费内部 marker、定位可见 caret 并沿用相对行/scrollback 账本。审查发现并修复全历史逐帧解析的性能回归，万行局部探针约 236→0.61 ms/帧。234 项组合、最终独立 renderer 67 项、3 组反转、Node 20.3 构建及两模式实际 CLI 满行/粘贴/resize/重绘屏幕验证通过，独立 APPROVE/CLEAR；见 features/phase-19-decisions.md §8.86。Windows 前端像素与 IME 证据仍缺，完整阶段目标继续。
+
+
+## [2026-10-07] feat | Phase 19 UI-02 共享 editor/composer 的 source/cell/viewport 布局，band 两侧 2 cells，应用复制与高亮同源，保留 tab/缩进/尾空白并去除软折行伪换行。审查修复 resize 旧命中和单行 regular 历史重追加。362 项组合、4 组反转、Node 20.3 构建及实际 CLI 两模式 caret/fullscreen 精确源文复制验证通过，独立 APPROVE/CLEAR；见 features/phase-19-decisions.md §8.87。原生终端选择、八形态/IME 和完整 Phase 19 继续。
