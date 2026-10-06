@@ -1,43 +1,14 @@
 import { Editor } from "../../presentation/tui/editor.js";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   couldBeFileReference,
   fileReferenceAt,
   fileSuggestions,
-  invalidateWorkspaceFiles,
   rankFiles,
-  warmWorkspaceFiles,
-  workspaceFiles,
 } from "./fileSuggestions.js";
 
-/**
- * `@` file references.
- *
- * Two things decide whether this is usable: when a reference is recognized at
- * all, and whether the listing is cheap enough to run on every keystroke. The
- * first is the rule below; the second is the cache, which is why the walk happens
- * once per workspace rather than once per character.
- */
 describe("file references", () => {
-  let workspace: string;
-
-  beforeEach(() => {
-    workspace = fs.mkdtempSync(path.join(os.tmpdir(), "file-suggestions-"));
-    fs.mkdirSync(path.join(workspace, "src", "core"), { recursive: true });
-    fs.writeFileSync(path.join(workspace, "src", "core", "model.ts"), "x");
-    fs.writeFileSync(path.join(workspace, "src", "core", "policy.ts"), "x");
-    fs.writeFileSync(path.join(workspace, "README.md"), "x");
-    fs.writeFileSync(path.join(workspace, "package.json"), "x");
-    invalidateWorkspaceFiles();
-  });
-
-  afterEach(() => {
-    fs.rmSync(workspace, { recursive: true, force: true });
-    invalidateWorkspaceFiles();
-  });
+  const files = ["README.md", "package.json", "src/core/model.ts", "src/core/policy.ts"];
 
   describe("recognizing a reference", () => {
     it("opens at the start of the draft", () => {
@@ -109,21 +80,18 @@ describe("file references", () => {
 
   describe("suggestions for a draft", () => {
     it("completes a quoted file in the middle without duplicating quotes or dropping prose", async () => {
-      fs.writeFileSync(path.join(workspace, "my file.ts"), "x");
-      await warmWorkspaceFiles(workspace);
       const editor = new Editor();
       editor.setText('查看 @"my f"  后缀👩‍💻');
       editor.move("doc-start");
       for (let count = 0; count < 9; count++) editor.move("right");
-      const candidate = fileSuggestions(editor.getText(), workspace, editor.snapshot())?.[0];
+      const candidate = fileSuggestions(editor.getText(), [...files, "my file.ts"], editor.snapshot())?.[0];
       expect(candidate?.value).toBe("@my file.ts");
       expect(editor.replace(candidate!.edit!)).toBe(true);
       expect(editor.getText()).toBe('查看 @"my file.ts"  后缀👩‍💻');
     });
 
     it("names where the accepted value starts, so it replaces only the reference", async () => {
-      await warmWorkspaceFiles(workspace);
-      const suggestions = fileSuggestions("please read @model", workspace);
+      const suggestions = fileSuggestions("please read @model", files);
 
       expect(suggestions?.[0]).toMatchObject({
         value: "@src/core/model.ts",
@@ -133,70 +101,19 @@ describe("file references", () => {
     });
 
     it("offers files for a bare sigil", async () => {
-      await warmWorkspaceFiles(workspace);
-      const values = (fileSuggestions("read @", workspace) ?? []).map((s) => s.value);
+      const values = (fileSuggestions("read @", files) ?? []).map((s) => s.value);
 
       expect(values).toContain("@README.md");
       expect(values).toContain("@src/core/model.ts");
     });
 
     it("returns nothing when the draft holds no reference", async () => {
-      await warmWorkspaceFiles(workspace);
-      expect(fileSuggestions("no sigil here", workspace)).toBeNull();
+      expect(fileSuggestions("no sigil here", files)).toBeNull();
     });
 
     it("returns nothing when nothing matches the reference", async () => {
-      await warmWorkspaceFiles(workspace);
-      expect(fileSuggestions("@zzzzz", workspace)).toBeNull();
+      expect(fileSuggestions("@zzzzz", files)).toBeNull();
     });
   });
 
-  describe("the listing", () => {
-    it("walks the workspace once, not once per keystroke", async () => {
-      await warmWorkspaceFiles(workspace);
-      // Two different queries, one listing: the second must not trigger a walk
-      // whose result could differ from the one already held.
-      const first = fileSuggestions("@model", workspace);
-      const second = fileSuggestions("@policy", workspace);
-
-      expect(first?.[0]?.value).toBe("@src/core/model.ts");
-      expect(second?.[0]?.value).toBe("@src/core/policy.ts");
-    });
-
-    it("re-walks after the cache is invalidated, so /reload sees new files", async () => {
-      await warmWorkspaceFiles(workspace);
-      expect(fileSuggestions("@brand-new", workspace)).toBeNull();
-
-      fs.writeFileSync(path.join(workspace, "brand-new.ts"), "x");
-      invalidateWorkspaceFiles();
-      await warmWorkspaceFiles(workspace);
-
-      expect(fileSuggestions("@brand-new", workspace)?.[0]?.value).toBe("@brand-new.ts");
-    });
-
-    it("keeps a listing for each workspace, not just the last one asked about", async () => {
-      // Subagent and worktree sessions reach the same process, so two roots is
-      // ordinary. A single slot meant the second workspace evicted the first, and
-      // completion in the first fell back to an empty list until its walk ran
-      // again.
-      const other = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-suggest-"));
-      fs.mkdirSync(path.join(other, "src"), { recursive: true });
-      fs.writeFileSync(path.join(other, "src", "elsewhere.ts"), "x");
-
-      await warmWorkspaceFiles(workspace);
-      await warmWorkspaceFiles(other);
-
-      // The first workspace must still answer from its own listing.
-      expect(fileSuggestions("@policy", workspace)?.[0]?.value).toBe("@src/core/policy.ts");
-      expect(fileSuggestions("@elsewhere", other)?.[0]?.value).toBe("@src/elsewhere.ts");
-    });
-
-    it("drops every workspace's listing when invalidated", async () => {
-      await warmWorkspaceFiles(workspace);
-      invalidateWorkspaceFiles();
-      // Nothing is held, so the first synchronous call reports nothing yet and
-      // must not claim a listing it no longer has.
-      expect(workspaceFiles(workspace)).toEqual([]);
-    });
-  });
 });

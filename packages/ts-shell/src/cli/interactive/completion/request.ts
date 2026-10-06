@@ -15,10 +15,19 @@ import { completionToken, completionEdit, quoteCompletion } from "../completion.
 import { getSlashInvocation } from "../../../entrypoints/slashCommandRegistry.js";
 import type { DraftSnapshot } from "../../../presentation/tui/editor/replacement.js";
 import { matchSuggestions, type Suggestion } from "../../../presentation/tui/chrome/suggestions.js";
+import { fileReferenceAt, fileSuggestions } from "../fileSuggestions.js";
 
-export type CatalogKind = "theme" | "skill" | "tools" | "session" | "entry" | "tree" | "thread" | "mcp" | "grant" | "connection" | "file" | "directory" | "model" | "provider" | "workflow" | MemoryCatalogKind;
+export type CatalogKind = "theme" | "skill" | "tools" | "session" | "entry" | "tree" | "thread" | "mcp" | "grant" | "connection" | "file" | "directory" | "reference" | "model" | "provider" | "workflow" | MemoryCatalogKind;
 
 export function catalogRequest(snapshot: DraftSnapshot) {
+  const command = commandCatalogRequest(snapshot);
+  if (command) return command;
+  if (!fileReferenceAt(snapshot.text, snapshot.cursor)) return undefined;
+  return { kind: "reference" as const, token: completionToken(snapshot.text, snapshot.cursor), snapshot,
+    fixed: [] as Suggestion[], query: undefined };
+}
+
+function commandCatalogRequest(snapshot: DraftSnapshot) {
   const token = completionToken(snapshot.text, snapshot.cursor);
   const command = token.before[0];
   if (!command || !/^\/[A-Za-z0-9:._?-]+$/.test(snapshot.text.slice(command.from, command.to))) return undefined;
@@ -57,6 +66,7 @@ export function catalogRequest(snapshot: DraftSnapshot) {
 }
 
 export function catalogSuggestions(request: NonNullable<ReturnType<typeof catalogRequest>>, items: readonly Suggestion[]) {
+  if (request.kind === "reference") return fileSuggestions(request.snapshot.text, items.map(item => item.value), request.snapshot) ?? [];
   return matchSuggestions(request.token.value, [...request.fixed, ...items]).slice(0, 100).map(item => {
     const text = (item.value.startsWith("-") && !request.token.before.some(token => token.value === "--") ? "-- " : "") + quoteCompletion(item.value, request.token.prefix);
     if ((request.kind === "file" || request.kind === "directory") && item.value.endsWith("/")) {

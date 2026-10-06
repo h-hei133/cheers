@@ -46,7 +46,7 @@ import { readStatusItems, writeStatusItems } from "./tuiSettings.js";
 import type { ImageContent } from "../../model-adapters/multimodal.js";
 import { readStatusFacts, readWelcomeState } from "./sessionFacts.js";
 import { couldBeCommand, slashArgumentHint, slashSuggestions } from "./slashSuggestions.js";
-import { couldBeFileReference, fileSuggestions } from "./fileSuggestions.js";
+import { couldBeFileReference } from "./fileSuggestions.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
 import { TurnSink } from "./turnSink.js";
 import { updateAppearance } from "../../presentation/theme/selection.js";
@@ -544,11 +544,7 @@ export class InteractiveMode {
     const draft = snapshot.text;
     this.completionStatus = undefined;
     if (this.catalogs.update(snapshot)) return;
-    // Files first: an `@` reference is unambiguous, while a leading slash could
-    // still become either a command or a path.
-    const matches =
-      fileSuggestions(draft, this.options.runtimeContext.projectRoot, snapshot) ??
-      slashSuggestions(draft, snapshot);
+    const matches = slashSuggestions(draft, snapshot);
     if (!matches) {
       this.completionStatus = slashArgumentHint(snapshot);
       this.view.setSuggesting(false);

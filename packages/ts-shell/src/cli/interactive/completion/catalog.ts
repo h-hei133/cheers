@@ -16,6 +16,7 @@ import type { ShellRuntimeContext } from "../../../core/shell/runtimeContext.js"
 import type { CliMcpGateway } from "../../../entrypoints/cliMcpModule.js";
 import type { CatalogKind } from "./request.js";
 import type { Suggestion } from "../../../presentation/tui/chrome/suggestions.js";
+import { listWorkspaceFiles } from "../../../runtime/execution/fileWalk.js";
 
 export function catalogIdentity(context: ShellRuntimeContext, themePaths: readonly string[] = []): string {
   return JSON.stringify([context.cwd, context.projectRoot, context.session.id, context.skillOptions,
@@ -45,7 +46,7 @@ async function readCatalog(kind: CatalogKind, context: ShellRuntimeContext, gate
   return [...tools.values()].map(tool => ({ value: tool.name, label: tool.name, detail: tool.description.split("\n")[0]?.slice(0, 160) }));
 }
 
-/** Reuse a pending catalog read across changing prefixes; cancellation only detaches the waiter. */
+/** Generic reads share pending work; file/path requests propagate cancellation to their owners. */
 export function createCatalogLoader(context: () => ShellRuntimeContext, gateway: CliMcpGateway, themePaths: readonly string[], manager?: SessionCatalog, policy?: GrantCatalog) {
   let pending: { key: string; task: Promise<readonly Suggestion[]> } | undefined;
   const skills = createSkillCatalog();
@@ -54,6 +55,11 @@ export function createCatalogLoader(context: () => ShellRuntimeContext, gateway:
   const load = async (kind: CatalogKind, signal: AbortSignal, query?: string): Promise<readonly Suggestion[]> => {
     signal.throwIfAborted();
     const current = context();
+    if (kind === "reference") {
+      const files = await listWorkspaceFiles(current.projectRoot, { abortSignal: signal });
+      signal.throwIfAborted();
+      return files.slice(0, 5000).map(value => ({ value, label: value }));
+    }
     if (kind === "file" || kind === "directory") return pathCatalog(current.cwd, query ?? "", kind === "directory", signal);
     const key = catalogIdentity(current, themePaths) + kind;
     if (!pending || pending.key !== key) {

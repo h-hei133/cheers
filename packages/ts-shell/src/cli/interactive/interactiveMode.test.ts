@@ -13,6 +13,7 @@ import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 import type { OverlayHost, Picker } from "./overlay.js";
 import type { PickerHost } from "./picker/registry.js";
 import type { InteractiveView } from "../../presentation/tui/surface/contract.js";
+import * as fileWalk from "../../runtime/execution/fileWalk.js";
 
 function build(overrides: { observeEvents?: () => () => void; exit?: (code?: number) => void } = {}): {
   mode: InteractiveMode;
@@ -54,6 +55,42 @@ function build(overrides: { observeEvents?: () => () => void; exit?: (code?: num
 }
 
 describe("session wiring", () => {
+  it("loads file references only on demand and accepts the async quoted candidate without submission", async () => {
+    const walk = vi.spyOn(fileWalk, "listWorkspaceFiles").mockResolvedValue(['my file.ts']);
+    const { mode, terminal } = build();
+    const host = mode as unknown as { view: InteractiveView; onSubmit(text: string): void };
+    const submit = vi.spyOn(host, "onSubmit").mockImplementation(() => {});
+    mode.start();
+    try {
+      expect(walk).not.toHaveBeenCalled();
+      terminal.input('@my');
+      await vi.waitFor(() => expect(host.view.suggestions.current()?.value).toBe('@my file.ts'));
+      terminal.input('\t');
+      expect(host.view.editor.getText()).toBe('@"my file.ts" ');
+      expect(submit).not.toHaveBeenCalled();
+      expect(walk).toHaveBeenCalledTimes(1);
+    } finally { mode.stop(); walk.mockRestore(); }
+  });
+
+  it.each(['escape', 'stop'])('cancels a pending reference walk on actual %s and ignores late results', async action => {
+    let resolve!: (files: readonly string[]) => void;
+    const walk = vi.spyOn(fileWalk, "listWorkspaceFiles").mockImplementation(() => new Promise(done => { resolve = done; }));
+    const { mode, terminal } = build();
+    const host = mode as unknown as { view: InteractiveView };
+    mode.start();
+    try {
+      terminal.input('@late');
+      await vi.waitFor(() => expect(walk).toHaveBeenCalledTimes(1));
+      const signal = walk.mock.calls[0]?.[1]?.abortSignal;
+      if (action === 'stop') mode.stop(); else terminal.input('\x1b');
+      // A lone Escape is dispatched after the input buffer's sequence timeout.
+      await vi.waitFor(() => expect(signal?.aborted).toBe(true));
+      resolve(['late-file']);
+      await new Promise(done => setTimeout(done, 0));
+      expect(host.view.suggestions.current()?.value).not.toBe('@late-file');
+    } finally { mode.stop(); walk.mockRestore(); }
+  });
+
   it.each([["cp", "[text]"], ["recall", "<query>"], ["retain", "<statement>"]])("keeps /%s usage informational and submits the literal body once", (name, hint) => {
     const { mode, terminal } = build();
     const host = mode as unknown as { view: InteractiveView; onSubmit(text: string): void };

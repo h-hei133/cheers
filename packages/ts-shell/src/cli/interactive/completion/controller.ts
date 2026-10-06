@@ -63,12 +63,12 @@ export class CatalogController {
     const epoch = this.epoch;
     const abort = new AbortController();
     this.abort = abort;
-    this.options.publish(catalogSuggestions(request, []), "Loading command entries…");
+    this.options.publish(catalogSuggestions(request, []), request.kind === "reference" ? "Loading file references…" : "Loading command entries…");
     this.delay = setTimeout(() => {
       this.deadline = setTimeout(() => {
         abort.abort();
         if (!this.current(epoch, identity, snapshot)) return;
-        this.finish(request, [], "Command entries timed out.");
+        this.finish(request, [], request.kind === "reference" ? "File references timed out." : "Command entries timed out.");
         this.epoch++;
       }, 1500);
       void this.options.load(request.kind, abort.signal, request.query).then(items => {
@@ -76,7 +76,7 @@ export class CatalogController {
         this.finish(request, items.slice(0, 5000));
       }, () => {
         if (!this.current(epoch, identity, snapshot)) return;
-        this.finish(request, [], "Command entries unavailable.");
+        this.finish(request, [], request.kind === "reference" ? "File references unavailable." : "Command entries unavailable.");
       });
     }, 75);
     return true;
