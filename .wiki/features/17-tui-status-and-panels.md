@@ -5,7 +5,7 @@ sources: [user-experience-report-2026-10-05, user-coloring-request-2026-10-05, c
 created: 2026-10-05
 updated: 2026-10-07
 tags: [research, tui, status-band, panels, slash-commands, pickers, coloring]
-summary: "Phase 19 设计与进展：UI-05 已接通独立窗口来源、未知/已报告零用量和费用估算；主题/形态预览已交付。结构化报告基础与 context 已接通，其他只读面板及逐命令迁移继续；历史首帧与终端归因保留边界。"
+summary: "Phase 19 设计与进展：UI-05 已接通独立窗口来源、未知/已报告零用量和费用估算；主题/形态预览已交付。结构化报告、自适应阅读器与 help 两步填入已接通，其他报告迁移继续；历史首帧与终端归因保留边界。"
 confidence: mixed
 ---
 
@@ -336,7 +336,7 @@ bridge 不在 runtime 的 output 生成阶段包色，也不把渲染字符串�
 - `LocalCommandResult.report` 已加入 version 1 的 spans/columns/facts；`output` 从同一不可变、无控制序列快照生成。`/context` 是首个消费者，保留窗口来源、实际 provider 用量、工具估算与未知状态；状态和报告百分比共用 50/70/90 阈值。
 - 结构通过既有 renderer/sink 进入转录与 Pager，presentation 按当前主题着色，窄列堆叠标签和值。分页折叠仅改变视图，纯文本全文继续用于复制；width/theme 缓存及跨样式过滤已验证。没有在任意 Markdown 上增加角色推断，也没有另造报告宿主。
 - 143 项首轮组合、最终修正定向、Node 20.3 构建、五组有效反转和独立 APPROVE/CLEAR 均有证据；实际 CLI 两模式报告换色/缩窗/输入恢复和强制彩色下 print 无 ANSI 通过，见 [主裁决 §8.92](phase-19-decisions.md#892-ui-06结构化报告基础与-context-首个消费者)。
-- 后续 §9 已让结构化报告按真实几何选择形式；legacy 文本仍保留原阈值。help 填入、其他报告迁移和语义持久化继续。JSON 事实可序列化不等于 CLI JSON 输出路径或持久重放已经交付。
+- 后续 §9 已让结构化报告按真实几何选择形式；legacy 文本仍保留原阈值。help 填入见 §10；其他报告迁移和语义持久化继续。JSON 事实可序列化不等于 CLI JSON 输出路径或持久重放已经交付。
 
 
 ## 9. UI-06 自适应报告宿主（2026-10-07）
@@ -344,4 +344,13 @@ bridge 不在 runtime 的 output 生成阶段包色，也不把渲染字符串�
 - 复用 Pager，语义报告按 Surface 扣除真实 composer/hints/activity 后的可用行数选择内嵌/全屏。短报告也可浏览，过滤不改变形式；未过滤内容放不下才全屏。纯文本旧输出的 18 行阈值继续保留。
 - renderer 的源条目映射支撑宽度重排后的阅读锚点和完整条目过滤，标签/值/来源共同保留。箭头、分页、Home/End、滚轮共享 viewport，粘贴只能进过滤器；关闭恢复草稿，新的请求、问题、审批与退出会让 reader 关闭。
 - regular 借用全屏时已补齐鼠标 enable/disable，并覆盖关闭/暂停/恢复/退出；内嵌报告全量可见且不显示滚轮提示，保留原生鼠标。actual CLI 两模式完成内嵌/全屏/分页/滚轮/过滤/恢复/后续请求链；六组有效反转、恢复后 123 项及独立 APPROVE/CLEAR 见 [主裁决 §8.93](phase-19-decisions.md#893-ui-06实际容量下的只读报告与输入归属)。
-- help 两步填入、其他命令迁移、CLI JSON 输出与持久语义重放尚未据此完成；完整 UI-06 与 Phase 19 继续。
+- help 两步填入已由后续 §10 交付；其他命令迁移、CLI JSON 输出与持久语义重放继续，完整 UI-06 与 Phase 19 尚未完成。
+
+
+## 10. UI-06 可搜索命令帮助（2026-10-07）
+
+- 裸 `/help` 与 `/?` 进入既有 picker；目录来自共享 slash registry，包含 `back`、独立命名入口与动态扩展。别名参与搜索但不重复列项，选中 `/models` 搜索结果填入 `/model `，`/recall` 保留独立语义；MCP 门控沿用共享注册表。分组和 interactive/print 适用范围来自声明，扩展未声明范围时标 registered，不伪称运行前置条件已满足。
+- Enter 只把规范命令和尾空格填入 composer，关闭面板；参数语法经既有 usage hint 显示，不把 `<query>` 等占位符填成可提交正文，也不在插入时触发候选目录联网。第二次明确提交才执行。浏览/过滤/取消保留原草稿，粘贴归过滤器，旧或已移除扩展不能通过过期选择插入。
+- 通用 inline panel 最多 8 个选项，标题/footer/溢出另计，消费 Surface 扣除实际 composer、提示和 activity 后的可用行数。极短帧保持边界与关闭提示。命令使用既有 command 色槽，筛选 terms 与显示标签分离；更新选项保留仍存在的焦点。
+- Overlay 拥有动态订阅生命周期；相同 picker 实例关闭重开时，以打开代际隔离旧 load 与 publication，并在选择、取消或替换后解除订阅。两模式 actual CLI 验证 canonical/命名入口、100→40 列、两次提交与退出；全部 0 provider 请求、配置逐字节不变。详细审查/测试/反转证据见 [主裁决 §8.94](phase-19-decisions.md#894-ui-06可搜索帮助与两步命令提交)。
+- 保留带参及 print 的既有命令路径；本批没有宣称其他报告迁移、CLI JSON 或持久语义重放完成。

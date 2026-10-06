@@ -14,6 +14,9 @@ export interface Option {
   /** Value handed back on accept. */
   readonly id: string;
   readonly label: string;
+  readonly labelRole?: "command";
+  /** Additional matching terms, such as aliases of a canonical entry. */
+  readonly searchText?: string;
   /** Secondary text on the same row. */
   readonly detail?: string;
   /** Third field, rendered dimmer still: status, version, timestamp. */
@@ -34,11 +37,13 @@ export class OptionModel {
 
   /** Replace the option set, keeping any prior multi-select state. */
   setOptions(options: readonly Option[]): void {
+    const focused = this.current()?.id;
     this.all = options;
     for (const option of options) {
       if (option.selected) this.chosen.add(option.id);
     }
     this.applyFilter();
+    if (focused) this.focus(focused);
   }
 
   get filter(): string {
@@ -128,5 +133,5 @@ export class OptionModel {
 }
 
 function haystack(option: Option): string {
-  return `${option.label} ${option.detail ?? ""} ${option.note ?? ""}`.toLowerCase();
+  return `${option.label} ${option.detail ?? ""} ${option.note ?? ""} ${option.searchText ?? ""}`.toLowerCase();
 }

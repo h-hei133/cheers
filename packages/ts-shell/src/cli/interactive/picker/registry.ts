@@ -9,6 +9,7 @@ import type { RewindPoint } from "./rewind.js";
 import type { Transcript } from "../../../presentation/tui/transcript/container.js";
 import type { Picker } from "../overlay.js";
 import { connectionPicker } from "./connections.js";
+import { helpPicker } from "./help.js";
 import { copyPicker } from "./copy.js";
 import { modelPicker } from "./model.js";
 import { permissionPicker } from "./permissions.js";
@@ -57,6 +58,7 @@ export interface PickerHost extends SettingsHost {
 type PickerFactory = (host: PickerHost, argument?: string) => Picker;
 
 const PICKERS: Record<string, PickerFactory> = {
+  help: () => helpPicker(),
   model: (host) => modelPicker(host.commandContext),
   copy: (host) => copyPicker(host.transcript, host.commandContext),
   resume: (host) =>

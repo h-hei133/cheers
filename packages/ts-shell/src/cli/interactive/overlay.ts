@@ -6,6 +6,7 @@ import type { MouseReport } from "../../presentation/tui/input/mouse.js";
 import { defaultTheme } from "../../presentation/theme/theme.js";
 import { CURSOR_MARKER } from "../../presentation/tui/render/paint.js";
 import { truncateToWidth } from "../../presentation/tui/text/layout.js";
+import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 import { InputForm, type PickerInput } from './picker/input.js';
 
 /**
@@ -26,8 +27,8 @@ export interface PickerOutcome {
   readonly note?: string;
   /**
    * Text to place in the prompt instead of acting immediately. Used where the
-   * next step needs a secret the picker should not be collecting — the user gets
-   * the exact command with the cursor after it.
+   * next step needs explicit submission or arguments — the user gets the exact
+   * command with the cursor after it.
    */
   readonly draft?: string;
 }
@@ -44,6 +45,7 @@ export interface Picker {
   readonly initialFilter?: string;
   /** Shown when the option set turns out to be empty. */
   readonly empty: string;
+  readonly footer?: string;
   /** True when the picker collects several answers before applying. */
   readonly multiple?: boolean;
   /**
@@ -57,6 +59,8 @@ export interface Picker {
   readonly detailRows?: number;
   /** Options to offer; may hit the network or the filesystem. */
   load(): Promise<readonly Option[]>;
+  /** Publish live options until the host releases the subscription on close. */
+  subscribe?(publish: (options: readonly Option[]) => void): () => void;
   /** Apply the choice, reporting what to show or to draft next. */
   apply(ids: readonly string[]): Promise<PickerOutcome | undefined>;
   /**
@@ -84,15 +88,13 @@ export interface Picker {
   onDeny?(reason: string | undefined): Promise<void> | void;
 }
 
-/** Rows the inline panel is allowed to occupy. */
-const PANEL_ROWS = 12;
-
 export class OverlayHost {
   private generation = 0;
   private input: InputForm | undefined;
   private picker: Picker | undefined;
   private model = new OptionModel();
   private loading = false;
+  private unsubscribe: (() => void) | undefined;
   private readonly optionRows = new Map<number, string>();
   private renderedWidth = 0;
 
@@ -116,8 +118,10 @@ export class OverlayHost {
 
   /** Open `picker`, loading its options in the background. */
   open(picker: Picker): void {
+    this.unsubscribe?.();
+    this.unsubscribe = undefined;
     this.model = new OptionModel();
-    this.generation++;
+    const generation = ++this.generation;
     this.input = picker.input ? new InputForm(picker.input) : undefined;
     this.optionRows.clear();
     this.picker?.previewEnd?.();
@@ -133,22 +137,33 @@ export class OverlayHost {
     void picker
       .load()
       .then((options) => {
-        if (this.picker !== picker) return;
+        if (this.picker !== picker || this.generation !== generation) return;
         this.optionRows.clear();
         this.model.setOptions(options);
         if (picker.initialSelection) this.model.focus(picker.initialSelection);
         if (!picker.multiple) picker.previewChange?.(idsOf(this.model.current()));
+        if (this.picker !== picker || this.generation !== generation) return;
+        const unsubscribe = picker.subscribe?.(options => {
+          if (this.picker !== picker || this.generation !== generation) return;
+          this.optionRows.clear();
+          this.model.setOptions(options);
+          this.onChange();
+        });
+        if (this.picker === picker && this.generation === generation) this.unsubscribe = unsubscribe;
+        else unsubscribe?.();
       })
       .catch(() => {
-        if (this.picker === picker) this.model.setOptions([]);
+        if (this.picker === picker && this.generation === generation) this.model.setOptions([]);
       })
       .finally(() => {
-        if (this.picker === picker) this.loading = false;
+        if (this.picker === picker && this.generation === generation) this.loading = false;
         this.onChange();
       });
   }
 
   close(): void {
+    this.unsubscribe?.();
+    this.unsubscribe = undefined;
     this.generation++;
     this.input = undefined;
     this.optionRows.clear();
@@ -163,7 +178,7 @@ export class OverlayHost {
   }
 
   /** Rows for the open picker at the given geometry, or none when closed. */
-  render(width: number, height: number): string[] {
+  render(width: number, height: number, availableRows = Math.max(0, height - 6)): string[] {
     this.optionRows.clear();
     this.renderedWidth = width;
     const picker = this.picker;
@@ -210,11 +225,12 @@ export class OverlayHost {
         empty,
         multiple: picker.multiple === true,
         filterable: picker.filterable,
+        footer: picker.footer,
         hideCount: isApproval,
         onOptionRow: (row, id) => this.optionRows.set(row, id),
       },
       width,
-      Math.min(PANEL_ROWS, Math.max(4, height - 6)),
+      Math.max(0, Math.min(height, availableRows)),
     );
   }
 
@@ -241,7 +257,7 @@ export class OverlayHost {
     if (this.input) this.input.paste(text);
     else if (this.subMode === 'none' && this.picker.filterable !== false) {
       this.optionRows.clear();
-      this.model.appendFilter(text.replace(/[\r\n\t]+/g, ' ').replace(/[\x00-\x1f\x7f-\x9f]/g, ''));
+      this.model.appendFilter(stripAnsi(text).replace(/[\r\n\t]+/g, ' ').replace(/[\x00-\x1f\x7f-\x9f]/g, ''));
     }
     this.onChange();
     return true;
@@ -572,6 +588,8 @@ export class OverlayHost {
 
   private accept(picker: Picker, apply: (picker: Picker, ids: readonly string[]) => void): void {
     const ids = picker.multiple ? this.model.chosenIds() : idsOf(this.model.current());
+    this.unsubscribe?.();
+    this.unsubscribe = undefined;
     this.picker = undefined;
     this.subMode = "none";
     this.loading = false;
@@ -583,6 +601,8 @@ export class OverlayHost {
     }
   }
   private acceptDirect(picker: Picker, apply: (picker: Picker, ids: readonly string[]) => void, ids: readonly string[]): void {
+    this.unsubscribe?.();
+    this.unsubscribe = undefined;
     this.picker = undefined;
     this.subMode = "none";
     this.loading = false;

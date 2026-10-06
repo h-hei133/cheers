@@ -98,6 +98,25 @@ describe("pointer focus", () => {
 
 
 describe("lifecycle", () => {
+  it('ignores an old load when the same picker instance is reopened and releases its live subscription', async () => {
+    const { overlay } = host(); const loads: ((options: readonly Option[]) => void)[] = [];
+    const publish: ((options: readonly Option[]) => void)[] = []; const releases = [vi.fn(), vi.fn()];
+    const menu = picker({ load: () => new Promise(resolve => loads.push(resolve)), subscribe: callback => {
+      publish.push(callback); return releases[publish.length - 1]!;
+    } });
+    overlay.open(menu); overlay.close(); overlay.open(menu);
+    loads[1]!(options); await new Promise(resolve => setTimeout(resolve, 0));
+    loads[0]!([{ id: 'old', label: 'obsolete row' }]); await new Promise(resolve => setTimeout(resolve, 0));
+    expect(publish).toHaveLength(1);
+    expect(overlay.render(60, 20).join('\n')).toContain('alpha');
+    expect(overlay.render(60, 20).join('\n')).not.toContain('obsolete row');
+    overlay.close(); expect(releases[0]).toHaveBeenCalledOnce();
+    overlay.open(menu); loads[2]!(options); await new Promise(resolve => setTimeout(resolve, 0));
+    publish[0]!([{ id: 'old', label: 'late publication' }]);
+    expect(overlay.render(60, 20).join('\n')).not.toContain('late publication');
+    overlay.handleKey(parseKeyEvent('\r'), vi.fn()); expect(releases[1]).toHaveBeenCalledOnce();
+  });
+
   it("is inactive until a picker opens", () => {
     const { overlay } = host();
     expect(overlay.active).toBe(false);

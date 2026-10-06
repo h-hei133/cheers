@@ -19,6 +19,7 @@ import type { InteractiveView } from "../../presentation/tui/surface/contract.js
 import * as fileWalk from "../../runtime/execution/fileWalk.js";
 import { currentTheme } from '../../presentation/theme/theme.js';
 import { isThemePreviewActive, selectTheme } from '../../presentation/theme/selection.js';
+import { helpPicker } from './picker/help.js';
 
 function build(overrides: { observeEvents?: () => () => void; exit?: (code?: number) => void } = {}): {
   mode: InteractiveMode;
@@ -60,6 +61,42 @@ function build(overrides: { observeEvents?: () => () => void; exit?: (code?: num
 }
 
 describe("session wiring", () => {
+  it.each([['/models', '/model ', undefined, '/model'], ['/recall', '/recall ', '<query>', '/recall '], ['/exit', '/exit ', undefined, '/exit']])(
+    'inserts the help choice %s and executes only on a second explicit submission', async (filter, command, usage, submitted) => {
+      const exit = vi.fn(); const { mode, terminal } = build({ exit });
+      const host = mode as unknown as { overlay: OverlayHost; view: InteractiveView; onSubmit(text: string): void };
+      const submit = vi.spyOn(host, 'onSubmit').mockImplementation(() => {});
+      mode.start();
+      try {
+        host.view.editor.setText('preserved draft'); host.overlay.open(helpPicker());
+        await new Promise(resolve => setTimeout(resolve, 0));
+        terminal.input(`\x1b[200~\x1b[31m${filter}\x1b[0m\x1b[201~`);
+        expect(host.view.editor.getText()).toBe('preserved draft');
+        terminal.input('\r');
+        await vi.waitFor(() => expect(host.view.editor.getText()).toBe(command));
+        expect(host.overlay.active).toBe(false); expect(host.view.suggestionsOpen).toBe(false);
+        expect(submit).not.toHaveBeenCalled(); expect(exit).not.toHaveBeenCalled();
+        if (usage) expect(stripAnsi(host.view.renderFrame({ columns: 100, rows: 24 }).rows.join('\n'))).toContain(`Usage: ${command}${usage}`);
+        terminal.input('\r'); expect(submit).toHaveBeenCalledOnce(); expect(submit).toHaveBeenCalledWith(submitted, undefined, undefined);
+      } finally { mode.stop(); }
+    });
+
+  it('gives help the remaining rows after a multiline composer and preserves the draft on escape', async () => {
+    const { mode, terminal } = build();
+    const host = mode as unknown as { overlay: OverlayHost; view: InteractiveView; toast?: string };
+    mode.start();
+    try {
+      const draft = 'first\nsecond\nthird\nfourth\nfifth\nsixth\nseventh\neighth'; host.view.editor.setText(draft); host.overlay.open(helpPicker());
+      host.toast = 'A session notice remains visible';
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const frame = stripAnsi(host.view.renderFrame({ columns: 100, rows: 16 }).rows.join('\n'));
+      expect(frame).toContain('Slash commands'); expect(frame).toContain('more'); expect(frame).toContain('Esc to close');
+      expect(frame).toContain('A session notice remains visible');
+      terminal.input('\x1b'); await vi.waitFor(() => expect(host.overlay.active).toBe(false));
+      expect(host.view.editor.getText()).toBe(draft);
+    } finally { mode.stop(); }
+  });
+
   it('ends an active theme preview before stopping its follower', async () => {
     selectTheme('dark'); const { mode } = build();
     const host = mode as unknown as { overlay: OverlayHost; pickerHost(): PickerHost; theme: { refresh(): void; stop(): void } };

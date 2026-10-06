@@ -25,6 +25,7 @@ export interface SlashCommandSpec {
     | "workflow"
     | "diagnostics";
   readonly summary: string;
+  readonly supportsNonInteractive?: boolean;
   readonly argumentHint?: string;
   readonly argumentMode?: CommandDefinition["argumentMode"];
   readonly getArgumentCompletions?: (
@@ -47,6 +48,7 @@ function project(command: CommandDefinition): SlashCommandSpec {
     ...(command.invocations ? { invocations: command.invocations } : {}),
     group: command.group,
     summary: command.summary,
+    supportsNonInteractive: command.supportsNonInteractive === true,
     ...(command.argumentHint ? { argumentHint: command.argumentHint } : {}),
     ...(command.argumentMode ? { argumentMode: command.argumentMode } : {}),
     ...(command.getArgumentCompletions
@@ -74,6 +76,7 @@ const PICKER_ONLY: readonly SlashCommandSpec[] = [
   // would give it two summaries — the menu showed the stale one.
   {
     name: "back",
+    supportsNonInteractive: false,
     group: "session",
     summary: "ask an earlier question again, keeping the rest of the conversation",
   },

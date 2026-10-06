@@ -13,12 +13,14 @@ import type { Option, OptionModel } from "./options.js";
  */
 
 const MARKER_WIDTH = 4;
+const MAX_OPTIONS = 8;
 
 export interface PanelChrome {
   readonly filterable?: boolean;
   readonly title: string;
   /** Shown when the option set is empty. */
   readonly empty: string;
+  readonly footer?: string;
   /** True when rows carry a checkbox rather than a single cursor. */
   readonly multiple: boolean;
   /** Hide the match count in the header. */
@@ -34,13 +36,17 @@ export function renderPanel(
   width: number,
   capacity: number,
 ): string[] {
+  capacity = Math.max(0, Math.floor(capacity));
+  if (capacity === 0 || width <= 0) return [];
+  if (capacity === 1) return [renderFooter(chrome, width)];
   const rows: string[] = [renderHeader(model, chrome, width)];
   // Header and footer always cost a row each; an overflow notice costs a third,
   // and forgetting to reserve it is how a bounded panel overruns its budget.
-  const chromeRows = model.total > Math.max(1, capacity - 2) ? 3 : 2;
-  const listRows = Math.max(1, capacity - chromeRows);
+  const overflow = capacity >= 4 && model.total > Math.min(MAX_OPTIONS, capacity - 2);
+  const listRows = Math.min(MAX_OPTIONS, Math.max(0, capacity - (overflow ? 3 : 2)));
+  if (listRows === 0) return [...rows, renderFooter(chrome, width)];
   if (model.total === 0) {
-    rows.push(`  ${defaultTheme.dim(chrome.empty)}`);
+    rows.push(truncateToWidth(`  ${defaultTheme.dim(chrome.empty)}`, width));
     rows.push(renderFooter(chrome, width));
     return rows;
   }
@@ -52,7 +58,7 @@ export function renderPanel(
     if (!option.disabled) chrome.onOptionRow?.(rows.length, option.id);
     rows.push(renderRow(option, index === model.selectedIndex, model, chrome, labelWidth, width));
   }
-  if (window.below > 0) rows.push(`  ${defaultTheme.dim(`↓ ${window.below} more`)}`);
+  if (overflow) rows.push(truncateToWidth(`  ${defaultTheme.dim(`↑ ${window.above} · ↓ ${window.below} more`)}`, width));
   rows.push(renderFooter(chrome, width));
   return rows;
 }
@@ -76,23 +82,25 @@ function renderRow(
   width: number,
 ): string {
   const marker = rowMarker(option, active, model, chrome);
+  const text = option.labelRole === "command" ? defaultTheme.fg("command", option.label) : option.label;
   const label = option.disabled
-    ? defaultTheme.dim(option.label)
+    ? defaultTheme.dim(text)
     : active
-      ? defaultTheme.bold(option.label)
-      : option.label;
+      ? defaultTheme.bold(text)
+      : text;
   // The note is a state word — "restorable", "default", "toggle" — so it is
   // pinned to the right and the detail gives way to it, rather than the note
   // being the first thing a long detail truncates away.
   const RIGHT_PAD = option.note ? 2 : 0;
-  const noteWidth = option.note ? visibleWidth(option.note) + RIGHT_PAD : 0;
+  const noteText = truncateToWidth(option.note ?? "", Math.max(0, Math.floor(width / 2) - RIGHT_PAD));
+  const noteWidth = option.note ? visibleWidth(noteText) + RIGHT_PAD : 0;
   const detailWidth = Math.max(0, width - visibleWidth(marker) - labelWidth - noteWidth);
   const detail = option.detail ? defaultTheme.dim(truncateToWidth(option.detail, detailWidth)) : "";
   const head = truncateToWidth(`${marker}${padToWidth(label, labelWidth)}${detail}`, width - noteWidth);
-  const note = option.note ? defaultTheme.fg("border", option.note) : "";
+  const note = option.note ? defaultTheme.fg("border", noteText) : "";
   const gap = Math.max(0, width - visibleWidth(head) - visibleWidth(note) - RIGHT_PAD);
   const trailingPad = " ".repeat(RIGHT_PAD);
-  const fitted = `${head}${" ".repeat(gap)}${note}${trailingPad}`;
+  const fitted = truncateToWidth(`${head}${" ".repeat(gap)}${note}${trailingPad}`, width);
   return active ? `${defaultTheme.bgOpen("selectedBg")}${padToWidth(fitted, width)}\x1b[0m` : fitted;
 }
 
@@ -104,6 +112,8 @@ function rowMarker(option: Option, active: boolean, model: OptionModel, chrome: 
 }
 
 function renderFooter(chrome: PanelChrome, width: number): string {
+  if (chrome.footer) return defaultTheme.dim(truncateToWidth(
+    visibleWidth(`  ${chrome.footer}`) <= width ? `  ${chrome.footer}` : "Esc to close", width));
   const keys = chrome.multiple
     ? ["↑↓ move", "space toggle", "↵ apply", "esc cancel"]
     : ["↑↓ move", "↵ choose", "esc cancel"];

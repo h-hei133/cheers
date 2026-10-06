@@ -264,7 +264,7 @@ export class InteractiveMode {
           Date.now() - this.gesture.lastCancelAt < CANCEL_ARMED_MS,
         overlayFullScreen: () => this.pager.fullScreen || this.overlay.fullScreen,
         overlayRows: (width, height, availableRows) =>
-          this.pager.active ? this.pager.render(width, height, availableRows) : this.overlay.render(width, height),
+          this.pager.active ? this.pager.render(width, height, availableRows) : this.overlay.render(width, height, availableRows),
         selection: () => this.pointer.selection,
         composerSelection: () => this.pointer.composerSelection,
         toast: () => this.toast ?? this.completionStatus,
@@ -769,10 +769,12 @@ export class InteractiveMode {
         if (outcome?.note) {
           this.state.transcript.append(textBlock("command", outcome.note, picker.title));
         }
-        if (outcome?.draft) {
-          // The next step needs a secret, so the picker hands over the exact
-          // command with the caret after it rather than collecting it here.
+        if (outcome?.draft && !this.stopped && this.overlay.revision === revision) {
+          // Insertion requires another explicit submission. Usage is only a
+          // hint; loading argument candidates here could perform network I/O.
           this.state.editor.setText(outcome.draft);
+          this.view.setSuggesting(false);
+          this.completionStatus = slashArgumentHint(this.state.editor.snapshot());
         }
       })
       .catch((error: unknown) => {
