@@ -1,8 +1,7 @@
 import { createServer } from "node:http";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as catalogStore from "../../core/models/catalogStore.js";
-import * as authorization from "../../provider/request/authorization.js";
-import * as authRuntime from "../../core/auth/providerAuthRuntime.js";
+import * as accountRenewal from "../../core/auth/account/renewal.js";
 import { HookDispatcher } from "../../core/hooks/hookDispatcher.js";
 import { checkRealProviderReadiness } from "../../core/shell/providerReadiness.js";
 import { createProviderReadinessCliTerminalEvent } from "../../entrypoints/providerReadinessCliSurface.js";
@@ -83,8 +82,7 @@ describe("provider admission", () => {
   it("hands the renewed account credential to readiness and the step factory", async () => {
     const old = { type: "openai-chatgpt-account" as const, accessToken: "old-test-token", refreshToken: "test-refresh", expiresAt: 1 };
     const fresh = { ...old, accessToken: "renewed-test-token", expiresAt: Date.now() + 60_000 };
-    vi.spyOn(authorization, "renewAccountAuthIfExpiring").mockResolvedValue({ renewed: true, accountAuth: fresh });
-    const persist = vi.spyOn(authRuntime, "persistRenewedAccountAuth").mockImplementation(() => {});
+    const renewal = vi.spyOn(accountRenewal, "renewStoredAccount").mockResolvedValue({ stored: true, writeState: 'persisted', accountAuth: fresh });
     const request = input();
     const run = await runCliRuntimeInvocation({
       ...request, providerCredentialResolution: { ...request.providerCredentialResolution,
@@ -104,6 +102,8 @@ describe("provider admission", () => {
       tools: () => new Map(), hooks: new HookDispatcher(),
     });
     expect((await collect(run.events)).at(-1)).toMatchObject({ type: "query.completed", result: { status: "completed" } });
-    expect(persist).toHaveBeenCalledWith({ provider: "openai", accountAuth: fresh });
+    expect(renewal).toHaveBeenCalledWith(expect.objectContaining({ workspaceRoot: request.workspaceRoot,
+      resolution: expect.objectContaining({ credential: expect.objectContaining({ accountAuth: old, source: 'config' }) }),
+    }));
   });
 });

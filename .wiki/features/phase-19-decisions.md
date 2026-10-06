@@ -1296,3 +1296,25 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 扩大组合 36 文件/427 项通过；最后观察目录链修正后 2 文件/24 项通过。初轮 35 文件出现 4 项失败：主题补全项目夹具缺明确授权，三个工具列表模式改 root 却保留旧 ConfigState 绑定；仅修正对应夹具，原列表、调用次数、文件变化及无应用断言保留。9 组有效反转均由行为断言检出，2 个产品文件逐字节恢复，恢复后 2 文件/24 项通过。
 - regular/fullscreen 最终构建 CLI 验证：未授权时主题名称/正文不出现，授权后安装项目颜色，编辑文件触发重绘，撤销后恢复后备颜色，后续被撤销文件编辑不生效；用户配置字节不变、合成凭据未显示、零 provider 请求、退出均为 0。最终 Node 20.3 构建、import cycles/config consumers/declarations/node floor/docs strict/diff 检查通过；NormProof 阻断义务满足、整体 partial，四项既有函数数量与 120 项文档来源 advisory 保留，新提交远端另按实际结果核对。
 - 0d4e51c1 的 CI 37444445566 与 Architecture Watch 37444445554 已成功；89928a66 的 Architecture Watch 37446385293 成功，CI 37446385274 在本次查询时仍进行中。原 07ac99fd/f9b008a6 CI 失败历史保留。剩余能力交叉验证、账户刷新身份竞态及 Phase 19 十六批/七十六项总体目标继续。
+
+§8.78 CI 补充：89928a66 的 CI 37446385274 最终失败，完整套件 653 文件/6741 项通过、1 项跳过，唯一失败文件的三项均为 interactiveCommandRouter 的工具列表夹具改项目目录却未重绑 ConfigState。该问题已在 f12c4c57 的主题消费者扩大验证中发现并修正，25 项路由测试及 427 项组合通过；原失败保留。f12c4c57 的 Architecture Watch 37448147983 已成功，CI 37448147913 在本次查询时仍进行中。
+
+
+§8.79 CI 补充：f12c4c5775192f60ea647fd9ffe16edadeb9d105 的 CI 37448147913 与 Architecture Watch 37448147983 均成功；上一 89928a66 的失败记录保留。
+
+### 8.80 CFG-03：账户续期身份、条件保存与可见失败
+
+- [账户 owner](../../packages/ts-shell/src/core/auth/account/renewal.ts)在交换令牌前捕获不可变原文基线、实际连接 ID 或配置槽、原始 CLI provider/baseUrl 选择意图及当前权威文件。删除旧 provider 范围批量保存 helper；主请求、手动压缩、遗留摘要与缓存续期共用协调器。未到期的既有凭据保留原使用语义，不把本批描述为每次请求都重新加载账户。
+- [保存状态](../../packages/ts-shell/src/core/auth/account/state.ts)仅修改所选连接/配置槽；只有原规范化身份完全一致的 provider 后备才作为镜像更新。其他账户、连接排序时间戳、原始 accountId/clientId/accountEmail 引用及空白保留，轮换只替换 accessToken/refreshToken/expiresAt。规范化 ID 重复的选择在网络前拒绝，避免一个 ID 命中多个账户。
+- 复用现有配置锁、三方字段合并与原子 writer；可选锁内 precondition 同时校验权威路径、完整连接 ID/provider 顺序和同 provider 的选择依赖。跨 provider 的活动 ID 抢占、悬空 ID 后来被满足、后备排序、重新登录/删除/端点改变均不能通过仅单记录合并。普通无关设置继续合并；凭据记录内并发模型/标签等编辑仍可保守冲突，不声称严格 CAS。
+- 写后既核验保存内容，也按原 CLI 意图重新解析当前实际凭据；环境引用变化、来源切换或身份失配时不返回新令牌。失败保留 unchanged/unknown/persisted 与 lock cleanup failed，输出受控原因，不输出原始 provider/I/O 错误或凭据。主请求阻止 readiness/资源准备/step；手动压缩返回失败原因，遗留摘要和缓存显示受控状态，没有将未核验保存隐藏成成功。
+- 进程内交换仍按 provider+refresh token 共享；每个等待者都独立匹配完整非令牌身份并保存/核验，不能因 renewed:false 依赖 leader 的保存结果。leader 写失败后 follower 可完成同一轮换；不接受来自另一账户或客户端的共享元数据。锁内已保存的相同结果按 unchanged 处理，保留其他设置。
+- 已开始的交换可能消耗 refresh token，因此操作取消后仍尝试条件保存，后续请求另查取消与准入。若取消同时遇到 unknown/persisted 保存失败，先保留写入事实，不能让取消错误遮住它。成功保存后的配置发布继续停止旧预热，旧捕获请求不跨 publication 发送。
+- 定向对照参考的锁内重读、先保存再使用、开始轮换后保留凭据决定；本项目复用同步配置锁与显式基线，不宣称跨进程只交换一次、非参与 writer 的原子 CAS、文件系统原子快照或跨文件崩溃事务。
+- 独立审查发现并修复重复连接 ID 批量覆盖、非令牌引用被改成字面值、跨 provider 锁内选择遗漏、压缩/缓存丢失写入事实、手动错误重复显示以及取消遮住保存失败。最终代码 APPROVE、架构 CLEAR；两路均为静态审查，主代理验证不冒充独立运行。
+- 验证：扩大组合 17 文件/243 项通过；最后取消/失败顺序修正后 2 文件/29 项通过；Node 20.3 构建通过。17 次反转尝试中 16 次由行为断言有效检出，5 个产品文件逐字节恢复，恢复后 3 文件/56 项通过。移除手动压缩外层取消检查仍被下游 signal guard 保护，这次未检出不计有效反转，未修改测试以强造失败。
+- 测试分类：早期 token 子串断言误把旧 refresh-a 匹配成 fresh-a，改为精确 JSON token；调用工厂附加参数和摘要包装文字属于夹具预期错误。初版 Google 元数据夹具含 schema 未声明字段，未进入续期，不能作为覆盖；已改为合法 clientId/accountEmail，强制断言交换调用及明确失败，并增加真实共享交换和成功保留引用用例。
+- 最终 regular/fullscreen 构建 CLI 各四种场景：正常、交换期间重新登录、writer 返回但未写、交换期间取消。每场仅一次本地合成 OAuth 交换；仅正常场景发送模型 HTTP，且服务端确认先保存新令牌；取消场景保存轮换但零模型请求，重新登录/unknown 场景不覆盖当前账户也零模型请求。其他账户不变，终端不含合成凭据，八场退出均为 0。探针只将 OAuth URL 改到隔离本地服务，并按场景注入未写故障，不使用真实 provider 配置。
+- import cycles/config consumers/declarations/node floor 与 43 项 gate 脚本测试通过；NormProof 阻断义务满足、整体 partial，四个既有函数数量 advisory 保留。本批新提交/远端结果另按实际 SHA 核对。此项关闭 §8.70/8.71 所述迟到续期响应按 provider 覆盖新身份的缺口；完整跨字段能力、主题历史优先级、其余资源策略及 Phase 19 十六批/七十六项总体目标继续。
+
+§8.80 门禁补充：最终五项静态 gate 与 diff 检查通过；strict docs 仍报告 120 项既有文档来源 advisory，不视为已修复。

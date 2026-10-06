@@ -5,8 +5,7 @@ import { writeProjectState } from '../core/state/projectState.js';
 import * as turnSession from '../turn/session.js';
 import { describe, expect, it, vi } from "vitest";
 import { createServer } from "node:http";
-import * as authorization from '../provider/request/authorization.js';
-import * as authPersistence from '../core/auth/providerAuthRuntime.js';
+import * as accountRenewal from '../core/auth/account/renewal.js';
 import { recordSessionUsage, resetSessionUsage } from "../observability/usageTelemetry.js";
 import { createTaskToolDefinition } from "../core/tools/taskTool.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
@@ -87,13 +86,16 @@ function dependencies(): { deps: CliRuntimeInvocationDependencies; calls: string
 describe("CLI runtime invocation", () => {
   it('builds dependent resources and the main step from the same renewed captured credential', async () => {
     const auth = { type: 'openai-chatgpt-account' as const, accessToken: 'renewed-test-token', refreshToken: 'test-refresh', expiresAt: Date.now() + 3600000 };
-    const renewal = vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockResolvedValue({ renewed: true, accountAuth: auth });
-    const persistence = vi.spyOn(authPersistence, 'persistRenewedAccountAuth').mockReturnValue(true);
+    const renewal = vi.spyOn(accountRenewal, 'renewStoredAccount').mockResolvedValue({ stored: true, writeState: 'persisted', accountAuth: auth });
     const published = vi.fn();
     let resourceResolution: ProviderCredentialResolution | undefined;
     let stepResolution: ProviderCredentialResolution | undefined;
     try {
       const run = await runCliRuntimeInvocation(baseInput({ onCredentialPersisted: published,
+        providerCredentialResolution: { ...providerCredentialResolution, credential: {
+          provider: 'openai', authMode: 'account-auth', source: 'config', envVarName: 'OPENAI_API_KEY',
+          accountAuth: { ...auth, accessToken: 'old-test-token', expiresAt: 1 },
+        } },
         prepareProviderResources: resolution => { resourceResolution = resolution; return {}; },
       }), { ...dependencies().deps, createStep: request => {
         stepResolution = request.providerCredentialResolution;
@@ -104,7 +106,7 @@ describe("CLI runtime invocation", () => {
       expect(resourceResolution).toBe(stepResolution);
       expect(resourceResolution?.credential?.accountAuth?.accessToken).toBe('renewed-test-token');
       expect(resourceResolution?.provider).toBe(providerCredentialResolution.provider);
-    } finally { renewal.mockRestore(); persistence.mockRestore(); }
+    } finally { renewal.mockRestore(); }
   });
   it("delivers captured requests and settlement to the warming runner", async () => {
     const cacheWarming = { noteRequest: vi.fn(), noteSettled: vi.fn(), stop: vi.fn(), status: () => ({ mode: "idle" as const }) };

@@ -15,7 +15,7 @@ import { registerDeclaredHooks, type HookApprovalRequest } from "../core/hooks/r
 import { loadToolCatalog } from "../core/tools/catalog.js";
 import { loadCatalog } from "../core/models/catalogStore.js";
 import { providerEndpoint, type CatalogProvider } from "../core/models/catalog.js";
-import type { AccountAuthConfig, RuntimeConfig } from "../config/runtimeConfig.js";
+import type { RuntimeConfig } from "../config/runtimeConfig.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { buildSystemPrompt, type SystemPromptContext } from "../turn/prompt.js";
 import type { RequestOverhead } from "../session/context.js";
@@ -40,8 +40,8 @@ import {
   providerTimeoutsFrom,
 } from "../provider/request/fetch.js";
 import { DEFAULT_ENDPOINT_KIND, endpointShape } from "../provider/endpoints/index.js";
-import { accountAuthFor, providerAuthorization, renewAccountAuthIfExpiring } from "../provider/request/authorization.js";
-import { persistRenewedAccountAuth } from "../core/auth/providerAuthRuntime.js";
+import { accountAuthFor, providerAuthorization } from "../provider/request/authorization.js";
+import { renewStoredAccount } from "../core/auth/account/renewal.js";
 import type {
   GoogleAccountAuthConfig,
   OpenAIAccountAuthConfig,
@@ -185,50 +185,6 @@ export async function runCliRuntimeInvocation(
   }
 }
 
-/**
- * Renew an expired account token and store the replacement.
- *
- * Lives on the invocation path rather than in the step because it must happen
- * before the credential is turned into headers, and because writing the new token
- * back is a filesystem operation that has no place inside a request builder.
- *
- * A failure is reported, not swallowed: a token the provider has already refused
- * cannot produce an answer, and the request that carries it fails for a reason the
- * user reads as a network problem. Naming the login as the cause is the only
- * version of this they can act on.
- */
-async function renewAccountAuth(input: {
-  readonly admission?: Admission;
-  readonly onCredentialPersisted?: () => void;
-  readonly provider: RuntimeProvider;
-  readonly credential: {
-    readonly apiKey?: string;
-    readonly accountAuth?: AccountAuthConfig;
-  };
-  readonly runtimeConfig: RuntimeConfig | undefined;
-}): Promise<{
-  readonly accountAuth?: AccountAuthConfig;
-  readonly failure?: string;
-}> {
-  // The renewal carries the same deadline as any other request to the provider's
-  // auth host, so a host that accepts the connection and never answers cannot hold
-  // up the start of a turn.
-  const fetchImpl = admittedFetch(providerFetch(input.runtimeConfig), input.admission);
-  const result = await renewAccountAuthIfExpiring({
-    provider: input.provider,
-    credential: input.credential,
-    fetchImpl,
-  });
-  if (result.renewed && result.accountAuth) {
-    assertAdmission(input.admission);
-    if (persistRenewedAccountAuth({ provider: input.provider, accountAuth: result.accountAuth })) input.onCredentialPersisted?.();
-  }
-  return {
-    accountAuth: result.accountAuth,
-    ...(result.failure ? { failure: result.failure } : {}),
-  };
-}
-
 function deferUntilReady(
   request: CliRuntimeInvocationRequest,
   dependencies: CliRuntimeInvocationDependencies,
@@ -238,16 +194,17 @@ function deferUntilReady(
   const buffered = pendingTurnInput();
   const events = (async function* (): AsyncIterable<QueryEvent> {
     assertAdmission(request.admission);
+    request.signal.throwIfAborted();
     // Renewed before the readiness check, because the check is what tells the user
     // the credential is usable: one that passes on a token about to expire produces
     // a run that fails a minute later with no hint that the login is the reason.
-    const renewed = await renewAccountAuth({
+    const renewed = await renewStoredAccount({
       admission: request.admission,
-      onCredentialPersisted: request.onCredentialPersisted,
-      provider: request.providerCredentialResolution.provider,
-      credential: request.providerCredentialResolution.credential ?? {},
-      runtimeConfig: request.runtimeConfig,
+      workspaceRoot: request.workspaceRoot,
+      resolution: request.providerCredentialResolution,
+      fetchImpl: admittedFetch(providerFetch(request.runtimeConfig), request.admission),
     });
+    if (renewed.stored) request.onCredentialPersisted?.();
     if (renewed.failure) {
       // The same terminal shape a failed readiness check produces, because it is
       // the same class of problem: the credential cannot be used, and the run
@@ -259,6 +216,8 @@ function deferUntilReady(
       });
       return;
     }
+    assertAdmission(request.admission);
+    request.signal.throwIfAborted();
     const catalog = loadCatalog();
     const resolution = request.providerCredentialResolution;
     request = {

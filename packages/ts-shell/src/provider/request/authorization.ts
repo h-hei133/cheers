@@ -143,8 +143,9 @@ function oauthConfigFor(
 /**
  * The outcome of renewing an account credential.
  *
- * `renewed` is true only for the call that performed the exchange, which is the one
- * that writes it back. A failure is reported rather than swallowed: falling
+ * `renewed` identifies the call that performed the exchange. Every caller must
+ * independently confirm storage before using a returned rotation. A failure is
+ * reported rather than swallowed: falling
  * through with a token the provider has already refused sends a request that
  * cannot succeed, and whatever the provider says about it reads as a network
  * problem. Naming the login is the only version the user can act on.

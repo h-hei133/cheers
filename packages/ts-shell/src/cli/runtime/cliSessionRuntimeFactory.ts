@@ -32,7 +32,7 @@ import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalSt
 import type { InteractiveApprovalResult } from "../interactive/picker/approval.js";
 import { requestCompactionSummary, type CompactionProvider as SummaryProvider } from "../../core/query/compaction/summarize.js";
 import { providerFetchForEndpoint, providerFetchFromTimeouts, providerTimeoutsFrom } from "../../provider/request/fetch.js";
-import { accountAuthFor, providerAuthorization, renewAccountAuthIfExpiring } from "../../provider/request/authorization.js";
+import { accountAuthFor, providerAuthorization } from "../../provider/request/authorization.js";
 import { catalogModel, providerEndpoint } from "../../core/models/catalog.js";
 import { resolveRequestShape } from "../../core/models/requestShape.js";
 import { endpointShape, type EndpointKind } from "../../provider/endpoints/index.js";
@@ -41,7 +41,7 @@ import { createCacheWarmingRunner, type CacheWarmingRunner } from "../../turn/ca
 import { resolveCacheWarmingMode } from "../../core/models/cacheEconomics.js";
 import { cacheRefreshFor } from "./cache.js";
 import { allowsSelfInitiatedRequests } from "../../core/network/policy.js";
-import { persistRenewedAccountAuth } from "../../core/auth/providerAuthRuntime.js";
+import { renewStoredAccount } from "../../core/auth/account/renewal.js";
 import { TURN_PREFIX_COMPACTION_PROMPT } from "../../core/query/compaction/summarizer.js";
 import { markContextUnknown, getSessionUsage } from "../../observability/usageTelemetry.js";
 import { recordCount } from "../../observability/metrics.js";
@@ -78,6 +78,11 @@ const windowLogger = createComponentLogger('model-window')
 
 interface CompactionProvider extends SummaryProvider {
   readonly providerId: string;
+}
+
+interface ProviderRenewal {
+  readonly provider?: CompactionProvider;
+  readonly failure?: string;
 }
 
 interface CompactionWiring {
@@ -288,21 +293,23 @@ export function createCliSessionRuntime(input: {
   };
 
   /** The same, with an expiring account token replaced before the request is built. */
-  const renewedProvider = async (resolved: ProviderCredentialResolution, config: RuntimeConfig, admission: Admission): Promise<CompactionProvider | undefined> => {
+  const renewedProvider = async (resolved: ProviderCredentialResolution, config: RuntimeConfig, admission: Admission, reportFailure = true): Promise<ProviderRenewal> => {
     assertAdmission(admission);
     const target = compactionTarget(resolved);
-    if (!target) return undefined;
-    const renewed = await renewAccountAuthIfExpiring({
-      provider: target.provider,
-      credential: { apiKey: target.apiKey, accountAuth: target.accountAuth ?? undefined },
+    if (!target) return {};
+    const renewed = await renewStoredAccount({
+      workspaceRoot: input.runtimeContext.projectRoot,
+      resolution: resolved,
+      admission,
       fetchImpl: admittedFetch(providerFetchFromTimeouts(providerTimeoutsFrom(config)), admission),
     });
-    if (renewed.failure) return undefined;
-    if (renewed.renewed && renewed.accountAuth) {
-      assertAdmission(admission);
-      if (persistRenewedAccountAuth({ provider: target.provider, accountAuth: renewed.accountAuth })) reportCredentialPublication();
+    if (renewed.failure) {
+      if (reportFailure) input.renderer.renderLine(renewed.failure);
+      return { failure: renewed.failure };
     }
-    return {
+    if (renewed.stored) reportCredentialPublication();
+    assertAdmission(admission);
+    return { provider: {
       headers: providerAuthorization({
         apiKey: target.apiKey,
         accountAuth: renewed.accountAuth ?? target.accountAuth,
@@ -313,7 +320,7 @@ export function createCliSessionRuntime(input: {
       providerId: target.provider,
       supportsTemperature: resolveRequestShape(catalog, target.provider, target.model, undefined).supportsTemperature,
       ...(endpointFor(target.provider) ? { endpoint: endpointFor(target.provider) } : {}),
-    };
+    } };
   };
   const reportCredentialPublication = () => {
     const result = refreshShellRuntimeConfig(input.runtimeContext);
@@ -336,18 +343,20 @@ export function createCliSessionRuntime(input: {
       ref: { mode: "explicit-local", root: projectMemoryRootFor(input.runtimeContext.projectRoot) },
     }),
     compactHistory: (sessionId, signal, instructions) => {
+      signal.throwIfAborted();
       const config = input.runtimeContext.runtimeConfig;
       const workspaceRoot = input.runtimeContext.projectRoot;
       const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
       const admission = configurationAdmission(input.runtimeContext);
-      return renewedProvider(resolved, config, admission).then((provider) => {
-        assertAdmission(admission);
+      return renewedProvider(resolved, config, admission, false).then(({ provider, failure }) => {
         if (!provider) {
           return {
             status: "failed" as const,
-            reason: `No credential for provider ${resolved.provider}; set ${resolved.expectedEnvVarName} or configure a connection.`,
+            reason: failure ?? `No credential for provider ${resolved.provider}; set ${resolved.expectedEnvVarName} or configure a connection.`,
           };
         }
+        assertAdmission(admission);
+        signal.throwIfAborted();
         const wiring = buildCompactionWiring({ provider, runtimeConfig: config, admission, sessionId, catalog });
         return compactSessionHistory({
           store: input.sessionManager,
@@ -378,7 +387,7 @@ export function createCliSessionRuntime(input: {
       const config = input.runtimeContext.runtimeConfig;
       const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
       const admission = configurationAdmission(input.runtimeContext);
-      return renewedProvider(resolved, config, admission).then((provider) => {
+      return renewedProvider(resolved, config, admission).then(({ provider }) => {
         assertAdmission(admission);
         if (!provider) return undefined;
         return requestCompactionSummary({
@@ -437,7 +446,7 @@ export function createCliSessionRuntime(input: {
           // write price — the opposite of what a refresh is for.
           ...cacheRefreshFor({ sessionId, runtimeConfig: config, admission,
             ...(activeProvider ? { provider: activeProvider } : {}),
-            renewHeaders: async () => (await renewedProvider(resolved, config, admission))?.headers,
+            renewHeaders: async () => (await renewedProvider(resolved, config, admission)).provider?.headers,
             isCurrent: () => {
               return !admission() && input.runtimeContext.configuration.current === publication &&
                 input.runtimeContext.session.id === sessionId &&

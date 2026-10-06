@@ -196,61 +196,6 @@ function persistConnectedAccountAuth(input: {
   };
 }
 
-/**
- * Store a renewed account token so the next request does not refresh again.
- *
- * A refresh happens because the token on disk had expired. Without writing the
- * replacement back, every request in the session repeats the exchange, and a
- * restart begins from the expired token as though nothing had happened.
- *
- * Both places the credential lives are updated: the active connection, which is
- * where the request path reads it, and the provider credentials block, which is
- * the fallback when no connection is active. Missing one would leave the token
- * renewed in one lookup and stale in the other.
- *
- * Returns false when there is nothing to update — a credential that came from an
- * API key or the environment has no stored token to renew.
- */
-export function persistRenewedAccountAuth(input: {
-  readonly provider: RuntimeProvider;
-  readonly accountAuth: AccountAuthConfig;
-}): boolean {
-  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
-  const latest = edit.values;
-  const accountAuth = toProviderAccountAuthConfig(input.provider, input.accountAuth);
-  const updatedAt = new Date().toISOString();
-  let changed = false;
-
-  const nextConnections = normalizeConnections(latest).map((connection) => {
-    if (connection.provider !== input.provider || connection.authType !== "account-auth") {
-      return connection;
-    }
-    changed = true;
-    return { ...connection, accountAuth, updatedAt };
-  });
-
-  const existingCredentials = latest.providerCredentials?.[input.provider];
-  const nextCredentials =
-    existingCredentials?.accountAuth !== undefined
-      ? (() => {
-          changed = true;
-          return { ...existingCredentials, accountAuth };
-        })()
-      : existingCredentials;
-
-  if (!changed) return false;
-
-  writeUserRuntimeConfigFile({
-    ...latest,
-    providerConnections: nextConnections,
-    providerCredentials: {
-      ...(latest.providerCredentials ?? {}),
-      ...(nextCredentials ? { [input.provider]: nextCredentials } : {}),
-    },
-  }, edit);
-  return true;
-}
-
 function persistConnectionPatch(input: {
   readonly patchKind: "insert-pending" | "mark-error";
   readonly connectionId: string;

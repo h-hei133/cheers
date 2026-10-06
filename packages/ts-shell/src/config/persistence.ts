@@ -33,7 +33,8 @@ export function readConfigEdit<T>(filePath: string, fields: ConfigFields): Confi
 }
 
 /** Lock + reread protects participating writers, not external editors' rename windows. */
-export function persistConfigEdit<T>(filePath: string, patch: T, baseline: ConfigEdit<T>, fields: ConfigFields): string {
+export function persistConfigEdit<T>(filePath: string, patch: T, baseline: ConfigEdit<T>, fields: ConfigFields,
+  precondition?: (current: Readonly<T>) => boolean): string {
   if (!(baseline instanceof EditBaseline) || baseline.path !== path.resolve(filePath)) throw new ConfigWriteError('baseline-invalid', 'unchanged');
   let state: ConfigWriteState = 'unchanged';
   let code: 'lock-failed' | 'invalid-document' | 'write-failed' | 'verification-failed' = 'lock-failed';
@@ -50,6 +51,11 @@ export function persistConfigEdit<T>(filePath: string, patch: T, baseline: Confi
       const current = readConfigSnapshot(baseline.path);
       if (baseline.revision !== null && !current) throw new ConfigWriteError('conflict', 'unchanged');
       validateRawConfig(current?.values ?? {}, fields);
+      // Some edits depend on a selector in another record. A three-way merge
+      // alone cannot validate that dependency against the locked snapshot.
+      if (precondition && !precondition(freezeDeep(current?.values ?? {}) as Readonly<T>)) {
+        throw new ConfigWriteError('conflict', 'unchanged');
+      }
       const merged = mergeConfigEdit(baseline.values as Record<string, unknown>, desired, current?.values ?? {});
       validateRawConfig(merged, fields);
       const text = patchConfigDocument(current, merged);

@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { readRuntimeConfigEditAt, writeRuntimeConfigFileAt, type RuntimeConfigFile } from './runtimeConfig.js';
+import { CONFIG_FIELDS, readRuntimeConfigEditAt, writeRuntimeConfigFileAt, type RuntimeConfigFile } from './runtimeConfig.js';
+import { persistConfigEdit } from './persistence.js';
 import * as store from '../session/store/sessionFileStore.js';
 import * as document from './document.js';
 
@@ -203,5 +204,33 @@ describe('revision-bound configuration saves', () => {
     try { writeRuntimeConfigFileAt(file, { theme: 'dark' }, base); throw new Error('unexpected success'); }
     catch (error) { expect(error).toMatchObject({ state: 'unchanged', cleanupFailed: true }); }
     expect(fs.existsSync(file)).toBe(false);
+  });
+
+  it('checks cross-record selection dependencies after acquiring the write lock', () => {
+    const a = { id: 'a', provider: 'openai' as const, apiKey: 'old-a', updatedAt: '2026-01-02' };
+    const b = { id: 'b', provider: 'openai' as const, apiKey: 'other-b', updatedAt: '2026-01-01' };
+    write({ providerConnections: [a, b] }); const base = readRuntimeConfigEditAt(file);
+    const latest = { providerConnections: [a, { ...b, updatedAt: '2026-01-03' }] };
+    const lock = store.withFileLock;
+    vi.spyOn(store, 'withFileLock').mockImplementation((lockPath, action, options) => lock(lockPath, () => {
+      write(latest); return action();
+    }, options));
+    const writer = vi.spyOn(store, 'writeTextFileAtomic');
+    const precondition = vi.fn((current: Readonly<RuntimeConfigFile>) => {
+      expect(Object.isFrozen(current.providerConnections)).toBe(true);
+      return current.providerConnections?.[1]?.updatedAt === b.updatedAt;
+    });
+    expect(() => persistConfigEdit(file, { providerConnections: [{ ...a, apiKey: 'renewed-a' }, b] }, base, CONFIG_FIELDS, precondition)).toThrow(/conflict/);
+    expect(precondition).toHaveBeenCalledOnce(); expect(writer).not.toHaveBeenCalled(); expect(read()).toEqual(latest);
+  });
+
+  it('preserves unrelated settings with a satisfied precondition and guards no-op writes too', () => {
+    write({ theme: 'dark', maxTurns: 5 }); const base = readRuntimeConfigEditAt(file);
+    write({ theme: 'dark', maxTurns: 9 });
+    persistConfigEdit(file, { theme: 'light' }, base, CONFIG_FIELDS, current => current.theme === 'dark');
+    expect(read()).toEqual({ theme: 'light', maxTurns: 9 });
+    const same = readRuntimeConfigEditAt(file); const writer = vi.spyOn(store, 'writeTextFileAtomic');
+    expect(() => persistConfigEdit(file, same.values, same, CONFIG_FIELDS, () => false)).toThrow(/conflict/);
+    expect(writer).not.toHaveBeenCalled(); expect(read()).toEqual({ theme: 'light', maxTurns: 9 });
   });
 });

@@ -50,8 +50,9 @@ describe("provider credential resolution", () => {
     });
     expect(result).toMatchObject({
       provider: selected ?? "anthropic", baseUrl: `https://${base}.invalid/v1`, model: `${base}-model`,
-      credential: { source: "connection", apiKey: key, baseUrl: `https://${base}.invalid/v1`, model: `${base}-model` },
+      credential: { source: "connection", connectionId: base, apiKey: key, baseUrl: `https://${base}.invalid/v1`, model: `${base}-model` },
     });
+    expect(result.selection).toEqual(selected ? { provider: selected } : {});
   });
 
   it.each([undefined, "cli-key"])("keeps a matching fallback endpoint with an explicit key (%s)", cliApiKey => {
@@ -211,7 +212,7 @@ describe("provider credential resolution", () => {
       },
       cliProvider: "openai", env: { OPENAI_API_KEY: "env-key" },
     });
-    expect(result.credential).toMatchObject({ source: "connection", authMode: "account-auth", accountAuth });
+    expect(result.credential).toMatchObject({ source: "connection", connectionId: "selected", authMode: "account-auth", accountAuth });
     expect(result.credential?.apiKey).toBeUndefined();
   });
 
@@ -225,7 +226,15 @@ describe("provider credential resolution", () => {
       },
       cliProvider: "openai", env: {},
     });
-    expect(result).toEqual({ provider: "openai", expectedEnvVarName: "OPENAI_API_KEY", baseUrl: undefined, model: undefined });
+    expect(result).toEqual({ provider: "openai", selection: { provider: "openai" }, expectedEnvVarName: "OPENAI_API_KEY", baseUrl: undefined, model: undefined });
+  });
+
+  it('retains explicit endpoint selection separately from the resolved endpoint and credential', () => {
+    const result = resolveProviderCredential({ runtimeConfig: createRuntimeConfig(), cliProvider: 'openai',
+      cliBaseUrl: 'https://explicit.invalid/v1/', cliApiKey: 'private-key', env: {} });
+    expect(result.selection).toEqual({ provider: 'openai', baseUrl: 'https://explicit.invalid/v1/' });
+    expect(result.baseUrl).toBe('https://explicit.invalid/v1');
+    expect(JSON.stringify(result.selection)).not.toContain('private-key');
   });
 
   it("returns missing credential with provider-specific env var hint", () => {

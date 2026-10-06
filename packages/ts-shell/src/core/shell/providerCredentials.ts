@@ -12,6 +12,8 @@ export type ProviderCredentialSource = "cli" | "env" | "connection" | "config";
 export type ProviderCredentialAuthMode = "api-key" | "account-auth";
 
 export interface ResolvedProviderCredential {
+  /** The actual selected record, including fallback selection without an active ID. */
+  readonly connectionId?: string;
   readonly provider: RuntimeProvider;
   readonly authMode: ProviderCredentialAuthMode;
   readonly apiKey?: string;
@@ -32,6 +34,8 @@ export interface ProviderCredentialResolutionInput {
 }
 
 export interface ProviderCredentialResolution {
+  /** Explicit selection inputs retained for identity checks against later settings. */
+  readonly selection?: { readonly provider?: RuntimeProvider; readonly baseUrl?: string };
   readonly thinkingEffort?: ThinkingPreference;
   readonly provider: RuntimeProvider;
   readonly credential?: ResolvedProviderCredential;
@@ -90,7 +94,9 @@ export function resolveProviderCredential(
   );
 
   const thinkingEffort = preferredEffort(activeConnectionProfile, configProfile);
-  const preference = thinkingEffort !== undefined ? { thinkingEffort } : {};
+  const preference = { ...(thinkingEffort !== undefined ? { thinkingEffort } : {}),
+    selection: { ...(input.cliProvider !== undefined ? { provider: input.cliProvider } : {}),
+      ...(input.cliBaseUrl !== undefined ? { baseUrl: input.cliBaseUrl } : {}) } };
 
   const cliApiKey = input.cliApiKey?.trim();
   if (cliApiKey) {
@@ -127,6 +133,7 @@ export function resolveProviderCredential(
         baseUrl,
         model,
         source: "connection",
+        connectionId: activeConnectionProfile?.id,
         envVarName: expectedEnvVarName,
       },
     };
@@ -167,6 +174,7 @@ export function resolveProviderCredential(
         baseUrl,
         model,
         source: "connection",
+        connectionId: activeConnectionProfile?.id,
         envVarName: expectedEnvVarName,
       },
     };
@@ -186,6 +194,7 @@ export function resolveProviderCredential(
         baseUrl,
         model,
         source: "connection",
+        connectionId: activeConnectionProfile?.id,
         envVarName: expectedEnvVarName,
       },
     };
