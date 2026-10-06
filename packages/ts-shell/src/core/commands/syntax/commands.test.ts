@@ -56,7 +56,7 @@ describe("trust command and storage boundaries", () => {
   });
 
   it.each(["on", "off", "session"])("keeps the legal %s action", async action => {
-    const setter = vi.spyOn(projectTrust, "setProjectTrust").mockImplementation(() => {});
+    const setter = vi.spyOn(projectTrust, "setProjectTrust").mockImplementation(() => ({ scope: "durable", changed: true }));
     const result = await runTrustCommand([action], { cwd: root });
     expect(result.output).toContain("Recorded");
     expect(setter).toHaveBeenCalledWith(root, trustSyntax.actions.find(item => item.name === action)!.level);

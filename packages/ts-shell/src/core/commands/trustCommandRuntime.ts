@@ -2,10 +2,11 @@ import { trustSyntax } from "./trust/syntax.js";
 import { parseSyntax } from "./syntax/parse.js";
 import { syntaxHelp } from "./syntax/projection.js";
 import path from "node:path";
-import { projectTrust } from "../security/projectTrust.js";
+import { projectTrust, TrustWriteError } from "../security/projectTrust.js";
 import { neutraliseForDisplay } from "../text/safety.js";
 import { loadHookDeclarations } from "../hooks/config.js";
 import { hookFingerprint } from "../hooks/trust.js";
+import { configurationApplicationNotice } from "./configuration.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
 /**
@@ -26,16 +27,23 @@ export async function runTrustCommand(
 ): Promise<LocalCommandResult> {
   const parsed = parseSyntax(trustSyntax, args);
   if (!parsed.ok) return { kind: "local", output: `Invalid /trust arguments: ${parsed.reason}\n${syntaxHelp(trustSyntax)}` };
-  const root = path.resolve(context.cwd || process.cwd());
+  const root = path.resolve(context.projectRoot ?? context.cwd ?? process.cwd());
   const level = parsed.action.level;
   if (level === undefined) return { kind: "local", output: describeTrust(root) };
 
-  const before = describeTrust(root);
-  projectTrust.setProjectTrust(root, level);
-  return {
-    kind: "local",
-    output: `Recorded '${level}' for ${root}.\n\n${before}\n\nRe-run /mcp refresh all for a change to MCP servers to take effect.`,
-  };
+  try {
+    const result = projectTrust.setProjectTrust(root, level);
+    if (!result) return { kind: 'local', output: 'Trust write outcome is unverified. Inspect the saved decision and reload.' };
+    const application = configurationApplicationNotice(context);
+    return { kind: 'local', output: [
+      `Recorded '${level}' for ${neutraliseForDisplay(root)}.`,
+      result.scope === 'process' ? 'Scope: this process only; a durable trust-store change expires this grant.' : 'Saved decision verified on disk.',
+      describeTrust(root), application,
+      'Re-run /mcp refresh all for a change to MCP servers to take effect.',
+    ].filter(Boolean).join('\n\n') };
+  } catch (error) {
+    return { kind: 'local', output: error instanceof TrustWriteError ? `${error.message} Inspect the saved decision and reload.` : 'Trust write outcome is unverified. Inspect the saved decision and reload.' };
+  }
 }
 
 /**
@@ -47,10 +55,12 @@ export async function runTrustCommand(
  * at exactly the moment the user is deciding.
  */
 function describeTrust(root: string): string {
-  const untrusted = projectTrust.isProjectUntrusted(root);
-  const decision = untrusted ? "untrusted (project resources are refused)" : "not refused";
+  const state = projectTrust.decision(root);
+  const decision = state === 'unavailable' ? 'unavailable (project resources are refused until the trust store can be read)'
+    : state === 'untrusted' ? 'untrusted (project resources are refused)'
+      : state === 'trusted' ? 'trusted' : 'undecided (no trust decision recorded)';
   const lines = [
-    `Project: ${root}`,
+    `Project: ${neutraliseForDisplay(root)}`,
     `Decision: ${decision}`,
     "",
   ];

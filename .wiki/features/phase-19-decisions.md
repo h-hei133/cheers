@@ -1253,3 +1253,17 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 先前 ffcbf09c 的 CI 37439272856 与 Architecture Watch 37439272847 均成功；107126aa 的 CI 37438947980 与 Architecture Watch 37438947968 也均成功。原 f9b008a6 CI 失败记录仍保留。本批远端按新提交核对；CFG-01 完整信任/能力 policy、账户刷新身份竞态及 Phase 19 十六批/七十六项总体目标继续。
 
 §8.76 门禁补充：最终 import cycles/config consumers/declarations/node floor/docs strict/diff 检查通过；NormProof 阻断义务满足、整体 partial，四项既有函数数量 advisory 与 120 项文档来源 advisory 保留。
+
+### 8.77 CFG-01 前置：统一项目信任判定与可核验保存
+
+- 信任行为移到 [trust owner](../../packages/ts-shell/src/core/security/trust/store.ts)，旧 projectTrust 仅兼容导出。单一 decision 区分 trusted/untrusted/undecided/unavailable；缺失不创建文件，损坏、未来版本、超大、非普通或不可访问文件均 unavailable，现有资源拒绝谓词在 unavailable 时关闭。undecided 保持既有资源兼容行为，本批没有把启动过程描述为已经建立肯定信任。
+- 持久父目录拒绝优先于子目录允许；临时授权只覆盖同一规范路径的持久拒绝，其他覆盖拒绝仍有效。session-only 明确为当前进程，不跨恢复/新进程；持久保存（含 no-op）、所选文件路径或对象版本变化使临时授权失效。读错误导致授权清除时也增加 revision。
+- 保存的允许保留批准时路径身份，不跟随后来替换的符号链接扩大到新目标。拒绝保留原路径和旧别名的保守边界；显式选择别名可迁移该条记录，仅选择新目标不会删除其他已保存路径的拒绝。路径范围使用真实边界，合法的 ..cache 子目录不被误判为向上逃逸。
+- [来源解析](../../packages/ts-shell/src/core/security/trust/source.ts)每次按既有当前/旧版目录顺序查找，只有确认缺失且祖先目录可访问才后退。悬空文件/目录链接、权限错误不能落到旧允许。revision 同时包含来源路径、链接条目及目标文件元数据，缺失与不可用不同；新建悬空链接在任何 decision 读取之前就会使配置准入失效。
+- [持久化](../../packages/ts-shell/src/core/security/trust/storage.ts)复用有界配置读取、现有严格本机锁与原子文本 writer。锁内重读保留无关记录，写前复核来源/精确文本，写后核验完整文本和当前权威路径。只有当前用户目录接收写入，旧目录只读；受控错误区分 unchanged/unknown/persisted 及 cleanupFailed，不输出原始文件内容或 I/O 错误。
+- /trust 使用 projectRoot，保存结果和实际生效判定分别显示；记录子目录允许时仍可明确显示父目录拒绝。只有核验成功才刷新现有配置发布，未知/失败不声称 Recorded。准入同时检查已接受 publication 的 trust revision，捕获一个新操作不能绕过未重载的旧配置；成功本地刷新终止旧后台信号。没有新增文件 watcher，不宣称外部编辑立即取消所有运行中的资源。
+- 定向对照参考的单一信任决定、明确拒绝与缺失区分、信任变化重读项目设置。保留本项目覆盖拒绝优先，不改成一般最长前缀允许；参考默认 trusted 参数不作为启动授权证据。当前锁协议仍不保证非参与 writer 的原子 CAS、跨文件崩溃事务或目录断电持久性。
+- 两路独立审查发现并修复允许随链接迁移、不可访问来源回退、读失败清除授权未改代数、别名保存误删旧拒绝、缺失到悬空状态未改 revision。最终代码 APPROVE、架构 CLEAR；两位审查者仅静态审查，没有将主代理测试当作其独立运行。
+- 验证：较早消费者组合 23 文件/247 项通过；最后路径与 revision 修正后定向 7 文件/113 项通过。16 组反转均触发行为断言，5 个产品文件逐字节恢复，恢复后 2 文件/35 项通过。最终 Node 20.3 构建、五项静态 gate、43 项 gate 脚本测试及 diff 检查通过；NormProof 阻断义务满足，整体 partial，四项既有函数数量与 120 项文档来源 advisory 保留。
+- regular/fullscreen 实际构建 CLI 各发两次本地合成 HTTP：writer 返回但未写时不报 Recorded 且文件不变；临时授权生效而另一个真实进程仍读取持久拒绝；/trust off 刷新后模型保存和请求可用；另一个进程改变信任后请求在 reload 前被阻断，重载后恢复；损坏内容和合成凭据不进入终端，两模式退出 0。
+- 上一 07ac99fd 的 Architecture Watch 37442106195 成功，但完整 CI 37442105264 失败：648 文件/6682 项通过、1 项跳过，3 文件/7 项失败集中在旧 thinking 持久化接口、显示文本及新增 effort/global 补全预期；此失败不由本地窄测试改写。修正与新提交远端结果单独记录。CFG-01 逐字段信任 policy、账户刷新身份竞态和 Phase 19 十六批/七十六项整体继续。

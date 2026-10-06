@@ -24,6 +24,9 @@ export function configurationAdmission(context: ConfigurationContext): () => str
   return () => {
     if (context.configuration.current.admissionBlocked) return 'Configuration safety validation failed; reload a valid configuration before starting new actions.';
     const actual = configurationBinding(context);
+    if (context.configuration.current.binding.trustRevision !== actual.trustRevision) {
+      return 'Project trust changed; reload configuration before starting new actions.';
+    }
     if (substrate !== context.configuration.substrateRevision || binding.workspaceRoot !== actual.workspaceRoot || binding.sessionId !== actual.sessionId || binding.trustRevision !== actual.trustRevision) {
       return 'Session, workspace or trust changed; start a new operation.';
     }

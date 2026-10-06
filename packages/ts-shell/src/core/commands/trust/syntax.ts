@@ -12,6 +12,6 @@ export const trustSyntax: CommandSyntax<TrustAction> = {
     { name: "status", summary: "show project resources and the current trust decision" },
     { name: "on", summary: "allow this project's MCP servers, hooks and workflow steps", level: "trusted" },
     { name: "off", summary: "refuse this project's resources", level: "untrusted" },
-    { name: "session", summary: "allow project resources until this session ends", level: "session-only" },
+    { name: "session", summary: "allow project resources for this process", level: "session-only" },
   ],
 };

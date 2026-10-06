@@ -286,3 +286,9 @@ regular/fullscreen CLI 均经本地合成 HTTP 的短回合、开启后的真实
 实施及验证见 [Phase 19 §8.76](phase-19-decisions.md#876-cfg-05模型与-effort-联合选择请求快照与全局失败补偿)。`/thinking` 与 `/model --effort` 共用 session selection，默认不污染另一会话或项目状态；显式 global 同时保存默认 model/effort。null 是 provider-decides 状态，缺值才继承旧默认/项目后备。已知不支持组合及无法容纳预算的输出 cap 在写前拒绝，自定义未知模型明确显示能力未验证。
 
 请求在操作开始捕获偏好，重试不读取变化中的项目状态；显式 effort 被拒绝时不会静默省略。global 已知未写时按 receipt 执行有条件恢复并生成新 revision，未知/部分结果不自动发布，不宣称跨文件崩溃原子性。此记录取代 §8.7 中 effort 尚未接入的状态，完整配置跨字段/trust policy、账户刷新代际保护和阶段其余目标继续。
+
+### 8.9 信任判定与发布失效前置
+
+[Phase 19 §8.77](phase-19-decisions.md#877-cfg-01-前置统一项目信任判定与可核验保存)统一 trusted/untrusted/undecided/unavailable；不可读来源不回退到旧允许，进程授权随持久来源变化或读取失败失效，保存只有完整核验后才刷新配置。允许记录不随替换链接迁移，拒绝保留原路径边界；配置准入同时核对已接受 publication 的信任版本。
+
+此项只是字段过滤的可靠前置。当前 getRuntimeConfig 尚未接入字段 trust 条件，启动没有肯定信任确认；undecided 与明确拒绝必须继续分别说明。下一步按字段保留安全声明和收紧值，不能把所有非 security 字段都视为安全，也不能过滤 plan、零指令预算或 offline:true 后回落到更宽默认。
