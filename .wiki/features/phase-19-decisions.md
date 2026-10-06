@@ -1267,3 +1267,5 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 验证：较早消费者组合 23 文件/247 项通过；最后路径与 revision 修正后定向 7 文件/113 项通过。16 组反转均触发行为断言，5 个产品文件逐字节恢复，恢复后 2 文件/35 项通过。最终 Node 20.3 构建、五项静态 gate、43 项 gate 脚本测试及 diff 检查通过；NormProof 阻断义务满足，整体 partial，四项既有函数数量与 120 项文档来源 advisory 保留。
 - regular/fullscreen 实际构建 CLI 各发两次本地合成 HTTP：writer 返回但未写时不报 Recorded 且文件不变；临时授权生效而另一个真实进程仍读取持久拒绝；/trust off 刷新后模型保存和请求可用；另一个进程改变信任后请求在 reload 前被阻断，重载后恢复；损坏内容和合成凭据不进入终端，两模式退出 0。
 - 上一 07ac99fd 的 Architecture Watch 37442106195 成功，但完整 CI 37442105264 失败：648 文件/6682 项通过、1 项跳过，3 文件/7 项失败集中在旧 thinking 持久化接口、显示文本及新增 effort/global 补全预期；此失败不由本地窄测试改写。修正与新提交远端结果单独记录。CFG-01 逐字段信任 policy、账户刷新身份竞态和 Phase 19 十六批/七十六项整体继续。
+
+§8.76 CI 修正补充：07ac99fd 的三文件/七项失败均为模型/effort 契约更新遗漏的测试迁移：newCommands 仍导入已移除的 getThinkingEffort、无 session 上下文却预期项目级保存，并预期 provider 静默忽略；两个补全文件仍期待旧 flags。改用真实隔离配置和 SessionManager，断言保存后恢复、同项目另一会话不变、全局字节不变、null provider-decides 与非法输入零保存；精确补全文本增加 global/effort，并检查 effort 值和已完成位置无候选。6 文件/120 项组合（含模型与新信任用例）通过，独立代码复审 APPROVE。没有修改产品行为或将原远端失败改写成通过，新提交 CI 另行核对。

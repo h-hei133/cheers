@@ -5,7 +5,10 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { runToolsCommand } from "./toolsCommandRuntime.js";
 import { runCommitCommand } from "./commitCommandRuntime.js";
-import { runThinkingCommand, getThinkingEffort } from "./thinkingCommandRuntime.js";
+import { runThinkingCommand } from "./thinkingCommandRuntime.js";
+import { SessionManager } from "../../session/SessionManager.js";
+import { readSessionModel } from "../../session/model/state.js";
+import { getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from "../../config/runtimeConfig.js";
 
 describe("/tools", () => {
   it("uses the supplied pool for details and preserves case-sensitive MCP names", async () => {
@@ -140,6 +143,9 @@ describe("/thinking", () => {
   let workspace: string;
   let realHome: string | undefined;
   let realProfile: string | undefined;
+  let manager: SessionManager;
+  let context: { cwd: string; projectRoot: string; sessionId: string };
+  let originalConfig: Buffer;
 
   beforeEach(() => {
     home = fs.mkdtempSync(path.join(os.tmpdir(), "thinking-home-"));
@@ -148,6 +154,14 @@ describe("/thinking", () => {
     realProfile = process.env.USERPROFILE;
     process.env.HOME = home;
     delete process.env.USERPROFILE;
+    fs.mkdirSync(path.join(workspace, ".agents"));
+    writeUserRuntimeConfigFile({ provider: "openai", activeProviderConnectionId: "fixture", providerConnections: [{
+      id: "fixture", provider: "openai", authType: "api-key", apiKey: "synthetic-key", model: "fixture-model",
+      createdAt: "2026-01-01", updatedAt: "2026-01-01", status: "connected",
+    }] }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+    originalConfig = fs.readFileSync(getUserRuntimeConfigPath());
+    manager = new SessionManager();
+    context = { cwd: workspace, projectRoot: workspace, sessionId: manager.createNew(workspace).id };
   });
 
   afterEach(() => {
@@ -158,33 +172,41 @@ describe("/thinking", () => {
     fs.rmSync(workspace, { recursive: true, force: true });
   });
 
-  it("keeps the level across a restart, since it belongs to the work", async () => {
-    await runThinkingCommand(["high"], { cwd: workspace });
-
-    expect(getThinkingEffort(workspace)).toBe("high");
+  it("keeps the level in the resumed session without changing another session or global defaults", async () => {
+    expect((await runThinkingCommand(["high"], context)).output).toContain("saved for resume");
+    manager.persistUserPromptBarrier(context.sessionId, "resume fixture");
+    manager.saveInterrupted(context.sessionId);
+    expect(new SessionManager().tryResume(context.sessionId)).toMatchObject({ ok: true });
+    expect(readSessionModel(context.sessionId)?.thinkingEffort).toBe("high");
+    expect((await runThinkingCommand([], context)).output).toContain("Thinking effort: high.");
+    const other = manager.createNew(workspace);
+    expect(readSessionModel(other.id)).toBeUndefined();
+    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(originalConfig);
   });
 
   it("reports what it asks for without claiming a token budget", async () => {
-    await runThinkingCommand(["low"], { cwd: workspace });
-    const shown = await runThinkingCommand([], { cwd: workspace });
+    expect((await runThinkingCommand(["low"], context)).output).toContain("Reasoning effort: low");
+    const shown = await runThinkingCommand([], context);
 
-    expect(shown.output).toContain("`low` reasoning effort");
-    expect(shown.output).toContain("Providers that do not implement the field ignore it");
+    expect(shown.output).toContain("Thinking effort: low.");
+    expect(shown.output).toContain("Explicit effort is preserved if the provider rejects it");
     expect(shown.output).not.toMatch(/budget of \d/);
   });
 
   it("goes back to letting the provider decide", async () => {
-    await runThinkingCommand(["medium"], { cwd: workspace });
-    await runThinkingCommand(["off"], { cwd: workspace });
-
-    expect(getThinkingEffort(workspace)).toBeUndefined();
+    await runThinkingCommand(["medium"], context);
+    expect((await runThinkingCommand(["off"], context)).output).toContain("provider decides");
+    expect(readSessionModel(context.sessionId)?.thinkingEffort).toBeNull();
+    expect((await runThinkingCommand([], context)).output).toContain("Thinking effort: auto (provider decides).");
+    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(originalConfig);
   });
 
   it("refuses a level it does not have", async () => {
-    const result = await runThinkingCommand(["maximum"], { cwd: workspace });
+    const result = await runThinkingCommand(["maximum"], context);
 
     expect(result.output).toContain("Invalid /thinking arguments: Unknown action.");
     expect(result.output).toContain("/thinking low");
-    expect(getThinkingEffort(workspace)).toBeUndefined();
+    expect(readSessionModel(context.sessionId)).toBeUndefined();
+    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(originalConfig);
   });
 });

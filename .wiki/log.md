@@ -6272,3 +6272,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-06] feat | Phase 19 CFG-05 接通 model/effort 同记录选择、会话 thinking、显式 global、目录/输出预算校验和固定请求快照；全局未写时按 receipt 安全恢复，未知结果不自动发布。独立审查发现的占位模型、遗漏预算和发布 cap 问题已修复，最终 APPROVE/CLEAR。19 组有效反转、恢复后 142 项、最终构建及两模式实际 HTTP 拒绝/切换/全局验证通过，见 features/phase-19-decisions.md §8.76；跨文件崩溃事务不作保证，完整阶段目标继续。
 
 ## [2026-10-06] fix | Phase 19 CFG-01 信任前置统一四态判定、进程授权、来源降级边界、可核验保存及已接受配置准入；审查修复链接迁移、旧拒绝误删与失效遗漏，最终 APPROVE/CLEAR。16 组有效反转、恢复后 35 项、最终构建与两模式实际 CLI/跨进程验证通过，见 features/phase-19-decisions.md §8.77。上一 07ac99fd CI 的三文件/七项旧 effort 测试失败正在修正，逐字段 trust policy 与整体目标继续。
+
+## [2026-10-06] test | 修正 07ac99fd 完整 CI 暴露的三个旧 effort/补全测试文件：使用真实会话保存与恢复，保留非法输入零写及全局隔离，精确断言 global/effort 补全。6 文件/120 项通过，独立代码复审 APPROVE；见 features/phase-19-decisions.md §8.76 CI 补充。原远端失败仍保留。

@@ -17,5 +17,7 @@ it("keeps flags synchronous and delegates entities to the surface", () => {
   expect(values("list open")).toEqual([]);
   expect(values("use chosen --g")).toEqual(["--global"]);
   expect(values("chosen --g")).toEqual(["--global"]);
-  expect(values("use chosen --global ")).toEqual([]);
+  expect(values("use chosen --global ")).toEqual(["--effort"]);
+  expect(values("use chosen --global --effort ")).toEqual(["low", "medium", "high", "auto", "off", "none"]);
+  expect(values("use chosen --global --effort low ")).toEqual([]);
 });

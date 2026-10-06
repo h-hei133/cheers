@@ -102,7 +102,7 @@ describe("command completions", () => {
     const matches = slashSuggestions("/model");
     expect(matches?.some((match) => match.value === "/model")).toBe(true);
     expect(matches?.find((match) => match.value === "/model")?.detail).toBe(
-      "inspect and switch active model [status|refresh|config|list [provider] [--refresh]|use <model-id> [--global]|help]",
+      "inspect and switch active model [status|refresh|config|list [provider] [--refresh]|use <model-id> [--global] [--effort <low|medium|high|auto|off|none>]|help]",
     );
     expect(slashSuggestions("/diagnose")?.[0]?.detail).not.toContain("<");
   });
@@ -118,7 +118,7 @@ describe("command completions", () => {
 
   it("hints the thinking levels the router accepts", () => {
     expect(slashSuggestions("/thinking")?.[0]?.detail).toBe(
-      "inspect or set reasoning effort for the next turn [low|medium|high|off]",
+      "inspect or set reasoning effort for the next turn [low|medium|high|off] [--global]",
     );
   });
 
