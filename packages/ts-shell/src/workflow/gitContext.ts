@@ -18,6 +18,7 @@ export interface WorkflowGitFileChange {
 }
 
 export interface WorkflowGitDiagnostics {
+  readonly statusAvailable: boolean
   readonly insideGit: boolean
   readonly branch: string | null
   readonly root: string | null
@@ -39,7 +40,7 @@ function runGit(args: string[], cwd: string) {
 
   return {
     ok: !result.error && result.status === 0,
-    stdout: (result.stdout || '').trim(),
+    stdout: result.stdout || '',
   }
 }
 
@@ -48,8 +49,9 @@ export function getWorkflowGitDiagnostics(
   options?: { readonly limit?: number },
 ): WorkflowGitDiagnostics {
   const inside = runGit(['rev-parse', '--is-inside-work-tree'], cwd)
-  if (!inside.ok || inside.stdout !== 'true') {
+  if (!inside.ok || inside.stdout.trim() !== 'true') {
     return {
+      statusAvailable: false,
       insideGit: false,
       branch: null,
       root: null,
@@ -63,13 +65,14 @@ export function getWorkflowGitDiagnostics(
     }
   }
 
-  const status = runGit(['status', '--porcelain=v1', '--branch'], cwd)
+  const status = runGit(['status', '--porcelain=v1', '-z', '--branch', '--untracked-files=all'], cwd)
   const root = runGit(['rev-parse', '--show-toplevel'], cwd)
   if (!status.ok) {
     return {
+      statusAvailable: false,
       insideGit: true,
       branch: null,
-      root: root.ok ? root.stdout : null,
+      root: root.ok ? root.stdout.trim() : null,
       ahead: 0,
       behind: 0,
       stagedCount: 0,
@@ -80,15 +83,18 @@ export function getWorkflowGitDiagnostics(
     }
   }
 
-  const lines = status.stdout.split(/\r?\n/).filter(Boolean)
-  const header = lines.find(line => line.startsWith('## '))
-  const body = lines.filter(line => !line.startsWith('## '))
+  const lines = status.stdout.split('\0').filter(Boolean)
+  const header = lines[0]?.startsWith('## ') ? lines[0] : undefined
+  const body = header ? lines.slice(1) : lines
   const parsedHeader = parseBranchHeader(header)
   const limit = Math.max(1, options?.limit ?? 30)
-  const entries: WorkflowGitFileChange[] = body
-    .map(parsePorcelainEntry)
-    .filter((entry): entry is WorkflowGitFileChange => entry !== null)
-    .slice(0, limit)
+  const entries: WorkflowGitFileChange[] = []
+  for (let index = 0; index < body.length; index++) {
+    const entry = parsePorcelainEntry(body[index]!)
+    if (entry) entries.push(entry)
+    // In -z output the destination is first; rename/copy has a second source field.
+    if (/^[RC]|^.[RC]/.test(body[index]!)) index++
+  }
 
   const stagedCount = entries.filter(entry => entry.staged).length
   const unstagedCount = entries.filter(entry => entry.unstaged).length
@@ -96,16 +102,17 @@ export function getWorkflowGitDiagnostics(
   const conflictedCount = entries.filter(entry => entry.conflicted).length
 
   return {
+    statusAvailable: true,
     insideGit: true,
     branch: parsedHeader.branch,
-    root: root.ok ? root.stdout : null,
+    root: root.ok ? root.stdout.trim() : null,
     ahead: parsedHeader.ahead,
     behind: parsedHeader.behind,
     stagedCount,
     unstagedCount,
     untrackedCount,
     conflictedCount,
-    entries,
+    entries: entries.slice(0, limit),
   }
 }
 
@@ -144,11 +151,11 @@ function parsePorcelainEntry(line: string): WorkflowGitFileChange | null {
 
   const indexStatus = line.slice(0, 1)
   const workTreeStatus = line.slice(1, 2)
-  const rawPath = line.slice(3).trim()
+  const rawPath = line.slice(3)
   if (!rawPath) {
     return null
   }
-  const path = rawPath.includes(' -> ') ? rawPath.split(' -> ').at(-1) ?? rawPath : rawPath
+  const path = rawPath
   const untracked = indexStatus === '?' && workTreeStatus === '?'
   const conflicted =
     indexStatus === 'U' ||
@@ -171,7 +178,7 @@ function parsePorcelainEntry(line: string): WorkflowGitFileChange | null {
 
 export function getWorkflowGitContext(cwd: string = process.cwd()): WorkflowGitContext {
   const inside = runGit(['rev-parse', '--is-inside-work-tree'], cwd)
-  if (!inside.ok || inside.stdout !== 'true') {
+  if (!inside.ok || inside.stdout.trim() !== 'true') {
     return {
       insideGit: false,
       branch: null,
@@ -186,8 +193,8 @@ export function getWorkflowGitContext(cwd: string = process.cwd()): WorkflowGitC
 
   return {
     insideGit: true,
-    branch: branch.ok ? branch.stdout : null,
+    branch: branch.ok ? branch.stdout.trim() : null,
     isClean: status.ok ? status.stdout.length === 0 : null,
-    root: root.ok ? root.stdout : null,
+    root: root.ok ? root.stdout.trim() : null,
   }
 }

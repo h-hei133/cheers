@@ -39,7 +39,7 @@ describe("sidebar panel command contract and runner", () => {
     });
 
     expect(result.output).toContain("Sidebar");
-    expect(result.output).toContain("[Next]");
+    expect(result.output).toContain("#### Next");
     expect(result.output).toContain("Inspect the panel output.");
     expect(result.output).toContain("No provider/model calls");
     expect(result.evidence).toContain("sidebar-panel-command-runner:read-only");

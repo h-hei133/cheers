@@ -5,10 +5,14 @@ import { randomUUID } from "node:crypto";
 export const LOG_TAIL_BYTES = 512 * 1024;
 
 /** Oldest first; callers choose a single live family or the full metrics history. */
-export function orderedLogFiles(directory: string, currentPath: string, options: { familyOnly?: boolean; strict?: boolean } = {}): string[] {
+export function orderedLogFiles(directory: string, currentPath: string, options: {
+  familyOnly?: boolean; strict?: boolean; onUnavailable?: (target: 'directory' | 'file') => void;
+} = {}): string[] {
   let names: string[];
   try { names = fs.readdirSync(directory); } catch (error) {
-    if (!options.strict || (error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    options.onUnavailable?.('directory');
+    if (!options.strict) return [];
     throw error;
   }
   const base = path.basename(currentPath).replace(/\.log(?:\.\d+)?$/, ".log");
@@ -17,6 +21,7 @@ export function orderedLogFiles(directory: string, currentPath: string, options:
     .flatMap((name) => {
       const file = path.join(directory, name);
       try { const stat = fs.statSync(file); return stat.isFile() ? [{ file, time: stat.mtimeMs }] : []; } catch (error) {
+        options.onUnavailable?.('file');
         if (!options.strict || (error as NodeJS.ErrnoException).code === "ENOENT") return [];
         throw error;
       }
@@ -28,7 +33,7 @@ export function orderedLogFiles(directory: string, currentPath: string, options:
 }
 
 /** A bounded tail, retaining only whole lines and respecting short reads. */
-export function tailLines(file: string, maxBytes = LOG_TAIL_BYTES): string[] {
+export function tailLines(file: string, maxBytes = LOG_TAIL_BYTES, options: { strict?: boolean } = {}): string[] {
   let handle: number | undefined;
   try {
     handle = fs.openSync(file, "r");
@@ -50,7 +55,7 @@ export function tailLines(file: string, maxBytes = LOG_TAIL_BYTES): string[] {
       }
     }
     return text.split("\n").filter((line) => line.trim().length > 0);
-  } catch { return []; } finally { if (handle !== undefined) fs.closeSync(handle); }
+  } catch (error) { if (options.strict) throw error; return []; } finally { if (handle !== undefined) fs.closeSync(handle); }
 }
 
 /** Validate aliases before any output is opened, then publish the complete copy. */

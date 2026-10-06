@@ -1,5 +1,7 @@
 import { buildSidebarPanel } from "./sidebarPanelLayout.js";
-import { renderSidebarPanel } from "./sidebarPanelRenderer.js";
+import { sidebarReport } from './report.js';
+import { reportText } from '../../core/commands/report/projection.js';
+import type { CommandReport } from '../../core/commands/report/contract.js';
 import type { SidebarStateSnapshot } from "./sidebarStateModel.js";
 import type { SidebarPanelCommandContract } from "./sidebarPanelCommandContract.js";
 
@@ -9,6 +11,7 @@ export interface RunSidebarPanelCommandInput {
 }
 
 export interface SidebarPanelCommandRunResult {
+  readonly report: CommandReport;
   readonly output: string;
   readonly evidence: readonly string[];
 }
@@ -20,8 +23,10 @@ export function runSidebarPanelCommand(
     density: input.contract.density,
     budget: input.contract.budget,
   });
+  const report = sidebarReport(panel);
   return {
-    output: renderSidebarPanel(panel),
+    report,
+    output: reportText(report),
     evidence: [
       "sidebar-panel-command-runner:read-only",
       "sidebar-panel-command-runner:no-provider-call",

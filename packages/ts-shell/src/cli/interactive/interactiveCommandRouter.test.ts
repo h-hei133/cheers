@@ -11,14 +11,18 @@ import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
 import { runNonInteractivePrompt } from "../../entrypoints/cliRuntimeModule.js";
 import { forgetSessionTodos } from "../../core/commands/todoCommandRuntime.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
+import type { CommandReport } from '../../core/commands/report/contract.js';
+import { reportText } from '../../core/commands/report/projection.js';
 
 function createHarness(root = "/tmp/project-alpha") {
   const lines: string[] = [];
+  const reports: CommandReport[] = [];
   let agentMode: "plan" | "build" = "build";
   let viewMode: "compact" | "verbose" = "compact";
   const turns: SessionMessage[] = [];
   return {
     lines,
+    reports,
     input: {
       readline: {} as never,
       mcpGateway: {} as never,
@@ -36,6 +40,7 @@ function createHarness(root = "/tmp/project-alpha") {
       } as never,
       renderer: {
         renderLine: (line: string) => lines.push(line),
+        renderReport: (report: CommandReport) => { reports.push(report); lines.push(reportText(report)); },
       } as never,
       sessionRuntime: {
         getViewMode: () => viewMode,
@@ -72,7 +77,9 @@ describe("interactive command router", () => {
       if (mode === "interactive") await routeInteractiveCommand({ ...harness.input, prompt: "/tools" });
       else await runNonInteractivePrompt({ ...harness.input, prompt: "/tools", printMode: mode === "print" });
       expect(harness.lines.join("\n")).toContain("### Tools (1)");
-      expect(harness.lines.join("\n")).toContain("| `mcp__fixture__Read` | allowed |");
+      expect(harness.lines.join("\n")).toContain("| mcp__fixture__Read | allowed |");
+      expect(harness.reports).toHaveLength(mode === 'interactive' ? 1 : 0);
+      if (mode === 'interactive') expect(harness.reports[0]?.facts.tools).toMatchObject([{ name: 'mcp__fixture__Read', planMode: 'allowed' }]);
       expect(snapshot).toHaveBeenCalledOnce();
     } finally {
       fs.rmSync(root, { recursive: true, force: true });

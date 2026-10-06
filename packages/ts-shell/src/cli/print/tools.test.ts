@@ -59,7 +59,7 @@ it("lists the same filtered MCP and skill tools the compiled CLI sends to the mo
     const listed = await command("/tools");
     expect(requests).toEqual([]);
     expect(listed.stdout, listed.stdout + listed.stderr).toContain("### Tools (3)");
-    const rows = listed.stdout.split("\n").flatMap(line => line.match(/^\| `([^`]+)` \|/)?.[1] ?? []).sort();
+    const rows = listed.stdout.split("\n").flatMap(line => line.match(/^\| ([^|]+) \| (?:allowed|read-only|blocked) \|/)?.[1] ?? []).sort();
     expect(rows).toEqual(names);
     await command("Reply briefly.");
     expect(requests).toEqual([names]);

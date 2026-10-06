@@ -103,9 +103,10 @@ export async function runSidebarLocalCommand(
     return {
       kind: "local",
       output: snapshotResult.output,
+      report: snapshotResult.report,
     };
   }
 
   const panel = runSidebarPanelCommand({ snapshot, contract: parsed.contract });
-  return { kind: "local", output: panel.output };
+  return { kind: "local", output: panel.output, report: panel.report };
 }

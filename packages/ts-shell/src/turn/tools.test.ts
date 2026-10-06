@@ -93,9 +93,9 @@ describe("createToolHooks", () => {
     const report = await runToolsCommand([], { cwd: process.cwd() });
     const hooks = createToolHooks(gate({ agentMode: "plan", permissionScope: "allow-all" }));
     for (const tool of createCoreToolRegistry().values()) {
-      const row = report.output.split("\n").find(line => line.startsWith(`| \`${tool.name}\` |`));
+      const row = (report.report!.facts.tools as { name: string; planMode: string }[]).find(item => item.name === tool.name);
       expect(row).toBeDefined();
-      const mode = row!.split(" | ")[1];
+      const mode = row!.planMode;
       const args = tool.name === "bash" ? { command: "pwd" } : tool.name === "browser" ? { action: "observe" } : {};
       const result = await hooks.beforeToolCall!(call(tool.name, args));
       expect(Boolean(result?.block), tool.name).toBe(mode === "blocked");
@@ -104,8 +104,8 @@ describe("createToolHooks", () => {
         expect((await hooks.beforeToolCall!(call(tool.name, mutation)))?.block).toBe(true);
       }
     }
-    expect(report.output).toContain("| `task` | blocked |");
-    expect(report.output).toContain("| `browser` | read-only |");
+    expect(report.output).toContain("| task | blocked |");
+    expect(report.output).toContain("| browser | read-only |");
   });
 
   it.each(["git status", "git diff", "git show HEAD", "git log -n 5", "git branch new-branch", "git diff --output=written.patch", "git show --output=written.patch"])(

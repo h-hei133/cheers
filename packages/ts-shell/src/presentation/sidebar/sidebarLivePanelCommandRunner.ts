@@ -1,5 +1,7 @@
 import { createSidebarLivePanelRuntime } from "./sidebarLivePanelRuntime.js";
-import { renderSidebarLivePanelFrame } from "./sidebarLivePanelRenderer.js";
+import { sidebarReport } from './report.js';
+import { reportText } from '../../core/commands/report/projection.js';
+import type { CommandReport } from '../../core/commands/report/contract.js';
 import type { SidebarLivePanelCommandContract } from "./sidebarLivePanelCommandContract.js";
 import type { SidebarLiveEventStore } from "./sidebarLiveEventStore.js";
 import type { SidebarStateSnapshot } from "./sidebarStateModel.js";
@@ -13,6 +15,7 @@ export interface RunSidebarLivePanelCommandInput {
 }
 
 export interface SidebarLivePanelCommandRunResult {
+  readonly report: CommandReport;
   readonly output: string;
   readonly evidence: readonly string[];
 }
@@ -29,9 +32,11 @@ export function runSidebarLivePanelCommand(
     maxFrameHistory: input.contract.frameCount,
     now: input.now,
   });
-  const output = renderSidebarLivePanelFrame(runtime.tick());
+  const frame = runtime.tick();
+  const report = sidebarReport(frame.panel, frame);
   return {
-    output,
+    report,
+    output: reportText(report),
     evidence: [
       "sidebar-live-panel-command-runner:read-only",
       "sidebar-live-panel-command-runner:bounded-frame-count",

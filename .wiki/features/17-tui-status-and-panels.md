@@ -370,3 +370,10 @@ bridge 不在 runtime 的 output 生成阶段包色，也不把渲染字符串�
 - 列表和详情使用共享报告 projection，参数名称、类型、必填和描述可在窄屏堆叠；资格取已有 Plan policy，permissions/approval 仍单独要求。详情只投影文档字段，不暴露 execute 或参数默认值。正文全文与语义 facts 在 transcript 折叠后仍可复制，报告通过既有 Pager 阅读，没有第二个宿主。
 - 输入归属按 overlay 代际持有，问题或新请求接管时旧异步详情不再阻塞输入或重新打开；目录失败由 Overlay 状态显示安全错误，排队包装与重试同样保留失败/空结果区别。182 项、六组有效反转/恢复后 39 项、独立 APPROVE/CLEAR 与两模式 actual CLI/print 证据见 [主裁决 §8.96](phase-19-decisions.md#896-ui-06工具列表到只读详情)。
 - diagnose/sidebar/metrics、CLI JSON 与持久语义重放仍在后续工作中，本节不代表完整 UI-06 或 Phase 19 完成。
+
+## 13. UI-06 诊断、指标与侧栏报告（2026-10-07）
+
+- `/diagnose` 保留配置 presence/status 和 readiness 未检查，Git 失败为 unavailable/null，完整计数先于样本。原生 NUL 路径解析保留特殊文件名及重命名目标，热点目录明确基于样本。
+- `/metrics` 沿用跨进程/会话日志，以每文件 512KiB 尾部和请求样本数为界；名称/单位/tags 的共享身份避免 count/ms 混合，timing 加权平均，坏行忽略，健康分片在局部读失败后仍可报告。来源、范围、partial/unavailable 和数值溢出保留在正文与 facts。
+- `/sidebar` 的有界脱敏模型直接投影语义报告，保留完整逻辑行与来源，使用原 Pager 换行/搜索；snapshot/manual refresh 语义及一次 tick 不变。禁用内容检查覆盖 facts，旧 box 仅保留原直接消费者。
+- 173 项、Node 20.3 构建、六组有效反转/恢复后 21 项、独立 APPROVE/CLEAR 及两模式 actual CLI/无 ANSI print 通过，完整证据和上批 CI 夹具修正见 [主裁决 §8.97](phase-19-decisions.md#897-ui-06诊断指标与侧栏状态报告)。CLI JSON 和持久语义重放继续，完整阶段目标未完成。

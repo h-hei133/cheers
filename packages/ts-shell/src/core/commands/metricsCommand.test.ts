@@ -1,12 +1,15 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { runMetricsCommand } from "./metricsCommandRuntime.js";
 import { runLogCommand } from "./logCommandRuntime.js";
 import { RotatingFileSink, setGlobalRotatingFileSink } from "../../observability/rotatingFileSink.js";
 import type { CommandContext } from "./types.js";
 import type { StructuredLogEntry } from "../../observability/types.js";
+import * as logFiles from '../../observability/logs/files.js';
+import { flushMetrics, recordCount, recordTiming, resetMetrics } from '../../observability/metrics.js';
+import { setStructuredLogSink } from '../../observability/structuredLogger.js';
 
 /**
  * `/metrics` is the reading half of the metrics feature, not a convenience.
@@ -56,11 +59,54 @@ function metricEntry(overrides: {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks(); resetMetrics(); setStructuredLogSink(null);
   setGlobalRotatingFileSink(null);
   for (const dir of tempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
 describe("runMetricsCommand", () => {
+  it('keeps units and delimiter-bearing names and tags separate from recording through the report', async () => {
+    const sink = sinkWith([]); setStructuredLogSink(entry => sink.write(entry)); resetMetrics();
+    const tags = { tool: 'a|outcome=b' };
+    recordCount('mixed', 2, tags); recordTiming('mixed', 6, tags);
+    recordCount('mixed', 3, { tool: 'a', outcome: 'b' });
+    tags.tool = 'mutated'; flushMetrics();
+    const result = await runMetricsCommand([], context);
+    expect(result.report?.facts.groups).toMatchObject([
+      { name: 'mixed', unit: 'count', total: 2, tags: { tool: 'a|outcome=b' } },
+      { name: 'mixed', unit: 'count', total: 3, tags: { tool: 'a', outcome: 'b' } },
+      { name: 'mixed', unit: 'ms', total: 6, average: 6, tags: { tool: 'a|outcome=b' } },
+    ]);
+    expect(result.report?.facts).toMatchObject({ scope: 'all-processes-and-sessions', status: 'reported', samplesRead: 3 });
+    expect(result.output).not.toContain('mutated');
+  });
+
+  it('ignores primitive and incomplete records and stops reading older files after enough valid samples', async () => {
+    const sink = sinkWith([metricEntry({ message: 'newest', metric: 'count', count: 1, total: 7, max: 7 })]);
+    fs.appendFileSync(sink.getCurrentFilePath(), '\nnull\n[]\n42\n{"component":"metric","message":"missing"}\n');
+    const older = path.join(sink.getLogDir(), 'old.log'); fs.writeFileSync(older, 'null\n'); fs.utimesSync(older, 1, 1);
+    const tail = vi.spyOn(logFiles, 'tailLines');
+    const result = await runMetricsCommand(['1'], context);
+    expect(result.report?.facts).toMatchObject({ samplesRead: 1, filesInspected: 1, sampleLimit: 1 });
+    expect(result.report?.facts.groups).toMatchObject([{ name: 'newest', total: 7 }]);
+    expect(tail).toHaveBeenCalledTimes(1); expect(result.output).not.toContain('missing');
+  });
+
+  it('reports partial and unavailable log reads without leaking error bodies or claiming an empty measurement', async () => {
+    const sink = sinkWith([metricEntry({ message: 'available', metric: 'count', count: 1, total: 1, max: 1 })]);
+    const failed = path.join(sink.getLogDir(), 'failed.log'); fs.writeFileSync(failed, 'fixture');
+    const original = logFiles.tailLines;
+    const read = vi.spyOn(logFiles, 'tailLines').mockImplementation((file, ...rest) => {
+      if (file === failed) throw new Error('PRIVATE_LOG_BODY'); return original(file, ...rest);
+    });
+    const partial = await runMetricsCommand([], context);
+    expect(partial.report?.facts).toMatchObject({ status: 'partial', unreadableFiles: 1 });
+    expect(partial.output).toContain('available samples only'); expect(partial.output).not.toContain('PRIVATE_LOG_BODY');
+    read.mockImplementation(() => { throw new Error('PRIVATE_LOG_BODY'); });
+    const unavailable = await runMetricsCommand([], context);
+    expect(unavailable.report?.facts.status).toBe('unavailable');
+    expect(unavailable.output).toContain('Metrics unavailable'); expect(unavailable.output).not.toContain('No metrics recorded');
+  });
   it("says so when nothing has been recorded", async () => {
     sinkWith([]);
     const result = await runMetricsCommand([], context);

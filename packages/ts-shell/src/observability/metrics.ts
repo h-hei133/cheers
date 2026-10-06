@@ -1,4 +1,5 @@
 import { createComponentLogger } from "./structuredLogger.js";
+import { metricKey } from './metrics/model.js';
 
 export interface MetricEvent {
   readonly name: string;
@@ -46,16 +47,8 @@ interface Accumulated {
 
 let pending = new Map<string, Accumulated>();
 
-/** The key a metric accumulates under: its name plus the tags that distinguish it. */
-function accumulationKey(name: string, tags: Record<string, string>): string {
-  const parts = Object.keys(tags)
-    .sort()
-    .map((key) => `${key}=${tags[key]}`);
-  return [name, ...parts].join("|");
-}
-
 function accumulate(name: string, value: number, unit: MetricEvent["unit"], tags: Record<string, string>): void {
-  const key = accumulationKey(name, tags);
+  const key = metricKey(name, unit, tags);
   const existing = pending.get(key);
   if (existing) {
     existing.count += 1;
@@ -63,7 +56,7 @@ function accumulate(name: string, value: number, unit: MetricEvent["unit"], tags
     existing.max = Math.max(existing.max, value);
     return;
   }
-  pending.set(key, { name, count: 1, total: value, max: value, unit, tags });
+  pending.set(key, { name, count: 1, total: value, max: value, unit, tags: { ...tags } });
 }
 
 /**
