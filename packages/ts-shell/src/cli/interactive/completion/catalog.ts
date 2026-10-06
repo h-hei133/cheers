@@ -9,7 +9,7 @@ import { catalogSources } from "./sources.js";
 import { modelCatalog } from "./models.js";
 import { workflowCatalog } from "./workflows.js";
 import { listThemes } from "../../../presentation/themes/index.js";
-import { resolveSkillCatalog } from "../../../core/skills/skillCatalog.js";
+import { createSkillCatalog } from "./skills.js";
 import { toolPoolFor } from "../../runtime/tools.js";
 import type { ShellRuntimeContext } from "../../../core/shell/runtimeContext.js";
 import type { CliMcpGateway } from "../../../entrypoints/cliMcpModule.js";
@@ -37,10 +37,6 @@ async function readCatalog(kind: CatalogKind, context: ShellRuntimeContext, gate
     return navigationCatalog(kind, context, manager);
   }
   if (kind === "theme") return [...new Set(["auto", ...listThemes(context.cwd, themePaths)])].map(value => ({ value, label: value, detail: "Select theme" }));
-  if (kind === "skill") {
-    const skills = resolveSkillCatalog({ workspaceRoot: context.cwd, ...context.skillOptions }).skills;
-    return [...skills.values()].map(skill => ({ value: skill.name, label: skill.name, detail: skill.description }));
-  }
   const snapshot = context.runtimeConfig.enableMcpTools ? gateway.peekSnapshot?.() : undefined;
   if (context.runtimeConfig.enableMcpTools && !snapshot) throw new Error("Tool catalog unavailable");
   if (snapshot?.clients.some(client => client.type !== "connected")) throw new Error("Tool catalog unavailable");
@@ -51,13 +47,14 @@ async function readCatalog(kind: CatalogKind, context: ShellRuntimeContext, gate
 /** Reuse a pending catalog read across changing prefixes; cancellation only detaches the waiter. */
 export function createCatalogLoader(context: () => ShellRuntimeContext, gateway: CliMcpGateway, themePaths: readonly string[], manager?: SessionCatalog, policy?: GrantCatalog) {
   let pending: { key: string; task: Promise<readonly Suggestion[]> } | undefined;
+  const skills = createSkillCatalog();
   const load = async (kind: CatalogKind, signal: AbortSignal, query?: string): Promise<readonly Suggestion[]> => {
     signal.throwIfAborted();
     const current = context();
     if (kind === "file" || kind === "directory") return pathCatalog(current.cwd, query ?? "", kind === "directory", signal);
     const key = catalogIdentity(current, themePaths) + kind;
     if (!pending || pending.key !== key) {
-      const task = readCatalog(kind, current, gateway, themePaths, manager, policy);
+      const task = kind === "skill" ? Promise.resolve(skills.read(current)) : readCatalog(kind, current, gateway, themePaths, manager, policy);
       pending = { key, task };
       void task.finally(() => { if (pending?.task === task) pending = undefined; }).catch(() => {});
     }
@@ -68,6 +65,7 @@ export function createCatalogLoader(context: () => ShellRuntimeContext, gateway:
   return Object.assign(load, {
     invalidate: () => { pending = undefined; },
     observe: (kind: CatalogKind, query: string | undefined, changed: () => void) => {
+      if (kind === "skill") return skills.observe(changed);
       const targets = catalogSources(kind, context().cwd, query, themePaths);
       if (!targets.length) return undefined;
       const close = targets.map(target => observeDirectory(target, changed));

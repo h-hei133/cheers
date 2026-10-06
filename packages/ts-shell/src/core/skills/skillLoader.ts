@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { resolveAllUserDataFiles, userDataDir } from "../paths/userHome.js";
+import { userDataSearchDirs } from "../paths/userHome.js";
 import { projectDirectories } from "../project/directories.js";
 import { isDirectoryIgnored } from "../../runtime/execution/ignoreRules.js";
 
@@ -142,6 +142,7 @@ export class SkillLoader {
    * make `--skill` silently do nothing.
    */
   private readonly ignoreRoot: string;
+  private readonly onSource?: (target: string) => void;
 
   constructor(
     workspaceRoot: string = process.cwd(),
@@ -158,13 +159,15 @@ export class SkillLoader {
       readonly extraPaths?: readonly string[];
       /** Skip every discovered root; only named paths are read. */
       readonly disableDiscovery?: boolean;
+      /** Report paths actually visited, before reading, for optional change observation. */
+      readonly onSource?: (target: string) => void;
     } = {},
   ) {
-    // Every user skills directory that exists, newest first. A listing that read
+    // Every user skills directory, newest first. A listing that read
     // only the current one would hide skills the user already wrote in an older
-    // location — they are additional, not superseded. When none exists yet, the
-    // current path stands in as the place new skills would be written.
-    const userSkillDirs = resolveAllUserDataFiles("skills");
+    // location — they are additional, not superseded. Missing roots are also
+    // reported to observers so later creation can invalidate a cached listing.
+    const userSkillDirs = userDataSearchDirs().map(directory => path.join(directory, "skills"));
     // Every project directory from the working one up to the root, so a skill
     // kept at the repository root is found when the session starts in a
     // subdirectory. Reading only the working directory made those skills
@@ -185,10 +188,11 @@ export class SkillLoader {
     // project's rules — which is right: they are that repository's statement
     // about its own files.
     this.ignoreRoot = workspaceRoot;
+    this.onSource = options.onSource;
     this.roots = this.disableDiscovery
       ? []
       : [
-          ...(userSkillDirs.length > 0 ? userSkillDirs : [path.join(userDataDir(), "skills")]).map(
+          ...userSkillDirs.map(
             (dir) => ({ dir, source: "user" as const }),
           ),
           // Project skills win: a repository that ships its own way of doing something
@@ -266,6 +270,7 @@ export class SkillLoader {
    * scan.
    */
   private loadRoot(dirOrFile: string, source: SkillSource): Skill[] {
+    this.onSource?.(dirOrFile);
     // Only a path the user named can be reported missing. A discovered root that
     // is absent is the ordinary state of a fresh install — nobody asked for
     // `~/.cheers/skills`, so its absence says nothing worth saying.
@@ -323,6 +328,7 @@ export class SkillLoader {
    * and it has no way to notice the omission.
    */
   private scan(dir: string, source: SkillSource, isRoot: boolean): Skill[] {
+    this.onSource?.(dir);
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });

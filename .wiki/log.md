@@ -6207,3 +6207,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-06] fix | Phase 19 CMD-04 连接目录接入外部配置事件，并修正用户文件从旧目录回退时的新来源覆盖通知；161 项、Node 20.3 构建、有效反转及 regular/fullscreen 真实 CLI 验证通过。连接 Tab 不写配置，Esc 后不重开，模型新文件覆盖/删除回退即时重读。见 features/phase-19-decisions.md §8.48，CMD-04 及 Phase 19 整体继续。
 
 ## [2026-10-06] fix | Phase 19 CMD-04 主题候选复用 owner 目录序列接入外部变化，覆盖用户/项目来源和额外文件/目录；205 项、Node 20.3 构建、有效反转和两模式真实 CLI 验证通过。技能递归发现与其他 owner 事件继续，见 features/phase-19-decisions.md §8.49。
+
+## [2026-10-06] fix | Phase 19 CMD-04 技能补全沿现有发现过程观察递归目录，支持外部深层 manifest 增改删，最多 256 个观察目标，禁用/退出释放；207 项、Node 20.3 构建、有效反转及两模式真实 CLI 检查通过。见 features/phase-19-decisions.md §8.50，其他 owner 事件与阶段任务继续。

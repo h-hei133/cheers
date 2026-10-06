@@ -918,3 +918,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - regular/fullscreen 真实 CLI 在无新按键时响应主题创建、名称编辑、删除、重建，Esc 后外部修改不重开菜单，两模式 exit 0。测试另核对只读查询前后的主题选择、配置字节和 mtime 不变。
 - import cycles/config consumers/declarations/node floor 通过，NormProof 无环/导入解析 satisfied，既有 5 个函数数量 advisory 保留。32598f7e Architecture Watch 37394082553 成功，CI 37394082538 查询时仍运行；b40344b5 CI 37393613562 亦待终态。
 - 技能目录检查确认存在递归分组、manifest 停止下探、ignore 与信任语义，后续事件路径应由同一发现过程提供，不另造递归扫描器。技能及会话/记忆/授权/MCP 状态事件、剩余参数与 Phase 19 后续任务继续；不把本批主题单层监听计为递归技能完成。
+
+### 8.50 CMD-04：技能发现路径观察
+
+- SkillLoader 在读取根路径及递归目录前，通过可选回调报告实际访问路径；补全沿同一发现过程建立监听，没有创建第二套技能递归扫描器。用户候选根包含尚未存在的目录，因此外部创建后可使空目录缓存失效；缺失根的读取仍返回空。
+- 沿用参考技能发现的 manifest 停止下探、分组递归和命名路径优先规则；技能候选仍由原 catalog 应用信任过滤。noSkills 不观察被禁用的发现目录，显式 skillPaths 仍可读取；新一轮发现会移除不再访问的路径监听。
+- 每个技能目录观察器最多保留 256 个目标，换树时先释放旧目标再接入新目标，峰值也受限；目标去重，停止后关闭全部句柄。超出上限和不支持文件事件的来源保留既有 TTL/显式刷新退路，没有声称任意规模都即时刷新。项目目录链 ignore 文件及用户信任候选文件纳入来源；完整 Git 外部 excludes/index 与其他间接配置事件仍需后续审计。
+- Linux、Node 20.3 隔离环境 18 文件/207 项与 build:ts 通过，包括原技能解析/信任测试、嵌套新增和编辑、manifest 下参考文件不作为独立技能、禁用后释放、显式文件原子替换、只读字节/mtime 与监听峰值。首轮夹具把 HOME 放进工作区触发仓库 ignore，归类为夹具边界错误，改为独立工作目录，未更改产品 ignore 决策。
+- 移除递归目录报告后，深层 manifest 编辑的事件断言失败；逐字节恢复后组合通过。regular/fullscreen 真实 CLI 在无新按键时响应深层技能创建、manifest 原子替换、删除及重建，Esc 后事件不重开菜单，两模式 exit 0。
+- import cycles/config consumers/declarations/node floor 通过，NormProof 无环/导入解析 satisfied，既有 5 个函数数量 advisory 保留。ce228211 Architecture Watch 37394466969 成功，CI 37394466624 查询时仍运行；32598f7e 与 b40344b5 的 CI 亦待终态。
+- CMD-04 的会话/记忆/授权 owner 与 MCP 状态、间接配置事件仍未完成；底层同步技能解析无法被 AbortSignal 物理中断的限制继续保留，剩余参数审计与 Phase 19 后续批次继续。
