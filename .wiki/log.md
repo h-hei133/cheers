@@ -6290,3 +6290,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-06] fix | Phase 19 CFG-01/05 命令、模型 picker 与补全共用已接受目录，侧问使用实际 CLI 凭据，context 使用模型预留和实际工具池；移除模型列表重复远程读取，刷新区分缓存保存与配置应用。修复前批 CI 遗留的 interactiveLoop 部分夹具及架构复审发现的混合依赖环。474 项组合、4 组有效反转、Node 20.3 构建、两模式共 8 次本地 HTTP、静态门禁通过；独立代码 APPROVE、架构 CLEAR，详见 features/phase-19-decisions.md §8.83。状态栏、连接 picker 与完整阶段目标继续。
 
 ## [2026-10-07] fix | Phase 19 CFG-01/UI-05 状态栏、欢迎模型和连接 picker 使用已接受目录及实际请求目标，避免磁盘编辑提前改变窗口/费用/登录草稿。87 项相关测试、另行 loop 2 项、3 组有效反转、Node 20.3 构建及两模式 VT 屏幕 16k→拒绝后16k→成功后24k 验证通过；独立代码 APPROVE、架构 CLEAR，见 features/phase-19-decisions.md §8.84。压缩后 usage 真值、主题历史优先级及完整阶段目标继续。
+
+## [2026-10-07] fix | Phase 19 CFG-01/UI-04 主题发现复用公共 HOME 解析并使当前目录覆盖历史同名文件，保留历史独有项、项目授权与显式路径优先级。53 项定向测试、2 组反转、Node 20.3 构建和两模式调色板/follower 验证通过，独立代码 APPROVE、架构 CLEAR，见 features/phase-19-decisions.md §8.85。regular 重绘序列留作 UI-01 待查案例，完整阶段目标继续。

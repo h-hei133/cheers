@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { dark as darkJson, light as lightJson, darkContrast, lightContrast } from "./assets.js";
 import { projectDirectories } from "../../core/project/directories.js";
-import { userDataSearchDirsFor } from "../../core/paths/userHome.js";
+import { userDataSearchDirs } from "../../core/paths/userHome.js";
 import { projectTrust } from "../../core/security/trust/store.js";
 import { identifyProject } from "../../core/security/trust/identity.js";
 
@@ -51,7 +51,8 @@ export function themeWatchDirectories(workspaceRoot: string): readonly string[] 
 }
 
 function themeRoots(workspaceRoot: string): readonly { directory: string; project: boolean }[] {
-  const userDirs = userDataSearchDirsFor(process.env.USERPROFILE ?? process.env.HOME ?? "")
+  // Discovery overwrites by name, so load oldest first and the current home last.
+  const userDirs = [...userDataSearchDirs()].reverse()
     .map(directory => path.join(directory, THEME_DIRECTORY));
   const projectDirs = projectDirectories(identifyProject(workspaceRoot))
     .map(directory => path.join(directory, ...PROJECT_THEME_PATH))

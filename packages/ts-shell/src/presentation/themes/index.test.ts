@@ -2,8 +2,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { listThemes, loadTheme, themeNamesFromPaths, themeSource } from "./index.js";
+import { listThemes, loadTheme, themeNamesFromPaths, themeSource, themeSourcePath } from "./index.js";
 import { projectTrust } from "../../core/security/trust/store.js";
+import { userDataSearchDirsFor } from "../../core/paths/userHome.js";
 
 /**
  * Where themes come from.
@@ -37,6 +38,51 @@ describe("theme discovery", () => {
 
   it("always offers the bundled themes", () => {
     expect(listThemes(root)).toEqual(expect.arrayContaining(["dark", "light"]));
+  });
+
+  it("prefers current personal themes while preserving historical additions and project or explicit overrides", () => {
+    const directories = userDataSearchDirsFor(home).map(directory => path.join(directory, 'themes'));
+    const colors = ['#110000', '#220000', '#330000', '#440000'];
+    directories.forEach((directory, index) => writeTheme(directory, 'priority.json', { colors: { text: colors[index] } }));
+    writeTheme(directories[directories.length - 1]!, 'older-only.json', { colors: { text: '#445566' } });
+    expect(listThemes(root).filter(name => name === 'priority')).toEqual(['priority']);
+    expect(loadTheme('older-only', root)?.colors.text).toBe('#445566');
+    for (const [index, directory] of directories.entries()) {
+      expect(loadTheme('priority', root)?.colors.text).toBe(colors[index]);
+      expect(themeSourcePath('priority', root)).toBe(path.join(directory, 'priority.json'));
+      if (index < directories.length - 1) fs.unlinkSync(path.join(directory, 'priority.json'));
+    }
+    writeTheme(directories[0]!, 'priority.json', { colors: { text: colors[0] } });
+    const workspace = path.join(root, 'workspace');
+    fs.mkdirSync(path.join(workspace, '.git'), { recursive: true });
+    const projectDirectory = path.join(workspace, '.agents', 'themes');
+    writeTheme(projectDirectory, 'priority.json', { colors: { text: '#556677' } });
+    expect(loadTheme('priority', workspace)?.colors.text).toBe(colors[0]);
+    projectTrust.setProjectTrust(workspace, 'session-only');
+    expect(loadTheme('priority', workspace)?.colors.text).toBe('#556677');
+    expect(themeSourcePath('priority', workspace)).toBe(path.join(projectDirectory, 'priority.json'));
+    const explicit = path.join(root, 'explicit');
+    writeTheme(explicit, 'priority.json', { colors: { text: '#778899' } });
+    expect(loadTheme('priority', workspace, [explicit])?.colors.text).toBe('#778899');
+    expect(themeSourcePath('priority', workspace, [explicit])).toBe(path.join(explicit, 'priority.json'));
+  });
+
+  it("reports an invalid current theme instead of silently selecting a historical copy", () => {
+    const directories = userDataSearchDirsFor(home).map(directory => path.join(directory, 'themes'));
+    writeTheme(directories[1]!, 'priority.json', { colors: { text: '#112233' } });
+    fs.mkdirSync(directories[0]!, { recursive: true });
+    const current = path.join(directories[0]!, 'priority.json');
+    fs.writeFileSync(current, '{ invalid');
+    expect(themeSourcePath('priority', root)).toBe(current);
+    expect(() => loadTheme('priority', root)).toThrow('Invalid theme priority');
+  });
+
+  it("uses the shared home fallback when USERPROFILE is empty", () => {
+    vi.stubEnv('USERPROFILE', '');
+    const directory = path.join(userDataSearchDirsFor(home)[0]!, 'themes');
+    writeTheme(directory, 'home-fallback.json', { colors: { text: '#123456' } });
+    expect(loadTheme('home-fallback', root)?.colors.text).toBe('#123456');
+    expect(themeSourcePath('home-fallback', root)).toBe(path.join(directory, 'home-fallback.json'));
   });
 
   it("finds a theme in the project's own directory", () => {
