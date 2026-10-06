@@ -1,4 +1,5 @@
 import { writeSessionUsage } from "./usage.js";
+import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -23,7 +24,7 @@ function activate(session: Session) {
   return createShellRuntimeContext({
     cwd: directory, originalCwd: directory, projectRoot: directory, rootMode: "direct",
     targetPathBase: directory, gitRoot: null, session,
-    runtimeConfig: { provider: "openai", maxTurns: 6, disabledTools: [], hiddenToolPrefixes: [], enableMcpTools: true, configSources: [] },
+    runtimeConfig: { ...getRuntimeConfig(directory), maxTurns: 6 },
     gitContext: { insideGit: false, root: null, branch: null, isClean: null },
   });
 }

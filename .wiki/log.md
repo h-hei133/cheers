@@ -6252,3 +6252,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-06] fix | Phase 19 CFG-03 配置保存要求显式基线，锁内三方字段合并及前后原文核验，错误区分未写/未知/已核验但清理失败；模型异步选择依赖与登录补写分支已保护。317 项、构建、13 组反转、两模式真实 CLI 锁超时/重试验证通过，审查发现的选择和 ID 兼容问题修复后获 APPROVE/CLEAR。见 features/phase-19-decisions.md §8.70；revision reload 和阶段整体继续。
 
 ## [2026-10-06] fix | Phase 19 CFG-03 不可变 revision reload 保留 last-good 与启动 overrides，主题准备后发布，显示值与待重启偏好分离；安全撤销贯穿工具、hook、签名后 HTTP 和 MCP。状态/选择器使用已接受快照，只有确认保存才刷新。742 项、构建、15 组反转及恢复后 174 项、两模式合成 HTTP CLI 验证通过，独立审查 APPROVE/CLEAR。见 features/phase-19-decisions.md §8.71；账户刷新身份竞态、完整配置来源/信任、settings/通知及 Phase 19 其余任务继续。
+
+## [2026-10-06] test | e044f2b3 远端完整套件发现五文件/七项旧配置上下文与 provider bridge 夹具未更新；修正为真实 factory/publication/refresh 接口，原行为断言保留。受影响 82 项通过，独立代码复审 APPROVE；原 CI 失败不以本地绿灯改写。见 features/phase-19-decisions.md §8.71 补充。

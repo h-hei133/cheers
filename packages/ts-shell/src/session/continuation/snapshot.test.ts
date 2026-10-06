@@ -14,6 +14,8 @@ import { extractSeedInfluenceFromQueryResult } from "./sessionSeedInfluence.js";
 import { projectSessionToolContinuity } from "./sessionToolContinuity.js";
 import { projectSessionUnresolvedItems } from "./sessionUnresolvedItems.js";
 import { resumeShellSession } from "../../core/shell/recovery.js";
+import { getRuntimeConfig } from '../../config/runtimeConfig.js';
+import { createShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 
 const timestamp = "2026-10-03T00:00:00.000Z";
 
@@ -301,8 +303,10 @@ describe("stored session continuity messages", () => {
     const reopened = new SessionManager();
     expect(reopened.buildContinuitySnapshot(session.id).recentFailedFiles).toEqual([]);
     const resumed = await resumeShellSession({ requestedSessionId: session.id, sessionManager: reopened,
-      runtimeContext: { projectRoot: session.projectRoot, session: { id: "other" },
-        activeSession: { sessionId: "other" }, runtimeConfig: { maxTurns: 6 } } as never,
+      runtimeContext: createShellRuntimeContext({ cwd: session.projectRoot, originalCwd: session.projectRoot, projectRoot: session.projectRoot,
+        targetPathBase: session.projectRoot, rootMode: 'direct', gitRoot: null,
+        session: { id: 'other', createdAt: 'now', updatedAt: 'now', status: 'active', turns: [] },
+        runtimeConfig: { ...getRuntimeConfig(session.projectRoot), maxTurns: 6 }, gitContext: { insideGit: false, root: null, branch: null, isClean: null } }),
       renderer: { renderLine() {} } as never,
     });
     expect(resumed.resumed && resumed.autoResume).toBeTruthy();

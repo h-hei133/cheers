@@ -35,9 +35,10 @@ it("persists a session-only selection through lifecycle writes, restart and sess
     session: one, runtimeConfig: getRuntimeConfig(home) });
   context.runtimeConfigOverrides = { allowedTools: ["Read"], offline: true, instructionBudgetBytes: 0 };
   refreshShellRuntimeConfig(context);
-  const bridge = createCliProviderRuntimeBridge({ projectRoot: home, options: {}, env: {}, currentSession: () => context.session });
+  const bridge = createCliProviderRuntimeBridge({ runtimeConfig: () => context.runtimeConfig, options: {}, env: {} });
   expect(bridge.resolveCredentialSnapshot().model).toBe("base-model");
-  const result = await runModelCommand(["use", "session-model"], { cwd: home, sessionId: one.id });
+  const result = await runModelCommand(["use", "session-model"], { cwd: home, sessionId: one.id,
+    runtimeConfig: context.runtimeConfig, refreshRuntimeConfig: () => refreshShellRuntimeConfig(context) });
   expect(result.output).toContain("saved for resume");
   expect(fs.readFileSync(configPath)).toEqual(original); expect(fs.statSync(configPath).mtimeMs).toBe(stamp);
   expect(bridge.resolveCredentialSnapshot().credential?.model).toBe("session-model");

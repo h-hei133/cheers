@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { getRuntimeConfig } from '../../config/runtimeConfig.js';
+import { createShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import { forgetSessionTodos, getSessionTodos, setSessionTodos } from "../../core/commands/todoCommandRuntime.js";
 import { Transcript } from "../../presentation/tui/transcript/container.js";
 import { restoreConversation, showConversation, startFreshSession } from "./history.js";
@@ -222,12 +224,9 @@ describe("showing a session", () => {
         createNew: () => ({ id: "s-new", turns: [] } as never),
         discardIfEmpty: () => true,
       },
-      context: {
-        session: { id: "s-old" },
-        projectRoot: "/p",
-        rootMode: "project",
-        gitContext: { root: null },
-      } as never,
+      context: createShellRuntimeContext({ cwd: '/p', originalCwd: '/p', projectRoot: '/p', targetPathBase: '/p', rootMode: 'direct', gitRoot: null,
+        session: { id: 's-old', createdAt: 'now', updatedAt: 'now', status: 'active', turns: [] },
+        runtimeConfig: getRuntimeConfig('/p'), gitContext: { insideGit: false, root: null, branch: null, isClean: null } }),
     });
 
     // Nothing of the discarded session's list is left for the new one to show.

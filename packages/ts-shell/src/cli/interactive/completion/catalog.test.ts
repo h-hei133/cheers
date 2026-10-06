@@ -1,13 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import { createCatalogLoader, catalogIdentity } from "./catalog.js";
 import { getRuntimeConfig } from "../../../config/runtimeConfig.js";
-import type { ShellRuntimeContext } from "../../../core/shell/runtimeContext.js";
+import { createShellRuntimeContext, type ShellRuntimeContext } from "../../../core/shell/runtimeContext.js";
 import type { CliMcpGateway } from "../../../entrypoints/cliMcpModule.js";
 
 function context(): ShellRuntimeContext {
-  return { cwd: process.cwd(), projectRoot: process.cwd(), session: { id: "catalog-fixture" },
-    skillOptions: { noSkills: true }, runtimeConfig: { ...getRuntimeConfig(), enableMcpTools: true,
-      allowedTools: ["mcp__fixture__read"], disabledTools: [], hiddenToolPrefixes: [] } } as unknown as ShellRuntimeContext;
+  const root = process.cwd();
+  const context = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root, targetPathBase: root,
+    rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+    session: { id: 'catalog-fixture', createdAt: 'now', updatedAt: 'now', status: 'active', turns: [] },
+    runtimeConfig: { ...getRuntimeConfig(), enableMcpTools: true, allowedTools: ['mcp__fixture__read'], disabledTools: [], hiddenToolPrefixes: [] } });
+  context.skillOptions = { noSkills: true };
+  return context;
 }
 
 describe("runtime catalog source", () => {
@@ -24,7 +28,8 @@ describe("runtime catalog source", () => {
     expect((await first).map(item => item.value)).toEqual(["mcp__fixture__read"]);
     expect(await second).toEqual(await first);
     const before = catalogIdentity(ctx);
-    ctx.runtimeConfig = { ...ctx.runtimeConfig, disabledTools: ["mcp__fixture__read"] };
+    const binding = ctx.configuration.current.binding;
+    ctx.configuration.publish(ctx.configuration.begin(binding), { ...ctx.runtimeConfig, disabledTools: ["mcp__fixture__read"] }, binding);
     expect(catalogIdentity(ctx)).not.toBe(before);
   });
 
