@@ -1,3 +1,5 @@
+import { loadCatalog } from "../../../core/models/catalogStore.js";
+import { withConfiguration } from "../../../test-utils/configuration.js";
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -26,24 +28,33 @@ it.each(["connection", "model"] as const)("reloads %s when source precedence cha
     ? { providerConnections: [{ id, provider: "openai", apiKey: "synthetic-private-key" }] }
     : { providers: { openai: { models: [{ id, contextWindow: 1000 }] } } });
   fs.mkdirSync(path.dirname(previous)); fs.writeFileSync(previous, payload("older"));
-  const context = { cwd: root, session: { id: "fixture" }, runtimeConfig: {} } as ShellRuntimeContext;
+  const context = withConfiguration({ cwd: root, session: { id: "fixture" }, runtimeConfig: {} } as ShellRuntimeContext);
   const load = createCatalogLoader(() => context, {} as CliMcpGateway, []);
   const changed = vi.fn(); const stop = load.observe(kind, undefined, changed)!; stops.push(stop);
   const values = async () => (await load(kind, new AbortController().signal)).map(item => item.value);
+  const publishModels = () => {
+    if (kind !== "model") return;
+    const state = context.configuration; const { config, binding } = state.current;
+    expect(state.publish(state.begin(binding), config, binding, undefined, loadCatalog()).status).toBe("applied");
+  };
   const value = (id: string) => kind === "connection" ? id : `openai/${id}`;
   expect(await values()).toContain(value("older"));
   expect(fs.existsSync(path.dirname(current))).toBe(false);
   fs.mkdirSync(path.dirname(current)); fs.writeFileSync(current, payload("newer"));
   await vi.waitFor(() => expect(changed).toHaveBeenCalled());
+  if (kind === "model") expect(await values()).toContain(value("older"));
+  publishModels();
   expect(await values()).toContain(value("newer"));
   expect(await values()).not.toContain(value("older"));
   changed.mockClear();
   const replacement = path.join(root, "replacement.json");
   fs.writeFileSync(replacement, payload("replacement")); fs.renameSync(replacement, current);
   await vi.waitFor(() => expect(changed).toHaveBeenCalled());
+  publishModels();
   expect(await values()).toContain(value("replacement"));
   changed.mockClear(); fs.unlinkSync(current);
   await vi.waitFor(() => expect(changed).toHaveBeenCalled());
+  publishModels();
   expect(await values()).toContain(value("older"));
   stop(); changed.mockClear(); fs.writeFileSync(previous, payload("after-stop"));
   await new Promise(resolve => setTimeout(resolve, 100));
@@ -62,7 +73,7 @@ it("tracks every trust-file fallback without creating files or traversing home",
 it('refreshes theme completions when trust is saved and revoked', async () => {
   fs.mkdirSync(path.join(root, '.git')); const themes = path.join(root, '.agents', 'themes');
   fs.mkdirSync(themes, { recursive: true }); fs.writeFileSync(path.join(themes, 'custom.json'), JSON.stringify({ colors: {} }));
-  const context = { cwd: root, projectRoot: root, session: { id: 'theme' }, runtimeConfig: {} } as ShellRuntimeContext;
+  const context = withConfiguration({ cwd: root, projectRoot: root, session: { id: 'theme' }, runtimeConfig: {} } as ShellRuntimeContext);
   const load = createCatalogLoader(() => context, {} as CliMcpGateway, []);
   const changed = vi.fn(); const stop = load.observe('theme', undefined, changed)!; stops.push(stop);
   const values = async () => (await load('theme', new AbortController().signal)).map(item => item.value);
@@ -89,7 +100,7 @@ it.each(['themes', 'agents', 'workspace'])('reattaches theme observations after 
   const target = (directory: string) => kind === 'themes' ? path.join(directory, '.agents', 'themes') : kind === 'agents' ? path.join(directory, '.agents') : directory;
   fs.rmSync(location, { recursive: true, force: true }); fs.symlinkSync(target(first), location, 'dir');
   projectTrust.setProjectTrust(first, 'trusted'); projectTrust.setProjectTrust(second, 'trusted');
-  const context = { cwd: alias, projectRoot: alias, session: { id: 'theme-alias' }, runtimeConfig: {} } as ShellRuntimeContext;
+  const context = withConfiguration({ cwd: alias, projectRoot: alias, session: { id: 'theme-alias' }, runtimeConfig: {} } as ShellRuntimeContext);
   const load = createCatalogLoader(() => context, {} as CliMcpGateway, []);
   const changed = vi.fn(); const stop = load.observe('theme', undefined, changed)!; stops.push(stop);
   const values = async () => (await load('theme', new AbortController().signal)).map(item => item.value);
@@ -111,7 +122,7 @@ it('observes canonical ancestor resource links when the workspace alias points b
   fs.writeFileSync(path.join(first, 'first.json'), JSON.stringify({ colors: {} }));
   fs.writeFileSync(path.join(second, 'second.json'), JSON.stringify({ colors: {} }));
   projectTrust.setProjectTrust(first, 'trusted'); projectTrust.setProjectTrust(second, 'trusted');
-  const context = { cwd: alias, projectRoot: alias, session: { id: 'nested-alias' }, runtimeConfig: {} } as ShellRuntimeContext;
+  const context = withConfiguration({ cwd: alias, projectRoot: alias, session: { id: 'nested-alias' }, runtimeConfig: {} } as ShellRuntimeContext);
   const load = createCatalogLoader(() => context, {} as CliMcpGateway, []);
   const changed = vi.fn(); const stop = load.observe('theme', undefined, changed)!; stops.push(stop);
   const values = async () => (await load('theme', new AbortController().signal)).map(item => item.value);

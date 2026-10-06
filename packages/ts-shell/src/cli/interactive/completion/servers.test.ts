@@ -1,3 +1,4 @@
+import { withConfiguration } from "../../../test-utils/configuration.js";
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -39,7 +40,7 @@ describe("MCP server read ownership", () => {
     const before = files.map(file => ({ bytes: fs.readFileSync(file), mtime: fs.statSync(file).mtimeMs }));
     const snapshot = vi.fn(async () => { throw new Error("must not connect"); });
     const refresh = vi.fn(async () => { throw new Error("must not refresh"); });
-    const context = { cwd: root, projectRoot: root, session: { id: "fixture" }, runtimeConfig: {} } as ShellRuntimeContext;
+    const context = withConfiguration({ cwd: root, projectRoot: root, session: { id: "fixture" }, runtimeConfig: {} } as ShellRuntimeContext);
     const load = createCatalogLoader(() => context, { snapshot, refresh }, []);
     const items = await load("mcp", new AbortController().signal);
     expect(items).toEqual([

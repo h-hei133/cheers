@@ -1,4 +1,4 @@
-import { RUNTIME_PROVIDERS } from "../../../config/runtimeConfig.js";
+import type { CatalogProvider } from "../../../core/models/catalog.js";
 import { loadCatalog } from "../../../core/models/catalogStore.js";
 import { modelSyntax, parseModelArgs } from "../../../core/commands/model/syntax.js";
 import { firstParameter } from "./position.js";
@@ -11,9 +11,8 @@ export function modelKind(before: readonly string[], current: string, after: rea
   return parsed.action.name === "use" ? "model" : parsed.action.name === "list" ? "provider" : undefined;
 }
 
-export function modelCatalog(kind: "model" | "provider"): readonly Suggestion[] {
-  const catalog = loadCatalog();
-  if (kind === "provider") return catalog.filter(provider => RUNTIME_PROVIDERS.some(id => id === provider.id))
+export function modelCatalog(kind: "model" | "provider", catalog: readonly CatalogProvider[] = loadCatalog()): readonly Suggestion[] {
+  if (kind === "provider") return catalog
     .map(provider => ({ value: provider.id, label: provider.id }));
   return catalog.flatMap(provider => provider.models.map(model => ({
     value: `${provider.id}/${model.id}`, label: `${provider.id}/${model.id}`,

@@ -136,6 +136,7 @@ export async function routeInteractiveCommand(
     // than only for the turn that ran it.
     runtimeConfig: input.runtimeContext.runtimeConfig,
     resolveConfigTarget: input.runtimeContext.resolveConfigTarget,
+    readConfiguration: () => input.runtimeContext.configuration.current,
     admission: configurationAdmission(input.runtimeContext),
     refreshRuntimeConfig: () => {
       const result = refreshShellRuntimeConfig(input.runtimeContext);

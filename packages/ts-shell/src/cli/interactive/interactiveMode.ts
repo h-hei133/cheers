@@ -780,6 +780,7 @@ export class InteractiveMode {
         projectRoot: this.options.runtimeContext.projectRoot,
         runtimeConfig: this.options.runtimeContext.runtimeConfig,
         resolveConfigTarget: this.options.runtimeContext.resolveConfigTarget,
+        readConfiguration: () => this.options.runtimeContext.configuration.current,
         refreshRuntimeConfig: () => refreshShellRuntimeConfig(this.options.runtimeContext),
         cwd: this.options.runtimeContext.cwd,
         sessionId: this.options.runtimeContext.session.id,

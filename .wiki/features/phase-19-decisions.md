@@ -1345,3 +1345,16 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 最终构建 CLI 的 regular/fullscreen 各拒绝三次不匹配模型/effort 操作，拒绝时配置与会话 state 原文不变、零请求；切换匹配连接后按 base-model→session-model→global-model 各发送三次本地合成 HTTP，另一连接不变。两种模式均显示启动配置警告；两个非交互调用也在零网络、零配置改动下拒绝。退出均为 0，终端不含合成凭据。regular 首轮诊断探针误用贪婪 OSC 清除规则，吞掉窗口标题之后的输出；只修正探针解析，原始终端字节已包含诊断，重跑通过。
 - 最终五项静态 gate、43 项门禁脚本测试及 diff 检查通过；strict docs 的 120 项既有来源 advisory 保留。本批远端状态按新提交另行查询，不能用上一 Architecture Watch 的绿灯覆盖。
 - 本批关闭上述错误保存与恢复通知缺口。`/btw`、`/context`、模型浏览的目录发布一致性，主题历史优先级、其他资源策略及 Phase 19 十六批/七十六项整体交付继续；没有据本批窄范围验证宣布整个阶段完成。
+
+§8.82 CI 补充：4653b2283cc84b48c8882aac7c5528f1bb386683 的 CI 37485449059 失败，658 文件/6850 项通过、1 项跳过，唯一失败是 interactiveLoop 的两个部分夹具仍缺少必需 configDiagnostics；Architecture Watch 37485449167 成功。本批补齐夹具数组并纳入扩大组合，没有增加产品兜底或删除断言。原提交的失败状态保留，新提交另按实际 SHA 验证。
+
+### 8.83 CFG-01/05：命令与模型菜单共用已接受目录
+
+- 命令 host 传入完整的实际凭据 resolver 和一次性配置/目录读取接口。[侧问](../../packages/ts-shell/src/core/commands/btwCommandRuntime.ts)使用实际 CLI provider、key、模型及当次已接受输出限制；[上下文报告](../../packages/ts-shell/src/core/commands/contextCommandRuntime.ts)使用同一目录与模型预算覆盖，保留零预留，读取实际工具池并在异步等待后复查准入。当前工具 schema 标为字符估算，不再从上次 provider usage 中相减、编造历史指令与对话分项。
+- [模型命令](../../packages/ts-shell/src/core/commands/modelCommandRuntime.ts)、模型 picker 和补全共用发布目录；列表默认本地读取，移除命令内第二套远程获取。显式 refresh 复用既有目录 owner，先保存缓存再请求配置发布，分别显示保存、应用拒绝和应用成功；无效 provider 在刷新前拒绝。精确目录 ID 优先于兼容别名，保留自定义 ID 的大小写；合法但无目录项的 runtime provider 显示空列表。状态同时标示保存连接和实际请求目标。
+- 补全 identity 包含 publication revision，成功 reload 后旧异步结果及缓存失效；磁盘目录修改和失败 reload 不提前改变菜单。现有来源 watcher 的测试明确验证“来源变化后仍为旧目录，发布后才更新”，其他来源观察契约不变。兼容数据读取 API 保留，无会话 host 的调用继续读取本地目录。
+- 定向对照本地参考的显式 awaited refresh 与运行时模型快照读取，复用本项目 ConfigState 与目录刷新 owner，没有新增存储或第二执行路径。独立架构审查发现分开的 runtime/type-only 图门禁遗漏混合环；[prompt](../../packages/ts-shell/src/turn/prompt.ts)直接读取 projectState owner，保持相同 goal 语义与命令公开 API，消除 prompt 对命令实现的依赖。
+- 验证：Node 20.3 扩大组合 36 文件/474 项和构建通过。初轮 34 项失败属于旧部分 UI 夹具缺少 configuration publication，使用真实 ConfigState 的共享测试夹具补齐；没有修改生产读取契约。4 组有效反转覆盖菜单快照、侧问实际目标、零预留和补全 revision，隔离源码副本触发行为断言、逐字节及 SHA-256 恢复，恢复后 4 项通过。
+- 最终构建 CLI 在 regular/fullscreen 各完成三次侧问与一次非交互侧问，共 8 次本地合成 HTTP；服务端核验 CLI key 和实际模型，失败 reload 后继续 1024 输出限制，成功 reload 后改为 512，窗口及模型列表也只在成功后更新。本地服务收到零目录 GET，命令测试另验证默认列表零 fetch；全部退出为 0，终端无合成凭据。首轮探针错误期待未配置的 temperature 出现在请求，并把 fullscreen 的旧重绘文字当作新命令结果；修正为当前命令回显后同步及既有无 temperature 契约后通过，未据探针错误改产品。
+- 两条独立审查最终代码 APPROVE、架构 CLEAR。代码审查独立执行三项 provider 列表探针、原失败 UI 测试和 diff 检查；架构审查独立验证混合图零环及函数数量，组合套件/构建/PTY 来自主代理。五项静态 gate、43 项 gate 脚本测试和 diff 检查通过；NormProof 图与解析义务满足、阻断项为零，整体 partial 仍保留四项既有函数数量 advisory，strict docs 的 120 项既有来源 advisory 未在本批修复。
+- 此项关闭上述命令、模型 picker 和补全的目录消费缺口；状态栏 sessionFacts 与连接 picker 的目录读取仍独立，主题历史优先级、其他资源策略以及完整 Phase 19 十六批/七十六项继续。当前证据不覆盖外部 provider 服务或目录持久化 owner 的所有网络/存储边界。

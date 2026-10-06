@@ -1,3 +1,4 @@
+import { withConfiguration } from "../../../test-utils/configuration.js";
 import { afterEach, expect, it, vi } from "vitest";
 import { createCatalogLoader } from "./catalog.js";
 import { DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE as checkpoints } from "../../../context/compact/checkpoint/compactLiveCheckpoint.js";
@@ -12,7 +13,7 @@ afterEach(() => vi.restoreAllMocks());
 
 it("invalidates approved candidates on owner writes and checkpoint clearing without polling", async () => {
   const id = "completion-state-fixture"; const scope = `session:${id}`;
-  const context = { cwd: process.cwd(), session: { id }, runtimeConfig: {} } as ShellRuntimeContext;
+  const context = withConfiguration({ cwd: process.cwd(), session: { id }, runtimeConfig: {} } as ShellRuntimeContext);
   const load = createCatalogLoader(() => context, {} as CliMcpGateway, []);
   const changed = vi.fn(); const stop = load.observe("approved", undefined, changed)!;
   const candidate = createProjectMemoryCandidate({ candidateKind: "project-fact", retentionClass: "project-scoped-candidate", confidence: "high", source: "system-derived", summary: "Fixture", reason: "Fixture", evidence: [] });

@@ -84,6 +84,7 @@ export interface BuildCliCommandExecutionInput {
   /** How `/reload` re-reads the session's configuration. Absent off-session. */
   readonly runtimeConfig?: RuntimeConfig;
   readonly resolveConfigTarget?: CommandContext['resolveConfigTarget'];
+  readonly readConfiguration?: CommandContext['readConfiguration'];
   readonly admission?: CommandContext['admission'];
   readonly refreshRuntimeConfig?: CommandContext['refreshRuntimeConfig'];
   readonly getToolPool?: CommandContext["getToolPool"];
@@ -145,6 +146,7 @@ export async function buildCliCommandExecution(
     refreshRuntimeConfig: input.refreshRuntimeConfig,
     runtimeConfig: input.runtimeConfig,
     resolveConfigTarget: input.resolveConfigTarget,
+    readConfiguration: input.readConfiguration,
     admission: input.admission,
     getToolPool: input.getToolPool,
     compactCheckpointStore: input.compactCheckpointStore,

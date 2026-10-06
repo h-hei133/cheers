@@ -20,7 +20,7 @@ import { listWorkspaceFiles } from "../../../runtime/execution/fileWalk.js";
 
 export function catalogIdentity(context: ShellRuntimeContext, themePaths: readonly string[] = []): string {
   return JSON.stringify([context.cwd, context.projectRoot, context.session.id, context.skillOptions,
-    themePaths, context.runtimeConfig.enableMcpTools, context.runtimeConfig.allowedTools, context.runtimeConfig.disabledTools, context.runtimeConfig.hiddenToolPrefixes]);
+    themePaths, context.configuration.current.revision, context.runtimeConfig.enableMcpTools, context.runtimeConfig.allowedTools, context.runtimeConfig.disabledTools, context.runtimeConfig.hiddenToolPrefixes]);
 }
 
 /** Trust and directory-link changes can change which automatic roots are eligible. */
@@ -43,7 +43,7 @@ async function readCatalog(kind: CatalogKind, context: ShellRuntimeContext, gate
   themePaths: readonly string[], manager?: SessionCatalog, policy?: GrantCatalog, onSource?: (target: string) => void): Promise<readonly Suggestion[]> {
   if (kind === "mcp") return serverCatalog(context.cwd);
   if (kind === "connection") return connectionCatalog();
-  if (kind === "model" || kind === "provider") return modelCatalog(kind);
+  if (kind === "model" || kind === "provider") return modelCatalog(kind, context.configuration.current.catalog);
   if (kind === "workflow") return workflowCatalog(context.cwd);
   if (kind === "record" || kind === "invalidatable" || kind === "candidate" || kind === "approvable" || kind === "approved") return memoryCatalog(kind, context);
   if (kind === "grant") {

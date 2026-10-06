@@ -1,3 +1,4 @@
+import { withConfiguration } from "../../../test-utils/configuration.js";
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -24,7 +25,7 @@ function write(file: string, name: string) {
 }
 
 it("follows newly discovered nested groups, stops at manifests, and releases disabled sources", async () => {
-  const context = { cwd: path.join(root, "workspace"), session: { id: "fixture" }, runtimeConfig: {} } as ShellRuntimeContext;
+  const context = withConfiguration({ cwd: path.join(root, "workspace"), session: { id: "fixture" }, runtimeConfig: {} } as ShellRuntimeContext);
   const load = createCatalogLoader(() => context, {} as CliMcpGateway, []);
   const changed = vi.fn(); const stop = load.observe("skill", undefined, changed)!; stops.push(stop);
   const values = async () => (await load("skill", new AbortController().signal)).map(item => item.value);
@@ -52,7 +53,7 @@ it("follows newly discovered nested groups, stops at manifests, and releases dis
 
 it("observes an explicitly named file while discovery is disabled and preserves read-only bytes", async () => {
   const file = path.join(root, "named.md"); write(file, "named-first");
-  const context = { cwd: path.join(root, "workspace"), session: { id: "fixture" }, runtimeConfig: {}, skillOptions: { noSkills: true, skillPaths: [file] } } as ShellRuntimeContext;
+  const context = withConfiguration({ cwd: path.join(root, "workspace"), session: { id: "fixture" }, runtimeConfig: {}, skillOptions: { noSkills: true, skillPaths: [file] } } as ShellRuntimeContext);
   const load = createCatalogLoader(() => context, {} as CliMcpGateway, []);
   const changed = vi.fn(); stops.push(load.observe("skill", undefined, changed)!);
   await load("skill", new AbortController().signal);

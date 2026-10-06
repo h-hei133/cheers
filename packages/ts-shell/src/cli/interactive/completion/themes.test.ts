@@ -1,3 +1,4 @@
+import { withConfiguration } from "../../../test-utils/configuration.js";
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -26,7 +27,7 @@ it.each(["user", "project", "extra-file", "extra-directory"])("observes %s theme
     : source === "project" ? path.join(root, ".agents", "themes") : path.join(root, "custom");
   const file = path.join(directory, "fixture.json");
   const extraPaths = source === "extra-file" ? [file] : source === "extra-directory" ? [directory] : [];
-  const context = { cwd: path.join(root, "nested"), session: { id: "fixture" }, runtimeConfig: {} } as ShellRuntimeContext;
+  const context = withConfiguration({ cwd: path.join(root, "nested"), session: { id: "fixture" }, runtimeConfig: {} } as ShellRuntimeContext);
   const load = createCatalogLoader(() => context, {} as CliMcpGateway, extraPaths);
   const appearance = [currentTheme(), selectedTheme()];
   const changed = vi.fn(); const stop = load.observe("theme", undefined, changed);

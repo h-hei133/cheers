@@ -1,3 +1,4 @@
+import { withConfiguration } from "../../../test-utils/configuration.js";
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -19,7 +20,7 @@ afterEach(() => {
 it.each(["session", "entry", "tree", "thread"] as const)("refreshes %s from owner writes and releases its observers", async kind => {
   const manager = new SessionManager(); const session = manager.createNew(root);
   manager.addTurn(session.id, { role: "user", content: "First question" });
-  const context = { cwd: root, projectRoot: root, session, runtimeConfig: {} } as ShellRuntimeContext;
+  const context = withConfiguration({ cwd: root, projectRoot: root, session, runtimeConfig: {} } as ShellRuntimeContext);
   const load = createCatalogLoader(() => context, {} as CliMcpGateway, [], manager);
   const changed = vi.fn(); const stop = load.observe(kind, undefined, changed)!; stops.push(stop);
   const before = await load(kind, new AbortController().signal);
@@ -35,7 +36,7 @@ it.each(["session", "entry", "tree", "thread"] as const)("refreshes %s from owne
 
 it("observes new session directories then their metadata without rescanning on each key", async () => {
   const manager = new SessionManager(); const session = manager.createNew(root);
-  const context = { cwd: root, projectRoot: root, session, runtimeConfig: {} } as ShellRuntimeContext;
+  const context = withConfiguration({ cwd: root, projectRoot: root, session, runtimeConfig: {} } as ShellRuntimeContext);
   const load = createCatalogLoader(() => context, {} as CliMcpGateway, [], manager);
   const changed = vi.fn(); stops.push(load.observe("session", undefined, changed)!);
   expect(await load("session", new AbortController().signal)).toEqual([]);
@@ -57,7 +58,7 @@ it("invalidates transcript candidates when a current-directory copy shadows a le
   const legacy = path.join(root, ".cheer", "sessions");
   fs.mkdirSync(path.dirname(legacy)); fs.renameSync(current, legacy);
   const manager = new SessionManager();
-  const context = { cwd: root, projectRoot: root, session, runtimeConfig: {} } as ShellRuntimeContext;
+  const context = withConfiguration({ cwd: root, projectRoot: root, session, runtimeConfig: {} } as ShellRuntimeContext);
   const load = createCatalogLoader(() => context, {} as CliMcpGateway, [], manager);
   const changed = vi.fn(); stops.push(load.observe("entry", undefined, changed)!);
   const before = await load("entry", new AbortController().signal);

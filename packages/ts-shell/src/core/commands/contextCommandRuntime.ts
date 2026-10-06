@@ -2,7 +2,7 @@ import { rejectArguments } from "./syntax/empty.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import { loadCatalog } from "../models/catalogStore.js";
-import { resolveContextWindow } from "../models/window.js";
+import { resolveContextWindow, resolveTokenBudget } from "../models/window.js";
 import { resolveProviderCredential } from "../shell/providerCredentials.js";
 import { getSessionUsage, totalTokens } from "../../observability/usageTelemetry.js";
 import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS } from "../../session/context.js";
@@ -20,10 +20,9 @@ import { createCoreToolRegistry } from "../tools/registry.js";
  * whatever was left after subtracting the other two. Numbers like that cannot be
  * checked, and a context report exists to be checked.
  *
- * What can be measured is measured: the tool schemas are serialised and counted
- * exactly as they go on the wire, and the prompt total comes from what the
- * provider reported for the last request. What is left over is named as a
- * remainder rather than split into invented parts.
+ * Current tool definitions are an estimate from the active pool, while prompt
+ * usage belongs to the last request. They may describe different configurations,
+ * so the current estimate is never subtracted to invent a historical breakdown.
  */
 
 const BAR_WIDTH = 32;
@@ -40,20 +39,23 @@ export async function runContextCommand(
   // the same configuration the engine reads, rather than from an environment
   // variable nothing sets and a constant that happens to match today: a report
   // about a threshold is only useful if it names the threshold in force.
-  const runtimeConfig = context.runtimeConfig ?? getRuntimeConfig(context.projectRoot ?? context.cwd);
+  const publication = context.readConfiguration?.();
+  const runtimeConfig = publication?.config ?? context.runtimeConfig ?? getRuntimeConfig(context.projectRoot ?? context.cwd);
   // The same resolution the compaction engine performs, so the number reported
   // here is the number in force. Asking the credential resolver for the active
   // model is what makes this per-model rather than one global value.
-  const active = resolveProviderCredential({ runtimeConfig });
+  const active = context.resolveConfigTarget?.(runtimeConfig) ?? resolveProviderCredential({ runtimeConfig });
   const window = resolveContextWindow({
-    catalog: loadCatalog(),
+    catalog: publication?.catalog ?? loadCatalog(),
     provider: active.provider,
     model: active.model,
     configured: runtimeConfig.contextWindow,
   }).window;
-  const reserve = runtimeConfig.reserveTokens ?? DEFAULT_RESERVE_TOKENS;
-  const schemaTokens = toolSchemaTokens();
-  const registry = createCoreToolRegistry();
+  const reserve = resolveTokenBudget(runtimeConfig.modelTokenBudgets, active.provider, active.model, "reserveTokens", runtimeConfig.reserveTokens, DEFAULT_RESERVE_TOKENS);
+  const registry = context.getToolPool ? await context.getToolPool() : createCoreToolRegistry();
+  const blocked = context.admission?.();
+  if (blocked) return { kind: "local", output: blocked };
+  const schemaTokens = toolSchemaTokens(registry);
 
   if (!telemetry || telemetry.lastPromptTokens <= 0) {
     return {
@@ -62,7 +64,7 @@ export async function runContextCommand(
         "### Context window",
         "",
         `- Window: ${window.toLocaleString()} tokens`,
-        `- Tool schemas sent with every request: ~${schemaTokens.toLocaleString()} tokens (${registry.size} tools)`,
+        `- Current tool schema estimate: ~${schemaTokens.toLocaleString()} tokens (${registry.size} tools)`,
         "",
         "No request has been sent in this session yet, so there is nothing measured to report. Ask something and run this again.",
       ].join("\n"),
@@ -70,7 +72,6 @@ export async function runContextCommand(
   }
 
   const used = telemetry.lastPromptTokens;
-  const remainder = Math.max(0, used - schemaTokens);
   const free = Math.max(0, window - used - reserve);
   // The threshold the loop actually applies: the reserve is headroom kept for
   // the reply, so compaction starts when a request would spend past the window
@@ -87,8 +88,7 @@ export async function runContextCommand(
       "",
       "| What | Tokens | How it is known |",
       "| :--- | ---: | :--- |",
-      `| Tool schemas | ~${schemaTokens.toLocaleString()} | ${registry.size} tool definitions, serialised and counted |`,
-      `| Instructions and conversation | ~${remainder.toLocaleString()} | the rest of what the provider counted |`,
+      `| Current tool schemas | ~${schemaTokens.toLocaleString()} | ${registry.size} current definitions; character-based estimate |`,
       `| **Last request total** | **${used.toLocaleString()}** | reported by the provider |`,
       "",
       `Auto-compaction runs when a request would exceed about ${compactAt.toLocaleString()} tokens. \`/compact\` runs it now.`,
@@ -99,9 +99,9 @@ export async function runContextCommand(
   };
 }
 
-/** Tokens the tool definitions occupy, from the bytes actually sent. */
-function toolSchemaTokens(): number {
-  const serialised = JSON.stringify(toolSchemas(createCoreToolRegistry()));
+/** Character-based estimate for the current tool definitions. */
+function toolSchemaTokens(registry: Parameters<typeof toolSchemas>[0]): number {
+  const serialised = JSON.stringify(toolSchemas(registry));
   return Math.round(serialised.length / CHARS_PER_TOKEN);
 }
 

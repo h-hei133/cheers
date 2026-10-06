@@ -1,3 +1,4 @@
+import { withConfiguration } from "../../test-utils/configuration.js";
 import { completionEdit } from "./completion.js";
 import { describe, expect, it, vi } from "vitest";
 import { InteractiveMode } from "./interactiveMode.js";
@@ -25,13 +26,13 @@ function build(overrides: { observeEvents?: () => () => void; exit?: (code?: num
   const readline: { current: unknown } = { current: null };
   const terminal = new RecordingTerminal();
   const mode = new InteractiveMode({
-    runtimeContext: {
+    runtimeContext: withConfiguration({
       cwd: "/workspace",
       projectRoot: "/workspace",
       session: { id: "sess_1" },
       gitContext: { branch: "main" },
       runtimeConfig: { provider: "openai", providerCredentials: {}, contextWindow: 64_000, configDiagnostics: [] },
-    } as unknown as ShellRuntimeContext,
+    } as unknown as ShellRuntimeContext),
     sessionRuntime: {
       observeEvents: overrides.observeEvents ?? (() => () => {}),
       cancelCurrentRun: () => {},

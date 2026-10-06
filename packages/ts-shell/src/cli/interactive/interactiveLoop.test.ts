@@ -23,7 +23,7 @@ describe("interactive loop", () => {
         cwd: "/tmp/project-alpha",
         projectRoot: "/tmp/project-alpha",
         session: { id: "sess_1234567890abcdef" },
-        runtimeConfig: { provider: "openai", providerCredentials: {}, contextWindow: 64000 },
+        runtimeConfig: { provider: "openai", providerCredentials: {}, contextWindow: 64000, configDiagnostics: [] },
         gitContext: { branch: "main" },
       } as never,
       sessionRuntime: {
@@ -75,7 +75,7 @@ describe("interactive loop", () => {
         cwd: "/tmp/project-beta",
         projectRoot: "/tmp/project-beta",
         session: { id: "sess_abcdef0123456789" },
-        runtimeConfig: { provider: "openai", providerCredentials: {}, contextWindow: 64000 },
+        runtimeConfig: { provider: "openai", providerCredentials: {}, contextWindow: 64000, configDiagnostics: [] },
         gitContext: { branch: "main" },
       } as never,
       sessionRuntime: {

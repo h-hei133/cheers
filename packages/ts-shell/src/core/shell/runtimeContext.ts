@@ -1,7 +1,7 @@
 import { type ConfigState, type ConfigReloadResult } from '../../config/state.js';
 import { configurationBinding, initialConfiguration, refreshConfiguration } from './configuration.js';
 import type { RuntimeConfig, RuntimeConfigOverrides } from '../../config/runtimeConfig.js'
-import type { ConfigModelTarget } from '../../config/constraints.js';
+import type { ProviderCredentialResolution } from './providerCredentials.js';
 import type { Session, WorkspaceRootMode } from '../../session/SessionManager.js'
 import type { WorkflowGitContext } from '../../workflow/gitContext.js'
 import path from 'node:path'
@@ -47,7 +47,7 @@ export interface ShellRuntimeContext {
   readonly configuration: ConfigState
   /** Explicit launch flags must survive settings reloads and session switches. */
   readonly runtimeConfigOverrides?: RuntimeConfigOverrides
-  readonly resolveConfigTarget?: (config: RuntimeConfig) => ConfigModelTarget
+  readonly resolveConfigTarget?: (config: RuntimeConfig) => ProviderCredentialResolution
   /**
    * How this run was asked to load skills.
    *
@@ -101,7 +101,7 @@ export function createShellRuntimeContext(input: {
   rootBindingDiagnostics?: readonly RootBindingDiagnostic[]
   runtimeConfig: RuntimeConfig
   runtimeConfigOverrides?: RuntimeConfigOverrides
-  resolveConfigTarget?: (config: RuntimeConfig) => ConfigModelTarget
+  resolveConfigTarget?: (config: RuntimeConfig) => ProviderCredentialResolution
   skillOptions?: {
     readonly skillPaths?: readonly string[]
     readonly noSkills?: boolean

@@ -1,3 +1,4 @@
+import { withConfiguration } from "../../test-utils/configuration.js";
 import { selectTheme, updateAppearance } from "../../presentation/theme/selection.js";
 import { currentTheme } from "../../presentation/theme/theme.js";
 import { describe, expect, it, vi } from "vitest";
@@ -28,7 +29,7 @@ function boot(
   terminal.columns = 80;
   terminal.rows = 24;
   const scheduler = new ManualScheduler();
-  const runtimeContext = {
+  const runtimeContext = withConfiguration({
       cwd: "/workspace",
       projectRoot: "/workspace",
       session: { id: "sess_first_frame" },
@@ -41,7 +42,7 @@ function boot(
         agentMode: "build",
         tuiMode,
       },
-    } as unknown as ShellRuntimeContext;
+    } as unknown as ShellRuntimeContext);
   const mode = new InteractiveMode({
     terminal,
     scheduler,

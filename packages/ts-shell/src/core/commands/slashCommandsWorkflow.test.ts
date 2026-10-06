@@ -158,7 +158,7 @@ describe("Phase 5 High-Level Workflow Commands Subsystem", () => {
       expect(result.kind).toBe("local");
       expect(result.output).toContain("No request has been sent in this session yet");
       expect(result.output).toContain("64,000 tokens");
-      expect(result.output).toMatch(/Tool schemas sent with every request: ~\d/);
+      expect(result.output).toMatch(/Current tool schema estimate: ~\d/);
     });
   });
 

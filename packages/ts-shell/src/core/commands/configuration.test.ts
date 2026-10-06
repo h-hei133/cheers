@@ -1,0 +1,142 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { getRuntimeConfig, getUserRuntimeConfigPath, type RuntimeConfigFile } from '../../config/runtimeConfig.js';
+import { userCatalogPath } from '../models/catalogStore.js';
+import { createShellRuntimeContext, refreshShellRuntimeConfig } from '../shell/runtimeContext.js';
+import { configurationAdmission } from '../shell/configuration.js';
+import { resolveCliCredential } from '../../cli/provider/cliProviderRuntimeBridge.js';
+import { SessionManager } from '../../session/SessionManager.js';
+import { recordSessionUsage } from '../../observability/usageTelemetry.js';
+import * as transport from '../../provider/request/fetch.js';
+import * as refresh from '../models/catalogRefresh.js';
+import { runBtwCommand } from './btwCommandRuntime.js';
+import { runContextCommand } from './contextCommandRuntime.js';
+import { runModelCommand } from './modelCommandRuntime.js';
+import { modelPicker } from '../../cli/interactive/picker/model.js';
+import { createCatalogLoader, catalogIdentity } from '../../cli/interactive/completion/catalog.js';
+import { buildCliCommandExecution } from '../../entrypoints/cliCommandExecutionBridge.js';
+import type { StreamingRenderer } from '../../presentation/terminal/streaming.js';
+import type { CliMcpGateway } from '../../entrypoints/cliMcpModule.js';
+import type { CommandContext } from './types.js';
+
+let root: string;
+let file: string;
+let settings: RuntimeConfigFile;
+beforeEach(() => {
+  root = fs.mkdtempSync(path.join(os.tmpdir(), 'command-config-'));
+  vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root);
+  file = getUserRuntimeConfigPath(); fs.mkdirSync(path.dirname(file), { recursive: true });
+  const connection = { authType: 'api-key' as const, apiKey: 'saved-synthetic', createdAt: '2026-01-01', updatedAt: '2026-01-01' };
+  settings = { provider: 'openai', activeProviderConnectionId: 'main', maxOutputTokens: 1024, reserveTokens: 8000,
+    providerConnections: [{ ...connection, id: 'main', provider: 'openai', model: 'other' },
+      { ...connection, id: 'alternate', provider: 'google', model: 'chosen', baseUrl: 'https://chosen.invalid' }],
+    modelTokenBudgets: { 'google/chosen': { reserveTokens: 0 } } };
+  fs.writeFileSync(file, JSON.stringify(settings));
+  catalog();
+});
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
+
+function catalog(extra = 'accepted-only', window = 16000) {
+  fs.writeFileSync(userCatalogPath(), JSON.stringify({ providers: {
+    google: { endpoint: 'openai-compatible', models: [
+      { id: 'chosen', contextWindow: window, maxTokens: 2048, compat: { supportsTemperature: false } }, { id: extra },
+    ] },
+  } }));
+}
+function fixture() {
+  const shell = createShellRuntimeContext({ cwd: root, originalCwd: root, projectRoot: root, targetPathBase: root,
+    rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+    session: new SessionManager().createNew(root), runtimeConfig: getRuntimeConfig(root),
+    resolveConfigTarget: config => resolveCliCredential(config, { provider: 'google', apiKey: 'cli-synthetic' }, {}) });
+  const context: CommandContext = { cwd: root, projectRoot: root, sessionId: shell.session.id,
+    runtimeConfig: shell.runtimeConfig, readConfiguration: () => shell.configuration.current,
+    resolveConfigTarget: shell.resolveConfigTarget, admission: configurationAdmission(shell),
+    refreshRuntimeConfig: () => refreshShellRuntimeConfig(shell), getToolPool: async () => new Map() };
+  return { shell, context };
+}
+
+it('keeps menus, completion, and context on the accepted catalogue until successful reload', async () => {
+  const { shell, context } = fixture();
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('no implicit network'));
+  const loader = createCatalogLoader(() => shell, {} as CliMcpGateway, []);
+  const identity = catalogIdentity(shell);
+  catalog('pending-only', 24000);
+  recordSessionUsage(shell.session.id, { promptTokens: 1000, completionTokens: 10, provider: 'google', model: 'chosen' });
+  const report = await runContextCommand([], context);
+  expect(report.output).toContain('of 16,000 tokens');
+  expect(report.output).toContain('15,000 free before the 0-token reserve');
+  expect(report.output).toContain('0 current definitions');
+  expect(report.output).not.toContain('Instructions and conversation');
+  for (const args of [[], ['list'], ['list', 'google']]) {
+    const result = await runModelCommand(args, context);
+    expect(result.output).toContain('accepted-only'); expect(result.output).not.toContain('pending-only');
+  }
+  expect((await modelPicker(context).load()).find(row => row.id === 'google/chosen')?.note).toBe('active');
+  expect((await loader('model', new AbortController().signal)).map(row => row.value)).toContain('google/accepted-only');
+  expect(fetch).not.toHaveBeenCalled();
+  fs.writeFileSync(file, JSON.stringify({ ...settings, maxOutputTokens: 3000 }));
+  expect(refreshShellRuntimeConfig(shell).status).toBe('rejected');
+  expect((await runModelCommand(['list'], context)).output).toContain('accepted-only');
+  fs.writeFileSync(file, JSON.stringify(settings));
+  expect(refreshShellRuntimeConfig(shell).status).toBe('applied');
+  expect(catalogIdentity(shell)).not.toBe(identity);
+  expect((await runModelCommand(['list'], context)).output).toContain('pending-only');
+  expect((await loader('model', new AbortController().signal)).map(row => row.value)).toContain('google/pending-only');
+  expect((await runContextCommand([], context)).output).toContain('of 24,000 tokens');
+});
+
+it('uses the host credential and one accepted configuration for a side question through the command bridge', async () => {
+  const { shell, context } = fixture();
+  const sent: Array<{ url: string; init?: RequestInit }> = [];
+  vi.spyOn(transport, 'providerFetchForEndpoint').mockImplementation(() => (async (url, init) => {
+    sent.push({ url: String(url), init });
+    fs.writeFileSync(file, JSON.stringify({ ...settings, maxOutputTokens: 512 }));
+    catalog('next-only', 24000);
+    expect(refreshShellRuntimeConfig(shell).status).toBe('applied');
+    return Response.json({ choices: [{ message: { content: 'side answer' }, finish_reason: 'stop' }] });
+  }) as typeof fetch);
+  const lines: string[] = [];
+  await buildCliCommandExecution({ ...context, prompt: '/btw question', interactive: true, printMode: false,
+    renderer: { renderLine: line => lines.push(line) } as StreamingRenderer });
+  expect(lines.join(' ')).toContain('side answer');
+  expect(sent[0].url).toBe('https://chosen.invalid/chat/completions');
+  expect(new Headers(sent[0].init?.headers).get('authorization')).toBe('Bearer cli-synthetic');
+  expect(JSON.parse(String(sent[0].init?.body))).toMatchObject({ model: 'chosen', max_tokens: 1024 });
+  expect(JSON.parse(String(sent[0].init?.body))).not.toHaveProperty('temperature');
+  await runBtwCommand(['next'], context);
+  expect(JSON.parse(String(sent[1].init?.body))).toMatchObject({ model: 'chosen', max_tokens: 512 });
+  expect(lines.join(' ')).not.toMatch(/cli-synthetic|saved-synthetic/);
+});
+
+it('publishes an explicit catalogue refresh and retains accepted values when publication fails', async () => {
+  const { shell, context } = fixture();
+  const refreshSpy = vi.spyOn(refresh, 'refreshCatalog').mockImplementation(async () => {
+    catalog('refreshed-only', 24000);
+    return { ok: true, providers: 1, models: 2, cachePath: 'synthetic-cache' };
+  });
+  expect((await runModelCommand(['list', 'does-not-exist', '--refresh'], context)).output).toContain('Unknown provider');
+  expect(refreshSpy).not.toHaveBeenCalled();
+  fs.writeFileSync(file, JSON.stringify({ ...settings, maxOutputTokens: 3000 }));
+  const failed = await runModelCommand(['list', 'google', '--refresh'], context);
+  expect(failed.output).toContain('Configuration was not applied (rejected)');
+  expect(failed.output).toContain('accepted-only'); expect(failed.output).not.toContain('- refreshed-only');
+  fs.writeFileSync(file, JSON.stringify(settings));
+  const applied = await runModelCommand(['list', 'google', '--refresh'], context);
+  expect(applied.output).toContain('Catalogue applied for the next operation.');
+  expect(applied.output).toContain('- refreshed-only');
+  expect(shell.configuration.current.catalog.find(provider => provider.id === 'google')?.models.some(model => model.id === 'refreshed-only')).toBe(true);
+});
+
+it('accepts exact provider ids from completion before compatibility aliases without implicit network', async () => {
+  const stored = JSON.parse(fs.readFileSync(userCatalogPath(), 'utf8'));
+  stored.providers.MixedCase = { label: 'Custom', runtime: 'openai-compatible', models: [{ id: 'custom-model' }] };
+  fs.writeFileSync(userCatalogPath(), JSON.stringify(stored));
+  const { context } = fixture();
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('no implicit network'));
+  expect((await runModelCommand(['list', 'siliconflow'], context)).output).toContain('Models for provider=siliconflow');
+  expect((await runModelCommand(['list', 'MixedCase'], context)).output).toContain('- custom-model');
+  expect((await runModelCommand(['list', 'openai-compatible'], context)).output).toContain('No models listed for this provider.');
+  expect(fetch).not.toHaveBeenCalled();
+});

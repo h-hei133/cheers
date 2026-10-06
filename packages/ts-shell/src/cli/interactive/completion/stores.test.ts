@@ -1,3 +1,4 @@
+import { withConfiguration } from "../../../test-utils/configuration.js";
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -17,7 +18,7 @@ it.each(["grant", "record", "invalidatable"] as const)("observes %s at its owner
   const cwd = path.join(root, "different-workspace"); fs.mkdirSync(cwd);
   const policy = new ApprovalTrustPolicy(path.join(root, "custom-policy", "grants.json"));
   const file = kind === "grant" ? policy.sourcePath : memoryCatalogStore(projectRoot).ref.recordsFile!;
-  const context = { cwd, projectRoot, session: { id: "fixture" }, runtimeConfig: {} } as ShellRuntimeContext;
+  const context = withConfiguration({ cwd, projectRoot, session: { id: "fixture" }, runtimeConfig: {} } as ShellRuntimeContext);
   const load = createCatalogLoader(() => context, {} as CliMcpGateway, [], undefined, policy);
   const changed = vi.fn(); const stop = load.observe(kind, undefined, changed);
   if (stop) stops.push(stop);

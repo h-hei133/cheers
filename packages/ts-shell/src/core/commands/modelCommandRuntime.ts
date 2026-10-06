@@ -2,7 +2,7 @@ import { parseEffortFlag } from "./model/preference.js";
 import { setModel } from "./model/selection.js";
 import {
   RUNTIME_PROVIDERS,
-  readUserRuntimeConfigFile,
+  getRuntimeConfig,
   type ProviderConnectionConfig,
   type RuntimeConfig,
   type RuntimeProvider,
@@ -14,9 +14,10 @@ import { projectSessionModel } from "../../session/model/projection.js";
 import { loadCatalog, ensureUserCatalog, userCatalogPath } from "../models/catalogStore.js";
 import { refreshCatalog } from "../models/catalogRefresh.js";
 import { renderCatalog } from "../models/catalogSurface.js";
+import { resolveProviderCredential } from "../shell/providerCredentials.js";
+import { configurationApplicationNotice } from "./configuration.js";
 import { needsUserEndpoint, providerFacts } from "../providers/facts.js";
 
-const MODELS_DEV_API_URL = "https://models.dev/api.json";
 
 /**
  * The models an OpenAI account connection can use.
@@ -29,17 +30,6 @@ const MODELS_DEV_API_URL = "https://models.dev/api.json";
 function accountAuthModelFacts(): { readonly allowed: readonly string[]; readonly defaultModel?: string } {
   const facts = providerFacts("openai");
   return { allowed: facts.accountAuthAllowedModels ?? [], defaultModel: facts.accountAuthDefaultModel };
-}
-
-interface ModelsDevModelInfo {
-  readonly id?: string;
-  readonly name?: string;
-}
-
-interface ModelsDevProviderInfo {
-  readonly id?: string;
-  readonly name?: string;
-  readonly models?: Record<string, ModelsDevModelInfo>;
 }
 
 export async function runModelCommand(
@@ -57,14 +47,9 @@ export async function runModelCommand(
     return { kind: "local", output: renderModelStatus(context) };
   }
   if (action === "refresh") {
-    const result = await refreshCatalog();
-    return {
-      kind: "local",
-      output: result.ok
-        ? `Catalogue refreshed: ${result.providers} providers, ${result.models} models, cached in \`${result.cachePath}\`. Your own entries in \`${userCatalogPath()}\` still win.`
-        : `Catalogue refresh failed (${result.error}). The shipped catalogue is unchanged and still complete.`,
-    };
+    return { kind: "local", output: await refreshModels(context) };
   }
+
   if (action === "config") {
     const path = ensureUserCatalog();
     return {
@@ -100,25 +85,26 @@ export async function runModelCommand(
  * models together — the old bare form answered "what am I using", which is
  * `/model status`.
  */
+function modelConfiguration(context: CommandContext) {
+  const publication = context.readConfiguration?.();
+  const config = publication?.config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
+  return { config, catalog: publication?.catalog ?? loadCatalog(),
+    active: context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config }) };
+}
+
 function renderCatalogView(context: CommandContext): string {
-  const config = context.runtimeConfig ?? projectSessionModel(readUserRuntimeConfigFile(), context.sessionId);
-  const connections = normalizeConnections(config);
-  const activeId = config.activeProviderConnectionId?.trim();
-  const active = connections.find((item) => item.id === activeId);
-  const activeProvider = active?.provider ?? config.provider;
+  const { config, catalog, active } = modelConfiguration(context);
   return renderCatalog({
-    providers: loadCatalog(),
-    connected: new Set(connections.map((connection) => connection.provider)),
-    activeProvider,
-    activeModel:
-      normalizeText(active?.model) ??
-      normalizeText(activeProvider ? config.providerCredentials?.[activeProvider]?.model : undefined),
+    providers: catalog,
+    connected: new Set(normalizeConnections(config).map(connection => connection.provider)),
+    activeProvider: active.provider,
+    activeModel: active.model,
     configPath: userCatalogPath(),
   });
 }
 
 function renderModelStatus(context: CommandContext): string {
-  const config = context.runtimeConfig ?? projectSessionModel(readUserRuntimeConfigFile(), context.sessionId);
+  const { config, active: request } = modelConfiguration(context);
   const connections = normalizeConnections(config);
   const activeId = config.activeProviderConnectionId?.trim();
   const activeConnection = connections.find((item) => item.id === activeId);
@@ -137,6 +123,8 @@ function renderModelStatus(context: CommandContext): string {
     `Auth type: ${authType}`,
     `Active connection: ${activeId ?? "none"}`,
     `Model: ${model ?? "unset"}`,
+    `Request provider: ${request.provider}`,
+    `Request model: ${request.model ?? "unset"}`,
     "",
     ...renderProviderReadinessLines({
       activeConnectionId: activeId,
@@ -228,107 +216,61 @@ export interface ModelCatalog {
   readonly provider: RuntimeProvider;
   readonly models: readonly string[];
   readonly active?: string;
-  /** True when the catalog came from a local fallback rather than the registry. */
+  /** The list is read locally; network refresh is always an explicit separate action. */
   readonly offline: boolean;
 }
 
 /**
  * The model catalog as data, for callers that present a chooser rather than
- * text. Shares the provider, auth, and fallback resolution with `/model list` so
+ * text. Shares the local catalogue and explicit refresh owner with `/model list` so
  * the two can never offer different models.
  */
 export async function readModelCatalog(refresh = false, sessionId?: string, runtimeConfig?: RuntimeConfig): Promise<ModelCatalog> {
-  const config = runtimeConfig ?? projectSessionModel(readUserRuntimeConfigFile(), sessionId);
-  const connections = normalizeConnections(config);
-  const activeId = config.activeProviderConnectionId?.trim();
-  const activeConnection = connections.find((item) => item.id === activeId);
-  const provider = activeConnection?.provider ?? config.provider ?? "openai";
-  const authType = activeConnection?.authType;
-  const active =
-    normalizeText(activeConnection?.model) ??
-    normalizeText(config.providerCredentials?.[provider]?.model);
+  const context = { cwd: process.cwd(), sessionId, runtimeConfig };
+  if (refresh) await refreshModels(context);
+  const { catalog, active } = modelConfiguration(context);
+  const allowed = active.credential?.authMode === 'account-auth' ? providerFacts(active.provider).accountAuthAllowedModels : undefined;
+  return { provider: active.provider, models: allowed ?? catalog.find(entry => entry.id === active.provider)?.models.map(model => model.id) ?? [],
+    active: active.model, offline: true };
+}
 
-  if (provider === "openai" && authType === "account-auth") {
-    return { provider, models: accountAuthModelFacts().allowed, active, offline: false };
-  }
-  const fromApi = await fetchModelsFromModelsDev(provider, refresh);
-  if (fromApi.length > 0) return { provider, models: fromApi, active, offline: false };
-  return { provider, models: fallbackModelsForProvider(provider, authType), active, offline: true };
+async function refreshModels(context: CommandContext): Promise<string> {
+  const blocked = context.admission?.();
+  if (blocked) return `Catalogue refresh blocked: ${blocked}`;
+  const result = await refreshCatalog();
+  if (!result.ok) return `Catalogue refresh failed (${result.error}). The accepted catalogue is unchanged.`;
+  const changed = context.admission?.();
+  const notice = changed ? `Catalogue saved but not applied: ${changed}` : configurationApplicationNotice(context);
+  return [
+    `Catalogue refreshed: ${result.providers} providers, ${result.models} models, cached in \`${result.cachePath}\`. Your own entries in \`${userCatalogPath()}\` still win.`,
+    notice ?? (context.refreshRuntimeConfig ? 'Catalogue applied for the next operation.' : 'Catalogue saved for the next load.'),
+  ].join('\n');
 }
 
 async function listModels(args: string[], refresh: boolean, context: CommandContext): Promise<string> {
-  const providerHint = normalizeProvider(args[0]);
-  if (args[0] && !providerHint) return "Unknown provider. Use /model to inspect the catalogue.";
-  const config = context.runtimeConfig ?? projectSessionModel(readUserRuntimeConfigFile(), context.sessionId);
-  const connections = normalizeConnections(config);
-  const activeId = config.activeProviderConnectionId?.trim();
-  const activeConnection = connections.find((item) => item.id === activeId);
-  const provider = providerHint ?? activeConnection?.provider ?? config.provider ?? "openai";
-  const authType = activeConnection?.authType;
-  const activeModel =
-    normalizeText(activeConnection?.model) ??
-    normalizeText(config.providerCredentials?.[provider]?.model);
+  let snapshot = modelConfiguration(context);
+  const hint = args[0]?.trim();
+  const requested = hint ? (snapshot.catalog.some(entry => entry.id === hint) ? hint : normalizeProvider(hint) ?? hint) : undefined;
+  if (requested && !snapshot.catalog.some(entry => entry.id === requested) && !RUNTIME_PROVIDERS.some(id => id === requested)) return 'Unknown provider. Use /model to inspect the catalogue.';
+  const notice = refresh ? await refreshModels(context) : undefined;
+  if (refresh) snapshot = modelConfiguration(context);
+  const { catalog, active } = snapshot;
+  const provider = requested ?? active.provider;
+  const entry = catalog.find(item => item.id === provider);
 
-  if (provider === "openai" && authType === "account-auth") {
-    return renderOpenAIAccountAuthModelList(activeModel);
+  const activeModel = provider === active.provider ? active.model : undefined;
+  if (provider === 'openai' && active.provider === provider && active.credential?.authMode === 'account-auth') {
+    return [notice, renderOpenAIAccountAuthModelList(activeModel)].filter(Boolean).join('\n');
   }
-
-  const modelsFromApi = await fetchModelsFromModelsDev(provider, refresh);
-  if (modelsFromApi.length === 0) {
-    const fallback = fallbackModelsForProvider(provider, authType);
-    return [
-      `Models for provider=${provider}`,
-      "(models.dev unavailable, fallback list)",
-      ...fallback.map((model) =>
-        model === activeModel ? `* ${model} (active)` : `- ${model}`,
-      ),
-      "",
-      "Use /model use <model-id> to switch active model.",
-    ].join("\n");
-  }
-
   return [
+    notice,
     `Models for provider=${provider}`,
-    "Source: models.dev/api.json (OpenAI-compatible provider catalog)",
-    ...modelsFromApi.map((model) =>
-      model === activeModel ? `* ${model} (active)` : `- ${model}`,
-    ),
-    "",
-    "Use /model use <model-id> to switch active model.",
-  ].join("\n");
-}
-
-
-async function fetchModelsFromModelsDev(
-  provider: RuntimeProvider,
-  forceRefresh: boolean,
-): Promise<string[]> {
-  const url = forceRefresh
-    ? `${MODELS_DEV_API_URL}?t=${Date.now()}`
-    : MODELS_DEV_API_URL;
-  try {
-    const response = await fetch(url, {
-      headers: { "User-Agent": "cheers/ts-shell" },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!response.ok) {
-      return [];
-    }
-    const payload = (await response.json()) as Record<
-      string,
-      ModelsDevProviderInfo
-    >;
-    const providerKey = needsUserEndpoint(provider)
-      ? "openai"
-      : provider;
-    const providerInfo = payload[providerKey];
-    if (!providerInfo?.models) {
-      return [];
-    }
-    return Object.keys(providerInfo.models).sort((a, b) => a.localeCompare(b));
-  } catch {
-    return [];
-  }
+    context.readConfiguration ? 'Source: accepted session catalogue' : 'Source: local catalogue (shipped, refreshed, then user entries)',
+    ...(entry?.models ?? []).map(model => model.id === activeModel ? `* ${model.id} (active)` : `- ${model.id}`),
+    entry?.models.length ? undefined : 'No models listed for this provider.',
+    '',
+    'Use /model use <model-id> to switch active model.',
+  ].filter(line => line !== undefined).join('\n');
 }
 
 function renderOpenAIAccountAuthModelList(activeModel?: string): string {
@@ -343,20 +285,6 @@ function renderOpenAIAccountAuthModelList(activeModel?: string): string {
   ].join("\n");
 }
 
-function fallbackModelsForProvider(
-  provider: RuntimeProvider,
-  authType?: ProviderConnectionConfig["authType"],
-): readonly string[] {
-  // The only case that is not simply the provider's declared list: an account
-  // login reaches a fixed set the service publishes, which is narrower than what
-  // the API offers. Read from this provider's own declaration — asking a fixed
-  // provider here would answer Google's login with OpenAI's models.
-  const facts = providerFacts(provider);
-  if (authType === "account-auth" && facts.accountAuthAllowedModels) {
-    return facts.accountAuthAllowedModels;
-  }
-  return facts.fallbackModels;
-}
 
 function normalizeProvider(input?: string): RuntimeProvider | undefined {
   const value = input?.trim().toLowerCase();

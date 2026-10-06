@@ -47,10 +47,11 @@ export async function runBtwCommand(
 
   const blocked = context.admission?.();
   if (blocked) return { kind: "local", output: blocked };
-  const runtimeConfig = context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
-  const resolution = resolveProviderCredential({ runtimeConfig });
+  const publication = context.readConfiguration?.();
+  const runtimeConfig = publication?.config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
+  const resolution = context.resolveConfigTarget?.(runtimeConfig) ?? resolveProviderCredential({ runtimeConfig });
   const credential = resolution.credential;
-  const catalog = loadCatalog();
+  const catalog = publication?.catalog ?? loadCatalog();
   const endpoint = providerEndpoint(catalog, resolution.provider);
 
   let answer = "";
@@ -82,6 +83,7 @@ export async function runBtwCommand(
             { role: "system", content: SIDE_QUESTION_SYSTEM_PROMPT },
             { role: "user", content: question },
           ],
+          maxOutputTokens: runtimeConfig.maxOutputTokens ?? shape.maxOutputCeiling,
           supportsTemperature: shape.supportsTemperature,
           signal: controller.signal,
           onFailure: (classification) => { failure = classification; },

@@ -6286,3 +6286,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 
 
 ## [2026-10-06] fix | Phase 19 CFG-05 将实际请求 provider 接入模型命令，目标不匹配时在 hook/保存前拒绝并于提交前重验；连接匹配后会话及显式全局更新正常。修复上一 CI 暴露的配置警告覆盖 resume 通知，诊断与生命周期分别展示。201 项组合、原 resume 回归、5 组有效反转及 Node 20.3 构建通过；独立代码 APPROVE、架构 CLEAR，详见 features/phase-19-decisions.md §8.82。完整阶段目标继续。
+
+## [2026-10-06] fix | Phase 19 CFG-01/05 命令、模型 picker 与补全共用已接受目录，侧问使用实际 CLI 凭据，context 使用模型预留和实际工具池；移除模型列表重复远程读取，刷新区分缓存保存与配置应用。修复前批 CI 遗留的 interactiveLoop 部分夹具及架构复审发现的混合依赖环。474 项组合、4 组有效反转、Node 20.3 构建、两模式共 8 次本地 HTTP、静态门禁通过；独立代码 APPROVE、架构 CLEAR，详见 features/phase-19-decisions.md §8.83。状态栏、连接 picker 与完整阶段目标继续。

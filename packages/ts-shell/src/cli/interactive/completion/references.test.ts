@@ -1,3 +1,4 @@
+import { withConfiguration } from "../../../test-utils/configuration.js";
 import { afterEach, expect, it, vi } from "vitest";
 import { CatalogController } from "./controller.js";
 import { catalogIdentity, createCatalogLoader } from "./catalog.js";
@@ -11,7 +12,7 @@ afterEach(() => { vi.useRealTimers(); vi.resetAllMocks(); });
 
 function harness() {
   vi.useFakeTimers();
-  let context = { cwd: "/workspace/subdir", projectRoot: "/workspace", session: { id: "one" }, runtimeConfig: {} } as ShellRuntimeContext;
+  let context = withConfiguration({ cwd: "/workspace/subdir", projectRoot: "/workspace", session: { id: "one" }, runtimeConfig: {} } as ShellRuntimeContext);
   let draft = { text: "look at @mo", cursor: 11, revision: 1 };
   const pending: Array<(files: readonly string[]) => void> = [];
   vi.mocked(listWorkspaceFiles).mockImplementation(() => new Promise(resolve => pending.push(resolve)));

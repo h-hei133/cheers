@@ -1,7 +1,8 @@
 import { projectSessionModel } from "../../../session/model/projection.js";
 import { runModelCommand } from "../../../core/commands/modelCommandRuntime.js";
-import { readUserRuntimeConfigFile } from "../../../config/runtimeConfig.js";
+import { getRuntimeConfig } from "../../../config/runtimeConfig.js";
 import { normalizeConnections } from "../../../core/commands/connect/preset.js";
+import { resolveProviderCredential } from "../../../core/shell/providerCredentials.js";
 import { loadCatalog } from "../../../core/models/catalogStore.js";
 import { summariseProvider } from "../../../core/models/catalogSurface.js";
 import type { CommandContext } from "../../../core/commands/types.js";
@@ -25,15 +26,15 @@ export function modelPicker(context: CommandContext): Picker {
     form: "panel",
     empty: "No providers in the catalogue.",
     async load(): Promise<readonly Option[]> {
-      const config = context.runtimeConfig ?? projectSessionModel(readUserRuntimeConfigFile(), context.sessionId);
+      const publication = context.readConfiguration?.();
+      const config = publication?.config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
       const connections = normalizeConnections(config);
       const connected = new Set<string>(connections.map((connection) => connection.provider));
-      const activeId = config.activeProviderConnectionId?.trim();
-      const active = connections.find((connection) => connection.id === activeId);
-      const activeModel = active?.model?.trim();
+      const active = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
+      const activeModel = active.model;
 
       const rows: Option[] = [];
-      for (const provider of ordered(loadCatalog(), connected)) {
+      for (const provider of ordered(publication?.catalog ?? loadCatalog(), connected)) {
         const ready = connected.has(provider.id);
         if (provider.models.length === 0) {
           rows.push({

@@ -276,6 +276,7 @@ export async function runNonInteractivePrompt(options: {
     // the same thing there rather than reporting that it cannot help.
     runtimeConfig: options.runtimeContext.runtimeConfig,
     resolveConfigTarget: options.runtimeContext.resolveConfigTarget,
+    readConfiguration: () => options.runtimeContext.configuration.current,
     admission: configurationAdmission(options.runtimeContext),
     refreshRuntimeConfig: () => {
       return refreshShellRuntimeConfig(options.runtimeContext);

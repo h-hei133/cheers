@@ -1,6 +1,6 @@
 import type { MultimodalContentBlock } from "../model-adapters/multimodal.js";
 import type { PermissionScope } from "../cli/approval/permissionScope.js";
-import { getActiveSessionGoal } from "../core/commands/goalCommandRuntime.js";
+import { readProjectState } from "../core/state/projectState.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
 
 /**
@@ -108,7 +108,7 @@ export function buildSystemPrompt(
  * that is already done.
  */
 export function environmentLine(workspaceRoot: string, permissionScope?: PermissionScope): string {
-  const goal = getActiveSessionGoal(workspaceRoot);
+  const goal = readProjectState(workspaceRoot).goal ?? null;
   const objective = goal?.phase === "active" ? ` | active_goal=${goal.objective}` : "";
   const perm = permissionScope ? ` | permission_scope=${permissionScope}` : "";
   return `[Environment Context: cwd=${workspaceRoot}${perm}${objective}]`;

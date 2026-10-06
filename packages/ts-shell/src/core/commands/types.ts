@@ -21,6 +21,8 @@ import type { BrowserSkillRuntimeBinding } from '../../browser/skill/runtime/bin
 import type { BrowserActionCache } from '../../browser/actionCache.js'
 import type { BrowserReceiptCacheStore } from '../../browser/receipt/store.js'
 import type { BrowserPublicReadOnlyWebSmokeConfig } from '../../browser/smoke/config.js'
+import type { CatalogProvider } from "../models/catalog.js"
+import type { ProviderCredentialResolution } from "../shell/providerCredentials.js"
 import type { RuntimeConfig } from "../../config/runtimeConfig.js"
 import type { ToolDefinition } from "../../tools/types.js"
 import type { SidebarEventSink } from '../../presentation/sidebar/sidebarEventSink.js'
@@ -103,7 +105,9 @@ export interface CommandContext {
    */
   readonly runtimeConfig?: RuntimeConfig
   /** Resolve the request provider using the host's explicit selection inputs. */
-  readonly resolveConfigTarget?: (config: RuntimeConfig) => { readonly provider: string }
+  readonly resolveConfigTarget?: (config: RuntimeConfig) => ProviderCredentialResolution
+  /** Read the configuration and catalogue from one accepted publication. */
+  readonly readConfiguration?: () => { readonly config: RuntimeConfig; readonly catalog: readonly CatalogProvider[] }
   readonly admission?: () => string | undefined
   readonly refreshRuntimeConfig?: () => import('../../config/application.js').ConfigReloadResult
 }
