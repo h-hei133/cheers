@@ -1,6 +1,7 @@
 import { memorySyntax } from "../../memory/commands/syntax.js";
 import { parseSyntax } from "./syntax/parse.js";
 import { syntaxHelp } from "./syntax/projection.js";
+import { textSyntax, parseTextArgs } from "./syntax/text.js";
 import {
   getLatestCompactCheckpoint,
   DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE,
@@ -44,6 +45,9 @@ import {
 } from "../memory/memoryTools.js";
 import type { MemoryCategory } from "../memory/types.js";
 
+export const recallSyntax = textSyntax("recall", "query", true);
+export const retainSyntax = textSyntax("retain", "statement", true);
+
 /**
  * /memory command
  * Unified memory engine:
@@ -59,23 +63,13 @@ export async function runMemoryCommand(
   const sub = args[0]?.toLowerCase();
 
   // Named invocations retain their independent free-text payload.
-  if (rawCmd === "recall") {
-    const query = args.join(" ").trim();
-    if (!query) {
-      return { kind: "local", output: "Usage: `/recall <query>`\nExample: `/recall NormProof rules`" };
-    }
-    const output = await executeMemoryRecall({ query });
-    return { kind: "local", output };
-  }
-
-  if (rawCmd === "retain") {
-    const statement = args.join(" ").trim();
-    if (!statement) {
-      return { kind: "local", output: "Usage: `/retain <statement>`\nExample: `/retain Project uses Vitest`" };
-    }
-    const output = await executeMemoryRetain({
-      items: [{ statement }],
-    });
+  if (rawCmd === "recall" || rawCmd === "retain") {
+    const syntax = rawCmd === "recall" ? recallSyntax : retainSyntax;
+    const parsed = parseTextArgs(syntax, args, context.rawCommandArgs);
+    if (!parsed.ok) return { kind: "local", output: `${parsed.reason}\n${syntaxHelp(syntax)}` };
+    const output = rawCmd === "recall"
+      ? await executeMemoryRecall({ query: parsed.text })
+      : await executeMemoryRetain({ items: [{ statement: parsed.text }] });
     return { kind: "local", output };
   }
 

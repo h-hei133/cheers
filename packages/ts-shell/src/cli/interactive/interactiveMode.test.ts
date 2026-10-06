@@ -54,27 +54,27 @@ function build(overrides: { observeEvents?: () => () => void; exit?: (code?: num
 }
 
 describe("session wiring", () => {
-  it("keeps prose usage informational and submits the literal body once", () => {
+  it.each([["cp", "[text]"], ["recall", "<query>"], ["retain", "<statement>"]])("keeps /%s usage informational and submits the literal body once", (name, hint) => {
     const { mode, terminal } = build();
     const host = mode as unknown as { view: InteractiveView; onSubmit(text: string): void };
     const submit = vi.spyOn(host, "onSubmit").mockImplementation(() => {});
     mode.start();
     try {
-      terminal.input("/cp ");
+      terminal.input(`/${name} `);
       expect(host.view.suggestionsOpen).toBe(false);
-      expect(stripAnsi(host.view.renderFrame({ columns: 100, rows: 24 }).rows.join("\n"))).toContain("Usage: /cp [text]");
+      expect(stripAnsi(host.view.renderFrame({ columns: 100, rows: 24 }).rows.join("\n"))).toContain(`Usage: /${name} ${hint}`);
       terminal.input("\t");
       expect(submit).not.toHaveBeenCalled();
-      expect(host.view.editor.getText()).toBe("/cp ");
+      expect(host.view.editor.getText()).toBe(`/${name} `);
       const body = "  a  'quote'\\path\n\t中文  ";
       terminal.input(`\x1b[200~${body}\x1b[201~`);
       terminal.input("\r");
       expect(submit).toHaveBeenCalledOnce();
-      expect(submit.mock.calls[0]?.[0]).toBe("/cp " + body);
+      expect(submit.mock.calls[0]?.[0]).toBe(`/${name} ` + body);
       terminal.input("/btw ");
       const next = stripAnsi(host.view.renderFrame({ columns: 100, rows: 24 }).rows.join("\n"));
       expect(next).toContain("Usage: /btw <question>");
-      expect(next).not.toContain("Usage: /cp");
+      expect(next).not.toContain(`Usage: /${name}`);
     } finally { mode.stop(); }
   });
 

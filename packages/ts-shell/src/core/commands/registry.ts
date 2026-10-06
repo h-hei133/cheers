@@ -68,7 +68,7 @@ import { runContextCommand } from "./contextCommandRuntime.js";
 import { runBtwCommand, btwSyntax } from "./btwCommandRuntime.js";
 import { runMarketplaceCommand } from "./marketplaceCommandRuntime.js";
 import { runPluginCommand } from "./pluginCommandRuntime.js";
-import { runMemoryCommand } from "./memoryCommandRuntime.js";
+import { runMemoryCommand, recallSyntax, retainSyntax } from "./memoryCommandRuntime.js";
 import { runWorkflowCommand } from "./workflowCommandRuntime.js";
 import { runDeepResearchCommand, webResearchSyntax } from "./deepResearchCommandRuntime.js";
 import { runBrainstormCommand } from "./brainstormCommandRuntime.js";
@@ -662,8 +662,8 @@ export function createCommandRegistry(
       name: "memory",
       aliases: ["mem"],
       invocations: [
-        { name: "recall", summary: "search retained memory facts", argumentHint: "<query>" },
-        { name: "retain", summary: "retain a memory statement", argumentHint: "<statement>" },
+        { name: "recall", summary: "search retained memory facts", argumentHint: syntaxHint(recallSyntax), argumentMode: "raw" },
+        { name: "retain", summary: "retain a memory statement", argumentHint: syntaxHint(retainSyntax), argumentMode: "raw" },
       ],
       kind: "local",
       supportsNonInteractive: true,

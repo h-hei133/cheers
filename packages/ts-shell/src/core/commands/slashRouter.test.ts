@@ -46,7 +46,8 @@ describe("slash router (W4)", () => {
 
   it.each(["recall", "retain", "RECALL", "RETAIN"])("preserves raw %s invocation semantics", async (name) => {
     const result = await routeSlashCommand(`/${name}`, { cwd: workspaceRoot });
-    expect(result).toMatchObject({ kind: "local", output: expect.stringContaining(`Usage: \`/${name.toLowerCase()} <`) });
+    const parameter = name.toLowerCase() === "recall" ? "query" : "statement";
+    expect(result).toMatchObject({ kind: "local", output: expect.stringContaining(`Usage: /${name.toLowerCase()} <${parameter}>`) });
   });
 
   it("passes a quoted theme name as one argument", async () => {

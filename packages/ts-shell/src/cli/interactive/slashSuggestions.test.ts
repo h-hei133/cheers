@@ -7,6 +7,7 @@ describe("command completions", () => {
     ["/continue ", "[sess_<id>] [prompt]"], ["/c ", "[sess_<id>] [prompt]"],
     ["/review ", "[focus]"], ["/cp ", "[text]"], ["/commit ", "[guidance]"],
     ["/ask ", "<question>"], ["/research ", "<topic>"], ["/recall ", "<query>"],
+    ["/retain ", "<statement>"],
   ])("shows usage without selectable placeholders for %s", (text, hint) => {
     expect(slashSuggestions(text)).toBeNull();
     expect(slashArgumentHint({ text, cursor: text.length, revision: 1 })).toBe(`Usage: ${text}${hint}`);
