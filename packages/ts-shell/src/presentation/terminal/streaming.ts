@@ -1,3 +1,6 @@
+import type { CommandReport } from '../../core/commands/report/contract.js';
+import { createReport, reportText } from '../../core/commands/report/projection.js';
+
 /**
  * Incremental output channel for prose.
  *
@@ -10,7 +13,7 @@
 
 export interface RendererSink {
   /** One complete line, without its trailing newline. */
-  line(text: string): void;
+  line(text: string, report?: CommandReport): void;
   /** A partial chunk of a streaming line, with no newline implied. */
   chunk(text: string): void;
 }
@@ -40,6 +43,14 @@ export class StreamingRenderer {
       return;
     }
     process.stdout.write(`${line}\n`);
+  }
+
+  /** Semantic output is retained by TUI sinks; plain sinks receive the same text. */
+  renderReport(report: CommandReport): void {
+    const snapshot = createReport(report);
+    const text = reportText(snapshot);
+    if (this.sink) this.sink.line(text, snapshot);
+    else this.renderLine(text);
   }
 
   renderChunk(chunk: string): void {

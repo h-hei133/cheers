@@ -1,8 +1,12 @@
+import { contextReport } from '../core/commands/context/report.js';
+import { reportText } from '../core/commands/report/projection.js';
+import { TurnSink } from '../cli/interactive/turnSink.js';
+import { Transcript } from '../presentation/tui/transcript/container.js';
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import type { StreamingRenderer } from "../presentation/terminal/streaming.js";
+import { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import {
   buildCliCommandExecution,
   projectCliCommandExecution,
@@ -266,4 +270,22 @@ describe("CLI command execution bridge", () => {
 
     expect(resolved).toEqual({ kind: "execute", effectivePrompt: "Explain the parser closely." });
   });
+});
+
+
+it('carries semantic reports to the TUI while print and plain sinks retain the same pure text', async () => {
+  const report = contextReport({ resolution: { window: 64000, source: 'catalog' }, used: 0,
+    reserve: 1000, schemaTokens: 12, toolCount: 1, totalTokens: 0, turns: 1 });
+  const output = reportText(report);
+  const renderer = new StreamingRenderer(); const transcript = new Transcript();
+  const sink = new TurnSink(transcript, () => {}); sink.begin('command', '/context'); renderer.setSink(sink);
+  const result = { kind: 'local' as const, output, report };
+  await buildCliCommandExecution({ prompt: '/context', cwd: process.cwd(), renderer, printMode: false, interactive: true }, bridge(result));
+  sink.end();
+  expect(transcript.all()).toHaveLength(1);
+  expect(transcript.last()).toMatchObject({ text: output, report });
+  expect(transcript.last()!.text).not.toContain('\x1b');
+  const lines: string[] = []; renderer.setSink({ line: text => lines.push(text), chunk: () => {} });
+  await buildCliCommandExecution({ prompt: '/context', cwd: process.cwd(), renderer, printMode: true, interactive: false }, bridge(result));
+  expect(lines).toEqual([output]);
 });

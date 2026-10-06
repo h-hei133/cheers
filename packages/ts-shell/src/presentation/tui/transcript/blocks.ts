@@ -1,3 +1,5 @@
+import type { CommandReport } from '../../../core/commands/report/contract.js';
+import { renderReport } from '../report/renderer.js';
 import { defaultTheme } from "../../theme/theme.js";
 import { formatCommandLine, formatToolDetail } from "../../theme/commandHighlight.js";
 import { padToWidth, wrapToWidth } from "../text/layout.js";
@@ -32,6 +34,7 @@ export interface Block {
    */
   detail?: string;
   text: string;
+  readonly report?: CommandReport;
   /** Unified diff rendered below the body, for edit-shaped tools. */
   diff?: string;
   status?: ToolStatus;
@@ -297,7 +300,10 @@ function elide(text: string, limit: number): string {
 function renderLabelled(block: Block, glyph: string, width: number): readonly string[] {
   const rows = [`${GUTTER}${glyph} ${defaultTheme.bold(block.title ?? "")}`];
   const bodyWidth = Math.max(8, width - visibleWidth(BODY_INDENT));
-  for (const row of renderMarkdown(block.text.replace(/\s+$/, ""), bodyWidth)) {
+  const body = block.report
+    ? block.collapsed ? [defaultTheme.dim('Report shown in reader · click to expand')] : renderReport(block.report, Math.max(1, width))
+    : renderMarkdown(block.text.replace(/\s+$/, ""), bodyWidth);
+  for (const row of body) {
     rows.push(`${BODY_INDENT}${row}`);
   }
   if (block.diff) {

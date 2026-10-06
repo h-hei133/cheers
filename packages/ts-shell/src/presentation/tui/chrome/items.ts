@@ -1,3 +1,4 @@
+import { contextPressure } from '../../../core/models/pressure.js';
 import { defaultTheme } from "../../theme/theme.js";
 import { formatTokens } from "../transcript/live.js";
 import type { WindowSource } from '../../../core/models/window.js';
@@ -91,12 +92,6 @@ export const DEFAULT_STATUS_ITEMS: readonly StatusItemId[] = [
   "directory",
 ];
 
-const CONTEXT_TIERS = [
-  { at: 90, token: "error" as const },
-  { at: 70, token: "warning" as const },
-  { at: 50, token: "accent" as const },
-];
-
 /** One item's rendered text, or undefined when its source has nothing to say. */
 export function renderStatusItem(id: StatusItemId, facts: StatusFacts): string | undefined {
   switch (id) {
@@ -158,8 +153,8 @@ function renderContext(facts: StatusFacts): string | undefined {
   if (facts.contextUsed === undefined) return defaultTheme.fg('statusLineContext', `?/${window}`);
   const percent = Math.min(100, Math.round((facts.contextUsed / facts.contextWindow) * 100));
   const text = `${formatTokens(facts.contextUsed)}/${window} ${percent}%`;
-  const tier = CONTEXT_TIERS.find((entry) => percent >= entry.at);
-  return defaultTheme.fg(tier?.token ?? "statusLineContext", text);
+  const token = { normal: 'statusLineContext', elevated: 'accent', high: 'warning', critical: 'error' } as const;
+  return defaultTheme.fg(token[contextPressure(facts.contextUsed, facts.contextWindow)], text);
 }
 
 /** The distinctive tail of a session id, which is what /resume accepts. */

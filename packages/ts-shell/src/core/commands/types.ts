@@ -1,3 +1,4 @@
+import type { CommandReport } from './report/contract.js';
 import type { KeyBinding } from "../../presentation/tui/chrome/keys.js";
 import type { CompactLiveCheckpointStore } from '../../context/compact/checkpoint/compactLiveCheckpoint.js'
 import type { CompactInjectionStateStore } from '../../context/compact/injection/compactInjectionState.js'
@@ -115,6 +116,7 @@ export interface CommandContext {
 export interface LocalCommandResult {
   readonly kind: 'local'
   readonly output: string
+  readonly report?: CommandReport
   /** State changed by this command, recorded with its result for session replay. */
   readonly state?: Record<string, unknown>
 }

@@ -167,9 +167,8 @@ export async function buildCliCommandExecution(
       // authority, with replay state beside the result, through the existing sink.
       input.onTurnMessage?.({ role: "user", content: `[Local command result]\n${slashResult.output}`, metadata: slashResult.state });
     }
-    input.renderer.renderLine(
-      input.printMode ? slashResult.output : `\n${slashResult.output}\n`,
-    );
+    if (slashResult.report && input.interactive && !input.printMode) input.renderer.renderReport(slashResult.report);
+    else input.renderer.renderLine(input.printMode ? slashResult.output : `\n${slashResult.output}\n`);
     return { kind: "handled" };
   }
 

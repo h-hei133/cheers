@@ -1,3 +1,5 @@
+import { contextReport } from './context/report.js';
+import { reportText } from './report/projection.js';
 import { rejectArguments } from "./syntax/empty.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
@@ -25,8 +27,6 @@ import { createCoreToolRegistry } from "../tools/registry.js";
  * so the current estimate is never subtracted to invent a historical breakdown.
  */
 
-const BAR_WIDTH = 32;
-
 export async function runContextCommand(
   args: string[],
   context: CommandContext,
@@ -51,74 +51,20 @@ export async function runContextCommand(
     model: active.model,
     configured: runtimeConfig.contextWindow,
   });
-  const window = resolution.window;
-  const windowDetails = [
-    `- Window: ${window.toLocaleString()} tokens (${resolution.source === 'default' ? 'assumed default' : resolution.source})`,
-    ...(resolution.warning ? [`- Warning: ${resolution.warning}`] : []),
-  ];
   const reserve = resolveTokenBudget(runtimeConfig.modelTokenBudgets, active.provider, active.model, "reserveTokens", runtimeConfig.reserveTokens, DEFAULT_RESERVE_TOKENS);
   const registry = context.getToolPool ? await context.getToolPool() : createCoreToolRegistry();
   const blocked = context.admission?.();
   if (blocked) return { kind: "local", output: blocked };
   const schemaTokens = toolSchemaTokens(registry);
 
-  if (!telemetry || telemetry.lastPromptTokens === undefined) {
-    return {
-      kind: "local",
-      output: [
-        "### Context window",
-        "",
-        ...windowDetails,
-        `- Current tool schema estimate: ~${schemaTokens.toLocaleString()} tokens (${registry.size} tools)`,
-        "",
-        "Current prompt usage is unknown. No provider measurement is available for this context.",
-      ].join("\n"),
-    };
-  }
-
-  const used = telemetry.lastPromptTokens;
-  const free = Math.max(0, window - used - reserve);
-  // The threshold the loop actually applies: the reserve is headroom kept for
-  // the reply, so compaction starts when a request would spend past the window
-  // minus that reserve — not at some fixed share of the window.
-  const compactAt = Math.max(0, window - reserve);
-
-  return {
-    kind: "local",
-    output: [
-      "### Context window",
-      "",
-      ...windowDetails,
-      `- ${bar(used, reserve, window)}  ${percent(used, window)} used`,
-      `- Last request carried ${used.toLocaleString()} of ${window.toLocaleString()} tokens; ${free.toLocaleString()} free before the ${reserve.toLocaleString()}-token reserve`,
-      "",
-      "| What | Tokens | How it is known |",
-      "| :--- | ---: | :--- |",
-      `| Current tool schemas | ~${schemaTokens.toLocaleString()} | ${registry.size} current definitions; character-based estimate |`,
-      `| **Last request total** | **${used.toLocaleString()}** | reported by the provider |`,
-      "",
-      `Auto-compaction runs when a request would exceed about ${compactAt.toLocaleString()} tokens. \`/compact\` runs it now.`,
-      totalTokens(telemetry) > 0
-        ? `\nAcross the whole session: ${totalTokens(telemetry).toLocaleString()} tokens over ${telemetry.turnsCount} ${telemetry.turnsCount === 1 ? "turn" : "turns"}.`
-        : "",
-    ].join("\n").replace(/\n+$/, ""),
-  };
+  const report = contextReport({ resolution, used: telemetry?.lastPromptTokens, reserve,
+    schemaTokens, toolCount: registry.size, totalTokens: telemetry ? totalTokens(telemetry) : 0,
+    turns: telemetry?.turnsCount ?? 0 });
+  return { kind: "local", output: reportText(report), report };
 }
 
 /** Character-based estimate for the current tool definitions. */
 function toolSchemaTokens(registry: Parameters<typeof toolSchemas>[0]): number {
   const serialised = JSON.stringify(toolSchemas(registry));
   return Math.round(serialised.length / CHARS_PER_TOKEN);
-}
-
-/** A bar showing used, reserved, and free, in that order. */
-function bar(used: number, reserve: number, window: number): string {
-  const usedCells = Math.min(BAR_WIDTH, Math.round((used / window) * BAR_WIDTH));
-  const reserveCells = Math.min(BAR_WIDTH - usedCells, Math.round((reserve / window) * BAR_WIDTH));
-  const freeCells = Math.max(0, BAR_WIDTH - usedCells - reserveCells);
-  return `\`${"█".repeat(usedCells)}${"▒".repeat(reserveCells)}${"░".repeat(freeCells)}\``;
-}
-
-function percent(part: number, whole: number): string {
-  return `${((part / whole) * 100).toFixed(1)}%`;
 }

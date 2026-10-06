@@ -5,7 +5,7 @@ sources: [user-experience-report-2026-10-05, user-coloring-request-2026-10-05, c
 created: 2026-10-05
 updated: 2026-10-07
 tags: [research, tui, status-band, panels, slash-commands, pickers, coloring]
-summary: "Phase 19 设计与进展：UI-05 已接通独立窗口来源、未知/已报告零用量和费用估算；主题/形态预览已交付。结构化报告、只读面板及逐命令迁移继续；历史首帧与终端归因保留边界。"
+summary: "Phase 19 设计与进展：UI-05 已接通独立窗口来源、未知/已报告零用量和费用估算；主题/形态预览已交付。结构化报告基础与 context 已接通，其他只读面板及逐命令迁移继续；历史首帧与终端归因保留边界。"
 confidence: mixed
 ---
 
@@ -329,3 +329,11 @@ bridge 不在 runtime 的 output 生成阶段包色，也不把渲染字符串�
 - regular/fullscreen 实际构建 CLI 均通过 fresh → 正数 → 缺失 → 零 → 压缩未知 → 新计量 → session overlay 恢复 → 退出并恢复同一 session；每场 4 次前台请求，累计费用保留，配置原文不变，进程退出 0。此前探针错误来自创建 session 的参数、输出预算和面板标题假设，已修正测试夹具，没有以改产品绕过。
 - 最终修复后定向 228 项、独立架构组合 255 项通过，Node 20.3 构建通过；六组反转均检出回归，恢复后 164 项通过。独立代码 APPROVE、架构 CLEAR，静态门禁与脚本测试通过；完整证据见 [主裁决 §8.91](phase-19-decisions.md#891-ui-05状态窗口用量与费用的事实边界)。
 - UI-06 的结构化报告、只读 host、搜索/分页及逐命令迁移继续；Windows 像素和真实 IME 仍未验证，不据隔离 VT 结果宣布完整 UI 或 Phase 19 验收完成。
+
+
+## 8. UI-06 报告基础进展（2026-10-07）
+
+- `LocalCommandResult.report` 已加入 version 1 的 spans/columns/facts；`output` 从同一不可变、无控制序列快照生成。`/context` 是首个消费者，保留窗口来源、实际 provider 用量、工具估算与未知状态；状态和报告百分比共用 50/70/90 阈值。
+- 结构通过既有 renderer/sink 进入转录与 Pager，presentation 按当前主题着色，窄列堆叠标签和值。分页折叠仅改变视图，纯文本全文继续用于复制；width/theme 缓存及跨样式过滤已验证。没有在任意 Markdown 上增加角色推断，也没有另造报告宿主。
+- 143 项首轮组合、最终修正定向、Node 20.3 构建、五组有效反转和独立 APPROVE/CLEAR 均有证据；实际 CLI 两模式报告换色/缩窗/输入恢复和强制彩色下 print 无 ANSI 通过，见 [主裁决 §8.92](phase-19-decisions.md#892-ui-06结构化报告基础与-context-首个消费者)。
+- 现有 Pager 的 18 行阈值仍待改为真实几何，自适应只读宿主、滚轮/resize 阅读定位、help 填入、其他报告迁移和语义持久化继续。JSON 事实可序列化不等于 CLI JSON 输出路径或持久重放已经交付。

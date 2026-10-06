@@ -6309,3 +6309,6 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 
 
 ## [2026-10-07] fix | Phase 19 UI-05 窗口来源独立于用量，保留未知/显式零与压缩恢复边界，费用标估算并拒绝 total-only 伪零和跨 provider 借价。最终修复后 228 项、独立 255 项、Node 20.3 构建、六组反转及恢复后 164 项通过；两模式实际 CLI 完成缺失/零/压缩/overlay/同 session 重启验证，独立 APPROVE/CLEAR，见 features/phase-19-decisions.md §8.91。UI-06 与完整阶段目标继续。
+
+
+## [2026-10-07] feat | Phase 19 UI-06 加入不可变 spans/columns/facts 报告，context 首个消费者贯通既有转录/Pager，窄列堆叠、主题换色与全文复制同源。143 项首轮组合、最终定向、Node 20.3 构建、五组有效反转及恢复后 20 项、两模式实际 CLI 和 print 检查通过，独立 APPROVE/CLEAR；见 features/phase-19-decisions.md §8.92。自适应报告宿主、其他命令迁移及完整阶段目标继续。

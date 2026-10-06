@@ -1,3 +1,6 @@
+import type { CommandReport } from '../../../core/commands/report/contract.js';
+import { renderReport } from '../report/renderer.js';
+import { stripAnsi } from '../text/ansi.js';
 import { defaultTheme } from "../../theme/theme.js";
 import { padToWidth, truncateToWidth } from "../text/layout.js";
 import { renderMarkdown } from "../transcript/markdown.js";
@@ -21,10 +24,15 @@ export const PAGER_THRESHOLD_ROWS = 18;
  * Move a block's text into the pager when it is long enough to be worth a view of
  * its own, leaving a one-line summary in the transcript. Returns whether it moved.
  */
-export function pageLongOutput(pager: Pager, title: string, block: PageableBlock, transcript?: { clearDiff(block: PageableBlock): void; setText(block: PageableBlock, text: string): void }): boolean {
+export function pageLongOutput(pager: Pager, title: string, block: PageableBlock, transcript?: { clearDiff(block: PageableBlock): void; setText(block: PageableBlock, text: string): void; setCollapsed?(block: PageableBlock, collapsed: boolean): void }): boolean {
   const lines = block.text.split("\n").length;
   if (lines < PAGER_THRESHOLD_ROWS) return false;
-  pager.open(title, block.text);
+  pager.open(title, block.text, block.report);
+  if (block.report) {
+    if (transcript?.setCollapsed) transcript.setCollapsed(block, true);
+    else block.collapsed = true;
+    return true;
+  }
   // Routed through the transcript's own setters when there is one, because the
   // block's cached rows are keyed by width and theme and do not know that its
   // text changed underneath them.
@@ -40,6 +48,8 @@ export function pageLongOutput(pager: Pager, title: string, block: PageableBlock
 
 export interface PageableBlock {
   text: string;
+  readonly report?: CommandReport;
+  collapsed?: boolean;
   diff?: string;
 }
 
@@ -49,6 +59,8 @@ export class Pager {
   private source = "";
   private top = 0;
   private width = 0;
+  private revision = -1;
+  private report: CommandReport | undefined;
   private filter = "";
 
   get active(): boolean {
@@ -60,7 +72,8 @@ export class Pager {
     return this.source;
   }
 
-  open(title: string, markdown: string): void {
+  open(title: string, markdown: string, report?: CommandReport): void {
+    this.report = report;
     this.title = title;
     this.source = markdown;
     this.filter = "";
@@ -70,6 +83,7 @@ export class Pager {
   }
 
   close(): void {
+    this.report = undefined;
     this.rows = [];
     this.source = "";
     this.filter = "";
@@ -127,8 +141,9 @@ export class Pager {
   /** Rows for the whole screen. */
   render(width: number, height: number): string[] {
     const inner = Math.max(8, width);
-    if (this.width !== inner) {
-      this.rows = renderMarkdown(this.source, inner - 4);
+    if (this.width !== inner || this.revision !== defaultTheme.colorRevision) {
+      this.rows = this.report ? renderReport(this.report, inner - 4) : renderMarkdown(this.source, inner - 4);
+      this.revision = defaultTheme.colorRevision;
       this.width = inner;
     }
     const body = this.visible();
@@ -151,7 +166,7 @@ export class Pager {
   private visible(): readonly string[] {
     if (!this.filter) return this.rows;
     const needle = this.filter.toLowerCase();
-    return this.rows.filter((row) => row.toLowerCase().includes(needle));
+    return this.rows.filter((row) => stripAnsi(row).toLowerCase().includes(needle));
   }
 
   private scroll(by: number, page: number): void {
