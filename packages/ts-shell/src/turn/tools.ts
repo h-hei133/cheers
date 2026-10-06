@@ -33,6 +33,8 @@ export interface ToolSchema {
  */
 
 export interface ToolGateOptions {
+  /** Rechecked at each effect boundary, including after asynchronous approvals. */
+  readonly admission?: () => string | undefined;
   readonly sessionId: string;
   readonly workspaceRoot: string;
   readonly agentMode?: "plan" | "build";
@@ -124,6 +126,8 @@ async function executeTool(
 ): Promise<AgentToolResult> {
   let streamed = "";
   try {
+    const blocked = options.admission?.();
+    if (blocked) throw new Error(blocked);
     validateToolArguments(tool.argsSchema, args);
     const result = await tool.execute(args, {
       workspaceRoot: options.workspaceRoot,
@@ -132,6 +136,8 @@ async function executeTool(
       interactiveAsk: options.interactiveAsk,
       sessionId: options.sessionId,
       assertFileAccess: (absolutePath) => {
+        const blocked = options.admission?.();
+        if (blocked) throw new Error(blocked);
         const decision = evaluateToolPermissionScope(tool.name,
           { ...args, path: absolutePath, filePath: absolutePath }, options.permissionScope,
           options.workspaceRoot, options.denyRules);
@@ -171,10 +177,14 @@ export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<st
   const approvals = new Map<string, { operation: string; decision: string }>();
   return {
     beforeToolCall: async ({ call, args }, signal) => {
+      const blocked = options.admission?.();
+      if (blocked) return { block: true, reason: blocked };
       const planBlock = planModeBlock(options.agentMode, call.name, args, tools?.get(call.name));
       if (planBlock) return { block: true, reason: planBlock };
       const permission = await askPermission(call.id, call.name, args, options, signal);
       if (permission.blocked) return { block: true, reason: permission.blocked };
+      const afterApproval = options.admission?.();
+      if (afterApproval) return { block: true, reason: afterApproval };
       if (permission.approved) approvals.set(call.id, permission.approved);
       const decision = await options.hooks.dispatch({
         eventName: "PreToolUse",
@@ -185,6 +195,8 @@ export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<st
         toolCallId: call.id,
         args,
       });
+      const afterHook = options.admission?.();
+      if (afterHook) { approvals.delete(call.id); return { block: true, reason: afterHook }; }
       if (decision.decision === "block") {
         approvals.delete(call.id);
         return { block: true, reason: `Blocked by Hook: ${decision.reason || "Action rejected by security/verification hook policy."}` };

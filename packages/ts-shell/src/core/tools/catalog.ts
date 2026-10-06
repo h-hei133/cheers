@@ -7,8 +7,10 @@ import { resolveSkillCatalog } from "../skills/skillCatalog.js";
 import { createComponentLogger } from "../../observability/structuredLogger.js";
 import { createCoreToolRegistry } from "./registry.js";
 import { filterVisibleToolNames } from "./prefilter.js";
+import { assertAdmission, type Admission } from '../network/admission.js';
 
 export interface ToolCatalogInput {
+  readonly admission?: Admission;
   readonly workspaceRoot: string;
   readonly skillOptions?: { readonly skillPaths?: readonly string[]; readonly noSkills?: boolean };
   readonly runtimeConfig?: RuntimeConfig;
@@ -20,8 +22,10 @@ export async function loadToolCatalog(input: ToolCatalogInput, override?: () => 
   readonly skills: ReadonlyMap<string, Skill>;
   readonly tools: ReadonlyMap<string, ToolDefinition>;
 }> {
+  assertAdmission(input.admission);
   const skills = discoverSkills(input);
   const mcp = await mcpToolsForRun(input);
+  assertAdmission(input.admission);
   const registry = override?.() ?? createCoreToolRegistry({ skills,
     ...(mcp ? { mcpTools: mcp.tools, mcpGateway: mcp.gateway } : {}),
   });
@@ -91,7 +95,7 @@ async function mcpToolsForRun(
   const gateway = request.mcpGateway;
   if (!gateway) return undefined;
   try {
-    const snapshot = await gateway.snapshot();
+    const snapshot = await gateway.snapshot(request.admission);
     // Servers that failed to connect are named here for the same reason a skill
     // that loaded nothing is: the run continues without their tools, and without
     // a line saying so, a server the user configured looks exactly like one the
@@ -104,7 +108,9 @@ async function mcpToolsForRun(
       );
     }
     if (snapshot.tools.length === 0) return undefined;
-    return { tools: snapshot.tools, gateway: gateway.invokeTool ? { invokeTool: gateway.invokeTool.bind(gateway) } : undefined };
+    return { tools: snapshot.tools, gateway: gateway.invokeTool ? {
+      invokeTool: (server, tool, args) => gateway.invokeTool!(server, tool, args, request.admission),
+    } : undefined };
   } catch (error) {
     // A snapshot that threw registers nothing, so the model is told nothing
     // exists rather than being handed tools that fail. Said out loud, because

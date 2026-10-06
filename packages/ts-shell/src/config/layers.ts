@@ -7,6 +7,7 @@ export interface ConfigLayer {
   readonly values: Record<string, unknown>;
   readonly diagnostics: string[];
   blocked: boolean;
+  valid: boolean;
 }
 
 function diagnostic(source: ConfigSource, field: string, code: string, blocked = false): string {
@@ -40,7 +41,7 @@ function validateTui(value: unknown, source: ConfigSource, layer: ConfigLayer): 
   for (const [key, child] of Object.entries(value)) {
     const field = Object.hasOwn(tuiFields, key) ? tuiFields[key] : undefined;
     if (!field) layer.diagnostics.push(diagnostic(source, 'tui', 'unknown-field'));
-    else if (!field.validate(child)) layer.diagnostics.push(diagnostic(source, `tui.${key}`, 'invalid-value'));
+    else if (!field.validate(child)) { layer.valid = false; layer.diagnostics.push(diagnostic(source, `tui.${key}`, 'invalid-value')); }
     else result[key] = child;
   }
   return result;
@@ -57,6 +58,7 @@ export function applyConfigLayer(layer: ConfigLayer, raw: Record<string, unknown
     let value: unknown = rawValue;
     if (field.merge === 'tui') value = validateTui(value, source, layer);
     if (!field.validate(value)) {
+      layer.valid = false;
       layer.blocked ||= field.security;
       layer.diagnostics.push(diagnostic(source, key, 'invalid-value', field.security));
       continue;
@@ -64,17 +66,18 @@ export function applyConfigLayer(layer: ConfigLayer, raw: Record<string, unknown
     if (source === 'user') {
       try { value = resolveConfigReferences(value, field.schema, budget); }
       catch (error) {
+        layer.valid = false;
         layer.diagnostics.push(diagnostic(source, key, error instanceof ConfigReferenceError ? error.code : 'invalid-value'));
         continue;
       }
-      if (!field.validate(value)) { layer.diagnostics.push(diagnostic(source, key, 'invalid-value')); continue; }
+      if (!field.validate(value)) { layer.valid = false; layer.diagnostics.push(diagnostic(source, key, 'invalid-value')); continue; }
     }
     layer.values[key] = mergeValue(layer.values[key], value, field.merge);
   }
 }
 
 export function loadConfigLayers(paths: readonly { path: string; source: 'project' | 'user' }[], overrides: unknown, fields: ConfigFields): ConfigLayer & { sources: string[] } {
-  const layer: ConfigLayer & { sources: string[] } = { values: {}, diagnostics: [], blocked: false, sources: [] };
+  const layer: ConfigLayer & { sources: string[] } = { values: {}, diagnostics: [], blocked: false, valid: true, sources: [] };
   for (const candidate of paths) {
     try {
       const document = readConfigDocument(candidate.path);
@@ -82,6 +85,7 @@ export function loadConfigLayers(paths: readonly { path: string; source: 'projec
       applyConfigLayer(layer, document, candidate.source, fields);
       layer.sources.push(candidate.path);
     } catch (error) {
+      layer.valid = false;
       layer.blocked = true;
       const code = error instanceof ConfigDocumentError ? error.message : 'unreadable';
       const safePath = candidate.path.replace(/[\x00-\x1f\x7f-\x9f]/g, '?').slice(0, 512);
@@ -95,6 +99,7 @@ export function loadConfigLayers(paths: readonly { path: string; source: 'projec
       inspectConfigDocument(overrides);
       applyConfigLayer(layer, overrides, 'override', fields);
     } catch {
+      layer.valid = false;
       layer.blocked = true;
       layer.diagnostics.push(diagnostic('override', '(document)', 'invalid-document', true));
     }

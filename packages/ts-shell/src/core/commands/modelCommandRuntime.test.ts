@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultHookDispatcher } from '../hooks/hookDispatcher.js';
-import { getUserRuntimeConfigPath } from "../../config/runtimeConfig.js";
+import { getUserRuntimeConfigPath, getRuntimeConfig } from "../../config/runtimeConfig.js";
 import { writeUserRuntimeConfigFile } from "../../config/runtimeConfig.js";
 import { runConnectCommand } from "./connectCommandRuntime.js";
 import { runModelCommand } from "./modelCommandRuntime.js";
@@ -47,6 +47,17 @@ describe("model command runtime", () => {
     expect(result.output).toContain("Provider: openai");
     expect(result.output).toContain("Provider readiness");
     expect(result.output).toContain("npm run verify:provider-readiness");
+  });
+
+  it('uses the accepted snapshot for model and connection status despite pending disk edits', async () => {
+    const runtimeConfig = getRuntimeConfig(workspaceRoot);
+    const before = await runModelCommand(['status'], { cwd: workspaceRoot, runtimeConfig });
+    const file = getUserRuntimeConfigPath();
+    writeUserRuntimeConfigFile({ providerConnections: runtimeConfig.providerConnections.map(connection => ({ ...connection, model: 'pending-model' })) }, readRuntimeConfigEditAt(file));
+    const after = await runModelCommand(['status'], { cwd: workspaceRoot, runtimeConfig });
+    expect(after.output).toBe(before.output);
+    expect((await runConnectCommand(['status'], { cwd: workspaceRoot, runtimeConfig })).output)
+      .toContain(`Active connection: ${runtimeConfig.activeProviderConnectionId}`);
   });
 
   it('keeps the baseline captured before an asynchronous model hook', async () => {

@@ -1,3 +1,4 @@
+import { configurationAdmission } from "../core/shell/configuration.js";
 import { refreshShellRuntimeConfig } from "../core/shell/runtimeContext.js";
 import type { CoreMcpGateway } from "../core/mcp/gateway.js";
 import type { PromptAttachments } from "../core/shell/sessionRuntime.js";
@@ -273,6 +274,8 @@ export async function runNonInteractivePrompt(options: {
     // Offered on the non-interactive path too: a scripted run has the same
     // session and the same one-shot configuration read, so `/reload` must mean
     // the same thing there rather than reporting that it cannot help.
+    runtimeConfig: options.runtimeContext.runtimeConfig,
+    admission: configurationAdmission(options.runtimeContext),
     refreshRuntimeConfig: () => {
       return refreshShellRuntimeConfig(options.runtimeContext);
     },

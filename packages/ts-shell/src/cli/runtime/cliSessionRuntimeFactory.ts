@@ -1,3 +1,8 @@
+import type { RuntimeConfig } from "../../config/runtimeConfig.js";
+import type { ProviderCredentialResolution } from "../../core/shell/providerCredentials.js";
+import { configurationAdmission } from "../../core/shell/configuration.js";
+import { refreshShellRuntimeConfig } from "../../core/shell/runtimeContext.js";
+import { admittedFetch, assertAdmission, type Admission } from "../../core/network/admission.js";
 import type { CoreMcpGateway } from "../../core/mcp/gateway.js";
 import { messageToText } from "../../model-adapters/multimodal.js";
 import type { Interface as ReadlineInterface } from "node:readline";
@@ -100,7 +105,8 @@ function buildCompactionWiring(input: {
     /** Which endpoint kind the summarizer must speak, when not the default. */
     readonly endpoint?: EndpointKind;
   };
-  readonly runtimeContext: ShellRuntimeContext;
+  readonly runtimeConfig: RuntimeConfig;
+  readonly admission?: Admission;
   readonly sessionId: string;
   /**
    * The catalogue, read once by the caller.
@@ -113,8 +119,8 @@ function buildCompactionWiring(input: {
   readonly catalog: readonly CatalogProvider[];
 }): CompactionWiring {
   const provider = input.provider;
-  const runtimeConfig = input.runtimeContext.runtimeConfig;
-  const fetchImpl = providerFetchForEndpoint(runtimeConfig, provider.endpoint, endpointShape);
+  const runtimeConfig = input.runtimeConfig;
+  const fetchImpl = providerFetchForEndpoint(runtimeConfig, provider.endpoint, endpointShape, input.admission);
   // Resolved per model rather than read from one global number: the catalog
   // knows each model's window, and using a single value compacted a million-token
   // model at sixty-four thousand.
@@ -221,6 +227,7 @@ export function createCliSessionRuntime(input: {
    * new run has begun.
    */
   let previousCacheWarming: CacheWarmingRunner | undefined;
+  let releaseCacheListener: (() => void) | undefined;
 
   const catalog = loadCatalog()
 
@@ -237,8 +244,7 @@ export function createCliSessionRuntime(input: {
    * token would be carried into a summarization request and come back as a provider
    * refusal. The turn's own path has already renewed by the time it gets here.
    */
-  const compactionTarget = () => {
-    const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
+  const compactionTarget = (resolved: ProviderCredentialResolution) => {
     const credential = resolved.credential;
     const accountAuth = accountAuthFor(resolved.provider, credential ?? {});
     if (!credential?.apiKey && !accountAuth && !endpointShape(endpointFor(resolved.provider)).signer) return undefined;
@@ -259,8 +265,8 @@ export function createCliSessionRuntime(input: {
     providerEndpoint(catalog, provider);
 
   /** The provider the turn's own compaction summarizes with. */
-  const compactionProvider = (): CompactionProvider | undefined => {
-    const target = compactionTarget();
+  const compactionProvider = (resolved: ProviderCredentialResolution): CompactionProvider | undefined => {
+    const target = compactionTarget(resolved);
     if (!target) return undefined;
     // Resolved from the catalogue the way the turn resolves it, so a model
     // that rejects a temperature does not get one in its summary request
@@ -282,17 +288,19 @@ export function createCliSessionRuntime(input: {
   };
 
   /** The same, with an expiring account token replaced before the request is built. */
-  const renewedProvider = async (): Promise<CompactionProvider | undefined> => {
-    const target = compactionTarget();
+  const renewedProvider = async (resolved: ProviderCredentialResolution, config: RuntimeConfig, admission: Admission): Promise<CompactionProvider | undefined> => {
+    assertAdmission(admission);
+    const target = compactionTarget(resolved);
     if (!target) return undefined;
     const renewed = await renewAccountAuthIfExpiring({
       provider: target.provider,
       credential: { apiKey: target.apiKey, accountAuth: target.accountAuth ?? undefined },
-      fetchImpl: providerFetchFromTimeouts(providerTimeoutsFrom(input.runtimeContext.runtimeConfig)),
+      fetchImpl: admittedFetch(providerFetchFromTimeouts(providerTimeoutsFrom(config)), admission),
     });
     if (renewed.failure) return undefined;
     if (renewed.renewed && renewed.accountAuth) {
-      persistRenewedAccountAuth({ provider: target.provider, accountAuth: renewed.accountAuth });
+      assertAdmission(admission);
+      if (persistRenewedAccountAuth({ provider: target.provider, accountAuth: renewed.accountAuth })) reportCredentialPublication();
     }
     return {
       headers: providerAuthorization({
@@ -307,7 +315,12 @@ export function createCliSessionRuntime(input: {
       ...(endpointFor(target.provider) ? { endpoint: endpointFor(target.provider) } : {}),
     };
   };
+  const reportCredentialPublication = () => {
+    const result = refreshShellRuntimeConfig(input.runtimeContext);
+    if (result.status !== 'applied') input.renderer.renderLine('Credential saved; configuration was not applied. Reload status: ' + result.status + '.');
+  };
   const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
+    configuredAgentMode: () => input.runtimeContext.runtimeConfig.agentMode,
     sessionManager: input.sessionManager,
     renderer: input.renderer,
     // The store the memory commands write through and the injection planner
@@ -323,15 +336,19 @@ export function createCliSessionRuntime(input: {
       ref: { mode: "explicit-local", root: projectMemoryRootFor(input.runtimeContext.projectRoot) },
     }),
     compactHistory: (sessionId, signal, instructions) => {
-      return renewedProvider().then((provider) => {
+      const config = input.runtimeContext.runtimeConfig;
+      const workspaceRoot = input.runtimeContext.projectRoot;
+      const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
+      const admission = configurationAdmission(input.runtimeContext);
+      return renewedProvider(resolved, config, admission).then((provider) => {
+        assertAdmission(admission);
         if (!provider) {
-          const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
           return {
             status: "failed" as const,
             reason: `No credential for provider ${resolved.provider}; set ${resolved.expectedEnvVarName} or configure a connection.`,
           };
         }
-        const wiring = buildCompactionWiring({ provider, runtimeContext: input.runtimeContext, sessionId, catalog });
+        const wiring = buildCompactionWiring({ provider, runtimeConfig: config, admission, sessionId, catalog });
         return compactSessionHistory({
           store: input.sessionManager,
           sessionId,
@@ -344,7 +361,7 @@ export function createCliSessionRuntime(input: {
           // could not previously make: the automatic path reports `threshold` or
           // `overflow`, and this path is the only `manual`.
           reason: "manual",
-          workspaceRoot: input.runtimeContext.projectRoot,
+          workspaceRoot,
           // The checkpoint is written here, after the condensation, because the
           // store it feeds is the same one the automatic path writes through.
           // Previously the command side wrote it before knowing whether any
@@ -352,25 +369,33 @@ export function createCliSessionRuntime(input: {
           checkpoint: {
             sessionScopeId: `session:${sessionId}`,
             sourceCommand: "/compact",
-            projectRoot: input.runtimeContext.projectRoot,
+            projectRoot: workspaceRoot,
           },
         });
       });
     },
     summarizeAbandonedTurns: (messages) => {
-      return renewedProvider().then((provider) => {
+      const config = input.runtimeContext.runtimeConfig;
+      const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
+      const admission = configurationAdmission(input.runtimeContext);
+      return renewedProvider(resolved, config, admission).then((provider) => {
+        assertAdmission(admission);
         if (!provider) return undefined;
         return requestCompactionSummary({
           provider,
           // The third of the three summarisers, and the one that was missed: it kept
           // the global fetch, so a `/back` whose summary stalled waited forever with
           // no deadline and no abort signal. Same wiring as its two siblings.
-          fetchImpl: providerFetchForEndpoint(input.runtimeContext.runtimeConfig, provider.endpoint, endpointShape),
+          fetchImpl: providerFetchForEndpoint(config, provider.endpoint, endpointShape, admission),
           messages: toCompactionMessages(messages),
         });
       });
     },
     runPrompt: (prompt, signal, _runtimeSeed, _continuityState, attachments, continuityContext, onPromptAccepted): PromptRun => {
+      const publication = input.runtimeContext.configuration.current;
+      const config = publication.config;
+      const backgroundSignal = input.runtimeContext.configuration.backgroundSignal;
+      const admission = configurationAdmission(input.runtimeContext);
       const resolvedCredential =
         input.providerRuntimeBridge.resolveCredentialSnapshot();
       const sessionId = input.runtimeContext.session.id;
@@ -378,62 +403,68 @@ export function createCliSessionRuntime(input: {
       // an idle timer, and it would refresh the same prefix the new runner is
       // about to refresh — the same money spent twice. Only the current run
       // keeps a window warm.
+      releaseCacheListener?.();
       previousCacheWarming?.stop();
       previousCacheWarming = undefined;
-      const activeProvider = compactionProvider();
-      // The prices and the cache window belong to the model, so they are read
-      // from the catalogue entry this run is talking to.
-      const warmingTarget = compactionTarget();
-      const warmingModel = warmingTarget
-        ? catalogModel(catalog, warmingTarget.provider, warmingTarget.model)
-        : undefined;
-      // Automatic compaction needs a provider to write the checkpoint; without
-      // one the turn runs with the history it has and overflow reports itself.
-      // Built per run rather than per session: the model can change between
-      // runs, and the prices and window the decision rests on are properties of
-      // the model.
-      // A refresh is a request nobody asked for, so it answers to the same switch
-      // as every other one. Gated here rather than inside the runner: the runner
-      // decides whether a refresh is worth its price, and whether this session
-      // may make unasked requests at all is a different question with a different
-      // answer.
-      const mayRefreshOnItsOwn = allowsSelfInitiatedRequests({
-        configuredOffline: input.runtimeContext.runtimeConfig.offline === true,
-      });
-      const cacheWarming = createCacheWarmingRunner({
-        mode: mayRefreshOnItsOwn
-          ? resolveCacheWarmingMode(input.runtimeContext.runtimeConfig.cacheWarming)
-          : "off",
-        ...(warmingModel ? { cost: warmingModel.cost, promptCache: warmingModel.promptCache } : {}),
-        // Replays the request that went out. Rebuilding it here would produce a
-        // different prefix, and a different prefix is a cache miss at the full
-        // write price — the opposite of what a refresh is for.
-        ...cacheRefreshFor({ sessionId, runtimeConfig: input.runtimeContext.runtimeConfig,
-          ...(activeProvider ? { provider: activeProvider } : {}),
-          renewHeaders: async () => (await renewedProvider())?.headers,
-          isCurrent: () => {
-            const target = compactionTarget();
-            return input.runtimeContext.session.id === sessionId &&
-              input.sessionManager.getSession(sessionId)?.turns.at(-1)?.id === sourceEntryId &&
-              target?.provider === warmingTarget?.provider && target?.model === warmingTarget?.model &&
-              target?.baseUrl === warmingTarget?.baseUrl;
-          },
-        }),
-      });
-      previousCacheWarming = cacheWarming;
-
-      const compaction: CompactionSetup | undefined = activeProvider
-        ? {
-            ...buildCompactionWiring({ provider: activeProvider, runtimeContext: input.runtimeContext, sessionId, catalog }),
-            onCompact: (record) => {
-              input.sessionManager.appendCompactionEntry(sessionId, record);
-              markContextUnknown(sessionId);
-              // Counted at the point a compaction actually happened, which is
-              // low frequency, so recording it inline is not a hot path.
-              recordCount("compaction.runs", 1, {});
+      const prepareProviderResources = (resolved: ProviderCredentialResolution) => {
+        const activeProvider = compactionProvider(resolved);
+        // The prices and the cache window belong to the model, so they are read
+        // from the catalogue entry this run is talking to.
+        const warmingTarget = compactionTarget(resolved);
+        const warmingModel = warmingTarget
+          ? catalogModel(catalog, warmingTarget.provider, warmingTarget.model)
+          : undefined;
+        // Automatic compaction needs a provider to write the checkpoint; without
+        // one the turn runs with the history it has and overflow reports itself.
+        // Built per run rather than per session: the model can change between
+        // runs, and the prices and window the decision rests on are properties of
+        // the model.
+        // A refresh is a request nobody asked for, so it answers to the same switch
+        // as every other one. Gated here rather than inside the runner: the runner
+        // decides whether a refresh is worth its price, and whether this session
+        // may make unasked requests at all is a different question with a different
+        // answer.
+        const mayRefreshOnItsOwn = allowsSelfInitiatedRequests({
+          configuredOffline: config.offline === true,
+        });
+        const cacheWarming = createCacheWarmingRunner({
+          mode: mayRefreshOnItsOwn
+            ? resolveCacheWarmingMode(config.cacheWarming)
+            : "off",
+          ...(warmingModel ? { cost: warmingModel.cost, promptCache: warmingModel.promptCache } : {}),
+          // Replays the request that went out. Rebuilding it here would produce a
+          // different prefix, and a different prefix is a cache miss at the full
+          // write price — the opposite of what a refresh is for.
+          ...cacheRefreshFor({ sessionId, runtimeConfig: config, admission,
+            ...(activeProvider ? { provider: activeProvider } : {}),
+            renewHeaders: async () => (await renewedProvider(resolved, config, admission))?.headers,
+            isCurrent: () => {
+              return !admission() && input.runtimeContext.configuration.current === publication &&
+                input.runtimeContext.session.id === sessionId &&
+                input.sessionManager.getSession(sessionId)?.turns.at(-1)?.id === sourceEntryId;
             },
-          }
-        : undefined;
+          }),
+        });
+        previousCacheWarming = cacheWarming;
+        const stopBackground = () => cacheWarming.stop();
+        backgroundSignal.addEventListener('abort', stopBackground, { once: true });
+        releaseCacheListener = () => backgroundSignal.removeEventListener('abort', stopBackground);
+        if (backgroundSignal.aborted) cacheWarming.stop();
+
+        const compaction: CompactionSetup | undefined = activeProvider
+          ? {
+              ...buildCompactionWiring({ provider: activeProvider, runtimeConfig: config, admission, sessionId, catalog }),
+              onCompact: (record) => {
+                input.sessionManager.appendCompactionEntry(sessionId, record);
+                markContextUnknown(sessionId);
+                // Counted at the point a compaction actually happened, which is
+                // low frequency, so recording it inline is not a hot path.
+                recordCount("compaction.runs", 1, {});
+              },
+            }
+          : undefined;
+        return { compaction, cacheWarming };
+      };
       const escalationPromptHandler = createCliApprovalEscalationBridge({
         renderer: input.renderer,
         readline: input.getReadline,
@@ -462,9 +493,9 @@ export function createCliSessionRuntime(input: {
 
       let sourceEntryId = allTurns.at(-1)?.id;
       const run = streamCliRuntimePrompt({
-    mcpGateway: input.mcpGateway,
+        mcpGateway: input.mcpGateway,
         // Carried so the tool pool honours disabledTools / hiddenToolPrefixes.
-        runtimeConfig: input.runtimeContext.runtimeConfig,
+        runtimeConfig: config,
         prompt,
         ...(continuityContext ? { continuityContext } : {}),
         ...(onPromptAccepted ? { onPromptAccepted } : {}),
@@ -472,7 +503,7 @@ export function createCliSessionRuntime(input: {
         sessionId,
         workspaceRoot: input.runtimeContext.cwd,
         signal,
-        maxTurns: input.runtimeContext.runtimeConfig.maxTurns,
+        maxTurns: config.maxTurns,
         escalationPromptHandler,
         permissionScope: sessionRuntime.getPermissionScope(),
         interactiveAsk: (questions, askSignal) =>
@@ -483,8 +514,9 @@ export function createCliSessionRuntime(input: {
           input.sessionManager.addTurn(sessionId, { ...message, id });
           sourceEntryId = id;
         },
-        compaction,
-        cacheWarming,
+        prepareProviderResources,
+        admission,
+        onCredentialPersisted: reportCredentialPublication,
         providerCredentialResolution: resolvedCredential,
         agentMode: sessionRuntime.getAgentMode(),
         providerRuntimeBridge: input.providerRuntimeBridge,

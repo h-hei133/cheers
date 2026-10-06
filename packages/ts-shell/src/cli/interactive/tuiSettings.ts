@@ -1,5 +1,5 @@
 import {
-  getRuntimeConfig,
+  getRuntimeConfig, type RuntimeConfig,
   readRuntimeConfigEditAt, getProjectConfigPath, getUserRuntimeConfigPath,
   writeProjectRuntimeConfigFile,
   writeUserRuntimeConfigFile,
@@ -18,8 +18,8 @@ import {
  */
 
 /** The configured items, or the default set when nothing is stored. */
-export function readStatusItems(workspaceRoot: string): readonly StatusItemId[] {
-  return normalizeStatusItems(getRuntimeConfig(workspaceRoot).tui?.statusItems);
+export function readStatusItems(workspaceRoot: string, config: RuntimeConfig = getRuntimeConfig(workspaceRoot)): readonly StatusItemId[] {
+  return normalizeStatusItems(config.tui?.statusItems);
 }
 
 /**
@@ -71,6 +71,6 @@ export function writeStatusItems(
 }
 
 /** The validated project-first diagram preference, or the renderer default. */
-export function readDiagramMode(workspaceRoot: string): "off" | "streaming" {
-  return getRuntimeConfig(workspaceRoot).tui?.diagrams ?? "streaming";
+export function readDiagramMode(workspaceRoot: string, config: RuntimeConfig = getRuntimeConfig(workspaceRoot)): "off" | "streaming" {
+  return config.tui?.diagrams ?? "streaming";
 }

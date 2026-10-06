@@ -66,7 +66,7 @@ export async function routeSlashCommand(
     };
   }
 
-  const registry = createCommandRegistry(context.cwd);
+  const registry = createCommandRegistry(context.cwd, context.runtimeConfig);
   const resolved = resolveCommandInvocation([...registry.values()], rawName);
   const command = resolved ? registry.get(resolved.commandName) : undefined;
 

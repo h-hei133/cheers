@@ -1,4 +1,4 @@
-import { applyDefaultTheme, applyTheme, currentTheme } from "./theme.js";
+import { applyDefaultTheme, currentTheme, prepareDefaultTheme, prepareTheme } from "./theme.js";
 
 let selection = "dark";
 let appearance: "dark" | "light" = "dark";
@@ -9,10 +9,13 @@ export function selectedTheme(): string {
 }
 
 export function selectTheme(name: string, workspaceRoot?: string, extraPaths: readonly string[] = []): void {
-  if (name === "auto") applyDefaultTheme(appearance);
-  else applyTheme(name, workspaceRoot, extraPaths);
-  // A failed load leaves both the selection and the working palette intact.
-  selection = name;
+  prepareThemeSelection(name, workspaceRoot, extraPaths)();
+}
+
+/** A failed preparation leaves both intent and the rendered palette untouched. */
+export function prepareThemeSelection(name: string, workspaceRoot?: string, extraPaths: readonly string[] = []): () => void {
+  const commit = name === 'auto' ? prepareDefaultTheme(appearance) : prepareTheme(name, workspaceRoot, extraPaths);
+  return () => { commit(); selection = name; };
 }
 
 /** Keep reports for a later auto selection, without overriding explicit choices. */

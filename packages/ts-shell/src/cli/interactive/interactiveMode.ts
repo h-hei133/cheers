@@ -191,7 +191,7 @@ export class InteractiveMode {
   constructor(private readonly options: InteractiveModeOptions) {
     this.alternateScreen = options.runtimeContext.runtimeConfig.tuiMode !== "regular";
     this.terminal = options.terminal ?? processTerminal;
-    this.statusItems = readStatusItems(options.runtimeContext.projectRoot);
+    this.statusItems = readStatusItems(options.runtimeContext.projectRoot, options.runtimeContext.runtimeConfig);
     // The checklist travels with the session, and every path that puts a
     // conversation on screen — opening, resuming, forking, rewinding — restores
     // it through `showConversation`. A session opened for the first time has no
@@ -764,6 +764,7 @@ export class InteractiveMode {
   private pickerHost(): PickerHost {
     return {
       commandContext: {
+        runtimeConfig: this.options.runtimeContext.runtimeConfig,
         refreshRuntimeConfig: () => refreshShellRuntimeConfig(this.options.runtimeContext),
         cwd: this.options.runtimeContext.cwd,
         sessionId: this.options.runtimeContext.session.id,
@@ -808,6 +809,7 @@ export class InteractiveMode {
       saveStatusItems: async (items) => {
         const written = writeStatusItems(this.options.runtimeContext.projectRoot, items);
         this.statusItems = items;
+        this.options.runtimeContext.configuration.recordDisplay({ tui: { ...this.options.runtimeContext.runtimeConfig.tui, statusItems: items } });
         return written.scope === "project"
           ? `Status band items saved to ${written.path} (this project's file, which wins over your own)`
           : `Status band items saved to ${written.path}`;

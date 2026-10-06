@@ -1,3 +1,4 @@
+import { configurationAdmission } from "../../core/shell/configuration.js";
 import { refreshShellRuntimeConfig } from "../../core/shell/runtimeContext.js";
 import type { KeyBinding } from "../../presentation/tui/chrome/keys.js";
 import type { PromptAttachments } from "../../core/shell/sessionRuntime.js";
@@ -133,9 +134,15 @@ export async function routeInteractiveCommand(
     // The settings live on the context this session carries, so replacing them in
     // place is what makes `/reload` take effect for the rest of the session rather
     // than only for the turn that ran it.
+    runtimeConfig: input.runtimeContext.runtimeConfig,
+    admission: configurationAdmission(input.runtimeContext),
     refreshRuntimeConfig: () => {
       const result = refreshShellRuntimeConfig(input.runtimeContext);
-      input.refreshKeybindings?.();
+      if (result.status === "applied") {
+        try { input.refreshKeybindings?.(); }
+        catch { return { ...result, status: 'application-unverified' as const,
+          diagnostics: [...result.diagnostics, 'Configuration was accepted; keybinding application outcome is unverified.'] }; }
+      }
       return result;
     },
   });

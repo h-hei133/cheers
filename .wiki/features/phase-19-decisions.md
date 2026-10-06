@@ -1162,3 +1162,19 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - regular/fullscreen 实际 CLI 使用独立 HOME 与本地合成 HTTP：受限写入被拒绝；本机活锁使 /connect use 超时且报告本次未写入，配置字节不变；释放锁后重试仅修改活动 ID 与所选连接时间。BOM/CRLF/注释/尾逗号/占位符/1e2/-0 保留，秘密未输出，项目与目标标记不变，两模式 exit 0。
 - 保证限于参与同一路径锁协议的 writer。检查与 rename 之间仍存在非参与编辑器窗口，未宣称原子 CAS；父路径别名、多机文件系统和目录 fsync/断电持久性没有新增保证。未知/残缺锁可能持续阻断，需要确认 owner 后人工处理；不会冒险自动回收。账户 token 刷新仍沿用 provider 范围与网络返回后读取的基线，旧网络响应覆盖新登录的身份问题未由本批解决。
 - CFG-03 的 last-good revision reload、候选发布与立即/下一轮/重启应用边界继续；CFG-01 的完整来源/信任 policy、CFG-04/05、SAFE-02 与其余 Phase 19 任务仍开放。import cycles/config consumers/declarations/node floor/docs strict 与 43 项脚本测试通过；NormProof 阻断义务满足，既有四项函数数量 advisory 与 120 项文档来源 advisory 不变。此前 76d4a7d7 的 Architecture Watch 37425003854 与 CI 37425003674 均已成功；本批提交与 CI 另查，不能据本地验证宣布整项或阶段完成。
+
+
+### 8.71 CFG-03：不可变配置发布与副作用准入
+
+- [state](../../packages/ts-shell/src/config/state.ts) 保存不可变有效配置、已接受偏好、递增 revision 和 workspace/session/trust/启动 overrides 绑定。候选 ticket 绑定 owner、代数和实际身份，只能消费一次；较旧、重复以及 A→B→A 前的候选不能应用资源。绑定转换先失效旧操作、保留设置并阻断准入，再按新绑定验证发布；不再用 raw reset 绕过主题准备。
+- [configuration](../../packages/ts-shell/src/core/shell/configuration.ts) 从 projectRoot 读取，保留冻结的显式启动参数并投影会话模型。结构化 valid/securityBlocked 区分普通警告、普通非法候选和安全错误，不解析诊断文案来决定成功。普通拒绝保留整份 last-good；安全字段、语法、无法读取或结构失败额外锁住后续副作用，只有完整有效发布能清除。主题先准备再提交；准备失败保留旧设置和 palette，意外提交异常为 application-unverified，不声称资源已恢复。
+- [application](../../packages/ts-shell/src/config/application.ts) 对现有文件字段完整声明生效时机，只显示字段名。主题立即应用；provider、工具池、上下文、重试等普通值在下一操作捕获。tui/tuiMode 保留当前实际安装值，requested 保存待重启偏好；重复 reload 仍显示待重启项。启动主题和显式状态栏保存由展示 owner 回报实际安装状态。
+- 普通运行快照固定不等于授权固定。工具在审批后、PreToolUse 后、执行前及最终文件访问检查准入；声明 hook 在异步授权返回后、真实进程启动前重查；provider transport 在签名准备之前和异步签名之后的实际 HTTP 派发前重查。MCP 将同一 admission 传入队列、连接、目录发现、调用和 stdio 启动，命令入口与工具目录读取也接入。信任 revision 包含进程内 epoch 与文件对象元数据，只作失效标记，不替代授权或改变既有信任存储语义。
+- provider bridge 读取已接受配置，主请求、自动压缩和缓存资源在账户刷新后使用同一最终解析结果；手动压缩、遗留摘要与 /btw 各自捕获操作快照。配置 agentMode 成为默认，显式会话选择仍优先。任何发布、拒绝、绑定转换或实际显示记录都会终止旧预热；成功 token 刷新也会保守停止该轮旧预热，可能到下一操作才恢复。账户刷新仍按 provider 范围写入、网络返回后取得基线，旧响应覆盖新登录的身份竞态未解决，不宣称凭据代际安全。
+- /reload 明确区分 applied/rejected/superseded/application-unverified，键绑定仅在配置接受后重载；后续键绑定失败单独报告未核验。connect 通过成功持久化回调决定是否刷新，查帮助、无效选择和未保存操作不应用其他磁盘修改；model/connect 分别报告保存与发布结果。文本状态、模型/连接选择器及 TUI 初始化读取已接受配置，避免未经 reload 的文件编辑被展示成正在运行的设置。
+- 定向比较参考设置管理器的重读和会话资源重建顺序，保留“设置与使用它的资源需要共同确定”的决定；未把分阶段重建当作跨资源原子事务。独立审查发现主题转换绕过准备、hook 授权后窗口、MCP 发现、异步签名窗口、磁盘状态读取、未保存 connect 刷新和待重启值混淆，均修正并加入回归；最终代码 APPROVE、架构 CLEAR。两个审查者接受预热的保守停止边界，并保留账户刷新持久化问题。
+- Linux、Node 20.3 隔离环境最终 50 文件/742 项与 build:ts 通过。前轮失败主要为旧 raw runtime 夹具未构造新配置 owner；最后一个失败为新测试通过 guarded writer 写入悬空活动连接，改成合法但尚未接受的模型变更后，保留状态快照断言。未给生产路径增加缺配置时的放行分支。组合存在既有 exit listener 警告，未修改无关监听器。
+- 十五组反转覆盖候选验证、安全锁定、代数、projectRoot、启动 overrides、主题提交、实际重启值、hook 授权后检查、签名后 HTTP、最终文件准入、MCP 连接后检查、provider 快照、两个选择器和确认保存后刷新，全部产生断言失败。十份源文件逐字节恢复并核对摘要，恢复后 8 文件/174 项通过；旧持久化批的反转没有充作本批证据。
+- regular/fullscreen 构建 CLI 各发五次本地合成 HTTP 请求：直接编辑文件仍用旧模型；普通非法值和缺失主题拒绝后仍用旧模型；有效 reload 使用新模型、temperature 0.2 和仅 read 工具池；报告待重启模式；损坏配置在 HTTP 前阻断，合法恢复后继续请求。两模式 exit 0，合成秘密不进入终端，未使用真实提供方配置。
+- import cycles、config consumers（40/40）、declarations（18 hooks/11 factories）、Node floor 与 docs strict 通过，43 项脚本测试通过。NormProof 阻断义务满足，整体 verdict 仍为 partial；既有四项函数数量 advisory 与 120 项文档来源 advisory 保留，没有把 advisory 当作全量架构通过。
+- CFG-03 的并发字段保存与版本 reload 验收已覆盖；完整来源/trust policy、模型能力交叉检查、CFG-04 settings/attentionOnIdle、CFG-05、SAFE-02 和其余 Phase 19 任务继续。前批 aabd4c1e 的 CI 37427035177 与 Architecture Watch 37427035249 均已成功；本批提交与远端结果另核，阶段总目标保持进行中。

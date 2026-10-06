@@ -6,7 +6,7 @@ import type { EscalationPrompt, EscalationResponse } from "../../core/shell/appr
 import type { PermissionScope } from "../approval/permissionScope.js";
 import type { InteractiveAsk } from "../../core/tools/ask/contract.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
-import { runCliRuntimeInvocation, type CliRuntimeInvocationResult } from "../../entrypoints/cliRuntimeInvocation.js";
+import { runCliRuntimeInvocation, type CliRuntimeInvocationResult, type CliRuntimeInvocationInput } from "../../entrypoints/cliRuntimeInvocation.js";
 import type { CompactionSetup } from "../../turn/session.js";
 import { pendingTurnInput } from "../../turn/pendingInput.js";
 import type { CacheWarmingRunner } from "../../turn/cacheWarm.js";
@@ -14,6 +14,9 @@ import type { CliProviderRuntimeBridge } from "../provider/cliProviderRuntimeBri
 import type { RuntimeConfig } from "../../config/runtimeConfig.js";
 
 export function streamCliRuntimePrompt(input: {
+  readonly admission?: CliRuntimeInvocationInput['admission'];
+  readonly onCredentialPersisted?: CliRuntimeInvocationInput['onCredentialPersisted'];
+  readonly prepareProviderResources?: CliRuntimeInvocationInput['prepareProviderResources'];
   readonly prompt: string;
   readonly continuityContext?: string;
   readonly onPromptAccepted?: () => void;
@@ -49,6 +52,9 @@ export function streamCliRuntimePrompt(input: {
   // reads start after the snapshot either way, so the promise is folded in
   // here rather than pushed into every caller's signature.
   const started = runCliRuntimeInvocation({
+    admission: input.admission,
+    onCredentialPersisted: input.onCredentialPersisted,
+    prepareProviderResources: input.prepareProviderResources,
     mcpGateway: input.mcpGateway,
     sessionId: input.sessionId,
     prompt: input.prompt,

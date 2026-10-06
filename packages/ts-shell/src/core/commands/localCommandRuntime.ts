@@ -5,7 +5,7 @@ import type { CommandContext, LocalCommandResult } from './types.js'
 import { needsUserEndpoint } from "../providers/facts.js";
 
 export async function runDoctorCommand(context: CommandContext): Promise<LocalCommandResult> {
-  const runtimeConfig = getRuntimeConfig(context.cwd)
+  const runtimeConfig = context.runtimeConfig ?? getRuntimeConfig(context.projectRoot ?? context.cwd)
   const gitContext = getWorkflowGitContext(context.cwd)
 
   const lines = [
@@ -66,7 +66,7 @@ export async function runWorkflowStatusCommand(context: CommandContext): Promise
 export async function runDiagnoseCommand(context: CommandContext, args: string[] = []): Promise<LocalCommandResult> {
   const invalid = rejectArguments("diagnose", args);
   if (invalid) return invalid;
-  const runtimeConfig = getRuntimeConfig(context.cwd)
+  const runtimeConfig = context.runtimeConfig ?? getRuntimeConfig(context.projectRoot ?? context.cwd)
   const diagnostics = getWorkflowGitDiagnostics(context.cwd, { limit: 12 })
   const lines = [
     'Repository diagnosis',

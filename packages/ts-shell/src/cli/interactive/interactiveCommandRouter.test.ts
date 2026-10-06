@@ -1,3 +1,5 @@
+import { ConfigState } from "../../config/state.js";
+import { configurationBinding } from "../../core/shell/configuration.js";
 import { describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
@@ -26,6 +28,8 @@ function createHarness() {
         addTurn: (_id: string, message: SessionMessage) => turns.push(structuredClone(message)),
       } as never,
       runtimeContext: {
+        runtimeConfig: getRuntimeConfig("/tmp/project-alpha"),
+        configuration: new ConfigState(getRuntimeConfig("/tmp/project-alpha"), configurationBinding({ projectRoot: "/tmp/project-alpha", session: { id: "sess_1234567890abcdef" } })),
         cwd: "/tmp/project-alpha",
         projectRoot: "/tmp/project-alpha",
         session: { id: "sess_1234567890abcdef" },

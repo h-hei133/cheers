@@ -3,7 +3,7 @@ import type { SessionManager } from "../../session/SessionManager.js";
 import type { Session } from "../../session/schema/sessionRecord.js";
 import type { ResumeResult } from "../../session/SessionManager.js";
 import type { WorkspaceRootMode } from "../../session/SessionManager.js";
-import type { RuntimeConfig } from "../../config/runtimeConfig.js";
+import type { RuntimeConfigOverrides, RuntimeConfig } from "../../config/runtimeConfig.js";
 import type { WorkflowGitContext } from "../../workflow/gitContext.js";
 import {
   createShellRuntimeContext,
@@ -94,6 +94,7 @@ export function bootstrapShellRuntime(input: {
   cwd: string;
   launchCwd?: string;
   runtimeConfig: RuntimeConfig;
+  runtimeConfigOverrides?: RuntimeConfigOverrides;
   /** How this run was asked to load skills; carried into the runtime context. */
   skillOptions?: {
     readonly skillPaths?: readonly string[];
@@ -320,6 +321,7 @@ export function bootstrapShellRuntime(input: {
       gitRoot: boundGitRoot,
       rootBindingDiagnostics,
       runtimeConfig: input.runtimeConfig,
+      runtimeConfigOverrides: input.runtimeConfigOverrides,
       ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
       ...(input.themePaths ? { themePaths: input.themePaths } : {}),
       gitContext: boundGitContext,

@@ -46,7 +46,7 @@ export function createConfigFields(providers: readonly string[]) {
     // Idle warming can spend money without a new prompt; only a personal choice enables it.
     cacheWarming: field(enumSchema(['off', 'streaming', 'idle']), personal),
     agentMode: field(enumSchema(['plan', 'build'])),
-    theme: field(nameSchema),
+    theme: field(nameSchema, withOverride),
     tuiMode: field(enumSchema(['regular', 'fullscreen'])),
     tui: field(objectSchema(tuiSchemas), undefined, 'tui'),
     retryEnabled: field(booleanSchema),

@@ -85,6 +85,19 @@ describe("connect command runtime", () => {
     );
   });
 
+  it('refreshes only after a confirmed save and reports publication rejection separately', async () => {
+    const config = configStore.getRuntimeConfig(workspaceRoot);
+    const refresh = vi.fn(() => ({ status: 'rejected' as const, before: config, after: config, revision: 1,
+      admissionBlocked: false, diagnostics: [], restartRequired: [] }));
+    const context = { cwd: workspaceRoot, refreshRuntimeConfig: refresh };
+    await runConnectCommand(['use', 'missing'], context);
+    expect(refresh).not.toHaveBeenCalled();
+    const result = await runConnectCommand(['login', 'openai', '--api-key', 'synthetic-key'], context);
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(result.output).toContain('Stored at:');
+    expect(result.output).toContain('Configuration was not applied (rejected)');
+  });
+
   it.each([
     ['--browser', 'unknown'], ['--browser', 'persisted'],
     ['--account', 'unknown'], ['--account', 'persisted'],

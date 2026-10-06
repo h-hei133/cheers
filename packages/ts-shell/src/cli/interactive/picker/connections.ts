@@ -26,7 +26,7 @@ export function connectionPicker(context: CommandContext): Picker {
     form: "panel",
     empty: "No providers available.",
     async load(): Promise<readonly Option[]> {
-      const config = readUserRuntimeConfigFile();
+      const config = context.runtimeConfig ?? readUserRuntimeConfigFile();
       const connections = normalizeConnections(config);
       const activeId = config.activeProviderConnectionId?.trim();
       const known = new Set<string>(connections.map((connection) => connection.provider));

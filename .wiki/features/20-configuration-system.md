@@ -3,9 +3,9 @@ title: "20：配置系统演进与高级参数模型设计"
 category: article
 sources: [user-experience-report-2026-10-05, current-source-28ff98ce, isolated-probes-2026-10-05, 14-user-experience-research, codex, oh-my-pi, pi]
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-06
 tags: [research, configuration, schema, validation, provenance, settings, registry]
-summary: "复核配置路径、局部校验、分层差异、attentionOnIdle 断线与 reload 行为；裁定保留现有 JSON 路径、按字段限定来源与信任、成熟 JSONC parser、无秘密诊断、并发安全字段补丁及版本化生效快照。Phase 19 字段验证与 JSONC 原文编辑首批已实施，revision/并发补丁/通知仍待完成。"
+summary: "复核配置路径、分层差异与通知接线；Phase 19 已实施字段验证、JSONC 原文编辑、基线字段补丁及 last-good revision reload，区分立即/下一操作/重启与安全撤销。完整来源/信任 policy、settings UI、通知和配置门禁继续。"
 confidence: high
 ---
 
@@ -132,7 +132,7 @@ Node `>=20.3.0`、TypeScript 和单文件分发不构成“零依赖”约束。
 
 来源需覆盖嵌套叶子和合并贡献，不只有顶层 winner。runtime 内部可保留解析定位；报告只投影可公开的 scope/来源标签，敏感值显示为已配置/未配置。必要时说明某层值为何被拒绝或遮蔽，而不回显秘密。
 
-每个候选配置带 revision、workspace identity、trust revision 和启动 overrides。后续 loader 应执行：读取 → 解析/迁移 → 字段来源过滤 → 校验/合并 → 跨字段检查 → 准备可应用资源 → **一次发布不可变 revision**。失败保留 last-good；并发较旧候选不得覆盖新 revision。
+每个候选配置带 revision、workspace identity、trust revision 和启动 overrides。loader 的目标顺序为：读取 → 解析/迁移 → 字段来源过滤 → 校验/合并 → 跨字段检查 → 准备可应用资源 → **一次发布不可变 revision**。失败保留 last-good；并发较旧候选不得覆盖新 revision。§8.3 已实施发布与应用边界，完整跨字段能力检查和迁移仍以各自验收为准。
 
 生效状态不能只用 `requiresRestart` 一个布尔量：
 
@@ -140,8 +140,8 @@ Node `>=20.3.0`、TypeScript 和单文件分发不构成“零依赖”约束。
 |---|---|
 | persisted | 对指定文件的字段补丁已提交且读取核验成功 |
 | effective | 当前运行组件实际消费的 revision/value |
-| next-turn | 已验证的变更将在下一个回合开始时使用；进行中的回合固定其快照 |
-| restart-required | 文件已保存，但现有 provider/工具池等资源尚未重建 |
+| next-turn / next operation | 已验证的普通设置在下一操作捕获；进行中的操作固定其快照，安全撤销和会话/工作区/信任变化仍在副作用前检查 |
+| restart-required | 已接受的偏好与当前安装的显示设置不同；目前为 tui/tuiMode，provider/工具配置在下一操作使用 |
 | rejected / not-saved | 候选或落盘失败，旧有效状态仍可辨认 |
 
 `/reload` 保留启动 CLI overrides，不因重读文件丢失 `--offline`、安全限制或其他显式启动值。主题预览回退、provider/工具资源替换和并发回合的生效边界分别由 owner 确认，不能发布一个“全已生效”的对象后才发现资源应用失败。
@@ -212,7 +212,7 @@ Node `>=20.3.0`、TypeScript 和单文件分发不构成“零依赖”约束。
 |---|---|---|
 | C1 | config 字段 policy、schema 与 revision 契约 | 逐字段 sources/trust/merge/apply 定义；保留 `/connect` 的个人认证与 CLI-only 边界；未来 schema 只读 |
 | C2 | config JSONC、诊断、迁移与持久化 | C1；成熟 parser 实测；字符串/注释/尾逗号/未闭合/深度/危险键；秘密不进日志；两个进程不同字段不丢更新 |
-| C3 | config loader 与 runtime reload | C1–C2；候选验证后原子发布；错误保留 last-good；保留启动 overrides；较旧候选失效；in-flight 回合固定 revision |
+| C3 | config loader 与 runtime reload | C1–C2；候选验证后发布；错误保留 last-good；保留启动 overrides；较旧候选失效；in-flight 普通设置固定 revision，安全撤销仍阻断新副作用 |
 | C4 | settings UI、provenance 与通知接线 | C3；persisted/effective/next-turn/restart 分离；scope 可见；保存失败不显示成功；通知行为验证 |
 | C5 | 配置接线门禁与回归用例 | 随 C1–C4 实施；检查允许来源与真实消费，保留模型/连接/安全政策语义 |
 
@@ -238,3 +238,14 @@ CFG-01 首批实现和证据见 [Phase 19 §8.68](phase-19-decisions.md#868-cfg-
 实施与证据见 [Phase 19 §8.70](phase-19-decisions.md#870-cfg-03基线字段补丁跨进程锁与保存结果)。writer 现在要求显式不可变基线，在既有文件锁内重读并只合并真正变化；普通叶子、数组、连接记录和凭据对象有不同冲突单位，外部删除/活动选择变化不会被旧请求静默覆盖。配置锁只回收明确死亡的本机 owner，保留未知 owner；JSONC 候选在写入前后核对精确原文，错误分别报告本次未写、最终状态未核验和已核验但清理失败。生产写入点均传递基线，异步模型 hook 与登录补写分支有对应回归。
 
 此进展取代 §8.1 中尚无锁与提交后核验的状态；没有承诺对非参与编辑器的原子 CAS、跨主机锁或断电持久性。账户刷新网络响应的身份绑定仍待处理。last-good revision reload、来源 UI、应用边界和通知接线仍未完成。
+
+
+### 8.3 不可变配置发布与安全撤销
+
+实施与验证见 [Phase 19 §8.71](phase-19-decisions.md#871-cfg-03不可变配置发布与副作用准入)。配置 owner 保存 last-good、递增 revision、绑定身份和一次性候选代数；从 projectRoot 重读并保留冻结的启动 overrides，先准备主题再发布。普通非法候选或主题准备失败保留旧设置；安全字段、语法、读取或结构失败同时锁住后续副作用准入，直到完整有效候选恢复。意外资源提交异常报告 application-unverified，不声称资源已回滚。
+
+主题立即应用；provider、工具、上下文、重试等普通值由下一操作捕获。自动压缩与主请求在账户刷新后使用同一份最终解析结果；手动压缩等独立操作各自捕获。当前安装的 tui/tuiMode 与已接受但待重启的偏好分开保存，重复 reload 仍显示待重启项。模型/连接状态与选择器显示已接受配置，connect 只有确认保存后才触发发布，并分别报告保存和应用结果。
+
+固定快照不冻结授权：会话/工作区/信任变化或安全阻断会使工具、审批后的 hook、实际签名后 HTTP 派发和 MCP 连接/发现/调用重新检查准入。信任 revision 是失效标记，不替代授权。每次发布、拒绝或绑定转换都会终止旧后台预热；成功 token 刷新也可能使预热暂停到下一操作，这是当前保守边界。
+
+此进展取代 §8.2 中 reload 尚未完成的状态。CFG-03 的字段补丁与版本发布本批已验证；不扩展为跨文件资源事务、凭据代际安全或完整来源 UI 的保证。账户刷新仍按 provider 范围保存、网络返回后取基线，旧响应覆盖新登录的竞态仍待修复。CFG-01 完整 provenance/trust 与模型能力检查、CFG-04 settings/attentionOnIdle、CFG-05 和 Phase 19 其他任务继续。

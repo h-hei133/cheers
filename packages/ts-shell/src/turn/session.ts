@@ -56,6 +56,7 @@ export interface CompactionSetup {
 }
 
 export interface TurnOptions {
+  readonly admission?: ToolGateOptions['admission'];
   readonly sessionId: string;
   /** Where the session's files live, when the caller knows. Carried into the event stream. */
   readonly sessionPath?: string;
@@ -163,6 +164,7 @@ function gateOptionsFor(
   emit: (event: QueryEvent) => void,
 ): ToolGateOptions {
   return {
+    admission: options.admission,
     sessionId: options.sessionId,
     workspaceRoot: options.workspaceRoot,
     agentMode: options.agentMode,

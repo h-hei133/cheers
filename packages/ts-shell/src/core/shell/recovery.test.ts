@@ -6,11 +6,11 @@ import type { AgentRunner } from "../../result/types.js";
 import { SessionManager } from "../../session/SessionManager.js";
 import { createQueryRuntimeStateFromSeed } from "../query/runtime/state.js";
 import { resolveSessionReference, resumeShellSession } from "./recovery.js";
-import type { ShellRuntimeContext } from "./runtimeContext.js";
+import { createShellRuntimeContext, type ShellRuntimeContext } from "./runtimeContext.js";
 import { ShellSessionRuntime } from "./sessionRuntime.js";
 
 function createRuntimeContext(): ShellRuntimeContext {
-  return {
+  return createShellRuntimeContext({
     cwd: "D:/repo",
     originalCwd: "D:/repo",
     projectRoot: "D:/repo",
@@ -19,6 +19,7 @@ function createRuntimeContext(): ShellRuntimeContext {
     targetPathBase: "D:/repo",
     gitRoot: "D:/repo",
     runtimeConfig: {
+      configValidation: { valid: true, securityBlocked: false }, configDiagnostics: [],
       provider: "openai",
       maxTurns: 6,
       disabledTools: [],
@@ -34,7 +35,7 @@ function createRuntimeContext(): ShellRuntimeContext {
     },
     session: { id: "sess_current" },
     activeSession: { sessionId: "sess_current", sessionProjectDir: "D:/repo" },
-  } as never;
+  } as never);
 }
 
 type ResumeShellSessionResult = Awaited<ReturnType<typeof resumeShellSession>>;
@@ -272,7 +273,7 @@ describe("shell recovery helpers", () => {
 
   it("does not partially mutate runtime context when resume fails", async () => {
     const lines: string[] = [];
-    const runtimeContext: ShellRuntimeContext = {
+    const runtimeContext: ShellRuntimeContext = createShellRuntimeContext({
       cwd: "D:/repo",
       originalCwd: "D:/repo",
       projectRoot: "D:/repo",
@@ -281,6 +282,7 @@ describe("shell recovery helpers", () => {
       targetPathBase: "D:/repo",
       gitRoot: "D:/repo",
       runtimeConfig: {
+        configValidation: { valid: true, securityBlocked: false }, configDiagnostics: [],
         provider: "openai",
         maxTurns: 6,
         disabledTools: [],
@@ -299,7 +301,7 @@ describe("shell recovery helpers", () => {
         sessionId: "sess_current",
         sessionProjectDir: "D:/repo",
       },
-    } as never;
+    } as never);
 
     const result = await resumeShellSession({
       requestedSessionId: "sess_missing",
@@ -372,7 +374,7 @@ describe("shell recovery helpers", () => {
 
   it("passes a replay-built runtime seed into resumed prompt execution", async () => {
     const lines: string[] = [];
-    const runtimeContext: ShellRuntimeContext = {
+    const runtimeContext: ShellRuntimeContext = createShellRuntimeContext({
       cwd: "D:/repo",
       originalCwd: "D:/repo",
       projectRoot: "D:/repo",
@@ -381,6 +383,7 @@ describe("shell recovery helpers", () => {
       targetPathBase: "D:/repo",
       gitRoot: "D:/repo",
       runtimeConfig: {
+        configValidation: { valid: true, securityBlocked: false }, configDiagnostics: [],
         provider: "openai",
         maxTurns: 6,
         disabledTools: [],
@@ -399,7 +402,7 @@ describe("shell recovery helpers", () => {
         sessionId: "sess_current",
         sessionProjectDir: "D:/repo",
       },
-    } as never;
+    } as never);
 
     const result = await resumeShellSession({
       requestedSessionId: "sess_resume",

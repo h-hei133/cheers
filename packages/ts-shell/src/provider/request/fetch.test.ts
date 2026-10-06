@@ -28,6 +28,27 @@ import { endpointShape } from "../endpoints/index.js";
 
 const servers: http.Server[] = [];
 
+it('checks admission after asynchronous signer setup and signing before HTTP dispatch', async () => {
+  let requests = 0;
+  const server = http.createServer((_request, response) => { requests++; response.end('{}'); });
+  servers.push(server);
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  for (const stage of ['setup', 'signing']) {
+    let blocked = false; let release!: () => void; let entered!: () => void;
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    const transport = providerFetchForEndpoint(undefined, 'fixture', () => ({ signer: async () => {
+      if (stage === 'setup') { entered(); await pending; }
+      return async () => { if (stage === 'signing') { entered(); await pending; } return {}; };
+    } }), () => blocked ? 'configuration revoked' : undefined);
+    const result = transport(url);
+    await started; blocked = true; release();
+    await expect(result).rejects.toThrow('configuration revoked');
+  }
+  expect(requests).toBe(0);
+});
+
 /** A server that accepts a connection and never answers. */
 async function startSilentServer(): Promise<string> {
   const server = http.createServer(() => {

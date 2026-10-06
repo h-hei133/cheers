@@ -69,6 +69,22 @@ describe("registering declared hooks", () => {
   const refusing = () => Promise.resolve(false);
   const homeDir = () => path.join(tempDir, "home");
 
+  it.each(['bypass', 'approval'])('does not launch a hook after revocation during %s', async stage => {
+    let blocked = false;
+    const dispatcher = new HookDispatcher();
+    registerDeclaredHooks(dispatcher, declareHook(markerCommand('revoked')), {
+      trustStore: new HookTrustStore(trustPath), homeDir: homeDir(), bypassed: stage === 'bypass',
+      admission: () => {
+        const reason = blocked ? 'configuration revoked' : undefined;
+        if (stage === 'bypass') queueMicrotask(() => { blocked = true; });
+        return reason;
+      },
+      requestApproval: async () => { blocked = true; return true; },
+    });
+    await fire(dispatcher);
+    expect(ran()).toEqual([]);
+  });
+
   it("does not run a hook the user refused", async () => {
     const dispatcher = new HookDispatcher();
     registerDeclaredHooks(dispatcher, declareHook(markerCommand("refused")), {

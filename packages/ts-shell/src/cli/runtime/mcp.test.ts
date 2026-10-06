@@ -1,3 +1,5 @@
+import { ConfigState } from "../../config/state.js";
+import { configurationBinding } from "../../core/shell/configuration.js";
 import { EventEmitter } from "node:events";
 import { createCliShutdown } from "./shutdown.js";
 import fs from "node:fs";
@@ -62,7 +64,10 @@ it("shows exactly the model pool, including skills and MCP, then reflects change
   fs.writeFileSync(skill, "---\nname: inspect-fixture\ndescription: Inspect this test fixture\n---\nRead the fixture.\n");
   const runtimeConfig = { ...input().runtimeConfig!, allowedTools: ["read", "skill", "mcp__local__echo_message"],
     disabledTools: [], hiddenToolPrefixes: [] };
-  const context = { cwd: root, projectRoot: root, runtimeConfig, skillOptions: { skillPaths: [skill], noSkills: true } } as ShellRuntimeContext;
+  const binding = configurationBinding({ projectRoot: root, session: { id: 'mcp-inspection' } });
+  const configuration = new ConfigState(runtimeConfig, binding);
+  const context = { cwd: root, projectRoot: root, session: { id: 'mcp-inspection' }, configuration,
+    get runtimeConfig() { return configuration.current.config; }, skillOptions: { skillPaths: [skill], noSkills: true } } as ShellRuntimeContext;
   const getToolPool = toolPoolFor(context, gateway);
   const report = await runToolsCommand([], { cwd: root, getToolPool });
   let names: string[] = [];
@@ -81,13 +86,16 @@ it("shows exactly the model pool, including skills and MCP, then reflects change
   expect(report.output).toContain("### Tools (3)");
   expect(starts()).toHaveLength(1);
   expect(alive(starts()[0]!)).toBe(true);
-  context.runtimeConfig = { ...runtimeConfig, disabledTools: ["skill"], hiddenToolPrefixes: ["mcp__"] };
+  configuration.publish(configuration.begin(binding), { ...runtimeConfig, disabledTools: ["skill"], hiddenToolPrefixes: ["mcp__"] }, binding);
   const filtered = await runToolsCommand([], { cwd: root, getToolPool });
   expect(filtered.output).toContain("### Tools (1)");
   expect(filtered.output).not.toContain("| `skill`");
   expect(filtered.output).not.toContain("| `mcp__");
-  context.runtimeConfig = { ...runtimeConfig, allowedTools: [], enableMcpTools: false };
+  configuration.publish(configuration.begin(binding), { ...runtimeConfig, allowedTools: [], enableMcpTools: false }, binding);
   expect((await runToolsCommand([], { cwd: root, getToolPool })).output).toContain("### Tools (0)");
+  expect(snapshot).toHaveBeenCalledTimes(3);
+  configuration.publish(configuration.begin(binding), { ...runtimeConfig, configValidation: { valid: false, securityBlocked: true } }, binding);
+  await expect(getToolPool()).rejects.toThrow('Configuration safety validation failed');
   expect(snapshot).toHaveBeenCalledTimes(3);
 });
 

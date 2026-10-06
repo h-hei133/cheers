@@ -34,6 +34,7 @@ export async function runProviderAccountAuthLogin(input: {
   readonly providerLabel: string;
   readonly defaultModel?: string;
   readonly labelOverride?: string;
+  readonly onPersisted?: () => void;
 }): Promise<string> {
   const contract = resolveProviderAuthContract(input.provider);
   if (!contract) {
@@ -63,6 +64,7 @@ export async function runProviderAccountAuthLogin(input: {
     connectionId,
     pendingConnection,
   });
+  input.onPersisted?.();
 
   try {
     const authResult = await contract.loginAccountAuth();
@@ -79,6 +81,7 @@ export async function runProviderAccountAuthLogin(input: {
       authorizeUrl: authResult.authorizeUrl,
       callbackUrl: authResult.callbackUrl,
     });
+    input.onPersisted?.();
 
     return [
       `${input.providerLabel} account-auth connected via browser login.`,
@@ -96,6 +99,7 @@ export async function runProviderAccountAuthLogin(input: {
       patchKind: "mark-error",
       connectionId,
     });
+    input.onPersisted?.();
     return [
       `${input.providerLabel} account-auth login failed.`,
       `Connection ID: ${connectionId}`,

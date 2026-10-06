@@ -1,3 +1,4 @@
+import { configurationApplicationNotice } from "./configuration.js";
 import { ConfigWriteError } from '../../config/outcome.js';
 import { connectSyntax, parseConnectArgs } from "./connect/syntax.js";
 import { syntaxHelp } from "./syntax/projection.js";
@@ -71,7 +72,7 @@ export function __setOpenAIAccountAuthRunnerForTest(
 
 export async function runConnectCommand(
   args: string[],
-  _context: CommandContext,
+  context: CommandContext,
 ): Promise<LocalCommandResult> {
   const parsed = parseConnectArgs(args);
   if (!parsed.ok) return { kind: "local", output: `Invalid /connect arguments: ${parsed.reason}\n${syntaxHelp(connectSyntax)}` };
@@ -82,36 +83,26 @@ export async function runConnectCommand(
   }
 
   if (action === "status" || action === "list") {
-    return { kind: "local", output: renderConnectionStatus() };
+    return { kind: "local", output: renderConnectionStatus(context.runtimeConfig) };
   }
 
   if (action === "presets") {
     return { kind: "local", output: renderPresetCatalog() };
   }
 
-  if (action === "login") {
-    return { kind: "local", output: await addConnection(rest) };
-  }
+  let persisted = false;
+  const onPersisted = () => { persisted = true; };
+  let output: string;
+  if (action === "login") output = await addConnection(rest, onPersisted);
+  else if (action === "set") output = await addConnectionFromLegacyAuthSet(rest, onPersisted);
+  else if (action === "use" || action === "activate") output = activateConnection(rest, onPersisted);
+  else if (action === "logout" || action === "remove" || action === "rm") output = removeConnection(rest, onPersisted);
+  else return { kind: "local", output: `Unknown /connect action: ${action}\n\n${getConnectHelpText()}` };
+  return { kind: "local", output: [output, persisted ? configurationApplicationNotice(context) : undefined].filter(Boolean).join('\n') };
 
-  if (action === "set") {
-    return { kind: "local", output: await addConnectionFromLegacyAuthSet(rest) };
-  }
-
-  if (action === "use" || action === "activate") {
-    return { kind: "local", output: activateConnection(rest) };
-  }
-
-  if (action === "logout" || action === "remove" || action === "rm") {
-    return { kind: "local", output: removeConnection(rest) };
-  }
-
-  return {
-    kind: "local",
-    output: `Unknown /connect action: ${action}\n\n${getConnectHelpText()}`,
-  };
 }
 
-export async function addConnection(args: string[]): Promise<string> {
+export async function addConnection(args: string[], onPersisted?: () => void): Promise<string> {
   const syntax = parseConnectArgs(["login", ...args]);
   if (!syntax.ok) return `Invalid /connect arguments: ${syntax.reason}\n${syntaxHelp(connectSyntax)}`;
   const parsed = { positionals: syntax.args, flags: Object.fromEntries(syntax.flags) };
@@ -126,11 +117,11 @@ export async function addConnection(args: string[]): Promise<string> {
   }
 
   if (parsed.flags.account === true) {
-    return await runAccountAuthConnection(target, parsed.flags.label);
+    return await runAccountAuthConnection(target, parsed.flags.label, onPersisted);
   }
 
   if (parsed.flags.browser === true) {
-    return await runBrowserAssistedCaptureConnection(target, parsed.flags.label);
+    return await runBrowserAssistedCaptureConnection(target, parsed.flags.label, onPersisted);
   }
 
   const apiKey = parseFlagValue(parsed.flags["api-key"] ?? parsed.flags.key);
@@ -190,6 +181,7 @@ export async function addConnection(args: string[]): Promise<string> {
     },
   };
   const configPath = writeUserRuntimeConfigFile(next, edit);
+  onPersisted?.();
 
   return [
     `Connected provider ${target.provider}.`,
@@ -204,7 +196,7 @@ export async function addConnection(args: string[]): Promise<string> {
   ].join("\n");
 }
 
-export async function addConnectionFromLegacyAuthSet(args: string[]): Promise<string> {
+export async function addConnectionFromLegacyAuthSet(args: string[], onPersisted?: () => void): Promise<string> {
   const syntax = parseConnectArgs(["set", ...args]);
   if (!syntax.ok) return `Invalid /connect arguments: ${syntax.reason}\n${syntaxHelp(connectSyntax)}`;
   args = [...syntax.args];
@@ -228,7 +220,7 @@ export async function addConnectionFromLegacyAuthSet(args: string[]): Promise<st
     forwardedArgs.push("--model", model);
   }
 
-  const result = await addConnection(forwardedArgs);
+  const result = await addConnection(forwardedArgs, onPersisted);
   return [
     result,
     "",
@@ -236,7 +228,7 @@ export async function addConnectionFromLegacyAuthSet(args: string[]): Promise<st
   ].join("\n");
 }
 
-export function activateConnection(args: string[]): string {
+export function activateConnection(args: string[], onPersisted?: () => void): string {
   const syntax = parseConnectArgs(["use", ...args]);
   if (!syntax.ok) return `Invalid /connect arguments: ${syntax.reason}\n${syntaxHelp(connectSyntax)}`;
   args = [...syntax.args];
@@ -272,6 +264,7 @@ export function activateConnection(args: string[]): string {
     providerConnections: nextConnections,
   };
   const configPath = writeUserRuntimeConfigFile(next, edit);
+  onPersisted?.();
 
   return [
     `Active connection switched to ${selected.id}.`,
@@ -281,7 +274,7 @@ export function activateConnection(args: string[]): string {
   ].join("\n");
 }
 
-export function removeConnection(args: string[]): string {
+export function removeConnection(args: string[], onPersisted?: () => void): string {
   const syntax = parseConnectArgs(["logout", ...args]);
   if (!syntax.ok) return `Invalid /connect arguments: ${syntax.reason}\n${syntaxHelp(connectSyntax)}`;
   args = [...syntax.args];
@@ -316,6 +309,7 @@ export function removeConnection(args: string[]): string {
         : userConfig.provider,
   };
   const configPath = writeUserRuntimeConfigFile(next, edit);
+  onPersisted?.();
 
   return [
     `Disconnected provider connection ${existing.id}.`,
@@ -329,6 +323,7 @@ export function removeConnection(args: string[]): string {
 export async function runBrowserAssistedCaptureConnection(
   target: ConnectPreset,
   labelFlag?: string | boolean,
+  onPersisted?: () => void,
 ): Promise<string> {
   const now = new Date().toISOString();
   const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
@@ -354,6 +349,7 @@ export async function runBrowserAssistedCaptureConnection(
     ...userConfig,
     providerConnections: [pendingConnection, ...normalizeConnections(userConfig)],
   }, edit);
+  onPersisted?.();
 
   try {
     const browserResult = await browserFlowRunner({
@@ -405,6 +401,7 @@ export async function runBrowserAssistedCaptureConnection(
       },
     };
     const configPath = writeUserRuntimeConfigFile(next, edit);
+  onPersisted?.();
 
     return [
       `Browser-assisted local credential capture completed for ${target.provider}.`,
@@ -438,6 +435,7 @@ export async function runBrowserAssistedCaptureConnection(
       ...latest,
       providerConnections: nextConnections,
     }, edit);
+    onPersisted?.();
     return [
       `Browser-assisted local credential capture failed for ${target.provider}.`,
       `Connection ID: ${connectionId}`,
@@ -452,11 +450,13 @@ export async function runBrowserAssistedCaptureConnection(
 export async function runAccountAuthConnection(
   target: ConnectPreset,
   labelFlag?: string | boolean,
+  onPersisted?: () => void,
 ): Promise<string> {
   return runProviderAccountAuthLogin({
     provider: target.provider,
     providerLabel: target.label,
     defaultModel: target.defaultModel,
     labelOverride: parseFlagValue(labelFlag),
+    onPersisted,
   });
 }

@@ -1,4 +1,5 @@
 import type { CoreMcpGateway } from "../../core/mcp/gateway.js";
+import { configurationAdmission } from '../../core/shell/configuration.js';
 import { getRuntimeConfig, type RuntimeConfigOverrides } from "../../config/runtimeConfig.js";
 import type {
   ShellBootstrapResult,
@@ -116,6 +117,7 @@ export function createCliBootstrapRuntimeContext(
         cwd: input.rootContext.workspaceRoot,
         launchCwd: input.launchCwd,
         runtimeConfig: input.rootContext.runtimeConfig,
+        runtimeConfigOverrides: configOverrides(input.options),
         ...(input.options.skillPaths || input.options.noSkills
           ? {
               skillOptions: {
@@ -146,8 +148,7 @@ export function createCliBootstrapRuntimeContext(
     }
   })();
   const runtimeContext = bootstrap.context;
-  runtimeContext.runtimeConfigOverrides = configOverrides(input.options);
-  const mcpGateway = createCliMcpGateway(() => runtimeContext.cwd);
+  const mcpGateway = createCliMcpGateway(() => runtimeContext.cwd, () => configurationAdmission(runtimeContext));
 
   return {
     ...input.rootContext,
@@ -179,6 +180,7 @@ export function logCliBootstrapSessionInitialized(
 
 function configOverrides(options: CliOptions): RuntimeConfigOverrides {
   return {
+    theme: options.useTheme,
     // Zero is the loader's opt-out, so the flag needs no separate path through
     // the prompt builder.
     instructionBudgetBytes: options.noContextFiles ? 0 : undefined,

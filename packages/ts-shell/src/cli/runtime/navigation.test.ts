@@ -1,3 +1,6 @@
+import { getRuntimeConfig } from "../../config/runtimeConfig.js";
+import { ConfigState } from "../../config/state.js";
+import { configurationBinding } from "../../core/shell/configuration.js";
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -35,7 +38,8 @@ function harness() {
   const lines: string[] = [];
   const input = {
     sessionManager: manager,
-    runtimeContext: { session, cwd: root, projectRoot: root } as never,
+    runtimeContext: { session, cwd: root, projectRoot: root, runtimeConfig: getRuntimeConfig(root),
+      configuration: new ConfigState(getRuntimeConfig(root), configurationBinding({ session, projectRoot: root })) } as never,
     sessionRuntime: { getState: () => "idle", summarizeAbandonedTurns: summarize } as never,
     renderer: { renderLine: (line: string) => lines.push(line) } as never,
     readline: {} as never, mcpGateway: {} as never, logger: {} as never,

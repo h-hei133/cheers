@@ -54,6 +54,7 @@ export type PromptRun =
   | { readonly events: AsyncIterable<QueryEvent>; readonly input?: TurnInput; readonly sourceEntryId?: () => string | undefined };
 
 export interface SessionRuntimeDependencies {
+  readonly configuredAgentMode?: () => 'plan' | 'build' | undefined;
   readonly sessionManager: SessionManager;
   readonly renderer: StreamingRenderer;
   readonly runPrompt: (
@@ -96,7 +97,7 @@ export class ShellSessionRuntime {
   private lastRun: Promise<string> | null = null;
   private viewMode: "compact" | "verbose" = "compact";
   private permissionScope: PermissionScope = "ask";
-  private agentMode: "plan" | "build" = "build";
+  private agentMode?: "plan" | "build";
 
   constructor(deps: SessionRuntimeDependencies) {
     this.deps = deps;
@@ -153,7 +154,7 @@ export class ShellSessionRuntime {
   }
 
   getAgentMode(): "plan" | "build" {
-    return this.agentMode;
+    return this.agentMode ?? this.deps.configuredAgentMode?.() ?? 'build';
   }
 
   setAgentMode(mode: "plan" | "build"): void {

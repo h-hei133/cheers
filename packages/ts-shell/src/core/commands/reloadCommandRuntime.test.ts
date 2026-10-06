@@ -1,139 +1,114 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { runReloadCommand } from "./reloadCommandRuntime.js";
-import { getRuntimeConfig, type RuntimeConfig } from "../../config/runtimeConfig.js";
-import { applyTheme, currentTheme, defaultTheme } from "../../presentation/theme/theme.js";
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { runReloadCommand } from './reloadCommandRuntime.js';
+import { getRuntimeConfig, getUserRuntimeConfigPath, getProjectConfigPath } from '../../config/runtimeConfig.js';
+import { createShellRuntimeContext, refreshShellRuntimeConfig, applyShellSubstrateTransition } from '../shell/runtimeContext.js';
+import { configurationAdmission } from '../shell/configuration.js';
+import { currentTheme, defaultTheme } from '../../presentation/theme/theme.js';
+import { selectTheme, selectedTheme, updateAppearance } from '../../presentation/theme/selection.js';
+import { createCliProviderRuntimeBridge } from '../../cli/provider/cliProviderRuntimeBridge.js';
 
-import { selectTheme, selectedTheme, updateAppearance } from "../../presentation/theme/selection.js";
-
-afterEach(() => { selectTheme("dark"); updateAppearance("dark"); });
-
-/** A context whose settings are replaced in place, as the session does. */
-function contextWith(initial: RuntimeConfig, next?: RuntimeConfig) {
-  const holder = { config: initial };
-  return {
-    context: {
-      cwd: "/tmp/reload-under-test",
-      refreshRuntimeConfig: () => {
-        const before = holder.config;
-        holder.config = next ?? before;
-        return { before, after: holder.config };
-      },
-    } as never,
-    holder,
-  };
+let root: string;
+let file: string;
+beforeEach(() => {
+  root = fs.mkdtempSync(path.join(os.tmpdir(), 'reload-'));
+  vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root);
+  file = getUserRuntimeConfigPath(); fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, '{"maxTurns":12,"theme":"dark"}');
+  selectTheme('dark');
+});
+afterEach(() => { selectTheme('dark'); updateAppearance('dark'); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
+function runtime(overrides = {}) {
+  const context = createShellRuntimeContext({ cwd: path.join(root, 'subdir'), originalCwd: root,
+    projectRoot: root, rootMode: 'direct', targetPathBase: root, gitRoot: null,
+    gitContext: { insideGit: false, root: null, branch: null, isClean: true },
+    runtimeConfig: getRuntimeConfig(root, overrides), runtimeConfigOverrides: overrides,
+    session: { id: 'reload-session', createdAt: 'now', updatedAt: 'now', status: 'active', turns: [] },
+  });
+  return { context, command: { cwd: context.cwd, refreshRuntimeConfig: () => refreshShellRuntimeConfig(context) } };
 }
 
-describe("/reload", () => {
-  it("replaces the session's settings with freshly read ones", async () => {
-    // Configuration is read once at startup, so without this a mid-session edit
-    // changes nothing until restart and says nothing about why.
-    const first = getRuntimeConfig("/tmp/nonexistent-a");
-    const second = getRuntimeConfig("/tmp/nonexistent-b", { instructionBudgetBytes: 0 });
-    const { context, holder } = contextWith(first, second);
+it('publishes valid settings from the project root and reports their application boundary', async () => {
+  const { context, command } = runtime();
+  const projectFile = getProjectConfigPath(root); fs.mkdirSync(path.dirname(projectFile), { recursive: true });
+  fs.writeFileSync(projectFile, '{"instructionBudgetBytes":0}');
+  fs.writeFileSync(file, '{"maxTurns":7,"theme":"light","tuiMode":"regular"}');
+  const result = await runReloadCommand([], command);
+  expect(context.runtimeConfig.maxTurns).toBe(7); expect(context.runtimeConfig.instructionBudgetBytes).toBe(0);
+  expect(defaultTheme.name).toBe('light');
+  expect(result.output).toContain('maxTurns: changed (next operation)');
+  expect(result.output).toContain('Applied theme `light`');
+  expect(result.output).toContain('Restart required: tuiMode');
+  expect(context.runtimeConfig.tuiMode).toBe('fullscreen');
+  expect(context.configuration.current.requested.tuiMode).toBe('regular');
+  const again = await runReloadCommand([], command);
+  expect(again.output).toContain('No configuration values changed.');
+  expect(again.output).toContain('Restart required: tuiMode');
+});
 
-    await runReloadCommand([], context);
+it('keeps all accepted settings and theme when theme preparation fails', async () => {
+  const { context, command } = runtime(); const before = context.runtimeConfig; const revision = defaultTheme.colorRevision;
+  fs.writeFileSync(file, '{"theme":"no-such-theme","maxTurns":7}');
+  const result = await runReloadCommand([], command);
+  expect(result.output).toContain('reload rejected'); expect(result.output).not.toContain('Re-read configuration.');
+  expect(context.runtimeConfig).toBe(before); expect(defaultTheme.colorRevision).toBe(revision);
+  expect(currentTheme()).toBe('dark');
+});
 
-    expect(holder.config.instructionBudgetBytes).toBe(0);
-  });
+it.each(['{"maxTurns":"wrong"}', '{broken', '{"allowedTools":false}'])('rejects %s without provider or settings fallback', async text => {
+  fs.writeFileSync(file, JSON.stringify({ maxTurns: 12, providerCredentials: { openai: { apiKey: 'synthetic-first-key', model: 'first-model', baseUrl: 'http://127.0.0.1:1' } } }));
+  const { context, command } = runtime(); const before = context.runtimeConfig;
+  const bridge = createCliProviderRuntimeBridge({ runtimeConfig: () => context.runtimeConfig, options: {}, env: {} });
+  const credential = bridge.resolveCredentialSnapshot();
+  expect(credential.model).toBe('first-model');
+  const admission = configurationAdmission(context);
+  fs.writeFileSync(file, text);
+  const result = await runReloadCommand([], command);
+  expect(result.output).toContain('reload rejected'); expect(context.runtimeConfig).toBe(before);
+  expect(bridge.resolveCredentialSnapshot()).toEqual(credential);
+  expect(Boolean(admission())).toBe(text !== '{"maxTurns":"wrong"}');
+  fs.writeFileSync(file, '{"maxTurns":9}');
+  expect((await runReloadCommand([], command)).output).toContain('Re-read configuration.');
+  expect(admission()).toBeUndefined(); expect(context.runtimeConfig.maxTurns).toBe(9);
+});
 
-  it("names the settings that changed", async () => {
-    const first = getRuntimeConfig("/tmp/nonexistent-a");
-    const second = getRuntimeConfig("/tmp/nonexistent-b", { instructionBudgetBytes: 0 });
-    const { context } = contextWith(first, second);
+it('preserves explicit launch overrides and applies automatic appearance', async () => {
+  const { context, command } = runtime({ theme: 'auto', offline: true });
+  updateAppearance('light');
+  fs.writeFileSync(file, '{"theme":"dark","offline":false}');
+  await runReloadCommand([], command);
+  expect(context.runtimeConfig.theme).toBe('auto'); expect(context.runtimeConfig.offline).toBe(true);
+  expect(selectedTheme()).toBe('auto'); expect(currentTheme()).toBe('light');
+  expect(Object.isFrozen(context.runtimeConfigOverrides)).toBe(true);
+});
 
-    const result = await runReloadCommand([], context);
+it('revokes old operations across same-session transitions and retires background work on rejection', () => {
+  const { context } = runtime(); const admission = configurationAdmission(context);
+  const oldBackground = context.configuration.backgroundSignal;
+  fs.writeFileSync(file, '{"maxTurns":"wrong"}');
+  refreshShellRuntimeConfig(context);
+  expect(oldBackground.aborted).toBe(true); expect(admission()).toBeUndefined();
+  fs.writeFileSync(file, '{}');
+  applyShellSubstrateTransition(context, { cwd: root });
+  applyShellSubstrateTransition(context, { cwd: path.join(root, 'subdir') });
+  expect(admission()).toContain('start a new operation');
+});
 
-    expect(result.output).toContain("instructionBudgetBytes");
-  });
+it('prepares themes on workspace transitions and blocks the new binding on preparation failure', () => {
+  const { context } = runtime();
+  fs.writeFileSync(file, '{"theme":"light"}');
+  applyShellSubstrateTransition(context, { cwd: root });
+  expect(currentTheme()).toBe('light'); expect(context.runtimeConfig.theme).toBe('light');
+  fs.writeFileSync(file, '{"theme":"missing-fixture"}');
+  applyShellSubstrateTransition(context, { cwd: path.join(root, 'subdir') });
+  expect(currentTheme()).toBe('light'); expect(context.runtimeConfig.theme).toBe('light');
+  expect(configurationAdmission(context)()).toContain('safety validation failed');
+});
 
-  it("says so when nothing changed", async () => {
-    const same = getRuntimeConfig("/tmp/nonexistent-a");
-    const { context } = contextWith(same, same);
-
-    const result = await runReloadCommand([], context);
-
-    expect(result.output).toContain("No configuration values changed.");
-  });
-
-  it("keeps working settings when the new ones cannot be read", async () => {
-    // A file that no longer parses must not replace settings that still work —
-    // the session would be left with no configuration at all.
-    const first = getRuntimeConfig("/tmp/nonexistent-a");
-    const { context, holder } = contextWith(first);
-    (context as { refreshRuntimeConfig: () => never }).refreshRuntimeConfig = () => {
-      throw new Error("config.json is not valid JSON");
-    };
-
-    const result = await runReloadCommand([], context);
-
-    expect(result.output).toContain("Could not re-read configuration");
-    expect(holder.config).toBe(first);
-  });
-
-  it("says what it cannot refresh rather than implying everything was", async () => {
-    const same = getRuntimeConfig("/tmp/nonexistent-a");
-    const { context } = contextWith(same, same);
-
-    const result = await runReloadCommand([], context);
-
-    expect(result.output).toContain("restart");
-  });
-
-  it("explains itself when the caller has no session to refresh", async () => {
-    const result = await runReloadCommand([], { cwd: "/tmp" } as never);
-
-    expect(result.output).toContain("Restart");
-  });
-
-  it("applies the theme it just read, rather than only reporting it", async () => {
-    // Reporting `theme: "dark" → "light"` while the screen stays dark teaches the
-    // reader to distrust the command. The report and the screen have to agree.
-    const first = getRuntimeConfig("/tmp/nonexistent-a");
-    const second = { ...first, theme: "light" as const };
-    const { context } = contextWith(first, second);
-
-    const result = await runReloadCommand([], context);
-
-    expect(result.output).toContain("theme");
-    expect(result.output).toContain("Applied theme `light`");
-    // The shared palette every surface renders with is the observable effect.
-    expect(defaultTheme.name).toBe("light");
-    // Restored because the palette is a module-level singleton: leaving it light
-    // would hand every later test in this worker a different starting state.
-    applyTheme("dark");
-  });
-
-  it("applies auto selection using the last reported appearance", async () => {
-    selectTheme("dark");
-    updateAppearance("light");
-    const first = getRuntimeConfig("/tmp/nonexistent-a");
-    const second = { ...first, theme: "auto" as const };
-    const { context } = contextWith(first, second);
-
-    const result = await runReloadCommand([], context);
-
-    expect(result.output).toContain("Following terminal appearance (currently `light`)");
-    expect(selectedTheme()).toBe("auto");
-    expect(currentTheme()).toBe("light");
-  });
-
-  it("keeps the reload working when the named theme no longer loads", async () => {
-    // A broken theme must not cost the settings that did reload.
-    const first = getRuntimeConfig("/tmp/nonexistent-a");
-    const second = { ...first, theme: "no-such-theme", instructionBudgetBytes: 0 };
-    const { context, holder } = contextWith(first, second);
-    const active = currentTheme();
-    const revision = defaultTheme.colorRevision;
-
-    const result = await runReloadCommand([], context);
-
-    expect(result.output).toContain("Re-read configuration");
-    expect(result.output).not.toContain("Applied theme");
-    expect(result.output).toContain("Theme 'no-such-theme' could not be applied: Theme not found");
-    expect(result.output).toContain(`Keeping active theme \`${active}\``);
-    expect(result.output).toContain("Configuration changes:");
-    expect(holder.config.instructionBudgetBytes).toBe(0);
-    expect(currentTheme()).toBe(active);
-    expect(defaultTheme.colorRevision).toBe(revision);
-  });
+it('reports missing sessions and unexpected refresh errors without claiming success', async () => {
+  expect((await runReloadCommand([], { cwd: root })).output).toContain('Restart');
+  const result = await runReloadCommand([], { cwd: root, refreshRuntimeConfig: () => { throw new Error('private detail'); } });
+  expect(result.output).toContain('unverified'); expect(result.output).not.toContain('private detail');
 });

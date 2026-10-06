@@ -1,3 +1,4 @@
+import { configurationApplicationNotice } from "./configuration.js";
 import { ConfigWriteError } from '../../config/outcome.js';
 import {
   RUNTIME_PROVIDERS,
@@ -5,7 +6,7 @@ import {
   readRuntimeConfigEditAt, getUserRuntimeConfigPath,
   writeUserRuntimeConfigFile,
   type ProviderConnectionConfig,
-  type RuntimeConfigFile,
+  type RuntimeConfigFile, type RuntimeConfig,
   type RuntimeProvider,
 } from "../../config/runtimeConfig.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
@@ -54,10 +55,10 @@ export async function runModelCommand(
   const action = parsed.action.name;
   const rest = [...parsed.args];
   if (!action) {
-    return { kind: "local", output: renderCatalogView(context.sessionId) };
+    return { kind: "local", output: renderCatalogView(context) };
   }
   if (action === "status") {
-    return { kind: "local", output: renderModelStatus(context.sessionId) };
+    return { kind: "local", output: renderModelStatus(context) };
   }
   if (action === "refresh") {
     const result = await refreshCatalog();
@@ -81,7 +82,7 @@ export async function runModelCommand(
   }
 
   if (action === "list" || action === "ls") {
-    return { kind: "local", output: await listModels(rest, parsed.flags.has("refresh"), context.sessionId) };
+    return { kind: "local", output: await listModels(rest, parsed.flags.has("refresh"), context) };
   }
 
   if (action === "use" || action === "set") {
@@ -103,8 +104,8 @@ export async function runModelCommand(
  * models together — the old bare form answered "what am I using", which is
  * `/model status`.
  */
-function renderCatalogView(sessionId?: string): string {
-  const config = projectSessionModel(readUserRuntimeConfigFile(), sessionId);
+function renderCatalogView(context: CommandContext): string {
+  const config = context.runtimeConfig ?? projectSessionModel(readUserRuntimeConfigFile(), context.sessionId);
   const connections = normalizeConnections(config);
   const activeId = config.activeProviderConnectionId?.trim();
   const active = connections.find((item) => item.id === activeId);
@@ -120,8 +121,8 @@ function renderCatalogView(sessionId?: string): string {
   });
 }
 
-function renderModelStatus(sessionId?: string): string {
-  const config = projectSessionModel(readUserRuntimeConfigFile(), sessionId);
+function renderModelStatus(context: CommandContext): string {
+  const config = context.runtimeConfig ?? projectSessionModel(readUserRuntimeConfigFile(), context.sessionId);
   const connections = normalizeConnections(config);
   const activeId = config.activeProviderConnectionId?.trim();
   const activeConnection = connections.find((item) => item.id === activeId);
@@ -240,8 +241,8 @@ export interface ModelCatalog {
  * text. Shares the provider, auth, and fallback resolution with `/model list` so
  * the two can never offer different models.
  */
-export async function readModelCatalog(refresh = false, sessionId?: string): Promise<ModelCatalog> {
-  const config = projectSessionModel(readUserRuntimeConfigFile(), sessionId);
+export async function readModelCatalog(refresh = false, sessionId?: string, runtimeConfig?: RuntimeConfig): Promise<ModelCatalog> {
+  const config = runtimeConfig ?? projectSessionModel(readUserRuntimeConfigFile(), sessionId);
   const connections = normalizeConnections(config);
   const activeId = config.activeProviderConnectionId?.trim();
   const activeConnection = connections.find((item) => item.id === activeId);
@@ -259,10 +260,10 @@ export async function readModelCatalog(refresh = false, sessionId?: string): Pro
   return { provider, models: fallbackModelsForProvider(provider, authType), active, offline: true };
 }
 
-async function listModels(args: string[], refresh: boolean, sessionId?: string): Promise<string> {
+async function listModels(args: string[], refresh: boolean, context: CommandContext): Promise<string> {
   const providerHint = normalizeProvider(args[0]);
   if (args[0] && !providerHint) return "Unknown provider. Use /model to inspect the catalogue.";
-  const config = projectSessionModel(readUserRuntimeConfigFile(), sessionId);
+  const config = context.runtimeConfig ?? projectSessionModel(readUserRuntimeConfigFile(), context.sessionId);
   const connections = normalizeConnections(config);
   const activeId = config.activeProviderConnectionId?.trim();
   const activeConnection = connections.find((item) => item.id === activeId);
@@ -400,14 +401,15 @@ async function setModel(args: string[], context: CommandContext, global: boolean
     try {
       configPath = writeUserRuntimeConfigFile(next, edit);
     } catch (error) {
-      context.refreshRuntimeConfig?.();
-      if (error instanceof ConfigWriteError) return `${context.sessionId ? `Session model switched to ${model}. ` : ''}${error.message}`;
+      const applicationNotice = configurationApplicationNotice(context);
+      if (error instanceof ConfigWriteError) return `${context.sessionId ? `Session model preference saved for ${model}. ` : ''}${error.message}${applicationNotice ? ` ${applicationNotice}` : ''}`;
       return context.sessionId
         ? `Session model switched to ${model}, but saving the global default failed. Global write outcome is unverified.`
         : "Saving the global model default failed. Global write outcome is unverified.";
     }
   }
-  context.refreshRuntimeConfig?.();
+  const applicationNotice = configurationApplicationNotice(context);
+  if (applicationNotice) return `Model preference saved for ${model}. ${applicationNotice}`;
 
   // Dispatch PostModelSwitch Hook
   await defaultHookDispatcher.dispatch({
@@ -494,7 +496,7 @@ function normalizeProvider(input?: string): RuntimeProvider | undefined {
   return RUNTIME_PROVIDERS.find(provider => provider === normalized);
 }
 
-function normalizeConnections(config: RuntimeConfigFile): ProviderConnectionConfig[] {
+function normalizeConnections(config: { readonly providerConnections?: readonly ProviderConnectionConfig[] }): ProviderConnectionConfig[] {
   if (!config.providerConnections || config.providerConnections.length === 0) {
     return [];
   }

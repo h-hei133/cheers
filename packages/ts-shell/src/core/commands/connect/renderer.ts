@@ -2,7 +2,7 @@ import { connectSyntax } from "./syntax.js";
 import { syntaxHelp } from "../syntax/projection.js";
 import {
   readUserRuntimeConfigFile,
-  type ProviderConnectionConfig,
+  type ProviderConnectionConfig, type RuntimeConfigFile,
 } from "../../../config/runtimeConfig.js";
 import { needsUserEndpoint } from "../../providers/facts.js";
 import {
@@ -41,8 +41,7 @@ export function renderPresetCatalog(): string {
   return lines.join("\n");
 }
 
-export function renderConnectionStatus(): string {
-  const userConfig = readUserRuntimeConfigFile();
+export function renderConnectionStatus(userConfig: Pick<RuntimeConfigFile, "provider" | "activeProviderConnectionId"> & { readonly providerConnections?: readonly ProviderConnectionConfig[] } = readUserRuntimeConfigFile()): string {
   const connections = normalizeConnections(userConfig);
   const activeId = userConfig.activeProviderConnectionId?.trim();
 

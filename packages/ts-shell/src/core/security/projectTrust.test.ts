@@ -26,6 +26,19 @@ describe("ProjectTrustStore Security Sandbox", () => {
     expect(store.isProjectTrusted("/some/random/untrusted/repo")).toBe(false);
   });
 
+  it('invalidates revisions for session-only changes, ABA decisions and file replacement', () => {
+    const store = new ProjectTrustStore(customStorePath);
+    const initial = store.revision();
+    store.setProjectTrust(tempDir, 'session-only'); const session = store.revision();
+    expect(session).not.toBe(initial);
+    store.setProjectTrust(tempDir, 'untrusted'); store.setProjectTrust(tempDir, 'session-only');
+    expect(store.revision()).not.toBe(session);
+    const beforeReplace = store.revision();
+    const replacement = customStorePath + '.replacement';
+    fs.writeFileSync(replacement, fs.readFileSync(customStorePath)); fs.renameSync(replacement, customStorePath);
+    expect(store.revision()).not.toBe(beforeReplace);
+  });
+
   it("persists trusted decision and verifies parent path inheritance", () => {
     const store = new ProjectTrustStore(customStorePath);
     const parent = "/home/user/projects";

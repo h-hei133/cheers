@@ -1,5 +1,7 @@
 import { projectSessionModel } from "../../session/model/projection.js";
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
+import { ConfigState, type ConfigReloadResult } from '../../config/state.js';
+import { configurationBinding, refreshConfiguration } from './configuration.js';
 import type { RuntimeConfig, RuntimeConfigOverrides } from '../../config/runtimeConfig.js'
 import type { Session, WorkspaceRootMode } from '../../session/SessionManager.js'
 import type { WorkflowGitContext } from '../../workflow/gitContext.js'
@@ -42,9 +44,10 @@ export interface ShellRuntimeContext {
    * nothing until restart, with no indication why. `/reload` re-reads it in place.
    * Everything else this context holds is fixed for the session.
    */
-  runtimeConfig: RuntimeConfig
+  readonly runtimeConfig: RuntimeConfig
+  readonly configuration: ConfigState
   /** Explicit launch flags must survive settings reloads and session switches. */
-  runtimeConfigOverrides?: RuntimeConfigOverrides
+  readonly runtimeConfigOverrides?: RuntimeConfigOverrides
   /**
    * How this run was asked to load skills.
    *
@@ -97,6 +100,7 @@ export function createShellRuntimeContext(input: {
   gitRoot: string | null
   rootBindingDiagnostics?: readonly RootBindingDiagnostic[]
   runtimeConfig: RuntimeConfig
+  runtimeConfigOverrides?: RuntimeConfigOverrides
   skillOptions?: {
     readonly skillPaths?: readonly string[]
     readonly noSkills?: boolean
@@ -107,6 +111,7 @@ export function createShellRuntimeContext(input: {
   resumeProvenance?: SessionResumeProvenance;
 }): ShellRuntimeContext {
   restoreSessionUsage(input.session.id, input.session.usage)
+  const configuration = new ConfigState(projectSessionModel(input.runtimeConfig, input.session.id), configurationBinding(input));
   return {
     cwd: input.cwd,
     originalCwd: input.originalCwd,
@@ -127,7 +132,9 @@ export function createShellRuntimeContext(input: {
         gitRoot: input.gitRoot,
         gitContext: input.gitContext,
       }),
-    runtimeConfig: projectSessionModel(input.runtimeConfig, input.session.id),
+    configuration,
+    runtimeConfigOverrides: configuration.current.binding.overrides,
+    get runtimeConfig() { return configuration.current.config; },
     ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
     ...(input.themePaths ? { themePaths: input.themePaths } : {}),
     gitContext: input.gitContext,
@@ -143,11 +150,8 @@ export function createShellRuntimeContext(input: {
 }
 
 /** Reload defaults, then apply the current session's durable model preference. */
-export function refreshShellRuntimeConfig(context: ShellRuntimeContext): { before: RuntimeConfig; after: RuntimeConfig } {
-  const before = context.runtimeConfig;
-  const after = projectSessionModel(getRuntimeConfig(context.cwd, context.runtimeConfigOverrides), context.session.id);
-  context.runtimeConfig = after;
-  return { before, after };
+export function refreshShellRuntimeConfig(context: ShellRuntimeContext): ConfigReloadResult {
+  return refreshConfiguration(context);
 }
 
 export function switchActiveSession(
@@ -196,7 +200,6 @@ export function applyShellSubstrateTransition(
     })
 
   if (nextSession.id !== context.session.id) {
-    context.runtimeConfig = projectSessionModel(getRuntimeConfig(nextCwd, context.runtimeConfigOverrides), nextSession.id)
     restoreSessionUsage(nextSession.id, nextSession.usage)
     forgetSessionTodos(context.session.id)
     forgetSessionTodos(nextSession.id)
@@ -214,6 +217,8 @@ export function applyShellSubstrateTransition(
   context.rootBindingDiagnostics = nextRootBindingDiagnostics
   context.gitContext = nextGitContext
   context.session = nextSession
+  context.configuration.transition(configurationBinding(context));
+  refreshConfiguration(context);
   context.activeSession = {
     sessionId: nextSession.id,
     sessionProjectDir: transition.sessionProjectDir ?? nextProjectRoot,

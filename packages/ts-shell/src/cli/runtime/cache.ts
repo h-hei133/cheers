@@ -15,11 +15,12 @@ export function cacheRefreshFor(input: {
   readonly sessionId: string;
   readonly runtimeConfig: RuntimeConfig;
   readonly isCurrent: () => boolean;
+  readonly admission?: () => string | undefined;
   readonly renewHeaders: () => Promise<Readonly<Record<string, string>> | undefined>;
   readonly provider?: { readonly providerId: string; readonly model: string; readonly endpoint?: string };
 }): Pick<CacheWarmingOptions, "refresh" | "canRefresh" | "onUsage" | "isCurrent"> {
   const provider = input.provider;
-  const fetchImpl = providerFetchForEndpoint(input.runtimeConfig, provider?.endpoint, endpointShape);
+  const fetchImpl = providerFetchForEndpoint(input.runtimeConfig, provider?.endpoint, endpointShape, input.admission);
   const canRefresh = (sent: SentRequest): boolean => provider !== undefined &&
     (sent.endpoint ?? DEFAULT_ENDPOINT_KIND) === (provider.endpoint ?? DEFAULT_ENDPOINT_KIND) && canRefreshSentRequest(sent);
   return {

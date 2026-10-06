@@ -132,6 +132,8 @@ export interface ProviderConnectionConfig {
 }
 
 export interface RuntimeConfig {
+  /** Structured acceptance facts; diagnostic wording never decides publication. */
+  readonly configValidation: { readonly valid: boolean; readonly securityBlocked: boolean };
   readonly provider: RuntimeProvider;
   readonly maxTurns: number;
   /**
@@ -399,6 +401,7 @@ export interface RuntimeConfigFile {
 const CONFIG_FIELDS = createConfigFields(RUNTIME_PROVIDERS) satisfies Record<keyof RuntimeConfigFile | "allowUntrustedHooks", ConfigField>;
 
 const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
+  configValidation: { valid: true, securityBlocked: false },
   provider: "openai",
   maxTurns: 15,
   disabledTools: [],
@@ -458,6 +461,7 @@ const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
  * in rather than read here so the config layer stays free of argument parsing.
  */
 export interface RuntimeConfigOverrides {
+  readonly theme?: string;
   readonly instructionBudgetBytes?: number
   /** Skip self-initiated requests; `undefined` leaves the configured value. */
   readonly offline?: boolean
@@ -483,6 +487,7 @@ export function getRuntimeConfig(
   const maxTurns = merged.maxTurns ?? DEFAULT_CONFIG.maxTurns;
 
   return {
+    configValidation: { valid: layer.valid, securityBlocked: layer.blocked },
     provider,
     maxTurns,
     // Left absent when unset, rather than defaulted to an empty list: an empty

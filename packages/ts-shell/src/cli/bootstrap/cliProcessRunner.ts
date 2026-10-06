@@ -10,7 +10,7 @@ import {
   setGlobalTraceContext,
 } from "../../observability/index.js";
 import { parseCliArgs } from "../../entrypoints/cliArgs.js";
-import { selectTheme } from "../../presentation/theme/selection.js";
+import { selectTheme, selectedTheme } from "../../presentation/theme/selection.js";
 import { readDiagramMode } from "../interactive/tuiSettings.js";
 import { setDiagramMode } from "../../presentation/tui/transcript/mermaid.js";
 import { listThemes, themeNamesFromPaths } from "../../presentation/themes/index.js";
@@ -103,8 +103,7 @@ export async function runCliProcess(
     runtimeContext,
   } = bootstrapRuntime;
   const providerRuntimeBridge = createCliProviderRuntimeBridge({
-    currentSession: () => ({ id: runtimeContext.session.id, projectRoot: runtimeContext.projectRoot }),
-    projectRoot: runtimeContext.projectRoot,
+    runtimeConfig: () => runtimeContext.runtimeConfig,
     options,
   });
   // The configured theme has to be applied to the shared palette before any
@@ -118,10 +117,11 @@ export async function runCliProcess(
     configured: runtimeContext.runtimeConfig.theme,
     renderer,
   });
+  runtimeContext.configuration.recordDisplay({ theme: selectedTheme() });
   // Chosen once here for the same reason the theme is: it decides how every
   // frame is built, so reading it later would let the display change between two
   // frames of the same answer.
-  setDiagramMode(readDiagramMode(runtimeContext.projectRoot ?? runtimeContext.cwd));
+  setDiagramMode(readDiagramMode(runtimeContext.projectRoot ?? runtimeContext.cwd, runtimeContext.runtimeConfig));
   const resolvedCredential =
     providerRuntimeBridge.resolveCredentialSnapshot();
   const mcpGateway = bootstrapRuntime.mcpGateway;

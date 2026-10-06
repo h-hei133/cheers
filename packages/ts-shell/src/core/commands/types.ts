@@ -101,7 +101,9 @@ export interface CommandContext {
    * knows how to replace the settings in place. Absent means the caller has no
    * session to refresh, and `/reload` says so instead of pretending.
    */
-  readonly refreshRuntimeConfig?: () => { readonly before: RuntimeConfig; readonly after: RuntimeConfig }
+  readonly runtimeConfig?: RuntimeConfig
+  readonly admission?: () => string | undefined
+  readonly refreshRuntimeConfig?: () => import('../../config/state.js').ConfigReloadResult
 }
 
 export interface LocalCommandResult {

@@ -40,7 +40,7 @@ export async function runContextCommand(
   // the same configuration the engine reads, rather than from an environment
   // variable nothing sets and a constant that happens to match today: a report
   // about a threshold is only useful if it names the threshold in force.
-  const runtimeConfig = getRuntimeConfig(context.cwd);
+  const runtimeConfig = context.runtimeConfig ?? getRuntimeConfig(context.projectRoot ?? context.cwd);
   // The same resolution the compaction engine performs, so the number reported
   // here is the number in force. Asking the credential resolver for the active
   // model is what makes this per-model rather than one global value.

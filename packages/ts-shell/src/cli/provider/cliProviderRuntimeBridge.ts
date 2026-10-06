@@ -1,7 +1,6 @@
-import { projectSessionModel } from "../../session/model/projection.js";
 import process from "node:process";
 
-import { getRuntimeConfig } from "../../config/runtimeConfig.js";
+import type { RuntimeConfig } from "../../config/runtimeConfig.js";
 import {
   resolveProviderCredential,
   type ProviderCredentialResolution,
@@ -15,17 +14,15 @@ export interface CliProviderRuntimeBridge {
 }
 
 export function createCliProviderRuntimeBridge(input: {
-  readonly projectRoot: string;
-  readonly currentSession?: () => { readonly id: string; readonly projectRoot: string };
+  readonly runtimeConfig: () => RuntimeConfig;
   readonly options: Pick<CliOptions, "provider" | "apiKey">;
   readonly env?: NodeJS.ProcessEnv;
 }): CliProviderRuntimeBridge {
   const env = input.env ?? process.env;
   return {
     resolveCredentialSnapshot: () => {
-      const session = input.currentSession?.();
       return resolveProviderCredential({
-        runtimeConfig: projectSessionModel(getRuntimeConfig(session?.projectRoot ?? input.projectRoot), session?.id),
+        runtimeConfig: input.runtimeConfig(),
         cliProvider: input.options.provider,
         cliApiKey: input.options.apiKey,
         env,

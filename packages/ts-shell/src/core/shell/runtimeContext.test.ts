@@ -26,6 +26,7 @@ describe('shell runtime context', () => {
       targetPathBase: 'D:/repo',
       gitRoot: 'D:/repo',
       runtimeConfig: {
+        configValidation: { valid: true, securityBlocked: false }, configDiagnostics: [],
         provider: 'openai',
         maxTurns: 6,
         disabledTools: [],
@@ -87,6 +88,7 @@ describe('shell runtime context', () => {
       targetPathBase: 'D:/repo',
       gitRoot: 'D:/repo',
       runtimeConfig: {
+        configValidation: { valid: true, securityBlocked: false }, configDiagnostics: [],
         provider: 'openai',
         maxTurns: 6,
         disabledTools: [],
@@ -150,6 +152,7 @@ describe('shell runtime context', () => {
       targetPathBase: 'D:/repo',
       gitRoot: 'D:/repo',
       runtimeConfig: {
+        configValidation: { valid: true, securityBlocked: false }, configDiagnostics: [],
         provider: 'openai',
         maxTurns: 6,
         disabledTools: [],

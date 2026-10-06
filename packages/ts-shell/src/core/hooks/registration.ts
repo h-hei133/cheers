@@ -32,6 +32,7 @@ export type { HookApprovalRequest } from "./types.js";
 const logger = createComponentLogger("hook-trust");
 
 export interface HookRegistrationOptions {
+  readonly admission?: () => string | undefined;
   /** Where the user's own hooks live. Overridden by tests. */
   readonly homeDir?: string
   readonly trustStore?: HookTrustStore
@@ -68,6 +69,7 @@ export function registerDeclaredHooks(
 
   const store = options?.trustStore ?? new HookTrustStore();
   dispatcher.setCommandHookTrust({
+    admission: options?.admission,
     store,
     requestApproval: options?.requestApproval,
     bypassed: options?.bypassed === true,

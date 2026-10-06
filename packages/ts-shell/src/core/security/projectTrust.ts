@@ -30,6 +30,7 @@ export class ProjectTrustStore {
   private static instance?: ProjectTrustStore;
   private readonly storePath: string;
   private sessionTrusts = new Set<string>();
+  private revisionNumber = 0;
 
   constructor(customPath?: string) {
     this.storePath =
@@ -43,6 +44,16 @@ export class ProjectTrustStore {
       ProjectTrustStore.instance = new ProjectTrustStore();
     }
     return ProjectTrustStore.instance;
+  }
+
+  /** Local decisions plus file identity invalidate prepared configuration tickets. */
+  revision(): string {
+    try {
+      const stat = fs.statSync(this.storePath, { bigint: true });
+      return `${this.revisionNumber}:${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeNs}:${stat.ctimeNs}`;
+    } catch (error) {
+      return `${this.revisionNumber}:${(error as NodeJS.ErrnoException).code === 'ENOENT' ? 'missing' : 'unreadable'}`;
+    }
   }
 
   isProjectTrusted(workspaceRoot: string): boolean {
@@ -89,6 +100,7 @@ export class ProjectTrustStore {
 
   setProjectTrust(workspaceRoot: string, level: ProjectTrustLevel): void {
     if (!isProjectTrustLevel(level)) throw new TypeError("Invalid project trust level.");
+    this.revisionNumber++;
     const normalized = identifyProject(workspaceRoot);
     if (level === "session-only") {
       this.sessionTrusts.add(normalized);

@@ -146,7 +146,7 @@ export function normalizeBaseUrl(baseUrl?: string): string | undefined {
   return trimmed.replace(/\/+$/, "");
 }
 
-export function normalizeConnections(config: RuntimeConfigFile): ProviderConnectionConfig[] {
+export function normalizeConnections(config: { readonly providerConnections?: readonly ProviderConnectionConfig[] }): ProviderConnectionConfig[] {
   if (!config.providerConnections || config.providerConnections.length === 0) {
     return [];
   }

@@ -62,7 +62,7 @@ export class HookDispatcher {
   private commandHooks: CommandHookConfig[] = [];
   private inProcessHooks: InProcessHookConfig[] = [];
   private trust:
-    | { store: HookTrustStore; requestApproval?: HookApprovalRequest; bypassed?: boolean }
+    | { store: HookTrustStore; requestApproval?: HookApprovalRequest; bypassed?: boolean; admission?: () => string | undefined }
     | undefined;
 
   /**
@@ -74,6 +74,7 @@ export class HookDispatcher {
    * "nobody has been asked".
    */
   setCommandHookTrust(trust: {
+    admission?: () => string | undefined;
     store: HookTrustStore;
     requestApproval?: HookApprovalRequest;
     bypassed?: boolean;
@@ -88,6 +89,8 @@ export class HookDispatcher {
    * this process, which is the process's own code and needs no permission.
    */
   private async declaredHookIsAllowed(hook: CommandHookConfig): Promise<boolean> {
+    const trust = this.trust;
+    if (trust?.admission?.()) return false;
     if (hook.fingerprint === undefined) return true;
     if (this.trust?.bypassed === true) {
       // Said every time rather than once, because the state that matters is
@@ -112,7 +115,7 @@ export class HookDispatcher {
       matcher: hook.matcher,
       sourcePath: hook.sourcePath ?? "(unknown)",
     });
-    if (approved !== true) {
+    if (approved !== true || trust !== this.trust || trust?.admission?.()) {
       logger.info(`Declared hook '${hook.command}' was not approved and will not run.`);
       return false;
     }
@@ -213,7 +216,9 @@ export class HookDispatcher {
       // What the hook last wrote to stderr, which the block contract reads.
       let lastStderr = "";
       if (hook.event === relevantEvent && this.matches(hook.matcher, payload)) {
+        const trust = this.trust;
         if (!(await this.declaredHookIsAllowed(hook))) continue;
+        if (trust !== this.trust || trust?.admission?.()) continue;
         const timeoutMs = hook.timeoutMs ?? hookTimeoutMs(relevantEvent);
         const jsonPayload = JSON.stringify(payload);
 

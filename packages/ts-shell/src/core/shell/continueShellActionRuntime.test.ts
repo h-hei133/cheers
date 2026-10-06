@@ -11,10 +11,10 @@ import {
   runResumeLikeShellAction,
   type ResumeLikePromptTurnInput,
 } from "./continueShellActionRuntime.js";
-import type { ShellRuntimeContext } from "./runtimeContext.js";
+import { createShellRuntimeContext, type ShellRuntimeContext } from "./runtimeContext.js";
 
 function createRuntimeContext(session: Session): ShellRuntimeContext {
-  return {
+  return createShellRuntimeContext({
     cwd: "D:/repo",
     originalCwd: "D:/repo",
     projectRoot: "D:/repo",
@@ -24,6 +24,7 @@ function createRuntimeContext(session: Session): ShellRuntimeContext {
     gitRoot: "D:/repo",
     rootBindingDiagnostics: [],
     runtimeConfig: {
+      configValidation: { valid: true, securityBlocked: false }, configDiagnostics: [],
       provider: "openai",
       maxTurns: 6,
       disabledTools: [],
@@ -39,7 +40,7 @@ function createRuntimeContext(session: Session): ShellRuntimeContext {
     },
     session,
     activeSession: { sessionId: session.id, sessionProjectDir: "D:/repo" },
-  } as never;
+  } as never);
 }
 
 function withFakeHome<T>(prefix: string, run: () => Promise<T>): Promise<T> {

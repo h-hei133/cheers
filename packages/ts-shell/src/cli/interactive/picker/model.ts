@@ -25,7 +25,7 @@ export function modelPicker(context: CommandContext): Picker {
     form: "panel",
     empty: "No providers in the catalogue.",
     async load(): Promise<readonly Option[]> {
-      const config = projectSessionModel(readUserRuntimeConfigFile(), context.sessionId);
+      const config = context.runtimeConfig ?? projectSessionModel(readUserRuntimeConfigFile(), context.sessionId);
       const connections = normalizeConnections(config);
       const connected = new Set<string>(connections.map((connection) => connection.provider));
       const activeId = config.activeProviderConnectionId?.trim();

@@ -45,7 +45,9 @@ export async function runBtwCommand(
   }
   const question = parsed.text;
 
-  const runtimeConfig = projectSessionModel(getRuntimeConfig(context.cwd), context.sessionId);
+  const blocked = context.admission?.();
+  if (blocked) return { kind: "local", output: blocked };
+  const runtimeConfig = context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
   const resolution = resolveProviderCredential({ runtimeConfig });
   const credential = resolution.credential;
   const catalog = loadCatalog();
@@ -74,7 +76,7 @@ export async function runBtwCommand(
             model,
             providerId: resolution.provider,
             ...(endpoint ? { endpoint } : {}),
-            fetchImpl: providerFetchForEndpoint(runtimeConfig, endpoint, endpointShape),
+            fetchImpl: providerFetchForEndpoint(runtimeConfig, endpoint, endpointShape, context.admission),
           },
           messages: [
             { role: "system", content: SIDE_QUESTION_SYSTEM_PROMPT },

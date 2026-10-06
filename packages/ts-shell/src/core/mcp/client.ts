@@ -1,3 +1,4 @@
+import { assertAdmission, type Admission } from "../network/admission.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { CallToolResultSchema, ListToolsResultSchema, ToolListChangedNotificationSchema, ResultSchema, ErrorCode, McpError, type Tool } from "@modelcontextprotocol/sdk/types.js";
 import { packageVersion } from "../version/current.js";
@@ -33,7 +34,8 @@ export class CoreMcpClient {
     private readonly changed?: () => void,
   ) {}
 
-  async connect(): Promise<McpConnectionState> {
+  async connect(admission?: Admission): Promise<McpConnectionState> {
+    assertAdmission(admission);
     if (this.closed) return this.failed("MCP client is closed");
     if (this.config.enabled === false) return { type: "disabled", name: this.name, config: this.config };
     if (this.config.authRequired) return { type: "needs-auth", name: this.name, config: this.config };
@@ -41,15 +43,16 @@ export class CoreMcpClient {
     if (!this.config.command) return this.failed("Missing stdio command");
     if (this.connected) return { type: "connected", name: this.name, config: this.config };
     if (this.opening) return this.opening;
-    this.opening = this.open();
+    this.opening = this.open(admission);
     try { return await this.opening; }
     finally { this.opening = undefined; }
   }
 
-  private async open(): Promise<McpConnectionState> {
+  private async open(admission?: Admission): Promise<McpConnectionState> {
     this.listedTools = undefined;
     this.changed?.();
     await this.disposeTransport();
+    assertAdmission(admission);
     const client = new Client({ name: "cheers", version: packageVersion() ?? "unknown" }, {
       capabilities: {}, enforceStrictCapabilities: true,
     });
@@ -59,7 +62,7 @@ export class CoreMcpClient {
       cwd: this.workspaceRoot,
       stderr: "pipe",
       maxBufferSize: 10 * 1024 * 1024,
-    });
+    }, admission);
     // Draining avoids blocking the server; raw diagnostics may contain credentials.
     transport.stderr?.on("data", () => {});
     client.onclose = () => {
@@ -92,10 +95,10 @@ export class CoreMcpClient {
     }
   }
 
-  async listTools(): Promise<McpToolDescriptor[]> {
+  async listTools(admission?: Admission): Promise<McpToolDescriptor[]> {
     this.listedTools = undefined;
     this.changed?.();
-    const client = await this.requireClient();
+    const client = await this.requireClient(admission);
     const revision = ++this.catalogRevision;
     if (!client.getServerCapabilities()?.tools) {
       this.catalog = new McpToolCatalog([]);
@@ -109,6 +112,7 @@ export class CoreMcpClient {
     let cursor: string | undefined;
     try {
       for (let page = 0; page < MAX_TOOL_PAGES; page++) {
+        assertAdmission(admission);
         // SDK listTools replaces its metadata cache per page; retain the complete catalog ourselves.
         const result = await this.withCancellation(signal => client.request(
           { method: "tools/list", params: cursor ? { cursor } : {} },
@@ -146,12 +150,13 @@ export class CoreMcpClient {
       ? structuredClone(this.listedTools) : undefined;
   }
 
-  async invokeTool(toolName: string, args: Record<string, unknown>): Promise<McpToolCallResult> {
-    const client = await this.requireClient();
-    if (!this.catalog) await this.listTools();
+  async invokeTool(toolName: string, args: Record<string, unknown>, admission?: Admission): Promise<McpToolCallResult> {
+    const client = await this.requireClient(admission);
+    if (!this.catalog) await this.listTools(admission);
     const catalog = this.catalog!;
     catalog.assertCallable(toolName);
     let response: unknown;
+    assertAdmission(admission);
     try {
       response = await this.withCancellation(signal => client.request(
         { method: "tools/call", params: { name: toolName, arguments: args } }, ResultSchema,
@@ -197,8 +202,9 @@ export class CoreMcpClient {
     this.transport = undefined;
   }
 
-  private async requireClient(): Promise<Client> {
-    const state = await this.connect();
+  private async requireClient(admission?: Admission): Promise<Client> {
+    const state = await this.connect(admission);
+    assertAdmission(admission);
     if (state.type !== "connected" || !this.client) {
       throw new McpClassifiedError(classifyMcpFailure({
         failureClass: this.config.transport !== "stdio" || !this.config.command ? "config" : "server-unavailable",

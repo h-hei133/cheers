@@ -39,6 +39,37 @@ function call(name: string, args: Record<string, unknown> = {}) {
 }
 
 describe("createToolHooks", () => {
+  it.each(['approval', 'hook'])('rechecks live admission after awaited %s', async stage => {
+    let blocked = false;
+    const setup = gate({ admission: () => blocked ? 'configuration revoked' : undefined,
+      permissionScope: 'ask', escalationPromptHandler: async prompt => {
+        if (stage === 'approval') blocked = true;
+        return { promptId: prompt.id, decision: 'allow-once', respondedAt: 1 };
+      },
+      hooks: { dispatch: async ({ eventName }: { eventName: string }) => {
+        if (stage === 'hook' && eventName === 'PreToolUse') blocked = true;
+        return { decision: 'allow' };
+      } } as never,
+    });
+    expect(await createToolHooks(setup).beforeToolCall!(call('write', { path: 'file', content: 'new' })))
+      .toMatchObject({ block: true, reason: 'configuration revoked' });
+  });
+
+  it('rechecks live admission before execution and again at final file access', async () => {
+    let blocked = false;
+    const effects = vi.fn();
+    const execute = vi.fn(async (_args, context) => {
+      await Promise.resolve(); blocked = true;
+      context.assertFileAccess('/tmp/final-file'); effects();
+      return { success: true, output: 'written' };
+    });
+    const adapted = adaptTools(new Map([['write', { name: 'write', argsSchema: { type: 'object' }, execute } as ToolDefinition]]),
+      gate({ admission: () => blocked ? 'configuration revoked' : undefined }))[0]!;
+    expect(await adapted.execute('one', {}, undefined)).toMatchObject({ isError: true });
+    expect(effects).not.toHaveBeenCalled();
+    expect(await adapted.execute('two', {}, undefined)).toMatchObject({ isError: true });
+    expect(execute).toHaveBeenCalledOnce();
+  });
   it.each([true, false, undefined, "true"])("uses only a boolean MCP read-only hint for plan eligibility (%s)", async hint => {
     const tools = createCoreToolRegistry({ mcpTools: [{ serverName: "notes", toolName: "lookup", qualifiedName: "notes__lookup",
       description: "Find notes", annotations: { readOnlyHint: hint as boolean } }] });

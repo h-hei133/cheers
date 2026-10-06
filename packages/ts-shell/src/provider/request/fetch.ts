@@ -1,3 +1,4 @@
+import { admittedFetch, type Admission } from "../../core/network/admission.js";
 import { Agent, ProxyAgent, fetch as undiciFetch } from "undici";
 
 export interface ProviderFetchEnvironment {
@@ -272,17 +273,19 @@ export function providerFetchForEndpoint(
   config: Parameters<typeof providerFetchFor>[0],
   endpoint: string | undefined,
   shapeFor: (kind: string | undefined) => { readonly signer?: () => Promise<RequestSigner | undefined> },
+  admission?: Admission,
 ): typeof fetch {
   const signer = shapeFor(endpoint).signer;
-  if (!signer) return providerFetchFor(config);
+  const base = admittedFetch(providerFetchFor(config), admission);
+  if (!signer) return base;
 
   let built: RequestSigner | undefined;
   let building: Promise<RequestSigner | undefined> | undefined;
-  return withRequestSigner(providerFetchFor(config), async (request) => {
+  return admittedFetch(withRequestSigner(base, async (request) => {
     building ??= signer();
     built ??= await building;
     return built ? await built(request) : {};
-  });
+  }), admission);
 }
 
 export function resolveProviderTransportConfig(

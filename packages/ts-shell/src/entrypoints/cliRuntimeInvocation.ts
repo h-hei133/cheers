@@ -54,10 +54,18 @@ import { getThinkingEffort } from "../core/commands/thinkingCommandRuntime.js";
 import { toolSchemas } from "../turn/tools.js";
 import { runSubagent, type SubagentRunner } from "../core/subagents/runner.js";
 import { adaptTools } from "../turn/tools.js";
+import { assertAdmission, admittedFetch, type Admission } from '../core/network/admission.js';
 
 type ProviderMode = "synthetic" | "real";
 
 export interface CliRuntimeInvocationInput {
+  readonly admission?: Admission;
+  readonly onCredentialPersisted?: () => void;
+  /** Built after renewal from the same captured provider binding as the main request. */
+  readonly prepareProviderResources?: (resolution: ProviderCredentialResolution) => {
+    readonly compaction?: CompactionSetup;
+    readonly cacheWarming?: CacheWarmingRunner;
+  };
   readonly sessionId: string;
   readonly prompt: string;
   /** Selected historical facts for this continuation, separate from user intent. */
@@ -187,6 +195,8 @@ export async function runCliRuntimeInvocation(
  * version of this they can act on.
  */
 async function renewAccountAuth(input: {
+  readonly admission?: Admission;
+  readonly onCredentialPersisted?: () => void;
   readonly provider: RuntimeProvider;
   readonly credential: {
     readonly apiKey?: string;
@@ -200,14 +210,15 @@ async function renewAccountAuth(input: {
   // The renewal carries the same deadline as any other request to the provider's
   // auth host, so a host that accepts the connection and never answers cannot hold
   // up the start of a turn.
-  const fetchImpl = providerFetch(input.runtimeConfig);
+  const fetchImpl = admittedFetch(providerFetch(input.runtimeConfig), input.admission);
   const result = await renewAccountAuthIfExpiring({
     provider: input.provider,
     credential: input.credential,
     fetchImpl,
   });
   if (result.renewed && result.accountAuth) {
-    persistRenewedAccountAuth({ provider: input.provider, accountAuth: result.accountAuth });
+    assertAdmission(input.admission);
+    if (persistRenewedAccountAuth({ provider: input.provider, accountAuth: result.accountAuth })) input.onCredentialPersisted?.();
   }
   return {
     accountAuth: result.accountAuth,
@@ -223,10 +234,13 @@ function deferUntilReady(
   // over when `adopt` sees the run; see `pendingTurnInput`.
   const buffered = pendingTurnInput();
   const events = (async function* (): AsyncIterable<QueryEvent> {
+    assertAdmission(request.admission);
     // Renewed before the readiness check, because the check is what tells the user
     // the credential is usable: one that passes on a token about to expire produces
     // a run that fails a minute later with no hint that the login is the reason.
     const renewed = await renewAccountAuth({
+      admission: request.admission,
+      onCredentialPersisted: request.onCredentialPersisted,
       provider: request.providerCredentialResolution.provider,
       credential: request.providerCredentialResolution.credential ?? {},
       runtimeConfig: request.runtimeConfig,
@@ -263,7 +277,7 @@ function deferUntilReady(
       model: request.providerCredentialResolution.model,
       endpoint: providerEndpoint(catalog, request.providerCredentialResolution.provider) ?? DEFAULT_ENDPOINT_KIND,
       signal: request.signal,
-      fetchImpl: providerFetch(request.runtimeConfig),
+      fetchImpl: admittedFetch(providerFetch(request.runtimeConfig), request.admission),
     });
     if (readiness.ok === false) {
       yield dependencies.createReadinessTerminalEvent({
@@ -413,16 +427,20 @@ async function startTurn(
   request: CliRuntimeInvocationRequest,
   dependencies: CliRuntimeInvocationDependencies,
 ): Promise<CliRuntimeInvocationResult> {
+  assertAdmission(request.admission);
+  request = { ...request, ...request.prepareProviderResources?.(request.providerCredentialResolution) };
   const hooks = dependencies.hooks ?? defaultHookDispatcher;
   setupBuiltinVerificationHooks(hooks);
   // Declared hooks are registered here so the user can be asked about them; the
   // approval itself is awaited at dispatch, where a pending answer does not hold
   // up the start of the run.
   registerDeclaredHooks(hooks, request.workspaceRoot, {
+    admission: request.admission,
     requestApproval: (hook) => approveDeclaredHook(request, hook),
     bypassed: request.runtimeConfig?.allowUntrustedHooks === true,
   });
   const { skills, tools } = await loadToolCatalog(request, dependencies.tools);
+  assertAdmission(request.admission);
   const promptContext = buildPromptContext(request, skills, [...tools.keys()]);
   // What the request spends outside the conversation. Computed here because this
   // is the only place both facts exist: the instruction as it will be sent, and
@@ -448,6 +466,7 @@ async function startTurn(
     : (dependencies.createStep ?? createProviderStep)(request, tools, promptContext);
 
   const run = runTurn({
+    admission: request.admission,
     commandEnv: commandEnvironmentFor(request),
     subagentHost: {
       step,
@@ -613,7 +632,7 @@ function createProviderStep(
     // them that is not a constant header: one signs, one carries a token that
     // expires. Both are applied by the transport, which is the only place a
     // request exists whole.
-    fetchImpl: providerFetchForEndpoint(request.runtimeConfig, endpoint, endpointShape),
+    fetchImpl: providerFetchForEndpoint(request.runtimeConfig, endpoint, endpointShape, request.admission),
     workspaceRoot: request.workspaceRoot,
     sessionId: request.sessionId,
     systemPrompt: buildSystemPrompt(request.agentMode, promptContext),

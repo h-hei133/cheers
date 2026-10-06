@@ -16,6 +16,14 @@ import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalSt
 import { ShellSessionRuntime } from "./sessionRuntime.js";
 
 describe("shell session runtime (W5)", () => {
+  it('uses the configured agent default until the user explicitly chooses a mode', () => {
+    let configured: 'plan' | 'build' = 'plan';
+    const runtime = new ShellSessionRuntime({ configuredAgentMode: () => configured } as never);
+    expect(runtime.getAgentMode()).toBe('plan');
+    configured = 'build'; expect(runtime.getAgentMode()).toBe('build');
+    runtime.setAgentMode('plan');
+    expect(runtime.getAgentMode()).toBe('plan');
+  });
   it.each([false, true])("publishes one cancellation terminal event after settlement (entered turn=%s)", async enteredTurn => {
     const recorded: unknown[] = [];
     const observed: unknown[] = [];

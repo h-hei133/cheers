@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createServer } from "node:http";
+import * as authorization from '../provider/request/authorization.js';
+import * as authPersistence from '../core/auth/providerAuthRuntime.js';
 import { recordSessionUsage, resetSessionUsage } from "../observability/usageTelemetry.js";
 import { createTaskToolDefinition } from "../core/tools/taskTool.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
@@ -78,6 +80,27 @@ function dependencies(): { deps: CliRuntimeInvocationDependencies; calls: string
 }
 
 describe("CLI runtime invocation", () => {
+  it('builds dependent resources and the main step from the same renewed captured credential', async () => {
+    const auth = { type: 'openai-chatgpt-account' as const, accessToken: 'renewed-test-token', refreshToken: 'test-refresh', expiresAt: Date.now() + 3600000 };
+    const renewal = vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockResolvedValue({ renewed: true, accountAuth: auth });
+    const persistence = vi.spyOn(authPersistence, 'persistRenewedAccountAuth').mockReturnValue(true);
+    const published = vi.fn();
+    let resourceResolution: ProviderCredentialResolution | undefined;
+    let stepResolution: ProviderCredentialResolution | undefined;
+    try {
+      const run = await runCliRuntimeInvocation(baseInput({ onCredentialPersisted: published,
+        prepareProviderResources: resolution => { resourceResolution = resolution; return {}; },
+      }), { ...dependencies().deps, createStep: request => {
+        stepResolution = request.providerCredentialResolution;
+        return async () => ({ text: 'done', toolCalls: [], stopReason: 'stop' });
+      } });
+      await collect(run.events);
+      expect(renewal).toHaveBeenCalledOnce(); expect(published).toHaveBeenCalledOnce();
+      expect(resourceResolution).toBe(stepResolution);
+      expect(resourceResolution?.credential?.accountAuth?.accessToken).toBe('renewed-test-token');
+      expect(resourceResolution?.provider).toBe(providerCredentialResolution.provider);
+    } finally { renewal.mockRestore(); persistence.mockRestore(); }
+  });
   it("delivers captured requests and settlement to the warming runner", async () => {
     const cacheWarming = { noteRequest: vi.fn(), noteSettled: vi.fn(), stop: vi.fn(), status: () => ({ mode: "idle" as const }) };
     const sent = { url: "https://local.test", headers: {}, body: "{}" };

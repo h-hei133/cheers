@@ -99,10 +99,14 @@ export class Theme {
    * already rendering.
    */
   apply(theme: ThemeConfig, mode: ColorMode = this.mode): void {
-    this.mode = mode;
-    this.name = theme.name;
-    this.colors = new Map(Object.entries(theme.colors) as [ThemeColorToken, string][]);
-    this.revision += 1;
+    this.prepare(theme, mode)();
+  }
+
+  /** Allocate and validate before the synchronous publication step. */
+  prepare(theme: ThemeConfig, mode: ColorMode = this.mode): () => void {
+    const colors = new Map(Object.entries(theme.colors) as [ThemeColorToken, string][]);
+    const name = theme.name;
+    return () => { this.mode = mode; this.name = name; this.colors = colors; this.revision += 1; };
   }
 
   /** Changes whenever the palette does, for caches keyed on the colors. */
@@ -192,12 +196,16 @@ export function applyTheme(
   workspaceRoot?: string,
   extraPaths: readonly string[] = [],
 ): void {
+  prepareTheme(name, workspaceRoot, extraPaths)();
+}
+
+export function prepareTheme(name: string, workspaceRoot?: string, extraPaths: readonly string[] = []): () => void {
   const config = loadTheme(name, workspaceRoot, extraPaths);
   if (!config) {
     throw new Error(`Theme not found: ${name}`);
   }
-  defaultTheme.apply(config, detectColorMode());
-  currentThemeName = config.name;
+  const commit = defaultTheme.prepare(config, detectColorMode());
+  return () => { commit(); currentThemeName = config.name; };
 }
 
 /** The theme currently in effect. */
@@ -207,8 +215,12 @@ export function currentTheme(): string {
 
 /** Automatic appearance uses the bundled pair, independent of named file overrides. */
 export function applyDefaultTheme(appearance: "dark" | "light"): void {
-  defaultTheme.apply(getDefaultTheme(appearance), detectColorMode());
-  currentThemeName = appearance;
+  prepareDefaultTheme(appearance)();
+}
+
+export function prepareDefaultTheme(appearance: "dark" | "light"): () => void {
+  const commit = defaultTheme.prepare(getDefaultTheme(appearance), detectColorMode());
+  return () => { commit(); currentThemeName = appearance; };
 }
 
 export const defaultTheme = new Theme(getDefaultTheme(), detectColorMode());

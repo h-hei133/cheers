@@ -32,7 +32,7 @@ import { syntaxHint, syntaxCompletions } from "./syntax/projection.js";
 import { trustSyntax } from "./trust/syntax.js";
 import { todoSyntax } from "./todo/syntax.js";
 import { thinkingSyntax } from "./thinking/syntax.js";
-import { getRuntimeConfig } from "../../config/runtimeConfig.js";
+import { getRuntimeConfig, type RuntimeConfig } from "../../config/runtimeConfig.js";
 import { compactCompletions } from "../../context/compact/command/completion.js";
 import { compactSyntax } from "../../context/compact/command/syntax.js";
 import { runBrowserLocalCommand } from "./browserCommandRuntime.js";
@@ -100,8 +100,8 @@ import type { CommandDefinition } from "./types.js";
 
 export function createCommandRegistry(
   cwd: string = process.cwd(),
+  runtimeConfig: RuntimeConfig = getRuntimeConfig(cwd),
 ): ReadonlyMap<string, CommandDefinition> {
-  const runtimeConfig = getRuntimeConfig(cwd);
   const commands: CommandDefinition[] = [
     {
       name: "diagnose",

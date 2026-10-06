@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CoreMcpClient } from "./client.js";
 import { McpConfigLoadError, loadMcpConfigs } from "./config.js";
 import {
@@ -29,6 +29,7 @@ describe("core MCP gateway (W3)", () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await Promise.all(gateways.splice(0).map(gateway => gateway.close()));
     if (originalUserProfile === undefined) delete process.env.USERPROFILE;
     else process.env.USERPROFILE = originalUserProfile;
@@ -36,6 +37,25 @@ describe("core MCP gateway (W3)", () => {
     else process.env.HOME = originalHome;
     fs.rmSync(fakeHomeDir, { recursive: true, force: true });
     fs.rmSync(workspaceRoot, { recursive: true, force: true });
+  });
+
+  it.each(['queue', 'connection'])('rechecks admission after the %s boundary before further MCP effects', async stage => {
+    let blocked = false;
+    const admission = () => blocked ? 'configuration revoked' : undefined;
+    fs.writeFileSync(path.join(workspaceRoot, '.cheers.mcp.json'), JSON.stringify({ mcpServers: {
+      first: { transport: 'stdio', command: 'never-spawn' }, second: { transport: 'stdio', command: 'never-spawn' },
+    } }));
+    const connect = vi.spyOn(CoreMcpClient.prototype, 'connect').mockImplementation(async function () {
+      blocked = true;
+      return { type: 'connected', name: this.name, config: this.config };
+    });
+    const list = vi.spyOn(CoreMcpClient.prototype, 'listTools').mockResolvedValue([]);
+    const gateway = new CoreMcpGateway(workspaceRoot); gateways.push(gateway);
+    const pending = gateway.snapshot(admission);
+    if (stage === 'queue') blocked = true;
+    await expect(pending).rejects.toThrow('configuration revoked');
+    expect(connect).toHaveBeenCalledTimes(stage === 'queue' ? 0 : 1);
+    expect(list).not.toHaveBeenCalled();
   });
 
   it("loads user and project MCP configs into scoped configs", () => {

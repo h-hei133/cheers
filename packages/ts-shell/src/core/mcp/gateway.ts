@@ -4,6 +4,7 @@ import {
 } from "./config.js";
 import { CoreMcpConnectionManager } from "./connectionManager.js";
 import { projectTrust } from "../security/projectTrust.js";
+import { assertAdmission, type Admission } from '../network/admission.js';
 import type {
   McpClientSnapshot,
   McpConnectionState,
@@ -106,7 +107,7 @@ export class CoreMcpGateway {
   private closed = false;
   private closing?: Promise<void>;
 
-  constructor(private readonly root: string | (() => string)) {
+  constructor(private readonly root: string | (() => string), private readonly admissionForOperation?: () => Admission) {
     this.workspaceRoot = typeof root === "string" ? root : root();
   }
 
@@ -118,8 +119,8 @@ export class CoreMcpGateway {
     return loadMcpConfigs(this.workspaceRoot, !projectTrust.isProjectUntrusted(this.workspaceRoot));
   }
 
-  snapshot(): Promise<McpClientSnapshot> {
-    return this.run(async () => this.readSnapshot(await this.prepare()));
+  snapshot(admission = this.admissionForOperation?.()): Promise<McpClientSnapshot> {
+    return this.run(async () => { assertAdmission(admission); return this.readSnapshot(await this.prepare(), admission); });
   }
 
   /** Read existing catalogs only; workspace reconciliation belongs to explicit operations. */
@@ -130,26 +131,31 @@ export class CoreMcpGateway {
   }
 
   refresh(target: string = "all"): Promise<McpClientSnapshot> {
+    const admission = this.admissionForOperation?.();
     return this.run(async () => {
+      assertAdmission(admission);
       const configs = await this.prepare();
       const name = target.trim();
       if (name && name.toLowerCase() !== "all" && !configs[name]) {
         throw unknownServer(name);
       }
       await this.connectionManager.close(!name || name.toLowerCase() === "all" ? undefined : name);
-      return this.readSnapshot(configs);
+      return this.readSnapshot(configs, admission);
     });
   }
 
-  invokeTool(serverName: string, toolName: string, args: Record<string, unknown>): Promise<McpToolCallResult> {
+  invokeTool(serverName: string, toolName: string, args: Record<string, unknown>, admission = this.admissionForOperation?.()): Promise<McpToolCallResult> {
     return this.run(async () => {
+      assertAdmission(admission);
       const configs = await this.prepare();
       const config = configs[serverName];
       if (!config) throw unknownServer(serverName);
+      assertAdmission(admission);
       const client = this.connectionManager.get(serverName, config, this.workspaceRoot);
-      const state = await client.connect();
+      const state = await client.connect(admission);
       if (state.type !== "connected") throw this.createUnavailableServerBlockedError(state);
-      const liveTools = await client.listTools();
+      assertAdmission(admission);
+      const liveTools = await client.listTools(admission);
       if (!liveTools.some(tool => tool.toolName === toolName)) {
         throw new McpGatewayBlockedError({
           message: "MCP tool " + toolName + " is unavailable on server " + serverName,
@@ -157,7 +163,8 @@ export class CoreMcpGateway {
           doNext: "Run /mcp refresh " + serverName + " and retry with a visible MCP tool.",
         });
       }
-      return client.invokeTool(toolName, args);
+      assertAdmission(admission);
+      return client.invokeTool(toolName, args, admission);
     });
   }
 
@@ -206,15 +213,17 @@ export class CoreMcpGateway {
     return configs;
   }
 
-  private async readSnapshot(configs: Record<string, ScopedMcpServerConfig>): Promise<McpClientSnapshot> {
+  private async readSnapshot(configs: Record<string, ScopedMcpServerConfig>, admission?: Admission): Promise<McpClientSnapshot> {
     const clients: McpConnectionState[] = [];
     const tools: McpClientSnapshot["tools"] = [];
     for (const [name, config] of Object.entries(configs)) {
+      assertAdmission(admission);
       const client = this.connectionManager.get(name, config, this.workspaceRoot);
-      let state = await client.connect();
+      let state = await client.connect(admission);
       if (state.type === "connected") {
+        assertAdmission(admission);
         try {
-          tools.push(...await client.listTools());
+          tools.push(...await client.listTools(admission));
         } catch (error) {
           await this.connectionManager.close(name);
           state = { type: "failed", name, config, error: classifyMcpFailure({
@@ -225,6 +234,7 @@ export class CoreMcpGateway {
       }
       clients.push(state);
     }
+    assertAdmission(admission);
     return { clients, tools };
   }
 

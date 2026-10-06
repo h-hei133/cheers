@@ -1,3 +1,6 @@
+import { ConfigState } from "../../config/state.js";
+import { configurationBinding } from "../../core/shell/configuration.js";
+import type { CliRuntimeInvocationInput } from "../../entrypoints/cliRuntimeInvocation.js";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -30,8 +33,8 @@ vi.mock("../../core/shell/sessionRuntime.js", () => ({ ShellSessionRuntime: clas
   getAgentMode() { return "plan"; }
 } }));
 vi.mock("../approval/cliApprovalEscalationBridge.js", () => ({ createCliApprovalEscalationBridge: () => vi.fn() }));
-vi.mock("./cliRuntimeInvocationBridge.js", () => ({ streamCliRuntimePrompt: (input: { compaction?: CompactionSetup }) => {
-  fixture.compaction = input.compaction;
+vi.mock("./cliRuntimeInvocationBridge.js", () => ({ streamCliRuntimePrompt: (input: CliRuntimeInvocationInput) => {
+  fixture.compaction = input.prepareProviderResources?.(input.providerCredentialResolution).compaction ?? input.compaction;
   return { events: [] };
 } }));
 vi.mock("../../core/shell/compaction.js", () => ({ compactSessionHistory: async (input: {
@@ -81,8 +84,11 @@ function runtime(withKey: boolean) {
   fixture.resolution = { provider: "fixture", model: "fixture-model", baseUrl,
     ...(withKey ? { credential: { apiKey: "synthetic", model: "fixture-model", baseUrl } } : {}),
   };
+  const context = { cwd: process.cwd(), projectRoot: process.cwd(), session: { id: "signed-summary" },
+    runtimeConfig: structuredClone({ ...fixture.config, configValidation: { valid: true, securityBlocked: false }, configDiagnostics: [] }) };
+  const configuration = new ConfigState(context.runtimeConfig as never, configurationBinding(context));
   createCliSessionRuntime({
-    runtimeContext: { cwd: process.cwd(), projectRoot: process.cwd(), session: { id: "signed-summary" }, runtimeConfig: fixture.config },
+    runtimeContext: { ...context, configuration },
     providerRuntimeBridge: { resolveCredentialSnapshot: () => fixture.resolution },
     sessionManager: { getSession: () => ({ turns: [] }) },
     renderer: {}, options: {}, approvalTrustPolicy: {}, approvalModeState: { get: () => undefined }, getReadline: () => null,
