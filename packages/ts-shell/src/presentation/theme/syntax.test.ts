@@ -33,12 +33,12 @@ it.each(["xml", "js", "python"])("decodes escaped source exactly for %s", (langu
   expect(stripAnsi(highlightCode(code, language, theme))).toBe(code);
 });
 
-it("leaves unknown, unlabelled and oversized blocks untouched", () => {
+it("colors unknown, unlabelled and oversized blocks with the fallback role", () => {
   for (const language of ["unknown", ""]) {
-    expect(highlightCode("const x = 1;", language, theme)).toBe("const x = 1;");
+    expect(highlightCode("const x = 1;", language, theme)).toBe(theme.fg("mdCodeBlock", "const x = 1;"));
   }
   const code = "x".repeat(65_537);
-  expect(highlightCode(code, "js", theme)).toBe(code);
+  expect(highlightCode(code, "js", theme)).toBe(theme.fg("mdCodeBlock", code));
 });
 
 it("falls back to source if rendering fails", () => {
@@ -90,4 +90,16 @@ it("preserves legacy parameter and nested variable colors", () => {
   const palette = new Theme(legacy, "truecolor");
   expect(highlightCode("def run(arg): return arg", "python", palette)).toContain(palette.fg("text", "arg"));
   expect(highlightCode('echo "$HOME"', "bash", palette)).toContain(palette.fg("commandString", "$HOME"));
+});
+
+
+it("uses the fallback role after a highlighter failure and closes each line independently", () => {
+  const palette = new Theme(getDefaultTheme(), "truecolor");
+  const original = palette.fg.bind(palette);
+  vi.spyOn(palette, "fg").mockImplementation((token, text) => {
+    if (token !== "mdCodeBlock") throw new Error("highlight unavailable");
+    return original(token, text);
+  });
+  const source = "const a = 1;\n\n  next  ";
+  expect(highlightCode(source, "js", palette)).toBe(original("mdCodeBlock", "const a = 1;") + "\n\n" + original("mdCodeBlock", "  next  "));
 });

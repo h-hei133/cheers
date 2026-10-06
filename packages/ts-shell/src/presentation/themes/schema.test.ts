@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import { parseTheme } from "./schema.js";
 import dark from "./dark.json" with { type: "json" };
+import light from "./light.json" with { type: "json" };
 
 it("resolves variable chains while inheriting omitted tokens", () => {
   const result = parseTheme({ vars: { base: "#123456", linked: "base" }, colors: { accent: "linked", text: "blue" } }, "custom", dark);
@@ -45,4 +46,34 @@ it("inherits new semantic roles from legacy overrides unless explicitly replaced
   const legacy = parseTheme({ colors: { commandFlag: "#102030", text: "#203040" } }, "legacy", dark);
   expect(legacy.colors.syntaxKeyword).toBe("#102030");
   expect(legacy.colors.syntaxText).toBe("#203040");
+});
+
+
+it("keeps explicit terminal defaults distinct from missing legacy roles, including variable chains", () => {
+  const theme = parseTheme({ vars: { inherited: "default" }, colors: {
+    text: "inherited", accent: "#123456", dim: "#234567", success: "#345678", warning: "#456789",
+  } }, "legacy", dark);
+  expect(theme.colors.text).toBe("default");
+  expect(theme.colors.syntaxText).toBe("default");
+  expect(theme.colors.mdCodeBlock).toBe("default");
+  expect(theme.colors.statusLineModel).toBe("#123456");
+  expect(theme.colors.statusLinePath).toBe("#234567");
+  expect(theme.colors.statusLineGitClean).toBe("#345678");
+  expect(theme.colors.statusLineGitDirty).toBe("#456789");
+  expect(theme.colors.statusLineContext).toBe("#234567");
+  expect(parseTheme({ colors: { statusLineModel: "default" } }, "explicit", dark).colors.statusLineModel).toBe("default");
+  expect(() => parseTheme({ colors: { text: "" } }, "invalid", dark)).toThrow(/Invalid color/);
+});
+
+
+it("inherits added roles from the complete old light palette without borrowing dark colors", () => {
+  const colors: Record<string, string> = { ...light.colors };
+  for (const key of ["statusLineModel", "statusLinePath", "statusLineGitClean", "statusLineGitDirty", "statusLineContext", "mdCodeBlock"]) delete colors[key];
+  const result = parseTheme({ colors }, "old-light", dark);
+  expect(result.colors.statusLineModel).toBe(light.colors.accent);
+  expect(result.colors.statusLinePath).toBe(light.colors.dim);
+  expect(result.colors.statusLineGitClean).toBe(light.colors.success);
+  expect(result.colors.statusLineGitDirty).toBe(light.colors.warning);
+  expect(result.colors.statusLineContext).toBe(light.colors.dim);
+  expect(result.colors.mdCodeBlock).toBe(light.colors.syntaxText);
 });

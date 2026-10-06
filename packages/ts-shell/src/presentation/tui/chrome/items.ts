@@ -96,7 +96,7 @@ const CONTEXT_TIERS = [
 export function renderStatusItem(id: StatusItemId, facts: StatusFacts): string | undefined {
   switch (id) {
     case "model":
-      return defaultTheme.fg("accent", facts.model);
+      return defaultTheme.fg("statusLineModel", facts.model);
     case "provider":
       return defaultTheme.dim(facts.provider);
     case "agent-mode":
@@ -117,18 +117,18 @@ export function renderStatusItem(id: StatusItemId, facts: StatusFacts): string |
         ? defaultTheme.fg("warning", facts.permissionScope)
         : defaultTheme.dim(facts.permissionScope);
     case "branch":
-      return facts.branch ? defaultTheme.fg("success", facts.branch) : undefined;
+      return facts.branch ? defaultTheme.fg(facts.worktreeDirty === undefined ? "dim" : facts.worktreeDirty ? "statusLineGitDirty" : "statusLineGitClean", facts.branch) : undefined;
     case "worktree":
       if (facts.worktreeDirty === undefined) return undefined;
       return facts.worktreeDirty
-        ? defaultTheme.fg("warning", "uncommitted")
-        : defaultTheme.dim("clean");
+        ? defaultTheme.fg("statusLineGitDirty", "uncommitted")
+        : defaultTheme.fg("statusLineGitClean", "clean");
     case "queued":
       return facts.queued ? defaultTheme.fg("accent", `${facts.queued} queued`) : undefined;
     case "peers":
       return facts.peers ? defaultTheme.dim(`${facts.peers} peers`) : undefined;
     case "directory":
-      return facts.directory ? defaultTheme.dim(facts.directory) : undefined;
+      return facts.directory ? defaultTheme.fg("statusLinePath", facts.directory) : undefined;
     case "context":
       return renderContext(facts);
     case "session-tokens":
@@ -150,7 +150,7 @@ function renderContext(facts: StatusFacts): string | undefined {
   const percent = Math.min(100, Math.round((facts.contextUsed / facts.contextWindow) * 100));
   const text = `${formatTokens(facts.contextUsed)}/${formatTokens(facts.contextWindow)} ${percent}%`;
   const tier = CONTEXT_TIERS.find((entry) => percent >= entry.at);
-  return tier ? defaultTheme.fg(tier.token, text) : defaultTheme.dim(text);
+  return defaultTheme.fg(tier?.token ?? "statusLineContext", text);
 }
 
 /** The distinctive tail of a session id, which is what /resume accepts. */

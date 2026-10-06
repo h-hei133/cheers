@@ -119,3 +119,16 @@ describe("item normalisation", () => {
     expect(normalizeStatusItems(["model", "nonsense"])).toEqual(["model"]);
   });
 });
+
+
+it("uses separate status roles without changing context risk thresholds or guessing clean Git state", () => {
+  expect(renderStatusItem("model", facts)).toBe(defaultTheme.fg("statusLineModel", facts.model));
+  expect(renderStatusItem("directory", facts)).toBe(defaultTheme.fg("statusLinePath", facts.directory!));
+  expect(renderStatusItem("branch", facts)).toBe(defaultTheme.fg("dim", "main"));
+  expect(renderStatusItem("branch", { ...facts, worktreeDirty: false })).toBe(defaultTheme.fg("statusLineGitClean", "main"));
+  expect(renderStatusItem("branch", { ...facts, worktreeDirty: true })).toBe(defaultTheme.fg("statusLineGitDirty", "main"));
+  for (const [percent, token] of [[49, "statusLineContext"], [50, "accent"], [70, "warning"], [90, "error"]] as const) {
+    expect(renderStatusItem("context", { ...facts, contextUsed: percent, contextWindow: 100 }))
+      .toBe(defaultTheme.fg(token, `${percent}/100 ${percent}%`));
+  }
+});

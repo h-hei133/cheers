@@ -21,7 +21,7 @@ export function composerStatus(facts: StatusFacts, items: readonly StatusItemId[
     const text = renderStatusItem(id, facts);
     return text ? [{ id, text }] : [];
   });
-  if (parts.length === 0) parts.push({ id: "model", text: defaultTheme.fg("accent", facts.model) });
+  if (parts.length === 0) parts.push({ id: "model", text: defaultTheme.fg("statusLineModel", facts.model) });
   return {
     left: fit(parts.filter(part => !RIGHT_ITEMS.has(part.id)).map(part => part.text), width),
     right: fit(parts.filter(part => RIGHT_ITEMS.has(part.id)).map(part => part.text), Math.max(0, width - 2)),

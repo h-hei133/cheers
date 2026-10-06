@@ -7,7 +7,7 @@ afterEach(() => vi.unstubAllEnvs());
 it("passes detected capability into named themes", () => {
   vi.stubEnv("FORCE_COLOR", "3");
   vi.stubEnv("COLORTERM", "truecolor");
-  expect(getTheme("dark").fg("text", "body")).toMatch(/^\x1b\[38;2;/);
+  expect(getTheme("dark").fg("accent", "body")).toMatch(/^\x1b\[38;2;/);
 });
 
 it.each([

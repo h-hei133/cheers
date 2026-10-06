@@ -42,7 +42,7 @@ function segments(facts: StatusFacts, items: readonly StatusItemId[]): string[] 
     if (text) parts.push(text);
   }
   // The band would be an empty coloured stripe otherwise, which reads as a bug.
-  if (parts.length === 0) parts.push(defaultTheme.fg("accent", facts.model));
+  if (parts.length === 0) parts.push(defaultTheme.fg("statusLineModel", facts.model));
   return parts;
 }
 

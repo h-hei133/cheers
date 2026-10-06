@@ -1413,3 +1413,14 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 验证：Node 20.3 隔离环境最终 17 文件/388 项通过，构建通过；import cycles、config consumers、declarations、Node floor、strict docs 与 43 项 script tests 通过。NormProof 0 blocking，保留四个既有 function-count advisory；strict docs 保留 120 个既有 source advisory。五组反转（形态 geometry fence、IME 尾、只读 viewport 预算、菜单焦点预览、真实滚动条分母）均实际触发断言失败，隔离副本逐字节/SHA-256 恢复后 77 项通过。代码独立 APPROVE、架构 CLEAR；额外窄窗穷举均由独立 lane 运行，不代替实际终端证据。
 - 两模式实际 CLI 逐项预览全部八形态、暂存零写入、Apply box、取消后恢复、CJK/插入/resize caret、重启读取 box，均退出 0；fullscreen box 正向与缩窗反向选择的 OSC 52 和隔离 clipboard stdin 均严格等于 45 字节源文。最初 PTY 两次失败分别等待了已滚出菜单视口的 Pending 行、把保留的命令标题误当仍打开的菜单；按实际可见 Apply/菜单行同步后通过，未改产品来迁就探针。
 - 本批交付八形态实现与隔离终端主链；真实输入法、Windows Terminal 像素和全部 UI/Phase 19 验收继续。UI-02 提交 `c261472c` 的 CI 37503608913、Architecture Watch 37503608896 已按 SHA 核实成功；本批远端状态另按新提交核实。
+
+
+### 8.89 UI-04：精确调色板、终端默认与语义 fallback
+
+- dark 按研究文档 §10 更新：原 48 项中 24 项语义变化、24 项保留，新增六个实际消费的角色；schema 与四套内建主题均为 54 项。新增 status model/path/git-clean/git-dirty/context 由状态 items 消费，未知 Git 状态仍用中性色，不推测干净；50/70/90 阈值保持。mdCodeBlock 用于未标语言、未知语言、过大或高亮失败的代码块，逐行闭色并保留源文；none 模式仍不着色。
+- JSON 与变量链支持显式 `default`；低层编码使用标准 SGR 39/49，不假定终端默认 RGB。现有字符串样式接口无法区分内层默认开启与普通颜色关闭，因此 scope 开启使用等效的标准重复 SGR 39;39/49;49，嵌套恢复保留这些完整组；颜色关闭仍恢复外层。中间布局不归并 SGR，只有最终 paint 归并；前景/背景独立、全 reset、软折行、截断再包色和最终归并均有有效终端色槽断言。
+- 对照参考的默认前景/背景编码和简单样式包装；后者没有解决本产品较强的嵌套恢复契约。避免引入终端专属样式栈或跨所有字符串消费者的新渲染系统，显式记录“最终绘制前保留 scope 开启组”的约束。
+- 新角色按依赖顺序继承旧主题自身的 accent/dim/success/warning/syntaxText；syntaxText 又可继承 text。完整旧 light/custom 不借新 dark 配色；显式 default 与缺省继承保持区别，现有 hex/ANSI 色名不变，未知值和空串仍被主题解析拒绝。其余三套预设新增角色沿用各自明暗/高对比语义。
+- Node 20.3 隔离组合 29 文件/442 项、构建、静态门、43 项 script tests 通过。NormProof 0 blocking，四个既有函数数 advisory 保持；strict docs 120 个既有 source advisory 保持。四组反转撤回默认 scope 区分、旧代码角色继承、fallback 新角色及 model 新角色，均触发断言失败并逐字节恢复；恢复后 66 项通过。独立代码 APPROVE（113 项与 3645 个组合色槽探针），架构 CLEAR（105 项、依赖与责任上限检查）。
+- 实际构建 CLI 使用隔离 HOME、受控本地 provider 和每场一次请求，分别运行 regular/truecolor 及 fullscreen/truecolor、256、16、none。四套主题切换后，历史 unknown fence 的颜色状态按主题变化并回到 dark，配置文件原文不变，五场均退出 0。truecolor 的代码颜色依次为 9cdcfe/111827/ffffff/000000/9cdcfe；低色模式按既有降色规则，none 始终默认。此证据是 VT 色槽与输出状态，不等于任意用户终端对比度认证。首轮 PTY 的 light-contrast 预期误写为 111111，核对内建既有 000000 后修正探针；无产品修补。
+- 本批完成 palette/default/inheritance/fallback 主链。主题在 Settings 内的实际预览、取消与 Apply 一致性继续，真实 IME/Windows 像素和完整 Phase 19 保持进行中。UI-03 `3297c375` 的 Architecture Watch 37509026666 已成功，CI 37509026653 记录时仍在运行；本批远端状态另按 SHA 核实。

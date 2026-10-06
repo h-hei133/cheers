@@ -7,7 +7,7 @@
  * 3. ANSI color escape sequences
  */
 
-import { colorToAnsi, detectColorMode, type ColorMode } from "./color.js";
+import { scopedColor, detectColorMode, type ColorMode } from "./color.js";
 import { loadTheme, getDefaultTheme, type ThemeConfig } from "../themes/index.js";
 
 import type { ThemeColorToken } from "./tokens.js";
@@ -36,6 +36,9 @@ const TEXT_ATTRIBUTES = [
 function reopenStyles(text: string, prefix: string, openings: ReadonlyMap<number, string>): string {
   if (!text.includes("\x1b[")) return text;
   return text.replace(/\x1b\[([\d;:]*)m/g, (sequence, parameters: string) => {
+    // These idempotent groups open an explicit default-color scope. Ordinary
+    // 39/49 close a nested scope and therefore restore its enclosing color.
+    if (parameters === "39;39" || parameters === "49;49") return sequence;
     const parts = parameters.split(";");
     let restored = "";
     let start = 0;
@@ -129,7 +132,7 @@ export class Theme {
   /** Combine a foreground with background and text attributes in one scope. */
   style(token: ThemeColorToken, text: string, options: ThemeStyleOptions = {}): string {
     const color = this.colors.get(token) ?? "#ffffff";
-    const layers: StyleLayer[] = [[colorToAnsi(color, this.mode), 39]];
+    const layers: StyleLayer[] = [[scopedColor(color, this.mode), 39]];
     if (options.bg) layers.push([this.bgOpen(options.bg), 49]);
     if (options.bold || options.dim) {
       layers.push([(options.bold ? "\x1b[1m" : "") + (options.dim ? "\x1b[2m" : ""), 22]);
@@ -143,7 +146,7 @@ export class Theme {
   /** The opening sequence alone, for rows that own their background and final reset. */
   bgOpen(token: ThemeColorToken): string {
     const color = this.colors.get(token) ?? "#000000";
-    return colorToAnsi(color, this.mode, true);
+    return scopedColor(color, this.mode, true);
   }
 
   inverse(text: string): string {

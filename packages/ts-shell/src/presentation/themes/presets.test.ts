@@ -41,3 +41,19 @@ it.each([[darkContrast, "#000000"], [lightContrast, "#ffffff"]] as const)(
     }
   },
 );
+
+
+it("ships the approved dark palette and exactly 54 semantic roles", () => {
+  expect(THEME_COLOR_TOKENS).toHaveLength(54);
+  expect(dark.colors).toMatchObject({
+    border: "#178fb9", borderAccent: "#0088fa", borderMuted: "#3d424a", mdHeading: "#febc38",
+    text: "default", userMessageText: "default", toolTitle: "default", commandArg: "default",
+    statusBandBg: "#121212", scrollbarTrack: "#808080", scrollbarThumb: "#e5e5e5",
+    syntaxComment: "#6A9955", syntaxKeyword: "#569CD6", syntaxString: "#CE9178", syntaxNumber: "#B5CEA8",
+    syntaxType: "#4EC9B0", syntaxFunction: "#DCDCAA", syntaxVariable: "#9CDCFE", syntaxBuiltin: "#9CDCFE",
+    commandFlag: "#569CD6", commandString: "#CE9178", commandNumber: "#B5CEA8",
+    mdQuoteText: "#777d88", mdCodeBorder: "#777d88",
+    statusLineModel: "#d787af", statusLinePath: "#00afaf", statusLineGitClean: "#5faf5f",
+    statusLineGitDirty: "#d7af5f", statusLineContext: "#8787af", mdCodeBlock: "#9CDCFE",
+  });
+});

@@ -59,14 +59,21 @@ function renderScopes(html: string, theme: Theme): string {
   return output;
 }
 
-/** Explicit language only; unsupported, oversized or failed highlighting preserves the source. */
+/** Close fallback color at each line boundary, just like successfully highlighted code. */
+function fallback(code: string, theme: Theme): string {
+  try { return code.split("\n").map(line => line ? theme.fg("mdCodeBlock", line) : "").join("\n"); }
+  catch { return code; }
+}
+
+/** Explicit grammar or semantic fallback; styling never rewrites the source. */
 export function highlightCode(code: string, language: string, theme: Theme = defaultTheme): string {
-  if (theme.colorMode === "none" || code.length > 64 * 1024 || !language || !highlighter.getLanguage(language)) return code;
+  if (theme.colorMode === "none") return code;
+  if (code.length > 64 * 1024 || !language || !highlighter.getLanguage(language)) return fallback(code, theme);
   try {
     const html = highlighter.highlight(code, { language, ignoreIllegals: true }).value;
     const rendered = renderScopes(html, theme);
-    return stripAnsi(rendered) === code ? rendered : code;
+    return stripAnsi(rendered) === code ? rendered : fallback(code, theme);
   } catch {
-    return code;
+    return fallback(code, theme);
   }
 }

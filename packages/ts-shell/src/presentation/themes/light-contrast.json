@@ -49,6 +49,12 @@
     "mdQuoteBorder": "#606060",
     "mdListBullet": "#684400",
     "mdRule": "#606060",
-    "mdCodeBorder": "#606060"
+    "mdCodeBorder": "#606060",
+    "statusLineModel": "#684400",
+    "statusLinePath": "#404040",
+    "statusLineGitClean": "#006520",
+    "statusLineGitDirty": "#684400",
+    "statusLineContext": "#404040",
+    "mdCodeBlock": "#000000"
   }
 }

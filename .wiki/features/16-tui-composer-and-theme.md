@@ -436,3 +436,12 @@ export interface ComposerLayout {
 Settings 聚焦时显示真实 composer，暂存不写配置，Apply 即时发布 shape 叶子；取消恢复已接受形态。失败保留选择并显示准确说明，下一次明确 Apply 才获取新 baseline；无法重读仍保留选择，不泄露读取异常。形态变更前的选择 geometry 立即失效，输入源文保持不变。
 
 两模式实际 CLI 已验证八项预览、暂存/取消/Apply、重启持久化、中文宽字素 caret 与 resize；fullscreen box 源文复制与隔离剪贴板输入精确一致。真实输入法及 Windows 像素未验证，保守尾策略不等于 IME 实测通过。独立评审、反转和本地/远端证据见 [Phase 19 §8.88](phase-19-decisions.md)。精确调色板与最终 54-token 集合继续由 UI-04 落实。
+
+
+## 20. UI-04 调色板与默认色实施
+
+§10 的 dark 精确映射及六个新增角色已经落地；四预设与 schema 均为 54 项。状态 roles 与未知/失败代码块 fallback 有实际读者，旧 light/custom 按自身已有颜色继承。`default` 是明确的 JSON/变量值，不能与缺省 token 或空串混同；低层使用 SGR 39/49。
+
+字符串样式组合中，显式默认开启使用终端等效的完整组 39;39/49;49，与普通 closing reset 区分。中间 wrapper 和布局保留完整组，最终 paint 才归并。这样保留现有字符串 API 并正确恢复多层前景、背景及 reset；不要在后续样式包装之前新增 ANSI 归一化。
+
+29 文件/442 项、构建和四组反转通过，独立 APPROVE/CLEAR；五场实际 CLI 的四种颜色能力与四套主题切换验证了历史代码块重绘。详情见 [Phase 19 §8.89](phase-19-decisions.md)。主题 Settings 预览/取消/Apply、一切真实输入法及 Windows 像素验收仍继续。

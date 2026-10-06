@@ -6301,3 +6301,6 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 
 
 ## [2026-10-07] feat | Phase 19 UI-03 八形态统一 composer，接通实际 Settings 预览、暂存/Apply、失败可恢复选择与即时叶子发布。修复重复折行、box 视口抖动和配置换形态的旧选择坐标。Node 20.3 构建、相关组合测试、5 组反转、两模式实际 CLI 与独立 APPROVE/CLEAR 证据见 features/phase-19-decisions.md §8.88；真实 IME、Windows 像素和完整阶段目标继续。
+
+
+## [2026-10-07] feat | Phase 19 UI-04 落实 dark 精确配色、54-token 集合、显式终端默认与嵌套样式、旧主题角色继承及真实 status/code fallback 消费。442 项、Node 20.3 构建、4 组反转和五场实际 CLI 颜色能力/主题重绘验证通过，独立 APPROVE/CLEAR；见 features/phase-19-decisions.md §8.89。主题 Settings 预览与完整阶段验收继续。

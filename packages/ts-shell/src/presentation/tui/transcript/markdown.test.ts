@@ -67,8 +67,8 @@ describe("block structure", () => {
     }
   });
 
-  it.each(["", "unknown"])("uses the syntax text color for a %s fallback fence", (language) => {
-    defaultTheme.apply({ ...getDefaultTheme(), colors: { ...getDefaultTheme().colors, syntaxText: "#123456" } }, "truecolor");
+  it.each(["", "unknown"])("uses the fallback code role for a %s fence", (language) => {
+    defaultTheme.apply({ ...getDefaultTheme(), colors: { ...getDefaultTheme().colors, syntaxText: "#abcdef", mdCodeBlock: "#123456" } }, "truecolor");
     try {
       expect(renderMarkdown(`\x60\x60\x60${language}\nplain body\n\x60\x60\x60`, 30)[1])
         .toContain("\x1b[38;2;18;52;86mplain body\x1b[39m");

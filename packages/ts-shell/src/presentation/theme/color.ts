@@ -51,6 +51,7 @@ function basicColor(r: number, g: number, b: number): number {
 /** One encoder for foreground and background, with explicit terminal capability. */
 export function colorToAnsi(color: string, mode: ColorMode, background = false): string {
   if (mode === "none") return "";
+  if (color === "default") return background ? "\x1b[49m" : "\x1b[39m";
   const named = COLOR_NAMES.indexOf(color.toLowerCase() as typeof COLOR_NAMES[number]);
   let index = named;
   if (/^#[\da-f]{6}$/i.test(color)) {
@@ -65,4 +66,14 @@ export function colorToAnsi(color: string, mode: ColorMode, background = false):
   if (index < 0) index = background ? 0 : 7;
   const base = index < 8 ? (background ? 40 : 30) : (background ? 100 : 90);
   return `\x1b[${base + index % 8}m`;
+}
+
+/**
+ * Default openings and closing resets need distinct spellings during string
+ * composition. Repeating the same SGR is standard and has no extra terminal
+ * effect; retain this spelling until final paint coalesces the styled output.
+ */
+export function scopedColor(color: string, mode: ColorMode, background = false): string {
+  if (color === "default" && mode !== "none") return background ? "\x1b[49;49m" : "\x1b[39;39m";
+  return colorToAnsi(color, mode, background);
 }

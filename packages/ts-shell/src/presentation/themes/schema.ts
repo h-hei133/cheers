@@ -25,7 +25,13 @@ const INHERITED_TOKENS = {
   "mdQuoteBorder": "border",
   "mdListBullet": "accent",
   "mdRule": "border",
-  "mdCodeBorder": "border"
+  "mdCodeBorder": "border",
+  "statusLineModel": "accent",
+  "statusLinePath": "dim",
+  "statusLineGitClean": "success",
+  "statusLineGitDirty": "warning",
+  "statusLineContext": "dim",
+  "mdCodeBlock": "syntaxText"
 } as const;
 
 /** Structural validation plus variable resolution; omitted tokens inherit a usable palette. */
@@ -68,7 +74,7 @@ function resolveColor(value: unknown, vars: Record<string, unknown>, resolved: M
     visiting.add(current);
     current = vars[current];
   }
-  if (typeof current !== "string" || !(/^#[\da-f]{6}$/i.test(current) || (COLOR_NAMES as readonly string[]).includes(current.toLowerCase()))) {
+  if (typeof current !== "string" || !(current === "default" || /^#[\da-f]{6}$/i.test(current) || (COLOR_NAMES as readonly string[]).includes(current.toLowerCase()))) {
     throw new Error(`Invalid color or missing variable: ${String(current)}`);
   }
   for (const name of visiting) resolved.set(name, current);

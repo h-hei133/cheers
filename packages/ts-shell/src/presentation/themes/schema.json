@@ -28,135 +28,135 @@
       "properties": {
         "text": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "userMessageText": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "thinkingText": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "toolTitle": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "toolOutput": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "diffAdded": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "diffRemoved": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "diffContext": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "filename": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "command": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "commandArg": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "commandFlag": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "commandString": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "commandNumber": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "commandPipe": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "mdHeading": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "mdCode": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "mdLink": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "success": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "error": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "warning": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "muted": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "dim": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "accent": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "border": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "borderAccent": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "borderMuted": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "selectedBg": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "userMessageBg": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "statusBandBg": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "scrollbarTrack": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "scrollbarThumb": {
           "type": "string",
-          "description": "A six-digit hex color, ANSI color name, or variable name."
+          "description": "A six-digit hex color, ANSI color name, explicit default, or variable name."
         },
         "syntaxText": {
           "type": "string",
-          "description": "Unscoped code and fallback code blocks."
+          "description": "Unscoped text inside successfully highlighted code."
         },
         "syntaxKeyword": {
           "type": "string",
@@ -217,6 +217,30 @@
         "mdCodeBorder": {
           "type": "string",
           "description": "Fenced code borders and language labels."
+        },
+        "statusLineModel": {
+          "type": "string",
+          "description": "Active model in status text."
+        },
+        "statusLinePath": {
+          "type": "string",
+          "description": "Project directory in status text."
+        },
+        "statusLineGitClean": {
+          "type": "string",
+          "description": "Known clean Git status."
+        },
+        "statusLineGitDirty": {
+          "type": "string",
+          "description": "Known dirty Git status."
+        },
+        "statusLineContext": {
+          "type": "string",
+          "description": "Context usage below the first risk threshold."
+        },
+        "mdCodeBlock": {
+          "type": "string",
+          "description": "Unlabelled, unsupported, oversized or failed code highlighting."
         }
       }
     }
