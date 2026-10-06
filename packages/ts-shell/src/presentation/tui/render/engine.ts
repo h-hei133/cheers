@@ -327,6 +327,7 @@ export class TUI {
       const freed = this.forgetTransmittedImages({ free: true });
       this.terminal.write(freed + (overlayScreen ? ENTER_ALT_SCREEN : EXIT_ALT_SCREEN));
       this.overlayScreen = overlayScreen;
+      this.setMouseTracking(this.alternateScreen || overlayScreen);
       this.painted = false;
       this.window = [];
     }

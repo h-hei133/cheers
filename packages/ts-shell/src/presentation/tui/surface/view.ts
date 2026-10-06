@@ -67,14 +67,14 @@ export class InteractiveSurface implements InteractiveView {
       this.choiceRegions = {};
       return { rows: [], chromeRows: [] };
     }
+    const chrome = this.renderChrome(width, height);
     if (this.context.overlayFullScreen()) {
       this.choiceRegions = { overlay: { top: 0, height } };
       this.lastComposerGeometry = undefined;
       // A full-screen overlay owns every row, so there is no fixed block to
       // redraw separately.
-      return { rows: this.context.overlayRows(width, height).slice(0, height).map(row => truncateToWidth(row, width)), fullScreen: true };
+      return { rows: chrome.overlayRows.slice(0, height).map(row => truncateToWidth(row, width)), fullScreen: true };
     }
-    const chrome = this.renderChrome(width, height);
     const capacity = Math.max(0, height - chrome.rows.length);
     const transcriptRows = capacity === 0 && layout !== "document" ? [] : this.pane.render(
       width,
@@ -198,17 +198,13 @@ export class InteractiveSurface implements InteractiveView {
     readonly composerLayout: ComposerLayout;
     readonly overlayOffset: number;
     readonly overlayHeight: number;
+    readonly overlayRows: readonly string[];
     readonly suggestionRows: number;
   } {
     const busy = this.context.busy();
     const chromeCapacity = Math.max(1, height - MIN_TRANSCRIPT_ROWS);
     const maxComposerRows = Math.min(chromeCapacity, Math.max(3, Math.min(10, Math.floor(height * 0.35))));
     const activityRows = renderActivity(this.context.activity(), this.context.now(), width);
-    const overlayRows = this.context.overlayRows(width, height);
-    const statusRows = [
-      ...activityRows,
-      ...overlayRows,
-    ];
     const composerLayout = layoutComposer(
       this.editor,
       { busy, shape: this.context.composerShape?.() ?? "default", status: composerStatus(this.context.facts(), this.context.statusItems(), width) },
@@ -236,12 +232,14 @@ export class InteractiveSurface implements InteractiveView {
         width,
       )).slice(0, remaining);
     remaining -= hints.length;
+    const overlayRows = this.context.overlayRows(width, height, Math.max(0, remaining - activityRows.length));
+    const statusRows = [...activityRows, ...overlayRows];
     const visibleStatus = remaining > 0 ? statusRows.slice(-remaining) : [];
     const droppedStatus = statusRows.length - visibleStatus.length;
     return {
       rows: [...visibleStatus, ...composerRows, ...suggestionRows, ...hints].map(row => truncateToWidth(row, width)),
       composerOffset: visibleStatus.length, composerRows, composerLayout,
-      overlayOffset: activityRows.length - droppedStatus, overlayHeight: overlayRows.length, suggestionRows: suggestionRows.length,
+      overlayOffset: activityRows.length - droppedStatus, overlayHeight: overlayRows.length, overlayRows, suggestionRows: suggestionRows.length,
     };
   }
 }

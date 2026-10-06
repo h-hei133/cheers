@@ -62,8 +62,8 @@ export interface ViewContext {
   cancelArmed(): boolean;
   /** True when an open picker or reader wants the whole screen. */
   overlayFullScreen(): boolean;
-  /** Rows for an open picker, or none when none is open. */
-  overlayRows(width: number, height: number): string[];
+  /** Render with actual space above the composer before querying full-screen form. */
+  overlayRows(width: number, height: number, availableRows?: number): string[];
   /** Cells the pointer is currently covering, or none when it is not dragging. */
   selection(): SelectionSpan | undefined;
   /** Transient status notification (e.g. clipboard copy feedback). */

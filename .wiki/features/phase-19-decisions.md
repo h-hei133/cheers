@@ -1457,3 +1457,15 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 五组反转分别撤回结构转交、窄屏堆叠、主题代际、跨样式搜索与 bar 角色，均触发行为断言，隔离源码副本逐字节/SHA-256 恢复后 20 项通过。首轮主题反转未被整页变化断言捕获，因为 footer 已换色；测试改为直接断言正文百分比的新色槽后有效检出，无产品改动。证据：`.tmp/report-tests-ohylrk87`、`.tmp/report-final-0rhokklt`、`.tmp/ui06-architecture-TmqlUO`、`.tmp/report-gates-np7ulh0v`、`.tmp/phase19-config/report-reversals/1791315904011793348`。
 - actual CLI regular/fullscreen 各一次本地受控 provider 请求，报告数字 dark `b5cea8` → light `b45309`，100→40 列后字段及来源完整，关闭命令后继续编辑，配置原文不变、退出 0。两次 print 在强制彩色下仍无 ANSI，并保留 catalog/unknown；报告 Pager 的换色/搜索/复制由组件集成测试验证，本次 CLI 报告长度未触发分页，不补称实际弹出验证。PTY 首轮缺少驱动 SIGWINCH，第二轮断言未等待完整重绘且忽略折行；修正夹具同步后通过，未修改产品。证据：`.tmp/phase19-config/report-pty-1791315991438707940`。
 - UI-05 `4a73f0f8` 的 CI 37519416015、Architecture Watch 37519415850 均按提交核实成功。本批远端状态另按新 SHA 跟踪。自适应只读 host、滚轮/resize 阅读定位、help 两步填入、cost/tools 等迁移与版本化语义持久化仍继续；本批不代表完整 UI-06 或 Phase 19 完成。
+
+
+### 8.93 UI-06：实际容量下的只读报告与输入归属
+
+- 结构化报告不再受旧 18 行阈值门控，短报告也进入既有 Pager；Surface 先布局真实 composer、hints、activity 和最小转录行，再把剩余容量交给 reader。完整未过滤正文加实际三行 chrome 放得下时内嵌，否则全屏；过滤不在输入过程中切换展示方式。legacy 纯文本保留旧分页阈值，未另造报告宿主或虚构 apply。
+- 报告 renderer 同时输出每个视觉行的原始条目身份；宽度变化后保留当前源条目，主题变化不会把同一段内的阅读位置重置。过滤按整条目匹配，跨软折行和不同样式的关键词仍可命中，标签/数值/来源一起保留。箭头、PageUp/PageDown、Home/End 与 wheel 共用实际 viewport；窄屏优先保留关闭提示，无可滚动余量时不显示滚轮提示。
+- 粘贴归 reader 过滤器，移除终端序列与控制字符，不能落进隐藏 composer 或提交；关闭后原草稿恢复。reader 在下个请求、运行时提问、权限提示和 shutdown 前关闭，避免覆盖需要用户响应的状态。无色、复制和原纯文本数据契约继续沿用上一批。
+- 独立代码审查发现 regular 借用全屏只发 alternate-screen 序列、未请求鼠标报告；旧注入 SGR 测试无法发现真实终端不会发滚轮事件。现由 engine 在借用/归还时同步获取/释放鼠标，stop/suspend/resume 复用相同生命周期。内嵌报告的未过滤正文完整可见，没有应用滚动区，regular 继续保留原生鼠标/scrollback；fullscreen reader 才消费应用滚轮。
+- Node 20.3 首轮 73 项、扩大 7 文件/177 项通过；鼠标/提示让位修复后 74 项、最终布局/提示 52 项及最终构建通过。独立代码 APPROVE（177 项后复跑 74 项）、架构 CLEAR（199 项后最终 87 项）。Surface 保留显式 render-before-form-query 约束；stock InteractiveMode 20、Surface 19，宽口径对象 callback 计数 InteractiveMode 83→83，未增名字，不宣称既有债务已消失。
+- 六组反转覆盖自适应形式、源条目锚点、粘贴归属、鼠标协商、真实容量和权限提示让位，全部触发行为断言；隔离源码副本逐字节/SHA-256 恢复后 123 项通过。import cycles、config consumers、declarations、Node floor、strict docs、43 项 script tests 通过；NormProof 0 blocking，既有 advisory 保留。证据：`.tmp/reader-tests-hcy8y7pz`、`.tmp/reader-reviewed-931m85z5`、`.tmp/reader-final-idfxt6rr`、`.tmp/ui06-reader-architecture-zTW2fe`、`.tmp/reader-gates-st6zji61`、`.tmp/phase19-config/reader-reversals/1791317381926702874`。
+- actual CLI regular/fullscreen 各两次本地受控 provider 请求，验证 100×60 内嵌 → 40×12 全屏 → PageDown/wheel → 粘贴过滤完整条目 → 100×60 恢复内嵌 → Esc → 新请求。regular 明确观察鼠标 enable/disable，过滤词未进入后续请求，配置原文不变、退出 0。首轮最后的夹具断言忽略了请求既有的 Environment/continuity 前缀；改为精确用户后缀加过滤词零泄漏后通过，无产品修补。证据：`.tmp/phase19-config/reader-pty-1791317627870718666`。
+- 上批 `aacd66cf` 的 CI 37521788268、Architecture Watch 37521788204 均已按 SHA 核实成功；本批远端状态另按新提交跟踪。UI-06 的 help 两步填入、cost/tools 等报告迁移与语义持久化继续，UI-07 和全部 Phase 19 仍未完成。

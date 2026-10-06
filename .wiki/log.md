@@ -6312,3 +6312,6 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 
 
 ## [2026-10-07] feat | Phase 19 UI-06 加入不可变 spans/columns/facts 报告，context 首个消费者贯通既有转录/Pager，窄列堆叠、主题换色与全文复制同源。143 项首轮组合、最终定向、Node 20.3 构建、五组有效反转及恢复后 20 项、两模式实际 CLI 和 print 检查通过，独立 APPROVE/CLEAR；见 features/phase-19-decisions.md §8.92。自适应报告宿主、其他命令迁移及完整阶段目标继续。
+
+
+## [2026-10-07] feat | Phase 19 UI-06 报告宿主按实际 composer 剩余空间自适应，保留源条目阅读位置，接通分页/滚轮/完整条目过滤与粘贴归属；修复 regular 借屏未协商鼠标，reader 让位运行时提示。177 项组合、最终定向/构建、六组反转及恢复后 123 项、两模式实际 CLI 验证通过，独立 APPROVE/CLEAR，见 features/phase-19-decisions.md §8.93。help、其他报告迁移与完整目标继续。

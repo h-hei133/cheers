@@ -1,3 +1,5 @@
+import { Pager } from '../chrome/pager.js';
+import { createReport, reportText, span } from '../../../core/commands/report/projection.js';
 import { describe, expect, it, vi } from "vitest";
 import { stripAnsi } from "../text/ansi.js";
 import { visibleWidth } from "../text/measure.js";
@@ -518,4 +520,28 @@ describe("collapsing from the keyboard", () => {
     view.toggleCollapsed("tool");
     expect(view.transcript.all().map((block) => block.collapsed)).toEqual([true, true]);
   });
+});
+
+
+it('fits report panels around the real composer and switches screens on resize', () => {
+  const report = createReport({ title: 'Measured report', facts: {}, lines: Array.from({ length: 6 }, (_, i) =>
+    ({ kind: 'text' as const, spans: [span(`value-${i} with complete provenance`)] })) });
+  const pager = new Pager(); pager.open('/context', reportText(report), report);
+  const { view } = surface({ overlayFullScreen: () => pager.fullScreen,
+    overlayRows: (width, height, available) => pager.render(width, height, available), composerShape: () => 'box' });
+  view.editor.setText('retained draft');
+  const inline = view.renderFrame({ columns: 80, rows: 30 });
+  expect(inline.fullScreen).not.toBe(true);
+  expect(stripAnsi(inline.rows.join('\n'))).toContain('value-5');
+  expect(stripAnsi(inline.rows.join('\n'))).toContain('retained draft');
+  const full = view.renderFrame({ columns: 24, rows: 10 });
+  expect(full.fullScreen).toBe(true); expect(full.rows).toHaveLength(10);
+  expect(view.composerGeometry()).toBeUndefined();
+  const restored = view.renderFrame({ columns: 80, rows: 30 });
+  expect(restored.fullScreen).not.toBe(true);
+  expect(stripAnsi(restored.rows.join('\n'))).toContain('retained draft');
+  pager.close();
+  const closed = view.renderFrame({ columns: 80, rows: 30 });
+  expect(stripAnsi(closed.rows.join('\n'))).not.toContain('Measured report');
+  expect(view.editor.getText()).toBe('retained draft');
 });

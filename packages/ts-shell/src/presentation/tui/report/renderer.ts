@@ -17,10 +17,21 @@ export function renderSpans(spans: readonly ReportSpan[]): string {
     { bold: item.role === 'command' || item.role === 'heading' })).join('');
 }
 
+export interface ReportLayout {
+  readonly rows: readonly string[];
+  /** Original report line for each visual row; -1 identifies the title. */
+  readonly sources: readonly number[];
+}
+
+export function renderReport(report: CommandReport, width: number): readonly string[] {
+  return layoutReport(report, width).rows;
+}
+
 /** Every field survives narrow layouts; source text and styles remain separate. */
-export function renderReport(report: CommandReport, width: number): string[] {
-  if (width <= 0) return [];
+export function layoutReport(report: CommandReport, width: number): ReportLayout {
+  if (width <= 0) return { rows: [], sources: [] };
   const rows = [...wrapToWidth(defaultTheme.style('mdHeading', report.title, { bold: true }), width), ''];
+  const sources: number[] = rows.map(() => -1);
   const columns = report.columns ?? [];
   const widths = columns.map(column => Math.max(column.minWidth, visibleWidth(column.label)));
   for (const line of report.lines) if (line.kind === 'columns') {
@@ -28,7 +39,7 @@ export function renderReport(report: CommandReport, width: number): string[] {
   }
   const stacked = widths.reduce((sum, value) => sum + value, Math.max(0, widths.length - 1) * 2) > width;
   let table = false;
-  for (const line of report.lines) {
+  for (const [index, line] of report.lines.entries()) {
     if (line.kind === 'space') rows.push('');
     else if (line.kind === 'columns') {
       if (stacked || !columns.length) {
@@ -44,7 +55,8 @@ export function renderReport(report: CommandReport, width: number): string[] {
         }).join('  '));
       }
     } else rows.push(...wrapToWidth(`${line.kind === 'text' && line.bullet ? '• ' : ''}${renderSpans(line.spans)}`, width));
+    while (sources.length < rows.length) sources.push(index);
     table = line.kind === 'columns';
   }
-  return rows;
+  return { rows, sources };
 }

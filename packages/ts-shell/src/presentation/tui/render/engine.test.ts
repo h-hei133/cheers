@@ -1,3 +1,4 @@
+import { ENABLE_MOUSE, DISABLE_MOUSE } from '../input/mouse.js';
 import { describe, expect, it } from "vitest";
 import { TUI } from "./engine.js";
 import { CURSOR_MARKER } from "./paint.js";
@@ -46,7 +47,9 @@ describe("keeping the terminal's own screen", () => {
     provider.fullScreen = true;
     provider.rows = ["page one"];
     tui.renderNow();
-    expect(terminal.drain()).toContain("\x1b[?1049h");
+    const entered = terminal.drain();
+    expect(entered).toContain("\x1b[?1049h");
+    expect(entered).toContain(ENABLE_MOUSE);
     provider.rows = ["page two"];
     tui.renderNow();
     const page = terminal.drain();
@@ -59,6 +62,7 @@ describe("keeping the terminal's own screen", () => {
     tui.renderNow();
     const restored = terminal.drain();
     expect(restored).toContain("\x1b[?1049l");
+    expect(restored).toContain(DISABLE_MOUSE);
     expect(restored).not.toContain("history");
     expect(restored).toContain("new content");
   });
@@ -72,11 +76,18 @@ describe("keeping the terminal's own screen", () => {
     tui.renderNow();
     terminal.drain();
     if (action === "stop") tui.stop();
-    else tui.suspend(() => expect(terminal.drain()).toContain("\x1b[?1049l"));
-    if (action === "stop") expect(terminal.drain()).toContain("\x1b[?1049l");
+    else tui.suspend(() => {
+      const released = terminal.drain();
+      expect(released).toContain("\x1b[?1049l"); expect(released).toContain(DISABLE_MOUSE);
+    });
+    if (action === "stop") {
+      const released = terminal.drain();
+      expect(released).toContain("\x1b[?1049l"); expect(released).toContain(DISABLE_MOUSE);
+    }
     else {
       tui.renderNow();
-      expect(terminal.drain()).toContain("\x1b[?1049h");
+      const resumed = terminal.drain();
+      expect(resumed).toContain("\x1b[?1049h"); expect(resumed).toContain(ENABLE_MOUSE);
     }
   });
 

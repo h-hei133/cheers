@@ -1,3 +1,5 @@
+import type { EscalationPrompt } from '../../core/shell/approval/contract.js';
+import type { Pager } from '../../presentation/tui/chrome/pager.js';
 import { withConfiguration } from "../../test-utils/configuration.js";
 import { completionEdit } from "./completion.js";
 import { describe, expect, it, vi } from "vitest";
@@ -340,4 +342,52 @@ describe("attention on idle", () => {
     const afterTitle = terminal.writes.slice(terminal.writes.indexOf(title!) + 1);
     expect(afterTitle.some((write) => write.includes("\x07"))).toBe(false);
   });
+});
+
+
+it('keeps real wheel and bracketed paste input in the reader and restores the untouched draft', async () => {
+  const { mode, terminal } = build();
+  const host = mode as unknown as { pager: Pager; view: InteractiveView; onSubmit(text: string): void };
+  const submit = vi.spyOn(host, 'onSubmit').mockImplementation(() => {});
+  mode.start();
+  try {
+    host.view.editor.setText('untouched draft');
+    host.pager.open('/log', Array.from({ length: 60 }, (_, i) => `record-${i}`).join('\n'));
+    host.view.renderFrame({ columns: 80, rows: 24 });
+    terminal.input('\x1b[<65;6;6M');
+    expect(stripAnsi(host.view.renderFrame({ columns: 80, rows: 24 }).rows[2]!)).toContain('record-3');
+    terminal.input('\x1b[200~record-42\x1b[201~');
+    const filtered = stripAnsi(host.view.renderFrame({ columns: 80, rows: 24 }).rows.join('\n'));
+    expect(filtered).toContain('record-42'); expect(filtered).not.toContain('record-3');
+    expect(host.view.editor.getText()).toBe('untouched draft'); expect(submit).not.toHaveBeenCalled();
+    terminal.input('\x1b'); await vi.waitFor(() => expect(host.pager.active).toBe(false));
+    terminal.input('!'); expect(host.view.editor.getText()).toBe('untouched draft!');
+    expect(submit).not.toHaveBeenCalled();
+  } finally { mode.stop(); }
+});
+
+
+it('yields a reader to runtime questions, permission prompts and queued pickers', async () => {
+  const { mode, terminal } = build();
+  const host = mode as unknown as { pager: Pager; view: InteractiveView; onQuestion(text: string): void;
+    promptApproval(prompt: EscalationPrompt): Promise<unknown>; run(text: string): Promise<void>; openPicker(text: string, wait: boolean): void };
+  const open = () => host.pager.open('/log', 'read only');
+  mode.start();
+  try {
+    open(); host.onQuestion('Need an answer'); expect(host.pager.active).toBe(false);
+    expect(host.view.editor.placeholder).toContain('Answer above');
+    open();
+    const decision = host.promptApproval({ id: 'reader-approval', title: 'Write', message: 'Confirm action',
+      context: { toolName: 'edit', operation: 'write', target: 'file.ts' }, options: [], defaultOption: 'deny',
+      recommendedAction: 'deny', severity: 'medium' });
+    expect(host.pager.active).toBe(false);
+    await Promise.resolve(); await Promise.resolve();
+    expect(stripAnsi(host.view.renderFrame({ columns: 80, rows: 24 }).rows.join('\n'))).toContain('Permission: edit');
+    terminal.input('\x1b');
+    await expect(decision).resolves.toEqual({ decision: 'deny' });
+    open(); const picker = vi.spyOn(host, 'openPicker').mockImplementation(() => {});
+    await host.run('/settings');
+    expect(host.pager.active).toBe(false); expect(picker).toHaveBeenCalledWith('/settings', true);
+    open(); mode.stop(); expect(host.pager.active).toBe(false);
+  } finally { mode.stop(); }
 });

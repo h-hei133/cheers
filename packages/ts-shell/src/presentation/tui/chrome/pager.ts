@@ -1,12 +1,14 @@
+import type { MouseReport } from '../input/mouse.js';
+import { visibleWidth } from '../text/measure.js';
 import type { CommandReport } from '../../../core/commands/report/contract.js';
-import { renderReport } from '../report/renderer.js';
+import { layoutReport } from '../report/renderer.js';
 import { stripAnsi } from '../text/ansi.js';
 import { defaultTheme } from "../../theme/theme.js";
 import { padToWidth, truncateToWidth } from "../text/layout.js";
 import { renderMarkdown } from "../transcript/markdown.js";
 
 /**
- * A full-screen reader for output too long to belong in the transcript.
+ * A read-only report host and full-screen reader for long legacy output.
  *
  * A command that answers with forty rows pushes the conversation off the screen to
  * say something the user will read once. Putting that in its own view keeps the
@@ -21,12 +23,13 @@ import { renderMarkdown } from "../transcript/markdown.js";
 export const PAGER_THRESHOLD_ROWS = 18;
 
 /**
- * Move a block's text into the pager when it is long enough to be worth a view of
- * its own, leaving a one-line summary in the transcript. Returns whether it moved.
+ * Open every semantic report in its adaptive view; long legacy text keeps the
+ * existing full-screen threshold. Reports retain their source in a collapsed
+ * transcript block, while legacy text leaves its existing summary.
  */
 export function pageLongOutput(pager: Pager, title: string, block: PageableBlock, transcript?: { clearDiff(block: PageableBlock): void; setText(block: PageableBlock, text: string): void; setCollapsed?(block: PageableBlock, collapsed: boolean): void }): boolean {
   const lines = block.text.split("\n").length;
-  if (lines < PAGER_THRESHOLD_ROWS) return false;
+  if (!block.report && lines < PAGER_THRESHOLD_ROWS) return false;
   pager.open(title, block.text, block.report);
   if (block.report) {
     if (transcript?.setCollapsed) transcript.setCollapsed(block, true);
@@ -55,17 +58,21 @@ export interface PageableBlock {
 
 export class Pager {
   private title = "";
-  private rows: readonly string[] = [];
+  private rows: readonly { readonly text: string; readonly source: number }[] = [];
   private source = "";
   private top = 0;
   private width = 0;
   private revision = -1;
   private report: CommandReport | undefined;
   private filter = "";
+  private pageRows = 1;
+  private wholeScreen = true;
 
   get active(): boolean {
     return this.rows.length > 0;
   }
+
+  get fullScreen(): boolean { return this.active && this.wholeScreen; }
 
   /** The text being shown, for a copy that should not include the chrome. */
   get text(): string {
@@ -79,7 +86,8 @@ export class Pager {
     this.filter = "";
     this.top = 0;
     this.width = 0;
-    this.rows = [""];
+    this.wholeScreen = true;
+    this.rows = [{ text: "", source: -1 }];
   }
 
   close(): void {
@@ -92,15 +100,19 @@ export class Pager {
   /** Route one key. Returns false when the pager is closed and did not claim it. */
   handleKey(keyId: string, text: string | undefined, height: number): boolean {
     if (!this.active) return false;
-    const page = Math.max(1, height - 3);
+    const page = this.width ? this.pageRows : Math.max(1, height - 3);
     switch (keyId) {
       case "escape":
+      case "ctrl+c":
       case "enter":
-      case "q":
         // Enter dismisses as well as Escape. Typing filters, which means someone
         // who did not notice the view is up would otherwise see their next command
         // silently become a search term.
         this.close();
+        return true;
+      case "q":
+        if (!this.report) this.close();
+        else this.handlePaste('q');
         return true;
       case "down":
       case "ctrl+n":
@@ -124,49 +136,79 @@ export class Pager {
         this.top = Math.max(0, this.visible().length - page);
         return true;
       case "backspace":
-        this.filter = this.filter.slice(0, -1);
+        this.filter = Array.from(this.filter).slice(0, -1).join("");
         this.top = 0;
         return true;
       default:
         // Typing filters, which is what "search" means in a view this size: the
         // rows that do not match are simply not shown.
         if (text && text !== " ") {
-          this.filter += text;
-          this.top = 0;
+          this.handlePaste(text);
         }
         return true;
     }
   }
 
-  /** Rows for the whole screen. */
-  render(width: number, height: number): string[] {
-    const inner = Math.max(8, width);
-    if (this.width !== inner || this.revision !== defaultTheme.colorRevision) {
-      this.rows = this.report ? renderReport(this.report, inner - 4) : renderMarkdown(this.source, inner - 4);
-      this.revision = defaultTheme.colorRevision;
-      this.width = inner;
-    }
-    const body = this.visible();
-    const page = Math.max(1, height - 3);
-    this.top = Math.max(0, Math.min(this.top, Math.max(0, body.length - page)));
-    const shown = body.slice(this.top, this.top + page);
-    const position = body.length > page ? `${this.top + 1}–${this.top + shown.length} of ${body.length}` : "";
-    const head = `  ${defaultTheme.bold(this.title)}${this.filter ? ` ${defaultTheme.fg("accent", this.filter)}` : ""}`;
-    const foot = defaultTheme.dim("  ↑↓ scroll  ·  type to filter  ·  enter or esc close");
-    const rows = [
-      truncateToWidth(`${head}${gap(head, position, inner)}${defaultTheme.dim(position)}`, inner),
-      "",
-      ...shown.map((row) => `  ${row}`),
-    ];
-    while (rows.length < height - 1) rows.push("");
-    rows.push(truncateToWidth(foot, inner));
-    return rows.map((row) => padToWidth(row, inner));
+  /** A reader owns pasted input, including while it fits above the composer. */
+  handlePaste(text: string): boolean {
+    if (!this.active) return false;
+    this.filter += stripAnsi(text).replace(/[\r\n\t]+/g, ' ').replace(/[\x00-\x1f\x7f-\x9f]/g, '');
+    this.top = 0;
+    return true;
   }
 
-  private visible(): readonly string[] {
+  handlePointer(report: MouseReport): boolean {
+    if (!this.active) return false;
+    if (report.kind === 'wheel' && !report.ctrl && !report.alt && !report.shift) this.scroll(report.button * 3, this.pageRows);
+    return true;
+  }
+
+  /** Choose the form from the same body and actual chrome capacity being drawn. */
+  render(width: number, height: number, inlineCapacity = 0): string[] {
+    if (!this.active || width <= 0 || height <= 0) return [];
+    const padding = Math.min(2, Math.floor((width - 1) / 2));
+    const inset = ' '.repeat(padding);
+    const inner = Math.max(1, width - padding * 2);
+    const reflow = this.width !== inner;
+    if (reflow || this.revision !== defaultTheme.colorRevision) {
+      const anchor = this.visible()[this.top]?.source;
+      if (this.report) {
+        const layout = layoutReport(this.report, inner);
+        this.rows = layout.rows.map((text, index) => ({ text, source: layout.sources[index]! }));
+      } else this.rows = renderMarkdown(this.source, inner).map((text, index) => ({ text, source: index }));
+      this.revision = defaultTheme.colorRevision;
+      this.width = inner;
+      if (this.report && reflow && anchor !== undefined) this.top = Math.max(0, this.visible().findIndex(row => row.source === anchor));
+    }
+    const body = this.visible();
+    // Filtering cannot switch forms under the user's cursor. Geometry follows
+    // the whole report, while the viewport follows the filtered result.
+    this.wholeScreen = !this.report || this.rows.length + 3 > inlineCapacity;
+    const capacity = this.wholeScreen ? height : Math.min(height, this.rows.length + 3);
+    this.pageRows = Math.max(1, capacity - 3);
+    this.top = Math.max(0, Math.min(this.top, Math.max(0, body.length - this.pageRows)));
+    const shown = body.slice(this.top, this.top + this.pageRows);
+    const position = body.length > this.pageRows ? `${this.top + 1}–${this.top + shown.length} of ${body.length}` : '';
+    const head = `${inset}${defaultTheme.bold(this.title)}${this.filter ? ` ${defaultTheme.fg('accent', this.filter)}` : ''}`;
+    const navigation = body.length > this.pageRows ? ' · ↑↓ / PgUp PgDn / wheel scroll' : '';
+    const foot = defaultTheme.dim(`${inset}esc close${navigation} · type to filter`);
+    const rows = [truncateToWidth(`${head}${gap(head, position, width)}${defaultTheme.dim(position)}`, width), '',
+      ...shown.map(row => `${inset}${row.text}`)];
+    while (rows.length < capacity - 1) rows.push('');
+    rows.push(truncateToWidth(foot, width));
+    return rows.slice(0, capacity).map(row => padToWidth(row, width));
+  }
+
+  private visible(): readonly { readonly text: string; readonly source: number }[] {
     if (!this.filter) return this.rows;
     const needle = this.filter.toLowerCase();
-    return this.rows.filter((row) => stripAnsi(row).toLowerCase().includes(needle));
+    if (!this.report) return this.rows.filter(row => stripAnsi(row.text).toLowerCase().includes(needle));
+    // Match entire source entries so a narrow wrapped value keeps its label and
+    // provenance, and a search is not limited to one visual row.
+    const text = new Map<number, string>();
+    for (const row of this.rows) text.set(row.source, (text.get(row.source) ?? '') + stripAnsi(row.text).toLowerCase());
+    const matched = new Set([...text].filter(([, value]) => value.includes(needle)).map(([source]) => source));
+    return this.rows.filter(row => matched.has(row.source));
   }
 
   private scroll(by: number, page: number): void {
@@ -177,6 +219,6 @@ export class Pager {
 
 /** Spacing that right-aligns `right` on a row that starts with `left`. */
 function gap(left: string, right: string, width: number): string {
-  const used = left.replace(/\x1b\[[0-9;]*m/g, "").length + right.length;
+  const used = visibleWidth(left) + visibleWidth(right);
   return " ".repeat(Math.max(1, width - used - 2));
 }

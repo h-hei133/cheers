@@ -262,9 +262,9 @@ export class InteractiveMode {
         cancelArmed: () =>
           this.gesture.lastCancelAt !== undefined &&
           Date.now() - this.gesture.lastCancelAt < CANCEL_ARMED_MS,
-        overlayFullScreen: () => this.pager.active || this.overlay.fullScreen,
-        overlayRows: (width, height) =>
-          this.pager.active ? this.pager.render(width, height) : this.overlay.render(width, height),
+        overlayFullScreen: () => this.pager.fullScreen || this.overlay.fullScreen,
+        overlayRows: (width, height, availableRows) =>
+          this.pager.active ? this.pager.render(width, height, availableRows) : this.overlay.render(width, height),
         selection: () => this.pointer.selection,
         composerSelection: () => this.pointer.composerSelection,
         toast: () => this.toast ?? this.completionStatus,
@@ -303,7 +303,8 @@ export class InteractiveMode {
         const region = this.view.choiceRegions?.overlay;
         const top = region && report.row >= (region.visibleTop ?? region.top) &&
           (region.height === undefined || report.row < region.top + region.height) ? region.top : undefined;
-        return this.pager.active || this.overlay.handlePointer(report, top);
+        if (this.pager.handlePointer(report)) { this.tui.requestRender(); return true; }
+        return this.overlay.handlePointer(report, top);
       },
       view: () => this.view,
       rows: () => this.view.contentRows(),
@@ -373,6 +374,7 @@ export class InteractiveMode {
       if (this.alternateScreen || this.pager.active || this.overlay.fullScreen) this.pointer.handle(report);
     });
     this.stdin.onPaste((text) => {
+      if (this.pager.handlePaste(text)) { this.tui.requestRender(); return; }
       if (this.overlay.handlePaste(text) || this.pickerInputPending > 0) return;
       // A paste while the full-screen editor is up belongs to it, whole; a paste
       // into the prompt is held aside once it is long enough to bury the draft.
@@ -418,6 +420,7 @@ export class InteractiveMode {
     this.stopped = true;
     if (this.tick) clearInterval(this.tick);
     this.tick = undefined;
+    this.pager.close();
     this.overlay.close();
     this.theme.stop();
     this.catalogs.invalidate();
@@ -532,6 +535,7 @@ export class InteractiveMode {
 
   /** Publish a runtime question as a transcript block and retarget the prompt. */
   private onQuestion(question: string): void {
+    this.pager.close();
     this.state.transcript.append(textBlock("notice", question));
     this.state.editor.placeholder = "Answer above, then press Enter";
     this.tui.requestRender();
@@ -543,6 +547,7 @@ export class InteractiveMode {
   }
 
   private promptApproval(prompt: EscalationPrompt): Promise<InteractiveApprovalResult> {
+    this.pager.close();
     return new Promise((resolve) => {
       let settled = false;
       const settle = (result: InteractiveApprovalResult) => {
@@ -626,6 +631,7 @@ export class InteractiveMode {
     text: string,
     attachments?: { readonly images: readonly ImageContent[] },
   ): Promise<void> {
+    this.pager.close();
     // Queued input reaches this same dispatch point after the current operation
     // settles. A chooser still needs confirmation, even if its command waited.
     if (opensPicker(text)) {

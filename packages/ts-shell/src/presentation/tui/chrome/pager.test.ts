@@ -1,3 +1,4 @@
+import { createReport, reportText, span } from '../../../core/commands/report/projection.js';
 import { describe, expect, it } from "vitest";
 import { PAGER_THRESHOLD_ROWS, Pager, pageLongOutput } from "./pager.js";
 import { stripAnsi } from "../text/ansi.js";
@@ -113,5 +114,46 @@ describe("reading in the pager", () => {
 
     expect(visibleWidth(narrow[2]!)).toBeLessThanOrEqual(30);
     expect(visibleWidth(wide[2]!)).toBeLessThanOrEqual(90);
+  });
+});
+
+
+describe('adaptive report reading', () => {
+  function report(count = 4) {
+    return createReport({ title: 'Report', lines: Array.from({ length: count }, (_, index) => ({ kind: 'text' as const,
+      spans: [span(`entry-${index} `, 'number'), span('a complete provider measurement with provenance')] })), facts: {} });
+  }
+
+  it('opens short reports and selects a form from actual available rows', () => {
+    const value = report(); const pager = new Pager();
+    expect(pageLongOutput(pager, '/context', { text: reportText(value), report: value })).toBe(true);
+    const inline = pager.render(80, 24, 12);
+    expect(pager.fullScreen).toBe(false); expect(inline.length).toBeLessThanOrEqual(12);
+    expect(plain(inline).at(-1)).not.toContain('wheel');
+    expect(plain(inline).at(-1)).toContain('esc close');
+    expect(plain(inline).join('\n')).toContain('entry-3');
+    expect(pager.render(24, 10, 5)).toHaveLength(10); expect(pager.fullScreen).toBe(true);
+    pager.handlePaste('entry-3');
+    const matched = plain(pager.render(24, 10, 5)).join('\n');
+    expect(matched).toContain('entry-3'); expect(matched).toContain('provenance');
+    expect(matched).not.toContain('entry-0'); expect(pager.fullScreen).toBe(true);
+    for (const [width, height] of [[1, 1], [4, 2], [8, 4], [0, 0]]) {
+      const rows = pager.render(width!, height!, 0);
+      expect(rows.length).toBeLessThanOrEqual(height!);
+      expect(rows.every(row => visibleWidth(row) <= width!)).toBe(true);
+    }
+    pager.close(); expect(pager.render(80, 24)).toEqual([]);
+  });
+
+  it('keeps the current source entry through reflow and uses the same wheel viewport', () => {
+    const value = report(40); const pager = new Pager(); pager.open('/context', reportText(value), value);
+    pager.render(80, 12, 8);
+    for (let i = 0; i < 5; i++) pager.handleKey('down', undefined, 12);
+    expect(plain(pager.render(80, 12, 8))[2]).toContain('entry-3');
+    expect(plain(pager.render(24, 12, 8))[2]).toContain('entry-3');
+    pager.handlePointer({ kind: 'wheel', button: 1, row: 4, column: 5, ctrl: false, alt: false, shift: false });
+    expect(plain(pager.render(24, 12, 8))[2]).not.toContain('entry-3');
+    pager.handleKey('home', undefined, 12); expect(plain(pager.render(24, 12, 8))[2]).toContain('Report');
+    pager.handleKey('end', undefined, 12); expect(plain(pager.render(24, 12, 8)).join('\n')).toContain('entry-39');
   });
 });

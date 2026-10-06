@@ -336,4 +336,12 @@ bridge 不在 runtime 的 output 生成阶段包色，也不把渲染字符串�
 - `LocalCommandResult.report` 已加入 version 1 的 spans/columns/facts；`output` 从同一不可变、无控制序列快照生成。`/context` 是首个消费者，保留窗口来源、实际 provider 用量、工具估算与未知状态；状态和报告百分比共用 50/70/90 阈值。
 - 结构通过既有 renderer/sink 进入转录与 Pager，presentation 按当前主题着色，窄列堆叠标签和值。分页折叠仅改变视图，纯文本全文继续用于复制；width/theme 缓存及跨样式过滤已验证。没有在任意 Markdown 上增加角色推断，也没有另造报告宿主。
 - 143 项首轮组合、最终修正定向、Node 20.3 构建、五组有效反转和独立 APPROVE/CLEAR 均有证据；实际 CLI 两模式报告换色/缩窗/输入恢复和强制彩色下 print 无 ANSI 通过，见 [主裁决 §8.92](phase-19-decisions.md#892-ui-06结构化报告基础与-context-首个消费者)。
-- 现有 Pager 的 18 行阈值仍待改为真实几何，自适应只读宿主、滚轮/resize 阅读定位、help 填入、其他报告迁移和语义持久化继续。JSON 事实可序列化不等于 CLI JSON 输出路径或持久重放已经交付。
+- 后续 §9 已让结构化报告按真实几何选择形式；legacy 文本仍保留原阈值。help 填入、其他报告迁移和语义持久化继续。JSON 事实可序列化不等于 CLI JSON 输出路径或持久重放已经交付。
+
+
+## 9. UI-06 自适应报告宿主（2026-10-07）
+
+- 复用 Pager，语义报告按 Surface 扣除真实 composer/hints/activity 后的可用行数选择内嵌/全屏。短报告也可浏览，过滤不改变形式；未过滤内容放不下才全屏。纯文本旧输出的 18 行阈值继续保留。
+- renderer 的源条目映射支撑宽度重排后的阅读锚点和完整条目过滤，标签/值/来源共同保留。箭头、分页、Home/End、滚轮共享 viewport，粘贴只能进过滤器；关闭恢复草稿，新的请求、问题、审批与退出会让 reader 关闭。
+- regular 借用全屏时已补齐鼠标 enable/disable，并覆盖关闭/暂停/恢复/退出；内嵌报告全量可见且不显示滚轮提示，保留原生鼠标。actual CLI 两模式完成内嵌/全屏/分页/滚轮/过滤/恢复/后续请求链；六组有效反转、恢复后 123 项及独立 APPROVE/CLEAR 见 [主裁决 §8.93](phase-19-decisions.md#893-ui-06实际容量下的只读报告与输入归属)。
+- help 两步填入、其他命令迁移、CLI JSON 输出与持久语义重放尚未据此完成；完整 UI-06 与 Phase 19 继续。
