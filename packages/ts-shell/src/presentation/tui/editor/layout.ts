@@ -17,6 +17,7 @@ export interface EditorLayout {
   readonly source: string;
   readonly sourceRevision: number;
   readonly viewportStart: number;
+  readonly totalRows: number;
   readonly rows: readonly (VisualRow & { readonly rendered: string })[];
 }
 

@@ -8,6 +8,7 @@ import {
   normalizeStatusItems,
   type StatusItemId,
 } from "../../presentation/tui/chrome/items.js";
+import type { ComposerShapeId } from "../../presentation/tui/composer/contract.js";
 
 /**
  * Display preferences for the interactive surface.
@@ -73,4 +74,20 @@ export function writeStatusItems(
 /** The validated project-first diagram preference, or the renderer default. */
 export function readDiagramMode(workspaceRoot: string, config: RuntimeConfig = getRuntimeConfig(workspaceRoot)): "off" | "streaming" {
   return config.tui?.diagrams ?? "streaming";
+}
+
+/** The accepted shape, with the product default kept outside persisted files. */
+export function readComposerShape(config: RuntimeConfig): ComposerShapeId {
+  return config.tui?.composerShape ?? "default";
+}
+
+/** A picker proposes a shape without changing the accepted configuration. */
+export class ComposerPreference {
+  private preview: ComposerShapeId | undefined;
+  constructor(private readonly config: () => RuntimeConfig, private readonly changed: () => void) {}
+  readonly read = (): ComposerShapeId => this.preview ?? readComposerShape(this.config());
+  readonly propose = (shape: ComposerShapeId | undefined): void => {
+    this.preview = shape;
+    this.changed();
+  };
 }

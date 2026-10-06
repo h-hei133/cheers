@@ -6,7 +6,7 @@ import { stripAnsi } from '../../../presentation/tui/text/ansi.js';
 import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
 
 function host() {
-  const save = vi.fn(async () => 'Saved to your user configuration. Effective for the next operation.');
+  const save = vi.fn(async () => ({ note: 'Saved to your user configuration. Effective for the next operation.', applied: true }));
   return { save, openSettings: (scope: 'user' | 'project' = 'user') => ({ save, scope,
     definitions: CONFIG_SETTINGS.filter(item => item.policy.sources.includes(scope)),
     values: Object.fromEntries(CONFIG_SETTINGS.map(item => [item.key, {
@@ -29,7 +29,7 @@ describe('advanced settings picker', () => {
     expect(h.save).not.toHaveBeenCalled();
   });
   it('stages choices separately from Apply and preserves application outcomes', async () => {
-    const h = host(); h.save.mockResolvedValue('Saved. Configuration was not applied (rejected).');
+    const h = host(); h.save.mockResolvedValue({ note: 'Saved. Configuration was not applied (rejected).', applied: false });
     const field = await detail(h); const staged = (await field.apply(['choice:0']))!.next!;
     expect(h.save).not.toHaveBeenCalled();
     expect((await staged.load()).find(item => item.id === 'pending')?.label).toBe('Pending: true');

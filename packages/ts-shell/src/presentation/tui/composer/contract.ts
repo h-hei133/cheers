@@ -1,3 +1,12 @@
+export type ComposerShapeId = "default" | "band" | "borderless" | "top-rule" | "padded-rules" | "field" | "rail" | "box";
+export type StatusAttachment = "top-border" | "top-band" | "top-rule-chip" | "none";
+
+export interface ComposerState {
+  readonly busy: boolean;
+  readonly shape?: ComposerShapeId;
+  readonly status?: { readonly left: string; readonly right: string; readonly full: string };
+}
+
 /** A rendered cell span and the indivisible source grapheme it represents. */
 export interface SourceCell {
   readonly columnStart: number;
@@ -23,6 +32,9 @@ export type ComposerLayoutRow = {
   readonly sourceStart: number;
   readonly sourceEnd: number;
   readonly breakAfter: "soft" | "logical" | "none";
+  readonly cursorOverflow?: number;
+  readonly imeSafeCursorTail?: boolean;
+  readonly scrollbarThumb?: boolean;
 } | {
   readonly kind: "decoration";
   readonly screenRow: number;
@@ -30,6 +42,7 @@ export type ComposerLayoutRow = {
 };
 
 export interface ComposerLayout {
+  readonly shape: ComposerShapeId;
   readonly source: string;
   readonly sourceRevision: number;
   readonly viewportStart: number;

@@ -1401,3 +1401,15 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 实际构建 CLI 的 regular/fullscreen 均通过普通输入、中间与分片中文粘贴、宽字素 caret、resize 和历史后输入，终端无 marker，退出均为 0。fullscreen 正向拖选及 20→40 列后的反向拖选，OSC 52 解码和隔离 wl-copy stdin 均严格等于同一 45 字节源文；未触及真实桌面剪贴板。探针首轮局部函数名遮蔽 Python select 模块，在启动等待前失败，仅修正探针名字后完成验证。
 - 独立代码 APPROVE、架构 CLEAR；代码独立运行 109 项相关测试及最终 surface/engine 75 项并复验历史，架构独立运行两项 resize/history 回归和普通/混合图检查。最终五项静态 gate、43 项门禁脚本测试、diff 检查通过；NormProof 图与解析义务满足、阻断项为零，四项既有函数数量及 120 项文档来源 advisory 保留。
 - 本批完成当前 band 的 source/cell/viewport 主链，UI-03 八形态、共享 IME 尾、真实预览与持久选择继续；Windows 前端像素/真实 IME 证据未取得，完整 UI/Phase 19 验收继续。前批 475de67a 的 CI 37499480267 和 Architecture Watch 37499480342、0ef70a34 的 CI 37497040158 和 Architecture Watch 37497039715 均已按 SHA 核实成功；本批远端状态另按新提交跟踪。
+
+
+### 8.88 UI-03：八形态、真实预览与持久选择
+
+- composer 的纯 metadata 统一注册 `default`、`band`、`borderless`、`top-rule`、`padded-rules`、`field`、`rail`、`box`；frame/row/layout 复用同一 editor/source/cell/viewport。未设置时使用 default，配置不写伪默认来源；现有 TUI 合并规则保持项目形态优先于用户形态。八形态均保留左右 2 cells，装饰、底栏和 gap 按真实总高度计费，窄到单列时退化而不修改源文。
+- 状态事实继续来自现有 items；形态决定顶带、右 chip、框内状态或左/完整底栏。field/rail/box 共用 EOL 不绘制右尾的保守 IME 策略；box 末行可并底框，EOL 时独立底框。侧边滚动条使用真实总行数和 caret-follow viewport，不创建另一份输入或滚动状态。
+- `/settings` 的 Input shape 使用真实 surface 预览，初始聚焦已接受值；键盘与指针聚焦改变形态，Enter 仅暂存，Apply 才写文件并发布。Esc 恢复已接受形态，草稿保持不变。保存返回结构化确认标志和原有准确结果文本；失败或未确认时保留待选值并恢复已接受形态，下一次明确 Apply 才读取新 baseline。配置暂时不可读也保留选择与安全说明，不用旧 baseline 写入或暴露读取异常。
+- `tui.composerShape` 独立即时发布；其他 TUI 叶子的 restart 行为、已安装值及来源保持。旧形态 geometry 在预览、resize、源文修改及已接受配置换形态后均失效，重绘前 release 不复制旧坐标。chrome 入口仅重导出 owner 契约并委托渲染。
+- 对照既有参考的共享形态接口、实际预览、状态挂载、侧框尾与滚动条决定；本产品保留自己的两格 padding、配置来源和 editor viewport。独立评审发现全形态重复折行，已改为只有 box/rail 做只读预算；5000 行基线约 58 ms，修复后约 56 ms，撤回曾约 103 ms 的回归。六种非自适应形态的一次布局断言保护此决定。box 的重复帧抖动由先预留可选底框、只读预算、一次提交消除。
+- 验证：Node 20.3 隔离环境最终 17 文件/388 项通过，构建通过；import cycles、config consumers、declarations、Node floor、strict docs 与 43 项 script tests 通过。NormProof 0 blocking，保留四个既有 function-count advisory；strict docs 保留 120 个既有 source advisory。五组反转（形态 geometry fence、IME 尾、只读 viewport 预算、菜单焦点预览、真实滚动条分母）均实际触发断言失败，隔离副本逐字节/SHA-256 恢复后 77 项通过。代码独立 APPROVE、架构 CLEAR；额外窄窗穷举均由独立 lane 运行，不代替实际终端证据。
+- 两模式实际 CLI 逐项预览全部八形态、暂存零写入、Apply box、取消后恢复、CJK/插入/resize caret、重启读取 box，均退出 0；fullscreen box 正向与缩窗反向选择的 OSC 52 和隔离 clipboard stdin 均严格等于 45 字节源文。最初 PTY 两次失败分别等待了已滚出菜单视口的 Pending 行、把保留的命令标题误当仍打开的菜单；按实际可见 Apply/菜单行同步后通过，未改产品来迁就探针。
+- 本批交付八形态实现与隔离终端主链；真实输入法、Windows Terminal 像素和全部 UI/Phase 19 验收继续。UI-02 提交 `c261472c` 的 CI 37503608913、Architecture Watch 37503608896 已按 SHA 核实成功；本批远端状态另按新提交核实。

@@ -43,7 +43,7 @@ import { TranscriptSearch } from "../../presentation/tui/transcript/searchState.
 import { routeSearchKey, styleSearchRow } from "../../presentation/tui/transcript/searchHost.js";
 import { OverlayHost, type Picker } from "./overlay.js";
 import { opensPicker, pickerFor, type PickerHost } from "./picker/registry.js";
-import { readStatusItems, writeStatusItems } from "./tuiSettings.js";
+import { ComposerPreference, readStatusItems, writeStatusItems } from "./tuiSettings.js";
 import type { ImageContent } from "../../model-adapters/multimodal.js";
 import { readStatusFacts, readWelcomeState } from "./sessionFacts.js";
 import { couldBeCommand, slashArgumentHint, slashSuggestions } from "./slashSuggestions.js";
@@ -148,6 +148,7 @@ export class InteractiveMode {
   private readonly search = new TranscriptSearch();
   private readonly pointer: Pointer;
   private readonly clipboard: Clipboard;
+  private readonly composerPreference: ComposerPreference;
   private statusItems: readonly StatusItemId[];
   /**
    * The band a still-open chooser is proposing. Present only while the chooser is
@@ -193,6 +194,10 @@ export class InteractiveMode {
   constructor(private readonly options: InteractiveModeOptions) {
     this.alternateScreen = options.runtimeContext.runtimeConfig.tuiMode !== "regular";
     this.terminal = options.terminal ?? processTerminal;
+    this.composerPreference = new ComposerPreference(() => this.options.runtimeContext.runtimeConfig, () => {
+      this.view.invalidateLayout();
+      this.tui.requestRender();
+    });
     this.statusItems = readStatusItems(options.runtimeContext.projectRoot, options.runtimeContext.runtimeConfig);
     // The checklist travels with the session, and every path that puts a
     // conversation on screen — opening, resuming, forking, rewinding — restores
@@ -244,6 +249,7 @@ export class InteractiveMode {
             peers: readAmbientFacts(this.options.runtimeContext.session.id).peerSessions,
           }),
         statusItems: () => this.previewItems ?? this.statusItems,
+        composerShape: this.composerPreference.read,
         activity: () => this.sink.activity(),
         busy: () => this.busy,
         // Follow-ups wait in two places: the turn's own queue and, for input a
@@ -829,6 +835,7 @@ export class InteractiveMode {
         this.previewItems = items;
         this.tui.requestRender();
       },
+      previewComposerShape: this.composerPreference.propose,
       saveStatusItems: async (items) => {
         const written = writeStatusItems(this.options.runtimeContext.projectRoot, items);
         this.statusItems = items;

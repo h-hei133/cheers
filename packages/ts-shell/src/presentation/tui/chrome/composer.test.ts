@@ -16,17 +16,17 @@ describe("prompt block", () => {
     editor.newline();
     editor.insert("line2");
     const rows = renderComposer(editor, idle, 40);
-    expect(rows[0]).toContain("╰─");
-    expect(rows[1]).not.toContain("╰─");
+    expect(rows[0]).toContain("─");
+    expect(rows[1]).toContain("❯");
+    expect(rows[2]).not.toContain("❯");
   });
 
   it("keeps two padding cells around source text within the real width", () => {
     const editor = new Editor();
     editor.insert("你好");
-    for (const row of renderComposer(editor, idle, 40)) {
-      expect(visibleWidth(row)).toBeLessThanOrEqual(40);
-      expect(stripAnsi(row)).toBe("╰─   你好  ");
-    }
+    const rows = renderComposer(editor, idle, 40);
+    expect(rows.every(row => visibleWidth(row) <= 40)).toBe(true);
+    expect(stripAnsi(rows[1]!)).toBe("❯   你好" + " ".repeat(32));
   });
 
   it("carries the cursor marker through for the renderer to place", () => {
@@ -36,7 +36,7 @@ describe("prompt block", () => {
   });
 
   it("reserves the cue and both padding sides from the text budget", () => {
-    expect(composerTextWidth(40)).toBe(33);
+    expect(composerTextWidth(40)).toBe(34);
   });
 
   it("bounds composer output to maxRows and tracks cursor", () => {
@@ -44,8 +44,10 @@ describe("prompt block", () => {
     editor.setText(Array.from({ length: 15 }, (_, i) => `prompt line ${i}`).join("\n"));
     const rows = renderComposer(editor, idle, 40, 4);
     expect(rows).toHaveLength(4);
-    expect(rows[0]).toContain("╰─");
-    expect(stripAnsi(rows[3]!)).toContain("prompt line 14");
+    expect(rows[0]).toContain("─");
+    expect(rows[1]).toContain("❯");
+    expect(stripAnsi(rows[2]!)).toContain("prompt line 14");
+    expect(stripAnsi(rows[3]!)).toBe("─".repeat(40));
     expect(rows.join("")).toContain(CURSOR_MARKER);
   });
   it("keeps composer rows within the terminal width", () => {

@@ -1,4 +1,5 @@
 import type { AnySchemaObject } from 'ajv';
+import { COMPOSER_SHAPES } from '../presentation/tui/composer/shapes.js';
 
 export const textSchema: AnySchemaObject = { type: 'string' };
 export const nameSchema: AnySchemaObject = { type: 'string', pattern: '\\S' };
@@ -48,6 +49,7 @@ export function connectionSchema(providers: readonly string[]): AnySchemaObject 
 }
 
 export const tuiSchemas = {
+  composerShape: enumSchema(Object.keys(COMPOSER_SHAPES)),
   statusItems: listSchema(textSchema),
   diagrams: enumSchema(['off', 'streaming']),
 };

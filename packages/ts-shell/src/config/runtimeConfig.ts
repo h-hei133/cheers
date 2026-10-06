@@ -11,6 +11,7 @@ import { loadConfigLayers, validateRawConfig } from "./layers.js";
 import { captureConfigTrust, type ConfigTrustBinding } from './trust.js';
 import type { ConfigProvenance } from './provenance/model.js';
 import { projectConfigOrigins } from './provenance/projection.js';
+import type { ComposerShapeId } from '../presentation/tui/composer/contract.js';
 
 /**
  * Token budgets for one model.
@@ -357,6 +358,8 @@ export interface RuntimeConfig {
  * only this module reads.
  */
 export interface TuiPreferences {
+  /** Input shape. Absent means `default`; accepted changes apply immediately. */
+  readonly composerShape?: ComposerShapeId;
   /** Status band item ids, in canonical order. Absent means the defaults. */
   readonly statusItems?: readonly string[];
   /**

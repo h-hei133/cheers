@@ -137,6 +137,7 @@ export class OverlayHost {
         this.optionRows.clear();
         this.model.setOptions(options);
         if (picker.initialSelection) this.model.focus(picker.initialSelection);
+        if (!picker.multiple) picker.previewChange?.(idsOf(this.model.current()));
       })
       .catch(() => {
         if (this.picker === picker) this.model.setOptions([]);
@@ -227,6 +228,7 @@ export class OverlayHost {
       const id = this.optionRows.get(report.row - top);
       if (id !== undefined) {
         this.model.focus(id);
+        if (!this.picker.multiple) this.picker.previewChange?.(idsOf(this.model.current()));
         this.onChange();
       }
     }
@@ -505,9 +507,11 @@ export class OverlayHost {
         return true;
       case "up":
         this.model.step(-1);
+        if (!picker.multiple) picker.previewChange?.(idsOf(this.model.current()));
         break;
       case "down":
         this.model.step(1);
+        if (!picker.multiple) picker.previewChange?.(idsOf(this.model.current()));
         break;
       case "space":
         if (picker.multiple) {

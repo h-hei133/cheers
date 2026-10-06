@@ -45,6 +45,7 @@ const descriptions = {
   enableMcpTools: ['Tools', 'Enable MCP tools', 'Any configured false disables MCP tools; approvals still apply'],
   theme: ['Display', 'Theme', 'Theme name, including custom themes and auto'],
   tuiMode: ['Display', 'Terminal mode', 'Regular or fullscreen; changes require restart'],
+  'tui.composerShape': ['Display', 'Input shape', 'Input appearance; project leaves take precedence. Unset uses default'],
   'tui.statusItems': ['Display', 'Status items', 'Supported status item names; project leaves take precedence. Empty uses the default band'],
   'tui.diagrams': ['Display', 'Diagrams', 'Diagram presentation; project leaves take precedence'],
 } as const;
@@ -52,7 +53,9 @@ const descriptions = {
 /** UI metadata joins the same schema/source/merge/application policy used by the loader. */
 export const CONFIG_SETTINGS: readonly SettingDefinition[] = Object.entries(descriptions).map(([key, [group, label, description]]) => {
   const [root, leaf] = key.split('.') as [keyof RuntimeConfigFile, string?];
-  const policy = CONFIG_FIELDS[root]; const schema = leaf ? tuiFields[leaf].schema : policy.schema;
+  const rootPolicy = CONFIG_FIELDS[root];
+  const policy = leaf ? { ...rootPolicy, application: tuiFields[leaf].application } : rootPolicy;
+  const schema = leaf ? tuiFields[leaf].schema : policy.schema;
   return { key, group, label, description, path: [root, leaf] as const, policy, schema,
     choices: schema.type === 'boolean' ? [true, false] : schema.enum };
 }).sort((left, right) => left.group.localeCompare(right.group));

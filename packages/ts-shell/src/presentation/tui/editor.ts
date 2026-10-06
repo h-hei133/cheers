@@ -276,13 +276,15 @@ export class Editor extends EditorBuffer {
   }
 
   /** Source mapping and caret-follow viewport shared by every editor surface. */
-  layout(width: number, maxRows?: number): EditorLayout {
+  layout(width: number, maxRows?: number, options: { readonly preview?: boolean } = {}): EditorLayout {
     const snapshot = this.snapshot();
-    const empty = { source: snapshot.text, sourceRevision: snapshot.revision, viewportStart: this.scrollOffset, rows: [] };
+    const empty = { source: snapshot.text, sourceRevision: snapshot.revision, viewportStart: this.scrollOffset, totalRows: 0, rows: [] };
     const cells = Math.max(0, Math.floor(width));
     if (cells === 0 || (maxRows !== undefined && maxRows <= 0)) return empty;
-    if (cells !== this.lastWidth) this.preferredColumn = undefined;
-    this.lastWidth = cells;
+    if (!options.preview) {
+      if (cells !== this.lastWidth) this.preferredColumn = undefined;
+      this.lastWidth = cells;
+    }
     const rows = editorRows(this.lines, cells);
     const caret = visualCaret(rows, this.row, this.lines[this.row]!, this.column);
     const cursorVisualRow = caret.index;
@@ -296,20 +298,22 @@ export class Editor extends EditorBuffer {
       rendered[caret.index]!.rendered = `${head}${CURSOR_MARKER}${text.slice(head.length)}`;
     }
     if (maxRows === undefined || rendered.length <= maxRows) {
-      this.scrollOffset = 0;
-      return { ...empty, viewportStart: 0, rows: rendered };
+      if (!options.preview) this.scrollOffset = 0;
+      return { ...empty, viewportStart: 0, totalRows: rendered.length, rows: rendered };
     }
 
+    let scrollOffset = this.scrollOffset;
     if (cursorVisualRow >= 0) {
-      if (cursorVisualRow < this.scrollOffset) {
-        this.scrollOffset = cursorVisualRow;
-      } else if (cursorVisualRow >= this.scrollOffset + maxRows) {
-        this.scrollOffset = cursorVisualRow - maxRows + 1;
+      if (cursorVisualRow < scrollOffset) {
+        scrollOffset = cursorVisualRow;
+      } else if (cursorVisualRow >= scrollOffset + maxRows) {
+        scrollOffset = cursorVisualRow - maxRows + 1;
       }
     }
     const maxScroll = Math.max(0, rendered.length - maxRows);
-    this.scrollOffset = Math.max(0, Math.min(this.scrollOffset, maxScroll));
-    return { ...empty, viewportStart: this.scrollOffset, rows: rendered.slice(this.scrollOffset, this.scrollOffset + maxRows) };
+    scrollOffset = Math.max(0, Math.min(scrollOffset, maxScroll));
+    if (!options.preview) this.scrollOffset = scrollOffset;
+    return { ...empty, viewportStart: scrollOffset, totalRows: rendered.length, rows: rendered.slice(scrollOffset, scrollOffset + maxRows) };
   }
 
   private setColumn(column: number): boolean {

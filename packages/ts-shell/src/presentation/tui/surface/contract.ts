@@ -11,7 +11,7 @@ import { Transcript } from "../transcript/container.js";
 import type { TurnActivity } from "../transcript/live.js";
 import type { SelectionPoint, SelectionSpan } from "../transcript/selection.js";
 import type { ScrollbarGeometry } from "../transcript/viewport.js";
-import type { ComposerLayout, SourceSelection } from "../composer/contract.js";
+import type { ComposerLayout, ComposerShapeId, SourceSelection } from "../composer/contract.js";
 
 /**
  * The seam between the interactive host and its stateful presentation surface.
@@ -48,6 +48,7 @@ export function createViewState(): ViewState {
 export interface ViewContext {
   facts(): StatusFacts;
   statusItems(): readonly StatusItemId[];
+  composerShape?(): ComposerShapeId;
   activity(): TurnActivity | undefined;
   busy(): boolean;
   /** Prompts waiting to run after the current turn. */

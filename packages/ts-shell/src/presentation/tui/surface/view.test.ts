@@ -7,6 +7,8 @@ import { createViewState, type ViewContext } from "./contract.js";
 import { InteractiveSurface } from "./view.js";
 import { TUI } from "../render/engine.js";
 import { ManualScheduler, RecordingTerminal } from "../../../test-utils/terminalDouble.js";
+import { COMPOSER_SHAPES } from "../composer/shapes.js";
+import type { ComposerShapeId } from "../composer/contract.js";
 import { Pointer } from "../../../cli/interactive/pointer.js";
 
 /** Facts a test can change between frames; the surface reads them at paint time. */
@@ -146,6 +148,18 @@ describe("the document a main-screen frame reports", () => {
 });
 
 describe("frame composition", () => {
+  it("rejects old shape hit regions before an accepted configuration change is painted", () => {
+    let shape: ComposerShapeId = "default";
+    const { view } = surface({ composerShape: () => shape });
+    view.editor.setText("  draft unchanged  "); frame(view);
+    expect(view.composerGeometry()!.layout.shape).toBe("default");
+    shape = "box";
+    expect(view.composerGeometry()).toBeUndefined();
+    frame(view);
+    expect(view.composerGeometry()!.layout.shape).toBe("box");
+    expect(view.editor.snapshot().text).toBe("  draft unchanged  ");
+  });
+
   it("cancels drag geometry immediately on resize before the scheduled frame", () => {
     const { view } = surface(); view.editor.setText("  draft with source  ");
     const terminal = new RecordingTerminal(); const scheduler = new ManualScheduler();
@@ -153,7 +167,8 @@ describe("frame composition", () => {
     tui.start(); scheduler.flush();
     const copy = vi.fn();
     const pointer = new Pointer({ view: () => view, rows: () => view.contentRows(), copy, redraw: () => tui.requestRender() });
-    const row = view.composerGeometry()!.top;
+    const geometry = view.composerGeometry()!;
+    const row = geometry.top + geometry.layout.rows.find(row => row.kind === "content")!.screenRow;
     const event = { row, button: 0, shift: false, alt: false, ctrl: false };
     pointer.handle({ ...event, column: 5, kind: "press" });
     pointer.handle({ ...event, column: 12, kind: "drag" });
@@ -166,8 +181,8 @@ describe("frame composition", () => {
     tui.stop();
   });
 
-  it("keeps draft and caret within small physical dimensions alongside suggestions and status", () => {
-    const { view, live } = surface();
+  it.each(Object.keys(COMPOSER_SHAPES) as ComposerShapeId[])("keeps %s draft and caret within small physical dimensions alongside suggestions and status", shape => {
+    const { view, live } = surface({ composerShape: () => shape });
     live.activity = { startedAt: 0, label: "working", tokens: 0, cancelling: false };
     live.busy = true;
     live.overlay = ["panel header", "panel item", "panel end"];
@@ -213,7 +228,7 @@ describe("frame composition", () => {
     expect(rows).toHaveLength(12);
     expect(rows.join("\n")).toContain("what is the plan?");
     expect(rows.join("\n")).toContain("the-model");
-    expect(rows.join("\n")).toContain("╰─   follow-up");
+    expect(rows.join("\n")).toContain("❯   follow-up");
     expect(rows[rows.length - 1]).toContain("2 open todos");
   });
 
@@ -224,7 +239,7 @@ describe("frame composition", () => {
     view.setSuggesting(true);
     expect(view.suggestionsOpen).toBe(true);
     const rows = frame(view, { columns: 60, rows: 12 });
-    const prompt = rows.findIndex((row) => row.includes("╰─   /mo"));
+    const prompt = rows.findIndex((row) => row.includes("❯   /mo"));
     const candidate = rows.findIndex((row) => row.includes("/mode"));
     const hint = rows.findIndex((row) => row.includes("tab complete"));
     expect(prompt).toBeGreaterThan(-1);
@@ -280,7 +295,8 @@ describe("frame composition", () => {
     const rows = frame(view);
     const geometry = view.composerGeometry();
     expect(geometry).toBeDefined();
-    expect(rows[geometry!.top]).toContain("╰─   draft");
+    const content = geometry!.layout.rows.find(row => row.kind === "content")!;
+    expect(rows[geometry!.top + content.screenRow]).toContain("❯   draft");
     expect(geometry!.bottom).toBeGreaterThanOrEqual(geometry!.top);
     expect(geometry!.rows.map(stripAnsi).join("\n")).toContain("draft");
   });
@@ -421,7 +437,7 @@ describe("selection", () => {
     live.selection = { from: anchor, to: { row: anchor.row + 2, column: 6 } };
     const rows = view.renderFrame(SIZE).rows;
     expect(rows[3]).toContain("\x1b[7m");
-    const composerRow = rows.find((row) => row.includes("╰─"));
+    const composerRow = rows.find((row) => row.includes("❯"));
     expect(composerRow).toBeDefined();
     expect(composerRow).not.toContain("\x1b[7m");
     expect(view.contentToScreenSpan(live.selection)?.from.row).toBe(3);

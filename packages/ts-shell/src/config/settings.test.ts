@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { CONFIG_FIELDS } from './runtimeConfig.js';
-import { CONFIG_SETTINGS, formatSetting } from './settings.js';
+import { CONFIG_SETTINGS, formatSetting, settingDefinition, settingPatch, validateSetting } from './settings.js';
 import { runSettingsCommand } from '../core/commands/settingsCommandRuntime.js';
 
 it('covers every public file field, expanding TUI leaves and excluding CLI-only exemptions', () => {
@@ -12,8 +12,22 @@ it('covers every public file field, expanding TUI leaves and excluding CLI-only 
 it('uses the same advanced registry for command help without accepting a write command', async () => {
   expect((await runSettingsCommand(['maxOutputTokens'], {} as never)).output).toContain('Requested output token budget');
   expect((await runSettingsCommand(['tui.diagrams'], {} as never)).output).toContain('restart');
+  expect((await runSettingsCommand(['tui.composerShape'], {} as never)).output).toContain('immediate');
   expect((await runSettingsCommand(['providerCredentials'], {} as never)).output).toContain('Invalid /settings');
   expect((await runSettingsCommand(['maxTurns', '25'], {} as never)).output).toContain('Invalid /settings');
+});
+
+it('offers all input shapes as an immediate safe leaf without changing other TUI policies', () => {
+  const shape = settingDefinition('tui.composerShape')!;
+  expect(shape.label).toBe('Input shape');
+  expect(shape.choices).toEqual(['default', 'band', 'borderless', 'top-rule', 'padded-rules', 'field', 'rail', 'box']);
+  expect(shape.policy).toMatchObject({ application: 'immediate', projectTrust: 'safe', merge: 'tui', sources: ['project', 'user'] });
+  for (const value of shape.choices!) expect(validateSetting(shape, value)).toBeUndefined();
+  expect(validateSetting(shape, 'unknown')).toContain('Invalid value');
+  expect(validateSetting(shape, undefined)).toBeUndefined();
+  expect(settingPatch({ tui: { diagrams: 'off' } }, shape, 'rail')).toEqual({ tui: { diagrams: 'off', composerShape: 'rail' } });
+  expect(settingDefinition('tui.diagrams')?.policy.application).toBe('restart');
+  expect(settingDefinition('tui.statusItems')?.policy.application).toBe('restart');
 });
 
 it('renders public file values as round-trippable JSON without terminal controls', () => {

@@ -34,13 +34,27 @@ it('explains defaults, ordinary precedence, environment and frozen launch overri
 });
 
 it('attributes TUI leaves independently, including empty project status fallback', () => {
-  project({ tui: { diagrams: 'off', statusItems: [] } });
-  user({ tui: { diagrams: 'streaming', statusItems: ['cost'] } });
+  project({ tui: { diagrams: 'off', statusItems: [], composerShape: 'rail' } });
+  user({ tui: { diagrams: 'streaming', statusItems: ['cost'], composerShape: 'box' } });
   const config = getRuntimeConfig(root); const trace = config.configProvenance.tui;
-  expect(config.tui).toEqual({ diagrams: 'off', statusItems: ['cost'] });
+  expect(config.tui).toEqual({ diagrams: 'off', statusItems: ['cost'], composerShape: 'rail' });
+  expect(trace.children?.composerShape).toMatchObject({ sources: ['project'], shadowed: ['user'] });
   expect(trace.children?.diagrams).toMatchObject({ sources: ['project'], shadowed: ['user'] });
   expect(trace.children?.statusItems).toMatchObject({ sources: ['user'], shadowed: ['project'] });
   expect(trace.sources).toEqual(['project', 'user']);
+});
+
+it('uses the default input shape when absent and rejects unsupported shapes without losing valid lower leaves', () => {
+  const defaults = getRuntimeConfig(root);
+  expect(defaults.tui?.composerShape ?? 'default').toBe('default');
+  expect(defaults.configProvenance.tui.sources).toEqual(['default']);
+  project({ tui: { composerShape: 'field' } });
+  user({ tui: { composerShape: 'unknown', diagrams: 'off' } });
+  const config = getRuntimeConfig(root);
+  expect(config.configValidation.valid).toBe(false);
+  expect(config.tui).toEqual({ composerShape: 'field', diagrams: 'off' });
+  expect(config.configProvenance.tui.children?.composerShape.sources).toEqual(['project']);
+  expect(config.configDiagnostics.join(' ')).toContain('tui.composerShape: invalid-value');
 });
 
 it('retains all security collection constraints and per-item contributors', () => {

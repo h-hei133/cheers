@@ -1,5 +1,5 @@
-import { renderBand } from "../chrome/band.js";
 import { layoutComposer } from "../composer/layout.js";
+import { composerStatus } from "../composer/status.js";
 import { highlightComposer } from "../composer/projection.js";
 import type { ComposerLayout } from "../composer/contract.js";
 import { truncateToWidth } from "../text/layout.js";
@@ -175,7 +175,7 @@ export class InteractiveSurface implements InteractiveView {
 
   composerGeometry(): ComposerGeometry | undefined {
     const geometry = this.lastComposerGeometry;
-    if (!geometry || this.context.overlayFullScreen()) return undefined;
+    if (!geometry || this.context.overlayFullScreen() || geometry.layout.shape !== (this.context.composerShape?.() ?? "default")) return undefined;
     const source = this.editor.snapshot();
     return source.revision === geometry.layout.sourceRevision && source.text === geometry.layout.source
       ? geometry : undefined;
@@ -208,11 +208,10 @@ export class InteractiveSurface implements InteractiveView {
     const statusRows = [
       ...activityRows,
       ...overlayRows,
-      renderBand(this.context.facts(), this.context.statusItems(), width),
     ];
     const composerLayout = layoutComposer(
       this.editor,
-      { busy },
+      { busy, shape: this.context.composerShape?.() ?? "default", status: composerStatus(this.context.facts(), this.context.statusItems(), width) },
       width,
       maxComposerRows,
     );

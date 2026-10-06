@@ -4,6 +4,7 @@ import { sameValue } from './values.js';
 import { configRestartRequired, type ConfigReloadResult } from './application.js';
 import { CONFIG_FIELDS } from './runtimeConfig.js';
 import { displayOrigins } from './provenance/projection.js';
+import { origin, sourcesOf } from './provenance/model.js';
 import type { CatalogProvider } from '../core/models/catalog.js';
 
 export type { ConfigReloadResult } from './application.js';
@@ -27,6 +28,21 @@ export interface ConfigPublication {
 
 class ConfigTicket {
   constructor(readonly owner: ConfigState, readonly generation: number, readonly binding: ConfigBinding) {}
+}
+
+/** Keep restart-only display values installed while publishing the live input preference. */
+function projectAccepted(installed: RuntimeConfig, candidate: RuntimeConfig): RuntimeConfig {
+  const { composerShape } = candidate.tui ?? {};
+  const tui = { ...installed.tui };
+  if (composerShape === undefined) delete tui.composerShape;
+  else tui.composerShape = composerShape;
+  const installedOrigin = installed.configProvenance.tui ?? origin('default');
+  const children = { ...installedOrigin.children };
+  delete children.composerShape;
+  if (composerShape !== undefined) children.composerShape = candidate.configProvenance.tui?.children?.composerShape ?? origin('default');
+  const tuiOrigin = { ...installedOrigin, children, sources: Object.keys(children).length ? sourcesOf(Object.values(children)) : origin('default').sources };
+  return { ...candidate, tui, tuiMode: installed.tuiMode,
+    configProvenance: { ...candidate.configProvenance, tui: tuiOrigin, tuiMode: installed.configProvenance.tuiMode } };
 }
 
 /** One owner for accepted settings, candidate ordering and live security admission. */
@@ -84,9 +100,7 @@ export class ConfigState {
       this.reject(['Configuration resource application outcome is unverified.'], true);
       return this.result('application-unverified', before);
     }
-    const installed = this.publication.config;
-    const config = { ...candidate, tui: installed.tui, tuiMode: installed.tuiMode,
-      configProvenance: { ...candidate.configProvenance, tui: installed.configProvenance.tui, tuiMode: installed.configProvenance.tuiMode } };
+    const config = projectAccepted(this.publication.config, candidate);
     this.publication = freezeDeep({ revision: this.publication.revision + 1, config, requested: candidate, catalog: structuredClone(catalog),
       binding: structuredClone(actual), admissionBlocked: false, diagnostics: candidate.configDiagnostics });
     return this.result('applied', before);

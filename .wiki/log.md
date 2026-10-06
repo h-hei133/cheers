@@ -6298,3 +6298,6 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 
 
 ## [2026-10-07] feat | Phase 19 UI-02 共享 editor/composer 的 source/cell/viewport 布局，band 两侧 2 cells，应用复制与高亮同源，保留 tab/缩进/尾空白并去除软折行伪换行。审查修复 resize 旧命中和单行 regular 历史重追加。362 项组合、4 组反转、Node 20.3 构建及实际 CLI 两模式 caret/fullscreen 精确源文复制验证通过，独立 APPROVE/CLEAR；见 features/phase-19-decisions.md §8.87。原生终端选择、八形态/IME 和完整 Phase 19 继续。
+
+
+## [2026-10-07] feat | Phase 19 UI-03 八形态统一 composer，接通实际 Settings 预览、暂存/Apply、失败可恢复选择与即时叶子发布。修复重复折行、box 视口抖动和配置换形态的旧选择坐标。Node 20.3 构建、相关组合测试、5 组反转、两模式实际 CLI 与独立 APPROVE/CLEAR 证据见 features/phase-19-decisions.md §8.88；真实 IME、Windows 像素和完整阶段目标继续。

@@ -5,9 +5,12 @@ import type { Picker, PickerOutcome } from '../overlay.js';
 import type { SettingsDraft } from '../settings.js';
 import { normalizeStatusItems } from '../../../presentation/tui/chrome/items.js';
 import { statusItemPicker } from './statusItems.js';
+import { isComposerShape } from '../../../presentation/tui/composer/shapes.js';
+import type { ComposerShapeId } from '../../../presentation/tui/composer/contract.js';
 
 export interface SettingsHost {
   openSettings(scope?: SettingsScope): SettingsDraft;
+  previewComposerShape?(shape: ComposerShapeId | undefined): void;
 }
 interface StagedValue { readonly value: unknown }
 
@@ -68,21 +71,48 @@ function detailOptions(draft: SettingsDraft, setting: SettingDefinition, pending
   return options;
 }
 
-function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: SettingDefinition, pending?: StagedValue): Picker {
+function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: SettingDefinition, pending?: StagedValue, failure?: string): Picker {
+  const currentChoice = setting.key === 'tui.composerShape'
+    ? Math.max(0, setting.choices?.findIndex(value => value === draft.values[setting.key].effective) ?? 0) : 0;
   return {
-    title: `${setting.label} — save to ${draft.scope}`, form: 'panel', exclusive: true, holdInput: true, empty: '', filterable: false,
-    initialSelection: pending ? 'apply' : setting.choices ? 'choice:0' : 'edit',
-    load: async () => detailOptions(draft, setting, pending),
+    title: `${setting.label}${setting.key === 'tui.composerShape' ? ' preview' : ''} — save to ${draft.scope}${failure ? " — Apply not confirmed" : ""}`, form: 'panel', exclusive: true, holdInput: true, empty: '', filterable: false,
+    initialSelection: pending ? 'apply' : setting.choices ? `choice:${currentChoice}` : 'edit',
+    load: async () => [ ...(failure ? [{ id: 'failure', label: failure, disabled: true }] : []), ...detailOptions(draft, setting, pending) ],
+    ...(setting.key === 'tui.composerShape' ? {
+      previewChange(ids: readonly string[]) {
+        if (failure && !ids[0]?.startsWith('choice:')) return;
+        const index = setting.choices?.findIndex((_, position) => ids[0] === `choice:${position}`) ?? -1;
+        const value = index >= 0 ? setting.choices![index] : pending ? pending.value : draft.values[setting.key].effective;
+        host.previewComposerShape?.(isComposerShape(value) ? value : undefined);
+      },
+      previewEnd: () => host.previewComposerShape?.(undefined),
+    } : {}),
     async apply(ids): Promise<PickerOutcome | undefined> {
+      if (setting.key === 'tui.composerShape') host.previewComposerShape?.(undefined);
       if (ids.length !== 1) return undefined;
       const id = ids[0];
       if (id === 'edit' && !setting.choices) return { next: valueEditor(host, draft, setting, pending) };
-      if (id === 'unset') return { next: settingDetail(host, draft, setting, { value: undefined }) };
+      if (id === 'unset') return { next: settingDetail(host, draft, setting, { value: undefined }, failure) };
       if (id === 'scope' && setting.policy.sources.includes('project')) return { next: scopePicker(host, setting, draft.scope) };
       if (id === 'back') return { next: settingsPicker(host, draft.scope) };
-      if (id === 'apply' && pending) return { note: `${setting.label}: ${await draft.save(setting.key, pending.value)}` };
+      if (id === 'apply' && pending) {
+        let current = draft;
+        if (failure) {
+          try { current = host.openSettings(draft.scope); }
+          catch {
+            const note = 'Configuration could not be reopened. The pending choice is retained; retry when it is readable.';
+            return { note, next: settingDetail(host, draft, setting, pending, note) };
+          }
+        }
+        const result = await current.save(setting.key, pending.value);
+        return {
+          note: `${setting.label}: ${result.note}`,
+          ...(!result.applied && setting.key === 'tui.composerShape'
+            ? { next: settingDetail(host, current, setting, pending, result.note) } : {}),
+        };
+      }
       const index = setting.choices?.findIndex((_, position) => id === `choice:${position}`) ?? -1;
-      if (index >= 0) return { next: settingDetail(host, draft, setting, { value: setting.choices![index] }) };
+      if (index >= 0) return { next: settingDetail(host, draft, setting, { value: setting.choices![index] }, failure) };
       return undefined;
     },
   };

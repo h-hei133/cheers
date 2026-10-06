@@ -1,13 +1,11 @@
 import type { Editor } from "../editor.js";
-import type { SourceSelection } from "../composer/contract.js";
+import type { ComposerState, SourceSelection } from "../composer/contract.js";
 import { layoutComposer } from "../composer/layout.js";
 import { highlightComposer } from "../composer/projection.js";
 
 export { composerTextWidth } from "../composer/layout.js";
 
-export interface ComposerState {
-  readonly busy: boolean;
-}
+export type { ComposerState } from "../composer/contract.js";
 
 /** Compatibility entry point; layout and source selection share the composer owner. */
 export function renderComposer(

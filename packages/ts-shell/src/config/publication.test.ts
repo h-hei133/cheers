@@ -4,6 +4,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getRuntimeConfig, getUserRuntimeConfigPath } from './runtimeConfig.js';
 import { ConfigState, type ConfigBinding } from './state.js';
+import { configRestartRequired, describeConfigChanges } from './application.js';
 
 let root: string;
 let file: string;
@@ -95,4 +96,45 @@ it('freezes published settings and reports unexpected resource application as un
   expect(JSON.stringify(result)).not.toContain('private resource detail');
   expect(state.current.admissionBlocked).toBe(true);
   expect(Object.isFrozen(state.current.config.denyRules)).toBe(true);
+});
+
+it('publishes the input shape and its source while retaining restart-only display values', () => {
+  fs.writeFileSync(path.join(root, '.cheers.json'), JSON.stringify({ tui: { composerShape: 'band', diagrams: 'off', statusItems: ['model'] } }));
+  const state = new ConfigState(load(), binding);
+  const before = state.current.config;
+  fs.unlinkSync(path.join(root, '.cheers.json'));
+  fs.writeFileSync(file, JSON.stringify({ tuiMode: 'regular', tui: { composerShape: 'box', diagrams: 'streaming', statusItems: ['cost'] } }));
+  const candidate = load();
+  expect(state.current.config.tui?.composerShape).toBe('band');
+  const result = state.publish(state.begin(binding), candidate, binding);
+  expect(result.status).toBe('applied');
+  expect(result.restartRequired).toEqual(['tuiMode', 'tui']);
+  expect(state.current.config.tui).toEqual({ composerShape: 'box', diagrams: 'off', statusItems: ['model'] });
+  expect(state.current.requested.tui).toEqual(candidate.tui);
+  expect(state.current.config.configProvenance.tui.children?.composerShape.sources).toEqual(['user']);
+  expect(state.current.config.configProvenance.tui.children?.diagrams.sources).toEqual(['project']);
+  expect(state.current.config.configProvenance.tui.sources).toEqual(['project', 'user']);
+  expect(describeConfigChanges(before, candidate)).toEqual(expect.arrayContaining([
+    'tui.composerShape: changed (immediate)', 'tui.diagrams: changed (restart)', 'tui.statusItems: changed (restart)',
+  ]));
+});
+
+it('applies shape-only publication without restart and resets only the live leaf when unset', () => {
+  fs.writeFileSync(file, JSON.stringify({ tui: { diagrams: 'off' } }));
+  const state = new ConfigState(load(), binding);
+  fs.writeFileSync(file, JSON.stringify({ tui: { diagrams: 'off', composerShape: 'rail' } }));
+  const candidate = load();
+  expect(configRestartRequired(state.current.config, candidate)).toEqual([]);
+  expect(describeConfigChanges(state.current.config, candidate)).toEqual(['tui.composerShape: changed (immediate)']);
+  expect(state.publish(state.begin(binding), candidate, binding).restartRequired).toEqual([]);
+  const accepted = state.current.config;
+  fs.writeFileSync(file, JSON.stringify({ maxTurns: 'bad', tui: { composerShape: 'box' } }));
+  expect(state.publish(state.begin(binding), load(), binding).status).toBe('rejected');
+  expect(state.current.config).toBe(accepted);
+  expect(state.current.config.tui?.composerShape).toBe('rail');
+  fs.writeFileSync(file, '{}');
+  expect(state.publish(state.begin(binding), load(), binding).status).toBe('applied');
+  expect(state.current.config.tui).toEqual({ diagrams: 'off' });
+  expect(state.current.config.configProvenance.tui.children?.composerShape).toBeUndefined();
+  expect(state.current.config.configProvenance.tui.children?.diagrams.sources).toEqual(['user']);
 });

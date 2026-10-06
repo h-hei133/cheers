@@ -69,4 +69,6 @@ export function createConfigFields(providers: readonly string[]) {
   };
 }
 
-export const tuiFields = Object.fromEntries(Object.entries(tuiSchemas).map(([key, schema]) => [key, field(schema, undefined, 'replace', false, { projectTrust: 'safe' })]));
+export const tuiFields = Object.fromEntries(Object.entries(tuiSchemas).map(([key, schema]) => [key, field(schema, undefined, 'replace', false, {
+  projectTrust: 'safe', application: key === 'composerShape' ? 'immediate' : 'restart',
+})]));

@@ -1,57 +1,47 @@
-import { defaultTheme } from "../../theme/theme.js";
 import type { Editor } from "../editor.js";
-import { CURSOR_MARKER } from "../render/paint.js";
-import { sliceWithWidth, visibleWidth } from "../text/measure.js";
-import type { ComposerLayout, ComposerLayoutRow } from "./contract.js";
+import { truncateToWidth } from "../text/layout.js";
+import type { ComposerLayout, ComposerLayoutRow, ComposerShapeId, ComposerState } from "./contract.js";
+import { bottomChrome, composerChrome, composerFrame, topChrome } from "./frame.js";
+import { contentRow, hasCursorTail, scrollbarRows } from "./row.js";
+import { COMPOSER_SHAPES } from "./shapes.js";
 
-const CUE = "╰─ ";
-
-/** Shrink decoration first, then reduce both padding sides together. */
-function geometry(width: number): { readonly width: number; readonly gutter: number; readonly padding: number; readonly text: number } {
-  const bounded = Math.max(0, Math.floor(width));
-  const gutter = Math.min(visibleWidth(CUE), Math.max(0, bounded - 5));
-  const padding = Math.min(2, Math.max(0, Math.floor((bounded - gutter - 1) / 2)));
-  return { width: bounded, gutter, padding, text: bounded - gutter - 2 * padding };
+/** The editor uses the same content width as the chosen shape's cell mapping. */
+export function composerTextWidth(width: number, shape: ComposerShapeId = "default", scrolling = false): number {
+  return composerFrame(width, COMPOSER_SHAPES[shape], scrolling).text;
 }
 
-/** Cells actually available to the editor, including at very narrow widths. */
-export function composerTextWidth(width: number): number {
-  return geometry(width).text;
-}
-
-/** A final-column caret remains in the physical terminal on unpadded rows. */
-function boundCaret(rendered: string, width: number): string {
-  const marker = rendered.indexOf(CURSOR_MARKER);
-  if (marker < 0 || visibleWidth(rendered.slice(0, marker)) < width) return rendered;
-  const plain = rendered.replace(CURSOR_MARKER, "");
-  const head = sliceWithWidth(plain, 0, width - 1).text;
-  return `${head}${CURSOR_MARKER}${plain.slice(head.length)}`;
-}
-
-/** The current prompt band decorates the editor's own visible source rows. */
-export function layoutComposer(
-  editor: Editor, state: { readonly busy: boolean }, width: number, maxRows?: number,
-): ComposerLayout {
-  const frame = geometry(width);
-  const editorLayout = editor.layout(frame.text, maxRows);
-  const cue = defaultTheme.fg(state.busy ? "warning" : "accent", sliceWithWidth(CUE, 0, frame.gutter).text);
-  const padding = " ".repeat(frame.padding);
-  const contentColumn = frame.gutter + frame.padding;
-  const rows: ComposerLayoutRow[] = editorLayout.rows.map((row, screenRow) => {
-    const gutter = screenRow === 0 ? cue : " ".repeat(frame.gutter);
-    const content = editorLayout.source === "" ? defaultTheme.dim(row.rendered) : row.rendered;
-    return {
-      kind: "content", screenRow,
-      rendered: boundCaret(gutter + padding + content + padding, frame.width),
-      contentColumn, contentCells: frame.text,
-      cells: row.cells.map((cell) => ({
-        ...cell, columnStart: contentColumn + cell.columnStart, columnEnd: contentColumn + cell.columnEnd,
-      })),
-      sourceStart: row.sourceStart, sourceEnd: row.sourceEnd, breakAfter: row.breakAfter,
-    };
-  });
+/** One editor viewport supplies every shape, its source map and scrollbar. */
+export function layoutComposer(editor: Editor, state: ComposerState, width: number, maxRows?: number): ComposerLayout {
+  const shape = COMPOSER_SHAPES[state.shape ?? "default"];
+  let frame = composerFrame(width, shape, false);
+  // Start with the optional bottom reserved. Removing it can only reveal rows
+  // after the caret, so an unchanged EOL frame cannot alternate its geometry.
+  let chrome = composerChrome(shape, state, frame.width, maxRows, shape.bottom === "merge");
+  if (shape.bottom === "merge" || shape.side === "rail") {
+    const preview = editor.layout(frame.text, chrome.contentRows, { preview: true });
+    const last = preview.rows.at(-1);
+    if (shape.bottom === "merge" && last && !hasCursorTail(last, preview.source)) {
+      chrome = composerChrome(shape, state, frame.width, maxRows, false);
+    }
+    if (shape.side === "rail" && preview.totalRows > preview.rows.length) {
+      frame = composerFrame(width, shape, true);
+    }
+  }
+  const source = editor.layout(frame.text, chrome.contentRows);
+  const rows: ComposerLayoutRow[] = [];
+  if (source.rows.length > 0) {
+    if (chrome.top) rows.push({ kind: "decoration", screenRow: rows.length, rendered: topChrome(shape, state, frame.width) });
+    const thumb = scrollbarRows(source, shape, frame);
+    for (let index = 0; index < source.rows.length; index++) {
+      rows.push(contentRow(source.rows[index]!, source.source, shape, frame, state, rows.length, index === 0, index === source.rows.length - 1, thumb.has(index)));
+    }
+    if (chrome.bottom) rows.push({ kind: "decoration", screenRow: rows.length, rendered: bottomChrome(shape, frame.width) });
+    if (chrome.gap) rows.push({ kind: "decoration", screenRow: rows.length, rendered: "" });
+    if (chrome.footer) rows.push({ kind: "decoration", screenRow: rows.length, rendered: truncateToWidth(chrome.footer, frame.width) });
+  }
   return {
-    source: editorLayout.source, sourceRevision: editorLayout.sourceRevision,
-    viewportStart: editorLayout.viewportStart, width: frame.width, rows, height: rows.length,
+    shape: shape.id,
+    source: source.source, sourceRevision: source.sourceRevision, viewportStart: source.viewportStart,
+    width: frame.width, rows, height: rows.length,
   };
 }

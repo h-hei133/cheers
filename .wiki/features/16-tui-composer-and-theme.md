@@ -427,3 +427,12 @@ export interface ComposerLayout {
 - surface 使用真实宽高，缩减 status/hints/suggestions 以保留输入，候选项按剩余高度维持所选身份和点击映射。regular 即使只剩一行仍交付完整 document 给 painter；物理尺寸为零时 engine 不绘制，恢复后不重新追加旧历史。regular 未启用应用鼠标捕获，意外鼠标报告不作用于文档坐标；原生终端拖选不在精确源文保证内。
 - 实际 Node 20.3 CLI 在两种模式通过输入、插入/分片中文粘贴、resize 与历史后草稿定位。fullscreen 的正向拖选和 resize 后反向拖选，OSC 52 解码与隔离原生命令 stdin 都严格等于 45 字节源文。未使用系统真实剪贴板；OSC 52 字节不等同于真实终端已更新剪贴板。Windows 像素、真实 IME、八形态验收继续。
 - 两路独立代码 APPROVE、架构 CLEAR；四组反转撤回源文提取、保留空白、resize 失效和零容量 document 保留，均触发行为断言，隔离源码副本逐字节/SHA-256 恢复。完整记录与测试数量见 [Phase 19 §8.87](phase-19-decisions.md)。
+
+
+## 19. UI-03 八形态实施
+
+八形态已由同一个 [metadata](../../packages/ts-shell/src/presentation/tui/composer/shapes.ts)、[frame](../../packages/ts-shell/src/presentation/tui/composer/frame.ts)、[row](../../packages/ts-shell/src/presentation/tui/composer/row.ts) 和 layout 实现。默认形态为 default，八项全部进入配置 schema 与 Settings。状态挂载、footer/gap、padding、侧滚动条和保守 IME 尾共用 source mapping 与 editor viewport；实际行高包含所有装饰。仅 box/rail 需要只读布局预算，其他形态单次折行。
+
+Settings 聚焦时显示真实 composer，暂存不写配置，Apply 即时发布 shape 叶子；取消恢复已接受形态。失败保留选择并显示准确说明，下一次明确 Apply 才获取新 baseline；无法重读仍保留选择，不泄露读取异常。形态变更前的选择 geometry 立即失效，输入源文保持不变。
+
+两模式实际 CLI 已验证八项预览、暂存/取消/Apply、重启持久化、中文宽字素 caret 与 resize；fullscreen box 源文复制与隔离剪贴板输入精确一致。真实输入法及 Windows 像素未验证，保守尾策略不等于 IME 实测通过。独立评审、反转和本地/远端证据见 [Phase 19 §8.88](phase-19-decisions.md)。精确调色板与最终 54-token 集合继续由 UI-04 落实。

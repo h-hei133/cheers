@@ -4,7 +4,7 @@ import { sameValue } from '../../config/values.js';
 import { ConfigWriteError } from '../../config/outcome.js';
 import { refreshShellRuntimeConfig, type ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import { isOffline, OFFLINE_ENV } from '../../core/network/policy.js';
-import { readDiagramMode, readStatusItems } from './tuiSettings.js';
+import { readComposerShape, readDiagramMode, readStatusItems } from './tuiSettings.js';
 import { currentTheme } from '../../presentation/theme/theme.js';
 import { configTrustNotice } from '../../config/trust.js';
 
@@ -21,10 +21,19 @@ export interface SettingsDraft {
   readonly scope: SettingsScope;
   readonly definitions: readonly SettingDefinition[];
   readonly values: Readonly<Record<string, SettingValue>>;
-  save(key: string, value: unknown): Promise<string>;
+  save(key: string, value: unknown): Promise<SettingsSaveResult>;
 }
 
+export interface SettingsSaveResult {
+  readonly note: string;
+  /** True only when this runtime confirmed acceptance of the saved configuration. */
+  readonly applied: boolean;
+}
+
+function unapplied(note: string): SettingsSaveResult { return { note, applied: false }; }
+
 function effective(context: ShellRuntimeContext, setting: SettingDefinition): unknown {
+  if (setting.key === 'tui.composerShape') return readComposerShape(context.runtimeConfig);
   if (setting.key === 'tui.statusItems') return readStatusItems(context.projectRoot, context.runtimeConfig);
   if (setting.key === 'tui.diagrams') return readDiagramMode(context.projectRoot, context.runtimeConfig);
   if (setting.key === 'theme') return currentTheme();
@@ -80,26 +89,26 @@ export function openSettings(context: ShellRuntimeContext, onApplied: () => void
     scope, definitions, values,
     async save(key, value) {
       const setting = settingDefinition(key);
-      if (!setting || !definitions.includes(setting)) return 'This setting is not editable in the selected scope.';
+      if (!setting || !definitions.includes(setting)) return unapplied('This setting is not editable in the selected scope.');
       const invalid = validateSetting(setting, value);
-      if (invalid) return invalid;
-      if (consumed || substrate !== context.configuration.substrateRevision) return 'Settings changed or the session moved. Reopen Settings before saving.';
+      if (invalid) return unapplied(invalid);
+      if (consumed || substrate !== context.configuration.substrateRevision) return unapplied('Settings changed or the session moved. Reopen Settings before saving.');
       consumed = true;
       try { writeRuntimeConfigFileAt(file, settingPatch(edit.values, setting, value), edit); }
       catch (error) {
-        return error instanceof ConfigWriteError ? `${error.message} Current settings were not refreshed.` : 'Settings save outcome is unverified. Current settings were not refreshed.';
+        return unapplied(error instanceof ConfigWriteError ? `${error.message} Current settings were not refreshed.` : 'Settings save outcome is unverified. Current settings were not refreshed.');
       }
       // A baseline-equal choice may preserve a concurrent writer's value.
       try {
-        if (!sameValue(settingValue(readRuntimeConfigEditAt(edit.path).values, setting), value)) return `The selected value is not confirmed in your ${scope} configuration. Current settings were not refreshed; reopen Settings.`;
-      } catch { return `The selected value could not be verified in your ${scope} configuration. Current settings were not refreshed; reopen Settings.`; }
+        if (!sameValue(settingValue(readRuntimeConfigEditAt(edit.path).values, setting), value)) return unapplied(`The selected value is not confirmed in your ${scope} configuration. Current settings were not refreshed; reopen Settings.`);
+      } catch { return unapplied(`The selected value could not be verified in your ${scope} configuration. Current settings were not refreshed; reopen Settings.`); }
       const saved = `Saved to your ${scope} configuration.`;
       try {
         const result = refreshShellRuntimeConfig(context);
-        if (result.status !== 'applied') return `${saved} Configuration was not applied (${result.status}).${result.admissionBlocked ? ' New actions are blocked until a valid configuration is loaded.' : ''}`;
+        if (result.status !== 'applied') return unapplied(`${saved} Configuration was not applied (${result.status}).${result.admissionBlocked ? ' New actions are blocked until a valid configuration is loaded.' : ''}`);
         onApplied();
-        return `${saved} ${applicationNotice(context, setting, value, scope)}`;
-      } catch { return `${saved} Configuration application outcome is unverified.`; }
+        return { note: `${saved} ${applicationNotice(context, setting, value, scope)}`, applied: true };
+      } catch { return unapplied(`${saved} Configuration application outcome is unverified.`); }
     },
   };
 }

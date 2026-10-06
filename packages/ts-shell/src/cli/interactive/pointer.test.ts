@@ -232,7 +232,7 @@ describe("pointer composer drag selection", () => {
   it("copies whitespace-only source and cancels a drag whose geometry or revision changes", () => {
     let geometry = composerGeometry("  \t  ");
     const { pointer, copied, surface } = build({ composerGeometry: () => geometry });
-    const event = { button: 0, shift: false, alt: false, ctrl: false, row: 10 };
+    const event = { button: 0, shift: false, alt: false, ctrl: false, row: geometry.top + geometry.layout.rows.find(row => row.kind === "content")!.screenRow };
     pointer.handle({ ...event, column: 0, kind: "press" });
     pointer.handle({ ...event, column: 39, kind: "release" });
     expect(copied).toEqual(["  \t  "]);
@@ -255,17 +255,18 @@ describe("pointer composer drag selection", () => {
       composerGeometry: () => geometry,
     });
 
-    // Press at row 10 (screen row 10, 1-based is 11), col 0 (1-based is 1)
-    pointer.handle(parseMouseReport("\x1b[<0;1;11M")!);
+    const inputRow = geometry.top + geometry.layout.rows.find(row => row.kind === "content")!.screenRow + 1;
+    // Mouse reports use one-based physical coordinates.
+    pointer.handle(parseMouseReport(`\x1b[<0;1;${inputRow}M`)!);
     expect(pointer.composerSelection).toBeDefined();
     expect(pointer.selection).toBeUndefined();
 
     // Drag to col 20 (1-based is 21)
-    pointer.handle(parseMouseReport("\x1b[<32;21;11M")!);
+    pointer.handle(parseMouseReport(`\x1b[<32;21;${inputRow}M`)!);
     expect(pointer.composerSelection).toBeDefined();
 
     // Release
-    pointer.handle(parseMouseReport("\x1b[<0;21;11m")!);
+    pointer.handle(parseMouseReport(`\x1b[<0;21;${inputRow}m`)!);
     expect(copied.length).toBe(1);
     expect(copied[0]).toContain("line 1");
     expect(redraws()).toBeGreaterThanOrEqual(3);
@@ -277,15 +278,16 @@ describe("pointer composer drag selection", () => {
       composerGeometry: () => geometry,
     });
 
+    const inputRow = geometry.top + geometry.layout.rows.find(row => row.kind === "content")!.screenRow + 1;
     // Make selection
-    pointer.handle(parseMouseReport("\x1b[<0;5;11M")!);
-    pointer.handle(parseMouseReport("\x1b[<32;15;11M")!);
-    pointer.handle(parseMouseReport("\x1b[<0;15;11m")!);
+    pointer.handle(parseMouseReport(`\x1b[<0;5;${inputRow}M`)!);
+    pointer.handle(parseMouseReport(`\x1b[<32;15;${inputRow}M`)!);
+    pointer.handle(parseMouseReport(`\x1b[<0;15;${inputRow}m`)!);
     expect(pointer.composerSelection).toBeDefined();
 
     // Single click
-    pointer.handle(parseMouseReport("\x1b[<0;6;11M")!);
-    pointer.handle(parseMouseReport("\x1b[<0;6;11m")!);
+    pointer.handle(parseMouseReport(`\x1b[<0;6;${inputRow}M`)!);
+    pointer.handle(parseMouseReport(`\x1b[<0;6;${inputRow}m`)!);
     expect(pointer.composerSelection).toBeUndefined();
   });
 });
