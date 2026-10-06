@@ -6197,3 +6197,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 - 2026-10-06：Phase 19 CMD-04 连接目录按标签匹配并接受完整 ID，避免同 provider 多连接误选。135 项、构建、反转和 regular/fullscreen 验证通过，见 [决策 §8.43](features/phase-19-decisions.md#843-cmd-04连接-id-动态目录)。7db76ae1 两项远端检查成功，阶段整体继续。
 
 - 2026-10-06：Phase 19 CMD-04 记忆记录与审批候选目录接线，区分记录状态和审批内容一致性。173 项、构建、反转与 regular/fullscreen 验证通过，见 [决策 §8.44](features/phase-19-decisions.md#844-cmd-04记忆记录与审批候选目录)。3eca2fd0、52dae49c 两项远端检查成功，阶段目标继续。
+
+- 2026-10-06：Phase 19 CMD-04 接入目录/文件参数补全，支持引用目录连续输入、分目录缓存和有界只读枚举。235 项、构建、反转及 regular/fullscreen 验证通过，见 [决策 §8.45](features/phase-19-decisions.md#845-cmd-04文件与目录路径补全)。3308f1c5、712eaa73 两项远端检查成功，阶段目标继续。

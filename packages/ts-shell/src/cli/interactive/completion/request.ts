@@ -4,13 +4,15 @@ import { permissionsSyntax } from "../../../core/commands/permissions/syntax.js"
 import { connectSyntax } from "../../../core/commands/connect/syntax.js";
 import { memorySyntax } from "../../../memory/commands/syntax.js";
 import type { MemoryCatalogKind } from "./memory.js";
+import { pathKind } from "./pathRequest.js";
+import { pathDirectory } from "./paths.js";
 import { scanCommandArgs } from "../../../core/commands/arguments.js";
 import { completionToken, completionEdit, quoteCompletion } from "../completion.js";
 import { getSlashInvocation } from "../../../entrypoints/slashCommandRegistry.js";
 import type { DraftSnapshot } from "../../../presentation/tui/editor/replacement.js";
 import { matchSuggestions, type Suggestion } from "../../../presentation/tui/chrome/suggestions.js";
 
-export type CatalogKind = "theme" | "skill" | "tools" | "session" | "entry" | "tree" | "thread" | "mcp" | "grant" | "connection" | MemoryCatalogKind;
+export type CatalogKind = "theme" | "skill" | "tools" | "session" | "entry" | "tree" | "thread" | "mcp" | "grant" | "connection" | "file" | "directory" | MemoryCatalogKind;
 
 export function catalogRequest(snapshot: DraftSnapshot) {
   const token = completionToken(snapshot.text, snapshot.cursor);
@@ -36,19 +38,25 @@ export function catalogRequest(snapshot: DraftSnapshot) {
     if (all.length > (preceding[1] === "--" ? 3 : 2)) return undefined;
     kind = name === "mcp" ? "mcp" : name === "connect" ? "connection" : name === "memory" ? memoryKind : "grant";
   } else {
-    kind = navigationKind(name, preceding, token.value, all.length);
+    kind = pathKind(name, preceding, all.filter(item => item.from >= token.to && item.from > snapshot.cursor).map(item => item.value)) ?? navigationKind(name, preceding, token.value, all.length);
   }
   if (!kind || (!preceding.includes("--") && token.value.startsWith("-"))) return undefined;
   const prefix = snapshot.text.slice(command.to, snapshot.cursor).trimStart();
   const fixed = [...(invocation?.getArgumentCompletions?.(prefix) ?? []),
     ...(kind === "approved" ? [{ value: "approved", label: "approved", detail: "save all approved candidates" }] : [])];
-  return { kind, token, snapshot, fixed };
+  return { kind, token, snapshot, fixed, query: kind === "file" || kind === "directory" ? pathDirectory(token.value) : undefined };
 
 }
 
 export function catalogSuggestions(request: NonNullable<ReturnType<typeof catalogRequest>>, items: readonly Suggestion[]) {
-  return matchSuggestions(request.token.value, [...request.fixed, ...items]).slice(0, 100).map(item =>
-    completionEdit(item, request.snapshot, request.token.from, request.token.to, (item.value.startsWith("-") && !request.token.before.some(token => token.value === "--") ? "-- " : "") + quoteCompletion(item.value, request.token.prefix)));
+  return matchSuggestions(request.token.value, [...request.fixed, ...items]).slice(0, 100).map(item => {
+    const text = (item.value.startsWith("-") && !request.token.before.some(token => token.value === "--") ? "-- " : "") + quoteCompletion(item.value, request.token.prefix);
+    if ((request.kind === "file" || request.kind === "directory") && item.value.endsWith("/")) {
+      return { ...item, edit: { snapshot: request.snapshot, from: request.token.from, to: request.token.to, text,
+        cursorOffset: text.length - (text.endsWith('"') || text.endsWith("'") ? 1 : 0) } };
+    }
+    return completionEdit(item, request.snapshot, request.token.from, request.token.to, text);
+  });
 }
 
 function navigationKind(name: string | undefined, preceding: readonly string[], current: string, count: number): CatalogKind | undefined {

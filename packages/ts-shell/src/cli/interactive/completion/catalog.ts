@@ -3,6 +3,7 @@ import { serverCatalog } from "./servers.js";
 import { grantCatalog, type GrantCatalog } from "./grants.js";
 import { connectionCatalog } from "./connections.js";
 import { memoryCatalog } from "./memory.js";
+import { pathCatalog } from "./paths.js";
 import { listThemes } from "../../../presentation/themes/index.js";
 import { resolveSkillCatalog } from "../../../core/skills/skillCatalog.js";
 import { toolPoolFor } from "../../runtime/tools.js";
@@ -44,9 +45,10 @@ async function readCatalog(kind: CatalogKind, context: ShellRuntimeContext, gate
 /** Reuse a pending catalog read across changing prefixes; cancellation only detaches the waiter. */
 export function createCatalogLoader(context: () => ShellRuntimeContext, gateway: CliMcpGateway, themePaths: readonly string[], manager?: SessionCatalog, policy?: GrantCatalog) {
   let pending: { key: string; task: Promise<readonly Suggestion[]> } | undefined;
-  const load = async (kind: CatalogKind, signal: AbortSignal): Promise<readonly Suggestion[]> => {
+  const load = async (kind: CatalogKind, signal: AbortSignal, query?: string): Promise<readonly Suggestion[]> => {
     signal.throwIfAborted();
     const current = context();
+    if (kind === "file" || kind === "directory") return pathCatalog(current.cwd, query ?? "", kind === "directory", signal);
     const key = catalogIdentity(current, themePaths) + kind;
     if (!pending || pending.key !== key) {
       const task = readCatalog(kind, current, gateway, themePaths, manager, policy);

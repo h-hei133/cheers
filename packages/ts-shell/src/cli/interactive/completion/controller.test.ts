@@ -9,7 +9,7 @@ function harness() {
   let draft = { text: "/theme d", cursor: 8, revision: 1 };
   let identity = "session-a";
   const pending: Array<(items: readonly Suggestion[]) => void> = [];
-  const load = vi.fn((_kind, _signal) => new Promise<readonly Suggestion[]>(resolve => pending.push(resolve)));
+  const load = vi.fn((_kind, _signal, _query?: string) => new Promise<readonly Suggestion[]>(resolve => pending.push(resolve)));
   const publish = vi.fn();
   const controller = new CatalogController({ identity: () => identity, draft: () => draft, load, publish });
   return { controller, load, publish, pending, draft: () => draft,
@@ -76,4 +76,17 @@ describe("catalog request lifecycle", () => {
     expect(catalogRequest({ text: "/skills ", cursor: 8, revision: 1 })?.kind).toBe("skill");
     expect(catalogRequest({ text: "/tools -- --f", cursor: 13, revision: 1 })?.kind).toBe("tools");
   });
+});
+
+it("caches each path directory separately while sharing basename prefixes", async () => {
+  const h = harness(); h.change("/cd one/a"); h.controller.update(h.draft()); await vi.advanceTimersByTimeAsync(75);
+  expect(h.load.mock.calls[0]?.[2]).toBe("one/");
+  h.pending[0]!([{ value: "one/alpha/", label: "one/alpha/" }]); await vi.advanceTimersByTimeAsync(0);
+  h.change("/cd one/al"); h.controller.update(h.draft());
+  expect(h.load).toHaveBeenCalledTimes(1);
+  h.change("/cd two/a"); h.controller.update(h.draft()); await vi.advanceTimersByTimeAsync(75);
+  expect(h.load.mock.calls[1]?.[2]).toBe("two/");
+  h.pending[1]!([{ value: "two/another/", label: "two/another/" }]); await vi.advanceTimersByTimeAsync(0);
+  expect(h.publish.mock.lastCall?.[0].map((item: Suggestion) => item.value)).toEqual(["two/another/"]);
+  h.controller.invalidate();
 });

@@ -866,3 +866,14 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - regular/fullscreen 真实 CLI 以进程内合成检查点和隔离记录文件验证 approve/save/delete 的完整 ID 接受；显式 Enter 仅批准，保存和删除位置 Tab 后未写记忆文件，两模式 exit 0。检查点由测试预加载器使用真实 packet/提取器建立，不把该探针计作压缩请求生成检查点的完整验收。
 - import cycles/config consumers/declarations/node floor 通过；NormProof 无环及导入解析 satisfied，既有 5 个函数数量 advisory 保留。3eca2fd0 与 52dae49c 的 CI/Architecture Watch 均成功；3308f1c5 Architecture Watch 37389522694 成功，CI 37389522700 查询时仍运行。
 - CMD-04 文件/目录位置、model/workflow 统一生命周期与完整外部版本事件尚待完成；CMD-03 其余声明及 Phase 19 后续批次继续。
+
+### 8.45 CMD-04：文件与目录路径补全
+
+- cd/workspace attach/switch/use 仅提供目录；report 与 export markdown/md/jsonl/html 的 path 位置提供文件及用于继续输入的目录。路径位置通过原 owner syntax 加占位目标验证，保留前后 flags，不在未知动作、多目标或非法 flag 位置查询。
+- 路径读取使用异步 opendir，只枚举输入所指的一级目录，最多检查 5000 项；在条目间响应取消并关闭迭代句柄，不递归遍历工作区。目录符号链接按真实类型判断，坏链接及非普通文件不进入候选。相对路径基准与命令相同为 cwd；文件目标的 ~/ 扩展沿用写目标语义，cd 未新增 home 扩展语法。
+- 复用现有请求 controller 的防抖/超时/迟到拒绝，并让缓存键包含路径父目录，相同目录内不同 basename 前缀复用，切目录重新读取；缓存限制 64 个目录/实体键。没有把既有 @ 文件递归索引复制成另一套目录浏览器，也不因补全自动加入 --outside 或写入目标。
+- DraftEdit 新增可选插入内光标位置，校验整数范围及 grapheme 边界。目录接受不添加空格，引用路径把光标留在闭合引号前，可以继续输入下一层；文件接受保留原分隔符或添加末尾空格。对照参考实现目录无空格后缀、光标留在引号内、符号链接类型检查的决定。
+- Linux、Node 20.3 隔离环境 14 文件/235 项及 build:ts 通过，涵盖编辑器、@ 文件补全、路径/权限 flags、分目录缓存与 cwd/projectRoot 不同的路径基准。取消插入内光标、缓存退回仅按实体种类的反转触发三处断言失败，逐字节恢复后组合通过。
+- regular/fullscreen 真实 CLI 从带空格目录连续接受到 child 目录，report 文件目标 Tab 后已有文件字节和 mtime 不变，两模式 exit 0。探针首次未剥离光标控制标记，修正终端清理后通过，未改产品行为来迎合等待条件。
+- import cycles/config consumers/declarations/node floor 通过；NormProof 全图无环与导入解析 satisfied，既有 5 个函数数量 advisory 保留。3308f1c5 与 712eaa73 的 CI/Architecture Watch 均成功。
+- CMD-04 仍需 model/workflow 统一生命周期及完整外部版本事件，其他路径型参数按各 owner 语义继续审计；本批没有宣称全命令目录与 Phase 19 整体完成。

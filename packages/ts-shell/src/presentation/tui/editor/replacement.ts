@@ -12,6 +12,8 @@ export interface DraftEdit {
   readonly from: number;
   readonly to: number;
   readonly text: string;
+  /** Caret within inserted text; omitted means its end. */
+  readonly cursorOffset?: number;
 }
 
 /** Reject stale edits and edits that cut a visible character in half. */
@@ -22,7 +24,9 @@ export function replaceDraft(current: DraftSnapshot, edit: DraftEdit): DraftSnap
   const boundaries = new Set(graphemeBoundaries(current.text));
   if (![edit.from, edit.to, current.cursor].every(offset => boundaries.has(offset))) return;
   const text = current.text.slice(0, edit.from) + edit.text + current.text.slice(edit.to);
-  const cursor = edit.from + edit.text.length;
+  const offset = edit.cursorOffset ?? edit.text.length;
+  if (!Number.isInteger(offset) || offset < 0 || offset > edit.text.length) return;
+  const cursor = edit.from + offset;
   if (!graphemeBoundaries(text).includes(cursor)) return;
   return { text, cursor, revision: current.revision + 1 };
 }

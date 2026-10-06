@@ -5,7 +5,7 @@ import { catalogRequest, catalogSuggestions, type CatalogKind } from "./request.
 interface Options {
   readonly identity: () => string;
   readonly draft: () => DraftSnapshot;
-  readonly load: ((kind: CatalogKind, signal: AbortSignal) => Promise<readonly Suggestion[]>) & { invalidate?: () => void };
+  readonly load: ((kind: CatalogKind, signal: AbortSignal, query?: string) => Promise<readonly Suggestion[]>) & { invalidate?: () => void };
   readonly publish: (items: readonly Suggestion[], status?: string) => void;
 }
 interface Cache { readonly items?: readonly Suggestion[]; readonly error?: string; readonly expires: number }
@@ -17,7 +17,7 @@ export class CatalogController {
   private delay?: ReturnType<typeof setTimeout>;
   private deadline?: ReturnType<typeof setTimeout>;
   private identity = "";
-  private readonly cache = new Map<CatalogKind, Cache>();
+  private readonly cache = new Map<string, Cache>();
 
   constructor(private readonly options: Options) {}
 
@@ -41,7 +41,7 @@ export class CatalogController {
     if (!request) return false;
     const identity = this.options.identity();
     if (identity !== this.identity) { this.cache.clear(); this.identity = identity; }
-    const cached = this.cache.get(request.kind);
+    const cached = this.cache.get(JSON.stringify([request.kind, request.query]));
     if (cached && cached.expires > Date.now()) {
       const matches = catalogSuggestions(request, cached.items ?? []);
       this.options.publish(matches, cached.error ?? (matches.length ? undefined : "No matching entries."));
@@ -58,7 +58,7 @@ export class CatalogController {
         this.finish(request, [], "Command entries timed out.");
         this.epoch++;
       }, 1500);
-      void this.options.load(request.kind, abort.signal).then(items => {
+      void this.options.load(request.kind, abort.signal, request.query).then(items => {
         if (!this.current(epoch, identity, snapshot)) return;
         this.finish(request, items.slice(0, 5000));
       }, () => {
@@ -77,7 +77,10 @@ export class CatalogController {
 
   private finish(request: NonNullable<ReturnType<typeof catalogRequest>>, items: readonly Suggestion[], error?: string): void {
     clearTimeout(this.deadline);
-    this.cache.set(request.kind, { items, error, expires: Date.now() + (error ? 3000 : 15000) });
+    const key = JSON.stringify([request.kind, request.query]);
+    this.cache.delete(key);
+    this.cache.set(key, { items, error, expires: Date.now() + (error ? 3000 : 15000) });
+    if (this.cache.size > 64) this.cache.delete(this.cache.keys().next().value!);
     const matches = catalogSuggestions(request, items);
     this.options.publish(matches, error ?? (matches.length ? undefined : "No matching entries."));
   }
