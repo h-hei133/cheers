@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getRuntimeConfig, getUserRuntimeConfigPath, readUserRuntimeConfigFile, writeUserRuntimeConfigFile, type RuntimeConfigFile, type RuntimeConfigOverrides } from './runtimeConfig.js';
+import { getRuntimeConfig, getUserRuntimeConfigPath, readUserRuntimeConfigFile, writeUserRuntimeConfigFile, writeRuntimeConfigFileAt, type RuntimeConfigFile, type RuntimeConfigOverrides } from './runtimeConfig.js';
 import { matchDenyRule } from '../core/shell/approval/deny.js';
 import { evaluateToolPermissionScope } from '../core/query/toolPolicy.js';
 import { readDiagramMode, readStatusItems, writeStatusItems } from '../cli/interactive/tuiSettings.js';
@@ -151,15 +151,21 @@ describe('configuration validation boundary', () => {
     expect(readDiagramMode(root)).toBe('streaming');
   });
 
-  it('rejects oversized formatted writes before changing a readable compact document', () => {
+  it('keeps compact documents compact and rejects an oversized final patch', () => {
     const document = { unknown: 'x'.repeat(1024 * 1024 - 6000), rows: Array(1000).fill(1) };
     user(document);
     const before = fs.readFileSync(userPath);
     expect(before.length).toBeLessThan(1024 * 1024);
     expect(getRuntimeConfig(root).allowedTools).toBeUndefined();
-    expect(() => writeUserRuntimeConfigFile({ theme: 'custom' })).toThrow(/resource-limit/);
-    expect(fs.readFileSync(userPath)).toEqual(before);
-    expect(readUserRuntimeConfigFile()).toEqual(document);
+    writeUserRuntimeConfigFile({ theme: 'custom' });
+    expect(fs.readFileSync(userPath).length).toBeLessThan(1024 * 1024);
+    expect(readUserRuntimeConfigFile()).toMatchObject(document);
+    const patched = fs.readFileSync(userPath);
+    expect(() => writeUserRuntimeConfigFile({ theme: 'x'.repeat(6000) })).toThrow(/resource-limit/);
+    expect(fs.readFileSync(userPath)).toEqual(patched);
+    const newPath = path.join(root, 'new-config.json');
+    expect(() => writeRuntimeConfigFileAt(newPath, document as RuntimeConfigFile)).toThrow(/resource-limit/);
+    expect(fs.existsSync(newPath)).toBe(false);
   });
 
   it('accepts an explicit current version and retains it through saving', () => {

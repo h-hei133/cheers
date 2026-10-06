@@ -1,5 +1,5 @@
 import type { AnySchemaObject } from 'ajv';
-import { CONFIG_MAX_BYTES } from './document.js';
+import { CONFIG_MAX_BYTES } from './syntax.js';
 
 export class ConfigReferenceError extends Error {
   constructor(readonly code: 'missing-environment' | 'resource-limit') { super(code); }

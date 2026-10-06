@@ -1,4 +1,5 @@
-import { CONFIG_MAX_BYTES, ConfigDocumentError, inspectConfigDocument, readConfigDocument } from './document.js';
+import { CONFIG_MAX_BYTES, ConfigDocumentError, inspectConfigDocument } from './syntax.js';
+import { readConfigDocument } from './document.js';
 import { type ConfigFields, type ConfigSource, type MergePolicy, tuiFields } from './fields.js';
 import { ConfigReferenceError, resolveConfigReferences } from './references.js';
 
@@ -82,7 +83,7 @@ export function loadConfigLayers(paths: readonly { path: string; source: 'projec
       layer.sources.push(candidate.path);
     } catch (error) {
       layer.blocked = true;
-      const code = error instanceof ConfigDocumentError ? error.code : 'unreadable';
+      const code = error instanceof ConfigDocumentError ? error.message : 'unreadable';
       const safePath = candidate.path.replace(/[\x00-\x1f\x7f-\x9f]/g, '?').slice(0, 512);
       layer.diagnostics.push(`Invalid config at ${safePath}: ${candidate.source} ${code}; tools blocked.`);
     }

@@ -1131,3 +1131,18 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - regular/fullscreen 实际 CLI 各跑 deny/损坏 JSON/未来版本三场景，每场景两次本地合成 HTTP 请求。合法项目 deny 保留 read/write 声明但实际 write 被拒绝；损坏及未来版本没有工具声明，provider 越权发来的 write 仍失败。CLI --tools 无法放宽阻断，工作区 marker 与两份配置字节不变，合成凭据/环境秘密/损坏文本标记不进入终端，六场景均 exit 0。初次夹具只接受 denied 等词，真实返回为 Blocked/Refused；补齐拒绝文案断言后通过，未改产品行为。
 - import cycles/config consumers/declarations/node floor/docs strict 通过；NormProof 阻断义务满足，保留既有四个函数数量 advisory 和 120 个 docs source-reference advisory。前批 29c1edba、fb659b65 的 CI/Architecture Watch 均已成功；本批新提交远端另核对。
 - CFG-01 剩余 provenance、信任条件、生效边界及跨字段能力验证继续；CFG-02 的 JSONC/重复键/定位、CFG-03 锁与 revision reload、CFG-04 attentionOnIdle/settings 和 CFG-05 仍在计划内。SAFE-02 原生内部读取/创建竞态/跨平台保证与 CMD-03/04 剩余审计仍开放，Phase 19 整体继续。
+
+
+### 8.69 CFG-02：有界 JSONC 解析与保留原文的配置编辑
+
+- 现有 config.json/.cheers.json 路径直接支持注释和尾逗号，不新增更高优先级文件或重命名旧文件。新增精确依赖 jsonc-parser 3.3.1（MIT，无运行时依赖，发布包解压 212821 字节），使用成熟 visitor/parser/AST/scanner/edit API；未采用手写去注释、拼接数字或修补尾逗号正则。
+- 有界文件读取保留 1MiB 加一字节 EOF 探测，严格 UTF-8 解码保留 BOM，非法编码拒绝且不改原字节。visitor 在构建值对象之前按 32 层/50000 节点阻断，并在首个语法错误、重复解码键、危险键或非有限数字立即抛受控错误，不接受容错 parser 的部分结果。空文件和仅注释的现存文件仍为无效文档，和不存在文件不同。
+- BOM 在解析输入中替换成等宽空格，原文保持不变。解析错误内部保留 offset，报告增加一基 line/column，不输出原文或键名；位置按 parser 的 UTF-16 字符计数，不冒充 UTF-8 字节列。非法裸换行、未闭合注释、1/*x*/2、转义后重复键和一万层输入均有反例。
+- 配置写入在现有 raw 快照上计算语义差异，仅编辑变化路径，保留未编辑原文、占位符、BOM/CRLF、数值字面量和注释。新文件仍使用受字节上限约束的缩进 JSON；已有紧凑文件不因一次小编辑被整体格式化，无变化时不写盘、mtime 不变。嵌套删除和显式空对象按旧顶层合并/字段替换契约处理。
+- 每个补丁最多 128 个语义变更路径；逐次编辑按候选文本大小累计计费，限额 8MiB。删除一个属性可产生两个文本范围编辑；初始/最终解析和扫描器工作不计入此计数，另受单文档字节、深度与节点界限约束。所有中间结果和最终结果仍受 1MiB 界限。超限只发生在内存候选上，不落入部分写入。最终重新解析并按 JSON 值语义比对预期 raw 文档，防止语法有效但落到错误字段；再将同一文本交给既有原子写入 owner。
+- 两路审查发现三个原文保留问题并已修复：上游首字段删除会带走头部/邻近注释；无 ID 记录数组重排会让注释对应错条目；JSON 往返与严格比较会把未编辑的 -0 改为 0。删除改为 AST 属性范围加 scanner 确认的一个相邻逗号，保留周围 trivia；变化数组仅在每个位置具有相同、唯一字符串 ID 时递归，否则整个变化数组替换（内部注释不承诺保留）；差异和最终核验统一按 JSON 数值语义视 ±0 等价，保留已有 token。精确字节、mtime、首/末/唯一含尾逗号字段、deny 重排和混合数组回归覆盖，复审返回 APPROVE/CLEAR。
+- 对照本地参考中的成熟 JSONC parser、逐叶编辑与语法树装饰保留决策；没有采用参考中的原文错误回显、扩展名决定是否保留格式或无累计限额的逐叶重新解析。当前 writer 仍接受 raw snapshot，跨进程锁/CAS、冲突检测、提交后核验与 revision reload 继续由 CFG-03 完成，不把原子 rename 当作并发补丁保证。
+- Node 20.3/Linux 下 16 文件/287 项及 build:ts 通过。新语法套件首轮 14 项在旧实现上失败 9 项；最终扩至 29 项。上一批临界大小回归按新行为细化为小补丁不扩展整份原文、超限最终补丁零写、新建超限缩进文档零创建，保留原有大小保护。十二组反转覆盖重复键、首错停止、提前深度、有限数、UTF-8、语义核验、操作/累计工作、删除注释、数组身份、负零和 no-op；逐字节恢复后 config 92 项通过。
+- regular/fullscreen 构建 CLI 各使用本地合成 HTTP 完成受拒绝的 write，再实际执行 connect use second。配置包含 BOM、CRLF、注释、尾逗号、环境占位符、1e2 和 -0；逐字节比较证明只改变活动连接 ID 与第二条连接 updatedAt，其余原文保留。项目配置和工作区 marker 不变，合成秘密不进入终端，两模式 exit 0；未访问真实提供方配置。
+- 单次本机成本探针（Node 20.3、276903 字节/36002 节点、10 次均值）中，原 JSON.parse 加结构检查约 5.52ms，JSONC 完整预检/解析/检查约 13.91ms，首次导入 syntax 模块约 14.80ms。这只刻画该进程与夹具，不代表完整 CLI 冷启动或跨平台性能；固定输入/编辑预算仍是工作上界。
+- 安装依赖时出现既有 undici 7.18.2 的 engines >=20.18.1 与当前 Node 20.3 不一致警告；本批未改该依赖、Node floor 或构建脚本，当前 Node 20.3 实测结果如上，不宣称解决依赖声明差异。import cycles/config consumers/declarations/node floor/docs strict 通过；NormProof 阻断义务满足，既有四个函数数量 advisory 和 120 个文档来源 advisory 不变。前批 d93c7a60 的 CI 37423264223 与 Architecture Watch 37423264273 均已成功；本批提交另查。CFG-01 的完整来源/信任/生效 policy、CFG-03/04/05、SAFE-02 与其余 Phase 19 任务继续。

@@ -5,7 +5,7 @@ sources: [user-experience-report-2026-10-05, current-source-28ff98ce, isolated-p
 created: 2026-10-05
 updated: 2026-10-05
 tags: [research, configuration, schema, validation, provenance, settings, registry]
-summary: "复核配置路径、局部校验、分层差异、attentionOnIdle 断线与 reload 行为；裁定保留现有 JSON 路径、按字段限定来源与信任、成熟 JSONC parser、无秘密诊断、并发安全字段补丁及版本化生效快照。Phase 19 首批字段验证与来源边界已实施，revision/JSONC/并发补丁/通知仍待完成。"
+summary: "复核配置路径、局部校验、分层差异、attentionOnIdle 断线与 reload 行为；裁定保留现有 JSON 路径、按字段限定来源与信任、成熟 JSONC parser、无秘密诊断、并发安全字段补丁及版本化生效快照。Phase 19 字段验证与 JSONC 原文编辑首批已实施，revision/并发补丁/通知仍待完成。"
 confidence: high
 ---
 
@@ -224,3 +224,10 @@ Node `>=20.3.0`、TypeScript 和单文件分发不构成“零依赖”约束。
 CFG-01 首批实现和证据见 [Phase 19 §8.68](phase-19-decisions.md#868-cfg-01首批配置验证来源与安全合并边界)。当前代码以 config registry 验证已知字段和已有 env/overrides，保持普通 user-first 与 TUI 叶子 project-first；项目不能提供个人连接或展开环境引用，工具限制按收紧语义合并。诊断不回显值，raw 保存保留未知顶层字段和占位符，最终落盘文本受同一读取字节上限保护。
 
 现有无版本文件保持兼容，显式 schemaVersion 1 表示相同格式，未知版本不写回；当前仍为 JSON，未实施 JSONC、重复键检测、迁移、CAS、last-good revision、来源 UI 或 attentionOnIdle 全链路。§§1–7 中的基线说明保留为研究历史，未完成项不能由首批验证层代替验收。完整范围和安全限制详见上述记录。
+
+
+### 8.1 JSONC 解析与原文编辑
+
+实施与验证见 [Phase 19 §8.69](phase-19-decisions.md#869-cfg-02有界-jsonc-解析与保留原文的配置编辑)。既有路径现支持注释/尾逗号，重复解码键、无效 UTF-8 和非有限数字被拒绝；语法错误保留受控字符位置。保存按变化路径编辑并保留未编辑文本，删除使用 AST/扫描器边界；变化数组只有位置一致的唯一字符串 ID 才逐项编辑，否则整体替换且不保留其内部注释。新文件和已有文件均核验最终字节上限；候选语义与预期不一致时零写。
+
+此进展取代 §8 中“仍为 JSON、未实施 JSONC/重复键检测”的当时状态；锁/CAS、提交后核验、last-good revision、来源 UI 和通知接线仍未完成，不能从原文编辑推导并发安全或全部设置已生效。

@@ -4,7 +4,9 @@ import { resolveUserDataFile, userDataDir } from "../core/paths/userHome.js"
 import { type DenyRule } from "../core/shell/approval/deny.js"
 import { writeTextFileAtomic } from "../session/store/sessionFileStore.js"
 import { createConfigFields, type ConfigField } from "./fields.js";
-import { readConfigDocument, serializeConfigDocument, ConfigDocumentError } from "./document.js";
+import { readConfigDocument, readConfigSnapshot } from "./document.js";
+import { ConfigDocumentError } from "./syntax.js";
+import { patchConfigDocument } from "./patch.js";
 import { loadConfigLayers, validateRawConfig } from "./layers.js";
 
 /**
@@ -586,7 +588,7 @@ export function readRuntimeConfigFileAt(configPath: string): RuntimeConfigFile {
     validateRawConfig(document, CONFIG_FIELDS);
     return document as RuntimeConfigFile;
   } catch (error) {
-    const reason = error instanceof ConfigDocumentError ? error.code : "invalid-field";
+    const reason = error instanceof ConfigDocumentError ? error.message : "invalid-field";
     // Field errors contain registry IDs only; parser and filesystem errors never escape.
     if (error instanceof Error && error.message.startsWith("Invalid config field ")) throw error;
     throw new Error(`Failed to read user runtime config: ${reason}.`);
@@ -638,8 +640,10 @@ export function writeRuntimeConfigFileAt(
   // loss it guards is a setting the user set by hand, recoverable by setting it
   // again, and a lock file that survives a crash would block every later write
   // for reasons that read as a broken config.
-  const onDisk = readRuntimeConfigFileAt(configPath);
-  const merged = { ...onDisk, ...config } as typeof onDisk;
+  const snapshot = readConfigSnapshot(configPath);
+  const onDisk = snapshot?.values ?? {};
+  validateRawConfig(onDisk, CONFIG_FIELDS);
+  const merged = { ...onDisk, ...config } as RuntimeConfigFile;
   validateRawConfig(merged, CONFIG_FIELDS);
   // An active-connection pointer has to name a connection in the list that
   // lands on disk, whichever side contributed each half. Keeping an id whose
@@ -655,7 +659,8 @@ export function writeRuntimeConfigFileAt(
   // truncated file every later read rejects. The merge above is not a lock:
   // the rename is what makes the single writer's own landing safe, and the
   // lost-update window the comment above accepts is unchanged by it.
-  writeTextFileAtomic(configPath, serializeConfigDocument(merged));
+  const text = patchConfigDocument(snapshot, merged as Record<string, unknown>);
+  if (text !== snapshot?.text) writeTextFileAtomic(configPath, text);
   return configPath;
 }
 
