@@ -1114,3 +1114,20 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 引用请求接线、取消转发、迟到拒绝、空列表缓存、带引号替换和实际界面接线六组反转均产生断言失败；五个源文件逐字节恢复后 50 项通过。五项静态门禁及 diff 检查通过；NormProof 阻断义务满足，四个既有函数数量 advisory 与 docs strict 的 120 个既有非阻断来源路径 advisory 保留。
 - regular/fullscreen 构建 CLI 各验证四次合成 Git 枚举：启动零枚举；Esc、期限和退出时真实子进程均被回收；成功查询不依赖下一次按键即显示含空格名称，Tab 形成正确带引号草稿。两模式 exit 0，工作区标记字节不变，使用隔离配置和 synthetic provider，无真实提供方调用。
 - 独立代码审查 APPROVE、架构 CLEAR；架构提出的通用 loader 注释已改明路径/文件读取会传播取消。d046e142 的 CI/Architecture Watch 已成功；29c1edba Architecture Watch 成功，CI 37419991717 最近查询仍在执行，本批远端按新提交另核。Phase 19 的十六批/七十六项总体目标继续。
+
+
+### 8.68 CFG-01：首批配置验证、来源与安全合并边界
+
+- config owner 新增 fields/schema/layers/document/references，复用既有 Ajv，不增加依赖或通用深合并。所有当前 RuntimeConfigFile 字段与 CLI-only hook override 有 schema/source/merge 定义，类型覆盖检查随构建执行；这只是 CFG-01 的首批边界，不代表 provenance、trust 与 apply policy 全部接通。
+- 普通字段保持 default → project → user，非法高层值保留已验证下层。CHEERS_MAX_TURNS 与已有 overrides 也校验。计数为安全整数；Node 计时值限定于其定时器可表示范围；温度仅检查有限数，模型能力交叉校验仍由后续工作补齐，不引入研究示例中的任意模型 token 上限。
+- 项目 provider、连接、凭据、活动连接选择及 cacheWarming 不进入有效配置。先过滤来源，再验证与插值；仅用户凭据/连接 schema 明示的字符串叶子可解析 `$VAR`/`${VAR}`，`$$` 表示字面 dollar。替换文本不再次扫描，缺变量诊断且忽略该字段；键名、未知结构与项目字符串不读取环境。个人连接对象不跨来源拼接，自定义主题、browser-oauth 和缺失连接时间戳沿用既有归一化。
+- 工具 allowlist 逐层取交集，disabled/prefix/deny 累积，MCP false 不被后层 true 放宽。语法损坏、无法读取、结构/资源异常、未知版本或非法安全字段在 overrides 之后投影为空 allowlist、通配 deny、MCP false 及 hook exemption false。真实工具门禁在 allow-all 下仍拒绝；这里只声明工具边界，不宣称 agentMode 初始化或完整网络隔离已修复。
+- 文件读量最多 1MiB 加一个 EOF 探测字节，嵌套深度 32、节点数 50000；实际句柄必须是普通文件，只有 ENOENT 为缺失。任何层级的危险键被拒绝。环境展开另有每层累计 1MiB 界限。诊断只用受控字段/来源/code，不保留原始 JSON、未知键名、Ajv paths 或异常文本。
+- 无版本标记继续作为现有格式；显式 `schemaVersion: 1` 标记同一格式，不自动给旧文件加标记。其他显式版本阻断加载并拒绝旧客户端写回。raw 读写保留顶层未知字段与占位符，已知嵌套形状非法时拒绝，尚无 JSONC 注释保留、重复键检测、版本迁移或跨进程字段 CAS。
+- tuiSettings 的状态项/diagram 读取委托有效配置；两个叶子独立校验并保持 project-first，项目空状态数组仍回退用户选择，保存保留同层兄弟字段。状态项合法 ID 的声明尚由展示 owner 归一化，未宣称完整 registry UI/来源展示已完成。
+- 独立代码与架构审查发现紧凑 JSON 大小校验与缩进落盘不一致：临界文档可能保存成功后超过读取上限。已在活动指针协调后序列化最终文本，按实际字节检查，再把同一文本交给原子写入 owner；回归证明拒绝时原文件字节不变。修正后的两路独立复审返回 APPROVE/CLEAR；审查者检查源码/测试/文档，未将主代理提供的运行结果冒充独立执行。
+- Linux、Node 20.3 隔离环境 15 文件/258 项及 build:ts 通过。新边界最初 27 项在旧实现上有 26 项失败；后来增加实际 deny gate、格式化大小、当前版本、展开累计及 TUI 保存覆盖。四处历史断言依赖项目个人凭据/原值诊断，按新契约改为用户来源与安全诊断；连接补全夹具原本只有 accountId 的不完整 accountAuth 补全为合法合成认证形状，保留隐私和精确 ID 断言。
+- 十二组有效反转覆盖来源、标量验证、allow/deny 合并、最终阻断、raw 写前验证、TUI 来源、单次展开、准确序列化、读字节/深度及未来版本。首次标量反转仅撤掉展开前验证，展开后验证仍挡住错误，因此该次未作为有效反转；随后撤掉两处才失败。逐字节恢复后 config/连接补全 79 项通过。
+- regular/fullscreen 实际 CLI 各跑 deny/损坏 JSON/未来版本三场景，每场景两次本地合成 HTTP 请求。合法项目 deny 保留 read/write 声明但实际 write 被拒绝；损坏及未来版本没有工具声明，provider 越权发来的 write 仍失败。CLI --tools 无法放宽阻断，工作区 marker 与两份配置字节不变，合成凭据/环境秘密/损坏文本标记不进入终端，六场景均 exit 0。初次夹具只接受 denied 等词，真实返回为 Blocked/Refused；补齐拒绝文案断言后通过，未改产品行为。
+- import cycles/config consumers/declarations/node floor/docs strict 通过；NormProof 阻断义务满足，保留既有四个函数数量 advisory 和 120 个 docs source-reference advisory。前批 29c1edba、fb659b65 的 CI/Architecture Watch 均已成功；本批新提交远端另核对。
+- CFG-01 剩余 provenance、信任条件、生效边界及跨字段能力验证继续；CFG-02 的 JSONC/重复键/定位、CFG-03 锁与 revision reload、CFG-04 attentionOnIdle/settings 和 CFG-05 仍在计划内。SAFE-02 原生内部读取/创建竞态/跨平台保证与 CMD-03/04 剩余审计仍开放，Phase 19 整体继续。

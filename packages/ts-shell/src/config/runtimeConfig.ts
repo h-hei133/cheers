@@ -1,9 +1,11 @@
-import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { resolveUserDataFile, userDataDir } from "../core/paths/userHome.js"
-import { parseDenyRules, type DenyRule } from "../core/shell/approval/deny.js"
-import { writeJsonFileAtomic } from "../session/store/sessionFileStore.js"
+import { type DenyRule } from "../core/shell/approval/deny.js"
+import { writeTextFileAtomic } from "../session/store/sessionFileStore.js"
+import { createConfigFields, type ConfigField } from "./fields.js";
+import { readConfigDocument, serializeConfigDocument, ConfigDocumentError } from "./document.js";
+import { loadConfigLayers, validateRawConfig } from "./layers.js";
 
 /**
  * Token budgets for one model.
@@ -226,7 +228,7 @@ export interface RuntimeConfig {
    */
   readonly cacheWarming?: "off" | "streaming" | "idle";
   readonly agentMode?: "plan" | "build";
-  readonly theme?: "dark" | "light" | "auto";
+  readonly theme?: string;
   /**
    * Explicit override of the interactive surface.
    *
@@ -325,15 +327,9 @@ export interface RuntimeConfig {
    */
   readonly providerBodyTimeoutMs?: number;
   /**
-   * Config files that could not be read, one message each.
-   *
-   * A malformed file used to stop the process, so a stray comma meant the
-   * product would not start and said so only in a stack trace. The file is
-   * skipped now and its complaint is carried here instead, because a
-   * configuration error is something to tell the user about, not something to
-   * refuse to run over.
-   *
-   * Empty when every file read cleanly, which is the normal case.
+   * Controlled source/field diagnostics without supplied values or parser text.
+   * Ordinary invalid values preserve validated lower layers. Unreadable or
+   * malformed documents and security fields block tool use at startup.
    */
   readonly configDiagnostics: readonly string[];
   readonly configSources: string[];
@@ -360,6 +356,7 @@ export interface TuiPreferences {
 }
 
 export interface RuntimeConfigFile {
+  schemaVersion?: 1;
   provider?: RuntimeProvider;
   maxTurns?: number;
   allowedTools?: string[];
@@ -382,7 +379,7 @@ export interface RuntimeConfigFile {
   offline?: boolean;
   cacheWarming?: "off" | "streaming" | "idle";
   agentMode?: "plan" | "build";
-  theme?: "dark" | "light" | "auto";
+  theme?: string;
   tuiMode?: "regular" | "fullscreen";
   tui?: TuiPreferences;
   retryEnabled?: boolean;
@@ -396,6 +393,8 @@ export interface RuntimeConfigFile {
   providerHeadersTimeoutMs?: number;
   providerBodyTimeoutMs?: number;
 }
+
+const CONFIG_FIELDS = createConfigFields(RUNTIME_PROVIDERS) satisfies Record<keyof RuntimeConfigFile | "allowUntrustedHooks", ConfigField>;
 
 const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources"> = {
   provider: "openai",
@@ -460,7 +459,7 @@ export interface RuntimeConfigOverrides {
   readonly instructionBudgetBytes?: number
   /** Skip self-initiated requests; `undefined` leaves the configured value. */
   readonly offline?: boolean
-  /** The tools this run may offer. Naming none leaves the pool unrestricted. */
+  /** Further restrict the configured allowlist; an empty list offers no tools. */
   readonly allowedTools?: readonly string[]
   /** Run declared hook commands without asking. Off unless a flag says otherwise. */
   readonly allowUntrustedHooks?: boolean
@@ -470,71 +469,16 @@ export function getRuntimeConfig(
   rootDir: string = process.cwd(),
   overrides?: RuntimeConfigOverrides,
 ): RuntimeConfig {
-  const sources: string[] = [];
-  const diagnostics: string[] = [];
-  let merged: RuntimeConfigFile = {};
-
-  // 先读项目级配置，再读用户级配置，确保 /auth 写入的个人凭据与 provider
-  // 选择能够覆盖仓库默认值，而不是被仓库内的默认配置反向压回去。
-  for (const candidate of [...getCandidateConfigPaths(rootDir)].reverse()) {
-    if (!fs.existsSync(candidate)) {
-      continue;
-    }
-
-    try {
-      const rawContent = fs.readFileSync(candidate, "utf8");
-      const content = rawContent.startsWith("\uFEFF") ? rawContent.slice(1) : rawContent;
-      // A config file names credentials by reference rather than by value, so a
-      // key can live in the environment instead of on disk. An unset name
-      // expands to the empty string rather than throwing: a missing secret
-      // should surface as the provider refusing the request, not as a process
-      // that cannot read its own config.
-      const interpolated = content
-        .replace(/\$\{([A-Za-z0-9_]+)\}/g, (_, name: string) => process.env[name] ?? "")
-        .replace(/\$([A-Za-z0-9_]+)/g, (_, name: string) => process.env[name] ?? "");
-      const parsed = JSON.parse(interpolated) as RuntimeConfigFile;
-      merged = {
-        ...merged,
-        ...parsed,
-        providerCredentials: {
-          ...(merged.providerCredentials ?? {}),
-          ...(parsed.providerCredentials ?? {}),
-        },
-      };
-      sources.push(candidate);
-    } catch (error) {
-      // Skipped rather than fatal, and the file contributes nothing: a bad
-      // project file must not silently inherit the user's values either, since
-      // "this file did not apply" is the honest reading. The complaint travels
-      // out on the result so the surface can say what happened.
-      diagnostics.push(
-        `Invalid config at ${candidate}: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  }
-
-  const maxTurnsFromEnv = process.env.CHEERS_MAX_TURNS;
-  const maxTurns = maxTurnsFromEnv
-    ? Number(maxTurnsFromEnv)
-    : (merged.maxTurns ?? DEFAULT_CONFIG.maxTurns);
-
-  // A provider name from a file is not typed by anything, and an unknown one
-  // would reach the provider facts, which refuse it by throwing — at the first
-  // request rather than here, and as a crash rather than a complaint. Falling
-  // back to the default with a diagnostic is the same treatment every other
-  // unusable config value gets.
-  const configuredProvider = merged.provider;
-  // Parsed before the result is built so what it dropped can travel out with the
-  // other diagnostics, which are collected into `diagnostics` and returned.
-  const denyRules = parseDenyRules(merged.denyRules);
-  diagnostics.push(...denyRules.dropped);
-  const providerKnown = configuredProvider === undefined || isRuntimeProvider(configuredProvider);
-  const provider = providerKnown ? (configuredProvider ?? DEFAULT_CONFIG.provider) : DEFAULT_CONFIG.provider;
-  if (!providerKnown) {
-    diagnostics.push(
-      `Unknown provider '${configuredProvider}' in config. Using '${provider}'. Known providers: ${RUNTIME_PROVIDERS.join(", ")}.`,
-    );
-  }
+  const layer = loadConfigLayers([
+    { path: getProjectConfigPath(rootDir), source: "project" },
+    { path: getUserConfigPath(), source: "user" },
+  ], overrides, CONFIG_FIELDS);
+  // Every accepted field has passed its registry schema before this projection.
+  const merged = layer.values as RuntimeConfigFile & RuntimeConfigOverrides;
+  const diagnostics = layer.diagnostics;
+  const sources = layer.sources;
+  const provider = merged.provider ?? DEFAULT_CONFIG.provider;
+  const maxTurns = merged.maxTurns ?? DEFAULT_CONFIG.maxTurns;
 
   return {
     provider,
@@ -542,15 +486,13 @@ export function getRuntimeConfig(
     // Left absent when unset, rather than defaulted to an empty list: an empty
     // allowlist means "offer nothing", and defaulting to it would disable every
     // tool for everyone.
-    ...(overrides?.allowedTools ?? merged.allowedTools
-      ? { allowedTools: overrides?.allowedTools ?? merged.allowedTools }
+    ...(merged.allowedTools !== undefined
+      ? { allowedTools: merged.allowedTools }
       : {}),
     disabledTools: merged.disabledTools ?? DEFAULT_CONFIG.disabledTools,
-    // Parsed here rather than at the gate, so a malformed entry is dropped once
-    // at load instead of on every tool call. What was dropped is pushed out as a
-    // diagnostic rather than discarded: a rule the user wrote and the session
-    // ignored is a rule they believe is protecting them.
-    denyRules: denyRules.rules,
+    denyRules: (merged.denyRules as DenyRule[] | undefined)?.map(rule => ({
+      tool: rule.tool.trim(), ...(rule.pattern ? { pattern: rule.pattern } : {}),
+    })) ?? DEFAULT_CONFIG.denyRules,
     hiddenToolPrefixes:
       merged.hiddenToolPrefixes ?? DEFAULT_CONFIG.hiddenToolPrefixes,
     enableMcpTools: merged.enableMcpTools ?? DEFAULT_CONFIG.enableMcpTools,
@@ -574,17 +516,13 @@ export function getRuntimeConfig(
     reserveTokens: merged.reserveTokens ?? DEFAULT_CONFIG.reserveTokens,
     modelTokenBudgets: merged.modelTokenBudgets ?? DEFAULT_CONFIG.modelTokenBudgets,
     instructionBudgetBytes:
-      overrides?.instructionBudgetBytes ??
       merged.instructionBudgetBytes ??
       DEFAULT_CONFIG.instructionBudgetBytes,
-    offline: overrides?.offline ?? merged.offline ?? DEFAULT_CONFIG.offline,
+    offline: merged.offline ?? DEFAULT_CONFIG.offline,
     cacheWarming: merged.cacheWarming ?? DEFAULT_CONFIG.cacheWarming,
-    // Deliberately read from the overrides only. Every other field falls back to
-    // the config files, but this one is an exemption from having hooks approved,
-    // and a repository that could write it would be approving its own commands
-    // from the same file that declares them. It is granted per run by a person
-    // typing a flag, or not at all.
-    allowUntrustedHooks: overrides?.allowUntrustedHooks ?? DEFAULT_CONFIG.allowUntrustedHooks,
+    // The registry accepts this exemption only from validated CLI overrides.
+    // A malformed security document also suppresses the exemption.
+    allowUntrustedHooks: merged.allowUntrustedHooks ?? DEFAULT_CONFIG.allowUntrustedHooks,
     agentMode: merged.agentMode ?? DEFAULT_CONFIG.agentMode,
     theme: merged.theme ?? DEFAULT_CONFIG.theme,
     tuiMode: merged.tuiMode ?? DEFAULT_CONFIG.tuiMode,
@@ -606,7 +544,8 @@ export function getRuntimeConfig(
 }
 
 /**
- * The two files a runtime config can come from, in the order they are merged.
+ * The user file followed by the project file, for existing path-list consumers.
+ * Loading and merging use explicit source policies rather than this list order.
  *
  * Named separately because readers and writers do not want the same one. A
  * reader takes everything; a writer has to say which scope it is changing, and
@@ -642,18 +581,15 @@ export function getUserRuntimeConfigPath(): string {
  * error stops the caller instead.
  */
 export function readRuntimeConfigFileAt(configPath: string): RuntimeConfigFile {
-  if (!fs.existsSync(configPath)) {
-    return {};
-  }
-
   try {
-    const rawContent = fs.readFileSync(configPath, "utf8");
-    const content = rawContent.startsWith("\uFEFF") ? rawContent.slice(1) : rawContent;
-    return JSON.parse(content) as RuntimeConfigFile;
+    const document = readConfigDocument(configPath) ?? {};
+    validateRawConfig(document, CONFIG_FIELDS);
+    return document as RuntimeConfigFile;
   } catch (error) {
-    throw new Error(
-      `Failed to read user runtime config at ${configPath}: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    const reason = error instanceof ConfigDocumentError ? error.code : "invalid-field";
+    // Field errors contain registry IDs only; parser and filesystem errors never escape.
+    if (error instanceof Error && error.message.startsWith("Invalid config field ")) throw error;
+    throw new Error(`Failed to read user runtime config: ${reason}.`);
   }
 }
 
@@ -704,6 +640,7 @@ export function writeRuntimeConfigFileAt(
   // for reasons that read as a broken config.
   const onDisk = readRuntimeConfigFileAt(configPath);
   const merged = { ...onDisk, ...config } as typeof onDisk;
+  validateRawConfig(merged, CONFIG_FIELDS);
   // An active-connection pointer has to name a connection in the list that
   // lands on disk, whichever side contributed each half. Keeping an id whose
   // record was just replaced leaves every reader reporting a connection that
@@ -718,7 +655,7 @@ export function writeRuntimeConfigFileAt(
   // truncated file every later read rejects. The merge above is not a lock:
   // the rename is what makes the single writer's own landing safe, and the
   // lost-update window the comment above accepts is unchanged by it.
-  writeJsonFileAtomic(configPath, merged);
+  writeTextFileAtomic(configPath, serializeConfigDocument(merged));
   return configPath;
 }
 

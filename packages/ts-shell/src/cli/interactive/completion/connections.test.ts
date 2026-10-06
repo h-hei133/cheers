@@ -22,7 +22,7 @@ it.each(["/auth use ", "/connect ", "/connect login openai ", "/connect set open
 });
 it("matches labels but accepts exact IDs without revealing credentials or mutating configuration", () => {
   fs.writeFileSync(file, JSON.stringify({ provider: "openai", activeProviderConnectionId: "first", providerConnections: [
-    { id: "first", provider: "openai", authType: "api-key", label: "First", apiKey: "synthetic-private-key", baseUrl: "https://private.invalid", accountAuth: { openai: { accountId: "private-account" } } },
+    { id: "first", provider: "openai", authType: "api-key", label: "First", apiKey: "synthetic-private-key", baseUrl: "https://private.invalid", accountAuth: { openai: { type: "openai-chatgpt-account", accessToken: "synthetic-access", refreshToken: "synthetic-refresh", expiresAt: 2_000_000_000_000, accountId: "private-account" } } },
     { id: "second full id", provider: "openai", authType: "api-key", label: "Distinct label", status: "pending", apiKey: "synthetic-other-key" },
   ] }));
   const bytes = fs.readFileSync(file); const mtime = fs.statSync(file).mtimeMs;

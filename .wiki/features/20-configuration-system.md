@@ -5,7 +5,7 @@ sources: [user-experience-report-2026-10-05, current-source-28ff98ce, isolated-p
 created: 2026-10-05
 updated: 2026-10-05
 tags: [research, configuration, schema, validation, provenance, settings, registry]
-summary: "复核配置路径、局部校验、分层差异、attentionOnIdle 断线与 reload 行为；裁定保留现有 JSON 路径、按字段限定来源与信任、成熟 JSONC parser、无秘密诊断、并发安全字段补丁及版本化生效快照。本文为 Phase 19 方案，未实施。"
+summary: "复核配置路径、局部校验、分层差异、attentionOnIdle 断线与 reload 行为；裁定保留现有 JSON 路径、按字段限定来源与信任、成熟 JSONC parser、无秘密诊断、并发安全字段补丁及版本化生效快照。Phase 19 首批字段验证与来源边界已实施，revision/JSONC/并发补丁/通知仍待完成。"
 confidence: high
 ---
 
@@ -217,3 +217,10 @@ Node `>=20.3.0`、TypeScript 和单文件分发不构成“零依赖”约束。
 | C5 | 配置接线门禁与回归用例 | 随 C1–C4 实施；检查允许来源与真实消费，保留模型/连接/安全政策语义 |
 
 本轮仅做文档复审与路径检查，没有运行构建、产品测试、真实 provider 或通知实测。后续生产代码变更应运行与 owner 对应的聚焦测试及仓库要求门禁；JSONC 成本、并发写、reload 和通知效果必须以实际结果验收。
+
+
+## 8. 2026-10-06 首批实施记录
+
+CFG-01 首批实现和证据见 [Phase 19 §8.68](phase-19-decisions.md#868-cfg-01首批配置验证来源与安全合并边界)。当前代码以 config registry 验证已知字段和已有 env/overrides，保持普通 user-first 与 TUI 叶子 project-first；项目不能提供个人连接或展开环境引用，工具限制按收紧语义合并。诊断不回显值，raw 保存保留未知顶层字段和占位符，最终落盘文本受同一读取字节上限保护。
+
+现有无版本文件保持兼容，显式 schemaVersion 1 表示相同格式，未知版本不写回；当前仍为 JSON，未实施 JSONC、重复键检测、迁移、CAS、last-good revision、来源 UI 或 attentionOnIdle 全链路。§§1–7 中的基线说明保留为研究历史，未完成项不能由首批验证层代替验收。完整范围和安全限制详见上述记录。

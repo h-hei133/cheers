@@ -198,11 +198,10 @@ describe("runtime config", () => {
     // file: two reads of the same config agree whatever it says, so that
     // comparison would pass with the fallback removed.
     expect(config.provider).toBe("openai");
-    const complaint = config.configDiagnostics.find((line) => line.includes("opemai"));
-    expect(complaint).toBeDefined();
-    // It names what does exist, so the typo can be corrected from the message.
-    expect(complaint).toContain("openai");
-    expect(complaint).toContain("anthropic");
+    expect(config.configDiagnostics).toEqual(["Config user provider: invalid-value; value ignored."]);
+    // Supplied provider text may itself be a credential; diagnostics identify
+    // the field and source without printing the rejected value.
+    expect(config.configDiagnostics.join(" ")).not.toContain("opemai");
   });
 
   it("takes a provider the config names when it is one it knows", () => {
@@ -297,8 +296,9 @@ describe("runtime config", () => {
     expect(Object.keys(config)).not.toContain("promptCacheTtl");
   });
 
-  it("expands environment references in a config file", () => {
-    const configPath = path.join(fakeRoot, ".cheers.json");
+  it("expands environment references in personal credential fields", () => {
+    const configPath = getUserRuntimeConfigPath();
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
     fs.writeFileSync(
       configPath,
       JSON.stringify({
@@ -316,8 +316,9 @@ describe("runtime config", () => {
     expect(config.providerCredentials.anthropic?.apiKey).toBe("sk-from-environment");
   });
 
-  it("loads project config and env overrides", () => {
-    const configPath = path.join(fakeRoot, ".cheers.json");
+  it("loads personal connections and env overrides", () => {
+    const configPath = getUserRuntimeConfigPath();
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
     fs.writeFileSync(
       configPath,
       JSON.stringify({
@@ -373,7 +374,7 @@ describe("runtime config", () => {
     expect(config.configSources).toContain(configPath);
   });
 
-  it("lets user runtime config override project defaults", () => {
+  it("keeps personal selection without inheriting project credentials", () => {
     fs.writeFileSync(
       path.join(fakeRoot, ".cheers.json"),
       JSON.stringify({
@@ -401,9 +402,8 @@ describe("runtime config", () => {
     expect(config.providerCredentials["openai-compatible"]?.apiKey).toBe(
       "user-compatible-key",
     );
-    expect(config.providerCredentials.openai?.apiKey).toBe(
-      "project-openai-key",
-    );
+    expect(config.providerCredentials.openai).toBeUndefined();
+    expect(config.configDiagnostics).toContain("Config project providerCredentials: source-not-allowed; value ignored.");
     expect(config.configSources).toEqual([
       path.join(fakeRoot, ".cheers.json"),
       getUserRuntimeConfigPath(),
