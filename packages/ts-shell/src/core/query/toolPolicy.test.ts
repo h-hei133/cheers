@@ -231,3 +231,21 @@ describe("a refusal nothing overrides", () => {
   });
 
 });
+
+describe('read-only classification uses declared names only', () => {
+  it.each(['constructor', '__proto__', 'toString'])('requires approval for an undeclared %s tool', name => {
+    for (const scope of ['ask', 'accept-edits'] as const) {
+      expect(evaluateToolPermissionScope(name, {}, scope, '/workspace')).toMatchObject({
+        operation: 'execute', requiresEscalation: true,
+      });
+    }
+  });
+
+  it.each(['constructor', '__proto__', 'toString'])('requires approval for an undeclared browser action %s', action => {
+    for (const scope of ['ask', 'accept-edits'] as const) {
+      expect(evaluateToolPermissionScope('browser', { action }, scope, '/workspace')).toMatchObject({
+        operation: 'execute', requiresEscalation: true,
+      });
+    }
+  });
+});

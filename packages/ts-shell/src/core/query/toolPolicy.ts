@@ -91,7 +91,7 @@ export function evaluateToolPermissionScope(
   let target = "";
   let isReadOnly = false;
 
-  if (READ_ONLY_TOOLS[toolName]) {
+  if (Object.hasOwn(READ_ONLY_TOOLS, toolName)) {
     operation = "read";
     target = String(safeArgs.path ?? safeArgs.filePath ?? safeArgs.pattern ?? safeArgs.query ?? safeArgs.url ?? toolName);
     isReadOnly = true;
@@ -116,7 +116,7 @@ export function evaluateToolPermissionScope(
   } else if (toolName === "browser") {
     const action = typeof safeArgs.action === "string" ? safeArgs.action.toLowerCase().trim() : "";
     target = typeof safeArgs.url === "string" ? safeArgs.url : action || "browser";
-    if (READ_ONLY_BROWSER_ACTIONS[action]) {
+    if (Object.hasOwn(READ_ONLY_BROWSER_ACTIONS, action)) {
       operation = "read";
       isReadOnly = true;
     } else {

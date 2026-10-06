@@ -1023,3 +1023,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 最终编译产物在 regular/fullscreen 真实 CLI 中通过本地合成 HTTP 工具调用，glob 的 ls-files 与目录 read 的 check-ignore 均在 Ctrl-C 后约 55–65 ms 回收子进程，取消后下一次请求成功，每模式 3 次本地请求、exit 0，工作区标记不变。首次探针在回复文字出现后立即退出未在期限内结束；增加回合结束后的等待后，两模式通过，移除诊断计时器探针后也通过，未据此修改产品退出代码。该证据不代表外部真实提供方或非 Linux 实机验收。
 - 原生配置读取、创建竞态和非 Linux 实际对象保证仍属 SAFE-02 未完成范围；同步技能发现的阻塞与 CMD-03/04 剩余复核也继续保留。`779948d6` 的 CI/Architecture Watch 均已成功；文件名修复 `c62e574b` 已推送、Architecture Watch 成功，CI `37412730106` 最近查询仍在执行，本批远端结果另按新提交核对。
 - 修正后独立代码复审 APPROVE、架构复审 CLEAR，前述三项 findings 均关闭。五项静态门禁通过；NormProof 阻断义务满足，四个既有函数数量 advisory 与 docs drift 的 120 个非阻断来源路径 advisory 保留。
+
+### 8.60 SAFE-02：实际枚举目标拒绝与工具权限名称校验
+
+- glob 的实际枚举目标由 turn 适配器以显式 path 传入共享文件策略；补上 glob 的路径归一化，使含空格、Tab 的绝对文件名也能匹配相对拒绝前缀。pattern 继续按模式处理，不冒充文件路径。此前手写的文件遍历拒绝回调未覆盖这条生产接线，新回归通过真实注册表、hooks 和适配器验证原生与回退枚举、三个 permission scope。
+- 工具和 browser 动作的只读表按自有属性判定，防止 constructor、__proto__ 等继承名称被当作只读而绕过 ask/accept-edits 审批。注册为 constructor 的扩展通过真实 turn hook 仍需审批，被拒绝后不执行。定向对照参考工具目录的显式名称集合与动作分派决定，保留本项目共享 evaluator 和既有计划模式语义，不新增策略系统。
+- 初次回归 9 项失败/36 项通过；修复后 Linux、Node 20.3 隔离环境 8 文件/143 项及 build:ts 通过。glob 目标归一化、工具名成员判断、browser 动作成员判断三组反转均产生断言失败，源码逐字节恢复后 45 项通过。独立代码审查 APPROVE、架构 CLEAR，核对恢复后的源文件哈希，无待修 findings。
+- regular/fullscreen 实际 CLI 使用本地合成 HTTP，各两次请求；拒绝目录中的普通、空格与 Tab 文件名均未出现在 provider 的工具消息中，工具正文精确为 public.txt，原文件字节不变，最终两模式 exit 0。
+- PTY 夹具一度报告 fullscreen 未退出。退出链追踪未发现挂起；10 轮插桩和 15 轮无插桩的双模式诊断均退出成功。对夹具独立复现了两次 poll 之间进程结束时仍报失败的竞态（报告 missing CLI exit，但 exit=0）；复查退出后谓词即可消除该反例，最终未插桩双模式再通过。早先失败未记录退出码，不能据此确认其历史根因，也不能把增加等待称为产品退出修复；本批未改产品退出链。
+- 四项代码静态门禁、diff 检查通过；NormProof 阻断义务满足，仍保留四个既有函数数量 advisory。`c62e574b` 的 CI/Architecture Watch 已成功；`3803c83b` Architecture Watch 成功，CI `37413770269` 最近查询仍在执行。本批远端结果另按新提交核对。
+- SAFE-02 继续开放：原生 Git/搜索隐式配置读取、创建副作用竞态和跨平台实际对象保证未由本批解决；同步发现、CMD-03/04 剩余复核及 Phase 19 其他任务继续。

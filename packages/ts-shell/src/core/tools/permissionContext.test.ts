@@ -17,11 +17,12 @@ function workspace(): string {
 }
 
 describe('file target policy', () => {
-  it.each(['read', 'write', 'edit', 'grep', 'lsp'])('denies the canonical target of %s across permission modes', tool => {
+  it.each(['read', 'write', 'edit', 'glob', 'grep', 'lsp'])('denies the canonical target of %s across permission modes', tool => {
     const root = workspace()
     const key = tool === 'lsp' ? 'filePath' : 'path'
     for (const scope of ['ask', 'accept-edits', 'allow-all'] as const) {
-      for (const target of ['private/data.txt', './private/data.txt', 'alias/data.txt', path.join(root, 'alias/data.txt')]) {
+      for (const target of ['private/data.txt', './private/data.txt', 'alias/data.txt', path.join(root, 'alias/data.txt'),
+        path.join(root, 'private/file name.txt'), path.join(root, 'private/tab\tname.txt')]) {
         const decision = evaluateToolPermissionScope(tool, { [key]: target }, scope, root, [{ tool, pattern: 'private/' }])
         expect(decision.denied, `${scope}: ${target}`).toBe(true)
         expect(decision.requiresEscalation).toBe(false)
