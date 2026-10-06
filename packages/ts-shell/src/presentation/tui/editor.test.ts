@@ -16,10 +16,39 @@ describe("text entry", () => {
     expect(shown(editor, 20)).toEqual(["hello|"]);
   });
 
-  it("expands tabs so the caret column stays truthful", () => {
+  it("retains source tabs and expands only their rendered cells", () => {
     const editor = new Editor();
     editor.insert("a\tb");
-    expect(editor.getText()).toBe("a  b");
+    expect(editor.getText()).toBe("a\tb");
+    expect(shown(editor, 20)).toEqual(["a  b|"]);
+  });
+
+  it("moves and deletes across one tab source character and restores it on undo", () => {
+    const editor = new Editor();
+    editor.insert("a\tb");
+    editor.move("left");
+    expect(shown(editor, 20)).toEqual(["a  |b"]);
+    expect(editor.snapshot().cursor).toBe(2);
+    editor.backspace();
+    expect(editor.getText()).toBe("ab");
+    expect(shown(editor, 20)).toEqual(["a|b"]);
+    editor.undo();
+    expect(editor.getText()).toBe("a\tb");
+    expect(shown(editor, 20)).toEqual(["a  |b"]);
+  });
+
+  it("uses tab display cells for vertical motion without changing source offsets", () => {
+    const editor = new Editor();
+    editor.insert("a\t界\nxy\nb\tz");
+    shown(editor, 20);
+    editor.move("doc-start"); editor.move("right"); editor.move("right");
+    editor.move("down"); editor.move("down");
+    expect(editor.snapshot().cursor).toBe(9);
+    expect(shown(editor, 20)).toEqual(["a  界", "xy", "b  |z"]);
+    expect(editor.getText()).toBe("a\t界\nxy\nb\tz");
+    editor.setDraftText("a\tbc");
+    editor.move("doc-start"); editor.move("right"); editor.move("right");
+    expect(shown(editor, 4)).toEqual(["a  ", "|bc"]);
   });
 
   it("shows a placeholder for an empty prompt", () => {
@@ -149,6 +178,31 @@ describe("multi-line prompts", () => {
 });
 
 describe("soft wrapping", () => {
+  it("keeps a tab together at a wrap boundary and navigates onto that row", () => {
+    const editor = new Editor();
+    editor.insert("abc\tde");
+    expect(shown(editor, 4)).toEqual(["abc", "  de|"]);
+    editor.move("doc-start");
+    expect(editor.move("down")).toBe(true);
+    expect(editor.snapshot().cursor).toBe(3);
+    expect(shown(editor, 4)).toEqual(["abc", "|  de"]);
+    expect(editor.move("up")).toBe(true);
+    expect(editor.snapshot().cursor).toBe(0);
+    expect(editor.getText()).toBe("abc\tde");
+  });
+
+  it("treats a tab wider than the viewport as one row with one source character", () => {
+    const editor = new Editor();
+    editor.insert("\tX");
+    expect(shown(editor, 1)).toEqual(["  ", "X|"]);
+    editor.move("doc-start");
+    expect(editor.move("down")).toBe(true);
+    expect(editor.snapshot().cursor).toBe(1);
+    expect(shown(editor, 1)).toEqual(["  ", "|X"]);
+    expect(editor.move("up")).toBe(true);
+    expect(editor.snapshot().cursor).toBe(0);
+  });
+
   it("moves through visual rows in both directions", () => {
     const editor = new Editor();
     editor.insert("abcdefghij");

@@ -1,4 +1,6 @@
 import { projectSessionModel } from "../../session/model/projection.js";
+import { textSyntax, parseTextArgs } from "./syntax/text.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import { resolveProviderCredential } from "../shell/providerCredentials.js";
@@ -28,17 +30,20 @@ const SIDE_QUESTION_SYSTEM_PROMPT =
  * credential, and transport handling done in the provider layer never applied to
  * it.
  */
+export const btwSyntax = textSyntax("btw", "question", true);
+
 export async function runBtwCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const question = args.join(" ").trim();
-  if (!question) {
+  const parsed = parseTextArgs(btwSyntax, args, context.rawCommandArgs);
+  if (!parsed.ok) {
     return {
       kind: "local",
-      output: "Usage: `/btw <question>`\nExample: `/btw what is the difference between Array.slice and splice in JS?`\n\nSide questions provide instant answers without adding clutter to your active conversation history.",
+      output: `${parsed.reason}\n${syntaxHelp(btwSyntax)}\nExample: /btw what is the difference between Array.slice and splice in JS?\n\nSide questions provide answers outside your active conversation history.`,
     };
   }
+  const question = parsed.text;
 
   const runtimeConfig = projectSessionModel(getRuntimeConfig(context.cwd), context.sessionId);
   const resolution = resolveProviderCredential({ runtimeConfig });

@@ -2,6 +2,14 @@ import { describe, expect, it } from "vitest";
 import { buildSystemPrompt, toChatMessages } from "./prompt.js";
 
 describe("toChatMessages", () => {
+  it("preserves source text while excluding an empty user message", () => {
+    const content = "  keep 'a  b' in C:\\tmp\\file\n\t--literal\\  \n";
+    expect(toChatMessages([
+      { role: "user", content: " \t\n " },
+      { role: "user", content },
+    ])).toEqual([{ role: "user", content }]);
+  });
+
   it("synthesizes cancelled tool messages when assistant tool calls were interrupted", () => {
     const converted = toChatMessages([
       { role: "user", content: "run it" },

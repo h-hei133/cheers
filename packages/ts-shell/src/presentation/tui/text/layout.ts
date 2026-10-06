@@ -1,4 +1,4 @@
-import { lineCells, sliceWithWidth, visibleWidth } from "./measure.js";
+import { lineCells, sliceWithWidth, visibleWidth, type LineCell } from "./measure.js";
 
 /**
  * Width-bounded line shaping: truncation, padding, and soft wrapping.
@@ -62,28 +62,37 @@ export function wrapToWidth(line: string, cells: number): string[] {
   if (cells <= 0) return [""];
   const total = visibleWidth(line);
   if (total <= cells) return [line];
+  return wrapSegments(lineCells(line), cells)
+    .map(segment => sliceWithWidth(line, segment.start, segment.width).text);
+}
 
-  const rows: string[] = [];
+/** Shared wrapping boundaries, retaining each source cell as an indivisible unit. */
+export function wrapSegments(source: Iterable<Pick<LineCell, "cluster" | "width">>, cells: number): {
+  readonly start: number;
+  readonly width: number;
+}[] {
+  if (cells <= 0) return [{ start: 0, width: 0 }];
+  const rows: { start: number; width: number }[] = [];
   let rowStart = 0;
   let column = 0;
   let lastSpaceEnd = -1;
 
-  for (const cell of lineCells(line)) {
+  for (const cell of source) {
     if (cell.cluster === "") continue;
     const end = column + cell.width;
-    if (end > rowStart + cells) {
+    while (end > rowStart + cells) {
       let cut = lastSpaceEnd > rowStart ? lastSpaceEnd : column;
       if (cut <= rowStart) cut = end;
-      rows.push(sliceWithWidth(line, rowStart, cut - rowStart).text);
+      rows.push({ start: rowStart, width: cut - rowStart });
       rowStart = cut;
       lastSpaceEnd = -1;
     }
-    if (cell.cluster === " ") lastSpaceEnd = end;
+    if (cell.cluster === " " || cell.cluster === "\t") lastSpaceEnd = end;
     column = end;
   }
 
   if (column > rowStart || rows.length === 0) {
-    rows.push(sliceWithWidth(line, rowStart, column - rowStart).text);
+    rows.push({ start: rowStart, width: column - rowStart });
   }
   return rows;
 }

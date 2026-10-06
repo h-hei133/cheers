@@ -26,6 +26,7 @@ export interface SlashCommandSpec {
     | "diagnostics";
   readonly summary: string;
   readonly argumentHint?: string;
+  readonly argumentMode?: CommandDefinition["argumentMode"];
   readonly getArgumentCompletions?: (
     argumentPrefix: string,
   ) => readonly SlashCommandCompletion[] | null;
@@ -47,6 +48,7 @@ function project(command: CommandDefinition): SlashCommandSpec {
     group: command.group,
     summary: command.summary,
     ...(command.argumentHint ? { argumentHint: command.argumentHint } : {}),
+    ...(command.argumentMode ? { argumentMode: command.argumentMode } : {}),
     ...(command.getArgumentCompletions
       ? { getArgumentCompletions: command.getArgumentCompletions }
       : {}),

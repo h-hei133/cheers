@@ -1,5 +1,9 @@
 import { exec } from "node:child_process";
+import { textSyntax, parseTextArgs } from "./syntax/text.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
+
+export const copySyntax = textSyntax("copy", "text");
 
 let lastCapturedResponseText = "";
 
@@ -98,10 +102,11 @@ async function pipeTo(candidate: ClipboardCommand, text: string): Promise<boolea
  */
 export async function runCopyCommand(
   args: string[],
-  _context: CommandContext,
+  context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const custom = args.join(" ").trim();
-  const text = custom || lastCapturedResponseText;
+  const parsed = parseTextArgs(copySyntax, args, context.rawCommandArgs);
+  if (!parsed.ok) return { kind: "local", output: `Invalid /copy arguments: ${parsed.reason}\n${syntaxHelp(copySyntax)}` };
+  const text = parsed.text || lastCapturedResponseText;
   if (!text) {
     return { kind: "local", output: "Nothing to copy: no recent response and no text given." };
   }

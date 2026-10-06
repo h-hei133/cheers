@@ -3,6 +3,7 @@ import { runBtwCommand } from "./btwCommandRuntime.js";
 import { loadCatalog } from "../models/catalogStore.js";
 import { providerFetchForEndpoint } from "../../provider/request/fetch.js";
 import { resolveProviderCredential } from "../shell/providerCredentials.js";
+import { routeSlashCommand } from "./slashRouter.js";
 
 vi.mock("../../config/runtimeConfig.js", () => ({ getRuntimeConfig: () => ({}) }));
 vi.mock("../shell/providerCredentials.js", () => ({ resolveProviderCredential: vi.fn(() => ({
@@ -71,5 +72,24 @@ it("keeps the missing-credential explanation and sends nothing", async () => {
   const result = await runBtwCommand(["question"], { cwd: "/synthetic" });
   expect(result.output).toContain("No provider credential is configured, so nothing was sent.");
   expect(result.output).not.toContain("Failure:");
+  expect(providerFetchForEndpoint).not.toHaveBeenCalled();
+});
+
+it("sends the literal side question without decoding quotes, whitespace or escapes", async () => {
+  const requests: Record<string, unknown>[] = [];
+  vi.mocked(providerFetchForEndpoint).mockReturnValue((async (_url, init) => {
+    requests.push(JSON.parse(String(init?.body)));
+    return Response.json({ choices: [{ message: { content: "answer" }, finish_reason: "stop" }] });
+  }) as typeof fetch);
+  const question = "  why 'a  b' in C:\\tmp\\file?\n\t--show-literal\\  ";
+  await routeSlashCommand("/side " + question, { cwd: "/synthetic", skillOptions: { noSkills: true } });
+  expect(requests).toHaveLength(1);
+  expect(requests[0]?.messages).toEqual(expect.arrayContaining([{ role: "user", content: question }]));
+});
+
+it.each(["", "  \t\n"])("rejects an empty side question before resolving credentials: %j", async (rawCommandArgs) => {
+  const result = await runBtwCommand([], { cwd: "/synthetic", rawCommandArgs });
+  expect(result.output).toContain("Usage: /btw <question>");
+  expect(resolveProviderCredential).not.toHaveBeenCalled();
   expect(providerFetchForEndpoint).not.toHaveBeenCalled();
 });

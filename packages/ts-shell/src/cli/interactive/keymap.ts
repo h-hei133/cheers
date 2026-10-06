@@ -2,6 +2,7 @@ import type { CursorMove, KillTarget } from "../../presentation/tui/editor.js";
 import type { ParsedKeyEvent } from "../../presentation/tui/input/keys.js";
 import type { InteractiveView, ViewActions } from "../../presentation/tui/surface/contract.js";
 import { KEY_ACTIONS, type Keybindings } from "./keybindings.js";
+import { getSlashInvocation } from "../../entrypoints/slashCommandRegistry.js";
 
 /**
  * Key routing for the interactive view.
@@ -401,14 +402,18 @@ function consumeSuggestionKey(event: ParsedKeyEvent, context: KeymapContext): bo
 
 function submitDraft(context: KeymapContext, disposition?: "steer" | "followUp"): void {
   const { view, actions } = context;
-  const draft = view.editor.getText().trim();
-  if (!draft) {
+  const source = view.editor.getText();
+  if (!source.trim()) {
     actions.redraw();
     return;
   }
   // History keeps the draft as it looked, so recalling it brings back a short line
   // rather than the whole pasted file. What is sent is the expansion.
-  const submission = view.pastes.expand(draft).trim();
+  const expanded = view.pastes.expand(source).trimStart();
+  const command = /^\/\s*(\S+)/.exec(expanded)?.[1];
+  const literal = command && getSlashInvocation(command)?.argumentMode === "raw";
+  const draft = literal ? source.trimStart() : source.trim();
+  const submission = literal ? expanded : expanded.trim();
   // Images are collected beside the text rather than from it: the placeholder
   // stands for an attachment, and expanding the draft turns it back into the
   // words it stood for, which for an image is nothing.

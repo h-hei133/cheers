@@ -58,6 +58,17 @@ describe("soft wrapping", () => {
     expect(wrapToWidth("你好世界你好", 5)).toEqual(["你好", "世界", "你好"]);
   });
 
+  it("checks the continuation width again after choosing a word boundary", () => {
+    expect(wrapToWidth(" ab界", 3)).toEqual([" ", "ab", "界"]);
+    expect(wrapToWidth("界x", 1)).toEqual(["界", "x"]);
+  });
+
+  it("carries formatting into continuation rows without changing their width", () => {
+    expect(wrapToWidth("\x1b[31mabcdef\x1b[0m", 3)).toEqual([
+      "\x1b[31mabc", "\x1b[31mdef",
+    ]);
+  });
+
   it("keeps every row inside the budget", () => {
     for (const row of wrapToWidth("the quick brown fox jumped over it", 9)) {
       expect(visibleWidth(row)).toBeLessThanOrEqual(9);

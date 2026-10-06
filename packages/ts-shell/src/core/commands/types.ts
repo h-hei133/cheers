@@ -171,6 +171,7 @@ export interface NamedCommandInvocation {
   readonly name: string
   readonly summary: string
   readonly argumentHint?: string
+  readonly argumentMode?: 'tokens' | 'raw'
   readonly getArgumentCompletions?: (argumentPrefix: string) => readonly CommandArgumentCompletion[] | null
 }
 
@@ -190,7 +191,7 @@ export interface CommandDefinition {
   readonly group: 'session' | 'context' | 'workspace' | 'workflow' | 'diagnostics'
   /** Argument grammar shown next to the summary, e.g. `use <provider/model>`. */
   readonly argumentHint?: string
-  /** Raw syntax belongs to the handler, such as a command accepting shell source. */
+  /** Raw syntax belongs to the handler, such as shell source or literal prose. */
   readonly argumentMode?: 'tokens' | 'raw'
   /**
    * Argument candidates once the command name is typed in full and a space

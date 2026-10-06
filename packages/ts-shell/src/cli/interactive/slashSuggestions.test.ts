@@ -1,8 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { slashSuggestions } from "./slashSuggestions.js";
+import { slashArgumentHint, slashSuggestions } from "./slashSuggestions.js";
 import { listSlashInvocations, getSlashCommand, registerSlashCommand } from "../../entrypoints/slashCommandRegistry.js";
 
 describe("command completions", () => {
+  it.each([
+    ["/continue ", "[sess_<id>] [prompt]"], ["/c ", "[sess_<id>] [prompt]"],
+    ["/review ", "[focus]"], ["/cp ", "[text]"], ["/commit ", "[guidance]"],
+    ["/ask ", "<question>"], ["/research ", "<topic>"], ["/recall ", "<query>"],
+  ])("shows usage without selectable placeholders for %s", (text, hint) => {
+    expect(slashSuggestions(text)).toBeNull();
+    expect(slashArgumentHint({ text, cursor: text.length, revision: 1 })).toBe(`Usage: ${text}${hint}`);
+  });
+
+  it.each(["/help ", "/qui ", "plain text", "/usr/local/bin "])("does not invent argument usage for %s", text => {
+    expect(slashArgumentHint({ text, cursor: text.length, revision: 1 })).toBeUndefined();
+  });
+
   it("offers nothing for ordinary prose", () => {
     expect(slashSuggestions("how do I build this")).toBeNull();
   });

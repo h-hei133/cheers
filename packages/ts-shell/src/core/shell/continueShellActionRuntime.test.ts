@@ -114,7 +114,7 @@ describe("runResumeLikeShellAction", () => {
           kind: "shell-action",
           action: "continue-session",
           sessionId: session.id,
-          continuationPrompt: " follow up ",
+          continuationPrompt: "  follow 'exact  text'\n\tC:\\tmp\\file  ",
         },
         source: "interactive",
         printMode: false,
@@ -136,7 +136,7 @@ describe("runResumeLikeShellAction", () => {
       expect(switched).toEqual([session.id]);
       expect(turns).toHaveLength(1);
       expect(turns[0]).toMatchObject({
-        effectivePrompt: "follow up",
+        effectivePrompt: "  follow 'exact  text'\n\tC:\\tmp\\file  ",
         turnNumber: 3,
         turnOrigin: "continued",
       });

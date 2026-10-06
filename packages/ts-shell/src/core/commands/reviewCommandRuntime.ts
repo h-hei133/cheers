@@ -1,14 +1,20 @@
 import { execFile } from "node:child_process";
+import { textSyntax, parseTextArgs } from "./syntax/text.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import type { CommandContext, CommandExecutionResult } from "./types.js";
 
 const DIFF_LIMIT = 24_000;
 const STATUS_LIMIT = 12_000;
 
 /** Collect review input; the existing prompt route owns the model call. */
+export const reviewSyntax = textSyntax("review", "focus");
+
 export async function runReviewCommand(
   args: string[],
   context: CommandContext,
 ): Promise<CommandExecutionResult> {
+  const parsed = parseTextArgs(reviewSyntax, args, context.rawCommandArgs);
+  if (!parsed.ok) return { kind: "local", output: `Invalid /review arguments: ${parsed.reason}\n${syntaxHelp(reviewSyntax)}` };
   const cwd = context.cwd || process.cwd();
   const status = await readGit(["status", "--short", "--untracked-files=all"], cwd);
   if (!status.ok) return { kind: "local", output: "Cannot read Git status. Review was not started; check the repository and Git availability." };
@@ -23,7 +29,7 @@ export async function runReviewCommand(
   if (!staged.ok || !unstaged.ok) return {
     kind: "local", output: "Cannot read the complete Git diff. Review was not started; check Git errors or output limits.",
   };
-  const focus = args.join(" ").trim();
+  const focus = parsed.text;
   return {
     kind: "prompt",
     notice: "Collected uncommitted changes. Starting model review.",

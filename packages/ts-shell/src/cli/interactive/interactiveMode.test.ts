@@ -54,6 +54,30 @@ function build(overrides: { observeEvents?: () => () => void; exit?: (code?: num
 }
 
 describe("session wiring", () => {
+  it("keeps prose usage informational and submits the literal body once", () => {
+    const { mode, terminal } = build();
+    const host = mode as unknown as { view: InteractiveView; onSubmit(text: string): void };
+    const submit = vi.spyOn(host, "onSubmit").mockImplementation(() => {});
+    mode.start();
+    try {
+      terminal.input("/cp ");
+      expect(host.view.suggestionsOpen).toBe(false);
+      expect(stripAnsi(host.view.renderFrame({ columns: 100, rows: 24 }).rows.join("\n"))).toContain("Usage: /cp [text]");
+      terminal.input("\t");
+      expect(submit).not.toHaveBeenCalled();
+      expect(host.view.editor.getText()).toBe("/cp ");
+      const body = "  a  'quote'\\path\n\t中文  ";
+      terminal.input(`\x1b[200~${body}\x1b[201~`);
+      terminal.input("\r");
+      expect(submit).toHaveBeenCalledOnce();
+      expect(submit.mock.calls[0]?.[0]).toBe("/cp " + body);
+      terminal.input("/btw ");
+      const next = stripAnsi(host.view.renderFrame({ columns: 100, rows: 24 }).rows.join("\n"));
+      expect(next).toContain("Usage: /btw <question>");
+      expect(next).not.toContain("Usage: /cp");
+    } finally { mode.stop(); }
+  });
+
   it("publishes a loaded theme menu without another key and accepts without submission", async () => {
     const { mode, terminal } = build();
     const host = mode as unknown as { view: InteractiveView; onSubmit(text: string): void };

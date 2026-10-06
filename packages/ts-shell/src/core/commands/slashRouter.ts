@@ -14,7 +14,7 @@ export async function routeSlashCommand(
     return null;
   }
 
-  const invocation = /^\/\s*(\S+)(?:\s+([\s\S]*))?$/.exec(input);
+  const invocation = /^\/\s*(\S+)(?:(?:\r\n|\s)([\s\S]*))?$/.exec(input);
   const rawName = invocation?.[1];
   const rawCommandArgs = invocation?.[2] ?? "";
   if (!rawName) {
@@ -89,7 +89,7 @@ export async function routeSlashCommand(
     }
     let args: string[];
     try {
-      args = command.argumentMode === "raw"
+      args = resolved!.argumentMode === "raw"
         ? (rawCommandArgs ? [rawCommandArgs] : [])
         : tokenizeCommandArgs(rawCommandArgs);
     } catch (error) {

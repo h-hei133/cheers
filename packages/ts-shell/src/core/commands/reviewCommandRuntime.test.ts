@@ -27,6 +27,14 @@ it("reviews staged changes in a repository without a first commit", async () => 
   expect(result).not.toHaveProperty("output");
 });
 
+it("preserves quoted and multiline review focus through the alias router", async () => {
+  await fs.writeFile(path.join(root, "new.txt"), "untracked content");
+  const focus = "  don't rewrite 'a  b' or C:\\tmp\\file\n\t--keep-this  ";
+  const result = await routeSlashCommand("/audit " + focus, { cwd: root });
+  expect(result).toMatchObject({ kind: "prompt", prompt: expect.stringContaining("User focus: " + focus + "\n") });
+  expect(git("status", "--short")).toBe("?? new.txt\n");
+});
+
 it("retains staged and unstaged changes even when they cancel in diff HEAD", async () => {
   const file = path.join(root, "tracked.txt");
   await fs.writeFile(file, "original\n");

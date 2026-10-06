@@ -45,7 +45,7 @@ import { opensPicker, pickerFor, type PickerHost } from "./picker/registry.js";
 import { readStatusItems, writeStatusItems } from "./tuiSettings.js";
 import type { ImageContent } from "../../model-adapters/multimodal.js";
 import { readStatusFacts, readWelcomeState } from "./sessionFacts.js";
-import { couldBeCommand, slashSuggestions } from "./slashSuggestions.js";
+import { couldBeCommand, slashArgumentHint, slashSuggestions } from "./slashSuggestions.js";
 import { couldBeFileReference, fileSuggestions } from "./fileSuggestions.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
 import { TurnSink } from "./turnSink.js";
@@ -550,6 +550,7 @@ export class InteractiveMode {
       fileSuggestions(draft, this.options.runtimeContext.projectRoot, snapshot) ??
       slashSuggestions(draft, snapshot);
     if (!matches) {
+      this.completionStatus = slashArgumentHint(snapshot);
       this.view.setSuggesting(false);
       return;
     }

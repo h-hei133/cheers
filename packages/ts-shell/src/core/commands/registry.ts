@@ -18,6 +18,7 @@ import { mcpSyntax } from "./mcp/syntax.js";
 import { permissionsSyntax } from "./permissions/syntax.js";
 import { viewSyntax } from "./view/syntax.js";
 import { resumeSyntax, forkSyntax, treeSyntax, entriesSyntax, navigationCompletions } from "./navigation/syntax.js";
+import { continueSyntax } from "./navigation/continuation.js";
 import { shellSyntax } from "./shell/syntax.js";
 import { fastSyntax } from "./fast/syntax.js";
 import { statuslineSyntax, statuslineCompletions } from "./statusline/syntax.js";
@@ -43,7 +44,7 @@ import { runSidebarLocalCommand } from "./sidebarCommandRuntime.js";
 import { runWarmupLocalCommand } from "./warmupCommandRuntime.js";
 import { runExitCommand } from "./exitCommandRuntime.js";
 import { runClearCommand } from "./clearCommandRuntime.js";
-import { runReviewCommand } from "./reviewCommandRuntime.js";
+import { runReviewCommand, reviewSyntax } from "./reviewCommandRuntime.js";
 import { runReloadCommand } from "./reloadCommandRuntime.js";
 import { runThemeCommand, themeSyntax } from "./themeCommandRuntime.js";
 import { runSettingsCommand } from "./settingsCommandRuntime.js";
@@ -55,7 +56,7 @@ import { runUndoCommand } from "./undoCommandRuntime.js";
 import { runExportCommand } from "./exportCommandRuntime.js";
 import { runEntriesCommand } from "./entriesCommandRuntime.js";
 import { runTreeCommand } from "./treeCommandRuntime.js";
-import { runCopyCommand } from "./copyCommandRuntime.js";
+import { runCopyCommand, copySyntax } from "./copyCommandRuntime.js";
 import { runHotkeyCommand } from "./hotkeyCommandRuntime.js";
 import { runRetryCommand } from "./retryCommandRuntime.js";
 import { runSkillCommand, skillSyntax } from "./skillCommandRuntime.js";
@@ -64,14 +65,14 @@ import { runLoopCommand } from "./loopCommandRuntime.js";
 import { runTodoCommand } from "./todoCommandRuntime.js";
 import { runFastCommand } from "./fastCommandRuntime.js";
 import { runContextCommand } from "./contextCommandRuntime.js";
-import { runBtwCommand } from "./btwCommandRuntime.js";
+import { runBtwCommand, btwSyntax } from "./btwCommandRuntime.js";
 import { runMarketplaceCommand } from "./marketplaceCommandRuntime.js";
 import { runPluginCommand } from "./pluginCommandRuntime.js";
 import { runMemoryCommand } from "./memoryCommandRuntime.js";
 import { runWorkflowCommand } from "./workflowCommandRuntime.js";
-import { runDeepResearchCommand } from "./deepResearchCommandRuntime.js";
+import { runDeepResearchCommand, webResearchSyntax } from "./deepResearchCommandRuntime.js";
 import { runBrainstormCommand } from "./brainstormCommandRuntime.js";
-import { runCommitCommand } from "./commitCommandRuntime.js";
+import { runCommitCommand, commitSyntax } from "./commitCommandRuntime.js";
 import { runThinkingCommand } from "./thinkingCommandRuntime.js";
 import { runToolsCommand, toolsSyntax } from "./toolsCommandRuntime.js";
 import { runShellCommand } from "./shellCommandRuntime.js";
@@ -258,6 +259,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "pick up this session's stopped work, optionally with a follow-up",
       group: "session",
+      argumentMode: "raw",
+      argumentHint: syntaxHint(continueSyntax),
       execute: (args, context) => runContinuePromptCommand(args, context),
     },
     {
@@ -373,7 +376,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "review working tree code changes and diffs",
       group: "workflow",
-      argumentHint: "[focus]",
+      argumentMode: "raw",
+      argumentHint: syntaxHint(reviewSyntax),
       execute: (args, context) => runReviewCommand(args, context),
     },
     {
@@ -542,7 +546,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "copy last assistant response to clipboard",
       group: "session",
-      argumentHint: "[text]",
+      argumentMode: "raw",
+      argumentHint: syntaxHint(copySyntax),
       execute: (args, context) => runCopyCommand(args, context),
     },
     {
@@ -623,7 +628,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "ask a quick side question out of band without history pollution",
       group: "session",
-      argumentHint: "<question>",
+      argumentMode: "raw",
+      argumentHint: syntaxHint(btwSyntax),
       execute: (args, context) => runBtwCommand(args, context),
     },
     {
@@ -691,7 +697,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "collect public web source excerpts with fixed search queries",
       group: "workflow",
-      argumentHint: "<topic>",
+      argumentMode: "raw",
+      argumentHint: syntaxHint(webResearchSyntax),
       execute: (args, context) => runDeepResearchCommand(args, context),
     },
     {
@@ -703,7 +710,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "draft a commit message from the staged diff",
       group: "workflow",
-      argumentHint: "[guidance]",
+      argumentMode: "raw",
+      argumentHint: syntaxHint(commitSyntax),
       execute: (args, context) => runCommitCommand(args, context),
     },
     {

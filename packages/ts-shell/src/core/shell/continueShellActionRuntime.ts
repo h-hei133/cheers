@@ -51,12 +51,12 @@ export async function runResumeLikeShellAction(options: {
 }): Promise<{ turnNumber: number }> {
   const continuationPrompt =
     options.slashResult.action === "continue-session"
-      ? options.slashResult.continuationPrompt?.trim()
+      ? options.slashResult.continuationPrompt
       : undefined;
   const targetSessionId =
     options.slashResult.sessionId ?? options.runtimeContext.session.id;
 
-  if (continuationPrompt) {
+  if (continuationPrompt?.trim()) {
     const targetSummary = (() => {
       try {
         return options.sessionManager.describeSessionReentry(targetSessionId);
@@ -143,7 +143,7 @@ export async function runResumeLikeShellAction(options: {
     return { turnNumber: options.turnNumber ?? 0 };
   }
 
-  if (continuationPrompt) {
+  if (continuationPrompt?.trim()) {
     const nextTurn = (options.turnNumber ?? 0) + 1;
     await options.executeResolvedPromptTurn({
       effectivePrompt: continuationPrompt,

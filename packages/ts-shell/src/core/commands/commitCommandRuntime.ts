@@ -1,4 +1,6 @@
 import { exec } from "node:child_process";
+import { textSyntax, parseTextArgs } from "./syntax/text.js";
+import { syntaxHelp } from "./syntax/projection.js";
 import type { CommandContext, CommandExecutionResult } from "./types.js";
 
 /**
@@ -18,10 +20,14 @@ import type { CommandContext, CommandExecutionResult } from "./types.js";
 const DIFF_LIMIT = 24_000;
 const GIT_TIMEOUT_MS = 30_000;
 
+export const commitSyntax = textSyntax("commit", "guidance");
+
 export async function runCommitCommand(
   args: string[],
   context: CommandContext,
 ): Promise<CommandExecutionResult> {
+  const parsed = parseTextArgs(commitSyntax, args, context.rawCommandArgs);
+  if (!parsed.ok) return { kind: "local", output: `Invalid /commit arguments: ${parsed.reason}\n${syntaxHelp(commitSyntax)}` };
   const cwd = context.cwd || process.cwd();
   const inside = await git("rev-parse --is-inside-work-tree", cwd);
   if (!inside.ok) {
@@ -38,7 +44,7 @@ export async function runCommitCommand(
     return { kind: "local", output: nothingStaged(status.text) };
   }
 
-  const guidance = args.join(" ").trim();
+  const guidance = parsed.text;
   const stat = await git("diff --staged --shortstat", cwd);
   return {
     kind: "prompt",

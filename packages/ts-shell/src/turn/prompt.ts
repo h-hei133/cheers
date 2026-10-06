@@ -138,13 +138,11 @@ export function toChatMessages(history: readonly SessionMessage[] = []): ChatMes
     if (message.role !== "tool" && pendingCalls && pendingCalls.length > 0) closePending();
 
     if (message.role === "user") {
-      // A user message may carry images, so it is passed through rather than
-      // flattened: trimming is a text operation, and applying it here would drop
-      // the images a message was sent for.
+      // Preserve the submitted text, including significant whitespace, and
+      // pass image blocks through without flattening them.
       const content = message.content;
       if (typeof content === "string") {
-        const text = content.trim();
-        if (text) result.push({ role: "user", content: text });
+        if (content.trim()) result.push({ role: "user", content });
       } else if (Array.isArray(content) && content.length > 0) {
         result.push({ role: "user", content });
       }

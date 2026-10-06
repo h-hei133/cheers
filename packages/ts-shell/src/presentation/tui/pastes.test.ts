@@ -122,11 +122,13 @@ describe("asking for a paste in full", () => {
     expect(repeat).toEqual({ find: placeholder, text: "line1\nline2\nline3" });
   });
 
-  it("normalizes tabs on hold so the draft and the expansion agree", () => {
+  it("retains tabs through held, repeated and updated pastes", () => {
     const store = new PasteStore();
-    store.hold("a\tb", 1_000);
-
-    expect(store.expand(store.hold("a\tb", 1_100))).toBe("a  b");
+    const placeholder = store.hold("a\tb", 1_000);
+    expect(store.expand(placeholder)).toBe("a\tb");
+    expect(store.expandOnRepeat("a\tb", 1_100)).toEqual({ find: placeholder, text: "a\tb" });
+    const updated = store.update(2, "\tchanged  ");
+    expect(store.expand(updated)).toBe("\tchanged  ");
   });
 
   it("keeps $ patterns literal when a placeholder is replaced", () => {

@@ -197,15 +197,13 @@ export function replaceLiteral(subject: string, find: string, text: string): str
 }
 
 /**
- * Line endings and tabs, normalized the same way the editor's insert does.
+ * Logical line endings, normalized the same way the editor's insert does.
  *
- * A clipboard from Windows carries CRLF, and a code block carries tabs. The
- * first paste goes through the editor's insert, which expands both; the second
- * paste's expansion path must produce the same text or the draft changes shape
- * when the placeholder is replaced.
+ * Tabs remain source characters. Their display width belongs to the editor
+ * layout, including when a held paste is expanded back into the draft.
  */
 function normalizePaste(text: string): string {
-  return text.replace(/\t/g, "  ").replace(/\r\n?/g, "\n");
+  return text.replace(/\r\n?/g, "\n");
 }
 
 /** What the draft shows in place of a held paste. */

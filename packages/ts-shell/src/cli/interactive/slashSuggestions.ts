@@ -48,6 +48,14 @@ export function slashSuggestions(draft: string, snapshot: DraftSnapshot = { text
   return values?.length ? values.map(candidate => completionEdit(candidate, snapshot, token.from, token.to,
     quoteCompletion(candidate.value, token.prefix))) : null;
 }
+
+/** Usage is informational: it must never become a selectable or executable entry. */
+export function slashArgumentHint(snapshot: DraftSnapshot): string | undefined {
+  const command = completionToken(snapshot.text, snapshot.cursor).before[0];
+  if (!command || !COMMAND_DRAFT.test(snapshot.text.slice(command.from, command.to))) return undefined;
+  const invocation = getSlashInvocation(command.value);
+  return invocation?.argumentHint ? `Usage: ${invocation.invocation} ${invocation.argumentHint}` : undefined;
+}
 /**
  * A draft that is a command name being typed and nothing else.
  *

@@ -1,25 +1,17 @@
-import type { CommandContext, ShellActionResult } from './types.js'
-
-function isSessionIdCandidate(token: string | undefined): boolean {
-  if (!token) {
-    return false
-  }
-  return /^sess_[a-z0-9_]+$/i.test(token)
-}
+import type { CommandContext, CommandExecutionResult } from "./types.js";
+import { continueSyntax, parseContinueArgs } from "./navigation/continuation.js";
+import { syntaxHelp } from "./syntax/projection.js";
 
 export async function runContinuePromptCommand(
   args: string[],
-  _context: CommandContext,
-): Promise<ShellActionResult> {
-  const firstArg = args[0]
-  const hasExplicitSession = isSessionIdCandidate(firstArg)
-  const sessionId = hasExplicitSession ? firstArg : undefined
-  const continuationPrompt = hasExplicitSession ? args.slice(1).join(' ').trim() : args.join(' ').trim()
-
+  context: CommandContext,
+): Promise<CommandExecutionResult> {
+  const parsed = parseContinueArgs(args, context.rawCommandArgs);
+  if (!parsed.ok) return { kind: "local", output: `Invalid /continue arguments: ${parsed.reason}\n${syntaxHelp(continueSyntax)}` };
   return {
-    kind: 'shell-action',
-    action: 'continue-session',
-    sessionId,
-    continuationPrompt: continuationPrompt.length > 0 ? continuationPrompt : undefined,
-  }
+    kind: "shell-action",
+    action: "continue-session",
+    sessionId: parsed.sessionId,
+    continuationPrompt: parsed.prompt,
+  };
 }

@@ -78,7 +78,7 @@ export abstract class EditorBuffer {
     this.adoptAsDraft();
   }
 
-  /** Insert literal text, expanding tabs and splitting embedded newlines. */
+  /** Insert source text, retaining tabs and splitting logical newlines. */
   insert(text: string): void {
     if (!text) return;
     this.revision += 1;
@@ -89,7 +89,7 @@ export abstract class EditorBuffer {
     const continuesWord = this.lastAction === "type" && isWordCharacter(text);
     if (!continuesWord) this.saveUndo();
     this.lastAction = isWordCharacter(text) ? "type" : null;
-    const clean = text.replace(/\t/g, "  ").replace(/\r\n?/g, "\n");
+    const clean = text.replace(/\r\n?/g, "\n");
     const line = this.lines[this.row]!;
     const before = line.slice(0, this.column);
     const after = line.slice(this.column);

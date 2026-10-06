@@ -968,3 +968,17 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - regular/fullscreen 真实 CLI 接收合成服务端变更通知和进程退出后无需新按键即使工具候选失效；通知和后续 peek 的协议日志字节不变，证明没有新增 tools/list 或重连。外部配置刷新服务器名称，Esc 后不重开，两模式 exit 0。第一次等待完整工具名因菜单正常截断而超时，改等稳定描述后通过；控制文件观察仅在服务端夹具中。
 - import cycles/config consumers/declarations/node floor 通过；NormProof 无环/导入解析 satisfied，最终 4 个函数数量 advisory，保留 §8.53 的计数器边界说明。980fca15 两项远端检查均成功；d6ca32f4 Architecture Watch 37397590916 成功，CI 37397591431 查询时仍运行。
 - CMD-04 主要来源已接入事件，仍需按全量参数表核对遗漏位置及间接配置边界；同步 owner 读取取消限制、CMD-03 剩余声明与 Phase 19 后续任务继续，未宣称本批完成整个命令系统或阶段。
+
+### 8.55 CMD-03：自由文本参数、usage 与端到端原文保留
+
+- continue/review/copy/commit/btw/web-research 及现有别名接入共享文本语法；注册目录、调用身份和输入层传递 raw 模式。命令后只消费一个分隔空白（CRLF 作为一个分隔），余下正文不做 shell 解码或首尾裁剪；continue 只识别开头可带引号的 sess_ 选择器，其余内容保持自由文本。必填问题/主题为空时不请求、不采集；copy 的空正文回退与显式空白拒绝保持区分。
+- 没有实体候选时显示同源 usage，说明不进入候选列表，Tab 不执行命令。短粘贴与折叠长粘贴先展开，再根据调用元数据提交；原有编辑器 CRLF 到 LF 规则保留，Tab 作为一个源字符保存、删除和撤销。
+- 修复 Tab 展开后被拆到两个视觉行、上下键可能回到原行的问题：复用文本域的同一换行边界计算，Tab 在显示时作为完整两格单元；一格窗口与宽字符遵循完整单元规则。选择词边界后重新检查续行宽度，避免宽字符使续行越界。没有新增第二套编辑器或命令执行通路。
+- 真实 HTTP 探针发现 continue 正文在 turn/prompt 的消息转换中仍被裁掉末尾空白，现仅用 trim 判空，传给 provider 的正文保留原值，环境上下文前缀继续存在。对照参考实现的正文透传、结构选择器局部解码、元数据提示和按 grapheme 换行决定；明确不采用其破坏源文的 Tab 展开，因为本项目需要保留复制与提交内容。
+- Linux、Node 20.3 的 146 文件/2001 项组合与 build:ts 通过，覆盖命令、交互、完整 TUI 和 turn；43 项脚本测试通过。串行组合出现 process exit listener 数量警告，未抑制或据此改动无关运行时。最初交互失败暴露 Tab 归一化丢失；随后两项窄窗回归及请求正文回归均先复现再修复，未弱化内容断言。
+- 六组反转分别恢复 shell 参数分词、破坏性 Tab 归一化、展开后换行、漏检续行宽度、continue 裁剪和请求正文裁剪，均产生断言失败；所有源文件逐字节恢复后 6 文件/115 项通过。首次路由反转没有失败，因为已有样本仍通过 raw 上下文保留正文；补入末尾反斜杠这一真实输入后才得到有效反转证据。
+- regular/fullscreen 真实 CLI 均 exit 0；短文本 57 bytes 与折叠长文本 449 bytes 到达隔离剪贴板适配器，OSC52 内容也一致。每模式本地合成 HTTP 服务收到 4 次请求，side/review/commit/continue 正文精确匹配；Tab、空 btw/web-research 零请求，Git index/HEAD 不变。夹具使用独立 HOME、合成凭据和本地服务，不作为外部真实 provider 或真实 Git 提交成功证据。
+- import cycles/config consumers/declarations/node floor 通过；NormProof 无环及导入解析 satisfied，保留原有 4 个函数数量 advisory。本批变更模块未新增超限。code-reviewer 与 architect 两条独立审查首次及重试均返回 HTTP 503，状态为 independent review unavailable，不记作批准或 merge-ready。提交 4ef138db 的 CI 37398722776 与 Architecture Watch 37398722778 已成功；本批远端证据需对应新提交另查。
+- CMD-03/04 的全量参数位置、间接来源与取消边界仍需复核；本批不代表 UI-02 完整源文选择和所有输入形态完成，Phase 19 的 16 批/76 项整体目标继续。
+- 续接核验：七个反转源文件与恢复时 SHA256 全部一致；Node 20.3 隔离环境重跑 56 文件/713 项与构建通过，regular/fullscreen 本地 HTTP/剪贴板探针再次通过。五项静态门禁通过；NormProof 阻断义务全部满足，仍有四个既有函数数量 advisory。串行测试仍有 exit listener 数量警告。预设独立审查通道分别返回模型不支持与服务繁忙，改用继承当前会话设置的独立审查通道继续；未将服务错误记为通过。
+- 两条继承设置的独立审查随后完成：代码审查覆盖 35 个 TypeScript 文件，结论 APPROVE；架构审查 CLEAR。代码审查额外枚举 6,144 个 ASCII/空格/Tab/CJK 窄窗布局，显示原文和相邻行导航均通过。审查方明确没有重复执行父任务的构建、组合测试与 PTY，证据来源分别保留。
