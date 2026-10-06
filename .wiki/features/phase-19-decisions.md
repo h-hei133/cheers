@@ -958,3 +958,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 移除列表子目录来源回调后，已有会话标题和新会话后续标题刷新两组断言失败，逐字节恢复后组合通过。新增专项验证旧目录转录被当前目录副本覆盖后候选更新。regular/fullscreen 真实 CLI 无新按键响应跨进程标题修改、会话删除和当前导航树追加消息，Esc 后不重开，两模式 exit 0。
 - import cycles/config consumers/declarations/node floor 通过；NormProof 无环/导入解析 satisfied，最终报告为 4 个函数数量 advisory；SessionStoreAccess 在新增回调参数后不再被报告，但其方法未减少，本批不据此宣称历史超限已修复，计数差异留作检查器边界。60908649 CI 37395619977 与 Architecture Watch 37395620099 均成功；980fca15 Architecture Watch 37396452028 成功，CI 37396451943 查询时仍运行。一次 GitHub 查询 EOF 后原查询重试成功，未重启 CI。
 - CMD-04 的 MCP 连接状态和间接配置事件仍需完成；全参数审计、同步读取取消限制与 Phase 19 后续任务继续。
+
+### 8.54 CMD-04：MCP 工具目录与连接状态事件
+
+- MCP client 在连接重建、列表读取开始/完成、关闭及服务端 tools/list_changed 时通知 connection manager；gateway 提供可释放订阅，工具补全沿共享 controller 失效。MCP 用户/项目配置和信任候选文件同步接入来源监听，包含用户目录优先级变化。
+- 服务端列表变更先清除已加载快照和后续调用目录，不在补全或通知回调内自动连接或 tools/list。显式 refresh、snapshot 或实际工具调用仍负责发现；菜单在没有新目录时报告 unavailable。对照参考连接关闭时清目录、旧 client 身份守卫、工具列表变更事件的决定；本项目采用失效后显式发现，保持补全只读边界。
+- 列表读取带目录版本检查，通知或关闭先于响应时不重新发布过期工具。已发起工具调用持有发起时的目录对象验证响应，避免通知清空共享目录后丢失输出契约。初轮真实协议测试暴露该并发验证错误，修正后通过；未通过吞掉结果验证或重放工具调用来处理。
+- Linux、Node 20.3 隔离环境 26 文件/215 项与 build:ts 通过，包括真实 stdio 协议、冷目录不连接、配置变更、关闭/取消生命周期、通知与列表响应交错。移除版本检查及调用目录捕获后两处断言失败，逐字节恢复后组合通过。
+- regular/fullscreen 真实 CLI 接收合成服务端变更通知和进程退出后无需新按键即使工具候选失效；通知和后续 peek 的协议日志字节不变，证明没有新增 tools/list 或重连。外部配置刷新服务器名称，Esc 后不重开，两模式 exit 0。第一次等待完整工具名因菜单正常截断而超时，改等稳定描述后通过；控制文件观察仅在服务端夹具中。
+- import cycles/config consumers/declarations/node floor 通过；NormProof 无环/导入解析 satisfied，最终 4 个函数数量 advisory，保留 §8.53 的计数器边界说明。980fca15 两项远端检查均成功；d6ca32f4 Architecture Watch 37397590916 成功，CI 37397591431 查询时仍运行。
+- CMD-04 主要来源已接入事件，仍需按全量参数表核对遗漏位置及间接配置边界；同步 owner 读取取消限制、CMD-03 剩余声明与 Phase 19 后续任务继续，未宣称本批完成整个命令系统或阶段。

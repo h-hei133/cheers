@@ -110,6 +110,10 @@ export class CoreMcpGateway {
     this.workspaceRoot = typeof root === "string" ? root : root();
   }
 
+  subscribe(changed: () => void): () => void {
+    return this.connectionManager.subscribe(changed);
+  }
+
   loadConfigs(): Record<string, ScopedMcpServerConfig> {
     return loadMcpConfigs(this.workspaceRoot, !projectTrust.isProjectUntrusted(this.workspaceRoot));
   }

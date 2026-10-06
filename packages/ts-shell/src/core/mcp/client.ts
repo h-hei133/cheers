@@ -1,5 +1,5 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { CallToolResultSchema, ListToolsResultSchema, ResultSchema, ErrorCode, McpError, type Tool } from "@modelcontextprotocol/sdk/types.js";
+import { CallToolResultSchema, ListToolsResultSchema, ToolListChangedNotificationSchema, ResultSchema, ErrorCode, McpError, type Tool } from "@modelcontextprotocol/sdk/types.js";
 import { packageVersion } from "../version/current.js";
 import { McpStdioTransport } from "./stdio.js";
 import { McpToolCatalog } from "./catalog.js";
@@ -23,12 +23,14 @@ export class CoreMcpClient {
   private readonly abort = new AbortController();
   private catalog?: McpToolCatalog;
   private listedTools?: McpToolDescriptor[];
+  private catalogRevision = 0;
 
   constructor(
     readonly name: string,
     readonly config: ScopedMcpServerConfig,
     private readonly workspaceRoot: string = process.cwd(),
     private readonly timeoutMs: number = REQUEST_TIMEOUT_MS,
+    private readonly changed?: () => void,
   ) {}
 
   async connect(): Promise<McpConnectionState> {
@@ -46,6 +48,7 @@ export class CoreMcpClient {
 
   private async open(): Promise<McpConnectionState> {
     this.listedTools = undefined;
+    this.changed?.();
     await this.disposeTransport();
     const client = new Client({ name: "cheers", version: packageVersion() ?? "unknown" }, {
       capabilities: {}, enforceStrictCapabilities: true,
@@ -59,7 +62,20 @@ export class CoreMcpClient {
     });
     // Draining avoids blocking the server; raw diagnostics may contain credentials.
     transport.stderr?.on("data", () => {});
-    client.onclose = () => { this.connected = false; };
+    client.onclose = () => {
+      if (this.client !== client) return;
+      this.connected = false;
+      this.catalogRevision++;
+      this.listedTools = undefined;
+      this.changed?.();
+    };
+    client.setNotificationHandler(ToolListChangedNotificationSchema, () => {
+      if (this.client !== client) return;
+      this.catalogRevision++;
+      this.catalog = undefined;
+      this.listedTools = undefined;
+      this.changed?.();
+    });
     this.client = client;
     this.transport = transport;
     try {
@@ -78,10 +94,13 @@ export class CoreMcpClient {
 
   async listTools(): Promise<McpToolDescriptor[]> {
     this.listedTools = undefined;
+    this.changed?.();
     const client = await this.requireClient();
+    const revision = ++this.catalogRevision;
     if (!client.getServerCapabilities()?.tools) {
       this.catalog = new McpToolCatalog([]);
       this.listedTools = [];
+      this.changed?.();
       return [];
     }
     const tools: McpToolDescriptor[] = [];
@@ -94,6 +113,7 @@ export class CoreMcpClient {
         const result = await this.withCancellation(signal => client.request(
           { method: "tools/list", params: cursor ? { cursor } : {} },
           ListToolsResultSchema, { timeout: this.timeoutMs, signal }));
+        if (this.closed || !this.connected || revision !== this.catalogRevision) throw new Error("MCP tool catalog changed during listing");
         metadata.push(...result.tools);
         for (const tool of result.tools) tools.push({
           serverName: this.name,
@@ -108,6 +128,7 @@ export class CoreMcpClient {
         if (cursor === undefined) {
           this.catalog = new McpToolCatalog(metadata);
           this.listedTools = structuredClone(tools);
+          this.changed?.();
           return tools;
         }
         if (!cursor || cursors.has(cursor)) throw new Error("MCP tool catalog repeated an invalid cursor");
@@ -128,7 +149,8 @@ export class CoreMcpClient {
   async invokeTool(toolName: string, args: Record<string, unknown>): Promise<McpToolCallResult> {
     const client = await this.requireClient();
     if (!this.catalog) await this.listTools();
-    this.catalog!.assertCallable(toolName);
+    const catalog = this.catalog!;
+    catalog.assertCallable(toolName);
     let response: unknown;
     try {
       response = await this.withCancellation(signal => client.request(
@@ -140,12 +162,13 @@ export class CoreMcpClient {
     }
     const parsed = CallToolResultSchema.safeParse(response);
     if (!parsed.success) throw protocolFailure(new Error("MCP tool returned a malformed result"), "malformed-result");
-    this.catalog!.validate(toolName, parsed.data);
+    catalog.validate(toolName, parsed.data);
     return projectMcpResult(parsed.data);
   }
 
   close(): Promise<void> {
     this.closed = true;
+    this.changed?.();
     this.abort.abort();
     return this.closing ??= this.finishClose();
   }

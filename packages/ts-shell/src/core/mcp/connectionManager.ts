@@ -1,10 +1,16 @@
 import { CoreMcpClient } from "./client.js";
+import { createStateChanges } from "../state/changes.js";
 import type { McpClientSnapshot, ScopedMcpServerConfig } from "./types.js";
 
 /** Owns all live connections; callers serialize config reconciliation and use. */
 export class CoreMcpConnectionManager {
   private closed = false;
   private readonly clients = new Map<string, CoreMcpClient>();
+  private readonly changes = createStateChanges();
+
+  subscribe(changed: () => void): () => void {
+    return this.changes.subscribe("catalog", changed);
+  }
 
   peekSnapshot(configs: Record<string, ScopedMcpServerConfig>): McpClientSnapshot | undefined {
     if (this.closed) return undefined;
@@ -32,7 +38,7 @@ export class CoreMcpConnectionManager {
     if (this.closed) throw new Error("MCP connection manager is closed");
     let client = this.clients.get(name);
     if (!client) {
-      client = new CoreMcpClient(name, config, workspaceRoot);
+      client = new CoreMcpClient(name, config, workspaceRoot, undefined, () => this.changes.notify("catalog"));
       this.clients.set(name, client);
     }
     return client;

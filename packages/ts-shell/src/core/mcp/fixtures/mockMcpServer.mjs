@@ -8,6 +8,10 @@ const record = (event, extra = {}) => {
   if (logPath) fs.appendFileSync(logPath, JSON.stringify({ event, pid: process.pid, cwd: process.cwd(), ...extra }) + "\n");
 };
 record("start");
+const controlIndex = process.argv.indexOf("--control");
+if (controlIndex >= 0) fs.watchFile(process.argv[controlIndex + 1], { interval: 30, persistent: false }, () => {
+  process.stdout.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/tools/list_changed" }) + "\n");
+});
 let initialized = false;
 const send = (id, result) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, result }) + "\n");
 const fail = (id, message) => process.stdout.write(JSON.stringify({
@@ -38,6 +42,7 @@ input.on("line", line => {
   if (request.id === undefined) return;
   if (!initialized) return fail(request.id, "Client did not send initialized");
   if (request.method === "tools/list") {
+    if (flags.has("--notify-during-list")) process.stdout.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/tools/list_changed" }) + "\n");
     if (flags.has("--hang-list")) return;
     if (flags.has("--invalid-tools-list")) return send(request.id, { tools: "not-an-array" });
     if (flags.has("--invalid-json")) {
@@ -62,6 +67,7 @@ input.on("line", line => {
   }
   if (request.method === "tools/call") {
     const message = request.params.arguments?.message ?? "missing";
+    if (message === "mcp-notify") process.stdout.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/tools/list_changed" }) + "\n");
     if (message === "mcp-invalid-args") {
       process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: request.id,
         error: { code: -32602, message: "Arguments rejected" } }) + "\n");

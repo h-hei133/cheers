@@ -77,8 +77,12 @@ export function createCatalogLoader(context: () => ShellRuntimeContext, gateway:
       const current = context();
       if (kind === "candidate" || kind === "approvable" || kind === "approved") return observeMemoryCatalog(current.session.id, changed);
       const targets = catalogSources(kind, { cwd: current.cwd, projectRoot: current.projectRoot, themePaths, grantPath: policy?.sourcePath }, query);
-      if (!targets.length) return undefined;
       const close = targets.map(target => observeDirectory(target, changed));
+      if (kind === "tools") {
+        const unsubscribe = gateway.subscribe?.(changed);
+        if (unsubscribe) close.push(unsubscribe);
+      }
+      if (!close.length) return undefined;
       return () => close.forEach(stop => stop());
     },
   });

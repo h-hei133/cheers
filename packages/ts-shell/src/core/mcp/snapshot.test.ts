@@ -66,3 +66,28 @@ it("distinguishes an empty configuration from a cold or malformed catalog", () =
   expect(() => owner.peekSnapshot()).toThrow();
   expect(fs.existsSync(log)).toBe(false);
 });
+
+it("notifies loaded, invalidated and closed catalogs without discovery by observers", async () => {
+  configure(); const changed = vi.fn(); const stop = owner.subscribe(changed);
+  expect(fs.existsSync(log)).toBe(false);
+  await owner.snapshot(); await vi.waitFor(() => expect(changed).toHaveBeenCalled());
+  expect(owner.peekSnapshot()?.tools).toHaveLength(1);
+  changed.mockClear();
+  await owner.invokeTool("fixture", "echo_message", { message: "mcp-notify" });
+  await vi.waitFor(() => expect(changed).toHaveBeenCalled());
+  const before = fs.readFileSync(log);
+  expect(owner.peekSnapshot()).toBeUndefined(); expect(fs.readFileSync(log)).toEqual(before);
+  await owner.snapshot(); expect(owner.peekSnapshot()?.tools).toHaveLength(1);
+  changed.mockClear();
+  await expect(owner.invokeTool("fixture", "echo_message", { message: "mcp-throw" })).rejects.toThrow();
+  await vi.waitFor(() => expect(changed).toHaveBeenCalled());
+  expect(owner.peekSnapshot()).toBeUndefined();
+  stop(); changed.mockClear(); await owner.close(); await Promise.resolve(); expect(changed).not.toHaveBeenCalled();
+});
+
+it("rejects a listing invalidated before its response instead of publishing stale tools", async () => {
+  configure({ args: [server, "--log", log, "--notify-during-list"] });
+  const snapshot = await owner.snapshot();
+  expect(snapshot.clients[0]?.type).toBe("failed"); expect(snapshot.tools).toEqual([]);
+  expect(owner.peekSnapshot()).toBeUndefined();
+});
