@@ -899,3 +899,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - regular/fullscreen 真实 CLI 在没有新增按键时响应目录增删、用户模型目录创建和原子替换；Esc 后继续外部写入未重新打开候选，两模式 exit 0。探针的文件变更仅用于隔离合成工作区与 HOME，没有模型请求。
 - import cycles/config consumers/declarations/node floor 通过；NormProof 无环/导入解析 satisfied，既有 5 个函数数量 advisory 保留。01425cae 两项远端检查均成功；086fe2c5 Architecture Watch 37392574377 成功，CI 37392574729 查询时仍运行。
 - CMD-04 全部来源事件尚未完成：theme/skill 的嵌套目录、会话/记忆/授权/连接 owner 版本与 MCP 连接状态仍需接线，底层同步读取取消限制保留；其余参数与 Phase 19 后续任务继续。
+
+### 8.48 CMD-04：连接配置事件与用户文件来源优先级
+
+- connect 的已保存连接目录接入用户配置文件监听，外部编辑或原子替换使当前候选重读；Tab 仍只接受完整 ID，不切换连接、不写配置。菜单仅投影身份字段，底层解析配置的原有行为未改。
+- 来源路径选择独立在 completion/sources 内，沿用户数据 owner 的候选目录顺序监听，包括尚未存在的高优先级文件及删除后可生效的回退文件。同步修正 model/provider 和 workflow 信任文件只监听当前解析路径、漏掉新来源覆盖的问题；没有改变文件读取优先级、认证或信任裁决。
+- 沿用参考事件处理仅刷新已查询来源的决定，不递归扫描用户目录。监听仍受 controller 的 64 组上限和释放代次约束，每组只覆盖固定数量的候选文件；不支持文件事件的环境继续使用 TTL/显式失效退路。
+- Linux、Node 20.3 隔离环境 13 文件/161 项和 build:ts 通过；将监听退回仅当前解析文件后，连接与模型的新来源创建断言失败，逐字节恢复后组合重跑通过。测试覆盖原子替换、优先级覆盖、删除回退与 stop 后不通知。
+- regular/fullscreen 真实 CLI 在不新增按键时响应外部连接替换、模型当前文件覆盖旧来源与删除回退；Tab 后配置字节及 mtime 不变，合成 key 未出现在终端，Esc 后事件未重开菜单，两模式 exit 0。
+- import cycles/config consumers/declarations/node floor 与 docs drift 阻断规则通过；NormProof 全图无环及导入解析 satisfied，既有 5 个函数数量 advisory 保留。086fe2c5 的 CI 37392574729 与 Architecture Watch 37392574377 均成功；b40344b5 Architecture Watch 37393613204 成功，CI 37393613562 查询时仍运行。
+- CMD-04 的 theme/skill 嵌套目录、会话/记忆/授权 owner 与 MCP 状态事件仍未完成，其余参数审计和 Phase 19 后续批次继续。

@@ -3,11 +3,9 @@ import { serverCatalog } from "./servers.js";
 import { grantCatalog, type GrantCatalog } from "./grants.js";
 import { connectionCatalog } from "./connections.js";
 import { memoryCatalog } from "./memory.js";
-import { pathCatalog, resolveCatalogDirectory } from "./paths.js";
+import { pathCatalog } from "./paths.js";
 import { observeDirectory } from "./watch.js";
-import { userCatalogPath, catalogCachePath } from "../../../core/models/catalogStore.js";
-import { workflowsDir } from "../../../core/workflow/definition.js";
-import { resolveUserDataFile } from "../../../core/paths/userHome.js";
+import { catalogSources } from "./sources.js";
 import { modelCatalog } from "./models.js";
 import { workflowCatalog } from "./workflows.js";
 import { listThemes } from "../../../presentation/themes/index.js";
@@ -70,11 +68,7 @@ export function createCatalogLoader(context: () => ShellRuntimeContext, gateway:
   return Object.assign(load, {
     invalidate: () => { pending = undefined; },
     observe: (kind: CatalogKind, query: string | undefined, changed: () => void) => {
-      const targets = kind === "file" || kind === "directory"
-        ? [resolveCatalogDirectory(context().cwd, query ?? "", kind === "directory")]
-        : kind === "model" || kind === "provider" ? [userCatalogPath(), catalogCachePath()]
-        : kind === "workflow" ? [workflowsDir(context().cwd), resolveUserDataFile("trust.json")]
-        : [];
+      const targets = catalogSources(kind, context().cwd, query);
       if (!targets.length) return undefined;
       const close = targets.map(target => observeDirectory(target, changed));
       return () => close.forEach(stop => stop());
