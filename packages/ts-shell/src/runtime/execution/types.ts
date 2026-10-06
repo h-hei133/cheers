@@ -1,3 +1,5 @@
+import type { WalkLimits } from './walk/budget.js'
+
 export interface FileWalkOptions {
   readonly assertFileAccess?: (absolutePath: string) => void
   readonly abortSignal?: AbortSignal
@@ -5,6 +7,8 @@ export interface FileWalkOptions {
   readonly pruneDirectories?: readonly string[]
   /** Whether ignore rules are honoured at all. Default true. */
   readonly respectIgnore?: boolean
+  /** Internal callers may tighten, never raise, cumulative traversal budgets. */
+  readonly limits?: WalkLimits
 }
 
 /**

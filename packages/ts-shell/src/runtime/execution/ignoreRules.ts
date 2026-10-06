@@ -5,6 +5,8 @@ import path from 'node:path'
 import ignore, { type Ignore } from 'ignore'
 import { ReadCleanupError, withVerifiedReadTarget } from './read.js'
 import type { FileWalkOptions } from './types.js'
+import type { FileHandle } from 'node:fs/promises'
+import { WalkBudget, WalkLimitError } from './walk/budget.js'
 
 /**
  * The repository's own ignore rules, as one question with one answer.
@@ -77,8 +79,8 @@ export const IGNORE_FILE_NAMES = IGNORE_FILES
  * worktree, a submodule and a `GIT_DIR` override all answer differently to a
  * directory scan.
  */
-export async function listWorkspaceFilesViaGit(root: string, abortSignal?: AbortSignal): Promise<readonly string[] | null> {
-  const output = await runGit(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], undefined, abortSignal)
+export async function listWorkspaceFilesViaGit(root: string, abortSignal?: AbortSignal, budget = new WalkBudget(abortSignal)): Promise<readonly string[] | null> {
+  const output = await runGit(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], undefined, abortSignal, budget, true)
   if (output === null) return null
   // Git already uses forward slashes. NUL records bypass filename quoting and
   // preserve whitespace, backslashes and embedded newlines as literal names.
@@ -90,7 +92,7 @@ function gitArgs(directory: string, args: readonly string[]): string[] {
 }
 
 /** Runtime queries share the command runner's process-tree cancellation. */
-async function runGit(directory: string, args: readonly string[], input?: string, abortSignal?: AbortSignal): Promise<string | null> {
+async function runGit(directory: string, args: readonly string[], input?: string, abortSignal?: AbortSignal, budget = new WalkBudget(abortSignal), countEntries = false): Promise<string | null> {
   abortSignal?.throwIfAborted()
   directory = path.resolve(directory)
   const controller = new AbortController()
@@ -100,11 +102,21 @@ async function runGit(directory: string, args: readonly string[], input?: string
   let outputBytes = 0
   let totalBytes = 0
   let oversized = false
+  let budgetError: unknown
   try {
     const result = await executeLocally({ command: 'git', args: gitArgs(directory, args), cwd: directory,
-      input, abortSignal: controller.signal, timeoutMs: GIT_TIMEOUT_MS, captureOutput: false,
+      input, abortSignal: controller.signal, timeoutMs: budget.timeRemaining(GIT_TIMEOUT_MS), captureOutput: false,
       onStdout: chunk => {
         if (controller.signal.aborted) return
+        try {
+          budget.check()
+          if (countEntries) {
+            budget.take('pathBytes', chunk.length)
+            let records = 0
+            for (let at = chunk.indexOf(0); at !== -1; at = chunk.indexOf(0, at + 1)) records++
+            budget.take('entries', records)
+          }
+        } catch (error) { budgetError = error; controller.abort(); return }
         outputBytes += chunk.length
         if (outputBytes > GIT_MAX_BUFFER_BYTES) { oversized = true; controller.abort(); return }
         chunks.push(chunk)
@@ -120,6 +132,8 @@ async function runGit(directory: string, args: readonly string[], input?: string
       throw new Error('Git query failed: input delivery or process cleanup could not be verified.')
     }
     abortSignal?.throwIfAborted()
+    if (budgetError) throw budgetError
+    budget.check()
     if (oversized || (result.status !== 'completed'
       && !(args[0] === 'check-ignore' && result.status === 'failed' && result.exitCode === 1 && !result.failureKind))) return null
     return Buffer.concat(chunks).toString('utf8')
@@ -137,11 +151,11 @@ function ignoredNames(names: readonly string[], paths: readonly string[], output
 }
 
 /** Async runtime counterpart of the synchronous discovery query below. */
-export async function loadIgnoredViaGit(directory: string, names: readonly string[], abortSignal?: AbortSignal): Promise<ReadonlySet<string> | null> {
+export async function loadIgnoredViaGit(directory: string, names: readonly string[], abortSignal?: AbortSignal, budget = new WalkBudget(abortSignal)): Promise<ReadonlySet<string> | null> {
   abortSignal?.throwIfAborted()
   if (names.length === 0) return new Set()
   const paths = literalGitPaths(names)
-  const output = await runGit(directory, ['check-ignore', '--stdin', '-z'], `${paths.join('\0')}\0`, abortSignal)
+  const output = await runGit(directory, ['check-ignore', '--stdin', '-z'], `${paths.join('\0')}\0`, abortSignal, budget)
   return output === null ? null : ignoredNames(names, paths, output)
 }
 
@@ -198,10 +212,11 @@ export function addIgnoreFile(matcher: Ignore, file: string, prefix: string, all
   addIgnoreContent(matcher, content, prefix)
 }
 
-function addIgnoreContent(matcher: Ignore, content: string, prefix: string): void {
+function addIgnoreContent(matcher: Ignore, content: string, prefix: string, budget?: WalkBudget): void {
   const patterns: string[] = []
   const literalPrefix = prefix.replace(/[\\*?\[\]]/g, '\\$&')
   for (const raw of content.replace(/^\uFEFF/, '').split(/\r?\n/)) {
+    budget?.check()
     // Whitespace and escapes belong to the ignore grammar. In particular a
     // leading space is literal and an escaped trailing space is significant.
     if (/^ *$/.test(raw) || raw.startsWith('#')) continue
@@ -218,11 +233,15 @@ function addIgnoreContent(matcher: Ignore, content: string, prefix: string): voi
       // Anchor the literal directory, including names beginning with # or !.
       rewritten = `/${literalPrefix}${rewritten}`
     }
-    patterns.push(negated ? `!${rewritten}` : rewritten)
+    const pattern = negated ? `!${rewritten}` : rewritten
+    budget?.take('rules', 1)
+    budget?.take('ruleBytes', Buffer.byteLength(pattern))
+    patterns.push(pattern)
   }
   if (patterns.length > 0) {
     matcher.add(patterns)
   }
+  budget?.check()
 }
 
 /**
@@ -258,27 +277,51 @@ function ignoreSources(root: string, target: string): { file: string; prefix: st
 }
 
 /** Runtime ignore rules are read from the same verified handles as source files. */
-export async function loadIgnoreFile(matcher: Ignore, file: string, prefix: string, root: string, options?: FileWalkOptions): Promise<void> {
+export async function loadIgnoreFile(matcher: Ignore, file: string, prefix: string, root: string, options?: FileWalkOptions, budget = new WalkBudget(options?.abortSignal, options?.limits)): Promise<void> {
+  budget.check()
   let content: string
   try {
     content = await withVerifiedReadTarget({ absolutePath: file, workspaceRoot: root,
       assertFileAccess: options?.assertFileAccess, abortSignal: options?.abortSignal,
     }, 'file', async (handle, verify) => {
-      const value = await handle.readFile({ encoding: 'utf8', signal: options?.abortSignal })
+      const value = await readIgnoreContent(handle, verify, budget)
       await verify()
       return value
     })
   } catch (error) {
     if (error instanceof ReadCleanupError) throw error
     options?.abortSignal?.throwIfAborted()
+    if (error instanceof WalkLimitError) throw error
+    budget.check()
     return
   }
-  addIgnoreContent(matcher, content, prefix)
+  addIgnoreContent(matcher, content, prefix, budget)
 }
 
-export async function loadDirectoryMatcher(root: string, target: string, options?: FileWalkOptions): Promise<Ignore> {
+async function readIgnoreContent(handle: FileHandle, verify: () => Promise<void>, budget: WalkBudget): Promise<string> {
+  const buffer = Buffer.alloc(16 * 1024)
+  const parts: Buffer[] = []
+  let position = 0
+  while (true) {
+    budget.check()
+    await verify()
+    const { bytesRead } = await handle.read({ buffer, position, length: budget.readAllowance('ignoreBytes', buffer.length) })
+    budget.take('ignoreBytes', bytesRead)
+    if (!bytesRead) break
+    parts.push(Buffer.from(buffer.subarray(0, bytesRead)))
+    position += bytesRead
+  }
+  return Buffer.concat(parts).toString('utf8')
+}
+
+export async function loadDirectoryMatcher(root: string, target: string, options?: FileWalkOptions, budget = new WalkBudget(options?.abortSignal, options?.limits)): Promise<Ignore> {
+  budget.depth(path.relative(root, target).split(path.sep).filter(Boolean).length)
   const matcher = ignore({ ignorecase: false })
-  for (const source of ignoreSources(root, target)) await loadIgnoreFile(matcher, source.file, source.prefix, root, options)
+  for (const source of ignoreSources(root, target)) {
+    budget.check()
+    await loadIgnoreFile(matcher, source.file, source.prefix, root, options, budget)
+  }
+  budget.check()
   return matcher
 }
 

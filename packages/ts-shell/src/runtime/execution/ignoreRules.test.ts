@@ -25,7 +25,7 @@ it('does not read an ignore file replaced after opening', async () => {
   let read: ReturnType<typeof vi.spyOn> | undefined
   vi.spyOn(fsp, 'open').mockImplementation(async (...args) => {
     handle = await open(...args)
-    read = vi.spyOn(handle, 'readFile')
+    read = vi.spyOn(handle, 'read')
     fs.renameSync(file, path.join(workspace, 'old'))
     fs.symlinkSync(path.join(root, 'outside'), file)
     return handle
@@ -42,12 +42,13 @@ it('uses the open file and refuses changed-path patterns after the read', async 
   let observed: unknown
   vi.spyOn(fsp, 'open').mockImplementation(async (...args) => {
     const handle = await open(...args)
-    const read = handle.readFile.bind(handle)
-    vi.spyOn(handle, 'readFile').mockImplementation(async (options: any) => {
+    const read = handle.read.bind(handle)
+    vi.spyOn(handle, 'read').mockImplementationOnce(async (options: any) => {
       fs.renameSync(file, path.join(workspace, 'old'))
       fs.symlinkSync(path.join(root, 'outside'), file)
-      observed = await read(options)
-      return observed as string
+      const result = await read(options)
+      observed = options.buffer.subarray(0, result.bytesRead).toString('utf8')
+      return result
     })
     return handle
   })

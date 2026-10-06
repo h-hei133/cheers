@@ -5,6 +5,8 @@ import { closeReadHandle, withVerifiedReadTarget } from './read.js'
 interface DirectoryReadOptions {
   readonly assertFileAccess?: (absolutePath: string) => void
   readonly abortSignal?: AbortSignal
+  readonly checkpoint?: () => void
+  readonly onEntry?: (entry: Dirent) => void
 }
 
 const MAX_ENTRIES = 10_000
@@ -28,7 +30,7 @@ export async function readDirectory(root: string, directory: string, options?: D
     assertFileAccess: options?.assertFileAccess, abortSignal: options?.abortSignal,
   }, 'directory', async (handle, verify) => {
     const target = `/proc/self/fd/${handle.fd}`
-    return collectEntries(target, deadline, verify, options?.abortSignal)
+    return collectEntries(target, deadline, verify, options)
   })
 }
 
@@ -52,13 +54,14 @@ async function readDirectoryByPath(root: string, directory: string, deadline: nu
     options?.assertFileAccess?.(target)
     options?.abortSignal?.throwIfAborted()
   }
-  return collectEntries(target, deadline, verify, options?.abortSignal)
+  return collectEntries(target, deadline, verify, options)
 }
 
 /** Keep the native prefetch buffer and retained names bounded independently of output pagination. */
-async function collectEntries(target: string, deadline: number, verify: () => Promise<void>, signal?: AbortSignal): Promise<Dirent[]> {
+async function collectEntries(target: string, deadline: number, verify: () => Promise<void>, options?: DirectoryReadOptions): Promise<Dirent[]> {
   const check = (): void => {
-    signal?.throwIfAborted()
+    options?.abortSignal?.throwIfAborted()
+    options?.checkpoint?.()
     if (performance.now() >= deadline) throw new DirectoryReadError('deadline')
   }
   check()
@@ -72,6 +75,7 @@ async function collectEntries(target: string, deadline: number, verify: () => Pr
       const entry = await directory.read()
       check()
       if (!entry) break
+      options?.onEntry?.(entry)
       if (entries.length >= MAX_ENTRIES) throw new DirectoryReadError('entries')
       nameBytes += Buffer.byteLength(entry.name)
       if (nameBytes > MAX_NAME_BYTES) throw new DirectoryReadError('bytes')

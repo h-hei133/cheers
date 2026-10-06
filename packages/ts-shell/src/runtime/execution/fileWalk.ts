@@ -31,6 +31,7 @@ import { verifyPathContainment } from '../../core/security/pathJail.js'
 import path from 'node:path'
 import { DirectoryReadError, readDirectory } from './directory.js'
 import { ReadCleanupError } from './read.js'
+import { WalkBudget, WalkLimitError } from './walk/budget.js'
 import type { FileWalkOptions } from './types.js'
 import ignore, { type Ignore } from 'ignore'
 import {
@@ -88,7 +89,8 @@ async function listViaWalk(
   root: string,
   pruned: readonly string[],
   respectIgnore: boolean,
-  options?: FileWalkOptions,
+  options: FileWalkOptions | undefined,
+  budget: WalkBudget,
 ): Promise<readonly string[]> {
   const matcher = ignore({ ignorecase: false })
   const found: string[] = []
@@ -101,25 +103,34 @@ async function listViaWalk(
     return relative.split(path.sep).join('/')
   }
 
-  async function visit(absolute: string, prefix: string): Promise<void> {
+  async function visit(absolute: string, prefix: string, depth: number): Promise<void> {
+    budget.check()
     if (!visiblePath(root, absolute, options)) return
+    budget.depth(depth)
+    budget.take('directories', 1)
     if (respectIgnore) {
       for (const name of IGNORE_FILE_NAMES) {
         const file = path.join(absolute, name)
-        if (visiblePath(root, file, options)) await loadIgnoreFile(matcher, file, prefix, root, options)
+        if (visiblePath(root, file, options)) await loadIgnoreFile(matcher, file, prefix, root, options, budget)
       }
     }
     let entries: Dirent[]
     try {
-      entries = await readDirectory(root, checkedPath(root, absolute, options), options)
+      entries = await readDirectory(root, checkedPath(root, absolute, options), {
+        ...options, checkpoint: () => budget.check(), onEntry: entry => {
+          budget.take('entries', 1)
+          budget.take('pathBytes', Buffer.byteLength(prefix + entry.name))
+        },
+      })
       checkedPath(root, absolute, options)
     } catch (error) {
       if (error instanceof ReadCleanupError) throw error
       options?.abortSignal?.throwIfAborted()
-      if (error instanceof DirectoryReadError) throw error
+      if (error instanceof DirectoryReadError || error instanceof WalkLimitError) throw error
       return
     }
     for (const entry of entries) {
+      budget.check()
       if (pruned.includes(entry.name)) continue
       const full = path.join(absolute, entry.name)
       if (!visiblePath(root, full, options)) continue
@@ -130,7 +141,7 @@ async function listViaWalk(
         // without it a `dir/` pattern would not match and the walk would descend
         // into something the rules exclude.
         if (respectIgnore && matcher.ignores(`${relative}/`)) continue
-        await visit(full, `${relative}/`)
+        await visit(full, `${relative}/`, depth + 1)
       } else if (entry.isFile()) {
         if (respectIgnore && matcher.ignores(relative)) continue
         found.push(relative)
@@ -138,7 +149,8 @@ async function listViaWalk(
     }
   }
 
-  await visit(root, '')
+  await visit(root, '', 0)
+  budget.check()
   return found
 }
 
@@ -154,6 +166,8 @@ export async function listWorkspaceFiles(
   root: string,
   options?: FileWalkOptions,
 ): Promise<readonly string[]> {
+  const budget = new WalkBudget(options?.abortSignal, options?.limits)
+  budget.check()
   const pruned = options?.pruneDirectories ?? PRUNED_DIRECTORIES
   const respectIgnore = options?.respectIgnore ?? true
   options?.abortSignal?.throwIfAborted()
@@ -166,19 +180,22 @@ export async function listWorkspaceFiles(
   checkedPath(resolved, resolved, options)
 
   if (respectIgnore) {
-    const viaGit = await listWorkspaceFilesViaGit(resolved, options?.abortSignal)
+    const viaGit = await listWorkspaceFilesViaGit(resolved, options?.abortSignal, budget)
     if (viaGit !== null) {
       // git already applied its own ignore rules; the pruned names are still
       // removed, because a repository need not ignore the directories that hold
       // no source.
-      return viaGit.filter((entry) =>
-        !entry.split('/').some((segment) => pruned.includes(segment))
-        && visiblePath(resolved, path.resolve(resolved, entry), options),
-      )
+      const files = viaGit.filter((entry) => {
+        budget.depth(entry.split('/').length - 1)
+        return !entry.split('/').some((segment) => pruned.includes(segment))
+          && visiblePath(resolved, path.resolve(resolved, entry), options)
+      })
+      budget.check()
+      return files
     }
   }
 
-  return listViaWalk(resolved, pruned, respectIgnore, options)
+  return listViaWalk(resolved, pruned, respectIgnore, options, budget)
 }
 
 /** One direct entry of a directory, as a listing should present it. */
@@ -222,6 +239,8 @@ export async function listDirectoryEntries(
   directory: string,
   options?: FileWalkOptions,
 ): Promise<DirectoryListing> {
+  const budget = new WalkBudget(options?.abortSignal, options?.limits)
+  budget.take('directories', 1)
   const pruned = options?.pruneDirectories ?? PRUNED_DIRECTORIES
   const respectIgnore = options?.respectIgnore ?? true
   options?.abortSignal?.throwIfAborted()
@@ -229,10 +248,17 @@ export async function listDirectoryEntries(
   const initial = verifyPathContainment(directory, root)
   const resolvedDirectory = checkedPath(resolvedRoot, initial.resolvedPath, options)
 
-  const dirents = await readDirectory(resolvedRoot, resolvedDirectory, options)
+  const dirents = await readDirectory(resolvedRoot, resolvedDirectory, {
+    ...options, checkpoint: () => budget.check(), onEntry: entry => {
+      budget.take('entries', 1)
+      budget.take('pathBytes', Buffer.byteLength(entry.name))
+    },
+  })
   checkedPath(resolvedRoot, resolvedDirectory, options)
-  const candidates = dirents.filter((entry) => !pruned.includes(entry.name)
-    && visiblePath(resolvedRoot, path.join(resolvedDirectory, entry.name), options))
+  const candidates = dirents.filter((entry) => {
+    budget.check()
+    return !pruned.includes(entry.name) && visiblePath(resolvedRoot, path.join(resolvedDirectory, entry.name), options)
+  })
   let omittedCount = dirents.length - candidates.length
 
   // Names are what git is asked about; paths are what the matcher needs.
@@ -241,19 +267,21 @@ export async function listDirectoryEntries(
         resolvedDirectory,
         candidates.map((entry) => entry.name),
         options?.abortSignal,
+        budget,
       )
     : new Set<string>()
   const matcher =
     respectIgnore && ignored === null
       ? await loadDirectoryMatcher(resolvedRoot, resolvedDirectory, { ...options, assertFileAccess: (file) => {
         if (!visiblePath(resolvedRoot, file, options)) throw new Error('Ignore file is unavailable or denied.')
-      } })
+      } }, budget)
       : null
   const relative = path.relative(resolvedRoot, resolvedDirectory)
   const prefix = relative === '' ? '' : `${relative.split(path.sep).join('/')}/`
 
   const entries: DirectoryEntry[] = []
   for (const entry of candidates) {
+    budget.check()
     if (!visiblePath(resolvedRoot, path.join(resolvedDirectory, entry.name), options)) { omittedCount++; continue }
     const isDirectory = await resolveIsDirectory(resolvedDirectory, entry)
     let excluded = false
@@ -280,6 +308,7 @@ export async function listDirectoryEntries(
     if (a.name > b.name) return 1
     return 0
   })
+  budget.check()
   return { entries, omittedCount }
 }
 

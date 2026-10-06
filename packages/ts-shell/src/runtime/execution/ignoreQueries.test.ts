@@ -50,7 +50,7 @@ it.each(['files', 'directory'])('does not launch %s Git work when already cancel
   expect(executeLocally).not.toHaveBeenCalled()
 })
 
-it('discards oversized Git output and uses the existing file walk', async () => {
+it('rejects oversized Git output without restarting the work through fallback', async () => {
   vi.mocked(executeLocally).mockImplementation(async input => {
     const chunk = Buffer.alloc(1024 * 1024, 120)
     for (let i = 0; i < 65; i++) {
@@ -60,7 +60,9 @@ it('discards oversized Git output and uses the existing file walk', async () => 
     expect(input.abortSignal?.aborted).toBe(true)
     return { status: 'cancelled', exitCode: null, stdout: '', stderr: '' }
   })
-  expect(await listWorkspaceFiles(root)).toEqual(['public.txt'])
+  const open = vi.spyOn(fs.promises, 'opendir')
+  await expect(listWorkspaceFiles(root)).rejects.toMatchObject({ reason: 'pathBytes' })
+  expect(open).not.toHaveBeenCalled()
   expect(executeLocally).toHaveBeenCalledTimes(1)
 })
 
