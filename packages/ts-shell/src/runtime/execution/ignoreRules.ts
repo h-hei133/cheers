@@ -200,19 +200,23 @@ export function addIgnoreFile(matcher: Ignore, file: string, prefix: string, all
 
 function addIgnoreContent(matcher: Ignore, content: string, prefix: string): void {
   const patterns: string[] = []
-  for (const raw of content.split(/\r?\n/)) {
-    const trimmed = raw.trim()
-    if (trimmed === '' || trimmed.startsWith('#')) continue
-    const negated = trimmed.startsWith('!')
-    const body = negated ? trimmed.slice(1) : trimmed
+  const literalPrefix = prefix.replace(/[\\*?\[\]]/g, '\\$&')
+  for (const raw of content.replace(/^\uFEFF/, '').split(/\r?\n/)) {
+    // Whitespace and escapes belong to the ignore grammar. In particular a
+    // leading space is literal and an escaped trailing space is significant.
+    if (/^ *$/.test(raw) || raw.startsWith('#')) continue
+    const negated = raw.startsWith('!')
+    const body = negated ? raw.slice(1) : raw
     if (body === '') continue
     const anchored = body.startsWith('/')
     const bare = anchored ? body.slice(1) : body
-    let rewritten = bare
+    let rewritten = prefix === '' ? body : bare
     if (prefix !== '') {
-      // No slash and not anchored: matches at any depth below this directory.
-      if (!anchored && !bare.includes('/')) rewritten = `**/${bare}`
-      rewritten = `${prefix}${rewritten}`
+      // A trailing directory marker does not anchor a basename pattern. Ignore
+      // trailing ASCII spaces only for classification; the matcher gets raw text.
+      if (!anchored && !bare.replace(/ +$/, '').replace(/\/$/, '').includes('/')) rewritten = `**/${bare}`
+      // Anchor the literal directory, including names beginning with # or !.
+      rewritten = `/${literalPrefix}${rewritten}`
     }
     patterns.push(negated ? `!${rewritten}` : rewritten)
   }
