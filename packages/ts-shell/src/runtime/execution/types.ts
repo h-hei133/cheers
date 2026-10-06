@@ -157,6 +157,30 @@ export interface TextFileWriteExecutionRequest extends ExecutionRequestMetadata<
   readonly expectedContent?: string
 }
 
+export interface TextPageReadRequest extends TextFileReadExecutionRequest {
+  readonly offset?: number
+  readonly limit?: number
+  /** Internal callers may tighten, never raise, the read budgets. */
+  readonly limits?: {
+    readonly scanBytes?: number
+    readonly outputBytes?: number
+    readonly lineBytes?: number
+    readonly timeoutMs?: number
+  }
+}
+
+export interface TextPageReadResult {
+  readonly text: string
+  readonly startLine: number
+  readonly endLine: number
+  /** Known only after observing EOF; stat size does not prove a line count. */
+  readonly totalLines?: number
+  readonly bytesRead: number
+  readonly stopReason?: 'line-limit' | 'output-limit' | 'scan-limit' | 'deadline'
+  readonly nextOffset?: number
+  readonly oversizedLine?: number
+}
+
 export interface FileListExecutionRequest extends ExecutionRequestMetadata<'file.list'> {
   readonly assertFileAccess?: (absolutePath: string) => void
   readonly abortSignal?: AbortSignal
@@ -227,6 +251,7 @@ export interface CommandExecutionResult extends NormalizedExecutionResult {
 
 export interface ExecutionService {
   readonly readTextFile: (request: TextFileReadExecutionRequest) => Promise<string>
+  readonly readTextPage: (request: TextPageReadRequest) => Promise<TextPageReadResult>
   readonly writeTextFile: (request: TextFileWriteExecutionRequest) => Promise<void>
   readonly listFilesRecursive: (request: FileListExecutionRequest) => Promise<readonly string[]>
   readonly runCommand: (request: CommandExecutionRequest) => Promise<CommandExecutionResult>

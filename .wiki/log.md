@@ -6233,3 +6233,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-06] fix | Phase 19 SAFE-02/04 搜索三阶段和工具边界保留执行清理未确认的失败，防止取消、限额或 exit 1 将其改成普通停止或成功。74 项、构建、四组反转、独立 APPROVE/CLEAR 及两模式真实 CLI 终止失败/退出重试回收通过，见 features/phase-19-decisions.md §8.61；阶段任务继续。
 
 ## [2026-10-06] fix | Phase 19 SAFE-02 回退忽略解析保留显著空白、BOM、根锚定与字面目录前缀，深层目录规则按原生语义匹配。70 项、构建、六组反转与两模式强制回退 CLI 验证通过，审查发现的空白/BOM 问题修正后获 APPROVE/CLEAR，见 features/phase-19-decisions.md §8.62；原生隐式读取与阶段其余任务继续。
+
+## [2026-10-06] fix | Phase 19 TOOL-01 文本及 artifact 改为已核验句柄上的有界 UTF-8 分页，限制扫描/单行/输出并保留真实 EOF、取消和续页语义。187 项、构建、八组有效反转、独立 APPROVE/CLEAR 与两模式真实 CLI 读量/句柄验证通过，见 features/phase-19-decisions.md §8.63；目录/glob 边界与阶段其余任务继续。

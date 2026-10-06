@@ -38,8 +38,8 @@ it("returns current content when an external write preserves the mtime", async (
 it("does not certify earlier bytes with a modification time observed after a read", async () => {
   const execution = createDefaultExecutionService();
   let first = true;
-  const registry = createCoreToolRegistry({ executionService: { ...execution, readTextFile: async (request) => {
-    const content = await execution.readTextFile(request);
+  const registry = createCoreToolRegistry({ executionService: { ...execution, readTextPage: async (request) => {
+    const content = await execution.readTextPage(request);
     if (first) {
       first = false;
       await fs.writeFile(request.absolutePath, "changed during read\n");

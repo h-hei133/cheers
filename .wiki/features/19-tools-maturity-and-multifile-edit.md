@@ -3,7 +3,7 @@ title: "19：核心工具成熟度、审批噪声隔离与多文件编辑方案"
 category: article
 sources: [doc-14-current-state, cheers-core-tools-28ff98ce, pi, oh-my-pi, codex]
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-06
 tags: [research, tools, edit, apply_patch, approval, security, sandbox]
 summary: "复审 15 个默认工具的真实契约，修正跨文件原子性、参考能力与资源边界的过度宣称。Phase 19 采用唯一 apply_patch 入口和 edit 域批次计划，复用 writer 与恢复链；补齐工具安全、真实 LSP、多模态/PDF 与浏览器能力。本文为决策与验收输入，不代表运行时已实现。"
 confidence: mixed
@@ -25,7 +25,7 @@ confidence: mixed
 
 | 工具 | Cheers 当前源码事实 | Phase 19 需要补齐的契约 |
 |---|---|---|
-| `read` | 文本/目录读取、offset/limit 分页与输出截断；文本分支先完整 `readTextFile` 再分行，尚不返回图片多模态块 | 大文件、单巨行、编码和内存预算；图片/PDF 有界读取与真实内容块，见 §3.7、§3.10 |
+| `read` | 文本及 artifact 已改为已验证句柄上的有界 UTF-8 分页；目录仍先枚举；尚不返回图片多模态块 | 文本本地验证见裁决 §8.63；目录预算、图片/PDF 有界读取与真实内容块继续，见 §3.7、§3.10 |
 | `write` | 单文件统一 writer、路径校验、进程内锁；非字符串 `content` 被转换为空串；底层支持可选 `expectedContent` | 非字符串拒绝、真实 schema 校验、显式不存在前置状态、精确 stale-read，见 §3.1 |
 | `edit` | 单文件可使用多段 `edits[]`、oldText/newText 或全量 content；快照记录供恢复 | 现有调用保留；新增 `apply_patch` 解析为同一 edit 域批次计划，不新增第二 writer，见 §4 |
 | `glob` | [glob.ts](../../packages/ts-shell/src/core/tools/glob.ts) 先枚举再过滤；1,000 项与输出字节上限不限制此前遍历 | 目录、文件、深度、时间与内存预算，取消及截断状态；成熟原生查找优先，保留受控 fallback |
@@ -107,7 +107,7 @@ confidence: mixed
 
 ### 3.7 `read`、`glob` 与 fallback：限制实际工作量
 
-输出截断不等于资源有界。`read` 当前先完整读再 split；单个超长行即使只要一行也可能占用大量内存。`glob` 当前先全枚举再过滤；限制最终 1,000 项不能限制目录遍历。
+输出截断不等于资源有界。2026-10-06 文本及 artifact 的 `read` 已改为有界分页：最多扫描 8MiB、保留 50KiB 文本和单行，使用协作式 5 秒期限，仅确认 EOF 后报告总行数。固定扫描上限或巨型行不提供无效的 offset 续页提示，详见 [裁决 §8.63](phase-19-decisions.md#863-tool-01文本与-artifact-有界分页)。`read` 目录分支及 `glob` 仍先枚举，限制最终 1,000 项不能限制此前目录遍历；TOOL-01 尚未整体完成。
 
 改进需在文件/目录 owner 中限制读取字节、单行字节、目录数量、候选文件数量、深度、打开句柄数和总 deadline；分页读取采用流式扫描或有界 seek 策略，超出条件返回明确的不完整原因。对编码检测、二进制误读、BOM/CRLF 保持和 UTF-8 截断边界设定契约。大目录扫描期间响应父取消。成熟原生工具可用时优先调用，缺失时 fallback 仍须有界。
 

@@ -216,9 +216,10 @@ describe("read tool improvements", () => {
     );
 
     expect(res.success).toBe(true);
-    expect(res.output).toContain("Line 1 is");
-    expect(res.output).toContain("exceeds 50KB limit");
-    expect(res.output).toContain("Use bash: sed -n '1p' bundle.min.js | head -c 51200");
+    expect(res.output).toContain("Line 1 exceeds the 50KB line limit");
+    expect(res.output).toContain("byte-range inspection");
+    expect(res.metadata?.read).toMatchObject({ stopReason: "output-limit", oversizedLine: 1 });
+    expect(res.output).not.toContain("60KB"); // The rest of the line was not scanned.
 
     await fs.rm(dir, { recursive: true, force: true });
   });
@@ -343,7 +344,9 @@ describe("reading a file that has not changed", () => {
     const manyLines = Array.from({ length: 1_600 }, (_, index) => `line ${index}`).join("\n");
     await withFile(manyLines, async ({ dir, sessionId }) => {
       const first = await read(dir, sessionId);
-      expect(first.output).toContain("Showing lines 1-500 of 1600");
+      expect(first.output).toContain("Showing lines 1-500 of an uncounted file");
+      expect(first.output).toContain("offset=501");
+      expect(first.metadata?.read).toMatchObject({ stopReason: "line-limit", nextOffset: 501 });
 
       const second = await read(dir, sessionId);
       expect(second.output).not.toContain("unchanged");
@@ -351,13 +354,12 @@ describe("reading a file that has not changed", () => {
     });
   });
 
-  it("does not dedupe a read that spilled to an artifact", async () => {
-    // The same reasoning for the byte ceiling: the output was cut short and
-    // stored, so the model never saw the file.
+  it("does not dedupe a read stopped by the line byte budget", async () => {
+    // The line was withheld, so the model never saw the file.
     const hugeLine = "var bundle=" + "x".repeat(60 * 1024);
     await withFile(hugeLine, async ({ dir, sessionId }) => {
       const first = await read(dir, sessionId);
-      expect(first.output).toContain("exceeds 50KB limit");
+      expect(first.output).toContain("exceeds the 50KB line limit");
 
       const second = await read(dir, sessionId);
       expect(second.output).not.toContain("unchanged");

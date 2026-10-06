@@ -1,7 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { verifyPathContainment } from '../security/pathJail.js'
-import { formatNonVisionFallback, getImageMimeType, isImageFilePath } from '../../model-adapters/multimodal.js'
 import { replaceInContent, replaceManyInContent } from './editEngine.js'
 import { backgroundTasks, renderTask, TaskRegistry } from '../shell/background/tasks.js'
 import { withFileLock } from '../../runtime/execution/fileLock.js'
@@ -14,7 +13,7 @@ import {
 import { createUnifiedDiff } from '../../presentation/tui/transcript/diff.js'
 import { truncateHead, truncateTail, truncateLineWidth } from './truncation.js'
 import { ArtifactManager } from '../session/artifactManager.js'
-import { parsePathSelector, sliceLinesBySelector } from './selectorParser.js'
+import { parsePathSelector } from './selectorParser.js'
 import {
   createDefaultExecutionService,
   type ExecutionAuthority,
@@ -22,8 +21,8 @@ import {
 } from '../../runtime/execution/service.js'
 import { McpGatewayBlockedError, type CoreMcpGateway } from '../mcp/gateway.js'
 import { classifyMcpFailure, classifyUnknownMcpFailure, mcpFailureMetadata } from '../mcp/errorTaxonomy.js'
-import { formatDirectoryListing } from './directoryListing.js'
 import { createGlobToolDefinition } from './glob.js'
+import { createReadToolDefinition } from './read.js'
 import { createSkillToolDefinition, type SkillCatalog } from './skill.js'
 import { createGrepToolDefinition } from './grep.js'
 import { createWebFetchToolDefinition } from './webFetch.js'
@@ -264,152 +263,7 @@ export function createCoreToolRegistry(options?: {
 }): ReadonlyMap<string, ToolDefinition> {
   const executionService = options?.executionService ?? createDefaultExecutionService()
   const tools: ToolDefinition[] = [
-    {
-      name: 'read',
-      description: 'Read a file in the workspace, with optional line offset/limit pagination and safe truncation protection. Reading a directory path lists its direct contents instead, one level deep. Image files are reported, not returned: this harness reads text, so use bash to inspect an image.',
-      argsSchema: {
-        type: 'object',
-        properties: {
-          path: {
-            type: 'string',
-            description: 'The relative path of the file or directory to read (e.g. package.json, src/index.ts, src).',
-          },
-          offset: {
-            type: 'number',
-            description: 'The 1-based starting line number, or entry number when reading a directory (default: 1).',
-          },
-          limit: {
-            type: 'number',
-            description: 'The maximum number of lines, or entries when reading a directory (default: 500, max: 1000).',
-          },
-        },
-        required: ['path'],
-      },
-      async execute(args, context) {
-        const rawPath = typeof args.path === 'string' ? args.path : ''
-        const selector = parsePathSelector(rawPath)
-        const artifactManager = ArtifactManager.getShared(context.workspaceRoot, context.sessionId)
-        let target = selector.cleanPath
-        let isArtifact = target.startsWith('artifact://')
-        let rawContent = ''
-
-        if (isArtifact) {
-          const resolvedArtifact = artifactManager.resolve(target)
-          if (!resolvedArtifact) {
-            throw new Error(`Artifact '${target}' not found in session storage.`)
-          }
-          rawContent = await executionService.readTextFile({
-            operationKind: 'file.read',
-            assertFileAccess: context.assertFileAccess,
-            abortSignal: context.abortSignal,
-            absolutePath: resolvedArtifact,
-            artifactDirectory: artifactManager.directory,
-            workspaceRoot: context.workspaceRoot,
-            authority: TOOL_APPROVED_READ_AUTHORITY,
-            caller: 'core-tool:read:artifact',
-            reason: 'Read session artifact output log.',
-            reportSafeTarget: resolvedArtifact,
-          })
-        } else {
-          target = resolveToolTarget({ path: selector.cleanPath }, 'path', context.workspaceRoot)
-          const containment = verifyPathContainment(target, context.workspaceRoot)
-          if (!containment.allowed) {
-            throw new Error(containment.reason ?? `Target '${target}' is outside workspace jail.`)
-          }
-          // A directory is a legitimate thing to read. Handing the model a raw
-          // EISDIR instead of the names it asked for makes "what is in here"
-          // unanswerable without shelling out, so the listing is answered here,
-          // through the same ignore policy every other tool walks with.
-          const stats = await fs.stat(containment.resolvedPath).catch(() => undefined)
-          if (stats?.isDirectory()) {
-            return approvedResult(
-              await formatDirectoryListing({
-                assertFileAccess: context.assertFileAccess,
-                abortSignal: context.abortSignal,
-                absolutePath: containment.resolvedPath,
-                workspaceRoot: context.workspaceRoot,
-                displayPath: selector.cleanPath,
-                sessionId: context.sessionId,
-                offset: typeof args.offset === 'number' ? args.offset : undefined,
-                limit: typeof args.limit === 'number' ? args.limit : undefined,
-              }),
-            )
-          }
-          // An image read as text is mojibake, and mojibake is worse than a
-          // refusal: it looks like content. Say what the file is and how to view
-          // it instead of handing the model bytes it cannot interpret.
-          if (isImageFilePath(containment.resolvedPath)) {
-            const stats = await fs.stat(containment.resolvedPath)
-            return approvedResult(
-              formatNonVisionFallback({
-                type: 'image',
-                data: '',
-                mimeType: getImageMimeType(containment.resolvedPath),
-              }) +
-                `\n${selector.cleanPath} is ${Math.round(stats.size / 1024)}KB on disk. ` +
-                `Its bytes cannot be read as text; this model receives no image content. ` +
-                `Use bash to inspect it (e.g. file, identify, exiftool) if you need facts about it.`,
-            )
-          }
-          // A read returns bytes from this invocation. Session identity and
-          // file timestamps cannot prove earlier content is still visible to
-          // this model, or that an external writer left the bytes unchanged.
-          rawContent = await executionService.readTextFile({
-            operationKind: 'file.read',
-            assertFileAccess: context.assertFileAccess,
-            abortSignal: context.abortSignal,
-            absolutePath: containment.resolvedPath,
-            workspaceRoot: context.workspaceRoot,
-            authority: TOOL_APPROVED_READ_AUTHORITY,
-            caller: 'core-tool:read',
-            reason: 'Read an approved workspace file target.',
-            reportSafeTarget: containment.resolvedPath,
-          })
-        }
-
-        // Strip leading BOM so the model never sees an invisible \uFEFF character
-        // that could pollute prompts or edits.
-        const { text: cleanContent } = splitByteOrderMark(rawContent)
-        const lines = cleanContent.split('\n')
-        const totalLines = lines.length
-
-        let selectedLines: string[] = []
-        let startLine = 1
-        let endLine = totalLines
-
-        if (selector.hasSelector) {
-          const sliced = sliceLinesBySelector(lines, selector)
-          selectedLines = sliced.selectedLines
-          startLine = sliced.startLine
-          endLine = sliced.endLine
-        } else {
-          const offset = typeof args.offset === 'number' && args.offset > 0 ? Math.floor(args.offset) : 1
-          const maxLimit = 1000
-          const defaultLimit = 500
-          const limit = typeof args.limit === 'number' && args.limit > 0 ? Math.min(Math.floor(args.limit), maxLimit) : defaultLimit
-          const startIdx = Math.max(0, offset - 1)
-          const endIdx = Math.min(totalLines, startIdx + limit)
-          selectedLines = lines.slice(startIdx, endIdx)
-          startLine = startIdx + 1
-          endLine = endIdx
-        }
-
-        let resultText = selectedLines.join('\n')
-        const truncated = truncateHead(resultText, { maxLines: 1500, maxBytes: 50 * 1024 })
-        resultText = truncated.content
-
-        if (truncated.firstLineExceedsLimit) {
-          const firstLineKb = Math.round((truncated.firstLineBytes ?? 0) / 1024)
-          resultText = `[Line ${startLine} is ${firstLineKb}KB, exceeds 50KB limit. Use bash: sed -n '${startLine}p' ${selector.cleanPath} | head -c 51200]`
-        } else if (truncated.truncated) {
-          const artifact = await artifactManager.save(rawContent, 'read')
-          resultText += `\n\n[Showing lines ${startLine}-${startLine + truncated.shownLines - 1} of ${totalLines} (${Math.round(truncated.shownBytes / 1024)}KB). Output spilled to ${artifact.uri}]\n[Use selector to read other sections: read(path="${selector.cleanPath}:${startLine + truncated.shownLines}-${startLine + truncated.shownLines + 200}")]`
-        } else if (startLine > 1 || endLine < totalLines) {
-          resultText += `\n[Showing lines ${startLine}-${endLine} of ${totalLines}. Use selector :N-M or offset/limit to view other sections]`
-        }
-        return approvedResult(resultText)
-      },
-    },
+    createReadToolDefinition(executionService),
     {
       name: 'write',
       description: 'Create or overwrite a file in the workspace with content.',
