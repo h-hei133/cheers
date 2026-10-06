@@ -30,6 +30,7 @@ import { promises as fs, realpathSync, type Dirent } from 'node:fs'
 import { verifyPathContainment } from '../../core/security/pathJail.js'
 import path from 'node:path'
 import { DirectoryReadError, readDirectory } from './directory.js'
+import { ReadCleanupError } from './read.js'
 import type { FileWalkOptions } from './types.js'
 import ignore, { type Ignore } from 'ignore'
 import {
@@ -113,7 +114,7 @@ async function listViaWalk(
       entries = await readDirectory(root, checkedPath(root, absolute, options), options)
       checkedPath(root, absolute, options)
     } catch (error) {
-      if (error instanceof DirectoryReadError && error.reason === 'cleanup') throw error
+      if (error instanceof ReadCleanupError) throw error
       options?.abortSignal?.throwIfAborted()
       if (error instanceof DirectoryReadError) throw error
       return

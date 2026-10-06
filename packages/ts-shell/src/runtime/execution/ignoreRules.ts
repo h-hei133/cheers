@@ -3,7 +3,7 @@ import { executeLocally } from './local.js'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import ignore, { type Ignore } from 'ignore'
-import { withVerifiedReadTarget } from './read.js'
+import { ReadCleanupError, withVerifiedReadTarget } from './read.js'
 import type { FileWalkOptions } from './types.js'
 
 /**
@@ -268,7 +268,8 @@ export async function loadIgnoreFile(matcher: Ignore, file: string, prefix: stri
       await verify()
       return value
     })
-  } catch {
+  } catch (error) {
+    if (error instanceof ReadCleanupError) throw error
     options?.abortSignal?.throwIfAborted()
     return
   }

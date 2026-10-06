@@ -1,6 +1,6 @@
 import { promises as fs, realpathSync, type Dirent } from 'node:fs'
 import { verifyPathContainment } from '../../core/security/pathJail.js'
-import { withVerifiedReadTarget } from './read.js'
+import { closeReadHandle, withVerifiedReadTarget } from './read.js'
 
 interface DirectoryReadOptions {
   readonly assertFileAccess?: (absolutePath: string) => void
@@ -12,11 +12,9 @@ const MAX_NAME_BYTES = 1024 * 1024
 const TIMEOUT_MS = 5_000
 
 export class DirectoryReadError extends Error {
-  constructor(readonly reason: 'entries' | 'bytes' | 'deadline' | 'cleanup') {
-    const detail = reason === 'cleanup' ? ''
-      : { entries: '10,000-entry limit', bytes: '1MiB name limit', deadline: 'read deadline' }[reason]
-    super(reason === 'cleanup' ? 'Directory listing failed: directory handle cleanup could not be verified.'
-      : `Directory listing stopped at the ${detail}; no complete listing is available. Read a smaller directory.`)
+  constructor(readonly reason: 'entries' | 'bytes' | 'deadline') {
+    const detail = { entries: '10,000-entry limit', bytes: '1MiB name limit', deadline: 'read deadline' }[reason]
+    super(`Directory listing stopped at the ${detail}; no complete listing is available. Read a smaller directory.`)
     this.name = 'DirectoryReadError'
   }
 }
@@ -84,8 +82,5 @@ async function collectEntries(target: string, deadline: number, verify: () => Pr
     await verify()
     check()
     return entries
-  } finally {
-    try { await directory.close() }
-    catch { throw new DirectoryReadError('cleanup') }
-  }
+  } finally { await closeReadHandle(directory) }
 }

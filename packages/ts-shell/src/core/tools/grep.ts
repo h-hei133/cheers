@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import { realpathSync } from "node:fs";
+import { ReadCleanupError } from '../../runtime/execution/read.js';
 import path from "node:path";
 import { approvedResult, deniedResult } from "./toolResultLifecycle.js";
 import type { ToolDefinition, ToolExecutionResult } from "../../tools/types.js";
@@ -107,7 +108,12 @@ export function createGrepToolDefinition(
       }
 
       if (viaRipgrep.reason === 'execution-failure') {
-        return deniedResult('Search stopped: execution failed; process cleanup could not be verified.');
+        return deniedResult('Search stopped: execution failed; process cleanup could not be verified.'
+          + (viaRipgrep.readCleanupFailed ? ' File handle cleanup also could not be verified.' : ''));
+      }
+
+      if (viaRipgrep.reason === 'read-cleanup-failed') {
+        return deniedResult('Search stopped: file handle cleanup could not be verified.');
       }
 
       if (context.abortSignal?.aborted || viaRipgrep.reason !== "not-installed") {
@@ -180,7 +186,8 @@ export function createGrepToolDefinition(
               }
             }
           }
-        } catch {
+        } catch (error) {
+          if (error instanceof ReadCleanupError) throw error;
           // Skip unreadable files gracefully
         }
       }

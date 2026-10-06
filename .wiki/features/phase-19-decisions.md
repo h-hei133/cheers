@@ -1077,3 +1077,16 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - regular/fullscreen 构建 CLI 各四次本地合成 HTTP 请求。包含 10020 项的真实目录由启动预热、read、回退 glob 分别触及，每个目录流只调用 Dir.read 10001 次并关闭；provider 收到明确限额错误，随后小文件仍正确返回，两模式 exit 0。夹具起初只预计两个工具读取，栈定位额外调用来自 warmWorkspaceFiles 后改为明确断言三类调用；没有将额外工作静默忽略。
 - 本批只完成单目录资源界；整棵目录树的累计数量/深度/期限、忽略文件读量、原生隐式读取和外层句柄失败仍需推进，TOOL-01、SAFE-02 与 Phase 19 整体继续。56afcb32 的 CI/Architecture Watch 已成功；fe5e5978 Architecture Watch 成功，CI 37417292877 最近仍在执行，本批远端结果另按新提交核对。
 - 五项静态门禁及 diff 检查通过；NormProof 阻断义务满足，四个既有函数数量 advisory 和 docs strict 的 120 个既有非阻断来源路径 advisory 保留。
+
+
+### 8.65 SAFE-02：读取句柄清理失败保留到工具结果
+
+- 已核验文件句柄和目录流共用 read owner 的 closeReadHandle 与 ReadCleanupError，移除上一批目录流单独的 cleanup 分支。关闭失败统一为安全的“句柄清理未确认”，不转发底层诊断；嵌套 finally 仍尝试释放每个句柄，不以抛出错误代替实际关闭尝试。
+- 遍历、忽略规则、回退 grep 和 workspace symbol scanner 保留该错误，优先于取消与 best-effort 跳过。write/edit 的原文读取关闭失败继续阻止后续 writer，回归断言目标原文不变且 writer 未调用。直接 read/page/directory 也不能把结果改成完整成功或披露合成诊断。
+- 原生搜索区分文件句柄清理失败与执行器的进程清理失败。复审发现两者同时发生时，后抛出的文件错误会覆盖已有 execution-failure；修正为搜索适配层记录已观察到的原生结果，保留 execution-failure 并附加 readCleanupFailed，工具同时呈现两项不确定性。共享关闭函数不依赖搜索结果类型。
+- 定向比较参考搜索中 no-match、失败退出和取消的分离决定，保留失败分类；对本项目已观察到的额外清理失败采用更严格的保留规则，不因取消或另一类清理失败丢弃它。不引入第二执行器、资源追踪系统或自动关闭重试。
+- 最初 12 个读取 owner 反例全部失败，确认旧路径的原始诊断、空数组/空 matcher 与取消覆盖。最终 Linux、Node 20.3 隔离环境 14 文件/171 项及 build:ts 通过，覆盖普通/分页/目录/忽略/嵌套句柄、回退与原生搜索、符号扫描、取消及 write/edit 零写。双重清理故障在适配器和真实工具层分别覆盖有/无取消。
+- 关闭分类、目录复用、遍历、忽略、回退 grep、符号扫描、原生分类、双重故障和工具双事实九组反转均触发断言失败，七个源文件逐字节恢复后 40 项通过。两条独立审查在双重故障修正后分别 APPROVE/CLEAR。
+- regular/fullscreen 构建 CLI 经本地合成 HTTP 各两次请求，实际子进程首次终止失败与父进程文件关闭失败同时注入。provider 工具消息保留两项失败且不含合成诊断；退出路径重试并回收已追踪子进程，两模式 exit 0，输入字节不变。插桩确认失败的文件句柄在进程退出前仍打开，故本批只证明失败传播与真实归因，不声称自动恢复、清理已完成或跨平台零残留。
+- 这一批解决 §8.64 记录的外层关闭错误被回退吞掉的问题；整树累计预算、忽略文件读量、原生隐式读取、创建副作用竞态和非 Linux 实际对象保证仍未完成，Phase 19 总体目标继续。fe5e5978 的 CI/Architecture Watch 已成功；c247e32f Architecture Watch 成功，CI 37417994960 最近已取得的状态仍为 in_progress，本批远端结果另按新提交核对。
+- 五项静态门禁和 diff 检查通过；NormProof 阻断义务满足，四个既有函数数量 advisory 与 docs strict 的 120 个既有非阻断来源路径 advisory 保留。

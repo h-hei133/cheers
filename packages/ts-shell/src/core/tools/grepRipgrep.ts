@@ -1,5 +1,5 @@
 import { StringDecoder } from "node:string_decoder";
-import { withVerifiedReadFiles } from '../../runtime/execution/read.js';
+import { ReadCleanupError, withVerifiedReadFiles } from '../../runtime/execution/read.js';
 import { executeLocally } from "../../runtime/execution/local.js";
 import path from "node:path";
 import { realpathSync, statSync } from 'node:fs';
@@ -63,13 +63,15 @@ export type RipgrepUnavailable =
   | "failed"
   /** The execution owner could not verify input delivery or process cleanup. */
   | "execution-failure"
+  /** A file descriptor used by native search could not be confirmed closed. */
+  | "read-cleanup-failed"
   | "cancelled"
   | "timeout"
   | "output-limit";
 
 export type RipgrepOutcome =
   | { readonly ok: true; readonly matches: readonly RipgrepMatch[] }
-  | { readonly ok: false; readonly reason: RipgrepUnavailable; readonly detail?: string };
+  | { readonly ok: false; readonly reason: RipgrepUnavailable; readonly detail?: string; readonly readCleanupFailed?: true };
 
 export interface RipgrepSearchInput {
   readonly assertFileAccess?: (target: string) => void;
@@ -257,18 +259,26 @@ export async function searchWithRipgrep(input: RipgrepSearchInput): Promise<Ripg
 async function streamSearch(binary: string, input: RipgrepSearchInput, files?: readonly string[]): Promise<RipgrepOutcome> {
   if (files && process.platform === 'linux') {
     const deadline = Date.now() + (input.timeoutMs ?? 30_000);
+    const observed: { outcome?: RipgrepOutcome } = {};
     try {
       return await withVerifiedReadFiles(files.map(file => ({
         operationKind: 'file.read', absolutePath: path.resolve(input.workspaceRoot, file), workspaceRoot: input.workspaceRoot,
         authority: { mode: 'read-only', source: 'tool-runtime-approval', reason: 'Read approved native search candidates.' },
         caller: 'core-tool:grep', reason: 'Bind native search to verified file descriptors.', reportSafeTarget: file,
         assertFileAccess: input.assertFileAccess, abortSignal: input.abortSignal,
-      })), handles => {
+      })), async handles => {
         const remaining = deadline - Date.now();
-        return remaining <= 0 ? Promise.resolve({ ok: false, reason: 'timeout' } as const)
-          : streamOutput(binary, { ...input, timeoutMs: remaining }, files, handles.map(handle => handle.fd));
+        observed.outcome = remaining <= 0 ? { ok: false, reason: 'timeout' }
+          : await streamOutput(binary, { ...input, timeoutMs: remaining }, files, handles.map(handle => handle.fd));
+        return observed.outcome;
       });
-    } catch { return { ok: false, reason: input.abortSignal?.aborted ? 'cancelled' : 'failed' }; }
+    } catch (error) {
+      if (error instanceof ReadCleanupError) {
+        return observed.outcome?.ok === false && observed.outcome.reason === 'execution-failure'
+          ? { ...observed.outcome, readCleanupFailed: true } : { ok: false, reason: 'read-cleanup-failed' };
+      }
+      return { ok: false, reason: input.abortSignal?.aborted ? 'cancelled' : 'failed' };
+    }
   }
   return streamOutput(binary, input, files);
 }

@@ -3,6 +3,20 @@ import { verifyPathContainment } from '../../core/security/pathJail.js'
 import type { FileHandle } from 'node:fs/promises'
 import type { TextFileReadExecutionRequest } from './types.js'
 
+export class ReadCleanupError extends Error {
+  readonly reason = 'cleanup'
+  constructor() {
+    super('Read failed: handle cleanup could not be verified.')
+    this.name = 'ReadCleanupError'
+  }
+}
+
+/** All read handles preserve unverified cleanup ahead of cancellation or content. */
+export async function closeReadHandle(handle: { close(): Promise<void> }): Promise<void> {
+  try { await handle.close() }
+  catch { throw new ReadCleanupError() }
+}
+
 function contained(target: string, root: string): string {
   const checked = verifyPathContainment(target, root)
   if (!checked.allowed) throw new Error('Read target is outside the authorized directory.')
@@ -61,7 +75,7 @@ export async function withVerifiedReadTarget<T>(request: ReadTarget, kind: 'file
     }
     throw error
   } finally {
-    await handle.close()
+    await closeReadHandle(handle)
   }
 }
 

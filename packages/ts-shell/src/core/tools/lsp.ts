@@ -1,4 +1,5 @@
 import path from "node:path";
+import { ReadCleanupError } from '../../runtime/execution/read.js';
 import { approvedResult, deniedResult } from "./toolResultLifecycle.js";
 import type { ToolDefinition, ToolExecutionContext } from "../../tools/types.js";
 import type { ExecutionService } from "../../runtime/execution/service.js";
@@ -138,7 +139,8 @@ export function createLspToolDefinition(
                 }
               }
             }
-          } catch {
+          } catch (error) {
+            if (error instanceof ReadCleanupError) throw error;
             // Skip unreadable files; the workspace scan remains best effort.
           }
         }
