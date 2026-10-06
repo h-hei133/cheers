@@ -15,6 +15,7 @@ import type { Option, OptionModel } from "./options.js";
 const MARKER_WIDTH = 4;
 
 export interface PanelChrome {
+  readonly filterable?: boolean;
   readonly title: string;
   /** Shown when the option set is empty. */
   readonly empty: string;
@@ -106,7 +107,7 @@ function renderFooter(chrome: PanelChrome, width: number): string {
   const keys = chrome.multiple
     ? ["↑↓ move", "space toggle", "↵ apply", "esc cancel"]
     : ["↑↓ move", "↵ choose", "esc cancel"];
-  return defaultTheme.dim(truncateToWidth(`  type to filter  ·  ${keys.join("  ·  ")}`, width));
+  return defaultTheme.dim(truncateToWidth(`  ${chrome.filterable === false ? '' : 'type to filter  ·  '}${keys.join("  ·  ")}`, width));
 }
 
 /** Column the detail text starts at, bounded so a long label cannot eat the row. */

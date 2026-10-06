@@ -12,7 +12,8 @@ import type { StructuredLogger } from '../../observability/structuredLogger.js';
 import type { ApprovalTrustPolicy } from '../../core/shell/approvalTrustPolicy.js';
 import type { CliMcpGateway } from '../../entrypoints/cliMcpModule.js';
 import type { PickerHost } from './picker/registry.js';
-import type { Picker } from './overlay.js';
+import type { Picker, OverlayHost } from './overlay.js';
+import { stripAnsi } from '../../presentation/tui/text/ansi.js';
 import type { InteractiveView } from '../../presentation/tui/surface/contract.js';
 import { StreamingRenderer } from '../../presentation/terminal/streaming.js';
 import { RecordingTerminal } from '../../test-utils/terminalDouble.js';
@@ -43,7 +44,7 @@ function build() {
     approvalTrustPolicy: {} as ApprovalTrustPolicy, initialMcpGateway: {} as CliMcpGateway,
   });
   modes.push(mode); mode.start();
-  const host = mode as unknown as { run(text: string): Promise<void>; pickerHost(): PickerHost; applyPicker(picker: Picker, ids: readonly string[]): void; queue: string[]; pickerPending: boolean; view: InteractiveView };
+  const host = mode as unknown as { run(text: string): Promise<void>; pickerHost(): PickerHost; applyPicker(picker: Picker, ids: readonly string[]): void; queue: string[]; pickerPending: boolean; view: InteractiveView; overlay: OverlayHost };
   return { context, terminal, mode, host, notifications: () => terminal.writes.filter(text => text.includes('\x1b]777;notify;')) };
 }
 
@@ -94,10 +95,66 @@ it('connects actual Settings input and confirmation to the accepted value and ne
   terminal.input('/settings\r'); await Promise.resolve(); await Promise.resolve();
   expect(context.runtimeConfig.attentionOnIdle).toBe(false);
   expect(fs.readFileSync(file, 'utf8')).toBe('{}');
-  // Filter to the requested state, then confirm the single row.
-  terminal.input('on — signal'); terminal.input('\r');
+  // Choosing the field and value only stages it; Apply is a separate action.
+  terminal.input('attentionOnIdle'); terminal.input('\r');
+  await vi.waitFor(() => expect(stripAnsi(host.overlay.render(80, 24).join('\n'))).toContain('Choose true'));
+  terminal.input('\r');
+  await vi.waitFor(() => expect(stripAnsi(host.overlay.render(80, 24).join('\n'))).toContain('Pending: true'));
+  expect(context.runtimeConfig.attentionOnIdle).toBe(false);
+  terminal.input('\r');
   await vi.waitFor(() => expect(context.runtimeConfig.attentionOnIdle).toBe(true));
   expect(getRuntimeConfig(root).attentionOnIdle).toBe(true);
   vi.spyOn(router, 'routeInteractiveCommand').mockImplementation(async input => { now += 30000; return { turnNumber: input.turnNumber + 1 }; });
   await host.run('synthetic turn'); expect(notifications()).toHaveLength(1);
+});
+
+it('keeps pasted advanced values out of the prompt and queues work until Apply finishes', async () => {
+  const { context, host, terminal } = build();
+  const route = vi.spyOn(router, 'routeInteractiveCommand').mockImplementation(async input => ({ turnNumber: input.turnNumber + 1 }));
+  const screen = () => stripAnsi(host.overlay.render(80, 24).join('\n'));
+  terminal.input('/settings\r'); await vi.waitFor(() => expect(screen()).toContain('Settings'));
+  terminal.input('\x1b[200~maxTurns\x1b[201~'); terminal.input('\r');
+  await vi.waitFor(() => expect(screen()).toContain('Edit value'));
+  host.queue.push('queued operation'); terminal.input('\r');
+  await vi.waitFor(() => expect(screen()).toContain('JSON integer'));
+  expect(route).not.toHaveBeenCalled(); expect(host.view.editor.getText()).toBe('');
+  terminal.input('\x15'); terminal.input('\x1b[200~27\x1b[201~'); terminal.input('\r');
+  await vi.waitFor(() => expect(screen()).toContain('Pending: 27'));
+  expect(context.runtimeConfig.maxTurns).toBe(15); expect(host.view.editor.getText()).toBe('');
+  expect(route).not.toHaveBeenCalled(); terminal.input('\r');
+  await vi.waitFor(() => expect(context.runtimeConfig.maxTurns).toBe(27));
+  await vi.waitFor(() => expect(route).toHaveBeenCalledOnce());
+});
+
+it.each(['replaced', 'stopped'] as const)('does not reopen a stale continuation when the overlay is %s', async state => {
+  const { host, mode } = build(); let finish!: (value: { next: Picker }) => void;
+  const pending = new Promise<{ next: Picker }>(resolve => { finish = resolve; });
+  const next: Picker = { title: 'stale-next', form: 'panel', empty: '', load: async () => [], apply: async () => undefined };
+  host.applyPicker({ ...next, exclusive: true, apply: () => pending }, ['value']);
+  if (state === 'replaced') host.overlay.open({ ...next, title: 'replacement' }); else mode.stop();
+  finish({ next }); await Promise.resolve(); await Promise.resolve();
+  expect(stripAnsi(host.overlay.render(80, 24).join('\n'))).not.toContain('stale-next');
+});
+
+it('retains input ownership for Enter and bracketed paste in the same transition chunk', async () => {
+  const { host, terminal } = build();
+  const route = vi.spyOn(router, 'routeInteractiveCommand').mockImplementation(async input => ({ turnNumber: input.turnNumber + 1 }));
+  terminal.input('/settings\r');
+  await vi.waitFor(() => expect(stripAnsi(host.overlay.render(80, 24).join('\n'))).toContain('Settings'));
+  terminal.input('maxTurns\rtyped-must-not-submit\r\x1b[200~must-not-become-a-prompt\x1b[201~\r');
+  await vi.waitFor(() => expect(stripAnsi(host.overlay.render(80, 24).join('\n'))).toContain('Edit value'));
+  expect(host.view.editor.getText()).toBe(''); expect(host.queue).toEqual([]); expect(route).not.toHaveBeenCalled();
+  terminal.input('\x1b'); await Promise.resolve(); expect(route).not.toHaveBeenCalled();
+});
+
+it('preserves typed and pasted prompt queueing during ordinary exclusive picker operations', async () => {
+  const { host, terminal } = build(); let finish!: () => void;
+  const pending = new Promise<undefined>(resolve => { finish = () => resolve(undefined); });
+  const route = vi.spyOn(router, 'routeInteractiveCommand').mockImplementation(async input => ({ turnNumber: input.turnNumber + 1 }));
+  host.applyPicker({ title: 'Navigate session', form: 'panel', empty: '', exclusive: true,
+    load: async () => [], apply: () => pending }, ['session']);
+  terminal.input('typed prompt\r\x1b[200~pasted prompt\x1b[201~\r');
+  expect(host.queue).toEqual(['typed prompt', 'pasted prompt']); expect(route).not.toHaveBeenCalled();
+  finish(); await vi.waitFor(() => expect(route).toHaveBeenCalledTimes(2));
+  expect(host.queue).toEqual([]);
 });

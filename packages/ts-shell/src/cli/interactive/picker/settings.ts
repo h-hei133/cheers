@@ -1,76 +1,107 @@
-import type { Option } from "../../../presentation/tui/chrome/options.js";
-import type { Picker, PickerOutcome } from "../overlay.js";
-import type { SettingKey, SettingsDraft } from "../settings.js";
+import type { Option } from '../../../presentation/tui/chrome/options.js';
+import { truncateToWidth } from '../../../presentation/tui/text/layout.js';
+import { formatSetting, validateSetting, type SettingDefinition, type SettingsScope } from '../../../config/settings.js';
+import type { Picker, PickerOutcome } from '../overlay.js';
+import type { SettingsDraft } from '../settings.js';
+import { normalizeStatusItems } from '../../../presentation/tui/chrome/items.js';
+import { statusItemPicker } from './statusItems.js';
 
-/** What the settings picker needs from its host. */
 export interface SettingsHost {
-  openSettings(): SettingsDraft;
+  openSettings(scope?: SettingsScope): SettingsDraft;
+}
+interface StagedValue { readonly value: unknown }
+
+function compact(value: unknown): string { return truncateToWidth(formatSetting(value), 36); }
+
+function inputError(setting: SettingDefinition, text: string): string | undefined {
+  try { return validateSetting(setting, JSON.parse(text)); }
+  catch { return 'Enter a valid JSON value. Strings need double quotes.'; }
 }
 
-/**
- * Runtime settings chooser.
- *
- * Only the settings that are safe to flip mid-session live here — the ones
- * whose next effect is a preference rather than a credential. Complex values
- * stay in the file, where a text editor beats a list of buttons; this panel
- * is for the switches a user reaches for while working.
- */
-
-/** One setting the panel can show and change. */
-interface ToggleSetting {
-  readonly key: SettingKey;
-  readonly label: string;
-  readonly describe: string;
-  readonly onText: string;
-  readonly offText: string;
+function valueEditor(host: SettingsHost, draft: SettingsDraft, setting: SettingDefinition, pending?: StagedValue): Picker {
+  const current = draft.values[setting.key];
+  const value = pending ? pending.value : current.stored === undefined ? current.requested : current.stored;
+  if (setting.key === 'tui.statusItems') {
+    const picker = statusItemPicker({ current: normalizeStatusItems(value as readonly string[] | undefined), save: async () => undefined, preview: () => {} });
+    return { ...picker, title: 'Stage status items — Enter reviews; empty uses defaults', exclusive: true, holdInput: true,
+      apply: async ids => validateSetting(setting, ids) ? undefined : ({ next: settingDetail(host, draft, setting, { value: normalizeStatusItems(ids) }) }) };
+  }
+  return {
+    title: `Edit ${setting.label} — ${draft.scope}`, form: 'panel', exclusive: true, holdInput: true, empty: '',
+    load: async () => [], apply: async () => undefined,
+    input: {
+      initial: value === undefined ? '' : formatSetting(value),
+      label: `JSON ${setting.schema.type}. Enter stages the value; Apply saves it.`,
+      validate: text => inputError(setting, text),
+      apply: async text => ({ next: settingDetail(host, draft, setting, { value: JSON.parse(text) }) }),
+    },
+  };
 }
 
-const TOGGLES: readonly ToggleSetting[] = [
-  {
-    key: "attentionOnIdle",
-    label: "Attention on idle",
-    describe: "Bell and notification sequence after a long operation; desktop display depends on your terminal",
-    onText: "on — signal after 30s turns",
-    offText: "off — never signal",
-  },
-  {
-    key: "offline",
-    label: "Offline",
-    describe: "Skip requests this session makes on its own initiative",
-    onText: "on — no self-initiated requests",
-    offText: "off — refreshes and checks allowed",
-  },
-];
+function scopePicker(host: SettingsHost, setting: SettingDefinition, scope: SettingsScope): Picker {
+  return {
+    title: 'Choose save scope — pending value will be discarded', form: 'panel', exclusive: true, holdInput: true, empty: '', initialSelection: scope,
+    load: async () => (['user', 'project'] as const).filter(scope => setting.policy.sources.includes(scope)).map(scope => ({ id: scope, label: scope === 'user' ? 'User configuration' : 'Project configuration' })),
+    async apply(ids) {
+      const scope = ids[0];
+      if (ids.length !== 1 || (scope !== 'user' && scope !== 'project') || !setting.policy.sources.includes(scope)) return undefined;
+      return { next: settingDetail(host, host.openSettings(scope), setting) };
+    },
+  };
+}
 
-export function settingsPicker(host: SettingsHost): Picker {
+function detailOptions(draft: SettingsDraft, setting: SettingDefinition, pending?: StagedValue): Option[] {
+  const current = draft.values[setting.key];
+  const options: Option[] = [
+    { id: 'effective', label: `Effective: ${compact(current.effective)}`, note: current.source, disabled: true },
+    { id: 'accepted', label: `Accepted: ${compact(current.requested)}`, note: current.restartRequired ? 'restart required' : current.requestedSource, disabled: true },
+    { id: 'stored', label: `Stored: ${compact(current.stored)}`, note: `${draft.scope} file`, disabled: true },
+  ];
+  if (pending) options.push({ id: 'pending', label: `Pending: ${compact(pending.value)}`, note: setting.policy.application, disabled: true });
+  if (setting.choices) setting.choices.forEach((value, index) => options.push({ id: `choice:${index}`, label: `Choose ${formatSetting(value)}`, detail: 'Stage without saving' }));
+  else options.push({ id: 'edit', label: 'Edit value', detail: setting.key === 'tui.statusItems' ? 'Choose supported items; stage without saving' : `JSON ${setting.schema.type}; stage without saving` });
+  options.push({ id: 'unset', label: 'Remove stored value', detail: 'Stage removal; other layers or defaults will apply' });
+  if (setting.policy.sources.includes('project')) options.push({ id: 'scope', label: 'Change save scope', note: draft.scope });
+  options.push({ id: 'apply', label: 'Apply', detail: pending ? `Save pending change to ${draft.scope} configuration` : 'Stage a value first', disabled: !pending });
+  options.push({ id: 'back', label: 'Back to settings', detail: 'Discard pending value' });
+  return options;
+}
+
+function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: SettingDefinition, pending?: StagedValue): Picker {
+  return {
+    title: `${setting.label} — save to ${draft.scope}`, form: 'panel', exclusive: true, holdInput: true, empty: '', filterable: false,
+    initialSelection: pending ? 'apply' : setting.choices ? 'choice:0' : 'edit',
+    load: async () => detailOptions(draft, setting, pending),
+    async apply(ids): Promise<PickerOutcome | undefined> {
+      if (ids.length !== 1) return undefined;
+      const id = ids[0];
+      if (id === 'edit' && !setting.choices) return { next: valueEditor(host, draft, setting, pending) };
+      if (id === 'unset') return { next: settingDetail(host, draft, setting, { value: undefined }) };
+      if (id === 'scope' && setting.policy.sources.includes('project')) return { next: scopePicker(host, setting, draft.scope) };
+      if (id === 'back') return { next: settingsPicker(host, draft.scope) };
+      if (id === 'apply' && pending) return { note: `${setting.label}: ${await draft.save(setting.key, pending.value)}` };
+      const index = setting.choices?.findIndex((_, position) => id === `choice:${position}`) ?? -1;
+      if (index >= 0) return { next: settingDetail(host, draft, setting, { value: setting.choices![index] }) };
+      return undefined;
+    },
+  };
+}
+
+/** Searchable grouped fields; selecting a row starts an explicit staged edit. */
+export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'): Picker {
   let draft: SettingsDraft | undefined;
   return {
-    title: "Settings — save to user configuration",
-    form: "panel",
-    empty: "Settings could not be loaded. Check your configuration and retry.",
+    title: `Settings — ${scope} configuration`, form: 'panel', exclusive: true, holdInput: true,
+    empty: 'Settings could not be loaded. Check your configuration and retry.',
     async load(): Promise<readonly Option[]> {
-      draft = host.openSettings();
-      const options: Option[] = [];
-      for (const toggle of TOGGLES) {
-        const current = draft.values[toggle.key];
-        for (const value of [true, false]) {
-          options.push({
-            id: `${toggle.key}:${value}`,
-            label: `${toggle.label} — ${value ? 'on' : 'off'}`,
-            detail: `${value ? toggle.onText : toggle.offText}. ${toggle.describe}. Enter saves this choice.`,
-            note: `Current ${current.effective ? 'on' : 'off'} · user ${current.stored === undefined ? 'unset' : current.stored ? 'on' : 'off'} · ${current.source}`,
-            selected: current.effective === value,
-          });
-        }
-      }
-      return options;
+      draft = host.openSettings(scope);
+      return draft.definitions.map(setting => ({ id: setting.key, label: `${setting.group} · ${setting.label}`,
+        detail: `${setting.key}. ${setting.description}`, note: `${compact(draft!.values[setting.key].effective)} · ${draft!.values[setting.key].source}` }));
     },
-    async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
+    async apply(ids): Promise<PickerOutcome | undefined> {
       if (!draft || ids.length !== 1) return undefined;
-      const toggle = TOGGLES.find(item => ids[0] === `${item.key}:true` || ids[0] === `${item.key}:false`);
-      if (!toggle) return undefined;
-      const note = await draft.save(toggle.key, ids[0] === `${toggle.key}:true`);
-      return { note: `${toggle.label}: ${note}` };
+      const setting = draft.definitions.find(item => item.key === ids[0]);
+      return setting ? { next: settingDetail(host, draft, setting) } : undefined;
     },
   };
 }

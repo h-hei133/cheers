@@ -159,6 +159,7 @@ export class InteractiveMode {
   private readonly alternateScreen: boolean;
   private busy = false;
   private pickerPending = false;
+  private pickerInputPending = 0;
   private toast?: string;
   private completionStatus?: string;
   private readonly catalogs: CatalogController;
@@ -354,6 +355,7 @@ export class InteractiveMode {
     this.stdin.onKey((event) => this.onKey(event));
     this.stdin.onMouse((report) => this.pointer.handle(report));
     this.stdin.onPaste((text) => {
+      if (this.overlay.handlePaste(text) || this.pickerInputPending > 0) return;
       // A paste while the full-screen editor is up belongs to it, whole; a paste
       // into the prompt is held aside once it is long enough to bury the draft.
       // Pasting the same thing twice in quick succession means "show it in full":
@@ -419,6 +421,7 @@ export class InteractiveMode {
 
 
   private onKey(event: Parameters<typeof routeKey>[0]): void {
+    if (this.pickerInputPending > 0 && !this.overlay.active) return;
     this.catalogs.cancel();
     this.completionStatus = undefined;
     // An open picker owns the keyboard: it needs the arrows, Enter, Escape, and
@@ -728,6 +731,8 @@ export class InteractiveMode {
 
   /** Hand the choice to the picker that produced it and surface what it reports. */
   private applyPicker(picker: Picker, ids: readonly string[]): void {
+    const revision = this.overlay.revision;
+    if (picker.holdInput) this.pickerInputPending++;
     if (picker.exclusive) {
       this.pickerPending = true;
       this.busy = true;
@@ -735,6 +740,7 @@ export class InteractiveMode {
     void picker
       .apply(ids)
       .then((outcome) => {
+        if (outcome?.next && !this.stopped && this.overlay.revision === revision) this.overlay.open(outcome.next);
         if (outcome?.note) {
           this.state.transcript.append(textBlock("command", outcome.note, picker.title));
         }
@@ -750,13 +756,14 @@ export class InteractiveMode {
         );
       })
       .finally(() => {
+        if (picker.holdInput) this.pickerInputPending--;
         this.catalogs.invalidate();
         if (picker.exclusive) {
           this.pickerPending = false;
           this.busy = false;
         }
         this.tui.requestRender();
-        const next = picker.exclusive ? this.queue.shift() : undefined;
+        const next = picker.exclusive && !this.stopped && !this.overlay.active ? this.queue.shift() : undefined;
         if (next !== undefined) void this.run(next);
       });
   }
@@ -815,7 +822,7 @@ export class InteractiveMode {
           ? `Status band items saved to ${written.path} (this project's file, which wins over your own)`
           : `Status band items saved to ${written.path}`;
       },
-      openSettings: () => openSettings(this.options.runtimeContext, () => this.theme.refresh()),
+      openSettings: (scope) => openSettings(this.options.runtimeContext, () => this.theme.refresh(), scope),
     };
   }
 

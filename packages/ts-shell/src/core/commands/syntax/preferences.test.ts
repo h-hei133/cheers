@@ -12,6 +12,7 @@ import { writeStatusItems } from "../../../cli/interactive/tuiSettings.js";
 import * as projectState from "../../state/projectState.js";
 import { STATUS_ITEMS } from "../../../presentation/tui/chrome/items.js";
 import { statuslineCompletions } from "../statusline/syntax.js";
+import { CONFIG_SETTINGS } from '../../../config/settings.js';
 
 let root: string;
 beforeEach(() => {
@@ -47,9 +48,10 @@ it("shares status item IDs and preserves comma lists, catalogue order and dedupl
 
 it("only describes implemented settings and refuses extra arguments", async () => {
   const command = createCommandRegistry(root).get("settings")!;
-  expect(command.getArgumentCompletions?.("")?.map(item => item.value)).toEqual(["attentionOnIdle", "offline"]);
+  expect(command.getArgumentCompletions?.("")?.map(item => item.value)).toEqual(CONFIG_SETTINGS.map(item => item.key));
   expect((await runSettingsCommand(["attentionOnIdle"], { cwd: root })).output).toContain("### attentionOnIdle");
-  for (const args of [["offline", "true"], ["temperature"], ["attentionOnIdle", "extra"]]) {
+  expect((await runSettingsCommand(["temperature"], { cwd: root })).output).toContain('### temperature');
+  for (const args of [["offline", "true"], ["providerCredentials"], ["attentionOnIdle", "extra"]]) {
     expect((await runSettingsCommand(args, { cwd: root })).output).toContain("Invalid /settings arguments");
   }
 });

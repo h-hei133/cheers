@@ -1207,3 +1207,16 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 验证：来源/配置/保存/会话覆盖/恢复/启动及面板组合 15 文件/243 项通过；初轮 22 项失败来自三个旧 shell 测试文件缺少新配置元数据的手造对象，改为复用真实 loader，保留原行为断言。Node 20.3 构建、import cycles/config consumers/declarations/node floor/docs strict 通过；NormProof 阻断义务满足，整体 verdict 仍为 partial，既有函数和文档 advisory 未被宣称解决。
 - 11 组有效反转覆盖普通遮蔽、TUI、限制贡献、开放 map 隐私、derived、会话覆盖、安装来源、环境引用、安全来源和面板来源；七个产品文件逐字节恢复，恢复后 2 文件/18 项通过。两个初始反转先触发测试解引用错误，不计为有效证据；调整断言顺序/可选访问后全部由行为断言检出。
 - regular/fullscreen 构建 CLI 在隔离 home/workspace 和本地合成 endpoint 下验证：打开面板不发 provider 请求；编辑磁盘后仍显示已接受来源，/reload 后显示新来源，环境覆盖可见，合成凭据未显示，退出均为 0。独立审查 APPROVE/CLEAR；高级字段编辑、分组搜索、可选 project 目标、pending/restart 详情面板仍继续，不能把本来源基础称作完整 CFG-04。完整 trust/模型能力校验、凭据刷新代际竞态、CFG-05 与 Phase 19 其他任务保持开放。
+
+
+### 8.74 CFG-04：高级设置编辑、明确范围与显式应用
+
+- config/settings 将 31 个可编辑条目的分组、说明和输入形状接到已有字段 schema/source/merge/application policy；TUI 展开为叶子，不纳入个人连接、凭据、元数据和 CLI-only hook override。搜索、命令说明和补全使用同一 registry，命令形式只提供说明。
+- 面板依次展示字段、详情、暂存选择/输入和显式 Apply。浏览、选择、编辑、切换 scope 与取消不写盘；详情区分 effective/source、accepted preference、stored target、pending 和 restart。user/project 目标明确且选择器从当前 scope 开始，换范围丢弃暂存并重取目标基线。
+- 复用配置 owner 的基线字段补丁，保存前后核验所选叶子，保留并发修改的其他字段和 JSONC 原文；显式 unset 删除该字段。只有核验保存后才刷新并报告实际应用，保留覆盖、拒绝与未核验状态。状态项和 diagram 的实际默认值来自渲染 owner，主题展示当前安装主题；会话 mode 优先于默认 mode 的事实单独说明。
+- 在现有 overlay 增加步骤续接及输入表单，复用 Editor 的字素移动、换行、撤销和删除，输入上限 64KiB，拒绝粘贴终端控制字符。每次打开使用新选择模型，reload 保留当前模型；不可过滤面板不消费过滤键或显示过滤提示。异步续接检查 overlay revision 和退出状态，下一设置步骤存在时不释放排队任务。
+- 独立审查发现并修复：状态项可保存未知 ID（改为 owner 合法集合和原状态项选择器，仅暂存、无实时写入）；合并限制误提示移除启动 override（仅 replace policy 使用该建议）；Enter 与粘贴同块时输入逸出（所有 Settings 步骤独立持有输入）。后者首次修复扩大到所有 exclusive 操作，已缩为 Settings 的 holdInput 计数并在 finally 释放，普通独占操作期间仍允许对话输入与排队。DEL/C1 显示转义保持 JSON 往返值。
+- 对照参考配置编辑器的有效值/目标文件分离与设置元数据复用，保留本项目字段级优先级、限制合并和显式 Apply；未另建持久化系统或执行器。两路独立审查最终 APPROVE/CLEAR，代码复审另确认控制字符转义。
+- 验证：较早扩大组合 75 文件/1085 项通过，其后 holdInput 收窄的受影响组合 4 文件/85 项通过，控制字符用例 1 文件/3 项通过。旧命令补全断言只列两个设置，按 registry 更新期望并保留非法参数拒绝；未用旧扩大组合代替最终增量验证。16 组有效反转均由断言检出，五个产品文件逐字节恢复后 5 文件/89 项通过。最终 Node 20.3 构建通过。
+- 最终 regular/fullscreen 构建 CLI 各发一次本地合成 HTTP 请求：暂存/取消配置字节不变；Apply temperature 0.3 后真实下一请求携带 0.3；明确 project 目标只改项目 diagram，用户配置不变且显示重启要求；注释保留、合成秘密未输出、退出 0。同块连续键入/粘贴哨兵未逸出菜单，过渡期零请求。
+- import cycles/config consumers/declarations/node floor/docs strict/diff 检查通过；最终 NormProof 阻断义务满足、整体仍为 partial，既有四个函数数量与 120 个文档来源 advisory 不视为已修复。此前 056a2ffa 与 0b6fec59 的 CI/Architecture Watch 均已成功，本批远端结果按新提交另核对。完整 CFG-01 trust/模型能力 policy、账户刷新代际竞态、CFG-05 和 Phase 19 十六批/七十六项总体目标继续。

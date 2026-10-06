@@ -6,6 +6,7 @@ import type { MouseReport } from "../../presentation/tui/input/mouse.js";
 import { defaultTheme } from "../../presentation/theme/theme.js";
 import { CURSOR_MARKER } from "../../presentation/tui/render/paint.js";
 import { truncateToWidth } from "../../presentation/tui/text/layout.js";
+import { InputForm, type PickerInput } from './picker/input.js';
 
 /**
  * The active picker.
@@ -19,6 +20,8 @@ import { truncateToWidth } from "../../presentation/tui/text/layout.js";
 export type PickerForm = "panel" | "modal";
 
 export interface PickerOutcome {
+  /** Continue a staged interaction in this same overlay without writing. */
+  readonly next?: Picker;
   /** Text to append to the transcript. */
   readonly note?: string;
   /**
@@ -30,6 +33,9 @@ export interface PickerOutcome {
 }
 
 export interface Picker {
+  /** Keep typed/pasted input within a staged interaction while its step applies. */
+  readonly holdInput?: boolean;
+  readonly input?: PickerInput<PickerOutcome | undefined>;
   readonly title: string;
   readonly form: PickerForm;
   /** Queue new submissions until a conversation-changing selection has settled. */
@@ -82,8 +88,10 @@ export interface Picker {
 const PANEL_ROWS = 12;
 
 export class OverlayHost {
+  private generation = 0;
+  private input: InputForm | undefined;
   private picker: Picker | undefined;
-  private readonly model = new OptionModel();
+  private model = new OptionModel();
   private loading = false;
   private readonly optionRows = new Map<number, string>();
   private renderedWidth = 0;
@@ -99,6 +107,7 @@ export class OverlayHost {
   get active(): boolean {
     return this.picker !== undefined;
   }
+  get revision(): number { return this.generation; }
 
   /** Whether the open picker wants the whole screen. */
   get fullScreen(): boolean {
@@ -107,6 +116,9 @@ export class OverlayHost {
 
   /** Open `picker`, loading its options in the background. */
   open(picker: Picker): void {
+    this.model = new OptionModel();
+    this.generation++;
+    this.input = picker.input ? new InputForm(picker.input) : undefined;
     this.optionRows.clear();
     this.picker?.previewEnd?.();
     this.picker = picker;
@@ -136,6 +148,8 @@ export class OverlayHost {
   }
 
   close(): void {
+    this.generation++;
+    this.input = undefined;
     this.optionRows.clear();
     this.picker?.previewEnd?.();
     this.picker = undefined;
@@ -153,6 +167,7 @@ export class OverlayHost {
     this.renderedWidth = width;
     const picker = this.picker;
     if (!picker) return [];
+    if (this.input) return this.input.render(picker.title, width, height);
 
     if (this.subMode === "confirm-delete") {
       return this.renderConfirmDelete(width, height);
@@ -193,6 +208,7 @@ export class OverlayHost {
         title: picker.title,
         empty,
         multiple: picker.multiple === true,
+        filterable: picker.filterable,
         hideCount: isApproval,
         onOptionRow: (row, id) => this.optionRows.set(row, id),
       },
@@ -204,6 +220,7 @@ export class OverlayHost {
   /** A picker owns pointer input; a click focuses, and keyboard confirmation applies. */
   handlePointer(report: MouseReport, top?: number): boolean {
     if (!this.picker) return false;
+    if (this.input) return true;
     if (!this.loading && this.subMode === "none" && top !== undefined &&
         report.kind === "press" && report.button === 0 && !report.shift && !report.alt && !report.ctrl &&
         report.column >= 0 && report.column < this.renderedWidth) {
@@ -213,6 +230,18 @@ export class OverlayHost {
         this.onChange();
       }
     }
+    return true;
+  }
+
+  /** Pasted form text never reaches the underlying conversation draft. */
+  handlePaste(text: string): boolean {
+    if (!this.picker) return false;
+    if (this.input) this.input.paste(text);
+    else if (this.subMode === 'none' && this.picker.filterable !== false) {
+      this.optionRows.clear();
+      this.model.appendFilter(text.replace(/[\r\n\t]+/g, ' ').replace(/[\x00-\x1f\x7f-\x9f]/g, ''));
+    }
+    this.onChange();
     return true;
   }
 
@@ -295,6 +324,15 @@ export class OverlayHost {
   handleKey(event: ParsedKeyEvent, apply: (picker: Picker, ids: readonly string[]) => void): boolean {
     const picker = this.picker;
     if (!picker) return false;
+    if (this.input) {
+      if (event.keyId === 'escape' || event.keyId === 'ctrl+c') this.close();
+      else if (event.keyId === 'enter') {
+        const value = this.input.value();
+        if (value !== undefined) this.acceptDirect({ ...picker, apply: () => picker.input!.apply(value) }, apply, []);
+      } else this.input.key(event);
+      this.onChange();
+      return true;
+    }
 
     // Sub-mode: confirm delete
     if (this.subMode === "confirm-delete") {
@@ -475,13 +513,13 @@ export class OverlayHost {
         if (picker.multiple) {
           this.model.toggle();
           picker.previewChange?.(this.model.chosenIds());
-        } else if (!isApprovalPicker) {
+        } else if (!isApprovalPicker && picker.filterable !== false) {
           this.optionRows.clear();
           this.model.appendFilter(" ");
         }
         break;
       case "backspace":
-        if (!isApprovalPicker) {
+        if (!isApprovalPicker && picker.filterable !== false) {
           this.optionRows.clear();
           this.model.backspaceFilter();
         }
@@ -501,7 +539,7 @@ export class OverlayHost {
           return true;
         }
         if (event.text && !event.ctrl && !event.alt) {
-          if (!isApprovalPicker) {
+          if (!isApprovalPicker && picker.filterable !== false) {
             this.optionRows.clear();
             this.model.appendFilter(event.text);
           }

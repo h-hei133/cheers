@@ -39,13 +39,13 @@ it('loads the default, project, user and explicit launch notification preference
 it('saves and publishes the chosen preference, retaining unrelated concurrent edits and JSONC trivia', async () => {
   fs.writeFileSync(file, '// user preferences\n{"offline":false,"maxTurns":12,}\n');
   const context = runtime(); const applied = vi.fn(); const draft = openSettings(context, applied);
-  expect(draft.values.attentionOnIdle).toEqual({ effective: false, stored: undefined, source: 'default' });
+  expect(draft.values.attentionOnIdle).toMatchObject({ effective: false, stored: undefined, source: 'default' });
   fs.writeFileSync(file, '// user preferences\n{"offline":false,"maxTurns":13,}\n');
   expect(await draft.save('attentionOnIdle', true)).toContain('Effective for the next operation');
   expect(context.runtimeConfig.attentionOnIdle).toBe(true);
   expect(context.runtimeConfig.maxTurns).toBe(13);
   expect(fs.readFileSync(file, 'utf8')).toContain('// user preferences');
-  expect(openSettings(context, applied).values.attentionOnIdle).toEqual({ effective: true, stored: true, source: 'user' });
+  expect(openSettings(context, applied).values.attentionOnIdle).toMatchObject({ effective: true, stored: true, source: 'user' });
   expect(getRuntimeConfig(root).attentionOnIdle).toBe(true); expect(applied).toHaveBeenCalledOnce();
 });
 
@@ -103,7 +103,7 @@ it('keeps accepted settings after invalid reload and distinguishes persistence f
   expect(context.runtimeConfig.attentionOnIdle).toBe(false);
   fs.writeFileSync(file, '{"attentionOnIdle":true}');
   const draft = openSettings(context, applied);
-  expect(draft.values.attentionOnIdle).toEqual({ effective: false, stored: true, source: 'default' });
+  expect(draft.values.attentionOnIdle).toMatchObject({ effective: false, stored: true, source: 'default' });
   fs.writeFileSync(getProjectConfigPath(root), '{broken');
   const notice = await draft.save('attentionOnIdle', true);
   expect(notice).toContain('Saved to your user configuration'); expect(notice).toContain('not applied (rejected)');
@@ -113,7 +113,7 @@ it('keeps accepted settings after invalid reload and distinguishes persistence f
 
 it.each(['unchanged', 'unknown', 'persisted'] as const)('preserves the %s save outcome without publishing', async state => {
   const context = runtime(); const applied = vi.fn(); const draft = openSettings(context, applied);
-  vi.spyOn(configFiles, 'writeUserRuntimeConfigFile').mockImplementation(() => { throw new ConfigWriteError('write-failed', state); });
+  vi.spyOn(configFiles, 'writeRuntimeConfigFileAt').mockImplementation(() => { throw new ConfigWriteError('write-failed', state); });
   const result = await draft.save('attentionOnIdle', true);
   expect(result).toContain(state === 'unchanged' ? 'did not write' : state === 'unknown' ? 'unverified' : 'lock cleanup failed');
   expect(result).not.toContain('Effective'); expect(applied).not.toHaveBeenCalled();
@@ -128,4 +128,71 @@ it('invalidates a menu after a substrate transition and consumes an applied choi
   await current.save('attentionOnIdle', true);
   expect(await current.save('attentionOnIdle', false)).toContain('Reopen Settings');
   expect(getRuntimeConfig(root).attentionOnIdle).toBe(true);
+});
+
+it('validates advanced numbers before writing and applies a valid request setting', async () => {
+  const context = runtime(); const applied = vi.fn(); const draft = openSettings(context, applied);
+  expect(await draft.save('maxTurns', 0)).toContain('Invalid value');
+  expect(fs.readFileSync(file, 'utf8')).toBe('{}'); expect(applied).not.toHaveBeenCalled();
+  expect(await draft.save('maxTurns', 25)).toContain('Effective for the next operation');
+  expect(context.runtimeConfig.maxTurns).toBe(25); expect(applied).toHaveBeenCalledOnce();
+});
+
+it('keeps project targeting explicit and reports ordinary user precedence', async () => {
+  fs.writeFileSync(file, '{"maxTurns":20}'); const context = runtime();
+  const draft = openSettings(context, vi.fn(), 'project');
+  expect(await draft.save('maxTurns', 10)).toContain('follows user policy');
+  expect(JSON.parse(fs.readFileSync(getProjectConfigPath(root), 'utf8')).maxTurns).toBe(10);
+  expect(JSON.parse(fs.readFileSync(file, 'utf8')).maxTurns).toBe(20);
+  expect(context.runtimeConfig.maxTurns).toBe(20);
+});
+
+it('shows renderer defaults and accepted display preferences while a restart is pending', async () => {
+  const context = runtime(); const draft = openSettings(context, vi.fn(), 'project');
+  expect(draft.values['tui.diagrams']).toMatchObject({ effective: 'streaming', requested: undefined, source: 'default', restartRequired: false });
+  expect(await draft.save('tui.diagrams', 'off')).toContain('Restart required');
+  expect(context.runtimeConfig.tui?.diagrams).toBeUndefined();
+  expect(context.configuration.current.requested.tui?.diagrams).toBe('off');
+  expect(openSettings(context, vi.fn(), 'project').values['tui.diagrams']).toMatchObject({ effective: 'streaming', requested: 'off', requestedSource: 'project', restartRequired: true });
+});
+
+it('saves one nested display leaf and retains concurrent sibling changes and comments', async () => {
+  fs.writeFileSync(file, '// preferences\n{"tui":{"statusItems":["cost"]}}');
+  const context = runtime(); const draft = openSettings(context, vi.fn());
+  fs.writeFileSync(file, '// preferences\n{"tui":{"statusItems":["model"]}}');
+  expect(await draft.save('tui.diagrams', 'off')).toContain('Saved to your user');
+  expect(fs.readFileSync(file, 'utf8')).toContain('// preferences');
+  expect(configFiles.readUserRuntimeConfigFile().tui).toEqual({ statusItems: ['model'], diagrams: 'off' });
+});
+
+it('removes only the selected stored field and exposes the remaining project value', async () => {
+  fs.writeFileSync(file, '{"maxTurns":20,"offline":true}');
+  fs.writeFileSync(getProjectConfigPath(root), '{"maxTurns":8}'); const context = runtime();
+  expect(await openSettings(context, vi.fn()).save('maxTurns', undefined)).toContain('Saved to your user');
+  expect(configFiles.readUserRuntimeConfigFile()).toEqual({ offline: true });
+  expect(context.runtimeConfig.maxTurns).toBe(8);
+  expect(openSettings(context, vi.fn()).values.maxTurns).toMatchObject({ effective: 8, source: 'project', stored: undefined });
+});
+
+it.each(['providerConnections', 'providerCredentials', 'allowUntrustedHooks', 'unknown'])('excludes %s from generic editing', async key => {
+  const context = runtime(); const draft = openSettings(context, vi.fn());
+  expect(draft.definitions.some(item => item.key === key)).toBe(false);
+  expect(await draft.save(key, true)).toContain('not editable'); expect(fs.readFileSync(file, 'utf8')).toBe('{}');
+});
+
+it('rejects unsupported status IDs without writing while preserving legacy loading compatibility', async () => {
+  const context = runtime(); const draft = openSettings(context, vi.fn());
+  expect(await draft.save('tui.statusItems', ['not-a-status-item'])).toContain('supported status');
+  expect(fs.readFileSync(file, 'utf8')).toBe('{}');
+  expect(await draft.save('tui.statusItems', ['cost'])).toContain('Saved');
+  expect(configFiles.readUserRuntimeConfigFile().tui?.statusItems).toEqual(['cost']);
+});
+
+it('explains merged restrictions without falsely prescribing removal of a launch override', async () => {
+  fs.writeFileSync(getProjectConfigPath(root), '{"allowedTools":["read"]}');
+  const context = runtime({ allowedTools: ['read', 'write'] });
+  const notice = await openSettings(context, vi.fn()).save('allowedTools', ['read', 'write']);
+  expect(context.runtimeConfig.allowedTools).toEqual(['read']);
+  expect(notice).toContain('project + user + override policy');
+  expect(notice).not.toContain('restart without');
 });

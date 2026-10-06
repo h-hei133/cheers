@@ -1,65 +1,25 @@
-import { settingsSyntax } from "./settings/syntax.js";
-import { syntaxHelp } from "./syntax/projection.js";
-import { parseSyntax } from "./syntax/parse.js";
-import type { CommandContext, LocalCommandResult } from "./types.js";
+import { settingsSyntax } from './settings/syntax.js';
+import { syntaxHelp } from './syntax/projection.js';
+import { parseSyntax } from './syntax/parse.js';
+import { CONFIG_SETTINGS, settingDefinition } from '../../config/settings.js';
+import type { CommandContext, LocalCommandResult } from './types.js';
 
-/**
- * `/settings`
- *
- * The interactive surface answers this with a panel — the picker registry
- * maps the bare command to the settings chooser, the same way `/model` and
- * `/statusline` become pickers. What runs here is the non-interactive story:
- * name the settings that exist, say where they live, and never pretend to
- * flip what a piped session cannot show.
- */
-
-export async function runSettingsCommand(
-  args: string[],
-  _context: CommandContext,
-): Promise<LocalCommandResult> {
+/** The command describes the same editable registry as the interactive panel. */
+export async function runSettingsCommand(args: string[], _context: CommandContext): Promise<LocalCommandResult> {
   const parsed = parseSyntax(settingsSyntax, args);
-  if (!parsed.ok) return { kind: "local", output: `Invalid /settings arguments: ${parsed.reason}\n${syntaxHelp(settingsSyntax)}` };
-  const which = parsed.action.name;
-  if (which === "attentionOnIdle") {
-    return {
-      kind: "local",
-      output: [
-        "### attentionOnIdle",
-        "",
-        "Bell and a desktop notification when a turn that ran 30s or longer",
-        "finishes with nothing queued behind it. Off by default.",
-        "",
-        'Set it in the user config: `"attentionOnIdle": true`',
-      ].join("\n"),
-    };
-  }
-  if (which === "offline") {
-    return {
-      kind: "local",
-      output: [
-        "### offline",
-        "",
-        "Skips requests this session makes on its own initiative — the release",
-        "check and catalogue refresh. Prompts and tools are unaffected.",
-        "",
-        'Set it in the user config: `"offline": true`',
-      ].join("\n"),
-    };
-  }
-  return {
-    kind: "local",
-    output: [
-      "### Settings",
-      "",
-      "Interactive: run `/settings` bare to open the panel.",
-      "",
-      "| Setting | What it does |",
-      "| :--- | :--- |",
-      "| attentionOnIdle | bell + notification when a long turn finishes |",
-      "| offline | skip self-initiated requests |",
-      "",
-      "Details: `/settings <name>`. The settings live in the user config file,",
-      "where the rest of the configuration already is.",
-    ].join("\n"),
-  };
+  if (!parsed.ok) return { kind: 'local', output: `Invalid /settings arguments: ${parsed.reason}\n${syntaxHelp(settingsSyntax)}` };
+  const setting = settingDefinition(parsed.action.name);
+  if (setting) return { kind: 'local', output: [
+    `### ${setting.key}`, '', setting.description, '',
+    `Group: ${setting.group}. Input: ${setting.schema.type}. Applies: ${setting.policy.application}.`,
+    `Editable scope: ${setting.policy.sources.filter(source => source === 'user' || source === 'project').join(', ')}. Merge: ${setting.policy.merge}.`,
+    'Open /settings, select the field, stage a value, and choose Apply to save. Selecting a row does not save.',
+  ].join('\n') };
+  return { kind: 'local', output: [
+    '### Settings', '', 'Open /settings in an interactive session. Type to search by field, group or description.',
+    'Choose a field and save scope, stage a value, then choose Apply. Credentials stay in /connect.', '',
+    '| Group | Setting | What it does |', '| :--- | :--- | :--- |',
+    ...CONFIG_SETTINGS.map(item => `| ${item.group} | ${item.key} | ${item.description} |`), '',
+    'Details: /settings <name>. This command does not write configuration.',
+  ].join('\n') };
 }

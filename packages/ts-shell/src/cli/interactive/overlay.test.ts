@@ -28,6 +28,14 @@ const press = (overlay: OverlayHost, data: string, apply = vi.fn()): boolean =>
   overlay.handleKey(parseKeyEvent(data), apply);
 
 describe("pointer focus", () => {
+  it('starts each new picker with its own selection and cursor state', async () => {
+    const { overlay } = host(); const apply = vi.fn();
+    overlay.open(picker({ multiple: true })); await Promise.resolve(); await Promise.resolve();
+    press(overlay, ' '); // select alpha in addition to preselected beta
+    overlay.open(picker({ multiple: true, load: async () => [{ id: 'a', label: 'alpha' }, { id: 'b', label: 'beta' }] }));
+    await Promise.resolve(); await Promise.resolve(); press(overlay, '\r', apply);
+    expect(apply).toHaveBeenCalledWith(expect.anything(), []);
+  });
   it.each(["panel", "modal"] as const)("selects a rendered %s row but waits for keyboard confirmation", async (form) => {
     const { overlay } = host();
     const apply = vi.fn();
