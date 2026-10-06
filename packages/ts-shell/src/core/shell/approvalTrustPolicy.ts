@@ -44,6 +44,11 @@ export class ApprovalTrustPolicy {
     this.policyFilePath = policyFilePath ?? defaultPolicyFilePath();
   }
 
+  /** The fixed source this policy instance reads, including a custom store path. */
+  get sourcePath(): string {
+    return this.policyFilePath;
+  }
+
   evaluate(prompt: EscalationPrompt, projectRoot: string): ApprovalEvaluation {
     const normalizedProjectRoot = normalizeProjectRoot(projectRoot);
     const scope = buildScope(prompt);

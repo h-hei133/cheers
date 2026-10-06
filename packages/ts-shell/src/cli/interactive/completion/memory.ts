@@ -9,10 +9,14 @@ import type { Suggestion } from "../../../presentation/tui/chrome/suggestions.js
 
 export type MemoryCatalogKind = "record" | "invalidatable" | "candidate" | "approvable" | "approved";
 
+export function memoryCatalogStore(projectRoot: string) {
+  return createProjectMemoryLocalStore({ ref: { mode: "explicit-local", root: projectMemoryRootFor(projectRoot) } });
+}
+
 /** Queries and review mutations stay in command owners; candidates only expose stable IDs. */
 export async function memoryCatalog(kind: MemoryCatalogKind, context: ShellRuntimeContext): Promise<readonly Suggestion[]> {
   if (kind === "record" || kind === "invalidatable") {
-    const store = createProjectMemoryLocalStore({ ref: { mode: "explicit-local", root: projectMemoryRootFor(context.projectRoot) } });
+    const store = memoryCatalogStore(context.projectRoot);
     const result = await store.list({ includeInvalidated: kind === "record" });
     if (result.diagnostics?.length) throw new Error("Memory catalog unavailable");
     return result.records.map(record => ({ value: record.id, label: record.id,

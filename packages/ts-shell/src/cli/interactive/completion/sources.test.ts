@@ -50,7 +50,7 @@ it.each(["connection", "model"] as const)("reloads %s when source precedence cha
 });
 
 it("tracks every trust-file fallback without creating files or traversing home", () => {
-  const sources = catalogSources("workflow", root);
+  const sources = catalogSources("workflow", { cwd: root, projectRoot: root });
   expect(sources).toEqual([
     path.join(root, ".agents", "workflows"),
     ...[".cheers", ".cheer", ".private-agents", ".coding-agents"].map(dir => path.join(root, dir, "trust.json")),

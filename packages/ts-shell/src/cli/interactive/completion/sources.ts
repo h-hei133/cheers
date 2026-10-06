@@ -6,13 +6,24 @@ import { workflowsDir } from "../../../core/workflow/definition.js";
 import { themeDirectories } from "../../../presentation/themes/index.js";
 import { resolveCatalogDirectory } from "./paths.js";
 import type { CatalogKind } from "./request.js";
+import { memoryCatalogStore } from "./memory.js";
+
+interface Sources {
+  readonly cwd: string;
+  readonly projectRoot: string;
+  readonly themePaths?: readonly string[];
+  readonly grantPath?: string;
+}
 
 /** Include absent higher-priority files and fallbacks that can become effective after deletion. */
 function userFiles(...files: string[]): string[] {
   return userDataSearchDirs().flatMap(directory => files.map(file => path.join(directory, path.basename(file))));
 }
 
-export function catalogSources(kind: CatalogKind, cwd: string, query?: string, themePaths: readonly string[] = []): readonly string[] {
+export function catalogSources(kind: CatalogKind, sources: Sources, query?: string): readonly string[] {
+  const { cwd, projectRoot, themePaths = [], grantPath } = sources;
+  if (kind === "grant") return grantPath ? [grantPath] : [];
+  if (kind === "record" || kind === "invalidatable") return [memoryCatalogStore(projectRoot).ref.recordsFile!];
   if (kind === "theme") return [...new Set([...themeDirectories(cwd), ...themePaths].map(target => path.resolve(target)))];
   if (kind === "file" || kind === "directory") return [resolveCatalogDirectory(cwd, query ?? "", kind === "directory")];
   if (kind === "connection") return userFiles(getUserRuntimeConfigPath());

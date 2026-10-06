@@ -928,3 +928,13 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 移除递归目录报告后，深层 manifest 编辑的事件断言失败；逐字节恢复后组合通过。regular/fullscreen 真实 CLI 在无新按键时响应深层技能创建、manifest 原子替换、删除及重建，Esc 后事件不重开菜单，两模式 exit 0。
 - import cycles/config consumers/declarations/node floor 通过，NormProof 无环/导入解析 satisfied，既有 5 个函数数量 advisory 保留。ce228211 Architecture Watch 37394466969 成功，CI 37394466624 查询时仍运行；32598f7e 与 b40344b5 的 CI 亦待终态。
 - CMD-04 的会话/记忆/授权 owner 与 MCP 状态、间接配置事件仍未完成；底层同步技能解析无法被 AbortSignal 物理中断的限制继续保留，剩余参数审计与 Phase 19 后续批次继续。
+
+### 8.51 CMD-04：授权策略与记忆记录文件事件
+
+- grant 候选观察实际 ApprovalTrustPolicy 实例的只读 sourcePath，支持自定义位置及构造时固定的回退文件，不在补全侧重新推算默认路径。新增 accessor 不改变授权匹配、授予、撤销或写入行为；只有列表接口的替代 policy 仍可使用既有 TTL。
+- record/invalidatable 复用同一记忆 store 工厂的规范化 recordsFile，使用会话 projectRoot 而非 cwd。没有猜测记录文件名或另建存储；缺失目录的监听不创建 store，外部创建、原子替换和删除都使缓存失效。候选/审批决定/压缩检查点仍属于内存 owner，未用磁盘事件冒充其状态通知。
+- 沿用此前参考文件事件仅刷新已查询来源、删除使其失效的决定，共享 controller 继续负责防抖、当前草稿校验、Esc 后不重开与退出释放。菜单不读取到正文展示层、不改变授权或记忆记录，实际命令仍由 owner 执行。
+- Linux、Node 20.3 隔离环境最终 20 文件/203 项及 build:ts 通过，覆盖自定义 policy、cwd/projectRoot 分离、创建/原子替换/删除/释放、字节及 mtime 不变，含现存授权与记忆持久化/删除测试。首轮选择了不存在的旧 local-store 测试路径，随后改为现存测试补跑并以最终实际数字记录。
+- 移除 grant/record/invalidatable 来源监听后三组事件断言均失败，逐字节恢复后组合通过。regular/fullscreen 真实 CLI 无新按键响应外部授权和记录变化，授权 Tab 不写文件、记忆正文未进入终端、Esc 后不重开，两模式 exit 0。
+- import cycles/config consumers/declarations/node floor 通过；NormProof 全图无环与导入解析 satisfied，既有 5 个函数数量 advisory 保留。32598f7e CI 37394082538 与 Architecture Watch 37394082553、b40344b5 CI 37393613562 与 Architecture Watch 37393613204 均成功；4a86f8af Architecture Watch 37394996510 成功，CI 37394996509 仍运行。
+- CMD-04 会话目录、内存审批/检查点、MCP 连接状态和间接配置事件尚未全部完成；剩余参数审计及 Phase 19 后续批次继续。
