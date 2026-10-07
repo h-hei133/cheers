@@ -1576,3 +1576,14 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 上批 `d28f379d` 已推送，CI 37550526553 和 Watch 37550526511 均在零步骤时失败；GitHub annotation 明确为账户付款/spending limit 导致 job 未启动。该 SHA 没有远端测试证据，不能将本地通过说成 CI 成功；账户侧恢复前后续提交同样需单独追踪。本批独立代码 APPROVE、架构 CLEAR。
 
 - 五项静态 gates、43 项 script tests 与 NormProof 0 blocking 通过，见 `.tmp/picker-gates-v47psh2k`，既有 advisory 保留。独立代码最终 overlay/options 64 项及 disabled approval 快捷键探针通过；架构 7 文件/135 项及最终文案后的 overlay 45 项通过，见 `.tmp/picker-architecture-_tgadb3y`。普通/混合类型图无环，JSON asset 检查后无未解析相对导入；计入 accessors 的 overlay 为 19→20、options 17→17，后续增加职责需要抽出模块。
+
+### 8.103 SES-01：current 身份、范围与动作复验
+
+- [selection owner](../../packages/ts-shell/src/session/navigation/selection.ts)使用实时运行时 session ID 和项目路径身份；同项目已有 reentry surface 才可进入列表，正常 completed 会话可重开，不误用异常恢复 eligibility。按 updatedAt 降序和精确 ID 稳定排序，最近 40 条外的 current 可额外纳入，但不绕过范围/内容过滤。磁盘 current 指针不参与判断；缺失/不可读、跨项目、无保存内容及被搜索隐藏各有说明。
+- [session picker](../../packages/ts-shell/src/cli/interactive/picker/session.ts)每次 load 捕获上下文，按 current ID 初始聚焦；resume/rename/delete 前检查 offered ID、实时 session/project/忙碌状态、fresh target 的存在/内容/范围，以及 requested ID 与 metadata ID 相同。当前删除保护直接比较 requested ID，堵住加载后伪造 metadata.id 的绕过路径；普通有效完成会话仍能恢复/重命名/删除。复用现有 action owner，不宣称跨进程租约或跨文件原子提交。
+- [modal](../../packages/ts-shell/src/presentation/tui/chrome/modal.ts)为右侧 note 保留空间，100 字符标题在 40 列仍显示 current；状态单独换行，pending/action notice 优先于过滤说明，加载失败不误报 current 被过滤。真实窄屏探针发现删除拒绝最初挤在静态 footer 后被裁剪，现统一到状态行并补实际 OverlayHost 确认回归。宿主回调抽入 session/host，InteractiveMode AST 函数数 94→93，modal 10、overlay 含 accessors 20 均未增长。
+- 定向参考列表按稳定身份保持焦点以及拒绝删除当前会话的决定，保留目标自身的 reentry/path owner。最终隔离 Node 20.3 构建与 9 文件/188 项通过，见 `.tmp/current-check-uszyrchs`。三组有效反转撤回截断外 current、metadata/requested ID 一致性和当前删除保护，均触发行为失败；隔离源码逐字节/SHA-256 恢复后 16 项通过，见 `.tmp/phase19-config/current-reversals/1791334277492316963`。
+- actual CLI regular/fullscreen 均在运行后另建 45 条较新会话和一条外项目会话，磁盘指针改变仍聚焦运行时 current；41 项列表排除外项目，拒绝删除 current，100 字符重命名后 40×18 仍显示标记、拒绝和过滤说明，重开保持焦点，再恢复 Recent 44 并验证 current 更新。47 个 metadata 保留，配置原文不变、0 provider 请求、退出 0，见 `.tmp/phase19-config/current-pty-1791334713760133426`。
+- 独立代码最终 APPROVE（5 文件/151 项），架构 CLEAR（最终 3 文件/77 项、1754 文件图无环/未解析相对导入），见 `.tmp/session-picker-architecture-se7te1me`。SES-01 功能验收已完成；同步全列表扫描仍在，41 项展示不能冒充有界 I/O，SES-02 与完整 Phase 19 继续。
+- 上批 `eba69f51` 已推送，CI 37551797587 和 Watch 37551797576 均零步骤失败，GitHub annotation 仍明确账户付款/spending limit 阻止 job 启动；与前批 `d28f379d` 一样没有远端测试执行证据。本批远端按新 SHA 单独追踪。
+- 五项静态 gates、43 项 script tests 和 NormProof 0 blocking 通过，见 `.tmp/current-gates-5gislqe9`；既有五项函数数量及 120 项文档来源 advisory 保留。

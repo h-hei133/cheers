@@ -3,7 +3,7 @@ title: "21：会话恢复、撤销语义与分支导航交互体验设计"
 category: article
 sources: [user-experience-report-2026-10-05, current-source-28ff98ce, 14-user-experience-research, pi, oh-my-pi, codex]
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-07
 tags: [research, ux, sessions, recovery, undo, rewind, tui]
 summary: "按已确认的 current 会话焦点、核心会话文件逻辑字节与最近已提交编辑操作撤销语义，修正 picker 生命周期、恢复安全链和分支反馈方案；区分源码事实、现场未知与后续生产验收。"
 confidence: high
@@ -25,7 +25,7 @@ confidence: high
 
 | 问题 | 当前事实 | 已裁定方案 |
 |---|---|---|
-| resume 重开焦点 | 共用 OptionModel，cursor/chosen 可跨 picker 残留；sessionPicker 没有 current 初始选中 | 完整生命周期 reset + generation；按稳定 current ID 聚焦 |
+| resume 重开焦点 | 生命周期隔离、按运行时 current ID 聚焦及动作复验已实施，见 §2.6–2.7 | 完整生命周期 reset + generation；按稳定 current ID 聚焦 |
 | 大小指标 | `turns.length` 是消息条目数；当前列表没有落盘大小投影 | session read/store owner 异步有界统计核心文件逻辑 bytes |
 | undo | 只描述最新快照并打印 restore 命令；无 session 归属和已提交操作筛选 | 先建立 operation receipts、加固恢复写链，再提供预览/批准/执行 |
 | 双 Esc 反馈 | 分支切换、note 与 draft 链路已存在；真实现场视觉根因未证明 | 修复失败后的状态真值，验收两种终端模式中的可见导航结果 |
@@ -37,7 +37,7 @@ confidence: high
 [OverlayHost](../../packages/ts-shell/src/cli/interactive/overlay.ts#L84) 每次打开均创建独立的 [OptionModel](../../packages/ts-shell/src/presentation/tui/chrome/options.ts)，同一打开期间复用其过滤与选择状态。
 
 - `open()` 重置候选、过滤、多选、临时操作和行映射；初次 load 与 reload 共用取消和代际校验，有 `initialSelection` 才显式 focus。
-- [sessionPicker](../../packages/ts-shell/src/cli/interactive/picker/session.ts#L26) 当前未提供 `initialSelection`。
+- [sessionPicker](../../packages/ts-shell/src/cli/interactive/picker/session.ts) 的 `initialSelection` 取本次加载捕获的运行时 current ID；标记与用户移动的高亮分开。
 - `OptionModel.applyFilter()` 现按稳定 ID 保留焦点，目标离开集合后回退首个 enabled；reload 保留用户明确取消的多选，删除/disabled 条目移出 chosen。
 - load/reload 与异步 rename/delete 完成现在同时绑定 generation 和请求 controller；旧请求成功、失败或旧操作完成均不能刷新新面板。同对象重开仍有独立代际。
 
@@ -51,7 +51,7 @@ pi 的 [session-selector.ts](../../../pi/packages/coding-agent/src/modes/interac
 
 ### 2.3 统一生命周期契约
 
-以下为后续实现要求，不是现有 API：
+以下为实现契约；当前交付与验证见 §2.6–2.7：
 
 1. **打开/关闭**：每次 open 生成新的 generation；关闭使其失效并结束预览、取消可取消的读取。清空上一 picker 的候选、filter、cursor、scroll、chosen、多选、行映射及临时 rename/delete 状态，再初始化本次上下文。不存在依据不足的通用 `preserveCursorOnOpen` 逃生开关。
 2. **加载**：load/reload 结果同时携带 generation、请求序号、workspace/session identity；只有仍属于当前打开实例且是最新请求的结果可发布。对象引用相同不足以判断请求仍有效。
@@ -70,7 +70,7 @@ pi 的 [session-selector.ts](../../../pi/packages/coding-agent/src/modes/interac
 
 恢复成功后才发布新的活动 session 身份；失败、permission-pending 或 unknown 不得提前把 current 标记移过去。切项目后旧列表结果和针对旧项目的选中请求都必须失效。
 
-### 2.5 待实施验收
+### 2.5 验收范围
 
 - 同一 picker 两次 open；不同 picker 切换；同对象重开；旧 load/reload 比新结果更晚返回。
 - filter/cursor/scroll/chosen/rename/delete/preview 状态不跨生命周期泄漏。
@@ -81,10 +81,18 @@ pi 的 [session-selector.ts](../../../pi/packages/coding-agent/src/modes/interac
 ### 2.6 SES-01 通用生命周期已实施部分（2026-10-07）
 
 - 首次加载与刷新复用同一 OverlayHost 方法；可选 AbortSignal 在换请求、关闭和接受时撤销，忽略取消的 producer 仍受身份/代际守卫。现有同步磁盘读取不能被 signal 物理打断，没有将可取消接口当作 I/O 性能证据。
-- rename/delete 一经确认执行，关闭面板不宣称撤销已接受的写入；完成只刷新当时的实例，操作期间屏蔽重复键/鼠标/粘贴提交。拒绝 note 可见，异常只提示结果未确认，不泄露原始异常，不许用错误路径显示成功；恢复面板 action owner 的忙碌/current/工作区复验仍待下一步落实。
+- rename/delete 一经确认执行，关闭面板不宣称撤销已接受的写入；完成只刷新当时的实例，操作期间屏蔽重复键/鼠标/粘贴提交。拒绝 note 可见，异常只提示结果未确认，不泄露原始异常，不许用错误路径显示成功；恢复面板 action owner 的忙碌/current/工作区复验见 §2.7。
 - 过滤、排序和 live options 更新以稳定 ID 保持单选；多选明确取消不会因旧 selected 标志在 reload 时被复选，已删除/disabled ID 清除。空或全 disabled 集合不可提交，显式 approval shortcut 也须命中 enabled ID；加载期间 Enter 不应用未知选项。预览跟随过滤/替换的真实焦点，加载失败结束临时预览，并与成功空集合区分。
 - Node 20.3 构建和 172 项通过；三组有效反转覆盖 reload 代际、操作完成归属及焦点身份，恢复后 64 项通过。实际 regular/fullscreen 均验证报告会话→resume→rename→刷新→取消 delete→重开→40 列，配置未改、零 provider 请求、退出 0。详见 [主裁决 §8.102](phase-19-decisions.md#8102-ses-01选择器加载与异步操作生命周期)。
-- current 标记/初始焦点、截断外纳入、session/workspace 范围及变更动作复验尚未完成，本节不将整个 SES-01 或 W5 标为已交付。会话大小/列表索引归 SES-02 后续工作。
+- current 部分随后在 §2.7 交付。会话大小/列表索引归 SES-02 后续工作，W5 和完整 Phase 19 尚未完成。
+
+### 2.7 SES-01 current 身份与动作复验（2026-10-07）
+
+- [selection owner](../../packages/ts-shell/src/session/navigation/selection.ts)沿用路径身份和 `sessionHasReentrySurface`，仅纳入当前项目已有可重入内容的会话；普通重开允许 completed，不误用仅服务异常恢复的 eligibility。最近 40 条按 updatedAt/精确 ID 排序，current 在限制之外时额外纳入，仍经过相同过滤。当前目录指针不影响运行时 current；缺失/不可读、跨项目、无保存内容与搜索隐藏分别说明。
+- 提交 resume/rename/delete 前验证 offered ID、捕获与实时 session/project、忙碌状态、重新读取的目标存在/范围/内容，以及请求 ID 与 metadata ID 相等。删除当前会话检查请求 ID，不信任可变 metadata 身份。沿用现有动作 owner，不声称跨进程租约或跨文件原子性。
+- modal 为右侧 current 标记保留宽度，并为 contextual status、Updating 和 action notice 提供独立换行行；加载失败不误报过滤隐藏，40 列长标题也能看到 current 与删除拒绝。宿主投影移入 session/host，InteractiveMode 既有函数数 94→93。
+- 最终隔离 Node 20.3 构建与 9 文件/188 项通过；三组有效反转覆盖截断外 current、metadata/requested ID、当前删除保护，恢复后 16 项通过。独立代码 APPROVE（151 项），架构 CLEAR（最终 77 项、1754 文件依赖图无环/未解析相对导入）。actual regular/fullscreen 验证 45 条较新会话、外项目排除、40 列标记/拒绝/过滤、重开及切换后 current 更新；配置逐字节不变、47 个 metadata 保留、零 provider 请求、退出 0。详见 [主裁决 §8.103](phase-19-decisions.md#8103-ses-01current-身份范围与动作复验)。
+- 本批仍调用同步完整列表；41 条展示上限不是磁盘 I/O 上限，SES-02 必须替换列表读取链路。
 
 ## 3. 会话面板大小：核心文件逻辑字节
 

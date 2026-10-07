@@ -6335,3 +6335,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-07] feat | Phase 19 UI-07 /context 显示最后已接受前台请求的精确 body/协议分项、原始 system 来源尺寸、当前有效工具池及同次 usage；明确 UTF-8/UTF-16/估算/tokenizer unavailable，前台收据不混入累计快照。最终 180 项、Node 20.3 构建、三组有效反转/恢复后 33 项及两模式本地 HTTP/PTY 通过；独立 APPROVE/CLEAR，上一 timing CI 已成功，见 features/phase-19-decisions.md §8.101。W5 与完整阶段目标继续。
 
 ## [2026-10-07] fix | Phase 19 SES-01 统一 picker load/reload 的取消与代际校验，旧 rename/delete 完成不刷新新面板；过滤/重排保留 ID、多选取消保留、全 disabled 不提交，异常明确结果未确认。172 项、Node 20.3 构建、三组反转/恢复后 64 项和两模式实际 rename/取消 delete/重开/窄屏通过，独立 APPROVE/CLEAR，见 features/phase-19-decisions.md §8.102。上一 d28f379d 两个 GitHub job 均因账户付款/spending limit 未启动；current 会话接线及完整阶段继续。
+
+## [2026-10-07] feat | Phase 19 SES-01 current 身份与范围：运行时 ID 聚焦、最近 40 条外纳入、项目/content 过滤、动作前复验与 metadata ID 防混淆、窄屏标记及拒绝说明；Node 20.3 构建/188 项、三组反转、两模式实际 PTY/切换、独立 APPROVE/CLEAR、五 gates/43 scripts/NormProof 0 blocking 通过。SES-02 同步全列表替换继续；上批 eba69f51 远端 CI/Watch 因账单限制零步骤失败，未计通过。详见 features/phase-19-decisions.md §8.103。

@@ -51,6 +51,8 @@ export interface Picker {
   /** Safe failure text when loading fails, distinct from a successful empty set. */
   readonly loadError?: string;
   readonly footer?: string;
+  /** Context that depends on which identities remain visible after filtering. */
+  status?(visible: readonly Option[]): string | undefined;
   /** True when the picker collects several answers before applying. */
   readonly multiple?: boolean;
   /**
@@ -188,10 +190,12 @@ export class OverlayHost {
       return this.renderDenyReason(width, height);
     }
     const empty = this.loading ? "loading…" : this.loadFailed ? picker.loadError ?? "Options could not be loaded." : picker.empty;
-    const actionHints = this.actionPending ? "Updating…" : this.actionNotice ?? (
+    const actionHints = (
       picker.onDelete || picker.onRename
         ? `${picker.onDelete ? "^D delete" : ""}  ${picker.onRename ? "^R rename" : ""}`.trim()
         : undefined);
+    const status = this.actionPending ? 'Updating…' : this.actionNotice ??
+      (!this.loading && !this.loadFailed ? picker.status?.(this.model.visible) : undefined);
 
     if (picker.form === "modal") {
       return renderModal(
@@ -201,6 +205,7 @@ export class OverlayHost {
           empty,
           detailRows: picker.detailRows ?? 2,
           onOptionRow: (row, id) => this.optionRows.set(row, id),
+          ...(status ? { status } : {}),
           ...(actionHints ? { actionHints } : {}),
         },
         width,
@@ -218,7 +223,7 @@ export class OverlayHost {
         empty,
         multiple: picker.multiple === true,
         filterable: picker.filterable,
-        footer: this.actionPending ? "Updating…" : this.actionNotice ?? picker.footer,
+        footer: status ?? picker.footer,
         hideCount: isApproval,
         onOptionRow: (row, id) => this.optionRows.set(row, id),
       },

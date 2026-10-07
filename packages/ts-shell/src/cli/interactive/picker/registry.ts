@@ -8,6 +8,7 @@ import type { SessionMessage } from "../../../session/schema/sessionMessage.js";
 import type { RewindPoint } from "./rewind.js";
 import type { Transcript } from "../../../presentation/tui/transcript/container.js";
 import type { Picker } from "../overlay.js";
+import type { SessionSelectionContext } from '../../../session/navigation/selection.js';
 import { connectionPicker } from "./connections.js";
 import { helpPicker } from "./help.js";
 import { toolsPicker } from "./tools.js";
@@ -42,6 +43,7 @@ export interface PickerHost extends SettingsHost {
   readonly approvalTrustPolicy: ApprovalTrustPolicy;
   readonly projectRoot: string;
   readonly statusItems: readonly StatusItemId[];
+  sessionContext(): SessionSelectionContext;
   resumeSession(sessionId: string): Promise<string | undefined>;
   deleteSession(sessionId: string): Promise<string | undefined>;
   renameSession(sessionId: string, title: string): Promise<string | undefined>;
@@ -66,6 +68,7 @@ const PICKERS: Record<string, PickerFactory> = {
   resume: (host) =>
     sessionPicker({
       sessionManager: host.sessionManager,
+      context: host.sessionContext,
       resume: host.resumeSession,
       delete: host.deleteSession,
       rename: host.renameSession,

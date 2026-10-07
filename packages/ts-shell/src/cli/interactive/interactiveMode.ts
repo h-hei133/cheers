@@ -1,3 +1,4 @@
+import { sessionPickerHost } from './picker/session/host.js';
 import { CatalogController } from "./completion/controller.js";
 import { catalogIdentity, createCatalogLoader } from "./completion/catalog.js";
 import { refreshShellRuntimeConfig } from "../../core/shell/runtimeContext.js";
@@ -832,15 +833,10 @@ export class InteractiveMode {
       approvalTrustPolicy: this.options.approvalTrustPolicy,
       projectRoot: this.options.runtimeContext.projectRoot,
       statusItems: this.statusItems,
-      resumeSession: (sessionId) => this.runCommandLine(`/resume ${sessionId}`),
-      deleteSession: async (sessionId) => {
-        this.options.sessionManager.deleteSession(sessionId);
-        return undefined;
-      },
-      renameSession: async (sessionId, title) => {
-        this.options.sessionManager.renameSession(sessionId, title);
-        return undefined;
-      },
+      ...sessionPickerHost({ runtimeContext: this.options.runtimeContext, sessionManager: this.options.sessionManager,
+        busy: () => this.stopped || this.closing || (this.busy && !this.pickerPending) || this.options.sessionRuntime.getCurrentRunController() !== null,
+        resume: sessionId => this.runCommandLine(`/resume ${sessionId}`),
+      }),
       refreshServer: (serverName) => this.runCommandLine(`/mcp refresh ${serverName}`),
       revokeGrant: (key) => this.runCommandLine(`/permissions revoke ${key}`),
       sessionTurns: () =>

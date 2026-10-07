@@ -22,6 +22,7 @@ export interface ModalChrome {
   readonly detailRows: number;
   /** Optional extra action hints shown in the footer (e.g. ^D delete · ^R rename). */
   readonly actionHints?: string;
+  readonly status?: string;
   readonly onOptionRow?: (row: number, id: string) => void;
 }
 
@@ -34,8 +35,9 @@ export function renderModal(
 ): string[] {
   const inner = Math.max(20, width - 2);
   const rows: string[] = [top(chrome.title, model, inner), searchRow(model, inner), divider(inner)];
-  const perOption = 1 + Math.max(0, chrome.detailRows);
-  const listRows = Math.max(perOption, height - FRAME_ROWS);
+  const statusRows = chrome.status ? wrapToWidth(chrome.status, inner - 2).slice(0, 2) : [];
+  const perOption = 2 + Math.max(0, chrome.detailRows);
+  const listRows = Math.max(perOption, height - FRAME_ROWS - statusRows.length);
   const capacity = Math.max(1, Math.floor(listRows / perOption));
 
   if (model.total === 0) {
@@ -57,7 +59,8 @@ export function renderModal(
     if (window.below > 0) rows.push(body(defaultTheme.dim(`↓ ${window.below} more`), inner));
   }
 
-  while (rows.length < height - 2) rows.push(edge(inner));
+  while (rows.length < height - 2 - statusRows.length) rows.push(edge(inner));
+  for (const line of statusRows) rows.push(body(defaultTheme.dim(line), inner));
   rows.push(body(footer(inner, chrome.actionHints), inner));
   rows.push(bottom(inner));
   return rows.slice(0, height);
@@ -67,8 +70,10 @@ export function renderModal(
 function optionRows(option: Option, active: boolean, chrome: ModalChrome, inner: number): string[] {
   const marker = active ? defaultTheme.fg("accent", "▸ ") : "  ";
   const label = active ? defaultTheme.bold(option.label) : option.label;
-  const note = option.note ? `  ${defaultTheme.fg("border", option.note)}` : "";
-  const head = `${marker}${label}${note}`;
+  const noteText = truncateToWidth(option.note ?? '', Math.max(0, Math.floor((inner - 2) / 2)));
+  const noteWidth = noteText ? visibleWidth(noteText) + 2 : 0;
+  const note = noteText ? `  ${defaultTheme.fg("border", noteText)}` : "";
+  const head = `${padToWidth(truncateToWidth(`${marker}${label}`, inner - 2 - noteWidth), inner - 2 - noteWidth)}${note}`;
   const rows = [body(active ? highlight(head, inner) : head, inner)];
   if (!option.detail || chrome.detailRows === 0) return rows;
   const detailWidth = Math.max(8, inner - 6);
