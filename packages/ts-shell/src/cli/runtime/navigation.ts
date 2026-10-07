@@ -5,8 +5,14 @@ import { markContextUnknown } from "../../observability/usageTelemetry.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import { readSessionNavigation } from "../../session/query/navigation.js";
 import { sessionThreadPath } from "../../session/schema/sessionThread.js";
+import { SessionNavigationWarning } from '../../session/navigation/revert.js';
+import { normalizePathIdentity } from '../../session/continuation/roots.js';
+import type { Session } from '../../session/schema/sessionRecord.js';
 
 export interface SessionNavigationResult {
+  /** The outcome of the saved branch navigation, separate from refreshing its view. */
+  readonly status: 'unchanged' | 'changed' | 'changed-with-warning' | 'unknown';
+  /** A verified replacement for the active runtime view is available. */
   readonly changed: boolean;
   readonly output: string;
   readonly draft?: string;
@@ -15,13 +21,21 @@ export interface SessionNavigationResult {
 /** The same leaf switch and branch summary serve terminal and scripted hosts. */
 export async function navigateSession(input: {
   readonly runtimeContext: ShellRuntimeContext;
-  readonly sessionManager: Pick<SessionManager, "getSession" | "revertTo">;
+  readonly sessionManager: Pick<SessionManager, "revertTo">;
   readonly sessionRuntime: Pick<ShellSessionRuntime, "getState" | "summarizeAbandonedTurns">;
 }, entryId?: string): Promise<SessionNavigationResult> {
   const { runtimeContext: context, sessionManager: manager, sessionRuntime: runtime } = input;
-  const { thread, points } = readSessionNavigation(context.session.id, context.cwd);
+  const sessionId = context.session.id;
+  const cwd = context.cwd;
+  const projectRoot = context.projectRoot;
+  const { thread, points, session } = readSessionNavigation(sessionId, cwd);
+  const expectedRoot = normalizePathIdentity(projectRoot);
+  if (!expectedRoot || normalizePathIdentity(session.projectRoot) !== expectedRoot) {
+    throw new Error('The saved session belongs to a different project. Reopen it in that project before navigating.');
+  }
   if (entryId === undefined) {
     return {
+      status: 'unchanged',
       changed: false,
       output: ["### Session tree", "", ...points.map((point) =>
         `${"  ".repeat(point.depth)}- ${point.current ? "* " : ""}${point.entryId} ${point.label}${point.unavailable ? ` [unavailable: ${point.unavailable}]` : ""}`),
@@ -34,20 +48,82 @@ export async function navigateSession(input: {
   if (point.unavailable || !sessionThreadPath(thread, entryId).resolved) {
     throw new Error(`Cannot navigate to ${entryId}: ${point.unavailable ?? "broken ancestry"}.`);
   }
-  if (thread.activeLeafId === entryId) return { changed: false, output: "Already at that point in the conversation." };
-  const dropped = await manager.revertTo(context.session.id, entryId,
-    (abandoned) => runtime.summarizeAbandonedTurns(abandoned));
-  if (readSessionNavigation(context.session.id, context.cwd).thread.activeLeafId !== entryId) {
-    throw new Error("The session did not retain the requested navigation. Reload the session tree before retrying.");
+  if (thread.activeLeafId === entryId) {
+    const changed = JSON.stringify(context.session.turns) !== JSON.stringify(session.turns)
+      || JSON.stringify(context.session.reports) !== JSON.stringify(session.reports);
+    if (changed) adoptSession(context, session);
+    return {
+      status: 'unchanged', changed,
+      output: changed
+        ? 'That entry is already active in the saved conversation. The active view was refreshed. Other branches and files are kept.'
+        : 'Already at that point in the conversation.',
+      ...(point.prompt !== undefined ? { draft: point.prompt } : {}),
+    };
   }
-  const restored = manager.getSession(context.session.id);
-  if (!restored) throw new Error("The navigated session could not be reloaded.");
-  context.session = restored;
-  markContextUnknown(restored.id);
-  replayTodosFromMessages(restored.id, restored.turns);
-  return {
-    changed: true,
-    output: `Now at ${entryId}. ${dropped} later ${dropped === 1 ? "turn is" : "turns are"} kept in the session tree. Files are unchanged.`,
-    ...(point.prompt !== undefined ? { draft: point.prompt } : {}),
+  const isCurrent = (): boolean => context.session.id === sessionId && context.cwd === cwd && context.projectRoot === projectRoot;
+  let dropped: number | undefined;
+  let failed = false;
+  let warning = 'A storage error was reported while navigating.';
+  try {
+    dropped = await manager.revertTo(sessionId, entryId,
+      abandoned => runtime.summarizeAbandonedTurns(abandoned),
+      () => {
+        if (!isCurrent() || runtime.getState() === 'running') {
+          throw new Error('The active session changed while preparing navigation.');
+        }
+      });
+  } catch (error) {
+    failed = true;
+    if (error instanceof SessionNavigationWarning) { warning = error.message; dropped = error.dropped; }
+  }
+  if (!isCurrent()) return {
+    status: 'unknown', changed: false,
+    output: 'The active session changed while navigating. Its view was preserved; reopen the previous session to check the navigation outcome.',
   };
+  if (runtime.getState() === 'running') return {
+    status: 'unknown', changed: false,
+    output: 'The session became busy while navigating. Its current view was preserved; reload the session tree when it is idle to check the navigation outcome.',
+  };
+  let verified: ReturnType<typeof readSessionNavigation>;
+  try {
+    verified = readSessionNavigation(sessionId, cwd);
+    if (normalizePathIdentity(verified.session.projectRoot) !== expectedRoot) {
+      return {
+        status: 'unknown', changed: false,
+        output: 'The saved session moved to a different project while navigating. The current view was preserved; reopen the session in its project before continuing.',
+      };
+    }
+    const current = verified.points.find(candidate => candidate.current);
+    if (!current || current.unavailable || !sessionThreadPath(verified.thread).resolved) throw new Error('Unreadable active branch');
+  } catch {
+    return {
+      status: 'unknown', changed: false,
+      output: 'Navigation outcome is unknown. The current view may be out of date; reopen this session before continuing.',
+    };
+  }
+  if (verified.thread.activeLeafId === thread.activeLeafId) return {
+    status: 'unchanged', changed: false,
+    output: 'The active conversation is unchanged. Navigation did not reach the requested entry; reload the session tree before retrying.',
+  };
+  const restored = verified.session;
+  adoptSession(context, restored);
+  if (verified.thread.activeLeafId !== entryId) return {
+    status: 'changed-with-warning', changed: true,
+    output: `The active conversation is now at ${verified.thread.activeLeafId}. The requested entry is not active; its draft was not applied. Other branches and files are kept.`,
+  };
+  const retained = dropped === undefined ? 'Other messages remain in the session tree.'
+    : `${dropped} later ${dropped === 1 ? 'message is' : 'messages are'} kept in the session tree.`;
+  const prompt = verified.points.find(candidate => candidate.entryId === entryId)?.prompt;
+  return {
+    status: failed ? 'changed-with-warning' : 'changed',
+    changed: true,
+    output: `Now at ${entryId}. ${retained} Files are unchanged.${failed ? ` Warning: ${warning}` : ''}`,
+    ...(prompt !== undefined ? { draft: prompt } : {}),
+  };
+}
+
+function adoptSession(context: ShellRuntimeContext, session: Session): void {
+  context.session = session;
+  markContextUnknown(session.id);
+  replayTodosFromMessages(session.id, session.turns);
 }

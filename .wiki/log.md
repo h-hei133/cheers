@@ -6341,3 +6341,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-07] feat | Phase 19 SES-02 核心会话文件大小：实际 layout 异步双采样、41 项/4 路预算、complete/partial/unknown、取消排空、逻辑大小替换 turns；构建/279 项、四组反转、两模式实际 PTY、独立 APPROVE/CLEAR、五 gates/43 scripts/NormProof 0 blocking 通过。完整列表与索引仍待替换，SES-02 未完成；891bfd72 远端 CI/Watch 仍因账单零步骤失败。详见 features/phase-19-decisions.md §8.104。
 
 ## [2026-10-07] feat | Phase 19 SES-02 默认 resume 与补全采用 current-first 增量摘要目录、受限正文读取及版本缓存；渐进结果保留可见 incomplete 和同草稿选择。修复审查发现的 BOM/扫描缓存淘汰及实际 PTY 状态隐藏问题。最新构建/212 项、七组有效反转、两模式实际 CLI 及独立 APPROVE/CLEAR 通过；全局发现仍枚举历史，显式完整读取 API 保留。a1df2e84 远端 CI/Watch 因账单零步骤失败；SES-03 与完整阶段继续，详见 features/phase-19-decisions.md §8.105。
+
+## [2026-10-07] fix | Phase 19 SES-03 分支回退区分写后 warning、unchanged 与 unknown，统一 snapshot/draft、锁内重验及两模式集合替换；独立审查修复已在目标的旧视图、忙碌回合覆盖和 current 缓存绕行。最终 Node 20.3 构建/308 项、10 组有效反转/恢复后 93 项、两模式实际 CLI 与独立 APPROVE/CLEAR 通过。4adb7ee0 的远端 job 因账单限制零步骤失败；SES-04 与完整阶段继续，详见 features/phase-19-decisions.md §8.106。

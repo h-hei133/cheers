@@ -10,17 +10,12 @@
 import type { CurrentSessionSelectionResolution } from "./store/currentSelection.js";
 import { SESSION_APPROVAL_AUDIT_HISTORY_LIMIT } from "./approval/sessionApprovalMemory.js";
 import { type TranscriptEvent } from "./sessionEventCodec.js";
-import { appendBranchSummaryEvent } from "./transcript/sessionTranscript.js";
 import { appendTranscriptEvent, readTranscriptEvents } from "./transcript/sessionTranscript.js";
 import { sessionRootEntryId, buildLinearSessionThreadSnapshot } from './schema/sessionThread.js';
 import { forkThread } from './branch/fork.js';
 import { sessionThreadPath } from "./schema/sessionThread.js";
-import {
-  readSessionThreadSnapshot,
-  switchDurableSessionActiveLeaf,
-} from "./store/threadState.js";
+import { revertSession } from './navigation/revert.js';
 import type { SessionMessage } from "./schema/sessionMessage.js";
-import { isSessionContextMessage } from "./schema/sessionMessage.js";
 import type { Session } from "./schema/sessionRecord.js";
 import type { SessionStateSnapshot } from "./schema/sessionStateSnapshot.js";
 import { buildSessionStateSnapshot } from "./schema/sessionStateSnapshot.js";
@@ -139,62 +134,14 @@ export class SessionManager extends SessionReadSurface {
     };
   }
 
-  /**
-   * Go back to an earlier point without erasing what came after it.
-   *
-   * The turns are not dropped. The thread is a tree, and going back moves which
-   * leaf is active — the abandoned turns keep their entries and stay in the
-   * transcript, so returning to that direction later finds it intact.
-   *
-   * The previous sentence is a correction. This used to truncate
-   * `session.turns` and write the result to the session metadata, which does not
-   * record turns at all: the cut never reached disk, and the turns came back on
-   * the next load. Reworking the question looked like it had worked until the
-   * session was reopened.
-   *
-   * When a summarizer is supplied, what the abandoned turns established travels
-   * as a note attached at the point the user returned to, so the next answer
-   * knows what was already tried.
-   *
-   * Returns how many turns were left behind.
-   */
+  /** Move the active leaf, preserving other branches; return the retained message count. */
   async revertTo(
     sessionId: string,
     entryId: string,
     summarize?: (abandoned: readonly SessionMessage[]) => Promise<string | undefined>,
+    beforeWrite?: () => void,
   ): Promise<number> {
-    const session = this.getSession(sessionId);
-    if (!session) return 0;
-
-    const layout = this.host.store.stateLayout(sessionId);
-    const current = readSessionThreadSnapshot({ session, layout });
-    const target = sessionThreadPath(current, entryId);
-    if (!target.resolved || target.path.length === 0) return 0;
-
-    const onBranch = new Set(target.path.map((entry) => entry.id));
-    const abandonedTurns = session.turns.filter(
-      (turn) => !isSessionContextMessage(turn) && (turn.id === undefined || !onBranch.has(turn.id)),
-    );
-    const summary = summarize && abandonedTurns.length > 0
-      ? await summarize(abandonedTurns).catch(() => undefined)
-      : undefined;
-
-    switchDurableSessionActiveLeaf({ session, layout, leafEntryId: entryId });
-    // Recorded whether or not anything could summarize it. The move is the fact
-    // worth keeping: without it, reopening the session showed a shorter
-    // conversation with nothing saying anything had been left behind.
-    //
-    // The abandoned turns are named for the same reason the entry ids are: the
-    // note has to be readable back on the branch it applies to and nowhere else,
-    // and which turns went is the only thing that says which branch that is.
-    appendBranchSummaryEvent(this.host.store.transcriptPath(sessionId), {
-      ...(summary !== undefined ? { summary } : {}),
-      droppedTurns: abandonedTurns.length,
-      toEntryId: entryId,
-      abandonedEntryIds: abandonedTurns.flatMap((turn) => (turn.id === undefined ? [] : [turn.id])),
-      timestamp: new Date().toISOString(),
-    });
-    return abandonedTurns.length;
+    return revertSession(this.host.store, sessionId, entryId, summarize, beforeWrite);
   }
 
   createNewWithId(

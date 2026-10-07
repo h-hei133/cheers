@@ -432,6 +432,20 @@ describe("scrolling", () => {
     expect(after.find((row) => row.includes("line "))).toBe(firstVisible);
     expect(view.scrolledBack).toBeGreaterThan(10);
   });
+
+  it('starts a replacement conversation at its end with a distinct document identity', () => {
+    const view = longConversation(40);
+    const before = view.renderFrame({ columns: 60, rows: 15 });
+    view.scroll(-10);
+    view.transcript.append({ kind: 'assistant', text: 'ordinary append', finalized: true });
+    expect(view.renderFrame({ columns: 60, rows: 15 }).documentId).toBe(before.documentId);
+    view.transcript.clear();
+    for (let index = 0; index < 40; index++) view.transcript.append({ kind: 'user', text: `new branch ${index}`, finalized: true });
+    const after = view.renderFrame({ columns: 60, rows: 15 });
+    expect(after.documentId).not.toBe(before.documentId);
+    expect(after.rows.join('\n')).toContain('new branch 39');
+    expect(view.scrolledBack).toBe(0);
+  });
 });
 
 describe("selection", () => {

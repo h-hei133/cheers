@@ -713,7 +713,7 @@ export class InteractiveMode {
         this.sink.end(true);
         this.tui.requestRender({ force: true });
       } else if (opened || navigation?.changed) {
-        showConversation(this.historyTarget());
+        showConversation(this.historyTarget(), navigation?.changed ? this.options.runtimeContext.session : undefined);
         this.tui.requestRender({ force: true });
       }
       if (navigation?.changed) {
@@ -844,10 +844,10 @@ export class InteractiveMode {
       rewind: async (point) => {
         const result = await navigateSession(this.options, point.entryId);
         if (result.changed) {
-          showConversation(this.historyTarget());
+          showConversation(this.historyTarget(), this.options.runtimeContext.session);
           this.tui.requestRender({ force: true });
         }
-        return result.output;
+        return { note: result.output, ...(result.draft !== undefined ? { draft: result.draft } : {}) };
       },
       previewStatusItems: (items) => {
         this.previewItems = items;

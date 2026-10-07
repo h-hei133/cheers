@@ -95,7 +95,7 @@ export class SessionStoreAccess {
    * The thread operations need the path and its lock together, and resolving them
    * separately would let the two disagree if the layout were located twice.
    */
-  stateLayout(sessionId: string): Pick<SessionFileLayout, "statePath" | "stateLockPath"> {
+  stateLayout(sessionId: string): SessionFileLayout {
     return locateExistingSessionLayout(this.storeLayout, sessionId);
   }
 

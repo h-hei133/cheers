@@ -272,13 +272,13 @@ describe("the record a move leaves behind", () => {
     const [newest] = rewindPoints(CONVERSATION);
     const picker = rewindPicker({
       turns: CONVERSATION,
-      rewind: async () => "note",
+      rewind: async () => ({ note: "note" }),
     });
 
     return picker.load().then((options) => {
       expect(options[0]?.detail).not.toMatch(/forget/i);
       expect(newest?.dropped).toBe(1);
-      expect(options[0]?.detail).toContain("after this question");
+      expect(options[0]?.detail).toBe("keeps one later message in the tree");
     });
   });
 });

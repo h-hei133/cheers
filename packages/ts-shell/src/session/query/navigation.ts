@@ -1,10 +1,11 @@
 import { messageToText } from "../../model-adapters/multimodal.js";
 import type { SessionMessage } from "../schema/sessionMessage.js";
 import type { SessionThreadSnapshot } from "../schema/sessionThread.js";
+import type { Session } from '../schema/sessionRecord.js';
+import { buildLinearSessionThreadSnapshot, catchUpSessionThread } from '../schema/sessionThread.js';
 import { createSessionStoreLayout, locateExistingSessionLayout, projectSessionFileLayout } from "../store/sessionFileLayout.js";
-import { loadSessionRecord } from "../store/sessionStore.js";
-import { readSessionThreadSnapshot } from "../store/threadState.js";
-import { readTranscriptEvents } from "../transcript/sessionTranscript.js";
+import { readSessionRecordSnapshot } from "../store/sessionStore.js";
+import { readSessionFileVersion } from '../store/version.js';
 import { transcriptEventToSessionMessage } from "../sessionEventCodec.js";
 import { readSessionTree } from "./sessionEntries.js";
 
@@ -21,17 +22,24 @@ export interface SessionNavigationPoint {
 export function readSessionNavigation(sessionId: string, cwd: string, onSource?: (target: string) => void): {
   readonly thread: SessionThreadSnapshot;
   readonly points: readonly SessionNavigationPoint[];
+  readonly session: Session;
 } {
   const store = createSessionStoreLayout();
   for (const sessionsDir of store.sessionsSearchDirs) onSource?.(projectSessionFileLayout({ sessionsDir, sessionId }).sessionDir);
   const layout = locateExistingSessionLayout(store, sessionId);
-  const session = loadSessionRecord({ sessionId, layout, cwd });
-  const thread = readSessionThreadSnapshot({ session, layout });
-  const messages = readTranscriptEvents(layout.transcriptPath).flatMap((event) => {
+  const before = readSessionFileVersion(layout);
+  const { session, state, events } = readSessionRecordSnapshot({ sessionId, layout, cwd });
+  if (session.id !== sessionId) throw new Error('The stored session identity does not match the requested session.');
+  const messages = events.flatMap((event) => {
     const message = transcriptEventToSessionMessage(event);
     return message ? [message] : [];
   });
-  return { thread, points: projectSessionNavigation(thread, messages) };
+  if (before !== readSessionFileVersion(layout)
+    || locateExistingSessionLayout(store, sessionId).sessionDir !== layout.sessionDir) {
+    throw new Error('The session changed while its navigation state was being read.');
+  }
+  const thread = catchUpSessionThread(state.thread ?? buildLinearSessionThreadSnapshot(session), session);
+  return { thread, points: projectSessionNavigation(thread, messages), session };
 }
 
 /** A repaired display edge never grants permission to navigate a broken path. */

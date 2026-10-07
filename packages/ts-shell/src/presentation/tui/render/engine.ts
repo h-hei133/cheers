@@ -343,7 +343,7 @@ export class TUI {
       // document is passed rather than the viewport, because there is no
       // viewport here — rows that do not fit are history, not something to
       // scroll to.
-      this.mainScreen.paint(frame.rows, frame.chromeRows ?? [], onWritten);
+      this.mainScreen.paint(frame.rows, frame.chromeRows ?? [], onWritten, frame.documentId);
     } else {
       this.paint(frame.rows, dimensions, onWritten);
     }

@@ -129,8 +129,8 @@ export interface HistoryTarget {
  * the runtime context has switched but the transcript still shows the session that
  * was left behind.
  */
-export function showConversation(target: HistoryTarget): void {
-  const session = target.sessionManager.getSession(target.context.session.id);
+export function showConversation(target: HistoryTarget, snapshot?: Session): void {
+  const session = snapshot ?? target.sessionManager.getSession(target.context.session.id);
   if (!session) return;
   target.transcript.clear();
   appendConversation(target, session);

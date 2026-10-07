@@ -1,6 +1,7 @@
 import { messageToText } from "../../../model-adapters/multimodal.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
 import type { SessionMessage } from "../../../session/schema/sessionMessage.js";
+import { isSessionContextMessage } from '../../../session/schema/sessionMessage.js';
 import type { Picker, PickerOutcome } from "../overlay.js";
 
 /**
@@ -35,7 +36,7 @@ export interface RewindPickerInput {
   /** A one-based recent point, a stable entry id, or initial search text. */
   readonly selector?: string;
   /** Make `point` active again, and put its prompt back in the composer. */
-  rewind(point: RewindPoint): Promise<string | undefined>;
+  rewind(point: RewindPoint): Promise<PickerOutcome | undefined>;
 }
 
 export function rewindPicker(input: RewindPickerInput): Picker {
@@ -62,8 +63,7 @@ export function rewindPicker(input: RewindPickerInput): Picker {
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
       const point = points.find((candidate) => candidate.entryId === ids[0]);
       if (!point) return undefined;
-      const note = await input.rewind(point);
-      return { note, draft: point.prompt };
+      return input.rewind(point);
     },
   };
 }
@@ -71,8 +71,9 @@ export function rewindPicker(input: RewindPickerInput): Picker {
 /** The questions in a session, newest first, each with what going back would cost. */
 export function rewindPoints(turns: readonly SessionMessage[]): RewindPoint[] {
   const points: RewindPoint[] = [];
-  for (let index = 0; index < turns.length; index++) {
-    const turn = turns[index]!;
+  const messages = turns.filter(turn => !isSessionContextMessage(turn));
+  for (let index = 0; index < messages.length; index++) {
+    const turn = messages[index]!;
     // A turn always has an id once recorded, but a session written before ids
     // existed does not. Those cannot be gone back to by name, so they are left
     // out rather than offered as a choice that would not survive being made.
@@ -80,11 +81,11 @@ export function rewindPoints(turns: readonly SessionMessage[]): RewindPoint[] {
     if (turn.role !== "user" || messageToText(turn.content).trim().length === 0) continue;
     points.push({
       entryId: turn.id,
-      prompt: messageToText(turn.content).trim(),
+      prompt: messageToText(turn.content),
       // Counts what is left behind, which is everything after this question.
       // The question itself stays — it is what goes back in the editor — so
       // including it would overstate the cost by one every time.
-      dropped: turns.length - index - 1,
+      dropped: messages.length - index - 1,
     });
   }
   return points.reverse().slice(0, MAX_POINTS);
@@ -100,9 +101,9 @@ export function rewindPoints(turns: readonly SessionMessage[]): RewindPoint[] {
  * unchanged.
  */
 function describeCost(dropped: number): string {
-  if (dropped === 0) return "drops the answer to this question";
-  if (dropped === 1) return "drops one turn after this question";
-  return `drops ${dropped} turns after this question`;
+  if (dropped === 0) return "continues from this question";
+  if (dropped === 1) return "keeps one later message in the tree";
+  return `keeps ${dropped} later messages in the tree`;
 }
 
 function summarise(prompt: string): string {

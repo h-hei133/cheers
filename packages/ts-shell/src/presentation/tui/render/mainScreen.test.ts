@@ -372,6 +372,25 @@ describe("MainScreenPainter", () => {
     expect(terminal.countOnScreen("chrome")).toBe(1);
   });
 
+  it('shows a replacement conversation after the previous one exceeded the viewport', () => {
+    const terminal = new Screen();
+    const painter = new MainScreenPainter(terminal.asDevice());
+    painter.start();
+    const chrome = ['prompt>'];
+    const earlier = Array.from({ length: 30 }, (_, index) => `old message ${index}`);
+    painter.paint([...earlier, ...chrome], chrome, undefined, {});
+    const scrollback = [...terminal.scrollback];
+    const replacement = {};
+    for (let render = 0; render < 3; render++) {
+      painter.paint(['first question', 'Now at first.', ...chrome], chrome, undefined, replacement);
+    }
+    expect(terminal.countOnScreen('first question')).toBe(1);
+    expect(terminal.countOnScreen('Now at first.')).toBe(1);
+    expect(terminal.countOnScreen('old message 29')).toBe(0);
+    expect(terminal.scrollback).toEqual(scrollback);
+    expect(terminal.allLines().filter(line => line === 'first question')).toHaveLength(1);
+  });
+
   it("keeps its cursor account on the row it actually wrote", () => {
     // The account and the terminal's cursor are one fact. A frame that leaves
     // them apart makes every later move land on the wrong row: the row the

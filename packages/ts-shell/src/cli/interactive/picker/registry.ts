@@ -5,7 +5,7 @@ import type { CliMcpGateway } from "../../../entrypoints/cliMcpModule.js";
 import type { SessionManager } from "../../../session/SessionManager.js";
 import type { StatusItemId } from "../../../presentation/tui/chrome/items.js";
 import type { SessionMessage } from "../../../session/schema/sessionMessage.js";
-import type { RewindPoint } from "./rewind.js";
+import type { RewindPickerInput } from "./rewind.js";
 import type { Transcript } from "../../../presentation/tui/transcript/container.js";
 import type { Picker } from "../overlay.js";
 import type { SessionSelectionContext } from '../../../session/navigation/selection.js';
@@ -54,8 +54,8 @@ export interface PickerHost extends SettingsHost {
   previewStatusItems(items: readonly StatusItemId[] | undefined): void;
   /** The current session's stored turns, for choosing a point to go back to. */
   sessionTurns(): readonly SessionMessage[];
-  /** Drop everything after a chosen point, leaving the workspace alone. */
-  rewind(point: RewindPoint): Promise<string | undefined>;
+  /** Navigate by stable identity and return only the confirmed note and draft. */
+  readonly rewind: RewindPickerInput['rewind'];
 }
 
 type PickerFactory = (host: PickerHost, argument?: string) => Picker;

@@ -10,7 +10,8 @@ import {
   createSessionBranch,
   switchSessionActiveLeaf,
 } from "../schema/sessionThread.js";
-import { readStateSnapshotSafely, writeSessionState } from "./sessionStateStore.js";
+import { readStateSnapshotRequired, readStateSnapshotSafely, withSessionStateLock, writeSessionState } from "./sessionStateStore.js";
+import { writeJsonFileAtomic } from './sessionFileStore.js';
 import type { SessionFileLayout } from "./sessionFileLayout.js";
 
 /**
@@ -63,19 +64,26 @@ export function switchDurableSessionActiveLeaf(input: {
   readonly layout: Pick<SessionFileLayout, "statePath" | "stateLockPath">;
   readonly leafEntryId: string;
   readonly branchId?: string;
+  readonly expected?: { readonly thread: SessionThreadSnapshot | undefined; readonly projectRoot: string | undefined };
+  readonly beforeWrite?: () => void;
 }): SessionThreadSnapshot {
-  const current = readSessionThreadSnapshot(input);
-  const thread = switchSessionActiveLeaf({
-    snapshot: current,
-    leafEntryId: input.leafEntryId,
-    ...(input.branchId ? { branchId: input.branchId } : {}),
-  });
-  writeSessionState({
-    session: input.session,
-    layout: input.layout,
-    overrides: { thread },
-  });
-  return thread;
+  return withSessionStateLock(input.layout, () => {
+    const state = readStateSnapshotRequired(input.layout.statePath);
+    if (input.expected && (JSON.stringify(state.thread) !== JSON.stringify(input.expected.thread)
+      || state.projectRoot !== input.expected.projectRoot)) {
+      throw new Error('The session branch or project changed while preparing navigation.');
+    }
+    const current = catchUpSessionThread(state.thread ?? buildLinearSessionThreadSnapshot(input.session), input.session);
+    const thread = switchSessionActiveLeaf({
+      snapshot: current,
+      leafEntryId: input.leafEntryId,
+      ...(input.branchId ? { branchId: input.branchId } : {}),
+    });
+    input.beforeWrite?.();
+    // Navigation changes the thread only, preserving unrelated state read under the lock.
+    writeJsonFileAtomic(input.layout.statePath, { ...state, thread });
+    return thread;
+  }, { requireExisting: true });
 }
 
 export function addDurableSessionCompaction(input: {

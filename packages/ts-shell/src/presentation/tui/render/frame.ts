@@ -17,6 +17,8 @@ export interface ViewportSize {
 export type FrameLayout = "document" | "viewport";
 
 export interface TerminalFramePlan {
+  /** Stable collection identity; replacement starts a new conversation view. */
+  readonly documentId?: object;
   /** A bounded overlay must not become permanent terminal scrollback. */
   readonly fullScreen?: boolean;
   /** Exactly the requested document or viewport rows, including the fixed tail. */

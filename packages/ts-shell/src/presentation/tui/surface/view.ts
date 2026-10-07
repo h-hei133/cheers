@@ -104,6 +104,7 @@ export class InteractiveSurface implements InteractiveView {
       } : {}),
     };
     return {
+      documentId: this.transcript.all(),
       rows: [...transcriptRows, ...chrome.rows],
       chromeRows: chrome.rows,
     };

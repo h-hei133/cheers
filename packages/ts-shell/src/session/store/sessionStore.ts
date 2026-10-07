@@ -8,7 +8,7 @@ import type { SessionMessage } from "../schema/sessionMessage.js";
 import type { SessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
 import { buildSessionStateSnapshot } from "../schema/sessionStateSnapshot.js";
 import { projectBranchMessages, readTranscriptEvents } from "../transcript/sessionTranscript.js";
-import { createTranscriptHeader } from "../sessionEventCodec.js";
+import { createTranscriptHeader, type TranscriptEvent } from "../sessionEventCodec.js";
 import { sessionThreadPath } from "../schema/sessionThread.js";
 import { readJsonFileWithRetry, writeJsonFileAtomic } from "./sessionFileStore.js";
 import type { SessionFileLayout } from "./sessionFileLayout.js";
@@ -76,11 +76,24 @@ export function deleteSessionRecord(input: {
   fs.rmSync(input.layout.sessionDir, { recursive: true, force: true });
 }
 
-export function loadSessionRecord(input: {
+interface SessionReadInput {
   readonly sessionId: string;
   readonly layout: SessionFileLayout;
   readonly cwd: string;
-}): Session {
+}
+
+export interface SessionRecordSnapshot {
+  readonly session: Session;
+  readonly state: SessionStateSnapshot;
+  readonly events: readonly TranscriptEvent[];
+}
+
+export function loadSessionRecord(input: SessionReadInput): Session {
+  return readSessionRecordSnapshot(input).session;
+}
+
+/** All projections share these acquired values; no second transcript or state read. */
+export function readSessionRecordSnapshot(input: SessionReadInput): SessionRecordSnapshot {
   if (
     !fs.existsSync(input.layout.sessionDir) ||
     !fs.existsSync(input.layout.metadataPath) ||
@@ -125,7 +138,7 @@ export function loadSessionRecord(input: {
       const timestamp = reports.at(-1)!.timestamp;
       if (Date.parse(timestamp) > Date.parse(session.updatedAt)) session.updatedAt = timestamp;
     }
-    return session;
+    return { session, state, events };
   } catch (error) {
     throw new Error(
       `Failed to load session ${input.sessionId}: ${error instanceof Error ? error.message : String(error)}`,

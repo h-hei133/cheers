@@ -2,6 +2,7 @@ import { constants, type Stats } from 'node:fs';
 import { lstat, open } from 'node:fs/promises';
 import { projectSessionFileLayout, validateSessionId, type SessionFileLayout, type SessionStoreLayout } from '../sessionFileLayout.js';
 import { CATALOG_LIMITS } from './model.js';
+import { fileVersion } from '../version.js';
 
 export interface CatalogFiles {
   readonly layout: SessionFileLayout;
@@ -38,10 +39,6 @@ export async function locateCatalogFiles(store: SessionStoreLayout, id: string, 
       version: JSON.stringify([layout.sessionDir, directory.dev, directory.ino, ...stats.map(fileVersion)]) };
   }
   return undefined;
-}
-
-function fileVersion(stat: Stats): readonly number[] {
-  return [stat.dev, stat.ino, stat.mode, stat.size, stat.mtimeMs, stat.ctimeMs];
 }
 
 /** A finite acquisition bound, checked against the opened object as well as its path. */

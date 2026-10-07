@@ -257,6 +257,12 @@ regular 的终端既有 scrollback 不适合由应用可靠地选择性重写；
 
 分别在 fullscreen/regular 实际 PTY 验证：短转录、先超过视口再缩短、resize、overlay、原生 scrollback、取消与错误、摘要追加失败及读取失败。数据断言证明分支状态，字节探针证明序列，截图/现场观察证明视觉；没有后者不能宣称“现场视觉问题彻底解决”。
 
+### 5.6 SES-03 已实施部分（2026-10-07）
+
+- [导航 owner](../../packages/ts-shell/src/session/navigation/revert.ts)保留数字返回兼容接口，将 durable leaf 写入与后续 branch note 失败分开；[CLI 协调](../../packages/ts-shell/src/cli/runtime/navigation.ts)按实际重读结果发布 unchanged、changed、changed-with-warning 或 unknown，只有确认后的 session/draft 进入视图。磁盘已在目标而界面过期时可只刷新视图，不声称又写了一次；摘要期间启动的新回合不会被迟到导航覆盖。
+- [共享读取](../../packages/ts-shell/src/session/store/sessionStore.ts)一次取得 metadata/state/transcript，导航的 session、tree 与 prompt 共用该次数据，前后版本及目录优先级检查拒绝观测到的来源变化。leaf 写入在原 state lock 内重验 thread/project 与会话身份，保留锁内其他状态；这些检查不构成跨文件事务。两个 picker 均将草稿与 current 判定交给动作 owner，不采用面板缓存中的旧决定。
+- 两模式均按 transcript 集合替换重建活动视图；regular 仅清除应用拥有的可见行并保留先前原生 scrollback，fullscreen 复位阅读位置。保留精确问题空白，说明按消息条目计数。最终 308 项、10 组有效反转、两模式实际 CLI 长历史/窄屏/取消/错误/恢复验证及独立审查见 [决策 §8.106](phase-19-decisions.md#8106-ses-03分支导航真值与视图一致性)。实际 Linux PTY 的终端屏幕模型证据不替代 Windows 前端像素、字体或 IME 验收。
+
 ## 6. Phase 19 任务依赖
 
 以下均为后续实现，统一批次见 [Phase 19 决策](phase-19-decisions.md)。

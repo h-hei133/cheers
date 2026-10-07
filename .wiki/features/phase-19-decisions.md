@@ -1611,3 +1611,15 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 上批 `a1df2e846007f6ef780bba3b1d0f12ca959e489b` 已推送；CI 37556140158、Watch 37556140209 均零步骤失败，annotation 核实为账户付款/spending limit 阻止启动，不是远端测试执行失败或通过。本批远端按新 SHA 跟踪；SES-03 及 W5 其余任务、完整 Phase 19 继续。
 - 独立架构最终 CLEAR；1,765 文件普通/混合依赖图均无环。最终 UI 增量复核确认 InteractiveMode 仅替换既有 callback，AST function-like 节点 126→126，既有数量 advisory 不增长；view 19、suggestions 14、hints 4，未新增超限 owner。代码 APPROVE 与架构 CLEAR 均有独立返回证据。
 - 五项静态 gates、43 项 script tests 通过，NormProof 阻断义务全部满足、0 blocking，见 `.tmp/catalog-gates-gv5waz_1`；原有函数数量与 120 项文档来源 advisory 保留。产品验证使用 Node 20.3；NormProof 首次出现其工具要求 Node 24 的 engine 提醒，随后在本机 Node 24.15 重新执行并核验阻断结果，未修改产品 Node floor。
+
+### 8.106 SES-03：分支导航真值与视图一致性
+
+- [revert owner](../../packages/ts-shell/src/session/navigation/revert.ts)从 SessionManager 提取实际导航，保留 `Promise<number>` 兼容面；摘要准备失败、leaf 写入与 branch note 追加分别处理。锁内重验预期 thread/project，提交前复查会话 ID、创建时间、项目和目录身份，只改 thread 并保留最新无关状态。写后 note 失败携带安全 warning，由 [CLI owner](../../packages/ts-shell/src/cli/runtime/navigation.ts)重读发布 unchanged、changed、changed-with-warning、unknown；异常不再等同完全未变，错误原文不进入提示。
+- [共享 snapshot](../../packages/ts-shell/src/session/store/sessionStore.ts)一次取得 session/state/events，导航的活动投影与候选 prompt 不再分别读取；[文件版本](../../packages/ts-shell/src/session/store/version.ts)与目录优先级在前后复核，catalog 复用原版本函数，删除重复定义。检查是乐观一致性，不宣称跨文件快照、跨进程事务或崩溃原子性。摘要期间 runtime 身份、忙碌状态或磁盘绑定改变时，不覆盖新回合/新项目的视图与状态。
+- rewind/tree picker 只传递 owner 确认的 draft，保留原问题空白，不用缓存的 current 提前返回；磁盘已在目标而运行时仍旧时只刷新视图。`status` 描述保存的导航结果，`changed` 只触发已确认的运行时视图替换，两者明确区分。转录复建直接消费已确认 snapshot，不再第三次读磁盘；旧分支可重入，消息计数排除上下文注释，文件不变。
+- [regular painter](../../packages/ts-shell/src/presentation/tui/render/mainScreen.ts)按 transcript 集合替换重置拥有的可见行账本，保留先前原生 scrollback；fullscreen 同步复位滚动位置，普通 append 不改变集合身份。定向比较只读参考快照 `5b6c792b4` 的 `agent-session.ts:navigateTree`、`session-manager.ts:branchWithSummary` 与交互重建：采用保留分支、从 canonical session 重建和 owner 返回编辑文本的决定；本项目仍按已裁决语义保留所选 user entry 为 active leaf，没有改成其 parent 语义，也没有复制其他存储方案。
+- 独立审查复现并修复读取混合/项目变化后，又补齐“已在目标但界面旧”“摘要时启动新回合”“tree current 缓存绕过 owner”三个反例。最终代码 APPROVE（另行 22 项及四场独立探针）、架构 CLEAR（1767 文件包含混合类型/值及 re-export 的图无环），现有入口函数数量 advisory 未增加。早期专用审查 503 与一次速率限制均未计作批准；后续独立返回才作为证据。
+- 最终 Node 20.3 构建及 13 文件/308 项通过，见 `.tmp/catalog-check-ewgz5x1n`。10 组关键决定反转均检出行为断言，源码副本逐字节/SHA-256 恢复后 4 文件/93 项通过，见 `.tmp/phase19-config/navigation-reversals/1791371887573419034`。早期一次恢复复跑因同文件时间 tick 的 ABA 夹具失败、一次因夹具保留空 runtime session 失败，分别改为明确版本变化及真实已加载会话，原断言未弱化；失败记录保留。
+- 最终 actual CLI regular/fullscreen 均通过长历史回退、单次说明、完整问题回填、40 列 resize、取消、旧末尾恢复、note 追加失败后的 changed-with-warning、重读失败的 unknown，以及通过 tree 当前项刷新旧视图、同 session 重启。各执行两场进程、3 次合成本地摘要请求，没有提交用户问题，配置和工作文件原文不变、退出 0，见 `.tmp/phase19-config/navigation-pty-1791372053934295414`。终端屏幕模型与磁盘断言不替代 Windows 像素/字体/IME 证据。
+- 上批 `4adb7ee09a28f81898c1548efdc33501ffe5b898` 已推送；CI 37563819193、Watch 37563819203 均零步骤失败，两个 annotation 均核实为账户付款/spending limit 阻止启动，没有远端测试执行证据。本批远端按新 SHA 跟踪；SES-04、W5 其余项与完整 Phase 19 继续。
+- 当前结果契约 gate 实跑 6 文件/149 项通过，见 `.tmp/result-contract-KeR2a4`；五项静态 gates、43 项 scripts 及 NormProof 0 blocking 通过，见 `.tmp/navigation-gates-inj7qzhl`。产品构建/测试使用 Node 20.3，独立架构工具使用其要求的 Node 24；既有 5 项函数数量与 120 项文档来源 advisory 保留。

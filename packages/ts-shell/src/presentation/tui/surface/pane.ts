@@ -33,6 +33,7 @@ export class TranscriptPane {
   private capacity = 0;
   private width = 80;
   private total = 0;
+  private document: readonly Block[] | undefined;
 
   constructor(private readonly transcript: Transcript) {}
 
@@ -48,6 +49,11 @@ export class TranscriptPane {
     options?: BlockRenderOptions,
     layout: FrameLayout = "viewport",
   ): string[] {
+    const document = this.transcript.all();
+    if (document !== this.document) {
+      this.scroller.scrollToEnd();
+      this.document = document;
+    }
     const safeWidth = Math.max(1, Math.floor(width));
     const hasScrollbar = layout === "viewport" && needsScrollbar(
       this.transcript.rowCount(safeWidth),

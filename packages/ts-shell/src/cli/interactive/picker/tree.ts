@@ -23,9 +23,7 @@ export function treePicker(context: CommandContext, rewind: RewindPickerInput["r
     async apply(ids) {
       const point = points.find((candidate) => candidate.entryId === ids[0]);
       if (!point || point.unavailable) return undefined;
-      if (point.current) return { note: "Already at that point in the conversation." };
-      const note = await rewind({ entryId: point.entryId, prompt: point.prompt ?? "", dropped: 0 });
-      return { note, ...(point.prompt !== undefined ? { draft: point.prompt } : {}) };
+      return rewind({ entryId: point.entryId, prompt: point.prompt ?? "", dropped: 0 });
     },
   };
 }

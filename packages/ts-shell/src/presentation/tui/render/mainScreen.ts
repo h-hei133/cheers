@@ -72,6 +72,7 @@ export class MainScreenPainter {
    * the first free row below the child's output.
    */
   private viewportUnplaced = false;
+  private documentId?: object;
 
   constructor(private readonly device: MainScreenDevice) {}
 
@@ -89,8 +90,13 @@ export class MainScreenPainter {
    * the tail of the content that is still visible, and the fixed block, are
    * rewritten in place.
    */
-  paint(rows: readonly string[], chromeRows: readonly string[], onWritten?: () => void): void {
+  paint(rows: readonly string[], chromeRows: readonly string[], onWritten?: () => void, documentId?: object): void {
     if (!this.started) return;
+    let replacement = '';
+    if (documentId !== undefined) {
+      if (this.documentId !== undefined && this.documentId !== documentId) replacement = this.replaceDocument();
+      this.documentId = documentId;
+    }
     const dimensions = this.device.getDimensions();
     const height = Math.max(1, dimensions.rows);
     const width = Math.max(1, dimensions.columns);
@@ -161,7 +167,7 @@ export class MainScreenPainter {
       return delta > 0 ? `\x1b[${delta}B\r` : `\x1b[${-delta}A\r`;
     };
 
-    let buffer = paintBegin(this.device.capabilities.supportsDec2026Sync);
+    let buffer = paintBegin(this.device.capabilities.supportsDec2026Sync) + replacement;
     if (appendRows.length > 0) {
       // Appending happens at the bottom of the content, which means stepping
       // over the fixed block to reach it. `writtenTotal` is that bottom, and it
@@ -256,6 +262,17 @@ export class MainScreenPainter {
     this.fixedRows = fixed;
     // Carried, not recomputed: see `move` above.
     this.cursorRow = cursor;
+  }
+
+  /** Clear owned visible rows while leaving earlier native scrollback intact. */
+  private replaceDocument(): string {
+    const move = this.viewportUnplaced ? '\r' : this.moveToRow(this.scrolled);
+    this.visibleContent = [];
+    this.scrolled = 0;
+    this.cursorRow = 0;
+    this.fixedRows = [];
+    this.viewportUnplaced = false;
+    return move + ERASE_TO_END_OF_SCREEN;
   }
 
   /**
