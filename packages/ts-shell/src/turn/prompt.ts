@@ -2,6 +2,8 @@ import type { MultimodalContentBlock } from "../model-adapters/multimodal.js";
 import type { PermissionScope } from "../cli/approval/permissionScope.js";
 import { readProjectState } from "../core/state/projectState.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
+import { textSize } from '../context/request/measure.js';
+import type { PromptSource } from '../context/request/model.js';
 
 /**
  * What the model is told before the conversation, and how the stored
@@ -76,6 +78,14 @@ export function buildSystemPrompt(
   agentMode: "plan" | "build" | undefined,
   context?: SystemPromptContext,
 ): string {
+  return systemPromptSnapshot(agentMode, context).text;
+}
+
+/** Text and source sizes are assembled together, before endpoint escaping or wrapping. */
+export function systemPromptSnapshot(
+  agentMode: 'plan' | 'build' | undefined,
+  context?: SystemPromptContext,
+): { readonly text: string; readonly sources: readonly PromptSource[] } {
   const sections = [
     `You are an expert autonomous coding agent equipped with real tools (${context?.toolNames?.join(", ") ?? "none available"}).`,
     agentMode === "plan"
@@ -93,11 +103,14 @@ export function buildSystemPrompt(
   // Instructions come after the rules that describe how to work and before the
   // skill list, so a project's own conventions read as the most specific thing
   // said about this repository.
-  if (context?.instructions) sections.push(context.instructions)
-  if (context?.appendedInstructions) sections.push(context.appendedInstructions)
-  if (context?.skills) sections.push(context.skills)
-
-  return sections.join("\n")
+  const parts: Array<{ kind: PromptSource['kind']; text: string }> = [{ kind: 'base', text: sections.join('\n') }];
+  if (context?.instructions) parts.push({ kind: 'instructions', text: context.instructions });
+  if (context?.appendedInstructions) parts.push({ kind: 'appended', text: context.appendedInstructions });
+  if (context?.skills) parts.push({ kind: 'skills', text: context.skills });
+  const text = parts.map(part => part.text).join('\n');
+  const sources: PromptSource[] = parts.map(part => Object.freeze({ kind: part.kind, ...textSize(part.text) }));
+  sources.push(Object.freeze({ kind: 'separators', ...textSize('\n'.repeat(parts.length - 1)) }));
+  return { text, sources: Object.freeze(sources) };
 }
 
 /**

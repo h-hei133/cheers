@@ -167,6 +167,7 @@ async function bedrockSigner(): Promise<RequestSigner | undefined> {
 }
 
 declareEndpoint("bedrock-converse-stream", {
+  contextFields: { system: 'system', conversation: 'messages', tools: 'toolConfig' },
   minimumThinkingOutputTokens: MIN_THINKING_BUDGET_TOKENS + MIN_ANSWER_TOKENS,
   // This protocol names the model in the URL, which is why the path is a function.
   path: (model, stream = true) => `/model/${encodeURIComponent(model)}/${stream ? "converse-stream" : "converse"}`,

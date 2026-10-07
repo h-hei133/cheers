@@ -73,6 +73,7 @@ export function vertexTarget(env: Readonly<Record<string, string | undefined>>):
 }
 
 declareEndpoint("google-vertex", {
+  contextFields: { system: 'systemInstruction', conversation: 'contents', tools: 'tools' },
   // The base address carries the account; this adds the model and the method.
   // The streaming form is a different method name, and the query is what asks for
   // events rather than one document.

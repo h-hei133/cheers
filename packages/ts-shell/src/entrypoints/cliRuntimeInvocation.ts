@@ -17,7 +17,7 @@ import { loadCatalog } from "../core/models/catalogStore.js";
 import { providerEndpoint, type CatalogProvider } from "../core/models/catalog.js";
 import type { RuntimeConfig } from "../config/runtimeConfig.js";
 import type { ToolDefinition } from "../tools/types.js";
-import { buildSystemPrompt, type SystemPromptContext } from "../turn/prompt.js";
+import { buildSystemPrompt, systemPromptSnapshot, type SystemPromptContext } from "../turn/prompt.js";
 import type { RequestOverhead } from "../session/context.js";
 import { renderSkillList, type Skill } from "../core/skills/skillLoader.js";
 import {
@@ -561,6 +561,7 @@ function createProviderStep(
   // change request shape between two steps of the same answer.
   const catalog = request.providerCatalog ?? loadCatalog();
   const endpoint = providerEndpoint(catalog, resolution.provider);
+  const system = systemPromptSnapshot(request.agentMode, promptContext);
   return createStepFunction({
     provider: {
       // Built from the whole credential, not from its key alone. An account login
@@ -592,7 +593,8 @@ function createProviderStep(
     fetchImpl: providerFetchForEndpoint(request.runtimeConfig, endpoint, endpointShape, request.admission),
     workspaceRoot: request.workspaceRoot,
     sessionId: request.sessionId,
-    systemPrompt: buildSystemPrompt(request.agentMode, promptContext),
+    systemPrompt: system.text,
+    systemPromptSources: system.sources,
     systemPromptFor: (agentMode, toolNames) => buildSystemPrompt(agentMode, { ...promptContext, toolNames }),
     thinkingEffort: request.thinkingEffort,
     thinkingEffortExplicit: request.thinkingEffortExplicit,

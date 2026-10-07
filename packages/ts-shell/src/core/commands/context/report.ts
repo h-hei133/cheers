@@ -2,12 +2,17 @@ import { contextPressure } from '../../models/pressure.js';
 import type { ResolvedContextWindow } from '../../models/window.js';
 import type { ReportLine } from '../report/contract.js';
 import { createReport, span } from '../report/projection.js';
+import type { RequestContext, TextSize } from '../../../context/request/model.js';
+import { CHARS_PER_TOKEN } from '../../../session/context.js';
+import { requestDetails } from './request.js';
 
 export function contextReport(input: {
   readonly resolution: ResolvedContextWindow;
   readonly used: number | undefined;
   readonly reserve: number;
   readonly schemaTokens: number;
+  readonly schemaSize?: TextSize;
+  readonly request?: RequestContext;
   readonly toolCount: number;
   readonly totalTokens: number;
   readonly turns: number;
@@ -28,25 +33,33 @@ export function contextReport(input: {
   } else {
     lines.push({ kind: 'text', bullet: true, spans: [...bar(used, reserve, window), span('  '),
       span(`${((used / window) * 100).toFixed(1)}%`, `context-${contextPressure(used, window)}`), span(' used')] },
-    { kind: 'text', bullet: true, spans: [span('Last request carried '), span(used.toLocaleString(), 'number'),
+    { kind: 'text', bullet: true, spans: [span('Latest context measurement: '), span(used.toLocaleString(), 'number'),
       span(' of '), span(window.toLocaleString(), 'number'), span(' tokens; '), span(free!.toLocaleString(), 'number'),
       span(' free before the '), span(reserve.toLocaleString(), 'number'), span('-token reserve')] },
     { kind: 'space' },
     { kind: 'columns', cells: [[span('Current tool schemas')], [span(`~${schemaTokens.toLocaleString()}`, 'number')],
       [span(`${toolCount} current definitions; character-based estimate`)]] },
-    { kind: 'columns', cells: [[span('Last request total')], [span(used.toLocaleString(), 'number')], [span('reported by the provider')]] },
+    { kind: 'columns', cells: [[span('Context input usage')], [span(used.toLocaleString(), 'number')], [span('reported by the provider')]] },
     { kind: 'space' },
     { kind: 'text', spans: [span('Auto-compaction runs when a request would exceed about '), span(compactAt.toLocaleString(), 'number'),
       span(' tokens. '), span('/compact', 'command'), span(' runs it now.')] });
     if (input.totalTokens > 0) lines.push({ kind: 'space' }, { kind: 'text', spans: [span('Across the whole session: '),
       span(input.totalTokens.toLocaleString(), 'number'), span(' tokens over '), span(input.turns, 'number'), span(input.turns === 1 ? ' turn.' : ' turns.')] });
   }
+  lines.push({ kind: 'text', spans: [span('The context gauge can include delegated requests. The foreground request below is captured separately.')] });
+  if (input.schemaSize) lines.push({ kind: 'space' }, { kind: 'text', spans: [span(
+    `Current tool definitions: ${input.schemaSize.bytes.toLocaleString()} UTF-8 bytes, ${input.schemaSize.codeUnits.toLocaleString()} UTF-16 code units of JSON; estimate divides code units by ${CHARS_PER_TOKEN}.`,
+  )] });
+  const request = requestDetails(input.request);
+  lines.push(...request.lines);
   return createReport({ title: 'Context window',
-    columns: [{ label: 'What', minWidth: 20 }, { label: 'Tokens', align: 'right', minWidth: 8 }, { label: 'How it is known', minWidth: 24 }],
+    columns: [{ label: 'What', minWidth: 20 }, { label: 'Value', align: 'right', minWidth: 8 }, { label: 'How it is known', minWidth: 24 }],
     lines, facts: { window: { tokens: window, source: resolution.source, warning: resolution.warning ?? null },
       prompt: used === undefined ? { status: 'unknown' } : { status: 'reported', tokens: used },
       reserveTokens: reserve, freeTokens: free ?? null, compactAtTokens: compactAt,
-      toolSchemas: { status: 'estimate', method: 'characters', tokens: schemaTokens, toolCount },
+      toolSchemas: { status: 'estimate', method: 'characters', tokens: schemaTokens, toolCount,
+        characterUnit: 'utf16-code-units', divisor: CHARS_PER_TOKEN, size: input.schemaSize ? { ...input.schemaSize } : null },
+      request: request.facts,
       session: { recordedTokens: input.totalTokens, recordedTurns: input.turns } },
   });
 }

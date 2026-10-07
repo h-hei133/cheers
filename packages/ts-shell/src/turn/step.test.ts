@@ -36,6 +36,22 @@ function jsonResponse(body: unknown, init: { ok?: boolean; status?: number } = {
 }
 
 describe("createStepFunction", () => {
+  it('observes the exact accepted serialization and drops static source claims for delegated prompts', async () => {
+    let body = ''; let captured: SentRequest | undefined;
+    const step = createStepFunction({ ...request, systemPrompt: '规则🔒\n"quoted"',
+      systemPromptSources: [{ kind: 'base', bytes: 10, codeUnits: 5 }],
+      systemPromptFor: () => 'delegated',
+      fetchImpl: async (_url, init) => { body = String(init?.body); return jsonResponse({ choices: [{ message: { content: 'ok' } }] }); },
+    });
+    await step([{ role: 'user', content: '问\\路径' }], undefined, {}, { allowTools: true, onRequestSent: sent => { captured = sent; } });
+    expect(captured!.body).toBe(body);
+    expect(captured!.context?.body).toEqual({ bytes: Buffer.byteLength(body), codeUnits: body.length });
+    expect(captured!.context?.systemSources).toEqual([{ kind: 'base', bytes: 10, codeUnits: 5 }]);
+    expect(JSON.stringify(captured!.context)).not.toContain('规则');
+    expect(JSON.stringify(captured!.context)).not.toContain('provider.test');
+    await step([], undefined, {}, { agentMode: 'plan', allowTools: false, onRequestSent: sent => { captured = sent; } });
+    expect(captured!.context?.systemSources).toBeUndefined();
+  });
   it.each([
     { usage: undefined, expected: undefined },
     { usage: null, expected: undefined },

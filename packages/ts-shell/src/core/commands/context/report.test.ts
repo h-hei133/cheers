@@ -1,9 +1,26 @@
 import { expect, it } from 'vitest';
 import { contextReport } from './report.js';
 import { reportText } from '../report/projection.js';
+import { requestContext } from '../../../context/request/projection.js';
 
 const input = { resolution: { window: 200000, source: 'catalog' as const }, reserve: 17000,
   schemaTokens: 8000, toolCount: 22, totalTokens: 72000, turns: 2 };
+
+it('keeps exact wire dimensions, raw estimates, tokenizer absence and provider usage distinct', () => {
+  const request = requestContext({ body: JSON.stringify({ messages: [{ role: 'system', content: 'PRIVATE_INSTRUCTIONS🔒' }], secret: 'FIXTURE_SECRET' }),
+    provider: 'fixture', model: 'm', endpoint: 'openai-compatible', fields: { conversation: 'messages', firstMessageIsSystem: true },
+    systemSources: [{ kind: 'instructions', bytes: 24, codeUnits: 21 }],
+  });
+  const report = contextReport({ ...input, used: undefined, schemaSize: { bytes: 120, codeUnits: 100 }, request: { ...request, promptTokens: 0 } });
+  expect(report.facts.request).toMatchObject({ status: 'accepted', body: request.body, tokenizer: { status: 'unavailable' }, usage: { status: 'reported', promptTokens: 0 } });
+  expect(report.facts.toolSchemas).toMatchObject({ characterUnit: 'utf16-code-units', divisor: 3.5, size: { bytes: 120, codeUnits: 100 } });
+  expect(reportText(report)).toContain('raw source sizes are not additive to wire sizes');
+  expect(reportText(report)).toContain('Provider reported 0 input tokens');
+  expect(reportText(report)).toContain('Last accepted foreground request');
+  expect(reportText(report)).toContain('context gauge can include delegated requests');
+  expect(JSON.stringify(report)).not.toMatch(/PRIVATE_INSTRUCTIONS|FIXTURE_SECRET/);
+  expect(contextReport({ ...input, used: undefined, request }).facts.request).toMatchObject({ usage: { status: 'unknown' } });
+});
 
 it('retains independent measured, estimated and unknown context facts', () => {
   const report = contextReport({ ...input, used: 64000 });

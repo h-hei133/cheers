@@ -1549,3 +1549,18 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 两模式实际 npm/tsx/JS/exe 各五次，以及关闭计时 JS 各五次，共 50 场全部通过，见 `.tmp/sm-642699446`。每次从外部启动前到 VT prompt、再到 composer 输入回显分别计时；内部 listener/layout/write 顺序正确，配置不变、零模型 message。重复四场的提示符中位数 regular/fullscreen：npm 2121/2088ms、tsx 1550/1552ms、JS 894/882ms、exe 410/411ms。关闭计时 JS 为 898/915ms，不能宣称零开销；冷/暖应用缓存、未控制 OS 缓存、P95 与早期夹具失败详见 [研究18 §5.5](18-input-slash-startup-context.md#55-ui-07-启动事件与入口矩阵2026-10-07)。没有声称本批比旧提交更快。
 - 上批 `a8774cfa` 已推送，Architecture Watch 37546372288 成功；CI 37546372317 当前仍运行。本批远端按新 SHA 核实。UI-07 的实际请求上下文账目及完整 Phase 19 继续，Windows 像素/真实 IME 仍未验证。
 - 五项静态 gates、43 项 script tests 与 NormProof 0 blocking 通过，见 `.tmp/startup-gates-zjry1oxl`；既有五项函数计数 advisory 和 120 项文档来源 advisory 保留。
+
+
+### 8.101 UI-07：实际请求与上下文来源账目
+
+- [request projection](../../packages/ts-shell/src/context/request/projection.ts)只保留最后已接受前台请求的精确 UTF-8 body bytes、UTF-16 code units、身份和时间；step 在 fetch 前只序列化一次，接受后从同一字符串测量。五种已有 endpoint 在声明处拥有字段归属，system/conversation/tools 序列化值和 JSON/settings envelope 合计等于 body；未知或重叠/不兼容字段不伪造分项。测量不含 headers、传输帧及压缩，也不将多媒体 bytes 叫作 tokens。
+- [system prompt](../../packages/ts-shell/src/turn/prompt.ts)保留原组装文本，同时输出 base/instructions/appended/skills/separators 的尺寸；原始来源合计等于组装文本，但不再与 wire 分项相加。`/context` 使用实际有效工具池的 JSON 尺寸与 code units / 3.5 估算，当前工具池和捕获请求保持独立；缺少 tokenizer 明确 unavailable，聚合 provider usage 不按估算比例分摊。
+- [foreground session](../../packages/ts-shell/src/turn/session.ts)发布收据并用身份匹配关联该次归一化 input usage；显式零有效、缺失未知、reset 后迟到 usage 不能重挂旧收据。既有 telemetry owner 管生命周期，context-reset 清除、usage-gap 保留观察，共享子代理 step 不覆盖前台；累计 snapshot 不存收据。显式命令报告沿用已有持久报告通道，只含尺寸与公开身份，无原始指令、headers、端点 URL 或凭据。
+- 定向比较参考会话压缩后用量新鲜度与 host 收集实际状态/纯 report 分工，保留现有协议声明和 usage map，未新增平行请求构造器。Node 20.3 构建及 9 文件/180 项通过，见 `.tmp/ledger-check-beiwo3ah`；首轮 171/172 是新增夹具误把既有 3.5 除数写成 4，已纠正并完整重跑。三组有效反转撤回 UTF-8 测量、前台发布与 reset 清除，均触发行为失败；源码副本逐字节/SHA-256 恢复后 33 项通过，见 `.tmp/phase19-config/ledger-reversals/1791331184383581060`。
+- actual CLI regular/fullscreen 各两次受控本地 HTTP 请求，最终报告与服务端原始 body 的 bytes/code units、四分项合计及 system 原文来源合计一致；第一请求 reported 9000、第二缺失 usage 显示 unknown；实际工具池恰为 read 一项，100×60→40×18 reader 可用，配置原文不变、退出 0，见 `.tmp/phase19-config/ledger-pty-1791331127879284147`。没有使用真实 provider 或作精确 tokenizer 声明。
+- 上批 `9488179f` 的 CI 37547821878 与 Architecture Watch 37547821911 均成功；更早 `a8774cfa` 的 CI 37546372317 与 Watch 37546372288 均成功。当前批次独立代码 APPROVE、架构 CLEAR。后续 W5、Windows 像素、真实 IME 及完整 Phase 19 继续。
+
+- 架构审查指出旧顶栏 “Last request” 可能来自共享子代理计量，与前台收据不同；现标题及 JSON facts 明确 foreground，顶栏改为 context measurement 并说明 delegated 用量。最终 Node 20.3 构建与 180 项、两模式实际 HTTP/PTY 全部重跑通过，见 `.tmp/ledger-check-s2scysev` 与 `.tmp/phase19-config/ledger-pty-1791331554487863324`；代码审查对最后展示修正独立 10 项通过并保留 APPROVE。
+- 五项静态 gates、43 项 script tests 与 NormProof 0 blocking 通过，见 `.tmp/ledger-gates-dsdvwpro`；既有五项函数计数 advisory 和 120 项文档来源 advisory 保留。
+
+- 独立架构最后 6 文件/139 项通过，普通及混合类型图 1751 文件均无环、无未解析相对导入；函数计数 telemetry 15→16、prompt 4→5、context command 2→1、新 projection 4，未新增超限，见 `.tmp/ledger-architecture-iDlVeb`。尺寸投影按请求体长度线性处理，本批未测独立吞吐性能。

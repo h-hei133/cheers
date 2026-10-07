@@ -1,4 +1,5 @@
 import type { ModelCostRates } from "../core/models/catalog.js";
+import type { RequestContext } from '../context/request/model.js';
 
 export type { ModelCostRates };
 
@@ -231,6 +232,12 @@ export function getSessionUsage(sessionId: string): SessionUsageTelemetry {
   return sessionTelemetries.get(sessionId) ?? emptyTelemetry();
 }
 
+export function recordRequestContext(sessionId: string, context: RequestContext): void {
+  const telemetry = sessionTelemetries.get(sessionId) ?? emptyTelemetry();
+  telemetry.requestContext = context;
+  sessionTelemetries.set(sessionId, telemetry);
+}
+
 /** An accepted request has no current measurement until its usage arrives. */
 export function clearContextUsage(sessionId: string): void {
   const existing = sessionTelemetries.get(sessionId);
@@ -249,6 +256,7 @@ export function clearContextUsage(sessionId: string): void {
 export function markContextUnknown(sessionId: string, kind: 'context-reset' | 'usage-gap' = 'context-reset'): void {
   const existing = sessionTelemetries.get(sessionId);
   if (!existing) return;
+  if (kind === 'context-reset') delete existing.requestContext;
   clearContextUsage(sessionId);
   pushHistory(existing, {
     promptTokens: 0,

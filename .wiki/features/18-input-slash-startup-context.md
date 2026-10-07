@@ -265,13 +265,13 @@ doc 14 历史样本中，从 `npm start` 到终端出现输入框为 **2,482–5
 | JS，计时关闭 | 898 / 908 | 915 / 1006 | 940 / 959 |
 
 - 表格仅重复缓存四场，P95 使用 nearest-rank（本样本量即最大值）；操作系统缓存未控制。关闭/开启计时样本重叠且顺序运行有噪声，不能据此宣称零开销或将负差当优化。该矩阵是当前入口对比，没有对前提交声称提速。证据 `.tmp/sm-642699446` 含首场、每次屏幕/记录及 summary。初轮失败分别是过长 TMPDIR 导致 tsx Unix socket 路径冲突、VT 夹具未处理 private DSR；缩短仓库内路径并补齐既有屏幕桩后重跑，无产品迁就。
-- 实际请求上下文尺寸/来源账目仍待后续 UI-07 工作，首帧计时不代表其完成。
+- 实际请求上下文尺寸/来源账目见 §6.5，首帧计时与请求计量独立验证。
 
 ## 6. 问题五：首轮约 5.4k 上下文的口径与来源
 
 ### 6.1 状态栏口径
 
-[sessionFacts.ts](../../packages/ts-shell/src/cli/interactive/sessionFacts.ts#L78) 在 `usage.lastPromptTokens > 0` 时将其作为 `contextUsed`。[usageTelemetry.ts](../../packages/ts-shell/src/observability/usageTelemetry.ts#L139) 对影响上下文的请求，将适配器归一化后的 prompt/cache read/cache write 用量汇总为该字段。
+[sessionFacts.ts](../../packages/ts-shell/src/cli/interactive/sessionFacts.ts) 将存在且有限的非负 `usage.lastPromptTokens` 作为 `contextUsed`；缺失与显式零分开，压缩后等待新的请求测量。[usageTelemetry.ts](../../packages/ts-shell/src/observability/usageTelemetry.ts#L139) 对影响上下文的请求，将适配器归一化后的 prompt/cache read/cache write 用量汇总为该字段。
 
 因此它表示**最近一次影响上下文的请求的归一化输入用量**，不是所有会话累计值，也不是按文件拆分的 tokenizer 账单。一轮中若产生多次 provider 请求，看到的是最近请求；不同 provider 的计数语义应由适配器归一化契约证明。
 
@@ -302,6 +302,14 @@ doc 14 历史样本中，从 `npm start` 到终端出现输入框为 **2,482–5
 - **先可观测，再削减**：保留 `instructionBudgetBytes` 与 `--no-context-files` 的现有边界；不能为了匹配 5.4k 任意截断项目安全与架构规则。
 - **工具选择保持能力完整**：先测 schema 冗余，再比较按需工具发现。初版“首轮仅留 read/edit/write/bash/glob”没有任务覆盖证据，不作为既定默认方案。
 - **缓存如实呈现**：[anthropicMessages.ts](../../packages/ts-shell/src/provider/endpoints/anthropicMessages.ts#L147) 已有缓存标记能力，但是否命中受 provider、最小长度、TTL 和前缀稳定性影响。删除“第二轮必命中”和“降低 90% 以上”保证；上下文占用和账单优惠分开显示，只报告实际 usage 中存在的 cache read/write 数据。
+
+### 6.5 UI-07 实际请求账目（2026-10-07）
+
+- `/context` 从当前运行时的有效工具池测量 schema JSON 的 UTF-8 bytes 与 UTF-16 code units，估算沿用 code units / 3.5，当前工具池和最后已接受请求的工具片段各自显示。没有删减默认工具或指令来拟合历史 token 数。
+- 主回合使用实际传给 fetch 的同一序列化字符串，HTTP 接受后只发布尺寸、协议/model/provider 标识和时间；五种已有协议自行声明 system/conversation/tools 字段。片段与 envelope 相加等于请求体，envelope 包含 JSON 键、分隔和其他设置；不包括 HTTP headers、传输帧或压缩。未知协议/不兼容结构只有总量，不推测分项。
+- system 组装同时记录 base、project instructions、appended instructions、skills 和连接换行的原文尺寸；这是序列化前的来源，不与 wire 再相加。Provider usage 只关联同一前台请求，缓存输入按既有适配契约归一化；没有 tokenizer 时明确 unavailable，不按字符份额分配聚合 usage。共享子代理请求不覆盖前台收据。
+- 收据属于现有 session usage 内存生命周期，不进入累计用量 snapshot；context-reset 清除，usage-gap 保留已接受收据但不借用上次请求用量。用户显式运行 `/context` 后，报告本身沿用已有语义报告持久化，不记录请求原文、指令正文、端点 URL 或 headers。
+- 定向参考会话压缩后的用量新鲜度、host 收集有效状态再交给纯报告器的安排；保留本项目协议声明 owner，未引入第二个端点 dispatcher、usage registry 或 tokenizer。Node 20.3 构建和 180 项通过，三组有效反转/恢复后 33 项通过；两模式各两次本地 HTTP 请求逐项校验实际 wire bytes/code units、来源合计和 reported→unknown，100×60→40×18 reader 验证通过，配置未改、退出 0。详见 [主裁决 §8.101](phase-19-decisions.md#8101-ui-07实际请求与上下文来源账目)。
 
 ## 7. 问题、证据与施工决定汇总
 

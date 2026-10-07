@@ -23,6 +23,7 @@ import { declareEndpoint } from "./kinds.js";
 const PATH = "/chat/completions";
 
 declareEndpoint("openai-compatible", {
+  contextFields: { conversation: 'messages', tools: 'tools', firstMessageIsSystem: true },
   // The model travels in the body, so the path is the same for every one.
   path: () => PATH,
   modelsPath: "/models",

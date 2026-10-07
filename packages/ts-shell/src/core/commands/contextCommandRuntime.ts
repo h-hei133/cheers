@@ -10,6 +10,7 @@ import { getSessionUsage, totalTokens } from "../../observability/usageTelemetry
 import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS } from "../../session/context.js";
 import { toolSchemas } from "../../turn/tools.js";
 import { createCoreToolRegistry } from "../tools/registry.js";
+import { textSize } from '../../context/request/measure.js';
 
 /**
  * /context — how much of the window the last request used.
@@ -55,16 +56,11 @@ export async function runContextCommand(
   const registry = context.getToolPool ? await context.getToolPool() : createCoreToolRegistry();
   const blocked = context.admission?.();
   if (blocked) return { kind: "local", output: blocked };
-  const schemaTokens = toolSchemaTokens(registry);
+  const schemaSize = textSize(JSON.stringify(toolSchemas(registry)));
+  const schemaTokens = Math.round(schemaSize.codeUnits / CHARS_PER_TOKEN);
 
   const report = contextReport({ resolution, used: telemetry?.lastPromptTokens, reserve,
-    schemaTokens, toolCount: registry.size, totalTokens: telemetry ? totalTokens(telemetry) : 0,
+    schemaTokens, schemaSize, request: telemetry?.requestContext, toolCount: registry.size, totalTokens: telemetry ? totalTokens(telemetry) : 0,
     turns: telemetry?.turnsCount ?? 0 });
   return { kind: "local", output: reportText(report), report };
-}
-
-/** Character-based estimate for the current tool definitions. */
-function toolSchemaTokens(registry: Parameters<typeof toolSchemas>[0]): number {
-  const serialised = JSON.stringify(toolSchemas(registry));
-  return Math.round(serialised.length / CHARS_PER_TOKEN);
 }

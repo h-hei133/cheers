@@ -757,6 +757,7 @@ function mapStopReason(reason: string): string {
  * edits nothing else.
  */
 declareEndpoint("anthropic-messages", {
+  contextFields: { system: 'system', conversation: 'messages', tools: 'tools' },
   // The model travels in the body, so the path is the same for every one.
   path: () => "/messages",
   modelsPath: "/models",

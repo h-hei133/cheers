@@ -1,9 +1,12 @@
 import { endpointShape, isEventStream } from "../endpoints/index.js";
 import type { ProviderUsage } from "../../turn/completion.js";
 import type { TurnRequest } from "../endpoints/kinds.js";
+import type { RequestContext } from '../../context/request/model.js';
 
 /** A prepared request captured before transport signing, with its exact prompt prefix. */
 export interface SentRequest {
+  /** Size-only observation of this accepted request, independent of cache refresh replay. */
+  readonly context?: RequestContext;
   readonly url: string;
   /** Provider authorization, replaced as a complete set on credential renewal. */
   readonly headers: Readonly<Record<string, string>>;

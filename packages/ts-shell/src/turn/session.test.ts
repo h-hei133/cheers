@@ -7,7 +7,8 @@ import { createTaskToolDefinition } from "../core/tools/taskTool.js";
 import { runTurn, type TurnOptions } from "./session.js";
 import type { StepFunction } from "./step.js";
 import { CONTEXT_OVERFLOW_PREFIX, createStepFunction } from "./step.js";
-import { recordSessionUsage, resetSessionUsage } from "../observability/usageTelemetry.js";
+import { getSessionUsage, markContextUnknown, persistSessionUsage, recordSessionUsage, resetSessionUsage } from "../observability/usageTelemetry.js";
+import { requestContext } from '../context/request/projection.js';
 
 /**
  * The turn is where the kernel's lifecycle meets the shell's contract. These
@@ -72,6 +73,68 @@ async function drain(events: AsyncIterable<QueryEvent>): Promise<QueryEvent[]> {
 }
 
 describe("runTurn", () => {
+  it.each([undefined, 0, 21])('ties accepted request dimensions to its own usage (%s) and excludes durable snapshots', async promptTokens => {
+    const sessionId = `context-receipt-${promptTokens}`;
+    let body = '';
+    const step = createStepFunction({ provider: { provider: 'fixture', model: 'm', baseUrl: 'https://fixture.test', headers: {} },
+      sessionId, workspaceRoot: process.cwd(), systemPrompt: '私有规则', tools: [],
+      fetchImpl: async (_url, init) => { body = String(init?.body); return new Response(JSON.stringify({
+        choices: [{ message: { content: 'done' }, finish_reason: 'stop' }],
+        ...(promptTokens === undefined ? {} : { usage: { prompt_tokens: promptTokens, completion_tokens: 1 } }),
+      }), { headers: { 'content-type': 'application/json' } }); },
+    });
+    try {
+      await drain(runTurn(options({ sessionId, step })).events);
+      expect(getSessionUsage(sessionId).requestContext).toMatchObject({ provider: 'fixture', model: 'm',
+        body: { bytes: Buffer.byteLength(body), codeUnits: body.length } });
+      expect(getSessionUsage(sessionId).requestContext?.promptTokens).toBe(promptTokens);
+      persistSessionUsage(sessionId, undefined, snapshot => { expect(JSON.stringify(snapshot)).not.toContain('requestContext'); });
+      const captured = getSessionUsage(sessionId).requestContext;
+      markContextUnknown(sessionId, 'usage-gap');
+      expect(getSessionUsage(sessionId).requestContext).toBe(captured);
+      markContextUnknown(sessionId);
+      expect(getSessionUsage(sessionId).requestContext).toBeUndefined();
+    } finally { resetSessionUsage(sessionId); }
+  });
+
+  it('does not reattach a request observation after a context reset during usage delivery', async () => {
+    const sessionId = 'context-receipt-reset';
+    const context = requestContext({ body: '{}', provider: 'fixture', model: 'm', endpoint: 'extension' });
+    const step: StepFunction = async (_messages, _signal, _listener, stepOptions) => {
+      stepOptions.onRequestSent?.({ context, url: 'https://fixture.test', headers: {}, body: '{}' });
+      expect(getSessionUsage(sessionId).requestContext).toBe(context);
+      markContextUnknown(sessionId);
+      stepOptions.onRequestUsage?.({ prompt_tokens: 40 });
+      return { text: 'done', toolCalls: [], stopReason: 'stop' };
+    };
+    await drain(runTurn(options({ sessionId, step })).events);
+    expect(getSessionUsage(sessionId).requestContext).toBeUndefined();
+    resetSessionUsage(sessionId);
+  });
+
+  it('keeps the foreground receipt when a shared step sends a delegated request', async () => {
+    const sessionId = 'context-receipt-delegation';
+    const context = requestContext({ body: '{"foreground":true}', provider: 'fixture', model: 'm', endpoint: 'extension' });
+    let calls = 0; let delegated = 0;
+    const step: StepFunction = async (_messages, _signal, _listener, stepOptions) => {
+      if (calls++ > 0) return { text: 'done', toolCalls: [], stopReason: 'stop' };
+      stepOptions.onRequestSent?.({ context, url: 'https://fixture.test', headers: {}, body: '{"foreground":true}' });
+      stepOptions.onRequestUsage?.({ prompt_tokens: 42 });
+      return { text: '', toolCalls: [{ id: 'dispatch', name: 'task', args: { description: 'inspect', prompt: 'inspect' } }], stopReason: 'stop' };
+    };
+    const childStep = createStepFunction({ provider: { model: 'child', baseUrl: 'https://fixture.test', headers: {} },
+      sessionId, workspaceRoot: process.cwd(), systemPrompt: 'child system', tools: [], fetchImpl: async () => {
+        delegated++; return new Response(JSON.stringify({ choices: [{ message: { content: 'child done' }, finish_reason: 'stop' }], usage: { prompt_tokens: 99 } }),
+          { headers: { 'content-type': 'application/json' } });
+      },
+    });
+    await drain(runTurn(options({ sessionId, step, subagentHost: { step: childStep, defaultMaxSteps: 1 },
+      tools: new Map([['task', createTaskToolDefinition()]]),
+    })).events);
+    expect(delegated).toBe(1);
+    expect(getSessionUsage(sessionId).requestContext).toEqual({ ...context, promptTokens: 42 });
+    resetSessionUsage(sessionId);
+  });
   it("invalidates a metered prefix before a later step that reports no usage", async () => {
     const cacheWarming = { noteRequest: vi.fn(), noteSettled: vi.fn(), stop: vi.fn(), status: () => ({ mode: "idle" as const }) };
     const first = { url: "https://fixture.test", headers: {}, body: "first" };

@@ -20,6 +20,8 @@ import { toChatMessages, type ChatMessage } from "./prompt.js";
 import { PARSE_ERROR_KEY, type ToolSchema } from "./tools.js";
 import { resolveRequestShape } from "../core/models/requestShape.js";
 import type { CatalogProvider } from "../core/models/catalog.js";
+import type { PromptSource } from '../context/request/model.js';
+import { requestContext } from '../context/request/projection.js';
 import {
   REFUSAL,
   isRetryableStatus,
@@ -117,6 +119,7 @@ export interface StepRequest {
   readonly workspaceRoot: string;
   readonly sessionId: string;
   readonly systemPrompt: string;
+  readonly systemPromptSources?: readonly PromptSource[];
   /** Reuse the session's approved instructions with a delegated mode and tool set. */
   readonly systemPromptFor?: (agentMode: "plan" | "build", toolNames: readonly string[]) => string;
   readonly tools: readonly ToolSchema[];
@@ -394,12 +397,13 @@ export function createStepFunction(request: StepRequest): StepFunction {
         let transient = false;
         let releaseNow = true;
         try {
+          const body = JSON.stringify(payload);
           const attemptResponse = await fetchImpl(
             endpointUrl(request.provider.baseUrl, endpoint, request.provider.model),
             {
               method: "POST",
               headers: { ...request.provider.headers, ...requestHeaders },
-              body: JSON.stringify(payload),
+              body,
               signal: requestSignal,
             },
           );
@@ -407,13 +411,17 @@ export function createStepFunction(request: StepRequest): StepFunction {
             clearContextUsage(request.sessionId);
             response = attemptResponse;
             options.onRequestSent?.({
+              context: requestContext({ body, endpoint, fields: endpointShape(endpoint).contextFields,
+                provider: request.provider.provider ?? '', model: request.provider.model,
+                ...(!(options.agentMode && request.systemPromptFor) && request.systemPromptSources
+                  ? { systemSources: request.systemPromptSources } : {}) }),
               endpoint,
               maxTokensField: shape.maxTokensField,
               reasoning: catalogModel(request.catalog ?? [], request.provider.provider ?? "", request.provider.model)?.reasoning,
               url: endpointUrl(request.provider.baseUrl, endpoint, request.provider.model),
               headers: request.provider.headers,
               requestHeaders,
-              body: JSON.stringify(payload),
+              body,
             });
             releaseAfterRead = releaseStream;
             releaseNow = false;

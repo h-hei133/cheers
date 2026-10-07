@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSystemPrompt, toChatMessages } from "./prompt.js";
+import { buildSystemPrompt, systemPromptSnapshot, toChatMessages } from "./prompt.js";
 
 describe("toChatMessages", () => {
   it("preserves source text while excluding an empty user message", () => {
@@ -46,6 +46,15 @@ describe("toChatMessages", () => {
 });
 
 describe("buildSystemPrompt", () => {
+  it('preserves assembly while accounting for raw source bytes and joining separators', () => {
+    const context = { instructions: '项目规则🔒\n', appendedInstructions: '"extra"', skills: '<skills>读</skills>' };
+    const snapshot = systemPromptSnapshot('build', context);
+    expect(snapshot.text).toBe([buildSystemPrompt('build'), context.instructions, context.appendedInstructions, context.skills].join('\n'));
+    expect(snapshot.sources.map(source => source.kind)).toEqual(['base', 'instructions', 'appended', 'skills', 'separators']);
+    expect(snapshot.sources.reduce((sum, source) => sum + source.bytes, 0)).toBe(Buffer.byteLength(snapshot.text));
+    expect(snapshot.sources.reduce((sum, source) => sum + source.codeUnits, 0)).toBe(snapshot.text.length);
+    expect(JSON.stringify(snapshot.sources)).not.toContain('项目规则');
+  });
   it("includes project instructions when they are supplied", () => {
     const prompt = buildSystemPrompt("build", {
       instructions: '<project_instructions path="/repo/AGENTS.md">\nrule one\n</project_instructions>',

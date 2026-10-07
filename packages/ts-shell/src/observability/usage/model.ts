@@ -7,6 +7,8 @@
  * amount nobody would be billed: the counts were measured correctly and then
  * attributed to the wrong model.
  */
+import type { RequestContext } from '../../context/request/model.js';
+
 export interface ModelUsageBucket {
   promptTokens: number;
   completionTokens: number;
@@ -18,6 +20,8 @@ export interface ModelUsageBucket {
 }
 
 export interface SessionUsageTelemetry {
+  /** Last accepted foreground request in this runtime, never persisted as cumulative usage. */
+  requestContext?: RequestContext;
   /**
    * Usage per model, keyed by `<provider>/<model>`.
    *

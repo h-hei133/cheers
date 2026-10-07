@@ -26,6 +26,7 @@ import { createSubagentRunner } from "./subagent.js";
 import type { DenyRule } from "../core/shell/approval/deny.js";
 import type { CacheWarmingRunner } from "./cacheWarm.js";
 import type { ToolDefinition } from "../tools/types.js";
+import { getSessionUsage, recordRequestContext } from '../observability/usageTelemetry.js';
 
 /**
  * One user turn, driven through the kernel.
@@ -248,10 +249,15 @@ export function runTurn(options: TurnOptions): TurnRun {
           onRequestSent: (sent) => {
             sentRequest = sent;
             inputTokens = 0;
+            if (sent.context) recordRequestContext(options.sessionId, sent.context);
           },
           onRequestUsage: (usage) => {
             const counted = usageFromProvider(usage);
             inputTokens = counted.promptTokens + counted.cacheReadTokens + counted.cacheWriteTokens;
+            if (sentRequest?.context && getSessionUsage(options.sessionId).requestContext === sentRequest.context &&
+              typeof usage.prompt_tokens === 'number' && Number.isFinite(usage.prompt_tokens) && usage.prompt_tokens >= 0 && Number.isFinite(inputTokens)) {
+              recordRequestContext(options.sessionId, Object.freeze({ ...sentRequest.context, promptTokens: inputTokens }));
+            }
           },
         },
       );

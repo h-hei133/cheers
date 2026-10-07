@@ -1,6 +1,7 @@
 import type { ChatMessage } from "../../turn/prompt.js";
 import type { RequestSigner } from "../request/fetch.js";
 import type { ToolSchema } from "../../turn/tools.js";
+import type { ContextFields } from '../../context/request/model.js';
 import {
   isEventStream,
   type CompletedBody,
@@ -41,6 +42,8 @@ export type EndpointKind = string;
 
 /** What one endpoint needs to say about itself. */
 export interface EndpointShape {
+  /** Where the final turn body carries context; used for size-only observations. */
+  readonly contextFields?: ContextFields;
   /** Smallest output cap that can hold a thinking budget and an answer. */
   readonly minimumThinkingOutputTokens?: number;
   /** An optional model-list resource at the same base URL. Absent means the
