@@ -98,6 +98,63 @@ describe("pointer focus", () => {
 
 
 describe("lifecycle", () => {
+  it('keeps previews aligned with the selected identity after filtering and live replacement', async () => {
+    const { overlay } = host(); const previewChange = vi.fn();
+    let publish!: (items: readonly Option[]) => void;
+    overlay.open(picker({ previewChange, subscribe: callback => { publish = callback; return () => {}; } }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    press(overlay, 'b'); expect(previewChange).toHaveBeenLastCalledWith(['b']);
+    publish([{ id: 'new', label: 'beta replacement' }]);
+    expect(previewChange).toHaveBeenLastCalledWith(['new']);
+    overlay.handlePaste('missing'); expect(previewChange).toHaveBeenLastCalledWith([]);
+  });
+  it('cancels loads and ignores a stale reload when the same picker is reopened', async () => {
+    const { overlay } = host(); const loads: ((items: readonly Option[]) => void)[] = []; const signals: AbortSignal[] = [];
+    const menu = picker({ onDelete: async () => undefined, load: signal => {
+      signals.push(signal!); return new Promise(resolve => loads.push(resolve));
+    } });
+    overlay.open(menu); loads[0]!(options); await new Promise(resolve => setTimeout(resolve, 0));
+    press(overlay, '\x04'); press(overlay, '\r'); await new Promise(resolve => setTimeout(resolve, 0));
+    expect(loads).toHaveLength(2); expect(signals[0]!.aborted).toBe(true);
+    overlay.close(); expect(signals[1]!.aborted).toBe(true);
+    overlay.open(menu); loads[2]!([{ id: 'new', label: 'fresh item' }]); await new Promise(resolve => setTimeout(resolve, 0));
+    loads[1]!([{ id: 'stale', label: 'stale reload' }]); await new Promise(resolve => setTimeout(resolve, 0));
+    expect(overlay.render(60, 20).join('\n')).toContain('fresh item');
+    expect(overlay.render(60, 20).join('\n')).not.toContain('stale reload');
+    const apply = vi.fn(); press(overlay, '\r', apply);
+    expect(apply).toHaveBeenCalledWith(menu, ['new']); expect(signals[2]!.aborted).toBe(true);
+  });
+
+  it.each(['delete', 'rename'] as const)('does not let a late %s settlement reload another open instance', async action => {
+    const { overlay } = host(); let settle!: () => void;
+    const pending = () => new Promise<undefined>(resolve => { settle = () => resolve(undefined); });
+    const load = vi.fn(async () => options);
+    const menu = picker({ load, onDelete: pending, onRename: pending });
+    overlay.open(menu); await new Promise(resolve => setTimeout(resolve, 0));
+    press(overlay, action === 'delete' ? '\x04' : '\x12'); press(overlay, '\r');
+    expect(overlay.render(60, 20).join('\n')).toContain('Updating');
+    const apply = vi.fn(); press(overlay, '\r', apply); expect(apply).not.toHaveBeenCalled();
+    overlay.close(); overlay.open(menu); await new Promise(resolve => setTimeout(resolve, 0));
+    settle(); await new Promise(resolve => setTimeout(resolve, 0));
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+
+  it('surfaces mutation failure safely and permits another attempt', async () => {
+    const { overlay } = host(); const onDelete = vi.fn(async () => { throw new Error('PRIVATE_PATH'); });
+    overlay.open(picker({ onDelete })); await new Promise(resolve => setTimeout(resolve, 0));
+    press(overlay, '\x04'); press(overlay, '\r'); await new Promise(resolve => setTimeout(resolve, 0));
+    expect(overlay.render(60, 20).join('\n')).toContain('update could not be confirmed');
+    expect(overlay.render(60, 20).join('\n')).not.toContain('PRIVATE_PATH');
+    press(overlay, '\x04'); press(overlay, '\r'); await new Promise(resolve => setTimeout(resolve, 0));
+    expect(onDelete).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([false, true])('never submits an all-disabled list (multiple %s)', async multiple => {
+    const { overlay } = host(); const apply = vi.fn();
+    overlay.open(picker({ multiple, load: async () => [{ id: 'blocked', label: 'blocked', selected: true, disabled: true }] }));
+    await new Promise(resolve => setTimeout(resolve, 0)); press(overlay, '\r', apply);
+    expect(apply).not.toHaveBeenCalled();
+  });
   it('ignores an old load when the same picker instance is reopened and releases its live subscription', async () => {
     const { overlay } = host(); const loads: ((options: readonly Option[]) => void)[] = [];
     const publish: ((options: readonly Option[]) => void)[] = []; const releases = [vi.fn(), vi.fn()];
@@ -150,7 +207,7 @@ describe("lifecycle", () => {
     overlay.open(picker({ load: () => Promise.reject(new Error("no")) }));
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(overlay.active).toBe(true);
-    expect(overlay.render(60, 20).join("\n")).toContain("none");
+    expect(overlay.render(60, 20).join("\n")).toContain("Options could not be loaded");
   });
 
   it("renders nothing when closed", () => {
@@ -419,7 +476,7 @@ describe("approval picker key routing", () => {
     expect(onDeny).toHaveBeenCalledWith(undefined);
     expect(overlay.active).toBe(false);
   });
-  it("calls previewEnd when an empty selection is accepted", () => {
+  it("waits for loading and calls previewEnd when an empty selection is accepted", async () => {
     const { overlay } = host();
     const apply = vi.fn();
     const previewEnd = vi.fn();
@@ -431,6 +488,10 @@ describe("approval picker key routing", () => {
       apply: async () => undefined,
       previewEnd,
     });
+    press(overlay, "\r", apply);
+    expect(overlay.active).toBe(true);
+    expect(previewEnd).not.toHaveBeenCalled();
+    await Promise.resolve();
     press(overlay, "\r", apply);
     expect(apply).not.toHaveBeenCalled();
     expect(previewEnd).toHaveBeenCalledOnce();

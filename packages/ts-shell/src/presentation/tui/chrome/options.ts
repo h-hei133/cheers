@@ -37,13 +37,14 @@ export class OptionModel {
 
   /** Replace the option set, keeping any prior multi-select state. */
   setOptions(options: readonly Option[]): void {
-    const focused = this.current()?.id;
+    const previous = new Set(this.all.map(option => option.id));
     this.all = options;
+    const enabled = new Set(options.filter(option => !option.disabled).map(option => option.id));
+    for (const id of this.chosen) if (!enabled.has(id)) this.chosen.delete(id);
     for (const option of options) {
-      if (option.selected) this.chosen.add(option.id);
+      if (option.selected && !option.disabled && !previous.has(option.id)) this.chosen.add(option.id);
     }
     this.applyFilter();
-    if (focused) this.focus(focused);
   }
 
   get filter(): string {
@@ -64,7 +65,8 @@ export class OptionModel {
   }
 
   current(): Option | undefined {
-    return this.matches[this.cursor];
+    const option = this.matches[this.cursor];
+    return option?.disabled ? undefined : option;
   }
 
   /** Focus a named, choosable option without accepting it. */
@@ -123,12 +125,13 @@ export class OptionModel {
   }
 
   private applyFilter(): void {
+    const focused = this.current()?.id;
     const needle = this.query.trim().toLowerCase();
     this.matches = needle
       ? this.all.filter((option) => haystack(option).includes(needle))
       : this.all;
-    this.cursor = Math.max(0, Math.min(this.cursor, this.matches.length - 1));
-    if (this.matches[this.cursor]?.disabled) this.step(1);
+    const retained = this.matches.findIndex(option => option.id === focused && !option.disabled);
+    this.cursor = Math.max(0, retained >= 0 ? retained : this.matches.findIndex(option => !option.disabled));
   }
 }
 

@@ -16,6 +16,17 @@ function model(): OptionModel {
 }
 
 describe("filtering", () => {
+  it('keeps focus by identity across filtering and reorder, then falls back to the first enabled match', () => {
+    const list = model();
+    list.focus('d'); list.setFilter('a');
+    expect(list.current()?.id).toBe('d');
+    list.setOptions([options[3]!, options[1]!, options[0]!]);
+    expect(list.current()?.id).toBe('d');
+    list.setOptions([options[1]!, options[0]!]);
+    expect(list.current()?.id).toBe('b');
+    list.setFilter('alpha'); expect(list.current()?.id).toBe('a');
+    list.setFilter(''); expect(list.current()?.id).toBe('a');
+  });
   it("matches on any field, not just the label", () => {
     // A user typing "greek" means the row mentioning greek, wherever it says so.
     const list = model();
@@ -83,6 +94,15 @@ describe("cursor", () => {
 });
 
 describe("multi-select", () => {
+  it('retains an explicit deselection on reload and drops disabled or removed choices', () => {
+    const list = model(); list.focus('b'); list.toggle();
+    list.setOptions([...options]); expect(list.chosenIds()).toEqual([]);
+    list.toggle(); list.setOptions(options.map(option => ({ ...option, disabled: true })));
+    expect(list.chosenIds()).toEqual([]); expect(list.current()).toBeUndefined();
+    list.setOptions([{ id: 'fresh', label: 'new', selected: true }]);
+    expect(list.chosenIds()).toEqual(['fresh']);
+    list.setOptions([]); expect(list.chosenIds()).toEqual([]);
+  });
   it("starts from whatever was already selected", () => {
     expect(model().chosenIds()).toEqual(["b"]);
   });

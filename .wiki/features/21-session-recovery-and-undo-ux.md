@@ -34,12 +34,12 @@ confidence: high
 
 ### 2.1 当前源码链路
 
-[OverlayHost](../../packages/ts-shell/src/cli/interactive/overlay.ts#L84) 在多个 picker 之间复用一个 [OptionModel](../../packages/ts-shell/src/presentation/tui/chrome/options.ts#L27)。
+[OverlayHost](../../packages/ts-shell/src/cli/interactive/overlay.ts#L84) 每次打开均创建独立的 [OptionModel](../../packages/ts-shell/src/presentation/tui/chrome/options.ts)，同一打开期间复用其过滤与选择状态。
 
-- `open()` 重置部分面板状态并设置 filter；异步 load 完成后设置 options，有 `initialSelection` 才显式 focus。
+- `open()` 重置候选、过滤、多选、临时操作和行映射；初次 load 与 reload 共用取消和代际校验，有 `initialSelection` 才显式 focus。
 - [sessionPicker](../../packages/ts-shell/src/cli/interactive/picker/session.ts#L26) 当前未提供 `initialSelection`。
-- `OptionModel.applyFilter()` 将旧 cursor 夹到新列表范围，而非建立新 picker 的选中身份。`chosen` 也有独立状态，只重置 cursor 不能清除多选残留。
-- `open()` 用 picker 对象身份排除部分旧结果，但同一个 picker 对象关闭重开仍可能接受旧请求；[reload](../../packages/ts-shell/src/cli/interactive/overlay.ts#L516) 缺少同等生命周期校验。
+- `OptionModel.applyFilter()` 现按稳定 ID 保留焦点，目标离开集合后回退首个 enabled；reload 保留用户明确取消的多选，删除/disabled 条目移出 chosen。
+- load/reload 与异步 rename/delete 完成现在同时绑定 generation 和请求 controller；旧请求成功、失败或旧操作完成均不能刷新新面板。同对象重开仍有独立代际。
 
 14 号文档记录了选择器重开的历史观察。原稿“15 个模型第 10 项切到 4 个会话第 4 项”是可由 clamp 推导的反例，**没有本次实测证据**，不能当独立探针通过记录。
 
@@ -77,6 +77,14 @@ pi 的 [session-selector.ts](../../../pi/packages/coding-agent/src/modes/interac
 - current 在最近列表内、在截断外、已删除、被 filter 隐藏、不可恢复；空列表和全 disabled。
 - 稳定排序与数据变更后按 ID 保持选择；Enter 使用预览时确认的目标身份。
 - 现有 [options tests](../../packages/ts-shell/src/presentation/tui/chrome/options.test.ts)、[overlay tests](../../packages/ts-shell/src/cli/interactive/overlay.test.ts) 与 [rewind tests](../../packages/ts-shell/src/cli/interactive/picker/rewind.test.ts) 按新契约评估，不预先声称“既有测试完全不受影响”。
+
+### 2.6 SES-01 通用生命周期已实施部分（2026-10-07）
+
+- 首次加载与刷新复用同一 OverlayHost 方法；可选 AbortSignal 在换请求、关闭和接受时撤销，忽略取消的 producer 仍受身份/代际守卫。现有同步磁盘读取不能被 signal 物理打断，没有将可取消接口当作 I/O 性能证据。
+- rename/delete 一经确认执行，关闭面板不宣称撤销已接受的写入；完成只刷新当时的实例，操作期间屏蔽重复键/鼠标/粘贴提交。拒绝 note 可见，异常只提示结果未确认，不泄露原始异常，不许用错误路径显示成功；恢复面板 action owner 的忙碌/current/工作区复验仍待下一步落实。
+- 过滤、排序和 live options 更新以稳定 ID 保持单选；多选明确取消不会因旧 selected 标志在 reload 时被复选，已删除/disabled ID 清除。空或全 disabled 集合不可提交，显式 approval shortcut 也须命中 enabled ID；加载期间 Enter 不应用未知选项。预览跟随过滤/替换的真实焦点，加载失败结束临时预览，并与成功空集合区分。
+- Node 20.3 构建和 172 项通过；三组有效反转覆盖 reload 代际、操作完成归属及焦点身份，恢复后 64 项通过。实际 regular/fullscreen 均验证报告会话→resume→rename→刷新→取消 delete→重开→40 列，配置未改、零 provider 请求、退出 0。详见 [主裁决 §8.102](phase-19-decisions.md#8102-ses-01选择器加载与异步操作生命周期)。
+- current 标记/初始焦点、截断外纳入、session/workspace 范围及变更动作复验尚未完成，本节不将整个 SES-01 或 W5 标为已交付。会话大小/列表索引归 SES-02 后续工作。
 
 ## 3. 会话面板大小：核心文件逻辑字节
 

@@ -63,7 +63,7 @@ export interface Picker {
   /** Rows each option occupies beyond its first, in the full-screen form. */
   readonly detailRows?: number;
   /** Options to offer; may hit the network or the filesystem. */
-  load(): Promise<readonly Option[]>;
+  load(signal?: AbortSignal): Promise<readonly Option[]>;
   /** Publish live options until the host releases the subscription on close. */
   subscribe?(publish: (options: readonly Option[]) => void): () => void;
   /** Apply the choice, reporting what to show or to draft next. */
@@ -100,6 +100,9 @@ export class OverlayHost {
   private model = new OptionModel();
   private loading = false;
   private loadFailed = false;
+  private loadController: AbortController | undefined;
+  private actionPending = false;
+  private actionNotice: string | undefined;
   private unsubscribe: (() => void) | undefined;
   private readonly optionRows = new Map<number, string>();
   private renderedWidth = 0;
@@ -127,7 +130,9 @@ export class OverlayHost {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.model = new OptionModel();
-    const generation = ++this.generation;
+    ++this.generation;
+    this.actionPending = false;
+    this.actionNotice = undefined;
     this.input = picker.input ? new InputForm(picker.input) : undefined;
     this.optionRows.clear();
     this.picker?.previewEnd?.();
@@ -141,37 +146,15 @@ export class OverlayHost {
     this.denyDraft = "";
     this.model.setFilter(picker.initialFilter ?? "");
     this.onChange();
-    void picker
-      .load()
-      .then((options) => {
-        if (this.picker !== picker || this.generation !== generation) return;
-        this.optionRows.clear();
-        this.model.setOptions(options);
-        if (picker.initialSelection) this.model.focus(picker.initialSelection);
-        if (!picker.multiple) picker.previewChange?.(idsOf(this.model.current()));
-        if (this.picker !== picker || this.generation !== generation) return;
-        const unsubscribe = picker.subscribe?.(options => {
-          if (this.picker !== picker || this.generation !== generation) return;
-          this.optionRows.clear();
-          this.model.setOptions(options);
-          this.onChange();
-        });
-        if (this.picker === picker && this.generation === generation) this.unsubscribe = unsubscribe;
-        else unsubscribe?.();
-      })
-      .catch(() => {
-        if (this.picker === picker && this.generation === generation) {
-          this.loadFailed = true;
-          this.model.setOptions([]);
-        }
-      })
-      .finally(() => {
-        if (this.picker === picker && this.generation === generation) this.loading = false;
-        this.onChange();
-      });
+    this.reload(true);
   }
 
   close(): void {
+    this.loadController?.abort();
+    this.loadController = undefined;
+    this.actionPending = false;
+    this.actionNotice = undefined;
+    this.denyDraft = "";
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.generation++;
@@ -204,11 +187,11 @@ export class OverlayHost {
     if (this.subMode === "deny-reason") {
       return this.renderDenyReason(width, height);
     }
-    const empty = this.loading ? "loading…" : this.loadFailed ? picker.loadError ?? picker.empty : picker.empty;
-    const actionHints =
+    const empty = this.loading ? "loading…" : this.loadFailed ? picker.loadError ?? "Options could not be loaded." : picker.empty;
+    const actionHints = this.actionPending ? "Updating…" : this.actionNotice ?? (
       picker.onDelete || picker.onRename
         ? `${picker.onDelete ? "^D delete" : ""}  ${picker.onRename ? "^R rename" : ""}`.trim()
-        : undefined;
+        : undefined);
 
     if (picker.form === "modal") {
       return renderModal(
@@ -235,7 +218,7 @@ export class OverlayHost {
         empty,
         multiple: picker.multiple === true,
         filterable: picker.filterable,
-        footer: picker.footer,
+        footer: this.actionPending ? "Updating…" : this.actionNotice ?? picker.footer,
         hideCount: isApproval,
         onOptionRow: (row, id) => this.optionRows.set(row, id),
       },
@@ -248,7 +231,7 @@ export class OverlayHost {
   handlePointer(report: MouseReport, top?: number): boolean {
     if (!this.picker) return false;
     if (this.input) return true;
-    if (!this.loading && this.subMode === "none" && top !== undefined &&
+    if (!this.loading && !this.actionPending && this.subMode === "none" && top !== undefined &&
         report.kind === "press" && report.button === 0 && !report.shift && !report.alt && !report.ctrl &&
         report.column >= 0 && report.column < this.renderedWidth) {
       const id = this.optionRows.get(report.row - top);
@@ -264,10 +247,12 @@ export class OverlayHost {
   /** Pasted form text never reaches the underlying conversation draft. */
   handlePaste(text: string): boolean {
     if (!this.picker) return false;
+    if (this.actionPending) return true;
     if (this.input) this.input.paste(text);
     else if (this.subMode === 'none' && this.picker.filterable !== false) {
       this.optionRows.clear();
       this.model.appendFilter(stripAnsi(text).replace(/[\r\n\t]+/g, ' ').replace(/[\x00-\x1f\x7f-\x9f]/g, ''));
+      if (!this.picker.multiple) this.picker.previewChange?.(idsOf(this.model.current()));
     }
     this.onChange();
     return true;
@@ -352,6 +337,12 @@ export class OverlayHost {
   handleKey(event: ParsedKeyEvent, apply: (picker: Picker, ids: readonly string[]) => void): boolean {
     const picker = this.picker;
     if (!picker) return false;
+    if (this.actionPending) {
+      if (event.keyId === 'escape' || event.keyId === 'ctrl+c') this.close();
+      return true;
+    }
+    if (this.loading && ['enter', 'delete', 'ctrl+d', 'ctrl+r'].includes(event.keyId)) return true;
+    const focused = this.model.current()?.id;
     if (this.input) {
       if (event.keyId === 'escape' || event.keyId === 'ctrl+c') this.close();
       else if (event.keyId === 'enter') {
@@ -370,9 +361,7 @@ export class OverlayHost {
         this.subTargetId = undefined;
         this.subTargetLabel = undefined;
         if (id && picker.onDelete) {
-          const maybe = picker.onDelete(id);
-          if (maybe instanceof Promise) void maybe.then(() => this.reload());
-          else this.reload();
+          this.mutate(() => picker.onDelete!(id));
         }
         this.onChange();
         return true;
@@ -405,9 +394,7 @@ export class OverlayHost {
         this.subTargetLabel = undefined;
         this.renameDraft = "";
         if (id && newTitle && picker.onRename) {
-          const maybe = picker.onRename(id, newTitle);
-          if (maybe instanceof Promise) void maybe.then(() => this.reload());
-          else this.reload();
+          this.mutate(() => picker.onRename!(id, newTitle));
         }
         this.onChange();
         return true;
@@ -533,11 +520,9 @@ export class OverlayHost {
         return true;
       case "up":
         this.model.step(-1);
-        if (!picker.multiple) picker.previewChange?.(idsOf(this.model.current()));
         break;
       case "down":
         this.model.step(1);
-        if (!picker.multiple) picker.previewChange?.(idsOf(this.model.current()));
         break;
       case "space":
         if (picker.multiple) {
@@ -577,40 +562,98 @@ export class OverlayHost {
           return true;
         }
     }
+    if (!picker.multiple && focused !== this.model.current()?.id) picker.previewChange?.(idsOf(this.model.current()));
     this.onChange();
     return true;
   }
 
-  private reload(): void {
-    if (!this.picker) return;
-    void this.picker
-      .load()
-      .then((options) => {
+  private reload(initial = false): void {
+    const picker = this.picker;
+    if (!picker) return;
+    this.loadController?.abort();
+    this.unsubscribe?.();
+    this.unsubscribe = undefined;
+    const controller = new AbortController();
+    this.loadController = controller;
+    const generation = this.generation;
+    this.loading = true;
+    this.loadFailed = false;
+    this.optionRows.clear();
+    let pending: Promise<readonly Option[]>;
+    try { pending = picker.load(controller.signal); }
+    catch (error) { pending = Promise.reject(error); }
+    void pending.then(options => {
+      if (this.picker !== picker || this.generation !== generation || this.loadController !== controller) return;
+      this.loading = false;
+      this.model.setOptions(options);
+      if (initial && picker.initialSelection) this.model.focus(picker.initialSelection);
+      if (!picker.multiple) picker.previewChange?.(idsOf(this.model.current()));
+      if (this.picker !== picker || this.generation !== generation || this.loadController !== controller) return;
+      const unsubscribe = picker.subscribe?.(options => {
+        if (this.picker !== picker || this.generation !== generation || this.loadController !== controller) return;
         this.optionRows.clear();
         this.model.setOptions(options);
-        this.onChange();
-      })
-      .catch(() => {
-        this.model.setOptions([]);
+        if (!picker.multiple) picker.previewChange?.(idsOf(this.model.current()));
         this.onChange();
       });
+      if (this.picker === picker && this.generation === generation && this.loadController === controller) this.unsubscribe = unsubscribe;
+      else unsubscribe?.();
+      this.onChange();
+    }).catch(() => {
+      if (this.picker !== picker || this.generation !== generation || this.loadController !== controller) return;
+      this.loading = false;
+      this.loadFailed = true;
+      this.optionRows.clear();
+      this.model.setOptions([]);
+      picker.previewEnd?.();
+      this.onChange();
+    });
+  }
+
+  /** An accepted mutation keeps its identity; settlement only refreshes its own open instance. */
+  private mutate(action: () => Promise<string | undefined> | void): void {
+    const picker = this.picker;
+    const generation = this.generation;
+    this.actionPending = true;
+    this.actionNotice = undefined;
+    this.optionRows.clear();
+    let pending: Promise<string | undefined> | void;
+    try { pending = action(); }
+    catch { pending = Promise.reject(); }
+    void Promise.resolve(pending).then(note => {
+      if (this.picker !== picker || this.generation !== generation) return;
+      this.actionPending = false;
+      this.actionNotice = typeof note === 'string' ? note : undefined;
+      this.reload();
+      this.onChange();
+    }).catch(() => {
+      if (this.picker !== picker || this.generation !== generation) return;
+      this.actionPending = false;
+      this.actionNotice = 'The update could not be confirmed.';
+      this.onChange();
+    });
   }
 
   private accept(picker: Picker, apply: (picker: Picker, ids: readonly string[]) => void): void {
     const ids = picker.multiple ? this.model.chosenIds() : idsOf(this.model.current());
+    this.loadController?.abort();
+    this.loadController = undefined;
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.picker = undefined;
     this.subMode = "none";
     this.loading = false;
     this.onChange();
-    if (ids.length > 0 || picker.multiple) {
+    if (ids.length > 0 || (picker.multiple && this.model.visible.some(option => !option.disabled))) {
       apply(picker, ids);
     } else {
       picker.previewEnd?.();
     }
   }
   private acceptDirect(picker: Picker, apply: (picker: Picker, ids: readonly string[]) => void, ids: readonly string[]): void {
+    if (ids.some(id => !this.model.visible.some(option => option.id === id && !option.disabled))) return;
+    this.loadController?.abort();
+    this.loadController = undefined;
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.picker = undefined;

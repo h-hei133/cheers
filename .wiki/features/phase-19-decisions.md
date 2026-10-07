@@ -1564,3 +1564,15 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 五项静态 gates、43 项 script tests 与 NormProof 0 blocking 通过，见 `.tmp/ledger-gates-dsdvwpro`；既有五项函数计数 advisory 和 120 项文档来源 advisory 保留。
 
 - 独立架构最后 6 文件/139 项通过，普通及混合类型图 1751 文件均无环、无未解析相对导入；函数计数 telemetry 15→16、prompt 4→5、context command 2→1、新 projection 4，未新增超限，见 `.tmp/ledger-architecture-iDlVeb`。尺寸投影按请求体长度线性处理，本批未测独立吞吐性能。
+
+
+### 8.102 SES-01：选择器加载与异步操作生命周期
+
+- [OverlayHost](../../packages/ts-shell/src/cli/interactive/overlay.ts)将首加载和 reload 合为一条受控路径，picker 对象、open generation 与 request controller 同时匹配才发布；关闭、接受、新加载撤销旧 signal，旧成功/失败及 live subscription 不进入新实例。保留已有 staged apply revision 契约，没有另建 picker manager。
+- rename/delete 绑定确认时目标，执行期间拒绝重复操作输入；完成只刷新原打开实例，返回 note 显示，异常显示结果未确认且不回显错误正文。关闭不会倒退已接受的实际写入，也不宣称底层不可取消工作已停。加载失败与空列表分开，预览结束；过滤/live replacement 的预览跟随当前身份。
+- [OptionModel](../../packages/ts-shell/src/presentation/tui/chrome/options.ts)按 ID 保留过滤/排序焦点，目标离开时选择首个 enabled。多选 reload 保留用户明确取消的选择，移除消失或 disabled ID；全 disabled、空列表和不在有效集合中的快捷键不触发 apply。参考列表组件按稳定 session path 保持已触及选择、与初始化分开的安排，未复制参考实现或用索引夹取替代身份。
+- 隔离 Node 20.3 构建和 8 文件/172 项通过，见 `.tmp/picker-check-2jn77ptk`；首次构建发现 void note 的类型未收窄，已修正。第一轮 170/171 的旧夹具在 load 尚未完成时接受空列表，现分开断言加载中不提交、加载后结束预览，未放松原断言。三组有效反转覆盖 reload 代际、mutation settlement 与 ID 焦点，全部检出行为失败；源码副本逐字节/SHA-256 恢复后 64 项通过，见 `.tmp/phase19-config/picker-reversals/1791332315906079355`。
+- actual CLI regular/fullscreen 均完成报告会话→resume→重命名刷新→取消删除→关闭重开→100×60 到 40×18；真实 metadata title 已保存，配置原文不变、0 provider 请求、退出 0，见 `.tmp/phase19-config/picker-pty-1791332260970391936`。本批尚未完成 current 标记/初始焦点、截断外纳入、会话范围与 action owner 复验；SES-01 余项、SES-02 与完整阶段继续。
+- 上批 `d28f379d` 已推送，CI 37550526553 和 Watch 37550526511 均在零步骤时失败；GitHub annotation 明确为账户付款/spending limit 导致 job 未启动。该 SHA 没有远端测试证据，不能将本地通过说成 CI 成功；账户侧恢复前后续提交同样需单独追踪。本批独立代码 APPROVE、架构 CLEAR。
+
+- 五项静态 gates、43 项 script tests 与 NormProof 0 blocking 通过，见 `.tmp/picker-gates-v47psh2k`，既有 advisory 保留。独立代码最终 overlay/options 64 项及 disabled approval 快捷键探针通过；架构 7 文件/135 项及最终文案后的 overlay 45 项通过，见 `.tmp/picker-architecture-_tgadb3y`。普通/混合类型图无环，JSON asset 检查后无未解析相对导入；计入 accessors 的 overlay 为 19→20、options 17→17，后续增加职责需要抽出模块。
