@@ -4,6 +4,8 @@ import type { Option } from "../../../presentation/tui/chrome/options.js";
 import type { Picker, PickerOutcome } from "../overlay.js";
 import { deriveSessionTitleFromPrompt } from "../../../session/lifecycle/sessionLifecycleStore.js";
 import { sessionChoices, sessionSelectionBlock, type SessionSelectionContext } from '../../../session/navigation/selection.js';
+import type { SessionFileSize } from '../../../session/store/files.js';
+import { sessionSizeLabel } from '../../../session/presentation/size.js';
 
 /**
  * Session chooser for resuming.
@@ -38,17 +40,21 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
     form: "modal",
     empty: "No recoverable sessions for this project.",
     loadError: 'Saved sessions could not be loaded.',
+    footer: 'Session files: logical size; excludes attachments.',
     get initialSelection() { return expected.sessionId; },
     status: visible => currentUnavailable ?? (visible.some(option => option.id === expected.sessionId)
       ? undefined : 'Current session is hidden by the filter.'),
     detailRows: 2,
     async load(signal): Promise<readonly Option[]> {
       signal?.throwIfAborted();
-      expected = { ...options.context() };
-      const selected = sessionChoices(options.sessionManager.listSessions(), expected, MAX_SESSIONS);
+      const context = { ...options.context() };
+      const selected = sessionChoices(options.sessionManager.listSessions(), context, MAX_SESSIONS);
+      const sizes = await options.sessionManager.files.sizes(selected.sessions.map(session => session.id), signal);
+      signal?.throwIfAborted();
+      expected = context;
       currentUnavailable = selected.currentUnavailable;
       offered = new Set(selected.sessions.map(session => session.id));
-      return selected.sessions.map(session => sessionOption(session, expected.sessionId));
+      return selected.sessions.map(session => sessionOption(session, context.sessionId, sizes.get(session.id)));
     },
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
       const sessionId = ids[0];
@@ -68,7 +74,7 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
 }
 
 /** Recent sessions as options, newest first. */
-function sessionOption(session: ReturnType<SessionManager['listSessions']>[number], currentId: string): Option {
+function sessionOption(session: ReturnType<SessionManager['listSessions']>[number], currentId: string, size: SessionFileSize | undefined): Option {
   const firstMsg =
     session.turns?.find(
       (t) => (t.role === "user" || t.role === "assistant") && messageToText(t.content).trim(),
@@ -81,7 +87,7 @@ function sessionOption(session: ReturnType<SessionManager['listSessions']>[numbe
   return {
     id: session.id,
     label,
-    detail: describe(session),
+    detail: describe(session, size),
     note: [session.id === currentId ? 'current' : undefined, age(session)].filter(Boolean).join(' · '),
   };
 }
@@ -96,11 +102,10 @@ interface SessionLike {
 }
 
 /** Subject and outcome, the two facts that identify a session to a human. */
-function describe(session: SessionLike): string {
+function describe(session: SessionLike, size: SessionFileSize | undefined): string {
   const parts: string[] = [];
   if (session.status) parts.push(session.status);
-  const turns = session.turns?.length;
-  if (turns !== undefined && turns > 0) parts.push(`${turns} turn${turns === 1 ? "" : "s"}`);
+  parts.push(sessionSizeLabel(size));
   parts.push(session.id.slice(0, 8));
   return parts.join(" · ") || "no recorded activity";
 }

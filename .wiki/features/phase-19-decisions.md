@@ -1587,3 +1587,14 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 独立代码最终 APPROVE（5 文件/151 项），架构 CLEAR（最终 3 文件/77 项、1754 文件图无环/未解析相对导入），见 `.tmp/session-picker-architecture-se7te1me`。SES-01 功能验收已完成；同步全列表扫描仍在，41 项展示不能冒充有界 I/O，SES-02 与完整 Phase 19 继续。
 - 上批 `eba69f51` 已推送，CI 37551797587 和 Watch 37551797576 均零步骤失败，GitHub annotation 仍明确账户付款/spending limit 阻止 job 启动；与前批 `d28f379d` 一样没有远端测试执行证据。本批远端按新 SHA 单独追踪。
 - 五项静态 gates、43 项 script tests 和 NormProof 0 blocking 通过，见 `.tmp/current-gates-5gislqe9`；既有五项函数数量及 120 项文档来源 advisory 保留。
+
+### 8.104 SES-02：核心文件逻辑大小采样
+
+- [store/files](../../packages/ts-shell/src/session/store/files.ts)复用实际目录投影和优先级进行异步定位，每批最多 41 个 ID、4 个 worker，每个 worker 顺序采样 metadata/transcript/state；不扫描目录、读取内容或计入锁/artifact。当前 loader 在历史目录中同样要求这三个核心文件，未凭目录年代虚构 state 可选规则。readonly files 服务经既有 store/read surface 字段暴露，没有增加其方法或新 facade。
+- 核心文件采样两次，只有普通文件身份/大小/mtime/ctime 一致才累加；复核目录身份和最终目录优先级。部分稳定文件为 partial，全未知、目录消失/替换或权威布局改变为 unknown/null；真实零是 complete/0。保留 sampledAt，无缓存，不持写锁，不宣称跨文件快照。取消前检查、派发间检查和完成后检查配合 allSettled 排空在途 stat；取消不伪装空列表或 unknown 大小。
+- [大小展示](../../packages/ts-shell/src/session/presentation/size.ts)替换消息条目数，使用二进制单位；partial 明确为已采样部分，不宣称并发截断后仍是当前大小下界。picker 在 size await 后先验 signal 再提交 context/offered ID。代码与架构独立审查均发现原 modal 不消费 picker.footer，现通过既有换行状态行回退展示逻辑字节及附件排除说明，保持动作/current 状态优先级，未扩大行预算。
+- 定向比较参考 async stat、受限 worker 与取消传播决定，采用相同读取资源边界；其列表仍全量枚举/解析 transcript，不满足下一步目录和字节预算，未复制这一方案。两轮构建均通过；第一轮 273/279 的六个失败是新夹具对不可重定义 ESM namespace 做 spy，改为模块 mock 后最终 Node 20.3 构建及 12 文件/279 项通过，见 `.tmp/size-check-itajam9h`，未修改产品迎合夹具。
+- 四组有效反转撤回两次稳定性、历史目录搜索、取消与 modal scope，均触发行为断言；隔离源码逐字节/SHA-256 恢复后 24 项通过，见 `.tmp/phase19-config/size-reversals/1791335335834624290`。actual CLI regular/fullscreen 分别统计核心文件 4982/5000 bytes 并验证 `4.9 KiB` 展示，额外 lock/artifact 不计入，40 列 current/拒绝/过滤、重开和切换继续通过；配置原文不变、47 个 metadata 保留、0 provider 请求、退出 0，见 `.tmp/phase19-config/size-pty-1791335335878474310`。
+- 独立代码 APPROVE（最终 5 文件/122 项及真实目录删除/替换探针）；完整列表仍同步加载所有 transcript，仅后置 size 采样有界，SES-02 的目录/摘要索引尚未完成。
+- 上批 `891bfd72f65c5cb43a02e3c3536be8c4f1a75e5b` 已推送；CI 37554930370、Watch 37554930469 均零步骤失败，两个 annotation 均核实为付款/spending limit 阻止启动，没有远端测试执行证据。本批远端按新 SHA 跟踪，完整 Phase 19 继续。
+- 独立架构 CLEAR（5 文件/90 项及真实交叠加载取消探针），1757 文件普通/混合图无环、无未解析相对导入；新 owner 7/1 函数，既有 read surface 23→23、store access 27→27、overlay 含 accessors 20→20，见 `.tmp/session-size-architecture-5mmat2ld`。五项静态 gates、43 项 script tests 与 NormProof 0 blocking 通过，见 `.tmp/size-gates-ou4tvgg1`；既有 advisory 保留。

@@ -205,7 +205,7 @@ export class OverlayHost {
           empty,
           detailRows: picker.detailRows ?? 2,
           onOptionRow: (row, id) => this.optionRows.set(row, id),
-          ...(status ? { status } : {}),
+          ...(status ? { status } : picker.footer ? { status: picker.footer } : {}),
           ...(actionHints ? { actionHints } : {}),
         },
         width,

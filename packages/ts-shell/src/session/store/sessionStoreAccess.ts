@@ -22,6 +22,7 @@ import {
   type SessionStoreLayout,
 } from "./sessionFileLayout.js";
 import { writeJsonFileAtomic } from "./sessionFileStore.js";
+import { SessionFiles } from './files.js';
 import {
   deleteSessionRecord,
   loadSessionRecord,
@@ -41,6 +42,7 @@ import {
 } from "./sessionStateStore.js";
 
 export class SessionStoreAccess {
+  readonly files: SessionFiles;
   private readonly storeLayout: SessionStoreLayout;
   private readonly listWarningState: SessionListWarningState = {
     warnedUnreadableSessionDirs: new Set<string>(),
@@ -49,6 +51,7 @@ export class SessionStoreAccess {
 
   constructor() {
     this.storeLayout = createSessionStoreLayout();
+    this.files = new SessionFiles(this.storeLayout);
     this.ensureLayout();
   }
 

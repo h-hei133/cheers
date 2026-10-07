@@ -26,7 +26,7 @@ confidence: high
 | 问题 | 当前事实 | 已裁定方案 |
 |---|---|---|
 | resume 重开焦点 | 生命周期隔离、按运行时 current ID 聚焦及动作复验已实施，见 §2.6–2.7 | 完整生命周期 reset + generation；按稳定 current ID 聚焦 |
-| 大小指标 | `turns.length` 是消息条目数；当前列表没有落盘大小投影 | session read/store owner 异步有界统计核心文件逻辑 bytes |
+| 大小指标 | 核心文件异步采样与 partial/unknown 已实施，见 §3.5；完整同步列表读取仍待替换 | session read/store owner 异步有界统计核心文件逻辑 bytes |
 | undo | 只描述最新快照并打印 restore 命令；无 session 归属和已提交操作筛选 | 先建立 operation receipts、加固恢复写链，再提供预览/批准/执行 |
 | 双 Esc 反馈 | 分支切换、note 与 draft 链路已存在；真实现场视觉根因未证明 | 修复失败后的状态真值，验收两种终端模式中的可见导航结果 |
 
@@ -98,7 +98,7 @@ pi 的 [session-selector.ts](../../../pi/packages/coding-agent/src/modes/interac
 
 ### 3.1 当前数据与存储边界
 
-[sessionPicker.describe](../../packages/ts-shell/src/cli/interactive/picker/session.ts#L82) 的 `N turns` 来自消息数组长度，不是用户问答回合数。[SessionLike](../../packages/ts-shell/src/cli/interactive/picker/session.ts#L72) 只是局部显示接口，领域模型仍是 [Session](../../packages/ts-shell/src/session/schema/sessionRecord.ts)。14 号文档指出局部接口缺 byte size 并没有混淆领域模型，不应称为已被推翻的事实错误。
+[sessionPicker.describe](../../packages/ts-shell/src/cli/interactive/picker/session.ts) 已用核心文件采样大小替换原 `N turns`（原值是消息条目数，不是问答回合数）。领域模型仍是 [Session](../../packages/ts-shell/src/session/schema/sessionRecord.ts)，大小是独立只读投影，不写回 session 或用消息序列化长度代替实际文件大小。
 
 [sessionFileLayout.ts](../../packages/ts-shell/src/session/store/sessionFileLayout.ts#L83) 定义 metadata、transcript、state、lock 的布局，并保留 legacy 定位路径；生产代码不能硬编码 `~/.cheers`。典型布局为：
 
@@ -123,10 +123,12 @@ pi 的 [session-selector.ts](../../../pi/packages/coding-agent/src/modes/interac
 | 状态 | 展示与含义 |
 |---|---|
 | complete | 三类核心文件按该布局的存在规则成功统计，显示人类可读大小 |
-| partial | 有确定的部分字节，但有文件不可读、读取中变化或异常缺失；显示“至少 … / 部分可读” |
+| partial | 有确定的部分采样字节，但有文件不可读、读取中变化或异常缺失；显示“sampled · partial”，不承诺是稍后当前文件大小的下界 |
 | unknown | 不能确定有意义的统计；显示“大小未知”，不能冒充 `0 B` |
 
 旧布局允许不存在的可选文件与一个应存在文件突然丢失不同，交给存储 owner 判定。真实空文件可以是零字节；权限错误或读取失败不能转换为零。
+
+当前实际 loader 在历史目录中也要求 metadata、transcript 和 state 全部存在；历史目录名本身不构成缺少 state 的可选文件规则。
 
 ### 3.3 Owner、异步 I/O 与一致性
 
@@ -139,6 +141,13 @@ pi 的 [session-selector.ts](../../../pi/packages/coding-agent/src/modes/interac
 ### 3.4 待实施验收
 
 隔离夹具按真实文件的 UTF-8 bytes 断言总和，覆盖中文、BOM/换行、保留分支、缺失可选文件、异常缺失、EACCES、append 并发、legacy 与注入目录。新增 lock/artifact 不改变指标。验收 I/O 并发上限、取消和重开后过期结果丢弃；UI 只接收大小投影，不调用文件系统。
+
+### 3.5 SES-02 核心文件采样已实施部分（2026-10-07）
+
+- [SessionFiles](../../packages/ts-shell/src/session/store/files.ts)复用实际 store layout，异步按目录优先级定位；每次最多 41 个 ID、4 个顺序 stat worker，先检查输入及取消，不枚举目录、不读取文件内容。两个采样中身份/大小/时间一致的普通核心文件才进入总和；目录消失/替换、优先目录改变或全不可读返回 unknown，部分稳定文件返回 partial。采样时间显式保留，没有跨文件原子快照声明，不长期持锁、不缓存过期结果。
+- [size presentation](../../packages/ts-shell/src/session/presentation/size.ts)使用 B/KiB/MiB 等二进制单位，未知与真实零分开；partial 只说已采样部分，不把可能并发截断的值说成当前大小下界。modal 正常状态说明逻辑大小及排除附件，动作反馈和 current 状态具有更高显示优先级。取消中的请求排空已派发 stat 后拒绝，不再派发下一会话；picker 在 await 后检查 signal 才更新捕获上下文与 offered ID。
+- 最终 Node 20.3 构建与 12 文件/279 项通过；四组有效反转覆盖稳定性、历史目录、取消及 modal scope，恢复后 24 项通过。actual regular/fullscreen 两模式将隔离核心文件 4982/5000 bytes 与 `4.9 KiB` 展示对应，加入锁和附件不改变总和，沿用 current/40 列/切换验证且配置未改、零 provider 请求。详见 [主裁决 §8.104](phase-19-decisions.md#8104-ses-02核心文件逻辑大小采样)。
+- 大小补充的 I/O 已有界，前面的 `listSessions()` 仍同步扫描所有会话并加载 transcript。SES-02 的目录/摘要索引与增量读取尚未完成；不把本节标为整个 SES-02 或 W5 完成。
 
 ## 4. `/undo`：最近已提交编辑操作的安全恢复
 
