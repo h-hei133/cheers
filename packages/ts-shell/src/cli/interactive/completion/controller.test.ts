@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { CatalogController } from "./controller.js";
 import { catalogRequest } from "./request.js";
 import type { Suggestion } from "../../../presentation/tui/chrome/suggestions.js";
+import type { CatalogProgressSink } from './result.js';
 
 afterEach(() => vi.useRealTimers());
 function harness() {
@@ -9,7 +10,7 @@ function harness() {
   let draft = { text: "/theme d", cursor: 8, revision: 1 };
   let identity = "session-a";
   const pending: Array<(items: readonly Suggestion[]) => void> = [];
-  const load = vi.fn((_kind, _signal, _query?: string) => new Promise<readonly Suggestion[]>(resolve => pending.push(resolve)));
+  const load = vi.fn((_kind, _signal, _query?: string, _progress?: CatalogProgressSink) => new Promise<readonly Suggestion[]>(resolve => pending.push(resolve)));
   const publish = vi.fn();
   const controller = new CatalogController({ identity: () => identity, draft: () => draft, load, publish });
   return { controller, load, publish, pending, draft: () => draft,
@@ -39,7 +40,8 @@ describe("catalog request lifecycle", () => {
     if (kind === "context") h.switch();
     if (kind === "cancel") h.controller.cancel();
     if (kind === "invalidate") h.controller.invalidate();
-    h.publish.mockClear(); h.pending[0]!(dark); await vi.advanceTimersByTimeAsync(0);
+    h.publish.mockClear(); h.load.mock.calls[0]?.[3]?.({ items: dark, status: 'partial' });
+    h.pending[0]!(dark); await vi.advanceTimersByTimeAsync(0);
     expect(h.publish).not.toHaveBeenCalled(); h.controller.invalidate();
   });
 
@@ -57,6 +59,30 @@ describe("catalog request lifecycle", () => {
     expect(h.publish.mock.lastCall).toEqual([[], "Command entries unavailable."]);
     h.change("/theme da"); h.controller.update(h.draft());
     expect(h.load).toHaveBeenCalledTimes(1);
+    h.controller.invalidate();
+  });
+
+  it('publishes bounded partial candidates and retains them when discovery times out', async () => {
+    const h = harness(); h.change('/resume cur'); h.controller.update(h.draft()); await vi.advanceTimersByTimeAsync(75);
+    const progress = h.load.mock.calls[0]?.[3]!;
+    progress({ items: [{ value: 'current-id', label: 'current title' }], status: 'Loading sessions; results are incomplete.' });
+    expect(h.publish.mock.lastCall?.[0].map((item: Suggestion) => item.value)).toEqual(['current', 'current-id']);
+    expect(h.publish.mock.lastCall?.[1]).toContain('incomplete');
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(h.publish.mock.lastCall?.[0].map((item: Suggestion) => item.value)).toEqual(['current', 'current-id']);
+    expect(h.publish.mock.lastCall?.[1]).toBe('Command entries timed out; results are incomplete.');
+    h.publish.mockClear(); progress({ items: dark }); h.pending[0]!(dark); await vi.advanceTimersByTimeAsync(0);
+    expect(h.publish).not.toHaveBeenCalled(); h.controller.invalidate();
+  });
+
+  it('retains a partial-read notice through completion and cached filtering', async () => {
+    const h = harness(); h.controller.update(h.draft()); await vi.advanceTimersByTimeAsync(75);
+    h.load.mock.calls[0]?.[3]?.({ items: dark, status: 'Some saved entries are unreadable.' });
+    h.pending[0]!(dark); await vi.advanceTimersByTimeAsync(0);
+    expect(h.publish.mock.lastCall?.[1]).toBe('Some saved entries are unreadable.');
+    h.change('/theme da'); h.controller.update(h.draft());
+    expect(h.publish.mock.lastCall?.[0][0]?.value).toBe('dark');
+    expect(h.publish.mock.lastCall?.[1]).toBe('Some saved entries are unreadable.');
     h.controller.invalidate();
   });
 

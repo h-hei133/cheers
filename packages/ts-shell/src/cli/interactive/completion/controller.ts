@@ -1,11 +1,12 @@
 import type { DraftSnapshot } from "../../../presentation/tui/editor/replacement.js";
 import type { Suggestion } from "../../../presentation/tui/chrome/suggestions.js";
 import { catalogRequest, catalogSuggestions, type CatalogKind } from "./request.js";
+import type { CatalogProgress, CatalogProgressSink } from './result.js';
 
 interface Options {
   readonly identity: () => string;
   readonly draft: () => DraftSnapshot;
-  readonly load: ((kind: CatalogKind, signal: AbortSignal, query?: string) => Promise<readonly Suggestion[]>) & {
+  readonly load: ((kind: CatalogKind, signal: AbortSignal, query?: string, progress?: CatalogProgressSink) => Promise<readonly Suggestion[]>) & {
     invalidate?: () => void;
     observe?: (kind: CatalogKind, query: string | undefined, changed: () => void) => (() => void) | undefined;
   };
@@ -65,18 +66,30 @@ export class CatalogController {
     this.abort = abort;
     this.options.publish(catalogSuggestions(request, []), request.kind === "reference" ? "Loading file references…" : "Loading command entries…");
     this.delay = setTimeout(() => {
+      let partial: CatalogProgress | undefined;
+      let settled = false;
+      const progress: CatalogProgressSink = update => {
+        if (settled || abort.signal.aborted || !this.current(epoch, identity, snapshot)) return;
+        partial = { items: update.items.slice(0, 5000), status: update.status };
+        this.options.publish(catalogSuggestions(request, partial.items), partial.status);
+      };
       this.deadline = setTimeout(() => {
+        settled = true;
         abort.abort();
         if (!this.current(epoch, identity, snapshot)) return;
-        this.finish(request, [], request.kind === "reference" ? "File references timed out." : "Command entries timed out.");
+        this.finish(request, partial?.items ?? [], partial ? 'Command entries timed out; results are incomplete.'
+          : request.kind === "reference" ? "File references timed out." : "Command entries timed out.");
         this.epoch++;
       }, 1500);
-      void this.options.load(request.kind, abort.signal, request.query).then(items => {
+      void this.options.load(request.kind, abort.signal, request.query, progress).then(items => {
+        settled = true;
         if (!this.current(epoch, identity, snapshot)) return;
-        this.finish(request, items.slice(0, 5000));
+        this.finish(request, items.slice(0, 5000), partial?.status);
       }, () => {
+        settled = true;
         if (!this.current(epoch, identity, snapshot)) return;
-        this.finish(request, [], request.kind === "reference" ? "File references unavailable." : "Command entries unavailable.");
+        this.finish(request, partial?.items ?? [], partial ? 'Some command entries are unavailable; results are incomplete.'
+          : request.kind === "reference" ? "File references unavailable." : "Command entries unavailable.");
       });
     }, 75);
     return true;

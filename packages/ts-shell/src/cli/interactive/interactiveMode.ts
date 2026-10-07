@@ -266,7 +266,7 @@ export class InteractiveMode {
           this.pager.active ? this.pager.render(width, height, availableRows) : this.overlay.render(width, height, availableRows),
         selection: () => this.pointer.selection,
         composerSelection: () => this.pointer.composerSelection,
-        toast: () => this.toast ?? this.completionStatus,
+        hintStatus: () => ({ toast: this.toast, completion: this.completionStatus }),
         searchBar: () => {
           // Built before asking: the count and the position only exist once the
           // query has been matched against the rows that are on screen.

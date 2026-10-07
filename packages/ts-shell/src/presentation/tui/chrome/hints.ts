@@ -24,6 +24,7 @@ export interface HintContext {
   /** Prompts waiting to be steered into the current turn. */
   readonly steering?: number;
   readonly toast?: string;
+  readonly completionStatus?: string;
 }
 export interface AmbientContext {
   /** Todo entries not yet done. */
@@ -70,6 +71,9 @@ export function renderHints(
   ambient: AmbientContext,
   width: number,
 ): string[] {
+  if (context.completionStatus && !context.cancelArmed) {
+    return [defaultTheme.fg('accent', truncateToWidth(context.completionStatus, width))];
+  }
   if (context.toast && !context.cancelArmed && !context.suggesting) {
     return [defaultTheme.fg("accent", truncateToWidth(context.toast, width))];
   }

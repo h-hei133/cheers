@@ -26,7 +26,7 @@ confidence: high
 | 问题 | 当前事实 | 已裁定方案 |
 |---|---|---|
 | resume 重开焦点 | 生命周期隔离、按运行时 current ID 聚焦及动作复验已实施，见 §2.6–2.7 | 完整生命周期 reset + generation；按稳定 current ID 聚焦 |
-| 大小指标 | 核心文件异步采样与 partial/unknown 已实施，见 §3.5；完整同步列表读取仍待替换 | session read/store owner 异步有界统计核心文件逻辑 bytes |
+| 大小指标 | 核心文件采样及默认 picker/补全的增量摘要目录已实施，见 §3.5–3.6 | session read/store owner 异步有界统计核心文件逻辑 bytes |
 | undo | 只描述最新快照并打印 restore 命令；无 session 归属和已提交操作筛选 | 先建立 operation receipts、加固恢复写链，再提供预览/批准/执行 |
 | 双 Esc 反馈 | 分支切换、note 与 draft 链路已存在；真实现场视觉根因未证明 | 修复失败后的状态真值，验收两种终端模式中的可见导航结果 |
 
@@ -92,7 +92,7 @@ pi 的 [session-selector.ts](../../../pi/packages/coding-agent/src/modes/interac
 - 提交 resume/rename/delete 前验证 offered ID、捕获与实时 session/project、忙碌状态、重新读取的目标存在/范围/内容，以及请求 ID 与 metadata ID 相等。删除当前会话检查请求 ID，不信任可变 metadata 身份。沿用现有动作 owner，不声称跨进程租约或跨文件原子性。
 - modal 为右侧 current 标记保留宽度，并为 contextual status、Updating 和 action notice 提供独立换行行；加载失败不误报过滤隐藏，40 列长标题也能看到 current 与删除拒绝。宿主投影移入 session/host，InteractiveMode 既有函数数 94→93。
 - 最终隔离 Node 20.3 构建与 9 文件/188 项通过；三组有效反转覆盖截断外 current、metadata/requested ID、当前删除保护，恢复后 16 项通过。独立代码 APPROVE（151 项），架构 CLEAR（最终 77 项、1754 文件依赖图无环/未解析相对导入）。actual regular/fullscreen 验证 45 条较新会话、外项目排除、40 列标记/拒绝/过滤、重开及切换后 current 更新；配置逐字节不变、47 个 metadata 保留、零 provider 请求、退出 0。详见 [主裁决 §8.103](phase-19-decisions.md#8103-ses-01current-身份范围与动作复验)。
-- 本批仍调用同步完整列表；41 条展示上限不是磁盘 I/O 上限，SES-02 必须替换列表读取链路。
+- 当时仍调用同步完整列表；41 条展示上限不是磁盘 I/O 上限。默认 picker/补全的替换随后在 §3.6 实施。
 
 ## 3. 会话面板大小：核心文件逻辑字节
 
@@ -134,11 +134,11 @@ pi 的 [session-selector.ts](../../../pi/packages/coding-agent/src/modes/interac
 
 统计属于 session read/store owner，向 picker 提供只读摘要，不在 renderer 或 picker 内做 `fs.statSync`、路径发现和全量目录扫描。按可见/已选 session 做有界并发异步读取，支持取消和 generation 失效；缓存必须随已知写入、版本或有限有效期失效。
 
-当前 [SessionStoreAccess.listSessions](../../packages/ts-shell/src/session/store/sessionStoreAccess.ts#L139) 先加载历史目录后排序。因此“只对返回的 40 条 stat 就没有全历史扫描”不成立。Phase 19 应把目录枚举、列表摘要读取与大小补充分别设预算，采用可分页或可增量列表，不在每次按键重复读取历史 transcript。
+旧 [SessionStoreAccess.listSessions](../../packages/ts-shell/src/session/store/sessionStoreAccess.ts) 仍为显式完整查询、恢复诊断和导出保留。默认 resume picker 与会话参数补全现消费 [SessionCatalog](../../packages/ts-shell/src/session/store/catalog/index.ts)，分别约束目录枚举、摘要正文和大小补充，不在首次展示前同步读取全部历史 transcript。完成全局发现仍需要枚举历史；增量与缓存不能描述成总 I/O 恒定。
 
 三个文件可能同时变化，采样总和不是跨文件原子快照。记录采样时点/版本，检测变化后有限重试或标 partial；不能为显示大小长期持有写锁。读取必须走真实 layout，覆盖 legacy、注入存储目录、已删除会话和不可读路径。
 
-### 3.4 待实施验收
+### 3.4 验收契约
 
 隔离夹具按真实文件的 UTF-8 bytes 断言总和，覆盖中文、BOM/换行、保留分支、缺失可选文件、异常缺失、EACCES、append 并发、legacy 与注入目录。新增 lock/artifact 不改变指标。验收 I/O 并发上限、取消和重开后过期结果丢弃；UI 只接收大小投影，不调用文件系统。
 
@@ -147,7 +147,14 @@ pi 的 [session-selector.ts](../../../pi/packages/coding-agent/src/modes/interac
 - [SessionFiles](../../packages/ts-shell/src/session/store/files.ts)复用实际 store layout，异步按目录优先级定位；每次最多 41 个 ID、4 个顺序 stat worker，先检查输入及取消，不枚举目录、不读取文件内容。两个采样中身份/大小/时间一致的普通核心文件才进入总和；目录消失/替换、优先目录改变或全不可读返回 unknown，部分稳定文件返回 partial。采样时间显式保留，没有跨文件原子快照声明，不长期持锁、不缓存过期结果。
 - [size presentation](../../packages/ts-shell/src/session/presentation/size.ts)使用 B/KiB/MiB 等二进制单位，未知与真实零分开；partial 只说已采样部分，不把可能并发截断的值说成当前大小下界。modal 正常状态说明逻辑大小及排除附件，动作反馈和 current 状态具有更高显示优先级。取消中的请求排空已派发 stat 后拒绝，不再派发下一会话；picker 在 await 后检查 signal 才更新捕获上下文与 offered ID。
 - 最终 Node 20.3 构建与 12 文件/279 项通过；四组有效反转覆盖稳定性、历史目录、取消及 modal scope，恢复后 24 项通过。actual regular/fullscreen 两模式将隔离核心文件 4982/5000 bytes 与 `4.9 KiB` 展示对应，加入锁和附件不改变总和，沿用 current/40 列/切换验证且配置未改、零 provider 请求。详见 [主裁决 §8.104](phase-19-decisions.md#8104-ses-02核心文件逻辑大小采样)。
-- 大小补充的 I/O 已有界，前面的 `listSessions()` 仍同步扫描所有会话并加载 transcript。SES-02 的目录/摘要索引与增量读取尚未完成；不把本节标为整个 SES-02 或 W5 完成。
+- 本批只完成大小补充，随后 §3.6 替换默认 picker/补全的目录与摘要读取；显式完整查询保持原契约，W5 其余任务继续。
+
+### 3.6 SES-02 增量摘要目录与补全（2026-10-07）
+
+- [catalog](../../packages/ts-shell/src/session/store/catalog/index.ts)先产出运行时 current，再以异步目录游标发现历史；每次更新最多检查 64 个目录项、读取 16 个摘要，4 个 worker，结果保留最近 40 条及符合相同范围规则的 current。metadata/state/transcript 正文上限分别为 64 KiB/1 MiB/2 MiB，每块读取最多 64 KiB。超大 state/transcript 保留 limited/unknown reentry 摘要，打开时仍由完整 action owner 复验；损坏或不可读来源与成功空集合分开。
+- 复用实际 layout、既有分支/报告投影及共享 transcript parser，保留 JSON BOM 兼容。正文读取绑定实际打开的普通文件身份与版本，完成后复查三个核心文件和目录优先级；不声称跨文件事务快照。512 项进程内缓存每次使用先检查版本，长扫描的未命中新项不能逐个淘汰已有缓存，current 与最终可见结果显式保留。独立 522 会话探针重复扫描仅重新打开 30 个正文文件，仍需目录与版本检查。
+- [picker listing](../../packages/ts-shell/src/cli/interactive/picker/session/listing.ts)拥有查询取消、订阅和按版本补充大小，关闭/重开不发布旧结果。补全渐进发布已知候选，个别来源失败及 1500 ms 期限到达时保留候选并显示 incomplete；候选存在也保留状态行。显式选择仅在值与完整 draft-bound edit 一致时跨更新保留，新草稿释放旧选择。
+- 最终 Node 20.3 构建与 10 文件/212 项通过，独立代码审查另行 6 文件/112 项通过并 APPROVE。七组有效反转覆盖目录预算、缓存、读取后复验、取消、状态显示、选择身份和期限保留，分别恢复后 10/64 项通过。actual regular/fullscreen 均验证渐进取消重开、损坏来源下的有效候选和 incomplete、截断外 current、40 列删除拒绝、重命名/切换及逻辑大小；配置原文不变、零 provider 请求、退出 0。完整证据与限制见 [主裁决 §8.105](phase-19-decisions.md#8105-ses-02增量会话目录与可见的部分结果)。
 
 ## 4. `/undo`：最近已提交编辑操作的安全恢复
 

@@ -1,4 +1,5 @@
 import type { Session } from '../schema/sessionRecord.js';
+import type { SessionSummary } from '../store/catalog/model.js';
 import { sessionHasReentrySurface } from '../presentation/sessionReentrySurface.js';
 import { normalizePathIdentity } from '../continuation/roots.js';
 
@@ -8,12 +9,13 @@ export interface SessionSelectionContext {
   readonly busy: boolean;
 }
 
-export function sessionChoices(sessions: readonly Session[], context: SessionSelectionContext, limit = 40): {
-  readonly sessions: readonly Session[];
+export function sessionChoices<T extends Session | SessionSummary>(sessions: readonly T[], context: SessionSelectionContext, limit = 40): {
+  readonly sessions: readonly T[];
   readonly currentUnavailable?: string;
 } {
   const root = normalizePathIdentity(context.projectRoot);
-  const scoped = sessions.filter(session => root !== undefined && normalizePathIdentity(session.projectRoot) === root && sessionHasReentrySurface(session));
+  const scoped = sessions.filter(session => root !== undefined && normalizePathIdentity(session.projectRoot) === root
+    && ('reentry' in session ? session.reentry !== 'empty' : sessionHasReentrySurface(session)));
   scoped.sort((left, right) => (Date.parse(right.updatedAt) - Date.parse(left.updatedAt)) || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
   const recent = scoped.slice(0, limit);
   const current = scoped.find(session => session.id === context.sessionId);

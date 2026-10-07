@@ -2,6 +2,7 @@ import { expect, it, vi } from 'vitest';
 import type { SessionManager } from '../../../session/SessionManager.js';
 import type { Session } from '../../../session/schema/sessionRecord.js';
 import { sessionChoices } from '../../../session/navigation/selection.js';
+import { summarizeSession } from '../../../session/store/catalog/projection.js';
 import { OverlayHost } from '../overlay.js';
 import { parseKeyEvent } from '../../../presentation/tui/input/keys.js';
 import { sessionPicker } from './session.js';
@@ -15,7 +16,8 @@ function fixture(sessions = [session('current'), session('other')]) {
   const records = new Map(sessions.map(item => [item.id, item]));
   const context = { sessionId: 'current', projectRoot: '/workspace', busy: false };
   const resume = vi.fn(async () => undefined); const remove = vi.fn(async () => undefined); const rename = vi.fn(async () => undefined);
-  const manager = { listSessions: () => [...records.values()], getSession: (id: string) => records.get(id),
+  const manager = { catalog: { async *list() { yield { ...sessionChoices([...records.values()].map(record => summarizeSession(record, 'version')), context),
+    scanned: records.size, unreadable: 0, limited: 0, status: 'complete' }; } }, getSession: (id: string) => records.get(id),
     files: { sizes: async (ids: readonly string[]) => new Map(ids.map(id => [id, { status: 'complete', bytes: 2048, sampledAt: '2026-10-07T00:00:00Z' }])) } } as unknown as SessionManager;
   return { records, context, resume, remove, rename,
     picker: sessionPicker({ sessionManager: manager, context: () => ({ ...context }), resume, delete: remove, rename }) };
@@ -103,7 +105,7 @@ it('sorts timestamp ties by ID regardless of input ordering', () => {
 });
 
 it('keeps load failure separate from a filtered-current explanation', async () => {
-  const picker = sessionPicker({ sessionManager: { listSessions: () => { throw new Error('PRIVATE_PATH'); } } as unknown as SessionManager,
+  const picker = sessionPicker({ sessionManager: { catalog: { list: () => { throw new Error('PRIVATE_PATH'); } } } as unknown as SessionManager,
     context: () => ({ sessionId: 'current', projectRoot: '/workspace', busy: false }), resume: async () => undefined });
   const overlay = new OverlayHost(() => {}); overlay.open(picker);
   expect(overlay.render(100, 20).join('\n')).not.toContain('hidden by the filter');

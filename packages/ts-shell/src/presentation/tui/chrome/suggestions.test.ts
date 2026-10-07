@@ -38,6 +38,19 @@ describe("ranking", () => {
 });
 
 describe("selection", () => {
+  it('keeps the explicitly chosen edit through incremental reordering but releases it for another draft', () => {
+    const snapshot = { text: '/resume s', cursor: 9, revision: 1 };
+    const item = (value: string): Suggestion => ({ value, label: value, edit: { snapshot, from: 8, to: 9, text: value + ' ' } });
+    const list = new SuggestionList();
+    list.setItems([item('session-a'), item('session-b')]); list.step(1);
+    list.setItems([item('session-c'), item('session-a'), item('session-b')]);
+    expect(list.current()?.value).toBe('session-b'); expect(list.chosen).toBe(true);
+    list.setItems([item('session-b')]);
+    expect(list.current()?.value).toBe('session-b'); expect(list.chosen).toBe(true);
+    list.setItems([{ ...item('session-b'), edit: { ...item('session-b').edit!, snapshot: { ...snapshot, revision: 2 } } }]);
+    expect(list.chosen).toBe(false);
+  });
+
   it("keeps the selected identity visible and clickable when the row budget shrinks", () => {
     const list = new SuggestionList();
     list.setItems(Array.from({ length: 12 }, (_, index) => ({ label: `item-${index}`, value: `${index}` })));

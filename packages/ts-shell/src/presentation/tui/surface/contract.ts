@@ -68,6 +68,8 @@ export interface ViewContext {
   selection(): SelectionSpan | undefined;
   /** Transient status notification (e.g. clipboard copy feedback). */
   toast?(): string | undefined;
+  /** Loading/partial status belongs to the completion list, independent of transient toasts. */
+  hintStatus?(): { readonly toast?: string; readonly completion?: string };
   /** Active mouse selection within the composer / input box. */
   composerSelection?(): SourceSelection | undefined;
   /** What an open search should show in the bar, or nothing when none is open. */

@@ -21,6 +21,7 @@ import { createComponentLogger } from "../observability/structuredLogger.js";
 import { forgetSessionTodos } from "../core/commands/todoCommandRuntime.js";
 import { sessionHasReentrySurface } from "./presentation/sessionReentrySurface.js";
 import type { SessionFiles } from './store/files.js';
+import type { SessionCatalog } from './store/catalog/index.js';
 import { buildRecoverySnapshotForSession } from "./recovery/sessionRecoveryRuntime.js";
 import {
   SessionLifecycleWrites,
@@ -51,10 +52,12 @@ const sessionLogger = createComponentLogger("SessionManager");
 
 export abstract class SessionReadSurface extends SessionLifecycleWrites {
   readonly files: SessionFiles;
+  readonly catalog: SessionCatalog;
 
   protected constructor(host: SessionLifecycleWriteHost) {
     super(host);
     this.files = host.store.files;
+    this.catalog = host.store.catalog;
   }
 
   getSessionFilePath(sessionId: string): string {

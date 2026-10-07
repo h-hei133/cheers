@@ -17,6 +17,7 @@ import type { CliMcpGateway } from "../../../entrypoints/cliMcpModule.js";
 import type { CatalogKind } from "./request.js";
 import type { Suggestion } from "../../../presentation/tui/chrome/suggestions.js";
 import { listWorkspaceFiles } from "../../../runtime/execution/fileWalk.js";
+import type { CatalogProgressSink } from './result.js';
 
 export function catalogIdentity(context: ShellRuntimeContext, themePaths: readonly string[] = []): string {
   return JSON.stringify([context.cwd, context.projectRoot, context.session.id, context.skillOptions,
@@ -68,7 +69,7 @@ export function createCatalogLoader(context: () => ShellRuntimeContext, gateway:
   const skills = createSkillCatalog();
   const navigation = new Map<CatalogKind, ReturnType<typeof createCatalogObservation>>(
     (["session", "entry", "tree", "thread"] as const).map(kind => [kind, createCatalogObservation()]));
-  const load = async (kind: CatalogKind, signal: AbortSignal, query?: string): Promise<readonly Suggestion[]> => {
+  const load = async (kind: CatalogKind, signal: AbortSignal, query?: string, progress?: CatalogProgressSink): Promise<readonly Suggestion[]> => {
     signal.throwIfAborted();
     const current = context();
     if (kind === "reference") {
@@ -77,6 +78,10 @@ export function createCatalogLoader(context: () => ShellRuntimeContext, gateway:
       return files.slice(0, 5000).map(value => ({ value, label: value }));
     }
     if (kind === "file" || kind === "directory") return pathCatalog(current.cwd, query ?? "", kind === "directory", signal);
+    if (kind === 'session') {
+      if (!manager) throw new Error('Session catalog unavailable');
+      return navigation.get(kind)!.read(track => navigationCatalog(kind, current, manager, track, signal, progress));
+    }
     const key = catalogIdentity(current, themePaths) + kind;
     if (!pending || pending.key !== key) {
       const observer = navigation.get(kind);

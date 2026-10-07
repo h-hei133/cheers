@@ -1598,3 +1598,16 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 独立代码 APPROVE（最终 5 文件/122 项及真实目录删除/替换探针）；完整列表仍同步加载所有 transcript，仅后置 size 采样有界，SES-02 的目录/摘要索引尚未完成。
 - 上批 `891bfd72f65c5cb43a02e3c3536be8c4f1a75e5b` 已推送；CI 37554930370、Watch 37554930469 均零步骤失败，两个 annotation 均核实为付款/spending limit 阻止启动，没有远端测试执行证据。本批远端按新 SHA 跟踪，完整 Phase 19 继续。
 - 独立架构 CLEAR（5 文件/90 项及真实交叠加载取消探针），1757 文件普通/混合图无环、无未解析相对导入；新 owner 7/1 函数，既有 read surface 23→23、store access 27→27、overlay 含 accessors 20→20，见 `.tmp/session-size-architecture-5mmat2ld`。五项静态 gates、43 项 script tests 与 NormProof 0 blocking 通过，见 `.tmp/size-gates-ou4tvgg1`；既有 advisory 保留。
+
+### 8.105 SES-02：增量会话目录与可见的部分结果
+
+- [session/store/catalog](../../packages/ts-shell/src/session/store/catalog/index.ts)为默认 resume picker 和会话参数补全提供增量摘要：先返回运行时 current，再以异步目录游标发现历史，每次更新最多检查 64 项目录记录、读取 16 个摘要，4 路并发。metadata/state/transcript 正文分别限制为 64 KiB/1 MiB/2 MiB，读取块为 64 KiB；超大状态/转录保留 limited/unknown reentry，损坏或不可读来源显式计数。结果为最近 40 条加同范围 current；完整 action owner 仍在动作前重新加载并验证保存的会话。
+- 摘要复用既有分支/报告投影和提取后的共享 transcript parser，保留 JSON BOM 读取兼容。实际文件打开前后检查身份/版本，读取完成后复核核心文件与目录优先级；512 项进程内版本缓存避免重复解析，扫描未命中不驱逐已有项，current/最终可见项显式保留。独立架构审查发现并修复顺序扫描淘汰问题，522 会话重复扫描的正文打开数从 1,566 降至 30，见 `.tmp/catalog-architecture-final-nrqnhli4/probe.log`。
+- [picker/session/listing](../../packages/ts-shell/src/cli/interactive/picker/session/listing.ts)承担订阅、取消和摘要版本变化后的大小补充；既有代际和 workspace/session 身份检查继续生效。补全支持有界增量发布，失败或 1500 ms 期限到达时保留已知候选并显示 incomplete。真实 PTY 发现候选存在时状态被隐藏，现通过一次 hintStatus 快照保留独立提示行；取消/退出提示优先。显式选择按候选值及完整草稿编辑快照保留，换草稿不会沿用旧选择。
+- 定向比较参考的异步读取、受限 worker、取消及进度发布决定；采用这些资源与生命周期约束，额外限制目录页和正文大小，没有复制全量 readdir/完整 transcript 方案。完成全局发现仍枚举历史，缓存仍检查文件版本；旧完整查询、恢复诊断及导出 API 保留，不宣称所有会话读取均已增量化或总 I/O 恒定。
+- 最新源码 Node 20.3 构建及 10 文件/212 项通过，见 `.tmp/catalog-check-6jwu7olk`；此前扩展组合 15 文件/281 项通过，见 `.tmp/catalog-check-rn_uwfgu`。独立代码审查发现的 BOM 兼容回归已修复，最终代码 APPROVE，另行 6 文件/112 项通过，见 `.tmp/catalog-check-xksutx7k`；不可用的早期审查请求未计作通过。
+- 四组目录/缓存/读取后复验/取消反转均检出行为失败，源码副本逐字节/SHA-256 恢复后 10 项通过，见 `.tmp/phase19-config/catalog-reversals/1791340343059269782`。三组状态显示/选择身份/期限保留反转同样有效，恢复后 64 项通过，见 `.tmp/phase19-config/catalog-ui-reversals/1791340743149884233`。
+- actual CLI regular/fullscreen 的最终扩展探针均通过：渐进加载中取消重开、损坏外项目来源下仍显示有效补全及 incomplete、最近 40 条外 current、40 列状态/拒绝/过滤、重命名、切换与 4.9 KiB 逻辑大小，附件排除；47 个 metadata 保留、配置原文不变、0 provider 请求、退出 0，见 `.tmp/phase19-config/catalog-pty-1791340882748521394`。较早探针的状态隐藏失败保留为已修复的产品缺陷，没有改写为原先通过。
+- 上批 `a1df2e846007f6ef780bba3b1d0f12ca959e489b` 已推送；CI 37556140158、Watch 37556140209 均零步骤失败，annotation 核实为账户付款/spending limit 阻止启动，不是远端测试执行失败或通过。本批远端按新 SHA 跟踪；SES-03 及 W5 其余任务、完整 Phase 19 继续。
+- 独立架构最终 CLEAR；1,765 文件普通/混合依赖图均无环。最终 UI 增量复核确认 InteractiveMode 仅替换既有 callback，AST function-like 节点 126→126，既有数量 advisory 不增长；view 19、suggestions 14、hints 4，未新增超限 owner。代码 APPROVE 与架构 CLEAR 均有独立返回证据。
+- 五项静态 gates、43 项 script tests 通过，NormProof 阻断义务全部满足、0 blocking，见 `.tmp/catalog-gates-gv5waz_1`；原有函数数量与 120 项文档来源 advisory 保留。产品验证使用 Node 20.3；NormProof 首次出现其工具要求 Node 24 的 engine 提醒，随后在本机 Node 24.15 重新执行并核验阻断结果，未修改产品 Node floor。

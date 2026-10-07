@@ -5,16 +5,19 @@ import { observeDirectory } from "./watch.js";
 export function createCatalogObservation() {
   const watchers = new Map<string, () => void>();
   let changed: (() => void) | undefined;
+  let generation = 0;
   const stop = () => {
+    generation++;
     changed = undefined;
     for (const close of watchers.values()) close();
     watchers.clear();
   };
   const read = <T>(reader: (track: (target: string) => void) => T): T => {
+    const revision = ++generation;
     const visited = new Set<string>();
     const track = (target: string) => {
       const absolute = path.resolve(target);
-      if (!changed || visited.size >= 256) return;
+      if (!changed || revision !== generation || visited.size >= 256) return;
       visited.add(absolute);
       if (!watchers.has(absolute) && watchers.size >= 256) {
         const stale = [...watchers.keys()].find(target => !visited.has(target));
@@ -22,12 +25,22 @@ export function createCatalogObservation() {
       }
       if (!watchers.has(absolute)) watchers.set(absolute, observeDirectory(absolute, () => changed?.()));
     };
-    try {
-      return reader(track);
-    } finally {
+    const finish = () => {
+      if (revision !== generation) return;
       for (const [target, close] of watchers) {
         if (!visited.has(target)) { close(); watchers.delete(target); }
       }
+    };
+    try {
+      const result = reader(track);
+      if (typeof result === 'object' && result !== null && 'then' in result && typeof result.then === 'function') {
+        return Promise.resolve(result).finally(finish) as T;
+      }
+      finish();
+      return result;
+    } catch (error) {
+      finish();
+      throw error;
     }
   };
   return { read, observe: (notify: () => void) => { stop(); changed = notify; return stop; } };

@@ -1,11 +1,11 @@
-import { messageToText } from "../../../model-adapters/multimodal.js";
 import type { SessionManager } from "../../../session/SessionManager.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
 import type { Picker, PickerOutcome } from "../overlay.js";
-import { deriveSessionTitleFromPrompt } from "../../../session/lifecycle/sessionLifecycleStore.js";
-import { sessionChoices, sessionSelectionBlock, type SessionSelectionContext } from '../../../session/navigation/selection.js';
+import { sessionSelectionBlock, type SessionSelectionContext } from '../../../session/navigation/selection.js';
 import type { SessionFileSize } from '../../../session/store/files.js';
+import type { SessionSummary } from '../../../session/store/catalog/model.js';
 import { sessionSizeLabel } from '../../../session/presentation/size.js';
+import { SessionListing, sessionListingStatus, type SessionListingPage } from './session/listing.js';
 
 /**
  * Session chooser for resuming.
@@ -13,8 +13,6 @@ import { sessionSizeLabel } from '../../../session/presentation/size.js';
  * Each entry needs several rows — which session, how old, what it was about, how
  * it ended — so this is the one picker that earns the whole screen.
  */
-
-const MAX_SESSIONS = 40;
 
 export interface SessionPickerOptions {
   readonly sessionManager: SessionManager;
@@ -30,7 +28,17 @@ export interface SessionPickerOptions {
 export function sessionPicker(options: SessionPickerOptions): Picker {
   let expected = { ...options.context() };
   let currentUnavailable: string | undefined;
+  let listingStatus: string | undefined;
+  let listingIncomplete = true;
   let offered = new Set<string>();
+  const listing = new SessionListing(options.sessionManager);
+  const accept = (page: SessionListingPage): readonly Option[] => {
+    currentUnavailable = page.snapshot.currentUnavailable;
+    listingIncomplete = page.stopped === true || page.snapshot.status !== 'complete';
+    listingStatus = sessionListingStatus(page);
+    offered = new Set(page.snapshot.sessions.map(session => session.id));
+    return page.snapshot.sessions.map(session => sessionOption(session, expected.sessionId, page.sizes.get(session.id)));
+  };
   const blocked = (id: string, action: 'resume' | 'rename' | 'delete'): string | undefined => {
     if (!offered.has(id)) return 'This session was not offered. Reopen the session picker.';
     return sessionSelectionBlock({ expected, current: options.context(), target: options.sessionManager.getSession(id), targetId: id, action });
@@ -38,24 +46,22 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
   return {
     title: "Resume session",
     form: "modal",
-    empty: "No recoverable sessions for this project.",
+    get empty() { return listingIncomplete ? 'No selectable sessions in the loaded results.' : 'No recoverable sessions for this project.'; },
     loadError: 'Saved sessions could not be loaded.',
     footer: 'Session files: logical size; excludes attachments.',
     get initialSelection() { return expected.sessionId; },
-    status: visible => currentUnavailable ?? (visible.some(option => option.id === expected.sessionId)
-      ? undefined : 'Current session is hidden by the filter.'),
+    status: visible => [currentUnavailable ?? (visible.some(option => option.id === expected.sessionId)
+      ? undefined : 'Current session is hidden by the filter.'), listingStatus].filter(Boolean).join(' ') || undefined,
     detailRows: 2,
     async load(signal): Promise<readonly Option[]> {
       signal?.throwIfAborted();
       const context = { ...options.context() };
-      const selected = sessionChoices(options.sessionManager.listSessions(), context, MAX_SESSIONS);
-      const sizes = await options.sessionManager.files.sizes(selected.sessions.map(session => session.id), signal);
+      const page = await listing.load(context, signal);
       signal?.throwIfAborted();
       expected = context;
-      currentUnavailable = selected.currentUnavailable;
-      offered = new Set(selected.sessions.map(session => session.id));
-      return selected.sessions.map(session => sessionOption(session, context.sessionId, sizes.get(session.id)));
+      return accept(page);
     },
+    subscribe: publish => listing.subscribe(page => publish(accept(page))),
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
       const sessionId = ids[0];
       if (!sessionId) return undefined;
@@ -74,20 +80,11 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
 }
 
 /** Recent sessions as options, newest first. */
-function sessionOption(session: ReturnType<SessionManager['listSessions']>[number], currentId: string, size: SessionFileSize | undefined): Option {
-  const firstMsg =
-    session.turns?.find(
-      (t) => (t.role === "user" || t.role === "assistant") && messageToText(t.content).trim(),
-    )?.content ||
-    session.pendingPrompt;
-  const label =
-    session.title?.trim() ||
-    (firstMsg ? deriveSessionTitleFromPrompt(messageToText(firstMsg)) : "") ||
-    "New session";
+function sessionOption(session: SessionSummary, currentId: string, size: SessionFileSize | undefined): Option {
   return {
     id: session.id,
-    label,
-    detail: describe(session, size),
+    label: session.title?.trim() || 'New session',
+    detail: [describe(session, size), session.quality === 'limited' ? 'preview limited' : undefined].filter(Boolean).join(' · '),
     note: [session.id === currentId ? 'current' : undefined, age(session)].filter(Boolean).join(' · '),
   };
 }

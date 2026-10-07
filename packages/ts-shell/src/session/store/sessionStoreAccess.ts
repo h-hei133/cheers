@@ -23,6 +23,7 @@ import {
 } from "./sessionFileLayout.js";
 import { writeJsonFileAtomic } from "./sessionFileStore.js";
 import { SessionFiles } from './files.js';
+import { SessionCatalog } from './catalog/index.js';
 import {
   deleteSessionRecord,
   loadSessionRecord,
@@ -43,6 +44,7 @@ import {
 
 export class SessionStoreAccess {
   readonly files: SessionFiles;
+  readonly catalog: SessionCatalog;
   private readonly storeLayout: SessionStoreLayout;
   private readonly listWarningState: SessionListWarningState = {
     warnedUnreadableSessionDirs: new Set<string>(),
@@ -52,6 +54,7 @@ export class SessionStoreAccess {
   constructor() {
     this.storeLayout = createSessionStoreLayout();
     this.files = new SessionFiles(this.storeLayout);
+    this.catalog = new SessionCatalog(this.storeLayout);
     this.ensureLayout();
   }
 

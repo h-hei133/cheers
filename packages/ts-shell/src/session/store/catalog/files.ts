@@ -1,0 +1,71 @@
+import { constants, type Stats } from 'node:fs';
+import { lstat, open } from 'node:fs/promises';
+import { projectSessionFileLayout, validateSessionId, type SessionFileLayout, type SessionStoreLayout } from '../sessionFileLayout.js';
+import { CATALOG_LIMITS } from './model.js';
+
+export interface CatalogFiles {
+  readonly layout: SessionFileLayout;
+  readonly directory: Stats;
+  readonly stats: readonly [Stats, Stats, Stats];
+  readonly version: string;
+}
+
+export async function locateCatalogFiles(store: SessionStoreLayout, id: string, signal?: AbortSignal, onSource?: (target: string) => void): Promise<CatalogFiles | undefined> {
+  signal?.throwIfAborted();
+  if (validateSessionId(id) !== id || id === '.' || id === '..') throw new Error('Invalid session identity.');
+  for (const sessionsDir of store.sessionsSearchDirs) {
+    signal?.throwIfAborted();
+    onSource?.(sessionsDir);
+    const layout = projectSessionFileLayout({ sessionsDir, sessionId: id });
+    onSource?.(layout.sessionDir);
+    let directory: Stats;
+    try { directory = await lstat(layout.sessionDir); }
+    catch (error) {
+      signal?.throwIfAborted();
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+      throw error;
+    }
+    if (!directory.isDirectory()) throw new Error('Session directory is unavailable.');
+    const stats: Stats[] = [];
+    for (const file of [layout.metadataPath, layout.statePath, layout.transcriptPath]) {
+      signal?.throwIfAborted();
+      const stat = await lstat(file);
+      if (!stat.isFile() || !Number.isSafeInteger(stat.size) || stat.size < 0) throw new Error('Session file is unavailable.');
+      stats.push(stat);
+    }
+    signal?.throwIfAborted();
+    return { layout, directory, stats: stats as [Stats, Stats, Stats],
+      version: JSON.stringify([layout.sessionDir, directory.dev, directory.ino, ...stats.map(fileVersion)]) };
+  }
+  return undefined;
+}
+
+function fileVersion(stat: Stats): readonly number[] {
+  return [stat.dev, stat.ino, stat.mode, stat.size, stat.mtimeMs, stat.ctimeMs];
+}
+
+/** A finite acquisition bound, checked against the opened object as well as its path. */
+export async function readCatalogFile(target: string, expected: Stats, limit: number, signal?: AbortSignal): Promise<string | undefined> {
+  signal?.throwIfAborted();
+  if (expected.size > limit) return undefined;
+  const handle = await open(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  try {
+    signal?.throwIfAborted();
+    const before = await handle.stat();
+    if (JSON.stringify(fileVersion(before)) !== JSON.stringify(fileVersion(expected))) throw new Error('Session changed while reading.');
+    const bytes = Buffer.alloc(expected.size);
+    let offset = 0;
+    while (offset < bytes.length) {
+      signal?.throwIfAborted();
+      const read = await handle.read(bytes, offset, Math.min(CATALOG_LIMITS.readChunkBytes, bytes.length - offset), offset);
+      if (!read.bytesRead) throw new Error('Session changed while reading.');
+      offset += read.bytesRead;
+    }
+    signal?.throwIfAborted();
+    const after = await handle.stat();
+    if (JSON.stringify(fileVersion(after)) !== JSON.stringify(fileVersion(expected))) throw new Error('Session changed while reading.');
+    return bytes.toString('utf8');
+  } finally {
+    await handle.close();
+  }
+}

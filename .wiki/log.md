@@ -6339,3 +6339,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-07] feat | Phase 19 SES-01 current 身份与范围：运行时 ID 聚焦、最近 40 条外纳入、项目/content 过滤、动作前复验与 metadata ID 防混淆、窄屏标记及拒绝说明；Node 20.3 构建/188 项、三组反转、两模式实际 PTY/切换、独立 APPROVE/CLEAR、五 gates/43 scripts/NormProof 0 blocking 通过。SES-02 同步全列表替换继续；上批 eba69f51 远端 CI/Watch 因账单限制零步骤失败，未计通过。详见 features/phase-19-decisions.md §8.103。
 
 ## [2026-10-07] feat | Phase 19 SES-02 核心会话文件大小：实际 layout 异步双采样、41 项/4 路预算、complete/partial/unknown、取消排空、逻辑大小替换 turns；构建/279 项、四组反转、两模式实际 PTY、独立 APPROVE/CLEAR、五 gates/43 scripts/NormProof 0 blocking 通过。完整列表与索引仍待替换，SES-02 未完成；891bfd72 远端 CI/Watch 仍因账单零步骤失败。详见 features/phase-19-decisions.md §8.104。
+
+## [2026-10-07] feat | Phase 19 SES-02 默认 resume 与补全采用 current-first 增量摘要目录、受限正文读取及版本缓存；渐进结果保留可见 incomplete 和同草稿选择。修复审查发现的 BOM/扫描缓存淘汰及实际 PTY 状态隐藏问题。最新构建/212 项、七组有效反转、两模式实际 CLI 及独立 APPROVE/CLEAR 通过；全局发现仍枚举历史，显式完整读取 API 保留。a1df2e84 远端 CI/Watch 因账单零步骤失败；SES-03 与完整阶段继续，详见 features/phase-19-decisions.md §8.105。

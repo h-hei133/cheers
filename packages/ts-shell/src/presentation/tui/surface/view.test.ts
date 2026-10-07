@@ -291,6 +291,21 @@ describe("frame composition", () => {
     expect(rows[rows.length - 1]).toContain("press ctrl+c again");
   });
 
+  it('keeps incomplete completion status visible beside selectable candidates at narrow and short sizes', () => {
+    const { view, live } = surface({ hintStatus: () => ({ completion: 'Results incomplete: unreadable sources' }) });
+    view.editor.setText('/resume Rec');
+    view.suggestions.setItems(Array.from({ length: 20 }, (_, index) => ({ label: `Recent ${index}`, value: `session-${index}` })));
+    view.setSuggesting(true);
+    for (const rows of [18, 6]) {
+      const rendered = frame(view, { columns: 40, rows });
+      expect(rendered.some(row => row.includes('Recent'))).toBe(true);
+      expect(rendered.some(row => row.includes('Results incomplete'))).toBe(true);
+      expect(rendered).toHaveLength(rows);
+    }
+    live.cancelArmed = true;
+    expect(frame(view).join('\n')).toContain('press ctrl+c again');
+  });
+
   it("reports where the composer was drawn", () => {
     const { view } = surface();
     view.editor.insert("draft");

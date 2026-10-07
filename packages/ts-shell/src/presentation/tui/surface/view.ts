@@ -213,7 +213,9 @@ export class InteractiveSurface implements InteractiveView {
     );
     const composerRows = highlightComposer(composerLayout, this.context.composerSelection?.());
     let remaining = chromeCapacity - composerRows.length;
-    const suggestionRows = this.suggestionsOpen ? this.suggestions.render(width, remaining) : [];
+    const hintStatus = this.context.hintStatus?.();
+    const completionStatus = hintStatus?.completion;
+    const suggestionRows = this.suggestionsOpen ? this.suggestions.render(width, Math.max(0, remaining - Number(!!completionStatus))) : [];
     remaining -= suggestionRows.length;
     // The search bar takes the hint row rather than adding one: an open search is
     // itself the hint, and the composer above it is where the user's text lives, so
@@ -226,7 +228,8 @@ export class InteractiveSurface implements InteractiveView {
           cancelArmed: this.context.cancelArmed(),
           queued: this.context.queuedCount(),
           steering: this.context.steeringCount?.() ?? 0,
-          toast: this.context.toast?.(),
+          toast: hintStatus?.toast ?? this.context.toast?.(),
+          completionStatus,
         },
         this.context.ambient(),
         width,

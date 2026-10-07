@@ -47,13 +47,17 @@ export function readTranscript(transcriptPath: string): ReadTranscript {
   if (!fs.existsSync(transcriptPath)) {
     return { version: 0, events: [], unreadableLines: 0, warnings: [] };
   }
+  return parseTranscript(fs.readFileSync(transcriptPath, "utf8"));
+}
 
+/** Decode already acquired text through the same compatibility rules as replay. */
+export function parseTranscript(text: string): ReadTranscript {
   const events: TranscriptEvent[] = [];
   let header: TranscriptHeader | undefined;
   let lineNumber = 0;
   let unreadableLines = 0;
   const warnings = new Set<string>();
-  for (const line of fs.readFileSync(transcriptPath, "utf8").split("\n")) {
+  for (const line of text.split("\n")) {
     if (!line) continue;
     const decoded = classifyTranscriptLine(line);
     if (decoded.kind === "header") {

@@ -39,7 +39,7 @@ describe("navigation candidate positions", () => {
 });
 
 describe("navigation catalog read ownership", () => {
-  it("uses persisted IDs and leaves session, branch and transcript bytes unchanged", () => {
+  it("uses persisted IDs and leaves session, branch and transcript bytes unchanged", async () => {
     const manager = new SessionManager();
     const session = manager.createNew(root);
     manager.addTurn(session.id, { role: "user", content: "Catalog first question" });
@@ -49,23 +49,36 @@ describe("navigation catalog read ownership", () => {
     const layout = locateExistingSessionLayout(createSessionStoreLayout(), session.id);
     const files = [layout.metadataPath, layout.statePath, layout.transcriptPath];
     const before = files.map(file => ({ bytes: fs.readFileSync(file), mtime: fs.statSync(file).mtimeMs }));
-    expect(navigationCatalog("session", context, manager)).toContainEqual(expect.objectContaining({ value: session.id, label: "Catalog title" }));
-    expect(navigationCatalog("entry", context, manager).map(item => item.value)).toEqual(manager.getTranscriptEvents(session.id).flatMap(event => event.id ? [event.id] : []));
+    expect(await navigationCatalog("session", context, manager)).toContainEqual(expect.objectContaining({ value: session.id, label: "Catalog title" }));
+    expect((await navigationCatalog("entry", context, manager)).map(item => item.value)).toEqual(manager.getTranscriptEvents(session.id).flatMap(event => event.id ? [event.id] : []));
     const actual = navigation.readSessionNavigation(session.id, root);
-    expect(navigationCatalog("thread", context, manager).map(item => item.value)).toEqual(actual.thread.entries.map(entry => entry.id));
-    expect(navigationCatalog("tree", context, manager).map(item => item.value)).toEqual(actual.points.filter(point => !point.unavailable).map(point => point.entryId));
+    expect((await navigationCatalog("thread", context, manager)).map(item => item.value)).toEqual(actual.thread.entries.map(entry => entry.id));
+    expect((await navigationCatalog("tree", context, manager)).map(item => item.value)).toEqual(actual.points.filter(point => !point.unavailable).map(point => point.entryId));
     files.forEach((file, index) => {
       expect(fs.readFileSync(file)).toEqual(before[index]!.bytes);
       expect(fs.statSync(file).mtimeMs).toBe(before[index]!.mtime);
     });
   });
 
-  it("never offers an unavailable navigation target", () => {
+  it("never offers an unavailable navigation target", async () => {
     vi.spyOn(navigation, "readSessionNavigation").mockReturnValue({ thread: { entries: [] }, points: [
       { entryId: "safe", label: "safe branch", current: false, depth: 0 },
       { entryId: "broken", label: "broken branch", current: false, depth: 0, unavailable: "broken ancestry" },
     ] } as ReturnType<typeof navigation.readSessionNavigation>);
     const context = { session: { id: "fixture" }, cwd: root } as ShellRuntimeContext;
-    expect(navigationCatalog("tree", context, {} as SessionManager).map(item => item.value)).toEqual(["safe"]);
+    expect((await navigationCatalog("tree", context, {} as SessionManager)).map(item => item.value)).toEqual(["safe"]);
+  });
+
+  it('keeps valid session candidates and a partial notice when another stored record is unreadable', async () => {
+    const manager = new SessionManager(); const session = manager.createNew(root);
+    manager.addTurn(session.id, { role: 'user', content: 'Known saved conversation' });
+    const other = manager.createNew(root + '-other');
+    fs.writeFileSync(locateExistingSessionLayout(createSessionStoreLayout(), other.id).metadataPath, 'invalid');
+    const context = { session, cwd: root, projectRoot: root } as ShellRuntimeContext;
+    const progress = vi.fn();
+    const suggestions = await navigationCatalog('session', context, manager, undefined, undefined, progress);
+    expect(suggestions.map(item => item.value)).toContain(session.id);
+    expect(progress.mock.calls[0]?.[0]).toMatchObject({ status: expect.stringContaining('incomplete') });
+    expect(progress.mock.lastCall?.[0]).toMatchObject({ status: expect.stringContaining('1 unreadable') });
   });
 });

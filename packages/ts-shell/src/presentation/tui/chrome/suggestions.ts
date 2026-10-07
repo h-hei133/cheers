@@ -76,12 +76,14 @@ export class SuggestionList {
   private moved = false;
   private renderedItems: readonly Suggestion[] = [];
 
-  /** Replace the candidate set, keeping the selection in range. */
+  /** Keep an explicit selection through progress updates for the same draft and edit. */
   setItems(items: readonly Suggestion[]): void {
+    const selected = this.moved ? this.current() : undefined;
+    const retained = selected?.edit ? items.findIndex(item => item.value === selected.value && sameEdit(item.edit, selected.edit)) : -1;
     this.renderedItems = [];
     this.items = items;
-    this.selected = Math.min(this.selected, Math.max(0, items.length - 1));
-    this.moved = false;
+    this.selected = retained >= 0 ? retained : Math.min(this.selected, Math.max(0, items.length - 1));
+    this.moved = retained >= 0;
     this.scrollToSelection();
   }
 
@@ -167,4 +169,10 @@ export class SuggestionList {
     else if (this.selected >= this.offset + MAX_VISIBLE) this.offset = this.selected - MAX_VISIBLE + 1;
     this.offset = Math.max(0, Math.min(this.offset, Math.max(0, this.items.length - MAX_VISIBLE)));
   }
+}
+
+function sameEdit(left: DraftEdit | undefined, right: DraftEdit | undefined): boolean {
+  return !!left && !!right && left.snapshot.revision === right.snapshot.revision
+    && left.snapshot.text === right.snapshot.text && left.snapshot.cursor === right.snapshot.cursor
+    && left.from === right.from && left.to === right.to && left.text === right.text && left.cursorOffset === right.cursorOffset;
 }
