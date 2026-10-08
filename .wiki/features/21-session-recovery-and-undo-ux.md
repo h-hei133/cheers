@@ -158,15 +158,15 @@ pi 的 [session-selector.ts](../../../pi/packages/coding-agent/src/modes/interac
 
 ## 4. `/undo`：最近已提交编辑操作的安全恢复
 
-### 4.1 当前事实与安全缺口
+### 4.1 修复前事实与安全缺口
 
-[runUndoCommand](../../packages/ts-shell/src/core/commands/undoCommandRuntime.ts#L26) 当前只描述最近快照并打印 `/restore execute ...`，不会恢复文件。`latestEdit` 扫工作区默认 ledger 的所有 authority，按 `createdAt` 取最新，没有当前 session 过滤。
+修复前的 `runUndoCommand` 只描述最近快照并打印 `/restore execute ...`，不会恢复文件。旧 `latestEdit` 扫工作区默认 ledger 的所有 authority，按 `createdAt` 取最新，没有当前 session 过滤；该实现已由 §4.8 的 operation owner 取代。
 
 [editSnapshot.defaultAuthorityId](../../packages/ts-shell/src/edit/recovery/editSnapshot.ts#L191) 默认生成含时间/随机散列的 authority；随机 ID 本身不是污染根因，**缺少归属、提交状态与操作分组**才使测试/外部脚本的快照有机会成为用户候选。只过滤 `.tmp` 路径不能证明记录属于本会话。
 
 [recoveryAuthorityStore.ts](../../packages/ts-shell/src/edit/recovery/recoveryAuthorityStore.ts#L40) 的记录是写前快照，不证明后续编辑成功。只加 `sessionId` 仍不能区分捕获后未写、部分写入、已提交、已撤销或未知操作。
 
-原 [restorePrimitive.ts](../../packages/ts-shell/src/edit/recovery/restorePrimitive.ts) 的异步 blob 读取后竞争窗口已由 EDIT-01 修复：先准备内容，再在共享文件锁内检查目标，交给共同 guarded committer 做最后检查及写后核验。旧无归属记录保留显式恢复；带 operation 归属的快照必须经过收据与批准路径，不能直接调用旧 primitive。`/undo` 交互仍归 EDIT-03，跨文件非原子且不自动重放未知写入。
+原 [restorePrimitive.ts](../../packages/ts-shell/src/edit/recovery/restorePrimitive.ts) 的异步 blob 读取后竞争窗口已由 EDIT-01 修复：先准备内容，再在共享文件锁内检查目标，交给共同 guarded committer 做最后检查及写后核验。旧无归属记录保留显式恢复；带 operation 归属的快照必须经过收据与批准路径，不能直接调用旧 primitive。`/undo` 交互见 §4.8，跨文件非原子且不自动重放未知写入。
 
 ### 4.2 用户已确认的操作单位
 
@@ -230,6 +230,12 @@ Codex 的 [app_backtrack.rs](../../../codex/codex-rs/tui/src/app_backtrack.rs) �
 [预览](../../packages/ts-shell/src/edit/recovery/operation/preview.ts)和[恢复](../../packages/ts-shell/src/edit/recovery/operation/restore.ts)绑定完整批准 revision，重新校验 blob、归属、授权及当前版本，稳定锁住整个目标集合后持久 undo intent，再逐文件提交及保存结果。中断 intent/unknown 可重启读取，不能自动重放。旧 restore 保留 dry-run，writer 后异常显示 unknown/partial；审批路径遵守工作区及 read/write/edit deny rules。
 
 [共同文件提交](../../packages/ts-shell/src/edit/authority/commit.ts)拒绝所有路径组件 symlink、非普通文件和无效 UTF-8，保留精确 BOM/CRLF 与普通权限位。Linux 使用打开目录固定目标、临时文件 fsync、更新 rename 或创建 exclusive link；快照/收据/锁目录共享同一边界。没有通用跨进程内容 CAS 或跨文件崩溃原子性；macOS fallback 尚无原生运行证据。完整定向验证、有效反转、独立 APPROVED 与两模式实际 CLI 证据见 [决策 §8.109](phase-19-decisions.md#8109-edit-01已提交操作收据与安全恢复底座)。本节没有将多文件 `apply_patch` 或 `/undo` 面板列为完成。
+
+### 4.8 EDIT-03 预览、确认与结果面板已实施（2026-10-08）
+
+裸 `/undo` 复用当前会话/工作区的已提交 operation，先打开 [chooser](../../packages/ts-shell/src/cli/interactive/picker/undo.ts)，Review 展示所有目标、diff、hash/mode、rename 关系与冲突；关闭 reader 仍停在默认 Cancel，明确 Restore 才写入。较新 partial/unknown 保持 barrier，历史无归属快照不被认领。超过 64 KiB 的文本显示围绕实际变化的明确 excerpt，并保留全部目标和版本信息；不把 excerpt 当完整 diff。
+
+直达语法为 `/undo preview`、`/undo status [operation-id]`、`/undo execute <operation-id> <preview-revision> --execute`；缺显式 flag 只提示等待确认，过期 revision、变化的身份/权限、忙碌与外改拒绝。保存结果可重启查看，恢复事实同步到后续模型上下文并提示重读；上下文保存失败保留文件实际结果及 warning。Node 20.3 构建、144 项、结果契约 149 项、七组有效反转和两模式实际 CLI 的精确证据见 [决策 §8.111](phase-19-decisions.md#8111-edit-03当前操作的预览确认与持久结果)。现有平台与跨文件保证边界仍保留。
 
 ## 5. 双 Esc 与会话导航反馈
 

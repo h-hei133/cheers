@@ -56,6 +56,7 @@ import { couldBeFileReference } from "./fileSuggestions.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
 import { TurnSink } from "./turnSink.js";
 import { reportWriter, reportSaveNotice } from '../output/reports.js';
+import { undoPickerHost } from '../runtime/undo.js';
 import { updateAppearance } from "../../presentation/theme/selection.js";
 import { followTheme, type ThemeFollower } from "../../presentation/themes/watch.js";
 import { themePreferences } from "../../presentation/theme/preview.js";
@@ -779,7 +780,6 @@ export class InteractiveMode {
     void picker
       .apply(ids)
       .then((outcome) => {
-        if (outcome?.next && !this.stopped && this.overlay.revision === revision) this.overlay.open(outcome.next);
         if (outcome?.note) {
           this.state.transcript.append(textBlock("command", outcome.note, picker.title));
         }
@@ -797,6 +797,7 @@ export class InteractiveMode {
           this.view.setSuggesting(false);
           this.completionStatus = slashArgumentHint(this.state.editor.snapshot());
         }
+        if (outcome?.next && !this.stopped && this.overlay.revision === revision) this.overlay.open(outcome.next);
       })
       .catch((error: unknown) => {
         this.state.transcript.append(
@@ -833,6 +834,7 @@ export class InteractiveMode {
         refreshRuntimeConfig: () => refreshShellRuntimeConfig(this.options.runtimeContext),
         cwd: this.options.runtimeContext.cwd,
         sessionId: this.options.runtimeContext.session.id,
+        workspaceRoots: this.options.runtimeContext.session.workspaceRoots,
         ...(this.options.runtimeContext.skillOptions
           ? { skillOptions: this.options.runtimeContext.skillOptions }
           : {}),
@@ -846,6 +848,8 @@ export class InteractiveMode {
       approvalTrustPolicy: this.options.approvalTrustPolicy,
       projectRoot: this.options.runtimeContext.projectRoot,
       statusItems: this.statusItems,
+      undo: undoPickerHost({ runtimeContext: this.options.runtimeContext, sessionManager: this.options.sessionManager,
+        busy: () => this.stopped || this.closing || (this.busy && !this.pickerPending) || this.options.sessionRuntime.getCurrentRunController() !== null }),
       ...sessionPickerHost({ runtimeContext: this.options.runtimeContext, sessionManager: this.options.sessionManager,
         busy: () => this.stopped || this.closing || (this.busy && !this.pickerPending) || this.options.sessionRuntime.getCurrentRunController() !== null,
         resume: sessionId => this.runCommandLine(`/resume ${sessionId}`),

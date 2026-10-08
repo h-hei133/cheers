@@ -54,6 +54,7 @@ import { runTrustCommand } from "./trustCommandRuntime.js";
 import { runInitCommand } from "./initCommandRuntime.js";
 import { runCostCommand } from "./costCommandRuntime.js";
 import { runUndoCommand } from "./undoCommandRuntime.js";
+import { undoSyntax } from './undo/syntax.js';
 import { runExportCommand } from "./exportCommandRuntime.js";
 import { runEntriesCommand } from "./entriesCommandRuntime.js";
 import { runTreeCommand } from "./treeCommandRuntime.js";
@@ -494,8 +495,10 @@ export function createCommandRegistry(
       // Names the files it reports, not the conversation. `rewind` and `revert`
       // used to be aliases here, which sent anyone asking to go back in the
       // conversation to a report about files. Going back is `/back`.
-      summary: "report the most recent file edit and the command to revert it",
+      summary: "preview, confirm or inspect this session’s recorded file undo",
       group: "session",
+      argumentHint: syntaxHint(undoSyntax),
+      getArgumentCompletions: prefix => syntaxCompletions(undoSyntax, prefix),
       execute: (args, context) => runUndoCommand(args, context),
     },
     {

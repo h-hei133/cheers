@@ -120,6 +120,8 @@ export interface LocalCommandResult {
   readonly report?: CommandReport
   /** State changed by this command, recorded with its result for session replay. */
   readonly state?: Record<string, unknown>
+  /** Independently durable results may still render with this warning if replay publication fails. */
+  readonly stateFailureWarning?: string
 }
 
 export interface PromptCommandResult {

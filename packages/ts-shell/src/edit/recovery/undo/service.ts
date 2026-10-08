@@ -1,0 +1,66 @@
+import type { CommandContext } from '../../../core/commands/types.js';
+import { restoreAccess } from '../../../core/commands/restore/access.js';
+import { markContextUnknown } from '../../../observability/usageTelemetry.js';
+import { captureOperationScope, readOperations } from '../operation/store.js';
+import { latestOperation, previewOperation, type UndoPreview } from '../operation/preview.js';
+import { restoreOperation, type UndoResult } from '../operation/restore.js';
+import type { OperationAccess } from '../operation/access.js';
+import type { OperationScope, OperationReceipt } from '../operation/model.js';
+
+export interface UndoHost {
+  context(): CommandContext;
+  busy?(): boolean;
+  publish?(result: UndoResult, receipt: OperationReceipt): void;
+}
+
+export interface UndoSelection {
+  readonly preview?: UndoPreview;
+  readonly note: string;
+}
+
+export function undoScope(context: CommandContext): OperationScope {
+  const blocked = context.admission?.();
+  if (blocked) throw new Error(blocked);
+  if (!context.sessionId) throw new Error('Undo requires the current saved session.');
+  return captureOperationScope({ sessionId: context.sessionId, workspaceRoot: context.projectRoot ?? context.cwd });
+}
+
+export function undoAccess(context: CommandContext, abortSignal?: AbortSignal): OperationAccess {
+  return { workspaceRoots: context.workspaceRoots, admission: context.admission, assertFileAccess: restoreAccess(context), abortSignal };
+}
+
+/** Only the current scoped ledger participates; unresolved newer operations remain barriers. */
+export async function prepareUndo(context: CommandContext, signal?: AbortSignal): Promise<UndoSelection> {
+  signal?.throwIfAborted();
+  const scope = undoScope(context);
+  const receipt = latestOperation(scope);
+  if (!receipt) return { note: 'Nothing to undo. No un-restored committed file operation belongs to this session and workspace.' };
+  const preview = await previewOperation(receipt, undoAccess(context, signal));
+  signal?.throwIfAborted();
+  if (JSON.stringify(undoScope(context)) !== JSON.stringify(scope)) throw new Error('Undo context changed during preview.');
+  return { preview, note: preview.canRestore ? 'Review every file before confirming restoration.'
+    : 'This operation requires inspection. Its blocked or unknown results cannot be replayed automatically.' };
+}
+
+export function undoHistory(context: CommandContext) { return readOperations(undoScope(context)); }
+
+export async function executeUndo(host: UndoHost, preview: UndoPreview, confirmed: boolean): Promise<{ readonly result: UndoResult; readonly warning?: string }> {
+  const original = preview.receipt;
+  let result: UndoResult;
+  try {
+    const context = host.context();
+    const scope = undoScope(context);
+    if (host.busy?.() || scope.sessionId !== original.sessionId || scope.workspace.path !== original.workspace.path
+      || scope.workspace.identity !== original.workspace.identity) throw new Error('Undo context changed.');
+    result = await restoreOperation(preview, confirmed ? { operationId: original.operationId, sessionId: original.sessionId,
+      workspaceIdentity: original.workspace.identity, revision: preview.revision } : undefined, undoAccess(context));
+  } catch {
+    result = { status: confirmed ? 'blocked' : 'denied', operationId: original.operationId,
+      files: original.files.map(file => ({ path: file.path, status: file.undo })) };
+  }
+  if (['restored-verified', 'partial', 'unknown'].includes(result.status)) {
+    try { markContextUnknown(original.sessionId); host.publish?.(result, original); }
+    catch { return { result, warning: 'File results remain in the operation receipt; the model context update could not be confirmed.' }; }
+  }
+  return { result };
+}

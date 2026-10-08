@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { validateToolArguments } from '../../core/tools/arguments.js';
 import { neutraliseForDisplay } from '../../core/text/safety.js';
-import { createUnifiedDiff } from '../../presentation/tui/transcript/diff.js';
+import { editDiff } from '../result/diff.js';
 import type { ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '../../tools/types.js';
 import { EditOperationError } from '../recovery/operation/write.js';
 import { readOperation } from '../recovery/operation/store.js';
@@ -22,7 +22,7 @@ export function createPatchToolDefinition(): ToolDefinition {
       const targets = Object.freeze(plan.files.map(file => Object.freeze({ path: path.join(file.workspaceRoot, file.relativePath), operation: file.content === undefined ? 'delete' as const : 'write' as const })));
       const preview = ['Patch plan', `Revision: ${plan.revision}`, ...plan.files.map(file => {
         const before = file.before.state === 'exists' ? file.before.content : '';
-        return `${file.content === undefined ? 'Delete' : file.rename ? 'Rename endpoint' : file.before.state === 'absent' ? 'Add' : 'Update'}: ${JSON.stringify(path.join(file.workspaceRoot, file.relativePath))}\n${safeDiff(createUnifiedDiff(file.relativePath, before, file.content ?? ''))}`;
+        return `${file.content === undefined ? 'Delete' : file.rename ? 'Rename endpoint' : file.before.state === 'absent' ? 'Add' : 'Update'}: ${JSON.stringify(path.join(file.workspaceRoot, file.relativePath))}\n${editDiff(file.relativePath, before, file.content ?? '')}`;
       }), 'Files commit separately. A later failure may require guarded compensation.'].join('\n\n');
       if (Buffer.byteLength(preview) > patchLimits.previewBytes) throw new Error('Patch preview is too large; split the operation before requesting approval.');
       return Object.freeze({ targets, preview, execute: async (actual: ToolExecutionContext) => {
@@ -49,10 +49,4 @@ function projectResult(receipt: import('../recovery/operation/model.js').Operati
   const lines = files.map(file => `${JSON.stringify(file.path)}: ${file.status}${file.compensation === 'none' ? '' : `, compensation ${file.compensation}`}`);
   return { success: status === 'committed', output: `Patch ${receipt.operationId}: ${status}.\n${lines.map(neutraliseForDisplay).join('\n')}`,
     metadata: { operationId: receipt.operationId, status, files, rollbackAtomicityClaim: false } };
-}
-
-function safeDiff(diff: string): string {
-  return diff.split('\n').map(line => /^[ +\-]/.test(line)
-    ? line[0] + JSON.stringify(line.slice(1)).replace(/[\u0080-\u009f\u2028\u2029]/g, character => `\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`)
-    : neutraliseForDisplay(line)).join('\n');
 }

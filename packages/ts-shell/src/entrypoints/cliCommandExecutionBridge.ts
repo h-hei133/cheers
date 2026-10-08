@@ -28,7 +28,7 @@ import type { CompactLiveCheckpointStore } from "../context/compact/checkpoint/c
 import type { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
 import type { ReportWriter } from '../session/reports/model.js';
-import { reportSaveNotice } from '../cli/output/reports.js';
+import { renderLocalCommand } from '../cli/output/command.js';
 
 type SlashRouteResult = Awaited<ReturnType<typeof routeSlashCommand>>;
 
@@ -167,17 +167,7 @@ export async function buildCliCommandExecution(
     browserPublicReadOnlyWebSmokeConfig,
   });
   if (slashResult?.kind === "local") {
-    if (slashResult.state) {
-      // A local action has no assistant tool call to pair with. Keep it at user
-      // authority, with replay state beside the result, through the existing sink.
-      input.onTurnMessage?.({ role: "user", content: `[Local command result]\n${slashResult.output}`, metadata: slashResult.state });
-    }
-    if (slashResult.report) input.renderer.renderReport(slashResult.report);
-    else input.renderer.renderLine(input.printMode ? slashResult.output : `\n${slashResult.output}\n`);
-    if (slashResult.report && input.onReport) {
-      const notice = reportSaveNotice(input.onReport(slashResult.report));
-      if (notice) input.renderer.renderLine(notice);
-    }
+    renderLocalCommand({ ...input, result: slashResult });
     return { kind: "handled" };
   }
 

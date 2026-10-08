@@ -26,6 +26,8 @@ import { createReport, span } from '../../core/commands/report/projection.js';
 import type { PickerOutcome } from './overlay.js';
 import { configurationBinding } from '../../core/shell/configuration.js';
 import * as management from '../../session/lifecycle/management.js';
+import * as undoService from '../../edit/recovery/undo/service.js';
+import type { UndoPreview } from '../../edit/recovery/operation/preview.js';
 
 function build(overrides: { observeEvents?: () => () => void; exit?: (code?: number) => void } = {}): {
   mode: InteractiveMode;
@@ -67,6 +69,41 @@ function build(overrides: { observeEvents?: () => () => void; exit?: (code?: num
 }
 
 describe("session wiring", () => {
+  it('shows undo preview above confirmation and requires a separate Restore selection', async () => {
+    const { mode, terminal } = build();
+    const host = mode as unknown as { overlay: OverlayHost; pager: Pager; view: InteractiveView;
+      openPicker(command: string): void };
+    const receipt = { operationId: 'op-preview', sessionId: 'sess_1', createdAt: '2026-10-08T00:00:00Z',
+      status: 'committed', undo: 'none', files: [{ path: 'a.txt', workspace: { path: '/workspace' }, kind: 'update',
+        status: 'committed', undo: 'none', before: { state: 'exists', hash: 'a'.repeat(64), mode: 0o644 },
+        after: { state: 'exists', hash: 'b'.repeat(64), mode: 0o644 } }] } as UndoPreview['receipt'];
+    const preview: UndoPreview = { receipt, revision: 'c'.repeat(64), canRestore: true, blockers: [], files: [{ file: receipt.files[0]!,
+      prepared: { content: 'before\n' } as never, current: { state: 'exists', content: 'after\n' } as never }] };
+    vi.spyOn(undoService, 'prepareUndo').mockResolvedValue({ preview, note: 'Review every file.' });
+    const restore = vi.spyOn(undoService, 'executeUndo').mockResolvedValue({ result: {
+      status: 'restored-verified', operationId: receipt.operationId, files: [{ path: 'a.txt', status: 'restored-verified' }] } });
+    mode.start();
+    try {
+      host.openPicker('/undo');
+      await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 30).join('\n'))).toContain('Review latest file operation'));
+      terminal.input('\x1b[B\r');
+      await vi.waitFor(() => expect(host.pager.active).toBe(true));
+      const report = host.view.transcript.all().find(block => block.report?.facts.status === 'preview')!;
+      expect(report.text).toContain('-"after"'); expect(report.text).toContain('+"before"');
+      expect(stripAnsi(host.overlay.render(100, 30).join('\n'))).toContain('Confirm file undo');
+      expect(restore).not.toHaveBeenCalled();
+      terminal.input('\r'); // Closing the reader leaves Cancel selected underneath.
+      expect(host.pager.active).toBe(false); expect(host.overlay.active).toBe(true);
+      terminal.input('\r'); expect(host.overlay.active).toBe(false); expect(restore).not.toHaveBeenCalled();
+      host.openPicker('/undo');
+      await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 30).join('\n'))).toContain('Review latest file operation'));
+      terminal.input('\x1b[B\r'); await vi.waitFor(() => expect(host.pager.active).toBe(true));
+      terminal.input('\r\x1b[B\x1b[B\r');
+      await vi.waitFor(() => expect(restore).toHaveBeenCalledOnce());
+      await vi.waitFor(() => expect(host.view.transcript.all().some(block => block.report?.facts.status === 'restored-verified')).toBe(true));
+    } finally { mode.stop(); vi.restoreAllMocks(); }
+  });
+
   it.each(['/new', '/clear'])('keeps the conversation and shows workspace refusal for %s without rejecting the terminal run', async command => {
     const { mode } = build();
     const host = mode as unknown as { run(text: string): Promise<void>; view: InteractiveView;

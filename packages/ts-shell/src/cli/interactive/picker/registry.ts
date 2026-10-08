@@ -25,6 +25,8 @@ import { sourcePicker } from "./sources.js";
 import { sessionPicker } from "./session.js";
 import { statusItemPicker } from "./statusItems.js";
 import { settingsPicker, type SettingsHost } from "./settings.js";
+import { undoPicker } from './undo.js';
+import type { UndoHost } from '../../../edit/recovery/undo/service.js';
 
 /**
  * Which commands open a chooser.
@@ -43,6 +45,7 @@ export interface PickerHost extends SettingsHost {
   readonly approvalTrustPolicy: ApprovalTrustPolicy;
   readonly projectRoot: string;
   readonly statusItems: readonly StatusItemId[];
+  readonly undo: UndoHost;
   sessionContext(): SessionSelectionContext;
   resumeSession(sessionId: string): Promise<string | undefined>;
   deleteSession(sessionId: string, version?: string): Promise<string | undefined>;
@@ -84,6 +87,7 @@ const PICKERS: Record<string, PickerFactory> = {
   plugin: (host) => pluginPicker(host.commandContext),
   marketplace: (host) => sourcePicker(host.commandContext),
   restore: (host) => restorePicker(host.projectRoot),
+  undo: (host) => undoPicker(host.undo),
   skill: (host) => skillPicker(host.commandContext),
   // Reachable either way: `/back`, or Escape twice on an empty prompt. The
   // gesture is fast once known; the command is how it becomes known.

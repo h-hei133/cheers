@@ -6351,3 +6351,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-08] feat | Phase 19 EDIT-01 接入 session/workspace/call 归属与已核验 operation receipt，统一普通编辑、快照和恢复的 guarded publication，固定 Linux 目录锁并保留 intent/partial/unknown。最终 Node 20.3 构建/64 项、补充后恢复验证 28 项、九组有效反转、两模式实际 CLI 收据与独立 APPROVED 通过，详见 features/phase-19-decisions.md §8.109。693eabc8 远端 CI/Watch 因账单限制零步骤失败；多文件 apply_patch、undo 面板及完整 Phase 19 继续。
 
 ## [2026-10-08] feat | Phase 19 EDIT-02 接入唯一 apply_patch，完整不可变计划审批、稳定批次锁、必需快照、快照后整批重验及真实 publication 的逆序条件补偿；保留 rename/mode、partial/unknown 和一次性 capability。Node 20.3 构建/最终 167 项、结果契约 149 项、十组有效反转/恢复后 22 项、两模式 actual CLI 与独立 APPROVED 通过，见 features/phase-19-decisions.md §8.110。9d62a64d 的远端 CI/Watch 因账单限制零步骤失败；EDIT-03 与完整 Phase 19 继续。
+
+## [2026-10-08] feat | Phase 19 EDIT-03 按当前 session/workspace 预览完整 operation，reader 关闭后默认 Cancel，明确 Restore 或精确 ID/revision/flag 才进入原 guarded 恢复链；持久 restored/partial/unknown 重启可查看，context 保存失败保留实际文件结果及 warning。Node 20.3 构建/144 项、结果契约 149 项、七组有效反转/恢复后 55 项、两模式 actual CLI、独立 APPROVED 与静态 gates/43 scripts/NormProof 0 blocking 通过，见 features/phase-19-decisions.md §8.111。a60c36d9 远端 job 因付款/额度限制零步骤失败，未计通过；W6 TOOL-01 与完整 Phase 19 继续。
