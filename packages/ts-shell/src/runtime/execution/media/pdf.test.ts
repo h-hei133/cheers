@@ -61,7 +61,7 @@ it('reads the requested native PDF pages with exact markers, no-text status, dig
 });
 
 it('classifies a real password-protected PDF without passing a password or exposing diagnostics', async () => {
-  const encrypted = await fs.readFile(new URL('./fixtures/encrypted.pdf', import.meta.url));
+  const encrypted = Buffer.from(await fs.readFile(new URL('./fixtures/encrypted.pdf.b64', import.meta.url), 'ascii'), 'base64');
   await fs.writeFile(request().absolutePath, encrypted);
   const pending = readMedia(request());
   const available = process.platform === 'linux' && ['pdfinfo', 'pdftotext', 'prlimit'].every(name => which.sync(name, { nothrow: true }));
