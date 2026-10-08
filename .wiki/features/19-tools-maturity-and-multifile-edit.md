@@ -35,6 +35,7 @@ confidence: mixed
 | `web_search` | Exa/Tavily/DDG 按配置选择，不是运行失败后的自动 failover；父 signal 替代自身期限；部分错误返回上游正文；成功体也全量读取 | 总期限、父取消、有界读取、响应 schema、错误脱敏、明确重试与提供商选择策略 |
 | `web_fetch` | 逐跳 URL 检查与正文上限；预取消信号未提前处理；hostname 规则不绑定实际连接地址 | DNS 全地址审查、连接 IP 绑定、redirect/TLS 约束、取消和解析预算，见 §3.5 |
 | `browser` | 原八动作及 tabs/tab_new/tab_select/tab_close、截图、受审批上传与显式 URL 下载；复用统一动作取消与 session artifact | Linux Node/executable 本地验收已通过；当前输入、权限、遮蔽及原生网络/平台边界见 §3.13 |
+| `desktop` | 显式 Linux X11 适配，窗口/屏幕快照、遮蔽截图、逐项批准的 focus/click/key/type 及脱敏 clipboard；复用唯一执行服务 | 原生权限/平台、人工确认遮蔽范围与取消副作用边界见 §3.14；不把 browser 当桌面能力 |
 | `todo` | 会话任务清单及持久化回放 | 勾选状态与行为完成证据分开；不由 `done` 自动证明任务成功 |
 | `task` | 前台子代理委派，可选 worktree、权限交集、递归限制；不同于 bash 的后台进程句柄 | 主子共享预算与 deadline、完整轨迹、只读委派准入；并发策略由通用调度契约承担 |
 | `ask` | 已按 Phase 19 区分回答来源与六种结果，空答不选择推荐项，中断保留已答项 | 本地实现与验证见 [裁决 §8.14](phase-19-decisions.md)；跨平台实机与远端结果另核对 |
@@ -133,7 +134,7 @@ confidence: mixed
 | 浏览器扩展 | browser 域统一 tabs、screenshot、dialog、upload/download、network policy/session 生命周期，工具入口仅适配 | 多标签隔离、导航后 ref 失效、截图证据、上传下载权限、弹窗取消和网络边界；既有八动作回归 |
 | 子代理与预算 | 通用 runner/调度与 `/goal` 的共享 admission、计量、deadline 和持久状态；默认无总 token cap，`budget N` 启用，`budget off` 移除 | 显式 cap 汇总主/子/顾问/重试且不可绕过；未设 cap 不虚构默认 100k；单请求窗口/输出/timeout/并发与安全取消仍生效；权限只能求交，研究复用该契约 |
 
-此表保留规划接口；已实施部分以裁决文档 §8 为准。TOOL-02 图片/PDF、TOOL-03 语言服务器与 TOOL-04 浏览器扩展的 Linux 本地实现见 §3.11、§3.12、§3.13；其他项没有因此变为已完成。不引入第二 runtime。
+此表保留规划接口；已实施部分以裁决文档 §8 为准。TOOL-02 图片/PDF、TOOL-03 语言服务器、TOOL-04 浏览器扩展与 TOOL-05 原生桌面的 Linux 本地实现见 §3.11–§3.14；其他项没有因此变为已完成。不引入第二 runtime。
 
 ### 3.11 图片/PDF 的当前实现边界
 
@@ -158,6 +159,14 @@ rename 仅返回不可变、零写入的 `editPlan.applyPatch = {input, expected
 执行动作沿既有 execute 审批，完整参数、项目对象和选定文档在预览关闭后仍默认 Deny；进入队列前和真正开始时重新核验绑定。上传最多四个获准 read 文件、合计 8 MiB，逐源检查附加只读根和当前 read deny；从已核验句柄取得有界固定 Buffer，上传前复验来源和页面。浏览器只接收文件名与 Buffer，不重新按文件路径读取。下载只支持显式 http(s) URL，不转发浏览器 cookie/凭据，点击或 blob 下载明确 unsupported；每跳执行浏览器 URL/DNS 地址准入，五次重定向及每响应传输/解压后各 8 MiB 限制。公共 fetch 的 public-only 策略保留。
 
 下载存入既有 session artifact，Linux 使用目录描述符锚定、独占发布、实际字节/hash 和最终对象复验；错误保留 not-published/unverified/verified 及独立 cleanup，外部替换内容不被失败补偿删除。取消后可能留存的目标及清理未知可见，清理未确认时拒绝新动作。下载的通用二进制 `.bin` 不伪读成文本；原文本 artifact 保留跨平台路径。新二进制发布在非 Linux 平台预先报告 unavailable。浏览器自身导航/原生请求仍有既有 DNS/重定向与沙箱边界，显式 URL 下载的连接约束不扩大成任意页面流量或进程 RSS 保证。准确验证记录见 [Phase 19 裁决](phase-19-decisions.md) §8.115。
+
+### 3.14 原生桌面的当前实现边界
+
+[desktop/](../../packages/ts-shell/src/desktop/) 通过既有 ExecutionService.runCommand 调用显式已安装的 xdotool/ffmpeg，可选 xclip。仅支持 Linux X11，本地 display、utility 绝对路径和可选 Xauthority 由 CHEERS_DESKTOP_* 显式选择；不继承 DISPLAY/Wayland，不自动安装、下载或开放代码执行接口。原生子进程环境仅 DISPLAY/显式 XAUTHORITY/PATH/LANG/LC_ALL，不传 loader/provider 环境。文件与 canonical 项目对象绑定到完整审批，capabilities 仅被动检查配置且可在 plan 中读取；窗口、屏幕和剪贴板读取同样需要 execute 授权。
+
+observe 显式选择 screen/window，并返回窗口/焦点、原生 frame、origin 和唯一 snapshotId。screenshot 使用该快照，捕获前后检查焦点、窗口身份与几何，PNG 最多 4 MP/2 MiB、1:1 原生像素，经现有 typed image 路径进入 provider。默认全黑且坐标不可用；只有 reviewedMasks:true 与显式最多 16 个帧内矩形才开放有用图片和 click 坐标。遮蔽范围由调用方审核，不承诺自动发现任意桌面秘密；显式空矩形列表表示审核后无遮蔽。
+
+focus/click/key/type 每项独立批准，坐标相对图片 origin，key 使用固定白名单，type 最多 16 KiB、字面字节经 stdin；输入后快照失效。clipboard 最多 64 KiB，仅返回字节数/hash，明文不进入终端、模型或普通日志。session/canonical 项目 owner 复用有界 lane；取消停止新派发、撤销排队 epoch，close 等待有界原生收尾并保留未确认状态。已发生或可能发生的外部效果不能回滚，未知清理封锁后续动作，close 不关闭用户应用窗口。无适配/原生访问权限显示 unavailable，已尝试输入失败保留 possible/confirmed；Wayland、macOS、Windows 未实现。准确验证与远端边界见 [Phase 19 裁决](phase-19-decisions.md) §8.116。
 
 ## 4. 多文件编辑：一个入口、一份计划、一个 writer
 

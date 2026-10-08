@@ -29,6 +29,7 @@ import { createWebFetchToolDefinition } from './webFetch.js'
 import { createWebSearchToolDefinition } from './webSearch.js'
 import { createLspToolDefinition } from './lsp.js'
 import { createUnifiedBrowserToolDefinition } from './browserToolUnified.js'
+import { createDesktopToolDefinition } from '../../desktop/tool.js'
 import { ShellManager } from '../shell/platform/shellManager.js'
 import { createAskToolDefinition } from './ask.js'
 import { createTodoToolDefinition } from './todoTool.js'
@@ -558,6 +559,7 @@ export function createCoreToolRegistry(options?: {
     createTodoToolDefinition(),
     createTaskToolDefinition(),
     createUnifiedBrowserToolDefinition(),
+    createDesktopToolDefinition(executionService),
   ]
 
   if (options?.skills && options.skills.size > 0) {

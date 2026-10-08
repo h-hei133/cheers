@@ -46,7 +46,7 @@ export const READ_ONLY_BROWSER_ACTIONS: Record<string, true> = {
 /** Plan eligibility only; approval and deny rules still apply to eligible calls. */
 export function toolPlanMode(name: string, tool?: ToolDefinition): "allowed" | "read-only" | "blocked" {
   if (Object.hasOwn(READ_ONLY_TOOLS, name)) return "allowed";
-  if (name === "bash" || name === "browser" || name === 'lsp') return "read-only";
+  if (name === "bash" || name === "browser" || name === 'lsp' || name === 'desktop') return "read-only";
   return tool?.mcpAnnotations?.readOnlyHint === true ? "allowed" : "blocked";
 }
 
@@ -58,6 +58,7 @@ export function planModeBlock(
 ): string | undefined {
   if (agentMode !== "plan" || toolPlanMode(name, tool) === "allowed") return undefined;
   if (name === 'lsp' && args.backend === 'scanner') return undefined;
+  if (name === 'desktop' && args.action === 'capabilities') return undefined;
   if (name === "bash" && typeof args.command === "string" && isReadOnlyBashCommand(args.command)) return undefined;
   if (name === "browser" && typeof args.action === "string" && Object.hasOwn(READ_ONLY_BROWSER_ACTIONS, args.action.toLowerCase().trim())) return undefined;
   return `Blocked: Plan mode is active. Tool '${name}' ${name === "bash" ? "with non-read-only command " : ""}is not permitted in plan mode. Press Shift+Tab to switch to build mode before executing modifications or commands.`;
@@ -93,7 +94,10 @@ export function evaluateToolPermissionScope(
   let target = "";
   let isReadOnly = false;
 
-  if (toolName === 'lsp') {
+  if (toolName === 'desktop') {
+    isReadOnly = safeArgs.action === 'capabilities'; operation = isReadOnly ? 'read' : 'execute';
+    target = `desktop:${String(safeArgs.action ?? '(no action)')}:${String(safeArgs.windowId ?? safeArgs.scope ?? 'selected snapshot')}`;
+  } else if (toolName === 'lsp') {
     isReadOnly = safeArgs.backend === 'scanner';
     operation = isReadOnly ? 'read' : 'execute';
     target = isReadOnly ? String(safeArgs.filePath ?? safeArgs.symbol ?? 'lsp scanner') : executionApprovalTarget(safeArgs, safeArgs.server, workspaceRoot);
