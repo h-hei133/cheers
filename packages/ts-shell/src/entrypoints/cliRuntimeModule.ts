@@ -10,6 +10,7 @@ import type { QueryRuntimeStateSeed } from "../core/query/runtime/state.js";
 import { runResumeLikeShellAction } from "../core/shell/continueShellActionRuntime.js";
 import { toolPoolFor } from "../cli/runtime/tools.js";
 import { goalCommandFor, goalPolicyFor } from '../cli/runtime/goal.js';
+import { schedulerForRuntime } from '../cli/runtime/goalScheduling.js';
 import { reportWriter } from '../cli/output/reports.js';
 import { runSessionManagement } from '../cli/runtime/management.js';
 import {
@@ -290,6 +291,7 @@ export async function runNonInteractivePrompt(options: {
     },
   });
   if (resolved.kind === "handled") {
+    await schedulerForRuntime(options.sessionRuntime)?.wait();
     return;
   }
   if (resolved.kind === "shell-action") {
@@ -447,6 +449,7 @@ export async function runNonInteractivePrompt(options: {
 }
 
 export async function executeResolvedPromptTurn(options: {
+  promptMetadata?: Record<string, unknown>;
   source: "interactive" | "non-interactive";
   effectivePrompt: string;
   /** Images that travelled with the prompt; see `PromptAttachments`. */
@@ -548,6 +551,7 @@ export async function executeResolvedPromptTurn(options: {
           runtimeSeed: options.runtimeSeed,
           continuityState: continuitySnapshot,
           ...(options.attachments ? { attachments: options.attachments } : {}),
+          ...(options.promptMetadata ? { promptMetadata: options.promptMetadata } : {}),
         },
       );
     } finally {

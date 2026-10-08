@@ -14,6 +14,8 @@ import { GoalWriteError, type GoalAction, type GoalScope, type GoalWriteState, t
 import { transitionGoal } from './state.js';
 import { decodeRequestLedger } from '../../core/agent/request/codec.js';
 import { createRequestLedger, initializeRequestScope } from '../../core/agent/request/ledger.js';
+import type { SessionStateSnapshot } from '../../session/schema/sessionStateSnapshot.js';
+import { GoalRunError } from './run/model.js';
 
 export interface GoalStoreHost {
   readonly getSessionDirPath: (sessionId: string) => string;
@@ -21,7 +23,8 @@ export interface GoalStoreHost {
 
 class GoalEdit {
   constructor(readonly layout: SessionFileLayout, readonly directoryIdentity: string, readonly scope: GoalScope,
-    readonly goal: SessionGoal | undefined, readonly rawGoal: unknown, readonly requestLedger?: unknown) { freezeDeep(this); }
+    readonly goal: SessionGoal | undefined, readonly rawGoal: unknown, readonly requestLedger: unknown,
+    readonly state: SessionStateSnapshot) { freezeDeep(this); }
 }
 export type SessionGoalEdit = GoalEdit;
 
@@ -31,7 +34,7 @@ export function readGoalEdit(host: GoalStoreHost, session: Session): SessionGoal
     const version = readSessionFileVersion(layout);
     const current = readCurrent(layout, session);
     if (readSessionFileVersion(layout) !== version) throw new GoalWriteError('conflict');
-    return new GoalEdit(layout, directoryIdentity(layout), current.scope, current.goal, current.state.goal, current.state.requestLedger);
+    return new GoalEdit(layout, directoryIdentity(layout), current.scope, current.goal, current.state.goal, current.state.requestLedger, current.state);
   } catch (error) {
     throw error instanceof GoalWriteError ? error : new GoalWriteError('unavailable');
   }
@@ -39,6 +42,23 @@ export function readGoalEdit(host: GoalStoreHost, session: Session): SessionGoal
 
 /** Change only the goal under the store's existing lock, preserving the latest other fields. */
 export function writeGoal(host: GoalStoreHost, session: Session, baseline: SessionGoalEdit, action: GoalAction): SessionGoalEdit {
+  return publishGoal(host, session, baseline, (current, scope) => transitionGoal(current, scope, action), action.type === 'set' || action.type === 'import');
+}
+
+/** Internal scheduling transitions use the same identity, comparison, lock and publication checks. */
+export function updateGoalScheduling(host: GoalStoreHost, session: Session, baseline: SessionGoalEdit,
+  update: (goal: SessionGoal, state: SessionStateSnapshot) => SessionGoal): SessionGoalEdit {
+  return publishGoal(host, session, baseline, (goal, _scope, state) => {
+    if (!goal || !goalMatchesScope(goal, baseline.scope)) throw new GoalWriteError('conflict');
+    const changed = update(goal, state);
+    if (changed.id !== goal.id || !decodeGoal(changed)) throw new GoalWriteError('invalid');
+    return changed;
+  }, false);
+}
+
+function publishGoal(host: GoalStoreHost, session: Session, baseline: SessionGoalEdit,
+  update: (goal: SessionGoal | undefined, scope: GoalScope, state: SessionStateSnapshot) => SessionGoal | undefined,
+  initializesLedger: boolean): SessionGoalEdit {
   if (!(baseline instanceof GoalEdit)) throw new GoalWriteError('invalid');
   let outcome: GoalWriteState = 'unchanged';
   let failure: GoalWriteError['code'] = 'lock-failed';
@@ -51,10 +71,10 @@ export function writeGoal(host: GoalStoreHost, session: Session, baseline: Sessi
       const current = readCurrent(layout, session);
       if (directoryIdentity(layout) !== baseline.directoryIdentity || !sameValue(current.scope, baseline.scope)
         || !sameValue(current.state.goal, baseline.rawGoal)) throw new GoalWriteError('conflict');
-      const goal = transitionGoal(current.goal, current.scope, action);
+      const goal = update(current.goal, current.scope, current.state);
       if (sameValue(goal, current.goal)) return;
       let requestLedger = current.state.requestLedger;
-      if (goal && (action.type === 'set' || action.type === 'import')) {
+      if (goal && initializesLedger) {
         const binding = { sessionId: session.id, sessionCreatedAt: session.createdAt, directoryIdentity: baseline.directoryIdentity };
         const ledger = requestLedger === undefined ? createRequestLedger(binding) : decodeRequestLedger(requestLedger);
         if (!ledger || ledger.sessionId !== binding.sessionId || ledger.sessionCreatedAt !== binding.sessionCreatedAt
@@ -75,11 +95,12 @@ export function writeGoal(host: GoalStoreHost, session: Session, baseline: Sessi
       const persisted = readCurrent(layout, session);
       if (!sameValue(persisted.state, next) || !sameValue(persisted.scope, current.scope)
         || directoryIdentity(layout) !== baseline.directoryIdentity) throw new GoalWriteError('verification-failed', 'unknown');
-      confirmed = new GoalEdit(layout, baseline.directoryIdentity, persisted.scope, persisted.goal, persisted.state.goal, persisted.state.requestLedger);
+      confirmed = new GoalEdit(layout, baseline.directoryIdentity, persisted.scope, persisted.goal, persisted.state.goal, persisted.state.requestLedger, persisted.state);
       outcome = 'persisted'; failure = 'lock-failed';
     }, { createParent: false, recovery: 'local-dead' });
     return confirmed;
   } catch (error) {
+    if (error instanceof GoalRunError && outcome === 'unchanged') throw error;
     throw new GoalWriteError(error instanceof GoalWriteError ? error.code : failure, outcome);
   }
 }

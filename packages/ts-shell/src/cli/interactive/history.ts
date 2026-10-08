@@ -39,6 +39,10 @@ export function restoreConversation(turns: readonly SessionMessage[], reports: r
   const respondedToolIds = new Set<string>();
   for (const turn of turns) {
     if (turn.role === "user") {
+      if (turn.metadata?.source === 'goal-continuation') {
+        blocks.push(textBlock('notice', `Goal continuation (round ${String(turn.metadata.round)}).`));
+        continue;
+      }
       const content = messageToText(turn.content).trim();
       if (content) {
         blocks.push(textBlock("user", content));

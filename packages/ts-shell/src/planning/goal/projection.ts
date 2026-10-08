@@ -2,6 +2,7 @@ import type { StoredGoal } from '../../core/state/projectState.js';
 import { goalIsDetached, type SessionGoalEdit } from './store.js';
 import { decodeRequestLedger } from '../../core/agent/request/codec.js';
 import { requestLedgerFacts } from '../../core/agent/request/projection.js';
+import { schedulingLines } from './run/projection.js';
 
 export function goalObjective(edit: SessionGoalEdit): string | undefined {
   return !goalIsDetached(edit) && edit.goal?.phase === 'active' ? edit.goal.objective : undefined;
@@ -17,7 +18,7 @@ export function showGoal(edit: SessionGoalEdit, legacy?: StoredGoal | null): str
     ...(goal.completion ? [`Completion: user-declared at ${goal.completion.timestamp}; acceptance was not verified.`] : []),
     goal.tokenBudget === undefined ? 'Budget: unset (no cumulative goal token cap).' : `Budget: ${goal.tokenBudget} tokens (strict admission; unsupported bounds block sending).`,
     ...usageLines(edit),
-    'Automatic continuation: unavailable. Active objectives accompany manually submitted turns.',
+    ...schedulingLines(goal),
   ] : ['No goal set for this session. Use /goal set <objective>.'];
   if (legacy) lines.push('A legacy project objective is available. /goal import copies its description into this session as paused.');
   return lines.join('\n');

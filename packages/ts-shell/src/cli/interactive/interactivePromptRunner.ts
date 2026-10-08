@@ -60,6 +60,7 @@ export async function runInteractiveResumeAction(input: {
 }
 
 export async function runInteractivePromptExecution(input: {
+  readonly promptMetadata?: Record<string, unknown>;
   readonly effectivePrompt: string;
   /** Images the draft referred to; see `PromptAttachments`. */
   readonly attachments?: PromptAttachments;
@@ -76,6 +77,7 @@ export async function runInteractivePromptExecution(input: {
   await executeResolvedPromptTurn({
     source: "interactive",
     effectivePrompt: input.effectivePrompt,
+    ...(input.promptMetadata ? { promptMetadata: input.promptMetadata } : {}),
     ...(input.attachments ? { attachments: input.attachments } : {}),
     sessionManager: input.sessionManager,
     setActiveNonInteractiveApprovalMode:

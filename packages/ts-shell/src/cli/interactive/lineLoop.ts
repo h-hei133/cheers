@@ -11,6 +11,9 @@ import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import { routeInteractiveCommand } from "./interactiveCommandRouter.js";
 import { buildInteractivePromptChrome, refreshInteractivePromptChrome } from "./promptChrome.js";
 import { installInteractiveSignalHandlers } from "./interactiveSignals.js";
+import { attachGoalSubmission } from '../runtime/goalScheduling.js';
+import { isGoalControl } from '../runtime/goal.js';
+import { QuestionBridge } from './questionBridge.js';
 
 /**
  * Line-oriented interactive loop for a session without a real terminal.
@@ -53,11 +56,14 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
     terminal: false,
     prompt: prompt(),
   });
-  options.setReadline(input);
+  // All lines reach control routing before they can be consumed as question answers.
+  const questions = new QuestionBridge({ ask: question => { options.renderer.renderLine(question); input.prompt(); }, settle: () => input.prompt() });
+  const questionInput = questions.asReadline(() => input.close());
+  options.setReadline(questionInput);
 
   installInteractiveSignalHandlers({
     process: options.process,
-    readline: input,
+    readline: questionInput,
     sessionRuntime: options.sessionRuntime,
     renderer: options.renderer,
     runtimeContext: options.runtimeContext,
@@ -68,51 +74,57 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
   let turnNumber = 0;
   const mcpGateway = options.initialMcpGateway;
   let chain = Promise.resolve();
+  let queued = 0; let busy = false; let closed = false;
+  let releaseRound: (() => void) | undefined; let roundBarrier = Promise.resolve();
+  const dispatch = async (text: string, promptMetadata?: Record<string, unknown>): Promise<void> => {
+    busy = true;
+    try {
+      const result = await routeInteractiveCommand({ prompt: text, ...(promptMetadata ? { promptMetadata } : {}), readline: questionInput, mcpGateway,
+        fallbackSessionId: options.fallbackSessionId, sessionManager: options.sessionManager,
+        runtimeContext: options.runtimeContext, renderer: options.renderer, sessionRuntime: options.sessionRuntime,
+        logger: options.logger, approvalTrustPolicy: options.approvalTrustPolicy, turnNumber,
+        setActiveNonInteractiveApprovalMode: options.setActiveNonInteractiveApprovalMode });
+      turnNumber = result.turnNumber;
+      if (result.exitRequested) { input.close(); return; }
+      if (result.refreshMcpGateway) await mcpGateway.syncWorkspace?.();
+      if (result.refreshPromptChrome) refreshInteractivePromptChrome({ readline: input, projectRoot: options.runtimeContext.projectRoot,
+        sessionId: options.runtimeContext.session.id, agentMode: options.sessionRuntime.getAgentMode() });
+    } finally { if (!promptMetadata) busy = false; input.prompt(); }
+  };
+  const releaseGoalSubmission = attachGoalSubmission(options.sessionRuntime, {
+    ready: () => !closed && !busy && queued === 0 && !input.line.trim() && !questions.question(),
+    submit: (prompt, metadata) => {
+      roundBarrier = new Promise<void>(resolve => { releaseRound = resolve; });
+      return dispatch(prompt, metadata);
+    },
+    settled: () => { busy = false; releaseRound?.(); releaseRound = undefined; },
+  });
 
   input.prompt();
   input.on("line", (line) => {
     const text = line.trim();
-    if (!text) {
-      input.prompt();
-      return;
-    }
     // Serialise turns: readline delivers the next line as soon as it arrives,
     // and two concurrent turns would interleave their output and their session
     // writes.
+    if ((busy || questions.question()) && isGoalControl(text)) {
+      void routeInteractiveCommand({ prompt: text, readline: questionInput, mcpGateway, sessionManager: options.sessionManager,
+        runtimeContext: options.runtimeContext, renderer: options.renderer, sessionRuntime: options.sessionRuntime,
+        logger: options.logger, approvalTrustPolicy: options.approvalTrustPolicy, turnNumber,
+        setActiveNonInteractiveApprovalMode: options.setActiveNonInteractiveApprovalMode }).then(() => input.prompt());
+      return;
+    }
+    if (questions.answer(line)) return;
+    if (!text) { input.prompt(); return; }
+    queued += 1;
     chain = chain.then(async () => {
-      const result = await routeInteractiveCommand({
-        prompt: text,
-        readline: input,
-        mcpGateway,
-        fallbackSessionId: options.fallbackSessionId,
-        sessionManager: options.sessionManager,
-        runtimeContext: options.runtimeContext,
-        renderer: options.renderer,
-        sessionRuntime: options.sessionRuntime,
-        logger: options.logger,
-        approvalTrustPolicy: options.approvalTrustPolicy,
-        turnNumber,
-        setActiveNonInteractiveApprovalMode: options.setActiveNonInteractiveApprovalMode,
-      });
-      turnNumber = result.turnNumber;
-      if (result.exitRequested) {
-        input.close();
-        return;
-      }
-      if (result.refreshMcpGateway) await mcpGateway.syncWorkspace?.();
-      if (result.refreshPromptChrome) {
-        refreshInteractivePromptChrome({
-          readline: input,
-          projectRoot: options.runtimeContext.projectRoot,
-          sessionId: options.runtimeContext.session.id,
-          agentMode: options.sessionRuntime.getAgentMode(),
-        });
-      }
-      input.prompt();
+      queued -= 1;
+      await roundBarrier;
+      await options.sessionRuntime.waitForIdle().catch(() => undefined);
+      await dispatch(text);
     });
   });
 
   await new Promise<void>((resolve) => {
-    input.on("close", () => resolve());
+    input.on("close", () => { closed = true; questionInput.close(); releaseGoalSubmission?.(); resolve(); });
   });
 }

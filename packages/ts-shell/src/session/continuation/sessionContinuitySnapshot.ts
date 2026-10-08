@@ -150,7 +150,7 @@ export function buildSessionContinuitySnapshot(input: {
     : undefined;
   const lastUserIntent = repairedPrompt?.trim()
     ? repairedPrompt
-    : findLastTurnContent(selectedTurns, "user");
+    : findLastTurnContent(selectedTurns.filter(turn => turn.metadata?.source !== 'goal-continuation'), "user");
   const mutationContinuity = projectSessionMutationContinuity({
     lastCodingResult,
     recentCodingResults,

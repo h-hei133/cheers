@@ -1,5 +1,6 @@
 import type { CommandSyntax } from "../syntax/model.js";
 import { parseSyntax } from "../syntax/parse.js";
+export const goalCommandAliases = ['objective', 'target'] as const;
 
 export const goalSyntax: CommandSyntax = {
   name: "goal", defaultAction: "",

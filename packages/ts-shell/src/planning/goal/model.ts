@@ -1,3 +1,5 @@
+import type { GoalRunOwner, GoalScheduling } from './run/model.js';
+
 export type GoalPhase = 'active' | 'paused' | 'complete' | 'dropped';
 
 export interface GoalWorkspace {
@@ -27,8 +29,8 @@ export interface SessionGoal extends GoalScope {
   readonly origin: 'user' | 'legacy-project';
   readonly createdAt: string;
   readonly updatedAt: string;
-  /** Scheduling is not connected by the entity/state batch. */
-  readonly runOwner: null;
+  readonly runOwner: GoalRunOwner | null;
+  readonly scheduling?: GoalScheduling;
   readonly pauseReason?: 'user' | 'session-reentry' | 'legacy-import';
   readonly completion?: GoalCompletion;
   /** Absent means no cumulative token cap; zero explicitly blocks admission. */

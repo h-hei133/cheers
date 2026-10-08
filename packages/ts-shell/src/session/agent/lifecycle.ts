@@ -28,6 +28,7 @@ export function handlePersistUserPromptBarrier(
   callbacks: SessionLifecycleCallbacks,
   sessionId: string,
   prompt: string,
+  metadata?: Record<string, unknown>,
 ): void {
   const session = callbacks.loadSession(sessionId);
   const timestamp = callbacks.now();
@@ -35,6 +36,7 @@ export function handlePersistUserPromptBarrier(
     session,
     prompt,
     timestamp,
+    metadata,
     appendTranscriptEvent: (event) => callbacks.appendTranscriptEvent(sessionId, event),
     writeSessionMetadata: (next) => callbacks.writeSessionMetadata(next),
     writeSessionState: (next, overrides) => callbacks.writeSessionState(next, overrides),

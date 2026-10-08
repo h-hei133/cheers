@@ -3,6 +3,7 @@ import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 export type AgentStopReason = "stop" | "length" | "error" | "aborted";
 
 export interface AgentMessage extends SessionMessage {
+  readonly admissionFailure?: import('./request/model.js').ModelAdmissionError['code'];
   readonly stopReason?: AgentStopReason | string;
   readonly errorMessage?: string;
 }

@@ -52,6 +52,8 @@ export interface KeymapContext {
   readonly actions: KeymapActions;
   /** True while a turn is running. */
   readonly busy: boolean;
+  /** True while background scheduling can be stopped between turns. */
+  readonly interruptible?: boolean;
   /** Monotonic clock, used for the double-press exit gesture. */
   readonly now: () => number;
   /**
@@ -264,7 +266,7 @@ function handleEscapeKey(context: KeymapContext): void {
     actions.redraw();
     return;
   }
-  if (context.busy) {
+  if (context.busy || context.interruptible) {
     actions.interrupt();
     gesture.lastEscapeAt = undefined;
     actions.redraw();
@@ -299,7 +301,7 @@ function handleCancelKey(context: KeymapContext): void {
     actions.redraw();
     return;
   }
-  if (context.busy) {
+  if (context.busy || context.interruptible) {
     actions.interrupt();
     actions.redraw();
     return;

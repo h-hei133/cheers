@@ -54,6 +54,8 @@ export type PromptRun =
   | { readonly events: AsyncIterable<QueryEvent>; readonly input?: TurnInput; readonly sourceEntryId?: () => string | undefined };
 
 export interface SessionRuntimeDependencies {
+  /** Cancellation reaches the owner of work scheduled across individual prompts. */
+  readonly onCancelRequested?: () => void;
   readonly configuredAgentMode?: () => 'plan' | 'build' | undefined;
   readonly sessionManager: SessionManager;
   readonly renderer: StreamingRenderer;
@@ -91,6 +93,7 @@ export class ShellSessionRuntime {
   private readonly deps: SessionRuntimeDependencies;
   private readonly stateMachine = new ShellStateMachine();
   private readonly eventObservers = new Set<QueryEventObserver>();
+  private readonly renderingObservers = new Set<QueryEventObserver>();
   private currentRunController: AbortController | null = null;
   private currentInput: TurnInput | undefined;
   private currentRun: Promise<string> | null = null;
@@ -108,9 +111,10 @@ export class ShellSessionRuntime {
    * event surface for interactive runs: both channels describe the same events,
    * so rendering both would duplicate every tool call and every token.
    */
-  observeEvents(observer: QueryEventObserver): () => void {
+  observeEvents(observer: QueryEventObserver, options?: { readonly renders?: boolean }): () => void {
     this.eventObservers.add(observer);
-    return () => this.eventObservers.delete(observer);
+    if (options?.renders !== false) this.renderingObservers.add(observer);
+    return () => { this.eventObservers.delete(observer); this.renderingObservers.delete(observer); };
   }
 
   getState() {
@@ -178,6 +182,7 @@ export class ShellSessionRuntime {
       continuityState?: SessionContinuitySnapshot;
       outputMode?: "interactive" | "print";
       attachments?: PromptAttachments;
+      promptMetadata?: Record<string, unknown>;
     },
   ): Promise<string> {
     const run = this.trackRun(this.drivePrompt(sessionId, prompt, options));
@@ -211,6 +216,7 @@ export class ShellSessionRuntime {
       continuityState?: SessionContinuitySnapshot;
       outputMode?: "interactive" | "print";
       attachments?: PromptAttachments;
+      promptMetadata?: Record<string, unknown>;
     },
   ): Promise<string> {
     this.currentRunController = new AbortController();
@@ -221,7 +227,7 @@ export class ShellSessionRuntime {
     const printMode = options?.outputMode === "print";
     let enteredQueryPhase = false;
     const eventDigest: RuntimeEventDigest = createRuntimeEventDigest();
-    const structuredOutput = !printMode && this.eventObservers.size > 0;
+    const structuredOutput = !printMode && this.renderingObservers.size > 0;
     let sourceEntryId: (() => string | undefined) | undefined;
 
     try {
@@ -283,7 +289,7 @@ export class ShellSessionRuntime {
         : undefined;
 
       if (!options?.runtimeSeed) {
-        this.deps.sessionManager.persistUserPromptBarrier(sessionId, prompt);
+        this.deps.sessionManager.persistUserPromptBarrier(sessionId, prompt, options?.promptMetadata);
       }
 
       let sawTerminalEvent = false;
@@ -416,6 +422,7 @@ export class ShellSessionRuntime {
   }
 
   cancelCurrentRun(): void {
+    this.deps.onCancelRequested?.();
     this.currentRunController?.abort();
     this.stateMachine.interruptRun();
   }

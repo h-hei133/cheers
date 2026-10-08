@@ -6,6 +6,7 @@ import type { Session } from '../../session/schema/sessionRecord.js';
 import { GoalWriteError, type GoalAction } from './model.js';
 import { readGoalEdit, writeGoal, goalIsDetached, type GoalStoreHost } from './store.js';
 import { showGoal } from './projection.js';
+import { GoalRunError } from './run/model.js';
 
 export async function runSessionGoalCommand(args: string[], context: CommandContext,
   host: GoalStoreHost, session: Session): Promise<LocalCommandResult> {
@@ -57,6 +58,8 @@ function resultNotice(verb: string): string {
 }
 
 function errorNotice(error: unknown): string {
+  if (error instanceof GoalRunError) return `Goal update was not saved: ${error.reason}. ${error.reason === 'recovery-required'
+    ? 'An earlier goal round remains unresolved; automatic replay is blocked.' : 'Inspect /goal show before retrying.'}`;
   if (error instanceof GoalWriteError && error.state === 'persisted') return 'Goal state was saved, but session lock cleanup failed. Reopen the session before another goal update.';
   if (error instanceof GoalWriteError && error.state === 'unknown') return 'Goal update was attempted, but persistence is unverified. Reopen the session before retrying.';
   if (error instanceof GoalWriteError && error.code === 'conflict') return 'Goal update refused because the session, workspace or goal changed. Reopen the session and inspect /goal show.';

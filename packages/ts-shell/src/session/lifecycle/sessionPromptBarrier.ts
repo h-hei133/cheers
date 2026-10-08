@@ -16,6 +16,7 @@ export function persistSessionUserPromptBarrier(input: {
   readonly session: Session;
   readonly prompt: string;
   readonly timestamp: string;
+  readonly metadata?: Record<string, unknown>;
   readonly appendTranscriptEvent: (event: TranscriptEvent) => void;
   readonly writeSessionMetadata: (session: Session) => void;
   readonly writeSessionState: (
@@ -27,6 +28,7 @@ export function persistSessionUserPromptBarrier(input: {
     role: "user",
     content: input.prompt,
     timestamp: input.timestamp,
+    ...(input.metadata ? { metadata: input.metadata } : {}),
     // Named here so the thread entry and the transcript line agree, as in
     // `appendSessionTurn`. Both writers have to do this or a branch would only
     // resolve for half the turns.

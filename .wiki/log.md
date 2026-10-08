@@ -6367,4 +6367,8 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 
 ## [2026-10-08] feat | Phase 19 AUTO-01 接入会话/工作区身份与 revision 的 goal 实体，锁内 CAS 保留其他 owner、旧目标显式 paused import、reentry 暂停和有来源的用户完成声明；new/fork 不继承，detached/unknown 保留。Node 20.3 构建/248 项组合、结果契约 149 项、八组有效反转/恢复后 14 项、Node/executable 两模式共 40 次本地 HTTP、备用独立 APPROVED、静态 gates/43 scripts/NormProof 0 blocking 通过，见 features/phase-19-decisions.md §8.117。378377e2 远端因账单限制零步骤失败；预算/自动续轮仍明确 unavailable，继续 AUTO-02，完整自主执行与 Phase 19 尚未完成。
 
-## [2026-10-08] feat | Phase 19 AUTO-02 接入缺省无 cap、显式 N/off、持久共享 attempt 账目与签名前预留/发送交接重验；主子代理、重发、btw、压缩/摘要及 cache 共用 policy，inclusive cache/reasoning、unknown、迟到结算与 off 历史保留明确。最终 Node 20.3 构建/403 项、结果契约 149 项、八组有效反转/恢复后 25 项、Node/executable 两模式共 32 次本地 HTTP、独立最终 APPROVED 与静态 gates/43 scripts/NormProof 0 blocking 通过，见 features/phase-19-decisions.md §8.118。现有 provider 无完整 token 上界证明，严格 cap 明确 unsupported/零发送；AUTO-03 调度与完整自主执行/Phase 19 继续。
+## [2026-10-08] feat | Phase 19 AUTO-02 接入缺省无 cap、显式 N/off、持久共享 attempt 账目与签名前预留/发送交接重验；主子代理、重发、btw、压缩/摘要及 cache 共用 policy，inclusive cache/reasoning、unknown、迟到结算与 off 历史保留明确。最终 Node 20.3 构建/403 项、结果契约 149 项、八组有效反转/恢复后 25 项、Node/executable 两模式共 32 次本地 HTTP、独立最终 APPROVED 与静态 gates/43 scripts/NormProof 0 blocking 通过，见 features/phase-19-decisions.md §8.118。3f57e6d1 已推送，远端 CI/Watch 因付款/额度限制零步骤失败；现有 provider 无完整 token 上界证明，严格 cap 明确 unsupported/零发送。AUTO-03 调度与完整自主执行/Phase 19 继续。
+
+## [2026-10-09] feat | Phase 19 AUTO-03 持久续轮与有界停止
+
+显式 set/resume 复用普通 session runtime 的 TUI/line/print 续轮，单 owner/round 在 state lock 内持久化，实际提交再查待输入，结算核验持久 prompt/terminal。pause 先阻止新派发并有界 drain，崩溃重启保留 unknown 且不重放；实际 hung 子进程退出修复通过。最终 Node 20.3 构建/450 项、结果契约 149 项、五组有效反转/恢复后 20 项、独立最终 APPROVED/15 项、两入口两模式共 64 次合成 HTTP 与五项静态 gates/43 scripts/NormProof 0 blocking 通过，见 features/phase-19-decisions.md §8.119。自动完成证据及 AUTO-04/05、完整 Phase 19 继续；本批 commit/push 与远端证据另行核对。

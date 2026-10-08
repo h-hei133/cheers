@@ -27,6 +27,8 @@ import type { EscalationPrompt } from "../../core/shell/approval/contract.js";
 import { promptInteractiveQuestions } from "../interactive/interactiveAskBridge.js";
 import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
 import { goalObjectiveFor, goalPolicyFor, prepareGoalSession } from './goal.js';
+import { installGoalScheduler } from './goalScheduling.js';
+import type { GoalScheduler } from '../../planning/goal/run/scheduler.js';
 import { compactSessionHistory } from "../../core/shell/compaction.js";
 import { recordCompactionCheckpoint } from "../../context/compact/checkpoint/compactionCheckpoint.js";
 import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalStore.js";
@@ -324,7 +326,9 @@ export function createCliSessionRuntime(input: {
     const result = refreshShellRuntimeConfig(input.runtimeContext);
     if (result.status !== 'applied') input.renderer.renderLine('Credential saved; configuration was not applied. Reload status: ' + result.status + '.');
   };
+  let goalScheduler: GoalScheduler | undefined;
   const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
+    onCancelRequested: () => goalScheduler?.interrupt(),
     configuredAgentMode: () => input.runtimeContext.runtimeConfig.agentMode,
     sessionManager: input.sessionManager,
     renderer: input.renderer,
@@ -550,5 +554,6 @@ export function createCliSessionRuntime(input: {
       return { ...run, sourceEntryId: () => sourceEntryId };
     },
   });
+  goalScheduler = installGoalScheduler(input.runtimeContext, input.sessionManager, sessionRuntime, message => input.renderer.renderLine(message));
   return sessionRuntime;
 }

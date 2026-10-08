@@ -265,3 +265,9 @@ Cheers 已有 [picker 注册器](../../packages/ts-shell/src/cli/interactive/pic
 [Phase 19 §8.118](phase-19-decisions.md#8118-auto-02完整请求准入与持久共享账目)已接入 `/goal budget N|off`、缺省无 cap 和按目标 ID 保存的共享账本。主子代理、内层重试/降级/空流重发、`/btw`、自动/手动压缩、分支/回合摘要与缓存刷新共用实际 attempt 准入；缓存和 reasoning 是 input/output 子项，缺失 usage 保留 unknown，off、暂停、降低 cap 和重启不删除历史。预留与发送交接均核验 live policy，确认未发送才释放，迟到结算仍归原目标。
 
 所有现有 endpoint 均缺少覆盖完整序列化输入和全部输出的可靠 token 上界，显式 cap 因此返回 admission unsupported，实际零发送；没有用字符估算或模型窗口冒充严格保证。无 cap 的目标可继续显式请求并计量，未知历史切换到 cap 后阻止准入。AUTO-02 的本地通用基元与现有发送路径验收完成；新顾问/研究等发送必须复用同一 policy，自动调度、验收完成证据及完整 U06 仍由后续任务交付。
+
+## 11. 自主续轮与停止实施补充
+
+[Phase 19 §8.119](phase-19-decisions.md#8119-auto-03持久续轮与有界停止)已接通显式 set/resume 后的持久单 owner 调度，复用原 TUI/line/print 和 session persistence。无 cap 可越过单轮 step-limit 并在普通回答后继续；暂停先阻止新发送，再有界等待取消，未知 owner/用量/副作用保留。轮间提交再次检查待输入；人工 queue 在自动轮持久结算后执行，自动 prompt 不变成人工意图。
+
+两种运行入口、两种 TUI 的实际中断写入验证均只写一次，恢复不重放，未对账 resume 明确拒绝。完成 round 要有同目标/owner 的持久 prompt 与 terminal 生命周期；UI 观察成功不替代保存成功。AUTO-03 本地验收完成，严格 cap 的 unsupported 边界仍保留；自动目标验收、guided/plan/queue UX 和顾问继续由 AUTO-04/05 交付，用户 complete 仍只是有来源的人工声明。

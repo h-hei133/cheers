@@ -46,6 +46,7 @@ import { reportWriter } from '../output/reports.js';
 import type { ShellActionResult } from '../../core/commands/types.js';
 
 export interface InteractiveCommandRouterInput {
+  readonly promptMetadata?: Record<string, unknown>;
   readonly prompt: string;
   /** Images the draft referred to; carried beside the text, not inside it. */
   readonly attachments?: PromptAttachments;
@@ -338,6 +339,7 @@ export async function routeInteractiveCommand(
     }
     nextTurnNumber += 1;
     await runInteractivePromptExecution({
+      ...(input.promptMetadata ? { promptMetadata: input.promptMetadata } : {}),
       effectivePrompt: resolved.effectivePrompt,
       ...(resolved.attachments ? { attachments: resolved.attachments } : {}),
       sessionManager: input.sessionManager,

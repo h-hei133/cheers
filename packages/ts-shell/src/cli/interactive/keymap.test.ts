@@ -8,7 +8,7 @@ import { KEY_BINDINGS } from "../../presentation/tui/chrome/keys.js";
 import { dispatchedKeyIds } from "./keymap.js";
 import { Keybindings } from "./keybindings.js";
 
-function build(busy = false): {
+function build(busy = false, interruptible = false): {
   press: (data: string) => void;
   surface: InteractiveSurface;
   actions: { [K in keyof KeymapActions]: ReturnType<typeof vi.fn> };
@@ -55,6 +55,7 @@ function build(busy = false): {
         view: surface,
         actions: actions as unknown as KeymapActions,
         busy,
+        interruptible,
         now: () => clock.now,
         gesture,
         keybindings: new Keybindings(),
@@ -203,6 +204,17 @@ describe("input while a turn runs", () => {
 });
 
 describe("interruption", () => {
+  it.each(['\x1b', '\x03'])('stops scheduling between turns with %j while preserving the draft', key => {
+    const { press, surface, actions } = build(false, true);
+    press('d');
+    press(key);
+    expect(actions.interrupt).toHaveBeenCalledOnce();
+    expect(surface.editor.getText()).toBe('d');
+    expect(actions.exit).not.toHaveBeenCalled();
+    press('\r');
+    expect(actions.submit).toHaveBeenCalledWith('d');
+  });
+
   it("escape interrupts a running turn", () => {
     const { press, actions } = build(true);
     press("\x1b");

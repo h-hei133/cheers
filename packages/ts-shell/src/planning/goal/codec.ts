@@ -1,6 +1,7 @@
 import { isRecord } from '../../core/values/record.js';
 import { freezeDeep } from '../../core/values/freeze.js';
 import type { GoalScope, SessionGoal } from './model.js';
+import { decodeRunOwner, decodeScheduling } from './run/codec.js';
 
 const PHASES = new Set(['active', 'paused', 'complete', 'dropped']);
 const PAUSE_REASONS = new Set(['user', 'session-reentry', 'legacy-import']);
@@ -10,7 +11,10 @@ export function decodeGoal(value: unknown): SessionGoal | undefined {
     || typeof value.revision !== 'number' || !Number.isSafeInteger(value.revision) || value.revision < 1
     || !text(value.sessionId) || !timestamp(value.sessionCreatedAt) || !timestamp(value.createdAt) || !timestamp(value.updatedAt)
     || typeof value.phase !== 'string' || !PHASES.has(value.phase)
-    || (value.origin !== 'user' && value.origin !== 'legacy-project') || value.runOwner !== null
+    || (value.origin !== 'user' && value.origin !== 'legacy-project')
+    || (value.runOwner !== null && !decodeRunOwner(value.runOwner))
+    || (value.scheduling !== undefined && !decodeScheduling(value.scheduling))
+    || (value.runOwner !== null && value.scheduling === undefined)
     || !isRecord(value.workspace) || !text(value.workspace.path) || !text(value.workspace.identity)
     || (value.pauseReason !== undefined && (typeof value.pauseReason !== 'string' || !PAUSE_REASONS.has(value.pauseReason)))
     || (value.tokenBudget !== undefined && (typeof value.tokenBudget !== 'number' || !Number.isSafeInteger(value.tokenBudget) || value.tokenBudget < 0))) return undefined;
@@ -24,7 +28,8 @@ export function decodeGoal(value: unknown): SessionGoal | undefined {
     sessionId: value.sessionId as string, sessionCreatedAt: value.sessionCreatedAt as string,
     workspace: { path: value.workspace.path as string, identity: value.workspace.identity as string },
     phase: value.phase as SessionGoal['phase'], origin: value.origin,
-    createdAt: value.createdAt as string, updatedAt: value.updatedAt as string, runOwner: null,
+    createdAt: value.createdAt as string, updatedAt: value.updatedAt as string, runOwner: value.runOwner === null ? null : decodeRunOwner(value.runOwner)!,
+    ...(value.scheduling !== undefined ? { scheduling: decodeScheduling(value.scheduling)! } : {}),
     ...(value.tokenBudget !== undefined ? { tokenBudget: value.tokenBudget as number } : {}),
     ...(value.pauseReason !== undefined ? { pauseReason: value.pauseReason as SessionGoal['pauseReason'] } : {}),
     ...(completion !== undefined ? { completion: { source: 'user-declared' as const,

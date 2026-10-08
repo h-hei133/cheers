@@ -111,4 +111,4 @@ export type QueryEvent =
   | { readonly type: 'lifecycle.cancelled'; readonly reason: string }
   | { readonly type: 'lifecycle.error'; readonly error: string }
   | { readonly type: 'query.completed'; readonly result: OrchestrationResult }
-  | { readonly type: 'query.failed'; readonly error: string }
+  | { readonly type: 'query.failed'; readonly error: string; readonly admissionFailure?: import('../../agent/request/model.js').ModelAdmissionError['code'] }

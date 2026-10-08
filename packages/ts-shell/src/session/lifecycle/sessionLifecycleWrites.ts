@@ -137,11 +137,12 @@ export abstract class SessionLifecycleWrites {
     handleMarkRunStarted(this.createSessionLifecycleCallbacks(), sessionId, prompt);
   }
 
-  persistUserPromptBarrier(sessionId: string, prompt: string): void {
+  persistUserPromptBarrier(sessionId: string, prompt: string, metadata?: Record<string, unknown>): void {
     handlePersistUserPromptBarrier(
       this.createSessionLifecycleCallbacks(),
       sessionId,
       prompt,
+      metadata,
     );
   }
 

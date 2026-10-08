@@ -24,6 +24,7 @@ const fixture = vi.hoisted(() => ({
 vi.mock("../../config/runtimeConfig.js", () => ({ getRuntimeConfig: () => fixture.config }));
 // Transport composition has no durable session or goal; budget policy is covered by its owning suite.
 vi.mock("./goal.js", () => ({ prepareGoalSession: () => undefined, goalObjectiveFor: () => undefined, goalPolicyFor: () => undefined }));
+vi.mock('./goalScheduling.js', () => ({ installGoalScheduler: () => undefined }));
 vi.mock("../../core/shell/providerCredentials.js", () => ({ resolveProviderCredential: () => fixture.resolution }));
 vi.mock("../../core/models/catalogStore.js", () => ({ loadCatalog: () => [{
   id: "fixture", endpoint: "test-signed-summary", models: [{ id: "fixture-model", contextWindow: 10000,

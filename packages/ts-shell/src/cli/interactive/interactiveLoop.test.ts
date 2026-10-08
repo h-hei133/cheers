@@ -99,7 +99,7 @@ describe("interactive loop", () => {
 
     stdin.end();
     await loop;
-    // A real readline drives the line loop, so question() comes from node itself.
+    // Actual readline drives the input while questions use the host stand-in.
     expect(capturedReadline).not.toBeNull();
     expect(typeof capturedReadline?.question).toBe("function");
     expect(sessionExists.mock.calls).toEqual([["sess_abcdef0123456789"]]);

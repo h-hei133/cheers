@@ -118,7 +118,7 @@ export class TurnProjection {
 
 /** How a finished run is reported to the shell. */
 export type RunOutcome =
-  | { readonly kind: "failed"; readonly error: string }
+  | { readonly kind: "failed"; readonly error: string; readonly admissionFailure?: import('../core/agent/request/model.js').ModelAdmissionError['code'] }
   | {
       readonly kind: "completed";
       readonly finalOutput: string;
@@ -136,11 +136,12 @@ export type RunOutcome =
  * reported honestly rather than summarized: the last tool's output if tools ran,
  * otherwise the step's own account of the silence.
  */
-export function concludeRun(messages: readonly AgentMessage[], prompt: string, sessionId: string, steps: number): RunOutcome {
+export function concludeRun(messages: readonly AgentMessage[], prompt: string, sessionId: string, steps: number, stepLimitReached = false): RunOutcome {
   const last = [...messages].reverse().find((message) => message.role === "assistant");
   if (last?.stopReason === "error") {
     return {
       kind: "failed",
+      ...(last.admissionFailure ? { admissionFailure: last.admissionFailure } : {}),
       error: isOverflowFailure(last)
         ? "Context overflow error: could not compact context automatically."
         : (last.errorMessage ?? "The model call failed."),
@@ -179,9 +180,10 @@ export function concludeRun(messages: readonly AgentMessage[], prompt: string, s
     completed: {
       type: "query.completed",
       result: {
-        status: "completed",
-        terminalClassification: "success",
-        terminalReason: "completed",
+        status: stepLimitReached ? 'stopped_max_turns' : 'completed',
+        terminalClassification: stepLimitReached ? 'stopped' : 'success',
+        terminalReason: stepLimitReached ? 'stopped_max_turns' : 'completed',
+        ...(stepLimitReached ? { stopReason: 'The turn reached its model step limit.' } : {}),
         transcript: [],
         sharedContext: { sessionId, initialPrompt: prompt, notes: [`steps: ${steps}`], handoffs: [] },
         finalOutput,

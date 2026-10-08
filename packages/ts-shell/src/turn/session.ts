@@ -410,7 +410,8 @@ export function runTurn(options: TurnOptions): TurnRun {
 
   /** Report how the run ended, in the terms the shell reads. */
   const conclude = async (): Promise<void> => {
-    const outcome = concludeRun(core.state.messages, options.prompt, options.sessionId, projection.stepCount);
+    const outcome = concludeRun(core.state.messages, options.prompt, options.sessionId, projection.stepCount,
+      projection.stepCount >= options.maxSteps && Boolean(core.state.messages.filter(message => message.role === 'assistant').at(-1)?.tool_calls?.length));
     if (outcome.kind === "failed") {
       await options.hooks.dispatch({
         eventName: "StopFailure",
@@ -420,7 +421,7 @@ export function runTurn(options: TurnOptions): TurnRun {
         turnsExecuted: projection.stepCount,
         error: outcome.error,
       });
-      channel.push({ type: "query.failed", error: outcome.error });
+      channel.push({ type: "query.failed", error: outcome.error, ...(outcome.admissionFailure ? { admissionFailure: outcome.admissionFailure } : {}) });
       return;
     }
     if (outcome.explained) {
@@ -441,7 +442,8 @@ export function runTurn(options: TurnOptions): TurnRun {
   void drive()
     .catch((error: unknown) => {
       if (options.signal.aborted) return;
-      channel.push({ type: "query.failed", error: error instanceof Error ? error.message : String(error) });
+      channel.push({ type: "query.failed", error: error instanceof Error ? error.message : String(error),
+        ...(error instanceof ModelAdmissionError ? { admissionFailure: error.code } : {}) });
     })
     .finally(async () => {
       // The run is over, so the session is waiting on a person rather than on a

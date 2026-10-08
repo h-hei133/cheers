@@ -1,4 +1,5 @@
 import { createCliShutdown } from "../runtime/shutdown.js";
+import { cancelGoalRunForShutdown } from '../runtime/goalScheduling.js';
 import type { Interface as ReadlineInterface } from "node:readline";
 import type { ReadStream } from "node:tty";
 
@@ -193,7 +194,7 @@ export async function runCliProcess(
       // is built.
       getPromptInteractiveApproval: () => interactiveApprovalPrompt,
     });
-    cancelRun = () => sessionRuntime.cancelAndWait();
+    cancelRun = () => cancelGoalRunForShutdown(sessionRuntime);
     if (bootstrapRuntime.writeJsonEvent) {
       sessionRuntime.observeEvents(bootstrapRuntime.writeJsonEvent);
     }

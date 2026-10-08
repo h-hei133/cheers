@@ -3,12 +3,14 @@ import { freezeDeep } from '../../core/values/freeze.js';
 import { isRecord } from '../../core/values/record.js';
 import { goalMatchesScope } from './codec.js';
 import { GoalWriteError, type GoalAction, type GoalScope, type SessionGoal } from './model.js';
+import { GoalRunError } from './run/model.js';
 
 /** State transitions never dispatch work or infer completion from a stopped run. */
 export function transitionGoal(current: SessionGoal | undefined, scope: GoalScope, action: GoalAction,
   timestamp = new Date().toISOString()): SessionGoal | undefined {
   validateAction(action);
   if (action.type === 'set' || action.type === 'import') {
+    if (current?.runOwner) throw new GoalWriteError('conflict');
     if (current && current.phase !== 'complete' && current.phase !== 'dropped') throw new GoalWriteError('conflict');
     const objective = action.objective.trim();
     if (!objective || objective.length > 16_384 || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(objective)) throw new GoalWriteError('invalid');
@@ -31,7 +33,10 @@ export function transitionGoal(current: SessionGoal | undefined, scope: GoalScop
   if (action.type === 'complete') return move(current, 'complete', timestamp,
     { completion: { source: 'user-declared', timestamp, declaration: '/goal complete' } });
   if (action.type === 'pause') return current.phase === 'paused' ? current : move(current, 'paused', timestamp, { pauseReason: 'user' });
-  if (action.type === 'resume') return current.phase === 'active' ? current : move(current, 'active', timestamp);
+  if (action.type === 'resume') {
+    if (current.scheduling?.pendingRound) throw new GoalRunError('recovery-required');
+    return current.phase === 'active' ? current : move(current, 'active', timestamp);
+  }
   if (action.type === 'budget') {
     if (current.tokenBudget === action.cap) return current;
     if (current.revision >= Number.MAX_SAFE_INTEGER) throw new GoalWriteError('invalid');
@@ -57,5 +62,9 @@ function move(current: SessionGoal, phase: SessionGoal['phase'], timestamp: stri
   details: Pick<SessionGoal, 'pauseReason' | 'completion'> = {}): SessionGoal {
   if (current.revision >= Number.MAX_SAFE_INTEGER) throw new GoalWriteError('invalid');
   const { pauseReason: _pause, completion: _completion, ...base } = current;
-  return freezeDeep({ ...base, revision: current.revision + 1, phase, updatedAt: timestamp, ...details });
+  return freezeDeep({ ...base, revision: current.revision + 1, phase, updatedAt: timestamp, ...details,
+    ...(current.scheduling && phase !== 'active' ? { scheduling: { ...current.scheduling,
+      phase: current.scheduling.pendingRound && current.runOwner ? 'draining' as const : 'paused' as const,
+      reason: details.pauseReason === 'session-reentry' ? 'session-reentry' as const : 'user' as const,
+      drain: current.scheduling.pendingRound ? 'pending' as const : 'settled' as const, updatedAt: timestamp } } : {}) });
 }

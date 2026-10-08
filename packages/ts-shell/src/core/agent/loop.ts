@@ -21,6 +21,7 @@ import {
 } from "./tools.js";
 
 export interface AssistantStep {
+  readonly admissionFailure?: import('./request/model.js').ModelAdmissionError['code'];
   readonly text: string;
   readonly toolCalls: readonly AgentToolCall[];
   readonly stopReason: AgentStopReason;
@@ -277,6 +278,7 @@ async function driveLoop(
         stopReason: step.stopReason,
         ...(step.errorMessage ? { errorMessage: step.errorMessage } : {}),
         ...(step.failureClass ? { failureClass: step.failureClass } : {}),
+        ...(step.admissionFailure ? { admissionFailure: step.admissionFailure } : {}),
         ...(step.reasoning ? { reasoning: step.reasoning } : {}),
         ...(step.origin ? { origin: step.origin } : {}),
       };

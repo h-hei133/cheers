@@ -469,7 +469,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
             );
           }
         } catch (error) {
-          if (error instanceof ModelAdmissionError) return stamp(errorStep(error.message, true));
+          if (error instanceof ModelAdmissionError) return stamp({ ...errorStep(error.message, true), admissionFailure: error.code });
           if (signal?.aborted) return stamp(abortedStep(""));
           // The request never arrived, which is the failure a second attempt
           // most often fixes.
@@ -540,7 +540,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
           : completed);
       } catch (error) {
         markContextUnknown(request.sessionId, 'usage-gap');
-        if (error instanceof ModelAdmissionError) return stamp(failedStep(error.message, shown, undefined, true));
+        if (error instanceof ModelAdmissionError) return stamp({ ...failedStep(error.message, shown, undefined, true), admissionFailure: error.code });
         if (signal?.aborted) return stamp(abortedStep(shown));
         const detail = error instanceof Error ? error.message : String(error);
         if (!shownAnything && !REFUSAL.test(detail) && streamAttempts < retry.maxRetries && /socket|connection|network|fetch|terminated|unexpected eof/i.test(detail)) {

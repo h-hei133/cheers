@@ -3,7 +3,7 @@ import { browserCompletions } from "../../browser/command/completion.js";
 import { connectSyntax, connectCompletions } from "./connect/syntax.js";
 import { loopSyntax, loopArgumentCompletions } from "./loop/syntax.js";
 import { brainstormSyntax } from "./brainstorm/syntax.js";
-import { goalSyntax } from "./goal/syntax.js";
+import { goalCommandAliases, goalSyntax } from "./goal/syntax.js";
 import { marketplaceSyntax } from "./marketplace/syntax.js";
 import { pluginSyntax } from "./plugin/syntax.js";
 import { workflowSyntax } from "../workflow/syntax.js";
@@ -563,7 +563,7 @@ export function createCommandRegistry(
     },
     {
       name: "goal",
-      aliases: ["objective", "target"],
+      aliases: goalCommandAliases,
       kind: "local",
       supportsNonInteractive: true,
       availability: "available",

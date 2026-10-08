@@ -33,6 +33,8 @@ import type { StreamingRenderer } from "../../presentation/terminal/streaming.js
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import { replaceLiteral } from "../../presentation/tui/pastes.js";
+import { goalCommandFor, isGoalControl } from '../runtime/goal.js';
+import { attachGoalSubmission, schedulerForRuntime } from '../runtime/goalScheduling.js';
 import { openSettings } from "./settings.js";
 import { InteractiveSurface } from "../../presentation/tui/surface/view.js";
 import { createViewState, type ViewState } from "../../presentation/tui/surface/contract.js";
@@ -189,6 +191,7 @@ export class InteractiveMode {
   /** Stops the background-completion notice from reaching a disposed session. */
   private readonly stopWatchingBackground: () => void;
   private releaseEvents: (() => void) | undefined;
+  private releaseGoalSubmission?: () => void;
   /**
    * The theme file being followed, when the theme in use came from one.
    *
@@ -401,6 +404,18 @@ export class InteractiveMode {
     });
     this.tui.onInput((data) => this.stdin.feed(data));
     this.releaseEvents = this.options.sessionRuntime.observeEvents((event) => this.sink.handleEvent(event));
+    this.releaseGoalSubmission = attachGoalSubmission(this.options.sessionRuntime, {
+      ready: () => !this.stopped && !this.closing && !this.busy && !this.pickerPending && !this.overlay.active
+        && !this.questions.question() && this.queue.length === 0 && !this.state.editor.getText().trim()
+        && !this.state.pastes.hasImages(this.state.editor.getText()),
+      submit: (prompt, metadata) => this.run(prompt, undefined, metadata),
+      settled: () => {
+        this.busy = this.pickerPending;
+        const next = this.pickerPending || this.overlay.active || this.stopped ? undefined : this.queue.shift();
+        if (next !== undefined) void this.run(next);
+        this.tui.requestRender();
+      },
+    });
     this.preferences.reload();
     // `regular` keeps the conversation in the terminal's own scrollback, so a
     // session that ends leaves something to scroll back through. `fullscreen` is
@@ -427,6 +442,8 @@ export class InteractiveMode {
     this.catalogs.invalidate();
     this.releaseEvents?.();
     this.releaseEvents = undefined;
+    this.releaseGoalSubmission?.();
+    this.releaseGoalSubmission = undefined;
     // The registry outlives this surface, so the subscription has to be given
     // back or a later command would be announced to a session already gone.
     this.stopWatchingBackground();
@@ -483,6 +500,7 @@ export class InteractiveMode {
     routeKey(event, {
       view: this.view,
       busy: this.busy,
+      interruptible: Boolean(schedulerForRuntime(this.options.sessionRuntime)?.ownerToken()),
       now: () => Date.now(),
       gesture: this.gesture,
       keybindings: this.preferences.keybindings,
@@ -602,6 +620,20 @@ export class InteractiveMode {
     this.completionStatus = undefined;
     this.catalogs.invalidate();
     appendPromptHistory(this.options.runtimeContext.projectRoot, text);
+    if (isGoalControl(text) && (this.busy || this.questions.question())) {
+      this.state.transcript.append(textBlock('user', text));
+      const context = this.options.runtimeContext;
+      void goalCommandFor(context, this.options.sessionManager)(text.trim().split(/\s+/).slice(1), {
+        cwd: context.cwd, projectRoot: context.projectRoot, sessionId: context.session.id, interactive: true,
+      }).then(result => {
+        this.state.transcript.append(textBlock('command', result.output, text.split(/\s+/)[0]));
+        this.tui.requestRender();
+      }, error => {
+        this.state.transcript.append(textBlock('error', error instanceof Error ? error.message : String(error)));
+        this.tui.requestRender();
+      });
+      return;
+    }
     if (this.questions.answer(text)) {
       this.tui.requestRender();
       return;
@@ -636,7 +668,9 @@ export class InteractiveMode {
   private async run(
     text: string,
     attachments?: { readonly images: readonly ImageContent[] },
+    promptMetadata?: Record<string, unknown>,
   ): Promise<void> {
+    const automatic = promptMetadata !== undefined;
     this.pager.close();
     this.overlay.close();
     // Queued input reaches this same dispatch point after the current operation
@@ -664,12 +698,13 @@ export class InteractiveMode {
     // `begin` clears the failure flag for the turn that is starting, so whether
     // the *previous* turn failed has to be read before that happens.
     const previousTurnFailed = this.sink.lastTurnFailed;
-    if (!text.startsWith("/")) this.lastPrompt = text;
+    if (!automatic && !text.startsWith("/")) this.lastPrompt = text;
     const command = text.startsWith("/") ? text.split(/\s+/)[0]! : "turn";
     this.sink.begin(text.startsWith("/") ? "command" : "turn", command);
     this.options.renderer.setSink(this.sink);
     try {
       const result = await routeInteractiveCommand({
+        ...(promptMetadata ? { promptMetadata } : {}),
         prompt: text,
         readline: this.readline,
         mcpGateway: this.options.initialMcpGateway,
@@ -712,7 +747,7 @@ export class InteractiveMode {
       const output = this.sink.commandOutput;
       if (output) pageLongOutput(this.pager, output.title, output.block, this.state.transcript);
       this.sink.end();
-      this.busy = this.pickerPending;
+      this.busy = automatic || this.pickerPending;
       if (sessionManagement && !this.stopped) this.overlay.open(sessionManagementPicker(this.pickerHost(), sessionManagement));
       if (exiting) {
         this.shutdown();
@@ -735,7 +770,7 @@ export class InteractiveMode {
         if (navigation.draft !== undefined) this.state.editor.setText(navigation.draft);
       }
       this.tui.requestRender();
-      const next = this.pickerPending || sessionManagement ? undefined : retrying ?? this.queue.shift();
+      const next = automatic || this.pickerPending || sessionManagement ? undefined : retrying ?? this.queue.shift();
       // The attention pair, when the user asked for it and the turn was long
       // enough that they may have looked away. A queued follow-up keeps the
       // conversation running, so the signal waits for the turn that ends it.
@@ -902,7 +937,10 @@ export class InteractiveMode {
    * than running against a turn the user just cancelled.
    */
   private async interrupt(): Promise<void> {
-    if (!this.busy) return;
+    if (!this.busy) {
+      if (schedulerForRuntime(this.options.sessionRuntime)?.ownerToken()) this.options.sessionRuntime.cancelCurrentRun();
+      return;
+    }
     this.sink.markCancelling();
     const undelivered = [...(this.options.sessionRuntime.input?.()?.clearQueue() ?? []), ...this.queue.splice(0)];
     await this.options.sessionRuntime.cancelAndWait();

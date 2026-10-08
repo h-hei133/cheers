@@ -28,6 +28,7 @@ import { configurationBinding } from '../../core/shell/configuration.js';
 import * as management from '../../session/lifecycle/management.js';
 import * as undoService from '../../edit/recovery/undo/service.js';
 import type { UndoPreview } from '../../edit/recovery/operation/preview.js';
+import * as goalScheduling from '../runtime/goalScheduling.js';
 
 function build(overrides: { observeEvents?: () => () => void; exit?: (code?: number) => void } = {}): {
   mode: InteractiveMode;
@@ -69,6 +70,19 @@ function build(overrides: { observeEvents?: () => () => void; exit?: (code?: num
 }
 
 describe("session wiring", () => {
+  it('interrupts goal scheduling between rounds without discarding the human draft', async () => {
+    const { mode, terminal } = build();
+    const host = mode as unknown as { options: { sessionRuntime: ShellSessionRuntime }; view: InteractiveView };
+    const cancel = vi.fn(); host.options.sessionRuntime.cancelCurrentRun = cancel;
+    vi.spyOn(goalScheduling, 'schedulerForRuntime').mockReturnValue({ ownerToken: () => 'fixture-owner' } as never);
+    mode.start();
+    try {
+      terminal.input('draft'); terminal.input('\x1b');
+      await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+      expect(host.view.editor.getText()).toBe('draft');
+    } finally { mode.stop(); vi.restoreAllMocks(); }
+  });
+
   it('shows undo preview above confirmation and requires a separate Restore selection', async () => {
     const { mode, terminal } = build();
     const host = mode as unknown as { overlay: OverlayHost; pager: Pager; view: InteractiveView;

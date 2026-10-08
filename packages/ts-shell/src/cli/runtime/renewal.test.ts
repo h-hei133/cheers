@@ -16,6 +16,9 @@ import { createCacheWarmingRunner } from '../../turn/cacheWarm.js';
 import { createCliSessionRuntime } from './cliSessionRuntimeFactory.js';
 
 const fixture = vi.hoisted(() => ({ deps: undefined as SessionRuntimeDependencies | undefined }));
+vi.mock('./goalScheduling.js', () => ({ installGoalScheduler: () => undefined }));
+// This credential/transport fixture has no durable goal session.
+vi.mock('./goal.js', () => ({ prepareGoalSession: () => undefined, goalObjectiveFor: () => undefined, goalPolicyFor: () => undefined }));
 vi.mock('../../core/shell/sessionRuntime.js', () => ({ ShellSessionRuntime: class {
   constructor(deps: SessionRuntimeDependencies) { fixture.deps = deps; }
   getPermissionScope() { return 'ask'; }

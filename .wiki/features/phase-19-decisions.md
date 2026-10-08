@@ -231,7 +231,7 @@ SSH 是现有执行接口的一种显式远端适配能力，仍由 TypeScript o
 |---|---|---|
 | AUTO-01 | 会话 goal 实体、版本、旧项目目标导入和状态机；planning/goal 与 session store | set/show/pause/resume/drop/complete 语义明确；旧目标不自动启动；不同会话/工作区无串用；手动完成明确为用户声明，实体本地验收见 §8.117，自动完成证据及调度仍由 AUTO-03/04 交付 |
 | AUTO-02 | 通用请求 admission、共享预算与幂等用量账本；core/agent 基元、turn/provider 实际 attempt 接线、usage owner，feature 注入 policy | 缺省无 cap；显式 cap 按 §3.2 跨主子顾问及所有内层重发，无法给上界则 unsupported；缓存/推理计量不漏不重；仅够一次余额时重试/降级/空流重发的第二次请求零发送；并发预留、unknown、取消、重启及降低cap不能绕过准入。本地基元/现有发送路径验收见 §8.118；现有 provider 严格 cap 明确 unsupported，新增顾问请求仍须接同一 policy |
-| AUTO-03 | 自主轮间调度、owner、暂停取消、崩溃恢复；既有 session runtime 与 goal owner | 超过单轮 step 仍可继续无cap目标；暂停响应且不新派发；进程中断恢复不重复副作用；预算耗尽/失败/完成状态不同 |
+| AUTO-03 | 自主轮间调度、owner、暂停取消、崩溃恢复；既有 session runtime 与 goal owner | 超过单轮 step 仍可继续无cap目标；暂停响应且不新派发；进程中断恢复不重复副作用；预算耗尽/失败/完成状态不同。本地实现/验收见 §8.119，自动完成证据仍由 AUTO-04 交付 |
 | AUTO-04 | /goal、/guided-goal、/plan、/plan-review、/queue 及计划执行 UX；既有 plan/input queue 接口 | guided-goal 把澄清答案形成可审核目标，不把未答项变批准；不建第二 mode；plan 只读限制有效；计划预览与批准分开；队列列表/调整/取消与实际执行顺序一致 |
 | AUTO-05 | 实时 advisor 路由、检查点及结果应用；通用 subagent runner + advisor 领域 | 用户启用后按配置运行；不同模型实际发送可验证；共享预算；超时/失败可见；意见不是授权，主流程/审核策略明确 |
 
@@ -1768,3 +1768,18 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - Node regular/fullscreen 各 8 次合成本地 HTTP，见 `.tmp/phase19-config/goal-budget-pty-1791474021886558959`；单文件 executable build 通过，见 `.tmp/goal-budget-exe-e84kymoc`，相同两模式各 8 次通过，见 `.tmp/phase19-config/goal-budget-exe-pty-1791474094404048741`。四场 **32 次**成功请求验证主/btw/压缩共享计量、inclusive cache/reasoning、cap 和降低 cap 零发送、off 历史保留、missing usage unknown、paused restart/manual、new 隔离与 print 零请求，配置/源原文不变、exit 0。fullscreen 初轮进程退出与 harness poll 竞态独立保留，修正探针同步后通过。
 - 独立 L3 最终 **APPROVED，无未解决 finding**，五项 material probes 独立执行通过，reviewed source manifest 与反转恢复 hash 相符，见 `.tmp/auto2-review-material/final-report.md`。五项静态 gates、43 项 script tests 通过，1884 文件普通/类型图无环；NormProof unresolved-specifier satisfied、0 blocking、整体 partial，保留既有 mixed-graph cycle/五个函数上限 advisory，docs strict 保留 120 条既有 source advisory，见 `.tmp/navigation-gates-wn85s7xf` 与已复制 `normproof-out`。没有把 advisory 或未执行远端测试改称全绿。
 - 本批验收覆盖本地通用请求基元及当前发送入口，AUTO-03/04/05、自动完成证据、真实外部 provider 与完整 Phase 19 继续；不以预算字段或本地 HTTP 声称完整自主执行或外部账单保证。
+- 已提交/推送 `3f57e6d1a2bf1fe18119b80414e016744a79eff4`；CI 37804208959/job 113404095987、Watch 37804209017/job 113404095093 均零步骤失败，annotations 确认账户付款/spending limit 阻止启动，见 `.tmp/auto2-remote-6iyr6jpq`。没有当前 SHA 远端构建/套件通过证据；继续 AUTO-03。
+
+### 8.119 AUTO-03：持久续轮与有界停止
+
+- [续轮 owner](../../packages/ts-shell/src/planning/goal/run/scheduler.ts)在既有 session state lock 内取得带 token/PID/hostname 的持久 claim，保存 round/pendingRound 后才提交；timer 与 CLI WeakMap 只唤醒/定位。发送 policy 核对同一 owner token，第二进程不能抢占活跃或不确定 owner。没有新增总轮数上限，单轮 step-limit 与普通回答都可继续未完成目标，预算/取消/失败仍阻止后续准入。
+- [CLI 宿主](../../packages/ts-shell/src/cli/runtime/goalScheduling.ts)复用原 session runtime、TUI/line 输入及 print 输出；仅已核验保存的显式 set/resume 启动，import/show/恢复选择不启动。同步检查及实际提交 microtask 检查 editor、图片、queue、问题、picker 和关闭状态；确认未提交才能撤销 pending marker。human queue 等待自动轮持久结算再执行。
+- [结算](../../packages/ts-shell/src/planning/goal/run/safety.ts)要求同 goal/owner/round 的持久 prompt 来源、后续 terminal lifecycle 和 idle 状态；`query.completed` 或宿主吞掉异常不是保存证据。自动 prompt 不污染 lastUserIntent/人工历史，恢复转录显示续轮说明；passive observer 不抑制 line/print 输出。step-limit 现在以 stopped 分类保存，不能显示为任务成功。
+- pause/drop/用户 complete 先持久阻止新派发，再取消当前请求，最多等待一秒 drain；未知执行和 usage 保留 owner/pending，不声称已撤回副作用。Escape/Ctrl+C 在轮间也可取消；busy goal 控制及 objective/target 别名先于问题回答。line 复用 QuestionBridge，空/原始回答和 input-close 正确结算。
+- [恢复](../../packages/ts-shell/src/planning/goal/run/store.ts)仅回收同主机、ESRCH 证明已死的 owner；外地主机、存活及不确定 owner 保留。中断 pending round 变为 paused/recovery-required，不自动重放；resume 要求 idle、无未核验副作用和未结算请求。拒绝明确报告 recovery-required，不以重启清空 ledger 后续跑。
+- CLI 退出复用有界 goal drain；未结算运行不再进入普通无限 cancelAndWait，watcher 不阻止进程退出。独立不响应取消的实际子进程基线 exit124，修复后 1.67 秒 exit0，见 `.tmp/auto3-review-material/hung-shutdown-final.log`；持久未知不被退出成功掩盖。
+- 定向实读参考 goal runtime 与 interactive submit 的双重 idle/待输入检查、checkpoint 后续轮决策；采用检查与持久 checkpoint，未采用 timer 所有权、年龄推断死亡或无证据的模型完成。五组反转分别破坏 live owner、实际 microtask、持久结算、crash pending 保留及普通回答续轮，全部产生行为 AssertionError；隔离副本逐字节/SHA-256 恢复，恢复后 20 项通过，见 `.tmp/phase19-config/goal-run-reversals/1791477539094305172`。首轮复制遇到编辑中断言/实现不同步，baseline 失败且未执行反转，冻结源码后重做，原记录保留。
+- 最终 Node 20.3 组合 20 文件/450 项及构建通过，编译产物 unref/退出适配/typed recovery 已核对，见 `.tmp/catalog-check-619ysu19/{tests,rebuild}.log`；结果契约实际 6 文件/149 项通过，见 `.tmp/result-contract-l01jPo`。保留组合 suite 的 MaxListenersExceededWarning，不将其当作断言失败或宣称无关 listener 清理完成。
+- Node regular/fullscreen 各 16 次合成 HTTP，见 `.tmp/phase19-config/goal-run-pty-1791477633423948182`；源码直编单文件 build exit0，见 `.tmp/goal-run-exe-00epx7zy`，同两模式各 16 次通过，见 `.tmp/phase19-config/goal-run-exe-pty-1791477590893582604`。共 64 次验证无 cap 跨两步轮、busy pause 后零新请求、unknown/restart 保留、写一次后 SIGKILL 不重写、未对账 resume 拒绝、失败非完成与人工完成来源；print show 零请求、print/line 自动回答可见，config/legacy/source 原文不变。早期 permission label/状态 hint 同步是 harness 问题，恢复拒绝通用文案是产品缺陷，分别修复后通过；测试 HTTP socket reset 属取消后的预期断连。
+- 五项静态门、43 项 scripts 与 1894 文件 runtime/type 无环通过，见 `.tmp/navigation-gates-k6vitqde`，已复制 NormProof 输出。unresolved-specifier 满足、0 blocking；verdict 仍 partial，保留既有混合图 cycle 和五项 function-ceiling advisory，docs strict 保留 120 项既有 source advisory。新增 owner 未超过 20，既有 monolith 未增加具名方法。
+- 独立最终 **APPROVED**、15/15 探针及 45 个改动源码/测试的稳定 hashes 见 `.tmp/auto3-review-material/{final-report.md,final-run.json,final-source-hashes.json}`。本批交付续轮/停止/恢复；普通回答、单轮成功、预算耗尽或失败不是目标验收，自动完成仍明确 unavailable。AUTO-04 可审核目标/计划批准/验收证据、AUTO-05 顾问和完整 Phase 19 继续；本批精确 commit/远端结果另行核对。
