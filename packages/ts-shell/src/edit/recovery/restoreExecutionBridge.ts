@@ -13,6 +13,8 @@ import {
 export type RestoreExecutionMode = "preview" | "execute";
 
 export interface RestoreExecutionBridgeResult {
+  readonly outcome: 'preview' | 'not-executed' | 'restored-verified' | 'partial' | 'unknown';
+  readonly unknownFiles: readonly RestorePreviewFile[];
   readonly mode: RestoreExecutionMode;
   readonly executed: boolean;
   readonly restoredFiles: readonly string[];
@@ -31,6 +33,7 @@ export async function runExplicitRestoreBridge(input: {
   readonly authorityId: string;
   readonly workspaceRoot: string;
   readonly recordSelection: readonly string[] | "all";
+  readonly assertFileAccess?: (absolutePath: string) => void;
 }): Promise<RestoreExecutionBridgeResult> {
   const selectedRecordIds =
     input.recordSelection === "all"
@@ -41,6 +44,7 @@ export async function runExplicitRestoreBridge(input: {
     authorityId: input.authorityId,
     workspaceRoot: input.workspaceRoot,
     recordIds: selectedRecordIds,
+    assertFileAccess: input.assertFileAccess,
   });
 
   if (input.mode === "preview") {
@@ -57,6 +61,7 @@ export async function runExplicitRestoreBridge(input: {
   const restoredFiles: string[] = [];
   const blockedFiles: RestorePreviewBlockedFile[] = [...preview.blockedFiles];
   const skippedFiles: RestorePreviewFile[] = [];
+  const unknownFiles: RestorePreviewFile[] = [];
 
   for (const file of reverseCaptureOrder(preview.restorableFiles)) {
     const result = await restoreRecoveryAuthorityRecord({
@@ -65,9 +70,14 @@ export async function runExplicitRestoreBridge(input: {
       recordId: file.recordId,
       workspaceRoot: input.workspaceRoot,
       workspaceRelativePath: file.workspaceRelativePath,
+      assertFileAccess: input.assertFileAccess,
     });
     if (result.restored === true) {
       restoredFiles.push(...result.restoredFiles);
+      continue;
+    }
+    if (result.outcome === 'unknown') {
+      unknownFiles.push(file);
       continue;
     }
     if (!("blockedReason" in result)) {
@@ -82,6 +92,8 @@ export async function runExplicitRestoreBridge(input: {
 
   return {
     mode: "execute",
+    outcome: unknownFiles.length ? 'unknown' : restoredFiles.length ? (blockedFiles.length || preview.missingRecords.length ? 'partial' : 'restored-verified') : 'not-executed',
+    unknownFiles,
     executed: restoredFiles.length > 0,
     restoredFiles,
     blockedFiles,
@@ -127,6 +139,8 @@ function fromPreview(
 ): RestoreExecutionBridgeResult {
   return {
     mode,
+    outcome: 'preview',
+    unknownFiles: [],
     executed: options.executed,
     restoredFiles: [...options.restoredFiles],
     blockedFiles: [...preview.blockedFiles],

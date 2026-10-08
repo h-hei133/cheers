@@ -56,6 +56,7 @@ export interface BuildCliCommandExecutionInput {
   readonly printMode: boolean;
   readonly interactive: boolean;
   readonly sessionId?: string;
+  readonly workspaceRoots?: CommandContext['workspaceRoots'];
   readonly onTurnMessage?: (message: SessionMessage) => void;
   readonly onReport?: ReportWriter;
   /**
@@ -151,6 +152,7 @@ export async function buildCliCommandExecution(
     resolveConfigTarget: input.resolveConfigTarget,
     readConfiguration: input.readConfiguration,
     admission: input.admission,
+    workspaceRoots: input.workspaceRoots,
     getToolPool: input.getToolPool,
     compactCheckpointStore: input.compactCheckpointStore,
     compactInjectionStateStore: input.compactInjectionStateStore,

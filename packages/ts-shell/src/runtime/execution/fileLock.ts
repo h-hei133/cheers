@@ -120,6 +120,9 @@ export async function withFileLock<T>(
     chain.set(key, (chain.get(key) ?? 0) + 1);
     return await heldByChain.run(chain, mutate);
   } finally {
+    const count = (chain.get(key) ?? 1) - 1;
+    if (count === 0) chain.delete(key);
+    else chain.set(key, count);
     release();
     // Only the last holder cleans up: an earlier one removing the entry would
     // let a new caller start while a later holder is still queued.
@@ -127,4 +130,11 @@ export async function withFileLock<T>(
       queues.delete(key);
     }
   }
+}
+
+/** Batch callers start without held locks and acquire their complete target set in this order. */
+export async function withFileLocks<T>(absolutePaths: readonly string[], mutate: () => Promise<T>): Promise<T> {
+  const keys = [...new Set(await Promise.all(absolutePaths.map(lockKey)))].sort();
+  const acquire = (index: number): Promise<T> => index === keys.length ? mutate() : withFileLock(keys[index]!, () => acquire(index + 1));
+  return acquire(0);
 }

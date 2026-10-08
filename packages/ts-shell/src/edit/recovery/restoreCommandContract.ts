@@ -11,6 +11,7 @@ export type RestoreCommandRecordSelection =
   | { readonly kind: "records"; readonly recordIds: readonly string[] };
 
 export interface RestoreCommandRequest {
+  readonly assertFileAccess?: (absolutePath: string) => void;
   readonly mode: RestoreCommandMode;
   readonly ledgerRoot?: string;
   readonly workspaceRoot?: string;
@@ -36,6 +37,8 @@ export interface ValidRestoreCommand {
 }
 
 export interface RestoreCommandResult {
+  readonly outcome?: 'preview' | 'not-executed' | 'restored-verified' | 'partial' | 'unknown';
+  readonly unknownFiles?: readonly RestorePreviewFile[];
   readonly mode: RestoreCommandMode;
   readonly executed: boolean;
   readonly restorableFiles: readonly RestorePreviewFile[];
@@ -126,6 +129,8 @@ export function blockedCommandResult(
 ): RestoreCommandResult {
   return {
     mode,
+    outcome: mode === 'preview' ? 'preview' : 'not-executed',
+    unknownFiles: [],
     executed: false,
     restorableFiles: [],
     restoredFiles: [],

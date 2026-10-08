@@ -1,19 +1,39 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { formatRestoreCommandResult } from '../../core/commands/restoreCommandRuntime.js';
 import { captureRecoveryAuthorityRecord } from "./recoveryAuthorityStore.js";
 import { runExplicitRestoreBridge } from "./restoreExecutionBridge.js";
 
 const tempRoots: string[] = [];
 
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const root of tempRoots.splice(0)) {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
 
 describe("restore execution bridge", () => {
+  it('reports an unknown writer outcome instead of asserting non-execution after publication', async () => {
+    const { ledgerRoot, workspaceRoot } = createFixture();
+    const target = path.join(workspaceRoot, 'src', 'a.ts');
+    fs.writeFileSync(target, 'after\n');
+    await captureUpdate({ ledgerRoot, recordId: 'update-a' });
+    const sync = fs.fsyncSync;
+    vi.spyOn(fs, 'fsyncSync').mockImplementation(fd => {
+      if (fs.readFileSync(target, 'utf8') === 'before\n') throw new Error('flush failed after publication');
+      return sync(fd);
+    });
+    const result = await runExplicitRestoreBridge({ mode: 'execute', ledgerRoot, workspaceRoot, authorityId: 'route-bridge', recordSelection: ['update-a'] });
+    expect(result.outcome).toBe('unknown');
+    expect(result.unknownFiles.map(file => file.workspaceRelativePath)).toEqual(['src/a.ts']);
+    expect(fs.readFileSync(target, 'utf8')).toBe('before\n');
+    const output = formatRestoreCommandResult({ ...result, restorableFiles: [] });
+    expect(output).toContain('Restore — outcome unknown');
+    expect(output).not.toContain('Executed: no');
+  });
   it("preview mode does not write and reports no automatic recovery", async () => {
     const { ledgerRoot, workspaceRoot } = createFixture();
     const filePath = path.join(workspaceRoot, "src", "a.ts");

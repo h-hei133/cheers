@@ -47,6 +47,7 @@ export interface CommandContext {
    */
   readonly projectRoot?: string
   readonly sessionId?: string
+  readonly workspaceRoots?: readonly import('../workspace/model.js').WorkspaceRoot[]
   /**
    * How this run was asked to load skills.
    *

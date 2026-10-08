@@ -1,14 +1,7 @@
-import { promises as fs } from 'node:fs'
-import { withFileLock } from './fileLock.js'
-import { FileContentConflictError } from './conflict.js'
+import { writeTextFile } from './write.js'
 import { readTextFile } from './read.js'
 import { readTextPage } from './page.js'
 import { verifyPathContainment } from '../../core/security/pathJail.js'
-import { existsSync, realpathSync } from 'node:fs'
-import path from 'node:path'
-import { createWorkspaceWriteAuthority } from '../../edit/authority/workspace.js'
-import { buildEditSnapshotStoreConfig } from '../../edit/recovery/editSnapshot.js'
-import { captureRecoveryAuthorityRecord } from '../../edit/recovery/recoveryAuthorityStore.js'
 import { executeLocally } from './local.js'
 import type { NormalizedExecutionResult } from './types.js'
 import {
@@ -36,20 +29,13 @@ import type {
   ExecutionService,
   FileListExecutionRequest,
   TextFileReadExecutionRequest,
-  TextFileWriteExecutionRequest,
 } from './types.js'
 
 export function createDefaultExecutionService(): ExecutionService {
   return {
     readTextFile,
     readTextPage,
-    async writeTextFile(request) {
-      // Held across the whole write, and taken by anyone who writes. A caller
-      // that read first then wrote through here has its read covered too, as
-      // long as it took the lock around both — the bare write is the last line
-      // of defence, not the whole guarantee.
-      return withFileLock(request.absolutePath, () => writeTextFileUnlocked(request))
-    },
+    writeTextFile,
     async listFilesRecursive(request) {
       request.abortSignal?.throwIfAborted()
       const checked = verifyPathContainment(request.absoluteRoot, request.workspaceRoot)
@@ -63,98 +49,6 @@ export function createDefaultExecutionService(): ExecutionService {
     runCommand(request) {
       return runCommand(request)
     },
-  }
-}
-
-/**
- * Record a pre-write snapshot, best effort.
- *
- * A snapshot exists so a write can be taken back. Failing to record one must not
- * block the write: the write itself is already gated by the workspace authority
- * and the approval path. A missing snapshot degrades /undo for that one change,
- * which /undo already reports as "nothing to undo".
- */
-/**
- * The write itself, with the lock already held by the caller.
- *
- * Split out so the lock is taken in exactly one place and nothing can reach the
- * filesystem without passing through it.
- */
-async function writeTextFileUnlocked(request: TextFileWriteExecutionRequest): Promise<void> {
-  request.abortSignal?.throwIfAborted()
-  const canonicalRoot = realpathSync(request.workspaceRoot)
-  const relativePath = path.relative(canonicalRoot, verifyPathContainment(request.absolutePath, request.workspaceRoot).resolvedPath)
-  // A target outside the workspace root cannot be expressed as a relative path,
-  // so the authority refuses it rather than writing through.
-  if (relativePath === '..' || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath)) {
-    throw new Error(
-      `Refuse to write outside the selected workspace: ${request.reportSafeTarget}`,
-    )
-  }
-  const checkAccess = (target: string): void => {
-    request.abortSignal?.throwIfAborted()
-    const initial = verifyPathContainment(target, request.workspaceRoot)
-    const checked = initial.allowed ? initial : verifyPathContainment(target, canonicalRoot)
-    if (!checked.allowed) throw new Error('Write target is outside the selected workspace.')
-    request.assertFileAccess?.(checked.resolvedPath)
-  }
-  checkAccess(request.absolutePath)
-  const authority = createWorkspaceWriteAuthority(canonicalRoot)
-  await fs.mkdir(path.dirname(request.absolutePath), { recursive: true })
-  checkAccess(request.absolutePath)
-  // Record what the file held before the write, so /undo and /restore have
-  // something to take back. Captured under the same authority the write uses: a
-  // snapshot of a target the write would refuse is worse than none, because it
-  // reads as recoverable.
-  const before = existsSync(request.absolutePath)
-    ? authority.readVerifiedFile(relativePath, checkAccess)
-    : undefined
-  if (request.expectedContent !== undefined && before !== request.expectedContent) {
-    throw new FileContentConflictError(request.reportSafeTarget)
-  }
-  await captureSnapshotBeforeWrite({
-    workspaceRoot: request.workspaceRoot,
-    relativePath,
-    before,
-  })
-  checkAccess(request.absolutePath)
-  // Snapshot persistence yields to other writers. Compare again immediately
-  // before the synchronous write, even if snapshot storage failed. This detects
-  // observed external edits; it is not an atomic filesystem compare-and-swap.
-  if (request.expectedContent !== undefined
-    && authority.readVerifiedFile(relativePath, checkAccess) !== request.expectedContent) {
-    throw new FileContentConflictError(request.reportSafeTarget)
-  }
-  if (existsSync(request.absolutePath)) {
-    // Existing targets are opened with O_NOFOLLOW and re-verified through the
-    // opened descriptor, so a symlink swapped in after the check still loses.
-    authority.writeFile(relativePath, request.content, checkAccess)
-    return
-  }
-  authority.createFileExclusive(relativePath, request.content, checkAccess)
-}
-
-async function captureSnapshotBeforeWrite(input: {
-  workspaceRoot: string
-  relativePath: string
-  before: string | undefined
-}): Promise<void> {
-  try {
-    await captureRecoveryAuthorityRecord({
-      ...buildEditSnapshotStoreConfig({
-        workspaceRoot: input.workspaceRoot,
-        targetPath: input.relativePath,
-      }),
-      recordId: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
-      workspaceRelativePath: input.relativePath,
-      operationKind: input.before === undefined ? 'create' : 'update',
-      beforeState: input.before === undefined ? 'absent' : 'exists',
-      ...(input.before !== undefined ? { beforeContent: input.before } : {}),
-      expectedCurrentState: input.before === undefined ? 'absent' : 'exists',
-      ...(input.before !== undefined ? { expectedCurrentContent: input.before } : {}),
-    })
-  } catch {
-    // Snapshot storage is a recovery aid, never a precondition for writing.
   }
 }
 

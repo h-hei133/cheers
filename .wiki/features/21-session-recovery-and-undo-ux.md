@@ -166,7 +166,7 @@ pi 的 [session-selector.ts](../../../pi/packages/coding-agent/src/modes/interac
 
 [recoveryAuthorityStore.ts](../../packages/ts-shell/src/edit/recovery/recoveryAuthorityStore.ts#L40) 的记录是写前快照，不证明后续编辑成功。只加 `sessionId` 仍不能区分捕获后未写、部分写入、已提交、已撤销或未知操作。
 
-当前 [restorePrimitive.ts](../../packages/ts-shell/src/edit/recovery/restorePrimitive.ts#L72) 在读取 blob 的异步间隔之前检查目标内容，再执行写入/删除，缺少与共享写路径结合的锁内最后 stale-read、完整审批上下文和写后核验。[restoreExecutionBridge.ts](../../packages/ts-shell/src/edit/recovery/restoreExecutionBridge.ts#L54) 也明确跨文件非原子且无自动恢复。因此“加确认框并复用现有 restore 就安全”不成立。
+原 [restorePrimitive.ts](../../packages/ts-shell/src/edit/recovery/restorePrimitive.ts) 的异步 blob 读取后竞争窗口已由 EDIT-01 修复：先准备内容，再在共享文件锁内检查目标，交给共同 guarded committer 做最后检查及写后核验。旧无归属记录保留显式恢复；带 operation 归属的快照必须经过收据与批准路径，不能直接调用旧 primitive。`/undo` 交互仍归 EDIT-03，跨文件非原子且不自动重放未知写入。
 
 ### 4.2 用户已确认的操作单位
 
@@ -222,6 +222,14 @@ pi 的 [session-selector.ts](../../../pi/packages/coding-agent/src/modes/interac
 Codex 的 [app_backtrack.rs](../../../codex/codex-rs/tui/src/app_backtrack.rs) 提供对话导航比较，不能证明 Cheers 的文件恢复安全。oh-my-pi 的 checkpoint/rewind 名称涉及探索上下文与摘要分支，不能仅凭工具名宣称其等价于文件恢复。文件编辑和对话导航分离是 Cheers 自己的明确产品契约。
 
 恢复验收至少包含：捕获但未写、编辑失败/partial/unknown、单文件与多文件 committed、跨 session/workspace、旧无归属记录、重复 undo、外部修改、预览后变化、blob/hash 篡改、symlink/越界、批准过期、拒绝/取消无写、异步读 blob 后竞争、逐文件失败、写后核验失败及各持久化边界崩溃。反转任何最终 stale-read、归属检查或证据投影都应使对应测试失败。
+
+### 4.7 EDIT-01 收据与恢复底座已实施（2026-10-08）
+
+普通会话 `write`/`edit` 现在经 [operation owner](../../packages/ts-shell/src/edit/recovery/operation/write.ts) 保存写前快照、持久 intent、逐文件核验与 committed receipt。收据绑定实际 session、主根 identity、tool-call、每文件授权根、前后 hash 和单调顺序；附加根快照仍保存到主根。捕获但未写、其他会话、无归属记录及无变化写入不进入正常撤销候选。丢失 index、孤立收据和较新未知操作均阻断，不能遗忘历史后选择更旧操作。
+
+[预览](../../packages/ts-shell/src/edit/recovery/operation/preview.ts)和[恢复](../../packages/ts-shell/src/edit/recovery/operation/restore.ts)绑定完整批准 revision，重新校验 blob、归属、授权及当前版本，稳定锁住整个目标集合后持久 undo intent，再逐文件提交及保存结果。中断 intent/unknown 可重启读取，不能自动重放。旧 restore 保留 dry-run，writer 后异常显示 unknown/partial；审批路径遵守工作区及 read/write/edit deny rules。
+
+[共同文件提交](../../packages/ts-shell/src/edit/authority/commit.ts)拒绝所有路径组件 symlink、非普通文件和无效 UTF-8，保留精确 BOM/CRLF 与普通权限位。Linux 使用打开目录固定目标、临时文件 fsync、更新 rename 或创建 exclusive link；快照/收据/锁目录共享同一边界。没有通用跨进程内容 CAS 或跨文件崩溃原子性；macOS fallback 尚无原生运行证据。完整定向验证、有效反转、独立 APPROVED 与两模式实际 CLI 证据见 [决策 §8.109](phase-19-decisions.md#8109-edit-01已提交操作收据与安全恢复底座)。本节没有将多文件 `apply_patch` 或 `/undo` 面板列为完成。
 
 ## 5. 双 Esc 与会话导航反馈
 

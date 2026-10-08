@@ -315,9 +315,10 @@ export function createCoreToolRegistry(options?: {
           }
           await executionService.writeTextFile({
             operationKind: 'file.write',
+            ...(context.sessionId ? { editIdentity: { sessionId: context.sessionId, workspaceRoot: context.artifactRoot ?? context.workspaceRoot, callId: context.taskId, correlationId: context.correlationId } } : {}),
             assertFileAccess: context.assertFileAccess,
             abortSignal: context.abortSignal,
-            absolutePath: containment.resolvedPath,
+            absolutePath: target,
             content,
             workspaceRoot: context.workspaceRoot,
             authority: TOOL_APPROVED_WRITE_AUTHORITY,
@@ -492,9 +493,10 @@ export function createCoreToolRegistry(options?: {
 
         await executionService.writeTextFile({
           operationKind: 'file.write',
+            ...(context.sessionId ? { editIdentity: { sessionId: context.sessionId, workspaceRoot: context.artifactRoot ?? context.workspaceRoot, callId: context.taskId, correlationId: context.correlationId } } : {}),
           assertFileAccess: context.assertFileAccess,
           abortSignal: context.abortSignal,
-          absolutePath: containment.resolvedPath,
+          absolutePath: target,
           content: finalContent,
           expectedContent,
           workspaceRoot: context.workspaceRoot,

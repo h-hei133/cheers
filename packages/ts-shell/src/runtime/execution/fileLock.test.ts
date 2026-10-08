@@ -1,8 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import fsPromises from 'node:fs/promises';
+import { syncBuiltinESMExports } from 'node:module';
 import { mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { withFileLock } from "./fileLock.js";
+import { withFileLock, withFileLocks } from "./fileLock.js";
 
 function tempDir(): string {
   return mkdtempSync(join(tmpdir(), "file-lock-"));
@@ -29,6 +31,58 @@ function settle(): Promise<void> {
 }
 
 describe("serializing mutations of one file", () => {
+  it('queues a completed nested lock behind a different chain when reacquired', async () => {
+    const dir = tempDir();
+    const outer = join(dir, 'outer.txt');
+    const nested = join(dir, 'nested.txt');
+    writeFileSync(outer, 'outer');
+    writeFileSync(nested, 'nested');
+    const beginOther = gate();
+    const otherEntered = gate();
+    const releaseOther = gate();
+    const other = (async () => {
+      await beginOther.wait;
+      await withFileLock(nested, async () => { otherEntered.open(); await releaseOther.wait; });
+    })();
+    await withFileLock(outer, async () => {
+      await withFileLock(nested, async () => undefined);
+      beginOther.open();
+      await otherEntered.wait;
+      let entered = false;
+      const lookup = gate();
+      const realpath = fsPromises.realpath;
+      const spy = vi.spyOn(fsPromises, 'realpath').mockImplementation(async (...args) => {
+        const resolved = await realpath(...args);
+        lookup.open();
+        return resolved;
+      });
+      syncBuiltinESMExports();
+      const again = withFileLock(nested, async () => { entered = true; });
+      try {
+        await lookup.wait;
+        await settle();
+        expect(entered).toBe(false);
+      } finally {
+        releaseOther.open();
+        await again;
+        spy.mockRestore();
+        syncBuiltinESMExports();
+      }
+    });
+    await other;
+  });
+
+  it('acquires opposite batch target orders without deadlock', async () => {
+    const dir = tempDir();
+    const first = join(dir, 'a.txt');
+    const second = join(dir, 'b.txt');
+    const order: number[] = [];
+    await Promise.all([
+      withFileLocks([first, second], async () => { order.push(1); await settle(); order.push(2); }),
+      withFileLocks([second, first], async () => { order.push(3); }),
+    ]);
+    expect(order).toEqual([1, 2, 3]);
+  });
   it("does not let two mutations of the same file overlap", async () => {
     const file = join(tempDir(), "a.txt");
     const order: string[] = [];

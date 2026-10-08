@@ -1,6 +1,10 @@
-import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { hashContent } from '../authority/content.js';
+import { commitWorkspaceFile } from '../authority/commit.js';
+import { inspectWorkspaceFile } from '../authority/state.js';
+import { prepareLedgerDirectory, readLedgerText, safeRecoveryId, validRecoveryRecord } from './record.js';
+export { hashContent } from '../authority/content.js';
 import type {
   OriginalContentAuthorityRecord,
   OriginalContentPersistence,
@@ -30,6 +34,14 @@ export interface CaptureRecoveryAuthorityRecordInput
   readonly expectedCurrentState: RecoveryAuthorityExpectedCurrentState;
   readonly expectedCurrentContent?: string;
   readonly createdAt?: string;
+  readonly operation?: RecoveryOperationBinding;
+}
+
+export interface RecoveryOperationBinding {
+  readonly operationId: string;
+  readonly sessionId: string;
+  readonly workspaceRoot: string;
+  readonly workspaceIdentity: string;
 }
 
 export type CaptureRecoveryAuthorityRecordEntry = Omit<
@@ -38,6 +50,7 @@ export type CaptureRecoveryAuthorityRecordEntry = Omit<
 >;
 
 export interface RecoveryAuthorityStoredRecord {
+  readonly operation?: RecoveryOperationBinding;
   readonly schemaVersion: 1;
   readonly authorityId: string;
   readonly recordId: string;
@@ -70,6 +83,7 @@ export type RecoveryAuthorityCaptureResult =
         | "invalid-id"
         | "invalid-workspace-relative-path"
         | "before-content-required"
+        | "content-too-large"
         | "file-system-error";
       readonly records: readonly [];
       readonly message: string;
@@ -111,7 +125,6 @@ export interface RecoveryAuthorityCleanupResult {
 }
 
 const schemaVersion = 1;
-const idPattern = /^[A-Za-z0-9._-]+$/;
 
 export async function captureRecoveryAuthorityRecord(
   input: CaptureRecoveryAuthorityRecordInput,
@@ -149,6 +162,9 @@ export async function captureRecoveryAuthorityRecord(
       "Recovery authority cannot restore an existing file without pre-write original content.",
     );
   }
+  if (input.beforeContent !== undefined && Buffer.byteLength(input.beforeContent, 'utf8') > 64 * 1024 * 1024) {
+    return blocked('content-too-large', 'Recovery snapshots support at most 64 MiB of UTF-8 text. Nothing was written.');
+  }
 
   const beforeContentHash =
     input.beforeContent === undefined
@@ -168,6 +184,7 @@ export async function captureRecoveryAuthorityRecord(
       : `blobs/${beforeContentHash}.content`;
 
   const record: RecoveryAuthorityStoredRecord = {
+    ...(input.operation ? { operation: input.operation } : {}),
     schemaVersion,
     authorityId: config.authorityId,
     recordId: input.recordId,
@@ -194,20 +211,19 @@ export async function captureRecoveryAuthorityRecord(
       config.ledgerRoot,
       config.authorityId,
     );
-    await fs.mkdir(path.join(namespaceRoot, "records"), { recursive: true });
+    prepareLedgerDirectory(path.join(namespaceRoot, 'records'));
+    prepareLedgerDirectory(path.join(namespaceRoot, 'blobs'));
     if (input.beforeContent !== undefined && beforeContentRef) {
-      await fs.mkdir(path.join(namespaceRoot, "blobs"), { recursive: true });
-      await fs.writeFile(
-        path.join(namespaceRoot, beforeContentRef),
-        input.beforeContent,
-        "utf8",
-      );
+      const relative = `${config.authorityId}/${beforeContentRef}`;
+      const existing = inspectWorkspaceFile(config.ledgerRoot, relative);
+      if (existing.state === 'exists') {
+        if (existing.content !== input.beforeContent) throw new Error('Stored snapshot blob failed its integrity check.');
+      } else commitWorkspaceFile({ workspaceRoot: config.ledgerRoot, relativePath: relative, expected: existing, content: input.beforeContent });
     }
-    await fs.writeFile(
-      recordPath(config.ledgerRoot, config.authorityId, input.recordId),
-      `${JSON.stringify(record, null, 2)}\n`,
-      "utf8",
-    );
+    const relative = `${config.authorityId}/records/${input.recordId}.json`;
+    const existing = inspectWorkspaceFile(config.ledgerRoot, relative);
+    if (existing.state !== 'absent') throw new Error('Snapshot record already exists.');
+    commitWorkspaceFile({ workspaceRoot: config.ledgerRoot, relativePath: relative, expected: existing, content: `${JSON.stringify(record, null, 2)}\n` });
   } catch (error) {
     return blocked(
       "file-system-error",
@@ -309,12 +325,10 @@ export async function readRecoveryAuthorityRecord(input: {
     return undefined;
   }
   try {
-    const raw = await fs.readFile(
-      recordPath(config.ledgerRoot, config.authorityId, input.recordId),
-      "utf8",
-    );
-    const parsed = JSON.parse(raw) as RecoveryAuthorityStoredRecord;
-    if (parsed.schemaVersion !== schemaVersion) {
+    const raw = await readLedgerText(config.ledgerRoot, `${config.authorityId}/records/${input.recordId}.json`);
+    const parsed: unknown = JSON.parse(raw);
+    if (!validRecoveryRecord(parsed, config.authorityId, input.recordId)
+      || normalizeWorkspaceRelativePath(parsed.workspaceRelativePath) !== parsed.workspaceRelativePath) {
       return undefined;
     }
     return parsed;
@@ -405,10 +419,6 @@ export function toOriginalContentAuthorityRecord(
   };
 }
 
-export function hashContent(content: string): string {
-  return crypto.createHash("sha256").update(content, "utf8").digest("hex");
-}
-
 export function normalizeWorkspaceRelativePath(
   workspaceRelativePath: string,
 ): string | undefined {
@@ -465,7 +475,7 @@ function validateNonDefaultConfig(input: {
       ),
     };
   }
-  if (!idPattern.test(input.authorityId) || !idPattern.test(input.recordId)) {
+  if (!safeRecoveryId(input.authorityId) || !safeRecoveryId(input.recordId)) {
     return {
       ok: false,
       failure: blocked(

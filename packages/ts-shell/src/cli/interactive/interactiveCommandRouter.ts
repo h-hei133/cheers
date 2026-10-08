@@ -128,6 +128,7 @@ export async function routeInteractiveCommand(
     printMode: false,
     interactive: true,
     sessionId: input.runtimeContext.session.id,
+    workspaceRoots: input.runtimeContext.session.workspaceRoots,
     onTurnMessage: (message) => input.sessionManager.addTurn(input.runtimeContext.session.id, message),
     onReport: reportWriter(input.sessionManager, input.runtimeContext.session.id),
     ...(input.runtimeContext.skillOptions ? { skillOptions: input.runtimeContext.skillOptions } : {}),

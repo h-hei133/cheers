@@ -1,24 +1,15 @@
-import fs from "node:fs/promises";
 import path from "node:path";
+import { prepareRecoveryRestore, type RestorePrimitiveBlockedReason } from "./restorePrimitive.js";
+import { inspectWorkspaceFile, matchesFileState } from "../authority/state.js";
 import {
-  hashContent,
   normalizeWorkspaceRelativePath,
-  readRecoveryAuthorityRecord,
 } from "./recoveryAuthorityStore.js";
 import {
   listRecoveryAuthorityRecords,
   type RecoveryAuthorityRecordIndexEntry,
 } from "./recoveryAuthorityIndex.js";
 
-export type RestorePreviewBlockedReason =
-  | "record-not-found"
-  | "invalid-workspace-relative-path"
-  | "record-path-mismatch"
-  | "workspace-boundary"
-  | "original-content-missing"
-  | "current-state-mismatch"
-  | "current-content-hash-mismatch"
-  | "file-system-error";
+export type RestorePreviewBlockedReason = RestorePrimitiveBlockedReason;
 
 export interface RestorePreviewFile {
   readonly recordId: string;
@@ -50,6 +41,7 @@ export async function previewRecoveryAuthorityRestore(input: {
   readonly authorityId: string;
   readonly workspaceRoot: string;
   readonly recordIds: readonly string[];
+  readonly assertFileAccess?: (absolutePath: string) => void;
 }): Promise<RestorePreviewResult> {
   const index = await listRecoveryAuthorityRecords({
     ledgerRoot: input.ledgerRoot,
@@ -115,35 +107,17 @@ export async function previewRecoveryAuthorityRestore(input: {
       continue;
     }
 
-    const stored = await readRecoveryAuthorityRecord({
-      ledgerRoot: input.ledgerRoot,
-      authorityId: input.authorityId,
-      recordId: record.recordId,
-    });
-    const expectedCurrentContentHash = stored?.expectedCurrentContentHash;
-    const current = await inspectCurrentContent(absolutePath);
-    if (
-      (record.expectedCurrentState === "exists" &&
-        current.state !== "exists") ||
-      (record.expectedCurrentState === "absent" && current.state !== "absent")
-    ) {
-      blockedFiles.push({
-        ...previewFile,
-        blockedReason: "current-state-mismatch",
-      });
-      currentContentMismatches.push(relativePath);
-      continue;
-    }
-    if (
-      current.state === "exists" &&
-      expectedCurrentContentHash &&
-      hashContent(current.content) !== expectedCurrentContentHash
-    ) {
-      blockedFiles.push({
-        ...previewFile,
-        blockedReason: "current-content-hash-mismatch",
-      });
-      currentContentMismatches.push(relativePath);
+    try {
+      const prepared = await prepareRecoveryRestore({ ...input, recordId: record.recordId, workspaceRelativePath: relativePath });
+      const current = inspectWorkspaceFile(input.workspaceRoot, relativePath, input.assertFileAccess);
+      if (!matchesFileState(current, prepared.expected)) {
+        blockedFiles.push({ ...previewFile, blockedReason: current.state !== prepared.expected.state ? 'current-state-mismatch' : 'current-content-hash-mismatch' });
+        currentContentMismatches.push(relativePath);
+        continue;
+      }
+    } catch (error) {
+      const reason = error instanceof Error && 'reason' in error ? error.reason as RestorePrimitiveBlockedReason : 'file-system-error';
+      blockedFiles.push({ ...previewFile, blockedReason: reason });
       continue;
     }
 
@@ -191,26 +165,6 @@ function toPreviewFile(
   };
 }
 
-async function inspectCurrentContent(
-  absolutePath: string,
-): Promise<
-  | { readonly state: "exists"; readonly content: string }
-  | { readonly state: "absent" }
-> {
-  try {
-    const stat = await fs.stat(absolutePath);
-    if (!stat.isFile()) {
-      return { state: "absent" };
-    }
-    return {
-      state: "exists",
-      content: await fs.readFile(absolutePath, "utf8"),
-    };
-  } catch {
-    return { state: "absent" };
-  }
-}
-
 function pathStaysInsideWorkspace(
   workspaceRoot: string,
   candidatePath: string,
@@ -218,5 +172,5 @@ function pathStaysInsideWorkspace(
   const root = path.resolve(workspaceRoot);
   const resolved = path.resolve(candidatePath);
   const relative = path.relative(root, resolved);
-  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+  return relative === "" || (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
 }

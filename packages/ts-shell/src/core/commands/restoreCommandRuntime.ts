@@ -1,4 +1,5 @@
 import { restoreSyntax } from "./restore/syntax.js";
+import { restoreAccess } from './restore/access.js';
 import { parseSyntax } from "./syntax/parse.js";
 import { syntaxHelp } from "./syntax/projection.js";
 import {
@@ -33,7 +34,7 @@ export async function runRestoreLocalCommand(
     if (!(error instanceof SyntaxError)) throw error;
     return { kind: "local", output: `Invalid /restore arguments: ${error.message} Nothing was written.\n${syntaxHelp(restoreSyntax)}` };
   }
-  const result = await runRestoreCommand(request);
+  const result = await runRestoreCommand({ ...request, assertFileAccess: restoreAccess(context) });
   return {
     kind: "local",
     output: formatRestoreCommandResult(result),
@@ -92,11 +93,13 @@ export function formatRestoreCommandResult(
   result: RestoreCommandResult,
 ): string {
   const preview = result.mode === "preview";
+  const unknown = result.outcome === 'unknown';
+  const partial = result.outcome === 'partial';
   const lines = [
-    `### Restore — ${preview ? "preview" : result.executed ? "executed" : "not executed"}`,
+    `### Restore — ${preview ? "preview" : unknown ? 'outcome unknown' : partial ? 'partially restored' : result.executed ? "executed" : "not executed"}`,
     "",
     `- Mode: ${result.mode}`,
-    `- Executed: ${result.executed ? "yes" : "no"}`,
+    `- Executed: ${unknown ? 'unknown; a write may have occurred' : result.executed ? "yes" : "no"}`,
     `- Automatic recovery: ${result.automaticRecovery ? "yes" : "no"}`,
     `- Atomic rollback: ${result.rollbackAtomicityClaim ? "yes" : "no"}`,
   ];
@@ -109,6 +112,7 @@ export function formatRestoreCommandResult(
   }
   lines.push(...fileSection(preview ? "Would restore" : "Restorable", result.restorableFiles.map(pathOf)));
   lines.push(...fileSection("Restored", result.restoredFiles));
+  lines.push(...fileSection('Unknown; inspect before retrying', (result.unknownFiles ?? []).map(pathOf)));
   lines.push(
     ...fileSection(
       "Blocked",

@@ -266,6 +266,7 @@ export async function runNonInteractivePrompt(options: {
     interactive: false,
     getToolPool: toolPoolFor(options.runtimeContext, options.mcpGateway),
     sessionId: options.runtimeContext.session.id,
+    workspaceRoots: options.runtimeContext.session.workspaceRoots,
     onTurnMessage: (message) => options.sessionManager.addTurn(options.runtimeContext.session.id, message),
     onReport: reportWriter(options.sessionManager, options.runtimeContext.session.id),
     ...(options.runtimeContext.skillOptions

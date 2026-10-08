@@ -153,6 +153,7 @@ export interface TextFileReadExecutionRequest extends ExecutionRequestMetadata<'
 }
 
 export interface TextFileWriteExecutionRequest extends ExecutionRequestMetadata<'file.write'> {
+  readonly editIdentity?: import('../../edit/recovery/operation/model.js').EditOperationIdentity
   readonly assertFileAccess?: (absolutePath: string) => void
   readonly abortSignal?: AbortSignal
   readonly absolutePath: string

@@ -15,18 +15,21 @@ export async function runRestoreCommand(
 
   const command = validation.command;
   const bridgeResult = await runExplicitRestoreBridge({
-    mode: command.mode,
+    mode: command.dryRun ? 'preview' : command.mode,
     ledgerRoot: command.ledgerRoot,
     authorityId: command.authorityId,
     workspaceRoot: command.workspaceRoot,
     recordSelection: command.recordSelection,
+    assertFileAccess: request.assertFileAccess,
   });
 
   return {
-    mode: command.mode,
+    mode: bridgeResult.mode,
+    outcome: bridgeResult.outcome,
+    unknownFiles: bridgeResult.unknownFiles,
     executed: bridgeResult.executed,
     restorableFiles:
-      command.mode === "preview" ? bridgeResult.skippedFiles : [],
+      bridgeResult.mode === "preview" ? bridgeResult.skippedFiles : [],
     restoredFiles: [...bridgeResult.restoredFiles],
     blockedFiles: [...bridgeResult.blockedFiles],
     inspectedFiles: [...bridgeResult.inspectedFiles],
