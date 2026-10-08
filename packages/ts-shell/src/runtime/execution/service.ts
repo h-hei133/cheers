@@ -1,6 +1,7 @@
 import { writeTextFile } from './write.js'
 import { readTextFile } from './read.js'
 import { readTextPage } from './page.js'
+import { readMedia } from './media/index.js'
 import { verifyPathContainment } from '../../core/security/pathJail.js'
 import { executeLocally } from './local.js'
 import type { NormalizedExecutionResult } from './types.js'
@@ -35,6 +36,7 @@ export function createDefaultExecutionService(): ExecutionService {
   return {
     readTextFile,
     readTextPage,
+    readMedia,
     writeTextFile,
     async listFilesRecursive(request) {
       request.abortSignal?.throwIfAborted()

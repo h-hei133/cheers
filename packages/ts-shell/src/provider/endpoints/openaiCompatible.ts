@@ -2,6 +2,8 @@ import {
   formatNonVisionFallback,
   toOpenAIImageUrlBlock,
   type OpenAIImageUrlBlock,
+  type MultimodalContentBlock,
+  messageToText,
 } from "../../model-adapters/multimodal.js";
 import { readCompletionStream, type CompletedBody } from "../../turn/completion.js";
 import type { ChatMessage } from "../../turn/prompt.js";
@@ -58,10 +60,7 @@ declareEndpoint("openai-compatible", {
       // A bare string, or an array of parts when the message carries images.
       // The bridging and the compaction the caller already did are its business,
       // not the protocol's; what is left here is how this wire writes a message.
-      ...input.messages.map((message) => ({
-        ...message,
-        content: wireContent(message.content, input.vision),
-      })),
+      ...wireMessages(input.messages, input.vision, input.assistantAfterToolResult),
     ],
     // Omitted rather than sent with `tool_choice: "none"`, which is what the
     // other protocol already did. Both ways stop the call, but keeping the
@@ -98,6 +97,29 @@ declareEndpoint("openai-compatible", {
   readBody: readBody,
   readStream: (body) => readCompletionStream(body),
 });
+
+/** Tool responses remain contiguous; this protocol accepts images in user turns. */
+function wireMessages(messages: readonly ChatMessage[], vision: boolean, bridge: boolean): Record<string, unknown>[] {
+  const result: Record<string, unknown>[] = [];
+  let pending: MultimodalContentBlock[] = [];
+  const flush = (): void => {
+    if (pending.length === 0) return;
+    if (bridge) result.push({ role: "assistant", content: "I have processed the tool results." });
+    result.push({ role: "user", content: wireContent(pending, vision) });
+    pending = [];
+  };
+  for (const message of messages) {
+    if (message.role !== "tool") flush();
+    if (message.role === "tool" && Array.isArray(message.content)) {
+      const images = message.content.filter(block => block.type === "image");
+      const text = messageToText(message.content, { placeholderForImages: !vision });
+      result.push({ ...message, content: text || (images.length ? "(see attached image)" : "") });
+      if (vision && images.length) pending.push({ type: "text", text: `Image from tool result ${message.tool_call_id ?? "unknown"}:` }, ...images);
+    } else result.push({ ...message, content: wireContent(message.content, vision) });
+  }
+  flush();
+  return result;
+}
 
 /** Preserve explicit refusal even when the provider reports an ordinary stop. */
 function readBody(body: unknown): CompletedBody {

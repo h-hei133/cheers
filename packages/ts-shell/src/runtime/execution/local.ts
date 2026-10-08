@@ -33,6 +33,7 @@ function collectStreamed(options: {
   input?: string
   /** Consume stdout separately; capture can be disabled for bounded stream consumers. */
   onStdout?: (chunk: Buffer) => void
+  onStderr?: (chunk: Buffer) => void
   captureOutput?: boolean
   /** Already verified read descriptors inherited as child fd 3 and above. */
   readDescriptors?: readonly number[]
@@ -115,6 +116,7 @@ function collectStreamed(options: {
     child.stderr?.on('data', (chunk: Buffer) => {
       const text = chunk.toString()
       if (options.captureOutput !== false) stderr += text
+      options.onStderr?.(chunk)
       options.onOutput(text)
     })
     child.on('error', (error: NodeJS.ErrnoException) => fail(error.message, {
@@ -172,6 +174,7 @@ export async function executeLocally(options: {
   input?: string
   /** Consume stdout separately; capture can be disabled for bounded stream consumers. */
   onStdout?: (chunk: Buffer) => void
+  onStderr?: (chunk: Buffer) => void
   captureOutput?: boolean
   /** Already verified read descriptors inherited as child fd 3 and above. */
   readDescriptors?: readonly number[]

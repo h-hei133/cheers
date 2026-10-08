@@ -1,4 +1,4 @@
-import type { MultimodalContentBlock } from "../../model-adapters/multimodal.js";
+import { messageToText, type MultimodalContentBlock } from "../../model-adapters/multimodal.js";
 export interface MicrocompactOptions {
   readonly keepRecentTurns?: number;
   readonly maxOutputChars?: number;
@@ -11,9 +11,8 @@ export interface ChatMessageLike {
   /**
    * Text, or text with images.
    *
-   * Widened so a message carrying an image can pass through. This compactor only
-   * rewrites string content — it checks the type before touching it — so an
-   * array is carried along untouched rather than being an error.
+   * Recent images stay intact. Older tool images are replaced by descriptive
+   * text and a re-read instruction; user attachments remain intact.
    */
   readonly content?: string | readonly MultimodalContentBlock[] | null;
   readonly tool_calls?: ReadonlyArray<{
@@ -91,30 +90,34 @@ export function microcompactMessages<T extends ChatMessageLike>(
 
   const result: T[] = messages.map((msg, index) => {
     // Only prune tool messages that occur before the recent turn boundary
-    if (index < boundaryIndex && msg.role === "tool" && typeof msg.content === "string") {
-      const originalLen = msg.content.length;
+    const hasImages = Array.isArray(msg.content) && msg.content.some(block => block.type === 'image');
+    if (index < boundaryIndex && msg.role === "tool" && (typeof msg.content === 'string' || hasImages)) {
+      const content = typeof msg.content === "string" ? msg.content : messageToText(msg.content, { placeholderForImages: true });
+      const imageNotice = hasImages ? "\n[Older tool images omitted; re-read the source if visual content is needed.]" : '';
+      const originalLen = typeof msg.content === 'string' ? msg.content.length
+        : (msg.content ?? []).reduce((length, block) => length + (block.type === 'image' ? block.data.length : block.text.length), 0);
 
       // Deduplicate identical outputs in older history using full content hash
       let hash = 0;
-      for (let c = 0; c < msg.content.length; c++) {
-        hash = ((hash << 5) - hash) + msg.content.charCodeAt(c);
+      for (let c = 0; c < content.length; c++) {
+        hash = ((hash << 5) - hash) + content.charCodeAt(c);
         hash |= 0;
       }
-      const contentHash = `${originalLen}:${hash}`;
+      const contentHash = `${content.length}:${hash}`;
 
-      if (seenOlderToolOutputs.has(contentHash) && originalLen > 300) {
+      if (!hasImages && seenOlderToolOutputs.has(contentHash) && originalLen > 300) {
         prunedCount++;
-        const deduplicated = `[... Duplicate tool output omitted: ${originalLen} characters previously shown ...]`;
-        savedChars += originalLen - deduplicated.length;
+        const deduplicated = `[... Duplicate tool output omitted: ${content.length} characters previously shown ...]${imageNotice}`;
+        savedChars += Math.max(0, originalLen - deduplicated.length);
         return {
           ...msg,
           content: deduplicated,
         };
       }
-      seenOlderToolOutputs.add(contentHash);
+      if (!hasImages) seenOlderToolOutputs.add(contentHash);
 
-      if (originalLen > maxOutputChars) {
-        const pruned = pruneToolContent(msg.content, headChars, tailChars);
+      if (content.length > maxOutputChars) {
+        const pruned = pruneToolContent(content, headChars, tailChars) + imageNotice;
         const diff = originalLen - pruned.length;
         if (diff > 0) {
           prunedCount++;
@@ -124,6 +127,11 @@ export function microcompactMessages<T extends ChatMessageLike>(
             content: pruned,
           };
         }
+      }
+      if (hasImages) {
+        prunedCount++;
+        savedChars += Math.max(0, originalLen - content.length - imageNotice.length);
+        return { ...msg, content: content + imageNotice };
       }
     }
     return msg;

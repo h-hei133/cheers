@@ -1,6 +1,7 @@
 import type { InteractiveAsk } from '../core/tools/ask/contract.js'
 import type { SubagentRunner } from '../core/subagents/runner.js'
 import type { WorkspaceRoot } from '../core/workspace/model.js'
+import type { ImageContent } from '../model-adapters/multimodal.js'
 
 export interface ToolExecutionContext {
   readonly taskId: string
@@ -46,6 +47,8 @@ export interface ToolExecutionResult {
   /** outputNotice reserves essential page/recovery facts when model text is shortened. */
   readonly metadata?: Record<string, unknown>
   readonly content?: string
+  /** Validated media kept separate from display text and structured metadata. */
+  readonly images?: readonly ImageContent[]
 }
 
 export interface ToolDefinition {

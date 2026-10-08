@@ -25,7 +25,7 @@ confidence: mixed
 
 | 工具 | Cheers 当前源码事实 | Phase 19 需要补齐的契约 |
 |---|---|---|
-| `read` | 文本及 artifact 已改为已验证句柄上的有界 UTF-8 分页；单目录增量枚举及异步遍历/忽略规则有累计资源界；尚不返回图片多模态块 | 本地验证见裁决 §8.63–8.66；原生内部读取、同步发现与图片/PDF 内容块继续，见 §3.7、§3.10 |
+| `read` | 有界 UTF-8/目录/artifact 页、真实 JPEG 图片块与 PDF 逐页文本；媒体使用固定私有副本和有界原生执行 | 文本见裁决 §8.63–8.66/8.112；图片/PDF Linux 本地验收及依赖边界见 §8.113，原生隐式读取/同步发现仍保留边界 |
 | `write` | 单文件统一 writer、路径校验、进程内锁；非字符串 `content` 被转换为空串；底层支持可选 `expectedContent` | 非字符串拒绝、真实 schema 校验、显式不存在前置状态、精确 stale-read，见 §3.1 |
 | `edit` | 单文件可使用多段 `edits[]`、oldText/newText 或全量 content；快照记录供恢复 | 现有调用保留；新增 `apply_patch` 解析为同一 edit 域批次计划，不新增第二 writer，见 §4 |
 | `glob` | [glob.ts](../../packages/ts-shell/src/core/tools/glob.ts) 先枚举再过滤；1,000 项与输出字节上限不限制此前遍历 | 目录、文件、深度、时间与内存预算，取消及截断状态；成熟原生查找优先，保留受控 fallback |
@@ -133,7 +133,13 @@ confidence: mixed
 | 浏览器扩展 | browser 域统一 tabs、screenshot、dialog、upload/download、network policy/session 生命周期，工具入口仅适配 | 多标签隔离、导航后 ref 失效、截图证据、上传下载权限、弹窗取消和网络边界；既有八动作回归 |
 | 子代理与预算 | 通用 runner/调度与 `/goal` 的共享 admission、计量、deadline 和持久状态；默认无总 token cap，`budget N` 启用，`budget off` 移除 | 显式 cap 汇总主/子/顾问/重试且不可绕过；未设 cap 不虚构默认 100k；单请求窗口/输出/timeout/并发与安全取消仍生效；权限只能求交，研究复用该契约 |
 
-上述均为拟实施能力，不是“现有实现已经具备”的清单。具体服务器/解析器选型需先核查目标接口，再做针对性参考与依赖评估；不可因参考项目用了另一种语言而引入第二 runtime。
+此表保留规划接口；已实施部分以裁决文档 §8 为准。TOOL-02 图片/PDF 已通过 Linux 本地验收，见 §3.11；其他项没有因此变为已完成。具体服务器/解析器选型需先核查目标接口，再做针对性参考与依赖评估，不引入第二 runtime。
+
+### 3.11 图片/PDF 的当前实现边界
+
+`runtime/execution/media/` 复用唯一 local executor，最多 16MiB 固定源副本、15 秒共同期限与原生资源限额；最多两次并行提取，清理未核实时封锁后续媒体准入。PNG/JPEG/WebP/GIF 经受限 FFmpeg 解码、首帧/缩小后以真正图片块进入支持 vision 的 provider；非视觉模型显示显式 fallback。PDF 经 Poppler 按页提取文字，默认/最多五页、文档最多 200 页，保留来源 hash、页定位、无文字状态和续读提示，不执行 OCR。原文件不修改，图片内容不会作为 base64 倾倒至终端。
+
+Linux 要求相应原生 utilities，缺失及其他平台明确 unavailable；资源限额不冒充系统沙箱。kernel 的批次图片预算、hook 脱敏、持久重放与旧图片压缩沿既有消息通路，没有增加平行 artifact/session 系统。构建、组合/契约测试、反转、独立审查与 actual CLI 的准确证据见 [Phase 19 裁决](phase-19-decisions.md) §8.113。
 
 ## 4. 多文件编辑：一个入口、一份计划、一个 writer
 

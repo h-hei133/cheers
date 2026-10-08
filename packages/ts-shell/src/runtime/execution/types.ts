@@ -255,9 +255,22 @@ export interface CommandExecutionResult extends NormalizedExecutionResult {
 }
 
 export interface ExecutionService {
+  readonly readMedia: (request: MediaReadRequest) => Promise<MediaReadResult>
   readonly readTextFile: (request: TextFileReadExecutionRequest) => Promise<string>
   readonly readTextPage: (request: TextPageReadRequest) => Promise<TextPageReadResult>
   readonly writeTextFile: (request: TextFileWriteExecutionRequest) => Promise<void>
   readonly listFilesRecursive: (request: FileListExecutionRequest) => Promise<readonly string[]>
   readonly runCommand: (request: CommandExecutionRequest) => Promise<CommandExecutionResult>
+}
+
+export interface MediaReadRequest extends TextFileReadExecutionRequest {
+  readonly kind: 'image' | 'pdf'
+  readonly offset?: number
+  readonly limit?: number
+}
+
+export interface MediaReadResult {
+  readonly output: string
+  readonly images?: readonly import('../../model-adapters/multimodal.js').ImageContent[]
+  readonly metadata: Record<string, unknown>
 }

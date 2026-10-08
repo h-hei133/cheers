@@ -1,5 +1,5 @@
 import type { ChatMessage } from "../../../turn/prompt.js";
-import { formatNonVisionFallback } from "../../../model-adapters/multimodal.js";
+import { formatNonVisionFallback, messageToText, type ImageContent } from "../../../model-adapters/multimodal.js";
 
 /** A block in a user turn. */
 type UserBlock =
@@ -29,6 +29,7 @@ export interface WireMessage {
  */
 export function convertMessages(messages: readonly ChatMessage[], vision: boolean): WireMessage[] {
   const wire: WireMessage[] = [];
+  let pendingImages: ImageContent[] = [];
 
   const pushUser = (block: UserBlock): void => {
     const previous = wire[wire.length - 1];
@@ -41,12 +42,16 @@ export function convertMessages(messages: readonly ChatMessage[], vision: boolea
 
   for (const message of messages) {
     if (message.role === "system") continue;
+    if (message.role !== "tool" && pendingImages.length) {
+      pushUserBlocks(pushUser, pendingImages, vision);
+      pendingImages = [];
+    }
 
     if (message.role === "tool") {
       pushUser({
         toolResult: {
           toolUseId: message.tool_call_id ?? "",
-          content: [{ text: textOf(message.content) }],
+          content: [{ text: messageToText(message.content, { placeholderForImages: !vision }) || '(see attached image)' }],
           // The conversation carries no success marker, so every result is
           // reported as one. The text is where a failure is described, and
           // claiming the opposite of what the text says would be worse than
@@ -54,6 +59,7 @@ export function convertMessages(messages: readonly ChatMessage[], vision: boolea
           status: "success",
         },
       });
+      if (vision && Array.isArray(message.content)) pendingImages.push(...message.content.filter((block): block is ImageContent => block.type === 'image'));
       continue;
     }
 
@@ -93,6 +99,7 @@ export function convertMessages(messages: readonly ChatMessage[], vision: boolea
       }
     }
   }
+  if (pendingImages.length) pushUserBlocks(pushUser, pendingImages, vision);
   return wire;
 }
 
@@ -187,4 +194,3 @@ function safeParse(arguments_: string): unknown {
     return {};
   }
 }
-

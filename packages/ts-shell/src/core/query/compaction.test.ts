@@ -47,6 +47,44 @@ describe("2-Layer Compaction Subsystem", () => {
       // The most recent tool message (index 8) is preserved untouched
       expect(messages[8].content).toBe(history[8].content);
     });
+
+    it('drops older tool images with source recovery guidance while retaining user and recent images', () => {
+      const content = [{ type: 'text' as const, text: 'Read diagram.png, source hash abc.' },
+        { type: 'image' as const, mimeType: 'image/png', data: 'x'.repeat(2000) }];
+      const history = [
+        { role: 'user' as const, content },
+        { role: 'assistant' as const, content: 'read image' },
+        { role: 'tool' as const, content, tool_call_id: 'old' },
+        { role: 'user' as const, content: 'next' },
+        { role: 'assistant' as const, content: 'read again' },
+        { role: 'tool' as const, content, tool_call_id: 'recent' },
+      ];
+      const compacted = microcompactMessages(history, { keepRecentTurns: 1 });
+      expect(compacted.messages[0].content).toBe(content);
+      expect(compacted.messages[5].content).toBe(content);
+      expect(compacted.messages[2].content).toContain('Read diagram.png, source hash abc.');
+      expect(compacted.messages[2].content).toContain('re-read the source');
+      expect(compacted.messages[2].content).not.toContain('x'.repeat(2000));
+      expect(compacted.prunedCount).toBe(1);
+      expect(compacted.savedChars).toBeGreaterThan(1800);
+      expect(history[2].content).toBe(content);
+    });
+
+    it('does not infer duplicate images from matching descriptive text', () => {
+      const image = (data: string) => [{ type: 'text' as const, text: 'same dimensions '.repeat(30) },
+        { type: 'image' as const, mimeType: 'image/jpeg', data }];
+      const history = [
+        { role: 'tool' as const, content: image('a'.repeat(2000)) },
+        { role: 'tool' as const, content: image('b'.repeat(2000)) },
+        { role: 'user' as const, content: 'next' },
+        { role: 'assistant' as const, content: 'answer' },
+      ];
+      const compacted = microcompactMessages(history, { keepRecentTurns: 1 });
+      expect(compacted.prunedCount).toBe(2);
+      expect(compacted.messages[1].content).not.toContain('Duplicate');
+      expect(compacted.messages[1].content).toContain('same dimensions');
+      expect(compacted.messages[1].content).toContain('re-read the source');
+    });
   });
 
   describe("Layer 2: 8-Section Checkpoint Summarizer", () => {

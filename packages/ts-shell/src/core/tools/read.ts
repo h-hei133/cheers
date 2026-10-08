@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises'
 import { verifyPathContainment } from '../security/pathJail.js'
-import { formatNonVisionFallback, getImageMimeType, isImageFilePath } from '../../model-adapters/multimodal.js'
+import { isImageFilePath } from '../../model-adapters/multimodal.js'
 import { ArtifactManager } from '../session/artifactManager.js'
 import { parsePathSelector } from './selectorParser.js'
 import { formatDirectoryListing } from './directoryListing.js'
@@ -14,7 +14,7 @@ const AUTHORITY = { mode: 'read-only', source: 'tool-runtime-approval', reason: 
 export function createReadToolDefinition(executionService: ExecutionService): ToolDefinition {
   return {
     name: 'read',
-    description: 'Read UTF-8 text in the workspace, with bounded line offset/limit pagination. Text scans read at most 8MiB and check a 5-second deadline between reads; text content is capped at 50KiB. Reading a directory path lists its direct contents instead, one level deep. Image files are identified without returning image content.',
+    description: 'Read bounded UTF-8 text pages, PDF text pages or direct directory entries. PDF offset/limit count pages (default/max five per read, max 200 document pages); PDF extraction is text-only, with no OCR. Images produce a decoded visual frame when the native reader and model vision support are available. Media requires Linux and native utilities, accepts at most 16MiB and has a shared 15-second deadline. Text scans at most 8MiB/5 seconds and returns at most 50KiB.',
     argsSchema: {
       type: 'object',
       properties: {
@@ -24,11 +24,11 @@ export function createReadToolDefinition(executionService: ExecutionService): To
         },
         offset: {
           type: 'number',
-          description: 'The 1-based starting line number, or entry number when reading a directory (default: 1).',
+          description: 'The 1-based starting line, directory entry or PDF page (default: 1). Images reject offset/limit.',
         },
         limit: {
           type: 'number',
-          description: 'The maximum number of lines, or entries when reading a directory (default: 500, max: 1000).',
+          description: 'Maximum text lines or directory entries (default: 500, max: 1000); for PDF, pages (default/max: 5).',
         },
       },
       required: ['path'],
@@ -83,22 +83,6 @@ export function createReadToolDefinition(executionService: ExecutionService): To
           })
           return approvedResult(listing.output, listing.outputNotice ? { outputNotice: listing.outputNotice } : undefined)
         }
-        // An image read as text is mojibake, and mojibake is worse than a
-        // refusal: it looks like content. Say what the file is and how to view
-        // it instead of handing the model bytes it cannot interpret.
-        if (isImageFilePath(containment.resolvedPath)) {
-          const stats = await fs.stat(containment.resolvedPath)
-          return approvedResult(
-            formatNonVisionFallback({
-              type: 'image',
-              data: '',
-              mimeType: getImageMimeType(containment.resolvedPath),
-            }) +
-              `\n${selector.cleanPath} is ${Math.round(stats.size / 1024)}KB on disk. ` +
-              `Its bytes cannot be read as text; this model receives no image content. ` +
-              `Use bash to inspect it (e.g. file, identify, exiftool) if you need facts about it.`,
-          )
-        }
         // A read returns bytes from this invocation. Session identity and
         // file timestamps cannot prove earlier content is still visible to
         // this model, or that an external writer left the bytes unchanged.
@@ -113,6 +97,20 @@ export function createReadToolDefinition(executionService: ExecutionService): To
           reason: 'Read an approved workspace file target.',
           reportSafeTarget: containment.resolvedPath,
         }
+      }
+
+      if (isImageFilePath(request.absolutePath)) {
+        if (selector.hasSelector || args.offset !== undefined || args.limit !== undefined) throw new Error('Image reads do not accept line offsets or limits.')
+        const media = await executionService.readMedia({ ...request, kind: 'image' })
+        context.abortSignal?.throwIfAborted()
+        return { success: true, ...media }
+      }
+      if (request.absolutePath.toLowerCase().endsWith('.pdf')) {
+        if (selector.hasSelector) throw new Error('PDF reads use offset/limit for pages; line selectors are not supported.')
+        const media = await executionService.readMedia({ ...request, kind: 'pdf',
+          offset: args.offset as number | undefined, limit: args.limit as number | undefined })
+        context.abortSignal?.throwIfAborted()
+        return { success: true, ...media }
       }
 
       const offset = selector.hasSelector ? selector.startLine ?? 1

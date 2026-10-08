@@ -178,6 +178,7 @@ async function executeTool(
         : [result.error, output].filter(Boolean).join("\n") || "Tool failed.",
       isError: !result.success,
       ...(result.metadata ? { metadata: result.metadata } : {}),
+      ...(result.images ? { images: result.images } : {}),
     };
   } catch (error) {
     return { output: [streamed ? boundText(streamed) : "", `Tool execution error: ${error instanceof Error ? error.message : String(error)}`].filter(Boolean).join("\n"), isError: true };

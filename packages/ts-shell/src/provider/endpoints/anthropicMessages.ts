@@ -189,7 +189,7 @@ type ContentBlock =
   | { readonly type: "redacted_thinking"; readonly data: string }
   | AnthropicImageBlock
   | { readonly type: "tool_use"; readonly id: string; readonly name: string; readonly input: unknown }
-  | { readonly type: "tool_result"; readonly tool_use_id: string; readonly content: string };
+  | { readonly type: "tool_result"; readonly tool_use_id: string; readonly content: string | readonly (AnthropicImageBlock | { readonly type: "text"; readonly text: string })[] };
 
 interface WireMessage {
   readonly role: "user" | "assistant";
@@ -222,8 +222,9 @@ function convertMessages(
       const block: ContentBlock = {
         type: "tool_result",
         tool_use_id: message.tool_call_id ?? "",
-        // A tool result is text on this side; images travel in user messages.
-        content: messageToText(message.content),
+        content: typeof message.content === "string" ? message.content
+          : (message.content ?? []).map(block => block.type === "text" ? { type: "text" as const, text: block.text }
+            : vision === true ? toAnthropicImageBlock(block) : { type: "text" as const, text: formatNonVisionFallback(block) }),
       };
       // Consecutive results belong in one user turn, which is what the API
       // expects after a turn with several tool calls.

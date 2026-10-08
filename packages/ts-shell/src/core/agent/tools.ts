@@ -1,4 +1,5 @@
-import { messageToText } from "../../model-adapters/multimodal.js";
+import { messageToText, type ImageContent } from "../../model-adapters/multimodal.js";
+import { boundToolMedia, createToolMediaBudget } from './media.js';
 import type { AgentEventSink } from "./events.js";
 import { recordCount, recordTiming } from "../../observability/metrics.js";
 import type { AgentMessage } from "./state.js";
@@ -12,6 +13,7 @@ export interface AgentToolCall {
 export interface AgentToolResult {
   readonly output: string;
   readonly isError: boolean;
+  readonly images?: readonly ImageContent[];
   readonly terminate?: boolean;
   /**
    * Structured facts a tool wants recorded beside its prose.
@@ -131,12 +133,15 @@ export function createToolResultMessage(
   toolCallId: string,
   output: string,
   metadata?: Record<string, unknown>,
+  images?: readonly ImageContent[],
 ): AgentMessage {
+  const bounded = boundToolMedia({ output, images, metadata }, createToolMediaBudget());
+  const retained = bounded.images ?? [];
   return {
     role: "tool",
     tool_call_id: toolCallId,
-    content: output,
-    ...(metadata ? { metadata } : {}),
+    content: retained.length ? [{ type: "text", text: bounded.output }, ...retained] : bounded.output,
+    ...(bounded.metadata ? { metadata: bounded.metadata } : {}),
   };
 }
 
@@ -243,18 +248,17 @@ export async function executeToolBatch(
     requested === "sequential" || forcedSequential
       ? await runSequential(tools, assistantMessage, calls, hooks, signal, emit)
       : await runParallel(tools, assistantMessage, calls, hooks, signal, emit);
-  // Bounded text, and the type it feeds is a string: this is the batch the
-  // kernel records, and it carries text rather than attachments.
-  const bounded = batch.messages.map((message) => ({
-    ...message,
-    content: boundText(messageToText(message.content), TOOL_OUTPUT_LIMIT, message.metadata?.outputNotice),
-  }));
+  // Bound model text while preserving validated media as typed content blocks.
+  const bounded = batch.messages.map((message) => {
+    const text = boundText(messageToText(message.content), TOOL_OUTPUT_LIMIT, message.metadata?.outputNotice);
+    const images = Array.isArray(message.content) ? message.content.filter((block): block is ImageContent => block.type === "image") : [];
+    return { ...message, content: images.length ? [{ type: "text" as const, text }, ...images] : text };
+  });
   if (!signal?.aborted) {
     return { messages: bounded, terminate: batch.terminate };
   }
   const pairedIds = new Set(bounded.map((message) => message.tool_call_id));
-  // Annotated because the bounded copy narrows `content` to a string, and this
-  // array also receives the tool results appended below.
+  // This array also receives aborted results for any calls not yet paired.
   const messages: AgentMessage[] = [...bounded];
   for (const call of calls) {
     if (pairedIds.has(call.id)) {
@@ -348,6 +352,7 @@ async function finalizeExecutedCall(
       ...executed,
       ...(executed.metadata || update.metadata ? { metadata } : {}),
       output,
+      ...(update.output !== undefined && output !== executed.output && (!executed.output || !output.startsWith(executed.output)) ? { images: undefined } : {}),
       isError: executed.isError || update.isError === true,
       terminate: update.terminate ?? executed.terminate,
     };
@@ -374,6 +379,7 @@ async function runSequential(
 ): Promise<ExecutedToolBatch> {
   const messages: AgentMessage[] = [];
   const results: AgentToolResult[] = [];
+  const mediaBudget = createToolMediaBudget();
   for (const call of calls) {
     await emit({ type: "tool_execution_start", toolCallId: call.id, toolName: call.name, args: call.args });
     const prepared = await prepareToolCall(tools, assistantMessage, call, hooks, signal);
@@ -384,11 +390,12 @@ async function runSequential(
       const executed = await executePreparedCall(prepared.tool, call, prepared.args, signal, emit);
       result = await finalizeExecutedCall(assistantMessage, call, prepared.args, executed, hooks, signal);
     }
+    result = boundToolMedia(result, mediaBudget);
     await emitExecutionEnd(emit, call, result.isError);
     results.push(result);
     messages.push(
       await emitToolResultMessage(
-        createToolResultMessage(call.id, result.output, result.metadata),
+        createToolResultMessage(call.id, result.output, result.metadata, result.images),
         emit,
       ),
     );
@@ -408,11 +415,12 @@ async function runParallel(
   emit: AgentEventSink,
 ): Promise<ExecutedToolBatch> {
   const pending: Array<() => Promise<AgentToolResult>> = [];
+  const mediaBudget = createToolMediaBudget();
   for (const call of calls) {
     await emit({ type: "tool_execution_start", toolCallId: call.id, toolName: call.name, args: call.args });
     const prepared = await prepareToolCall(tools, assistantMessage, call, hooks, signal);
     if (prepared.kind === "immediate") {
-      const result = prepared.result;
+      const result = boundToolMedia(prepared.result, mediaBudget);
       await emitExecutionEnd(emit, call, result.isError);
       pending.push(async () => result);
     } else {
@@ -424,14 +432,14 @@ async function runParallel(
           return result;
         }
         const executed = await executePreparedCall(preparedCall.tool, call, preparedCall.args, signal, emit);
-        const result = await finalizeExecutedCall(
+        const result = boundToolMedia(await finalizeExecutedCall(
           assistantMessage,
           call,
           preparedCall.args,
           executed,
           hooks,
           signal,
-        );
+        ), mediaBudget);
         await emitExecutionEnd(emit, call, result.isError);
         return result;
       });
@@ -446,7 +454,7 @@ async function runParallel(
   for (let index = 0; index < paired.length; index += 1) {
     messages.push(
       await emitToolResultMessage(
-        createToolResultMessage(paired[index].id, results[index].output, results[index].metadata),
+        createToolResultMessage(paired[index].id, results[index].output, results[index].metadata, results[index].images),
         emit,
       ),
     );

@@ -6356,3 +6356,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 
 
 ## [2026-10-08] fix | Phase 19 TOOL-01 保留目录枚举失败与选定页 artifact 真值，read/glob 显式提示穿过模型截断，补读当前页后才前进；hook 失败/替换事实保留。Node 20.3 构建及 203 项组合、结果契约 149 项、八组有效反转/恢复后 64 项、独立 APPROVED 和两模式十场 actual CLI/30 次本地 HTTP 通过，见 features/phase-19-decisions.md §8.112。公共异步工具 Linux 本地验收完成，原生内部/同步发现/非 Linux 边界明确保留；上一 725eaf51 远端因账单限制未启动，继续 TOOL-02 与完整 Phase 19。
+
+## [2026-10-08] feat | Phase 19 TOOL-02 返回真实工具图片并按页提取 PDF，固定源副本、共同原生资源界、批次图片预算、清理失败准入封锁及非视觉 fallback 明确。Node 20.3 构建/242 项、结果契约 149 项、七组有效反转/恢复后 26 项、独立 APPROVED 与 Node/executable 共八场 actual CLI/24 次本地 HTTP（含同 session 重启）通过。Linux 原生依赖、OCR/非 Linux/真实 provider 缺口见 features/phase-19-decisions.md §8.113；0faace27 远端因账单限制未启动，继续 TOOL-03 与完整 Phase 19。
