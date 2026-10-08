@@ -1,3 +1,5 @@
+import type { FileState } from '../../authority/state.js';
+
 export interface WorkspaceIdentity {
   readonly path: string;
   readonly identity: string;
@@ -8,8 +10,8 @@ export interface OperationScope {
   readonly workspace: WorkspaceIdentity;
 }
 
-export type ContentVersion = { readonly state: 'absent' } | { readonly state: 'exists'; readonly hash: string };
-export type OperationStatus = 'intent' | 'committed' | 'failed' | 'partial' | 'unknown';
+export type ContentVersion = { readonly state: 'absent' } | { readonly state: 'exists'; readonly hash: string; readonly mode?: number };
+export type OperationStatus = 'intent' | 'committed' | 'compensating' | 'restored' | 'failed' | 'partial' | 'unknown';
 export type UndoStatus = 'none' | 'intent' | 'restored-verified' | 'partial' | 'unknown';
 
 export interface OperationFile {
@@ -21,6 +23,8 @@ export interface OperationFile {
   readonly after: ContentVersion;
   readonly snapshot: { readonly authorityId: string; readonly recordId: string };
   readonly status: 'pending' | 'committed' | 'unchanged' | 'unknown';
+  readonly compensation?: 'intent' | 'restored-verified' | 'blocked' | 'unknown';
+  readonly rename?: { readonly source: string; readonly target: string };
   readonly undo: 'none' | 'intent' | 'restored-verified' | 'blocked' | 'unknown';
 }
 
@@ -44,4 +48,22 @@ export interface EditOperationIdentity {
   readonly workspaceRoot: string;
   readonly callId: string;
   readonly correlationId?: string;
+}
+
+export interface PreparedFile {
+  readonly workspaceRoot: string;
+  readonly workspaceIdentity?: string;
+  readonly relativePath: string;
+  readonly before: FileState;
+  readonly content: string | undefined;
+  readonly mode?: number;
+  readonly rename?: OperationFile['rename'];
+  readonly assertFileAccess?: (absolutePath: string) => void;
+}
+
+export interface PreparedOperation {
+  readonly scope: OperationScope;
+  readonly identity: EditOperationIdentity;
+  readonly operationId: string;
+  readonly files: readonly { readonly input: PreparedFile; readonly receipt: OperationFile }[];
 }

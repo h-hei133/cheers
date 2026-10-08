@@ -6349,3 +6349,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-08] feat | Phase 19 SES-05 持久附加读/写根与同 ID rebind，复用原 writer、jail 和迁移补偿；主根资源发现、跨进程撤权、沙箱只读优先级及 unknown admission 明确。Node 20.3 构建/263 项、结果契约 149 项、八组有效反转/恢复后 58 项、原生 Linux 沙箱、两模式实际 CLI/重启/技能与 MCP 刷新及独立最终 APPROVED 通过，见 features/phase-19-decisions.md §8.108。52f87bba 的远端 job 因账单限制零步骤失败；EDIT-01 与完整阶段继续。
 
 ## [2026-10-08] feat | Phase 19 EDIT-01 接入 session/workspace/call 归属与已核验 operation receipt，统一普通编辑、快照和恢复的 guarded publication，固定 Linux 目录锁并保留 intent/partial/unknown。最终 Node 20.3 构建/64 项、补充后恢复验证 28 项、九组有效反转、两模式实际 CLI 收据与独立 APPROVED 通过，详见 features/phase-19-decisions.md §8.109。693eabc8 远端 CI/Watch 因账单限制零步骤失败；多文件 apply_patch、undo 面板及完整 Phase 19 继续。
+
+## [2026-10-08] feat | Phase 19 EDIT-02 接入唯一 apply_patch，完整不可变计划审批、稳定批次锁、必需快照、快照后整批重验及真实 publication 的逆序条件补偿；保留 rename/mode、partial/unknown 和一次性 capability。Node 20.3 构建/最终 167 项、结果契约 149 项、十组有效反转/恢复后 22 项、两模式 actual CLI 与独立 APPROVED 通过，见 features/phase-19-decisions.md §8.110。9d62a64d 的远端 CI/Watch 因账单限制零步骤失败；EDIT-03 与完整 Phase 19 继续。

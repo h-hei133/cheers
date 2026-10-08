@@ -28,7 +28,7 @@ export function resolveWorkspaceToolTarget(
 
 /** Policy compares both the requested spelling and the file the tool resolves. */
 export function filePolicyTargets(toolName: string, args: Record<string, unknown>, workspaceRoot: string): readonly string[] {
-  const key = toolName === 'lsp' ? 'filePath' : ['read', 'write', 'edit', 'glob', 'grep'].includes(toolName) ? 'path' : undefined
+  const key = toolName === 'lsp' ? 'filePath' : ['read', 'write', 'edit', 'apply_patch', 'glob', 'grep'].includes(toolName) ? 'path' : undefined
   if (!key || typeof args[key] !== 'string') return []
   const raw = args[key] as string
   const clean = toolName === 'read' ? parsePathSelector(raw).cleanPath : raw

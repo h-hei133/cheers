@@ -9,6 +9,7 @@ export function commitWorkspaceFile(input: {
   readonly relativePath: string;
   readonly expected: FileExpectation;
   readonly content: string | undefined;
+  readonly mode?: number;
   readonly assertFileAccess?: (absolutePath: string) => void;
 }): FileState {
   const root = fs.realpathSync(input.workspaceRoot);
@@ -28,11 +29,12 @@ export function commitWorkspaceFile(input: {
     const parentIdentity = fileIdentity(fs.fstatSync(fd));
     if (descriptorPath(fd, parent) !== parent) throw new Error('File parent changed path.');
     if (input.content !== undefined) {
-      const temporaryFd = fs.openSync(temporary, 'wx', before.state === 'exists' ? before.mode & 0o777 : 0o666);
+      const mode = input.mode ?? (before.state === 'exists' ? before.mode & 0o777 : undefined);
+      const temporaryFd = fs.openSync(temporary, 'wx', mode ?? 0o666);
       createdTemporary = true;
       try {
         fs.writeFileSync(temporaryFd, input.content, 'utf8');
-        if (before.state === 'exists') fs.fchmodSync(temporaryFd, before.mode & 0o777);
+        if (mode !== undefined) fs.fchmodSync(temporaryFd, mode & 0o777);
         fs.fsyncSync(temporaryFd);
       } finally { fs.closeSync(temporaryFd); }
     }
@@ -56,7 +58,8 @@ export function commitWorkspaceFile(input: {
     }
     if (process.platform === 'linux') fs.fsyncSync(fd);
     const after = inspectWorkspaceFile(root, input.relativePath, input.assertFileAccess);
-    if (!matchesFileState(after, input.content === undefined ? { state: 'absent' } : { state: 'exists', content: input.content })) {
+    if (!matchesFileState(after, input.content === undefined ? { state: 'absent' } : { state: 'exists', content: input.content,
+      mode: input.mode ?? (before.state === 'exists' ? before.mode : undefined) })) {
       throw new Error('File commit could not be verified.');
     }
     return after;

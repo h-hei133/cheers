@@ -37,6 +37,7 @@ export type RestorePrimitiveResult = RestorePrimitiveFacts & (
 );
 
 export interface PreparedRestore {
+  readonly mode?: number;
   readonly record: RecoveryAuthorityStoredRecord;
   readonly relativePath: string;
   readonly expected: FileExpectation;
@@ -63,7 +64,7 @@ export async function prepareRecoveryRestore(input: RestorePrimitiveInput): Prom
   try { content = await readRecoveryBlob(input.ledgerRoot, record); }
   catch { throw new RestoreBlocked('original-content-invalid'); }
   input.abortSignal?.throwIfAborted();
-  return { record, relativePath, expected: state === 'absent' ? { state } : { state, hash }, content };
+  return { record, relativePath, expected: state === 'absent' ? { state } : { state, hash, mode: record.expectedCurrentMode }, content, mode: record.beforeMode };
 }
 
 export async function restoreRecoveryAuthorityRecord(input: RestorePrimitiveInput): Promise<RestorePrimitiveResult> {
@@ -80,7 +81,7 @@ export async function restoreRecoveryAuthorityRecord(input: RestorePrimitiveInpu
       if (!matchesFileState(current, prepared.expected)) return blocked('current-content-hash-mismatch', [prepared.relativePath]);
       writerStarted = true;
       commitWorkspaceFile({ workspaceRoot: input.workspaceRoot, relativePath: prepared.relativePath,
-        expected: current, content: prepared.content, assertFileAccess: checkAccess });
+        expected: current, content: prepared.content, mode: prepared.mode, assertFileAccess: checkAccess });
       return { restored: true, outcome: 'restored-verified', restoredFiles: [prepared.relativePath], inspectedFiles: [prepared.relativePath], rollbackAtomicityClaim: false,
         evidence: ['recovery-restore-primitive:explicit-call', 'recovery-restore-primitive:current-content-guard-passed',
           'recovery-restore-primitive:single-file-restore', 'recovery-restore-primitive:verified', 'recovery-restore-primitive:no-atomic-rollback'] };

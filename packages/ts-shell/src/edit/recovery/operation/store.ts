@@ -85,7 +85,7 @@ export function persistOperation(receipt: OperationReceipt): void {
   if (before.state === 'exists') {
     const previous = decodeOperation(JSON.parse(before.content), receipt);
     const immutable = (value: OperationReceipt) => JSON.stringify({ ...value, revision: 0, status: '', undo: '', updatedAt: '',
-      files: value.files.map(file => ({ ...file, status: '', undo: '' })) });
+      files: value.files.map(file => ({ ...file, status: '', undo: '', compensation: '' })) });
     if (receipt.revision !== previous.revision + 1 || immutable(receipt) !== immutable(previous)) throw new Error('Edit operation receipt changed before publication.');
   } else if (receipt.revision !== 1) throw new Error('Edit operation receipt disappeared before publication.');
   const text = JSON.stringify(receipt);

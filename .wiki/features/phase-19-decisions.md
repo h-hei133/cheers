@@ -3,7 +3,7 @@ title: "Phase 19 裁决：生产正确性、完整交互与自主协作能力"
 category: article
 sources: [14-user-experience-research, 15-deep-research-design, 16-tui-composer-and-theme, 17-tui-status-and-panels, 18-input-slash-startup-context, 19-tools-maturity-and-multifile-edit, 20-configuration-system, 21-session-recovery-and-undo-ux, 22-command-inventory-alignment, 23-command-argument-options, 24-shared-command-parity, verification-15-21]
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 tags: [phase-19, decisions, production, tui, commands, research, goal, collaboration]
 summary: "汇总 14–24 的纠错、维护者裁决、生产契约、分批任务及验收标准。包含完整自主目标、软件与论文深研、八种输入框形态、Git 工作台、顾问、安全分析、公共技能商店和远程协作。此文是待实施计划；文档审查完成不代表功能或生产验收完成。"
 confidence: mixed
@@ -1654,3 +1654,15 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - actual CLI regular/fullscreen 各两场进程、14 次本地合成 HTTP 请求，批准的附加根 write 生成唯一 committed receipt，实际 session/call ID、主 ledger、附加文件根及 after hash 均核实；只读拒写不产生额外收据。移除撤权、new/restart、同 ID rebind、技能/MCP 刷新和窄屏拒绝仍通过，配置/原工作文件不变、退出 0，见 `.tmp/phase19-config/edit-receipt-pty-1791451767205171523`。这证明实际编辑收据接线，没有宣称 `/undo` 面板完成。
 - 上一 `693eabc876e9f3fbcccf781b780a3c0d701aaa07` 的 CI 37752192116/job 113227863615、Watch 37752192235/job 113227863793 均零步骤失败；两个 annotation 核实账户付款/spending limit 阻止启动，未计远端测试通过。本批远端按新 SHA 跟踪；EDIT-02/03 与完整 Phase 19 继续。
 - 五项静态 gates、43 项 scripts 通过，1799 文件的 runtime/type import 图无环；Node 24.15 的 NormProof enforcement 确认 0 blocking、所有阻断义务 satisfied，artifact 固定保存于 `.tmp/navigation-gates-2l_plaa_`。新增/实质拆分 owner 的 function-like names 最多 15，既有入口 advisory 保留；架构规则已登记共用 committer 与 receipt owner。
+
+
+### 8.110 EDIT-02：完整计划审批与持久多文件补丁
+
+- [patch owner](../../packages/ts-shell/src/edit/patch/plan.ts) 通过唯一 `apply_patch` 工具解析严格 Begin/End Patch 文本协议，支持 add/update/delete 与同一授权根内、目标不存在的 rename。精确且唯一的原文匹配保留 BOM、未触及行尾与末尾换行形态，拒绝 shell 包装、未知指令、模糊或歧义匹配。canonical/物理文件别名、保守 case/NFC 名称冲突及文件目标父子重叠在预检拒绝；不自动探测卷大小写后放宽。输入 256 KiB、64 个 patch 操作、单文件 1 MiB、原文加结果总量 4 MiB、20,000 行；完整预览超过 512 KiB 时拒绝准备，不能截断遗漏目标。
+- [neutral preparation](../../packages/ts-shell/src/tools/preparation.ts) 将不可变参数对象、原工具、gate owner 与批准 call ID 绑定为一次性 capability；普通 adapter 先 schema/admission/plan-mode 再读取原文，逐 endpoint 复验主/附加根权限及 read/write/edit/apply_patch deny。完整计划在 PreToolUse、审批、doom-loop 后才授权；克隆、跨 runtime、直接执行、未批准及重放均拒绝。拒绝、异常、完成清除 capability，准备型修改工具在主/子代理共用 adapter 标为 sequential。
+- [batch](../../packages/ts-shell/src/edit/patch/batch.ts) 稳定锁住完整 canonical 目标集；批准后及异步快照保存后均整批重验，快照和 intent 保存失败阻止新的目标写入。rename 的 destination create 与 source delete 属同一 operation，保留两端关系和 executable mode。逐文件共享 committer 核验 publication 并保存 outcome；取得真实 written identity/content/mode 后才能按实际写序逆序补偿，外改或同内容替换对象都保留 partial。补偿 intent、每项结果及终态持久化；receipt 写后保存失败停止后续文件、报告 unknown，不从未确认保存状态补偿。新增 after mode 及 snapshot expectedCurrentMode 防止 undo 覆盖后来 chmod。
+- 实际 [approval adapter](../../packages/ts-shell/src/cli/interactive/picker/approval.ts) 复用 semantic Pager 展示所有计划行，键盘/粘贴/鼠标先归 reader；关闭预览只回到审批，默认 Deny，必须明确 Allow once/既有许可才执行。可缺省 context 的兼容访问保留。四个 legacy restore chooser 夹具仍使用淘汰的 replace/假 hash/content 引用，分类为 harness/setup drift，更新为生产 schema 与真实 hash/blob；未放宽 reader。新 UI 回归先缺现有 deny-reason 提交步骤及误用 modal 标题，PTY 首轮假设 Home 可导航审批，均修正探针，保留失败证据。
+- 最后 production Node 20.3 构建见 `.tmp/catalog-check-7_090a00/build.log`；仅修正 UI 测试标题后最终 5 文件/167 项通过，见 `.tmp/catalog-check-0svx67wn`。普通 write/edit 与 legacy restore 补充 3 文件/43 项通过，见 `.tmp/catalog-check-mmyxusfk`；前次 5 文件/90 项通过见 `.tmp/catalog-check-w0ekqym6`；结果契约实跑 6 文件/149 项通过，见 `.tmp/result-contract-pGRjuK`，分次数字不合并。十组 capability/endpoint deny/唯一 context/portable alias/快照后整批重验/条件补偿/mode/必需快照/unknown receipt/executable compensation 反转全部检出行为 AssertionError，源码逐字节与 SHA-256 恢复，恢复后 1 文件/22 项通过，见 `.tmp/phase19-config/patch-reversals/1791454547751264270`；条件补偿同时反转共同 committer 守卫以穿透双层保护。首轮 mode 反转脚本定位旧字串失败，未计检出，随后改为实际 matcher 重新完成。独立最终 APPROVED，另行隔离 12 项探针通过，见 `.tmp/edit2-final-review-jkgzfsew/tests.log`。
+- actual CLI regular/fullscreen 各两场进程、各 8 次本地合成 HTTP 请求，验证完整 diff/尾部预览、关闭仍 pending、明确批准、主/附加根五 endpoint 一 committed receipt、每项 after hash/mode、可执行 rename、取消零目标写、批准后外改零目标写，以及同 session 重启保留收据且无自动重放；配置和未触及文件原文不变、退出 0，见 `.tmp/phase19-config/patch-pty-1791454483210070731`。Linux 实际运行；原生 macOS fallback 与大小写不敏感卷仍未平台实跑。共享锁/guarded publication 不承诺通用 filesystem CAS、跨文件崩溃原子性或本地可改 ledger 的不可抵赖性。
+- 五项静态 gates、43 项 scripts 与 1808 文件 runtime/type 无环通过，见 `.tmp/navigation-gates-6loyth7z`；Node 24.15 NormProof enforcement 为 0 blocking，保留既有 advisory。新增/实质拆分 owner function-like names 均不超过 20，既有 InteractiveMode ceiling 继续登记；架构规则补充 preparation/approval owner。
+- 上一 `9d62a64d019078f24950eef8a53736f28ba27c8a` 的 CI 37757587719/job 113245841249、Watch 37757587596/job 113245840456 均零步骤失败；本次重新查询两项 annotations 确认账户付款/spending limit 阻止启动，未计远端测试通过。EDIT-02 按新 SHA 追踪远端；EDIT-03 `/undo` 实际预览/确认/结果面板及完整 Phase 19 继续。

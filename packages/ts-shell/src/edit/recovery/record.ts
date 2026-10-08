@@ -46,6 +46,8 @@ export function validRecoveryRecord(value: unknown, authorityId: string, recordI
     || !path.isAbsolute(binding.workspaceRoot) || typeof binding.workspaceIdentity !== 'string'
     || !/^\d+:\d+:[\d.]+$/.test(binding.workspaceIdentity))) return false;
   return entry.schemaVersion === 1 && entry.authorityId === authorityId && entry.recordId === recordId
+    && (entry.beforeMode === undefined || (Number.isInteger(entry.beforeMode) && entry.beforeMode >= 0 && entry.beforeMode <= 0o777))
+    && (entry.expectedCurrentMode === undefined || (Number.isInteger(entry.expectedCurrentMode) && entry.expectedCurrentMode >= 0 && entry.expectedCurrentMode <= 0o777))
     && ['update', 'create', 'delete', 'move'].includes(entry.operationKind)
     && typeof entry.workspaceRelativePath === 'string' && entry.workspaceRelativePath.length <= 4096
     && ['exists', 'absent'].includes(entry.beforeState) && ['exists', 'absent', 'unknown'].includes(entry.expectedCurrentState)

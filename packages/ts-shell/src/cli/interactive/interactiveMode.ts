@@ -36,7 +36,7 @@ import { replaceLiteral } from "../../presentation/tui/pastes.js";
 import { openSettings } from "./settings.js";
 import { InteractiveSurface } from "../../presentation/tui/surface/view.js";
 import { createViewState, type ViewState } from "../../presentation/tui/surface/contract.js";
-import { approvalPicker, type InteractiveApprovalResult } from "./picker/approval.js";
+import { approvalPicker, approvalPreview, type InteractiveApprovalResult } from "./picker/approval.js";
 import { routeKey } from "./keymap.js";
 import { InputPreferences } from "./inputPreferences.js";
 import { QuestionBridge } from "./questionBridge.js";
@@ -554,10 +554,14 @@ export class InteractiveMode {
       const settle = (result: InteractiveApprovalResult) => {
         if (settled) return;
         settled = true;
+        if (prompt.context?.preview) this.pager.close();
         this.overlay.close();
         resolve(result);
       };
       this.overlay.open(approvalPicker(prompt, settle));
+      const preview = approvalPreview(prompt);
+      if (preview) this.pager.open(preview.title, reportText(preview), preview);
+      this.tui.requestRender();
     });
   }
   /**

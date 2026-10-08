@@ -151,7 +151,7 @@ export interface TurnRun extends TurnInput {
 }
 
 /** Tools whose calls must not interleave: each one changes what the next sees. */
-const SEQUENTIAL_TOOLS = new Set(["bash", "write", "edit", "task", "browser"]);
+const SEQUENTIAL_TOOLS = new Set(["bash", "write", "edit", 'apply_patch', "task", "browser"]);
 
 /**
  * Everything a tool call is judged by, from the turn's own options.

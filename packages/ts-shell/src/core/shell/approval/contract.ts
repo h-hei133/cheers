@@ -15,6 +15,8 @@ export interface EscalationPrompt {
     toolName: string;
     operation: string;
     target: string;
+    /** A complete read-only prepared file plan; closing it does not approve a write. */
+    preview?: string;
   };
   options: EscalationOption[];
   defaultOption: EscalationDecision;
@@ -27,4 +29,3 @@ export interface EscalationOption {
   label: string;
   description: string;
 }
-

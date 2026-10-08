@@ -31,8 +31,10 @@ export interface CaptureRecoveryAuthorityRecordInput
   readonly operationKind: RouteScopedEditJournalOperationKind;
   readonly beforeState: RecoveryAuthorityBeforeState;
   readonly beforeContent?: string;
+  readonly beforeMode?: number;
   readonly expectedCurrentState: RecoveryAuthorityExpectedCurrentState;
   readonly expectedCurrentContent?: string;
+  readonly expectedCurrentMode?: number;
   readonly createdAt?: string;
   readonly operation?: RecoveryOperationBinding;
 }
@@ -59,9 +61,11 @@ export interface RecoveryAuthorityStoredRecord {
   readonly beforeState: RecoveryAuthorityBeforeState;
   readonly beforeContentHash?: string;
   readonly beforeContentSizeBytes?: number;
+  readonly beforeMode?: number;
   readonly beforeContentRef?: string;
   readonly expectedCurrentState: RecoveryAuthorityExpectedCurrentState;
   readonly expectedCurrentContentHash?: string;
+  readonly expectedCurrentMode?: number;
   readonly capturedAtPhase: "pre-write";
   readonly persistence: "non-default";
   readonly createdAt: string;
@@ -191,10 +195,12 @@ export async function captureRecoveryAuthorityRecord(
     workspaceRelativePath: relativePath,
     operationKind: input.operationKind,
     beforeState: input.beforeState,
+    ...(input.beforeMode === undefined ? {} : { beforeMode: input.beforeMode }),
     ...(beforeContentHash ? { beforeContentHash } : {}),
     ...(beforeContentSizeBytes !== undefined ? { beforeContentSizeBytes } : {}),
     ...(beforeContentRef ? { beforeContentRef } : {}),
     expectedCurrentState: input.expectedCurrentState,
+    ...(input.expectedCurrentMode === undefined ? {} : { expectedCurrentMode: input.expectedCurrentMode }),
     ...(expectedCurrentContentHash ? { expectedCurrentContentHash } : {}),
     capturedAtPhase: "pre-write",
     persistence: "non-default",

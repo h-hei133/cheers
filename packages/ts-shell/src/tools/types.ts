@@ -53,8 +53,16 @@ export interface ToolDefinition {
   readonly argsSchema: Record<string, unknown>
   /** Server-declared capability hints; these never replace permission checks. */
   readonly mcpAnnotations?: { readonly readOnlyHint: boolean }
+  /** A complete immutable file plan prepared before permission hooks, with no target writes. */
+  readonly prepare?: (args: Record<string, unknown>, context: ToolExecutionContext) => ToolPreparation
   execute(
     args: Record<string, unknown>,
     context: ToolExecutionContext,
   ): Promise<ToolExecutionResult>
+}
+
+export interface ToolPreparation {
+  readonly targets: readonly { readonly path: string; readonly operation: 'write' | 'delete' }[]
+  readonly preview: string
+  readonly execute: (context: ToolExecutionContext) => Promise<ToolExecutionResult>
 }

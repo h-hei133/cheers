@@ -13,6 +13,8 @@ import { neutraliseForDisplay } from "../core/text/safety.js";
 import { validateToolArguments } from "../core/tools/arguments.js";
 import { workspaceToolBinding } from '../core/workspace/tools.js';
 import type { WorkspaceRoot } from '../core/workspace/model.js';
+import { authorizeToolCall, consumeToolCall, discardToolCall, preparedToolCall, prepareToolCall } from '../tools/preparation.js';
+import { preparationContext, preparationPermission } from './preparation.js';
 
 /** A tool definition in the shape a chat completion request takes. */
 export interface ToolSchema {
@@ -97,10 +99,14 @@ export function adaptTools(
 ): readonly AgentTool[] {
   return [...tools.values()].map((tool) => ({
     name: tool.name,
+    ...(tool.prepare ? { executionMode: 'sequential' as const } : {}),
     prepareArguments: (args) => {
       const prepared = prepareArguments(tool.name, args);
       validateToolArguments(tool.argsSchema, prepared);
-      return prepared;
+      if (!tool.prepare) return prepared;
+      const blocked = options.admission?.() ?? planModeBlock(options.agentMode, tool.name, prepared, tool);
+      if (blocked) throw new Error(blocked);
+      return prepareToolCall(tool, prepared, preparationContext(tool.name, options), options);
     },
     execute: (toolCallId, args, signal, onUpdate) =>
       executeTool(tool, toolCallId, args, signal, options, onUpdate),
@@ -133,7 +139,10 @@ async function executeTool(
     if (blocked) throw new Error(blocked);
     validateToolArguments(tool.argsSchema, args);
     const binding = workspaceToolBinding(tool.name, args, options.workspaceRoot, options.workspaceRoots);
-    const result = await tool.execute(binding.args, {
+    const preparation = consumeToolCall(args, options, tool, toolCallId);
+    const execute = preparation ? (_args: Record<string, unknown>, context: import('../tools/types.js').ToolExecutionContext) => preparation.execute(context)
+      : tool.execute.bind(tool);
+    const result = await execute(binding.args, {
       workspaceRoot: binding.root,
       workspaceRoots: options.workspaceRoots,
       artifactRoot: options.workspaceRoot,
@@ -142,6 +151,7 @@ async function executeTool(
       interactiveAsk: options.interactiveAsk,
       sessionId: options.sessionId,
       assertFileAccess: (absolutePath) => {
+        if (preparation) { preparationContext(tool.name, options).assertFileAccess!(absolutePath); return; }
         const blocked = options.admission?.();
         if (blocked) throw new Error(blocked);
         const actualArgs = { ...args, path: absolutePath, filePath: absolutePath };
@@ -171,7 +181,7 @@ async function executeTool(
     };
   } catch (error) {
     return { output: [streamed ? boundText(streamed) : "", `Tool execution error: ${error instanceof Error ? error.message : String(error)}`].filter(Boolean).join("\n"), isError: true };
-  }
+  } finally { discardToolCall(args); }
 }
 
 /**
@@ -187,8 +197,11 @@ export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<st
   const approvals = new Map<string, { operation: string; decision: string }>();
   return {
     beforeToolCall: async ({ call, args }, signal) => {
+      let authorized = false;
+      try {
       const blocked = options.admission?.();
       if (blocked) return { block: true, reason: blocked };
+      if (tools?.get(call.name)?.prepare && !preparedToolCall(args, options)) return { block: true, reason: 'The original prepared tool call is required.' };
       const planBlock = planModeBlock(options.agentMode, call.name, args, tools?.get(call.name));
       if (planBlock) return { block: true, reason: planBlock };
       const permission = await askPermission(call.id, call.name, args, options, signal);
@@ -233,9 +246,13 @@ export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<st
           reason: `Warning: Doom Loop detected! ${observation} This request was blocked. Try different arguments or respond using the available observations.`,
         };
       }
+      authorizeToolCall(args, options, call.name, call.id);
+      authorized = true;
       return undefined;
+      } finally { if (!authorized) discardToolCall(args); }
     },
     afterToolCall: async ({ call, args, result, isError }) => {
+      discardToolCall(args);
       const approval = approvals.get(call.id);
       approvals.delete(call.id);
       let output = result.output;
@@ -294,7 +311,10 @@ async function askPermission(
   signal: AbortSignal | undefined,
 ): Promise<{ readonly blocked?: string; readonly approved?: { operation: string; decision: string } }> {
   let evaluation: ReturnType<typeof evaluateToolPermissionScope>;
-  try { evaluation = evaluateWorkspacePermission(toolName, args, options); }
+  try {
+    const preparation = preparedToolCall(args, options);
+    evaluation = preparation ? preparationPermission(toolName, preparation, options) : evaluateWorkspacePermission(toolName, args, options);
+  }
   catch (error) { return { blocked: error instanceof Error ? error.message : 'Workspace access could not be checked.' }; }
   // A refusal is an answer, not a question. Asking about it would offer the user
   // a chance to override what the user already wrote, and the tool would be
@@ -327,9 +347,10 @@ async function askPermission(
     toolCallId,
     args,
   });
-  const response = await options.escalationPromptHandler(
-    buildToolEscalationPrompt(toolName, evaluation.operation, evaluation.target, evaluation.reason),
-  );
+  const prompt = buildToolEscalationPrompt(toolName, evaluation.operation, evaluation.target, evaluation.reason);
+  const preparation = preparedToolCall(args, options);
+  if (preparation) prompt.context.preview = preparation.preview;
+  const response = await options.escalationPromptHandler(prompt);
   if (signal?.aborted) return { blocked: "Operation aborted" };
   if (response.decision === "deny") {
     options.emit({ type: "approval.resolved", toolName, taskId: toolCallId, outcome: "denied" });

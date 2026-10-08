@@ -53,7 +53,7 @@ export async function restoreOperation(preview: UndoPreview, approval: UndoAppro
           assertOperationFile(original, entry.file, access);
           started = true;
           commitWorkspaceFile({ workspaceRoot: entry.file.workspace.path, relativePath: entry.file.path,
-            expected: entry.current!, content: entry.prepared!.content,
+            expected: entry.current!, content: entry.prepared!.content, mode: entry.prepared!.mode,
             assertFileAccess: absolute => { assertOperationFile(original, entry.file, access); access.assertFileAccess?.(absolute); } });
           receipt = updateFile(receipt, entry.file.id, 'restored-verified');
           persistOperation(receipt);

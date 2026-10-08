@@ -14,7 +14,8 @@ function identity(value: unknown): value is WorkspaceIdentity {
 }
 
 function version(value: unknown): value is ContentVersion {
-  return object(value) && (value.state === 'absent' || (value.state === 'exists' && typeof value.hash === 'string' && contentHashPattern.test(value.hash)));
+  return object(value) && (value.state === 'absent' || (value.state === 'exists' && typeof value.hash === 'string' && contentHashPattern.test(value.hash)
+    && (value.mode === undefined || (Number.isInteger(value.mode) && (value.mode as number) >= 0 && (value.mode as number) <= 0o777))));
 }
 
 function file(value: unknown): value is OperationFile {
@@ -22,6 +23,9 @@ function file(value: unknown): value is OperationFile {
     || normalizeWorkspaceRelativePath(value.path) !== value.path || !version(value.before) || !version(value.after)
     || !object(value.snapshot) || !safeRecoveryId(value.snapshot.authorityId) || !safeRecoveryId(value.snapshot.recordId)
     || !['pending', 'committed', 'unchanged', 'unknown'].includes(value.status as string)
+    || (value.compensation !== undefined && !['intent', 'restored-verified', 'blocked', 'unknown'].includes(value.compensation as string))
+    || (value.rename !== undefined && (!object(value.rename) || typeof value.rename.source !== 'string' || typeof value.rename.target !== 'string'
+      || normalizeWorkspaceRelativePath(value.rename.source) !== value.rename.source || normalizeWorkspaceRelativePath(value.rename.target) !== value.rename.target))
     || !['none', 'intent', 'restored-verified', 'blocked', 'unknown'].includes(value.undo as string)) return false;
   return (value.kind === 'create' && value.before.state === 'absent' && value.after.state === 'exists')
     || (value.kind === 'update' && value.before.state === 'exists' && value.after.state === 'exists')
@@ -36,7 +40,7 @@ export function decodeOperation(value: unknown, scope: OperationScope): Operatio
     || (value.correlationId !== undefined && typeof value.correlationId !== 'string')
     || !Number.isSafeInteger(value.sequence) || (value.sequence as number) < 1
     || !Number.isSafeInteger(value.revision) || (value.revision as number) < 1
-    || !['intent', 'committed', 'failed', 'partial', 'unknown'].includes(value.status as string)
+    || !['intent', 'committed', 'compensating', 'restored', 'failed', 'partial', 'unknown'].includes(value.status as string)
     || !['none', 'intent', 'restored-verified', 'partial', 'unknown'].includes(value.undo as string)
     || !Array.isArray(value.files) || !value.files.length || value.files.length > 256 || !value.files.every(file)
     || typeof value.createdAt !== 'string' || !Number.isFinite(Date.parse(value.createdAt))
@@ -46,6 +50,7 @@ export function decodeOperation(value: unknown, scope: OperationScope): Operatio
     || new Set(files.map(entry => `${entry.workspace.path}\0${entry.path}`)).size !== files.length
     || (value.status === 'committed' && files.some(entry => entry.status !== 'committed'))
     || (value.status === 'failed' && files.some(entry => entry.status !== 'unchanged'))
+    || (value.status === 'restored' && files.some(entry => entry.status !== 'unchanged' && entry.compensation !== 'restored-verified'))
     || files.some(entry => entry.snapshot.authorityId !== value.operationId || entry.snapshot.recordId !== entry.id)
     || (value.undo === 'restored-verified' && files.some(entry => entry.undo !== 'restored-verified'))) {
     throw new Error('Edit operation receipt has inconsistent file results.');

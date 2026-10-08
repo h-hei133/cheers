@@ -542,6 +542,31 @@ it('keeps real wheel and bracketed paste input in the reader and restores the un
 });
 
 
+it('shows the complete file plan and keeps approval pending when its reader closes', async () => {
+  const { mode, terminal } = build();
+  const host = mode as unknown as { pager: Pager; overlay: OverlayHost; view: InteractiveView;
+    promptApproval(prompt: EscalationPrompt): Promise<unknown> };
+  const preview = Array.from({ length: 60 }, (_, index) => `planned endpoint ${index}`).join('\n');
+  mode.start();
+  try {
+    let settled = false;
+    const decision = host.promptApproval({ id: 'patch-approval', title: 'Patch', message: 'Confirm complete plan',
+      context: { toolName: 'apply_patch', operation: 'write', target: '60 endpoints', preview }, options: [],
+      defaultOption: 'deny', recommendedAction: 'deny', severity: 'medium' }).then(result => { settled = true; return result; });
+    await Promise.resolve(); await Promise.resolve();
+    expect(host.pager.text).toContain('planned endpoint 59');
+    host.view.renderFrame({ columns: 55, rows: 18 }); terminal.input('\x1b[F');
+    expect(stripAnsi(host.view.renderFrame({ columns: 55, rows: 18 }).rows.join('\n'))).toContain('planned endpoint 59');
+    terminal.input('\r');
+    await vi.waitFor(() => expect(host.pager.active).toBe(false));
+    expect(settled).toBe(false); expect(host.overlay.active).toBe(true);
+    terminal.input('\r');
+    await vi.waitFor(() => expect(stripAnsi(host.overlay.render(80, 24).join('\n'))).toContain('Permission Denied:'));
+    terminal.input('\r');
+    await expect(decision).resolves.toEqual({ decision: 'deny' });
+  } finally { mode.stop(); }
+});
+
 it('yields a reader to runtime questions, permission prompts and queued pickers', async () => {
   const { mode, terminal } = build();
   const host = mode as unknown as { pager: Pager; view: InteractiveView; onQuestion(text: string): void;

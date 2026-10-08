@@ -95,8 +95,8 @@ export function evaluateToolPermissionScope(
     operation = "read";
     target = String(safeArgs.path ?? safeArgs.filePath ?? safeArgs.pattern ?? safeArgs.query ?? safeArgs.url ?? toolName);
     isReadOnly = true;
-  } else if (toolName === "write" || toolName === "edit") {
-    operation = "write";
+  } else if (toolName === "write" || toolName === "edit" || toolName === 'apply_patch') {
+    operation = toolName === 'apply_patch' && safeArgs.operation === 'delete' ? 'delete' : 'write';
     const rawPath = typeof safeArgs.path === "string" ? safeArgs.path : "";
     target = rawPath || "(unspecified path)";
     isReadOnly = false;
@@ -154,7 +154,7 @@ export function evaluateToolPermissionScope(
     matchDenyRule(denyRules, toolName, target) ??
     (toolName === "bash" ? matchDenyRule(denyRules, toolName, target.trim()) : undefined) ??
     matchDenyRule(denyRules, toolName, normalizedPathTarget(toolName === "bash" ? target.trim() : target, workspaceRoot,
-      ["read", "write", "edit"].includes(toolName) && typeof safeArgs.path === "string")) ??
+      ["read", "write", "edit", 'apply_patch'].includes(toolName) && typeof safeArgs.path === "string")) ??
     filePolicyTargets(toolName, safeArgs, workspaceRoot)
       .map(candidate => matchDenyRule(denyRules, toolName, candidate)).find(Boolean);
   if (denied) {
@@ -191,7 +191,7 @@ export function evaluateToolPermissionScope(
     // accept-edits is strictly a statement about workspace file edits (write/edit).
     // Process spawns, shell commands (including bash rm), and network operations
     // must always require user escalation.
-    if ((toolName === "write" || toolName === "edit") && (operation === "write" || operation === "delete")) {
+    if ((toolName === "write" || toolName === "edit" || toolName === 'apply_patch') && (operation === "write" || operation === "delete")) {
       const rawPath = typeof safeArgs.path === "string" ? safeArgs.path : "";
       if (!rawPath.trim()) {
         return {

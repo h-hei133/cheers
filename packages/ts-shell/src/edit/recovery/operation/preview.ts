@@ -22,14 +22,14 @@ export interface UndoPreview {
 
 /** An unresolved newer operation is a barrier; never silently fall back to older history. */
 export function latestOperation(scope: OperationScope): OperationReceipt | undefined {
-  return readOperations(scope).find(receipt => receipt.undo !== 'restored-verified' && receipt.status !== 'failed');
+  return readOperations(scope).find(receipt => receipt.undo !== 'restored-verified' && receipt.status !== 'failed' && receipt.status !== 'restored');
 }
 
 export async function previewOperation(receipt: OperationReceipt, access: OperationAccess = {}): Promise<UndoPreview> {
   const saved = readOperation(receipt, receipt.operationId);
   const blockers: string[] = [];
   if (JSON.stringify(saved) !== JSON.stringify(receipt)) blockers.push('operation-changed');
-  if (receipt.status !== 'committed') blockers.push(`operation-${receipt.status === 'intent' ? 'unknown' : receipt.status}`);
+  if (receipt.status !== 'committed') blockers.push(`operation-${receipt.status === 'intent' || receipt.status === 'compensating' ? 'unknown' : receipt.status}`);
   if (receipt.undo === 'intent' || receipt.undo === 'unknown') blockers.push('undo-unknown');
   if (receipt.undo === 'restored-verified') blockers.push('already-restored');
   const files: UndoPreviewFile[] = [];
@@ -42,7 +42,11 @@ export async function previewOperation(receipt: OperationReceipt, access: Operat
       if (record.operation?.operationId !== receipt.operationId || record.operation.sessionId !== receipt.sessionId
         || record.operation.workspaceRoot !== file.workspace.path || record.operation.workspaceIdentity !== file.workspace.identity
         || record.beforeState !== file.before.state || record.beforeContentHash !== (file.before.state === 'exists' ? file.before.hash : undefined)
+        || record.beforeMode !== (file.before.state === 'exists' ? file.before.mode : undefined)
         || record.expectedCurrentState !== file.after.state || record.expectedCurrentContentHash !== (file.after.state === 'exists' ? file.after.hash : undefined)) {
+        throw new Error('Snapshot does not match the operation receipt.');
+      }
+      if (record.expectedCurrentMode !== (file.after.state === 'exists' ? file.after.mode : undefined)) {
         throw new Error('Snapshot does not match the operation receipt.');
       }
       assertOperationFile(receipt, file, access);

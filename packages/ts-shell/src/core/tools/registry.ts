@@ -43,6 +43,7 @@ import type { ToolExecutionResult } from '../../tools/types.js'
 import { networkNotice, planSandboxedCommand, readSandboxRules } from '../../sandbox/osSandbox.js'
 import { resolveCommandTimeout, DEFAULT_COMMAND_TIMEOUT_MS, MAX_COMMAND_TIMEOUT_MS } from '../../runtime/execution/commandTimeout.js'
 import { workspaceSandboxPolicy } from '../../sandbox/workspace.js'
+import { createPatchToolDefinition } from '../../edit/patch/tool.js'
 
 type ExecutionFailureKind = 'sandbox_preflight' | 'execution_failure' | 'timeout' | 'cancelled'
 const TOOL_APPROVED_READ_AUTHORITY: ExecutionAuthority = {
@@ -266,6 +267,7 @@ export function createCoreToolRegistry(options?: {
   const executionService = options?.executionService ?? createDefaultExecutionService()
   const tools: ToolDefinition[] = [
     createReadToolDefinition(executionService),
+    createPatchToolDefinition(),
     {
       name: 'write',
       description: 'Create or overwrite a file in the workspace with content.',

@@ -15,6 +15,7 @@ export type FileExpectation = { readonly state: 'absent' } | {
   readonly hash?: string;
   readonly content?: string;
   readonly identity?: string;
+  readonly mode?: number;
 };
 
 /** Refuse links in every component, including links that currently stay inside the root. */
@@ -49,7 +50,7 @@ export function descriptorPath(fd: number, fallback: string): string {
 }
 
 /** Inspection failures and non-files are never converted to an absent file. */
-export function inspectWorkspaceFile(root: string, relative: string, assertFileAccess?: (absolutePath: string) => void): FileState {
+export function inspectWorkspaceFile(root: string, relative: string, assertFileAccess?: (absolutePath: string) => void, maxBytes?: number): FileState {
   const absolute = workspaceFilePath(root, relative);
   assertFileAccess?.(absolute);
   let stat: fs.Stats;
@@ -69,7 +70,8 @@ export function inspectWorkspaceFile(root: string, relative: string, assertFileA
       throw new Error('File target changed path.');
     }
     assertFileAccess?.(actual);
-    const bytes = fs.readFileSync(fd);
+    if (maxBytes !== undefined && opened.size > maxBytes) throw new Error('File exceeds the edit size limit.');
+    const bytes = maxBytes === undefined ? fs.readFileSync(fd) : readBounded(fd, maxBytes);
     const content = bytes.toString('utf8');
     if (!Buffer.from(content, 'utf8').equals(bytes)) throw new Error('File target is not UTF-8 text.');
     const final = fs.fstatSync(fd);
@@ -82,7 +84,20 @@ export function matchesFileState(actual: FileState, expected: FileExpectation): 
   return actual.state === expected.state && (actual.state === 'absent' || (expected.state === 'exists'
     && (expected.hash === undefined || actual.hash === expected.hash)
     && (expected.content === undefined || actual.content === expected.content)
-    && (expected.identity === undefined || actual.identity === expected.identity)));
+    && (expected.identity === undefined || actual.identity === expected.identity)
+    && (expected.mode === undefined || (actual.mode & 0o777) === (expected.mode & 0o777))));
+}
+
+function readBounded(fd: number, maxBytes: number): Buffer {
+  const bytes = Buffer.alloc(Math.min(fs.fstatSync(fd).size + 1, maxBytes + 1));
+  let offset = 0;
+  while (offset < bytes.length) {
+    const count = fs.readSync(fd, bytes, offset, bytes.length - offset, null);
+    if (!count) return bytes.subarray(0, offset);
+    offset += count;
+  }
+  if (offset > maxBytes || fs.readSync(fd, Buffer.alloc(1), 0, 1, null) > 0) throw new Error('File exceeds the edit size limit or changed while reading.');
+  return bytes;
 }
 
 export function ensureWorkspaceDirectory(root: string, relative: string): void {

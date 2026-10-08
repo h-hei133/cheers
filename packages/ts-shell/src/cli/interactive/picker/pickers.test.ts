@@ -4,6 +4,7 @@ import { getRuntimeConfig, getUserRuntimeConfigPath } from "../../../config/runt
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { connectionPicker } from "./connections.js";
 import { copyPicker } from "./copy.js";
@@ -137,8 +138,9 @@ describe("restore chooser", () => {
       options.authorityId,
     );
     fs.mkdirSync(path.join(namespace, "records"), { recursive: true });
-    fs.mkdirSync(path.join(namespace, "content"), { recursive: true });
-    fs.writeFileSync(path.join(namespace, "content", `${options.recordId}.txt`), "before", "utf8");
+    const hash = createHash('sha256').update('before').digest('hex');
+    fs.mkdirSync(path.join(namespace, "blobs"), { recursive: true });
+    fs.writeFileSync(path.join(namespace, "blobs", `${hash}.content`), "before", "utf8");
     fs.writeFileSync(
       path.join(namespace, "records", `${options.recordId}.json`),
       JSON.stringify({
@@ -146,11 +148,11 @@ describe("restore chooser", () => {
         authorityId: options.authorityId,
         recordId: options.recordId,
         workspaceRelativePath: options.relativePath,
-        operationKind: "replace",
+        operationKind: "update",
         beforeState: "exists",
-        beforeContentHash: "abc",
+        beforeContentHash: hash,
         beforeContentSizeBytes: 6,
-        beforeContentRef: path.join("content", `${options.recordId}.txt`),
+        beforeContentRef: `blobs/${hash}.content`,
         expectedCurrentState: "unknown",
         capturedAtPhase: "pre-write",
         persistence: "non-default",
