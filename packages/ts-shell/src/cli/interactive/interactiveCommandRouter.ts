@@ -5,7 +5,7 @@ import type { PromptAttachments } from "../../core/shell/sessionRuntime.js";
 import type { Interface as ReadlineInterface } from "node:readline";
 
 import { toolPoolFor } from "../runtime/tools.js";
-import { goalCommandFor } from '../runtime/goal.js';
+import { goalCommandFor, goalPolicyFor } from '../runtime/goal.js';
 import { navigateSession, type SessionNavigationResult } from "../runtime/navigation.js";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
@@ -122,6 +122,7 @@ export async function routeInteractiveCommand(
 
   const resolved = await buildCliCommandExecution({
     goalCommand: goalCommandFor(input.runtimeContext, input.sessionManager),
+    requestPolicy: goalPolicyFor(input.runtimeContext, input.sessionManager),
     prompt: input.prompt,
     ...(input.attachments ? { attachments: input.attachments } : {}),
     cwd: input.runtimeContext.cwd,

@@ -2,6 +2,9 @@ import { endpointShape, isEventStream } from "../endpoints/index.js";
 import type { ProviderUsage } from "../../turn/completion.js";
 import type { TurnRequest } from "../endpoints/kinds.js";
 import type { RequestContext } from '../../context/request/model.js';
+import type { ModelTransport, RequestPolicy } from '../../core/agent/request/model.js';
+import { ModelAdmissionError } from '../../core/agent/request/model.js';
+import { prepareRequestAttempt } from './attempt.js';
 
 /** A prepared request captured before transport signing, with its exact prompt prefix. */
 export interface SentRequest {
@@ -39,20 +42,24 @@ export async function sendSentRequest(
   sent: SentRequest,
   signal: AbortSignal | undefined,
   fetchImpl: typeof fetch = fetch,
+  metering?: { readonly policy?: RequestPolicy; readonly transport?: ModelTransport; readonly provider: string; readonly model: string },
 ): Promise<ProviderUsage | undefined> {
   const body = refreshBody(sent);
   if (!body || signal?.aborted) return undefined;
   const release = new AbortController();
   try {
+    const serialized = JSON.stringify(body);
+    const attempt = await prepareRequestAttempt({ body: serialized, provider: metering?.provider ?? '', model: metering?.model ?? String(body.model ?? ''),
+      endpoint: sent.endpoint ?? 'openai-compatible', purpose: 'cache-refresh', policy: metering?.policy });
     const headers = new Headers(sent.headers);
     for (const [name, value] of Object.entries(sent.requestHeaders ?? {})) headers.set(name, value);
-    const response = await fetchImpl(sent.url, {
+    const response = await attempt.send(sent.url, {
       method: "POST",
       headers: Object.fromEntries(headers.entries()),
-      body: JSON.stringify(body),
+      body: serialized,
       signal: signal ? AbortSignal.any([signal, release.signal]) : release.signal,
-    });
-    if (!response.ok || signal?.aborted) return undefined;
+    }, fetchImpl, metering?.transport);
+    if (!response.ok) { attempt.settle(); return undefined; }
     const shape = endpointShape(sent.endpoint);
     let usage: ProviderUsage | undefined;
     let finishReason: string | null | undefined;
@@ -63,13 +70,15 @@ export async function sendSentRequest(
       ({ usage, finishReason } = next.value);
     } else {
       const completion = shape.readBody(await response.json());
-      if (!completion.choices?.[0]?.message) return undefined;
+      if (!completion.choices?.[0]?.message) { attempt.settle(completion.usage); return undefined; }
       usage = completion.usage;
       finishReason = completion.choices[0].finish_reason;
     }
+    attempt.settle(usage);
     if (signal?.aborted || (finishReason != null && !["stop", "length", "tool_calls"].includes(finishReason))) return undefined;
     return usage;
-  } catch {
+  } catch (error) {
+    if (error instanceof ModelAdmissionError) throw error;
     // Background refresh failure never becomes an answer or a usage estimate.
     return undefined;
   } finally {

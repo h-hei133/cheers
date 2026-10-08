@@ -12,7 +12,8 @@ export function decodeGoal(value: unknown): SessionGoal | undefined {
     || typeof value.phase !== 'string' || !PHASES.has(value.phase)
     || (value.origin !== 'user' && value.origin !== 'legacy-project') || value.runOwner !== null
     || !isRecord(value.workspace) || !text(value.workspace.path) || !text(value.workspace.identity)
-    || (value.pauseReason !== undefined && (typeof value.pauseReason !== 'string' || !PAUSE_REASONS.has(value.pauseReason)))) return undefined;
+    || (value.pauseReason !== undefined && (typeof value.pauseReason !== 'string' || !PAUSE_REASONS.has(value.pauseReason)))
+    || (value.tokenBudget !== undefined && (typeof value.tokenBudget !== 'number' || !Number.isSafeInteger(value.tokenBudget) || value.tokenBudget < 0))) return undefined;
   const completion = value.completion;
   if (value.phase === 'complete') {
     if (!isRecord(completion) || completion.source !== 'user-declared' || !timestamp(completion.timestamp)
@@ -24,6 +25,7 @@ export function decodeGoal(value: unknown): SessionGoal | undefined {
     workspace: { path: value.workspace.path as string, identity: value.workspace.identity as string },
     phase: value.phase as SessionGoal['phase'], origin: value.origin,
     createdAt: value.createdAt as string, updatedAt: value.updatedAt as string, runOwner: null,
+    ...(value.tokenBudget !== undefined ? { tokenBudget: value.tokenBudget as number } : {}),
     ...(value.pauseReason !== undefined ? { pauseReason: value.pauseReason as SessionGoal['pauseReason'] } : {}),
     ...(completion !== undefined ? { completion: { source: 'user-declared' as const,
       timestamp: (completion as Record<string, unknown>).timestamp as string, declaration: '/goal complete' as const } } : {}),

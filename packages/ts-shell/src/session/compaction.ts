@@ -1,4 +1,5 @@
 import { messageToText } from "../model-adapters/multimodal.js";
+import { ModelAdmissionError } from '../core/agent/request/model.js';
 import type { NextStepSnapshot, NextStepUpdate } from "../core/agent/loop.js";
 import type { AgentMessage } from "../core/agent/state.js";
 import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS, estimateRequestTokens, estimateTokens, messageCharCount, type RequestOverhead } from "./context.js";
@@ -661,6 +662,7 @@ export function createCompactionStep(
         lifecycleReason: reason,
       });
     } catch (error) {
+      if (error instanceof ModelAdmissionError) throw error;
       if (signal?.aborted) {
         return undefined;
       }

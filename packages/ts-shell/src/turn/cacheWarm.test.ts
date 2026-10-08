@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createCacheWarmingRunner } from "./cacheWarm.js";
+import { ModelAdmissionError } from '../core/agent/request/model.js';
 
 /**
  * What actually happens to a prompt between requests.
@@ -23,6 +24,19 @@ const priced = {
 };
 
 describe("the cache warming runner", () => {
+  it('stops and exposes admission refusal without rescheduling', async () => {
+    vi.useFakeTimers();
+    try {
+      const refresh = vi.fn(async () => { throw new ModelAdmissionError('exhausted'); });
+      const onDecision = vi.fn(); const runner = createCacheWarmingRunner({ mode: 'idle', ...priced, refresh, onDecision });
+      runner.noteRequest(500_000, sent); await vi.advanceTimersByTimeAsync(270_000);
+      expect(refresh).toHaveBeenCalledOnce(); expect(runner.status()).toMatchObject({ stopReason: expect.stringContaining('exhausted') });
+      expect(runner.status().nextRefreshAt).toBeUndefined();
+      expect(onDecision).toHaveBeenLastCalledWith(expect.anything(), expect.stringContaining('exhausted'));
+      runner.noteSettled(); runner.noteRequest(500_000, sent); await vi.advanceTimersByTimeAsync(600_000);
+      expect(refresh).toHaveBeenCalledOnce();
+    } finally { vi.useRealTimers(); }
+  });
   it.each([0, Number.NaN, Number.POSITIVE_INFINITY])("invalidates a prefix with %s input tokens without permanently stopping", async tokens => {
     vi.useFakeTimers();
     try {

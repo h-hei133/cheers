@@ -499,6 +499,7 @@ function googleUsage(usage: Chunk["usageMetadata"]): CompletedBody["usage"] {
     prompt_tokens: usage.promptTokenCount,
     completion_tokens: usage.candidatesTokenCount === undefined && usage.thoughtsTokenCount === undefined
       ? undefined : (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0),
+    metering_output_complete: usage.candidatesTokenCount !== undefined && usage.thoughtsTokenCount !== undefined,
     prompt_tokens_details: { cached_tokens: usage.cachedContentTokenCount },
     ...(usage.totalTokenCount !== undefined ? { total_tokens: usage.totalTokenCount } : {}),
   };

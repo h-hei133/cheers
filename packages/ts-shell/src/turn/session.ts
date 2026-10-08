@@ -22,6 +22,7 @@ import { isOverflowFailure, type StepFunction } from "./step.js";
 import { adaptTools, createToolHooks, type ToolGateOptions } from "./tools.js";
 import { usageFromProvider } from "../provider/response/usage.js";
 import type { SentRequest } from "../provider/request/sentRequest.js";
+import { ModelAdmissionError } from '../core/agent/request/model.js';
 import { createSubagentRunner } from "./subagent.js";
 import type { DenyRule } from "../core/shell/approval/deny.js";
 import type { CacheWarmingRunner } from "./cacheWarm.js";
@@ -233,7 +234,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     ),
     beforeToolCall: hooks.beforeToolCall,
     afterToolCall: hooks.afterToolCall,
-    streamStep: async (messages, signal) => {
+    streamStep: async (messages, signal, request) => {
       // A new request replaces the old prefix even if it fails or reports no usage.
       if (lastSentRequest) options.cacheWarming?.noteRequest(0, lastSentRequest);
       lastSentRequest = undefined;
@@ -249,6 +250,7 @@ export function runTurn(options: TurnOptions): TurnRun {
         },
         {
           allowTools: projection.stepCount < options.maxSteps,
+          requestId: request?.requestId,
           // Kept so a refresh can replay it. Captured at the step, because that
           // is the only place the request exists in the shape it was sent.
           onRequestSent: (sent) => {
@@ -391,7 +393,7 @@ export function runTurn(options: TurnOptions): TurnRun {
         reason: "overflow",
       }),
       lifecycleReason: "overflow",
-    }).catch(() => undefined);
+    }).catch(error => { if (error instanceof ModelAdmissionError) throw error; return undefined; });
     // A decline here leaves the run reporting the overflow it already hit: the
     // engine judged that condensing would not make the context smaller, so
     // retrying the same request would fail the same way.

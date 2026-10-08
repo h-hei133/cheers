@@ -13,7 +13,6 @@ export async function runSessionGoalCommand(args: string[], context: CommandCont
   if (!parsed.ok) return local(`Invalid /goal arguments: ${parsed.reason}\n${syntaxHelp(goalSyntax)}`);
   if (context.sessionId !== session.id || context.projectRoot !== session.projectRoot) return local('Goal update refused: the current session changed.');
   const verb = parsed.action.name || (parsed.args.length ? 'set' : 'show');
-  if (verb === 'budget') return local('Goal budget admission is unavailable. No cumulative goal token cap has been set.');
   try {
     const baseline = readGoalEdit(host, session);
     if (verb === 'show') return local(showGoal(baseline, readProjectState(session.projectRoot).goal));
@@ -40,11 +39,17 @@ function commandAction(verb: string, args: readonly string[], session: Session):
     return legacy ? { type: 'import', objective: legacy.objective } : undefined;
   }
   if (verb === 'complete') return { type: 'complete', source: 'user-declared' };
+  if (verb === 'budget') {
+    if (args[0] === 'off') return { type: 'budget' };
+    if (!/^(0|[1-9][0-9]*)$/.test(args[0] ?? '') || !Number.isSafeInteger(Number(args[0]))) throw new GoalWriteError('invalid');
+    return { type: 'budget', cap: Number(args[0]) };
+  }
   if (verb === 'pause' || verb === 'resume' || verb === 'drop') return { type: verb };
   throw new GoalWriteError('invalid');
 }
 
 function resultNotice(verb: string): string {
+  if (verb === 'budget') return 'Goal token budget saved. Existing usage and unresolved requests are retained.';
   if (verb === 'import') return 'Legacy description imported as paused. Use /goal resume explicitly to activate it.';
   if (verb === 'complete') return 'Goal recorded as user-declared complete.';
   if (verb === 'drop') return 'Goal abandoned; its identity and description are retained.';

@@ -12,7 +12,7 @@ export const goalSyntax: CommandSyntax = {
     { name: "complete", aliases: ["done"], summary: "declare the session goal complete" },
     { name: "drop", aliases: ["clear"], summary: "abandon the session goal" },
     { name: "import", summary: "import the legacy project description as paused" },
-    { name: "budget", summary: "goal budget admission is not yet available", parameters: [{ name: "limit", kind: "text", required: true }] },
+    { name: "budget", summary: "set a strict cumulative token cap or off", parameters: [{ name: "limit", kind: "text", required: true }] },
   ],
 };
 

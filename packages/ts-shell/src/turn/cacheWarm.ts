@@ -8,6 +8,7 @@ import {
 } from "../core/models/cacheEconomics.js";
 import type { ModelCostRates } from "../core/models/catalog.js";
 import type { SentRequest } from "../provider/request/sentRequest.js";
+import { ModelAdmissionError } from '../core/agent/request/model.js';
 
 /**
  * Keeping a prompt cached between requests.
@@ -88,7 +89,7 @@ export interface CacheWarmingRunner {
   /** Nothing more will be sent. */
   stop(): void;
   /** What is scheduled, for a surface that has to explain itself. */
-  status(): { readonly mode: CacheWarmingMode; readonly nextRefreshAt?: number };
+  status(): { readonly mode: CacheWarmingMode; readonly nextRefreshAt?: number; readonly stopReason?: string };
 }
 
 export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWarmingRunner {
@@ -99,6 +100,7 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
   let controller: AbortController | undefined;
   let generation = 0;
   let stopped = false;
+  let stopReason: string | undefined;
   /**
    * When the current phase began.
    *
@@ -181,7 +183,12 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
       if (stopped || generation !== expectedGeneration) return;
       if (options.isCurrent?.() === false) { clear(); return; }
       if (usage) options.onUsage?.(usage);
-    } catch {
+    } catch (error) {
+      if (error instanceof ModelAdmissionError) {
+        stopReason = error.message; stopped = true; clear();
+        options.onDecision?.(decision, stopReason);
+        return;
+      }
       // A refresh that failed is a refresh that did not happen. It is not worth
       // reporting: nothing the user did caused it, and nothing they can do
       // would fix it.
@@ -252,8 +259,8 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
       clear();
     },
 
-    status(): { readonly mode: CacheWarmingMode; readonly nextRefreshAt?: number } {
-      return { mode, ...(nextRefreshAt !== undefined ? { nextRefreshAt } : {}) };
+    status(): { readonly mode: CacheWarmingMode; readonly nextRefreshAt?: number; readonly stopReason?: string } {
+      return { mode, ...(nextRefreshAt !== undefined ? { nextRefreshAt } : {}), ...(stopReason ? { stopReason } : {}) };
     },
   };
 }

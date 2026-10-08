@@ -15,6 +15,7 @@ import type { RuntimeConfig } from "../../config/runtimeConfig.js";
 import type { CatalogProvider } from "../../core/models/catalog.js";
 
 export function streamCliRuntimePrompt(input: {
+  readonly requestPolicy?: CliRuntimeInvocationInput['requestPolicy'];
   readonly goalObjective?: string;
   readonly admission?: CliRuntimeInvocationInput['admission'];
   readonly onCredentialPersisted?: CliRuntimeInvocationInput['onCredentialPersisted'];
@@ -57,6 +58,7 @@ export function streamCliRuntimePrompt(input: {
   // here rather than pushed into every caller's signature.
   const started = runCliRuntimeInvocation({
     goalObjective: input.goalObjective,
+    requestPolicy: input.requestPolicy,
     admission: input.admission,
     onCredentialPersisted: input.onCredentialPersisted,
     prepareProviderResources: input.prepareProviderResources,

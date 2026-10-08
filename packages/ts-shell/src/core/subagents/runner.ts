@@ -31,7 +31,7 @@ export interface SubagentStep {
   readonly step: (
     messages: readonly AgentMessage[],
     signal: AbortSignal | undefined,
-    options: { readonly allowTools: boolean; readonly allowedTools: readonly string[] },
+    options: { readonly allowTools: boolean; readonly allowedTools: readonly string[]; readonly requestId?: string },
   ) => Promise<AssistantStep>;
 }
 
@@ -170,9 +170,9 @@ export async function runSubagent(
     [],
     {
       tools: [...selected.values()],
-      streamStep: (context, signal) => {
+      streamStep: (context, signal, request) => {
         steps += 1;
-        return host.step(context, signal, { allowTools: steps < maxSteps, allowedTools: allowed });
+        return host.step(context, signal, { allowTools: steps < maxSteps, allowedTools: allowed, requestId: request?.requestId });
       },
       shouldStopAfterStep: () => steps >= maxSteps,
       ...(host.beforeToolCall ? { beforeToolCall: host.beforeToolCall } : {}),

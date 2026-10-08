@@ -57,10 +57,13 @@ import { runSubagent, type SubagentRunner } from "../core/subagents/runner.js";
 import { adaptTools } from "../turn/tools.js";
 import { assertAdmission, admittedFetch, type Admission } from '../core/network/admission.js';
 import { decodeWorkspaceRoots, type WorkspaceRoot } from '../core/workspace/model.js';
+import type { RequestPolicy } from '../core/agent/request/model.js';
+import { providerModelTransport } from '../provider/request/transport.js';
 
 type ProviderMode = "synthetic" | "real";
 
 export interface CliRuntimeInvocationInput {
+  readonly requestPolicy?: RequestPolicy;
   readonly goalObjective?: string;
   readonly workspaceRoots?: readonly WorkspaceRoot[];
   readonly admission?: Admission;
@@ -568,6 +571,8 @@ function createProviderStep(
   const endpoint = providerEndpoint(catalog, resolution.provider);
   const system = systemPromptSnapshot(request.agentMode, promptContext);
   return createStepFunction({
+    requestPolicy: request.requestPolicy,
+    modelTransport: providerModelTransport(request.runtimeConfig, endpoint, request.admission),
     provider: {
       // Built from the whole credential, not from its key alone. An account login
       // yields a token instead of a key, and formatting the header here from a

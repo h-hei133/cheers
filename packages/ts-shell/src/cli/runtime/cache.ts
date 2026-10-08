@@ -7,11 +7,14 @@ import { hasUsage, usageFromProvider } from "../../provider/response/usage.js";
 import { recordSessionUsage } from "../../observability/usageTelemetry.js";
 import { writeSessionUsage } from "../../session/store/usage.js";
 import { createComponentLogger } from "../../observability/structuredLogger.js";
+import type { RequestPolicy } from '../../core/agent/request/model.js';
+import { providerModelTransport } from '../../provider/request/transport.js';
 
 const logger = createComponentLogger("cache-warming");
 
 /** Provider transport and accounting for one run's captured request. */
 export function cacheRefreshFor(input: {
+  readonly requestPolicy?: RequestPolicy;
   readonly sessionId: string;
   readonly runtimeConfig: RuntimeConfig;
   readonly isCurrent: () => boolean;
@@ -30,7 +33,10 @@ export function cacheRefreshFor(input: {
       if (signal.aborted || !input.isCurrent() || !canRefresh(sent)) return;
       const renewed = await input.renewHeaders();
       if (!renewed || signal.aborted || !input.isCurrent()) return;
-      return sendSentRequest({ ...sent, headers: renewed }, signal, fetchImpl);
+      return sendSentRequest({ ...sent, headers: renewed }, signal, fetchImpl, {
+        policy: input.requestPolicy, provider: provider!.providerId, model: provider!.model,
+        transport: providerModelTransport(input.runtimeConfig, provider!.endpoint, input.admission),
+      });
     },
     onUsage: (usage) => {
       if (!provider || !hasUsage(usage)) return;

@@ -12,6 +12,8 @@ import { providerEndpoint } from "../models/catalog.js";
 import { providerFetchForEndpoint } from "../../provider/request/fetch.js";
 import { endpointShape } from "../../provider/endpoints/index.js";
 import { classifyProviderFailure, type ProviderFailureClass } from "../../provider/registry/provider.js";
+import { ModelAdmissionError } from '../agent/request/model.js';
+import { providerModelTransport } from '../../provider/request/transport.js';
 
 /** How long a side question may take before it is abandoned. */
 const SIDE_QUESTION_TIMEOUT_MS = 15_000;
@@ -67,6 +69,7 @@ export async function runBtwCommand(
     try {
       answer =
         (await requestSimpleCompletion({
+          requestPolicy: context.requestPolicy,
           provider: {
             headers: providerAuthorization({
               apiKey: credential?.apiKey,
@@ -78,6 +81,7 @@ export async function runBtwCommand(
             providerId: resolution.provider,
             ...(endpoint ? { endpoint } : {}),
             fetchImpl: providerFetchForEndpoint(runtimeConfig, endpoint, endpointShape, context.admission),
+            modelTransport: providerModelTransport(runtimeConfig, endpoint, context.admission),
           },
           messages: [
             { role: "system", content: SIDE_QUESTION_SYSTEM_PROMPT },
@@ -89,6 +93,7 @@ export async function runBtwCommand(
           onFailure: (classification) => { failure = classification; },
         })) ?? "";
     } catch (error) {
+      if (error instanceof ModelAdmissionError) return { kind: 'local', output: error.message };
       failure ??= classifyProviderFailure({
         errorName: error instanceof Error ? error.name : undefined,
         message: error instanceof Error ? error.message : String(error),

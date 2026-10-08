@@ -1,4 +1,5 @@
 import type { AgentEventSink } from "./events.js";
+import { randomUUID } from 'node:crypto';
 import type { ProviderFailureClass } from "../../provider/registry/provider.js";
 import { flushMetrics, recordCount, recordTiming } from "../../observability/metrics.js";
 import type { AgentMessage, AgentStopReason } from "./state.js";
@@ -111,6 +112,7 @@ export interface AgentLoopConfig {
   readonly streamStep: (
     messages: readonly AgentMessage[],
     signal?: AbortSignal,
+    request?: { readonly requestId: string },
   ) => Promise<AssistantStep>;
 }
 
@@ -164,9 +166,10 @@ async function retryStep(
   emit: AgentEventSink,
 ): Promise<AssistantStep> {
   const policy = resolveRetryPolicy("turn", config.retry ?? {});
+  const request = Object.freeze({ requestId: randomUUID() });
   let attempt = 0;
   for (;;) {
-    const step = await config.streamStep(context, signal);
+    const step = await config.streamStep(context, signal, request);
     // A step whose own layer already retried is not retried again here. The
     // provider layer sees the status and the server's delay, so it is the one
     // that knows whether asking again is worth anything; by the time it gives up

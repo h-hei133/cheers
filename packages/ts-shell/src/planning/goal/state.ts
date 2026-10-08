@@ -32,17 +32,25 @@ export function transitionGoal(current: SessionGoal | undefined, scope: GoalScop
     { completion: { source: 'user-declared', timestamp, declaration: '/goal complete' } });
   if (action.type === 'pause') return current.phase === 'paused' ? current : move(current, 'paused', timestamp, { pauseReason: 'user' });
   if (action.type === 'resume') return current.phase === 'active' ? current : move(current, 'active', timestamp);
+  if (action.type === 'budget') {
+    if (current.tokenBudget === action.cap) return current;
+    if (current.revision >= Number.MAX_SAFE_INTEGER) throw new GoalWriteError('invalid');
+    const { tokenBudget: _budget, ...base } = current;
+    return freezeDeep({ ...base, revision: current.revision + 1, updatedAt: timestamp,
+      ...(action.cap !== undefined ? { tokenBudget: action.cap } : {}) });
+  }
   throw new GoalWriteError('invalid');
 }
 
 function validateAction(action: unknown): void {
   if (!isRecord(action)) throw new GoalWriteError('invalid');
   if (action.type === 'complete-automatically') throw new GoalWriteError('unavailable');
-  if (typeof action.type !== 'string' || !['set', 'import', 'pause', 'resume', 'drop', 'complete', 'reentry'].includes(action.type)) throw new GoalWriteError('invalid');
-  const keys = action.type === 'set' || action.type === 'import' ? ['type', 'objective'] : action.type === 'complete' ? ['type', 'source'] : ['type'];
+  if (typeof action.type !== 'string' || !['set', 'import', 'pause', 'resume', 'drop', 'complete', 'reentry', 'budget'].includes(action.type)) throw new GoalWriteError('invalid');
+  const keys = action.type === 'set' || action.type === 'import' ? ['type', 'objective'] : action.type === 'complete' ? ['type', 'source'] : action.type === 'budget' ? ['type', 'cap'] : ['type'];
   if (Object.keys(action).some(key => !keys.includes(key))
     || ((action.type === 'set' || action.type === 'import') && typeof action.objective !== 'string')
-    || (action.type === 'complete' && action.source !== 'user-declared')) throw new GoalWriteError('invalid');
+    || (action.type === 'complete' && action.source !== 'user-declared')
+    || (action.type === 'budget' && action.cap !== undefined && (typeof action.cap !== 'number' || !Number.isSafeInteger(action.cap) || action.cap < 0))) throw new GoalWriteError('invalid');
 }
 
 function move(current: SessionGoal, phase: SessionGoal['phase'], timestamp: string,

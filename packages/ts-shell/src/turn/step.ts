@@ -1,4 +1,7 @@
 import { catalogModel } from "../core/models/catalog.js";
+import { randomUUID } from 'node:crypto';
+import { ModelAdmissionError, type ModelTransport, type RequestPolicy } from '../core/agent/request/model.js';
+import { prepareRequestAttempt, type RequestAttempt } from '../provider/request/attempt.js';
 import { hasUsage, usageFromProvider } from "../provider/response/usage.js";
 import type { AgentToolCall } from "../core/agent/tools.js";
 import type { AgentMessage, AgentStopReason } from "../core/agent/state.js";
@@ -84,6 +87,7 @@ export interface StepListener {
 }
 
 export interface StepOptions {
+  readonly requestId?: string;
   /** Whether the model may call tools on this step; the last step may not. */
   readonly allowTools: boolean;
   /** Restrict the bound tool schemas for this call; an empty list withdraws all tools. */
@@ -113,6 +117,8 @@ export type StepFunction = (
 ) => Promise<AssistantStep>;
 
 export interface StepRequest {
+  readonly requestPolicy?: RequestPolicy;
+  readonly modelTransport?: ModelTransport;
   readonly thinkingEffort?: ThinkingPreference;
   readonly thinkingEffortExplicit?: boolean;
   readonly provider: ProviderTarget;
@@ -247,6 +253,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
       ? { ...(request.provider.provider ? { provider: request.provider.provider } : {}), model: request.provider.model }
       : undefined;
   return async (messages, signal, listener, options): Promise<AssistantStep> => {
+    const requestId = options.requestId ?? randomUUID();
     const allowed = options.allowedTools && new Set(options.allowedTools);
     const tools = allowed ? request.tools.filter((tool) => allowed.has(tool.function.name)) : request.tools;
     const systemPrompt = options.agentMode && request.systemPromptFor
@@ -384,6 +391,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
       // very stream the caller is about to read.
       let attempt = 0;
       let response: Response | undefined;
+      let responseAttempt: RequestAttempt | undefined;
       let releaseAfterRead: AbortController | undefined;
       let refusal = "";
       let refusalClass: ProviderFailureClass | undefined;
@@ -398,7 +406,9 @@ export function createStepFunction(request: StepRequest): StepFunction {
         let releaseNow = true;
         try {
           const body = JSON.stringify(payload);
-          const attemptResponse = await fetchImpl(
+          const modelAttempt = await prepareRequestAttempt({ body, provider: request.provider.provider ?? '', model: request.provider.model,
+            endpoint, purpose: options.agentMode ? 'subagent' : 'turn', requestId, policy: request.requestPolicy });
+          const attemptResponse = await modelAttempt.send(
             endpointUrl(request.provider.baseUrl, endpoint, request.provider.model),
             {
               method: "POST",
@@ -406,10 +416,12 @@ export function createStepFunction(request: StepRequest): StepFunction {
               body,
               signal: requestSignal,
             },
+            fetchImpl, request.modelTransport,
           );
           if (attemptResponse.ok) {
             clearContextUsage(request.sessionId);
             response = attemptResponse;
+            responseAttempt = modelAttempt;
             options.onRequestSent?.({
               context: requestContext({ body, endpoint, fields: endpointShape(endpoint).contextFields,
                 provider: request.provider.provider ?? '', model: request.provider.model,
@@ -427,6 +439,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
             releaseNow = false;
             break;
           }
+          modelAttempt.settle();
           const detail = await attemptResponse.text();
           // The conversation outgrew the window. That is answered by condensing,
           // not by asking again, so it keeps its own prefix and stops here.
@@ -456,6 +469,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
             );
           }
         } catch (error) {
+          if (error instanceof ModelAdmissionError) return stamp(errorStep(error.message, true));
           if (signal?.aborted) return stamp(abortedStep(""));
           // The request never arrived, which is the failure a second attempt
           // most often fixes.
@@ -506,6 +520,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
       try {
         const completion = await readCompletion(response, watched, endpoint);
         const usage = completion.usage;
+        responseAttempt?.settle(usage);
         if (hasUsage(usage)) {
           recordSessionUsage(request.sessionId, {
             ...usageFromProvider(usage),
@@ -525,6 +540,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
           : completed);
       } catch (error) {
         markContextUnknown(request.sessionId, 'usage-gap');
+        if (error instanceof ModelAdmissionError) return stamp(failedStep(error.message, shown, undefined, true));
         if (signal?.aborted) return stamp(abortedStep(shown));
         const detail = error instanceof Error ? error.message : String(error);
         if (!shownAnything && !REFUSAL.test(detail) && streamAttempts < retry.maxRetries && /socket|connection|network|fetch|terminated|unexpected eof/i.test(detail)) {

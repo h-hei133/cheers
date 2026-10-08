@@ -2,6 +2,8 @@ import { endpointBody, endpointKind, endpointShape, endpointUrl, type EndpointKi
 import { classifyProviderFailure, type ProviderFailureClass } from "../registry/provider.js";
 import { REFUSAL } from "../../core/agent/retry.js";
 import type { ChatMessage } from "../../turn/prompt.js";
+import type { ModelTransport, RequestPolicy } from '../../core/agent/request/model.js';
+import { prepareRequestAttempt } from './attempt.js';
 
 /**
  * One out-of-band model call.
@@ -40,9 +42,11 @@ export interface SimpleProvider {
   readonly endpoint?: EndpointKind;
   /** The transport, with its deadlines. Absent means the global fetch. */
   readonly fetchImpl?: typeof fetch;
+  readonly modelTransport?: ModelTransport;
 }
 
 export interface SimpleCompletionRequest {
+  readonly requestPolicy?: RequestPolicy;
   readonly provider: SimpleProvider;
   readonly messages: readonly ChatMessage[];
   /** The ceiling this request may produce. Absent leaves the field off. */
@@ -79,23 +83,23 @@ export async function requestSimpleCompletion(
   const messages = request.messages.filter((message) => message.role !== "system");
   const headers = new Headers(request.provider.headers);
   headers.set("accept", "application/json");
-  const res = await fetchImpl(endpointUrl(request.provider.baseUrl, kind, request.provider.model, false), {
+  const serialized = JSON.stringify(
+    endpointBody(kind, {
+      model: request.provider.model, systemPrompt, messages,
+      ...(request.maxOutputTokens !== undefined ? { maxOutputTokens: request.maxOutputTokens } : {}),
+      ...(request.supportsTemperature !== undefined ? { supportsTemperature: request.supportsTemperature } : {}),
+    }),
+  );
+  const attempt = await prepareRequestAttempt({ body: serialized, provider: request.provider.providerId ?? '', model: request.provider.model,
+    endpoint: kind ?? 'openai-compatible', purpose: 'side-question', policy: request.requestPolicy });
+  const res = await attempt.send(endpointUrl(request.provider.baseUrl, kind, request.provider.model, false), {
     method: "POST",
     headers,
-    body: JSON.stringify(
-      endpointBody(kind, {
-        model: request.provider.model,
-        systemPrompt,
-        messages,
-        ...(request.maxOutputTokens !== undefined ? { maxOutputTokens: request.maxOutputTokens } : {}),
-        ...(request.supportsTemperature !== undefined
-          ? { supportsTemperature: request.supportsTemperature }
-          : {}),
-      }),
-    ),
+    body: serialized,
     ...(request.signal ? { signal: request.signal } : {}),
-  });
+  }, fetchImpl, request.provider.modelTransport);
   if (!res.ok) {
+    attempt.settle();
     request.onFailure?.(classifyProviderFailure({ status: res.status }));
     return undefined;
   }
@@ -108,7 +112,9 @@ export async function requestSimpleCompletion(
     }
     throw error;
   }
-  const choice = endpointShape(kind).readBody(body).choices?.[0];
+  const completion = endpointShape(kind).readBody(body);
+  attempt.settle(completion.usage);
+  const choice = completion.choices?.[0];
   if (REFUSAL.test(choice?.finish_reason ?? "")) {
     request.onFailure?.("provider_safety_block");
     return undefined;

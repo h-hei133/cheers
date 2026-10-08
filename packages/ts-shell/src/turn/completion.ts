@@ -43,6 +43,8 @@ export interface ProviderUsage {
   readonly prompt_tokens_details?: { readonly cached_tokens?: number };
   readonly cache_read_input_tokens?: number;
   readonly cache_creation_input_tokens?: number;
+  /** A protocol omitted a distinct output category; its aggregate is only a lower bound. */
+  readonly metering_output_complete?: boolean;
 }
 
 /**

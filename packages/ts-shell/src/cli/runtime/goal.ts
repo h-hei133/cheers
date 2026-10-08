@@ -4,6 +4,8 @@ import type { Session } from '../../session/schema/sessionRecord.js';
 import { readGoalEdit, writeGoal, goalIsDetached, type GoalStoreHost } from '../../planning/goal/store.js';
 import { goalObjective } from '../../planning/goal/projection.js';
 import { runSessionGoalCommand } from '../../planning/goal/command.js';
+import { goalRequestPolicy } from '../../planning/goal/budget.js';
+import { ModelAdmissionError, type RequestPolicy } from '../../core/agent/request/model.js';
 
 interface Activation { readonly session: Session; readonly projectRoot: string; readonly issue?: string }
 const activations = new WeakMap<ShellRuntimeContext, Activation>();
@@ -38,4 +40,9 @@ export function goalObjectiveFor(context: ShellRuntimeContext, host: GoalStoreHo
   if (prepareGoalSession(context, host).issue) return undefined;
   try { return goalObjective(readGoalEdit(host, context.session)); }
   catch { return undefined; }
+}
+
+export function goalPolicyFor(context: ShellRuntimeContext, host: GoalStoreHost): RequestPolicy | undefined {
+  if (prepareGoalSession(context, host).issue) return { reserve: () => { throw new ModelAdmissionError('unavailable'); } };
+  return goalRequestPolicy(host, context.session);
 }

@@ -26,7 +26,7 @@ import type { CliProviderRuntimeBridge } from "../provider/cliProviderRuntimeBri
 import type { EscalationPrompt } from "../../core/shell/approval/contract.js";
 import { promptInteractiveQuestions } from "../interactive/interactiveAskBridge.js";
 import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
-import { goalObjectiveFor, prepareGoalSession } from './goal.js';
+import { goalObjectiveFor, goalPolicyFor, prepareGoalSession } from './goal.js';
 import { compactSessionHistory } from "../../core/shell/compaction.js";
 import { recordCompactionCheckpoint } from "../../context/compact/checkpoint/compactionCheckpoint.js";
 import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalStore.js";
@@ -56,6 +56,8 @@ import { toChatMessages } from "../../turn/prompt.js";
 import type { AgentMessage } from "../../core/agent/state.js";
 import type { CompactionChatMessage } from "../../core/query/compaction/summarize.js";
 import type { CompactionSetup } from "../../turn/session.js";
+import type { RequestPolicy } from '../../core/agent/request/model.js';
+import { providerModelTransport } from '../../provider/request/transport.js';
 
 /**
  * Messages for a compaction call.
@@ -101,6 +103,7 @@ interface CompactionWiring {
  * token budget.
  */
 function buildCompactionWiring(input: {
+  readonly requestPolicy?: RequestPolicy;
   readonly provider: {
     /** Built from the resolved credential, so an account token reaches this path too. */
     readonly headers: Readonly<Record<string, string>>;
@@ -126,6 +129,7 @@ function buildCompactionWiring(input: {
   const provider = input.provider;
   const runtimeConfig = input.runtimeConfig;
   const fetchImpl = providerFetchForEndpoint(runtimeConfig, provider.endpoint, endpointShape, input.admission);
+  const modelTransport = providerModelTransport(runtimeConfig, provider.endpoint, input.admission);
   // Resolved per model rather than read from one global number: the catalog
   // knows each model's window, and using a single value compacted a million-token
   // model at sixty-four thousand.
@@ -172,6 +176,7 @@ function buildCompactionWiring(input: {
     },
     summarize: (request) =>
       requestCompactionSummary({
+        requestPolicy: input.requestPolicy, modelTransport, maxOutputTokens: runtimeConfig.maxOutputTokens,
         provider,
         // The same deadlines as the main request. A summarization that hangs is
         // as fatal to a turn as an answer that hangs, and harder to notice: the
@@ -187,6 +192,7 @@ function buildCompactionWiring(input: {
     // follows rather than recapping what came before.
     summarizeTurnPrefix: (messages, signal) =>
       requestCompactionSummary({
+        requestPolicy: input.requestPolicy, modelTransport, maxOutputTokens: runtimeConfig.maxOutputTokens, purpose: 'turn-summary',
         provider,
         fetchImpl,
         messages: toCompactionMessages(messages),
@@ -349,7 +355,8 @@ export function createCliSessionRuntime(input: {
         }
         assertAdmission(admission);
         signal.throwIfAborted();
-        const wiring = buildCompactionWiring({ provider, runtimeConfig: config, admission, sessionId, catalog });
+        const wiring = buildCompactionWiring({ provider, runtimeConfig: config, admission, sessionId, catalog,
+          requestPolicy: goalPolicyFor(input.runtimeContext, input.sessionManager) });
         return compactSessionHistory({
           store: input.sessionManager,
           sessionId,
@@ -383,6 +390,8 @@ export function createCliSessionRuntime(input: {
         assertAdmission(admission);
         if (!provider) return undefined;
         return requestCompactionSummary({
+          requestPolicy: goalPolicyFor(input.runtimeContext, input.sessionManager), purpose: 'branch-summary', maxOutputTokens: config.maxOutputTokens,
+          modelTransport: providerModelTransport(config, provider.endpoint, admission),
           provider,
           // The third of the three summarisers, and the one that was missed: it kept
           // the global fetch, so a `/back` whose summary stalled waited forever with
@@ -401,6 +410,7 @@ export function createCliSessionRuntime(input: {
       const resolvedCredential =
         input.providerRuntimeBridge.resolveCredentialSnapshot();
       const sessionId = input.runtimeContext.session.id;
+      const requestPolicy = goalPolicyFor(input.runtimeContext, input.sessionManager);
       // A runner left over from an earlier run in this session is still holding
       // an idle timer, and it would refresh the same prefix the new runner is
       // about to refresh — the same money spent twice. Only the current run
@@ -438,6 +448,7 @@ export function createCliSessionRuntime(input: {
           // different prefix, and a different prefix is a cache miss at the full
           // write price — the opposite of what a refresh is for.
           ...cacheRefreshFor({ sessionId, runtimeConfig: config, admission,
+            requestPolicy,
             ...(activeProvider ? { provider: activeProvider } : {}),
             renewHeaders: async () => (await renewedProvider(resolved, config, admission, catalog)).provider?.headers,
             isCurrent: () => {
@@ -446,6 +457,7 @@ export function createCliSessionRuntime(input: {
                 input.sessionManager.getSession(sessionId)?.turns.at(-1)?.id === sourceEntryId;
             },
           }),
+          onDecision: (_decision, stopReason) => { if (stopReason) input.renderer.renderLine(`Cache refresh stopped: ${stopReason}`); },
         });
         previousCacheWarming = cacheWarming;
         const stopBackground = () => cacheWarming.stop();
@@ -455,7 +467,7 @@ export function createCliSessionRuntime(input: {
 
         const compaction: CompactionSetup | undefined = activeProvider
           ? {
-              ...buildCompactionWiring({ provider: activeProvider, runtimeConfig: config, admission, sessionId, catalog }),
+              ...buildCompactionWiring({ provider: activeProvider, runtimeConfig: config, admission, sessionId, catalog, requestPolicy }),
               onCompact: (record) => {
                 input.sessionManager.appendCompactionEntry(sessionId, record);
                 markContextUnknown(sessionId);
@@ -496,6 +508,7 @@ export function createCliSessionRuntime(input: {
       let sourceEntryId = allTurns.at(-1)?.id;
       const run = streamCliRuntimePrompt({
         goalObjective: goalObjectiveFor(input.runtimeContext, input.sessionManager),
+        requestPolicy,
         mcpGateway: input.mcpGateway,
         // Carried so the tool pool honours disabledTools / hiddenToolPrefixes.
         runtimeConfig: config,

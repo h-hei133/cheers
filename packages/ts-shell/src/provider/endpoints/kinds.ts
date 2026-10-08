@@ -2,6 +2,7 @@ import type { ChatMessage } from "../../turn/prompt.js";
 import type { RequestSigner } from "../request/fetch.js";
 import type { ToolSchema } from "../../turn/tools.js";
 import type { ContextFields } from '../../context/request/model.js';
+import type { RequestBound } from '../../core/agent/request/model.js';
 import {
   isEventStream,
   type CompletedBody,
@@ -42,6 +43,8 @@ export type EndpointKind = string;
 
 /** What one endpoint needs to say about itself. */
 export interface EndpointShape {
+  /** Trusted complete-input and enforced-inclusive-output proof; absence means cap unsupported. */
+  readonly requestBound?: (request: { readonly body: string; readonly provider: string; readonly model: string }) => RequestBound | Promise<RequestBound | undefined> | undefined;
   /** Where the final turn body carries context; used for size-only observations. */
   readonly contextFields?: ContextFields;
   /** Smallest output cap that can hold a thinking budget and an answer. */

@@ -22,6 +22,8 @@ const fixture = vi.hoisted(() => ({
   config: { providerConnectTimeoutMs: 1000, providerHeadersTimeoutMs: 1000, providerBodyTimeoutMs: 1000, offline: true },
 }));
 vi.mock("../../config/runtimeConfig.js", () => ({ getRuntimeConfig: () => fixture.config }));
+// Transport composition has no durable session or goal; budget policy is covered by its owning suite.
+vi.mock("./goal.js", () => ({ prepareGoalSession: () => undefined, goalObjectiveFor: () => undefined, goalPolicyFor: () => undefined }));
 vi.mock("../../core/shell/providerCredentials.js", () => ({ resolveProviderCredential: () => fixture.resolution }));
 vi.mock("../../core/models/catalogStore.js", () => ({ loadCatalog: () => [{
   id: "fixture", endpoint: "test-signed-summary", models: [{ id: "fixture-model", contextWindow: 10000,

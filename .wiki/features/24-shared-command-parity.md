@@ -258,4 +258,10 @@ Cheers 已有 [picker 注册器](../../packages/ts-shell/src/cli/interactive/pic
 
 ## 9. 会话目标实体实施补充
 
-[Phase 19 §8.117](phase-19-decisions.md#8117-auto-01会话目标实体显式导入与有来源的状态机)将 goal 从项目描述迁入会话实体，显式 set/show/pause/resume/drop/complete 与 legacy import 复用 session state/lock；新会话/fork 不继承，旧描述只可导入为 paused，reentry 在下一动作前暂停。手动完成只记录用户声明，detached/unknown/persisted 后清理失败不伪装成可恢复或未写。本批 active 目标只伴随手动回合，预算及自动续轮明确 unavailable；AUTO-02/03/04/05 继续承担共享计量、调度、计划与顾问，完整自治范围保持不变。
+[Phase 19 §8.117](phase-19-decisions.md#8117-auto-01会话目标实体显式导入与有来源的状态机)将 goal 从项目描述迁入会话实体，显式 set/show/pause/resume/drop/complete 与 legacy import 复用 session state/lock；新会话/fork 不继承，旧描述只可导入为 paused，reentry 在下一动作前暂停。手动完成只记录用户声明，detached/unknown/persisted 后清理失败不伪装成可恢复或未写。该实体批次没有交付预算或自动续轮；共享预算后续进展见下一节，调度、计划与顾问继续由 AUTO-03/04/05 承担，完整自治范围保持不变。
+
+## 10. 共享请求预算实施补充
+
+[Phase 19 §8.118](phase-19-decisions.md#8118-auto-02完整请求准入与持久共享账目)已接入 `/goal budget N|off`、缺省无 cap 和按目标 ID 保存的共享账本。主子代理、内层重试/降级/空流重发、`/btw`、自动/手动压缩、分支/回合摘要与缓存刷新共用实际 attempt 准入；缓存和 reasoning 是 input/output 子项，缺失 usage 保留 unknown，off、暂停、降低 cap 和重启不删除历史。预留与发送交接均核验 live policy，确认未发送才释放，迟到结算仍归原目标。
+
+所有现有 endpoint 均缺少覆盖完整序列化输入和全部输出的可靠 token 上界，显式 cap 因此返回 admission unsupported，实际零发送；没有用字符估算或模型窗口冒充严格保证。无 cap 的目标可继续显式请求并计量，未知历史切换到 cap 后阻止准入。AUTO-02 的本地通用基元与现有发送路径验收完成；新顾问/研究等发送必须复用同一 policy，自动调度、验收完成证据及完整 U06 仍由后续任务交付。

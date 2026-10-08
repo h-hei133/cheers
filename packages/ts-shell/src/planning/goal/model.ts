@@ -31,13 +31,16 @@ export interface SessionGoal extends GoalScope {
   readonly runOwner: null;
   readonly pauseReason?: 'user' | 'session-reentry' | 'legacy-import';
   readonly completion?: GoalCompletion;
+  /** Absent means no cumulative token cap; zero explicitly blocks admission. */
+  readonly tokenBudget?: number;
 }
 
 export type GoalAction =
   | { readonly type: 'set'; readonly objective: string }
   | { readonly type: 'import'; readonly objective: string }
   | { readonly type: 'pause' | 'resume' | 'drop' | 'reentry' }
-  | { readonly type: 'complete'; readonly source: 'user-declared' };
+  | { readonly type: 'complete'; readonly source: 'user-declared' }
+  | { readonly type: 'budget'; readonly cap?: number };
 
 export type GoalWriteState = 'unchanged' | 'unknown' | 'persisted';
 

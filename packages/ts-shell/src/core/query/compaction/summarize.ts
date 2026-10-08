@@ -10,7 +10,10 @@ import {
   formatCheckpointMessage,
   parseCompactedSummary,
 } from "./summarizer.js";
-import { endpointBody, endpointKind, endpointText, endpointUrl, type EndpointKind } from "../../../provider/endpoints/index.js";
+import { endpointBody, endpointKind, endpointUrl, type EndpointKind } from "../../../provider/endpoints/index.js";
+import { endpointShape } from '../../../provider/endpoints/index.js';
+import { prepareRequestAttempt } from '../../../provider/request/attempt.js';
+import type { ModelTransport, RequestPolicy } from '../../agent/request/model.js';
 
 /**
  * One summarization request.
@@ -22,6 +25,7 @@ import { endpointBody, endpointKind, endpointText, endpointUrl, type EndpointKin
  */
 
 export interface CompactionProvider {
+  readonly providerId?: string;
   readonly baseUrl: string;
   /**
    * Headers this summarization authenticates with.
@@ -75,6 +79,10 @@ export interface CompactionChatMessage {
 }
 
 export interface CompactionRequest {
+  readonly requestPolicy?: RequestPolicy;
+  readonly modelTransport?: ModelTransport;
+  readonly maxOutputTokens?: number;
+  readonly purpose?: 'compaction' | 'turn-summary' | 'branch-summary';
   readonly provider: CompactionProvider;
   /**
    * The fetch to send with.
@@ -134,29 +142,31 @@ export async function requestCompactionSummary(request: CompactionRequest): Prom
   const fetchImpl = request.fetchImpl;
   const headers = new Headers(request.provider.headers);
   headers.set("accept", "application/json");
-  const res = await fetchImpl(endpointUrl(request.provider.baseUrl, endpointKind(request.provider.endpoint), request.provider.model, false), {
+  const kind = endpointKind(request.provider.endpoint);
+  const body = JSON.stringify(
+    endpointBody(kind, {
+      model: request.provider.model,
+      ...(request.maxOutputTokens !== undefined ? { maxOutputTokens: request.maxOutputTokens } : {}),
+      ...(request.provider.supportsTemperature !== undefined ? { supportsTemperature: request.provider.supportsTemperature } : {}),
+      ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
+      messages: [
+        ...(previousSummary ? [{ role: 'user' as const, content: `<previous-summary>\n${previousSummary}\n</previous-summary>` }] : []),
+        ...request.messages, { role: 'user' as const, content: prompt },
+      ],
+    }),
+  );
+  const attempt = await prepareRequestAttempt({ body, provider: request.provider.providerId ?? '', model: request.provider.model,
+    endpoint: kind ?? 'openai-compatible', purpose: request.purpose ?? 'compaction', policy: request.requestPolicy });
+  const res = await attempt.send(endpointUrl(request.provider.baseUrl, kind, request.provider.model, false), {
     method: "POST",
     headers,
-    body: JSON.stringify(
-      endpointBody(endpointKind(request.provider.endpoint), {
-        model: request.provider.model,
-        ...(request.provider.supportsTemperature !== undefined
-          ? { supportsTemperature: request.provider.supportsTemperature }
-          : {}),
-        ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
-        messages: [
-          ...(previousSummary
-            ? [{ role: "user" as const, content: `<previous-summary>\n${previousSummary}\n</previous-summary>` }]
-            : []),
-          ...request.messages,
-          { role: "user" as const, content: prompt },
-        ],
-      }),
-    ),
+    body,
     signal: request.signal,
-  });
-  if (!res.ok) return undefined;
-  const summaryContent = endpointText(endpointKind(request.provider.endpoint), await res.json());
+  }, fetchImpl, request.modelTransport);
+  if (!res.ok) { attempt.settle(); return undefined; }
+  const completion = endpointShape(kind).readBody(await res.json());
+  attempt.settle(completion.usage);
+  const summaryContent = completion.choices?.[0]?.message?.content;
   if (!summaryContent) return undefined;
   const { rawSummary } = parseCompactedSummary(summaryContent);
   // The previous checkpoint's own footprint is merged in, so a file read before

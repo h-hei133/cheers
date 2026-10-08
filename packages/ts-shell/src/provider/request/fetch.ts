@@ -274,9 +274,15 @@ export function providerFetchForEndpoint(
   endpoint: string | undefined,
   shapeFor: (kind: string | undefined) => { readonly signer?: () => Promise<RequestSigner | undefined> },
   admission?: Admission,
+  beforeDispatch?: (init?: RequestInit) => void,
 ): typeof fetch {
   const signer = shapeFor(endpoint).signer;
-  const base = admittedFetch(providerFetchFor(config), admission);
+  const configured = providerFetchFor(config);
+  const base = admittedFetch((input, init) => {
+    init?.signal?.throwIfAborted();
+    beforeDispatch?.(init);
+    return configured(input, init);
+  }, admission);
   if (!signer) return base;
 
   let built: RequestSigner | undefined;
