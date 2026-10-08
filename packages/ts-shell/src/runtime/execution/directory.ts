@@ -14,9 +14,10 @@ const MAX_NAME_BYTES = 1024 * 1024
 const TIMEOUT_MS = 5_000
 
 export class DirectoryReadError extends Error {
-  constructor(readonly reason: 'entries' | 'bytes' | 'deadline') {
-    const detail = { entries: '10,000-entry limit', bytes: '1MiB name limit', deadline: 'read deadline' }[reason]
-    super(`Directory listing stopped at the ${detail}; no complete listing is available. Read a smaller directory.`)
+  constructor(readonly reason: 'entries' | 'bytes' | 'deadline' | 'unavailable') {
+    const detail = { entries: '10,000-entry limit', bytes: '1MiB name limit', deadline: 'read deadline', unavailable: 'filesystem access failure' }[reason]
+    super(reason === 'unavailable' ? 'Directory enumeration failed; no complete listing is available. Check filesystem access and retry.'
+      : `Directory listing stopped at the ${detail}; no complete listing is available. Read a smaller directory.`)
     this.name = 'DirectoryReadError'
   }
 }

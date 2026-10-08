@@ -3,6 +3,7 @@ import type { AgentLifecycleEvent } from "./events.js";
 import type { AgentMessage } from "./state.js";
 import {
   boundText,
+  TOOL_OUTPUT_LIMIT,
   createToolResultMessage,
   executeToolBatch,
   failTruncatedCalls,
@@ -166,6 +167,55 @@ describe("prepareToolCall", () => {
 });
 
 describe("executeToolBatch", () => {
+  it.each(["parallel", "sequential"] as const)("retains explicit page notices within the model cap in %s mode", async mode => {
+    const notice = "[Page saved to artifact://123; 50 matches are outside this page]";
+    const output = "path\n".repeat(4000) + notice;
+    const tool = makeTool({ execute: async () => ({ output, isError: false, metadata: { outputNotice: notice } }) });
+    const batch = await executeToolBatch([tool], assistantMessage(), [makeCall()], undefined, mode, undefined, collect().emit);
+    expect(batch.messages[0].content).toContain("artifact://123");
+    expect(batch.messages[0].content).toContain("50 matches are outside this page");
+    expect((batch.messages[0].content as string).length).toBeLessThanOrEqual(TOOL_OUTPUT_LIMIT);
+    const short = await executeToolBatch([makeTool({ execute: async () => ({ output: notice, isError: false, metadata: { outputNotice: notice } }) })],
+      assistantMessage(), [makeCall()], undefined, mode, undefined, collect().emit);
+    expect(short.messages[0].content).toBe(notice);
+  });
+
+  it("bounds oversized explicit notices and ignores non-string notice metadata", async () => {
+    const notice = "artifact://123 " + "n".repeat(20000) + " hook failure";
+    const output = "x".repeat(20000);
+    const tool = makeTool({ execute: async () => ({ output, isError: false, metadata: { outputNotice: notice } }) });
+    const batch = await executeToolBatch([tool], assistantMessage(), [makeCall()], undefined, "parallel", undefined, collect().emit);
+    expect((batch.messages[0].content as string).length).toBeLessThanOrEqual(TOOL_OUTPUT_LIMIT);
+    expect(batch.messages[0].content).toContain("artifact://123");
+    expect(batch.messages[0].content).toContain("hook failure");
+    const malformed = await executeToolBatch([makeTool({ execute: async () => ({ output, isError: false, metadata: { outputNotice: { text: notice } } }) })],
+      assistantMessage(), [makeCall()], undefined, "parallel", undefined, collect().emit);
+    expect(malformed.messages[0].content).toBe(boundText(output));
+  });
+
+  it.each(["feedback", "throw", "replace"])("preserves hook %s facts when long tool output is bounded", async mode => {
+    const notice = "[Page saved to artifact://123]";
+    const output = "x".repeat(20000) + notice;
+    const tool = makeTool({ execute: async () => ({ output, isError: false, metadata: { outputNotice: notice, status: "partial" } }) });
+    const { emit, events } = collect();
+    const batch = await executeToolBatch([tool], assistantMessage(), [makeCall()], {
+      afterToolCall: async () => {
+        if (mode === "throw") throw new Error("verification unavailable");
+        return { output: mode === "replace" ? "redacted ".repeat(2000) : output + "\n[Verification feedback]\ncheck failed", isError: true };
+      },
+    }, "sequential", undefined, emit);
+    expect(batch.messages[0].metadata?.status).toBe("partial");
+    expect(events).toContainEqual(expect.objectContaining({ type: "tool_execution_end", isError: true }));
+    if (mode === "replace") {
+      expect(batch.messages[0].content).not.toContain("artifact://123");
+      expect(batch.messages[0].metadata?.outputNotice).toBeUndefined();
+    } else {
+      expect(batch.messages[0].content).toContain("artifact://123");
+      expect(batch.messages[0].content).toContain(mode === "throw" ? "Tool result hook error: verification unavailable" : "check failed");
+      expect((batch.messages[0].content as string).length).toBeLessThanOrEqual(TOOL_OUTPUT_LIMIT);
+    }
+  });
+
   it("executes calls in parallel while keeping result order", async () => {
     let concurrent = 0;
     let maxConcurrent = 0;

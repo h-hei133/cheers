@@ -4,6 +4,9 @@ import path from "node:path";
 import os from "node:os";
 import { createCoreToolRegistry } from "./registry.js";
 import { matchesGlob } from "./globMatch.js";
+import { ArtifactManager } from '../session/artifactManager.js';
+import { createGlobToolDefinition } from './glob.js';
+import type { ExecutionService } from '../../runtime/execution/types.js';
 
 /**
  * A directory holding `count` files, plus a nested directory so a pattern that
@@ -279,7 +282,19 @@ describe("both caps reached at once", () => {
     const shownCounts = output.match(/showing \d+ of/g) ?? [];
     expect(shownCounts).toHaveLength(1);
     expect(output).not.toContain("for more");
+    const uri = /artifact:\/\/\d+/.exec(output)![0];
+    const saved = await fs.readFile(ArtifactManager.getShared(dir).resolve(uri)!, 'utf8');
+    expect(saved.split('\n')).toHaveLength(500);
+    expect(output).toContain('500-match page saved');
+    expect(output).toContain('1000 additional matches');
+    expect(output).not.toContain('Full list');
 
     await fs.rm(dir, { recursive: true, force: true });
   });
+});
+
+it('honours cancellation delivered with the enumeration result before publishing matches', async () => {
+  const controller = new AbortController();
+  const glob = createGlobToolDefinition({ listFilesRecursive: async () => { controller.abort(); return ['a.ts']; } } as unknown as ExecutionService);
+  await expect(glob.execute({ pattern: '*.ts' }, { workspaceRoot: process.cwd(), taskId: 't', abortSignal: controller.signal } as never)).rejects.toThrow();
 });

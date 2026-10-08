@@ -65,12 +65,13 @@ export interface DirectoryListingRequest {
  */
 export async function formatDirectoryListing(
   request: DirectoryListingRequest,
-): Promise<string> {
+): Promise<{ output: string; outputNotice?: string }> {
   const listing = await listDirectoryEntries(
     request.workspaceRoot,
     request.absolutePath,
     { assertFileAccess: request.assertFileAccess, abortSignal: request.abortSignal },
   )
+  request.abortSignal?.throwIfAborted()
   const entries = listing.entries
   const shownPath = displayDirectoryPath(request)
 
@@ -79,9 +80,9 @@ export async function formatDirectoryListing(
     // model that is told "empty" when entries exist will conclude the workspace
     // does not hold what it is looking for.
     if (listing.omittedCount > 0) {
-      return `Directory ${shownPath} holds no entries that this tool may show (${listing.omittedCount} omitted by ignore or access rules).`
+      return { output: `Directory ${shownPath} holds no entries that this tool may show (${listing.omittedCount} omitted by ignore or access rules).` }
     }
-    return `Directory ${shownPath} is empty.`
+    return { output: `Directory ${shownPath} is empty.` }
   }
 
   const offset =
@@ -103,23 +104,25 @@ export async function formatDirectoryListing(
   // cap and still arrives over budget. The byte budget is what actually bounds
   // the response.
   const truncated = truncateHead(lines.join('\n'), { maxLines: Number.MAX_SAFE_INTEGER })
-  let body = `${header}\n${truncated.content}`
+  const notices: string[] = []
 
   if (truncated.truncated) {
-    // Spilled rather than dropped: the rest is reachable by reading the file
-    // instead of re-listing a narrower path.
+    // Only the selected page is saved; later entries remain outside it.
     const artifact = await ArtifactManager.getShared(request.artifactRoot ?? request.workspaceRoot, request.sessionId).save(
       lines.join('\n'),
       'read',
     )
-    body += `\n[${Math.round(truncated.shownBytes / 1024)}KB limit reached, showing ${truncated.shownLines} of ${lines.length} entries. Full listing written to ${artifact.uri}]`
+    notices.push(`[${Math.round(truncated.shownBytes / 1024)}KB limit reached, showing ${truncated.shownLines} of ${lines.length} page entries. ${page.length}-entry page saved to ${artifact.uri}${endIndex < entries.length ? `; ${entries.length - endIndex} additional entries are outside this page` : ''}]`)
   } else if (endIndex < entries.length) {
-    body += continuationNotice(shownPath, page.length, entries.length, endIndex + 1)
+    notices.push(continuationNotice(shownPath, page.length, entries.length, endIndex + 1).trimStart())
   }
   if (listing.omittedCount > 0) {
-    body += `\n[${listing.omittedCount} ${listing.omittedCount === 1 ? 'entry' : 'entries'} omitted by ignore or access rules]`
+    notices.push(`[${listing.omittedCount} ${listing.omittedCount === 1 ? 'entry' : 'entries'} omitted by ignore or access rules]`)
   }
-  return body
+  request.abortSignal?.throwIfAborted()
+  const outputNotice = notices.join('\n')
+  return { output: [`${header}\n${truncated.content}`, outputNotice].filter(Boolean).join('\n'),
+    outputNotice: [outputNotice, `[To inspect omitted page entries, re-read this directory using offset=${offset} and a smaller limit before advancing.]`].filter(Boolean).join('\n') }
 }
 
 /**

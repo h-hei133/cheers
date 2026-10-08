@@ -74,6 +74,7 @@ export function createGlobToolDefinition(
         reason: 'List approved workspace files for glob matching.',
         reportSafeTarget: context.workspaceRoot,
       })
+      context.abortSignal?.throwIfAborted()
       const filtered = files.filter((file) => matchesGlob(file, pattern))
       if (filtered.length === 0) {
         return approvedResult('No files matched the pattern.')
@@ -96,12 +97,12 @@ export function createGlobToolDefinition(
       const notices: string[] = []
 
       if (truncated.truncated) {
-        // Spilled rather than dropped, so nothing matched is unreachable — the
-        // model can read the rest instead of re-running a narrower search.
+        // Save this selected page, including its bytes omitted from the reply.
+        // Matches beyond the count cap still require a narrower search.
         const artifactManager = ArtifactManager.getShared(context.artifactRoot ?? context.workspaceRoot, context.sessionId)
         const artifact = await artifactManager.save(raw, 'glob')
         notices.push(
-          `${Math.round(truncated.shownBytes / 1024)}KB limit reached, showing ${truncated.shownLines} of ${filtered.length} matches. Full list written to ${artifact.uri}`,
+          `${Math.round(truncated.shownBytes / 1024)}KB limit reached, showing ${truncated.shownLines} of ${filtered.length} matches. ${page.length}-match page saved to ${artifact.uri}${filtered.length > page.length ? `; ${filtered.length - page.length} additional matches are outside this page` : ''}`,
         )
       }
       if (truncated.truncated) {
@@ -118,8 +119,11 @@ export function createGlobToolDefinition(
         )
       }
 
+      context.abortSignal?.throwIfAborted()
+      const notice = notices.length === 0 ? undefined : `[${notices.join('. ')}]`
       return approvedResult(
-        notices.length === 0 ? truncated.content : `${truncated.content}\n\n[${notices.join('. ')}]`,
+        notice ? `${truncated.content}\n\n${notice}` : truncated.content,
+        { outputNotice: [notice, '[To inspect omitted matches, narrow the pattern. Increasing limit cannot recover text omitted from model output.]'].filter(Boolean).join('\n') },
       )
     },
   }

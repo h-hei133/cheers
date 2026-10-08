@@ -127,7 +127,7 @@ async function listViaWalk(
       if (error instanceof ReadCleanupError) throw error
       options?.abortSignal?.throwIfAborted()
       if (error instanceof DirectoryReadError || error instanceof WalkLimitError) throw error
-      return
+      throw new DirectoryReadError('unavailable')
     }
     for (const entry of entries) {
       budget.check()

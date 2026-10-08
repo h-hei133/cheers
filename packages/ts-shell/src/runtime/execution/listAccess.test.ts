@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { listDirectoryEntries, listWorkspaceFiles } from './fileWalk.js'
 import { createDefaultExecutionService } from './service.js'
 import { createCoreToolRegistry } from '../../core/tools/registry.js'
+import { DirectoryReadError } from './directory.js'
 
 let root: string
 let workspace: string
@@ -84,4 +85,31 @@ it('glob forwards policy into the real execution service', async () => {
 it('retains ordinary double-dot-prefixed files in the fallback walk', async () => {
   fs.writeFileSync(path.join(workspace, '..notes'), 'notes')
   expect(await listWorkspaceFiles(workspace, { respectIgnore: false })).toContain('..notes')
+})
+
+it.each([false, true])('reports an unreadable directory instead of empty or complete matches, nested=%s', async nested => {
+  if (nested) fs.mkdirSync(path.join(workspace, 'sub'))
+  const opened: Awaited<ReturnType<typeof fs.promises.open>>[] = []
+  const open = fs.promises.open
+  vi.spyOn(fs.promises, 'open').mockImplementation(async (...args) => {
+    const handle = await open(...args); opened.push(handle); return handle
+  })
+  const opendir = fs.promises.opendir
+  vi.spyOn(fs.promises, 'opendir').mockImplementation(async (...args) => {
+    const actual = fs.realpathSync(String(args[0]))
+    if (actual === (nested ? path.join(workspace, 'sub') : workspace)) {
+      throw Object.assign(new Error('PRIVATE_DIRECTORY_EACCES'), { code: 'EACCES' })
+    }
+    return opendir(...args)
+  })
+  try {
+    await listWorkspaceFiles(workspace, { respectIgnore: false })
+    throw new Error('Expected enumeration failure')
+  } catch (error) {
+    expect(error).toBeInstanceOf(DirectoryReadError)
+    expect(String(error)).toContain('no complete listing')
+    expect(String(error)).not.toContain('PRIVATE_DIRECTORY_EACCES')
+  }
+  expect(opened.length).toBeGreaterThan(0)
+  expect(opened.every(handle => handle.fd === -1)).toBe(true)
 })

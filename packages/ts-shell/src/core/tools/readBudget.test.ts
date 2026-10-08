@@ -4,10 +4,47 @@ import path from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createCoreToolRegistry } from './registry.js'
 import { ArtifactManager } from '../session/artifactManager.js'
+import { executeToolBatch, TOOL_OUTPUT_LIMIT } from '../agent/tools.js'
+import { adaptTools, createToolHooks, type ToolGateOptions } from '../../turn/tools.js'
 
 let root: string
 beforeEach(async () => { root = await fs.mkdtemp(path.join(os.tmpdir(), 'read-budget-')) })
 afterEach(async () => { vi.restoreAllMocks(); await fs.rm(root, { recursive: true, force: true }) })
+
+async function modelOutput(name: string, args: Record<string, unknown>): Promise<string> {
+  const registry = createCoreToolRegistry()
+  const options: ToolGateOptions = { workspaceRoot: root, sessionId: 'paging', permissionScope: 'allow-all',
+    hooks: { dispatch: async () => ({ decision: 'allow' }) } as never, emit: () => {} }
+  const batch = await executeToolBatch(adaptTools(registry, options), { role: 'assistant', content: '' },
+    [{ id: 'page', name, args }], createToolHooks(options, registry), 'sequential', undefined, () => {})
+  return batch.messages[0].content as string
+}
+
+it('retains file continuation and tells the model to recover omitted page text before advancing', async () => {
+  await fs.writeFile(path.join(root, 'page.txt'), ('x'.repeat(200) + '\n').repeat(500))
+  const output = await modelOutput('read', { path: 'page.txt' })
+  expect(output.length).toBeLessThanOrEqual(TOOL_OUTPUT_LIMIT)
+  expect(output).toMatch(/offset=\d+ to continue/)
+  expect(output).toContain('offset=1 and a smaller limit before advancing')
+  expect(output).toContain('byte-range inspection')
+  const small = await modelOutput('read', { path: 'page.txt', limit: 1 })
+  expect(small).toContain('x'.repeat(200))
+  expect(small).toContain('offset=2 to continue')
+  expect(small).not.toContain('output truncated')
+})
+
+it.each(['read', 'glob'])('keeps accurate selected-page artifact notices from %s through the turn and kernel', async name => {
+  for (let index = 0; index < 550; index++) await fs.writeFile(path.join(root, 'z'.repeat(200) + '-' + index + '.ts'), 'x')
+  const output = await modelOutput(name, name === 'read' ? { path: '.' } : { pattern: '*.ts' })
+  expect(output.length).toBeLessThanOrEqual(TOOL_OUTPUT_LIMIT)
+  expect(output).toContain('500-')
+  expect(output).toContain('page saved to artifact://')
+  expect(output).toContain('50 additional')
+  expect(output).not.toContain('Full list')
+  const uri = /artifact:\/\/\d+/.exec(output)![0]
+  const saved = await fs.readFile(ArtifactManager.getShared(root, 'paging').resolve(uri)!, 'utf8')
+  expect(saved.split('\n')).toHaveLength(500)
+})
 
 it('reads a short page without reading or buffering the rest of the file', async () => {
   await fs.writeFile(path.join(root, 'large.txt'), 'first\n' + 'rest\n'.repeat(400_000))

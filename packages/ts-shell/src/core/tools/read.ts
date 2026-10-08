@@ -70,19 +70,18 @@ export function createReadToolDefinition(executionService: ExecutionService): To
         // through the same ignore policy every other tool walks with.
         const stats = await fs.stat(containment.resolvedPath).catch(() => undefined)
         if (stats?.isDirectory()) {
-          return approvedResult(
-            await formatDirectoryListing({
-              assertFileAccess: context.assertFileAccess,
-              abortSignal: context.abortSignal,
-              absolutePath: containment.resolvedPath,
-              workspaceRoot: context.workspaceRoot,
-              artifactRoot: context.artifactRoot,
-              displayPath: selector.cleanPath,
-              sessionId: context.sessionId,
-              offset: typeof args.offset === 'number' ? args.offset : undefined,
-              limit: typeof args.limit === 'number' ? args.limit : undefined,
-            }),
-          )
+          const listing = await formatDirectoryListing({
+            assertFileAccess: context.assertFileAccess,
+            abortSignal: context.abortSignal,
+            absolutePath: containment.resolvedPath,
+            workspaceRoot: context.workspaceRoot,
+            artifactRoot: context.artifactRoot,
+            displayPath: selector.cleanPath,
+            sessionId: context.sessionId,
+            offset: typeof args.offset === 'number' ? args.offset : undefined,
+            limit: typeof args.limit === 'number' ? args.limit : undefined,
+          })
+          return approvedResult(listing.output, listing.outputNotice ? { outputNotice: listing.outputNotice } : undefined)
         }
         // An image read as text is mojibake, and mojibake is worse than a
         // refusal: it looks like content. Say what the file is and how to view
@@ -122,13 +121,15 @@ export function createReadToolDefinition(executionService: ExecutionService): To
         ? selector.endLine === undefined ? selector.isRaw ? 1000 : 500 : Math.min(1000, selector.endLine - offset + 1)
         : typeof args.limit === 'number' && args.limit > 0 ? Math.min(1000, Math.floor(args.limit)) : 500
       const page = await executionService.readTextPage({ ...request, offset, limit })
+      context.abortSignal?.throwIfAborted()
       const { text: _, ...metadata } = page
-      return approvedResult(formatPage(page), { read: metadata })
+      const formatted = formatPage(page)
+      return approvedResult(formatted.output, { read: metadata, outputNotice: formatted.outputNotice })
     },
   }
 }
 
-function formatPage(page: TextPageReadResult): string {
+function formatPage(page: TextPageReadResult): { output: string; outputNotice: string } {
   if (page.totalLines !== undefined && page.startLine > page.totalLines) {
     throw new Error(`Offset ${page.startLine} is beyond end of file (${page.totalLines} lines).`)
   }
@@ -148,5 +149,11 @@ function formatPage(page: TextPageReadResult): string {
   } else if (page.startLine > 1) {
     notes.push(`Showing lines ${page.startLine}-${page.endLine} of ${page.totalLines}.`)
   }
-  return notes.length ? [page.text, ...notes.map(note => `[${note}]`)].filter(Boolean).join('\n') : page.text
+  const notice = notes.map(note => `[${note}]`).join('\n')
+  return {
+    output: [page.text, notice].filter(Boolean).join('\n'),
+    // This guidance is reserved for a model projection that drops page text;
+    // nextOffset describes the complete tool page, not the shortened message.
+    outputNotice: [notice, `[To inspect omitted page text, re-read the same file without a line selector using offset=${page.startLine} and a smaller limit before advancing. If a single line is still shortened, use byte-range inspection.]`].filter(Boolean).join('\n'),
+  }
 }

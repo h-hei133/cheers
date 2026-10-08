@@ -19,8 +19,8 @@ export interface AgentToolResult {
    * The prose is what the model reads and answers; the metadata is what a
    * later reader replays state from — the todo checklist, say, which is part of
    * the session's facts rather than of the answer. It travels with the result
-   * message and is bounded at the event boundary, so recording state does not
-   * pay for it in the prompt.
+   * message and is bounded at the event boundary. An explicit string
+   * outputNotice also preserves page/recovery facts when model text is shortened.
    */
   readonly metadata?: Record<string, unknown>;
 }
@@ -102,11 +102,29 @@ export function parseToolArgs(
   }
 }
 
-export function boundText(text: string, limit: number = TOOL_OUTPUT_LIMIT): string {
+export function boundText(text: string, limit: number = TOOL_OUTPUT_LIMIT, notice?: unknown): string {
   if (text.length <= limit) {
     return text;
   }
-  return `${text.slice(0, limit)}\n\n[... output truncated to ${limit} chars]`;
+  const marker = `\n\n[... output truncated to ${limit} chars]`;
+  if (typeof notice !== "string" || notice.length === 0) {
+    return `${text.slice(0, limit)}${marker}`;
+  }
+  // Producers identify the facts needed to recover an omitted page. Reserve
+  // space for them, including the marker, without parsing the result's prose.
+  const tail = boundedNotice(notice, Math.min(2000, Math.max(0, limit - marker.length - 2)));
+  const suffix = `${marker}\n\n${tail}`;
+  return `${text.slice(0, Math.max(0, limit - suffix.length))}${suffix}`.slice(0, limit);
+}
+
+function boundedNotice(notice: string, limit: number): string {
+  if (notice.length <= limit) return notice;
+  const marker = "\n[... result notice shortened]\n";
+  if (limit <= marker.length) return marker.slice(0, limit);
+  const retained = limit - marker.length;
+  const head = Math.ceil(retained / 2);
+  const tail = retained - head;
+  return notice.slice(0, head) + marker + (tail ? notice.slice(-tail) : "");
 }
 
 export function createToolResultMessage(
@@ -229,7 +247,7 @@ export async function executeToolBatch(
   // kernel records, and it carries text rather than attachments.
   const bounded = batch.messages.map((message) => ({
     ...message,
-    content: boundText(messageToText(message.content)),
+    content: boundText(messageToText(message.content), TOOL_OUTPUT_LIMIT, message.metadata?.outputNotice),
   }));
   if (!signal?.aborted) {
     return { messages: bounded, terminate: batch.terminate };
@@ -315,17 +333,32 @@ async function finalizeExecutedCall(
     if (!update) {
       return executed;
     }
+    const output = update.output ?? executed.output;
+    const metadata = { ...executed.metadata, ...update.metadata };
+    if (output !== executed.output && !Object.hasOwn(update.metadata ?? {}, "outputNotice")) {
+      // Appended hook facts must survive the same cap as the producer's notice.
+      // A replacement (including redaction) invalidates the original notice.
+      if (typeof executed.metadata?.outputNotice === "string" && output.startsWith(executed.output)) {
+        metadata.outputNotice = executed.metadata.outputNotice + output.slice(executed.output.length);
+      } else {
+        delete metadata.outputNotice;
+      }
+    }
     return {
       ...executed,
-      ...(update.metadata ? { metadata: { ...executed.metadata, ...update.metadata } } : {}),
-      output: update.output ?? executed.output,
+      ...(executed.metadata || update.metadata ? { metadata } : {}),
+      output,
       isError: executed.isError || update.isError === true,
       terminate: update.terminate ?? executed.terminate,
     };
   } catch (error) {
+    const warning = `Tool result hook error: ${error instanceof Error ? error.message : String(error)}`;
     return {
       ...executed,
-      output: `${executed.output}\n\nTool result hook error: ${error instanceof Error ? error.message : String(error)}`,
+      output: `${executed.output}\n\n${warning}`,
+      metadata: { ...executed.metadata, outputNotice: [
+        typeof executed.metadata?.outputNotice === "string" ? executed.metadata.outputNotice : "", warning,
+      ].filter(Boolean).join("\n\n") },
       isError: true,
     };
   }

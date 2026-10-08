@@ -43,6 +43,7 @@ export interface ToolExecutionResult {
   readonly success: boolean
   readonly output?: string
   readonly error?: string
+  /** outputNotice reserves essential page/recovery facts when model text is shortened. */
   readonly metadata?: Record<string, unknown>
   readonly content?: string
 }

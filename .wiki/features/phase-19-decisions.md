@@ -219,7 +219,7 @@ SSH 是现有执行接口的一种显式远端适配能力，仍由 TypeScript o
 
 | ID | 交付与 owner | 依赖与关键验收 |
 |---|---|---|
-| TOOL-01 | read 分页/大行内存界、glob 遍历界与取消；runtime/execution 文件 owner | 输出上限与读取内存分别测试；巨型文件/目录、权限失败、符号链接环、取消后句柄释放；不得再先全量读取再声称有界 |
+| TOOL-01 | read 分页/大行内存界、glob 遍历界与取消；runtime/execution 文件 owner | 输出上限与读取内存分别测试；巨型文件/目录、权限失败、符号链接环、取消后句柄释放；不得再先全量读取再声称有界。公共异步工具的 Linux 本地验收及资源边界见 §8.112 |
 | TOOL-02 | 图片视觉内容与 PDF/文档分页读取；tools 媒体适配与 artifact owner | 真正进入 provider 支持的内容结构；不支持时明确；尺寸/页数/解压/输出预算、格式伪装、取消、页/节出处；原文件不修改 |
 | TOOL-03 | 真正的 LSP 客户端与语言服务生命周期；明确语言服务 owner | 初始化/能力协商、document version、诊断/引用/定义/rename、超时/取消/重启；按项目许可启动，编辑仍走批次审批；旧 scanner 明确兼容 |
 | TOOL-04 | Browser 截图、标签页、上传/下载；browser/adapters | 每能力有权限/输入/结果契约；下载/上传路径受边界限制；截图遮蔽敏感值；不可观察动作或断连保持unknown，依赖 SAFE-07 |
@@ -1677,3 +1677,15 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 最终 actual CLI regular/fullscreen 各两场进程、各 6 次本地合成 HTTP 请求，通过五 endpoint 完整预览、reader 关闭仍待确认、默认取消、批准后外改拒绝、整组核验恢复及 executable mode、直达缺 flag 零写/显式 flag 恢复、下一实际 provider 请求包含 picker/直达恢复事实。独立 Node 进程通过原恢复 owner 产生 partial/unknown，重启 CLI 保留 restored/partial/unknown 收据并显示未知 barrier/禁用 Restore，无自动重放；配置与未触及文件原文不变，退出 0，见 `.tmp/phase19-config/undo-pty-1791456220533506242`。Linux 实跑；macOS fallback/Windows 前端没有本批原生证据。
 - 上一 `a60c36d92a10e8557bd0e550be24f689a247af91` 的 CI 37762718025/job 113262803624、Watch 37762718033/job 113262803774 均零步骤失败；本次重新查询两个 annotations 确认账户付款/spending limit 阻止启动，未计远端测试通过。本批按新 SHA 追踪远端；W6 TOOL-01 及完整 Phase 19 继续。
 - 独立最终 APPROVED，四项 Node 20.3 探针通过，见 `.tmp/edit3-final-review-vup3grtu/tests.log`。五项静态 gates、43 项 script tests 与 1817 文件 runtime/type 无环通过，见 `.tmp/navigation-gates-u0z2_613`；Node 24.15 NormProof enforcement 确认 0 blocking、所有阻断义务 satisfied，原有 cycle/五项函数数量 advisory 保留，没有新增超过 20 的 owner。NormProof artifact 已复制到该目录的 `normproof-out/`，没有将 advisory 或 exit 0 冒充全部义务通过。
+
+### 8.112 TOOL-01：枚举失败真值与模型截断后的页面恢复
+
+- 回退遍历不再把普通目录 I/O/权限失败吞成空列表或伪完整匹配；[目录 owner](../../packages/ts-shell/src/runtime/execution/directory.ts)提供安全的 unavailable 错误，[遍历 owner](../../packages/ts-shell/src/runtime/execution/fileWalk.ts)保留 cleanup、取消和限额优先级。有意按访问/忽略规则排除的路径沿原策略处理，错误不输出原始异常正文。定向比较参考的目录失败与 await 后取消决策，保留本项目已核验对象，不复制全量缓冲或原始 stderr。glob 与 read 目录的 artifact 仅保存选定页，页外数量另列，不再称完整列表；最终发布前检查取消。
+- actual CLI 发现 [kernel](../../packages/ts-shell/src/core/agent/tools.ts) 的 10,000 字符截断丢掉末尾 artifact/限制提示。[read](../../packages/ts-shell/src/core/tools/read.ts)、[glob](../../packages/ts-shell/src/core/tools/glob.ts)及[目录呈现](../../packages/ts-shell/src/core/tools/directoryListing.ts)现在显式提供 metadata.outputNotice，不解析 prose。仅模型文本实际缩短时保留提示，提示最多 2,000 字符，过长标明缩短并保留首尾；正文、marker 与提示合计不超过 10,000 字符，没有显式提示的既有 boundText 调用保持原行为。hook 追加反馈/失败事实沿同一保留路径；替换/脱敏输出清除继承的旧提示，除非 hook 显式提供新提示，失败状态保留。
+- nextOffset 描述完整工具页，不能当作模型实际看完该页。缩短的 read 要求去掉行 selector、以原 offset 和较小 limit 补读当前页后再前进；单行仍缩短时建议 byte-range inspection。glob 即使未触及自身 50KiB/数量 cap，也提供缩小 pattern 的恢复说明，增加 limit 不能追回模型截掉的内容。正常短输出不重复追加提示。
+- 新模型投影回归先实跑 2 文件/9 失败、26 通过，见 `.tmp/catalog-check-ja5pk_62`；修复后 Node 20.3 构建及 11 文件/203 项通过，见 `.tmp/catalog-check-sp767wm4`。先前目录/glob 的 4 失败及 7 文件/114 项证据保留，见 `.tmp/catalog-check-3fhccf_h`、`.tmp/catalog-check-_aepcrqx`，不存在的 read.test.ts 未计 suite。结果契约 gate 实跑 6 文件/149 项通过，见 `.tmp/result-contract-8By4v1`。
+- 八组枚举失败、glob artifact、完成时取消、kernel 提示、文本补读、目录 artifact、hook 替换/错误反转均检出行为 AssertionError；隔离源码逐字节/SHA-256 恢复后 4 文件/64 项通过，见 `.tmp/phase19-config/glob-reversals/1791457870699828891`。独立最终 APPROVED，11 项 Node 20.3 探针通过，见 `.tmp/tool1-final-review-_jjkzmcc/tests.log`，含未达到工具 byte cap 的 glob、单行恢复、清理优先级与保存中取消。
+- regular/fullscreen actual CLI 共十场、30 次本地合成 HTTP 请求：真实 chmod(0) 目录失败、glob/目录 500 项页 artifact 与页外数量、长文本当前页恢复、15k 单行 fallback 均到达 provider 消息，随后 small.txt 读取成功，配置/源文件不变、退出 0，见 `.tmp/phase19-config/glob-pty-1791457931374125307`。目录初次夹具漏算运行时创建的 .ts-shell，实际产品枚举正确；按实际 553 项修正预期后全部复跑通过，未放松完整页断言。
+- **完成边界裁决**：TOOL-01 公共异步 read（文本/artifact/直接目录）与 glob 已完成 Linux 本地实现/验收。§8.63–8.66 的读取/保留量、逐目录/累计遍历与忽略规则预算独立于模型输出 cap；内存界指这些 owner 实际保留的数据，不等于整个进程/原生 Git 的 RSS 上界。原生 Git 保留原语义，只承诺输出/期限/取消清理，其内部 index/config 读取不受 TS 计数器计费。同步 discovery 兼容接口不在这两个工具的异步执行路径内，资源界随扩展发现 owner 继续跟踪；原生隐式读取及非 Linux 实际对象保证仍归 SAFE-02。协作式期限不抢占挂起内核调用，macOS/Windows 无本批原生证据。这些缺口没有改为已通过；按顺序继续 TOOL-02，Phase 19 总体 active。
+- 上一 `725eaf5133e419b2e19c66a60491f77a5f48284d` 的 CI 37765874312/job 113273288749、Watch 37765874311/job 113273288256 未执行；本次再次查询两个 annotations 确认账户付款/spending limit 阻止启动，CI job 零步骤，未计远端通过。本批按新 SHA 独立追踪。
+- 五项静态 gates、43 项 script tests 与 1817 文件 runtime/type 无环通过，见 `.tmp/navigation-gates-ujwciri_`。Node 24.15 NormProof enforcement 保留 0 blocking，原 cycle/五项函数数量 advisory 沿旧状态；artifact 已复制到该目录 normproof-out。实际修改的六个 behavior owner 均不超过 20 个函数名，kernel 为 16；原 .gitignore 修改排除。
