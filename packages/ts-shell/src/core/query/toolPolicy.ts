@@ -5,6 +5,7 @@ import { isReadOnlyBashCommand } from "../shell/approval/evaluator.js";
 import { matchDenyRule, type DenyRule } from "../shell/approval/deny.js";
 import type { ToolDefinition } from "../../tools/types.js";
 import { filePolicyTargets } from "../tools/permissionContext.js";
+import { executionApprovalTarget } from '../../runtime/execution/binding.js';
 
 export interface ToolPermissionEvaluation {
   readonly requiresEscalation: boolean;
@@ -26,7 +27,6 @@ const READ_ONLY_TOOLS: Record<string, true> = {
   read: true,
   glob: true,
   grep: true,
-  lsp: true,
   web_search: true,
   web_fetch: true,
   todo: true,
@@ -45,7 +45,7 @@ export const READ_ONLY_BROWSER_ACTIONS: Record<string, true> = {
 /** Plan eligibility only; approval and deny rules still apply to eligible calls. */
 export function toolPlanMode(name: string, tool?: ToolDefinition): "allowed" | "read-only" | "blocked" {
   if (Object.hasOwn(READ_ONLY_TOOLS, name)) return "allowed";
-  if (name === "bash" || name === "browser") return "read-only";
+  if (name === "bash" || name === "browser" || name === 'lsp') return "read-only";
   return tool?.mcpAnnotations?.readOnlyHint === true ? "allowed" : "blocked";
 }
 
@@ -56,9 +56,10 @@ export function planModeBlock(
   tool?: ToolDefinition,
 ): string | undefined {
   if (agentMode !== "plan" || toolPlanMode(name, tool) === "allowed") return undefined;
+  if (name === 'lsp' && args.backend === 'scanner') return undefined;
   if (name === "bash" && typeof args.command === "string" && isReadOnlyBashCommand(args.command)) return undefined;
   if (name === "browser" && typeof args.action === "string" && Object.hasOwn(READ_ONLY_BROWSER_ACTIONS, args.action.toLowerCase().trim())) return undefined;
-  return `Blocked: Plan mode is active. Tool '${name}' ${name === "bash" ? "with non-read-only command " : ""}is not permitted in plan mode. Switch to build mode via /build to execute modifications or commands.`;
+  return `Blocked: Plan mode is active. Tool '${name}' ${name === "bash" ? "with non-read-only command " : ""}is not permitted in plan mode. Press Shift+Tab to switch to build mode before executing modifications or commands.`;
 }
 
 /**
@@ -91,7 +92,11 @@ export function evaluateToolPermissionScope(
   let target = "";
   let isReadOnly = false;
 
-  if (Object.hasOwn(READ_ONLY_TOOLS, toolName)) {
+  if (toolName === 'lsp') {
+    isReadOnly = safeArgs.backend === 'scanner';
+    operation = isReadOnly ? 'read' : 'execute';
+    target = isReadOnly ? String(safeArgs.filePath ?? safeArgs.symbol ?? 'lsp scanner') : executionApprovalTarget(safeArgs, safeArgs.server, workspaceRoot);
+  } else if (Object.hasOwn(READ_ONLY_TOOLS, toolName)) {
     operation = "read";
     target = String(safeArgs.path ?? safeArgs.filePath ?? safeArgs.pattern ?? safeArgs.query ?? safeArgs.url ?? toolName);
     isReadOnly = true;

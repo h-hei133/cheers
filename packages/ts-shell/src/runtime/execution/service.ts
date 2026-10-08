@@ -68,6 +68,11 @@ async function runCommand(request: CommandExecutionRequest): Promise<CommandExec
     ...(request.abortSignal ? { abortSignal: request.abortSignal } : {}),
     ...(request.env ? { env: request.env } : {}),
     ...(request.onOutput ? { onOutput: request.onOutput } : {}),
+    ...(request.onStdin ? { onStdin: request.onStdin } : {}),
+    ...(request.onStdout ? { onStdout: request.onStdout } : {}),
+    ...(request.onStderr ? { onStderr: request.onStderr } : {}),
+    ...(request.captureOutput !== undefined ? { captureOutput: request.captureOutput } : {}),
+    ...(request.cleanupTreeOnExit ? { cleanupTreeOnExit: true } : {}),
   })
 
   return withCommandExecutionProjection(request, 'ts-local', localResult)

@@ -45,7 +45,7 @@ describe("lsp symbol scanning", () => {
       const list = vi.spyOn(service, 'listFilesRecursive');
       const tool = createLspToolDefinition(service);
       for (const filePath of [path.join(outside, 'secret.ts'), path.relative(workspaceRoot, path.join(outside, 'secret.ts')), 'escape/secret.ts']) {
-        const result = await tool.execute({ operation, filePath, symbol: 'confidential' }, { workspaceRoot, taskId: 'escape' });
+        const result = await tool.execute({ backend: 'scanner', operation, filePath, symbol: 'confidential' }, { workspaceRoot, taskId: 'escape' });
         expect(result.success).toBe(false);
         expect(JSON.stringify(result)).not.toContain('export const confidential');
       }
@@ -58,7 +58,7 @@ describe("lsp symbol scanning", () => {
     const service = createDefaultExecutionService();
     const read = vi.spyOn(service, 'readTextFile');
     const tool = createLspToolDefinition(service);
-    const result = await tool.execute({ operation: 'hover', filePath: ' module.ts ', symbol: 'wanted' }, { workspaceRoot, taskId: 'hover' });
+    const result = await tool.execute({ backend: 'scanner', operation: 'hover', filePath: ' module.ts ', symbol: 'wanted' }, { workspaceRoot, taskId: 'hover' });
     expect(result.success).toBe(true);
     expect(result.output).toContain('wanted');
     expect(read).toHaveBeenCalledWith(expect.objectContaining({ absolutePath: path.join(workspaceRoot, ' module.ts ') }));
@@ -76,10 +76,10 @@ describe("lsp symbol scanning", () => {
       hooks: { dispatch: async () => ({ decision: 'allow' }) } as never, emit: () => {} };
     const [tool] = adaptTools(new Map([['lsp', definition]]), options);
     expect(evaluateToolPermissionScope('lsp', { filePath: 'alias.ts' }, 'allow-all', workspaceRoot, denyRules).denied).toBe(true);
-    const denied = await tool.execute('explicit', { operation: 'hover', filePath: 'alias.ts' });
+    const denied = await tool.execute('explicit', { backend: 'scanner', operation: 'hover', filePath: 'alias.ts' });
     expect(denied.isError).toBe(true);
     expect(read).not.toHaveBeenCalled();
-    const scan = await tool.execute('scan', { operation: 'workspaceSymbol', symbol: 'guarded' });
+    const scan = await tool.execute('scan', { backend: 'scanner', operation: 'workspaceSymbol', symbol: 'guarded' });
     expect(scan.output).not.toContain('hidden.ts');
     expect(scan.output).not.toContain('constant guarded');
     expect(read.mock.calls.map(([input]) => input.absolutePath)).toEqual([path.join(workspaceRoot, 'public.ts')]);
@@ -92,7 +92,7 @@ describe("lsp symbol scanning", () => {
     const service = createDefaultExecutionService();
     vi.spyOn(service, 'listFilesRecursive').mockResolvedValue(['alias.ts', path.join(outside, 'secret.ts')]);
     const read = vi.spyOn(service, 'readTextFile');
-    const result = await createLspToolDefinition(service).execute({ operation: 'definition', symbol: 'concealed' }, { workspaceRoot, taskId: 'scan' });
+    const result = await createLspToolDefinition(service).execute({ backend: 'scanner', operation: 'definition', symbol: 'concealed' }, { workspaceRoot, taskId: 'scan' });
     expect(result.output).not.toContain('constant concealed');
     expect(read).not.toHaveBeenCalled();
   });
@@ -110,7 +110,7 @@ describe("lsp symbol scanning", () => {
     const tool = createLspToolDefinition(executionService(["src/example.ts"]));
 
     const result = await tool.execute(
-      { operation: "documentSymbol", filePath: "src/example.ts" },
+      { backend: 'scanner', operation: "documentSymbol", filePath: "src/example.ts" },
       { workspaceRoot, taskId: "lsp-test" },
     );
 
@@ -129,7 +129,7 @@ describe("lsp symbol scanning", () => {
     const tool = createLspToolDefinition(executionService(["src/example.ts"]));
 
     const result = await tool.execute(
-      { operation: "definition", symbol: "streamValues" },
+      { backend: 'scanner', operation: "definition", symbol: "streamValues" },
       { workspaceRoot, taskId: "lsp-test" },
     );
 
@@ -158,7 +158,7 @@ describe("lsp references", () => {
     const tool = createLspToolDefinition(executionService(["src/g.ts"]));
 
     const result = await tool.execute(
-      { operation: "references", symbol: "greet", filePath: "src/g.ts" },
+      { backend: 'scanner', operation: "references", symbol: "greet", filePath: "src/g.ts" },
       { workspaceRoot, taskId: "lsp-test" },
     );
 

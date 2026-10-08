@@ -5,6 +5,9 @@ import { selectWorkspaceRoot } from './roots.js';
 
 /** Resolve file tools before dispatch; commands, artifacts and external tools keep their own boundaries. */
 export function workspaceToolBinding(name: string, args: Record<string, unknown>, primary: string, roots: readonly WorkspaceRoot[] = []) {
+  // A server executes for the approved primary project; returned/source files
+  // select their grants individually in the language owner.
+  if (name === 'lsp' && args.backend !== 'scanner') return { root: primary, args, scoped: false };
   const key = name === 'lsp' ? 'filePath' : ['read', 'write', 'edit', 'apply_patch', 'grep', 'glob'].includes(name) ? 'path' : undefined;
   const raw = key && typeof args[key] === 'string' ? args[key] as string : undefined;
   const clean = name === 'read' && raw !== undefined ? parsePathSelector(raw).cleanPath : raw;

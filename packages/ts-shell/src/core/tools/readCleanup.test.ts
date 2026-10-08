@@ -58,7 +58,7 @@ it.each(['read', 'grep', 'lsp'].flatMap(tool => [false, true].map(cancel => [too
   '%s cannot turn failed cleanup into success with cancellation=%s', async (tool, cancel) => {
     const controller = runtime(false, cancel)
     const args = tool === 'read' ? { path: 'one.ts' } : tool === 'grep' ? { pattern: 'needle' }
-      : { operation: 'workspaceSymbol', symbol: 'needle' }
+      : { backend: 'scanner', operation: 'workspaceSymbol', symbol: 'needle' }
     await expect(createCoreToolRegistry().get(tool)!.execute(args, {
       workspaceRoot: root, taskId: 'cleanup', abortSignal: controller.signal,
     })).rejects.toMatchObject({ name: 'ReadCleanupError', reason: 'cleanup',

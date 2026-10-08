@@ -30,7 +30,7 @@ confidence: mixed
 | `edit` | 单文件可使用多段 `edits[]`、oldText/newText 或全量 content；快照记录供恢复 | 现有调用保留；新增 `apply_patch` 解析为同一 edit 域批次计划，不新增第二 writer，见 §4 |
 | `glob` | [glob.ts](../../packages/ts-shell/src/core/tools/glob.ts) 先枚举再过滤；1,000 项与输出字节上限不限制此前遍历 | 目录、文件、深度、时间与内存预算，取消及截断状态；成熟原生查找优先，保留受控 fallback |
 | `grep` | 原生 `rg`，缺失时进程内遍历；路径处理剥掉前导点与斜线，可能把 `.hidden` 改成 `hidden` | 保留原路径语义、统一 containment、原生与 fallback 一致；AST 搜索是额外能力，不是文本 grep 的生产必要条件 |
-| `lsp` | [lsp.ts](../../packages/ts-shell/src/core/tools/lsp.ts) 已自述 symbol scanner；跨仓搜索筛 TS/JS，单文件 parser 还支持 Python/Rust/Go/JSON；不连接语言服务器 | 所有 filePath 入口的读取权限与围栏；真实 LSP 客户端、服务器生命周期、diagnostics/rename/code actions，见 §3.2、§3.10 |
+| `lsp` | [language/](../../packages/ts-shell/src/language/) 管真实服务器生命周期、UTF-16 同步、定义/引用/符号/诊断及 rename 提案；显式 scanner 保留兼容 | TOOL-03 Linux 本地验收与服务器执行/平台/提案边界见 §3.12、裁决 §8.114；code action 等未开放协议不能因能力声明视为支持 |
 | `bash` | ShellManager、执行服务、OS 沙箱、超时、后台句柄与输出 artifact | 明确支持平台与交互限制；取消、进程组与逃逸后代的已确认/未知状态，不凭信号发送承诺全树退出 |
 | `web_search` | Exa/Tavily/DDG 按配置选择，不是运行失败后的自动 failover；父 signal 替代自身期限；部分错误返回上游正文；成功体也全量读取 | 总期限、父取消、有界读取、响应 schema、错误脱敏、明确重试与提供商选择策略 |
 | `web_fetch` | 逐跳 URL 检查与正文上限；预取消信号未提前处理；hostname 规则不绑定实际连接地址 | DNS 全地址审查、连接 IP 绑定、redirect/TLS 约束、取消和解析预算，见 §3.5 |
@@ -133,13 +133,21 @@ confidence: mixed
 | 浏览器扩展 | browser 域统一 tabs、screenshot、dialog、upload/download、network policy/session 生命周期，工具入口仅适配 | 多标签隔离、导航后 ref 失效、截图证据、上传下载权限、弹窗取消和网络边界；既有八动作回归 |
 | 子代理与预算 | 通用 runner/调度与 `/goal` 的共享 admission、计量、deadline 和持久状态；默认无总 token cap，`budget N` 启用，`budget off` 移除 | 显式 cap 汇总主/子/顾问/重试且不可绕过；未设 cap 不虚构默认 100k；单请求窗口/输出/timeout/并发与安全取消仍生效；权限只能求交，研究复用该契约 |
 
-此表保留规划接口；已实施部分以裁决文档 §8 为准。TOOL-02 图片/PDF 已通过 Linux 本地验收，见 §3.11；其他项没有因此变为已完成。具体服务器/解析器选型需先核查目标接口，再做针对性参考与依赖评估，不引入第二 runtime。
+此表保留规划接口；已实施部分以裁决文档 §8 为准。TOOL-02 图片/PDF 和 TOOL-03 语言服务器已通过 Linux 本地验收，见 §3.11、§3.12；其他项没有因此变为已完成。不引入第二 runtime。
 
 ### 3.11 图片/PDF 的当前实现边界
 
 `runtime/execution/media/` 复用唯一 local executor，最多 16MiB 固定源副本、15 秒共同期限与原生资源限额；最多两次并行提取，清理未核实时封锁后续媒体准入。PNG/JPEG/WebP/GIF 经受限 FFmpeg 解码、首帧/缩小后以真正图片块进入支持 vision 的 provider；非视觉模型显示显式 fallback。PDF 经 Poppler 按页提取文字，默认/最多五页、文档最多 200 页，保留来源 hash、页定位、无文字状态和续读提示，不执行 OCR。原文件不修改，图片内容不会作为 base64 倾倒至终端。
 
 Linux 要求相应原生 utilities，缺失及其他平台明确 unavailable；资源限额不冒充系统沙箱。kernel 的批次图片预算、hook 脱敏、持久重放与旧图片压缩沿既有消息通路，没有增加平行 artifact/session 系统。构建、组合/契约测试、反转、独立审查与 actual CLI 的准确证据见 [Phase 19 裁决](phase-19-decisions.md) §8.113。
+
+### 3.12 语言服务器的当前实现边界
+
+`language/` 通过唯一执行服务启动显式选定、已安装的绝对可执行文件及参数，不自动发现项目启动配置、安装服务器或下载依赖。server 是默认 backend，进入 execute 审批；完整 executable/argv/canonical cwd 经现有报告预览，关闭后仍默认 Deny。plan mode 阻止 server，旧源码 scanner 必须显式选择。进程池按 session、canonical 项目对象和服务器选择跨回合复用，最多四个；闲置一分钟、总生命周期五分钟，支持 status/restart/shutdown，清理未核验时保留状态并拒绝替换。
+
+客户端协商 UTF-16、full/incremental 同步，逐文件保留原始 UTF-8 hash 和 document version。definitions/references/hover/symbols/diagnostics 来自真实服务器；push diagnostics 有版本时拒绝旧值，无版本时标明 currency unverified，没收到发布不伪造空的清洁结果。返回的 URI、source、关联位置和 edit targets 分别复验获准根及 deny。服务器的内部文件读取、插件或任意行为属于已批准进程执行，客户端路径检查不提供沙箱。
+
+rename 仅返回不可变、零写入的 `editPlan.applyPatch = {input, expectedHashes}`，包括逐源 hash、document/server version 状态、proposed hash 和 revision；服务器 `workspace/applyEdit` 请求被拒绝。原有 apply_patch 在准备/审批前核对完整原始 hash，再沿现有完整批次预览、锁与 writer。拒绝过时版本、重叠/资源操作、不可精确保留的文字形态；完整提案超过模型工具消息的 10,000 字符上限时明确拒绝，不发半份 patch。支持需要 open/close 的 full/incremental 同步；code action、自动安装与其他协议能力尚未开放。Windows server backend 明确 unavailable，macOS 未原生验收；Linux 进程清理限原进程组。精确验证、提交及远端边界见 [Phase 19 裁决](phase-19-decisions.md) §8.114。
 
 ## 4. 多文件编辑：一个入口、一份计划、一个 writer
 

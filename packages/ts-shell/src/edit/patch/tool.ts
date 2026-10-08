@@ -8,17 +8,28 @@ import { readOperation } from '../recovery/operation/store.js';
 import { applyPatchPlan } from './batch.js';
 import { planPatch } from './plan.js';
 import { patchLimits } from './parse.js';
+import { hashContent } from '../authority/content.js';
 
 export function createPatchToolDefinition(): ToolDefinition {
   return {
     name: 'apply_patch',
     description: 'Apply one approved text patch across files as one recorded operation. Use exact *** Begin Patch / *** End Patch, Add File (+ lines), Delete File, or Update File (@@ exact unique context, +/-/space lines; optional Move to and End of File). Renames stay in one workspace and never overwrite. Partial/unknown outcomes remain visible; no cross-file crash atomicity.',
-    argsSchema: { type: 'object', properties: { input: { type: 'string', maxLength: patchLimits.inputBytes } }, required: ['input'], additionalProperties: false },
+    argsSchema: { type: 'object', properties: { input: { type: 'string', maxLength: patchLimits.inputBytes },
+      expectedHashes: { type: 'object', description: 'Optional exact SHA-256 source snapshots from a language edit proposal. All updated source files must match.', additionalProperties: { type: 'string' } } }, required: ['input'], additionalProperties: false },
     prepare(args, context) {
       validateToolArguments(this.argsSchema, args);
       if (!context.sessionId) throw new Error('A saved session is required for a recorded patch.');
       const root = context.artifactRoot ?? context.workspaceRoot;
       const plan = planPatch(args.input as string, { ...context, sessionId: context.sessionId, workspaceRoot: root });
+      if (args.expectedHashes !== undefined) {
+        if (!args.expectedHashes || typeof args.expectedHashes !== 'object' || Array.isArray(args.expectedHashes)) throw new Error('Patch source hashes are invalid.');
+        const expected = args.expectedHashes as Record<string, unknown>;
+        const sources = plan.files.filter(file => file.before.state === 'exists');
+        if (Object.keys(expected).length !== sources.length || sources.some(file => {
+          const digest = expected[path.join(file.workspaceRoot, file.relativePath)];
+          return typeof digest !== 'string' || !/^[0-9a-f]{64}$/.test(digest) || file.before.state !== 'exists' || hashContent(file.before.content) !== digest;
+        })) throw new Error('FILE_CONTENT_CHANGED: Patch source snapshots no longer match the proposal.');
+      }
       const targets = Object.freeze(plan.files.map(file => Object.freeze({ path: path.join(file.workspaceRoot, file.relativePath), operation: file.content === undefined ? 'delete' as const : 'write' as const })));
       const preview = ['Patch plan', `Revision: ${plan.revision}`, ...plan.files.map(file => {
         const before = file.before.state === 'exists' ? file.before.content : '';

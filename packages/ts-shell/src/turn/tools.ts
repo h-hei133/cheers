@@ -15,6 +15,7 @@ import { workspaceToolBinding } from '../core/workspace/tools.js';
 import type { WorkspaceRoot } from '../core/workspace/model.js';
 import { authorizeToolCall, consumeToolCall, discardToolCall, preparedToolCall, prepareToolCall } from '../tools/preparation.js';
 import { preparationContext, preparationPermission } from './preparation.js';
+import { bindExecutionTarget, executionApprovalPreview } from '../runtime/execution/binding.js';
 
 /** A tool definition in the shape a chat completion request takes. */
 export interface ToolSchema {
@@ -155,6 +156,16 @@ async function executeTool(
         const blocked = options.admission?.();
         if (blocked) throw new Error(blocked);
         const actualArgs = { ...args, path: absolutePath, filePath: absolutePath };
+        if (tool.name === 'lsp') {
+          const fileArgs = { ...actualArgs, backend: 'scanner' };
+          const selected = workspaceToolBinding('lsp', fileArgs, options.workspaceRoot, options.workspaceRoots);
+          for (const root of new Set([options.workspaceRoot, selected.root])) {
+            for (const name of ['lsp', 'read']) {
+              const checked = evaluateToolPermissionScope(name, fileArgs, options.permissionScope, root, options.denyRules);
+              if (checked.denied) throw new Error(checked.reason);
+            }
+          }
+        }
         if (binding.scoped) {
           const actual = workspaceToolBinding(tool.name, actualArgs, options.workspaceRoot, options.workspaceRoots);
           if (actual.root !== binding.root) throw new Error('The tool target changed workspace roots.');
@@ -313,6 +324,7 @@ async function askPermission(
 ): Promise<{ readonly blocked?: string; readonly approved?: { operation: string; decision: string } }> {
   let evaluation: ReturnType<typeof evaluateToolPermissionScope>;
   try {
+    if (toolName === 'lsp' && args.backend !== 'scanner') bindExecutionTarget(args, args.server, options.workspaceRoot);
     const preparation = preparedToolCall(args, options);
     evaluation = preparation ? preparationPermission(toolName, preparation, options) : evaluateWorkspacePermission(toolName, args, options);
   }
@@ -351,6 +363,10 @@ async function askPermission(
   const prompt = buildToolEscalationPrompt(toolName, evaluation.operation, evaluation.target, evaluation.reason);
   const preparation = preparedToolCall(args, options);
   if (preparation) prompt.context.preview = preparation.preview;
+  else if (toolName === 'lsp' && args.backend !== 'scanner') {
+    prompt.context.preview = executionApprovalPreview(args, args.server, options.workspaceRoot);
+    prompt.context.previewKind = 'execution';
+  }
   const response = await options.escalationPromptHandler(prompt);
   if (signal?.aborted) return { blocked: "Operation aborted" };
   if (response.decision === "deny") {

@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+import { readFileSync } from 'node:fs';
 import { executeLocally } from "./local.js";
 
 it('delivers literal stdin bytes and closes the stream, including empty input', async () => {
@@ -50,3 +51,20 @@ it.skipIf(process.platform === "win32").each([false, true])(
     }
   },
 );
+
+it.skipIf(process.platform !== 'linux')('cleans a descendant with ignored stdio after its service leader exits normally', async () => {
+  const script = [
+    `const { spawn } = require('node:child_process');`,
+    `const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });`,
+    `console.log(child.pid);`,
+    `setTimeout(() => process.exit(0), 50);`,
+  ].join('\n');
+  const result = await executeLocally({ command: process.execPath, args: ['-e', script], cwd: process.cwd(), cleanupTreeOnExit: true, timeoutMs: 3000 });
+  const descendant = Number(result.stdout.trim());
+  try {
+    expect(result.status).toBe('completed'); expect(descendant).toBeGreaterThan(1);
+    let running = false;
+    try { running = !/^State:\s+[ZX]/m.test(readFileSync(`/proc/${descendant}/status`, 'utf8')); } catch { /* The child has been reaped. */ }
+    expect(running).toBe(false);
+  } finally { try { process.kill(descendant, 'SIGKILL'); } catch { /* Already gone. */ } }
+});

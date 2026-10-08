@@ -96,7 +96,7 @@ describe("createToolHooks", () => {
       const row = (report.report!.facts.tools as { name: string; planMode: string }[]).find(item => item.name === tool.name);
       expect(row).toBeDefined();
       const mode = row!.planMode;
-      const args = tool.name === "bash" ? { command: "pwd" } : tool.name === "browser" ? { action: "observe" } : {};
+      const args = tool.name === "bash" ? { command: "pwd" } : tool.name === "browser" ? { action: "observe" } : tool.name === 'lsp' ? { backend: 'scanner' } : {};
       const result = await hooks.beforeToolCall!(call(tool.name, args));
       expect(Boolean(result?.block), tool.name).toBe(mode === "blocked");
       if (mode === "read-only") {

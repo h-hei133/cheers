@@ -5,7 +5,7 @@ import { createReport, span } from '../../../core/commands/report/projection.js'
 
 export function approvalPreview(prompt: EscalationPrompt) {
   const preview = prompt.context?.preview;
-  return preview ? createReport({ title: 'Review file plan — close to choose approval', facts: { permission: 'pending' },
+  return preview ? createReport({ title: prompt.context.previewKind === 'execution' ? 'Review execution request — close to choose approval' : 'Review file plan — close to choose approval', facts: { permission: 'pending' },
     lines: preview.split('\n').map(text => ({ kind: 'text', spans: [span(text, 'code')] })) }) : undefined;
 }
 
@@ -36,7 +36,8 @@ export function approvalPicker(
     form: "panel",
     empty: "No options",
     filterable: false,
-    ...(prompt.context?.preview ? { initialSelection: 'deny', footer: 'Preview closed. Choose Allow once to apply this exact plan.' } : {}),
+    ...(prompt.context?.preview ? { initialSelection: 'deny', footer: prompt.context.previewKind === 'execution'
+      ? 'Preview closed. Choose Allow once to execute this request.' : 'Preview closed. Choose Allow once to apply this exact plan.' } : {}),
     load: async (): Promise<readonly Option[]> => [
       {
         id: "allow-once",

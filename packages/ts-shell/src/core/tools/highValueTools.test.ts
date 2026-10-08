@@ -57,7 +57,7 @@ describe("High-Value Modern Built-in Tools Subsystem", () => {
     it("extracts document symbols from a source file", async () => {
       const tool = createLspToolDefinition(createDefaultExecutionService());
       const result = await tool.execute(
-        { operation: "documentSymbol", filePath: "src/service.ts" },
+        { backend: 'scanner', operation: "documentSymbol", filePath: "src/service.ts" },
         { workspaceRoot: tempDir, taskId: "task-1" },
       );
 
@@ -72,7 +72,7 @@ describe("High-Value Modern Built-in Tools Subsystem", () => {
 
       // Definition search
       const defResult = await tool.execute(
-        { operation: "definition", symbol: "UserService" },
+        { backend: 'scanner', operation: "definition", symbol: "UserService" },
         { workspaceRoot: tempDir, taskId: "task-1" },
       );
       expect(defResult.success).toBe(true);
@@ -81,7 +81,7 @@ describe("High-Value Modern Built-in Tools Subsystem", () => {
 
       // Reference search
       const refResult = await tool.execute(
-        { operation: "references", symbol: "UserService" },
+        { backend: 'scanner', operation: "references", symbol: "UserService" },
         { workspaceRoot: tempDir, taskId: "task-1" },
       );
       expect(refResult.success).toBe(true);
@@ -91,7 +91,7 @@ describe("High-Value Modern Built-in Tools Subsystem", () => {
     it("rejects documentSymbol when filePath is missing", async () => {
       const tool = createLspToolDefinition(createDefaultExecutionService());
       const result = await tool.execute(
-        { operation: "documentSymbol" },
+        { backend: 'scanner', operation: "documentSymbol" },
         { workspaceRoot: tempDir, taskId: "task-1" },
       );
       expect(result.success).toBe(false);
@@ -99,24 +99,12 @@ describe("High-Value Modern Built-in Tools Subsystem", () => {
       expect(err).toContain("filePath parameter is required");
     });
 
-    it("declares no position arguments, because it takes none", async () => {
-      // It advertised `line` and `character` and never read either, so a caller
-      // following the schema would believe it could ask about a position and get
-      // the precision of a language server. It cannot: the answers come from
-      // parsing source. A schema promising what the tool does not do is worse
-      // than a smaller schema, because the caller cannot tell the difference.
+    it("declares real server positions and explicit scanner compatibility", () => {
       const tool = createLspToolDefinition(createDefaultExecutionService());
       const properties = (tool.argsSchema as { properties: Record<string, unknown> }).properties;
-
-      expect(Object.keys(properties)).not.toContain("line");
-      expect(Object.keys(properties)).not.toContain("character");
-    });
-
-    it("says it is a symbol scanner rather than a language server", async () => {
-      const tool = createLspToolDefinition(createDefaultExecutionService());
-
-      expect(tool.description).toMatch(/symbol scanner/i);
-      expect(tool.description).toMatch(/not a language server/i);
+      expect(Object.keys(properties)).toEqual(expect.arrayContaining(['backend', 'server', 'line', 'character']));
+      expect(tool.description).toContain('backend: scanner');
+      expect(tool.description).toContain('server.command');
     });
 
     it("answers a hover from the symbol name alone", async () => {
@@ -124,7 +112,7 @@ describe("High-Value Modern Built-in Tools Subsystem", () => {
       // the position was never used.
       const tool = createLspToolDefinition(createDefaultExecutionService());
       const result = await tool.execute(
-        { operation: "hover", filePath: "src/service.ts", symbol: "UserService" },
+        { backend: 'scanner', operation: "hover", filePath: "src/service.ts", symbol: "UserService" },
         { workspaceRoot: tempDir, taskId: "task-1" },
       );
 

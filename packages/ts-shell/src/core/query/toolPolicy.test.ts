@@ -3,7 +3,7 @@ import { evaluateToolPermissionScope, buildToolEscalationPrompt } from "./toolPo
 
 describe("toolPolicy", () => {
   it("allows read-only tools without escalation across all modes", () => {
-    for (const tool of ["read", "glob", "grep", "lsp", "web_search", "web_fetch", "todo", "ask"]) {
+    for (const tool of ["read", "glob", "grep", "web_search", "web_fetch", "todo", "ask"]) {
       for (const scope of ["ask", "accept-edits", "allow-all"] as const) {
         const result = evaluateToolPermissionScope(tool, { path: "foo.txt" }, scope);
         expect(result.requiresEscalation).toBe(false);

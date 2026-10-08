@@ -75,7 +75,7 @@ Do not reintroduce a second language for performance. Execution latency is domin
 
 - `packages/ts-shell/src/core/state/`: domain-neutral bounded retention and scoped change notifications; feature owners keep their state transitions and payloads.
 - `packages/ts-shell/src/runtime/execution/media/`: verified media staging, native decoding/text extraction, resource budgets and cleanup admission through the existing local executor. Typed tool images follow the existing agent/turn/session/provider message path; `core/agent/media.ts` owns the shared tool-batch image budget.
-
+- `packages/ts-shell/src/language/`: bounded language-server protocol, document versions, diagnostics and rename proposals; its process pool follows session and canonical project identity across tool catalogs. `runtime/execution/binding.ts` binds executable arguments and working-directory identity to approval; duplex process I/O and cleanup use the existing executor. Language edits enter `edit/patch/` for complete preparation and approval.
 - `packages/ts-shell/src/entrypoints/`: executable entrypoints and compatibility re-exports only; reusable CLI contracts belong under `packages/ts-shell/src/cli/`.
 - Current owners for new edit/result logic include `packages/ts-shell/src/edit/`, `packages/ts-shell/src/edit/patch/`, `packages/ts-shell/src/edit/result/`, `packages/ts-shell/src/verification/`, `packages/ts-shell/src/repair/`, and `packages/ts-shell/src/result/`.
 - `packages/ts-shell/src/edit/authority/` owns guarded file inspection/publication shared by ordinary writes and recovery. `edit/recovery/operation/` owns session/workspace-scoped durable edit and undo receipts; snapshots alone are not commit evidence. Command and tool entrypoints delegate to these owners.

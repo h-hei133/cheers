@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { killProcessTree, trackChildPid, untrackChildPid } from '../../core/shell/platform/processTree.js'
-import type { NormalizedExecutionResult } from './types.js'
+import type { ExecutionInput, NormalizedExecutionResult } from './types.js'
 
 /**
  * Running a command, locally.
@@ -31,6 +31,8 @@ function collectStreamed(options: {
   env?: Readonly<Record<string, string>>
   /** Literal stdin content; an explicit empty string still sends EOF. */
   input?: string
+  onStdin?: (input: ExecutionInput) => void
+  cleanupTreeOnExit?: boolean
   /** Consume stdout separately; capture can be disabled for bounded stream consumers. */
   onStdout?: (chunk: Buffer) => void
   onStderr?: (chunk: Buffer) => void
@@ -44,8 +46,8 @@ function collectStreamed(options: {
     const child = spawn(options.command, options.args, {
       cwd: options.cwd,
       windowsHide: true,
-      ...(options.readDescriptors || options.input !== undefined ? {
-        stdio: [options.input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe', ...(options.readDescriptors ?? [])] as import('node:child_process').StdioOptions,
+      ...(options.readDescriptors || options.input !== undefined || options.onStdin ? {
+        stdio: [options.input !== undefined || options.onStdin ? 'pipe' : 'ignore', 'pipe', 'pipe', ...(options.readDescriptors ?? [])] as import('node:child_process').StdioOptions,
       } : {}),
       // Only when the caller named one: passing `env: undefined` is the same as
       // inheriting, but stating that explicitly reads as if it were chosen.
@@ -61,6 +63,7 @@ function collectStreamed(options: {
     let timedOut = false
     let cancelled = false
     let inputFailed = false
+    let streamFailed = false
     let settled = false
     let termination: Promise<void> | undefined
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -83,7 +86,7 @@ function collectStreamed(options: {
       termination = (child.pid ? killProcessTree(child.pid) : Promise.resolve().then(() => {
         child.kill('SIGKILL')
       })).catch((error: unknown) => {
-        const reason = cancelled ? 'Command cancelled' : 'Command timed out'
+        const reason = cancelled ? 'Command cancelled' : timedOut ? 'Command timed out' : 'Command cleanup'
         const message = `${reason}; process termination failed and remains unverified: ${error instanceof Error ? error.message : String(error)}`
         fail(message, { terminationFailed: true, stderr: [stderr, message].filter(Boolean).join('\n') })
         child.stdin?.destroy()
@@ -110,28 +113,44 @@ function collectStreamed(options: {
     child.stdout?.on('data', (chunk: Buffer) => {
       const text = chunk.toString()
       if (options.captureOutput !== false) stdout += text
-      options.onStdout?.(chunk)
-      options.onOutput(text)
+      try { options.onStdout?.(chunk); options.onOutput(text) }
+      catch { streamFailed = true; stop() }
     })
     child.stderr?.on('data', (chunk: Buffer) => {
       const text = chunk.toString()
       if (options.captureOutput !== false) stderr += text
-      options.onStderr?.(chunk)
-      options.onOutput(text)
+      try { options.onStderr?.(chunk); options.onOutput(text) }
+      catch { streamFailed = true; stop() }
     })
     child.on('error', (error: NodeJS.ErrnoException) => fail(error.message, {
       ...(typeof error.code === 'string' ? { spawnErrorCode: error.code } : {}),
     }))
-    if (options.input !== undefined && child.stdin) {
+    if ((options.input !== undefined || options.onStdin) && child.stdin) {
       // A command may exit before consuming its input. Let its exit status
       // report that outcome instead of crashing on the pipe's EPIPE event.
       child.stdin.on('error', (error: NodeJS.ErrnoException) => {
         if (error.code !== 'EPIPE') inputFailed = true
       })
-      child.stdin.end(options.input)
+      if (options.onStdin) {
+        let queued = 0
+        const input: ExecutionInput = {
+          write(chunk) {
+            if (settled || termination || !child.stdin?.writable || options.abortSignal?.aborted) return Promise.reject(new Error('Command input is closed.'))
+            if (queued + chunk.length > 2 * 1024 * 1024) return Promise.reject(new Error('Command input queue limit exceeded.'))
+            queued += chunk.length
+            return new Promise<void>((resolveWrite, rejectWrite) => {
+              child.stdin!.write(chunk, error => { queued -= chunk.length; error ? rejectWrite(new Error('Command input could not be delivered.')) : resolveWrite() })
+            })
+          },
+          end() { child.stdin?.end() },
+        }
+        try { options.onStdin(input) }
+        catch { inputFailed = true; stop() }
+      } else child.stdin.end(options.input)
     }
     child.on('close', (code, signal) => {
       finish()
+      if (options.cleanupTreeOnExit && !termination) stop()
       // Windows retries address a root PID, not a persistent group. Once that
       // child has closed its PID must not be reused for a later taskkill.
       if (child.pid && process.platform === 'win32') untrackChildPid(child.pid)
@@ -140,10 +159,10 @@ function collectStreamed(options: {
       void Promise.resolve(termination).then(() => {
         if (settled) return
         if (child.pid && process.platform !== 'win32') untrackChildPid(child.pid)
-        if (cancelled || timedOut || inputFailed || code !== 0) {
+        if (cancelled || timedOut || inputFailed || streamFailed || code !== 0) {
           const message = cancelled ? 'Command cancelled' : timedOut ? 'Command timed out'
-            : inputFailed ? 'Command input could not be delivered' : `Command failed with exit code ${code ?? 'null'}`
-          fail(message, { code, signal, inputFailed })
+            : streamFailed ? 'Command output consumer failed' : inputFailed ? 'Command input could not be delivered' : `Command failed with exit code ${code ?? 'null'}`
+          fail(message, { code, signal, inputFailed: inputFailed || streamFailed })
           return
         }
         settled = true
@@ -172,6 +191,8 @@ export async function executeLocally(options: {
   env?: Readonly<Record<string, string>>
   /** Literal stdin content; an explicit empty string still sends EOF. */
   input?: string
+  onStdin?: (input: ExecutionInput) => void
+  cleanupTreeOnExit?: boolean
   /** Consume stdout separately; capture can be disabled for bounded stream consumers. */
   onStdout?: (chunk: Buffer) => void
   onStderr?: (chunk: Buffer) => void
@@ -237,6 +258,7 @@ export async function executeLocally(options: {
       stdout: execError.stdout ?? '',
       stderr: execError.stderr || execError.message || 'Command failed',
       ...(execError.spawnErrorCode ? { spawnErrorCode: execError.spawnErrorCode } : {}),
+      ...(execError.terminationFailed ? { terminationFailed: true as const } : {}),
       ...(execError.terminationFailed || execError.inputFailed ? { failureKind: 'execution_failure' as const } : {}),
     }
   }

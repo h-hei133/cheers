@@ -25,6 +25,8 @@ export interface NormalizedExecutionResult {
   readonly stderr: string
   /** OS error when the process could not be spawned; not an exit status. */
   readonly spawnErrorCode?: string
+  /** A failed process-tree cleanup must block consumers from claiming shutdown. */
+  readonly terminationFailed?: true
   readonly failureKind?: 'sandbox_preflight' | 'execution_failure' | 'timeout' | 'cancelled'
 }
 
@@ -141,7 +143,20 @@ export interface CommandExecutionRequest {
   readonly env?: Readonly<Record<string, string>>
   /** Forwarded output, for a command whose progress the caller wants to show. */
   readonly onOutput?: (chunk: string) => void
+  /** Duplex consumers use the same spawn, cancellation and process-tree owner. */
+  readonly onStdin?: (input: ExecutionInput) => void
+  readonly onStdout?: (chunk: Buffer) => void
+  readonly onStderr?: (chunk: Buffer) => void
+  readonly captureOutput?: boolean
+  /** Long-lived duplex services must clean their group even after a normal leader exit. */
+  readonly cleanupTreeOnExit?: boolean
   readonly policy?: ExecutionPolicyMetadata
+}
+
+/** Bounded writes settle only after the pipe has consumed the supplied bytes. */
+export interface ExecutionInput {
+  write(chunk: Buffer): Promise<void>
+  end(): void
 }
 
 export interface TextFileReadExecutionRequest extends ExecutionRequestMetadata<'file.read'> {

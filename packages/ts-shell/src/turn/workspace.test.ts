@@ -40,7 +40,7 @@ describe('workspace file grants through the existing tools', () => {
     expect(selected.isError).toBe(false); expect(selected.output).toContain('second'); expect(selected.output).not.toContain('first');
     expect((await tools.execute('glob', { path: extra, pattern: '*.ts' })).output).toContain('source.ts');
     expect((await tools.execute('grep', { path: extra, pattern: 'second' })).output).toContain('source.ts:2:');
-    expect((await tools.execute('lsp', { filePath: path.join(extra, 'source.ts'), operation: 'documentSymbol' })).output).toContain('workspaceSymbol');
+    expect((await tools.execute('lsp', { backend: 'scanner', filePath: path.join(extra, 'source.ts'), operation: 'documentSymbol' })).output).toContain('workspaceSymbol');
     expect((await tools.execute('read', { path: 'source.ts' })).isError).toBe(true);
     expect((await tools.execute('read', { path: path.join(outside, 'unknown') })).isError).toBe(true);
   });

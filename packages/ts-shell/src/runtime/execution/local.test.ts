@@ -99,3 +99,34 @@ it('does not report exit zero as success when stdin delivery fails', async () =>
   child.emit('close', 0, null);
   expect(await result).toMatchObject({ status: 'failed', exitCode: 0, failureKind: 'execution_failure' });
 });
+
+it('keeps duplex stdin open for bounded writes until explicitly ended', async () => {
+  const child = childProcess(); const received: Buffer[] = [];
+  child.stdin.on('data', chunk => received.push(chunk));
+  let input!: import('./types.js').ExecutionInput;
+  const result = executeLocally({ command: 'test', args: [], cwd: '.', onStdin: port => { input = port; } });
+  await input.write(Buffer.from('first')); await input.write(Buffer.from('second'));
+  expect(child.stdin.writableEnded).toBe(false);
+  await expect(input.write(Buffer.alloc(2 * 1024 * 1024 + 1))).rejects.toThrow(/queue limit/);
+  input.end(); child.emit('close', 0, null);
+  expect((await result).status).toBe('completed'); expect(Buffer.concat(received).toString()).toBe('firstsecond');
+  await expect(input.write(Buffer.from('late'))).rejects.toThrow(/closed/);
+});
+
+it('awaits opt-in process-group cleanup after a natural leader exit', async () => {
+  const child = childProcess(); let release!: () => void;
+  vi.mocked(killProcessTree).mockReturnValue(new Promise(resolve => { release = resolve; }));
+  let finished = false;
+  const result = executeLocally({ command: 'test', args: [], cwd: '.', cleanupTreeOnExit: true }).then(value => { finished = true; return value; });
+  child.emit('close', 0, null); await Promise.resolve();
+  expect(killProcessTree).toHaveBeenCalledWith(child.pid); expect(finished).toBe(false);
+  release(); expect((await result).status).toBe('completed');
+});
+
+it('preserves unverified cleanup when opt-in cleanup fails after a normal leader exit', async () => {
+  const child = childProcess(); vi.mocked(killProcessTree).mockRejectedValue(new Error('synthetic failure'));
+  const result = executeLocally({ command: 'test', args: [], cwd: '.', cleanupTreeOnExit: true });
+  child.emit('close', 0, null);
+  expect(await result).toMatchObject({ status: 'failed', terminationFailed: true });
+  expect(untrackChildPid).not.toHaveBeenCalled();
+});
