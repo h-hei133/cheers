@@ -255,3 +255,7 @@ Cheers 已有 [picker 注册器](../../packages/ts-shell/src/cli/interactive/pic
 ## 8. 模型与 thinking 实施补充
 
 [Phase 19 §8.76](phase-19-decisions.md#876-cfg-05模型与-effort-联合选择请求快照与全局失败补偿)已将 model/effort 接入同一会话记录与能力校验，`/thinking` 默认保存到会话，`--global` 显式修改默认；auto/off/none 均表示 provider 决定。已知不支持明确拒绝，目录缺项视为能力未验证并保留自定义 ID，不能把本地目录缺失当作远端不存在。保存与生效分开报告，global 明确未写可按 revision 补偿，未知结果仍需检查并 reload。该进展不代表本研究的其他 parity 项已全部完成。
+
+## 9. 会话目标实体实施补充
+
+[Phase 19 §8.117](phase-19-decisions.md#8117-auto-01会话目标实体显式导入与有来源的状态机)将 goal 从项目描述迁入会话实体，显式 set/show/pause/resume/drop/complete 与 legacy import 复用 session state/lock；新会话/fork 不继承，旧描述只可导入为 paused，reentry 在下一动作前暂停。手动完成只记录用户声明，detached/unknown/persisted 后清理失败不伪装成可恢复或未写。本批 active 目标只伴随手动回合，预算及自动续轮明确 unavailable；AUTO-02/03/04/05 继续承担共享计量、调度、计划与顾问，完整自治范围保持不变。

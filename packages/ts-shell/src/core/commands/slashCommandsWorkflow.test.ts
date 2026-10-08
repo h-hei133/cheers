@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { runGoalCommand, getActiveSessionGoal, setActiveSessionGoal } from "./goalCommandRuntime.js";
+import { runGoalCommand } from "./goalCommandRuntime.js";
 import { runLoopCommand } from "./loopCommandRuntime.js";
 import { runTodoCommand, getSessionTodos } from "./todoCommandRuntime.js";
 import { runFastCommand, isFastModeEnabled, setFastModeEnabled } from "./fastCommandRuntime.js";
@@ -24,7 +24,6 @@ describe("Phase 5 High-Level Workflow Commands Subsystem", () => {
     realProfile = process.env.USERPROFILE;
     process.env.HOME = tempDir;
     delete process.env.USERPROFILE;
-    setActiveSessionGoal(tempDir, null);
     setFastModeEnabled(tempDir, false);
   });
 
@@ -36,32 +35,14 @@ describe("Phase 5 High-Level Workflow Commands Subsystem", () => {
   });
 
   describe("/goal command", () => {
-    it("creates, pauses, resumes, and completes goal state", async () => {
-      // 1. Create goal
-      const createRes = await runGoalCommand(["Build", "authentication", "system"], { cwd: tempDir });
-      expect(createRes.output).toContain("Objective set");
-      expect(getActiveSessionGoal(tempDir)?.objective).toBe("Build authentication system");
-      expect(getActiveSessionGoal(tempDir)?.phase).toBe("active");
-
-      // 2. Pause goal
-      const pauseRes = await runGoalCommand(["pause"], { cwd: tempDir });
-      expect(pauseRes.output).toContain("Objective paused");
-      expect(getActiveSessionGoal(tempDir)?.phase).toBe("paused");
-
-      // 3. Resume goal
-      const resumeRes = await runGoalCommand(["resume"], { cwd: tempDir });
-      expect(resumeRes.output).toContain("Objective resumed");
-      expect(getActiveSessionGoal(tempDir)?.phase).toBe("active");
-
-      // 4. Complete goal
-      const completeRes = await runGoalCommand(["complete"], { cwd: tempDir });
-      expect(completeRes.output).toContain("Objective complete");
-      expect(getActiveSessionGoal(tempDir)?.phase).toBe("complete");
-
-      // 5. Clear goal
-      const clearRes = await runGoalCommand(["clear"], { cwd: tempDir });
-      expect(clearRes.output).toContain("cleared");
-      expect(getActiveSessionGoal(tempDir)).toBeNull();
+    it("delegates goal semantics to the session host and refuses off-session writes", async () => {
+      expect((await runGoalCommand(["set", "Build authentication system"], { cwd: tempDir })).output).toContain('unavailable');
+      const calls: string[][] = [];
+      const context = { cwd: tempDir, goalCommand: async (args: string[]) => {
+        calls.push(args); return { kind: 'local' as const, output: 'session owner result' };
+      } };
+      expect(await routeSlashCommand('/goal set Build authentication system', context)).toMatchObject({ output: 'session owner result' });
+      expect(calls).toEqual([['set', 'Build', 'authentication', 'system']]);
     });
   });
 

@@ -46,6 +46,7 @@ export type CliCommandExecution =
     };
 
 export interface BuildCliCommandExecutionInput {
+  readonly goalCommand?: CommandContext['goalCommand'];
   readonly prompt: string;
   /** Images the draft referred to, carried beside the text rather than in it. */
   readonly attachments?: PromptAttachments;
@@ -138,6 +139,7 @@ export async function buildCliCommandExecution(
       ref: { mode: "explicit-local", root: projectMemoryRootFor(projectRoot) },
     });
   const slashResult = await bridge.routeSlashCommand(input.prompt, {
+    goalCommand: input.goalCommand,
     cwd: input.cwd,
     interactive: input.interactive,
     projectRoot,

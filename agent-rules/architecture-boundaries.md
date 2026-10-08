@@ -88,5 +88,6 @@ Do not reintroduce a second language for performance. Execution latency is domin
 - `packages/ts-shell/src/core/values/`: domain-neutral value helpers with no feature knowledge - `freeze.ts` (`freezeDeep`) is the single recursive freeze used by twelve domains, and `record.ts` (`isRecord`) is the record-shape guard shared by `browser/` and `turn/`.
 - `packages/ts-shell/src/core/shell/`: shell/session display surface; keep feature-specific policy and writer semantics outside this layer when possible.
 - `packages/ts-shell/src/core/workspace/`: configuration-neutral root grants, directory identity and file-tool authority selection shared by session, turn and sandbox owners.
+- `packages/ts-shell/src/planning/goal/` owns session-bound goal entities, transitions, legacy import and state-file CAS. CLI composition supplies neutral command/objective ports; core and turn code do not read feature state directly. Ordinary session saves preserve the goal payload, and selection/reentry is not authorization to resume an active goal.
 - `packages/ts-shell/src/session/`: session lifecycle, durable session state, and resume/recovery boundaries.
 - `scripts/`: repository-level validation scripts, readiness checks, and real-provider smoke entrypoints.

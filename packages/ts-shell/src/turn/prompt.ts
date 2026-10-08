@@ -1,6 +1,5 @@
 import type { MultimodalContentBlock } from "../model-adapters/multimodal.js";
 import type { PermissionScope } from "../cli/approval/permissionScope.js";
-import { readProjectState } from "../core/state/projectState.js";
 import type { SessionMessage } from "../session/schema/sessionMessage.js";
 import { textSize } from '../context/request/measure.js';
 import type { PromptSource } from '../context/request/model.js';
@@ -120,9 +119,8 @@ export function systemPromptSnapshot(
  * out of the way, and repeating a completed one would keep steering towards work
  * that is already done.
  */
-export function environmentLine(workspaceRoot: string, permissionScope?: PermissionScope): string {
-  const goal = readProjectState(workspaceRoot).goal ?? null;
-  const objective = goal?.phase === "active" ? ` | active_goal=${goal.objective}` : "";
+export function environmentLine(workspaceRoot: string, permissionScope?: PermissionScope, goalObjective?: string): string {
+  const objective = goalObjective ? ` | active_goal=${JSON.stringify(goalObjective)}` : "";
   const perm = permissionScope ? ` | permission_scope=${permissionScope}` : "";
   return `[Environment Context: cwd=${workspaceRoot}${perm}${objective}]`;
 }

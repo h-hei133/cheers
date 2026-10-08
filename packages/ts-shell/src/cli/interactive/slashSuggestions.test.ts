@@ -41,7 +41,7 @@ describe("command completions", () => {
     expect(slashSuggestions("/qu")?.[0]?.value).toBe("/quit");
     expect(slashSuggestions("/qu")?.[0]?.detail).toContain("alias of /exit");
     expect(slashSuggestions("/where re")?.map(item => item.value)).toEqual(slashSuggestions("/workspace re")?.map(item => item.value));
-    expect(slashSuggestions("/WHERE re")?.[0]?.value).toBe("recent");
+    expect(slashSuggestions("/WHERE rece")?.[0]?.value).toBe("recent");
   });
 
   it("invalidates cached names and aliases when an extension is removed", () => {

@@ -61,6 +61,7 @@ import { decodeWorkspaceRoots, type WorkspaceRoot } from '../core/workspace/mode
 type ProviderMode = "synthetic" | "real";
 
 export interface CliRuntimeInvocationInput {
+  readonly goalObjective?: string;
   readonly workspaceRoots?: readonly WorkspaceRoot[];
   readonly admission?: Admission;
   readonly onCredentialPersisted?: () => void;
@@ -430,6 +431,7 @@ async function startTurn(
     : (dependencies.createStep ?? createProviderStep)(request, tools, promptContext);
 
   const run = runTurn({
+    goalObjective: request.goalObjective,
     admission: request.admission,
     commandEnv: commandEnvironmentFor(request),
     subagentHost: {

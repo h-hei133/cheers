@@ -9,6 +9,7 @@ import * as readline from "node:readline";
 import type { QueryRuntimeStateSeed } from "../core/query/runtime/state.js";
 import { runResumeLikeShellAction } from "../core/shell/continueShellActionRuntime.js";
 import { toolPoolFor } from "../cli/runtime/tools.js";
+import { goalCommandFor } from '../cli/runtime/goal.js';
 import { reportWriter } from '../cli/output/reports.js';
 import { runSessionManagement } from '../cli/runtime/management.js';
 import {
@@ -258,6 +259,7 @@ export async function runNonInteractivePrompt(options: {
 
   replayTodosFromMessages(options.runtimeContext.session.id, options.sessionManager.getSession(options.runtimeContext.session.id)?.turns ?? []);
   const resolved = await resolveTurnInputForExecution({
+    goalCommand: goalCommandFor(options.runtimeContext, options.sessionManager),
     prompt: trimmedPrompt,
     cwd: options.runtimeContext.cwd,
     projectRoot: options.runtimeContext.projectRoot,

@@ -32,6 +32,8 @@ import type { SidebarLiveEventStore } from '../../presentation/sidebar/sidebarLi
 export type CommandKind = 'local' | 'prompt' | 'shell-action'
 
 export interface CommandContext {
+  /** Feature handler supplied by the CLI's current session composition. */
+  readonly goalCommand?: (args: string[], context: CommandContext) => Promise<LocalCommandResult>
   readonly cwd: string
   /** Current configured pool, resolved on demand by the CLI host. */
   readonly getToolPool?: () => Promise<ReadonlyMap<string, ToolDefinition>>

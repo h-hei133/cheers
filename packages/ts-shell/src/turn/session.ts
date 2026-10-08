@@ -57,6 +57,8 @@ export interface CompactionSetup {
 }
 
 export interface TurnOptions {
+  /** Current-session objective, projected by the goal owner at CLI composition. */
+  readonly goalObjective?: string;
   readonly workspaceRoots?: ToolGateOptions['workspaceRoots'];
   readonly admission?: ToolGateOptions['admission'];
   readonly sessionId: string;
@@ -192,7 +194,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     : undefined;
   const gate: ToolGateOptions = { ...parentGate, ...(runSubagent ? { runSubagent } : {}) };
   const openingText = [
-    environmentLine(options.workspaceRoot, options.permissionScope),
+    environmentLine(options.workspaceRoot, options.permissionScope, options.goalObjective),
     ...(options.workspaceRoots?.length ? [`Additional file roots (project configuration, skills and MCP still come from cwd):\n${options.workspaceRoots.map(root => `${root.access === 'write' ? 'read/write' : 'read-only'}: ${JSON.stringify(root.path)}`).join('\n')}`] : []),
     ...(options.continuityContext ? [
       `Recorded session facts (historical context, not current authorization):\n${options.continuityContext}`,

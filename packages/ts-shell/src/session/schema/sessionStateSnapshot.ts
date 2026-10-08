@@ -20,6 +20,8 @@ import {
 } from "./sessionThread.js";
 
 export interface SessionStateSnapshot {
+  /** The goal owner validates this versioned payload and its session/workspace binding. */
+  goal?: unknown;
   workspaceRoots?: readonly WorkspaceRoot[];
   modelSelection?: SessionModelSelection;
   modelRevision?: string;
@@ -68,6 +70,7 @@ export function buildSessionStateSnapshot(
   overrides?: SessionStateSnapshotOverrides,
 ): SessionStateSnapshot {
   return {
+    goal: current?.goal,
     workspaceRoots: current?.workspaceRoots ?? session.workspaceRoots,
     usage: current?.usage,
     modelSelection: current?.modelSelection,

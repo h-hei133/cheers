@@ -4,16 +4,22 @@ import { parseSyntax } from "../syntax/parse.js";
 export const goalSyntax: CommandSyntax = {
   name: "goal", defaultAction: "",
   actions: [
-    { name: "", summary: "inspect or set the project objective", parameters: [{ name: "objective", kind: "text", rest: true }] },
+    { name: "", summary: "inspect or set the session goal", parameters: [{ name: "objective", kind: "text", rest: true }] },
+    { name: "set", summary: "set a new session goal", parameters: [{ name: "objective", kind: "text", rest: true, required: true }] },
+    { name: "show", summary: "inspect the session goal" },
     { name: "pause", summary: "pause the recorded objective" },
     { name: "resume", summary: "resume the recorded objective" },
-    { name: "complete", aliases: ["done"], summary: "mark the recorded objective complete" },
-    { name: "clear", summary: "remove the recorded objective" },
+    { name: "complete", aliases: ["done"], summary: "declare the session goal complete" },
+    { name: "drop", aliases: ["clear"], summary: "abandon the session goal" },
+    { name: "import", summary: "import the legacy project description as paused" },
+    { name: "budget", summary: "goal budget admission is not yet available", parameters: [{ name: "limit", kind: "text", required: true }] },
   ],
 };
 
-/** Only a single reserved token is an action; multiword objectives remain prose. */
+/** Old phase words inside multiword objectives remain prose. Canonical verbs validate arguments. */
 export function parseGoalArgs(args: readonly string[]) {
-  const action = args.length === 1 && goalSyntax.actions.some(item => item.name === args[0]?.toLowerCase() || item.aliases?.includes(args[0]?.toLowerCase() ?? ""));
+  const first = args[0]?.toLowerCase();
+  const canonical = ['set', 'show', 'drop', 'import', 'budget'].includes(first ?? '');
+  const action = canonical || (args.length === 1 && goalSyntax.actions.some(item => item.name === first || item.aliases?.includes(first ?? "")));
   return parseSyntax(goalSyntax, action ? args : ["", ...args]);
 }

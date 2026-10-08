@@ -7,16 +7,9 @@ import { resolveUserDataFile } from "../paths/userHome.js";
 /**
  * Durable per-project state for choices that outlive a turn.
  *
- * Some things a command sets are not preferences and not conversation: they are
- * standing instructions for how work in this project proceeds. An objective is the
- * clearest case — it exists to stop a long piece of work from drifting, and long
- * work is exactly what spans restarts, so holding it in a process variable defeats
- * the reason for having it.
- *
- * It is deliberately not the settings file: settings are written by the user and
- * often committed, and an agent quietly editing them would be a surprise. It is
- * also deliberately not the session: a new session in the same project should
- * still know what the work is.
+ * Sampling and thinking preferences remain project-scoped. The goal field is a
+ * legacy description available only through explicit session import; new goals
+ * live in the session store and never steer another session automatically.
  *
  * Reads never throw. A state file that is missing, truncated, or written by a
  * newer version reads as "nothing recorded", because a lost objective should cost
@@ -36,6 +29,7 @@ import type { ThinkingLevel as ThinkingEffort } from '../models/effort.js';
 export type { ThinkingLevel as ThinkingEffort } from '../models/effort.js';
 
 export interface ProjectState {
+  /** Legacy description only. /goal import copies it into a paused session goal. */
   readonly goal?: StoredGoal | null;
   /** Whether sampling is held down for shorter, more direct answers. */
   readonly fastSampling?: boolean;

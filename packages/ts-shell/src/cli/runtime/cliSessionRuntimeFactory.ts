@@ -26,6 +26,7 @@ import type { CliProviderRuntimeBridge } from "../provider/cliProviderRuntimeBri
 import type { EscalationPrompt } from "../../core/shell/approval/contract.js";
 import { promptInteractiveQuestions } from "../interactive/interactiveAskBridge.js";
 import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
+import { goalObjectiveFor, prepareGoalSession } from './goal.js';
 import { compactSessionHistory } from "../../core/shell/compaction.js";
 import { recordCompactionCheckpoint } from "../../context/compact/checkpoint/compactionCheckpoint.js";
 import { createProjectMemoryLocalStore } from "../../memory/projectMemoryLocalStore.js";
@@ -216,6 +217,7 @@ export function createCliSessionRuntime(input: {
     | undefined
   );
 }): ShellSessionRuntime {
+  prepareGoalSession(input.runtimeContext, input.sessionManager);
   const isStdinTty = input.isStdinTty ?? (() => Boolean(process.stdin.isTTY));
   /**
    * The runner the current run is using, so the next run can retire it.
@@ -493,6 +495,7 @@ export function createCliSessionRuntime(input: {
 
       let sourceEntryId = allTurns.at(-1)?.id;
       const run = streamCliRuntimePrompt({
+        goalObjective: goalObjectiveFor(input.runtimeContext, input.sessionManager),
         mcpGateway: input.mcpGateway,
         // Carried so the tool pool honours disabledTools / hiddenToolPrefixes.
         runtimeConfig: config,

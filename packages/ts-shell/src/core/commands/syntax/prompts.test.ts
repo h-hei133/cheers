@@ -2,33 +2,23 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { runGoalCommand, getActiveSessionGoal } from "../goalCommandRuntime.js";
+import { parseGoalArgs } from '../goal/syntax.js';
 import { runBrainstormCommand } from "../brainstormCommandRuntime.js";
 import { createCommandRegistry } from "../registry.js";
-import * as state from "../../state/projectState.js";
 
 let root: string;
 beforeEach(() => { root = fs.mkdtempSync(path.join(os.tmpdir(), "prompt-syntax-")); vi.stubEnv("HOME", root); vi.stubEnv("USERPROFILE", root); });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
 
-it("keeps reserved words inside a multiword goal as prose and supports done", async () => {
-  await runGoalCommand(["pause", "the", "migration", "--safely"], { cwd: root });
-  expect(getActiveSessionGoal(root)).toMatchObject({ objective: "pause the migration --safely", phase: "active" });
-  await runGoalCommand(["done"], { cwd: root });
-  expect(getActiveSessionGoal(root)?.phase).toBe("complete");
-  await runGoalCommand(["resume"], { cwd: root });
-  expect(getActiveSessionGoal(root)?.phase).toBe("active");
+it("keeps reserved words inside a multiword goal as prose and supports canonical verbs and aliases", () => {
+  expect(parseGoalArgs(['pause', 'the', 'migration', '--safely'])).toMatchObject({ ok: true, action: { name: '' }, args: ['pause', 'the', 'migration', '--safely'] });
+  expect(parseGoalArgs(['done'])).toMatchObject({ ok: true, action: { name: 'complete' } });
+  expect(parseGoalArgs(['clear'])).toMatchObject({ ok: true, action: { name: 'drop' } });
+  expect(parseGoalArgs(['set', 'pause', 'the', 'migration'])).toMatchObject({ ok: true, action: { name: 'set' }, args: ['pause', 'the', 'migration'] });
 });
 
-it("does not claim persisted or in-memory success when goal writes fail", async () => {
-  await runGoalCommand(["existing"], { cwd: root });
-  vi.spyOn(state, "writeProjectState").mockReturnValue(undefined);
-  for (const args of [["replacement"], ["clear"], ["pause"], ["done"]]) {
-    const result = await runGoalCommand(args, { cwd: root });
-    expect(result.output).toContain("not confirmed persisted");
-    expect(result.output).not.toMatch(/Objective set|Objective cleared|lost when this process ends/);
-    expect(getActiveSessionGoal(root)).toMatchObject({ objective: "existing", phase: "active" });
-  }
+it.each([['set'], ['show', 'extra'], ['drop', 'extra'], ['import', 'extra'], ['budget']])("rejects malformed canonical goal arguments %j", (...args) => {
+  expect(parseGoalArgs(args).ok).toBe(false);
 });
 
 it.each([["--unknown", "design"], ["-i", "-s", "design"], ["--save=false", "design"], ["-i", "--interactive", "design"]])("rejects invalid brainstorm flags %j", async (...args) => {
