@@ -44,6 +44,7 @@ import { runSidebarLocalCommand } from "./sidebarCommandRuntime.js";
 import { runWarmupLocalCommand } from "./warmupCommandRuntime.js";
 import { runExitCommand } from "./exitCommandRuntime.js";
 import { runClearCommand } from "./clearCommandRuntime.js";
+import { renameSyntax, deleteSyntax, runSessionManagementCommand } from './navigation/management.js';
 import { runReviewCommand, reviewSyntax } from "./reviewCommandRuntime.js";
 import { runReloadCommand } from "./reloadCommandRuntime.js";
 import { runThemeCommand, themeSyntax } from "./themeCommandRuntime.js";
@@ -238,6 +239,13 @@ export function createCommandRegistry(
       getArgumentCompletions: (prefix) => navigationCompletions(resumeSyntax, prefix),
       execute: (args, context) => runResumeCommand(args, context),
     },
+    ...(['rename', 'delete'] as const).map(name => {
+      const syntax = name === 'rename' ? renameSyntax : deleteSyntax;
+      return { name, kind: 'shell-action' as const, supportsNonInteractive: true, availability: 'available' as const,
+        enabled: true, summary: syntax.actions[0]!.summary, group: 'session' as const,
+        argumentHint: syntaxHint(syntax), getArgumentCompletions: (prefix: string) => syntaxCompletions(syntax, prefix),
+        execute: async (args: string[]) => runSessionManagementCommand(name, args) };
+    }),
     {
       name: "fork",
       kind: "prompt",
@@ -358,7 +366,7 @@ export function createCommandRegistry(
     },
     {
       name: "clear",
-      aliases: ["reset", "cls"],
+      aliases: ["reset", "cls", "new"],
       kind: "shell-action",
       supportsNonInteractive: true,
       availability: "available",

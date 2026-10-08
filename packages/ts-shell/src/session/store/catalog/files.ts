@@ -4,14 +4,18 @@ import { projectSessionFileLayout, validateSessionId, type SessionFileLayout, ty
 import { CATALOG_LIMITS } from './model.js';
 import { fileVersion } from '../version.js';
 
-export interface CatalogFiles {
+export interface CatalogDirectory {
   readonly layout: SessionFileLayout;
   readonly directory: Stats;
+}
+
+export interface CatalogFiles extends CatalogDirectory {
   readonly stats: readonly [Stats, Stats, Stats];
   readonly version: string;
 }
 
-export async function locateCatalogFiles(store: SessionStoreLayout, id: string, signal?: AbortSignal, onSource?: (target: string) => void): Promise<CatalogFiles | undefined> {
+/** Physical identity remains usable even when the saved content needs recovery. */
+export async function locateCatalogDirectory(store: SessionStoreLayout, id: string, signal?: AbortSignal, onSource?: (target: string) => void): Promise<CatalogDirectory | undefined> {
   signal?.throwIfAborted();
   if (validateSessionId(id) !== id || id === '.' || id === '..') throw new Error('Invalid session identity.');
   for (const sessionsDir of store.sessionsSearchDirs) {
@@ -27,18 +31,26 @@ export async function locateCatalogFiles(store: SessionStoreLayout, id: string, 
       throw error;
     }
     if (!directory.isDirectory()) throw new Error('Session directory is unavailable.');
-    const stats: Stats[] = [];
-    for (const file of [layout.metadataPath, layout.statePath, layout.transcriptPath]) {
-      signal?.throwIfAborted();
-      const stat = await lstat(file);
-      if (!stat.isFile() || !Number.isSafeInteger(stat.size) || stat.size < 0) throw new Error('Session file is unavailable.');
-      stats.push(stat);
-    }
     signal?.throwIfAborted();
-    return { layout, directory, stats: stats as [Stats, Stats, Stats],
-      version: JSON.stringify([layout.sessionDir, directory.dev, directory.ino, ...stats.map(fileVersion)]) };
+    return { layout, directory };
   }
   return undefined;
+}
+
+export async function locateCatalogFiles(store: SessionStoreLayout, id: string, signal?: AbortSignal, onSource?: (target: string) => void): Promise<CatalogFiles | undefined> {
+  const found = await locateCatalogDirectory(store, id, signal, onSource);
+  if (!found) return undefined;
+  const { layout, directory } = found;
+  const stats: Stats[] = [];
+  for (const file of [layout.metadataPath, layout.statePath, layout.transcriptPath]) {
+    signal?.throwIfAborted();
+    const stat = await lstat(file);
+    if (!stat.isFile() || !Number.isSafeInteger(stat.size) || stat.size < 0) throw new Error('Session file is unavailable.');
+    stats.push(stat);
+  }
+  signal?.throwIfAborted();
+  return { layout, directory, stats: stats as [Stats, Stats, Stats],
+    version: JSON.stringify([layout.sessionDir, directory.dev, directory.ino, ...stats.map(fileVersion)]) };
 }
 
 /** A finite acquisition bound, checked against the opened object as well as its path. */

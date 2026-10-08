@@ -177,7 +177,7 @@ it('reports unreadable sources, rejects mismatched identities and respects autho
   expect(JSON.stringify(result)).not.toContain('PRIVATE_CONTENT');
 });
 
-it('drains dispatched reads on cancellation, closes the cursor, and dispatches no later files', async () => {
+it.each(['listing', 'reference'])('drains dispatched %s reads on cancellation, closes the cursor, and dispatches no later files', async mode => {
   const { layout, context, catalog } = fixture(); seed(layout, 'current');
   for (let index = 0; index < 24; index++) seed(layout, `saved-${index}`);
   const controller = new AbortController(); const query = catalog.list(context, controller.signal); await query.next();
@@ -193,7 +193,8 @@ it('drains dispatched reads on cancellation, closes the cursor, and dispatches n
     directory.close = (async () => { directoryClosed++; return close(); }) as typeof directory.close;
     return directory;
   }) as typeof io.opendir);
-  const pending = query.next(); const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  const pending = mode === 'listing' ? query.next() : catalog.resolve('not a session', { signal: controller.signal });
+  const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
   await vi.waitFor(() => expect(entered).toBe(4)); controller.abort(); release(); await rejected;
   expect({ entered, closed, directoryClosed }).toEqual({ entered: 4, closed: 4, directoryClosed: 1 });
 });
@@ -217,5 +218,93 @@ it('does not cache a summary whose core files changed during acquisition', async
 it('rejects pre-cancelled discovery before any filesystem operation', async () => {
   const { catalog, context } = fixture();
   await expect(catalog.list(context, AbortSignal.abort()).next()).rejects.toMatchObject({ name: 'AbortError' });
+  await expect(catalog.resolve('current', { signal: AbortSignal.abort() })).rejects.toMatchObject({ name: 'AbortError' });
   expect(io.open).not.toHaveBeenCalled(); expect(io.lstat).not.toHaveBeenCalled(); expect(io.opendir).not.toHaveBeenCalled();
+});
+
+it('resolves exact IDs without discovery and includes older prefix and title collisions', async () => {
+  const { layout, context, catalog } = fixture();
+  for (let index = 0; index < 50; index++) seed(layout, `recent-${index}`);
+  seed(layout, 'work-recent', { title: 'Shared work', updatedAt: '2026-10-08T00:00:00.000Z' });
+  seed(layout, 'work-old', { title: 'Shared work', updatedAt: '2025-01-01T00:00:00.000Z' });
+  expect((await finish(catalog, context)).last.sessions.some(session => session.id === 'work-old')).toBe(false);
+  vi.mocked(io.opendir).mockClear();
+  expect(await catalog.resolve('work-old')).toEqual({ ok: true, sessionId: 'work-old' });
+  expect(io.opendir).not.toHaveBeenCalled();
+  expect(await catalog.resolve('work-')).toMatchObject({ ok: false, reason: 'ambiguous',
+    candidates: expect.arrayContaining([expect.objectContaining({ id: 'work-old' }), expect.objectContaining({ id: 'work-recent' })]) });
+  expect(await catalog.resolve('Shared work')).toMatchObject({ ok: false, reason: 'ambiguous' });
+  expect(await catalog.resolve('work-o')).toEqual({ ok: true, sessionId: 'work-old' });
+});
+
+it('matches full stored titles without treating a long title as an unreadable ID path', async () => {
+  const { layout, catalog } = fixture();
+  const longTitle = 'x'.repeat(520) + 'needle';
+  seed(layout, 'long-title', { title: longTitle });
+  seed(layout, 'short-title', { title: 'needle' });
+  expect(await catalog.resolve('needle')).toMatchObject({ ok: false, reason: 'ambiguous' });
+  expect(await catalog.resolve(longTitle)).toEqual({ ok: true, sessionId: 'long-title' });
+});
+
+it('refuses unproven recency and inferred-title matches from a limited summary while keeping IDs usable', async () => {
+  const { layout, catalog } = fixture();
+  const large = seed(layout, 'large-history', { updatedAt: '2026-10-06T00:00:00.000Z' });
+  seed(layout, 'small-history', { title: 'Conversation small', updatedAt: '2026-10-07T00:00:00.000Z' });
+  fs.appendFileSync(large.layout.transcriptPath, Array.from({ length: 40 }, (_, index) => JSON.stringify(
+    createMessageTranscriptEvent({ id: `large-${index}`, role: 'assistant', content: 'x'.repeat(60_000), timestamp: large.session.updatedAt }),
+  )).join('\n') + '\n');
+  fs.appendFileSync(large.layout.transcriptPath, JSON.stringify({ type: 'command-output', id: 'newer-report',
+    sourceEntryId: sessionRootEntryId('large-history'), timestamp: '2026-10-08T00:00:00.000Z',
+    text: 'Most recent report' }) + '\n');
+  expect(loadSessionRecord({ sessionId: 'large-history', layout: large.layout, cwd: '/workspace' }).updatedAt).toBe('2026-10-08T00:00:00.000Z');
+  expect(await catalog.resolve('last')).toMatchObject({ ok: false, reason: 'incomplete' });
+  expect(await catalog.resolve('Conversation')).toMatchObject({ ok: false, reason: 'incomplete' });
+  expect(await catalog.resolve('large-')).toEqual({ ok: true, sessionId: 'large-history' });
+});
+
+it('resolves last by recency and keeps explicit project scope distinct from a preference', async () => {
+  const { layout, catalog } = fixture();
+  seed(layout, 'older', { title: 'Shared title', status: 'interrupted', updatedAt: '2026-10-06T00:00:00.000Z' });
+  seed(layout, 'newest', { updatedAt: '2026-10-07T00:00:00.000Z' });
+  seed(layout, 'foreign', { projectRoot: '/elsewhere', title: 'Shared title', updatedAt: '2026-10-08T00:00:00.000Z' });
+  expect(await catalog.resolve('last', { projectRoot: '/workspace' })).toEqual({ ok: true, sessionId: 'newest' });
+  expect(await catalog.resolve('latest')).toEqual({ ok: true, sessionId: 'foreign' });
+  expect(await catalog.resolve('Shared title', { projectRoot: '/workspace' })).toMatchObject({ reason: 'ambiguous' });
+  expect(await catalog.resolve('Shared title', { projectRoot: '/workspace', strictProject: true })).toEqual({ ok: true, sessionId: 'older' });
+  expect(await catalog.resolve('foreign', { projectRoot: '/workspace', strictProject: true })).toMatchObject({ ok: false, reason: 'outside-project' });
+  expect(await catalog.resolve('foreign', { strictProject: true })).toMatchObject({ ok: false, reason: 'incomplete' });
+});
+
+it('keeps incomplete discovery distinct from unique or missing references while exact IDs remain usable', async () => {
+  const { layout, catalog } = fixture();
+  seed(layout, 'good', { title: 'Only readable title' });
+  const broken = seed(layout, 'broken'); fs.writeFileSync(broken.layout.metadataPath, '{');
+  expect(await catalog.resolve('Only readable')).toMatchObject({ ok: false, reason: 'incomplete' });
+  expect(await catalog.resolve('Not present')).toMatchObject({ ok: false, reason: 'incomplete' });
+  expect(await catalog.resolve('good')).toEqual({ ok: true, sessionId: 'good' });
+  expect(await catalog.resolve('broken')).toEqual({ ok: true, sessionId: 'broken' });
+  const legacy = seed(layout, 'legacy-unscoped');
+  for (const file of [legacy.layout.metadataPath, legacy.layout.statePath]) {
+    const value = JSON.parse(fs.readFileSync(file, 'utf8')); delete value.projectRoot;
+    fs.writeFileSync(file, JSON.stringify(value));
+  }
+  seed(layout, 'oversize-title', { title: 'x'.repeat(CATALOG_LIMITS.metadataBytes) });
+  vi.mocked(io.open).mockClear(); vi.mocked(io.opendir).mockClear();
+  expect(await catalog.resolve('legacy-unscoped')).toEqual({ ok: true, sessionId: 'legacy-unscoped' });
+  expect(await catalog.resolve('oversize-title')).toEqual({ ok: true, sessionId: 'oversize-title' });
+  expect(io.open).not.toHaveBeenCalled(); expect(io.opendir).not.toHaveBeenCalled();
+  expect(await catalog.resolve('legacy-unscoped', { projectRoot: '/workspace', strictProject: true }))
+    .toMatchObject({ ok: false, reason: 'incomplete' });
+});
+
+it('uses the authoritative layout once when matching a reference across historical directories', async () => {
+  const { layout, root } = fixture();
+  const history = path.join(root, 'history');
+  seed(layout, 'saved', { title: 'Current title' });
+  seed({ ...layout, sessionsDir: history }, 'saved', { title: 'Historical title' });
+  seed({ ...layout, sessionsDir: history }, 'legacy', { title: 'Legacy title' });
+  const catalog = new SessionCatalog({ ...layout, sessionsSearchDirs: [layout.sessionsDir, history] });
+  expect(await catalog.resolve('Current title')).toEqual({ ok: true, sessionId: 'saved' });
+  expect(await catalog.resolve('Historical title')).toMatchObject({ ok: false, reason: 'not-found' });
+  expect(await catalog.resolve('Legacy title')).toEqual({ ok: true, sessionId: 'legacy' });
 });

@@ -20,9 +20,9 @@ export interface SessionPickerOptions {
   /** Resume the chosen session; the host owns how that is executed. */
   readonly resume: (sessionId: string) => Promise<string | undefined>;
   /** Delete a session permanently, with confirmation handled by the host. */
-  readonly delete?: (sessionId: string) => Promise<string | undefined>;
+  readonly delete?: (sessionId: string, version?: string) => Promise<string | undefined>;
   /** Rename a session. */
-  readonly rename?: (sessionId: string, title: string) => Promise<string | undefined>;
+  readonly rename?: (sessionId: string, title: string, version?: string) => Promise<string | undefined>;
 }
 
 export function sessionPicker(options: SessionPickerOptions): Picker {
@@ -31,12 +31,14 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
   let listingStatus: string | undefined;
   let listingIncomplete = true;
   let offered = new Set<string>();
+  let versions = new Map<string, string>();
   const listing = new SessionListing(options.sessionManager);
   const accept = (page: SessionListingPage): readonly Option[] => {
     currentUnavailable = page.snapshot.currentUnavailable;
     listingIncomplete = page.stopped === true || page.snapshot.status !== 'complete';
     listingStatus = sessionListingStatus(page);
     offered = new Set(page.snapshot.sessions.map(session => session.id));
+    for (const session of page.snapshot.sessions) if (!versions.has(session.id)) versions.set(session.id, session.version);
     return page.snapshot.sessions.map(session => sessionOption(session, expected.sessionId, page.sizes.get(session.id)));
   };
   const blocked = (id: string, action: 'resume' | 'rename' | 'delete'): string | undefined => {
@@ -59,6 +61,7 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
       const page = await listing.load(context, signal);
       signal?.throwIfAborted();
       expected = context;
+      versions = new Map();
       return accept(page);
     },
     subscribe: publish => listing.subscribe(page => publish(accept(page))),
@@ -71,10 +74,10 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
       return note ? { note } : undefined;
     },
     onDelete: options.delete
-      ? async (sessionId: string) => blocked(sessionId, 'delete') ?? options.delete!(sessionId)
+      ? async (sessionId: string) => blocked(sessionId, 'delete') ?? options.delete!(sessionId, versions.get(sessionId))
       : undefined,
     onRename: options.rename
-      ? async (sessionId: string, title: string) => blocked(sessionId, 'rename') ?? options.rename!(sessionId, title)
+      ? async (sessionId: string, title: string) => blocked(sessionId, 'rename') ?? options.rename!(sessionId, title, versions.get(sessionId))
       : undefined,
   };
 }

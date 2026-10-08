@@ -25,6 +25,7 @@ import * as toolCatalog from '../../core/tools/catalog.js';
 import { createReport, span } from '../../core/commands/report/projection.js';
 import type { PickerOutcome } from './overlay.js';
 import { configurationBinding } from '../../core/shell/configuration.js';
+import * as management from '../../session/lifecycle/management.js';
 
 function build(overrides: { observeEvents?: () => () => void; exit?: (code?: number) => void } = {}): {
   mode: InteractiveMode;
@@ -66,6 +67,33 @@ function build(overrides: { observeEvents?: () => () => void; exit?: (code?: num
 }
 
 describe("session wiring", () => {
+  it('keeps queued input behind the session title editor until it is dismissed', async () => {
+    const { mode, terminal } = build();
+    const host = mode as unknown as { busy: boolean; pickerPending: boolean; queue: string[]; overlay: OverlayHost;
+      pickerHost(): PickerHost; run(text: string): Promise<void> };
+    const prepare = vi.spyOn(management, 'prepareSessionManagement').mockResolvedValue({ preview: {
+      action: 'rename', session: { id: 'sess_1', projectRoot: '/workspace', title: 'Current title', turns: [],
+        createdAt: '2026-10-08T00:00:00Z', updatedAt: '2026-10-08T00:00:00Z', status: 'active' },
+      expected: { sessionId: 'sess_1', projectRoot: '/workspace', busy: false }, layout: {} as never, version: 'fixture',
+    } });
+    vi.spyOn(host, 'pickerHost').mockReturnValue({ sessionManager: {},
+      sessionContext: () => ({ sessionId: 'sess_1', projectRoot: '/workspace', busy: host.busy && !host.pickerPending }),
+    } as unknown as PickerHost);
+    const run = host.run.bind(host);
+    const dispatch = vi.spyOn(host, 'run').mockImplementation(text => text === '/help' ? Promise.resolve() : run(text));
+    mode.start();
+    try {
+      await host.run('/rename');
+      await vi.waitFor(() => expect(prepare).toHaveBeenCalled());
+      await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 30).join('\n'))).toContain('Edit session title'));
+      host.queue.push('/help'); terminal.input('\x1b[B'); terminal.input('\r');
+      await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 30).join('\n'))).toContain('Session title'));
+      expect(dispatch).not.toHaveBeenCalledWith('/help'); expect(host.queue).toEqual(['/help']);
+      terminal.input('\x1b');
+      await vi.waitFor(() => expect(dispatch).toHaveBeenCalledWith('/help'));
+      expect(host.queue).toEqual([]);
+    } finally { mode.stop(); vi.restoreAllMocks(); }
+  });
   it.each([false, true])('restores saved reports in the first frame with message history=%s', withMessages => {
     const { mode } = build();
     const host = mode as unknown as { view: InteractiveView; sink: { begin(): void }; options: { runtimeContext: ShellRuntimeContext } };

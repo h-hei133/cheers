@@ -331,3 +331,7 @@ refNoToken = ref.filter(command => intersection(token(command), oursTokens).size
 - 实施时保留会在关键决定反转后失败的测试：raw alias、Plan 不放权、stale hunk 不暂存、撤销不覆盖外部修改、显式预算耗尽不再 admission。
 - 用量、费用估算、目标预算和账单分开；缺失用量标未知并执行保守 admission，不能算零。
 - 本轮只有 Markdown，做静态事实/计数/路径/差异核对；未运行 build/tests、PTY、网络或真实 Provider，不能据此声称功能可用。
+
+## 8. SES-04 直达入口实施补充（2026-10-08）
+
+`/new` 作为 `/clear` 别名、`/session new` 作为同一 shell action 已接通；`/rename [title...]` 管当前会话，`/delete <reference>` 与 `/session rename|delete` 管保存记录。帮助、语法和动态会话候选共用现有注册表；完整目录的 exact/prefix/title/last 匹配、确认与锁内复验归 session owner。非交互 delete 只预览，交互默认 Cancel，裸 rename 提供标题编辑。具体校验与交付边界见 [决策 §8.107](phase-19-decisions.md#8107-ses-04会话直达管理与完整目录匹配)；本文原始 58 条统计仍是规划基线，不作为当前注册数。

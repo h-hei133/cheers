@@ -1,4 +1,6 @@
 import { sessionPickerHost } from './picker/session/host.js';
+import { sessionManagementPicker } from './picker/session/management.js';
+import type { ShellActionResult } from '../../core/commands/types.js';
 import { CatalogController } from "./completion/controller.js";
 import { catalogIdentity, createCatalogLoader } from "./completion/catalog.js";
 import { refreshShellRuntimeConfig } from "../../core/shell/runtimeContext.js";
@@ -653,6 +655,7 @@ export class InteractiveMode {
     let clearing = false;
     let opened = false;
     let navigation: SessionNavigationResult | undefined;
+    let sessionManagement: ShellActionResult | undefined;
     // `begin` clears the failure flag for the turn that is starting, so whether
     // the *previous* turn failed has to be read before that happens.
     const previousTurnFailed = this.sink.lastTurnFailed;
@@ -690,6 +693,7 @@ export class InteractiveMode {
       if (result.clearRequested) clearing = true;
       if (result.sessionOpened) opened = true;
       navigation = result.navigation;
+      sessionManagement = result.sessionManagement;
     } catch (error) {
       this.state.transcript.append(
         textBlock("error", error instanceof Error ? error.message : String(error), "error"),
@@ -704,6 +708,7 @@ export class InteractiveMode {
       if (output) pageLongOutput(this.pager, output.title, output.block, this.state.transcript);
       this.sink.end();
       this.busy = this.pickerPending;
+      if (sessionManagement && !this.stopped) this.overlay.open(sessionManagementPicker(this.pickerHost(), sessionManagement));
       if (exiting) {
         this.shutdown();
         return;
@@ -721,7 +726,7 @@ export class InteractiveMode {
         if (navigation.draft !== undefined) this.state.editor.setText(navigation.draft);
       }
       this.tui.requestRender();
-      const next = this.pickerPending ? undefined : retrying ?? this.queue.shift();
+      const next = this.pickerPending || sessionManagement ? undefined : retrying ?? this.queue.shift();
       // The attention pair, when the user asked for it and the turn was long
       // enough that they may have looked away. A queued follow-up keeps the
       // conversation running, so the signal waits for the turn that ends it.

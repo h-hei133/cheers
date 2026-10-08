@@ -58,13 +58,13 @@ export function formatSessionSwitchNotFoundLine(input: {
 
 export function formatSessionSwitchAmbiguousLine(input: {
   readonly reference: string;
-  readonly candidates: readonly Pick<Session, "id" | "status" | "title">[];
+  readonly candidates: readonly (Pick<Session, 'id' | 'title'> & Partial<Pick<Session, 'status'>>)[];
   readonly printMode: boolean;
 }): string {
   const lines: string[] = [`Switch target '${input.reference}' is ambiguous.`];
   for (const candidate of input.candidates.slice(0, 3)) {
     const title = candidate.title?.trim() || "(untitled)";
-    lines.push(`- ${candidate.id} [${candidate.status}] ${title}`);
+    lines.push(`- ${candidate.id} [${candidate.status ?? 'unknown'}] ${title}`);
   }
   lines.push(
     "Hint: use a longer session id prefix or exact session id from /resume list.",

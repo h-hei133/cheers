@@ -14,76 +14,16 @@ import {
   type ShellRuntimeContext,
 } from "./runtimeContext.js";
 
-interface SessionReferenceResolution {
-  readonly ok: boolean;
-  readonly sessionId?: string;
-  readonly reason?: "not-found" | "ambiguous";
-  readonly candidates?: readonly SessionReentrySummary[];
-}
-
 export function resolveSessionReference(input: {
   readonly reference?: string;
   readonly sessionManager: SessionManager;
   readonly preferredProjectRoot?: string;
-}): SessionReferenceResolution {
-  const reference = input.reference?.trim();
-  if (!reference) {
-    return { ok: false, reason: "not-found", candidates: [] };
-  }
-
-  const lowerReference = reference.toLowerCase();
-  const summaries =
-    typeof input.sessionManager.listReentrySummaries === "function"
-      ? input.sessionManager.listReentrySummaries({
-          limit: 24,
-          preferredProjectRoot: input.preferredProjectRoot,
-          // Resolving a reference is answering an explicit request, so a session
-          // nobody spoke in is still findable by the id or title that named it.
-          includeUntouched: true,
-        })
-      : [];
-
-  if (lowerReference === "last" || lowerReference === "latest") {
-    return summaries[0]
-      ? { ok: true, sessionId: summaries[0].id }
-      : { ok: false, reason: "not-found", candidates: [] };
-  }
-
-  if (
-    typeof input.sessionManager.sessionExists === "function" &&
-    input.sessionManager.sessionExists(reference)
-  ) {
-    return { ok: true, sessionId: reference };
-  }
-
-  const exactMatches = summaries.filter(
-    (summary) => summary.id.toLowerCase() === lowerReference,
-  );
-  if (exactMatches.length === 1) {
-    return { ok: true, sessionId: exactMatches[0].id };
-  }
-
-  const prefixMatches = summaries.filter((summary) =>
-    summary.id.toLowerCase().startsWith(lowerReference),
-  );
-  if (prefixMatches.length === 1) {
-    return { ok: true, sessionId: prefixMatches[0].id };
-  }
-  if (prefixMatches.length > 1) {
-    return { ok: false, reason: "ambiguous", candidates: prefixMatches };
-  }
-
-  const titleMatches = summaries.filter((summary) =>
-    summary.title?.trim().toLowerCase().includes(lowerReference),
-  );
-  if (titleMatches.length === 1) {
-    return { ok: true, sessionId: titleMatches[0].id };
-  }
-  if (titleMatches.length > 1) {
-    return { ok: false, reason: "ambiguous", candidates: titleMatches };
-  }
-
-  return { ok: false, reason: "not-found", candidates: summaries.slice(0, 5) };
+  readonly signal?: AbortSignal;
+}): ReturnType<SessionManager['catalog']['resolve']> {
+  return input.sessionManager.catalog.resolve(input.reference ?? '', {
+    projectRoot: input.preferredProjectRoot,
+    signal: input.signal,
+  });
 }
 
 function isFailedResume(
@@ -150,7 +90,7 @@ export async function resumeShellSession(input: {
     }
 > {
   const reentrySummaries =
-    typeof input.sessionManager.listReentrySummaries === "function"
+    !input.requestedSessionId?.trim() && typeof input.sessionManager.listReentrySummaries === "function"
       ? input.sessionManager.listReentrySummaries({
           limit: 3,
           preferredProjectRoot: input.runtimeContext.projectRoot,
@@ -176,11 +116,17 @@ export async function resumeShellSession(input: {
     input.sessionManager.getSuggestedRecoverySession()?.id;
 
   if (input.requestedSessionId?.trim()) {
-    const resolved = resolveSessionReference({
+    const expectedSessionId = input.runtimeContext.session.id;
+    const expectedProjectRoot = input.runtimeContext.projectRoot;
+    const resolved = await resolveSessionReference({
       reference: input.requestedSessionId,
       sessionManager: input.sessionManager,
       preferredProjectRoot: input.runtimeContext.projectRoot,
     });
+    if (input.runtimeContext.session.id !== expectedSessionId || input.runtimeContext.projectRoot !== expectedProjectRoot) {
+      input.renderer.renderLine('The active session or project changed while resolving the reference. No session was resumed.');
+      return { resumed: false };
+    }
     if (!resolved.ok) {
       if (resolved.reason === "ambiguous") {
         const hintItems = (resolved.candidates ?? []).slice(0, 3);
@@ -190,12 +136,14 @@ export async function resumeShellSession(input: {
         for (const candidate of hintItems) {
           const title = candidate.title?.trim() || "(untitled)";
           input.renderer.renderLine(
-            `- ${candidate.id} [${candidate.status}] ${title}`,
+            `- ${candidate.id} [${candidate.status ?? 'unknown'}] ${title}`,
           );
         }
         input.renderer.renderLine(
           "Hint: use a longer session id prefix or exact session id from /resume list.\n",
         );
+      } else if (resolved.reason === 'incomplete') {
+        input.renderer.renderLine('\nSaved sessions could not be fully checked. Use an exact session ID or retry after the unavailable records are repaired. No session was resumed.\n');
       } else {
         input.renderer.renderLine(
           `\nResume target '${input.requestedSessionId}' was not found.`,

@@ -89,9 +89,9 @@ it('blocks current deletion while permitting explicit rename and normal complete
   const setup = fixture(); await setup.picker.load();
   expect(await setup.picker.onDelete?.('current')).toContain('current session cannot be deleted');
   expect(setup.remove).not.toHaveBeenCalled();
-  await setup.picker.onRename?.('current', 'changed'); expect(setup.rename).toHaveBeenCalledWith('current', 'changed');
+  await setup.picker.onRename?.('current', 'changed'); expect(setup.rename).toHaveBeenCalledWith('current', 'changed', 'version');
   await setup.picker.apply(['other']); expect(setup.resume).toHaveBeenCalledWith('other');
-  await setup.picker.onDelete?.('other'); expect(setup.remove).toHaveBeenCalledWith('other');
+  await setup.picker.onDelete?.('other'); expect(setup.remove).toHaveBeenCalledWith('other', 'version');
   expect((await setup.picker.apply(['not-offered']))?.note).toContain('not offered');
   const overlay = new OverlayHost(() => {}); overlay.open(setup.picker); await new Promise(resolve => setTimeout(resolve, 0));
   overlay.handleKey(parseKeyEvent('\x04'), () => {}); overlay.handleKey(parseKeyEvent('\r'), () => {});

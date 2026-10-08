@@ -10,6 +10,7 @@ import type { QueryRuntimeStateSeed } from "../core/query/runtime/state.js";
 import { runResumeLikeShellAction } from "../core/shell/continueShellActionRuntime.js";
 import { toolPoolFor } from "../cli/runtime/tools.js";
 import { reportWriter } from '../cli/output/reports.js';
+import { runSessionManagement } from '../cli/runtime/management.js';
 import {
   isFenceLine,
   opensMultilineLiteralPrompt,
@@ -335,6 +336,11 @@ export async function runNonInteractivePrompt(options: {
         printMode: options.printMode,
         lifecycleNotices: options.lifecycleNotices,
       });
+      return;
+    }
+
+    if (resolved.slashResult.action === 'manage-session') {
+      await runSessionManagement(options, resolved.slashResult);
       return;
     }
 

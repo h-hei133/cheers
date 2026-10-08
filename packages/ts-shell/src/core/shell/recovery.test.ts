@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import type { AgentRunner } from "../../result/types.js";
 import { SessionManager } from "../../session/SessionManager.js";
 import { createQueryRuntimeStateFromSeed } from "../query/runtime/state.js";
-import { resolveSessionReference, resumeShellSession } from "./recovery.js";
+import { resumeShellSession } from "./recovery.js";
 import { createShellRuntimeContext, type ShellRuntimeContext } from "./runtimeContext.js";
 import { ShellSessionRuntime } from "./sessionRuntime.js";
 
@@ -87,6 +87,8 @@ describe("shell recovery helpers", () => {
       runtimeContext: createRuntimeContext(),
       renderer: { renderLine() {} } as never,
       sessionManager: {
+        listReentrySummaries: () => { throw new Error('Explicit references must not scan the full legacy session list.'); },
+        catalog: { resolve: async (reference: string) => ({ ok: true, sessionId: reference }) },
         sessionExists: () => true,
         tryResume: () => ({ ok: true, session: { id: "sess_resume", projectRoot: "D:/repo",
           status: "interrupted", turns: [], pendingPrompt: "discarded request" } }),
@@ -99,64 +101,29 @@ describe("shell recovery helpers", () => {
     expect(builtSeed).toBe(false);
   });
 
-  it("resolves session reference by unique id prefix", () => {
-    const resolved = resolveSessionReference({
-      reference: "sess_fix_auth",
-      preferredProjectRoot: "D:/repo",
+  it.each(['incomplete', 'changed'])('does not resume after %s reference resolution', async outcome => {
+    const runtimeContext = createRuntimeContext();
+    const current = runtimeContext.session;
+    const tryResume = vi.fn();
+    const lines: string[] = [];
+    const result = await resumeShellSession({
+      requestedSessionId: 'saved', runtimeContext,
+      renderer: { renderLine: (line: string) => lines.push(line) } as never,
       sessionManager: {
-        listReentrySummaries: () => [
-          {
-            id: "sess_fix_auth_123",
-            title: "Fix auth flow",
-            status: "interrupted",
-            projectRoot: "D:/repo",
-            createdAt: "2026-01-01T00:00:00.000Z",
-            updatedAt: "2026-01-01T01:00:00.000Z",
-            recoverable: true,
-          },
-        ],
-        sessionExists: () => false,
+        catalog: { resolve: async () => {
+          if (outcome === 'changed') {
+            runtimeContext.session = { ...current, id: 'replacement' };
+            return { ok: true, sessionId: 'saved' };
+          }
+          return { ok: false, reason: 'incomplete', candidates: [] };
+        } },
+        tryResume,
       } as never,
     });
-
-    expect(resolved).toEqual({
-      ok: true,
-      sessionId: "sess_fix_auth_123",
-    });
-  });
-
-  it("returns ambiguous when reference matches multiple sessions", () => {
-    const resolved = resolveSessionReference({
-      reference: "fix",
-      preferredProjectRoot: "D:/repo",
-      sessionManager: {
-        listReentrySummaries: () => [
-          {
-            id: "sess_a",
-            title: "Fix auth flow",
-            status: "interrupted",
-            projectRoot: "D:/repo",
-            createdAt: "2026-01-01T00:00:00.000Z",
-            updatedAt: "2026-01-01T01:00:00.000Z",
-            recoverable: true,
-          },
-          {
-            id: "sess_b",
-            title: "Fix lint warnings",
-            status: "interrupted",
-            projectRoot: "D:/repo",
-            createdAt: "2026-01-01T00:00:00.000Z",
-            updatedAt: "2026-01-01T01:00:00.000Z",
-            recoverable: true,
-          },
-        ],
-        sessionExists: () => false,
-      } as never,
-    });
-
-    expect(resolved.ok).toBe(false);
-    expect(resolved.reason).toBe("ambiguous");
-    expect(resolved.candidates?.length).toBe(2);
+    expect(result).toEqual({ resumed: false });
+    expect(tryResume).not.toHaveBeenCalled();
+    expect(runtimeContext.session.id).toBe(outcome === 'changed' ? 'replacement' : current.id);
+    expect(lines.join('\n')).toContain(outcome === 'changed' ? 'changed while resolving' : 'could not be fully checked');
   });
 
   it("returns resumed false when no recoverable session exists", async () => {
@@ -307,6 +274,7 @@ describe("shell recovery helpers", () => {
     const result = await resumeShellSession({
       requestedSessionId: "sess_missing",
       sessionManager: {
+        catalog: { resolve: async (reference: string) => ({ ok: true, sessionId: reference }) },
         sessionExists: () => true,
         tryResume: () => ({
           ok: false,
@@ -360,6 +328,10 @@ describe("shell recovery helpers", () => {
             resumeDetail: "ready",
           },
         ],
+        catalog: { resolve: async () => ({ ok: false, reason: 'ambiguous', candidates: [
+          { id: 'sess_fix_auth_1', title: 'Fix auth flow', status: 'interrupted' },
+          { id: 'sess_fix_lint_2', title: 'Fix lint warnings', status: 'interrupted' },
+        ] }) },
         sessionExists: () => false,
       } as never,
       runtimeContext: createRuntimeContext(),
@@ -408,6 +380,7 @@ describe("shell recovery helpers", () => {
     const result = await resumeShellSession({
       requestedSessionId: "sess_resume",
       sessionManager: {
+        catalog: { resolve: async (reference: string) => ({ ok: true, sessionId: reference }) },
         sessionExists: () => true,
         tryResume: () => ({
           ok: true,
@@ -944,6 +917,7 @@ describe("shell recovery helpers", () => {
     const result = await resumeShellSession({
       requestedSessionId: "sess_guarded",
       sessionManager: {
+        catalog: { resolve: async (reference: string) => ({ ok: true, sessionId: reference }) },
         sessionExists: () => true,
         tryResume: () => ({
           ok: true,

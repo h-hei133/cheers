@@ -3,14 +3,19 @@ import { sessionChoices, type SessionSelectionContext } from '../../navigation/s
 import type { SessionStoreLayout } from '../sessionFileLayout.js';
 import { discoverSessions } from './discovery.js';
 import { locateCatalogFiles, readCatalogFile } from './files.js';
-import { CATALOG_LIMITS, type SessionCatalogSnapshot, type SessionSummary } from './model.js';
+import { CATALOG_LIMITS, type SessionCatalogSnapshot, type SessionReferenceQuery, type SessionReferenceResolution, type SessionSummary } from './model.js';
 import { decodeSessionSummary } from './projection.js';
+import { resolveCatalogReference } from './reference.js';
 
 /** Bounded, process-local listing index; every use checks the actual core-file version. */
 export class SessionCatalog {
   private readonly cache = new Map<string, SessionSummary>();
 
   constructor(private readonly layout: SessionStoreLayout) {}
+
+  resolve(reference: string, options: SessionReferenceQuery = {}): Promise<SessionReferenceResolution> {
+    return resolveCatalogReference(this.layout, (id, signal, directory) => this.read(id, signal, directory), reference, options);
+  }
 
   async *list(context: SessionSelectionContext, signal?: AbortSignal, limit = 40,
     onSource?: (target: string) => void): AsyncGenerator<SessionCatalogSnapshot> {

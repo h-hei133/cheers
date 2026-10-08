@@ -42,6 +42,7 @@ import {
 import { describeCompaction, parseCompactCommand } from "./compact.js";
 import { defaultTheme } from "../../presentation/theme/theme.js";
 import { reportWriter } from '../output/reports.js';
+import type { ShellActionResult } from '../../core/commands/types.js';
 
 export interface InteractiveCommandRouterInput {
   readonly prompt: string;
@@ -74,6 +75,7 @@ export interface InteractiveCommandRouterInput {
 }
 
 export interface InteractiveCommandRouterResult {
+  readonly sessionManagement?: ShellActionResult;
   readonly turnNumber: number;
   readonly navigation?: SessionNavigationResult;
   readonly refreshPromptChrome?: boolean;
@@ -193,6 +195,10 @@ export async function routeInteractiveCommand(
 
   if (isShellAction(slashResult, "clear-session")) {
     return { turnNumber: nextTurnNumber, clearRequested: true };
+  }
+
+  if (isShellAction(slashResult, 'manage-session')) {
+    return { turnNumber: nextTurnNumber, sessionManagement: slashResult };
   }
 
   if (isShellAction(slashResult, "retry-turn")) {

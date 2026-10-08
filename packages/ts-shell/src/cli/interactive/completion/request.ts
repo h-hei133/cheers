@@ -1,4 +1,5 @@
 import { resumeSyntax, forkSyntax, treeSyntax, entriesSyntax, parseNavigationArgs } from "../../../core/commands/navigation/syntax.js";
+import { deleteSyntax } from '../../../core/commands/navigation/management.js';
 import { parseSyntax } from "../../../core/commands/syntax/parse.js";
 import { mcpSyntax } from "../../../core/commands/mcp/syntax.js";
 import { permissionsSyntax } from "../../../core/commands/permissions/syntax.js";
@@ -78,12 +79,12 @@ export function catalogSuggestions(request: NonNullable<ReturnType<typeof catalo
 }
 
 function navigationKind(name: string | undefined, preceding: readonly string[], current: string, following: readonly string[]): CatalogKind | undefined {
-  const syntax = name === "resume" ? resumeSyntax : name === "fork" ? forkSyntax : name === "tree" ? treeSyntax : name === "entries" ? entriesSyntax : undefined;
+  const syntax = name === "resume" ? resumeSyntax : name === "fork" ? forkSyntax : name === 'delete' ? deleteSyntax : name === "tree" ? treeSyntax : name === "entries" ? entriesSyntax : undefined;
   if (!syntax) return undefined;
   if (!preceding.length && syntax.actions.some(item => item.name && (item.name === current.toLowerCase() || item.aliases?.includes(current.toLowerCase())))) return undefined;
-  const parsed = firstParameter(input => name === "fork" ? parseSyntax(syntax, input) : parseNavigationArgs(syntax, input), preceding, following);
+  const parsed = firstParameter(input => name === "fork" || name === 'delete' ? parseSyntax(syntax, input) : parseNavigationArgs(syntax, input), preceding, following);
   if (!parsed) return undefined;
-  if (name === "resume" || name === "fork") return "session";
+  if (name === "resume" || name === "fork" || name === 'delete') return "session";
   if (name === "tree") return "tree";
   return parsed.action.name === "tree" ? "thread" : "entry";
 }

@@ -45,8 +45,8 @@ export interface PickerHost extends SettingsHost {
   readonly statusItems: readonly StatusItemId[];
   sessionContext(): SessionSelectionContext;
   resumeSession(sessionId: string): Promise<string | undefined>;
-  deleteSession(sessionId: string): Promise<string | undefined>;
-  renameSession(sessionId: string, title: string): Promise<string | undefined>;
+  deleteSession(sessionId: string, version?: string): Promise<string | undefined>;
+  renameSession(sessionId: string, title: string, version?: string): Promise<string | undefined>;
   refreshServer(serverName: string): Promise<string | undefined>;
   revokeGrant(key: string): Promise<string | undefined>;
   saveStatusItems(items: readonly StatusItemId[]): Promise<string | undefined>;

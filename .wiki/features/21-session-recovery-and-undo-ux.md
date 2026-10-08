@@ -280,3 +280,7 @@ regular 的终端既有 scrollback 不适合由应用可靠地选择性重写；
 ## 7. 本轮证据边界
 
 本次交付是文档复审：核对源码、研究结论和路径，撤回“归零是最终默认”“默认 regular”“现场根因已破解”“确认后恢复天然安全”等断言。没有运行 `/undo` 写入、文件大小动态探针、产品测试、build 或真实终端录屏。所有新增 API、operation receipts、异步统计和安全恢复要求均为 Phase 19 待实现项，不得据本文把现状描述成生产能力已完成。
+
+## 8. SES-04 会话管理实施补充（2026-10-08）
+
+`/rename`、`/delete` 和 `/session rename|delete` 与列表动作共用 [lifecycle owner](../../packages/ts-shell/src/session/lifecycle/management.ts)，完整目录解析不以最近页推定唯一结果。批准绑定首次提供的文件版本、项目和运行时身份，当前或忙碌会话删除受保护；删除默认取消，非交互只预览。`/new`、`/session new` 复用原新会话规则，有内容/报告的旧记录保留。标题编辑接续期间仍持有输入队列；异常保留未知结果。构建、定向测试、七组反转、两模式实际 CLI 与独立 APPROVED 的精确证据见 [决策 §8.107](phase-19-decisions.md#8107-ses-04会话直达管理与完整目录匹配)。此补充没有将文件 undo 或多根迁移列为完成。

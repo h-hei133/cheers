@@ -8,6 +8,9 @@ export async function runResumeCommand(args: string[], _context: CommandContext)
   if (!parsed.ok) return { kind: "local", output: `Invalid /resume arguments: ${parsed.reason}\n${syntaxHelp(resumeSyntax)}\n${syntaxHelp(forkSyntax)}` };
   const mode = parsed.action.name;
   const reference = parsed.args[0]?.trim();
+  if (mode === "new") return { kind: "shell-action", action: "clear-session" };
+  if (mode === "rename" || mode === "delete") return { kind: "shell-action", action: "manage-session", sessionOperation: mode,
+    sessionId: reference, ...(mode === "rename" && parsed.args.length > 1 ? { sessionTitle: parsed.args.slice(1).join(" ") } : {}) };
   if (mode === "fork" && reference && !validSessionReference(reference)) return { kind: "local", output: "Invalid session reference. No session action was started." };
   if (mode === "fork") return {
     kind: "shell-action", action: "fork-session",

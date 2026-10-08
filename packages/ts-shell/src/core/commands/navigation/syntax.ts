@@ -14,6 +14,9 @@ export const resumeSyntax: CommandSyntax = {
     ...["panel", "list", "current"].map(name => ({ name, aliases: name === "list" ? ["ls"] : name === "current" ? ["active"] : [], summary: `show ${name} sessions`, flags: [] })),
     { name: "switch", aliases: ["use"], summary: "switch to a session", parameters: [reference], flags: [] },
     { name: "fork", summary: "copy a session and continue the copy", parameters: [{ ...reference, name: "session-id|here", required: true }], flags: [] },
+    { name: "rename", summary: "edit a saved session title", parameters: [{ ...reference, required: true }, { name: "title", kind: "text", rest: true }], flags: [] },
+    { name: "delete", summary: "preview and confirm saved session deletion", parameters: [{ ...reference, required: true }], flags: [] },
+    { name: "new", summary: "start a new conversation", flags: [] },
     help,
   ],
 };

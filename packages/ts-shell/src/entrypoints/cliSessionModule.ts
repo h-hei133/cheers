@@ -235,20 +235,25 @@ export function hasBlockedRootBindingDiagnostic(
   return diagnostics.some((diagnostic) => diagnostic.severity === "blocked");
 }
 
-export function resolveSwitchSessionReference(input: {
+export async function resolveSwitchSessionReference(input: {
   renderer: StreamingRenderer;
   sessionManager: SessionManager;
   preferredProjectRoot: string;
   reference: string;
   printMode: boolean;
-}): string | null {
-  const resolved = resolveSessionReference({
+}): Promise<string | null> {
+  const resolved = await resolveSessionReference({
     reference: input.reference,
     sessionManager: input.sessionManager,
     preferredProjectRoot: input.preferredProjectRoot,
   });
   if (resolved.ok && resolved.sessionId) {
     return resolved.sessionId;
+  }
+
+  if (resolved.reason === 'incomplete') {
+    input.renderer.renderLine('Saved sessions could not be fully checked. Use an exact session ID or retry after the unavailable records are repaired. No session was switched.');
+    return null;
   }
 
   if (resolved.reason === "ambiguous") {
@@ -271,27 +276,33 @@ export function resolveSwitchSessionReference(input: {
   return null;
 }
 
-function runCliSessionSwitch(input: {
+async function runCliSessionSwitch(input: {
   readonly renderer: StreamingRenderer;
   readonly sessionManager: SessionManager;
   readonly runtimeContext: ShellRuntimeContext;
   readonly sessionId?: string;
   readonly printMode: boolean;
   readonly onSessionSwitched?: () => void;
-}): void {
+}): Promise<void> {
   const targetSessionReference = input.sessionId?.trim();
   if (!targetSessionReference) {
     input.renderer.renderLine(formatSessionSwitchUsage({ printMode: input.printMode }));
     return;
   }
 
-  const resolvedSessionId = resolveSwitchSessionReference({
+  const expectedSessionId = input.runtimeContext.session.id;
+  const expectedProjectRoot = input.runtimeContext.projectRoot;
+  const resolvedSessionId = await resolveSwitchSessionReference({
     renderer: input.renderer,
     sessionManager: input.sessionManager,
     preferredProjectRoot: input.runtimeContext.projectRoot,
     reference: targetSessionReference,
     printMode: input.printMode,
   });
+  if (input.runtimeContext.session.id !== expectedSessionId || input.runtimeContext.projectRoot !== expectedProjectRoot) {
+    input.renderer.renderLine('The active session or project changed while resolving the reference. No session was switched.');
+    return;
+  }
   if (!resolvedSessionId) {
     return;
   }

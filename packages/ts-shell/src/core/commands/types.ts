@@ -155,8 +155,11 @@ export interface ShellActionResult {
     | 'clear-session'
     | 'fork-session'
     | 'navigate-session'
+    | 'manage-session'
   readonly entryId?: string
   readonly sessionId?: string
+  readonly sessionOperation?: 'rename' | 'delete'
+  readonly sessionTitle?: string
   readonly viewMode?: 'compact' | 'verbose'
   readonly sessionAction?: 'panel' | 'list' | 'switch' | 'current' | 'help'
   readonly permissionAction?: 'list' | 'explain' | 'revoke' | 'reset'

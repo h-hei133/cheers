@@ -5,6 +5,8 @@ export interface SessionSummary {
   readonly id: string;
   readonly projectRoot: string;
   readonly title?: string;
+  /** Title matching must not use an inferred title from omitted conversation data. */
+  readonly titleComplete: boolean;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly status?: Session['status'];
@@ -21,6 +23,19 @@ export interface SessionCatalogSnapshot {
   readonly unreadable: number;
   readonly limited: number;
   readonly status: 'scanning' | 'complete' | 'partial';
+}
+
+export interface SessionReferenceQuery {
+  readonly projectRoot?: string;
+  readonly strictProject?: boolean;
+  readonly signal?: AbortSignal;
+}
+
+export interface SessionReferenceResolution {
+  readonly ok: boolean;
+  readonly sessionId?: string;
+  readonly reason?: 'not-found' | 'ambiguous' | 'incomplete' | 'outside-project';
+  readonly candidates?: readonly SessionSummary[];
 }
 
 export const CATALOG_LIMITS = Object.freeze({
