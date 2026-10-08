@@ -6371,4 +6371,9 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 
 ## [2026-10-09] feat | Phase 19 AUTO-03 持久续轮与有界停止
 
-显式 set/resume 复用普通 session runtime 的 TUI/line/print 续轮，单 owner/round 在 state lock 内持久化，实际提交再查待输入，结算核验持久 prompt/terminal。pause 先阻止新派发并有界 drain，崩溃重启保留 unknown 且不重放；实际 hung 子进程退出修复通过。最终 Node 20.3 构建/450 项、结果契约 149 项、五组有效反转/恢复后 20 项、独立最终 APPROVED/15 项、两入口两模式共 64 次合成 HTTP 与五项静态 gates/43 scripts/NormProof 0 blocking 通过，见 features/phase-19-decisions.md §8.119。自动完成证据及 AUTO-04/05、完整 Phase 19 继续；本批 commit/push 与远端证据另行核对。
+显式 set/resume 复用普通 session runtime 的 TUI/line/print 续轮，单 owner/round 在 state lock 内持久化，实际提交再查待输入，结算核验持久 prompt/terminal。pause 先阻止新派发并有界 drain，崩溃重启保留 unknown 且不重放；实际 hung 子进程退出修复通过。最终 Node 20.3 构建/450 项、结果契约 149 项、五组有效反转/恢复后 20 项、独立最终 APPROVED/15 项、两入口两模式共 64 次合成 HTTP 与五项静态 gates/43 scripts/NormProof 0 blocking 通过，见 features/phase-19-decisions.md §8.119。4c1eacef 已推送，精确 SHA 的 CI/Watch 因付款/额度限制零步骤失败；自动完成证据及 AUTO-04/05、完整 Phase 19 继续。
+
+
+## [2026-10-09] feat | Phase 19 AUTO-04 精确计划、真实队列与原生验收
+
+guided 明确答案/可选预算精确批准为 paused goal；计划沿用只读 mode，预览/批准/执行分开且不授工具权限。TUI/line/actual pipe 编辑、移位、取消真实 pending queue，修复 EOF/goal 自等待与 stale session provenance。Node 20.3 构建/461 项组合及最终 32 项、结果契约 149 项、六组有效反转/恢复后 14 项、Node/executable 两模式共 72 次合成 HTTP、独立最终 APPROVED/20 项、静态 gates/43 scripts/NormProof 0 blocking 通过，见 features/phase-19-decisions.md §8.120。自动完成依据精确条件、原生 UUID、当前 target、committed edit receipt 与已对账 ledger；不支持目标保持 unverified，AUTO-05/完整 Phase 19 继续。提交/推送与远端事实单独补记。

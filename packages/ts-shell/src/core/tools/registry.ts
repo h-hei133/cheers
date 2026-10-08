@@ -45,6 +45,7 @@ import { networkNotice, planSandboxedCommand, readSandboxRules } from '../../san
 import { resolveCommandTimeout, DEFAULT_COMMAND_TIMEOUT_MS, MAX_COMMAND_TIMEOUT_MS } from '../../runtime/execution/commandTimeout.js'
 import { workspaceSandboxPolicy } from '../../sandbox/workspace.js'
 import { createPatchToolDefinition } from '../../edit/patch/tool.js'
+import { startCommandProof } from '../../runtime/execution/proof.js'
 
 type ExecutionFailureKind = 'sandbox_preflight' | 'execution_failure' | 'timeout' | 'cancelled'
 const TOOL_APPROVED_READ_AUTHORITY: ExecutionAuthority = {
@@ -150,6 +151,8 @@ async function runCommandTool(
       exitCode: 1,
     })
   }
+  const proof = startCommandProof(command, context)
+  context.commandProof?.started(proof, context.assertSourceAccess)
   const result = await executionService.runCommand({
     operationKind: 'command.run',
     command: sandbox.command ?? shellBin,
@@ -165,6 +168,7 @@ async function runCommandTool(
     ...(context.commandEnv ? { env: context.commandEnv } : {}),
     ...(context.onOutput ? { onOutput: context.onOutput } : {}),
   })
+  context.commandProof?.settled({ ...proof, settledAt: new Date().toISOString(), status: result.status, exitCode: result.exitCode }, context.assertSourceAccess)
   const artifactManager = ArtifactManager.getShared(context.workspaceRoot, context.sessionId)
   const isOk = result.status === 'completed' && result.exitCode === 0
   const rawOutput = isOk

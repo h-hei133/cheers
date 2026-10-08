@@ -2,23 +2,20 @@ import { configurationAdmission } from "../core/shell/configuration.js";
 import { refreshShellRuntimeConfig } from "../core/shell/runtimeContext.js";
 import type { CoreMcpGateway } from "../core/mcp/gateway.js";
 import type { PromptAttachments } from "../core/shell/sessionRuntime.js";
+import { parseTransportPrompts } from '../core/shell/printPromptInput.js';
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import * as readline from "node:readline";
 import type { QueryRuntimeStateSeed } from "../core/query/runtime/state.js";
 import { runResumeLikeShellAction } from "../core/shell/continueShellActionRuntime.js";
 import { toolPoolFor } from "../cli/runtime/tools.js";
 import { goalCommandFor, goalPolicyFor } from '../cli/runtime/goal.js';
+import { queueCommandFor } from '../cli/runtime/inputQueue.js';
+import { runPromptInputStream } from '../cli/runtime/inputStream.js';
+import { planningCommandFor } from '../cli/runtime/planning.js';
 import { schedulerForRuntime } from '../cli/runtime/goalScheduling.js';
 import { reportWriter } from '../cli/output/reports.js';
 import { runSessionManagement } from '../cli/runtime/management.js';
-import {
-  isFenceLine,
-  opensMultilineLiteralPrompt,
-  parseTransportPrompts,
-  updateFenceState,
-} from "../core/shell/printPromptInput.js";
 import type { ShellRuntimeContext } from "../core/shell/runtimeContext.js";
 import { ShellSessionRuntime } from "../core/shell/sessionRuntime.js";
 import {
@@ -46,7 +43,6 @@ import {
 import {
   buildCliCommandExecution as resolveTurnInputForExecution,
 } from "./cliCommandExecutionBridge.js";
-import { formatCliContextTag } from "./cliInteractiveLoopState.js";
 import { createCliMcpGateway, runCliMcpCommand } from "./cliMcpModule.js";
 import { runCliPermissionCommand } from "./cliPermissionModule.js";
 import type { ApprovalTrustPolicy } from "../core/shell/approvalTrustPolicy.js";
@@ -74,144 +70,15 @@ export async function runNonTtyPromptStream(options: {
   ) => void;
   nonInteractiveCliApprovalMode?: "deny" | "allow-once" | "allow-always";
 }): Promise<void> {
-  const contextTag = (): string =>
-    formatCliContextTag({
-      projectRoot: options.runtimeContext.projectRoot,
-      sessionId: options.runtimeContext.session.id,
-    });
-  options.renderer.renderLine(
-    `Non-TTY stdin mode ${contextTag()}: waiting for newline-delimited prompts.`,
-  );
-  options.renderer.renderLine(
-    "Send one prompt per line, or paste fenced/multiline content. Close stdin to finish.\n",
-  );
-  options.logger.info("CLI non-TTY stdin stream mode started", {
-    sessionId: options.runtimeContext.session.id,
-  });
-
-  const stdinReader = readline.createInterface({
-    input: process.stdin,
-    crlfDelay: Infinity,
-    terminal: false,
-  });
-
-  let processedCount = 0;
-  let exitRequested = false;
-  let turnChain = Promise.resolve();
-  let pendingPrompt: {
-    lines: string[];
-    inFence: boolean;
-    multilineLiteral: boolean;
-  } | null = null;
-
-  const enqueuePrompt = (prompt: string) => {
-    turnChain = turnChain
-      .then(async () => {
-        if (exitRequested) return;
-        processedCount += 1;
-        options.renderer.renderLine(`${contextTag()} > ${prompt}`);
-        const outcome = await runNonInteractivePrompt({
-          prompt,
-          sessionManager: options.sessionManager,
-          mcpGateway: options.mcpGateway,
-          runtimeContext: options.runtimeContext,
-          renderer: options.renderer,
-          sessionRuntime: options.sessionRuntime,
-          logger: options.logger,
-          printMode: false,
-          approvalTrustPolicy: options.approvalTrustPolicy,
-          fallbackSessionId: options.fallbackSessionId,
-          lifecycleNotices: options.lifecycleNotices,
-          setActiveNonInteractiveApprovalMode:
-            options.setActiveNonInteractiveApprovalMode,
-          nonInteractiveCliApprovalMode: options.nonInteractiveCliApprovalMode,
-        });
-        if (outcome === "exit") {
-          exitRequested = true;
-          pendingPrompt = null;
-          stdinReader.close();
-        }
-      })
-      .catch((error) => {
-        options.renderer.renderLine(
-          `Run failed: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      });
-  };
-
-  const flushPendingPrompt = () => {
-    if (!pendingPrompt) {
-      return;
-    }
-    const prompt = pendingPrompt.lines.join("\n").trim();
-    pendingPrompt = null;
-    if (prompt.length > 0) {
-      enqueuePrompt(prompt);
-    }
-  };
-
-  stdinReader.on("line", (line) => {
-    if (exitRequested) return;
-    const normalizedLine = line.replace(/^\uFEFF/, "");
-    if (pendingPrompt) {
-      if (
-        pendingPrompt.multilineLiteral &&
-        !pendingPrompt.inFence &&
-        normalizedLine.trim().length === 0
-      ) {
-        flushPendingPrompt();
-        return;
-      }
-      pendingPrompt.lines.push(normalizedLine);
-      pendingPrompt.inFence = updateFenceState(
-        pendingPrompt.inFence,
-        normalizedLine,
-      );
-      if (!pendingPrompt.inFence && pendingPrompt.lines.some(isFenceLine)) {
-        flushPendingPrompt();
-      }
-      return;
-    }
-
-    if (normalizedLine.trim().length === 0) {
-      return;
-    }
-
-    const startsFence = isFenceLine(normalizedLine);
-    if (startsFence || opensMultilineLiteralPrompt(normalizedLine)) {
-      pendingPrompt = {
-        lines: [normalizedLine],
-        inFence: updateFenceState(false, normalizedLine),
-        multilineLiteral: opensMultilineLiteralPrompt(normalizedLine),
-      };
-      if (!pendingPrompt.inFence && startsFence) {
-        flushPendingPrompt();
-      }
-      return;
-    }
-
-    for (const prompt of parseTransportPrompts(normalizedLine, {
-      allowComments: false,
-    })) {
-      enqueuePrompt(prompt);
-    }
-  });
-
-  await new Promise<void>((resolve) => {
-    stdinReader.once("close", () => resolve());
-  });
-  flushPendingPrompt();
-  await turnChain;
-  options.renderer.renderLine(
-    `\nStdin stream closed. Processed ${processedCount} prompt(s).\n`,
-  );
-  options.logger.info("CLI non-TTY stdin stream mode closed", {
-    sessionId: options.runtimeContext.session.id,
-    processedCount,
+  await runPromptInputStream({ runtimeContext: options.runtimeContext, sessionRuntime: options.sessionRuntime,
+    renderer: options.renderer, logger: options.logger,
+    runPrompt: prompt => runNonInteractivePrompt({ ...options, prompt, printMode: false, awaitGoalScheduling: false }),
   });
 }
 
 export async function runNonInteractivePrompt(options: {
+  /** A live stdin host owns scheduler drainage while continuing to accept controls. */
+  awaitGoalScheduling?: boolean;
   prompt: string;
   sessionManager: SessionManager;
   mcpGateway?: CoreMcpGateway;
@@ -261,6 +128,8 @@ export async function runNonInteractivePrompt(options: {
   replayTodosFromMessages(options.runtimeContext.session.id, options.sessionManager.getSession(options.runtimeContext.session.id)?.turns ?? []);
   const resolved = await resolveTurnInputForExecution({
     goalCommand: goalCommandFor(options.runtimeContext, options.sessionManager),
+    queueCommand: queueCommandFor(options.runtimeContext, options.sessionRuntime),
+    planningCommand: planningCommandFor(options.runtimeContext, options.sessionManager, options.sessionRuntime),
     requestPolicy: goalPolicyFor(options.runtimeContext, options.sessionManager),
     prompt: trimmedPrompt,
     cwd: options.runtimeContext.cwd,
@@ -291,7 +160,7 @@ export async function runNonInteractivePrompt(options: {
     },
   });
   if (resolved.kind === "handled") {
-    await schedulerForRuntime(options.sessionRuntime)?.wait();
+    if (options.awaitGoalScheduling !== false) await schedulerForRuntime(options.sessionRuntime)?.wait();
     return;
   }
   if (resolved.kind === "shell-action") {
@@ -435,6 +304,7 @@ export async function runNonInteractivePrompt(options: {
   await executeResolvedPromptTurn({
     source: "non-interactive",
     effectivePrompt: resolved.effectivePrompt,
+    ...(resolved.promptMetadata ? { promptMetadata: resolved.promptMetadata } : {}),
     sessionManager: options.sessionManager,
     setActiveNonInteractiveApprovalMode:
       options.setActiveNonInteractiveApprovalMode,

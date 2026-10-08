@@ -2,6 +2,7 @@ import { isRecord } from '../../core/values/record.js';
 import { freezeDeep } from '../../core/values/freeze.js';
 import type { GoalScope, SessionGoal } from './model.js';
 import { decodeRunOwner, decodeScheduling } from './run/codec.js';
+import { decodeVerifiedCompletion } from './acceptance/codec.js';
 
 const PHASES = new Set(['active', 'paused', 'complete', 'dropped']);
 const PAUSE_REASONS = new Set(['user', 'session-reentry', 'legacy-import']);
@@ -20,8 +21,8 @@ export function decodeGoal(value: unknown): SessionGoal | undefined {
     || (value.tokenBudget !== undefined && (typeof value.tokenBudget !== 'number' || !Number.isSafeInteger(value.tokenBudget) || value.tokenBudget < 0))) return undefined;
   const completion = value.completion;
   if (value.phase === 'complete') {
-    if (!isRecord(completion) || completion.source !== 'user-declared' || !timestamp(completion.timestamp)
-      || completion.declaration !== '/goal complete') return undefined;
+    if (!decodeVerifiedCompletion(completion) && (!isRecord(completion) || completion.source !== 'user-declared' || !timestamp(completion.timestamp)
+      || completion.declaration !== '/goal complete')) return undefined;
   } else if (completion !== undefined) return undefined;
   return freezeDeep({
     schemaVersion: 1, id: value.id as string, revision: value.revision, objective: value.objective as string,
@@ -32,7 +33,7 @@ export function decodeGoal(value: unknown): SessionGoal | undefined {
     ...(value.scheduling !== undefined ? { scheduling: decodeScheduling(value.scheduling)! } : {}),
     ...(value.tokenBudget !== undefined ? { tokenBudget: value.tokenBudget as number } : {}),
     ...(value.pauseReason !== undefined ? { pauseReason: value.pauseReason as SessionGoal['pauseReason'] } : {}),
-    ...(completion !== undefined ? { completion: { source: 'user-declared' as const,
+    ...(completion !== undefined ? { completion: decodeVerifiedCompletion(completion) ?? { source: 'user-declared' as const,
       timestamp: (completion as Record<string, unknown>).timestamp as string, declaration: '/goal complete' as const } } : {}),
   });
 }

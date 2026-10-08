@@ -41,6 +41,7 @@ export type CliCommandExecution =
   | {
       readonly kind: "execute";
       readonly effectivePrompt: string;
+      readonly promptMetadata?: Record<string, unknown>;
       /** Images that travelled with the draft; see `PromptAttachments`. */
       readonly attachments?: PromptAttachments;
     };
@@ -48,6 +49,8 @@ export type CliCommandExecution =
 export interface BuildCliCommandExecutionInput {
   readonly requestPolicy?: CommandContext['requestPolicy'];
   readonly goalCommand?: CommandContext['goalCommand'];
+  readonly planningCommand?: CommandContext['planningCommand'];
+  readonly queueCommand?: CommandContext['queueCommand'];
   readonly prompt: string;
   /** Images the draft referred to, carried beside the text rather than in it. */
   readonly attachments?: PromptAttachments;
@@ -141,6 +144,8 @@ export async function buildCliCommandExecution(
     });
   const slashResult = await bridge.routeSlashCommand(input.prompt, {
     goalCommand: input.goalCommand,
+    planningCommand: input.planningCommand,
+    queueCommand: input.queueCommand,
     requestPolicy: input.requestPolicy,
     cwd: input.cwd,
     interactive: input.interactive,
@@ -197,6 +202,7 @@ export async function buildCliCommandExecution(
   return {
     kind: "execute",
     effectivePrompt: slashResult?.kind === "prompt" ? slashResult.prompt : input.prompt,
+    ...(slashResult?.kind === 'prompt' && slashResult.promptMetadata ? { promptMetadata: slashResult.promptMetadata } : {}),
     // A slash command resolves to a prompt template, and a template has no way to
     // refer to an attachment; the images the draft held still belong to the turn,
     // so they travel with whichever text is finally sent.

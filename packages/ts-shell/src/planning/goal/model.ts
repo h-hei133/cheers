@@ -14,11 +14,12 @@ export interface GoalScope {
 }
 
 /** A declaration records the user's decision; it is not verified acceptance. */
-export interface GoalCompletion {
+export interface UserGoalCompletion {
   readonly source: 'user-declared';
   readonly timestamp: string;
   readonly declaration: '/goal complete';
 }
+export type GoalCompletion = UserGoalCompletion | import('./acceptance/model.js').VerifiedCompletion;
 
 export interface SessionGoal extends GoalScope {
   readonly schemaVersion: 1;
@@ -40,6 +41,7 @@ export interface SessionGoal extends GoalScope {
 export type GoalAction =
   | { readonly type: 'set'; readonly objective: string }
   | { readonly type: 'import'; readonly objective: string }
+  | { readonly type: 'prepare'; readonly objective: string }
   | { readonly type: 'pause' | 'resume' | 'drop' | 'reentry' }
   | { readonly type: 'complete'; readonly source: 'user-declared' }
   | { readonly type: 'budget'; readonly cap?: number };

@@ -4,6 +4,7 @@ import { connectSyntax, connectCompletions } from "./connect/syntax.js";
 import { loopSyntax, loopArgumentCompletions } from "./loop/syntax.js";
 import { brainstormSyntax } from "./brainstorm/syntax.js";
 import { goalCommandAliases, goalSyntax } from "./goal/syntax.js";
+import { guidedGoalSyntax, planReviewSyntax, planSyntax, queueSyntax } from './planning/syntax.js';
 import { marketplaceSyntax } from "./marketplace/syntax.js";
 import { pluginSyntax } from "./plugin/syntax.js";
 import { workflowSyntax } from "../workflow/syntax.js";
@@ -98,7 +99,7 @@ import {
   runViewShellAction,
   runWorkspaceShellAction,
 } from "./shellActionRuntime.js";
-import type { CommandDefinition } from "./types.js";
+import type { CommandContext, CommandDefinition } from "./types.js";
 
 export function createCommandRegistry(
   cwd: string = process.cwd(),
@@ -573,6 +574,21 @@ export function createCommandRegistry(
       argumentHint: syntaxHint(goalSyntax),
       getArgumentCompletions: (prefix) => syntaxCompletions(goalSyntax, prefix),
       execute: (args, context) => runGoalCommand(args, context),
+    },
+    ...([planSyntax, planReviewSyntax, guidedGoalSyntax] as const).map(syntax => ({
+      name: syntax.name, kind: 'prompt' as const, supportsNonInteractive: true, availability: 'available' as const,
+      enabled: true, summary: syntax.actions[0]!.summary, group: 'workflow' as const,
+      argumentHint: syntaxHint(syntax), getArgumentCompletions: (prefix: string) => syntaxCompletions(syntax, prefix),
+      execute: (args: string[], context: CommandContext) => context.planningCommand
+        ? context.planningCommand(syntax.name as 'plan' | 'plan-review' | 'guided-goal', args, context)
+        : Promise.resolve({ kind: 'local' as const, output: 'Planning requires a bound session runtime.' }),
+    })),
+    {
+      name: 'queue', kind: 'prompt', supportsNonInteractive: true, availability: 'available', enabled: true, group: 'workflow',
+      summary: 'inspect and manage actual undelivered input', argumentHint: syntaxHint(queueSyntax),
+      getArgumentCompletions: prefix => syntaxCompletions(queueSyntax, prefix),
+      execute: (args, context) => context.queueCommand ? context.queueCommand(args, context)
+        : Promise.resolve({ kind: 'local', output: 'Pending input is unavailable in this host.' }),
     },
     {
       name: "loop",

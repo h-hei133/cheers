@@ -29,6 +29,7 @@ import * as management from '../../session/lifecycle/management.js';
 import * as undoService from '../../edit/recovery/undo/service.js';
 import type { UndoPreview } from '../../edit/recovery/operation/preview.js';
 import * as goalScheduling from '../runtime/goalScheduling.js';
+import type { SubmissionQueue } from './inputQueue.js';
 
 function build(overrides: { observeEvents?: () => () => void; exit?: (code?: number) => void } = {}): {
   mode: InteractiveMode;
@@ -137,7 +138,7 @@ describe("session wiring", () => {
 
   it('keeps queued input behind the session title editor until it is dismissed', async () => {
     const { mode, terminal } = build();
-    const host = mode as unknown as { busy: boolean; pickerPending: boolean; queue: string[]; overlay: OverlayHost;
+    const host = mode as unknown as { busy: boolean; pickerPending: boolean; queue: SubmissionQueue; overlay: OverlayHost;
       pickerHost(): PickerHost; run(text: string): Promise<void> };
     const prepare = vi.spyOn(management, 'prepareSessionManagement').mockResolvedValue({ preview: {
       action: 'rename', session: { id: 'sess_1', projectRoot: '/workspace', title: 'Current title', turns: [],
@@ -156,10 +157,10 @@ describe("session wiring", () => {
       await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 30).join('\n'))).toContain('Edit session title'));
       host.queue.push('/help'); terminal.input('\x1b[B'); terminal.input('\r');
       await vi.waitFor(() => expect(stripAnsi(host.overlay.render(100, 30).join('\n'))).toContain('Session title'));
-      expect(dispatch).not.toHaveBeenCalledWith('/help'); expect(host.queue).toEqual(['/help']);
+      expect(dispatch).not.toHaveBeenCalledWith('/help'); expect(host.queue.control.entries().map(entry => entry.text)).toEqual(['/help']);
       terminal.input('\x1b');
       await vi.waitFor(() => expect(dispatch).toHaveBeenCalledWith('/help'));
-      expect(host.queue).toEqual([]);
+      expect(host.queue.control.entries()).toEqual([]);
     } finally { mode.stop(); vi.restoreAllMocks(); }
   });
   it.each([false, true])('restores saved reports in the first frame with message history=%s', withMessages => {
@@ -422,7 +423,7 @@ describe("session wiring", () => {
     const { mode, terminal } = build();
     const host = mode as unknown as {
       busy: boolean;
-      queue: string[];
+      queue: SubmissionQueue;
       overlay: OverlayHost;
       pickerHost(): PickerHost;
       applyPicker(picker: Picker, ids: readonly string[]): void;
@@ -450,7 +451,7 @@ describe("session wiring", () => {
           return undefined;
         },
       }, ["first"]);
-      host.queue.push("/back 2", "/help");
+      host.queue.push("/back 2"); host.queue.push("/help");
       expect(host.busy).toBe(true);
       expect(dispatched).not.toHaveBeenCalled();
       finish();
@@ -467,7 +468,7 @@ describe("session wiring", () => {
         expect(rewind).not.toHaveBeenCalled();
       }
       await vi.waitFor(() => expect(dispatched).toHaveBeenCalledWith("/help"));
-      expect(host.queue).toEqual([]);
+      expect(host.queue.control.entries()).toEqual([]);
     } finally { mode.stop(); }
   });
 

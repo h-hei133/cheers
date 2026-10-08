@@ -14,6 +14,9 @@ import { installInteractiveSignalHandlers } from "./interactiveSignals.js";
 import { attachGoalSubmission } from '../runtime/goalScheduling.js';
 import { isGoalControl } from '../runtime/goal.js';
 import { QuestionBridge } from './questionBridge.js';
+import { attachInputQueue, isQueueControl } from '../runtime/inputQueue.js';
+import { SubmissionQueue } from './inputQueue.js';
+import { isPlanningControl } from '../runtime/planning.js';
 
 /**
  * Line-oriented interactive loop for a session without a real terminal.
@@ -74,7 +77,10 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
   let turnNumber = 0;
   const mcpGateway = options.initialMcpGateway;
   let chain = Promise.resolve();
-  let queued = 0; let busy = false; let closed = false;
+  let busy = false; let closed = false;
+  const queue = new SubmissionQueue(() => options.runtimeContext.session, () => {
+    options.renderer.renderLine('Queued input was not executed because the session changed. Queue it again explicitly.');
+  });
   let releaseRound: (() => void) | undefined; let roundBarrier = Promise.resolve();
   const dispatch = async (text: string, promptMetadata?: Record<string, unknown>): Promise<void> => {
     busy = true;
@@ -91,8 +97,18 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
         sessionId: options.runtimeContext.session.id, agentMode: options.sessionRuntime.getAgentMode() });
     } finally { if (!promptMetadata) busy = false; input.prompt(); }
   };
+  const scheduleDrain = (): void => {
+    chain = chain.then(async () => {
+      await roundBarrier;
+      await options.sessionRuntime.waitForIdle().catch(() => undefined);
+      const text = queue.shift(); if (text !== undefined) await dispatch(text);
+    }).catch(error => { options.renderer.renderLine(`Queued turn failed: ${error instanceof Error ? error.message : 'runtime failure'}`); });
+  };
+  const releaseInputQueue = attachInputQueue(options.sessionRuntime, {
+    control: queue.control, enqueue: text => queue.push(text), drain: scheduleDrain,
+  });
   const releaseGoalSubmission = attachGoalSubmission(options.sessionRuntime, {
-    ready: () => !closed && !busy && queued === 0 && !input.line.trim() && !questions.question(),
+    ready: () => !closed && !busy && queue.length === 0 && !input.line.trim() && !questions.question(),
     submit: (prompt, metadata) => {
       roundBarrier = new Promise<void>(resolve => { releaseRound = resolve; });
       return dispatch(prompt, metadata);
@@ -106,7 +122,7 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
     // Serialise turns: readline delivers the next line as soon as it arrives,
     // and two concurrent turns would interleave their output and their session
     // writes.
-    if ((busy || questions.question()) && isGoalControl(text)) {
+    if (isQueueControl(text) || (busy || questions.question()) && (isGoalControl(text) || isPlanningControl(text))) {
       void routeInteractiveCommand({ prompt: text, readline: questionInput, mcpGateway, sessionManager: options.sessionManager,
         runtimeContext: options.runtimeContext, renderer: options.renderer, sessionRuntime: options.sessionRuntime,
         logger: options.logger, approvalTrustPolicy: options.approvalTrustPolicy, turnNumber,
@@ -115,16 +131,11 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
     }
     if (questions.answer(line)) return;
     if (!text) { input.prompt(); return; }
-    queued += 1;
-    chain = chain.then(async () => {
-      queued -= 1;
-      await roundBarrier;
-      await options.sessionRuntime.waitForIdle().catch(() => undefined);
-      await dispatch(text);
-    });
+    queue.push(text); scheduleDrain();
   });
 
   await new Promise<void>((resolve) => {
-    input.on("close", () => { closed = true; questionInput.close(); releaseGoalSubmission?.(); resolve(); });
+    input.on("close", () => { closed = true; questionInput.close(); releaseGoalSubmission?.(); releaseInputQueue(); resolve(); });
   });
+  await chain;
 }

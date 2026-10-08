@@ -32,7 +32,7 @@ import { neutraliseForDisplay } from "../core/text/safety.js";
 import { projectTrust } from "../core/security/projectTrust.js";
 import { pendingTurnInput } from "../turn/pendingInput.js";
 import { CoreMcpGateway } from "../core/mcp/gateway.js";
-import { runTurn, type CompactionSetup, type TurnRun } from "../turn/session.js";
+import { runTurn, type CompactionSetup, type TurnRun, type TurnOptions } from "../turn/session.js";
 import { createStepFunction, type StepFunction } from "../turn/step.js";
 import {
   providerFetchForEndpoint,
@@ -74,6 +74,8 @@ export interface CliRuntimeInvocationInput {
     readonly cacheWarming?: CacheWarmingRunner;
   };
   readonly sessionId: string;
+  readonly commandProof?: TurnOptions['commandProof'];
+  readonly correlationId?: string;
   readonly prompt: string;
   /** Selected historical facts for this continuation, separate from user intent. */
   readonly continuityContext?: string;
@@ -434,6 +436,8 @@ async function startTurn(
     : (dependencies.createStep ?? createProviderStep)(request, tools, promptContext);
 
   const run = runTurn({
+    commandProof: request.commandProof,
+    correlationId: request.correlationId,
     goalObjective: request.goalObjective,
     admission: request.admission,
     commandEnv: commandEnvironmentFor(request),

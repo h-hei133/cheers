@@ -35,6 +35,10 @@ import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import { replaceLiteral } from "../../presentation/tui/pastes.js";
 import { goalCommandFor, isGoalControl } from '../runtime/goal.js';
 import { attachGoalSubmission, schedulerForRuntime } from '../runtime/goalScheduling.js';
+import { attachSubmissionQueue, isQueueControl, queueCommandFor } from '../runtime/inputQueue.js';
+import { tokenizeCommandArgs } from '../../core/commands/arguments.js';
+import { isPlanningControl, planningCommandFor } from '../runtime/planning.js';
+import { SubmissionQueue } from './inputQueue.js';
 import { openSettings } from "./settings.js";
 import { InteractiveSurface } from "../../presentation/tui/surface/view.js";
 import { createViewState, type ViewState } from "../../presentation/tui/surface/contract.js";
@@ -187,11 +191,15 @@ export class InteractiveMode {
    * model turn takes input directly: steering reaches it before its next step
    * and follow-ups run after it, both through the runtime's input handle.
    */
-  private readonly queue: string[] = [];
+  private readonly queue = new SubmissionQueue(() => this.options.runtimeContext.session, text => {
+    this.state.editor.setText([text, this.state.editor.getText()].filter(Boolean).join('\n\n'));
+    this.state.transcript.append(textBlock('error', 'Queued input was not executed because the session changed; it was returned to the draft.'));
+  });
   /** Stops the background-completion notice from reaching a disposed session. */
   private readonly stopWatchingBackground: () => void;
   private releaseEvents: (() => void) | undefined;
   private releaseGoalSubmission?: () => void;
+  private releaseInputQueue?: () => void;
   /**
    * The theme file being followed, when the theme in use came from one.
    *
@@ -404,6 +412,8 @@ export class InteractiveMode {
     });
     this.tui.onInput((data) => this.stdin.feed(data));
     this.releaseEvents = this.options.sessionRuntime.observeEvents((event) => this.sink.handleEvent(event));
+    this.releaseInputQueue = attachSubmissionQueue(this.options.sessionRuntime, this.queue, this.run.bind(this),
+      () => !(this.busy || this.pickerPending || this.overlay.active || this.stopped || this.questions.question()));
     this.releaseGoalSubmission = attachGoalSubmission(this.options.sessionRuntime, {
       ready: () => !this.stopped && !this.closing && !this.busy && !this.pickerPending && !this.overlay.active
         && !this.questions.question() && this.queue.length === 0 && !this.state.editor.getText().trim()
@@ -444,6 +454,7 @@ export class InteractiveMode {
     this.releaseEvents = undefined;
     this.releaseGoalSubmission?.();
     this.releaseGoalSubmission = undefined;
+    this.releaseInputQueue?.(); this.releaseInputQueue = undefined;
     // The registry outlives this surface, so the subscription has to be given
     // back or a later command would be announced to a session already gone.
     this.stopWatchingBackground();
@@ -620,6 +631,18 @@ export class InteractiveMode {
     this.completionStatus = undefined;
     this.catalogs.invalidate();
     appendPromptHistory(this.options.runtimeContext.projectRoot, text);
+    if (isQueueControl(text)) {
+      this.state.transcript.append(textBlock('user', text));
+      const context = this.options.runtimeContext;
+      const rawCommandArgs = text.trim().replace(/^\/queue(?:\s|$)/i, '');
+      void queueCommandFor(context, this.options.sessionRuntime)(tokenizeCommandArgs(rawCommandArgs), {
+        cwd: context.cwd, projectRoot: context.projectRoot, sessionId: context.session.id, interactive: true, rawCommandArgs,
+      }).then(result => {
+        if (result.kind === 'local') this.state.transcript.append(textBlock('command', result.output, '/queue'));
+        this.tui.requestRender();
+      });
+      return;
+    }
     if (isGoalControl(text) && (this.busy || this.questions.question())) {
       this.state.transcript.append(textBlock('user', text));
       const context = this.options.runtimeContext;
@@ -632,6 +655,18 @@ export class InteractiveMode {
         this.state.transcript.append(textBlock('error', error instanceof Error ? error.message : String(error)));
         this.tui.requestRender();
       });
+      return;
+    }
+    if (isPlanningControl(text) && (this.busy || this.questions.question())) {
+      const match = /^\/(\S+)(?:\s+([\s\S]*))?$/.exec(text.trim())!;
+      const context = this.options.runtimeContext;
+      void planningCommandFor(context, this.options.sessionManager, this.options.sessionRuntime, this.readline)(
+        match[1] as 'plan' | 'plan-review' | 'guided-goal', tokenizeCommandArgs(match[2] ?? ''), {
+          cwd: context.cwd, projectRoot: context.projectRoot, sessionId: context.session.id, interactive: true, rawCommandArgs: match[2] ?? '',
+        }).then(result => {
+          if (result.kind === 'local') this.state.transcript.append(textBlock('command', result.output, `/${match[1]}`));
+          this.tui.requestRender();
+        });
       return;
     }
     if (this.questions.answer(text)) {

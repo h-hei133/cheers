@@ -1,4 +1,5 @@
 import type { TurnInput } from "./session.js";
+import { PendingQueue, inputQueueControl } from '../core/agent/queue.js';
 
 /**
  * A run's input handle, from before the run exists.
@@ -29,28 +30,34 @@ export interface PendingTurnInput {
 }
 
 export function pendingTurnInput(): PendingTurnInput {
-  const steering: string[] = [];
-  const followUps: string[] = [];
+  const steering = new PendingQueue<string>('all');
+  const followUps = new PendingQueue<string>('all');
   // The run's own handle once it exists. Everything below reads and writes
   // through it when it is set, so the queue reported and the queue drained are
   // the run's — the queue that actually holds the messages.
   let live: TurnInput | undefined;
+  const buffered = inputQueueControl([
+    { lane: 'steering', queue: steering, text: text => text, replace: (_value, text) => text },
+    { lane: 'followUp', queue: followUps, text: text => text, replace: (_value, text) => text },
+  ]);
 
   const input: TurnInput = {
-    steer: (text) => {
-      if (live) live.steer(text);
-      else steering.push(text);
+    steer: (text, id) => {
+      if (live) live.steer(text, id);
+      else steering.enqueue(text, id);
     },
-    followUp: (text) => {
-      if (live) live.followUp(text);
-      else followUps.push(text);
+    followUp: (text, id) => {
+      if (live) live.followUp(text, id);
+      else followUps.enqueue(text, id);
     },
+    queue: { entries: () => (live?.queue ?? buffered).entries(), edit: (id, text) => (live?.queue ?? buffered).edit(id, text),
+      cancel: id => (live?.queue ?? buffered).cancel(id), move: (id, beforeId) => (live?.queue ?? buffered).move(id, beforeId) },
     pending: () =>
-      live?.pending() ?? { steering: [...steering], followUps: [...followUps] },
+      live?.pending() ?? { steering: steering.entries().map(entry => entry.value), followUps: followUps.entries().map(entry => entry.value) },
     clearQueue: () => {
       // Emptied as it is read: the interrupt path hands this text back to the
       // editor, and a second read must not hand it over twice.
-      const taken = [...steering.splice(0), ...followUps.splice(0)];
+      const taken = [...steering.drain(), ...followUps.drain()];
       return [...taken, ...(live?.clearQueue() ?? [])];
     },
   };
@@ -60,8 +67,9 @@ export function pendingTurnInput(): PendingTurnInput {
     adopt: (run) => {
       if (!run?.input) return;
       live = run.input;
-      for (const text of steering.splice(0)) live.steer(text);
-      for (const text of followUps.splice(0)) live.followUp(text);
+      for (const entry of steering.entries()) live.steer(entry.value, entry.id);
+      for (const entry of followUps.entries()) live.followUp(entry.value, entry.id);
+      steering.clear(); followUps.clear();
     },
   };
 }

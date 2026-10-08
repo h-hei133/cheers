@@ -4,6 +4,8 @@ import type { WorkspaceRoot } from '../core/workspace/model.js'
 import type { ImageContent } from '../model-adapters/multimodal.js'
 
 export interface ToolExecutionContext {
+  readonly commandProof?: import('../runtime/execution/proof.js').CommandProofObserver;
+  readonly assertSourceAccess?: (absolute: string) => void;
   readonly taskId: string
   readonly workspaceRoot: string
   readonly workspaceRoots?: readonly WorkspaceRoot[]

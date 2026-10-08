@@ -218,8 +218,9 @@ export abstract class SessionLifecycleWrites {
       return false;
     }
     if (sessionHasConversation(session) || session.hasReportHistory) return false;
-    // An explicit model choice is durable user state even before the first turn.
-    if (this.host.store.readStateSnapshotSafely(this.host.store.statePath(sessionId))?.modelSelection) return false;
+    // Explicit durable user state can precede the first model turn.
+    const state = this.host.store.readStateSnapshotSafely(this.host.store.statePath(sessionId));
+    if (state && [state.modelSelection, state.goal, state.plan, state.goalDraft, state.goalAcceptance].some(value => value !== undefined)) return false;
     const projectRoot = session.projectRoot;
     this.host.store.deleteSession(sessionId);
     forgetSessionTodos(sessionId);

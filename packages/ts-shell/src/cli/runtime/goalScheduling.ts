@@ -3,6 +3,8 @@ import type { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
 import type { SessionManager } from '../../session/SessionManager.js';
 import { GoalScheduler } from '../../planning/goal/run/scheduler.js';
 import type { GoalSubmissionHost } from '../../planning/goal/run/model.js';
+import { completeAcceptedGoal } from '../../planning/goal/acceptance/complete.js';
+import { assertSourceAccess } from '../../core/query/sourcePolicy.js';
 
 const contexts = new WeakMap<ShellRuntimeContext, GoalScheduler>();
 const runtimes = new WeakMap<ShellSessionRuntime, GoalScheduler>();
@@ -11,6 +13,11 @@ const runtimes = new WeakMap<ShellSessionRuntime, GoalScheduler>();
 export function installGoalScheduler(context: ShellRuntimeContext, store: SessionManager, runtime: ShellSessionRuntime,
   report: (message: string) => void): GoalScheduler {
   const scheduler = new GoalScheduler({ store, current: () => context.session, cancel: () => runtime.cancelCurrentRun(), report,
+    afterRoundSettled: session => {
+      try { if (completeAcceptedGoal(store, session, absolute => assertSourceAccess(absolute, session.projectRoot,
+        session.workspaceRoots, runtime.getPermissionScope(), context.runtimeConfig.denyRules))) report('Goal completed from approved criteria and verified runtime evidence.'); }
+      catch { /* Unknown acceptance does not publish completion. */ }
+    },
     host: { ready: () => runtime.getCurrentRunController() === null,
       submit: async (prompt, promptMetadata) => { await runtime.executePrompt(context.session.id, prompt, { promptMetadata, outputMode: 'print' }); } } });
   runtime.observeEvents(event => scheduler.observe(event), { renders: false });

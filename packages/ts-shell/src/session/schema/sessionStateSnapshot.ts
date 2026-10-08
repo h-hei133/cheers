@@ -22,6 +22,10 @@ import {
 export interface SessionStateSnapshot {
   /** The goal owner validates this versioned payload and its session/workspace binding. */
   goal?: unknown;
+  /** Draft/review owners validate exact versions; ordinary saves only preserve their payloads. */
+  plan?: unknown;
+  goalDraft?: unknown;
+  goalAcceptance?: unknown;
   /** The request owner validates durable reservations, metering and replay protection. */
   requestLedger?: unknown;
   workspaceRoots?: readonly WorkspaceRoot[];
@@ -73,6 +77,9 @@ export function buildSessionStateSnapshot(
 ): SessionStateSnapshot {
   return {
     goal: current?.goal,
+    plan: current?.plan,
+    goalDraft: current?.goalDraft,
+    goalAcceptance: current?.goalAcceptance,
     requestLedger: current?.requestLedger,
     workspaceRoots: current?.workspaceRoots ?? session.workspaceRoots,
     usage: current?.usage,

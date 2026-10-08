@@ -39,6 +39,8 @@ export interface ToolSchema {
  */
 
 export interface ToolGateOptions {
+  readonly correlationId?: string;
+  readonly commandProof?: import('../runtime/execution/proof.js').CommandProofObserver;
   /** Rechecked at each effect boundary, including after asynchronous approvals. */
   readonly admission?: () => string | undefined;
   readonly sessionId: string;
@@ -152,6 +154,9 @@ async function executeTool(
       abortSignal: signal,
       interactiveAsk: options.interactiveAsk,
       sessionId: options.sessionId,
+      correlationId: options.correlationId,
+      commandProof: options.commandProof,
+      assertSourceAccess: absolute => assertSourceAccess(absolute, options.workspaceRoot, options.workspaceRoots, options.permissionScope, options.denyRules),
       assertFileAccess: (absolutePath) => {
         if (preparation) { preparationContext(tool.name, options).assertFileAccess!(absolutePath); return; }
         const blocked = options.admission?.();

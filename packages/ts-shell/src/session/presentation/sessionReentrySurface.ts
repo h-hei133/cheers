@@ -112,6 +112,7 @@ export function sessionHasConversation(session: Session): boolean {
  * session with nothing said and nothing pending is not.
  */
 export function sessionHasReentrySurface(session: Session): boolean {
+  if (session.hasPlanningState) return true;
   if (session.hasReportHistory) return true;
   if (sessionHasConversation(session)) return true;
   if (session.pendingPrompt?.trim()) return true;

@@ -6,6 +6,8 @@ import type { Interface as ReadlineInterface } from "node:readline";
 
 import { toolPoolFor } from "../runtime/tools.js";
 import { goalCommandFor, goalPolicyFor } from '../runtime/goal.js';
+import { queueCommandFor } from '../runtime/inputQueue.js';
+import { planningCommandFor } from '../runtime/planning.js';
 import { navigateSession, type SessionNavigationResult } from "../runtime/navigation.js";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
@@ -123,6 +125,8 @@ export async function routeInteractiveCommand(
 
   const resolved = await buildCliCommandExecution({
     goalCommand: goalCommandFor(input.runtimeContext, input.sessionManager),
+    queueCommand: queueCommandFor(input.runtimeContext, input.sessionRuntime),
+    planningCommand: planningCommandFor(input.runtimeContext, input.sessionManager, input.sessionRuntime, input.readline),
     requestPolicy: goalPolicyFor(input.runtimeContext, input.sessionManager),
     prompt: input.prompt,
     ...(input.attachments ? { attachments: input.attachments } : {}),
@@ -339,7 +343,7 @@ export async function routeInteractiveCommand(
     }
     nextTurnNumber += 1;
     await runInteractivePromptExecution({
-      ...(input.promptMetadata ? { promptMetadata: input.promptMetadata } : {}),
+      ...((resolved.promptMetadata ?? input.promptMetadata) ? { promptMetadata: resolved.promptMetadata ?? input.promptMetadata } : {}),
       effectivePrompt: resolved.effectivePrompt,
       ...(resolved.attachments ? { attachments: resolved.attachments } : {}),
       sessionManager: input.sessionManager,

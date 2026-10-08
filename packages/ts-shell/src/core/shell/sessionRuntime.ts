@@ -51,7 +51,8 @@ export interface PromptAttachments {
  */
 export type PromptRun =
   | AsyncIterable<QueryEvent>
-  | { readonly events: AsyncIterable<QueryEvent>; readonly input?: TurnInput; readonly sourceEntryId?: () => string | undefined };
+  | { readonly events: AsyncIterable<QueryEvent>; readonly input?: TurnInput; readonly sourceEntryId?: () => string | undefined;
+      readonly settled?: (outcome: { readonly status: 'completed' | 'error'; readonly finalOutput: string }) => void };
 
 export interface SessionRuntimeDependencies {
   /** Cancellation reaches the owner of work scheduled across individual prompts. */
@@ -229,6 +230,7 @@ export class ShellSessionRuntime {
     const eventDigest: RuntimeEventDigest = createRuntimeEventDigest();
     const structuredOutput = !printMode && this.renderingObservers.size > 0;
     let sourceEntryId: (() => string | undefined) | undefined;
+    let settled: Exclude<PromptRun, AsyncIterable<QueryEvent>>['settled'];
 
     try {
       const continuityBuilder = (
@@ -318,6 +320,7 @@ export class ShellSessionRuntime {
       const events = Symbol.asyncIterator in run ? run : run.events;
       this.currentInput = Symbol.asyncIterator in run ? undefined : run.input;
       sourceEntryId = Symbol.asyncIterator in run ? undefined : run.sourceEntryId;
+      settled = Symbol.asyncIterator in run ? undefined : run.settled;
       for await (const event of events) {
         if (!enteredQueryPhase) {
           enteredQueryPhase = true;
@@ -382,6 +385,7 @@ export class ShellSessionRuntime {
       this.stateMachine.completeRun();
       this.currentRunController = null;
       this.currentInput = undefined;
+      settled?.({ status: terminalState.terminalStatus === 'completed' ? 'completed' : 'error', finalOutput: terminalState.finalOutput });
       return terminalState.finalOutput;
     } catch (error) {
       let cancellation: Extract<QueryEvent, { type: "lifecycle.cancelled" }> | undefined;

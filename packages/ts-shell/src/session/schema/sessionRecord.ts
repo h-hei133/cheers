@@ -5,6 +5,8 @@ import type { SessionReport } from '../reports/model.js';
 import type { WorkspaceRoot } from '../../core/workspace/model.js';
 
 export interface Session {
+  /** Read-only reentry projection; durable planning owners validate the stored payloads. */
+  hasPlanningState?: boolean;
   usage?: SessionUsageSnapshot;
   id: string;
   projectRoot: string;

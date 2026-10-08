@@ -15,7 +15,9 @@ export function showGoal(edit: SessionGoalEdit, legacy?: StoredGoal | null): str
     `Workspace: ${goal.workspace.path}`,
     ...(goalIsDetached(edit) ? ['Binding: detached from the current session/workspace. It cannot steer turns or resume. Use /goal drop before setting a new goal.'] : []),
     ...(goal.pauseReason ? [`Pause reason: ${goal.pauseReason}`] : []),
-    ...(goal.completion ? [`Completion: user-declared at ${goal.completion.timestamp}; acceptance was not verified.`] : []),
+    ...(goal.completion ? [goal.completion.source === 'verified-acceptance'
+      ? `Completion: verified acceptance at ${goal.completion.timestamp}; exact approved plan ${goal.completion.planVersion}.`
+      : `Completion: user-declared at ${goal.completion.timestamp}; acceptance was not verified.`] : ['Acceptance: unverified until approved criteria and trustworthy runtime evidence are reconciled.']),
     goal.tokenBudget === undefined ? 'Budget: unset (no cumulative goal token cap).' : `Budget: ${goal.tokenBudget} tokens (strict admission; unsupported bounds block sending).`,
     ...usageLines(edit),
     ...schedulingLines(goal),

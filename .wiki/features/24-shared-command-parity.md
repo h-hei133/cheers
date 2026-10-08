@@ -271,3 +271,10 @@ Cheers 已有 [picker 注册器](../../packages/ts-shell/src/cli/interactive/pic
 [Phase 19 §8.119](phase-19-decisions.md#8119-auto-03持久续轮与有界停止)已接通显式 set/resume 后的持久单 owner 调度，复用原 TUI/line/print 和 session persistence。无 cap 可越过单轮 step-limit 并在普通回答后继续；暂停先阻止新发送，再有界等待取消，未知 owner/用量/副作用保留。轮间提交再次检查待输入；人工 queue 在自动轮持久结算后执行，自动 prompt 不变成人工意图。
 
 两种运行入口、两种 TUI 的实际中断写入验证均只写一次，恢复不重放，未对账 resume 明确拒绝。完成 round 要有同目标/owner 的持久 prompt 与 terminal 生命周期；UI 观察成功不替代保存成功。AUTO-03 本地验收完成，严格 cap 的 unsupported 边界仍保留；自动目标验收、guided/plan/queue UX 和顾问继续由 AUTO-04/05 交付，用户 complete 仍只是有来源的人工声明。
+
+
+### 追加执行记录（2026-10-09，U06 guided/plan/queue 与验收）
+
+[Phase 19 §8.120](phase-19-decisions.md#8120-auto-04精确计划批准目标澄清实际队列与原生验收)接通 exact version 的 plan/guided 草稿与批准、既有只读 plan 模式、TUI/line/actual pipe 的真实 pending queue，以及批准后原生命令/当前 target/同会话 committed edit receipt/已对账 ledger 的自动完成闭环。guided 可选预算 N/off 进入同一版本与 budget owner，批准只创建 paused goal；计划批准与工具权限分开。实际管道控制链与 EOF 按真实执行排空，取消未知项保留。
+
+自动完成只覆盖经明确批准的可观测条件；regular UTF-8 file ≤1 MiB 或已核验 absence 以外目标保持 unverified，纯模型完成声明不通过。Node/executable 两种 TUI 与 actual pipe、反转和独立审查证据见该节；严格 cap 的现有 provider unsupported 边界仍保留。AUTO-05 的独立模型/上下文顾问与其余 Phase 19 继续，不以本批验收宣称完整阶段完成。

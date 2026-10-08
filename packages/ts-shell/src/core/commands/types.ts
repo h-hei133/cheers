@@ -35,6 +35,8 @@ export interface CommandContext {
   readonly requestPolicy?: import('../agent/request/model.js').RequestPolicy;
   /** Feature handler supplied by the CLI's current session composition. */
   readonly goalCommand?: (args: string[], context: CommandContext) => Promise<LocalCommandResult>
+  readonly planningCommand?: (name: 'plan' | 'plan-review' | 'guided-goal', args: string[], context: CommandContext) => Promise<CommandExecutionResult>
+  readonly queueCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly cwd: string
   /** Current configured pool, resolved on demand by the CLI host. */
   readonly getToolPool?: () => Promise<ReadonlyMap<string, ToolDefinition>>
@@ -130,6 +132,7 @@ export interface LocalCommandResult {
 export interface PromptCommandResult {
   readonly kind: 'prompt'
   readonly prompt: string
+  readonly promptMetadata?: Record<string, unknown>
   /**
    * What to show the user in place of the prompt.
    *

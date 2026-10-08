@@ -1,6 +1,7 @@
 import type { ImageContent } from "../model-adapters/multimodal.js";
 import { messageToText } from "../model-adapters/multimodal.js";
 import { AgentCore } from "../core/agent/agent.js";
+import { inputQueueControl } from '../core/agent/queue.js';
 import type { AgentLifecycleEvent } from "../core/agent/events.js";
 import type { AgentMessage } from "../core/agent/state.js";
 import type { HookDispatcher } from "../core/hooks/hookDispatcher.js";
@@ -58,6 +59,8 @@ export interface CompactionSetup {
 }
 
 export interface TurnOptions {
+  readonly correlationId?: string;
+  readonly commandProof?: ToolGateOptions['commandProof'];
   /** Current-session objective, projected by the goal owner at CLI composition. */
   readonly goalObjective?: string;
   readonly workspaceRoots?: ToolGateOptions['workspaceRoots'];
@@ -141,9 +144,10 @@ export interface TurnOptions {
 /** Input the user can hand a running turn. */
 export interface TurnInput {
   /** Deliver before the model's next step, inside the current work. */
-  steer(text: string): void;
+  steer(text: string, id?: string): void;
   /** Deliver once the current work has stopped. */
-  followUp(text: string): void;
+  followUp(text: string, id?: string): void;
+  readonly queue?: import('../core/agent/queue.js').InputQueueControl;
   pending(): { readonly steering: readonly string[]; readonly followUps: readonly string[] };
   /** Take back everything not yet delivered. */
   clearQueue(): string[];
@@ -170,6 +174,8 @@ function gateOptionsFor(
 ): ToolGateOptions {
   return {
     admission: options.admission,
+    correlationId: options.correlationId,
+    commandProof: options.commandProof,
     sessionId: options.sessionId,
     workspaceRoot: options.workspaceRoot,
     workspaceRoots: options.workspaceRoots,
@@ -187,8 +193,6 @@ function gateOptionsFor(
 export function runTurn(options: TurnOptions): TurnRun {
   const channel = new EventChannel<QueryEvent>();
   const projection = new TurnProjection();
-  const steering: string[] = [];
-  const followUps: string[] = [];
   const parentGate = gateOptionsFor(options, (event) => channel.push(event));
   const runSubagent = options.subagentHost
     ? createSubagentRunner(options.subagentHost, options.tools, parentGate)
@@ -293,18 +297,12 @@ export function runTurn(options: TurnOptions): TurnRun {
       : undefined,
   });
 
-  const forget = (list: string[], text: string): boolean => {
-    const index = list.indexOf(text);
-    if (index === -1) return false;
-    list.splice(index, 1);
-    return true;
-  };
-
+  const queues = core.pendingQueues;
+  const queue = inputQueueControl([
+    { lane: 'steering', queue: queues.steering, text: message => messageToText(message.content), replace: (message, text) => ({ ...message, content: text }) },
+    { lane: 'followUp', queue: queues.followUps, text: message => messageToText(message.content), replace: (message, text) => ({ ...message, content: text }) },
+  ]);
   core.subscribe((event: AgentLifecycleEvent) => {
-    if (event.type === "message_start" && event.message.role === "user") {
-      const text = messageToText(event.message.content);
-      forget(steering, text) || forget(followUps, text);
-    }
     if (event.type === "message_end" && event.message !== opening) persist(options.onMessage, event.message);
     for (const projected of projection.project(event)) channel.push(projected);
   });
@@ -463,21 +461,19 @@ export function runTurn(options: TurnOptions): TurnRun {
 
   return {
     events: channel,
-    steer: (text) => {
+    queue,
+    steer: (text, id) => {
       if (!text.trim()) return;
-      steering.push(text);
-      core.steer({ role: "user", content: text });
+      core.steer({ role: "user", content: text }, id);
     },
-    followUp: (text) => {
+    followUp: (text, id) => {
       if (!text.trim()) return;
-      followUps.push(text);
-      core.followUp({ role: "user", content: text });
+      core.followUp({ role: "user", content: text }, id);
     },
-    pending: () => ({ steering: [...steering], followUps: [...followUps] }),
+    pending: () => ({ steering: queue.entries().filter(entry => entry.lane === 'steering').map(entry => entry.text),
+      followUps: queue.entries().filter(entry => entry.lane === 'followUp').map(entry => entry.text) }),
     clearQueue: () => {
-      const taken = [...steering, ...followUps];
-      steering.length = 0;
-      followUps.length = 0;
+      const taken = queue.entries().map(entry => entry.text);
       core.clearAllQueues();
       return taken;
     },

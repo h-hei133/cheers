@@ -37,6 +37,7 @@ export class AgentCore {
   private readonly listeners = new Set<AgentEventListener>();
   private readonly steeringQueue: PendingQueue<AgentMessage>;
   private readonly followUpQueue: PendingQueue<AgentMessage>;
+  public readonly pendingQueues: { readonly steering: PendingQueue<AgentMessage>; readonly followUps: PendingQueue<AgentMessage> };
   private readonly options: AgentCoreOptions;
   private activeRun?: ActiveRun;
   private lastRun?: Promise<void>;
@@ -46,6 +47,7 @@ export class AgentCore {
     this.internalState = createAgentState(options.initialState);
     this.steeringQueue = new PendingQueue<AgentMessage>(options.steeringMode ?? "one-at-a-time");
     this.followUpQueue = new PendingQueue<AgentMessage>(options.followUpMode ?? "one-at-a-time");
+    this.pendingQueues = { steering: this.steeringQueue, followUps: this.followUpQueue };
   }
 
   public get state(): AgentState {
@@ -119,12 +121,12 @@ export class AgentCore {
     }
   }
 
-  public steer(message: AgentMessage): void {
-    this.steeringQueue.enqueue(message);
+  public steer(message: AgentMessage, id?: string): void {
+    this.steeringQueue.enqueue(message, id);
   }
 
-  public followUp(message: AgentMessage): void {
-    this.followUpQueue.enqueue(message);
+  public followUp(message: AgentMessage, id?: string): void {
+    this.followUpQueue.enqueue(message, id);
   }
 
   public clearAllQueues(): void {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { pendingTurnInput } from "./pendingInput.js";
 import type { TurnInput } from "./session.js";
+import { inputQueueControl, PendingQueue } from '../core/agent/queue.js';
 
 /** A run's own handle, recording what reaches it. */
 function recordingRun(): {
@@ -32,6 +33,19 @@ function recordingRun(): {
 }
 
 describe("input held before a run exists", () => {
+  it('preserves pending IDs across adoption and edits the queue consumed by the live run', () => {
+    const buffered = pendingTurnInput(); buffered.input.followUp('duplicate'); buffered.input.followUp('duplicate');
+    const entries = buffered.input.queue!.entries();
+    const live = new PendingQueue<string>('all');
+    const queue = inputQueueControl([{ lane: 'followUp', queue: live, text: value => value, replace: (_value, text) => text }]);
+    buffered.adopt({ input: { steer() {}, followUp: (text, id) => { live.enqueue(text, id); }, queue,
+      pending: () => ({ steering: [], followUps: live.entries().map(entry => entry.value) }), clearQueue: () => live.drain() } });
+    expect(buffered.input.queue!.entries().map(entry => entry.id)).toEqual(entries.map(entry => entry.id));
+    expect(buffered.input.queue!.edit(entries[1]!.id, 'changed')).toBe(true);
+    expect(buffered.input.queue!.move(entries[1]!.id, entries[0]!.id)).toBe(true);
+    expect(live.drain()).toEqual(['changed', 'duplicate']); expect(buffered.input.queue!.entries()).toEqual([]);
+  });
+
   it("holds what arrives, then hands it to the run when it is adopted", () => {
     const buffered = pendingTurnInput();
     buffered.input.steer("steered early");

@@ -16,6 +16,8 @@ import type { CatalogProvider } from "../../core/models/catalog.js";
 
 export function streamCliRuntimePrompt(input: {
   readonly requestPolicy?: CliRuntimeInvocationInput['requestPolicy'];
+  readonly commandProof?: CliRuntimeInvocationInput['commandProof'];
+  readonly correlationId?: string;
   readonly goalObjective?: string;
   readonly admission?: CliRuntimeInvocationInput['admission'];
   readonly onCredentialPersisted?: CliRuntimeInvocationInput['onCredentialPersisted'];
@@ -59,6 +61,8 @@ export function streamCliRuntimePrompt(input: {
   const started = runCliRuntimeInvocation({
     goalObjective: input.goalObjective,
     requestPolicy: input.requestPolicy,
+    commandProof: input.commandProof,
+    correlationId: input.correlationId,
     admission: input.admission,
     onCredentialPersisted: input.onCredentialPersisted,
     prepareProviderResources: input.prepareProviderResources,

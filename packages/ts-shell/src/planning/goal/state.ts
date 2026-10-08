@@ -9,15 +9,15 @@ import { GoalRunError } from './run/model.js';
 export function transitionGoal(current: SessionGoal | undefined, scope: GoalScope, action: GoalAction,
   timestamp = new Date().toISOString()): SessionGoal | undefined {
   validateAction(action);
-  if (action.type === 'set' || action.type === 'import') {
+  if (action.type === 'set' || action.type === 'import' || action.type === 'prepare') {
     if (current?.runOwner) throw new GoalWriteError('conflict');
     if (current && current.phase !== 'complete' && current.phase !== 'dropped') throw new GoalWriteError('conflict');
     const objective = action.objective.trim();
     if (!objective || objective.length > 16_384 || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(objective)) throw new GoalWriteError('invalid');
     return freezeDeep({ ...scope, schemaVersion: 1, id: randomUUID(), revision: 1, objective,
-      phase: action.type === 'import' ? 'paused' : 'active', origin: action.type === 'import' ? 'legacy-project' : 'user',
+      phase: action.type === 'set' ? 'active' : 'paused', origin: action.type === 'import' ? 'legacy-project' : 'user',
       createdAt: timestamp, updatedAt: timestamp, runOwner: null,
-      ...(action.type === 'import' ? { pauseReason: 'legacy-import' as const } : {}) });
+      ...(action.type !== 'set' ? { pauseReason: action.type === 'import' ? 'legacy-import' as const : 'user' as const } : {}) });
   }
   if (!current) return undefined;
   if (!goalMatchesScope(current, scope) && action.type !== 'drop') throw new GoalWriteError('conflict');
@@ -50,10 +50,10 @@ export function transitionGoal(current: SessionGoal | undefined, scope: GoalScop
 function validateAction(action: unknown): void {
   if (!isRecord(action)) throw new GoalWriteError('invalid');
   if (action.type === 'complete-automatically') throw new GoalWriteError('unavailable');
-  if (typeof action.type !== 'string' || !['set', 'import', 'pause', 'resume', 'drop', 'complete', 'reentry', 'budget'].includes(action.type)) throw new GoalWriteError('invalid');
-  const keys = action.type === 'set' || action.type === 'import' ? ['type', 'objective'] : action.type === 'complete' ? ['type', 'source'] : action.type === 'budget' ? ['type', 'cap'] : ['type'];
+  if (typeof action.type !== 'string' || !['set', 'import', 'prepare', 'pause', 'resume', 'drop', 'complete', 'reentry', 'budget'].includes(action.type)) throw new GoalWriteError('invalid');
+  const keys = action.type === 'set' || action.type === 'import' || action.type === 'prepare' ? ['type', 'objective'] : action.type === 'complete' ? ['type', 'source'] : action.type === 'budget' ? ['type', 'cap'] : ['type'];
   if (Object.keys(action).some(key => !keys.includes(key))
-    || ((action.type === 'set' || action.type === 'import') && typeof action.objective !== 'string')
+    || ((action.type === 'set' || action.type === 'import' || action.type === 'prepare') && typeof action.objective !== 'string')
     || (action.type === 'complete' && action.source !== 'user-declared')
     || (action.type === 'budget' && action.cap !== undefined && (typeof action.cap !== 'number' || !Number.isSafeInteger(action.cap) || action.cap < 0))) throw new GoalWriteError('invalid');
 }

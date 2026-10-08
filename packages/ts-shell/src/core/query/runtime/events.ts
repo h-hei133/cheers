@@ -12,6 +12,7 @@ import type {
 import type { QueryRuntimeProofProjection } from './proof.js'
 
 export type QueryEvent =
+  | { readonly type: 'execution.command'; readonly proof: import('../../../runtime/execution/proof.js').NativeCommandProof; readonly sourcePromptEntryId: string }
   | {
       readonly type: 'query.started';
       readonly sessionId: string;

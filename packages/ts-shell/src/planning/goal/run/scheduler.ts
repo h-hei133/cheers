@@ -10,6 +10,7 @@ const ROUND_DELAY_MS = 80;
 const DRAIN_TIMEOUT_MS = 1_000;
 
 export interface GoalSchedulerDependencies {
+  readonly afterRoundSettled?: (session: Session) => void;
   readonly store: GoalRunStoreHost;
   readonly current: () => Session;
   readonly cancel: () => void;
@@ -149,7 +150,9 @@ export class GoalScheduler {
     } catch (error) { this.outcome = 'failure'; this.failure ??= runFailure(error); }
     finally { clearInterval(watcher); }
     try {
-      const edit = dispatched() ? settleGoalRound(this.deps.store, session, token, this.outcome, this.failure) : readGoalEdit(this.deps.store, session);
+      if (dispatched()) settleGoalRound(this.deps.store, session, token, this.outcome, this.failure);
+      this.deps.afterRoundSettled?.(session);
+      const edit = readGoalEdit(this.deps.store, session);
       if (edit.goal?.phase !== 'active') {
         if (this.failure) this.deps.report(`Goal scheduling paused: ${this.failure}. Goal completion was not inferred.`);
         this.clearOwner();

@@ -28,6 +28,9 @@ import { promptInteractiveQuestions } from "../interactive/interactiveAskBridge.
 import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
 import { goalObjectiveFor, goalPolicyFor, prepareGoalSession } from './goal.js';
 import { installGoalScheduler } from './goalScheduling.js';
+import { acceptanceCapture } from '../../planning/goal/acceptance/capture.js';
+import { planningSettlement } from './planning.js';
+import { readGoalEdit } from '../../planning/goal/store.js';
 import type { GoalScheduler } from '../../planning/goal/run/scheduler.js';
 import { compactSessionHistory } from "../../core/shell/compaction.js";
 import { recordCompactionCheckpoint } from "../../context/compact/checkpoint/compactionCheckpoint.js";
@@ -510,7 +513,11 @@ export function createCliSessionRuntime(input: {
           : allTurns;
 
       let sourceEntryId = allTurns.at(-1)?.id;
+      const promptEntryId = sourceEntryId;
+      const currentGoal = readGoalEdit(input.sessionManager, input.runtimeContext.session).goal;
       const run = streamCliRuntimePrompt({
+        ...(promptEntryId ? { correlationId: promptEntryId, commandProof: acceptanceCapture(input.sessionManager,
+          input.runtimeContext.session, promptEntryId, currentGoal?.id) } : {}),
         goalObjective: goalObjectiveFor(input.runtimeContext, input.sessionManager),
         requestPolicy,
         mcpGateway: input.mcpGateway,
@@ -551,7 +558,8 @@ export function createCliSessionRuntime(input: {
             }
           : {}),
       });
-      return { ...run, sourceEntryId: () => sourceEntryId };
+      return { ...run, sourceEntryId: () => sourceEntryId,
+        settled: planningSettlement(input.sessionManager, sessionId, promptEntryId, sessionRuntime, config, input.renderer) };
     },
   });
   goalScheduler = installGoalScheduler(input.runtimeContext, input.sessionManager, sessionRuntime, message => input.renderer.renderLine(message));
