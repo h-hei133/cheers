@@ -12,6 +12,7 @@ import type { SessionHarnessState } from "../harness/state.js";
 import type { Session } from "./sessionRecord.js";
 import type { SessionUsageSnapshot } from "../../observability/usage/model.js";
 import type { SessionModelSelection } from "../model/contract.js";
+import type { WorkspaceRoot } from '../../core/workspace/model.js';
 import {
   buildLinearSessionThreadSnapshot,
   catchUpSessionThread,
@@ -19,6 +20,7 @@ import {
 } from "./sessionThread.js";
 
 export interface SessionStateSnapshot {
+  workspaceRoots?: readonly WorkspaceRoot[];
   modelSelection?: SessionModelSelection;
   modelRevision?: string;
   usage?: SessionUsageSnapshot;
@@ -66,6 +68,7 @@ export function buildSessionStateSnapshot(
   overrides?: SessionStateSnapshotOverrides,
 ): SessionStateSnapshot {
   return {
+    workspaceRoots: current?.workspaceRoots ?? session.workspaceRoots,
     usage: current?.usage,
     modelSelection: current?.modelSelection,
     modelRevision: current?.modelRevision,

@@ -56,10 +56,12 @@ import { toolSchemas } from "../turn/tools.js";
 import { runSubagent, type SubagentRunner } from "../core/subagents/runner.js";
 import { adaptTools } from "../turn/tools.js";
 import { assertAdmission, admittedFetch, type Admission } from '../core/network/admission.js';
+import { decodeWorkspaceRoots, type WorkspaceRoot } from '../core/workspace/model.js';
 
 type ProviderMode = "synthetic" | "real";
 
 export interface CliRuntimeInvocationInput {
+  readonly workspaceRoots?: readonly WorkspaceRoot[];
   readonly admission?: Admission;
   readonly onCredentialPersisted?: () => void;
   /** Built after renewal from the same captured provider binding as the main request. */
@@ -445,6 +447,7 @@ async function startTurn(
     ...(request.continuityContext ? { continuityContext: request.continuityContext } : {}),
     ...(request.attachments ? { attachments: request.attachments } : {}),
     workspaceRoot: request.workspaceRoot,
+    workspaceRoots: decodeWorkspaceRoots(request.workspaceRoots),
     agentMode: request.agentMode,
     permissionScope: request.permissionScope,
     escalationPromptHandler: request.escalationPromptHandler,

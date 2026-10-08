@@ -103,7 +103,7 @@ export function createGrepToolDefinition(
       if (viaRipgrep.ok) {
         return await reportGrepMatches(
           viaRipgrep.matches.map((match) => formatRipgrepMatch(match, 500)),
-          context.workspaceRoot, context.sessionId,
+          context.artifactRoot ?? context.workspaceRoot, context.sessionId,
         );
       }
 
@@ -193,7 +193,7 @@ export function createGrepToolDefinition(
       }
 
       if (context.abortSignal?.aborted) return deniedResult("Search stopped: cancelled.");
-      return await reportGrepMatches(results, context.workspaceRoot, context.sessionId);
+      return await reportGrepMatches(results, context.artifactRoot ?? context.workspaceRoot, context.sessionId);
     },
   };
 }

@@ -3,7 +3,7 @@ title: "命令清单对齐：注册事实、词法映射与 Phase 19 处置"
 category: article
 sources: [cheers-registry-2026-10-05, ref-builtin-commands-2026-10-05, 18-input-slash-startup-context]
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-08
 tags: [commands, slash-commands, alignment, parity, gap-analysis]
 summary: "核对 Cheers 58 条 dispatch 定义、58 个别名、26 个参数补全提供者，以及参考 85 条顶层和 138 条子命令声明。区分命名关系与真实能力，为 53 个无词法交集的参考定义确定 Phase 19 处置。"
 confidence: high
@@ -335,3 +335,7 @@ refNoToken = ref.filter(command => intersection(token(command), oursTokens).size
 ## 8. SES-04 直达入口实施补充（2026-10-08）
 
 `/new` 作为 `/clear` 别名、`/session new` 作为同一 shell action 已接通；`/rename [title...]` 管当前会话，`/delete <reference>` 与 `/session rename|delete` 管保存记录。帮助、语法和动态会话候选共用现有注册表；完整目录的 exact/prefix/title/last 匹配、确认与锁内复验归 session owner。非交互 delete 只预览，交互默认 Cancel，裸 rename 提供标题编辑。具体校验与交付边界见 [决策 §8.107](phase-19-decisions.md#8107-ses-04会话直达管理与完整目录匹配)；本文原始 58 条统计仍是规划基线，不作为当前注册数。
+
+## 9. SES-05 workspace 实施补充（2026-10-08）
+
+现有 `/workspace` 语法新增 `add <path> [--write]`、`remove <path>` 与 `rebind <path>`，解析、帮助、补全及交互/脚本入口共用描述；默认附加只读、写根仍经审批与 deny rules。`attach` 跨项目创建独立 session，`rebind` 迁移同一保存身份；附加根不接管配置、技能或 MCP 发现。持久继承、失效根撤权、busy/overlap/unknown 与动作前复验见 [决策 §8.108](phase-19-decisions.md#8108-ses-05持久多根授权与同会话工作区迁移)。

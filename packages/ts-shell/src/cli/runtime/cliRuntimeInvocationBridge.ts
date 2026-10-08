@@ -26,6 +26,7 @@ export function streamCliRuntimePrompt(input: {
   readonly attachments?: PromptAttachments;
   readonly sessionId: string;
   readonly workspaceRoot: string;
+  readonly workspaceRoots?: CliRuntimeInvocationInput['workspaceRoots'];
   readonly signal: AbortSignal;
   readonly maxTurns: number;
   readonly escalationPromptHandler: (prompt: EscalationPrompt) => Promise<EscalationResponse>;
@@ -64,6 +65,7 @@ export function streamCliRuntimePrompt(input: {
     ...(input.continuityContext ? { continuityContext: input.continuityContext } : {}),
     ...(input.attachments ? { attachments: input.attachments } : {}),
     workspaceRoot: input.workspaceRoot,
+    workspaceRoots: input.workspaceRoots,
     signal: input.signal,
     maxTurns: input.maxTurns,
     escalationPromptHandler: input.escalationPromptHandler,

@@ -1,4 +1,5 @@
 import * as fs from "node:fs";
+import { decodeWorkspaceRoots } from '../../core/workspace/model.js';
 import { selectSessionReports } from '../reports/projection.js';
 import { decodeUsageSnapshot } from "../../observability/usage/snapshot.js";
 import type { SessionMetadata } from "../schema/sessionMetadataCodec.js";
@@ -158,6 +159,7 @@ export function projectLoadedSession(input: {
   }
   return {
     id: metadata.id,
+    ...(input.state.workspaceRoots !== undefined ? { workspaceRoots: decodeWorkspaceRoots(input.state.workspaceRoots) } : {}),
     projectRoot:
       metadata.projectRoot?.trim() ||
       input.state.projectRoot?.trim() ||

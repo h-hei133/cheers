@@ -11,6 +11,8 @@ import type { ToolDefinition } from "../tools/types.js";
 import type { SubagentRunner } from "../core/subagents/runner.js";
 import { neutraliseForDisplay } from "../core/text/safety.js";
 import { validateToolArguments } from "../core/tools/arguments.js";
+import { workspaceToolBinding } from '../core/workspace/tools.js';
+import type { WorkspaceRoot } from '../core/workspace/model.js';
 
 /** A tool definition in the shape a chat completion request takes. */
 export interface ToolSchema {
@@ -37,6 +39,7 @@ export interface ToolGateOptions {
   readonly admission?: () => string | undefined;
   readonly sessionId: string;
   readonly workspaceRoot: string;
+  readonly workspaceRoots?: readonly WorkspaceRoot[];
   readonly agentMode?: "plan" | "build";
   readonly permissionScope?: PermissionScope;
   readonly hooks: HookDispatcher;
@@ -129,8 +132,11 @@ async function executeTool(
     const blocked = options.admission?.();
     if (blocked) throw new Error(blocked);
     validateToolArguments(tool.argsSchema, args);
-    const result = await tool.execute(args, {
-      workspaceRoot: options.workspaceRoot,
+    const binding = workspaceToolBinding(tool.name, args, options.workspaceRoot, options.workspaceRoots);
+    const result = await tool.execute(binding.args, {
+      workspaceRoot: binding.root,
+      workspaceRoots: options.workspaceRoots,
+      artifactRoot: options.workspaceRoot,
       taskId: toolCallId,
       abortSignal: signal,
       interactiveAsk: options.interactiveAsk,
@@ -138,9 +144,13 @@ async function executeTool(
       assertFileAccess: (absolutePath) => {
         const blocked = options.admission?.();
         if (blocked) throw new Error(blocked);
-        const decision = evaluateToolPermissionScope(tool.name,
-          { ...args, path: absolutePath, filePath: absolutePath }, options.permissionScope,
-          options.workspaceRoot, options.denyRules);
+        const actualArgs = { ...args, path: absolutePath, filePath: absolutePath };
+        if (binding.scoped) {
+          const actual = workspaceToolBinding(tool.name, actualArgs, options.workspaceRoot, options.workspaceRoots);
+          if (actual.root !== binding.root) throw new Error('The tool target changed workspace roots.');
+        }
+        const decision = binding.scoped ? evaluateWorkspacePermission(tool.name, actualArgs, options)
+          : evaluateToolPermissionScope(tool.name, actualArgs, options.permissionScope, options.workspaceRoot, options.denyRules);
         if (decision.denied) throw new Error(decision.reason);
       },
       ...(options.commandEnv ? { commandEnv: options.commandEnv } : {}),
@@ -283,13 +293,9 @@ async function askPermission(
   options: ToolGateOptions,
   signal: AbortSignal | undefined,
 ): Promise<{ readonly blocked?: string; readonly approved?: { operation: string; decision: string } }> {
-  const evaluation = evaluateToolPermissionScope(
-    toolName,
-    args,
-    options.permissionScope ?? "ask",
-    options.workspaceRoot,
-    options.denyRules ?? [],
-  );
+  let evaluation: ReturnType<typeof evaluateToolPermissionScope>;
+  try { evaluation = evaluateWorkspacePermission(toolName, args, options); }
+  catch (error) { return { blocked: error instanceof Error ? error.message : 'Workspace access could not be checked.' }; }
   // A refusal is an answer, not a question. Asking about it would offer the user
   // a chance to override what the user already wrote, and the tool would be
   // usable again by answering "allow" — which is what makes a rule real.
@@ -349,4 +355,13 @@ async function askPermission(
   }
   options.emit({ type: "approval.resolved", toolName, taskId: toolCallId, outcome: "approved" });
   return { approved: { operation: evaluation.operation, decision: response.decision } };
+}
+
+/** Denials apply to the requested spelling and to the selected root's relative paths. */
+function evaluateWorkspacePermission(toolName: string, args: Record<string, unknown>, options: ToolGateOptions) {
+  const original = evaluateToolPermissionScope(toolName, args, options.permissionScope, options.workspaceRoot, options.denyRules);
+  if (original.denied) return original;
+  const binding = workspaceToolBinding(toolName, args, options.workspaceRoot, options.workspaceRoots);
+  return binding.root === options.workspaceRoot ? original
+    : evaluateToolPermissionScope(toolName, binding.args, options.permissionScope, binding.root, options.denyRules);
 }

@@ -1,8 +1,10 @@
 import path from "node:path";
+import { decodeWorkspaceRoots, type WorkspaceRoot } from '../../core/workspace/model.js';
 
 export type WorkspaceRootMode = "git-root" | "direct";
 
 export interface ProjectBindingOptions {
+  readonly workspaceRoots?: readonly WorkspaceRoot[];
   readonly rootMode?: WorkspaceRootMode;
   readonly requestedWorkspaceRoot?: string;
   readonly targetPathBase?: string;
@@ -10,6 +12,7 @@ export interface ProjectBindingOptions {
 }
 
 export interface ProjectSessionBinding {
+  readonly workspaceRoots?: readonly WorkspaceRoot[];
   readonly projectRoot: string;
   readonly rootMode?: WorkspaceRootMode;
   readonly requestedWorkspaceRoot?: string;
@@ -38,6 +41,7 @@ export function projectSessionBinding(input: {
   const options = input.options;
   return {
     projectRoot: input.projectRoot,
+    ...(options?.workspaceRoots ? { workspaceRoots: decodeWorkspaceRoots(options.workspaceRoots) } : {}),
     ...(options?.rootMode ? { rootMode: options.rootMode } : {}),
     ...(options?.requestedWorkspaceRoot
       ? { requestedWorkspaceRoot: options.requestedWorkspaceRoot }

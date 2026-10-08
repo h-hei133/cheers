@@ -351,6 +351,8 @@ export async function runNonInteractivePrompt(options: {
         runtimeContext: options.runtimeContext,
         workspaceAction: resolved.slashResult.workspaceAction,
         workspaceTarget: resolved.slashResult.workspaceTarget,
+        workspaceAccess: resolved.slashResult.workspaceAccess,
+        busy: () => options.sessionRuntime.getCurrentRunController() !== null,
         printMode: options.printMode,
       });
       return;

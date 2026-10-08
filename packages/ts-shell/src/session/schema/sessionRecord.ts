@@ -2,11 +2,13 @@ import type { WorkspaceRootMode } from "../store/projectBindingPolicy.js";
 import type { SessionMessage } from "./sessionMessage.js";
 import type { SessionUsageSnapshot } from "../../observability/usage/model.js";
 import type { SessionReport } from '../reports/model.js';
+import type { WorkspaceRoot } from '../../core/workspace/model.js';
 
 export interface Session {
   usage?: SessionUsageSnapshot;
   id: string;
   projectRoot: string;
+  workspaceRoots?: readonly WorkspaceRoot[];
   rootMode?: WorkspaceRootMode;
   requestedWorkspaceRoot?: string;
   targetPathBase?: string;

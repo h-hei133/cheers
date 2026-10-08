@@ -7,8 +7,11 @@ export function startNewSession(
   context: ShellRuntimeContext,
   manager: Pick<SessionManager, "createNew" | "discardIfEmpty">,
 ): void {
+  const blocked = context.workspaceIssue ?? context.workspaceAdmission?.();
+  if (blocked) throw new Error(blocked);
   const previous = context.session.id;
   const created = manager.createNew(context.projectRoot, {
+    workspaceRoots: context.session.workspaceRoots,
     rootMode: context.rootMode,
     requestedWorkspaceRoot: context.projectRoot,
     targetPathBase: context.projectRoot,

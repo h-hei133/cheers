@@ -50,6 +50,7 @@ function createHarness(root = "/tmp/project-alpha") {
           agentMode = nextMode;
         },
         getState: () => "idle",
+        getCurrentRunController: () => null,
       } as never,
       logger: {
         error: () => undefined,

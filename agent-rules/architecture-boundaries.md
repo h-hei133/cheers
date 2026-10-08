@@ -81,5 +81,6 @@ Do not reintroduce a second language for performance. Execution latency is domin
 - `packages/ts-shell/src/core/security/`: path containment, project trust, and the report-safe text redactors shared across domains - `redaction.ts` (provider paths, bearer tokens, credential assignments) and `reportText.ts` (report-unsafe markers and length caps), the latter shared by `browser/` and `presentation/`.
 - `packages/ts-shell/src/core/values/`: domain-neutral value helpers with no feature knowledge - `freeze.ts` (`freezeDeep`) is the single recursive freeze used by twelve domains, and `record.ts` (`isRecord`) is the record-shape guard shared by `browser/` and `turn/`.
 - `packages/ts-shell/src/core/shell/`: shell/session display surface; keep feature-specific policy and writer semantics outside this layer when possible.
+- `packages/ts-shell/src/core/workspace/`: configuration-neutral root grants, directory identity and file-tool authority selection shared by session, turn and sandbox owners.
 - `packages/ts-shell/src/session/`: session lifecycle, durable session state, and resume/recovery boundaries.
 - `scripts/`: repository-level validation scripts, readiness checks, and real-provider smoke entrypoints.

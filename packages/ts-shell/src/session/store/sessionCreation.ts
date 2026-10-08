@@ -1,11 +1,7 @@
-import { projectSessionBinding, type WorkspaceRootMode } from "./projectBindingPolicy.js";
+import { projectSessionBinding, type ProjectBindingOptions } from "./projectBindingPolicy.js";
 import type { Session } from "../schema/sessionRecord.js";
 
-export interface SessionCreationOptions {
-  readonly rootMode?: WorkspaceRootMode;
-  readonly requestedWorkspaceRoot?: string;
-  readonly targetPathBase?: string;
-  readonly gitRoot?: string | null;
+export interface SessionCreationOptions extends ProjectBindingOptions {
   /** A title to start with, for a session that is born carrying another's. */
   readonly title?: string;
   /** The session this one is copied from, when it is a fork. */

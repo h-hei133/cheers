@@ -12,6 +12,7 @@ import { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import { createJsonEventWriter } from "../../presentation/terminal/jsonEvents.js";
 import type { StructuredLogger } from "../../observability/index.js";
 import { SessionManager } from "../../session/SessionManager.js";
+import { sessionWorkspaceAdmission } from '../../session/continuation/workspace.js';
 import { getWorkflowGitContext } from "../../workflow/gitContext.js";
 import type { CliOptions } from "../options/cliOptions.js";
 import { resolveCliCredential } from '../provider/cliProviderRuntimeBridge.js';
@@ -150,6 +151,7 @@ export function createCliBootstrapRuntimeContext(
     }
   })();
   const runtimeContext = bootstrap.context;
+  runtimeContext.workspaceAdmission = () => sessionWorkspaceAdmission(sessionManager, runtimeContext.session);
   const mcpGateway = createCliMcpGateway(() => runtimeContext.cwd, () => configurationAdmission(runtimeContext));
 
   return {

@@ -6,6 +6,11 @@ export const workspaceSyntax: CommandSyntax = {
   actions: [
     { name: "status", aliases: ["current"], summary: "inspect the workspace binding" },
     { name: "attach", aliases: ["switch", "use"], summary: "attach a workspace path", parameters: [target] },
+    { name: 'add', summary: 'add a read-only file root, or explicitly grant write access', parameters: [{ ...target, required: true }], flags: [
+      { name: 'write', kind: 'boolean', summary: 'allow approved file edits in this additional root' },
+    ] },
+    { name: 'remove', summary: 'remove an additional root without deleting files', parameters: [{ ...target, required: true }] },
+    { name: 'rebind', summary: 'migrate this saved session to a different primary workspace', parameters: [{ ...target, required: true }] },
     { name: "recent", aliases: ["projects"], summary: "list recent projects" },
   ],
 };

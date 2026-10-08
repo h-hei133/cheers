@@ -3,7 +3,7 @@ title: "21：会话恢复、撤销语义与分支导航交互体验设计"
 category: article
 sources: [user-experience-report-2026-10-05, current-source-28ff98ce, 14-user-experience-research, pi, oh-my-pi, codex]
 created: 2026-10-05
-updated: 2026-10-07
+updated: 2026-10-08
 tags: [research, ux, sessions, recovery, undo, rewind, tui]
 summary: "按已确认的 current 会话焦点、核心会话文件逻辑字节与最近已提交编辑操作撤销语义，修正 picker 生命周期、恢复安全链和分支反馈方案；区分源码事实、现场未知与后续生产验收。"
 confidence: high
@@ -283,4 +283,8 @@ regular 的终端既有 scrollback 不适合由应用可靠地选择性重写；
 
 ## 8. SES-04 会话管理实施补充（2026-10-08）
 
-`/rename`、`/delete` 和 `/session rename|delete` 与列表动作共用 [lifecycle owner](../../packages/ts-shell/src/session/lifecycle/management.ts)，完整目录解析不以最近页推定唯一结果。批准绑定首次提供的文件版本、项目和运行时身份，当前或忙碌会话删除受保护；删除默认取消，非交互只预览。`/new`、`/session new` 复用原新会话规则，有内容/报告的旧记录保留。标题编辑接续期间仍持有输入队列；异常保留未知结果。构建、定向测试、七组反转、两模式实际 CLI 与独立 APPROVED 的精确证据见 [决策 §8.107](phase-19-decisions.md#8107-ses-04会话直达管理与完整目录匹配)。此补充没有将文件 undo 或多根迁移列为完成。
+`/rename`、`/delete` 和 `/session rename|delete` 与列表动作共用 [lifecycle owner](../../packages/ts-shell/src/session/lifecycle/management.ts)，完整目录解析不以最近页推定唯一结果。批准绑定首次提供的文件版本、项目和运行时身份，当前或忙碌会话删除受保护；删除默认取消，非交互只预览。`/new`、`/session new` 复用原新会话规则，有内容/报告的旧记录保留。标题编辑接续期间仍持有输入队列；异常保留未知结果。构建、定向测试、七组反转、两模式实际 CLI 与独立 APPROVED 的精确证据见 [决策 §8.107](phase-19-decisions.md#8107-ses-04会话直达管理与完整目录匹配)。此补充没有将文件 undo 列为完成。
+
+## 9. SES-05 工作区授权与迁移实施补充（2026-10-08）
+
+附加读/写根保存到会话 state，`/new`、同项目 fork 和重启继承；移除不删文件，主根 rebind 保留 ID。配置、技能、hooks 和 MCP 仍由主根发现，确认迁移后同步刷新；文件工具复用原 writer 与 jail。跨进程撤权在动作边界复验，迁移 partial/unknown 阻止后续操作；`/new` 拒绝失效授权时保留原对话。契约、原生 Linux 沙箱、两模式实际 CLI、反转和独立审查证据见 [决策 §8.108](phase-19-decisions.md#8108-ses-05持久多根授权与同会话工作区迁移)。不承诺跨文件崩溃原子性或撤回已启动 shell；文件 undo 继续归 EDIT-01/03。

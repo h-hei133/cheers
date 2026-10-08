@@ -57,6 +57,7 @@ export interface CompactionSetup {
 }
 
 export interface TurnOptions {
+  readonly workspaceRoots?: ToolGateOptions['workspaceRoots'];
   readonly admission?: ToolGateOptions['admission'];
   readonly sessionId: string;
   /** Where the session's files live, when the caller knows. Carried into the event stream. */
@@ -168,6 +169,7 @@ function gateOptionsFor(
     admission: options.admission,
     sessionId: options.sessionId,
     workspaceRoot: options.workspaceRoot,
+    workspaceRoots: options.workspaceRoots,
     agentMode: options.agentMode,
     permissionScope: options.permissionScope,
     hooks: options.hooks,
@@ -191,6 +193,7 @@ export function runTurn(options: TurnOptions): TurnRun {
   const gate: ToolGateOptions = { ...parentGate, ...(runSubagent ? { runSubagent } : {}) };
   const openingText = [
     environmentLine(options.workspaceRoot, options.permissionScope),
+    ...(options.workspaceRoots?.length ? [`Additional file roots (project configuration, skills and MCP still come from cwd):\n${options.workspaceRoots.map(root => `${root.access === 'write' ? 'read/write' : 'read-only'}: ${JSON.stringify(root.path)}`).join('\n')}`] : []),
     ...(options.continuityContext ? [
       `Recorded session facts (historical context, not current authorization):\n${options.continuityContext}`,
     ] : []),

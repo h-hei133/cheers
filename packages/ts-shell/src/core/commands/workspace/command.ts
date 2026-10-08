@@ -7,6 +7,8 @@ export async function runWorkspaceShellAction(args: string[], _context: CommandC
   const parsed = parseSyntax(workspaceSyntax, args);
   if (!parsed.ok) return { kind: "local", output: `Invalid /workspace arguments: ${parsed.reason}\n${syntaxHelp(workspaceSyntax)}` };
   const mode = parsed.action.name;
+  if (mode === 'add' || mode === 'remove' || mode === 'rebind') return { kind: 'shell-action', action: 'show-workspace',
+    workspaceAction: mode, workspaceTarget: parsed.args[0], ...(mode === 'add' ? { workspaceAccess: parsed.flags.has('write') ? 'write' : 'read' } : {}) };
   if (mode === "attach") return { kind: "shell-action", action: "show-workspace", workspaceAction: "attach", workspaceTarget: parsed.args[0] };
   return { kind: "shell-action", action: "show-workspace", workspaceAction: mode === "recent" ? "recent" : "status" };
 }

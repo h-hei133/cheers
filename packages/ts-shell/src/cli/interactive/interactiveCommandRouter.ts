@@ -270,6 +270,8 @@ export async function routeInteractiveCommand(
       runtimeContext: input.runtimeContext,
       workspaceAction: slashResult.workspaceAction,
       workspaceTarget: slashResult.workspaceTarget,
+      workspaceAccess: slashResult.workspaceAccess,
+      busy: () => input.sessionRuntime.getCurrentRunController() !== null,
       printMode: false,
       onProjectContextSwitched: () => {
         projectContextSwitched = true;
@@ -279,6 +281,7 @@ export async function routeInteractiveCommand(
       turnNumber: nextTurnNumber,
       refreshPromptChrome: projectContextSwitched,
       refreshMcpGateway: projectContextSwitched,
+      ...(projectContextSwitched ? { themeChanged: true } : {}),
     };
   }
 

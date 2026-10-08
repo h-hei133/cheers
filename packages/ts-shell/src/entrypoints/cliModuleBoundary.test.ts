@@ -81,8 +81,7 @@ describe("CLI module facades", () => {
       false,
     );
     expect(isWorkspaceInfoPromptStrict("current directory")).toBe(false);
-    expect(normalizePathForCompare("/Repo/./src")).toBe(
-      normalizePathForCompare("/repo/src"),
-    );
+    expect(normalizePathForCompare("/Repo/./src") === normalizePathForCompare("/repo/src")).toBe(process.platform === 'win32');
+    expect(normalizePathForCompare('/Repo/./src')).toBe(normalizePathForCompare('/Repo/src'));
   });
 });

@@ -503,6 +503,7 @@ export function createCliSessionRuntime(input: {
         ...(attachments ? { attachments } : {}),
         sessionId,
         workspaceRoot: input.runtimeContext.cwd,
+        workspaceRoots: input.runtimeContext.session.workspaceRoots,
         signal,
         maxTurns: config.maxTurns,
         escalationPromptHandler,

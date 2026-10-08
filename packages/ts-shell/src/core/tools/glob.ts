@@ -10,6 +10,7 @@ import { approvedResult } from './toolResultLifecycle.js'
 import { matchesGlob } from './globMatch.js'
 import { truncateHead } from './truncation.js'
 import { ArtifactManager } from '../session/artifactManager.js'
+import { resolveWorkspaceToolTarget } from './permissionContext.js'
 import type { ToolDefinition } from '../../tools/types.js'
 import type { ExecutionAuthority, ExecutionService } from '../../runtime/execution/service.js'
 
@@ -42,6 +43,7 @@ export function createGlobToolDefinition(
     argsSchema: {
       type: 'object',
       properties: {
+        path: { type: 'string', description: 'Directory to search, relative to the primary workspace or an absolute registered root (default: primary workspace).' },
         pattern: {
           type: 'string',
           description: 'The file pattern or suffix to match (e.g. *.json, src/**/*.ts).',
@@ -60,11 +62,12 @@ export function createGlobToolDefinition(
       // silently searching for a name the caller did not ask for. The matcher
       // understands `./` on its own, so there is nothing to strip.
       const pattern = (typeof args.pattern === 'string' ? args.pattern.trim() : '') || '*'
+      const searchRoot = resolveWorkspaceToolTarget({ path: typeof args.path === 'string' ? args.path : '.' }, 'path', context.workspaceRoot)
       const files = await executionService.listFilesRecursive({
         operationKind: 'file.list',
         assertFileAccess: context.assertFileAccess,
         abortSignal: context.abortSignal,
-        absoluteRoot: context.workspaceRoot,
+        absoluteRoot: searchRoot,
         workspaceRoot: context.workspaceRoot,
         authority: TOOL_APPROVED_READ_AUTHORITY,
         caller: 'core-tool:glob',
@@ -95,7 +98,7 @@ export function createGlobToolDefinition(
       if (truncated.truncated) {
         // Spilled rather than dropped, so nothing matched is unreachable — the
         // model can read the rest instead of re-running a narrower search.
-        const artifactManager = ArtifactManager.getShared(context.workspaceRoot, context.sessionId)
+        const artifactManager = ArtifactManager.getShared(context.artifactRoot ?? context.workspaceRoot, context.sessionId)
         const artifact = await artifactManager.save(raw, 'glob')
         notices.push(
           `${Math.round(truncated.shownBytes / 1024)}KB limit reached, showing ${truncated.shownLines} of ${filtered.length} matches. Full list written to ${artifact.uri}`,

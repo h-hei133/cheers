@@ -27,6 +27,10 @@ export interface SessionResumeProvenance {
 }
 
 export interface ShellRuntimeContext {
+  workspaceRevision?: number;
+  workspaceIssue?: string;
+  /** Durable workspace authority, supplied by the session store owner. */
+  workspaceAdmission?: () => string | undefined;
   cwd: string
   originalCwd: string
   projectRoot: string
@@ -114,6 +118,7 @@ export function createShellRuntimeContext(input: {
   restoreSessionUsage(input.session.id, input.session.usage)
   const configuration = initialConfiguration(input);
   return {
+    workspaceRevision: 0,
     cwd: input.cwd,
     originalCwd: input.originalCwd,
     projectRoot: input.projectRoot,
@@ -219,6 +224,8 @@ export function applyShellSubstrateTransition(
   context.rootBindingDiagnostics = nextRootBindingDiagnostics
   context.gitContext = nextGitContext
   context.session = nextSession
+  context.workspaceRevision = (context.workspaceRevision ?? 0) + 1
+  context.workspaceIssue = undefined
   context.configuration.transition(configurationBinding(context));
   refreshConfiguration(context);
   context.activeSession = {

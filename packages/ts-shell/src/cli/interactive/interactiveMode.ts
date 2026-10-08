@@ -714,8 +714,12 @@ export class InteractiveMode {
         return;
       }
       if (clearing) {
-        startFreshSession(this.historyTarget());
-        this.sink.end(true);
+        try {
+          startFreshSession(this.historyTarget());
+          this.sink.end(true);
+        } catch (error) {
+          this.state.transcript.append(textBlock('error', error instanceof Error ? error.message : String(error), 'error'));
+        }
         this.tui.requestRender({ force: true });
       } else if (opened || navigation?.changed) {
         showConversation(this.historyTarget(), navigation?.changed ? this.options.runtimeContext.session : undefined);

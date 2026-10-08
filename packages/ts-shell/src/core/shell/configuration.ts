@@ -12,6 +12,9 @@ import { resolveProviderCredential } from './providerCredentials.js';
 import type { RuntimeConfig } from '../../config/runtimeConfig.js';
 
 interface ConfigurationContext {
+  readonly workspaceRevision?: number;
+  readonly workspaceIssue?: string;
+  readonly workspaceAdmission?: () => string | undefined;
   readonly configuration: ConfigState;
   readonly projectRoot: string;
   readonly session: { readonly id: string };
@@ -47,7 +50,12 @@ function validateCandidate(config: RuntimeConfig, context: Pick<ConfigurationCon
 export function configurationAdmission(context: ConfigurationContext): () => string | undefined {
   const binding = configurationBinding(context);
   const substrate = context.configuration.substrateRevision;
+  const workspaceRevision = context.workspaceRevision;
   return () => {
+    if (context.workspaceIssue) return context.workspaceIssue;
+    if (workspaceRevision !== context.workspaceRevision) return 'Workspace roots changed; start a new operation.';
+    const workspaceBlocked = context.workspaceAdmission?.();
+    if (workspaceBlocked) return workspaceBlocked;
     if (context.configuration.current.admissionBlocked) return 'Configuration safety validation failed; reload a valid configuration before starting new actions.';
     const actual = configurationBinding(context);
     if (context.configuration.current.binding.trustRevision !== actual.trustRevision || context.configuration.current.binding.workspaceRoot !== actual.workspaceRoot) {

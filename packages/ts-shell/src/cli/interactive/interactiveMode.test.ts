@@ -67,6 +67,23 @@ function build(overrides: { observeEvents?: () => () => void; exit?: (code?: num
 }
 
 describe("session wiring", () => {
+  it.each(['/new', '/clear'])('keeps the conversation and shows workspace refusal for %s without rejecting the terminal run', async command => {
+    const { mode } = build();
+    const host = mode as unknown as { run(text: string): Promise<void>; view: InteractiveView;
+      options: { runtimeContext: ShellRuntimeContext; sessionManager: SessionManager } };
+    const context = host.options.runtimeContext;
+    context.session.turns = [{ role: 'user', content: 'Retained conversation' }];
+    context.workspaceAdmission = () => 'Saved workspace changed. Reopen the session.';
+    const create = vi.fn(); Object.assign(host.options.sessionManager, { createNew: create });
+    mode.start();
+    try {
+      await expect(host.run(command)).resolves.toBeUndefined();
+      expect(create).not.toHaveBeenCalled(); expect(context.session.id).toBe('sess_1');
+      const text = host.view.transcript.all().map(block => block.text).join('\n');
+      expect(text).toContain('Retained conversation'); expect(text).toContain('Saved workspace changed. Reopen the session.');
+    } finally { mode.stop(); }
+  });
+
   it('keeps queued input behind the session title editor until it is dismissed', async () => {
     const { mode, terminal } = build();
     const host = mode as unknown as { busy: boolean; pickerPending: boolean; queue: string[]; overlay: OverlayHost;

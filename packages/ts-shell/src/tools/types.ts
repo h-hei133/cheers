@@ -1,9 +1,13 @@
 import type { InteractiveAsk } from '../core/tools/ask/contract.js'
 import type { SubagentRunner } from '../core/subagents/runner.js'
+import type { WorkspaceRoot } from '../core/workspace/model.js'
 
 export interface ToolExecutionContext {
   readonly taskId: string
   readonly workspaceRoot: string
+  readonly workspaceRoots?: readonly WorkspaceRoot[]
+  /** Session artifact storage stays bound to the primary root while file tools select a grant. */
+  readonly artifactRoot?: string
   readonly sessionId?: string
   readonly correlationId?: string
   readonly abortSignal?: AbortSignal

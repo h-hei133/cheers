@@ -4,6 +4,9 @@ import { projectSessionMetadata } from "../schema/sessionMetadataCodec.js";
 import { isRecord } from "../../core/values/record.js";
 import { normalizePathIdentity } from "./roots.js";
 import { projectSessionRootRebase } from "./sessionRootRebase.js";
+import type { ProjectBindingOptions } from '../store/projectBindingPolicy.js';
+import { validateWorkspaceRoots } from '../../core/workspace/roots.js';
+import type { WorkspaceRoot } from '../../core/workspace/model.js';
 
 type RebindOutcome = "unchanged" | "restored" | "partial" | "committed";
 type RebindStage = "prepare" | "state" | "metadata" | "lock-release" | "selection";
@@ -22,7 +25,13 @@ export class SessionRootRebindError extends Error {
   }
 }
 
-interface RebindInput {
+export interface SessionRootRebindOptions {
+  readonly beforeCommit?: () => void;
+  readonly binding?: Omit<ProjectBindingOptions, 'workspaceRoots'>;
+  readonly workspaceRoots?: readonly WorkspaceRoot[];
+}
+
+interface RebindInput extends SessionRootRebindOptions {
   readonly session: Session;
   readonly nextProjectRoot: string;
   readonly updatedAt: string;
@@ -49,9 +58,12 @@ export function rebindSessionProjectRootContinuity(input: RebindInput): Session 
         previousRoot: latest.projectRoot,
         nextProjectRoot: input.nextProjectRoot,
       });
+      const roots = (input.workspaceRoots ?? current.workspaceRoots)?.filter(root => normalizePathIdentity(root.path) !== normalizePathIdentity(projection.projectRoot));
+      if (roots?.length) validateWorkspaceRoots(projection.projectRoot, roots);
       const nextState: SessionStateSnapshot = {
         ...current,
         projectRoot: projection.projectRoot,
+        ...(roots ? { workspaceRoots: roots } : {}),
         ...(projection.workingMemory !== undefined ? { workingMemory: projection.workingMemory } : {}),
       };
       const nextSession: Session = {
@@ -59,6 +71,7 @@ export function rebindSessionProjectRootContinuity(input: RebindInput): Session 
         projectRoot: projection.projectRoot,
         updatedAt: input.updatedAt,
         status: current.status,
+        ...(roots ? { workspaceRoots: roots } : {}),
         pendingPrompt: current.pendingPrompt,
         lastError: current.lastError,
       };
@@ -70,6 +83,8 @@ export function rebindSessionProjectRootContinuity(input: RebindInput): Session 
         delete nextSession.rootMode;
         delete nextSession.gitRoot;
       }
+      if (input.binding) Object.assign(nextSession, input.binding);
+      input.beforeCommit?.();
       try {
         input.writeStateSnapshot(nextState);
       } catch (error) {
@@ -106,11 +121,14 @@ function validateSource(input: RebindInput, latest: Session, current: SessionSta
   if (!input.nextProjectRoot.trim()) throw new Error("Destination project root is empty");
   const expectedRoot = normalizePathIdentity(input.session.projectRoot);
   const latestRoot = normalizePathIdentity(latest.projectRoot);
-  if (latest.id !== input.session.id || !expectedRoot || expectedRoot !== latestRoot) {
+  if (latest.id !== input.session.id || latest.createdAt !== input.session.createdAt || !expectedRoot || expectedRoot !== latestRoot) {
     throw new Error("Session identity or project root changed before migration");
   }
   if (current.projectRoot !== undefined && normalizePathIdentity(current.projectRoot) !== latestRoot) {
     throw new Error("Session metadata and state project roots disagree");
+  }
+  if (current.status === 'active' && (current.runPhase === 'prompt-persisted' || current.runPhase === 'turn-active')) {
+    throw new Error('Session is busy; finish or recover the active turn before migration');
   }
 }
 

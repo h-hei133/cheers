@@ -10,6 +10,6 @@ export function pathKind(name: string | undefined, before: readonly string[], af
   if (!syntax) return undefined;
   const parsed = firstParameter(input => parseSyntax(syntax, input), before, after);
   if (!parsed) return undefined;
-  if (name === "workspace" && parsed.action.name !== "attach") return undefined;
+  if (name === "workspace" && !['attach', 'add', 'remove', 'rebind'].includes(parsed.action.name)) return undefined;
   return name === "cd" || name === "workspace" ? "directory" : "file";
 }

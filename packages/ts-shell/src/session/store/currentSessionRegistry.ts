@@ -9,7 +9,7 @@ import {
   type CurrentSessionSelectionResolution,
   type CurrentSessionSelectionStore,
 } from "./currentSelection.js";
-import { normalizeProjectRootKey } from "./projectBindingPolicy.js";
+import { normalizePathIdentity } from '../continuation/roots.js';
 import { projectCurrentSessionMetadata } from "../sessionMetadataProjection.js";
 
 export interface SessionRegistryReadResult {
@@ -140,9 +140,11 @@ export function resolveCurrentSessionForProject(input: {
   readonly sessionExists: (sessionId: string) => boolean;
   readonly loadSession: (sessionId: string) => Session;
 }): CurrentSessionSelectionResolution {
-  const normalizedProjectRoot = normalizeProjectRootKey(input.projectRoot);
+  const normalizedProjectRoot = normalizePathIdentity(input.projectRoot) ?? '';
   const registry = readMergedSessionRegistryStore(input.storeSearchPaths ?? [input.storePath]);
-  const selection = registry.store.byProjectRoot[normalizedProjectRoot];
+  // Older stores folded case on every platform. A legacy entry is only usable
+  // after its actual session binding passes the host's path identity check.
+  const selection = registry.store.byProjectRoot[normalizedProjectRoot] ?? registry.store.byProjectRoot[normalizedProjectRoot.toLowerCase()];
   if (!selection?.sessionId?.trim()) {
     return projectCurrentSessionRegistryResolution({
       projectRoot: input.projectRoot,
@@ -178,7 +180,7 @@ export function resolveCurrentSessionForProject(input: {
       sessionExists: true,
       session,
       sessionProjectRoot,
-      normalizedSessionProjectRoot: normalizeProjectRootKey(sessionProjectRoot),
+      normalizedSessionProjectRoot: normalizePathIdentity(sessionProjectRoot),
     });
     if (!selectedProjection.resolution.ok) {
       clearCurrentSessionSelection({
@@ -212,7 +214,7 @@ export function setCurrentSessionSelection(input: {
   readonly sessionId: string;
   readonly updatedAt: string;
 }): void {
-  const normalizedProjectRoot = normalizeProjectRootKey(input.projectRoot);
+  const normalizedProjectRoot = normalizePathIdentity(input.projectRoot) ?? '';
   const normalizedSessionId = input.sessionId.trim();
   if (!normalizedProjectRoot || !normalizedSessionId) {
     return;
@@ -260,6 +262,6 @@ export function clearCurrentSessionSelectionForProject(input: {
   clearCurrentSessionSelection({
     storePath: input.storePath,
     storeSearchPaths: input.storeSearchPaths,
-    normalizedProjectRoot: normalizeProjectRootKey(input.projectRoot),
+    normalizedProjectRoot: normalizePathIdentity(input.projectRoot) ?? '',
   });
 }

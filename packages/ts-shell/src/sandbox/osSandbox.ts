@@ -254,6 +254,8 @@ export function planSandboxedCommand(input: {
   readonly shellArgs: readonly string[];
   readonly workspaceRoot: string;
   readonly rules?: SandboxRules;
+  /** Explicit session restrictions applied after all writable grants. */
+  readonly readOnlyRoots?: readonly string[];
 }): SandboxPlan {
   const rules = input.rules ?? readSandboxRules(input.workspaceRoot);
   if (rules.enabled !== true) return { state: "off" };
@@ -262,8 +264,8 @@ export function planSandboxedCommand(input: {
 
   const args =
     launcher.kind === "bwrap"
-      ? bwrapArgs(rules, input.workspaceRoot, input.shell, input.shellArgs)
-      : seatbeltArgs(rules, input.workspaceRoot, input.shell, input.shellArgs);
+      ? bwrapArgs(rules, input.workspaceRoot, input.shell, input.shellArgs, input.readOnlyRoots ?? [])
+      : seatbeltArgs(rules, input.workspaceRoot, input.shell, input.shellArgs, input.readOnlyRoots ?? []);
   return { state: "isolated", command: launcher.bin, args };
 }
 
@@ -278,8 +280,9 @@ function bwrapArgs(
   workspaceRoot: string,
   shell: string,
   shellArgs: readonly string[],
+  readOnlyRoots: readonly string[],
 ): string[] {
-  const args = ["--die-with-parent", "--new-session", "--proc", "/proc", "--dev", "/dev"];
+  const args = ["--die-with-parent", "--new-session", "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp"];
   for (const readable of ["/usr", "/bin", "/lib", "/lib64", "/etc", "/opt", ...(rules.filesystem?.allowRead ?? [])]) {
     if (fs.existsSync(readable)) args.push("--ro-bind", readable, readable);
   }
@@ -287,7 +290,8 @@ function bwrapArgs(
   for (const writable of rules.filesystem?.allowWrite ?? []) {
     if (fs.existsSync(writable)) args.push("--bind", writable, writable);
   }
-  args.push("--tmpfs", "/tmp");
+  // A later writable ancestor bind would shadow an earlier read-only child.
+  for (const readable of readOnlyRoots) args.push("--ro-bind", readable, readable);
   for (const hidden of hiddenPaths(rules)) {
     if (fs.existsSync(hidden)) args.push("--tmpfs", hidden);
   }
@@ -302,14 +306,16 @@ function seatbeltArgs(
   workspaceRoot: string,
   shell: string,
   shellArgs: readonly string[],
+  readOnlyRoots: readonly string[],
 ): string[] {
   const writable = [workspaceRoot, "/tmp", ...(rules.filesystem?.allowWrite ?? [])];
   const profile = [
     "(version 1)",
     "(allow default)",
     "(deny file-write*)",
-    ...writable.map((target) => `(allow file-write* (subpath "${target}"))`),
-    ...hiddenPaths(rules).map((target) => `(deny file-read* (subpath "${target}"))`),
+    ...writable.map((target) => `(allow file-write* (subpath ${JSON.stringify(target)}))`),
+    ...readOnlyRoots.map((target) => `(deny file-write* (subpath ${JSON.stringify(target)}))`),
+    ...hiddenPaths(rules).map((target) => `(deny file-read* (subpath ${JSON.stringify(target)}))`),
     ...((rules.network?.allowedDomains ?? []).length === 0 ? ["(deny network*)"] : []),
   ].join("\n");
   return ["-p", profile, shell, ...shellArgs];

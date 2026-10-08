@@ -43,10 +43,10 @@ import type {
   ApprovalAuditMemoryState,
   SessionContinuitySnapshot,
 } from "./sessionContinuityTypes.js";
-import { type WorkspaceRootMode } from "./store/projectBindingPolicy.js";
+import { type WorkspaceRootMode, type ProjectBindingOptions } from "./store/projectBindingPolicy.js";
 import { applySessionWorkspaceBinding } from "./store/sessionProjectBinding.js";
 import { SessionReadSurface } from "./sessionReadSurface.js";
-import { rebindSessionProjectRootContinuity, SessionRootRebindError } from "./continuation/sessionProjectRootRebind.js";
+import { rebindSessionProjectRootContinuity, SessionRootRebindError, type SessionRootRebindOptions } from "./continuation/sessionProjectRootRebind.js";
 import {
   buildRecoverySnapshotForSession,
   evaluateRecoveryTrustBoundaryForSession,
@@ -147,12 +147,7 @@ export class SessionManager extends SessionReadSurface {
   createNewWithId(
     sessionId: string,
     projectRoot: string = process.cwd(),
-    options?: {
-      readonly rootMode?: WorkspaceRootMode;
-      readonly requestedWorkspaceRoot?: string;
-      readonly targetPathBase?: string;
-      readonly gitRoot?: string | null;
-    },
+    options?: ProjectBindingOptions,
   ): Session {
     return createSessionWithId({
       callbacks: this.createSessionCreationCallbacks(),
@@ -164,12 +159,7 @@ export class SessionManager extends SessionReadSurface {
 
   createNew(
     projectRoot: string = process.cwd(),
-    options?: {
-      readonly rootMode?: WorkspaceRootMode;
-      readonly requestedWorkspaceRoot?: string;
-      readonly targetPathBase?: string;
-      readonly gitRoot?: string | null;
-    },
+    options?: ProjectBindingOptions,
   ): Session {
     return createSession({
       callbacks: this.createSessionCreationCallbacks(),
@@ -205,6 +195,7 @@ export class SessionManager extends SessionReadSurface {
       callbacks: this.createSessionCreationCallbacks(),
       projectRoot: projectRoot ?? source.projectRoot,
       options: {
+        ...(!projectRoot || projectRoot === source.projectRoot ? { workspaceRoots: source.workspaceRoots } : {}),
         ...(source.title ? { title: source.title } : {}),
         parentSession: source.id,
       },
@@ -312,10 +303,13 @@ export class SessionManager extends SessionReadSurface {
     return sessionId ? this.host.store.load(sessionId) : null;
   }
 
-  rebindSessionProjectRoot(sessionId: string, nextProjectRoot: string): Session {
+  rebindSessionProjectRoot(sessionId: string, nextProjectRoot: string,
+    options?: SessionRootRebindOptions,
+  ): Session {
     const session = this.host.store.load(sessionId);
     const statePath = this.host.store.statePath(session.id);
     const rebound = rebindSessionProjectRootContinuity({
+      ...options,
       session,
       nextProjectRoot,
       updatedAt: new Date().toISOString(),

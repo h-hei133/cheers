@@ -42,6 +42,7 @@ import { approvedResult, deniedResult, runtimeErrorResult } from './toolResultLi
 import type { ToolExecutionResult } from '../../tools/types.js'
 import { networkNotice, planSandboxedCommand, readSandboxRules } from '../../sandbox/osSandbox.js'
 import { resolveCommandTimeout, DEFAULT_COMMAND_TIMEOUT_MS, MAX_COMMAND_TIMEOUT_MS } from '../../runtime/execution/commandTimeout.js'
+import { workspaceSandboxPolicy } from '../../sandbox/workspace.js'
 
 type ExecutionFailureKind = 'sandbox_preflight' | 'execution_failure' | 'timeout' | 'cancelled'
 const TOOL_APPROVED_READ_AUTHORITY: ExecutionAuthority = {
@@ -114,6 +115,7 @@ function planCommandLaunch(
     shell: shellBin,
     shellArgs,
     workspaceRoot: context.workspaceRoot,
+    ...workspaceSandboxPolicy(context.workspaceRoot, context.workspaceRoots),
   })
   return { shellBin, shellArgs, sandbox }
 }

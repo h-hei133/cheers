@@ -166,7 +166,8 @@ export interface ShellActionResult {
   readonly permissionSelector?: string
   readonly mcpAction?: 'status' | 'tools' | 'doctor' | 'refresh'
   readonly mcpTarget?: string
-  readonly workspaceAction?: 'status' | 'attach' | 'recent'
+  readonly workspaceAction?: 'status' | 'attach' | 'recent' | 'add' | 'remove' | 'rebind'
+  readonly workspaceAccess?: 'read' | 'write'
   readonly workspaceTarget?: string
   readonly continuationPrompt?: string
 }

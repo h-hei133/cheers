@@ -6345,3 +6345,5 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 ## [2026-10-07] fix | Phase 19 SES-03 分支回退区分写后 warning、unchanged 与 unknown，统一 snapshot/draft、锁内重验及两模式集合替换；独立审查修复已在目标的旧视图、忙碌回合覆盖和 current 缓存绕行。最终 Node 20.3 构建/308 项、10 组有效反转/恢复后 93 项、两模式实际 CLI 与独立 APPROVE/CLEAR 通过。4adb7ee0 的远端 job 因账单限制零步骤失败；SES-04 与完整阶段继续，详见 features/phase-19-decisions.md §8.106。
 
 ## [2026-10-08] feat | Phase 19 SES-04 接通 new/rename/delete 直达，完整目录匹配拒绝歧义与 incomplete，批准后锁内复验并保留 unknown；列表复用同一 owner，修复标题编辑队列交接。Node 20.3 构建/353 项及最终队列文件 38 项、结果契约 149 项、七组反转/恢复后 74 项、两模式实际 CLI、独立 APPROVED 与静态 gates 通过。0ab9fbd0 远端因账单限制零步骤失败；SES-05 与完整阶段继续，见 features/phase-19-decisions.md §8.107。
+
+## [2026-10-08] feat | Phase 19 SES-05 持久附加读/写根与同 ID rebind，复用原 writer、jail 和迁移补偿；主根资源发现、跨进程撤权、沙箱只读优先级及 unknown admission 明确。Node 20.3 构建/263 项、结果契约 149 项、八组有效反转/恢复后 58 项、原生 Linux 沙箱、两模式实际 CLI/重启/技能与 MCP 刷新及独立最终 APPROVED 通过，见 features/phase-19-decisions.md §8.108。52f87bba 的远端 job 因账单限制零步骤失败；EDIT-01 与完整阶段继续。

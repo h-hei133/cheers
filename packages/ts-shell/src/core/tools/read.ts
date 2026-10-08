@@ -36,7 +36,7 @@ export function createReadToolDefinition(executionService: ExecutionService): To
     async execute(args, context) {
       const rawPath = typeof args.path === 'string' ? args.path : ''
       const selector = parsePathSelector(rawPath)
-      const artifactManager = ArtifactManager.getShared(context.workspaceRoot, context.sessionId)
+      const artifactManager = ArtifactManager.getShared(context.artifactRoot ?? context.workspaceRoot, context.sessionId)
       let target = selector.cleanPath
       const isArtifact = target.startsWith('artifact://')
       let request: TextPageReadRequest
@@ -52,7 +52,7 @@ export function createReadToolDefinition(executionService: ExecutionService): To
           abortSignal: context.abortSignal,
           absolutePath: resolvedArtifact,
           artifactDirectory: artifactManager.directory,
-          workspaceRoot: context.workspaceRoot,
+          workspaceRoot: context.artifactRoot ?? context.workspaceRoot,
           authority: AUTHORITY,
           caller: 'core-tool:read:artifact',
           reason: 'Read session artifact output log.',
@@ -76,6 +76,7 @@ export function createReadToolDefinition(executionService: ExecutionService): To
               abortSignal: context.abortSignal,
               absolutePath: containment.resolvedPath,
               workspaceRoot: context.workspaceRoot,
+              artifactRoot: context.artifactRoot,
               displayPath: selector.cleanPath,
               sessionId: context.sessionId,
               offset: typeof args.offset === 'number' ? args.offset : undefined,
