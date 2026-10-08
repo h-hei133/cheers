@@ -3,6 +3,7 @@ import { selectWorkspaceRoot } from '../core/workspace/roots.js';
 import type { PermissionScope } from '../cli/approval/permissionScope.js';
 import type { DenyRule } from '../core/shell/approval/deny.js';
 import type { ToolExecutionContext, ToolPreparation } from '../tools/types.js';
+import { assertSourceAccess } from '../core/query/sourcePolicy.js';
 
 interface PreparationGate extends Pick<ToolExecutionContext, 'workspaceRoot' | 'workspaceRoots' | 'sessionId'> {
   readonly permissionScope?: PermissionScope;
@@ -13,10 +14,16 @@ interface PreparationGate extends Pick<ToolExecutionContext, 'workspaceRoot' | '
 /** Preflight and publication both enforce every path's grants and read/write denials. */
 export function preparationContext(toolName: string, options: PreparationGate): ToolExecutionContext {
   return { workspaceRoot: options.workspaceRoot, artifactRoot: options.workspaceRoot, workspaceRoots: options.workspaceRoots,
-    sessionId: options.sessionId, taskId: 'preparation', assertFileAccess: absolute => { targetPermission(toolName, { path: absolute, operation: 'write' }, options); } };
+    sessionId: options.sessionId, taskId: 'preparation', assertFileAccess: absolute => {
+      if (toolName === 'browser') {
+        const blocked = options.admission?.(); if (blocked) throw new Error(blocked);
+        assertSourceAccess(absolute, options.workspaceRoot, options.workspaceRoots, options.permissionScope, options.denyRules);
+      } else targetPermission(toolName, { path: absolute, operation: 'write' }, options);
+    } };
 }
 
 export function preparationPermission(toolName: string, preparation: ToolPreparation, options: PreparationGate) {
+  if (preparation.permissionArgs) return evaluateToolPermissionScope(toolName, { ...preparation.permissionArgs }, options.permissionScope, options.workspaceRoot, options.denyRules);
   const decisions = preparation.targets.map(target => targetPermission(toolName, target, options));
   return { requiresEscalation: decisions.some(decision => decision.requiresEscalation), denied: false,
     operation: preparation.targets.some(target => target.operation === 'delete') ? 'delete' as const : 'write' as const,

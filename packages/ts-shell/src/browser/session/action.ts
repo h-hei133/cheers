@@ -15,7 +15,7 @@ export interface BrowserActionEvidence {
 
 export type BrowserOperation<T> =
   | { readonly status: "completed"; readonly value: T; readonly evidence: BrowserActionEvidence }
-  | { readonly status: "cancelled" | "error"; readonly evidence: BrowserActionEvidence };
+  | { readonly status: "cancelled" | "error"; readonly value?: T; readonly evidence: BrowserActionEvidence };
 
 type Cleanup = () => Promise<{ readonly ok: boolean; readonly failure?: { readonly cleanup?: "failed" | "unknown" } }>;
 const DEFAULT_ACTION_MS = 30_000;
@@ -23,6 +23,8 @@ const CANCELLATION_WAIT_MS = 4_000;
 
 /** Scope survives a caller timeout until its underlying operation has settled. */
 export class ActionScope {
+  private readonly controller = new AbortController();
+  readonly signal = this.controller.signal;
   readonly stopped: Promise<void>;
   private stop!: () => void;
   private readonly timer: ReturnType<typeof setTimeout>;
@@ -45,6 +47,7 @@ export class ActionScope {
   cancel(reason: NonNullable<BrowserActionEvidence["reason"]>): void {
     if (this.reason) return;
     this.reason = reason;
+    this.controller.abort(new Error('Browser action stopped.'));
     this.stop();
   }
 
@@ -91,10 +94,11 @@ export class BrowserActions {
     }
     this.scope = scope;
     scope.activity = "started";
+    let finished: { readonly ok: true; readonly value: T } | { readonly ok: false } | undefined;
     const work = Promise.resolve().then(() => { scope.check(); return operation(); }).then(
       (value) => ({ ok: true as const, value }),
       () => ({ ok: false as const }),
-    );
+    ).then(result => { finished = result; return result; });
     const first = await Promise.race([work, scope.stopped.then(() => undefined)]);
     if (first && !scope.reason) {
       scope.activity = "completed";
@@ -123,7 +127,7 @@ export class BrowserActions {
         settling,
         new Promise<"unknown">((resolve) => { timer = setTimeout(() => resolve("unknown"), CANCELLATION_WAIT_MS); }),
       ]);
-      return { status: "cancelled", evidence: scope.evidence("cancelled", outcome) };
+      return { status: "cancelled", ...(finished?.ok ? { value: finished.value } : {}), evidence: scope.evidence("cancelled", outcome) };
     } finally {
       clearTimeout(timer);
     }

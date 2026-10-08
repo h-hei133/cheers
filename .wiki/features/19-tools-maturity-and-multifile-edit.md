@@ -34,7 +34,7 @@ confidence: mixed
 | `bash` | ShellManager、执行服务、OS 沙箱、超时、后台句柄与输出 artifact | 明确支持平台与交互限制；取消、进程组与逃逸后代的已确认/未知状态，不凭信号发送承诺全树退出 |
 | `web_search` | Exa/Tavily/DDG 按配置选择，不是运行失败后的自动 failover；父 signal 替代自身期限；部分错误返回上游正文；成功体也全量读取 | 总期限、父取消、有界读取、响应 schema、错误脱敏、明确重试与提供商选择策略 |
 | `web_fetch` | 逐跳 URL 检查与正文上限；预取消信号未提前处理；hostname 规则不绑定实际连接地址 | DNS 全地址审查、连接 IP 绑定、redirect/TLS 约束、取消和解析预算，见 §3.5 |
-| `browser` | 八个基本动作：open/observe/click/type/select/hover/press/close；工具入口与会话管理器未完整传递取消 | 动作生命周期取消、截图多模态、标签页、上传下载、弹窗与网络策略，见 §3.8、§3.10 |
+| `browser` | 原八动作及 tabs/tab_new/tab_select/tab_close、截图、受审批上传与显式 URL 下载；复用统一动作取消与 session artifact | Linux Node/executable 本地验收已通过；当前输入、权限、遮蔽及原生网络/平台边界见 §3.13 |
 | `todo` | 会话任务清单及持久化回放 | 勾选状态与行为完成证据分开；不由 `done` 自动证明任务成功 |
 | `task` | 前台子代理委派，可选 worktree、权限交集、递归限制；不同于 bash 的后台进程句柄 | 主子共享预算与 deadline、完整轨迹、只读委派准入；并发策略由通用调度契约承担 |
 | `ask` | 已按 Phase 19 区分回答来源与六种结果，空答不选择推荐项，中断保留已答项 | 本地实现与验证见 [裁决 §8.14](phase-19-decisions.md)；跨平台实机与远端结果另核对 |
@@ -133,7 +133,7 @@ confidence: mixed
 | 浏览器扩展 | browser 域统一 tabs、screenshot、dialog、upload/download、network policy/session 生命周期，工具入口仅适配 | 多标签隔离、导航后 ref 失效、截图证据、上传下载权限、弹窗取消和网络边界；既有八动作回归 |
 | 子代理与预算 | 通用 runner/调度与 `/goal` 的共享 admission、计量、deadline 和持久状态；默认无总 token cap，`budget N` 启用，`budget off` 移除 | 显式 cap 汇总主/子/顾问/重试且不可绕过；未设 cap 不虚构默认 100k；单请求窗口/输出/timeout/并发与安全取消仍生效；权限只能求交，研究复用该契约 |
 
-此表保留规划接口；已实施部分以裁决文档 §8 为准。TOOL-02 图片/PDF 和 TOOL-03 语言服务器已通过 Linux 本地验收，见 §3.11、§3.12；其他项没有因此变为已完成。不引入第二 runtime。
+此表保留规划接口；已实施部分以裁决文档 §8 为准。TOOL-02 图片/PDF、TOOL-03 语言服务器与 TOOL-04 浏览器扩展的 Linux 本地实现见 §3.11、§3.12、§3.13；其他项没有因此变为已完成。不引入第二 runtime。
 
 ### 3.11 图片/PDF 的当前实现边界
 
@@ -148,6 +148,16 @@ Linux 要求相应原生 utilities，缺失及其他平台明确 unavailable；�
 客户端协商 UTF-16、full/incremental 同步，逐文件保留原始 UTF-8 hash 和 document version。definitions/references/hover/symbols/diagnostics 来自真实服务器；push diagnostics 有版本时拒绝旧值，无版本时标明 currency unverified，没收到发布不伪造空的清洁结果。返回的 URI、source、关联位置和 edit targets 分别复验获准根及 deny。服务器的内部文件读取、插件或任意行为属于已批准进程执行，客户端路径检查不提供沙箱。
 
 rename 仅返回不可变、零写入的 `editPlan.applyPatch = {input, expectedHashes}`，包括逐源 hash、document/server version 状态、proposed hash 和 revision；服务器 `workspace/applyEdit` 请求被拒绝。原有 apply_patch 在准备/审批前核对完整原始 hash，再沿现有完整批次预览、锁与 writer。拒绝过时版本、重叠/资源操作、不可精确保留的文字形态；完整提案超过模型工具消息的 10,000 字符上限时明确拒绝，不发半份 patch。支持需要 open/close 的 full/incremental 同步；code action、自动安装与其他协议能力尚未开放。Windows server backend 明确 unavailable，macOS 未原生验收；Linux 进程清理限原进程组。精确验证、提交及远端边界见 [Phase 19 裁决](phase-19-decisions.md) §8.114。
+
+### 3.13 浏览器扩展的当前实现边界
+
+`browser/session/` 复用现有动作队列、取消与收尾，按 session/canonical 项目对象保留页面；标签页具有稳定 ID，导航、切换和重新观察后旧 ref 拒绝且不复用。新增 tabs/tab_new/tab_select/tab_close，保留原八动作；页面与 popup 共用请求策略，dialog 默认 dismiss 并记录结果。关闭失败或未知时保留 owner，不能靠丢弃对象假称收尾完成。
+
+截图只返回原生 CSS 视口 PNG，最多 4 MP/2 MiB，进入现有 typed tool image、批次预算、持久消息和 provider 通路。默认遮蔽所有 input/textarea/select/contenteditable 及 iframe/frame 区域，支持开放 shadow DOM；最多 16 个附加 selector，必需遮蔽不匹配、捕获期间消失或文档变化均不返回图片。普通渲染文字、canvas、封闭 shadow 内容仍可能含未知敏感值，不能宣称自动识别任意秘密。
+
+执行动作沿既有 execute 审批，完整参数、项目对象和选定文档在预览关闭后仍默认 Deny；进入队列前和真正开始时重新核验绑定。上传最多四个获准 read 文件、合计 8 MiB，逐源检查附加只读根和当前 read deny；从已核验句柄取得有界固定 Buffer，上传前复验来源和页面。浏览器只接收文件名与 Buffer，不重新按文件路径读取。下载只支持显式 http(s) URL，不转发浏览器 cookie/凭据，点击或 blob 下载明确 unsupported；每跳执行浏览器 URL/DNS 地址准入，五次重定向及每响应传输/解压后各 8 MiB 限制。公共 fetch 的 public-only 策略保留。
+
+下载存入既有 session artifact，Linux 使用目录描述符锚定、独占发布、实际字节/hash 和最终对象复验；错误保留 not-published/unverified/verified 及独立 cleanup，外部替换内容不被失败补偿删除。取消后可能留存的目标及清理未知可见，清理未确认时拒绝新动作。下载的通用二进制 `.bin` 不伪读成文本；原文本 artifact 保留跨平台路径。新二进制发布在非 Linux 平台预先报告 unavailable。浏览器自身导航/原生请求仍有既有 DNS/重定向与沙箱边界，显式 URL 下载的连接约束不扩大成任意页面流量或进程 RSS 保证。准确验证记录见 [Phase 19 裁决](phase-19-decisions.md) §8.115。
 
 ## 4. 多文件编辑：一个入口、一份计划、一个 writer
 

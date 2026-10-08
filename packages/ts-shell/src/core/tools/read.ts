@@ -8,6 +8,7 @@ import { resolveToolTarget } from './permissionContext.js'
 import { approvedResult } from './toolResultLifecycle.js'
 import type { ToolDefinition } from '../../tools/types.js'
 import type { ExecutionService, TextPageReadRequest, TextPageReadResult } from '../../runtime/execution/types.js'
+import { withVerifiedReadTarget } from '../../runtime/execution/read.js'
 
 const AUTHORITY = { mode: 'read-only', source: 'tool-runtime-approval', reason: 'Read an approved file page.' } as const
 
@@ -111,6 +112,11 @@ export function createReadToolDefinition(executionService: ExecutionService): To
           offset: args.offset as number | undefined, limit: args.limit as number | undefined })
         context.abortSignal?.throwIfAborted()
         return { success: true, ...media }
+      }
+
+      if (request.artifactDirectory && request.absolutePath.endsWith('.bin')) {
+        const bytes = await withVerifiedReadTarget(request, 'file', async (handle, verify) => { await verify(); return (await handle.stat()).size; });
+        return approvedResult(`Binary artifact (${bytes} bytes). Content is unavailable as text; use a supported image or PDF artifact for media reads.`, { binaryArtifact: { bytes, content: 'unavailable' } });
       }
 
       const offset = selector.hasSelector ? selector.startLine ?? 1

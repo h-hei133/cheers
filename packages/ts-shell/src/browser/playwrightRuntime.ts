@@ -30,6 +30,7 @@ export interface PwBrowserContext {
   /** Covers pages and popup first requests, but not every server redirect hop. */
   route(pattern: string, handler: (route: PwRoute) => Promise<void>): Promise<void>;
   newPage(): Promise<PwPage>;
+  on?(event: 'page', handler: (page: PwPage) => void): void;
   /** Present in Playwright; optional here because a minimal double need not take a script. */
   addInitScript?(script: string): Promise<unknown>;
   close(): Promise<void>;
@@ -41,9 +42,8 @@ export interface PwBrowserContext {
  * Narrow on purpose: it is everything the browser session calls, and nothing
  * else. A wider declaration would describe Playwright rather than our use of it,
  * and every member declared but unused is one a reader has to rule out before
- * they can trust the ones that are. The locator API (`locator`, `getByRole`,
- * `getByLabel`) was declared here and never called from anywhere; the session
- * evaluates selectors directly, so it is gone rather than carried.
+ * they can trust the ones that are. Locator, screenshot and file input members
+ * are optional so an adapter can report an unavailable feature explicitly.
  *
  * The shapes match Playwright's, so the value returned by a real launch
  * satisfies this without a cast.
@@ -58,9 +58,15 @@ export interface PwPage {
   selectOption(selector: string, value: string, options?: { readonly timeout?: number }): Promise<void>;
   hover(selector: string, options?: { readonly timeout?: number }): Promise<void>;
   keyboard: { press(key: string): Promise<void> };
-  on(event: string, handler: () => void): void;
+  on(event: string, handler: (event: PwPage & { dismiss(): Promise<void> }) => void): void;
+  viewportSize?(): { width: number; height: number } | null;
+  locator?(selector: string): PwLocator;
+  screenshot?(options: { type: 'png'; scale: 'css'; fullPage: false; mask: readonly PwLocator[]; maskColor: string; timeout: number }): Promise<Buffer>;
+  setInputFiles?(selector: string, files: readonly { name: string; mimeType: string; buffer: Buffer }[], options: { timeout: number }): Promise<void>;
   close(): Promise<void>;
 }
+
+export interface PwLocator { count(): Promise<number> }
 
 /** One intercepted request, as much of it as the policy check reads. */
 export interface PwRoute {

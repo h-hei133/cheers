@@ -1,4 +1,6 @@
 import { BrowserActions, type BrowserActionContext, type BrowserOperation } from "./session/action.js";
+import { retainBrowser, releaseBrowser } from "./session/lifetime.js";
+import { BrowserTabs } from "./session/tabs.js";
 import { ResourceCleanup, initializationSettled } from "./session/cleanup.js";
 import { importPwRuntime, type PwBrowser, type PwBrowserContext, type PwPage } from "./playwrightRuntime.js";
 import {
@@ -119,16 +121,15 @@ function classifyLaunchFailure(message: string): BrowserSessionFailure {
 
 class BrowserSessionManager {
   private readonly cleanup = new ResourceCleanup();
-  private readonly actions = new BrowserActions();
+  readonly actions = new BrowserActions();
+  readonly tabs = new BrowserTabs(this.cleanup);
+  readonly retainedCleanup = new Set<{ close(): Promise<void> }>();
   private browser: PwBrowser | null = null;
-  private context: PwBrowserContext | null = null;
-  private currentPage: PwPage | null = null;
+  context: PwBrowserContext | null = null;
   private currentUrl = "about:blank";
   private currentTitle = "Blank Page";
-  private elementRefs: Map<string, string> = new Map();
   private initPromise: Promise<PwPage | null> | null = null;
   private closePromise: Promise<BrowserActionResult> | null = null;
-  private cleanupRegistered = false;
   /**
    * The policy the current page's own requests are judged by.
    *
@@ -166,15 +167,16 @@ class BrowserSessionManager {
     if (this.closePromise) await this.closePromise;
     this.actions.scope?.check();
     if (this.sessionFailure?.kind === "close-failed") return null;
-    if (this.currentPage) return this.currentPage;
+    if (this.tabs.current) return this.tabs.current;
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = (async () => {
       try {
         if (this.dependencies.launchPage) {
-          this.currentPage = await this.dependencies.launchPage();
+          this.tabs.current = await this.dependencies.launchPage();
+          if (this.tabs.current) this.tabs.register(this.tabs.current);
           this.actions.scope?.check();
-          return this.currentPage;
+          return this.tabs.current;
         }
         // Imported through the module that already resolves the package, rather
         // than a second copy of the import dance. It reports which package
@@ -192,9 +194,11 @@ class BrowserSessionManager {
 
         this.browser = await imported.module.chromium.launch({
           headless: true,
+          ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}),
           args: [...STEALTH_LAUNCH_ARGS],
           ignoreDefaultArgs: [...STEALTH_IGNORE_DEFAULT_ARGS],
         });
+        retainBrowser(this.browser);
         this.actions.scope?.check();
         this.context = await this.browser.newContext({
           userAgent: DEFAULT_USER_AGENT,
@@ -202,6 +206,7 @@ class BrowserSessionManager {
           locale: "en-US",
           timezoneId: "America/New_York",
           serviceWorkers: "block",
+          acceptDownloads: false,
         });
         this.actions.scope?.check();
         // Install before any page exists, including a popup's first request.
@@ -213,26 +218,13 @@ class BrowserSessionManager {
         await this.context.addInitScript?.(stealthScript);
         this.actions.scope?.check();
 
-        this.currentPage = await this.context.newPage();
+        this.tabs.current = await this.context.newPage();
+        this.tabs.register(this.tabs.current);
         this.actions.scope?.check();
-        const launchedPage = this.currentPage;
-        // A crashed or closed page must not stay as the handle every later call
-        // uses, or the session keeps answering from a page that is gone.
-        this.currentPage.on("close", () => {
-          if (this.currentPage === launchedPage) this.currentPage = null;
-        });
-        this.currentPage.on("crash", () => {
-          if (this.currentPage === launchedPage) this.currentPage = null;
-        });
+        this.context.on?.('page', page => this.tabs.register(page));
 
-        if (!this.cleanupRegistered) {
-          process.once("exit", () => {
-            this.browser?.close().catch(() => {});
-          });
-          this.cleanupRegistered = true;
-        }
         this.sessionFailure = null;
-        return this.currentPage;
+        return this.tabs.current;
       } catch (error) {
         const launchFailure = classifyLaunchFailure(
           error instanceof Error ? error.message : String(error),
@@ -278,7 +270,7 @@ class BrowserSessionManager {
       };
     }
 
-    this.elementRefs.clear();
+    this.tabs.invalidate();
     this.requestFailure = null;
     const page = await this.getOrCreatePage();
     this.actions.scope?.check();
@@ -339,7 +331,7 @@ class BrowserSessionManager {
   async observe(): Promise<ObservedPageState> {
     this.actions.scope?.check();
     let failure: BrowserSessionFailure | undefined;
-    this.elementRefs.clear();
+    this.tabs.invalidate();
     const elements: BrowserElementRef[] = [];
     const outlineLines: string[] = [];
 
@@ -347,8 +339,9 @@ class BrowserSessionManager {
     this.actions.scope?.check();
     if (page) {
       this.currentUrl = this.readPageUrl() || this.currentUrl;
+      this.currentTitle = "";
       try {
-        this.currentTitle = (await page.title()) || this.currentTitle;
+        this.currentTitle = await page.title();
       } catch {
         failure = { kind: "action-failed", reason: "The page title could not be observed.", nextAction: "Retry observation before acting on page elements." };
       }
@@ -360,6 +353,7 @@ class BrowserSessionManager {
     if (this.requestFailure) {
       outlineLines.push(`Request guard: ${this.requestFailure.reason}`, this.requestFailure.nextAction);
     }
+    outlineLines.push(`Dialogs: ${this.tabs.dialogs.map(record => record.state).join(", ") || "none"}`);
     outlineLines.push("", "Interactive Elements:");
 
     if (page) {
@@ -401,9 +395,8 @@ class BrowserSessionManager {
         });
 
         this.actions.scope?.check();
-        rawElements.forEach((el, index) => {
-          const ref = `e${index + 1}`;
-          this.elementRefs.set(ref, el.selector);
+        rawElements.forEach((el) => {
+          const ref = this.tabs.ref(el.selector);
           elements.push({ ref, role: el.role, name: el.name, selector: el.selector });
           outlineLines.push(`- [ref=${ref}] ${el.role} "${el.name}" (selector: ${el.selector})`);
         });
@@ -460,19 +453,12 @@ class BrowserSessionManager {
 
   /** Where the page actually is. Read through one place so a failure has one shape. */
   private readPageUrl(): string {
-    return this.currentPage?.url() ?? "";
+    return this.tabs.current?.url() ?? "";
   }
 
-  /**
-   * Resolve a ref or a raw selector to the selector to act on.
-   *
-   * A ref that was never observed is returned unchanged, so it reaches the page
-   * as a selector and fails there with the page's own message. Reporting "no such
-   * ref" here instead would be a second guess at what the caller meant.
-   */
+  /** Observed refs are scoped to the selected tab and its current document. */
   resolveSelector(refOrSelector: string): string {
-    const clean = refOrSelector.trim();
-    return this.elementRefs.get(clean) ?? clean;
+    return this.tabs.resolve(refOrSelector);
   }
 
   /**
@@ -489,13 +475,12 @@ class BrowserSessionManager {
   ): Promise<BrowserActionResult> {
     this.actions.scope?.check();
     if (this.sessionFailure?.kind === "close-failed") return { ok: false, failure: this.sessionFailure };
-    const selector = this.resolveSelector(target);
     // A page the caller never opened is not a failure of this action, and
     // launching a browser to answer it is worse than saying so: the launch
     // succeeds, the page is blank, and the action then spends its full locator
     // timeout waiting for an element on a page nobody asked for. The answer the
     // caller needs is that there is no page yet.
-    const page = this.currentPage;
+    const page = this.tabs.current;
     if (!page) {
       return {
         ok: false,
@@ -505,6 +490,10 @@ class BrowserSessionManager {
           nextAction: "Open a page first, then act on an element it lists.",
         },
       };
+    }
+    let selector: string;
+    try { selector = this.resolveSelector(target); } catch (error) {
+      return { ok: false, failure: { kind: "action-failed", reason: (error as Error).message, nextAction: "Observe the selected tab again." } };
     }
     try {
       if (this.actions.scope) await this.actions.scope.perform(() => act(page, selector));
@@ -551,7 +540,7 @@ class BrowserSessionManager {
     if (this.sessionFailure?.kind === "close-failed") return { ok: false, failure: this.sessionFailure };
     // Same rule as the element actions: no page means nothing to press a key
     // into, and launching a browser to discover that spends seconds proving it.
-    const page = this.currentPage;
+    const page = this.tabs.current;
     if (!page) {
       return {
         ok: false,
@@ -576,6 +565,10 @@ class BrowserSessionManager {
         },
       };
     }
+  }
+
+  isReleased(): boolean {
+    return !this.browser && !this.context && !this.tabs.current && !this.initPromise && !this.closePromise && !this.actions.scope && !this.sessionFailure && !this.retainedCleanup.size;
   }
 
   /** Close the session and release the browser. */
@@ -604,23 +597,29 @@ class BrowserSessionManager {
   }
 
   private async closeResources(): Promise<BrowserActionResult> {
-    const failures: string[] = [];
+    const failures: string[] = [...await this.tabs.closeAll()];
     const resources = [
-      ["currentPage", "page"], ["context", "context"], ["browser", "browser"],
+      ["context", "context"], ["browser", "browser"],
     ] as const;
-    let unknown = false;
+    let unknown = failures.some(failure => failure.includes("unknown"));
+    for (const resource of this.retainedCleanup) {
+      const outcome = await this.cleanup.close(resource);
+      if (outcome === 'closed') this.retainedCleanup.delete(resource);
+      else { unknown = true; failures.push(`artifact handles: ${outcome}`); }
+    }
     for (const [key, label] of resources) {
       const resource = this[key];
       if (!resource) continue;
       const outcome = await this.cleanup.close(resource);
       if (outcome === "closed") {
+        if (key === "browser") releaseBrowser(resource as PwBrowser);
         if (this[key] === resource) this[key] = null;
       } else {
         unknown ||= outcome === "unknown";
         failures.push(`${label}: ${outcome}`);
       }
     }
-    this.elementRefs.clear();
+    this.tabs.invalidate();
     this.requestFailure = null;
     if (failures.length > 0) {
       this.sessionFailure = {

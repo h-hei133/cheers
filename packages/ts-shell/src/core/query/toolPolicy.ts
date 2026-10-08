@@ -39,6 +39,7 @@ export const READ_ONLY_BROWSER_ACTIONS: Record<string, true> = {
   url: true,
   title: true,
   screenshot: true,
+  tabs: true,
   ariasnapshot: true,
 };
 

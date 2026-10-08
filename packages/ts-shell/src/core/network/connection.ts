@@ -1,7 +1,7 @@
 import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import { isIP } from 'node:net';
-import { publicLookup, publicUrl } from './address.js';
+import { approvedLookup, publicLookup, publicUrl } from './address.js';
 import { responseBody } from './body.js';
 import { NetworkError } from './error.js';
 import type { RequestScope } from './request.js';
@@ -15,9 +15,22 @@ export interface PublicRequest {
 
 /** Direct public-web connection; no implicit redirects, proxy DNS, or pooled sockets. */
 export async function requestPublic(input: string, init: PublicRequest, scope: RequestScope): Promise<Response> {
+  return requestApproved(publicUrl(input), init, scope, publicLookup);
+}
+
+/** Same bounded transport, with an explicitly supplied browser URL and DNS-answer policy. */
+export async function requestBrowser(input: string, init: PublicRequest, scope: RequestScope, policy: {
+  readonly admitUrl: (input: string) => boolean;
+  readonly admitAddress: (address: string) => boolean;
+}): Promise<Response> {
+  if (!policy.admitUrl(input)) throw new NetworkError('denied');
+  const url = new URL(input);
+  return requestApproved(url, init, scope, (selected, current) => approvedLookup(selected, current, policy.admitAddress));
+}
+
+async function requestApproved(url: URL, init: PublicRequest, scope: RequestScope, resolve: typeof publicLookup): Promise<Response> {
   scope.check();
-  const url = publicUrl(input);
-  const lookup = await publicLookup(url, scope);
+  const lookup = await resolve(url, scope);
   scope.check();
   return new Promise<Response>((resolve, reject) => {
     const request = url.protocol === 'https:' ? httpsRequest : httpRequest;

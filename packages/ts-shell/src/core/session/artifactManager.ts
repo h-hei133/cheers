@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import crypto from "node:crypto";
+import { ArtifactPublicationError, publishArtifact, publishTextArtifact } from './artifacts/publication.js';
 import { verifyPathContainment } from '../security/pathJail.js';
 
 export interface StoredArtifact {
@@ -11,6 +11,9 @@ export interface StoredArtifact {
   readonly totalBytes: number;
   readonly totalLines: number;
   readonly createdAt: string;
+  readonly sha256?: string;
+  readonly format?: string;
+  readonly publication?: 'verified';
 }
 
 export class ArtifactManager {
@@ -64,40 +67,44 @@ export class ArtifactManager {
   }
 
   async save(content: string, toolType: string = "output"): Promise<StoredArtifact> {
+    return this.publish(Buffer.from(content, 'utf8'), toolType, 'log', content.split('\n').length);
+  }
+
+  async saveBinary(content: Uint8Array, toolType = 'binary', format = 'bin', signal?: AbortSignal): Promise<StoredArtifact> {
+    if (!['bin', 'png', 'jpg', 'jpeg', 'webp', 'pdf'].includes(format)) throw new Error('Unsupported binary artifact format.');
+    if (content.byteLength > 8 * 1024 * 1024) throw new Error('Binary artifact exceeds the 8 MiB limit.');
+    this.assertBinaryStorage();
+    return this.publish(Buffer.from(content), toolType, format, 0, signal);
+  }
+
+  assertBinaryStorage(): void {
+    try {
+      if (process.platform !== 'linux') throw new Error();
+      const checked = verifyPathContainment(this.artifactsDir, this.workspaceRoot);
+      if (!checked.allowed || checked.resolvedPath !== this.artifactsDir) throw new Error();
+      if (fs.existsSync(this.artifactsDir)) this.verifyDirectory();
+    } catch { throw new ArtifactPublicationError('not-published', 'complete', this.artifactsDir); }
+  }
+
+  private async publish(content: Buffer, toolType: string, format: string, lines: number, signal?: AbortSignal): Promise<StoredArtifact> {
     const id = String(this.counter++);
     const tag = toolType.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64) || 'output';
-    const filename = `${id}.${tag}.log`;
+    const filename = `${id}.${tag}.${format}`;
     const targetPath = path.join(this.artifactsDir, filename);
-    const tempPath = path.join(this.artifactsDir, `${filename}.tmp-${crypto.randomUUID()}`);
-
-    const lines = content.split("\n").length;
-    const totalBytes = Buffer.byteLength(content, "utf8");
-
-    try {
-      if (!fs.existsSync(this.artifactsDir)) {
-        const checked = verifyPathContainment(this.artifactsDir, this.workspaceRoot);
-        if (!checked.allowed || checked.resolvedPath !== this.artifactsDir) {
-          throw new Error('Artifact directory resolves through a symbolic link.');
-        }
-        fs.mkdirSync(this.artifactsDir, { recursive: true });
-      }
-      this.verifyDirectory();
-      await fs.promises.writeFile(tempPath, content, { encoding: 'utf8', flag: 'wx' });
-      this.verifyDirectory();
-      // Exclusive publication cannot overwrite an artifact from an earlier run.
-      await fs.promises.link(tempPath, targetPath);
-    } finally {
-      await fs.promises.unlink(tempPath).catch(() => {});
-    }
+    const checked = verifyPathContainment(this.artifactsDir, this.workspaceRoot);
+    if (!checked.allowed || checked.resolvedPath !== this.artifactsDir) throw new Error('Artifact directory resolves through a symbolic link.');
+    const sha256 = format === 'log' ? await publishTextArtifact(this.workspaceRoot, this.artifactsDir, filename, content)
+      : await publishArtifact(this.workspaceRoot, this.artifactsDir, filename, content, signal);
 
     return {
       id,
       uri: `artifact://${id}`,
       path: targetPath,
       toolType,
-      totalBytes,
+      totalBytes: content.length,
       totalLines: lines,
       createdAt: new Date().toISOString(),
+      sha256, format, ...(process.platform === 'linux' ? { publication: 'verified' as const } : {}),
     };
   }
 
@@ -109,7 +116,7 @@ export class ArtifactManager {
       if (!fs.existsSync(this.artifactsDir)) return null;
       this.verifyDirectory();
       const entries = fs.readdirSync(this.artifactsDir);
-      const matches = entries.filter(entry => entry === id || (entry.startsWith(`${id}.`) && entry.endsWith('.log')));
+      const matches = entries.filter(entry => entry === id || (entry.startsWith(`${id}.`) && /\.(log|bin|png|jpg|jpeg|webp|pdf)$/.test(entry)));
       if (matches.length !== 1) return null;
       const checked = verifyPathContainment(path.join(this.artifactsDir, matches[0]), this.artifactsDir);
       if (checked.allowed && fs.statSync(checked.resolvedPath).isFile()) return checked.resolvedPath;

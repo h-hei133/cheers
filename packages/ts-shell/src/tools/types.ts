@@ -66,6 +66,9 @@ export interface ToolDefinition {
 }
 
 export interface ToolPreparation {
+  /** Execution tools may bind a complete non-file request to the same approval lifecycle. */
+  readonly permissionArgs?: Readonly<Record<string, unknown>>
+  readonly previewKind?: 'file-plan' | 'execution'
   readonly targets: readonly { readonly path: string; readonly operation: 'write' | 'delete' }[]
   readonly preview: string
   readonly execute: (context: ToolExecutionContext) => Promise<ToolExecutionResult>

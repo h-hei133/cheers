@@ -139,6 +139,7 @@ describe("Unified Browser Tool & Session Manager", () => {
   });
 
   it("clicks an element by ref and reports what it did", async () => {
+    await manager.openUrl("http://localhost:3000/dashboard");
     await manager.observe();
     const clicked = await manager.click("e1");
 

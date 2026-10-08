@@ -16,6 +16,7 @@ import type { WorkspaceRoot } from '../core/workspace/model.js';
 import { authorizeToolCall, consumeToolCall, discardToolCall, preparedToolCall, prepareToolCall } from '../tools/preparation.js';
 import { preparationContext, preparationPermission } from './preparation.js';
 import { bindExecutionTarget, executionApprovalPreview } from '../runtime/execution/binding.js';
+import { assertSourceAccess } from '../core/query/sourcePolicy.js';
 
 /** A tool definition in the shape a chat completion request takes. */
 export interface ToolSchema {
@@ -156,6 +157,7 @@ async function executeTool(
         const blocked = options.admission?.();
         if (blocked) throw new Error(blocked);
         const actualArgs = { ...args, path: absolutePath, filePath: absolutePath };
+        if (tool.name === 'browser') assertSourceAccess(absolutePath, options.workspaceRoot, options.workspaceRoots, options.permissionScope, options.denyRules);
         if (tool.name === 'lsp') {
           const fileArgs = { ...actualArgs, backend: 'scanner' };
           const selected = workspaceToolBinding('lsp', fileArgs, options.workspaceRoot, options.workspaceRoots);
@@ -362,7 +364,7 @@ async function askPermission(
   });
   const prompt = buildToolEscalationPrompt(toolName, evaluation.operation, evaluation.target, evaluation.reason);
   const preparation = preparedToolCall(args, options);
-  if (preparation) prompt.context.preview = preparation.preview;
+  if (preparation) { prompt.context.preview = preparation.preview; prompt.context.previewKind = preparation.previewKind; }
   else if (toolName === 'lsp' && args.backend !== 'scanner') {
     prompt.context.preview = executionApprovalPreview(args, args.server, options.workspaceRoot);
     prompt.context.previewKind = 'execution';

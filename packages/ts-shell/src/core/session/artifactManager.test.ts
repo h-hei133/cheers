@@ -97,8 +97,20 @@ describe("ArtifactManager In-Session Spilling", () => {
     expect(next.id).not.toBe(original.id);
     expect(fs.readFileSync(original.path, 'utf8')).toBe('original');
     vi.spyOn(fs.promises, 'link').mockRejectedValueOnce(new Error('publication failed'));
-    await expect(restarted.save('never published')).rejects.toThrow('publication failed');
+    await expect(restarted.save('never published')).rejects.toMatchObject({ publication: 'not-published', cleanup: 'complete' });
     expect(fs.readdirSync(manager.directory).sort()).toEqual(['0.output.log', '1.output.log']);
+  });
+
+  it('preserves an external replacement when binary publication verification fails', async () => {
+    const manager = new ArtifactManager(tempWorkspace, 'test');
+    const link = fs.promises.link.bind(fs.promises);
+    vi.spyOn(fs.promises, 'link').mockImplementationOnce(async (source, target) => {
+      await link(source, target);
+      await fs.promises.unlink(target);
+      await fs.promises.writeFile(target, 'external replacement');
+    });
+    await expect(manager.saveBinary(Buffer.from('owned'), 'browser-download')).rejects.toMatchObject({ publication: 'unverified', cleanup: 'complete' });
+    expect(fs.readFileSync(path.join(manager.directory, '0.browser-download.bin'), 'utf8')).toBe('external replacement');
   });
 
   it('keeps arbitrary tool labels inside the artifact filename and rejects invalid session identities', async () => {

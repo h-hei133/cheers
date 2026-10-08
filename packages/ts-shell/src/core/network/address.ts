@@ -14,13 +14,18 @@ export function publicUrl(input: string): URL {
 
 /** Capture all DNS answers once. The socket lookup returns only this reviewed set. */
 export async function publicLookup(url: URL, scope: RequestScope): Promise<LookupFunction> {
+  return approvedLookup(url, scope, isPublicAddress);
+}
+
+/** Browser transfers inject their explicit address admission; public callers keep the public policy. */
+export async function approvedLookup(url: URL, scope: RequestScope, admitAddress: (address: string) => boolean): Promise<LookupFunction> {
   scope.check();
   const hostname = url.hostname.replace(/^\[|\]$/g, '');
   const family = isIP(hostname);
   const addresses = family ? [{ address: hostname, family }]
     : await withinRequest(lookup(hostname, { all: true, verbatim: true }), scope);
   scope.check();
-  if (!addresses.length || addresses.some(entry => !isPublicAddress(entry.address)
+  if (!addresses.length || addresses.some(entry => !admitAddress(entry.address)
     || isIP(entry.address) !== entry.family)) throw new NetworkError('denied');
   const approved = addresses.map(entry => ({ ...entry }));
   return (_hostname, options, callback) => {
