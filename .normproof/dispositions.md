@@ -106,3 +106,5 @@ Recording here never changes the verdict; judge keeps reporting every run.
 - call-unreferenced | presentation/theme/tokens.ts THEME_COLOR_TOKENS | reviewed 2026-09-30 | decision: ignore | reason: This schema-derived constant is exported through the theme facade and used as data by theme tests; it documents the supported token vocabulary and is not an uncalled runtime algorithm.
 
 - declared_functions_within_module_ceiling | packages/ts-shell/src/cli/interactive/interactiveMode.ts reports 21 names including arithmetic local pending | reviewed 2026-10-07 | decision: ignore | reason: The new pending value is a numeric subtraction, not a callable; independent AST counting is unchanged at 94 versus HEAD. This disposition does not change the judge verdict or waive existing callback responsibility debt.
+
+- source_graph_has_no_unresolved_specifiers | complete module graph exceeds bundled 8192 edge collector ceiling | reviewed 2026-10-09 | decision: defer | W16 must repair complete structural proof capacity; source graph was not narrowed and not_proven remains.

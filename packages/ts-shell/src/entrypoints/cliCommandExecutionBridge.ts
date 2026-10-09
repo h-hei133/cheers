@@ -54,6 +54,7 @@ export interface BuildCliCommandExecutionInput {
   readonly advisorCommand?: CommandContext['advisorCommand'];
   readonly researchCommand?: CommandContext['researchCommand'];
   readonly gitCommand?: CommandContext['gitCommand'];
+  readonly securityCommand?: CommandContext['securityCommand'];
   readonly worktreeCommand?: CommandContext['worktreeCommand'];
   readonly commitCommand?: CommandContext['commitCommand'];
   readonly prompt: string;
@@ -154,6 +155,7 @@ export async function buildCliCommandExecution(
     advisorCommand: input.advisorCommand,
     researchCommand: input.researchCommand,
     gitCommand: input.gitCommand,
+    securityCommand: input.securityCommand,
     worktreeCommand: input.worktreeCommand,
     commitCommand: input.commitCommand,
     requestPolicy: input.requestPolicy,

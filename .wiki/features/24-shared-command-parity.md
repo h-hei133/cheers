@@ -138,6 +138,8 @@ Cheers 已有 [picker 注册器](../../packages/ts-shell/src/cli/interactive/pic
 
 **用户范围已确认**：安全分析系统完整纳入 Phase 19，保持独立领域。交付扫描计划、成熟分析器适配、版本/规则/范围、SARIF、安全历史、finding 证据/对比/处置和批准后的修复复验。缺工具、超时、部分覆盖不等于零漏洞；处置不会删除证据。复用统一执行/权限/patch owner，不造第二运行时。归 SEC-01/02/03。
 
+**W10 实施**：[security/service](../../packages/ts-shell/src/security/service.ts)接通十一action。`plan <absolute-executable> <version> <local-rules> <file...>`只保存精确预览；`scan <plan-id>`另外批准version/SARIF/JSON三项命令，以实际文件清单和错误交叉核对覆盖。仅自包含本地规则和显式文件，Opengrep是可选外部依赖；源grant不表示内核sandbox。import永远保留unknown本地覆盖，disposition保留理由/原始finding，export通过原patch writer写新文件；结构化值先脱敏再序列化。`disposition … propose <patch-file>`和普通模型`security_propose`只生成提案，`apply <proposal-id>`需另行审批/真实receipt，`validate`单独复测并在普通hook后回查当前源、规则、分析器、grant及原生提交收据。精确source/验证/限制及交付见 [Phase 19 §8.124](phase-19-decisions.md#8124-w10-sec-01–03成熟分析器安全证据与批准修复本地交付)。
+
 ### 12. `/review`、`/plan-review` 与实时 `/advisor`
 
 **现状**：[review handler](../../packages/ts-shell/src/core/commands/reviewCommandRuntime.ts)与 `/git review` 代理[同一 Git owner](../../packages/ts-shell/src/workflow/git/service.ts)，读取已授权 diff/path 构造任务。host 请求 metadata 经既有 Plan gate 限制本次模型工具；不改用户保存的模式，仓库文本不授写权，读取不完整就不能声称完整审查。

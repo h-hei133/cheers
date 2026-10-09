@@ -8,6 +8,7 @@ import { guidedGoalSyntax, planReviewSyntax, planSyntax, queueSyntax } from './p
 import { advisorCommandDefinition } from './advisor/registration.js';
 import { researchCommandDefinition } from './research/registration.js';
 import { gitCommandDefinitions } from './git/registration.js';
+import { securityCommandDefinition } from './security/registration.js';
 import { marketplaceSyntax } from "./marketplace/syntax.js";
 import { pluginSyntax } from "./plugin/syntax.js";
 import { workflowSyntax } from "../workflow/syntax.js";
@@ -733,6 +734,7 @@ export function createCommandRegistry(
     },
     researchCommandDefinition(),
     ...gitCommandDefinitions(),
+    securityCommandDefinition(),
     {
       name: "commit",
       // A staged diff expands into a prompt; an empty index answers locally.

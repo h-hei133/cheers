@@ -160,6 +160,8 @@ export interface ExecutionInput {
 }
 
 export interface TextFileReadExecutionRequest extends ExecutionRequestMetadata<'file.read'> {
+  /** Callers may require a bounded complete read instead of an incomplete page. */
+  readonly maxBytes?: number
   readonly absolutePath: string
   /** Narrows workspace access to the calling artifact store; never widens it. */
   readonly artifactDirectory?: string

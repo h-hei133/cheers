@@ -29,6 +29,7 @@ export interface SessionStateSnapshot {
   advisor?: unknown;
   research?: unknown;
   gitWorkflow?: unknown;
+  security?: unknown;
   /** The request owner validates durable reservations, metering and replay protection. */
   requestLedger?: unknown;
   workspaceRoots?: readonly WorkspaceRoot[];
@@ -86,6 +87,7 @@ export function buildSessionStateSnapshot(
     advisor: current?.advisor,
     research: current?.research,
     gitWorkflow: current?.gitWorkflow,
+    security: current?.security,
     requestLedger: current?.requestLedger,
     workspaceRoots: current?.workspaceRoots ?? session.workspaceRoots,
     usage: current?.usage,

@@ -34,7 +34,22 @@ function workspaceTarget(target: string, requestedRoot: string, realRoot: string
 
 /** Read bytes from the verified handle, never by reopening its pathname. */
 export async function readTextFile(request: TextFileReadExecutionRequest): Promise<string> {
-  return withVerifiedReadTarget(request, 'file', handle => handle.readFile({ encoding: 'utf8', signal: request.abortSignal }))
+  if (request.maxBytes !== undefined && (!Number.isSafeInteger(request.maxBytes) || request.maxBytes < 1 || request.maxBytes > 8 * 1024 * 1024)) throw new Error('Complete read byte limit is invalid.')
+  return withVerifiedReadTarget(request, 'file', async (handle, verify) => {
+    if (request.maxBytes === undefined) return handle.readFile({ encoding: 'utf8', signal: request.abortSignal })
+    const chunks: Buffer[] = []; let bytes = 0
+    const buffer = Buffer.alloc(Math.min(64 * 1024, request.maxBytes + 1))
+    for (;;) {
+      await verify()
+      const result = await handle.read(buffer, 0, Math.min(buffer.length, request.maxBytes - bytes + 1), bytes)
+      if (!result.bytesRead) break
+      bytes += result.bytesRead
+      if (bytes > request.maxBytes) throw new Error('Complete read exceeds its byte limit.')
+      chunks.push(Buffer.from(buffer.subarray(0, result.bytesRead)))
+    }
+    await verify()
+    return Buffer.concat(chunks, bytes).toString('utf8')
+  })
 }
 
 type ReadTarget = Pick<TextFileReadExecutionRequest, 'absolutePath' | 'workspaceRoot' | 'artifactDirectory' | 'assertFileAccess' | 'abortSignal'>

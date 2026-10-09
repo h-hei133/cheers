@@ -273,7 +273,7 @@ refNoToken = ref.filter(command => intersection(token(command), oursTokens).size
 | 28 | dirs | 新增多根查看 | 显示主根/附加根/权限/失效状态，与增删同源，不能用单根 pwd 代替。 | SES-05 |
 | 29 | restart | 新增受控重启 | 保存可恢复状态、处理在途任务、保留启动参数，兼容编译产物；重启与恢复分别举证。 | PAR-04 |
 | 30 | reload-plugins | 增强插件生命周期 | 排空/取消实例、清理 hooks/tools/MCP/commands 后重建；版本及缓存一致，部分失败不报全成功。 | ECO-03、PAR-04 |
-| 31 | security | 新增漏洞分析系统 | 扫描计划/执行/取消/历史、SARIF 导入导出、验证/对比/处置；外部分析器经执行 owner，规则来源和漏扫可见。 | SEC-01/02/03 |
+| 31 | security | 独立漏洞分析系统 | W10十一action已实现；冻结计划、原生SARIF+JSON覆盖、保留finding/理由、批准导出与finding patch/原收据/单独复测；最终本地验收及工具容量限制见Phase19 §8.124。 | SEC-01/02/03 |
 | 32 | plan | 复用 Plan 模式 | 与 Shift+Tab 同一状态/门禁，增加计划产物、状态和退出入口，不新建平行模式。 | AUTO-04 |
 | 33 | plan-review | 新增计划审查 UX | 打开指定版本，记录修改及批准对象；过期计划不可沿用批准，不重定向代码 review。 | AUTO-04 |
 | 34 | vibe | 新增 director/worker 工作流 | director 可见工具收窄为读取/管理；持久 worker 可执行 session 已授权且显式委派的能力（可含写），继续受审批/沙箱/预算约束；退出终止 worker，不因模式自动放权。 | FLOW-02 |

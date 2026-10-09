@@ -38,6 +38,7 @@ import { attachGoalSubmission, schedulerForRuntime } from '../runtime/goalSchedu
 import { attachSubmissionQueue, isQueueControl, queueCommandFor } from '../runtime/inputQueue.js';
 import { tokenizeCommandArgs } from '../../core/commands/arguments.js';
 import { isPlanningControl, planningCommandFor } from '../runtime/planning.js';
+import { isSecurityControl, securityCommandFor } from '../runtime/security.js';
 import { isAdvisorControl, advisorCommandFor } from '../runtime/advisor.js';
 import { isResearchControl, researchCommandFor } from '../runtime/research.js';
 import { gitWorkbenchFor } from '../runtime/git.js';
@@ -654,6 +655,16 @@ export class InteractiveMode {
           if (result.kind === 'local') this.state.transcript.append(textBlock('command', result.output, `/${match[1]}`));
           this.tui.requestRender();
         });
+      return;
+    }
+    if (isSecurityControl(text) && (this.busy || this.questions.question())) {
+      const context = this.options.runtimeContext;
+      void securityCommandFor(context)(tokenizeCommandArgs(text.trim().replace(/^\/security(?:\s|$)/i, '')), {
+        cwd: context.cwd, projectRoot: context.projectRoot, sessionId: context.session.id, interactive: true,
+      }).then(result => {
+        if (result.kind === 'local') this.state.transcript.append(textBlock('command', result.output, '/security'));
+        this.tui.requestRender();
+      });
       return;
     }
     if (isAdvisorControl(text) && (this.busy || this.questions.question())) {

@@ -29,6 +29,11 @@ function request(target = 'source/file.txt', overrides: Partial<TextFileReadExec
 }
 
 describe('verified text reads', () => {
+  it('bounds complete reads from the verified handle and preserves exact BOM/line endings', async () => {
+    expect(await service.readTextFile(request(undefined, { maxBytes: 16 }))).toBe('\ufeffauthorized\r\n')
+    await expect(service.readTextFile(request(undefined, { maxBytes: 4 }))).rejects.toThrow('byte limit')
+    await expect(service.readTextFile(request(undefined, { maxBytes: 0 }))).rejects.toThrow('invalid')
+  })
   it('preserves exact bytes and reads an authorized internal alias', async () => {
     fs.symlinkSync(path.join(workspace, 'source/file.txt'), path.join(workspace, 'alias.txt'))
     expect(await service.readTextFile(request('alias.txt'))).toBe('\ufeffauthorized\r\n')

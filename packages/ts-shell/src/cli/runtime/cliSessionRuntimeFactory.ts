@@ -29,6 +29,7 @@ import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
 import { researchRunFor } from './research.js';
 import { cancelGitFor, gitFeatureTools } from './git.js';
 import { installGitCliRuntime } from './gitGate.js';
+import { installSecurityRuntime, cancelSecurityFor, securityFeatureTools } from './security.js';
 import { gitRequestMode } from '../../workflow/git/operation/policy.js';
 import { goalObjectiveFor, goalPolicyFor, prepareGoalSession } from './goal.js';
 import { installGoalScheduler } from './goalScheduling.js';
@@ -336,7 +337,7 @@ export function createCliSessionRuntime(input: {
   };
   let goalScheduler: GoalScheduler | undefined;
   const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
-    onCancelRequested: () => { goalScheduler?.interrupt(); cancelGitFor(input.runtimeContext); },
+    onCancelRequested: () => { goalScheduler?.interrupt(); cancelGitFor(input.runtimeContext); cancelSecurityFor(input.runtimeContext); },
     configuredAgentMode: () => input.runtimeContext.runtimeConfig.agentMode,
     sessionManager: input.sessionManager,
     renderer: input.renderer,
@@ -523,7 +524,7 @@ export function createCliSessionRuntime(input: {
       const promptEntryId = sourceEntryId;
       const currentGoal = readGoalEdit(input.sessionManager, input.runtimeContext.session).goal;
       const run = streamCliRuntimePrompt({
-        featureTools: [...research.featureTools, ...gitFeatureTools(input.runtimeContext)],
+        featureTools: [...research.featureTools, ...gitFeatureTools(input.runtimeContext), ...securityFeatureTools(input.runtimeContext)],
         checkpoint: advisorCheckpointFor(input.runtimeContext, input.sessionManager, input.renderer, promptEntryId),
         checkpointError: input.renderer.renderLine.bind(input.renderer),
         ...(promptEntryId ? { correlationId: promptEntryId, commandProof: acceptanceCapture(input.sessionManager,
@@ -573,6 +574,7 @@ export function createCliSessionRuntime(input: {
     },
   });
   goalScheduler = installGoalScheduler(input.runtimeContext, input.sessionManager, sessionRuntime, message => input.renderer.renderLine(message));
-  installGitCliRuntime(input, sessionRuntime, isStdinTty);
+  const nativeGate = installGitCliRuntime(input, sessionRuntime, isStdinTty);
+  installSecurityRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate);
   return sessionRuntime;
 }
