@@ -6415,3 +6415,7 @@ ECO-04接通用户/项目角色CRUD/启停/模型/effort与普通task，审批�
 ## [2026-10-09] feat | Phase 19 ECO-05 协商后的资源、提示与有界通知
 
 共享原stdio连接接通完整分页、读取、只读提示预览、订阅与200项通知元数据；修复远端错误泄露、输入解析、取消前启动/host队列和startup关闭反例。Node20.3与executable构建、198项组合/149契约、展示delta47项、四有效反转/恢复16项、四场actualCLI共56协议请求零模型POST及独立APPROVE/CLEAR通过。边界和证据见features/mcp.md及phase-19-decisions.md §8.128；本批为协议组件，配置CRUD/HTTP/OAuth与W12–W16继续，完整Phase19仍active，静态门及提交/推送另记。
+
+### 2026-10-09 — Phase 19 ECO-05配置组件
+
+配置CRUD与启停override已通过普通批准/有界JSONC精确发布，save与连接测试分开，busy停用实际撤销变化连接且无重放。只读文件检查移入中性workspace owner；角色与配置沿同一publication/runner。独立code APPROVE、architecture CLEAR，最终26文件327项/149契约、Node20.3与exe构建、五静态门/43scripts、五有效反转及四模式实际CLI（80local结果/零模型POST）通过，详细边界与材料见[Phase19 §8.129](features/phase-19-decisions.md#8129-w11-eco-05受信范围配置与原生批准发布本地配置组件)。完整NormProof仍not_proven；HTTP/OAuth→W12–W16继续，完整目标未完成，用户.gitignore保留不提交。

@@ -110,3 +110,19 @@ it('dispatches parsed agent lifecycle controls in order while the ordinary turn 
   expect(seen).toEqual(['/agents disable project review', '/agents edit project review updated.md']);
   release(); stdin.end(); await run;
 });
+
+it('cancels earlier queued MCP configuration controls and retains later explicit input', async () => {
+  const stdin = new PassThrough(); const seen: string[] = []; const lines: string[] = [];
+  let release!: () => void; let started!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; }); const first = new Promise<void>(resolve => { started = resolve; });
+  const context = { session: { id: 'pipe', projectRoot: '/workspace' }, projectRoot: '/workspace' } as ShellRuntimeContext;
+  const run = runPromptInputStream({ stdin, runtimeContext: context, sessionRuntime: { waitForIdle: async () => {} } as ShellSessionRuntime,
+    renderer: { renderLine: (line: string) => lines.push(line) } as never, logger: { info: () => {} } as never, runPrompt: async prompt => {
+      seen.push(prompt); if (prompt === '/plan show') { started(); await held; }
+    } });
+  stdin.write('/plan show\n'); await first;
+  stdin.end('/mcp disable project earlier\n/mcp cancel\n/mcp enable project later\n');
+  release(); await run;
+  expect(seen).toEqual(['/plan show', '/mcp cancel', '/mcp enable project later']);
+  expect(lines).toContain('Queued MCP configuration command cancelled before dispatch.');
+});

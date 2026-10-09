@@ -21,6 +21,8 @@ export interface McpServerConfig {
   readonly enabled?: boolean
   readonly command?: string
   readonly args?: string[]
+  readonly env?: Record<string, string>
+  readonly headers?: Record<string, string>
   readonly url?: string
   readonly scope?: McpConfigScope
   readonly authRequired?: boolean
@@ -36,6 +38,8 @@ export interface McpServerConfig {
 
 export interface ScopedMcpServerConfig extends McpServerConfig {
   readonly scope: McpConfigScope
+  readonly sourcePath?: string
+  readonly overridePath?: string
 }
 
 export type McpConnectionState =

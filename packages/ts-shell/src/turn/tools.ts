@@ -10,6 +10,7 @@ import type { EscalationPrompt, EscalationResponse } from "../core/shell/approva
 import type { ToolDefinition } from "../tools/types.js";
 import type { SubagentRunner } from "../core/subagents/runner.js";
 import { neutraliseForDisplay } from "../core/text/safety.js";
+import { redactExportText } from "../core/security/redaction.js";
 import { validateToolArguments } from "../core/tools/arguments.js";
 import { workspaceToolBinding } from '../core/workspace/tools.js';
 import type { WorkspaceRoot } from '../core/workspace/model.js';
@@ -314,7 +315,7 @@ export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<st
         // Hook feedback reaches the model, and a hook's text can come from a
         // project-supplied configuration. Neutralised so a newline or a control
         // character cannot forge extra lines or repaint the transcript.
-        output = `${output}\n\n[Verification feedback]\n${neutraliseForDisplay(decision.feedback)}`;
+        output = `${output}\n\n[Verification feedback]\n${neutraliseForDisplay(redactExportText(decision.feedback))}`;
       }
       const refused = tools?.get(call.name)?.resultAdmission?.();
       if (refused) return { isError: true, output: `${output}\n${refused} Actual effect evidence remains visible.`, ...(approval ? { metadata: { approval } } : {}) };

@@ -31,6 +31,7 @@ import { cancelGitFor, gitFeatureTools } from './git.js';
 import { installGitCliRuntime } from './gitGate.js';
 import { installSecurityRuntime, cancelSecurityFor, securityFeatureTools } from './security.js';
 import { installAgentsRuntime } from './agents.js';
+import { installMcpRuntime, cancelMcpFor } from './mcp.js';
 import { installExtensionRuntime, cancelExtensionsFor, refreshExtensionsFor } from './extensions.js';
 import { gitRequestMode } from '../../workflow/git/operation/policy.js';
 import { goalObjectiveFor, goalPolicyFor, prepareGoalSession } from './goal.js';
@@ -339,7 +340,7 @@ export function createCliSessionRuntime(input: {
   };
   let goalScheduler: GoalScheduler | undefined;
   const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
-    onCancelRequested: () => { goalScheduler?.interrupt(); cancelGitFor(input.runtimeContext); cancelSecurityFor(input.runtimeContext); cancelExtensionsFor(input.runtimeContext); input.mcpGateway?.cancelContent(); },
+    onCancelRequested: () => { goalScheduler?.interrupt(); cancelGitFor(input.runtimeContext); cancelSecurityFor(input.runtimeContext); cancelExtensionsFor(input.runtimeContext); cancelMcpFor(input.runtimeContext); input.mcpGateway?.cancelContent(); },
     configuredAgentMode: () => input.runtimeContext.runtimeConfig.agentMode,
     sessionManager: input.sessionManager,
     renderer: input.renderer,
@@ -580,6 +581,7 @@ export function createCliSessionRuntime(input: {
   const nativeGate = installGitCliRuntime(input, sessionRuntime, isStdinTty);
   installSecurityRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate);
   installAgentsRuntime(input.runtimeContext, nativeGate);
+  if (input.mcpGateway) installMcpRuntime(input.runtimeContext, input.mcpGateway, nativeGate);
   installExtensionRuntime(input.runtimeContext, sessionRuntime, nativeGate);
   return sessionRuntime;
 }

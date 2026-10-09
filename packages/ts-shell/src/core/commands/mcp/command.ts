@@ -4,10 +4,14 @@ import { syntaxHelp } from "../syntax/projection.js";
 import { mcpSyntax } from "./syntax.js";
 import type { McpContentRequest } from "../../mcp/content/types.js";
 
-export async function runMcpShellAction(args: string[], _context: CommandContext): Promise<CommandExecutionResult> {
+export async function runMcpShellAction(args: string[], context: CommandContext): Promise<CommandExecutionResult> {
   const parsed = parseSyntax(mcpSyntax, args);
   if (!parsed.ok) return { kind: "local", output: `Invalid /mcp arguments: ${parsed.reason}\n${syntaxHelp(mcpSyntax)}` };
   const mode = parsed.action.name;
+  if (["list", "show", "add", "edit", "remove", "enable", "disable"].includes(mode)) {
+    return context.mcpCommand ? context.mcpCommand(args, context) : { kind: "local", output: "MCP configuration management is unavailable in this host." };
+  }
+  if (mode === "test") return { kind: "shell-action", action: "show-mcp", mcpAction: "test", mcpTarget: parsed.args[0] };
   if (mode === "tools" || mode === "doctor" || mode === "refresh") return { kind: "shell-action", action: "show-mcp", mcpAction: mode, mcpTarget: parsed.args[0] };
   if (mode === "notifications" || mode === "cancel") return { kind: "shell-action", action: "show-mcp", mcpAction: mode, mcpTarget: parsed.args[0] };
   if (mode !== "status") {

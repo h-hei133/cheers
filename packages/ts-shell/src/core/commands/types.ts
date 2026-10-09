@@ -43,6 +43,7 @@ export interface CommandContext {
   readonly gitCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly securityCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly agentsCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
+  readonly mcpCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly worktreeCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly commitCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly cwd: string
@@ -181,7 +182,7 @@ export interface ShellActionResult {
   readonly sessionAction?: 'panel' | 'list' | 'switch' | 'current' | 'help'
   readonly permissionAction?: 'list' | 'explain' | 'revoke' | 'reset'
   readonly permissionSelector?: string
-  readonly mcpAction?: 'status' | 'tools' | 'doctor' | 'refresh' | 'content' | 'notifications' | 'cancel'
+  readonly mcpAction?: 'status' | 'tools' | 'doctor' | 'refresh' | 'test' | 'content' | 'notifications' | 'cancel'
   readonly mcpContent?: import('../mcp/content/types.js').McpContentRequest
   readonly mcpTarget?: string
   readonly workspaceAction?: 'status' | 'attach' | 'recent' | 'add' | 'remove' | 'rebind'

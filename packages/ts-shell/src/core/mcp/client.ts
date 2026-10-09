@@ -65,6 +65,7 @@ export class CoreMcpClient {
     const transport = new McpStdioTransport({
       command: this.config.command!,
       args: this.config.args,
+      env: this.config.env,
       cwd: this.workspaceRoot,
       stderr: "pipe",
       maxBufferSize: 10 * 1024 * 1024,

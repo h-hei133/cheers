@@ -18,6 +18,12 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { re
 function request(text: string) { return catalogRequest({ text, cursor: text.length, revision: 1 }); }
 
 describe("MCP server candidate positions", () => {
+  it.each(["/mcp show ", "/mcp test ", "/mcp reload ", "/mcp disable project ", "/mcp remove user ", "/mcp edit project "])("accepts new %s", text => {
+    expect(request(text)?.kind).toBe("mcp");
+  });
+  it.each(["/mcp add project new ", "/mcp edit user existing ", "/mcp add project completion-target ", "/mcp edit user completion-target "])("completes definition files for %s", text => {
+    expect(request(text)?.kind).toBe("file");
+  });
   it.each(["/mcp tools ", "/mcp doctor f", "/mcp diagnose ", "/mcp refresh ", "/mcp reconnect ", "/mcp tools -- -", "/mcp -- tools ", "/mcp resources ", "/mcp templates ", "/mcp prompts ", "/mcp read ", "/mcp prompt ", "/mcp subscribe ", "/mcp unsubscribe ", "/mcp notifications "])("accepts %s", text => {
     expect(request(text)?.kind).toBe("mcp");
   });
@@ -35,7 +41,7 @@ describe("MCP server read ownership", () => {
   it("reads configured names without connecting or exposing endpoint and command data", async () => {
     vi.spyOn(projectTrust, "isProjectUntrusted").mockReturnValue(false);
     const files = [path.join(root, ".cheers", "mcp.json"), path.join(root, ".cheers.mcp.json")];
-    fs.writeFileSync(files[0]!, JSON.stringify({ mcpServers: { user: { transport: "http", url: "https://secret.invalid/token" }, duplicate: { enabled: true } } }));
+    fs.writeFileSync(files[0]!, JSON.stringify({ mcpServers: { user: { transport: "http", url: "https://secret.invalid/token" }, duplicate: { transport: "stdio", command: "must-never-run", enabled: true } } }));
     fs.writeFileSync(files[1]!, JSON.stringify({ mcpServers: { "-full name": { command: "must-never-run", args: ["secret"] }, duplicate: { enabled: false } } }));
     const before = files.map(file => ({ bytes: fs.readFileSync(file), mtime: fs.statSync(file).mtimeMs }));
     const snapshot = vi.fn(async () => { throw new Error("must not connect"); });
@@ -45,7 +51,7 @@ describe("MCP server read ownership", () => {
     const items = await load("mcp", new AbortController().signal);
     expect(items).toEqual([
       { value: "user", label: "user", detail: "user · configured" },
-      { value: "duplicate", label: "duplicate", detail: "project · disabled" },
+      { value: "duplicate", label: "duplicate", detail: "user (project override) · disabled" },
       { value: "-full name", label: "-full name", detail: "project · configured" },
     ]);
     expect(snapshot).not.toHaveBeenCalled(); expect(refresh).not.toHaveBeenCalled();

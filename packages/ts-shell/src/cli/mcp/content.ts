@@ -45,6 +45,13 @@ export function isMcpContent(text: string): boolean {
   return Boolean(parsed?.ok && ["resources", "templates", "prompts", "read", "prompt", "subscribe", "unsubscribe"].includes(parsed.action.name));
 }
 
+export function isMcpConfiguration(text: string): boolean {
+  const parsed = parseMcpInput(text);
+  return Boolean(parsed?.ok && ["list", "show", "add", "edit", "remove", "enable", "disable"].includes(parsed.action.name));
+}
+
+export function isMcpRequest(text: string): boolean { return isMcpContent(text) || isMcpConfiguration(text); }
+
 function parseMcpInput(text: string): ReturnType<typeof parseSyntax> | undefined {
   const match = /^\/mcp(?:\s+([\s\S]*))?$/i.exec(text.trim());
   if (!match) return undefined;

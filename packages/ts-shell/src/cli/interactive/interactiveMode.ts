@@ -42,7 +42,9 @@ import { isPlanningControl, planningCommandFor } from '../runtime/planning.js';
 import { isSecurityControl, securityCommandFor } from '../runtime/security.js';
 import { isAgentsControl, agentsCommandFor } from '../runtime/agents.js';
 import { isExtensionControl, extensionCommandFor } from '../runtime/extensions.js';
-import { isMcpContent, mcpControl } from '../mcp/content.js';
+import { isMcpRequest, isMcpConfiguration, mcpControl } from '../mcp/content.js';
+import { runMcpConfigurationControl } from '../mcp/control.js';
+import { cancelMcpFor } from '../runtime/mcp.js';
 import { runCliMcpCommand } from '../../entrypoints/cliMcpModule.js';
 import { isAdvisorControl, advisorCommandFor } from '../runtime/advisor.js';
 import { isResearchControl, researchCommandFor } from '../runtime/research.js';
@@ -665,11 +667,15 @@ export class InteractiveMode {
     }
     const mcp = mcpControl(text);
     if (mcp && (mcp.action === 'cancel' || this.busy || this.questions.question())) {
-      if (mcp.action === 'cancel') this.queue.cancelWhere(isMcpContent);
+      if (mcp.action === 'cancel') { this.queue.cancelWhere(isMcpRequest); cancelMcpFor(this.options.runtimeContext); }
       void runCliMcpCommand({ gateway: this.options.initialMcpGateway,
         renderer: transcriptLineRenderer(this.state.transcript, this.tui, '/mcp'),
         mcpAction: mcp.action, mcpTarget: mcp.target,
       });
+      return;
+    }
+    if (isMcpConfiguration(text) && (this.busy || this.questions.question())) {
+      void runMcpConfigurationControl(text, this.options.runtimeContext, transcriptLineRenderer(this.state.transcript, this.tui, '/mcp'), Boolean(this.questions.question()));
       return;
     }
     if (isAgentsControl(text) && (this.busy || this.questions.question())) {

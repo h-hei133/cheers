@@ -1,7 +1,7 @@
 import { resumeSyntax, forkSyntax, treeSyntax, entriesSyntax, parseNavigationArgs } from "../../../core/commands/navigation/syntax.js";
 import { deleteSyntax } from '../../../core/commands/navigation/management.js';
 import { parseSyntax } from "../../../core/commands/syntax/parse.js";
-import { mcpSyntax } from "../../../core/commands/mcp/syntax.js";
+import { mcpCatalogKind } from './mcp.js';
 import { permissionsSyntax } from "../../../core/commands/permissions/syntax.js";
 import { connectSyntax } from "../../../core/commands/connect/syntax.js";
 import { memorySyntax } from "../../../memory/commands/syntax.js";
@@ -45,16 +45,18 @@ function commandCatalogRequest(snapshot: DraftSnapshot) {
     kind = name;
   } else if (name === "model") {
     kind = modelKind(preceding, token.value, following);
-  } else if (name === "mcp" || name === "permissions" || name === "connect" || name === "memory" || name === "workflow") {
-    const syntax = name === "mcp" ? mcpSyntax : name === "connect" ? connectSyntax : name === "memory" ? memorySyntax : name === "workflow" ? workflowSyntax : permissionsSyntax;
-    const parsed = firstParameter(input => parseSyntax(syntax, input, name === "mcp"), preceding, following);
+  } else if (name === "mcp") {
+    kind = mcpCatalogKind(preceding, following);
+  } else if (name === "permissions" || name === "connect" || name === "memory" || name === "workflow") {
+    const syntax = name === "connect" ? connectSyntax : name === "memory" ? memorySyntax : name === "workflow" ? workflowSyntax : permissionsSyntax;
+    const parsed = firstParameter(input => parseSyntax(syntax, input), preceding, following);
     const action = parsed?.action;
     if (name === "permissions" && action?.name !== "revoke") return undefined;
     if (name === "connect" && action?.name !== "use" && action?.name !== "logout") return undefined;
     if (name === "workflow" && action?.name !== "run") return undefined;
     const memoryKind = action?.name === "delete" ? "record" : action?.name === "invalidate" ? "invalidatable" : action?.name === "approve" ? "approvable" : action?.name === "reject" ? "candidate" : action?.name === "save" ? "approved" : undefined;
     if (!parsed || (name === "memory" && !memoryKind)) return undefined;
-    kind = name === "mcp" ? "mcp" : name === "connect" ? "connection" : name === "memory" ? memoryKind : name === "workflow" ? "workflow" : "grant";
+    kind = name === "connect" ? "connection" : name === "memory" ? memoryKind : name === "workflow" ? "workflow" : "grant";
   } else {
     kind = pathKind(name, preceding, following) ?? navigationKind(name, preceding, token.value, following);
   }

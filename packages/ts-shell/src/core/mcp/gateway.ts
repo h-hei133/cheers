@@ -51,18 +51,28 @@ export class CoreMcpGateway {
     return this.connectionManager.peekSnapshot(this.loadConfigs());
   }
 
-  refresh(target: string = "all"): Promise<McpClientSnapshot> {
+  refresh(target: string = "all", options?: { exactTarget: boolean }): Promise<McpClientSnapshot> {
     const admission = this.admissionForOperation?.();
     return this.run(async () => {
       assertAdmission(admission);
       const configs = await this.prepare();
       const name = target.trim();
-      if (name && name.toLowerCase() !== "all" && !configs[name]) {
+      const all = !options?.exactTarget && (!name || name.toLowerCase() === "all");
+      if (!all && !Object.hasOwn(configs, name)) {
         throw unknownServer(name);
       }
-      await this.connectionManager.close(!name || name.toLowerCase() === "all" ? undefined : name);
-      return this.readSnapshot(configs, admission);
+      await this.connectionManager.close(all ? undefined : name);
+      return this.readSnapshot(all ? configs : { [name]: configs[name]! }, admission);
     });
+  }
+
+  /** Revocation begins before queued work settles; config publication never starts discovery. */
+  async configurationChanged(): Promise<void> {
+    // Close only changed owners immediately, including a request holding the lane.
+    // The normal admission fence rejects its late result without replay.
+    try { await this.connectionManager.reconcile(this.loadConfigs()); }
+    catch (error) { await this.connectionManager.close(); throw error; }
+    await this.run(async () => { await this.prepare(); });
   }
 
   invokeTool(serverName: string, toolName: string, args: Record<string, unknown>, admission = this.admissionForOperation?.()): Promise<McpToolCallResult> {

@@ -7,6 +7,6 @@ export function serverCatalog(workspaceRoot: string): readonly Suggestion[] {
   const configs = loadMcpConfigs(workspaceRoot, !projectTrust.isProjectUntrusted(workspaceRoot));
   return Object.entries(configs).map(([name, config]) => ({
     value: name, label: name,
-    detail: `${config.scope} · ${config.enabled === false ? "disabled" : "configured"}`,
+    detail: `${config.scope}${config.overridePath ? " (project override)" : ""} · ${config.enabled === false ? "disabled" : "configured"}`,
   }));
 }

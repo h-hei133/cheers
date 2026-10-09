@@ -14,7 +14,7 @@ import { runMcpContentCommand } from "../cli/mcp/content.js";
 import type { McpContentRequest } from "../core/mcp/content/types.js";
 import { classifyUnknownMcpFailure } from "../core/mcp/errorTaxonomy.js";
 
-export type CliMcpAction = "status" | "tools" | "doctor" | "refresh" | "content" | "notifications" | "cancel";
+export type CliMcpAction = "status" | "tools" | "doctor" | "refresh" | "test" | "content" | "notifications" | "cancel";
 
 export type CliMcpGateway = Pick<CoreMcpGateway, "snapshot" | "refresh"> & Partial<Pick<CoreMcpGateway, "close" | "syncWorkspace" | "peekSnapshot" | "subscribe" | "content" | "notifications" | "cancelContent">>;
 
@@ -34,10 +34,15 @@ export async function runCliMcpCommand(input: {
   const mcpTarget = input.mcpTarget?.trim();
   try {
     if (await runMcpContentCommand(input)) return;
-    if (mcpAction === "refresh") {
+    if (mcpAction === "refresh" || mcpAction === "test") {
       const refreshTarget =
-        !mcpTarget || mcpTarget.toLowerCase() === "all" ? "all" : mcpTarget;
-      const snapshot = await input.gateway.refresh(refreshTarget);
+        mcpAction !== "test" && (!mcpTarget || mcpTarget.toLowerCase() === "all") ? "all" : mcpTarget ?? "";
+      const snapshot = await input.gateway.refresh(refreshTarget, { exactTarget: mcpAction === "test" });
+      if (mcpAction === "test") {
+        input.renderer.renderLine("MCP test: negotiated connection and tool discovery only; no tools called.");
+        renderMcpDoctorControlPlane(input.renderer, snapshot, mcpTarget);
+        return;
+      }
       renderMcpRefreshControlPlane(input.renderer, snapshot, refreshTarget);
       return;
     }
