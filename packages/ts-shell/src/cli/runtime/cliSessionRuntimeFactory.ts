@@ -26,6 +26,7 @@ import type { CliProviderRuntimeBridge } from "../provider/cliProviderRuntimeBri
 import type { EscalationPrompt } from "../../core/shell/approval/contract.js";
 import { promptInteractiveQuestions } from "../interactive/interactiveAskBridge.js";
 import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
+import { researchRunFor } from './research.js';
 import { goalObjectiveFor, goalPolicyFor, prepareGoalSession } from './goal.js';
 import { installGoalScheduler } from './goalScheduling.js';
 import { acceptanceCapture } from '../../planning/goal/acceptance/capture.js';
@@ -418,7 +419,9 @@ export function createCliSessionRuntime(input: {
       const resolvedCredential =
         input.providerRuntimeBridge.resolveCredentialSnapshot();
       const sessionId = input.runtimeContext.session.id;
-      const requestPolicy = goalPolicyFor(input.runtimeContext, input.sessionManager);
+      const research = researchRunFor(input.runtimeContext, input.sessionManager, input.renderer,
+        goalPolicyFor(input.runtimeContext, input.sessionManager));
+      const requestPolicy = research.requestPolicy;
       // A runner left over from an earlier run in this session is still holding
       // an idle timer, and it would refresh the same prefix the new runner is
       // about to refresh — the same money spent twice. Only the current run
@@ -517,6 +520,7 @@ export function createCliSessionRuntime(input: {
       const promptEntryId = sourceEntryId;
       const currentGoal = readGoalEdit(input.sessionManager, input.runtimeContext.session).goal;
       const run = streamCliRuntimePrompt({
+        featureTools: research.featureTools,
         checkpoint: advisorCheckpointFor(input.runtimeContext, input.sessionManager, input.renderer, promptEntryId),
         checkpointError: input.renderer.renderLine.bind(input.renderer),
         ...(promptEntryId ? { correlationId: promptEntryId, commandProof: acceptanceCapture(input.sessionManager,

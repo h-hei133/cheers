@@ -3,9 +3,9 @@ title: "15：深度研究命令的真实形态设计与差距研究"
 category: article
 sources: [14-user-experience-research, deep-research-command-architecture, phase-18-decisions, openai-deep-research-guide, anthropic-multi-agent-research, langchain-open-deep-research, gpt-researcher-docs, dzhng-deep-research, jina-deepsearch-guide, storm-paper, smolagents-open-deep-research, openalex-api, arxiv-api, pi, oh-my-pi]
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-09
 tags: [research, deep-research, agent-loop, subagents, slash-commands, design, adversarial-verification, literature-review]
-summary: "复审并统一深度研究的现行决定：/deep-research 承担软件与论文双域、迭代研究、全文读取和对抗核验，/web-research 保留有界收集器。新研究 owner 复用既有 TypeScript loop、工具与主子共享预算/持久恢复，补齐可消费的来源与声明证据。保留原研究的开源材料、星数快照及旧实现历史，修正纯 prompt 即生产就绪、摘要即全文、红队未反驳即证真等过度承诺。本轮为文档修订，未实现运行时能力。"
+summary: "W8 实现软件与论文双域深度研究：原生子代理分解、实际来源、缺口再调查、独立反证、分段报告与受审批保存，复用同一请求账本、执行和会话边界。本文区分现行实现、日期快照与旧设计；本地验收与独立审查通过，真实模型研究质量和跨平台运行仍未证明。"
 confidence: mixed
 ---
 
@@ -13,11 +13,11 @@ confidence: mixed
 
 ## 1. 范围与结论口径
 
-本篇基于 [14 号研究](14-user-experience-research.md) §6、Phase 18 裁决及后续用户要求，复审新增研究中的事实、可执行性与内部矛盾。基线为 Cheers `28ff98cee8c4dd63e6752452f73a362ed3559ae3`；本地参考快照为 pi `b2b5c42f`、oh-my-pi `1c0993c3`。本文中的未来 owner、接口和流程均为 **Phase 19 待实施设计**。
+本篇基于 [14 号研究](14-user-experience-research.md) §6、Phase 18 裁决及后续用户要求。2026-10-05 文档复审的基线为 Cheers `28ff98cee8c4dd63e6752452f73a362ed3559ae3`，本地参考快照为 pi `b2b5c42f`、oh-my-pi `1c0993c3`。2026-10-09 W8 在 `1ea58289` 基础上实现本文契约；当前源码行为见 §2、§6–§7、§13–§16，本地实现/验收与独立L3批准完成，精确提交与远端结果见Phase19 §8.122。§12 与 §17.3 保留原历史证据，不代表本批执行记录。
 
 **现行结论**：深度研究必须具备模型驱动的分解、迭代检索与阅读、缺口检测、声明级证据、对抗核验和综合报告，覆盖软件与论文。命令 prompt 是研究简报入口；可执行的权限、预算、来源真实性、恢复与结果保证必须由运行时承担。会话持久化不等于研究阶段可恢复，步数上限不等于主子代理总预算，来源列表不等于声明已被证据支持。
 
-本次修订保留原研究的历史和来源，但不继续保留被否决的建议作为现行方案。源码核查、公开材料阅读、原研究报告的探针结果和设计推断分别标识；星数、归档与 API 响应属于日期快照，不能据此外推当前生产可用性。本次未运行真实研究回合、构建或测试，未修改运行时代码、配置、package scripts 或 provider/auth 核心。
+本文保留原研究的历史和来源，但不继续保留被否决的建议作为现行方案。源码、实际验证、公开材料与设计推断分别标识；星数、归档与 API 响应属于日期快照。W8 使用隔离 home、本地合成模型和真实原生工具验证运行时契约；这些结果不能证明真实模型研究质量。没有读取真实 provider 配置，也没有改变 provider/auth 核心或 package scripts。
 
 ## 1.5 已确认的用户裁决
 
@@ -27,25 +27,25 @@ confidence: mixed
 4. 产品采用 TypeScript；命令和标识符使用中性命名。成熟解析器或原生工具通过现有执行边界接入，不新增第二产品 runtime。
 5. 公共技能商店、远程协作、完整 Git 面板、实时顾问与安全分析等大型系统也纳入 Phase 19，并可分批实施；本篇只定义研究与相关工具边界，不能自行用“太大”将它们排除。
 
-上述是本轮用户确认。具体 provider、解析器、数值预算预设和验收样本是待实现的工程选择，不冒称用户已经逐项选定。
+上述是用户确认的范围。§6 的期限、§13 的 API/解析器和验收样本是 W8 工程选择，不冒称用户已经逐项选定。
 
 ## 2. 当前实现与所需能力
 
-| 维度 | 当前实现：源码事实 | Phase 19 目标 |
+| 维度 | 现行 W8 实现：源码事实 | 保证与边界 |
 |---|---|---|
-| 入口 | `/web-research` 是 local 命令，调用 collector 后直接渲染文本 | `/deep-research` 创建研究简报与 run；通过既有回合机制执行 |
-| 分解与迭代 | 两条固定查询模板，每条取至多三个 URL；单次抓取摘录 | 模型生成子问题，按证据调整检索，受共享预算和停止条件约束 |
-| 来源去重 | `resultUrls` 使用 URL 解析/规范化、去 fragment、拒绝凭证后去重 | 保留规范 URL；另记录内容/转载关系，不能把多个 URL 算成独立证据 |
-| 阅读 | web_search/web_fetch 提供文本，尚无研究全文解析契约 | 网页、源码、论文 HTML/PDF 的实际获取、解析状态与定位 |
-| 声明与报告 | renderer 按来源列原文摘录，无声明→证据图 | 有真实 fetch/read 生产者、报告与校验消费者的最小证据记录 |
-| 核验 | 无模型核验；旧 Jaccard 聚类已删除 | 独立审查尝试、反证检索、冲突保留；核验状态与证据支持分开 |
-| 预算 | collector 固定次数；普通回合与子代理各有局部 steps | 显式 token cap 共享 admission；请求/工具计量、单请求及明确研究阶段期限分别控制，见 §6.6 |
-| 持久与恢复 | local collector 输出不构成普通研究回合；已有会话存储/恢复 | 研究阶段、来源、声明、子任务、预算及未完成动作可恢复 |
-| 权限 | 工具已有 gate；未知工具在 plan 被拒；task 在 plan 也非自动允许 | 新学术工具和受限只读委派显式纳入 capability；权限只求交 |
-| 取消 | collector 调用点未传 signal；网络工具存在已登记缺口 | 父/子/网络/解析全链路取消，取消后停止新请求并保留部分结果 |
-| 进度 | 普通工具卡和流式正文已存在 | 复用事件通道，新增真实 research 阶段/覆盖/预算投影 |
+| 入口 | `/deep-research`、`research`、`deep` 创建 host 绑定的 run 并进入普通回合；`/web-research` 保留无模型 collector | 普通后续 prompt 无权重入旧 run；别名没有双语义 |
+| 分解与迭代 | 原生子代理依次 brief、investigate、gaps、再调查、draft、review、report | 缺口推动实际再调查；quick/deep 有显式阶段与期限上限 |
+| 来源去重 | 实际字节/元数据 hash 与 locator；内容相同和 DOI 转载关联 source IDs | 不计票；不同 arXiv revision 保留；A→B→A 刷新仍标记过期来源 |
+| 阅读 | 原生 read/web_fetch、学术 API、document_read 与 Poppler PDF 逐页文本 | 元数据/摘要不等于全文；访问受限、扫描件、解析失败和未选页分别保留 |
+| 声明与报告 | 实际工具生产 source/excerpt；引用校验、声明级支持、有序分段与报告 digest | 编造 ID/quote、过期来源、无引用的间接支持不能算覆盖；语义蕴含仍需判断 |
+| 核验 | fresh child/context，当前 reviewer 的实际读取与逐声明 finding 覆盖 | 未读取/遗漏声明显式不足；completed 仅为审查过程完成，同模型偏差可见 |
+| 预算 | 原生 policy/ledger；主、子、报告、重试、最后主响应共享一个 scope | 无 cap 不造隐藏总量；现有协议缺完整请求上界时严格 cap 明确 unsupported/零发送 |
+| 持久与恢复 | bound session CAS 保存阶段、来源、声明、child/request IDs、epoch 与 owner | pause 停新准入；unknown 不自动重放；显式 discard 保留账目，resume 实际回读来源 |
+| 权限 | host 非序列化只读 capability，父/角色/请求与 deny/hooks 求交 | 不授 bash/write/task；保存另走完整普通批准和原生 Add File |
+| 取消 | 原生 loop/request/network/parser 共享取消和原 deadline | 在途不确定账目保留；只读 status/dump 不撤销 live/unknown owner |
+| 进度 | 原生阶段、tool call、检索/反证 query 与成功/拒绝/失败事件 | 白名单参数有界脱敏；不以模型叙述制造执行轨迹 |
 
-来源：[collector.ts](../../packages/ts-shell/src/core/research/collector.ts)、[renderer.ts](../../packages/ts-shell/src/core/research/renderer.ts)、[deepResearchCommandRuntime.ts](../../packages/ts-shell/src/core/commands/deepResearchCommandRuntime.ts)、[toolPolicy.ts](../../packages/ts-shell/src/core/query/toolPolicy.ts)。不能把“当前 collector 没有模型调用”推广成“所有 local 命令都不调用模型”：`/btw` 即反例。
+来源：[research/run/runtime.ts](../../packages/ts-shell/src/research/run/runtime.ts)、[child.ts](../../packages/ts-shell/src/research/run/child.ts)、[evidence/validation.ts](../../packages/ts-shell/src/research/evidence/validation.ts)、[review/validation.ts](../../packages/ts-shell/src/research/review/validation.ts)、[report/save.ts](../../packages/ts-shell/src/research/report/save.ts)。原 collector 仍在 [core/research/collector.ts](../../packages/ts-shell/src/core/research/collector.ts)，其固定查询/无模型语义没有被推广到其他 local 命令。
 
 ## 3. 目标实现与历史证据
 
@@ -53,7 +53,7 @@ confidence: mixed
 
 `collectSources` 使用两个固定查询、URL 去重、并发上限 2 与每页少量摘录。其报告如实标为 untrusted source text，未宣称模型综合或事实核验；这份诚实的 collector 应保留。
 
-它复用了现有网络工具，但这些工具尚有预取消、期限、响应读取及 DNS/连接边界风险，见 [19 号研究](19-tools-maturity-and-multifile-edit.md) §3。复用已有工具不等于继承了尚未存在的生产保证。
+它复用现有网络工具。2026-10-05 基线的预取消、期限、正文计量与 DNS/连接风险由 Phase 19 SAFE/TOOL 批次修复并记录于[实施证据](phase-19-decisions.md)；W8 继续使用同一 bounded transport，不新增网络旁路。
 
 ### 3.2 旧实现的确定事实
 
@@ -65,10 +65,10 @@ confidence: mixed
 
 | 已有 owner/入口 | 可复用部分 | 不能直接推得的保证 |
 |---|---|---|
-| [agent/loop.ts](../../packages/ts-shell/src/core/agent/loop.ts)、[agent.ts](../../packages/ts-shell/src/core/agent/agent.ts) | 工具循环、steering/follow-up、abort | 不自动提供研究状态机和主子共享总预算 |
-| [commands/types.ts](../../packages/ts-shell/src/core/commands/types.ts) 的 PromptCommandResult | prompt/notice 进入模型回合 | 当前只有 prompt/notice，研究 run 元数据与 budget 接线需要扩展 |
-| [taskTool.ts](../../packages/ts-shell/src/core/tools/taskTool.ts)、[subagents/runner.ts](../../packages/ts-shell/src/core/subagents/runner.ts) | 子上下文、权限交集、递归限制 | 子代理不自动继承父 compaction；当前事件 sink 与返回字段不构成完整研究轨迹 |
-| [session/](../../packages/ts-shell/src/session/) | 会话存储、回放、压缩、恢复设施 | resume 会话不是恢复研究阶段、子任务和预算预留 |
+| [agent/loop.ts](../../packages/ts-shell/src/core/agent/loop.ts)、[agent.ts](../../packages/ts-shell/src/core/agent/agent.ts) | 工具循环、steering/follow-up、abort | W8 状态机在 research/run，预算仍由原生 request policy 所有 |
+| [commands/types.ts](../../packages/ts-shell/src/core/commands/types.ts) 的 PromptCommandResult | prompt/notice/metadata 进入模型回合 | host 精确绑定 run/epoch；模型给出的 runId 不能创建授权 |
+| [taskTool.ts](../../packages/ts-shell/src/core/tools/taskTool.ts)、[subagents/runner.ts](../../packages/ts-shell/src/core/subagents/runner.ts) | 子上下文、权限交集、递归限制及实际事件/result observer | current child 真实读取与 request IDs 由 research 消费；不能从角色名推断独立核验 |
+| [session/](../../packages/ts-shell/src/session/) | 会话存储、回放、压缩与 bound CAS | 普通保存保留 research/ledger；研究恢复须另核对 owner、unknown、来源及原期限 |
 | [toolCards.ts](../../packages/ts-shell/src/cli/interactive/toolCards.ts) | web_search/web_fetch/task 卡片、真实工具事件 | 未发生的核验/完成不能由进度文案合成 |
 | [todoTool.ts](../../packages/ts-shell/src/core/tools/todoTool.ts) | 可见计划清单 | todo done 不证明研究问题已有支持证据 |
 | [runtimeConfig.ts](../../packages/ts-shell/src/config/runtimeConfig.ts) | maxTurns/contextWindow/maxOutputTokens 等配置 | maxTurns 不限制子代理总消耗；maxOutputTokens 仍限制 write 工具参数生成 |
@@ -105,11 +105,11 @@ oh-my-pi 的 [web/search/](../../../oh-my-pi/packages/coding-agent/src/web/searc
 
 软件报告不强制无关的论文检索；论文报告不能仅靠通用搜索摘录满足全文研究要求。九项是能力契约，不是每个简单问题机械执行相同数量的步骤。
 
-## 5. 当前差距与关键依赖
+## 5. 现行实现与验证边界
 
-核心缺口包括新的研究语义 owner、可消费的证据数据、真实共享预算、阶段持久化、学术来源/全文读取与受限只读委派。它不是“一个 prompt 加两三处接线”，也不需要重建第二研究执行引擎。
+W8 已实现研究 owner、工具产生的来源/声明证据、共享原生账本、阶段持久化、学术发现/全文读取、只读委派、独立反证和原生保存。最终组合套件、反转、实际 CLI 与独立 L3 APPROVED 已完成，证据见 §17.5；这份本地验收不替代真实模型质量和跨平台证据。
 
-依赖顺序为：网络/文件工具安全与资源边界 → 通用主子预算和可恢复运行 → 研究来源/声明状态 → 双域与全文解析 → 独立核验/报告 → 交互投影。可分批开放已验证的能力，但单代理自反思或仅摘要路径交付不能称完整深度研究完成。
+实现顺序仍为网络/文件安全 → 原生预算与可恢复运行 → 来源/声明 → 双域/全文 → 独立核验/报告 → 交互投影。剩余证据边界包括真实模型研究质量、混合域真实样本、跨平台 Poppler/PTY 与外部服务持续可用性。当前 provider 缺完整输入/输出上界证明时，显式严格 cap 保持 unsupported；它没有被估算账目替代。
 
 ## 6. 命令、产物与预算契约
 
@@ -122,30 +122,34 @@ oh-my-pi 的 [web/search/](../../../oh-my-pi/packages/coding-agent/src/web/searc
 
 [slashRouter.ts](../../packages/ts-shell/src/core/commands/slashRouter.ts) 主名先于 alias 匹配不构成允许双重登记的理由。发布在同一变更中更新 registry、补全、帮助、文档与 [collector.test.ts](../../packages/ts-shell/src/core/research/collector.test.ts)；迁移提示解释行为变化，不使 `/deep-research` 有时落 collector。保留明确 `/web-research` 调用供需要原始摘录的脚本使用。
 
-### 6.2 参数形态（设计，非现有实现）
+### 6.2 现行参数形态
 
 ```text
 /deep-research <question>
 /deep-research --mode software <question>
 /deep-research --mode paper <question>
+/deep-research --mode mixed <question>
 /deep-research --depth quick <question>
 /deep-research --depth deep <question>
 /deep-research --brief <file> <question>
 /deep-research --save <question>
+/deep-research status | dump | pause | resume
+/deep-research steer <text>
+/deep-research reconcile discard
 /web-research <topic>
 ```
 
 沿用 [arguments.ts](../../packages/ts-shell/src/core/commands/arguments.ts) 的引号/连字符契约；未知、冲突或缺值参数显式报错。模式由显式参数或简报分类决定，结果可见、可 steering 更正；混合问题使用一个 run 的双域来源，不复制两套引擎。`--brief` 文件先经正常 read 权限、containment 与字节预算，不照搬不受限模板展开。
 
-`--depth` 选择研究范围及阶段步骤、工具调用、时间等工作量配置，不隐式创建 goal 总 token cap；不再将 quick=8/deep=40 等未经校准数字写成保证。quick 可以缩小范围，但必须披露核验覆盖；阶段限制或显式预算耗尽时报告 partial，不以“快速”掩盖未做的必备阶段。非交互模式使用同一契约，缺必要答案/权限/来源能力时明确停在对应状态。
+`--depth` 选择工作量，不隐式创建总 token cap。当前 quick 为 5 分钟原期限、每次调查至多 8 steps/2 rounds、review 至多 5 steps、3 个报告片段；deep 为 15 分钟、16 steps/3 rounds、review 至多 8 steps、6 个片段。这些是显式资源上限，不是质量或费用承诺。缺必要阶段/证据时保留 partial、paused 或失败原因；非交互入口使用同一契约。
 
 ### 6.3 报告与保存
 
 报告包含结论、按子问题组织的论证、引用来源、冲突与未知、检索轨迹、核验轨迹；论文报告还包含相关工作与方法/评测/结论，软件报告锚定版本、源码或发布说明。引用直接消费 §14 的证据记录，模型不能凭空生成 source id。
 
-未指定 `--save` 时不因报告过长擅自向 workspace 写报告。常规会话/run 状态仍按已声明持久化策略保存；它与用户工作区报告是不同产物。`--save` 经过既有 writer/审批，候选路径如 `docs/research/<slug>.md` 必须验证、展示并拒绝静默覆盖。只有 write 返回真实成功后报告保存路径。
+未指定 `--save` 时不向 workspace 写报告，原生会话/run 持久化继续有效。`research_save {runId,path}` 只准备完整 native report 的 exclusive Add File，经现有完整预览、普通权限/deny/hooks 与 edit operation 执行；不收模型 content。仅 committed operation receipt 标记已保存；明确 user deny 终结为 denied，预检失败为 failed，unknown 单列，不把未来路径当交付文件。
 
-write 的 content 也占模型输出预算，保存不是绕过 maxOutputTokens。长报告需有界分段生成、内容/引用校验、按顺序累计和最终完整性检查；分段中断保留 partial。无保存授权则在会话内输出可用部分与未完成说明，不自动落盘。artifact 累计与最终文件写入复用已有安全存储/编辑边界，不创建另一 writer。
+每个模型生成片段都受普通请求输出预算，片段顺序、claim/source IDs 与包含 draft/review 的 digest 校验后才累计。原生保存消费这些已验证片段，没有再次通过大 content 工具参数生成报告。原生投影超过 120000 字符时明确显示 truncation，保留 state 中完整记录，并拒绝把该不完整投影保存为完整报告；无保存授权不自动落盘。最终写入与工件使用原有安全存储/edit 边界。
 
 ### 6.4 进度与取消
 
@@ -169,9 +173,9 @@ write 的 content 也占模型输出预算，保存不是绕过 maxOutputTokens�
 
 ## 7. owner 与依赖方向
 
-拟新增 `packages/ts-shell/src/research/` 为高层研究 owner，以职责分为 run/brief/evidence/state/projection/sources/report 等模块（**拟新增路径**）。它依赖既有 core loop、通用 subagent、工具 contract、session 与 execution 接口。研究角色、来源策略和报告协议归 research，不写进中心 orchestration 或 core registry。
+[packages/ts-shell/src/research/](../../packages/ts-shell/src/research/) 为现行研究 owner，按 brief/evidence/sources/review/report/run 分职责；run/state、store、codec、policy 管理绑定状态，report/renderer 投影真实记录。它依赖既有 core loop、通用 subagent、工具、session 与 execution。研究角色、来源策略和报告协议不进入中心 orchestration 或 core registry。
 
-core 命令/工具只保留参数与结果薄适配；高层装配通过注册/injection 提供研究服务，**core 不反向 import research feature**。现有 `core/commands/deepResearchCommandRuntime.ts` 是 collector 的历史入口，不把新研究编排继续堆进这个文件。`paper_search` 等新工具也通过契约注册，source 获取和解析行为归 research/document owner。
+core 命令保留纯 syntax/薄注册，CLI 通过注入 handler 与 feature tools 装配，**core 不反向 import research feature**。`core/commands/deepResearchCommandRuntime.ts` 继续仅拥有 collector 兼容入口；`paper_search`、`document_read` 的获取与解析归 research/sources。只读 tool/delegation 的非序列化 host capability 与拒绝生命周期属于通用 core/turn 契约。
 
 通用预算、持久调度、子任务权限与生命周期归 runtime/session/agent 所有，研究消费而非复制。新增状态对象必须有生产者、持久规则和报告/验证消费者；旧 AtomicLearning 无消费者的教训不构成拒绝必要证据建模的理由。
 
@@ -294,11 +298,15 @@ OpenAlex 官方文档站在复审抓取时返回 403，文档仓镜像可能是�
 
 ### 13.2 学术来源工具与 provider 契约
 
-拟新增 `paper_search` 等薄工具适配，能力由 research/sources 承载：query、identifier lookup、引用关系、全文位置发现。结构化结果含来源 provider、论文标识、版本、元数据字段来源及是否完整；缺失字段不能用模型补成事实。
+现行 [paper_search](../../packages/ts-shell/src/research/sources/papers.ts) 支持 auto/openalex/arxiv/semantic-scholar，action 为 search/lookup/references/citations；search 只接 query，其他 action 只接 identifier。每页 1–20 项、至多 3 页、总期限 100–60000ms、API 正文至多 2MiB。arXiv 不提供引用图并明确拒绝 references/citations。缺字段不补成事实；实际原 API response SHA/时间/URL 与稳定规范化元数据 hash 分开保存。
 
 原研究探针记录：OpenAlex 一次 keyless search 成功；arXiv id 查询成功、search 发生限流；Semantic Scholar 多次 keyless 429。它们证明那几次请求的结果，不能证明 OpenAlex 无限流/永久免费，或 Semantic Scholar 所有端点必需 key。Semantic Scholar 官方说明多数端点可无认证访问、部分需 key，共享匿名池可能进一步限流。
 
 provider 按能力、认证、配额和可用性选择，不把单次成功当永久主服务保证。所有适配都要总 deadline、父取消、Retry-After/有界退避、分页/结果/正文上限、去重、schema 校验与稳定错误分类；失败/限流保持可见。arXiv 按其公开使用规则节流，并对并行 run 共享限速；切换 provider 不能绕开任务预算或 deny。
+
+W8 API 适配共享有界 transport。429 至多一次重试并尊重有界 Retry-After，超过窗口或期限保留 rate_limited；API key 只在既有环境入口读入并放 header，既不落 URL、source state 也不落错误正文。原生 file lock/process owner 在同一 runtime home 内串行完整请求及 body 生命周期；arXiv 完成后至少间隔 3 秒，不以进程内 Map 冒充跨进程保证。不同 runtime homes 的协调不在这项保证内。
+
+Atom 使用 saxes 6.0.0（ISC，依赖 xmlchars 2.2.0/MIT，Node 要求 >=12.22.7）；不自造正则 XML parser。2026-10-09 上游 npm latest 仍为 6.0.0，发布于 2021-11-07，上游 GitHub 仓已 archived，最后 push 为 2025-12-31；这是维护限制，不称持续维护。当前固定版本用于受 2MiB、DTD 拒绝、namespace、24 层 depth、24000 字符 field 和结果数量约束的单一 Atom 适配，Node 20.3 实测验证；不新增 native runtime。公开快照保存在 `.tmp/phase19-config/research/parser-upstream.json`。
 
 ### 13.3 全文获取与解析是必要能力
 
@@ -306,9 +314,11 @@ provider 按能力、认证、配额和可用性选择，不把单次成功当�
 
 采用成熟解析器；需要外部进程时走现有 TypeScript execution/sandbox 边界。限定大小、页数、解压、CPU/内存/时间与取消，拒绝损坏/恶意输入。解析文本是数据，不提升为指令。全文确实不可获取时给出已读摘要可支持的结论与未核验部分；不能继续补造实验参数，也不能因此宣布论文模式完整验收通过。
 
+[document_read](../../packages/ts-shell/src/research/sources/document.ts) 的 url/path 排他；URL 至多下载 8MiB 到既有 session artifact，再用 TOOL-02 的原生 Poppler owner 读取至多 5 页，offset 是页序号。HTML 转既有 markdown、选取至多 24000 字符，明确 unselected/no-text/truncated/parser/access failure。授权本地 path 复用 read containment 与 source deny，不把受限文件搬到 artifact 绕拒绝；不提供 OCR、图表或公式语义解释。
+
 ### 13.4 capability、plan 与权限
 
-[toolPolicy.ts](../../packages/ts-shell/src/core/query/toolPolicy.ts) 当前没有 `paper_search`，未知工具在 plan 被阻止；task 在父 plan 也不自动允许。新增只读学术工具与只读 research delegation 要显式注册 capability：允许的目标、工具集合、是否联网、是否可创建子任务、数量/深度和预算都在 admission 校验。
+[toolPolicy.ts](../../packages/ts-shell/src/core/query/toolPolicy.ts) 通过 host-issued native readonly capability 准入学术工具；仅有名称、序列化对象或外部 schema 不能伪造 capability。[core/subagents/capability.ts](../../packages/ts-shell/src/core/subagents/capability.ts) 对实际父 tool pool、角色声明、网络开关、maxSteps 与 deny 求交。普通 task 在父 plan 没有因此全局开放；研究子代理串行、不可递归，也没有 bash/write/edit/research_save。
 
 研究员与反证审查员只获 read/search/fetch/解析及必要只读查询；父/角色/请求的允许能力取交集，任一 deny 都优先。不因为要研究而自动切 build，不通过 bash 或自定义工具绕过拒绝。报告保存单独经过 writer 权限。浏览器扩展属于 Phase 19 工具范围，是否可用于当前研究由该 run 的 capability 决定，不是“加浏览器就新增执行平面”。
 
@@ -316,20 +326,22 @@ provider 按能力、认证、配额和可用性选择，不把单次成功当�
 
 ### 14.1 最小证据记录与真实消费者
 
-拟新增的 evidence record 至少包含：
+现行 [evidence record](../../packages/ts-shell/src/research/evidence/model.ts) 包含：
 
 - source id、来源类型/provider、原始与最终 URL 或授权文件定位、版本/论文 id、获取时间。
 - 实际 fetch/read 的 call/run id，读取状态（成功/失败/受限/仅摘要/截断等）、内容 hash，以及页/节/行等可定位摘录；必要时链接受控内容 artifact。
 - claim id、声明文本与适用范围、支持/反对的 source id 和定位、转载/同源关系。
 - 核验角色、输入版本、执行状态、反证查询与实际读取、结论理由、未覆盖项。
 
-来源记录由真实工具执行生产，模型只能引用已有记录，不能写一句“已读”创建成功来源。报告投影消费这些记录，校验器拒绝缺失/失败来源引用与无定位的强声明；语义支持仍需审查与人工抽核。fetch 成功只证明获取内容，不证明内容为真。
+来源记录由真实工具执行生产，模型只能引用已有记录，不能写一句“已读”创建成功来源。报告与校验器拒绝缺失/失败/过期 source 和不匹配 quote；无实际 supporting 的 indirect 声明降为 insufficient，并从 covered 移入 uncovered。实际 search/反证 query 及 identifier/locator/分页参数通过白名单有界脱敏进入现有 runEvent，start 只表示尝试，end 保存真实结果，不创建伪成功来源。语义支持仍需审查与人工抽核；fetch 成功只证明获取内容。
 
 ### 14.2 核验流程与独立性
 
 先形成有来源绑定的草稿，再在独立子上下文中尝试反驳关键结论：检查最弱证据、相反来源、版本/评测条件不匹配、利益偏差与转载。子任务拿到有界草稿、claim/source 清单和可回读定位，复用同一 loop/gate/预算。研究角色归 research owner，不将长研究 prompt 塞入通用 subagentLoader。
 
 同上下文自反思可用于草稿阶段，但记录为 self-review，不能替代用户要求的独立反证审查。初始委派按当前有界串行能力实现；并行仅在通用只读调度条件满足后开启。
+
+每条 retained claim 都有 review finding；模型遗漏由 host 补为 insufficient/uncovered。非 insufficient finding 必须引用当前 reviewer child 实际成功获取的 source/excerpt，缓存中的调查者引用或仅宣称“已读”不计本次核验；元数据/摘要不能完成 behavior/method/evaluation 核验。审查过程可以 completed，同时研究仍 partial；none-found 表示有实际读取后的本次未发现反证，不表示正确。
 
 ### 14.3 状态维度分别记录
 
@@ -350,13 +362,13 @@ provider 按能力、认证、配额和可用性选择，不把单次成功当�
 
 ### 14.5 现有资产与新增项映射
 
-| 需求 | 复用 | 拟新增 |
+| 需求 | 复用 | W8 owner |
 |---|---|---|
-| 独立研究/审查上下文 | task/runner、同一 agent loop | 只读角色注册、完整事件/轨迹投影、父子共享 admission |
-| 来源读取 | web/search/fetch/read 与 execution | 学术元数据/全文解析、真实来源记录与定位 |
-| 状态持久化 | session 存储及通用 goal run | 研究阶段/brief/claim/source/coverage state 与版本迁移 |
-| 引用/核验结果 | 现有最终消息与工具结果通道 | 报告投影和引用/完成性校验消费者 |
-| 取消与预算 | 现有 abort、steps/config | 父子总预算/期限、在途请求对账、暂停恢复 |
+| 独立研究/审查上下文 | task/runner、同一 agent loop | run/child、review/validation、host capability 与原生 events |
+| 来源读取 | web/search/fetch/read 与 execution | sources、evidence/producer、实际 hash/定位 |
+| 状态持久化 | session 存储及通用 goal/request policy | run/state/store/codec，来源重读与 epoch fencing |
+| 引用/核验结果 | 现有最终消息与工具结果通道 | evidence/review/report validators 与 renderer |
+| 取消与预算 | 现有 abort、steps/config/native ledger | run/runtime/policy，保留 unknown 和原 deadline |
 
 ### 14.6 残余风险
 
@@ -383,12 +395,12 @@ provider 按能力、认证、配额和可用性选择，不把单次成功当�
 |---|---|---|
 | 网络/读取安全和资源上限 | tools/network/document/execution | 19 |
 | 全局预算、继续运行、暂停恢复 | runtime/agent/session | 21、22、24 的 goal/会话契约 |
-| 简报、来源、声明与核验 | 拟新增 research | 本文 |
+| 简报、来源、声明与核验 | 现行 research/brief/evidence/review/run | 本文 |
 | command schema、别名与参数 UI | commands/CLI 装配 | 18、22、23、24 |
 | 研究进度、未核验/部分状态展示 | research projection + CLI | 16、17 |
 | 保存、长报告及撤销 | research report + edit/writer | 19、21 |
 
-这里的 owner 是职责约束；未存在的模块须标拟新增，真实路径由实施前的目标导航确认。不得为了凑表制造无消费者的 contracts 或重建平行工具体系。
+这里的 owner 对应 W8 当前源码。没有为了凑表新增跨 runtime contracts，也没有新增 provider、工具执行或 writer 平面。提交与本地/远端验收状态以 §17.5 和 Phase 19 实施证据为准。
 
 ## 17. 验收与修订记录
 
@@ -412,12 +424,30 @@ provider 按能力、认证、配额和可用性选择，不把单次成功当�
 
 在隔离 provider 环境与明确授权下，分别运行软件版本比较、论文方法/评测综述、混合域问题与有意冲突的来源集，检查声明支持、来源独立性、引用准确性、全文覆盖与研究效率。真实模型结果与确定性 contract/故障测试分别报告，不能由格式完整的报告替代功能验收。
 
-本轮未运行这些验收；不访问真实 provider 配置。后续是否通过、使用哪个 commit、是否推送/CI 必须以当时证据记录。
+W8 合成模型与实际原生 CLI 验证运行时契约，不代表上述真实模型研究质量评估已运行；没有访问真实 provider 配置。后续真实质量、commit、推送与远端步骤仍须按实际证据分别记录。
 
-### 17.3 本次修订的证据范围
+### 17.3 2026-10-05 文档修订的历史证据范围
 
 - 沿用并核对 14/15/19 的目标源码与历史判断，具体路径在正文；历史原命令清单保留于 §12.0。
 - 复审开源材料补充 GPT Researcher ReviewerAgent 与 STORM 定位，收窄“唯一/全部/无核验”等全称断言；星数及归档日期仅保留原研究快照。
 - 修正 Semantic Scholar 认证事实、OpenAlex 单次成功外推，以及 prompt 百分比/时效表被当客观指标的问题。
 - 统一命令、owner、共享预算、恢复、全文、证据消费者与核验状态；删除不满足类型/权限边界的伪实现片段。
 - 本轮产物为文档修订；未运行 build/tests/模型请求，未实现产品功能。
+
+
+### 17.4 W8 实施前的公开服务契约复核（2026-10-09）
+
+本次只读取公开官方文档并各运行一次匿名元数据请求，没有读取真实 provider 配置或运行真实模型研究。官方文档正文与结果保留在 `.tmp/research-contracts-81x3jrlx`，实际 API 响应在 `.tmp/research-public-api-ddemopdd`；它们是日期快照，不是永久额度或服务可用性保证。
+
+- OpenAlex 原认证文档现重定向到[当前认证说明](https://help.openalex.org/api/authentication/)。基本匿名查询可用；key 增加每日预算，支持 Authorization bearer，不必把 key 放进 URL。文档当前列每页最多 100、每日预算与请求速率均可能触发 429。匿名 search/per_page=1 实际 HTTP 200，返回可信字段，但这篇论文的 primary_location.pdf_url 为 null；这不能证明所有其他授权全文来源不存在。
+- [Semantic Scholar 官方 API 说明](https://www.semanticscholar.org/product/api)明确多数端点匿名可用、共享池/繁忙期可进一步限流，部分端点需 key，初始 authenticated 配额为 1 RPS。本次 identifier lookup 实际 HTTP 429、无 Retry-After；按受限/未读取保留，不把 keyless 失败解释成所有端点必需 key。
+- [arXiv 官方使用条款](https://info.arxiv.org/help/api/tou.html)要求 legacy API 最多三秒一次且同时仅一个连接。本次 identifier Atom 查询实际 HTTP 200。实现须共享并串行约束完整请求/正文读取生命周期，单独设置发送间隔不足以约束慢请求；取消、期限、claim ownership 和未知状态分开处理。
+
+新研究仍按 §6–§7、§13–§17 与 Phase 19 W8 交付；这些公开请求不证明模型分解、论文全文解析、独立反证、报告保存或研究恢复已完成。实际实现/验收及 commit、推送和远端步骤另记。
+
+
+### 17.5 W8 现行实现与本地验收（2026-10-09）
+
+具体 owner、命令、来源/review/save/recovery 行为见 §2、§6–§7、§13–§16。最终 Node 20.3 构建与35文件392项、结果契约149项、8有效反转/恢复后25项、五项静态 gates/43 scripts/NormProof 0 blocking、Node/executable两入口两模式共171次合成请求通过；源码82项冻结稳定。独立审查修复与最终批准、精确提交和远端结果统一记录于[Phase 19 §8.122](phase-19-decisions.md)。
+
+合成模型按 schema 驱动真实 CLI、工具/PDF、审批/writer、shared ledger 与重启边界，因此是运行时契约证据；不是生成式模型真实研究质量、混合域真实样本或跨平台证明。公共API快照只支持该次服务事实。真实质量与跨平台证据仍归最终QA，完整Phase19继续。

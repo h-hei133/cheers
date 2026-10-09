@@ -1,6 +1,7 @@
 import { httpError } from '../network/error.js';
 import { requestScope } from '../network/request.js';
-import { discardResponse, readResponseText } from '../network/response.js';
+import { discardResponse, readResponseBytes } from '../network/response.js';
+import { createHash } from 'node:crypto';
 import { webFailure } from './web/result.js';
 import { approvedResult, deniedResult } from "./toolResultLifecycle.js";
 import { requestWithRedirects } from "../network/redirect.js";
@@ -141,7 +142,10 @@ export function createWebFetchToolDefinition(): ToolDefinition {
         const { response, finalUrl } = await requestWithRedirects(rawUrl, { method: 'GET', headers: BROWSER_HEADERS, maxBytes: MAX_BODY_BYTES }, scope, 'public');
         if (!response.ok) { discardResponse(response); throw httpError(response.status); }
         const contentType = response.headers.get('content-type') || '';
-        const rawBody = await readResponseText(response, scope, MAX_BODY_BYTES);
+        const bytes = await readResponseBytes(response, scope, MAX_BODY_BYTES);
+        const rawBody = new TextDecoder().decode(bytes);
+        const provenance = { originalUrl: rawUrl, finalUrl, fetchedAt: new Date().toISOString(), mime: contentType,
+          bytes: bytes.byteLength, contentHash: createHash('sha256').update(bytes).digest('hex'), parser: 'html-markdown', location: 'extracted-lines' };
         scope.check();
         const rawUrlForName = finalUrl;
 
@@ -160,7 +164,7 @@ export function createWebFetchToolDefinition(): ToolDefinition {
         const notRendered = "no readable text was extracted";
         if (!formattedContent.trim()) {
           return approvedResult(
-            `[Fetched successfully, but ${notRendered}]`,
+            `[Fetched successfully, but ${notRendered}]`, { provenance, empty: true },
           );
         }
 
@@ -171,7 +175,7 @@ export function createWebFetchToolDefinition(): ToolDefinition {
             `\n\n[Content truncated to ${MAX_OUTPUT_CHARS} characters. Full length: ${formattedContent.length}]`;
         }
 
-        return approvedResult(output, { network: { source: 'fetch' }, truncated: formattedContent.length > MAX_OUTPUT_CHARS });
+        return approvedResult(output, { network: { source: 'fetch' }, provenance, truncated: formattedContent.length > MAX_OUTPUT_CHARS });
       } catch (error) {
         try { scope.check(); } catch (stopped) { return webFailure('fetch', stopped); }
         return webFailure('fetch', error);

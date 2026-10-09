@@ -6,6 +6,7 @@ import { brainstormSyntax } from "./brainstorm/syntax.js";
 import { goalCommandAliases, goalSyntax } from "./goal/syntax.js";
 import { guidedGoalSyntax, planReviewSyntax, planSyntax, queueSyntax } from './planning/syntax.js';
 import { advisorCommandDefinition } from './advisor/registration.js';
+import { researchCommandDefinition } from './research/registration.js';
 import { marketplaceSyntax } from "./marketplace/syntax.js";
 import { pluginSyntax } from "./plugin/syntax.js";
 import { workflowSyntax } from "../workflow/syntax.js";
@@ -719,7 +720,6 @@ export function createCommandRegistry(
     },
     {
       name: "web-research",
-      aliases: ["deep-research", "research", "deep"],
       kind: "local",
       supportsNonInteractive: true,
       availability: "available",
@@ -730,6 +730,7 @@ export function createCommandRegistry(
       argumentHint: syntaxHint(webResearchSyntax),
       execute: (args, context) => runDeepResearchCommand(args, context),
     },
+    researchCommandDefinition(),
     {
       name: "commit",
       // A staged diff expands into a prompt; an empty index answers locally.

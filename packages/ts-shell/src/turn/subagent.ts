@@ -1,5 +1,6 @@
 import { runSubagent, type SubagentRunner } from "../core/subagents/runner.js";
 import { subagentMode } from "../core/subagents/boundary.js";
+import { delegationTools } from '../core/subagents/capability.js';
 import type { ToolDefinition } from "../tools/types.js";
 import type { StepFunction } from "./step.js";
 import { adaptTools, createToolHooks, type ToolGateOptions } from "./tools.js";
@@ -19,6 +20,15 @@ export function createSubagentRunner(
   parent: ToolGateOptions,
 ): SubagentRunner {
   return async (input) => {
+    if (input.capability) {
+      try {
+        const allowed = delegationTools(input.capability, tools, parent.denyRules, input.definition.name);
+        const declared = input.definition.tools;
+        input = { ...input, agentMode: 'plan', definition: { ...input.definition, permissionMode: 'plan',
+          tools: allowed.filter(name => !declared || declared.includes(name)),
+          maxTurns: Math.min(input.definition.maxTurns ?? input.capability.maxSteps, input.capability.maxSteps) } };
+      } catch { return { text: '', failed: true, failure: 'Read-only delegation admission refused.', steps: 0, allowedTools: [] }; }
+    }
     let step: StepFunction | undefined;
     try { step = input.definition.model ? await host.stepForModel?.(input.definition.model, input.admission) : host.step; }
     catch { return { text: '', failed: true, failure: 'Requested delegated model is unavailable.', steps: 0, allowedTools: [] }; }

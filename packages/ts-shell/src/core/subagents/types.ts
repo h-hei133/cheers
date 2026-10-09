@@ -2,6 +2,12 @@ export type SubagentMemoryScope = "user" | "project" | "local";
 export type SubagentIsolationMode = "worktree" | "none";
 export type SubagentPermissionMode = "default" | "plan" | "auto" | "acceptEdits" | "bypassPermissions";
 
+export interface ReadOnlyDelegation {
+  readonly tools: readonly string[];
+  readonly network: boolean;
+  readonly maxSteps: number;
+}
+
 export interface SubagentDefinition {
   readonly name: string;
   readonly description: string;

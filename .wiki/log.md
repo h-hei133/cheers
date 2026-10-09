@@ -6381,4 +6381,9 @@ guided 明确答案/可选预算精确批准为 paused goal；计划沿用只读
 
 ## [2026-10-09] feat | Phase 19 AUTO-05 独立模型顾问与原生检查点
 
-顾问默认关闭且显式启用，真实不同 model/独立 context 复用 generic subagent 与共享请求账目；压缩前捕获全部启用边界，cadence/有界覆盖分开。epoch/goal controlRevision/transcript frontier 在 state lock 内阻止过期发布/apply；超时 pending 保留到实际 settle，迟到仅结算原会话，dead-only 本地恢复不删除 unknown usage。Node 20.3 构建/503 项、结果契约 149 项、Node/executable 两模式共 84 次合成 HTTP、静态 gates/43 scripts/NormProof 0 blocking 通过，见 features/phase-19-decisions.md §8.121。六组有效反转/恢复后 61 项与备用独立最终 APPROVED/17 项通过；AUTO-05 本地完成，提交/推送与精确 SHA 远端事实另记。下一批 W8 RSC-01–05，完整 Phase 19 保持进行中。
+顾问默认关闭且显式启用，真实不同 model/独立 context 复用 generic subagent 与共享请求账目；压缩前捕获全部启用边界，cadence/有界覆盖分开。epoch/goal controlRevision/transcript frontier 在 state lock 内阻止过期发布/apply；超时 pending 保留到实际 settle，迟到仅结算原会话，dead-only 本地恢复不删除 unknown usage。Node 20.3 构建/503 项、结果契约 149 项、Node/executable 两模式共 84 次合成 HTTP、静态 gates/43 scripts/NormProof 0 blocking 通过，见 features/phase-19-decisions.md §8.121。六组有效反转/恢复后 61 项与备用独立最终 APPROVED/17 项通过；AUTO-05 本地完成并以 1ea58289 提交/推送；精确 SHA 的 CI/Watch 因付款/额度限制零步骤失败，未计通过。下一批 W8 RSC-01–05，完整 Phase 19 保持进行中。
+
+
+## [2026-10-09] feat | Phase 19 W8 软件与论文持久深度研究
+
+RSC-01–05 顺序实现：新命令/aliases 与 collector 分离，原生分解/实际来源/缺口再调查/fresh逐声明反证/有序报告；复用同一request ledger、只读grant、session CAS和批准writer。无证据/遗漏核验不算覆盖，全文/摘要/冲突分别保留；pause/unknown不重放，变源回读失效，拒绝保存为denied、截断拒绝完整保存。Node20.3构建/35文件392项、结果契约149项、8有效反转/恢复后25项、Node/executable两模式171次合成HTTP、独立最终APPROVED/8项、静态gates/43scripts/NormProof0blocking通过，见features/phase-19-decisions.md §8.122。真实模型质量与跨平台仍待QA；提交/推送和精确远端结果另记，继续W9，完整Phase19进行中。

@@ -79,7 +79,13 @@ export interface ModelAttempt {
   confirmUnsent(): void;
   settle(usage?: ModelUsage): void;
 }
-export interface RequestPolicy { reserve(request: PreparedRequest): ModelAttempt }
+export interface RequestPolicy {
+  reserve(request: PreparedRequest): ModelAttempt;
+  /** Native owner may reserve room for later stages; no-cap admission is unchanged. */
+  readonly withCompletionReserve?: (tokens: () => number) => RequestPolicy;
+  /** Additional native admission is checked under the same ledger transaction. */
+  readonly withAdmission?: (admit: () => void) => RequestPolicy;
+}
 
 export type ModelTransport = (input: RequestInfo | URL, init: RequestInit,
   beforeDispatch: () => void) => Promise<Response>;

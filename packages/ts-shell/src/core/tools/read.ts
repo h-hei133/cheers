@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import { verifyPathContainment } from '../security/pathJail.js'
 import { isImageFilePath } from '../../model-adapters/multimodal.js'
 import { ArtifactManager } from '../session/artifactManager.js'
@@ -111,7 +112,8 @@ export function createReadToolDefinition(executionService: ExecutionService): To
         const media = await executionService.readMedia({ ...request, kind: 'pdf',
           offset: args.offset as number | undefined, limit: args.limit as number | undefined })
         context.abortSignal?.throwIfAborted()
-        return { success: true, ...media }
+        return { success: true, ...media, metadata: { ...media.metadata,
+          provenance: { locator: rawPath, fetchedAt: new Date().toISOString(), mime: 'application/pdf', parser: 'poppler', location: 'pages' } } }
       }
 
       if (request.artifactDirectory && request.absolutePath.endsWith('.bin')) {
@@ -128,7 +130,9 @@ export function createReadToolDefinition(executionService: ExecutionService): To
       context.abortSignal?.throwIfAborted()
       const { text: _, ...metadata } = page
       const formatted = formatPage(page)
-      return approvedResult(formatted.output, { read: metadata, outputNotice: formatted.outputNotice })
+      return approvedResult(formatted.output, { read: metadata, outputNotice: formatted.outputNotice,
+        provenance: { locator: rawPath, fetchedAt: new Date().toISOString(), contentHash: createHash('sha256').update(page.text).digest('hex'),
+          hashScope: 'selected-text', parser: 'utf8', location: 'lines' } })
     },
   }
 }

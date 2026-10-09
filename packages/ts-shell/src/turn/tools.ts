@@ -109,8 +109,10 @@ export function adaptTools(
       validateToolArguments(tool.argsSchema, prepared);
       if (!tool.prepare) return prepared;
       const blocked = options.admission?.() ?? planModeBlock(options.agentMode, tool.name, prepared, tool);
-      if (blocked) throw new Error(blocked);
-      return prepareToolCall(tool, prepared, preparationContext(tool.name, options), options);
+      const context = preparationContext(tool.name, options);
+      if (blocked) { tool.onRefusal?.(prepared, context, 'blocked'); throw new Error(blocked); }
+      try { return prepareToolCall(tool, prepared, context, options); }
+      catch (error) { tool.onRefusal?.(prepared, context, 'failed'); throw error; }
     },
     execute: (toolCallId, args, signal, onUpdate) =>
       executeTool(tool, toolCallId, args, signal, options, onUpdate),
@@ -217,14 +219,15 @@ export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<st
   return {
     beforeToolCall: async ({ call, args }, signal) => {
       let authorized = false;
+      let refusal: 'blocked' | 'denied' = 'blocked';
       try {
       const blocked = options.admission?.();
       if (blocked) return { block: true, reason: blocked };
       if (tools?.get(call.name)?.prepare && !preparedToolCall(args, options)) return { block: true, reason: 'The original prepared tool call is required.' };
       const planBlock = planModeBlock(options.agentMode, call.name, args, tools?.get(call.name));
       if (planBlock) return { block: true, reason: planBlock };
-      const permission = await askPermission(call.id, call.name, args, options, signal);
-      if (permission.blocked) return { block: true, reason: permission.blocked };
+      const permission = await askPermission(call.id, call.name, args, options, signal, tools?.get(call.name));
+      if (permission.blocked) { refusal = 'denied'; return { block: true, reason: permission.blocked }; }
       const afterApproval = options.admission?.();
       if (afterApproval) return { block: true, reason: afterApproval };
       if (permission.approved) approvals.set(call.id, permission.approved);
@@ -268,7 +271,10 @@ export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<st
       authorizeToolCall(args, options, call.name, call.id);
       authorized = true;
       return undefined;
-      } finally { if (!authorized) discardToolCall(args); }
+      } finally { if (!authorized) {
+        try { tools?.get(call.name)?.onRefusal?.(args, preparationContext(call.name, options), signal?.aborted ? 'cancelled' : refusal); }
+        finally { discardToolCall(args); }
+      } }
     },
     afterToolCall: async ({ call, args, result, isError }) => {
       discardToolCall(args);
@@ -328,12 +334,13 @@ async function askPermission(
   args: Record<string, unknown>,
   options: ToolGateOptions,
   signal: AbortSignal | undefined,
+  tool?: ToolDefinition,
 ): Promise<{ readonly blocked?: string; readonly approved?: { operation: string; decision: string } }> {
   let evaluation: ReturnType<typeof evaluateToolPermissionScope>;
   try {
     if (toolName === 'lsp' && args.backend !== 'scanner') bindExecutionTarget(args, args.server, options.workspaceRoot);
     const preparation = preparedToolCall(args, options);
-    evaluation = preparation ? preparationPermission(toolName, preparation, options) : evaluateWorkspacePermission(toolName, args, options);
+    evaluation = preparation ? preparationPermission(toolName, preparation, options) : evaluateWorkspacePermission(toolName, args, options, tool);
   }
   catch (error) { return { blocked: error instanceof Error ? error.message : 'Workspace access could not be checked.' }; }
   // A refusal is an answer, not a question. Asking about it would offer the user
@@ -403,10 +410,10 @@ async function askPermission(
 }
 
 /** Denials apply to the requested spelling and to the selected root's relative paths. */
-function evaluateWorkspacePermission(toolName: string, args: Record<string, unknown>, options: ToolGateOptions) {
-  const original = evaluateToolPermissionScope(toolName, args, options.permissionScope, options.workspaceRoot, options.denyRules);
+function evaluateWorkspacePermission(toolName: string, args: Record<string, unknown>, options: ToolGateOptions, tool?: ToolDefinition) {
+  const original = evaluateToolPermissionScope(toolName, args, options.permissionScope, options.workspaceRoot, options.denyRules, tool);
   if (original.denied) return original;
   const binding = workspaceToolBinding(toolName, args, options.workspaceRoot, options.workspaceRoots);
   return binding.root === options.workspaceRoot ? original
-    : evaluateToolPermissionScope(toolName, binding.args, options.permissionScope, binding.root, options.denyRules);
+    : evaluateToolPermissionScope(toolName, binding.args, options.permissionScope, binding.root, options.denyRules, tool);
 }

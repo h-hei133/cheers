@@ -4,7 +4,6 @@ import { syntaxHelp } from "./syntax/projection.js";
 import { collectSources } from "../research/collector.js";
 import { renderCollection } from "../research/renderer.js";
 
-/** The old command name remains supported as a compatibility alias. */
 export const webResearchSyntax = textSyntax("web-research", "topic", true);
 
 export async function runDeepResearchCommand(
@@ -22,7 +21,6 @@ export async function runDeepResearchCommand(
       ...(!parsed.ok ? [parsed.reason] : []),
       syntaxHelp(webResearchSyntax),
       "Example: `/web-research Node.js permission model changes between v20 and v22`",
-      "Compatibility aliases: /deep-research, /research, /deep",
     ].join("\n") };
   }
   const report = await collectSources(parsed.text, {

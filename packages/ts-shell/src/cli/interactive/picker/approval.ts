@@ -1,7 +1,26 @@
 import type { EscalationPrompt } from "../../../core/shell/approval/contract.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
-import type { Picker } from "../overlay.js";
-import { createReport, span } from '../../../core/commands/report/projection.js';
+import type { OverlayHost, Picker } from "../overlay.js";
+import type { Pager } from '../../../presentation/tui/chrome/pager.js';
+import { createReport, reportText, span } from '../../../core/commands/report/projection.js';
+
+/** Approval owns its preview lifecycle as well as its choices. */
+export function promptApproval(prompt: EscalationPrompt, host: { readonly pager: Pick<Pager, 'open' | 'close'>;
+  readonly overlay: Pick<OverlayHost, 'open' | 'close'>; readonly render: () => void }): Promise<InteractiveApprovalResult> {
+  host.pager.close();
+  return new Promise(resolve => {
+    let settled = false;
+    const settle = (result: InteractiveApprovalResult) => {
+      if (settled) return; settled = true;
+      if (prompt.context?.preview) host.pager.close();
+      host.overlay.close(); resolve(result);
+    };
+    host.overlay.open(approvalPicker(prompt, settle));
+    const preview = approvalPreview(prompt);
+    if (preview) host.pager.open(preview.title, reportText(preview), preview);
+    host.render();
+  });
+}
 
 export function approvalPreview(prompt: EscalationPrompt) {
   const preview = prompt.context?.preview;

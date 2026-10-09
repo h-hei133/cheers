@@ -14,7 +14,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.clearAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
 
-it.each(["web-research", "research"])("passes the literal /%s query to the collection owner", async name => {
+it.each(["web-research"])("passes the literal /%s query to the collection owner", async name => {
   const topic = "  compare 'exact  phrase' with C:\\tmp\\file\n\t--literal\\  ";
   expect(await routeSlashCommand(`/${name} ${topic}`, { cwd: root })).toEqual({ kind: "local", output: "Collected" });
   expect(collectSources).toHaveBeenCalledOnce();

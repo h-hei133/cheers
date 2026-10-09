@@ -30,16 +30,19 @@ import * as undoService from '../../edit/recovery/undo/service.js';
 import type { UndoPreview } from '../../edit/recovery/operation/preview.js';
 import * as goalScheduling from '../runtime/goalScheduling.js';
 import type { SubmissionQueue } from './inputQueue.js';
+import type { InteractiveApprovalResult } from './picker/approval.js';
 
 function build(overrides: { observeEvents?: () => () => void; exit?: (code?: number) => void } = {}): {
   mode: InteractiveMode;
   renderer: StreamingRenderer;
   readline: { current: unknown };
   terminal: RecordingTerminal;
+  approval: { current: ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>) | undefined };
 } {
   const renderer = new StreamingRenderer();
   const readline: { current: unknown } = { current: null };
   const terminal = new RecordingTerminal();
+  const approval: { current: ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>) | undefined } = { current: undefined };
   const mode = new InteractiveMode({
     runtimeContext: withConfiguration({
       cwd: "/workspace",
@@ -63,11 +66,12 @@ function build(overrides: { observeEvents?: () => () => void; exit?: (code?: num
     initialMcpGateway: {} as unknown as CliMcpGateway,
     terminal,
     exit: overrides.exit,
+    setInteractiveApprovalPrompt: handler => { approval.current = handler; },
     setReadline: (value) => {
       readline.current = value;
     },
   });
-  return { mode, renderer, readline, terminal };
+  return { mode, renderer, readline, terminal, approval };
 }
 
 describe("session wiring", () => {
@@ -595,14 +599,13 @@ it('keeps real wheel and bracketed paste input in the reader and restores the un
 
 
 it('shows the complete file plan and keeps approval pending when its reader closes', async () => {
-  const { mode, terminal } = build();
-  const host = mode as unknown as { pager: Pager; overlay: OverlayHost; view: InteractiveView;
-    promptApproval(prompt: EscalationPrompt): Promise<unknown> };
+  const { mode, terminal, approval } = build();
+  const host = mode as unknown as { pager: Pager; overlay: OverlayHost; view: InteractiveView };
   const preview = Array.from({ length: 60 }, (_, index) => `planned endpoint ${index}`).join('\n');
   mode.start();
   try {
     let settled = false;
-    const decision = host.promptApproval({ id: 'patch-approval', title: 'Patch', message: 'Confirm complete plan',
+    const decision = approval.current!({ id: 'patch-approval', title: 'Patch', message: 'Confirm complete plan',
       context: { toolName: 'apply_patch', operation: 'write', target: '60 endpoints', preview }, options: [],
       defaultOption: 'deny', recommendedAction: 'deny', severity: 'medium' }).then(result => { settled = true; return result; });
     await Promise.resolve(); await Promise.resolve();
@@ -620,16 +623,16 @@ it('shows the complete file plan and keeps approval pending when its reader clos
 });
 
 it('yields a reader to runtime questions, permission prompts and queued pickers', async () => {
-  const { mode, terminal } = build();
+  const { mode, terminal, approval } = build();
   const host = mode as unknown as { pager: Pager; view: InteractiveView; onQuestion(text: string): void;
-    promptApproval(prompt: EscalationPrompt): Promise<unknown>; run(text: string): Promise<void>; openPicker(text: string, wait: boolean): void };
+    run(text: string): Promise<void>; openPicker(text: string, wait: boolean): void };
   const open = () => host.pager.open('/log', 'read only');
   mode.start();
   try {
     open(); host.onQuestion('Need an answer'); expect(host.pager.active).toBe(false);
     expect(host.view.editor.placeholder).toContain('Answer above');
     open();
-    const decision = host.promptApproval({ id: 'reader-approval', title: 'Write', message: 'Confirm action',
+    const decision = approval.current!({ id: 'reader-approval', title: 'Write', message: 'Confirm action',
       context: { toolName: 'edit', operation: 'write', target: 'file.ts' }, options: [], defaultOption: 'deny',
       recommendedAction: 'deny', severity: 'medium' });
     expect(host.pager.active).toBe(false);

@@ -27,6 +27,7 @@ export interface SessionStateSnapshot {
   goalDraft?: unknown;
   goalAcceptance?: unknown;
   advisor?: unknown;
+  research?: unknown;
   /** The request owner validates durable reservations, metering and replay protection. */
   requestLedger?: unknown;
   workspaceRoots?: readonly WorkspaceRoot[];
@@ -82,6 +83,7 @@ export function buildSessionStateSnapshot(
     goalDraft: current?.goalDraft,
     goalAcceptance: current?.goalAcceptance,
     advisor: current?.advisor,
+    research: current?.research,
     requestLedger: current?.requestLedger,
     workspaceRoots: current?.workspaceRoots ?? session.workspaceRoots,
     usage: current?.usage,

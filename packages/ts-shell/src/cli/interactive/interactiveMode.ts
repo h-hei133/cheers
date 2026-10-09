@@ -39,11 +39,12 @@ import { attachSubmissionQueue, isQueueControl, queueCommandFor } from '../runti
 import { tokenizeCommandArgs } from '../../core/commands/arguments.js';
 import { isPlanningControl, planningCommandFor } from '../runtime/planning.js';
 import { isAdvisorControl, advisorCommandFor } from '../runtime/advisor.js';
+import { isResearchControl, researchCommandFor } from '../runtime/research.js';
 import { SubmissionQueue } from './inputQueue.js';
 import { openSettings } from "./settings.js";
 import { InteractiveSurface } from "../../presentation/tui/surface/view.js";
 import { createViewState, type ViewState } from "../../presentation/tui/surface/contract.js";
-import { approvalPicker, approvalPreview, type InteractiveApprovalResult } from "./picker/approval.js";
+import { promptApproval, type InteractiveApprovalResult } from "./picker/approval.js";
 import { routeKey } from "./keymap.js";
 import { InputPreferences } from "./inputPreferences.js";
 import { QuestionBridge } from "./questionBridge.js";
@@ -337,7 +338,8 @@ export class InteractiveMode {
     });
     this.readline = this.questions.asReadline(() => { void this.shutdown(); });
     this.options.setReadline?.(this.readline);
-    this.options.setInteractiveApprovalPrompt?.((prompt) => this.promptApproval(prompt));
+    this.options.setInteractiveApprovalPrompt?.((prompt) => promptApproval(prompt,
+      { pager: this.pager, overlay: this.overlay, render: () => this.tui.requestRender() }));
     this.tui.setFrameProvider(this.view);
     this.state.editor.placeholder = DEFAULT_PLACEHOLDER;
     // A chip token deletes whole: the caret sits at its end, and one Backspace
@@ -578,23 +580,6 @@ export class InteractiveMode {
     this.tui.requestRender();
   }
 
-  private promptApproval(prompt: EscalationPrompt): Promise<InteractiveApprovalResult> {
-    this.pager.close();
-    return new Promise((resolve) => {
-      let settled = false;
-      const settle = (result: InteractiveApprovalResult) => {
-        if (settled) return;
-        settled = true;
-        if (prompt.context?.preview) this.pager.close();
-        this.overlay.close();
-        resolve(result);
-      };
-      this.overlay.open(approvalPicker(prompt, settle));
-      const preview = approvalPreview(prompt);
-      if (preview) this.pager.open(preview.title, reportText(preview), preview);
-      this.tui.requestRender();
-    });
-  }
   /**
    *
    * A closed list reopens on typing, on Tab, and on any edit that leaves a draft
@@ -677,6 +662,17 @@ export class InteractiveMode {
           cwd: context.cwd, projectRoot: context.projectRoot, sessionId: context.session.id, interactive: true,
         }).then(result => {
           if (result.kind === 'local') this.state.transcript.append(textBlock('command', result.output, '/advisor'));
+          this.tui.requestRender();
+        });
+      return;
+    }
+    if (isResearchControl(text) && (this.busy || this.questions.question())) {
+      const context = this.options.runtimeContext;
+      void researchCommandFor(context, this.options.sessionManager, this.options.sessionRuntime, this.options.renderer)(
+        tokenizeCommandArgs(text.trim().replace(/^\/\S+(?:\s|$)/, '')), {
+          cwd: context.cwd, projectRoot: context.projectRoot, sessionId: context.session.id, interactive: true,
+        }).then(result => {
+          if (result.kind === 'local') this.state.transcript.append(textBlock('command', result.output, '/deep-research'));
           this.tui.requestRender();
         });
       return;

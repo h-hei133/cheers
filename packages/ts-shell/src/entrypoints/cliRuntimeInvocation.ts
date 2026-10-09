@@ -63,6 +63,7 @@ import { createProviderStep, delegatedSteps } from '../cli/provider/step.js';
 type ProviderMode = "synthetic" | "real";
 
 export interface CliRuntimeInvocationInput {
+  readonly featureTools?: readonly ToolDefinition[];
   readonly requestPolicy?: RequestPolicy;
   readonly goalObjective?: string;
   readonly workspaceRoots?: readonly WorkspaceRoot[];

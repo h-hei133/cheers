@@ -8,13 +8,18 @@ export function discardResponse(response: Response): void {
 
 /** Limits response-stream bytes, after any transport decompression. */
 export async function readResponseText(response: Response, scope: RequestScope, maxBytes: number): Promise<string> {
+  return new TextDecoder().decode(await readResponseBytes(response, scope, maxBytes));
+}
+
+/** Preserve verified bytes for content-addressed source evidence and media. */
+export async function readResponseBytes(response: Response, scope: RequestScope, maxBytes: number): Promise<Uint8Array> {
   const declared = response.headers.get('content-length');
   if (declared !== null && /^\d+$/.test(declared) && Number(declared) > maxBytes) {
     discardResponse(response);
     throw new NetworkError('response_limit');
   }
   try { scope.check(); } catch (error) { discardResponse(response); throw error; }
-  if (!response.body) return '';
+  if (!response.body) return new Uint8Array();
   const reader = response.body.getReader();
   const cancel = (): void => { void reader.cancel().catch(() => undefined); };
   scope.signal.addEventListener('abort', cancel, { once: true });
@@ -36,7 +41,7 @@ export async function readResponseText(response: Response, scope: RequestScope, 
       }
       buffer.set(value, bytes - value.byteLength);
     }
-    return new TextDecoder().decode(buffer.subarray(0, bytes));
+    return buffer.subarray(0, bytes);
   } finally {
     if (!complete) cancel();
     scope.signal.removeEventListener('abort', cancel);

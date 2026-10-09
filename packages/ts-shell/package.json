@@ -26,6 +26,7 @@
     "jsonc-parser": "3.3.1",
     "picomatch": "^4.0.7",
     "playwright-core": "^1.60.0",
+    "saxes": "6.0.0",
     "typescript": "^5.2.0",
     "undici": "^7.18.2",
     "which": "4.0.0"

@@ -54,6 +54,9 @@ export interface ToolExecutionResult {
 }
 
 export interface ToolDefinition {
+  /** Native observation of a refused call; must not perform target effects. */
+  readonly onRefusal?: (args: Record<string, unknown>, context: ToolExecutionContext,
+    outcome: 'blocked' | 'denied' | 'cancelled' | 'failed') => void;
   readonly name: string
   readonly description: string
   readonly argsSchema: Record<string, unknown>

@@ -6,6 +6,7 @@ import { matchDenyRule, type DenyRule } from "../shell/approval/deny.js";
 import type { ToolDefinition } from "../../tools/types.js";
 import { filePolicyTargets } from "../tools/permissionContext.js";
 import { executionApprovalTarget } from '../../runtime/execution/binding.js';
+import { nativeReadOnly } from '../tools/capability.js';
 
 export interface ToolPermissionEvaluation {
   readonly requiresEscalation: boolean;
@@ -45,7 +46,7 @@ export const READ_ONLY_BROWSER_ACTIONS: Record<string, true> = {
 
 /** Plan eligibility only; approval and deny rules still apply to eligible calls. */
 export function toolPlanMode(name: string, tool?: ToolDefinition): "allowed" | "read-only" | "blocked" {
-  if (Object.hasOwn(READ_ONLY_TOOLS, name)) return "allowed";
+  if (Object.hasOwn(READ_ONLY_TOOLS, name) || nativeReadOnly(tool)) return "allowed";
   if (name === "bash" || name === "browser" || name === 'lsp' || name === 'desktop') return "read-only";
   return tool?.mcpAnnotations?.readOnlyHint === true ? "allowed" : "blocked";
 }
@@ -88,6 +89,7 @@ export function evaluateToolPermissionScope(
   scope: PermissionScope = "ask",
   workspaceRoot: string = process.cwd(),
   denyRules: readonly DenyRule[] = [],
+  tool?: ToolDefinition,
 ): ToolPermissionEvaluation {
   const safeArgs = args && typeof args === "object" ? args : {};
   let operation: "read" | "write" | "delete" | "execute" = "read";
@@ -101,7 +103,7 @@ export function evaluateToolPermissionScope(
     isReadOnly = safeArgs.backend === 'scanner';
     operation = isReadOnly ? 'read' : 'execute';
     target = isReadOnly ? String(safeArgs.filePath ?? safeArgs.symbol ?? 'lsp scanner') : executionApprovalTarget(safeArgs, safeArgs.server, workspaceRoot);
-  } else if (Object.hasOwn(READ_ONLY_TOOLS, toolName)) {
+  } else if (Object.hasOwn(READ_ONLY_TOOLS, toolName) || nativeReadOnly(tool)) {
     operation = "read";
     target = String(safeArgs.path ?? safeArgs.filePath ?? safeArgs.pattern ?? safeArgs.query ?? safeArgs.url ?? toolName);
     isReadOnly = true;

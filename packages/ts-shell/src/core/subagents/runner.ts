@@ -1,7 +1,8 @@
 import { runAgentLoop, type AssistantStep, type AgentLoopConfig } from "../agent/loop.js";
-import type { AgentTool, ToolHooks } from "../agent/tools.js";
+import type { AgentTool, ToolHooks, AfterToolCallContext } from "../agent/tools.js";
+import type { AgentEventSink } from '../agent/events.js';
 import type { AgentMessage } from "../agent/state.js";
-import type { SubagentDefinition } from "./types.js";
+import type { ReadOnlyDelegation, SubagentDefinition } from "./types.js";
 import { subagentMaxSteps, subagentTools } from "./boundary.js";
 
 /**
@@ -36,6 +37,11 @@ export interface SubagentStep {
 }
 
 export interface SubagentRunInput {
+  readonly capability?: ReadOnlyDelegation;
+  readonly events?: AgentEventSink;
+  readonly onRequest?: (requestId: string) => Promise<void> | void;
+  /** Observes actual native results, before any model output can claim evidence. */
+  readonly observeTool?: (context: AfterToolCallContext) => Promise<{ readonly suffix?: string; readonly metadata?: Record<string, unknown> } | undefined>;
   readonly definition: SubagentDefinition;
   /** Requested restriction; the host intersects it with its own permission boundary. */
   readonly agentMode?: "plan" | "build";
@@ -63,6 +69,8 @@ export interface SubagentRunInput {
 export type SubagentRunner = (input: SubagentRunInput) => Promise<SubagentRunResult>;
 
 export interface SubagentRunResult {
+  /** Final answer separately from intermediate narration. */
+  readonly finalText?: string;
   /** Set by the host that built the actual tool gate; absent for unbound runners. */
   readonly agentMode?: "plan" | "build";
   /** What the subagent said, in order. */
@@ -174,17 +182,24 @@ export async function runSubagent(
     {
       tools: [...selected.values()],
       ...(host.retry ? { retry: host.retry } : {}),
-      streamStep: (context, signal, request) => {
+      streamStep: async (context, signal, request) => {
         if (admissionRefused(input)) return Promise.resolve({ text: '', toolCalls: [], stopReason: 'error' as const,
           errorMessage: 'Delegated request admission refused.', retriesExhausted: true });
+        if (request?.requestId) await input.onRequest?.(request.requestId);
         steps += 1;
         return host.step(context, signal, { allowTools: steps < maxSteps, allowedTools: allowed, requestId: request?.requestId });
       },
       shouldStopAfterStep: () => steps >= maxSteps,
       ...(host.beforeToolCall ? { beforeToolCall: host.beforeToolCall } : {}),
-      ...(host.afterToolCall ? { afterToolCall: host.afterToolCall } : {}),
+      ...((host.afterToolCall || input.observeTool) ? { afterToolCall: async (context, signal) => {
+        const observed = await input.observeTool?.(context);
+        const hooked = await host.afterToolCall?.(context, signal);
+        return observed || hooked ? { ...hooked,
+          ...(observed?.suffix ? { output: `${hooked?.output ?? context.result.output}\n\n${observed.suffix}` } : {}),
+          ...(observed?.metadata || hooked?.metadata ? { metadata: { ...observed?.metadata, ...hooked?.metadata } } : {}) } : undefined;
+      } } : {}),
     },
-    () => {},
+    input.events ?? (() => {}),
     input.signal,
   );
 
@@ -210,6 +225,7 @@ export async function runSubagent(
   }
 
   return {
+    finalText: typeof lastAssistant?.content === 'string' ? lastAssistant.content : '',
     text,
     failed: failure !== undefined,
     ...(failure ? { failure } : {}),

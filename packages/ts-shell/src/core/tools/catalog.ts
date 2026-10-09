@@ -10,6 +10,8 @@ import { filterVisibleToolNames } from "./prefilter.js";
 import { assertAdmission, type Admission } from '../network/admission.js';
 
 export interface ToolCatalogInput {
+  /** Native feature composition; visibility restrictions apply after merging. */
+  readonly featureTools?: readonly ToolDefinition[];
   readonly admission?: Admission;
   readonly workspaceRoot: string;
   readonly skillOptions?: { readonly skillPaths?: readonly string[]; readonly noSkills?: boolean };
@@ -29,7 +31,12 @@ export async function loadToolCatalog(input: ToolCatalogInput, override?: () => 
   const registry = override?.() ?? createCoreToolRegistry({ skills,
     ...(mcp ? { mcpTools: mcp.tools, mcpGateway: mcp.gateway } : {}),
   });
-  return { skills, tools: input.runtimeConfig ? restrictToolPool(registry, input.runtimeConfig) : registry };
+  const combined = new Map(registry);
+  for (const tool of input.featureTools ?? []) {
+    if (combined.has(tool.name)) throw new Error('Feature tool registration collides with an existing tool.');
+    combined.set(tool.name, tool);
+  }
+  return { skills, tools: input.runtimeConfig ? restrictToolPool(combined, input.runtimeConfig) : combined };
 }
 
 /**

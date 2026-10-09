@@ -62,7 +62,7 @@ it("prints source excerpts through the built CLI with synthetic web responses", 
     for (const key of ["PATH", "SystemRoot", "WINDIR", "LANG"]) env[key] = process.env[key];
     Object.assign(env, { HOME: home, USERPROFILE: home, TMPDIR: root, CHEERS_TEST_ROOT: root, NO_COLOR: "1" });
     await run("git", ["init", "-q", workspace], { env });
-    for (const name of ["web-research", "deep-research"]) {
+    for (const name of ["web-research"]) {
       const child = run(process.execPath, ["--require", preload, path.join(repo, "dist/cli.js"),
         "--project", workspace, "--offline", "--print", `/${name} runtime permissions`],
         { cwd: workspace, env, timeout: 20000, maxBuffer: 1024 * 1024 });
@@ -74,9 +74,9 @@ it("prints source excerpts through the built CLI with synthetic web responses", 
       expect(stdout).not.toMatch(/SECRET_RESPONSE|cross-verified|multi-agent tree search/i);
     }
     const requests = (await fs.readFile(log, "utf8")).trim().split("\n").map(line => JSON.parse(line));
-    expect(requests).toHaveLength(8);
-    expect(requests.filter(url => url === "https://docs.example/ok")).toHaveLength(2);
-    expect(requests.filter(url => url === "https://html.duckduckgo.com/html/")).toHaveLength(4);
+    expect(requests).toHaveLength(4);
+    expect(requests.filter(url => url === "https://docs.example/ok")).toHaveLength(1);
+    expect(requests.filter(url => url === "https://html.duckduckgo.com/html/")).toHaveLength(2);
   } finally {
     await fs.rm(root, { recursive: true, force: true });
   }
