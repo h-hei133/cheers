@@ -7,11 +7,9 @@ import { CoreMcpGateway } from "./gateway.js";
 /**
  * What the control plane says it can do.
  *
- * The protocol defines three primitives and this build reaches one of them. The
- * failure this guards against is not a missing feature — it is claiming one. A
- * snapshot carrying empty `resources` and `prompts` maps reads as "this server
- * has none", which is a different statement from "this build cannot ask", and
- * the difference is what a reader would act on.
+ * Tool discovery must not imply discovery of resources or prompts. Those
+ * catalogs are fetched explicitly through the content channel. An empty map on
+ * a tools-only snapshot would misrepresent a catalog that was never requested.
  */
 
 describe("the MCP surface this build offers", () => {
@@ -27,8 +25,7 @@ describe("the MCP surface this build offers", () => {
 
       expect(snapshot).toHaveProperty("clients");
       expect(snapshot).toHaveProperty("tools");
-      // Absent, not empty: there is no way to fetch either, so there is nothing
-      // truthful to put here.
+      // This snapshot did not fetch either catalog.
       expect(snapshot).not.toHaveProperty("resources");
       expect(snapshot).not.toHaveProperty("prompts");
     } finally {

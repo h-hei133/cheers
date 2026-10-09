@@ -100,9 +100,7 @@ function failurePlaneForClass(failureClass: McpFailureClass): McpFailurePlane {
 }
 
 function sanitizeMcpDiagnostic(value: string): string {
-  return value
-    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [redacted]")
-    .replace(/(api[_-]?key|token|authorization|secret)=\S+/gi, "$1=[redacted]")
-    .replace(/\/home\/wang\/\.private-agents-real[^\s"'`]*/g, "[redacted-real-provider-home]")
-    .slice(0, 240);
+  return neutraliseForDisplay(redactReportText(value, 240));
 }
+import { redactReportText } from "../security/redaction.js";
+import { neutraliseForDisplay } from "../text/safety.js";

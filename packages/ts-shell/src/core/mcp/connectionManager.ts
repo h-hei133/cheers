@@ -1,6 +1,7 @@
 import { CoreMcpClient } from "./client.js";
 import { createStateChanges } from "../state/changes.js";
 import type { McpClientSnapshot, ScopedMcpServerConfig } from "./types.js";
+import type { McpNotificationSnapshot } from "./content/types.js";
 
 /** Owns all live connections; callers serialize config reconciliation and use. */
 export class CoreMcpConnectionManager {
@@ -32,6 +33,14 @@ export class CoreMcpConnectionManager {
         await this.close(name);
       }
     }
+  }
+
+  notifications(configs: Record<string, ScopedMcpServerConfig>): McpNotificationSnapshot[] {
+    return Object.entries(configs).map(([name, config]) => {
+      const client = this.clients.get(name);
+      if (!this.closed && client && JSON.stringify(client.config) === JSON.stringify(config)) return client.notifications();
+      return { serverName: name, state: "not-connected", entries: [], dropped: 0 };
+    });
   }
 
   get(name: string, config: ScopedMcpServerConfig, workspaceRoot: string): CoreMcpClient {

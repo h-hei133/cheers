@@ -20,6 +20,8 @@ import { isPlanningControl } from '../runtime/planning.js';
 import { isSecurityControl } from '../runtime/security.js';
 import { isAgentsControl } from '../runtime/agents.js';
 import { isExtensionControl } from '../runtime/extensions.js';
+import { isMcpContent, mcpControl } from '../mcp/content.js';
+import { runCliMcpCommand } from '../../entrypoints/cliMcpModule.js';
 import { isAdvisorControl } from '../runtime/advisor.js';
 import { isResearchControl } from '../runtime/research.js';
 
@@ -124,6 +126,13 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
   input.prompt();
   input.on("line", (line) => {
     const text = line.trim();
+    const mcp = mcpControl(text);
+    if (mcp && (mcp.action === 'cancel' || busy || questions.question())) {
+      if (mcp.action === 'cancel') queue.cancelWhere(isMcpContent);
+      void runCliMcpCommand({ gateway: mcpGateway, renderer: options.renderer,
+        mcpAction: mcp.action, mcpTarget: mcp.target }).then(() => input.prompt());
+      return;
+    }
     if (isAgentsControl(text) && questions.question()) {
       options.renderer.renderLine('Agent control refused while another approval or question is pending; answer it first.'); input.prompt(); return;
     }

@@ -48,12 +48,8 @@ export type McpConnectionState =
 /**
  * What the configured servers can be asked for.
  *
- * Tools only. The protocol defines two more primitives, and this build reaches
- * neither of them: there is no way to fetch a server's resources or prompts, and
- * nothing here could consume one if there were — a model cannot reference a
- * resource, and no command inserts a prompt. Reporting empty maps for them would
- * read as "this server has none", which is a different statement from "this
- * build cannot ask".
+ * Tool discovery only. Resources and prompts are fetched explicitly through the
+ * content channel; this snapshot does not imply that either catalog was read.
  */
 export interface McpClientSnapshot {
   readonly clients: McpConnectionState[]

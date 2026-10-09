@@ -181,7 +181,8 @@ export interface ShellActionResult {
   readonly sessionAction?: 'panel' | 'list' | 'switch' | 'current' | 'help'
   readonly permissionAction?: 'list' | 'explain' | 'revoke' | 'reset'
   readonly permissionSelector?: string
-  readonly mcpAction?: 'status' | 'tools' | 'doctor' | 'refresh'
+  readonly mcpAction?: 'status' | 'tools' | 'doctor' | 'refresh' | 'content' | 'notifications' | 'cancel'
+  readonly mcpContent?: import('../mcp/content/types.js').McpContentRequest
   readonly mcpTarget?: string
   readonly workspaceAction?: 'status' | 'attach' | 'recent' | 'add' | 'remove' | 'rebind'
   readonly workspaceAccess?: 'read' | 'write'

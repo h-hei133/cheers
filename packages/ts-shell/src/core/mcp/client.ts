@@ -5,6 +5,8 @@ import { packageVersion } from "../version/current.js";
 import { McpStdioTransport } from "./stdio.js";
 import { McpToolCatalog } from "./catalog.js";
 import { projectMcpResult } from "./projection.js";
+import { McpContentChannel } from "./content/channel.js";
+import type { McpContentRequest, McpContentResult, McpNotificationSnapshot } from "./content/types.js";
 import { McpClassifiedError, classifyMcpFailure } from "./errorTaxonomy.js";
 import type { McpFailureClass } from "./errorTaxonomy.js";
 import type { McpConnectionState, McpToolCallResult, McpToolDescriptor, ScopedMcpServerConfig } from "./types.js";
@@ -25,6 +27,7 @@ export class CoreMcpClient {
   private catalog?: McpToolCatalog;
   private listedTools?: McpToolDescriptor[];
   private catalogRevision = 0;
+  private contentChannel?: McpContentChannel;
 
   constructor(
     readonly name: string,
@@ -34,8 +37,9 @@ export class CoreMcpClient {
     private readonly changed?: () => void,
   ) {}
 
-  async connect(admission?: Admission): Promise<McpConnectionState> {
+  async connect(admission?: Admission, signal?: AbortSignal): Promise<McpConnectionState> {
     assertAdmission(admission);
+    signal?.throwIfAborted();
     if (this.closed) return this.failed("MCP client is closed");
     if (this.config.enabled === false) return { type: "disabled", name: this.name, config: this.config };
     if (this.config.authRequired) return { type: "needs-auth", name: this.name, config: this.config };
@@ -43,16 +47,18 @@ export class CoreMcpClient {
     if (!this.config.command) return this.failed("Missing stdio command");
     if (this.connected) return { type: "connected", name: this.name, config: this.config };
     if (this.opening) return this.opening;
-    this.opening = this.open(admission);
+    this.opening = this.open(admission, signal);
     try { return await this.opening; }
     finally { this.opening = undefined; }
   }
 
-  private async open(admission?: Admission): Promise<McpConnectionState> {
+  private async open(admission?: Admission, signal?: AbortSignal): Promise<McpConnectionState> {
     this.listedTools = undefined;
     this.changed?.();
     await this.disposeTransport();
     assertAdmission(admission);
+    this.abort.signal.throwIfAborted();
+    signal?.throwIfAborted();
     const client = new Client({ name: "cheers", version: packageVersion() ?? "unknown" }, {
       capabilities: {}, enforceStrictCapabilities: true,
     });
@@ -74,6 +80,7 @@ export class CoreMcpClient {
     };
     client.setNotificationHandler(ToolListChangedNotificationSchema, () => {
       if (this.client !== client) return;
+      this.contentChannel?.notifications.record("notifications/tools/list_changed");
       this.catalogRevision++;
       this.catalog = undefined;
       this.listedTools = undefined;
@@ -81,13 +88,15 @@ export class CoreMcpClient {
     });
     this.client = client;
     this.transport = transport;
+    this.contentChannel = new McpContentChannel(client, () => !this.closed && this.client === client && this.connected, this.changed);
     try {
-      await this.withCancellation(signal => client.connect(transport, { timeout: this.timeoutMs, signal }));
+      await this.withCancellation(signal => client.connect(transport, { timeout: this.timeoutMs, signal }), signal);
       if (this.closed) throw new Error("MCP client closed during connection");
       this.connected = true;
       return { type: "connected", name: this.name, config: this.config };
     } catch (error) {
       await this.disposeTransport();
+      if (signal?.aborted) throw signal.reason ?? error;
       return this.failed(classifyMcpFailure({
         failureClass: "server-unavailable",
         detail: error instanceof Error ? error.message : String(error),
@@ -150,6 +159,22 @@ export class CoreMcpClient {
       ? structuredClone(this.listedTools) : undefined;
   }
 
+  async content(request: McpContentRequest, admission?: Admission, signal?: AbortSignal): Promise<McpContentResult> {
+    try {
+      await this.requireClient(admission, signal);
+      const channel = this.contentChannel!;
+      return await this.withCancellation(signal => channel.run(request, signal, this.timeoutMs, admission), signal);
+    } catch (error) {
+      throw protocolFailure(error, "protocol");
+    }
+  }
+
+  notifications(): McpNotificationSnapshot {
+    const live = !this.closed && this.connected && this.contentChannel;
+    return { serverName: this.name, state: live ? "live" : "not-connected",
+      ...(live ? live.notifications.snapshot() : { entries: [], dropped: 0 }) };
+  }
+
   async invokeTool(toolName: string, args: Record<string, unknown>, admission?: Admission): Promise<McpToolCallResult> {
     const client = await this.requireClient(admission);
     if (!this.catalog) await this.listTools(admission);
@@ -178,32 +203,40 @@ export class CoreMcpClient {
     return this.closing ??= this.finishClose();
   }
 
-  private async withCancellation<T>(operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  private async withCancellation<T>(operation: (signal: AbortSignal) => Promise<T>, signal?: AbortSignal): Promise<T> {
     // SDK request listeners stay on their signal after settlement. Give each
     // request its own signal, and release its link to the connection in finally.
     const controller = new AbortController();
     const cancel = () => controller.abort();
     if (this.abort.signal.aborted) cancel();
     else this.abort.signal.addEventListener("abort", cancel, { once: true });
+    if (signal?.aborted) cancel();
+    else signal?.addEventListener("abort", cancel, { once: true });
     try { return await operation(controller.signal); }
-    finally { this.abort.signal.removeEventListener("abort", cancel); }
+    finally {
+      this.abort.signal.removeEventListener("abort", cancel);
+      signal?.removeEventListener("abort", cancel);
+    }
   }
 
   private async finishClose(): Promise<void> {
-    await this.opening;
-    await this.disposeTransport();
+    try { await this.opening; }
+    catch (error) {
+      if (!(error instanceof Error && error.name === "AbortError")) throw error;
+    } finally { await this.disposeTransport(); }
   }
 
   private async disposeTransport(): Promise<void> {
     this.connected = false;
     this.catalog = undefined;
+    this.contentChannel = undefined;
     await this.transport?.close();
     this.client = undefined;
     this.transport = undefined;
   }
 
-  private async requireClient(admission?: Admission): Promise<Client> {
-    const state = await this.connect(admission);
+  private async requireClient(admission?: Admission, signal?: AbortSignal): Promise<Client> {
+    const state = await this.connect(admission, signal);
     assertAdmission(admission);
     if (state.type !== "connected" || !this.client) {
       throw new McpClassifiedError(classifyMcpFailure({

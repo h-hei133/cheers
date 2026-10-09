@@ -10,10 +10,13 @@ import {
   renderMcpStatusControlPlane,
   renderMcpToolsControlPlane,
 } from "./mcpControlCliSurface.js";
+import { runMcpContentCommand } from "../cli/mcp/content.js";
+import type { McpContentRequest } from "../core/mcp/content/types.js";
+import { classifyUnknownMcpFailure } from "../core/mcp/errorTaxonomy.js";
 
-export type CliMcpAction = "status" | "tools" | "doctor" | "refresh";
+export type CliMcpAction = "status" | "tools" | "doctor" | "refresh" | "content" | "notifications" | "cancel";
 
-export type CliMcpGateway = Pick<CoreMcpGateway, "snapshot" | "refresh"> & Partial<Pick<CoreMcpGateway, "close" | "syncWorkspace" | "peekSnapshot" | "subscribe">>;
+export type CliMcpGateway = Pick<CoreMcpGateway, "snapshot" | "refresh"> & Partial<Pick<CoreMcpGateway, "close" | "syncWorkspace" | "peekSnapshot" | "subscribe" | "content" | "notifications" | "cancelContent">>;
 
 export function createCliMcpGateway(cwd: string | (() => string), admissionForOperation?: () => () => string | undefined): CoreMcpGateway {
   return new CoreMcpGateway(cwd, admissionForOperation);
@@ -24,10 +27,13 @@ export async function runCliMcpCommand(input: {
   readonly gateway: CliMcpGateway;
   readonly mcpAction?: CliMcpAction;
   readonly mcpTarget?: string;
+  readonly mcpContent?: McpContentRequest;
+  readonly signal?: AbortSignal;
 }): Promise<void> {
   const mcpAction = input.mcpAction ?? "status";
   const mcpTarget = input.mcpTarget?.trim();
   try {
+    if (await runMcpContentCommand(input)) return;
     if (mcpAction === "refresh") {
       const refreshTarget =
         !mcpTarget || mcpTarget.toLowerCase() === "all" ? "all" : mcpTarget;
@@ -59,9 +65,7 @@ export async function runCliMcpCommand(input: {
     renderMcpBlockedContract(input.renderer, {
       blockerKind: "unknown",
       reason:
-        error instanceof Error
-          ? `MCP control plane failed: ${error.message}`
-          : `MCP control plane failed: ${String(error)}`,
+        `MCP control plane failed: ${classifyUnknownMcpFailure(error).safeDetail}`,
       doNext:
         "Run /mcp refresh all to reload server connections, then retry your MCP command.",
     });

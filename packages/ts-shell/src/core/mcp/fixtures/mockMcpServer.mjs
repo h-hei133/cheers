@@ -30,7 +30,10 @@ input.on("line", line => {
     if (flags.has("--initialize-hang")) return;
     send(request.id, {
       protocolVersion: request.params.protocolVersion,
-      capabilities: flags.has("--no-tools") ? {} : { tools: {} },
+      capabilities: {
+        ...(flags.has("--no-tools") ? {} : { tools: {} }),
+        ...(flags.has("--content") ? { resources: { subscribe: true, listChanged: true }, prompts: { listChanged: true }, logging: {} } : {}),
+      },
       serverInfo: { name: "fixture", version: "1.0.0" },
     });
     return;
@@ -41,6 +44,41 @@ input.on("line", line => {
   }
   if (request.id === undefined) return;
   if (!initialized) return fail(request.id, "Client did not send initialized");
+  if (["resources/list", "resources/templates/list", "prompts/list"].includes(request.method)) {
+    if (flags.has("--hang-content")) return;
+    const second = Boolean(request.params?.cursor);
+    if (flags.has("--notify-during-content")) process.stdout.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/resources/list_changed" }) + "\n");
+    if (flags.has("--notify-resource-during-content")) process.stdout.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/resources/updated", params: { uri: "fixture://file/one" } }) + "\n");
+    if (flags.has("--malformed-content")) return send(request.id, { resources: 7, resourceTemplates: 7, prompts: 7 });
+    const result = request.method === "resources/list" ? { resources: [{ uri: `fixture://file/${second ? "two" : "one"}`, name: second ? "second resource" : "first resource" }] }
+      : request.method === "resources/templates/list" ? { resourceTemplates: [{ uriTemplate: `fixture://template/${second ? "two" : "one"}/{id}`, name: "file template" }] }
+      : { prompts: [{ name: second ? "second_prompt" : "summarize", description: "A remote prompt", arguments: [{ name: "topic", required: true }] }] };
+    send(request.id, { ...result, ...((flags.has("--paginate") && !second) || flags.has("--repeat-cursor") ? { nextCursor: "next" } : {}) });
+    return;
+  }
+  if (request.method === "resources/read") {
+    if (flags.has("--hang-content")) return;
+    if (flags.has("--notify-resource-during-content")) process.stdout.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/resources/updated", params: { uri: request.params.uri } }) + "\n");
+    if (flags.has("--content-error")) return fail(request.id, 'Remote error \u001b]52;c;unsafe\u0007 password: synthetic-password {"token":"synthetic-token"} sk-syntheticReview12345');
+    const response = () => send(request.id, { contents: [{ uri: request.params.uri, mimeType: "text/plain",
+      text: flags.has("--large-content") ? "x".repeat(1024 * 1024 + 1) : "resource body\nBearer fixture-secret\n\u001b]52;c;unsafe\u0007" },
+      { uri: request.params.uri + "/binary", mimeType: "image/png", blob: "AA==" }] });
+    if (flags.has("--delay-content")) setTimeout(response, 200);
+    else response();
+    return;
+  }
+  if (request.method === "prompts/get") {
+    send(request.id, { description: "Remote template", messages: [{ role: "user", content: { type: "text", text: "Discuss " + request.params.arguments.topic } }] });
+    return;
+  }
+  if (request.method === "resources/subscribe" || request.method === "resources/unsubscribe") {
+    send(request.id, {});
+    if (request.method === "resources/subscribe") setTimeout(() => {
+      for (let i = 0; i < 205; i++) process.stdout.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/message", params: { level: "info", data: "Bearer fixture-secret " + i } }) + "\n");
+      process.stdout.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/resources/updated", params: { uri: request.params.uri } }) + "\n");
+    }, 30);
+    return;
+  }
   if (request.method === "tools/list") {
     if (flags.has("--notify-during-list")) process.stdout.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/tools/list_changed" }) + "\n");
     if (flags.has("--hang-list")) return;

@@ -55,7 +55,7 @@ it("validates the direct permission runner before touching persisted grants", ()
 it("uses the syntax vocabulary for alias and reset-scope suggestions", () => {
   const registry = createCommandRegistry(root);
   expect(registry.get("workspace")!.getArgumentCompletions?.("pro")?.map(item => item.value)).toEqual(["projects"]);
-  expect(registry.get("mcp")!.getArgumentCompletions?.("re")?.map(item => item.value)).toEqual(["refresh", "reconnect"]);
+  expect(registry.get("mcp")!.getArgumentCompletions?.("re")?.map(item => item.value)).toEqual(["refresh", "reconnect", "resources", "read"]);
   expect(registry.get("permissions")!.getArgumentCompletions?.("reset ")?.map(item => item.value)).toEqual(["all"]);
   expect(registry.get("permissions")!.getArgumentCompletions?.("reset all ")).toBeNull();
   expect(registry.get("view")!.getArgumentCompletions?.("ver")?.map(item => item.value)).toEqual(["verbose"]);

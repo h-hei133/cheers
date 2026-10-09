@@ -26,6 +26,7 @@ import { Pointer } from "./pointer.js";
 import { TUI } from "../../presentation/tui/render/engine.js";
 import { processTerminal, type TerminalDevice } from "../../presentation/tui/terminal.js";
 import { textBlock } from "../../presentation/tui/transcript/blocks.js";
+import { transcriptLineRenderer } from "../../presentation/tui/transcript/output.js";
 import { reportText } from '../../core/commands/report/projection.js';
 import { toolPoolFor } from '../runtime/tools.js';
 import type { RenderScheduler } from "../../presentation/tui/render/frame.js";
@@ -41,6 +42,8 @@ import { isPlanningControl, planningCommandFor } from '../runtime/planning.js';
 import { isSecurityControl, securityCommandFor } from '../runtime/security.js';
 import { isAgentsControl, agentsCommandFor } from '../runtime/agents.js';
 import { isExtensionControl, extensionCommandFor } from '../runtime/extensions.js';
+import { isMcpContent, mcpControl } from '../mcp/content.js';
+import { runCliMcpCommand } from '../../entrypoints/cliMcpModule.js';
 import { isAdvisorControl, advisorCommandFor } from '../runtime/advisor.js';
 import { isResearchControl, researchCommandFor } from '../runtime/research.js';
 import { gitWorkbenchFor } from '../runtime/git.js';
@@ -658,6 +661,15 @@ export class InteractiveMode {
           if (result.kind === 'local') this.state.transcript.append(textBlock('command', result.output, `/${match[1]}`));
           this.tui.requestRender();
         });
+      return;
+    }
+    const mcp = mcpControl(text);
+    if (mcp && (mcp.action === 'cancel' || this.busy || this.questions.question())) {
+      if (mcp.action === 'cancel') this.queue.cancelWhere(isMcpContent);
+      void runCliMcpCommand({ gateway: this.options.initialMcpGateway,
+        renderer: transcriptLineRenderer(this.state.transcript, this.tui, '/mcp'),
+        mcpAction: mcp.action, mcpTarget: mcp.target,
+      });
       return;
     }
     if (isAgentsControl(text) && (this.busy || this.questions.question())) {

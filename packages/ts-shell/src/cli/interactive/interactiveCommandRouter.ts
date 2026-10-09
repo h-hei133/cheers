@@ -314,6 +314,7 @@ export async function routeInteractiveCommand(
       gateway: input.mcpGateway,
       mcpAction: slashResult.mcpAction,
       mcpTarget: slashResult.mcpTarget,
+      mcpContent: slashResult.mcpContent,
     });
     return { turnNumber: nextTurnNumber, ...(themeChanged ? { themeChanged: true } : {}) };
   }

@@ -2,6 +2,8 @@ import {
   describeMcpConnectionState,
 } from "../core/mcp/gateway.js";
 import type { McpClientSnapshot } from "../core/mcp/types.js";
+import { redactReportText } from "../core/security/redaction.js";
+import { neutraliseForDisplay } from "../core/text/safety.js";
 
 export interface McpCliLineRenderer {
   renderLine(line: string): void;
@@ -24,8 +26,8 @@ export function renderMcpBlockedContract(
   renderer.renderLine("Result");
   renderer.renderLine("- Outcome: blocked");
   renderer.renderLine(`- BlockerKind: ${input.blockerKind}`);
-  renderer.renderLine(`- Reason: ${input.reason}`);
-  renderer.renderLine(`- DoNext: ${input.doNext}`);
+  renderer.renderLine(`- Reason: ${neutraliseForDisplay(redactReportText(input.reason, 2000))}`);
+  renderer.renderLine(`- DoNext: ${neutraliseForDisplay(redactReportText(input.doNext, 2000))}`);
   renderer.renderLine("");
 }
 

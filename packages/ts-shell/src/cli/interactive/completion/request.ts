@@ -47,7 +47,7 @@ function commandCatalogRequest(snapshot: DraftSnapshot) {
     kind = modelKind(preceding, token.value, following);
   } else if (name === "mcp" || name === "permissions" || name === "connect" || name === "memory" || name === "workflow") {
     const syntax = name === "mcp" ? mcpSyntax : name === "connect" ? connectSyntax : name === "memory" ? memorySyntax : name === "workflow" ? workflowSyntax : permissionsSyntax;
-    const parsed = firstParameter(input => parseSyntax(syntax, input), preceding, following);
+    const parsed = firstParameter(input => parseSyntax(syntax, input, name === "mcp"), preceding, following);
     const action = parsed?.action;
     if (name === "permissions" && action?.name !== "revoke") return undefined;
     if (name === "connect" && action?.name !== "use" && action?.name !== "logout") return undefined;

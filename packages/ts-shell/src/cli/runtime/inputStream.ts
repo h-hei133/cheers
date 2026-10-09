@@ -11,6 +11,7 @@ import { isGoalControl } from './goal.js';
 import { isSecurityControl } from './security.js';
 import { isAgentsControl } from './agents.js';
 import { isExtensionControl } from './extensions.js';
+import { isMcpContent, isMcpControl, mcpControl } from '../mcp/content.js';
 import { isAdvisorControl } from './advisor.js';
 import { isResearchControl } from './research.js';
 import { isPlanningStreamControl } from './planning.js';
@@ -49,6 +50,7 @@ export async function runPromptInputStream(options: {
   let exitRequested = false;
   let turnChain = Promise.resolve();
   let controlChain = Promise.resolve();
+  let contentCancellation = Promise.resolve();
   let pendingControls = 0;
   let pendingPrompt: {
     lines: string[];
@@ -72,17 +74,27 @@ export async function runPromptInputStream(options: {
     turnChain = turnChain.then(async () => {
       await roundBarrier;
       await options.sessionRuntime.waitForIdle().catch(() => undefined);
+      // A cancellation can overtake this host's queue. Let it settle before
+      // dispatching a later explicit request from that same queue.
+      for (;;) {
+        const cancellation = contentCancellation;
+        await cancellation;
+        if (cancellation === contentCancellation) break;
+      }
       const prompt = queue.shift(); if (prompt === undefined || exitRequested) return;
       busy = true;
       try { await dispatch(prompt); } finally { busy = false; }
     }).catch(error => options.renderer.renderLine(`Run failed: ${error instanceof Error ? error.message : 'runtime failure'}`));
   };
   const enqueuePrompt = (prompt: string): void => {
-    if (isQueueControl(prompt) || isGoalControl(prompt) || isPlanningStreamControl(prompt) || isAdvisorControl(prompt) || isSecurityControl(prompt) || isAgentsControl(prompt) || isResearchControl(prompt) || isExtensionControl(prompt)) {
+    const cancellingContent = mcpControl(prompt)?.action === 'cancel';
+    if (cancellingContent) queue.cancelWhere(isMcpContent);
+    if (isQueueControl(prompt) || isGoalControl(prompt) || isPlanningStreamControl(prompt) || isAdvisorControl(prompt) || isSecurityControl(prompt) || isAgentsControl(prompt) || isResearchControl(prompt) || isExtensionControl(prompt) || isMcpControl(prompt)) {
       pendingControls += 1;
       controlChain = controlChain.then(() => dispatch(prompt))
         .catch(error => options.renderer.renderLine(`Control failed: ${error instanceof Error ? error.message : 'runtime failure'}`))
         .finally(() => { pendingControls -= 1; });
+      if (cancellingContent) contentCancellation = controlChain;
       return;
     }
     queue.push(prompt); drain();

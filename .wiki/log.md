@@ -6411,3 +6411,7 @@ ECO-01–03已以c59a75e1597527ad4e22c5218e1b296ed21de5bb提交/推送并读回�
 ## [2026-10-09] feat | Phase 19 W11 原生角色配置与逐角色请求
 
 ECO-04接通用户/项目角色CRUD/启停/模型/effort与普通task，审批前角色身份和每次请求/工具/返回fence保留父权限、tool pool和共享账目。独立原四反例及父级held-disable缺口均修复；最终31项Node20.3构建/22文件377项、149契约、43scripts/五静态门、三有效反转/恢复14项、Node/executable四路径及busy/pipe共118POST本地通过。父级直接读84项native配对/48publication及pending usage，独立L3最终APPROVED；协议/边界/历史失败见features/agent-definitions.md及phase-19-decisions.md §8.127。完整NormProof容量仍待W16；ECO-05和W12–W16继续，提交/推送另记。
+
+## [2026-10-09] feat | Phase 19 ECO-05 协商后的资源、提示与有界通知
+
+共享原stdio连接接通完整分页、读取、只读提示预览、订阅与200项通知元数据；修复远端错误泄露、输入解析、取消前启动/host队列和startup关闭反例。Node20.3与executable构建、198项组合/149契约、展示delta47项、四有效反转/恢复16项、四场actualCLI共56协议请求零模型POST及独立APPROVE/CLEAR通过。边界和证据见features/mcp.md及phase-19-decisions.md §8.128；本批为协议组件，配置CRUD/HTTP/OAuth与W12–W16继续，完整Phase19仍active，静态门及提交/推送另记。

@@ -255,6 +255,7 @@ export async function runNonInteractivePrompt(options: {
           gateway,
           mcpAction: resolved.slashResult.mcpAction,
           mcpTarget: resolved.slashResult.mcpTarget,
+          mcpContent: resolved.slashResult.mcpContent,
         });
       } finally {
         if (!options.mcpGateway) await gateway.close();

@@ -34,4 +34,10 @@ export class SubmissionQueue {
   splice(_start: 0): string[] {
     const values = this.pending.entries().map(entry => entry.value.text); this.pending.clear(); return values;
   }
+
+  cancelWhere(matches: (text: string) => boolean): void {
+    for (const entry of this.pending.entries()) {
+      if (matches(entry.value.text)) this.pending.cancel(entry.id);
+    }
+  }
 }
