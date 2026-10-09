@@ -17,6 +17,8 @@ import type { CatalogProvider } from "../../core/models/catalog.js";
 export function streamCliRuntimePrompt(input: {
   readonly requestPolicy?: CliRuntimeInvocationInput['requestPolicy'];
   readonly commandProof?: CliRuntimeInvocationInput['commandProof'];
+  readonly checkpoint?: CliRuntimeInvocationInput['checkpoint'];
+  readonly checkpointError?: CliRuntimeInvocationInput['checkpointError'];
   readonly correlationId?: string;
   readonly goalObjective?: string;
   readonly admission?: CliRuntimeInvocationInput['admission'];
@@ -62,6 +64,8 @@ export function streamCliRuntimePrompt(input: {
     goalObjective: input.goalObjective,
     requestPolicy: input.requestPolicy,
     commandProof: input.commandProof,
+    checkpoint: input.checkpoint,
+    checkpointError: input.checkpointError,
     correlationId: input.correlationId,
     admission: input.admission,
     onCredentialPersisted: input.onCredentialPersisted,

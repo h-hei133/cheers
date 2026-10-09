@@ -7,6 +7,7 @@ import type { Interface as ReadlineInterface } from "node:readline";
 import { toolPoolFor } from "../runtime/tools.js";
 import { goalCommandFor, goalPolicyFor } from '../runtime/goal.js';
 import { queueCommandFor } from '../runtime/inputQueue.js';
+import { advisorCommandFor } from '../runtime/advisor.js';
 import { planningCommandFor } from '../runtime/planning.js';
 import { navigateSession, type SessionNavigationResult } from "../runtime/navigation.js";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
@@ -126,6 +127,7 @@ export async function routeInteractiveCommand(
   const resolved = await buildCliCommandExecution({
     goalCommand: goalCommandFor(input.runtimeContext, input.sessionManager),
     queueCommand: queueCommandFor(input.runtimeContext, input.sessionRuntime),
+    advisorCommand: advisorCommandFor(input.runtimeContext, input.sessionManager, input.sessionRuntime, input.renderer),
     planningCommand: planningCommandFor(input.runtimeContext, input.sessionManager, input.sessionRuntime, input.readline),
     requestPolicy: goalPolicyFor(input.runtimeContext, input.sessionManager),
     prompt: input.prompt,

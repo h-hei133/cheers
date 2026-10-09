@@ -6376,4 +6376,9 @@ Node20.3隔离环境下38套371项与构建通过；三处反转分别7/2/2项�
 
 ## [2026-10-09] feat | Phase 19 AUTO-04 精确计划、真实队列与原生验收
 
-guided 明确答案/可选预算精确批准为 paused goal；计划沿用只读 mode，预览/批准/执行分开且不授工具权限。TUI/line/actual pipe 编辑、移位、取消真实 pending queue，修复 EOF/goal 自等待与 stale session provenance。Node 20.3 构建/461 项组合及最终 32 项、结果契约 149 项、六组有效反转/恢复后 14 项、Node/executable 两模式共 72 次合成 HTTP、独立最终 APPROVED/20 项、静态 gates/43 scripts/NormProof 0 blocking 通过，见 features/phase-19-decisions.md §8.120。自动完成依据精确条件、原生 UUID、当前 target、committed edit receipt 与已对账 ledger；不支持目标保持 unverified，AUTO-05/完整 Phase 19 继续。提交/推送与远端事实单独补记。
+guided 明确答案/可选预算精确批准为 paused goal；计划沿用只读 mode，预览/批准/执行分开且不授工具权限。TUI/line/actual pipe 编辑、移位、取消真实 pending queue，修复 EOF/goal 自等待与 stale session provenance。Node 20.3 构建/461 项组合及最终 32 项、结果契约 149 项、六组有效反转/恢复后 14 项、Node/executable 两模式共 72 次合成 HTTP、独立最终 APPROVED/20 项、静态 gates/43 scripts/NormProof 0 blocking 通过，见 features/phase-19-decisions.md §8.120。自动完成依据精确条件、原生 UUID、当前 target、committed edit receipt 与已对账 ledger；不支持目标保持 unverified，AUTO-05/完整 Phase 19 继续。a465ce78 已推送，精确 SHA 的 CI/Watch 因付款/额度限制零步骤失败，未计通过。
+
+
+## [2026-10-09] feat | Phase 19 AUTO-05 独立模型顾问与原生检查点
+
+顾问默认关闭且显式启用，真实不同 model/独立 context 复用 generic subagent 与共享请求账目；压缩前捕获全部启用边界，cadence/有界覆盖分开。epoch/goal controlRevision/transcript frontier 在 state lock 内阻止过期发布/apply；超时 pending 保留到实际 settle，迟到仅结算原会话，dead-only 本地恢复不删除 unknown usage。Node 20.3 构建/503 项、结果契约 149 项、Node/executable 两模式共 84 次合成 HTTP、静态 gates/43 scripts/NormProof 0 blocking 通过，见 features/phase-19-decisions.md §8.121。六组有效反转/恢复后 61 项与备用独立最终 APPROVED/17 项通过；AUTO-05 本地完成，提交/推送与精确 SHA 远端事实另记。下一批 W8 RSC-01–05，完整 Phase 19 保持进行中。

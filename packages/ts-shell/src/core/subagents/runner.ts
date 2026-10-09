@@ -1,4 +1,4 @@
-import { runAgentLoop, type AssistantStep } from "../agent/loop.js";
+import { runAgentLoop, type AssistantStep, type AgentLoopConfig } from "../agent/loop.js";
 import type { AgentTool, ToolHooks } from "../agent/tools.js";
 import type { AgentMessage } from "../agent/state.js";
 import type { SubagentDefinition } from "./types.js";
@@ -48,6 +48,8 @@ export interface SubagentRunInput {
   /** Persistent memory for this agent type, already rendered. */
   readonly memory?: string;
   readonly signal?: AbortSignal;
+  /** Internal dispatch fence supplied by the owner; never interpreted from model text. */
+  readonly admission?: () => string | undefined;
 }
 
 /**
@@ -124,6 +126,7 @@ export async function runSubagent(
     readonly tools: ReadonlyMap<string, AgentTool>;
     readonly step: SubagentStep["step"];
     readonly defaultMaxSteps: number;
+    readonly retry?: AgentLoopConfig['retry'];
     /**
      * The gate a subagent's tool calls pass through, when the caller has one.
      *
@@ -139,8 +142,8 @@ export async function runSubagent(
   const available = [...host.tools.keys()];
   const allowed = subagentTools(input.definition, available);
   const maxSteps = subagentMaxSteps(input.definition, host.defaultMaxSteps);
-  if (input.signal?.aborted) {
-    return { text: "", failed: true, failure: "the subagent was aborted", steps: 0, allowedTools: allowed };
+  if (input.signal?.aborted || admissionRefused(input)) {
+    return { text: "", failed: true, failure: input.signal?.aborted ? "the subagent was aborted" : 'Delegated request admission refused.', steps: 0, allowedTools: allowed };
   }
 
   const selected = new Map<string, AgentTool>();
@@ -170,7 +173,10 @@ export async function runSubagent(
     [],
     {
       tools: [...selected.values()],
+      ...(host.retry ? { retry: host.retry } : {}),
       streamStep: (context, signal, request) => {
+        if (admissionRefused(input)) return Promise.resolve({ text: '', toolCalls: [], stopReason: 'error' as const,
+          errorMessage: 'Delegated request admission refused.', retriesExhausted: true });
         steps += 1;
         return host.step(context, signal, { allowTools: steps < maxSteps, allowedTools: allowed, requestId: request?.requestId });
       },
@@ -210,4 +216,8 @@ export async function runSubagent(
     steps,
     allowedTools: allowed,
   };
+}
+
+function admissionRefused(input: SubagentRunInput): boolean {
+  try { return Boolean(input.admission?.()); } catch { return true; }
 }

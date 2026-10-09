@@ -34,7 +34,8 @@ export function updateGoalScheduling(host: GoalStoreHost, session: Session, base
   update: (goal: SessionGoal, state: SessionStateSnapshot) => SessionGoal): SessionGoalEdit {
   return publishGoal(host, session, baseline, (goal, _scope, state) => {
     if (!goal || !goalMatchesScope(goal, baseline.scope)) throw new GoalWriteError('conflict');
-    const changed = update(goal, state);
+    const updated = update(goal, state);
+    const changed = { ...updated, controlRevision: goal.controlRevision + (updated.phase !== goal.phase ? 1 : 0) };
     if (changed.id !== goal.id || !decodeGoal(changed)) throw new GoalWriteError('invalid'); return changed;
   }, false);
 }

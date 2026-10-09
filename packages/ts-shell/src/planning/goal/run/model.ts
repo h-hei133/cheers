@@ -1,9 +1,6 @@
-export interface GoalRunOwner {
-  readonly token: string;
-  readonly pid: number;
-  readonly hostname: string;
-  readonly startedAt: string;
-}
+import type { ProcessOwner } from '../../../core/state/owner.js';
+
+export type GoalRunOwner = ProcessOwner;
 
 export type GoalRunReason = 'user' | 'cancelled' | 'session-reentry' | 'recovery-required' | 'exhausted' | 'unsupported'
   | 'history-unknown' | 'breach' | 'unavailable' | 'replay' | 'failure' | 'refused' | 'session-changed';

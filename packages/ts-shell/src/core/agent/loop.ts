@@ -324,7 +324,7 @@ async function driveLoop(
         return;
       }
 
-      await emit({ type: "turn_end", message: assistant, toolResults });
+      await emit({ type: "turn_end", message: assistant, toolResults, willContinue: hasMoreToolCalls });
       completedStep = { message: assistant, toolResults, messages: [...context] };
       if (await config.shouldStopAfterStep?.(completedStep)) {
         await emit({ type: "agent_end", messages: [...produced] });

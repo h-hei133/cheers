@@ -278,3 +278,10 @@ Cheers 已有 [picker 注册器](../../packages/ts-shell/src/cli/interactive/pic
 [Phase 19 §8.120](phase-19-decisions.md#8120-auto-04精确计划批准目标澄清实际队列与原生验收)接通 exact version 的 plan/guided 草稿与批准、既有只读 plan 模式、TUI/line/actual pipe 的真实 pending queue，以及批准后原生命令/当前 target/同会话 committed edit receipt/已对账 ledger 的自动完成闭环。guided 可选预算 N/off 进入同一版本与 budget owner，批准只创建 paused goal；计划批准与工具权限分开。实际管道控制链与 EOF 按真实执行排空，取消未知项保留。
 
 自动完成只覆盖经明确批准的可观测条件；regular UTF-8 file ≤1 MiB 或已核验 absence 以外目标保持 unverified，纯模型完成声明不通过。Node/executable 两种 TUI 与 actual pipe、反转和独立审查证据见该节；严格 cap 的现有 provider unsupported 边界仍保留。AUTO-05 的独立模型/上下文顾问与其余 Phase 19 继续，不以本批验收宣称完整阶段完成。
+
+
+## 12. 独立顾问实施补充
+
+[Phase 19 §8.121](phase-19-decisions.md#8121-auto-05独立模型顾问原生检查点与显式意见应用)接通 `/advisor configure/on/off/status/dump/review/apply`。顾问缺省关闭，配置不隐含启用，无模型零发送；原生回合结束、压缩前捕获有界不可变检查点，频率跳过的证据仍进入后续审查，覆盖遗漏明确标注。显式目标通过原通用委派/模型请求 machinery 发给实际不同模型，使用独立上下文、空工具/plan 权限及同一 budget/retry policy。
+
+意见的模型/时间/epoch/digest/覆盖可查看，只有当前 session/workspace/goal controls/transcript 仍匹配才能手动 apply 为普通 prompt；意见不授工具权限、批准或完成权。超时/取消保留未实际结算的 claim，重入需明确启用，迟到结果只结算原会话；证明本机 owner 已退出后可显式恢复本地 claim，shared ledger 未知消耗仍保留。Node/executable 两模式、实际 pipe、合成 HTTP 与本地验证证据见该节；远端执行和完整 Phase 19 仍分别核验。

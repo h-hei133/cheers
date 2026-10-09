@@ -30,6 +30,7 @@ import { goalObjectiveFor, goalPolicyFor, prepareGoalSession } from './goal.js';
 import { installGoalScheduler } from './goalScheduling.js';
 import { acceptanceCapture } from '../../planning/goal/acceptance/capture.js';
 import { planningSettlement } from './planning.js';
+import { advisorCheckpointFor } from './advisor.js';
 import { readGoalEdit } from '../../planning/goal/store.js';
 import type { GoalScheduler } from '../../planning/goal/run/scheduler.js';
 import { compactSessionHistory } from "../../core/shell/compaction.js";
@@ -516,6 +517,8 @@ export function createCliSessionRuntime(input: {
       const promptEntryId = sourceEntryId;
       const currentGoal = readGoalEdit(input.sessionManager, input.runtimeContext.session).goal;
       const run = streamCliRuntimePrompt({
+        checkpoint: advisorCheckpointFor(input.runtimeContext, input.sessionManager, input.renderer, promptEntryId),
+        checkpointError: input.renderer.renderLine.bind(input.renderer),
         ...(promptEntryId ? { correlationId: promptEntryId, commandProof: acceptanceCapture(input.sessionManager,
           input.runtimeContext.session, promptEntryId, currentGoal?.id) } : {}),
         goalObjective: goalObjectiveFor(input.runtimeContext, input.sessionManager),

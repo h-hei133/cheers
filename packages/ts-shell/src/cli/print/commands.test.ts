@@ -62,7 +62,15 @@ describe("scripted session commands", () => {
     expect(result.timedOut).toBe(false);
     expect(result.exitCode, result.output.combined).toBe(0);
     expect(result.output.stdout).toContain("Started a new session:");
-    expect(result.output.stdout).toContain("No tasks currently");
+    if (printMode) {
+      expect(result.output.stdout).toContain("No tasks currently");
+    } else {
+      const rejection = "Queued input was not executed because the session changed. Queue it again explicitly.";
+      expect(result.output.stdout.split(rejection).length - 1).toBe(3);
+      expect(result.output.stdout).toContain("Processed 2 prompt(s).");
+      expect(result.output.stdout).not.toContain("> /todo list");
+      expect(result.output.stdout).not.toContain("> /exit");
+    }
     expect(result.output.stdout).not.toContain("must-not-run");
     expect(result.output.stdout).not.toContain("interactive-only");
   }, 20_000);

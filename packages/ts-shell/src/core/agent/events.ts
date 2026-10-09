@@ -6,6 +6,7 @@ export type AgentLifecycleEvent =
   | { readonly type: "turn_start" }
   | {
       readonly type: "turn_end";
+      readonly willContinue?: boolean;
       readonly message: AgentMessage;
       readonly toolResults: readonly AgentMessage[];
     }

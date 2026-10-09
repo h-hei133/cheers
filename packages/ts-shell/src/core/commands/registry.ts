@@ -5,6 +5,7 @@ import { loopSyntax, loopArgumentCompletions } from "./loop/syntax.js";
 import { brainstormSyntax } from "./brainstorm/syntax.js";
 import { goalCommandAliases, goalSyntax } from "./goal/syntax.js";
 import { guidedGoalSyntax, planReviewSyntax, planSyntax, queueSyntax } from './planning/syntax.js';
+import { advisorCommandDefinition } from './advisor/registration.js';
 import { marketplaceSyntax } from "./marketplace/syntax.js";
 import { pluginSyntax } from "./plugin/syntax.js";
 import { workflowSyntax } from "../workflow/syntax.js";
@@ -106,6 +107,7 @@ export function createCommandRegistry(
   runtimeConfig: RuntimeConfig = getRuntimeConfig(cwd),
 ): ReadonlyMap<string, CommandDefinition> {
   const commands: CommandDefinition[] = [
+    advisorCommandDefinition(),
     {
       name: "diagnose",
       aliases: ["repo", "changes"],

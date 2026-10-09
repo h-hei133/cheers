@@ -170,3 +170,25 @@ it("gives the model the executable child tool set without changing the shared pa
   await step([{ role: "user", content: "parent request" }], undefined, {}, { allowTools: true });
   expect(bodies[2].tools?.map((tool) => tool.function.name)).toEqual(["read", "write", "task"]);
 });
+
+it('refuses an unavailable explicit model with zero main-step fallback', async () => {
+  const main = vi.fn(); const run = createSubagentRunner({ step: main, defaultMaxSteps: 1 }, new Map(), {
+    sessionId: 'model-unavailable', workspaceRoot: process.cwd(), permissionScope: 'ask', hooks: {} as ToolGateOptions['hooks'], emit: () => {},
+  });
+  expect(await run({ ...request, definition: { ...reviewer, model: 'openai/exact-unavailable' } })).toMatchObject({ failed: true, steps: 0, failure: 'Requested delegated model is unavailable.' });
+  expect(main).not.toHaveBeenCalled();
+});
+
+it('enforces a default-model delegated admission fence before startup and each native request', async () => {
+  const main = vi.fn(async () => ({ text: 'reading', toolCalls: [{ id: 'read', name: 'read', args: {} }], stopReason: 'stop' as const }));
+  let refusal: string | undefined = 'initially fenced';
+  const execute = vi.fn(async () => { refusal = 'fenced after tool'; return { success: true, output: 'evidence' }; });
+  const run = createSubagentRunner({ step: main, defaultMaxSteps: 3 }, new Map([['read', { name: 'read', description: 'read', argsSchema: {}, execute }]]), {
+    sessionId: 'admission', workspaceRoot: process.cwd(), agentMode: 'plan', permissionScope: 'allow-all',
+    hooks: { dispatch: async () => ({ decision: 'allow' }) } as ToolGateOptions['hooks'], emit: () => {},
+  });
+  const input = { ...request, definition: { ...reviewer, tools: ['read'] }, admission: () => refusal };
+  expect(await run(input)).toMatchObject({ failed: true, steps: 0 }); expect(main).not.toHaveBeenCalled();
+  refusal = undefined; expect(await run(input)).toMatchObject({ failed: true, steps: 1, failure: 'Delegated request admission refused.' });
+  expect(main).toHaveBeenCalledOnce(); expect(execute).toHaveBeenCalledOnce();
+});

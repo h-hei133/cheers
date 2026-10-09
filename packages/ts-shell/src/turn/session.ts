@@ -109,10 +109,9 @@ export interface TurnOptions {
    * this left the user's refusals out of the subagent's copy, so a rule held at
    * the front door and not at the one the subagent came through.
    */
-  readonly subagentHost?: {
-    readonly step: StepFunction;
-    readonly defaultMaxSteps: number;
-  };
+  readonly subagentHost?: import('./subagent.js').SubagentHost;
+  readonly checkpoint?: import('./checkpoint.js').TurnCheckpointHandler;
+  readonly checkpointError?: (message: string) => void;
   /** Calls this session refuses outright; see `ToolGateOptions.denyRules`. */
   readonly denyRules?: readonly DenyRule[];
   /**
@@ -302,9 +301,16 @@ export function runTurn(options: TurnOptions): TurnRun {
     { lane: 'steering', queue: queues.steering, text: message => messageToText(message.content), replace: (message, text) => ({ ...message, content: text }) },
     { lane: 'followUp', queue: queues.followUps, text: message => messageToText(message.content), replace: (message, text) => ({ ...message, content: text }) },
   ]);
-  core.subscribe((event: AgentLifecycleEvent) => {
+  core.subscribe(async (event: AgentLifecycleEvent, signal) => {
     if (event.type === "message_end" && event.message !== opening) persist(options.onMessage, event.message);
     for (const projected of projection.project(event)) channel.push(projected);
+    if (event.type === 'turn_end' && options.checkpoint && runSubagent) {
+      try { await options.checkpoint({ messages: core.state.messages, step: projection.stepCount,
+        willContinue: Boolean(event.willContinue) && projection.stepCount < options.maxSteps,
+        failed: signal.aborted || event.message.stopReason === 'error' || event.message.stopReason === 'aborted',
+      }, runSubagent, signal); }
+      catch { try { options.checkpointError?.('Checkpoint observer failed; the main turn continues without its advice.'); } catch { /* Observer reporting cannot change the main outcome. */ } }
+    }
   });
 
   let overflowRecovered = false;

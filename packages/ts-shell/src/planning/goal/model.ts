@@ -25,6 +25,8 @@ export interface SessionGoal extends GoalScope {
   readonly schemaVersion: 1;
   readonly id: string;
   readonly revision: number;
+  /** Authority generation changes on control/phase transitions, not ordinary scheduling saves. */
+  readonly controlRevision: number;
   readonly objective: string;
   readonly phase: GoalPhase;
   readonly origin: 'user' | 'legacy-project';

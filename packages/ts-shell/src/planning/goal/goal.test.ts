@@ -13,7 +13,7 @@ import { goalCommandFor, goalObjectiveFor, prepareGoalSession } from '../../cli/
 import { environmentLine } from '../../turn/prompt.js';
 import { decodeGoal } from './codec.js';
 import { GoalWriteError, type GoalAction } from './model.js';
-import { readGoalEdit, writeGoal, goalIsDetached } from './store.js';
+import { readGoalEdit, writeGoal, goalIsDetached, updateGoalScheduling } from './store.js';
 import { runSessionGoalCommand } from './command.js';
 import { goalObjective } from './projection.js';
 import { transitionGoal } from './state.js';
@@ -167,5 +167,18 @@ describe('session goals', () => {
     vi.restoreAllMocks();
     vi.spyOn(files, 'withFileLock').mockImplementationOnce((_target, action) => { action(); throw new Error('lock release'); });
     expect((await command(['resume'])).output).toContain('state was saved'); expect(goal()!.phase).toBe('active');
+  });
+
+  it('decodes legacy control generation without writes and keeps it stable through ordinary scheduling saves', async () => {
+    await command(['set', 'Legacy generation']); const original = goal()!;
+    const { controlRevision: _generation, ...legacy } = original;
+    const current = readStateSnapshotRequired(statePath()); files.writeJsonFileAtomic(statePath(), { ...current, goal: legacy });
+    const before = fs.readFileSync(statePath()); expect(goal()!.controlRevision).toBe(original.revision); expect(fs.readFileSync(statePath())).toEqual(before);
+    updateGoalScheduling(manager, session, readGoalEdit(manager, session), saved => ({ ...saved, revision: saved.revision + 1, updatedAt: new Date().toISOString() }));
+    expect(goal()).toMatchObject({ revision: 2, controlRevision: 1 });
+    updateGoalScheduling(manager, session, readGoalEdit(manager, session), saved => ({ ...saved, revision: saved.revision + 1, phase: 'paused', updatedAt: new Date().toISOString() }));
+    expect(goal()).toMatchObject({ revision: 3, controlRevision: 2 });
+    await command(['resume']); await command(['budget', '100']); expect(goal()).toMatchObject({ revision: 5, controlRevision: 4 });
+    expect(decodeGoal({ ...goal(), controlRevision: 6 })).toBeUndefined(); expect(decodeGoal({ ...goal(), controlRevision: 0 })).toBeUndefined();
   });
 });

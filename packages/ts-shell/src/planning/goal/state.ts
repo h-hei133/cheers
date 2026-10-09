@@ -14,7 +14,7 @@ export function transitionGoal(current: SessionGoal | undefined, scope: GoalScop
     if (current && current.phase !== 'complete' && current.phase !== 'dropped') throw new GoalWriteError('conflict');
     const objective = action.objective.trim();
     if (!objective || objective.length > 16_384 || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(objective)) throw new GoalWriteError('invalid');
-    return freezeDeep({ ...scope, schemaVersion: 1, id: randomUUID(), revision: 1, objective,
+    return freezeDeep({ ...scope, schemaVersion: 1, id: randomUUID(), revision: 1, controlRevision: 1, objective,
       phase: action.type === 'set' ? 'active' : 'paused', origin: action.type === 'import' ? 'legacy-project' : 'user',
       createdAt: timestamp, updatedAt: timestamp, runOwner: null,
       ...(action.type !== 'set' ? { pauseReason: action.type === 'import' ? 'legacy-import' as const : 'user' as const } : {}) });
@@ -41,7 +41,7 @@ export function transitionGoal(current: SessionGoal | undefined, scope: GoalScop
     if (current.tokenBudget === action.cap) return current;
     if (current.revision >= Number.MAX_SAFE_INTEGER) throw new GoalWriteError('invalid');
     const { tokenBudget: _budget, ...base } = current;
-    return freezeDeep({ ...base, revision: current.revision + 1, updatedAt: timestamp,
+    return freezeDeep({ ...base, revision: current.revision + 1, controlRevision: (current.controlRevision ?? current.revision) + 1, updatedAt: timestamp,
       ...(action.cap !== undefined ? { tokenBudget: action.cap } : {}) });
   }
   throw new GoalWriteError('invalid');
@@ -62,7 +62,7 @@ function move(current: SessionGoal, phase: SessionGoal['phase'], timestamp: stri
   details: Pick<SessionGoal, 'pauseReason' | 'completion'> = {}): SessionGoal {
   if (current.revision >= Number.MAX_SAFE_INTEGER) throw new GoalWriteError('invalid');
   const { pauseReason: _pause, completion: _completion, ...base } = current;
-  return freezeDeep({ ...base, revision: current.revision + 1, phase, updatedAt: timestamp, ...details,
+  return freezeDeep({ ...base, revision: current.revision + 1, controlRevision: (current.controlRevision ?? current.revision) + 1, phase, updatedAt: timestamp, ...details,
     ...(current.scheduling && phase !== 'active' ? { scheduling: { ...current.scheduling,
       phase: current.scheduling.pendingRound && current.runOwner ? 'draining' as const : 'paused' as const,
       reason: details.pauseReason === 'session-reentry' ? 'session-reentry' as const : 'user' as const,

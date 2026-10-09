@@ -38,6 +38,7 @@ import { attachGoalSubmission, schedulerForRuntime } from '../runtime/goalSchedu
 import { attachSubmissionQueue, isQueueControl, queueCommandFor } from '../runtime/inputQueue.js';
 import { tokenizeCommandArgs } from '../../core/commands/arguments.js';
 import { isPlanningControl, planningCommandFor } from '../runtime/planning.js';
+import { isAdvisorControl, advisorCommandFor } from '../runtime/advisor.js';
 import { SubmissionQueue } from './inputQueue.js';
 import { openSettings } from "./settings.js";
 import { InteractiveSurface } from "../../presentation/tui/surface/view.js";
@@ -665,6 +666,17 @@ export class InteractiveMode {
           cwd: context.cwd, projectRoot: context.projectRoot, sessionId: context.session.id, interactive: true, rawCommandArgs: match[2] ?? '',
         }).then(result => {
           if (result.kind === 'local') this.state.transcript.append(textBlock('command', result.output, `/${match[1]}`));
+          this.tui.requestRender();
+        });
+      return;
+    }
+    if (isAdvisorControl(text) && (this.busy || this.questions.question())) {
+      const context = this.options.runtimeContext;
+      void advisorCommandFor(context, this.options.sessionManager, this.options.sessionRuntime, this.options.renderer)(
+        tokenizeCommandArgs(text.trim().replace(/^\/advisor(?:\s|$)/i, '')), {
+          cwd: context.cwd, projectRoot: context.projectRoot, sessionId: context.session.id, interactive: true,
+        }).then(result => {
+          if (result.kind === 'local') this.state.transcript.append(textBlock('command', result.output, '/advisor'));
           this.tui.requestRender();
         });
       return;

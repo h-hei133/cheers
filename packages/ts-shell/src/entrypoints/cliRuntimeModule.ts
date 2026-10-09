@@ -11,6 +11,7 @@ import { runResumeLikeShellAction } from "../core/shell/continueShellActionRunti
 import { toolPoolFor } from "../cli/runtime/tools.js";
 import { goalCommandFor, goalPolicyFor } from '../cli/runtime/goal.js';
 import { queueCommandFor } from '../cli/runtime/inputQueue.js';
+import { advisorCommandFor } from '../cli/runtime/advisor.js';
 import { runPromptInputStream } from '../cli/runtime/inputStream.js';
 import { planningCommandFor } from '../cli/runtime/planning.js';
 import { schedulerForRuntime } from '../cli/runtime/goalScheduling.js';
@@ -129,6 +130,7 @@ export async function runNonInteractivePrompt(options: {
   const resolved = await resolveTurnInputForExecution({
     goalCommand: goalCommandFor(options.runtimeContext, options.sessionManager),
     queueCommand: queueCommandFor(options.runtimeContext, options.sessionRuntime),
+    advisorCommand: advisorCommandFor(options.runtimeContext, options.sessionManager, options.sessionRuntime, options.renderer),
     planningCommand: planningCommandFor(options.runtimeContext, options.sessionManager, options.sessionRuntime),
     requestPolicy: goalPolicyFor(options.runtimeContext, options.sessionManager),
     prompt: trimmedPrompt,

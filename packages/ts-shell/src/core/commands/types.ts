@@ -37,6 +37,7 @@ export interface CommandContext {
   readonly goalCommand?: (args: string[], context: CommandContext) => Promise<LocalCommandResult>
   readonly planningCommand?: (name: 'plan' | 'plan-review' | 'guided-goal', args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly queueCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
+  readonly advisorCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly cwd: string
   /** Current configured pool, resolved on demand by the CLI host. */
   readonly getToolPool?: () => Promise<ReadonlyMap<string, ToolDefinition>>

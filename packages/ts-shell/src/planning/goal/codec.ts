@@ -10,6 +10,8 @@ const PAUSE_REASONS = new Set(['user', 'session-reentry', 'legacy-import']);
 export function decodeGoal(value: unknown): SessionGoal | undefined {
   if (!isRecord(value) || value.schemaVersion !== 1 || !text(value.id) || !text(value.objective)
     || typeof value.revision !== 'number' || !Number.isSafeInteger(value.revision) || value.revision < 1
+    || value.controlRevision !== undefined && (typeof value.controlRevision !== 'number' || !Number.isSafeInteger(value.controlRevision)
+      || value.controlRevision < 1 || value.controlRevision > value.revision)
     || !text(value.sessionId) || !timestamp(value.sessionCreatedAt) || !timestamp(value.createdAt) || !timestamp(value.updatedAt)
     || typeof value.phase !== 'string' || !PHASES.has(value.phase)
     || (value.origin !== 'user' && value.origin !== 'legacy-project')
@@ -25,7 +27,8 @@ export function decodeGoal(value: unknown): SessionGoal | undefined {
       || completion.declaration !== '/goal complete')) return undefined;
   } else if (completion !== undefined) return undefined;
   return freezeDeep({
-    schemaVersion: 1, id: value.id as string, revision: value.revision, objective: value.objective as string,
+    schemaVersion: 1, id: value.id as string, revision: value.revision,
+    controlRevision: typeof value.controlRevision === 'number' ? value.controlRevision : value.revision, objective: value.objective as string,
     sessionId: value.sessionId as string, sessionCreatedAt: value.sessionCreatedAt as string,
     workspace: { path: value.workspace.path as string, identity: value.workspace.identity as string },
     phase: value.phase as SessionGoal['phase'], origin: value.origin,

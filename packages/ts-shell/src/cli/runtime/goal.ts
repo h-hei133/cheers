@@ -9,6 +9,7 @@ import { ModelAdmissionError, type RequestPolicy } from '../../core/agent/reques
 import { recoverGoalRun, type GoalRunStoreHost } from '../../planning/goal/run/store.js';
 import { goalCommandAliases, parseGoalArgs } from '../../core/commands/goal/syntax.js';
 import { schedulerForContext } from './goalScheduling.js';
+import { pauseAdvisor } from './advisor.js';
 
 interface Activation { readonly session: Session; readonly projectRoot: string; readonly issue?: string }
 const activations = new WeakMap<ShellRuntimeContext, Activation>();
@@ -35,6 +36,7 @@ export function goalCommandFor(context: ShellRuntimeContext, host: GoalStoreHost
     const activation = prepareGoalSession(context, host);
     if (activation.issue) return { kind: 'local', output: activation.issue };
     const result = await runSessionGoalCommand(args, commandContext, host, context.session);
+    if (['pause', 'drop', 'complete'].includes(args[0]?.toLowerCase() ?? '') && readGoalEdit(host, context.session).goal?.phase !== 'active') pauseAdvisor(context, host);
     const scheduler = schedulerForContext(context);
     const parsed = parseGoalArgs(args);
     if (!scheduler || !parsed.ok) return result;

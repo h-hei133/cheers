@@ -51,6 +51,7 @@ export interface BuildCliCommandExecutionInput {
   readonly goalCommand?: CommandContext['goalCommand'];
   readonly planningCommand?: CommandContext['planningCommand'];
   readonly queueCommand?: CommandContext['queueCommand'];
+  readonly advisorCommand?: CommandContext['advisorCommand'];
   readonly prompt: string;
   /** Images the draft referred to, carried beside the text rather than in it. */
   readonly attachments?: PromptAttachments;
@@ -146,6 +147,7 @@ export async function buildCliCommandExecution(
     goalCommand: input.goalCommand,
     planningCommand: input.planningCommand,
     queueCommand: input.queueCommand,
+    advisorCommand: input.advisorCommand,
     requestPolicy: input.requestPolicy,
     cwd: input.cwd,
     interactive: input.interactive,

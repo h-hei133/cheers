@@ -104,6 +104,8 @@ pause 立即停止新派发并传播取消，在有界收尾后持久标记调�
 
 顾问复用同一工具/模型/预算边界，默认按用户启用后的研究或执行检查点运行，有并发与频率限制。意见不自动改文件、不自带批准权，也不把“顾问未返回”当批准。模型路由与 prompt 配置分开验证，不能因配置存在 model 字段就宣称多模型已接通。
 
+AUTO-05 的顾问默认关闭；configure 保存精确 provider/connection 与 model、频率、turn/end 检查点模式和有界 timeout，并保持关闭，on 才为当前 host 显式启用。没有模型时显示 no-model 且零发送；重入只投影 paused，不通过只读 status/dump 改写其他存活 owner。原生回合结束先保存不可变、脱敏且有界的检查点，随后才允许压缩；频率控制派发，跳过派发的保留检查点仍进入后续审查，省略或截断明确标注覆盖边界。顾问使用通用 subagent runner、无工具/只读权限、同一请求 policy 和用户重试设置，不创建另一请求循环。意见保存模型、检查点 ID/digest、覆盖及 epoch；只有当前会话/工作区/目标与转录仍匹配的意见才能显式 apply 至普通 prompt，submitted 只表示提交，不表示写入或审核批准。
+
 ### 3.3 深度研究与证据
 
 /deep-research 及 research/deep aliases 在同一发布归入新研究流程；从 /web-research 移除这些 alias，帮助说明语义变化。收集器继续提供原能力；同一个词不能同时表示收费模型研究与无模型收集。
@@ -237,7 +239,7 @@ SSH 是现有执行接口的一种显式远端适配能力，仍由 TypeScript o
 | AUTO-02 | 通用请求 admission、共享预算与幂等用量账本；core/agent 基元、turn/provider 实际 attempt 接线、usage owner，feature 注入 policy | 缺省无 cap；显式 cap 按 §3.2 跨主子顾问及所有内层重发，无法给上界则 unsupported；缓存/推理计量不漏不重；仅够一次余额时重试/降级/空流重发的第二次请求零发送；并发预留、unknown、取消、重启及降低cap不能绕过准入。本地基元/现有发送路径验收见 §8.118；现有 provider 严格 cap 明确 unsupported，新增顾问请求仍须接同一 policy |
 | AUTO-03 | 自主轮间调度、owner、暂停取消、崩溃恢复；既有 session runtime 与 goal owner | 超过单轮 step 仍可继续无cap目标；暂停响应且不新派发；进程中断恢复不重复副作用；预算耗尽/失败/完成状态不同。本地实现/验收见 §8.119，自动完成证据仍由 AUTO-04 交付 |
 | AUTO-04 | /goal、/guided-goal、/plan、/plan-review、/queue、批准验收证据及计划执行 UX；既有 plan/input queue 接口 | 本地验收见 §8.120：澄清答案/可选预算精确批准为 paused goal，不把未答项变批准；复用实际只读 plan mode，预览/批准/执行分开；TUI/line/实际 pipe 队列与调整/取消执行一致；自动完成按 §3.2 的已批准条件、原生证据及当前目标判断，unsupported targets 保持 unverified |
-| AUTO-05 | 实时 advisor 路由、检查点及结果应用；通用 subagent runner + advisor 领域 | 用户启用后按配置运行；不同模型实际发送可验证；共享预算；超时/失败可见；意见不是授权，主流程/审核策略明确 |
+| AUTO-05 | 实时 advisor 路由、检查点及结果应用；通用 subagent runner + advisor 领域 | 本地验证见 §8.121：显式启用及实际不同模型/独立上下文；原生压缩前检查点与覆盖；同一预算/重试 policy；有界超时与未知结算；手动 apply 保留普通权限，意见不授批准或完成权 |
 
 ### W8 — 软件与论文深度研究
 
@@ -1804,3 +1806,19 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 五项静态 gates、43 项 script tests 与 1930 文件 runtime/type 无环通过，见 `.tmp/navigation-gates-fkopdoev`；Node 24.15 NormProof enforcement 为 0 blocking、阻断 import-resolution 义务 satisfied，verdict partial 保留既有 mixed-cycle/五项 ceiling advisory，实际 artifacts 已复制至 `normproof-out`。strict docs 保留 120 项既有 source advisory。60 个 production owner 的 AST 审计无新增超限，既有 InteractiveMode/factory/AgentCore/lifecycle 数量不增长；新 owner 最多 10 个函数名。新增职责已登记架构规则，原 `.gitignore` 原文/hash 保持并排除提交。
 - 独立 L3 最终 **APPROVED**，20/20 独立 probes 通过，60 个 production source hashes 在审查前后均匹配 `c88bf2d3e0f80e9be9a3d191183de0e3420ab2b0cf198812ea459f0a97296f7f` manifest；production/test/review 共 78 个材料 hashes 见 `.tmp/auto4-review-material/{final-report.md,final-run.json,final-reviewed-material-hashes.json}`。此前审查服务 503 未作为批准，使用实际返回的备用独立报告。
 - 本批按 Tier 1 XL 实施、L3 独立审查交付，复用原 session writer、真实 queue、工具权限与 request policy；额外接线依赖为中性 state publication 与 actual pipe host，均留在其 owner。AUTO-04 本地闭环覆盖明确批准的可观测条件，未证明全部自然语言语义目标、真实外部 provider 或跨平台运行；AUTO-05 顾问及完整 Phase 19 继续。提交/推送与精确 SHA 远端事实另行记录。
+
+- 已提交/推送 `a465ce7806d18c808e6f045ecd71b88895e9d391`；CI 37821011857/job 113461727937、Watch 37821011856/job 113461729173 均零步骤失败，annotations 确认账户付款/spending limit 阻止启动，见 `.tmp/auto4-remote-8ni3_k1b`。本地验收、提交和推送已确认，当前 SHA 没有远端构建/套件通过证据；继续 AUTO-05。
+
+
+### 8.121 AUTO-05：独立模型顾问、原生检查点与显式意见应用
+
+- [顾问 owner](../../packages/ts-shell/src/advisor/runtime.ts)默认关闭；`/advisor configure <provider-or-connection/model> --every N --timeout MS --mode turn|end` 验证 N 1–100、timeout 100–60000 ms 并保持关闭。on 才绑定当前 host/持久 epoch；无模型明确 no-model/零发送。status/dump 是只读投影，重入显示 paused，不改写其他存活 owner；new/fork 不继承顾问状态，只有顾问配置的空会话仍可重新选择。
+- [通用委派](../../packages/ts-shell/src/turn/subagent.ts)把定义中的 model 经中性 stepForModel 路由到真实模型，不可用时零 fallback。[CLI provider composition](../../packages/ts-shell/src/cli/provider/step.ts)复用 credential、connection、catalog、endpoint、auth、effort、transport 和原 request policy；主子代理共用目标 ledger，provider/child loop 都遵守 retry-off。顾问每次使用新独立上下文、plan mode、空工具集和一轮上限；没有另一模型循环或自动写入通道。
+- [原生回合 observer](../../packages/ts-shell/src/turn/session.ts)在 turn_end、压缩之前等待捕获与有界审查；异步 observer 失败隔离并安全报告，不把成功主回答变成失败。[检查点](../../packages/ts-shell/src/advisor/checkpoint.ts)保存真实 prompt origin、step、willContinue、失败状态、脱敏文本/digest、持久 transcript frontier 和 goal binding。每个启用后的边界均捕获，cadence 只控制发送；保留的跳过边界进入后续输入。滚动保留 16 个检查点，输入文本总量有界，遗漏/截断写入 note coverage。
+- [审查 claim/publication](../../packages/ts-shell/src/advisor/review.ts)与手动 apply 在原 session state lock 内复验 session/workspace、epoch、goal controlRevision 和 transcript frontier。controlRevision 兼容旧 goal（缺省沿 revision），普通 round 保存不使建议失效，pause→resume 等控制变化不能重新授权旧审查。configure/off/session transition/goal pause/新 transcript 后的旧结果不发布意见；迟到结算只清理捕获的原会话，不污染新会话。
+- 审查是有界、等待式检查点，没有后台自动续轮。取消/超时保留 pending，直到实际本地 runner settles；明确 on 仅可恢复经本机 host/缺失 PID 证明死亡的 owner，live/foreign/unknown/旧无 owner claim 不自动释放。恢复本地 claim 不清除 shared ledger 的 unknown。note 保留 target、timestamp、epoch、checkpoint ID/digest 与覆盖；apply 只提交普通 prompt，submitted 不表示执行、写入、批准或完成，重复/过期意见拒绝。未确认远端停止或 usage 时仍显示不确定性。
+- 定向对照成熟顾问实现后采用“压缩前捕获、cadence 与捕获分开、显式模型实际路由、transition 取消/身份失效”的决定；有界等待与手动应用沿本项目契约，不采用无截止等待或顾问自主推进。比较和反例见 `.tmp/auto5-review-material/reference-decisions.md`。Tier 1 XL 实施、父级 L2 与独立 L3 审查；S/U/P/E/R 保持单 owner、无新增环、中性 ports、既有机制复用和可替换 adapter。三项配套依赖为委派 model port、共享中性 process owner、goal controlRevision，均在其归属域。
+- 最终 Node 20.3 build 与 **34 文件/503 项**通过，43 个 production modules 前后 SHA-256 相同，见 `.tmp/advisor-check-_wb1fnxf`。早轮 502/503 的唯一失败是 AUTO-04 `/clear` 旧预期：原会话已排队三条输入应拒绝，实际 isolated CLI 证据 `.tmp/advisor-command-classification-9f1uzw4j`；改为精确三次拒绝、仅处理两条且不执行旧 list/exit 的断言，未改 runtime 迎合。结果契约 **6 文件/149 项**通过，见 `.tmp/result-contract-Ud1Ejl`。
+- Node regular/fullscreen 与单文件 executable 两模式全部 exit0、每场 21 次合成 HTTP，合计 **84 次**，见 `.tmp/phase19-config/advisor-pty-1791508751048012094`、`.tmp/phase19-config/advisor-pty-1791508887269293925`、`.tmp/phase19-config/advisor-exe-pty-1791508888602944767`；executable build 见 `.tmp/goal-run-exe-luj7jybn`。实际 gpt-5.3 主模型/gpt-4.1 顾问 body、独立上下文/两边界 cadence、manual apply 后真实 write 拒绝、重入零发送、busy off/timeout/503 retry-off/脱敏、普通 pipe 控制/EOF、print 零发送和共享 330 known tokens/一个未结算顾问请求均核验；unknown 历史开启 cap 后零新发送，配置/未触及文件原文不变。真实外部 provider 和跨平台未验收。
+- 静态 import cycles（1,955 文件，runtime/type-only 0）、config consumers 43/43、declarations、Node floor、严格 docs drift 与 **43 scripts tests**通过，见 `.tmp/navigation-gates-84lz798j`。实际 NormProof artifacts 保存在同目录 `normproof-out/`：退出 0/无 blocking、import resolution satisfied；既有 mixed-cycle 与 function-ceiling advisory 保留。43 个改动非测试模块的 AST audit 无新越界或旧越界增长，见 `.tmp/auto5-review-material/module-counts.json`；没有将 advisory 或未执行远端步骤算成通过。
+- 六组有效行为反转（实际不同模型、保留跳过边界、持久 epoch、未知 pending、原会话 drain、locked apply）均检出 AssertionError；隔离源码逐字节/SHA 恢复后 **6 文件/61 项**通过，见 `.tmp/phase19-config/advisor-reversals/1791509076912691287`。首轮 unavailable-model 的空 mock 仅产生 TypeError，恢复并保留材料但不计有效反转；最终改用真实 HTTP body.model 断言。备用独立 L3 **APPROVED**、**17/17**探针与 43-module 稳定 manifest/60 项材料 hashes 见 `.tmp/auto5-review-material/{final-report.md,fallback-independent-run.json,fallback-source-before.json,fallback-source-after.json,final-reviewed-material-hashes.json}`。原审查 role 调用 503 未执行，不计批准；备用审查完成后才收口。AUTO-05 本地实现/验收完成；提交、推送及精确 SHA 远端事实另行记录，完整 Phase 19 保持进行中，下一批 W8 RSC-01–05。
