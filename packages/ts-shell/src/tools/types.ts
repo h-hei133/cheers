@@ -54,6 +54,8 @@ export interface ToolExecutionResult {
 }
 
 export interface ToolDefinition {
+  /** Captured native authority may be revoked by ordinary after-call hooks. */
+  readonly resultAdmission?: () => string | undefined;
   /** Native observation of a refused call; must not perform target effects. */
   readonly onRefusal?: (args: Record<string, unknown>, context: ToolExecutionContext,
     outcome: 'blocked' | 'denied' | 'cancelled' | 'failed') => void;

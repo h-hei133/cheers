@@ -83,8 +83,10 @@ export async function runPluginCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
+  if (context.extensionCommand) return context.extensionCommand('plugin', args, context);
   const parsed = parseSyntax(pluginSyntax, args);
   if (!parsed.ok) return { kind: "local", output: `Invalid /plugin arguments: ${parsed.reason}\n${syntaxHelp(pluginSyntax)}` };
+  if (parsed.action.name === 'install') return { kind: 'local', output: 'Signed extension installation requires a bound session runtime and an explicit source:name@exact-version. A legacy registration is added with /plugin add and grants no runtime authority.' };
   try {
     const run = (plugins: InstalledPlugin[]) => runPluginAction([parsed.action.name, ...parsed.args], context, plugins);
     return ["add", "remove", "enable", "disable"].includes(parsed.action.name) ? withPluginRegistry(run) : run(getInstalledPlugins());

@@ -6,11 +6,20 @@ describe("command completions", () => {
   it.each([
     ["/continue ", "[sess_<id>] [prompt]"], ["/c ", "[sess_<id>] [prompt]"],
     ["/review ", "[focus]"], ["/cp ", "[text]"], ["/commit ", "[guidance]"],
-    ["/ask ", "<question>"], ["/research ", "<topic>"], ["/recall ", "<query>"],
+    ["/ask ", "<question>"], ["/recall ", "<query>"],
     ["/retain ", "<statement>"],
   ])("shows usage without selectable placeholders for %s", (text, hint) => {
     expect(slashSuggestions(text)).toBeNull();
     expect(slashArgumentHint({ text, cursor: text.length, revision: 1 })).toBe(`Usage: ${text}${hint}`);
+  });
+
+  it.each(["deep-research", "research", "deep"])("offers research controls and keeps the question informational for /%s", (name) => {
+    const text = `/${name} `;
+    expect(slashSuggestions(text)?.map(item => item.value)).toEqual([
+      "status", "dump", "pause", "resume", "steer", "reconcile",
+    ]);
+    expect(slashSuggestions(`${text}a software question`)).toBeNull();
+    expect(slashArgumentHint({ text, cursor: text.length, revision: 1 })).toContain("question");
   });
 
   it.each(["/help ", "/qui ", "plain text", "/usr/local/bin "])("does not invent argument usage for %s", text => {

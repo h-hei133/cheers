@@ -256,6 +256,8 @@ export function planSandboxedCommand(input: {
   readonly rules?: SandboxRules;
   /** Explicit session restrictions applied after all writable grants. */
   readonly readOnlyRoots?: readonly string[];
+  /** Untrusted descendants must remain in a kernel-owned process namespace. */
+  readonly isolateProcesses?: boolean;
 }): SandboxPlan {
   const rules = input.rules ?? readSandboxRules(input.workspaceRoot);
   if (rules.enabled !== true) return { state: "off" };
@@ -264,7 +266,7 @@ export function planSandboxedCommand(input: {
 
   const args =
     launcher.kind === "bwrap"
-      ? bwrapArgs(rules, input.workspaceRoot, input.shell, input.shellArgs, input.readOnlyRoots ?? [])
+      ? bwrapArgs(rules, input.workspaceRoot, input.shell, input.shellArgs, input.readOnlyRoots ?? [], input.isolateProcesses === true)
       : seatbeltArgs(rules, input.workspaceRoot, input.shell, input.shellArgs, input.readOnlyRoots ?? []);
   return { state: "isolated", command: launcher.bin, args };
 }
@@ -281,8 +283,10 @@ function bwrapArgs(
   shell: string,
   shellArgs: readonly string[],
   readOnlyRoots: readonly string[],
+  isolateProcesses: boolean,
 ): string[] {
   const args = ["--die-with-parent", "--new-session", "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp"];
+  if (isolateProcesses) args.push('--unshare-pid');
   for (const readable of ["/usr", "/bin", "/lib", "/lib64", "/etc", "/opt", ...(rules.filesystem?.allowRead ?? [])]) {
     if (fs.existsSync(readable)) args.push("--ro-bind", readable, readable);
   }

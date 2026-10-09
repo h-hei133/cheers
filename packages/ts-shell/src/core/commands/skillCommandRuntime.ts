@@ -25,6 +25,7 @@ export async function runSkillCommand(
   // appears, and an untrusted project's skills do not.
   const skills = resolveSkillCatalog({
     workspaceRoot: context.cwd,
+    sessionId: context.sessionId,
     ...(context.skillOptions?.skillPaths ? { skillPaths: context.skillOptions.skillPaths } : {}),
     ...(context.skillOptions?.noSkills ? { noSkills: true } : {}),
   }).skills;

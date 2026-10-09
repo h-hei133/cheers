@@ -313,6 +313,8 @@ export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<st
         // character cannot forge extra lines or repaint the transcript.
         output = `${output}\n\n[Verification feedback]\n${neutraliseForDisplay(decision.feedback)}`;
       }
+      const refused = tools?.get(call.name)?.resultAdmission?.();
+      if (refused) return { isError: true, output: `${output}\n${refused} Actual effect evidence remains visible.`, ...(approval ? { metadata: { approval } } : {}) };
       if (output === result.output && !approval) return undefined;
       return {
         ...(output === result.output ? {} : { output }),

@@ -106,12 +106,15 @@ describe("Model, Marketplace & Plugin Commands", () => {
       expect(getInstalledPlugins()).toEqual([]);
     });
 
-    it("installs, enables, disables, and uninstalls plugins", async () => {
-      // 1. Install
-      const installRes = await runPluginCommand(["install", "react-tools"], { cwd: process.cwd() });
+    it("keeps legacy registration flags separate from signed installation and runtime grants", async () => {
+      const rejectedInstall = await runPluginCommand(['install', 'react-tools'], { cwd: process.cwd() });
+      expect(rejectedInstall.output).toContain('explicit source:name@exact-version');
+      expect(getInstalledPlugins()).toEqual([]);
+      const installRes = await runPluginCommand(["add", "react-tools"], { cwd: process.cwd() });
       expect(installRes.kind).toBe("local");
       expect(installRes.output).toContain("react-tools");
       expect(getInstalledPlugins().some((p) => p.name === "react-tools")).toBe(true);
+      expect(getInstalledPlugins().find(p => p.name === 'react-tools')!.resolved).toBe(false);
 
       // 2. Disable
       const disableRes = await runPluginCommand(["disable", "react-tools"], { cwd: process.cwd() });

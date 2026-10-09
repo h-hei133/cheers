@@ -28,8 +28,8 @@ interface GitComposition {
   readonly options: CliOptions;
   readonly getPromptInteractiveApproval?: () => ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>) | undefined;
 }
-export function installGitCliRuntime(input: GitComposition, runtime: ShellSessionRuntime, isStdinTty: () => boolean): (tool?: 'bash' | 'apply_patch' | 'security_propose') => ToolGateOptions {
-  const gate = (tool: 'bash' | 'apply_patch' | 'security_propose' = 'bash') => gitGateFor(input.runtimeContext, input.sessionManager, runtime,
+export function installGitCliRuntime(input: GitComposition, runtime: ShellSessionRuntime, isStdinTty: () => boolean): (tool?: string) => ToolGateOptions {
+  const gate = (tool: string = 'bash') => gitGateFor(input.runtimeContext, input.sessionManager, runtime,
     createCliApprovalEscalationBridge({ renderer: input.renderer, readline: input.getReadline, getViewMode: () => runtime.getViewMode(),
       trustPolicy: input.approvalTrustPolicy, getProjectRoot: () => input.runtimeContext.projectRoot,
       getNonInteractiveDecision: () => !isStdinTty() ? input.options.nonInteractiveApproval : undefined,
@@ -40,7 +40,7 @@ export function installGitCliRuntime(input: GitComposition, runtime: ShellSessio
 }
 
 export function gitGateFor(context: ShellRuntimeContext, manager: SessionManager, runtime: ShellSessionRuntime,
-  approval: NonNullable<ToolGateOptions['escalationPromptHandler']>, tool: 'bash' | 'apply_patch' | 'security_propose' = 'bash'): ToolGateOptions {
+  approval: NonNullable<ToolGateOptions['escalationPromptHandler']>, tool: string = 'bash'): ToolGateOptions {
   const admission = () => configurationAdmission(context)() ?? (!filterVisibleToolNames([tool], context.runtimeConfig).length ? 'The selected native capability is disabled.' : undefined);
   const hooks = new HookDispatcher(); setupBuiltinVerificationHooks(hooks);
   registerDeclaredHooks(hooks, context.cwd, { admission, bypassed: context.runtimeConfig.allowUntrustedHooks,

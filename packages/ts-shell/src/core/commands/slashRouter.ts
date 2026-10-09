@@ -5,6 +5,7 @@ import { TemplateLoader } from "../prompts/templateLoader.js";
 import { expandSkill, expandTemplate } from "../prompts/expansion.js";
 import type { CommandContext, CommandExecutionResult, CommandDefinition } from "./types.js";
 import { tokenizeCommandArgs } from "./arguments.js";
+import { catalogContributions } from '../catalog/contributions.js';
 
 export async function routeSlashCommand(
   input: string,
@@ -36,6 +37,7 @@ export async function routeSlashCommand(
   // both lists rather than only from one.
   const skills = resolveSkillCatalog({
     workspaceRoot: context.cwd,
+    sessionId: context.sessionId,
     ...(context.skillOptions?.skillPaths ? { skillPaths: context.skillOptions.skillPaths } : {}),
     ...(context.skillOptions?.noSkills ? { noSkills: true } : {}),
   }).skills;
@@ -114,6 +116,16 @@ export async function routeSlashCommand(
       prompt: expanded.text,
       notice: `Expanded template \`${expanded.template}\` into a prompt.`,
     };
+  }
+
+  const dynamic = catalogContributions(context.cwd, context.sessionId).flatMap(entry => entry.commands);
+  const extension = resolveCommandInvocation(dynamic, rawName);
+  const handler = dynamic.find(entry => entry.name === extension?.commandName);
+  if (handler) {
+    let args: string[];
+    try { args = tokenizeCommandArgs(rawCommandArgs); }
+    catch { return { kind: 'local', output: 'Invalid extension command arguments.' }; }
+    return handler.execute(args, { ...context, rawCommandName: rawName, rawCommandArgs });
   }
 
   return {

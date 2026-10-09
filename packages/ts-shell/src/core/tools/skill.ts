@@ -43,7 +43,7 @@ export function createSkillToolDefinition(skills: SkillCatalog): ToolDefinition 
       }
 
       const skill = skills.get(requested)
-      if (!skill) {
+      if (!skill || skill.isCurrent?.() === false) {
         // Naming what is available turns a dead end into a next step; a bare
         // "not found" leaves the model guessing at spellings.
         const available = [...skills.keys()].sort()

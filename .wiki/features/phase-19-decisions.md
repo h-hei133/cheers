@@ -3,7 +3,7 @@ title: "Phase 19 裁决：生产正确性、完整交互与自主协作能力"
 category: article
 sources: [14-user-experience-research, 15-deep-research-design, 16-tui-composer-and-theme, 17-tui-status-and-panels, 18-input-slash-startup-context, 19-tools-maturity-and-multifile-edit, 20-configuration-system, 21-session-recovery-and-undo-ux, 22-command-inventory-alignment, 23-command-argument-options, 24-shared-command-parity, verification-15-21]
 created: 2026-10-05
-updated: 2026-10-08
+updated: 2026-10-09
 tags: [phase-19, decisions, production, tui, commands, research, goal, collaboration]
 summary: "汇总 14–24 的纠错、维护者裁决、生产契约、分批任务及验收标准。包含完整自主目标、软件与论文深研、八种输入框形态、Git 工作台、顾问、安全分析、公共技能商店和远程协作。此文是待实施计划；文档审查完成不代表功能或生产验收完成。"
 confidence: mixed
@@ -1869,3 +1869,22 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 最终五静态门/43script tests通过（`.tmp/security-gates-g25xeb4p`）；`normproof judge`exit2、not_proven/openBlocking1，因为完整module graph超过所携工具8192-edge采集上限。该证据容量失败不证明有unresolved也不证明无unresolved；原报告`.tmp/phase19-config/security/gate-capacity/`保留，未缩小图/跳过义务，已授权W16负责完整结构门容量修复。build与完整cycle gate分别通过，NormProof不计通过。
 - 独立L3 **APPROVED（仅W10本地源码）**，原post-hook反例脚本未改，最终5/5探针通过、43项前后hash稳定；实际committed patch+clean native历史保留，stale当前证明拒绝verified，export native receipt/validJSON/metadata/脱敏/import roundtrip通过。审查另读四流程persisted state/committed receipt/current source/export及paused-goal账本。正式报告`.tmp/security-review-material/final-report.md`，SHA256`bb1f27f44fe992fed0f2624a168244010746784c1b201c934fbff27a31817e97`；37项材料hash见`reviewed-material-hashes.json`。Telemetry：XL单coder+独立L3，S/U/E/P/R owner/复用五项通过；bounded existing reader和actual-tool neutral gate为两项显式依赖，NormProof容量为W16依赖；.gitignore用户改动完整保留。
 - W10产品本地交付，完整仓库NormProof证明/remote CI/真实模型质量/跨平台尚未完成；提交、推送及精确SHA远端事实分开记录。下一批W11 ECO-01→02→03→04→05继续，完整Phase19不标完成。
+- W10已提交并推送`51aaefa25fda89b54bbb8f9b3a2aa05979046bd2`，远端分支读回同SHA。精确CI run37892143550/job113695218928、Watch run37892143567/job113695219149均failure/零steps，annotations确认付款/spending-limit阻止启动；不计远端测试通过。第一次jobs查询API EOF后重试成功，属于查询失败。证据`.tmp/phase19-config/security/{delivery.json,remote/evidence.json}`；用户`.gitignore`未提交。
+
+### 8.125 W11 批次复核与执行边界（进行中）
+
+- 重读ECO-01→05全部验收及现有marketplace/plugin/skills/subagent/MCP owners后，按依赖顺序交付三个完整批次：ECO-01–03共享来源/包身份/安装回退/权限与动态注册；ECO-04角色配置和已有实际模型路由消费者；ECO-05既有MCP协议/认证/配置生命周期。拆分依据是不同owner、回退及高风险API/凭据边界，五项范围完整保留。均为Tier1单coder、父级L2和冻结后独立L3，不在共享CLI上并行编码。
+- 第一个XL批次已在W10推送后开始。注册来源不自动fetch、安装不运行脚本、enable不合并prompt/script/tool授权；签名信任锚由用户明确选择，digest只证明完整性。完整性先于成熟归档库提取，guarded publication保留脏用户内容；扩展加入原skills/commands/tool pool和执行/审批路径，disable/reload真实注销。目标和定向参考决定见`.tmp/phase19-config/ecosystem/{preparation.md,handoff.md}`；首批本地验收已完成，见§8.126；ECO-04与ECO-05仍待按序交付。
+- 源/包/独立授权协议及平台边界以[扩展源协议](extension-registry.md)为当前技术说明。初冻54项的父级组合484/485通过，唯一research补全旧预期在精确HEAD同样失败，按W8实际语法修正测试；初冻三有效反转检出后恢复27项通过。独立审查确认父目录替换误删用户数据、取消下载后迟到发布、脏技能阻断管理命令三项，父级L2另确认同根多会话注册归属及公钥读取策略缺口；这些缺口已在重新冻结后修复，最终证据见§8.126；初冻结果不作为最终交付证明。
+- 独立L3补充确认动态alias在普通审批等待期间未归属共享cancel owner；命令审批/hooks/dispatch改为同一runTool后，原反例零原生派发，无法排空的审批三秒后明确unknown。该63项冻结`e96a20a543967dd15320cd8cdaa6706fc79cbcbc166795706c2dcc2e64dfc89e`的Node20.3构建/29文件504项、exe构建、149契约、五静态门/43scripts通过（`.tmp/ecosystem-check-zlcmmen3`）；完整NormProof仍exit2/not_proven，不计通过。实际exe终端进一步暴露HTTP响应头等待取消悬空：同一最小本地服务Node约1ms AbortError，Bun两秒仍pending，已由现有network owner明确接管abort并关闭原生连接，最终验证见§8.126。长报告分页/alternate buffer与session status断言的harness问题分别修正并保留旧失败；四终端验收及最终独立批准已完成，历史失败与最终证据分开保留。
+
+
+### 8.126 W11 ECO-01–03：签名来源、已拥有的包生命周期与独立运行授权（本地交付）
+
+- 来源登记/list/restart不fetch；显式search/details使用版本化签名协议与真实分页。固定版本、压缩包digest先验和成熟tar库的资源/路径限制先于提取；安装、启用及prompt/script/command/tool grants分别决定，普通每次执行审批仍生效。协议、完整manifest、命令、边界与部署示例见[扩展源协议](extension-registry.md)。不把签名或安装当执行许可。
+- 包文件/目录inventory与版本到文件系统根的目录身份共同绑定，替换祖先symlink或普通目录均拒绝；dirty update/rollback/uninstall保留用户文件，卸载不删独立用户数据。共享catalog绑定实际session，管理命令不被坏prompt阻断；真实技能、alias、模型tool接入既有catalog/审批/hooks/唯一ExecutionService，disable/reload/restart实际注销。
+- metadata/search/download、普通审批与动态命令全部由同一cancel owner跟踪；审批未排空三秒后保留unknown，迟到allow零原生派发。实际CLI检出的exe HTTP等待取消悬空由原network连接owner修复：直接结束等待、关闭request/response、覆盖正文生命周期并释放listener。原反例未改；独立Node/Bun响应头/partial body取消均关闭原生socket、零迟到body，正常body/listener也验证。Bun短时peer keepalive同精确HEAD，原严格一秒socket断言exit1保留为harness假设，不重标为通过。
+- 最终65项冻结aggregate `3e9335f2f855507bd5577a034487da2a9350ccd4dad0deea195ab941ef035bd9`；Node20.3 CLI构建、33文件580/580（pending0）、exe构建、149结果契约、五静态门及43script tests通过（`.tmp/ecosystem-check-9t_rng_f`）。exe SHA256 `8bf8069886b037e638dd93e03929cc51c377875fc1e7003e2c81ef63397f9f56`。三组完整性先验/本地技能优先/独立script grant反转均产生真实AssertionError；精确恢复后41/41通过（`.tmp/phase19-config/ecosystem-reversals/1791532854352686260`）。
+- 最新Node/executable × regular/fullscreen四条实际CLI均exit0，各56本地命令/10合成POST/25签名registry GET。真实Linux沙箱只读工作区、去父环境凭据、loopback连接拒绝、held native进程有界取消/清理、批准后held archive取消零迟到publication、权限扩大重批、dirty保留及同session重启皆有断言。父级直接读四份transcript的当前tool.result/receipt和持久state（`.tmp/phase19-config/ecosystem/parent-cli-audit.json`），退出后idle/无pending、安装列表空、用户数据保留。fixture取消后向断开的peer写响应产生的ConnectionResetError单独归因；主进程和所有验收断言exit0，不称为产品异常。
+- 独立L3 **APPROVED（仅ECO-01–03本地源码）**，报告`.tmp/ecosystem-review-material/final-report.md`，SHA256 `e2834d5d9f75a4eb3e11d8cb9fa1bfbb78e80c28b686d377fdf588285b57840b`；全65项及用户.gitignore前后hash一致。Telemetry：XL单coder、父级L2与独立L3；S/U/E/P/R owning domain/复用/有界接口五项通过；共享catalog、普通native gate、共同watcher和network取消为已验证依赖。两个旧测试分别按实际research补全语法及必需session fixture修正，原失败/HEAD分类保留，不靠弱化测试通过。
+- 完整NormProof仍exit2/not_proven，8192-edge容量修复仍由W16负责，未缩图/豁免；真实公共源质量、非Linux执行和真实模型质量未从本地fixture推出。目录身份不承诺跨进程fs竞态或多文件崩溃原子性；系统只读根仍可见。当前只完成ECO-01–03，ECO-04→05及W12–W16继续，完整Phase19保持进行中；commit/push/精确远端状态另记。

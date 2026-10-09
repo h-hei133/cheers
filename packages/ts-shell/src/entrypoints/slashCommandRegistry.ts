@@ -3,6 +3,7 @@ import { syntaxHelp } from "../core/commands/syntax/projection.js";
 import { commandInvocations, resolveCommandInvocation, type CommandInvocation } from "../core/commands/invocation.js";
 import { listVisibleCommands } from "../core/commands/registry.js";
 import type { CommandDefinition } from "../core/commands/types.js";
+import { catalogContributions, observeCatalogContributions } from '../core/catalog/contributions.js';
 
 export interface SlashCommandCompletion {
   readonly value: string;
@@ -83,15 +84,17 @@ const PICKER_ONLY: readonly SlashCommandSpec[] = [
 ];
 
 const extensions: SlashCommandSpec[] = [...PICKER_ONLY];
+export interface SlashCatalogScope { readonly root: string; readonly sessionId?: string }
 const listeners = new Set<(commands: readonly SlashCommandSpec[]) => void>();
+observeCatalogContributions(undefined, () => { for (const listener of listeners) listener(allCommands()); });
 
-function allCommands(): readonly SlashCommandSpec[] {
-  const builtins = builtinCommands();
+function allCommands(scope?: SlashCatalogScope): readonly SlashCommandSpec[] {
+  const builtins = [...builtinCommands(), ...catalogContributions(scope?.root, scope?.sessionId).flatMap(entry => entry.commands).map(project)];
   return extensions.length === 0 ? builtins : [...builtins, ...extensions];
 }
 
-export function listSlashCommands(): readonly SlashCommandSpec[] {
-  return allCommands();
+export function listSlashCommands(scope?: SlashCatalogScope): readonly SlashCommandSpec[] {
+  return allCommands(scope);
 }
 
 export function registerSlashCommand(command: SlashCommandSpec): () => void {
@@ -115,22 +118,22 @@ export function registerSlashCommand(command: SlashCommandSpec): () => void {
   };
 }
 
-export function subscribeSlashCommands(listener: (commands: readonly SlashCommandSpec[]) => void): () => void {
-  listeners.add(listener);
-  listener(allCommands());
-  return () => listeners.delete(listener);
+export function subscribeSlashCommands(listener: (commands: readonly SlashCommandSpec[]) => void, scope?: SlashCatalogScope): () => void {
+  const changed = () => listener(allCommands(scope)); listeners.add(changed);
+  changed();
+  return () => listeners.delete(changed);
 }
 
-export function listSlashInvocations(): readonly CommandInvocation[] {
-  return allCommands().flatMap(commandInvocations);
+export function listSlashInvocations(scope?: SlashCatalogScope): readonly CommandInvocation[] {
+  return allCommands(scope).flatMap(commandInvocations);
 }
 
-export function getSlashInvocation(name: string): CommandInvocation | undefined {
-  return resolveCommandInvocation(allCommands(), name);
+export function getSlashInvocation(name: string, scope?: SlashCatalogScope): CommandInvocation | undefined {
+  return resolveCommandInvocation(allCommands(scope), name);
 }
 
-export function getSlashCommand(name: string): SlashCommandSpec | undefined {
-  const commands = allCommands();
+export function getSlashCommand(name: string, scope?: SlashCatalogScope): SlashCommandSpec | undefined {
+  const commands = allCommands(scope);
   const invocation = resolveCommandInvocation(commands, name);
   return commands.find(command => command.name === invocation?.commandName);
 }
@@ -172,8 +175,8 @@ const GROUP_TITLES: Record<SlashCommandSpec["group"], string> = {
  * means the guide cannot describe a command that does not exist, and cannot omit
  * one that does.
  */
-export function renderUserHelp(renderer: SlashCommandLineRenderer): void {
-  const commands = listSlashInvocations().filter(invocation => invocation.kind !== "alias");
+export function renderUserHelp(renderer: SlashCommandLineRenderer, scope?: SlashCatalogScope): void {
+  const commands = listSlashInvocations(scope).filter(invocation => invocation.kind !== "alias");
   const width = longestName(commands);
   renderer.renderLine("\nSlash commands");
   for (const group of Object.keys(GROUP_TITLES) as SlashCommandSpec["group"][]) {

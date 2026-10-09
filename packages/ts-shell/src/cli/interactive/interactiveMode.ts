@@ -39,6 +39,7 @@ import { attachSubmissionQueue, isQueueControl, queueCommandFor } from '../runti
 import { tokenizeCommandArgs } from '../../core/commands/arguments.js';
 import { isPlanningControl, planningCommandFor } from '../runtime/planning.js';
 import { isSecurityControl, securityCommandFor } from '../runtime/security.js';
+import { isExtensionControl, extensionCommandFor } from '../runtime/extensions.js';
 import { isAdvisorControl, advisorCommandFor } from '../runtime/advisor.js';
 import { isResearchControl, researchCommandFor } from '../runtime/research.js';
 import { gitWorkbenchFor } from '../runtime/git.js';
@@ -594,9 +595,10 @@ export class InteractiveMode {
     const draft = snapshot.text;
     this.completionStatus = undefined;
     if (this.catalogs.update(snapshot)) return;
-    const matches = slashSuggestions(draft, snapshot);
+    const scope = { root: this.options.runtimeContext.cwd, sessionId: this.options.runtimeContext.session.id };
+    const matches = slashSuggestions(draft, snapshot, scope);
     if (!matches) {
-      this.completionStatus = slashArgumentHint(snapshot);
+      this.completionStatus = slashArgumentHint(snapshot, scope);
       this.view.setSuggesting(false);
       return;
     }
@@ -664,6 +666,14 @@ export class InteractiveMode {
       }).then(result => {
         if (result.kind === 'local') this.state.transcript.append(textBlock('command', result.output, '/security'));
         this.tui.requestRender();
+      });
+      return;
+    }
+    if (isExtensionControl(text) && (this.busy || this.questions.question())) {
+      const context = this.options.runtimeContext;
+      const args = /^\/reload-plugins/i.test(text.trim()) ? ['reload'] : tokenizeCommandArgs(text.trim().replace(/^\/\S+(?:\s|$)/, ''));
+      void extensionCommandFor(context)('plugin', args, { cwd: context.cwd, projectRoot: context.projectRoot, sessionId: context.session.id, interactive: true }).then(result => {
+        this.state.transcript.append(textBlock('command', result.output, '/plugin')); this.tui.requestRender();
       });
       return;
     }
@@ -885,7 +895,7 @@ export class InteractiveMode {
           // hint; loading argument candidates here could perform network I/O.
           this.state.editor.setText(outcome.draft);
           this.view.setSuggesting(false);
-          this.completionStatus = slashArgumentHint(this.state.editor.snapshot());
+          this.completionStatus = slashArgumentHint(this.state.editor.snapshot(), { root: this.options.runtimeContext.cwd, sessionId: this.options.runtimeContext.session.id });
         }
         if (outcome?.next && !this.stopped && this.overlay.revision === revision) this.overlay.open(outcome.next);
       })

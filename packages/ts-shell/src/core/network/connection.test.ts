@@ -1,14 +1,20 @@
 import { readFileSync } from 'node:fs';
+import { getEventListeners } from 'node:events';
 import { createServer as httpServer, type Server, type ServerResponse } from 'node:http';
 import { createServer as httpsServer } from 'node:https';
 import { gzipSync, deflateSync, brotliCompressSync } from 'node:zlib';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { requestPublic } from './connection.js';
+import { requestBrowser, requestPublic } from './connection.js';
 import { requestScope } from './request.js';
 import { readResponseText } from './response.js';
 
 // This local fixture explicitly substitutes address admission; address.test.ts checks real policy.
-const fixture = vi.hoisted(() => ({ ca: undefined as Buffer | undefined, lookup: vi.fn(), request: vi.fn() }));
+const fixture = vi.hoisted(() => ({ ca: undefined as Buffer | undefined, lookup: vi.fn(), request: vi.fn(), ignoresSignal: false }));
+vi.mock('node:http', async () => {
+  const actual = await vi.importActual<typeof import('node:http')>('node:http');
+  return { ...actual, request: (url: URL, options: import('node:http').RequestOptions, callback: (response: import('node:http').IncomingMessage) => void) =>
+    actual.request(url, fixture.ignoresSignal ? { ...options, signal: undefined } : options, callback) };
+});
 vi.mock('./address.js', async () => ({
   ...await vi.importActual<typeof import('./address.js')>('./address.js'),
   publicLookup: async () => fixture.lookup,
@@ -39,7 +45,7 @@ async function listen(tls = false, addressFamily: 'ipv4' | 'ipv6' = 'ipv4'): Pro
   return `${tls ? 'https' : 'http'}://public.example:${address.port}`;
 }
 beforeEach(() => {
-  host = undefined; sni = undefined; fixture.ca = cert;
+  host = undefined; sni = undefined; fixture.ca = cert; fixture.ignoresSignal = false;
   fixture.lookup.mockImplementation((_hostname, options, callback) => options.all
     ? callback(null, [{ address: '127.0.0.1', family: 4 }]) : callback(null, '127.0.0.1', 4));
   handler = response => response.end('public text');
@@ -57,6 +63,28 @@ it('uses the approved socket lookup while preserving Host and TLS identity', asy
     expect(fixture.lookup).toHaveBeenCalled();
     expect(host).toBe(new URL(url).host); expect(sni).toBe('public.example');
     expect(fixture.request).toHaveBeenCalledWith(expect.objectContaining({ agent: false, rejectUnauthorized: true, servername: 'public.example', lookup: fixture.lookup }));
+    await vi.waitFor(() => expect(getEventListeners(scope.signal, 'abort')).toHaveLength(0));
+  } finally { scope.dispose(); }
+});
+
+it.each(['headers', 'body'] as const)('explicitly aborts held %s and closes its socket when native signal settlement is unavailable', async phase => {
+  // Bun's native HTTP abort may close without rejecting held headers. Keep a real
+  // socket/server while withholding native signal handling to exercise owner cancellation.
+  fixture.ignoresSignal = true;
+  let entered!: () => void; const held = new Promise<void>(resolve => { entered = resolve; }); let response!: ServerResponse;
+  handler = incoming => { response = incoming; if (phase === 'body') incoming.writeHead(200).flushHeaders(); entered(); };
+  const url = (await listen()).replace('public.example', '127.0.0.1'); const control = new AbortController(); const scope = requestScope(2000, control.signal);
+  let admitted = 0;
+  const pending = requestBrowser(url, { maxBytes: 1024 }, scope, { admitUrl: selected => selected === url, admitAddress: address => address === '127.0.0.1' })
+    .then(incoming => { admitted++; return readResponseText(incoming, scope, 1024); });
+  const rejected = expect(pending).rejects.toMatchObject({ code: 'cancelled' });
+  try {
+    await held; if (phase === 'body') await vi.waitFor(() => expect(admitted).toBe(1));
+    const closed = new Promise<void>(resolve => response.once('close', resolve));
+    const started = performance.now(); control.abort('PRIVATE_ABORT_REASON');
+    await rejected; expect(performance.now() - started).toBeLessThan(1000); await closed;
+    expect(response.socket?.destroyed ?? response.destroyed).toBe(true); expect(getEventListeners(scope.signal, 'abort')).toHaveLength(0);
+    response.end('LATE_PRIVATE_BODY'); await new Promise(resolve => setImmediate(resolve)); expect(admitted).toBe(phase === 'headers' ? 0 : 1);
   } finally { scope.dispose(); }
 });
 

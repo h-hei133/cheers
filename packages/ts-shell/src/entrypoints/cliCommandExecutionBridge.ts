@@ -47,6 +47,7 @@ export type CliCommandExecution =
     };
 
 export interface BuildCliCommandExecutionInput {
+  readonly extensionCommand?: CommandContext['extensionCommand'];
   readonly requestPolicy?: CommandContext['requestPolicy'];
   readonly goalCommand?: CommandContext['goalCommand'];
   readonly planningCommand?: CommandContext['planningCommand'];
@@ -149,6 +150,7 @@ export async function buildCliCommandExecution(
       ref: { mode: "explicit-local", root: projectMemoryRootFor(projectRoot) },
     });
   const slashResult = await bridge.routeSlashCommand(input.prompt, {
+    extensionCommand: input.extensionCommand,
     goalCommand: input.goalCommand,
     planningCommand: input.planningCommand,
     queueCommand: input.queueCommand,

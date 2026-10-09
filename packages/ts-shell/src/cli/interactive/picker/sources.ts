@@ -44,7 +44,7 @@ export function sourcePicker(context: CommandContext): Picker {
         {
           id: ADD_ID,
           label: "add a source…",
-          detail: "a git repository or a local directory holding an extension manifest",
+          detail: "an explicitly selected signed extension registry URL",
           note: "new",
         },
       ];

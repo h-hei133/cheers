@@ -2,7 +2,7 @@
 
 > Compiled knowledge base for the three-layer autonomous coding agent architecture, proof grounding, and reference models.
 
-Last updated: 2026-10-02
+Last updated: 2026-10-09
 
 ## Statistics
 
@@ -19,6 +19,8 @@ Last updated: 2026-10-02
 - [Keyboard shortcuts and rebinding](guides/keybindings.md)
 - [Themes and automatic appearance](guides/themes.md)
 - [Phase 18 decisions and implementation evidence](features/phase-18-decisions.md)
+- [Phase 19 decisions and implementation evidence](features/phase-19-decisions.md)
+- [Extension registry protocol and capability grants](features/extension-registry.md)
 - [Feature and defect register](features/13-feature-and-defect-register.md)
 - [All Sources](raw/_index.md)
 - [Concepts](wiki/concepts/_index.md)

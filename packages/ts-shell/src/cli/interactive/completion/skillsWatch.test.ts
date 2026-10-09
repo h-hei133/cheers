@@ -12,12 +12,13 @@ it("bounds live targets while replacing a catalog and closes every handle", () =
     live++; peak = Math.max(peak, live);
     return () => { live--; };
   });
-  vi.spyOn(discovery, "resolveSkillCatalog").mockImplementation((_options, onSource) => {
+  vi.spyOn(discovery, "resolveSkillCatalog").mockImplementation((options, onSource) => {
+    expect(options.sessionId).toBe("catalog-watch-test");
     for (let i = 0; i < 300; i++) onSource?.(`/synthetic-${generation}/${i}`);
     return { skills: new Map(), collisions: [], diagnostics: [], failures: [] };
   });
   const catalog = createSkillCatalog(); const stop = catalog.observe(vi.fn());
-  const context = { cwd: process.cwd() } as ShellRuntimeContext;
+  const context = { cwd: process.cwd(), session: { id: "catalog-watch-test" } } as ShellRuntimeContext;
   catalog.read(context); expect(live).toBe(256);
   generation = "second"; catalog.read(context);
   expect(peak).toBe(256); expect(live).toBe(256);

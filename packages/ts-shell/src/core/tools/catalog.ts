@@ -8,12 +8,14 @@ import { createComponentLogger } from "../../observability/structuredLogger.js";
 import { createCoreToolRegistry } from "./registry.js";
 import { filterVisibleToolNames } from "./prefilter.js";
 import { assertAdmission, type Admission } from '../network/admission.js';
+import { catalogContributions } from '../catalog/contributions.js';
 
 export interface ToolCatalogInput {
   /** Native feature composition; visibility restrictions apply after merging. */
   readonly featureTools?: readonly ToolDefinition[];
   readonly admission?: Admission;
   readonly workspaceRoot: string;
+  readonly sessionId?: string;
   readonly skillOptions?: { readonly skillPaths?: readonly string[]; readonly noSkills?: boolean };
   readonly runtimeConfig?: RuntimeConfig;
   readonly mcpGateway?: Pick<CoreMcpGateway, "snapshot"> & Partial<Pick<CoreMcpGateway, "invokeTool">>;
@@ -32,7 +34,7 @@ export async function loadToolCatalog(input: ToolCatalogInput, override?: () => 
     ...(mcp ? { mcpTools: mcp.tools, mcpGateway: mcp.gateway } : {}),
   });
   const combined = new Map(registry);
-  for (const tool of input.featureTools ?? []) {
+  for (const tool of [...input.featureTools ?? [], ...catalogContributions(input.workspaceRoot, input.sessionId).flatMap(entry => entry.tools)]) {
     if (combined.has(tool.name)) throw new Error('Feature tool registration collides with an existing tool.');
     combined.set(tool.name, tool);
   }
@@ -51,6 +53,7 @@ export async function loadToolCatalog(input: ToolCatalogInput, override?: () => 
 function discoverSkills(request: ToolCatalogInput): ReadonlyMap<string, Skill> {
   const { skills, collisions, diagnostics, failures } = resolveSkillCatalog({
     workspaceRoot: request.workspaceRoot,
+    sessionId: request.sessionId,
     ...(request.skillOptions?.skillPaths ? { skillPaths: request.skillOptions.skillPaths } : {}),
     ...(request.skillOptions?.noSkills ? { noSkills: true } : {}),
   });

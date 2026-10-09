@@ -9,6 +9,7 @@ import { SubmissionQueue } from '../interactive/inputQueue.js';
 import { attachInputQueue, isQueueControl } from './inputQueue.js';
 import { isGoalControl } from './goal.js';
 import { isSecurityControl } from './security.js';
+import { isExtensionControl } from './extensions.js';
 import { isAdvisorControl } from './advisor.js';
 import { isResearchControl } from './research.js';
 import { isPlanningStreamControl } from './planning.js';
@@ -76,7 +77,7 @@ export async function runPromptInputStream(options: {
     }).catch(error => options.renderer.renderLine(`Run failed: ${error instanceof Error ? error.message : 'runtime failure'}`));
   };
   const enqueuePrompt = (prompt: string): void => {
-    if (isQueueControl(prompt) || isGoalControl(prompt) || isPlanningStreamControl(prompt) || isAdvisorControl(prompt) || isSecurityControl(prompt) || isResearchControl(prompt)) {
+    if (isQueueControl(prompt) || isGoalControl(prompt) || isPlanningStreamControl(prompt) || isAdvisorControl(prompt) || isSecurityControl(prompt) || isResearchControl(prompt) || isExtensionControl(prompt)) {
       pendingControls += 1;
       controlChain = controlChain.then(() => dispatch(prompt))
         .catch(error => options.renderer.renderLine(`Control failed: ${error instanceof Error ? error.message : 'runtime failure'}`))

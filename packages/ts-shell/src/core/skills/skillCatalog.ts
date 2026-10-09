@@ -1,5 +1,6 @@
 import { SkillLoader, type Skill, type SkillCollision, type SkillDiagnostic } from "./skillLoader.js";
 import { projectTrust } from "../security/projectTrust.js";
+import { catalogContributions } from '../catalog/contributions.js';
 
 /**
  * The skills one run may offer, resolved from the flags it was started with.
@@ -16,6 +17,7 @@ import { projectTrust } from "../security/projectTrust.js";
 
 export interface SkillCatalogOptions {
   readonly workspaceRoot: string;
+  readonly sessionId?: string;
   /**
    * Files or directories named on the command line. A file loads directly; a
    * directory is searched the way a discovered one is.
@@ -48,12 +50,17 @@ export function resolveSkillCatalog(options: SkillCatalogOptions, onSource?: (ta
     ...(options.noSkills ? { disableDiscovery: true } : {}),
     ...(onSource ? { onSource } : {}),
   });
-  const { skills, collisions, diagnostics, failures } = loader.loadDetailed();
+  const loaded = loader.loadDetailed();
+  const { collisions, diagnostics, failures } = loaded;
+  const skills = new Map(loaded.skills);
+  if (!options.noSkills) for (const entry of catalogContributions(options.workspaceRoot, options.sessionId)) for (const skill of entry.skills()) {
+    if (!skills.has(skill.name) && skill.isCurrent?.() !== false) skills.set(skill.name, skill);
+  }
   if (!projectTrust.isProjectUntrusted(options.workspaceRoot)) {
     return { skills, collisions, diagnostics, failures };
   }
   return {
-    skills: new Map([...skills].filter(([, skill]) => skill.source === "user" || skill.source === "cli")),
+    skills: new Map([...skills].filter(([, skill]) => skill.source === "user" || skill.source === "cli" || skill.source === 'extension')),
     collisions,
     diagnostics,
     failures,

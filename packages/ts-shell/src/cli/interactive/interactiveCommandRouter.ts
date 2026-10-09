@@ -11,6 +11,7 @@ import { advisorCommandFor } from '../runtime/advisor.js';
 import { researchCommandFor } from '../runtime/research.js';
 import { gitCommandFor, worktreeCommandFor, commitCommandFor } from '../runtime/git.js';
 import { securityCommandFor } from '../runtime/security.js';
+import { extensionCommandFor } from '../runtime/extensions.js';
 import { planningCommandFor } from '../runtime/planning.js';
 import { navigateSession, type SessionNavigationResult } from "../runtime/navigation.js";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
@@ -134,6 +135,7 @@ export async function routeInteractiveCommand(
     researchCommand: researchCommandFor(input.runtimeContext, input.sessionManager, input.sessionRuntime, input.renderer),
     gitCommand: gitCommandFor(input.runtimeContext),
     securityCommand: securityCommandFor(input.runtimeContext),
+    extensionCommand: extensionCommandFor(input.runtimeContext),
     worktreeCommand: worktreeCommandFor(input.runtimeContext),
     commitCommand: commitCommandFor(input.runtimeContext),
     planningCommand: planningCommandFor(input.runtimeContext, input.sessionManager, input.sessionRuntime, input.readline),
@@ -315,7 +317,7 @@ export async function routeInteractiveCommand(
   }
 
   if (isShellAction(slashResult, "show-help")) {
-    renderUserHelp(input.renderer);
+    renderUserHelp(input.renderer, { root: input.runtimeContext.cwd, sessionId: input.runtimeContext.session.id });
     return { turnNumber: nextTurnNumber, ...(themeChanged ? { themeChanged: true } : {}) };
   }
 

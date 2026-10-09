@@ -30,6 +30,7 @@ import { researchRunFor } from './research.js';
 import { cancelGitFor, gitFeatureTools } from './git.js';
 import { installGitCliRuntime } from './gitGate.js';
 import { installSecurityRuntime, cancelSecurityFor, securityFeatureTools } from './security.js';
+import { installExtensionRuntime, cancelExtensionsFor, refreshExtensionsFor } from './extensions.js';
 import { gitRequestMode } from '../../workflow/git/operation/policy.js';
 import { goalObjectiveFor, goalPolicyFor, prepareGoalSession } from './goal.js';
 import { installGoalScheduler } from './goalScheduling.js';
@@ -337,7 +338,7 @@ export function createCliSessionRuntime(input: {
   };
   let goalScheduler: GoalScheduler | undefined;
   const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
-    onCancelRequested: () => { goalScheduler?.interrupt(); cancelGitFor(input.runtimeContext); cancelSecurityFor(input.runtimeContext); },
+    onCancelRequested: () => { goalScheduler?.interrupt(); cancelGitFor(input.runtimeContext); cancelSecurityFor(input.runtimeContext); cancelExtensionsFor(input.runtimeContext); },
     configuredAgentMode: () => input.runtimeContext.runtimeConfig.agentMode,
     sessionManager: input.sessionManager,
     renderer: input.renderer,
@@ -523,6 +524,7 @@ export function createCliSessionRuntime(input: {
       let sourceEntryId = allTurns.at(-1)?.id;
       const promptEntryId = sourceEntryId;
       const currentGoal = readGoalEdit(input.sessionManager, input.runtimeContext.session).goal;
+      refreshExtensionsFor(input.runtimeContext);
       const run = streamCliRuntimePrompt({
         featureTools: [...research.featureTools, ...gitFeatureTools(input.runtimeContext), ...securityFeatureTools(input.runtimeContext)],
         checkpoint: advisorCheckpointFor(input.runtimeContext, input.sessionManager, input.renderer, promptEntryId),
@@ -576,5 +578,6 @@ export function createCliSessionRuntime(input: {
   goalScheduler = installGoalScheduler(input.runtimeContext, input.sessionManager, sessionRuntime, message => input.renderer.renderLine(message));
   const nativeGate = installGitCliRuntime(input, sessionRuntime, isStdinTty);
   installSecurityRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate);
+  installExtensionRuntime(input.runtimeContext, sessionRuntime, nativeGate);
   return sessionRuntime;
 }

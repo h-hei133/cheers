@@ -17,7 +17,7 @@ import { isDirectoryIgnored } from "../../runtime/execution/ignoreRules.js";
  * nothing is executed by discovery, which is why scanning is safe to do eagerly.
  */
 
-export type SkillSource = "user" | "project" | "cli";
+export type SkillSource = "user" | "project" | "cli" | "extension";
 
 /** Something wrong with a skill that did not prevent it loading, or did. */
 export interface SkillDiagnostic {
@@ -34,6 +34,8 @@ export interface SkillCollision {
 }
 
 export interface Skill {
+  /** Captured feature text can be revoked while a turn still holds its catalog. */
+  readonly isCurrent?: () => boolean;
   readonly name: string;
   readonly description: string;
   /** Instruction body, with the frontmatter removed. */

@@ -1,5 +1,6 @@
 import type { Skill } from "../skills/skillLoader.js";
 import { tokenizeCommandArgs } from "../commands/arguments.js";
+import { escapeAttribute, neutraliseTagBoundaries } from '../text/safety.js';
 
 /**
  * Turning a typed line into what the model receives.
@@ -88,7 +89,7 @@ export function substituteArguments(content: string, args: readonly string[]): s
 function skillBlock(skill: Skill): string {
   // The same shape a template uses, for the same reason: the model has to be able
   // to tell instructions it was handed from words the user says.
-  return [`<skill name="${skill.name}">`, skill.body, "</skill>"].join("\n");
+  return [`<skill name="${escapeAttribute(skill.name)}">`, neutraliseTagBoundaries(skill.body), "</skill>"].join("\n");
 }
 
 /** The name a line invokes, and the text after it. */
@@ -119,7 +120,7 @@ export function expandSkill(
   if (!text.startsWith(SKILL_PREFIX)) return { text };
   const { name, argsText } = splitInvocation(text.slice(SKILL_PREFIX.length));
   const skill = skills.get(name);
-  if (!skill) return { text, unknownSkill: name };
+  if (!skill || skill.isCurrent?.() === false) return { text, unknownSkill: name };
   const args = argsText.trim();
   return { text: args ? `${skillBlock(skill)}\n\n${args}` : skillBlock(skill), skill: name };
 }

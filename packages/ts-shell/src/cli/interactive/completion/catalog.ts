@@ -11,6 +11,7 @@ import { workflowCatalog } from "./workflows.js";
 import { listThemes } from "../../../presentation/themes/index.js";
 import { createSkillCatalog } from "./skills.js";
 import { createCatalogObservation } from "./observation.js";
+import { observeCatalogContributions } from '../../../core/catalog/contributions.js';
 import { toolPoolFor } from "../../runtime/tools.js";
 import type { ShellRuntimeContext } from "../../../core/shell/runtimeContext.js";
 import type { CliMcpGateway } from "../../../entrypoints/cliMcpModule.js";
@@ -107,6 +108,7 @@ export function createCatalogLoader(context: () => ShellRuntimeContext, gateway:
       const targets = catalogSources(kind, { cwd: current.cwd, projectRoot: current.projectRoot, themePaths, grantPath: policy?.sourcePath }, query);
       const close = targets.map(target => observeDirectory(target, changed));
       if (kind === "tools") {
+        close.push(observeCatalogContributions(current.cwd, changed));
         const unsubscribe = gateway.subscribe?.(changed);
         if (unsubscribe) close.push(unsubscribe);
       }

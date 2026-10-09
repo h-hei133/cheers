@@ -6,20 +6,24 @@ import {
   listSlashInvocations,
   getSlashInvocation,
   subscribeSlashCommands,
+  type SlashCatalogScope,
 } from "../../entrypoints/slashCommandRegistry.js";
 
 let cached: readonly Suggestion[] | undefined;
 let defaults: readonly Suggestion[] | undefined;
 let unsubscribe: (() => void) | undefined;
+let cachedScope: string | undefined;
 
-function candidates(includeAliases: boolean): readonly Suggestion[] {
+function candidates(includeAliases: boolean, scope?: SlashCatalogScope): readonly Suggestion[] {
   unsubscribe ??= subscribeSlashCommands(() => {
     cached = undefined;
     defaults = undefined;
   });
+  const selected = JSON.stringify(scope ?? { root: process.cwd() });
+  if (cachedScope !== selected) { cached = undefined; defaults = undefined; cachedScope = selected; }
   if (!cached) {
     const suggestions = new Map<string, Suggestion>();
-    const invocations = listSlashInvocations();
+    const invocations = listSlashInvocations(scope);
     for (const invocation of invocations) {
       const detail = invocation.argumentHint ? `${invocation.summary} ${invocation.argumentHint}` : invocation.summary;
       suggestions.set(invocation.name, {
@@ -34,15 +38,15 @@ function candidates(includeAliases: boolean): readonly Suggestion[] {
   return includeAliases ? cached : defaults!;
 }
 
-export function slashSuggestions(draft: string, snapshot: DraftSnapshot = { text: draft, cursor: draft.length, revision: 0 }): Suggestion[] | null {
+export function slashSuggestions(draft: string, snapshot: DraftSnapshot = { text: draft, cursor: draft.length, revision: 0 }, scope?: SlashCatalogScope): Suggestion[] | null {
   const token = completionToken(draft, snapshot.cursor);
   if (token.before.length === 0 && COMMAND_DRAFT.test(token.prefix)) {
-    const matches = matchSuggestions(token.prefix, candidates(token.prefix !== "/"));
+    const matches = matchSuggestions(token.prefix, candidates(token.prefix !== "/", scope));
     return matches.length ? matches.map(candidate => completionEdit(candidate, snapshot, token.from, token.to)) : null;
   }
   const command = token.before[0];
   if (!command || !COMMAND_DRAFT.test(draft.slice(command.from, command.to))) return null;
-  const invocation = getSlashInvocation(command.value);
+  const invocation = getSlashInvocation(command.value, scope);
   const prefix = [...token.before.slice(1).map(item => item.value), token.value].join(" ");
   const values = invocation?.getArgumentCompletions?.(prefix);
   return values?.length ? values.map(candidate => completionEdit(candidate, snapshot, token.from, token.to,
@@ -50,10 +54,10 @@ export function slashSuggestions(draft: string, snapshot: DraftSnapshot = { text
 }
 
 /** Usage is informational: it must never become a selectable or executable entry. */
-export function slashArgumentHint(snapshot: DraftSnapshot): string | undefined {
+export function slashArgumentHint(snapshot: DraftSnapshot, scope?: SlashCatalogScope): string | undefined {
   const command = completionToken(snapshot.text, snapshot.cursor).before[0];
   if (!command || !COMMAND_DRAFT.test(snapshot.text.slice(command.from, command.to))) return undefined;
-  const invocation = getSlashInvocation(command.value);
+  const invocation = getSlashInvocation(command.value, scope);
   return invocation?.argumentHint ? `Usage: ${invocation.invocation} ${invocation.argumentHint}` : undefined;
 }
 /**

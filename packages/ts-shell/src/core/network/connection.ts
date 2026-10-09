@@ -1,4 +1,4 @@
-import { request as httpRequest } from 'node:http';
+import { request as httpRequest, type IncomingMessage } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import { isIP } from 'node:net';
 import { approvedLookup, publicLookup, publicUrl } from './address.js';
@@ -35,11 +35,21 @@ async function requestApproved(url: URL, init: PublicRequest, scope: RequestScop
   return new Promise<Response>((resolve, reject) => {
     const request = url.protocol === 'https:' ? httpsRequest : httpRequest;
     const hostname = url.hostname.replace(/^\[|\]$/g, '');
+    let response: IncomingMessage | undefined;
+    const cleanup = () => scope.signal.removeEventListener('abort', abort);
+    const fail = (error: unknown) => { cleanup(); reject(error); };
+    // Native signal support may close a socket without settling its header promise.
+    // Settle the owner directly and close transport resources independently of error events.
+    const abort = () => { fail(scope.signal.reason ?? new NetworkError('cancelled')); response?.destroy(); outgoing.destroy(); };
     const outgoing = request(url, {
       method: init.method ?? 'GET', headers: { 'accept-encoding': 'gzip, deflate, br', ...init.headers },
-      lookup, agent: false, signal: scope.signal, maxHeaderSize: 16 * 1024,
+      // This owner handles cancellation; native abort may synchronously close and
+      // remove listeners before rejecting held headers on alternate runtimes.
+      lookup, agent: false, maxHeaderSize: 16 * 1024,
       ...(url.protocol === 'https:' ? { rejectUnauthorized: true, servername: isIP(hostname) ? '' : hostname } : {}),
     }, incoming => {
+      response = incoming;
+      incoming.once('close', cleanup);
       try {
         scope.check();
         const status = incoming.statusCode ?? 0;
@@ -52,10 +62,14 @@ async function requestApproved(url: URL, init: PublicRequest, scope: RequestScop
         const noBody = status < 200 || status >= 300 || status === 204 || status === 205;
         if (noBody) incoming.destroy();
         resolve(new Response(noBody ? null : responseBody(incoming, init.maxBytes), { status, headers }));
-      } catch (error) { incoming.destroy(); reject(error); }
+      } catch (error) { incoming.destroy(); outgoing.destroy(); fail(error); }
     });
-    outgoing.on('error', reject);
-    outgoing.on('upgrade', (_response, socket) => { socket.destroy(); reject(new NetworkError('invalid_response')); });
-    outgoing.end(init.body);
+    // Keep an error consumer until destruction settles; an asynchronous native abort
+    // error must not become an unhandled EventEmitter error after direct rejection.
+    outgoing.once('error', fail);
+    outgoing.once('close', cleanup);
+    outgoing.once('upgrade', (_response, socket) => { socket.destroy(); fail(new NetworkError('invalid_response')); });
+    scope.signal.addEventListener('abort', abort, { once: true });
+    if (scope.signal.aborted) abort(); else outgoing.end(init.body);
   });
 }

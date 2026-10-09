@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { listVisibleCommands } from '../core/commands/registry.js';
+import { commandInvocations } from '../core/commands/invocation.js';
 import {
   getSlashCommand,
   getSlashInvocation,
@@ -71,8 +73,9 @@ describe("slash command registry CLI surface", () => {
 
 
 it("enumerates builtins, the interactive entry, aliases, and distinct invocations", () => {
-  expect(listSlashCommands()).toHaveLength(59);
-  expect(listSlashInvocations()).toHaveLength(117);
+  expect(listSlashCommands().map(entry => entry.name).sort()).toEqual([...listVisibleCommands().map(entry => entry.name), 'back'].sort());
+  expect(listSlashInvocations().map(entry => entry.name).sort()).toEqual([...listVisibleCommands().flatMap(commandInvocations).map(entry => entry.name), 'back'].sort());
+  expect(getSlashInvocation('reload-plugins')).toMatchObject({ commandName: 'plugin', kind: 'named' });
   expect(getSlashInvocation("/models")).toMatchObject({ name: "models", commandName: "model", invocation: "/models", kind: "alias" });
   expect(getSlashInvocation("/RECALL")).toMatchObject({ name: "recall", commandName: "memory", invocation: "/recall", kind: "named", argumentHint: "<query>" });
   expect(capture(renderUserHelp).join("\n")).toContain("/recall");

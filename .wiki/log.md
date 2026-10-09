@@ -6397,3 +6397,10 @@ GIT-01–04 接通 split/file/hunk/composer、branch/commit/merge/push/reconcile
 ## [2026-10-09] feat | Phase 19 W10 原生安全分析、研判与批准修复
 
 SEC-01–03接通十一action、精确零执行计划/另行审批、SARIF+JSON实际覆盖、保留finding/理由/baseline/脱敏export及原patch receipt/独立同scope复验。实际CLI和独立L3发现并修复JSON脱敏结构破坏、复测后hook改源仍verified；原反例未改。旧freeze362组合/149契约与最终三文件delta18项/双构建分开，最终三有效反转/恢复16项、四终端流程28native/8synthetic、五静态门/43scripts及独立5项通过；独立L3正式APPROVED仅本地源码，报告`.tmp/security-review-material/final-report.md`。完整NormProof图越8192边，exit2/not_proven，未计通过，W16容量修复待办。精确source/状态/限制见features/phase-19-decisions.md §8.124；W11和完整Phase19继续，提交/推送另记。
+
+W10已提交/推送`51aaefa25fda89b54bbb8f9b3a2aa05979046bd2`并读回远端同SHA；CI37892143550/job113695218928与Watch37892143567/job113695219149均零步骤付款/spending-limit失败，未计通过。W11按ECO-01–03、ECO-04、ECO-05三个owner/回退/认证边界批次顺序继续；首批正在实现，未标验收完成。
+
+
+## [2026-10-09] feat | Phase 19 W11 签名扩展源与隔离运行
+
+ECO-01–03接通真实签名分页/固定版本、完整性先验和有界归档、保留用户文件的安装更新回退卸载及独立prompt/script/command/tool授权。修复祖先替换、迟到取消、脏prompt阻断、session归属、公钥读取及exe HTTP取消缺口；原反例保留。最终Node20.3/33文件580项、149契约、三有效反转/恢复41项、两入口两模式四条actualCLI（40合成POST/100registry GET）、五静态门/43scripts与独立最终APPROVED通过。原生隔离/网络拒绝/held进程和下载取消、重启注销及真实持久收据分别核验；完整NormProof仍因8192-edge容量exit2/not_proven，W16修复待办。协议/边界与证据见features/extension-registry.md及phase-19-decisions.md §8.126；ECO-04/05与W12–W16继续，提交/推送另记。

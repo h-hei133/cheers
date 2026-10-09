@@ -22,6 +22,7 @@ export function skillPicker(context: CommandContext): Picker {
       skills = [
         ...resolveSkillCatalog({
           workspaceRoot: context.cwd,
+          sessionId: context.sessionId,
           ...(context.skillOptions?.skillPaths ? { skillPaths: context.skillOptions.skillPaths } : {}),
           ...(context.skillOptions?.noSkills ? { noSkills: true } : {}),
         }).skills.values(),

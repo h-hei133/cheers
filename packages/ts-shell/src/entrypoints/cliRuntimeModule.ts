@@ -15,6 +15,7 @@ import { advisorCommandFor } from '../cli/runtime/advisor.js';
 import { researchCommandFor } from '../cli/runtime/research.js';
 import { gitCommandFor, worktreeCommandFor, commitCommandFor } from '../cli/runtime/git.js';
 import { securityCommandFor } from '../cli/runtime/security.js';
+import { extensionCommandFor } from '../cli/runtime/extensions.js';
 import { runPromptInputStream } from '../cli/runtime/inputStream.js';
 import { planningCommandFor } from '../cli/runtime/planning.js';
 import { schedulerForRuntime } from '../cli/runtime/goalScheduling.js';
@@ -137,6 +138,7 @@ export async function runNonInteractivePrompt(options: {
     researchCommand: researchCommandFor(options.runtimeContext, options.sessionManager, options.sessionRuntime, options.renderer),
     gitCommand: gitCommandFor(options.runtimeContext),
     securityCommand: securityCommandFor(options.runtimeContext),
+    extensionCommand: extensionCommandFor(options.runtimeContext),
     worktreeCommand: worktreeCommandFor(options.runtimeContext),
     commitCommand: commitCommandFor(options.runtimeContext),
     planningCommand: planningCommandFor(options.runtimeContext, options.sessionManager, options.sessionRuntime),

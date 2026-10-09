@@ -6,6 +6,7 @@ import { configurationAdmission } from '../../core/shell/configuration.js';
 import { assertAdmission } from '../../core/network/admission.js';
 import { researchInspectionTools } from './research.js';
 import { securityFeatureTools } from './security.js';
+import { refreshExtensionsFor } from './extensions.js';
 
 /** Resolve on each inspection, including after reload or project navigation. */
 export function toolPoolFor(
@@ -15,10 +16,11 @@ export function toolPoolFor(
   return async () => {
     const admission = configurationAdmission(context);
     assertAdmission(admission);
+    refreshExtensionsFor(context);
     const workspaceRoot = context.projectRoot ?? context.cwd;
     const owned = !supplied && context.runtimeConfig.enableMcpTools ? new CoreMcpGateway(workspaceRoot) : undefined;
     try {
-      return (await loadToolCatalog({ workspaceRoot, runtimeConfig: context.runtimeConfig, admission, featureTools: [...researchInspectionTools(context), ...securityFeatureTools(context)],
+      return (await loadToolCatalog({ workspaceRoot, sessionId: context.session.id, runtimeConfig: context.runtimeConfig, admission, featureTools: [...researchInspectionTools(context), ...securityFeatureTools(context)],
         skillOptions: context.skillOptions, mcpGateway: supplied ?? owned })).tools;
     } finally {
       await owned?.close();

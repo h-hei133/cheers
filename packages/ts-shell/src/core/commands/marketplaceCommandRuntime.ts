@@ -14,6 +14,7 @@ export async function runMarketplaceCommand(
   args: string[],
   _context: CommandContext,
 ): Promise<LocalCommandResult> {
+  if (_context.extensionCommand) return _context.extensionCommand('marketplace', args, _context);
   const parsed = parseSyntax(marketplaceSyntax, args);
   if (!parsed.ok) return { kind: "local", output: `Invalid /marketplace arguments: ${parsed.reason}\n${syntaxHelp(marketplaceSyntax)}` };
   try {
