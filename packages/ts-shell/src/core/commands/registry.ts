@@ -7,6 +7,7 @@ import { goalCommandAliases, goalSyntax } from "./goal/syntax.js";
 import { guidedGoalSyntax, planReviewSyntax, planSyntax, queueSyntax } from './planning/syntax.js';
 import { advisorCommandDefinition } from './advisor/registration.js';
 import { researchCommandDefinition } from './research/registration.js';
+import { gitCommandDefinitions } from './git/registration.js';
 import { marketplaceSyntax } from "./marketplace/syntax.js";
 import { pluginSyntax } from "./plugin/syntax.js";
 import { workflowSyntax } from "../workflow/syntax.js";
@@ -731,6 +732,7 @@ export function createCommandRegistry(
       execute: (args, context) => runDeepResearchCommand(args, context),
     },
     researchCommandDefinition(),
+    ...gitCommandDefinitions(),
     {
       name: "commit",
       // A staged diff expands into a prompt; an empty index answers locally.

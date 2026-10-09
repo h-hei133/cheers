@@ -140,7 +140,7 @@ Cheers 已有 [picker 注册器](../../packages/ts-shell/src/cli/interactive/pic
 
 ### 12. `/review`、`/plan-review` 与实时 `/advisor`
 
-**现状**：[review handler](../../packages/ts-shell/src/core/commands/reviewCommandRuntime.ts)收集 Git 变更构造审查任务；[工具策略](../../packages/ts-shell/src/core/query/toolPolicy.ts)已限制 Plan 模式，不能称所有规划门禁缺失。
+**现状**：[review handler](../../packages/ts-shell/src/core/commands/reviewCommandRuntime.ts)与 `/git review` 代理[同一 Git owner](../../packages/ts-shell/src/workflow/git/service.ts)，读取已授权 diff/path 构造任务。host 请求 metadata 经既有 Plan gate 限制本次模型工具；不改用户保存的模式，仓库文本不授写权，读取不完整就不能声称完整审查。
 
 **参考**：oh-my-pi [plan-review](../../../oh-my-pi/packages/coding-agent/src/slash-commands/builtin-modes.ts)重新打开计划审查，[advisor](../../../oh-my-pi/packages/coding-agent/src/slash-commands/builtin-collaboration.ts)让第二模型审查回合并注入 notes。声明及 handler 不证明审查一定减少错误，更不授予顾问自动写入权。
 
@@ -148,11 +148,13 @@ Cheers 已有 [picker 注册器](../../packages/ts-shell/src/cli/interactive/pic
 
 ### 13. `/commit` 与完整 `/git`
 
-**现状**：[commit handler](../../packages/ts-shell/src/core/commands/commitCommandRuntime.ts)检查 staged diff，委派模型调用 bash 提交并读回哈希；禁止擅自 stage/amend/push。其注册摘要“draft”不完整，但这不是“只写草稿”。
+**现状**：[commit handler](../../packages/ts-shell/src/core/commands/commitCommandRuntime.ts)与[Git 工作台](../../packages/ts-shell/src/workflow/git/service.ts)共用 owner。模型只拟消息并请求 host 绑定的 `git_commit {commitId,message}`，普通命令审批后由原生 Git 提交；tree/parent/hash 读回与收据保存状态分开。已有 split diff/file/hunk/composer、branch/merge/push/reconcile 与同 ID worktree 迁移；禁止擅自 stage/amend/push。
 
 **参考**：oh-my-pi [Git 入口](../../../oh-my-pi/packages/coding-agent/src/slash-commands/builtin-session.ts)开启 split diff/staging/composer；独立 [CLI commit](../../../oh-my-pi/packages/coding-agent/src/commands/commit.ts)有参数和降级路径。其 mechanical fallback 即使形成 commit，也以 nonzero 表达 degraded，不能写成模型失败后始终成功。CLI flags 也不能不经审查直接移成 Slash flags。
 
 **用户范围已确认**：完整文件/hunk stage/unstage、分屏差异、提交编辑及读回、分支操作和工作区迁移均纳入。选中 hunk 绑定 index/worktree 版本，后续外改拒绝；binary/rename/untracked/conflict/no-HEAD/大 diff 有实际处理。stage、commit、push 各自有授权与证据；未知网络结果先查询，不盲重试。`/wt` 另需 staged/unstaged/untracked 保真与失败补偿，不是现有子任务 worktree 的几行接线。归 GIT-01/02/03/04。
+
+**W9 实施边界**：原生执行复用唯一 ExecutionService，审批绑定 executable/environment、根/index/HEAD/refs/config/hooks/attributes 与已获 read grants 的 raw bytes。受限路径仅 metadata/status 并显式 limited；迁移逐边界检查原 checkout、branch/head/index 与字节/模式/links，外改及替换目标保留。configured filters、conflict/submodule 和转换后 clean checkout bytes 无法精确匹配 HEAD 的迁移明确 unavailable；ignored 用户文件阻止删除/补偿。无跨进程 read/remove 或多文件 crash atomicity 承诺。最终验证与交付见 [Phase 19 §8.123](phase-19-decisions.md#8123-w9-git-01–04原生-git-工作台与保留源改动的迁移)。
 
 ### 14. `/skill` 与公共技能商店
 

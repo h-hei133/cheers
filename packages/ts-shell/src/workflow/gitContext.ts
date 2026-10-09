@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process'
+import { inspectGitDiscovery } from '../runtime/execution/discovery.js'
 
 export interface WorkflowGitContext {
   readonly insideGit: boolean
@@ -32,16 +32,7 @@ export interface WorkflowGitDiagnostics {
 }
 
 function runGit(args: string[], cwd: string) {
-  const result = spawnSync('git', args, {
-    cwd,
-    encoding: 'utf8',
-    shell: false,
-  })
-
-  return {
-    ok: !result.error && result.status === 0,
-    stdout: result.stdout || '',
-  }
+  return inspectGitDiscovery(args, cwd)
 }
 
 export function getWorkflowGitDiagnostics(

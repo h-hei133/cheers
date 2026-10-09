@@ -39,6 +39,9 @@ export interface CommandContext {
   readonly queueCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly advisorCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly researchCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
+  readonly gitCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
+  readonly worktreeCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
+  readonly commitCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly cwd: string
   /** Current configured pool, resolved on demand by the CLI host. */
   readonly getToolPool?: () => Promise<ReadonlyMap<string, ToolDefinition>>

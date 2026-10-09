@@ -40,6 +40,7 @@ import { tokenizeCommandArgs } from '../../core/commands/arguments.js';
 import { isPlanningControl, planningCommandFor } from '../runtime/planning.js';
 import { isAdvisorControl, advisorCommandFor } from '../runtime/advisor.js';
 import { isResearchControl, researchCommandFor } from '../runtime/research.js';
+import { gitWorkbenchFor } from '../runtime/git.js';
 import { SubmissionQueue } from './inputQueue.js';
 import { openSettings } from "./settings.js";
 import { InteractiveSurface } from "../../presentation/tui/surface/view.js";
@@ -928,6 +929,7 @@ export class InteractiveMode {
       statusItems: this.statusItems,
       undo: undoPickerHost({ runtimeContext: this.options.runtimeContext, sessionManager: this.options.sessionManager,
         busy: () => this.stopped || this.closing || (this.busy && !this.pickerPending) || this.options.sessionRuntime.getCurrentRunController() !== null }),
+      gitWorkbench: gitWorkbenchFor(this.options.runtimeContext),
       ...sessionPickerHost({ runtimeContext: this.options.runtimeContext, sessionManager: this.options.sessionManager,
         busy: () => this.stopped || this.closing || (this.busy && !this.pickerPending) || this.options.sessionRuntime.getCurrentRunController() !== null,
         resume: sessionId => this.runCommandLine(`/resume ${sessionId}`),

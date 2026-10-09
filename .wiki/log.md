@@ -6386,4 +6386,9 @@ guided 明确答案/可选预算精确批准为 paused goal；计划沿用只读
 
 ## [2026-10-09] feat | Phase 19 W8 软件与论文持久深度研究
 
-RSC-01–05 顺序实现：新命令/aliases 与 collector 分离，原生分解/实际来源/缺口再调查/fresh逐声明反证/有序报告；复用同一request ledger、只读grant、session CAS和批准writer。无证据/遗漏核验不算覆盖，全文/摘要/冲突分别保留；pause/unknown不重放，变源回读失效，拒绝保存为denied、截断拒绝完整保存。Node20.3构建/35文件392项、结果契约149项、8有效反转/恢复后25项、Node/executable两模式171次合成HTTP、独立最终APPROVED/8项、静态gates/43scripts/NormProof0blocking通过，见features/phase-19-decisions.md §8.122。真实模型质量与跨平台仍待QA；提交/推送和精确远端结果另记，继续W9，完整Phase19进行中。
+RSC-01–05 顺序实现：新命令/aliases 与 collector 分离，原生分解/实际来源/缺口再调查/fresh逐声明反证/有序报告；复用同一request ledger、只读grant、session CAS和批准writer。无证据/遗漏核验不算覆盖，全文/摘要/冲突分别保留；pause/unknown不重放，变源回读失效，拒绝保存为denied、截断拒绝完整保存。Node20.3构建/35文件392项、结果契约149项、8有效反转/恢复后25项、Node/executable两模式171次合成HTTP、独立最终APPROVED/8项、静态gates/43scripts/NormProof0blocking通过，见features/phase-19-decisions.md §8.122。真实模型质量与跨平台仍待QA；14ce009d已提交/推送，精确SHA的CI/Watch因付款/额度限制零步骤失败，未计通过；继续W9，完整Phase19进行中。
+
+
+## [2026-10-09] feat | Phase 19 W9 原生 Git 工作台与保留源的 worktree 迁移
+
+GIT-01–04 接通 split/file/hunk/composer、branch/commit/merge/push/reconcile 与同 ID 工作区迁移，复用唯一执行/审批/session owner。修复收据保存结果覆盖、早到外改/替换目标、source deny、attributes stale 与受限clean提示；ignored用户文件保留。Node20.3构建/388项组合、149项契约、5有效反转/恢复后32项、两入口两模式16次合成HTTP与独立最终APPROVED/13项通过；最终两文件提示delta另验25项、双构建、8条实际CLI零POST与五静态gates。精确source/平台/转换边界见features/phase-19-decisions.md §8.123；本地完成，提交/推送及远端事实随后记录。W10安全分析与完整Phase19继续。

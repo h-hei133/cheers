@@ -53,6 +53,9 @@ export interface BuildCliCommandExecutionInput {
   readonly queueCommand?: CommandContext['queueCommand'];
   readonly advisorCommand?: CommandContext['advisorCommand'];
   readonly researchCommand?: CommandContext['researchCommand'];
+  readonly gitCommand?: CommandContext['gitCommand'];
+  readonly worktreeCommand?: CommandContext['worktreeCommand'];
+  readonly commitCommand?: CommandContext['commitCommand'];
   readonly prompt: string;
   /** Images the draft referred to, carried beside the text rather than in it. */
   readonly attachments?: PromptAttachments;
@@ -150,6 +153,9 @@ export async function buildCliCommandExecution(
     queueCommand: input.queueCommand,
     advisorCommand: input.advisorCommand,
     researchCommand: input.researchCommand,
+    gitCommand: input.gitCommand,
+    worktreeCommand: input.worktreeCommand,
+    commitCommand: input.commitCommand,
     requestPolicy: input.requestPolicy,
     cwd: input.cwd,
     interactive: input.interactive,

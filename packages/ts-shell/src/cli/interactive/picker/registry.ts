@@ -27,6 +27,8 @@ import { statusItemPicker } from "./statusItems.js";
 import { settingsPicker, type SettingsHost } from "./settings.js";
 import { undoPicker } from './undo.js';
 import type { UndoHost } from '../../../edit/recovery/undo/service.js';
+import type { GitWorkbench } from '../../../workflow/git/service.js';
+import { gitPicker } from './git.js';
 
 /**
  * Which commands open a chooser.
@@ -46,6 +48,7 @@ export interface PickerHost extends SettingsHost {
   readonly projectRoot: string;
   readonly statusItems: readonly StatusItemId[];
   readonly undo: UndoHost;
+  readonly gitWorkbench?: GitWorkbench;
   sessionContext(): SessionSelectionContext;
   resumeSession(sessionId: string): Promise<string | undefined>;
   deleteSession(sessionId: string, version?: string): Promise<string | undefined>;
@@ -100,6 +103,7 @@ const PICKERS: Record<string, PickerFactory> = {
       preview: host.previewStatusItems,
     }),
   settings: (host) => settingsPicker(host),
+  git: host => gitPicker(host.gitWorkbench),
 };
 
 /** Arguments belong to the picker when that command explicitly accepts them. */

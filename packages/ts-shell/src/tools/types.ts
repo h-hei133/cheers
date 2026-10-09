@@ -71,6 +71,8 @@ export interface ToolDefinition {
 }
 
 export interface ToolPreparation {
+  /** A native execution adapter may retain ordinary bash command policy. */
+  readonly permissionToolName?: 'bash'
   /** Execution tools may bind a complete non-file request to the same approval lifecycle. */
   readonly permissionArgs?: Readonly<Record<string, unknown>>
   readonly previewKind?: 'file-plan' | 'execution'

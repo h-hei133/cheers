@@ -232,8 +232,8 @@ refNoToken = ref.filter(command => intersection(token(command), oursTokens).size
 | `/browser` / `/computer` | Cheers 管受控浏览器执行/回执；参考 browser 切 eval prelude 的显示方式，computer 切桌面 prelude。 | 不互作别名；桌面能力单列实质任务。 |
 | `/undo` / `/branch` | 文件恢复指导不等于对话导航。 | 文件撤销与对话回溯分开，撤销单位按用户选择的一次已提交编辑操作。 |
 | `/diagnose` / `/cleanse` | 只读诊断不等于自主写入修复。 | 修复链单列审批、执行和复验。 |
-| `/commit` / `/git` | Cheers 会委派模型执行真实 commit 并读哈希，禁止顺带 stage/amend/push，并非仅草稿。 | 完整 Git 面板独立纳入；stage/commit/push 分别授权与举证。 |
-| `/wt` | 已有 manager 为已批准子任务从 HEAD 分配 checkout，不能搬当前 dirty 工作区与 session。 | staged/unstaged/untracked 保真、冲突、取消、补偿、rebind 均需实现；删除廉价估工。 |
+| `/commit` / `/git` | 同一 Git owner 已接通 staged/index/worktree、split diff 与 hunk；模型 commit 只拟消息并调用 host 绑定的 `git_commit`。 | stage/commit/merge/push 分别审批；原生读回与收据保存结果分开，未知远端写先 reconcile。 |
+| `/wt` | 已复用 manager 与同 ID session rebind，复制精确 index/工作树/未跟踪内容并保留源。 | 当前 source read grant 和 destination deny 均检查；冲突/子模块/转换后 clean bytes 不匹配拒绝迁移；外改/replacement/ignored 用户文件保留。 |
 
 证据：[新会话](../../packages/ts-shell/src/cli/runtime/session.ts)、[会话选择器](../../packages/ts-shell/src/cli/interactive/picker/session.ts)、[键位](../../packages/ts-shell/src/cli/interactive/keybindings.ts)、[工具策略](../../packages/ts-shell/src/core/query/toolPolicy.ts)、[忙时交互](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts)、[fast](../../packages/ts-shell/src/core/commands/fastCommandRuntime.ts)、[goal](../../packages/ts-shell/src/core/commands/goalCommandRuntime.ts)、[commit](../../packages/ts-shell/src/core/commands/commitCommandRuntime.ts)、[worktree](../../packages/ts-shell/src/core/workflow/gitWorktreeManager.ts)。其他语义审查见 [24](24-shared-command-parity.md)。
 
@@ -267,7 +267,7 @@ refNoToken = ref.filter(command => intersection(token(command), oursTokens).size
 | 22 | debug | 增强诊断入口 | 聚合已有日志/崩溃/耗时/指标和实际可用工具，不虚构 DAP/AST 调试器。 | PAR-04 |
 | 23 | rename | 复用会话重命名 | Slash/picker 共用持久化；空参编辑/建议、重名和失败可见，模型标题标建议。 | SES-04 |
 | 24 | move | 增强 session rebind | 保持 ID，迁移路径值及缓存身份；锁内重读、边界和补偿有证据，不直接改 cwd 冒充迁移。 | SES-05 |
-| 25 | wt | 新增 dirty 迁移 | 复用 worktree 创建/rebind；保留索引、工作树、未跟踪文件，冲突不覆盖；取消/失败补偿且 partial 可见。 | GIT-03 |
+| 25 | wt | 已接通 dirty 迁移 | 原生 create/switch/migrate/delete 与同 ID rebind；保留源 index/bytes，补偿只移除原身份的 clean owned checkout，ignored 用户文件保留。 | GIT-03，§10 |
 | 26 | add-dir | 新增多根工作区 | 每根规范化、信任/读写权限独立，containment 使用授权根集合；新增根不自动扩大代理权限。 | SES-05 |
 | 27 | remove-dir | 新增多根撤销 | 撤销未来访问、处理在途操作、失效缓存；不删除物理目录或静默重绑主根。 | SES-05 |
 | 28 | dirs | 新增多根查看 | 显示主根/附加根/权限/失效状态，与增删同源，不能用单根 pwd 代替。 | SES-05 |
@@ -291,7 +291,7 @@ refNoToken = ref.filter(command => intersection(token(command), oursTokens).size
 | 46 | usage | 独立额度入口 | 与估算 cost 分开，显示可得额度及未知；权益兑换预览实际消耗并确认，不承诺清任意 429。 | PAR-03 |
 | 47 | changelog | 新增版本说明 | 绑定真实构建版本/发布记录，离线或无记录可解释，不把无法获取当最新版本。 | PAR-04 |
 | 48 | agents | 增强角色配置面板 | 复用本地角色覆盖，接通 per-agent 模型/思考路由、来源和权限；不只编辑未被消费的字段。 | ECO-04 |
-| 49 | git | 新增完整 Git 面板 | 分屏 diff、文件/hunk stage/unstage、提交编辑和回执；索引 stale 检查，binary/rename/untracked/conflict 有明确处理。 | GIT-01/02/04 |
+| 49 | git | 已接通完整 Git 面板 | staged/unstaged/untracked、split diff、文件/hunk stage/unstage、composer 与原生 commit/branch/merge/push/reconcile；源与执行身份绑定审批。 | GIT-01/02/04，§10 |
 | 50 | hub | 新增实时代理总览 | 真实事件显示主子任务、顾问、依赖、预算、停止原因；与角色配置 agents 分清。 | FLOW-01 |
 | 51 | branch | 增强对话分支 | 历史节点选择保留旧路径，摘要策略及失败可见；不触发文件撤销。 | PAR-01、SES-03 |
 | 52 | login | 复用 Provider 登录 | 明确入口到 `/connect login`，复用认证 owner；Provider/账号/作用域明确，不近似匹配错账号。 | PAR-03 |
@@ -339,3 +339,9 @@ refNoToken = ref.filter(command => intersection(token(command), oursTokens).size
 ## 9. SES-05 workspace 实施补充（2026-10-08）
 
 现有 `/workspace` 语法新增 `add <path> [--write]`、`remove <path>` 与 `rebind <path>`，解析、帮助、补全及交互/脚本入口共用描述；默认附加只读、写根仍经审批与 deny rules。`attach` 跨项目创建独立 session，`rebind` 迁移同一保存身份；附加根不接管配置、技能或 MCP 发现。持久继承、失效根撤权、busy/overlap/unknown 与动作前复验见 [决策 §8.108](phase-19-decisions.md#8108-ses-05持久多根授权与同会话工作区迁移)。
+
+## 10. W9 Git/worktree 实施补充（2026-10-09）
+
+`/git` 裸入口打开现有 panel；显式 `status` 返回原生状态，`diff <staged|unstaged|untracked> <path>` 共用 split report，`stage|unstage <path> [hunkId]` 绑定原始版本。`commit <message>`、`branch create|switch|delete <name>`、`merge <branch>`、`push <remote> <refs/heads/branch>` 各自进入普通审批，`reconcile <operationId>` 另行批准精确远端查询。`review [focus]` 共用逐请求只读审查，`goal` 转给现有 goal owner。
+
+`/wt list|create <path> <branch>|migrate <path> <branch>|switch <path>|delete <path>` 与 `/worktree` alias 共用同一 owner。`/commit [guidance]` 的模型仅拟提交消息；host commit ID、原始 staged index、普通审批和原生 tree/parent/hash 读回决定实际结果。仅有原生 metadata/status 的受限路径显式显示 limited，diff/review/commit evidence/migration 需要当前 source read grants；nested 全仓迁移需要已有父仓 read root。收据保存 unknown 不抹去已发生的原生结果。能力边界及最终验收状态见 [Phase 19 §8.123](phase-19-decisions.md#8123-w9-git-01–04原生-git-工作台与保留源改动的迁移)。原始注册计数仍作为规划基线。

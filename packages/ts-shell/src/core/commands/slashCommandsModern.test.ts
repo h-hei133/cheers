@@ -1,3 +1,4 @@
+import { gitCommandContext } from "../../test-utils/git.js";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { promises as fs } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -37,7 +38,7 @@ describe("Modern Slash Commands Subsystem", () => {
 
   it("/review answers locally for a clean tree", async () => {
     execFileSync("git", ["init", "--quiet", tempDir]);
-    const result = await runReviewCommand(["focus on tests"], { cwd: tempDir, sessionId: "sess_1" });
+    const result = await runReviewCommand(["focus on tests"], { ...gitCommandContext(tempDir), sessionId: "sess_1" });
     expect(result.kind).toBe("local");
     if (result.kind !== "local") throw new Error("Expected local clean status");
     expect(result.output).toContain("Working tree clean");

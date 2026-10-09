@@ -5,6 +5,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { runToolsCommand } from "./toolsCommandRuntime.js";
 import { runCommitCommand } from "./commitCommandRuntime.js";
+import { gitCommandContext } from "../../test-utils/git.js";
 import { runThinkingCommand } from "./thinkingCommandRuntime.js";
 import { SessionManager } from "../../session/SessionManager.js";
 import { readSessionModel } from "../../session/model/state.js";
@@ -74,7 +75,7 @@ describe("/commit", () => {
   });
 
   it("reports a clean tree instead of asking for a message", async () => {
-    const result = await runCommitCommand([], { cwd: repo });
+    const result = await runCommitCommand([], gitCommandContext(repo));
 
     expect(result.kind).toBe("local");
     if (result.kind === "local") expect(result.output).toContain("the tree is clean");
@@ -82,7 +83,7 @@ describe("/commit", () => {
 
   it("refuses to guess which files belong in the commit", async () => {
     fs.writeFileSync(path.join(repo, "a.txt"), "one\n", "utf8");
-    const result = await runCommitCommand([], { cwd: repo });
+    const result = await runCommitCommand([], gitCommandContext(repo));
 
     expect(result.kind).toBe("local");
     if (result.kind === "local") {
@@ -94,13 +95,14 @@ describe("/commit", () => {
   it("puts the staged diff in the prompt so the message describes the change", async () => {
     fs.writeFileSync(path.join(repo, "a.txt"), "hello world\n", "utf8");
     execFileSync("git", ["add", "a.txt"], { cwd: repo });
-    const result = await runCommitCommand([], { cwd: repo });
+    const result = await runCommitCommand([], gitCommandContext(repo));
 
     expect(result.kind).toBe("prompt");
     if (result.kind === "prompt") {
       expect(result.prompt).toContain("hello world");
       expect(result.prompt).toContain("```diff");
-      expect(result.prompt).toMatch(/git log --oneline/);
+      expect(result.prompt).toContain("Use only git_commit");
+      expect(result.promptMetadata).toMatchObject({ source: "git-commit", gitCommitId: "synthetic-armed-commit" });
       expect(result.prompt).toMatch(/do not amend/i);
       expect(result.prompt).toMatch(/Do not push/i);
     }
@@ -109,7 +111,7 @@ describe("/commit", () => {
   it("says what it read instead of printing the whole diff into the transcript", async () => {
     fs.writeFileSync(path.join(repo, "a.txt"), "x\n", "utf8");
     execFileSync("git", ["add", "a.txt"], { cwd: repo });
-    const result = await runCommitCommand([], { cwd: repo });
+    const result = await runCommitCommand([], gitCommandContext(repo));
 
     expect(result.kind).toBe("prompt");
     if (result.kind === "prompt") {
@@ -123,17 +125,17 @@ describe("/commit", () => {
   it("carries what the user said about the commit into the prompt", async () => {
     fs.writeFileSync(path.join(repo, "a.txt"), "x\n", "utf8");
     execFileSync("git", ["add", "a.txt"], { cwd: repo });
-    const result = await runCommitCommand(["this", "closes", "the", "leak"], { cwd: repo });
+    const result = await runCommitCommand(["this", "closes", "the", "leak"], gitCommandContext(repo));
 
     if (result.kind === "prompt") expect(result.prompt).toContain("this closes the leak");
   });
 
   it("says it is not a repository rather than failing obscurely", async () => {
     const bare = fs.mkdtempSync(path.join(os.tmpdir(), "not-a-repo-"));
-    const result = await runCommitCommand([], { cwd: bare });
+    const result = await runCommitCommand([], gitCommandContext(bare));
 
     expect(result.kind).toBe("local");
-    if (result.kind === "local") expect(result.output).toContain("Not a git repository");
+    if (result.kind === "local") expect(result.output).toContain("Commit unavailable");
     fs.rmSync(bare, { recursive: true, force: true });
   });
 });

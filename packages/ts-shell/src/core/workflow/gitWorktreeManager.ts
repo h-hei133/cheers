@@ -34,6 +34,19 @@ export class GitWorktreeManager {
     this.workspaceRoot = path.resolve(workspaceRoot);
   }
 
+  /** Called only by a prepared session operation with an approved execution port. */
+  async createCheckout(target: string, branch: string, head: string, signal?: AbortSignal): Promise<void> {
+    await this.git(['worktree', 'add', '-b', branch, target, head], undefined, signal);
+    if (await fs.realpath(target) !== target || await this.git(['rev-parse', 'HEAD'], target, signal) !== head
+      || await this.git(['rev-parse', '--abbrev-ref', 'HEAD'], target, signal) !== branch) throw new Error('Created worktree identity could not be confirmed.');
+  }
+
+  /** Non-forced Git removal preserves dirty or otherwise occupied directories. */
+  async removeCheckout(target: string, signal?: AbortSignal): Promise<void> {
+    await this.git(['worktree', 'remove', target], undefined, signal);
+    if (!await this.missing(target)) throw new Error('Worktree removal could not be confirmed.');
+  }
+
   private async git(args: readonly string[], cwd = this.workspaceRoot, signal?: AbortSignal): Promise<string> {
     const operation = args.slice(0, 2).join(" ");
     const allowed = ["rev-parse --show-toplevel", "rev-parse --git-common-dir", "rev-parse HEAD", "rev-parse --abbrev-ref",

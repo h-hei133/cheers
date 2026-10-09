@@ -9,6 +9,7 @@ import { goalCommandFor, goalPolicyFor } from '../runtime/goal.js';
 import { queueCommandFor } from '../runtime/inputQueue.js';
 import { advisorCommandFor } from '../runtime/advisor.js';
 import { researchCommandFor } from '../runtime/research.js';
+import { gitCommandFor, worktreeCommandFor, commitCommandFor } from '../runtime/git.js';
 import { planningCommandFor } from '../runtime/planning.js';
 import { navigateSession, type SessionNavigationResult } from "../runtime/navigation.js";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
@@ -130,6 +131,9 @@ export async function routeInteractiveCommand(
     queueCommand: queueCommandFor(input.runtimeContext, input.sessionRuntime),
     advisorCommand: advisorCommandFor(input.runtimeContext, input.sessionManager, input.sessionRuntime, input.renderer),
     researchCommand: researchCommandFor(input.runtimeContext, input.sessionManager, input.sessionRuntime, input.renderer),
+    gitCommand: gitCommandFor(input.runtimeContext),
+    worktreeCommand: worktreeCommandFor(input.runtimeContext),
+    commitCommand: commitCommandFor(input.runtimeContext),
     planningCommand: planningCommandFor(input.runtimeContext, input.sessionManager, input.sessionRuntime, input.readline),
     requestPolicy: goalPolicyFor(input.runtimeContext, input.sessionManager),
     prompt: input.prompt,

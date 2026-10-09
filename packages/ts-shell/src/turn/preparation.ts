@@ -14,6 +14,7 @@ interface PreparationGate extends Pick<ToolExecutionContext, 'workspaceRoot' | '
 /** Preflight and publication both enforce every path's grants and read/write denials. */
 export function preparationContext(toolName: string, options: PreparationGate): ToolExecutionContext {
   return { workspaceRoot: options.workspaceRoot, artifactRoot: options.workspaceRoot, workspaceRoots: options.workspaceRoots,
+    assertSourceAccess: absolute => { const blocked = options.admission?.(); if (blocked) throw new Error(blocked); assertSourceAccess(absolute, options.workspaceRoot, options.workspaceRoots, options.permissionScope, options.denyRules); },
     sessionId: options.sessionId, taskId: 'preparation', assertFileAccess: absolute => {
       if (toolName === 'browser') {
         const blocked = options.admission?.(); if (blocked) throw new Error(blocked);
@@ -23,7 +24,11 @@ export function preparationContext(toolName: string, options: PreparationGate): 
 }
 
 export function preparationPermission(toolName: string, preparation: ToolPreparation, options: PreparationGate) {
-  if (preparation.permissionArgs) return evaluateToolPermissionScope(toolName, { ...preparation.permissionArgs }, options.permissionScope, options.workspaceRoot, options.denyRules);
+  if (preparation.permissionArgs) {
+    const original = evaluateToolPermissionScope(toolName, { ...preparation.permissionArgs }, options.permissionScope, options.workspaceRoot, options.denyRules);
+    if (original.denied || !preparation.permissionToolName) return original;
+    return evaluateToolPermissionScope(preparation.permissionToolName, { ...preparation.permissionArgs }, options.permissionScope, options.workspaceRoot, options.denyRules);
+  }
   const decisions = preparation.targets.map(target => targetPermission(toolName, target, options));
   return { requiresEscalation: decisions.some(decision => decision.requiresEscalation), denied: false,
     operation: preparation.targets.some(target => target.operation === 'delete') ? 'delete' as const : 'write' as const,
