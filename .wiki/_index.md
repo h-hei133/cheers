@@ -21,6 +21,7 @@ Last updated: 2026-10-09
 - [Phase 18 decisions and implementation evidence](features/phase-18-decisions.md)
 - [Phase 19 decisions and implementation evidence](features/phase-19-decisions.md)
 - [Extension registry protocol and capability grants](features/extension-registry.md)
+- [Agent definitions, model routing and lifecycle](features/agent-definitions.md)
 - [Feature and defect register](features/13-feature-and-defect-register.md)
 - [All Sources](raw/_index.md)
 - [Concepts](wiki/concepts/_index.md)

@@ -6404,3 +6404,10 @@ W10已提交/推送`51aaefa25fda89b54bbb8f9b3a2aa05979046bd2`并读回远端同S
 ## [2026-10-09] feat | Phase 19 W11 签名扩展源与隔离运行
 
 ECO-01–03接通真实签名分页/固定版本、完整性先验和有界归档、保留用户文件的安装更新回退卸载及独立prompt/script/command/tool授权。修复祖先替换、迟到取消、脏prompt阻断、session归属、公钥读取及exe HTTP取消缺口；原反例保留。最终Node20.3/33文件580项、149契约、三有效反转/恢复41项、两入口两模式四条actualCLI（40合成POST/100registry GET）、五静态门/43scripts与独立最终APPROVED通过。原生隔离/网络拒绝/held进程和下载取消、重启注销及真实持久收据分别核验；完整NormProof仍因8192-edge容量exit2/not_proven，W16修复待办。协议/边界与证据见features/extension-registry.md及phase-19-decisions.md §8.126；ECO-04/05与W12–W16继续，提交/推送另记。
+
+ECO-01–03已以c59a75e1597527ad4e22c5218e1b296ed21de5bb提交/推送并读回；精确SHA CI37903862382/job113732486977、Watch37903862381/job113732487247为付款/额度限制零步骤失败，未计通过。ECO-04单coder顺序执行中。
+
+
+## [2026-10-09] feat | Phase 19 W11 原生角色配置与逐角色请求
+
+ECO-04接通用户/项目角色CRUD/启停/模型/effort与普通task，审批前角色身份和每次请求/工具/返回fence保留父权限、tool pool和共享账目。独立原四反例及父级held-disable缺口均修复；最终31项Node20.3构建/22文件377项、149契约、43scripts/五静态门、三有效反转/恢复14项、Node/executable四路径及busy/pipe共118POST本地通过。父级直接读84项native配对/48publication及pending usage，独立L3最终APPROVED；协议/边界/历史失败见features/agent-definitions.md及phase-19-decisions.md §8.127。完整NormProof容量仍待W16；ECO-05和W12–W16继续，提交/推送另记。

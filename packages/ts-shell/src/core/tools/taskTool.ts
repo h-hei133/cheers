@@ -5,6 +5,7 @@ import { SubagentLoader } from "../subagents/subagentLoader.js";
 import { AgentMemoryManager } from "../subagents/agentMemoryManager.js";
 import { defaultHookDispatcher } from "../hooks/hookDispatcher.js";
 import { projectTrust } from "../security/projectTrust.js";
+import { bindRole } from '../subagents/admission.js';
 
 /**
  * /task & /agent tool
@@ -14,7 +15,7 @@ import { projectTrust } from "../security/projectTrust.js";
 export function createTaskToolDefinition(
   worktreeManager?: Pick<GitWorktreeManager, "allocateWorktree" | "releaseWorktree">,
 ): ToolDefinition {
-  return {
+  const tool: ToolDefinition = {
     name: "task",
     description:
       "Delegate a focused multi-step task and return its result. Optionally use a separate Git worktree.",
@@ -61,8 +62,15 @@ export function createTaskToolDefinition(
         return deniedResult("Error: isolation must be worktree or none.");
       }
       const requestedType = (typeof args.subagent_type === "string" ? args.subagent_type.trim() : "") || "general-purpose";
-      const loader = new SubagentLoader(context.workspaceRoot);
-      const subagentDef = loader.getSubagent(requestedType, !projectTrust.isProjectUntrusted(context.workspaceRoot));
+      const loader = new SubagentLoader(context.workspaceRoot, context.assertSourceAccess);
+      const trusted = () => !projectTrust.isProjectUntrusted(context.workspaceRoot);
+      const discovery = loader.discover(trusted());
+      const selected = discovery.effective.get(requestedType.toLowerCase());
+      if (!selected && !trusted()) return deniedResult('Unknown custom agent dispatch is refused in an untrusted workspace.');
+      if (selected && (!selected.definition || selected.definition.enabled === false)) return deniedResult('Agent is disabled or invalid; the task was not started.');
+      if (discovery.diagnostics.some(note => /unreadable|limit reached|unsafe path/.test(note))) return deniedResult('Agent discovery is incomplete; the task was not started.');
+      const subagentDef = selected?.definition;
+      const role = bindRole(loader, requestedType, subagentDef, trusted, context.abortSignal);
       const subtaskId = `task_${Math.random().toString(36).slice(2, 8).padEnd(6, "0")}`;
       const agentType = subagentDef?.name || requestedType;
       const contextStr = typeof args.context === "string" ? args.context.trim() : "";
@@ -89,13 +97,14 @@ export function createTaskToolDefinition(
           startAttempted = true;
           await defaultHookDispatcher.dispatch({ eventName: "SubagentStart", sessionId: context.taskId || subtaskId,
             workspaceRoot: context.workspaceRoot, timestamp: new Date().toISOString(), agentId: subtaskId, agentType });
+          const afterStart = role.admission(); if (afterStart) throw new Error(afterStart);
           let memoryContext = "";
           if (subagentDef?.memory) {
             const mem = new AgentMemoryManager(context.workspaceRoot).loadMemory(agentType, subagentDef.memory);
             if (mem.content) memoryContext = `[Agent Persistent Memory (${subagentDef.memory})]:\n${mem.content.slice(0, 1000)}`;
           }
           if (manager) {
-            const candidate = await manager.allocateWorktree(subtaskId, context.abortSignal);
+            const candidate = await manager.allocateWorktree(subtaskId, role.signal);
             if (!candidate.isIsolated || candidate.worktreePath === context.workspaceRoot) {
               throw new Error("An isolated worktree was not established; the subagent was not started.");
             }
@@ -105,21 +114,19 @@ export function createTaskToolDefinition(
               workspaceRoot: context.workspaceRoot, timestamp: new Date().toISOString(), subtaskId,
               worktreePath: allocated.worktreePath, branch: allocated.branch });
           }
-          if (context.abortSignal?.aborted) throw new Error("The task was cancelled before the subagent started.");
+          const refused = role.admission();
+          if (refused) throw new Error(refused);
+          if (role.signal.aborted) throw new Error("The task was cancelled before the subagent started.");
           mode = "not reported by runner";
           const result = await context.runSubagent({
-            definition: {
+            definition: subagentDef ?? {
               name: agentType, description,
-              systemPrompt: subagentDef?.systemPrompt ?? `You are ${agentType}, an autonomous subagent for: "${description}".`,
-              ...(subagentDef?.tools ? { tools: subagentDef.tools } : {}),
-              ...(subagentDef?.disallowedTools ? { disallowedTools: subagentDef.disallowedTools } : {}),
-              ...(subagentDef?.maxTurns !== undefined ? { maxTurns: subagentDef.maxTurns } : {}),
-              ...(subagentDef?.permissionMode ? { permissionMode: subagentDef.permissionMode } : {}),
-              source: subagentDef?.source ?? "builtin",
+              systemPrompt: `You are ${agentType}, an autonomous subagent for: "${description}".`,
+              source: "builtin",
             },
             prompt, ...(args.agentMode ? { agentMode: args.agentMode } : {}), workspace: effectiveWorkspace,
             ...(contextStr ? { context: contextStr } : {}), ...(memoryContext ? { memory: memoryContext } : {}),
-            ...(context.abortSignal ? { signal: context.abortSignal } : {}),
+            signal: role.signal, admission: role.admission,
           });
           subagentResponse = result.text;
           mode = result.agentMode === "plan" ? "PLAN (Read-Only)"
@@ -128,6 +135,7 @@ export function createTaskToolDefinition(
           stepsTaken = result.steps;
           if (result.failed) fail(result.failure || "the subagent failed");
           else if (!result.text.trim()) fail("the subagent returned no answer");
+          if (role.admission()) fail('Agent definition changed during the task; returned work is partial.');
         }
       } catch (error) {
         fail(reason(error));
@@ -154,12 +162,15 @@ export function createTaskToolDefinition(
               workspaceRoot: context.workspaceRoot, timestamp: new Date().toISOString(), agentId: subtaskId, agentType });
           } catch (error) { fail(`SubagentStop hook failed: ${reason(error)}`); }
         }
+        role.close();
       }
 
       const lines: string[] = [
         `# 🤖 Subagent Task ${subagentFailure ? "Failed" : "Completed"} (\`${subtaskId}\`)`, "",
         `- **Agent Type**: \`${agentType}\` (${subagentDef?.source || "dynamic"})`,
         `- **Description**: ${description}`, `- **Mode**: \`${mode}\``,
+        `- **Requested model**: ${subagentDef?.model ?? 'inherited from parent'}`,
+        `- **Requested effort**: ${subagentDef?.effort === null ? 'provider default' : subagentDef?.effort ?? 'inherited from parent'} (selected-model capability is checked at dispatch; unknown capability remains unverified)`,
         `- **Filesystem Isolation**: \`${allocated ? `Git Worktree (${effectiveWorkspace})` : shouldIsolate ? "not established" : "Shared Workspace"}\``,
         ...(release ? [`- **Worktree cleanup**: ${release.outcome}`] : []),
         ...(contextStr ? [`- **Context Attached**: ${contextStr}`] : []),
@@ -182,4 +193,22 @@ export function createTaskToolDefinition(
       return subagentFailure ? { success: false, error: lines.join("\n") } : approvedResult(lines.join("\n"));
     },
   };
+  return { ...tool, prepare: (args, context) => {
+    const name = (typeof args.subagent_type === 'string' ? args.subagent_type.trim() : '') || 'general-purpose';
+    const loader = new SubagentLoader(context.workspaceRoot, context.assertSourceAccess);
+    const trusted = !projectTrust.isProjectUntrusted(context.workspaceRoot);
+    const initial = loader.discover(trusted).effective.get(name.toLowerCase());
+    const identity = initial?.definition?.identity;
+    if (initial && (!initial.definition || initial.definition.enabled === false)) throw new Error('Agent is disabled or invalid; the task was not started.');
+    return { targets: [], permissionArgs: { ...args }, preview: `Delegate to ${name}; source=${initial?.source ?? 'dynamic'}; model=${initial?.definition?.model ?? 'inherit'}; effort=${initial?.definition?.effort === null ? 'auto' : initial?.definition?.effort ?? 'inherit'}. The selected definition identity is bound to this approval.`,
+      execute: async approved => {
+        const currentTrust = !projectTrust.isProjectUntrusted(context.workspaceRoot);
+        const current = loader.discover(currentTrust).effective.get(name.toLowerCase());
+        if (approved.workspaceRoot !== context.workspaceRoot || approved.sessionId !== context.sessionId || trusted !== currentTrust
+          || current?.definition?.identity !== identity || current && (!current.definition || current.definition.enabled === false)) {
+          return deniedResult('Agent definition or session changed after task approval; the task was not started.');
+        }
+        return tool.execute(args, approved);
+      } };
+  } };
 }

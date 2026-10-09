@@ -39,6 +39,7 @@ import { attachSubmissionQueue, isQueueControl, queueCommandFor } from '../runti
 import { tokenizeCommandArgs } from '../../core/commands/arguments.js';
 import { isPlanningControl, planningCommandFor } from '../runtime/planning.js';
 import { isSecurityControl, securityCommandFor } from '../runtime/security.js';
+import { isAgentsControl, agentsCommandFor } from '../runtime/agents.js';
 import { isExtensionControl, extensionCommandFor } from '../runtime/extensions.js';
 import { isAdvisorControl, advisorCommandFor } from '../runtime/advisor.js';
 import { isResearchControl, researchCommandFor } from '../runtime/research.js';
@@ -657,6 +658,23 @@ export class InteractiveMode {
           if (result.kind === 'local') this.state.transcript.append(textBlock('command', result.output, `/${match[1]}`));
           this.tui.requestRender();
         });
+      return;
+    }
+    if (isAgentsControl(text) && (this.busy || this.questions.question())) {
+      if (this.questions.question() || this.overlay.active) {
+        this.state.transcript.append(textBlock('command', 'Agent control refused while another approval or question is pending; answer it first.', '/agents'));
+        this.tui.requestRender(); return;
+      }
+      const context = this.options.runtimeContext;
+      void agentsCommandFor(context)(tokenizeCommandArgs(text.trim().replace(/^\/agents(?:\s|$)/i, '')), {
+        cwd: context.cwd, projectRoot: context.projectRoot, sessionId: context.session.id, interactive: true,
+      }).then(result => {
+        if (result.kind === 'local') this.state.transcript.append(textBlock('command', result.output, '/agents'));
+        this.tui.requestRender();
+      }, error => {
+        this.state.transcript.append(textBlock('error', error instanceof Error ? error.message : 'Agent control failed.'));
+        this.tui.requestRender();
+      });
       return;
     }
     if (isSecurityControl(text) && (this.busy || this.questions.question())) {

@@ -30,6 +30,7 @@ import { researchRunFor } from './research.js';
 import { cancelGitFor, gitFeatureTools } from './git.js';
 import { installGitCliRuntime } from './gitGate.js';
 import { installSecurityRuntime, cancelSecurityFor, securityFeatureTools } from './security.js';
+import { installAgentsRuntime } from './agents.js';
 import { installExtensionRuntime, cancelExtensionsFor, refreshExtensionsFor } from './extensions.js';
 import { gitRequestMode } from '../../workflow/git/operation/policy.js';
 import { goalObjectiveFor, goalPolicyFor, prepareGoalSession } from './goal.js';
@@ -578,6 +579,7 @@ export function createCliSessionRuntime(input: {
   goalScheduler = installGoalScheduler(input.runtimeContext, input.sessionManager, sessionRuntime, message => input.renderer.renderLine(message));
   const nativeGate = installGitCliRuntime(input, sessionRuntime, isStdinTty);
   installSecurityRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate);
+  installAgentsRuntime(input.runtimeContext, nativeGate);
   installExtensionRuntime(input.runtimeContext, sessionRuntime, nativeGate);
   return sessionRuntime;
 }

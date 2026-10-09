@@ -93,3 +93,20 @@ it('serializes planning controls in input order without waiting behind a held mo
     'start:/guided-goal show', 'end:/guided-goal show']);
   release(); await run;
 });
+it('dispatches parsed agent lifecycle controls in order while the ordinary turn is held', async () => {
+  const stdin = new PassThrough(); const seen: string[] = [];
+  let release!: () => void; let started!: () => void; let finishControls!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; }); const first = new Promise<void>(resolve => { started = resolve; });
+  const controls = new Promise<void>(resolve => { finishControls = resolve; });
+  const context = { session: { id: 'pipe', projectRoot: '/workspace' }, projectRoot: '/workspace' } as ShellRuntimeContext;
+  const run = runPromptInputStream({ stdin, runtimeContext: context, sessionRuntime: { waitForIdle: async () => {} } as ShellSessionRuntime,
+    renderer: { renderLine: () => {} } as never, logger: { info: () => {} } as never, runPrompt: async prompt => {
+      if (prompt === 'HELD') { started(); await held; return; }
+      seen.push(prompt); await new Promise<void>(resolve => setImmediate(resolve));
+      if (prompt === '/agents edit project review updated.md') finishControls();
+    } });
+  stdin.write('HELD\n'); await first;
+  stdin.write('/agents disable project review\n/agents edit project review updated.md\n'); await controls;
+  expect(seen).toEqual(['/agents disable project review', '/agents edit project review updated.md']);
+  release(); stdin.end(); await run;
+});

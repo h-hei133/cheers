@@ -158,7 +158,10 @@ async function executeTool(
       sessionId: options.sessionId,
       correlationId: options.correlationId,
       commandProof: options.commandProof,
-      assertSourceAccess: absolute => assertSourceAccess(absolute, options.workspaceRoot, options.workspaceRoots, options.permissionScope, options.denyRules),
+      assertSourceAccess: absolute => {
+        if (tool.name === 'task') preparationContext(tool.name, options).assertSourceAccess!(absolute);
+        else assertSourceAccess(absolute, options.workspaceRoot, options.workspaceRoots, options.permissionScope, options.denyRules);
+      },
       assertFileAccess: (absolutePath) => {
         if (preparation) { preparationContext(tool.name, options).assertFileAccess!(absolutePath); return; }
         const blocked = options.admission?.();

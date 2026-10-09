@@ -15,6 +15,10 @@ export interface SubagentDefinition {
   readonly tools?: readonly string[];
   readonly disallowedTools?: readonly string[];
   readonly model?: string;
+  readonly effort?: import('../models/effort.js').ThinkingPreference;
+  readonly enabled?: boolean;
+  /** Current discovered bytes and filesystem identity; never supplied by prompt text. */
+  readonly identity?: string;
   readonly permissionMode?: SubagentPermissionMode;
   readonly maxTurns?: number;
   readonly isolation?: SubagentIsolationMode;

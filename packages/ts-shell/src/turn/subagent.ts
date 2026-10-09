@@ -10,7 +10,7 @@ export interface SubagentHost {
   readonly step: StepFunction;
   readonly defaultMaxSteps: number;
   readonly retry?: AgentLoopConfig['retry'];
-  readonly stepForModel?: (model: string, admission?: () => string | undefined) => StepFunction | Promise<StepFunction>;
+  readonly stepForModel?: (model: string, admission?: () => string | undefined, effort?: import('../core/models/effort.js').ThinkingPreference) => StepFunction | Promise<StepFunction>;
 }
 
 /** Bind each delegated run to the parent's policies and its own narrower mode. */
@@ -30,11 +30,13 @@ export function createSubagentRunner(
       } catch { return { text: '', failed: true, failure: 'Read-only delegation admission refused.', steps: 0, allowedTools: [] }; }
     }
     let step: StepFunction | undefined;
-    try { step = input.definition.model ? await host.stepForModel?.(input.definition.model, input.admission) : host.step; }
+    try { step = input.definition.model || input.definition.effort !== undefined || input.admission && host.stepForModel
+      ? await host.stepForModel?.(input.definition.model ?? '', input.admission, input.definition.effort) : host.step; }
     catch { return { text: '', failed: true, failure: 'Requested delegated model is unavailable.', steps: 0, allowedTools: [] }; }
     if (!step) return { text: '', failed: true, failure: 'Requested delegated model is unavailable.', steps: 0, allowedTools: [] };
     const agentMode = subagentMode(parent.agentMode, input.definition.permissionMode, input.agentMode);
     const gate = { ...parent, workspaceRoot: input.workspace, agentMode,
+      admission: () => parent.admission?.() ?? input.admission?.(),
       workspaceRoots: input.workspace === parent.workspaceRoot ? parent.workspaceRoots : undefined };
     const hooks = createToolHooks(gate, tools);
     const result = await runSubagent(input, {

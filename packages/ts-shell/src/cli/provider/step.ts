@@ -97,11 +97,16 @@ export function createProviderStep(
 }
 
 /** Each explicit delegated model is resolved once; unavailable targets never use the main step. */
-export function delegatedSteps(request: ProviderStepHost, tools: ReadonlyMap<string, ToolDefinition>, context: SystemPromptContext) {
-  return (model: string, admission?: () => string | undefined): StepFunction => {
-    if (request.providerMode === 'synthetic') throw new Error('Independent model review is unavailable in synthetic provider mode.');
-    const resolution = delegatedTarget(model, request.providerCredentialResolution, request.runtimeConfig);
+export function delegatedSteps(request: ProviderStepHost, tools: ReadonlyMap<string, ToolDefinition>, context: SystemPromptContext, syntheticDefault?: StepFunction) {
+  return (model: string, admission?: () => string | undefined, effort?: ThinkingPreference): StepFunction => {
+    if (request.providerMode === 'synthetic') {
+      if (!model && effort === undefined && syntheticDefault) return syntheticDefault;
+      throw new Error('Independent model review is unavailable in synthetic provider mode.');
+    }
+    const resolution = model ? delegatedTarget(model, request.providerCredentialResolution, request.runtimeConfig) : request.providerCredentialResolution;
+    const admit = () => request.admission?.() ?? admission?.();
+    const requestPolicy = request.requestPolicy?.withAdmission?.(() => { const refusal = admit(); if (refusal) throw new Error(refusal); }) ?? request.requestPolicy;
     return createProviderStep({ ...request, providerCredentialResolution: resolution,
-      admission: () => request.admission?.() ?? admission?.() }, tools, context);
+      requestPolicy, admission: admit, ...(effort !== undefined ? { thinkingEffort: effort, thinkingEffortExplicit: true } : {}) }, tools, context);
   };
 }

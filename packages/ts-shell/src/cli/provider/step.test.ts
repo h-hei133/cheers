@@ -1,4 +1,6 @@
 import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createAdvisorHarness, cleanupAdvisorHarnesses } from '../../test-utils/advisor.js';
 import { createSubagentRunner } from '../../turn/subagent.js';
@@ -10,6 +12,9 @@ import { writeGoal, readGoalEdit } from '../../planning/goal/store.js';
 import { goalRequestPolicy } from '../../planning/goal/budget.js';
 import { decodeRequestLedger } from '../../core/agent/request/codec.js';
 import { readBoundSessionState } from '../../session/store/bound.js';
+import { createTaskToolDefinition } from '../../core/tools/taskTool.js';
+import { runTurn } from '../../turn/session.js';
+import { runAgentsCommand } from '../../core/subagents/command.js';
 
 const servers: http.Server[] = [];
 afterEach(async () => {
@@ -17,13 +22,18 @@ afterEach(async () => {
   cleanupAdvisorHarnesses();
 });
 
-async function wire(setup: ReturnType<typeof createAdvisorHarness>, status = 200) {
+async function wire(setup: ReturnType<typeof createAdvisorHarness>, status = 200, ordinary = false, held = false) {
   const received: Record<string, unknown>[] = [];
+  let onChild!: () => void; const childReceived = new Promise<void>(resolve => { onChild = resolve; });
   const server = http.createServer(async (request, response) => {
     const chunks: Buffer[] = []; for await (const chunk of request) chunks.push(Buffer.from(chunk));
-    received.push(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+    const body = JSON.parse(Buffer.concat(chunks).toString('utf8')); received.push(body);
+    if (body.model === 'review-model') { onChild(); if (held) return; }
+    const message = ordinary && body.model === 'primary-model' && received.length === 1 ? { role: 'assistant', content: '', tool_calls: [{ id: 'ordinary-task', type: 'function',
+      function: { name: 'task', arguments: JSON.stringify({ description: 'Role inspection', prompt: 'Inspect role evidence', subagent_type: 'review' }) } }] }
+      : { role: 'assistant', content: 'INDEPENDENT_ADVISOR_FINDING' };
     response.writeHead(status, { 'content-type': 'application/json' });
-    response.end(status === 200 ? JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'INDEPENDENT_ADVISOR_FINDING' }, finish_reason: 'stop' }],
+    response.end(status === 200 ? JSON.stringify({ choices: [{ message, finish_reason: 'stop' }],
       usage: { prompt_tokens: 4, completion_tokens: 1, total_tokens: 5 } }) : JSON.stringify({ error: { message: 'sk-synthetic-HTTP-BODY-MUST-NOT-PUBLISH' } }));
   });
   servers.push(server); await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -39,14 +49,65 @@ async function wire(setup: ReturnType<typeof createAdvisorHarness>, status = 200
     provider: 'openai', model: 'primary-model', baseUrl, expectedEnvVarName: 'OPENAI_API_KEY',
     credential: { provider: 'openai', authMode: 'api-key', apiKey: 'synthetic-wire-only', model: 'primary-model', baseUrl, source: 'cli', envVarName: 'OPENAI_API_KEY' } },
     workspaceRoot: setup.root, sessionId: setup.session.id, runtimeConfig: config,
-    providerCatalog: [{ id: 'openai', label: 'Isolated wire fixture', runtime: 'openai', auth: 'api-key', endpoint, baseUrl, models: [{ id: 'review-model', contextWindow: 10000, maxTokens: 10 }] }],
+    providerCatalog: [{ id: 'openai', label: 'Isolated wire fixture', runtime: 'openai', auth: 'api-key', endpoint, baseUrl, models: [
+      { id: 'review-model', contextWindow: 10000, maxTokens: 10, reasoning: true }, { id: 'primary-model', contextWindow: 10000, maxTokens: 10, reasoning: true },
+      { id: 'plain-model', contextWindow: 10000, maxTokens: 10, reasoning: false }] }],
     requestPolicy: goalRequestPolicy(setup.manager, setup.session), agentMode: 'build' };
   const main = vi.fn(async () => ({ text: 'WRONG_PARENT_STEP', toolCalls: [], stopReason: 'stop' as const }));
   const runner = createSubagentRunner({ step: main, stepForModel: delegatedSteps(request, new Map(), {}), defaultMaxSteps: 1,
     retry: { enabled: config.retryEnabled, maxRetries: config.retryMaxRetries } }, new Map(), {
     sessionId: setup.session.id, workspaceRoot: setup.root, agentMode: 'build', permissionScope: 'ask', hooks: new HookDispatcher(), emit: () => {} });
-  return { received, request, main, runner };
+  return { received, request, main, runner, childReceived };
 }
+
+function ordinaryTurn(setup: ReturnType<typeof createAdvisorHarness>, server: Awaited<ReturnType<typeof wire>>) {
+  const tools = new Map([['task', createTaskToolDefinition()]]);
+  const request = { ...server.request, thinkingEffort: 'low' as const, thinkingEffortExplicit: true };
+  const step = createProviderStep(request, tools, {}); const messages: string[] = [];
+  const turn = runTurn({ sessionId: setup.session.id, workspaceRoot: setup.root, agentMode: 'build', permissionScope: 'allow-all',
+    prompt: 'MAIN_CONTEXT_MARKER', history: [], onMessage: message => messages.push(String(message.content)), signal: setup.signal,
+    step, tools, hooks: new HookDispatcher(), maxSteps: 3, retry: { enabled: false, maxRetries: 0 },
+    subagentHost: { step, stepForModel: delegatedSteps(request, tools, {}), defaultMaxSteps: 1, retry: { enabled: false, maxRetries: 0 } } });
+  return { messages, finished: (async () => { for await (const _event of turn.events) { /* consume actual native turn */ } })() };
+}
+
+it('ordinary main task dispatch consumes fresh role prompt, model and effort on actual HTTP and the same ledger without changing main effort', async () => {
+  const setup = createAdvisorHarness(false, false); writeGoal(setup.manager, setup.session, readGoalEdit(setup.manager, setup.session), { type: 'set', objective: 'Ordinary roles' });
+  fs.mkdirSync(path.join(setup.root, '.agents'));
+  fs.writeFileSync(path.join(setup.root, '.agents', 'review.md'), '---\nname: review\ndescription: Inspect\nmodel: openai/review-model\neffort: high\ntools: []\nmaxTurns: 1\n---\nACTUAL_ROLE_PROMPT');
+  const server = await wire(setup, 200, true); await ordinaryTurn(setup, server).finished;
+  expect(server.received.map(body => [body.model, body.reasoning_effort])).toEqual([['primary-model', 'low'], ['review-model', 'high'], ['primary-model', 'low']]);
+  expect(JSON.stringify(server.received[1])).toContain('ACTUAL_ROLE_PROMPT'); expect(JSON.stringify(server.received[1])).not.toContain('MAIN_CONTEXT_MARKER');
+  const ledger = decodeRequestLedger(readBoundSessionState(setup.manager, setup.session).state.requestLedger)!;
+  expect(ledger.scopes[readGoalEdit(setup.manager, setup.session).goal!.id]).toMatchObject({ inputTokens: 12, outputTokens: 3, historyUnknown: false, pending: {} });
+});
+it('ordinary task disabled and known unsupported effort refuse before a child HTTP send', async () => {
+  const setup = createAdvisorHarness(false, false); fs.mkdirSync(path.join(setup.root, '.agents'));
+  const role = path.join(setup.root, '.agents', 'review.md');
+  fs.writeFileSync(role, '---\nname: review\ndescription: Inspect\nmodel: openai/review-model\neffort: high\nenabled: false\n---\nROLE');
+  const disabled = await wire(setup, 200, true); const result = ordinaryTurn(setup, disabled); await result.finished;
+  expect(disabled.received.map(body => body.model)).toEqual(['primary-model', 'primary-model']); expect(result.messages.join('\n')).toContain('disabled or invalid');
+  fs.writeFileSync(role, '---\nname: review\ndescription: Inspect\nmodel: openai/plain-model\neffort: high\n---\nROLE');
+  const unsupported = await wire(setup, 200, true); const refused = ordinaryTurn(setup, unsupported); await refused.finished;
+  expect(unsupported.received.map(body => body.model)).toEqual(['primary-model', 'primary-model']); expect(refused.messages.join('\n')).toContain('does not support this reasoning effort');
+});
+it('ordinary effort-only role keeps the exact parent model and changes only its own request effort', async () => {
+  const setup = createAdvisorHarness(false, false); fs.mkdirSync(path.join(setup.root, '.agents'));
+  fs.writeFileSync(path.join(setup.root, '.agents', 'review.md'), '---\nname: review\ndescription: Inspect\neffort: high\nmaxTurns: 1\n---\nEFFORT_ONLY_PROMPT');
+  const server = await wire(setup, 200, true); await ordinaryTurn(setup, server).finished;
+  expect(server.received.map(body => [body.model, body.reasoning_effort])).toEqual([['primary-model', 'low'], ['primary-model', 'high'], ['primary-model', 'low']]);
+  expect(JSON.stringify(server.received[1])).toContain('EFFORT_ONLY_PROMPT');
+});
+it('disable cancels a held actual ordinary-task child request within its bounded cleanup window', async () => {
+  const setup = createAdvisorHarness(false, false); fs.mkdirSync(path.join(setup.root, '.agents'));
+  fs.writeFileSync(path.join(setup.root, '.agents', 'review.md'), '---\nname: review\ndescription: Inspect\nmodel: openai/review-model\neffort: high\n---\nROLE');
+  const server = await wire(setup, 200, true, true); const running = ordinaryTurn(setup, server); await server.childReceived;
+  const output = await runAgentsCommand(['disable', 'project', 'review'], { root: setup.root, trusted: () => true, sourceAccess: () => {},
+    gate: () => ({ sessionId: setup.session.id, workspaceRoot: setup.root, agentMode: 'build', permissionScope: 'allow-all', hooks: new HookDispatcher(), emit: () => {} }) });
+  await running.finished;
+  expect(output.output).toContain('Affected live roles stopped'); expect(running.messages.join('\n')).toContain('aborted');
+  expect(server.received.filter(body => body.model === 'review-model')).toHaveLength(1);
+});
 
 it('sends actual different body.model with independent tool-free context, shares main goal usage and refuses a lowered cap without fallback', async () => {
   const setup = createAdvisorHarness(); writeGoal(setup.manager, setup.session, readGoalEdit(setup.manager, setup.session), { type: 'set', objective: 'Independent review' });

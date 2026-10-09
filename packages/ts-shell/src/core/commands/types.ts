@@ -42,6 +42,7 @@ export interface CommandContext {
   readonly researchCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly gitCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly securityCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
+  readonly agentsCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly worktreeCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly commitCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly cwd: string

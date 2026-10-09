@@ -18,6 +18,7 @@ import { attachInputQueue, isQueueControl } from '../runtime/inputQueue.js';
 import { SubmissionQueue } from './inputQueue.js';
 import { isPlanningControl } from '../runtime/planning.js';
 import { isSecurityControl } from '../runtime/security.js';
+import { isAgentsControl } from '../runtime/agents.js';
 import { isExtensionControl } from '../runtime/extensions.js';
 import { isAdvisorControl } from '../runtime/advisor.js';
 import { isResearchControl } from '../runtime/research.js';
@@ -123,10 +124,13 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
   input.prompt();
   input.on("line", (line) => {
     const text = line.trim();
+    if (isAgentsControl(text) && questions.question()) {
+      options.renderer.renderLine('Agent control refused while another approval or question is pending; answer it first.'); input.prompt(); return;
+    }
     // Serialise turns: readline delivers the next line as soon as it arrives,
     // and two concurrent turns would interleave their output and their session
     // writes.
-    if (isQueueControl(text) || (busy || questions.question()) && (isGoalControl(text) || isPlanningControl(text) || isAdvisorControl(text) || isSecurityControl(text) || isResearchControl(text) || isExtensionControl(text))) {
+    if (isQueueControl(text) || (busy || questions.question()) && (isGoalControl(text) || isPlanningControl(text) || isAdvisorControl(text) || isSecurityControl(text) || isAgentsControl(text) || isResearchControl(text) || isExtensionControl(text))) {
       void routeInteractiveCommand({ prompt: text, readline: questionInput, mcpGateway, sessionManager: options.sessionManager,
         runtimeContext: options.runtimeContext, renderer: options.renderer, sessionRuntime: options.sessionRuntime,
         logger: options.logger, approvalTrustPolicy: options.approvalTrustPolicy, turnNumber,

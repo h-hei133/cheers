@@ -449,7 +449,7 @@ async function startTurn(
     subagentHost: {
       step,
       defaultMaxSteps: SUBAGENT_DEFAULT_STEPS,
-      stepForModel: delegatedSteps(request, tools, promptContext),
+      stepForModel: delegatedSteps(request, tools, promptContext, step),
       retry: { enabled: request.runtimeConfig?.retryEnabled, maxRetries: request.runtimeConfig?.retryMaxRetries,
         baseDelayMs: request.runtimeConfig?.retryBaseDelayMs, maxDelayMs: request.runtimeConfig?.retryMaxDelayMs },
     },
