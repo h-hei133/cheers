@@ -581,7 +581,7 @@ export function createCliSessionRuntime(input: {
   const nativeGate = installGitCliRuntime(input, sessionRuntime, isStdinTty);
   installSecurityRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate);
   installAgentsRuntime(input.runtimeContext, nativeGate);
-  if (input.mcpGateway) installMcpRuntime(input.runtimeContext, input.mcpGateway, nativeGate);
+  if (input.mcpGateway) installMcpRuntime(input.runtimeContext, input.mcpGateway, nativeGate, url => input.renderer.renderLine(`Open this MCP sign-in URL in your browser:\n${url}`));
   installExtensionRuntime(input.runtimeContext, sessionRuntime, nativeGate);
   return sessionRuntime;
 }

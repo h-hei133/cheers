@@ -27,7 +27,7 @@ describe("a server on a transport this build does not implement", () => {
     // `connected` is not cosmetic: the gateway reads it to decide whether the
     // server is executable, so a wrong answer here reaches the user as
     // "executable=yes" for a server that cannot run anything.
-    for (const transport of ["http", "ws", "sdk"] as const) {
+    for (const transport of ["ws", "sdk"] as const) {
       await expect(client(transport).connect()).resolves.toMatchObject({
         type: "failed",
         name: "remote",
@@ -38,8 +38,8 @@ describe("a server on a transport this build does not implement", () => {
   it("names the transport and what is supported", async () => {
     // "not implemented" and "unknown transport" call for different fixes, so
     // the message has to say which one this is.
-    const state = await client("http").connect();
-    expect(state.type === "failed" && state.error).toContain("http");
+    const state = await client("ws").connect();
+    expect(state.type === "failed" && state.error).toContain("ws");
     expect(state.type === "failed" && state.error).toContain("stdio");
   });
 
@@ -47,7 +47,7 @@ describe("a server on a transport this build does not implement", () => {
     // The failure that matters most: a tool call answering "executed
     // successfully" when nothing was sent. A caller cannot detect it, and the
     // model would report work that never happened.
-    await expect(client("http").invokeTool("do_thing", { a: 1 })).rejects.toThrow(
+    await expect(client("ws").invokeTool("do_thing", { a: 1 })).rejects.toThrow(
       /does not implement/,
     );
   });
@@ -55,7 +55,7 @@ describe("a server on a transport this build does not implement", () => {
   it("classifies the refusal as a configuration problem", async () => {
     // The fix is in the user's file, so the failure belongs on the user-config
     // plane rather than looking like a server outage.
-    const error = await client("http")
+    const error = await client("ws")
       .invokeTool("do_thing", {})
       .then(() => undefined)
       .catch((caught: unknown) => caught);

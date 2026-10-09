@@ -16,7 +16,7 @@ export async function runMcpContentCommand(input: {
   if (input.mcpAction === "cancel") {
     if (!input.gateway.cancelContent) throw new Error("MCP content cancellation is unavailable in this host");
     input.gateway.cancelContent();
-    input.renderer.renderLine("MCP content cancellation requested; outstanding requests may still be settling.");
+    input.renderer.renderLine("MCP cancellation requested; outstanding requests may still be settling.");
     return true;
   }
   if (input.mcpAction === "notifications") {
@@ -47,7 +47,7 @@ export function isMcpContent(text: string): boolean {
 
 export function isMcpConfiguration(text: string): boolean {
   const parsed = parseMcpInput(text);
-  return Boolean(parsed?.ok && ["list", "show", "add", "edit", "remove", "enable", "disable"].includes(parsed.action.name));
+  return Boolean(parsed?.ok && ["list", "show", "add", "edit", "remove", "enable", "disable", 'auth', 'logout'].includes(parsed.action.name));
 }
 
 export function isMcpRequest(text: string): boolean { return isMcpContent(text) || isMcpConfiguration(text); }

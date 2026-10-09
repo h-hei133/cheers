@@ -18,7 +18,7 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { re
 function request(text: string) { return catalogRequest({ text, cursor: text.length, revision: 1 }); }
 
 describe("MCP server candidate positions", () => {
-  it.each(["/mcp show ", "/mcp test ", "/mcp reload ", "/mcp disable project ", "/mcp remove user ", "/mcp edit project "])("accepts new %s", text => {
+  it.each(["/mcp show ", "/mcp test ", "/mcp auth ", "/mcp logout ", "/mcp reload ", "/mcp disable project ", "/mcp remove user ", "/mcp edit project "])("accepts new %s", text => {
     expect(request(text)?.kind).toBe("mcp");
   });
   it.each(["/mcp add project new ", "/mcp edit user existing ", "/mcp add project completion-target ", "/mcp edit user completion-target "])("completes definition files for %s", text => {

@@ -3,6 +3,9 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { CallToolResultSchema, ListToolsResultSchema, ToolListChangedNotificationSchema, ResultSchema, ErrorCode, McpError, type Tool } from "@modelcontextprotocol/sdk/types.js";
 import { packageVersion } from "../version/current.js";
 import { McpStdioTransport } from "./stdio.js";
+import { McpHttpTransport } from './http/transport.js';
+import type { McpHttpAuthorization } from './http/fetch.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { McpToolCatalog } from "./catalog.js";
 import { projectMcpResult } from "./projection.js";
 import { McpContentChannel } from "./content/channel.js";
@@ -18,7 +21,7 @@ const MAX_TOOLS = 10_000;
 /** One standard MCP connection. Calls with unknown outcomes are never replayed. */
 export class CoreMcpClient {
   private client?: Client;
-  private transport?: McpStdioTransport;
+  private transport?: Transport;
   private opening?: Promise<McpConnectionState>;
   private connected = false;
   private closed = false;
@@ -35,6 +38,7 @@ export class CoreMcpClient {
     private readonly workspaceRoot: string = process.cwd(),
     private readonly timeoutMs: number = REQUEST_TIMEOUT_MS,
     private readonly changed?: () => void,
+    private readonly authorization?: McpHttpAuthorization,
   ) {}
 
   async connect(admission?: Admission, signal?: AbortSignal): Promise<McpConnectionState> {
@@ -42,9 +46,10 @@ export class CoreMcpClient {
     signal?.throwIfAborted();
     if (this.closed) return this.failed("MCP client is closed");
     if (this.config.enabled === false) return { type: "disabled", name: this.name, config: this.config };
-    if (this.config.authRequired) return { type: "needs-auth", name: this.name, config: this.config };
-    if (this.config.transport !== "stdio") return this.failed(this.unsupported());
-    if (!this.config.command) return this.failed("Missing stdio command");
+    if (this.config.authRequired && this.config.transport !== 'http') return { type: "needs-auth", name: this.name, config: this.config };
+    if (this.config.transport !== "stdio" && this.config.transport !== 'http') return this.failed(this.unsupported());
+    if (this.config.transport === 'stdio' && !this.config.command) return this.failed("Missing stdio command");
+    if (this.config.transport === 'http' && !this.config.url) return this.failed('Missing HTTP URL');
     if (this.connected) return { type: "connected", name: this.name, config: this.config };
     if (this.opening) return this.opening;
     this.opening = this.open(admission, signal);
@@ -62,7 +67,7 @@ export class CoreMcpClient {
     const client = new Client({ name: "cheers", version: packageVersion() ?? "unknown" }, {
       capabilities: {}, enforceStrictCapabilities: true,
     });
-    const transport = new McpStdioTransport({
+    const transport = this.config.transport === 'http' ? new McpHttpTransport(this.config, admission, this.authorization) : new McpStdioTransport({
       command: this.config.command!,
       args: this.config.args,
       env: this.config.env,
@@ -71,7 +76,12 @@ export class CoreMcpClient {
       maxBufferSize: 10 * 1024 * 1024,
     }, admission);
     // Draining avoids blocking the server; raw diagnostics may contain credentials.
-    transport.stderr?.on("data", () => {});
+    if (transport instanceof McpStdioTransport) transport.stderr?.on("data", () => {});
+    client.onerror = () => {
+      if (this.client !== client || !(transport instanceof McpHttpTransport)) return;
+      this.connected = false; this.catalogRevision++; this.listedTools = undefined; this.changed?.();
+      void transport.close().catch(() => {});
+    };
     client.onclose = () => {
       if (this.client !== client) return;
       this.connected = false;
@@ -98,9 +108,11 @@ export class CoreMcpClient {
     } catch (error) {
       await this.disposeTransport();
       if (signal?.aborted) throw signal.reason ?? error;
+      const failure = transport instanceof McpHttpTransport ? transport.failure ?? error : error;
+      if (failure instanceof McpClassifiedError && failure.failureClass === 'permission-denied') return { type: 'needs-auth', name: this.name, config: this.config };
       return this.failed(classifyMcpFailure({
         failureClass: "server-unavailable",
-        detail: error instanceof Error ? error.message : String(error),
+        detail: failure instanceof Error ? failure.message : String(failure),
       }).safeDetail);
     }
   }
@@ -241,7 +253,8 @@ export class CoreMcpClient {
     assertAdmission(admission);
     if (state.type !== "connected" || !this.client) {
       throw new McpClassifiedError(classifyMcpFailure({
-        failureClass: this.config.transport !== "stdio" || !this.config.command ? "config" : "server-unavailable",
+        failureClass: state.type === 'needs-auth' ? 'permission-denied' : !['stdio', 'http'].includes(this.config.transport)
+          || this.config.transport === 'stdio' && !this.config.command || this.config.transport === 'http' && !this.config.url ? 'config' : "server-unavailable",
         detail: state.type === "failed" ? state.error : "MCP server " + this.name + " is " + state.type,
       }));
     }
@@ -254,7 +267,7 @@ export class CoreMcpClient {
 
   private unsupported(): string {
     return "MCP server '" + this.name + "' is configured with transport '" + this.config.transport
-      + "', which this build does not implement (supported: stdio)";
+      + "', which this build does not implement (supported: stdio, http)";
   }
 }
 

@@ -7,7 +7,7 @@ import { NetworkError } from './error.js';
 import type { RequestScope } from './request.js';
 
 export interface PublicRequest {
-  readonly method?: 'GET' | 'POST';
+  readonly method?: 'GET' | 'POST' | 'DELETE';
   readonly headers?: Readonly<Record<string, string>>;
   readonly body?: string;
   readonly maxBytes: number;

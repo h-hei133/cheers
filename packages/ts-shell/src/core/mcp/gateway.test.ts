@@ -3,6 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CoreMcpClient } from "./client.js";
+import { parseSyntax } from '../commands/syntax/parse.js';
+import { mcpSyntax } from '../commands/mcp/syntax.js';
 import { McpConfigLoadError, loadMcpConfigs } from "./config.js";
 import {
   CoreMcpGateway,
@@ -327,7 +329,7 @@ describe("core MCP gateway (W3)", () => {
       gateway.invokeTool("localSdk", "search", {}),
     ).rejects.toMatchObject({
       blockerKind: "environment-not-ready",
-      doNext: "Authenticate server 'localSdk' and rerun /mcp refresh localSdk.",
+      doNext: 'Interactive MCP authentication is unavailable for transport \'sdk\'; use a supported transport before /mcp test -- "localSdk".',
     });
   });
 
@@ -388,7 +390,7 @@ describe("core MCP gateway (W3)", () => {
     expect(needsAuth).toMatchObject({
       executable: false,
       reason: "MCP server authServer requires authentication",
-      doNext: "Authenticate server 'authServer' and rerun /mcp refresh authServer.",
+      doNext: 'Run /mcp auth -- "authServer", then /mcp test -- "authServer".',
     });
 
     const failed = describeMcpConnectionState({
@@ -415,5 +417,13 @@ describe("core MCP gateway (W3)", () => {
       doNext:
         "Enable server 'disabledServer' in MCP config, then rerun /mcp refresh disabledServer.",
     });
+  });
+
+  it('gives usable authentication guidance for dash-leading HTTP names and distinguishes other transports', () => {
+    const state = { type: 'needs-auth' as const, name: '-server', config: { transport: 'http' as const, scope: 'project' as const } };
+    const guidance = describeMcpConnectionState(state).doNext;
+    expect(guidance).toBe('Run /mcp auth -- "-server", then /mcp test -- "-server".');
+    for (const action of ['auth', 'test']) expect(parseSyntax(mcpSyntax, [action, '--', '-server'])).toMatchObject({ ok: true, args: ['-server'] });
+    expect(describeMcpConnectionState({ ...state, config: { ...state.config, transport: 'stdio' } }).doNext).toContain("unavailable for transport 'stdio'");
   });
 });

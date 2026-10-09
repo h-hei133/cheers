@@ -180,7 +180,7 @@ function page(heading: string, detail: string): string {
     "</head><body><h1>",
     heading,
     "</h1><p>",
-    detail,
+    detail.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]!),
     "</p></body></html>",
   ].join("");
 }

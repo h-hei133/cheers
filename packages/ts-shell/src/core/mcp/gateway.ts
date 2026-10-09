@@ -7,6 +7,7 @@ import { projectTrust } from "../security/projectTrust.js";
 import { assertAdmission, type Admission } from '../network/admission.js';
 import type { McpContentRequest, McpContentResponse, McpNotificationSnapshot } from "./content/types.js";
 import { McpContentLifetime } from "./content/lifetime.js";
+import type { McpHttpAuthorization } from './http/fetch.js';
 import type {
   McpClientSnapshot,
   McpConnectionState,
@@ -22,14 +23,16 @@ import { describeMcpConnectionState, McpGatewayBlockedError, unknownServer, fail
 
 export class CoreMcpGateway {
   private workspaceRoot: string;
-  private readonly connectionManager = new CoreMcpConnectionManager();
+  private readonly connectionManager: CoreMcpConnectionManager;
   private queue: Promise<unknown> = Promise.resolve();
   private closed = false;
   private closing?: Promise<void>;
   private readonly contentLifetime = new McpContentLifetime();
 
-  constructor(private readonly root: string | (() => string), private readonly admissionForOperation?: () => Admission) {
+  constructor(private readonly root: string | (() => string), private readonly admissionForOperation?: () => Admission,
+    authorizationFor?: (name: string, config: ScopedMcpServerConfig) => McpHttpAuthorization | undefined) {
     this.workspaceRoot = typeof root === "string" ? root : root();
+    this.connectionManager = new CoreMcpConnectionManager(authorizationFor);
   }
 
   subscribe(changed: () => void): () => void {
@@ -67,10 +70,10 @@ export class CoreMcpGateway {
   }
 
   /** Revocation begins before queued work settles; config publication never starts discovery. */
-  async configurationChanged(): Promise<void> {
+  async configurationChanged(target?: string): Promise<void> {
     // Close only changed owners immediately, including a request holding the lane.
     // The normal admission fence rejects its late result without replay.
-    try { await this.connectionManager.reconcile(this.loadConfigs()); }
+    try { if (target) await this.connectionManager.close(target); await this.connectionManager.reconcile(this.loadConfigs()); }
     catch (error) { await this.connectionManager.close(); throw error; }
     await this.run(async () => { await this.prepare(); });
   }

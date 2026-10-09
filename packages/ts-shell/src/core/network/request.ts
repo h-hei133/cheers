@@ -4,6 +4,8 @@ export interface RequestScope {
   readonly signal: AbortSignal;
   check(): void;
   dispose(): void;
+  /** A protocol may own the body deadline after successful streaming headers. */
+  releaseDeadline(): void;
 }
 
 /** Stop waiting for non-cancellable operations without dispatching their late result. */
@@ -20,7 +22,7 @@ export async function withinRequest<T>(operation: Promise<T>, scope: RequestScop
 /** One deadline spans headers, redirects, body consumption and parsing. */
 export function requestScope(timeoutMs: number, parent?: AbortSignal): RequestScope {
   const controller = new AbortController();
-  const deadline = performance.now() + timeoutMs;
+  let deadline = performance.now() + timeoutMs;
   const cancel = (): void => controller.abort(new NetworkError('cancelled'));
   const timeout = (): void => controller.abort(new NetworkError('timeout'));
   parent?.addEventListener('abort', cancel, { once: true });
@@ -36,5 +38,6 @@ export function requestScope(timeoutMs: number, parent?: AbortSignal): RequestSc
       clearTimeout(timer);
       parent?.removeEventListener('abort', cancel);
     },
+    releaseDeadline() { clearTimeout(timer); deadline = Infinity; },
   };
 }

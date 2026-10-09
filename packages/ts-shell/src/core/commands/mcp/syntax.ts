@@ -13,6 +13,8 @@ export const mcpSyntax: CommandSyntax = {
     ...(["remove", "enable", "disable"] as const).map(name => ({ name, aliases: name === "remove" ? ["delete"] : undefined,
       summary: `${name} a scoped server definition`, parameters: scoped })),
     { name: "test", summary: "negotiate and discover exactly one server without calling tools", parameters: [{ ...target, required: true }] },
+    { name: 'auth', summary: 'explicit OAuth sign-in for one HTTP server', parameters: [{ ...target, required: true }] },
+    { name: 'logout', summary: 'remove this definition\'s local MCP credentials', parameters: [{ ...target, required: true }] },
     { name: "tools", summary: "list tools, optionally for one server", parameters: [target] },
     { name: "doctor", aliases: ["diagnose"], summary: "diagnose MCP state", parameters: [target] },
     { name: "refresh", aliases: ["reconnect", "reload"], summary: "reload definitions and refresh MCP connections", parameters: [target] },

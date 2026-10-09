@@ -6419,3 +6419,7 @@ ECO-04接通用户/项目角色CRUD/启停/模型/effort与普通task，审批�
 ### 2026-10-09 — Phase 19 ECO-05配置组件
 
 配置CRUD与启停override已通过普通批准/有界JSONC精确发布，save与连接测试分开，busy停用实际撤销变化连接且无重放。只读文件检查移入中性workspace owner；角色与配置沿同一publication/runner。独立code APPROVE、architecture CLEAR，最终26文件327项/149契约、Node20.3与exe构建、五静态门/43scripts、五有效反转及四模式实际CLI（80local结果/零模型POST）通过，详细边界与材料见[Phase19 §8.129](features/phase-19-decisions.md#8129-w11-eco-05受信范围配置与原生批准发布本地配置组件)。完整NormProof仍not_proven；HTTP/OAuth→W12–W16继续，完整目标未完成，用户.gitignore保留不提交。
+
+### 2026-10-09 — Phase 19 ECO-05 HTTP与显式OAuth
+
+共享网络/SDK接通Streamable HTTP，原生auth/logout批准、issuer/source身份、PKCE/state callback、私有CAS记录、先保存再刷新与无秘密撤销身份已闭环。独立原反例修复POST超时/立即下一请求、SSE错误续传和双向ID冲突，最终APPROVE/CLEAR；23文件291项、Node20.3/单文件构建、149契约、五静态门/43scripts、五有效反转/恢复8项及四终端72local commands零模型POST通过。actualCLI登录/重启/刷新/注销/取消/停用均有记录；公共账户与非Linux未推断通过。协议与材料见[Phase19 §8.130](features/phase-19-decisions.md#8130-w11-eco-05streamable-http与显式oauth本地认证组件)及features/mcp.md。完整NormProof容量待W16；ECO-05本地三组件完成，W12–W16及完整Phase19继续，精确commit/push/remote状态另记。

@@ -13,13 +13,14 @@ import {
 import { runMcpContentCommand } from "../cli/mcp/content.js";
 import type { McpContentRequest } from "../core/mcp/content/types.js";
 import { classifyUnknownMcpFailure } from "../core/mcp/errorTaxonomy.js";
+import { authorizationForMcp } from '../cli/mcp/auth/service.js';
 
 export type CliMcpAction = "status" | "tools" | "doctor" | "refresh" | "test" | "content" | "notifications" | "cancel";
 
 export type CliMcpGateway = Pick<CoreMcpGateway, "snapshot" | "refresh"> & Partial<Pick<CoreMcpGateway, "close" | "syncWorkspace" | "peekSnapshot" | "subscribe" | "content" | "notifications" | "cancelContent">>;
 
 export function createCliMcpGateway(cwd: string | (() => string), admissionForOperation?: () => () => string | undefined): CoreMcpGateway {
-  return new CoreMcpGateway(cwd, admissionForOperation);
+  return new CoreMcpGateway(cwd, admissionForOperation, authorizationForMcp);
 }
 
 export async function runCliMcpCommand(input: {

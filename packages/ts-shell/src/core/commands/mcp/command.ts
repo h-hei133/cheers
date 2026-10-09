@@ -8,7 +8,7 @@ export async function runMcpShellAction(args: string[], context: CommandContext)
   const parsed = parseSyntax(mcpSyntax, args);
   if (!parsed.ok) return { kind: "local", output: `Invalid /mcp arguments: ${parsed.reason}\n${syntaxHelp(mcpSyntax)}` };
   const mode = parsed.action.name;
-  if (["list", "show", "add", "edit", "remove", "enable", "disable"].includes(mode)) {
+  if (["list", "show", "add", "edit", "remove", "enable", "disable", 'auth', 'logout'].includes(mode)) {
     return context.mcpCommand ? context.mcpCommand(args, context) : { kind: "local", output: "MCP configuration management is unavailable in this host." };
   }
   if (mode === "test") return { kind: "shell-action", action: "show-mcp", mcpAction: "test", mcpTarget: parsed.args[0] };

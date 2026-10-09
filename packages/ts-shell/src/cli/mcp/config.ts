@@ -9,7 +9,7 @@ import type { ToolGateOptions } from '../../turn/tools.js';
 import type { LocalCommandResult } from '../../core/commands/types.js';
 import { parseSyntax } from '../../core/commands/syntax/parse.js';
 import { mcpSyntax } from '../../core/commands/mcp/syntax.js';
-import { evaluateToolPermissionScope } from '../../core/query/toolPolicy.js';
+import { checkTarget } from './policy.js';
 import { neutraliseForDisplay } from '../../core/text/safety.js';
 import { redactReportText } from '../../core/security/redaction.js';
 import { loadMcpConfigs, mcpConfigPath, readMcpDocument } from '../../core/mcp/config/document.js';
@@ -18,22 +18,15 @@ import type { McpConfigScope, ScopedMcpServerConfig } from '../../core/mcp/types
 
 export interface McpConfigHost {
   readonly root: string; readonly trusted: () => boolean; readonly gate: () => ToolGateOptions;
-  readonly sourceAccess: (absolute: string) => void; readonly changed: () => Promise<void>;
+  readonly sourceAccess: (absolute: string) => void; readonly changed: (target?: string) => Promise<void>;
   readonly signal?: AbortSignal;
+  readonly onAuthorizeUrl?: (url: string) => void;
 }
 
 function report(output: string, status = 'inspected', connection = 'not-tested'): LocalCommandResult {
   const safe = redactReportText(output, 48_000, { preserveLines: true }).split('\n').map(neutraliseForDisplay);
   return { kind: 'local', output: safe.join('\n'), report: { version: 1, title: 'MCP configuration', facts: { status, connection },
     lines: safe.map(text => ({ kind: 'text', spans: [{ text, role: 'text' }] })) } };
-}
-
-function checkTarget(target: string, options: ToolGateOptions, write = true): void {
-  const refused = options.admission?.(); if (refused) throw new Error(refused);
-  for (const name of write ? ['read', 'apply_patch', 'write', 'edit'] : ['read']) {
-    const decision = evaluateToolPermissionScope(name, { path: target }, options.permissionScope, options.workspaceRoot, options.denyRules);
-    if (decision.denied) throw new Error(decision.reason);
-  }
 }
 
 function summary(name: string, config: ScopedMcpServerConfig): string {

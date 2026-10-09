@@ -123,6 +123,17 @@ describe("the loopback callback", () => {
     await settled;
   });
 
+  it('renders a remote authorization error as text without executable markup', async () => {
+    const server = await startCallbackServer({ path: '/auth/callback', port: 0, expectedState: 's1', timeoutMs: 5_000, label: 'Test' });
+    const detail = '<script>alert("remote")</script>&';
+    const settled = expect(server.received).rejects.toThrow(detail);
+    const target = new URL(server.redirectUri); target.search = new URLSearchParams({ error: 'access_denied', error_description: detail, state: 's1' }).toString();
+    const response = await fetch(target); expect(response.status).toBe(400);
+    const text = await response.text(); expect(text).not.toContain('<script>');
+    expect(text).toContain('&lt;script&gt;alert(&quot;remote&quot;)&lt;/script&gt;&amp;');
+    await settled;
+  });
+
   it("gives up with a message naming where it was listening", async () => {
     const server = await startCallbackServer({
       path: "/auth/callback",
