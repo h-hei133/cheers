@@ -12,6 +12,7 @@ import { toolPoolFor } from "../cli/runtime/tools.js";
 import { goalCommandFor, goalPolicyFor } from '../cli/runtime/goal.js';
 import { handoffCommandFor } from '../cli/runtime/handoff.js';
 import { directorCommandFor } from '../cli/runtime/director.js';
+import { mediaCommandFor } from '../cli/runtime/media.js';
 import { evaluationCommandFor } from '../cli/runtime/evaluation.js';
 import { queueCommandFor } from '../cli/runtime/inputQueue.js';
 import { advisorCommandFor } from '../cli/runtime/advisor.js';
@@ -151,6 +152,7 @@ export async function runNonInteractivePrompt(options: {
     handoffCommand: handoffCommandFor(options.runtimeContext, options.sessionManager, options.sessionRuntime),
     directorCommand: directorCommandFor(options.runtimeContext),
     improveCommand: evaluationCommandFor(options.runtimeContext),
+    mediaCommand: mediaCommandFor(options.runtimeContext),
     jobsCommand: jobsCommandFor(options.runtimeContext),
     workflowCommand: workflowCommandFor(options.runtimeContext),
     extensionCommand: extensionCommandFor(options.runtimeContext),

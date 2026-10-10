@@ -34,6 +34,7 @@ export class TranscriptPane {
   private width = 80;
   private total = 0;
   private document: readonly Block[] | undefined;
+  sensitiveRows: readonly string[] = [];
 
   constructor(private readonly transcript: Transcript) {}
 
@@ -79,7 +80,9 @@ export class TranscriptPane {
     const marked = highlight
       ? shaded.map((row, index) => (index < filler ? row : highlight(row, top + index - filler)))
       : shaded;
-    return this.geometry ? paintScrollbar(marked, this.geometry, safeWidth) : marked;
+    const painted = this.geometry ? paintScrollbar(marked, this.geometry, safeWidth) : marked;
+    this.sensitiveRows = painted.filter((row, index) => row && this.blockAtScreenRow(index)?.kind === 'user');
+    return painted;
   }
 
   /** How far back the window is, in rows; 0 means it is following the newest. */

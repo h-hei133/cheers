@@ -44,6 +44,7 @@ import { isPlanningControl, planningCommandFor } from '../runtime/planning.js';
 import { handoffControl, handoffCommandFor } from '../runtime/handoff.js';
 import { directorControl, directorCommandFor, directorInterruptible } from '../runtime/director.js';
 import { evaluationCommandFor, evaluationInterruptible, cancelEvaluationFor, evaluationControl } from '../runtime/evaluation.js';
+import { mediaCommandFor, mediaControl, cancelMediaCommand, mediaInterruptible, excludeRecordingInput, recordingFrameProvider } from '../runtime/media.js';
 import { isSecurityControl, securityCommandFor } from '../runtime/security.js';
 import { isAgentsControl, agentsCommandFor } from '../runtime/agents.js';
 import { isCollaborationControl, runCollaborationControl } from '../collaboration/control.js';
@@ -261,6 +262,7 @@ export class InteractiveMode {
     // runner may settle during construction; completion notices must have a
     // valid storage target even in that narrow window.
     this.state = createViewState();
+    excludeRecordingInput(options.runtimeContext, () => this.stopped || Boolean(this.state.editor.getText() || this.questions.question() || this.overlay.active || this.pager.active || this.search.active));
     // Completion is a scoped local notice. Output does not become new user intent
     // or silently dispatch a model request; taskOutput exposes the retained facts.
     this.stopWatchingBackground = watchJobsFor(options.runtimeContext, (task) => {
@@ -352,7 +354,7 @@ export class InteractiveMode {
     this.options.setReadline?.(this.readline);
     this.options.setInteractiveApprovalPrompt?.((prompt) => promptApproval(prompt,
       { pager: this.pager, overlay: this.overlay, render: () => this.tui.requestRender() }));
-    this.tui.setFrameProvider(this.view);
+    this.tui.setFrameProvider(recordingFrameProvider(options.runtimeContext, this.view));
     this.state.editor.placeholder = DEFAULT_PLACEHOLDER;
     // A chip token deletes whole: the caret sits at its end, and one Backspace
     // removes the token — and with it the attachment — instead of half a symbol.
@@ -666,6 +668,15 @@ export class InteractiveMode {
       return;
     }
     const evaluation = evaluationControl(text);
+    const media = mediaControl(text);
+    if (media?.stop) this.queue.cancelWhere(value => new RegExp(`^/${media.name}(?:\\s|$)`, 'i').test(value.trim()));
+    if (media && (this.busy || this.questions.question())) {
+      if (media.stop) cancelMediaCommand(this.options.runtimeContext, media.name, media.args[0]?.toLowerCase() === 'stop' ? 'stopped' : 'cancelled');
+      const context = this.options.runtimeContext;
+      void mediaCommandFor(context)(media.name, media.args, { cwd: context.cwd, projectRoot: context.projectRoot, sessionId: context.session.id, interactive: true })
+        .then(result => { if (result.kind === 'local') this.state.transcript.append(textBlock('command', result.output, `/${media.name}`)); this.tui.requestRender(); });
+      return;
+    }
     if (evaluation === 'stop') { this.queue.cancelWhere(value => /^\/improve(?:\s|$)/i.test(value.trim())); cancelEvaluationFor(this.options.runtimeContext); }
     if (evaluation && (this.busy || this.questions.question())) {
       const context = this.options.runtimeContext;
@@ -1087,7 +1098,7 @@ export class InteractiveMode {
    */
   private async interrupt(): Promise<void> {
     if (!this.busy) {
-      if (schedulerForRuntime(this.options.sessionRuntime)?.ownerToken() || directorInterruptible(this.options.runtimeContext) || evaluationInterruptible(this.options.runtimeContext)) this.options.sessionRuntime.cancelCurrentRun();
+      if (schedulerForRuntime(this.options.sessionRuntime)?.ownerToken() || directorInterruptible(this.options.runtimeContext) || evaluationInterruptible(this.options.runtimeContext) || mediaInterruptible(this.options.runtimeContext)) this.options.sessionRuntime.cancelCurrentRun();
       return;
     }
     this.sink.markCancelling();

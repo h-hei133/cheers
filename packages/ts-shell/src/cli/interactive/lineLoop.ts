@@ -20,6 +20,7 @@ import { isPlanningControl } from '../runtime/planning.js';
 import { handoffControl } from '../runtime/handoff.js';
 import { directorControl } from '../runtime/director.js';
 import { evaluationControl, cancelEvaluationFor } from '../runtime/evaluation.js';
+import { mediaControl, cancelMediaCommand, excludeRecordingInput } from '../runtime/media.js';
 import { isSecurityControl } from '../runtime/security.js';
 import { isAgentsControl } from '../runtime/agents.js';
 import { isCollaborationControl, runCollaborationControl } from '../collaboration/control.js';
@@ -75,6 +76,7 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
   // All lines reach control routing before they can be consumed as question answers.
   const questions = new QuestionBridge({ ask: question => { options.renderer.renderLine(question); input.prompt(); }, settle: () => input.prompt() });
   const questionInput = questions.asReadline(() => input.close());
+  excludeRecordingInput(options.runtimeContext, () => Boolean(questions.question()));
   options.setReadline(questionInput);
 
   installInteractiveSignalHandlers({
@@ -135,6 +137,8 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
     const mcp = mcpControl(text);
     const ssh = sshControl(text);
     const evaluation = evaluationControl(text);
+    const media = mediaControl(text);
+    if (media?.stop) { queue.cancelWhere(value => new RegExp(`^/${media.name}(?:\\s|$)`, 'i').test(value.trim())); cancelMediaCommand(options.runtimeContext, media.name, media.args[0]?.toLowerCase() === 'stop' ? 'stopped' : 'cancelled'); }
     if (evaluation === 'stop') {
       queue.cancelWhere(value => /^\/improve(?:\s|$)/i.test(value.trim())); cancelEvaluationFor(options.runtimeContext);
     }
@@ -164,7 +168,7 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
     // Serialise turns: readline delivers the next line as soon as it arrives,
     // and two concurrent turns would interleave their output and their session
     // writes.
-    if (isQueueControl(text) || (busy || questions.question()) && (evaluation || isGoalControl(text) || isPlanningControl(text) || handoffControl(text) || directorControl(text) || isAdvisorControl(text) || isSecurityControl(text) || isAgentsControl(text) || isResearchControl(text) || isExtensionControl(text) || isMcpConfiguration(text))) {
+    if (isQueueControl(text) || (busy || questions.question()) && (media || evaluation || isGoalControl(text) || isPlanningControl(text) || handoffControl(text) || directorControl(text) || isAdvisorControl(text) || isSecurityControl(text) || isAgentsControl(text) || isResearchControl(text) || isExtensionControl(text) || isMcpConfiguration(text))) {
       void routeInteractiveCommand({ prompt: text, readline: questionInput, mcpGateway, sessionManager: options.sessionManager,
         runtimeContext: options.runtimeContext, renderer: options.renderer, sessionRuntime: options.sessionRuntime,
         logger: options.logger, approvalTrustPolicy: options.approvalTrustPolicy, turnNumber,

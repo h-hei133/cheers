@@ -6475,3 +6475,10 @@ SSH/父生命周期组件已提交/推送`e38c614986163be7d5ec6b817180760a237aa5
 ## 2026-10-10：W13 FLOW-03 固定评测与候选发布
 
 `/improve` 与主模型工具复用单一 ExecutionService、Linux只读分离命名空间、native patch/receipt/补偿、会话CAS和普通批准，完整 train/holdout 与guardrails通过后仍需最终复评和独立源文件写入批准。独立反例修复逐文件撤销、固定原评分器漂移、系统挂载暴露和管道停止排队，actualCLI修复仅评测会话被空会话清理误删。最终30TS freeze code APPROVE/architecture WATCH→综合COMMENT，保留主模型普通读取和适应性holdout/泛化限制；264组合/149契约/43scripts、五静态门、两种构建、8有效反转/恢复38项及六actualCLI+两条模型工具链（6合成POST）通过。完整NormProof仍8192-edge容量not_proven待W16，未宣称完整suite/远端CI通过。边界与材料见[固定评测文档](features/improve.md)、[Phase19 §8.138](features/phase-19-decisions.md#8138-w13-flow-03固定评测隔离候选与独立批准合入)及`.tmp/evaluation/acceptance.json`。FLOW-03本地完成，W14→W15→W16继续，Phase19全目标active；commit/push/精确远端事实另记，用户.gitignore保留不提交。
+
+
+FLOW-03 已提交/推送 `4d99ce4e0da73eaee9bab4ed08ad516b427ce95f`，远端同SHA；CI38060746520与Watch38060746519均付款/spending-limit导致零step failure，未计远端通过，材料 `.tmp/evaluation/delivery.json`。
+
+### 2026-10-10 — Phase 19 W14 实时语音与本地终端录制
+
+`/live`、`/record`接通公开Live协议、Linux native设备和实际终端输出，明确批准/选择/保留，复用执行/账目/session CAS/edit publication；半双工等长静音、final seconds与unknown token分别保留，safe text回放无控制执行。独立反例修复控制payload凭据、同尺寸外部edit删除、排队start取消、native device deny/cwd、提交输入重绘、ordinary stop语义及长回放撤销；media-only正常终止保留journal。39TS/35production最终freeze，无新增/增长ceiling；Node20.3组合181/最终媒体17、43scripts、两种构建、四静态门和四有效反转通过；六actualCLI共18合成POST验证实际批准/deny/PID死亡/输入隐私/resize/导出回放及restart零接管。独立code APPROVE、architecture WATCH→COMMENT，保留已披露录制时序/遗漏与jobs耦合。完整NormProof仍8192-edge容量not_proven待W16。详见[媒体文档](features/media.md)、[Phase19 §8.139](features/phase-19-decisions.md#8139-w14-media-0102显式实时语音与本地终端录制)及 `.tmp/media/acceptance.json`；真实设备/Live未验，commit/push/精确CI另记。W15→W16继续，Phase19全目标active，用户.gitignore保留不提交。

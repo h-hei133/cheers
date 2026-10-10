@@ -22,6 +22,7 @@ import { isPlanningStreamControl } from './planning.js';
 import { handoffControl } from './handoff.js';
 import { directorControl } from './director.js';
 import { evaluationControl, cancelEvaluationFor } from './evaluation.js';
+import { mediaControl, cancelMediaCommand, withoutRecordingInput } from './media.js';
 import { attachGoalSubmission, schedulerForRuntime } from './goalScheduling.js';
 
 export async function runPromptInputStream(options: {
@@ -75,7 +76,7 @@ export async function runPromptInputStream(options: {
   const dispatch = async (prompt: string): Promise<void> => {
     if (exitRequested) return;
     processedCount += 1;
-    options.renderer.renderLine(`${contextTag()} > ${prompt}`);
+    withoutRecordingInput(options.runtimeContext, () => options.renderer.renderLine(`${contextTag()} > ${prompt}`));
     const outcome = await options.runPrompt(prompt);
     if (outcome === 'exit') { exitRequested = true; pendingPrompt = null; queue.splice(0); stdinReader.close(); }
   };
@@ -96,6 +97,16 @@ export async function runPromptInputStream(options: {
     }).catch(error => options.renderer.renderLine(`Run failed: ${error instanceof Error ? error.message : 'runtime failure'}`));
   };
   const enqueuePrompt = (prompt: string): void => {
+    const media = mediaControl(prompt);
+    if (media) {
+      if (media.stop) {
+        queue.cancelWhere(value => new RegExp(`^/${media.name}(?:\\s|$)`, 'i').test(value.trim())); cancelMediaCommand(options.runtimeContext, media.name, media.args[0]?.toLowerCase() === 'stop' ? 'stopped' : 'cancelled');
+      }
+      pendingControls++;
+      localControlChain = localControlChain.then(() => dispatch(prompt))
+        .catch(() => options.renderer.renderLine('Media control is unavailable; inspect retained outcomes.'))
+        .finally(() => { pendingControls--; }); return;
+    }
     const evaluation = evaluationControl(prompt);
     if (evaluation) {
       if (evaluation === 'stop') {

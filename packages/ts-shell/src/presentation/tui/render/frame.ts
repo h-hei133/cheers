@@ -23,6 +23,8 @@ export interface TerminalFramePlan {
   readonly fullScreen?: boolean;
   /** Exactly the requested document or viewport rows, including the fixed tail. */
   readonly rows: readonly string[]
+  /** Rows containing user input, including wrapped/selected transcript echoes. */
+  readonly sensitiveRows?: readonly string[];
   /**
    * The bottom block that stays put when the surface is not the whole screen.
    *

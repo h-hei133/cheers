@@ -145,3 +145,18 @@ it('dispatches evaluation status and stop during a held check and cancels queued
   expect(dispatchedWhileHeld).toBe(true);
   expect(seen).toEqual(['/improve check', '/improve status', '/improve stop']);
 });
+it('stops media controls during a held turn and removes parameterized queued starts', async () => {
+  const stdin = new PassThrough(); const seen: string[] = [];
+  let started!: () => void; let release!: () => void; let stopped!: () => void;
+  const first = new Promise<void>(resolve => { started = resolve; }); const held = new Promise<void>(resolve => { release = resolve; });
+  const stop = new Promise<void>(resolve => { stopped = resolve; });
+  const context = { session: { id: 'pipe', projectRoot: '/workspace' }, projectRoot: '/workspace' } as ShellRuntimeContext;
+  const run = runPromptInputStream({ stdin, runtimeContext: context, sessionRuntime: { waitForIdle: async () => {} } as ShellSessionRuntime,
+    renderer: { renderLine: () => {} } as never, logger: { info: () => {} } as never, runPrompt: async prompt => {
+      seen.push(prompt); if (prompt === 'HELD') { started(); await held; }
+      if (prompt === '/record stop') { stopped(); release(); }
+    } });
+  stdin.write('HELD\n'); await first;
+  stdin.end('/record start pending.cast --retain keep\n/live start --seconds 10\n/live stop\n/record stop\n');
+  await stop; await run; expect(seen).toEqual(['HELD', '/live stop', '/record stop']);
+});

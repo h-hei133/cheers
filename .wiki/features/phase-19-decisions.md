@@ -2045,3 +2045,14 @@ actualCLI最终六条验收通过：Node20.3/单文件各regular+fullscreen+pipe
 - 最终 30TS/28production freeze `ba4dff05a5c525e4972579c279f79a4ce9c529a303074a60574c000f81c99746`；独立 code **APPROVE**、architecture **WATCH**，确定性综合 **COMMENT**，无未解决实现 blocker。WATCH 的保留边界：主模型仍可普通读取用户清单/评分器，反复汇总反馈允许适应性过拟合；固定样本改进不证明统计显著性、普遍质量或绝对检测硬编码答案。报告 `.tmp/evaluation/{code-review/review.md,architecture-review/final.md}`；两个 lane 以相同最终 hash 审查，失败的旧委派不计批准。
 - Node20.3 最终受影响组合 12 文件/264 项、149 result-contract、43 scripts、import/config/declaration/node-floor/strict-docs 门与 Node/单文件构建通过。Node/可执行程序 × regular/fullscreen/pipe 六条 actualCLI 验证独立批准、拒绝、最终复评、源保留、即时停止及正常退出后零接管；两条 fullscreen actual 模型工具链共 6 个合成 POST，native candidate patch→check→原会话快照→保留重启通过。材料 `.tmp/evaluation/acceptance.json` 与对应 CLI/reversal 目录；没有真实 provider 凭据访问或质量推断。运行器的既有 MaxListeners warning 未当成测试失败或功能证明。
 - 完整 NormProof 实际 exit2/not_proven，完整图仍超 8192-edge collector 容量并缺阻断 unresolved-specifier 证据；材料 `.tmp/evaluation/normproof-out`，没有缩图/豁免/称通过，W16负责。当前支持 Linux+bwrap；Node20.3 已验收，Bun/其他平台尚未证明；每轮 60 秒、每进程 10 秒，清单64KiB/文件1MiB/总8MiB/样本32/重复1–3/轮次3–16/保留8/状态16MiB。详见 [固定评测文档](improve.md)。FLOW-03 本地交付完成，W14→W15→W16按序继续，Phase19全目标active；commit/push/精确远端事实另记，用户.gitignore原SHA保留不提交。
+
+
+FLOW-03 已提交/推送 `4d99ce4e0da73eaee9bab4ed08ad516b427ce95f` 并读回远端同 SHA。精确 CI38060746520/job114238328306 和 Architecture Watch38060746519/job114238328604 均 completed/failure、steps=[]；annotations确认账号付款/spending-limit阻止job启动，没有远端验证通过。材料 `.tmp/evaluation/delivery.json`。
+
+### 8.139 W14 MEDIA-01/02：显式实时语音与本地终端录制
+
+- `/live` 与 `/record` 由 `media/live`、`media/record` 持有协议/设备/格式/写入和安全回放，CLI注入会话、普通批准、请求账本及实际终端输出；复用唯一ExecutionService、session CAS和edit publication，没有静默模型媒体工具。完整范围见[媒体文档](media.md)。
+- 定向公开Live文档及参考控制器/录制实现后，采用固定公开协议、Linux成熟ALSA程序、session.started之后捕获、半双工等长静音、明确选择user片段进入普通提示；不推断completed turn，不以秒数伪造tokens。仅session.closed确认final seconds；token cap在发送前拒绝，未知token历史保留，无自动重连/重启接管。
+- 录制实际stdout/stderr和resize，显式新目的地/mode600/keep或discard，经普通批准；whole-line/control-payload凭据过滤，neutral敏感行保留提交后输入来源。safe text回放不发控制/执行命令；取消丢尾行且incomplete，ordinary stop flush脱敏尾行。discard绑定自有摘要/mtime/ctime，外部同尺寸编辑保留unknown；footer/fsync/close/journal失败不假称成功。空媒体会话正常终止保留journal。
+- 最终39TS/35production freeze `cabcf157319e7ebcbe0b3c69ec11c8354698773af0c83769739f5cf4363beb63`，新模块最多16声明，无新增/增长ceiling违规。Node20.3受影响组合15文件/181项、最终媒体17项、43scripts、TS/单文件构建与import/config/declaration/node-floor门通过；四项有效隔离反转均实际AssertionError。独立code APPROVE、architecture WATCH→综合COMMENT；无未解决blocker，WATCH保留明确披露的行完成时序/stream重排、整帧隐私排除造成输出遗漏及jobs admission耦合。
+- 六条actualCLI（Node20.3/executable × regular/fullscreen/pipe）共18合成POST/exit0，独立拒绝零发送/零文件、真实native PID死亡、转写选择普通query/write另批、任意输入提交/resize重绘排除、导出回放discard、断流unknown及重启零接管实际读回。材料 `.tmp/media/acceptance.json`、两份独立review和reversal.json。完整NormProof实际exit2/not_proven，完整图超8192-edge collector且缺阻断unresolved-specifier证据，W16修复；不缩图/豁免。没有真实硬件/Live或非Linux证明。W14本地完成，W15→W16按序继续，Phase19全目标active；提交/推送/精确CI另记，用户.gitignore原SHA保留不提交。

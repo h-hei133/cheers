@@ -34,6 +34,7 @@ export type CommandKind = 'local' | 'prompt' | 'shell-action'
 export interface CommandContext {
   readonly handoffCommand?: (args: string[], context: CommandContext) => Promise<LocalCommandResult>;
   readonly directorCommand?: (args: string[], context: CommandContext) => Promise<LocalCommandResult>;
+  readonly mediaCommand?: (name: 'live' | 'record', args: string[], context: CommandContext) => Promise<CommandExecutionResult>;
   readonly improveCommand?: (args: string[], context: CommandContext) => Promise<LocalCommandResult>;
   readonly jobsCommand?: (name: 'jobs' | 'hub', args: string[], context: CommandContext) => Promise<LocalCommandResult>;
   readonly workflowCommand?: (args: string[], context: CommandContext) => Promise<LocalCommandResult>;

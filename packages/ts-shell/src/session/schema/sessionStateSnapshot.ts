@@ -36,6 +36,9 @@ export interface SessionStateSnapshot {
   directors?: unknown;
   /** The evaluation owner validates frozen inputs, comparable rounds and approved publication. */
   evaluations?: unknown;
+  /** Media owners validate capture lifetimes and retained local recording evidence. */
+  live?: unknown;
+  recordings?: unknown;
   gitWorkflow?: unknown;
   security?: unknown;
   /** The request owner validates durable reservations, metering and replay protection. */
@@ -98,6 +101,8 @@ export function buildSessionStateSnapshot(
     handoffs: current?.handoffs,
     directors: current?.directors,
     evaluations: current?.evaluations,
+    live: current?.live,
+    recordings: current?.recordings,
     gitWorkflow: current?.gitWorkflow,
     security: current?.security,
     requestLedger: current?.requestLedger,

@@ -18,6 +18,7 @@ import { sshCommandFor } from '../runtime/ssh.js';
 import { jobsCommandFor, workflowCommandFor } from '../runtime/jobs.js';
 import { handoffCommandFor } from '../runtime/handoff.js';
 import { directorCommandFor } from '../runtime/director.js';
+import { mediaCommandFor } from '../runtime/media.js';
 import { evaluationCommandFor } from '../runtime/evaluation.js';
 import { extensionCommandFor } from '../runtime/extensions.js';
 import { planningCommandFor } from '../runtime/planning.js';
@@ -150,6 +151,7 @@ export async function routeInteractiveCommand(
     handoffCommand: handoffCommandFor(input.runtimeContext, input.sessionManager, input.sessionRuntime),
     directorCommand: directorCommandFor(input.runtimeContext),
     improveCommand: evaluationCommandFor(input.runtimeContext),
+    mediaCommand: mediaCommandFor(input.runtimeContext),
     jobsCommand: jobsCommandFor(input.runtimeContext),
     workflowCommand: workflowCommandFor(input.runtimeContext),
     extensionCommand: extensionCommandFor(input.runtimeContext),

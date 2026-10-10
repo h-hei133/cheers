@@ -2,6 +2,7 @@ import { createCliShutdown } from "../runtime/shutdown.js";
 import { cancelGoalRunForShutdown } from '../runtime/goalScheduling.js';
 import { closeCollaborationFor } from '../runtime/collaboration.js';
 import { closeSshFor } from '../runtime/ssh.js';
+import { installMediaSurface, closeMediaFor } from '../runtime/media.js';
 import { closeJobsFor } from '../runtime/jobs.js';
 import { closeDirectorFor } from '../runtime/director.js';
 import { runCollaborationServiceMode } from '../collaboration/service.js';
@@ -109,6 +110,7 @@ export async function runCliProcess(
     recoveryCandidate,
     runtimeContext,
   } = bootstrapRuntime;
+  installMediaSurface(runtimeContext, input.process.stdout, input.process.stderr);
   const providerRuntimeBridge = createCliProviderRuntimeBridge({
     runtimeConfig: () => runtimeContext.runtimeConfig,
     options,
@@ -136,6 +138,7 @@ export async function runCliProcess(
   const shutdown = createCliShutdown({
     close: async () => {
       await cancelRun?.();
+      await closeMediaFor(runtimeContext);
       await closeDirectorFor(runtimeContext);
       await closeJobsFor(runtimeContext);
       await closeSshFor(runtimeContext);

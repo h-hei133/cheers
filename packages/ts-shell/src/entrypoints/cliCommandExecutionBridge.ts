@@ -49,6 +49,7 @@ export type CliCommandExecution =
 export interface BuildCliCommandExecutionInput {
   readonly handoffCommand?: CommandContext['handoffCommand'];
   readonly directorCommand?: CommandContext['directorCommand'];
+  readonly mediaCommand?: CommandContext['mediaCommand'];
   readonly improveCommand?: CommandContext['improveCommand'];
   readonly jobsCommand?: CommandContext['jobsCommand'];
   readonly workflowCommand?: CommandContext['workflowCommand'];
@@ -174,6 +175,7 @@ export async function buildCliCommandExecution(
     handoffCommand: input.handoffCommand,
     directorCommand: input.directorCommand,
     improveCommand: input.improveCommand,
+    mediaCommand: input.mediaCommand,
     jobsCommand: input.jobsCommand,
     workflowCommand: input.workflowCommand,
     worktreeCommand: input.worktreeCommand,

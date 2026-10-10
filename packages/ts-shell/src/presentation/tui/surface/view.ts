@@ -106,6 +106,7 @@ export class InteractiveSurface implements InteractiveView {
     return {
       documentId: this.transcript.all(),
       rows: [...transcriptRows, ...chrome.rows],
+      sensitiveRows: this.pane.sensitiveRows,
       chromeRows: chrome.rows,
     };
   }

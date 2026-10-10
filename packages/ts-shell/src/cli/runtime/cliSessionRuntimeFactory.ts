@@ -33,6 +33,7 @@ import { installCollaborationRuntime } from './collaboration.js';
 import { installSshRuntime, sshFeatureTools, cancelSshFor } from './ssh.js';
 import { installJobsRuntime, jobsRunnerFor } from './jobs.js';
 import { directorRunFor, cancelDirectorFor } from './director.js';
+import { cancelMediaFor } from './media.js';
 import { evaluationFeatureTools, cancelEvaluationFor } from './evaluation.js';
 import { admitCollaborationPrompt, settleCollaborationPrompt } from '../collaboration/acceptance.js';
 import { collaborationAdmissionFor } from '../collaboration/policy.js';
@@ -203,7 +204,7 @@ export function createCliSessionRuntime(input: {
   const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
     admitPrompt: admitCollaborationPrompt.bind(undefined, input.runtimeContext),
     promptSettled: handoffSettlement(input.runtimeContext, settleCollaborationPrompt.bind(undefined, input.runtimeContext)),
-    onCancelRequested: () => { goalScheduler?.interrupt(); cancelDirectorFor(input.runtimeContext); cancelEvaluationFor(input.runtimeContext); cancelGitFor(input.runtimeContext); cancelSecurityFor(input.runtimeContext); cancelExtensionsFor(input.runtimeContext); cancelMcpFor(input.runtimeContext); cancelSshFor(input.runtimeContext); input.mcpGateway?.cancelContent(); },
+    onCancelRequested: () => { goalScheduler?.interrupt(); cancelDirectorFor(input.runtimeContext); cancelEvaluationFor(input.runtimeContext); cancelMediaFor(input.runtimeContext); cancelGitFor(input.runtimeContext); cancelSecurityFor(input.runtimeContext); cancelExtensionsFor(input.runtimeContext); cancelMcpFor(input.runtimeContext); cancelSshFor(input.runtimeContext); input.mcpGateway?.cancelContent(); },
     configuredAgentMode: () => input.runtimeContext.runtimeConfig.agentMode,
     sessionManager: input.sessionManager,
     renderer: input.renderer,
