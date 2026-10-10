@@ -63,6 +63,8 @@ export interface SandboxPlan {
 const CONFIG_NAME = "sandbox.json";
 /** Paths never exposed, regardless of configuration. */
 const ALWAYS_HIDDEN = [".ssh", ".aws", ".gnupg", ".private-agents-real"];
+/** System paths exposed to isolated commands for interpreters and their libraries. */
+export const sandboxSystemReadRoots = ["/usr", "/bin", "/lib", "/lib64", "/etc", "/opt"] as const;
 
 /**
  * The rules in force for `workspaceRoot`.
@@ -287,7 +289,7 @@ function bwrapArgs(
 ): string[] {
   const args = ["--die-with-parent", "--new-session", "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp"];
   if (isolateProcesses) args.push('--unshare-pid');
-  for (const readable of ["/usr", "/bin", "/lib", "/lib64", "/etc", "/opt", ...(rules.filesystem?.allowRead ?? [])]) {
+  for (const readable of [...sandboxSystemReadRoots, ...(rules.filesystem?.allowRead ?? [])]) {
     if (fs.existsSync(readable)) args.push("--ro-bind", readable, readable);
   }
   args.push("--bind", workspaceRoot, workspaceRoot);

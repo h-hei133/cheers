@@ -43,6 +43,7 @@ import { tokenizeCommandArgs } from '../../core/commands/arguments.js';
 import { isPlanningControl, planningCommandFor } from '../runtime/planning.js';
 import { handoffControl, handoffCommandFor } from '../runtime/handoff.js';
 import { directorControl, directorCommandFor, directorInterruptible } from '../runtime/director.js';
+import { evaluationCommandFor, evaluationInterruptible, cancelEvaluationFor, evaluationControl } from '../runtime/evaluation.js';
 import { isSecurityControl, securityCommandFor } from '../runtime/security.js';
 import { isAgentsControl, agentsCommandFor } from '../runtime/agents.js';
 import { isCollaborationControl, runCollaborationControl } from '../collaboration/control.js';
@@ -664,6 +665,15 @@ export class InteractiveMode {
       });
       return;
     }
+    const evaluation = evaluationControl(text);
+    if (evaluation === 'stop') { this.queue.cancelWhere(value => /^\/improve(?:\s|$)/i.test(value.trim())); cancelEvaluationFor(this.options.runtimeContext); }
+    if (evaluation && (this.busy || this.questions.question())) {
+      const context = this.options.runtimeContext;
+      void evaluationCommandFor(context)(tokenizeCommandArgs(text.trim().replace(/^\/improve\s*/i, '')), {
+        cwd: context.cwd, projectRoot: context.projectRoot, sessionId: context.session.id, interactive: true,
+      }).then(result => { this.state.transcript.append(textBlock('command', result.output, '/improve')); this.tui.requestRender(); });
+      return;
+    }
     if (directorControl(text) && (this.busy || this.questions.question())) {
       if (this.questions.question() && !/^\/director(?:\s+(?:status|off|show|output)(?:\s|$)|\s*$)/i.test(text.trim())) {
         this.state.transcript.append(textBlock('command', 'Director assignment waits for the pending approval or question.', '/director'));
@@ -1077,7 +1087,7 @@ export class InteractiveMode {
    */
   private async interrupt(): Promise<void> {
     if (!this.busy) {
-      if (schedulerForRuntime(this.options.sessionRuntime)?.ownerToken() || directorInterruptible(this.options.runtimeContext)) this.options.sessionRuntime.cancelCurrentRun();
+      if (schedulerForRuntime(this.options.sessionRuntime)?.ownerToken() || directorInterruptible(this.options.runtimeContext) || evaluationInterruptible(this.options.runtimeContext)) this.options.sessionRuntime.cancelCurrentRun();
       return;
     }
     this.sink.markCancelling();

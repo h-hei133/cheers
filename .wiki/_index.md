@@ -26,6 +26,7 @@ Last updated: 2026-10-10
 - [Session-owned local jobs and hub](features/jobs.md)
 - [One-turn model handoff](features/handoff.md)
 - [Persistent worker coordination](features/director.md)
+- [Fixed evaluator improvement workflow](features/improve.md)
 - [Feature and defect register](features/13-feature-and-defect-register.md)
 - [All Sources](raw/_index.md)
 - [Concepts](wiki/concepts/_index.md)

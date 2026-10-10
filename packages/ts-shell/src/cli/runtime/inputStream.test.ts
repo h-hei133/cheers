@@ -126,3 +126,22 @@ it('cancels earlier queued MCP configuration controls and retains later explicit
   expect(seen).toEqual(['/plan show', '/mcp cancel', '/mcp enable project later']);
   expect(lines).toContain('Queued MCP configuration command cancelled before dispatch.');
 });
+it('dispatches evaluation status and stop during a held check and cancels queued evaluation edits', async () => {
+  const stdin = new PassThrough(); const seen: string[] = [];
+  let started!: () => void; let release!: () => void; let stopped!: () => void;
+  const first = new Promise<void>(resolve => { started = resolve; }); const held = new Promise<void>(resolve => { release = resolve; });
+  const stop = new Promise<void>(resolve => { stopped = resolve; });
+  const context = { session: { id: 'pipe', projectRoot: '/workspace' }, projectRoot: '/workspace' } as ShellRuntimeContext;
+  const run = runPromptInputStream({ stdin, runtimeContext: context, sessionRuntime: { waitForIdle: async () => {} } as ShellSessionRuntime,
+    renderer: { renderLine: () => {} } as never, logger: { info: () => {} } as never, runPrompt: async prompt => {
+      seen.push(prompt);
+      if (prompt === '/improve check') { started(); await held; }
+      if (prompt === '/improve stop') { stopped(); release(); }
+    } });
+  stdin.write('/improve check\n'); await first;
+  stdin.end('/improve patch pending.patch\n/improve status\n/improve stop\n');
+  await Promise.race([stop, new Promise(resolve => setTimeout(resolve, 250))]);
+  const dispatchedWhileHeld = seen.includes('/improve stop'); release(); await run;
+  expect(dispatchedWhileHeld).toBe(true);
+  expect(seen).toEqual(['/improve check', '/improve status', '/improve stop']);
+});

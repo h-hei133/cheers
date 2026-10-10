@@ -21,6 +21,7 @@ import { isResearchControl } from './research.js';
 import { isPlanningStreamControl } from './planning.js';
 import { handoffControl } from './handoff.js';
 import { directorControl } from './director.js';
+import { evaluationControl, cancelEvaluationFor } from './evaluation.js';
 import { attachGoalSubmission, schedulerForRuntime } from './goalScheduling.js';
 
 export async function runPromptInputStream(options: {
@@ -95,6 +96,16 @@ export async function runPromptInputStream(options: {
     }).catch(error => options.renderer.renderLine(`Run failed: ${error instanceof Error ? error.message : 'runtime failure'}`));
   };
   const enqueuePrompt = (prompt: string): void => {
+    const evaluation = evaluationControl(prompt);
+    if (evaluation) {
+      if (evaluation === 'stop') {
+        queue.cancelWhere(value => /^\/improve(?:\s|$)/i.test(value.trim())); cancelEvaluationFor(options.runtimeContext);
+      }
+      pendingControls++;
+      localControlChain = localControlChain.then(() => dispatch(prompt))
+        .catch(() => options.renderer.renderLine('Evaluation control is unavailable; inspect retained outcomes.'))
+        .finally(() => { pendingControls--; }); return;
+    }
     const cancellingContent = mcpControl(prompt)?.action === 'cancel';
     const ssh = sshControl(prompt);
     if (ssh && ['status', 'jobs', 'cancel-pending', 'disconnect'].includes(ssh.action)) {

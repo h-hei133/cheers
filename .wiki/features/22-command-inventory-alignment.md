@@ -284,7 +284,7 @@ refNoToken = ref.filter(command => intersection(token(command), oursTokens).size
 | 39 | skillful | 增强技能注入策略 | 控制 session 技能目录提示注入，显示实际状态并可恢复；不卸载技能或改变执行权限。 | PAR-03 |
 | 40 | extended-context | 新增窗口选择 | 仅暴露 Provider/模型支持的窗口，检查请求限制/预算/费用，保留压缩策略，不任意翻倍元数据。 | PAR-03 |
 | 41 | computer | 新增受控桌面交互 | 平台适配、屏幕/窗口范围、敏感动作审批、取消及回执；与 browser 分域，无适配器明确 unavailable。 | TOOL-05 |
-| 42 | ratchet | 新增评测优化流 | 固定 evaluator/基线/保留集、修改范围和预算；保存每轮证据、防指标投机，未达阈值不报成功。 | FLOW-03 |
+| 42 | ratchet | 接通 `/improve` 固定评测迭代 | 冻结基线/指标/训练及保留集；分离候选与评分器的隔离进程；有界候选补丁、完整配对评分、最终复评后单独批准精确合入。边界见 [improve](improve.md)。 | FLOW-03 |
 | 43 | prewalk | 新增单次模型交接 | 参考是 @default 规划后在下一次 edit/write（todo-gated）交给 @smol，不是廉价先研；Cheers 明确触发/快照/接管/回退，一次性状态及用量可追踪。 | FLOW-02 |
 | 44 | modelpreset | 新增模型预设 | 保存角色模型/思考等级和作用域，应用前整体验证，失败无半更新，恢复一致。 | PAR-03 |
 | 45 | jobs | 增强后台任务视图 | 真实 ID/状态/输出/取消/预算；DAG、普通后台工具和子代理保留类型，不能互相冒充。 | FLOW-01 |

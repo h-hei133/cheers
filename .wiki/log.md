@@ -6468,3 +6468,10 @@ SSH/父生命周期组件已提交/推送`e38c614986163be7d5ec6b817180760a237aa5
 ### 2026-10-10 — Phase 19 W13 持久 worker 编排
 
 `/director` 和同源 worker 工具沿既有 agent job、持久 child、独立批准与父请求账目接通；主模型工具收窄、same-child checkpoint 续接及 worker 原模型/effort保留，off/Escape exact native cleanup、restart零接管和普通工具恢复闭环。修复普通prompt覆盖director、收据unknown误报完成与状态发布失败跳过清理；最终40TS/39production freeze独立 code APPROVE、architecture CLEAR。Node20.3 220组合/149契约/43scripts、五静态门、两种构建、五有效反转/恢复22项及六actualCLI（48合成POST）通过，实际独立write deny/native PID死亡读回。边界与材料见[director文档](features/director.md)、[Phase19 §8.137](features/phase-19-decisions.md#8137-w13-flow-02持久-directorworker-编排组件)及`.tmp/director/acceptance.json`。完整NormProof仍8192-edge容量not_proven，W16修复；FLOW-02本地完成，FLOW-03与W14–W16继续，Phase19全目标active，commit/push/精确远端事实另记，用户.gitignore保留不提交。
+
+
+持久 worker 编排组件已提交/推送 `d9c7860cae4aa1e0bced8f797f831e8b57d28f0d` 并独立读回同 SHA；精确 CI38056381869/job114225652890 与 Watch38056381849/job114225652443 均 completed/failure、steps=[]，annotations 确认付款/spending-limit 阻止启动，未计远端通过。材料 `.tmp/director/delivery.json`；FLOW-03按序继续，Phase19全目标active。
+
+## 2026-10-10：W13 FLOW-03 固定评测与候选发布
+
+`/improve` 与主模型工具复用单一 ExecutionService、Linux只读分离命名空间、native patch/receipt/补偿、会话CAS和普通批准，完整 train/holdout 与guardrails通过后仍需最终复评和独立源文件写入批准。独立反例修复逐文件撤销、固定原评分器漂移、系统挂载暴露和管道停止排队，actualCLI修复仅评测会话被空会话清理误删。最终30TS freeze code APPROVE/architecture WATCH→综合COMMENT，保留主模型普通读取和适应性holdout/泛化限制；264组合/149契约/43scripts、五静态门、两种构建、8有效反转/恢复38项及六actualCLI+两条模型工具链（6合成POST）通过。完整NormProof仍8192-edge容量not_proven待W16，未宣称完整suite/远端CI通过。边界与材料见[固定评测文档](features/improve.md)、[Phase19 §8.138](features/phase-19-decisions.md#8138-w13-flow-03固定评测隔离候选与独立批准合入)及`.tmp/evaluation/acceptance.json`。FLOW-03本地完成，W14→W15→W16继续，Phase19全目标active；commit/push/精确远端事实另记，用户.gitignore保留不提交。
