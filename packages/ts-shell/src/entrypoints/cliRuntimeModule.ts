@@ -18,7 +18,7 @@ import { securityCommandFor } from '../cli/runtime/security.js';
 import { agentsCommandFor } from '../cli/runtime/agents.js';
 import { mcpCommandFor } from '../cli/runtime/mcp.js';
 import { collaborationCommandFor } from '../cli/runtime/collaboration.js';
-import { jobsCommandFor } from '../cli/runtime/jobs.js';
+import { jobsCommandFor, workflowCommandFor } from '../cli/runtime/jobs.js';
 import { extensionCommandFor } from '../cli/runtime/extensions.js';
 import { runPromptInputStream } from '../cli/runtime/inputStream.js';
 import { planningCommandFor } from '../cli/runtime/planning.js';
@@ -146,6 +146,7 @@ export async function runNonInteractivePrompt(options: {
     mcpCommand: mcpCommandFor(options.runtimeContext),
     collaborationCommand: collaborationCommandFor(options.runtimeContext),
     jobsCommand: jobsCommandFor(options.runtimeContext),
+    workflowCommand: workflowCommandFor(options.runtimeContext),
     extensionCommand: extensionCommandFor(options.runtimeContext),
     worktreeCommand: worktreeCommandFor(options.runtimeContext),
     commitCommand: commitCommandFor(options.runtimeContext),

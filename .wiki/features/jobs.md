@@ -18,9 +18,26 @@ Local shell jobs run through the same execution service, tool approval and sandb
 | `/jobs output <id> stdout\|stderr <byte-offset>` | Read a page of at most 16 KiB from a retained stream. |
 | `/jobs output <agent-id> text <byte-offset>` | Read a redacted page of retained agent text. |
 | `/jobs continue <agent-id> <new prompt>` | Approve a new run at a settled child checkpoint; earlier runs remain immutable. |
+| `/workflow list` | Inspect readable workflow definitions in the current project. |
+| `/workflow run <name>` or `/workflow queue <name>` | Approve an immutable command graph for immediate scheduling or later fresh approval. |
+| `/workflow status` or `/workflow show <id>` | Inspect retained session graphs, their dependencies and actual command children. |
+| `/workflow pause <id>` or `/workflow cancel <id>` | Halt scheduling and await cleanup by its exact live native owners. |
+| `/workflow resume <id>` | Obtain fresh approval for the same undispatched graph; dispatched graphs never replay. |
 | `/hub` | Read current main/goal/advisor state, job parents and the shared request ledger. |
 
 Remote control remains under `/ssh`; a remote row in `/jobs list` retains its SSH backend. Completion is a local notice, so it does not become a new user prompt or dispatch an unrequested model request.
+
+## Approved command graphs
+
+Project definitions live in `.agents/workflows/<name>.json`. Each step has an `id`, an exact shell `run`, optional prerequisite IDs in `needs`, and an optional `timeoutSeconds`. The existing graph resolver orders dependency batches; the existing dispatcher runs at most two commands concurrently. Every batch settles before the next one starts, and a failed batch skips all later batches. Native exit codes, retained stream bytes, cancellation and output uncertainty remain owned by the ordinary local jobs.
+
+Approving a graph approves scheduling. Each command still passes through its ordinary exact bash preparation, approval and sandbox boundary. Source reads honor the existing read-denial policy. The graph captures its canonical directory identity, raw definition fingerprint, session binding and parent provenance before approval; configuration, mode, trust, hooks and those identities remain admission fences. Declared command hooks refuse this background path because their existing owner cannot confirm cancellable cleanup; the main session remains available.
+
+Graph and child IDs are reserved durably before possible child creation. Both levels retain permanent dispatch fences. Restart restores inspection without recreating controllers; a stored running graph without its live owner is `unknown`. Queued graphs require fresh scheduling and command approvals against the unchanged definition and directory. A dispatched graph cannot resume, including one whose native commands were successfully paused. That settled pause releases a scheduling slot while retaining its history. Reserved children cannot resume independently through `/jobs`, including after uncertain handoff; inspect their output there and control scheduling through `/workflow`.
+
+Graphs allow 1–32 steps, a definition of at most 512 KiB, commands of at most 16 KiB, and explicit native deadlines of 1–300 seconds. Definitions may request concurrency 1–16, with effective concurrency capped at two. At most two unresolved graphs occupy scheduling slots. All reserved child IDs count once against the shared 128-ID limit, even when no local row was created. Future immutable child metadata is reserved in the same 1 MiB journal; native output capacity is admitted by the local owner before each child is created. A later capacity refusal can halt a graph after earlier approved effects; it does not roll them back. Unknown cleanup or result publication cannot become completed or ordinary cancellation.
+
+New graphs use the session journal rather than the older project-wide last-run file. Legacy records remain read-only compatibility history and never provide executable authority. Definitions that previously requested a deadline above 300 seconds must be changed explicitly. Scheduling termination and successful native commands remain separate from goal acceptance.
 
 ## Independent conversations
 
@@ -48,6 +65,6 @@ Closing or changing the runtime/session/workspace cancels its live local handles
 
 ## Hub and delivery boundary
 
-The hub projects validated state and provenance. `parents` identifies goal, applied advisor-note, collaboration-acceptance and source-prompt relationships; these are not invented DAG scheduling edges. Request usage comes from the existing bound ledger, including known tokens, retained reservations, dispatched unknown attempts and history uncertainty. A matching goal's token cap is displayed once per shared scope rather than multiplied by the number of jobs. Foreign ledger bindings are unavailable, and detached workspace scopes remain explicit. Job or scheduler termination is not goal acceptance.
+The hub projects validated state and provenance. `parents` identifies goal, applied advisor-note, collaboration-acceptance, source-prompt and actual graph-child relationships; dependency edges come from the approved stored graph. Request usage comes from the existing bound ledger, including known tokens, retained reservations, dispatched unknown attempts and history uncertainty. A matching goal's token cap is displayed once per shared scope rather than multiplied by the number of jobs. Native command graphs do not introduce a model loop or duplicate request ledger. Foreign ledger bindings are unavailable, and detached workspace scopes remain explicit. Job or scheduler termination is not goal acceptance.
 
-Local shell jobs and persistent independent conversations are implemented. Approved DAG dispatch remains the next FLOW-01 component. FLOW-02/03 and the rest of Phase 19 remain open.
+Local shell jobs, persistent independent conversations and approved command graphs are implemented. FLOW-02/03 and the rest of Phase 19 remain open; final integration and external delivery evidence remain separate.

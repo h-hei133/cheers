@@ -8,6 +8,7 @@ import type { LocalJournal } from '../../workflow/jobs/local/journal.js';
 import type { TaskRegistry } from '../../workflow/jobs/local/registry.js';
 import type { BackgroundTask } from '../../workflow/jobs/local/model.js';
 import type { AgentService } from '../../workflow/jobs/agent/service.js';
+import type { DagService } from '../../workflow/jobs/dag/service.js';
 import type { AgentRuntimeInput } from './agent/model.js';
 
 export interface JobsComposition {
@@ -20,6 +21,7 @@ export interface JobsComposition {
   readonly local: LocalJournal;
   readonly registry: TaskRegistry;
   readonly agents: AgentService;
+  readonly dags: DagService;
   readonly agentRuntimeInput?: AgentRuntimeInput;
 }
 export interface JobsInstallation {

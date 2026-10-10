@@ -30,6 +30,7 @@ export class TaskRegistry implements BackgroundRunner {
     try { return taskSnapshot(this.journal.get(id), this.tasks.get(id)); } catch { return undefined; }
   }
   hasLive(id: string): boolean { return this.operations.has(id); }
+  settled(id: string): Promise<void> { return this.operations.get(id)?.settlement ?? Promise.resolve(); }
   start(input: BackgroundInput): BackgroundTask {
     if (this.closing) throw new Error('Local job owner is closing.');
     const id = this.journal?.create(input) ?? `bg_${this.nextId++}`;

@@ -52,7 +52,7 @@ export function inspectWorkspaceFile(root: string, relative: string, assertFileA
     throw error;
   }
   if (!stat.isFile()) throw new Error('File target is not a regular file.');
-  const fd = fs.openSync(absolute, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
+  const fd = fs.openSync(absolute, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0) | (fs.constants.O_NONBLOCK ?? 0));
   try {
     const opened = fs.fstatSync(fd);
     if (!opened.isFile() || fileIdentity(opened) !== fileIdentity(stat)) throw new Error('File target changed identity.');

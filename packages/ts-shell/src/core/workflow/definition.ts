@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { inspectWorkspaceFile } from '../workspace/files.js';
 
 /**
  * Workflow definitions, read from the repository.
@@ -29,9 +30,10 @@ export interface WorkflowFile {
   readonly steps: readonly WorkflowStep[];
   /** Where it was read from, for reporting. */
   readonly source: string;
+  readonly fingerprint: string;
 }
 
-const DEFAULT_TIMEOUT_SECONDS = 600;
+const DEFAULT_TIMEOUT_SECONDS = 300;
 const DEFAULT_CONCURRENCY = 4;
 
 /** Where this project keeps its workflows. */
@@ -61,13 +63,18 @@ export function listWorkflowNames(workspaceRoot: string): readonly string[] {
 export function readWorkflow(
   workspaceRoot: string,
   name: string,
+  assertFileAccess?: (absolutePath: string) => void,
 ): { readonly workflow: WorkflowFile } | { readonly error: string } {
+  if (!/^[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}$/.test(name)) return { error: 'Invalid workflow name.' };
   const source = path.join(workflowsDir(workspaceRoot), `${name}.json`);
   let raw: string;
+  let fingerprint: string;
   try {
-    raw = fs.readFileSync(source, "utf8");
+    const inspected = inspectWorkspaceFile(workspaceRoot, path.relative(workspaceRoot, source), assertFileAccess, 512 * 1024);
+    if (inspected.state === 'absent') return { error: `No workflow named "${name}" in ${path.relative(workspaceRoot, workflowsDir(workspaceRoot))}.` };
+    raw = inspected.content; fingerprint = inspected.hash;
   } catch {
-    return { error: `No workflow named "${name}" in ${path.relative(workspaceRoot, workflowsDir(workspaceRoot))}.` };
+    return { error: `Workflow "${name}" is unavailable: its source must be stable UTF-8 text, without symlinks, of at most 512 KiB.` };
   }
   let parsed: unknown;
   try {
@@ -75,7 +82,7 @@ export function readWorkflow(
   } catch (err) {
     return { error: `${name}.json is not valid JSON: ${err instanceof Error ? err.message : String(err)}` };
   }
-  return build(parsed, name, source);
+  return build(parsed, name, source, fingerprint);
 }
 
 /** A validated workflow from parsed JSON, or the first thing wrong with it. */
@@ -83,13 +90,14 @@ function build(
   parsed: unknown,
   name: string,
   source: string,
+  fingerprint: string,
 ): { readonly workflow: WorkflowFile } | { readonly error: string } {
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     return { error: `${name}.json must hold an object.` };
   }
   const record = parsed as Record<string, unknown>;
   const rawSteps = record.steps;
-  if (!Array.isArray(rawSteps) || rawSteps.length === 0) {
+  if (!Array.isArray(rawSteps) || rawSteps.length === 0 || rawSteps.length > 32) {
     return { error: `${name}.json needs a non-empty "steps" array.` };
   }
   const steps: WorkflowStep[] = [];
@@ -102,6 +110,9 @@ function build(
     steps.push(step.step);
   }
   const concurrency = record.maxConcurrency;
+  if (concurrency !== undefined && (!Number.isSafeInteger(concurrency) || Number(concurrency) < 1 || Number(concurrency) > 16)) return { error: `${name}.json maxConcurrency must be 1–16; native dispatch permits at most two commands.` };
+  if (record.name !== undefined && (typeof record.name !== 'string' || Buffer.byteLength(record.name) > 256)) return { error: `${name}.json name exceeds 256 bytes.` };
+  if (record.description !== undefined && (typeof record.description !== 'string' || Buffer.byteLength(record.description) > 4096)) return { error: `${name}.json description exceeds 4096 bytes.` };
   return {
     workflow: {
       name: typeof record.name === "string" && record.name.length > 0 ? record.name : name,
@@ -110,6 +121,7 @@ function build(
         typeof concurrency === "number" && concurrency >= 1 ? Math.floor(concurrency) : DEFAULT_CONCURRENCY,
       steps,
       source,
+      fingerprint,
     },
   };
 }
@@ -124,18 +136,19 @@ function readStep(
   }
   const record = entry as Record<string, unknown>;
   const id = record.id;
-  if (typeof id !== "string" || id.trim().length === 0) {
+  if (typeof id !== "string" || !/^[A-Za-z0-9_.-]{1,64}$/.test(id.trim())) {
     return { error: `step ${index + 1} needs an "id".` };
   }
   const run = record.run;
-  if (typeof run !== "string" || run.trim().length === 0) {
+  if (typeof run !== "string" || run.trim().length === 0 || Buffer.byteLength(run) > 16384 || run.includes('\0')) {
     return { error: `step "${id}" needs a "run" command.` };
   }
   const needs = record.needs;
-  if (needs !== undefined && !(Array.isArray(needs) && needs.every((value) => typeof value === "string"))) {
+  if (needs !== undefined && !(Array.isArray(needs) && needs.length <= 32 && needs.every((value) => typeof value === "string" && /^[A-Za-z0-9_.-]{1,64}$/.test(value)))) {
     return { error: `step "${id}" has a "needs" that is not a list of step ids.` };
   }
   const timeout = record.timeoutSeconds;
+  if (timeout !== undefined && (!Number.isSafeInteger(timeout) || Number(timeout) < 1 || Number(timeout) > 300)) return { error: `step "${id}" timeoutSeconds must be 1–300.` };
   return {
     step: {
       id: id.trim(),

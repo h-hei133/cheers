@@ -1,6 +1,7 @@
 import type { BoundSessionScope } from '../../session/store/bound.js';
 import type { SshWorkspace } from '../../runtime/execution/ssh/model.js';
 import type { AgentJob } from './agent/model.js';
+import type { DagJob } from './dag/model.js';
 import type { JobOrigin, JobStatus } from './contract.js';
 export type { JobOrigin, JobStatus } from './contract.js';
 export type RemoteWorkspace = SshWorkspace;
@@ -32,6 +33,7 @@ export interface JobJournal {
   readonly jobs: readonly RemoteJob[];
   readonly local?: readonly LocalJob[];
   readonly agents?: readonly AgentJob[];
+  readonly dags?: readonly DagJob[];
 }
 export interface LocalJob {
   readonly id: string;

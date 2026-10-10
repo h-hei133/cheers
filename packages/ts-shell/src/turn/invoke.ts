@@ -11,7 +11,7 @@ function publicationOutput(output: string): string {
 
 /** Direct native commands share model tool preparation, permission and hooks. */
 export async function runPreparedTool(tool: ToolDefinition, input: Record<string, unknown>, options: ToolGateOptions, signal?: AbortSignal,
-  id = randomUUID(), label = 'Native operation', publication?: { readonly eventKey: string }): Promise<AgentToolResult> {
+  id: string = randomUUID(), label = 'Native operation', publication?: { readonly eventKey: string }): Promise<AgentToolResult> {
   const pool = new Map([[tool.name, tool]]); const adapted = adaptTools(pool, options)[0]!; const hooks = createToolHooks(options, pool);
   const assistantMessage: AgentMessage = { role: 'assistant', content: [], timestamp: new Date().toISOString() };
   let observed: AgentToolResult | undefined;

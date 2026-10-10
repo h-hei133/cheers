@@ -13,9 +13,10 @@ export class LocalJournal implements LocalJournalPort {
   private readonly admissions = new Map<string, () => string | undefined>();
   constructor(readonly store: JobStore, private readonly origin: () => JobOrigin,
     private readonly captureAdmission: () => () => string | undefined) {}
-  create(input: BackgroundInput): string {
+  create(input: BackgroundInput, reserved?: { readonly id: string; readonly origin: JobOrigin }): string {
     const admission = this.captureAdmission(); if (admission()) throw new JobStateError('unavailable');
-    const id = randomUUID(); const origin = this.origin(); validateOrigin(origin);
+    const id = reserved?.id ?? randomUUID(); const origin = reserved?.origin ?? this.origin(); validateOrigin(origin);
+    if (!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(id)) throw new JobStateError('invalid');
     const timeoutMs = input.timeoutMs ?? 300000;
     const root = this.store.scope().workspace.path;
     const captured = captureWorkspaceRoot(input.cwd, root, 'read');
@@ -23,7 +24,8 @@ export class LocalJournal implements LocalJournalPort {
     const directory = { path: captured.path, identity: captured.identity };
     this.store.update((current, scope) => {
       const local = current.local ?? [];
-      if (current.jobs.length + local.length + (current.agents?.length ?? 0) >= 128 || local.filter(job => ['queued', 'running', 'paused', 'unknown'].includes(job.status)).length >= 2)
+      if ([...current.jobs, ...local, ...current.agents ?? [], ...current.dags ?? []].some(job => job.id === id)) throw new JobStateError('conflict');
+      if (current.jobs.length + local.length + (current.agents?.length ?? 0) + (current.dags?.length ?? 0) >= 128 || local.filter(job => ['queued', 'running', 'paused', 'unknown'].includes(job.status)).length >= 2)
         throw new JobStateError('capacity');
       const intent = { id, ownerId: this.ownerId, command: input.command, directory, timeoutMs, origin, scope, createdAt: Date.now() };
       const job: LocalJob = { ...intent, backend: 'local', digest: localDigest(intent), status: 'queued', dispatchPossible: false,
@@ -90,6 +92,7 @@ export class LocalJournal implements LocalJournalPort {
     if (expected.dispatchPossible || !['queued', 'paused'].includes(expected.status)) throw new JobStateError('conflict');
     let selected!: LocalJob;
     this.store.update((current, scope) => {
+      if (current.dags?.some(job => job.steps.some(step => step.jobId === id))) throw new JobStateError('conflict');
       if (!sameValue(expected.scope, scope) || !sameValue(current.local?.find(job => job.id === id), expected)) throw new JobStateError('detached');
       const next = { ...expected, ownerId: this.ownerId, status: 'queued' as const, note: 'Fresh exact approval bound this undispatched command to the live owner.' };
       selected = { ...next, digest: localDigest(next) };

@@ -5,8 +5,10 @@ import path from "node:path";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { definitionExample, listWorkflowNames, readWorkflow, workflowsDir } from "../workflow/definition.js";
 import { projectTrust } from "../security/projectTrust.js";
-import { runWorkflow, type StepOutcome, type WorkflowRun } from "../workflow/runner.js";
-import { readLastRun, writeRun } from "../workflow/runStore.js";
+import { runWorkflow } from '../workflow/runner.js';
+import type { StepOutcome, WorkflowRun } from "../workflow/runner.js";
+import { readLastRun } from "../workflow/runStore.js";
+import { redactReportText } from '../security/redaction.js';
 
 /**
  * /workflow — run a dependency graph of commands declared in this project.
@@ -29,6 +31,7 @@ export async function runWorkflowCommand(
   /** Whether this project may supply commands. Defaults to reading the trust store. */
   projectAllowed?: boolean,
 ): Promise<LocalCommandResult> {
+  if (context.workflowCommand) return context.workflowCommand(args, context);
   const parsed = parseSyntax(workflowSyntax, args);
   if (!parsed.ok) return { kind: "local", output: `Invalid /workflow arguments: ${parsed.reason}${parsed.reason === "Missing name." ? " Which workflow?" : ""}\n${syntaxHelp(workflowSyntax)}` };
   const root = context.cwd;
@@ -52,7 +55,7 @@ export async function runWorkflowCommand(
         output: ["No workflow has run in this project yet.", "", renderList(root)].join("\n"),
       };
     }
-    return { kind: "local", output: renderRun(last, { finished: true }) };
+    return { kind: "local", output: redactReportText(renderRun(last, { finished: true }), 48000, { preserveLines: true }) };
   }
 
   return {
@@ -77,19 +80,11 @@ async function execute(root: string, name: string, projectAllowed: boolean): Pro
     ].join("\n");
   }
 
-  const outcome = await runWorkflow(loaded.workflow, root);
-  if ("error" in outcome) return outcome.error;
-
-  const stored = writeRun(root, outcome.run);
-  const lines = [renderRun(outcome.run, { finished: true })];
-  if (!stored) {
-    lines.push("", "The result could not be written to disk, so `/workflow status` will not recall it.");
-  }
-  return lines.join("\n");
+  return (await runWorkflow(loaded.workflow, root)).error;
 }
 
 /** The workflows this project has, or how to add one. */
-function renderList(root: string): string {
+export function renderList(root: string, assertFileAccess?: (absolutePath: string) => void): string {
   const names = listWorkflowNames(root);
   const where = path.relative(root, workflowsDir(root)) || workflowsDir(root);
   if (names.length === 0) {
@@ -104,7 +99,7 @@ function renderList(root: string): string {
     ].join("\n");
   }
   const rows = names.map((name) => {
-    const loaded = readWorkflow(root, name);
+    const loaded = readWorkflow(root, name, assertFileAccess);
     if ("error" in loaded) return `- \`${name}\` — unreadable: ${loaded.error}`;
     const summary = loaded.workflow.description ? ` — ${loaded.workflow.description}` : "";
     return `- \`${name}\` (${loaded.workflow.steps.length} steps)${summary}`;

@@ -21,8 +21,8 @@ it("rejects extra workflow arguments before executing the named definition", asy
     expect(fs.existsSync(path.join(root, "marker"))).toBe(false);
   }
   expect((await runWorkflowCommand(["templates"], { cwd: root }, true)).output).toContain("probe");
-  expect((await runWorkflowCommand(["start", "probe"], { cwd: root }, true)).output).toContain("Every step passed");
-  expect(fs.readFileSync(path.join(root, "marker"), "utf8").trim()).toBe("executed");
+  expect((await runWorkflowCommand(["start", "probe"], { cwd: root }, true)).output).toContain("bound session runtime and ordinary command approval");
+  expect(fs.existsSync(path.join(root, "marker"))).toBe(false);
 });
 
 it("uses shared warmup actions and rejects invalid flags", () => {

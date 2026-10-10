@@ -8,6 +8,7 @@ import type { JobOrigin } from '../../workflow/jobs/model.js';
 import type { JobsComposition } from './model.js';
 import { localProjection, remoteProjection } from './projection.js';
 import { agentProjection } from './agent/projection.js';
+import { dagProjection } from './dag/projection.js';
 
 /** Parent relationships describe provenance/lifetime, not an invented DAG order. */
 function parentLinks(id: string, origin: JobOrigin) {
@@ -26,7 +27,8 @@ export function hubProjection(host: JobsComposition) {
   const ledger = decodeRequestLedger(bound.state.requestLedger);
   const ledgerBound = ledger?.sessionId === bound.scope.sessionId && ledger.sessionCreatedAt === bound.scope.sessionCreatedAt
     && ledger.directoryIdentity === bound.directoryIdentity;
-  const jobs = [...(journal.local ?? []).map(job => localProjection(host, job)), ...(journal.agents ?? []).map(job => agentProjection(host, job)), ...journal.jobs.map(remoteProjection)];
+  const jobs = [...(journal.local ?? []).map(job => localProjection(host, job)), ...(journal.agents ?? []).map(job => agentProjection(host, job)),
+    ...(journal.dags ?? []).map(job => dagProjection(host, job)), ...journal.jobs.map(remoteProjection)];
   return { sessionId: host.session.id,
     main: { kind: 'session', status: host.runtime.getState?.() ?? bound.state.status,
       runPhase: bound.state.runPhase, sourceEntryId: bound.state.pendingPromptEntryId, stopReason: bound.state.terminalReason },
@@ -41,8 +43,10 @@ export function hubProjection(host: JobsComposition) {
     requestUsage: ledger && ledgerBound ? Object.values(ledger.scopes).map(scope => ({ scopeId: scope.scope.id,
       detached: scope.scope.workspacePath !== bound.scope.workspace.path || scope.scope.workspaceIdentity !== bound.scope.workspace.identity,
       ...(scope.scope.id === goal?.id ? { tokenBudget: goal.tokenBudget ?? 'uncapped' } : {}), ...requestLedgerFacts(scope) })) : 'unavailable',
-    parents: [...(journal.local ?? []), ...(journal.agents ?? []), ...journal.jobs].flatMap(job => [
+    parents: [...(journal.local ?? []), ...(journal.agents ?? []), ...(journal.dags ?? []), ...journal.jobs].flatMap(job => [
       ...parentLinks(job.id, job.origin), ...(job.backend === 'agent' && job.child ? [{ childId: job.child.scope.sessionId, parentId: job.scope.sessionId, parentKind: 'session' }] : []),
-    ]),
+    ]).concat((journal.dags ?? []).flatMap(job => job.steps.map(step => ({ childId: step.jobId, parentId: job.id, parentKind: 'workflow' })))),
+    dependencies: (journal.dags ?? []).flatMap(job => job.definition.steps.flatMap(step => step.needs.map(needed => ({ workflowId: job.id,
+      childId: job.steps.find(state => state.id === step.id)!.jobId, dependsOn: job.steps.find(state => state.id === needed)!.jobId })))),
     completionProof: false };
 }

@@ -18,6 +18,9 @@ import { AgentService } from '../../workflow/jobs/agent/service.js';
 import type { AgentRuntimeInput } from '../jobs/agent/model.js';
 import { settledWithin } from '../../workflow/jobs/settlement.js';
 import { report } from '../jobs/projection.js';
+import { DagJournal } from '../../workflow/jobs/dag/journal.js';
+import { DagService } from '../../workflow/jobs/dag/service.js';
+import { runDagCommand } from '../jobs/dag/command.js';
 
 export function installJobsRuntime(context: ShellRuntimeContext, manager: SessionManager, runtime: ShellSessionRuntime,
   gate: (tool?: string) => ToolGateOptions, agentRuntimeInput?: AgentRuntimeInput): void {
@@ -32,7 +35,8 @@ export function jobsFor(context: ShellRuntimeContext): JobsComposition | undefin
     if (installed.retiring.size >= 8) return undefined;
     for (const [previousKey, previous] of installed.hosts) {
       installed.hosts.delete(previousKey);
-      const retired = Promise.all([previous.registry.close(), previous.agents.close()]).then(() => previous.agents.drain()).finally(() => installed.retiring.delete(retired));
+      const retired = Promise.all([previous.registry.close(), previous.agents.close(), previous.dags.close()])
+        .then(() => Promise.all([previous.agents.drain(), previous.dags.drain()])).then(() => undefined).finally(() => installed.retiring.delete(retired));
       installed.retiring.add(retired);
     }
     const session = context.session; const jobs = new JobStore(installed.manager, () => session);
@@ -40,6 +44,7 @@ export function jobsFor(context: ShellRuntimeContext): JobsComposition | undefin
       () => jobAdmission({ context, manager: installed.manager, session, gate: installed.gate }));
     host = { context, manager: installed.manager, runtime: installed.runtime, gate: installed.gate, session,
       jobs, local, registry: new TaskRegistry(undefined, local), agents: new AgentService(new AgentJournal(jobs)),
+      dags: new DagService(new DagJournal(jobs)),
       agentRuntimeInput: installed.agentRuntimeInput }; installed.hosts.set(key, host);
     const selected = host;
     host.agents.onEnded(job => {
@@ -64,6 +69,13 @@ export function jobsCommandFor(context: ShellRuntimeContext): NonNullable<Comman
       ? runJobsCommand(host, name, args, command) : { kind: 'local', output: 'Jobs require the current bound session runtime.' };
   };
 }
+export function workflowCommandFor(context: ShellRuntimeContext): NonNullable<CommandContext['workflowCommand']> {
+  return async (args, command) => {
+    const host = jobsFor(context);
+    return host && command.sessionId === host.session.id && command.cwd === context.cwd
+      ? runDagCommand(host, args) : { kind: 'local', output: 'Workflows require the current bound session runtime.' };
+  };
+}
 function unavailable(): never { throw new Error('The bound local job owner is unavailable; retry after cleanup settles.'); }
 const unavailableRunner: BackgroundRunner = {
   start: unavailable, list: unavailable, get: unavailable, stop: async () => unavailable(), onEnded: unavailable,
@@ -74,6 +86,6 @@ export function jobsRunnerFor(context: ShellRuntimeContext): BackgroundRunner {
 export async function closeJobsFor(context: ShellRuntimeContext): Promise<void> {
   const installed = jobsInstallations.get(context); if (!installed) return;
   installed.closing = true;
-  await settledWithin(Promise.allSettled([...installed.retiring, ...[...installed.hosts.values()].flatMap(host => [host.registry.close(), host.agents.close()])]));
+  await settledWithin(Promise.allSettled([...installed.retiring, ...[...installed.hosts.values()].flatMap(host => [host.registry.close(), host.agents.close(), host.dags.close()])]));
   jobsInstallations.delete(context);
 }

@@ -6,6 +6,8 @@ import { DAGResolver } from "./dagResolver.js";
 import { ParallelDispatcher } from "./parallelDispatcher.js";
 import { runWorkflowCommand } from "../commands/workflowCommandRuntime.js";
 import { routeSlashCommand } from "../commands/slashRouter.js";
+import { readWorkflow } from './definition.js';
+import { runRecordPath } from './runStore.js';
 import type { WorkflowTask, WorkflowStage } from "./types.js";
 
 describe("Workflow & Agentic SDLC Subsystem Test Suite", () => {
@@ -110,13 +112,14 @@ describe("Workflow & Agentic SDLC Subsystem Test Suite", () => {
       expect(nodeFs.existsSync(nodePath.join(project, "ran.txt"))).toBe(false);
     });
 
-    it("still runs a workflow for a project nobody has ruled on", async () => {
-      define("fine", [{ id: "ok", run: "exit 0" }]);
+    it("refuses unbound execution even for a project nobody has ruled on", async () => {
+      define("fine", [{ id: "ok", run: "touch UNBOUND" }]);
 
       const result = await runWorkflowCommand(["run", "fine"], { cwd: project });
 
       expect(result.output).not.toContain("untrusted");
-      expect(result.output).toContain("ok");
+      expect(result.output).toContain("bound session runtime and ordinary command approval");
+      expect(nodeFs.existsSync(nodePath.join(project, "UNBOUND"))).toBe(false);
     });
 
     it("says nothing has run rather than showing progress it never observed", async () => {
@@ -133,6 +136,28 @@ describe("Workflow & Agentic SDLC Subsystem Test Suite", () => {
       expect(list.output).toContain("`verify` (1 steps) — a real one");
     });
 
+    it('hashes exact UTF-8 source and refuses invalid byte encodings and oversized definitions', () => {
+      define('bytes', [{ id: 'one', run: 'exit 0' }]); const source = nodePath.join(project, '.agents/workflows/bytes.json');
+      const before = readWorkflow(project, 'bytes'); nodeFs.appendFileSync(source, '\n'); const after = readWorkflow(project, 'bytes');
+      expect(before).toHaveProperty('workflow'); expect(after).toHaveProperty('workflow');
+      if ('workflow' in before && 'workflow' in after) expect(after.workflow.fingerprint).not.toBe(before.workflow.fingerprint);
+      nodeFs.writeFileSync(source, Buffer.concat([Buffer.from('{"description":"'), Buffer.from([0x80]), Buffer.from('","steps":[{"id":"one","run":"exit 0"}]}')]));
+      expect(readWorkflow(project, 'bytes')).toHaveProperty('error');
+      nodeFs.writeFileSync(source, ' '.repeat(512 * 1024 + 1)); expect(readWorkflow(project, 'bytes')).toHaveProperty('error');
+    });
+
+    it('keeps legacy inspection read-only, report-safe and resilient to malformed nested records', async () => {
+      const record = runRecordPath(project); nodeFs.mkdirSync(nodePath.dirname(record), { recursive: true });
+      const legacy = { name: 'verify', startedAt: 'legacy', finishedAt: 'legacy', status: 'failed', batches: [['one']],
+        steps: [{ id: 'one', status: 'failed', exitCode: 3, output: 'Authorization: Bearer SYNTHETIC_WORKFLOW_SECRET' }] };
+      nodeFs.writeFileSync(record, JSON.stringify(legacy)); const before = nodeFs.readFileSync(record);
+      const result = await runWorkflowCommand(['status'], { cwd: project });
+      expect(result.output).toContain('failed (exit 3)'); expect(result.output).not.toContain('SYNTHETIC_WORKFLOW_SECRET');
+      expect(nodeFs.readFileSync(record)).toEqual(before);
+      nodeFs.writeFileSync(record, JSON.stringify({ ...legacy, steps: [null], batches: [null] }));
+      expect((await runWorkflowCommand(['status'], { cwd: project })).output).toContain('No workflow has run');
+    });
+
     it("offers a file shape instead of built-in templates when there are none", async () => {
       const list = await runWorkflowCommand(["list"], { cwd: project });
 
@@ -140,38 +165,8 @@ describe("Workflow & Agentic SDLC Subsystem Test Suite", () => {
       expect(list.output).not.toMatch(/feature-delivery|adversarial-review|auto-repair/);
     });
 
-    it("runs every step and reports the exit codes it saw", async () => {
-      define("verify", [
-        { id: "first", run: "exit 0" },
-        { id: "second", run: "exit 0", needs: ["first"] },
-      ]);
-      const result = await runWorkflowCommand(["run", "verify"], { cwd: project });
-
-      expect(result.output).toContain("passed");
-      expect(result.output).toContain("Every step passed");
-      expect(result.output).toContain("2 batches");
-    });
-
-    it("stops at a failing batch and reports what never ran", async () => {
-      define("verify", [
-        { id: "gate", run: "echo boom 1>&2; exit 3" },
-        { id: "after", run: "exit 0", needs: ["gate"] },
-      ]);
-      const result = await runWorkflowCommand(["run", "verify"], { cwd: project });
-
-      expect(result.output).toContain("`gate` failed (exit 3)");
-      expect(result.output).toContain("`after` skipped");
-      expect(result.output).toContain("boom");
-      expect(result.output).toContain("never ran");
-    });
-
-    it("recalls the last run after the process that ran it is gone", async () => {
-      define("verify", [{ id: "ok", run: "exit 0" }]);
-      await runWorkflowCommand(["run", "verify"], { cwd: project });
-      const status = await runWorkflowCommand(["status"], { cwd: project });
-
-      expect(status.output).toContain("Workflow `verify` — passed");
-    });
+    // Native execution, failure output and restart inspection are exercised by
+    // cli/jobs/dag/command.test.ts through the bound ordinary tool gates.
 
     it("refuses a graph with a cycle instead of running half of it", async () => {
       define("cyclic", [

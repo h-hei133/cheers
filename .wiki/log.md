@@ -6449,3 +6449,9 @@ SSH/父生命周期组件已提交/推送`e38c614986163be7d5ec6b817180760a237aa5
 原生/jobs agent与queue/检查/精确pause/cancel/新checkpoint continuation接通独立durable child和父CAS journal；共享既有goal/collaboration attempt policy，main仍可独立进行普通turn。startup capture、不可重试fork tombstone、immutable run/output reservation、父child目录撤销、原生命令/media cleanup unknown及command-hook fail-closed边界经独立反例修复；36TS冻结code APPROVE/architecture CLEAR，Node20.3组合277/149契约/43scripts、两种构建及五有效反转/恢复32项通过。完整NormProof仍8192-edge容量not_proven待W16；边界/材料见[作业文档](features/jobs.md)与[Phase19 §8.134](features/phase-19-decisions.md#8134-w13-flow-01-持久旁路代理组件独立会话共享请求与真实清理)。actualCLI及commit/push/精确CI另记；DAG→FLOW-02/03→W14–W16继续，Phase19未完成，用户.gitignore保留不提交。
 
 旁路代理actualCLI六条最终通过（两entrypoint各regular/fullscreen/pipe），42actual POST覆盖父main独立、child write另行deny、精确pause/新run、queued restart新批准、abrupt unknown零重放、脱敏和hub真实账目；材料`.tmp/jobs/agent-acceptance.json`。本地completion与检查无模型POST，配置及.gitignore原SHA保持；待commit/push/精确CI事实。
+
+旁路代理组件已提交/推送`42d6de8a2025f61aba492156b069c9e4d7dc8f7d`并读回同SHA；CI38045948694/job114195396180及Watch38045948700/job114195396355均付款/spending-limit阻止启动、零步骤failure，未计通过。FLOW-01 DAG顺序继续。
+
+### 2026-10-10 — Phase 19 W13 批准的命令图组件
+
+原/workflow直接exec与project-wide writer由session绑定图owner替代，复用普通独立bash审批、native local jobs与唯一ExecutionService；dependency batch失败停止后续、exact live停止、永久graph/child fence和restart unknown零重放接通。独立反例修复publication uncertainty、全局reserved IDs、directory identity、settled pause槽释放及reserved child adoption；code APPROVE/architecture CLEAR，最终31TS freeze未漂移。Node20.3组合88项、边界54项、149契约、43scripts/五静态门、两种构建、六有效反转/恢复39项、六actualCLI共96local commands零modelPOST通过。完整NormProof仍8192-edge容量not_proven，W16负责；未宣称完整TS suite/远端CI通过。边界与材料见[作业文档](features/jobs.md)、[Phase19 §8.135](features/phase-19-decisions.md#8135-w13-flow-01-批准的命令图依赖调度独立审批与永久重放围栏)及`.tmp/jobs/dag-acceptance.json`。FLOW-01三个组件本地实现/验收完成，FLOW-02/03与W14–W16继续，Phase19全目标active；commit/push/精确CI另记，用户.gitignore保留不提交。

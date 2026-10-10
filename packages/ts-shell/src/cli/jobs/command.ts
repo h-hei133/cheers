@@ -10,6 +10,8 @@ import { agentControl } from './agent/command.js';
 import { agentProjection } from './agent/projection.js';
 import { report, localPage, localProjection, remoteProjection } from './projection.js';
 import { hubProjection } from './hub.js';
+import { dagControl } from './dag/command.js';
+import { dagProjection } from './dag/projection.js';
 
 export async function runJobsCommand(host: JobsComposition, name: 'jobs' | 'hub', args: string[], context: CommandContext): Promise<LocalCommandResult> {
   if (name === 'hub') {
@@ -30,7 +32,8 @@ export async function runJobsCommand(host: JobsComposition, name: 'jobs' | 'hub'
 }
 async function control(host: JobsComposition, action: string, args: readonly string[], queue = false): Promise<string> {
   if (action === 'list') { const journal = host.jobs.read(); return report([...(journal.local ?? []).map(job => localProjection(host, job)),
-    ...(journal.agents ?? []).map(job => agentProjection(host, job)), ...journal.jobs.map(remoteProjection)]); }
+    ...(journal.agents ?? []).map(job => agentProjection(host, job)), ...(journal.dags ?? []).map(job => dagProjection(host, job)), ...journal.jobs.map(remoteProjection)]); }
+  if (host.dags.journal.list().some(job => job.id === args[0])) return dagControl(host, action, args);
   if (action === 'agent' || action === 'continue' || host.agents.journal.list().some(job => job.id === args[0])) return agentControl(host, action, args, queue);
   const tool = createCoreToolRegistry();
   if (action === 'run' || action === 'queue') return approved(host, 'bash', args[0]!, `Local command: ${report(args[0]!, 24000)}\n300s native deadline; 64KiB retained per stream; exact live cancellation. ${action === 'queue' ? 'Queue only; fresh resume approval is required to dispatch.' : 'Runs independently of the main turn.'}`,
@@ -42,6 +45,9 @@ async function control(host: JobsComposition, action: string, args: readonly str
     if (args[1] !== 'stdout' && args[1] !== 'stderr') throw new Error('Unknown output stream.');
     return localPage(local, args[1], Number(args[2]));
   }
+  const graph = host.dags.journal.list().find(job => job.steps.some(step => step.jobId === local.id));
+  if (graph && (action === 'resume' || action === 'pause' || action === 'cancel' && !local.dispatchPossible))
+    return `Command ${local.id} belongs to workflow ${graph.id}. Control its scheduling with /workflow; reserved children never resume independently.`;
   if (action === 'cancel') return approved(host, 'taskStop', local.command, `Cancel exact local job ${local.id}. The live owner must settle cleanup; no stored PID is used.`,
     async context => {
       if (!local.dispatchPossible) { host.local.adopt(local.id); host.local.cancelIntent(local.id); return { success: true, output: `Intent ${local.id} cancelled; no command was dispatched.` }; }
