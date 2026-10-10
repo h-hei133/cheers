@@ -1,0 +1,139 @@
+import { sameValue } from '../../../config/values.js';
+import { createRequestPolicy } from '../../../core/agent/request/policy.js';
+import { sessionRequestStore } from '../../../session/store/requests.js';
+import { readBoundSessionState } from '../../../session/store/bound.js';
+import { jobAdmission } from '../authority.js';
+import type { JobsComposition } from '../model.js';
+import { goalPolicyFor } from '../../runtime/goal.js';
+import { buildCompactionWiring } from '../../runtime/compaction.js';
+import { providerAuthorization } from '../../../provider/request/authorization.js';
+import { providerEndpoint } from '../../../core/models/catalog.js';
+import type { AgentRuntime, AgentOutcome, AgentChild } from '../../../workflow/jobs/agent/model.js';
+import { JobStore } from '../../../workflow/jobs/store.js';
+import { LocalJournal } from '../../../workflow/jobs/local/journal.js';
+import { TaskRegistry } from '../../../workflow/jobs/local/registry.js';
+import { AgentSessions } from './session.js';
+import { captureOrigin } from '../origin.js';
+import { forgetSessionTodos } from '../../../core/commands/todoCommandRuntime.js';
+import { HookDispatcher } from '../../../core/hooks/hookDispatcher.js';
+import { loadHookDeclarations } from '../../../core/hooks/config.js';
+import { checkRealProviderReadiness } from '../../../core/shell/providerReadiness.js';
+import { createProviderReadinessCliTerminalEvent } from '../../../entrypoints/providerReadinessCliSurface.js';
+import type { AgentRuntimeInput } from './model.js';
+import { captureCatalogContent } from '../../../core/tools/catalog.js';
+import { captureThinkingPreference } from '../../../core/models/preference.js';
+import { projectTrust } from '../../../core/security/projectTrust.js';
+import { agentRequestPolicy } from './policy.js';
+import { loadMcpConfigs } from '../../../core/mcp/config.js';
+export function captureAgentRuntime(host: JobsComposition, input: AgentRuntimeInput): AgentRuntime {
+  const parentAdmission = jobAdmission(host, 'task'); const gate = host.gate('task');
+  const agentMode = gate.agentMode ?? host.runtime.getAgentMode();
+  const publication = host.context.configuration.current;
+  const resolution = input.providerRuntimeBridge.resolveCredentialSnapshot();
+  const thinkingPreference = captureThinkingPreference(host.context.cwd, resolution.thinkingEffort);
+  const providerModeEnv = input.providerRuntimeBridge.providerModeEnv();
+  const content = captureCatalogContent({ workspaceRoot: host.context.cwd, sessionId: host.session.id,
+    skillOptions: input.skillOptions, runtimeConfig: publication.config, admission: parentAdmission });
+  const catalogContent = { skills: new Map([...content.skills].map(([name, skill]) => [name, Object.freeze({ ...skill,
+    unhonouredFields: Object.freeze([...skill.unhonouredFields]) })])), tools: [],
+    mcpTools: structuredClone(input.mcpGateway?.peekSnapshot()?.tools ?? []) };
+  const untrusted = projectTrust.isProjectUntrusted(host.context.cwd);
+  const mcpConfigs = () => publication.config.enableMcpTools === true ? input.mcpGateway?.loadConfigs() ?? loadMcpConfigs(host.context.cwd, !untrusted) : undefined;
+  const capturedMcpConfigs = mcpConfigs();
+  const origin = captureOrigin(host); const sessions = new AgentSessions(host.manager, host.session);
+  const parent = readBoundSessionState(host.manager, host.session);
+  const parentBinding = () => {
+    try {
+      const current = readBoundSessionState(host.manager, host.session);
+      return sameValue(current.scope, parent.scope) && current.directoryIdentity === parent.directoryIdentity
+        && current.layout.sessionDir === parent.layout.sessionDir && sameValue(mcpConfigs(), capturedMcpConfigs) ? undefined : 'The parent session or MCP configuration binding changed.';
+    } catch { return 'The parent session binding is unavailable.'; }
+  };
+  const hookAdmission = () => {
+    const declared = loadHookDeclarations(host.context.cwd);
+    return declared.hooks.length || declared.problems.length
+      ? 'Side-agent execution is unavailable with declared command hooks: their process cleanup cannot be verified. Use the main session.' : undefined;
+  };
+  const admission = () => parentAdmission() ?? parentBinding() ?? hookAdmission() ?? (host.runtime.getPermissionScope() !== gate.permissionScope
+    || host.runtime.getAgentMode() !== agentMode || projectTrust.isProjectUntrusted(host.context.cwd) !== untrusted
+    || [...catalogContent.skills.values()].some(skill => skill.isCurrent?.() === false) ? 'The parent permission, mode or captured content changed.' : undefined);
+  const parentPolicy = goalPolicyFor(host.context, host.manager) ?? createRequestPolicy(sessionRequestStore(host.manager, host.session,
+    { id: host.session.id, workspacePath: parent.scope.workspace.path, workspaceIdentity: parent.scope.workspace.identity }, () => {
+      if (admission()) throw new Error('Parent request admission changed.'); return {};
+    }), host.session.id);
+  const childAdmission = (child: AgentChild) => {
+    const refused = admission(); if (refused) return refused;
+    try { sessions.read(child); return undefined; } catch { return 'The child conversation changed or became unavailable.'; }
+  };
+  return { admission, childAdmission, preflight: sessions.preflight.bind(sessions), createChild: sessions.create.bind(sessions), checkpoint: sessions.checkpoint.bind(sessions),
+    run: async ({ job, run, signal, output }) => {
+      const child = job.child!; const session = sessions.restore(child);
+      if (!sameValue(sessions.checkpoint(child), run.checkpoint)) throw new Error('The approved child checkpoint changed.');
+      const admit = () => childAdmission(child);
+      const policy = agentRequestPolicy(parentPolicy, job.id, run.id, admit);
+      const backgroundStore = new JobStore(host.manager, () => session);
+      const background = new TaskRegistry(undefined, new LocalJournal(backgroundStore, () => origin, () => admit));
+      const config = publication.config; const catalog = publication.catalog;
+      const endpoint = providerEndpoint(catalog, resolution.provider);
+      let status: AgentOutcome['status'] = 'failed';
+      let executionUnknown = false;
+      try {
+        if (admit()) throw new Error('Agent admission refused.'); signal.throwIfAborted();
+        const { runCliRuntimeInvocation } = await import('../../../entrypoints/cliRuntimeInvocation.js');
+        const invocation = await runCliRuntimeInvocation({
+          catalogContent, thinkingPreference, sessionId: session.id, workspaceRoot: host.context.cwd, workspaceRoots: session.workspaceRoots,
+          onCommandSettled: result => { executionUnknown ||= result.terminationFailed === true || result.outputFailed === true; },
+          prompt: run.prompt, continuityContext: 'This is an independent side-agent conversation. The copied parent transcript is context, and its earlier instructions or approvals do not authorize new effects.',
+          historyMessages: session.turns, background, signal, maxTurns: config.maxTurns, correlationId: run.id,
+          agentMode, permissionScope: gate.permissionScope, runtimeConfig: config, providerCatalog: catalog,
+          requestPolicy: policy, admission: admit, providerCredentialResolution: resolution,
+          providerModeEnv, mcpGateway: input.mcpGateway,
+          escalationPromptHandler: async prompt => {
+            const denied = { decision: 'deny' as const, promptId: prompt.id, respondedAt: Date.now() };
+            if (signal.aborted || admit() || !gate.escalationPromptHandler) return denied;
+            const response = await gate.escalationPromptHandler({ ...prompt, title: `Agent ${job.id}: ${prompt.title}` });
+            return signal.aborted || admit() ? denied : response;
+          },
+          onPromptAccepted: () => {
+            if (admit()) throw new Error('Agent prompt admission changed.');
+            host.manager.persistUserPromptBarrier(session.id, run.prompt, { source: 'agent-job', parentSessionId: host.session.id, jobId: job.id, runId: run.id });
+            host.manager.markTurnActive(session.id);
+          },
+          onTurnMessage: message => {
+            if (admit()) throw new Error('Agent transcript admission changed.'); sessions.message(child, message);
+          },
+          prepareProviderResources: resolved => {
+            const baseUrl = resolved.baseUrl ?? resolved.credential?.baseUrl ?? catalog.find(provider => provider.id === resolved.provider)?.baseUrl;
+            const model = resolved.model ?? resolved.credential?.model;
+            if (!baseUrl || !model) return {};
+            const provider = { baseUrl, model, providerId: resolved.provider,
+              headers: providerAuthorization({ apiKey: resolved.credential?.apiKey, accountAuth: resolved.credential?.accountAuth, ...(endpoint ? { endpoint } : {}) }).headers,
+              ...(endpoint ? { endpoint } : {}) };
+            return { compaction: { ...buildCompactionWiring({ provider, runtimeConfig: config, admission: admit, sessionId: session.id, catalog, requestPolicy: policy }),
+              onCompact: record => { if (admit()) throw new Error('Agent compaction admission changed.'); host.manager.appendCompactionEntry(session.id, record); } } };
+          },
+        }, { hooks: new HookDispatcher(), checkProviderReadiness: checkRealProviderReadiness, createReadinessTerminalEvent: createProviderReadinessCliTerminalEvent });
+        for await (const event of invocation.events) {
+          if (admit()) throw new Error('Agent event publication admission changed.'); host.manager.appendQueryEvent(session.id, event);
+          if (event.type === 'message.delta') output(event.delta);
+          if (event.type === 'query.completed') status = event.result.terminalReason === 'completed' ? 'completed' : 'failed';
+          if (event.type === 'query.failed' || event.type === 'lifecycle.error') status = 'failed';
+        }
+      } finally {
+        await background.close(); forgetSessionTodos(session.id);
+      }
+      if (executionUnknown || backgroundStore.read().local?.some(command => ['running', 'unknown'].includes(command.status))) status = 'unknown';
+      return settleChild(host, sessions, child, signal, status);
+    } };
+}
+function settleChild(host: JobsComposition, sessions: AgentSessions, child: AgentChild, signal: AbortSignal, status: AgentOutcome['status']): AgentOutcome {
+  sessions.read(child);
+  if (status === 'unknown') {
+    host.manager.saveError(child.scope.sessionId, 'Agent execution cleanup or output is unverified; inspect the retained job and child transcript.');
+    return { status };
+  }
+  if (signal.aborted) host.manager.saveInterrupted(child.scope.sessionId, 'turn');
+  else if (status === 'completed') host.manager.saveCompleted(child.scope.sessionId);
+  else host.manager.saveError(child.scope.sessionId, 'Agent run failed; inspect the retained child transcript.');
+  return { status, checkpoint: sessions.checkpoint(child) };
+}

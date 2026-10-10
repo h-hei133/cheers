@@ -9,8 +9,13 @@ import { createCoreToolRegistry } from "./registry.js";
 import { filterVisibleToolNames } from "./prefilter.js";
 import { assertAdmission, type Admission } from '../network/admission.js';
 import { catalogContributions } from '../catalog/contributions.js';
+import { createDefaultExecutionService } from '../../runtime/execution/service.js';
+import { sameValue } from '../../config/values.js';
 
 export interface ToolCatalogInput {
+  /** Fixed content for an independently approved run; executable contributions remain owner-bound. */
+  readonly catalogContent?: CatalogContent;
+  readonly onCommandSettled?: Parameters<typeof createDefaultExecutionService>[0];
   /** Native feature composition; visibility restrictions apply after merging. */
   readonly featureTools?: readonly ToolDefinition[];
   readonly admission?: Admission;
@@ -21,20 +26,33 @@ export interface ToolCatalogInput {
   readonly mcpGateway?: Pick<CoreMcpGateway, "snapshot"> & Partial<Pick<CoreMcpGateway, "invokeTool">>;
 }
 
+export interface CatalogContent {
+  readonly skills: ReadonlyMap<string, Skill>;
+  readonly tools: readonly ToolDefinition[];
+  /** Child runs inherit only previously discovered descriptors, including their permission hints. */
+  readonly mcpTools?: readonly McpToolDescriptor[];
+}
+
+export function captureCatalogContent(input: ToolCatalogInput): CatalogContent {
+  assertAdmission(input.admission);
+  return { skills: discoverSkills(input), tools: catalogContributions(input.workspaceRoot, input.sessionId).flatMap(entry => entry.tools) };
+}
+
 /** Build the same current tool pool for a model run and for command inspection. */
 export async function loadToolCatalog(input: ToolCatalogInput, override?: () => ReadonlyMap<string, ToolDefinition>): Promise<{
   readonly skills: ReadonlyMap<string, Skill>;
   readonly tools: ReadonlyMap<string, ToolDefinition>;
 }> {
   assertAdmission(input.admission);
-  const skills = discoverSkills(input);
+  const { skills, tools: contributed } = input.catalogContent ?? captureCatalogContent(input);
   const mcp = await mcpToolsForRun(input);
   assertAdmission(input.admission);
   const registry = override?.() ?? createCoreToolRegistry({ skills,
+    ...(input.onCommandSettled ? { executionService: createDefaultExecutionService(input.onCommandSettled) } : {}),
     ...(mcp ? { mcpTools: mcp.tools, mcpGateway: mcp.gateway } : {}),
   });
   const combined = new Map(registry);
-  for (const tool of [...input.featureTools ?? [], ...catalogContributions(input.workspaceRoot, input.sessionId).flatMap(entry => entry.tools)]) {
+  for (const tool of [...input.featureTools ?? [], ...contributed]) {
     if (combined.has(tool.name)) throw new Error('Feature tool registration collides with an existing tool.');
     combined.set(tool.name, tool);
   }
@@ -117,8 +135,9 @@ async function mcpToolsForRun(
         `MCP tools unavailable this run: ${unavailable.map((client) => `${client.name} (${client.type})`).join(", ")}.`,
       );
     }
-    if (snapshot.tools.length === 0) return undefined;
-    return { tools: snapshot.tools, gateway: gateway.invokeTool ? {
+    const tools = request.catalogContent ? snapshot.tools.filter(tool => request.catalogContent!.mcpTools?.some(captured => sameValue(captured, tool))) : snapshot.tools;
+    if (tools.length === 0) return undefined;
+    return { tools, gateway: gateway.invokeTool ? {
       invokeTool: (server, tool, args) => gateway.invokeTool!(server, tool, args, request.admission),
     } : undefined };
   } catch (error) {

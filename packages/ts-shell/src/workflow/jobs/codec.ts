@@ -6,6 +6,7 @@ import { validateWorkspace } from '../../runtime/execution/ssh/validation.js';
 import { JobStateError, type JobJournal, type RemoteJob } from './model.js';
 import { valid, text, validateOrigin, validateScope } from './validation.js';
 import { validateLocal } from './local/codec.js';
+import { validateAgent } from './agent/codec.js';
 export { validateOrigin } from './validation.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -18,7 +19,7 @@ export function jobDigest(job: Pick<RemoteJob, 'id' | 'command' | 'binding' | 'o
 }
 export function decodeJournal(value: unknown, scope: BoundSessionScope): JobJournal {
   if (value === undefined) return freezeDeep({ version: 1, revision: 0, scope, jobs: [] });
-  valid(isRecord(value) && Object.keys(value).every(key => ['version', 'revision', 'scope', 'remote', 'jobs', 'local'].includes(key))
+  valid(isRecord(value) && Object.keys(value).every(key => ['version', 'revision', 'scope', 'remote', 'jobs', 'local', 'agents'].includes(key))
     && value.version === 1 && Number.isSafeInteger(value.revision) && Number(value.revision) >= 1);
   validateScope(value.scope, scope); valid(Array.isArray(value.jobs) && value.jobs.length <= 128);
   valid(Buffer.byteLength(JSON.stringify(value)) <= 1024 * 1024);
@@ -27,6 +28,8 @@ export function decodeJournal(value: unknown, scope: BoundSessionScope): JobJour
   for (const job of value.jobs) { validateJob(job, scope); valid(!ids.has(job.id)); ids.add(job.id); }
   valid(value.local === undefined || Array.isArray(value.local) && value.local.length + value.jobs.length <= 128);
   for (const job of value.local ?? []) { validateLocal(job, scope); valid(!ids.has(job.id)); ids.add(job.id); }
+  valid(value.agents === undefined || Array.isArray(value.agents) && value.agents.length + ids.size <= 128);
+  for (const job of value.agents ?? []) { validateAgent(job, scope); valid(!ids.has(job.id)); ids.add(job.id); }
   return freezeDeep(value as unknown as JobJournal);
 }
 function validateJob(value: unknown, scope: BoundSessionScope): asserts value is RemoteJob {

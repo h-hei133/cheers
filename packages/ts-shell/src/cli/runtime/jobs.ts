@@ -13,10 +13,15 @@ import { runJobsCommand } from '../jobs/command.js';
 import type { JobsComposition } from '../jobs/model.js';
 import type { BackgroundRunner, BackgroundTask } from '../../workflow/jobs/local/model.js';
 import { captureWorkspaceRoot } from '../../core/workspace/roots.js';
+import { AgentJournal } from '../../workflow/jobs/agent/journal.js';
+import { AgentService } from '../../workflow/jobs/agent/service.js';
+import type { AgentRuntimeInput } from '../jobs/agent/model.js';
+import { settledWithin } from '../../workflow/jobs/settlement.js';
+import { report } from '../jobs/projection.js';
 
 export function installJobsRuntime(context: ShellRuntimeContext, manager: SessionManager, runtime: ShellSessionRuntime,
-  gate: (tool?: string) => ToolGateOptions): void {
-  jobsInstallations.set(context, { manager, runtime, gate, hosts: new Map(), listeners: new Set(), retiring: new Set(), closing: false });
+  gate: (tool?: string) => ToolGateOptions, agentRuntimeInput?: AgentRuntimeInput): void {
+  jobsInstallations.set(context, { manager, runtime, gate, hosts: new Map(), listeners: new Set(), retiring: new Set(), closing: false, agentRuntimeInput });
 }
 export function jobsFor(context: ShellRuntimeContext): JobsComposition | undefined {
   const installed = jobsInstallations.get(context); if (!installed || installed.closing) return undefined;
@@ -27,15 +32,20 @@ export function jobsFor(context: ShellRuntimeContext): JobsComposition | undefin
     if (installed.retiring.size >= 8) return undefined;
     for (const [previousKey, previous] of installed.hosts) {
       installed.hosts.delete(previousKey);
-      const retired = previous.registry.close().finally(() => installed.retiring.delete(retired));
+      const retired = Promise.all([previous.registry.close(), previous.agents.close()]).then(() => previous.agents.drain()).finally(() => installed.retiring.delete(retired));
       installed.retiring.add(retired);
     }
     const session = context.session; const jobs = new JobStore(installed.manager, () => session);
     const local = new LocalJournal(jobs, () => captureOrigin({ context, manager: installed.manager }),
       () => jobAdmission({ context, manager: installed.manager, session, gate: installed.gate }));
     host = { context, manager: installed.manager, runtime: installed.runtime, gate: installed.gate, session,
-      jobs, local, registry: new TaskRegistry(undefined, local) }; installed.hosts.set(key, host);
+      jobs, local, registry: new TaskRegistry(undefined, local), agents: new AgentService(new AgentJournal(jobs)),
+      agentRuntimeInput: installed.agentRuntimeInput }; installed.hosts.set(key, host);
     const selected = host;
+    host.agents.onEnded(job => {
+      if (context.session.id === session.id && jobsFor(context) === selected)
+        installed.agentRuntimeInput?.notice?.(report(`Agent ${job.id} ${job.status}; inspect /jobs show ${job.id}.`));
+    });
     host.registry.onEnded(task => {
       if (context.session.id !== session.id || jobsFor(context) !== selected) return;
       for (const listener of installed.listeners) listener(task);
@@ -64,6 +74,6 @@ export function jobsRunnerFor(context: ShellRuntimeContext): BackgroundRunner {
 export async function closeJobsFor(context: ShellRuntimeContext): Promise<void> {
   const installed = jobsInstallations.get(context); if (!installed) return;
   installed.closing = true;
-  await Promise.allSettled([...installed.retiring, ...[...installed.hosts.values()].map(host => host.registry.close())]);
+  await settledWithin(Promise.allSettled([...installed.retiring, ...[...installed.hosts.values()].flatMap(host => [host.registry.close(), host.agents.close()])]));
   jobsInstallations.delete(context);
 }

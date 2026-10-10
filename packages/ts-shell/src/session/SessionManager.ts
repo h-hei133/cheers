@@ -105,14 +105,14 @@ export class SessionManager extends SessionReadSurface {
     });
   }
 
-  private createSessionCreationCallbacks() {
+  private createSessionCreationCallbacks(activate = true) {
     return {
       sessionExists: (sessionId: string) => this.sessionExists(sessionId),
       validateSessionId,
       createSessionId: () => this.host.store.createSessionId(),
       writeSession: (session: Session) => this.host.store.writeSession(session),
       setCurrentSessionForProject: (projectRoot: string, sessionId: string) =>
-        this.setCurrentSessionForProject(projectRoot, sessionId),
+        activate ? this.setCurrentSessionForProject(projectRoot, sessionId) : undefined,
       now: () => new Date().toISOString(),
     };
   }
@@ -182,7 +182,7 @@ export class SessionManager extends SessionReadSurface {
    * source id, because the copied events say nothing about where they came
    * from. Both are the source's, not invented for the copy.
    */
-  fork(sessionId: string, projectRoot?: string): Session {
+  fork(sessionId: string, projectRoot?: string, options?: { readonly activate?: boolean; readonly sessionId?: string }): Session {
     if (!this.sessionExists(sessionId)) {
       throw new Error(`Cannot fork: session ${sessionId} does not exist`);
     }
@@ -191,15 +191,16 @@ export class SessionManager extends SessionReadSurface {
       ?? buildLinearSessionThreadSnapshot(source);
     if (!sessionThreadPath(sourceThread).resolved) throw new Error('Cannot fork: session ancestry is unavailable.');
     const events = readTranscriptEvents(this.host.store.transcriptPath(sessionId));
-    const forked = createSession({
-      callbacks: this.createSessionCreationCallbacks(),
+    const creation = {
+      callbacks: this.createSessionCreationCallbacks(options?.activate !== false),
       projectRoot: projectRoot ?? source.projectRoot,
       options: {
         ...(!projectRoot || projectRoot === source.projectRoot ? { workspaceRoots: source.workspaceRoots } : {}),
         ...(source.title ? { title: source.title } : {}),
         parentSession: source.id,
       },
-    });
+    };
+    const forked = options?.sessionId === undefined ? createSession(creation) : createSessionWithId({ ...creation, sessionId: options.sessionId });
     const transcriptPath = this.host.store.transcriptPath(forked.id);
     for (const event of events) {
       appendTranscriptEvent(transcriptPath, event.type === 'command-output' && event.sourceEntryId === sessionRootEntryId(source.id)

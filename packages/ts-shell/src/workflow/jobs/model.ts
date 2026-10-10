@@ -1,18 +1,9 @@
 import type { BoundSessionScope } from '../../session/store/bound.js';
 import type { SshWorkspace } from '../../runtime/execution/ssh/model.js';
+import type { AgentJob } from './agent/model.js';
+import type { JobOrigin, JobStatus } from './contract.js';
+export type { JobOrigin, JobStatus } from './contract.js';
 export type RemoteWorkspace = SshWorkspace;
-export interface JobOrigin {
-  readonly kind: 'local' | 'collaboration' | 'goal' | 'advisor';
-  readonly principal?: string;
-  readonly acceptanceId?: string;
-  readonly parentId?: string;
-  readonly goalId?: string;
-  readonly roomId?: string;
-  readonly serviceEpoch?: string;
-  readonly hostGeneration?: number;
-  readonly sourceEntryId?: string;
-}
-export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'unknown';
 export interface RemoteJob {
   readonly id: string;
   readonly backend: 'ssh';
@@ -40,6 +31,7 @@ export interface JobJournal {
   readonly remote?: RemoteWorkspace;
   readonly jobs: readonly RemoteJob[];
   readonly local?: readonly LocalJob[];
+  readonly agents?: readonly AgentJob[];
 }
 export interface LocalJob {
   readonly id: string;

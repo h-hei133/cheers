@@ -7,6 +7,7 @@ import { sameValue } from '../../config/values.js';
 import type { JobOrigin } from '../../workflow/jobs/model.js';
 import type { JobsComposition } from './model.js';
 import { localProjection, remoteProjection } from './projection.js';
+import { agentProjection } from './agent/projection.js';
 
 /** Parent relationships describe provenance/lifetime, not an invented DAG order. */
 function parentLinks(id: string, origin: JobOrigin) {
@@ -25,7 +26,7 @@ export function hubProjection(host: JobsComposition) {
   const ledger = decodeRequestLedger(bound.state.requestLedger);
   const ledgerBound = ledger?.sessionId === bound.scope.sessionId && ledger.sessionCreatedAt === bound.scope.sessionCreatedAt
     && ledger.directoryIdentity === bound.directoryIdentity;
-  const jobs = [...(journal.local ?? []).map(job => localProjection(host, job)), ...journal.jobs.map(remoteProjection)];
+  const jobs = [...(journal.local ?? []).map(job => localProjection(host, job)), ...(journal.agents ?? []).map(job => agentProjection(host, job)), ...journal.jobs.map(remoteProjection)];
   return { sessionId: host.session.id,
     main: { kind: 'session', status: host.runtime.getState?.() ?? bound.state.status,
       runPhase: bound.state.runPhase, sourceEntryId: bound.state.pendingPromptEntryId, stopReason: bound.state.terminalReason },
@@ -40,6 +41,8 @@ export function hubProjection(host: JobsComposition) {
     requestUsage: ledger && ledgerBound ? Object.values(ledger.scopes).map(scope => ({ scopeId: scope.scope.id,
       detached: scope.scope.workspacePath !== bound.scope.workspace.path || scope.scope.workspaceIdentity !== bound.scope.workspace.identity,
       ...(scope.scope.id === goal?.id ? { tokenBudget: goal.tokenBudget ?? 'uncapped' } : {}), ...requestLedgerFacts(scope) })) : 'unavailable',
-    parents: [...(journal.local ?? []), ...journal.jobs].flatMap(job => parentLinks(job.id, job.origin)),
+    parents: [...(journal.local ?? []), ...(journal.agents ?? []), ...journal.jobs].flatMap(job => [
+      ...parentLinks(job.id, job.origin), ...(job.backend === 'agent' && job.child ? [{ childId: job.child.scope.sessionId, parentId: job.scope.sessionId, parentKind: 'session' }] : []),
+    ]),
     completionProof: false };
 }

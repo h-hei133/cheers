@@ -12,7 +12,7 @@ import type { SessionMessage } from "../session/schema/sessionMessage.js";
 import { defaultHookDispatcher, type HookDispatcher } from "../core/hooks/hookDispatcher.js";
 import { setupBuiltinVerificationHooks } from "../core/hooks/builtin/index.js";
 import { registerDeclaredHooks, type HookApprovalRequest } from "../core/hooks/registration.js";
-import { loadToolCatalog } from "../core/tools/catalog.js";
+import { loadToolCatalog, type CatalogContent, type ToolCatalogInput } from "../core/tools/catalog.js";
 import { loadCatalog } from "../core/models/catalogStore.js";
 import { providerEndpoint, type CatalogProvider } from "../core/models/catalog.js";
 import type { RuntimeConfig } from "../config/runtimeConfig.js";
@@ -63,6 +63,9 @@ import { createProviderStep, delegatedSteps } from '../cli/provider/step.js';
 type ProviderMode = "synthetic" | "real";
 
 export interface CliRuntimeInvocationInput {
+  readonly catalogContent?: CatalogContent;
+  readonly onCommandSettled?: ToolCatalogInput['onCommandSettled'];
+  readonly thinkingPreference?: ReturnType<typeof captureThinkingPreference>;
   readonly background?: TurnOptions['background'];
   readonly featureTools?: readonly ToolDefinition[];
   readonly requestPolicy?: RequestPolicy;
@@ -163,7 +166,7 @@ function syntheticToolIntent() {
 export function buildCliRuntimeInvocation(input: CliRuntimeInvocationInput): CliRuntimeInvocationRequest {
   const providerMode: ProviderMode = input.providerModeEnv === "synthetic" ? "synthetic" : "real";
   const { providerModeEnv: _providerModeEnv, ...request } = input;
-  return { ...request, ...captureThinkingPreference(input.workspaceRoot, input.providerCredentialResolution.thinkingEffort), providerMode };
+  return { ...request, ...(input.thinkingPreference ?? captureThinkingPreference(input.workspaceRoot, input.providerCredentialResolution.thinkingEffort)), providerMode };
 }
 
 /**

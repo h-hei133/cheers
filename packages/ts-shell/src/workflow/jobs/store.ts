@@ -6,6 +6,7 @@ import { validateWorkspace } from '../../runtime/execution/ssh/validation.js';
 import { decodeJournal, jobDigest, validateOrigin } from './codec.js';
 import { JobStateError, type JobJournal, type JobOrigin, type RemoteJob, type RemoteWorkspace } from './model.js';
 import { reservedLocalBytes } from './local/capacity.js';
+import { reservedAgentBytes } from './agent/capacity.js';
 export { JobStateError } from './model.js';
 
 export class JobStore {
@@ -22,7 +23,7 @@ export class JobStore {
       if (!current.remote) throw new JobStateError('unavailable');
       if (!sameValue(current.scope, scope)) throw new JobStateError('detached');
       if (typeof command !== 'string' || Buffer.byteLength(command) > 16384 || !command.trim() || command.includes('\0')) throw new JobStateError('invalid');
-      if (current.jobs.length + (current.local?.length ?? 0) >= 128 || current.jobs.filter(job => ['queued', 'running', 'unknown'].includes(job.status)).length >= 2) throw new JobStateError('capacity');
+      if (current.jobs.length + (current.local?.length ?? 0) + (current.agents?.length ?? 0) >= 128 || current.jobs.filter(job => ['queued', 'running', 'unknown'].includes(job.status)).length >= 2) throw new JobStateError('capacity');
       const intent = { id, command, binding: current.remote, scope, origin, lifetime: origin.kind === 'local' ? 'detached' as const : 'parent' as const };
       const job: RemoteJob = { ...intent, digest: jobDigest(intent), backend: 'ssh', createdAt: Date.now(), status: 'queued',
         dispatchPossible: false, output: 'pending', note: 'Approved queued intent; no remote command was sent.' };
@@ -43,7 +44,8 @@ export class JobStore {
     const session = this.session(); const baseline = readBoundSessionState(this.manager, session);
     const current = decodeJournal(baseline.state.jobs, baseline.scope);
     const next = { ...change(current, baseline.scope), version: 1 as const, revision: current.revision + 1 };
-    if (next.jobs.length + (next.local?.length ?? 0) > 128 || Buffer.byteLength(JSON.stringify(next)) + reservedLocalBytes(next) > 1024 * 1024) throw new JobStateError('capacity');
+    if (next.jobs.length + (next.local?.length ?? 0) + (next.agents?.length ?? 0) > 128
+      || Buffer.byteLength(JSON.stringify(next)) + reservedLocalBytes(next) + reservedAgentBytes(next) > 1024 * 1024) throw new JobStateError('capacity');
     decodeJournal(next, baseline.scope);
     const saved = publishBoundSessionState(this.manager, session, baseline, (latest, prior) => sameValue(latest.jobs, prior.jobs),
       latest => ({ ...latest, jobs: next }));

@@ -1,7 +1,7 @@
 import { writeTextFile } from './write.js'
 import { readTextFile } from './read.js'
 import { readTextPage } from './page.js'
-import { readMedia } from './media/index.js'
+import { readMedia, processCleanupFailed } from './media/index.js'
 import { verifyPathContainment } from '../../core/security/pathJail.js'
 import { executeLocally } from './local.js'
 import type { NormalizedExecutionResult } from './types.js'
@@ -32,11 +32,17 @@ import type {
   TextFileReadExecutionRequest,
 } from './types.js'
 
-export function createDefaultExecutionService(): ExecutionService {
+export function createDefaultExecutionService(onCommandSettled?: (result: Pick<CommandExecutionResult, 'terminationFailed' | 'outputFailed'>) => void): ExecutionService {
   return {
     readTextFile,
     readTextPage,
-    readMedia,
+    async readMedia(request) {
+      try { return await readMedia(request) }
+      catch (error) {
+        if (processCleanupFailed(error)) onCommandSettled?.({ terminationFailed: true })
+        throw error
+      }
+    },
     writeTextFile,
     async listFilesRecursive(request) {
       request.abortSignal?.throwIfAborted()
@@ -48,8 +54,10 @@ export function createDefaultExecutionService(): ExecutionService {
         abortSignal: request.abortSignal ?? request.walkOptions?.abortSignal,
       })
     },
-    runCommand(request) {
-      return runCommand(request)
+    async runCommand(request) {
+      const result = await runCommand(request)
+      onCommandSettled?.({ terminationFailed: result.terminationFailed, outputFailed: result.outputFailed })
+      return result
     },
   }
 }

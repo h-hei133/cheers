@@ -20,7 +20,7 @@ export function createMediaReader(): (request: MediaReadRequest) => Promise<Medi
   }
 }
 
-function processCleanupFailed(error: unknown): boolean {
+export function processCleanupFailed(error: unknown): boolean {
   return error instanceof MediaReadError && error.reason === 'cleanup' ||
     error instanceof AggregateError && error.errors.some(processCleanupFailed)
 }

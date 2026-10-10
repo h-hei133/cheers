@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { writeProjectState } from '../core/state/projectState.js';
+import { captureThinkingPreference } from '../core/models/preference.js';
 import * as turnSession from '../turn/session.js';
 import { describe, expect, it, vi } from "vitest";
 import { createServer } from "node:http";
@@ -343,4 +344,18 @@ it.each([undefined, 'medium', null] as const)('captures effort %s before readine
     expect(turn.mock.calls.at(-1)?.[0].commandEnv?.CHEERS_REASONING_LEVEL).toBe(level ?? undefined);
     expect(turn.mock.calls.at(-1)?.[0].commandEnv?.CHEERS_MODEL).toBe('captured-model');
   } finally { turn.mockRestore(); fs.rmSync(workspace, { recursive: true, force: true }); }
+});
+
+it('honors an effort snapshot captured before a delayed independent-run approval', async () => {
+  const workspace = fs.mkdtempSync(path.resolve(process.cwd(), '../../.tmp/agent-effort-'));
+  fs.mkdirSync(path.join(workspace, '.agents'));
+  try {
+    writeProjectState(workspace, { thinkingEffort: 'low' });
+    const thinkingPreference = captureThinkingPreference(workspace);
+    writeProjectState(workspace, { thinkingEffort: 'high' });
+    const { deps } = dependencies();
+    const step = vi.fn(request => { expect(request.thinkingEffort).toBe('low'); expect(request.thinkingEffortExplicit).toBe(false); return deps.createStep!(request, new Map()); });
+    await collect((await runCliRuntimeInvocation(baseInput({ workspaceRoot: workspace, thinkingPreference }), { ...deps, createStep: step })).events);
+    expect(step).toHaveBeenCalledOnce();
+  } finally { fs.rmSync(workspace, { recursive: true, force: true }); }
 });

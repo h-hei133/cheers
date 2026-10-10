@@ -7,6 +7,8 @@ import type { JobStore } from '../../workflow/jobs/store.js';
 import type { LocalJournal } from '../../workflow/jobs/local/journal.js';
 import type { TaskRegistry } from '../../workflow/jobs/local/registry.js';
 import type { BackgroundTask } from '../../workflow/jobs/local/model.js';
+import type { AgentService } from '../../workflow/jobs/agent/service.js';
+import type { AgentRuntimeInput } from './agent/model.js';
 
 export interface JobsComposition {
   readonly context: ShellRuntimeContext;
@@ -17,6 +19,8 @@ export interface JobsComposition {
   readonly jobs: JobStore;
   readonly local: LocalJournal;
   readonly registry: TaskRegistry;
+  readonly agents: AgentService;
+  readonly agentRuntimeInput?: AgentRuntimeInput;
 }
 export interface JobsInstallation {
   closing: boolean;
@@ -26,4 +30,5 @@ export interface JobsInstallation {
   readonly hosts: Map<string, JobsComposition>;
   readonly listeners: Set<(task: BackgroundTask) => void>;
   readonly retiring: Set<Promise<void>>;
+  readonly agentRuntimeInput?: AgentRuntimeInput;
 }

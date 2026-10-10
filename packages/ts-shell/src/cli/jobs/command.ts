@@ -4,10 +4,10 @@ import { tokenizeCommandArgs } from '../../core/commands/arguments.js';
 import { parseSyntax } from '../../core/commands/syntax/parse.js';
 import { syntaxHelp } from '../../core/commands/syntax/projection.js';
 import { createCoreToolRegistry } from '../../core/tools/registry.js';
-import { runPreparedTool } from '../../turn/invoke.js';
-import type { ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '../../tools/types.js';
 import type { JobsComposition } from './model.js';
-import { jobAdmission } from './authority.js';
+import { approved } from './approval.js';
+import { agentControl } from './agent/command.js';
+import { agentProjection } from './agent/projection.js';
 import { report, localPage, localProjection, remoteProjection } from './projection.js';
 import { hubProjection } from './hub.js';
 
@@ -17,16 +17,21 @@ export async function runJobsCommand(host: JobsComposition, name: 'jobs' | 'hub'
     catch { return { kind: 'local', output: 'The stored job and request ledger is unavailable.' }; }
   }
   const raw = context.rawCommandArgs; const shell = raw && /^\s*(run|queue)\s+([\s\S]*)$/i.exec(raw);
+  const agent = raw && /^\s*agent\s+(?:(--queue)\s+)?(?:--\s+)?([\s\S]*)$/i.exec(raw);
+  const continuation = raw && /^\s*continue\s+(\S+)\s+(?:--\s+)?([\s\S]*)$/i.exec(raw);
   let tokens: string[];
-  try { tokens = shell ? [shell[1]!, shell[2]!] : raw !== undefined ? tokenizeCommandArgs(raw) : args; }
+  try { tokens = shell ? [shell[1]!, '--', shell[2]!] : agent ? ['agent', ...(agent[1] ? ['--queue'] : []), '--', agent[2]!]
+    : continuation ? ['continue', continuation[1]!, '--', continuation[2]!] : raw !== undefined ? tokenizeCommandArgs(raw) : args; }
   catch { return { kind: 'local', output: `Invalid /jobs arguments.\n${syntaxHelp(jobsSyntax)}` }; }
   const parsed = parseSyntax(jobsSyntax, tokens);
   if (!parsed.ok) return { kind: 'local', output: `Invalid /jobs arguments: ${parsed.reason}\n${syntaxHelp(jobsSyntax)}` };
-  try { return { kind: 'local', output: await control(host, parsed.action.name, parsed.args) }; }
+  try { return { kind: 'local', output: await control(host, parsed.action.name, parsed.args, parsed.flags.has('queue')) }; }
   catch { return { kind: 'local', output: 'Local job operation refused or unverified. Inspect /jobs; dispatched IDs are never replayed.' }; }
 }
-async function control(host: JobsComposition, action: string, args: readonly string[]): Promise<string> {
-  if (action === 'list') { const journal = host.jobs.read(); return report([...(journal.local ?? []).map(job => localProjection(host, job)), ...journal.jobs.map(remoteProjection)]); }
+async function control(host: JobsComposition, action: string, args: readonly string[], queue = false): Promise<string> {
+  if (action === 'list') { const journal = host.jobs.read(); return report([...(journal.local ?? []).map(job => localProjection(host, job)),
+    ...(journal.agents ?? []).map(job => agentProjection(host, job)), ...journal.jobs.map(remoteProjection)]); }
+  if (action === 'agent' || action === 'continue' || host.agents.journal.list().some(job => job.id === args[0])) return agentControl(host, action, args, queue);
   const tool = createCoreToolRegistry();
   if (action === 'run' || action === 'queue') return approved(host, 'bash', args[0]!, `Local command: ${report(args[0]!, 24000)}\n300s native deadline; 64KiB retained per stream; exact live cancellation. ${action === 'queue' ? 'Queue only; fresh resume approval is required to dispatch.' : 'Runs independently of the main turn.'}`,
     async context => action === 'queue' ? { success: true, output: `Queued ${host.local.create({ command: args[0]!, cwd: context.workspaceRoot })}; no command was dispatched.` }
@@ -53,13 +58,4 @@ async function control(host: JobsComposition, action: string, args: readonly str
     return tool.get('bash')!.execute({ command: selected.command, runInBackground: true }, { ...context, background: runner });
   });
   throw new Error('Unsupported local job operation.');
-}
-async function approved(host: JobsComposition, name: string, command: string, preview: string,
-  execute: (context: ToolExecutionContext) => Promise<ToolExecutionResult>): Promise<string> {
-  const admission = jobAdmission(host); const gate = host.gate(name);
-  const definition: ToolDefinition = { name, description: 'Operate one session-bound local job.', argsSchema: { type: 'object' },
-    prepare: () => ({ targets: [], permissionArgs: { command, runInBackground: true }, previewKind: 'execution', preview,
-      execute: context => { if (admission()) throw new Error('Job admission changed after approval.'); return execute(context); } }),
-    execute: async () => ({ success: false, error: 'Prepared job approval required.' }), resultAdmission: admission };
-  return (await runPreparedTool(definition, {}, { ...gate, background: host.registry, admission }, undefined, undefined, 'Local job', { eventKey: 'jobs' })).output;
 }

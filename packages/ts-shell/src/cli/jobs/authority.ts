@@ -5,11 +5,11 @@ import { readGoalEdit } from '../../planning/goal/store.js';
 import type { JobsComposition } from './model.js';
 import { jobsInstallations } from './state.js';
 
-export function jobAdmission(host: Pick<JobsComposition, 'context' | 'manager' | 'session' | 'gate'>): () => string | undefined {
+export function jobAdmission(host: Pick<JobsComposition, 'context' | 'manager' | 'session' | 'gate'>, tool = 'bash'): () => string | undefined {
   const lifetime = jobsInstallations.get(host.context);
   const configuration = configurationAdmission(host.context); const collaboration = collaborationAdmissionFor(host.context);
   const acceptance = collaborationHosts.get(host.context)?.active;
-  const goal = readGoalEdit(host.manager, host.session).goal; const gate = host.gate('bash').admission;
+  const goal = readGoalEdit(host.manager, host.session).goal; const gate = host.gate(tool).admission;
   const cwd = host.context.cwd;
   return () => {
     try {

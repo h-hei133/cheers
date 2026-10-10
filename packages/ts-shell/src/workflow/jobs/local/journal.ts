@@ -23,7 +23,7 @@ export class LocalJournal implements LocalJournalPort {
     const directory = { path: captured.path, identity: captured.identity };
     this.store.update((current, scope) => {
       const local = current.local ?? [];
-      if (current.jobs.length + local.length >= 128 || local.filter(job => ['queued', 'running', 'paused', 'unknown'].includes(job.status)).length >= 2)
+      if (current.jobs.length + local.length + (current.agents?.length ?? 0) >= 128 || local.filter(job => ['queued', 'running', 'paused', 'unknown'].includes(job.status)).length >= 2)
         throw new JobStateError('capacity');
       const intent = { id, ownerId: this.ownerId, command: input.command, directory, timeoutMs, origin, scope, createdAt: Date.now() };
       const job: LocalJob = { ...intent, backend: 'local', digest: localDigest(intent), status: 'queued', dispatchPossible: false,

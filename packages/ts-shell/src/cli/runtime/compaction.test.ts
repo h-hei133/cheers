@@ -1,4 +1,7 @@
 import { ConfigState } from "../../config/state.js";
+import fs from 'node:fs';
+import path from 'node:path';
+import { SessionManager } from '../../session/SessionManager.js';
 import { configurationBinding } from "../../core/shell/configuration.js";
 import type { CliRuntimeInvocationInput } from "../../entrypoints/cliRuntimeInvocation.js";
 import http from "node:http";
@@ -21,8 +24,8 @@ const fixture = vi.hoisted(() => ({
   resolution: {} as Record<string, unknown>,
   config: { providerConnectTimeoutMs: 1000, providerHeadersTimeoutMs: 1000, providerBodyTimeoutMs: 1000, offline: true },
 }));
-vi.mock("../../config/runtimeConfig.js", () => ({ getRuntimeConfig: () => fixture.config }));
-// Transport composition has no durable session or goal; budget policy is covered by its owning suite.
+vi.mock("../../config/runtimeConfig.js", async importOriginal => ({ ...await importOriginal<typeof import('../../config/runtimeConfig.js')>(), getRuntimeConfig: () => fixture.config }));
+// This transport composition has no goal; budget policy is covered by its owning suite.
 vi.mock("./goal.js", () => ({ prepareGoalSession: () => undefined, goalObjectiveFor: () => undefined, goalPolicyFor: () => undefined }));
 vi.mock('./goalScheduling.js', () => ({ installGoalScheduler: () => undefined }));
 vi.mock("../../core/shell/providerCredentials.js", () => ({ resolveProviderCredential: () => fixture.resolution }));
@@ -58,7 +61,10 @@ let server: http.Server;
 let baseUrl: string;
 let signed: Parameters<RequestSigner>[0][];
 let received: { path: string; body: unknown; signature?: string; accept?: string }[];
+let scratch: string;
 beforeEach(async () => {
+  scratch = fs.mkdtempSync(path.resolve(process.cwd(), '../../.tmp/compaction-runtime-'));
+  vi.stubEnv('HOME', scratch); vi.stubEnv('USERPROFILE', scratch);
   signed = [];
   received = [];
   fixture.compaction = undefined;
@@ -85,21 +91,24 @@ beforeEach(async () => {
 afterEach(async () => {
   server.closeAllConnections();
   await new Promise<void>(resolve => server.close(() => resolve()));
+  vi.unstubAllEnvs(); fs.rmSync(scratch, { recursive: true, force: true });
 });
 
 function runtime(withKey: boolean) {
   fixture.resolution = { provider: "fixture", model: "fixture-model", baseUrl,
     ...(withKey ? { credential: { apiKey: "synthetic", model: "fixture-model", baseUrl } } : {}),
   };
-  const context = { cwd: process.cwd(), projectRoot: process.cwd(), session: { id: "signed-summary" },
+  const manager = new SessionManager();
+  const session = manager.createNewWithId('signed-summary', process.cwd());
+  const context = { cwd: process.cwd(), projectRoot: process.cwd(), session,
     runtimeConfig: structuredClone({ ...fixture.config, configProvenance: {}, configValidation: { valid: true, securityBlocked: false }, configDiagnostics: [] }) };
   const configuration = new ConfigState(context.runtimeConfig as never, configurationBinding(context), loadCatalog());
   fixture.configuration = configuration;
   createCliSessionRuntime({
     runtimeContext: { ...context, configuration },
     providerRuntimeBridge: { resolveCredentialSnapshot: () => fixture.resolution },
-    sessionManager: { getSession: () => ({ turns: [] }) },
-    renderer: {}, options: {}, approvalTrustPolicy: {}, approvalModeState: { get: () => undefined }, getReadline: () => null,
+    sessionManager: manager,
+    renderer: { renderLine: vi.fn(), emit: vi.fn() }, options: {}, approvalTrustPolicy: {}, approvalModeState: { get: () => undefined }, getReadline: () => null,
   } as never);
   return fixture.deps!;
 }
