@@ -275,11 +275,17 @@ export interface CommandExecutionResult extends NormalizedExecutionResult {
   readonly recoveryReason?: string
 }
 
+/** Returned by the writer after native verification; absent for older injected adapters. */
+export interface TextFileWriteResult {
+  readonly status: 'unchanged' | 'committed';
+  readonly operationId?: string;
+}
+
 export interface ExecutionService {
   readonly readMedia: (request: MediaReadRequest) => Promise<MediaReadResult>
   readonly readTextFile: (request: TextFileReadExecutionRequest) => Promise<string>
   readonly readTextPage: (request: TextPageReadRequest) => Promise<TextPageReadResult>
-  readonly writeTextFile: (request: TextFileWriteExecutionRequest) => Promise<void>
+  readonly writeTextFile: (request: TextFileWriteExecutionRequest) => Promise<TextFileWriteResult | void>
   readonly listFilesRecursive: (request: FileListExecutionRequest) => Promise<readonly string[]>
   readonly runCommand: (request: CommandExecutionRequest) => Promise<CommandExecutionResult>
 }

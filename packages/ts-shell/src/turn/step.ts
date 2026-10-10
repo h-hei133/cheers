@@ -444,23 +444,20 @@ export function createStepFunction(request: StepRequest): StepFunction {
           // The conversation outgrew the window. That is answered by condensing,
           // not by asking again, so it keeps its own prefix and stops here.
           if (isContextOverflow(detail)) {
-            return stamp(errorStep(`${CONTEXT_OVERFLOW_PREFIX}${detail.slice(0, 200)}`));
+            return stamp(errorStep(`${CONTEXT_OVERFLOW_PREFIX}Provider rejected the context size.`));
           }
           if (effort && /reasoning_effort|thinking|reasoning.*(?:effort|budget)/i.test(detail) && attemptResponse.status >= 400 && attemptResponse.status < 500 && attemptResponse.status !== 429) {
             if (explicitEffort) return stamp(errorStep('Provider rejected the selected reasoning effort. The preference was preserved. Select another level or use /thinking auto.'));
             dropEffort = true;
             break;
           }
-          refusal = `Provider HTTP ${attemptResponse.status}: ${detail.slice(0, 200)}`;
-          // The class is recorded alongside the message rather than replacing
-          // it: the message carries the provider's own words, which is what
-          // makes a failure diagnosable, while the class is what lets a reader
-          // tell an expired key from an exhausted quota without matching on
-          // prose that every provider phrases differently.
+          // Provider bodies may echo credentials, prompts or private workspace text.
+          // Keep them within classification; only the status and category cross the result boundary.
           refusalClass = classifyProviderFailure({
             status: attemptResponse.status,
             message: detail,
           });
+          refusal = `Provider HTTP ${attemptResponse.status}: ${refusalClass}. Response details withheld.`;
           transient = isRetryableStatus(attemptResponse.status);
           if (transient) {
             requestedDelayMs = serverRequestedDelayMs(

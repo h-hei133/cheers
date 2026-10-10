@@ -6455,3 +6455,9 @@ SSH/父生命周期组件已提交/推送`e38c614986163be7d5ec6b817180760a237aa5
 ### 2026-10-10 — Phase 19 W13 批准的命令图组件
 
 原/workflow直接exec与project-wide writer由session绑定图owner替代，复用普通独立bash审批、native local jobs与唯一ExecutionService；dependency batch失败停止后续、exact live停止、永久graph/child fence和restart unknown零重放接通。独立反例修复publication uncertainty、全局reserved IDs、directory identity、settled pause槽释放及reserved child adoption；code APPROVE/architecture CLEAR，最终31TS freeze未漂移。Node20.3组合88项、边界54项、149契约、43scripts/五静态门、两种构建、六有效反转/恢复39项、六actualCLI共96local commands零modelPOST通过。完整NormProof仍8192-edge容量not_proven，W16负责；未宣称完整TS suite/远端CI通过。边界与材料见[作业文档](features/jobs.md)、[Phase19 §8.135](features/phase-19-decisions.md#8135-w13-flow-01-批准的命令图依赖调度独立审批与永久重放围栏)及`.tmp/jobs/dag-acceptance.json`。FLOW-01三个组件本地实现/验收完成，FLOW-02/03与W14–W16继续，Phase19全目标active；commit/push/精确CI另记，用户.gitignore保留不提交。
+
+命令图组件已提交/推送`b81eacbf6d77efb05afdaf662689f890a61d69fe`并读回远端同SHA；CI38049811075/job114206497314及Watch38049821029/job114206523901均completed/failure、steps=[]。annotations确认付款/spending-limit阻止job启动，未计远端通过；材料`.tmp/jobs/dag-delivery.json`。FLOW-02顺序继续，Phase19全目标active。
+
+### 2026-10-10 — Phase 19 W13 一次性模型交接
+
+`/handover` 接通 checklist/实际批准提交后的一回合模型切换，复用原工具/执行/请求账目并保留 `/handoff` 压缩别名。修复 restart adoption、no-op writer、转录/收据 uncertainty、opaque 模型连接冲突及 HTTP 正文报告泄露；最终 33TS freeze 独立 code APPROVE/architecture CLEAR。428 受影响项、149 契约、两种构建、五静态门/43scripts、七有效反转和六 actualCLI（70 合成 POST）通过；原生取消、下一回合来源恢复及 safe failure 直接读回。边界/材料见[交接文档](features/handoff.md)与[Phase19 §8.136](features/phase-19-decisions.md#8136-w13-flow-02一次性模型交接组件)。完整 NormProof 仍容量 not_proven 待 W16；持久 director/worker 与后续任务继续，Phase19 active，commit/push/精确远端事实另记，用户 .gitignore 保留不提交。

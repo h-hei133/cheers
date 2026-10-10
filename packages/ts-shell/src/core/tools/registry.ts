@@ -277,7 +277,7 @@ export function createCoreToolRegistry(options?: {
             if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error
             originalUnreadable = true
           }
-          await executionService.writeTextFile({
+          const written = await executionService.writeTextFile({
             operationKind: 'file.write',
             ...(context.sessionId ? { editIdentity: { sessionId: context.sessionId, workspaceRoot: context.artifactRoot ?? context.workspaceRoot, callId: context.taskId, correlationId: context.correlationId } } : {}),
             assertFileAccess: context.assertFileAccess,
@@ -296,7 +296,7 @@ export function createCoreToolRegistry(options?: {
             : originalUnreadable
               ? `Wrote ${relPath} (original unreadable, no diff)`
               : `Wrote ${relPath}`
-          return approvedResult(output)
+          return approvedResult(output, written ? { ...written } : { status: 'unverified' })
           })
       },
     },
@@ -455,7 +455,7 @@ export function createCoreToolRegistry(options?: {
           throw new Error("Must provide 'content', 'edits', or both 'oldText' and 'newText'.")
         }
 
-        await executionService.writeTextFile({
+        const written = await executionService.writeTextFile({
           operationKind: 'file.write',
             ...(context.sessionId ? { editIdentity: { sessionId: context.sessionId, workspaceRoot: context.artifactRoot ?? context.workspaceRoot, callId: context.taskId, correlationId: context.correlationId } } : {}),
           assertFileAccess: context.assertFileAccess,
@@ -475,7 +475,7 @@ export function createCoreToolRegistry(options?: {
           : originalUnreadable
             ? `Updated ${relPath} (original unreadable, no diff)`
             : `Updated ${relPath}`
-        return approvedResult(output)
+        return approvedResult(output, written ? { ...written } : { status: 'unverified' })
         })
       },
     },

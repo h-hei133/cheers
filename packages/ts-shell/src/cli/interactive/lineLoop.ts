@@ -17,6 +17,7 @@ import { QuestionBridge } from './questionBridge.js';
 import { attachInputQueue, isQueueControl } from '../runtime/inputQueue.js';
 import { SubmissionQueue } from './inputQueue.js';
 import { isPlanningControl } from '../runtime/planning.js';
+import { handoffControl } from '../runtime/handoff.js';
 import { isSecurityControl } from '../runtime/security.js';
 import { isAgentsControl } from '../runtime/agents.js';
 import { isCollaborationControl, runCollaborationControl } from '../collaboration/control.js';
@@ -154,7 +155,7 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
     // Serialise turns: readline delivers the next line as soon as it arrives,
     // and two concurrent turns would interleave their output and their session
     // writes.
-    if (isQueueControl(text) || (busy || questions.question()) && (isGoalControl(text) || isPlanningControl(text) || isAdvisorControl(text) || isSecurityControl(text) || isAgentsControl(text) || isResearchControl(text) || isExtensionControl(text) || isMcpConfiguration(text))) {
+    if (isQueueControl(text) || (busy || questions.question()) && (isGoalControl(text) || isPlanningControl(text) || handoffControl(text) || isAdvisorControl(text) || isSecurityControl(text) || isAgentsControl(text) || isResearchControl(text) || isExtensionControl(text) || isMcpConfiguration(text))) {
       void routeInteractiveCommand({ prompt: text, readline: questionInput, mcpGateway, sessionManager: options.sessionManager,
         runtimeContext: options.runtimeContext, renderer: options.renderer, sessionRuntime: options.sessionRuntime,
         logger: options.logger, approvalTrustPolicy: options.approvalTrustPolicy, turnNumber,

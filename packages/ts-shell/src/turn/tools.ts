@@ -18,6 +18,7 @@ import { authorizeToolCall, consumeToolCall, discardToolCall, preparedToolCall, 
 import { preparationContext, preparationPermission } from './preparation.js';
 import { bindExecutionTarget, executionApprovalPreview } from '../runtime/execution/binding.js';
 import { assertSourceAccess } from '../core/query/sourcePolicy.js';
+import { EditOperationError } from '../edit/recovery/operation/write.js';
 
 /** A tool definition in the shape a chat completion request takes. */
 export interface ToolSchema {
@@ -207,7 +208,8 @@ async function executeTool(
       ...(result.images ? { images: result.images } : {}),
     };
   } catch (error) {
-    return { output: [streamed ? boundText(streamed) : "", `Tool execution error: ${error instanceof Error ? error.message : String(error)}`].filter(Boolean).join("\n"), isError: true };
+    return { output: [streamed ? boundText(streamed) : "", `Tool execution error: ${error instanceof Error ? error.message : String(error)}`].filter(Boolean).join("\n"), isError: true,
+      ...(error instanceof EditOperationError ? { metadata: { operationId: error.operationId, status: error.status } } : {}) };
   } finally { discardToolCall(args); }
 }
 

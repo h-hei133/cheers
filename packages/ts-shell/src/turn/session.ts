@@ -59,6 +59,8 @@ export interface CompactionSetup {
 }
 
 export interface TurnOptions {
+  /** Observes kernel facts after the ordinary transcript writer and projection have accepted them. */
+  readonly observe?: import('../core/agent/events.js').AgentEventListener;
   readonly correlationId?: string;
   readonly commandProof?: ToolGateOptions['commandProof'];
   /** Current-session objective, projected by the goal owner at CLI composition. */
@@ -306,6 +308,7 @@ export function runTurn(options: TurnOptions): TurnRun {
   core.subscribe(async (event: AgentLifecycleEvent, signal) => {
     if (event.type === "message_end" && event.message !== opening) persist(options.onMessage, event.message);
     for (const projected of projection.project(event)) channel.push(projected);
+    await options.observe?.(event, signal);
     if (event.type === 'turn_end' && options.checkpoint && runSubagent) {
       try { await options.checkpoint({ messages: core.state.messages, step: projection.stepCount,
         willContinue: Boolean(event.willContinue) && projection.stepCount < options.maxSteps,

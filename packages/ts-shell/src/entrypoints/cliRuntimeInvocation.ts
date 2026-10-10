@@ -63,6 +63,7 @@ import { createProviderStep, delegatedSteps } from '../cli/provider/step.js';
 type ProviderMode = "synthetic" | "real";
 
 export interface CliRuntimeInvocationInput {
+  readonly stepControl?: import('../turn/control.js').StepControlFactory;
   readonly catalogContent?: CatalogContent;
   readonly onCommandSettled?: ToolCatalogInput['onCommandSettled'];
   readonly thinkingPreference?: ReturnType<typeof captureThinkingPreference>;
@@ -438,11 +439,15 @@ async function startTurn(
   // to the same model. The step and the budget are handed over as a host; the
   // turn composes the runner from its own gate, so the user's refusals reach a
   // subagent's tool calls too.
-  const step = request.providerMode === "synthetic"
+  const baseStep = request.providerMode === "synthetic"
     ? createSyntheticStep({ toolIntent: syntheticToolIntent() })
     : (dependencies.createStep ?? createProviderStep)(request, tools, promptContext);
+  const forModel = delegatedSteps(request, tools, promptContext, baseStep);
+  const control = request.stepControl?.({ step: baseStep, forModel, tools, hooks });
+  const step = control?.step ?? baseStep;
 
   const run = runTurn({
+    observe: control?.observe,
     background: request.background,
     checkpoint: request.checkpoint,
     checkpointError: request.checkpointError,
@@ -454,7 +459,7 @@ async function startTurn(
     subagentHost: {
       step,
       defaultMaxSteps: SUBAGENT_DEFAULT_STEPS,
-      stepForModel: delegatedSteps(request, tools, promptContext, step),
+      stepForModel: forModel,
       retry: { enabled: request.runtimeConfig?.retryEnabled, maxRetries: request.runtimeConfig?.retryMaxRetries,
         baseDelayMs: request.runtimeConfig?.retryBaseDelayMs, maxDelayMs: request.runtimeConfig?.retryMaxDelayMs },
     },

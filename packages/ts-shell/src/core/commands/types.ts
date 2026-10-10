@@ -32,6 +32,7 @@ import type { SidebarLiveEventStore } from '../../presentation/sidebar/sidebarLi
 export type CommandKind = 'local' | 'prompt' | 'shell-action'
 
 export interface CommandContext {
+  readonly handoffCommand?: (args: string[], context: CommandContext) => Promise<LocalCommandResult>;
   readonly jobsCommand?: (name: 'jobs' | 'hub', args: string[], context: CommandContext) => Promise<LocalCommandResult>;
   readonly workflowCommand?: (args: string[], context: CommandContext) => Promise<LocalCommandResult>;
   readonly collaborationCommand?: (name: 'collab' | 'share' | 'dump', args: string[], context: CommandContext) => Promise<CommandExecutionResult>;

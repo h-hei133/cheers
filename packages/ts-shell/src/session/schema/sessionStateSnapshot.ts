@@ -30,6 +30,8 @@ export interface SessionStateSnapshot {
   research?: unknown;
   /** The jobs owner validates remote binding, provenance and immutable dispatch fences. */
   jobs?: unknown;
+  /** The handoff owner validates selection, turn ownership and permanent run identities. */
+  handoffs?: unknown;
   gitWorkflow?: unknown;
   security?: unknown;
   /** The request owner validates durable reservations, metering and replay protection. */
@@ -89,6 +91,7 @@ export function buildSessionStateSnapshot(
     advisor: current?.advisor,
     research: current?.research,
     jobs: current?.jobs,
+    handoffs: current?.handoffs,
     gitWorkflow: current?.gitWorkflow,
     security: current?.security,
     requestLedger: current?.requestLedger,

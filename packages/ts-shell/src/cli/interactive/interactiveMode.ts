@@ -41,6 +41,7 @@ import { attachGoalSubmission, schedulerForRuntime } from '../runtime/goalSchedu
 import { attachSubmissionQueue, isQueueControl, queueCommandFor } from '../runtime/inputQueue.js';
 import { tokenizeCommandArgs } from '../../core/commands/arguments.js';
 import { isPlanningControl, planningCommandFor } from '../runtime/planning.js';
+import { handoffControl, handoffCommandFor } from '../runtime/handoff.js';
 import { isSecurityControl, securityCommandFor } from '../runtime/security.js';
 import { isAgentsControl, agentsCommandFor } from '../runtime/agents.js';
 import { isCollaborationControl, runCollaborationControl } from '../collaboration/control.js';
@@ -650,6 +651,15 @@ export class InteractiveMode {
       }, error => {
         this.state.transcript.append(textBlock('error', error instanceof Error ? error.message : String(error)));
         this.tui.requestRender();
+      });
+      return;
+    }
+    if (handoffControl(text) && (this.busy || this.questions.question())) {
+      const context = this.options.runtimeContext;
+      void handoffCommandFor(context, this.options.sessionManager, this.options.sessionRuntime)(tokenizeCommandArgs(text.trim().replace(/^\/handover\s*/i, '')), {
+        cwd: context.cwd, projectRoot: context.projectRoot, sessionId: context.session.id, interactive: true,
+      }).then(result => {
+        this.state.transcript.append(textBlock('command', result.output, '/handover')); this.tui.requestRender();
       });
       return;
     }

@@ -8,13 +8,13 @@ import { captureRecoveryAuthorityRecord } from '../../edit/recovery/recoveryAuth
 import { commitOperation, prepareOperation } from '../../edit/recovery/operation/write.js';
 import { FileContentConflictError } from './conflict.js';
 import { withFileLock } from './fileLock.js';
-import type { TextFileWriteExecutionRequest } from './types.js';
+import type { TextFileWriteExecutionRequest, TextFileWriteResult } from './types.js';
 
-export function writeTextFile(request: TextFileWriteExecutionRequest): Promise<void> {
+export function writeTextFile(request: TextFileWriteExecutionRequest): Promise<TextFileWriteResult> {
   return withFileLock(request.absolutePath, () => writeUnlocked(request));
 }
 
-async function writeUnlocked(request: TextFileWriteExecutionRequest): Promise<void> {
+async function writeUnlocked(request: TextFileWriteExecutionRequest): Promise<TextFileWriteResult> {
   request.abortSignal?.throwIfAborted();
   if (request.authority.mode !== 'approved-for-write') throw new Error('File write requires approved write authority.');
   const root = realpathSync(request.workspaceRoot);
@@ -32,14 +32,14 @@ async function writeUnlocked(request: TextFileWriteExecutionRequest): Promise<vo
   if (request.expectedContent !== undefined && (before.state !== 'exists' || before.content !== request.expectedContent)) {
     throw new FileContentConflictError(request.reportSafeTarget);
   }
-  if (before.state === 'exists' && before.content === request.content) return;
+  if (before.state === 'exists' && before.content === request.content) return { status: 'unchanged' };
   const input = { workspaceRoot: root, relativePath: relative, before, content: request.content, assertFileAccess: checkAccess };
   if (request.editIdentity) {
     const prepared = await prepareOperation(request.editIdentity, [input]);
     // Snapshot persistence yields. Refuse stale input before publishing a write intent.
     checkCondition(request, root, relative, before, checkAccess);
-    commitOperation(prepared);
-    return;
+    const receipt = commitOperation(prepared);
+    return { status: 'committed', operationId: receipt.operationId };
   }
   // Legacy non-session callers retain best-effort snapshot capture, without being
   // admitted to a session's undo stack. A snapshot is never commit evidence.
@@ -52,6 +52,7 @@ async function writeUnlocked(request: TextFileWriteExecutionRequest): Promise<vo
   } catch { /* Unowned snapshots remain optional. */ }
   checkCondition(request, root, relative, before, checkAccess);
   commitWorkspaceFile({ ...input, expected: before });
+  return { status: 'committed' };
 }
 
 function checkCondition(request: TextFileWriteExecutionRequest, root: string, relative: string,

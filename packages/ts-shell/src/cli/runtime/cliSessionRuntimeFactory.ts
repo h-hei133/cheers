@@ -43,6 +43,7 @@ import { goalObjectiveFor, goalPolicyFor, prepareGoalSession } from './goal.js';
 import { installGoalScheduler } from './goalScheduling.js';
 import { acceptanceCapture } from '../../planning/goal/acceptance/capture.js';
 import { planningSettlement } from './planning.js';
+import { handoffAcceptance, handoffRunFor, handoffSettlement } from './handoff.js';
 import { advisorCheckpointFor } from './advisor.js';
 import { readGoalEdit } from '../../planning/goal/store.js';
 import type { GoalScheduler } from '../../planning/goal/run/scheduler.js';
@@ -199,7 +200,7 @@ export function createCliSessionRuntime(input: {
   let goalScheduler: GoalScheduler | undefined;
   const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
     admitPrompt: admitCollaborationPrompt.bind(undefined, input.runtimeContext),
-    promptSettled: settleCollaborationPrompt.bind(undefined, input.runtimeContext),
+    promptSettled: handoffSettlement(input.runtimeContext, settleCollaborationPrompt.bind(undefined, input.runtimeContext)),
     onCancelRequested: () => { goalScheduler?.interrupt(); cancelGitFor(input.runtimeContext); cancelSecurityFor(input.runtimeContext); cancelExtensionsFor(input.runtimeContext); cancelMcpFor(input.runtimeContext); cancelSshFor(input.runtimeContext); input.mcpGateway?.cancelContent(); },
     configuredAgentMode: () => input.runtimeContext.runtimeConfig.agentMode,
     sessionManager: input.sessionManager,
@@ -282,13 +283,16 @@ export function createCliSessionRuntime(input: {
       const config = publication.config;
       const catalog = publication.catalog;
       const backgroundSignal = input.runtimeContext.configuration.backgroundSignal;
-      const admission = collaborationAdmissionFor(input.runtimeContext, configurationAdmission(input.runtimeContext));
+      const parentAdmission = collaborationAdmissionFor(input.runtimeContext, configurationAdmission(input.runtimeContext));
       const resolvedCredential =
         input.providerRuntimeBridge.resolveCredentialSnapshot();
       const sessionId = input.runtimeContext.session.id;
+      const handoff = handoffRunFor(input.runtimeContext, input.sessionManager, sessionRuntime, resolvedCredential, signal,
+        parentAdmission, input.renderer.renderLine.bind(input.renderer));
+      const admission = handoff?.admission ?? parentAdmission;
       const research = researchRunFor(input.runtimeContext, input.sessionManager, input.renderer,
         goalPolicyFor(input.runtimeContext, input.sessionManager));
-      const requestPolicy = research.requestPolicy;
+      const requestPolicy = handoff ? handoff.policy(research.requestPolicy) : research.requestPolicy;
       // A runner left over from an earlier run in this session is still holding
       // an idle timer, and it would refresh the same prefix the new runner is
       // about to refresh — the same money spent twice. Only the current run
@@ -355,7 +359,7 @@ export function createCliSessionRuntime(input: {
               },
             }
           : undefined;
-        return { compaction, cacheWarming };
+        return handoff ? handoff.resources({ compaction, cacheWarming }) : { compaction, cacheWarming };
       };
       const escalationPromptHandler = createCliApprovalEscalationBridge({
         renderer: input.renderer,
@@ -388,6 +392,8 @@ export function createCliSessionRuntime(input: {
       const currentGoal = readGoalEdit(input.sessionManager, input.runtimeContext.session).goal;
       refreshExtensionsFor(input.runtimeContext);
       const run = streamCliRuntimePrompt({
+        stepControl: handoff?.control,
+        onCommandSettled: handoff?.commandSettled.bind(handoff),
         background: jobsRunnerFor(input.runtimeContext),
         featureTools: [...research.featureTools, ...gitFeatureTools(input.runtimeContext), ...securityFeatureTools(input.runtimeContext), ...sshFeatureTools(input.runtimeContext)],
         checkpoint: advisorCheckpointFor(input.runtimeContext, input.sessionManager, input.renderer, promptEntryId),
@@ -401,8 +407,8 @@ export function createCliSessionRuntime(input: {
         runtimeConfig: config,
         providerCatalog: catalog,
         prompt,
-        ...(continuityContext ? { continuityContext } : {}),
-        ...(onPromptAccepted ? { onPromptAccepted } : {}),
+        ...((continuityContext || handoff) ? { continuityContext: [continuityContext, handoff?.contextText].filter(Boolean).join('\n\n') } : {}),
+        onPromptAccepted: handoffAcceptance(handoff, onPromptAccepted),
         ...(attachments ? { attachments } : {}),
         sessionId,
         workspaceRoot: input.runtimeContext.cwd,

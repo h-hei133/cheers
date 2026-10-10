@@ -241,11 +241,12 @@ describe("createStepFunction", () => {
   it("marks a context overflow so the session can compact and retry", async () => {
     const step = createStepFunction({
       ...request,
-      fetchImpl: async () => jsonResponse({ error: { code: "context_length_exceeded" } }, { ok: false, status: 400 }),
+      fetchImpl: async () => jsonResponse({ error: { code: "context_length_exceeded", message: 'SYNTHETIC_PRIVATE_RESPONSE' } }, { ok: false, status: 400 }),
     });
     const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
     expect(result.stopReason).toBe("error");
     expect(result.errorMessage?.startsWith(CONTEXT_OVERFLOW_PREFIX)).toBe(true);
+    expect(result.errorMessage).not.toContain('SYNTHETIC_PRIVATE_RESPONSE');
   });
 
   it("names the model every kind of step came from", async () => {
@@ -371,6 +372,7 @@ describe("createStepFunction", () => {
     let body: { temperature?: number; top_p?: number; max_tokens?: number } = {};
     const step = createStepFunction({
       ...request,
+      thinkingEffort: null,
       temperature: 0.2,
       topP: 0.9,
       maxOutputTokens: 777,
@@ -564,8 +566,8 @@ describe("createStepFunction", () => {
       const result = await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
 
       expect(result.failureClass, `status ${status}`).toBe(expected);
-      // The provider's own words survive alongside it.
-      expect(result.errorMessage).toContain(body);
+      expect(result.errorMessage).toContain(`Provider HTTP ${status}: ${expected}`);
+      expect(result.errorMessage).not.toContain(body);
     }
   });
 
