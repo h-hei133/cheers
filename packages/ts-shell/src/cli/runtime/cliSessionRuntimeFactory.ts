@@ -30,6 +30,7 @@ import { researchRunFor } from './research.js';
 import { cancelGitFor, gitFeatureTools } from './git.js';
 import { installGitCliRuntime } from './gitGate.js';
 import { installCollaborationRuntime } from './collaboration.js';
+import { installSshRuntime, sshFeatureTools, cancelSshFor } from './ssh.js';
 import { admitCollaborationPrompt, settleCollaborationPrompt } from '../collaboration/acceptance.js';
 import { collaborationAdmissionFor } from '../collaboration/policy.js';
 import { installSecurityRuntime, cancelSecurityFor, securityFeatureTools } from './security.js';
@@ -345,7 +346,7 @@ export function createCliSessionRuntime(input: {
   const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
     admitPrompt: admitCollaborationPrompt.bind(undefined, input.runtimeContext),
     promptSettled: settleCollaborationPrompt.bind(undefined, input.runtimeContext),
-    onCancelRequested: () => { goalScheduler?.interrupt(); cancelGitFor(input.runtimeContext); cancelSecurityFor(input.runtimeContext); cancelExtensionsFor(input.runtimeContext); cancelMcpFor(input.runtimeContext); input.mcpGateway?.cancelContent(); },
+    onCancelRequested: () => { goalScheduler?.interrupt(); cancelGitFor(input.runtimeContext); cancelSecurityFor(input.runtimeContext); cancelExtensionsFor(input.runtimeContext); cancelMcpFor(input.runtimeContext); cancelSshFor(input.runtimeContext); input.mcpGateway?.cancelContent(); },
     configuredAgentMode: () => input.runtimeContext.runtimeConfig.agentMode,
     sessionManager: input.sessionManager,
     renderer: input.renderer,
@@ -533,7 +534,7 @@ export function createCliSessionRuntime(input: {
       const currentGoal = readGoalEdit(input.sessionManager, input.runtimeContext.session).goal;
       refreshExtensionsFor(input.runtimeContext);
       const run = streamCliRuntimePrompt({
-        featureTools: [...research.featureTools, ...gitFeatureTools(input.runtimeContext), ...securityFeatureTools(input.runtimeContext)],
+        featureTools: [...research.featureTools, ...gitFeatureTools(input.runtimeContext), ...securityFeatureTools(input.runtimeContext), ...sshFeatureTools(input.runtimeContext)],
         checkpoint: advisorCheckpointFor(input.runtimeContext, input.sessionManager, input.renderer, promptEntryId),
         checkpointError: input.renderer.renderLine.bind(input.renderer),
         ...(promptEntryId ? { correlationId: promptEntryId, commandProof: acceptanceCapture(input.sessionManager,
@@ -585,6 +586,7 @@ export function createCliSessionRuntime(input: {
   goalScheduler = installGoalScheduler(input.runtimeContext, input.sessionManager, sessionRuntime, message => input.renderer.renderLine(message));
   const nativeGate = installGitCliRuntime(input, sessionRuntime, isStdinTty);
   installCollaborationRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate);
+  installSshRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate, message => input.renderer.renderLine(message));
   installSecurityRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate);
   installAgentsRuntime(input.runtimeContext, nativeGate);
   if (input.mcpGateway) installMcpRuntime(input.runtimeContext, input.mcpGateway, nativeGate, url => input.renderer.renderLine(`Open this MCP sign-in URL in your browser:\n${url}`));

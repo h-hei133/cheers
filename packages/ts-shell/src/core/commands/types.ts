@@ -33,6 +33,7 @@ export type CommandKind = 'local' | 'prompt' | 'shell-action'
 
 export interface CommandContext {
   readonly collaborationCommand?: (name: 'collab' | 'share' | 'dump', args: string[], context: CommandContext) => Promise<CommandExecutionResult>;
+  readonly sshCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>;
   readonly extensionCommand?: (kind: 'marketplace' | 'plugin', args: string[], context: CommandContext) => Promise<LocalCommandResult>;
   readonly requestPolicy?: import('../agent/request/model.js').RequestPolicy;
   /** Feature handler supplied by the CLI's current session composition. */

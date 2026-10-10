@@ -220,7 +220,7 @@ export abstract class SessionLifecycleWrites {
     if (sessionHasConversation(session) || session.hasReportHistory) return false;
     // Explicit durable user state can precede the first model turn.
     const state = this.host.store.readStateSnapshotSafely(this.host.store.statePath(sessionId));
-    if (state && [state.modelSelection, state.goal, state.plan, state.goalDraft, state.goalAcceptance, state.advisor, state.research, state.gitWorkflow].some(value => value !== undefined)) return false;
+    if (state && [state.modelSelection, state.goal, state.plan, state.goalDraft, state.goalAcceptance, state.advisor, state.research, state.gitWorkflow, state.jobs].some(value => value !== undefined)) return false;
     const projectRoot = session.projectRoot;
     this.host.store.deleteSession(sessionId);
     forgetSessionTodos(sessionId);

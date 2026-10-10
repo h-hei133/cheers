@@ -13,6 +13,8 @@ import { isAgentsControl } from './agents.js';
 import { isExtensionControl } from './extensions.js';
 import { isMcpRequest, isMcpConfiguration, isMcpControl, mcpControl } from '../mcp/content.js';
 import { cancelMcpFor } from './mcp.js';
+import { sshControl } from '../ssh/control.js';
+import { cancelSshFor } from './ssh.js';
 import { isAdvisorControl } from './advisor.js';
 import { isResearchControl } from './research.js';
 import { isPlanningStreamControl } from './planning.js';
@@ -51,6 +53,7 @@ export async function runPromptInputStream(options: {
   let exitRequested = false;
   let turnChain = Promise.resolve();
   let controlChain = Promise.resolve();
+  let localControlChain = Promise.resolve();
   let contentCancellation = Promise.resolve();
   let mcpCancellationGeneration = 0;
   let pendingControls = 0;
@@ -90,8 +93,18 @@ export async function runPromptInputStream(options: {
   };
   const enqueuePrompt = (prompt: string): void => {
     const cancellingContent = mcpControl(prompt)?.action === 'cancel';
+    const ssh = sshControl(prompt);
+    if (ssh && ['status', 'jobs', 'cancel-pending', 'disconnect'].includes(ssh.action)) {
+      if (ssh.action === 'cancel-pending' || ssh.action === 'disconnect') {
+        queue.cancelWhere(value => /^\/ssh(?:\s|$)/i.test(value.trim())); cancelSshFor(options.runtimeContext);
+      }
+      pendingControls++;
+      localControlChain = localControlChain.then(() => dispatch(prompt))
+        .catch(() => options.renderer.renderLine('Local SSH control is unavailable; retained remote jobs may still run.'))
+        .finally(() => { pendingControls--; }); return;
+    }
     if (cancellingContent) { mcpCancellationGeneration++; queue.cancelWhere(isMcpRequest); cancelMcpFor(options.runtimeContext); }
-    if (isQueueControl(prompt) || isGoalControl(prompt) || isPlanningStreamControl(prompt) || isAdvisorControl(prompt) || isSecurityControl(prompt) || isAgentsControl(prompt) || isResearchControl(prompt) || isExtensionControl(prompt) || isMcpControl(prompt) || isMcpConfiguration(prompt)) {
+    if (isQueueControl(prompt) || isGoalControl(prompt) || isPlanningStreamControl(prompt) || isAdvisorControl(prompt) || isSecurityControl(prompt) || isAgentsControl(prompt) || isResearchControl(prompt) || isExtensionControl(prompt) || isMcpControl(prompt) || isMcpConfiguration(prompt) || sshControl(prompt)) {
       pendingControls += 1;
       const generation = mcpCancellationGeneration;
       controlChain = controlChain.then(() => {
@@ -180,11 +193,13 @@ export async function runPromptInputStream(options: {
   });
   flushPendingPrompt();
   for (;;) {
+    const localControls = localControlChain;
+    await localControls;
     const controls = controlChain;
     await controls;
     const turns = turnChain;
     await turns;
-    if (controls === controlChain && turns === turnChain) break;
+    if (localControls === localControlChain && controls === controlChain && turns === turnChain) break;
   }
   await schedulerForRuntime(options.sessionRuntime)?.stop('cancelled');
   releaseGoal?.();

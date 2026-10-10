@@ -159,7 +159,7 @@ export function projectLoadedSession(input: {
   }
   return {
     id: metadata.id,
-    ...([input.state.goal, input.state.plan, input.state.goalDraft, input.state.goalAcceptance, input.state.advisor, input.state.research, input.state.gitWorkflow, input.state.security].some(value => value !== undefined)
+    ...([input.state.goal, input.state.plan, input.state.goalDraft, input.state.goalAcceptance, input.state.advisor, input.state.research, input.state.gitWorkflow, input.state.security, input.state.jobs].some(value => value !== undefined)
       ? { hasPlanningState: true } : {}),
     ...(input.state.workspaceRoots !== undefined ? { workspaceRoots: decodeWorkspaceRoots(input.state.workspaceRoots) } : {}),
     projectRoot:

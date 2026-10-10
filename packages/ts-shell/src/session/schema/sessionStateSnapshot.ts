@@ -28,6 +28,8 @@ export interface SessionStateSnapshot {
   goalAcceptance?: unknown;
   advisor?: unknown;
   research?: unknown;
+  /** The jobs owner validates remote binding, provenance and immutable dispatch fences. */
+  jobs?: unknown;
   gitWorkflow?: unknown;
   security?: unknown;
   /** The request owner validates durable reservations, metering and replay protection. */
@@ -86,6 +88,7 @@ export function buildSessionStateSnapshot(
     goalAcceptance: current?.goalAcceptance,
     advisor: current?.advisor,
     research: current?.research,
+    jobs: current?.jobs,
     gitWorkflow: current?.gitWorkflow,
     security: current?.security,
     requestLedger: current?.requestLedger,

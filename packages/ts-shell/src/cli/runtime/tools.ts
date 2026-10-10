@@ -7,6 +7,7 @@ import { assertAdmission } from '../../core/network/admission.js';
 import { researchInspectionTools } from './research.js';
 import { securityFeatureTools } from './security.js';
 import { refreshExtensionsFor } from './extensions.js';
+import { sshFeatureTools } from './ssh.js';
 
 /** Resolve on each inspection, including after reload or project navigation. */
 export function toolPoolFor(
@@ -20,7 +21,7 @@ export function toolPoolFor(
     const workspaceRoot = context.projectRoot ?? context.cwd;
     const owned = !supplied && context.runtimeConfig.enableMcpTools ? new CoreMcpGateway(workspaceRoot) : undefined;
     try {
-      return (await loadToolCatalog({ workspaceRoot, sessionId: context.session.id, runtimeConfig: context.runtimeConfig, admission, featureTools: [...researchInspectionTools(context), ...securityFeatureTools(context)],
+      return (await loadToolCatalog({ workspaceRoot, sessionId: context.session.id, runtimeConfig: context.runtimeConfig, admission, featureTools: [...researchInspectionTools(context), ...securityFeatureTools(context), ...sshFeatureTools(context)],
         skillOptions: context.skillOptions, mcpGateway: supplied ?? owned })).tools;
     } finally {
       await owned?.close();

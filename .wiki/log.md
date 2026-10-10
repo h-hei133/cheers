@@ -6429,3 +6429,9 @@ HTTP/OAuth已提交/推送d4225db2fa2f301fe261d3b51cc8db968e9ae622并读回同SH
 ### 2026-10-10 — Phase 19 W12协作与安全共享组件
 
 显式前台服务、认证ACL/短ticket/单host租约、持久relay/游标和已批准只读共享接通；提案由host明确接管，走原生prompt/工具/请求账目，取消与unknown usage真实保留。独立反例与实际状态审计修复root替换、旧结果升级、unknown误判及Node20.3长预览心跳饥饿。最终61文件冻结，先前41文件496项/149契约/43scripts，最终delta16文件142项与两种构建、七旧及三新有效反转/恢复34项、四条严格actualCLI通过；共156local命令/12hostPOST/0guestPOST，取消/重启/吊销/删除/raw授权/持久关房及来源账目直接读回。功能和完整限制见[协作文档](features/collaboration.md)与[Phase19 §8.131](features/phase-19-decisions.md#8131-w12-rem-0103显式协作服务安全共享与原生提案接管本地组件)。完整NormProof仍not_proven/容量待W16；REM-04、完整REM-05与W13–W16继续，Phase19未完成。交付前再修复旧host迟到心跳越过实例隔离；真实命令成功/失败两路及有效反转/恢复36项、重新构建与四条actualCLI通过，最终代码APPROVE/架构CLEAR（新freeze1900b66f），commit/push/远端事实另记。
+
+协作组件已提交/推送`845a0c4550778b7747b4090c255cb319d3b82ac8`，远端分支读回同SHA。CI38020298100/job114119603237及Watch38020298182/job114119603515均completed/failure、steps=[]；check annotations确认付款/spending-limit阻止启动，未计远端通过。REM-04按序继续。
+
+### 2026-10-10 — Phase 19 W12显式SSH与父作业生命周期
+
+原生SSH沿ExecutionService接通私有profile/固定host key、session CAS永久tombstone、native user-manager/cgroup作业、精确取消与有界输出；goal/collaboration/applied-advisor来源和一次parent cancellation能力沿普通批准和共享账目，restart不重建权力。独立反例修复scope/invocation、配置revision、late teardown、model取消、pipe控制及跨页脱敏，代码APPROVE/架构CLEAR；最终174组合/149契约/43scripts、Node20.3与单文件构建、五有效反转/恢复31项及八actualCLI路径通过。SSH四路径80local commands零模型POST；协作四路径8hostPOST/0guestPOST、每条110tokens结算加1项unknown reservation和精确cgroup cancellation均读回。功能边界、失败归因和材料见[SSH文档](features/ssh.md)与[Phase19 §8.132](features/phase-19-decisions.md#8132-w12-rem-04-与-ssh-关联-rem-05显式远端作业和父生命周期)。完整NormProof仍8192-edge容量not_proven，W16负责完整图修复；W13–W16和Phase19全目标继续，commit/push/精确远端结果另记，用户.gitignore保留不提交。

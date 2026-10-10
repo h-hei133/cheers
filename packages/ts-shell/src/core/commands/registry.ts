@@ -11,6 +11,7 @@ import { gitCommandDefinitions } from './git/registration.js';
 import { securityCommandDefinition } from './security/registration.js';
 import { agentsCommandDefinition } from './agents/registration.js';
 import { collaborationDefinitions } from './collaboration/registration.js';
+import { sshCommandDefinition } from './ssh/registration.js';
 import { marketplaceSyntax } from "./marketplace/syntax.js";
 import { pluginSyntax } from "./plugin/syntax.js";
 import { workflowSyntax } from "../workflow/syntax.js";
@@ -740,6 +741,7 @@ export function createCommandRegistry(
     securityCommandDefinition(),
     agentsCommandDefinition(),
     ...collaborationDefinitions(),
+    sshCommandDefinition(),
     {
       name: "commit",
       // A staged diff expands into a prompt; an empty index answers locally.
