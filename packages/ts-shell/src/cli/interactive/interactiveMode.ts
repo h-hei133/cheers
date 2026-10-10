@@ -42,6 +42,7 @@ import { attachSubmissionQueue, isQueueControl, queueCommandFor } from '../runti
 import { tokenizeCommandArgs } from '../../core/commands/arguments.js';
 import { isPlanningControl, planningCommandFor } from '../runtime/planning.js';
 import { handoffControl, handoffCommandFor } from '../runtime/handoff.js';
+import { directorControl, directorCommandFor, directorInterruptible } from '../runtime/director.js';
 import { isSecurityControl, securityCommandFor } from '../runtime/security.js';
 import { isAgentsControl, agentsCommandFor } from '../runtime/agents.js';
 import { isCollaborationControl, runCollaborationControl } from '../collaboration/control.js';
@@ -524,7 +525,7 @@ export class InteractiveMode {
     routeKey(event, {
       view: this.view,
       busy: this.busy,
-      interruptible: Boolean(schedulerForRuntime(this.options.sessionRuntime)?.ownerToken()),
+      interruptible: Boolean(schedulerForRuntime(this.options.sessionRuntime)?.ownerToken()) || directorInterruptible(this.options.runtimeContext),
       now: () => Date.now(),
       gesture: this.gesture,
       keybindings: this.preferences.keybindings,
@@ -660,6 +661,18 @@ export class InteractiveMode {
         cwd: context.cwd, projectRoot: context.projectRoot, sessionId: context.session.id, interactive: true,
       }).then(result => {
         this.state.transcript.append(textBlock('command', result.output, '/handover')); this.tui.requestRender();
+      });
+      return;
+    }
+    if (directorControl(text) && (this.busy || this.questions.question())) {
+      if (this.questions.question() && !/^\/director(?:\s+(?:status|off|show|output)(?:\s|$)|\s*$)/i.test(text.trim())) {
+        this.state.transcript.append(textBlock('command', 'Director assignment waits for the pending approval or question.', '/director'));
+        this.tui.requestRender(); return;
+      }
+      const context = this.options.runtimeContext;
+      void directorCommandFor(context)([], { cwd: context.cwd, projectRoot: context.projectRoot, sessionId: context.session.id, interactive: true,
+        rawCommandArgs: text.trim().replace(/^\/director\s*/i, '') }).then(result => {
+        this.state.transcript.append(textBlock('command', result.output, '/director')); this.tui.requestRender();
       });
       return;
     }
@@ -1064,7 +1077,7 @@ export class InteractiveMode {
    */
   private async interrupt(): Promise<void> {
     if (!this.busy) {
-      if (schedulerForRuntime(this.options.sessionRuntime)?.ownerToken()) this.options.sessionRuntime.cancelCurrentRun();
+      if (schedulerForRuntime(this.options.sessionRuntime)?.ownerToken() || directorInterruptible(this.options.runtimeContext)) this.options.sessionRuntime.cancelCurrentRun();
       return;
     }
     this.sink.markCancelling();

@@ -6,7 +6,7 @@ import type { ProviderCredentialResolution } from '../../core/shell/providerCred
 import type { SessionManager } from '../../session/SessionManager.js';
 import { sameValue } from '../../config/values.js';
 import { HandoffStore } from '../../workflow/handoff/store.js';
-import { sourceChoice, executionChoice } from '../handoff/model.js';
+import { sourceChoice, executionChoice } from '../provider/selection.js';
 import { runHandoffCommand } from '../handoff/command.js';
 import { HandoffRun } from '../handoff/runtime.js';
 import { armedHandoffs, liveHandoffs } from '../handoff/state.js';

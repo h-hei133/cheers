@@ -32,6 +32,7 @@ import { installGitCliRuntime } from './gitGate.js';
 import { installCollaborationRuntime } from './collaboration.js';
 import { installSshRuntime, sshFeatureTools, cancelSshFor } from './ssh.js';
 import { installJobsRuntime, jobsRunnerFor } from './jobs.js';
+import { directorRunFor, cancelDirectorFor } from './director.js';
 import { admitCollaborationPrompt, settleCollaborationPrompt } from '../collaboration/acceptance.js';
 import { collaborationAdmissionFor } from '../collaboration/policy.js';
 import { installSecurityRuntime, cancelSecurityFor, securityFeatureTools } from './security.js';
@@ -201,7 +202,7 @@ export function createCliSessionRuntime(input: {
   const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
     admitPrompt: admitCollaborationPrompt.bind(undefined, input.runtimeContext),
     promptSettled: handoffSettlement(input.runtimeContext, settleCollaborationPrompt.bind(undefined, input.runtimeContext)),
-    onCancelRequested: () => { goalScheduler?.interrupt(); cancelGitFor(input.runtimeContext); cancelSecurityFor(input.runtimeContext); cancelExtensionsFor(input.runtimeContext); cancelMcpFor(input.runtimeContext); cancelSshFor(input.runtimeContext); input.mcpGateway?.cancelContent(); },
+    onCancelRequested: () => { goalScheduler?.interrupt(); cancelDirectorFor(input.runtimeContext); cancelGitFor(input.runtimeContext); cancelSecurityFor(input.runtimeContext); cancelExtensionsFor(input.runtimeContext); cancelMcpFor(input.runtimeContext); cancelSshFor(input.runtimeContext); input.mcpGateway?.cancelContent(); },
     configuredAgentMode: () => input.runtimeContext.runtimeConfig.agentMode,
     sessionManager: input.sessionManager,
     renderer: input.renderer,
@@ -287,12 +288,13 @@ export function createCliSessionRuntime(input: {
       const resolvedCredential =
         input.providerRuntimeBridge.resolveCredentialSnapshot();
       const sessionId = input.runtimeContext.session.id;
+      const director = directorRunFor(input.runtimeContext, input.sessionManager, parentAdmission);
       const handoff = handoffRunFor(input.runtimeContext, input.sessionManager, sessionRuntime, resolvedCredential, signal,
         parentAdmission, input.renderer.renderLine.bind(input.renderer));
-      const admission = handoff?.admission ?? parentAdmission;
+      const admission = director?.admission ?? handoff?.admission ?? parentAdmission;
       const research = researchRunFor(input.runtimeContext, input.sessionManager, input.renderer,
         goalPolicyFor(input.runtimeContext, input.sessionManager));
-      const requestPolicy = handoff ? handoff.policy(research.requestPolicy) : research.requestPolicy;
+      const requestPolicy = director ? director.policy(research.requestPolicy) : handoff ? handoff.policy(research.requestPolicy) : research.requestPolicy;
       // A runner left over from an earlier run in this session is still holding
       // an idle timer, and it would refresh the same prefix the new runner is
       // about to refresh — the same money spent twice. Only the current run
@@ -395,7 +397,7 @@ export function createCliSessionRuntime(input: {
         stepControl: handoff?.control,
         onCommandSettled: handoff?.commandSettled.bind(handoff),
         background: jobsRunnerFor(input.runtimeContext),
-        featureTools: [...research.featureTools, ...gitFeatureTools(input.runtimeContext), ...securityFeatureTools(input.runtimeContext), ...sshFeatureTools(input.runtimeContext)],
+        featureTools: [...research.featureTools, ...gitFeatureTools(input.runtimeContext), ...securityFeatureTools(input.runtimeContext), ...sshFeatureTools(input.runtimeContext), ...director?.featureTools ?? []],
         checkpoint: advisorCheckpointFor(input.runtimeContext, input.sessionManager, input.renderer, promptEntryId),
         checkpointError: input.renderer.renderLine.bind(input.renderer),
         ...(promptEntryId ? { correlationId: promptEntryId, commandProof: acceptanceCapture(input.sessionManager,
@@ -404,10 +406,10 @@ export function createCliSessionRuntime(input: {
         requestPolicy,
         mcpGateway: input.mcpGateway,
         // Carried so the tool pool honours disabledTools / hiddenToolPrefixes.
-        runtimeConfig: config,
+        runtimeConfig: director?.config(config) ?? config,
         providerCatalog: catalog,
         prompt,
-        ...((continuityContext || handoff) ? { continuityContext: [continuityContext, handoff?.contextText].filter(Boolean).join('\n\n') } : {}),
+        ...((continuityContext || handoff || director) ? { continuityContext: [continuityContext, handoff?.contextText, director?.contextText].filter(Boolean).join('\n\n') } : {}),
         onPromptAccepted: handoffAcceptance(handoff, onPromptAccepted),
         ...(attachments ? { attachments } : {}),
         sessionId,

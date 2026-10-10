@@ -11,6 +11,7 @@ import { runResumeLikeShellAction } from "../core/shell/continueShellActionRunti
 import { toolPoolFor } from "../cli/runtime/tools.js";
 import { goalCommandFor, goalPolicyFor } from '../cli/runtime/goal.js';
 import { handoffCommandFor } from '../cli/runtime/handoff.js';
+import { directorCommandFor } from '../cli/runtime/director.js';
 import { queueCommandFor } from '../cli/runtime/inputQueue.js';
 import { advisorCommandFor } from '../cli/runtime/advisor.js';
 import { researchCommandFor } from '../cli/runtime/research.js';
@@ -147,6 +148,7 @@ export async function runNonInteractivePrompt(options: {
     mcpCommand: mcpCommandFor(options.runtimeContext),
     collaborationCommand: collaborationCommandFor(options.runtimeContext),
     handoffCommand: handoffCommandFor(options.runtimeContext, options.sessionManager, options.sessionRuntime),
+    directorCommand: directorCommandFor(options.runtimeContext),
     jobsCommand: jobsCommandFor(options.runtimeContext),
     workflowCommand: workflowCommandFor(options.runtimeContext),
     extensionCommand: extensionCommandFor(options.runtimeContext),

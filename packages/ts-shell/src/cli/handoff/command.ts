@@ -11,8 +11,9 @@ import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import type { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
 import type { SessionManager } from '../../session/SessionManager.js';
 import { HandoffStore } from '../../workflow/handoff/store.js';
-import { executionChoice, sourceChoice } from './model.js';
+import { executionChoice, sourceChoice } from '../provider/selection.js';
 import { armedHandoffs, liveHandoffs } from './state.js';
+import { DirectorStore } from '../../workflow/director/store.js';
 
 export async function runHandoffCommand(context: ShellRuntimeContext, manager: SessionManager, runtime: ShellSessionRuntime,
   args: string[]): Promise<LocalCommandResult> {
@@ -36,6 +37,8 @@ export async function runHandoffCommand(context: ShellRuntimeContext, manager: S
         : 'Model selection retired. The earlier turn outcome remains unknown; inspection does not stop or replay it.' };
     }
     const publication = context.configuration.current;
+    if (new DirectorStore(manager, context.session).read().cycles.some(row => !row.retired && row.phase !== 'disabled'))
+      throw new Error('Disable the director preset before arming a model handoff.');
     const resolution = context.resolveConfigTarget?.(publication.config);
     if (!resolution) throw new Error('The active provider binding is unavailable.');
     const source = sourceChoice(context.cwd, resolution);

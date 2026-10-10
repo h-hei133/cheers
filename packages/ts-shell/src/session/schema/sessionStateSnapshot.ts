@@ -32,6 +32,8 @@ export interface SessionStateSnapshot {
   jobs?: unknown;
   /** The handoff owner validates selection, turn ownership and permanent run identities. */
   handoffs?: unknown;
+  /** The director owner binds live selection and permanent agent-job membership. */
+  directors?: unknown;
   gitWorkflow?: unknown;
   security?: unknown;
   /** The request owner validates durable reservations, metering and replay protection. */
@@ -92,6 +94,7 @@ export function buildSessionStateSnapshot(
     research: current?.research,
     jobs: current?.jobs,
     handoffs: current?.handoffs,
+    directors: current?.directors,
     gitWorkflow: current?.gitWorkflow,
     security: current?.security,
     requestLedger: current?.requestLedger,

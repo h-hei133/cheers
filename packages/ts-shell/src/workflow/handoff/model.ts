@@ -1,12 +1,5 @@
-import type { ThinkingPreference } from '../../core/models/effort.js';
 import type { BoundSessionScope } from '../../session/store/bound.js';
-
-export interface ModelChoice {
-  readonly provider: string;
-  readonly model: string;
-  readonly thinkingEffort: ThinkingPreference;
-  readonly connectionId?: string;
-}
+import type { ModelChoice } from '../../core/models/selection.js';
 export interface Handoff {
   readonly id: string;
   readonly scope: BoundSessionScope;

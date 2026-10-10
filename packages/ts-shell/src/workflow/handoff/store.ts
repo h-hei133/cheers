@@ -3,7 +3,8 @@ import { sameValue } from '../../config/values.js';
 import type { Session } from '../../session/schema/sessionRecord.js';
 import { publishBoundSessionState, readBoundSessionState, type BoundSessionHost } from '../../session/store/bound.js';
 import { decodeHandoffs } from './codec.js';
-import type { Handoff, HandoffState, ModelChoice } from './model.js';
+import type { Handoff, HandoffState } from './model.js';
+import type { ModelChoice } from '../../core/models/selection.js';
 
 export class HandoffStore {
   constructor(private readonly manager: BoundSessionHost, private readonly session: Session) {}

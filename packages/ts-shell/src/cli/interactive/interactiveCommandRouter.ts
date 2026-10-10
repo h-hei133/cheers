@@ -17,6 +17,7 @@ import { collaborationCommandFor } from '../runtime/collaboration.js';
 import { sshCommandFor } from '../runtime/ssh.js';
 import { jobsCommandFor, workflowCommandFor } from '../runtime/jobs.js';
 import { handoffCommandFor } from '../runtime/handoff.js';
+import { directorCommandFor } from '../runtime/director.js';
 import { extensionCommandFor } from '../runtime/extensions.js';
 import { planningCommandFor } from '../runtime/planning.js';
 import { navigateSession, type SessionNavigationResult } from "../runtime/navigation.js";
@@ -146,6 +147,7 @@ export async function routeInteractiveCommand(
     collaborationCommand: collaborationCommandFor(input.runtimeContext),
     sshCommand: sshCommandFor(input.runtimeContext),
     handoffCommand: handoffCommandFor(input.runtimeContext, input.sessionManager, input.sessionRuntime),
+    directorCommand: directorCommandFor(input.runtimeContext),
     jobsCommand: jobsCommandFor(input.runtimeContext),
     workflowCommand: workflowCommandFor(input.runtimeContext),
     extensionCommand: extensionCommandFor(input.runtimeContext),

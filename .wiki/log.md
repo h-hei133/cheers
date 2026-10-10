@@ -6461,3 +6461,10 @@ SSH/父生命周期组件已提交/推送`e38c614986163be7d5ec6b817180760a237aa5
 ### 2026-10-10 — Phase 19 W13 一次性模型交接
 
 `/handover` 接通 checklist/实际批准提交后的一回合模型切换，复用原工具/执行/请求账目并保留 `/handoff` 压缩别名。修复 restart adoption、no-op writer、转录/收据 uncertainty、opaque 模型连接冲突及 HTTP 正文报告泄露；最终 33TS freeze 独立 code APPROVE/architecture CLEAR。428 受影响项、149 契约、两种构建、五静态门/43scripts、七有效反转和六 actualCLI（70 合成 POST）通过；原生取消、下一回合来源恢复及 safe failure 直接读回。边界/材料见[交接文档](features/handoff.md)与[Phase19 §8.136](features/phase-19-decisions.md#8136-w13-flow-02一次性模型交接组件)。完整 NormProof 仍容量 not_proven 待 W16；持久 director/worker 与后续任务继续，Phase19 active，commit/push/精确远端事实另记，用户 .gitignore 保留不提交。
+
+交接组件已提交/推送 `97070b2d7142fae3d47bf5ee9a90796e5470adc6` 并读回同 SHA；CI38053522880/job114217265676 与 Watch38053522900/job114217265494 均付款/spending-limit 阻止启动、零步骤 failure，未计通过。持久 director/worker 继续。
+
+
+### 2026-10-10 — Phase 19 W13 持久 worker 编排
+
+`/director` 和同源 worker 工具沿既有 agent job、持久 child、独立批准与父请求账目接通；主模型工具收窄、same-child checkpoint 续接及 worker 原模型/effort保留，off/Escape exact native cleanup、restart零接管和普通工具恢复闭环。修复普通prompt覆盖director、收据unknown误报完成与状态发布失败跳过清理；最终40TS/39production freeze独立 code APPROVE、architecture CLEAR。Node20.3 220组合/149契约/43scripts、五静态门、两种构建、五有效反转/恢复22项及六actualCLI（48合成POST）通过，实际独立write deny/native PID死亡读回。边界与材料见[director文档](features/director.md)、[Phase19 §8.137](features/phase-19-decisions.md#8137-w13-flow-02持久-directorworker-编排组件)及`.tmp/director/acceptance.json`。完整NormProof仍8192-edge容量not_proven，W16修复；FLOW-02本地完成，FLOW-03与W14–W16继续，Phase19全目标active，commit/push/精确远端事实另记，用户.gitignore保留不提交。

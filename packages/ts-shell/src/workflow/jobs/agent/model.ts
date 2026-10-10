@@ -41,6 +41,8 @@ export interface AgentOutcome {
   readonly checkpoint?: AgentCheckpoint;
 }
 export interface AgentRuntime {
+  /** The owning preset records permanent membership before any child can be created. */
+  readonly reserved?: (job: AgentJob) => void;
   readonly admission: () => string | undefined;
   readonly preflight: () => void;
   readonly childAdmission: (child: AgentChild) => string | undefined;

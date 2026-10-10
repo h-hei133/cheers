@@ -20,6 +20,7 @@ import { isAdvisorControl } from './advisor.js';
 import { isResearchControl } from './research.js';
 import { isPlanningStreamControl } from './planning.js';
 import { handoffControl } from './handoff.js';
+import { directorControl } from './director.js';
 import { attachGoalSubmission, schedulerForRuntime } from './goalScheduling.js';
 
 export async function runPromptInputStream(options: {
@@ -106,7 +107,7 @@ export async function runPromptInputStream(options: {
         .finally(() => { pendingControls--; }); return;
     }
     if (cancellingContent) { mcpCancellationGeneration++; queue.cancelWhere(isMcpRequest); cancelMcpFor(options.runtimeContext); }
-    if (isQueueControl(prompt) || isGoalControl(prompt) || isPlanningStreamControl(prompt) || handoffControl(prompt) || isAdvisorControl(prompt) || isSecurityControl(prompt) || isAgentsControl(prompt) || isResearchControl(prompt) || isExtensionControl(prompt) || isMcpControl(prompt) || isMcpConfiguration(prompt) || sshControl(prompt) || jobsControl(prompt)) {
+    if (isQueueControl(prompt) || isGoalControl(prompt) || isPlanningStreamControl(prompt) || handoffControl(prompt) || directorControl(prompt) || isAdvisorControl(prompt) || isSecurityControl(prompt) || isAgentsControl(prompt) || isResearchControl(prompt) || isExtensionControl(prompt) || isMcpControl(prompt) || isMcpConfiguration(prompt) || sshControl(prompt) || jobsControl(prompt)) {
       pendingControls += 1;
       const generation = mcpCancellationGeneration;
       controlChain = controlChain.then(() => {

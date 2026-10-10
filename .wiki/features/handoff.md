@@ -8,4 +8,4 @@
 
 记录绑定会话、workspace 对象、模型 revision 和确切回合。`armed` 还要求当前进程内的显式选择；重启、fork 或新 runtime 不接管旧选择。丢失的 `running`/`switched` 投影为 `unknown`，需要明确 `/handover off` 后才能开始新回合；解除选择保留原未知结果。最多保留 16 个周期、64 KiB，满时拒绝新选择，不淘汰历史。
 
-运行中用现有 Escape 手势中断当前回合，原生清理与用量按实际结果结算。状态 `completed` 只表示回合终结，`completionProof` 固定为 false，不证明用户目标完成。检查和解除选择都不会重放工具。该能力只覆盖一次性模型交接；持久 director/worker 由 FLOW-02 的后续组件交付。
+运行中用现有 Escape 手势中断当前回合，原生清理与用量按实际结果结算。状态 `completed` 只表示回合终结，`completionProof` 固定为 false，不证明用户目标完成。检查和解除选择都不会重放工具。该能力只覆盖一次性模型交接；持久编排使用同属 FLOW-02 的 [director/worker](director.md)。

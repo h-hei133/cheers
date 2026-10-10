@@ -27,6 +27,8 @@ export class AgentService {
     runtime.preflight();
     const fenced = this.journal.change(expected, { status: 'unknown', output: 'unknown',
       note: 'Child creation may occur at the reserved session ID; uncertain creation never retries.' });
+    runtime.reserved?.(fenced);
+    if (runtime.admission()) throw new JobStateError('unavailable');
     const bound = runtime.createChild(fenced.childSessionId);
     const job = this.journal.change(fenced, { ...bound, status: 'queued', output: 'pending',
       note: 'The retained independent child is bound; no model request was dispatched.' });

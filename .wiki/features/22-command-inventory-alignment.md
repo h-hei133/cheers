@@ -276,7 +276,7 @@ refNoToken = ref.filter(command => intersection(token(command), oursTokens).size
 | 31 | security | 独立漏洞分析系统 | W10十一action已实现；冻结计划、原生SARIF+JSON覆盖、保留finding/理由、批准导出与finding patch/原收据/单独复测；最终本地验收及工具容量限制见Phase19 §8.124。 | SEC-01/02/03 |
 | 32 | plan | 复用 Plan 模式 | 与 Shift+Tab 同一状态/门禁，增加计划产物、状态和退出入口，不新建平行模式。 | AUTO-04 |
 | 33 | plan-review | 新增计划审查 UX | 打开指定版本，记录修改及批准对象；过期计划不可沿用批准，不重定向代码 review。 | AUTO-04 |
-| 34 | vibe | 新增 director/worker 工作流 | director 可见工具收窄为读取/管理；持久 worker 可执行 session 已授权且显式委派的能力（可含写），继续受审批/沙箱/预算约束；退出终止 worker，不因模式自动放权。 | FLOW-02 |
+| 34 | vibe | 已接通 `/director` 编排 | 主模型工具收窄；原生持久 child 通过独立批准和确切 checkpoint 续接，worker 效果仍单独审批；off/Escape 清理所属 worker，重启不接管。边界见 [director](director.md)。 | FLOW-02 |
 | 35 | guided-goal | 新增目标澄清 | 收集目标/验收/可选预算/约束，形成可审阅目标后进入同一 goal owner；取消不暗中启动任务。 | AUTO-04 |
 | 36 | queue | 复用输入队列 | 查看/追加/撤回 follow-up，明确 steer 与 yield 后投递；忙闲切换/取消/重放无丢失或重复。 | AUTO-04 |
 | 37 | switch | 复用模型选择 | 统一解析后作 `/model` 快捷入口，默认 session；模型和思考等级联合校验，不另建配置路径。 | CFG-05、PAR-03 |

@@ -14,6 +14,7 @@ import { collaborationDefinitions } from './collaboration/registration.js';
 import { sshCommandDefinition } from './ssh/registration.js';
 import { jobsDefinitions } from './jobs/registration.js';
 import { handoffDefinition } from './handoff/registration.js';
+import { directorDefinition } from './director/registration.js';
 import { marketplaceSyntax } from "./marketplace/syntax.js";
 import { pluginSyntax } from "./plugin/syntax.js";
 import { workflowSyntax } from "../workflow/syntax.js";
@@ -746,6 +747,7 @@ export function createCommandRegistry(
     sshCommandDefinition(),
     ...jobsDefinitions(),
     handoffDefinition(),
+    directorDefinition(),
     {
       name: "commit",
       // A staged diff expands into a prompt; an empty index answers locally.

@@ -3,6 +3,7 @@ import { cancelGoalRunForShutdown } from '../runtime/goalScheduling.js';
 import { closeCollaborationFor } from '../runtime/collaboration.js';
 import { closeSshFor } from '../runtime/ssh.js';
 import { closeJobsFor } from '../runtime/jobs.js';
+import { closeDirectorFor } from '../runtime/director.js';
 import { runCollaborationServiceMode } from '../collaboration/service.js';
 import type { Interface as ReadlineInterface } from "node:readline";
 import type { ReadStream } from "node:tty";
@@ -135,6 +136,7 @@ export async function runCliProcess(
   const shutdown = createCliShutdown({
     close: async () => {
       await cancelRun?.();
+      await closeDirectorFor(runtimeContext);
       await closeJobsFor(runtimeContext);
       await closeSshFor(runtimeContext);
       try { await closeCollaborationFor(runtimeContext); }
