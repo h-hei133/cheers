@@ -10,6 +10,7 @@ import { recoverGoalRun, type GoalRunStoreHost } from '../../planning/goal/run/s
 import { goalCommandAliases, parseGoalArgs } from '../../core/commands/goal/syntax.js';
 import { schedulerForContext } from './goalScheduling.js';
 import { pauseAdvisor } from './advisor.js';
+import { collaborationPolicyFor } from '../collaboration/policy.js';
 
 interface Activation { readonly session: Session; readonly projectRoot: string; readonly issue?: string }
 const activations = new WeakMap<ShellRuntimeContext, Activation>();
@@ -60,7 +61,7 @@ export function goalObjectiveFor(context: ShellRuntimeContext, host: GoalStoreHo
 
 export function goalPolicyFor(context: ShellRuntimeContext, host: GoalStoreHost): RequestPolicy | undefined {
   if (prepareGoalSession(context, host).issue) return { reserve: () => { throw new ModelAdmissionError('unavailable'); } };
-  return goalRequestPolicy(host, context.session, schedulerForContext(context)?.ownerToken());
+  return collaborationPolicyFor(context, goalRequestPolicy(host, context.session, schedulerForContext(context)?.ownerToken()));
 }
 
 /** Only parsed control actions may bypass a busy prompt or an unanswered question. */

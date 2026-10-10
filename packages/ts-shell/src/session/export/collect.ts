@@ -6,7 +6,7 @@ import { messageToText } from "../../model-adapters/multimodal.js";
 import { renderMarkdownHtml } from "./htmlRender.js";
 import { projectExportTree } from "./graph.js";
 import { sanitizeExport } from "./sanitize.js";
-import { readExportSource } from "./source.js";
+import { readExportSource, readExportThread } from "./source.js";
 import type { ExportEntry, ExportPayload } from "./model.js";
 import { restoreReport } from '../reports/projection.js';
 import type { ReportTranscriptEntry } from '../reports/model.js';
@@ -21,8 +21,9 @@ export function gatherExport(input: {
   readonly sessionId: string;
   readonly workspace: string;
   readonly now?: () => Date;
+  readonly maxSourceBytes?: number;
 }): ExportGatherResult {
-  const source = readExportSource(input.sessionId);
+  const source = readExportSource(input.sessionId, input.maxSourceBytes);
   if (!source.ok) return source;
   const { transcript, statePath } = source;
   const messages = transcript.events.filter((event): event is Extract<TranscriptEvent, { type: "message" }> => event.type === "message");
@@ -45,7 +46,8 @@ export function gatherExport(input: {
   }
   let snapshot: SessionThreadSnapshot | undefined;
   try {
-    snapshot = readStateSnapshotRequired(statePath).thread;
+    snapshot = input.maxSourceBytes === undefined ? readStateSnapshotRequired(statePath).thread
+      : readExportThread(statePath, input.maxSourceBytes);
   } catch {
     // A chronological view remains useful, but must identify its lost branch history.
   }

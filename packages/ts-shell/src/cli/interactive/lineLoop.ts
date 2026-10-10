@@ -19,6 +19,7 @@ import { SubmissionQueue } from './inputQueue.js';
 import { isPlanningControl } from '../runtime/planning.js';
 import { isSecurityControl } from '../runtime/security.js';
 import { isAgentsControl } from '../runtime/agents.js';
+import { isCollaborationControl, runCollaborationControl } from '../collaboration/control.js';
 import { isExtensionControl } from '../runtime/extensions.js';
 import { isMcpRequest, isMcpConfiguration, mcpControl } from '../mcp/content.js';
 import { cancelMcpFor } from '../runtime/mcp.js';
@@ -128,6 +129,10 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
   input.on("line", (line) => {
     const text = line.trim();
     const mcp = mcpControl(text);
+    if (isCollaborationControl(text) && (busy || questions.question())) {
+      void runCollaborationControl(text, options.runtimeContext, options.renderer, Boolean(questions.question()));
+      return;
+    }
     if (mcp && (mcp.action === 'cancel' || busy || questions.question())) {
       if (mcp.action === 'cancel') { queue.cancelWhere(isMcpRequest); cancelMcpFor(options.runtimeContext); }
       void runCliMcpCommand({ gateway: mcpGateway, renderer: options.renderer,

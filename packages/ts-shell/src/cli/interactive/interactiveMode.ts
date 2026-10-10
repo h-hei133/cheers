@@ -41,6 +41,7 @@ import { tokenizeCommandArgs } from '../../core/commands/arguments.js';
 import { isPlanningControl, planningCommandFor } from '../runtime/planning.js';
 import { isSecurityControl, securityCommandFor } from '../runtime/security.js';
 import { isAgentsControl, agentsCommandFor } from '../runtime/agents.js';
+import { isCollaborationControl, runCollaborationControl } from '../collaboration/control.js';
 import { isExtensionControl, extensionCommandFor } from '../runtime/extensions.js';
 import { isMcpRequest, isMcpConfiguration, mcpControl } from '../mcp/content.js';
 import { runMcpConfigurationControl } from '../mcp/control.js';
@@ -666,6 +667,10 @@ export class InteractiveMode {
       return;
     }
     const mcp = mcpControl(text);
+    if (isCollaborationControl(text) && (this.busy || this.questions.question())) {
+      void runCollaborationControl(text, this.options.runtimeContext, transcriptLineRenderer(this.state.transcript, this.tui, '/collab'), Boolean(this.questions.question() || this.overlay.active));
+      return;
+    }
     if (mcp && (mcp.action === 'cancel' || this.busy || this.questions.question())) {
       if (mcp.action === 'cancel') { this.queue.cancelWhere(isMcpRequest); cancelMcpFor(this.options.runtimeContext); }
       void runCliMcpCommand({ gateway: this.options.initialMcpGateway,

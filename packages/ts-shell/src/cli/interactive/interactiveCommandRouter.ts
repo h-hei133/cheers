@@ -13,6 +13,7 @@ import { gitCommandFor, worktreeCommandFor, commitCommandFor } from '../runtime/
 import { securityCommandFor } from '../runtime/security.js';
 import { agentsCommandFor } from '../runtime/agents.js';
 import { mcpCommandFor } from '../runtime/mcp.js';
+import { collaborationCommandFor } from '../runtime/collaboration.js';
 import { extensionCommandFor } from '../runtime/extensions.js';
 import { planningCommandFor } from '../runtime/planning.js';
 import { navigateSession, type SessionNavigationResult } from "../runtime/navigation.js";
@@ -139,6 +140,7 @@ export async function routeInteractiveCommand(
     securityCommand: securityCommandFor(input.runtimeContext),
     agentsCommand: agentsCommandFor(input.runtimeContext),
     mcpCommand: mcpCommandFor(input.runtimeContext),
+    collaborationCommand: collaborationCommandFor(input.runtimeContext),
     extensionCommand: extensionCommandFor(input.runtimeContext),
     worktreeCommand: worktreeCommandFor(input.runtimeContext),
     commitCommand: commitCommandFor(input.runtimeContext),

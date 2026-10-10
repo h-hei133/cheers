@@ -1,5 +1,7 @@
 import { createCliShutdown } from "../runtime/shutdown.js";
 import { cancelGoalRunForShutdown } from '../runtime/goalScheduling.js';
+import { closeCollaborationFor } from '../runtime/collaboration.js';
+import { runCollaborationServiceMode } from '../collaboration/service.js';
 import type { Interface as ReadlineInterface } from "node:readline";
 import type { ReadStream } from "node:tty";
 
@@ -62,6 +64,7 @@ export interface CliProcessRunnerInput {
 export async function runCliProcess(
   input: CliProcessRunnerInput,
 ): Promise<void> {
+  if (await runCollaborationServiceMode(input)) return;
   setGlobalTraceContext(createTraceContext());
   const logger = createComponentLogger("cli");
   const approvalTrustPolicy = new ApprovalTrustPolicy();
@@ -130,7 +133,8 @@ export async function runCliProcess(
   const shutdown = createCliShutdown({
     close: async () => {
       await cancelRun?.();
-      await mcpGateway.close();
+      try { await closeCollaborationFor(runtimeContext); }
+      finally { await mcpGateway.close(); }
     }, process: input.process, exit: input.exit, writeError: input.writeError,
     streams: [input.stdin, input.process.stdout, input.process.stderr],
     handleInterrupt: options.printMode === true || options.jsonEvents === true || !input.stdin.isTTY,

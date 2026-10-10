@@ -29,6 +29,9 @@ import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
 import { researchRunFor } from './research.js';
 import { cancelGitFor, gitFeatureTools } from './git.js';
 import { installGitCliRuntime } from './gitGate.js';
+import { installCollaborationRuntime } from './collaboration.js';
+import { admitCollaborationPrompt, settleCollaborationPrompt } from '../collaboration/acceptance.js';
+import { collaborationAdmissionFor } from '../collaboration/policy.js';
 import { installSecurityRuntime, cancelSecurityFor, securityFeatureTools } from './security.js';
 import { installAgentsRuntime } from './agents.js';
 import { installMcpRuntime, cancelMcpFor } from './mcp.js';
@@ -340,6 +343,8 @@ export function createCliSessionRuntime(input: {
   };
   let goalScheduler: GoalScheduler | undefined;
   const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({
+    admitPrompt: admitCollaborationPrompt.bind(undefined, input.runtimeContext),
+    promptSettled: settleCollaborationPrompt.bind(undefined, input.runtimeContext),
     onCancelRequested: () => { goalScheduler?.interrupt(); cancelGitFor(input.runtimeContext); cancelSecurityFor(input.runtimeContext); cancelExtensionsFor(input.runtimeContext); cancelMcpFor(input.runtimeContext); input.mcpGateway?.cancelContent(); },
     configuredAgentMode: () => input.runtimeContext.runtimeConfig.agentMode,
     sessionManager: input.sessionManager,
@@ -422,7 +427,7 @@ export function createCliSessionRuntime(input: {
       const config = publication.config;
       const catalog = publication.catalog;
       const backgroundSignal = input.runtimeContext.configuration.backgroundSignal;
-      const admission = configurationAdmission(input.runtimeContext);
+      const admission = collaborationAdmissionFor(input.runtimeContext, configurationAdmission(input.runtimeContext));
       const resolvedCredential =
         input.providerRuntimeBridge.resolveCredentialSnapshot();
       const sessionId = input.runtimeContext.session.id;
@@ -579,6 +584,7 @@ export function createCliSessionRuntime(input: {
   });
   goalScheduler = installGoalScheduler(input.runtimeContext, input.sessionManager, sessionRuntime, message => input.renderer.renderLine(message));
   const nativeGate = installGitCliRuntime(input, sessionRuntime, isStdinTty);
+  installCollaborationRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate);
   installSecurityRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate);
   installAgentsRuntime(input.runtimeContext, nativeGate);
   if (input.mcpGateway) installMcpRuntime(input.runtimeContext, input.mcpGateway, nativeGate, url => input.renderer.renderLine(`Open this MCP sign-in URL in your browser:\n${url}`));

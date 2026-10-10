@@ -6423,3 +6423,9 @@ ECO-04接通用户/项目角色CRUD/启停/模型/effort与普通task，审批�
 ### 2026-10-09 — Phase 19 ECO-05 HTTP与显式OAuth
 
 共享网络/SDK接通Streamable HTTP，原生auth/logout批准、issuer/source身份、PKCE/state callback、私有CAS记录、先保存再刷新与无秘密撤销身份已闭环。独立原反例修复POST超时/立即下一请求、SSE错误续传和双向ID冲突，最终APPROVE/CLEAR；23文件291项、Node20.3/单文件构建、149契约、五静态门/43scripts、五有效反转/恢复8项及四终端72local commands零模型POST通过。actualCLI登录/重启/刷新/注销/取消/停用均有记录；公共账户与非Linux未推断通过。协议与材料见[Phase19 §8.130](features/phase-19-decisions.md#8130-w11-eco-05streamable-http与显式oauth本地认证组件)及features/mcp.md。完整NormProof容量待W16；ECO-05本地三组件完成，W12–W16及完整Phase19继续，精确commit/push/remote状态另记。
+
+HTTP/OAuth已提交/推送d4225db2fa2f301fe261d3b51cc8db968e9ae622并读回同SHA；CI37930918577/job113821126927及Watch37930918490/job113821127110均付款/spending-limit阻止启动、零步骤failure，未计通过。
+
+### 2026-10-10 — Phase 19 W12协作与安全共享组件
+
+显式前台服务、认证ACL/短ticket/单host租约、持久relay/游标和已批准只读共享接通；提案由host明确接管，走原生prompt/工具/请求账目，取消与unknown usage真实保留。独立反例与实际状态审计修复root替换、旧结果升级、unknown误判及Node20.3长预览心跳饥饿。最终61文件冻结，先前41文件496项/149契约/43scripts，最终delta16文件142项与两种构建、七旧及三新有效反转/恢复34项、四条严格actualCLI通过；共156local命令/12hostPOST/0guestPOST，取消/重启/吊销/删除/raw授权/持久关房及来源账目直接读回。功能和完整限制见[协作文档](features/collaboration.md)与[Phase19 §8.131](features/phase-19-decisions.md#8131-w12-rem-0103显式协作服务安全共享与原生提案接管本地组件)。完整NormProof仍not_proven/容量待W16；REM-04、完整REM-05与W13–W16继续，Phase19未完成。交付前再修复旧host迟到心跳越过实例隔离；真实命令成功/失败两路及有效反转/恢复36项、重新构建与四条actualCLI通过，最终代码APPROVE/架构CLEAR（新freeze1900b66f），commit/push/远端事实另记。

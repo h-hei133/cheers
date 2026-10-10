@@ -128,6 +128,7 @@ export async function runCopyCommand(
       return {
         kind: "local",
         output: `Copied ${describe(text)} to the clipboard.`,
+        state: { clipboard: 'copied' },
       };
     }
   }
@@ -136,9 +137,10 @@ export async function runCopyCommand(
     return {
       kind: "local",
       output: `Sent ${describe(text)} to the terminal clipboard. If nothing was pasted, this terminal does not accept it.`,
+      state: { clipboard: 'offered' },
     };
   }
-  return { kind: "local", output: `Could not reach a clipboard for ${describe(text)}.` };
+  return { kind: "local", output: `Could not reach a clipboard for ${describe(text)}.`, state: { clipboard: 'unavailable' } };
 }
 
 /** How much text this is, in the terms a reader checks against what they selected. */

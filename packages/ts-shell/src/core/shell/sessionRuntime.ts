@@ -55,6 +55,9 @@ export type PromptRun =
       readonly settled?: (outcome: { readonly status: 'completed' | 'error'; readonly finalOutput: string }) => void };
 
 export interface SessionRuntimeDependencies {
+  /** Native provenance owner may validate a one-use submission before durable prompt publication. */
+  readonly admitPrompt?: (prompt: string, metadata: Record<string, unknown> | undefined, signal: AbortSignal) => Promise<void>;
+  readonly promptSettled?: (metadata: Record<string, unknown> | undefined, signal: AbortSignal, outcome: 'completed' | 'failed' | 'cancelled' | 'unknown') => Promise<void>;
   /** Cancellation reaches the owner of work scheduled across individual prompts. */
   readonly onCancelRequested?: () => void;
   readonly configuredAgentMode?: () => 'plan' | 'build' | undefined;
@@ -231,6 +234,7 @@ export class ShellSessionRuntime {
     const structuredOutput = !printMode && this.renderingObservers.size > 0;
     let sourceEntryId: (() => string | undefined) | undefined;
     let settled: Exclude<PromptRun, AsyncIterable<QueryEvent>>['settled'];
+    let provenanceOutcome: 'completed' | 'failed' | 'cancelled' | 'unknown' = 'unknown';
 
     try {
       const continuityBuilder = (
@@ -291,6 +295,7 @@ export class ShellSessionRuntime {
         : undefined;
 
       if (!options?.runtimeSeed) {
+        await this.deps.admitPrompt?.(prompt, options?.promptMetadata, signal);
         this.deps.sessionManager.persistUserPromptBarrier(sessionId, prompt, options?.promptMetadata);
       }
 
@@ -383,6 +388,7 @@ export class ShellSessionRuntime {
         );
       }
       this.stateMachine.completeRun();
+      provenanceOutcome = terminalState.terminalStatus === 'completed' ? 'completed' : 'failed';
       this.currentRunController = null;
       this.currentInput = undefined;
       settled?.({ status: terminalState.terminalStatus === 'completed' ? 'completed' : 'error', finalOutput: terminalState.finalOutput });
@@ -400,6 +406,7 @@ export class ShellSessionRuntime {
           enteredQueryPhase ? "turn" : "prompt",
         );
         this.stateMachine.interruptRun();
+        provenanceOutcome = 'cancelled';
       } else {
         const errorSave = projectRuntimeFailureSessionSave({
           error,
@@ -415,6 +422,7 @@ export class ShellSessionRuntime {
           errorSave.options,
         );
         this.stateMachine.failRun();
+        provenanceOutcome = 'failed';
       }
       this.currentRunController = null;
       this.currentInput = undefined;
@@ -422,6 +430,12 @@ export class ShellSessionRuntime {
         for (const observer of this.eventObservers) observer(cancellation);
       }
       throw error;
+    } finally {
+      if (this.currentRunController?.signal === signal) {
+        this.currentRunController = null; this.currentInput = undefined;
+        if (provenanceOutcome === 'unknown') this.stateMachine.failRun();
+      }
+      await this.deps.promptSettled?.(options?.promptMetadata, signal, provenanceOutcome);
     }
   }
 
