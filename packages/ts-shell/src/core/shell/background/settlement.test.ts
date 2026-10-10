@@ -13,15 +13,16 @@ vi.mock("node:child_process", async () => {
   launch.mockImplementation(actual.spawn);
   return { ...actual, spawn: launch };
 });
-vi.mock("./output.js", async () => {
-  const actual = await vi.importActual<typeof import("./output.js")>("./output.js");
+vi.mock("../../../workflow/jobs/local/output.js", async () => {
+  const actual = await vi.importActual<typeof import("./output.js")>("../../../workflow/jobs/local/output.js");
   makeSink.mockImplementation(actual.createOutputSink);
   return { ...actual, createOutputSink: makeSink };
 });
+vi.mock('../platform/processTree.js', () => ({ trackChildPid: vi.fn(), untrackChildPid: vi.fn(), killProcessTree: vi.fn(async () => {}) }));
 
 afterEach(async () => {
   launch.mockReset().mockImplementation((await vi.importActual<typeof import("node:child_process")>("node:child_process")).spawn);
-  makeSink.mockReset().mockImplementation((await vi.importActual<typeof import("./output.js")>("./output.js")).createOutputSink);
+  makeSink.mockReset().mockImplementation((await vi.importActual<typeof import("./output.js")>("../../../workflow/jobs/local/output.js")).createOutputSink);
 });
 
 async function until(check: () => boolean): Promise<void> {
@@ -35,6 +36,7 @@ async function until(check: () => boolean): Promise<void> {
 describe("background output settlement", () => {
   it("pauses both pipes on backpressure and refreshes failed spill state before notifying", async () => {
     const child = new ChildProcess();
+    Object.assign(child, { pid: 12345 });
     child.stdout = new PassThrough();
     child.stderr = new PassThrough();
     launch.mockReturnValue(child);
@@ -52,7 +54,7 @@ describe("background output settlement", () => {
     const ended = vi.fn();
     registry.onEnded(ended);
     const task = registry.start({ command: "synthetic child", cwd: process.cwd() });
-    child.stdout.emit("data", "prefix");
+    child.stdout.emit("data", Buffer.from("prefix"));
     expect(child.stdout.isPaused()).toBe(true);
     expect(child.stderr.isPaused()).toBe(true);
     expect(registry.get(task.id)?.outputPath).toBe("initial.log");
@@ -66,16 +68,19 @@ describe("background output settlement", () => {
     child.emit("close", 0, null);
     expect(registry.get(task.id)?.state).toBe("running");
     expect(ended).not.toHaveBeenCalled();
-    expect(await registry.stop(task.id)).toBe(false);
+    let settled = false;
+    const stop = registry.stop(task.id).then(value => { settled = true; return value; });
+    await Promise.resolve(); expect(settled).toBe(false);
     close();
-    await closing;
-    expect(registry.get(task.id)).toMatchObject({ state: "exited", exitCode: 0, output: "tail", outputTruncated: true });
+    expect(await stop).toBe(true);
+    expect(registry.get(task.id)).toMatchObject({ state: "killed", exitCode: 0, output: "tail", outputTruncated: true });
     expect(registry.get(task.id)?.outputPath).toBeUndefined();
     expect(ended).toHaveBeenCalledTimes(1);
   });
 
   it("decodes split UTF-8 independently on each pipe", async () => {
     const child = new ChildProcess();
+    Object.assign(child, { pid: 12345 });
     child.stdout = new PassThrough();
     child.stderr = new PassThrough();
     launch.mockReturnValue(child);
@@ -94,7 +99,7 @@ describe("background output settlement", () => {
 
   it("retains the latest completed tasks without evicting a running task", async () => {
     const children: ChildProcess[] = [];
-    launch.mockImplementation(() => { const child = new ChildProcess(); children.push(child); return child; });
+    launch.mockImplementation(() => { const child = new ChildProcess(); Object.assign(child, { pid: 12345 }); children.push(child); return child; });
     const registry = new TaskRegistry();
     const running = registry.start({ command: "held", cwd: process.cwd() });
     const completed: string[] = [];
@@ -102,14 +107,14 @@ describe("background output settlement", () => {
       const task = registry.start({ command: "finished", cwd: process.cwd() });
       completed.push(task.id);
       children.at(-1)!.emit("close", 0, null);
-      await Promise.resolve();
+      await until(() => registry.get(task.id)?.state === 'exited');
     }
     expect(registry.get(running.id)?.state).toBe("running");
     expect(registry.list()).toHaveLength(101);
     expect(registry.get(completed[4]!)).toBeUndefined();
     expect(registry.get(completed[5]!)?.state).toBe("exited");
     children[0]!.emit("close", 0, null);
-    await Promise.resolve();
+    await until(() => registry.get(running.id)?.state === 'exited');
     expect(registry.list()).toHaveLength(100);
     expect(registry.list().at(-1)?.id).toBe(running.id);
     expect(registry.get(completed[5]!)).toBeUndefined();

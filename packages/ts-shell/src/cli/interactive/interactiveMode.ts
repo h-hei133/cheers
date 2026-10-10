@@ -5,7 +5,9 @@ import { CatalogController } from "./completion/controller.js";
 import { catalogIdentity, createCatalogLoader } from "./completion/catalog.js";
 import { refreshShellRuntimeConfig } from "../../core/shell/runtimeContext.js";
 import { configurationAdmission } from '../../core/shell/configuration.js';
-import { backgroundTasks, renderTaskNotice } from "../../core/shell/background/tasks.js";
+import { renderTaskNotice } from '../../workflow/jobs/local/projection.js';
+import { jobsFor, watchJobsFor } from '../runtime/jobs.js';
+import { jobsControl, runJobsControl } from '../jobs/control.js';
 import type { Interface as ReadlineInterface } from "node:readline";
 import path from "node:path";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
@@ -252,20 +254,16 @@ export class InteractiveMode {
       onReload: () => this.tui.requestRender({ force: true }),
     });
     this.tui.setDisconnectHandler(() => { void this.shutdown(); });
-    // A command that ends while nobody is looking is announced through the queue
-    // a follow-up already uses, rather than through a mechanism of its own: the
-    // model should learn about it the same way it learns about anything else the
-    // user queued, and a second channel would need its own ordering rules.
-    this.stopWatchingBackground = backgroundTasks.onEnded((task) => {
-      const runtime = this.options.sessionRuntime;
-      if (this.busy) {
-        runtime.input?.()?.followUp(renderTaskNotice(task));
-      } else {
-        this.queue.push(renderTaskNotice(task));
-      }
+    // Build the transcript before subscribing to the live job owner. A native
+    // runner may settle during construction; completion notices must have a
+    // valid storage target even in that narrow window.
+    this.state = createViewState();
+    // Completion is a scoped local notice. Output does not become new user intent
+    // or silently dispatch a model request; taskOutput exposes the retained facts.
+    this.stopWatchingBackground = watchJobsFor(options.runtimeContext, (task) => {
+      this.state.transcript.append(textBlock('notice', renderTaskNotice(task)));
       this.tui.requestRender();
     });
-    this.state = createViewState();
     this.view = new InteractiveSurface(
       {
         facts: () =>
@@ -284,7 +282,7 @@ export class InteractiveMode {
         queuedCount: () => this.queue.length + (this.options.sessionRuntime.input?.()?.pending().followUps.length ?? 0),
         steeringCount: () => this.options.sessionRuntime.input?.()?.pending().steering.length ?? 0,
         now: () => Date.now(),
-        ambient: () => readAmbientFacts(this.options.runtimeContext.session.id),
+        ambient: () => readAmbientFacts(this.options.runtimeContext.session.id, jobsFor(this.options.runtimeContext)?.registry),
         cancelArmed: () =>
           this.gesture.lastCancelAt !== undefined &&
           Date.now() - this.gesture.lastCancelAt < CANCEL_ARMED_MS,
@@ -668,6 +666,10 @@ export class InteractiveMode {
       return;
     }
     const mcp = mcpControl(text);
+    if (jobsControl(text) && (this.busy || this.questions.question())) {
+      void runJobsControl(text, this.options.runtimeContext, transcriptLineRenderer(this.state.transcript, this.tui, '/jobs'),
+        Boolean(this.questions.question() || this.overlay.active)); return;
+    }
     const ssh = sshControl(text);
     if (ssh && (this.busy || this.questions.question() || ssh.action === 'cancel-pending')) {
       if (ssh.action === 'cancel-pending') this.queue.cancelWhere(value => /^\/ssh(?:\s|$)/i.test(value.trim()));

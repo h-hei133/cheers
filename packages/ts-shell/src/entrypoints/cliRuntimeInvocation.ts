@@ -63,6 +63,7 @@ import { createProviderStep, delegatedSteps } from '../cli/provider/step.js';
 type ProviderMode = "synthetic" | "real";
 
 export interface CliRuntimeInvocationInput {
+  readonly background?: TurnOptions['background'];
   readonly featureTools?: readonly ToolDefinition[];
   readonly requestPolicy?: RequestPolicy;
   readonly goalObjective?: string;
@@ -439,6 +440,7 @@ async function startTurn(
     : (dependencies.createStep ?? createProviderStep)(request, tools, promptContext);
 
   const run = runTurn({
+    background: request.background,
     checkpoint: request.checkpoint,
     checkpointError: request.checkpointError,
     commandProof: request.commandProof,

@@ -7,6 +7,7 @@ import { assertSourceAccess } from '../core/query/sourcePolicy.js';
 import { assertAgentSourceAccess } from '../core/subagents/source.js';
 
 interface PreparationGate extends Pick<ToolExecutionContext, 'workspaceRoot' | 'workspaceRoots' | 'sessionId'> {
+  readonly background?: ToolExecutionContext['background'];
   readonly permissionScope?: PermissionScope;
   readonly denyRules?: readonly DenyRule[];
   readonly admission?: () => string | undefined;
@@ -15,6 +16,7 @@ interface PreparationGate extends Pick<ToolExecutionContext, 'workspaceRoot' | '
 /** Preflight and publication both enforce every path's grants and read/write denials. */
 export function preparationContext(toolName: string, options: PreparationGate): ToolExecutionContext {
   return { workspaceRoot: options.workspaceRoot, artifactRoot: options.workspaceRoot, workspaceRoots: options.workspaceRoots,
+    background: options.background,
     assertSourceAccess: absolute => { const blocked = options.admission?.(); if (blocked) throw new Error(blocked);
       (toolName === 'task' ? assertAgentSourceAccess : assertSourceAccess)(absolute, options.workspaceRoot, options.workspaceRoots, options.permissionScope, options.denyRules); },
     sessionId: options.sessionId, taskId: 'preparation', assertFileAccess: absolute => {

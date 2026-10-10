@@ -47,6 +47,7 @@ export type CliCommandExecution =
     };
 
 export interface BuildCliCommandExecutionInput {
+  readonly jobsCommand?: CommandContext['jobsCommand'];
   readonly extensionCommand?: CommandContext['extensionCommand'];
   readonly requestPolicy?: CommandContext['requestPolicy'];
   readonly goalCommand?: CommandContext['goalCommand'];
@@ -166,6 +167,7 @@ export async function buildCliCommandExecution(
     mcpCommand: input.mcpCommand,
     collaborationCommand: input.collaborationCommand,
     sshCommand: input.sshCommand,
+    jobsCommand: input.jobsCommand,
     worktreeCommand: input.worktreeCommand,
     commitCommand: input.commitCommand,
     requestPolicy: input.requestPolicy,

@@ -130,3 +130,29 @@ it('preserves unverified cleanup when opt-in cleanup fails after a normal leader
   expect(await result).toMatchObject({ status: 'failed', terminationFailed: true });
   expect(untrackChildPid).not.toHaveBeenCalled();
 });
+
+it.each([false, true])('awaits the paused output consumer and preserves its failure=%s after native close', async rejectOutput => {
+  vi.useRealTimers();
+  const child = childProcess(); vi.mocked(killProcessTree).mockResolvedValue(undefined);
+  let release!: () => void; let reject!: (error: Error) => void;
+  const held = new Promise<void>((resolve, refuse) => { release = resolve; reject = refuse; });
+  let settled = false;
+  const result = executeLocally({ command: 'test', args: [], cwd: '.', onStdout: () => held })
+    .then(value => { settled = true; return value; });
+  child.stdout.write('retained');
+  expect(child.stdout.isPaused()).toBe(true); expect(child.stderr.isPaused()).toBe(true);
+  child.emit('close', 0, null); await new Promise(resolve => setImmediate(resolve)); expect(settled).toBe(false);
+  if (rejectOutput) reject(new Error('Synthetic output persistence failure')); else release();
+  expect(await result).toMatchObject({ status: rejectOutput ? 'failed' : 'completed', stdout: 'retained' });
+  expect(child.stdout.isPaused()).toBe(false); expect(child.stderr.isPaused()).toBe(false);
+});
+
+it('observes only native started IDs and refuses an aborted dispatch before spawning', async () => {
+  const child = childProcess(); const started = vi.fn();
+  const result = executeLocally({ command: 'test', args: [], cwd: '.', onStarted: started });
+  expect(started).toHaveBeenCalledWith(child.pid); child.emit('close', 0, null); await result;
+  vi.mocked(spawn).mockClear(); const controller = new AbortController(); controller.abort();
+  expect(await executeLocally({ command: 'test', args: [], cwd: '.', abortSignal: controller.signal, onStarted: started }))
+    .toMatchObject({ status: 'cancelled', exitCode: null });
+  expect(spawn).not.toHaveBeenCalled(); expect(started).toHaveBeenCalledTimes(1);
+});

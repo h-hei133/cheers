@@ -99,6 +99,7 @@ export interface TurnOptions {
   readonly signal: AbortSignal;
   /** What a command the model runs should know about this session. */
   readonly commandEnv?: Readonly<Record<string, string>>;
+  readonly background?: ToolGateOptions['background'];
   /**
    * What a subagent needs from the model side, when this session can delegate.
    *
@@ -185,6 +186,7 @@ function gateOptionsFor(
     interactiveAsk: options.interactiveAsk,
     emit,
     ...(options.commandEnv ? { commandEnv: options.commandEnv } : {}),
+    ...(options.background ? { background: options.background } : {}),
     ...(options.denyRules ? { denyRules: options.denyRules } : {}),
   };
 }

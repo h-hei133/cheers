@@ -27,6 +27,8 @@ export interface NormalizedExecutionResult {
   readonly spawnErrorCode?: string
   /** A failed process-tree cleanup must block consumers from claiming shutdown. */
   readonly terminationFailed?: true
+  /** Output consumption failed or could not drain within the settlement deadline. */
+  readonly outputFailed?: true
   readonly failureKind?: 'sandbox_preflight' | 'execution_failure' | 'timeout' | 'cancelled'
 }
 
@@ -143,10 +145,12 @@ export interface CommandExecutionRequest {
   readonly env?: Readonly<Record<string, string>>
   /** Forwarded output, for a command whose progress the caller wants to show. */
   readonly onOutput?: (chunk: string) => void
+  /** Native owner observed a newly spawned child; callers cannot synthesize its PID. */
+  readonly onStarted?: (pid: number) => void
   /** Duplex consumers use the same spawn, cancellation and process-tree owner. */
   readonly onStdin?: (input: ExecutionInput) => void
-  readonly onStdout?: (chunk: Buffer) => void
-  readonly onStderr?: (chunk: Buffer) => void
+  readonly onStdout?: (chunk: Buffer) => void | Promise<void>
+  readonly onStderr?: (chunk: Buffer) => void | Promise<void>
   readonly captureOutput?: boolean
   /** Long-lived duplex services must clean their group even after a normal leader exit. */
   readonly cleanupTreeOnExit?: boolean

@@ -31,6 +31,7 @@ import { cancelGitFor, gitFeatureTools } from './git.js';
 import { installGitCliRuntime } from './gitGate.js';
 import { installCollaborationRuntime } from './collaboration.js';
 import { installSshRuntime, sshFeatureTools, cancelSshFor } from './ssh.js';
+import { installJobsRuntime, jobsRunnerFor } from './jobs.js';
 import { admitCollaborationPrompt, settleCollaborationPrompt } from '../collaboration/acceptance.js';
 import { collaborationAdmissionFor } from '../collaboration/policy.js';
 import { installSecurityRuntime, cancelSecurityFor, securityFeatureTools } from './security.js';
@@ -534,6 +535,7 @@ export function createCliSessionRuntime(input: {
       const currentGoal = readGoalEdit(input.sessionManager, input.runtimeContext.session).goal;
       refreshExtensionsFor(input.runtimeContext);
       const run = streamCliRuntimePrompt({
+        background: jobsRunnerFor(input.runtimeContext),
         featureTools: [...research.featureTools, ...gitFeatureTools(input.runtimeContext), ...securityFeatureTools(input.runtimeContext), ...sshFeatureTools(input.runtimeContext)],
         checkpoint: advisorCheckpointFor(input.runtimeContext, input.sessionManager, input.renderer, promptEntryId),
         checkpointError: input.renderer.renderLine.bind(input.renderer),
@@ -587,6 +589,7 @@ export function createCliSessionRuntime(input: {
   const nativeGate = installGitCliRuntime(input, sessionRuntime, isStdinTty);
   installCollaborationRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate);
   installSshRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate, message => input.renderer.renderLine(message));
+  installJobsRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate);
   installSecurityRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate);
   installAgentsRuntime(input.runtimeContext, nativeGate);
   if (input.mcpGateway) installMcpRuntime(input.runtimeContext, input.mcpGateway, nativeGate, url => input.renderer.renderLine(`Open this MCP sign-in URL in your browser:\n${url}`));

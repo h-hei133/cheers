@@ -94,7 +94,7 @@ describe("starting a command in the background", () => {
     // the handle rather than being thrown at a caller that already has it.
     const task = backgroundTasks.start({ command: "echo x", cwd: "/nonexistent-directory-for-a-test" });
 
-    await until(() => backgroundTasks.get(task.id)?.state !== "running");
+    await until(() => backgroundTasks.get(task.id)?.state === 'exited');
     const failed = backgroundTasks.get(task.id)!;
     expect(failed.state).toBe("exited");
     expect(failed.failure ?? failed.output).toMatch(/ENOENT|no such file/i);

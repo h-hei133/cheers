@@ -2,7 +2,7 @@
 
 > Compiled knowledge base for the three-layer autonomous coding agent architecture, proof grounding, and reference models.
 
-Last updated: 2026-10-09
+Last updated: 2026-10-10
 
 ## Statistics
 
@@ -23,6 +23,7 @@ Last updated: 2026-10-09
 - [Extension registry protocol and capability grants](features/extension-registry.md)
 - [Agent definitions, model routing and lifecycle](features/agent-definitions.md)
 - [SSH sessions, remote jobs and cancellation](features/ssh.md)
+- [Session-owned local jobs and hub](features/jobs.md)
 - [Feature and defect register](features/13-feature-and-defect-register.md)
 - [All Sources](raw/_index.md)
 - [Concepts](wiki/concepts/_index.md)

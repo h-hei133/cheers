@@ -7,7 +7,7 @@ import type { DenyRule } from "../core/shell/approval/deny.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
 import type { InteractiveAsk } from "../core/tools/ask/contract.js";
 import type { EscalationPrompt, EscalationResponse } from "../core/shell/approval/contract.js";
-import type { ToolDefinition } from "../tools/types.js";
+import type { ToolDefinition, ToolExecutionContext } from "../tools/types.js";
 import type { SubagentRunner } from "../core/subagents/runner.js";
 import { neutraliseForDisplay } from "../core/text/safety.js";
 import { redactExportText } from "../core/security/redaction.js";
@@ -40,6 +40,7 @@ export interface ToolSchema {
  */
 
 export interface ToolGateOptions {
+  readonly background?: ToolExecutionContext['background'];
   readonly correlationId?: string;
   readonly commandProof?: import('../runtime/execution/proof.js').CommandProofObserver;
   /** Rechecked at each effect boundary, including after asynchronous approvals. */
@@ -188,6 +189,7 @@ async function executeTool(
         if (decision.denied) throw new Error(decision.reason);
       },
       ...(options.commandEnv ? { commandEnv: options.commandEnv } : {}),
+      ...(options.background ? { background: options.background } : {}),
       ...(options.runSubagent ? { runSubagent: options.runSubagent } : {}),
       // A tool that reports progress passes it on; one that does not is
       // unaffected, since the callback only fires if the tool calls it.

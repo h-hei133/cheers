@@ -6435,3 +6435,9 @@ HTTP/OAuth已提交/推送d4225db2fa2f301fe261d3b51cc8db968e9ae622并读回同SH
 ### 2026-10-10 — Phase 19 W12显式SSH与父作业生命周期
 
 原生SSH沿ExecutionService接通私有profile/固定host key、session CAS永久tombstone、native user-manager/cgroup作业、精确取消与有界输出；goal/collaboration/applied-advisor来源和一次parent cancellation能力沿普通批准和共享账目，restart不重建权力。独立反例修复scope/invocation、配置revision、late teardown、model取消、pipe控制及跨页脱敏，代码APPROVE/架构CLEAR；最终174组合/149契约/43scripts、Node20.3与单文件构建、五有效反转/恢复31项及八actualCLI路径通过。SSH四路径80local commands零模型POST；协作四路径8hostPOST/0guestPOST、每条110tokens结算加1项unknown reservation和精确cgroup cancellation均读回。功能边界、失败归因和材料见[SSH文档](features/ssh.md)与[Phase19 §8.132](features/phase-19-decisions.md#8132-w12-rem-04-与-ssh-关联-rem-05显式远端作业和父生命周期)。完整NormProof仍8192-edge容量not_proven，W16负责完整图修复；W13–W16和Phase19全目标继续，commit/push/精确远端结果另记，用户.gitignore保留不提交。
+
+SSH/父生命周期组件已提交/推送`e38c614986163be7d5ec6b817180760a237aa58e`并读回远端同SHA；CI38032616827/job114156536007及Watch38032616712/job114156535598均付款/spending-limit阻止启动、零步骤failure，未计通过。W13 FLOW-01按序继续。
+
+### 2026-10-10 — Phase 19 W13 本地命令作业组件
+
+原后台进程归位`workflow/jobs/local/`，CLI使用会话绑定CAS/永久dispatch fence、普通批准和单一ExecutionService；接通/jobs本地run/queue/show/pause/resume/cancel/字节分页，以及/hub真实main/goal/advisor、父来源和共享预算。异步output背压/有界drain、held cleanup/output失败、late approval、root rebind、UTF8原始字节与跨页脱敏均保留真实unknown；completion notice不再生成新prompt。147定向/149契约/43scripts、Node/单文件构建与六actualCLI共78local commands零modelPOST通过，三项新反转及恢复26项通过。独立code APPROVE（8probe/13项）、architecture CLEAR（8native/51项）确认最终57hash及零残留进程，仅覆盖本地命令组件，报告`.tmp/jobs-review/{code-final.md,architecture-final.md}`。HEAD/当前attention同两条stale queue断言失败，完整suite未宣称绿。边界与材料见[作业文档](features/jobs.md)及[Phase19 §8.133](features/phase-19-decisions.md#8133-w13-flow-01-本地命令作业组件持久意图原生清理与会话总览)。持久旁路代理/DAG仍属FLOW-01后续组件，FLOW-02/03与W14–W16按序继续；commit/push/精确CI另记，用户.gitignore保留不提交。

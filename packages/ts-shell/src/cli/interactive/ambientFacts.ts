@@ -1,6 +1,6 @@
 import { getSessionTodos } from "../../core/commands/todoCommandRuntime.js";
 import { AgentRegistryScanner } from "../../core/messaging/agentRegistryScanner.js";
-import { backgroundTasks } from "../../core/shell/background/tasks.js";
+import type { BackgroundRunner } from '../../workflow/jobs/local/model.js';
 import type { AmbientContext } from "../../presentation/tui/chrome/hints.js";
 
 /**
@@ -14,11 +14,11 @@ import type { AmbientContext } from "../../presentation/tui/chrome/hints.js";
 const scanner = new AgentRegistryScanner();
 
 /** Current ambient state, recomputed per frame from live stores. */
-export function readAmbientFacts(sessionId: string): AmbientContext {
+export function readAmbientFacts(sessionId: string, background?: BackgroundRunner): AmbientContext {
   return {
     openTodos: getSessionTodos(sessionId).filter((todo) => todo.status !== "done").length,
     peerSessions: countPeerSessions(sessionId),
-    runningCommands: backgroundTasks.list().filter((task) => task.state === "running").length,
+    runningCommands: background?.list().filter((task) => task.state === "running" || task.state === 'starting').length ?? 0,
   };
 }
 

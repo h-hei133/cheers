@@ -68,6 +68,7 @@ async function runCommand(request: CommandExecutionRequest): Promise<CommandExec
     ...(request.abortSignal ? { abortSignal: request.abortSignal } : {}),
     ...(request.env ? { env: request.env } : {}),
     ...(request.onOutput ? { onOutput: request.onOutput } : {}),
+    ...(request.onStarted ? { onStarted: request.onStarted } : {}),
     ...(request.onStdin ? { onStdin: request.onStdin } : {}),
     ...(request.onStdout ? { onStdout: request.onStdout } : {}),
     ...(request.onStderr ? { onStderr: request.onStderr } : {}),

@@ -39,6 +39,27 @@ export interface JobJournal {
   readonly scope: BoundSessionScope;
   readonly remote?: RemoteWorkspace;
   readonly jobs: readonly RemoteJob[];
+  readonly local?: readonly LocalJob[];
+}
+export interface LocalJob {
+  readonly id: string;
+  readonly backend: 'local';
+  readonly ownerId: string;
+  readonly command: string;
+  readonly directory: BoundSessionScope['workspace'];
+  readonly timeoutMs: number;
+  readonly digest: string;
+  readonly origin: JobOrigin;
+  readonly scope: BoundSessionScope;
+  readonly createdAt: number;
+  readonly status: JobStatus | 'paused';
+  readonly dispatchPossible: boolean;
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly truncated: boolean;
+  readonly output: 'pending' | 'complete' | 'interrupted' | 'unknown';
+  readonly exitCode?: number;
+  readonly note: string;
 }
 export class JobStateError extends Error {
   constructor(readonly code: 'invalid' | 'capacity' | 'conflict' | 'unavailable' | 'detached') {

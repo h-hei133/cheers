@@ -2,7 +2,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { verifyPathContainment } from '../security/pathJail.js'
 import { replaceInContent, replaceManyInContent } from './editEngine.js'
-import { backgroundTasks, renderTask, TaskRegistry } from '../shell/background/tasks.js'
+import { startBackgroundCommand, createTaskOutputToolDefinition, createTaskStopToolDefinition } from './shell/background.js';
+import { planCommandLaunch } from './shell/launch.js';
+import { TOOL_APPROVED_COMMAND_AUTHORITY } from './shell/authority.js';
 import { withFileLock } from '../../runtime/execution/fileLock.js'
 import {
   detectLineEnding,
@@ -30,7 +32,6 @@ import { createWebSearchToolDefinition } from './webSearch.js'
 import { createLspToolDefinition } from './lsp.js'
 import { createUnifiedBrowserToolDefinition } from './browserToolUnified.js'
 import { createDesktopToolDefinition } from '../../desktop/tool.js'
-import { ShellManager } from '../shell/platform/shellManager.js'
 import { createAskToolDefinition } from './ask.js'
 import { createTodoToolDefinition } from './todoTool.js'
 import { createTaskToolDefinition } from './taskTool.js'
@@ -41,9 +42,8 @@ import { resolveToolTarget } from './permissionContext.js'
 import { validateToolArguments } from './arguments.js'
 import { approvedResult, deniedResult, runtimeErrorResult } from './toolResultLifecycle.js'
 import type { ToolExecutionResult } from '../../tools/types.js'
-import { networkNotice, planSandboxedCommand, readSandboxRules } from '../../sandbox/osSandbox.js'
+import { networkNotice, readSandboxRules } from '../../sandbox/osSandbox.js'
 import { resolveCommandTimeout, DEFAULT_COMMAND_TIMEOUT_MS, MAX_COMMAND_TIMEOUT_MS } from '../../runtime/execution/commandTimeout.js'
-import { workspaceSandboxPolicy } from '../../sandbox/workspace.js'
 import { createPatchToolDefinition } from '../../edit/patch/tool.js'
 import { startCommandProof } from '../../runtime/execution/proof.js'
 
@@ -58,11 +58,7 @@ const TOOL_APPROVED_WRITE_AUTHORITY: ExecutionAuthority = {
   source: 'tool-runtime-approval',
   reason: 'ToolRuntime approved the filesystem write before ExecutionService was called.',
 }
-const TOOL_APPROVED_COMMAND_AUTHORITY: ExecutionAuthority = {
-  mode: 'command-allowlisted',
-  source: 'tool-runtime-approval',
-  reason: 'ToolRuntime allowlist and process permission checks passed before ExecutionService was called.',
-}
+
 
 function inferFailureKind(result: {
   status: 'completed' | 'failed' | 'timeout' | 'cancelled'
@@ -82,45 +78,6 @@ function inferFailureKind(result: {
     default:
       return undefined
   }
-}
-
-/**
- * How a command will be launched: the shell, its arguments, and the isolation
- * plan.
- *
- * Shared so the two ways a command can be started cannot disagree about either
- * of the safety decisions here. A path that composed its own argv would quietly
- * skip the sandbox, which is a real confinement boundary rather than a flag, and
- * the difference would only show up as a command running unjailed.
- */
-function planCommandLaunch(
-  command: string,
-  context: ToolExecutionContext,
-): { shellBin: string; shellArgs: string[]; sandbox: ReturnType<typeof planSandboxedCommand> } {
-  const env = ShellManager.getActiveEnvironment()
-  const isWindows = process.platform === 'win32'
-  const shellBin = env.executionPath
-  let shellArgs: string[]
-
-  if (env.activeBackend === 'powershell') {
-    shellArgs = ['-NoProfile', '-NonInteractive', '-Command', command]
-  } else if (env.activeBackend === 'git-bash' || env.activeBackend === 'bash') {
-    shellArgs = ['-c', command]
-  } else if (env.activeBackend === 'wsl') {
-    shellArgs = ['-e', 'sh', '-c', command]
-  } else {
-    shellArgs = isWindows ? ['/d', '/s', '/c', command] : ['-c', command]
-  }
-  // OS-level isolation, when it has been turned on. The plan says which of the
-  // three states applies, and an unavailable launcher is reported on the result
-  // rather than quietly downgraded to no isolation.
-  const sandbox = planSandboxedCommand({
-    shell: shellBin,
-    shellArgs,
-    workspaceRoot: context.workspaceRoot,
-    ...workspaceSandboxPolicy(context.workspaceRoot, context.workspaceRoots),
-  })
-  return { shellBin, shellArgs, sandbox }
 }
 
 async function runCommandTool(
@@ -536,7 +493,7 @@ export function createCoreToolRegistry(options?: {
           },
           timeout: {
             type: 'number',
-            description: `Optional timeout in seconds. Defaults to ${DEFAULT_COMMAND_TIMEOUT_MS / 1000} seconds; the maximum is ${MAX_COMMAND_TIMEOUT_MS / 1000}. Raise it for a build, an install, or a full test run that needs longer. Ignored when runInBackground is set, because such a command is not waited on.`,
+            description: `Optional timeout in seconds. Foreground defaults to ${DEFAULT_COMMAND_TIMEOUT_MS / 1000} seconds; the maximum is ${MAX_COMMAND_TIMEOUT_MS / 1000}. Session-owned background jobs default to 300 seconds and accept 1–300 seconds; unbound legacy background callers refuse an explicit timeout.`,
           },
           runInBackground: {
             type: 'boolean',
@@ -614,148 +571,4 @@ export function createCoreToolRegistry(options?: {
     })
   }
   return new Map(tools.map(tool => [tool.name, tool]))
-}
-
-/**
- * Start a command and come back to it.
- *
- * The command is not waited on, so the answer is a handle rather than an outcome.
- * Saying which handle is the whole point: without it there is no way to ask what
- * happened, and a command nobody can ask about is indistinguishable from one that
- * never ran.
- */
-/**
- * Start a command that outlives the turn.
- *
- * A background command is the same command as a foreground one: it is planned
- * through the same launcher, so it carries the same isolation rather than
- * running bare on the host. The only thing that differs is that nothing waits
- * for it.
- *
- * A timeout is refused rather than ignored. There is no deadline to enforce on
- * work that deliberately continues past the turn, so accepting a number here
- * would report a limit that nothing applies — and a caller who asked for one
- * means to stop it, which is what taskStop is for.
- */
-function startBackgroundCommand(
-  command: string,
-  context: ToolExecutionContext,
-  requestedTimeoutSeconds?: unknown,
-): ToolExecutionResult {
-  // Output past the in-memory limit goes beside this session's other artifacts,
-  // so the file a reader is pointed at sits with the ones the foreground tools
-  // write rather than in a directory of its own.
-  TaskRegistry.getShared().spillDirectory = ArtifactManager.getShared(
-    context.workspaceRoot, context.sessionId,
-  ).directory;
-  if (!command.trim()) {
-    return deniedResult('Error: No command provided to execute.', { status: 'failed', exitCode: 1 })
-  }
-  if (requestedTimeoutSeconds !== undefined) {
-    return deniedResult(
-      'Error: a background command has no timeout, because nothing waits for it. Start it without one and stop it with taskStop.',
-      { status: 'failed', exitCode: 1 },
-    )
-  }
-  const { sandbox } = planCommandLaunch(command, context)
-  // Same refusal as the foreground path: a background command is not a way to
-  // run something the sandbox declined to isolate.
-  if (sandbox.state === 'refused') {
-    return deniedResult(`Error: ${sandbox.notice ?? 'sandbox refused the command'}`, {
-      status: 'failed',
-      exitCode: 1,
-    })
-  }
-  const task = backgroundTasks.start({
-    command,
-    cwd: context.workspaceRoot,
-    ...(sandbox.command && sandbox.args
-      ? { shell: { command: sandbox.command, args: [...sandbox.args] } }
-      : {}),
-    ...(context.commandEnv ? { env: context.commandEnv } : {}),
-  })
-  if (task.failure) {
-    return deniedResult(`Error: the command could not be started: ${task.failure}`, {
-      status: 'failed',
-      exitCode: 1,
-    })
-  }
-  const isolation = sandbox.state === 'isolated'
-    ? `\n[sandbox] ${sandbox.notice ?? 'Runs inside the workspace sandbox.'}`
-    : sandbox.notice
-      ? `\n[sandbox] ${sandbox.notice}`
-      : ''
-  return approvedResult(
-    `Started ${task.id} in the background.\n${renderTask(task)}${isolation}\n\n` +
-      `Read it with taskOutput, or stop it with taskStop. It keeps running if this turn ends.`,
-  )
-}
-
-/** What a background command has produced, and whether it is still going. */
-function createTaskOutputToolDefinition(): ToolDefinition {
-  return {
-    name: 'taskOutput',
-    description:
-      'Read what a command started with runInBackground has produced. Reports whether it is still running and how it ended.',
-    argsSchema: {
-      type: 'object',
-      properties: {
-        taskId: { type: 'string', description: 'The identifier the background command was started under.' },
-        all: { type: 'boolean', description: 'List running commands and the most recent 100 completions instead of one.' },
-      },
-    },
-    async execute(args) {
-      if (args.all === true) {
-        const tasks = backgroundTasks.list()
-        if (tasks.length === 0) return approvedResult('No background commands have been started.')
-        return approvedResult(tasks.map(renderTask).join('\n\n'))
-      }
-      const id = typeof args.taskId === 'string' ? args.taskId.trim() : ''
-      if (!id) {
-        return deniedResult('Error: give a taskId, or set all to list every background command.')
-      }
-      const task = backgroundTasks.get(id)
-      if (!task) {
-        return deniedResult(
-          `Error: no background command named '${id}'. Known: ${backgroundTasks.list().map((t) => t.id).join(', ') || 'none'}.`,
-        )
-      }
-      return approvedResult(renderTask(task))
-    },
-  }
-}
-
-/**
- * Stop a command that was started in the background.
- *
- * Refused rather than reported as success when nothing matched: a caller that
- * believes it stopped something and did not has a process still running under a
- * name it will not ask about again.
- */
-function createTaskStopToolDefinition(): ToolDefinition {
-  return {
-    name: 'taskStop',
-    description: 'Stop a command started with runInBackground, by signalling its whole process group.',
-    argsSchema: {
-      type: 'object',
-      properties: {
-        taskId: { type: 'string', description: 'The identifier of the command to stop.' },
-      },
-      required: ['taskId'],
-    },
-    async execute(args) {
-      const id = typeof args.taskId === 'string' ? args.taskId.trim() : ''
-      if (!id) return deniedResult('Error: taskStop needs a taskId.')
-      const stopped = await backgroundTasks.stop(id)
-      if (!stopped) {
-        const task = backgroundTasks.get(id)
-        return deniedResult(
-          task
-            ? `Error: ${id} is not running any more (${task.state}).`
-            : `Error: no background command named '${id}'.`,
-        )
-      }
-      return approvedResult(`Stop requested for ${id}. Check taskOutput for the observed result.`)
-    },
-  }
 }
