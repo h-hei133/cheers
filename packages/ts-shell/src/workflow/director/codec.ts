@@ -1,6 +1,6 @@
 import { isRecord } from '../../core/values/record.js';
 import { isThinkingPreference } from '../../core/models/effort.js';
-import type { BoundSessionScope } from '../../session/store/bound.js';
+import type { BoundSessionScope } from '../../session/store/contract.js';
 import { validateScope } from '../jobs/validation.js';
 import type { DirectorState } from './model.js';
 

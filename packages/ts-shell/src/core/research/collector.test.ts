@@ -75,7 +75,7 @@ describe("web source collection", () => {
     expect(report.pages.every((page) => page.excerpts.length === 5)).toBe(true);
   });
 
-  it.each(["web-research", "deep-research", "research", "deep"])("routes /%s to honest help and collection", async (name) => {
+  it.each(["web-research"])("routes /%s to honest help and collection", async (name) => {
     const help = await routeSlashCommand(`/${name}`, { cwd: context.workspaceRoot });
     expect(help?.kind).toBe("local");
     if (help?.kind === "local") expect(help.output).toContain("Web Source Collection (/web-research)");
@@ -84,5 +84,15 @@ describe("web source collection", () => {
     if (result?.kind !== "local") throw new Error("Expected local collection");
     expect(result.output).toContain("# Web Source Collection: topic");
     expect(mocks.search.mock.calls[0][1].workspaceRoot).toBe(context.workspaceRoot);
+  });
+
+  it.each(["deep-research", "research", "deep"])("requires a bound research runtime for /%s instead of falling back to collection", async name => {
+    for (const suffix of ['', ' topic']) {
+      const result = await routeSlashCommand(`/${name}${suffix}`, { cwd: context.workspaceRoot });
+      expect(result?.kind).toBe('local');
+      if (result?.kind === 'local') expect(result.output).toContain('Deep research requires a bound session runtime');
+    }
+    expect(mocks.search).not.toHaveBeenCalled();
+    expect(mocks.fetch).not.toHaveBeenCalled();
   });
 });

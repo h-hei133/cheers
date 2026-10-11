@@ -1,4 +1,4 @@
-import type { CommandArgumentCompletion } from "../types.js";
+import type { CommandArgumentCompletion } from "./model.js";
 import { scanCommandArgs } from "../arguments.js";
 import type { CommandAction, CommandSyntax } from "./model.js";
 import { parseFlags } from "./flags.js";

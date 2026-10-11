@@ -2,7 +2,7 @@ import path from 'node:path';
 import { inspectWorkspaceFile } from '../../../edit/authority/state.js';
 import { readOperations } from '../../../edit/recovery/operation/store.js';
 import type { OperationReceipt } from '../../../edit/recovery/operation/model.js';
-import type { BoundSessionScope } from '../../../session/store/bound.js';
+import type { BoundSessionScope } from '../../../session/store/contract.js';
 import type { TargetObservation } from './model.js';
 
 export function observeTargets(root: string, targets: readonly string[], assertAccess: (absolute: string) => void): readonly TargetObservation[] {

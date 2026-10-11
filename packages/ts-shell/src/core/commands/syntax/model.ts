@@ -36,3 +36,9 @@ export interface CommandSyntax<Action extends CommandAction = CommandAction> {
   readonly actions: readonly Action[];
   readonly flags?: readonly CommandFlag[];
 }
+
+export interface CommandArgumentCompletion {
+  readonly value: string
+  readonly label: string
+  readonly detail?: string
+}

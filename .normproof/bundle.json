@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "package": "normproof",
+  "packageVersion": "0.1.0",
+  "baseCommit": "e712ec48acd4282fd7214ad46e9c24bd21909b35",
+  "sourceArchive": ".normproof/normproof-0.1.0.tgz",
+  "sourceSha256": "d79b5d94d4e80cb1df99315920494a440859f9cad1a638c9b27f3e6a05a5923e",
+  "patch": ".normproof/patches/graph.patch",
+  "patchSha256": "3cb6617066340386b1658b62c4a0fc8fbbbc21d403cc3d278f8886a077b6e833",
+  "members": {
+    "package/dist/adapters/sidecar-file/module-graph.js": {
+      "before": "93ed2d104a7aa41d508ab6a7f9011dcb477e21dcf2807aa0c3d97261a340e50e",
+      "after": "d55723ea4aa21ae24264ad724e07d734b64326b01771a226a30524bce4e64faa"
+    },
+    "package/dist/engine/proof/expression/evaluate.js": {
+      "before": "be674a694f6a7ad32855e5b07857a1c3b241fa321f6141fc33a305575b204feb",
+      "after": "8c723a91502b9e164c1da7881639aebd1be046d2be7a509e31a776c2d3adb988"
+    }
+  },
+  "limits": {
+    "graphEdges": 16384,
+    "setPaths": 4096,
+    "sourceFileBytes": 1048576,
+    "reachabilitySteps": 20000
+  },
+  "policy": "complete declared TS/TSX graph; unresolved specifiers remain blocking; collector overflow remains not_proven",
+  "vendor": {
+    "name": "typescript",
+    "version": "5.9.3",
+    "license": "Apache-2.0",
+    "files": [
+      {
+        "source": "node_modules/typescript/lib/typescript.js",
+        "target": "package/dist/vendor/typescript.cjs",
+        "sha256": "3ae902c92cc44dace175c0e69e13a4b0899f6983c6121d76b9ab8dd5795e7675"
+      },
+      {
+        "source": "node_modules/typescript/LICENSE.txt",
+        "target": "package/dist/vendor/LICENSE.txt",
+        "sha256": "a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47"
+      },
+      {
+        "source": "node_modules/typescript/ThirdPartyNoticeText.txt",
+        "target": "package/dist/vendor/ThirdPartyNoticeText.txt",
+        "sha256": "1af3c68039c57e539422da82a4faada506ce6d0ea6f90e0b699d02dbcdb7a90c"
+      }
+    ]
+  },
+  "archiveSha256": "6c1a37e95434bcc149f29ce2568bbccb3a3aeec91df6547535675865f6aca985"
+}

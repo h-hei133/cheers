@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { handleShellSigint } from "./core/shell/signalHandlers.js";
 import { createLongSessionContinuityFixture } from "./test-utils/longSessionContinuityFixtures.js";
+import { normalizePathIdentity } from "./session/continuation/roots.js";
 import { SessionManager } from "./session/SessionManager.js";
 import {
   createGitRepoFixture,
@@ -1097,7 +1098,7 @@ describe("CLI streaming baseline (T3)", () => {
       ),
     ) as { byProjectRoot?: Record<string, { sessionId?: string }> };
     const selection =
-      currentSessionStore.byProjectRoot?.[path.resolve(projectRoot).toLowerCase()];
+      currentSessionStore.byProjectRoot?.[normalizePathIdentity(projectRoot)!];
     expect(selection?.sessionId).toBeDefined();
     expect(selection?.sessionId).not.toBe(crossRootSessionId);
   }, 15000);
@@ -1184,7 +1185,7 @@ describe("CLI streaming baseline (T3)", () => {
       expect(output).toContain("needsAuth: needs-auth");
       expect(output).toContain("MCP server needsAuth requires authentication");
       expect(output).toContain(
-        "Authenticate server 'needsAuth' and rerun /mcp refresh needsAuth.",
+        "Run /mcp auth -- \"needsAuth\", then /mcp test -- \"needsAuth\".",
       );
       expect(output).toContain("brokenStdio: failed");
       expect(output).toContain(
@@ -1265,7 +1266,7 @@ describe("CLI streaming baseline (T3)", () => {
       expect(authOutput).toContain("needsAuth: needs-auth (executable=no)");
       expect(authOutput).toContain("MCP server needsAuth requires authentication");
       expect(authOutput).toContain(
-        "Authenticate server 'needsAuth' and rerun /mcp refresh needsAuth.",
+        "Run /mcp auth -- \"needsAuth\", then /mcp test -- \"needsAuth\".",
       );
 
       const failedResult = await runCliCommandToClose({
@@ -1359,7 +1360,7 @@ describe("CLI streaming baseline (T3)", () => {
       expect(authOutput).toContain("- BlockerKind: environment-not-ready");
       expect(authOutput).toContain("MCP server needsAuth requires authentication");
       expect(authOutput).toContain(
-        "Authenticate server 'needsAuth' and rerun /mcp refresh needsAuth.",
+        "Run /mcp auth -- \"needsAuth\", then /mcp test -- \"needsAuth\".",
       );
       expect(authOutput).not.toContain("MCP refresh complete (needsAuth).");
 
@@ -1456,7 +1457,7 @@ describe("CLI streaming baseline (T3)", () => {
       expect(output).toContain("needsAuth: needs-auth (executable=no)");
       expect(output).toContain("MCP server needsAuth requires authentication");
       expect(output).toContain(
-        "Authenticate server 'needsAuth' and rerun /mcp refresh needsAuth.",
+        "Run /mcp auth -- \"needsAuth\", then /mcp test -- \"needsAuth\".",
       );
       expect(output).toContain("brokenStdio: failed (executable=no)");
       expect(output).toContain(
@@ -1594,7 +1595,7 @@ describe("CLI streaming baseline (T3)", () => {
       fs.readFileSync(currentSessionStorePath, "utf8"),
     ) as { byProjectRoot?: Record<string, { sessionId?: string }> };
     const repoASelection =
-      currentSessionStore.byProjectRoot?.[repoA.toLowerCase()];
+      currentSessionStore.byProjectRoot?.[normalizePathIdentity(repoA)!];
     expect(repoASelection?.sessionId).toBeDefined();
     expect(repoASelection?.sessionId).not.toBe(targetSessionId);
 
@@ -2643,7 +2644,7 @@ describe("CLI streaming baseline (T3)", () => {
       byProjectRoot?: Record<string, { sessionId?: string }>;
     };
     expect(
-      currentStore.byProjectRoot?.[path.resolve(projectRoot).toLowerCase()]
+      currentStore.byProjectRoot?.[normalizePathIdentity(projectRoot)!]
         ?.sessionId,
     ).toBe(completedSessionId);
   }, 60000);

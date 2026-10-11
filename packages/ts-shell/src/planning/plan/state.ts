@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { freezeDeep } from '../../core/values/freeze.js';
-import type { BoundSessionScope } from '../../session/store/bound.js';
+import type { BoundSessionScope } from '../../session/store/contract.js';
 import { decodePlan, planVersion } from './codec.js';
 import { PlanError, type PlanCriterion, type PlanDraft } from './model.js';
 

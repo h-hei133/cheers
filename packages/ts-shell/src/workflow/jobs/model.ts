@@ -1,4 +1,4 @@
-import type { BoundSessionScope } from '../../session/store/bound.js';
+import type { BoundSessionScope } from '../../session/store/contract.js';
 import type { SshWorkspace } from '../../runtime/execution/ssh/model.js';
 import type { AgentJob } from './agent/model.js';
 import type { DagJob } from './dag/model.js';

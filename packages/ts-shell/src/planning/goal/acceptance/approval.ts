@@ -1,5 +1,5 @@
 import type { SessionStateSnapshot } from '../../../session/schema/sessionStateSnapshot.js';
-import type { BoundSessionScope } from '../../../session/store/bound.js';
+import type { BoundSessionScope } from '../../../session/store/contract.js';
 import type { PlanDraft } from '../../plan/model.js';
 import { planVersion } from '../../plan/codec.js';
 import { decodeGoal } from '../codec.js';

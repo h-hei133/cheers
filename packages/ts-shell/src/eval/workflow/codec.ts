@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { sameValue } from '../../config/values.js';
 import { isRecord } from '../../core/values/record.js';
-import type { BoundSessionScope } from '../../session/store/bound.js';
+import type { BoundSessionScope } from '../../session/store/contract.js';
 import { decodeEvaluationSpec, evaluationPath } from './manifest.js';
 import { compareEvaluation, completeMeasurements } from './scoring.js';
 import type { Evaluation, EvaluationState } from './model.js';

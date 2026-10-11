@@ -6486,3 +6486,11 @@ FLOW-03 已提交/推送 `4d99ce4e0da73eaee9bab4ed08ad516b427ce95f`，远端同S
 ### 2026-10-11 — Phase 19 W15 命令控制闭环
 
 session/history/context、todo/memory、model/provider偏好、rules/cleanse/force与diagnostics/restart均复用真实bound owner。历史fork在所选问题前分支并保留完整历史/可编辑draft，附件实际send前复验read/digest，tier真实wire不改temperature，规则exact proposal另批patch/receipt/readback，cleanse同scope native复测，restart同进程重入且未知cleanup拒绝成功。最终164TS/129production freeze独立code APPROVE/architecture CLEAR，Node20.3受影响104文件/1012项、149契约/43scripts、五静态门、两构建、六有效反转/恢复73项及六actualCLI（24合成POST）通过；另历史picker/trace HTTP cleanup真实读回。边界/材料见[命令控制](features/command-controls.md)、[Phase19 §8.140](features/phase-19-decisions.md#8140-w15-par-01–05会话上下文与运行时命令闭环)及 `.tmp/parity/acceptance.json`。完整NormProof仍容量not_proven由W16修复，Phase19全目标active；提交/推送/精确CI另记，用户.gitignore保留不提交。
+
+W15已提交/推送 `e712ec48acd4282fd7214ad46e9c24bd21909b35` 并读回远端同SHA。精确CI 38119354927 与Architecture Watch 38119354931 均completed/failure、steps=[]；annotations确认付款/spending-limit阻止job启动，没有远端验证通过。材料 `.tmp/parity/delivery.json`；W16继续，Phase19全目标active。
+
+### 2026-10-11 — Phase 19 W16 完整结构与集成验证
+
+完整 TS/TSX 图扩容并采用固定 AST 解析，2424 模块/10360 边的未解析与混合环义务均满足，4 项既有函数数量 advisory 保留；校验包支持固定基础/补丁/parser 逐字节重建。提取中性契约消除反向类型依赖，已有生产 JavaScript 不变。旧路径门禁改为当前 owner 的实际套件并严格拒绝跳过；独立复核发现的父进程超时泄漏及新增中断清理责任均以原生回归修复。全套 Node20.3 7862 通过/10 原有跳过，当前源码复验一致；两产物×三模式实际 CLI 共24合成 POST 通过。详情见[76 项集成验收与剩余证据](features/phase-19-acceptance.md)；SAFE-02 原生隐式读取/非 Linux、W7-33 真实传输、用户前端和外部服务仍开放，Phase19 全目标 active。最终脚本/复审及提交推送精确事实另记，用户 `.gitignore` 保留。
+
+最终 `2b6ffc0e…` 源码冻结获独立代码 APPROVE、架构 CLEAR；57 scripts 与修复后149契约项通过，四更新门禁及五静态门均已有实际通过证据。预设路由503和中途限流未计批准，最终两条独立复核均返回；63文件源码清单及报告保存在 `.tmp/integration/`。

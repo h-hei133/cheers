@@ -4,7 +4,8 @@ import { syntaxCompletions, syntaxHint } from '../syntax/projection.js';
 import { parseSyntax } from '../syntax/parse.js';
 import { parseNavigationArgs } from './syntax.js';
 
-export type SessionCommandName = 'pin' | 'history' | 'import' | 'open' | 'shake';
+import type { SessionCommandName } from './contract.js';
+export type { SessionCommandName } from './contract.js';
 const path = { name: 'path', kind: 'text', required: true } as const;
 const mode = { name: 'mode', kind: 'text', values: ['elide', 'images', 'thinking'] } as const;
 export const sessionSyntax: Readonly<Record<SessionCommandName, CommandSyntax>> = {

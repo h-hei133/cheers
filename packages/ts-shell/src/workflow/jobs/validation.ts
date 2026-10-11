@@ -1,5 +1,5 @@
 import { isRecord } from '../../core/values/record.js';
-import type { BoundSessionScope } from '../../session/store/bound.js';
+import type { BoundSessionScope } from '../../session/store/contract.js';
 import { JobStateError, type JobOrigin } from './model.js';
 
 export function valid(value: unknown): asserts value {

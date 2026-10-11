@@ -13,8 +13,9 @@ describe("interactive loop", () => {
     const stdout = Object.assign(new PassThrough(), { isTTY: true }) as unknown as NodeJS.WriteStream;
     const processEvents = new EventEmitter() as NodeJS.Process;
     let capturedReadline: ReadlineInterface | null = null;
+    const stop = new AbortController();
 
-    await runInteractiveLoop({
+    const loop = runInteractiveLoop({
       stdin,
       stdout,
       process: processEvents,
@@ -45,6 +46,7 @@ describe("interactive loop", () => {
       },
       setActiveNonInteractiveApprovalMode: () => undefined,
       exit: () => undefined,
+      stopSignal: stop.signal,
     });
 
     // The host owns raw stdin, so downstream command routers get a readline
@@ -53,6 +55,8 @@ describe("interactive loop", () => {
     expect(typeof capturedReadline?.question).toBe("function");
     expect(typeof capturedReadline?.close).toBe("function");
 
+    stop.abort();
+    await loop;
     capturedReadline?.close();
     (stdin as unknown as PassThrough).destroy();
     (stdout as unknown as PassThrough).destroy();

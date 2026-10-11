@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { isRecord } from '../../../core/values/record.js';
-import type { BoundSessionScope } from '../../../session/store/bound.js';
+import type { BoundSessionScope } from '../../../session/store/contract.js';
 import type { LocalJob } from '../model.js';
 import { valid, text, validateOrigin, validateScope } from '../validation.js';
 

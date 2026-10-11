@@ -9,7 +9,6 @@ import { closeExtensionsFor } from '../runtime/extensions.js';
 import { closeTraceDashboard } from '../../observability/traceDashboard.js';
 import { runCollaborationServiceMode } from '../collaboration/service.js';
 import type { Interface as ReadlineInterface } from "node:readline";
-import type { ReadStream } from "node:tty";
 
 import { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import type { InteractiveApprovalResult } from "../interactive/picker/approval.js";
@@ -58,15 +57,8 @@ import {
 } from "../print/stdinPromptCapture.js";
 import type { RestartOutcome, RestartPort, RestartRequest } from '../../core/commands/restart/contract.js';
 
-export interface CliProcessRunnerInput {
-  readonly args: readonly string[];
-  readonly launchCwd: string;
-  readonly stdin: ReadStream;
-  readonly process: NodeJS.Process;
-  readonly writeOutput: (message: string) => void;
-  readonly writeError: (message: string) => void;
-  readonly exit: (code: number) => never;
-}
+import type { CliProcessRunnerInput } from './contract.js';
+export type { CliProcessRunnerInput } from './contract.js';
 
 export async function runCliProcess(
   input: CliProcessRunnerInput,

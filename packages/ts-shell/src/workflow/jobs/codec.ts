@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { isRecord } from '../../core/values/record.js';
 import { freezeDeep } from '../../core/values/freeze.js';
-import type { BoundSessionScope } from '../../session/store/bound.js';
+import type { BoundSessionScope } from '../../session/store/contract.js';
 import { validateWorkspace } from '../../runtime/execution/ssh/validation.js';
 import { JobStateError, type JobJournal, type RemoteJob } from './model.js';
 import { valid, text, validateOrigin, validateScope } from './validation.js';

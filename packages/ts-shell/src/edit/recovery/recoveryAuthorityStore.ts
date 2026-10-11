@@ -1,3 +1,5 @@
+import type { RecoveryAuthorityBeforeState, RecoveryAuthorityExpectedCurrentState, RecoveryOperationBinding, RecoveryAuthorityStoredRecord } from './model.js';
+export type { RecoveryAuthorityBeforeState, RecoveryAuthorityExpectedCurrentState, RecoveryOperationBinding, RecoveryAuthorityStoredRecord } from './model.js';
 import fs from "node:fs/promises";
 import path from "node:path";
 import { hashContent } from '../authority/content.js';
@@ -12,12 +14,6 @@ import type {
 import type { RouteScopedEditJournalOperationKind } from "../result/journal/model.js";
 
 export type RecoveryAuthorityStoreMode = "disabled" | "non-default";
-export type RecoveryAuthorityBeforeState = "exists" | "absent";
-export type RecoveryAuthorityExpectedCurrentState =
-  | "exists"
-  | "absent"
-  | "unknown";
-
 export interface RecoveryAuthorityStoreConfig {
   readonly mode: RecoveryAuthorityStoreMode;
   readonly ledgerRoot?: string;
@@ -39,38 +35,10 @@ export interface CaptureRecoveryAuthorityRecordInput
   readonly operation?: RecoveryOperationBinding;
 }
 
-export interface RecoveryOperationBinding {
-  readonly operationId: string;
-  readonly sessionId: string;
-  readonly workspaceRoot: string;
-  readonly workspaceIdentity: string;
-}
-
 export type CaptureRecoveryAuthorityRecordEntry = Omit<
   CaptureRecoveryAuthorityRecordInput,
   keyof RecoveryAuthorityStoreConfig
 >;
-
-export interface RecoveryAuthorityStoredRecord {
-  readonly operation?: RecoveryOperationBinding;
-  readonly schemaVersion: 1;
-  readonly authorityId: string;
-  readonly recordId: string;
-  readonly workspaceRelativePath: string;
-  readonly operationKind: RouteScopedEditJournalOperationKind;
-  readonly beforeState: RecoveryAuthorityBeforeState;
-  readonly beforeContentHash?: string;
-  readonly beforeContentSizeBytes?: number;
-  readonly beforeMode?: number;
-  readonly beforeContentRef?: string;
-  readonly expectedCurrentState: RecoveryAuthorityExpectedCurrentState;
-  readonly expectedCurrentContentHash?: string;
-  readonly expectedCurrentMode?: number;
-  readonly capturedAtPhase: "pre-write";
-  readonly persistence: "non-default";
-  readonly createdAt: string;
-  readonly evidence: readonly string[];
-}
 
 export type RecoveryAuthorityCaptureResult =
   | {

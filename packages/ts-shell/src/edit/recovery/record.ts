@@ -3,7 +3,7 @@ import { constants, lstatSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { ensureWorkspaceDirectory, workspaceFilePath } from '../authority/state.js';
 import { hashContent } from '../authority/content.js';
-import type { RecoveryAuthorityStoredRecord } from './recoveryAuthorityStore.js';
+import type { RecoveryAuthorityStoredRecord } from './model.js';
 
 export const contentHashPattern = /^[a-f0-9]{64}$/;
 

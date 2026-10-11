@@ -415,7 +415,7 @@ describe("session wiring", () => {
       expect(host.view.editor.getText()).toBe("/m");
       terminal.input("\r");
       expect(host.view.editor.getText()).toBe("/memory ");
-      expect(host.view.suggestions.current()?.value).toBe("inspect");
+      expect(host.view.suggestions.current()?.value).toBe("view");
       expect(submit).not.toHaveBeenCalled();
     } finally { mode.stop(); }
   });

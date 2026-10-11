@@ -11,12 +11,8 @@ import { readSessionMetadataRecord } from './sessionStore.js';
 import { readStateSnapshotRequired } from './sessionStateStore.js';
 import { withFileLock, writeJsonFileAtomic } from './sessionFileStore.js';
 
-export interface BoundSessionHost { readonly getSessionDirPath: (sessionId: string) => string }
-export interface BoundSessionScope {
-  readonly sessionId: string;
-  readonly sessionCreatedAt: string;
-  readonly workspace: { readonly path: string; readonly identity: string };
-}
+import type { BoundSessionHost, BoundSessionScope } from './contract.js';
+export type { BoundSessionHost, BoundSessionScope } from './contract.js';
 export class SessionPublicationError extends Error {
   constructor(readonly code: 'invalid' | 'conflict' | 'unavailable' | 'write-failed' | 'verification-failed' | 'lock-failed',
     readonly state: 'unchanged' | 'unknown' | 'persisted' = 'unchanged') {

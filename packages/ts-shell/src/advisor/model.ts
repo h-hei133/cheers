@@ -1,4 +1,4 @@
-import type { BoundSessionScope } from '../session/store/bound.js';
+import type { BoundSessionScope } from '../session/store/contract.js';
 import type { TurnCheckpoint } from '../turn/checkpoint.js';
 import type { SubagentRunner } from '../core/subagents/runner.js';
 import type { ProcessOwner } from '../core/state/owner.js';

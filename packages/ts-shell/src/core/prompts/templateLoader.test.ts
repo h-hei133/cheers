@@ -66,13 +66,13 @@ describe("finding templates", () => {
   });
 
   it("does not read templates from above the project root", () => {
-    // Without a marker the walk considers only the given directory: an arbitrary
-    // parent is not a project, and reading configuration out of one would apply
-    // rules a repository never declared.
+    // A nested project has its own boundary even when the fixture itself sits
+    // beneath the repository running this test.
     const root = workspace();
     write(root, "outside", "Not part of a project.");
     const nested = path.join(root, "packages", "app");
     fs.mkdirSync(nested, { recursive: true });
+    fs.mkdirSync(path.join(nested, '.git'));
     expect(new TemplateLoader(nested).load().has("outside")).toBe(false);
   });
 

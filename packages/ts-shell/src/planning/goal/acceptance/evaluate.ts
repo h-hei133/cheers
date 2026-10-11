@@ -1,6 +1,6 @@
 import { sameValue } from '../../../config/values.js';
 import type { TranscriptEvent } from '../../../session/sessionEventCodec.js';
-import type { BoundSessionScope } from '../../../session/store/bound.js';
+import type { BoundSessionScope } from '../../../session/store/contract.js';
 import type { OperationReceipt } from '../../../edit/recovery/operation/model.js';
 import { nativeProof } from './codec.js';
 import { textDigest } from '../../plan/codec.js';

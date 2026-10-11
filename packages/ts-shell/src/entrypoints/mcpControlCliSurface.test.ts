@@ -90,7 +90,7 @@ describe("MCP control CLI surface", () => {
     expect(needsAuth).toContain("- No tools currently exposed.");
     expect(needsAuth).toContain("  needsAuth: needs-auth (executable=no)");
     expect(needsAuth).toContain(
-      "    do-next: Authenticate server 'needsAuth' and rerun /mcp refresh needsAuth.",
+      "    do-next: Run /mcp auth -- \"needsAuth\", then /mcp test -- \"needsAuth\".",
     );
   });
 

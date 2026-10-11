@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { SessionManager } from '../../session/SessionManager.js';
 import { ConfigState } from '../../config/state.js';
 import { getRuntimeConfig, type RuntimeConfigFile } from '../../config/runtimeConfig.js';
 import { configurationBinding } from '../../core/shell/configuration.js';
@@ -17,12 +18,13 @@ import { createCliSessionRuntime } from './cliSessionRuntimeFactory.js';
 
 const fixture = vi.hoisted(() => ({ deps: undefined as SessionRuntimeDependencies | undefined }));
 vi.mock('./goalScheduling.js', () => ({ installGoalScheduler: () => undefined }));
-// This credential/transport fixture has no durable goal session.
+// This credential/transport fixture has no active goal scheduler.
 vi.mock('./goal.js', () => ({ prepareGoalSession: () => undefined, goalObjectiveFor: () => undefined, goalPolicyFor: () => undefined }));
 vi.mock('../../core/shell/sessionRuntime.js', () => ({ ShellSessionRuntime: class {
   constructor(deps: SessionRuntimeDependencies) { fixture.deps = deps; }
   getPermissionScope() { return 'ask'; }
   getAgentMode() { return 'plan'; }
+  getCurrentRunController() { return null; }
 } }));
 vi.mock('../../turn/cacheWarm.js', () => ({ createCacheWarmingRunner: vi.fn(() => ({ stop: vi.fn() })) }));
 vi.mock('../../memory/projectMemoryLocalStore.js', () => ({ createProjectMemoryLocalStore: () => ({}) }));
@@ -34,6 +36,7 @@ vi.mock('../../core/shell/compaction.js', () => ({ compactSessionHistory: async 
   summarize: (request: { messages: []; signal: AbortSignal }) => Promise<string | undefined>; signal: AbortSignal;
 }) => ({ status: 'compacted', summary: await input.summarize({ messages: [], signal: input.signal }) }) }));
 
+let sessionManager: SessionManager;
 let home: string;
 let root: string;
 let file: string;
@@ -48,6 +51,8 @@ beforeEach(async () => {
   home = fs.mkdtempSync(path.join(os.tmpdir(), 'summary-renewal-')); root = path.join(home, 'workspace');
   fs.mkdirSync(root); fs.mkdirSync(path.join(home, '.cheers')); file = path.join(home, '.cheers', 'config.json');
   vi.stubEnv('HOME', home); vi.stubEnv('USERPROFILE', home); vi.stubEnv('OPENAI_API_KEY', '');
+  sessionManager = new SessionManager({ storageDir: path.join(home, '.cheers', 'sessions') });
+  sessionManager.createNewWithId('summary-renewal', root);
   received = []; vi.mocked(createCacheWarmingRunner).mockClear();
   server = http.createServer(async (request, response) => {
     for await (const _chunk of request) { /* consume the local request */ }
@@ -69,13 +74,13 @@ afterEach(async () => {
 });
 
 function runtime() {
-  const config = getRuntimeConfig(root); const identity = { projectRoot: root, session: { id: 'summary-renewal' } };
+  const config = getRuntimeConfig(root); const identity = { projectRoot: root, session: sessionManager.getSession('summary-renewal')! };
   const configuration = new ConfigState(config, configurationBinding(identity));
   const context = { ...identity, cwd: root, configuration, get runtimeConfig() { return configuration.current.config; } };
   const renderLine = vi.fn();
   createCliSessionRuntime({ runtimeContext: context,
     providerRuntimeBridge: { resolveCredentialSnapshot: () => resolveProviderCredential({ runtimeConfig: context.runtimeConfig, env: {} }) },
-    sessionManager: { getSession: () => ({ turns: [] }) }, renderer: { renderLine }, options: {},
+    sessionManager, renderer: { renderLine }, options: {},
     approvalTrustPolicy: {}, approvalModeState: { get: () => undefined }, getReadline: () => null,
   } as never);
   return { deps: fixture.deps!, context, renderLine };

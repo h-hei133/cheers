@@ -1,4 +1,4 @@
-import type { BoundSessionScope } from '../../../session/store/bound.js';
+import type { BoundSessionScope } from '../../../session/store/contract.js';
 import type { JobOrigin, JobStatus } from '../contract.js';
 
 export interface AgentChild {

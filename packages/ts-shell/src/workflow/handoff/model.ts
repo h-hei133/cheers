@@ -1,4 +1,4 @@
-import type { BoundSessionScope } from '../../session/store/bound.js';
+import type { BoundSessionScope } from '../../session/store/contract.js';
 import type { ModelChoice } from '../../core/models/selection.js';
 export interface Handoff {
   readonly id: string;

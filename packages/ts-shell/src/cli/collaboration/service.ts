@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { readServiceConfig } from '../../collaboration/service/config.js';
 import { startCollaborationService } from '../../collaboration/service/listener.js';
-import type { CliProcessRunnerInput } from '../bootstrap/cliProcessRunner.js';
+import type { CliProcessRunnerInput } from '../bootstrap/contract.js';
 
 /** The explicit foreground mode is composed before agent/provider bootstrap. */
 export async function runCollaborationServiceMode(input: CliProcessRunnerInput): Promise<boolean> {

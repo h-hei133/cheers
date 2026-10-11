@@ -3,7 +3,7 @@ import { freezeDeep } from '../../../core/values/freeze.js';
 import { isRecord } from '../../../core/values/record.js';
 import { textDigest } from '../../plan/codec.js';
 import { PlanError } from '../../plan/model.js';
-import type { BoundSessionScope } from '../../../session/store/bound.js';
+import type { BoundSessionScope } from '../../../session/store/contract.js';
 import { guidanceFields, type GuidanceDraft, type GuidanceField, type GuidanceQuestionField } from './model.js';
 
 export function guidanceVersion(draft: GuidanceDraft): string {

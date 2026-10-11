@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { isRecord } from '../../../core/values/record.js';
 import { DAGResolver } from '../../../core/workflow/dagResolver.js';
-import type { BoundSessionScope } from '../../../session/store/bound.js';
+import type { BoundSessionScope } from '../../../session/store/contract.js';
 import { valid, text, validateOrigin, validateScope } from '../validation.js';
 import type { DagJob } from './model.js';
 

@@ -1,7 +1,7 @@
 import { isThinkingPreference } from '../../core/models/effort.js';
 import { sameValue } from '../../config/values.js';
 import { isRecord } from '../../core/values/record.js';
-import type { BoundSessionScope } from '../../session/store/bound.js';
+import type { BoundSessionScope } from '../../session/store/contract.js';
 import type { HandoffState } from './model.js';
 
 const phases = new Set(['armed', 'running', 'switched', 'completed', 'failed', 'cancelled', 'unknown']);

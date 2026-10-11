@@ -1,3 +1,5 @@
+import type { CommandArgumentCompletion } from './syntax/model.js';
+export type { CommandArgumentCompletion } from './syntax/model.js';
 import type { CommandReport } from './report/contract.js';
 import type { KeyBinding } from "../../presentation/tui/chrome/keys.js";
 import type { CompactLiveCheckpointStore } from '../../context/compact/checkpoint/compactLiveCheckpoint.js'
@@ -32,7 +34,7 @@ import type { SidebarLiveEventStore } from '../../presentation/sidebar/sidebarLi
 export type CommandKind = 'local' | 'prompt' | 'shell-action'
 
 export interface CommandContext {
-  readonly sessionCommand?: (name: import('./navigation/operations.js').SessionCommandName, args: string[], context: CommandContext) => Promise<CommandExecutionResult>;
+  readonly sessionCommand?: (name: import('./navigation/contract.js').SessionCommandName, args: string[], context: CommandContext) => Promise<CommandExecutionResult>;
   readonly dataTransfer?: import('./transfer/contract.js').CommandDataTransfer;
   /** Bound rule/diagnostic/context owner; proposal commands never write directly. */
   readonly ruleControlsCommand?: (name: 'init' | 'rules' | 'context', args: string[], context: CommandContext) => Promise<CommandExecutionResult>;
@@ -212,12 +214,6 @@ export interface ShellActionResult {
 }
 
 export type CommandExecutionResult = LocalCommandResult | PromptCommandResult | ShellActionResult
-
-export interface CommandArgumentCompletion {
-  readonly value: string
-  readonly label: string
-  readonly detail?: string
-}
 
 /** A distinct invocation handled by the same owner, not a synonymous alias. */
 export interface NamedCommandInvocation {

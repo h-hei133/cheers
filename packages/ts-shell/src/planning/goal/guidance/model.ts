@@ -1,4 +1,4 @@
-import type { BoundSessionScope } from '../../../session/store/bound.js';
+import type { BoundSessionScope } from '../../../session/store/contract.js';
 export type GuidanceQuestionField = 'objective' | 'outcome' | 'constraints';
 export type GuidanceField = GuidanceQuestionField | 'budget';
 export const guidanceFields: readonly GuidanceQuestionField[] = ['objective', 'outcome', 'constraints'];

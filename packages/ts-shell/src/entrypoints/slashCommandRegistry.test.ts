@@ -40,7 +40,7 @@ describe("slash command registry CLI surface", () => {
     expect(lines[0]).toBe("Session command map:");
     expect(lines[1]).toContain("/resume switch [id|prefix|title|last]");
     expect(lines[1]).toContain("/resume fork <session-id|here>");
-    expect(lines[2]).toBe("Usage: /fork <session-id|here>");
+    expect(lines[2]).toBe("Usage: /fork <session-id|here> [--from <value>]");
     expect(lines[3]).toContain("Quote a multi-word session title");
     expect(lines.at(-1)).toContain("/help");
   });

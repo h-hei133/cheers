@@ -1,4 +1,4 @@
-import type { BoundSessionScope } from '../../session/store/bound.js';
+import type { BoundSessionScope } from '../../session/store/contract.js';
 export interface RecordOptions { readonly retention: 'keep' | 'discard'; readonly maxBytes: number; readonly seconds: number }
 export interface RecordingRow {
   readonly id: string;

@@ -6,14 +6,14 @@
       "id": "source_module_graph",
       "source": {
         "kind": "module-graph",
-        "pattern": "packages/**/*.ts"
+        "pattern": "packages/**/*.ts*"
       }
     },
     {
       "id": "source_module_functions",
       "source": {
         "kind": "module-functions",
-        "pattern": "packages/**/*.ts"
+        "pattern": "packages/**/*.ts*"
       }
     }
   ]

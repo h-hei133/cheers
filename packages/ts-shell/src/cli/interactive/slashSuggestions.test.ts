@@ -111,7 +111,7 @@ describe("command completions", () => {
     const matches = slashSuggestions("/model");
     expect(matches?.some((match) => match.value === "/model")).toBe(true);
     expect(matches?.find((match) => match.value === "/model")?.detail).toBe(
-      "inspect and switch active model [status|refresh|config|list [provider] [--refresh]|use <model-id> [--global] [--effort <low|medium|high|auto|off|none>]|help]",
+      "inspect and switch active model [status|refresh|config|list [provider] [--refresh]|use <model-id> [--global] [--effort <low|medium|high|auto|off|none>]|preset [arguments...]|help]",
     );
     expect(slashSuggestions("/diagnose")?.[0]?.detail).not.toContain("<");
   });

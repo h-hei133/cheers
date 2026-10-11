@@ -1,5 +1,5 @@
 import type { ModelChoice } from '../../core/models/selection.js';
-import type { BoundSessionScope } from '../../session/store/bound.js';
+import type { BoundSessionScope } from '../../session/store/contract.js';
 
 export interface Director {
   readonly id: string;

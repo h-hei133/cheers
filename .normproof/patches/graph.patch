@@ -1,0 +1,211 @@
+--- a/package/dist/adapters/sidecar-file/module-graph.js
++++ b/package/dist/adapters/sidecar-file/module-graph.js
+@@ -1,23 +1,15 @@
+ import { dirname, join, normalize } from "node:path";
++import ts from "../../vendor/typescript.cjs";
+ import { compareUnicodeCodeUnits } from "../../utils/canonical-json.js";
+ /**
+- * Extracts the module dependency graph declared by a set of TypeScript sources.
+- *
+- * This reads what a module's import statements *say*, not what a bundler would *resolve*. A path
+- * alias, a dynamic import, or a runtime require produces no edge here. That limit is deliberate and
+- * is stated on the manifest source kind: a rule over this graph asserts over the direction an author
+- * wrote, which is the direction an author can act on.
+- *
+- * Scanning rather than parsing is the other deliberate limit. A full TypeScript parse would be more
+- * faithful and would cost a compiler dependency inside the evidence path, where `AGENTS.md` requires
+- * every fact to be attributable and reproducible. What is scanned instead is narrow: static `import`
+- * and `export ... from` forms, which are the only forms that can declare a static edge.
+- *
+- * A module whose imports cannot be scanned is reported as a failure by the caller rather than
+- * silently contributing no edges — an unscannable module is not a module with no dependencies.
++ * Collect declared module specifiers using the pinned TypeScript parser shipped in this archive.
++ * Static imports, re-exports, import-equals, import types and literal dynamic imports are included.
++ * Computed runtime paths and require calls have no declared target in this source graph.
++ * Syntax failures invalidate the whole collection rather than contributing an empty module.
++ * No compiler resolution, type-checking or file execution occurs along this evidence path.
+  */
+ /** Hard ceiling on edges in one collected graph, so traversal cost stays bounded and declared. */
+-export const MODULE_GRAPH_MAX_EDGES = 8192;
++export const MODULE_GRAPH_MAX_EDGES = 16384;
+ /**
+  * Blanks comment and string contents before specifier scanning, keeping the contents recoverable.
+  *
+@@ -127,63 +119,56 @@
+     }
+     return { masked: out.join(""), literals };
+ }
+-/**
+- * Matches the static forms that declare a module edge.
+- *
+- * Two shapes, deliberately not one permissive pattern: a side-effect import where the specifier
+- * follows the keyword directly, and any `import`/`export` whose specifier follows `from`. Requiring
+- * `from` for the second shape is what keeps `export const path = "./thing.ts"` from scanning as an
+- * edge — a string assigned in an exported constant is data, not a dependency.
+- *
+- * Covered across line breaks: named, default, namespace, type-only, side-effect, and re-export forms.
+- * Deliberately not covered: dynamic `import("x")` and `require("x")`, which are runtime forms rather
+- * than declarations, and which the source kind's documentation names as an accepted blind spot.
+- *
+- * The `d` flag records group offsets, which is how the specifier is recovered from the masked
+- * source: the pattern runs over text whose string contents are blank, so the match locates the
+- * literal rather than carrying it.
+- */
+-const STATIC_SPECIFIER = /(?:^|[\s;}])(?:import\s*(["'])|(?:import|export)\b[\s\S]{0,512}?\bfrom\s*(["']))/gd;
+-const DYNAMIC_SPECIFIER = /\bimport\s*\(\s*(["'])/gd;
+-export function staticSpecifiers(source) {
+-    const { masked, literals } = maskSource(source);
+-    const found = new Set();
+-    const staticMatcher = new RegExp(STATIC_SPECIFIER.source, STATIC_SPECIFIER.flags);
+-    let match;
+-    while ((match = staticMatcher.exec(masked)) !== null) {
+-        const indices = match.indices;
+-        const quoteAt = indices?.[1]?.[0] ?? indices?.[2]?.[0];
+-        if (quoteAt === undefined)
+-            continue;
+-        const specifier = literals.get(quoteAt);
+-        if (specifier !== undefined && specifier.length > 0) {
+-            found.add(specifier);
+-        }
+-    }
+-    return [...found];
+-}
+-export function dynamicSpecifiers(source) {
+-    const { masked, literals } = maskSource(source);
+-    const found = new Set();
+-    const dynamicMatcher = new RegExp(DYNAMIC_SPECIFIER.source, DYNAMIC_SPECIFIER.flags);
+-    let match;
+-    while ((match = dynamicMatcher.exec(masked)) !== null) {
+-        const indices = match.indices;
+-        const quoteAt = indices?.[1]?.[0];
+-        if (quoteAt === undefined)
+-            continue;
+-        const specifier = literals.get(quoteAt);
+-        if (specifier !== undefined && specifier.length > 0) {
+-            found.add(specifier);
+-        }
+-    }
+-    return [...found];
+-}
+-/** Every module specifier a source statically or dynamically declares, in source order and de-duplicated. */
+-export function declaredSpecifiers(source) {
+-    const statics = staticSpecifiers(source);
+-    const dynamics = dynamicSpecifiers(source);
+-    return [...new Set([...statics, ...dynamics])];
++/** Parse once per module, preserving TS/TSX grammar, literal escapes and declaration boundaries. */
++function specifierGroups(source, file = "source.ts") {
++    const kind = file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
++    const syntax = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, false, kind);
++    if (syntax.parseDiagnostics.length > 0) {
++        const diagnostic = syntax.parseDiagnostics[0];
++        // Report coordinates and a diagnostic code, never unbounded source or compiler text.
++        throw new Error(`module parse failed at offset ${diagnostic.start ?? 0} (TS${diagnostic.code}); collection is incomplete`);
++    }
++    const statics = new Set();
++    const dynamics = new Set();
++    const all = new Set();
++    const pending = [syntax];
++    while (pending.length > 0) {
++        const node = pending.pop();
++        let literal;
++        let group;
++        if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
++            literal = node.moduleSpecifier;
++            group = statics;
++        } else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)) {
++            literal = node.moduleReference.expression;
++            group = statics;
++        } else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument)) {
++            literal = node.argument.literal;
++            group = dynamics;
++        } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
++            literal = node.arguments[0];
++            group = dynamics;
++        }
++        if (group && literal && ts.isStringLiteralLike(literal) && literal.text.length > 0) {
++            group.add(literal.text);
++            all.add(literal.text);
++        }
++        const children = [];
++        ts.forEachChild(node, child => { children.push(child); });
++        // An explicit stack preserves source order without recursive traversal of user syntax.
++        for (let index = children.length - 1; index >= 0; index -= 1) pending.push(children[index]);
++    }
++    return { statics: [...statics], dynamics: [...dynamics], all: [...all] };
++}
++export function staticSpecifiers(source, file) {
++    return specifierGroups(source, file).statics;
++}
++export function dynamicSpecifiers(source, file) {
++    return specifierGroups(source, file).dynamics;
++}
++/** Every statically named module target, in source order and de-duplicated. */
++export function declaredSpecifiers(source, file) {
++    return specifierGroups(source, file).all;
+ }
+ /**
+  * Resolves a relative specifier against the importing module's own path.
+@@ -235,8 +220,7 @@
+  * `sources` maps workspace-relative module paths to their text. Only edges whose target is also in
+  * the set become edges — an import of an external package is not a node.
+  *
+- * Specifiers that cannot be resolved to a module in the set (path aliases, dynamic imports, missing
+- * relative targets, or escaping paths) are recorded as `unresolved` so obligations can assert over
++ * Specifiers that cannot be resolved to a module in the set (path aliases, missing relative targets, or escaping paths) are recorded as `unresolved` so obligations can assert over
+  * graph completeness. A relative specifier naming a non-source asset (`.json`, `.css`, `.svg`, …) is
+  * neither an edge nor a hole: it resolves to a file outside this graph's claimed scope, so recording
+  * it would assert that a sound workspace has a broken graph.
+@@ -246,7 +230,13 @@
+     const edges = [];
+     const unresolved = [];
+     for (const [from, text] of sources) {
+-        for (const specifier of declaredSpecifiers(text)) {
++        let specifiers;
++        try {
++            specifiers = declaredSpecifiers(text, from);
++        } catch {
++            return { failure: `module specifiers could not be parsed: ${from}; collection is incomplete` };
++        }
++        for (const specifier of specifiers) {
+             if (isAliasSpecifier(specifier)) {
+                 unresolved.push({ from, specifier });
+                 continue;
+@@ -262,20 +252,19 @@
+                     unresolved.push({ from, specifier });
+                     continue;
+                 }
+-                const target = modules.has(resolved)
+-                    ? resolved
+-                    : modules.has(resolved.replace(/\.ts$/, "/index.ts"))
+-                        ? resolved.replace(/\.ts$/, "/index.ts")
+-                        : null;
++                const candidates = specifier.endsWith(".js")
++                    ? [resolved, resolved.replace(/\.ts$/, ".tsx")]
++                    : /\.tsx?$/.test(specifier) ? [resolved]
++                        : [resolved, resolved.replace(/\.ts$/, ".tsx"),
++                            resolved.replace(/\.ts$/, "/index.ts"), resolved.replace(/\.ts$/, "/index.tsx")];
++                const target = candidates.find(candidate => modules.has(candidate)) ?? null;
+                 if (target === null) {
+                     unresolved.push({ from, specifier });
+                     continue;
+                 }
+-                if (target === from)
+-                    continue;
+                 if (edges.length >= MODULE_GRAPH_MAX_EDGES) {
+                     return {
+-                        failure: `oversized: module graph exceeds the ${MODULE_GRAPH_MAX_EDGES} edge ceiling; narrow the pattern`
++                        failure: `oversized: module graph exceeds the ${MODULE_GRAPH_MAX_EDGES} edge ceiling; collection is incomplete`
+                     };
+                 }
+                 edges.push({ from, to: target });
+--- a/package/dist/engine/proof/expression/evaluate.js
++++ b/package/dist/engine/proof/expression/evaluate.js
+@@ -24,7 +24,7 @@
+  * — a bound that rejects ordinary input is a miscalibration, not a safeguard. This matches the
+  * collector's own edge ceiling, so a graph that collects successfully can always be evaluated.
+  */
+-export const OBLIGATION_EXPRESSION_MAX_GRAPH_EDGES = 8192;
++export const OBLIGATION_EXPRESSION_MAX_GRAPH_EDGES = 16384;
+ /**
+  * Classifies a pointer's error string into the cause an expression can branch on.
+  *

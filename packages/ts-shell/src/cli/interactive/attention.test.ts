@@ -16,6 +16,7 @@ import type { Picker, OverlayHost } from './overlay.js';
 import { stripAnsi } from '../../presentation/tui/text/ansi.js';
 import type { InteractiveView } from '../../presentation/tui/surface/contract.js';
 import { StreamingRenderer } from '../../presentation/terminal/streaming.js';
+import type { SubmissionQueue } from './inputQueue.js';
 import { RecordingTerminal } from '../../test-utils/terminalDouble.js';
 
 let root: string;
@@ -44,7 +45,7 @@ function build() {
     approvalTrustPolicy: {} as ApprovalTrustPolicy, initialMcpGateway: {} as CliMcpGateway,
   });
   modes.push(mode); mode.start();
-  const host = mode as unknown as { run(text: string): Promise<void>; pickerHost(): PickerHost; applyPicker(picker: Picker, ids: readonly string[]): void; queue: string[]; pickerPending: boolean; view: InteractiveView; overlay: OverlayHost };
+  const host = mode as unknown as { run(text: string): Promise<void>; pickerHost(): PickerHost; applyPicker(picker: Picker, ids: readonly string[]): void; queue: SubmissionQueue; pickerPending: boolean; view: InteractiveView; overlay: OverlayHost };
   return { context, terminal, mode, host, notifications: () => terminal.writes.filter(text => text.includes('\x1b]777;notify;')) };
 }
 
@@ -143,7 +144,7 @@ it('retains input ownership for Enter and bracketed paste in the same transition
   await vi.waitFor(() => expect(stripAnsi(host.overlay.render(80, 24).join('\n'))).toContain('Settings'));
   terminal.input('maxTurns\rtyped-must-not-submit\r\x1b[200~must-not-become-a-prompt\x1b[201~\r');
   await vi.waitFor(() => expect(stripAnsi(host.overlay.render(80, 24).join('\n'))).toContain('Edit value'));
-  expect(host.view.editor.getText()).toBe(''); expect(host.queue).toEqual([]); expect(route).not.toHaveBeenCalled();
+  expect(host.view.editor.getText()).toBe(''); expect(host.queue.control.entries()).toEqual([]); expect(route).not.toHaveBeenCalled();
   terminal.input('\x1b'); await Promise.resolve(); expect(route).not.toHaveBeenCalled();
 });
 
@@ -154,7 +155,7 @@ it('preserves typed and pasted prompt queueing during ordinary exclusive picker 
   host.applyPicker({ title: 'Navigate session', form: 'panel', empty: '', exclusive: true,
     load: async () => [], apply: () => pending }, ['session']);
   terminal.input('typed prompt\r\x1b[200~pasted prompt\x1b[201~\r');
-  expect(host.queue).toEqual(['typed prompt', 'pasted prompt']); expect(route).not.toHaveBeenCalled();
+  expect(host.queue.control.entries().map(entry => entry.text)).toEqual(['typed prompt', 'pasted prompt']); expect(route).not.toHaveBeenCalled();
   finish(); await vi.waitFor(() => expect(route).toHaveBeenCalledTimes(2));
-  expect(host.queue).toEqual([]);
+  expect(host.queue.control.entries()).toEqual([]);
 });

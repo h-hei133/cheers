@@ -1,4 +1,4 @@
-import type { BoundSessionScope } from '../../session/store/bound.js';
+import type { BoundSessionScope } from '../../session/store/contract.js';
 import type { ContentVersion } from '../../edit/recovery/operation/model.js';
 
 export interface Metric {

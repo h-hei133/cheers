@@ -28,16 +28,17 @@ it("reads overlays without creating or refreshing files and retains fixed action
 });
 it("offers only parseable acyclic workflow filenames without running steps", () => {
   const dir = path.join(root, ".agents", "workflows"); fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, "fixture name.json");
+  const file = path.join(dir, "fixture-name.json");
   fs.writeFileSync(file, JSON.stringify({ name: "Display title", steps: [{ id: "one", run: "must-never-run" }] }));
   fs.writeFileSync(path.join(dir, "broken.json"), "{bad");
   fs.writeFileSync(path.join(dir, "cycle.json"), JSON.stringify({ steps: [{ id: "one", run: "unused", needs: ["one"] }] }));
+  fs.writeFileSync(path.join(dir, "invalid name.json"), JSON.stringify({ steps: [{ id: "one", run: "must-never-run" }] }));
   const trust = vi.spyOn(projectTrust, "isProjectUntrusted").mockReturnValue(false);
   const bytes = fs.readFileSync(file); const mtime = fs.statSync(file).mtimeMs;
-  expect(workflowCatalog(root)).toEqual([{ value: "fixture name", label: "Display title", detail: "1 steps" }]);
-  expect(catalogSuggestions(request("/workflow run Display")!, workflowCatalog(root))[0]?.edit?.text).toBe('"fixture name" ');
+  expect(workflowCatalog(root)).toEqual([{ value: "fixture-name", label: "Display title", detail: "1 steps" }]);
+  expect(catalogSuggestions(request("/workflow run Display")!, workflowCatalog(root))[0]?.edit?.text).toBe('fixture-name ');
   expect(fs.readFileSync(file)).toEqual(bytes); expect(fs.statSync(file).mtimeMs).toBe(mtime);
-  expect(fs.readdirSync(dir).sort()).toEqual(["broken.json", "cycle.json", "fixture name.json"]);
+  expect(fs.readdirSync(dir).sort()).toEqual(["broken.json", "cycle.json", "fixture-name.json", "invalid name.json"]);
   trust.mockReturnValue(true);
   expect(() => workflowCatalog(root)).toThrow("unavailable");
 });

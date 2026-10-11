@@ -1,4 +1,4 @@
-import type { BoundSessionScope } from '../../session/store/bound.js';
+import type { BoundSessionScope } from '../../session/store/contract.js';
 import type { ProcessOwner } from '../../core/state/owner.js';
 import type { ResearchBrief, ResearchRequest } from '../brief/model.js';
 import type { SourceRecord, ClaimRecord, ResearchDraft } from '../evidence/model.js';

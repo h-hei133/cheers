@@ -3,7 +3,7 @@ title: "Phase 19 裁决：生产正确性、完整交互与自主协作能力"
 category: article
 sources: [14-user-experience-research, 15-deep-research-design, 16-tui-composer-and-theme, 17-tui-status-and-panels, 18-input-slash-startup-context, 19-tools-maturity-and-multifile-edit, 20-configuration-system, 21-session-recovery-and-undo-ux, 22-command-inventory-alignment, 23-command-argument-options, 24-shared-command-parity, verification-15-21]
 created: 2026-10-05
-updated: 2026-10-09
+updated: 2026-10-11
 tags: [phase-19, decisions, production, tui, commands, research, goal, collaboration]
 summary: "汇总 14–24 的纠错、维护者裁决、生产契约、分批任务及验收标准。包含完整自主目标、软件与论文深研、八种输入框形态、Git 工作台、顾问、安全分析、公共技能商店和远程协作。此文是待实施计划；文档审查完成不代表功能或生产验收完成。"
 confidence: mixed
@@ -2066,3 +2066,15 @@ FLOW-03 已提交/推送 `4d99ce4e0da73eaee9bab4ed08ad516b427ce95f` 并读回远
 - 最终164TS/129production freeze `c2a9e8cd541cd35c1a30a665ff836f49ef2714e4ec786ae39170999e5ea41dc5`，独立code APPROVE/architecture CLEAR→综合APPROVE，exact inventory/hash复验无漂移，早期draft BLOCK已由最终修复与实际probe取代。Node20.3最终受影响组合104文件/1012项、149result-contract、43scripts、五静态门与TS/单文件构建通过；无新增/增长ceiling。早期100文件组合3失败已按1 stale expectation/2TMPDIR harness分类修正并重新取得完整受影响green，没有称早期运行通过。
 - 六actualCLI lanes（Node/executable×regular/fullscreen/print-pipe）共24合成POST，实际tier+temperature、附件wire/changed零send、rule deny→approve receipt/exact BOM+CRLF→no replay、todo独立、memory approve/save/use/重启view与global配置保留通过。另两历史picker读回before-question active path/full history/editable draft/cancel零切换，两trace probe真实HTTP data与重启后old listener refusal通过。六隔离反转均实际AssertionError，源逐字节恢复后6文件/73项通过。独立lane真实native analyzer六pass、committed repair receipt和原finding/当前零finding复测通过；另一lane模拟analyzer证据不冒充native。材料 `.tmp/parity/acceptance.json`、reversal.json及两份final review。
 - 完整NormProof仍exit2/not_proven：complete graph超8192-edge collector，无缩图/豁免；W16负责repair和跨域/平台/协议/迁移/发布证据。以上是W15本地实现/验收完成，commit/push/精确CI另记，Phase19全目标active；真实provider/account、硬件及非Linux未证明，用户.gitignore原SHA保留不提交。
+
+W15已提交/推送 `e712ec48acd4282fd7214ad46e9c24bd21909b35` 并读回远端同SHA。精确CI 38119354927 与Architecture Watch 38119354931 均completed/failure、steps=[]；annotations确认付款/spending-limit阻止job启动，没有远端验证通过。材料 `.tmp/parity/delivery.json`；W16继续，Phase19全目标active。
+
+### 8.141 W16：完整结构证明、契约门禁与集成证据
+
+完整 TS/TSX 图已扩容并改用固定 AST 解析，2424 模块/10360 边，无未解析目标或混合环；容量溢出与解析失败仍为不完整，不缩图、不改阻断义务。包可由固定基础包、零 fuzz 补丁和带许可的解析器逐字节重建。中性类型归回各 owner，已有生产 JavaScript 输出不变；4 项原有函数数量 advisory 保留。
+
+失效的 lifecycle/query/workspace 门禁和重复 result runner 统一消费当前 owner 的真实套件，空/跳过断言拒绝通过。独立审查复现的原有超时后代泄漏已修复，随后补齐中断的清理责任；进程组无法确认清理时保留失败。全套 Node20.3 两线程 782 文件通过/1 原有跳过、7862 项通过/10 原有跳过，当前 TS 冻结复验一致；本轮另有两种产物×三模式的实际 CLI、24 合成 POST 全部通过。
+
+完整 76 项索引、八组跨域反例、脚本/反转/独立审查、平台/协议和迁移回退详见[集成验收表](phase-19-acceptance.md)。SAFE-02 的原生隐式读取/非 Linux 对象绑定、W7-33 真实 TLS/HTTP2、用户前端及真实外部服务格继续开放。源码提交/推送/精确 CI 另记；Phase19 全目标保持 active，不以本地全套或完整图通过宣布全阶段完成。
+
+最终 63 文件冻结 `2b6ffc0e333392f453d9b949594bde8831772da1a0dedf038c2b10579c3face9` 获得独立 code APPROVE / architecture CLEAR；57 scripts 和中断修复后 149 result-contract 通过，四个更新门禁共用严格断言检查。两条预设审查路由 503/中途限流不计通过，最终独立原生证据已返回；四项原有函数数量及118项docs-source advisory保留。

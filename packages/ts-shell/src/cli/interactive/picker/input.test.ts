@@ -8,6 +8,7 @@ it('keeps invalid input open, routes paste to the editor, and only submits valid
   const submit = vi.fn(async () => undefined); const overlay = new OverlayHost(() => {});
   overlay.open({ title: 'Edit value', form: 'panel', empty: '', load: async () => [], apply: async () => undefined,
     input: { initial: '', label: 'JSON integer', validate: text => /^\d+$/.test(text) ? undefined : 'Invalid integer', apply: submit } });
+  await Promise.resolve();
   const invoke = vi.fn((picker, ids) => { void picker.apply(ids); });
   overlay.handlePaste('bad'); overlay.handleKey(parseKeyEvent('\r'), invoke);
   expect(overlay.active).toBe(true); expect(invoke).not.toHaveBeenCalled();

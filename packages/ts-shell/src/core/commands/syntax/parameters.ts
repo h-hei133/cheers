@@ -1,6 +1,6 @@
 import type { CommandSyntax } from "./model.js";
 import { parseSyntax } from "./parse.js";
-import type { CommandArgumentCompletion } from "../types.js";
+import type { CommandArgumentCompletion } from "./model.js";
 
 /** Only enumerate the next legal position after validating the completed tokens. */
 export function parameterCompletions(syntax: CommandSyntax, before: readonly string[], query: string): readonly CommandArgumentCompletion[] | null {
