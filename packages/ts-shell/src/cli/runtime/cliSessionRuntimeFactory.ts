@@ -29,6 +29,8 @@ import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
 import { researchRunFor } from './research.js';
 import { cancelGitFor, gitFeatureTools } from './git.js';
 import { installGitCliRuntime } from './gitGate.js';
+import { installDataTransfer } from '../data/transfer.js';
+import { selectModelContext } from '../../session/context/selection.js';
 import { installCollaborationRuntime } from './collaboration.js';
 import { installSshRuntime, sshFeatureTools, cancelSshFor } from './ssh.js';
 import { installJobsRuntime, jobsRunnerFor } from './jobs.js';
@@ -72,6 +74,9 @@ import type { CatalogProvider } from "../../core/models/catalog.js";
 import type { CompactionSetup } from "../../turn/session.js";
 import { buildCompactionWiring, toCompactionMessages, type CompactionProvider } from './compaction.js';
 import { providerModelTransport } from '../../provider/request/transport.js';
+import { installRuleControlRuntime, takeForcedTool } from './ruleControls.js';
+import { contextEntryStillAuthorized, renderContextEntry, assertContextBounds } from '../../context/attachment/entry.js';
+import { sourceReaderFor } from '../data/access.js';
 
 interface ProviderRenewal {
   readonly provider?: CompactionProvider;
@@ -109,6 +114,20 @@ export function createCliSessionRuntime(input: {
    */
   let previousCacheWarming: CacheWarmingRunner | undefined;
   let releaseCacheListener: (() => void) | undefined;
+  let cacheWarmingSessionId: string | undefined;
+  input.runtimeContext.freshState = {
+    admission: () => sessionRuntime.getCurrentRunController() !== null ? 'Wait for the current provider turn before resetting local state.' : undefined,
+    clearCache: async () => {
+      const sessionId = input.runtimeContext.session.id;
+      const owner = previousCacheWarming;
+      if (!owner || cacheWarmingSessionId !== sessionId) return 'unchanged';
+      const result = await owner.reset();
+      if (input.runtimeContext.session.id !== sessionId || owner !== previousCacheWarming) return 'unknown';
+      previousCacheWarming = undefined; cacheWarmingSessionId = undefined;
+      releaseCacheListener?.(); releaseCacheListener = undefined;
+      return result;
+    },
+  };
 
   /**
    * The provider both compaction paths summarize with, or nothing when none is
@@ -293,7 +312,9 @@ export function createCliSessionRuntime(input: {
       const director = directorRunFor(input.runtimeContext, input.sessionManager, parentAdmission);
       const handoff = handoffRunFor(input.runtimeContext, input.sessionManager, sessionRuntime, resolvedCredential, signal,
         parentAdmission, input.renderer.renderLine.bind(input.renderer));
-      const admission = director?.admission ?? handoff?.admission ?? parentAdmission;
+      const requestAdmission = director?.admission ?? handoff?.admission ?? parentAdmission;
+      let attachmentAdmission: () => string | undefined = () => undefined;
+      const admission = () => requestAdmission() ?? attachmentAdmission();
       const research = researchRunFor(input.runtimeContext, input.sessionManager, input.renderer,
         goalPolicyFor(input.runtimeContext, input.sessionManager));
       const requestPolicy = director ? director.policy(research.requestPolicy) : handoff ? handoff.policy(research.requestPolicy) : research.requestPolicy;
@@ -346,6 +367,7 @@ export function createCliSessionRuntime(input: {
           onDecision: (_decision, stopReason) => { if (stopReason) input.renderer.renderLine(`Cache refresh stopped: ${stopReason}`); },
         });
         previousCacheWarming = cacheWarming;
+        cacheWarmingSessionId = sessionId;
         const stopBackground = () => cacheWarming.stop();
         backgroundSignal.addEventListener('abort', stopBackground, { once: true });
         releaseCacheListener = () => backgroundSignal.removeEventListener('abort', stopBackground);
@@ -384,7 +406,7 @@ export function createCliSessionRuntime(input: {
       const existingSession = input.sessionManager.getSession(
         input.runtimeContext.session.id,
       );
-      const allTurns = existingSession?.turns ?? [];
+      const allTurns = selectModelContext(existingSession);
       const historyMessages =
         allTurns.length > 0 &&
         messageToText(allTurns[allTurns.length - 1]?.content) === prompt
@@ -395,11 +417,26 @@ export function createCliSessionRuntime(input: {
       const promptEntryId = sourceEntryId;
       const currentGoal = readGoalEdit(input.sessionManager, input.runtimeContext.session).goal;
       refreshExtensionsFor(input.runtimeContext);
+      const attachedContext = [
+        ...(input.runtimeContext.contextAttachments ?? []),
+        ...(input.runtimeContext.transientContextAttachments ?? []),
+      ];
+      assertContextBounds(attachedContext);
+      const readAttachedSource = sourceReaderFor(input.runtimeContext, signal);
+      attachmentAdmission = () => attachedContext.every(entry => contextEntryStillAuthorized(input.runtimeContext.cwd, entry, readAttachedSource))
+        ? undefined : 'Extra context changed or is no longer authorized. Drop or reattach the selected files before sending.';
+      const attachmentRefusal = attachmentAdmission();
+      if (attachmentRefusal) throw new Error(attachmentRefusal);
+      const forcedTool = takeForcedTool(input.runtimeContext);
+      const promptWithAttachments = attachedContext.length
+        ? [attachedContext.map(renderContextEntry).join('\n\n'), '<user_request>', prompt, '</user_request>'].join('\n\n')
+        : prompt;
       const run = streamCliRuntimePrompt({
         stepControl: handoff?.control,
         onCommandSettled: handoff?.commandSettled.bind(handoff),
         background: jobsRunnerFor(input.runtimeContext),
         featureTools: [...research.featureTools, ...gitFeatureTools(input.runtimeContext), ...securityFeatureTools(input.runtimeContext), ...sshFeatureTools(input.runtimeContext), ...evaluationFeatureTools(input.runtimeContext), ...director?.featureTools ?? []],
+        ...(forcedTool ? { allowedTools: [forcedTool] } : {}),
         checkpoint: advisorCheckpointFor(input.runtimeContext, input.sessionManager, input.renderer, promptEntryId),
         checkpointError: input.renderer.renderLine.bind(input.renderer),
         ...(promptEntryId ? { correlationId: promptEntryId, commandProof: acceptanceCapture(input.sessionManager,
@@ -410,9 +447,12 @@ export function createCliSessionRuntime(input: {
         // Carried so the tool pool honours disabledTools / hiddenToolPrefixes.
         runtimeConfig: director?.config(config) ?? config,
         providerCatalog: catalog,
-        prompt,
+        prompt: promptWithAttachments,
         ...((continuityContext || handoff || director) ? { continuityContext: [continuityContext, handoff?.contextText, director?.contextText].filter(Boolean).join('\n\n') } : {}),
-        onPromptAccepted: handoffAcceptance(handoff, onPromptAccepted),
+        onPromptAccepted: handoffAcceptance(handoff, () => {
+          input.runtimeContext.transientContextAttachments = undefined;
+          onPromptAccepted?.();
+        }),
         ...(attachments ? { attachments } : {}),
         sessionId,
         workspaceRoot: input.runtimeContext.cwd,
@@ -435,6 +475,7 @@ export function createCliSessionRuntime(input: {
         providerCredentialResolution: resolvedCredential,
         agentMode: gitRequestMode(allTurns.at(-1)) ?? sessionRuntime.getAgentMode(),
         providerRuntimeBridge: input.providerRuntimeBridge,
+        ...(forcedTool ? { forcedTool } : {}),
         ...(input.options.skillPaths || input.options.noSkills
           ? {
               skillOptions: {
@@ -448,8 +489,10 @@ export function createCliSessionRuntime(input: {
         settled: planningSettlement(input.sessionManager, sessionId, promptEntryId, sessionRuntime, config, input.renderer) };
     },
   });
+  installRuleControlRuntime({ runtimeContext: input.runtimeContext, sessionManager: input.sessionManager, busy: () => sessionRuntime.getCurrentRunController() !== null });
   goalScheduler = installGoalScheduler(input.runtimeContext, input.sessionManager, sessionRuntime, message => input.renderer.renderLine(message));
   const nativeGate = installGitCliRuntime(input, sessionRuntime, isStdinTty);
+  installDataTransfer(input.runtimeContext, nativeGate);
   installCollaborationRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate);
   installSshRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate, message => input.renderer.renderLine(message));
   installJobsRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate, {

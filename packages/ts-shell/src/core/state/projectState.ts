@@ -31,7 +31,7 @@ export type { ThinkingLevel as ThinkingEffort } from '../models/effort.js';
 export interface ProjectState {
   /** Legacy description only. /goal import copies it into a paused session goal. */
   readonly goal?: StoredGoal | null;
-  /** Whether sampling is held down for shorter, more direct answers. */
+  /** Legacy sampling preference, retained for migration notices; it no longer controls requests. */
   readonly fastSampling?: boolean;
   readonly thinkingEffort?: ThinkingEffort | null;
 }

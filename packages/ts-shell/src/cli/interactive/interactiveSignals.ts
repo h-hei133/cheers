@@ -16,8 +16,13 @@ export function installInteractiveSignalHandlers(input: {
   readonly runtimeContext: ShellRuntimeContext;
   readonly sessionManager: { sessionExists(sessionId: string): boolean };
   readonly exit: (code?: number) => void;
-}): void {
+}): () => void {
   let closing = false;
+  const release = (): void => {
+    closing = true;
+    input.process.off('SIGINT', interrupt);
+    input.readline?.off('close', close);
+  };
   const close = (): void => {
     if (closing) return;
     closing = true;
@@ -41,4 +46,5 @@ export function installInteractiveSignalHandlers(input: {
   };
   input.process.on("SIGINT", interrupt);
   input.readline?.on("close", close);
+  return release;
 }

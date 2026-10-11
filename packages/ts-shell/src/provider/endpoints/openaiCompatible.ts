@@ -25,6 +25,7 @@ import { declareEndpoint } from "./kinds.js";
 const PATH = "/chat/completions";
 
 declareEndpoint("openai-compatible", {
+  serviceTiers: ['default', 'auto', 'priority', 'fast', 'flex'],
   contextFields: { conversation: 'messages', tools: 'tools', firstMessageIsSystem: true },
   // The model travels in the body, so the path is the same for every one.
   path: () => PATH,
@@ -72,6 +73,7 @@ declareEndpoint("openai-compatible", {
       : {}),
     stream: true,
     stream_options: { include_usage: true },
+    ...(input.serviceTier !== undefined ? { service_tier: input.serviceTier } : {}),
     // Omitted where the model is known to reject it, and where thinking is on:
     // a reasoning mode and a sampling temperature are alternatives, not
     // companions, and a host that enforces that rejects the whole request.

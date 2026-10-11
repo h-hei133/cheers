@@ -289,3 +289,7 @@ Cheers 已有 [picker 注册器](../../packages/ts-shell/src/cli/interactive/pic
 [Phase 19 §8.121](phase-19-decisions.md#8121-auto-05独立模型顾问原生检查点与显式意见应用)接通 `/advisor configure/on/off/status/dump/review/apply`。顾问缺省关闭，配置不隐含启用，无模型零发送；原生回合结束、压缩前捕获有界不可变检查点，频率跳过的证据仍进入后续审查，覆盖遗漏明确标注。显式目标通过原通用委派/模型请求 machinery 发给实际不同模型，使用独立上下文、空工具/plan 权限及同一 budget/retry policy。
 
 意见的模型/时间/epoch/digest/覆盖可查看，只有当前 session/workspace/goal controls/transcript 仍匹配才能手动 apply 为普通 prompt；意见不授工具权限、批准或完成权。超时/取消保留未实际结算的 claim，重入需明确启用，迟到结果只结算原会话；证明本机 owner 已退出后可显式恢复本地 claim，shared ledger 未知消耗仍保留。Node/executable 两模式、实际 pipe、合成 HTTP 与本地验证证据见该节；远端执行和完整 Phase 19 仍分别核验。
+
+## 13. W15 命令控制实施补充（2026-10-11）
+
+PAR-01–05已接通session pin/history/open/shake/历史fork与受限附件、todo编辑/批准文件传输、memory review/save/use及实际admitted provenance、session preset/服务tier/skillful/window/fresh/auth快捷、debug/trace/restart/changelog、exact规则proposal/apply及retained安全finding修复复测。它们复用原session/权限/patch/执行/配置/observability owner。restart为同OS进程runtime重入，changelog为授权项目notes与installed version label比对，quota/account支持未知；规则提案startup-local、收据durable。完整语法、正常/拒绝/unknown/恢复及最终验收见[命令控制文档](command-controls.md)与[Phase19 §8.140](phase-19-decisions.md#8140-w15-par-01–05会话上下文与运行时命令闭环)。原始注册计数及“新增”处置仍作为规划基线；本补充提供对应实施事实，不据此宣布全Phase19/完整NormProof/远端CI已通过。

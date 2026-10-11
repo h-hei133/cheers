@@ -13,6 +13,7 @@ import type { Session } from "./sessionRecord.js";
 import type { SessionUsageSnapshot } from "../../observability/usage/model.js";
 import type { SessionModelSelection } from "../model/contract.js";
 import type { WorkspaceRoot } from '../../core/workspace/model.js';
+import type { ContextEntry } from '../../context/attachment/entry.js';
 import {
   buildLinearSessionThreadSnapshot,
   catchUpSessionThread,
@@ -39,6 +40,9 @@ export interface SessionStateSnapshot {
   /** Media owners validate capture lifetimes and retained local recording evidence. */
   live?: unknown;
   recordings?: unknown;
+  contextSelection?: unknown;
+  contextAttachments?: readonly ContextEntry[];
+  historyImport?: unknown;
   gitWorkflow?: unknown;
   security?: unknown;
   /** The request owner validates durable reservations, metering and replay protection. */
@@ -82,6 +86,8 @@ export type SessionStateSnapshotOverrides = Partial<
     | "pendingLifecycle"
     | "harness"
     | "thread"
+    | "contextSelection"
+    | "contextAttachments"
   >
 >;
 
@@ -103,6 +109,15 @@ export function buildSessionStateSnapshot(
     evaluations: current?.evaluations,
     live: current?.live,
     recordings: current?.recordings,
+    contextSelection:
+      overrides && Object.prototype.hasOwnProperty.call(overrides, "contextSelection")
+        ? overrides.contextSelection
+        : current?.contextSelection,
+    contextAttachments:
+      overrides && Object.prototype.hasOwnProperty.call(overrides, "contextAttachments")
+        ? overrides.contextAttachments
+        : current?.contextAttachments ?? session.contextAttachments,
+    historyImport: current?.historyImport,
     gitWorkflow: current?.gitWorkflow,
     security: current?.security,
     requestLedger: current?.requestLedger,

@@ -9,6 +9,8 @@ import process from "node:process";
 import type { QueryRuntimeStateSeed } from "../core/query/runtime/state.js";
 import { runResumeLikeShellAction } from "../core/shell/continueShellActionRuntime.js";
 import { toolPoolFor } from "../cli/runtime/tools.js";
+import { dataTransferFor } from '../cli/data/transfer.js';
+import { sessionCommandFor } from '../cli/runtime/sessionCommands.js';
 import { goalCommandFor, goalPolicyFor } from '../cli/runtime/goal.js';
 import { handoffCommandFor } from '../cli/runtime/handoff.js';
 import { directorCommandFor } from '../cli/runtime/director.js';
@@ -68,6 +70,7 @@ import { replayTodosFromMessages } from "../core/commands/todoCommandRuntime.js"
 import { runPrintSessionAction } from "../cli/print/actions.js";
 
 export async function runNonTtyPromptStream(options: {
+  stopRequested?: () => boolean;
   sessionManager: SessionManager;
   mcpGateway?: CoreMcpGateway;
   runtimeContext: ShellRuntimeContext;
@@ -82,6 +85,8 @@ export async function runNonTtyPromptStream(options: {
     mode: ApprovalModeObject | undefined,
   ) => void;
   nonInteractiveCliApprovalMode?: "deny" | "allow-once" | "allow-always";
+  ruleControlsCommand?: import("../core/commands/types.js").CommandContext['ruleControlsCommand'];
+  forceTool?: import("../core/commands/types.js").CommandContext['forceTool'];
 }): Promise<void> {
   await runPromptInputStream({ runtimeContext: options.runtimeContext, sessionRuntime: options.sessionRuntime,
     renderer: options.renderer, logger: options.logger,
@@ -90,6 +95,7 @@ export async function runNonTtyPromptStream(options: {
 }
 
 export async function runNonInteractivePrompt(options: {
+  stopRequested?: () => boolean;
   /** A live stdin host owns scheduler drainage while continuing to accept controls. */
   awaitGoalScheduling?: boolean;
   prompt: string;
@@ -114,6 +120,8 @@ export async function runNonInteractivePrompt(options: {
     mode: ApprovalModeObject | undefined,
   ) => void;
   nonInteractiveCliApprovalMode?: "deny" | "allow-once" | "allow-always";
+  ruleControlsCommand?: import("../core/commands/types.js").CommandContext['ruleControlsCommand'];
+  forceTool?: import("../core/commands/types.js").CommandContext['forceTool'];
 }): Promise<"exit" | void> {
   const trimmedPrompt = options.prompt.trim();
   if (!trimmedPrompt) {
@@ -140,6 +148,13 @@ export async function runNonInteractivePrompt(options: {
 
   replayTodosFromMessages(options.runtimeContext.session.id, options.sessionManager.getSession(options.runtimeContext.session.id)?.turns ?? []);
   const resolved = await resolveTurnInputForExecution({
+    freshState: options.runtimeContext.freshState,
+    restart: options.runtimeContext.restart,
+    startupArgs: options.runtimeContext.startupArgs,
+    sessionCommand: sessionCommandFor({ runtimeContext: options.runtimeContext, sessionManager: options.sessionManager, sessionRuntime: options.sessionRuntime, dataTransfer: dataTransferFor(options.runtimeContext) }),
+    dataTransfer: dataTransferFor(options.runtimeContext),
+    ruleControlsCommand: options.ruleControlsCommand ?? options.runtimeContext.ruleControlsCommand,
+    forceTool: options.forceTool ?? options.runtimeContext.forceTool,
     goalCommand: goalCommandFor(options.runtimeContext, options.sessionManager),
     queueCommand: queueCommandFor(options.runtimeContext, options.sessionRuntime),
     advisorCommand: advisorCommandFor(options.runtimeContext, options.sessionManager, options.sessionRuntime, options.renderer),
@@ -189,6 +204,7 @@ export async function runNonInteractivePrompt(options: {
     },
   });
   if (resolved.kind === "handled") {
+    if (options.stopRequested?.()) return 'exit';
     if (options.awaitGoalScheduling !== false) await schedulerForRuntime(options.sessionRuntime)?.wait();
     return;
   }
@@ -284,7 +300,7 @@ export async function runNonInteractivePrompt(options: {
       // resumes later.
       const sourceId = resolved.slashResult.sessionId ?? options.runtimeContext.session.id;
       try {
-        const forked = options.sessionManager.fork(sourceId, options.runtimeContext.projectRoot);
+        const forked = options.sessionManager.fork(sourceId, options.runtimeContext.projectRoot, { activate: false, entryId: resolved.slashResult.entryId });
         options.renderer.renderLine(`Forked ${sourceId} into ${forked.id}. Resume it with: cheers --resume ${forked.id}`);
       } catch (error) {
         options.renderer.renderLine(`Fork failed: ${error instanceof Error ? error.message : String(error)}`);

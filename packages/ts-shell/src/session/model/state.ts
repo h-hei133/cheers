@@ -7,14 +7,45 @@ import { sameValue } from '../../config/values.js';
 import { SessionModelWriteError, type ModelWriteState } from './outcome.js';
 
 import { isThinkingPreference, type ThinkingPreference } from '../../core/models/effort.js';
-import type { SessionModelSelection } from "./contract.js";
+import type { SessionModelPreset, SessionModelRole, SessionModelSelection } from "./contract.js";
 
 export function decodeSessionModel(value: unknown): SessionModelSelection | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const candidate = value as Record<string, unknown>;
   if (![candidate.connectionId, candidate.provider, candidate.model].every(item => typeof item === "string" && item.trim().length > 0)) return undefined;
   if (Object.hasOwn(candidate, 'thinkingEffort') && !isThinkingPreference(candidate.thinkingEffort)) return undefined;
-  return { ...(candidate.thinkingEffort !== undefined ? { thinkingEffort: candidate.thinkingEffort as ThinkingPreference } : {}), connectionId: (candidate.connectionId as string).trim(), provider: (candidate.provider as string).trim(), model: (candidate.model as string).trim() };
+  const serviceTier = candidate.serviceTier;
+  if (serviceTier !== undefined && (typeof serviceTier !== 'string' || serviceTier.trim().length === 0 || serviceTier.length > 64)) return undefined;
+  const presets = decodePresets(candidate.presets);
+  if (candidate.presets !== undefined && !presets) return undefined;
+  if (candidate.skillful !== undefined && typeof candidate.skillful !== 'boolean') return undefined;
+  const contextWindow = candidate.contextWindow;
+  if (contextWindow !== undefined && (!Number.isSafeInteger(contextWindow) || (contextWindow as number) < 1)) return undefined;
+  return { ...(candidate.thinkingEffort !== undefined ? { thinkingEffort: candidate.thinkingEffort as ThinkingPreference } : {}), ...(serviceTier !== undefined ? { serviceTier: serviceTier.trim() } : {}), ...(presets ? { presets } : {}), ...(candidate.skillful !== undefined ? { skillful: candidate.skillful } : {}), ...(contextWindow !== undefined ? { contextWindow: contextWindow as number } : {}), connectionId: (candidate.connectionId as string).trim(), provider: (candidate.provider as string).trim(), model: (candidate.model as string).trim() };
+}
+
+function decodePresets(value: unknown): Readonly<Record<string, SessionModelPreset>> | undefined {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  if (Object.keys(value).length > 32) return undefined;
+  const result: Record<string, SessionModelPreset> = {};
+  for (const [name, raw] of Object.entries(value)) {
+    if (!/^[a-zA-Z0-9._-]{1,64}$/.test(name) || ['__proto__', 'constructor', 'prototype'].includes(name) || !raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+    const roles = (raw as Record<string, unknown>).roles;
+    if (!roles || typeof roles !== 'object' || Array.isArray(roles) || Object.keys(roles).length > 16) return undefined;
+    const normalized: Record<string, SessionModelRole> = {};
+    for (const [role, target] of Object.entries(roles)) {
+      const item = target as Record<string, unknown>;
+      if (!/^[a-zA-Z0-9._-]{1,64}$/.test(role) || ['__proto__', 'constructor', 'prototype'].includes(role) || !item || typeof item !== 'object' || Array.isArray(item)
+        || typeof item.connectionId !== 'string' || typeof item.provider !== 'string' || typeof item.model !== 'string'
+        || !item.connectionId.trim() || !item.provider.trim() || !item.model.trim()
+        || (item.thinkingEffort !== undefined && !isThinkingPreference(item.thinkingEffort))) return undefined;
+      normalized[role] = { connectionId: item.connectionId.trim(), provider: item.provider.trim(), model: item.model.trim(), ...(item.thinkingEffort !== undefined ? { thinkingEffort: item.thinkingEffort as ThinkingPreference } : {}) };
+    }
+    if (Object.keys(normalized).length === 0) return undefined;
+    result[name] = { roles: normalized };
+  }
+  return result;
 }
 
 function layoutFor(sessionId: string) {

@@ -73,7 +73,7 @@ export function readStatusFacts(
     worktreeDirty: context.gitContext.isClean === null ? undefined : !context.gitContext.isClean,
     queued: live.queued,
     peers: live.peers,
-    openTodos: getSessionTodos(context.session.id).filter((todo) => todo.status !== "done").length,
+    openTodos: getSessionTodos(context.session.id).filter((todo) => todo.status !== "done" && todo.status !== "dropped").length,
     // The denominator is the same resolution compaction uses, even when its
     // numerator is unknown after startup, restoration, or context replacement.
     contextWindow: window.window,

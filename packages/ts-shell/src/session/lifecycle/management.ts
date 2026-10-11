@@ -6,11 +6,13 @@ import type { SessionSelectionContext } from '../navigation/selection.js';
 import { normalizePathIdentity } from '../continuation/roots.js';
 import { projectSessionFileLayout, type SessionFileLayout } from '../store/sessionFileLayout.js';
 import { readSessionRecordSnapshot } from '../store/sessionStore.js';
+import { projectSessionMetadata } from '../schema/sessionMetadataCodec.js';
+import { writeJsonFileAtomic } from '../store/sessionFileStore.js';
 import { readSessionFileVersion } from '../store/version.js';
 import { withSessionStateLock } from '../store/sessionStateStore.js';
 
 type Manager = Pick<SessionManager, 'catalog' | 'getSessionDirPath' | 'renameSession' | 'deleteSession' | 'sessionExists'>;
-export type SessionManagementAction = 'rename' | 'delete';
+export type SessionManagementAction = 'rename' | 'delete' | 'pin';
 export interface SessionManagementPreview {
   readonly action: SessionManagementAction;
   readonly session: Session;
@@ -52,7 +54,7 @@ export async function prepareSessionManagement(manager: Manager, context: () => 
 
 /** Recheck after confirmation and serialize against cooperating state writers. */
 export function applySessionManagement(manager: Manager, context: () => SessionSelectionContext,
-  preview: SessionManagementPreview, title?: string,
+  preview: SessionManagementPreview, title?: string, pinned?: boolean,
 ): SessionManagementResult {
   if (preview.action === 'rename' && invalidSessionTitle(title ?? '')) {
     return { status: 'unchanged', note: invalidSessionTitle(title ?? '')! };
@@ -71,6 +73,14 @@ export function applySessionManagement(manager: Manager, context: () => SessionS
       if (note) return { status: 'unchanged', note };
       if (readSessionFileVersion(layout) !== preview.version) return { status: 'unchanged', note: 'The saved session changed after the preview. Reopen the action.' };
       started = true;
+      if (preview.action === 'pin') {
+        const selected = pinned ?? !snapshot.session.pinned;
+        writeJsonFileAtomic(layout.metadataPath, projectSessionMetadata({ ...snapshot.session, pinned: selected }));
+        const saved = readSessionRecordSnapshot({ sessionId: id, layout, cwd: preview.expected.projectRoot }).session;
+        return saved.id === id && saved.createdAt === preview.session.createdAt && Boolean(saved.pinned) === selected
+          ? { status: 'changed', note: `Session ${id} ${selected ? 'pinned' : 'unpinned'}.` }
+          : { status: 'unknown', note: 'Pinning was attempted, but its saved state could not be confirmed. Reopen the session list.' };
+      }
       if (preview.action === 'delete') {
         manager.deleteSession(id);
         confirmedDeletion = !manager.sessionExists(id) && directoryMissing(layout.sessionDir);

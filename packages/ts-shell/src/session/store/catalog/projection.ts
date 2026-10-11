@@ -15,6 +15,7 @@ export function summarizeSession(session: Session, version: string, limited = fa
   const preview = messageToText(first?.content) || session.pendingPrompt;
   return {
     id: session.id, projectRoot: session.projectRoot,
+    ...(session.pinned === true ? { pinned: true } : {}),
     // Metadata acquisition already bounds this value; clipping belongs to presentation.
     title: session.title?.trim() || (preview ? deriveSessionTitleFromPrompt(preview) : '') || 'New session',
     titleComplete: Boolean(session.title?.trim()) || !limited,
@@ -37,7 +38,7 @@ export function decodeSessionSummary(id: string, metadataText: string, stateText
     || (typeof state?.projectRoot === 'string' && state.projectRoot.trim());
   // A missing workspace identity cannot be inferred from the project doing the listing.
   if (!root) throw new Error('Session project identity is unavailable.');
-  if (!state) return { id, projectRoot: root, title: metadata.title, titleComplete: Boolean(metadata.title?.trim()), createdAt: metadata.createdAt,
+  if (!state) return { id, projectRoot: root, title: metadata.title, ...(metadata.pinned === true ? { pinned: true } : {}), titleComplete: Boolean(metadata.title?.trim()), createdAt: metadata.createdAt,
     updatedAt: metadata.updatedAt, reentry: 'unknown', quality: 'limited', version };
   const transcript = transcriptText === undefined ? undefined : parseTranscript(transcriptText);
   const selected = state.thread === undefined ? undefined : sessionThreadPath(state.thread);

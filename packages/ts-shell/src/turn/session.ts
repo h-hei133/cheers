@@ -141,6 +141,8 @@ export interface TurnOptions {
   readonly steeringMode?: "one-at-a-time" | "all";
   /** How many queued follow-up messages reach the model at once. */
   readonly followUpMode?: "one-at-a-time" | "all";
+  /** Restrict the model schemas for this one user request after `/force`. */
+  readonly allowedTools?: readonly string[];
 }
 
 /** Input the user can hand a running turn. */
@@ -257,6 +259,7 @@ export function runTurn(options: TurnOptions): TurnRun {
         },
         {
           allowTools: projection.stepCount < options.maxSteps,
+          ...(options.allowedTools ? { allowedTools: options.allowedTools } : {}),
           requestId: request?.requestId,
           // Kept so a refresh can replay it. Captured at the step, because that
           // is the only place the request exists in the shape it was sent.

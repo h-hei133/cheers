@@ -23,6 +23,26 @@ describe("project memory future-turn injection", () => {
     fs.rmSync(storeRoot, { recursive: true, force: true });
   });
 
+  it('records only fact bodies admitted by the budget, even when all selected IDs remain visible', async () => {
+    const memoryStore = createProjectMemoryLocalStore({ ref: { mode: 'test-only', root: storeRoot } });
+    const records = Array.from({ length: 5 }, (_, index) => record(`pmr:budget-${index}`, `FACT_${index} ${'x'.repeat(350)}`, 'project-fact'));
+    await seed(memoryStore, records);
+    const states = createProjectMemoryInjectionStateStore();
+    const staged = states.markPending({ sessionScopeId: 'budget', mode: 'wake', recordIds: records.map(item => item.id), sourceCommand: '/memory use' });
+    for (const maxInjectedContextChars of [1600, 2000, 3000]) {
+      const plan = await planProjectMemoryFutureTurnInjection({ mode: 'prepare', memoryStore, injectionState: staged,
+        markConsumed: input => states.markConsumed(input), maxInjectedContextChars });
+      expect(plan.shouldInject).toBe(true);
+      const admitted = records.filter((_, index) => plan.injectedContext!.includes(`FACT_${index}`)).map(item => item.id).sort();
+      expect(plan.provenance!.records.map(item => item.id).sort()).toEqual(admitted);
+      if (maxInjectedContextChars === 1600) {
+        expect(admitted.length).toBeLessThan(records.length);
+        expect(plan.injectedContext).toContain('pmr:budget-4');
+      }
+    }
+    expect(states.get('budget')).toBe(staged);
+  });
+
   it.each<Partial<ProjectMemoryRecord>>([
     { safety: "needs-review" },
     { retentionClass: "never-remember" },

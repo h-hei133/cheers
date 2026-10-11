@@ -9,9 +9,12 @@ export function createCliShutdown(input: {
   exit: (code: number) => void;
   writeError: (message: string) => void;
   handleInterrupt?: boolean;
+  /** Total bound across resource owners; expiry never admits runtime reentry. */
+  timeoutMs?: number;
 }): { close(): Promise<void>; exit(code?: number): void } {
   let exiting = false;
   let exitCode = 0;
+  let closing: Promise<void> | undefined;
   const onTerm = () => exit(143);
   const onHangup = () => exit(129);
   const onInterrupt = () => exit(130);
@@ -27,17 +30,22 @@ export function createCliShutdown(input: {
     input.process.off("SIGINT", onInterrupt);
     for (const stream of input.streams ?? []) stream.off("error", onStreamError);
   };
-  const close = async (): Promise<void> => {
+  const drain = async (): Promise<void> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const results = await Promise.allSettled([
+      const cleanup = Promise.allSettled([
         Promise.resolve().then(() => input.close()),
         killAllTrackedProcesses(),
       ]);
+      const results = await Promise.race([cleanup, new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Resource cleanup timed out; runtime reentry is blocked.')), input.timeoutMs ?? 10_000);
+      })]);
       const failure = results.find((result) => result.status === "rejected");
       if (failure?.status === "rejected") throw failure.reason;
     }
-    finally { if (!exiting) removeHandlers(); }
+    finally { clearTimeout(timer); if (!exiting) removeHandlers(); }
   };
+  const close = (): Promise<void> => closing ??= drain();
   const exit = (code = 0): void => {
     if (exitCode === 0 && code !== 0) exitCode = code;
     if (exiting) return;

@@ -3,15 +3,15 @@ import { readSessionNavigation, type SessionNavigationPoint } from "../../../ses
 import type { Picker } from "../overlay.js";
 import type { RewindPickerInput } from "./rewind.js";
 
-export function treePicker(context: CommandContext, rewind: RewindPickerInput["rewind"]): Picker {
+export function treePicker(context: CommandContext, rewind: RewindPickerInput["rewind"], userOnly = false): Picker {
   let points: readonly SessionNavigationPoint[] = [];
   return {
-    title: "Session tree",
+    title: userOnly ? 'Fork before saved question' : 'Session tree',
     form: "modal",
     exclusive: true,
     empty: "No session entries are available.",
     async load() {
-      points = context.sessionId ? readSessionNavigation(context.sessionId, context.cwd).points : [];
+      points = context.sessionId ? readSessionNavigation(context.sessionId, context.cwd).points.filter(point => !userOnly || point.prompt !== undefined) : [];
       return points.map((point) => ({
         id: point.entryId,
         label: `${"  ".repeat(point.depth)}${point.label}`,

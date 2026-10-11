@@ -1061,6 +1061,7 @@ export class InteractiveMode {
         }
         return { note: result.output, ...(result.draft !== undefined ? { draft: result.draft } : {}) };
       },
+      fork: entryId => this.runCommandLine(`/fork here --from ${entryId}`),
       previewStatusItems: (items) => {
         this.previewItems = items;
         this.tui.requestRender();

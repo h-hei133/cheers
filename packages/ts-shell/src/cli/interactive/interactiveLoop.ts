@@ -42,6 +42,7 @@ export interface InteractiveLoopInput {
   /** Theme paths this run was started with, so `/theme` can still select them. */
   readonly themePaths?: readonly string[];
   readonly exit?: (code?: number) => void;
+  readonly stopSignal?: AbortSignal;
 }
 
 export async function runInteractiveLoop(input: InteractiveLoopInput): Promise<void> {
@@ -76,11 +77,13 @@ export async function runInteractiveLoop(input: InteractiveLoopInput): Promise<v
       setReadline: input.setReadline,
       setActiveNonInteractiveApprovalMode: input.setActiveNonInteractiveApprovalMode,
       exit,
+      stopSignal: input.stopSignal,
     });
     return;
   }
 
-  new InteractiveMode({
+  await new Promise<void>((resolve, reject) => {
+  const mode = new InteractiveMode({
     runtimeContext: input.runtimeContext,
     sessionRuntime: input.sessionRuntime,
     sessionManager: input.sessionManager,
@@ -92,6 +95,12 @@ export async function runInteractiveLoop(input: InteractiveLoopInput): Promise<v
     setReadline: input.setReadline,
     setInteractiveApprovalPrompt: input.setInteractiveApprovalPrompt,
     setActiveNonInteractiveApprovalMode: input.setActiveNonInteractiveApprovalMode,
-    exit,
-  }).start();
+    exit: code => { release(); exit(code); resolve(); },
+  });
+  const stop = () => { release(); mode.stop(); resolve(); };
+  const release = () => input.stopSignal?.removeEventListener('abort', stop);
+  input.stopSignal?.addEventListener('abort', stop, { once: true });
+  try { mode.start(); if (input.stopSignal?.aborted) stop(); }
+  catch (error) { release(); mode.stop(); reject(error); }
+  });
 }

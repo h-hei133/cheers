@@ -88,6 +88,8 @@ export interface CacheWarmingRunner {
   noteSettled(): void;
   /** Nothing more will be sent. */
   stop(): void;
+  /** Retire captured provider input and wait for owned refresh work to settle. */
+  reset(): Promise<'reset' | 'unchanged' | 'unknown'>;
   /** What is scheduled, for a surface that has to explain itself. */
   status(): { readonly mode: CacheWarmingMode; readonly nextRefreshAt?: number; readonly stopReason?: string };
 }
@@ -120,6 +122,7 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
    * the prefix the provider cached.
    */
   let lastSent: SentRequest | undefined;
+  const pendingRefreshes = new Set<Promise<ProviderUsage | void>>();
 
   const clear = (): void => {
     generation += 1;
@@ -178,8 +181,11 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
     }
 
     controller = new AbortController();
+    let refreshing: Promise<ProviderUsage | void> | undefined;
     try {
-      const usage = await options.refresh(sent, controller.signal);
+      refreshing = options.refresh(sent, controller.signal);
+      pendingRefreshes.add(refreshing);
+      const usage = await refreshing;
       if (stopped || generation !== expectedGeneration) return;
       if (options.isCurrent?.() === false) { clear(); return; }
       if (usage) options.onUsage?.(usage);
@@ -192,7 +198,7 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
       // A refresh that failed is a refresh that did not happen. It is not worth
       // reporting: nothing the user did caused it, and nothing they can do
       // would fix it.
-    }
+    } finally { if (refreshing) pendingRefreshes.delete(refreshing); }
     // A completion from an old prefix or phase must not replace a newer timer
     // or restart a stopped session, even if the transport ignored cancellation.
     if (!stopped && generation === expectedGeneration) schedule();
@@ -257,6 +263,19 @@ export function createCacheWarmingRunner(options: CacheWarmingOptions): CacheWar
     stop(): void {
       stopped = true;
       clear();
+    },
+
+    async reset() {
+      const hadState = lastSent !== undefined || timer !== undefined || pendingRefreshes.size > 0;
+      stopped = true; clear(); lastSent = undefined;
+      if (!hadState) return 'unchanged';
+      let deadline: NodeJS.Timeout | undefined;
+      try {
+        return await Promise.race([
+          Promise.allSettled([...pendingRefreshes]).then(() => 'reset' as const),
+          new Promise<'unknown'>(resolve => { deadline = setTimeout(() => resolve('unknown'), 3000); }),
+        ]);
+      } finally { if (deadline) clearTimeout(deadline); }
     },
 
     status(): { readonly mode: CacheWarmingMode; readonly nextRefreshAt?: number; readonly stopReason?: string } {

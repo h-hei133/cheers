@@ -16,6 +16,12 @@ import { jobsDefinitions } from './jobs/registration.js';
 import { handoffDefinition } from './handoff/registration.js';
 import { directorDefinition } from './director/registration.js';
 import { mediaDefinitions } from './media/registration.js';
+import { sessionCommandDefinitions } from './navigation/operations.js';
+import { cleanseCommandDefinition } from './cleanse/registration.js';
+import { forceCommandDefinition } from './force/registration.js';
+import { rulesCommandDefinition } from './rules/registration.js';
+import { initSyntax } from './rules/syntax.js';
+import { contextSyntax } from '../../context/attachment/syntax.js';
 import { improveDefinition } from './improve/registration.js';
 import { marketplaceSyntax } from "./marketplace/syntax.js";
 import { pluginSyntax } from "./plugin/syntax.js";
@@ -24,6 +30,9 @@ import { sidebarSyntax } from "../../presentation/sidebar/syntax.js";
 import { warmupSyntax } from "../../context/startup/syntax.js";
 import { crashSyntax } from "./crash/syntax.js";
 import { reportSyntax } from "./report/syntax.js";
+import { debugSyntax } from './debug/syntax.js';
+import { traceSyntax } from './trace/syntax.js';
+import { changelogSyntax } from './changelog/syntax.js';
 import { metricsSyntax } from "./metrics/syntax.js";
 import { logSyntax } from "./log/syntax.js";
 import { workspaceSyntax, cdSyntax } from "./workspace/syntax.js";
@@ -34,14 +43,19 @@ import { resumeSyntax, forkSyntax, treeSyntax, entriesSyntax, navigationCompleti
 import { continueSyntax } from "./navigation/continuation.js";
 import { shellSyntax } from "./shell/syntax.js";
 import { fastSyntax } from "./fast/syntax.js";
+import { slowSyntax } from "./slow/syntax.js";
+import { skillfulSyntax } from "./skillful/syntax.js";
+import { extendedContextSyntax } from "./extended-context/syntax.js";
 import { statuslineSyntax, statuslineCompletions } from "./statusline/syntax.js";
 import { settingsSyntax } from "./settings/syntax.js";
 import { modelArgumentCompletions } from "./model/completion.js";
 import { modelSyntax } from "./model/syntax.js";
+import { modelPresetSyntax } from "./model/presetSyntax.js";
 import { memorySyntax } from "../../memory/commands/syntax.js";
 import { exportSyntax } from "./export/syntax.js";
 import { restoreSyntax } from "./restore/syntax.js";
-import { syntaxHint, syntaxCompletions } from "./syntax/projection.js";
+import { syntaxHelp, syntaxHint, syntaxCompletions } from "./syntax/projection.js";
+import { parseSyntax } from "./syntax/parse.js";
 import { trustSyntax } from "./trust/syntax.js";
 import { todoSyntax } from "./todo/syntax.js";
 import { thinkingSyntax } from "./thinking/syntax.js";
@@ -79,6 +93,14 @@ import { runGoalCommand } from "./goalCommandRuntime.js";
 import { runLoopCommand } from "./loopCommandRuntime.js";
 import { runTodoCommand } from "./todoCommandRuntime.js";
 import { runFastCommand } from "./fastCommandRuntime.js";
+import { runSlowCommand } from './model/serviceTier.js';
+import { runSkillfulCommand } from './skillfulCommandRuntime.js';
+import { runExtendedContextCommand } from './model/context.js';
+import { runModelPresetCommand } from './model/presetCommand.js';
+import { runUsageCommand } from './usageCommandRuntime.js';
+import { runLoginShortcut, runLogoutShortcut } from './authShortcuts.js';
+import { freshLocalState } from './fresh.js';
+import { freshSyntax } from './fresh/syntax.js';
 import { runContextCommand } from "./contextCommandRuntime.js";
 import { runBtwCommand, btwSyntax } from "./btwCommandRuntime.js";
 import { runMarketplaceCommand } from "./marketplaceCommandRuntime.js";
@@ -96,6 +118,10 @@ import { runCrashCommand } from "./crashCommandRuntime.js";
 import { runTimingsCommand } from "./timingsCommandRuntime.js";
 import { runMetricsCommand } from "./metricsCommandRuntime.js";
 import { runReportCommand } from "./reportCommandRuntime.js";
+import { runDebugCommand } from './debugCommandRuntime.js';
+import { runTraceCommand } from './traceCommandRuntime.js';
+import { runChangelogCommand } from './changelogCommandRuntime.js';
+import { runRestartCommand } from './restartCommandRuntime.js';
 import {
   runDiagnoseCommand,
 } from "./localCommandRuntime.js";
@@ -118,6 +144,10 @@ export function createCommandRegistry(
   runtimeConfig: RuntimeConfig = getRuntimeConfig(cwd),
 ): ReadonlyMap<string, CommandDefinition> {
   const commands: CommandDefinition[] = [
+    ...sessionCommandDefinitions(),
+    forceCommandDefinition(),
+    rulesCommandDefinition(),
+    cleanseCommandDefinition(),
     advisorCommandDefinition(),
     {
       name: "diagnose",
@@ -193,8 +223,18 @@ export function createCommandRegistry(
       execute: (args, context) => runConnectCommand(args, context),
     },
     {
+      name: 'login', kind: 'local', supportsNonInteractive: true, availability: 'available', enabled: true,
+      summary: 'log in through the existing provider connection owner', group: 'session',
+      execute: (args, context) => runLoginShortcut(args, context),
+    },
+    {
+      name: 'logout', kind: 'local', supportsNonInteractive: true, availability: 'available', enabled: true,
+      summary: 'log out through the existing provider connection owner', group: 'session',
+      execute: (args, context) => runLogoutShortcut(args, context),
+    },
+    {
       name: "model",
-      aliases: ["models"],
+      aliases: ["models", "switch"],
       kind: "local",
       supportsNonInteractive: true,
       availability: "available",
@@ -204,6 +244,19 @@ export function createCommandRegistry(
       argumentHint: syntaxHint(modelSyntax),
       getArgumentCompletions: modelArgumentCompletions,
       execute: (args, context) => runModelCommand(args, context),
+    },
+    {
+      name: 'modelpreset',
+      aliases: ['model-presets'],
+      kind: 'local',
+      supportsNonInteractive: true,
+      availability: 'available',
+      enabled: true,
+      summary: 'save and apply session-scoped model role presets',
+      group: 'diagnostics',
+      argumentHint: syntaxHint(modelPresetSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(modelPresetSyntax, prefix),
+      execute: (args, context) => runModelPresetCommand(args, context),
     },
     {
       name: "restore",
@@ -219,6 +272,7 @@ export function createCommandRegistry(
     },
     {
       name: "tree",
+      aliases: ['branch'],
       kind: "shell-action",
       supportsNonInteractive: true,
       availability: "available",
@@ -487,6 +541,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "inspect tech stack and initialize AGENTS.md rules",
       group: "workflow",
+      argumentHint: syntaxHint(initSyntax),
+      getArgumentCompletions: prefix => syntaxCompletions(initSyntax, prefix),
       execute: (args, context) => runInitCommand(args, context),
     },
     {
@@ -499,6 +555,11 @@ export function createCommandRegistry(
       summary: "display session token usage and estimated cost",
       group: "session",
       execute: (args, context) => runCostCommand(args, context),
+    },
+    {
+      name: 'usage', kind: 'local', supportsNonInteractive: true, availability: 'available', enabled: true,
+      summary: 'show measured session usage and unknown account quota', group: 'session',
+      execute: (args, context) => runUsageCommand(args, context),
     },
     {
       name: "undo",
@@ -539,6 +600,13 @@ export function createCommandRegistry(
       group: "workspace",
       argumentHint: syntaxHint(skillSyntax),
       execute: (args, context) => runSkillCommand(args, context),
+    },
+    {
+      name: 'skillful', kind: 'local', supportsNonInteractive: true, availability: 'available', enabled: true,
+      summary: 'control actual skill instruction injection for this session', group: 'workflow',
+      argumentHint: syntaxHint(skillfulSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(skillfulSyntax, prefix),
+      execute: (args, context) => runSkillfulCommand(args, context),
     },
     {
       name: "retry",
@@ -642,11 +710,36 @@ export function createCommandRegistry(
       supportsNonInteractive: true,
       availability: "available",
       enabled: true,
-      summary: "inspect or change the sampling temperature preference",
+      summary: "inspect or select a supported provider fast service tier",
       group: "workflow",
       argumentHint: syntaxHint(fastSyntax),
       getArgumentCompletions: (prefix) => syntaxCompletions(fastSyntax, prefix),
       execute: (args, context) => runFastCommand(args, context),
+    },
+    {
+      name: 'slow', kind: 'local', supportsNonInteractive: true, availability: 'available', enabled: true,
+      summary: 'use the provider flex tier when the model advertises it', group: 'workflow',
+      argumentHint: syntaxHint(slowSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(slowSyntax, prefix),
+      execute: (args, context) => runSlowCommand(args, context),
+    },
+    {
+      name: 'extended-context', kind: 'local', supportsNonInteractive: true, availability: 'available', enabled: true,
+      summary: 'select only the catalog-supported model context window', group: 'diagnostics',
+      argumentHint: syntaxHint(extendedContextSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(extendedContextSyntax, prefix),
+      execute: (args, context) => runExtendedContextCommand(args, context),
+    },
+    {
+      name: 'fresh', kind: 'local', supportsNonInteractive: true, availability: 'available', enabled: true,
+      summary: 'reset controllable local connection, cursor, and cache state', group: 'session',
+      argumentHint: syntaxHint(freshSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(freshSyntax, prefix),
+      execute: async (args, context) => {
+        const parsed = parseSyntax(freshSyntax, args);
+        if (!parsed.ok) return { kind: 'local', output: `Invalid /fresh arguments: ${parsed.reason}\n${syntaxHelp(freshSyntax)}` };
+        return { kind: 'local', output: context.freshState ? await freshLocalState(context.freshState) : 'Fresh local state is unavailable in this host; transcript and remote account state were not changed.' };
+      },
     },
     {
       name: "context",
@@ -657,6 +750,8 @@ export function createCommandRegistry(
       enabled: true,
       summary: "visualize context window allocation and token categories",
       group: "diagnostics",
+      argumentHint: syntaxHint(contextSyntax),
+      getArgumentCompletions: prefix => syntaxCompletions(contextSyntax, prefix),
       execute: (args, context) => runContextCommand(args, context),
     },
     {
@@ -876,6 +971,52 @@ export function createCommandRegistry(
       argumentHint: syntaxHint(reportSyntax),
       getArgumentCompletions: (prefix) => syntaxCompletions(reportSyntax, prefix),
       execute: (args, context) => runReportCommand(args, context),
+    },
+    {
+      name: "debug",
+      kind: "local",
+      supportsNonInteractive: true,
+      availability: "available",
+      enabled: true,
+      summary: "aggregate bounded logs, crashes, timings, metrics and tools",
+      group: "diagnostics",
+      argumentHint: syntaxHint(debugSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(debugSyntax, prefix),
+      execute: (args, context) => runDebugCommand(args, context),
+    },
+    {
+      name: "trace",
+      kind: "local",
+      supportsNonInteractive: true,
+      availability: "available",
+      enabled: true,
+      summary: "open, inspect or close the loopback trace dashboard",
+      group: "diagnostics",
+      argumentHint: syntaxHint(traceSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(traceSyntax, prefix),
+      execute: (args, context) => runTraceCommand(args, context),
+    },
+    {
+      name: "changelog",
+      kind: "local",
+      supportsNonInteractive: true,
+      availability: "available",
+      enabled: true,
+      summary: "show the installed version's local release notes",
+      group: "diagnostics",
+      argumentHint: syntaxHint(changelogSyntax),
+      getArgumentCompletions: (prefix) => syntaxCompletions(changelogSyntax, prefix),
+      execute: (args, context) => runChangelogCommand(args, context),
+    },
+    {
+      name: "restart",
+      kind: "local",
+      supportsNonInteractive: true,
+      availability: "available",
+      enabled: true,
+      summary: "request a controlled process restart while preserving startup arguments",
+      group: "session",
+      execute: (args, context) => runRestartCommand(args, context),
     },
   ];
 

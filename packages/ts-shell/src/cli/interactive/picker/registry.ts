@@ -62,6 +62,7 @@ export interface PickerHost extends SettingsHost {
   sessionTurns(): readonly SessionMessage[];
   /** Navigate by stable identity and return only the confirmed note and draft. */
   readonly rewind: RewindPickerInput['rewind'];
+  readonly fork?: (entryId: string) => Promise<undefined>;
 }
 
 type PickerFactory = (host: PickerHost, argument?: string) => Picker;
@@ -96,6 +97,7 @@ const PICKERS: Record<string, PickerFactory> = {
   // gesture is fast once known; the command is how it becomes known.
   back: (host, selector) => rewindPicker({ turns: host.sessionTurns(), rewind: host.rewind, selector }),
   tree: (host) => treePicker(host.commandContext, host.rewind),
+  fork: host => treePicker(host.commandContext, point => host.fork?.(point.entryId) ?? Promise.resolve(undefined), true),
   statusline: (host) =>
     statusItemPicker({
       current: host.statusItems,

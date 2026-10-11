@@ -5,6 +5,7 @@ export interface SessionSummary {
   readonly id: string;
   readonly projectRoot: string;
   readonly title?: string;
+  readonly pinned?: boolean;
   /** Title matching must not use an inferred title from omitted conversation data. */
   readonly titleComplete: boolean;
   readonly createdAt: string;

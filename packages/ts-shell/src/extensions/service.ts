@@ -37,6 +37,7 @@ export class ExtensionService implements LifecycleHost {
   private epoch = 0;
   private closed = false;
   private drainUnknown = false;
+  private processCleanupUnknown = false;
   private registrations: Array<() => void> = [];
   private readonly calls = new ExtensionCalls();
   private watchers: Array<() => void> = [];
@@ -89,7 +90,11 @@ export class ExtensionService implements LifecycleHost {
     if (decision.denied) throw new Error(decision.reason);
     if (!this.options.assertSourceAccess) throw new Error('Extension public-key source access is unavailable.'); this.options.assertSourceAccess(absolute);
   }
-  async close(): Promise<void> { this.closed = true; this.watchers.splice(0).forEach(close => close()); this.epoch++; this.registrations.splice(0).forEach(close => close()); await this.cancel(); }
+  async close(): Promise<void> {
+    this.closed = true; this.watchers.splice(0).forEach(close => close()); this.epoch++;
+    this.registrations.splice(0).forEach(close => close());
+    if (!await this.calls.cancel() || this.processCleanupUnknown) throw new Error('Extension cleanup remains unknown; runtime reentry is blocked.');
+  }
   tool(record: PackageRecord, script: string, grant: string, selected = 'extension_run'): ToolDefinition {
     const epoch = this.epoch;
     const declared = record.active.manifest.tools.find(entry => grant === `tool:${entry.name}`)?.description;
@@ -111,7 +116,7 @@ export class ExtensionService implements LifecycleHost {
     current();
     return this.calls.run(async signal => {
       const result = await executeScript({ file: this.store.file, root: this.root, check: this.check, denyRules: this.options.denyRules, execution: this.options.execution }, record.active, script, args, current, { ...context, abortSignal: signal });
-      if (result.metadata?.cleanup === 'unknown') { this.drainUnknown = true; this.epoch++; this.registrations.splice(0).forEach(unregister => unregister()); this.errors.push('Extension process or runtime-home cleanup is unknown; capabilities withheld.'); }
+      if (result.metadata?.cleanup === 'unknown') { this.drainUnknown = true; this.processCleanupUnknown = true; this.epoch++; this.registrations.splice(0).forEach(unregister => unregister()); this.errors.push('Extension process or runtime-home cleanup is unknown; capabilities withheld.'); }
       try { current(); } catch { return { ...result, success: false, output: `${result.output}\nExtension authority changed after execution; actual receipt remains visible.` }; } return result;
     }, context.abortSignal);
   }

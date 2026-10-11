@@ -30,6 +30,8 @@ export interface ProjectMemoryFutureTurnCandidateContext {
   readonly modelFacingMemorySummary: string;
   readonly structuredFacts: ProjectMemoryStructuredFacts;
   readonly recordIds: readonly string[];
+  /** Formatter-owned facts retain their source before any budget selection. */
+  readonly factSources?: readonly { readonly recordId: string; readonly summary: string }[];
   readonly excludedRecords: readonly string[];
   readonly redactions: readonly string[];
   readonly warnings: readonly { readonly id: string; readonly message: string }[];
@@ -116,6 +118,7 @@ function candidateFromRecords(input: {
       ])),
     },
     recordIds: safeRecords.map((record) => record.id),
+    factSources: safeRecords.map(record => ({ recordId: record.id, summary: recordSummary(record) })),
     excludedRecords: input.records
       .filter((record) => !memoryRecordIsInjectable(record))
       .map((record) => `${record.id}:${record.invalidatedAt ? "invalidated" : "policy-excluded"}`),

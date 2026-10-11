@@ -1,6 +1,7 @@
 import type { CommandContext, CommandExecutionResult } from "./types.js";
 import { forkSyntax, resumeSyntax, parseNavigationArgs, validSessionReference } from "./navigation/syntax.js";
 import { syntaxHelp } from "./syntax/projection.js";
+import { runSessionCommand } from './navigation/operations.js';
 
 /** Validate before handing any session switch or fork to the runtime owner. */
 export async function runResumeCommand(args: string[], _context: CommandContext): Promise<CommandExecutionResult> {
@@ -8,6 +9,7 @@ export async function runResumeCommand(args: string[], _context: CommandContext)
   if (!parsed.ok) return { kind: "local", output: `Invalid /resume arguments: ${parsed.reason}\n${syntaxHelp(resumeSyntax)}\n${syntaxHelp(forkSyntax)}` };
   const mode = parsed.action.name;
   const reference = parsed.args[0]?.trim();
+  if (mode === 'pin' || mode === 'history' || mode === 'import' || mode === 'open' || mode === 'shake') return runSessionCommand(mode, [...parsed.args], _context);
   if (mode === "new") return { kind: "shell-action", action: "clear-session" };
   if (mode === "rename" || mode === "delete") return { kind: "shell-action", action: "manage-session", sessionOperation: mode,
     sessionId: reference, ...(mode === "rename" && parsed.args.length > 1 ? { sessionTitle: parsed.args.slice(1).join(" ") } : {}) };
@@ -15,6 +17,7 @@ export async function runResumeCommand(args: string[], _context: CommandContext)
   if (mode === "fork") return {
     kind: "shell-action", action: "fork-session",
     ...(reference!.toLowerCase() !== "here" ? { sessionId: reference } : {}),
+    ...(typeof parsed.flags.get('from') === 'string' ? { entryId: parsed.flags.get('from') as string } : {}),
   };
   if (!mode) return { kind: "shell-action", action: "resume-session", ...(reference ? { sessionId: reference } : {}) };
   if (mode === "switch") return { kind: "shell-action", action: "list-sessions", sessionAction: "switch", ...(reference ? { sessionId: reference } : {}) };

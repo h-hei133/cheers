@@ -303,6 +303,17 @@ describe('actual capability grants, precedence and bounded unload', () => {
     expect(await running).toContain('cancelled'); expect(performance.now() - cancellationStarted).toBeLessThan(4000);
     expect(listSlashCommands().some(entry => entry.name === 'sample-echo')).toBe(false); expect(fs.readdirSync(path.join(root, 'owned')).some(entry => entry.startsWith('.run-'))).toBe(false);
   });
+  it('rejects shutdown while a live operation ignores cancellation and confirms cleanup only after it settles', async () => {
+    let release!: () => void;
+    let started!: () => void;
+    const entered = new Promise<void>(resolve => { started = resolve; });
+    const operation = service.request(() => { started(); return new Promise<void>(resolve => { release = resolve; }); });
+    const outcome = operation.catch(error => error);
+    await entered;
+    try { await expect(service.close()).rejects.toThrow('cleanup remains unknown'); }
+    finally { release(); await outcome; }
+    await expect(service.close()).resolves.toBeUndefined();
+  });
   it('uninstalls intact owned versions and preserves data outside them', async () => {
     await ready(); const data = path.join(root, 'owned/data/sample'); fs.mkdirSync(data, { recursive: true }); fs.writeFileSync(path.join(data, 'keep'), 'user data');
     expect(await service.approve(removeOperation(service, 'sample'))).toContain('uninstalled'); expect(service.store.read().packages).toEqual([]); expect(fs.readFileSync(path.join(data, 'keep'), 'utf8')).toBe('user data');

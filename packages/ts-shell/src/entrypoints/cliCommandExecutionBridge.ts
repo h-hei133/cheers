@@ -47,6 +47,13 @@ export type CliCommandExecution =
     };
 
 export interface BuildCliCommandExecutionInput {
+  readonly freshState?: CommandContext['freshState'];
+  readonly restart?: CommandContext['restart'];
+  readonly startupArgs?: CommandContext['startupArgs'];
+  readonly sessionCommand?: CommandContext['sessionCommand'];
+  readonly dataTransfer?: CommandContext['dataTransfer'];
+  readonly ruleControlsCommand?: CommandContext['ruleControlsCommand'];
+  readonly forceTool?: CommandContext['forceTool'];
   readonly handoffCommand?: CommandContext['handoffCommand'];
   readonly directorCommand?: CommandContext['directorCommand'];
   readonly mediaCommand?: CommandContext['mediaCommand'];
@@ -160,6 +167,13 @@ export async function buildCliCommandExecution(
       ref: { mode: "explicit-local", root: projectMemoryRootFor(projectRoot) },
     });
   const slashResult = await bridge.routeSlashCommand(input.prompt, {
+    freshState: input.freshState,
+    restart: input.restart,
+    startupArgs: input.startupArgs,
+    sessionCommand: input.sessionCommand,
+    dataTransfer: input.dataTransfer,
+    ruleControlsCommand: input.ruleControlsCommand,
+    forceTool: input.forceTool,
     extensionCommand: input.extensionCommand,
     goalCommand: input.goalCommand,
     planningCommand: input.planningCommand,

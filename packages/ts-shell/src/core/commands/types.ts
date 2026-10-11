@@ -32,6 +32,12 @@ import type { SidebarLiveEventStore } from '../../presentation/sidebar/sidebarLi
 export type CommandKind = 'local' | 'prompt' | 'shell-action'
 
 export interface CommandContext {
+  readonly sessionCommand?: (name: import('./navigation/operations.js').SessionCommandName, args: string[], context: CommandContext) => Promise<CommandExecutionResult>;
+  readonly dataTransfer?: import('./transfer/contract.js').CommandDataTransfer;
+  /** Bound rule/diagnostic/context owner; proposal commands never write directly. */
+  readonly ruleControlsCommand?: (name: 'init' | 'rules' | 'context', args: string[], context: CommandContext) => Promise<CommandExecutionResult>;
+  /** One-use selection of an already available tool; execution still uses normal gates. */
+  readonly forceTool?: (tool: string) => Promise<string>;
   readonly handoffCommand?: (args: string[], context: CommandContext) => Promise<LocalCommandResult>;
   readonly directorCommand?: (args: string[], context: CommandContext) => Promise<LocalCommandResult>;
   readonly mediaCommand?: (name: 'live' | 'record', args: string[], context: CommandContext) => Promise<CommandExecutionResult>;
@@ -134,6 +140,12 @@ export interface CommandContext {
   readonly readConfiguration?: () => { readonly config: RuntimeConfig; readonly catalog: readonly CatalogProvider[] }
   readonly admission?: () => string | undefined
   readonly refreshRuntimeConfig?: () => import('../../config/application.js').ConfigReloadResult
+  /** Local transport/cursor/cache owners used by `/fresh`; transcript is never part of this port. */
+  readonly freshState?: import('./fresh.js').FreshStateOwner
+  /** Bootstrap-owned restart handoff; the command only requests it. */
+  readonly restart?: import('./restart/contract.js').RestartPort
+  /** Original process arguments preserved for a controlled restart. */
+  readonly startupArgs?: readonly string[]
 }
 
 export interface LocalCommandResult {

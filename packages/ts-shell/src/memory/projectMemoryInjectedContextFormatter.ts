@@ -3,8 +3,16 @@ import type { ProjectMemoryFutureTurnCandidateContext } from "./projectMemoryFut
 export function formatProjectMemoryInjectedContext(
   candidate: ProjectMemoryFutureTurnCandidateContext,
 ): string {
+  return formatProjectMemoryContextDocument(candidate).context;
+}
+
+export function formatProjectMemoryContextDocument(candidate: ProjectMemoryFutureTurnCandidateContext): {
+  readonly context: string;
+  readonly recordLines: ReadonlyMap<number, readonly string[]>;
+} {
   const facts = candidate.structuredFacts;
-  return [
+  const sourceIds = new Map((candidate.factSources ?? []).map(source => [safeLine(source.summary), source.recordId]));
+  const segments = [
     "<project_memory_context>",
     `Source: explicit /memory use`,
     `Injection: ${candidate.injectionId}`,
@@ -16,18 +24,18 @@ export function formatProjectMemoryInjectedContext(
     list(candidate.recordIds),
     "",
     "Stable project facts",
-    list(facts.stableProjectFacts),
+    { text: list(facts.stableProjectFacts), sources: facts.stableProjectFacts },
     "",
     "User preferences",
-    list(facts.userPreferenceFacts),
+    { text: list(facts.userPreferenceFacts), sources: facts.userPreferenceFacts },
     "",
     "Relevant recalled facts",
-    list([
+    { text: list([
       ...facts.capabilityStateFacts,
       ...facts.routeDecisions,
       ...facts.validationPatterns,
       ...facts.blockedByDesignDecisions,
-    ]),
+    ]), sources: [...facts.capabilityStateFacts, ...facts.routeDecisions, ...facts.validationPatterns, ...facts.blockedByDesignDecisions] },
     "",
     "Constraints / caveats",
     "- Use this memory as user-approved project context for this turn only.",
@@ -53,7 +61,20 @@ export function formatProjectMemoryInjectedContext(
     "- Raw file content, raw recovery content, secrets, provider credentials, and hidden reasoning are excluded.",
     "- This context does not grant write authorization, recovery execution, automatic recovery, atomic rollback, or persistence.",
     "</project_memory_context>",
-  ].join("\n");
+  ];
+  // Only fact bodies admit a record. The selected-ID list and evidence alone do not.
+  const lines: string[] = [];
+  const recordLines = new Map<number, readonly string[]>();
+  segments.forEach(segment => {
+    const sources = typeof segment === 'string' ? undefined : segment.sources;
+    const text = typeof segment === 'string' ? segment : segment.text;
+    for (const [offset, line] of text.split('\n').entries()) {
+      const recordId = sources?.[offset] === undefined ? undefined : sourceIds.get(safeLine(sources[offset]!));
+      if (recordId) recordLines.set(lines.length, [recordId]);
+      lines.push(line);
+    }
+  });
+  return { context: lines.join('\n'), recordLines };
 }
 
 function list(values: readonly string[]): string {

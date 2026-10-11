@@ -14,6 +14,7 @@ import { providerFetchForEndpoint } from '../../provider/request/fetch.js';
 import { endpointShape } from '../../provider/endpoints/index.js';
 import { toolSchemas } from '../../turn/tools.js';
 import { delegatedTarget } from './target.js';
+import { serviceTierCapability } from '../../core/models/serviceTier.js';
 
 export interface ProviderStepHost {
   readonly providerMode: 'synthetic' | 'real';
@@ -27,6 +28,7 @@ export interface ProviderStepHost {
   readonly admission?: () => string | undefined;
   readonly thinkingEffort?: ThinkingPreference;
   readonly thinkingEffortExplicit?: boolean;
+  readonly serviceTier?: string;
 }
 
 export function createProviderStep(
@@ -40,6 +42,12 @@ export function createProviderStep(
   // change request shape between two steps of the same answer.
   const catalog = request.providerCatalog ?? loadCatalog();
   const endpoint = providerEndpoint(catalog, resolution.provider);
+  const configuredTier = request.serviceTier ?? request.runtimeConfig?.providerConnections
+    ?.find(item => item.id === resolution.credential?.connectionId)?.serviceTier
+    ?? request.runtimeConfig?.providerCredentials?.[resolution.provider]?.serviceTier;
+  if (configuredTier && serviceTierCapability(catalog, resolution.provider, resolution.model, configuredTier) !== 'supported') {
+    throw new Error(`Configured service tier '${configuredTier}' is not verified for ${resolution.provider}/${resolution.model}.`);
+  }
   const system = systemPromptSnapshot(request.agentMode, promptContext);
   return createStepFunction({
     requestPolicy: request.requestPolicy,
@@ -62,6 +70,7 @@ export function createProviderStep(
       // catalog rather than inferred from the provider id: the id names who
       // answers, and an endpoint is how they want to be asked.
       ...(endpoint ? { endpoint } : {}),
+      ...(configuredTier ? { serviceTier: configuredTier } : {}),
     },
     // Without this the request is sent with the global fetch, which has no
     // deadline: a provider that accepts the connection and then never answers

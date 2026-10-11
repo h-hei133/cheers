@@ -37,3 +37,18 @@ it("keeps cleanup failure visible at the CLI exit", async () => {
   expect(await exited).toBe(1);
   expect(errors).toEqual([expect.stringContaining("not verified")]);
 });
+
+it('blocks runtime reentry and exits unsuccessfully when a resource ignores cancellation', async () => {
+  vi.mocked(killAllTrackedProcesses).mockResolvedValue(undefined);
+  const close = vi.fn(() => new Promise<void>(() => {}));
+  const errors: string[] = [];
+  let finish!: (code: number) => void;
+  const exited = new Promise<number>(resolve => { finish = resolve; });
+  const shutdown = createCliShutdown({ process: new EventEmitter() as NodeJS.Process, close,
+    writeError: message => errors.push(message), exit: finish, timeoutMs: 20 });
+  await expect(shutdown.close()).rejects.toThrow('reentry is blocked');
+  shutdown.exit();
+  expect(await exited).toBe(1);
+  expect(close).toHaveBeenCalledTimes(1);
+  expect(errors).toEqual([expect.stringContaining('not verified')]);
+});

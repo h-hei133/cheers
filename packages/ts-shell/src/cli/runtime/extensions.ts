@@ -9,14 +9,25 @@ import { ExtensionService } from '../../extensions/service.js';
 import { marketplaceCommand } from '../../extensions/command/marketplace.js';
 import { pluginCommand } from '../../extensions/command/plugin.js';
 
-interface ExtensionRuntime { readonly service: () => ExtensionService }
+interface ExtensionRuntime { readonly service: () => ExtensionService; readonly close: () => Promise<void>; readonly cancel: () => Promise<void> }
 const runtimes = new WeakMap<ShellRuntimeContext, ExtensionRuntime>();
 export function installExtensionRuntime(context: ShellRuntimeContext, runtime: ShellSessionRuntime, gate: (tool?: string) => ToolGateOptions): void {
   let service: ExtensionService | undefined; let identity: string | undefined;
-  runtimes.set(context, { service: () => {
+  let closed = false; let retiredUnknown = false;
+  const retiring = new Set<Promise<void>>();
+  runtimes.set(context, { cancel: async () => { await service?.cancel(); }, close: async () => {
+    closed = true;
+    const results = await Promise.allSettled([...retiring, ...(service ? [service.close()] : [])]);
+    if (retiredUnknown || results.some(result => result.status === 'rejected')) throw new Error('Extension cleanup remains unknown; runtime reentry is blocked.');
+  }, service: () => {
+    if (closed || retiredUnknown) throw new Error('Extension runtime is closed or prior cleanup is unknown.');
     const key = `${context.session.id}:${context.cwd}`;
     if (!service || identity !== key) {
-      if (service) void service.close(); identity = key; const session = context.session.id; const root = context.cwd;
+      if (service) {
+        const retirement = service.close().catch(() => { retiredUnknown = true; }).finally(() => retiring.delete(retirement));
+        retiring.add(retirement);
+      }
+      identity = key; const session = context.session.id; const root = context.cwd;
       const check = () => { const refused = configurationAdmission(context)() ?? (context.session.id !== session || context.cwd !== root ? 'Extension session or workspace changed.' : undefined); if (refused) throw new Error(refused); };
       service = new ExtensionService({ root, gate: tool => ({ ...gate(tool), admission: () => gate(tool).admission?.() ?? (context.session.id !== session || context.cwd !== root ? 'Extension session changed.' : undefined) }),
         check, offline: () => context.runtimeConfig.offline === true, denyRules: () => context.runtimeConfig.denyRules,
@@ -34,6 +45,7 @@ export function extensionCommandFor(context: ShellRuntimeContext): NonNullable<C
     return service ? kind === 'marketplace' ? marketplaceCommand(args, service) : pluginCommand(args, service) : { kind: 'local', output: 'Extensions require a bound session runtime.' };
   };
 }
-export function cancelExtensionsFor(context: ShellRuntimeContext): void { void runtimes.get(context)?.service().cancel(); }
+export function cancelExtensionsFor(context: ShellRuntimeContext): void { void runtimes.get(context)?.cancel(); }
+export async function closeExtensionsFor(context: ShellRuntimeContext): Promise<void> { await runtimes.get(context)?.close(); }
 export function refreshExtensionsFor(context: ShellRuntimeContext): void { runtimes.get(context)?.service(); }
 export function isExtensionControl(text: string): boolean { return /^\/(?:plugin|plugins)(?:\s+(?:cancel|list|details|disable|revoke|reload)(?:\s|$)|\s*$)|^\/reload-plugins(?:\s|$)/i.test(text.trim()); }

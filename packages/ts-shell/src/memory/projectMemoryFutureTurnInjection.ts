@@ -4,7 +4,7 @@ import {
   type ProjectMemoryFutureTurnCandidateContext,
 } from "./projectMemoryFutureTurnAdapter.js";
 import { applyProjectMemoryInjectedContextBudget } from "./projectMemoryInjectedContextBudget.js";
-import { formatProjectMemoryInjectedContext } from "./projectMemoryInjectedContextFormatter.js";
+import { formatProjectMemoryContextDocument } from "./projectMemoryInjectedContextFormatter.js";
 import {
   planProjectMemoryInjectionMerge,
   type ProjectMemoryPendingRecordLifecycle,
@@ -19,10 +19,12 @@ import type {
 } from "./projectMemoryStoreContract.js";
 import { buildProjectMemoryWakeupPreview } from "./projectMemoryWakeup.js";
 import { memoryRecordIsInjectable } from "./memoryValidation.js";
+import { injectionProvenance, type MemoryInjectionProvenance } from "./knowledge/provenance.js";
 
 export interface ProjectMemoryFutureTurnInjectionPlan {
   readonly shouldInject: boolean;
   readonly injectedContext?: string;
+  readonly provenance?: MemoryInjectionProvenance;
   readonly updatedInjectionState: ProjectMemoryInjectionState;
   readonly invalidationReason?: string;
   readonly warnings: readonly { readonly id: string; readonly message: string }[];
@@ -41,6 +43,7 @@ export interface PlanProjectMemoryFutureTurnInjectionInput {
   readonly markConsumed: (input: {
     readonly sessionScopeId: string;
     readonly memoryInjectionId: string;
+    readonly provenance?: MemoryInjectionProvenance;
   }) => ProjectMemoryInjectionState;
   readonly markInvalid?: (input: {
     readonly sessionScopeId: string;
@@ -111,7 +114,8 @@ export async function planProjectMemoryFutureTurnInjection(
     );
   }
 
-  const formattedContext = formatProjectMemoryInjectedContext(merge.candidate);
+  const formatted = formatProjectMemoryContextDocument(merge.candidate);
+  const formattedContext = formatted.context;
   const quality = evaluateProjectMemoryInjectionQuality({
     candidate: merge.candidate,
     injectedContext: formattedContext,
@@ -130,6 +134,7 @@ export async function planProjectMemoryFutureTurnInjection(
 
   const budget = applyProjectMemoryInjectedContextBudget(formattedContext, {
     maxChars: input.maxInjectedContextChars,
+    recordLines: formatted.recordLines,
   });
   if (!budget.fits) {
     return skip(state, "memory-injection-budget-insufficient",
@@ -146,6 +151,7 @@ export async function planProjectMemoryFutureTurnInjection(
     ]);
   }
 
+  const provenance = injectionProvenance(budget.context, selectedRecords, budget.admittedRecordIds);
   let updatedInjectionState = state;
   if (input.mode !== "prepare") {
     const injected = input.markInjected?.({
@@ -158,6 +164,7 @@ export async function planProjectMemoryFutureTurnInjection(
     updatedInjectionState = input.markConsumed({
       sessionScopeId: state.sessionScopeId,
       memoryInjectionId: state.memoryInjectionId,
+      provenance,
     });
     if (updatedInjectionState.memoryInjectionId !== state.memoryInjectionId || updatedInjectionState.injectionStatus !== "consumed") {
       return skip(updatedInjectionState, "memory-injection-state-changed", "Pending memory injection changed or was evicted during retrieval.", baseEvidence);
@@ -166,6 +173,7 @@ export async function planProjectMemoryFutureTurnInjection(
   return {
     shouldInject: true,
     injectedContext: budget.context,
+    provenance,
     updatedInjectionState,
     warnings: [
       ...merge.candidate.warnings,

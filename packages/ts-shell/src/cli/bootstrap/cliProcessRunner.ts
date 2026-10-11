@@ -5,6 +5,8 @@ import { closeSshFor } from '../runtime/ssh.js';
 import { installMediaSurface, closeMediaFor } from '../runtime/media.js';
 import { closeJobsFor } from '../runtime/jobs.js';
 import { closeDirectorFor } from '../runtime/director.js';
+import { closeExtensionsFor } from '../runtime/extensions.js';
+import { closeTraceDashboard } from '../../observability/traceDashboard.js';
 import { runCollaborationServiceMode } from '../collaboration/service.js';
 import type { Interface as ReadlineInterface } from "node:readline";
 import type { ReadStream } from "node:tty";
@@ -54,6 +56,7 @@ import {
 import {
   captureCliStdinPrompts,
 } from "../print/stdinPromptCapture.js";
+import type { RestartOutcome, RestartPort, RestartRequest } from '../../core/commands/restart/contract.js';
 
 export interface CliProcessRunnerInput {
   readonly args: readonly string[];
@@ -68,6 +71,16 @@ export interface CliProcessRunnerInput {
 export async function runCliProcess(
   input: CliProcessRunnerInput,
 ): Promise<void> {
+  let recovery: RestartRequest | undefined;
+  for (;;) {
+    const request = await runCliCycle({ ...input, args: recovery?.argv ?? input.args,
+      launchCwd: recovery?.workingDirectory ?? input.launchCwd }, recovery);
+    if (!request) return;
+    recovery = request;
+  }
+}
+
+async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartRequest): Promise<RestartRequest | undefined> {
   if (await runCollaborationServiceMode(input)) return;
   setGlobalTraceContext(createTraceContext());
   const logger = createComponentLogger("cli");
@@ -84,7 +97,9 @@ export async function runCliProcess(
     return;
   }
 
-  const options: CliOptions = parsedCliArgs.args.options;
+  const options: CliOptions = recovery ? { ...parsedCliArgs.args.options, sessionId: recovery.sessionId,
+    projectPath: recovery.workspaceRoot, promptArg: undefined, replayFile: undefined, migrateSessionRoot: false }
+    : parsedCliArgs.args.options;
   const rootContext = createCliRootContext({
     launchCwd: input.launchCwd,
     options,
@@ -135,22 +150,46 @@ export async function runCliProcess(
     providerRuntimeBridge.resolveCredentialSnapshot();
   const mcpGateway = bootstrapRuntime.mcpGateway;
   let cancelRun: (() => Promise<void>) | undefined;
+  let isBusy: (() => boolean) | undefined;
+  let requested: RestartRequest | undefined;
+  const stopSurface = new AbortController();
   const shutdown = createCliShutdown({
     close: async () => {
-      await cancelRun?.();
-      await closeMediaFor(runtimeContext);
-      await closeDirectorFor(runtimeContext);
-      await closeJobsFor(runtimeContext);
-      await closeSshFor(runtimeContext);
-      try { await closeCollaborationFor(runtimeContext); }
-      finally { await mcpGateway.close(); }
+      const results = await Promise.allSettled([
+        Promise.resolve().then(() => cancelRun?.()),
+        closeMediaFor(runtimeContext), closeDirectorFor(runtimeContext), closeJobsFor(runtimeContext), closeSshFor(runtimeContext),
+        closeCollaborationFor(runtimeContext), closeExtensionsFor(runtimeContext), closeTraceDashboard(), mcpGateway.close(),
+        Promise.resolve().then(async () => { if (await runtimeContext.freshState?.clearCache?.() === 'unknown') throw new Error('Provider cache cleanup is unverified.'); }),
+      ]);
+      const failure = results.find(result => result.status === 'rejected');
+      if (failure?.status === 'rejected') throw failure.reason;
     }, process: input.process, exit: input.exit, writeError: input.writeError,
     streams: [input.stdin, input.process.stdout, input.process.stderr],
     handleInterrupt: options.printMode === true || options.jsonEvents === true || !input.stdin.isTTY,
   });
+  // These bridges are installed after bootstrap has the real resource owners.
+  // Only bootstrap can retire this host and read back a new runtime generation.
+  runtimeContext.startupArgs = [...input.args];
+  const restart: RestartPort = {
+    request: async (request): Promise<RestartOutcome> => {
+      if (requested) return { status: 'unavailable', reason: 'A restart is already pending.' };
+      if (isBusy?.()) return { status: 'unavailable', reason: 'Wait for the current provider turn before restarting.' };
+      if (request.sessionId !== runtimeContext.session.id || !sessionManager.sessionExists(runtimeContext.session.id)
+        || request.argv.length !== input.args.length || request.argv.some((arg, index) => arg !== input.args[index])) {
+        return { status: 'unavailable', reason: 'Restart identity or startup arguments changed; recovery was not admitted.' };
+      }
+      requested = { ...request, workspaceRoot: runtimeContext.projectRoot, workingDirectory: runtimeContext.cwd };
+      // Let command publication finish before retiring the interactive surface.
+      setImmediate(() => stopSurface.abort());
+      return { status: 'requested', request: requested };
+    },
+  };
+  runtimeContext.restart = restart;
 
   try {
-    const stdinPromptCapture = await captureCliStdinPrompts({
+    const stdinPromptCapture = recovery && (options.printMode || !input.stdin.isTTY) ? {
+      stdinTransportMode: 'capture-batch' as const, pipedInput: null, nonInteractivePrompts: [], cliModePlan: { kind: 'stdin-batch' as const },
+    } : await captureCliStdinPrompts({
       options,
       stdin: input.stdin,
     });
@@ -208,8 +247,15 @@ export async function runCliProcess(
       getPromptInteractiveApproval: () => interactiveApprovalPrompt,
     });
     cancelRun = () => cancelGoalRunForShutdown(sessionRuntime);
+    isBusy = () => sessionRuntime.getCurrentRunController() !== null;
     if (bootstrapRuntime.writeJsonEvent) {
       sessionRuntime.observeEvents(bootstrapRuntime.writeJsonEvent);
+    }
+    if (recovery) {
+      const saved = sessionManager.getSession(runtimeContext.session.id);
+      if (!saved || saved.id !== recovery.sessionId || saved.projectRoot !== runtimeContext.projectRoot) throw new Error('Restart recovery could not verify the selected saved session.');
+      input.writeOutput(`Restart recovery: runtime rebuilt and saved session ${saved.id} read back. Startup prompt and captured input were not replayed.`);
+      if (options.printMode || !input.stdin.isTTY) return;
     }
 
     const handledPrintMode = await runCliPrintModeRouter({
@@ -226,10 +272,10 @@ export async function runCliProcess(
         approvalModeState.set(mode);
       },
       approvalTrustPolicy,
+      stopRequested: () => requested !== undefined,
     });
     if (handledPrintMode) {
-      await shutdown.close();
-      return;
+      return requested;
     }
 
     await runInteractiveLoop({
@@ -255,10 +301,11 @@ export async function runCliProcess(
       },
       ...(options.themePaths ? { themePaths: options.themePaths } : {}),
       exit: shutdown.exit,
+      stopSignal: stopSurface.signal,
     });
-  } catch (error) {
+    return requested;
+  } finally {
     await shutdown.close();
-    throw error;
   }
 }
 

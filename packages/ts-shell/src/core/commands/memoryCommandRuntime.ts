@@ -44,6 +44,7 @@ import {
   executeMemoryRecall,
 } from "../memory/memoryTools.js";
 import type { MemoryCategory } from "../memory/types.js";
+import { isMemoryMaintenanceAction, memoryReviewCandidates, runMemoryMaintenanceCommand } from "../../memory/commands/maintenance.js";
 
 export const recallSyntax = textSyntax("recall", "query", true);
 export const retainSyntax = textSyntax("retain", "statement", true);
@@ -137,9 +138,17 @@ export async function runMemoryLocalCommand(
     const compactStore =
       context.compactCheckpointStore ?? DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE;
     const latest = getLatestCompactCheckpoint(compactStore, reviewSessionId);
-    const candidates = latest
+    const extracted = latest
       ? extractProjectMemoryCandidates({ compactPacket: latest.packet })
       : [];
+    const reviewStore = context.projectMemoryReviewStateStore ?? DEFAULT_PROJECT_MEMORY_REVIEW_STATE_STORE;
+    const candidates = memoryReviewCandidates(extracted, reviewStore.get(reviewSessionId));
+    if (isMemoryMaintenanceAction(parsed.action.name)) {
+      const localResult = await runMemoryMaintenanceCommand({ action: parsed.action.name, args: parsed.args, context,
+        scope: reviewSessionId, candidates, reviewStore });
+      emitCommandResultToSidebar(context, { command: "/memory", args, result: localResult });
+      return localResult;
+    }
     if (args[0] === "recall" || args[0] === "search" || args[0] === "wake") {
       const request = parseProjectMemoryRecallCommandArgs(args);
       const result = await runProjectMemoryRecallCommand({

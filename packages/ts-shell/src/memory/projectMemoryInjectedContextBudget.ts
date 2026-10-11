@@ -3,6 +3,7 @@ import { fitContextLines } from "../context/budget/lines.js";
 export interface ProjectMemoryInjectedContextBudgetOptions {
   readonly maxChars?: number;
   readonly maxListItems?: number;
+  readonly recordLines?: ReadonlyMap<number, readonly string[]>;
 }
 
 export interface ProjectMemoryInjectedContextBudgetResult {
@@ -17,7 +18,10 @@ export interface ProjectMemoryInjectedContextBudgetResult {
     readonly message: string;
   }[];
   readonly evidence: readonly string[];
+  readonly admittedRecordIds: readonly string[];
 }
+
+type ContextLine = { readonly text: string; readonly sourceIndex: number };
 
 const DEFAULT_MAX_CHARS = 10_000;
 const DEFAULT_MAX_LIST_ITEMS = 10;
@@ -29,12 +33,13 @@ export function applyProjectMemoryInjectedContextBudget(
   const requestedMax = options.maxChars ?? DEFAULT_MAX_CHARS;
   const maxChars = Number.isFinite(requestedMax) ? Math.max(0, Math.floor(requestedMax)) : 0;
   const maxListItems = options.maxListItems ?? DEFAULT_MAX_LIST_ITEMS;
-  const dedupedLines = dedupeLines(context.split("\n"));
+  const dedupedLines = dedupeLines(context.split("\n").map((text, sourceIndex) => ({ text, sourceIndex })));
   const listCappedLines = capListItems(dedupedLines, maxListItems);
-  const listCappedContext = listCappedLines.join("\n");
+  const listCappedContext = listCappedLines.map(line => line.text).join("\n");
   if (listCappedContext.length <= maxChars) {
     return {
       context: listCappedContext,
+      admittedRecordIds: admittedIds(listCappedLines, options.recordLines),
       fits: true,
       estimatedSize: listCappedContext.length,
       originalSize: context.length,
@@ -54,11 +59,12 @@ export function applyProjectMemoryInjectedContextBudget(
     };
   }
 
-  const fitted = fitContextLines(listCappedLines, maxChars, isCriticalLine,
+  const fitted = fitContextLines(listCappedLines.map(line => line.text), maxChars, isCriticalLine,
     "- Budget: additional entries omitted; required safety content preserved.");
   const budgeted = fitted.context;
   return {
     context: budgeted,
+    admittedRecordIds: admittedIds(fitted.selectedIndices.map(index => listCappedLines[index]!), options.recordLines),
     fits: fitted.fits,
     estimatedSize: budgeted.length,
     originalSize: context.length,
@@ -77,11 +83,11 @@ export function applyProjectMemoryInjectedContextBudget(
   };
 }
 
-function dedupeLines(lines: readonly string[]): string[] {
+function dedupeLines(lines: readonly ContextLine[]): ContextLine[] {
   const seen = new Set<string>();
-  const result: string[] = [];
+  const result: ContextLine[] = [];
   for (const line of lines) {
-    const key = line.trim();
+    const key = line.text.trim();
     if (key && seen.has(key)) {
       continue;
     }
@@ -93,12 +99,12 @@ function dedupeLines(lines: readonly string[]): string[] {
   return result;
 }
 
-function capListItems(lines: readonly string[], maxListItems: number): string[] {
-  const result: string[] = [];
+function capListItems(lines: readonly ContextLine[], maxListItems: number): ContextLine[] {
+  const result: ContextLine[] = [];
   let currentListCount = 0;
   for (const line of lines) {
-    const isListItem = /^- /.test(line) || /^  - /.test(line);
-    if (!isListItem || isCriticalLine(line)) {
+    const isListItem = /^- /.test(line.text) || /^  - /.test(line.text);
+    if (!isListItem || isCriticalLine(line.text)) {
       currentListCount = isListItem ? currentListCount + 1 : 0;
       result.push(line);
       continue;
@@ -107,10 +113,14 @@ function capListItems(lines: readonly string[], maxListItems: number): string[] 
     if (currentListCount <= maxListItems) {
       result.push(line);
     } else if (currentListCount === maxListItems + 1) {
-      result.push("- ... additional memory entries omitted by budget");
+      result.push({ text: "- ... additional memory entries omitted by budget", sourceIndex: -1 });
     }
   }
   return result;
+}
+
+function admittedIds(lines: readonly ContextLine[], sources?: ReadonlyMap<number, readonly string[]>): readonly string[] {
+  return [...new Set(lines.flatMap(line => sources?.get(line.sourceIndex) ?? []))];
 }
 
 function isCriticalLine(line: string): boolean {

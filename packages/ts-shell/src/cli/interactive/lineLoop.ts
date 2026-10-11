@@ -56,6 +56,7 @@ export interface LineLoopOptions {
   readonly setReadline: (readline: ReadlineInterface | null) => void;
   readonly setActiveNonInteractiveApprovalMode: (mode: ApprovalModeObject | undefined) => void;
   readonly exit: (code?: number) => void;
+  readonly stopSignal?: AbortSignal;
 }
 
 /** Run until stdin closes, resolving once the loop has finished. */
@@ -79,7 +80,7 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
   excludeRecordingInput(options.runtimeContext, () => Boolean(questions.question()));
   options.setReadline(questionInput);
 
-  installInteractiveSignalHandlers({
+  const releaseSignals = installInteractiveSignalHandlers({
     process: options.process,
     readline: questionInput,
     sessionRuntime: options.sessionRuntime,
@@ -181,7 +182,10 @@ export async function runLineLoop(options: LineLoopOptions): Promise<void> {
   });
 
   await new Promise<void>((resolve) => {
-    input.on("close", () => { closed = true; questionInput.close(); releaseGoalSubmission?.(); releaseInputQueue(); resolve(); });
+    const stop = () => { releaseSignals(); queue.splice(0); input.close(); };
+    options.stopSignal?.addEventListener('abort', stop, { once: true });
+    input.on("close", () => { closed = true; questionInput.close(); releaseSignals(); options.stopSignal?.removeEventListener('abort', stop); releaseGoalSubmission?.(); releaseInputQueue(); resolve(); });
+    if (options.stopSignal?.aborted) stop();
   });
   await chain;
 }

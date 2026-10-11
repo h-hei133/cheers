@@ -257,6 +257,44 @@ describe("the cache warming runner", () => {
 
 
 describe("cache warming lifecycle", () => {
+  it('reports reset uncertainty when a refresh ignores cancellation, and discards its late usage', async () => {
+    vi.useFakeTimers();
+    try {
+      let finish!: (value: { prompt_tokens: number }) => void;
+      let signal!: AbortSignal;
+      const onUsage = vi.fn();
+      const refresh = vi.fn(async (_sent, received) => { signal = received; return new Promise<{ prompt_tokens: number }>(resolve => { finish = resolve; }); });
+      const runner = createCacheWarmingRunner({ mode: 'idle', ...priced, refresh, onUsage });
+      runner.noteRequest(500000, sent);
+      await vi.advanceTimersByTimeAsync(270000);
+      const reset = runner.reset();
+      expect(signal.aborted).toBe(true);
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(await reset).toBe('unknown');
+      finish({ prompt_tokens: 500000 });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(onUsage).not.toHaveBeenCalled();
+      expect(runner.status().nextRefreshAt).toBeUndefined();
+      runner.noteRequest(500000, sent);
+      await vi.advanceTimersByTimeAsync(600000);
+      expect(refresh).toHaveBeenCalledOnce();
+      expect(await runner.reset()).toBe('unchanged');
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('retires the captured prefix without sending and reports stateless reset as unchanged', async () => {
+    vi.useFakeTimers();
+    try {
+      const refresh = vi.fn(async () => {});
+      const runner = createCacheWarmingRunner({ mode: 'idle', ...priced, refresh });
+      runner.noteRequest(500000, sent);
+      expect(await runner.reset()).toBe('reset');
+      expect(await runner.reset()).toBe('unchanged');
+      await vi.advanceTimersByTimeAsync(600000);
+      expect(refresh).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+
   it.each(["stop", "settle"])("does not rearm after %s during a refresh", async (action) => {
     vi.useFakeTimers();
     try {

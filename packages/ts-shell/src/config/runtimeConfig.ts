@@ -121,6 +121,7 @@ export interface ProviderCredentialConfig {
   readonly baseUrl?: string;
   readonly model?: string;
   readonly thinkingEffort?: ThinkingPreference;
+  readonly serviceTier?: string;
   readonly accountAuth?: ProviderAccountAuthConfig;
 }
 
@@ -133,6 +134,7 @@ export interface ProviderConnectionConfig {
   readonly baseUrl?: string;
   readonly model?: string;
   readonly thinkingEffort?: ThinkingPreference;
+  readonly serviceTier?: string;
   readonly accountAuth?: ProviderAccountAuthConfig;
   readonly status?: "connected" | "pending" | "error";
   readonly createdAt: string;
@@ -687,12 +689,14 @@ function normalizeProviderCredentials(
       credentials[provider]?.accountAuth,
     );
     const thinkingEffort = credentials[provider]?.thinkingEffort;
-    if (apiKey || baseUrl || model || accountAuth || thinkingEffort !== undefined) {
+    const serviceTier = credentials[provider]?.serviceTier?.trim();
+    if (apiKey || baseUrl || model || accountAuth || thinkingEffort !== undefined || serviceTier) {
       normalized[provider] = {
         ...(apiKey ? { apiKey } : {}),
         ...(baseUrl ? { baseUrl } : {}),
         ...(model ? { model } : {}),
         ...(thinkingEffort !== undefined ? { thinkingEffort } : {}),
+        ...(serviceTier ? { serviceTier } : {}),
         ...(accountAuth ? { accountAuth } : {}),
       };
     }
@@ -735,6 +739,7 @@ function normalizeProviderConnections(
     const apiKey = connection.apiKey?.trim();
     const baseUrl = normalizeBaseUrl(connection.baseUrl);
     const model = connection.model?.trim();
+    const serviceTier = connection.serviceTier?.trim();
     const accountAuth = normalizeProviderAccountAuth(
       connection.provider,
       connection.accountAuth,
@@ -749,6 +754,7 @@ function normalizeProviderConnections(
       ...(baseUrl ? { baseUrl } : {}),
       ...(model ? { model } : {}),
       ...(connection.thinkingEffort !== undefined ? { thinkingEffort: connection.thinkingEffort } : {}),
+      ...(serviceTier ? { serviceTier } : {}),
       ...(accountAuth ? { accountAuth } : {}),
       status:
         connection.status === "pending" || connection.status === "error"

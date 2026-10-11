@@ -9,6 +9,10 @@ import { createZipArchive } from "../../observability/zipArchive.js";
 import { redactReportText } from "../security/redaction.js";
 import { resolveUserDataFile } from "../paths/userHome.js";
 import { resolveWriteTarget } from "../security/writeTarget.js";
+import { getGlobalRotatingFileSink } from "../../observability/rotatingFileSink.js";
+import { readStructuredLogs } from "../../observability/diagnostics.js";
+import { readMetrics } from "../../observability/metrics/reader.js";
+import { formatTimingReport } from "../../observability/startupTiming.js";
 
 /**
  * `/report` — a bundle someone can attach to a bug report.
@@ -91,6 +95,14 @@ export async function runReportCommand(
     ...(record.stack ? { stack: scrubStack(record.stack, redactions, projectRoot) } : {}),
   }));
 
+  const sink = getGlobalRotatingFileSink();
+  const logs = readStructuredLogs(sink.getLogDir(), sink.getCurrentFilePath());
+  const metrics = readMetrics(sink.getLogDir(), sink.getCurrentFilePath(), 2000);
+  let tools: readonly string[] = [];
+  let toolsStatus: "reported" | "unavailable" = "reported";
+  try { tools = [...(context.getToolPool ? await context.getToolPool() : new Map()).keys()].sort(); }
+  catch { toolsStatus = "unavailable"; }
+
   const report = {
     formatVersion: 1,
     generatedAt: new Date().toISOString(),
@@ -106,6 +118,12 @@ export async function runReportCommand(
       project: redactReportText(path.basename(context.cwd), MAX_FIELD_LENGTH, { redactions }),
     },
     crashes,
+    observability: {
+      logs: { entries: logs.entries.length, filesInspected: logs.filesInspected, unreadableFiles: logs.unreadableFiles, status: logs.status },
+      metrics: { samples: metrics.samples.length, filesInspected: metrics.filesInspected, unreadableFiles: metrics.unreadableFiles, status: metrics.status },
+      timing: formatTimingReport(),
+      tools: { status: toolsStatus, count: tools.length, names: tools },
+    },
   };
 
   const summary = [
@@ -116,6 +134,9 @@ export async function runReportCommand(
     `- Platform: ${report.environment.platform} ${report.environment.arch}`,
     `- Node: ${report.environment.nodeVersion}`,
     `- Crashes recorded: ${crashes.length}`,
+    `- Structured logs observed: ${logs.entries.length} (${logs.status})`,
+    `- Metric samples observed: ${metrics.samples.length} (${metrics.status})`,
+    `- Available tools observed: ${tools.length} (${toolsStatus})`,
     "",
     "The conversation itself is not included: a bug report is not a reason to copy",
     "your code out. Free-text fields are scrubbed of credentials and paths.",

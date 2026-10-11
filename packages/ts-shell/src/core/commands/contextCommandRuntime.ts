@@ -1,6 +1,7 @@
 import { contextReport } from './context/report.js';
 import { reportText } from './report/projection.js';
-import { rejectArguments } from "./syntax/empty.js";
+import { parseSyntax } from './syntax/parse.js';
+import { contextSyntax } from '../../context/attachment/syntax.js';
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import { loadCatalog } from "../models/catalogStore.js";
@@ -32,8 +33,12 @@ export async function runContextCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
-  const invalid = rejectArguments("context", args);
-  if (invalid) return invalid;
+  const parsed = parseSyntax(contextSyntax, args);
+  if (!parsed.ok) return { kind: 'local', output: `Invalid /context arguments: ${parsed.reason}` };
+  if (parsed.action.name !== 'status') {
+    return context.ruleControlsCommand ? context.ruleControlsCommand('context', args, context) as Promise<LocalCommandResult>
+      : { kind: 'local', output: 'Extra context requires a bound source-read permission owner.' };
+  }
   const sessionId = context.sessionId ?? "";
   const telemetry = sessionId ? getSessionUsage(sessionId) : undefined;
   // The window and reserve the compaction engine actually works to. Read from

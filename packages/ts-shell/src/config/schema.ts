@@ -33,7 +33,7 @@ const accountAuth = objectSchema({
 });
 
 export const credentialSchema = objectSchema({
-  apiKey: referenceSchema, baseUrl: referenceSchema, model: referenceSchema, accountAuth,
+  apiKey: referenceSchema, baseUrl: referenceSchema, model: referenceSchema, serviceTier: nameSchema, accountAuth,
   thinkingEffort: { enum: ['low', 'medium', 'high', null] },
 });
 

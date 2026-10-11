@@ -88,7 +88,7 @@ function sessionOption(session: SessionSummary, currentId: string, size: Session
     id: session.id,
     label: session.title?.trim() || 'New session',
     detail: [describe(session, size), session.quality === 'limited' ? 'preview limited' : undefined].filter(Boolean).join(' · '),
-    note: [session.id === currentId ? 'current' : undefined, age(session)].filter(Boolean).join(' · '),
+    note: [session.id === currentId ? 'current' : undefined, session.pinned ? 'pinned' : undefined, age(session)].filter(Boolean).join(' · '),
   };
 }
 

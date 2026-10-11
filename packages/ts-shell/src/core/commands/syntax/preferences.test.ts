@@ -6,13 +6,16 @@ import { ShellManager } from "../../shell/platform/shellManager.js";
 import { runShellCommand } from "../shellCommandRuntime.js";
 import { runStatuslineCommand } from "../statuslineCommandRuntime.js";
 import { runSettingsCommand } from "../settingsCommandRuntime.js";
-import { runFastCommand, isFastModeEnabled } from "../fastCommandRuntime.js";
+import { runFastCommand } from "../fastCommandRuntime.js";
 import { createCommandRegistry } from "../registry.js";
 import { writeStatusItems } from "../../../cli/interactive/tuiSettings.js";
 import * as projectState from "../../state/projectState.js";
 import { STATUS_ITEMS } from "../../../presentation/tui/chrome/items.js";
 import { statuslineCompletions } from "../statusline/syntax.js";
 import { CONFIG_SETTINGS } from '../../../config/settings.js';
+import { SessionManager } from '../../../session/SessionManager.js';
+import * as modelState from '../../../session/model/state.js';
+import { getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../config/runtimeConfig.js';
 
 let root: string;
 beforeEach(() => {
@@ -56,20 +59,26 @@ it("only describes implemented settings and refuses extra arguments", async () =
   }
 });
 
-it("rejects extra sampling arguments, preserves aliases and reports failed persistence truthfully", async () => {
-  await runFastCommand(["1"], { cwd: root });
-  const file = projectState.projectStatePath(root); const before = fs.readFileSync(file);
+it("rejects extra tier arguments, preserves aliases and reports failed persistence truthfully", async () => {
+  writeUserRuntimeConfigFile({ activeProviderConnectionId: 'fixture', provider: 'openai', providerConnections: [{
+    id: 'fixture', provider: 'openai', model: 'o4-mini', authType: 'api-key', apiKey: 'synthetic-key', status: 'connected', createdAt: '2026-01-01', updatedAt: '2026-01-01',
+  }] }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+  const manager = new SessionManager(); const session = manager.createNew(root);
+  modelState.writeSessionModel(session.id, { connectionId: 'fixture', provider: 'openai', model: 'o4-mini' }, modelState.readSessionModelEdit(session.id));
+  const context = { cwd: root, sessionId: session.id };
+  await runFastCommand(["1"], context);
+  const file = path.join(manager.getSessionDirPath(session.id), 'state.json'); const before = fs.readFileSync(file);
   for (const args of [["off", "extra"], ["toggle", "--force"], ["bogus"]]) {
-    expect((await runFastCommand(args, { cwd: root })).output).toContain("Invalid /fast arguments");
+    expect((await runFastCommand(args, context)).output).toContain("Invalid /fast arguments");
     expect(fs.readFileSync(file)).toEqual(before);
   }
-  await runFastCommand(["disable"], { cwd: root });
-  expect(isFastModeEnabled(root)).toBe(false);
-  vi.spyOn(projectState, "writeProjectState").mockReturnValue(undefined);
-  const failed = await runFastCommand(["on"], { cwd: root });
-  expect(failed.output).toContain("Write outcome is unverified");
-  expect(failed.output).not.toContain("Fast mode is on");
-  expect(isFastModeEnabled(root)).toBe(false);
+  await runFastCommand(["disable"], context);
+  expect(modelState.readSessionModel(session.id)?.serviceTier).toBe('default');
+  vi.spyOn(modelState, "writeSessionModel").mockImplementationOnce(() => { throw new Error('disk unavailable'); });
+  const failed = await runFastCommand(["on"], context);
+  expect(failed.output).toContain("write outcome is unverified");
+  expect(failed.output).not.toContain("Service tier set");
+  expect(modelState.readSessionModel(session.id)?.serviceTier).toBe('default');
 });
 
 it("offers backend IDs only after a legal selecting action, including aliases", () => {
@@ -78,6 +87,6 @@ it("offers backend IDs only after a legal selecting action, including aliases", 
   for (const prefix of ["use ", "set "]) expect(shell.getArgumentCompletions?.(prefix)?.map(item => item.value)).toContain("bash");
   for (const prefix of ["status ", "diag ", "auto ", "use bash ", "bogus "]) expect(shell.getArgumentCompletions?.(prefix)).toBeNull();
   expect(shell.getArgumentCompletions?.("re")?.map(item => item.value)).toContain("reset");
-  expect(registry.get("fast")!.summary).not.toMatch(/latency|model tier/);
+  expect(registry.get("fast")!.summary).toContain('service tier');
   expect(registry.get("fast")!.getArgumentCompletions?.("0")?.map(item => item.value)).toEqual(["0"]);
 });

@@ -16,7 +16,8 @@ export function sessionChoices<T extends Session | SessionSummary>(sessions: rea
   const root = normalizePathIdentity(context.projectRoot);
   const scoped = sessions.filter(session => root !== undefined && normalizePathIdentity(session.projectRoot) === root
     && ('reentry' in session ? session.reentry !== 'empty' : sessionHasReentrySurface(session)));
-  scoped.sort((left, right) => (Date.parse(right.updatedAt) - Date.parse(left.updatedAt)) || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
+  scoped.sort((left, right) => Number(right.pinned === true) - Number(left.pinned === true)
+    || (Date.parse(right.updatedAt) - Date.parse(left.updatedAt)) || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
   const recent = scoped.slice(0, limit);
   const current = scoped.find(session => session.id === context.sessionId);
   if (current && !recent.includes(current)) recent.push(current);

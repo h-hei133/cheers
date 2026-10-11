@@ -18,6 +18,7 @@ import { effortOutputFailure } from '../../../provider/endpoints/effort.js';
 import { catalogModel, providerEndpoint } from '../../models/catalog.js';
 import type { ThinkingPreference } from '../../models/effort.js';
 import type { CommandContext } from '../types.js';
+import { connectionIdentity, credentialIdentity } from './identity.js';
 
 export async function setModel(args: string[], context: CommandContext, global: boolean, requestedEffort?: ThinkingPreference): Promise<string> {
   try { return await selectModel(args, context, global, requestedEffort); }
@@ -157,7 +158,20 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   let receipt: SessionModelReceipt | undefined;
   if (context.sessionId) {
     try {
-      receipt = writeSessionModel(context.sessionId, { connectionId: activeId, provider, model, thinkingEffort }, sessionEdit!, beforeCommit);
+      receipt = writeSessionModel(context.sessionId, {
+        connectionId: activeId,
+        provider,
+        model,
+        thinkingEffort,
+        // Presets are session-owned named roles, not the active model. Preserve
+        // them when switching the active target; a switch must not silently
+        // delete resume-scoped controls.
+        ...(sessionEdit?.selection?.presets ? { presets: sessionEdit.selection.presets } : {}),
+        // Skill listing is a session control and follows the session across
+        // model changes. Service tier and context window are model-specific;
+        // omitting them makes the new model resolve its own defaults.
+        ...(sessionEdit?.selection?.skillful !== undefined ? { skillful: sessionEdit.selection.skillful } : {}),
+      }, sessionEdit!, beforeCommit);
     } catch (error) {
       return sessionFailure(error);
     }
@@ -201,16 +215,4 @@ function sessionFailure(error: unknown): string {
 
 function matchesRequestProvider(context: CommandContext, config: RuntimeConfig, provider: string): boolean {
   return !context.resolveConfigTarget || context.resolveConfigTarget(config).provider === provider;
-}
-
-function connectionIdentity(connection: ProviderConnectionConfig | undefined): object | undefined {
-  if (!connection) return undefined;
-  const { model, thinkingEffort, createdAt, updatedAt, label, ...identity } = connection;
-  return identity;
-}
-
-function credentialIdentity(credential: ProviderCredentialConfig | undefined): object | undefined {
-  if (!credential) return undefined;
-  const { model, thinkingEffort, ...identity } = credential;
-  return Object.keys(identity).length ? identity : undefined;
 }

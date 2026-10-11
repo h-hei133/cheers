@@ -19,6 +19,7 @@ export function streamCliRuntimePrompt(input: {
   readonly onCommandSettled?: CliRuntimeInvocationInput['onCommandSettled'];
   readonly background?: CliRuntimeInvocationInput['background'];
   readonly featureTools?: CliRuntimeInvocationInput['featureTools'];
+  readonly allowedTools?: CliRuntimeInvocationInput['allowedTools'];
   readonly requestPolicy?: CliRuntimeInvocationInput['requestPolicy'];
   readonly commandProof?: CliRuntimeInvocationInput['commandProof'];
   readonly checkpoint?: CliRuntimeInvocationInput['checkpoint'];
@@ -58,6 +59,7 @@ export function streamCliRuntimePrompt(input: {
     readonly skillPaths?: readonly string[];
     readonly noSkills?: boolean;
   };
+  readonly forcedTool?: CliRuntimeInvocationInput['forcedTool'];
 }): CliRuntimeInvocationResult {
   // The turn below is async since MCP tools joined the pool — their snapshot
   // has to be awaited before the first event, and a caller that can only take
@@ -69,6 +71,7 @@ export function streamCliRuntimePrompt(input: {
     onCommandSettled: input.onCommandSettled,
     background: input.background,
     featureTools: input.featureTools,
+    ...(input.allowedTools ? { allowedTools: input.allowedTools } : {}),
     goalObjective: input.goalObjective,
     requestPolicy: input.requestPolicy,
     commandProof: input.commandProof,
@@ -100,6 +103,7 @@ export function streamCliRuntimePrompt(input: {
     ...(input.runtimeConfig ? { runtimeConfig: input.runtimeConfig } : {}),
     ...(input.providerCatalog ? { providerCatalog: input.providerCatalog } : {}),
     ...(input.skillOptions ? { skillOptions: input.skillOptions } : {}),
+    ...(input.forcedTool ? { forcedTool: input.forcedTool } : {}),
     ...(input.cacheWarming ? { cacheWarming: input.cacheWarming } : {}),
   });
   const events = (async function* (): AsyncIterable<QueryEvent> {

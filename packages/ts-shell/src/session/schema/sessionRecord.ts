@@ -3,6 +3,7 @@ import type { SessionMessage } from "./sessionMessage.js";
 import type { SessionUsageSnapshot } from "../../observability/usage/model.js";
 import type { SessionReport } from '../reports/model.js';
 import type { WorkspaceRoot } from '../../core/workspace/model.js';
+import type { ContextEntry } from '../../context/attachment/entry.js';
 
 export interface Session {
   /** Read-only reentry projection; durable planning owners validate the stored payloads. */
@@ -16,6 +17,11 @@ export interface Session {
   targetPathBase?: string;
   gitRoot?: string | null;
   title?: string;
+  pinned?: boolean;
+  /** Original turns remain intact; the context owner derives the model-facing view. */
+  contextSelection?: unknown;
+  /** Explicit, read-only context entries retained by the session owner. */
+  contextAttachments?: readonly ContextEntry[];
   /**
    * The session this one was forked from, when it was.
    *

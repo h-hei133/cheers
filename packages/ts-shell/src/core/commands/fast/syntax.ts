@@ -3,9 +3,9 @@ import type { CommandSyntax } from "../syntax/model.js";
 export const fastSyntax: CommandSyntax = {
   name: "fast", defaultAction: "", flags: [],
   actions: [
-    { name: "", summary: "inspect sampling preference" },
-    { name: "on", aliases: ["enable", "1"], summary: "use a lower sampling temperature" },
-    { name: "off", aliases: ["disable", "0"], summary: "restore default sampling temperature" },
-    { name: "toggle", summary: "toggle the sampling preference" },
+    { name: "", aliases: ['status'], summary: "inspect provider fast service tier" },
+    { name: "on", aliases: ["enable", "1"], summary: "use a supported provider priority tier" },
+    { name: "off", aliases: ["disable", "0"], summary: "select standard provider processing" },
+    { name: "toggle", summary: "toggle the session service tier" },
   ],
 };

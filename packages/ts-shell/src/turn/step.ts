@@ -1,5 +1,6 @@
 import { catalogModel } from "../core/models/catalog.js";
 import { randomUUID } from 'node:crypto';
+import { createComponentLogger } from "../observability/structuredLogger.js";
 import { ModelAdmissionError, type ModelTransport, type RequestPolicy } from '../core/agent/request/model.js';
 import { prepareRequestAttempt, type RequestAttempt } from '../provider/request/attempt.js';
 import { hasUsage, usageFromProvider } from "../provider/response/usage.js";
@@ -8,7 +9,6 @@ import type { AgentMessage, AgentStopReason } from "../core/agent/state.js";
 import type { AssistantStep } from "../core/agent/loop.js";
 import { parseJsonWithRepair } from "../model-adapters/jsonRepair.js";
 import { clearContextUsage, markContextUnknown, recordSessionUsage } from "../observability/usageTelemetry.js";
-import { samplingTemperature } from "../core/commands/fastCommandRuntime.js";
 import { captureThinkingPreference } from '../core/models/preference.js';
 import { effortOutputFailure } from '../provider/endpoints/effort.js';
 import { effortCapability } from '../core/models/capability.js';
@@ -76,6 +76,8 @@ export interface ProviderTarget {
    * want to be asked — one provider can offer both.
    */
   readonly endpoint?: EndpointKind;
+  /** Provider service tier selected by the session. */
+  readonly serviceTier?: string;
 }
 
 /** What a step reports while it runs, before the assembled message exists. */
@@ -238,6 +240,7 @@ function withFinalStepNotice(
 }
 
 export function createStepFunction(request: StepRequest): StepFunction {
+  const traceLogger = createComponentLogger("provider-request");
   let effortAccepted = true;
   const captured = captureThinkingPreference(request.workspaceRoot, request.thinkingEffort);
   const explicitEffort = request.thinkingEffortExplicit ?? captured.thinkingEffortExplicit;
@@ -254,6 +257,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
       : undefined;
   return async (messages, signal, listener, options): Promise<AssistantStep> => {
     const requestId = options.requestId ?? randomUUID();
+    let requestAcceptedAt: number | undefined;
     const allowed = options.allowedTools && new Set(options.allowedTools);
     const tools = allowed ? request.tools.filter((tool) => allowed.has(tool.function.name)) : request.tools;
     const systemPrompt = options.agentMode && request.systemPromptFor
@@ -312,11 +316,12 @@ export function createStepFunction(request: StepRequest): StepFunction {
           tools,
           allowTools: options.allowTools,
           vision: shape.vision,
-          temperature: samplingTemperature(request.workspaceRoot, request.temperature ?? 0.7),
+          temperature: request.temperature ?? 0.7,
           systemRole: shape.systemRole,
           reasoningEffort: Boolean(shape.reasoningEffort),
           maxTokensField: shape.maxTokensField,
           assistantAfterToolResult: shape.assistantAfterToolResult,
+          serviceTier: request.provider.serviceTier,
         }) ?? {};
         payload = endpointTurnBody(endpoint, {
           model: request.provider.model,
@@ -332,7 +337,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
           tools,
           allowTools: options.allowTools,
           vision: shape.vision,
-          temperature: samplingTemperature(request.workspaceRoot, request.temperature ?? 0.7),
+          temperature: request.temperature ?? 0.7,
           ...(request.topP != null ? { topP: request.topP } : {}),
           ...((request.maxOutputTokens ?? shape.maxOutputCeiling) != null
             ? { maxOutputTokens: request.maxOutputTokens ?? shape.maxOutputCeiling }
@@ -349,6 +354,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
           reasoningEffort: shape.reasoningEffort,
           maxTokensField: shape.maxTokensField,
           assistantAfterToolResult: shape.assistantAfterToolResult,
+          serviceTier: request.provider.serviceTier,
         });
       } catch (error) {
         // The only throw from this call is an undeclared kind, and it names both
@@ -419,6 +425,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
             fetchImpl, request.modelTransport,
           );
           if (attemptResponse.ok) {
+            requestAcceptedAt = Date.now();
+            traceLogger.info("provider request accepted", { requestId, endpoint, provider: request.provider.provider, model: request.provider.model, attempt });
             clearContextUsage(request.sessionId);
             response = attemptResponse;
             responseAttempt = modelAttempt;
@@ -516,6 +524,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
 
       try {
         const completion = await readCompletion(response, watched, endpoint);
+        traceLogger.info("provider request completed", { requestId, endpoint, provider: request.provider.provider, model: request.provider.model, attempt: streamAttempts, usage: Boolean(completion.usage), durationMs: requestAcceptedAt === undefined ? undefined : Math.max(0, Date.now() - requestAcceptedAt) });
         const usage = completion.usage;
         responseAttempt?.settle(usage);
         if (hasUsage(usage)) {

@@ -91,6 +91,8 @@ export interface CatalogModel {
    * still reaches the model.
    */
   readonly vision?: boolean;
+  /** Provider service tiers this model accepts, for example `priority` or `flex`. */
+  readonly serviceTiers?: readonly string[];
 }
 
 /** How one model wants a request shaped, when it differs from the default. */
@@ -286,7 +288,7 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
       { id: "gpt-5.3", contextWindow: 400_000, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 }, vision: true },
       { id: "gpt-5.3-codex", contextWindow: 400_000, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 } },
       { id: "gpt-5.1-mini", contextWindow: 400_000, compat: REASONING_REQUEST_SHAPE, promptCache: { short: 600, long: 86_400 }, vision: true },
-      { id: "o4-mini", contextWindow: 200_000, compat: REASONING_REQUEST_SHAPE, vision: true },
+      { id: "o4-mini", contextWindow: 200_000, compat: REASONING_REQUEST_SHAPE, vision: true, serviceTiers: ['default', 'priority', 'fast', 'flex'] },
     ],
   },
   {

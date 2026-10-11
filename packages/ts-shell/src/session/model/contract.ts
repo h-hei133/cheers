@@ -1,10 +1,27 @@
 import type { ThinkingPreference } from '../../core/models/effort.js';
 
-/** A model preference contains no credential and applies only to its connection. */
-export interface SessionModelSelection {
+export interface SessionModelRole {
   readonly connectionId: string;
   readonly provider: string;
   readonly model: string;
   readonly thinkingEffort?: ThinkingPreference;
 }
 
+export interface SessionModelPreset {
+  readonly roles: Readonly<Record<string, SessionModelRole>>;
+}
+
+/** A model preference contains no credential and applies only to its connection. */
+export interface SessionModelSelection {
+  readonly connectionId: string;
+  readonly provider: string;
+  readonly model: string;
+  readonly thinkingEffort?: ThinkingPreference;
+  /** Provider service tier for this session, when the active model advertises it. */
+  readonly serviceTier?: string;
+  readonly presets?: Readonly<Record<string, SessionModelPreset>>;
+  /** Session-only prompt skill listing override; undefined follows startup default. */
+  readonly skillful?: boolean;
+  /** Session-only context window selection from the provider/model catalog. */
+  readonly contextWindow?: number;
+}

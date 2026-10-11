@@ -18,6 +18,8 @@ import { providerEndpoint, type CatalogProvider } from "../core/models/catalog.j
 import type { RuntimeConfig } from "../config/runtimeConfig.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { buildSystemPrompt, systemPromptSnapshot, type SystemPromptContext } from "../turn/prompt.js";
+import { readSessionModel } from '../session/model/state.js';
+import { skillPrompt } from '../core/commands/skillful.js';
 import type { RequestOverhead } from "../session/context.js";
 import { renderSkillList, type Skill } from "../core/skills/skillLoader.js";
 import {
@@ -69,6 +71,8 @@ export interface CliRuntimeInvocationInput {
   readonly thinkingPreference?: ReturnType<typeof captureThinkingPreference>;
   readonly background?: TurnOptions['background'];
   readonly featureTools?: readonly ToolDefinition[];
+  /** One-use model tool restriction selected by `/force`; ordinary gates remain active. */
+  readonly allowedTools?: readonly string[];
   readonly requestPolicy?: RequestPolicy;
   readonly goalObjective?: string;
   readonly workspaceRoots?: readonly WorkspaceRoot[];
@@ -112,6 +116,8 @@ export interface CliRuntimeInvocationInput {
     readonly skillPaths?: readonly string[];
     readonly noSkills?: boolean;
   };
+  /** A validated one-use tool selection for this request only. */
+  readonly forcedTool?: string;
 }
 
 export interface CliRuntimeInvocationRequest extends Omit<CliRuntimeInvocationInput, "providerModeEnv"> {
@@ -325,7 +331,7 @@ function buildPromptContext(
   return {
     instructions: renderInstructionFiles(instructions.files),
     appendedInstructions: renderAppendedInstructions(appended.files),
-    skills: renderSkillList(skills),
+    skills: skillPrompt(skills, readSessionModel(request.sessionId)?.skillful),
     toolNames,
   };
 }
@@ -417,7 +423,13 @@ async function startTurn(
     requestApproval: (hook) => approveDeclaredHook(request, hook),
     bypassed: request.runtimeConfig?.allowUntrustedHooks === true,
   });
-  const { skills, tools } = await loadToolCatalog(request, dependencies.tools);
+  const { skills, tools: catalogTools } = await loadToolCatalog(request, dependencies.tools);
+  const tools = request.forcedTool
+    ? new Map([...catalogTools].filter(([name]) => name === request.forcedTool))
+    : catalogTools;
+  if (request.forcedTool && !tools.has(request.forcedTool)) {
+    throw new Error(`Forced tool '${request.forcedTool}' is no longer available in the current tool pool.`);
+  }
   assertAdmission(request.admission);
   const promptContext = buildPromptContext(request, skills, [...tools.keys()]);
   // What the request spends outside the conversation. Computed here because this
@@ -485,6 +497,7 @@ async function startTurn(
     tools,
     hooks,
     maxSteps: request.maxTurns,
+    ...(request.allowedTools ? { allowedTools: request.allowedTools } : {}),
     compaction,
     ...(request.cacheWarming ? { cacheWarming: request.cacheWarming } : {}),
     signal: request.signal,

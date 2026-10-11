@@ -44,12 +44,12 @@ describe("Modern Slash Commands Subsystem", () => {
     expect(result.output).toContain("Working tree clean");
   });
 
-  it("/init inspects project directory and generates guidance", async () => {
+  it("/init refuses project inspection without bound source and patch authority", async () => {
     await fs.writeFile(path.join(tempDir, "package.json"), JSON.stringify({ name: "demo-pkg", scripts: { test: "vitest" } }), "utf8");
     const result = await runInitCommand([], { cwd: tempDir, sessionId: "sess_1" });
     expect(result.kind).toBe("local");
-    expect(result.output).toContain("Project Initialization & Architecture Inspection");
-    expect(result.output).toContain("demo-pkg");
+    expect(result.kind === 'local' ? result.output : '').toContain('requires a bound source-read and patch approval owner');
+    await expect(fs.access(path.join(tempDir, 'AGENTS.md'))).rejects.toThrow();
   });
 
   it("/cost counts nothing when no completion has been recorded", async () => {

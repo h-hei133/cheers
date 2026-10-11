@@ -146,7 +146,7 @@ async function buildPromptWithProjectMemoryInjection(input: {
           if (plan.invalidationReason) {
             injectionStateStore.markInvalid({ ...target, reason: plan.invalidationReason });
           } else {
-            injectionStateStore.markConsumed(target);
+            injectionStateStore.markConsumed({ ...target, provenance: plan.provenance });
           }
         },
       }

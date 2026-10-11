@@ -14,6 +14,7 @@ import { sessionThreadPath } from "../schema/sessionThread.js";
 import { readJsonFileWithRetry, writeJsonFileAtomic } from "./sessionFileStore.js";
 import type { SessionFileLayout } from "./sessionFileLayout.js";
 import { readStateSnapshotRequired, writeSessionState } from "./sessionStateStore.js";
+import { decodeContextEntries } from '../../context/attachment/entry.js';
 
 export function sessionExistsAtLayout(layout: Pick<SessionFileLayout, "sessionDir">): boolean {
   return fs.existsSync(layout.sessionDir);
@@ -57,6 +58,19 @@ export function writeSessionMetadataRecord(input: {
   readonly layout: Pick<SessionFileLayout, "metadataPath">;
 }): void {
   const metadata = projectSessionMetadata(input.session);
+  // Pinning is owned by session management, independent of an older live view.
+  // Creation and a concurrent catalog read can observe the metadata path
+  // between directory setup and its atomic publication. An optional read keeps
+  // that window equivalent to "no older pin"; a required read turns it into a
+  // false creation failure.
+  const current = readJsonFileWithRetry<SessionMetadata>(input.layout.metadataPath, {
+    required: false,
+    parseErrorDetail: "Failed to load session metadata",
+  });
+  if (current?.id === metadata.id && current.createdAt === metadata.createdAt) {
+    if (current.pinned === true) metadata.pinned = true;
+    else delete metadata.pinned;
+  }
   writeJsonFileAtomic(input.layout.metadataPath, metadata);
 }
 
@@ -159,6 +173,8 @@ export function projectLoadedSession(input: {
   }
   return {
     id: metadata.id,
+    ...(input.state.contextSelection === undefined ? {} : { contextSelection: input.state.contextSelection }),
+    ...(input.state.contextAttachments === undefined ? {} : { contextAttachments: decodeContextEntries(input.state.contextAttachments) }),
     ...([input.state.goal, input.state.plan, input.state.goalDraft, input.state.goalAcceptance, input.state.advisor, input.state.research, input.state.gitWorkflow, input.state.security, input.state.jobs].some(value => value !== undefined)
       ? { hasPlanningState: true } : {}),
     ...(input.state.workspaceRoots !== undefined ? { workspaceRoots: decodeWorkspaceRoots(input.state.workspaceRoots) } : {}),
@@ -177,6 +193,7 @@ export function projectLoadedSession(input: {
       ? { gitRoot: metadata.gitRoot?.trim() || null }
       : {}),
     title: metadata.title,
+    ...(metadata.pinned === true ? { pinned: true } : {}),
     ...(metadata.parentSession ? { parentSession: metadata.parentSession } : {}),
     createdAt: metadata.createdAt,
     updatedAt: metadata.updatedAt,

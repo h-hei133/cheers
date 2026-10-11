@@ -30,12 +30,14 @@ export interface RunCliPrintModeRouterInput {
   ) => void;
   /** Passed through so a scripted `/permissions` writes the same trust store. */
   readonly approvalTrustPolicy: ApprovalTrustPolicy;
+  readonly stopRequested?: () => boolean;
 }
 
 export async function runCliPrintModeRouter(
   input: RunCliPrintModeRouterInput,
 ): Promise<boolean> {
   const runtimeInput = {
+    stopRequested: input.stopRequested,
     mcpGateway: input.bootstrapRuntime.mcpGateway,
     sessionManager: input.bootstrapRuntime.sessionManager,
     runtimeContext: input.bootstrapRuntime.runtimeContext,

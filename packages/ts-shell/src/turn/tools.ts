@@ -19,6 +19,9 @@ import { preparationContext, preparationPermission } from './preparation.js';
 import { bindExecutionTarget, executionApprovalPreview } from '../runtime/execution/binding.js';
 import { assertSourceAccess } from '../core/query/sourcePolicy.js';
 import { EditOperationError } from '../edit/recovery/operation/write.js';
+import { createComponentLogger } from "../observability/structuredLogger.js";
+
+const traceLogger = createComponentLogger("tool-call");
 
 /** A tool definition in the shape a chat completion request takes. */
 export interface ToolSchema {
@@ -143,6 +146,8 @@ async function executeTool(
   onUpdate?: (partialResult: unknown) => void,
 ): Promise<AgentToolResult> {
   let streamed = "";
+  const startedAt = Date.now();
+  traceLogger.info("tool call started", { toolCallId, tool: tool.name, requestId: options.correlationId });
   try {
     const blocked = options.admission?.();
     if (blocked) throw new Error(blocked);
@@ -200,6 +205,7 @@ async function executeTool(
       },
     });
     const output = result.output ?? result.content ?? (streamed ? boundText(streamed) : undefined);
+    traceLogger.info("tool call completed", { toolCallId, tool: tool.name, requestId: options.correlationId, success: result.success, durationMs: Math.max(0, Date.now() - startedAt) });
     return {
       output: result.success ? output ?? "Success"
         : [result.error, output].filter(Boolean).join("\n") || "Tool failed.",
@@ -208,6 +214,7 @@ async function executeTool(
       ...(result.images ? { images: result.images } : {}),
     };
   } catch (error) {
+    traceLogger.warn("tool call failed", { toolCallId, tool: tool.name, requestId: options.correlationId, error: error instanceof Error ? error.message : String(error) });
     return { output: [streamed ? boundText(streamed) : "", `Tool execution error: ${error instanceof Error ? error.message : String(error)}`].filter(Boolean).join("\n"), isError: true,
       ...(error instanceof EditOperationError ? { metadata: { operationId: error.operationId, status: error.status } } : {}) };
   } finally { discardToolCall(args); }

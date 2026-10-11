@@ -7,6 +7,8 @@ import type { WorkflowGitContext } from '../../workflow/gitContext.js'
 import path from 'node:path'
 import { forgetSessionTodos, replayTodosFromMessages } from '../commands/todoCommandRuntime.js'
 import { restoreSessionUsage } from '../../observability/usageTelemetry.js'
+import type { CommandContext } from '../commands/types.js'
+import type { ContextEntry } from '../../context/attachment/entry.js';
 
 export interface ActiveSessionIdentity {
   readonly sessionId: string
@@ -77,6 +79,15 @@ export interface ShellRuntimeContext {
   session: Session
   activeSession: ActiveSessionIdentity
   resumeProvenance?: SessionResumeProvenance;
+  /** Host-owned command bridges installed after runtime composition. */
+  ruleControlsCommand?: CommandContext['ruleControlsCommand'];
+  forceTool?: CommandContext['forceTool'];
+  consumeForcedTool?: () => string | undefined;
+  contextAttachments?: readonly ContextEntry[];
+  transientContextAttachments?: readonly ContextEntry[];
+  freshState?: CommandContext['freshState'];
+  restart?: import('../commands/restart/contract.js').RestartPort;
+  startupArgs?: readonly string[];
 }
 
 export interface ShellSubstrateTransition {
@@ -150,6 +161,7 @@ export function createShellRuntimeContext(input: {
       sessionId: input.session.id,
       sessionProjectDir: input.projectRoot,
     },
+    ...(input.session.contextAttachments ? { contextAttachments: input.session.contextAttachments } : {}),
     ...(input.resumeProvenance
       ? { resumeProvenance: input.resumeProvenance }
       : {}),
@@ -224,6 +236,8 @@ export function applyShellSubstrateTransition(
   context.rootBindingDiagnostics = nextRootBindingDiagnostics
   context.gitContext = nextGitContext
   context.session = nextSession
+  context.contextAttachments = nextSession.contextAttachments
+  context.transientContextAttachments = undefined
   context.workspaceRevision = (context.workspaceRevision ?? 0) + 1
   context.workspaceIssue = undefined
   context.configuration.transition(configurationBinding(context));

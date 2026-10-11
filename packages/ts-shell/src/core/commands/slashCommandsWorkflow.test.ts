@@ -5,7 +5,8 @@ import os from "node:os";
 import { runGoalCommand } from "./goalCommandRuntime.js";
 import { runLoopCommand } from "./loopCommandRuntime.js";
 import { runTodoCommand, getSessionTodos } from "./todoCommandRuntime.js";
-import { runFastCommand, isFastModeEnabled, setFastModeEnabled } from "./fastCommandRuntime.js";
+import { runFastCommand } from "./fastCommandRuntime.js";
+import { readProjectState } from '../state/projectState.js';
 import { runContextCommand } from "./contextCommandRuntime.js";
 import { runBtwCommand } from "./btwCommandRuntime.js";
 import { routeSlashCommand } from "./slashRouter.js";
@@ -24,7 +25,6 @@ describe("Phase 5 High-Level Workflow Commands Subsystem", () => {
     realProfile = process.env.USERPROFILE;
     process.env.HOME = tempDir;
     delete process.env.USERPROFILE;
-    setFastModeEnabled(tempDir, false);
   });
 
   afterEach(async () => {
@@ -117,16 +117,13 @@ describe("Phase 5 High-Level Workflow Commands Subsystem", () => {
   });
 
   describe("/fast command", () => {
-    it("toggles fast mode on and off", async () => {
+    it("requires a selected session model before changing a provider tier", async () => {
       const onRes = await runFastCommand(["on"], { cwd: tempDir });
-      expect(onRes.output).toContain("Fast mode is on");
-      // What it changes is sampling, not which model answers.
-      expect(onRes.output).not.toMatch(/Model Routing/);
-      expect(isFastModeEnabled(tempDir)).toBe(true);
+      expect(onRes.output).toContain('requires an active session');
 
       const offRes = await runFastCommand(["off"], { cwd: tempDir });
-      expect(offRes.output).toMatch(/fast mode is off/i);
-      expect(isFastModeEnabled(tempDir)).toBe(false);
+      expect(offRes.output).toContain('requires an active session');
+      expect(readProjectState(tempDir).fastSampling).toBeUndefined();
     });
   });
 

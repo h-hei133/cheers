@@ -5,6 +5,8 @@ import type { PromptAttachments } from "../../core/shell/sessionRuntime.js";
 import type { Interface as ReadlineInterface } from "node:readline";
 
 import { toolPoolFor } from "../runtime/tools.js";
+import { dataTransferFor } from '../data/transfer.js';
+import { sessionCommandFor } from '../runtime/sessionCommands.js';
 import { goalCommandFor, goalPolicyFor } from '../runtime/goal.js';
 import { queueCommandFor } from '../runtime/inputQueue.js';
 import { advisorCommandFor } from '../runtime/advisor.js';
@@ -33,6 +35,7 @@ import {
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
 import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { SessionManager } from "../../session/SessionManager.js";
+import { readSessionNavigation } from '../../session/query/navigation.js';
 import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import {
   buildCliCommandExecution,
@@ -62,6 +65,9 @@ import { reportWriter } from '../output/reports.js';
 import type { ShellActionResult } from '../../core/commands/types.js';
 
 export interface InteractiveCommandRouterInput {
+  readonly freshState?: import('../../core/commands/types.js').CommandContext['freshState'];
+  readonly ruleControlsCommand?: import('../../core/commands/types.js').CommandContext['ruleControlsCommand'];
+  readonly forceTool?: import('../../core/commands/types.js').CommandContext['forceTool'];
   readonly promptMetadata?: Record<string, unknown>;
   readonly prompt: string;
   /** Images the draft referred to; carried beside the text, not inside it. */
@@ -138,6 +144,13 @@ export async function routeInteractiveCommand(
   const themeBefore = defaultTheme.colorRevision;
 
   const resolved = await buildCliCommandExecution({
+    freshState: input.freshState ?? input.runtimeContext.freshState,
+    restart: input.runtimeContext.restart,
+    startupArgs: input.runtimeContext.startupArgs,
+    sessionCommand: sessionCommandFor({ runtimeContext: input.runtimeContext, sessionManager: input.sessionManager, sessionRuntime: input.sessionRuntime, dataTransfer: dataTransferFor(input.runtimeContext) }),
+    dataTransfer: dataTransferFor(input.runtimeContext),
+    ruleControlsCommand: input.ruleControlsCommand ?? input.runtimeContext.ruleControlsCommand,
+    forceTool: input.forceTool ?? input.runtimeContext.forceTool,
     goalCommand: goalCommandFor(input.runtimeContext, input.sessionManager),
     queueCommand: queueCommandFor(input.runtimeContext, input.sessionRuntime),
     advisorCommand: advisorCommandFor(input.runtimeContext, input.sessionManager, input.sessionRuntime, input.renderer),
@@ -279,9 +292,13 @@ export async function routeInteractiveCommand(
     // would have them type into the wrong conversation.
     const sourceId = slashResult.sessionId ?? input.runtimeContext.session.id;
     try {
+      if (input.sessionRuntime.getCurrentRunController() !== null) throw new Error('Wait for the current turn before forking.');
+      const point = slashResult.entryId === undefined ? undefined
+        : readSessionNavigation(sourceId, input.runtimeContext.projectRoot).points.find(item => item.entryId === slashResult.entryId && item.prompt !== undefined && !item.unavailable);
       const forked = input.sessionManager.fork(
         sourceId,
         input.runtimeContext.projectRoot,
+        { entryId: slashResult.entryId },
       );
       switchRuntimeSessionProjectContext(input.runtimeContext, forked);
       renderProjectedLines(input.renderer, [
@@ -293,6 +310,8 @@ export async function routeInteractiveCommand(
         refreshPromptChrome: true,
         refreshMcpGateway: true,
         sessionOpened: true,
+        ...(point?.prompt === undefined ? {} : { navigation: { status: 'changed' as const, changed: true,
+          output: 'The fork ends before the selected saved message, which is now an editable draft. Reattach any media before sending a new ordinary turn.', draft: point.prompt } }),
         ...(themeChanged ? { themeChanged: true } : {}),
       };
     } catch (error) {

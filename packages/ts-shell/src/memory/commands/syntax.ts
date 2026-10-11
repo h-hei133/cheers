@@ -34,6 +34,13 @@ export const memoryUseSyntax: CommandSyntax = { name: "memory", actions: use };
 export const memorySyntax: CommandSyntax = {
   name: "memory", defaultAction: "list",
   actions: [
+    { name: "view", summary: "show versioned knowledge and admitted injection provenance", parameters: [{ name: "record-id", kind: "text" }], flags: [] },
+    { name: "diagnose", summary: "inspect actual project-memory persistence health", flags: [] },
+    { name: "queue", summary: "show the current memory maintenance and approval queue", flags: [] },
+    { name: "enqueue", summary: "queue a statement for review without saving it", parameters: [{ name: "statement", kind: "text", required: true, rest: true }] },
+    { name: "sync", summary: "refresh the local review queue without approving or saving", flags: [] },
+    { name: "import", summary: "import bounded versioned knowledge into the review queue", parameters: [{ name: "path", kind: "text", required: true }], flags: [] },
+    { name: "export", summary: "export versioned active knowledge after file-write approval", parameters: [{ name: "path", kind: "text", required: true }], flags: [] },
     { name: "inspect", aliases: ["stats"], summary: "inspect retained facts and storage statistics", flags: [] },
     { name: "add", aliases: ["retain"], summary: "explicitly retain a fact", parameters: [{ name: "statement", kind: "text", required: true, rest: true }] },
     ...review, ...recall, ...use, ...lifecycle, ...save,

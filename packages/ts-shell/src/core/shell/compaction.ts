@@ -1,4 +1,5 @@
 import { markContextUnknown } from "../../observability/usageTelemetry.js";
+import { selectModelContext } from '../../session/context/selection.js';
 import { defaultHookDispatcher, type HookDispatcher } from "../hooks/hookDispatcher.js";
 import { recordCompactionCheckpoint } from "../../context/compact/checkpoint/compactionCheckpoint.js";
 import type { CompactLiveCheckpointStore } from "../../context/compact/checkpoint/compactLiveCheckpoint.js";
@@ -175,7 +176,7 @@ function declineOutcome(reason: CompactionDecline): CompactionOutcome {
 }
 
 export async function compactSessionHistory(input: CompactionInput): Promise<CompactionOutcome> {
-  const turns = input.store.getSession(input.sessionId)?.turns ?? [];
+  const turns = selectModelContext(input.store.getSession(input.sessionId));
   const reason = input.reason ?? "manual";
   const lifecycle = buildCompactionLifecycle({
     ...(input.hooks ? { hooks: input.hooks } : {}),

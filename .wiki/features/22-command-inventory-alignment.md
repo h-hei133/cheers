@@ -345,3 +345,7 @@ refNoToken = ref.filter(command => intersection(token(command), oursTokens).size
 `/git` 裸入口打开现有 panel；显式 `status` 返回原生状态，`diff <staged|unstaged|untracked> <path>` 共用 split report，`stage|unstage <path> [hunkId]` 绑定原始版本。`commit <message>`、`branch create|switch|delete <name>`、`merge <branch>`、`push <remote> <refs/heads/branch>` 各自进入普通审批，`reconcile <operationId>` 另行批准精确远端查询。`review [focus]` 共用逐请求只读审查，`goal` 转给现有 goal owner。
 
 `/wt list|create <path> <branch>|migrate <path> <branch>|switch <path>|delete <path>` 与 `/worktree` alias 共用同一 owner。`/commit [guidance]` 的模型仅拟提交消息；host commit ID、原始 staged index、普通审批和原生 tree/parent/hash 读回决定实际结果。仅有原生 metadata/status 的受限路径显式显示 limited，diff/review/commit evidence/migration 需要当前 source read grants；nested 全仓迁移需要已有父仓 read root。收据保存 unknown 不抹去已发生的原生结果。能力边界及最终验收状态见 [Phase 19 §8.123](phase-19-decisions.md#8123-w9-git-01–04原生-git-工作台与保留源改动的迁移)。原始注册计数仍作为规划基线。
+
+## 11. W15 命令控制实施补充（2026-10-11）
+
+PAR-01–05已接通session pin/history/open/shake/历史fork与受限附件、todo编辑/批准文件传输、memory review/save/use及实际admitted provenance、session preset/服务tier/skillful/window/fresh/auth快捷、debug/trace/restart/changelog、exact规则proposal/apply及retained安全finding修复复测。它们复用原session/权限/patch/执行/配置/observability owner。restart为同OS进程runtime重入，changelog为授权项目notes与installed version label比对，quota/account支持未知；规则提案startup-local、收据durable。完整语法、正常/拒绝/unknown/恢复及最终验收见[命令控制文档](command-controls.md)与[Phase19 §8.140](phase-19-decisions.md#8140-w15-par-01–05会话上下文与运行时命令闭环)。原始注册计数及“新增”处置仍作为规划基线；本补充提供对应实施事实，不据此宣布全Phase19/完整NormProof/远端CI已通过。

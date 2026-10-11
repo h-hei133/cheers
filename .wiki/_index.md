@@ -28,6 +28,7 @@ Last updated: 2026-10-10
 - [Persistent worker coordination](features/director.md)
 - [Fixed evaluator improvement workflow](features/improve.md)
 - [Live voice and local terminal recording](features/media.md)
+- [Session and runtime command controls](features/command-controls.md)
 - [Feature and defect register](features/13-feature-and-defect-register.md)
 - [All Sources](raw/_index.md)
 - [Concepts](wiki/concepts/_index.md)

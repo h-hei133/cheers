@@ -31,6 +31,7 @@ it.each(["..", ".", " ../outside ", "a/b", "a\\b"])("rejects unsafe fork session
 it("keeps fork here and bare switching separate and rejects routed fork extras", async () => {
   expect(await routeSlashCommand("/fork here extra", context)).toMatchObject({ kind: "local" });
   expect(await routeSlashCommand("/fork here", context)).toEqual({ kind: "shell-action", action: "fork-session" });
+  expect(await routeSlashCommand('/fork here --from saved-user', context)).toEqual({ kind: 'shell-action', action: 'fork-session', entryId: 'saved-user' });
   expect(await routeSlashCommand('/resume switch "My session title"', context)).toMatchObject({ action: "list-sessions", sessionId: "My session title" });
   expect(await runResumeCommand(["USE", "sess_Target"], context)).toMatchObject({ action: "list-sessions", sessionAction: "switch", sessionId: "sess_Target" });
 });
@@ -45,6 +46,22 @@ it('shares direct lifecycle commands with the session grammar and rejects invali
   for (const command of ['/delete', '/delete first extra', '/delete --yes first', '/rename --force title', '/new extra', '/session new extra', '/session delete', '/session rename']) {
     expect(await routeSlashCommand(command, context)).toMatchObject({ kind: 'local', output: expect.stringMatching(/Invalid|does not accept/) });
   }
+});
+
+it('routes session parity commands through the bound session owner', async () => {
+  const sessionCommand = vi.fn(async (name: string, args: string[]) => ({ kind: 'local' as const, output: `${name}:${args.join('|')}` }));
+  const context = { cwd: process.cwd(), sessionId: 'sess_navigation_owner', sessionCommand };
+  expect(await routeSlashCommand('/history export out.json', context)).toEqual({ kind: 'local', output: 'history:export|out.json' });
+  expect(await routeSlashCommand('/session history list', context)).toEqual({ kind: 'local', output: 'history:list' });
+  expect(await routeSlashCommand('/session shake apply images', context)).toEqual({ kind: 'local', output: 'shake:apply|images' });
+  expect(await routeSlashCommand('/open 1', context)).toEqual({ kind: 'local', output: 'open:1' });
+  expect(await routeSlashCommand('/resume open 2', context)).toEqual({ kind: 'local', output: 'open:2' });
+  expect(await routeSlashCommand('/open LIST', context)).toEqual({ kind: 'local', output: 'open:LIST' });
+  expect(sessionCommand).toHaveBeenCalledTimes(6);
+  for (const command of ['/pin here on extra', '/history export out.json extra', '/import source.json extra', '/shake restore extra', '/resume history list out.json', '/resume open list extra', '/session shake restore elide']) {
+    expect(await routeSlashCommand(command, context)).toMatchObject({ kind: 'local', output: expect.stringContaining('Invalid') });
+  }
+  expect(sessionCommand).toHaveBeenCalledTimes(6);
 });
 
 it.each([ ["tree", "entry", "extra"], ["cursor", "extra"], ["help", "extra"], ["--unknown"] ])("does not read entries for malformed arguments: %j", async (...args) => {
@@ -70,7 +87,7 @@ it("projects real actions and the current-session fork target only where legal",
   expect(values(resumeSyntax, "fork h")).toEqual(["here"]);
   expect(values(forkSyntax, "h")).toEqual(["here"]);
   expect(values(resumeSyntax, "current ")).toEqual([]);
-  expect(values(forkSyntax, "here ")).toEqual([]);
+  expect(values(forkSyntax, "here ")).toEqual(['--from']);
   expect(values(entriesSyntax, "")).toEqual(["tree", "help"]);
   expect(values(treeSyntax, "--h")).toEqual(["--help"]);
 });

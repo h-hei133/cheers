@@ -105,7 +105,7 @@ describe("shared syntax projections", () => {
         expect(command.argumentHint).toContain(action.name);
         for (const name of [action.name, ...(action.aliases ?? [])]) {
           expect(command.getArgumentCompletions?.(name)?.map(item => item.value)).toContain(name);
-          const args = action.name === "add" ? ["text"] : action.parameters?.length ? ["1"] : [];
+          const args = action.name === "edit" ? ['1', 'text'] : action.name === "add" ? ["text"] : action.parameters?.length ? ["1"] : [];
           expect(parseSyntax(syntax, [name, ...args])).toMatchObject({ ok: true, action });
         }
       }

@@ -17,6 +17,7 @@ import { renderCatalog } from "../models/catalogSurface.js";
 import { resolveProviderCredential } from "../shell/providerCredentials.js";
 import { configurationApplicationNotice } from "./configuration.js";
 import { needsUserEndpoint, providerFacts } from "../providers/facts.js";
+import { runModelPresetCommand } from './model/presetCommand.js';
 
 
 /**
@@ -60,6 +61,10 @@ export async function runModelCommand(
         "An entry with a known provider id patches it — a different base URL, extra models, a different key variable. An unknown id adds a provider outright.",
       ].join("\n"),
     };
+  }
+
+  if (action === "preset" || action === "presets") {
+    return runModelPresetCommand(rest, context);
   }
 
   if (action === "list" || action === "ls") {

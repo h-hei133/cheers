@@ -103,6 +103,8 @@ export interface EndpointShape {
    * have.
    */
   readonly turnBody: (input: TurnRequest) => Record<string, unknown>;
+  /** Exact values emitted by this wire adapter; model support is checked separately. */
+  readonly serviceTiers?: readonly string[];
   /** Lower only output controls for a captured prefix; absent means not replayable. */
   readonly refreshBody?: (body: Record<string, unknown>, model: {
     readonly reasoning?: boolean;
@@ -191,6 +193,8 @@ export interface TurnRequest {
   readonly maxTokensField: "max_tokens" | "max_completion_tokens";
   /** Whether a synthetic assistant turn bridges tool results and a user turn. */
   readonly assistantAfterToolResult: boolean;
+  /** Provider service tier selected by the session, when supported. */
+  readonly serviceTier?: string;
 }
 
 /**

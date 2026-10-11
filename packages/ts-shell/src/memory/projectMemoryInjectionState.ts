@@ -1,4 +1,5 @@
 import { RetainedMap, retainHistory, retentionCapacity, type RetentionState, type RetentionStatus } from "../core/state/retention.js";
+import type { MemoryInjectionProvenance } from "./knowledge/provenance.js";
 
 export const MEMORY_INJECTION_LIMITS = { sessions: 128, history: 256, diagnostics: 256 } as const;
 
@@ -29,6 +30,8 @@ export interface ProjectMemoryInjectionState extends RetentionState {
   readonly createdAt?: string;
   readonly injectedAt?: string;
   readonly consumedAt?: string;
+  /** Exact model-facing payload admitted to a normal prompt; staging has no payload. */
+  readonly provenance?: MemoryInjectionProvenance;
   readonly supersededInjectionIds: readonly string[];
   readonly warnings: readonly ProjectMemoryInjectionWarning[];
   readonly redactions: readonly string[];
@@ -77,6 +80,7 @@ export interface MarkProjectMemoryInjectionConsumedInput {
   readonly sessionScopeId: string;
   readonly memoryInjectionId: string;
   readonly consumedAt?: string;
+  readonly provenance?: MemoryInjectionProvenance;
 }
 
 export interface MarkProjectMemoryInjectionInvalidInput {
@@ -184,6 +188,7 @@ export function createProjectMemoryInjectionStateStore(
         ...injected,
         injectionStatus: "consumed",
         consumedAt: input.consumedAt ?? now(),
+        provenance: input.provenance,
         evidence: [...injected.evidence, "project-memory-injection-state:consumed"],
       });
     },
