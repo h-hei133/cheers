@@ -2098,3 +2098,24 @@ Git 配置逐文件准入，包含 common/worktree config、index/sharedindex、
 镜像为每次请求增加 O(n) 元数据/占位文件工作。50 目录、三次运行中位数：1000 文件 Git 私有视图 793.10ms、ripgrep 私有视图 568.73ms；5000 文件分别 2791.29ms、2098.29ms，同场直接 Git/ripgrep 为 14.50/13.80ms，返回名称逐项一致。材料 `.tmp/native-read/final/benchmark-results.json`；这不是正文搜索或真实大仓基准，也不能宣称性能不变。
 
 SAFE-02 继续开放同步 discovery 并发替换、非 Linux 实际对象绑定及镜像性能；外部 linked metadata 和 `hasconfig:` 条件明确拒绝，未证明跨进程文件内容稳定。系统加载器运行环境不是逐文件 deny 的全 OS 隔离证明。W7-33、用户前端和真实外部服务仍开放，Phase19 全目标 active。源码提交/推送与本批精确 SHA CI 另行取证，W16 历史账单失败不替代新提交 CI。
+
+该组件已提交/推送 `72374db9098ff7eabce07112271f719f2e59a531`，远端分支读回同 SHA。精确 CI 38280517934/job 114916398458 与 Watch 38280517938/job 114916398656 均 completed/failure、steps=[]；分别读取的 annotations 确认付款/spending-limit 阻止启动，没有远端验证通过。材料 `.tmp/native-read/final/delivery.json`。
+
+### 8.143 SAFE-02：原生枚举性能与清理边界
+
+私有视图继续保留逐路径准入、已核验 metadata 和 child 完成收据。优化位于原 owner：[路径包含检查](../../packages/ts-shell/src/core/security/pathJail.ts)在 Linux 每次使用原生 realpath，失败时仍尝试原 JavaScript 解析；缺失后代仍追加到最深现存祖先，不缓存路径授权。定向参考比较后采用原生解析，保留本项目原有回退契约，实际 symlink 重定向与原生失败回归约束这项选择。
+
+[镜像树](../../packages/ts-shell/src/runtime/execution/view/tree.ts)只对已准入名称的空占位文件采用每批最多 8 个写入。metadata 正文捕获和原生执行顺序保持原 owner。整批 allSettled 后才报告失败/取消并清理，批次前后仍检查同一遍历预算；并发最多增加到 8 个占位写入，条目/目录/字节/深度/时间上限未放大。
+
+预设性能门槛为同场 5000 文件的 Git/ripgrep 中位数均改善至少 25%，名称逐项匹配。新 Node20.3 基线的剖析在两条路径分别记录 41244/20968 次 JavaScript realpath、1.10s/0.67s；串行空文件写入累计等待 0.78s/0.75s。仅切换原生解析改善 18.65%/13.79%，没有达到门槛；加入有界占位批次后达到以下结果。每组 50 目录、3 次，均严格匹配直接原生工具返回的名称。
+
+| 文件数 | Git 基线/优化后 | 改善 | rg 基线/优化后 | 改善 |
+|---:|---:|---:|---:|---:|
+| 1000 | 835.36/584.46ms | 30.03% | 597.11/382.90ms | 35.87% |
+| 5000 | 2761.69/1668.29ms | 39.59% | 2140.32/1267.66ms | 40.77% |
+
+本地 Node20.3 **29 文件/370 项**、两种构建、四个源码门通过；完整 NormProof exit0，未解析与混合环 satisfied，4 项既有函数数量 advisory 保持 partial。两个隔离反转均触发真实 AssertionError：移除 JavaScript 回退误放行逃逸路径；提前失败的批次等待在 7 个写入尚未结束时开始清理。Node/单文件实际 print grep 四条工具链共 **8 次合成 POST**通过，包含超过一批的占位名称，原文件字节保持。最初 Node20.3 的 tsx 调用方式错误已按 harness 分类并改为基线同一 CLI 入口，不计成功。
+
+独立 code **APPROVE**（38 项及别名/零普通正文打开探针），architecture **WATCH**（135 项及 2 个探针）覆盖同一 4 TS/2 production 冻结；真实 ulimit64 的 EMFILE 反例确认最多 8 个写入、全部结算、清理开始时零活跃写入。综合 **COMMENT**：残余 O(n) 镜像成本仍约 1.67s/1.27s，未宣称真实大仓、高并发或正文搜索性能。材料 `.tmp/native-read/performance/{contract.json,comparison.json,acceptance.json,review-code.md,review-architecture.md}`。
+
+本批仅降低已测枚举成本；同步 discovery 竞态、非 Linux 对象绑定、外部 metadata/hasconfig、跨进程正文稳定及其余外部验收仍开放，SAFE-02/Phase19 全目标 active。新提交/推送/精确 SHA CI 单独取证，不能继承起点提交的远端结论。

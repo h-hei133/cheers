@@ -1,4 +1,4 @@
-import fs from 'node:fs';
+import fs, { promises as fsp } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -6,6 +6,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { listWorkspaceFiles, listDirectoryEntries } from '../fileWalk.js';
 import { listWorkspaceFilesViaGit, loadIgnoredViaGit, listIgnoredViaGit } from '../ignoreRules.js';
 import { searchWithRipgrep, forgetRipgrepBinary } from '../../../core/tools/grepRipgrep.js';
+import { withNativeReadView } from './index.js';
+import { WalkBudget } from '../walk/budget.js';
 
 let fixture: string;
 let root: string;
@@ -21,6 +23,49 @@ function git(...args: string[]): void {
   execFileSync('git', ['-C', root, ...args], { env: { PATH: process.env.PATH, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' } });
 }
 const linux = it.skipIf(process.platform !== 'linux');
+
+it.each(['failure', 'cancel'])('settles a bounded placeholder batch before %s cleanup', async scenario => {
+  for (let index = 0; index < 18; index++) fs.writeFileSync(path.join(root, `item-${index}.txt`), 'source bytes');
+  const controller = new AbortController();
+  const writeFile = fsp.writeFile;
+  const remove = fsp.rm;
+  let active = 0;
+  let maximum = 0;
+  let attempted = 0;
+  let settled = 0;
+  let cleanupActive: number | undefined;
+  let mirror = '';
+  const writes = vi.spyOn(fsp, 'writeFile').mockImplementation(async (...args) => {
+    expect(args[1]).toBe('');
+    const index = attempted++;
+    maximum = Math.max(maximum, ++active);
+    try {
+      if (index === 0 && scenario === 'failure') throw new Error('placeholder failed');
+      if (index === 0 && scenario === 'cancel') controller.abort(new Error('placeholder cancelled'));
+      await new Promise<void>(resolve => setImmediate(resolve));
+      await writeFile(...args);
+    } finally { active--; settled++; }
+  });
+  const cleanup = vi.spyOn(fsp, 'rm').mockImplementation(async (...args) => {
+    if (args[0] === mirror) cleanupActive = active;
+    return remove(...args);
+  });
+  try {
+    const pending = withNativeReadView({ root, assertFileAccess: () => {}, abortSignal: controller.signal,
+      budget: new WalkBudget(controller.signal) }, async (sources, _plan, materialize) => {
+      mirror = sources.mirror;
+      await materialize({ native: 'search' });
+    });
+    await expect(pending).rejects.toThrow(scenario === 'failure' ? 'placeholder failed' : 'placeholder cancelled');
+    expect(maximum).toBeGreaterThan(1);
+    expect(maximum).toBeLessThanOrEqual(8);
+    expect(attempted).toBeLessThanOrEqual(8);
+    expect(settled).toBe(attempted);
+    expect(cleanupActive).toBe(0);
+    expect(fs.existsSync(mirror)).toBe(false);
+    expect(fs.readFileSync(path.join(root, 'item-0.txt'), 'utf8')).toBe('source bytes');
+  } finally { writes.mockRestore(); cleanup.mockRestore(); }
+});
 
 linux('keeps tracked exceptions, nested rules, and literal names under native metadata isolation', async () => {
   git('init', '-q');

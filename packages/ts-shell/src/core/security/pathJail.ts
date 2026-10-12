@@ -1,6 +1,17 @@
 import path from "node:path";
 import fs from "node:fs";
 
+function canonicalPath(target: string): string {
+  if (process.platform === "linux") {
+    try {
+      return fs.realpathSync.native(target);
+    } catch {
+      // Keep the JavaScript resolver for filesystems the native resolver cannot handle.
+    }
+  }
+  return fs.realpathSync(target);
+}
+
 /**
  * The real path of the deepest ancestor of `target` that exists, with the
  * not-yet-existing remainder appended.
@@ -18,7 +29,7 @@ function realpathOfDeepestExisting(target: string): string | undefined {
   for (;;) {
     if (fs.existsSync(current)) {
       try {
-        return path.join(fs.realpathSync(current), ...remainder.reverse());
+        return path.join(canonicalPath(current), ...remainder.reverse());
       } catch {
         return undefined;
       }
@@ -81,7 +92,7 @@ export function verifyPathContainment(
     const realTarget = realpathOfDeepestExisting(resolvedTarget);
     if (realTarget !== undefined) {
       const realWorkspace = fs.existsSync(normalizedWorkspace)
-        ? fs.realpathSync(normalizedWorkspace)
+        ? canonicalPath(normalizedWorkspace)
         : normalizedWorkspace;
       const realRelative = path.relative(realWorkspace, realTarget);
       const isRealContained = realRelative !== ".." && !realRelative.startsWith(`..${path.sep}`) && !path.isAbsolute(realRelative);

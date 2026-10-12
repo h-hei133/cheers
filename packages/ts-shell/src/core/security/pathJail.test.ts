@@ -1,4 +1,4 @@
-import { afterAll, describe, it, expect } from "vitest";
+import { afterAll, describe, it, expect, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -66,5 +66,47 @@ describe("a write through a symlinked directory", () => {
   it("still allows a new file in a directory that is really inside", () => {
     const res = verifyPathContainment(path.join(workspace, "deep", "nested", "a.html"), workspace);
     expect(res.allowed).toBe(true);
+  });
+
+  it("checks a retargeted ancestor afresh through a symlinked workspace", () => {
+    const alias = path.join(realRoot, "alias");
+    const safe = path.join(workspace, "safe");
+    const link = path.join(workspace, "changing");
+    fs.mkdirSync(safe);
+    fs.symlinkSync(workspace, alias);
+    fs.symlinkSync(safe, link);
+    const native = vi.spyOn(fs.realpathSync, "native");
+    try {
+      const target = path.join(alias, "changing", "missing", "new.html");
+      expect(verifyPathContainment(target, alias)).toMatchObject({
+        allowed: true,
+        resolvedPath: path.join(safe, "missing", "new.html"),
+      });
+      fs.unlinkSync(link);
+      fs.symlinkSync(outside, link);
+      expect(verifyPathContainment(target, alias)).toMatchObject({
+        allowed: false,
+        resolvedPath: path.join(outside, "missing", "new.html"),
+      });
+      if (process.platform === "linux") expect(native).toHaveBeenCalledWith(alias);
+    } finally {
+      native.mockRestore();
+    }
+  });
+
+  it.skipIf(process.platform !== "linux")("keeps containment checks when native resolution fails", () => {
+    const native = vi.spyOn(fs.realpathSync, "native").mockImplementation(() => {
+      throw new Error("Native resolution unavailable");
+    });
+    try {
+      expect(verifyPathContainment(path.join(workspace, "escape", "new.html"), workspace).allowed).toBe(false);
+      expect(verifyPathContainment(path.join(workspace, "deep", "new.html"), workspace)).toMatchObject({
+        allowed: true,
+        resolvedPath: path.join(workspace, "deep", "new.html"),
+      });
+      expect(native).toHaveBeenCalled();
+    } finally {
+      native.mockRestore();
+    }
   });
 });

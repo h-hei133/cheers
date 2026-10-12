@@ -20,6 +20,16 @@ export interface ViewSelection {
 interface Rules { readonly layers: readonly Ignore[]; readonly repository: boolean }
 const RULE_FILES = ['.gitignore', '.ignore', '.rgignore'];
 
+async function createPlaceholders(sources: ViewSources, files: string[]): Promise<void> {
+  if (!files.length) return;
+  sources.input.budget.check();
+  // Settle the whole bounded batch before reporting failure or removing the view.
+  const results = await Promise.allSettled(files.splice(0).map(destination =>
+    fsp.writeFile(destination, '', { mode: 0o600, flag: 'wx' })));
+  for (const result of results) if (result.status === 'rejected') throw result.reason;
+  sources.input.budget.check();
+}
+
 function entries(sources: ViewSources, directory: string, depth: number) {
   const { root, budget } = sources.input;
   budget.depth(depth); budget.take('directories', 1);
@@ -92,6 +102,7 @@ export async function materializeView(sources: ViewSources, selection: ViewSelec
   async function visit(directory: string, depth: number, rules: Rules): Promise<void> {
     await fsp.mkdir(sources.destination(directory), { recursive: true, mode: 0o700 });
     rules = await directoryRules(sources, directory, rules, selection);
+    const files: string[] = [];
     for (const entry of await entries(sources, directory, depth)) {
       budget.check();
       if (entry.name === '.git' || pruned.includes(entry.name)) continue;
@@ -105,15 +116,18 @@ export async function materializeView(sources: ViewSources, selection: ViewSelec
       if (entry.isDirectory()) {
         await fsp.mkdir(destination, { recursive: true, mode: 0o700 });
         if (selection.recursive === false || !selection.preserveIgnored && !trackedParents.has(relative) && ignored(rules, `${relative}/`)) continue;
+        await createPlaceholders(sources, files);
         await visit(target, depth + 1, rules);
       } else if (entry.isFile() && !fs.existsSync(destination)) {
-        await fsp.writeFile(destination, '', { mode: 0o600, flag: 'wx' });
+        files.push(destination);
+        if (files.length === 8) await createPlaceholders(sources, files);
       } else if (entry.isSymbolicLink() && !fs.existsSync(destination)) {
         // Preserve native no-follow enumeration. Explicit search targets are
         // canonicalized by the caller before selection.
         await sources.link(file, target);
       }
     }
+    await createPlaceholders(sources, files);
   }
   if (fs.statSync(selected).isDirectory()) await visit(selected, 0, inherited);
   else if (!fs.existsSync(sources.destination(selected))) await fsp.writeFile(sources.destination(selected), '', { mode: 0o600, flag: 'wx' });

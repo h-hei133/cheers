@@ -144,3 +144,22 @@ SAFE-02 下一步继续处理同步 discovery 竞态、非 Linux 对象绑定和
 | 5000 | 14.50ms | 2791.29ms | 13.80ms | 2098.29ms |
 
 材料 `.tmp/native-read/final/benchmark-results.json`；该测试只比较合成目录枚举，不证明正文搜索、真实大仓或高并发性能。镜像每次 O(n) 工作仍是实质成本。外部 linked worktree metadata、hasconfig 条件及非 Linux 原生视图保持明确拒绝；同步 discovery 的替换竞态、跨进程正文内容变化和系统加载器环境的完整 OS deny 仍无保证。SAFE-02 与 Phase19 继续 active，未从本批局部测试推断全仓、交互 PTY、真实 provider 或外部服务通过。提交/推送及本批精确 SHA CI 单独记录。
+
+该组件已提交/推送 `72374db9098ff7eabce07112271f719f2e59a531`，远端读回同 SHA。CI 38280517934/job 114916398458 与 Watch 38280517938/job 114916398656 均 completed/failure、steps=[]；annotations 确认付款/spending-limit 阻止启动，未计远端通过，材料 `.tmp/native-read/final/delivery.json`。
+
+## 8. SAFE-02 私有视图性能局部验收（2026-10-13）
+
+起点为 §7 提交，本批只修改 4 个 TS 文件、其中 2 个 production owner。Linux 路径包含检查每次使用原生 realpath 并保留 JavaScript 回退；空占位文件每批最多 8 个并发写入，全部结算后才报告失败/取消和清理。名称准入、metadata 捕获、私有挂载、完成收据及遍历总预算继续使用原机制。
+
+| 证据 | 实际结果 | 范围/材料 |
+|---|---|---|
+| 同场 Node20.3 基准 | 5000 文件 Git 2761.69→1668.29ms、rg 2140.32→1267.66ms；39.59%/40.77% 改善 | 50 目录、3 次中位数、1000/5000 文件名称逐项匹配；预设双路 25% 门槛通过，`.tmp/native-read/performance/comparison.json` |
+| 受影响组合 | 29 文件/370 项通过 | 路径/读写/私有视图/metadata/预算/清理/搜索/技能；`.tmp/native-read/performance/affected-final.log` |
+| 两种构建、静态门 | TS/单文件及四源码门通过；完整 judge exit0/partial | 未解析/混合环 satisfied，4 项既有 ceiling advisory；本批未重跑全仓套件或 scripts，`.tmp/native-read/performance/` |
+| 两类隔离反转 | 均出现真实 AssertionError，原源码未改动 | 去掉解析回退会误放行逃逸；提前失败的批次在 7 个活跃写入时清理，`reversal-*.log` |
+| 实际 print CLI | Node/单文件四条工具链、8 合成 POST 通过 | 超过一批的占位名称、有界搜索/排除匹配、本次 call ID、原文保留；`cli-smoke-results.json` |
+| 独立 code/architecture | APPROVE/WATCH，综合 COMMENT | 同一冻结；独立 38/135 项和别名/零正文打开/真实 EMFILE 探针，`review-code.md`、`review-architecture.md` |
+
+剖析与只切换原生解析的中间结果均保留，未把不足 25% 的结果称为达标。真实 ulimit64 反例观察到最多 8 个占位写入、8 个均结算、5 个 EMFILE，清理开始时零活跃写入且镜像已删除。当前冻结与用户 `.gitignore` 原 SHA 均复验一致；材料 `.tmp/native-read/performance/{inventory.json,acceptance.json}`。
+
+O(n) 镜像成本仍是 architecture WATCH，性能门槛通过不关闭 §5 的其余 SAFE-02 和外部边界，也不证明正文搜索、真实大仓、高并发、非 Linux 或全阶段完成。新提交/推送/精确 CI 单独记录，Phase19 保持 active。
