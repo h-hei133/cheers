@@ -6536,3 +6536,11 @@ manifest组件 `d589e8d02c5299f0de4a3a25169b9aea1a742540` 已提交/推送、10�
 实际child证明 native/fallback ignore 查询返回后改写规则仍发布旧技能。现有读owner在核验/关闭成功后报告metadata，原discovery扩展有界最早修订ledger，发布前复验实际捕获的manifest/ignore/Git config/index/别名；普通缺失与取消/resource/cleanup不混同，无正文重读或保留句柄。最终11TS/8production，Node20.3 14文件/224项、两构建/四源码门/完整judge通过，4既有ceiling advisory保持partial。两隔离反转均实际AssertionError；四actual print CLI stable两组共4合成POST，changed在ignore关闭和manifest读取后child改写、均exit1/零POST/零旧指令。继承外层仓库的首探针属harness且已修正，未计产品复现。材料 `.tmp/catalog-sources/`，详见[裁决 §8.147](features/phase-19-decisions.md)和[局部验收 §12](features/phase-19-acceptance.md)；未捕获来源/目录事务、平台与真实外部证据继续开放，Phase19 active，交付另验。
 
 独立code142项APPROVE、architecture156项CLEAR及各自child/owner/contribution检查通过，源码与用户`.gitignore`前后相符，综合APPROVE限本批。code早期tsx launcher与root-cwd测试选择错误已分类，未计失败/中止为验证通过。
+
+来源组件 `5416bc6c4d5fd8fade9b135ed58e3cdf3729bbab` 已提交/推送、14路径/blob审计通过，远端同SHA且用户`.gitignore`排除保持。CI38297427374/job114971784410、Watch38297427106/job114971783285均付款/spending-limit未启动、零步骤failure，无远端通过；材料 `.tmp/catalog-sources/{commit-audit.json,delivery.json}`。
+
+### 2026-10-13 — SAFE-02 本地 remote-URL 条件配置
+
+原config准入先捕获native无条件扫描的全部本地hasconfig依赖图，再由Git负责URL glob、worktree/优先级、间接remote URL禁止。新增回归发现非法config的128被当无仓库fallback；复用原inert config独立识别repo后再完整校验，拒绝该假完整结果。最终3TS/2production，Node20.3修复后10文件/170项、两构建/四源码门/完整judge通过，4既有ceiling advisory保持partial。两有效反转实际AssertionError；四actual print CLI共8合成POST、隐藏技能零泄漏、config/manifest与用户`.gitignore`原字节保持。首轮产品失败和首反转未捕获Error均保留，不计通过。详见[裁决 §8.148](features/phase-19-decisions.md)与[局部验收 §13](features/phase-19-acceptance.md)，材料 `.tmp/git-condition/`；外部metadata、非Linux、目录事务与真实外部证据继续开放，Phase19 active，交付另验。
+
+最终断言字节native文件36项复验通过，不与170相加；独立code APPROVE（相同生产66项、最终断言3项子集和四检查），architecture CLEAR（133项、最终native36项和parity/child/metadata-only/恢复失败检查），综合限本批APPROVE。两lane最终3路径哈希相符、无源码/测试/文档编辑，用户`.gitignore`保持；材料 `.tmp/git-condition/{review-code.md,review-architecture.md,tests-final-assertion.log}`。

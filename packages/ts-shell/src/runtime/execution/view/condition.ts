@@ -5,7 +5,8 @@ import { ViewSources, ViewSourceError } from './source.js';
 import { ReadCleanupError } from '../read.js';
 import type { GitMetadata } from './git.js';
 
-async function withInertConfiguration<T>(sources: ViewSources, metadata: GitMetadata, identity: string, consume: () => Promise<T>): Promise<T> {
+export async function withInertConfiguration<T>(sources: ViewSources, metadata: GitMetadata, consume: () => Promise<T>): Promise<T> {
+  const identity = randomUUID();
   const original = sources.destination(path.join(metadata.common, 'config'));
   const saved = `${original}.read-${identity}`;
   let moved = false;
@@ -27,8 +28,8 @@ async function withInertConfiguration<T>(sources: ViewSources, metadata: GitMeta
 /** Let Git evaluate its own wildmatch rules using an inert include target. */
 export async function conditionApplies(sources: ViewSources, metadata: GitMetadata, origin: string, condition: string,
   query: (args: readonly string[]) => Promise<string | null>): Promise<boolean> {
-  // These conditions require the complete remote-url config, including later
-  // files. Refuse them until that dependency graph can be admitted safely.
+  // Remote-URL conditions need the full scan-ahead graph. The configuration
+  // owner admits their dependencies before native evaluation, not this probe.
   if (condition.startsWith('hasconfig:')) throw new ViewSourceError();
   if (/[\r\n\0]/.test(condition)) throw new ViewSourceError();
   const identity = randomUUID();
@@ -38,7 +39,7 @@ export async function conditionApplies(sources: ViewSources, metadata: GitMetada
   try {
     await fs.writeFile(sources.destination(sentinel), '[readview]\nactive = true\n', { mode: 0o600, flag: 'wx' });
     await fs.writeFile(sources.destination(probe), `[includeIf "${quoted}"]\npath = .read-sentinel-${identity}\n`, { mode: 0o600, flag: 'wx' });
-    const output = await withInertConfiguration(sources, metadata, identity,
+    const output = await withInertConfiguration(sources, metadata,
       () => query(['config', '--includes', '--file', probe, '--show-origin', '--null', '--list']));
     if (output === null) throw new ViewSourceError();
     return output.split('\0').some(field => field === 'readview.active\ntrue');

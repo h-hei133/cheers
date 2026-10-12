@@ -93,6 +93,71 @@ linux('hydrates native include chains and their winning contained excludes file'
   expect(files).toContain('public.txt'); expect(files).not.toContain('hidden.tmp');
 });
 
+linux.each(['later-url', 'later-override', 'worktree-url'] as const)('preserves native remote-URL conditions with %s', async scenario => {
+  git('init', '-q');
+  const config = path.join(root, '.git/config');
+  const conditional = '[includeIf "hasconfig:remote.*.url:https://synthetic.invalid/**"]\npath=../conditional.config\n';
+  const remote = '[remote "origin"]\nurl=https://synthetic.invalid/team/project\n';
+  fs.writeFileSync(path.join(root, 'conditional.config'), '[include]\npath=final.config\n');
+  fs.writeFileSync(path.join(root, 'final.config'), '[core]\nexcludesFile=conditional.rules\n');
+  fs.writeFileSync(path.join(root, 'conditional.rules'), 'hidden.tmp\n');
+  fs.appendFileSync(config, conditional);
+  if (scenario === 'worktree-url') {
+    fs.appendFileSync(config, '[extensions]\nworktreeConfig=true\n');
+    fs.writeFileSync(path.join(root, '.git/config.worktree'), remote);
+  } else fs.appendFileSync(config, remote);
+  if (scenario === 'later-override') {
+    fs.appendFileSync(config, '[core]\nexcludesFile=override.rules\n');
+    fs.writeFileSync(path.join(root, 'override.rules'), 'public.txt\n');
+  }
+  const native = execFileSync('git', ['-C', root, 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
+    encoding: 'utf8', env: { PATH: process.env.PATH, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+  }).split('\0').filter(Boolean).sort();
+  const original = fs.readFileSync(config);
+  const pending = listWorkspaceFiles(root);
+  await expect(pending.then(files => files.slice().sort())).resolves.toEqual(native);
+  const files = await pending;
+  expect(files).not.toContain(scenario === 'later-override' ? 'public.txt' : 'hidden.tmp');
+  expect(files).toContain(scenario === 'later-override' ? 'hidden.tmp' : 'public.txt');
+  expect(fs.readFileSync(config)).toEqual(original);
+});
+
+linux('stages inactive remote-URL includes without applying them and preserves missing targets', async () => {
+  git('init', '-q');
+  fs.writeFileSync(path.join(root, 'inactive.config'), '[core]\nexcludesFile=inactive.rules\n');
+  fs.writeFileSync(path.join(root, 'inactive.rules'), 'public.txt\n');
+  fs.appendFileSync(path.join(root, '.git/config'), '[includeIf "hasconfig:remote.*.url:https://other.invalid/**"]\npath=../inactive.config\n'
+    + '[includeIf "hasconfig:remote.*.url:https://synthetic.invalid/**"]\npath=../missing.config\n[remote "origin"]\nurl=https://synthetic.invalid/team/project\n');
+  const open = vi.spyOn(fsp, 'open');
+  try {
+    expect(await listWorkspaceFiles(root)).toContain('public.txt');
+    expect(open.mock.calls.some(([file]) => file === path.join(root, 'inactive.config'))).toBe(true);
+    expect(fs.existsSync(path.join(root, 'missing.config'))).toBe(false);
+  } finally { open.mockRestore(); }
+});
+
+linux('retains native rejection of remote URLs nested under an inactive remote-URL include', async () => {
+  git('init', '-q');
+  fs.writeFileSync(path.join(root, 'inactive.config'), '[include]\npath=forbidden.config\n');
+  fs.writeFileSync(path.join(root, 'forbidden.config'), '[remote "forbidden"]\nurl=https://PRIVATE_REMOTE_MARKER.invalid/project\n');
+  fs.appendFileSync(path.join(root, '.git/config'), '[includeIf "hasconfig:remote.*.url:https://other.invalid/**"]\npath=../inactive.config\n'
+    + '[remote "origin"]\nurl=https://synthetic.invalid/team/project\n');
+  await expect(listWorkspaceFiles(root)).rejects.toThrow('No complete native answer');
+});
+
+linux.each(['https://synthetic.invalid/**', 'https://other.invalid/**'])('refuses an external scan-ahead source for pattern %s before opening it', async pattern => {
+  git('init', '-q');
+  const outside = path.join(fixture, 'external.config');
+  fs.writeFileSync(outside, '[remote "forbidden"]\nurl=https://PRIVATE_REMOTE_MARKER.invalid/project\n');
+  fs.appendFileSync(path.join(root, '.git/config'), `[includeIf "hasconfig:remote.*.url:${pattern}"]\npath=${outside}\n`
+    + '[remote "origin"]\nurl=https://synthetic.invalid/team/project\n');
+  const open = vi.spyOn(fsp, 'open');
+  try {
+    await expect(listWorkspaceFiles(root)).rejects.toThrow('No complete native answer');
+    expect(open.mock.calls.some(([file]) => file === outside)).toBe(false);
+  } finally { open.mockRestore(); }
+});
+
 linux('refuses unauthorized Git metadata instead of silently changing tracked semantics', async () => {
   git('init', '-q'); git('add', 'public.txt');
   await expect(listWorkspaceFiles(root, { assertFileAccess: file => {

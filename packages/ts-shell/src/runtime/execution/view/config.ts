@@ -2,7 +2,7 @@ import fs, { promises as fsp } from 'node:fs';
 import path from 'node:path';
 import { ViewSourceError, ViewSources } from './source.js';
 import { materializeMetadata, repositoryMarker, type GitMetadata } from './git.js';
-import { conditionApplies } from './condition.js';
+import { conditionApplies, withInertConfiguration } from './condition.js';
 
 type Query = (args: readonly string[], detached?: boolean) => Promise<string | null>;
 
@@ -40,7 +40,11 @@ async function admitConfiguration(sources: ViewSources, metadata: GitMetadata, q
       }
       const condition = /^includeif\.(.+)\.path$/.exec(record.key)?.[1];
       if (record.key !== 'include.path' && condition === undefined) continue;
-      if (condition !== undefined && !await conditionApplies(sources, metadata, file, condition, query)) continue;
+      // Git scans every remote-URL include target while collecting URLs, even
+      // when its pattern does not match. Admit that whole graph first; the final
+      // native query owns matching, precedence, and forbidding conditional URLs.
+      if (condition !== undefined && !condition.startsWith('hasconfig:remote.*.url:')
+        && !await conditionApplies(sources, metadata, file, condition, query)) continue;
       if (!record.origin.startsWith('file:') || record.value.startsWith('~')) throw new ViewSourceError();
       const origin = record.origin.slice(5);
       const included = path.resolve(path.dirname(origin), record.value);
@@ -58,14 +62,17 @@ export async function configureGitView(sources: ViewSources, directory: string, 
   if (!metadata) throw new ViewSourceError();
   await admitConfiguration(sources, metadata, query);
   await fsp.mkdir(sources.destination(directory), { recursive: true, mode: 0o700 });
-  for (const args of [['rev-parse', '--absolute-git-dir'], ['rev-parse', '--path-format=absolute', '--git-common-dir'], ['rev-parse', '--show-toplevel']]) {
-    const output = await query(args);
-    // A malformed or placeholder `.git` entry is the same "no repository"
-    // answer Git would give outside a work tree. Let the caller use the
-    // in-process matcher; execution uncertainty still throws from runGitOutput.
-    if (!output) return null;
-    sources.target(output.replace(/\n$/, ''));
-  }
+  const repository = await withInertConfiguration(sources, metadata, async () => {
+    for (const args of [['rev-parse', '--absolute-git-dir'], ['rev-parse', '--path-format=absolute', '--git-common-dir'], ['rev-parse', '--show-toplevel']]) {
+      const output = await query(args);
+      // Probe repository layout separately from full configuration. An invalid
+      // include graph must not turn a real repository into a matcher fallback.
+      if (!output) return false;
+      sources.target(output.replace(/\n$/, ''));
+    }
+    return true;
+  });
+  if (!repository) return null;
   const output = await query(['config', '--includes', '--show-origin', '--null', '--list']);
   if (output === null) throw new ViewSourceError();
   let excludes: string | undefined;

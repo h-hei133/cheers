@@ -101,7 +101,7 @@ Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)�
 | macOS/Windows | 部分 profile、接口与纯逻辑用例 | 原生路径/文件描述符、进程树清理、终端与设备尚未取得等价实机证据 |
 | 模型传输与严格预算 | 合成 HTTP/SSE/usage/重试/unknown、统一 request admission | W7-33 四端点真实 TLS/HTTP2 矩阵仍缺；无法证明上界的请求继续拒绝 strict cap 准入 |
 | 公共包、认证、协作和 SSH | 受控服务、签名、ACL、撤权、重连与未知副作用 | 真实账户、公共部署 TLS、真实远端主机/主机密钥和生产互通验收 |
-| SAFE-02 | Linux 公开文件工具的检查/句柄/拒绝/清理及受管编辑目录固定；原生 Git/ripgrep 私有视图、配置准入和 child 完成收据；异步技能发现、批准前捕获与共享预算；读取期间及 catalog 发布前已捕获 manifest/ignore/Git 来源变化拒绝，见 §7–12 | 非 Linux 实际对象绑定、未捕获来源/目录枚举的并发一致性与私有镜像剩余成本继续开放；外部 metadata/hasconfig 明确拒绝，资源计数器不约束原生进程内部全部读取 |
+| SAFE-02 | Linux 公开文件工具的检查/句柄/拒绝/清理及受管编辑目录固定；原生 Git/ripgrep 私有视图、配置准入和 child 完成收据；异步技能发现、批准前捕获与共享预算；读取期间及 catalog 发布前已捕获 manifest/ignore/Git 来源变化拒绝；本地remote-URL条件及native配置错误拒绝，见 §7–13 | 非 Linux 实际对象绑定、未捕获来源/目录枚举的并发一致性与私有镜像剩余成本继续开放；外部 metadata 仍拒绝，未知future hasconfig不宣称支持，资源计数器不约束原生进程内部全部读取 |
 
 技能发现的同步正文/Git 忽略路径已按 §9 替换；§10 拒绝检测到的读取期间源变化，§11–12 在 catalog 发布前复查已捕获 manifest、ignore 与 Git 来源。SAFE-02 继续处理非 Linux 对象绑定、未捕获来源/枚举一致性和镜像成本，扩展外部 metadata/条件支持须重新证明准入。逐文件检查不保证其后全部变化或整目录事务。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把 W1–W16 或 Phase 19 总目标标为完成。
 
@@ -241,3 +241,20 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 | 四条实际 print CLI | Node/单文件 stable均exit0、共4合成 POST；changed均exit1、零POST/零旧指令 | `cli-smoke-results.json`；实际 ignore 关闭后、manifest IN_ACCESS时 child 改写；stable可见/隐藏技能、本次call ID及源字节 |
 
 最多4096来源路径并占用既有累计 path budget；manifest文件/字节限额不变。普通初始缺失/不可读与后续已知变化、取消/resource/cleanup保持区分。此证据不覆盖未读/初始缺失来源、目录事务、最后逐源检查之后的变化或非Linux实际对象；§5的外部metadata/hasconfig、平台、真实服务与用户前端条件仍开放。未重跑全仓/scripts/PTY/真实provider，Phase19 active，提交/推送/精确CI另验。
+
+该来源组件已提交/推送 `5416bc6c4d5fd8fade9b135ed58e3cdf3729bbab`，14路径/blob审计通过，用户`.gitignore`原字节排除、远端同SHA。CI38297427374/job114971784410、Watch38297427106/job114971783285均付款/spending-limit未启动、零步骤failure，没有远端验证通过；材料 `.tmp/catalog-sources/{commit-audit.json,delivery.json}`。
+
+## 13. SAFE-02 本地 remote-URL 条件与配置错误局部验收（2026-10-13）
+
+起点为 §12 来源提交。现有config准入按native扫描策略捕获全部本地`hasconfig:remote.*.url`依赖图，包含未匹配条件；native继续拥有glob、后值优先、worktree scope、深度与禁止条件remote URL。repo布局识别复用原inert config，与完整配置验证分离，配置错误不再变成无仓库fallback。
+
+| 证据 | 实际结果 | 范围/材料 |
+|---|---|---|
+| 最终冻结 | 3 TS/2 production，用户`.gitignore`原SHA保持 | `inventory-final-reversal.json` SHA256 `db9a381184e80a266a3f2546fa4026fb2d66d2789fa4c10c0299255743fa86e3` |
+| native基线/修复 | baseline有效本地条件拒绝，修复后列表与普通Git相符 | `baseline-probe.log`、`repaired-probe.log` |
+| 受影响组合/构建/门 | Node20.3修复后10文件/170项、两构建/四源码门通过；完整judge exit0/partial | `tests-repair.log`、`build-final`、`executable-final`、`gates-final`、`normproof-out`；4既有ceiling advisory，无新增 |
+| 最终断言/独立评审 | 最终native文件36项复验；code APPROVE、architecture CLEAR，综合APPROVE（限本批） | `tests-final-assertion.log`；code相同生产66项与最终断言3项子集、四项检查；architecture133项与最终native36项、parity/child/metadata-only/恢复失败检查；全部最终哈希相符，未编辑源码/测试/文档，复验不相加 |
+| 两个有效反转 | 条件准入、inert布局隔离分别移除后实际AssertionError，正向副本通过、原源字节不变 | `reversals-effective/results.json`；初次未捕获Error不计strict断言反转 |
+| 四条actual print CLI | Node/单文件×后置URL/后值覆盖，exit0、共8合成POST | `cli-smoke-results.json`；技能catalog/正文、隐藏零泄漏、本次call ID与源config/manifest字节 |
+
+首轮新增回归实际发现间接非法remote URL导致128后错误fallback，属于product behavior drift，修复后再通过170项。随后只调整列表对照的promise成功断言，production未变。外部匹配/未匹配条件来源均未打开；未知future hasconfig、外部metadata和其余§5平台/枚举/真实服务缺口继续开放。未重跑全仓/scripts/PTY/真实provider，Phase19 active，交付另验。

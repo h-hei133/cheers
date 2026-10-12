@@ -2185,3 +2185,17 @@ Node20.3/单文件 × stable/changed **四条实际 print CLI**通过。stable �
 独立 code **APPROVE**（7文件/142项及两路child、六项source-owner检查），architecture **CLEAR**（9文件/156项及两路child、contribution等待/metadata-only/path-budget三检查），综合 **APPROVE（限本批）**。两lane运行前后全部冻结路径相符，无源码/测试改动。code最初Node20 launcher不支持tsx的`--import`，根cwd Vitest选择到临时反转副本后主动中止，两类harness运行未计通过；实际workspace cwd串行运行才计上述142项。
 
 Node20.3/单文件 × stable/changed **四条实际 print CLI**通过；stable 两组共 **4合成 POST**，可见技能描述/工具正文正常、原先隐藏技能零泄漏，本次 call ID 与源字节相符。changed 两组实际 IN_CLOSE_NOWRITE 后、manifest IN_ACCESS 时 child 改写规则，均 exit1、**零 POST/零旧指令**。材料 `.tmp/catalog-sources/{contract.json,inventory-final.json,baseline-repaired-probe.log,repaired-probe.log,tests-first.log,reversals/results.json,cli-smoke-results.json,normproof-out/}`。范围止于已捕获来源的最后逐源检查；未捕获或初始缺失来源、目录枚举事务、检查后变化、非 Linux、外部 metadata/hasconfig 与真实外部验收仍未关闭，SAFE-02/Phase19 active；本批未重跑全仓/scripts/PTY/真实 provider，交付另验。
+
+该来源组件已提交/推送 `5416bc6c4d5fd8fade9b135ed58e3cdf3729bbab`，14 个原始路径/blob 对照冻结源码/文档审计通过、用户 `.gitignore` 原字节排除，远端同 SHA。CI38297427374/job114971784410、Watch38297427106/job114971783285 均 completed/failure、steps=[]；annotations确认付款/spending-limit阻止启动，没有远端验证通过。材料 `.tmp/catalog-sources/{commit-audit.json,delivery.json}`。
+
+### 8.148 SAFE-02：本地 remote-URL 条件配置与配置错误拒绝
+
+基线中普通 Git 能按仓库内的 `includeIf "hasconfig:remote.*.url:..."` 规则排除文件，原私有视图拒绝整个查询。定向对照原生配置实现与测试：URL扫描会无条件递归访问这类include，即使pattern不匹配；直接/间接条件来源禁止remote URL；最终完整读取保持native glob、config scope、include深度和后值优先。本项目沿用原生Git解析/优先级的决策，在已有[配置准入owner](../../packages/ts-shell/src/runtime/execution/view/config.ts)先捕获整个条件依赖图，再交回native完整求值，未新增URL匹配器、配置解析系统或外部read grant。
+
+新增回归实际发现：非法间接remote URL使native退出128，原repo识别误判“无仓库”，进而fallback返回完整列表。修复复用[已有inert config](../../packages/ts-shell/src/runtime/execution/view/condition.ts)先单独核验repo布局，再核验完整配置；真实配置错误不再fallback，原malformed marker仍保留普通无仓库契约。gitdir/onbranch条件仍用inert probe，完整child收据、capture currency、资源/取消和清理优先级保持。匹配/不匹配的外部扫描来源均在打开前拒绝；本地缺失include保留native可选语义，未知future hasconfig不作支持。
+
+最终 **3 TS/2 production**，`inventory-final-reversal.json` SHA256 `db9a381184e80a266a3f2546fa4026fb2d66d2789fa4c10c0299255743fa86e3`。Node20.3修复后受影响组合 **10文件/170项**、TS/单文件构建和四源码门通过；完整judge exit0，图义务satisfied、4既有ceiling advisory仍partial，无新增。后续仅将native列表比较改为先显式assert promise成功再查结果，生产字节保持；初次反转的未捕获ViewSourceError虽为产品拒绝，但strict harness未识别AssertionError而中止，未计有效。使用精确promise断言的新副本后，移除条件准入和移除inert布局隔离两组均实际AssertionError，正向副本通过，原源码/用户`.gitignore`原字节保持。
+
+最终测试断言字节另跑 native 文件 **36项**通过，这是170项中的同文件复验，不相加。独立 code **APPROVE**（4文件/66项在相同生产字节上通过，最终断言3项子集复验；native对照及四项取消/清理/条件来源检查），architecture **CLEAR**（7文件/133项，最终native文件36项复验；公开parity、实际child贡献等待期间改写、metadata-only复查和恢复失败检查），综合 **APPROVE（限本批）**。两lane逐项核对最终3路径，未修改源码、测试或文档；材料 `review-code.md`、`review-architecture.md`、`tests-final-assertion.log`。
+
+Node20.3/单文件×后置URL/后置excludes覆盖 **四条actual print CLI**，共 **8合成POST**，均exit0；技能描述/正文、本次call ID、隐藏技能零泄漏和config/manifest原字节均核对。材料 `.tmp/git-condition/{contract.json,inventory-final-reversal.json,baseline-probe.log,repaired-probe.log,tests-first.log,tests-repair.log,reversals-effective/results.json,cli-smoke-results.json,normproof-out/}`。本地remote-URL条件不再列为明确拒绝；外部metadata、非Linux对象、未捕获来源/目录事务和真实外部验收继续开放，SAFE-02/Phase19 active，本批未重跑全仓/scripts/PTY/真实provider，提交/推送/精确CI另验。
