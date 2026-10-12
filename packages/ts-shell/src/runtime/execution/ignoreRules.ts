@@ -1,7 +1,7 @@
 import path from 'node:path'
 import ignore, { type Ignore } from 'ignore'
 import { isReadResourceFailure, ReadChangedError, ReadCleanupError, withVerifiedReadTarget } from './read.js'
-import type { FileWalkOptions } from './types.js'
+import type { CapturedReadSource, FileWalkOptions } from './types.js'
 import type { FileHandle } from 'node:fs/promises'
 import { WalkBudget, WalkLimitError } from './walk/budget.js'
 import { addIgnoreContent } from './ignore/syntax.js'
@@ -67,9 +67,11 @@ function ignoreSources(root: string, target: string): { file: string; prefix: st
 export async function loadIgnoreFile(matcher: Ignore, file: string, prefix: string, root: string, options?: FileWalkOptions, budget = new WalkBudget(options?.abortSignal, options?.limits)): Promise<void> {
   budget.check()
   let content: string
+  let source: CapturedReadSource | undefined
   try {
     content = await withVerifiedReadTarget({ absolutePath: file, workspaceRoot: root,
       assertFileAccess: options?.assertFileAccess, abortSignal: options?.abortSignal,
+      onCapturedSource: captured => { source = captured },
     }, 'file', async (handle, verify) => {
       const value = await readIgnoreContent(handle, verify, budget)
       await verify()
@@ -82,6 +84,7 @@ export async function loadIgnoreFile(matcher: Ignore, file: string, prefix: stri
     budget.check()
     return
   }
+  if (source) options?.onCapturedSource?.(source)
   addIgnoreContent(matcher, content, prefix, budget)
 }
 
@@ -123,7 +126,7 @@ export async function loadIgnoredDirectories(root: string, directory: string, na
   if (!names.length) return new Set()
   if (repositoryMarker(resolvedRoot, resolvedDirectory)) {
     const native = await loadIgnoredViaGit(resolvedDirectory, names, options?.abortSignal, budget,
-      { root: resolvedRoot, assertFileAccess: options?.assertFileAccess ?? (() => {}), directories: true })
+      { root: resolvedRoot, assertFileAccess: options?.assertFileAccess ?? (() => {}), onCapturedSource: options?.onCapturedSource, directories: true })
     if (native !== null) return native
   }
   const matcher = await loadDirectoryMatcher(resolvedRoot, resolvedDirectory, options, budget)

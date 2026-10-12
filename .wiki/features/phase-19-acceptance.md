@@ -101,9 +101,9 @@ Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)�
 | macOS/Windows | 部分 profile、接口与纯逻辑用例 | 原生路径/文件描述符、进程树清理、终端与设备尚未取得等价实机证据 |
 | 模型传输与严格预算 | 合成 HTTP/SSE/usage/重试/unknown、统一 request admission | W7-33 四端点真实 TLS/HTTP2 矩阵仍缺；无法证明上界的请求继续拒绝 strict cap 准入 |
 | 公共包、认证、协作和 SSH | 受控服务、签名、ACL、撤权、重连与未知副作用 | 真实账户、公共部署 TLS、真实远端主机/主机密钥和生产互通验收 |
-| SAFE-02 | Linux 公开文件工具的检查/句柄/拒绝/清理及受管编辑目录固定；原生 Git/ripgrep 私有视图、配置准入和 child 完成收据；异步技能发现、批准前捕获与共享预算；读取期间及 catalog 发布前已捕获 manifest 变化拒绝，见 §7–11 | 非 Linux 实际对象绑定、ignore 来源/目录枚举的并发一致性与私有镜像剩余成本继续开放；外部 metadata/hasconfig 明确拒绝，资源计数器不约束原生进程内部全部读取 |
+| SAFE-02 | Linux 公开文件工具的检查/句柄/拒绝/清理及受管编辑目录固定；原生 Git/ripgrep 私有视图、配置准入和 child 完成收据；异步技能发现、批准前捕获与共享预算；读取期间及 catalog 发布前已捕获 manifest/ignore/Git 来源变化拒绝，见 §7–12 | 非 Linux 实际对象绑定、未捕获来源/目录枚举的并发一致性与私有镜像剩余成本继续开放；外部 metadata/hasconfig 明确拒绝，资源计数器不约束原生进程内部全部读取 |
 
-技能发现的同步正文/Git 忽略路径已按 §9 替换；§10 拒绝检测到的读取期间源变化，§11 在 catalog 发布前复查已捕获 manifest。SAFE-02 继续处理非 Linux 对象绑定、ignore/枚举一致性和镜像成本，扩展外部 metadata/条件支持须重新证明准入。逐文件检查不保证其后全部变化或整目录事务。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把 W1–W16 或 Phase 19 总目标标为完成。
+技能发现的同步正文/Git 忽略路径已按 §9 替换；§10 拒绝检测到的读取期间源变化，§11–12 在 catalog 发布前复查已捕获 manifest、ignore 与 Git 来源。SAFE-02 继续处理非 Linux 对象绑定、未捕获来源/枚举一致性和镜像成本，扩展外部 metadata/条件支持须重新证明准入。逐文件检查不保证其后全部变化或整目录事务。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把 W1–W16 或 Phase 19 总目标标为完成。
 
 ## 6. 迁移、回退与交付
 
@@ -224,3 +224,20 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 初次重复选择测试的第三次回调没有发生，属于 harness/setup drift；改为实际第二次并断言次数后才记通过。普通初始不可读、资源失败、取消与cleanup契约保持区分，已有变更不能省略成完整catalog。
 
 这里保证已读 manifest 到其最后一次逐源 metadata 核验；不是目录/ignore全源事务，也不保证尚未枚举来源或之后全部变化。没有本批非 Linux、全仓/scripts、PTY或真实provider证据；§5其余条件、SAFE-02/Phase19 active。提交/推送/精确CI另验。
+
+该组件已提交/推送 `d589e8d02c5299f0de4a3a25169b9aea1a742540`，10路径/blob审计通过，用户 `.gitignore` 原字节排除、远端同 SHA。CI38295056304/job114964024097、Watch38295056278/job114964022341 均付款/spending-limit 未启动、零步骤 failure，没有远端验证通过；材料 `.tmp/catalog-currency/{commit-audit.json,delivery.json}`。
+
+## 12. SAFE-02 已捕获 ignore/Git 来源发布前复验（2026-10-13）
+
+起点为 §11 manifest 提交。现有 verified-read 在成功核验和关闭后报告中性 metadata，fallback ignore 通知在可选读取 catch 外，native view 保留原路径/别名和最早 staged revision。技能 discovery 共用一个有界 ledger，loader/catalog 发布前复查实际捕获的 manifest、ignore、config/index 等来源，不保留描述符或重读正文。
+
+| 证据 | 实际结果 | 范围/材料 |
+|---|---|---|
+| 最终冻结 | 11 TS/8 production，用户 `.gitignore` 原 SHA 保持 | `inventory-final.json` SHA256 `f19007ffad95ca869139a223546f66e8781166840dbb0d8a0f04f0991cf0d20b` |
+| 实际 child 基线/修复 | native/fallback 原先在规则关闭后改写仍发布技能，修复后安全拒绝、全部句柄关闭 | `baseline-repaired-probe.log`、`repaired-probe.log`；初始继承外层仓库未触发为 harness/setup，不计产品证据 |
+| 受影响组合/构建/门 | Node20.3 14文件/224项、两构建、四源码门通过；完整judge exit0/partial | `tests-first.log`、`build-first`、`executable-first`、`gates-first`、`normproof-out`；4既有ceiling advisory，无新增 |
+| 独立 code/architecture | APPROVE/CLEAR，综合 APPROVE（限本批），全部冻结路径前后相符 | `review-code.md`、`review-architecture.md`；独立142/156项及child、source-owner、contribution/metadata-only/path-budget检查；launcher/root-cwd失败和中止不计通过 |
+| 两个有效反转 | native/fallback 来源通知分别移除后实际 AssertionError，正向副本通过且原源字节不变 | `reversals/results.json` |
+| 四条实际 print CLI | Node/单文件 stable均exit0、共4合成 POST；changed均exit1、零POST/零旧指令 | `cli-smoke-results.json`；实际 ignore 关闭后、manifest IN_ACCESS时 child 改写；stable可见/隐藏技能、本次call ID及源字节 |
+
+最多4096来源路径并占用既有累计 path budget；manifest文件/字节限额不变。普通初始缺失/不可读与后续已知变化、取消/resource/cleanup保持区分。此证据不覆盖未读/初始缺失来源、目录事务、最后逐源检查之后的变化或非Linux实际对象；§5的外部metadata/hasconfig、平台、真实服务与用户前端条件仍开放。未重跑全仓/scripts/PTY/真实provider，Phase19 active，提交/推送/精确CI另验。

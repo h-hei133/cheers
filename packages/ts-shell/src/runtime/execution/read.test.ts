@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import { promises as fsp } from 'node:fs'
-import { withVerifiedReadFiles } from './read.js'
+import { readRevision, withVerifiedReadFiles } from './read.js'
 import { execFileSync } from 'node:child_process'
 import os from 'node:os'
 import path from 'node:path'
@@ -59,6 +59,20 @@ describe('verified text reads', () => {
     fs.symlinkSync(path.join(workspace, 'source/file.txt'), path.join(workspace, 'alias.txt'))
     expect(await service.readTextFile(request('alias.txt'))).toBe('\ufeffauthorized\r\n')
     expect(await service.readTextFile(request())).toBe('\ufeffauthorized\r\n')
+  })
+
+  it('reports the original alias and verified metadata after its handle closes', async () => {
+    const target = path.join(workspace, 'source/file.txt')
+    const alias = path.join(workspace, 'alias.txt'); fs.symlinkSync(target, alias)
+    const open = fsp.open
+    let captured: Awaited<ReturnType<typeof open>> | undefined
+    vi.spyOn(fsp, 'open').mockImplementation(async (...args) => { captured = await open(...args); return captured })
+    const onCapturedSource = vi.fn(source => {
+      expect(captured?.fd).toBe(-1)
+      expect(source).toEqual({ path: alias, target, root: workspace, revision: readRevision(fs.statSync(target, { bigint: true })) })
+    })
+    expect(await service.readTextFile(request('alias.txt', { onCapturedSource }))).toBe('\ufeffauthorized\r\n')
+    expect(onCapturedSource).toHaveBeenCalledOnce()
   })
 
   it('supports a workspace reached through a symlink and canonical tool targets', async () => {

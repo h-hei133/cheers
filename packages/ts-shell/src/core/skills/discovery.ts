@@ -5,10 +5,9 @@ import type { WorkspaceRoot } from '../workspace/model.js';
 import { readDirectory, DirectoryReadError } from '../../runtime/execution/directory.js';
 import { readBinarySnapshot, SnapshotLimitError } from '../../runtime/execution/snapshot.js';
 import { isReadResourceFailure, ReadChangedError, ReadCleanupError, readRevision } from '../../runtime/execution/read.js';
+import type { CapturedReadSource } from '../../runtime/execution/types.js';
 import { WalkBudget, WalkLimitError, type WalkLimits } from '../../runtime/execution/walk/budget.js';
 import { verifyPathContainment } from '../security/pathJail.js';
-
-interface ManifestSource { readonly root: string; readonly target: string; readonly revision: string; }
 
 export class SkillDiscoveryError extends Error {
   constructor() { super('Skill discovery stopped at its resource limit; no complete catalog is available.'); }
@@ -18,7 +17,7 @@ export class SkillDiscoveryError extends Error {
 export class SkillDiscovery {
   readonly budget: WalkBudget;
   private readonly roots = new Map<string, WorkspaceRoot>();
-  private readonly captured = new Map<string, ManifestSource>();
+  private readonly captured = new Map<string, CapturedReadSource>();
   private bytes = 0;
   private files = 0;
   constructor(readonly signal?: AbortSignal, limits?: WalkLimits) {
@@ -39,14 +38,25 @@ export class SkillDiscovery {
 
   verify(): void {
     for (const boundary of this.roots.keys()) this.root(boundary);
-    for (const [file, source] of this.captured) this.verifySource(file, source);
+    for (const source of this.captured.values()) this.verifySource(source);
     this.budget.check();
   }
 
-  private verifySource(file: string, source: ManifestSource): void {
+  /** Keep the earliest successful capture, including aliases used by native queries. */
+  capture(source: CapturedReadSource): void {
+    const captured = this.captured.get(source.path);
+    if (captured) this.verifySource(captured);
+    this.verifySource(source);
+    if (captured) return;
+    if (this.captured.size >= 4096) throw new SkillDiscoveryError();
+    this.budget.take('pathBytes', Buffer.byteLength(source.path) + Buffer.byteLength(source.target) + Buffer.byteLength(source.root));
+    this.captured.set(source.path, Object.freeze({ ...source }));
+  }
+
+  private verifySource(source: CapturedReadSource): void {
     this.budget.check();
     try {
-      const checked = verifyPathContainment(file, source.root);
+      const checked = verifyPathContainment(source.path, source.root);
       if (!checked.allowed || checked.resolvedPath !== source.target
         || readRevision(fs.statSync(source.target, { bigint: true })) !== source.revision) throw new ReadChangedError();
     } catch (error) {
@@ -73,22 +83,15 @@ export class SkillDiscovery {
   async content(boundary: string, file: string): Promise<string> {
     const root = this.root(boundary);
     const captured = this.captured.get(file);
-    if (captured) this.verifySource(file, captured);
+    if (captured) this.verifySource(captured);
     if (++this.files > 512 || this.bytes >= 8 * 1024 * 1024) throw new SkillDiscoveryError();
     const maximum = Math.min(512 * 1024, 8 * 1024 * 1024 - this.bytes);
-    const checked = verifyPathContainment(file, root);
-    if (!checked.allowed) throw new Error('Skill manifest is outside the selected root.');
-    const before = fs.statSync(checked.resolvedPath, { bigint: true });
-    if (before.size > BigInt(maximum)) throw new SkillDiscoveryError();
-    const source = { root, target: checked.resolvedPath, revision: readRevision(before) };
     const bytes = await readBinarySnapshot({ absolutePath: file, workspaceRoot: root, abortSignal: this.signal,
       assertFileAccess: () => { this.root(boundary); },
+      onCapturedSource: source => { this.capture(source); },
     }, maximum);
     this.bytes += bytes.length;
     this.root(boundary);
-    this.verifySource(file, source);
-    if (captured) this.verifySource(file, captured);
-    else this.captured.set(file, source);
     return bytes.toString('utf8');
   }
 

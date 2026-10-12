@@ -1,5 +1,13 @@
 import type { WalkLimits } from './walk/budget.js'
 
+/** Metadata from a successfully verified file capture whose handle has closed. */
+export interface CapturedReadSource {
+  readonly path: string
+  readonly target: string
+  readonly root: string
+  readonly revision: string
+}
+
 export interface FileWalkOptions {
   readonly assertFileAccess?: (absolutePath: string) => void
   readonly abortSignal?: AbortSignal
@@ -9,6 +17,7 @@ export interface FileWalkOptions {
   readonly respectIgnore?: boolean
   /** Internal callers may tighten, never raise, cumulative traversal budgets. */
   readonly limits?: WalkLimits
+  readonly onCapturedSource?: (source: CapturedReadSource) => void
 }
 
 /**
@@ -171,6 +180,7 @@ export interface TextFileReadExecutionRequest extends ExecutionRequestMetadata<'
   readonly artifactDirectory?: string
   readonly assertFileAccess?: (absolutePath: string) => void
   readonly abortSignal?: AbortSignal
+  readonly onCapturedSource?: (source: CapturedReadSource) => void
 }
 
 export interface TextFileWriteExecutionRequest extends ExecutionRequestMetadata<'file.write'> {

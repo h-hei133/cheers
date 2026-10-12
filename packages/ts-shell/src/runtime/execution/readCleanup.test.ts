@@ -49,15 +49,17 @@ it.each(['file', 'page', 'directory', 'walk', 'ignore'].flatMap(kind => [false, 
   'preserves %s handle cleanup failure with cancellation=%s', async (kind, cancel) => {
     const controller = new AbortController()
     const attempts = failClose(cancel ? controller : undefined)
-    const options = { abortSignal: controller.signal, respectIgnore: false }
-    const pending = kind === 'file' ? readTextFile(request('one.txt', controller.signal))
-      : kind === 'page' ? readTextPage(request('one.txt', controller.signal))
+    const onCapturedSource = vi.fn()
+    const options = { abortSignal: controller.signal, respectIgnore: false, onCapturedSource }
+    const pending = kind === 'file' ? readTextFile({ ...request('one.txt', controller.signal), onCapturedSource })
+      : kind === 'page' ? readTextPage({ ...request('one.txt', controller.signal), onCapturedSource })
         : kind === 'directory' ? readDirectory(root, root, options)
           : kind === 'walk' ? listWorkspaceFiles(root, options)
             : loadDirectoryMatcher(root, root, options)
     await expect(pending).rejects.toMatchObject({ name: 'ReadCleanupError', reason: 'cleanup',
       message: 'Read failed: handle cleanup could not be verified.' })
     expect(attempts).toHaveBeenCalledTimes(1)
+    expect(onCapturedSource).not.toHaveBeenCalled()
   },
 )
 

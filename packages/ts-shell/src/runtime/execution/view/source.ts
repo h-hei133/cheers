@@ -4,6 +4,7 @@ import { readBinarySnapshot } from '../snapshot.js';
 import { readRevision } from '../read.js';
 import { WalkBudget } from '../walk/budget.js';
 import { verifyPathContainment } from '../../../core/security/pathJail.js';
+import type { FileWalkOptions } from '../types.js';
 
 export interface NativeViewInput {
   readonly root: string;
@@ -11,6 +12,7 @@ export interface NativeViewInput {
   readonly abortSignal?: AbortSignal;
   readonly budget: WalkBudget;
   readonly pruneDirectories?: readonly string[];
+  readonly onCapturedSource?: FileWalkOptions['onCapturedSource'];
 }
 
 export class ViewSourceError extends Error {
@@ -67,7 +69,12 @@ export class ViewSources {
   async capture(file: string, maximumBytes = 64 * 1024 * 1024): Promise<boolean> {
     file = path.resolve(file);
     const target = this.target(file);
-    if (this.captured.has(target)) return this.link(file, target);
+    const captured = this.captured.get(target);
+    if (captured !== undefined) {
+      const linked = await this.link(file, target);
+      this.input.onCapturedSource?.({ path: file, target, root: this.input.root, revision: captured });
+      return linked;
+    }
     let before: BigIntStats;
     try { before = fs.statSync(target, { bigint: true }); }
     catch (error) {
@@ -86,6 +93,7 @@ export class ViewSources {
     this.bytes += bytes.length;
     await this.link(file, target);
     this.input.budget.check();
+    this.input.onCapturedSource?.({ path: file, target, root: this.input.root, revision: readRevision(before) });
     return true;
   }
 

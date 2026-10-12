@@ -1,4 +1,5 @@
 import { constants, promises as fs, realpathSync, statSync, type BigIntStats } from 'node:fs'
+import path from 'node:path'
 import { verifyPathContainment } from '../../core/security/pathJail.js'
 import type { FileHandle } from 'node:fs/promises'
 import type { TextFileReadExecutionRequest } from './types.js'
@@ -70,7 +71,7 @@ export async function readTextFile(request: TextFileReadExecutionRequest): Promi
   })
 }
 
-type ReadTarget = Pick<TextFileReadExecutionRequest, 'absolutePath' | 'workspaceRoot' | 'artifactDirectory' | 'assertFileAccess' | 'abortSignal'>
+type ReadTarget = Pick<TextFileReadExecutionRequest, 'absolutePath' | 'workspaceRoot' | 'artifactDirectory' | 'assertFileAccess' | 'abortSignal' | 'onCapturedSource'>
 
 export async function withVerifiedReadTarget<T>(request: ReadTarget, kind: 'file' | 'directory', consume: (handle: FileHandle, verify: () => Promise<void>) => Promise<T>): Promise<T> {
   request.abortSignal?.throwIfAborted()
@@ -82,9 +83,12 @@ export async function withVerifiedReadTarget<T>(request: ReadTarget, kind: 'file
   const before = statSync(target, { bigint: true })
   if (kind === 'file' ? !before.isFile() : !before.isDirectory()) throw new Error(`Read target must be a ${kind === 'file' ? 'regular file' : 'directory'}.`)
   const handle = await fs.open(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0) | (kind === 'directory' ? (constants.O_DIRECTORY ?? 0) : 0))
+  let result: T
+  let revision: string
   try {
     request.abortSignal?.throwIfAborted()
     const opened = await handle.stat({ bigint: true })
+    revision = readRevision(opened)
     if ((kind === 'file' ? !opened.isFile() : !opened.isDirectory()) || !sameFile(before, opened)) {
       throw new ReadChangedError()
     }
@@ -102,9 +106,8 @@ export async function withVerifiedReadTarget<T>(request: ReadTarget, kind: 'file
       request.abortSignal?.throwIfAborted()
     }
     await verify()
-    const result = await consume(handle, verify)
+    result = await consume(handle, verify)
     await verify()
-    return result
   } catch (error) {
     // A disappearing opened file is a failed read, not evidence that a writer
     // may treat its pre-read as an initially absent target.
@@ -115,6 +118,8 @@ export async function withVerifiedReadTarget<T>(request: ReadTarget, kind: 'file
   } finally {
     await closeReadHandle(handle)
   }
+  if (kind === 'file') request.onCapturedSource?.({ path: path.resolve(request.absolutePath), target, root, revision })
+  return result
 }
 
 /** Linux descriptor inputs stay open until their command settles. */

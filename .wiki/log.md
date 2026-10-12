@@ -6528,3 +6528,11 @@ W16 已提交/推送 `f43ae09ec90a5890b768598ab52a17821c5e9efc` 并读回远端�
 ### 2026-10-13 — SAFE-02 已捕获技能 manifest 的发布复验
 
 实际子进程重现较早manifest关闭后、后续读取或contribution等待期间改写仍发布旧指令。原discovery按预算保存最早metadata并在已有loader/catalog发布检查逐源复验，重复选择不覆盖旧修订；snapshot/媒体/私有视图复用原读取owner的同一revision策略，未增读系统/正文重读/保留句柄。最终7TS/5production，Node20.3 18文件/247项、两产物/四源码门/完整judge通过，4既有ceiling advisory保持partial；独立code122项APPROVE、architecture151项CLEAR，综合APPROVE限本批。两隔离反转实际断言失败；四actual print CLI stable两组共4合成POST，changed在首源关闭、第二源content access后child写入，均exit1/零POST/零旧指令。初次重复测试未触发及反转多命中均属harness并已修正、未计成功。源码与用户`.gitignore`字节保持，详见[裁决 §8.146](features/phase-19-decisions.md)与[局部验收 §11](features/phase-19-acceptance.md)，材料 `.tmp/catalog-currency/`。ignore/枚举、非Linux、镜像和真实外部余项仍开放，Phase19 active；提交/推送/精确CI另记。
+
+manifest组件 `d589e8d02c5299f0de4a3a25169b9aea1a742540` 已提交/推送、10路径/blob审计通过，远端同SHA且用户`.gitignore`排除保持。CI38295056304/job114964024097、Watch38295056278/job114964022341均付款/spending-limit未启动、零步骤failure，无远端通过；材料 `.tmp/catalog-currency/{commit-audit.json,delivery.json}`。
+
+### 2026-10-13 — SAFE-02 已捕获 ignore/Git 来源发布复验
+
+实际child证明 native/fallback ignore 查询返回后改写规则仍发布旧技能。现有读owner在核验/关闭成功后报告metadata，原discovery扩展有界最早修订ledger，发布前复验实际捕获的manifest/ignore/Git config/index/别名；普通缺失与取消/resource/cleanup不混同，无正文重读或保留句柄。最终11TS/8production，Node20.3 14文件/224项、两构建/四源码门/完整judge通过，4既有ceiling advisory保持partial。两隔离反转均实际AssertionError；四actual print CLI stable两组共4合成POST，changed在ignore关闭和manifest读取后child改写、均exit1/零POST/零旧指令。继承外层仓库的首探针属harness且已修正，未计产品复现。材料 `.tmp/catalog-sources/`，详见[裁决 §8.147](features/phase-19-decisions.md)和[局部验收 §12](features/phase-19-acceptance.md)；未捕获来源/目录事务、平台与真实外部证据继续开放，Phase19 active，交付另验。
+
+独立code142项APPROVE、architecture156项CLEAR及各自child/owner/contribution检查通过，源码与用户`.gitignore`前后相符，综合APPROVE限本批。code早期tsx launcher与root-cwd测试选择错误已分类，未计失败/中止为验证通过。

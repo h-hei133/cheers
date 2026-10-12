@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import fs, { promises as fsp } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import which from "which";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SkillLoader } from "./skillLoader.js";
 
@@ -210,6 +211,77 @@ describe("skill discovery", () => {
     await expect(loader.loadDetailed()).rejects.toMatchObject({ name: 'ReadChangedError' });
     expect(observed).toBe(2);
     expect(open.mock.calls.filter(([target]) => target === file)).toHaveLength(1);
+  });
+
+  it.each(['native', 'fallback'] as const)('rejects captured %s ignore changes after the query returns', async mode => {
+    writeSkill('one', 'one', 'PRIVATE_SKILL_BODY');
+    const rules = path.join(workspace, '.gitignore');
+    const manifest = path.join(workspace, '.agents/skills/one/SKILL.md');
+    fs.writeFileSync(rules, '');
+    if (mode === 'fallback') {
+      const sync = which.sync;
+      vi.spyOn(which, 'sync').mockImplementation(((command: string, options: any) =>
+        command === 'git' ? null : sync(command, options)) as typeof sync);
+    }
+    expect((await new SkillLoader(workspace).load()).has('one')).toBe(true);
+    const open = fsp.open;
+    const handles: Awaited<ReturnType<typeof open>>[] = [];
+    let source: Awaited<ReturnType<typeof open>> | undefined;
+    let changed = false;
+    vi.spyOn(fsp, 'open').mockImplementation(async (...args) => {
+      const handle = await open(...args); handles.push(handle);
+      if (args[0] === rules) source = handle;
+      if (args[0] === manifest && !changed) {
+        expect(source?.fd).toBe(-1);
+        execFileSync(process.execPath, ['-e', 'require("node:fs").writeFileSync(process.argv[1], ".agents/skills/one/\\n")', rules]);
+        changed = true;
+      }
+      return handle;
+    });
+    await expect(new SkillLoader(workspace).loadDetailed()).rejects.toMatchObject({ name: 'ReadChangedError' });
+    expect(changed).toBe(true);
+    expect(handles.every(handle => handle.fd === -1)).toBe(true);
+  });
+
+  it.each(['config', 'index', 'alias'] as const)('rejects captured Git %s changes before publishing a skill catalog', async kind => {
+    writeSkill('one', 'one', 'PRIVATE_SKILL_BODY');
+    const relative = '.agents/skills/one/SKILL.md';
+    const manifest = path.join(workspace, relative);
+    const rules = path.join(workspace, 'excluded.rules');
+    fs.writeFileSync(rules, '.agents/skills/one/\n');
+    let source = path.join(workspace, '.git', kind === 'index' ? 'index' : 'config');
+    let script = 'require("node:fs").appendFileSync(process.argv[1], "\\n[core]\\nexcludesFile=" + process.argv[2] + "\\n")';
+    let arguments_ = [source, rules];
+    if (kind === 'index') {
+      fs.writeFileSync(path.join(workspace, '.gitignore'), '.agents/skills/one/\n');
+      execFileSync('git', ['-C', workspace, 'add', '-f', relative]);
+      script = 'require("node:child_process").execFileSync("git", ["-C", process.argv[1], "update-index", "--force-remove", process.argv[2]])';
+      arguments_ = [workspace, relative];
+    } else if (kind === 'alias') {
+      source = path.join(workspace, 'initial.rules'); fs.writeFileSync(source, '');
+      const alias = path.join(workspace, 'rules-link'); fs.symlinkSync(source, alias);
+      execFileSync('git', ['-C', workspace, 'config', 'core.excludesFile', alias]);
+      script = 'const fs=require("node:fs"); fs.unlinkSync(process.argv[1]); fs.symlinkSync(process.argv[2], process.argv[1])';
+      arguments_ = [alias, rules];
+    }
+    expect((await new SkillLoader(workspace).load()).has('one')).toBe(true);
+    const open = fsp.open;
+    const handles: Awaited<ReturnType<typeof open>>[] = [];
+    let captured: Awaited<ReturnType<typeof open>> | undefined;
+    let changed = false;
+    vi.spyOn(fsp, 'open').mockImplementation(async (...args) => {
+      const handle = await open(...args); handles.push(handle);
+      if (args[0] === source) captured = handle;
+      if (args[0] === manifest && !changed) {
+        expect(captured?.fd).toBe(-1);
+        execFileSync(process.execPath, ['-e', script, ...arguments_]);
+        changed = true;
+      }
+      return handle;
+    });
+    await expect(new SkillLoader(workspace).loadDetailed()).rejects.toMatchObject({ name: 'ReadChangedError' });
+    expect(changed).toBe(true);
+    expect(handles.every(handle => handle.fd === -1)).toBe(true);
   });
 
   it('rejects a manifest that grows beyond the byte budget after its size precheck', async () => {

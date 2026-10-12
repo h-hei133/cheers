@@ -363,7 +363,7 @@ export class SkillLoader {
         ignored = await loadIgnoredDirectories(discovery.root(boundary), dir,
           candidates.map(entry => entry.name), { abortSignal: this.signal, assertFileAccess: absolute => {
             this.onSource?.(absolute); discovery.root(boundary);
-          } }, discovery.budget);
+          }, onCapturedSource: captured => { discovery.capture(captured); } }, discovery.budget);
       } catch (error) {
         discovery.rethrow(error);
         throw error;

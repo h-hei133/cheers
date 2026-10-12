@@ -33,6 +33,7 @@ interface GitReadAccess {
   readonly pruneDirectories?: readonly string[]
   /** Directory candidates remain traversable when they contain indexed files. */
   readonly directories?: boolean
+  readonly onCapturedSource?: FileWalkOptions['onCapturedSource']
 }
 
 /**
@@ -51,7 +52,7 @@ interface GitReadAccess {
 export async function listWorkspaceFilesViaGit(root: string, abortSignal?: AbortSignal, budget = new WalkBudget(abortSignal), options?: FileWalkOptions): Promise<readonly string[] | null> {
   const workspaceRoot = path.resolve(root)
   const output = await runGit(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], undefined, abortSignal, budget, true,
-    { root: workspaceRoot, assertFileAccess: options?.assertFileAccess ?? (() => {}), pruneDirectories: options?.pruneDirectories })
+    { root: workspaceRoot, assertFileAccess: options?.assertFileAccess ?? (() => {}), pruneDirectories: options?.pruneDirectories, onCapturedSource: options?.onCapturedSource })
   if (output === null) return null
   // Git already uses forward slashes. NUL records bypass filename quoting and
   // preserve whitespace, backslashes and embedded newlines as literal names.

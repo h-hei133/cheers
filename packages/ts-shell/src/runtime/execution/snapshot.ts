@@ -6,7 +6,7 @@ export class SnapshotLimitError extends Error {
 }
 
 /** Bounded bytes from the verified file handle, rejecting mutation during capture. */
-export async function readBinarySnapshot(request: Pick<TextFileReadExecutionRequest, 'absolutePath' | 'workspaceRoot' | 'assertFileAccess' | 'abortSignal'>, maxBytes: number): Promise<Buffer> {
+export async function readBinarySnapshot(request: Pick<TextFileReadExecutionRequest, 'absolutePath' | 'workspaceRoot' | 'assertFileAccess' | 'abortSignal' | 'onCapturedSource'>, maxBytes: number): Promise<Buffer> {
   return withVerifiedReadTarget(request, 'file', async (handle, verify) => {
     const before = await handle.stat({ bigint: true });
     if (before.size > BigInt(maxBytes)) throw new SnapshotLimitError();

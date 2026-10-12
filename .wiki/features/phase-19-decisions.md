@@ -2171,3 +2171,17 @@ metadata 策略统一为已有[读取 owner](../../packages/ts-shell/src/runtime
 Node20.3/单文件 × stable/changed **四条实际 print CLI**通过。stable 两组共 **4合成 POST**，catalog 描述与 skill 工具正文正常、本次 call ID 相符、源字节保持；changed 由 IN_CLOSE_NOWRITE 先确认首源句柄关闭，再观察第二源 IN_ACCESS 后实际子进程 pwrite，均 exit1、**零 POST/零旧指令**，安全拒绝发生在发送模型请求之前。第二源正文原字节保持。
 
 材料 `.tmp/catalog-currency/{contract.json,inventory-final.json,baseline-scoped-probe.log,repaired-probe.log,tests-final.log,review-code.md,review-architecture.md,reversals-final/results.json,cli-smoke-results.json,normproof-out/}`。范围是已读 manifest 到其最后一次逐源 metadata 检查；未宣称所有 ignore 源、未枚举文件或整目录原子事务，不保证该检查后的变化，非 Linux 和真实外部证据另验。本批未重跑全仓/scripts/PTY/真实 provider。SAFE-02/Phase19 active，提交、推送和精确 SHA CI 单独记录。
+
+该组件已提交/推送 `d589e8d02c5299f0de4a3a25169b9aea1a742540`，10 个原始路径/blob 与最终源码/文档逐项审计通过，用户 `.gitignore` 排除且原 SHA 保持，远端分支读回同 SHA。CI 38295056304/job114964024097 与 Watch38295056278/job114964022341 均 completed/failure、steps=[]；分别读取的 annotations 确认付款/spending-limit 阻止启动，未计远端验证通过。材料 `.tmp/catalog-currency/{commit-audit.json,delivery.json}`。
+
+### 8.147 SAFE-02：技能发布前复查已捕获的 ignore 与 Git 来源
+
+实际子进程在 ignore 查询返回、源句柄关闭后改写规则，原生 Git 和 TypeScript fallback 均曾继续发布已被排除技能。现有[读取 owner](../../packages/ts-shell/src/runtime/execution/read.ts)现在仅在完整核验与成功关闭后报告中性 `CapturedReadSource` metadata；snapshot 复用该观察边界，技能 manifest 删去独立的前置 metadata 捕获。[ignore owner](../../packages/ts-shell/src/runtime/execution/ignoreRules.ts)在普通可选读取的 catch 之外通知，观察器的 resource/取消/变化拒绝不会被当成缺失规则。[原生来源 owner](../../packages/ts-shell/src/runtime/execution/view/source.ts)报告实际捕获的原路径、canonical target 和最早 staged revision，包含 Git config/index、excludes 与已用别名。
+
+原[discovery ledger](../../packages/ts-shell/src/core/skills/discovery.ts)扩展到上述已捕获来源，仍使用 loader/catalog 现有最终检查，无正文重读或保留句柄。最多 4096 个来源路径，metadata 路径占用既有累计 path budget；512 manifest、单文件512KiB和总8MiB不变。重复捕获不覆盖最早修订；路径重绑、消失或修订变化拒绝完整 catalog，普通初始缺失/不可读保持原契约。定向参考的规则前缀、忽略优先级和普通可选读取决策保持；其同步加载没有跨来源发布检查，本项目复用已有 metadata ledger 补上已知变化，以原生/fallback 两项有效反转约束这一差异。
+
+最终冻结 **11 TS/8 production**，`inventory-final.json` SHA256 `f19007ffad95ca869139a223546f66e8781166840dbb0d8a0f04f0991cf0d20b`。Node20.3 受影响组合 **14文件/224项**、TS/单文件构建和四源码静态门通过；完整 judge exit0，图义务 satisfied，4项既有ceiling advisory保持partial，无新增。两项隔离反转分别省略 native/fallback 来源通知，均实际 AssertionError，正向副本通过且原源码/用户 `.gitignore` 字节保持。初次 fallback 探针继承外层仓库、未打开目标 manifest，属 harness/setup；改用独立 Git 根并从 PATH 排除 Git 后，两路均实际观测 ignore 读取/关闭及 child 改写，再运行产品断言。
+
+独立 code **APPROVE**（7文件/142项及两路child、六项source-owner检查），architecture **CLEAR**（9文件/156项及两路child、contribution等待/metadata-only/path-budget三检查），综合 **APPROVE（限本批）**。两lane运行前后全部冻结路径相符，无源码/测试改动。code最初Node20 launcher不支持tsx的`--import`，根cwd Vitest选择到临时反转副本后主动中止，两类harness运行未计通过；实际workspace cwd串行运行才计上述142项。
+
+Node20.3/单文件 × stable/changed **四条实际 print CLI**通过；stable 两组共 **4合成 POST**，可见技能描述/工具正文正常、原先隐藏技能零泄漏，本次 call ID 与源字节相符。changed 两组实际 IN_CLOSE_NOWRITE 后、manifest IN_ACCESS 时 child 改写规则，均 exit1、**零 POST/零旧指令**。材料 `.tmp/catalog-sources/{contract.json,inventory-final.json,baseline-repaired-probe.log,repaired-probe.log,tests-first.log,reversals/results.json,cli-smoke-results.json,normproof-out/}`。范围止于已捕获来源的最后逐源检查；未捕获或初始缺失来源、目录枚举事务、检查后变化、非 Linux、外部 metadata/hasconfig 与真实外部验收仍未关闭，SAFE-02/Phase19 active；本批未重跑全仓/scripts/PTY/真实 provider，交付另验。
