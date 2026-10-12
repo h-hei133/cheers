@@ -101,9 +101,9 @@ Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)�
 | macOS/Windows | 部分 profile、接口与纯逻辑用例 | 原生路径/文件描述符、进程树清理、终端与设备尚未取得等价实机证据 |
 | 模型传输与严格预算 | 合成 HTTP/SSE/usage/重试/unknown、统一 request admission | W7-33 四端点真实 TLS/HTTP2 矩阵仍缺；无法证明上界的请求继续拒绝 strict cap 准入 |
 | 公共包、认证、协作和 SSH | 受控服务、签名、ACL、撤权、重连与未知副作用 | 真实账户、公共部署 TLS、真实远端主机/主机密钥和生产互通验收 |
-| SAFE-02 | Linux 公开文件工具的检查/句柄/拒绝/清理及受管编辑目录固定；原生 Git/ripgrep 私有视图、配置准入和 child 完成收据；异步技能发现、批准前捕获与共享预算，见 §7–9 | 非 Linux 实际对象绑定、跨进程正文稳定、整 catalog 一致性与私有镜像剩余成本继续开放；外部 metadata/hasconfig 明确拒绝，资源计数器不约束原生进程内部全部读取 |
+| SAFE-02 | Linux 公开文件工具的检查/句柄/拒绝/清理及受管编辑目录固定；原生 Git/ripgrep 私有视图、配置准入和 child 完成收据；异步技能发现、批准前捕获与共享预算；读取期间已知变化拒绝发布，见 §7–10 | 非 Linux 实际对象绑定、最终 metadata 检查后的正文稳定、跨文件/整 catalog 一致性与私有镜像剩余成本继续开放；外部 metadata/hasconfig 明确拒绝，资源计数器不约束原生进程内部全部读取 |
 
-技能发现的同步正文/Git 忽略路径已按 §9 替换；SAFE-02 继续处理非 Linux 对象绑定、跨进程正文稳定和镜像成本，扩展外部 metadata/条件支持须重新证明准入。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把 W1–W16 或 Phase 19 总目标标为完成。
+技能发现的同步正文/Git 忽略路径已按 §9 替换；§10 拒绝检测到的读取期间源变化。SAFE-02 继续处理非 Linux 对象绑定、跨文件一致性和镜像成本，扩展外部 metadata/条件支持须重新证明准入。逐文件检查不保证其后全部变化或整目录事务。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把 W1–W16 或 Phase 19 总目标标为完成。
 
 ## 6. 迁移、回退与交付
 
@@ -185,3 +185,23 @@ O(n) 镜像成本仍是 architecture WATCH，性能门槛通过不关闭 §5 的
 参考方案可跳过不可读 ignore 源，本项目保留普通缺失而明确传播 resource/cleanup，不以隐藏来源漏出换取部分成功。CLI 初次夹具的默认拒绝、无效相对 excludes cwd 和 RTK proxy 的非TTY输出分别保留失败记录；修正夹具后才计上述通过。没有重跑全仓套件或真实 provider。
 
 WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查询延迟、256个源订阅和缓存过期回退、整catalog的并发内容一致性；单项快照不构成目录事务，扩展 inventory 仍使用原同步身份验证。SAFE-02 其余边界及 W7-33、用户前端、真实外部服务保持 §5 状态，Phase19 active；本批源码提交/推送/精确CI另行核对。
+
+该组件已提交/推送 `4e30b0b453d9e4434e4909238d5c846bb264bbf2`，远端读回同 SHA。CI 38290174983/job114948097412、Watch38290174987/job114948098104 均付款/spending-limit 阻止启动，steps=[]、failure，未计远端通过。交付前关闭 rename 识别后逐项审计 46 个原始路径/blob/删除与文档字节、排除用户 `.gitignore`；材料 `.tmp/skill-discovery/{commit-audit.json,delivery.json}`。
+
+## 10. SAFE-02 读取期间源变化局部验收（2026-10-13）
+
+起点为 §9 技能提交。[原读取 owner](../../packages/ts-shell/src/runtime/execution/read.ts)核验打开时的 size/mtimeNs/ctimeNs 与路径/身份，在 consumer 返回后复验，原生输入在后续打开完毕后复查早期输入。已知打开后替换/消失/逃逸/正文修订采用 `ReadChangedError`；搜索不发布匹配，ignore/技能不省略已知变化，媒体适配为原 `changed` 分类，清理不确定性保持优先。
+
+| 证据 | 实际结果 | 范围/材料 |
+|---|---|---|
+| 最终冻结 | 13 TS/7 production，逐文件两 lane 前后相符，用户 `.gitignore` 原 SHA 保持 | `inventory-final.json` SHA256 `96c841200d90e258992c276c40b1b28a3db4bb97546e9d731bda2d7fecbaf707` |
+| 子进程基线/修复 | 原完整读/分页/rg 描述符发布变更结果；最终均拒绝、零字节、关闭 | `baseline-probe.log`、`repaired-probe.log`及独立 `review-*-child-final`；是 reader/native owner 证据 |
+| 最终受影响组合 | Node20.3 26文件/350项通过 | `tests-final.log`，包含 editEngine/LSP/conditionalWrite/媒体；不存在测试过滤不计通过，本批未重跑 scripts/全仓 |
+| 构建/静态/完整结构 | 两产物、四源码门通过；judge exit0/partial，未解析和混合环 satisfied | `build-final`、`executable-final`、`gates-final`、`normproof-out`；4项既有ceiling advisory，无新增 |
+| 独立 code/architecture | APPROVE/WATCH，综合 COMMENT，没有未解决 blocker | `review-code.md`、`review-architecture.md`；独立164/161项、快照第三stat、六个替换/消失消费者、媒体分类与bounds/优先级探针 |
+| 四组隔离反转 | 正向通过，四反转均真实 AssertionError，原源字节不变 | 最终检查、早期输入检查、路径/快照类型；`reversals/results.json` |
+| 八条实际 print 工具链 | Node20.3/单文件 × read/grep × stable/changed，16 合成 POST、exit0 | `cli-smoke-results.json`；真实 IN_ACCESS watcher child 写入，stable正常正文、changed明确工具失败/零needle，核对本次call ID |
+
+复审修复 snapshot 自有最后 stat 的通用错误被技能吞掉、身份/路径变化被 fallback/ignore/技能当作不可读及媒体现有 `changed` 分类被共享验证抢先覆盖。已知变化的拒绝不是初始缺失或普通不可读；真实执行失败和关闭不确定性不降级为变更或取消。
+
+证据止于最终逐文件 metadata 核验；ctime-only 变化可保守拒绝，即使正文相同。没有 OS 锁、跨文件/整 catalog 事务、最后检查以后稳定、非 Linux 实际对象或本批延迟基准。实际 CLI 的 exit0 与模型收尾不升级 changed 工具结果为成功。本批没有真实 provider、PTY或外部服务新增验收。§5 的其余条件、SAFE-02 和 Phase19 继续 active；提交/推送/精确 SHA CI 单独核对。

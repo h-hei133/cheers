@@ -19,6 +19,23 @@ beforeEach(() => {
   fs.writeFileSync(path.join(root, 'outside'), 'PRIVATE_PATTERN\n')
 })
 afterEach(() => { vi.restoreAllMocks(); fs.rmSync(root, { recursive: true, force: true }) })
+it('does not discard a changed ignore source and expose excluded candidates', async () => {
+  const open = fsp.open
+  let captured: Awaited<ReturnType<typeof open>> | undefined
+  vi.spyOn(fsp, 'open').mockImplementation(async (...args) => {
+    const handle = await open(...args); captured = handle
+    const read = handle.read.bind(handle)
+    vi.spyOn(handle, 'read').mockImplementationOnce(async (options: any) => {
+      const content = await read(options)
+      execFileSync(process.execPath, ['-e', 'require("node:fs").writeFileSync(process.argv[1], "changed.txt\\n")', file])
+      return content
+    })
+    return handle
+  })
+  await expect(loadIgnoreFile(ignore(), file, '', workspace)).rejects.toMatchObject({ name: 'ReadChangedError' })
+  expect(captured?.fd).toBe(-1)
+})
+
 it('does not read an ignore file replaced after opening', async () => {
   const open = fsp.open
   let handle: Awaited<ReturnType<typeof fsp.open>> | undefined
@@ -31,7 +48,7 @@ it('does not read an ignore file replaced after opening', async () => {
     return handle
   })
   const matcher = ignore()
-  await loadIgnoreFile(matcher, file, '', workspace)
+  await expect(loadIgnoreFile(matcher, file, '', workspace)).rejects.toMatchObject({ name: 'ReadChangedError' })
   expect(handle).toBeDefined()
   expect(read).not.toHaveBeenCalled()
   expect(handle?.fd).toBe(-1)
@@ -53,7 +70,7 @@ it('uses the open file and refuses changed-path patterns after the read', async 
     return handle
   })
   const matcher = ignore()
-  await loadIgnoreFile(matcher, file, '', workspace)
+  await expect(loadIgnoreFile(matcher, file, '', workspace)).rejects.toMatchObject({ name: 'ReadChangedError' })
   expect(observed).toBe('original.txt\n')
   expect(matcher.ignores('original.txt')).toBe(false)
   expect(matcher.ignores('PRIVATE_PATTERN')).toBe(false)

@@ -2137,3 +2137,21 @@ SAFE-02 继续开放同步 discovery 并发替换、非 Linux 实际对象绑定
 五类隔离源码反转均出现真实 AssertionError：取消实际对象复验、提前批准、跳过 warm cache 预算、把清理失败当取消、吞掉 fallback ignore resource。正向副本通过，源及 `.gitignore` 字节均保持。Node20.3/单文件各完成 automatic tracked/ignored/config-excludes 和显式 `--skill`+`--no-skills` 四条 print 工具链，共 **8 合成 POST**；regular/fullscreen 四条实际 PTY 技能展开、参数发送与隐藏技能零发送，共 **4 合成 POST**，退出0且原技能/config 字节保持。首次夹具缺少明确非交互批准、相对 excludes 值在查询 cwd 无效，以及 RTK proxy 吞掉 PTY 属性，均按 harness 分类并修正，失败材料保留。
 
 材料 `.tmp/skill-discovery/{contract.json,inventory-final-repair.json,review-code.md,review-architecture.md,reversals/results.json,cli-smoke-results.json,cli-pty-results.json,normproof-out/}`。本批关闭技能发现的同步正文/原生忽略读取路径；SAFE-02 非 Linux 实际对象绑定、跨进程正文稳定、外部 metadata/hasconfig 及镜像剩余成本仍开放，W7-33/用户前端/真实外部服务另验，Phase19 全目标 active。提交/推送/本批精确 SHA CI 单独取证，不继承历史通过。
+
+该技能组件已提交/推送 `4e30b0b453d9e4434e4909238d5c846bb264bbf2`，远端分支读回同 SHA。CI 38290174983/job114948097412 与 Watch38290174987/job114948098104 均 completed/failure、steps=[]；分别读取的 annotations 确认付款/spending-limit 阻止启动，没有远端验证通过。Git 自动识别测试迁移为 rename 后，交付前以 `--no-renames` 逐项复核全部 46 个原始路径、源 blob/删除、文档字节及 `.gitignore` 排除，审计通过；材料 `.tmp/skill-discovery/{commit-audit.json,delivery.json}`。
+
+### 8.145 SAFE-02：读取期间的已知源变化拒绝发布
+
+[读取 owner](../../packages/ts-shell/src/runtime/execution/read.ts)按打开句柄捕获的 size/mtimeNs/ctimeNs 核验正文修订，并在 consumer 返回后、结果释放前再次核验。Linux 描述符搜索复用同一 verifier，在后续输入打开完毕后复查早期输入才启动 child。检测到打开后身份/路径替换、canonical 逃逸、消失或正文修订均抛出安全的 `ReadChangedError`；初始缺失、未准入与普通不可读保持原契约。[快照](../../packages/ts-shell/src/runtime/execution/snapshot.ts)最后一次 handle-stat 也使用同一错误。[媒体 owner](../../packages/ts-shell/src/runtime/execution/media/source.ts)在直接 verify 和最外层最终检查中适配为既有 `MediaReadError('changed')`，不吞掉清理不确定性。
+
+原生和 fallback 搜索检测到已知变更时都拒绝发布匹配；原生执行清理失败先于变更，文件关闭失败仍先于取消/正文。[ignore owner](../../packages/ts-shell/src/runtime/execution/ignoreRules.ts)与[技能 owner](../../packages/ts-shell/src/core/skills/discovery.ts)传播同一错误，不将已知变更省略成空规则或完整空 catalog。复审实际重现并修复快照第三次 stat 的遗漏、路径替换被吞及媒体错误分类回归。现有替换测试改为明确拒绝，保留零读取和关闭断言，未放宽测试。
+
+定向参考读取采用单次异步完整读取后分页，本项目保留异步/取消语义，但继续使用已有有界分页和已核验句柄；参考不提供事务正文稳定，因此沿用本地 snapshot 的 metadata 修订策略。实际子进程基线曾发布完整读和混合分页；最终 complete/page/真实 rg 描述符探针均拒绝，零结果字节且关闭。该决策的回归与反转约束最后检查及早期输入复查，不引入第二套读路径。
+
+最终冻结 **13 TS/7 production**，`inventory-final.json` SHA256 `96c841200d90e258992c276c40b1b28a3db4bb97546e9d731bda2d7fecbaf707`。Node20.3 最终受影响组合 **26文件/350项**通过，包含真实 editEngine、LSP、conditionalWrite 和媒体消费者；早期命令中的不存在 write/edit/upload 测试过滤不计验证。TS/单文件构建、四源码门通过；完整 judge exit0，未解析/混合环 satisfied，4 项既有 ceiling advisory 保持 partial，无新增违规。本批未改 gates，未重跑 scripts 或全仓套件。
+
+独立 code **APPROVE**（9文件/164项及原样快照、子进程和优先级探针），architecture **WATCH**（9文件/161项、六个 replace/remove 消费者反例、bounds/准入/取消/cleanup 及媒体直接/最外层分类），均逐文件核对最终源码，综合 **COMMENT**，没有未解决 blocker。WATCH 保留逐文件 metadata 边界、ctime-only 保守拒绝、Linux 实际对象范围和未测延迟；不是全 catalog 事务、OS 锁或最终检查之后的稳定保证。
+
+四组隔离反转（最终复验、早期输入复验、路径变化类型、快照变化类型）均实际 AssertionError，正向副本通过，原源码与用户 `.gitignore` 字节不变。Node20.3/单文件 × read/grep × stable/changed **八条实际 print CLI、16 合成 POST**通过；并发变化由实际 IN_ACCESS 观察子进程触发 pwrite，工具结果安全拒绝且零 `END_NEEDLE`，稳定组正常返回、原字节保持。CLI exit0 仅表示工具链完成，changed 工具结果仍明确失败，不记作读取成功。
+
+材料 `.tmp/read-currency/{contract.json,inventory-final.json,baseline-probe.log,tests-final.log,review-code.md,review-architecture.md,reversals/results.json,cli-smoke-results.json,normproof-out/}`。本批补上已知读取期间变化的传播/发布边界；非 Linux 对象绑定、跨文件/整 catalog 一致性、外部 metadata/hasconfig、镜像成本及其余真实外部验收继续开放，SAFE-02/Phase19 active。源码提交、推送、精确 SHA CI 单独取证。

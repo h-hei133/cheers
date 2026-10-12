@@ -8,6 +8,7 @@ import { createDefaultExecutionService } from "../../runtime/execution/service.j
 import { executeLocally } from "../../runtime/execution/local.js";
 import which from "which";
 import { completeNativeRead } from '../../test-utils/native.js';
+import { execFileSync } from 'node:child_process';
 
 vi.mock("../../runtime/execution/local.js", async () => {
   const actual = await vi.importActual<typeof import("../../runtime/execution/local.js")>("../../runtime/execution/local.js");
@@ -121,6 +122,31 @@ it("uses the existing file walk when no binary is installed", async () => {
   const result = await createGrepToolDefinition(createDefaultExecutionService()).execute({ pattern: "needle" }, { taskId: "fixture", workspaceRoot: workspace });
   expect(result.success).toBe(true);
   expect(result.output).toContain("a.txt:1: fallback needle");
+});
+
+it.each(['rewrite', 'replace', 'remove'])('does not return complete fallback matches after a child %s during capture', async mutation => {
+  await fs.unlink(path.join(root, 'rg'));
+  for (const command of ['git', 'bwrap']) await fs.symlink(which.sync(command), path.join(root, command));
+  vi.stubEnv('PATH', root);
+  const file = path.join(workspace, 'a.ts');
+  const open = fs.open;
+  let captured: Awaited<ReturnType<typeof open>> | undefined;
+  vi.spyOn(fs, 'open').mockImplementation(async (...args) => {
+    const handle = await open(...args);
+    if (args[0] === file) {
+      captured = handle; const read = handle.readFile.bind(handle);
+      vi.spyOn(handle, 'readFile').mockImplementationOnce(async (options: any) => {
+        const content = await read(options);
+        execFileSync(process.execPath, ['-e', 'const fs=require("node:fs");const [file,mode]=process.argv.slice(1);if(mode==="replace")fs.renameSync(file,file+".old");if(mode==="remove")fs.unlinkSync(file);else fs.writeFileSync(file,"changed source")', file, mutation]);
+        return content;
+      });
+    }
+    return handle;
+  });
+  const result = await createGrepToolDefinition(createDefaultExecutionService()).execute({ pattern: 'needle' }, { taskId: 'fixture', workspaceRoot: workspace });
+  expect(result.success).toBe(false);
+  expect(result.error).toBe('Search stopped: a source file changed during reading. Retry with a stable source.');
+  expect(captured?.fd).toBe(-1);
 });
 
 it("failed native execution does not conceal the failure with a fallback scan", async () => {

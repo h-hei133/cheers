@@ -6516,3 +6516,9 @@ W16 已提交/推送 `f43ae09ec90a5890b768598ab52a17821c5e9efc` 并读回远端�
 ### 2026-10-13 — SAFE-02 异步技能发现
 
 删除同步技能正文/原生Git忽略发现路径，技能 owner 复用核验目录/文件句柄、私有Git视图与共享预算。内置/扩展/warm cache 同受512 manifest、单512KiB/总8MiB；清理、resource、取消不发布完整catalog。准备能力在完整捕获及准入复验后才发布，kernel批准前等待；contribution撤权和生效Git源变化保持可见。最终43TS/31production（含删除），修复后192项及最后96项、两构建、四源码门/完整judge通过；独立code225项APPROVE、architecture186项WATCH，无剩余blocker。五隔离反转均实际断言失败；Node/单文件四print与四PTY共12合成POST通过，技能/config与用户`.gitignore`原字节保留。夹具批准/相对excludes/PTY属性错误已分类修正，未算产品失败或通过。详情见[裁决 §8.144](features/phase-19-decisions.md)和[局部验收 §9](features/phase-19-acceptance.md)，材料 `.tmp/skill-discovery/`。平台、目录延迟/观察覆盖、整catalog并发一致性及其余外部证据保持开放，Phase19 active；提交/推送/精确CI另验。
+
+技能组件 `4e30b0b453d9e4434e4909238d5c846bb264bbf2` 已提交/推送并读回同 SHA；CI38290174983/job114948097412、Watch38290174987/job114948098104 均付款/spending-limit 未启动、零步骤 failure，没有远端通过。关闭 rename 识别后对 46 原始路径/blob/删除、文档和用户 `.gitignore` 排除审计通过，材料 `.tmp/skill-discovery/{commit-audit.json,delivery.json}`。
+
+### 2026-10-13 — SAFE-02 已知读取变化拒绝发布
+
+原读取 owner 加入正文修订/结果释放前复验与早期原生输入复查，已知身份/路径/消失和正文变化共享安全类型。搜索停止且丢弃匹配，ignore/技能拒绝不完整规则/catalog，媒体保留原 changed 分类；执行/关闭不确定性优先。复审重现并修复 snapshot 第三stat遗漏、替换被静默吞与媒体消费者回归。最终13TS/7production，Node20.3 26文件/350项、两产物/四源码门/完整judge通过，4既有ceiling advisory保持partial；独立code164项APPROVE、architecture161项WATCH，综合COMMENT，无blocker。四隔离反转实际AssertionError，八actual print read/grep×Node/单文件×stable/changed共16合成POST通过；IN_ACCESS实际子进程写入的changed工具结果明确失败/零正文。原源码与用户`.gitignore`字节保持。详见[裁决 §8.145](features/phase-19-decisions.md)与[局部验收 §10](features/phase-19-acceptance.md)，材料 `.tmp/read-currency/`。逐文件metadata不承诺OS锁/跨文件catalog/最后检查后稳定；平台、镜像和真实外部余项仍开放，Phase19 active，提交/推送/精确CI另记。

@@ -8,6 +8,7 @@ import { createDefaultExecutionService } from '../../runtime/execution/service.j
 import { createGrepToolDefinition } from './grep.js'
 import { forgetRipgrepBinary, searchWithRipgrep } from './grepRipgrep.js'
 import { completeNativeRead } from '../../test-utils/native.js'
+import { execFileSync } from 'node:child_process'
 
 vi.mock('../../runtime/execution/local.js', () => ({ executeLocally: vi.fn() }))
 
@@ -23,6 +24,29 @@ afterEach(() => { forgetRipgrepBinary(); vi.restoreAllMocks(); fs.rmSync(root, {
 const stages = ['probe', 'candidates', 'contents'] as const
 type Stage = typeof stages[number]
 const success = { status: 'completed' as const, exitCode: 0, stdout: '', stderr: '' }
+
+it.each([false, true])('does not publish changed native inputs or erase execution failure=%s', async executionFailure => {
+  vi.mocked(executeLocally).mockImplementation(async input => {
+    if (input.args.includes('--files')) input.onStdout?.(Buffer.from('public.txt\0'))
+    else if (!input.args.includes('--version')) {
+      input.onStdout?.(Buffer.from(JSON.stringify({ type: 'match', data: {
+        path: { text: '/proc/self/fd/3' }, lines: { text: 'PRIVATE_MATCH_DETAIL\n' }, line_number: 1,
+      } }) + '\n'))
+      execFileSync(process.execPath, ['-e', 'require("node:fs").writeFileSync(process.argv[1], "change")', path.join(root, 'public.txt')])
+      if (executionFailure) return { ...success, status: 'failed', exitCode: 1, failureKind: 'execution_failure' }
+    }
+    completeNativeRead(input)
+    return success
+  })
+  const service = createDefaultExecutionService()
+  const fallback = vi.spyOn(service, 'listFilesRecursive')
+  const result = await createGrepToolDefinition(service).execute({ pattern: 'needle' }, { workspaceRoot: root, taskId: 'fixture' })
+  expect(result.success).toBe(false)
+  expect(result.error).toBe(executionFailure ? 'Search stopped: execution failed; process cleanup could not be verified.'
+    : 'Search stopped: a source file changed during reading. Retry with a stable source.')
+  expect(JSON.stringify(result)).not.toContain('PRIVATE_MATCH_DETAIL')
+  expect(fallback).not.toHaveBeenCalled()
+})
 
 function injectFailure(stage: Stage, trigger: 'none' | 'parent' | 'limit', controller: AbortController): void {
   vi.mocked(executeLocally).mockImplementation(async input => {

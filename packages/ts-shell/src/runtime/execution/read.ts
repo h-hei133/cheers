@@ -11,6 +11,13 @@ export class ReadCleanupError extends Error {
   }
 }
 
+export class ReadChangedError extends Error {
+  constructor() {
+    super('Read target changed during capture; no stable result is available.')
+    this.name = 'ReadChangedError'
+  }
+}
+
 /** Resource exhaustion cannot be treated as an absent optional read source. */
 export function isReadResourceFailure(error: unknown): boolean {
   return error !== null && typeof error === 'object' && 'code' in error && typeof error.code === 'string'
@@ -31,6 +38,10 @@ function contained(target: string, root: string): string {
 
 function sameFile(left: BigIntStats, right: BigIntStats): boolean {
   return left.ino !== 0n && left.dev === right.dev && left.ino === right.ino
+}
+
+function sameRevision(left: BigIntStats, right: BigIntStats): boolean {
+  return left.size === right.size && left.mtimeNs === right.mtimeNs && left.ctimeNs === right.ctimeNs
 }
 
 function workspaceTarget(target: string, requestedRoot: string, realRoot: string): string {
@@ -74,25 +85,30 @@ export async function withVerifiedReadTarget<T>(request: ReadTarget, kind: 'file
     request.abortSignal?.throwIfAborted()
     const opened = await handle.stat({ bigint: true })
     if ((kind === 'file' ? !opened.isFile() : !opened.isDirectory()) || !sameFile(before, opened)) {
-      throw new Error('Read target changed while opening the file.')
+      throw new ReadChangedError()
     }
     const verify = async (): Promise<void> => {
       // Only Linux exposes the actual open object through this interface.
       const actual = process.platform === 'linux' ? await fs.realpath(`/proc/self/fd/${handle.fd}`) : await fs.realpath(target)
-      if (contained(actual, root) !== target || realpathSync(request.workspaceRoot) !== workspace
-        || !sameFile(opened, statSync(target, { bigint: true }))) {
-        throw new Error('Read target changed after validation.')
+      const current = statSync(target, { bigint: true })
+      const checked = verifyPathContainment(actual, root)
+      if (!checked.allowed || checked.resolvedPath !== target || realpathSync(request.workspaceRoot) !== workspace
+        || !sameFile(opened, current)) {
+        throw new ReadChangedError()
       }
+      if (kind === 'file' && !sameRevision(opened, current)) throw new ReadChangedError()
       request.assertFileAccess?.(actual)
       request.abortSignal?.throwIfAborted()
     }
     await verify()
-    return await consume(handle, verify)
+    const result = await consume(handle, verify)
+    await verify()
+    return result
   } catch (error) {
     // A disappearing opened file is a failed read, not evidence that a writer
     // may treat its pre-read as an initially absent target.
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-      throw new Error('Read target became unavailable after opening.')
+    if (error instanceof Error && 'code' in error && (error.code === 'ENOENT' || error.code === 'ENOTDIR')) {
+      throw new ReadChangedError()
     }
     throw error
   } finally {
@@ -104,27 +120,17 @@ export async function withVerifiedReadTarget<T>(request: ReadTarget, kind: 'file
 export async function withVerifiedReadFiles<T>(requests: readonly TextFileReadExecutionRequest[], consume: (handles: readonly FileHandle[]) => Promise<T>): Promise<T> {
   if (process.platform !== 'linux') throw new Error('Descriptor input binding is unavailable on this platform.')
   const handles: FileHandle[] = []
+  const checks: Array<() => Promise<void>> = []
   async function openNext(index: number): Promise<T> {
     if (index < requests.length) {
-      return withVerifiedReadTarget(requests[index]!, 'file', async handle => {
+      return withVerifiedReadTarget(requests[index]!, 'file', async (handle, verify) => {
         handles.push(handle)
+        checks.push(verify)
         return openNext(index + 1)
       })
     }
     // Opening later files yields; recheck earlier descriptors before giving them to a child.
-    for (let i = 0; i < handles.length; i++) {
-      const request = requests[i]!
-      request.abortSignal?.throwIfAborted()
-      const actual = await fs.realpath(`/proc/self/fd/${handles[i]!.fd}`)
-      const target = realpathSync(request.absolutePath)
-      const workspace = realpathSync(request.workspaceRoot)
-      const allowedRoot = request.artifactDirectory ? contained(realpathSync(request.artifactDirectory), workspace) : workspace
-      if (contained(actual, allowedRoot) !== target
-        || !sameFile(await handles[i]!.stat({ bigint: true }), statSync(target, { bigint: true }))) {
-        throw new Error('Read target changed before command execution.')
-      }
-      request.assertFileAccess?.(actual)
-    }
+    for (const verify of checks) await verify()
     return consume(handles)
   }
   return openNext(0)

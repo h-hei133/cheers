@@ -4,7 +4,7 @@ import { captureWorkspaceRoot, assertWorkspaceRoot } from '../workspace/roots.js
 import type { WorkspaceRoot } from '../workspace/model.js';
 import { readDirectory, DirectoryReadError } from '../../runtime/execution/directory.js';
 import { readBinarySnapshot, SnapshotLimitError } from '../../runtime/execution/snapshot.js';
-import { isReadResourceFailure, ReadCleanupError } from '../../runtime/execution/read.js';
+import { isReadResourceFailure, ReadChangedError, ReadCleanupError } from '../../runtime/execution/read.js';
 import { WalkBudget, WalkLimitError, type WalkLimits } from '../../runtime/execution/walk/budget.js';
 
 export class SkillDiscoveryError extends Error {
@@ -79,7 +79,7 @@ export class SkillDiscovery {
   rethrow(error: unknown): void {
     if (error instanceof SnapshotLimitError) throw new SkillDiscoveryError();
     if (isReadResourceFailure(error)) throw new SkillDiscoveryError();
-    if (error instanceof ReadCleanupError || error instanceof SkillDiscoveryError || error instanceof WalkLimitError
+    if (error instanceof ReadCleanupError || error instanceof ReadChangedError || error instanceof SkillDiscoveryError || error instanceof WalkLimitError
       || error instanceof DirectoryReadError && error.reason !== 'unavailable') throw error;
     this.signal?.throwIfAborted();
     this.budget.check();

@@ -152,8 +152,32 @@ describe("skill discovery", () => {
       }
       return handle;
     });
-    expect([...(await new SkillLoader(workspace).load()).keys()]).toEqual([]);
+    await expect(new SkillLoader(workspace).load()).rejects.toMatchObject({ name: 'ReadChangedError' });
     expect(captured).toBeDefined(); expect(read).not.toHaveBeenCalled(); expect(captured!.fd).toBe(-1);
+  });
+
+  it('rejects a complete catalog when a child changes a manifest at its final snapshot stat', async () => {
+    const file = path.join(workspace, 'named.md');
+    const original = '---\nname: one\ndescription: synthetic\n---\noriginal';
+    fs.writeFileSync(file, original);
+    const open = fsp.open;
+    let captured: Awaited<ReturnType<typeof open>> | undefined;
+    let statCalls = 0;
+    vi.spyOn(fsp, 'open').mockImplementation(async (...args) => {
+      const handle = await open(...args);
+      if (args[0] === file) {
+        captured = handle;
+        const stat = handle.stat.bind(handle);
+        vi.spyOn(handle, 'stat').mockImplementation(async (...options: any[]) => {
+          if (++statCalls === 3) execFileSync(process.execPath, ['-e', 'require("node:fs").writeFileSync(process.argv[1], process.argv[2])', file, original.replace('original', 'revised!')]);
+          return stat(...options as [any]);
+        });
+      }
+      return handle;
+    });
+    await expect(new SkillLoader(workspace, { disableDiscovery: true, extraPaths: [file] }).loadDetailed()).rejects.toMatchObject({ name: 'ReadChangedError' });
+    expect(statCalls).toBe(3);
+    expect(captured?.fd).toBe(-1);
   });
 
   it('rejects a manifest that grows beyond the byte budget after its size precheck', async () => {

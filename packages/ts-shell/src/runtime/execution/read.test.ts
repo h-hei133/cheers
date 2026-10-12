@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import { promises as fsp } from 'node:fs'
 import { withVerifiedReadFiles } from './read.js'
+import { execFileSync } from 'node:child_process'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -29,6 +30,26 @@ function request(target = 'source/file.txt', overrides: Partial<TextFileReadExec
 }
 
 describe('verified text reads', () => {
+  it.each([undefined, 64 * 1024])('rejects child changes before publishing a complete read with maxBytes=%s', async maxBytes => {
+    const target = path.join(workspace, 'source/file.txt')
+    const open = fsp.open
+    let captured: Awaited<ReturnType<typeof open>> | undefined
+    vi.spyOn(fsp, 'open').mockImplementation(async (...args) => {
+      const handle = await open(...args); captured = handle
+      const rewrite = () => execFileSync(process.execPath, ['-e', 'require("node:fs").writeFileSync(process.argv[1], "changed bytes")', target])
+      if (maxBytes === undefined) {
+        const read = handle.readFile.bind(handle)
+        vi.spyOn(handle, 'readFile').mockImplementationOnce(async (options: any) => { const content = await read(options); rewrite(); return content })
+      } else {
+        const read = handle.read.bind(handle)
+        vi.spyOn(handle, 'read').mockImplementationOnce(async (...options: any[]) => { const content = await read(...options as [any]); rewrite(); return content })
+      }
+      return handle
+    })
+    await expect(service.readTextFile(request(undefined, { maxBytes }))).rejects.toMatchObject({ name: 'ReadChangedError' })
+    expect(captured?.fd).toBe(-1)
+  })
+
   it('bounds complete reads from the verified handle and preserves exact BOM/line endings', async () => {
     expect(await service.readTextFile(request(undefined, { maxBytes: 16 }))).toBe('\ufeffauthorized\r\n')
     await expect(service.readTextFile(request(undefined, { maxBytes: 4 }))).rejects.toThrow('byte limit')
@@ -145,6 +166,24 @@ describe('verified text reads', () => {
 })
 
 describe('verified command inputs', () => {
+  it.each(['later-open', 'consumer'])('rejects content revisions during %s and closes every command input', async stage => {
+    fs.writeFileSync(path.join(workspace, 'second.txt'), 'second')
+    const target = path.join(workspace, 'source/file.txt')
+    const mutate = () => execFileSync(process.execPath, ['-e', 'require("node:fs").writeFileSync(process.argv[1], "changed bytes")', target])
+    const open = fsp.open
+    const handles: Awaited<ReturnType<typeof open>>[] = []
+    vi.spyOn(fsp, 'open').mockImplementation(async (...args) => {
+      const handle = await open(...args); handles.push(handle)
+      if (stage === 'later-open' && handles.length === 2) mutate()
+      return handle
+    })
+    const consume = vi.fn(async () => { if (stage === 'consumer') mutate(); return 'unverified answer' })
+    await expect(withVerifiedReadFiles([request(), request('second.txt')], consume)).rejects.toMatchObject({ name: 'ReadChangedError' })
+    expect(consume).toHaveBeenCalledTimes(stage === 'consumer' ? 1 : 0)
+    expect(handles).toHaveLength(2)
+    expect(handles.every(handle => handle.fd === -1)).toBe(true)
+  })
+
   it.each(['later-open', 'consumer'])('closes earlier handles after %s failure', async failure => {
     const open = fsp.open
     const handles: Awaited<ReturnType<typeof fsp.open>>[] = []

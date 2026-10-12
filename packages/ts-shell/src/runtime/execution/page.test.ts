@@ -4,6 +4,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { readTextPage } from './page.js'
 import type { TextPageReadRequest } from './types.js'
+import { execFileSync } from 'node:child_process'
 
 let root: string
 let request: TextPageReadRequest
@@ -13,6 +14,25 @@ beforeEach(async () => {
     authority: { mode: 'read-only', source: 'tool-runtime-approval', reason: 'fixture' }, caller: 'test', reason: 'fixture' }
 })
 afterEach(async () => { vi.restoreAllMocks(); await fs.rm(root, { recursive: true, force: true }) })
+
+it('rejects a page rather than returning mixed revisions after a child rewrites the source', async () => {
+  const original = ('A'.repeat(511) + '\n').repeat(100)
+  await fs.writeFile(request.absolutePath, original)
+  const open = fs.open
+  let captured: Awaited<ReturnType<typeof open>> | undefined
+  vi.spyOn(fs, 'open').mockImplementation(async (...args) => {
+    const handle = await open(...args); captured = handle
+    const read = handle.read.bind(handle)
+    vi.spyOn(handle, 'read').mockImplementationOnce(async (...options: any[]) => {
+      const content = await read(...options as [any])
+      execFileSync(process.execPath, ['-e', 'require("node:fs").writeFileSync(process.argv[1], process.argv[2])', request.absolutePath, original.replaceAll('A', 'B')])
+      return content
+    })
+    return handle
+  })
+  await expect(readTextPage({ ...request, limit: 1000 })).rejects.toMatchObject({ name: 'ReadChangedError' })
+  expect(captured?.fd).toBe(-1)
+})
 
 it.each(['', 'one', 'one\n', '\uFEFFone\r\ntwo\r\n', 'a'.repeat(16_383) + '中文\nlast'])('preserves complete UTF-8 text and CRLF (%#)', async text => {
   await fs.writeFile(request.absolutePath, text)

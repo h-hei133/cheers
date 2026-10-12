@@ -3,7 +3,7 @@ import type { FileHandle } from 'node:fs/promises'
 import { constants, promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { closeReadHandle, ReadCleanupError, withVerifiedReadTarget } from '../read.js'
+import { closeReadHandle, ReadChangedError, ReadCleanupError, withVerifiedReadTarget } from '../read.js'
 import { MediaReadError, type MediaReadRequest } from './model.js'
 
 export interface MediaSource {
@@ -25,7 +25,7 @@ export async function withMediaSource<T>(request: MediaReadRequest, consume: (so
     const before = await handle.stat({ bigint: true })
     if (before.size > 16n * 1024n * 1024n) throw new MediaReadError('bytes')
     const verify = async (): Promise<void> => {
-      await verifyTarget()
+      await verifyTarget().catch(throwSourceError)
       if (performance.now() >= deadline) throw new MediaReadError('deadline')
       const current = await handle.stat({ bigint: true })
       if (current.size !== before.size || current.mtimeNs !== before.mtimeNs || current.ctimeNs !== before.ctimeNs) throw new MediaReadError('changed')
@@ -57,8 +57,13 @@ export async function withMediaSource<T>(request: MediaReadRequest, consume: (so
     if (processCleanupFailed && error instanceof ReadCleanupError) {
       throw new AggregateError([new MediaReadError('cleanup'), error], 'Media extraction failed: process cleanup and input-handle cleanup could not be verified.')
     }
-    throw error
+    throwSourceError(error)
   }
+}
+
+function throwSourceError(error: unknown): never {
+  if (error instanceof ReadChangedError) throw new MediaReadError('changed')
+  throw error
 }
 
 async function copySource(handle: FileHandle, staged: FileHandle, verify: () => Promise<void>): Promise<{ hash: string; signature: Buffer; bytes: number }> {

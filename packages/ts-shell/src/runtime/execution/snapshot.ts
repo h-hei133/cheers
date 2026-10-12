@@ -1,4 +1,4 @@
-import { withVerifiedReadTarget } from './read.js';
+import { ReadChangedError, withVerifiedReadTarget } from './read.js';
 import type { TextFileReadExecutionRequest } from './types.js';
 
 export class SnapshotLimitError extends Error {
@@ -23,7 +23,7 @@ export async function readBinarySnapshot(request: Pick<TextFileReadExecutionRequ
     }
     await verify();
     const after = await handle.stat({ bigint: true });
-    if (before.size !== after.size || before.mtimeNs !== after.mtimeNs || before.ctimeNs !== after.ctimeNs) throw new Error('Upload source changed during capture.');
+    if (before.size !== after.size || before.mtimeNs !== after.mtimeNs || before.ctimeNs !== after.ctimeNs) throw new ReadChangedError();
     return Buffer.concat(chunks, bytes);
   });
 }

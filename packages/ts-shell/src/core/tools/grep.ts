@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs";
 import { realpathSync } from "node:fs";
-import { ReadCleanupError } from '../../runtime/execution/read.js';
+import { ReadChangedError, ReadCleanupError } from '../../runtime/execution/read.js';
 import path from "node:path";
 import { approvedResult, deniedResult } from "./toolResultLifecycle.js";
 import type { ToolDefinition, ToolExecutionResult } from "../../tools/types.js";
@@ -116,6 +116,10 @@ export function createGrepToolDefinition(
         return deniedResult('Search stopped: file handle cleanup could not be verified.');
       }
 
+      if (viaRipgrep.reason === 'changed') {
+        return deniedResult('Search stopped: a source file changed during reading. Retry with a stable source.');
+      }
+
       if (context.abortSignal?.aborted || viaRipgrep.reason !== "not-installed") {
         return deniedResult(`Search stopped: ${context.abortSignal?.aborted ? "cancelled" : viaRipgrep.reason}.`);
       }
@@ -188,6 +192,7 @@ export function createGrepToolDefinition(
           }
         } catch (error) {
           if (error instanceof ReadCleanupError) throw error;
+          if (error instanceof ReadChangedError) return deniedResult('Search stopped: a source file changed during reading. Retry with a stable source.');
           // Skip unreadable files gracefully
         }
       }

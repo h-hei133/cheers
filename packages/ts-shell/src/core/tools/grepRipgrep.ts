@@ -1,5 +1,5 @@
 import { StringDecoder } from "node:string_decoder";
-import { ReadCleanupError, withVerifiedReadFiles } from '../../runtime/execution/read.js';
+import { ReadChangedError, ReadCleanupError, withVerifiedReadFiles } from '../../runtime/execution/read.js';
 import { executeLocally } from "../../runtime/execution/local.js";
 import path from "node:path";
 import { realpathSync, statSync } from 'node:fs';
@@ -56,6 +56,7 @@ export type RipgrepUnavailable =
   | "execution-failure"
   /** A file descriptor used by native search could not be confirmed closed. */
   | "read-cleanup-failed"
+  | "changed"
   | "cancelled"
   | "timeout"
   | "output-limit";
@@ -271,6 +272,8 @@ async function streamSearch(binary: string, input: RipgrepSearchInput, files?: r
         return observed.outcome?.ok === false && observed.outcome.reason === 'execution-failure'
           ? { ...observed.outcome, readCleanupFailed: true } : { ok: false, reason: 'read-cleanup-failed' };
       }
+      if (observed.outcome?.ok === false && observed.outcome.reason === 'execution-failure') return observed.outcome;
+      if (error instanceof ReadChangedError) return { ok: false, reason: 'changed' };
       return { ok: false, reason: input.abortSignal?.aborted ? 'cancelled' : 'failed' };
     }
   }

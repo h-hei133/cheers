@@ -1,6 +1,6 @@
 import path from 'node:path'
 import ignore, { type Ignore } from 'ignore'
-import { isReadResourceFailure, ReadCleanupError, withVerifiedReadTarget } from './read.js'
+import { isReadResourceFailure, ReadChangedError, ReadCleanupError, withVerifiedReadTarget } from './read.js'
 import type { FileWalkOptions } from './types.js'
 import type { FileHandle } from 'node:fs/promises'
 import { WalkBudget, WalkLimitError } from './walk/budget.js'
@@ -76,7 +76,7 @@ export async function loadIgnoreFile(matcher: Ignore, file: string, prefix: stri
       return value
     })
   } catch (error) {
-    if (error instanceof ReadCleanupError || isReadResourceFailure(error)) throw error
+    if (error instanceof ReadCleanupError || error instanceof ReadChangedError || isReadResourceFailure(error)) throw error
     options?.abortSignal?.throwIfAborted()
     if (error instanceof WalkLimitError) throw error
     budget.check()
