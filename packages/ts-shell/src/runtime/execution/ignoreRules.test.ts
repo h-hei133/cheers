@@ -129,10 +129,11 @@ it('resolves relative runtime Git directories exactly once', async () => {
 
 it.each(['true', 'false'])('preserves tracked and untracked Git paths with core.quotePath=%s', async quotePath => {
   execFileSync('git', ['init', '-q', workspace])
-  execFileSync('git', ['-C', workspace, 'config', 'core.quotePath', quotePath])
-  fs.writeFileSync(path.join(workspace, '.gitignore'), '*.tmp\n')
   const nested = path.join(workspace, 'nested')
   fs.mkdirSync(nested)
+  execFileSync('git', ['init', '-q', nested])
+  execFileSync('git', ['-C', nested, 'config', 'core.quotePath', quotePath])
+  fs.writeFileSync(path.join(nested, '.git', 'info', 'exclude'), 'ignored.tmp\n')
   const tracked = literalNames.map(name => `tracked-${name}.tmp`)
   const untracked = literalNames.map(name => `untracked-${name}.txt`)
   for (const name of [...tracked, ...untracked, 'ignored.tmp']) fs.writeFileSync(path.join(nested, name), 'content')

@@ -6494,3 +6494,11 @@ W15已提交/推送 `e712ec48acd4282fd7214ad46e9c24bd21909b35` 并读回远端�
 完整 TS/TSX 图扩容并采用固定 AST 解析，2424 模块/10360 边的未解析与混合环义务均满足，4 项既有函数数量 advisory 保留；校验包支持固定基础/补丁/parser 逐字节重建。提取中性契约消除反向类型依赖，已有生产 JavaScript 不变。旧路径门禁改为当前 owner 的实际套件并严格拒绝跳过；独立复核发现的父进程超时泄漏及新增中断清理责任均以原生回归修复。全套 Node20.3 7862 通过/10 原有跳过，当前源码复验一致；两产物×三模式实际 CLI 共24合成 POST 通过。详情见[76 项集成验收与剩余证据](features/phase-19-acceptance.md)；SAFE-02 原生隐式读取/非 Linux、W7-33 真实传输、用户前端和外部服务仍开放，Phase19 全目标 active。最终脚本/复审及提交推送精确事实另记，用户 `.gitignore` 保留。
 
 最终 `2b6ffc0e…` 源码冻结获独立代码 APPROVE、架构 CLEAR；57 scripts 与修复后149契约项通过，四更新门禁及五静态门均已有实际通过证据。预设路由503和中途限流未计批准，最终两条独立复核均返回；63文件源码清单及报告保存在 `.tmp/integration/`。
+
+W16 已提交/推送 `f43ae09ec90a5890b768598ab52a17821c5e9efc` 并读回远端同 SHA。CI 38136502604/job 114461346739 与 Watch 38136502606/job 114461346594 均因付款/spending-limit 未启动，零步骤 failure，不计远端通过；材料 `.tmp/integration/delivery.json`。SAFE-02 原生隐式读取继续，Phase19 全目标 active。
+
+### 2026-10-13 — SAFE-02 Linux 原生读取私有视图
+
+默认 Git/ripgrep 枚举经已准入 metadata/忽略规则的私有 bwrap 镜像，正文沿已核验描述符；保留缺 Git fallback、祖先 tracked exception 和嵌套仓库语义。新复核两 HIGH 已修复：条件探测以临时 inert config 避免读取尚未准入的 include，launcher 普通退出须独立 child 完成收据。最终 27TS/16production，独立 code APPROVE、architecture WATCH，生产逐文件 hash 一致。Node20.3 298 项受影响组合、新增回归后 41 项私有视图、两种构建、四源码静态门/57scripts通过；三类隔离反转及 inotify 正反对照证明敏感性，源/用户 `.gitignore` 字节保持。Node/单文件实际 print grep 四条工具链共 8 合成 POST 通过；5k 文件镜像 Git/rg 枚举中位数 2.79s/2.10s，成本明确保留。详情见[局部验收 §7](features/phase-19-acceptance.md#7-safe-02-linux-原生读取局部验收2026-10-13)和[裁决 §8.142](features/phase-19-decisions.md#8142-safe-02linux-原生读取私有视图与完成收据)，材料 `.tmp/native-read/final/`。同步 discovery 竞态、非 Linux/外部 metadata/hasconfig 与镜像性能继续开放，SAFE-02/Phase19 active；提交/推送/精确 CI 另行取证，不继承 W16 的历史远端结论。
+
+交付前清理三个生产文件各一个末尾 LF，两独立复核确认精确字节差异和生成 JavaScript 相等，原行为测试证据仍保持原运行来源。最终源码完整 NormProof judge exit0，未解析/混合环 satisfied，四项既有函数数量 advisory 保留为 partial；strict docs 门通过并保留 118 项既有 source-reference advisory。材料 `.tmp/native-read/final/{normproof-delivery-out,docs-drift-eof.log}`，不将退出 0 改写为结构全达标。

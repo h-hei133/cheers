@@ -3,6 +3,9 @@ import { statSync } from 'node:fs';
 import { StringDecoder } from 'node:string_decoder';
 import { executeLocally } from '../../runtime/execution/local.js';
 import { verifyPathContainment } from '../security/pathJail.js';
+import { withNativeReadView, type NativeReadPlan } from '../../runtime/execution/view/index.js';
+import { WalkBudget, WalkLimitError } from '../../runtime/execution/walk/budget.js';
+import { ReadCleanupError } from '../../runtime/execution/read.js';
 
 export function permittedSearchFile(root: string, file: string, check: (target: string) => void): string | undefined {
   const target = verifyPathContainment(path.resolve(root, file), root);
@@ -23,9 +26,35 @@ export function permittedSearchFile(root: string, file: string, check: (target: 
 
 /** Enumerate names with the native ignore semantics, without searching file contents. */
 export async function collectSearchFiles(input: {
-  binary: string; args: readonly string[]; workspaceRoot: string;
+  binary: string; args: readonly string[]; workspaceRoot: string; searchPath?: string;
   assertFileAccess: (target: string) => void; abortSignal?: AbortSignal; timeoutMs?: number;
-}): Promise<{ ok: true; files: readonly string[] } | { ok: false; reason: 'failed' | 'execution-failure' | 'cancelled' | 'timeout' | 'output-limit' }> {
+}): Promise<{ ok: true; files: readonly string[] } | { ok: false; reason: 'failed' | 'execution-failure' | 'read-cleanup-failed' | 'cancelled' | 'timeout' | 'output-limit'; readCleanupFailed?: true }> {
+  const budget = new WalkBudget(input.abortSignal, { timeoutMs: input.timeoutMs });
+  let executionFailed = false;
+  try {
+    return await withNativeReadView({ root: input.workspaceRoot, assertFileAccess: input.assertFileAccess,
+      abortSignal: input.abortSignal, budget,
+    }, async (sources, plan, materialize) => {
+      const prepared = plan(input.binary, input.args, input.workspaceRoot);
+      const preserveIgnored = input.args.some((arg, index) => input.args[index - 1] === '--glob' && !arg.startsWith('!'));
+      await materialize({ native: 'search', directory: path.resolve(input.workspaceRoot, input.searchPath || '.'), preserveIgnored });
+      sources.verify();
+      const result = await collectNativeFiles(input, prepared, budget);
+      executionFailed = !result.ok && result.reason === 'execution-failure';
+      if (result.ok) sources.verify();
+      return result;
+    });
+  } catch (error) {
+    if (executionFailed) return { ok: false, reason: 'execution-failure', ...(error instanceof ReadCleanupError ? { readCleanupFailed: true } : {}) };
+    if (error instanceof ReadCleanupError) return { ok: false, reason: 'read-cleanup-failed' };
+    if (input.abortSignal?.aborted) return { ok: false, reason: 'cancelled' };
+    if (error instanceof WalkLimitError) return { ok: false, reason: error.reason === 'deadline' ? 'timeout' : 'output-limit' };
+    return { ok: false, reason: 'failed' };
+  }
+}
+
+async function collectNativeFiles(input: Parameters<typeof collectSearchFiles>[0], plan: NativeReadPlan, budget: WalkBudget)
+  : Promise<Awaited<ReturnType<typeof collectSearchFiles>>> {
   const controller = new AbortController();
   const onAbort = (): void => controller.abort();
   input.abortSignal?.addEventListener('abort', onAbort, { once: true });
@@ -36,8 +65,8 @@ export async function collectSearchFiles(input: {
   let bytes = 0;
   let oversized = false;
   try {
-    const result = await executeLocally({ command: input.binary, args: [...input.args],
-      cwd: input.workspaceRoot, abortSignal: controller.signal, timeoutMs: input.timeoutMs ?? 30_000,
+    const result = await executeLocally({ ...plan,
+      abortSignal: controller.signal, timeoutMs: budget.timeRemaining(input.timeoutMs ?? 30_000),
       captureOutput: false, onStdout: (chunk) => {
         if (controller.signal.aborted) return;
         bytes += chunk.length;
@@ -55,6 +84,7 @@ export async function collectSearchFiles(input: {
     if (input.abortSignal?.aborted) return { ok: false, reason: 'cancelled' };
     if (oversized) return { ok: false, reason: 'output-limit' };
     if (result.status === 'timeout') return { ok: false, reason: 'timeout' };
+    if (result.status === 'completed' || result.status === 'failed') await plan.verifyExit(result.exitCode);
     if (pending || (result.status !== 'completed' && !(result.status === 'failed' && result.exitCode === 1))) {
       return { ok: false, reason: 'failed' };
     }

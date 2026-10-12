@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { promises as fsp } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -6,6 +7,7 @@ import { executeLocally } from '../../runtime/execution/local.js'
 import { createDefaultExecutionService } from '../../runtime/execution/service.js'
 import { createGrepToolDefinition } from './grep.js'
 import { forgetRipgrepBinary, searchWithRipgrep } from './grepRipgrep.js'
+import { completeNativeRead } from '../../test-utils/native.js'
 
 vi.mock('../../runtime/execution/local.js', () => ({ executeLocally: vi.fn() }))
 
@@ -26,7 +28,7 @@ function injectFailure(stage: Stage, trigger: 'none' | 'parent' | 'limit', contr
   vi.mocked(executeLocally).mockImplementation(async input => {
     const current = input.args.includes('--version') ? 'probe' : input.args.includes('--files') ? 'candidates' : 'contents'
     if (current === 'candidates') input.onStdout?.(Buffer.from('public.txt\0'))
-    if (current !== stage) return success
+    if (current !== stage) { completeNativeRead(input); return success }
     if (trigger === 'parent') controller.abort()
     if (trigger === 'limit') {
       if (stage === 'candidates') input.onStdout?.(Buffer.alloc(17 * 1024 * 1024, 120))
@@ -77,7 +79,22 @@ it('does not cache an unverified probe as an installed or absent executable', as
   injectFailure('probe', 'none', new AbortController())
   const input = { pattern: 'needle', searchPath: '', limit: 1, workspaceRoot: root }
   expect(await searchWithRipgrep(input)).toEqual({ ok: false, reason: 'execution-failure' })
-  vi.mocked(executeLocally).mockReset().mockResolvedValue(success)
+  vi.mocked(executeLocally).mockReset().mockImplementation(async input => { completeNativeRead(input); return success })
   expect(await searchWithRipgrep(input)).toEqual({ ok: true, matches: [] })
   expect(vi.mocked(executeLocally).mock.calls[0]![0].args).toContain('--version')
+})
+
+it('retains execution failure when the native status handle also fails cleanup', async () => {
+  injectFailure('candidates', 'none', new AbortController())
+  const open = fsp.open
+  vi.spyOn(fsp, 'open').mockImplementation(async (...args) => {
+    const handle = await open(...args)
+    if (args[1] === 'ax+') {
+      const close = handle.close.bind(handle)
+      vi.spyOn(handle, 'close').mockImplementation(async () => { await close(); throw new Error('PRIVATE_STATUS_CLEANUP') })
+    }
+    return handle
+  })
+  expect(await searchWithRipgrep({ pattern: 'needle', searchPath: '', limit: 10, workspaceRoot: root }))
+    .toEqual({ ok: false, reason: 'execution-failure', readCleanupFailed: true })
 })

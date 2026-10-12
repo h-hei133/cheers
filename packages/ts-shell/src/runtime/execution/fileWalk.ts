@@ -32,6 +32,7 @@ import path from 'node:path'
 import { DirectoryReadError, readDirectory } from './directory.js'
 import { ReadCleanupError } from './read.js'
 import { WalkBudget, WalkLimitError } from './walk/budget.js'
+import { PRUNED_DIRECTORIES } from './walk/policy.js'
 import type { FileWalkOptions } from './types.js'
 import ignore, { type Ignore } from 'ignore'
 import {
@@ -41,16 +42,6 @@ import {
   listWorkspaceFilesViaGit,
   loadDirectoryMatcher,
 } from './ignoreRules.js'
-
-/**
- * Directory names never entered, at any depth.
- *
- * These are the directories that cannot hold the source a tool is looking for:
- * installed packages, the repository's own metadata, build output, and this
- * project's audit residue. They are named rather than pathed so a nested copy is
- * pruned too.
- */
-const PRUNED_DIRECTORIES = ['node_modules', '.git', 'dist', '.normproof'] as const
 
 export type { FileWalkOptions } from './types.js'
 
@@ -180,7 +171,7 @@ export async function listWorkspaceFiles(
   checkedPath(resolved, resolved, options)
 
   if (respectIgnore) {
-    const viaGit = await listWorkspaceFilesViaGit(resolved, options?.abortSignal, budget)
+    const viaGit = await listWorkspaceFilesViaGit(resolved, options?.abortSignal, budget, options)
     if (viaGit !== null) {
       // git already applied its own ignore rules; the pruned names are still
       // removed, because a repository need not ignore the directories that hold
@@ -268,6 +259,7 @@ export async function listDirectoryEntries(
         candidates.map((entry) => entry.name),
         options?.abortSignal,
         budget,
+        { root: resolvedRoot, assertFileAccess: options?.assertFileAccess ?? (() => {}), pruneDirectories: pruned },
       )
     : new Set<string>()
   const matcher =

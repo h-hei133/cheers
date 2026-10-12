@@ -4,6 +4,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { executeLocally } from './local.js'
 import { listDirectoryEntries, listWorkspaceFiles } from './fileWalk.js'
+import { completeNativeRead } from '../../test-utils/native.js'
 
 vi.mock('./local.js', async () => {
   const actual = await vi.importActual<typeof import('./local.js')>('./local.js')
@@ -24,7 +25,7 @@ it.each(['files', 'directory'])('cancels an in-flight %s Git query without start
   let started = false
   let nativeStatus: string | undefined
   vi.mocked(executeLocally).mockImplementation(input => {
-    expect(input.command).toBe('git')
+    expect(path.basename(input.command)).toBe('bwrap')
     return actual.executeLocally({ ...input, command: process.execPath,
       args: ['-e', 'process.stdout.write("READY"); setTimeout(() => process.exit(0), 2000)'],
       onStdout: chunk => {
@@ -71,6 +72,7 @@ it('decodes split UTF-8 only after the complete Git output arrives', async () =>
   fs.writeFileSync(path.join(root, name), 'public')
   vi.mocked(executeLocally).mockImplementation(async input => {
     for (const byte of Buffer.from(`${name}\0`)) input.onStdout?.(Buffer.from([byte]))
+    completeNativeRead(input)
     return { status: 'completed', exitCode: 0, stdout: '', stderr: '' }
   })
   expect(await listWorkspaceFiles(root)).toEqual([name])
@@ -79,8 +81,7 @@ it('decodes split UTF-8 only after the complete Git output arrives', async () =>
 it('does not treat a timeout with exit one as a valid empty ignore answer', async () => {
   fs.writeFileSync(path.join(root, '.ignore'), 'public.txt\n')
   vi.mocked(executeLocally).mockResolvedValue({ status: 'timeout', exitCode: 1, stdout: '', stderr: 'fixture failure' })
-  const listing = await listDirectoryEntries(root, root)
-  expect(listing.entries.map(entry => entry.name)).not.toContain('public.txt')
+  await expect(listDirectoryEntries(root, root)).rejects.toThrow('Git query failed before a complete native answer was available.')
   expect(executeLocally).toHaveBeenCalledTimes(1)
 })
 
@@ -104,4 +105,18 @@ it('propagates cancellation that arrives as Git finishes, without returning the 
     return { status: 'completed', exitCode: 0, stdout: '', stderr: '' }
   })
   await expect(listWorkspaceFiles(root, { abortSignal: controller.signal })).rejects.toThrow()
+})
+
+it('retains Git execution failure when the native status handle also fails cleanup', async () => {
+  vi.mocked(executeLocally).mockResolvedValue({ status: 'failed', exitCode: 1, failureKind: 'execution_failure', stdout: '', stderr: 'PRIVATE_PROCESS_DIAGNOSTIC' })
+  const open = fs.promises.open
+  vi.spyOn(fs.promises, 'open').mockImplementation(async (...args) => {
+    const handle = await open(...args)
+    if (args[1] === 'ax+') {
+      const close = handle.close.bind(handle)
+      vi.spyOn(handle, 'close').mockImplementation(async () => { await close(); throw new Error('PRIVATE_STATUS_CLEANUP') })
+    }
+    return handle
+  })
+  await expect(listWorkspaceFiles(root)).rejects.toThrow('Git query failed: input delivery or process cleanup could not be verified. Read cleanup also could not be verified.')
 })

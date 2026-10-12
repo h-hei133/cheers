@@ -2,7 +2,7 @@
 title: "Phase 19 集成验收与剩余证据"
 category: article
 created: 2026-10-11
-updated: 2026-10-11
+updated: 2026-10-13
 tags: [phase-19, acceptance, validation]
 summary: "记录完整源码图、契约门禁、全套测试、实际 CLI 及平台范围；保留尚未完成的对象隔离和外部验收。"
 ---
@@ -11,10 +11,12 @@ summary: "记录完整源码图、契约门禁、全套测试、实际 CLI 及�
 
 Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)的 16 批、76 项为范围，分别记录实现、局部验收和剩余条件。W16 修复了此前无法取得完整依赖图证明的检查器，并恢复重构后失效的契约门禁；全阶段完成仍需下面列明的剩余工作。
 
+§1–4 的完整套件和冻结证据属于 W16 提交 `f43ae09ec90a5890b768598ab52a17821c5e9efc`。后续 SAFE-02 Linux 原生读取变更单独记录在 §7，不能将 W16 的全套通过套用到后续源码。
+
 ## 1. 本轮源码与验证范围
 
-- 起点为 `e712ec48acd4282fd7214ad46e9c24bd21909b35`。当前 63 个源码/验证文件的冻结 SHA-256 为 `2b6ffc0e333392f453d9b949594bde8831772da1a0dedf038c2b10579c3face9`，清单位于 `.tmp/integration/source-final.json`。其中 51 个 TypeScript 文件、39 个生产文件；运行时改动仅提取中性类型及调整类型导入，35 个已有生产文件的 JavaScript 输出逐字节不变，4 个新增类型模块仅输出空导出。
-- 全套 TypeScript 测试实际完成：**782 文件通过、1 文件原有跳过；7862 项通过、10 项原有跳过，零失败**。Node 20.3.0、两个工作线程、隔离 HOME/USERPROFILE/TMPDIR/CHEERS_TEST_ROOT；日志 `.tmp/integration/full/runner.log`。冻结清单与当前 TypeScript 内容复验一致。后续改动仅在验证脚本，不把旧失败运行或不同次数的局部测试相加成一次全套结果。
+- W16 起点为 `e712ec48acd4282fd7214ad46e9c24bd21909b35`。该批 63 个源码/验证文件的冻结 SHA-256 为 `2b6ffc0e333392f453d9b949594bde8831772da1a0dedf038c2b10579c3face9`，清单位于 `.tmp/integration/source-final.json`。其中 51 个 TypeScript 文件、39 个生产文件；运行时改动仅提取中性类型及调整类型导入，35 个已有生产文件的 JavaScript 输出逐字节不变，4 个新增类型模块仅输出空导出。
+- W16 全套 TypeScript 测试实际完成：**782 文件通过、1 文件原有跳过；7862 项通过、10 项原有跳过，零失败**。Node 20.3.0、两个工作线程、隔离 HOME/USERPROFILE/TMPDIR/CHEERS_TEST_ROOT；日志 `.tmp/integration/full/runner.log`。冻结清单与该提交 TypeScript 内容复验一致。该批后续改动仅在验证脚本，不把旧失败运行或不同次数的局部测试相加成一次全套结果。
 - 初轮全套为 23 文件/44 项失败，单独复跑并分类后修正了旧命令语义预期、会话存储身份夹具、异步 picker/loop 生命周期及临时项目边界。没有删除失败用例或新增跳过。原生日志仍保留在 `.tmp/parity/validation/integration-full.log` 与 `integration-failures.log`。
 - TypeScript 构建及单文件构建均已运行通过，日志为 `.tmp/parity/validation/integration-final-build.log`、`integration-final-executable.log`。本轮实际 CLI 再次覆盖两种产物，见 §4。源文件、编译产物、真实请求和账户能力分别取证。
 - 用户原有 `.gitignore` 修改保留，SHA-256 为 `20e91ccf19fdc755718372e6fcc9ef77ca6a579280ff4b0dc1f69c73a2eaf2d3`，不纳入本批提交。
@@ -99,9 +101,9 @@ Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)�
 | macOS/Windows | 部分 profile、接口与纯逻辑用例 | 原生路径/文件描述符、进程树清理、终端与设备尚未取得等价实机证据 |
 | 模型传输与严格预算 | 合成 HTTP/SSE/usage/重试/unknown、统一 request admission | W7-33 四端点真实 TLS/HTTP2 矩阵仍缺；无法证明上界的请求继续拒绝 strict cap 准入 |
 | 公共包、认证、协作和 SSH | 受控服务、签名、ACL、撤权、重连与未知副作用 | 真实账户、公共部署 TLS、真实远端主机/主机密钥和生产互通验收 |
-| SAFE-02 | Linux 公开文件工具的检查/句柄/拒绝/清理及受管编辑目录固定 | 原生工具内部 index/config 等隐式读取的约束、非 Linux 实际对象绑定仍开放；资源计数器不约束原生进程内部全部读取 |
+| SAFE-02 | Linux 公开文件工具的检查/句柄/拒绝/清理及受管编辑目录固定；原生 Git/ripgrep 私有视图、配置准入和 child 完成收据，见 §7 | 同步 discovery 并发替换、非 Linux 实际对象绑定、私有镜像性能继续开放；外部 metadata/hasconfig 明确拒绝，资源计数器不约束原生进程内部全部读取 |
 
-下一项可继续的本地工作是 SAFE-02 的原生隐式读取边界：先沿实际 Git/工具执行入口核实读取对象和策略，再作定向比较与修复。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把 W1–W16 或 Phase 19 总目标标为完成。
+SAFE-02 下一步继续处理同步 discovery 竞态、非 Linux 对象绑定和镜像成本，扩展外部 metadata/条件支持须重新证明准入。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把 W1–W16 或 Phase 19 总目标标为完成。
 
 ## 6. 迁移、回退与交付
 
@@ -111,4 +113,34 @@ Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)�
 
 最终冻结 `2b6ffc0e…` 获得独立代码 **APPROVE**、架构 **CLEAR**，综合 **APPROVE（限本批源码）**，报告 `.tmp/integration/review/code-final.md`、`architecture-final.md`。代码审查独立使用 Node 24.15 验证信号/超时/监听器，架构审查使用 Node 20.3 完成七项原生检查。预设路由的 503 和中途请求限流均不计通过；最终实际返回的独立证据取代早期未完成结果。该结论没有关闭 §5 的剩余任务。
 
-代码提交、GitHub 推送、精确 SHA 的 CI/Architecture Watch 和发布逐项读回后记录。起点 W15 的远端同 SHA 已核验；其 CI 38119354927 与 Watch 38119354931 因付款/spending-limit 零步骤失败。该历史状态不预判本批远端运行，也不构成本批远端通过证据。当前没有发布或合并结论。
+本批代码与验收文档已提交/推送为 `f43ae09ec90a5890b768598ab52a17821c5e9efc`，远端分支读回同 SHA。该提交的 CI 38136502604/job 114461346739 与 Architecture Watch 38136502606/job 114461346594 均为 completed/failure、`steps=[]`；分别读取的 annotations 确认付款/spending-limit 阻止作业启动，未取得远端验证通过。材料 `.tmp/integration/delivery.json`。起点 W15 的历史运行不替代这份证据；后续文档或源码提交按各自 SHA 追踪，当前没有发布或合并结论。
+
+## 7. SAFE-02 Linux 原生读取局部验收（2026-10-13）
+
+本批起点为上述 W16 提交；27 个 TypeScript 文件、16 个 production 文件，逐文件冻结在 `.tmp/native-read/final/inventory-latest.json`。production digest 为 `80aba0992538c322d4f68e8d7b74747bfe504dff9c0b94366fc06ce0997f8f2e`。默认 Git/ripgrep 调用均经私有镜像，Git 配置依赖先准入，gitdir/onbranch 探测期间禁用原 include，正文搜索经已核验描述符；只有 launcher 证明 child 完成后才接受普通原生退出码。
+
+| 证据 | 实际结果 | 范围/材料 |
+|---|---|---|
+| Node20.3 受影响组合 | 22 文件/298 项通过 | `.tmp/native-read/final/affected-final.log`；不是全仓套件 |
+| 新增条件回归后的私有视图复验 | 3 文件/41 项通过，包括 2 项新增回归 | `.tmp/native-read/final/source-final.log`；common/worktree 条件、配置恢复、真实/伪造 child status |
+| 构建与源码门 | TS/单文件构建、import cycles/config consumers/declarations/Node floor、57 scripts 通过 | `.tmp/native-read/final/`；生产字节与两审查一致 |
+| strict docs/完整 NormProof | strict 通过；judge exit0、未解析与混合环义务 satisfied，整体 partial | `.tmp/native-read/final/{docs-drift-final.log,normproof-delivery-out}`；118 项既有文档源码引用和 4 项既有函数数量 advisory 保留，新增模块无超 20-name ceiling |
+| 三类隔离反转 | 均出现真实 AssertionError，原源码未改动 | 默认调用绕过边界、移除完成收据、移除 inert config；条件测试 1 失败/1 通过，`.tmp/native-read/final/reversals/results.json` |
+| OS 外部 include 读取对照 | 当前零 inotify 事件，移除 inert config 后 IN_OPEN/IN_ACCESS | 拒绝结果相同而读取事实不同；正向监测控制有效，见反转材料和独立 code report |
+| 原生失败为空结果的反转 | 原实现 failed，移除收据后错误返回成功/零匹配 | `.tmp/native-read/final/{baseline-rg-receipt,reversed-rg-receipt}.log` |
+| 实际 print CLI | Node/单文件各有界搜索与排除匹配，共四条通过、8 合成 POST | `.tmp/native-read/final/cli-smoke-results.json`；检查本次 tool_call_id 与原文件字节，首次历史结果选择错误已单独保留 |
+| 独立 code | APPROVE；Node24.15 8 文件/110 项及新增 2 项通过 | `.tmp/native-read/review-final-code/report.md`；两 HIGH 修复后重新取证 |
+| 独立 architecture | WATCH；Node20.3 11 文件/142 项、16 断言及真实 launcher-status 探针 | `.tmp/native-read/review-final-architecture/report-final.md`；旧 BLOCK 报告保留为历史 |
+
+两审查生产清单逐文件与最终源一致；aggregate 编码不同，未直接混比 aggregate hash。额外两项测试由 code lane 独立复核。与 opencode ripgrep 决策比较后保留单一执行 owner、no-config、原生流与有界输出；其部分 exit 2 接受策略未采用，本项目的失败输出保持失败。
+
+交付前只清理三个生产文件各一个末尾 LF，两独立复核确认精确差异、当前清单/暂存字节及生成 JavaScript 相等。上表行为测试与反转仍归属于原运行字节，不将格式清理冒充重跑；最终源码完整 judge 和 strict docs 已另行运行。
+
+私有镜像的成本已实测。相同 Linux/Node20.3 环境、50 个目录、每组 3 次；以下为中位数，返回文件名称逐项一致。
+
+| 文件数 | 原生 Git | 私有视图 Git | 原生 rg 枚举 | 私有视图 rg 枚举 |
+|---:|---:|---:|---:|---:|
+| 1000 | 10.43ms | 793.10ms | 13.51ms | 568.73ms |
+| 5000 | 14.50ms | 2791.29ms | 13.80ms | 2098.29ms |
+
+材料 `.tmp/native-read/final/benchmark-results.json`；该测试只比较合成目录枚举，不证明正文搜索、真实大仓或高并发性能。镜像每次 O(n) 工作仍是实质成本。外部 linked worktree metadata、hasconfig 条件及非 Linux 原生视图保持明确拒绝；同步 discovery 的替换竞态、跨进程正文内容变化和系统加载器环境的完整 OS deny 仍无保证。SAFE-02 与 Phase19 继续 active，未从本批局部测试推断全仓、交互 PTY、真实 provider 或外部服务通过。提交/推送及本批精确 SHA CI 单独记录。

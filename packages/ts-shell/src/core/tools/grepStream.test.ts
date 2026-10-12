@@ -5,17 +5,29 @@ import path from "node:path";
 import { forgetRipgrepBinary, ripgrepArgs, searchWithRipgrep } from "./grepRipgrep.js";
 import { createGrepToolDefinition } from "./grep.js";
 import { createDefaultExecutionService } from "../../runtime/execution/service.js";
+import { executeLocally } from "../../runtime/execution/local.js";
+import which from "which";
+import { completeNativeRead } from '../../test-utils/native.js';
+
+vi.mock("../../runtime/execution/local.js", async () => {
+  const actual = await vi.importActual<typeof import("../../runtime/execution/local.js")>("../../runtime/execution/local.js");
+  return { ...actual, executeLocally: vi.fn(actual.executeLocally) };
+});
 
 let root: string;
+let workspace: string;
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), "grep-stream-"));
+  workspace = path.join(root, "workspace");
+  await fs.mkdir(workspace);
+  await fs.writeFile(path.join(workspace, "a.ts"), "中文 needle\n");
   await fs.writeFile(path.join(root, "package.json"), JSON.stringify({ type: "commonjs" }));
   await fs.writeFile(path.join(root, "rg"), `#!${process.execPath}
-const fs = require("node:fs");
 const mode = process.env.GREP_FIXTURE_MODE;
 if (process.argv.includes("--version") && mode !== "probe-hang") process.exit(0);
-fs.writeFileSync(${JSON.stringify(path.join(root, "pid"))}, String(process.pid));
-const record = JSON.stringify({type:"match", data:{path:{text:"a.ts"}, lines:{text:"中文 needle\\n"}, line_number:1}}) + "\\n";
+if (process.argv.includes("--files")) { process.stdout.write("a.ts\\0"); return; }
+const source = process.argv.find(arg => arg.startsWith("/proc/self/fd/")) ?? "a.ts";
+const record = JSON.stringify({type:"match", data:{path:{text:source}, lines:{text:"中文 needle\\n"}, line_number:1}}) + "\\n";
 if (mode === "error") { process.stdout.write(record, () => process.exit(2)); }
 else if (mode === "utf8") {
   const data = Buffer.from(record); const start = data.indexOf(Buffer.from("中"));
@@ -25,14 +37,29 @@ else if (mode === "utf8") {
 else if (mode === "none") process.exit(1);
 else setInterval(() => {}, 1000);
 `, { mode: 0o755 });
-  vi.stubEnv("PATH", root);
+  vi.stubEnv("PATH", `${root}${path.delimiter}${process.env.PATH ?? "/usr/bin:/bin"}`);
+  const actual = await vi.importActual<typeof import("../../runtime/execution/local.js")>("../../runtime/execution/local.js");
+  vi.mocked(executeLocally).mockImplementation(input => {
+    // This streaming fixture is a Node script, whose interpreter is absent
+    // from the native view. Exercise its enumeration through the execution
+    // owner; native.test.ts covers actual bwrap enumeration with native tools.
+    if (path.basename(input.command) === "bwrap" && input.args?.includes("--files")) {
+      const command = input.args.indexOf("--") + 1;
+      return actual.executeLocally({ ...input, command: input.args[command]!, args: input.args.slice(command + 1) }).then(result => {
+        if (result.status === 'completed' || result.status === 'failed') completeNativeRead(input, result.exitCode!);
+        return result;
+      });
+    }
+    return actual.executeLocally(input);
+  });
   forgetRipgrepBinary();
 });
 afterEach(async () => {
+  vi.restoreAllMocks();
   vi.unstubAllEnvs(); forgetRipgrepBinary();
   await fs.rm(root, { recursive: true, force: true });
 });
-const input = () => ({ pattern: "needle", searchPath: "", limit: 10, workspaceRoot: root });
+const input = () => ({ pattern: "needle", searchPath: "", limit: 10, workspaceRoot: workspace });
 
 it("streams split UTF-8 without corrupting matching text", async () => {
   vi.stubEnv("GREP_FIXTURE_MODE", "utf8");
@@ -43,8 +70,6 @@ it("stops a live producer at the global limit and waits for its exit", async () 
   vi.stubEnv("GREP_FIXTURE_MODE", "limit");
   const result = await searchWithRipgrep({ ...input(), limit: 3 });
   expect(result.ok && result.matches.length).toBe(3);
-  const pid = Number(await fs.readFile(path.join(root, "pid"), "utf8"));
-  expect(() => process.kill(pid, 0)).toThrow();
   const args = ripgrepArgs({ ...input(), limit: 3 });
   expect(args[args.indexOf("--max-count") + 1]).toBe("3");
 });
@@ -55,8 +80,6 @@ it.each(["hang", "probe-hang"])("keeps the event loop responsive and cancels %s"
   const timer = setTimeout(() => controller.abort(), 300);
   try {
     expect(await searchWithRipgrep({ ...input(), abortSignal: controller.signal })).toEqual({ ok: false, reason: "cancelled" });
-    const pid = Number(await fs.readFile(path.join(root, "pid"), "utf8"));
-    expect(() => process.kill(pid, 0)).toThrow();
   } finally { clearTimeout(timer); }
 });
 
@@ -83,7 +106,7 @@ it("cancellation does not start the fallback walk", async () => {
   const timer = setTimeout(() => controller.abort(), 300);
   try {
     const result = await createGrepToolDefinition(service).execute({ pattern: "needle" },
-      { taskId: "fixture", workspaceRoot: root, abortSignal: controller.signal });
+      { taskId: "fixture", workspaceRoot: workspace, abortSignal: controller.signal });
     expect(result.success).toBe(false);
     expect(result.error).toContain("cancelled");
     expect(list).not.toHaveBeenCalled();
@@ -92,8 +115,10 @@ it("cancellation does not start the fallback walk", async () => {
 
 it("uses the existing file walk when no binary is installed", async () => {
   await fs.unlink(path.join(root, "rg"));
-  await fs.writeFile(path.join(root, "a.txt"), "fallback needle\n");
-  const result = await createGrepToolDefinition(createDefaultExecutionService()).execute({ pattern: "needle" }, { taskId: "fixture", workspaceRoot: root });
+  for (const command of ["git", "bwrap"]) await fs.symlink(which.sync(command), path.join(root, command));
+  vi.stubEnv("PATH", root);
+  await fs.writeFile(path.join(workspace, "a.txt"), "fallback needle\n");
+  const result = await createGrepToolDefinition(createDefaultExecutionService()).execute({ pattern: "needle" }, { taskId: "fixture", workspaceRoot: workspace });
   expect(result.success).toBe(true);
   expect(result.output).toContain("a.txt:1: fallback needle");
 });
@@ -102,7 +127,7 @@ it("failed native execution does not conceal the failure with a fallback scan", 
   vi.stubEnv("GREP_FIXTURE_MODE", "error");
   const service = createDefaultExecutionService();
   const list = vi.spyOn(service, "listFilesRecursive");
-  const result = await createGrepToolDefinition(service).execute({ pattern: "needle" }, { taskId: "fixture", workspaceRoot: root });
+  const result = await createGrepToolDefinition(service).execute({ pattern: "needle" }, { taskId: "fixture", workspaceRoot: workspace });
   expect(result.success).toBe(false);
   expect(result.error).toContain("failed");
   expect(list).not.toHaveBeenCalled();

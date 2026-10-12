@@ -7,6 +7,7 @@ import { verifyPathContainment } from '../security/pathJail.js';
 import { collectSearchFiles, permittedSearchFile, searchFileBatches } from './searchFiles.js';
 import which from 'which';
 import { truncateLineWidth } from "./truncation.js";
+import { PRUNED_DIRECTORIES } from '../../runtime/execution/walk/policy.js';
 
 /**
  * Searching file contents with ripgrep, when ripgrep is there.
@@ -26,16 +27,6 @@ import { truncateLineWidth } from "./truncation.js";
  * the same degradation the compared implementations use for their native
  * dependencies.
  */
-
-/**
- * Directories never searched, at any depth.
- *
- * The same set the in-process walk prunes. Passed explicitly because ripgrep
- * reads the repository's ignore files but does not know which directories this
- * project decided are never worth reading: a repository that does not ignore
- * `node_modules` still should not have it searched.
- */
-const PRUNED_DIRECTORIES = ["node_modules", ".git", "dist", ".normproof"] as const;
 
 /**
  * The largest file either search path will read.
@@ -233,18 +224,21 @@ export async function searchWithRipgrep(input: RipgrepSearchInput): Promise<Ripg
   const current = verifyPathContainment(currentTarget, input.workspaceRoot);
   if (!current.allowed) return { ok: false, reason: 'outside-workspace' };
   if (current.resolvedPath !== currentTarget) return { ok: false, reason: 'failed' };
-  if (!input.assertFileAccess) return streamSearch(binary, input);
+  // Enumeration uses the private view; content search uses verified handles.
+  // A missing callback supplies no extra deny policy to either read boundary.
+  const assertFileAccess = input.assertFileAccess ?? (() => {});
+  input = { ...input, assertFileAccess };
   const deadline = Date.now() + (input.timeoutMs ?? 30_000);
   const listed = await collectSearchFiles({ binary,
     args: ['--files', '--null', ...searchOptions(input), '--', input.searchPath || '.'],
-    workspaceRoot: input.workspaceRoot, assertFileAccess: input.assertFileAccess,
+    workspaceRoot: input.workspaceRoot, searchPath: input.searchPath, assertFileAccess,
     abortSignal: input.abortSignal, timeoutMs: input.timeoutMs,
   });
   if (!listed.ok) return listed;
   const matches: RipgrepMatch[] = [];
   for (const batch of searchFileBatches(listed.files)) {
     if (input.abortSignal?.aborted) return { ok: false, reason: 'cancelled' };
-    const allowed = batch.filter((file) => permittedSearchFile(input.workspaceRoot, file, input.assertFileAccess!) === file);
+    const allowed = batch.filter((file) => permittedSearchFile(input.workspaceRoot, file, assertFileAccess) === file);
     if (!allowed.length) continue;
     const remaining = deadline - Date.now();
     if (remaining <= 0) return { ok: false, reason: 'timeout' };
@@ -253,7 +247,7 @@ export async function searchWithRipgrep(input: RipgrepSearchInput): Promise<Ripg
     matches.push(...result.matches);
     if (matches.length >= input.limit) break;
   }
-  return { ok: true, matches: matches.filter((match) => permittedSearchFile(input.workspaceRoot, match.path, input.assertFileAccess!) !== undefined) };
+  return { ok: true, matches: matches.filter((match) => permittedSearchFile(input.workspaceRoot, match.path, assertFileAccess) !== undefined) };
 }
 
 async function streamSearch(binary: string, input: RipgrepSearchInput, files?: readonly string[]): Promise<RipgrepOutcome> {

@@ -6,12 +6,16 @@ import { WalkBudget } from './budget.js'
 import { listDirectoryEntries, listWorkspaceFiles } from '../fileWalk.js'
 import { loadDirectoryMatcher } from '../ignoreRules.js'
 import { executeLocally } from '../local.js'
+import { completeNativeRead } from '../../../test-utils/native.js'
 
 vi.mock('../local.js', () => ({ executeLocally: vi.fn() }))
 let root: string
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'walk-budget-'))
-  vi.mocked(executeLocally).mockReset().mockResolvedValue({ status: 'failed', exitCode: 128, stdout: '', stderr: '' })
+  vi.mocked(executeLocally).mockReset().mockImplementation(async input => {
+    completeNativeRead(input, 128)
+    return { status: 'failed', exitCode: 128, stdout: '', stderr: '' }
+  })
 })
 afterEach(async () => { vi.restoreAllMocks(); await fs.rm(root, { recursive: true, force: true }) })
 
@@ -44,8 +48,9 @@ it('keeps a single deadline across native fallback and directory reads', async (
   await put('a/one')
   let clock = 0
   vi.spyOn(performance, 'now').mockImplementation(() => clock)
-  vi.mocked(executeLocally).mockImplementation(async () => {
+  vi.mocked(executeLocally).mockImplementation(async input => {
     clock = 4
+    completeNativeRead(input, 128)
     return { status: 'failed', exitCode: 128, stdout: '', stderr: '' }
   })
   const opendir = fs.opendir
@@ -87,6 +92,7 @@ it.each(['entries', 'pathBytes'])('retains consumed native %s when the failed qu
   await put('one')
   vi.mocked(executeLocally).mockImplementation(async input => {
     input.onStdout?.(Buffer.from('old\0'))
+    completeNativeRead(input, 128)
     return { status: 'failed', exitCode: 128, stdout: '', stderr: '' }
   })
   const opendir = vi.spyOn(fs, 'opendir')

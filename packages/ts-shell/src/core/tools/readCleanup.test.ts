@@ -6,6 +6,7 @@ import { executeLocally } from '../../runtime/execution/local.js'
 import { createDefaultExecutionService } from '../../runtime/execution/service.js'
 import { createCoreToolRegistry } from './registry.js'
 import { forgetRipgrepBinary, searchWithRipgrep } from './grepRipgrep.js'
+import { completeNativeRead } from '../../test-utils/native.js'
 
 vi.mock('../../runtime/execution/local.js', () => ({ executeLocally: vi.fn() }))
 vi.mock('which', () => ({ default: { sync: () => null } }))
@@ -37,6 +38,7 @@ function runtime(native: boolean, cancel: boolean, processFailure = false): Abor
     if (processFailure && !input.args.includes('--version') && !input.args.includes('--files')) {
       return { status: 'failed', exitCode: 1, failureKind: 'execution_failure', stdout: '', stderr: 'PRIVATE_PROCESS_DIAGNOSTIC' }
     }
+    completeNativeRead(input)
     return { status: 'completed', exitCode: 0, stdout: '', stderr: '' }
   })
   const controller = new AbortController()

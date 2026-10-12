@@ -3,7 +3,7 @@ title: "Phase 19 裁决：生产正确性、完整交互与自主协作能力"
 category: article
 sources: [14-user-experience-research, 15-deep-research-design, 16-tui-composer-and-theme, 17-tui-status-and-panels, 18-input-slash-startup-context, 19-tools-maturity-and-multifile-edit, 20-configuration-system, 21-session-recovery-and-undo-ux, 22-command-inventory-alignment, 23-command-argument-options, 24-shared-command-parity, verification-15-21]
 created: 2026-10-05
-updated: 2026-10-11
+updated: 2026-10-13
 tags: [phase-19, decisions, production, tui, commands, research, goal, collaboration]
 summary: "汇总 14–24 的纠错、维护者裁决、生产契约、分批任务及验收标准。包含完整自主目标、软件与论文深研、八种输入框形态、Git 工作台、顾问、安全分析、公共技能商店和远程协作。此文是待实施计划；文档审查完成不代表功能或生产验收完成。"
 confidence: mixed
@@ -2078,3 +2078,23 @@ W15已提交/推送 `e712ec48acd4282fd7214ad46e9c24bd21909b35` 并读回远端�
 完整 76 项索引、八组跨域反例、脚本/反转/独立审查、平台/协议和迁移回退详见[集成验收表](phase-19-acceptance.md)。SAFE-02 的原生隐式读取/非 Linux 对象绑定、W7-33 真实 TLS/HTTP2、用户前端及真实外部服务格继续开放。源码提交/推送/精确 CI 另记；Phase19 全目标保持 active，不以本地全套或完整图通过宣布全阶段完成。
 
 最终 63 文件冻结 `2b6ffc0e333392f453d9b949594bde8831772da1a0dedf038c2b10579c3face9` 获得独立 code APPROVE / architecture CLEAR；57 scripts 和中断修复后 149 result-contract 通过，四个更新门禁共用严格断言检查。两条预设审查路由 503/中途限流不计通过，最终独立原生证据已返回；四项原有函数数量及118项docs-source advisory保留。
+
+W16 已提交/推送 `f43ae09ec90a5890b768598ab52a17821c5e9efc` 并读回远端同 SHA。精确 CI 38136502604/job 114461346739 与 Watch 38136502606/job 114461346594 均 completed/failure、steps=[]；各自 annotations 确认付款/spending-limit 阻止启动，未计远端通过。材料 `.tmp/integration/delivery.json`；SAFE-02 本地剩余边界继续，Phase19 全目标 active。
+
+### 8.142 SAFE-02：Linux 原生读取私有视图与完成收据
+
+默认 Git 文件枚举、目录忽略查询及 ripgrep 候选枚举现在都经过 `runtime/execution/view/` 的私有镜像，未提供额外 deny 回调也不能绕过此边界。原生进程通过唯一执行 owner 运行；`sandbox/read.ts` 只把已核验描述符所指镜像挂载到 workspace 路径，并提供选定程序和系统加载器运行环境。镜像保留源名称、已准入忽略配置及必要 Git metadata，正文搜索继续使用 Linux 已核验文件描述符。缺 Git 时先返回既有 TypeScript matcher fallback；缺隔离启动器或未经确认的原生执行拒绝提供完整原生答案。
+
+Git 配置逐文件准入，包含 common/worktree config、index/sharedindex、gitfile/commondir、info/exclude 和生效的 include/excludes 依赖。Git 自己判断 gitdir/onbranch 条件，但探测期间以临时 inert common config 禁用尚未准入的 include 及 worktree config，随后恢复原字节。目录查询始终携带完整 workspace root，保留祖先仓库的 tracked exception；嵌套仓库和非仓库子目录分别保持原生/`.ignore` fallback 语义。同步 discovery 已归入 `ignore/discovery.ts`，以包含性和配置拒绝检查限制其可信兼容用途，不声称描述符竞态隔离。
+
+新独立复核发现并修复两项 HIGH：bwrap 自身 exit 1 被当作 ripgrep 的成功空结果，以及早期条件探测读取了后续尚未准入的 include。启动器现在通过私有、已 unlink 的独立 status 描述符提供 JSON 行收据；只有完整 child-start 和匹配 child-exit 才能解释 Git/ripgrep 的普通退出码。取消、输出/时间边界、执行或清理未知仍保留原失败优先级。旧 BLOCK/问题报告保留为历史，最终 code **APPROVE**、architecture **WATCH**，综合 **COMMENT**，仅覆盖此 Linux 源码组件。
+
+与 opencode `packages/core/src/ripgrep.ts` 定向比较后继续采用原执行接缝、`--no-config`、原生流式和有界输出；该参考部分场景接受 exit 2，本项目保留失败状态，不能把失败进程的局部输出当作完整答案。现有 no-config 和 failed-output 回归约束这项差异。
+
+本地 Node20.3 隔离环境组合 **22 文件/298 项**通过，新增 common/worktree 条件回归加入后私有视图 **3 文件/41 项**通过；两种构建、四个源码静态门和 **57 scripts**实际通过。strict docs 漂移门通过，118 项既有 source-reference advisory 保留。最新完整 NormProof judge 实际 exit0，未解析与混合环义务 satisfied，4 项既有函数数量 advisory 使整体仍为 partial；新增模块没有超过 20-name ceiling，材料 `.tmp/native-read/final/normproof-delivery-out/`。当前 27 TS/16 production 清单为 `.tmp/native-read/final/inventory-latest.json`，production digest `80aba0992538c322d4f68e8d7b74747bfe504dff9c0b94366fc06ce0997f8f2e`；两条独立审查逐文件生产 hash 完全一致。code 独立 Node24.15 **8 文件/110 项**及新增 **2 项**通过，architecture 独立 Node20.3 **11 文件/142 项**、16 断言及真实 launcher-status 探针通过；报告为 `.tmp/native-read/review-final-code/report.md`、`.tmp/native-read/review-final-architecture/report-final.md`。
+
+三类反转在隔离源码副本进行：默认调用绕过边界、移除完成收据、移除条件 inert config 均产生真实 AssertionError。条件反转为 **1 失败/1 通过**，common config 用例证明敏感性；同一 include 拒绝场景的 inotify 正反对照分别为零事件与 `[IN_OPEN, IN_ACCESS]`，拒绝消息本身不构成零读取证明。额外 ripgrep 收据反转直接得到错误的 `{ok:true,matches:[]}`；原实现返回 failed。反转期间源和用户 `.gitignore` 原字节保持不变。实际 Node/单文件 CLI 各完成有界搜索与排除匹配两条 print 工具链，共 **8 次本地合成 POST**，匹配关联确切 tool call、原文件字节保留；首次 ad hoc harness 取历史结果的失败已归类并修正。材料在 `.tmp/native-read/final/{reversals,cli-smoke-results.json}`，本批未重跑全仓套件或交互 PTY。交付前仅移除三生产文件各一个末尾 LF，两复审独立确认精确字节差异及生成 JavaScript 逐字节相等；原测试/反转保持各自实际运行的源码归属，当前 hash 清单及暂存检查另验。
+
+镜像为每次请求增加 O(n) 元数据/占位文件工作。50 目录、三次运行中位数：1000 文件 Git 私有视图 793.10ms、ripgrep 私有视图 568.73ms；5000 文件分别 2791.29ms、2098.29ms，同场直接 Git/ripgrep 为 14.50/13.80ms，返回名称逐项一致。材料 `.tmp/native-read/final/benchmark-results.json`；这不是正文搜索或真实大仓基准，也不能宣称性能不变。
+
+SAFE-02 继续开放同步 discovery 并发替换、非 Linux 实际对象绑定及镜像性能；外部 linked metadata 和 `hasconfig:` 条件明确拒绝，未证明跨进程文件内容稳定。系统加载器运行环境不是逐文件 deny 的全 OS 隔离证明。W7-33、用户前端和真实外部服务仍开放，Phase19 全目标 active。源码提交/推送与本批精确 SHA CI 另行取证，W16 历史账单失败不替代新提交 CI。
