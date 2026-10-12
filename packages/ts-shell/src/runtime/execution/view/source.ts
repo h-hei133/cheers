@@ -1,6 +1,7 @@
 import fs, { promises as fsp, type BigIntStats } from 'node:fs';
 import path from 'node:path';
 import { readBinarySnapshot } from '../snapshot.js';
+import { readRevision } from '../read.js';
 import { WalkBudget } from '../walk/budget.js';
 import { verifyPathContainment } from '../../../core/security/pathJail.js';
 
@@ -14,10 +15,6 @@ export interface NativeViewInput {
 
 export class ViewSourceError extends Error {
   constructor() { super('Native enumeration metadata is unavailable, denied, or outside the workspace. No complete native answer is available.'); }
-}
-
-function revision(stat: BigIntStats): string {
-  return `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeNs}:${stat.ctimeNs}`;
 }
 
 /** Metadata snapshots are bounded separately from source-file placeholders. */
@@ -81,11 +78,11 @@ export class ViewSources {
     const bytes = await readBinarySnapshot({ absolutePath: target, workspaceRoot: this.input.root,
       assertFileAccess: absolute => this.target(absolute), abortSignal: this.input.abortSignal,
     }, Math.min(maximumBytes, 64 * 1024 * 1024 - this.bytes));
-    if (revision(before) !== revision(fs.statSync(target, { bigint: true }))) throw new ViewSourceError();
+    if (readRevision(before) !== readRevision(fs.statSync(target, { bigint: true }))) throw new ViewSourceError();
     const destination = this.destination(target);
     await fsp.mkdir(path.dirname(destination), { recursive: true, mode: 0o700 });
     await fsp.writeFile(destination, bytes, { mode: 0o600 });
-    this.captured.set(target, revision(before));
+    this.captured.set(target, readRevision(before));
     this.bytes += bytes.length;
     await this.link(file, target);
     this.input.budget.check();
@@ -101,7 +98,7 @@ export class ViewSources {
     }
     for (const [file, expected] of this.captured) {
       this.target(file);
-      if (revision(fs.statSync(file, { bigint: true })) !== expected) throw new ViewSourceError();
+      if (readRevision(fs.statSync(file, { bigint: true })) !== expected) throw new ViewSourceError();
     }
   }
 }

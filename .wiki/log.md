@@ -6522,3 +6522,9 @@ W16 已提交/推送 `f43ae09ec90a5890b768598ab52a17821c5e9efc` 并读回远端�
 ### 2026-10-13 — SAFE-02 已知读取变化拒绝发布
 
 原读取 owner 加入正文修订/结果释放前复验与早期原生输入复查，已知身份/路径/消失和正文变化共享安全类型。搜索停止且丢弃匹配，ignore/技能拒绝不完整规则/catalog，媒体保留原 changed 分类；执行/关闭不确定性优先。复审重现并修复 snapshot 第三stat遗漏、替换被静默吞与媒体消费者回归。最终13TS/7production，Node20.3 26文件/350项、两产物/四源码门/完整judge通过，4既有ceiling advisory保持partial；独立code164项APPROVE、architecture161项WATCH，综合COMMENT，无blocker。四隔离反转实际AssertionError，八actual print read/grep×Node/单文件×stable/changed共16合成POST通过；IN_ACCESS实际子进程写入的changed工具结果明确失败/零正文。原源码与用户`.gitignore`字节保持。详见[裁决 §8.145](features/phase-19-decisions.md)与[局部验收 §10](features/phase-19-acceptance.md)，材料 `.tmp/read-currency/`。逐文件metadata不承诺OS锁/跨文件catalog/最后检查后稳定；平台、镜像和真实外部余项仍开放，Phase19 active，提交/推送/精确CI另记。
+
+读取组件 `6852c9012b9177b28706f69df7280adf9104936b` 已提交/推送并读回同 SHA，16路径/blob审计通过、用户`.gitignore`排除保持。CI38293312382/job114958327518、Watch38293312397/job114958327471均付款/spending-limit未启动、零步骤failure，无远端通过；材料 `.tmp/read-currency/{commit-audit.json,delivery.json}`。
+
+### 2026-10-13 — SAFE-02 已捕获技能 manifest 的发布复验
+
+实际子进程重现较早manifest关闭后、后续读取或contribution等待期间改写仍发布旧指令。原discovery按预算保存最早metadata并在已有loader/catalog发布检查逐源复验，重复选择不覆盖旧修订；snapshot/媒体/私有视图复用原读取owner的同一revision策略，未增读系统/正文重读/保留句柄。最终7TS/5production，Node20.3 18文件/247项、两产物/四源码门/完整judge通过，4既有ceiling advisory保持partial；独立code122项APPROVE、architecture151项CLEAR，综合APPROVE限本批。两隔离反转实际断言失败；四actual print CLI stable两组共4合成POST，changed在首源关闭、第二源content access后child写入，均exit1/零POST/零旧指令。初次重复测试未触发及反转多命中均属harness并已修正、未计成功。源码与用户`.gitignore`字节保持，详见[裁决 §8.146](features/phase-19-decisions.md)与[局部验收 §11](features/phase-19-acceptance.md)，材料 `.tmp/catalog-currency/`。ignore/枚举、非Linux、镜像和真实外部余项仍开放，Phase19 active；提交/推送/精确CI另记。

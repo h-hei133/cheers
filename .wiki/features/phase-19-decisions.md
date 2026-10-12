@@ -2155,3 +2155,19 @@ SAFE-02 继续开放同步 discovery 并发替换、非 Linux 实际对象绑定
 四组隔离反转（最终复验、早期输入复验、路径变化类型、快照变化类型）均实际 AssertionError，正向副本通过，原源码与用户 `.gitignore` 字节不变。Node20.3/单文件 × read/grep × stable/changed **八条实际 print CLI、16 合成 POST**通过；并发变化由实际 IN_ACCESS 观察子进程触发 pwrite，工具结果安全拒绝且零 `END_NEEDLE`，稳定组正常返回、原字节保持。CLI exit0 仅表示工具链完成，changed 工具结果仍明确失败，不记作读取成功。
 
 材料 `.tmp/read-currency/{contract.json,inventory-final.json,baseline-probe.log,tests-final.log,review-code.md,review-architecture.md,reversals/results.json,cli-smoke-results.json,normproof-out/}`。本批补上已知读取期间变化的传播/发布边界；非 Linux 对象绑定、跨文件/整 catalog 一致性、外部 metadata/hasconfig、镜像成本及其余真实外部验收继续开放，SAFE-02/Phase19 active。源码提交、推送、精确 SHA CI 单独取证。
+
+该组件已提交/推送 `6852c9012b9177b28706f69df7280adf9104936b`，16 个原始路径及全部 blob 与最终源码/文档逐项审计通过，用户 `.gitignore` 排除且原 SHA 保持；远端分支读回同 SHA。CI 38293312382/job114958327518 与 Watch38293312397/job114958327471 均 completed/failure、steps=[]；两份 annotations 确认付款/spending-limit 阻止作业启动，未计远端通过。材料 `.tmp/read-currency/{commit-audit.json,delivery.json}`。
+
+### 8.146 SAFE-02：技能目录发布前复查已捕获 manifest
+
+真实子进程基线证明：较早 manifest 的句柄已经关闭后，加载后续 manifest 或等待扩展 contribution 时改写该源，原 `SkillLoader`/`resolveSkillCatalog` 仍返回含旧指令的完整目录。修复位于已有[技能 discovery](../../packages/ts-shell/src/core/skills/discovery.ts)：一次 discovery 保存有界 manifest metadata，完成 snapshot 后核对路径/身份/修订，现有 loader 与 catalog 的最终 `verify()` 再逐源复查。重复选择同一源保持最早记录，读取前后均检查，后读不得覆盖旧记录掩盖变化；未保留句柄，最终复验不重读正文。
+
+metadata 策略统一为已有[读取 owner](../../packages/ts-shell/src/runtime/execution/read.ts)的 `readRevision`，同一 dev/ino/size/mtimeNs/ctimeNs 表达式由 snapshot、媒体与私有视图复用，移除局部重复。原文件预算、资源失败安全归类、取消和关闭不确定性继续权威；已捕获源的消失/替换/修订拒绝完整目录，普通初始不可读仍保留诊断。定向参考采用同步逐 manifest 读取、普通失败诊断且无全目录事务，本项目保留普通诊断与已采用的异步 owner；沿用本地私有视图的修订记录/后验核对决策，以回归和反转约束已知变更，不另建事务系统。
+
+最终 **7 TS/5 production** 冻结 `inventory-final.json` SHA256 `8bb2264aabc9c1a34be94b7e52b1e18f8ebc808b25b165beb4255fcaa89719c1`。Node20.3 受影响组合 **18文件/247项**、TS/单文件构建、四源码静态门通过；完整 judge exit0，图义务 satisfied，4项既有ceiling advisory保持partial，无新增。独立 code **APPROVE**（7文件/122项及实际变更/重复/资源/取消/cleanup 探针），architecture **CLEAR**（9文件/151项、两公共子进程探针与六场景），最终源码逐文件前后相符，综合 **APPROVE（限本批）**。
+
+两个隔离反转分别移除发布前复验、允许重复捕获覆盖旧记录，均实际 AssertionError；正向副本通过，源与用户 `.gitignore` 字节保持。第一次反转文本匹配有两个命中而中止，属于 harness/setup，未计有效反转；限定唯一上下文后才运行有效副本。最初重复选择测试等待第三次 `onSource`，实际两次选择只有两次回调，未触发变化；修正为第二次并明确断言次数后通过，没有弱化产品断言。
+
+Node20.3/单文件 × stable/changed **四条实际 print CLI**通过。stable 两组共 **4合成 POST**，catalog 描述与 skill 工具正文正常、本次 call ID 相符、源字节保持；changed 由 IN_CLOSE_NOWRITE 先确认首源句柄关闭，再观察第二源 IN_ACCESS 后实际子进程 pwrite，均 exit1、**零 POST/零旧指令**，安全拒绝发生在发送模型请求之前。第二源正文原字节保持。
+
+材料 `.tmp/catalog-currency/{contract.json,inventory-final.json,baseline-scoped-probe.log,repaired-probe.log,tests-final.log,review-code.md,review-architecture.md,reversals-final/results.json,cli-smoke-results.json,normproof-out/}`。范围是已读 manifest 到其最后一次逐源 metadata 检查；未宣称所有 ignore 源、未枚举文件或整目录原子事务，不保证该检查后的变化，非 Linux 和真实外部证据另验。本批未重跑全仓/scripts/PTY/真实 provider。SAFE-02/Phase19 active，提交、推送和精确 SHA CI 单独记录。

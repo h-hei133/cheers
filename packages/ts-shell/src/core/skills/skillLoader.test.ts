@@ -180,6 +180,38 @@ describe("skill discovery", () => {
     expect(captured?.fd).toBe(-1);
   });
 
+  it('rejects earlier manifest changes while loading a later manifest', async () => {
+    const first = path.join(workspace, 'first.md');
+    const second = path.join(workspace, 'second.md');
+    const original = '---\nname: first\ndescription: synthetic\n---\noriginal';
+    fs.writeFileSync(first, original);
+    fs.writeFileSync(second, '---\nname: second\ndescription: synthetic\n---\nsecond');
+    const open = fsp.open;
+    const handles: Awaited<ReturnType<typeof open>>[] = [];
+    vi.spyOn(fsp, 'open').mockImplementation(async (...args) => {
+      const handle = await open(...args); handles.push(handle);
+      if (args[0] === second) execFileSync(process.execPath, ['-e', 'require("node:fs").writeFileSync(process.argv[1], process.argv[2])', first, original.replace('original', 'revised!')]);
+      return handle;
+    });
+    await expect(new SkillLoader(workspace, { disableDiscovery: true, extraPaths: [first, second] }).loadDetailed()).rejects.toMatchObject({ name: 'ReadChangedError' });
+    expect(handles).toHaveLength(2);
+    expect(handles.every(handle => handle.fd === -1)).toBe(true);
+  });
+
+  it('does not replace an earlier captured revision when the same manifest is selected again', async () => {
+    const file = path.join(workspace, 'named.md');
+    const original = '---\nname: one\ndescription: synthetic\n---\noriginal';
+    fs.writeFileSync(file, original);
+    let observed = 0;
+    const open = vi.spyOn(fsp, 'open');
+    const loader = new SkillLoader(workspace, { disableDiscovery: true, extraPaths: [file, file], onSource: target => {
+      if (target === file && ++observed === 2) execFileSync(process.execPath, ['-e', 'require("node:fs").writeFileSync(process.argv[1], process.argv[2])', file, original.replace('original', 'revised!')]);
+    } });
+    await expect(loader.loadDetailed()).rejects.toMatchObject({ name: 'ReadChangedError' });
+    expect(observed).toBe(2);
+    expect(open.mock.calls.filter(([target]) => target === file)).toHaveLength(1);
+  });
+
   it('rejects a manifest that grows beyond the byte budget after its size precheck', async () => {
     const file = path.join(workspace, 'named.md'); fs.writeFileSync(file, 'small');
     const open = fsp.open; let captured: Awaited<ReturnType<typeof open>> | undefined; let read: ReturnType<typeof vi.spyOn> | undefined;

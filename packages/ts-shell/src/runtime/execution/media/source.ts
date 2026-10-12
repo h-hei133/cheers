@@ -3,7 +3,7 @@ import type { FileHandle } from 'node:fs/promises'
 import { constants, promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { closeReadHandle, ReadChangedError, ReadCleanupError, withVerifiedReadTarget } from '../read.js'
+import { closeReadHandle, ReadChangedError, ReadCleanupError, readRevision, withVerifiedReadTarget } from '../read.js'
 import { MediaReadError, type MediaReadRequest } from './model.js'
 
 export interface MediaSource {
@@ -28,7 +28,7 @@ export async function withMediaSource<T>(request: MediaReadRequest, consume: (so
       await verifyTarget().catch(throwSourceError)
       if (performance.now() >= deadline) throw new MediaReadError('deadline')
       const current = await handle.stat({ bigint: true })
-      if (current.size !== before.size || current.mtimeNs !== before.mtimeNs || current.ctimeNs !== before.ctimeNs) throw new MediaReadError('changed')
+      if (readRevision(current) !== readRevision(before)) throw new MediaReadError('changed')
     }
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'cheers-media-'))
     let writer: FileHandle | undefined

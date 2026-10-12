@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { projectTrust } from "../security/projectTrust.js";
 import { resolveSkillCatalog } from "./skillCatalog.js";
 import { registerCatalogContribution } from '../catalog/contributions.js';
+import { execFileSync } from 'node:child_process';
 
 /**
  * The one rule every skill reader resolves through.
@@ -104,5 +105,21 @@ describe("resolveSkillCatalog", () => {
     const pending = resolveSkillCatalog({ workspaceRoot: workspace, sessionId: 'capture' });
     try { await started; first(); release(); expect((await pending).skills.has('earlier')).toBe(false); }
     finally { first(); second(); release(); }
+  });
+
+  it('rejects a builtin manifest changed by a child while an extension contribution settles', async () => {
+    const file = path.join(workspace, 'named.md');
+    const original = '---\nname: one\ndescription: synthetic\n---\noriginal';
+    fs.writeFileSync(file, original);
+    let changed = false;
+    const unregister = registerCatalogContribution({ root: workspace, sessionId: 'capture', tools: [], commands: [], skills: async () => {
+      execFileSync(process.execPath, ['-e', 'require("node:fs").writeFileSync(process.argv[1], process.argv[2])', file, original.replace('original', 'revised!')]);
+      changed = true;
+      return [];
+    } });
+    try {
+      await expect(resolveSkillCatalog({ workspaceRoot: workspace, sessionId: 'capture', skillPaths: [file] })).rejects.toMatchObject({ name: 'ReadChangedError' });
+      expect(changed).toBe(true);
+    } finally { unregister(); }
   });
 });

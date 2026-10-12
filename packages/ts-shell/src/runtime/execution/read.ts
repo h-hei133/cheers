@@ -40,8 +40,9 @@ function sameFile(left: BigIntStats, right: BigIntStats): boolean {
   return left.ino !== 0n && left.dev === right.dev && left.ino === right.ino
 }
 
-function sameRevision(left: BigIntStats, right: BigIntStats): boolean {
-  return left.size === right.size && left.mtimeNs === right.mtimeNs && left.ctimeNs === right.ctimeNs
+/** Metadata identity shared by bounded captures and their later publication checks. */
+export function readRevision(stat: BigIntStats): string {
+  return `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeNs}:${stat.ctimeNs}`
 }
 
 function workspaceTarget(target: string, requestedRoot: string, realRoot: string): string {
@@ -96,7 +97,7 @@ export async function withVerifiedReadTarget<T>(request: ReadTarget, kind: 'file
         || !sameFile(opened, current)) {
         throw new ReadChangedError()
       }
-      if (kind === 'file' && !sameRevision(opened, current)) throw new ReadChangedError()
+      if (kind === 'file' && readRevision(opened) !== readRevision(current)) throw new ReadChangedError()
       request.assertFileAccess?.(actual)
       request.abortSignal?.throwIfAborted()
     }
