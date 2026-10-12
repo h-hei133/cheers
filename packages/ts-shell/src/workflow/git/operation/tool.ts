@@ -1,11 +1,11 @@
-import type { ToolDefinition, ToolExecutionContext } from '../../../tools/types.js';
+import type { ToolDefinition, ToolExecutionContext, ToolPreparation } from '../../../tools/types.js';
 import type { GitPlan, GitOperationResult } from './model.js';
 import { NativeGit } from '../read/native.js';
 import { executeGitPlan } from './execute.js';
 import { publishGitResult } from './publication.js';
 
 /** A native prepared command reuses bash's existing permission/deny semantics. */
-export function nativeGitTool(git: NativeGit, plan: GitPlan, publish: (result: GitOperationResult) => GitOperationResult | void, checkNativeTarget?: (absolute: string) => void): ToolDefinition {
+export function nativeGitTool(git: NativeGit, plan: GitPlan, publish: (result: GitOperationResult) => GitOperationResult | void, checkNativeTarget?: (absolute: string) => void): ToolDefinition<ToolPreparation> {
   return { name: 'bash', description: 'Execute this exact native Git operation after ordinary command approval.',
     argsSchema: { type: 'object', additionalProperties: false, required: ['command'], properties: { command: { const: plan.summary } } },
     onRefusal: (_args, _context, status) => { publishGitResult({ status: status === 'denied' ? 'denied' : 'blocked', note: `Git operation ${status}; no target effect was authorized.` }, publish); },

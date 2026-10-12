@@ -19,6 +19,7 @@ export interface ToolCatalogInput {
   /** Native feature composition; visibility restrictions apply after merging. */
   readonly featureTools?: readonly ToolDefinition[];
   readonly admission?: Admission;
+  readonly signal?: AbortSignal;
   readonly workspaceRoot: string;
   readonly sessionId?: string;
   readonly skillOptions?: { readonly skillPaths?: readonly string[]; readonly noSkills?: boolean };
@@ -33,9 +34,13 @@ export interface CatalogContent {
   readonly mcpTools?: readonly McpToolDescriptor[];
 }
 
-export function captureCatalogContent(input: ToolCatalogInput): CatalogContent {
+export async function captureCatalogContent(input: ToolCatalogInput): Promise<CatalogContent> {
   assertAdmission(input.admission);
-  return { skills: discoverSkills(input), tools: catalogContributions(input.workspaceRoot, input.sessionId).flatMap(entry => entry.tools) };
+  input.signal?.throwIfAborted();
+  const skills = await discoverSkills(input);
+  input.signal?.throwIfAborted();
+  assertAdmission(input.admission);
+  return { skills, tools: catalogContributions(input.workspaceRoot, input.sessionId).flatMap(entry => entry.tools) };
 }
 
 /** Build the same current tool pool for a model run and for command inspection. */
@@ -44,7 +49,7 @@ export async function loadToolCatalog(input: ToolCatalogInput, override?: () => 
   readonly tools: ReadonlyMap<string, ToolDefinition>;
 }> {
   assertAdmission(input.admission);
-  const { skills, tools: contributed } = input.catalogContent ?? captureCatalogContent(input);
+  const { skills, tools: contributed } = input.catalogContent ?? await captureCatalogContent(input);
   const mcp = await mcpToolsForRun(input);
   assertAdmission(input.admission);
   const registry = override?.() ?? createCoreToolRegistry({ skills,
@@ -68,10 +73,11 @@ export async function loadToolCatalog(input: ToolCatalogInput, override?: () => 
  * the catalog, which is the same rule `/skill` and `/skill:` resolve through —
  * see `resolveSkillCatalog`.
  */
-function discoverSkills(request: ToolCatalogInput): ReadonlyMap<string, Skill> {
-  const { skills, collisions, diagnostics, failures } = resolveSkillCatalog({
+async function discoverSkills(request: ToolCatalogInput): Promise<ReadonlyMap<string, Skill>> {
+  const { skills, collisions, diagnostics, failures } = await resolveSkillCatalog({
     workspaceRoot: request.workspaceRoot,
     sessionId: request.sessionId,
+    abortSignal: request.signal,
     ...(request.skillOptions?.skillPaths ? { skillPaths: request.skillOptions.skillPaths } : {}),
     ...(request.skillOptions?.noSkills ? { noSkills: true } : {}),
   });

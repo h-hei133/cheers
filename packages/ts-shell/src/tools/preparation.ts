@@ -9,10 +9,17 @@ interface PreparedCall {
 
 const calls = new WeakMap<object, PreparedCall>();
 
-export function prepareToolCall(tool: ToolDefinition, args: Record<string, unknown>, context: ToolExecutionContext, owner: object): Record<string, unknown> {
+export function prepareToolCall(tool: ToolDefinition, args: Record<string, unknown>, context: ToolExecutionContext, owner: object,
+  verify?: () => void): Record<string, unknown> | Promise<Record<string, unknown>> {
   const prepared = Object.freeze({ ...args });
-  calls.set(prepared, { tool, owner, preparation: tool.prepare!(prepared, context) });
-  return prepared;
+  const publish = (preparation: ToolPreparation): Record<string, unknown> => {
+    context.abortSignal?.throwIfAborted();
+    verify?.();
+    calls.set(prepared, { tool, owner, preparation });
+    return prepared;
+  };
+  const preparation = tool.prepare!(prepared, context);
+  return preparation instanceof Promise ? preparation.then(publish) : publish(preparation);
 }
 
 export function preparedToolCall(args: object, owner: object): ToolPreparation | undefined {

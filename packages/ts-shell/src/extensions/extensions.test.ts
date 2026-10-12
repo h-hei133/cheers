@@ -4,6 +4,7 @@ import path from 'node:path';
 import { createServer, type Server, type ServerResponse } from 'node:http';
 import { generateKeyPairSync, sign } from 'node:crypto';
 import { gzipSync, gunzipSync } from 'node:zlib';
+import { execFileSync } from 'node:child_process';
 import { create, Header } from 'tar';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { canonical, digest, manifest as parseManifest } from './registry/validation.js';
@@ -66,6 +67,7 @@ async function ready(): Promise<void> { await install(); await enable(); for (co
 
 beforeEach(async () => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'extensions-')); workspace = path.join(root, 'workspace'); fs.mkdirSync(workspace);
+  execFileSync('git', ['init', '-q', workspace]);
   vi.stubEnv('HOME', path.join(root, 'home')); vi.stubEnv('USERPROFILE', path.join(root, 'home')); vi.stubEnv('CHEERS_MARKETPLACES_FILE', path.join(root, 'sources.json'));
   vi.stubEnv('CHEERS_EXTENSIONS_FILE', path.join(root, 'owned/registry.json')); vi.stubEnv('CHEERS_PLUGINS_FILE', path.join(root, 'legacy.json')); vi.stubEnv('CHEERS_OFFLINE', '0');
   vi.stubEnv('FAKE_PROVIDER_KEY', 'must-not-inherit'); allow = true; requests = []; approvals = []; denyRules = []; releases = []; bodies = new Map(); hooks = new HookDispatcher(); tampered = false; malformed = false; holdPath = undefined; onHeld = undefined; held = []; approvalWait = undefined;
@@ -231,7 +233,7 @@ describe('actual capability grants, precedence and bounded unload', () => {
     } finally { release(); await running; }
   });
   it('withholds a replaced storage owner across restart and still allows builtin disable', async () => {
-    await ready(); const record = service.store.read().packages[0]!; const parent = path.dirname(versionPath(record.active)); const captured = resolveSkillCatalog({ workspaceRoot: workspace }).skills.get('shared')!;
+    await ready(); const record = service.store.read().packages[0]!; const parent = path.dirname(versionPath(record.active)); const captured = (await resolveSkillCatalog({ workspaceRoot: workspace })).skills.get('shared')!;
     fs.renameSync(parent, `${parent}-retained`); fs.cpSync(`${parent}-retained`, parent, { recursive: true }); expect(captured.isCurrent!()).toBe(false);
     await service.close(); service = newService(); expect((await loadToolCatalog({ workspaceRoot: workspace })).tools.has('ext_sample_echo')).toBe(false); expect(service.errors.join('\n')).toContain('registration withheld');
     const result = await routeSlashCommand('/plugin disable sample', { cwd: workspace, interactive: false, sessionId: 'test', extensionCommand: async (_, args) => pluginCommand(args, service) });
@@ -240,7 +242,7 @@ describe('actual capability grants, precedence and bounded unload', () => {
   it('withholds a dirty prompt without blocking builtin recovery or local skill discovery', async () => {
     await ready(); const selected = path.join(versionPath(service.store.read().packages[0]!.active), 'skills/shared/SKILL.md'); fs.appendFileSync(selected, '\nuser bytes');
     const local = path.join(workspace, '.agents/skills/local'); fs.mkdirSync(local, { recursive: true }); fs.writeFileSync(path.join(local, 'SKILL.md'), '---\nname: local\ndescription: owned local\n---\nlocal bytes');
-    const catalog = resolveSkillCatalog({ workspaceRoot: workspace }); expect(catalog.skills.has('shared')).toBe(false); expect(catalog.skills.has('local')).toBe(true); expect(service.errors.join('\n')).toContain('prompt contribution withheld');
+    const catalog = (await resolveSkillCatalog({ workspaceRoot: workspace })); expect(catalog.skills.has('shared')).toBe(false); expect(catalog.skills.has('local')).toBe(true); expect(service.errors.join('\n')).toContain('prompt contribution withheld');
     const result = await routeSlashCommand('/plugin disable sample', { cwd: workspace, interactive: false, sessionId: 'test', extensionCommand: async (_, args) => pluginCommand(args, service) });
     expect((result as { output: string }).output).toContain('disable saved'); expect(service.store.read().packages[0]!.activation[workspace]!.enabled).toBe(false); expect(fs.readFileSync(selected, 'utf8')).toContain('user bytes');
   });
@@ -253,16 +255,16 @@ describe('actual capability grants, precedence and bounded unload', () => {
       expect(listSlashCommands({ root: workspace, sessionId: 'second' }).some(entry => entry.name === 'sample-echo')).toBe(true); expect(listSlashCommands({ root: root }).some(entry => entry.name === 'sample-echo')).toBe(false);
       expect(slashSuggestions('/sample', undefined, { root: workspace, sessionId: 'second' })?.some(entry => entry.value === '/sample-echo')).toBe(true); expect(slashSuggestions('/sample', undefined, { root })).toBeNull();
       expect((await runPreparedTool(firstTool, { args: [] }, second.options.gate(firstTool.name))).isError).toBe(true);
-      secondCurrent = false; expect(resolveSkillCatalog({ workspaceRoot: workspace, sessionId: 'second' }).skills.has('shared')).toBe(false); expect(resolveSkillCatalog({ workspaceRoot: workspace, sessionId: 'test' }).skills.has('shared')).toBe(true);
+      secondCurrent = false; expect((await resolveSkillCatalog({ workspaceRoot: workspace, sessionId: 'second' })).skills.has('shared')).toBe(false); expect((await resolveSkillCatalog({ workspaceRoot: workspace, sessionId: 'test' })).skills.has('shared')).toBe(true);
       const refused = await routeSlashCommand('/sample-alias other', { cwd: workspace, sessionId: 'second', interactive: false }); expect((refused as { output: string }).output).toContain('could not be confirmed');
       secondCurrent = true; await second.close(); expect((await loadToolCatalog({ workspaceRoot: workspace, sessionId: 'test' })).tools.get('ext_sample_echo')).toBe(firstTool); expect((await loadToolCatalog({ workspaceRoot: workspace, sessionId: 'second' })).tools.has('ext_sample_echo')).toBe(false);
       expect((await runPreparedTool(firstTool, { args: ['owner'] }, service.options.gate(firstTool.name))).output).toContain('fixture:owner:');
     } finally { await second.close(); }
   });
   it('keeps install, enable, prompt and script/tool/command grants distinct', async () => {
-    await install(); expect(resolveSkillCatalog({ workspaceRoot: workspace }).skills.has('shared')).toBe(false);
+    await install(); expect((await resolveSkillCatalog({ workspaceRoot: workspace })).skills.has('shared')).toBe(false);
     await enable(); expect((await loadToolCatalog({ workspaceRoot: workspace })).tools.has('ext_sample_echo')).toBe(false);
-    await grant('prompt'); expect(resolveSkillCatalog({ workspaceRoot: workspace }).skills.has('shared')).toBe(true);
+    await grant('prompt'); expect((await resolveSkillCatalog({ workspaceRoot: workspace })).skills.has('shared')).toBe(true);
     expect(await service.run('sample', 'echo', ['ungranted'])).toContain('could not be confirmed');
     await grant('tool:echo'); expect((await loadToolCatalog({ workspaceRoot: workspace })).tools.has('ext_sample_echo')).toBe(false);
     await grant('script:echo'); await service.invalidate(); expect((await loadToolCatalog({ workspaceRoot: workspace })).tools.has('ext_sample_echo')).toBe(true);
@@ -278,9 +280,9 @@ describe('actual capability grants, precedence and bounded unload', () => {
   });
   it('preserves local skill override and revokes captured tool/skill objects on disable and restart', async () => {
     await ready(); const capturedTool = (await loadToolCatalog({ workspaceRoot: workspace })).tools.get('ext_sample_echo')!;
-    const capturedSkill = resolveSkillCatalog({ workspaceRoot: workspace }).skills.get('shared')!;
+    const capturedSkill = (await resolveSkillCatalog({ workspaceRoot: workspace })).skills.get('shared')!;
     const directory = path.join(workspace, '.agents/skills/shared'); fs.mkdirSync(directory, { recursive: true }); fs.writeFileSync(path.join(directory, 'SKILL.md'), '---\nname: shared\ndescription: local wins\n---\nlocal instructions');
-    expect(resolveSkillCatalog({ workspaceRoot: workspace }).skills.get('shared')!.description).toBe('local wins');
+    expect((await resolveSkillCatalog({ workspaceRoot: workspace })).skills.get('shared')!.description).toBe('local wins');
     await service.approve(activationOperation(service, workspace, 'disable', 'sample'), 'extension_grant'); await service.invalidate();
     expect(capturedSkill.isCurrent!()).toBe(false); expect((await runPreparedTool(capturedTool, { args: [] }, service.options.gate(capturedTool.name))).isError).toBe(true);
     expect(listSlashCommands().some(entry => entry.name === 'sample-echo')).toBe(false); expect((await loadToolCatalog({ workspaceRoot: workspace })).tools.has('ext_sample_echo')).toBe(false);

@@ -10,6 +10,7 @@ import path from 'node:path';
 import type { PackageRecord } from '../model.js';
 import type { ToolDefinition } from '../../tools/types.js';
 import type { CommandDefinition } from '../../core/commands/types.js';
+import { SkillDiscovery } from '../../core/skills/discovery.js';
 
 export interface RegistrationHost {
   readonly root: string;
@@ -43,17 +44,21 @@ export function registerPackage(host: RegistrationHost, record: PackageRecord): 
     tools.push(host.tool(record, entry.script, `tool:${entry.name}`, selected));
   }
   let cached: readonly Skill[] | undefined;
-  const skills = () => {
+  const skills = async (signal?: AbortSignal, discovery?: SkillDiscovery) => {
     if (!activation.grants.includes('prompt')) return [];
+    const reader = discovery ?? new SkillDiscovery(signal);
     try {
       host.current(record, 'prompt');
       if (!cached) {
-        const loaded = new SkillLoader(host.root, { disableDiscovery: true, extraPaths: manifest.skills.map(entry => path.join(versionPath(record.active, host.file), entry.path)) }).loadDetailed();
+        const loaded = await new SkillLoader(host.root, { disableDiscovery: true, abortSignal: signal, discovery: reader,
+          extraPaths: manifest.skills.map(entry => path.join(versionPath(record.active, host.file), entry.path)) }).loadDetailed();
+        signal?.throwIfAborted(); host.current(record, 'prompt');
         if (loaded.failures.length || loaded.diagnostics.length || loaded.skills.size !== manifest.skills.length) throw new Error('Installed extension skill cannot be parsed.');
         cached = [...loaded.skills.values()].map(skill => ({ ...skill, source: 'extension' as const, isCurrent: () => { try { host.current(record, 'prompt'); return true; } catch { return false; } } }));
-      }
+      } else reader.cached(cached.map(skill => [skill.name, skill.description, skill.body, skill.filePath, skill.source, ...skill.unhonouredFields]));
+      signal?.throwIfAborted(); host.current(record, 'prompt');
       return cached;
-    } catch { host.withheld(record.name); return []; }
+    } catch (error) { reader.rethrow(error); host.withheld(record.name); return []; }
   };
   return registerCatalogContribution({ root: host.root, sessionId: host.sessionId, commands, tools, skills });
 }

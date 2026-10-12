@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { afterEach, beforeEach, expect, it } from 'vitest';
-import { listIgnoredViaGit } from './discovery.js';
+import { loadIgnoredViaGit } from './git.js';
 
 let fixture: string;
 let root: string;
@@ -18,16 +18,16 @@ beforeEach(() => {
 afterEach(() => fs.rmSync(fixture, { recursive: true, force: true }));
 const linux = it.skipIf(process.platform !== 'linux');
 
-linux.each(['config', 'config.worktree', 'index', 'info/exclude', 'commondir'])('refuses an escaping %s metadata source', relative => {
+linux.each(['config', 'config.worktree', 'index', 'info/exclude', 'commondir'])('refuses an escaping %s metadata source', async relative => {
   const outside = path.join(fixture, 'outside');
   fs.writeFileSync(outside, 'PRIVATE_METADATA\n');
   const source = path.join(root, '.git', relative);
   fs.rmSync(source, { force: true });
   fs.symlinkSync(outside, source);
-  expect(listIgnoredViaGit(root, ['hidden.tmp'])).toBeNull();
+  await expect(loadIgnoredViaGit(root, ['hidden.tmp'])).rejects.toThrow();
 });
 
-linux.each(['include', 'symlink'])('checks the worktree metadata config before using its %s source', scenario => {
+linux.each(['include', 'symlink'])('checks the worktree metadata config before using its %s source', async scenario => {
   const common = path.join(root, 'common');
   const metadata = path.join(root, 'metadata');
   fs.renameSync(path.join(root, '.git'), common);
@@ -41,10 +41,10 @@ linux.each(['include', 'symlink'])('checks the worktree metadata config before u
   const config = path.join(metadata, 'config.worktree');
   if (scenario === 'symlink') fs.symlinkSync(outside, config);
   else fs.writeFileSync(config, `[include]\npath=${outside}\n`);
-  expect(listIgnoredViaGit(root, ['hidden.tmp'])).toBeNull();
+  await expect(loadIgnoredViaGit(root, ['hidden.tmp'])).rejects.toThrow();
 });
 
-it('does not let core.worktree relocate implicit ignore reads', () => {
+it('does not let core.worktree relocate implicit ignore reads', async () => {
   execFileSync('git', ['-C', root, 'config', 'core.worktree', fixture], { env: gitEnv });
-  expect(listIgnoredViaGit(root, ['hidden.tmp'])).toBeNull();
+  await expect(loadIgnoredViaGit(root, ['hidden.tmp'])).rejects.toThrow();
 });

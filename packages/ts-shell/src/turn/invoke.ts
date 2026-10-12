@@ -17,7 +17,8 @@ export async function runPreparedTool(tool: ToolDefinition, input: Record<string
   let observed: AgentToolResult | undefined;
   try {
     signal?.throwIfAborted();
-    const args = adapted.prepareArguments!(input); const call = { id, name: tool.name, args };
+    const args = await adapted.prepareArguments!(input, signal); const call = { id, name: tool.name, args };
+    signal?.throwIfAborted();
     const denied = await hooks.beforeToolCall!({ call, args, assistantMessage }, signal);
     if (denied?.block) return publication ? { isError: true, output: publicationOutput(`${label} refused: ${denied.reason}`), metadata: { status: 'unchanged' } }
       : { isError: true, output: `${label} refused by its ordinary permission or hook gate.` };

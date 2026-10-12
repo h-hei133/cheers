@@ -35,12 +35,12 @@ export async function routeSlashCommand(
   // here are exactly the ones the model was told about: `--skill` loads a file
   // the model can already use, and an untrusted project's skills are absent from
   // both lists rather than only from one.
-  const skills = resolveSkillCatalog({
+  const skills = input.startsWith('/skill:') ? (await resolveSkillCatalog({
     workspaceRoot: context.cwd,
     sessionId: context.sessionId,
     ...(context.skillOptions?.skillPaths ? { skillPaths: context.skillOptions.skillPaths } : {}),
     ...(context.skillOptions?.noSkills ? { noSkills: true } : {}),
-  }).skills;
+  })).skills : new Map();
   const skill = expandSkill(input, skills);
   if (skill.skill) {
     return {

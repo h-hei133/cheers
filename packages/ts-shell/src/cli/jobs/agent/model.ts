@@ -11,6 +11,7 @@ export interface AgentRuntimeInput {
 }
 
 export interface AgentRuntimeOptions {
+  readonly signal?: AbortSignal;
   readonly worker?: ModelChoice;
   readonly admission?: () => string | undefined;
   readonly reserved?: (job: AgentJob) => void;

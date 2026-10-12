@@ -20,12 +20,12 @@ export function skillPicker(context: CommandContext): Picker {
     empty: "No skills found. Put a SKILL.md under .agents/skills/<name>/ to add one.",
     async load(): Promise<readonly Option[]> {
       skills = [
-        ...resolveSkillCatalog({
+        ...(await resolveSkillCatalog({
           workspaceRoot: context.cwd,
           sessionId: context.sessionId,
           ...(context.skillOptions?.skillPaths ? { skillPaths: context.skillOptions.skillPaths } : {}),
           ...(context.skillOptions?.noSkills ? { noSkills: true } : {}),
-        }).skills.values(),
+        })).skills.values(),
       ];
       return skills.map<Option>((skill) => ({
         id: skill.name,

@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { loadDirectoryMatcher, matcherForDirectory } from './ignoreRules.js'
+import { loadDirectoryMatcher } from './ignoreRules.js'
 import { listWorkspaceFiles } from './fileWalk.js'
 
 let root: string
@@ -16,7 +16,7 @@ function write(name: string, content = 'fixture'): void {
   fs.writeFileSync(target, content)
 }
 
-it('preserves significant pattern whitespace in both loaders and the fallback walk', async () => {
+it('preserves significant pattern whitespace in the verified loader and fallback walk', async () => {
   write('.gitignore', ' leading.txt\n #note.txt\ntrailing\\ \n/anchored.txt\n')
   const hidden = [' leading.txt', ' #note.txt', 'anchored.txt', ...(process.platform === 'win32' ? [] : ['trailing '])]
   const visible = ['leading.txt', '#note.txt', 'trailing', 'deep/anchored.txt']
@@ -26,7 +26,8 @@ it('preserves significant pattern whitespace in both loaders and the fallback wa
     input: [...hidden, ...visible].join('\0') + '\0', encoding: 'utf8',
   }).split('\0').filter(Boolean)
   expect(native).toEqual(hidden)
-  for (const matcher of [matcherForDirectory(root, root), await loadDirectoryMatcher(root, root)]) {
+  const matcher = await loadDirectoryMatcher(root, root)
+  {
     for (const name of hidden) expect(matcher.ignores(name), name).toBe(true)
     for (const name of visible) expect(matcher.ignores(name), name).toBe(false)
   }
@@ -51,7 +52,8 @@ it.each(['scope', 'literal[1]', '#scope', '!scope', ...(process.platform === 'wi
     }).split('\0').filter(Boolean)
     expect(native).toEqual(hidden)
     const target = path.join(root, directory)
-    for (const matcher of [matcherForDirectory(root, target), await loadDirectoryMatcher(root, target)]) {
+    const matcher = await loadDirectoryMatcher(root, target)
+    {
       for (const name of hidden) expect(matcher.ignores(name), name).toBe(true)
       for (const name of visible) expect(matcher.ignores(name), name).toBe(false)
     }
@@ -80,7 +82,8 @@ it.each([
   expect(execFileSync('git', ['-C', root, 'check-ignore', '--no-index', '-z', '--stdin'], {
     input: [...hidden, ...visible].join('\0') + '\0', encoding: 'utf8',
   }).split('\0').filter(Boolean)).toEqual(hidden)
-  for (const matcher of [matcherForDirectory(root, path.join(root, 'scope')), await loadDirectoryMatcher(root, path.join(root, 'scope'))]) {
+  const matcher = await loadDirectoryMatcher(root, path.join(root, 'scope'))
+  {
     for (const name of hidden) expect(matcher.ignores(name), name).toBe(true)
     for (const name of visible) expect(matcher.ignores(name), name).toBe(false)
   }

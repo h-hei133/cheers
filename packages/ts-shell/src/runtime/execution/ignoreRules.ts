@@ -1,15 +1,14 @@
-import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import ignore, { type Ignore } from 'ignore'
-import { ReadCleanupError, withVerifiedReadTarget } from './read.js'
+import { isReadResourceFailure, ReadCleanupError, withVerifiedReadTarget } from './read.js'
 import type { FileWalkOptions } from './types.js'
 import type { FileHandle } from 'node:fs/promises'
 import { WalkBudget, WalkLimitError } from './walk/budget.js'
 import { addIgnoreContent } from './ignore/syntax.js'
-import { listIgnoredViaGit } from './ignore/discovery.js'
+import { loadIgnoredViaGit } from './ignore/git.js'
+import { repositoryMarker } from './view/git.js'
 
 export { listWorkspaceFilesViaGit, loadIgnoredViaGit } from './ignore/git.js'
-export { listIgnoredViaGit } from './ignore/discovery.js'
 
 /**
  * The repository's own ignore rules, as one question with one answer.
@@ -47,43 +46,6 @@ const IGNORE_FILES = ['.gitignore', '.ignore'] as const
 /** The ignore files read at each directory when git is not available. */
 export const IGNORE_FILE_NAMES = IGNORE_FILES
 
-/**
- * Fold one directory's ignore file into `matcher`.
- *
- * A pattern in a nested ignore file is relative to that file's directory, so each
- * line is rewritten to be relative to the root before being added. Without this a
- * `.gitignore` in `a/b/` containing `c` would also hide a root-level `c`.
- *
- * The rewrite follows git's own rule that a pattern without a slash matches at
- * any depth below the declaring directory, while one containing a slash is
- * anchored there. `prefix` is empty at the root and `a/b/` below it.
- */
-export function addIgnoreFile(matcher: Ignore, file: string, prefix: string, allowed?: (file: string) => boolean): void {
-  if (allowed && !allowed(file)) return
-  let content: string
-  try {
-    content = readFileSync(file, 'utf8')
-  } catch {
-    return
-  }
-  addIgnoreContent(matcher, content, prefix)
-}
-
-/**
- * An ignore matcher carrying every rule that reaches `target`.
- *
- * Built by replaying the ancestor chain from `root` down, because a rule in an
- * ancestor applies to `target` and there is no cheaper way to know it: the
- * matcher is stateful and the prefixes differ at each level. Each directory's
- * ignore files are folded in with that directory's prefix relative to `root`,
- * exactly as the walk does when it descends.
- */
-export function matcherForDirectory(root: string, target: string, allowed?: (file: string) => boolean): Ignore {
-  const matcher = ignore({ ignorecase: false })
-  for (const source of ignoreSources(root, target)) addIgnoreFile(matcher, source.file, source.prefix, allowed)
-  return matcher
-}
-
 function ignoreSources(root: string, target: string): { file: string; prefix: string }[] {
   const relative = path.relative(root, target)
   const segments = relative === '' || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)
@@ -114,7 +76,7 @@ export async function loadIgnoreFile(matcher: Ignore, file: string, prefix: stri
       return value
     })
   } catch (error) {
-    if (error instanceof ReadCleanupError) throw error
+    if (error instanceof ReadCleanupError || isReadResourceFailure(error)) throw error
     options?.abortSignal?.throwIfAborted()
     if (error instanceof WalkLimitError) throw error
     budget.check()
@@ -150,34 +112,20 @@ export async function loadDirectoryMatcher(root: string, target: string, options
   return matcher
 }
 
-/**
- * Whether one directory holds something the repository excludes.
- *
- * The single question skill discovery asks, and the reason this module is
- * exported rather than inlined at each caller: a skill inside a directory the
- * repository ignores must be as invisible to discovery as it is to every tool.
- *
- * Fails open — an unreadable tree, an absent git, or a directory outside `root`
- * all answer "not ignored". Missing a skill is worse than showing one that a
- * `.gitignore` covers: the model cannot use a skill it was never told about, and
- * it has no way to notice the omission.
- */
-export function isDirectoryIgnored(root: string, directory: string): boolean {
+/** One directory's skill candidates share the native view and traversal budget. */
+export async function loadIgnoredDirectories(root: string, directory: string, names: readonly string[], options?: FileWalkOptions,
+  budget = new WalkBudget(options?.abortSignal, options?.limits)): Promise<ReadonlySet<string>> {
+  budget.check()
   const resolvedRoot = path.resolve(root)
   const resolvedDirectory = path.resolve(directory)
   const relative = path.relative(resolvedRoot, resolvedDirectory)
-  if (relative === '' || relative.startsWith('..') || path.isAbsolute(relative)) {
-    return false
+  if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) throw new Error('Discovery directory is outside its selected root.')
+  if (!names.length) return new Set()
+  if (repositoryMarker(resolvedRoot, resolvedDirectory)) {
+    const native = await loadIgnoredViaGit(resolvedDirectory, names, options?.abortSignal, budget,
+      { root: resolvedRoot, assertFileAccess: options?.assertFileAccess ?? (() => {}), directories: true })
+    if (native !== null) return native
   }
-  const parent = path.dirname(resolvedDirectory)
-  const name = path.basename(resolvedDirectory)
-
-  const viaGit = listIgnoredViaGit(parent, [name])
-  if (viaGit !== null) return viaGit.has(name)
-
-  // git has no repository to answer from, so the rules are matched in-process.
-  // The trailing separator is how the matcher is told this is a directory, so a
-  // `dir/` pattern matches.
-  const prefix = relative.split(path.sep).join('/')
-  return matcherForDirectory(resolvedRoot, parent).ignores(`${prefix}/`)
+  const matcher = await loadDirectoryMatcher(resolvedRoot, resolvedDirectory, options, budget)
+  return new Set(names.filter(name => matcher.ignores(`${path.posix.join(relative.split(path.sep).join('/'), name)}/`)))
 }

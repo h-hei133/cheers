@@ -6,6 +6,7 @@ import type { ToolDefinition } from "../tools/types.js";
 import { adaptTools, createToolHooks, PARSE_ERROR_KEY, type ToolGateOptions } from "./tools.js";
 import { createCoreToolRegistry } from "../core/tools/registry.js";
 import { runToolsCommand } from "../core/commands/toolsCommandRuntime.js";
+import { executeToolBatch } from '../core/agent/tools.js';
 
 /**
  * The gate decides what a tool call may do before the kernel runs it. Each
@@ -37,6 +38,31 @@ function gate(overrides: Partial<ToolGateOptions> = {}): ToolGateOptions & { eve
 function call(name: string, args: Record<string, unknown> = {}) {
   return { assistantMessage: assistant, call: { id: `call_${name}`, name, args }, args };
 }
+
+it.each(['allowed', 'cancelled', 'revoked'] as const)('settles asynchronous preparation before approval and preserves %s admission', async outcome => {
+  let release!: () => void; let began!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  const started = new Promise<void>(resolve => { began = resolve; });
+  const controller = new AbortController(); let revoked = false;
+  const approval = vi.fn(async (prompt: { id: string }) => ({ promptId: prompt.id, decision: 'allow-once' as const, respondedAt: 1 }));
+  const execute = vi.fn(async () => ({ success: true, output: 'complete' })); const refused = vi.fn();
+  const definition: ToolDefinition = { name: 'worker_start', description: 'Bound preparation', argsSchema: { type: 'object' }, onRefusal: refused,
+    prepare: async (_args, context) => {
+      expect(context.abortSignal).toBe(controller.signal); began(); await held;
+      return { targets: [], permissionToolName: 'task', permissionArgs: { prompt: 'complete captured instructions' }, preview: 'complete', execute };
+    }, execute };
+  const pool = new Map([[definition.name, definition]]);
+  const options = gate({ permissionScope: 'ask', escalationPromptHandler: approval, admission: () => revoked ? 'capture revoked' : undefined });
+  const pending = executeToolBatch(adaptTools(pool, options), assistant, [{ id: 'prepared', name: definition.name, args: {} }],
+    createToolHooks(options, pool), 'sequential', controller.signal, () => {});
+  await started; expect(approval).not.toHaveBeenCalled(); expect(execute).not.toHaveBeenCalled();
+  if (outcome === 'cancelled') controller.abort();
+  if (outcome === 'revoked') revoked = true;
+  release(); const result = await pending;
+  if (outcome === 'allowed') { expect(approval).toHaveBeenCalledOnce(); expect(execute).toHaveBeenCalledOnce(); expect(refused).not.toHaveBeenCalled(); }
+  else { expect(approval).not.toHaveBeenCalled(); expect(execute).not.toHaveBeenCalled(); expect(refused).toHaveBeenCalledWith({}, expect.anything(), outcome === 'cancelled' ? 'cancelled' : 'blocked'); }
+  expect(result.messages[0]!.content).toBe(outcome === 'allowed' ? 'complete' : outcome === 'cancelled' ? 'Operation aborted' : 'capture revoked');
+});
 
 describe("createToolHooks", () => {
   it.each(['approval', 'hook'])('rechecks live admission after awaited %s', async stage => {

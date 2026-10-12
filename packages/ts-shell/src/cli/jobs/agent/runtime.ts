@@ -27,7 +27,8 @@ import { agentRequestPolicy } from './policy.js';
 import { loadMcpConfigs } from '../../../core/mcp/config.js';
 import { executionChoice, sourceChoice } from '../../provider/selection.js';
 import { AgentOutcomeProof } from './outcome.js';
-export function captureAgentRuntime(host: JobsComposition, input: AgentRuntimeInput, options: AgentRuntimeOptions = {}): AgentRuntime {
+export class AgentCaptureError extends Error {}
+export async function captureAgentRuntime(host: JobsComposition, input: AgentRuntimeInput, options: AgentRuntimeOptions = {}): Promise<AgentRuntime> {
   const parentAdmission = jobAdmission(host, 'task'); const gate = host.gate('task');
   const agentMode = gate.agentMode ?? host.runtime.getAgentMode();
   const publication = host.context.configuration.current;
@@ -38,11 +39,7 @@ export function captureAgentRuntime(host: JobsComposition, input: AgentRuntimeIn
   const resolution = target ? { ...original, model: target.model, thinkingEffort: target.thinkingEffort } : original;
   const thinkingPreference = captureThinkingPreference(host.context.cwd, resolution.thinkingEffort);
   const providerModeEnv = input.providerRuntimeBridge.providerModeEnv();
-  const content = captureCatalogContent({ workspaceRoot: host.context.cwd, sessionId: host.session.id,
-    skillOptions: input.skillOptions, runtimeConfig: publication.config, admission: parentAdmission });
-  const catalogContent = { skills: new Map([...content.skills].map(([name, skill]) => [name, Object.freeze({ ...skill,
-    unhonouredFields: Object.freeze([...skill.unhonouredFields]) })])), tools: [],
-    mcpTools: structuredClone(input.mcpGateway?.peekSnapshot()?.tools ?? []) };
+  const mcpTools = structuredClone(input.mcpGateway?.peekSnapshot()?.tools ?? []);
   const untrusted = projectTrust.isProjectUntrusted(host.context.cwd);
   const mcpConfigs = () => publication.config.enableMcpTools === true ? input.mcpGateway?.loadConfigs() ?? loadMcpConfigs(host.context.cwd, !untrusted) : undefined;
   const capturedMcpConfigs = mcpConfigs();
@@ -60,9 +57,15 @@ export function captureAgentRuntime(host: JobsComposition, input: AgentRuntimeIn
     return declared.hooks.length || declared.problems.length
       ? 'Side-agent execution is unavailable with declared command hooks: their process cleanup cannot be verified. Use the main session.' : undefined;
   };
+  const content = await captureCatalogContent({ workspaceRoot: host.context.cwd, sessionId: host.session.id,
+    skillOptions: input.skillOptions, runtimeConfig: publication.config, signal: options.signal,
+    admission: () => options.admission?.() ?? parentAdmission() ?? parentBinding() });
+  const catalogContent = { skills: new Map([...content.skills].map(([name, skill]) => [name, Object.freeze({ ...skill,
+    unhonouredFields: Object.freeze([...skill.unhonouredFields]) })])), tools: [], mcpTools };
   const admission = () => options.admission?.() ?? parentAdmission() ?? parentBinding() ?? hookAdmission() ?? (host.runtime.getPermissionScope() !== gate.permissionScope
     || host.runtime.getAgentMode() !== agentMode || projectTrust.isProjectUntrusted(host.context.cwd) !== untrusted
     || [...catalogContent.skills.values()].some(skill => skill.isCurrent?.() === false) ? 'The parent permission, mode or captured content changed.' : undefined);
+  const refused = admission(); if (refused) throw new AgentCaptureError(refused);
   const parentPolicy = goalPolicyFor(host.context, host.manager) ?? createRequestPolicy(sessionRequestStore(host.manager, host.session,
     { id: host.session.id, workspacePath: parent.scope.workspace.path, workspaceIdentity: parent.scope.workspace.identity }, () => {
       if (admission()) throw new Error('Parent request admission changed.'); return {};

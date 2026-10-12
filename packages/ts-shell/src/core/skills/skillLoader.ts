@@ -3,7 +3,9 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { userDataSearchDirs } from "../paths/userHome.js";
 import { projectDirectories } from "../project/directories.js";
-import { isDirectoryIgnored } from "../../runtime/execution/ignoreRules.js";
+import { loadIgnoredDirectories } from "../../runtime/execution/ignoreRules.js";
+import { SkillDiscovery } from './discovery.js';
+import type { WalkLimits } from '../../runtime/execution/walk/budget.js';
 
 /**
  * Skill discovery.
@@ -121,30 +123,15 @@ const VALID_NAME = /^[a-z0-9-]+$/;
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 
 export class SkillLoader {
-  private readonly roots: readonly { readonly dir: string; readonly source: SkillSource }[];
+  private readonly roots: readonly { readonly dir: string; readonly source: SkillSource; readonly boundary: string }[];
   /** Paths the user named explicitly, as files or directories. */
   private readonly extraPaths: readonly string[];
   /** Whether the discovered roots are read at all. */
   private readonly disableDiscovery: boolean;
-  /**
-   * Named paths that could not be loaded, with why.
-   *
-   * Kept apart from `SkillDiagnostic` because they describe the path rather than
-   * a skill: there is no name to attribute them to, and nothing was inspected.
-   * Collected during `loadDetailed` rather than the constructor so a loader that
-   * is never asked to load reports nothing.
-   */
-  private readonly failures: { readonly filePath: string; readonly message: string }[] = [];
-  /**
-   * Where the repository's ignore rules are read from.
-   *
-   * Only discovered roots are subject to it. A path the user named is loaded
-   * whatever the rules say — pointing at a file is a more specific statement than
-   * a pattern that happens to match it, and honouring the pattern there would
-   * make `--skill` silently do nothing.
-   */
-  private readonly ignoreRoot: string;
   private readonly onSource?: (target: string) => void;
+  private readonly signal?: AbortSignal;
+  private readonly limits?: WalkLimits;
+  private readonly discovery?: SkillDiscovery;
 
   constructor(
     workspaceRoot: string = process.cwd(),
@@ -163,6 +150,11 @@ export class SkillLoader {
       readonly disableDiscovery?: boolean;
       /** Report paths actually visited, before reading, for optional change observation. */
       readonly onSource?: (target: string) => void;
+      readonly abortSignal?: AbortSignal;
+      readonly limits?: WalkLimits;
+      /** An enclosing catalog shares one budget across builtins and extensions. */
+      readonly discovery?: SkillDiscovery;
+      readonly allowProject?: boolean;
     } = {},
   ) {
     // Every user skills directory, newest first. A listing that read
@@ -178,34 +170,33 @@ export class SkillLoader {
     // Nearest first, because within one source the first file found wins: a skill
     // written for a subdirectory is the more specific statement and should take
     // precedence over one written for the whole repository.
-    const projectSkillDirs = [...projectDirectories(workspaceRoot)].reverse().map((dir) => ({
+    const projectDirs = projectDirectories(workspaceRoot);
+    const projectSkillDirs = [...projectDirs].reverse().map((dir) => ({
       dir: path.join(dir, ".agents", "skills"),
       source: "project" as const,
+      boundary: projectDirs[0]!,
     }));
     this.extraPaths = options.extraPaths ?? [];
     this.disableDiscovery = options.disableDiscovery ?? false;
-    // The repository's rules are read from the working directory, which git
-    // resolves upward to the repository that owns it. A user-level skills
-    // directory lies outside this root and is therefore never subject to the
-    // project's rules — which is right: they are that repository's statement
-    // about its own files.
-    this.ignoreRoot = workspaceRoot;
     this.onSource = options.onSource;
+    this.signal = options.abortSignal;
+    this.limits = options.limits;
+    this.discovery = options.discovery;
     this.roots = this.disableDiscovery
       ? []
       : [
           ...userSkillDirs.map(
-            (dir) => ({ dir, source: "user" as const }),
+            (dir) => ({ dir, source: "user" as const, boundary: path.dirname(dir) }),
           ),
           // Project skills win: a repository that ships its own way of doing something
           // should override the user's general habit for that repository.
-          ...projectSkillDirs,
+          ...(options.allowProject === false ? [] : projectSkillDirs),
         ];
   }
 
   /** Every discoverable skill, keyed by name, project overriding user. */
-  load(): ReadonlyMap<string, Skill> {
-    return this.loadDetailed().skills;
+  async load(): Promise<ReadonlyMap<string, Skill>> {
+    return (await this.loadDetailed()).skills;
   }
 
   /**
@@ -220,24 +211,25 @@ export class SkillLoader {
    * deliberate — a repository that ships its own way of doing something should
    * override the user's general habit for that repository.
    */
-  loadDetailed(): {
+  async loadDetailed(): Promise<{
     skills: ReadonlyMap<string, Skill>
     collisions: readonly SkillCollision[]
     diagnostics: readonly SkillDiagnostic[]
     /** Named paths that could not be loaded. Empty unless one was named. */
     failures: readonly { readonly filePath: string; readonly message: string }[]
-  } {
+  }> {
     const skills = new Map<string, Skill>();
     const collisions: SkillCollision[] = [];
     const diagnostics: SkillDiagnostic[] = [];
-    this.failures.length = 0;
+    const failures: { filePath: string; message: string }[] = [];
+    const discovery = this.discovery ?? new SkillDiscovery(this.signal, this.limits);
     // Named paths last, so an explicit file wins a name a discovered skill
     // shares: the user pointed at it, and that is the more specific statement.
     for (const root of [
       ...this.roots,
-      ...this.extraPaths.map((entry) => ({ dir: entry, source: "cli" as const })),
+      ...this.extraPaths.map((entry) => ({ dir: entry, source: "cli" as const, boundary: undefined })),
     ]) {
-      for (const skill of this.loadRoot(root.dir, root.source)) {
+      for (const skill of await this.loadRoot(root.dir, root.source, root.boundary, discovery, failures)) {
         diagnostics.push(...inspectSkill(skill));
         const existing = skills.get(skill.name);
         if (existing && existing.source === skill.source) {
@@ -258,7 +250,8 @@ export class SkillLoader {
         skills.set(skill.name, skill);
       }
     }
-    return { skills, collisions, diagnostics, failures: [...this.failures] };
+    discovery.verify();
+    return { skills, collisions, diagnostics, failures };
   }
 
   /**
@@ -271,7 +264,8 @@ export class SkillLoader {
    * this loader discovered are all directories, so for them this is the plain
    * scan.
    */
-  private loadRoot(dirOrFile: string, source: SkillSource): Skill[] {
+  private async loadRoot(dirOrFile: string, source: SkillSource, boundary: string | undefined, discovery: SkillDiscovery,
+    failures: { filePath: string; message: string }[]): Promise<Skill[]> {
     this.onSource?.(dirOrFile);
     // Only a path the user named can be reported missing. A discovered root that
     // is absent is the ordinary state of a fresh install — nobody asked for
@@ -281,8 +275,9 @@ export class SkillLoader {
     try {
       stats = fs.statSync(dirOrFile);
     } catch (error) {
+      discovery.rethrow(error);
       if (report) {
-        this.failures.push({
+        failures.push({
           filePath: dirOrFile,
           message:
             error instanceof Error && "code" in error && error.code === "ENOENT"
@@ -292,10 +287,23 @@ export class SkillLoader {
       }
       return [];
     }
+    // An explicit path selects its current canonical root; discovered paths stay
+    // within the project or user-data root that admitted them.
+    try {
+      if (!boundary) {
+        dirOrFile = fs.realpathSync(dirOrFile);
+        boundary = stats.isDirectory() ? dirOrFile : path.dirname(dirOrFile);
+      }
+      discovery.root(boundary);
+    } catch (error) {
+      discovery.rethrow(error);
+      failures.push({ filePath: dirOrFile, message: 'could not be read from its selected root' });
+      return [];
+    }
     if (stats.isFile()) {
-      const skill = readSkill(dirOrFile, undefined, source);
+      const skill = await this.readSkill(dirOrFile, undefined, source, boundary, discovery);
       if (!skill && report) {
-        this.failures.push({
+        failures.push({
           filePath: dirOrFile,
           message: "is not a readable skill file, so nothing was loaded from it",
         });
@@ -304,16 +312,16 @@ export class SkillLoader {
     }
     if (!stats.isDirectory()) {
       // A FIFO, socket, or device node. `scan` would swallow the ENOTDIR that
-      // readdirSync raises, and the named path would vanish with no explanation.
+      // directory enumeration rejects, and the named path would vanish without an explanation.
       if (report) {
-        this.failures.push({
+        failures.push({
           filePath: dirOrFile,
           message: "is neither a file nor a directory, so nothing was loaded from it",
         });
       }
       return [];
     }
-    return this.scan(dirOrFile, source, true);
+    return this.scan(dirOrFile, source, true, boundary, discovery, 0);
   }
 
   /**
@@ -329,24 +337,38 @@ export class SkillLoader {
    * found ones are good: the model cannot use a skill it was never told about,
    * and it has no way to notice the omission.
    */
-  private scan(dir: string, source: SkillSource, isRoot: boolean): Skill[] {
+  private async scan(dir: string, source: SkillSource, isRoot: boolean, boundary: string, discovery: SkillDiscovery, depth: number): Promise<Skill[]> {
     this.onSource?.(dir);
     let entries: fs.Dirent[];
     try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
+      entries = await discovery.directory(boundary, dir, depth);
+    } catch (error) {
+      discovery.rethrow(error);
       return [];
     }
 
     // A directory holding a manifest is itself the skill, at any depth: its
     // subdirectories are that skill's own files, not more skills.
     const manifestPath = path.join(dir, MANIFEST);
-    if (fs.existsSync(manifestPath)) {
-      const skill = readSkill(manifestPath, path.basename(dir), source);
+    if (entries.some(entry => entry.name === MANIFEST)) {
+      const skill = await this.readSkill(manifestPath, path.basename(dir), source, boundary, discovery);
       return skill ? [skill] : [];
     }
 
     const found: Skill[] = [];
+    const candidates = entries.filter(entry => entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules');
+    let ignored: ReadonlySet<string> = new Set();
+    if (source === 'project') {
+      try {
+        ignored = await loadIgnoredDirectories(discovery.root(boundary), dir,
+          candidates.map(entry => entry.name), { abortSignal: this.signal, assertFileAccess: absolute => {
+            this.onSource?.(absolute); discovery.root(boundary);
+          } }, discovery.budget);
+      } catch (error) {
+        discovery.rethrow(error);
+        throw error;
+      }
+    }
     for (const entry of entries) {
       // Dot-directories hold tooling state rather than skills, and a dependency
       // directory holds other people's skills. Neither is this project's.
@@ -362,33 +384,33 @@ export class SkillLoader {
         // Not for a path the user named: pointing at a directory is a more
         // specific statement than a pattern that happens to match it, so a
         // `--skill <dir>` whose contents the repository ignores still loads.
-        if (source !== "cli" && isDirectoryIgnored(this.ignoreRoot, child)) continue;
-        found.push(...this.scan(child, source, false));
+        if (ignored.has(entry.name)) continue;
+        found.push(...await this.scan(child, source, false, boundary, discovery, depth + 1));
         continue;
       }
       // Loose files are only skills at the root. Deeper down, a bare `.md` is
       // more likely to be part of the skill above it than a skill of its own.
       if (isRoot && entry.name.endsWith(".md")) {
-        const skill = readSkill(path.join(dir, entry.name), undefined, source);
+        const skill = await this.readSkill(path.join(dir, entry.name), undefined, source, boundary, discovery);
         if (skill) found.push(skill);
       }
     }
     return found.sort((left, right) => left.name.localeCompare(right.name));
   }
+
+  private async readSkill(file: string, dirName: string | undefined, source: SkillSource, boundary: string, discovery: SkillDiscovery): Promise<Skill | undefined> {
+    try { return parseSkill(await discovery.content(boundary, file), file, dirName, source); }
+    catch (error) { discovery.rethrow(error); return undefined; }
+  }
 }
 
 /** One skill file, or undefined when it is unreadable or turned off. */
-function readSkill(
+function parseSkill(
+  content: string,
   filePath: string,
   dirName: string | undefined,
   source: SkillSource,
 ): Skill | undefined {
-  let content: string;
-  try {
-    content = fs.readFileSync(filePath, "utf8");
-  } catch {
-    return undefined;
-  }
   const match = FRONTMATTER.exec(content);
   const fields = match ? parseFields(match[1]!) : new Map<string, string>();
   if (fields.get("enabled") === "false") return undefined;

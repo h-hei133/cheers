@@ -11,6 +11,12 @@ export class ReadCleanupError extends Error {
   }
 }
 
+/** Resource exhaustion cannot be treated as an absent optional read source. */
+export function isReadResourceFailure(error: unknown): boolean {
+  return error !== null && typeof error === 'object' && 'code' in error && typeof error.code === 'string'
+    && ['EMFILE', 'ENFILE', 'ENOMEM', 'ENOSPC'].includes(error.code)
+}
+
 /** All read handles preserve unverified cleanup ahead of cancellation or content. */
 export async function closeReadHandle(handle: { close(): Promise<void> }): Promise<void> {
   try { await handle.close() }

@@ -23,12 +23,12 @@ export async function runSkillCommand(
   // The same catalog the prompt path and `/skill:` resolve through, so the list
   // read here is the list the model was given — a skill named with `--skill`
   // appears, and an untrusted project's skills do not.
-  const skills = resolveSkillCatalog({
+  const skills = (await resolveSkillCatalog({
     workspaceRoot: context.cwd,
     sessionId: context.sessionId,
     ...(context.skillOptions?.skillPaths ? { skillPaths: context.skillOptions.skillPaths } : {}),
     ...(context.skillOptions?.noSkills ? { noSkills: true } : {}),
-  }).skills;
+  })).skills;
   const wanted = parsed.args[0];
   if (!wanted) return { kind: "local", output: listSkills([...skills.values()]) };
 

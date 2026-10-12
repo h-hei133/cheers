@@ -60,7 +60,7 @@ Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)�
 | W4 UI-01–07 | §8.86–101；[输入布局](../../packages/ts-shell/src/presentation/tui/composer/)、[呈现](../../packages/ts-shell/src/presentation/tui/)、[启动度量](../../packages/ts-shell/src/observability/startupTiming.ts) | 两模式 PTY、八形态、源文复制、状态和计量已有本地证据；用户前端像素/字体/IME 实证仍缺 |
 | W5 SES-01–05 | §8.102–108；[选择器](../../packages/ts-shell/src/cli/interactive/picker/)、[续接](../../packages/ts-shell/src/session/continuation/) | current、大小、分支、新会话、多根和同 ID 迁移已验；跨文件崩溃原子性不作承诺 |
 | W5 EDIT-01–03 | §8.109–111；[批次](../../packages/ts-shell/src/edit/patch/)、[恢复](../../packages/ts-shell/src/edit/recovery/) | 提案、批准、收据、整组 undo、partial/unknown 和外改保护已验；不自动重放未知写入 |
-| W6 TOOL-01–05 | §8.112–116；[媒体读取](../../packages/ts-shell/src/runtime/execution/media/)、[语言服务](../../packages/ts-shell/src/language/)、[浏览器](../../packages/ts-shell/src/browser/)、[桌面](../../packages/ts-shell/src/desktop/) | 公共异步读/枚举、有界媒体、真实语言服务与浏览器、Linux X11 已验；同步发现资源界及其他原生平台仍有限制 |
+| W6 TOOL-01–05 | §8.112–116；[媒体读取](../../packages/ts-shell/src/runtime/execution/media/)、[语言服务](../../packages/ts-shell/src/language/)、[浏览器](../../packages/ts-shell/src/browser/)、[桌面](../../packages/ts-shell/src/desktop/) | 公共异步读/枚举、有界媒体、真实语言服务与浏览器、Linux X11 已验；技能异步资源界见 §9，其他原生平台仍有限制 |
 | W7 AUTO-01–05 | §8.117–121；[目标](../../packages/ts-shell/src/planning/goal/)、[顾问](../../packages/ts-shell/src/advisor/) | 无 cap 续轮、共享请求账目、暂停、批准条件、顾问闭环已验；无法证明请求上界的协议在显式 cap 下仍为 unsupported |
 | W8 RSC-01–05 | §8.122；[研究](../../packages/ts-shell/src/research/) | 软件/论文来源、独立审查、阶段恢复和有序报告已有本地证据；来源不全或审查不可用保留缺口，不保证模型结论为真 |
 | W9 GIT-01–04 | §8.123；[Git 工作台](../../packages/ts-shell/src/workflow/git/) | 原生 hunk/index/commit/worktree、失效预览和远端 unknown 已验；推送仍需独立授权和远端读回 |
@@ -101,9 +101,9 @@ Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)�
 | macOS/Windows | 部分 profile、接口与纯逻辑用例 | 原生路径/文件描述符、进程树清理、终端与设备尚未取得等价实机证据 |
 | 模型传输与严格预算 | 合成 HTTP/SSE/usage/重试/unknown、统一 request admission | W7-33 四端点真实 TLS/HTTP2 矩阵仍缺；无法证明上界的请求继续拒绝 strict cap 准入 |
 | 公共包、认证、协作和 SSH | 受控服务、签名、ACL、撤权、重连与未知副作用 | 真实账户、公共部署 TLS、真实远端主机/主机密钥和生产互通验收 |
-| SAFE-02 | Linux 公开文件工具的检查/句柄/拒绝/清理及受管编辑目录固定；原生 Git/ripgrep 私有视图、配置准入和 child 完成收据，见 §7 | 同步 discovery 并发替换、非 Linux 实际对象绑定、私有镜像性能继续开放；外部 metadata/hasconfig 明确拒绝，资源计数器不约束原生进程内部全部读取 |
+| SAFE-02 | Linux 公开文件工具的检查/句柄/拒绝/清理及受管编辑目录固定；原生 Git/ripgrep 私有视图、配置准入和 child 完成收据；异步技能发现、批准前捕获与共享预算，见 §7–9 | 非 Linux 实际对象绑定、跨进程正文稳定、整 catalog 一致性与私有镜像剩余成本继续开放；外部 metadata/hasconfig 明确拒绝，资源计数器不约束原生进程内部全部读取 |
 
-SAFE-02 下一步继续处理同步 discovery 竞态、非 Linux 对象绑定和镜像成本，扩展外部 metadata/条件支持须重新证明准入。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把 W1–W16 或 Phase 19 总目标标为完成。
+技能发现的同步正文/Git 忽略路径已按 §9 替换；SAFE-02 继续处理非 Linux 对象绑定、跨进程正文稳定和镜像成本，扩展外部 metadata/条件支持须重新证明准入。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把 W1–W16 或 Phase 19 总目标标为完成。
 
 ## 6. 迁移、回退与交付
 
@@ -163,3 +163,25 @@ SAFE-02 下一步继续处理同步 discovery 竞态、非 Linux 对象绑定和
 剖析与只切换原生解析的中间结果均保留，未把不足 25% 的结果称为达标。真实 ulimit64 反例观察到最多 8 个占位写入、8 个均结算、5 个 EMFILE，清理开始时零活跃写入且镜像已删除。当前冻结与用户 `.gitignore` 原 SHA 均复验一致；材料 `.tmp/native-read/performance/{inventory.json,acceptance.json}`。
 
 O(n) 镜像成本仍是 architecture WATCH，性能门槛通过不关闭 §5 的其余 SAFE-02 和外部边界，也不证明正文搜索、真实大仓、高并发、非 Linux 或全阶段完成。新提交/推送/精确 CI 单独记录，Phase19 保持 active。
+
+该性能组件已提交/推送 `d6cfaaf5a8c863eda291e298bfae2c9137493ff8`，远端读回同 SHA。CI 38283637758/job114926652699 和 Watch 38283637674/job114926652491 均 completed/failure、steps=[]；annotations 确认付款/spending-limit 阻止启动，未计远端通过，材料 `.tmp/native-read/performance/delivery.json`。
+
+## 9. SAFE-02 异步技能发现局部验收（2026-10-13）
+
+起点为 §8 性能提交。现有[技能 owner](../../packages/ts-shell/src/core/skills/discovery.ts)复用核验目录/文件句柄和私有 Git 视图，同步 discovery 正文读取与 Git 子进程已删除。内置与扩展共用遍历预算及 512 manifest/单项512KiB/总8MiB；warm cache 保留字段也计入。普通缺失保持诊断，resource/limit/cancel/cleanup 不返回完整 catalog；目录忽略结合 indexed descendants，保留 ignored-but-tracked 技能。
+
+| 证据 | 实际结果 | 范围/材料 |
+|---|---|---|
+| 源码冻结 | 43 TS 路径/31 production（含删除），两独立 lane 逐文件前后相符 | `inventory-final-repair.json` SHA256 `25eb2b46edab17c70a2aeb69a6929da5843254567eae9ab32f89ad7ab9fc1469`；用户 `.gitignore` 原 SHA 保持 |
+| 受影响组合与修复回归 | 此前40文件/552项；修复后10文件/192项；最后resource修复4文件/96项，分别通过 | `tests-final`、`tests-repaired`、`tests-ignore-final`；不同阶段的运行不合并成全套或最终字节全套证据 |
+| 最终构建/静态 | TS/单文件、四源码门及完整 judge exit0 | `build-final`、`executable-final`、`*-final`；图义务满足、4项既有ceiling advisory/partial，无新增 |
+| 独立 code/architecture | APPROVE/WATCH，综合 COMMENT，没有未解决 blocker | 最终225/186项及七/六实际探针；`review-code.md`、`review-architecture.md` |
+| 五组隔离反转 | 正向副本通过，五反转均真实 AssertionError；源字节不变 | 对象复验、准备先于批准、缓存预算、清理优先级、fallback resource；`reversals/results.json` |
+| actual print | Node/单文件四条工具链、8合成 POST、exit0 | 自动catalog/skill工具正文、ignored/tracked/contained-excludes、显式路径+noSkills；`cli-smoke-results.json` |
+| actual PTY | Node/单文件×regular/fullscreen四条、4合成 POST、exit0 | 同步实际启动prompt、技能展开和参数、隐藏技能零发送、技能/config原字节；`cli-pty-results.json` |
+
+异步 preparation 通过原 WeakMap 能力在实际捕获及准入复验后发布，权限 hooks 等待同一准备 seam；worker、director 和 side-agent 不在完整技能捕获前批准。最终 catalog 复验 contribution owner/current，Git 实际生效源进入现有观察器。直接复核修复了 warm cache 绕预算、读取清理被取消覆盖、资源失败被吞与 excludes 变化不通知的问题。
+
+参考方案可跳过不可读 ignore 源，本项目保留普通缺失而明确传播 resource/cleanup，不以隐藏来源漏出换取部分成功。CLI 初次夹具的默认拒绝、无效相对 excludes cwd 和 RTK proxy 的非TTY输出分别保留失败记录；修正夹具后才计上述通过。没有重跑全仓套件或真实 provider。
+
+WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查询延迟、256个源订阅和缓存过期回退、整catalog的并发内容一致性；单项快照不构成目录事务，扩展 inventory 仍使用原同步身份验证。SAFE-02 其余边界及 W7-33、用户前端、真实外部服务保持 §5 状态，Phase19 active；本批源码提交/推送/精确CI另行核对。

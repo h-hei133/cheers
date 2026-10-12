@@ -12,14 +12,17 @@ export function selectedWorker(owner: DirectorOwner, id: string): AgentJob {
   if (!owner.row.workers.includes(id)) throw new Error('The worker does not belong to this director.');
   return owner.host.agents.journal.get(id);
 }
-export function prepareWorker(owner: DirectorOwner, action: 'start' | 'send' | 'stop', args: Record<string, unknown>): ToolPreparation {
+export async function prepareWorker(owner: DirectorOwner, action: 'start' | 'send' | 'stop', args: Record<string, unknown>, signal?: AbortSignal): Promise<ToolPreparation> {
+  signal?.throwIfAborted();
   const refused = owner.admission(); if (refused) throw new Error(refused);
   const { host } = owner;
   const job = action === 'start' ? undefined : selectedWorker(owner, String(args.id));
   const instruction = action === 'stop' ? `Stop exact worker ${job!.id}` : args.prompt;
   if (!prompt(instruction)) throw new Error('Worker assignment must be nonempty and at most 16 KiB.');
-  const runtime = action === 'stop' ? undefined : host.agentRuntimeInput ? captureAgentRuntime(host, host.agentRuntimeInput,
-    { worker: owner.row.worker, admission: owner.admission, directorId: owner.row.id, reserved: owner.reserved }) : undefined;
+  const runtime = action === 'stop' ? undefined : host.agentRuntimeInput ? await captureAgentRuntime(host, host.agentRuntimeInput,
+    { worker: owner.row.worker, admission: owner.admission, directorId: owner.row.id, reserved: owner.reserved, signal }) : undefined;
+  signal?.throwIfAborted();
+  const changed = owner.admission(); if (changed) throw new Error(changed);
   if (action !== 'stop' && !runtime) throw new Error('The bound worker runtime is unavailable.');
   if (runtime?.admission()) throw new Error(runtime.admission());
   if (job && action === 'send' && (host.agents.hasLive(job.id) || !job.child || !sameValue(runtime!.checkpoint(job.child), job.checkpoint)

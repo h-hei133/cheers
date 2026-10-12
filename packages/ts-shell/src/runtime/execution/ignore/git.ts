@@ -12,9 +12,8 @@ import { repositoryMarker } from '../view/git.js'
 /**
  * How long git may take before the caller gives up on it.
  *
- * Runtime queries can be cancelled through the execution owner. Discovery still
- * has a synchronous compatibility call, so both paths also need a finite budget.
- * Incomplete asynchronous queries throw instead of changing native semantics.
+ * Runtime and discovery queries can be cancelled through the execution owner.
+ * Incomplete queries throw instead of changing native semantics.
  */
 export const GIT_TIMEOUT_MS = 10_000
 
@@ -27,6 +26,14 @@ export const GIT_TIMEOUT_MS = 10_000
  * asynchronous result remains a failure rather than a matcher fallback.
  */
 export const GIT_MAX_BUFFER_BYTES = 64 * 1024 * 1024
+
+interface GitReadAccess {
+  readonly root: string
+  readonly assertFileAccess: (target: string) => void
+  readonly pruneDirectories?: readonly string[]
+  /** Directory candidates remain traversable when they contain indexed files. */
+  readonly directories?: boolean
+}
 
 /**
  * The paths git reports for `root`, or null when `root` is not in a repository.
@@ -70,7 +77,7 @@ function detachedGitArgs(args: readonly string[]): string[] {
 
 /** Runtime queries share the command runner's process-tree cancellation. */
 async function runGit(directory: string, args: readonly string[], input: string | undefined, abortSignal: AbortSignal | undefined,
-  budget: WalkBudget, countEntries: boolean, access: { root: string; assertFileAccess: (target: string) => void; pruneDirectories?: readonly string[] }): Promise<string | null> {
+  budget: WalkBudget, countEntries: boolean, access: GitReadAccess): Promise<string | null> {
   budget.check()
   // Executable discovery reads no Git config. A machine without Git keeps the
   // TypeScript matcher fallback and does not need a native view launcher.
@@ -94,13 +101,25 @@ async function runGit(directory: string, args: readonly string[], input: string 
         plan('git', detached ? detachedGitArgs(arguments_) : gitViewArgs(access.root, directory, arguments_), directory, detached))
       const configuration = await configureGitView(sources, directory, query)
       if (!configuration) return null
-      const tracked = countEntries ? await query(['ls-files', '-z', '--cached']) : ''
+      const tracked = countEntries || access.directories ? await query(['ls-files', '-z', '--cached']) : ''
       if (tracked === null) throw new ViewSourceError()
-      await materialize({ native: 'git', directory, recursive: countEntries, tracked: tracked.split('\0').filter(Boolean), ...configuration })
+      const trackedPaths = tracked.split('\0').filter(Boolean)
+      if (access.directories) {
+        budget.take('entries', trackedPaths.length)
+        budget.take('pathBytes', Buffer.byteLength(tracked))
+      }
+      const prefix = path.relative(access.root, directory).split(path.sep).join('/')
+      await materialize({ native: 'git', directory, recursive: countEntries,
+        tracked: trackedPaths.map(file => path.posix.join(prefix, file)), ...configuration })
       const output = await execute(directory, args, input, abortSignal, budget, countEntries, plan('git', gitViewArgs(access.root, directory, args), directory))
       if (output === null) throw new ViewSourceError()
       sources.verify()
-      return output
+      if (!access.directories) return output
+      const parents = new Set<string>()
+      for (const file of trackedPaths) {
+        for (let parent = path.posix.dirname(file); parent !== '.' && parent !== path.posix.dirname(parent); parent = path.posix.dirname(parent)) parents.add(parent)
+      }
+      return output.split('\0').filter(name => name && !parents.has(path.posix.normalize(name))).map(name => `${name}\0`).join('')
     })
   } catch (error) {
     if (executionError && error instanceof ReadCleanupError) {
@@ -183,9 +202,9 @@ export function ignoredNames(names: readonly string[], paths: readonly string[],
   return new Set(names.filter((_, index) => ignored.has(paths[index]!)))
 }
 
-/** Runtime counterpart of the restricted synchronous discovery query. */
+/** Runtime and skill discovery share the private native query. */
 export async function loadIgnoredViaGit(directory: string, names: readonly string[], abortSignal?: AbortSignal, budget = new WalkBudget(abortSignal),
-  access?: { root: string; assertFileAccess: (target: string) => void; pruneDirectories?: readonly string[] }): Promise<ReadonlySet<string> | null> {
+  access?: GitReadAccess): Promise<ReadonlySet<string> | null> {
   abortSignal?.throwIfAborted()
   if (names.length === 0) return new Set()
   const paths = literalGitPaths(names)

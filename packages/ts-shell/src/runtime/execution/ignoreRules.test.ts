@@ -4,7 +4,7 @@ import path from 'node:path'
 import ignore from 'ignore'
 import { execFileSync } from 'node:child_process'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { loadDirectoryMatcher, loadIgnoreFile, loadIgnoredViaGit, listIgnoredViaGit, listWorkspaceFilesViaGit } from './ignoreRules.js'
+import { loadDirectoryMatcher, loadIgnoreFile, loadIgnoredDirectories, loadIgnoredViaGit, listWorkspaceFilesViaGit } from './ignoreRules.js'
 import { listDirectoryEntries, listWorkspaceFiles } from './fileWalk.js'
 
 let root: string
@@ -108,7 +108,7 @@ it.each(['files', 'ignore', 'discovery'])('does not execute configured filesyste
   } else if (query === 'ignore') {
     expect(await loadIgnoredViaGit(workspace, ['tracked.txt', 'hidden.tmp'])).toEqual(new Set(['hidden.tmp']))
   } else {
-    expect(listIgnoredViaGit(workspace, ['tracked.txt', 'hidden.tmp'])).toEqual(new Set(['hidden.tmp']))
+    expect(await loadIgnoredDirectories(workspace, workspace, ['tracked.txt', 'hidden.tmp'])).toEqual(new Set(['hidden.tmp']))
   }
   expect(fs.existsSync(marker)).toBe(false)
 })
@@ -142,7 +142,7 @@ it.each(['true', 'false'])('preserves tracked and untracked Git paths with core.
   expect([...(await listWorkspaceFilesViaGit(nested) ?? [])].sort()).toEqual([...tracked, ...untracked].sort())
 })
 
-it.each([listIgnoredViaGit, loadIgnoredViaGit])('checks literal ignore records without interpreting quotes or splitting embedded newlines (%#)', async query => {
+it('checks literal ignore records without interpreting quotes or splitting embedded newlines', async () => {
   execFileSync('git', ['init', '-q', workspace])
   fs.writeFileSync(path.join(workspace, '.gitignore'), '*.tmp\n')
   fs.writeFileSync(path.join(workspace, 'tracked.tmp'), 'tracked')
@@ -150,15 +150,15 @@ it.each([listIgnoredViaGit, loadIgnoredViaGit])('checks literal ignore records w
   const ignored = literalNames.map(name => `${name}.tmp`)
   const visible = ['tracked.tmp', 'public.txt', ...(process.platform === 'win32' ? [] : ['hidden.tmp\npublic.txt', '"quoted.tmp"'])]
 
-  expect(await query(workspace, [...ignored, ...visible])).toEqual(new Set(ignored))
-  expect(await query(workspace, visible)).toEqual(new Set())
+  expect(await loadIgnoredViaGit(workspace, [...ignored, ...visible])).toEqual(new Set(ignored))
+  expect(await loadIgnoredViaGit(workspace, visible)).toEqual(new Set())
 })
 
-it.each([listIgnoredViaGit, loadIgnoredViaGit])('checks leading-colon names as literal paths without changing ordinary wildcard names (%#)', async query => {
+it('checks leading-colon names as literal paths without changing ordinary wildcard names', async () => {
   execFileSync('git', ['init', '-q', workspace])
   fs.writeFileSync(path.join(workspace, '.gitignore'), '*.tmp\n')
   const ignored = [':secret.tmp', './:secret.tmp', ':(literal)secret.tmp', '*secret.tmp', '[secret].tmp']
-  expect(await query(workspace, [...ignored, ':public.txt', './:explicit.tmp'])).toEqual(new Set([...ignored, './:explicit.tmp']))
+  expect(await loadIgnoredViaGit(workspace, [...ignored, ':public.txt', './:explicit.tmp'])).toEqual(new Set([...ignored, './:explicit.tmp']))
 })
 
 it('applies ignore and deny policies to the exact names returned by Git', async () => {

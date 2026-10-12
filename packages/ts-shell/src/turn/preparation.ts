@@ -14,8 +14,9 @@ interface PreparationGate extends Pick<ToolExecutionContext, 'workspaceRoot' | '
 }
 
 /** Preflight and publication both enforce every path's grants and read/write denials. */
-export function preparationContext(toolName: string, options: PreparationGate): ToolExecutionContext {
+export function preparationContext(toolName: string, options: PreparationGate, signal?: AbortSignal): ToolExecutionContext {
   return { workspaceRoot: options.workspaceRoot, artifactRoot: options.workspaceRoot, workspaceRoots: options.workspaceRoots,
+    abortSignal: signal,
     background: options.background,
     assertSourceAccess: absolute => { const blocked = options.admission?.(); if (blocked) throw new Error(blocked);
       (toolName === 'task' ? assertAgentSourceAccess : assertSourceAccess)(absolute, options.workspaceRoot, options.workspaceRoots, options.permissionScope, options.denyRules); },

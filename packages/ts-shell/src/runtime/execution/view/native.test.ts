@@ -4,7 +4,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { listWorkspaceFiles, listDirectoryEntries } from '../fileWalk.js';
-import { listWorkspaceFilesViaGit, loadIgnoredViaGit, listIgnoredViaGit } from '../ignoreRules.js';
+import { listWorkspaceFilesViaGit, loadIgnoredViaGit } from '../ignoreRules.js';
 import { searchWithRipgrep, forgetRipgrepBinary } from '../../../core/tools/grepRipgrep.js';
 import { withNativeReadView } from './index.js';
 import { WalkBudget } from '../walk/budget.js';
@@ -118,7 +118,6 @@ linux.each(['files', 'directory', 'native files', 'native ignore'])('keeps the d
     : query === 'native files' ? listWorkspaceFilesViaGit(root)
     : loadIgnoredViaGit(root, ['public.txt']);
   await expect(result).rejects.toThrow('No complete native answer');
-  expect(listIgnoredViaGit(root, ['public.txt'])).toBeNull();
 });
 
 linux('does not admit an inactive conditional include', async () => {

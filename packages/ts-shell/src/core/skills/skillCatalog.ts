@@ -1,6 +1,7 @@
 import { SkillLoader, type Skill, type SkillCollision, type SkillDiagnostic } from "./skillLoader.js";
 import { projectTrust } from "../security/projectTrust.js";
-import { catalogContributions } from '../catalog/contributions.js';
+import { catalogContributions, type CatalogContribution } from '../catalog/contributions.js';
+import { SkillDiscovery } from './discovery.js';
 
 /**
  * The skills one run may offer, resolved from the flags it was started with.
@@ -25,6 +26,7 @@ export interface SkillCatalogOptions {
   readonly skillPaths?: readonly string[];
   /** Skip every discovered root; named paths still load. */
   readonly noSkills?: boolean;
+  readonly abortSignal?: AbortSignal;
 }
 
 export interface SkillCatalogResult {
@@ -44,17 +46,33 @@ export interface SkillCatalogResult {
  * are the paths the user named on the command line — a named file is a direct
  * instruction, whatever directory it happens to live in.
  */
-export function resolveSkillCatalog(options: SkillCatalogOptions, onSource?: (target: string) => void): SkillCatalogResult {
+export async function resolveSkillCatalog(options: SkillCatalogOptions, onSource?: (target: string) => void): Promise<SkillCatalogResult> {
+  const discovery = new SkillDiscovery(options.abortSignal);
   const loader = new SkillLoader(options.workspaceRoot, {
     ...(options.skillPaths && options.skillPaths.length > 0 ? { extraPaths: options.skillPaths } : {}),
     ...(options.noSkills ? { disableDiscovery: true } : {}),
     ...(onSource ? { onSource } : {}),
+    abortSignal: options.abortSignal,
+    discovery,
+    allowProject: !projectTrust.isProjectUntrusted(options.workspaceRoot),
   });
-  const loaded = loader.loadDetailed();
+  const loaded = await loader.loadDetailed();
   const { collisions, diagnostics, failures } = loaded;
   const skills = new Map(loaded.skills);
-  if (!options.noSkills) for (const entry of catalogContributions(options.workspaceRoot, options.sessionId)) for (const skill of entry.skills()) {
-    if (!skills.has(skill.name) && skill.isCurrent?.() !== false) skills.set(skill.name, skill);
+  const owners = new Map<string, CatalogContribution>();
+  if (!options.noSkills) for (const entry of catalogContributions(options.workspaceRoot, options.sessionId)) {
+    const contributed = await entry.skills(options.abortSignal, discovery);
+    options.abortSignal?.throwIfAborted();
+    if (!catalogContributions(options.workspaceRoot, options.sessionId).includes(entry)) continue;
+    for (const skill of contributed) if (!skills.has(skill.name) && skill.isCurrent?.() !== false) {
+      skills.set(skill.name, skill); owners.set(skill.name, entry);
+    }
+  }
+  options.abortSignal?.throwIfAborted();
+  discovery.verify();
+  const current = new Set(catalogContributions(options.workspaceRoot, options.sessionId));
+  for (const [name, skill] of skills) {
+    if (skill.isCurrent?.() === false || owners.has(name) && !current.has(owners.get(name)!)) skills.delete(name);
   }
   if (!projectTrust.isProjectUntrusted(options.workspaceRoot)) {
     return { skills, collisions, diagnostics, failures };

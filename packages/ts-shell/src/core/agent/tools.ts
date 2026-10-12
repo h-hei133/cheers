@@ -32,7 +32,7 @@ export type AgentToolExecutionMode = "sequential" | "parallel";
 export interface AgentTool {
   readonly name: string;
   readonly executionMode?: AgentToolExecutionMode;
-  readonly prepareArguments?: (args: unknown) => Record<string, unknown>;
+  readonly prepareArguments?: (args: unknown, signal?: AbortSignal) => Record<string, unknown> | Promise<Record<string, unknown>>;
   execute(
     toolCallId: string,
     args: Record<string, unknown>,
@@ -202,7 +202,9 @@ export async function prepareToolCall(
     return { kind: "immediate", result: { output: `Tool ${call.name} not found`, isError: true } };
   }
   try {
-    const args = tool.prepareArguments ? tool.prepareArguments(call.args) : toArgsRecord(call.args);
+    signal?.throwIfAborted();
+    const args = tool.prepareArguments ? await tool.prepareArguments(call.args, signal) : toArgsRecord(call.args);
+    signal?.throwIfAborted();
     if (hooks?.beforeToolCall) {
       const decision = await hooks.beforeToolCall({ assistantMessage, call, args }, signal);
       if (signal?.aborted) {
@@ -226,7 +228,7 @@ export async function prepareToolCall(
   } catch (error) {
     return {
       kind: "immediate",
-      result: { output: error instanceof Error ? error.message : String(error), isError: true },
+      result: signal?.aborted && error === signal.reason ? abortedResult() : { output: error instanceof Error ? error.message : String(error), isError: true },
     };
   }
 }

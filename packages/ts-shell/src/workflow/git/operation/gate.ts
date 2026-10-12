@@ -21,7 +21,8 @@ export async function runNativeGit(git: NativeGit, plan: GitPlan, options: ToolG
   const adapted = adaptTools(pool, options)[0]!; const hooks = createToolHooks(options, pool);
   const assistantMessage: AgentMessage = { role: 'assistant', content: [], timestamp: new Date().toISOString() };
   try {
-    const args = adapted.prepareArguments!({ command: plan.summary });
+    const args = await adapted.prepareArguments!({ command: plan.summary }, signal);
+    signal?.throwIfAborted();
     const call = { id: plan.id, name: tool.name, args };
     notify({ status: 'permission-pending', note: 'Exact Git operation awaits its ordinary permission and hooks.' });
     if (outcome.durability) throw new Error('Git preparation could not be durably saved; no operation was dispatched.');

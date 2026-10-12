@@ -79,6 +79,11 @@ export function createCatalogLoader(context: () => ShellRuntimeContext, gateway:
       return files.slice(0, 5000).map(value => ({ value, label: value }));
     }
     if (kind === "file" || kind === "directory") return pathCatalog(current.cwd, query ?? "", kind === "directory", signal);
+    if (kind === "skill") {
+      const items = await skills.read(current, signal);
+      signal.throwIfAborted();
+      return items;
+    }
     if (kind === 'session') {
       if (!manager) throw new Error('Session catalog unavailable');
       return navigation.get(kind)!.read(track => navigationCatalog(kind, current, manager, track, signal, progress));
@@ -86,8 +91,7 @@ export function createCatalogLoader(context: () => ShellRuntimeContext, gateway:
     const key = catalogIdentity(current, themePaths) + kind;
     if (!pending || pending.key !== key) {
       const observer = navigation.get(kind);
-      const task = kind === "skill" ? Promise.resolve(skills.read(current))
-        : observer ? observer.read(track => readCatalog(kind, current, gateway, themePaths, manager, policy, track))
+      const task = observer ? observer.read(track => readCatalog(kind, current, gateway, themePaths, manager, policy, track))
         : readCatalog(kind, current, gateway, themePaths, manager, policy);
       pending = { key, task };
       void task.finally(() => { if (pending?.task === task) pending = undefined; }).catch(() => {});

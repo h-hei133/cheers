@@ -1,11 +1,15 @@
 import { withVerifiedReadTarget } from './read.js';
 import type { TextFileReadExecutionRequest } from './types.js';
 
+export class SnapshotLimitError extends Error {
+  constructor() { super('Upload source exceeds the byte limit.'); }
+}
+
 /** Bounded bytes from the verified file handle, rejecting mutation during capture. */
 export async function readBinarySnapshot(request: Pick<TextFileReadExecutionRequest, 'absolutePath' | 'workspaceRoot' | 'assertFileAccess' | 'abortSignal'>, maxBytes: number): Promise<Buffer> {
   return withVerifiedReadTarget(request, 'file', async (handle, verify) => {
     const before = await handle.stat({ bigint: true });
-    if (before.size > BigInt(maxBytes)) throw new Error('Upload source exceeds the byte limit.');
+    if (before.size > BigInt(maxBytes)) throw new SnapshotLimitError();
     const chunks: Buffer[] = [];
     let bytes = 0;
     for (;;) {
@@ -14,7 +18,7 @@ export async function readBinarySnapshot(request: Pick<TextFileReadExecutionRequ
       const read = await handle.read(chunk, 0, chunk.length, bytes);
       if (!read.bytesRead) break;
       bytes += read.bytesRead;
-      if (bytes > maxBytes) throw new Error('Upload source exceeds the byte limit.');
+      if (bytes > maxBytes) throw new SnapshotLimitError();
       chunks.push(chunk.subarray(0, read.bytesRead));
     }
     await verify();

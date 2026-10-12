@@ -10,7 +10,8 @@ export async function runSecurityTool(tool: ToolDefinition, input: Record<string
   const assistantMessage: AgentMessage = { role: 'assistant', content: [], timestamp: new Date().toISOString() };
   let observed: AgentToolResult | undefined;
   try {
-    const args = adapted.prepareArguments!(input); const call = { id, name: tool.name, args };
+    const args = await adapted.prepareArguments!(input, signal); const call = { id, name: tool.name, args };
+    signal?.throwIfAborted();
     const denied = await hooks.beforeToolCall!({ call, args, assistantMessage }, signal);
     if (denied?.block) return { isError: true, output: 'Security operation refused by its ordinary permission or hook gate.' };
     options.emit({ type: 'tool.started', toolName: tool.name, taskId: id, args: { securityOperation: id } });

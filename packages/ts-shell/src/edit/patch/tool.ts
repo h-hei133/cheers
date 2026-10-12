@@ -2,7 +2,7 @@ import path from 'node:path';
 import { validateToolArguments } from '../../core/tools/arguments.js';
 import { neutraliseForDisplay } from '../../core/text/safety.js';
 import { editDiff } from '../result/diff.js';
-import type { ToolDefinition, ToolExecutionContext, ToolExecutionResult } from '../../tools/types.js';
+import type { ToolDefinition, ToolExecutionContext, ToolExecutionResult, ToolPreparation } from '../../tools/types.js';
 import { EditOperationError } from '../recovery/operation/write.js';
 import { readOperation } from '../recovery/operation/store.js';
 import { applyPatchPlan } from './batch.js';
@@ -10,7 +10,7 @@ import { planPatch } from './plan.js';
 import { patchLimits } from './parse.js';
 import { hashContent } from '../authority/content.js';
 
-export function createPatchToolDefinition(): ToolDefinition {
+export function createPatchToolDefinition(): ToolDefinition<ToolPreparation> {
   return {
     name: 'apply_patch',
     description: 'Apply one approved text patch across files as one recorded operation. Use exact *** Begin Patch / *** End Patch, Add File (+ lines), Delete File, or Update File (@@ exact unique context, +/-/space lines; optional Move to and End of File). Renames stay in one workspace and never overwrite. Partial/unknown outcomes remain visible; no cross-file crash atomicity.',

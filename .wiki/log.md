@@ -6508,3 +6508,11 @@ W16 已提交/推送 `f43ae09ec90a5890b768598ab52a17821c5e9efc` 并读回远端�
 ### 2026-10-13 — SAFE-02 私有枚举成本优化
 
 剖析后在原路径包含 owner 采用 Linux 原生 realpath/JavaScript 回退，并在镜像树 owner 将空占位写入限制为最多 8 个一批、完整结算后清理。5000 文件新基线 Git 2.76→1.67s、rg 2.14→1.27s，约 40%/41% 改善，名称逐项匹配；预设双路 25% 门槛通过。29 文件/370 项、两构建、四源码门及完整 judge（既有 4 ceiling advisory/partial）通过；两隔离反转实际失败，四 actual print 工具链共 8 合成 POST 通过。独立 code APPROVE/architecture WATCH，真实 EMFILE 探针确认全部写入结算后零活跃清理。仅 4TS/2production，用户 `.gitignore` 原 SHA 保留；残余 O(n) 成本与其余 SAFE-02/外部边界继续开放，Phase19 active。详见[裁决 §8.143](features/phase-19-decisions.md)及[局部验收 §8](features/phase-19-acceptance.md)，材料 `.tmp/native-read/performance/`；新提交/推送/精确 CI 另记。
+
+### 2026-10-13 — 私有枚举性能交付核验
+
+`d6cfaaf5a8c863eda291e298bfae2c9137493ff8` 已提交/推送且远端读回一致。该 SHA 的 CI 38283637758/job114926652699、Watch38283637674/job114926652491 均付款/spending-limit阻止启动，steps=[]、failure，无远端验证通过；材料 `.tmp/native-read/performance/delivery.json`。
+
+### 2026-10-13 — SAFE-02 异步技能发现
+
+删除同步技能正文/原生Git忽略发现路径，技能 owner 复用核验目录/文件句柄、私有Git视图与共享预算。内置/扩展/warm cache 同受512 manifest、单512KiB/总8MiB；清理、resource、取消不发布完整catalog。准备能力在完整捕获及准入复验后才发布，kernel批准前等待；contribution撤权和生效Git源变化保持可见。最终43TS/31production（含删除），修复后192项及最后96项、两构建、四源码门/完整judge通过；独立code225项APPROVE、architecture186项WATCH，无剩余blocker。五隔离反转均实际断言失败；Node/单文件四print与四PTY共12合成POST通过，技能/config与用户`.gitignore`原字节保留。夹具批准/相对excludes/PTY属性错误已分类修正，未算产品失败或通过。详情见[裁决 §8.144](features/phase-19-decisions.md)和[局部验收 §9](features/phase-19-acceptance.md)，材料 `.tmp/skill-discovery/`。平台、目录延迟/观察覆盖、整catalog并发一致性及其余外部证据保持开放，Phase19 active；提交/推送/精确CI另验。

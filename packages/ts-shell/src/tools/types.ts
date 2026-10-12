@@ -54,7 +54,7 @@ export interface ToolExecutionResult {
   readonly images?: readonly ImageContent[]
 }
 
-export interface ToolDefinition {
+export interface ToolDefinition<Preparation = ToolPreparation | Promise<ToolPreparation>> {
   /** Captured native authority may be revoked by ordinary after-call hooks. */
   readonly resultAdmission?: () => string | undefined;
   /** Native observation of a refused call; must not perform target effects. */
@@ -65,8 +65,8 @@ export interface ToolDefinition {
   readonly argsSchema: Record<string, unknown>
   /** Server-declared capability hints; these never replace permission checks. */
   readonly mcpAnnotations?: { readonly readOnlyHint: boolean }
-  /** A complete immutable file plan prepared before permission hooks, with no target writes. */
-  readonly prepare?: (args: Record<string, unknown>, context: ToolExecutionContext) => ToolPreparation
+  /** A complete immutable request prepared before permission hooks, with no target effects. */
+  readonly prepare?: (args: Record<string, unknown>, context: ToolExecutionContext) => Preparation
   execute(
     args: Record<string, unknown>,
     context: ToolExecutionContext,

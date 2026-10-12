@@ -11,13 +11,13 @@ export function createSkillCatalog() {
   const observation = createCatalogObservation();
   return {
     observe: (changed: () => void) => { const stop = observation.observe(changed); const close = observeCatalogContributions(undefined, changed); return () => { stop(); close(); }; },
-    read: (context: ShellRuntimeContext) => observation.read(track => {
+    read: (context: ShellRuntimeContext, signal?: AbortSignal) => observation.read(async track => {
       // Ancestor ignore files can change discovery without modifying a skill directory.
       for (const directory of projectDirectories(context.cwd)) {
         for (const name of IGNORE_FILE_NAMES) track(path.join(directory, name));
       }
       for (const directory of userDataSearchDirs()) track(path.join(directory, "trust.json"));
-      const catalog = resolveSkillCatalog({ workspaceRoot: context.cwd, sessionId: context.session.id, ...context.skillOptions }, track);
+      const catalog = await resolveSkillCatalog({ workspaceRoot: context.cwd, sessionId: context.session.id, ...context.skillOptions, abortSignal: signal }, track);
       return [...catalog.skills.values()].map(skill => ({ value: skill.name, label: skill.name, detail: skill.description }));
     }),
   };

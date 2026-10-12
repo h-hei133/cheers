@@ -3,6 +3,7 @@ import { createStateChanges } from '../state/changes.js';
 import { commandInvocations } from '../commands/invocation.js';
 import type { CommandDefinition } from '../commands/types.js';
 import type { Skill } from '../skills/skillLoader.js';
+import type { SkillDiscovery } from '../skills/discovery.js';
 import type { ToolDefinition } from '../../tools/types.js';
 
 /** Neutral session composition port. The feature owner retains lifecycle and authority. */
@@ -11,7 +12,7 @@ export interface CatalogContribution {
   readonly sessionId: string;
   readonly commands: readonly CommandDefinition[];
   readonly tools: readonly ToolDefinition[];
-  readonly skills: () => readonly Skill[];
+  readonly skills: (signal?: AbortSignal, discovery?: SkillDiscovery) => readonly Skill[] | Promise<readonly Skill[]>;
 }
 const entries = new Set<CatalogContribution>();
 const changes = createStateChanges();

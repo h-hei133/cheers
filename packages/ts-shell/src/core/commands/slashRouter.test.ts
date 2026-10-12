@@ -2,6 +2,7 @@ import * as statuslineSyntax from "./statusline/syntax.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { execFileSync } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createCompactLiveCheckpointStore,
@@ -115,6 +116,7 @@ describe("slash router (W4)", () => {
     // name, find nothing in the registry, and answer "Unknown slash command" — so a
     // documented invocation failed while the same skill worked through `/skill`.
     const skillsDir = path.join(workspaceRoot, ".agents", "skills", "demo");
+    execFileSync('git', ['init', '-q', workspaceRoot]);
     fs.mkdirSync(skillsDir, { recursive: true });
     fs.writeFileSync(
       path.join(skillsDir, "SKILL.md"),

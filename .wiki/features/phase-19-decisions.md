@@ -2085,7 +2085,7 @@ W16 已提交/推送 `f43ae09ec90a5890b768598ab52a17821c5e9efc` 并读回远端�
 
 默认 Git 文件枚举、目录忽略查询及 ripgrep 候选枚举现在都经过 `runtime/execution/view/` 的私有镜像，未提供额外 deny 回调也不能绕过此边界。原生进程通过唯一执行 owner 运行；`sandbox/read.ts` 只把已核验描述符所指镜像挂载到 workspace 路径，并提供选定程序和系统加载器运行环境。镜像保留源名称、已准入忽略配置及必要 Git metadata，正文搜索继续使用 Linux 已核验文件描述符。缺 Git 时先返回既有 TypeScript matcher fallback；缺隔离启动器或未经确认的原生执行拒绝提供完整原生答案。
 
-Git 配置逐文件准入，包含 common/worktree config、index/sharedindex、gitfile/commondir、info/exclude 和生效的 include/excludes 依赖。Git 自己判断 gitdir/onbranch 条件，但探测期间以临时 inert common config 禁用尚未准入的 include 及 worktree config，随后恢复原字节。目录查询始终携带完整 workspace root，保留祖先仓库的 tracked exception；嵌套仓库和非仓库子目录分别保持原生/`.ignore` fallback 语义。同步 discovery 已归入 `ignore/discovery.ts`，以包含性和配置拒绝检查限制其可信兼容用途，不声称描述符竞态隔离。
+Git 配置逐文件准入，包含 common/worktree config、index/sharedindex、gitfile/commondir、info/exclude 和生效的 include/excludes 依赖。Git 自己判断 gitdir/onbranch 条件，但探测期间以临时 inert common config 禁用尚未准入的 include 及 worktree config，随后恢复原字节。目录查询始终携带完整 workspace root，保留祖先仓库的 tracked exception；嵌套仓库和非仓库子目录分别保持原生/`.ignore` fallback 语义。该批当时保留同步 discovery 的可信兼容路径，仅提供包含性和配置拒绝检查；后续 §8.144 已删除该同步路径，接入异步技能 owner 和已有核验读取。
 
 新独立复核发现并修复两项 HIGH：bwrap 自身 exit 1 被当作 ripgrep 的成功空结果，以及早期条件探测读取了后续尚未准入的 include。启动器现在通过私有、已 unlink 的独立 status 描述符提供 JSON 行收据；只有完整 child-start 和匹配 child-exit 才能解释 Git/ripgrep 的普通退出码。取消、输出/时间边界、执行或清理未知仍保留原失败优先级。旧 BLOCK/问题报告保留为历史，最终 code **APPROVE**、architecture **WATCH**，综合 **COMMENT**，仅覆盖此 Linux 源码组件。
 
@@ -2119,3 +2119,21 @@ SAFE-02 继续开放同步 discovery 并发替换、非 Linux 实际对象绑定
 独立 code **APPROVE**（38 项及别名/零普通正文打开探针），architecture **WATCH**（135 项及 2 个探针）覆盖同一 4 TS/2 production 冻结；真实 ulimit64 的 EMFILE 反例确认最多 8 个写入、全部结算、清理开始时零活跃写入。综合 **COMMENT**：残余 O(n) 镜像成本仍约 1.67s/1.27s，未宣称真实大仓、高并发或正文搜索性能。材料 `.tmp/native-read/performance/{contract.json,comparison.json,acceptance.json,review-code.md,review-architecture.md}`。
 
 本批仅降低已测枚举成本；同步 discovery 竞态、非 Linux 对象绑定、外部 metadata/hasconfig、跨进程正文稳定及其余外部验收仍开放，SAFE-02/Phase19 全目标 active。新提交/推送/精确 SHA CI 单独取证，不能继承起点提交的远端结论。
+
+该性能组件已提交/推送 `d6cfaaf5a8c863eda291e298bfae2c9137493ff8`，远端分支读回同 SHA。CI 38283637758/job114926652699 与 Watch 38283637674/job114926652491 均 completed/failure、steps=[]；两份 annotations 均确认付款/spending-limit 阻止启动，没有远端验证通过。材料 `.tmp/native-read/performance/delivery.json`。
+
+### 8.144 SAFE-02：异步技能发现与批准前捕获
+
+[技能发现 owner](../../packages/ts-shell/src/core/skills/discovery.ts)持有一次目录读取的根身份、共享遍历预算和 manifest 预算，委托已有目录/文件核验句柄与私有 Git 视图。同步正文发现和同步 Git 子进程路径已删除；根与文件身份 metadata 检查仍同步。保留 project/user/显式路径优先级、`--no-skills` 下显式路径、manifest 终止节点、诊断与信任过滤。原生目录忽略查询结合 indexed descendants，忽略目录中已跟踪的技能仍可发现；生效 Git config/include/excludes 源传入现有有界观察器。
+
+目录共用原遍历预算，manifest 最多 512 项、单项 512KiB、累计 8MiB；内置与扩展共用同一预算，已缓存扩展的保留字段也计入。资源耗尽、超限、取消与无法确认关闭均拒绝完整目录；关闭失败优先于同时发生的取消。定向参考比较保留“缺失可选 ignore 源可跳过”的语义，但不采用吞掉所有 ignore 读取错误的策略：文件资源耗尽必须传播并由技能 owner 安全归类。真实无 Git 回退与原生 Git 的基线/注入回归约束这个差异。
+
+[已有准备能力](../../packages/ts-shell/src/tools/preparation.ts)接受同步或异步 preparation，实际捕获结束且取消/准入复验通过后才发布 WeakMap 能力。kernel、工具适配、side-agent 与 director 都等待同一 seam；worker 完整技能捕获发生在普通权限批准之前，捕获后的撤权不进入批准。扩展在读取后和最终 catalog 发布前复验 owner/current；读取中取消不覆盖独立清理错误，只有 `error === signal.reason` 才归为普通取消。未增加执行平面或另建权限系统。
+
+最终冻结 `inventory-final-repair.json` 为 **43 TS 路径/31 production（含删除）**，文件 SHA256 `25eb2b46edab17c70a2aeb69a6929da5843254567eae9ab32f89ad7ab9fc1469`，用户 `.gitignore` 原 SHA 保留。此前受影响组合 **40 文件/552 项**通过；复核修复后 **10 文件/192 项**通过；最后共享 resource 修复后 **4 文件/96 项**通过，不将这些不同运行相加为完整套件。最终两种构建、四源码静态门通过；完整 NormProof exit0，未解析/混合环 satisfied，4 项既有函数数量 advisory 仍为 partial，没有新增 ceiling 违规。
+
+独立 code **APPROVE**（最终 **13 文件/225 项**及七个实际故障/边界探针），architecture **WATCH**（最终 **9 文件/186 项**及六个探针），均在运行前后核对全部冻结路径，综合 **COMMENT**，没有未解决 blocker。复核发现并已修复 warm cache 绕预算、清理错误被取消覆盖、manifest/root/ignore resource 故障被当成省略及 Git excludes 源未通知观察器。大目录延迟、256 个观察订阅覆盖、非 Linux/bwrap 可用性和整目录并发内容一致性为明确 WATCH；逐文件安全快照不等于整目录事务，扩展安装 inventory 的同步验证也未在本批改造。
+
+五类隔离源码反转均出现真实 AssertionError：取消实际对象复验、提前批准、跳过 warm cache 预算、把清理失败当取消、吞掉 fallback ignore resource。正向副本通过，源及 `.gitignore` 字节均保持。Node20.3/单文件各完成 automatic tracked/ignored/config-excludes 和显式 `--skill`+`--no-skills` 四条 print 工具链，共 **8 合成 POST**；regular/fullscreen 四条实际 PTY 技能展开、参数发送与隐藏技能零发送，共 **4 合成 POST**，退出0且原技能/config 字节保持。首次夹具缺少明确非交互批准、相对 excludes 值在查询 cwd 无效，以及 RTK proxy 吞掉 PTY 属性，均按 harness 分类并修正，失败材料保留。
+
+材料 `.tmp/skill-discovery/{contract.json,inventory-final-repair.json,review-code.md,review-architecture.md,reversals/results.json,cli-smoke-results.json,cli-pty-results.json,normproof-out/}`。本批关闭技能发现的同步正文/原生忽略读取路径；SAFE-02 非 Linux 实际对象绑定、跨进程正文稳定、外部 metadata/hasconfig 及镜像剩余成本仍开放，W7-33/用户前端/真实外部服务另验，Phase19 全目标 active。提交/推送/本批精确 SHA CI 单独取证，不继承历史通过。

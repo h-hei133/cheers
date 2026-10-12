@@ -110,15 +110,26 @@ export function adaptTools(
   return [...tools.values()].map((tool) => ({
     name: tool.name,
     ...(tool.prepare ? { executionMode: 'sequential' as const } : {}),
-    prepareArguments: (args) => {
+    prepareArguments: (args, signal) => {
       const prepared = prepareArguments(tool.name, args);
       validateToolArguments(tool.argsSchema, prepared);
       if (!tool.prepare) return prepared;
-      const blocked = options.admission?.() ?? planModeBlock(options.agentMode, tool.name, prepared, tool);
-      const context = preparationContext(tool.name, options);
-      if (blocked) { tool.onRefusal?.(prepared, context, 'blocked'); throw new Error(blocked); }
-      try { return prepareToolCall(tool, prepared, context, options); }
-      catch (error) { tool.onRefusal?.(prepared, context, 'failed'); throw error; }
+      const context = preparationContext(tool.name, options, signal);
+      let refusal: 'blocked' | 'failed' = 'failed';
+      const verify = () => {
+        signal?.throwIfAborted();
+        const blocked = options.admission?.() ?? planModeBlock(options.agentMode, tool.name, prepared, tool);
+        if (blocked) { refusal = 'blocked'; throw new Error(blocked); }
+      };
+      const refused = (error: unknown): never => {
+        tool.onRefusal?.(prepared, context, signal?.aborted && error === signal.reason ? 'cancelled' : refusal);
+        throw error;
+      };
+      try {
+        verify();
+        const result = prepareToolCall(tool, prepared, context, options, verify);
+        return result instanceof Promise ? result.catch(refused) : result;
+      } catch (error) { return refused(error); }
     },
     execute: (toolCallId, args, signal, onUpdate) =>
       executeTool(tool, toolCallId, args, signal, options, onUpdate),

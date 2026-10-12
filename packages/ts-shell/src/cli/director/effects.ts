@@ -12,7 +12,7 @@ export function workerEffects(owner: DirectorOwner): ToolDefinition[] {
     argsSchema: { type: 'object', properties: { ...(action === 'start' ? {} : { id }), ...(action === 'stop' ? {} : { prompt }) },
       required: [...(action === 'start' ? [] : ['id']), ...(action === 'stop' ? [] : ['prompt'])], additionalProperties: false },
     resultAdmission: owner.admission,
-    prepare: args => prepareWorker(owner, action, args),
+    prepare: (args, context) => prepareWorker(owner, action, args, context.abortSignal),
     execute: async () => ({ success: false, error: 'Prepared worker approval is required.' }),
   }));
 }

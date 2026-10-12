@@ -3,13 +3,13 @@ import type { JobsComposition } from '../model.js';
 import { report } from '../projection.js';
 import { approved } from '../approval.js';
 import { captureOrigin } from '../origin.js';
-import { captureAgentRuntime } from './runtime.js';
+import { captureAgentRuntime, AgentCaptureError } from './runtime.js';
 import { agentProjection, agentPage } from './projection.js';
 
 export async function agentControl(host: JobsComposition, action: string, args: readonly string[], queue = false): Promise<string> {
   if (action === 'agent') {
     if (!host.agentRuntimeInput) throw new Error('The bound agent runner is unavailable.');
-    const runtime = captureAgentRuntime(host, host.agentRuntimeInput);
+    const runtime = await runtimeFor(host); if (typeof runtime === 'string') return runtime;
     const refused = runtime.admission(); if (refused) return report(refused);
     return approved(host, 'task', args[0]!, `Independent agent assignment:\n${report(args[0]!, 24000)}\nParent context and skills are copied; model requests share the parent budget. Session-bound extension tools are unavailable; MCP inherits already discovered tools. Declared command hooks prevent side-agent startup. Tool effects still use their ordinary approval. ${queue ? 'Queue only; resume requires fresh approval.' : 'Runs alongside the main session.'}`,
       async () => {
@@ -32,7 +32,7 @@ export async function agentControl(host: JobsComposition, action: string, args: 
   if (action === 'resume' || action === 'continue') {
     if (!host.agentRuntimeInput) throw new Error('The bound agent runner is unavailable.');
     if (action === 'resume' && job.runs.length > 0) throw new Error('Dispatched agent runs never resume; use a new checkpoint continuation.');
-    const runtime = captureAgentRuntime(host, host.agentRuntimeInput);
+    const runtime = await runtimeFor(host); if (typeof runtime === 'string') return runtime;
     const refused = runtime.admission(); if (refused) return report(refused);
     const checkpoint = job.child ? runtime.checkpoint(job.child) : undefined;
     if (checkpoint && !sameValue(checkpoint, job.checkpoint)) throw new Error('The retained child checkpoint changed.');
@@ -45,4 +45,9 @@ export async function agentControl(host: JobsComposition, action: string, args: 
       });
   }
   throw new Error('Unsupported agent job action.');
+}
+
+async function runtimeFor(host: JobsComposition) {
+  try { return await captureAgentRuntime(host, host.agentRuntimeInput!); }
+  catch (error) { if (error instanceof AgentCaptureError) return report(error.message); throw error; }
 }
