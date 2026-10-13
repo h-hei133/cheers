@@ -6597,3 +6597,7 @@ manifest组件 `d589e8d02c5299f0de4a3a25169b9aea1a742540` 已提交/推送、10�
 ### 2026-10-13 — Windows UNC 读取局部验收
 
 原生 Windows Node 20.3.0/24.12.0 访问 WSL 仓库 UNC，两版各 6 项读取与目录检查通过；Node 20.3 另证目录句柄及原受管目录创建可用。六个 owner 的 ESM 输出与原 dist 字节一致，初始 CommonJS 转译误判保留为 harness 失败；源码与用户 `.gitignore` 未改。本批仅补文档，不重复全套/构建。Windows 本地 NTFS、原生对象绑定、macOS、实际前端/设备及真实服务仍未验，Phase19 active。材料 `.tmp/windows-read/`；见[裁决 §8.154](features/phase-19-decisions.md)与[验收 §19](features/phase-19-acceptance.md)。
+
+### 2026-10-13 — Windows Terminal 前端捕获复核
+
+复核 `.tmp/windows-console/` 的真实 Windows Terminal 前端材料（WT 1.24.2610.01001、DPI 144、WSL 产品进程、受控 PTY 输入、Win32 PrintWindow 抓帧），产品源码与二进制未变。`matrix.py` 对仍在写入的 PTY 日志取哈希，后续运行会截断，故 `regular-box.raw`/`fullscreen-box.raw` 已不再等于记录值；矩阵当时的字节保存在 `<label>.captured.raw`，[复核脚本](../.tmp/windows-console/review/verify.py)对全部 20 条重算 SHA256 全部匹配。直接 zlib 解 PNG（宿主无 PIL）显示主题边框行零横向断口、CJK 墨迹约为拉丁两倍宽；`vsllm/gpt-6-astra`（先用合成图验证确能看像素）对 12 张抓帧判定中文为真实字形、无 tofu。`regular-box.raw` 的 324 个同步帧经无头复现判为输入驱动：纯 8s 空闲 0 字节 0 帧、每输入事件 1 帧，非空闲渲染环。本批只改文档，四源码门、strict docs、57 项脚本测试通过；`c849a75e` 已推送、远端同 SHA，CI/Watch 均付款/spending-limit 未启动、无远端通过。材料 `.tmp/windows-console/review/`；见[裁决 §8.155](features/phase-19-decisions.md)与[验收 §20](features/phase-19-acceptance.md)。原生 Windows CLI/套件、真实 IME、本地 NTFS 与用户手动逐帧/字体证据仍缺，Phase19 active。
