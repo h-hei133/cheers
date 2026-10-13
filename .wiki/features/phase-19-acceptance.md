@@ -11,7 +11,7 @@ summary: "记录完整源码图、契约门禁、全套测试、实际 CLI 及�
 
 Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)的 16 批、76 项为范围，分别记录实现、局部验收和剩余条件。W16 修复了此前无法取得完整依赖图证明的检查器，并恢复重构后失效的契约门禁；全阶段完成仍需下面列明的剩余工作。
 
-§1–4 的完整套件和冻结证据属于 W16 提交 `f43ae09ec90a5890b768598ab52a17821c5e9efc`。后续 SAFE-02 Linux 原生读取变更分别记录在 §7–17；最新源码的完整套件已重新运行，见 §18，不能把 W16 的历史全套直接套用到后续源码。
+§1–4 的完整套件和冻结证据属于 W16 提交 `f43ae09ec90a5890b768598ab52a17821c5e9efc`。后续 SAFE-02 Linux 原生读取变更分别记录在 §7–17；最新源码的完整套件已重新运行，见 §18，不能把 W16 的历史全套直接套用到后续源码。§19 补充未改源码的 Windows UNC 读取证据。
 
 ## 1. 本轮源码与验证范围
 
@@ -98,7 +98,8 @@ Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)�
 |---|---|---|
 | Linux/WSL、Node 20.3、单文件程序 | 构建、全套、原生文件/进程/Git/沙箱、两模式 PTY | 用户实际前端逐帧、字体、IME 和系统复制仍需同前端证据 |
 | Linux X11、媒体设备、语言服务、分析器 | 各适配器的明确能力与有界 native 进程路径 | 未安装/不支持状态继续可见；真实声音设备/Live、其他桌面协议另验 |
-| macOS/Windows | 部分 profile、接口与纯逻辑用例 | 原生路径/文件描述符、进程树清理、终端与设备尚未取得等价实机证据 |
+| Windows | 原生 Windows Node 20.3/24.12 访问 WSL UNC：两版各 6 项读取/目录检查通过；目录句柄与受管目录创建另验，见 §19 | 本地 NTFS、原生禁止重解析/对象路径绑定、完整 Windows CLI/套件、进程树、前端及设备仍未验 |
+| macOS | 部分 profile、接口与纯逻辑用例 | 原生路径/文件描述符、进程树清理、终端与设备尚未取得等价实机证据 |
 | 模型传输与严格预算 | 合成 HTTP/SSE/usage/重试/unknown、统一 request admission | W7-33 四端点真实 TLS/HTTP2 矩阵仍缺；无法证明上界的请求继续拒绝 strict cap 准入 |
 | 公共包、认证、协作和 SSH | 受控服务、签名、ACL、撤权、重连与未知副作用 | 真实账户、公共部署 TLS、真实远端主机/主机密钥和生产互通验收 |
 | SAFE-02 | Linux 公开文件工具的检查/句柄/拒绝/清理及受管编辑目录固定；原生 Git/ripgrep 私有视图、配置准入和 child 完成收据；异步技能发现、批准前捕获与共享预算；读取期间及 catalog 发布前已捕获 manifest/ignore/Git 来源变化拒绝；本地remote-URL条件及native配置错误拒绝；已枚举目录修订、visit先捕获后探测规则，可选native/技能根来源的父目录/alias观察、已知消失传播及成功/null最终复验，见 §7–17 | 非 Linux 实际对象绑定、未观察树与私有镜像剩余成本继续开放；外部 metadata 仍拒绝，未知future hasconfig不宣称支持，资源计数器不约束原生进程内部全部读取 |
@@ -370,3 +371,19 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 最终补审绑定同一 `5572549e…` 冻结：独立 code **APPROVE**（实际 Node20.3 的 7 项生命周期测试及 5 项命令/存储探针），architecture **WATCH**（独立 7 项通过、owner/CAS/codec 原字节检查），综合 **COMMENT（无阻断，限本批）**。两条 lane 前后 17 路径和用户 `.gitignore` 哈希一致；WATCH 为注入执行适配器必须维持 detached session 义务，不要求为假设中的适配器新建执行系统。原专用路由 503 不计审查；继承当前会话配置的两条独立 lane 实际返回证据。代码探针启动器和架构错误工作目录的失败保留，后者生成的两处自有临时目录在确认进程终止后已精确清理。报告 `.tmp/integration-current/{review-code-close.md,review-architecture-close.md}`。
 
 本批代码及验收文档已提交/推送 `32b3110705c4588d264c30ee2d1ad7b6a0c23535`，远端 git-ref API 读回同 SHA；20 个提交路径的原始 blob 与冻结清单逐项一致，用户 `.gitignore` 原字节排除。最终 strict docs 门禁通过，验收表 76 个本地路径链接均存在。精确 [CI 38389024800](https://github.com/h-hei133/cheers/actions/runs/38389024800) / job 115267873427 与 [Architecture Watch 38389024889](https://github.com/h-hei133/cheers/actions/runs/38389024889) / job 115267873468 均 completed/failure、`steps=[]`；各自 annotations 确认付款/spending-limit 阻止启动，**没有取得远端验证通过**。材料 `.tmp/integration-current/{commit-audit.json,delivery.json}`。后续交付补记只修改文档；本批源码、全量/构建、提交/推送和外部前置失败分别取证，Phase19 总目标仍 active。
+
+## 19. Windows UNC 读取局部验收（2026-10-13）
+
+取证起点 `60ab0f66f87ee26ec7d8956d871965c00b04cf87`，产品源码仍为 §18 已交付版本。WSL 可以启动宿主的原生 Windows 进程；本轮在 Windows NT 10.0.26100.0 上，分别用 Windows Node **20.3.0** 与 **24.12.0** 访问仓库 UNC 路径。Node 20.3 来自官方发行文件，SHA256 与官方清单一致，记录在 `.tmp/windows-read/node-verification.json`。运行前把 HOME/USERPROFILE/TEMP/TMP/CHEERS_TEST_ROOT 指向仓库内隔离目录，再动态加载现有编译 owner；未调用 provider。
+
+| 检查 | 实际结果 | 范围 |
+|---|---|---|
+| 文件与目录行为 | 两个版本各 6 项通过 | 稳定正文含 BOM/CRLF、稳定枚举、越根拒绝、预先取消拒绝、已观察目录修订变化拒绝、打开后文件替换拒绝并核对 descriptor 仍读到原字节 |
+| Windows 目录能力 | Node 20.3 的目录 `openSync`/`fstat` 成功，既有 `ensureWorkspaceDirectory` 创建嵌套目录成功并清理 | `O_DIRECTORY`/`O_NOFOLLOW` 均未定义；这些常量缺失不能单独证明目录句柄不可用，也不提供禁止重解析保证 |
+| 源码与编译产物对应 | 六个读取、目录、路径及编辑 owner 的 ESM 输出逐字节一致；源码、对应 dist 和用户 `.gitignore` 哈希保持 | TypeScript 5.9.3 内存转译比较，不是新一轮全量构建或类型检查 |
+
+行为原始结果为 `.tmp/windows-read/baseline-node20.json`、`baseline-node24.json`；目录能力为 `capability-results.json`；源码/产物清单及范围为 `inventory.json`、`compiled-inventory.json`、`audit.json`。首次孤立转译没有读取 package 的 `type: module`，把 NodeNext `.ts` 当成 CommonJS，六项比较均失败；该 harness 记录保留在 `source-emission.json`。按项目 ESM 格式修正转译后，六项实际相等，材料 `emission.mjs`、`source-emission-esm.json`，没有为迁就检查器修改源码或 dist。
+
+[读取 owner](../../packages/ts-shell/src/runtime/execution/read.ts)与[目录 owner](../../packages/ts-shell/src/runtime/execution/directory.ts)在非 Linux 分支仍依赖路径复验和 metadata/descriptor identity 比较。定向参考比较区分了路径级检查与原生禁止重解析、句柄对象验证；后者不能由本轮通过的路径检查替代。本轮没有发现新的具体产品回归，也没有新增原生模块或执行平面。
+
+证据只覆盖 **Windows 进程访问 WSL UNC**，不覆盖本地 NTFS、原生对象路径绑定、macOS、完整 Windows CLI/套件、PTY/字体/IME 或设备。§5 的真实服务/账户、四端点 TLS/HTTP2 与远端 CI 条件仍开放；Windows 局部通过不改变 Phase19 **active**。本批仅更新文档，§18 的全套与构建未重复运行。

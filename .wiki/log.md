@@ -6593,3 +6593,7 @@ manifest组件 `d589e8d02c5299f0de4a3a25169b9aea1a742540` 已提交/推送、10�
 最终冻结补审 code **APPROVE**（7项及5个独立生命周期探针）、architecture **WATCH**（独立7项及原owner契约检查），综合 **COMMENT，无阻断，限本批**；两lane前后17路径/用户`.gitignore`哈希一致。503路由故障未计批准，实际独立继承路由已返回；探针启动与工作目录harness失败均保留，已清理可归属的临时残留。报告 `.tmp/integration-current/{review-code-close.md,review-architecture-close.md}`；最终文档门禁和交付另记。
 
 本批源码/验收提交 `32b3110705c4588d264c30ee2d1ad7b6a0c23535` 已推送、远端同 SHA，20 路径 blob 审计通过，用户`.gitignore`保留。最终 strict docs 通过；CI38389024800/job115267873427、Watch38389024889/job115267873468均付款/spending-limit 阻止启动、steps=[]、failure，未计远端通过。详见[验收§18](features/phase-19-acceptance.md)，`.tmp/integration-current/delivery.json`；Phase19 active。
+
+### 2026-10-13 — Windows UNC 读取局部验收
+
+原生 Windows Node 20.3.0/24.12.0 访问 WSL 仓库 UNC，两版各 6 项读取与目录检查通过；Node 20.3 另证目录句柄及原受管目录创建可用。六个 owner 的 ESM 输出与原 dist 字节一致，初始 CommonJS 转译误判保留为 harness 失败；源码与用户 `.gitignore` 未改。本批仅补文档，不重复全套/构建。Windows 本地 NTFS、原生对象绑定、macOS、实际前端/设备及真实服务仍未验，Phase19 active。材料 `.tmp/windows-read/`；见[裁决 §8.154](features/phase-19-decisions.md)与[验收 §19](features/phase-19-acceptance.md)。

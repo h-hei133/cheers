@@ -2294,3 +2294,11 @@ Node20.3/单文件×stable/changed四条实际print CLI通过；stable共4合成
 最终补审绑定同一 `5572549e…` 冻结：独立 code **APPROVE**（实际 Node20.3 的 7 项生命周期测试及 5 项命令/存储探针），architecture **WATCH**（独立 7 项通过、owner/CAS/codec 原字节检查），综合 **COMMENT（无阻断，限本批）**。两条 lane 前后 17 路径和用户 `.gitignore` 哈希一致；WATCH 为注入执行适配器必须维持 detached session 义务，不要求为假设中的适配器新建执行系统。原专用路由 503 不计审查；继承当前会话配置的两条独立 lane 实际返回证据。代码探针启动器和架构错误工作目录的失败保留，后者生成的两处自有临时目录在确认进程终止后已精确清理。报告 `.tmp/integration-current/{review-code-close.md,review-architecture-close.md}`。
 
 本批已提交/推送 `32b3110705c4588d264c30ee2d1ad7b6a0c23535`，20 路径 blob 审计及远端同 SHA 核验通过；strict docs 通过。对应 CI 与 Architecture Watch 均因付款/spending-limit 未启动，没有远端通过；详见[验收§18](phase-19-acceptance.md)。此交付不关闭仍缺真实证据的 Phase19 项目。
+
+### 8.154 SAFE-02：Windows UNC 读取证据与平台边界
+
+原“没有 Windows 实机证据”的表述补充为范围明确的原生进程证据：WSL 启动宿主 Windows Node 20.3.0/24.12.0，访问仓库 UNC；两版各 6 项读取/枚举/越根/取消/修订/文件替换检查通过。Node 20.3 官方文件 checksum 已核对，运行环境隔离在仓库内，未调用 provider。目录 `openSync`/`fstat` 和原受管目录创建也实际成功，不能仅因 Windows 缺少 `O_DIRECTORY`/`O_NOFOLLOW` 就断言目录句柄不可用。
+
+定向比较后保持原平台契约：现有路径复验与 descriptor identity 检查尚不等于原生禁止重解析/对象路径绑定，本轮不据此降低 SAFE-02 要求或新增第二运行时。六个 owner 的内存 ESM 输出与现有 dist 逐字节一致；初始孤立 NodeNext 转译误选 CommonJS 的失败记录保留，修正 harness 后比较通过，源码和用户 `.gitignore` 未变。
+
+材料 `.tmp/windows-read/`，详见[验收 §19](phase-19-acceptance.md)。本轮不证明 Windows 本地 NTFS、完整 CLI/套件、进程树、前端/设备或 macOS；真实服务、四端点 TLS/HTTP2 和远端 CI 仍缺。只更新验收文档，不重跑未改源码的全套/构建，Phase19 active。
