@@ -11,7 +11,7 @@ summary: "记录完整源码图、契约门禁、全套测试、实际 CLI 及�
 
 Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)的 16 批、76 项为范围，分别记录实现、局部验收和剩余条件。W16 修复了此前无法取得完整依赖图证明的检查器，并恢复重构后失效的契约门禁；全阶段完成仍需下面列明的剩余工作。
 
-§1–4 的完整套件和冻结证据属于 W16 提交 `f43ae09ec90a5890b768598ab52a17821c5e9efc`。后续 SAFE-02 Linux 原生读取变更分别记录在 §7–17；最新源码的完整套件已重新运行，见 §18，不能把 W16 的历史全套直接套用到后续源码。§19 补充未改源码的 Windows UNC 读取证据。
+§1–4 的完整套件和冻结证据属于 W16 提交 `f43ae09ec90a5890b768598ab52a17821c5e9efc`。后续 SAFE-02 Linux 原生读取变更分别记录在 §7–17；最新源码的完整套件已重新运行，见 §18，不能把 W16 的历史全套直接套用到后续源码。§19 补充未改源码的 Windows UNC 读取证据，§20 复核未改源码的 Windows Terminal 前端捕获材料。
 
 ## 1. 本轮源码与验证范围
 
@@ -96,9 +96,9 @@ Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)�
 
 | 范围 | 已取得证据 | 剩余条件 |
 |---|---|---|
-| Linux/WSL、Node 20.3、单文件程序 | 构建、全套、原生文件/进程/Git/沙箱、两模式 PTY | 用户实际前端逐帧、字体、IME 和系统复制仍需同前端证据 |
+| Linux/WSL、Node 20.3、单文件程序 | 构建、全套、原生文件/进程/Git/沙箱、两模式 PTY | 用户实际前端逐帧、字体、IME 和系统复制仍需同前端证据；§20 已补 Windows Terminal 像素层局部证据 |
 | Linux X11、媒体设备、语言服务、分析器 | 各适配器的明确能力与有界 native 进程路径 | 未安装/不支持状态继续可见；真实声音设备/Live、其他桌面协议另验 |
-| Windows | 原生 Windows Node 20.3/24.12 访问 WSL UNC：两版各 6 项读取/目录检查通过；目录句柄与受管目录创建另验，见 §19 | 本地 NTFS、原生禁止重解析/对象路径绑定、完整 Windows CLI/套件、进程树、前端及设备仍未验 |
+| Windows | 原生 Windows Node 20.3/24.12 访问 WSL UNC：两版各 6 项读取/目录检查通过；目录句柄与受管目录创建另验，见 §19；真实 Windows Terminal 前端抓帧、像素与视觉判定见 §20 | 本地 NTFS、原生禁止重解析/对象路径绑定、完整 Windows CLI/套件、进程树、真实 IME 及设备仍未验 |
 | macOS | 部分 profile、接口与纯逻辑用例 | 原生路径/文件描述符、进程树清理、终端与设备尚未取得等价实机证据 |
 | 模型传输与严格预算 | 合成 HTTP/SSE/usage/重试/unknown、统一 request admission | W7-33 四端点真实 TLS/HTTP2 矩阵仍缺；无法证明上界的请求继续拒绝 strict cap 准入 |
 | 公共包、认证、协作和 SSH | 受控服务、签名、ACL、撤权、重连与未知副作用 | 真实账户、公共部署 TLS、真实远端主机/主机密钥和生产互通验收 |
@@ -387,3 +387,20 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 [读取 owner](../../packages/ts-shell/src/runtime/execution/read.ts)与[目录 owner](../../packages/ts-shell/src/runtime/execution/directory.ts)在非 Linux 分支仍依赖路径复验和 metadata/descriptor identity 比较。定向参考比较区分了路径级检查与原生禁止重解析、句柄对象验证；后者不能由本轮通过的路径检查替代。本轮没有发现新的具体产品回归，也没有新增原生模块或执行平面。
 
 证据只覆盖 **Windows 进程访问 WSL UNC**，不覆盖本地 NTFS、原生对象路径绑定、macOS、完整 Windows CLI/套件、PTY/字体/IME 或设备。§5 的真实服务/账户、四端点 TLS/HTTP2 与远端 CI 条件仍开放；Windows 局部通过不改变 Phase19 **active**。本批仅更新文档，§18 的全套与构建未重复运行。
+
+## 20. Windows Terminal 前端捕获复核（2026-10-13）
+
+取证起点 `7bd7ef4c21d83cb450e870ff90164776e00fa319`，产品二进制仍为 §18 已交付版本，`dist/bin/cheers` SHA256 `6c28dd24217f5b0df435142e86fb8689f03fde6ddbdd3485c00f2f5de0ebc4c4` 与 `.tmp/windows-console/inventory.json` 一致，用户 `.gitignore` 原 SHA 保持。宿主 Windows NT 10.0.26100.0、Windows Terminal 1.24.2610.01001、DPI 144；由 `window.ps1` 经 `wt.exe` 打开带 token 标题的窗口，WSL 内 `terminal.py` 以私有 PTY 运行产品并回放合成 provider（只回 GET），`matrix.py`/`resize.py` 经 `control.py` 驱动，最后用 Win32 `PrintWindow` 抓帧。本批**只复核既有材料**，未改产品源码、未重跑构建。
+
+| 检查 | 实际结果 | 范围 |
+|---|---|---|
+| 20 条抓取字节 | 对 `matrix-results.json`（16）与 `resize-results.json`（4）记录逐条重算 SHA256，`rawMatches` 全 true | `review/verify.py` 从 `.captured.raw` 复算；`regular-box.raw`/`fullscreen-box.raw` 被后续运行截断，作为矩阵条目不可信 |
+| 帧元数据 | 20 条 PNG 的 IHDR 尺寸与 `frame` 记录逐条一致；handle 3869410、WindowsTerminal 36244、144 DPI 统一 | 矩阵窗口与 `launch-check` 的 5311056 是更早、已关闭的另一窗口 |
+| 逻辑层 | 八形态×两模式均含 `中文边界`/`indented`/`end`；`providerPosts` 全 0；缩放后 `CARE\|T`→`CARE\|!T` 出现 | VT 屏仿真 + 字节断言，非像素 |
+| 像素层 | 主题真彩 `(23,143,185)` 边框行 1660/1656 px、零横向断口；CJK 墨迹 25–27px vs 拉丁 12–13px | `review/verify.py` 直接 zlib 解 PNG（宿主无 PIL） |
+| 视觉判定 | `vsllm/gpt-6-astra` 对 12 张抓帧判定中文为真实字形、无 tofu；3 条另报轻微 ghosting | 合成图先验证该模型确能看像素；`read ?q=` 自身 401 属配置缺口 |
+| 空闲重绘 | 无头复现：纯 8s 空闲 0 字节/0 帧，每输入事件 1 帧 | `review/idle-probe.py`；`regular-box.raw` 的 324 帧来自另一次输入驱动的探索会话 |
+
+`regular-box.raw`（732,294B、324 个 `\x1b[?2026h`）不是产品空闲重绘：该会话的 `request.json`/`ack.json` 止于 `id 2 = launch`，无 `send`；帧内容是 composer 停在 `/`、方向键走完 106 项斜杠目录约三圈再加一次清稿键。斜杠目录步进只有 keymap 方向键与 pointer 鼠标两个调用点（regular 未开鼠标追踪），100ms 活动 tick 仅在 `run()` 期间武装，没有计时器/观察者能在无输入时推进。
+
+材料 `.tmp/windows-console/review/{verify.py,idle-probe.py,capture-verification.json,pixel-checks.json,vision-verdicts.json,summary.json}`。证据限于“Windows Terminal 1.24.2610.01001 + WSL 产品进程 + 受控 PTY 输入”，不覆盖原生 Windows CLI/套件、真实 IME 候选窗、用户手动逐帧/字体选择或本地 NTFS；视觉判定来自单一路由且 8 张抓帧因额度/超时未取得，故不把八形态像素整体标为通过。§5 的外部服务/账户/部署条件不变，Phase19 **active**；本批仅文档，提交/推送/精确 CI 另记。

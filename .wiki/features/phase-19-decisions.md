@@ -2302,3 +2302,15 @@ Node20.3/单文件×stable/changed四条实际print CLI通过；stable共4合成
 定向比较后保持原平台契约：现有路径复验与 descriptor identity 检查尚不等于原生禁止重解析/对象路径绑定，本轮不据此降低 SAFE-02 要求或新增第二运行时。六个 owner 的内存 ESM 输出与现有 dist 逐字节一致；初始孤立 NodeNext 转译误选 CommonJS 的失败记录保留，修正 harness 后比较通过，源码和用户 `.gitignore` 未变。
 
 材料 `.tmp/windows-read/`，详见[验收 §19](phase-19-acceptance.md)。本轮不证明 Windows 本地 NTFS、完整 CLI/套件、进程树、前端/设备或 macOS；真实服务、四端点 TLS/HTTP2 和远端 CI 仍缺。只更新验收文档，不重跑未改源码的全套/构建，Phase19 active。
+
+### 8.155 QA-02：Windows Terminal 前端捕获复核（2026-10-13）
+
+宿主真实 Windows Terminal 的前端捕获材料位于 `.tmp/windows-console/`：`window.ps1` 用 `wt.exe` 打开带固定 token 标题的窗口，在 WSL 内跑 `terminal.py`（PTY 桥 + 只回 GET 的合成 provider），`matrix.py`/`resize.py` 经 `control.py` 驱动八形态×两模式与缩放，再用 Win32 `PrintWindow` 抓帧。起点 `7bd7ef4c`，产品二进制 `dist/bin/cheers` SHA256 `6c28dd24…` 与 `inventory.json` 一致，用户 `.gitignore` 原 SHA 保持。本批只复核既有材料，未改产品源码、未重跑构建。
+
+**Hash 与产物一致性。** `matrix.py` 对**仍在写入**的 PTY 日志 `<label>.raw` 取哈希；其后 resize 运行与另一次手工桥接会截断同一文件，故 `regular-box.raw`（现 732,294B）与 `fullscreen-box.raw`（现 8.6KB）已不再等于记录值。矩阵当时的字节保存在 `matrix.py` 之后写的 `<label>.captured.raw`，[复核脚本](../../.tmp/windows-console/review/verify.py)对全部 20 条重新计算 SHA256：`rawMatches` 全为 true。`fullscreen-box-restored` 的 `.raw` 与 `.captured.raw` 同时匹配；`regular-box.raw`/`fullscreen-box.raw` 作为矩阵条目不可信，只作另一次探索的原始记录。`matrix-status.json`/`matrix-ack.json` 保存的是 resize 运行末尾状态而非矩阵运行状态，这一命名混淆已记录。PNG 的 IHDR 尺寸与 20 条 `frame` 记录逐条一致，handle/process/dpi 统一（矩阵窗口 3869410、WindowsTerminal 36244、144 DPI）。
+
+**“324 帧”不是产品重绘缺陷。** `regular-box.raw` 有 324 个 `\x1b[?2026h` 同步帧、117 个不同内容、33 段“连续两帧相同”。这些来自另一次手工桥接会话（`request.json`/`ack.json` 止于 `id 2 = launch`，无 `send`）：光标停在 composer 的 `/`，用方向键走完 106 项斜杠目录约三圈再加一次清稿键。[无头复现](../../.tmp/windows-console/review/idle-probe.py)（本机真实二进制、隔离 HOME、`WT_SESSION` 置位）给出：**纯 8 秒空闲 0 字节、0 帧**，而每个输入事件恰好产生一帧（约 2.4KB）。斜杠目录步进只有两个调用点——[keymap](../../packages/ts-shell/src/cli/interactive/keymap.ts#L378) 的方向键与 [pointer](../../packages/ts-shell/src/cli/interactive/pointer.ts) 的鼠标（regular 未开鼠标追踪），[`step`](../../packages/ts-shell/src/presentation/tui/chrome/suggestions.ts#L108) 以 `% items.length` 环绕；100ms 活动 tick 仅在 `run()` 期间武装。没有计时器/观察者/渲染路径能在无输入时推进目录。因此判为**输入驱动**，非空闲渲染环。
+
+**像素与真实前端证据。** 对 `regular-box.png`/`fullscreen-box.png` 做像素级检查（无 PIL，直接 zlib 解 PNG）：主题真彩 `(23,143,185)` 边框行连续 1660/1656 px、**零横向断口**，证明 box-drawing 字形在真实 Windows Terminal 中无缝衔接；样例行里 CJK 墨迹列宽 25–27px、拉丁 12–13px，约 2:1，符合 DPI 144 下的双宽单元格，非 tofu。另经 `vsllm/gpt-6-astra`（真实能看像素，先用合成图验证）对 12 张抓帧取得视觉判定：全部报告中文为**真实字形**（`中文边界`/`会话`），无一报 tofu；其中 3 条同时指出轻微 ghosting/misalignment。`read ?q=` 自身返回 401 属 harness 配置缺口：`modelRoles.vision` 未设，回退到无效的 OpenAI 环境键；已记录但不改配置。
+
+**边界。** 证据限于“Windows Terminal 1.24.2610.01001 + WSL 产品进程 + 受控 PTY 输入”，**不含**原生 Windows CLI/套件、真实 IME 候选窗、用户手动逐帧/字体选择或本地 NTFS；`resize.py` 的缩放证据只覆盖无头重排与抓帧宽度。视觉判定来自单一路由且部分抓帧因额度/超时未取得，故不作为“全部形态像素通过”的结论。材料 `.tmp/windows-console/review/{verify.py,capture-verification.json,pixel-checks.json,vision-verdicts.json,summary.json}`，详见[验收 §20](phase-19-acceptance.md)。Phase19 active；本批仅文档，提交/推送/精确 CI 另记。
