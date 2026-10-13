@@ -38,7 +38,8 @@ export async function runDirectorCommand(host: JobsComposition, args: string[], 
       if (live) await live.close();
       const pending = cycles.find(row => !row.retired && row.phase !== 'disabled');
       if (!pending) return { kind: 'local', output: 'Director is off.' };
-      store.change(pending, { phase: 'unknown', retired: true, ...(pending.endedAt === undefined ? { endedAt: Date.now() } : {}) });
+      store.change(pending, { phase: 'unknown', retired: true,
+        ...(pending.endedAt === undefined ? { endedAt: Math.max(pending.createdAt, Date.now()) } : {}) });
       return { kind: 'local', output: 'Director off; the earlier owner is unavailable. Retained workers remain unknown and are not adopted or replayed.' };
     }
     if (['on', 'spawn', 'send', 'stop'].includes(parsed.action.name) && host.runtime.getCurrentRunController())

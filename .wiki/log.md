@@ -6583,3 +6583,11 @@ manifest组件 `d589e8d02c5299f0de4a3a25169b9aea1a742540` 已提交/推送、10�
 
 
 最终独立code **APPROVE**（5文件/90项、七项owner/consumer probes和原initial/final path消失反例重验），architecture **CLEAR**（最终3文件/77项、原阻挡parent反例、alias binding、零enumeration/关闭及resource/budget/取消/清理检查），综合 **APPROVE（限本批修复冻结）**。两lane六路径与用户`.gitignore`前后哈希匹配；初始b7b3的HIGH/REQUEST CHANGES/BLOCK及失败日志保留，不混入最终计数。Node20.3/单文件两条actual print自动技能发现/调用CLI共4合成POST通过，忽略内容未发送、tool call ID与原manifest字节核对；这是stable路径，changed路径由实际catalog/tool consumer child probes证明，未声称changed CLI或PTY验收。报告 `.tmp/skill-roots/{review-code.md,review-architecture.md,cli-smoke-results.json}`。提交/推送/精确SHA CI单独取证，Phase19 active。
+
+### 2026-10-13 — 技能根交付与 QA-01 最终本地集成
+
+技能根 `e9dc426cee2872feb4b1209ea495823f37bf0782` 已提交/推送且远端同SHA；CI38340153756/job115109091168、Watch38340153769/job115109091176均付款/spending-limit阻止启动、steps=[]、failure，无远端通过，材料 `.tmp/skill-roots/delivery.json`。
+
+本批修复沙箱第二session导致取消组失去后代，以及director在时钟回拨时无法持久关闭；修正当前native/query预算契约的测试准备和临时Git边界，未删除场景或新增skip。最终17TS/7production、冻结5572549e…；Node20.3最终全量789文件/7984项通过，1文件/10项原有跳过，零失败，两构建/四源码门通过，完整judge图义务satisfied、4既有ceiling advisory仍partial。早期22/1/2项失败、未完成运行及旧CLI参数拒绝均保留。三类隔离反转实际失败、正向副本通过；六actual print共12合成POST验证同一沙箱字节，director另有实际命令/存储生命周期与最终全套。原沙箱独立审查code APPROVE/architecture WATCH，最终时钟补审与交付另记。私有镜像性能候选未达门槛，结束方向、无生产补丁。详见[裁决§8.153](features/phase-19-decisions.md)与[验收§18](features/phase-19-acceptance.md)，材料 `.tmp/integration-current/`；用户`.gitignore`原字节保持，Phase19 active，真实平台/服务/前端边界继续开放。
+
+最终冻结补审 code **APPROVE**（7项及5个独立生命周期探针）、architecture **WATCH**（独立7项及原owner契约检查），综合 **COMMENT，无阻断，限本批**；两lane前后17路径/用户`.gitignore`哈希一致。503路由故障未计批准，实际独立继承路由已返回；探针启动与工作目录harness失败均保留，已清理可归属的临时残留。报告 `.tmp/integration-current/{review-code-close.md,review-architecture-close.md}`；最终文档门禁和交付另记。

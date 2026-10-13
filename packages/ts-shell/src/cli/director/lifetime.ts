@@ -72,7 +72,8 @@ export class DirectorRuntime implements DirectorOwner {
     }));
     const unknown = publicationUnknown || results.some(result => result.status === 'rejected' || !result.value);
     try {
-      this.current = this.store.change(this.row, { phase: unknown ? 'unknown' : 'disabled', endedAt: Date.now(), ...(unknown ? { retired: true } : {}) });
+      this.current = this.store.change(this.row, { phase: unknown ? 'unknown' : 'disabled',
+        endedAt: Math.max(this.row.createdAt, Date.now()), ...(unknown ? { retired: true } : {}) });
       return unknown ? 'Director off; worker cleanup or prior outcomes remain unknown. Retained jobs are not replayed.'
         : 'Director off; exact worker cleanup settled. Ordinary model preferences and tools are available for the next turn.';
     } catch { return 'Director revoked; state publication or cleanup is unverified. Inspect /director status and /jobs.'; }

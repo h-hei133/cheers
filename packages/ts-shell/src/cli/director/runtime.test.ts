@@ -150,7 +150,13 @@ it('requires a live selection after restart and refuses adopting the retained wo
   liveDirectors.delete(context); await closeJobsFor(context); install();
   expect(() => directorRunFor(context, manager, () => undefined)).toThrow('no adoptable'); expect(await command('status')).toContain('unknown');
   expect(await command(`send ${first.id} Must not replay`)).toContain('No live'); expect(requests).toHaveLength(1);
-  expect(await command('off')).toContain('not adopted'); expect(await command('on')).toContain('Director on');
+  const previous = new DirectorStore(manager, context.session).read().cycles[0]!;
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(previous.createdAt - 1);
+  let off: string;
+  try { off = await command('off'); } finally { clock.mockRestore(); }
+  expect(off, off).toContain('not adopted');
+  expect(new DirectorStore(manager, context.session).read().cycles[0]).toMatchObject({ phase: 'unknown', retired: true, endedAt: previous.createdAt });
+  expect(requests).toHaveLength(1); expect(await command('on')).toContain('Director on');
 });
 it('confirms exact cancellation only after native cleanup settles', async () => {
   let began!: () => void; const ready = new Promise<void>(resolve => { began = resolve; });
@@ -161,8 +167,13 @@ it('confirms exact cancellation only after native cleanup settles', async () => 
   });
   await command('on'); await command('spawn Hold exact command'); await ready;
   const id = jobsFor(context)!.agents.journal.list()[0]!.id;
-  expect(await command('off')).toContain('cleanup settled'); expect(await settled(id)).toMatchObject({ status: 'cancelled' });
-  expect(new DirectorStore(manager, context.session).read().cycles[0]!.phase).toBe('disabled'); expect(requests).toHaveLength(1);
+  const previous = new DirectorStore(manager, context.session).read().cycles[0]!;
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(previous.createdAt - 1);
+  let off: string;
+  try { off = await command('off'); } finally { clock.mockRestore(); }
+  expect(off, off).toContain('cleanup settled'); expect(await settled(id)).toMatchObject({ status: 'cancelled' });
+  expect(new DirectorStore(manager, context.session).read().cycles[0]).toMatchObject({ phase: 'disabled', endedAt: previous.createdAt });
+  expect(requests).toHaveLength(1);
 });
 it('retains unknown mutation receipt outcomes and refuses any later model request or assignment', async () => {
   let turn = 0; reply = (_body, response) => ++turn === 1 ? respond(response, [{ id: 'receipt-effect', name: 'write', args: { path: 'uncertain.txt', content: 'effect' } }]) : respond(response);

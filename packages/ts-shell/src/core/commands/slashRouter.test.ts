@@ -133,6 +133,7 @@ describe("slash router (W4)", () => {
   });
 
   it("names the available skills when the one asked for does not exist", async () => {
+    execFileSync('git', ['init', '-q', workspaceRoot]);
     const result = await routeSlashCommand("/skill:nosuch", { cwd: workspaceRoot });
     expect(result?.kind).toBe("local");
     if (result?.kind === "local") {
@@ -891,6 +892,7 @@ describe("slash router (W4)", () => {
   });
 
   it("routes every visible registry command name and alias without falling through to unknown", async () => {
+    execFileSync('git', ['init', '-q', workspaceRoot]);
     const registry = createCommandRegistry(workspaceRoot);
     const visibleCommands = Array.from(registry.values()).filter(
       (command) => command.availability !== "hidden" && command.enabled !== false,
@@ -1362,6 +1364,7 @@ describe("a skill the command line named", () => {
     process.env.USERPROFILE = fakeHomeDir;
     process.env.HOME = fakeHomeDir;
     workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-named-skill-"));
+    execFileSync('git', ['init', '-q', workspaceRoot]);
   });
 
   afterEach(() => {

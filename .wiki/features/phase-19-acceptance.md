@@ -11,7 +11,7 @@ summary: "记录完整源码图、契约门禁、全套测试、实际 CLI 及�
 
 Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)的 16 批、76 项为范围，分别记录实现、局部验收和剩余条件。W16 修复了此前无法取得完整依赖图证明的检查器，并恢复重构后失效的契约门禁；全阶段完成仍需下面列明的剩余工作。
 
-§1–4 的完整套件和冻结证据属于 W16 提交 `f43ae09ec90a5890b768598ab52a17821c5e9efc`。后续 SAFE-02 Linux 原生读取变更单独记录在 §7，不能将 W16 的全套通过套用到后续源码。
+§1–4 的完整套件和冻结证据属于 W16 提交 `f43ae09ec90a5890b768598ab52a17821c5e9efc`。后续 SAFE-02 Linux 原生读取变更分别记录在 §7–17；最新源码的完整套件已重新运行，见 §18，不能把 W16 的历史全套直接套用到后续源码。
 
 ## 1. 本轮源码与验证范围
 
@@ -54,7 +54,7 @@ Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)�
 
 | 批次与任务 | 实现与直接验证入口 | 当前边界 |
 |---|---|---|
-| W1 SAFE-01–08 | §8.1–18、58–66、108–112；[工具](../../packages/ts-shell/src/core/tools/)、[执行](../../packages/ts-shell/src/runtime/execution/)、[编辑 authority](../../packages/ts-shell/src/edit/authority/) | Linux 正常/拒绝/取消路径已验；SAFE-02 原生隐式读取与非 Linux 实际对象保证仍待完成，不能整体勾选 |
+| W1 SAFE-01–08 | §8.1–18、58–66、108–112；[工具](../../packages/ts-shell/src/core/tools/)、[执行](../../packages/ts-shell/src/runtime/execution/)、[编辑 authority](../../packages/ts-shell/src/edit/authority/) | Linux 文件及原生读取的正常/拒绝/取消证据已补至 §18；非 Linux 实际对象绑定及 §5 所列限制仍未关闭，不能整体勾选 |
 | W2 CMD-01–04 | §8.19–57、67；[语法](../../packages/ts-shell/src/core/commands/syntax/)、[补全](../../packages/ts-shell/src/cli/interactive/completion/) | 共享语法、原稿替换、动态目录与过期响应已有本地证据；保留独立 raw invocation 语义 |
 | W3 CFG-01–05 | §8.68–85；[配置](../../packages/ts-shell/src/config/)、[模型会话](../../packages/ts-shell/src/session/model/) | schema、JSONC、字段 CAS、发布和会话/全局作用域已验；账户与真实端点能力另验 |
 | W4 UI-01–07 | §8.86–101；[输入布局](../../packages/ts-shell/src/presentation/tui/composer/)、[呈现](../../packages/ts-shell/src/presentation/tui/)、[启动度量](../../packages/ts-shell/src/observability/startupTiming.ts) | 两模式 PTY、八形态、源文复制、状态和计量已有本地证据；用户前端像素/字体/IME 实证仍缺 |
@@ -70,7 +70,7 @@ Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)�
 | W13 FLOW-01–03 | §8.133–138；[作业](jobs.md)、[交接](handoff.md)、[编排](director.md)、[固定评测](improve.md) | 持久命令/代理/DAG、一次性交接、worker、固定 evaluator 与独立发布批准已验；保留 Linux 隔离及评测覆盖限制 |
 | W14 MEDIA-01–02 | §8.139；[媒体](media.md) | 合成协议、native 进程、明确启用、录制隐私和安全回放已验；真实设备、声音质量与真实 Live 服务尚未验 |
 | W15 PAR-01–05 | §8.140；[命令控制](command-controls.md) | 历史/上下文、todo/记忆、模型/tier、诊断/restart、规则提案闭环已验；未知账户权益和远端缓存不造成功状态 |
-| W16 QA-01 | 本文 §2、§4；完整源码图、套件、反转与独立审查 | 本地证据已扩展；最终逐项验收仍受下面明确的未覆盖格约束 |
+| W16 QA-01 | 本文 §2、§4、§18；完整源码图、最新全套、反转与独立审查 | 本地证据已扩展；最终逐项验收仍受下面明确的未覆盖格约束 |
 | W16 QA-02 | 本文 §5、§6；[历史外部矩阵](phase-18-acceptance.md) | 源码、构建与平台范围已记录；外部服务、用户前端、精确远端 CI 和发布证据仍需补齐 |
 
 ## 4. 跨域矩阵与实际 CLI
@@ -339,3 +339,32 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 
 
 最终独立code **APPROVE**（5文件/90项、七项owner/consumer probes和原initial/final path消失反例重验），architecture **CLEAR**（最终3文件/77项、原阻挡parent反例、alias binding、零enumeration/关闭及resource/budget/取消/清理检查），综合 **APPROVE（限本批修复冻结）**。两lane六路径与用户`.gitignore`前后哈希匹配；初始b7b3的HIGH/REQUEST CHANGES/BLOCK及失败日志保留，不混入最终计数。Node20.3/单文件两条actual print自动技能发现/调用CLI共4合成POST通过，忽略内容未发送、tool call ID与原manifest字节核对；这是stable路径，changed路径由实际catalog/tool consumer child probes证明，未声称changed CLI或PTY验收。报告 `.tmp/skill-roots/{review-code.md,review-architecture.md,cli-smoke-results.json}`。提交/推送/精确SHA CI单独取证，Phase19 active。
+
+该技能根组件已提交/推送 `e9dc426cee2872feb4b1209ea495823f37bf0782`，远端同 SHA，用户 `.gitignore` 原字节排除。精确 CI38340153756/job115109091168 与 Watch38340153769/job115109091176 均 completed/failure、`steps=[]`；各自 annotations 确认付款/spending-limit 阻止启动，无远端验证通过。材料 `.tmp/skill-roots/{commit-audit.json,delivery.json}`。
+
+## 18. QA-01 沙箱取消与最终集成验收（2026-10-13）
+
+起点 `e9dc426`；当前 17TS/7production 冻结为 `inventory-close.json`，SHA256 `5572549e5ffa30f51aedbecaef240ad51d6ad18ff1be5031c4f0bf27c26802a2`。用户 `.gitignore` 原字节排除。沙箱计划只在原 detached execution owner 已负责会话时省去第二 `setsid()`；direct-execFile hook 保留默认。director 两处关闭对新 `endedAt` 取 `createdAt` 下界，避免回拨使原 codec 拒绝；不改变 schema、CAS、已记录结束时间或 unknown/重放规则。
+
+| 证据 | 实际结果 | 材料/边界 |
+|---|---|---|
+| 最终全量 | 789 文件通过、1 文件原有跳过；7984 项通过、10 项原有跳过，零失败 | `full-suite-close-final.json/.log`，Node20.3、隔离合成环境、两个工作线程，601.77秒；最终源码清单核对一致 |
+| 最终两种构建 | TS 与单文件通过 | `build-ts-close`、`build-exe-close`；包含两处时钟修复 |
+| 最终源码结构门 | import cycles/config consumers/declarations/Node floor 通过；judge exit0 | `*-close`、`normproof-close-out/`；未解析及混合环 satisfied，4项既有ceiling advisory/partial保留 |
+| 脚本套件 | 本批57项通过，零跳过/失败 | `scripts.json/.log`；脚本文件此后未改，不冒称重新运行 |
+| 受影响组合与关闭 | 原沙箱组合106、82、87项分别通过；最终director/invocation两文件23项通过 | `failures-final`、`sandbox-owner`、`native-hooks`、`director-clock-final`；组间不累加为一次全量 |
+| 三类有效反转 | 两个第二会话反转分别实际失败；原始关闭时钟使两个生命周期断言失败；正向副本通过 | `reversals/results.json`、`clock-reversal/results.json`；原source及用户`.gitignore`保持 |
+| 六条actual print CLI | Node20.3/单文件×两类grep和sandboxed bash，12合成POST通过 | `cli-smoke-results.json`；call ID、正文/排除、实际marker/pwd和原字节；沙箱源码未变，未声称覆盖director关闭 |
+| 原沙箱独立审查 | code APPROVE、architecture WATCH，原范围综合COMMENT | `review-code.md`、`review-architecture.md`；进程组、PTY/早期取消/timeout证据保持；最终时钟差异补审另记 |
+
+早期全量的22、1、2项失败原样保留。中断/未完成的`full-suite-integration`以及旧线程CLI参数导致启动拒绝的`full-suite-close`不计通过。定向命令/存储探针证明1ms回拨会使两处关闭失败；修复后两个既有生命周期用例仍验证真实取消/清理、持久状态和零额外请求，不把时钟反例断言为此前随机失败的唯一根因。
+
+查询/budget测试隔离metadata/materialization准备，仍检查实际plan/status/output/deadline/cancellation/cleanup；未mock的native套件负责视图集成。搜索测试要求实际descriptor原文/零replacement marker，并把已知替换与撤权分别报为changed/failed。独立Git根只隔离临时测试项目，没有弱化生产发现或权限规则。
+
+架构WATCH继续为注入执行接口的detached session契约；当前默认图及实际进程已证明，未来adapter须保留该义务。隔离PID namespace内主动脱离组的探针不扩称普通shell、SIGKILL/OOM或全部平台的任意后代都可回收。
+
+私有镜像两性能候选均未达预声明双路20%门槛，结束该方向、零生产性能补丁；`.tmp/native-mirror/`保留实验和harness失败，已有O(n)成本保持可见。
+
+材料 `.tmp/integration-current/`。没有用户数据schema迁移；回退源提交并重建会恢复旧取消组/回拨缺陷，不需要重写用户数据。§5列明的非Linux对象、W7-33、实际前端/设备及公共服务/账户/SSH部署保持开放，Phase19 active。文档门禁及提交/推送/精确CI另记。
+
+最终补审绑定同一 `5572549e…` 冻结：独立 code **APPROVE**（实际 Node20.3 的 7 项生命周期测试及 5 项命令/存储探针），architecture **WATCH**（独立 7 项通过、owner/CAS/codec 原字节检查），综合 **COMMENT（无阻断，限本批）**。两条 lane 前后 17 路径和用户 `.gitignore` 哈希一致；WATCH 为注入执行适配器必须维持 detached session 义务，不要求为假设中的适配器新建执行系统。原专用路由 503 不计审查；继承当前会话配置的两条独立 lane 实际返回证据。代码探针启动器和架构错误工作目录的失败保留，后者生成的两处自有临时目录在确认进程终止后已精确清理。报告 `.tmp/integration-current/{review-code-close.md,review-architecture-close.md}`。

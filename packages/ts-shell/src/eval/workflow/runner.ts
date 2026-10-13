@@ -12,7 +12,7 @@ export class EvaluationExecutionError extends Error {
 async function isolatedResult(row: Evaluation, round: EvaluationRound, execution: Pick<ExecutionService, 'runCommand'>,
   signal: AbortSignal, root: string, entry: string, input: unknown, identity: string, candidate: boolean) {
   const plan = planSandboxedCommand({ shell: row.frozen.executable.path, shellArgs: [path.join(root, entry)],
-    workspaceRoot: root, isolateProcesses: true, readOnlyRoots: [root],
+    workspaceRoot: root, isolateProcesses: true, sessionCreated: true, readOnlyRoots: [root],
     rules: { enabled: true, failClosed: true, network: { allowedDomains: [] },
       filesystem: { allowRead: [row.frozen.executable.path], allowWrite: [], denyRead: [] } } });
   if (plan.state !== 'isolated' || !plan.command || !plan.args) throw new Error('Evaluation isolation is unavailable. No evaluator was dispatched.');

@@ -44,7 +44,7 @@ export async function executeScript(host: ExecutionHost, record: VersionRecord, 
     if ((stored.filesystem?.allowRead ?? []).length || (stored.filesystem?.allowWrite ?? []).length) throw new Error('Extension scripts cannot inherit broader filesystem sandbox grants.');
     const readOnly = [...(record.manifest.permissions.workspace === 'read' ? [host.root] : []), owned, host.file, sourceFile()];
     const plan = planSandboxedCommand({ shell: '/bin/sh', shellArgs: [absolute, ...argv], workspaceRoot: host.root,
-      rules: { enabled: true, failClosed: true, network: { allowedDomains: [] }, filesystem: { allowRead: [owned], allowWrite: [home], denyRead: [...stored.filesystem?.denyRead ?? []] } }, readOnlyRoots: readOnly, isolateProcesses: true });
+      rules: { enabled: true, failClosed: true, network: { allowedDomains: [] }, filesystem: { allowRead: [owned], allowWrite: [home], denyRead: [...stored.filesystem?.denyRead ?? []] } }, readOnlyRoots: readOnly, isolateProcesses: true, sessionCreated: true });
     if (plan.state !== 'isolated' || !plan.command || !plan.args) throw new Error(plan.notice ?? 'Extension sandbox unavailable; no script ran.');
     current(); host.check(); assertInventory(owned, record); abort.signal.throwIfAborted();
     dispatched = true;

@@ -35,7 +35,8 @@ export function planNativeRead(input: {
   if ([launcher, command, ...runtime].some(file => contains(input.root, fs.realpathSync(file)) || contains(fs.realpathSync(file), input.root))) {
     throw new Error('The workspace overlaps the native enumeration runtime.');
   }
-  const args = ['--unshare-all', '--die-with-parent', '--new-session', '--json-status-fd', '4', '--proc', '/proc', '--dev', '/dev', '--tmpfs', '/tmp'];
+  // The execution owner creates the session and retains its group for cleanup.
+  const args = ['--unshare-all', '--die-with-parent', '--json-status-fd', '4', '--proc', '/proc', '--dev', '/dev', '--tmpfs', '/tmp'];
   for (const file of runtime) args.push('--ro-bind', file, file);
   args.push('--ro-bind', command, command, '--ro-bind', '/proc/self/fd/3', input.root,
     '--chdir', input.directory, '--clearenv', '--setenv', 'LANG', 'C', '--setenv', 'LC_ALL', 'C',

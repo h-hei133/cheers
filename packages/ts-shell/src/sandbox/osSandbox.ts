@@ -260,6 +260,8 @@ export function planSandboxedCommand(input: {
   readonly readOnlyRoots?: readonly string[];
   /** Untrusted descendants must remain in a kernel-owned process namespace. */
   readonly isolateProcesses?: boolean;
+  /** The execution owner launches this plan in an already detached session. */
+  readonly sessionCreated?: boolean;
 }): SandboxPlan {
   const rules = input.rules ?? readSandboxRules(input.workspaceRoot);
   if (rules.enabled !== true) return { state: "off" };
@@ -268,7 +270,7 @@ export function planSandboxedCommand(input: {
 
   const args =
     launcher.kind === "bwrap"
-      ? bwrapArgs(rules, input.workspaceRoot, input.shell, input.shellArgs, input.readOnlyRoots ?? [], input.isolateProcesses === true)
+      ? bwrapArgs(rules, input.workspaceRoot, input.shell, input.shellArgs, input.readOnlyRoots ?? [], input.isolateProcesses === true, input.sessionCreated === true)
       : seatbeltArgs(rules, input.workspaceRoot, input.shell, input.shellArgs, input.readOnlyRoots ?? []);
   return { state: "isolated", command: launcher.bin, args };
 }
@@ -286,8 +288,12 @@ function bwrapArgs(
   shellArgs: readonly string[],
   readOnlyRoots: readonly string[],
   isolateProcesses: boolean,
+  sessionCreated: boolean,
 ): string[] {
-  const args = ["--die-with-parent", "--new-session", "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp"];
+  // Execution already starts a detached session. A second setsid inside bwrap
+  // moves its child out of the process group owned by cancellation and cleanup.
+  const args = ["--die-with-parent", "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp"];
+  if (!sessionCreated) args.push('--new-session');
   if (isolateProcesses) args.push('--unshare-pid');
   for (const readable of [...sandboxSystemReadRoots, ...(rules.filesystem?.allowRead ?? [])]) {
     if (fs.existsSync(readable)) args.push("--ro-bind", readable, readable);

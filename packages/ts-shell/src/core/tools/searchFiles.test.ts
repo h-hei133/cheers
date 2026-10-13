@@ -62,7 +62,8 @@ it('rechecks policy before retaining native output', async () => {
     const result = await searchWithRipgrep({ pattern: 'needle', searchPath: 'public.txt', limit: 10, workspaceRoot: root,
       assertFileAccess: () => { if (revoked) throw new Error('denied'); },
     });
-    expect(result).toEqual({ ok: true, matches: [] });
+    expect(revoked).toBe(true);
+    expect(result).toEqual({ ok: false, reason: 'failed' });
   } finally { vi.mocked(executeLocally).mockImplementation(actual.executeLocally); }
 });
 it('batches long candidate lists without dropping paths', () => {
@@ -103,19 +104,24 @@ it.each([false, true])('ignores inherited preprocessing configuration with polic
   if (result.ok) expect(result.matches.map(match => match.line)).toEqual(['needle public']);
 });
 
-it('searches the verified file rather than a replacement installed before spawn', async () => {
+it('searches only the verified descriptor and refuses a replacement installed before spawn', async () => {
   if (process.platform !== 'linux') return;
   const actual = await vi.importActual<typeof import('../../runtime/execution/local.js')>('../../runtime/execution/local.js');
+  let nativeOutput = '';
   vi.mocked(executeLocally).mockImplementation(async input => {
     if (input.args?.includes('--json')) {
       await fs.rename(path.join(root, 'public.txt'), path.join(root, 'original.txt'));
       await fs.writeFile(path.join(root, 'public.txt'), 'needle REPLACEMENT_MARKER');
     }
-    return actual.executeLocally(input);
+    return actual.executeLocally({ ...input, onStdout: chunk => {
+      if (input.args?.includes('--json')) nativeOutput += chunk.toString();
+      return input.onStdout?.(chunk);
+    } });
   });
   try {
     const result = await searchWithRipgrep({ pattern: 'needle', searchPath: 'public.txt', limit: 10, workspaceRoot: root, assertFileAccess: check });
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.matches).toEqual([{ path: 'public.txt', lineNumber: 1, line: 'needle public' }]);
+    expect(nativeOutput).toContain('needle public');
+    expect(nativeOutput).not.toContain('REPLACEMENT_MARKER');
+    expect(result).toEqual({ ok: false, reason: 'changed' });
   } finally { vi.mocked(executeLocally).mockImplementation(actual.executeLocally); }
 });

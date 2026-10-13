@@ -3158,6 +3158,9 @@ describe("CLI streaming baseline (T3)", () => {
         sessionId: `sess_non_write_${scenario}_recovery`,
         projectName: `continue-non-write-${scenario}-project`,
       });
+      // These temporary projects must not discover the surrounding test checkout.
+      const initialized = spawnSync('git', ['init', '-q', projectRoot], { encoding: 'utf8' });
+      expect(initialized.status, initialized.stderr).toBe(0);
 
       const runPrint = (prompt: string) =>
         spawnSync(
@@ -3197,7 +3200,7 @@ describe("CLI streaming baseline (T3)", () => {
 
       const result = runPrint(`/continue continue ${scenario}`);
       expect(result.error).toBeUndefined();
-      expect(result.status).toBe(0);
+      expect(result.status, `${result.stdout ?? ''}${result.stderr ?? ''}`).toBe(0);
       const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
       expect(output).toContain("Continuation");
       expect(output).toContain("Failure handoff: status=blocked");

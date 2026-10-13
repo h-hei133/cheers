@@ -4,7 +4,13 @@ import path from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { executeLocally } from './local.js'
 import { listDirectoryEntries, listWorkspaceFiles } from './fileWalk.js'
-import { completeNativeRead } from '../../test-utils/native.js'
+import { completeNativeRead, isNativeFileQuery } from '../../test-utils/native.js'
+
+// This suite owns query output, cancellation and cleanup. Metadata admission and
+// mirror traversal are exercised with real repositories in view/native.test.ts.
+vi.mock('./view/git.js', () => ({ repositoryMarker: async (sources: { input: { root: string } }) => path.join(sources.input.root, '.git') }))
+vi.mock('./view/config.js', () => ({ configureGitView: async () => ({ ignoreCase: false }) }))
+vi.mock('./view/tree.js', () => ({ materializeView: async () => {} }))
 
 vi.mock('./local.js', async () => {
   const actual = await vi.importActual<typeof import('./local.js')>('./local.js')
@@ -12,10 +18,18 @@ vi.mock('./local.js', async () => {
 })
 
 let root: string
-beforeEach(() => {
+let query: typeof executeLocally
+const queries = () => vi.mocked(executeLocally).mock.calls.filter(([input]) => isNativeFileQuery(input))
+beforeEach(async () => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'ignore-queries-'))
   fs.writeFileSync(path.join(root, 'public.txt'), 'public')
-  vi.mocked(executeLocally).mockClear()
+  const actual = await vi.importActual<typeof import('./local.js')>('./local.js')
+  query = actual.executeLocally
+  vi.mocked(executeLocally).mockReset().mockImplementation(async input => {
+    if (isNativeFileQuery(input)) return query(input)
+    completeNativeRead(input)
+    return { status: 'completed', exitCode: 0, stdout: '', stderr: '' }
+  })
 })
 afterEach(() => { vi.restoreAllMocks(); fs.rmSync(root, { recursive: true, force: true }) })
 
@@ -24,7 +38,7 @@ it.each(['files', 'directory'])('cancels an in-flight %s Git query without start
   const controller = new AbortController()
   let started = false
   let nativeStatus: string | undefined
-  vi.mocked(executeLocally).mockImplementation(input => {
+  query = input => {
     expect(path.basename(input.command)).toBe('bwrap')
     return actual.executeLocally({ ...input, command: process.execPath,
       args: ['-e', 'process.stdout.write("READY"); setTimeout(() => process.exit(0), 2000)'],
@@ -34,13 +48,13 @@ it.each(['files', 'directory'])('cancels an in-flight %s Git query without start
         input.onStdout?.(chunk)
       },
     }).then(result => { nativeStatus = result.status; return result })
-  })
+  }
   const options = { abortSignal: controller.signal }
-  const query = kind === 'files' ? listWorkspaceFiles(root, options) : listDirectoryEntries(root, root, options)
-  await expect(query).rejects.toThrow()
+  const pending = kind === 'files' ? listWorkspaceFiles(root, options) : listDirectoryEntries(root, root, options)
+  await expect(pending).rejects.toThrow()
   expect(started).toBe(true)
   expect(nativeStatus).toBe('cancelled')
-  expect(executeLocally).toHaveBeenCalledTimes(1)
+  expect(queries()).toHaveLength(1)
 })
 
 it.each(['files', 'directory'])('does not launch %s Git work when already cancelled', async kind => {
@@ -52,7 +66,7 @@ it.each(['files', 'directory'])('does not launch %s Git work when already cancel
 })
 
 it('rejects oversized Git output without restarting the work through fallback', async () => {
-  vi.mocked(executeLocally).mockImplementation(async input => {
+  query = async input => {
     const chunk = Buffer.alloc(1024 * 1024, 120)
     for (let i = 0; i < 65; i++) {
       input.onStdout?.(chunk)
@@ -60,38 +74,38 @@ it('rejects oversized Git output without restarting the work through fallback', 
     }
     expect(input.abortSignal?.aborted).toBe(true)
     return { status: 'cancelled', exitCode: null, stdout: '', stderr: '' }
-  })
+  }
   const open = vi.spyOn(fs.promises, 'opendir')
   await expect(listWorkspaceFiles(root)).rejects.toMatchObject({ reason: 'pathBytes' })
   expect(open).not.toHaveBeenCalled()
-  expect(executeLocally).toHaveBeenCalledTimes(1)
+  expect(queries()).toHaveLength(1)
 })
 
 it('decodes split UTF-8 only after the complete Git output arrives', async () => {
   const name = '中文.txt'
   fs.writeFileSync(path.join(root, name), 'public')
-  vi.mocked(executeLocally).mockImplementation(async input => {
+  query = async input => {
     for (const byte of Buffer.from(`${name}\0`)) input.onStdout?.(Buffer.from([byte]))
     completeNativeRead(input)
     return { status: 'completed', exitCode: 0, stdout: '', stderr: '' }
-  })
+  }
   expect(await listWorkspaceFiles(root)).toEqual([name])
 })
 
 it('does not treat a timeout with exit one as a valid empty ignore answer', async () => {
   fs.writeFileSync(path.join(root, '.ignore'), 'public.txt\n')
-  vi.mocked(executeLocally).mockResolvedValue({ status: 'timeout', exitCode: 1, stdout: '', stderr: 'fixture failure' })
+  query = async () => ({ status: 'timeout', exitCode: 1, stdout: '', stderr: 'fixture failure' })
   await expect(listDirectoryEntries(root, root)).rejects.toThrow('Git query failed before a complete native answer was available.')
-  expect(executeLocally).toHaveBeenCalledTimes(1)
+  expect(queries()).toHaveLength(1)
 })
 
 it.each(['none', 'parent', 'output'])('reports unverified execution before %s cancellation or fallback', async cancellation => {
   const controller = new AbortController()
-  vi.mocked(executeLocally).mockImplementation(async input => {
+  query = async input => {
     if (cancellation === 'parent') controller.abort()
     if (cancellation === 'output') input.onStdout?.(Buffer.alloc(65 * 1024 * 1024))
     return { status: 'failed', exitCode: 1, failureKind: 'execution_failure', stdout: '', stderr: 'PRIVATE_DIAGNOSTIC' }
-  })
+  }
   await expect(listDirectoryEntries(root, root, { abortSignal: controller.signal })).rejects.toThrow(
     'Git query failed: input delivery or process cleanup could not be verified.',
   )
@@ -99,16 +113,16 @@ it.each(['none', 'parent', 'output'])('reports unverified execution before %s ca
 
 it('propagates cancellation that arrives as Git finishes, without returning the late list', async () => {
   const controller = new AbortController()
-  vi.mocked(executeLocally).mockImplementation(async input => {
+  query = async input => {
     input.onStdout?.(Buffer.from('public.txt\0'))
     controller.abort()
     return { status: 'completed', exitCode: 0, stdout: '', stderr: '' }
-  })
+  }
   await expect(listWorkspaceFiles(root, { abortSignal: controller.signal })).rejects.toThrow()
 })
 
 it('retains Git execution failure when the native status handle also fails cleanup', async () => {
-  vi.mocked(executeLocally).mockResolvedValue({ status: 'failed', exitCode: 1, failureKind: 'execution_failure', stdout: '', stderr: 'PRIVATE_PROCESS_DIAGNOSTIC' })
+  query = async () => ({ status: 'failed', exitCode: 1, failureKind: 'execution_failure', stdout: '', stderr: 'PRIVATE_PROCESS_DIAGNOSTIC' })
   const open = fs.promises.open
   vi.spyOn(fs.promises, 'open').mockImplementation(async (...args) => {
     const handle = await open(...args)

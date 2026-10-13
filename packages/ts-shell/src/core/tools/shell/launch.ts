@@ -37,6 +37,7 @@ export function planCommandLaunch(
     shell: shellBin,
     shellArgs,
     workspaceRoot: context.workspaceRoot,
+    sessionCreated: true,
     ...workspaceSandboxPolicy(context.workspaceRoot, context.workspaceRoots),
   })
   return { shellBin, shellArgs, sandbox }

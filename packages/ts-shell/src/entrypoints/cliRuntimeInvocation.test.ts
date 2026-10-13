@@ -327,6 +327,7 @@ describe("CLI runtime invocation", () => {
 it.each([undefined, 'medium', null] as const)('captures effort %s before readiness and shares it with step and command environment', async preference => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'invocation-effort-'));
   fs.mkdirSync(path.join(workspace, '.agents'));
+  fs.mkdirSync(path.join(workspace, '.git'));
   const turn = vi.spyOn(turnSession, 'runTurn');
   try {
     writeProjectState(workspace, { thinkingEffort: 'low' });
@@ -349,6 +350,7 @@ it.each([undefined, 'medium', null] as const)('captures effort %s before readine
 it('honors an effort snapshot captured before a delayed independent-run approval', async () => {
   const workspace = fs.mkdtempSync(path.resolve(process.cwd(), '../../.tmp/agent-effort-'));
   fs.mkdirSync(path.join(workspace, '.agents'));
+  fs.mkdirSync(path.join(workspace, '.git'));
   try {
     writeProjectState(workspace, { thinkingEffort: 'low' });
     const thinkingPreference = captureThinkingPreference(workspace);

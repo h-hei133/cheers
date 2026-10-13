@@ -2268,3 +2268,27 @@ Node20.3/单文件×stable/changed四条实际print CLI通过；stable共4合成
 
 
 最终独立code **APPROVE**（5文件/90项、七项owner/consumer probes和原initial/final path消失反例重验），architecture **CLEAR**（最终3文件/77项、原阻挡parent反例、alias binding、零enumeration/关闭及resource/budget/取消/清理检查），综合 **APPROVE（限本批修复冻结）**。两lane六路径与用户`.gitignore`前后哈希匹配；初始b7b3的HIGH/REQUEST CHANGES/BLOCK及失败日志保留，不混入最终计数。Node20.3/单文件两条actual print自动技能发现/调用CLI共4合成POST通过，忽略内容未发送、tool call ID与原manifest字节核对；这是stable路径，changed路径由实际catalog/tool consumer child probes证明，未声称changed CLI或PTY验收。报告 `.tmp/skill-roots/{review-code.md,review-architecture.md,cli-smoke-results.json}`。提交/推送/精确SHA CI单独取证，Phase19 active。
+
+该技能根组件已提交/推送 `e9dc426cee2872feb4b1209ea495823f37bf0782`，远端同 SHA，用户 `.gitignore` 原字节排除。精确 CI38340153756/job115109091168 与 Watch38340153769/job115109091176 均 completed/failure、`steps=[]`；各自 annotations 确认付款/spending-limit 阻止启动，无远端验证通过。材料 `.tmp/skill-roots/{commit-audit.json,delivery.json}`。
+
+### 8.153 QA-01：沙箱取消、关闭时钟与最终集成
+
+本批起点 `e9dc426cee2872feb4b1209ea495823f37bf0782`。最终 17 个 TypeScript 文件、7 个 production 文件；`.tmp/integration-current/inventory-close.json` SHA256 `5572549e5ffa30f51aedbecaef240ad51d6ad18ff1be5031c4f0bf27c26802a2`。当前 2552 个原清单文件中，最终清单之外没有新增内容变化；用户原有 `.gitignore` 修改保持原字节并排除提交。
+
+全量基线的 22 项失败经分类后，修正了未进入当前私有视图准备阶段的 native/budget mock、撤权或已知替换后仍期待成功的旧断言，以及继承外层 Git 身份的 slash/MCP/continuation/effort 夹具。查询测试仍消费真实 plan、launcher 收据、预算、取消和清理；metadata 与视图另由未 mock 的集成用例覆盖。搜索测试保留实际 descriptor 原内容、零替换内容，并拒绝发布已知变化的结果。没有删除场景、弱化权限断言或新增跳过。
+
+扩展取消等满 25 秒 sleep 是实际产品缺陷；独立探针在 1ms 取消时同样等满 5 秒。执行 owner 已创建 detached session，bwrap 再次 `setsid()` 使后代离开其取消组。定向比较工具 runner 的 detached group 与原生 launcher 的会话/信号语义后，[沙箱规划](../../packages/ts-shell/src/sandbox/osSandbox.ts)仅让走同一 execution owner 的 shell/extension/evaluator 声明 `sessionCreated`；direct-execFile hook 保留默认 `--new-session`，[原生读规划](../../packages/ts-shell/src/sandbox/read.ts)也只使用原 owner 的会话。文件、网络、PID 隔离和失败/清理真值保持原契约。
+
+另一次集成运行暴露 director 关闭拒绝。定向探针证明时钟比 `createdAt` 回拨 1ms 时，两处原 `Date.now()` 生成非法 `endedAt`，被原 codec 拒绝。对照目标运行计量对负时钟差值取零的决定，[保留 owner 关闭](../../packages/ts-shell/src/cli/director/command.ts)和[存活 owner 关闭](../../packages/ts-shell/src/cli/director/lifetime.ts)只对新记载的结束时间取 `createdAt` 下界；保留既有 `endedAt`、状态验证、CAS、unknown 与禁止自动认领/重放。这里没有引入新的时钟或存储系统，也不把确定性的回拨反例当作此前随机失败的唯一已证根因。
+
+最终全量实际结束：**789 文件通过、1 文件原有跳过；7984 项通过、10 项原有跳过，零失败**，Node 20.3、隔离合成环境、两个工作线程，601.77 秒。日志 `full-suite-close-final.json/.log`，最终源码逐文件核对一致。两产物构建 `build-ts-close` / `build-exe-close`、四源码门 `*-close` 通过；完整 `normproof-close` 的未解析和混合环义务 satisfied，整体仍 partial，保留 4 项既有函数上限 advisory。脚本未变，沿用本批实际 57 项通过的 `scripts.json/.log`。
+
+早期全量 22、1、2 项失败仍分别保留；`full-suite-integration` 未产生最终摘要，不计通过；`full-suite-close` 的旧 CLI 参数被拒绝，属于 harness/setup。更正为线程环境变量后才取得上述最终结果。三类隔离反转分别恢复 command/native 第二会话及原始关闭时钟：前两类各产生实际 AssertionError，时钟类使两条关闭用例实际失败，正向副本通过；原源码和用户 `.gitignore` 均保持。
+
+本批六条实际 print CLI 覆盖 Node20.3/单文件 × bounded grep、excluded grep、sandboxed bash，共 12 合成 POST，核对本次 call ID、正文及原字节。这些材料证明同一沙箱生产字节；director 关闭另由实际命令/存储生命周期及最终全套证明。原两条独立审查的进程组、PTY、early/ready 取消及 timeout 证据继续属于其未变源码；最终时钟差异的独立补审另记，不拿旧批准覆盖新生产代码。
+
+私有镜像的 hardlink 与同步空写原型均未达到预声明双路 20% 性能门槛，结束该优化方向，没有生产性能补丁；材料 `.tmp/native-mirror/{contract.json,baseline-results.json,outcome.json}`。已有 O(n) 成本保留为限制，不继续为这一收尾批扩展性能试验。
+
+验收见[§18](phase-19-acceptance.md)，材料 `.tmp/integration-current/`。非 Linux 实际对象绑定、W7-33 真实 TLS/HTTP2、用户前端/设备及公共服务/账户/SSH 部署仍缺证据；逐源检查不承诺未来不变或全目录事务。Phase19 总目标 active；文档门禁、提交/推送及精确 CI 分别取证。
+
+最终补审绑定同一 `5572549e…` 冻结：独立 code **APPROVE**（实际 Node20.3 的 7 项生命周期测试及 5 项命令/存储探针），architecture **WATCH**（独立 7 项通过、owner/CAS/codec 原字节检查），综合 **COMMENT（无阻断，限本批）**。两条 lane 前后 17 路径和用户 `.gitignore` 哈希一致；WATCH 为注入执行适配器必须维持 detached session 义务，不要求为假设中的适配器新建执行系统。原专用路由 503 不计审查；继承当前会话配置的两条独立 lane 实际返回证据。代码探针启动器和架构错误工作目录的失败保留，后者生成的两处自有临时目录在确认进程终止后已精确清理。报告 `.tmp/integration-current/{review-code-close.md,review-architecture-close.md}`。

@@ -6,18 +6,36 @@ import { WalkBudget } from './budget.js'
 import { listDirectoryEntries, listWorkspaceFiles } from '../fileWalk.js'
 import { loadDirectoryMatcher } from '../ignoreRules.js'
 import { executeLocally } from '../local.js'
-import { completeNativeRead } from '../../../test-utils/native.js'
+import { completeNativeRead, isNativeFileQuery } from '../../../test-utils/native.js'
+import { repositoryMarker } from '../view/git.js'
+import { configureGitView } from '../view/config.js'
+
+// Isolate native-output/fallback accounting from separately tested metadata and
+// mirror traversal; retain the real read plan and launcher completion verifier.
+vi.mock('../view/git.js', () => ({ repositoryMarker: vi.fn() }))
+vi.mock('../view/config.js', () => ({ configureGitView: vi.fn() }))
+vi.mock('../view/tree.js', () => ({ materializeView: async () => {} }))
 
 vi.mock('../local.js', () => ({ executeLocally: vi.fn() }))
 let root: string
+let query: typeof executeLocally
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'walk-budget-'))
-  vi.mocked(executeLocally).mockReset().mockImplementation(async input => {
+  vi.mocked(repositoryMarker).mockReset().mockResolvedValue(undefined)
+  vi.mocked(configureGitView).mockReset().mockResolvedValue({ ignoreCase: false })
+  query = async input => {
     completeNativeRead(input, 128)
     return { status: 'failed', exitCode: 128, stdout: '', stderr: '' }
+  }
+  vi.mocked(executeLocally).mockReset().mockImplementation(async input => {
+    if (isNativeFileQuery(input)) return query(input)
+    completeNativeRead(input)
+    return { status: 'completed', exitCode: 0, stdout: '', stderr: '' }
   })
 })
 afterEach(async () => { vi.restoreAllMocks(); await fs.rm(root, { recursive: true, force: true }) })
+
+function native(): void { vi.mocked(repositoryMarker).mockResolvedValue(path.join(root, '.git')) }
 
 async function put(name: string, content = ''): Promise<void> {
   await fs.mkdir(path.dirname(path.join(root, name)), { recursive: true })
@@ -45,13 +63,13 @@ it.each(['walk', 'listing'])('counts UTF-8 path bytes during %s enumeration', as
 })
 
 it('keeps a single deadline across native fallback and directory reads', async () => {
+  native()
   await put('a/one')
   let clock = 0
   vi.spyOn(performance, 'now').mockImplementation(() => clock)
-  vi.mocked(executeLocally).mockImplementation(async input => {
+  vi.mocked(configureGitView).mockImplementation(async () => {
     clock = 4
-    completeNativeRead(input, 128)
-    return { status: 'failed', exitCode: 128, stdout: '', stderr: '' }
+    return null
   })
   const opendir = fs.opendir
   vi.spyOn(fs, 'opendir').mockImplementation(async (...args) => {
@@ -88,12 +106,12 @@ it('accepts an ignore file at the exact byte ceiling after observing EOF', async
   expect(matcher.ignores('public.txt')).toBe(false)
 })
 
-it.each(['entries', 'pathBytes'])('retains consumed native %s when the failed query falls back', async kind => {
+it.each(['entries', 'pathBytes'])('retains consumed native %s when metadata preparation falls back', async kind => {
   await put('one')
-  vi.mocked(executeLocally).mockImplementation(async input => {
-    input.onStdout?.(Buffer.from('old\0'))
-    completeNativeRead(input, 128)
-    return { status: 'failed', exitCode: 128, stdout: '', stderr: '' }
+  native()
+  vi.mocked(configureGitView).mockImplementation(async sources => {
+    sources.input.budget.take(kind, kind === 'entries' ? 1 : 4)
+    return null
   })
   const opendir = vi.spyOn(fs, 'opendir')
   await expect(listWorkspaceFiles(root, {
@@ -132,21 +150,23 @@ it.each(['rules', 'ruleBytes'])('limits cumulative %s after nested rule expansio
 })
 
 it.each(['entries', 'pathBytes'])('stops native output at the %s budget without launching fallback', async kind => {
-  vi.mocked(executeLocally).mockImplementation(async input => {
+  native()
+  query = async input => {
     input.onStdout?.(Buffer.from('one\0two\0three\0'))
     expect(input.abortSignal?.aborted).toBe(true)
     return { status: 'cancelled', exitCode: null, failureKind: 'cancelled', stdout: '', stderr: '' }
-  })
+  }
   const open = vi.spyOn(fs, 'opendir')
   await expect(listWorkspaceFiles(root, { limits: kind === 'entries' ? { entries: 2 } : { pathBytes: 5 } })).rejects.toMatchObject({ reason: kind })
   expect(open).not.toHaveBeenCalled()
 })
 
 it('keeps unverified native cleanup ahead of a traversal limit', async () => {
-  vi.mocked(executeLocally).mockImplementation(async input => {
+  native()
+  query = async input => {
     input.onStdout?.(Buffer.from('one\0two\0'))
     return { status: 'failed', exitCode: null, failureKind: 'execution_failure', stdout: '', stderr: 'PRIVATE_DIAGNOSTIC' }
-  })
+  }
   await expect(listWorkspaceFiles(root, { limits: { entries: 1 } })).rejects.toThrow('process cleanup could not be verified')
 })
 

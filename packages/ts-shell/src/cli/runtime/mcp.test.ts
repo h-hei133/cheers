@@ -1,6 +1,7 @@
 import { ConfigState } from "../../config/state.js";
 import { configurationBinding } from "../../core/shell/configuration.js";
 import { EventEmitter } from "node:events";
+import { execFileSync } from 'node:child_process';
 import { createCliShutdown } from "./shutdown.js";
 import fs from "node:fs";
 import os from "node:os";
@@ -41,6 +42,7 @@ function input(): CliRuntimeInvocationInput {
 }
 beforeEach(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), "cheers-mcp-prompts-"));
+  execFileSync('git', ['init', '-q', root]);
   const home = path.join(root, "home");
   fs.mkdirSync(home);
   vi.stubEnv("HOME", home);
