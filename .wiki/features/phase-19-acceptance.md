@@ -398,11 +398,11 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 | 帧元数据 | 20 条 PNG 的 IHDR 尺寸与 `frame` 记录逐条一致；handle 3869410、WindowsTerminal 36244、144 DPI 统一 | 矩阵窗口与 `launch-check` 的 5311056 是更早、已关闭的另一窗口 |
 | 逻辑层 | 八形态×两模式均含 `中文边界`/`indented`/`end`；`providerPosts` 全 0；缩放后 `CARE\|T`→`CARE\|!T` 出现 | VT 屏仿真 + 字节断言，非像素 |
 | 像素层 | 主题真彩 `(23,143,185)` 边框行 1660/1656 px、零横向断口；CJK 墨迹 25–27px vs 拉丁 12–13px | `review/verify.py` 直接 zlib 解 PNG（宿主无 PIL） |
-| 视觉判定 | `vsllm/gpt-6-astra` 对 12 张抓帧判定中文为真实字形、无 tofu；3 条另报轻微 ghosting | 合成图先验证该模型确能看像素；`read ?q=` 自身 401 属配置缺口 |
+| 视觉判定 | `vsllm/gpt-6-astra` 对 19/20 张抓帧判定中文为真实字形、无 tofu（1 张预览降采样误报 tofu，被全分辨率像素检查推翻；1 张因额度未取得） | 合成图先验证该模型确能看像素；`read ?q=` 自身 401 属配置缺口 |
 | 空闲重绘 | 无头复现：纯 8s 空闲 0 字节/0 帧，每输入事件 1 帧 | `review/idle-probe.py`；`regular-box.raw` 的 324 帧来自另一次输入驱动的探索会话 |
 
 `regular-box.raw`（732,294B、324 个 `\x1b[?2026h`）不是产品空闲重绘：该会话的 `request.json`/`ack.json` 止于 `id 2 = launch`，无 `send`；帧内容是 composer 停在 `/`、方向键走完 106 项斜杠目录约三圈再加一次清稿键。斜杠目录步进只有 keymap 方向键与 pointer 鼠标两个调用点（regular 未开鼠标追踪），100ms 活动 tick 仅在 `run()` 期间武装，没有计时器/观察者能在无输入时推进。
 
 捕获脚本已按上述根因修正：[matrix.py](../../.tmp/windows-console/matrix.py) 先写 `<label>.captured.raw` 快照、再哈希该快照，记录新增 `rawEvidence` 字段（[resize.py](../../.tmp/windows-console/resize.py) 同样补字段），避免对仍在写入的 `<label>.raw` 取哈希；现有 20 条记录按此重算。
 
-材料 `.tmp/windows-console/review/{verify.py,idle-probe.py,capture-verification.json,pixel-checks.json,vision-verdicts.json,summary.json}`。证据限于“Windows Terminal 1.24.2610.01001 + WSL 产品进程 + 受控 PTY 输入”，不覆盖原生 Windows CLI/套件、真实 IME 候选窗、用户手动逐帧/字体选择或本地 NTFS；视觉判定来自单一路由且 8 张抓帧因额度/超时未取得，故不把八形态像素整体标为通过。§5 的外部服务/账户/部署条件不变，Phase19 **active**；本批仅文档，提交/推送/精确 CI 另记。
+材料 `.tmp/windows-console/review/{verify.py,idle-probe.py,capture-verification.json,pixel-checks.json,vision-verdicts.json,summary.json}`。证据限于“Windows Terminal 1.24.2610.01001 + WSL 产品进程 + 受控 PTY 输入”，不覆盖原生 Windows CLI/套件、真实 IME 候选窗、用户手动逐帧/字体选择或本地 NTFS；视觉判定来自单一路由（20 张中 19 张取得，1 张 `fullscreen-box-restored` 因额度未取得），故不把八形态像素整体标为通过。§5 的外部服务/账户/部署条件不变，Phase19 **active**；本批仅文档，提交/推送/精确 CI 另记。
