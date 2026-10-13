@@ -101,9 +101,9 @@ Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)�
 | macOS/Windows | 部分 profile、接口与纯逻辑用例 | 原生路径/文件描述符、进程树清理、终端与设备尚未取得等价实机证据 |
 | 模型传输与严格预算 | 合成 HTTP/SSE/usage/重试/unknown、统一 request admission | W7-33 四端点真实 TLS/HTTP2 矩阵仍缺；无法证明上界的请求继续拒绝 strict cap 准入 |
 | 公共包、认证、协作和 SSH | 受控服务、签名、ACL、撤权、重连与未知副作用 | 真实账户、公共部署 TLS、真实远端主机/主机密钥和生产互通验收 |
-| SAFE-02 | Linux 公开文件工具的检查/句柄/拒绝/清理及受管编辑目录固定；原生 Git/ripgrep 私有视图、配置准入和 child 完成收据；异步技能发现、批准前捕获与共享预算；读取期间及 catalog 发布前已捕获 manifest/ignore/Git 来源变化拒绝；本地remote-URL条件及native配置错误拒绝；已枚举目录修订、visit先捕获后探测规则，可选来源的父目录/alias观察及成功/null最终复验，见 §7–16 | 非 Linux 实际对象绑定、未观察树与私有镜像剩余成本继续开放；外部 metadata 仍拒绝，未知future hasconfig不宣称支持，资源计数器不约束原生进程内部全部读取 |
+| SAFE-02 | Linux 公开文件工具的检查/句柄/拒绝/清理及受管编辑目录固定；原生 Git/ripgrep 私有视图、配置准入和 child 完成收据；异步技能发现、批准前捕获与共享预算；读取期间及 catalog 发布前已捕获 manifest/ignore/Git 来源变化拒绝；本地remote-URL条件及native配置错误拒绝；已枚举目录修订、visit先捕获后探测规则，可选native/技能根来源的父目录/alias观察、已知消失传播及成功/null最终复验，见 §7–17 | 非 Linux 实际对象绑定、未观察树与私有镜像剩余成本继续开放；外部 metadata 仍拒绝，未知future hasconfig不宣称支持，资源计数器不约束原生进程内部全部读取 |
 
-技能发现的同步正文/Git 忽略路径已按 §9 替换；§10 拒绝检测到的读取期间源变化，§11–12 在 catalog 发布前复查已捕获 manifest、ignore 与 Git 来源。§14拒绝已枚举目录的已知修订变化，§15修复native visit的规则探测顺序；§16复验可选native来源已观察父目录及alias。SAFE-02继续处理非Linux对象绑定、未观察树和镜像成本，扩展外部metadata/条件支持须重新证明准入。逐源检查不保证其后全部变化或整目录事务。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把W1–W16或Phase19总目标标为完成。
+技能发现的同步正文/Git 忽略路径已按 §9 替换；§10 拒绝检测到的读取期间源变化，§11–12 在 catalog 发布前复查已捕获 manifest、ignore 与 Git 来源。§14拒绝已枚举目录的已知修订变化，§15修复native visit的规则探测顺序；§16复验可选native来源已观察父目录及alias，§17观察可选技能根parent并保留已知消失状态。SAFE-02继续处理非Linux对象绑定、未观察树和镜像成本，扩展外部metadata/条件支持须重新证明准入。逐源检查不保证其后全部变化或整目录事务。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把W1–W16或Phase19总目标标为完成。
 
 ## 6. 迁移、回退与交付
 
@@ -317,3 +317,25 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 仅证明已观察父目录及绑定至最后逐源核验；无关条目变化可能保守拒绝，没有OS锁、全目录/catalog事务或之后稳定保证。未观察树、非Linux实际对象、外部metadata、镜像剩余成本与§5其余实际环境条件继续开放，SAFE-02/Phase19 active。本批未重跑全仓/scripts/PTY/真实provider，独立评审与提交/推送/精确CI另验。
 
 最终独立code **APPROVE**（7文件/144项、原alias反例及六项owner/取消/资源/清理检查），architecture **CLEAR**（最终native/absence 48项、原alias反例、零enumeration/关闭观察、cached alias回调/精确path budget及cycle门），综合 **APPROVE（限本批）**。architecture早期144项属于被拒绝的21dd冻结，不与最终48项相加。两lane最终8路径及用户`.gitignore`前后哈希相符，未改源码/测试/文档；早期HIGH/REQUEST CHANGES/BLOCK与实际失败材料保留。报告 `review-code.md`、`review-architecture.md`，提交/推送/精确CI另验。
+
+
+该可选原生来源组件已提交/推送 `379dca3705ef4529f727a23ec329ea87d2ef2c73`，11个原始路径/blob审计通过、用户`.gitignore`原字节排除，GitHub git-ref API读回同SHA。CI38337159014/job115099739827与Watch38337158956/job115099739651均completed/failure、steps=[]；本轮分别读取annotations确认付款/spending-limit阻止启动，无远端验证通过。SSH关闭连接及代理EOF属于推送后的观察失败，未归为push失败；去除代理环境后API读取成功。材料 `.tmp/optional-sources/{commit-audit.json,delivery.json}`。
+
+
+## 17. SAFE-02 技能可选根目录观察局部验收（2026-10-13）
+
+项目、用户和显式技能根在stat前观察最近已存在parent；原SkillDiscovery ledger保留最早metadata及pathname，最终loader/catalog复验拒绝已知变化。初始普通文件/ENOTDIR阻挡向上找到目录；已经选择的parent在核验中消失保留ReadChangedError，不能变成optional absence。目录owner共享Linux核验句柄及原非Linuxpath分支，观察零enumeration、capture前关闭、无manifest jail扩张。
+
+| 证据 | 实际结果 | 材料/边界 |
+|---|---|---|
+| 修复冻结 | 6TS/3production，用户`.gitignore`原SHA排除 | `inventory-repair.json` SHA256 `5f4e3d80100348cb530050162f6dcbf04206fc57bb87565f422312dcc618e214`；b7b3为被拒绝冻结 |
+| 最终受影响组合 | Node20.3，11文件/157项通过 | `tests-repair.json/.log`；skills、extensions、read/directory、tool和completion consumers |
+| 构建/源码门 | TS/单文件、四源码门通过，judge exit0 | `build-ts-repair`、`build-exe-repair`、四源码门及`normproof-repair-out/`；图satisfied，同4既有ceiling advisory/partial |
+| 三项有效反转 | 全部actual AssertionError，正向副本通过 | `reversals-repair/results.json`；observer、retention、changed分类分别撤销，原source/用户`.gitignore`保持 |
+
+初始catalog/工具consumer probes实际缺少预期拒绝；两lane额外实际复现普通文件阻挡及path核验parent消失，原拒绝审查和失败日志保留，修复后同probe重验。首轮测试的父观察handle计数和nested temp Git ancestry分别作为stale expectation/harness修正，原manifest变化拒绝和关闭断言保留。早期初版测试/CLI证据不替代最终修复freeze。
+
+材料 `.tmp/skill-roots/`。元数据观察可能因无关parent条目变化保守拒绝；只能证明至最后逐源核验，非全目录/catalog事务或之后稳定。非Linuxpath分支模拟不等于非Linux实机/实际对象证明，§5其余边界继续开放，Phase19 active。本批没有全仓/scripts/PTY/真实provider新增结论；独立评审和提交/推送/精确CI另验。
+
+
+最终独立code **APPROVE**（5文件/90项、七项owner/consumer probes和原initial/final path消失反例重验），architecture **CLEAR**（最终3文件/77项、原阻挡parent反例、alias binding、零enumeration/关闭及resource/budget/取消/清理检查），综合 **APPROVE（限本批修复冻结）**。两lane六路径与用户`.gitignore`前后哈希匹配；初始b7b3的HIGH/REQUEST CHANGES/BLOCK及失败日志保留，不混入最终计数。Node20.3/单文件两条actual print自动技能发现/调用CLI共4合成POST通过，忽略内容未发送、tool call ID与原manifest字节核对；这是stable路径，changed路径由实际catalog/tool consumer child probes证明，未声称changed CLI或PTY验收。报告 `.tmp/skill-roots/{review-code.md,review-architecture.md,cli-smoke-results.json}`。提交/推送/精确SHA CI单独取证，Phase19 active。

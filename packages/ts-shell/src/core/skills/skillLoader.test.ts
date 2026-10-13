@@ -195,7 +195,8 @@ describe("skill discovery", () => {
       return handle;
     });
     await expect(new SkillLoader(workspace, { disableDiscovery: true, extraPaths: [first, second] }).loadDetailed()).rejects.toMatchObject({ name: 'ReadChangedError' });
-    expect(handles).toHaveLength(2);
+    // The shared parent observation closes before either manifest is opened.
+    expect(handles).toHaveLength(3);
     expect(handles.every(handle => handle.fd === -1)).toBe(true);
   });
 

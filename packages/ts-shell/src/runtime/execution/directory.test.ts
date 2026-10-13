@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { readDirectory } from './directory.js'
+import { readDirectory, observeDirectory } from './directory.js'
 
 let root: string
 let workspace: string
@@ -121,6 +121,48 @@ it('reports directory metadata after both enumeration handles close', async () =
   expect((await readDirectory(workspace, directory, { onCapturedSource: captured })).map(entry => entry.name)).toEqual(['public.txt'])
   expect(captured).toHaveBeenCalledOnce()
 })
+
+it.each(['linux', 'darwin'])('observes %s directory metadata without enumerating or retaining a handle', async platform => {
+  const originalPlatform = process.platform
+  Object.defineProperty(process, 'platform', { value: platform, configurable: true })
+  const enumerate = vi.spyOn(fsp, 'opendir')
+  const open = fsp.open
+  const handles: Awaited<ReturnType<typeof open>>[] = []
+  vi.spyOn(fsp, 'open').mockImplementation(async (...args) => {
+    const handle = await open(...args); handles.push(handle); return handle
+  })
+  const captured = vi.fn(source => {
+    expect(source).toMatchObject({ path: directory, target: directory, root: workspace })
+    expect(handles).toHaveLength(platform === 'linux' ? 1 : 0)
+    expect(handles.every(handle => handle.fd === -1)).toBe(true)
+  })
+  try {
+    await observeDirectory(workspace, directory, { onCapturedSource: captured })
+    expect(captured).toHaveBeenCalledOnce()
+    expect(enumerate).not.toHaveBeenCalled()
+  } finally { Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true }) }
+})
+
+it('preserves a changed result when a child removes an already selected path observation', async () => {
+  const platform = process.platform
+  Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+  const stat = fsp.stat
+  let calls = 0
+  vi.spyOn(fsp, 'stat').mockImplementation(async (...args) => {
+    if (args[0] === directory && ++calls === 2) {
+      execFileSync(process.execPath, ['-e', 'require("node:fs").rmSync(process.argv[1], {recursive:true})', directory])
+    }
+    return stat(...args)
+  })
+  const captured = vi.fn()
+  try {
+    await expect(observeDirectory(workspace, directory, { onCapturedSource: captured })).rejects.toMatchObject({ name: 'ReadChangedError' })
+    expect(calls).toBe(2)
+    expect(fs.existsSync(directory)).toBe(false)
+    expect(captured).not.toHaveBeenCalled()
+  } finally { Object.defineProperty(process, 'platform', { value: platform, configurable: true }) }
+})
+
 it('refuses a regular file instead of opening it as a directory', async () => {
   const open = vi.spyOn(fsp, 'open')
   await expect(readDirectory(workspace, path.join(directory, 'public.txt'))).rejects.toThrow('directory')

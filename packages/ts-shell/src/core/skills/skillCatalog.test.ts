@@ -24,6 +24,7 @@ describe("resolveSkillCatalog", () => {
     process.env.HOME = fakeHome;
     process.env.USERPROFILE = fakeHome;
     workspace = fs.mkdtempSync(path.join(os.tmpdir(), "catalog-ws-"));
+    execFileSync('git', ['init', '-q', workspace]);
   });
 
   afterEach(() => {
@@ -120,6 +121,46 @@ describe("resolveSkillCatalog", () => {
     try {
       await expect(resolveSkillCatalog({ workspaceRoot: workspace, sessionId: 'capture', skillPaths: [file] })).rejects.toMatchObject({ name: 'ReadChangedError' });
       expect(changed).toBe(true);
+    } finally { unregister(); }
+  });
+
+  it.each(['project', 'user', 'cli'] as const)('rejects a missing %s skill root created by a child while a contribution settles', async source => {
+    const directory = source === 'project' ? path.join(workspace, '.agents', 'skills', 'added')
+      : source === 'user' ? path.join(fakeHome, '.cheers', 'skills', 'added') : path.join(workspace, 'named');
+    const manifest = path.join(directory, 'SKILL.md');
+    const skillPaths = source === 'cli' ? [directory] : undefined;
+    let changed = false;
+    const unregister = registerCatalogContribution({ root: workspace, sessionId: 'capture', tools: [], commands: [], skills: async () => {
+      expect(fs.existsSync(directory)).toBe(false);
+      execFileSync(process.execPath, ['-e', 'const fs = require("node:fs"), path = require("node:path"); fs.mkdirSync(path.dirname(process.argv[1]), {recursive:true}); fs.writeFileSync(process.argv[1], "---\\nname: added\\ndescription: synthetic\\n---\\nadded instructions");', manifest]);
+      changed = true;
+      return [];
+    } });
+    try {
+      await expect(resolveSkillCatalog({ workspaceRoot: workspace, sessionId: 'capture', skillPaths })).rejects.toMatchObject({ name: 'ReadChangedError' });
+      expect(changed).toBe(true);
+      unregister();
+      const fresh = await resolveSkillCatalog({ workspaceRoot: workspace, skillPaths });
+      expect([...fresh.skills.keys()]).toEqual(['added']);
+      expect(fresh.skills.get('added')?.source).toBe(source);
+    } finally { unregister(); }
+  });
+
+  it('rejects a child replacing a file that initially blocked the project skill root', async () => {
+    const parent = path.join(workspace, '.agents');
+    const manifest = path.join(parent, 'skills', 'added', 'SKILL.md');
+    fs.writeFileSync(parent, 'not a directory');
+    let changed = false;
+    const unregister = registerCatalogContribution({ root: workspace, sessionId: 'capture', tools: [], commands: [], skills: async () => {
+      execFileSync(process.execPath, ['-e', 'const fs = require("node:fs"), path = require("node:path"); fs.unlinkSync(process.argv[1]); fs.mkdirSync(path.dirname(process.argv[2]), {recursive:true}); fs.writeFileSync(process.argv[2], "---\\nname: added\\ndescription: synthetic\\n---\\nadded instructions");', parent, manifest]);
+      changed = true;
+      return [];
+    } });
+    try {
+      await expect(resolveSkillCatalog({ workspaceRoot: workspace, sessionId: 'capture' })).rejects.toMatchObject({ name: 'ReadChangedError' });
+      expect(changed).toBe(true);
+      unregister();
+      expect([...(await resolveSkillCatalog({ workspaceRoot: workspace })).skills.keys()]).toEqual(['added']);
     } finally { unregister(); }
   });
 });

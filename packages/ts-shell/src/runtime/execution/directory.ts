@@ -28,7 +28,8 @@ export class DirectoryReadError extends Error {
 /** Enumerate the verified directory, then recheck before releasing its names. */
 export async function readDirectory(root: string, directory: string, options?: DirectoryReadOptions): Promise<Dirent[]> {
   const deadline = performance.now() + TIMEOUT_MS
-  if (process.platform !== 'linux') return readDirectoryByPath(root, directory, deadline, options)
+  if (process.platform !== 'linux') return withPathDirectory(root, directory, options,
+    (target, verify) => collectEntries(target, deadline, verify, options))
   return withVerifiedReadTarget({
     absolutePath: directory, workspaceRoot: root,
     assertFileAccess: options?.assertFileAccess, abortSignal: options?.abortSignal,
@@ -39,8 +40,25 @@ export async function readDirectory(root: string, directory: string, options?: D
   })
 }
 
+/** Observe directory metadata without enumerating entries or retaining a handle. */
+export async function observeDirectory(root: string, directory: string, options?: DirectoryReadOptions): Promise<void> {
+  try {
+    if (process.platform !== 'linux') return await withPathDirectory(root, directory, options, async () => {})
+    await withVerifiedReadTarget({ absolutePath: directory, workspaceRoot: root,
+      assertFileAccess: options?.assertFileAccess, abortSignal: options?.abortSignal,
+      onCapturedSource: options?.onCapturedSource,
+    }, 'directory', async () => {})
+  } catch (error) { rethrowDirectoryChange(error) }
+}
+
+function rethrowDirectoryChange(error: unknown): never {
+  if (error instanceof Error && 'code' in error && (error.code === 'ENOENT' || error.code === 'ENOTDIR')) throw new ReadChangedError()
+  throw error
+}
+
 /** Platforms without proc descriptors retain path checks, without claiming descriptor isolation. */
-async function readDirectoryByPath(root: string, directory: string, deadline: number, options?: DirectoryReadOptions): Promise<Dirent[]> {
+async function withPathDirectory<T>(root: string, directory: string, options: DirectoryReadOptions | undefined,
+  consume: (target: string, verify: () => Promise<void>) => Promise<T>): Promise<T> {
   options?.abortSignal?.throwIfAborted()
   const workspace = realpathSync(root)
   const checked = verifyPathContainment(directory, root)
@@ -51,18 +69,20 @@ async function readDirectoryByPath(root: string, directory: string, deadline: nu
   if (!before.isDirectory()) throw new Error('Read target must be a directory.')
   options?.abortSignal?.throwIfAborted()
   const verify = async (): Promise<void> => {
-    const after = await fs.stat(target, { bigint: true })
-    if (realpathSync(root) !== workspace || realpathSync(directory) !== target
-      || !after.isDirectory() || readRevision(before) !== readRevision(after)) {
-      throw new ReadChangedError()
-    }
-    options?.assertFileAccess?.(target)
-    options?.abortSignal?.throwIfAborted()
+    try {
+      const after = await fs.stat(target, { bigint: true })
+      if (realpathSync(root) !== workspace || realpathSync(directory) !== target
+        || !after.isDirectory() || readRevision(before) !== readRevision(after)) {
+        throw new ReadChangedError()
+      }
+      options?.assertFileAccess?.(target)
+      options?.abortSignal?.throwIfAborted()
+    } catch (error) { rethrowDirectoryChange(error) }
   }
-  const entries = await collectEntries(target, deadline, verify, options)
+  const result = await consume(target, verify)
   await verify()
   options?.onCapturedSource?.({ path: path.resolve(directory), target, root: workspace, revision: readRevision(before) })
-  return entries
+  return result
 }
 
 /** Keep the native prefetch buffer and retained names bounded independently of output pagination. */

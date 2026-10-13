@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { captureWorkspaceRoot, assertWorkspaceRoot } from '../workspace/roots.js';
 import type { WorkspaceRoot } from '../workspace/model.js';
-import { readDirectory, DirectoryReadError } from '../../runtime/execution/directory.js';
+import { readDirectory, observeDirectory, DirectoryReadError } from '../../runtime/execution/directory.js';
 import { readBinarySnapshot, SnapshotLimitError } from '../../runtime/execution/snapshot.js';
 import { isReadResourceFailure, ReadChangedError, ReadCleanupError, readRevision } from '../../runtime/execution/read.js';
 import type { CapturedReadSource } from '../../runtime/execution/types.js';
@@ -63,6 +63,31 @@ export class SkillDiscovery {
       if (isReadResourceFailure(error)) throw new SkillDiscoveryError();
       throw new ReadChangedError();
     }
+  }
+
+  /** Missing roots depend on their nearest existing parent's revision and binding. */
+  async observeParent(file: string, boundary?: string): Promise<void> {
+    this.budget.check();
+    if (boundary && !verifyPathContainment(file, boundary).allowed) throw new Error('The selected skill path is outside its root.');
+    let directory = path.dirname(path.resolve(file));
+    for (;;) {
+      this.budget.check();
+      try {
+        if (fs.statSync(directory).isDirectory()) break;
+      } catch (error) {
+        if (!(error instanceof Error && 'code' in error && (error.code === 'ENOENT' || error.code === 'ENOTDIR'))) throw error;
+      }
+      const parent = path.dirname(directory);
+      if (parent === directory) throw new Error('The selected skill parent is not a directory.');
+      directory = parent;
+    }
+    const captured = this.captured.get(directory);
+    if (captured) { this.verifySource(captured); return; }
+    this.budget.take('directories', 1);
+    // This parent is a metadata dependency, never a root for manifest content.
+    await observeDirectory(directory, directory, { abortSignal: this.signal,
+      onCapturedSource: source => { this.capture({ ...source, root: directory }); },
+    });
   }
 
   async directory(boundary: string, directory: string, depth: number): Promise<fs.Dirent[]> {

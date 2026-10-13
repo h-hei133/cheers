@@ -6572,3 +6572,14 @@ manifest组件 `d589e8d02c5299f0de4a3a25169b9aea1a742540` 已提交/推送、10�
 实际child四项基线证明ancestor规则/首次repo/missing include的旧答案发布。现有source owner在可选探测前观察最近已存在父目录，用原核验句柄/预算/最早ledger，无额外enumeration；native生命周期统一复验成功/null，技能过滤删除重复预探测。独立两lane实际发现alias改指后原目录不变的HIGH/BLOCK，修复同一4096 ledger保留原路径target/revision，cache命中也报告alias。最终8TS/6production，Node20.3受影响12文件/203项、两构建/四源码门通过；完整judge图义务satisfied、4既有ceiling advisory仍partial。五项隔离反转实际AssertionError；四actual print子目录grep CLI共8合成POST，changed在ancestor规则IN_ACCESS后child新增规则，工具失败/零旧匹配，CLI exit0只计回合完成。首次遗漏async consumer与旧launcher fixture分别分类实现回归/harness，失败记录保留。详见[裁决 §8.151](features/phase-19-decisions.md)、[验收 §16](features/phase-19-acceptance.md)，材料 `.tmp/optional-sources/`；未观察树、非Linux对象、镜像和真实环境条件仍开放，Phase19 active，独立评审及交付另验，用户`.gitignore`保持排除。
 
 最终独立code **APPROVE**（7文件/144项、原alias反例及六项owner/取消/资源/清理检查），architecture **CLEAR**（最终native/absence 48项、原alias反例、零enumeration/关闭观察、cached alias回调/精确path budget及cycle门），综合 **APPROVE（限本批）**。architecture早期144项属于被拒绝的21dd冻结，不与最终48项相加。两lane最终8路径及用户`.gitignore`前后哈希相符，未改源码/测试/文档；早期HIGH/REQUEST CHANGES/BLOCK与实际失败材料保留。报告 `.tmp/optional-sources/{review-code.md,review-architecture.md}`，提交/推送/精确CI另验。
+
+
+该可选原生来源组件已提交/推送 `379dca3705ef4529f727a23ec329ea87d2ef2c73`，11个原始路径/blob审计通过、用户`.gitignore`原字节排除，GitHub git-ref API读回同SHA。CI38337159014/job115099739827与Watch38337158956/job115099739651均completed/failure、steps=[]；本轮分别读取annotations确认付款/spending-limit阻止启动，无远端验证通过。SSH关闭连接及代理EOF属于推送后的观察失败，未归为push失败；去除代理环境后API读取成功。材料 `.tmp/optional-sources/{commit-audit.json,delivery.json}`。
+
+
+### 2026-10-13 — SAFE-02 技能可选根目录与消失状态
+
+实际child证明缺失技能root在贡献settle期间创建后仍发布旧列表。原discovery在根stat前以shared目录owner捕获最近现有parent，保留最早revision/path并在原catalog发布前复验；零enumeration、关闭后capture、不扩大manifest jail。两独立lane实际拒绝初版的普通文件阻挡/路径parent已知消失缺口，分别修复原owner ascent和changed错误分类，原HIGH/BLOCK/失败证据保留。最终6TS/3production，Node20.3受影响11文件/157项、两构建/四源码门及judge图义务通过；4既有ceiling advisory仍partial，三项隔离反转均actual AssertionError、正向副本通过。详见[裁决 §8.152](features/phase-19-decisions.md)、[验收 §17](features/phase-19-acceptance.md)，材料 `.tmp/skill-roots/`；独立评审/CLI/交付另记，用户`.gitignore`保持排除，Phase19 active。
+
+
+最终独立code **APPROVE**（5文件/90项、七项owner/consumer probes和原initial/final path消失反例重验），architecture **CLEAR**（最终3文件/77项、原阻挡parent反例、alias binding、零enumeration/关闭及resource/budget/取消/清理检查），综合 **APPROVE（限本批修复冻结）**。两lane六路径与用户`.gitignore`前后哈希匹配；初始b7b3的HIGH/REQUEST CHANGES/BLOCK及失败日志保留，不混入最终计数。Node20.3/单文件两条actual print自动技能发现/调用CLI共4合成POST通过，忽略内容未发送、tool call ID与原manifest字节核对；这是stable路径，changed路径由实际catalog/tool consumer child probes证明，未声称changed CLI或PTY验收。报告 `.tmp/skill-roots/{review-code.md,review-architecture.md,cli-smoke-results.json}`。提交/推送/精确SHA CI单独取证，Phase19 active。

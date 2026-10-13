@@ -2251,3 +2251,20 @@ Node20.3/单文件×stable/changed四条实际print CLI通过；stable共4合成
 材料 `.tmp/optional-sources/{contract.json,inventory-alias.json,tests-baseline.log,tests-alias.log,reversals/results.json,cli-smoke-results.json,normproof-alias-out/}`。证据限于已观察父目录及路径绑定的最后逐源检查；未观察树、最后检查后变化、非Linux实际对象、外部metadata、镜像成本与§5真实外部/前端证据继续开放，SAFE-02/Phase19 active。本批未重跑全仓/scripts/PTY/真实provider，独立评审及提交/推送/精确CI分别取证。
 
 最终独立code **APPROVE**（7文件/144项、原alias反例及六项owner/取消/资源/清理检查），architecture **CLEAR**（最终native/absence 48项、原alias反例、零enumeration/关闭观察、cached alias回调/精确path budget及cycle门），综合 **APPROVE（限本批）**。architecture早期144项属于被拒绝的21dd冻结，不与最终48项相加。两lane最终8路径及用户`.gitignore`前后哈希相符，未改源码/测试/文档；早期HIGH/REQUEST CHANGES/BLOCK与实际失败材料保留。报告 `review-code.md`、`review-architecture.md`，提交/推送/精确CI另验。
+
+
+该可选原生来源组件已提交/推送 `379dca3705ef4529f727a23ec329ea87d2ef2c73`，11个原始路径/blob审计通过、用户`.gitignore`原字节排除，GitHub git-ref API读回同SHA。CI38337159014/job115099739827与Watch38337158956/job115099739651均completed/failure、steps=[]；本轮分别读取annotations确认付款/spending-limit阻止启动，无远端验证通过。SSH关闭连接及代理EOF属于推送后的观察失败，未归为push失败；去除代理环境后API读取成功。材料 `.tmp/optional-sources/{commit-audit.json,delivery.json}`。
+
+
+### 8.152 SAFE-02：技能可选根目录观察与已知消失传播
+
+实际Node20.3 child基线在catalog及工具catalog consumer均漏掉初始缺失的项目技能根：贡献settle期间创建`.agents/skills`，原调用仍发布旧列表。[技能发现owner](../../packages/ts-shell/src/core/skills/discovery.ts)在[根探测](../../packages/ts-shell/src/core/skills/skillLoader.ts)前观察最近已存在父目录的metadata，复用原ledger、预算和最终catalog复验；[目录owner](../../packages/ts-shell/src/runtime/execution/directory.ts)共享核验/关闭及既有非Linux路径分支。观察不枚举目录、不保留句柄、不扩大manifest正文读取的root。
+
+定向同步参考的默认根缺失返回空、显式缺失路径给诊断两个决策保持；其同步探测没有异步contribution发布窗口，本项目按实际child证据在原owner补观察。最早revision和原parent路径保留，重复观察共享目录/path预算。独立两lane拒绝首个b7b3冻结：初始普通文件阻挡技能根时未观察更上层目录；已选择的路径分支parent在首个/最终awaited stat消失时raw ENOENT被吞成absence。修复分别在原discovery向上越过非目录/ENOTDIR，在shared观察及路径复验中将已知消失映射为ReadChangedError；资源、取消和清理错误保持原归因。原失败、HIGH/REQUEST CHANGES/BLOCK和修复后复验分别留存。
+
+最终6TS/3production，`inventory-repair.json` SHA256 `5f4e3d80100348cb530050162f6dcbf04206fc57bb87565f422312dcc618e214`。Node20.3受影响11文件/157项、两构建/四源码门通过；完整judge exit0，图义务satisfied、同4项既有ceiling advisory保持partial。三项隔离反转撤销观察、retention和已知消失分类，均实际AssertionError，正向副本通过；原源码/用户`.gitignore`字节保持。原错误exact handle count及nested-temp继承Git ancestry作为stale expectation/harness修正，未弱化拒绝/关闭断言。早期155项不替代修复后的157项。
+
+材料 `.tmp/skill-roots/`，局部验收见[§17](phase-19-acceptance.md)。父目录无关entry变化也可能保守拒绝；逐源复验不是OS锁、整目录/catalog事务或最后检查后稳定保证。非Linuxpath用例在Linux host切换分支，不宣称macOS/Windows实机或actual-object绑定。未观察树、外部metadata、镜像剩余成本、W7-33及其余真实环境条件继续开放，Phase19 active；本批未重跑全仓/scripts/PTY/真实provider，独立评审和交付另记。
+
+
+最终独立code **APPROVE**（5文件/90项、七项owner/consumer probes和原initial/final path消失反例重验），architecture **CLEAR**（最终3文件/77项、原阻挡parent反例、alias binding、零enumeration/关闭及resource/budget/取消/清理检查），综合 **APPROVE（限本批修复冻结）**。两lane六路径与用户`.gitignore`前后哈希匹配；初始b7b3的HIGH/REQUEST CHANGES/BLOCK及失败日志保留，不混入最终计数。Node20.3/单文件两条actual print自动技能发现/调用CLI共4合成POST通过，忽略内容未发送、tool call ID与原manifest字节核对；这是stable路径，changed路径由实际catalog/tool consumer child probes证明，未声称changed CLI或PTY验收。报告 `.tmp/skill-roots/{review-code.md,review-architecture.md,cli-smoke-results.json}`。提交/推送/精确SHA CI单独取证，Phase19 active。

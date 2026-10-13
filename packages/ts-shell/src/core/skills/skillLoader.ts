@@ -273,6 +273,7 @@ export class SkillLoader {
     const report = source === "cli";
     let stats: fs.Stats;
     try {
+      await discovery.observeParent(dirOrFile, boundary);
       stats = fs.statSync(dirOrFile);
     } catch (error) {
       discovery.rethrow(error);
