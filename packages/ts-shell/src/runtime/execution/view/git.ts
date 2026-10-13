@@ -54,6 +54,7 @@ async function captureDirectory(sources: ViewSources, directory: string, visited
     return;
   }
   const entries = await readDirectory(root, target, { ...sources.input, checkpoint: () => budget.check(),
+    onCapturedSource: source => { sources.captureDirectory(source); },
     onEntry: entry => { budget.take('entries', 1); budget.take('pathBytes', Buffer.byteLength(path.join(target, entry.name))); },
   });
   for (const entry of entries) {

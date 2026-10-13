@@ -1,12 +1,15 @@
 import { promises as fs, realpathSync, type Dirent } from 'node:fs'
+import path from 'node:path'
 import { verifyPathContainment } from '../../core/security/pathJail.js'
-import { closeReadHandle, withVerifiedReadTarget } from './read.js'
+import { closeReadHandle, withVerifiedReadTarget, ReadChangedError, readRevision } from './read.js'
+import type { CapturedReadSource } from './types.js'
 
 interface DirectoryReadOptions {
   readonly assertFileAccess?: (absolutePath: string) => void
   readonly abortSignal?: AbortSignal
   readonly checkpoint?: () => void
   readonly onEntry?: (entry: Dirent) => void
+  readonly onCapturedSource?: (source: CapturedReadSource) => void
 }
 
 const MAX_ENTRIES = 10_000
@@ -29,6 +32,7 @@ export async function readDirectory(root: string, directory: string, options?: D
   return withVerifiedReadTarget({
     absolutePath: directory, workspaceRoot: root,
     assertFileAccess: options?.assertFileAccess, abortSignal: options?.abortSignal,
+    onCapturedSource: options?.onCapturedSource,
   }, 'directory', async (handle, verify) => {
     const target = `/proc/self/fd/${handle.fd}`
     return collectEntries(target, deadline, verify, options)
@@ -49,13 +53,16 @@ async function readDirectoryByPath(root: string, directory: string, deadline: nu
   const verify = async (): Promise<void> => {
     const after = await fs.stat(target, { bigint: true })
     if (realpathSync(root) !== workspace || realpathSync(directory) !== target
-      || !after.isDirectory() || before.dev !== after.dev || before.ino !== after.ino) {
-      throw new Error('Directory changed while reading.')
+      || !after.isDirectory() || readRevision(before) !== readRevision(after)) {
+      throw new ReadChangedError()
     }
     options?.assertFileAccess?.(target)
     options?.abortSignal?.throwIfAborted()
   }
-  return collectEntries(target, deadline, verify, options)
+  const entries = await collectEntries(target, deadline, verify, options)
+  await verify()
+  options?.onCapturedSource?.({ path: path.resolve(directory), target, root: workspace, revision: readRevision(before) })
+  return entries
 }
 
 /** Keep the native prefetch buffer and retained names bounded independently of output pagination. */

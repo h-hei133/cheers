@@ -1,6 +1,7 @@
 import fs, { promises as fsp } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { execFileSync } from 'node:child_process'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { readDirectory } from './directory.js'
 
@@ -83,6 +84,42 @@ it('rechecks identity after bounded enumeration before returning names', async (
   })
   await expect(readDirectory(workspace, directory)).rejects.toThrow()
   await expect(Promise.resolve().then(() => stream!.read())).rejects.toMatchObject({ code: 'ERR_DIR_CLOSED' })
+})
+
+it.each(['linux', 'darwin'])('refuses a child changing directory entries during %s enumeration', async platform => {
+  const originalPlatform = process.platform
+  Object.defineProperty(process, 'platform', { value: platform, configurable: true })
+  const captured = vi.fn()
+  let changed = false
+  try {
+    const pending = readDirectory(workspace, directory, { onCapturedSource: captured, onEntry: () => {
+      if (changed) return
+      execFileSync(process.execPath, ['-e', 'require("node:fs").writeFileSync(process.argv[1], "new entry")', path.join(directory, 'added.txt')])
+      changed = true
+    } })
+    await expect(pending).rejects.toMatchObject({ name: 'ReadChangedError' })
+    expect(changed).toBe(true)
+    expect(captured).not.toHaveBeenCalled()
+  } finally { Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true }) }
+})
+
+it('reports directory metadata after both enumeration handles close', async () => {
+  const open = fsp.open
+  const enumerate = fsp.opendir
+  let stream: fs.Dir | undefined
+  vi.spyOn(fsp, 'opendir').mockImplementation(async (...args) => { stream = await enumerate(...args); return stream })
+  const handles: Awaited<ReturnType<typeof open>>[] = []
+  vi.spyOn(fsp, 'open').mockImplementation(async (...args) => {
+    const handle = await open(...args); handles.push(handle); return handle
+  })
+  const captured = vi.fn(source => {
+    expect(source).toMatchObject({ path: directory, target: directory, root: workspace })
+    expect(handles).toHaveLength(1)
+    expect(handles[0]!.fd).toBe(-1)
+    expect(() => stream!.readSync()).toThrow(/closed/i)
+  })
+  expect((await readDirectory(workspace, directory, { onCapturedSource: captured })).map(entry => entry.name)).toEqual(['public.txt'])
+  expect(captured).toHaveBeenCalledOnce()
 })
 it('refuses a regular file instead of opening it as a directory', async () => {
   const open = vi.spyOn(fsp, 'open')

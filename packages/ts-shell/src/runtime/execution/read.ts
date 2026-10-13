@@ -89,7 +89,8 @@ export async function withVerifiedReadTarget<T>(request: ReadTarget, kind: 'file
     request.abortSignal?.throwIfAborted()
     const opened = await handle.stat({ bigint: true })
     revision = readRevision(opened)
-    if ((kind === 'file' ? !opened.isFile() : !opened.isDirectory()) || !sameFile(before, opened)) {
+    if ((kind === 'file' ? !opened.isFile() : !opened.isDirectory()) || !sameFile(before, opened)
+      || kind === 'directory' && readRevision(before) !== revision) {
       throw new ReadChangedError()
     }
     const verify = async (): Promise<void> => {
@@ -101,7 +102,7 @@ export async function withVerifiedReadTarget<T>(request: ReadTarget, kind: 'file
         || !sameFile(opened, current)) {
         throw new ReadChangedError()
       }
-      if (kind === 'file' && readRevision(opened) !== readRevision(current)) throw new ReadChangedError()
+      if (revision !== readRevision(current)) throw new ReadChangedError()
       request.assertFileAccess?.(actual)
       request.abortSignal?.throwIfAborted()
     }
@@ -118,7 +119,7 @@ export async function withVerifiedReadTarget<T>(request: ReadTarget, kind: 'file
   } finally {
     await closeReadHandle(handle)
   }
-  if (kind === 'file') request.onCapturedSource?.({ path: path.resolve(request.absolutePath), target, root, revision })
+  request.onCapturedSource?.({ path: path.resolve(request.absolutePath), target, root, revision })
   return result
 }
 

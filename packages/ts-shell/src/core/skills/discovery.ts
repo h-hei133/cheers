@@ -71,6 +71,7 @@ export class SkillDiscovery {
     this.budget.take('directories', 1);
     const entries = await readDirectory(root, directory, { abortSignal: this.signal,
       checkpoint: () => { this.root(boundary); },
+      onCapturedSource: source => { this.capture(source); },
       onEntry: entry => {
         this.budget.take('entries', 1);
         this.budget.take('pathBytes', Buffer.byteLength(path.join(directory, entry.name)));

@@ -101,9 +101,9 @@ Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)�
 | macOS/Windows | 部分 profile、接口与纯逻辑用例 | 原生路径/文件描述符、进程树清理、终端与设备尚未取得等价实机证据 |
 | 模型传输与严格预算 | 合成 HTTP/SSE/usage/重试/unknown、统一 request admission | W7-33 四端点真实 TLS/HTTP2 矩阵仍缺；无法证明上界的请求继续拒绝 strict cap 准入 |
 | 公共包、认证、协作和 SSH | 受控服务、签名、ACL、撤权、重连与未知副作用 | 真实账户、公共部署 TLS、真实远端主机/主机密钥和生产互通验收 |
-| SAFE-02 | Linux 公开文件工具的检查/句柄/拒绝/清理及受管编辑目录固定；原生 Git/ripgrep 私有视图、配置准入和 child 完成收据；异步技能发现、批准前捕获与共享预算；读取期间及 catalog 发布前已捕获 manifest/ignore/Git 来源变化拒绝；本地remote-URL条件及native配置错误拒绝，见 §7–13 | 非 Linux 实际对象绑定、未捕获来源/目录枚举的并发一致性与私有镜像剩余成本继续开放；外部 metadata 仍拒绝，未知future hasconfig不宣称支持，资源计数器不约束原生进程内部全部读取 |
+| SAFE-02 | Linux 公开文件工具的检查/句柄/拒绝/清理及受管编辑目录固定；原生 Git/ripgrep 私有视图、配置准入和 child 完成收据；异步技能发现、批准前捕获与共享预算；读取期间及 catalog 发布前已捕获 manifest/ignore/Git 来源变化拒绝；本地remote-URL条件及native配置错误拒绝，已枚举目录修订核验和最终复查，见 §7–14 | 非 Linux 实际对象绑定、未枚举或初始缺失来源的并发一致性与私有镜像剩余成本继续开放；外部 metadata 仍拒绝，未知future hasconfig不宣称支持，资源计数器不约束原生进程内部全部读取 |
 
-技能发现的同步正文/Git 忽略路径已按 §9 替换；§10 拒绝检测到的读取期间源变化，§11–12 在 catalog 发布前复查已捕获 manifest、ignore 与 Git 来源。SAFE-02 继续处理非 Linux 对象绑定、未捕获来源/枚举一致性和镜像成本，扩展外部 metadata/条件支持须重新证明准入。逐文件检查不保证其后全部变化或整目录事务。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把 W1–W16 或 Phase 19 总目标标为完成。
+技能发现的同步正文/Git 忽略路径已按 §9 替换；§10 拒绝检测到的读取期间源变化，§11–12 在 catalog 发布前复查已捕获 manifest、ignore 与 Git 来源。§14继续拒绝已枚举目录的已知修订变化；SAFE-02继续处理非Linux对象绑定、未枚举或初始缺失来源和镜像成本，扩展外部 metadata/条件支持须重新证明准入。逐文件检查不保证其后全部变化或整目录事务。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把 W1–W16 或 Phase 19 总目标标为完成。
 
 ## 6. 迁移、回退与交付
 
@@ -258,3 +258,23 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 | 四条actual print CLI | Node/单文件×后置URL/后值覆盖，exit0、共8合成POST | `cli-smoke-results.json`；技能catalog/正文、隐藏零泄漏、本次call ID与源config/manifest字节 |
 
 首轮新增回归实际发现间接非法remote URL导致128后错误fallback，属于product behavior drift，修复后再通过170项。随后只调整列表对照的promise成功断言，production未变。外部匹配/未匹配条件来源均未打开；未知future hasconfig、外部metadata和其余§5平台/枚举/真实服务缺口继续开放。未重跑全仓/scripts/PTY/真实provider，Phase19 active，交付另验。
+
+
+该条件配置组件已提交/推送 `415ff5d24dc0450aa3a35ad1cbd6cefcc1f5c4fe`，6个原始路径/blob对照冻结源码和文档审计通过，用户`.gitignore`排除且原SHA保持、远端同SHA。CI38299423064/job114978414682与Watch38299423076/job114978414529均completed/failure、steps=[]；annotations确认付款/spending-limit阻止作业启动，无远端验证通过。材料 `.tmp/git-condition/{commit-audit.json,delivery.json}`。
+
+## 14. SAFE-02 已枚举目录修订局部验收（2026-10-13）
+
+已捕获目录与文件metadata复用现有source ledger和最终发布检查。目录新增/删除改变修订时拒绝旧的完整结果；保持4096来源和原遍历/path预算，逐源检查不保证目录/catalog事务。
+
+| 证据 | 实际结果 | 材料/边界 |
+|---|---|---|
+| 最终冻结 | 9TS/6production，用户`.gitignore`原SHA保持 | `inventory-final-guard.json` SHA256 `02321067d3bcc16fd4c43fce948e77073a800d80a96f3ad753583770a15ab431` |
+| 受影响组合/构建/门 | Node20.3 12文件/199项、两构建/四源码门通过；完整judge exit0/partial | `tests-final.log`、`build-final`、`executable-final`、`gates-final`、`normproof-final-out`；4既有ceiling advisory |
+| 四项有效反转 | 目录读取核验、native ledger、catalog ledger和文件种类准入分别移除后实际AssertionError；正向副本通过且原源不变 | `reversals-final/results.json`；初次脚本文本匹配中止不计有效 |
+| 四条实际print CLI | stable共4合成POST；changed两组exit1、零POST/零旧指令 | `cli-smoke-results.json`；实际目录关闭后新增manifest，原manifest/ignore字节保持 |
+
+直接目录读取的Linux与模拟无proc分支、成功关闭后metadata通知、native和catalog发布拒绝均有focused证据。首轮技能用例未触发预定修改，属于harness/setup，不计行为通过；实际open触发修正后再验。初始缺失/未枚举来源、最后逐源检查后变化、非Linux实际对象、外部metadata和§5其余外部验收仍开放。本批未重跑全仓/scripts/PTY/真实provider，Phase19 active，独立评审及交付另验。
+
+最终独立code **APPROVE**、architecture **CLEAR**，综合 **APPROVE（限本批）**；code原149项后在最终字节通过4项native子集、guard与六项capture探针，architecture原151项后在最终字节通过native38项、安全mixed及四项currency/alias/budget探针。原冻结套件不当作最终全套，复验不相加；两lane最终9路径前后哈希一致，无源码/测试/文档编辑。材料 `.tmp/directory-currency/{review-code.md,review-architecture.md,review-architecture-guard.md}`。
+
+未覆盖的具体窗口为规则不存在探测之后、目录初始修订捕获之前；此间新增规则可能未进入本次视图。目录复查不把该窗口或未枚举树变成已验证。文件capture缓存复用现在先保留普通文件准入，拒绝原始EISDIR而返回safe owner错误；实际回归、guard增量评审和第四项反转均通过。

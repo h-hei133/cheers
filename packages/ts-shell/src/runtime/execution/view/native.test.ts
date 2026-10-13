@@ -67,6 +67,19 @@ it.each(['failure', 'cancel'])('settles a bounded placeholder batch before %s cl
   } finally { writes.mockRestore(); cleanup.mockRestore(); }
 });
 
+linux('refuses a native view after a child adds rules to an enumerated directory', async () => {
+  let mirror = '';
+  const pending = withNativeReadView({ root, assertFileAccess: () => {}, budget: new WalkBudget() }, async (sources, _plan, materialize) => {
+    mirror = sources.mirror;
+    await materialize({ native: 'search' });
+    execFileSync(process.execPath, ['-e', 'require("node:fs").writeFileSync(process.argv[1], "public.txt\\n")', path.join(root, '.ignore')]);
+    sources.verify();
+  });
+  await expect(pending).rejects.toThrow(/no complete native answer/i);
+  expect(fs.existsSync(mirror)).toBe(false);
+  expect(fs.readFileSync(path.join(root, 'public.txt'), 'utf8')).toBe('needle public');
+});
+
 linux('keeps tracked exceptions, nested rules, and literal names under native metadata isolation', async () => {
   git('init', '-q');
   fs.writeFileSync(path.join(root, '.gitignore'), '*.tmp\n');
@@ -91,6 +104,13 @@ linux('hydrates native include chains and their winning contained excludes file'
   git('config', 'include.path', '../first.rules');
   const files = await listWorkspaceFiles(root, { assertFileAccess: () => {} });
   expect(files).toContain('public.txt'); expect(files).not.toContain('hidden.tmp');
+});
+
+linux('refuses a captured directory selected as a config file source', async () => {
+  git('init', '-q');
+  git('config', 'core.excludesFile', '.git');
+  const pending = listWorkspaceFiles(root);
+  await expect(pending).rejects.toThrow(/no complete native answer/i);
 });
 
 linux.each(['later-url', 'later-override', 'worktree-url'] as const)('preserves native remote-URL conditions with %s', async scenario => {

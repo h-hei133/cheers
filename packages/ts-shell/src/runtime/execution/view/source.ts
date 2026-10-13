@@ -4,7 +4,7 @@ import { readBinarySnapshot } from '../snapshot.js';
 import { readRevision } from '../read.js';
 import { WalkBudget } from '../walk/budget.js';
 import { verifyPathContainment } from '../../../core/security/pathJail.js';
-import type { FileWalkOptions } from '../types.js';
+import type { CapturedReadSource, FileWalkOptions } from '../types.js';
 
 export interface NativeViewInput {
   readonly root: string;
@@ -55,6 +55,18 @@ export class ViewSources {
     return path.join(this.mirror, relative);
   }
 
+  /** Directory captures share the earliest-revision ledger with admitted metadata. */
+  captureDirectory(source: CapturedReadSource): void {
+    if (this.target(source.path) !== source.target || readRevision(fs.statSync(source.target, { bigint: true })) !== source.revision) throw new ViewSourceError();
+    const captured = this.captured.get(source.target);
+    if (captured !== undefined && captured !== source.revision) throw new ViewSourceError();
+    if (captured === undefined) {
+      if (this.captured.size >= 4096) throw new ViewSourceError();
+      this.captured.set(source.target, source.revision);
+    }
+    this.input.onCapturedSource?.(source);
+  }
+
   async link(file: string, target: string): Promise<boolean> {
     if (file === target || this.aliases.has(file)) return false;
     if (this.target(file) !== target) throw new ViewSourceError();
@@ -71,6 +83,7 @@ export class ViewSources {
     const target = this.target(file);
     const captured = this.captured.get(target);
     if (captured !== undefined) {
+      if (!fs.statSync(target).isFile()) throw new ViewSourceError();
       const linked = await this.link(file, target);
       this.input.onCapturedSource?.({ path: file, target, root: this.input.root, revision: captured });
       return linked;

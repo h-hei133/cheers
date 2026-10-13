@@ -2199,3 +2199,22 @@ Node20.3/单文件 × stable/changed **四条实际 print CLI**通过；stable �
 最终测试断言字节另跑 native 文件 **36项**通过，这是170项中的同文件复验，不相加。独立 code **APPROVE**（4文件/66项在相同生产字节上通过，最终断言3项子集复验；native对照及四项取消/清理/条件来源检查），architecture **CLEAR**（7文件/133项，最终native文件36项复验；公开parity、实际child贡献等待期间改写、metadata-only复查和恢复失败检查），综合 **APPROVE（限本批）**。两lane逐项核对最终3路径，未修改源码、测试或文档；材料 `review-code.md`、`review-architecture.md`、`tests-final-assertion.log`。
 
 Node20.3/单文件×后置URL/后置excludes覆盖 **四条actual print CLI**，共 **8合成POST**，均exit0；技能描述/正文、本次call ID、隐藏技能零泄漏和config/manifest原字节均核对。材料 `.tmp/git-condition/{contract.json,inventory-final-reversal.json,baseline-probe.log,repaired-probe.log,tests-first.log,tests-repair.log,reversals-effective/results.json,cli-smoke-results.json,normproof-out/}`。本地remote-URL条件不再列为明确拒绝；外部metadata、非Linux对象、未捕获来源/目录事务和真实外部验收继续开放，SAFE-02/Phase19 active，本批未重跑全仓/scripts/PTY/真实provider，提交/推送/精确CI另验。
+
+
+该条件配置组件已提交/推送 `415ff5d24dc0450aa3a35ad1cbd6cefcc1f5c4fe`，6个原始路径/blob对照冻结源码和文档审计通过，用户`.gitignore`排除且原SHA保持、远端同SHA。CI38299423064/job114978414682与Watch38299423076/job114978414529均completed/failure、steps=[]；annotations确认付款/spending-limit阻止作业启动，无远端验证通过。材料 `.tmp/git-condition/{commit-audit.json,delivery.json}`。
+
+### 8.149 SAFE-02：已枚举目录修订与发布前复查
+
+实际子进程新增条目时，原读取只检查目录身份，直接枚举与原生私有视图仍返回成功。现有[读 owner](../../packages/ts-shell/src/runtime/execution/read.ts)对目录也复用 `readRevision`，从打开到最终核验均检测修订变化；[目录 owner](../../packages/ts-shell/src/runtime/execution/directory.ts)在流与描述符成功关闭后报告中性metadata。无proc分支增加相同路径修订检查，只有本机模拟分支证据，不当作其他平台实际对象绑定。
+
+目录来源进入已有[视图ledger](../../packages/ts-shell/src/runtime/execution/view/source.ts)和[discovery ledger](../../packages/ts-shell/src/core/skills/discovery.ts)，保留最早修订及现有最终发布复查；共享4096来源限额和累计path budget，不保留句柄、不重读目录或正文。定向参考的manifest优先、直接枚举/ignore和普通诊断语义保持；参考同步枚举没有事务检查，本项目保留既有异步、有界owner，以本地修订拒绝已知变化。新增测试与四项有效反转约束读取核验、native ledger、catalog ledger和文件种类准入。
+
+最终9TS/6production，`inventory-final-guard.json` SHA256 `02321067d3bcc16fd4c43fce948e77073a800d80a96f3ad753583770a15ab431`；Node20.3受影响12文件/199项、两构建、四源码门通过，完整judge exit0，图义务satisfied、4既有ceiling advisory仍partial。最初技能用例误用不会在直接manifest读取时触发的onSource，属harness/setup；修正为实际open后子进程修改才取得行为证据。反转脚本首次匹配两个回调而中止，未计有效；限定目录上下文后的四份隔离副本均实际AssertionError，正向副本通过，原源码/用户`.gitignore`保持。
+
+Node20.3/单文件×stable/changed四条实际print CLI通过；stable共4合成POST，描述/正文及本次call ID正确；changed实际观察目录句柄关闭，再于manifest IN_ACCESS时新增文件，两组exit1、零POST/零旧指令。原manifest/ignore字节保持。材料 `.tmp/directory-currency/{contract.json,inventory-final-guard.json,tests-baseline.log,tests-final.log,reversals-final/results.json,cli-smoke-results.json,normproof-final-out/}`。范围止于已枚举目录的最后逐源metadata检查，未宣称未枚举或初始缺失树、全catalog事务、OS锁或未来稳定；非Linux对象、外部metadata、镜像成本和真实外部证据继续开放，SAFE-02/Phase19 active，独立评审与提交/推送/精确CI另验。
+
+独立架构检查另发现目录加入共享ledger后，文件capture缓存命中会跳过普通文件准入，并在后续read产生原始EISDIR；在capture owner补回文件种类检查，实际core.excludesFile指向已捕获目录的回归与第四项反转约束report-safe拒绝。该增量前的198项及独立149/151项证据属于原冻结，最终199项、构建/门/反转/CLI和增量评审分别绑定新冻结。
+
+具体未覆盖窗口保留：directoryRules先探测不存在的规则文件，之后entries才捕获目录初始修订；这两点之间新增规则可能被遗漏且新目录修订成为基线。该窗口没有单独时间上界；本批不据目录复查宣称覆盖它，继续按SAFE-02处理。
+
+最终独立code **APPROVE**、architecture **CLEAR**，综合 **APPROVE（限本批）**；code原149项后在最终字节通过4项native子集、guard与六项capture探针，architecture原151项后在最终字节通过native38项、安全mixed及四项currency/alias/budget探针。原冻结套件不当作最终全套，复验不相加；两lane最终9路径前后哈希一致，无源码/测试/文档编辑。材料 `.tmp/directory-currency/{review-code.md,review-architecture.md,review-architecture-guard.md}`。

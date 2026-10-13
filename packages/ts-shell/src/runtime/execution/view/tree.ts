@@ -34,6 +34,7 @@ function entries(sources: ViewSources, directory: string, depth: number) {
   const { root, budget } = sources.input;
   budget.depth(depth); budget.take('directories', 1);
   return readDirectory(root, directory, { ...sources.input, checkpoint: () => budget.check(),
+    onCapturedSource: source => { sources.captureDirectory(source); },
     onEntry: entry => { budget.take('entries', 1); budget.take('pathBytes', Buffer.byteLength(path.join(directory, entry.name))); },
   });
 }

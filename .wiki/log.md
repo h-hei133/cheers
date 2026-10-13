@@ -6544,3 +6544,12 @@ manifest组件 `d589e8d02c5299f0de4a3a25169b9aea1a742540` 已提交/推送、10�
 原config准入先捕获native无条件扫描的全部本地hasconfig依赖图，再由Git负责URL glob、worktree/优先级、间接remote URL禁止。新增回归发现非法config的128被当无仓库fallback；复用原inert config独立识别repo后再完整校验，拒绝该假完整结果。最终3TS/2production，Node20.3修复后10文件/170项、两构建/四源码门/完整judge通过，4既有ceiling advisory保持partial。两有效反转实际AssertionError；四actual print CLI共8合成POST、隐藏技能零泄漏、config/manifest与用户`.gitignore`原字节保持。首轮产品失败和首反转未捕获Error均保留，不计通过。详见[裁决 §8.148](features/phase-19-decisions.md)与[局部验收 §13](features/phase-19-acceptance.md)，材料 `.tmp/git-condition/`；外部metadata、非Linux、目录事务与真实外部证据继续开放，Phase19 active，交付另验。
 
 最终断言字节native文件36项复验通过，不与170相加；独立code APPROVE（相同生产66项、最终断言3项子集和四检查），architecture CLEAR（133项、最终native36项和parity/child/metadata-only/恢复失败检查），综合限本批APPROVE。两lane最终3路径哈希相符、无源码/测试/文档编辑，用户`.gitignore`保持；材料 `.tmp/git-condition/{review-code.md,review-architecture.md,tests-final-assertion.log}`。
+
+
+该条件配置组件已提交/推送 `415ff5d24dc0450aa3a35ad1cbd6cefcc1f5c4fe`，6个原始路径/blob对照冻结源码和文档审计通过，用户`.gitignore`排除且原SHA保持、远端同SHA。CI38299423064/job114978414682与Watch38299423076/job114978414529均completed/failure、steps=[]；annotations确认付款/spending-limit阻止作业启动，无远端验证通过。材料 `.tmp/git-condition/{commit-audit.json,delivery.json}`。
+
+### 2026-10-13 — SAFE-02 已枚举目录修订
+
+读取owner扩展既有revision到目录，成功关闭后报告metadata；原native/discovery ledger保留最早捕获并在发布前复查，无新增walk/事务系统。最终9TS/6production，Node20.3受影响12文件/199项、两构建/四源码门通过，完整judge图义务satisfied、4既有ceiling advisory保持partial。四项有效反转实际AssertionError；四actual print CLI稳定共4合成POST，实际child在目录关闭后新增manifest的两路exit1/零POST/零旧指令。技能初次错误hook和反转文本匹配中止均为harness/setup，不计行为通过。详见[裁决 §8.149](features/phase-19-decisions.md)和[验收 §14](features/phase-19-acceptance.md)，材料 `.tmp/directory-currency/`；未枚举树/全目录事务、非Linux对象、外部metadata、镜像成本与真实外部证据继续开放，Phase19 active，独立评审及交付另验。
+
+最终独立code **APPROVE**、architecture **CLEAR**，综合 **APPROVE（限本批）**；code原149项后在最终字节通过4项native子集、guard与六项capture探针，architecture原151项后在最终字节通过native38项、安全mixed及四项currency/alias/budget探针。原冻结套件不当作最终全套，复验不相加；两lane最终9路径前后哈希一致，无源码/测试/文档编辑。材料 `.tmp/directory-currency/{review-code.md,review-architecture.md,review-architecture-guard.md}`。

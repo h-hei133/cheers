@@ -199,6 +199,29 @@ describe("skill discovery", () => {
     expect(handles.every(handle => handle.fd === -1)).toBe(true);
   });
 
+  it('rejects a catalog when a child adds a manifest after its directory was enumerated', async () => {
+    const directory = path.join(workspace, 'selected');
+    fs.mkdirSync(directory);
+    const first = path.join(directory, 'first.md');
+    fs.writeFileSync(first, '---\nname: first\ndescription: synthetic\n---\nfirst');
+    let changed = false;
+    const open = fsp.open;
+    const handles: Awaited<ReturnType<typeof open>>[] = [];
+    vi.spyOn(fsp, 'open').mockImplementation(async (...args) => {
+      const handle = await open(...args); handles.push(handle);
+      if (args[0] === first && !changed) {
+        execFileSync(process.execPath, ['-e', 'require("node:fs").writeFileSync(process.argv[1], process.argv[2])',
+          path.join(directory, 'added.md'), '---\nname: added\ndescription: synthetic\n---\nadded']);
+        changed = true;
+      }
+      return handle;
+    });
+    const loader = new SkillLoader(workspace, { disableDiscovery: true, extraPaths: [directory] });
+    await expect(loader.loadDetailed()).rejects.toMatchObject({ name: 'ReadChangedError' });
+    expect(changed).toBe(true);
+    expect(handles.every(handle => handle.fd === -1)).toBe(true);
+  });
+
   it('does not replace an earlier captured revision when the same manifest is selected again', async () => {
     const file = path.join(workspace, 'named.md');
     const original = '---\nname: one\ndescription: synthetic\n---\noriginal';
