@@ -36,7 +36,10 @@ export async function withNativeReadView<T>(input: NativeViewInput, consume: (so
           return { ...planNativeRead({ command, args, root, directory: detached ? '/' : directory,
             descriptor: handle.fd, statusDescriptor: status.fd }), verifyExit: code => verifyNativeExit(status, code) };
         };
-        return await consume(sources, plan, selection => materializeView(sources, selection));
+        const result = await consume(sources, plan, selection => materializeView(sources, selection));
+        // Absence and fallback decisions also depend on the captured sources.
+        sources.verify();
+        return result;
       } finally { await closeReadHandle(status); }
     } finally { await closeReadHandle(handle); }
   } finally {

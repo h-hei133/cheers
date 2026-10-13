@@ -101,9 +101,9 @@ Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)�
 | macOS/Windows | 部分 profile、接口与纯逻辑用例 | 原生路径/文件描述符、进程树清理、终端与设备尚未取得等价实机证据 |
 | 模型传输与严格预算 | 合成 HTTP/SSE/usage/重试/unknown、统一 request admission | W7-33 四端点真实 TLS/HTTP2 矩阵仍缺；无法证明上界的请求继续拒绝 strict cap 准入 |
 | 公共包、认证、协作和 SSH | 受控服务、签名、ACL、撤权、重连与未知副作用 | 真实账户、公共部署 TLS、真实远端主机/主机密钥和生产互通验收 |
-| SAFE-02 | Linux 公开文件工具的检查/句柄/拒绝/清理及受管编辑目录固定；原生 Git/ripgrep 私有视图、配置准入和 child 完成收据；异步技能发现、批准前捕获与共享预算；读取期间及 catalog 发布前已捕获 manifest/ignore/Git 来源变化拒绝；本地remote-URL条件及native配置错误拒绝，已枚举目录修订核验和最终复查、native visit先捕获后探测规则，见 §7–15 | 非 Linux 实际对象绑定、未枚举或初始缺失来源的并发一致性与私有镜像剩余成本继续开放；外部 metadata 仍拒绝，未知future hasconfig不宣称支持，资源计数器不约束原生进程内部全部读取 |
+| SAFE-02 | Linux 公开文件工具的检查/句柄/拒绝/清理及受管编辑目录固定；原生 Git/ripgrep 私有视图、配置准入和 child 完成收据；异步技能发现、批准前捕获与共享预算；读取期间及 catalog 发布前已捕获 manifest/ignore/Git 来源变化拒绝；本地remote-URL条件及native配置错误拒绝；已枚举目录修订、visit先捕获后探测规则，可选来源的父目录/alias观察及成功/null最终复验，见 §7–16 | 非 Linux 实际对象绑定、未观察树与私有镜像剩余成本继续开放；外部 metadata 仍拒绝，未知future hasconfig不宣称支持，资源计数器不约束原生进程内部全部读取 |
 
-技能发现的同步正文/Git 忽略路径已按 §9 替换；§10 拒绝检测到的读取期间源变化，§11–12 在 catalog 发布前复查已捕获 manifest、ignore 与 Git 来源。§14拒绝已枚举目录的已知修订变化，§15修复native visit的规则探测顺序；SAFE-02继续处理非Linux对象绑定、未枚举或初始缺失来源和镜像成本，扩展外部 metadata/条件支持须重新证明准入。逐文件检查不保证其后全部变化或整目录事务。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把 W1–W16 或 Phase 19 总目标标为完成。
+技能发现的同步正文/Git 忽略路径已按 §9 替换；§10 拒绝检测到的读取期间源变化，§11–12 在 catalog 发布前复查已捕获 manifest、ignore 与 Git 来源。§14拒绝已枚举目录的已知修订变化，§15修复native visit的规则探测顺序；§16复验可选native来源已观察父目录及alias。SAFE-02继续处理非Linux对象绑定、未观察树和镜像成本，扩展外部metadata/条件支持须重新证明准入。逐源检查不保证其后全部变化或整目录事务。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把W1–W16或Phase19总目标标为完成。
 
 ## 6. 迁移、回退与交付
 
@@ -296,3 +296,24 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 两构建、四源码门、docs strict通过；完整judge exit0，图义务satisfied、4既有ceiling advisory仍partial。一项隔离顺序反转使两路回归均实际AssertionError，正向副本通过、原源码/用户`.gitignore`保持。Node20.3/单文件×stable/changed四条actual print CLI共8合成POST：stable实际grep返回目标正文；changed在已有规则IN_ACCESS后child创建新规则，工具安全返回Search stopped: failed，零END_NEEDLE/零旧结果；CLI exit0表示回合完成，不计搜索成功。原数据/已有规则字节保持，本次call ID核对。
 
 独立code **APPROVE**（native40项及两路capture-before-probe/child/关闭/清理检查），architecture **CLEAR**（native40项及parent/child目录各枚举一次、捕获先于规则探测的独立检查），综合 **APPROVE（限本批）**；两lane最终2路径前后哈希相符，未改源码/测试/文档。材料 `.tmp/rule-order/{tests-first.log,review-code.md,review-architecture.md,reversals/results.json,cli-smoke-results.json,normproof-out/}`。本批未重跑全仓/scripts/PTY/真实provider，提交/推送/精确CI另验，Phase19 active。
+
+该顺序组件已提交/推送 `4ae5ca8f2550971501793bbe3c4b16ce798facbd`，5个原始路径/blob审计通过，用户`.gitignore`排除且原SHA保持、远端同SHA。CI38334654789/job115091919308与Watch38334654875/job115091919479均completed/failure、steps=[]；本轮分别读取annotations确认付款/spending-limit阻止启动，无远端验证通过。材料 `.tmp/rule-order/{commit-audit.json,delivery.json}`。
+
+## 16. SAFE-02 可选原生来源观察局部验收（2026-10-13）
+
+原view source owner在可选规则、repo marker和metadata absence前观察最近已存在父目录，复用核验/关闭和最早revision ledger；原生命周期在成功及null发布前复验。contained目录alias也保留原路径绑定，包括cache命中新alias；canonical/alias共用4096记录及path budget，观察不增加目录enumeration或保留句柄。无repo的技能过滤委派同一owner，确认null后使用已有fallback。
+
+| 证据 | 实际结果 | 材料/边界 |
+|---|---|---|
+| 最终冻结 | 8TS/6production；用户`.gitignore`原SHA保持 | `inventory-alias.json` SHA256 `34b9a7430bc99ff1a88e1391e8a236de6deef540b910f368e5b4bf573485aefe` |
+| 原基线 | 四项actual-child AssertionError | ancestor Git/search规则、初始repo marker、missing include；`tests-baseline.log` |
+| 最终受影响组合 | Node20.3，12文件/203项通过 | `tests-alias.json/.log`；包括fresh/cached alias回归 |
+| 构建/门 | TS/单文件、四源码门通过；完整judge exit0 | `build-ts-alias`、`build-exe-alias`、`gates-alias`、`normproof-alias-out/`；4既有ceiling advisory/partial保留 |
+| 五项有效反转 | 全部actual AssertionError，正向副本通过 | `reversals/results.json`；原source和用户`.gitignore`保持 |
+| 四条actual print CLI | stable/changed各两产物，共8合成POST | `cli-smoke-results.json`；ancestor IN_ACCESS后child写规则；changed工具安全失败、零旧匹配，CLI exit0不计搜索成功 |
+
+材料 `.tmp/optional-sources/`。首轮遗漏async consumer是实现回归，54个unhandled errors及构建失败未计通过；无repo不再启动Git后，旧launcher fixture未进入原生路径，加入真实repo后保留原断言。独立actual-child发现的父目录alias缺口在原ledger修复，早期BLOCK冻结不计批准。最终203项、构建/门/反转/CLI单独绑定新冻结，早期201项不替代它。
+
+仅证明已观察父目录及绑定至最后逐源核验；无关条目变化可能保守拒绝，没有OS锁、全目录/catalog事务或之后稳定保证。未观察树、非Linux实际对象、外部metadata、镜像剩余成本与§5其余实际环境条件继续开放，SAFE-02/Phase19 active。本批未重跑全仓/scripts/PTY/真实provider，独立评审与提交/推送/精确CI另验。
+
+最终独立code **APPROVE**（7文件/144项、原alias反例及六项owner/取消/资源/清理检查），architecture **CLEAR**（最终native/absence 48项、原alias反例、零enumeration/关闭观察、cached alias回调/精确path budget及cycle门），综合 **APPROVE（限本批）**。architecture早期144项属于被拒绝的21dd冻结，不与最终48项相加。两lane最终8路径及用户`.gitignore`前后哈希相符，未改源码/测试/文档；早期HIGH/REQUEST CHANGES/BLOCK与实际失败材料保留。报告 `review-code.md`、`review-architecture.md`，提交/推送/精确CI另验。

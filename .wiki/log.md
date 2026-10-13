@@ -6564,3 +6564,11 @@ manifest组件 `d589e8d02c5299f0de4a3a25169b9aea1a742540` 已提交/推送、10�
 两构建、四源码门、docs strict通过；完整judge exit0，图义务satisfied、4既有ceiling advisory仍partial。一项隔离顺序反转使两路回归均实际AssertionError，正向副本通过、原源码/用户`.gitignore`保持。Node20.3/单文件×stable/changed四条actual print CLI共8合成POST：stable实际grep返回目标正文；changed在已有规则IN_ACCESS后child创建新规则，工具安全返回Search stopped: failed，零END_NEEDLE/零旧结果；CLI exit0表示回合完成，不计搜索成功。原数据/已有规则字节保持，本次call ID核对。
 
 独立code **APPROVE**（native40项及两路capture-before-probe/child/关闭/清理检查），architecture **CLEAR**（native40项及parent/child目录各枚举一次、捕获先于规则探测的独立检查），综合 **APPROVE（限本批）**；两lane最终2路径前后哈希相符，未改源码/测试/文档。材料 `.tmp/rule-order/{tests-first.log,review-code.md,review-architecture.md,reversals/results.json,cli-smoke-results.json,normproof-out/}`。本批未重跑全仓/scripts/PTY/真实provider，提交/推送/精确CI另验，Phase19 active。
+
+该顺序组件已提交/推送 `4ae5ca8f2550971501793bbe3c4b16ce798facbd`，5个原始路径/blob审计通过，用户`.gitignore`排除且原SHA保持、远端同SHA。CI38334654789/job115091919308与Watch38334654875/job115091919479均completed/failure、steps=[]；本轮分别读取annotations确认付款/spending-limit阻止启动，无远端验证通过。材料 `.tmp/rule-order/{commit-audit.json,delivery.json}`。
+
+### 2026-10-13 — SAFE-02 可选原生来源与目录路径绑定
+
+实际child四项基线证明ancestor规则/首次repo/missing include的旧答案发布。现有source owner在可选探测前观察最近已存在父目录，用原核验句柄/预算/最早ledger，无额外enumeration；native生命周期统一复验成功/null，技能过滤删除重复预探测。独立两lane实际发现alias改指后原目录不变的HIGH/BLOCK，修复同一4096 ledger保留原路径target/revision，cache命中也报告alias。最终8TS/6production，Node20.3受影响12文件/203项、两构建/四源码门通过；完整judge图义务satisfied、4既有ceiling advisory仍partial。五项隔离反转实际AssertionError；四actual print子目录grep CLI共8合成POST，changed在ancestor规则IN_ACCESS后child新增规则，工具失败/零旧匹配，CLI exit0只计回合完成。首次遗漏async consumer与旧launcher fixture分别分类实现回归/harness，失败记录保留。详见[裁决 §8.151](features/phase-19-decisions.md)、[验收 §16](features/phase-19-acceptance.md)，材料 `.tmp/optional-sources/`；未观察树、非Linux对象、镜像和真实环境条件仍开放，Phase19 active，独立评审及交付另验，用户`.gitignore`保持排除。
+
+最终独立code **APPROVE**（7文件/144项、原alias反例及六项owner/取消/资源/清理检查），architecture **CLEAR**（最终native/absence 48项、原alias反例、零enumeration/关闭观察、cached alias回调/精确path budget及cycle门），综合 **APPROVE（限本批）**。architecture早期144项属于被拒绝的21dd冻结，不与最终48项相加。两lane最终8路径及用户`.gitignore`前后哈希相符，未改源码/测试/文档；早期HIGH/REQUEST CHANGES/BLOCK与实际失败材料保留。报告 `.tmp/optional-sources/{review-code.md,review-architecture.md}`，提交/推送/精确CI另验。

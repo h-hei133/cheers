@@ -1,6 +1,5 @@
 import path from 'node:path'
 import which from 'which'
-import { promises as fs } from 'node:fs'
 import { executeLocally } from '../local.js'
 import { ReadCleanupError } from '../read.js'
 import type { FileWalkOptions } from '../types.js'
@@ -63,12 +62,10 @@ export function gitArgs(directory: string, args: readonly string[]): string[] {
   return ['-c', 'core.fsmonitor=false', '-C', directory, ...args]
 }
 
-function gitViewArgs(root: string, directory: string, args: readonly string[]): string[] {
+function gitViewArgs(marker: string, directory: string, args: readonly string[]): string[] {
   // The private native view is mounted at the workspace path, which is a
   // filesystem boundary from its parent. Explicit repository roots keep Git
   // from walking out of the view while preserving nested-repository selection.
-  const marker = repositoryMarker(root, directory)
-  if (!marker) throw new ViewSourceError()
   return ['-c', 'core.fsmonitor=false', '--git-dir', marker, '--work-tree', path.dirname(marker), '-C', directory, ...args]
 }
 
@@ -91,15 +88,10 @@ async function runGit(directory: string, args: readonly string[], input: string 
   }
   try {
     return await withNativeReadView({ ...access, abortSignal, budget }, async (sources, plan, materialize) => {
-      if (!repositoryMarker(access.root, directory)) {
-        await fs.mkdir(sources.destination(directory), { recursive: true, mode: 0o700 })
-        const output = await execute(directory, args, input, abortSignal, budget, countEntries,
-          plan('git', gitArgs(directory, args), directory))
-        if (output !== null) sources.verify()
-        return output
-      }
+      const marker = await repositoryMarker(sources, directory)
+      if (!marker) return null
       const query = (arguments_: readonly string[], detached = false) => execute(directory, arguments_, undefined, abortSignal, budget, false,
-        plan('git', detached ? detachedGitArgs(arguments_) : gitViewArgs(access.root, directory, arguments_), directory, detached))
+        plan('git', detached ? detachedGitArgs(arguments_) : gitViewArgs(marker, directory, arguments_), directory, detached))
       const configuration = await configureGitView(sources, directory, query)
       if (!configuration) return null
       const tracked = countEntries || access.directories ? await query(['ls-files', '-z', '--cached']) : ''
@@ -112,9 +104,8 @@ async function runGit(directory: string, args: readonly string[], input: string 
       const prefix = path.relative(access.root, directory).split(path.sep).join('/')
       await materialize({ native: 'git', directory, recursive: countEntries,
         tracked: trackedPaths.map(file => path.posix.join(prefix, file)), ...configuration })
-      const output = await execute(directory, args, input, abortSignal, budget, countEntries, plan('git', gitViewArgs(access.root, directory, args), directory))
+      const output = await execute(directory, args, input, abortSignal, budget, countEntries, plan('git', gitViewArgs(marker, directory, args), directory))
       if (output === null) throw new ViewSourceError()
-      sources.verify()
       if (!access.directories) return output
       const parents = new Set<string>()
       for (const file of trackedPaths) {

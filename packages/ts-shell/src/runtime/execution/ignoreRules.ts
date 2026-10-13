@@ -6,7 +6,6 @@ import type { FileHandle } from 'node:fs/promises'
 import { WalkBudget, WalkLimitError } from './walk/budget.js'
 import { addIgnoreContent } from './ignore/syntax.js'
 import { loadIgnoredViaGit } from './ignore/git.js'
-import { repositoryMarker } from './view/git.js'
 
 export { listWorkspaceFilesViaGit, loadIgnoredViaGit } from './ignore/git.js'
 
@@ -124,11 +123,9 @@ export async function loadIgnoredDirectories(root: string, directory: string, na
   const relative = path.relative(resolvedRoot, resolvedDirectory)
   if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) throw new Error('Discovery directory is outside its selected root.')
   if (!names.length) return new Set()
-  if (repositoryMarker(resolvedRoot, resolvedDirectory)) {
-    const native = await loadIgnoredViaGit(resolvedDirectory, names, options?.abortSignal, budget,
-      { root: resolvedRoot, assertFileAccess: options?.assertFileAccess ?? (() => {}), onCapturedSource: options?.onCapturedSource, directories: true })
-    if (native !== null) return native
-  }
+  const native = await loadIgnoredViaGit(resolvedDirectory, names, options?.abortSignal, budget,
+    { root: resolvedRoot, assertFileAccess: options?.assertFileAccess ?? (() => {}), onCapturedSource: options?.onCapturedSource, directories: true })
+  if (native !== null) return native
   const matcher = await loadDirectoryMatcher(resolvedRoot, resolvedDirectory, options, budget)
   return new Set(names.filter(name => matcher.ignores(`${path.posix.join(relative.split(path.sep).join('/'), name)}/`)))
 }

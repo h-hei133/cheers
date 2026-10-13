@@ -323,6 +323,7 @@ linux('uses fallback rules for a non-repository child directory', async () => {
 });
 
 linux.each([0, 1])('refuses launcher exit %s without a native child completion', async exitCode => {
+  git('init', '-q');
   fs.writeFileSync(path.join(fixture, 'bwrap'), `#!/bin/sh\nexit ${exitCode}\n`, { mode: 0o755 });
   vi.stubEnv('PATH', `${fixture}${path.delimiter}${process.env.PATH}`);
   await expect(listWorkspaceFiles(root)).rejects.toThrow('No complete native answer');

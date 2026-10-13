@@ -9,6 +9,7 @@ const repositories = new WeakMap<ViewSources, Map<string, GitMetadata>>();
 
 /** Capture only the selected repository; linked metadata must share its read grant. */
 export async function materializeMetadata(sources: ViewSources, directory: string, mode: 'git' | 'search' = 'git'): Promise<GitMetadata | undefined> {
+  await sources.observeDirectory(directory);
   const marker = path.join(directory, '.git');
   if (!fs.existsSync(marker)) return undefined;
   const target = sources.target(marker);
@@ -48,7 +49,7 @@ async function captureDirectory(sources: ViewSources, directory: string, visited
   if (mode === 'search') {
     for (const relative of ['commondir', 'info/exclude']) {
       const file = path.join(target, relative);
-      if (fs.existsSync(file)) await sources.capture(file);
+      await sources.capture(file);
     }
     await sources.link(directory, target);
     return;
@@ -77,12 +78,13 @@ async function captureDirectory(sources: ViewSources, directory: string, visited
   await sources.link(directory, target);
 }
 
-export function repositoryMarker(root: string, directory: string): string | undefined {
+export async function repositoryMarker(sources: ViewSources, directory: string): Promise<string | undefined> {
   let current = directory;
   for (;;) {
+    await sources.observeDirectory(current);
     const marker = path.join(current, '.git');
     if (fs.existsSync(marker)) return marker;
-    if (current === root) return undefined;
+    if (current === sources.input.root) return undefined;
     const parent = path.dirname(current);
     if (parent === current) throw new ViewSourceError();
     current = parent;

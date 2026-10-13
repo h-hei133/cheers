@@ -56,7 +56,7 @@ async function admitConfiguration(sources: ViewSources, metadata: GitMetadata, q
 
 /** Native Git keeps config precedence; all source dependencies are admitted first. */
 export async function configureGitView(sources: ViewSources, directory: string, query: Query): Promise<{ ignoreCase: boolean; excludesFile?: string } | null> {
-  const marker = repositoryMarker(sources.input.root, directory);
+  const marker = await repositoryMarker(sources, directory);
   if (!marker) return null;
   const metadata = await materializeMetadata(sources, path.dirname(marker));
   if (!metadata) throw new ViewSourceError();
