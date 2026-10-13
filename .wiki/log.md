@@ -6553,3 +6553,14 @@ manifest组件 `d589e8d02c5299f0de4a3a25169b9aea1a742540` 已提交/推送、10�
 读取owner扩展既有revision到目录，成功关闭后报告metadata；原native/discovery ledger保留最早捕获并在发布前复查，无新增walk/事务系统。最终9TS/6production，Node20.3受影响12文件/199项、两构建/四源码门通过，完整judge图义务satisfied、4既有ceiling advisory保持partial。四项有效反转实际AssertionError；四actual print CLI稳定共4合成POST，实际child在目录关闭后新增manifest的两路exit1/零POST/零旧指令。技能初次错误hook和反转文本匹配中止均为harness/setup，不计行为通过。详见[裁决 §8.149](features/phase-19-decisions.md)和[验收 §14](features/phase-19-acceptance.md)，材料 `.tmp/directory-currency/`；未枚举树/全目录事务、非Linux对象、外部metadata、镜像成本与真实外部证据继续开放，Phase19 active，独立评审及交付另验。
 
 最终独立code **APPROVE**、architecture **CLEAR**，综合 **APPROVE（限本批）**；code原149项后在最终字节通过4项native子集、guard与六项capture探针，architecture原151项后在最终字节通过native38项、安全mixed及四项currency/alias/budget探针。原冻结套件不当作最终全套，复验不相加；两lane最终9路径前后哈希一致，无源码/测试/文档编辑。材料 `.tmp/directory-currency/{review-code.md,review-architecture.md,review-architecture-guard.md}`。
+
+
+该目录修订组件已提交/推送 `1fc329c685b38da1dab69c7bef2ba30667eac2a5`，12个原始路径/blob对照冻结源码/文档审计通过，用户`.gitignore`排除且原SHA保持、远端同SHA。CI38333984581/job115089837603与Watch38333984529/job115089837690均completed/failure、steps=[]；annotations确认付款/spending-limit阻止启动，无远端验证通过。首次读取annotations遇到EOF，属于观察网络失败，重读同run/job成功后才完成归因；材料 `.tmp/directory-currency/{commit-audit.json,delivery.json}`。
+
+### 2026-10-13 — SAFE-02 原生规则探测顺序
+
+实际子进程复现可选规则不存在探测后创建规则，原Git/ripgrep继续返回成功；现有tree owner先枚举/捕获目录再探测规则，复用同一entries和source ledger，无额外遍历。最终2TS/1production，Node20.3受影响9文件/167项通过；search首次调用契约错误作为harness/setup保留，纠正后两路基线均真实AssertionError。详见[裁决 §8.150](features/phase-19-decisions.md)、[验收 §15](features/phase-19-acceptance.md)，材料 `.tmp/rule-order/`；ancestor-only规则、初始缺失metadata/未枚举树、非Linux、外部metadata与真实服务继续开放，Phase19 active，其余验证/独立评审/交付另验。
+
+两构建、四源码门、docs strict通过；完整judge exit0，图义务satisfied、4既有ceiling advisory仍partial。一项隔离顺序反转使两路回归均实际AssertionError，正向副本通过、原源码/用户`.gitignore`保持。Node20.3/单文件×stable/changed四条actual print CLI共8合成POST：stable实际grep返回目标正文；changed在已有规则IN_ACCESS后child创建新规则，工具安全返回Search stopped: failed，零END_NEEDLE/零旧结果；CLI exit0表示回合完成，不计搜索成功。原数据/已有规则字节保持，本次call ID核对。
+
+独立code **APPROVE**（native40项及两路capture-before-probe/child/关闭/清理检查），architecture **CLEAR**（native40项及parent/child目录各枚举一次、捕获先于规则探测的独立检查），综合 **APPROVE（限本批）**；两lane最终2路径前后哈希相符，未改源码/测试/文档。材料 `.tmp/rule-order/{tests-first.log,review-code.md,review-architecture.md,reversals/results.json,cli-smoke-results.json,normproof-out/}`。本批未重跑全仓/scripts/PTY/真实provider，提交/推送/精确CI另验，Phase19 active。

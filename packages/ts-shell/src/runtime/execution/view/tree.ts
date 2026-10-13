@@ -102,9 +102,11 @@ export async function materializeView(sources: ViewSources, selection: ViewSelec
   }
   async function visit(directory: string, depth: number, rules: Rules): Promise<void> {
     await fsp.mkdir(sources.destination(directory), { recursive: true, mode: 0o700 });
+    // Capture directory currency before optional rule probes and their awaits.
+    const capturedEntries = await entries(sources, directory, depth);
     rules = await directoryRules(sources, directory, rules, selection);
     const files: string[] = [];
-    for (const entry of await entries(sources, directory, depth)) {
+    for (const entry of capturedEntries) {
       budget.check();
       if (entry.name === '.git' || pruned.includes(entry.name)) continue;
       const file = path.join(directory, entry.name);

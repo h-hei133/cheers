@@ -2218,3 +2218,18 @@ Node20.3/单文件×stable/changed四条实际print CLI通过；stable共4合成
 具体未覆盖窗口保留：directoryRules先探测不存在的规则文件，之后entries才捕获目录初始修订；这两点之间新增规则可能被遗漏且新目录修订成为基线。该窗口没有单独时间上界；本批不据目录复查宣称覆盖它，继续按SAFE-02处理。
 
 最终独立code **APPROVE**、architecture **CLEAR**，综合 **APPROVE（限本批）**；code原149项后在最终字节通过4项native子集、guard与六项capture探针，architecture原151项后在最终字节通过native38项、安全mixed及四项currency/alias/budget探针。原冻结套件不当作最终全套，复验不相加；两lane最终9路径前后哈希一致，无源码/测试/文档编辑。材料 `.tmp/directory-currency/{review-code.md,review-architecture.md,review-architecture-guard.md}`。
+
+
+该目录修订组件已提交/推送 `1fc329c685b38da1dab69c7bef2ba30667eac2a5`，12个原始路径/blob对照冻结源码/文档审计通过，用户`.gitignore`排除且原SHA保持、远端同SHA。CI38333984581/job115089837603与Watch38333984529/job115089837690均completed/failure、steps=[]；annotations确认付款/spending-limit阻止启动，无远端验证通过。首次读取annotations遇到EOF，属于观察网络失败，重读同run/job成功后才完成归因；材料 `.tmp/directory-currency/{commit-audit.json,delivery.json}`。
+
+### 8.150 SAFE-02：原生目录先捕获、规则后探测
+
+§8.149独立评审指出的窗口已用实际子进程复现：缺失规则探测返回false后创建规则，原Git枚举仍包含应隐藏文件，原ripgrep搜索还返回其正文。修复仅在现有[视图tree owner](../../packages/ts-shell/src/runtime/execution/view/tree.ts)把目录enumeration/capture移至可选规则探测前；后续loop复用同一entries，不增加第二次遍历或额外walker。由既有sources ledger在native计划/最终发布时拒绝目录修订变化，规则解析、层次优先级、tracked例外、prune及全部资源预算保持原owner。
+
+定向参考保持manifest-first、ignore前缀/优先级和普通缺失诊断；其同步实现先读规则再枚举，本项目对异步顺序明确不同意，因为child实测能产生混合视图。沿用已验证的本地目录revision owner，两个Git/search回归和一个顺序反转约束这一差异。初次search用例误传位置参数，属harness/setup，未计产品失败；按当前input/outcome契约纠正后，两路基线均实际AssertionError，修复后通过。
+
+最终2TS/1production，`inventory-final.json` SHA256 `255ef93b43222be8353511bb17fd164b0d426778ec241bfab2aa66bced894166`；Node20.3受影响9文件/167项通过。本批只覆盖native visit已枚举目录的可选规则探测顺序；ancestor-only规则、初始缺失repo metadata、未枚举树和最后逐源检查后的变化仍未证明，不据此宣称catalog或目录事务。SAFE-02/Phase19 active，其余构建/门/反转/actual CLI、独立评审和交付分别记录。
+
+两构建、四源码门、docs strict通过；完整judge exit0，图义务satisfied、4既有ceiling advisory仍partial。一项隔离顺序反转使两路回归均实际AssertionError，正向副本通过、原源码/用户`.gitignore`保持。Node20.3/单文件×stable/changed四条actual print CLI共8合成POST：stable实际grep返回目标正文；changed在已有规则IN_ACCESS后child创建新规则，工具安全返回Search stopped: failed，零END_NEEDLE/零旧结果；CLI exit0表示回合完成，不计搜索成功。原数据/已有规则字节保持，本次call ID核对。
+
+独立code **APPROVE**（native40项及两路capture-before-probe/child/关闭/清理检查），architecture **CLEAR**（native40项及parent/child目录各枚举一次、捕获先于规则探测的独立检查），综合 **APPROVE（限本批）**；两lane最终2路径前后哈希相符，未改源码/测试/文档。材料 `.tmp/rule-order/{tests-first.log,review-code.md,review-architecture.md,reversals/results.json,cli-smoke-results.json,normproof-out/}`。本批未重跑全仓/scripts/PTY/真实provider，提交/推送/精确CI另验，Phase19 active。

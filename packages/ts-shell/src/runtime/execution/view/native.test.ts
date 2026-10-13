@@ -80,6 +80,27 @@ linux('refuses a native view after a child adds rules to an enumerated directory
   expect(fs.readFileSync(path.join(root, 'public.txt'), 'utf8')).toBe('needle public');
 });
 
+linux.each(['git', 'search'] as const)('refuses %s output when a child creates a rule after its absence probe', async mode => {
+  if (mode === 'git') git('init', '-q');
+  const file = path.join(root, mode === 'git' ? '.gitignore' : '.ignore');
+  const exists = fs.existsSync;
+  let changed = false;
+  const probe = vi.spyOn(fs, 'existsSync').mockImplementation(target => {
+    const found = exists(target);
+    if (target === file && !found && !changed) {
+      execFileSync(process.execPath, ['-e', 'require("node:fs").writeFileSync(process.argv[1], "public.txt\\n")', file]);
+      changed = true;
+    }
+    return found;
+  });
+  try {
+    if (mode === 'git') await expect(listWorkspaceFiles(root)).rejects.toThrow(/no complete native answer/i);
+    else await expect(searchWithRipgrep({ workspaceRoot: root, pattern: 'needle', searchPath: '', limit: 10,
+      assertFileAccess: () => {} })).resolves.toEqual({ ok: false, reason: 'failed' });
+    expect(changed).toBe(true);
+  } finally { probe.mockRestore(); }
+});
+
 linux('keeps tracked exceptions, nested rules, and literal names under native metadata isolation', async () => {
   git('init', '-q');
   fs.writeFileSync(path.join(root, '.gitignore'), '*.tmp\n');

@@ -101,9 +101,9 @@ Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)�
 | macOS/Windows | 部分 profile、接口与纯逻辑用例 | 原生路径/文件描述符、进程树清理、终端与设备尚未取得等价实机证据 |
 | 模型传输与严格预算 | 合成 HTTP/SSE/usage/重试/unknown、统一 request admission | W7-33 四端点真实 TLS/HTTP2 矩阵仍缺；无法证明上界的请求继续拒绝 strict cap 准入 |
 | 公共包、认证、协作和 SSH | 受控服务、签名、ACL、撤权、重连与未知副作用 | 真实账户、公共部署 TLS、真实远端主机/主机密钥和生产互通验收 |
-| SAFE-02 | Linux 公开文件工具的检查/句柄/拒绝/清理及受管编辑目录固定；原生 Git/ripgrep 私有视图、配置准入和 child 完成收据；异步技能发现、批准前捕获与共享预算；读取期间及 catalog 发布前已捕获 manifest/ignore/Git 来源变化拒绝；本地remote-URL条件及native配置错误拒绝，已枚举目录修订核验和最终复查，见 §7–14 | 非 Linux 实际对象绑定、未枚举或初始缺失来源的并发一致性与私有镜像剩余成本继续开放；外部 metadata 仍拒绝，未知future hasconfig不宣称支持，资源计数器不约束原生进程内部全部读取 |
+| SAFE-02 | Linux 公开文件工具的检查/句柄/拒绝/清理及受管编辑目录固定；原生 Git/ripgrep 私有视图、配置准入和 child 完成收据；异步技能发现、批准前捕获与共享预算；读取期间及 catalog 发布前已捕获 manifest/ignore/Git 来源变化拒绝；本地remote-URL条件及native配置错误拒绝，已枚举目录修订核验和最终复查、native visit先捕获后探测规则，见 §7–15 | 非 Linux 实际对象绑定、未枚举或初始缺失来源的并发一致性与私有镜像剩余成本继续开放；外部 metadata 仍拒绝，未知future hasconfig不宣称支持，资源计数器不约束原生进程内部全部读取 |
 
-技能发现的同步正文/Git 忽略路径已按 §9 替换；§10 拒绝检测到的读取期间源变化，§11–12 在 catalog 发布前复查已捕获 manifest、ignore 与 Git 来源。§14继续拒绝已枚举目录的已知修订变化；SAFE-02继续处理非Linux对象绑定、未枚举或初始缺失来源和镜像成本，扩展外部 metadata/条件支持须重新证明准入。逐文件检查不保证其后全部变化或整目录事务。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把 W1–W16 或 Phase 19 总目标标为完成。
+技能发现的同步正文/Git 忽略路径已按 §9 替换；§10 拒绝检测到的读取期间源变化，§11–12 在 catalog 发布前复查已捕获 manifest、ignore 与 Git 来源。§14拒绝已枚举目录的已知修订变化，§15修复native visit的规则探测顺序；SAFE-02继续处理非Linux对象绑定、未枚举或初始缺失来源和镜像成本，扩展外部 metadata/条件支持须重新证明准入。逐文件检查不保证其后全部变化或整目录事务。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把 W1–W16 或 Phase 19 总目标标为完成。
 
 ## 6. 迁移、回退与交付
 
@@ -278,3 +278,21 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 最终独立code **APPROVE**、architecture **CLEAR**，综合 **APPROVE（限本批）**；code原149项后在最终字节通过4项native子集、guard与六项capture探针，architecture原151项后在最终字节通过native38项、安全mixed及四项currency/alias/budget探针。原冻结套件不当作最终全套，复验不相加；两lane最终9路径前后哈希一致，无源码/测试/文档编辑。材料 `.tmp/directory-currency/{review-code.md,review-architecture.md,review-architecture-guard.md}`。
 
 未覆盖的具体窗口为规则不存在探测之后、目录初始修订捕获之前；此间新增规则可能未进入本次视图。目录复查不把该窗口或未枚举树变成已验证。文件capture缓存复用现在先保留普通文件准入，拒绝原始EISDIR而返回safe owner错误；实际回归、guard增量评审和第四项反转均通过。
+
+
+该目录修订组件已提交/推送 `1fc329c685b38da1dab69c7bef2ba30667eac2a5`，12个原始路径/blob对照冻结源码/文档审计通过，用户`.gitignore`排除且原SHA保持、远端同SHA。CI38333984581/job115089837603与Watch38333984529/job115089837690均completed/failure、steps=[]；annotations确认付款/spending-limit阻止启动，无远端验证通过。首次读取annotations遇到EOF，属于观察网络失败，重读同run/job成功后才完成归因；材料 `.tmp/directory-currency/{commit-audit.json,delivery.json}`。
+
+## 15. SAFE-02 原生规则探测顺序局部验收（2026-10-13）
+
+现有native visit先捕获目录，再探测规则；缺失规则探测之后的child创建改变已保留revision，拒绝旧完整答案。native glob/ignore优先级、tracked与prune语义不新增解析器或重复遍历。
+
+| 证据 | 实际结果 | 材料/边界 |
+|---|---|---|
+| 最终冻结 | 2TS/1production，用户`.gitignore`原SHA保持 | `inventory-final.json` SHA256 `255ef93b43222be8353511bb17fd164b0d426778ec241bfab2aa66bced894166` |
+| 两路基线/修复 | corrected基线Git/ripgrep均AssertionError；修复9文件/167项通过 | `tests-baseline-repair.log`、`tests-first.log`；初次search调用错误只计harness/setup |
+
+材料 `.tmp/rule-order/`；顺序修复只覆盖native visit目录，ancestor-only规则、初始缺失metadata、未枚举树、非Linux实际对象和外部metadata保持未验。逐源revision不是全目录事务或未来稳定保证。构建/门/反转/actual CLI、独立评审和提交/推送/精确CI分别取证；Phase19 active。
+
+两构建、四源码门、docs strict通过；完整judge exit0，图义务satisfied、4既有ceiling advisory仍partial。一项隔离顺序反转使两路回归均实际AssertionError，正向副本通过、原源码/用户`.gitignore`保持。Node20.3/单文件×stable/changed四条actual print CLI共8合成POST：stable实际grep返回目标正文；changed在已有规则IN_ACCESS后child创建新规则，工具安全返回Search stopped: failed，零END_NEEDLE/零旧结果；CLI exit0表示回合完成，不计搜索成功。原数据/已有规则字节保持，本次call ID核对。
+
+独立code **APPROVE**（native40项及两路capture-before-probe/child/关闭/清理检查），architecture **CLEAR**（native40项及parent/child目录各枚举一次、捕获先于规则探测的独立检查），综合 **APPROVE（限本批）**；两lane最终2路径前后哈希相符，未改源码/测试/文档。材料 `.tmp/rule-order/{tests-first.log,review-code.md,review-architecture.md,reversals/results.json,cli-smoke-results.json,normproof-out/}`。本批未重跑全仓/scripts/PTY/真实provider，提交/推送/精确CI另验，Phase19 active。
