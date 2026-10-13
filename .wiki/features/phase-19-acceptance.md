@@ -403,4 +403,6 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 
 `regular-box.raw`（732,294B、324 个 `\x1b[?2026h`）不是产品空闲重绘：该会话的 `request.json`/`ack.json` 止于 `id 2 = launch`，无 `send`；帧内容是 composer 停在 `/`、方向键走完 106 项斜杠目录约三圈再加一次清稿键。斜杠目录步进只有 keymap 方向键与 pointer 鼠标两个调用点（regular 未开鼠标追踪），100ms 活动 tick 仅在 `run()` 期间武装，没有计时器/观察者能在无输入时推进。
 
+捕获脚本已按上述根因修正：[matrix.py](../../.tmp/windows-console/matrix.py) 先写 `<label>.captured.raw` 快照、再哈希该快照，记录新增 `rawEvidence` 字段（[resize.py](../../.tmp/windows-console/resize.py) 同样补字段），避免对仍在写入的 `<label>.raw` 取哈希；现有 20 条记录按此重算。
+
 材料 `.tmp/windows-console/review/{verify.py,idle-probe.py,capture-verification.json,pixel-checks.json,vision-verdicts.json,summary.json}`。证据限于“Windows Terminal 1.24.2610.01001 + WSL 产品进程 + 受控 PTY 输入”，不覆盖原生 Windows CLI/套件、真实 IME 候选窗、用户手动逐帧/字体选择或本地 NTFS；视觉判定来自单一路由且 8 张抓帧因额度/超时未取得，故不把八形态像素整体标为通过。§5 的外部服务/账户/部署条件不变，Phase19 **active**；本批仅文档，提交/推送/精确 CI 另记。
