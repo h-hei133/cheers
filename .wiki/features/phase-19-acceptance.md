@@ -606,3 +606,5 @@ owner迁移 `fce6f6a079106911dd7e5271028f20fdd59b4faa` 与分页/集成 `837aa53
 当前executable/Node20.3各regular/fullscreen PTY通过共享read、deny/approved patch、committed receipt、restart零重放与来源/配置不变，结果 `integration-pty-1792006826722337061/results.json`、`integration-pty-1792007035918592109/results.json`。Node首轮regular退出误判保留在`integration-pty-1792006826722424994/`，实际process exit0；原helper两次poll间竞态已分类，隔离副本只复查同一predicate、仍断言timeout及零退出，不改产品或原helper。该PTY不证明native枚举竞态或真实服务质量。
 
 A25-T01的cleanup发布检查已局部修复；顺序最后stat、未观察/排除子树、query-start/整树/OS原子性及广泛成本仍无保证。旧生产42 defaults仍41 complete/1原因未分类ViewSourceError、六期限拒绝；本批受控变化不能解释原拒绝或通过全部默认完成验收。8081pass/10skip全套早于本批delta；A01/A03/A12及A25整体仍开放，Phase19 **active**。详见[裁决 §10.18](phase-19-decisions.md#1018-a25--树观察的时间边界2026-10-15清理后发布缺口已局部修复)，五路径交付及精确SHA的远端状态另验，用户`.gitignore`保留排除。
+
+代码a1901132a39f4a9a956e98a80df9599f8b03734a已推送、remote/PR head一致，5冻结blob及20证据hash匹配、历史§9与用户`.gitignore`保持排除；PR描述精确读回、仍draft。精确CI38627086419/job116068873438及Watch38627086402/job116068873841各自annotations证实付款/spending-limit未启动、steps=[]、failure，无远端执行或通过，材料`tracked-view/publication-code-delivery-observation.json`。后续纯证据文档SHA另验，不重复构建/测试；Phase19 active。
