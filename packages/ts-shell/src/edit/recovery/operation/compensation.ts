@@ -16,7 +16,7 @@ export function compensateOperation(prepared: PreparedOperation, receipt: Operat
     let started = false;
     try {
       assertWorkspaceRoot({ ...file.workspace, access: 'write' });
-      const current = inspectWorkspaceFile(input.workspaceRoot, input.relativePath, input.assertFileAccess);
+      const current = inspectWorkspaceFile(input.workspaceRoot, input.relativePath, input.assertFileAccess, input.maxBytes);
       if (matchesFileState(current, expected)) {
         started = true;
         commitWorkspaceFile({ ...input, expected, content: input.before.state === 'exists' ? input.before.content : undefined,

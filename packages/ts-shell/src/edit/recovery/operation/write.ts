@@ -55,7 +55,7 @@ export function commitOperation(prepared: PreparedOperation, options: { readonly
     return withOperationStore(prepared.scope, () => {
       for (const { input, receipt: file } of prepared.files) {
         assertWorkspaceRoot({ ...file.workspace, access: 'write' });
-        if (!matchesFileState(inspectWorkspaceFile(input.workspaceRoot, input.relativePath, input.assertFileAccess), input.before)) {
+        if (!matchesFileState(inspectWorkspaceFile(input.workspaceRoot, input.relativePath, input.assertFileAccess, input.maxBytes), input.before)) {
           throw new Error('Edit batch changed before any target write.');
         }
       }
@@ -78,7 +78,7 @@ export function commitOperation(prepared: PreparedOperation, options: { readonly
           files[index] = { ...files[index]!, status: 'committed' };
         } catch {
           let unchanged = false;
-          try { unchanged = matchesFileState(inspectWorkspaceFile(input.workspaceRoot, input.relativePath, input.assertFileAccess), input.before); }
+          try { unchanged = matchesFileState(inspectWorkspaceFile(input.workspaceRoot, input.relativePath, input.assertFileAccess, input.maxBytes), input.before); }
           catch { /* The writer outcome remains unknown when inspection is unavailable. */ }
           files[index] = { ...files[index]!, status: unchanged ? 'unchanged' : 'unknown' };
           for (let remaining = index + 1; remaining < files.length; remaining++) files[remaining] = { ...files[remaining]!, status: 'unchanged' };

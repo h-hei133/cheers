@@ -188,6 +188,60 @@ describe('recorded patch batches', () => {
     expect(readOperations(scope())).toEqual([]);
   });
 
+  it.each(['approval', 'snapshot', 'before-publication', 'readback'])('keeps patch rereads bounded after %s source growth', async phase => {
+    let grown = false; let unboundedTargetReads = 0; let oversizedBytesRead = 0;
+    const target = phase === 'approval' || phase === 'snapshot' ? b : a;
+    const grow = () => { fs.truncateSync(target, 2 * 1024 * 1024); grown = true; };
+    const readFile = fs.readFileSync; const read = fs.readSync;
+    vi.spyOn(fs, 'readFileSync').mockImplementation((...args: Parameters<typeof fs.readFileSync>) => {
+      if (typeof args[0] === 'number' && fs.fstatSync(args[0]).ino === fs.statSync(target).ino) unboundedTargetReads++;
+      return readFile(...args);
+    });
+    vi.spyOn(fs, 'readSync').mockImplementation((...args: Parameters<typeof fs.readSync>) => {
+      const count = read(...args);
+      if (fs.fstatSync(args[0]).ino === fs.statSync(target).ino && grown) oversizedBytesRead += count;
+      return count;
+    });
+    if (phase === 'snapshot') {
+      const link = fs.linkSync;
+      vi.spyOn(fs, 'linkSync').mockImplementation((source, destination) => {
+        const result = link(source, destination);
+        if (String(destination).endsWith('.content')) grow();
+        return result;
+      });
+    }
+    if (phase === 'before-publication') {
+      const sync = fs.fsyncSync;
+      vi.spyOn(fs, 'fsyncSync').mockImplementation(fd => {
+        sync(fd);
+        if (!grown && fs.fstatSync(fd).isFile() && fs.readlinkSync(`/proc/self/fd/${fd}`).startsWith(path.join(workspace, '.edit-'))) grow();
+      });
+    }
+    if (phase === 'readback') {
+      const rename = fs.renameSync;
+      vi.spyOn(fs, 'renameSync').mockImplementation((source, destination) => {
+        const result = rename(source, destination);
+        if (String(destination).endsWith('/a.txt')) grow();
+        return result;
+      });
+    }
+    const result = await run(two(), phase === 'approval' ? { permissionScope: 'ask', escalationPromptHandler: async prompt => {
+      grow(); return { promptId: prompt.id, decision: 'allow-once', respondedAt: 1 };
+    } } : {});
+    expect(grown).toBe(true);
+    expect(result.messages[0]?.content).not.toContain(': committed.');
+    expect(unboundedTargetReads).toBe(0); expect(oversizedBytesRead).toBe(0);
+    expect(fs.statSync(target).size).toBe(2 * 1024 * 1024);
+    if (phase === 'approval' || phase === 'snapshot') {
+      expect(readOperations(scope())).toEqual([]);
+      expect(fs.readFileSync(a, 'utf8')).toBe('before-a\n');
+    } else {
+      expect(result.messages[0]?.content).toContain(': unknown.');
+      expect(readOperations(scope())[0]?.status).toBe('unknown');
+      expect(fs.readFileSync(b, 'utf8')).toBe('before-b\n');
+    }
+  });
+
   it('retains an interrupted intent and unknown outcome if receipt publication fails after a file commit', async () => {
     const rename = fs.renameSync;
     vi.spyOn(fs, 'renameSync').mockImplementation((source, destination) => {

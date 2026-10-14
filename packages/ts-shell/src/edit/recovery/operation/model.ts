@@ -56,6 +56,8 @@ export interface PreparedFile {
   readonly relativePath: string;
   readonly before: FileState;
   readonly content: string | undefined;
+  /** Complete-read ceiling retained across approval, snapshots and commit checks. */
+  readonly maxBytes?: number;
   readonly mode?: number;
   readonly rename?: OperationFile['rename'];
   readonly assertFileAccess?: (absolutePath: string) => void;

@@ -2632,3 +2632,12 @@ Node20.3 直接受影响 22 文件/315 项、TypeScript 与 Linux 单文件构�
 - 定向比较参考上下文加载的 user/project 来源分离、canonical 身份和角色/技能发现的确定性优先级：保留这些决定。参考的同步 `readFileSync`/`readdirSync` 没有父来源求交及等价总量上限，本批不把其全量读取/链接跟随当作安全保证；复用本项目已有 reader、source policy 与遍历预算，不建立第二套权限或发现系统。
 - Node20.3 隔离环境受影响 10 文件/109 项通过。新增 8 项覆盖实际 task 记忆 deny 零打开/零子请求、外部链接、64 KiB + 1 实际字节及关闭、缺失/取消/legacy user、管理元数据拒绝、8300 个非 Markdown 和 550 空目录。移除 task 来源接线、管理来源接线、恢复旧全量发现三组反转分别真实失败 1/1/2 项，逐字节恢复；夹具初轮缺 hook 的 2 项失败属于未到读取路径的 setup 错误，修正后通过。
 - 最终 `build:ts`、import-cycles/config-consumers/declarations/node-floor、strict docs 与 diff 空白检查均通过；NormProof 图义务满足、无阻断项，4 项既有 ceiling advisory 保留、整体 partial。当前证据限本地受影响链；A01 非 Linux 对象保证、最终集成/真实平台/独立审查和远端 CI 仍未证明。材料 `.tmp/phase19-repair/a11-reversal.log`、`a18-reversal.log`、`a23-reversal.log`、`subagents-final-normproof/`；交付另验，Phase19 active。
+
+`970c0ac998679ae2400f8d1ac21091f72037e24d` 已推送、远端同 SHA。CI `38568475880`/job `115867129224`、Watch `38568475887`/job `115867130167` 均 completed/failure、`steps=[]`，各自 annotations 确认付款/spending-limit 未启动；不计远端通过。
+
+### 10.3 A10 — 批准后的 patch 读取预算贯通
+
+- [patch plan](../../packages/ts-shell/src/edit/patch/plan.ts) 在不可变批准计划中保留每文件前后正文最大字节数，仍受原 1 MiB/文件和 4 MiB/批约束。[batch](../../packages/ts-shell/src/edit/patch/batch.ts)、[operation](../../packages/ts-shell/src/edit/recovery/operation/write.ts)、[共享 writer](../../packages/ts-shell/src/edit/authority/commit.ts) 的预检、快照后预检、提交前复验、写后读回和失败归类均传入此预算；[补偿](../../packages/ts-shell/src/edit/recovery/operation/compensation.ts) 保留同一预算。不新增 writer 或重写原有有界 inspection。
+- 定向实读参考 edit 的按文件 mutation queue、每次异步 I/O 后检查取消及 BOM/换行保留决定：继续保留原锁生命周期和精确原文政策。参考 `ops.readFile` 为全量读取且无本项目批准计划/操作收据契约，本批不照搬此资源行为；预算贯穿持久化后的实际消费者，不以预览截断代替。
+- Node20.3 隔离环境 patch/operation/writeAccess/workspace-files 共 5 文件/71 项、`build:ts` 通过。四项实际文件扩展覆盖批准后、快照后、发布前和写后读回；所有阶段零无界目标 `readFileSync`，巨型目标零正文读取。前两阶段零目标写入/零操作收据；writer intent 后结果保留 unknown，不因失败即声称零写或已补偿。移除计划预算时四项分别观察到 1/2/5/6 次无界读取而真实失败，精确恢复后组合套件通过。初轮发布前注入误命中元数据 writer、读回探针误用可复用 inode，均属夹具错误，收窄到目标目录及当前目标 inode 后通过。
+- 五项本地静态/文档门及 diff 空白检查通过；NormProof 图义务满足、4 项既有 ceiling advisory 保留、整体 partial。当前证据限本地 patch 资源链；非 Linux 对象保证、最终集成/独立审查/真实平台和精确 CI 继续开放。材料 `.tmp/phase19-repair/a10-reversal.log`、`patch-normproof/`；交付另验，Phase19 active。

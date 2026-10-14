@@ -6645,3 +6645,9 @@ Linux单文件实际patch CLI拒绝越界、合法批准创建及committed收据
 ### 2026-10-14 — A11/A18/A23 子代理读取与发现修复
 
 子代理记忆消费共享核验reader及父来源权限，64KiB有界读取，拒绝/越界/取消不启动子模型；管理发现补接父来源回调并复用角色定义配置例外。原同步loader改为有界目录流，复用WalkBudget累计entries/directories/路径字节/检查点期限，保留原优先级与不完整诊断。对照参考来源分离/canonical决定，未采用其全量读取作安全保证。受影响10文件/109项通过；三组反转实际失败1/1/2项、源码精确恢复，初轮缺hook夹具失败已分类修正。详见[裁决 §10.2](features/phase-19-decisions.md#102-a11a18a23--子代理读取权限与发现预算)；最终构建/门禁/交付另验，其余问题及平台/CI条件继续开放，Phase19 active。
+
+`970c0ac9` 已推送、远端同SHA；CI38568475880/Watch38568475887分别annotations确认付款/spending-limit未启动，steps=[]、failure，无远端通过。本批最终build:ts、五门及NormProof图义务通过，4既有ceiling advisory仍partial。
+
+### 2026-10-14 — A10 patch 批准后读取预算
+
+不可变patch计划保留前后正文最大字节数并贯穿批准后/快照后/提交复验/写后读回/补偿及失败归类，复用原inspection和writer。对照参考逐文件队列与原文保留，未采用无界读取。Node20.3隔离环境5文件/71项、build:ts通过；四阶段实际扩展回归零无界目标读取，移除预算时四项真实失败，恢复后组合通过。前两阶段零写/零操作收据，intent后保留unknown。见[裁决 §10.3](features/phase-19-decisions.md#103-a10--批准后的-patch-读取预算贯通)；静态门/交付另验，其余问题继续，Phase19 active。

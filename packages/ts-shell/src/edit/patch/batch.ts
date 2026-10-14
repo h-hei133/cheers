@@ -20,7 +20,7 @@ export async function applyPatchPlan(plan: PatchPlan, identity: EditOperationIde
       access.assertFileAccess?.(absolute);
     } }));
     for (const file of files) {
-      if (!matchesFileState(inspectWorkspaceFile(file.workspaceRoot, file.relativePath, file.assertFileAccess), file.before)) throw new Error('Patch changed after approval. Nothing was written.');
+      if (!matchesFileState(inspectWorkspaceFile(file.workspaceRoot, file.relativePath, file.assertFileAccess, file.maxBytes), file.before)) throw new Error('Patch changed after approval. Nothing was written.');
     }
     const prepared = await prepareOperation(identity, files);
     access.abortSignal?.throwIfAborted();

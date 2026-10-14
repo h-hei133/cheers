@@ -74,6 +74,8 @@ export function planPatch(input: string, context: {
   }
   if (bytes > patchLimits.totalBytes) throw new Error('Patch batch exceeds its total size limit.');
   const planned = files.map(file => Object.freeze({ ...file,
+    maxBytes: Math.max(file.before.state === 'exists' ? Buffer.byteLength(file.before.content) : 0,
+      file.content === undefined ? 0 : Buffer.byteLength(file.content)),
     mode: file.content === undefined ? undefined : file.mode ?? (file.before.state === 'exists' ? file.before.mode & 0o777 : 0o666 & ~process.umask()) }));
   const revision = hashContent(JSON.stringify({ scope, files: planned }));
   return Object.freeze({ scope, revision, files: Object.freeze(planned) });
