@@ -2776,3 +2776,23 @@ A13 owner迁移单独提交 `fce6f6a079106911dd7e5271028f20fdd59b4faa`；A07分�
 独立补审code **APPROVE**、RS-C01已闭合、无新finding；architecture **CLEAR**、无新BLOCK/WATCH；本批综合 **APPROVE**，仅适用于receipt-status delta。两份 `receipt-status-{code,architecture}-supplement.{md,json}` 已先发布证据再综合，9个冻结路径及用户`.gitignore`均匹配；代码lane独立重跑原触发器确认旧request/digest不再进入命令/event，收据未变，原失败报告/probe哈希保留。最终验收文档追加属于另记的doc-only drift，8个源码/测试hash不变，交付另冻11路径；§9历史审计保持。本地inspection缺口已解决，可信远端原请求结算仍缺明确API证明且不自动清围栏；未把先前全套8081/10称为最终字节全量证明。提交/推送/对应SHA的CI另验，Phase19 **active**；A01/A03/A12/A25与真实账户/平台/质量条件继续开放。
 
 本批 `c72a838fd7127a154f2666849c190059e13e0a1e` 已提交推送，远端分支与[PR #1](https://github.com/h-hei133/cheers/pull/1) head读回同SHA，11个冻结blob匹配，历史审计及用户`.gitignore`原hash保持且未暂存。PR仍draft，标题/描述已按最终runtime safety/recovery/account范围更新并逐字读回；旧`gh pr edit`因classic Projects GraphQL字段失效，改用仅title/body的REST PATCH完成，不改workflow。精确代码SHA的CI [38611399627](https://github.com/h-hei133/cheers/actions/runs/38611399627)/job116015404324、Watch [38611400500](https://github.com/h-hei133/cheers/actions/runs/38611400500)/job116015402610均completed/failure、steps=[]，分别读取annotations确认付款/spending-limit阻止启动；无远端产品执行、无CI通过，不重跑任务。材料 `.tmp/phase19-repair/receipt-status-code-delivery.json`、`receipt-status-code-delivery-freeze.json`、`receipt-status-pr-readback.json`。本段为后续纯证据文档，按其自身SHA另核远端状态；Phase19保持active，剩余条件不因本地查询或推送闭合。
+
+### 10.15 A25 — 当前仓库并发成本与期限验收（2026-10-15，本机局部证据）
+
+继续核对 `8522e0c2` 后确认：既有三候选性能试验均只测合成树，当前真实仓库及并发查询的成本/期限/清理证据仍缺。先登记再补测，不重复已否决的硬链接、同步写入和exclusive open-close候选。读取原view/source/tree、budget及Git/rg真实消费者后，定向比较参考的直接rg派发与原生namespace/deny-read构造：同意成熟原生工具负责匹配和系统层隔离；本项目仍需元数据准入、逐来源deny及有界遍历，不能直接挂载整个可变源树来获得更快成绩，参考也明确拒绝以可写symlink的当前目标快照假装deny-read保证。
+
+本轮先用现有owner及当前构建，在本仓库实际Git/rg名称集合下测单查询及2/4并发（各三组）、RSS/句柄/占位写入上界和10/100/1000ms期限。预先口径：默认预算下返回结果须与匹配政策的原生名称集合完全一致；超时/取消不得返回完整成功；每view最多8占位操作，返回前全部settle并移除私有目录；期限只约束检查点，不隐瞒为完成清理而超过deadline的实际时间。隔离runtime home/TMPDIR，不读真实provider配置、不修改产品或原仓库来源，只记录计数/摘要/成本。若发现行为缺陷即补记后决定修复；一台Linux仓库的测量不外推全平台或整树事务，A01/A03/A12与A25完整一致性保证继续开放。
+
+首轮真实名称差异已逐项分类：Git原生3860而产品3849，rg原生3776而产品3766；两路均省略原 `PRUNED_DIRECTORIES` 明确排除的 `.normproof` 10文件，Git另省略一个仓库外symlink。只检查该别名metadata/是否越界，未读取其内容或输出目标；未改产品政策。属于benchmark setup未应用既定剪枝/canonical containment，不作为产品回归；保留原 `mirror-live/results.json` 的names-mismatch记录，补充政策规范化基准再核对每个原始输出hash，不重写原结果为从未失败。首轮42个默认查询和6个期限查询均每view最多8占位操作、全部settle/关闭/私有目录删除；实际成本和deadline清理超时将在最终证据中按观察值报告。
+
+政策规范化后的本仓库3849 Git名称、3766 rg名称分别与原21个采样输出hash全部一致。私有Git/rg在1/2/4并发的每请求中位数分别2623.50/2023.28ms、3227.70/2597.75ms、5167.40/4141.19ms；最慢6092.58ms，原生单查询中位数16.03/21.07ms。峰值采样RSS约108.20MiB，四并发总占位操作峰值32、`fsp.open`的FileHandle峰值12，每view最大8/3；该句柄统计不含Dir内部fd/子进程pipe/整个OS进程树。采样event-loop max521.67ms/p99 141.56ms。包含observer开销、暖重复查询，成本仍显著，不以30s预算内完成称性能问题全部解决。
+
+六个10/100/1000ms期限查询全部拒绝完整成功，并返回前占位settle、受观测FileHandle关闭、私有目录删除；实际耗时Git12.26/135.06/1047.14ms，rg11.19/105.69/1051.99ms，明确包含到清理结束的超时。材料 `.tmp/phase19-repair/mirror-live/{results,classification}.json`、`run.log`、`benchmark.mjs`；六个直接consumer/owner的现有dist与当前TS按package ESM格式转译逐字节一致。单文件转译首轮忽略NodeNext package type误生CJS属验证helper设置错误，纠正核验格式后全部一致，不代表产品构建失败。本轮无产品补丁；A25当前仓库规模/并发/资源证据已补，整树一致性、广泛平台/成本优化继续开放。
+
+### 10.16 A25 — 私有空模板复制候选（2026-10-15，未采用）
+
+当前成本证据支持继续探索占位I/O而非改权限或挂载整个源树。本次新候选仅用Node原生成熟`copyFile`复制内部零字节模板到独立占位inode，模板创建后unlink并保持句柄，以`/proc/self/fd`供同进程复制；不硬链接、不复制ordinary host source、不引入依赖/可执行程序/第二语言或authority cache。先固定原5000-file Git与rg两路中位数均改善至少20%、名称完全一致的门槛；原canonical/deny/预算、最多8并发和settle-before-cleanup全部保持。只在临时合成树估算性能，模板零长度/新inode/exclusive destination须先实际验证；达到门槛后仍需在原owner实现、真实回归、反转、构建及独立审查，未达到则无产品补丁。既有被否决三候选不重做，完整A25与A01/A03/A12不因候选数字闭合。
+
+实际5000文件/50目录、Node20.3、各三次：baseline Git/rg中位数1838.76/1357.16ms，内部空模板copy1816.41/1343.59ms，仅改善1.22%/1.00%，未达双路20%门槛。模板unlink后复制成功、目标零字节/0600/独立inode、重复目标EEXIST均实际断言通过，六次候选查询累计30000占位copy且名称完全相同；这些是隔离估算而非生产模板安全/生命周期证明。材料 `.tmp/phase19-repair/mirror-live/candidate-results.json`、`candidate.log`、`candidate.mjs`；无产品改动，结束该I/O primitive替换方向。随后仅剖析当前查询的同步路径成本，未经热点证据不缓存authority或改原目录政策。
+
+在同一真实仓库对现有Git/rg各一次做只读CPU profile及同步FS计数：总elapsed约2922.90/2125.54ms，两个查询共native realpath94274次/约801.35ms、exists104826次/335.19ms、JS realpath5049次/88.47ms；CPU self-samples中realpath约915.64ms、access455.92ms，idle2116.20ms。不同计时可能嵌套且observer有开销，不将这些数直接相加或声称完整关键路径证明。该证据否决“只替换JS realpath就能消除主要成本”的猜测；下一方向应先证明可减少哪些重复路径工作而不削弱canonical/deny/变更复验，不能依据计数引入跨请求authority cache。材料 `mirror-live/profile.{json,mjs,cpuprofile}`，无产品修改或性能完成声称。

@@ -6713,3 +6713,7 @@ implementation匹配已知mode和当前权限位；顾问/调度复用同一cano
 新增 `/usage reset status [request-id]`，在当前持久账户下跨会话/过期凭据/离线查看原有界收据，零网络/消费/写入且unknown围栏不变。独立初审发现PostToolUse切换账户后旧明细仍泄入命令/event；先记录RS-C01 HIGH，再在本地owner保留私有明细并完成hook后/命令前核验，原失败报告保留。最终4文件/82项、Node20.3两种构建、五门及Node/executable regular/fullscreen PTY通过，三反转实际失败1/2/1场景、原字节恢复；NormProof无阻断、4既有advisory/partial。独立补审APPROVE/CLEAR、本批综合APPROVE，源码freeze9保持并单独记录最后证据文档漂移。详见[裁决 §10.14](features/phase-19-decisions.md#1014-a13--未知兑换收据的只读查询缺口2026-10-15本地修复已验证)与[验收 §26.3](features/phase-19-acceptance.md#263-只读权益收据查询与账户输出边界)。可信远端原请求结算、真实账户/平台及A01/A03/A12/A25仍开放，Phase19 active；提交/推送/精确CI另验，不把历史全套称为本批最终字节全量证明。
 
 功能c72a838f已推送、remote/PR head同SHA、11冻结blob匹配，用户`.gitignore`保留排除；PR标题/描述按最终范围更新且仍draft。精确CI38611399627/job116015404324及Watch38611400500/job116015402610各自annotations确认付款/spending-limit未启动、steps=[]、failure，无远端通过。本段纯证据文档交付另核自身SHA，Phase19 active。
+
+### 2026-10-15 — A25 真实仓库并发成本与候选裁决
+
+现有owner在本仓库隔离Node20.3运行42个1/2/4并发默认枚举及6个短期限请求，全部占位settle、受观测FileHandle关闭、私有目录清理。首轮差异分类为原剪枝10文件及一个Git外部symlink，原记录保留；政策规范化3849/3766名称与全部输出hash一致。Git/rg单查询中位2623.50/2023.28ms，四并发5167.40/4141.19ms；峰值RSS108.20MiB、总占位32/FileHandle12（不含Dir或进程pipe），期限拒绝明确保留清理超时。新内部空模板copy仅改善1.22%/1.00%，未达20%门槛，未进产品；CPU profile确认大量实时canonical/access调用，未经安全证明不缓存authority或盲改JS realpath。见[裁决 §10.15–16](features/phase-19-decisions.md#1015-a25--当前仓库并发成本与期限验收2026-10-15本机局部证据)与[验收 §26.4](features/phase-19-acceptance.md#264-当前真实仓库的私有枚举成本)。本轮仅证据文档，源码不变，不重复构建/测试；A01/A03/A12/A25完整保证继续开放，Phase19 active，GitHub交付另核。

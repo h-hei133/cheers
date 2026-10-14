@@ -570,3 +570,17 @@ owner迁移 `fce6f6a079106911dd7e5271028f20fdd59b4faa` 与分页/集成 `837aa53
 补修后的Node20.3/executable regular/fullscreen真实PTY各通过，结果在 `receipt-status-pty-1792000189567191167/results.json`、`receipt-status-pty-1792000277814364446/results.json`：过期合成账户、离线、跨会话请求ID查询、unknown围栏保留、零模型请求、收据原字节/mtime与配置不变、raw私密字段未投影。独立code supplement为APPROVE（原触发器重跑旧明细未泄出），architecture supplement为CLEAR，本批综合APPROVE；原失败报告及freeze9保留，最终doc-only drift另冻，源码hash不变。范围限本地查询delta，不代表整个Phase19或最终字节全套通过；可信远端结算、真实账户/平台质量、A01/A03/A12/A25仍开放。见[裁决 §10.14](phase-19-decisions.md#1014-a13--未知兑换收据的只读查询缺口2026-10-15本地修复已验证)，GitHub交付与对应CI另验，Phase19 **active**。
 
 功能交付 `c72a838fd7127a154f2666849c190059e13e0a1e` 已推送、branch/PR head同SHA、11冻结blob匹配，用户`.gitignore`未暂存且原hash保留，PR标题/描述按最终范围更新并读回、仍draft。该SHA的CI38611399627/job116015404324及Watch38611400500/job116015402610均completed/failure、steps=[]，各自annotations证实付款/spending-limit未启动；无远端产品执行或CI通过。材料 `receipt-status-code-delivery.json`、`receipt-status-pr-readback.json`，后续纯证据文档SHA单独核对，不重复构建/测试或重跑被账单阻断的任务。
+
+### 26.4 当前真实仓库的私有枚举成本
+
+在`8522e0c2`、隔离Node20.3/Linux runtime home/TMPDIR下，现有Git/rg实际owner对本仓库运行1/2/4并发、每种三组，共42个默认查询；另6个10/100/1000ms期限查询。六个直接owner/consumer的dist与当前TS按已核验的package ESM格式逐字节一致。原始baseline未应用既定剪枝，故保留names-mismatch记录；定向分类确认仅`.normproof`10文件及一个Git仓库外symlink，未读别名内容，产品无改动。独立再读原生列表的初始hash一致，应用原政策后3849 Git/3766 rg名称与全部原采样输出hash一致。材料 `.tmp/phase19-repair/mirror-live/{results,classification}.json`、`benchmark.mjs`、`run.log`。
+
+| 每组并发数 | Git 每请求中位数 | rg 每请求中位数 | 实际默认请求数 |
+|---|---|---|---|
+| 1 | 2623.50ms | 2023.28ms | 各3 |
+| 2 | 3227.70ms | 2597.75ms | 各6 |
+| 4 | 5167.40ms | 4141.19ms | 各12 |
+
+原生单查询中位数16.03/21.07ms，私有最慢6092.58ms；采样峰值RSS108.20MiB、event-loop max521.67ms/p99 141.56ms。每view占位峰值8、`fsp.open` FileHandle峰值3，四并发总峰值32/12；不含Dir内部fd、子进程pipe或OS进程树。全部48查询返回前占位settle、受观测FileHandle关闭、私有目录移除。六个短期限均拒绝完整成功，Git实际12.26/135.06/1047.14ms、rg11.19/105.69/1051.99ms，含清理超时；不声称硬时限、全局并发资源上界、全平台或整树事务。
+
+新的内部空模板copy候选在5000文件/50目录各三次只改善Git1.22%/rg1.00%，未到先定双路20%门槛，零长/独立inode/0600/EEXIST及native名称一致只证明隔离原型，无产品补丁。CPU profile指向大量实时canonical/access调用（两个实际查询94274/104826次），JS realpath仅5049次；计时嵌套/observer开销显式保留，不盲改FS primitive或缓存authority。材料 `candidate-results.json`、`profile.json`及对应脚本/profile。本轮补齐本机实际规模/并发/期限资源证据，性能优化、A25整树一致性及A01/A03/A12仍开放，Phase19 active；历史合成结果不重写，源码/配置/用户`.gitignore`保持，交付按自身SHA另验。
