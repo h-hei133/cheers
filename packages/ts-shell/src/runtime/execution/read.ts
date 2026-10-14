@@ -51,6 +51,32 @@ function workspaceTarget(target: string, requestedRoot: string, realRoot: string
   return checked.allowed ? checked.resolvedPath : contained(target, realRoot)
 }
 
+type ReadAncestor = { readonly path: string; readonly identity: BigIntStats }
+
+/** A surviving leaf hard link must not hide replacement of its authorized ancestry. */
+function captureReadAncestors(target: string, root: string): ReadAncestor[] {
+  const canonicalRoot = contained(root, root)
+  const relative = path.relative(canonicalRoot, target)
+  if (path.isAbsolute(relative) || relative === '..' || relative.startsWith(`..${path.sep}`)) throw new ReadChangedError()
+  const depth = relative.split(path.sep).filter(Boolean).length
+  const ancestors: ReadAncestor[] = []
+  let parent = depth === 0 ? target : path.dirname(target)
+  for (let index = 0; index < Math.max(1, depth); index++) {
+    const identity = statSync(parent, { bigint: true })
+    if (!identity.isDirectory() || identity.ino === 0n) throw new ReadChangedError()
+    ancestors.push({ path: parent, identity })
+    parent = path.dirname(parent)
+  }
+  return ancestors
+}
+
+function verifyReadAncestors(ancestors: readonly ReadAncestor[]): void {
+  for (const ancestor of ancestors) {
+    const current = statSync(ancestor.path, { bigint: true })
+    if (!current.isDirectory() || !sameFile(ancestor.identity, current)) throw new ReadChangedError()
+  }
+}
+
 /** Read bytes from the verified handle, never by reopening its pathname. */
 export async function readTextFile(request: TextFileReadExecutionRequest): Promise<string> {
   if (request.maxBytes !== undefined && (!Number.isSafeInteger(request.maxBytes) || request.maxBytes < 1 || request.maxBytes > 8 * 1024 * 1024)) throw new Error('Complete read byte limit is invalid.')
@@ -80,6 +106,7 @@ export async function withVerifiedReadTarget<T>(request: ReadTarget, kind: 'file
     ? realpathSync(workspaceTarget(request.artifactDirectory, request.workspaceRoot, workspace)) : workspace
   const target = contained(workspaceTarget(request.absolutePath, request.workspaceRoot, workspace), root)
   request.assertFileAccess?.(target)
+  const ancestors = process.platform === 'linux' ? [] : captureReadAncestors(target, root)
   const before = statSync(target, { bigint: true })
   if (kind === 'file' ? !before.isFile() : !before.isDirectory()) throw new Error(`Read target must be a ${kind === 'file' ? 'regular file' : 'directory'}.`)
   const handle = await fs.open(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0) | (kind === 'directory' ? (constants.O_DIRECTORY ?? 0) : 0))
@@ -97,6 +124,7 @@ export async function withVerifiedReadTarget<T>(request: ReadTarget, kind: 'file
       // Only Linux exposes the actual open object through this interface.
       const actual = process.platform === 'linux' ? await fs.realpath(`/proc/self/fd/${handle.fd}`) : await fs.realpath(target)
       const current = statSync(target, { bigint: true })
+      verifyReadAncestors(ancestors)
       const checked = verifyPathContainment(actual, root)
       if (!checked.allowed || checked.resolvedPath !== target || realpathSync(request.workspaceRoot) !== workspace
         || !sameFile(opened, current)) {

@@ -135,6 +135,74 @@ describe('verified text reads', () => {
     expect(close!).toHaveBeenCalledOnce()
   })
 
+  it.each(['parent', 'workspace'])('rejects non-proc %s replacement even when the leaf identity and revision survive', async boundary => {
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform')!
+    const target = path.join(workspace, 'source/file.txt')
+    const originalDirectory = boundary === 'workspace' ? workspace : path.join(workspace, 'source')
+    const replacement = path.join(root, 'replacement')
+    const replacementFile = boundary === 'workspace' ? path.join(replacement, 'source/file.txt') : path.join(replacement, 'file.txt')
+    fs.mkdirSync(path.dirname(replacementFile), { recursive: true })
+    fs.linkSync(target, replacementFile)
+    const before = readRevision(fs.statSync(target, { bigint: true }))
+    const open = fsp.open
+    let captured: Awaited<ReturnType<typeof open>> | undefined
+    let read: ReturnType<typeof vi.spyOn> | undefined
+    vi.spyOn(fsp, 'open').mockImplementationOnce(async (...args) => {
+      captured = await open(...args)
+      read = vi.spyOn(captured, 'readFile')
+      fs.renameSync(originalDirectory, path.join(outside, 'moved'))
+      fs.renameSync(replacement, originalDirectory)
+      expect(readRevision(fs.statSync(target, { bigint: true }))).toBe(before)
+      return captured
+    })
+    const published = vi.fn()
+    Object.defineProperty(process, 'platform', { value: 'darwin' })
+    try {
+      await expect(service.readTextFile(request(undefined, { onCapturedSource: published }))).rejects.toMatchObject({ name: 'ReadChangedError' })
+      expect(read).not.toHaveBeenCalled()
+      expect(published).not.toHaveBeenCalled()
+      expect(captured?.fd).toBe(-1)
+    } finally { Object.defineProperty(process, 'platform', platform) }
+  })
+
+  it.each([false, true])('checks non-proc ancestry after capture while allowing unrelated entries: replacement=%s', async replaceParent => {
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform')!
+    const target = path.join(workspace, 'source/file.txt')
+    const replacement = path.join(root, 'replacement')
+    fs.mkdirSync(replacement)
+    fs.linkSync(target, path.join(replacement, 'file.txt'))
+    const before = readRevision(fs.statSync(target, { bigint: true }))
+    const open = fsp.open
+    let captured: Awaited<ReturnType<typeof open>> | undefined
+    vi.spyOn(fsp, 'open').mockImplementationOnce(async (...args) => {
+      captured = await open(...args)
+      const read = captured.readFile.bind(captured)
+      vi.spyOn(captured, 'readFile').mockImplementationOnce(async (options: any) => {
+        const content = await read(options)
+        if (replaceParent) {
+          fs.renameSync(path.join(workspace, 'source'), path.join(outside, 'moved'))
+          fs.renameSync(replacement, path.join(workspace, 'source'))
+        } else fs.writeFileSync(path.join(workspace, 'source/sibling.txt'), 'unrelated')
+        expect(readRevision(fs.statSync(target, { bigint: true }))).toBe(before)
+        return content
+      })
+      return captured
+    })
+    const published = vi.fn()
+    Object.defineProperty(process, 'platform', { value: 'darwin' })
+    try {
+      const result = service.readTextFile(request(undefined, { onCapturedSource: published }))
+      if (replaceParent) {
+        await expect(result).rejects.toMatchObject({ name: 'ReadChangedError' })
+        expect(published).not.toHaveBeenCalled()
+      } else {
+        await expect(result).resolves.toBe('\ufeffauthorized\r\n')
+        expect(published).toHaveBeenCalledOnce()
+      }
+      expect(captured?.fd).toBe(-1)
+    } finally { Object.defineProperty(process, 'platform', platform) }
+  })
+
   it('rechecks denial on the opened target and closes on rejection', async () => {
     const open = fsp.open.bind(fsp)
     let read: ReturnType<typeof vi.spyOn>

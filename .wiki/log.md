@@ -6617,3 +6617,9 @@ Windows Node20.3 经仓库 UNC 运行实际 CLI：零输入启动/EOF、print、
 ### 2026-10-14 — 原生 Windows ConPTY 两模式交互验收
 
 未改产品源码，Windows Node20.3 的实际CLI在原生ConPTY下运行regular/fullscreen，各17检查点通过，共6次localhost合成POST。进程自身确认win32、三流TTY和100×32→55×20→110×35尺寸；补全、清稿零发送、中文多行粘贴精确请求、取消连接与独立恢复回答、自然退出0及raw/mode恢复均验。关闭Job前已无进程，宿主另按记录PID核验残留。10直接owner转译与dist字节相同，18稳定证据hash核验通过；六次harness失败保留并分类，用户`.gitignore`原字节保持。本批仅验收文档，未跑新构建/全套；实际前端像素、IME/剪贴板、NTFS写入、完整Windows套件、macOS/真实服务及CI付款条件仍开放。见[裁决§8.158](features/phase-19-decisions.md)、[验收§23](features/phase-19-acceptance.md)，材料`.tmp/windows-interactive/`；交付另验，Phase19 active。
+
+### 2026-10-14 — SAFE-02 读取祖先身份修复
+
+原生Windows复现父目录移出/硬链接替代后leaf完整revision不变而仍读取发布；共享read owner现于open前捕获规范父目录至授权根、在已有检查点复验身份，允许无关sibling更新。2TS/1production，Node20.3受影响22文件/315项、两构建/四源码门通过，完整judge图义务满足、4既有ceiling advisory仍partial，owner函数名15。一次隔离反转令三条拒绝断言真实失败；隔离WindowsNode20.3、Linuxfloor与Windows编译read owner均零read/零发布/关闭。实际WindowsCLI和Linux单文件各2路径共8合成POST，合法正文/越界拒绝、本次ID及原字节核验。用户`.gitignore`原hash保持。
+
+独立code APPROVE、architecture WATCH无blocker，综合COMMENT（限本批）；架构原生确认两次检查之间移出/读取/恢复仍返回正文与来源，完整非Linux对象绑定继续开放。隔离handle-path候选在UNC移动后返回旧路径，另一候选的Windows单文件NAPI终结崩溃均未进入产品；早期环境未跨WSL转发的结果保留为unisolated中间材料，最终native consumer明确断言隔离。见[裁决§8.159](features/phase-19-decisions.md)、[验收§24](features/phase-19-acceptance.md)和`.tmp/object-binding/`。当前全套、NTFS/macOS、未观察树/镜像成本、真实服务/设备/W7-33及CI条件仍开放，Phase19 active；文档门禁/提交/推送另验。

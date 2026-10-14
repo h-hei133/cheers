@@ -11,7 +11,7 @@ summary: "记录完整源码图、契约门禁、全套测试、实际 CLI 及�
 
 Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)的 16 批、76 项为范围，分别记录实现、局部验收和剩余条件。W16 修复了此前无法取得完整依赖图证明的检查器，并恢复重构后失效的契约门禁；全阶段完成仍需下面列明的剩余工作。
 
-§1–4 的完整套件和冻结证据属于 W16 提交 `f43ae09ec90a5890b768598ab52a17821c5e9efc`。后续 SAFE-02 Linux 原生读取变更分别记录在 §7–17，§18 的全套属于 `32b31107` 源码，不能把历史全套直接套用到后续源码。§19–21 补充未改源码的 Windows 读取、前端、CLI 和进程证据；§22 修复 Windows 大小写包含边界并运行直接受影响套件、构建、原生与实际 CLI 检查，没有重新运行当前全套。§23 在未变的 §22 源码上补充原生 Windows ConPTY 两模式交互证据。
+§1–4 的完整套件和冻结证据属于 W16 提交 `f43ae09ec90a5890b768598ab52a17821c5e9efc`。后续 SAFE-02 Linux 原生读取变更分别记录在 §7–17，§18 的全套属于 `32b31107` 源码，不能把历史全套直接套用到后续源码。§19–21 补充未改源码的 Windows 读取、前端、CLI 和进程证据；§22 修复 Windows 大小写包含边界并运行直接受影响套件、构建、原生与实际 CLI 检查，没有重新运行当前全套。§23 在未变的 §22 源码上补充原生 Windows ConPTY 两模式交互证据。§24 修复非 Linux 读取检查点可见的父目录替换，并明确保留检查之间变化的缺口。
 
 ## 1. 本轮源码与验证范围
 
@@ -104,7 +104,7 @@ Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)�
 | 公共包、认证、协作和 SSH | 受控服务、签名、ACL、撤权、重连与未知副作用 | 真实账户、公共部署 TLS、真实远端主机/主机密钥和生产互通验收 |
 | SAFE-02 | Linux 公开文件工具的检查/句柄/拒绝/清理及受管编辑目录固定；原生 Git/ripgrep 私有视图、配置准入和 child 完成收据；异步技能发现、批准前捕获与共享预算；读取期间及 catalog 发布前已捕获 manifest/ignore/Git 来源变化拒绝；本地remote-URL条件及native配置错误拒绝；已枚举目录修订、visit先捕获后探测规则，可选native/技能根来源的父目录/alias观察、已知消失传播及成功/null最终复验，见 §7–17 | 非 Linux 实际对象绑定、未观察树与私有镜像剩余成本继续开放；外部 metadata 仍拒绝，未知future hasconfig不宣称支持，资源计数器不约束原生进程内部全部读取 |
 
-技能发现的同步正文/Git 忽略路径已按 §9 替换；§10 拒绝检测到的读取期间源变化，§11–12 在 catalog 发布前复查已捕获 manifest、ignore 与 Git 来源。§14拒绝已枚举目录的已知修订变化，§15修复native visit的规则探测顺序；§16复验可选native来源已观察父目录及alias，§17观察可选技能根parent并保留已知消失状态；§22修复Windows大小写边界并保留普通路径别名。SAFE-02继续处理非Linux对象绑定、未观察树和镜像成本，扩展外部metadata/条件支持须重新证明准入。逐源检查不保证其后全部变化或整目录事务。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把W1–W16或Phase19总目标标为完成。
+技能发现的同步正文/Git 忽略路径已按 §9 替换；§10 拒绝检测到的读取期间源变化，§11–12 在 catalog 发布前复查已捕获 manifest、ignore 与 Git 来源。§14拒绝已枚举目录的已知修订变化，§15修复native visit的规则探测顺序；§16复验可选native来源已观察父目录及alias，§17观察可选技能根parent并保留已知消失状态；§22修复Windows大小写边界并保留普通路径别名，§24拒绝检查点可见的祖先身份替换。SAFE-02继续处理非Linux对象绑定、检查之间及未观察树的变化和镜像成本，扩展外部metadata/条件支持须重新证明准入。逐源检查不保证其后全部变化或整目录事务。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把W1–W16或Phase19总目标标为完成。
 
 ## 6. 迁移、回退与交付
 
@@ -465,3 +465,24 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 六次早期失败分别来自验证脚本的UNC导入参数、父进程管道继承、box输入提示匹配、请求上下文预期、同步退出写入的捕获位置以及Windows文件共享下的请求rename。均保留原失败记录；最终改用file URL、创建子进程时暂时清空并立即还原父标准句柄、匹配实际box提示、精确上下文比较、读取真实ConPTY退出输出和有界共享冲突重试。未为这些验证错误修改产品。失败运行的强制清理与最终自然退出分开记录，宿主另按已记录PID复核残留，材料 `cleanup.json`。
 
 本轮仅补验收文档；没有新构建、全仓/完整Windows套件或独立代码审查。上述是**原生Windows进程和ConPTY输入/字节证据**，不扩称Windows Terminal像素、用户前端逐帧、真实IME/剪贴板、本地NTFS写入、macOS、脱离受管Job的进程或真实服务已验。§5剩余要求及远端CI付款限制仍有效，Phase19 **active**；文档门禁、提交/推送和精确SHA远端结果在 `.tmp/windows-interactive/delivery.json` 单独取证。
+
+## 24. SAFE-02 非 Linux 读取祖先检查（2026-10-14）
+
+本批起点 `93674062087d4439669d4bbf98742c07a16502a8`，仅修改共享 read owner 和其测试。冻结 SHA256 为 read.ts `cce9e2c45155b6fb5ca67d43765a3ef659c94ea149c61cd2c487a770424c5644`、read.test.ts `a95bc665989f67e2aced8d32a6ce227c85caa4add6e9cdd72cb32249ca6d2057`；用户 `.gitignore` 原 hash 保持并排除提交。
+
+准备硬链接后将打开对象的父目录移出授权根、换成另一个目录，leaf 身份与完整 revision 不变。原 Windows 读取返回正文/发布来源，Linux descriptor 路径拒绝；原始材料 `consumer-windows-before.json`、`consumer-linux-before.json` 和三项真实基线断言失败。修复在非 Linux open 前捕获父目录至规范授权根，在已有检查点复验目录身份，不以目录 revision 拒绝无关 sibling 更新；保留同句柄读取、关闭错误及来源发布顺序。artifact 根继续收窄授权范围。
+
+| 验证 | 实际结果 | 材料 |
+|---|---|---|
+| Node20.3 直接受影响组合 | 22文件/315项通过，无跳过/失败 | `affected.json` 及其中 Vitest 原始断言；单独22项read suite不相加 |
+| 构建与结构 | TypeScript构建、Linux单文件构建及version通过；四源码门通过；完整judge解析/无环满足，4既有ceiling advisory仍partial，read owner函数名15 | `build-ts.log`、`build.json`、`gates.json`、`normproof-out/` |
+| 持续替换的原生复验 | 隔离Windows Node20.3、Linux Node20.3及Windows Bun1.3.14编译的read owner均拒绝；零read、零来源发布，句柄关闭 | `native.json`、`compiled-windows.json`、`compiled-runner.json`；Windows编译探针只包含真实owner及harness |
+| 实际CLI | Windows Node20.3与Linux单文件各2条合法别名/越界拒绝路径，合计8次localhost合成POST；正文、tool ID、原文件/配置核验 | `.tmp/path-identity/cli-object-binding-win32.json`、`cli-exe-object-binding.json`；exit0仅表示回合结束 |
+| 隔离反转 | 1次移除祖先捕获/复查，3项拒绝断言实际失败；正向4项通过，原字节保持 | `reversal.json`；排除过滤掉的测试，未引用误导性的aggregate通过数 |
+| 独立审查 | code APPROVE（34项/12探针）；architecture WATCH无blocker（61项、Linux分支13探针、隔离Windows11探针），综合COMMENT | `review-code.md`、`review-architecture.md`；两项不支持的UNC symlink夹具not-run，不计通过 |
+
+所有上述相对材料位于 `.tmp/object-binding/`，CLI材料除外。原生 Windows 环境未从 Linux shell 转发的初轮结果留为 `unisolated-*`，最终通过 Windows `execFile` 显式传入隔离环境并由实际consumer断言；初次Node路径、UNC hardlink/move与probe夹具错误记录保留，不能充当产品行为证据。测试切换darwin分支只证明Linux上的分支逻辑，不能作为macOS实机结果。
+
+**架构WATCH仍开放：** native Windows lane 在两次检查之间移出父目录、让句柄读取、再恢复原目录，当前实现仍返回 `CHECKPOINT_OBJECT` 并发布来源，见 `review-architecture/checkpoint-win32.json`。保证止于已有检查点观察到的身份变化；不保证检查之间或最后检查之后的变化、非Linux actual-object绑定或整目录事务。新增metadata检查的成本随路径深度增长，未取得高延迟/深层文件系统基准。
+
+隔离handle-path候选在Windows UNC移动后返回旧授权名，见 `node20-object.json` 的真实AssertionError；另一桥接候选的Windows编译产物exit3/NAPI终结崩溃，builtin FFI导入成功也未证明绑定。未增加产品依赖或替换现有执行平面。当前没有重跑全仓/完整Windows套件、scripts、PTY或真实provider；§5的NTFS/macOS、未观察树/镜像成本、前端IME/设备、外部服务/W7-33与远端CI条件继续有效，Phase19 **active**。文档检查、提交blob和精确远端状态另存本批audit/delivery。

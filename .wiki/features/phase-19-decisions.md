@@ -2346,3 +2346,17 @@ Node20.3/单文件×stable/changed四条实际print CLI通过；stable共4合成
 10个直接owner的ESM输出与dist字节一致，源码树 `c8ae73e1…` 和用户`.gitignore`原hash保持。六个早期harness/setup失败保留，分别修正UNC导入、标准句柄继承、实际box提示、环境前缀、同步退出捕获和共享rename冲突；不为脚本错误改产品。最终18个稳定证据文件hash与请求/回答身份复核通过，材料 `.tmp/windows-interactive/{audit.json,evidence.json,cleanup.json}`，见[验收 §23](phase-19-acceptance.md)。
 
 证据限原生Windows ConPTY输入/字节/受管进程组；未新增实际前端像素、IME/剪贴板、本地NTFS写入、完整Windows套件、macOS或真实服务。仅补文档，不重跑未改源码的构建/全套；精确提交/推送和远端结果另存delivery，Phase19保持active。
+
+### 8.159 SAFE-02：读取检查点的祖先身份（2026-10-14）
+
+原生 Windows Node20.3 复现：读取前在两个目录中准备同一文件的硬链接，open 后将原父目录移出授权根并安装另一目录；leaf 的 dev/ino/size/mtime/ctime 全部不变，旧实现仍读取正文并发布来源。Linux 的实际 descriptor 路径检查拒绝同一场景。三条新增拒绝回归在原实现上真实失败，无关 sibling 新增的控制用例通过。
+
+裁决保持共享 [read owner](../../packages/ts-shell/src/runtime/execution/read.ts)：非 Linux 在 open 前捕获目标父目录到规范授权根的目录身份，在已有 verify 检查点复查目录类型和 dev/ino；artifact 使用收窄后的根。包含授权仍由原路径校验器决定，relative 只用于已准入路径的祖先层数。目录 revision 不用于此检查，以允许无关 entry 更新；正文仍由同一个句柄读取，成功关闭后才发布来源，清理失败保留优先级。Linux 继续使用原 descriptor 路径；本 owner 15 个函数名，没有新增执行平面、公开契约或产品依赖。
+
+定向比较参考读取的 pathname 重开、descriptor 关闭顺序、父路径复用和重解析决策后，保留同句柄消费及原关闭责任，拒绝以 pathname 或相同 leaf metadata 作为充分绑定证据。隔离原生桥接实验也没有形成可采用的完整方案：Windows handle-path API 在 UNC 父目录移动后仍返回旧授权名；一个桥接候选的 Windows 单文件产物出现 NAPI 终结崩溃（exit3），另一 builtin FFI 仅证明导入可用。这些材料只在 `.tmp/object-binding/`，没有进入产品依赖或构建。
+
+Node20.3 直接受影响 22 文件/315 项、TypeScript 与 Linux 单文件构建、四源码门均通过；完整 judge 的解析/无环义务 satisfied，4 个既有 ceiling advisory 仍使整体 partial。一次隔离反转移除祖先捕获/复查后，三项拒绝断言重新出现 promise resolved 失败，正向副本四项通过，原源码和用户 `.gitignore` hash 保持。隔离 native Windows20.3、Linux floor Node 与 Windows Bun1.3.14 编译的真实 read owner 均在本次持续替换场景中零字节读取、零发布、句柄关闭；Windows owner 可执行探针不冒称整个 Windows CLI 单文件产物。实际 Windows Node CLI/Linux 单文件 CLI 各验合法别名和越界拒绝，合计8次 loopback 合成 POST，核对本次 call ID、原文件和配置。
+
+独立 code **APPROVE**（34项及12探针）；architecture **WATCH，无 blocker**（61项、Linux分支13探针、隔离原生Windows11探针；两项不支持的UNC symlink夹具not-run）。综合 **COMMENT（限本批）**。架构 lane 原生复现了两次检查之间移出父目录、读取后恢复原目录的漏检：仍返回正文和来源。此项检查点限制须保留，不能将当前修复称为非Linux actual-object绑定。每次新增检查成本随授权根内路径深度增长，尚无深层/高延迟文件系统性能基准。
+
+见[验收 §24](phase-19-acceptance.md)，材料 `.tmp/object-binding/`。早期 Windows 环境没有跨 WSL 转发的结果保留为 unisolated 中间材料；最终 Windows launcher 在实际子进程中断言隔离 home/temp 和 synthetic provider。UNC hardlink/move、错误Node路径、参考probe夹具与参数失败均按harness/setup保存，不计行为通过。当前全套、NTFS/macOS、未观察树/镜像成本、真实设备/服务/W7-33及远端CI要求仍开放；Phase19 **active**，本批提交/推送/精确CI另验。
