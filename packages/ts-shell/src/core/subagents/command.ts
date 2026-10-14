@@ -34,7 +34,7 @@ function checkTarget(target: string, options: ToolGateOptions): void {
 export async function runAgentsCommand(args: readonly string[], host: AgentManagementHost): Promise<LocalCommandResult> {
   const parsed = parseAgentsArgs(args);
   if (!parsed.ok) return report(`${parsed.reason}\n${syntaxHelp(agentsSyntax)}`, 'unchanged');
-  const action = parsed.action.name; const values = parsed.args; const loader = new SubagentLoader(host.root);
+  const action = parsed.action.name; const values = parsed.args; const loader = new SubagentLoader(host.root, host.sourceAccess);
   const options = host.gate(); const refused = options.admission?.(); if (refused) return report(refused, 'unchanged');
   const discovery = loader.discover(host.trusted());
   try {

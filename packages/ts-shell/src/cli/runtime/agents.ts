@@ -2,7 +2,7 @@ import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import type { CommandContext } from '../../core/commands/types.js';
 import type { ToolGateOptions } from '../../turn/tools.js';
 import { runAgentsCommand } from '../../core/subagents/command.js';
-import { assertSourceAccess } from '../../core/query/sourcePolicy.js';
+import { assertAgentSourceAccess } from '../../core/subagents/source.js';
 import { configurationAdmission } from '../../core/shell/configuration.js';
 import { projectTrust } from '../../core/security/projectTrust.js';
 import { parseAgentsArgs } from '../../core/commands/agents/syntax.js';
@@ -28,7 +28,7 @@ export function agentsCommandFor(context: ShellRuntimeContext): NonNullable<Comm
     try { return await runAgentsCommand(args, { root, trusted: () => !projectTrust.isProjectUntrusted(root),
       gate: () => ({ ...original, admission }), sourceAccess: absolute => {
         const refused = admission(); if (refused) throw new Error(refused);
-        assertSourceAccess(absolute, root, context.session.workspaceRoots, original.permissionScope, original.denyRules);
+        assertAgentSourceAccess(absolute, root, context.session.workspaceRoots, original.permissionScope, original.denyRules);
       } }); } finally { pending.delete(context); }
   };
 }

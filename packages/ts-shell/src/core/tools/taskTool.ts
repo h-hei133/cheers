@@ -100,7 +100,7 @@ export function createTaskToolDefinition(
           const afterStart = role.admission(); if (afterStart) throw new Error(afterStart);
           let memoryContext = "";
           if (subagentDef?.memory) {
-            const mem = new AgentMemoryManager(context.workspaceRoot).loadMemory(agentType, subagentDef.memory);
+            const mem = await new AgentMemoryManager(context.workspaceRoot, context.assertSourceAccess).loadMemory(agentType, subagentDef.memory, role.signal);
             if (mem.content) memoryContext = `[Agent Persistent Memory (${subagentDef.memory})]:\n${mem.content.slice(0, 1000)}`;
           }
           if (manager) {

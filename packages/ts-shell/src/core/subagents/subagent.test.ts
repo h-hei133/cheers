@@ -97,16 +97,16 @@ describe("subagent subsystem", () => {
   });
 
   describe("AgentMemoryManager", () => {
-    it("manages and loads MEMORY.md across scopes", () => {
+    it("manages and loads MEMORY.md across scopes", async () => {
       const memoryMgr = new AgentMemoryManager(tempWorkspace);
       const agentName = "test-auditor";
 
-      const initial = memoryMgr.loadMemory(agentName, "project");
+      const initial = await memoryMgr.loadMemory(agentName, "project");
       expect(initial.content).toBe("");
 
       memoryMgr.saveMemory(agentName, "# Audit Insights\n- Always check authentication gates.", "project");
 
-      const loaded = memoryMgr.loadMemory(agentName, "project");
+      const loaded = await memoryMgr.loadMemory(agentName, "project");
       expect(loaded.content).toContain("# Audit Insights");
       expect(loaded.content).toContain("Always check authentication gates");
     });

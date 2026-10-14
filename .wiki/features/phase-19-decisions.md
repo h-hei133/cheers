@@ -2621,3 +2621,14 @@ Node20.3 直接受影响 22 文件/315 项、TypeScript 与 Linux 单文件构�
 - 定向实读参考 grep/read：采用原生搜索的流式限额决定，保留本项目缺少原生命令时的必要降级；参考上下文读取采用全量读取后展示截断，不能作为资源保证。本批复用已核验句柄的有界 reader，不另建读取器或匹配系统。
 - Linux、隔离 HOME/USERPROFILE/TMPDIR/CHEERS_TEST_ROOT、Node 20.3 下 grep/searchFailure/read/readCleanup 7 文件/95 项通过，`build:ts` 通过。新增实际增长回归核对失败状态、实际读取 10 MiB + 1 字节及句柄关闭；恰好 10 MiB 文件仍可搜索。原有三条并发修改回归的注入点由 `readFile` 改为实际分块 `read`，保留原拒绝和关闭断言。
 - 移除 grep 的 `maxBytes` 接线时，增长回归实际得到成功而失败；精确恢复源码后该回归通过。NormProof 图义务满足、无阻断项，整体 partial 来自 4 项既有函数数量 advisory。A04 本地修复验证成立；当前最终集成、独立审查、跨平台及精确远端 CI 未由本批证明，其余 §9 问题继续开放。材料 `.tmp/phase19-repair/a04-reversal.log`、`normproof/`；提交/推送另验。
+
+修复 `25fae007a6992f62c4020815b6486d678dc7438e` 已提交并推送，远端 `feat/phase-18` 读回同 SHA。CI `38567172201`/job `115862698382`、Architecture Watch `38567172208`/job `115862700203` 均 completed/failure、`steps=[]`；两个 job 的 annotations 分别确认付款/spending-limit 阻止启动，无远端验证通过。
+
+### 10.2 A11/A18/A23 — 子代理读取权限与发现预算
+
+- [memory owner](../../packages/ts-shell/src/core/subagents/agentMemoryManager.ts) 改为异步消费共享核验 reader，64 KiB 完整读取上限、取消和句柄关闭贯穿实际读取；[task](../../packages/ts-shell/src/core/tools/taskTool.ts) 传入父 `assertSourceAccess` 及角色取消信号。源文件缺失仍是可选空记忆，拒绝、超限和不稳定读取均阻止启动子模型。project/local 受工作区和具体记忆目录约束；user 必须通过父来源权限，不借角色定义配置例外扩大权限。既有 user 记忆目录回退仍保留。
+- [管理发现](../../packages/ts-shell/src/core/subagents/command.ts) 将已提供的来源回调传至原 loader；[CLI 组合](../../packages/ts-shell/src/cli/runtime/agents.ts) 复用 task 已有的角色定义来源策略，保留 user 定义的窄配置例外及 deny 求交，不能因补接回调而让正常 user 定义失效。list/discover 在读取角色正文或展示其声明名称/model 前拒绝源。
+- [loader](../../packages/ts-shell/src/core/subagents/subagentLoader.ts) 保留同步发现和原优先级，以 `opendirSync` 的 32 条预取分块收集后再排序，复用既有 `WalkBudget` 限制整次发现的 8192 entries、512 directories、1 MiB 路径字节及 2 秒检查点期限。非 Markdown 与空目录同样计数；达到累计上限关闭句柄并停止其他根，diagnostics 明确不完整，task 拒绝派发。同步系统调用自身的阻塞时间不由检查点期限保证。
+- 定向比较参考上下文加载的 user/project 来源分离、canonical 身份和角色/技能发现的确定性优先级：保留这些决定。参考的同步 `readFileSync`/`readdirSync` 没有父来源求交及等价总量上限，本批不把其全量读取/链接跟随当作安全保证；复用本项目已有 reader、source policy 与遍历预算，不建立第二套权限或发现系统。
+- Node20.3 隔离环境受影响 10 文件/109 项通过。新增 8 项覆盖实际 task 记忆 deny 零打开/零子请求、外部链接、64 KiB + 1 实际字节及关闭、缺失/取消/legacy user、管理元数据拒绝、8300 个非 Markdown 和 550 空目录。移除 task 来源接线、管理来源接线、恢复旧全量发现三组反转分别真实失败 1/1/2 项，逐字节恢复；夹具初轮缺 hook 的 2 项失败属于未到读取路径的 setup 错误，修正后通过。
+- 最终 `build:ts`、import-cycles/config-consumers/declarations/node-floor、strict docs 与 diff 空白检查均通过；NormProof 图义务满足、无阻断项，4 项既有 ceiling advisory 保留、整体 partial。当前证据限本地受影响链；A01 非 Linux 对象保证、最终集成/真实平台/独立审查和远端 CI 仍未证明。材料 `.tmp/phase19-repair/a11-reversal.log`、`a18-reversal.log`、`a23-reversal.log`、`subagents-final-normproof/`；交付另验，Phase19 active。

@@ -5,6 +5,9 @@ import { resolveUserDataFile } from '../paths/userHome.js';
 import { BUILTIN_SUBAGENTS } from './builtin.js';
 import { parseDefinition } from './definition.js';
 import { definitionIdentity, pathIdentity, readAgentFile } from './files.js';
+import { WalkBudget, WalkLimitError } from '../../runtime/execution/walk/budget.js';
+
+type DiscoveryBudget = { files: number; bytes: number; walk: WalkBudget };
 
 export interface AgentCandidate {
   readonly name: string; readonly source: SubagentDefinition['source']; readonly filePath?: string;
@@ -24,12 +27,18 @@ export class SubagentLoader {
   directories(): readonly string[] { return [this.userAgentsDir, path.join(this.workspaceRoot, '.agents', 'agents'), path.join(this.workspaceRoot, '.agents')]; }
   discover(allowProjectAgents = true): AgentDiscovery {
     const candidates: AgentCandidate[] = BUILTIN_SUBAGENTS.map(definition => ({ name: definition.name, source: 'builtin', definition: { ...definition, identity: `builtin:${definition.name}` } }));
-    const diagnostics: string[] = []; const budget = { files: 0, bytes: 0 };
-    this.scan(this.userAgentsDir, 'user', candidates, diagnostics, budget, 0);
-    if (allowProjectAgents) {
-      this.scan(this.directories()[1]!, 'project', candidates, diagnostics, budget, 0);
-      this.scan(this.directories()[2]!, 'project', candidates, diagnostics, budget, 0, true);
-    } else diagnostics.push('Project definitions are excluded because this workspace is untrusted.');
+    const diagnostics: string[] = []; const budget: DiscoveryBudget = { files: 0, bytes: 0,
+      walk: new WalkBudget(undefined, { entries: 8192, directories: 512, pathBytes: 1024 * 1024, timeoutMs: 2000 }) };
+    try {
+      this.scan(this.userAgentsDir, 'user', candidates, diagnostics, budget, 0);
+      if (allowProjectAgents) {
+        this.scan(this.directories()[1]!, 'project', candidates, diagnostics, budget, 0);
+        this.scan(this.directories()[2]!, 'project', candidates, diagnostics, budget, 0, true);
+      } else diagnostics.push('Project definitions are excluded because this workspace is untrusted.');
+    } catch (error) {
+      if (!(error instanceof WalkLimitError)) throw error;
+      diagnostics.push(`Agent discovery limit reached: ${error.message}`);
+    }
     const effective = new Map<string, AgentCandidate>();
     for (const candidate of candidates) effective.set(candidate.name.toLowerCase(), candidate);
     return { effective, candidates, diagnostics };
@@ -42,12 +51,28 @@ export class SubagentLoader {
     return registry;
   }
   getSubagent(name: string, allowProjectAgents = true): SubagentDefinition | undefined { return this.loadAllSubagents(allowProjectAgents).get(name.trim().toLowerCase()); }
-  private scan(directory: string, source: 'user' | 'project', candidates: AgentCandidate[], diagnostics: string[], budget: { files: number; bytes: number }, depth: number, skipAgents = false): void {
+  private entries(directory: string, budget: WalkBudget): fs.Dirent[] {
+    budget.take('directories', 1);
+    const handle = fs.opendirSync(directory, { bufferSize: 32 });
+    try {
+      const entries: fs.Dirent[] = [];
+      for (;;) {
+        budget.check();
+        const entry = handle.readSync(); if (!entry) break;
+        budget.take('entries', 1); budget.take('pathBytes', Buffer.byteLength(path.join(directory, entry.name)));
+        entries.push(entry);
+      }
+      budget.check();
+      return entries.sort((a, b) => a.name.localeCompare(b.name));
+    } finally { handle.closeSync(); }
+  }
+  private scan(directory: string, source: 'user' | 'project', candidates: AgentCandidate[], diagnostics: string[], budget: DiscoveryBudget, depth: number, skipAgents = false): void {
     try {
       pathIdentity(directory);
       let entries: fs.Dirent[];
-      try { entries = fs.readdirSync(directory, { withFileTypes: true }); } catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return; throw error; }
-      for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      try { entries = this.entries(directory, budget.walk); } catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return; throw error; }
+      for (const entry of entries) {
+        budget.walk.check();
         const target = path.join(directory, entry.name);
         if (entry.isDirectory() && !entry.name.startsWith('.') && !(skipAgents && entry.name === 'agents')) {
           if (depth >= 6) { diagnostics.push(`${target}: discovery depth limit reached.`); continue; }
@@ -71,6 +96,9 @@ export class SubagentLoader {
           diagnostics.push(`${target}: ${diagnostic}`);
         }
       }
-    } catch { diagnostics.push(`${directory}: agent directory is unreadable or traverses an unsafe path.`); }
+    } catch (error) {
+      if (error instanceof WalkLimitError) throw error;
+      diagnostics.push(`${directory}: agent directory is unreadable or traverses an unsafe path.`);
+    }
   }
 }

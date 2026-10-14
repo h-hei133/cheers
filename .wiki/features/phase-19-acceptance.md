@@ -522,5 +522,8 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 | 问题 | 本地证据 | 边界 |
 |---|---|---|
 | A04 grep 降级无界读取 | Node20.3 隔离环境 7 文件/95 项、build:ts 通过；实际增长至上限外时只读 10 MiB + 1 字节、失败且句柄关闭；恰好上限保留兼容；移除接线时回归实际失败、恢复后通过 | Linux 本地证据；NormProof 图义务满足、4 既有 ceiling advisory，整体 partial；最终集成/独立审查/跨平台/远端 CI 未证明 |
+| A11 子代理记忆读取 | 真实 task consumer 的 deny 零打开/零子请求、外部链接拒绝、64 KiB + 1 实际字节与关闭；缺失/取消及 legacy user 控制；移除来源接线时回归实际失败 | user 记忆无额外配置例外；共享 reader 的非 Linux 对象边界仍开放 |
+| A18 管理发现来源 | 真实管理 consumer 的 list/discover 均在正文读取前拒绝，声明 name/model 不泄出；保留 user 定义配置例外及父 deny；移除来源接线时实际失败 | 未取得本批 CLI/PTY 或独立审查证据 |
+| A23 角色发现工作量 | 8300 个非 Markdown 与 550 空目录实际触发共享 entries/directories 限额，超限关闭句柄；恢复旧发现时两项实际失败；本组受影响 10 文件/109 项通过 | 同步系统调用阻塞时间不能由检查点 deadline 保证；超限目录不报告完整发现 |
 
 当前状态为局部修复，Phase19 **active**；其余审查问题及 §5 外部条件继续开放，不能以单条修复替代最终集成验收。材料位于 `.tmp/phase19-repair/`，修复实现见[裁决 §10](phase-19-decisions.md#10-审查后修复2026-10-14进行中)。

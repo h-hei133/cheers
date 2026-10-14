@@ -3,6 +3,9 @@ import * as path from "node:path";
 import * as os from "node:os";
 import type { SubagentMemoryScope } from "./types.js";
 import { resolveUserDataFile } from "../../core/paths/userHome.js"
+import { readTextFile } from '../../runtime/execution/read.js';
+
+const MEMORY_BYTES = 64 * 1024;
 
 export interface AgentMemoryContext {
   readonly memoryDir: string;
@@ -17,7 +20,7 @@ export interface AgentMemoryContext {
 export class AgentMemoryManager {
   private readonly workspaceRoot: string;
 
-  constructor(workspaceRoot: string = process.cwd()) {
+  constructor(workspaceRoot: string = process.cwd(), private readonly sourceAccess?: (absolute: string) => void) {
     this.workspaceRoot = path.resolve(workspaceRoot);
   }
 
@@ -36,17 +39,23 @@ export class AgentMemoryManager {
     return path.join(this.workspaceRoot, ".agents", "memory", cleanName);
   }
 
-  loadMemory(agentName: string, scope: SubagentMemoryScope = "project"): AgentMemoryContext {
+  async loadMemory(agentName: string, scope: SubagentMemoryScope = "project", abortSignal?: AbortSignal): Promise<AgentMemoryContext> {
     const memoryDir = this.resolveMemoryDir(agentName, scope);
     const memoryFilePath = path.join(memoryDir, "MEMORY.md");
 
+    this.sourceAccess?.(memoryFilePath);
     let content = "";
     try {
-      if (fs.existsSync(memoryFilePath)) {
-        content = fs.readFileSync(memoryFilePath, "utf8");
-      }
-    } catch {
-      content = "";
+      content = await readTextFile({
+        operationKind: 'file.read', absolutePath: memoryFilePath,
+        workspaceRoot: scope === 'user' ? path.dirname(memoryDir) : this.workspaceRoot,
+        artifactDirectory: memoryDir, maxBytes: MEMORY_BYTES,
+        assertFileAccess: this.sourceAccess, abortSignal,
+        authority: { mode: 'read-only', source: 'tool-runtime-approval', reason: 'Read parent-authorized agent memory.' },
+        caller: 'subagent:memory', reason: 'Load optional persistent agent memory.',
+      });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
 
     return {

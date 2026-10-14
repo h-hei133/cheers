@@ -9,13 +9,15 @@ import { createTaskToolDefinition } from '../tools/taskTool.js';
 import { adaptTools, createToolHooks, type ToolGateOptions } from '../../turn/tools.js';
 import { createSubagentRunner } from '../../turn/subagent.js';
 import { runPreparedTool } from '../../turn/invoke.js';
+import { assertAgentSourceAccess } from './source.js';
 
 afterEach(cleanupAdvisorHarnesses);
 function fixture(approve?: ToolGateOptions['escalationPromptHandler']) {
   const setup = createAdvisorHarness(false, false); let trusted = true;
   const gate: ToolGateOptions = { sessionId: setup.session.id, workspaceRoot: setup.root, agentMode: 'build', permissionScope: approve ? 'ask' : 'allow-all',
     hooks: new HookDispatcher(), emit: () => {}, escalationPromptHandler: approve };
-  const host = { root: setup.root, trusted: () => trusted, sourceAccess: () => {}, gate: () => gate };
+  const host = { root: setup.root, trusted: () => trusted,
+    sourceAccess: (absolute: string) => assertAgentSourceAccess(absolute, setup.root, [], gate.permissionScope, gate.denyRules), gate: () => gate };
   const input = path.join(setup.root, 'definition.md');
   fs.writeFileSync(input, '---\nname: review\ndescription: Review files\ntools: [read, write, task]\ndisallowedTools: [write]\nmaxTurns: 2\nmodel: openai/review-model\neffort: high\n---\nROLE_PROMPT\n');
   return { ...setup, gate, host, input, command: (...args: string[]) => runAgentsCommand(args, host), trust: (value: boolean) => { trusted = value; } };
@@ -118,4 +120,19 @@ it('ordinary task source admission preserves user definitions and refuses denied
   await f.command('create', 'project', 'review', f.input);
   expect((await runPreparedTool(createTaskToolDefinition(), input, { ...options, denyRules: [{ tool: 'read', pattern: loader.getSubagent('review')!.filePath! }] })).isError).toBe(true);
   expect(captured).not.toHaveBeenCalled();
+});
+
+it('uses parent source admission before management discovery reads role metadata', async () => {
+  const f = fixture(); const directory = path.join(f.root, '.agents'); fs.mkdirSync(directory, { recursive: true });
+  const target = path.join(directory, 'hidden.md');
+  fs.writeFileSync(target, '---\nname: body-only-name\ndescription: Hidden\nmodel: body-only-model\n---\nPRIVATE_ROLE_BODY');
+  const sourceAccess = vi.fn((absolute: string) => { if (absolute === target) throw new Error('Synthetic source refusal'); });
+  const open = vi.spyOn(fs, 'openSync');
+  for (const action of ['list', 'discover']) {
+    const result = await runAgentsCommand([action], { ...f.host, sourceAccess });
+    expect(result.output).toContain('Definition source refused or unreadable');
+    expect(result.output).not.toMatch(/body-only-name|body-only-model|PRIVATE_ROLE_BODY/);
+  }
+  expect(sourceAccess).toHaveBeenCalledWith(target);
+  expect(open.mock.calls.some(call => call[0] === target)).toBe(false);
 });
