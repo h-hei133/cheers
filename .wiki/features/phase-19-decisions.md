@@ -2705,3 +2705,16 @@ Node20.3 直接受影响 22 文件/315 项、TypeScript 与 Linux 单文件构�
 - 验证先发现Poppler缺失，最初PDF绿灯仅证明unavailable拒绝，未计作真实解析。随后只在仓库临时目录解包官方Ubuntu Poppler24.02，以独立loader wrapper适配既有最小进程env，真实正文产生双换行伪造页标且仍只引用p1；旧实现确实生成p42。首轮反转参数组合错误只产生TypeError，不计反转证据；修正后才取得上述真实断言失败。初轮brief事件观察误用了parent emit，改核对原child持久事件。
 
 反转精确恢复并启用隔离Poppler后，Node20.3/Linux最终受影响17文件/197项、build:ts及五门通过；无skip，原生PDF已实际解析。NormProof图义务满足、4既有ceiling advisory/partial。提交/推送/精确CI另验。19项代码缺陷均已形成局部修复，A01/A13/A25交付及A02/A03/A12验收继续开放，Phase19 **active**，不把受控服务或本地Linux证明称为全平台/真实质量验收。
+
+研究修复 `ec9a890a3837dee070a68ae916db8b8e29ba79c5` 已提交并推送。精确 CI38577711316/job115899092653、Watch38577711327/job115899092664 均 completed/failure、steps=[]；本轮再次读取两份 annotations，分别明确付款/spending-limit 阻止启动，无远端验证通过。
+
+### 10.10 A13 — 账户额度及权益消耗入口
+
+- [账户 usage owner](../../packages/ts-shell/src/core/auth/account/usage/service.ts) 与原[命令入口](../../packages/ts-shell/src/core/commands/usageCommandRuntime.ts)接通 `/usage account`、`/usage reset` 和 `/usage reset apply <preview-id>`。范围为当前选中的、持久化的 OpenAI ChatGPT account；API key、其他协议、缺少绑定或非交互 host 明确 unavailable。普通 `/usage` 仍报告本地计量，不冒充账户额度。
+- [协议 owner](../../packages/ts-shell/src/core/auth/account/usage/remote.ts)只向固定 issuer 请求，模型 endpoint override 不接收账户 token。快照保留 quota windows、source、fetchedAt；权益列表失败不丢已知额度，也不将未知计数变成零。复用已有 public network/response/request owners，128KiB响应上限和15秒期限，不保留错误正文。过期账户须通过原登录/更新路径恢复，不另建认证续期系统。
+- 有效未过期权益按最早到期选择；预览绑定精确账户/凭据摘要、会话、credit、UUID请求ID及两分钟期限。只读预览不POST；新预览替换未用预览，旧ID拒绝，已确认/未知外部结果保留。[CLI确认](../../packages/ts-shell/src/cli/runtime/usage.ts)复用原picker/audit但不使用工具授权缓存，确认只接受当前会话allow-once；缺失确认器或allow-always均拒绝。原[审批picker](../../packages/ts-shell/src/cli/interactive/picker/approval.ts)实际遵守prompt的选项，不能显示或选择已排除的长期授权。
+- 消费走原prepared tool权限/deny/plan门，在批准后重新读取账户及当前offer，在原锁内CAS持久pending后最多派发一次。只凭明确业务code `reset`确认成功；`no_credit`/`nothing_to_reset`为refused，HTTP200缺code、网络丢失和`already_redeemed`均unknown。[状态owner](../../packages/ts-shell/src/core/auth/account/usage/state.ts)复用file lock与guarded writer/读回，0600、校验/有界收据，不存token。pending/unknown跨会话拒绝新消费及自动重放；本地收据未确认也不包装成成功。
+- 定向对照参考的账户/凭据目标、最早到期选择、UUID幂等、持久pending fence和批准后offer复读；没有采用其HTTP成功即reset、超时后自动解除围栏或自动消费。官方[套餐与用量说明](https://developers.openai.com/codex/pricing)解释账户用量/credits/重置时间，未建立上述公开兑换API保证。此实现的wire契约来自已核对的参考协议，本批只验证合成账户，不把参考兼容实现称为官方API或真实账户互通已验；该外部验收保留在A03。
+- 五个隔离反转分别移除非文件permissionArgs、独立确认lane、明确业务结果、pending/unknown围栏、最终账户复核，实际检出1/2/1/2/1项AssertionError，源码逐字节恢复；日志 `.tmp/phase19-repair/a13-{permission,confirmation,proof,fence,binding}-reversal.log`。初轮四项实际产品失败来自空targets误判无变化；已补不可变permissionArgs，随后发现普通授权bridge仍可自动回答，才改独立确认；没有通过弱化断言消除失败。
+
+反转恢复后，隔离Node20.3/Linux受影响11文件/246项、build:ts及五门通过，无skip。覆盖原账户续期/CLI摘要、普通审批和usage消费者；NormProof完整图的解析/无环义务满足，4项既有ceiling advisory仍partial，新增owner无超限。A13本地源码接通并验证；真实账户互通、A01/A25与最终集成/外部验收/精确CI继续开放，Phase19 **active**；提交/推送另验。

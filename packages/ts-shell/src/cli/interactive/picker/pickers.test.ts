@@ -279,6 +279,19 @@ describe("approval chooser", () => {
     expect(onSettle).toHaveBeenCalledWith({ decision: "allow-always" });
   });
 
+  it('honors a consumption prompt that permits only a one-time choice', async () => {
+    const onSettle = vi.fn();
+    const picker = approvalPicker({ ...samplePrompt, options: [
+      { value: 'allow-once', label: 'Allow once', description: 'Confirm this request' },
+      { value: 'deny', label: 'Deny', description: 'Refuse' },
+    ] }, onSettle);
+    expect((await picker.load()).map(option => option.id)).toEqual(['allow-once', 'deny']);
+    await picker.apply(['allow-always']);
+    expect(onSettle).toHaveBeenLastCalledWith({ decision: 'deny' });
+    await picker.apply(['allow-once']);
+    expect(onSettle).toHaveBeenLastCalledWith({ decision: 'allow-once' });
+  });
+
   it("settles with deny when preview ends or cancelled", () => {
     const onSettle = vi.fn();
     const picker = approvalPicker(samplePrompt, onSettle);

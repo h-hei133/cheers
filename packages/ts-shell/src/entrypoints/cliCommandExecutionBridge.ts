@@ -71,6 +71,7 @@ export interface BuildCliCommandExecutionInput {
   readonly securityCommand?: CommandContext['securityCommand'];
   readonly agentsCommand?: CommandContext['agentsCommand'];
   readonly mcpCommand?: CommandContext['mcpCommand'];
+  readonly usageCommand?: CommandContext['usageCommand'];
   readonly collaborationCommand?: CommandContext['collaborationCommand'];
   readonly sshCommand?: CommandContext['sshCommand'];
   readonly worktreeCommand?: CommandContext['worktreeCommand'];
@@ -184,6 +185,7 @@ export async function buildCliCommandExecution(
     securityCommand: input.securityCommand,
     agentsCommand: input.agentsCommand,
     mcpCommand: input.mcpCommand,
+    usageCommand: input.usageCommand,
     collaborationCommand: input.collaborationCommand,
     sshCommand: input.sshCommand,
     handoffCommand: input.handoffCommand,

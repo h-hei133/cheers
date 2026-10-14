@@ -41,7 +41,9 @@ History imports require one root, legal stable entry IDs, complete ancestry and 
 | `/skillful on\|off\|toggle\|status` | Control session skill-directory prompt injection. Installed skills and execution permissions have their own owners. |
 | `/extended-context on\|off\|status` | Use the supported model window or normal context policy while retaining request/output and compaction constraints. |
 | `/fresh` | Reset only the controllable local cache-warming owner, with a bounded wait and late-result fencing. Stateless or absent owners return unchanged. |
-| `/usage [show\|status]` | Report recorded session activity; absent account quota is unknown and reset credit is unavailable. |
+| `/usage [show\|status]` | Report recorded session activity; account quota remains separate. |
+| `/usage account` | Read quota windows, reset offers, source and fetch time for the current stored account; unsupported authentication remains unavailable. |
+| `/usage reset [apply <preview-id>]` | Preview the earliest valid unexpired offer without consuming it. Applying requires a fresh one-time interactive approval, the same session/account and a current offer reread. Pending/unknown outcomes refuse automatic replay. |
 | `/login …`, `/logout …` | Exact shortcuts to the existing `/connect login` and `/connect logout` authentication owner. |
 
 Fast/slow require both endpoint protocol support and model capability. Actual requests carry `service_tier`; temperature is unchanged. Legacy `fastSampling` configuration is retained with a migration notice and no sampling effect. Account entitlement, remote caches, prices and quotas are not inferred from local settings or synthetic acceptance. Session/config/catalog/credential identity is rechecked before preference publication and dispatch.

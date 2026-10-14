@@ -558,7 +558,7 @@ export function createCommandRegistry(
     },
     {
       name: 'usage', kind: 'local', supportsNonInteractive: true, availability: 'available', enabled: true,
-      summary: 'show measured session usage and unknown account quota', group: 'session',
+      summary: 'show session usage, selected account quota and explicit reset previews', group: 'session', argumentHint: '[show|account|reset [apply <preview-id>]]',
       execute: (args, context) => runUsageCommand(args, context),
     },
     {

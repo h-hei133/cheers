@@ -15,6 +15,7 @@ import { gitCommandFor, worktreeCommandFor, commitCommandFor } from '../runtime/
 import { securityCommandFor } from '../runtime/security.js';
 import { agentsCommandFor } from '../runtime/agents.js';
 import { mcpCommandFor } from '../runtime/mcp.js';
+import { usageCommandFor } from '../runtime/usage.js';
 import { collaborationCommandFor } from '../runtime/collaboration.js';
 import { sshCommandFor } from '../runtime/ssh.js';
 import { jobsCommandFor, workflowCommandFor } from '../runtime/jobs.js';
@@ -159,6 +160,7 @@ export async function routeInteractiveCommand(
     securityCommand: securityCommandFor(input.runtimeContext),
     agentsCommand: agentsCommandFor(input.runtimeContext),
     mcpCommand: mcpCommandFor(input.runtimeContext),
+    usageCommand: usageCommandFor(input.runtimeContext),
     collaborationCommand: collaborationCommandFor(input.runtimeContext),
     sshCommand: sshCommandFor(input.runtimeContext),
     handoffCommand: handoffCommandFor(input.runtimeContext, input.sessionManager, input.sessionRuntime),

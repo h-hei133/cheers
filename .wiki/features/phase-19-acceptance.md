@@ -535,7 +535,10 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 | A16 完整partial恢复 | quick3/deep6实际来源复读后只派发reconcile、原片段不变；quick中途只派发剩余index1/2；原deadline保留，变化来源原回归继续有效；反转两项真实失败 | 既有partial原因继续保留，不自动声称覆盖完整 |
 | A22 必需brief输入 | 实际createSubagentRunner正常读取/空文件可入investigate；无read、父deny、60KiB超限保持brief partial；当前child/revision/hash完整receipt绑定；反转一项真实失败 | 使用原50KiB输出/8MiB scan，不支持把部分输入默认为完整 |
 | A21 保存中断 | 真实子进程原writer四阶段退出，prepared/intent/target均unknown、最终receipt committed；错call/target拒绝，live/foreign不撤销，unknown不重放/不被refusal覆盖；两处反转各一项真实失败 | 只凭原operation receipt，不凭目标存在；无跨文件crash atomicity承诺 |
+| A13 账户额度/权益 | 实际usage route获取quota/source/time、精确最早到期预览、独立allow-once后一次consume；deny/plan/deny-rule/账户或offer变化/缺确认器/长期授权均零POST；HTTP200缺code/网络丢失/已兑换保持unknown跨会话围栏；五反转实际失败1/2/1/2/1项、原字节恢复 | 合成账户wire验证；官方文档未保证公开兑换API、无真实账户/续期互通证据；普通本地usage与账户额度仍分开 |
 
 研究四项反转恢复后，隔离Node20.3/Linux含真实Poppler24.02的最终受影响组合17文件/197项、build:ts及五门通过，无skip；该组合不是全仓集成。NormProof图义务满足，4既有ceiling advisory仍partial。
+
+账户权益反转恢复后，隔离Node20.3/Linux受影响11文件/246项、build:ts及五门通过，无skip；包含原账户续期/摘要与普通审批消费者。NormProof完整图义务满足，同4项既有ceiling advisory/partial；这不是公开协议保证或真实账户互通验收。
 
 当前状态为局部修复，Phase19 **active**；其余审查问题及 §5 外部条件继续开放，不能以单条修复替代最终集成验收。材料位于 `.tmp/phase19-repair/`，修复实现见[裁决 §10](phase-19-decisions.md#10-审查后修复2026-10-14进行中)。

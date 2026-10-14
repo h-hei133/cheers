@@ -60,6 +60,7 @@ export interface CommandContext {
   readonly securityCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly agentsCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly mcpCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
+  readonly usageCommand?: (args: string[], context: CommandContext) => Promise<LocalCommandResult>
   readonly worktreeCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly commitCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>
   readonly cwd: string

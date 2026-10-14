@@ -6681,3 +6681,11 @@ implementation匹配已知mode和当前权限位；顾问/调度复用同一cano
 原有reader提供纯正文/定位，研究引用不再解析展示页码或引用host notice；same raw hash提取纠正也使旧证据失效。完整partial报告在实际来源复读后收束且零越界章节，中途仅补剩余片段；指定brief须当前child真实完整正常read。保存在原patch intent前持久operation/call关联，terminal报告也恢复，只有原committed receipt能确认成功，其余unknown可见且阻止重放。对照原生页身份、正文/notice分离和checkpoint提交/跳过已完成工作决定，复用reader/writer/store。四阶段真实进程退出及五反转已运行，各检出2/2/1/1/1项真实断言失败并恢复原字节。首轮缺Poppler仅为unavailable证据，之后临时解包Poppler24.02取得真实伪造页码解析；初轮错误反转TypeError不计。见[裁决 §10.9](features/phase-19-decisions.md#109-a14a16a21a22--研究输入定位与恢复)；最终组合/构建/门禁及交付另验，19代码缺陷均有局部修复，剩余交付/验收继续开放，Phase19 active。
 
 反转恢复后隔离Node20.3/Linux含真实Poppler的17文件/197项、build:ts及五门通过，无skip；NormProof无阻断、4既有ceiling advisory/partial。MCP675c5ecf和目标e8648c38均已推送，精确CI/Watch继续因付款/spending-limit未启动，steps=[]；研究交付与最终集成继续单独取证。
+
+研究修复ec9a890a已推送，精确CI38577711316/Watch38577711327各自annotations确认付款/spending-limit未启动、steps=[]，无远端通过。
+
+### 2026-10-14 — A13 账户额度与权益消费
+
+在原auth/usage与CLI owner接通当前持久账户的quota/source/time、最早到期有效权益预览、独立交互确认和一次consume。复用原权限/deny/plan、public network、账户身份、锁与guarded writer；pending/unknown跨会话不重放，明确业务code才成功，错误正文不留存。原picker现在实际遵守选项限制，权益仅允许一次/拒绝。对照参考精确目标/UUID/持久fence/offer复读，未沿用HTTP成功即reset或自动解除未知围栏；官方用量文档不保证公开兑换API，本批只验合成账户wire，真实互通仍开放。五反转实际检出1/2/1/2/1项断言失败、逐字节恢复；初轮permissionArgs遗漏的四产品失败已修复并保留原证据。见[裁决 §10.10](features/phase-19-decisions.md#1010-a13--账户额度及权益消耗入口)；最终本地/交付另验，Phase19 active。
+
+最终Node20.3隔离受影响11文件/246项、build:ts与五门通过，无skip；完整NormProof图义务满足、4既有ceiling advisory/partial，新增owner未超限。提交/推送/精确CI和最终集成另验。

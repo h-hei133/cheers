@@ -50,6 +50,7 @@ export function approvalPicker(
   const toolName = prompt.context?.toolName || "tool";
   const operation = prompt.context?.operation ? ` (${prompt.context.operation})` : "";
   const target = prompt.context?.target ? ` on '${prompt.context.target}'` : "";
+  const permitted = (choice: ApprovalDecision) => !prompt.options.length || prompt.options.some(option => option.value === choice);
   return {
     title: `Permission: ${toolName}${operation}`,
     form: "panel",
@@ -76,10 +77,10 @@ export function approvalPicker(
         detail: "Block this action and return failure to model",
         note: "3 / n / d / esc",
       },
-    ],
+    ].filter(option => permitted(option.id as ApprovalDecision)),
     apply: async (ids): Promise<undefined> => {
       const choice = ids[0] as ApprovalDecision | undefined;
-      onSettle({ decision: choice ?? "deny" });
+      onSettle({ decision: choice && permitted(choice) ? choice : "deny" });
       return undefined;
     },
     onDeny: (reason?: string) => {

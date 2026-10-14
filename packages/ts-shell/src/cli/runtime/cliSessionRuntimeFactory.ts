@@ -77,6 +77,7 @@ import { providerModelTransport } from '../../provider/request/transport.js';
 import { installRuleControlRuntime, takeForcedTool } from './ruleControls.js';
 import { contextEntryStillAuthorized, renderContextEntry, assertContextBounds } from '../../context/attachment/entry.js';
 import { sourceReaderFor } from '../data/access.js';
+import { installUsageRuntime, usageResetApproval } from './usage.js';
 
 interface ProviderRenewal {
   readonly provider?: CompactionProvider;
@@ -503,6 +504,8 @@ export function createCliSessionRuntime(input: {
   });
   installSecurityRuntime(input.runtimeContext, input.sessionManager, sessionRuntime, nativeGate);
   installAgentsRuntime(input.runtimeContext, nativeGate);
+  installUsageRuntime(input.runtimeContext, nativeGate,
+    usageResetApproval(input.runtimeContext, input.sessionManager, input.getPromptInteractiveApproval ?? (() => undefined)));
   if (input.mcpGateway) installMcpRuntime(input.runtimeContext, input.mcpGateway, nativeGate, url => input.renderer.renderLine(`Open this MCP sign-in URL in your browser:\n${url}`));
   installExtensionRuntime(input.runtimeContext, sessionRuntime, nativeGate);
   return sessionRuntime;
