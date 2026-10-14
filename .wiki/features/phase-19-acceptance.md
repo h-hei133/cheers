@@ -2,7 +2,7 @@
 title: "Phase 19 集成验收与剩余证据"
 category: article
 created: 2026-10-11
-updated: 2026-10-13
+updated: 2026-10-14
 tags: [phase-19, acceptance, validation]
 summary: "记录完整源码图、契约门禁、全套测试、实际 CLI 及平台范围；保留尚未完成的对象隔离和外部验收。"
 ---
@@ -11,7 +11,7 @@ summary: "记录完整源码图、契约门禁、全套测试、实际 CLI 及�
 
 Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)的 16 批、76 项为范围，分别记录实现、局部验收和剩余条件。W16 修复了此前无法取得完整依赖图证明的检查器，并恢复重构后失效的契约门禁；全阶段完成仍需下面列明的剩余工作。
 
-§1–4 的完整套件和冻结证据属于 W16 提交 `f43ae09ec90a5890b768598ab52a17821c5e9efc`。后续 SAFE-02 Linux 原生读取变更分别记录在 §7–17；最新源码的完整套件已重新运行，见 §18，不能把 W16 的历史全套直接套用到后续源码。§19 补充未改源码的 Windows UNC 读取证据，§20 复核未改源码的 Windows Terminal 前端捕获材料。
+§1–4 的完整套件和冻结证据属于 W16 提交 `f43ae09ec90a5890b768598ab52a17821c5e9efc`。后续 SAFE-02 Linux 原生读取变更分别记录在 §7–17；最新源码的完整套件已重新运行，见 §18，不能把 W16 的历史全套直接套用到后续源码。§19 补充未改源码的 Windows UNC 读取证据，§20 复核未改源码的 Windows Terminal 前端捕获材料；§21 补充原生 Windows CLI、进程取消和最后一张截图的直接判读。
 
 ## 1. 本轮源码与验证范围
 
@@ -57,7 +57,7 @@ Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)�
 | W1 SAFE-01–08 | §8.1–18、58–66、108–112；[工具](../../packages/ts-shell/src/core/tools/)、[执行](../../packages/ts-shell/src/runtime/execution/)、[编辑 authority](../../packages/ts-shell/src/edit/authority/) | Linux 文件及原生读取的正常/拒绝/取消证据已补至 §18；非 Linux 实际对象绑定及 §5 所列限制仍未关闭，不能整体勾选 |
 | W2 CMD-01–04 | §8.19–57、67；[语法](../../packages/ts-shell/src/core/commands/syntax/)、[补全](../../packages/ts-shell/src/cli/interactive/completion/) | 共享语法、原稿替换、动态目录与过期响应已有本地证据；保留独立 raw invocation 语义 |
 | W3 CFG-01–05 | §8.68–85；[配置](../../packages/ts-shell/src/config/)、[模型会话](../../packages/ts-shell/src/session/model/) | schema、JSONC、字段 CAS、发布和会话/全局作用域已验；账户与真实端点能力另验 |
-| W4 UI-01–07 | §8.86–101；[输入布局](../../packages/ts-shell/src/presentation/tui/composer/)、[呈现](../../packages/ts-shell/src/presentation/tui/)、[启动度量](../../packages/ts-shell/src/observability/startupTiming.ts) | 两模式 PTY、八形态、源文复制、状态和计量已有本地证据；用户前端像素/字体/IME 实证仍缺 |
+| W4 UI-01–07 | §8.86–101；[输入布局](../../packages/ts-shell/src/presentation/tui/composer/)、[呈现](../../packages/ts-shell/src/presentation/tui/)、[启动度量](../../packages/ts-shell/src/observability/startupTiming.ts) | 两模式 PTY、八形态、源文复制、状态和计量已有本地证据；§20–21 补充实际前端快照，真实 IME、系统选择与手动逐帧仍未验 |
 | W5 SES-01–05 | §8.102–108；[选择器](../../packages/ts-shell/src/cli/interactive/picker/)、[续接](../../packages/ts-shell/src/session/continuation/) | current、大小、分支、新会话、多根和同 ID 迁移已验；跨文件崩溃原子性不作承诺 |
 | W5 EDIT-01–03 | §8.109–111；[批次](../../packages/ts-shell/src/edit/patch/)、[恢复](../../packages/ts-shell/src/edit/recovery/) | 提案、批准、收据、整组 undo、partial/unknown 和外改保护已验；不自动重放未知写入 |
 | W6 TOOL-01–05 | §8.112–116；[媒体读取](../../packages/ts-shell/src/runtime/execution/media/)、[语言服务](../../packages/ts-shell/src/language/)、[浏览器](../../packages/ts-shell/src/browser/)、[桌面](../../packages/ts-shell/src/desktop/) | 公共异步读/枚举、有界媒体、真实语言服务与浏览器、Linux X11 已验；技能异步资源界见 §9，其他原生平台仍有限制 |
@@ -98,7 +98,7 @@ Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)�
 |---|---|---|
 | Linux/WSL、Node 20.3、单文件程序 | 构建、全套、原生文件/进程/Git/沙箱、两模式 PTY | 用户实际前端逐帧、字体、IME 和系统复制仍需同前端证据；§20 已补 Windows Terminal 像素层局部证据 |
 | Linux X11、媒体设备、语言服务、分析器 | 各适配器的明确能力与有界 native 进程路径 | 未安装/不支持状态继续可见；真实声音设备/Live、其他桌面协议另验 |
-| Windows | 原生 Windows Node 20.3/24.12 访问 WSL UNC：两版各 6 项读取/目录检查通过；目录句柄与受管目录创建另验，见 §19；真实 Windows Terminal 前端抓帧、像素与视觉判定见 §20 | 本地 NTFS、原生禁止重解析/对象路径绑定、完整 Windows CLI/套件、进程树、真实 IME 及设备仍未验 |
+| Windows | 原生 Windows Node 20.3/24.12 访问 WSL UNC：两版各 6 项读取/目录检查通过，见 §19；实际前端抓帧见 §20–21；Node 20.3 原生 CLI 启动/print/read 与进程预取消/取消/超时均通过，见 §21 | 本地 NTFS、原生禁止重解析/对象路径绑定、完整 Windows 套件与交互 CLI、退出后孤儿进程、真实 IME 及设备仍未验 |
 | macOS | 部分 profile、接口与纯逻辑用例 | 原生路径/文件描述符、进程树清理、终端与设备尚未取得等价实机证据 |
 | 模型传输与严格预算 | 合成 HTTP/SSE/usage/重试/unknown、统一 request admission | W7-33 四端点真实 TLS/HTTP2 矩阵仍缺；无法证明上界的请求继续拒绝 strict cap 准入 |
 | 公共包、认证、协作和 SSH | 受控服务、签名、ACL、撤权、重连与未知副作用 | 真实账户、公共部署 TLS、真实远端主机/主机密钥和生产互通验收 |
@@ -406,3 +406,22 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 捕获脚本已按上述根因修正：[matrix.py](../../.tmp/windows-console/matrix.py) 先写 `<label>.captured.raw` 快照、再哈希该快照，记录新增 `rawEvidence` 字段（[resize.py](../../.tmp/windows-console/resize.py) 同样补字段），避免对仍在写入的 `<label>.raw` 取哈希；现有 20 条记录按此重算。
 
 材料 `.tmp/windows-console/review/{verify.py,idle-probe.py,capture-verification.json,pixel-checks.json,vision-verdicts.json,summary.json}`。证据限于“Windows Terminal 1.24.2610.01001 + WSL 产品进程 + 受控 PTY 输入”，不覆盖原生 Windows CLI/套件、真实 IME 候选窗、用户手动逐帧/字体选择或本地 NTFS；视觉判定来自单一路由（20 张中 19 张取得，1 张 `fullscreen-box-restored` 因额度未取得），故不把八形态像素整体标为通过。§5 的外部服务/账户/部署条件不变，Phase19 **active**；本批仅文档，提交/推送/精确 CI 另记。
+
+## 21. 原生 Windows CLI 与进程取消局部验收（2026-10-14）
+
+起点 `ecac1bcffc7436cc4b811a957307a6fa925a6211`。当前源码树 `ac00fe663c211afac24d690913b2c18460e620ba` 与 §18 的源码提交 `32b3110705c4588d264c30ee2d1ad7b6a0c23535` 一致；本轮没有修改产品、依赖或构建脚本。使用 §19 已核对官方 checksum 的 Windows Node **20.3.0**，程序、工作区、HOME/USERPROFILE、缓存和临时目录均在仓库 UNC 下。请求只到 Windows 进程内的 loopback 合成服务，不读取真实 provider 配置。
+
+| 检查 | 实际结果 | 范围/材料 |
+|---|---|---|
+| 原生 CLI 启动与退出 | 零输入启动、EOF 后退出 0，零 POST | `.tmp/windows-cli/run-nGDOCa/startup.log`；真实 `dist/cli.js`，不是 WSL 产品进程 |
+| print 请求 | 退出 0，1 次合成 POST，实际答案标记匹配 | 同目录 `print.log`、`requests.json` |
+| read 工具闭环 | 退出 0，2 次合成 POST；本次 tool call ID 和中文正文匹配；原 BOM/CRLF 文件及配置 hash 不变 | 同目录 `read.log`、`results.json`；模型终稿不单独作为读取成功证据 |
+| 进程预取消 | `cancelled`，零派发、零输出 | `.tmp/windows-cli/process-kGrd8s/results.json` |
+| 进程取消与超时 | 分别返回 `cancelled` / `timeout`；后代先报告 ready，再停止，原生 PID 探测确认父子均不存在 | 同目录 `cancel.json`、`timeout.json`；实际 execution owner 和系统进程树终止工具，非 mock |
+| 源码/产物对应 | 8 个直接相关 owner 的内存 ESM 输出与现有 dist 逐字节相等，零转译诊断；用户 `.gitignore` 原 hash 保持 | `.tmp/windows-cli/audit.json`；不冒称新的完整构建或类型检查 |
+
+运行器为 `.tmp/windows-cli/run.mjs`、`process.mjs`。首次探针把 `--help` 当成 Usage 输出，实际 CLI 正常进入输入流并退出；该断言属于 **harness/setup drift**，失败材料 `run-doBXuA/` 保留。本轮按既有 CLI 契约检查启动/print/read，没有为探针新增旗标或改写产品。成功三次 CLI 的端到端时间分别为 24.746、28.651、33.403 秒；包含 UNC 加载、启动、请求及退出，既不是首帧基准，也不代表本地 NTFS 性能。进程证据只覆盖存活父进程拥有的普通后代，不宣称能回收所有逃逸/孤儿进程。
+
+此前缺少视觉路由答复的 `fullscreen-box-restored.png` 本轮由当前助手直接查看原分辨率 **1752×936** 图像，确认 `中文边界`、换行中文及重音字形可见、无缺字方框。PNG SHA256 为 `6a7e830c8c300e302bd25348c40df7d188f4a54eb712749c78c5837087b27270`，记录在上述 `audit.json`；这是补充的直接图片判读，不回填旧外部路由的失败，也不据一张恢复快照证明真实 IME、系统复制或全部逐帧行为。
+
+§18 的全套/构建保持其原执行记录。本轮四个源码门、strict docs 与文档 diff 检查均通过，材料 `.tmp/windows-cli/gates.json` 及对应日志。补证没有发现需要修改产品的回归，仍须保留 §5 的非 Linux 对象绑定、NTFS/macOS/交互输入/设备及真实服务条件。起点精确 CI `38438481424` 的 job `115438584305` 为 completed/failure、`steps=[]`，annotation 再次确认付款/spending-limit 阻止启动。没有远端 CI 通过，Phase19 **active**；本批提交/推送及其精确 CI 单独取证。

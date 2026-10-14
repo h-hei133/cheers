@@ -3,7 +3,7 @@ title: "Phase 19 裁决：生产正确性、完整交互与自主协作能力"
 category: article
 sources: [14-user-experience-research, 15-deep-research-design, 16-tui-composer-and-theme, 17-tui-status-and-panels, 18-input-slash-startup-context, 19-tools-maturity-and-multifile-edit, 20-configuration-system, 21-session-recovery-and-undo-ux, 22-command-inventory-alignment, 23-command-argument-options, 24-shared-command-parity, verification-15-21]
 created: 2026-10-05
-updated: 2026-10-13
+updated: 2026-10-14
 tags: [phase-19, decisions, production, tui, commands, research, goal, collaboration]
 summary: "汇总 14–24 的纠错、维护者裁决、生产契约、分批任务及验收标准。包含完整自主目标、软件与论文深研、八种输入框形态、Git 工作台、顾问、安全分析、公共技能商店和远程协作。此文是待实施计划；文档审查完成不代表功能或生产验收完成。"
 confidence: mixed
@@ -2314,3 +2314,11 @@ Node20.3/单文件×stable/changed四条实际print CLI通过；stable共4合成
 **像素与真实前端证据。** 对 `regular-box.png`/`fullscreen-box.png` 做像素级检查（无 PIL，直接 zlib 解 PNG）：主题真彩 `(23,143,185)` 边框行连续 1660/1656 px、**零横向断口**，证明 box-drawing 字形在真实 Windows Terminal 中无缝衔接；样例行里 CJK 墨迹列宽 25–27px、拉丁 12–13px，约 2:1，符合 DPI 144 下的双宽单元格，非 tofu。另经 `vsllm/gpt-6-astra`（真实能看像素，先用合成图验证）对抓帧取得视觉判定：19/20 张可读，全部报告中文为**真实字形**（`中文边界`/`会话`），无 tofu；其中若干条另指出轻微 ghosting/misalignment。唯一一条 `regular-box-restored` 预览因 300px 降采样报 tofu，被全分辨率像素检查推翻——该抓帧在 y=416 处有 24 段 21–24px 的 CJK 墨迹。`read ?q=` 自身返回 401 属 harness 配置缺口：`modelRoles.vision` 未设，回退到无效的 OpenAI 环境键；已记录但不改配置。
 
 **边界。** 证据限于“Windows Terminal 1.24.2610.01001 + WSL 产品进程 + 受控 PTY 输入”，**不含**原生 Windows CLI/套件、真实 IME 候选窗、用户手动逐帧/字体选择或本地 NTFS；`resize.py` 的缩放证据只覆盖无头重排与抓帧宽度。视觉判定来自单一路由，20 张中 19 张取得（`fullscreen-box-restored` 因额度未取得，已由全分辨率像素检查替代），故不作为“全部形态像素通过”的结论。材料 `.tmp/windows-console/review/{verify.py,idle-probe.py,capture-verification.json,pixel-checks.json,vision-verdicts.json,summary.json}`，详见[验收 §20](phase-19-acceptance.md)。Phase19 active；本批仅文档，提交/推送/精确 CI 另记。
+
+### 8.156 QA-02：原生 Windows CLI 与进程取消（2026-10-14）
+
+在未变的 §8.153 源码上补充原生 Windows Node20.3 验收。实际 `dist/cli.js` 的零输入启动/EOF、print、read 三条链路均退出 0，合计 3 次 loopback 合成 POST；read 另核对真实工具结果、本次 call ID 与原 BOM/CRLF 文件，隔离配置和用户 `.gitignore` hash 保持。现有 execution owner 的预取消零派发，取消/超时先等实际后代 ready，再确认父子 PID 均不存在，结果分别保持 cancelled/timeout。八个直接相关 owner 的 ESM 输出与既有 dist 字节相同。
+
+初次 `--help`/Usage 断言不符既有 CLI 契约，属于保留的 harness/setup 失败，未修改产品迁就检查。三次 CLI 端到端耗时 24.746/28.651/33.403 秒，包含 UNC 加载、请求和退出，不充当首帧或 NTFS 基准。另直接查看此前缺少视觉答复的恢复窗口原分辨率 PNG，中文与重音字形正常；不覆盖真实 IME、系统复制或完整逐帧行为。
+
+材料 `.tmp/windows-cli/`，见[验收 §21](phase-19-acceptance.md)。本轮只补验收文档，未改产品/依赖/构建，不重复全套。非 Linux 对象绑定、NTFS/macOS/交互输入/设备与真实服务仍缺；起点精确 CI 再次被付款/spending-limit 拒绝启动，Phase19 保持 active。
