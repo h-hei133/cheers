@@ -6631,3 +6631,7 @@ Windows Node20.3 经仓库 UNC 运行实际 CLI：零输入启动/EOF、print、
 原生Windows真实复现Root/root不同inode越界pre-read和write，及facade同名文件错误映射，原外部字节立即恢复。共享core owner复用规范包含判断，在丢弃输入根前缀前向上检查实际组件/选根身份；薄facade委派同一owner，已选别名/规范根兼容。两路初审拒绝source-link缺口和测试夹具，另修中间canonical别名回归；最终code APPROVE/architecture CLEAR，原拒绝材料保留。3TS/2production，Node20.3受影响11文件/142项、两构建/五门通过；完整judge图义务satisfied、4既有ceiling advisory仍partial，owner名数9/15。四反转实际失败10/3/5/1项、正向14通过，源码/用户`.gitignore`原字节保持。
 
 Linux单文件实际patch CLI拒绝越界、合法批准创建及committed收据原store复验通过；Windows拒绝越界，但合法创建因原exclusive hardlink在UNC报ENOTSUP，原HEAD隔离对照同失败、零目标写入，未计通过。原生no-follow候选拒绝普通UNC，no-delete-sharing锚点仍允许双侧移动，均未入产品。见[裁决§8.160](features/phase-19-decisions.md)、[验收§25](features/phase-19-acceptance.md)，材料 `.tmp/workspace-boundary/`和`.tmp/object-binding/anchors-*`；非Linux绑定/Windows创建及其余平台/真实环境条件仍开放，Phase19 active，提交/推送/精确CI另验。
+
+### 2026-10-14 — Phase 19 全量任务静态复核收束
+
+按用户要求先审后修，以 `71f87aeb` 为起点对照 14–24 与 16 批/76 项裁决；每确认一项立即登记，未等全审后集中回填。[裁决 §9](features/phase-19-decisions.md#9-全量任务复核2026-10-14审查已收束问题未修复)记录25项：19代码缺陷、3未完成交付、3验收证据缺失，逐项区分静态调用链、触发条件和未运行边界；范围已收束，缺陷尚未修复。涉及读/patch资源、退出凭据、诊断脱敏、UTF-8分页、子代理/MCP、目标/顾问和研究定位/恢复/保存，历史非Linux/未观察树/真实质量与CI缺口一并保留。只改文档，不跑产品构建/测试，不访问真实provider；用户`.gitignore`原改动保留且不提交。GitHub分支/PR起点同SHA；精确CI38525429578/Watch38525429712的jobs均steps=[]、failure，分别annotations确认付款/额度阻止启动，无远端通过。审计文档检查与本次交付另验；Phase19 active，下一步按原owner/依赖修复。

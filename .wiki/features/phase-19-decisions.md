@@ -2378,3 +2378,237 @@ Node20.3 直接受影响 22 文件/315 项、TypeScript 与 Linux 单文件构�
 实际 Linux 单文件 CLI 的越界补丁零写入/零收据，合法批准创建保留精确正文并由原 operation store核验committed收据；共4次loopback合成POST。Windows Node CLI拒绝越界补丁，但合法创建在快照阶段停止，零目标写入；隔离当前/原HEAD owner对照确认原exclusive hardlink在WSL UNC返回ENOTSUP，是既有平台能力限制，**Windows合法创建和收据未通过**。初版harness缺文件异常被finally断言覆盖，修正诊断后另存最终观察，不把exit0计为写入成功。
 
 原生绑定探索的两个候选也不足：`NtCreateFile/OBJ_DONT_REPARSE`只读普通本地Windows对象成功，却拒绝普通WSL UNC（0xc000050b/4395）；没有delete sharing的目录锚点仍允许Windows及Linux发起的UNC移动，句柄仍读原对象，路径返回旧名或错误。材料 `.tmp/object-binding/anchors-windows.json`，没有进入产品。见[验收 §25](phase-19-acceptance.md)。本批局部修复不关闭完整非Linux对象绑定、检查之间的变化、未观察树/镜像成本、Windows创建/NTFS/macOS、IME/设备/真实服务/W7-33及当前全套/远端CI；Phase19 **active**，提交/推送和精确CI另验。
+
+## 9. 全量任务复核（2026-10-14，审查已收束、问题未修复）
+
+本轮按用户最新要求，先审核 §4 的全部 **76 项**及 14–24 的对应裁决，**每确认一项问题立即登记，全部任务审查结束前不修改产品代码**。起点为 `71f87aeb0b462ee7e131a1eddfbac544c3785029`；用户原有 `.gitignore` 改动不属于本轮。§8 的历史实现、测试和审查仅作为定位依据，不能代替当前源码或尚缺的实际验收。
+
+复核区分「代码缺陷」「未完成交付」「验收证据缺失」；已披露的开放边界也要登记，但不伪称为新引入的回归。「已审、未发现新增缺陷」仅表示已核对列出的生产路径和契约，不表示全平台通过。本次审查未运行构建或测试；文档变更按仓库规则只做文档检查。旧项目记忆中的其他阶段审计计数不计入本表。
+
+### 9.1 覆盖进度
+
+| 批次 | 已审任务 | 待审任务 | 问题登记 |
+|---|---|---|---|
+| W1 | SAFE-01–08 及文件/媒体/语言/子代理消费者 | — | A01、A11、A15、A18、A25；资源问题归 A04/A10/A23 |
+| W2 | CMD-01–04 | — | 目标别名消费者见 A20 |
+| W3 | CFG-01–05 | — | 未发现新增缺陷；外部证据见 A03 |
+| W4 | UI-01–07 | — | 未发现新增缺陷；实际前端证据见 A03 |
+| W5 | SES-01–05、EDIT-01–03 | — | A10；非 Linux 对象边界见 A01/A03 |
+| W6 | TOOL-01–05 | — | A04、A23；平台与实际设备证据见 A03 |
+| W7 | AUTO-01–05 | — | A17、A20、A24 |
+| W8 | RSC-01–05 | — | A14、A16、A21、A22；真实质量证据见 A03 |
+| W9 | GIT-01–04 | — | 未发现新增缺陷 |
+| W10 | SEC-01–03 | — | 未发现新增缺陷 |
+| W11 | ECO-01–05 | — | A09、A11、A15、A18、A19、A23；公共服务证据见 A03 |
+| W12 | REM-01–05 | — | A07；真实部署/SSH 证据见 A03 |
+| W13 | FLOW-01–03 | — | A07 |
+| W14 | MEDIA-01–02 | — | 未发现新增缺陷；真实音频/Live 证据见 A03 |
+| W15 | PAR-01–05 | — | A05、A06、A08、A09、A13 |
+| W16 | QA-01/02，含跨域实现/验证范围与交付实态 | — | A02、A03、A12 |
+
+### 9.2 逐项问题登记
+
+#### A01 — SAFE-02：非 Linux 实际读取对象绑定仍未完成（高，未完成交付）
+
+- **契约**：§4 SAFE-02 要求 canonical containment、deny 与实际打开对象一致；§8.159 已明确祖先检查点不等于该保证。
+- **当前证据**：[read owner](../../packages/ts-shell/src/runtime/execution/read.ts#L102) 的 `withVerifiedReadTarget` 在 Linux 读取 descriptor 的实际路径，其他平台仍用 `fs.realpath(target)`，再以祖先身份及 leaf metadata 做前后复验（第 109、125–143 行）。这只能发现检查时仍存在的替换；两次检查之间移出、读取、再恢复原目录仍不被该机制排除。§8.159 保存了独立原生复现，本轮源码仍保留相同分支，未重新运行该探针。
+- **影响/状态**：现有检查点修复成立，但完整非 Linux 对象绑定仍是开放交付，不能用更多局部绿色检查或已恢复路径标成 SAFE-02 完成。此项是既有未完成条件的复核登记，不是本轮新回归。
+- **后续验收**：在原读取 owner 比较可用的原生对象绑定方案及其平台语义，覆盖移出后恢复、链接与合法别名；分别证明实际消费对象和取消/关闭。无法证明的场景继续明确未验，不以 pathname/相同 metadata 替代对象证据。全量复核结束前不开始修复。
+
+#### A02 — QA-01：最终源码的集成证据尚未闭合（高，验收证据缺失）
+
+- **契约**：§7 与 QA-01 要求最终改动范围的实际跨域闭环，不能用早期冻结的全套结果证明后续源码。
+- **当前证据**：[集成验收](phase-19-acceptance.md)开头及 §18 将最近全套绑定于 `32b31107`；之后 §22、24、25 分别修改路径包含、读取祖先和共享写入 owner，均明确只跑直接受影响组合。当前起点已是 `71f87aeb`，现有记录没有这个源码状态的最终集成运行。独立架构复核同时确认这一时效差异。
+- **影响/状态**：历史全套和各批定向结果各自有效，但尚未构成当前全阶段完成证明；没有证据表明全套会失败，也不把未运行说成失败。
+- **后续验收**：全部审查和必要修复结束后，对最终冻结运行与跨域变更匹配的集成矩阵、相关全套及独立复核，按实际源码标识保存结果；不在仅追加本台账时重复构建/测试。
+
+#### A03 — QA-02：必要的真实环境验收仍未完成（高，验收证据缺失）
+
+- **契约**：QA-02、§7.3 及 [集成验收 §5](phase-19-acceptance.md#5-平台协议与剩余工作)要求按适用平台/协议取得实际证据；受控服务、PTY 字节和合成请求各自不能证明真实前端、账户或部署互通。
+- **已确认未验格**：UI-01–03 的真实 IME/系统复制及完整前端逐帧；SAFE-02 的非 Linux 对象绑定（A01）和 Windows 本地写入/macOS；AUTO-02/PAR-03 所涉及的 W7-33 四端点真实 TLS/HTTP2；RSC-05/[15 §17.2](15-deep-research-design.md#172-真实质量验收)的软件版本、论文方法、混合域与有意冲突来源四类真实模型质量样本，以及 TOOL-02/RSC-02 的跨平台 PDF 获取/解析；ECO-01–03/05 的公共包源和账户互通；REM-01–05 的部署 TLS、真实远端主机/密钥与 SSH；MEDIA-01 的真实设备、声音及 Live 服务。验收 §19–25 的局部证据没有覆盖这些格。
+- **证据/影响**：这是当前文档明确保留、独立文档复核再次确认的未完成清单，不是这些能力运行失败的断言，也不把显式允许的 `unsupported` 平台或严格预算当成新缺陷。当前保持 active 正确；“本地实现”不能被改成全阶段验收完成。
+- **后续验收**：在各原 owner 的适用环境补真实链路，配置/凭据只能通过既定显式 opt-in 门禁，记录适用范围和真实失败类别。精确源码的提交、推送、CI 和发布状态另行从外部实态取证；本轮没有读取真实 provider 配置或把旧提交的 CI 结论沿用到新 SHA。
+
+#### A04 — TOOL-01：grep 降级路径的实际读取没有字节上限（高，代码缺陷）
+
+- **契约**：[19 §3.7](19-tools-maturity-and-multifile-edit.md#37-readglob-与-fallback限制实际工作量)要求 fallback 同样限制实际读取工作量，不能以输出截断或读取前 stat 替代内存界。
+- **当前证据**：[grep](../../packages/ts-shell/src/core/tools/grep.ts#L160) 在原生程序不存在时，先 `await fs.stat(fullPath)` 并检查 `MAX_SEARCHED_FILE_BYTES`，随后调用 `executionService.readTextFile`，但没有传 `maxBytes`。[read owner](../../packages/ts-shell/src/runtime/execution/read.ts#L81) 在 `maxBytes === undefined` 时直接 `handle.readFile` 全量读取；原 owner 已有可复用的限额分块分支。
+- **触发/影响**：文件在前一次 stat 后、实际读取前增长并保持稳定时，新句柄可以读入任意大的正文；读取后的 revision 复验不能撤销已分配的内存，若增长早于新句柄的初始 stat 还可能直接返回大正文。随后 `split` 继续复制数据。此项依据当前调用链静态确认，未运行大文件/内存探针；不声称已发生 OOM。
+- **后续修复/验收**：在原 grep 读取调用上使用现有 `maxBytes` 契约，将限额触发报告为明确的不完整/资源失败，不能静默当成完整零匹配；用一个受控增长反例验证上限发生在读取中。全量复核结束前暂不改代码。
+
+#### A05 — PAR-03：退出最后一个连接后仍可使用其持久凭据（高，代码缺陷）
+
+- **契约**：[22 的 logout 处置](22-command-inventory-alignment.md#5-53-个参考无词法交集项的-phase-19-处置)要求区分 session 解绑和持久凭据移除；正常请求不能在报告无连接后悄悄继续使用刚退出的登录。
+- **当前证据**：[连接创建](../../packages/ts-shell/src/core/commands/connectCommandRuntime.ts#L168) 同时写入 `providerConnections` 与 `providerCredentials`；账户登录也保存这两处。相同 owner 的 `removeConnection`（第 297–318 行）仅删连接列表，保留整个 `providerCredentials`，却报告 `Disconnected`/`Active connection now: none`。[凭据解析](../../packages/ts-shell/src/core/shell/providerCredentials.ts#L203) 在没有连接时仍返回该配置中的 API key 或账户认证；[实际请求装配](../../packages/ts-shell/src/cli/provider/step.ts#L59) 不要求 connection ID 就使用它构造认证头。`/logout` 是到同一 owner 的薄别名。
+- **触发/影响**：无环境或 CLI 凭据覆盖时，登录一个连接，再退出最后一个连接，重载/重启后普通 prompt 仍能解析到退出前的持久凭据。独立代码 lane 提出，主代理已核对创建→移除→解析→请求装配；本轮仅静态取证，没有读取真实密钥或发请求。
+- **后续修复/验收**：在原 auth/config owner 明确解绑与移除凭据的作用域，用现有字段 CAS 同时清理属于所退出连接的备用凭据，保留其他连接和外部提供的凭据。隔离覆盖 API-key 与 account-auth 的登录→退出→fresh resolution，并验证其他连接不被误删；报告不能暗示已撤销远端 token。全量复核结束前不修代码。
+
+#### A06 — PAR-04：trace 的元数据字符串绕过报告脱敏（中，代码缺陷）
+
+- **契约**：PAR-04 的诊断必须 report-safe；[命令控制](command-controls.md)要求复用脱敏事件投影，而非只清理正文。
+- **当前证据**：[traceRows](../../packages/ts-shell/src/observability/diagnostics.ts#L45) 只对 `message` 调用 `redactReportText`，`toolId`、`requestId`、`traceId`、`spanId`、component 等字符串原样返回；[trace 服务](../../packages/ts-shell/src/observability/traceDashboard.ts#L13) 将结果直接用于 HTML 与 `/data`。compatible 响应解析允许任意非空 tool-call ID，`turn/tools.ts` 将其写入结构日志；logger 的字段名/特定 key 格式过滤不覆盖 ID 值内的普通凭据赋值。
+- **触发/影响**：合成 ID `token=synthetic-private` 可沿实际 provider→工具日志→trace 投影原样进入报告，尽管共享报告脱敏器会移除该格式。独立 lane 追踪生产者与消费者，主代理复核投影及 logger；未运行服务或真实 provider，不声称发现真实秘密泄漏。
+- **后续修复/验收**：在原诊断投影对所有面向报告的字符串统一做有界脱敏，保留可选字段缺失语义；用生产 logger 元数据到 trace JSON/HTML 的合成反例验证。不得只转义 HTML 后声称已经脱敏。
+
+#### A07 — FLOW-01、REM-04：作业输出分页会拆坏 UTF-8 字符（中，代码缺陷）
+
+- **契约**：本地/远端作业应可通过返回的分页位置读回实际输出，持久原始字节与展示边界必须一致。
+- **当前证据**：[localPage](../../packages/ts-shell/src/cli/jobs/projection.ts#L22) 先固定切取 16384 字节再 `toString('utf8')`。[SSH output](../../packages/ts-shell/src/runtime/execution/ssh/client.ts#L58) 同样切原始字节，[pageDisplay](../../packages/ts-shell/src/cli/ssh/projection.ts#L11) 独立解码每页，没有跨页 decoder 状态或 UTF-8 边界修正。
+- **触发/影响**：保留的 stdout 若为 16383 个 ASCII 字符后接 `中`，第一页只有该字符首字节，按返回 next 读取的下一页只有余下两字节，两次解码均产生替换字符。四字节字符有相同问题。原始 journal 未损坏，缺陷限于正常分页展示；这是当前字节切片的静态可证反例，本轮未运行探针。
+- **后续修复/验收**：复用文本/输出 owner 的 UTF-8 边界策略，在保留真实 byte offset 和跨页脱敏上下文的前提下返回完整字符；分别覆盖本地与 SSH 的三/四字节边界，不将乱码当作原命令输出。
+
+#### A08 — PAR-04：report 归档直接保存未经脱敏的外部工具名（中，代码缺陷）
+
+- **契约**：`/report` 明确声明自由文本已清理凭据和路径；外部能力名也是报告输入，不能因位于 metadata 而免于处理。
+- **当前证据**：[report 命令](../../packages/ts-shell/src/core/commands/reportCommandRuntime.ts#L103) 从实际 tool pool 取全部 key，第 125 行直接保存为 `report.json` 的 `observability.tools.names`，不经过现有 `redactReportText` 或 redactions 记录。MCP 客户端/registry 保留服务提供的 tool name 并将 qualified name 放入同一 pool；不必执行该工具即可进入归档。
+- **触发/影响**：外部工具名带符合共享脱敏器识别格式的合成 key 时，正文和 crash 已被清理，归档工具名仍含原值，且总结继续声称全部自由文本已 scrub。独立 lane 提出，主代理已读归档构造；没有创建归档、读取真实秘密或执行外部工具。
+- **后续修复/验收**：在原 report owner 对工具名等外部字符串复用同一有界脱敏及 notice 计数，保留真实工具数量与 reported/unavailable 状态。隔离提取实际归档，验证合成敏感名称不出现在任一归档成员；不另建报告或日志系统。
+
+#### A09 — ECO-05、PAR-05：force 的工具目录未复用已认证 MCP gateway（中，代码缺陷）
+
+- **契约**：force 必须选择当前实际可用的工具；MCP OAuth 保存的认证应进入真实连接和能力目录，选择器不能创建认证状态不同的目录。
+- **当前证据**：独立 code lane 追踪 [force 入口](../../packages/ts-shell/src/cli/runtime/ruleControls.ts#L31) 调用 `toolPoolFor(context)()`，没有传入当前 gateway；[工具组合](../../packages/ts-shell/src/cli/runtime/tools.ts#L25) 因而新建没有 `authorizationForMcp` 的 `CoreMcpGateway`。主回合则通过 [CLI MCP 组合](../../packages/ts-shell/src/entrypoints/cliMcpModule.ts#L22) 注入认证。HTTP 连接在 `authRequired` 或 401 时不能加载现有 OAuth token，选择目录遗漏原本可用的工具。
+- **触发/影响**：已在隔离配置中完成 OAuth、普通 MCP test/主回合可用的 HTTP 工具，经 `/force` 选择却报 unavailable；这是生产者→目录消费者的静态缺陷，本轮没有启动服务或执行 OAuth。
+- **后续修复/验收**：在既有 CLI 组合复用已认证 gateway 或统一配置工厂，保留当前作用域、重载与关闭 owner；合成 OAuth 目录在实际 force 选择及下一请求中均可见，禁用/撤销后仍须拒绝。
+
+#### A10 — EDIT-02：批准后的 patch 复验丢失文件读取上限（高，代码缺陷）
+
+- **契约**：单批 patch 的资源预算必须贯穿预览、批准后的 stale 检查与真实提交，不能只在初次 plan 中有界。
+- **当前证据**：`patchLimits.fileBytes` 为 1 MiB，`totalBytes` 为 4 MiB；[plan](../../packages/ts-shell/src/edit/patch/plan.ts#L41) 将上限传给 `inspectWorkspaceFile`。但 [batch](../../packages/ts-shell/src/edit/patch/batch.ts#L23)、[operation commit](../../packages/ts-shell/src/edit/recovery/operation/write.ts#L58) 与 [统一 writer](../../packages/ts-shell/src/edit/authority/commit.ts#L18) 的复读都未传上限；[文件读取](../../packages/ts-shell/src/core/workspace/files.ts#L84) 在省略上限时调用 `fs.readFileSync(fd)`，然后才比较当前内容/身份。
+- **触发/影响**：小文件生成合法预览后被外部扩展成巨型文件，批准后的零写 stale 检查先同步全量分配并复制正文，可能阻塞或耗尽内存，之后才拒绝。无写入不等于资源有界。该静态缺陷与 A04 是两个实际调用链；本轮未运行巨型文件或内存探针。
+- **后续修复/验收**：在现有 inspection/operation owner 保留原预算或利用已批准内容长度做有界相等性检查；覆盖批准后、快照持久化后及提交 readback 的变化，失败仍区分零写/partial/unknown。复用现有 bounded reader，不另建 writer。
+
+#### A11 — ECO-04、SAFE-02：子代理 memory 绕过父读取权限与文件资源边界（高，代码缺陷）
+
+- **契约**：角色模型、工具与记忆不能扩大父权限；agent 定义目录的显式读取例外不授予任意 memory 文件读取权。
+- **当前证据**：独立 code lane 追踪 [task 工具](../../packages/ts-shell/src/core/tools/taskTool.ts#L103) 在声明 memory 时直接调用 `AgentMemoryManager.loadMemory`，没有 `context.assertSourceAccess`。[memory owner](../../packages/ts-shell/src/core/subagents/agentMemoryManager.ts#L39) 使用 `existsSync` 与无界 `fs.readFileSync`，跟随符号链接；截取前 1000 字符发生在全量读取之后。结果经 task 的 memory 参数进入 [子代理 runner](../../packages/ts-shell/src/core/subagents/runner.ts#L124) 的真实模型上下文。
+- **触发/影响**：角色为 project memory 时，父 read-deny 已拒绝 `.agents/memory/<role>/MEMORY.md`，子任务仍可读取并发送其内容，角色 `tools: []` 也不阻止；memory 文件若指向外部目标，还能越过 workspace 边界。源码链已确认，没有读取实际 memory、真实配置或发模型请求。
+- **后续修复/验收**：在既有 memory owner 复用 source permission、实际文件对象核验和 bounded reader；拒绝必须发生在读取/发送前。合成 deny、外部链接、巨型文件与合法记忆用例约束父权限求交，不另建子代理权限系统。
+
+#### A12 — QA-02：当前提交的远端 CI 未执行，最终交付证据仍缺（高，验收证据缺失）
+
+- **契约**：QA-02 要求精确源码的本地、提交、推送、CI 状态分别证明，不能以已推送或旧套件通过替代当前远端验证。
+- **当前外部证据**：本轮实际读取 GitHub 分支、PR #1、两次 workflow 的 jobs 及各自 check annotations。`feat/phase-18` 与 PR head 均为 `71f87aeb0b462ee7e131a1eddfbac544c3785029`，PR 为 open/unstable。CI [38525429578](https://github.com/h-hei133/cheers/actions/runs/38525429578)/job `115724558413` 与 Architecture Watch [38525429712](https://github.com/h-hei133/cheers/actions/runs/38525429712)/job `115724559068` 均 completed/failure、`steps=[]`；两份 annotations 分别明确付款失败或 spending-limit 阻止作业启动。
+- **影响/状态**：起点提交与推送已证实；当前没有远端 CI 通过。此失败属于平台账户前置，不能归为运行后的产品失败，也不能通过重试、略过门禁或沿用别的 SHA 消除。A02 是最终本地集成证据，A03 是平台/真实服务证据，本项单列外部 CI 条件；审计文档当前尚未提交，不把起点 CI 结果当作后续提交结果。
+- **后续验收**：全部复核和修复后按最终源码保存提交/推送读回及精确 workflow/job 实态；账户条件恢复后取得真正执行的门禁结果。在此之前保持未验，不为付款问题修改产品、构建或 CI 契约。
+
+#### A13 — PAR-03：账户额度与权益兑换仍只有未知占位，未交付原裁决能力（中，未完成交付）
+
+- **契约**：[22 §5 第 46 项](22-command-inventory-alignment.md#5-53-个参考无词法交集项的-phase-19-处置)要求独立账户额度入口、可得额度和实际权益消耗预览/确认；[24 §10](24-shared-command-parity.md#10-costusagestats)还要求账户、来源、更新时间、幂等及外部失败状态。无可用协议时如实 unknown 是正确兜底，不等于整个能力已经交付。
+- **当前证据**：[实际 usage handler](../../packages/ts-shell/src/core/commands/usageCommandRuntime.ts#L5)只接受 show/status，读取本地 session telemetry，恒定返回 `Account quota: unknown` 与 `Reset credit: unavailable`；没有调用账户额度 owner，也没有账户选择、获取时间或权益预览/批准/执行入口。[命令注册](../../packages/ts-shell/src/core/commands/registry.ts#L560)只装配这个 handler。当前生产源码定向查找 quota/credit/redeem/entitlement 未找到对应能力消费者；相关测试只断言上述未知字符串。§8.140 虽已披露未知，却把 W15 本地实现整体记为完成，没有修订原交付项或给出替代验收。
+- **参考/影响**：已在只读参考的同类入口核对账户枚举、精确 provider/credential target、`redeemResetCredit` 实际调用及交互确认分支；这是特定账户协议的能力，不能复制成任意 provider 均可重置的承诺。本项是确定的交付差距，不把现有 truthful unknown 当作错误，也不声称已知某个真实账户的可用权益。
+- **后续验收**：先在原 auth/usage owner 明确并核查可支持的外部协议及账户范围，接入来源/时间/状态快照；权益操作须绑定确切账户、实际消耗预览、单独批准、幂等与未知外部结果。无能力的协议继续明确 unavailable，不能拿本地计数、清限流或未知占位替代该交付。全部任务审查结束前不开始实现。
+
+#### A14 — RSC-02/03：从工具展示正文重建来源摘录，可伪造页号并混入宿主提示（高，代码缺陷）
+
+- **契约**：研究来源必须由实际读取 owner 提供可定位的正文及页/行身份；来源内容是数据，不能反过来定义定位协议。引用及独立复读应绑定这些实际证据。
+- **当前证据**：[来源生产](../../packages/ts-shell/src/research/evidence/producer.ts#L22)将 `context.result.output` 交给 `pdfExcerpts`/`textExcerpts`。PDF 分支（第 58–60 行）用正则解析 `[Page N of M]`，没有消费或验证实际 `metadata.media.pages` 页身份；[PDF owner](../../packages/ts-shell/src/runtime/execution/media/pdf.ts#L25)将不可信提取正文原样拼进相同标记格式。文本分支（第 62–70 行）对完整展示字符串分行，包括 [read formatter](../../packages/ts-shell/src/core/tools/read.ts#L159)追加的宿主 notice，尽管 provenance hash 只覆盖 `page.text`。原始 `toolSources`、read/PDF producer 和引用/review consumer 已逐段核对。
+- **触发/影响**：单页 PDF 正文含空行后的 `[Page 42 of 1]`，即产生 `p42`/`page 42` 来源摘录，真实 page metadata 仍仅有 page 1；普通两行文本用 offset 2 读取第二行时，`[Showing lines 2-2 of 2.]` 也被记成源文件的下一行正文。[引用验证](../../packages/ts-shell/src/research/evidence/validation.ts#L5)只检查源/摘录/quote 存在，独立 reviewer 再读相同路径仍产生相同错误定位，报告可沿用它。此项是确定的展示与证据边界错误，不把模型审查完成说成结论为真；本轮未运行 PDF 或研究探针。
+- **后续修复/验收**：在原读取/media owner 提供结构化、不可由正文伪造的页/行边界与纯正文，研究消费者直接使用；hash、摘录、定位及截断口径保持一致，宿主提示独立展示。合成 PDF 页标记和文本分页 notice 各有一个能约束实际 source→citation→review/report 的反例，不能仅在最终报告隐藏错误页号。全量复核结束前不修代码。
+
+#### A15 — ECO-05、SAFE-01：同名 MCP 工具更新后仍沿用当轮旧契约执行（高，代码缺陷）
+
+- **契约**：MCP 动态能力的 schema、来源与权限必须一致；已批准或已准入的旧工具定义，不能自动授权后来同名但契约不同的能力。Plan 门禁仍须在实际派发时成立。
+- **当前证据**：[tool registry](../../packages/ts-shell/src/core/tools/registry.ts#L529)捕获当轮 `inputSchema` 与 `readOnlyHint`；[Plan policy](../../packages/ts-shell/src/core/query/toolPolicy.ts#L50)按该 hint 放行，`turn/tools.ts` 执行前只验证同一旧 schema。[gateway](../../packages/ts-shell/src/core/mcp/gateway.ts#L93)派发前确实读取最新 `liveTools`，却只检查名称存在，然后调用工具；[client/catalog](../../packages/ts-shell/src/core/mcp/catalog.ts#L20)只额外检查存在、taskSupport 及结果 schema，没有把新定义与旧准入契约比较。list-changed 通知仅清 catalog/通知订阅方；当轮 ToolDefinition 不被撤销。session/config admission 绑定工作区/信任/配置，不含工具目录契约版本。
+- **触发/影响**：当轮列出的同名工具原为 read-only，审批等待或前一工具运行期间更新成非只读或改变参数 schema；gateway 已取得新定义仍发送 `tools/call`，Plan 准入和参数校验来自旧定义。该漏洞不依赖服务谎称只读，也不是从“没有通知”推断目录过期；问题正是客户端看到了新契约仍未拒绝旧批准。独立 lane 追踪普通 turn/startTurn/ToolGate/snapshot，主代理核对 registry→policy→gateway→client/catalog；本轮未启动 MCP 服务或运行探针。
+- **后续修复/验收**：在现有能力快照与调用 owner 绑定完整审查契约身份，发现 schema/安全 annotation/来源或连接身份改变就拒绝旧调用，刷新后重新校验及审批；工具名相同不足以复用批准。受控同名更新覆盖 Plan 和批准等待，证明变化后零派发、合法未变定义可用；不新增平行工具权限系统。全量复核结束前不修代码。
+
+#### A16 — RSC-05：已收束的 partial 报告 resume 会越界追加片段（中，代码缺陷）
+
+- **契约**：研究 resume 复用已完成阶段、继续未完成工作；有证据缺口的 partial 报告不能通过重复生成已收束片段假装继续调查，也不能进入无法结束的报告阶段。
+- **当前证据**：[resume](../../packages/ts-shell/src/research/run/runtime.ts#L96)允许 partial run 恢复并保留原 `fragments`，将原 report 阶段写为 `resumeStage`；[来源 reconcile](../../packages/ts-shell/src/research/run/stages.ts#L69)在回读不变时恢复 report。[report transition](../../packages/ts-shell/src/research/run/stages.ts#L44)只有片段数**恰好等于** quick 3/deep 6 时才标 completed/partial；[focus](../../packages/ts-shell/src/research/run/prompts.ts#L52)也只有对应数量的章节。当前 runtime 测试确有 quick 三片段正常 partial 报告，却没有该终态的不变来源恢复场景。
+- **触发/影响**：quick 调查有覆盖缺口并完成三片段 partial，用户在原 deadline 内 resume、引用来源成功复读且不变；host 接着请求 index 3 的第四片段，章节 focus 越界。即使模型正确返回该 index，状态仍 running，之后继续追加直至持久 schema 的六片段上限拒绝；deep 则首次追加第七片段就拒绝。没有补缺口调查或有效终结。本项由确定的状态转换与数量判定确认，未运行动态恢复探针。
+- **后续修复/验收**：在原 run/stage owner 明确已收束 partial 的继续语义：确有未完成调查则重新进入相应阶段并使旧报告版本失效；没有可继续工作的报告保持可解释的终态。覆盖 quick/deep 的完整 partial 与中途 report 暂停，证明不请求越界章节且不重复已完成片段；保留原 deadline、来源回读与账目。全量复核结束前不修代码。
+
+#### A17 — AUTO-04：implementation 验收匹配 edit receipt 时忽略当前文件权限模式（中，代码缺陷）
+
+- **契约**：§3.2 的实施条件须匹配已批准后同会话 committed edit receipt 与**当前版本**；正文 hash 不能证明 receipt 所记录的整个文件版本仍成立。
+- **当前证据**：[目标观察](../../packages/ts-shell/src/planning/goal/acceptance/targets.ts#L10)记录真实 mode，原 [operation receipt](../../packages/ts-shell/src/edit/recovery/operation/write.ts#L42)也保存 `after.mode`；但 `matchingOperations`（第 25–26 行）仅比较 state/hash，未比 mode。[evaluate](../../packages/ts-shell/src/planning/goal/acceptance/evaluate.ts#L42)直接据此匹配 `--implementation` 条件，随后可发布 verified acceptance。原 authority 的版本相等性包含 `mode & 0o777`，不是本轮新增的版本定义。
+- **触发/影响**：批准 artifact 的 implementation 条件后，普通 writer 提交正文 H、mode 0644，之后原生命令或外部 `chmod` 改成 0777、正文仍 H；终态成功和账目已对账时，旧 receipt 仍被接受为当前 after-version，目标可标 verified。artifact hash 条件本身成立，但额外的 implementation receipt 条件已失真。已核对观察→receipt→evaluate 链及现有内容变化用例；未执行 chmod 探针。
+- **后续修复/验收**：复用已有文件版本语义匹配 mode 与 hash/state，保留 absence 及平台适用范围；一个正文不变而 mode 改变的实施反例须阻止 verified completion，合法相同版本仍可完成。不得通过删除 `--implementation` 约束或弱化版本定义闭合此项。全量复核结束前不修代码。
+
+#### A18 — ECO-04、SAFE-02：agents 管理发现未使用已经提供的父读取权限（中，代码缺陷）
+
+- **契约**：角色管理与真实 task 发现共用读取边界；父 read-deny 应在定义正文读取前执行，不能只在后续 show/edit 阶段检查目标。
+- **当前证据**：[CLI composition](../../packages/ts-shell/src/cli/runtime/agents.ts#L27)提供含 configuration admission、父权限及 deny 的 `host.sourceAccess`。但 [管理 owner](../../packages/ts-shell/src/core/subagents/command.ts#L36)构造 `new SubagentLoader(host.root)` 时未传此 callback，并在所有动作前 `discover`；[loader](../../packages/ts-shell/src/core/subagents/subagentLoader.ts#L61)的 sourceAccess 为可选，缺省直接 `readAgentFile`。list/discover 随即展示从正文取得的 name/model/effort；show 到发现完成后才 checkTarget。task 入口已接同一 callback，管理入口遗漏是独立消费者问题，不与 A11 的 memory 混为一项。
+- **触发/影响**：父 read-deny 指定某 role 文件，调用 `/agents list` 仍读取完整定义并展示其元数据；`show` 虽可在最终输出正文前拒绝，读取已经发生。已核对 CLI 提供者、管理调用及 loader 读取顺序；本轮没有读取实际角色文件或执行该命令。
+- **后续修复/验收**：管理发现复用原 loader 的 sourceAccess，权限拒绝只展示安全的不可用诊断，不解析被拒绝正文；一个 denied definition 反例验证零正文读取及零敏感元数据输出，合法覆盖/来源排序保持原契约。全量复核结束前不修代码。
+
+#### A19 — ECO-05：普通 MCP 工具调用未把回合取消信号传至实际 RPC（中，代码缺陷）
+
+- **契约**：ECO-05 的实际工具调用须消费父取消；停止新增派发、请求取消、已发生的远端 effect 与未确认结果分别表示，不能只让内容命令或配置管理可取消。
+- **当前证据**：`turn/tools.ts` 向执行 context 提供 abortSignal，但 [MCP tool adapter](../../packages/ts-shell/src/core/tools/registry.ts#L535)忽略 `_context`；[catalog wrapper](../../packages/ts-shell/src/core/tools/catalog.ts#L148)仅传 admission。[gateway invokeTool](../../packages/ts-shell/src/core/mcp/gateway.ts#L81)无 signal 参数，[实际 client](../../packages/ts-shell/src/core/mcp/client.ts#L199)调用已有 `withCancellation` 时省略父 signal，仅绑定连接关闭。普通 CLI [取消回调](../../packages/ts-shell/src/cli/runtime/cliSessionRuntimeFactory.ts#L225)取消 config/auth 和 `cancelContent`，未取消该 tools/call；共享 gateway 不在单轮结束前关闭，agent loop 会等待工具 Promise。
+- **触发/影响**：已送出的 MCP tools/call 挂起时按 Escape/取消回合，RPC 不收到本次父取消，仍等待服务响应或自身期限，远端工作也未收到相应取消通知。此项不承诺远端取消必能撤销已发生 effect，缺陷是现有父 signal 没有进入实际请求，不能用回合随后 stopped 或 timeout 声称取消传播成立。独立 lane 排除了 UI/shared gateway/loop 的其他取消路径，主代理复核 adapter→client 及 UI callback；未运行 held-call 探针。
+- **后续修复/验收**：沿原 tool/catalog/gateway/client 接通请求 signal，复用现有 SDK cancellation 和监听清理；预取消零派发，在途取消有界返回且保留 effect unknown/不重放，健康连接与后续请求按实际关闭策略验证。全量复核结束前不修代码。
+
+#### A20 — AUTO-01/05、CMD-01：goal 的完成/放弃别名跳过顾问暂停与解除启用（中，代码缺陷）
+
+- **契约**：`done→complete`、`clear→drop` 是同义调用，目标生命周期及顾问取消不能因入口拼写改变；新目标不应继承已经退出目标的顾问派发授权。
+- **当前证据**：[语法](../../packages/ts-shell/src/core/commands/goal/syntax.ts#L13)明确声明两个 aliases；[CLI goal composition](../../packages/ts-shell/src/cli/runtime/goal.ts#L40)却只用原始 `args[0]` 判断 `pauseAdvisor`。随后 scheduler.stop 按 `parseGoalArgs` 的 canonical verb 处理，因此 aliases 能停目标，却不进入 AdvisorRuntime.pause 的 abort、epoch 与 armed 清理。顾问实际 armed binding 不含 goal ID，checkpoint 结果另有 digest stale 检查，后者不能代替新派发的 enablement。
+- **触发/影响**：advisor configure/on 后设目标，使用 `/goal clear` 或 `/goal done` 再设新目标，旧 armed 状态仍可接受新 checkpoint 并发送顾问模型请求；canonical drop/complete 则会解除启用，需重新 on。此项不声称旧意见会绕过 digest 后直接应用，范围是同义 lifecycle 的取消及新目标付费派发差异。已读语法、CLI 和顾问暂停/派发守卫；未运行请求探针。
+- **后续修复/验收**：在原 composition 使用同一个 parsed canonical verb处理顾问与调度生命周期，保持非法语法/未成功状态零额外动作；一个 actual alias→新目标场景约束顾问零自动发送，并与 canonical 行为一致。全量复核结束前不修代码。
+
+#### A21 — RSC-03/05：报告保存中进程退出后，writer 未确认结果仍停留 pending（高，代码缺陷）
+
+- **契约**：保存成功须由 committed edit receipt 证明；writer 开始后失去结果应显式 unknown，不以报告已完成、预期路径或失去的 owner 隐藏文件结果。
+- **当前证据**：[save owner](../../packages/ts-shell/src/research/report/save.ts#L38)在执行批准的 prepared patch 前持久化 `owner`、`save.status=pending` 和 target，run.status 仍为 completed/partial；仅在执行返回后才写 outcome/operationId（第 54–56 行）。[recovery](../../packages/ts-shell/src/research/run/runtime.ts#L130)只处理 ready/running，跳过已经收束的报告；discard 清 owner 也不修改 save.status。[status](../../packages/ts-shell/src/research/command.ts#L29)及 [report](../../packages/ts-shell/src/research/report/renderer.ts#L40)照常投影 completed/partial + save pending，没有 writer 未确认警告或 receipt reconciliation。
+- **触发/影响**：批准 Add File 后，原 patch writer 已持久 intent 或已写文件，进程在 research outcome 更新前退出；fresh runtime 仍显示报告 completed、保存 pending，已证明死亡的 save owner 也不会把该状态变成 unknown。正常的存活 pending 不是漏洞，问题是丢失 writer 结果后的恢复/展示没有单独处理。已读保存→原 prepared writer→重入/显式 discard→状态链；本轮没有运行崩溃探针，不承诺跨文件原子性。
+- **后续修复/验收**：在原 run/save owner 持久并核对可关联的 writer intent/receipt，存活 pending 与已死/未知 owner 的未确认结果分开；没有 committed 证据就显示 unknown 并阻止重放未知保存。覆盖写前/intent 后/写后、research outcome 持久化前的隔离中断，恢复只能据原 receipt 结论，不凭目标存在补成功。全量复核结束前不修代码。
+
+#### A22 — RSC-01：指定 brief 文件仅交给模型自行读取，实际未读也可继续研究（中，代码缺陷）
+
+- **契约**：[15 §6.2](15-deep-research-design.md)要求 `--brief` 文件先经正常 read 权限、containment 和字节预算；显式指定的研究输入不能静默遗漏，读取失败须反映在 run 状态/限制中。
+- **当前证据**：request 只保存 `briefPath`；[research prompt](../../packages/ts-shell/src/research/run/prompts.ts#L44)要求模型自行 read，但 [brief stage acceptance](../../packages/ts-shell/src/research/run/stages.ts#L18)只检查返回 brief 的 schema/revision/mode/question ID。原 child 获只读工具权限并记录实际 source receipts，brief acceptance 没有消费这些 receipt，也没有在创建时由正常 read owner先取得指定文件。父 deny 本身有效，未发现越权读取；缺的是对必需输入是否取得的实际核验。
+- **触发/影响**：带 `--brief constraints.md` 启动研究，brief 子上下文零工具读取，或读取被拒绝后仍返回合法 brief JSON，host 接受并继续 investigate/report，没有标记指定输入缺失。此项针对确切必需输入，不要求宿主证明模型理解或遵守全部正文语义；本轮静态核对实际输入、prompt、stage 和 source consumer，未运行模型探针。
+- **后续修复/验收**：复用现有 read/source 权限及 bounded reader先绑定指定简报，或由原阶段 owner 强制核验本次实际读取及其成功/完整性再接受派生 brief；拒绝/缺失/超限明确停住或保留输入未验证状态。一个指定输入未读/deny 的反例不得进入完整研究成功，合法受限读取仍保留预算与原路径语义。全量复核结束前不修代码。
+
+#### A23 — ECO-04、TOOL-01：角色发现的文件限额不约束实际目录枚举工作量（中，代码缺陷）
+
+- **契约**：角色发现须有实际资源上限；[agent definitions](agent-definitions.md)的六层/512 文件/8 MiB 限额不能仅约束解析出的 Markdown，任意来源目录的宽度也必须有界。
+- **当前证据**：[loader scan](../../packages/ts-shell/src/core/subagents/subagentLoader.ts#L45)先同步 `fs.readdirSync(...withFileTypes)` 全量分配并排序当前目录，之后对子目录递归；仅遇 `.md` 才累计 files/bytes（第 55–59 行）。非 Markdown entries 与全部目录数量、路径字节没有累计预算。管理命令和真实 task preparation 都消费此同步发现，不由异步 completion 的期限限制实际工作。
+- **触发/影响**：可信角色根只有少量合法 Markdown，却含大量非 Markdown 文件或空子目录，仍会在主线程全量枚举/排序/递归；512 定义限制与六层深度都不能限制任意宽树。此项不宣称已经 OOM 或测得具体耗时，范围是当前代码缺少实际 entries/directories 上限；与 A04 的 grep 读取、A10 的 patch 复读及 A11 的 memory 是不同消费者。
+- **后续修复/验收**：角色发现复用既有有界枚举/read owner，累计实际目录、entries、path bytes 和读取预算，取消/partial 进入原诊断及拒绝任务链；一个非 Markdown 或空目录宽树反例约束实际枚举，而非只断言返回定义数量。全量复核结束前不修代码。
+
+#### A24 — AUTO-05：检查点在 JSON 序列化后脱敏，漏掉已编码的工具参数凭据（高，代码缺陷）
+
+- **契约**：§3.2 的顾问检查点须脱敏、有界、不可变；工具参数是检查点输入，不能因位于 JSON 字符串而绕过现有 credential 字段规则，尤其在发送到独立模型之前。
+- **当前证据**：[checkpoint](../../packages/ts-shell/src/advisor/checkpoint.ts#L19)先 `JSON.stringify(message.tool_calls)`，再 `advisorText→redactExportText`。真实 `function.arguments` 本身已是 JSON 字符串，二次编码后键的引号带反斜线；[现有脱敏规则](../../packages/ts-shell/src/core/security/redaction.ts#L109)匹配普通 JSON 键/赋值，不能识别该转义层。检查点 text 持久化、dump，并经 [review](../../packages/ts-shell/src/advisor/review.ts#L21)进入独立顾问模型 prompt（第 69 行）。现有用例只包含可被 known-key/Bearer 规则识别的直接文本，不覆盖普通值的 encoded tool arguments。
+- **触发/影响**：合成工具参数 `{"token":"SYNTHETIC_CANARY"}` 或普通 password assignment 在真实 tool_calls 数据中进入 checkpoint；序列化后的键不能匹配字段规则，值也不具已知 key 外形，因而可残留于声称脱敏的持久检查点及顾问请求。本项不要求把原始受控转录改成报告投影，问题限于明确承诺脱敏的顾问消费者；独立 lane 与主代理已核对 stringify→rules→review，未读取真实秘密或发送请求。
+- **后续修复/验收**：在原 checkpoint/redaction owner 按结构先处理工具名、参数与各字符串叶子，再序列化安全投影；对已编码 arguments 作有界解析/失败安全处理，保留轨迹和 truncation。一个真实 AgentMessage tool-call 参数反例须约束 durable checkpoint/dump/实际顾问输入都不含合成值，不能靠换成已知 sk-格式掩盖边界。全量复核结束前不修代码。
+
+#### A25 — SAFE-02：未观察树的一致性及私有镜像实际成本仍是开放交付（中，未完成交付）
+
+- **契约**：本轮复核必须把既已披露的开放条件列回任务，不能用已捕获来源的逐项复验外推整个目录快照一致，也不能将局部性能优化误作原生读取方案的全部成本已验。
+- **当前证据**：[验收 §5/§17/§18](phase-19-acceptance.md)持续保留未观察树和镜像剩余成本；当前 [ViewSources.verify](../../packages/ts-shell/src/runtime/execution/view/source.ts#L151)仅复查原 aliases/captured 集合及根身份。[materializeView](../../packages/ts-shell/src/runtime/execution/view/tree.ts#L88)仍遍历所选树并逐项创建私有占位文件/目录，已有 bounded walk 与最多八并发写入约束，未形成整树事务。后续探索的两性能候选未达到原门槛、没有产品补丁；历史 5000 文件局部优化中位数约 1.27–1.67 秒，不能当作当前所有真实仓库/高并发性能。
+- **影响/状态**：已观察来源的检查点修复有效；尚未观察或最后检查之后发生的变化不由原 ledger 证明，未承诺 OS 锁/跨文件快照。镜像成本是文档已承认的剩余交付条件，未测就不能关闭；本项不把安全的 unsupported/显式拒绝外部 metadata、未来条件语法改列漏洞，也不要求仅凭名称改建另一运行时。没有重跑历史 benchmark 或创建新竞态探针。
+- **后续验收**：在原 owner 和明确支持范围核查未观察变化是否影响准入/完整结果，并比较成熟原生能力或受控快照方案；用真实规模/并发及资源期限证据决定成本是否可接受。不能达到的保证需修订精确契约并留明示限制，不能用更多局部绿色测试或删除旧开放记录收尾。全量复核结束前不修代码。
+
+### 9.3 当前源码核对依据
+
+- **GIT-01–04、SEC-01–03（已审，未发现新增缺陷）**：独立 lane 已读 Git snapshot/diff/execute/transfer/push 与 security scan/coverage/comparison/remediation；主代理补查 nativeGitTool 的 source/target/普通审批、prepareCommit 的 index 身份、CheckoutGuard 的目标目录/HEAD/index 复验、CLI worktree→same-ID migrate，以及 host-armed commit/read-only review/goal shortcut。security disposition 保留带理由历史，export 递归脱敏并拒绝截断，import 固定 partial/unknown local coverage，analyzer 的 permission-pending/running/unknown 和成熟原生进程结果有实际 owner，未发现未执行即记零发现或 verified 的新路径。相关测试源码已查，未运行。
+- **AUTO-01–05（已审）**：goal codec/transition、bound CAS、legacy inert/import 与 new/fork 隔离；goal policy→session locked ledger→reserve/dispatch/settle→实际主/子/顾问 step、重试/摘要/缓存请求；持久 claim、提交前 readiness、prompt/terminal provenance、bounded drain/死亡 owner 恢复及真实输入队列；plan 版本、guided 显式答案/paused 创建、pipe/EOF、native proof/目标复读/receipt 完成；advisor 不同模型/独立无工具上下文、压缩前 checkpoint/cadence/coverage、pending/epoch/locked apply 的实际生产链已核对。新增完成版本、alias 生命周期、顾问脱敏问题见 A17/A20/A24。无法证明完整请求上界的 strict cap unsupported 是既定诚实拒绝，不另记新缺陷；测试正文已读，未运行。
+- **RSC-01–05（已审）**：新 aliases 独占、语法→interactive/print→host armed metadata→阶段/CAS/会话持久；三类官方学术适配→有界公共 HTTP/whole-body rate owner→paper ID/revision/replicas/摘要及 PDF；实际 tool source receipt→claim/draft/review/fragment→报告与原 patch 保存；host capability→父工具/角色/Plan/source deny 求交及 fresh reviewer 逐 claim 实读；research request policy→实际 delegated provider/step/compaction/cache 与暂停/reconcile/原 deadline 均已追踪。指定输入、定位、partial 恢复和保存中断问题分别见 A22/A14/A16/A21；来源执行、支持及独立审查没有合并为真值。测试正文已读，未运行，真实质量验收归 A03。
+- **ECO-01–05（已审）**：签名 registry→有界 archive→固定版本 install→独立 activation/grants/scripts 的生产链已读；rollback 清除启用/权限并核对原包和 source 身份。remove 先持久注销，再仅删除通过 inventory 验证的版本，未知/修改内容保留；invalidate 先注销命令/工具、取消在途、按 epoch 再激活。角色 CRUD/覆盖/enable/model/effort→真实 delegated step/父工具池/请求账目，MCP negotiation/分页/content/通知窗口→配置 CAS/reconcile/精确 test/reload，以及 HTTP/OAuth 的 PKCE/state/issuer/私有存储/refresh/logout 均已追踪。认证目录、角色 memory/定义发现/资源、动态契约与普通 RPC 取消缺陷见 A09/A11/A18/A23/A15/A19。外部直接编辑配置时，已批准且真实完成的旧 RPC 历史结果与即时能力撤销的关系缺少更强契约证据，未据内容链有不同 fence 就额外记漏洞；内部配置保存会实际 reconcile。公共服务与账户验收归 A03。
+
+- **TOOL-01–05（已审）**：text page 按 chunk/line/output/scan/deadline 分别限额，walk 的目录/条目/path bytes/depth 与取消/关闭在真实枚举 owner 执行；grep fallback 的无界复读登记 A04。媒体经过核验句柄、私有复制、共享期限、进程输出/尺寸/页数预算，PDF 按实际页和 source hash 报告，image 经 batch media budget 进入 tool-result 内容；依赖缺失/平台不支持明确。LanguageService/RpcConnection 的初始化协商、UTF-16 版本、stale 复验、cancel/timeout/restart 与 rename 仅提案链已读，旧入口只 re-export，scanner 保持显式选择。browser 上传使用核验快照及总量预算，下载走公共网络与 artifact publication；tabs/screenshot 使用动作 scope 与当前 page binding。desktop 的预览绑定配置/快照、逐项权限、焦点/坐标复验、X11 原生命令、默认遮蔽与 clipboard 只返回大小/hash 均有实际消费者。没有把已披露的人工 mask、Linux 原生工具或真实外部设备缺口当作本轮新缺陷。
+
+- **SAFE-01、SAFE-03（未发现新增缺陷）**：`turn/tools.ts` 的 `adaptTools` 在 prepare/审批之前调用 `validateToolArguments`，执行前再次校验；`core/tools/arguments.ts` 对 schema 方言、异步/无效 schema 与输入类型失败封闭，write/edit 直接入口也调用同一校验。`core/tools/ask.ts` 保留 callback 的显式答案及取消/无 UI/错误状态。已阅读相关生产函数和定向测试用例；未运行测试。
+- **SAFE-04–06、SAFE-08（未发现新增缺陷）**：grep 先用原路径解析并仅在 `not-installed` 降级；公共网络 owner 将全部已审核 DNS 地址绑定 socket lookup，原 hostname/TLS 校验保留，编码与解码逐层限额，父取消/总期限共用 scope。工具终稿由 `ToolCards.finish` 替换预览，审批写入独立 metadata，`TurnSink` 保留停止/失败；对应测试源码覆盖这些反例。此结论不替代 SAFE-02 或 A03 的平台/外部验证。
+- **SAFE-07（未发现新增缺陷）**：已读 `BrowserActions.run`、`ActionScope.perform`、`BrowserSessionManager.closeResources` 与 `ResourceCleanup.close`。预取消不派发、动作前后检查、已发生 effect 和 cleanup unknown 分别保留；清理 owner 将底层 close 拒绝转换成明确结果，不能把抽象 callback 可能抛错的假设直接报成产品漏洞。
+- **CMD-01–04（已审）**：目录与 alias/raw invocation 由现有 registry 投影；注册快照归 registry 所有，卸载通知订阅方。`parseSyntax`、领域语法及 help/补全共用定义，trust 存储额外验证实际枚举，整数参数拒绝尾缀。`slashSuggestions`→`completionEdit`→editor 的原稿范围和 `consumeSuggestionKey` 的接受/提交分离均已查；关键 `/res`、后缀、过期候选测试正文已读。`CatalogController` 按身份/epoch/snapshot 丢弃迟到结果，去抖、期限、有界缓存及 partial 提示有真实消费者；目标 alias 在新顾问消费者处遗漏见 A20，不能据 registry 正确外推消费者一致。未运行对应测试。
+- **CFG-01–05（已审，未发现新增缺陷）**：静态 AST 比对实际运行，`RuntimeConfigFile` 的 35 字段全部有 `createConfigFields` 定义，registry 共 36 项，额外 `allowUntrustedHooks` 明确为 CLI-only；3 个 TUI 字段均有 schema。已读字段来源/合并、`parseConfigText`/结构预算、`persistConfigEdit` 的锁内重读及三方合并、`ConfigState.publish` 的完整候选与失败保留、settings 的 preview→pending→Apply，以及通知实际 terminal 消费。`selectModel` 与 session `commitModel` 共同绑定模型/effort/连接及锁内前置条件；会话/global 结果分开，未知和部分结果不升级成功。相关配置冲突/JSONC/未来版本、会话选择和发布测试源码已核对，未运行测试。
+- **UI-01–07（已审，未发现新增缺陷）**：已核对 regular `prepareRows`→paint 的 marker/坐标账本，共同 composer layout→shape→source selection 的原稿范围与 revision；四主题各 54 项，dark 的逐值映射、default SGR、legacy 继承和六角色的 chrome/syntax 实际读者一致。`readStatusFacts` 使用真实 window/usage/cost 来源与 50/70/90 风险阈值；report codec→terminal/JSON/transcript/Pager 共用结构，分页/筛选/resize 保留 source anchor。startup 将输入可用、布局和写入完成分开；`turn/step.ts` 在实际请求处采集上下文。测试正文和生产路径已读，未运行；前端像素、IME 与系统剪贴板仍归 A03。
+- **SES-01–05、EDIT-01–03（已审，资源复验缺陷见 A10）**：session picker/OverlayHost 的 offered ID、版本、generation 与迟到回调守卫已核对；SessionCatalog 有界发现和 SessionFiles 前后 stat 保留 partial/unknown。navigation、rename/delete 和 same-ID workspace rebind 各自保留写入后警告/未知，`workspaceRevision`、configuration transition 与实际 `syncWorkspace` 触发刷新。patch parser/plan 拒绝重复/重叠/链接/二进制及越界预算；prepare→稳定锁→全文件预检→原 writer→逐项 receipt/补偿的真实路径已读。undo 批准后重新读 blob/最新 operation/文件身份，持久化 intent 后的异常保留 unknown，context 更新失败仅加 warning；没有从展示层重造写入。非 Linux 对象保证仍归 A01，不把现有同步检查或 Linux descriptor 锚定外推成全平台通过。
+- **REM-01–05、FLOW-01–03（独立 code lane 已审）**：认证/ACL/share/proposal admission 与 SSH transport 主 owner，以及原生事件→有界队列→guest cursor、job intent→持久 fence→SSH/cgroup receipt、本地输出→journal/registry→jobs/hub 的实际接口已追踪。撤权、双客户端身份、取消及未知写不自动重放；分页显示缺陷记 A07。director/handoff 与固定 evaluator 的独立候选/冻结资产/train/holdout/结果发布链已核对，无新增矛盾。这里记录源码复核，不替代真实部署/SSH 或跨域运行证据。
+- **MEDIA-01–02、PAR-01–05（独立 code lane 已审）**：音频设备在明确确认后才开始采集，selected transcript 以带来源的普通 prompt 进入执行；terminal output/input exclusions→record writer→finalize/discard 保留界限、身份与未知状态。历史/导入/附件实际 request 消费、todo/memory、预设、restart/shutdown/rules 主 owner 已读；service tier 进入实际 wire，force 为一次性消费并重查当前目录。凭据和诊断报告问题分别登记 A05/A06/A08。相关测试正文已读，未执行；独立 architecture lane 未完成，不据此给出整体批准。
+- **QA-01/02（审查收束，验收未闭合）**：按 §7.2 八组反例对照 [验收 §4](phase-19-acceptance.md#4-跨域矩阵与实际-cli)及上列真实生产消费者。权限与 schema 的 producer 正确不能外推 MCP/子代理最终消费者（A11/A15/A18/A19）；受限文本/patch 预览不能外推批准后读取预算（A04/A10）；持久 completed/partial 也不能外推保存/恢复或验收版本（A16/A17/A21/A22）。文件补偿、会话世代、预算/unknown、研究反证、外部数据、Git/receipt 和 TUI 源文分别由原 owner 核查，没有从展示层赋予 authority。当前静态审查覆盖 76 项，但八组动态证据必须在最终修复源码重新匹配，见 A02；真实平台/服务/质量和精确 CI 缺口见 A03/A12。MCP 配置禁用/订阅/注销与 auth refresh 竞争、普通/后台/角色取消到实际 RPC 等已列入后续跨域组合，不能拿旧合成绿灯作为新发现已修证明。
+
+### 9.4 审查收束与实施边界
+
+16 批、76 项及输入 14–24 的对应裁决已完成本轮**当前源码静态复核**，无待审任务。共逐项即时登记 **25 项**：**19 项代码缺陷、3 项未完成交付、3 项验收证据缺失**。其中 A01/A02/A03/A12/A25 包含历史已披露的开放条件，A13 为原裁决能力的交付差距，不能把 25 项都称为新回归。每项证据和后续验收见 §9.2；发现顺序即登记顺序，未等全审结束再补台账。
+
+这只表示审查范围收束，不证明已经穷尽任意未来漏洞或满足全部验收。上述缺陷仍待修复；本次审查没有修改产品代码、脚本、构建、配置或 provider 行为，没有运行产品测试/构建/真实请求。用户 `.gitignore` 保持原改动且不纳入审计提交。Phase 19 继续 **active**，不能以审查收束标记实现或发布完成。
+
+后续实施按 §4 的依赖与实际 owner，先处理文件/权限/资源边界，再处理命令、目标/研究及动态扩展消费者。每批在动代码前补对应只读参考的具体决定比较，复用已有 reader/writer/ledger/gateway，做能区分本缺陷的 focused 验证；外部前置未满足不阻止无关本地修复，也不允许将未验条件删除或静默延期。最终集成与提交/推送/CI 分别取证，审查台账保留本次起点及未修事实，修复结果另追加。
+
+审计文档已实际通过 strict docs 与 diff 空白检查；推送前四项源码静态门（import-cycles/config-consumers/declarations/node-floor）均通过。独立脚本复算 §4 为 76 个唯一任务，§9.2 连续 A01–A25、分类为 19/3/3；本节 74 个本地链接目标和行号范围存在。strict 保留 118 个既有非阻断源码引用 advisory；这些检查不证明产品行为。用户 `.gitignore` SHA-256 仍为 `20e91ccf19fdc755718372e6fcc9ef77ca6a579280ff4b0dc1f69c73a2eaf2d3`；审计文档提交/推送及其精确 CI 另验。
