@@ -9,12 +9,16 @@ import { researchLimits } from '../brief/model.js';
 import { researchInputDigest, researchPrompt } from './prompts.js';
 import { assertChild, boundRun, runEvent, updateRun, type RunBinding } from './state.js';
 import type { ResearchRun } from './model.js';
-import { applyStage } from './stages.js';
+import { applyStage, settleReport } from './stages.js';
 import { isRecord } from '../../core/values/record.js';
+import { briefInputHash } from '../brief/input.js';
 
 export async function runResearchChild(binding: RunBinding, runner: SubagentRunner, signal: AbortSignal,
   report: (message: string) => void): Promise<ResearchRun> {
-  const initial = boundRun(binding); const childId = randomUUID(); const epoch = initial.epoch;
+  const initial = boundRun(binding);
+  const settled = settleReport(initial);
+  if (settled !== initial) return updateRun(binding, () => settled);
+  const childId = randomUUID(); const epoch = initial.epoch;
   const stage = initial.stage;
   if (initial.pending || initial.children.length >= 48) throw new Error('Research child bound or pending outcome prevents new work.');
   const started = updateRun(binding, run => runEvent({ ...run, status: 'running',
@@ -50,12 +54,15 @@ export async function runResearchChild(binding: RunBinding, runner: SubagentRunn
     },
     observeTool: async context => {
       const incoming = toolSources(context, childId, started.briefRevision);
+      const briefHash = stage === 'brief' && started.request.briefPath
+        ? briefInputHash(context, started.workspace.path, started.request.briefPath) : undefined;
       if (!incoming.length) return;
       updateRun(binding, run => { assertChild(run, epoch, childId);
         const merged = mergeSources(run.sources, incoming);
         const changed = merged.changed.length > 0 && run.stage !== 'reconcile';
         const claims = changed ? run.claims.filter(claim => ![...claim.supporting, ...claim.opposing].some(reference => merged.changed.includes(reference.sourceId))) : run.claims;
         const next = { ...run, sources: merged.sources, claims,
+          ...(briefHash ? { briefInput: { path: run.request.briefPath!, contentHash: briefHash, childId, briefRevision: run.briefRevision } } : {}),
           ...(changed ? { draft: undefined, review: undefined, fragments: [],
             ...(['review', 'report'].includes(run.stage) ? { stage: 'investigate' as const } : {}) } : {}),
           children: run.children.map(child => child.id === childId ? { ...child, sourceIds: [...new Set([...child.sourceIds, ...incoming.map(source => source.id)])].slice(-128) } : child) };

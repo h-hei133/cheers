@@ -17,6 +17,8 @@ export interface ToolExecutionContext {
   readonly abortSignal?: AbortSignal
   /** Recheck path-specific denial for each actual file, including scan results. */
   readonly assertFileAccess?: (absolutePath: string) => void
+  /** Persist native operation correlation before the approved patch can write its intent. */
+  readonly onEditOperationPrepared?: (operationId: string) => void
   /**
    * What a command this tool runs should know about the session it runs in.
    *

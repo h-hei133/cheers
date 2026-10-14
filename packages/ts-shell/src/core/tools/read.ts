@@ -128,9 +128,8 @@ export function createReadToolDefinition(executionService: ExecutionService): To
         : typeof args.limit === 'number' && args.limit > 0 ? Math.min(1000, Math.floor(args.limit)) : 500
       const page = await executionService.readTextPage({ ...request, offset, limit })
       context.abortSignal?.throwIfAborted()
-      const { text: _, ...metadata } = page
       const formatted = formatPage(page)
-      return approvedResult(formatted.output, { read: metadata, outputNotice: formatted.outputNotice,
+      return approvedResult(formatted.output, { read: page, outputNotice: formatted.outputNotice,
         provenance: { locator: rawPath, fetchedAt: new Date().toISOString(), contentHash: createHash('sha256').update(page.text).digest('hex'),
           hashScope: 'selected-text', parser: 'utf8', location: 'lines' } })
     },

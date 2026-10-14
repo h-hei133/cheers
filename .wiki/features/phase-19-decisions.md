@@ -2682,6 +2682,8 @@ Node20.3 直接受影响 22 文件/315 项、TypeScript 与 Linux 单文件构�
 
 反转精确恢复后，最终 MCP CLI/HTTP 两文件 25 项通过；这是同一生产源码的复验，不与 93 项累加。
 
+交付 `675c5ecf56ad35dc9579cabf4335bed229e97687` 已推送；CI38572728439/job115881845242、Watch38572728428/job115881845459 均 steps=[]，annotation 明确付款/spending-limit 阻止启动，未取得远端运行证据。
+
 ### 10.8 A17/A20 — 目标实施版本与顾问别名生命周期
 
 - [验收 target owner](../../packages/ts-shell/src/planning/goal/acceptance/targets.ts) 匹配 committed implementation receipt 时同时要求 after.mode 已知且权限位与当前文件相同，沿用原 authority 的 `mode & 0o777` 语义。正文相同不足以匹配当前版本；absence 行为保持原契约，旧缺失 mode 的收据不能证明完整版本。
@@ -2689,3 +2691,17 @@ Node20.3 直接受影响 22 文件/315 项、TypeScript 与 Linux 单文件构�
 - 定向比较参考命令的 alias 指向同一个 action，以及 abort 同时取消各后台责任并等到 idle：采用 canonical 生命周期入口，继续使用原 pauseAdvisor。参考 edit 保留正文/BOM/换行，但没有本项目的 implementation receipt 验收契约；不能将其正文相同当作权限模式已验证，沿用本项目既有完整版本定义。
 - Node20.3/Linux 隔离环境 5 文件/34 项、build:ts及五门通过。artifact-only implementation 经真实 writer 提交后 chmod，正文 hash 仍同而目标不完成；恢复原 mode 后原收据可完成。四个 canonical/alias 实际顾问控制先证明可派发，再验证新目标零自动派发、显式 on 后恢复；非法/旧会话不改变 epoch。初轮夹具缺完整 provider baseUrl，导致参考派发零次，补齐合成绑定后才记行为通过。
 - 撤销 mode 比较时实际错误 verified complete，撤回 alias 归一时 done/clear 各实际派发一条新目标顾问请求；1/2 项真实断言失败、源码精确恢复，最终 34 项通过。材料 `.tmp/phase19-repair/a17-reversal.log`、`a20-reversal.log`；NormProof 无阻断、同 4 既有 ceiling advisory/partial。最终集成/平台/独立审查/精确CI仍开放，Phase19 active，交付另验。
+
+交付 `e8648c38ca029b9f6fc7b5a13acc9b9a3375f580` 已推送且远端分支精确读回；CI38573748822/job115885339478、Watch38573748860/job115885340051 均 steps=[]，annotation 明确付款/spending-limit 阻止启动，无远端通过。
+
+### 10.9 A14/A16/A21/A22 — 研究输入、定位与恢复
+
+- 原 [read](../../packages/ts-shell/src/core/tools/read.ts)、[PDF](../../packages/ts-shell/src/runtime/execution/media/pdf.ts)、[web fetch](../../packages/ts-shell/src/core/tools/webFetch.ts) 和 [document read](../../packages/ts-shell/src/research/sources/document.ts) 保留有界纯正文及原生行/页身份；[来源 producer](../../packages/ts-shell/src/research/evidence/producer.ts) 只消费这些字段，展示 notice 和正文内页码标记不能定义定位。来源 ID 绑定摘录内容/位置；相同 raw hash 的提取纠正同样使旧证据失效，缺少纯正文明确失败并不可引用。
+- [阶段 owner](../../packages/ts-shell/src/research/run/stages.ts) 和 [child admission](../../packages/ts-shell/src/research/run/child.ts) 在已齐 quick3/deep6 片段时收束原 partial/completed 判定；恢复仍实际复读引用来源，未变则保留终态/原片段且零额外 report 请求，中途恢复仅生成剩余片段，来源内容/摘录变化仍重新调查。
+- [必需 brief](../../packages/ts-shell/src/research/brief/input.ts) 使用当前 brief child 的真实正常 read receipt，须 exact path、revision、完整行范围/原生 hash且无截断。无读取、父deny及60KiB超限输入不能进入调查；正常/空文件可继续。原50KiB输出、8MiB scan和权限路径复用，没有额外宿主 reader。
+- [保存恢复](../../packages/ts-shell/src/research/report/recovery.ts) 复用原 edit store；批准的原 patch 在 prepareOperation 后、commit intent 前回调持久 operationId/callId。恢复即使报告已 partial/completed 也核对同会话/工作区、确切调用、单个 exclusive create target、原 receipt及undo状态。只有原 committed receipt 确认成功，missing/intent/未知保持unknown；live/foreign owner不被观察撤销。状态/报告明确未确认文件结果、拒绝重放，普通拒绝也不覆盖unknown。
+- 对照参考的实际PDF页产物身份及读取“纯正文→另附截断提示”，采用定位由reader提供，未采用展示正则或全量读取；参考checkpoint只有可验证已提交记录能恢复，agent_complete跳过已完成agent loop。采用已提交证据/不重复完成阶段；保留本项目普通writer/ledger/CAS、dead-owner规则，不引入第二套checkpoint或文件写入器。参考没有必需brief receipt协议，本项目根据显式输入契约增加当前child验证。
+- 四个真实隔离保存进程在 prepared/intent/target/最终receipt退出：前三项unknown（即使target存在），最后一项依原receipt committed；错call/target拒绝。旧恢复反转、target存在推成功反转各实际失败一项。报告恢复/brief gate反转各实际失败2/1项；旧producer反转在伪造p42及宿主notice两项实际失败。原字节恢复，日志 `.tmp/phase19-repair/a14-reversal.log`、`a16-reversal.log`、`a21-reversal.log`、`a21-target-reversal.log`、`a22-reversal.log`。
+- 验证先发现Poppler缺失，最初PDF绿灯仅证明unavailable拒绝，未计作真实解析。随后只在仓库临时目录解包官方Ubuntu Poppler24.02，以独立loader wrapper适配既有最小进程env，真实正文产生双换行伪造页标且仍只引用p1；旧实现确实生成p42。首轮反转参数组合错误只产生TypeError，不计反转证据；修正后才取得上述真实断言失败。初轮brief事件观察误用了parent emit，改核对原child持久事件。
+
+反转精确恢复并启用隔离Poppler后，Node20.3/Linux最终受影响17文件/197项、build:ts及五门通过；无skip，原生PDF已实际解析。NormProof图义务满足、4既有ceiling advisory/partial。提交/推送/精确CI另验。19项代码缺陷均已形成局部修复，A01/A13/A25交付及A02/A03/A12验收继续开放，Phase19 **active**，不把受控服务或本地Linux证明称为全平台/真实质量验收。

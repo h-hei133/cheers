@@ -17,14 +17,14 @@ export async function readPdf(request: MediaReadRequest, source: MediaSource): P
   if (!Number.isSafeInteger(totalPages) || totalPages < 1) throw new MediaReadError('decode')
   if (totalPages > 200 || offset > totalPages) throw new MediaReadError('pages')
   const endPage = Math.min(totalPages, offset + limit - 1)
-  const pages: { page: number; status: 'text' | 'no-text'; extractedBytes: number }[] = []
+  const pages: { page: number; status: 'text' | 'no-text'; extractedBytes: number; text: string }[] = []
   const output: string[] = [`PDF pages ${offset}-${endPage} of ${totalPages}. Source SHA-256: ${source.hash}. Text extraction only; OCR, images and layout interpretation were not performed.`]
   let remaining = 48 * 1024
   for (let page = offset; page <= endPage; page++) {
     const bytes = await runMediaProcess(source, request.workspaceRoot, 'pdftotext', ['-q', '-enc', 'UTF-8', '-eol', 'unix', '-layout', '-nopgbrk', '-f', String(page), '-l', String(page), '/proc/self/fd/3', '-'], remaining, request.abortSignal, 3)
     const text = bytes.toString('utf8').trimEnd()
     remaining -= bytes.length
-    pages.push({ page, status: text.trim() ? 'text' : 'no-text', extractedBytes: bytes.length })
+    pages.push({ page, status: text.trim() ? 'text' : 'no-text', extractedBytes: bytes.length, text })
     output.push(`[Page ${page} of ${totalPages}]\n${text.trim() ? text : '[No extractable text. This page may be blank, scanned or contain unsupported text; OCR was not run.]'}`)
   }
   const nextOffset = endPage < totalPages ? endPage + 1 : undefined

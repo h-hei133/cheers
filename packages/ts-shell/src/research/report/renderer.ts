@@ -38,6 +38,8 @@ export function researchReportProjection(run: ResearchRun, ledger?: LedgerProjec
       ? `Shared scope ${ledger.scopeId}: ${ledger.inputTokens} input + ${ledger.outputTokens} output tokens settled; ${ledger.unknown} unknown attempts; history unknown: ${ledger.historyUnknown}; breach: ${ledger.breach}.`
       : 'The native shared ledger could not be projected; resource totals are unverified.',
     `Save: ${run.save.status}${run.save.path ? `; path: ${run.save.path}` : ''}${run.save.operationId ? `; operation: ${run.save.operationId}` : ''}.`,
+    ...(run.save.status === 'unknown' || run.save.status === 'pending' && run.save.path
+      ? ['Report file outcome is unconfirmed. Inspect the original edit operation before further file actions; automatic replay is refused.'] : []),
     'Replica counts, completed review and report generation do not verify correctness.', '',
     ...run.events.map(event => `${event.sequence}. ${event.timestamp} ${event.kind}/${event.stage}: ${event.detail}`), ''];
   const redactions = new Set<string>();

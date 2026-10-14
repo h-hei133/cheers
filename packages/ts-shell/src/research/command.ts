@@ -27,7 +27,7 @@ export async function runResearchCommand(args: readonly string[], context: Comma
 }
 
 export function showResearch(run: ResearchRun | undefined): string {
-  return run ? `Research ${run.id}: ${run.status}; stage ${run.stage}; brief revision ${run.briefRevision}; deadline ${run.deadlineAt}.\nSources ${run.sources.length}; claims ${run.claims.length}; fragments ${run.fragments.length}; review ${run.review?.status ?? 'not-run'}; save ${run.save.status}.\n${run.pending ? 'Child outcome pending; new work is fenced.\n' : ''}${run.stopReason ?? ''}`.trim()
+  return run ? `Research ${run.id}: ${run.status}; stage ${run.stage}; brief revision ${run.briefRevision}; deadline ${run.deadlineAt}.\nSources ${run.sources.length}; claims ${run.claims.length}; fragments ${run.fragments.length}; review ${run.review?.status ?? 'not-run'}; save ${run.save.status}.\n${run.save.status === 'unknown' || run.save.status === 'pending' && run.save.path ? 'Report file outcome is unconfirmed; inspect the original edit operation. Save replay is refused.\n' : ''}${run.pending ? 'Child outcome pending; new work is fenced.\n' : ''}${run.stopReason ?? ''}`.trim()
     : 'No research run is bound to this session.';
 }
 

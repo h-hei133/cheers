@@ -19,13 +19,14 @@ export function toolSources(context: AfterToolCallContext, childId: string, brie
   const truncated = metadata?.truncated === true || read?.stopReason !== undefined || media?.nextOffset !== undefined;
   const noText = metadata?.empty === true || media && Array.isArray(media.pages) && media.pages.every(page => isRecord(page) && page.status === 'no-text');
   const failure = context.isError ? safeFailure(metadata) : undefined;
-  const excerpts = context.isError ? [] : media?.kind === 'pdf' ? pdfExcerpts(context.result.output) : textExcerpts(context.result.output, read, String(provenance.location ?? 'extracted-lines'));
-  const id = `s-${digestOf(`${locator}\n${digest ?? context.call.id}\n${excerpts.map(e => e.location).join('|')}`).slice(0, 20)}`;
+  const bodyAvailable = media?.kind === 'pdf' ? Array.isArray(media.pages) : typeof read?.text === 'string';
+  const excerpts = context.isError ? [] : media?.kind === 'pdf' ? pdfExcerpts(media) : textExcerpts(read, String(provenance.location ?? 'extracted-lines'));
+  const id = `s-${digestOf(`${locator}\n${digest ?? context.call.id}\n${JSON.stringify(excerpts)}`).slice(0, 20)}`;
   return [{ id, kind: typeof context.args.path === 'string' ? 'file' : 'web', provider: context.call.name,
     locator: safeText(locator, 4096), ...(typeof provenance.finalUrl === 'string' ? { finalLocator: safeText(provenance.finalUrl, 4096) } : {}),
     fetchedAt: typeof provenance.fetchedAt === 'string' ? provenance.fetchedAt : new Date().toISOString(),
     callId: context.call.id, childId, briefRevision,
-    status: context.isError ? failure?.includes('denied') ? 'restricted' : 'failed' : noText ? 'no-text' : !digest ? 'failed' : truncated ? 'truncated' : 'read',
+    status: context.isError ? failure?.includes('denied') ? 'restricted' : 'failed' : noText ? 'no-text' : !digest || !bodyAvailable ? 'failed' : truncated ? 'truncated' : 'read',
     ...(digest ? { contentHash: digest } : {}), hashScope: media?.kind === 'pdf' ? 'source-bytes' : String(provenance.hashScope ?? 'source-bytes'),
     readKey: JSON.stringify({ offset: context.args.offset ?? 1, limit: context.args.limit ?? (media?.kind === 'pdf' ? 5 : 500) }),
     ...(typeof provenance.mime === 'string' && provenance.mime ? { mime: safeText(provenance.mime, 128) } : {}),
@@ -34,6 +35,7 @@ export function toolSources(context: AfterToolCallContext, childId: string, brie
     limits: [...(truncated ? ['Only bounded selected text was read; unselected content is uncovered.'] : []),
       ...(media?.kind === 'pdf' ? [`Selected pages ${media.startPage}-${media.endPage} of ${media.totalPages}; text-only extraction, no OCR/images/layout interpretation.`] : []),
       ...(!digest ? ['The tool did not provide content-addressed native provenance.'] : []),
+      ...(!bodyAvailable && !context.isError ? ['Native source text is unavailable; display output cannot supply citable evidence.'] : []),
       ...(excerpts.reduce((sum, excerpt) => sum + excerpt.text.length, 0) >= 24000 ? ['Stored excerpts are bounded to 24000 characters.'] : [])],
     ...(failure ? { failure } : {}) }];
 }
@@ -55,12 +57,18 @@ function paperSource(item: PaperItem, context: AfterToolCallContext, childId: st
     limits: item.limits.map(limit => safeText(limit, 4096)) };
 }
 
-function pdfExcerpts(output: string): SourceExcerpt[] {
-  const matches = [...output.matchAll(/\[Page (\d+) of \d+\]\n([\s\S]*?)(?=\n\n\[Page \d+ of \d+\]|\n\n\[Selected PDF pages|$)/g)];
-  return matches.slice(0, 5).map(match => ({ id: `p${match[1]}`, location: `page ${match[1]} (extracted text)`, text: safeText(match[2]!, Math.min(8000, 24000 / Math.max(1, matches.length))) }));
+function pdfExcerpts(media: Record<string, unknown>): SourceExcerpt[] {
+  if (!Array.isArray(media.pages)) return [];
+  const pages = media.pages.filter(isRecord).filter(page => Number.isSafeInteger(page.page) && Number(page.page) >= Number(media.startPage)
+    && Number(page.page) <= Number(media.endPage) && Number(page.page) <= Number(media.totalPages) && page.status === 'text' && typeof page.text === 'string').slice(0, 5);
+  return pages.map(page => ({ id: `p${page.page}`, location: `page ${page.page} (extracted text)`,
+    text: safeText(page.text as string, Math.min(8000, 24000 / Math.max(1, pages.length))) }));
 }
-function textExcerpts(output: string, read: Record<string, unknown> | undefined, location: string): SourceExcerpt[] {
-  const lines = output.split('\n'); let remaining = 24000;
+function textExcerpts(read: Record<string, unknown> | undefined, location: string): SourceExcerpt[] {
+  if (typeof read?.text !== 'string' || !Number.isSafeInteger(read.startLine) || Number(read.startLine) < 1) return [];
+  const lines = read.text.split('\n');
+  if (Number.isSafeInteger(read.endLine)) lines.length = Math.max(0, Math.min(lines.length, Number(read.endLine) - Number(read.startLine) + 1));
+  let remaining = 24000;
   const result: SourceExcerpt[] = [];
   for (let index = 0; index < lines.length && result.length < 24 && remaining > 0; index += 20) {
     const start = Number(read?.startLine ?? 1) + index;

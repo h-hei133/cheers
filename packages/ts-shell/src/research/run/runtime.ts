@@ -14,6 +14,7 @@ import { boundRun, runEvent, updateRun, type RunBinding } from './state.js';
 import { researchLedger, researchRequestPolicy } from './policy.js';
 import { runResearchChild } from './child.js';
 import type { ResearchRun } from './model.js';
+import { recoverResearchSave } from '../report/recovery.js';
 
 export interface ResearchHost {
   readonly store: BoundSessionHost;
@@ -110,7 +111,7 @@ export class ResearchRuntime {
     const ledger = researchLedger(this.host.store, binding.session, previous);
     if ((ledger.unknown || ledger.historyUnknown) && previous.reconciledUnknown !== ledger.unknownDigest) throw new Error('Unknown request outcomes require explicit reconciliation before steering.');
     const run = updateRun(binding, value => runEvent({ ...value, epoch: value.epoch + 1, briefRevision: value.briefRevision + 1,
-      request: { ...value.request, question: safeText(question, 8000) }, brief: undefined, status: 'ready', stage: 'brief',
+      request: { ...value.request, question: safeText(question, 8000) }, brief: undefined, briefInput: undefined, status: 'ready', stage: 'brief',
       claims: [], draft: undefined, review: undefined, fragments: [], gapQuestions: [], investigationRounds: 0, stopReason: undefined }, 'steered', question));
     this.arm(run); return run;
   }
@@ -128,6 +129,7 @@ export class ResearchRuntime {
     if (this.activation === session) return;
     this.activation = session; this.armed = undefined;
     const run = currentResearch(readResearch(this.host.store, session));
+    if (run && recoverResearchSave({ host: this.host.store, session, id: run.id }, run)) return;
     if (!run || !['ready', 'running'].includes(run.status)) return;
     const owner = run.owner ?? run.pending?.owner;
     // Read-only inspection cannot revoke a live or unknown owner's authority.
@@ -146,7 +148,8 @@ export class ResearchRuntime {
   }
   saveBinding(runId: string): { binding: RunBinding; run: ResearchRun; digest: string } {
     const run = this.selected(runId);
-    if (!run || run.pending || !['completed', 'partial'].includes(run.status) || !run.save.requested) throw new Error('Report save requires the current requested, settled research output.');
+    if (!run || run.pending || run.owner || !['completed', 'partial'].includes(run.status) || !run.save.requested) throw new Error('Report save requires the current requested, settled research output.');
+    if (run.save.status === 'unknown' || run.save.status === 'pending' && run.save.path) throw new Error('Report file outcome is unconfirmed; inspect the original edit operation. Replaying the save is refused.');
     return { binding: this.armed!, run, digest: researchReportDigest(run) };
   }
 }

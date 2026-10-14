@@ -57,6 +57,7 @@ export function createDocumentReadTool(execution: ExecutionService = createDefau
         const output = text.slice(0, 24000);
         return { success: true, output: output || '[No readable document text.]', metadata: {
           provenance: { ...provenance, parser: body.mime.includes('html') ? 'html-markdown' : 'utf8', location: 'extracted-lines' },
+          read: { text: output, startLine: 1 },
           truncated, empty: !output.trim(), documentStatus: truncated ? 'truncated' : !output.trim() ? 'no-text' : 'read' } };
       } catch (error) {
         const failure = error instanceof MediaReadError ? { code: `media-${error.reason}` } : networkFailure(error);

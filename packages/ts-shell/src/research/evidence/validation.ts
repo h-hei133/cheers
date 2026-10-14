@@ -1,6 +1,7 @@
 import type { ClaimRecord, ClaimReference, ResearchDraft, SourceRecord } from './model.js';
 import type { ResearchBrief } from '../brief/model.js';
 import { safeText } from './producer.js';
+import { sameValue } from '../../config/values.js';
 
 export function validateReference(reference: ClaimReference, sources: readonly SourceRecord[]): SourceRecord {
   const source = sources.find(source => source.id === reference.sourceId);
@@ -51,7 +52,8 @@ export function mergeSources(current: readonly SourceRecord[], incoming: readonl
     const previous = sources.filter(old => old.id !== source.id && old.locator === source.locator && old.hashScope === source.hashScope
       && (source.hashScope === 'source-bytes' || old.readKey === source.readKey) && !old.stale);
     for (const old of previous) {
-      if (old.contentHash && source.contentHash && old.contentHash !== source.contentHash) {
+      if (old.contentHash && source.contentHash && (old.contentHash !== source.contentHash
+        || old.readKey === source.readKey && !sameValue(old.excerpts, source.excerpts))) {
         const index = sources.indexOf(old); sources[index] = { ...old, stale: true }; changed.push(old.id);
       }
     }

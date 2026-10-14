@@ -6675,3 +6675,9 @@ force复用已认证gateway，临时目录也消费原OAuth服务；完整工具
 ### 2026-10-14 — A17/A20 目标版本与别名生命周期
 
 implementation匹配已知mode和当前权限位；顾问/调度复用同一canonical verb，并要求实际目标revision改变。参考别名共用action和完整取消责任，保留本项目原版本及暂停owner。Node20.3/Linux 5文件/34项、build:ts及五门通过，真实chmod/恢复、退出别名后新目标零顾问派发/显式重新on均通过；两处反转实际失败1/2项、精确恢复，NormProof无阻断、4既有advisory/partial。首轮缺baseUrl夹具已分类补齐。见[裁决 §10.8](features/phase-19-decisions.md#108-a17a20--目标实施版本与顾问别名生命周期)；最终集成/真实平台/独立审查/CI继续开放，交付另验，Phase19 active。
+
+### 2026-10-14 — A14/A16/A21/A22 研究定位与恢复
+
+原有reader提供纯正文/定位，研究引用不再解析展示页码或引用host notice；same raw hash提取纠正也使旧证据失效。完整partial报告在实际来源复读后收束且零越界章节，中途仅补剩余片段；指定brief须当前child真实完整正常read。保存在原patch intent前持久operation/call关联，terminal报告也恢复，只有原committed receipt能确认成功，其余unknown可见且阻止重放。对照原生页身份、正文/notice分离和checkpoint提交/跳过已完成工作决定，复用reader/writer/store。四阶段真实进程退出及五反转已运行，各检出2/2/1/1/1项真实断言失败并恢复原字节。首轮缺Poppler仅为unavailable证据，之后临时解包Poppler24.02取得真实伪造页码解析；初轮错误反转TypeError不计。见[裁决 §10.9](features/phase-19-decisions.md#109-a14a16a21a22--研究输入定位与恢复)；最终组合/构建/门禁及交付另验，19代码缺陷均有局部修复，剩余交付/验收继续开放，Phase19 active。
+
+反转恢复后隔离Node20.3/Linux含真实Poppler的17文件/197项、build:ts及五门通过，无skip；NormProof无阻断、4既有ceiling advisory/partial。MCP675c5ecf和目标e8648c38均已推送，精确CI/Watch继续因付款/spending-limit未启动，steps=[]；研究交付与最终集成继续单独取证。

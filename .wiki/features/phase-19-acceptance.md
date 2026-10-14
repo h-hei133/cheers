@@ -531,5 +531,11 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 | A05 登出凭据 | Node20.3 隔离环境 4 文件/98 项及 build:ts 通过；API-key/account 实际登录→退出→fresh resolution 无旧凭据，落盘无合成值；共享/独立替换/环境凭据保留；移除接线两项真实失败，恢复后组合通过 | 原 CAS 内清理精确镜像；本地合成数据，无远端撤销/真实认证/最终集成/CI 通过 |
 | A09/A15/A19 MCP | Node20.3 12 文件/93 项、build:ts及五门通过；OAuth force共享握手/下一调用/撤销、同名契约变化四项零派发、真实父取消通知/后续健康/预取消均通过；四处反转实际失败 1/1/4/1 项、精确恢复 | 合成本地 HTTP及真实 stdio；远端 effect 未确认，不声称回滚；最终集成/真实服务/独立审查/CI 未证明 |
 | A17/A20 目标验收与顾问 | Node20.3/Linux 5 文件/34 项、build:ts及五门通过；真实 chmod 阻止 artifact implementation 完成，恢复模式后完成；四种命令退出后新目标零顾问派发，显式 on 恢复；两处反转失败 1/2 项、精确恢复后组合通过 | 仅适用 POSIX 文件模式与合成模型派发；最终集成/真实服务/独立审查/CI 未证明 |
+| A14 研究引用定位 | native read纯正文/行号与Poppler24.02实际p1含伪造p42正文，经citation/review/report只接受p1；宿主notice不可引用、同raw hash纠正失效；原producer反转两项真实失败 | 首轮Poppler缺失只验unavailable，最终真实Linux解析另验；没有跨平台PDF或真实研究质量证明 |
+| A16 完整partial恢复 | quick3/deep6实际来源复读后只派发reconcile、原片段不变；quick中途只派发剩余index1/2；原deadline保留，变化来源原回归继续有效；反转两项真实失败 | 既有partial原因继续保留，不自动声称覆盖完整 |
+| A22 必需brief输入 | 实际createSubagentRunner正常读取/空文件可入investigate；无read、父deny、60KiB超限保持brief partial；当前child/revision/hash完整receipt绑定；反转一项真实失败 | 使用原50KiB输出/8MiB scan，不支持把部分输入默认为完整 |
+| A21 保存中断 | 真实子进程原writer四阶段退出，prepared/intent/target均unknown、最终receipt committed；错call/target拒绝，live/foreign不撤销，unknown不重放/不被refusal覆盖；两处反转各一项真实失败 | 只凭原operation receipt，不凭目标存在；无跨文件crash atomicity承诺 |
+
+研究四项反转恢复后，隔离Node20.3/Linux含真实Poppler24.02的最终受影响组合17文件/197项、build:ts及五门通过，无skip；该组合不是全仓集成。NormProof图义务满足，4既有ceiling advisory仍partial。
 
 当前状态为局部修复，Phase19 **active**；其余审查问题及 §5 外部条件继续开放，不能以单条修复替代最终集成验收。材料位于 `.tmp/phase19-repair/`，修复实现见[裁决 §10](phase-19-decisions.md#10-审查后修复2026-10-14进行中)。

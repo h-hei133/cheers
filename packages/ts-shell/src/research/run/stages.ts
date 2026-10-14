@@ -13,9 +13,12 @@ import { parseResearchOutput } from './parse.js';
 import { gapsSchema, reconciliationSchema, researchInputDigest } from './prompts.js';
 import { reportFragmentSchema } from './schema.js';
 import type { ReportFragment, ResearchRun } from './model.js';
+import { sameValue } from '../../config/values.js';
 
 export function applyStage(run: ResearchRun, text: string, childId: string): ResearchRun {
   if (run.stage === 'brief') {
+    if (run.request.briefPath && (run.briefInput?.path !== run.request.briefPath || run.briefInput.childId !== childId
+      || run.briefInput.briefRevision !== run.briefRevision)) throw new Error('The required brief file was not completely read by this brief child. Obtain an authorized complete bounded text read before research can continue.');
     const brief = parseResearchOutput<ResearchBrief>(text, briefSchema);
     if (brief.revision !== run.briefRevision || run.request.mode && brief.mode !== run.request.mode
       || new Set(brief.questions.map(question => question.id)).size !== brief.questions.length) throw new Error('Research brief has an invalid revision, mode or question identity.');
@@ -41,14 +44,21 @@ export function applyStage(run: ResearchRun, text: string, childId: string): Res
       limitation: safeText(['Independent context uses the same model; errors may be correlated.', output.limitation].filter(Boolean).join(' '), 4096) } };
   }
   if (run.stage === 'report') {
+    if (run.fragments.length >= researchLimits[run.request.depth].fragments) return settleReport(run);
     const fragment = validateFragment(parseResearchOutput<ReportFragment>(text, reportFragmentSchema), run);
     const fragments = [...run.fragments, fragment];
-    const partial = !run.draft || run.draft.uncovered.length > 0 || run.claims.some(claim => claim.support === 'insufficient')
-      || run.review?.status !== 'completed' || run.review.uncovered.length > 0 || run.review.findings.some(finding => finding.outcome === 'insufficient');
-    return { ...run, fragments, ...(fragments.length === researchLimits[run.request.depth].fragments ? { status: partial ? 'partial' as const : 'completed' as const } : {}) };
+    return settleReport({ ...run, fragments });
   }
   parseResearchOutput(text, reconciliationSchema);
   return reconcileSources(run, childId);
+}
+
+/** A settled report has no next fragment, including after source reconciliation. */
+export function settleReport(run: ResearchRun): ResearchRun {
+  if (run.stage !== 'report' || run.fragments.length < researchLimits[run.request.depth].fragments) return run;
+  const partial = !run.draft || run.draft.uncovered.length > 0 || run.claims.some(claim => claim.support === 'insufficient')
+    || run.review?.status !== 'completed' || run.review.uncovered.length > 0 || run.review.findings.some(finding => finding.outcome === 'insufficient');
+  return { ...run, status: partial ? 'partial' : 'completed' };
 }
 
 export function citedSourceIds(run: ResearchRun): readonly string[] {
@@ -64,8 +74,8 @@ function reconcileSources(run: ResearchRun, childId: string): ResearchRun {
     const refreshed = run.sources.find(source => actual.includes(source.id) && source.locator === previous.locator
       && source.readKey === previous.readKey && !source.stale && ['read', 'truncated', 'metadata', 'abstract'].includes(source.status));
     if (!refreshed) throw new Error('Recovery requires actual successful re-reads of every retained cited source.');
-    if (refreshed.contentHash !== previous.contentHash || previous.stale) changed.push(id);
+    if (refreshed.contentHash !== previous.contentHash || !sameValue(refreshed.excerpts, previous.excerpts) || previous.stale) changed.push(id);
   }
   if (changed.length) return { ...run, claims: [], draft: undefined, review: undefined, fragments: [], gapQuestions: ['Cited source content changed during recovery; reinvestigate before reusing conclusions.'], stage: 'investigate', resumeStage: undefined };
-  return { ...run, stage: run.resumeStage ?? 'investigate', resumeStage: undefined };
+  return settleReport({ ...run, stage: run.resumeStage ?? 'investigate', resumeStage: undefined });
 }

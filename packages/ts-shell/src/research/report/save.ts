@@ -5,6 +5,7 @@ import type { ResearchRuntime } from '../run/runtime.js';
 import { boundRun, runEvent, updateRun } from '../run/state.js';
 import { researchReportDigest } from '../run/prompts.js';
 import { createProcessOwner } from '../../core/state/owner.js';
+import { savedOperationOutcome } from './recovery.js';
 
 export function researchSaveTool(runtime: ResearchRuntime, runId: string): ToolDefinition {
   const schema = { type: 'object', additionalProperties: false, required: ['runId', 'path'],
@@ -14,7 +15,7 @@ export function researchSaveTool(runtime: ResearchRuntime, runId: string): ToolD
       if (args.runId !== runId) return;
       const run = runtime.current();
       if (!run || run.id !== runId || run.sessionId !== context.sessionId || run.workspace.path !== context.workspaceRoot
-        || run.save.status === 'committed' || run.owner) return;
+        || ['committed', 'unknown'].includes(run.save.status) || run.save.status === 'pending' && run.save.path || run.owner) return;
       const binding = runtime.binding();
       updateRun(binding, current => runEvent({ ...current, save: { ...current.save,
         status: outcome === 'denied' ? 'denied' : 'failed' } }, 'stopped', `Native report save ${outcome}; no target operation was dispatched.`));
@@ -36,27 +37,36 @@ export function researchSaveTool(runtime: ResearchRuntime, runId: string): ToolD
         if (current.revision !== captured.run.revision || current.epoch !== captured.run.epoch
           || researchReportDigest(current) !== captured.digest || runtime.selected(runId)?.epoch !== current.epoch) throw new Error('Research report changed after save preparation.');
         const owner = createProcessOwner();
-        const pending = updateRun(captured.binding, run => ({ ...run, owner, save: { ...run.save, status: 'pending', path: target } }));
+        let pending = updateRun(captured.binding, run => ({ ...run, owner,
+          save: { requested: true, status: 'pending', path: target, callId: actual.taskId } }));
         const assert = () => {
           const run = boundRun(captured.binding);
           if (run.revision !== pending.revision || run.epoch !== pending.epoch || researchReportDigest(run) !== captured.digest
             || runtime.selected(runId)?.epoch !== run.epoch) throw new Error('Research save authority changed before publication.');
         };
         let result: ToolExecutionResult;
-        try { assert(); result = await prepared.execute({ ...actual, assertFileAccess: absolute => { assert(); actual.assertFileAccess?.(absolute); } }); }
+        try { assert(); result = await prepared.execute({ ...actual,
+          onEditOperationPrepared: operationId => {
+            assert();
+            pending = updateRun(captured.binding, run => ({ ...run, save: { ...run.save, operationId } }));
+            actual.onEditOperationPrepared?.(operationId);
+          },
+          assertFileAccess: absolute => { assert(); actual.assertFileAccess?.(absolute); } }); }
         catch { result = { success: false, error: 'Research save failed before a verified committed receipt. Inspect the edit operation before retrying.', metadata: { status: 'unknown' } }; }
-        const committed = result.success && result.metadata?.status === 'committed' && typeof result.metadata.operationId === 'string';
+        const receiptOutcome = savedOperationOutcome(pending);
+        const committed = result.success && result.metadata?.status === 'committed'
+          && result.metadata.operationId === pending.save.operationId && receiptOutcome === 'committed';
+        const status = committed ? 'committed' : receiptOutcome === 'failed' || !pending.save.operationId && result.metadata?.status === undefined ? 'failed' : 'unknown';
         try {
           updateRun(captured.binding, run => {
             // Record the original operation's factual outcome even after a pause;
             // the pause phase/epoch stay authoritative for any new work.
             if (run.owner?.token !== owner.token || run.save.path !== target) throw new Error('Research save outcome binding changed.');
-            return runEvent({ ...run, owner: undefined, save: { requested: true, status: committed ? 'committed' : result.metadata?.status === 'unknown' ? 'unknown' : 'failed',
-              path: target, ...(typeof result.metadata?.operationId === 'string' ? { operationId: result.metadata.operationId } : {}) } }, committed ? 'saved' : 'stopped',
+            return runEvent({ ...run, owner: undefined, save: { ...pending.save, status } }, committed ? 'saved' : 'stopped',
               committed ? 'Report file committed by the native edit operation.' : 'Report save did not produce a committed receipt.');
           });
         } catch { return { ...result, success: false, error: 'File operation outcome returned, but research save state could not be confirmed.', metadata: { ...result.metadata, researchSave: 'unknown' } }; }
-        return { ...result, success: committed, metadata: { ...result.metadata, researchSave: committed ? 'committed' : 'not-committed' } };
+        return { ...result, success: committed, metadata: { ...result.metadata, researchSave: status } };
       } });
     }, async execute() { throw new Error('Research save requires its original prepared and approved file plan.'); } };
 }

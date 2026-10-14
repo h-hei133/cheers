@@ -9,6 +9,7 @@ import type { PatchPlan } from './plan.js';
 export async function applyPatchPlan(plan: PatchPlan, identity: EditOperationIdentity, access: {
   readonly assertFileAccess?: (absolutePath: string) => void;
   readonly abortSignal?: AbortSignal;
+  readonly onEditOperationPrepared?: (operationId: string) => void;
 } = {}): Promise<OperationReceipt | undefined> {
   if (identity.sessionId !== plan.scope.sessionId || path.resolve(identity.workspaceRoot) !== plan.scope.workspace.path) throw new Error('Patch approval belongs to another session or workspace.');
   if (!plan.files.length) return undefined;
@@ -23,6 +24,7 @@ export async function applyPatchPlan(plan: PatchPlan, identity: EditOperationIde
       if (!matchesFileState(inspectWorkspaceFile(file.workspaceRoot, file.relativePath, file.assertFileAccess, file.maxBytes), file.before)) throw new Error('Patch changed after approval. Nothing was written.');
     }
     const prepared = await prepareOperation(identity, files);
+    access.onEditOperationPrepared?.(prepared.operationId);
     access.abortSignal?.throwIfAborted();
     return commitOperation(prepared, { compensate: true });
   });

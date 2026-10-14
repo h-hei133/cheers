@@ -175,7 +175,8 @@ export function createWebFetchToolDefinition(): ToolDefinition {
             `\n\n[Content truncated to ${MAX_OUTPUT_CHARS} characters. Full length: ${formattedContent.length}]`;
         }
 
-        return approvedResult(output, { network: { source: 'fetch' }, provenance, truncated: formattedContent.length > MAX_OUTPUT_CHARS });
+        return approvedResult(output, { network: { source: 'fetch' }, provenance,
+          read: { text: formattedContent.slice(0, MAX_OUTPUT_CHARS), startLine: 1 }, truncated: formattedContent.length > MAX_OUTPUT_CHARS });
       } catch (error) {
         try { scope.check(); } catch (stopped) { return webFailure('fetch', stopped); }
         return webFailure('fetch', error);

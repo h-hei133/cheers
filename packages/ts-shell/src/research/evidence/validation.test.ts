@@ -5,6 +5,11 @@ import { researchInputDigest, researchReportDigest } from '../run/prompts.js';
 import { researchHarness, finishResearch, cleanupResearch } from '../../test-utils/research.js';
 import { afterEach } from 'vitest';
 import { validateFragment } from '../report/validation.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { createReadToolDefinition } from '../../core/tools/read.js';
+import { createDefaultExecutionService } from '../../runtime/execution/service.js';
+import { toolSources } from './producer.js';
 
 afterEach(cleanupResearch);
 it('binds exact quotes to real nonstale excerpts and rejects abstract-only evaluation support', () => {
@@ -48,4 +53,23 @@ it('rejects old report fragments when real review changes despite unchanged evid
   expect(researchInputDigest(run)).toBe(researchInputDigest(changed)); expect(researchReportDigest(run)).not.toBe(researchReportDigest(changed));
   expect(() => validateFragment(fragment, changed)).toThrow(/binding/);
   expect(() => validateFragment({ ...fragment, text: '[source:invented#l1]' }, run)).toThrow(/outside/);
+});
+
+it('uses only actual selected text for line citations and invalidates corrected extraction even with identical raw bytes', async () => {
+  const setup = researchHarness(); fs.writeFileSync(path.join(setup.root, 'release.md'), 'FIRST\nACTUAL');
+  const args = { path: 'release.md', offset: 2, limit: 1 };
+  const result = await createReadToolDefinition(createDefaultExecutionService()).execute(args, { taskId: 'text', workspaceRoot: setup.root, sessionId: setup.session.id });
+  expect(result.output).toContain('Showing lines 2-2');
+  const context = { assistantMessage: { role: 'assistant' as const, content: '' }, call: { id: 'text', name: 'read', args }, args,
+    result: { output: result.output!, metadata: result.metadata, isError: false }, isError: false };
+  const source = toolSources(context, 'text', 1)[0]!;
+  expect(source.excerpts).toEqual([{ id: 'l2', location: 'lines 2-2', text: 'ACTUAL' }]);
+  expect(() => validateReference({ sourceId: source.id, excerptId: 'l2', quote: 'Showing lines' }, [source])).toThrow(/citation/);
+  expect(validateReference({ sourceId: source.id, excerptId: 'l2', quote: 'ACTUAL' }, [source])).toBe(source);
+  const previous = { ...source, id: 's-old-extraction', excerpts: [{ id: 'l2', location: 'lines 2-4', text: result.output! }] };
+  const merged = mergeSources([previous], [source]);
+  expect(merged.changed).toEqual([previous.id]); expect(merged.sources[0]?.stale).toBe(true);
+  const missingBody = toolSources({ ...context, result: { ...context.result, metadata: { provenance: result.metadata!.provenance } } }, 'text', 1)[0]!;
+  expect(missingBody.status).toBe('failed'); expect(missingBody.excerpts).toEqual([]);
+  expect(missingBody.limits.join(' ')).toContain('Native source text is unavailable');
 });

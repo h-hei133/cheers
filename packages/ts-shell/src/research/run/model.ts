@@ -43,6 +43,7 @@ export interface ResearchRun extends BoundSessionScope {
   readonly ledgerScopeId: string;
   readonly briefRevision: number;
   readonly brief?: ResearchBrief;
+  readonly briefInput?: { readonly path: string; readonly contentHash: string; readonly childId: string; readonly briefRevision: number };
   readonly briefs: readonly ResearchBrief[];
   readonly status: ResearchStatus;
   readonly stage: ResearchStage;
@@ -61,7 +62,7 @@ export interface ResearchRun extends BoundSessionScope {
   readonly stopReason?: string;
   readonly resumeStage?: ResearchStage;
   readonly reconciledUnknown?: string;
-  readonly save: { readonly requested: boolean; readonly status: 'not-requested' | 'pending' | 'committed' | 'denied' | 'failed' | 'unknown'; readonly path?: string; readonly operationId?: string };
+  readonly save: { readonly requested: boolean; readonly status: 'not-requested' | 'pending' | 'committed' | 'denied' | 'failed' | 'unknown'; readonly path?: string; readonly operationId?: string; readonly callId?: string };
 }
 
 export interface ResearchState extends BoundSessionScope {
