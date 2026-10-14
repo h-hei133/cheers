@@ -107,6 +107,21 @@ it('refuses stale target versions and later failed native checks', async () => {
   await turn(script([check, `${check}; exit 1`]));
   expect(readGoalEdit(manager, session).goal?.phase).toBe('paused');
 });
+
+it('requires the committed file mode for an artifact implementation even when its bytes are unchanged', async () => {
+  await plan('set Preserve the approved implementation version');
+  await plan(`artifact accepted.txt ${textDigest('ok\n')} --implementation`);
+  const version = planVersion(readPlan(manager, session).plan!);
+  for (const action of ['approve', 'execute'] as const) await runPlanCommand('plan-review', [action, version],
+    { cwd: root, projectRoot: root, sessionId: session.id }, manager, session, { beforeChange: async () => {}, setMode: () => {} });
+  let committedMode = 0;
+  await turn(script([], () => { const file = path.join(root, 'accepted.txt'); committedMode = fs.statSync(file).mode & 0o777; fs.chmodSync(file, 0o777); }));
+  expect(fs.readFileSync(path.join(root, 'accepted.txt'), 'utf8')).toBe('ok\n');
+  expect(readGoalEdit(manager, session).goal?.phase).toBe('paused');
+  fs.chmodSync(path.join(root, 'accepted.txt'), committedMode);
+  expect(completeAcceptedGoal(manager, manager.getSession(session.id)!, access)).toBe(true);
+  expect(readGoalEdit(manager, session).goal?.completion?.source).toBe('verified-acceptance');
+});
 it('refuses reused actual model call IDs even when both native invocations succeed', async () => {
   await approved(); await turn(script([check, check], undefined, true));
   const events = manager.getTranscriptEvents(session.id);

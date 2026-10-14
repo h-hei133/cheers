@@ -36,18 +36,22 @@ export function goalCommandFor(context: ShellRuntimeContext, host: GoalStoreHost
   return async (args, commandContext) => {
     const activation = prepareGoalSession(context, host);
     if (activation.issue) return { kind: 'local', output: activation.issue };
-    const result = await runSessionGoalCommand(args, commandContext, host, context.session);
-    if (['pause', 'drop', 'complete'].includes(args[0]?.toLowerCase() ?? '') && readGoalEdit(host, context.session).goal?.phase !== 'active') pauseAdvisor(context, host);
-    const scheduler = schedulerForContext(context);
     const parsed = parseGoalArgs(args);
-    if (!scheduler || !parsed.ok) return result;
+    const before = readGoalEdit(host, context.session).goal;
+    const result = await runSessionGoalCommand(args, commandContext, host, context.session);
+    if (!parsed.ok) return result;
+    const scheduler = schedulerForContext(context);
     const verb = parsed.action.name || (parsed.args.length ? 'set' : 'show');
     const goal = readGoalEdit(host, context.session).goal;
+    const stopped = ['pause', 'drop', 'complete'].includes(verb) && goal && before && goal.id === before.id
+      && goal.revision !== before.revision && goal.phase !== 'active';
+    if (stopped) pauseAdvisor(context, host);
+    if (!scheduler) return result;
     if ((verb === 'set' || verb === 'resume') && goal?.phase === 'active' && result.output.startsWith(verb === 'set' ? 'Goal set.' : 'Goal resumed.')) {
       const issue = scheduler.start();
       return issue ? { ...result, output: `${result.output}\n${issue}` } : { ...result, output: `${result.output}\nAutomatic continuation scheduled.` };
     }
-    if (['pause', 'drop', 'complete'].includes(verb) && goal?.phase !== 'active') await scheduler.stop('user');
+    if (stopped) await scheduler.stop('user');
     return result;
   };
 }

@@ -6671,3 +6671,7 @@ trace全部公开字符串、report外部工具名复用现有有界报告脱敏
 ### 2026-10-14 — A09/A15/A19 MCP 消费者修复
 
 force复用已认证gateway，临时目录也消费原OAuth服务；完整工具定义/物理连接身份绑定当轮批准，变更后派发前拒绝。父取消贯穿真实SDK请求，保留远端结果未确认及不重放。对照参考连接复用、目录更新与监听清理，在原owner补齐旧批准/真实RPC边界。Node20.3受影响12文件/93项、构建/五门通过，四处反转实际失败1/1/4/1项、精确恢复；NormProof无阻断、4既有advisory/partial。首轮事件metadata断言属测试契约误用，已改核对实际公开分类。见[裁决 §10.7](features/phase-19-decisions.md#107-a09a15a19--mcp-目录批准契约与取消)；最终复验/交付另验，真实服务/最终集成与其余问题继续开放，Phase19 active。
+
+### 2026-10-14 — A17/A20 目标版本与别名生命周期
+
+implementation匹配已知mode和当前权限位；顾问/调度复用同一canonical verb，并要求实际目标revision改变。参考别名共用action和完整取消责任，保留本项目原版本及暂停owner。Node20.3/Linux 5文件/34项、build:ts及五门通过，真实chmod/恢复、退出别名后新目标零顾问派发/显式重新on均通过；两处反转实际失败1/2项、精确恢复，NormProof无阻断、4既有advisory/partial。首轮缺baseUrl夹具已分类补齐。见[裁决 §10.8](features/phase-19-decisions.md#108-a17a20--目标实施版本与顾问别名生命周期)；最终集成/真实平台/独立审查/CI继续开放，交付另验，Phase19 active。

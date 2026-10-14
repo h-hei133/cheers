@@ -2681,3 +2681,11 @@ Node20.3 直接受影响 22 文件/315 项、TypeScript 与 Linux 单文件构�
 - NormProof 无阻断项、同 4 项既有 ceiling advisory/partial。证据是本地合成 HTTP/真实 stdio 协议链，不代表真实账户、部署或平台互通；最终集成/独立审查/精确远端 CI 仍开放，Phase19 active，交付另验。
 
 反转精确恢复后，最终 MCP CLI/HTTP 两文件 25 项通过；这是同一生产源码的复验，不与 93 项累加。
+
+### 10.8 A17/A20 — 目标实施版本与顾问别名生命周期
+
+- [验收 target owner](../../packages/ts-shell/src/planning/goal/acceptance/targets.ts) 匹配 committed implementation receipt 时同时要求 after.mode 已知且权限位与当前文件相同，沿用原 authority 的 `mode & 0o777` 语义。正文相同不足以匹配当前版本；absence 行为保持原契约，旧缺失 mode 的收据不能证明完整版本。
+- [CLI goal owner](../../packages/ts-shell/src/cli/runtime/goal.ts) 在同一 parsed canonical verb 下处理 advisor 与 scheduler，并确认原目标 revision 实际改变且已离开 active。非法语法/旧会话拒绝不触发额外暂停；done/clear 和 complete/drop 均解除原顾问 armed 状态，新目标须显式重新 on。
+- 定向比较参考命令的 alias 指向同一个 action，以及 abort 同时取消各后台责任并等到 idle：采用 canonical 生命周期入口，继续使用原 pauseAdvisor。参考 edit 保留正文/BOM/换行，但没有本项目的 implementation receipt 验收契约；不能将其正文相同当作权限模式已验证，沿用本项目既有完整版本定义。
+- Node20.3/Linux 隔离环境 5 文件/34 项、build:ts及五门通过。artifact-only implementation 经真实 writer 提交后 chmod，正文 hash 仍同而目标不完成；恢复原 mode 后原收据可完成。四个 canonical/alias 实际顾问控制先证明可派发，再验证新目标零自动派发、显式 on 后恢复；非法/旧会话不改变 epoch。初轮夹具缺完整 provider baseUrl，导致参考派发零次，补齐合成绑定后才记行为通过。
+- 撤销 mode 比较时实际错误 verified complete，撤回 alias 归一时 done/clear 各实际派发一条新目标顾问请求；1/2 项真实断言失败、源码精确恢复，最终 34 项通过。材料 `.tmp/phase19-repair/a17-reversal.log`、`a20-reversal.log`；NormProof 无阻断、同 4 既有 ceiling advisory/partial。最终集成/平台/独立审查/精确CI仍开放，Phase19 active，交付另验。

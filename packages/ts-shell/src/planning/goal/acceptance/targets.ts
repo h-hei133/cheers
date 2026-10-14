@@ -23,7 +23,8 @@ export function matchingOperations(operations: readonly OperationReceipt[], base
     if (!latest || latest.sequence <= baseline || latest.status !== 'committed' || latest.undo !== 'none') return undefined;
     const file = latest.files.find(file => file.path === target.path)!;
     if (file.status !== 'committed' || file.undo !== 'none' || file.after.state !== target.version.state
-      || target.version.state === 'exists' && (file.after.state !== 'exists' || file.after.hash !== target.version.hash)) return undefined;
+      || target.version.state === 'exists' && (file.after.state !== 'exists' || file.after.hash !== target.version.hash
+        || file.after.mode === undefined || (file.after.mode & 0o777) !== (target.version.mode & 0o777))) return undefined;
     if (!result.some(item => item.operationId === latest.operationId)) result.push(latest);
   }
   return result;
