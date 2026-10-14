@@ -11,7 +11,7 @@ summary: "记录完整源码图、契约门禁、全套测试、实际 CLI 及�
 
 Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)的 16 批、76 项为范围，分别记录实现、局部验收和剩余条件。W16 修复了此前无法取得完整依赖图证明的检查器，并恢复重构后失效的契约门禁；全阶段完成仍需下面列明的剩余工作。
 
-§1–4 的完整套件和冻结证据属于 W16 提交 `f43ae09ec90a5890b768598ab52a17821c5e9efc`。后续 SAFE-02 Linux 原生读取变更分别记录在 §7–17，§18 的全套属于 `32b31107` 源码，不能把历史全套直接套用到后续源码。§19–21 补充未改源码的 Windows 读取、前端、CLI 和进程证据；§22 修复 Windows 大小写包含边界并运行直接受影响套件、构建、原生与实际 CLI 检查，没有重新运行当前全套。
+§1–4 的完整套件和冻结证据属于 W16 提交 `f43ae09ec90a5890b768598ab52a17821c5e9efc`。后续 SAFE-02 Linux 原生读取变更分别记录在 §7–17，§18 的全套属于 `32b31107` 源码，不能把历史全套直接套用到后续源码。§19–21 补充未改源码的 Windows 读取、前端、CLI 和进程证据；§22 修复 Windows 大小写包含边界并运行直接受影响套件、构建、原生与实际 CLI 检查，没有重新运行当前全套。§23 在未变的 §22 源码上补充原生 Windows ConPTY 两模式交互证据。
 
 ## 1. 本轮源码与验证范围
 
@@ -98,7 +98,7 @@ Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)�
 |---|---|---|
 | Linux/WSL、Node 20.3、单文件程序 | 构建、全套、原生文件/进程/Git/沙箱、两模式 PTY | 用户实际前端逐帧、字体、IME 和系统复制仍需同前端证据；§20 已补 Windows Terminal 像素层局部证据 |
 | Linux X11、媒体设备、语言服务、分析器 | 各适配器的明确能力与有界 native 进程路径 | 未安装/不支持状态继续可见；真实声音设备/Live、其他桌面协议另验 |
-| Windows | 原生 Windows Node 20.3/24.12 访问 WSL UNC：两版各 6 项读取/目录检查通过，见 §19；实际前端抓帧见 §20–21；Node 20.3 原生 CLI 与进程检查见 §21；规范路径的不同大小写目录拒绝、普通 NTFS/UNC 别名读取与目录复验，以及当前实际 read CLI 见 §22 | 本地 NTFS 写入/对象竞态、原生禁止重解析/对象路径绑定、完整 Windows 套件与交互 CLI、退出后孤儿进程、真实 IME 及设备仍未验 |
+| Windows | 原生 Windows Node 20.3/24.12 访问 WSL UNC：两版各 6 项读取/目录检查通过，见 §19；实际前端抓帧见 §20–21；Node 20.3 原生 CLI 与进程检查见 §21；规范路径的不同大小写目录拒绝、普通 NTFS/UNC 别名读取与目录复验，以及当前实际 read CLI 见 §22；原生 ConPTY 两模式的输入/缩放/取消/自然退出及受管进程组清空见 §23 | 本地 NTFS 写入/对象竞态、原生禁止重解析/对象路径绑定、完整 Windows 套件、原生交互前端逐帧/系统复制、异常退出或脱离组清理、真实 IME 及设备仍未验 |
 | macOS | 部分 profile、接口与纯逻辑用例 | 原生路径/文件描述符、进程树清理、终端与设备尚未取得等价实机证据 |
 | 模型传输与严格预算 | 合成 HTTP/SSE/usage/重试/unknown、统一 request admission | W7-33 四端点真实 TLS/HTTP2 矩阵仍缺；无法证明上界的请求继续拒绝 strict cap 准入 |
 | 公共包、认证、协作和 SSH | 受控服务、签名、ACL、撤权、重连与未知副作用 | 真实账户、公共部署 TLS、真实远端主机/主机密钥和生产互通验收 |
@@ -445,3 +445,23 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 证据只关闭该规范路径大小写缺陷和本批引入的兼容回归，不证明非 Linux 原生对象路径绑定、完整 Windows/macOS 套件、交互 PTY/IME/系统复制、真实设备/服务或当前全仓套件。§5 的剩余要求继续有效，Phase19 **active**；strict docs、提交/推送及精确 SHA CI 在本批交付时另验。
 
 源码与本批验收提交 `be1ffcbca841fbafd6edafa5a21629d0382060d4` 已推送，远端分支及 PR #1 head 同 SHA；7 个提交路径和4个冻结 blob审计通过，`.gitignore`未提交、原hash保持。strict docs/diff均通过。CI [38512190024](https://github.com/h-hei133/cheers/actions/runs/38512190024)/job115682957106、Watch [38512189548](https://github.com/h-hei133/cheers/actions/runs/38512189548)/job115682955541 均 completed/failure、steps为空，各自annotations确认付款/spending-limit阻止作业启动。它们不是运行后的产品失败，也不是CI通过；材料 `.tmp/path-identity/delivery.json`。Phase19继续 **active**。
+
+## 23. Windows 原生 ConPTY 交互局部验收
+
+起点 `55bfd0240b2b961017c0cf6159076b605aeeafd7`，产品源码树 `c8ae73e19916a27b4548411e1deab18800e5e574` 保持。宿主 Windows Node20.3 运行当前 `dist/cli.js`，Win32 `CreatePseudoConsole` 提供实际控制台；CLI 进程自身记录 `platform=win32`、三个标准流均为 TTY、初始尺寸 100×32。验证脚本在仓库内隔离 HOME/USERPROFILE/TEMP、配置和工作区，仅访问合成 localhost provider，没有读取真实 provider 配置。
+
+最终运行 `.tmp/windows-interactive/run-R7K79E/` 的 **regular/fullscreen 各17检查点通过**，共6次合成POST；两模式各覆盖以下行为：
+
+| 范围 | 实际证据 |
+|---|---|
+| 输入与界面 | regular 不启用 alternate screen，fullscreen 启用；稳定后1.3秒空闲零输出；`/mo` 补全显示 `/model`，Ctrl+C 清稿不发请求 |
+| 多行粘贴 | bracketed paste 的 `中文 café\nsecond ✨` 不提前提交；Enter 后精确核验完整环境上下文前缀和用户文本，实际回答进入终端 |
+| 缩放 | 原生控制台100×32→55×20→110×35；Node stdout的实际 resize事件逐次确认尺寸 |
+| 取消与恢复 | 等待本次挂起请求到达后 Escape 取消，终端显示 interrupted、对应HTTP连接关闭；恢复回合的独立回答标记到达，历史回答不能满足断言 |
+| 退出与清理 | `/exit` 自然退出0；关闭验证控制台前Job已无进程，未靠Job强杀判成功；stdin raw恢复false，实际ConPTY输出含paste/cursor恢复序列，配置原字节保持 |
+
+10个直接经过的TypeScript owner逐项转译后与现有dist字节一致，CLI入口SHA256为 `b236dafc…`；冻结材料 `.tmp/windows-interactive/audit.json`。结束后复核18个稳定证据文件的hash、34检查点、6请求及独立回答身份，材料 `evidence.json`；用户`.gitignore`原SHA256 `20e91ccf…`保持。观察的首提示耗时24.218/24.138秒包含验证桥接与UNC加载，不充当产品启动基准。
+
+六次早期失败分别来自验证脚本的UNC导入参数、父进程管道继承、box输入提示匹配、请求上下文预期、同步退出写入的捕获位置以及Windows文件共享下的请求rename。均保留原失败记录；最终改用file URL、创建子进程时暂时清空并立即还原父标准句柄、匹配实际box提示、精确上下文比较、读取真实ConPTY退出输出和有界共享冲突重试。未为这些验证错误修改产品。失败运行的强制清理与最终自然退出分开记录，宿主另按已记录PID复核残留，材料 `cleanup.json`。
+
+本轮仅补验收文档；没有新构建、全仓/完整Windows套件或独立代码审查。上述是**原生Windows进程和ConPTY输入/字节证据**，不扩称Windows Terminal像素、用户前端逐帧、真实IME/剪贴板、本地NTFS写入、macOS、脱离受管Job的进程或真实服务已验。§5剩余要求及远端CI付款限制仍有效，Phase19 **active**；文档门禁、提交/推送和精确SHA远端结果在 `.tmp/windows-interactive/delivery.json` 单独取证。

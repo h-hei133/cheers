@@ -2338,3 +2338,11 @@ Node20.3/单文件×stable/changed四条实际print CLI通过；stable共4合成
 详见[验收 §22](phase-19-acceptance.md)，材料 `.tmp/path-identity/`。本批只运行直接受影响套件，§8.153 的历史全套不冒称当前全套；未新增完整 Windows 套件/交互 PTY/真实服务验收。本地 NTFS 仅补只读大小写别名检查，非 Linux 原生对象绑定、未观察树、macOS、真实 IME/设备/服务及精确远端 CI 条件仍开放，Phase19 active。用户 `.gitignore` 原字节保留，提交/推送/精确 CI 单独取证。
 
 本批源码与验收提交 `be1ffcbca841fbafd6edafa5a21629d0382060d4` 已推送 `feat/phase-18`，远端与 PR #1 读回同 SHA；7 路径提交审计及四个冻结源码/测试 blob 校验通过，用户 `.gitignore` 排除且原 hash 保持。strict docs/diff 检查通过。精确 CI `38512190024`/job `115682957106` 与 Watch `38512189548`/job `115682955541` 均 completed/failure、`steps=[]`，各自 annotation 确认付款/spending-limit 阻止启动，**没有远端验证通过**。交付材料 `.tmp/path-identity/delivery.json`；该结果不关闭剩余平台和真实服务验收，Phase19 active。
+
+### 8.158 QA-02：原生 Windows 两模式交互验收（2026-10-14）
+
+在未变的 §8.157 源码上运行 Windows Node20.3 的实际 CLI，由 Win32 ConPTY 提供控制台。regular/fullscreen 各17检查点通过，共6次隔离localhost合成POST；进程自身确认win32、三个标准流均TTY及原生resize尺寸。补全、清稿零发送、中文多行粘贴不提前提交及精确请求、取消连接、独立标记的恢复回答、自然退出0与raw/mode恢复均验。关闭验证Job前已无进程，未把强杀清理计作产品退出；宿主另按记录PID核验残留。
+
+10个直接owner的ESM输出与dist字节一致，源码树 `c8ae73e1…` 和用户`.gitignore`原hash保持。六个早期harness/setup失败保留，分别修正UNC导入、标准句柄继承、实际box提示、环境前缀、同步退出捕获和共享rename冲突；不为脚本错误改产品。最终18个稳定证据文件hash与请求/回答身份复核通过，材料 `.tmp/windows-interactive/{audit.json,evidence.json,cleanup.json}`，见[验收 §23](phase-19-acceptance.md)。
+
+证据限原生Windows ConPTY输入/字节/受管进程组；未新增实际前端像素、IME/剪贴板、本地NTFS写入、完整Windows套件、macOS或真实服务。仅补文档，不重跑未改源码的构建/全套；精确提交/推送和远端结果另存delivery，Phase19保持active。
