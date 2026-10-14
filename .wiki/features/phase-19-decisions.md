@@ -2754,3 +2754,23 @@ owner迁移后已再次运行 Node20.3/Linux 与单文件可执行程序 regular
 A13 owner迁移单独提交 `fce6f6a079106911dd7e5271028f20fdd59b4faa`；A07分页、两项集成夹具、删除路径测试适配及证据提交 `837aa53a27818cae87d0c56f3cab717d484f5d5e`。两笔均已推送至 `feat/phase-18`，远端分支与 PR #1 head读回同 `837aa53a`。交付19路径、97个冻结blob逐一匹配，旧core两个owner删除、非import正文未变、§9历史审计逐字未变；用户 `.gitignore` 未提交且原hash保持。补修后的隔离Node20.3 NormProof无阻断，整体partial/4个既有ceiling advisory，材料 `delta-normproof/`。
 
 精确代码SHA的CI [38604410209](https://github.com/h-hei133/cheers/actions/runs/38604410209)/job115991492715与Watch [38604410443](https://github.com/h-hei133/cheers/actions/runs/38604410443)/job115991494371均completed/failure、steps=[]；独立读取各自annotations确认付款/spending-limit阻止启动。无远端产品执行、无CI通过，不重跑或改变workflow。材料 `.tmp/phase19-repair/integration-delivery.json`、`integration-{ci,watch}-{jobs,annotations}.json`；后续纯证据文档提交的remote状态需按自身SHA另核。全套8081/10与后续15项的来源界限、APPROVE/WATCH综合COMMENT及只读reset receipt查询缺口继续按§10.11保留。Phase19 **active**，A01/A03/A12/A25及真实账户/平台验收仍开放。
+
+### 10.14 A13 — 未知兑换收据的只读查询缺口（2026-10-15，本地修复已验证）
+
+当前 `54e1a7ac` 的独立architecture WATCH（ARCH-02）已实际核对：`cli/usage/service.ts` 的pending/unknown拒绝文案要求用户查看/对账原请求，`core/commands/usage/syntax.ts`却只提供preview/apply，无法通过产品完成本地收据检查。先记录问题，再修复；§9原始25项审计保持历史快照，不将新复核意见塞回原统计。
+
+本批裁决：增加 `/usage reset status [request-id]`，仅查看当前持久账户的有界本地收据，可跨会话和在凭据过期/离线时查看；复用原配置身份、只读prepared-tool权限和128KiB/128项状态reader。展示请求ID、account/credit摘要、创建时间及明确local state，最多20条并优先显示pending/unknown，按ID可检查其余记录。配置/会话/工作区变更拒绝；正常尚无账户收据或store时明确无保留请求，指定ID未匹配时明确未找到；损坏、外部链接等无效存储必须unavailable。查询零provider请求、零消费、零批准、零状态写入，不根据时间、额度下降、新offer或本地文件存在清除未知围栏。
+
+参考定向比较：pi的auth-storage接口未提供reset receipt查询/结算；相关参考的 `auth/resets.ts` 将list与redeem分开、模糊claim保留原credit/request身份，`helpers/reset-usage.ts`只投影明确账户并把非可信文本压成一行。本项目同意查询/消费分离、确切账户及安全投影；其另一账户协议通过余额减少/offer消失推断或重试原claim，本项目当前固定issuer协议没有原请求结果查询保证，因此不迁入自动对账或重试，只提供本地证据及明确外部对账要求。将保留跨会话pending/unknown查询仍零网络/零写入和当前账户隔离的回归及真实反转。
+
+`54e1a7acddbd522ac53f6ecb6ba707b530471ae4`文档交付已推送；其CI38604951419/job115993331088、Watch38604951467/job115993331145均completed/failure、steps=[]，各自annotations确认付款/spending-limit阻止启动。材料 `.tmp/phase19-repair/final-delivery.json`；该旧SHA状态不代表本批新改动验证。
+
+独立code lane记录 **RS-C01 HIGH / REQUEST CHANGES**：两次账户核验均在tool execute内部，实际PostToolUse等待期间切换持久账户后，旧请求ID和account digest仍进入`tool.result`及命令输出。原报告与合成复现保留于 `.tmp/phase19-repair/receipt-status-code-review.{md,json}`、`receipt-status-code-probe.{mjs,json}`；原architecture scoped CLEAR只覆盖其冻结审查时结论，不能抵消该缺陷。先记录再修补：收据明细留在本地owner，普通hook/event只接收通用读取结果；待所有hook完成后再次核验身份才显示明细，错误/反馈不得变成查询成功。回归需覆盖真实异步hook窗口和两种输出；不改变共享writer的实际效果证据语义。补修前77项/PTY/构建证据不作为补修后的最终验证。
+
+最终实现由 `cli/usage/status.ts` 持有有界明细；原prepared-tool完成普通权限、deny、plan及hook处理，hook/event只看到通用读取结果。既有resultAdmission在hook后核验账户，使账户切换后的通用事件明确失败；`runPreparedTool`返回后再次核验才展开本地明细，也覆盖同步result observer切换。hook派发或事件失败保留失败而不展开明细，正常反馈保留原单行安全投影；共享invoke/tools/writer和原收据reader未改。runtime的status允许查看正在消费的pending记录，但不移除原pending guard，因此另一消费仍被拒绝。
+
+验证：原功能源码配新增回归实际6项失败；补审缺陷的最终5项回归在补修前全部真实失败（异步hook两种输出、派发失败、安全反馈事件、result observer），补修并完成三组反转后隔离Node20.3/Linux最终4文件/82项全部通过、零skip。三组反转移除最终display binding、event resultAdmission、错误结果保护时实际失败1/2/1个场景，逐字节恢复；初版反转汇总按AssertionError分组打印1/1/1，最终数量以原terminal失败场景和 `receipt-status-hook-evidence.json` 校正值为准。补审首轮feedback的字面换行预期属测试契约误用，已按现有`\\x0a`投影纠正，最终red5不含该预期错误。Node20.3 `build:ts`/`build:exe`、五静态门及diff空白检查通过；NormProof无阻断，同4项既有ceiling advisory/partial。
+
+补修后两种构建的regular/fullscreen真实PTY均通过：合成过期账户、离线及跨会话UUID查询显示unknown而不解除围栏，零模型请求，收据原字节/mtime及配置不变，raw账户/credit/token不出现。结果分别为 `.tmp/phase19-repair/receipt-status-pty-1792000189567191167/results.json`、`receipt-status-pty-1792000277814364446/results.json`；测试最终材料为 `receipt-status-restored-final.{log,json}`、`receipt-status-hook-{build,exe,gates}.log`、`receipt-status-hook-normproof/`，原功能red/反转及初次PTY仍保留并区分源码快照。
+
+独立补审code **APPROVE**、RS-C01已闭合、无新finding；architecture **CLEAR**、无新BLOCK/WATCH；本批综合 **APPROVE**，仅适用于receipt-status delta。两份 `receipt-status-{code,architecture}-supplement.{md,json}` 已先发布证据再综合，9个冻结路径及用户`.gitignore`均匹配；代码lane独立重跑原触发器确认旧request/digest不再进入命令/event，收据未变，原失败报告/probe哈希保留。最终验收文档追加属于另记的doc-only drift，8个源码/测试hash不变，交付另冻11路径；§9历史审计保持。本地inspection缺口已解决，可信远端原请求结算仍缺明确API证明且不自动清围栏；未把先前全套8081/10称为最终字节全量证明。提交/推送/对应SHA的CI另验，Phase19 **active**；A01/A03/A12/A25与真实账户/平台/质量条件继续开放。

@@ -560,3 +560,11 @@ A25新空文件exclusive open+close候选在fresh5000-file baseline的private Gi
 ### 26.2 本批代码交付
 
 owner迁移 `fce6f6a079106911dd7e5271028f20fdd59b4faa` 与分页/集成 `837aa53a27818cae87d0c56f3cab717d484f5d5e` 已提交推送；远端分支及PR #1 head均读回后者。19个交付路径、97个冻结blob匹配，历史§9审计保持，`.gitignore`未提交/原hash不变。最后隔离Node20.3 NormProof无阻断、partial保留4项既有advisory。该代码SHA的CI38604410209/job115991492715、Watch38604410443/job115991494371各自annotations确认付款/spending-limit阻止启动、steps=[]，不能称CI通过；后续纯文档提交另核其SHA。材料 `.tmp/phase19-repair/integration-delivery.json`，详细记录见[裁决 §10.13](phase-19-decisions.md#1013-本批交付与精确远端状态2026-10-15)。Phase19 **active**，外部及WATCH缺口不因推送闭合。
+
+### 26.3 只读权益收据查询与账户输出边界
+
+`/usage reset status [request-id]` 在当前持久账户下读取原有界store，跨会话及过期凭据/离线可用，最多20条并优先pending/unknown；按UUID查看保留的其他记录。正常缺失和未匹配明确呈现，损坏/外部链接unavailable；只显示请求ID、摘要、时间和本地状态，远端结果未检查。零账户网络请求/消费/批准/收据写入，不清未知围栏；正在消费时可查pending但另一消费继续被runtime guard拒绝。
+
+独立初审真实PostToolUse切换账户复现了RS-C01 HIGH：旧收据进入命令及event。补修让hook/event只接收通用读取结果，在hook后及最终命令明细前复验账户。回归补修前真实red5；最终反转恢复后4文件/82项通过、零skip，三保护反转检出1/2/1个失败场景、源码逐字节恢复。Node20.3两种构建及五门通过，NormProof无阻断/4既有advisory/partial；最终材料 `receipt-status-restored-final.{log,json}`、`receipt-status-hook-evidence.json`。反转摘要初版分组计数错误已明确校正，不能将该摘要1/1/1当实际场景数。
+
+补修后的Node20.3/executable regular/fullscreen真实PTY各通过，结果在 `receipt-status-pty-1792000189567191167/results.json`、`receipt-status-pty-1792000277814364446/results.json`：过期合成账户、离线、跨会话请求ID查询、unknown围栏保留、零模型请求、收据原字节/mtime与配置不变、raw私密字段未投影。独立code supplement为APPROVE（原触发器重跑旧明细未泄出），architecture supplement为CLEAR，本批综合APPROVE；原失败报告及freeze9保留，最终doc-only drift另冻，源码hash不变。范围限本地查询delta，不代表整个Phase19或最终字节全套通过；可信远端结算、真实账户/平台质量、A01/A03/A12/A25仍开放。见[裁决 §10.14](phase-19-decisions.md#1014-a13--未知兑换收据的只读查询缺口2026-10-15本地修复已验证)，GitHub交付与对应CI另验，Phase19 **active**。

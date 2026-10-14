@@ -1,54 +1,15 @@
 import { randomUUID } from 'node:crypto';
-import type { OpenAIAccountAuthConfig } from '../../config/runtimeConfig.js';
 import { sameValue } from '../../config/values.js';
-import type { ProviderCredentialResolution } from '../../core/shell/providerCredentials.js';
-import { captureAccountEdit } from '../../core/auth/account/state.js';
-import { hashContent } from '../../core/workspace/files.js';
-import { loadAccountUsage, consumeResetCredit, AccountUsageError } from '../../core/auth/account/usage/remote.js';
+import { loadAccountUsage, consumeResetCredit } from '../../core/auth/account/usage/remote.js';
 import { readResetAttempts, updateResetAttempts } from './state.js';
+import { bind, checkBinding, type AccountUsageHost, type Binding } from './binding.js';
 import type { ResetAttempt, AccountUsage } from '../../core/auth/account/usage/model.js';
 import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js';
 import { runPreparedTool } from '../../turn/invoke.js';
-import type { ToolGateOptions } from '../../turn/tools.js';
 import { readOnlyTool } from '../../core/tools/capability.js';
 import { neutraliseForDisplay } from '../../core/text/safety.js';
-import type { EscalationPrompt, EscalationResponse } from '../../core/shell/approval/contract.js';
-
-export interface AccountUsageHost {
-  current(): { readonly workspace: string; readonly sessionId: string; readonly resolution: ProviderCredentialResolution };
-  check(): void;
-  gate(tool: string): ToolGateOptions;
-  approveReset(prompt: EscalationPrompt): Promise<EscalationResponse>;
-}
-interface Binding {
-  readonly workspace: string;
-  readonly sessionId: string;
-  readonly resolution: ProviderCredentialResolution;
-  readonly account: OpenAIAccountAuthConfig;
-  readonly accountKey: string;
-  readonly credentialKey: string;
-}
-
-function bind(host: AccountUsageHost): Binding {
-  host.check(); const current = host.current(); const account = current.resolution.credential?.accountAuth;
-  if (current.resolution.provider !== 'openai' || account?.type !== 'openai-chatgpt-account'
-    || !account.accountId || !/^[^\x00-\x20\x7f]{1,512}$/.test(account.accountId)) throw new AccountUsageError('unsupported');
-  if (!Number.isFinite(account.expiresAt) || account.expiresAt <= Date.now() + 60000) throw new AccountUsageError('authentication');
-  captureAccountEdit(current.workspace, current.resolution);
-  const accountKey = hashContent(`openai\0${account.accountId}`);
-  const credentialKey = hashContent(JSON.stringify({ provider: current.resolution.provider, baseUrl: current.resolution.baseUrl,
-    source: current.resolution.credential!.source, connectionId: current.resolution.credential!.connectionId, account }));
-  return { ...current, account, accountKey, credentialKey };
-}
-function checkBinding(host: AccountUsageHost, binding: Binding): void {
-  host.check(); const current = host.current();
-  if (current.workspace !== binding.workspace || current.sessionId !== binding.sessionId
-    || !sameValue(current.resolution.credential, binding.resolution.credential) || current.resolution.provider !== binding.resolution.provider
-    || current.resolution.baseUrl !== binding.resolution.baseUrl) throw new Error('Account selection changed; reopen /usage reset before spending.');
-  captureAccountEdit(binding.workspace, binding.resolution);
-}
 function assertUnspent(attempts: readonly ResetAttempt[], creditId?: string): void {
-  if (attempts.some(attempt => ['pending', 'unknown'].includes(attempt.status))) throw new Error('An account reset is pending or unknown. Its external result must be reconciled before another consume; automatic replay is refused.');
+  if (attempts.some(attempt => ['pending', 'unknown'].includes(attempt.status))) throw new Error('An account reset is pending or unknown. Inspect /usage reset status; reconcile its external result before another consume. Automatic replay is refused.');
   if (creditId && attempts.some(attempt => attempt.credit.id === creditId && ['reset'].includes(attempt.status))) throw new Error('This credit already has a confirmed reset receipt; it cannot be spent again.');
 }
 function safeLabel(binding: Binding): string {
@@ -117,7 +78,7 @@ export async function applyAccountReset(host: AccountUsageHost, id: string): Pro
           try { updateResetAttempts(binding.accountKey, attempts => {
             if (!sameValue(attempts.find(value => value.id === id), pending)) throw new Error('Reset receipt changed before settlement.');
             return attempts.map(value => value.id === id ? { ...pending, status, ...(code === 'unknown' ? {} : { code }) } : value);
-          }); } catch { return { success: false, output: `Account reset ${id}: external result ${status}; local receipt unconfirmed. Inspect the retained request before further consumption.`, metadata: { status: 'unknown', externalStatus: status } }; }
+          }); } catch { return { success: false, output: `Account reset ${id}: external result ${status}; local receipt unconfirmed. Inspect /usage reset status ${id} before further consumption.`, metadata: { status: 'unknown', externalStatus: status } }; }
           return { success: status === 'reset', output: `Account reset ${id}: ${status}${code !== 'unknown' ? ` (${code})` : ''}.\n${status === 'unknown' ? 'External result is unconfirmed; automatic replay is refused.' : status === 'reset' ? 'The exact account protocol confirmed this rate-limit reset.' : 'The account protocol confirmed no reset was applied.'}`, metadata: { status, requestId: id } };
         } });
     }, async execute() { throw new Error('An original prepared reset and explicit approval are required.'); } };

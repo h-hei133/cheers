@@ -9,6 +9,7 @@ import { routeSlashCommand } from '../../core/commands/slashRouter.js';
 import { installUsageRuntime, usageCommandFor, usageResetApproval } from './usage.js';
 import { readResetAttempts, updateResetAttempts } from '../usage/state.js';
 import { hashContent } from '../../core/workspace/files.js';
+import type { ToolGateOptions } from '../../turn/tools.js';
 import * as network from '../../core/network/connection.js';
 
 let scratch: string; let root: string; let home: string; let configPath: string;
@@ -20,25 +21,27 @@ function writeConfig(change: Partial<RuntimeConfigFile> = {}) {
     authType: 'account-auth', baseUrl: 'https://endpoint.example.invalid/v1', status: 'connected', createdAt: '2026-01-01', updatedAt: '2026-01-01',
     accountAuth: { openai: { type: 'openai-chatgpt-account', accessToken: 'SYNTHETIC_ACCOUNT_TOKEN', refreshToken: 'SYNTHETIC_REFRESH_TOKEN', accountId, expiresAt: Date.now() + 3600000 } } }], ...change }));
 }
-function harness(options: { decision?: 'allow-once' | 'allow-always' | 'deny'; mode?: 'plan' | 'build'; denied?: boolean; onApproval?: () => void; missingApproval?: boolean } = {}) {
+function harness(options: { decision?: 'allow-once' | 'allow-always' | 'deny'; mode?: 'plan' | 'build'; denied?: boolean; deniedTool?: string; onGate?: () => void; onApproval?: () => void; onEmit?: ToolGateOptions['emit']; missingApproval?: boolean } = {}) {
   const manager = new SessionManager(); const session = manager.createNew(root);
   const context = createShellRuntimeContext({ cwd: root, projectRoot: root, originalCwd: root, rootMode: 'direct', targetPathBase: root,
     gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: true }, runtimeConfig: getRuntimeConfig(root), session });
   const approval = vi.fn(async prompt => { options.onApproval?.(); return { promptId: prompt.id, decision: options.decision ?? 'allow-once', respondedAt: Date.now() }; });
-  installUsageRuntime(context, () => ({ workspaceRoot: root, sessionId: session.id, agentMode: options.mode ?? 'build', permissionScope: 'allow-all',
-    hooks: new HookDispatcher(), denyRules: options.denied ? [{ tool: 'account_reset' }] : [], emit: () => {},
-    escalationPromptHandler: async prompt => ({ promptId: prompt.id, decision: 'allow-always', respondedAt: Date.now() }) }),
+  const hooks = new HookDispatcher(); const emit = vi.fn((event: Parameters<ToolGateOptions['emit']>[0]) => options.onEmit?.(event));
+  installUsageRuntime(context, () => { options.onGate?.(); return { workspaceRoot: root, sessionId: session.id, agentMode: options.mode ?? 'build', permissionScope: 'allow-all',
+    hooks, denyRules: options.denied || options.deniedTool ? [{ tool: options.deniedTool ?? 'account_reset' }] : [], emit,
+    escalationPromptHandler: async prompt => ({ promptId: prompt.id, decision: 'allow-always' as const, respondedAt: Date.now() }) }; },
     options.missingApproval ? undefined : usageResetApproval(context, manager, () => approval));
   const command = { cwd: root, projectRoot: root, sessionId: session.id, interactive: true, usageCommand: usageCommandFor(context) };
-  return { manager, session, context, command, approval, run: (input: string) => routeSlashCommand(input, command) };
+  return { manager, session, context, command, approval, hooks, emit, run: (input: string) => routeSlashCommand(input, command) };
 }
-function protocol(options: { code?: string; creditReply?: unknown; creditStatus?: number; consumeThrows?: boolean } = {}) {
+function protocol(options: { code?: string; creditReply?: unknown; creditStatus?: number; consumeThrows?: boolean; consume?: () => Promise<Response> } = {}) {
   const calls: { url: string; init: network.PublicRequest }[] = [];
   const request = vi.spyOn(network, 'requestPublic').mockImplementation(async (url, init, scope) => {
     scope.check(); calls.push({ url, init });
     expect(new URL(url).origin).toBe('https://chatgpt.com');
     expect(init.headers).toMatchObject({ Authorization: 'Bearer SYNTHETIC_ACCOUNT_TOKEN', 'ChatGPT-Account-Id': accountId });
     if (url.endsWith('/consume')) {
+      if (options.consume) return options.consume();
       if (options.consumeThrows) throw new Error('SYNTHETIC_PRIVATE_RESPONSE_BODY');
       return new Response(JSON.stringify(options.code === undefined ? {} : { code: options.code }));
     }
@@ -147,4 +150,180 @@ it('refuses unsupported authentication and absent interactive binding before any
   expect(await setup.run('/usage account')).toMatchObject({ kind: 'local', output: expect.stringContaining('unsupported') });
   expect(await routeSlashCommand('/usage reset', { ...setup.command, interactive: false })).toMatchObject({ kind: 'local', output: expect.stringContaining('interactive') });
   expect(remote.request).not.toHaveBeenCalled();
+});
+
+it.each(['pending', 'unknown'] as const)('inspects retained %s receipts offline across sessions without settling or replaying them', async status => {
+  const setup = harness(); const remote = protocol({ consumeThrows: true }); const id = await prepare(setup);
+  if (status === 'unknown') await setup.run(`/usage reset apply ${id}`);
+  else updateResetAttempts(accountKey, attempts => attempts.map(attempt => ({ ...attempt, status })));
+  const file = path.join(home, '.cheers/accounts/resets', `${accountKey}.json`);
+  const before = fs.readFileSync(file); const modified = fs.statSync(file).mtimeMs;
+  const configuration = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  configuration.providerConnections[0].accountAuth.openai.expiresAt = Date.now() - 60000;
+  configuration.providerConnections[0].accountAuth.openai.accessToken = 'SYNTHETIC_EXPIRED_TOKEN';
+  fs.writeFileSync(configPath, JSON.stringify(configuration));
+  const fresh = harness({ mode: 'plan' }); const requests = remote.calls.length;
+  for (const input of ['/usage reset status', `/usage reset status ${id}`]) {
+    const result = await fresh.run(input); const output = (result as { output: string }).output;
+    expect(output).toContain(`Request ${id}; local state ${status}`);
+    expect(output).toContain(`Account digest: ${accountKey}`);
+    expect(output).toContain(`credit digest ${hashContent(credit.id)}`);
+    expect(output).toContain('remote result'); expect(output).toContain('blocked');
+    expect(output).not.toMatch(/SYNTHETIC_|credit-first|synthetic-account/);
+  }
+  expect(remote.calls).toHaveLength(requests); expect(fresh.approval).not.toHaveBeenCalled();
+  expect(fs.readFileSync(file)).toEqual(before); expect(fs.statSync(file).mtimeMs).toBe(modified);
+  writeConfig();
+  expect(await harness().run('/usage reset')).toMatchObject({ kind: 'local', output: expect.stringContaining('pending or unknown') });
+  expect(remote.calls).toHaveLength(requests); expect(readResetAttempts(accountKey)[0]).toMatchObject({ id, status });
+});
+
+it('limits receipt inspection to the current persisted account and handles an absent requested receipt explicitly', async () => {
+  const setup = harness(); const remote = protocol(); const id = await prepare(setup);
+  const configuration = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  configuration.providerConnections[0].accountAuth.openai.accountId = 'another-synthetic-account';
+  fs.writeFileSync(configPath, JSON.stringify(configuration));
+  const fresh = harness(); const requests = remote.calls.length;
+  expect(await fresh.run('/usage reset status')).toMatchObject({ kind: 'local', output: expect.stringContaining('No retained reset requests') });
+  const absent = await fresh.run(`/usage reset status ${id}`);
+  expect((absent as { output: string }).output).toContain('No retained reset request matches');
+  expect(JSON.stringify(absent)).not.toContain(id); expect(remote.calls).toHaveLength(requests);
+  expect(readResetAttempts(accountKey)[0]).toMatchObject({ id, status: 'prepared' });
+});
+
+it.each(['deny', 'selection-change'])('refuses receipt inspection after %s before publishing saved details', async scenario => {
+  const remote = protocol(); const id = await prepare(harness()); const requests = remote.calls.length;
+  const setup = harness({ deniedTool: scenario === 'deny' ? 'account_reset_status' : undefined,
+    onGate: scenario === 'selection-change' ? () => writeConfig({ activeProviderConnectionId: 'another' }) : undefined });
+  const result = await setup.run(`/usage reset status ${id}`);
+  if (scenario === 'deny') expect((result as { output: string }).output).toContain('refused by its ordinary permission or hook gate');
+  else expect((result as { output: string }).output).toMatch(/changed|conflict|authority/i);
+  expect((result as { output: string }).output).not.toContain(`Request ${id}`);
+  expect((result as { output: string }).output).not.toContain(`Account digest: ${accountKey}`);
+  expect(remote.calls).toHaveLength(requests); expect(setup.approval).not.toHaveBeenCalled();
+  expect(readResetAttempts(accountKey)[0]?.status).toBe('prepared');
+});
+
+it.each(['command', 'tool-result'])('withholds receipt details from %s after a persisted account switch in an awaited post-use hook', async surface => {
+  const remote = protocol(); const id = await prepare(harness()); const requests = remote.calls.length;
+  const file = path.join(home, '.cheers/accounts/resets', `${accountKey}.json`);
+  const before = fs.readFileSync(file); const modified = fs.statSync(file).mtimeMs;
+  const setup = harness(); let entered!: () => void; let resume!: () => void; let hookOutput = '';
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const continued = new Promise<void>(resolve => { resume = resolve; });
+  setup.hooks.registerInProcessHook({ name: 'switch-account-after-read', event: 'PostToolUse', matcher: '^account_reset_status$', handler: async payload => {
+    if (payload.eventName === 'PostToolUse') hookOutput = payload.output;
+    entered(); await continued;
+    const configuration = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    configuration.providerConnections[0].accountAuth.openai.accountId = 'another-synthetic-account';
+    fs.writeFileSync(configPath, JSON.stringify(configuration));
+    return { feedback: 'Selected account changed during inspection.' };
+  } });
+  const inspecting = setup.run(`/usage reset status ${id}`);
+  await started;
+  expect(setup.emit.mock.calls.some(([event]) => event.type === 'tool.result')).toBe(false);
+  resume(); const result = await inspecting;
+  const event = setup.emit.mock.calls.map(([value]) => value).find(value => value.type === 'tool.result');
+  expect(event).toBeDefined();
+  const output = surface === 'command' ? (result as { output: string }).output : JSON.stringify(event);
+  expect(output).not.toContain(id); expect(output).not.toContain(accountKey); expect(output).not.toContain(hashContent(credit.id));
+  expect(hookOutput).not.toContain(id); expect(hookOutput).not.toContain(accountKey);
+  expect(event).toMatchObject({ success: false });
+  expect((result as { output: string }).output).toMatch(/changed|authority/i);
+  expect(remote.calls).toHaveLength(requests); expect(setup.approval).not.toHaveBeenCalled();
+  expect(fs.readFileSync(file)).toEqual(before); expect(fs.statSync(file).mtimeMs).toBe(modified);
+});
+
+it('withholds receipt details when post-use dispatch fails while preserving the failure', async () => {
+  const remote = protocol(); const id = await prepare(harness()); const setup = harness(); const requests = remote.calls.length;
+  const before = readResetAttempts(accountKey); const dispatch = setup.hooks.dispatch.bind(setup.hooks);
+  vi.spyOn(setup.hooks, 'dispatch').mockImplementation(async payload => {
+    const decision = await dispatch(payload);
+    if (payload.eventName === 'PostToolUse') throw new Error('Synthetic post-use dispatch failure');
+    return decision;
+  });
+  const result = await setup.run(`/usage reset status ${id}`);
+  expect((result as { output: string }).output).not.toContain(id);
+  expect((result as { output: string }).output).not.toContain(accountKey);
+  expect((result as { output: string }).output).toContain('after-call hooks or publication failed');
+  expect(remote.calls).toHaveLength(requests); expect(readResetAttempts(accountKey)).toEqual(before);
+});
+
+it('shows receipt details with sanitized post-use feedback only after final account verification', async () => {
+  const remote = protocol(); const id = await prepare(harness()); const setup = harness(); const requests = remote.calls.length;
+  setup.hooks.registerInProcessHook({ name: 'receipt-feedback', event: 'PostToolUse', matcher: '^account_reset_status$',
+    handler: async () => ({ feedback: 'Checked\nSYNTHETIC_FEEDBACK' }) });
+  const result = await setup.run(`/usage reset status ${id}`);
+  expect((result as { output: string }).output).toContain(`Request ${id}; local state prepared`);
+  expect((result as { output: string }).output).toContain('[Verification feedback]');
+  expect((result as { output: string }).output).toContain('Checked\\x0aSYNTHETIC_FEEDBACK');
+  const events = JSON.stringify(setup.emit.mock.calls);
+  expect(events).not.toContain(id); expect(events).not.toContain(accountKey);
+  expect(remote.calls).toHaveLength(requests); expect(setup.approval).not.toHaveBeenCalled();
+});
+
+it('withholds receipt details if a result observer switches the persisted account before command display', async () => {
+  const remote = protocol(); const id = await prepare(harness()); const requests = remote.calls.length;
+  const before = readResetAttempts(accountKey);
+  const setup = harness({ onEmit: event => {
+    if (event.type === 'tool.result') writeConfig({ activeProviderConnectionId: 'another' });
+  } });
+  const result = await setup.run(`/usage reset status ${id}`);
+  expect((result as { output: string }).output).not.toContain(id);
+  expect((result as { output: string }).output).not.toContain(accountKey);
+  expect((result as { output: string }).output).toMatch(/changed|conflict|authority/i);
+  expect(JSON.stringify(setup.emit.mock.calls)).not.toContain(id);
+  expect(remote.calls).toHaveLength(requests); expect(readResetAttempts(accountKey)).toEqual(before);
+});
+
+it('inspects an in-flight pending receipt without releasing the runtime guard for another reset request', async () => {
+  let entered!: () => void; let settle!: (response: Response) => void;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const setup = harness(); const remote = protocol({ consume: () => {
+    entered(); return new Promise<Response>(resolve => { settle = resolve; });
+  } });
+  const id = await prepare(setup); const applying = setup.run(`/usage reset apply ${id}`);
+  await started;
+  try {
+    const requests = remote.calls.length;
+    expect(await setup.run(`/usage reset status ${id}`)).toMatchObject({ kind: 'local', output: expect.stringContaining(`Request ${id}; local state pending`) });
+    expect(await setup.run('/usage reset')).toMatchObject({ kind: 'local', output: expect.stringContaining('already pending') });
+    expect(remote.calls).toHaveLength(requests); expect(remote.posts()).toHaveLength(1);
+  } finally { settle(new Response(JSON.stringify({ code: 'reset' }))); await applying; }
+  expect(readResetAttempts(accountKey)[0]).toMatchObject({ id, status: 'reset' });
+});
+
+it('bounds the saved receipt list, prioritizes unresolved results, and keeps raw account and credit fields out of reports', async () => {
+  const setup = harness(); const remote = protocol(); const id = await prepare(setup);
+  updateResetAttempts(accountKey, attempts => {
+    const template = attempts[0]!;
+    return [{ ...template, status: 'pending', createdAt: '2020-01-01T00:00:00.000Z' }, ...Array.from({ length: 25 }, (_, index) => ({ ...template,
+      id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`, status: 'reset' as const, code: 'reset' as const,
+      createdAt: new Date(Date.UTC(2025, 0, index + 1)).toISOString(), credit: { ...template.credit, id: 'SYNTHETIC_PRIVATE_CREDIT\n\x1b[2J' } }))];
+  });
+  const before = readResetAttempts(accountKey); const requests = remote.calls.length;
+  const result = await setup.run('/usage reset status'); const output = (result as { output: string }).output;
+  expect(output).toContain('Showing 20 of 26'); expect(output.match(/^Request /gm)).toHaveLength(20);
+  expect(output.indexOf(`Request ${id}; local state pending`)).toBeLessThan(output.indexOf('local state reset'));
+  expect(output).not.toMatch(/SYNTHETIC_|credit-first|synthetic-account|\x1b/); expect(output.length).toBeLessThan(8000);
+  const oldId = '00000000-0000-4000-8000-000000000000';
+  expect(output).not.toContain(oldId);
+  expect(await setup.run(`/usage reset status ${oldId}`)).toMatchObject({ kind: 'local', output: expect.stringContaining(`Request ${oldId}; local state reset`) });
+  expect(remote.calls).toHaveLength(requests); expect(readResetAttempts(accountKey)).toEqual(before);
+});
+
+it('reports damaged or redirected receipt storage as unavailable without exposing it or converting it into an empty result', async () => {
+  const setup = harness(); const remote = protocol(); const id = await prepare(setup);
+  const file = path.join(home, '.cheers/accounts/resets', `${accountKey}.json`);
+  const requests = remote.calls.length;
+  fs.writeFileSync(file, 'SYNTHETIC_PRIVATE_BROKEN_RECEIPT');
+  let result = await setup.run(`/usage reset status ${id}`);
+  expect((result as { output: string }).output).toContain('Local reset receipts are unavailable or invalid');
+  expect(JSON.stringify(result)).not.toContain('SYNTHETIC_PRIVATE_BROKEN_RECEIPT');
+  const outside = path.join(root, 'private-receipts.json'); fs.writeFileSync(outside, 'SYNTHETIC_PRIVATE_OUTSIDE');
+  fs.unlinkSync(file); fs.symlinkSync(outside, file);
+  result = await setup.run('/usage reset status');
+  expect((result as { output: string }).output).toContain('Local reset receipts are unavailable or invalid');
+  expect(JSON.stringify(result)).not.toContain('SYNTHETIC_PRIVATE_OUTSIDE');
+  expect(fs.readlinkSync(file)).toBe(outside); expect(remote.calls).toHaveLength(requests); expect(setup.approval).not.toHaveBeenCalled();
 });

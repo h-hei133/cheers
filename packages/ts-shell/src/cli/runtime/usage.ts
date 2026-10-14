@@ -5,8 +5,9 @@ import { configurationAdmission } from '../../core/shell/configuration.js';
 import { resolveProviderCredential } from '../../core/shell/providerCredentials.js';
 import { parseUsageArgs } from '../../core/commands/usage/syntax.js';
 import { inspectAccountUsage, applyAccountReset } from '../usage/service.js';
+import { inspectResetStatus } from '../usage/status.js';
 import { redactReportText } from '../../core/security/redaction.js';
-import type { AccountUsageHost } from '../usage/service.js';
+import type { AccountUsageHost } from '../usage/binding.js';
 import type { SessionManager } from '../../session/SessionManager.js';
 import type { EscalationPrompt } from '../../core/shell/approval/contract.js';
 import type { InteractiveApprovalResult } from '../interactive/picker/approval.js';
@@ -32,7 +33,8 @@ export function usageCommandFor(context: ShellRuntimeContext): NonNullable<Comma
     const installed = gates.get(context); const gate = installed?.gate; const sessionId = context.session.id; const workspace = context.projectRoot;
     const parsed = parseUsageArgs(args);
     if (!gate || !parsed.ok || command.sessionId !== sessionId || command.projectRoot !== workspace || command.interactive !== true) return { kind: 'local', output: 'Account usage requires the current bound interactive session. Nothing was consumed.' };
-    if (pending.has(context)) return { kind: 'local', output: 'Account usage is already pending; settle its request or approval first.' };
+    const status = parsed.action.name === 'reset' && parsed.args[0] === 'status';
+    if (pending.has(context) && !status) return { kind: 'local', output: 'Account usage is already pending; inspect /usage reset status or settle its request or approval first.' };
     const admission = configurationAdmission(context);
     const check = () => {
       const refusal = admission() ?? command.admission?.();
@@ -42,12 +44,12 @@ export function usageCommandFor(context: ShellRuntimeContext): NonNullable<Comma
       resolution: command.resolveConfigTarget?.(context.runtimeConfig) ?? resolveProviderCredential({ runtimeConfig: context.runtimeConfig }) }),
     check, gate: (tool: string) => { const original = gate(tool); return { ...original, admission: () => { try { check(); return original.admission?.(); } catch { return 'Account request authority changed.'; } } }; },
     approveReset: installed!.approve ?? (async prompt => ({ promptId: prompt.id, decision: 'deny' as const, respondedAt: Date.now(), userComment: 'Explicit account confirmation is unavailable.' })) };
-    pending.add(context);
+    if (!status) pending.add(context);
     try {
-      const output = parsed.action.name === 'reset' && parsed.args[0] === 'apply'
+      const output = status ? await inspectResetStatus(host, parsed.args[1]) : parsed.action.name === 'reset' && parsed.args[0] === 'apply'
         ? await applyAccountReset(host, parsed.args[1]!) : await inspectAccountUsage(host, parsed.action.name === 'reset');
       return { kind: 'local', output };
     } catch (error) { return { kind: 'local', output: redactReportText(error instanceof Error ? error.message : 'Account usage unavailable; no confirmed reset.', 4096) }; }
-    finally { pending.delete(context); }
+    finally { if (!status) pending.delete(context); }
   };
 }

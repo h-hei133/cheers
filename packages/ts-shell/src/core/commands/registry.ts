@@ -558,7 +558,7 @@ export function createCommandRegistry(
     },
     {
       name: 'usage', kind: 'local', supportsNonInteractive: true, availability: 'available', enabled: true,
-      summary: 'show session usage, selected account quota and explicit reset previews', group: 'session', argumentHint: '[show|account|reset [apply <preview-id>]]',
+      summary: 'show session usage, account quota and reset previews or saved receipts', group: 'session', argumentHint: '[show|account|reset [apply <preview-id>|status [request-id]]]',
       execute: (args, context) => runUsageCommand(args, context),
     },
     {
