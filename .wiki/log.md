@@ -6611,3 +6611,5 @@ Windows Node20.3 经仓库 UNC 运行实际 CLI：零输入启动/EOF、print、
 ### 2026-10-14 — Windows 大小写目录越界修复
 
 原生 Windows Node20.3 复现不同 inode 的 Root/root 被词法大小写折叠误准入、泄出外部文件与目录结果。原路径 owner 采用 native realpath、同一现存祖先解析与 namespace 根大小写兼容，目录 owner 复用规范目标复验；无新增读取系统。独立复核拒绝初版的普通目录别名、缺失根、UNC server/share 三处回归，修复后代码 APPROVE/架构 CLEAR，早期拒绝材料保留。最终4TS/2production，Node20.3受影响15文件/185项、两构建/四源码门和judge图义务通过；4既有ceiling advisory仍partial。五项隔离反转实际失败，正向通过；作者Windows25/Linux13，独立lane另有原生证据。实际Windows CLI与Linux单文件各两条read链路共8合成POST，越界拒绝、合法别名正文和原文件/配置均核验；首轮合成服务误用历史tool结果属harness，修正本次ID后复跑，exit0不升级拒绝结果。见[裁决§8.157](features/phase-19-decisions.md)、[验收§22](features/phase-19-acceptance.md)，材料`.tmp/path-identity/`。用户`.gitignore`原字节保持；当前全套、非Linux对象绑定、平台/交互/真实服务及CI条件仍未证明，Phase19 active，交付另验。
+
+源码与验收 `be1ffcbca841fbafd6edafa5a21629d0382060d4` 已推送，远端/PR #1 同SHA，7路径及4冻结blob审计通过；用户`.gitignore`排除并保持原hash。strict docs通过；精确CI38512190024/job115682957106、Watch38512189548/job115682955541均付款/spending-limit阻止启动，steps=[]、failure，未计远端通过。详见[验收§22](features/phase-19-acceptance.md)和`.tmp/path-identity/delivery.json`，Phase19 active。

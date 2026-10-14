@@ -2336,3 +2336,5 @@ Node20.3/单文件×stable/changed四条实际print CLI通过；stable共4合成
 作者原生 Windows 25 项/Linux 13 项检查通过；另经实际 Windows Node20.3 `dist/cli.js` 与 Linux 单文件程序各运行拒绝/合法别名两条 print/read 链路，合计 8 次 loopback 合成 POST。本次 tool call ID、拒绝内容/合法中文正文、原文件与隔离配置均核验；外部正文没有进入请求或终端。CLI exit0 仅证明回合结束，越界调用仍是失败。首轮合成服务错误地消费前一回合 tool 结果，属 harness/setup，改为本次 call ID 后复跑通过，未迁就检查修改产品。
 
 详见[验收 §22](phase-19-acceptance.md)，材料 `.tmp/path-identity/`。本批只运行直接受影响套件，§8.153 的历史全套不冒称当前全套；未新增完整 Windows 套件/交互 PTY/真实服务验收。本地 NTFS 仅补只读大小写别名检查，非 Linux 原生对象绑定、未观察树、macOS、真实 IME/设备/服务及精确远端 CI 条件仍开放，Phase19 active。用户 `.gitignore` 原字节保留，提交/推送/精确 CI 单独取证。
+
+本批源码与验收提交 `be1ffcbca841fbafd6edafa5a21629d0382060d4` 已推送 `feat/phase-18`，远端与 PR #1 读回同 SHA；7 路径提交审计及四个冻结源码/测试 blob 校验通过，用户 `.gitignore` 排除且原 hash 保持。strict docs/diff 检查通过。精确 CI `38512190024`/job `115682957106` 与 Watch `38512189548`/job `115682955541` 均 completed/failure、`steps=[]`，各自 annotation 确认付款/spending-limit 阻止启动，**没有远端验证通过**。交付材料 `.tmp/path-identity/delivery.json`；该结果不关闭剩余平台和真实服务验收，Phase19 active。

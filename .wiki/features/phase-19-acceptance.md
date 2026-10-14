@@ -443,3 +443,5 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 全部材料位于 `.tmp/path-identity/`，四路径冻结为 `freeze.json`：路径 owner `dc683560…`、目录 owner `649d81cd…`，两测试 `8dafcf78…`/`08592a6f…`；用户 `.gitignore` SHA256 `20e91ccf…` 保持。初始独立 REQUEST CHANGES/BLOCK 与三个实际兼容反例被保留并修复，未将早期失败判作最终通过。CLI 首轮合成服务复用了前一回合 tool 结果，按 **harness/setup drift** 修正为本次 call ID 后完整复跑；`cli-windows.json`/`cli-exe.json` 保留失败，最终结果单列。
 
 证据只关闭该规范路径大小写缺陷和本批引入的兼容回归，不证明非 Linux 原生对象路径绑定、完整 Windows/macOS 套件、交互 PTY/IME/系统复制、真实设备/服务或当前全仓套件。§5 的剩余要求继续有效，Phase19 **active**；strict docs、提交/推送及精确 SHA CI 在本批交付时另验。
+
+源码与本批验收提交 `be1ffcbca841fbafd6edafa5a21629d0382060d4` 已推送，远端分支及 PR #1 head 同 SHA；7 个提交路径和4个冻结 blob审计通过，`.gitignore`未提交、原hash保持。strict docs/diff均通过。CI [38512190024](https://github.com/h-hei133/cheers/actions/runs/38512190024)/job115682957106、Watch [38512189548](https://github.com/h-hei133/cheers/actions/runs/38512189548)/job115682955541 均 completed/failure、steps为空，各自annotations确认付款/spending-limit阻止作业启动。它们不是运行后的产品失败，也不是CI通过；材料 `.tmp/path-identity/delivery.json`。Phase19继续 **active**。
