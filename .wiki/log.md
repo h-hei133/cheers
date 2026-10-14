@@ -6689,3 +6689,17 @@ implementation匹配已知mode和当前权限位；顾问/调度复用同一cano
 在原auth/usage与CLI owner接通当前持久账户的quota/source/time、最早到期有效权益预览、独立交互确认和一次consume。复用原权限/deny/plan、public network、账户身份、锁与guarded writer；pending/unknown跨会话不重放，明确业务code才成功，错误正文不留存。原picker现在实际遵守选项限制，权益仅允许一次/拒绝。对照参考精确目标/UUID/持久fence/offer复读，未沿用HTTP成功即reset或自动解除未知围栏；官方用量文档不保证公开兑换API，本批只验合成账户wire，真实互通仍开放。五反转实际检出1/2/1/2/1项断言失败、逐字节恢复；初轮permissionArgs遗漏的四产品失败已修复并保留原证据。见[裁决 §10.10](features/phase-19-decisions.md#1010-a13--账户额度及权益消耗入口)；最终本地/交付另验，Phase19 active。
 
 最终Node20.3隔离受影响11文件/246项、build:ts与五门通过，无skip；完整NormProof图义务满足、4既有ceiling advisory/partial，新增owner未超限。提交/推送/精确CI和最终集成另验。
+
+账户28a3824c已推送且远端同SHA；CI38594118024/Watch38594117912各自annotations确认付款/spending-limit未启动、steps=[]，没有远端通过。
+
+### 2026-10-15 — A02 当前源码全套初验失败分类
+
+在最终修复源码28a3824c上实际运行Node20.3/Linux完整Vitest：799文件784通过/14失败/1跳过，8086项8054通过/22失败/10跳过，503.17秒；不能称集成通过。失败包括子进程收据/退出、多个实际时限、MCP undefined执行context旧夹具、规则错误文案以及调度/作业结果。已保留失败集合并按安装版支持的环境变量减至4worker复查，不改默认设置或删除取消。scripts57项及单文件构建通过，PTY继续验证；详见[裁决 §10.11](features/phase-19-decisions.md#1011-a02--当前源码集成复验2026-10-15进行中)，Phase19 active。
+
+### 2026-10-15 — A02/A07/A13 最终本地复验与独立复核
+
+两项测试夹具修复、A07 live UTF-8 byte cursor 修复、A13 `cli/usage` owner 迁移和 normproof 测试的删除路径适配后，最终完整 Vitest 在 Node20.3/Linux、4 workers 下为 799 文件（798 pass、1 env-gated skip）、8091 项（8081 pass、10 skip、0 fail），422.60 秒；显式跳过为 Chromium/public smoke。A07 定向 14 项、usage 32 项通过；build:ts、build:exe、五源码门、result-contract149、scripts57、NormProof blocking obligations 通过，整体仍有4项既有 ceiling advisory。
+
+独立两lane先核对96文件和 `.gitignore`；后续证据文档/UTF-8补修已在代码最终报告区分为91/96原hash保留，额外normproof测试也纳入复核。code为APPROVE、无剩余finding；architecture确认core方向BLOCK已由service/state迁移消除，保留未知receipt无只读inspection/reconciliation的WATCH；综合COMMENT。报告 `.tmp/phase19-repair/*-review-final.{md,json}`，交付另冻97路径。owner迁移后的Node20.3/executable regular/fullscreen PTY再次通过，结果分别在 `integration-pty-1791996994370774840/`、`integration-pty-1791997053445195601/`；该构建早于末尾UTF-8补修且不测分页，补修后宿主Node24.15两种构建及五门再次通过。A01/A03/A12/A25和真实provider/平台仍开放，当前修复未提交/推送，Phase19 active。
+
+全套后独立code再发现UTF-8 terminal/open end-cursor细节，原边界函数与consumer测试补修后15项通过；全套仍绑定小delta前字节，不合并成一次全量证明。新A25空文件exclusive-open-close候选只改善private Git/rg 2.03%/2.79%，未达到先定20%门槛，无产品补丁；不重复旧硬链接/同步方向，真实成本与整树一致性仍开放。

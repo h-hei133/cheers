@@ -64,7 +64,7 @@ export class SshClient {
       && Number.isInteger(size) && size >= 0 && size <= 65536 && reportedNext <= size && context.length === size
       && Number.isSafeInteger(offset) && offset >= 0 && offset <= reportedNext
       && (value.dropped === 'unknown' || /^[0-9]{1,20}$/.test(value.dropped!)), 'protocol');
-    const nextOffset = utf8PageEnd(context, offset, 16384);
+    const nextOffset = utf8PageEnd(context, offset, 16384, value.dropped === 'unknown');
     return { bytes: context.subarray(offset, nextOffset), context, nextOffset, size,
       truncated: value.dropped === 'unknown' ? 'unknown' as const : BigInt(value.dropped!) > 0n };
   }

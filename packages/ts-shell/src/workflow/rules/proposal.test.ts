@@ -13,7 +13,7 @@ describe('rule proposals', () => {
     const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-rule-outside-')); roots.push(outside);
     fs.writeFileSync(path.join(outside, 'private'), 'external fixture');
     fs.symlinkSync(path.join(outside, 'private'), path.join(root, 'AGENTS.md'));
-    expect(() => proposeRules(root, 'init')).toThrow('symlink');
+    expect(() => proposeRules(root, 'init')).toThrow('outside the selected workspace');
     fs.unlinkSync(path.join(root, 'AGENTS.md'));
     fs.writeFileSync(path.join(root, 'package.json'), ' '.repeat(128 * 1024 + 1));
     expect(() => proposeRules(root, 'init')).toThrow('size limit');

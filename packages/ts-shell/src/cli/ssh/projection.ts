@@ -8,12 +8,14 @@ export function display(value: unknown, max = 12000): string {
   return neutraliseForDisplay(redactReportText(typeof value === 'string' ? value : JSON.stringify(value, null, 2), max, { preserveLines: true }));
 }
 /** Reports never publish a raw substring whose credential prefix may lie on another page. */
-export function pageDisplay(page: { readonly bytes: Buffer; readonly context?: Buffer; readonly size: number }): string {
+export function pageDisplay(page: { readonly bytes: Buffer; readonly context?: Buffer; readonly size: number; readonly nextOffset?: number }): string {
   if (!page.context || page.context.length !== page.size || page.size > 65536) return 'Remote content lacks bounded redaction context; this page is withheld.';
   const whole = page.context.toString('utf8');
   const redactions = new Set<string>(); redactReportText(whole, 262144, { preserveLines: true, redactions });
   if (redactions.has('unsafe-content'))
     return 'Remote stream contains sensitive patterns; content is withheld from reports. Raw byte offsets remain valid.';
+  if (!page.bytes.length && page.nextOffset !== undefined && page.nextOffset < page.size)
+    return 'A UTF-8 character is still arriving; reuse this byte cursor.';
   return display(page.bytes.toString('utf8'), 24000);
 }
 export function profilePreview(profile?: SshProfile): string {

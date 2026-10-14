@@ -2718,3 +2718,33 @@ Node20.3 直接受影响 22 文件/315 项、TypeScript 与 Linux 单文件构�
 - 五个隔离反转分别移除非文件permissionArgs、独立确认lane、明确业务结果、pending/unknown围栏、最终账户复核，实际检出1/2/1/2/1项AssertionError，源码逐字节恢复；日志 `.tmp/phase19-repair/a13-{permission,confirmation,proof,fence,binding}-reversal.log`。初轮四项实际产品失败来自空targets误判无变化；已补不可变permissionArgs，随后发现普通授权bridge仍可自动回答，才改独立确认；没有通过弱化断言消除失败。
 
 反转恢复后，隔离Node20.3/Linux受影响11文件/246项、build:ts及五门通过，无skip。覆盖原账户续期/CLI摘要、普通审批和usage消费者；NormProof完整图的解析/无环义务满足，4项既有ceiling advisory仍partial，新增owner无超限。A13本地源码接通并验证；真实账户互通、A01/A25与最终集成/外部验收/精确CI继续开放，Phase19 **active**；提交/推送另验。
+
+`28a3824cbc5bfcb59843e00f8138b10771beda2f` 已提交推送，远端分支读回同SHA。CI38594118024/job115956304183、Watch38594117912/job115956302687 均completed/failure、steps=[]；两份annotations再次确认付款/spending-limit阻止启动，无远端通过。
+
+### 10.11 A02 — 当前源码集成复验（2026-10-15，进行中）
+
+- 对`28a3824c`在Node20.3/Linux隔离环境运行完整Vitest：799文件为784通过/14失败/1跳过，8086项为8054通过/22失败/10跳过，503.17秒，不能记为最终集成通过。失败集合与原cache留在 `.tmp/phase19-repair/full-{initial-cache,failed-paths}.json`；cache只用于找到本次实际存在的14个失败文件，不把历史已移除文件计入结果。
+- 首轮发现浏览器CLI子进程的退出/缺少收据、原生分析/Git/grep超时，goal轮数/子作业未收束，以及MCP forwarding与规则proposal断言；当前先复查分类，未修改产品或放宽超时。原MCP测试传`undefined`作为ToolExecutionContext，而A19实际消费其abortSignal；这比最初猜测的目录接口缺失更精确，需按真实调用契约修复夹具，不能删除取消接线。规则链接仍被包含边界拒绝，旧断言指定`symlink`文案；继续核对完整拒绝行为。
+- 57项scripts tests、当前单文件构建通过；两者不是完整Vitest通过。当前16逻辑CPU/7.5GiB环境首轮存在负载和交换，减至4个本地worker复查失败集合以分离时限与行为问题，不改仓库默认/CI设置。首个CLI参数`--maxThreads`被Vitest0.34拒绝、零测试执行；按安装版实际支持的VITEST_MAX_THREADS/MIN_THREADS环境变量重新启动。实际Node/单文件×regular/fullscreen的当前源码PTY另验。
+
+失败集合复查14文件/134项为128通过/6失败，无skip；12文件在原源码/原时限下通过，环境负载分类成立。余下5个MCP失败由原测试`undefined as never`绕过执行context契约导致，改为类型完整的最小真实context，保留转发、错误分类/脱敏和next-step断言；规则1项改为当前准确越界拒绝文案，不改变owner或允许链接。复查JSON的numFailedTestSuites误报0，不作为通过证据：实际6项失败及2个失败testResults才是本轮结论。原报告 `.tmp/phase19-repair/full-failed-recheck.json`保留。
+
+两项夹具纠正后完整复验为799文件797通过/1失败/1跳过，8086项8075通过/1失败/10跳过，429.92秒；JSON汇总将skip计入numPassedTests，不采用其8085作为实际通过数。唯一失败为CLI stopped unknown writer的follow-up退出码；随后原源码/原时限两项定向恢复用例及完整CLI40项均通过，无新增skip或放宽期限，但该复验不把完整运行改写为全绿。
+
+独立审查初次两lane均因预设模型404不可用，没有审查批准；按skill以当前会话模型重新建立两个独立clean-context lane。复核发现A07边界函数在运行中日志尾部只有UTF-8前缀时仍推进cursor并输出替换字符，后续补齐字节不能从该cursor继续；首字节为无效continuation的原始输出也被拒绝。另确认A13新service/state从core直接依赖turn/edit/session，违反core admission方向。两项先登记，再在原分页与CLI命令owner修复；独立最终意见和修复后验证另记。
+
+最终修复将额度 service/state 原样迁入 `cli/usage/`，core 仅保留 account usage model/固定issuer remote；原 prepared-tool、审批、file-lock/CAS 语义不变。A07 改为仅在 owner 明确仍可能增长且 suffix 是有效 UTF-8 前缀时停留在原 byte cursor；已完成流的合法字符、终端不完整序列和 malformed bytes 仍可按原始字节前进并显示替换字符。新增本地 journal、SSH growing stream、malformed bytes 回归，A07 定向 14/14 通过；额度消费者迁移后定向 32/32 通过。
+
+末尾两文件补修前的集成源码在同一隔离环境、Node20.3/Linux、4 worker 实际运行完整套件：799 文件中 798 通过、1 文件含环境门控跳过，8091 项中 8081 通过、10 跳过、0 失败，422.60 秒；跳过为真实 Chromium/public smoke 的显式 env-gated 场景，不计入通过。`full-final.json` 的 `numPassedTests=8091` 包含 runner 对 skipped 的聚合，按 assertion 状态采用 8081/10，文件计数采用 terminal log。`npm run build:ts`、`build:exe`、五源码门、`verify:result-contract`（6套/149项）、`test:scripts`（57项）及 NormProof blocking obligations 均通过；NormProof 仍报告4个既有 ceiling advisory/partial。
+
+全套结束后独立 code lane 又发现 terminal incomplete suffix 的 end cursor 无法读空页，以及 open stream raw-end cursor 会回退；只在共享UTF-8边界函数与原 consumer 测试补修。最终两文件15项通过，包含实际本地/SSH完整及open末尾空页、malformed-prefix分页的整体decode一致性；原全套仍绑定小修复之前，不把后续定向结果混作一次全套。独立lane另以20,000组terminal bytes检查发现零decode/推进不一致，旧A07问题和本次尾部问题均闭合。
+
+两位独立审查者先核对 `.tmp/phase19-repair/review-freeze-final.json` 的96个文件及 `.gitignore`。此后3份证据文档与UTF-8函数/consumer测试变化，代码最终报告明确记录原冻结91/96匹配，并覆盖两个源码补修和额外 `scripts/normproof.test.mjs`；不称原冻结一直不变。code lane 为 **APPROVE**、无剩余finding；architecture lane 的原 core 方向 BLOCK 已消除，状态为 **WATCH**，保留 pending/unknown 权益没有只读 receipt inspection/reconciliation 命令这一非阻断运营缺口，综合为 **COMMENT**。报告为 `.tmp/phase19-repair/code-review-final.md` 与 `architecture-review-final.md`；首次模型404失败报告保留，不能当作批准。交付冻结另存 `delivery-freeze.json`，包含97个现存任务路径、两条删除路径与审查之后的纯证据文档变化；`.gitignore` hash仍为 `20e91ccf19fdc755718372e6fcc9ef77ca6a579280ff4b0dc1f69c73a2eaf2d3`。
+
+owner迁移后已再次运行 Node20.3/Linux 与单文件可执行程序 regular/fullscreen PTY 合成 provider：本地 `/usage` 计量、account/reset unsupported 不发账户请求，真实 native read、deny/approved apply_patch、持久 committed receipt、重启零重放均通过；材料为 `.tmp/phase19-repair/integration-pty-1791996994370774840/` 与 `.tmp/phase19-repair/integration-pty-1791997053445195601/`。PTY使用末尾UTF-8补修前的构建，不覆盖分页；补修后宿主Node24.15的两种构建及五源码门再次通过，日志为 `delta-build-{ts,exe}.log` 和 `delta-{cycles,config,declarations,node-floor,docs}.log`。这不覆盖真实 provider、设备/平台、A01 非 Linux actual-object binding、A03 真实环境、A12 账单阻断 CI 或 A25 未观察树/镜像成本；Phase19 仍 **active**。当前修复尚未提交/推送，远端 CI 不能据此宣称通过。
+
+### 10.12 A25 — 私有空占位的新候选测量（2026-10-15）
+
+在全套负载结束后只于临时目录比较新候选：`writeFile('', wx)`改为exclusive open+close以省去空write，不重复此前硬链接/同步方案。原owner的canonical/policy、最多8并发和settle-before-cleanup不变，先固定两条5000文件中位数均改善20%的门槛。
+
+同Node20.3/Linux、50目录、1000/5000文件各3次、native Git/rg exact-name比较，fresh baseline的5000文件private Git/rg中位数为1776.45/1303.71ms，新候选为1740.40/1267.39ms；只改善2.03%/2.79%，不达门槛。两个查询名称均相同，但候选只是隔离估算，无产品补丁/新依赖/authority cache。材料 `.tmp/phase19-repair/mirror/{contract,baseline-results,empty-results,outcome}.json`。保留现有有界空占位并结束该方向；A25整树一致性与真实规模/并发成本仍开放，不将局部合成结果称为已完成交付。

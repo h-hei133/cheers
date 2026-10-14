@@ -77,6 +77,26 @@ it('retains exact native bytes across split UTF-8 chunks and an incomplete final
   expect(localPage(local.get(task.id), 'stdout', 0)).toContain('next byte 9/9');
 });
 
+it.each(['中', '🙂'])('keeps the live journal cursor before an unfinished %s character', character => {
+  const local = journal(); const id = local.create({ command: 'incremental byte stream', cwd: root });
+  local.arm(id); local.started(id);
+  const prefix = Buffer.from('x'.repeat(16383)); const encoded = Buffer.from(character);
+  local.output(id, 'stdout', Buffer.concat([prefix, encoded.subarray(0, 1)]));
+  const first = localPage(local.get(id), 'stdout', 0);
+  expect(first).toContain('next byte 16383/16384');
+  expect(first.slice(first.indexOf('\n') + 1)).toBe(prefix.toString());
+  for (let index = 1; index < encoded.length - 1; index++) {
+    local.output(id, 'stdout', encoded.subarray(index, index + 1));
+    const pending = localPage(local.get(id), 'stdout', 16383);
+    expect(pending).toContain(`next byte 16383/${16384 + index}`);
+    expect(pending).not.toContain('�');
+  }
+  local.output(id, 'stdout', Buffer.concat([encoded.subarray(-1), Buffer.from('tail')]));
+  const last = localPage(local.get(id), 'stdout', 16383);
+  expect(last.slice(last.indexOf('\n') + 1)).toBe(character + 'tail');
+  expect(Buffer.from(local.get(id).stdout, 'base64')).toEqual(Buffer.concat([prefix, encoded, Buffer.from('tail')]));
+});
+
 it('does not claim cancellation until the native owner settles and preserves failed cleanup as unknown', async () => {
   const local = journal(); let settle!: (value: CommandExecutionResult) => void;
   const owner = new TaskRegistry({ runCommand: vi.fn(request => {

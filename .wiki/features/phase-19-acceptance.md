@@ -542,3 +542,17 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 账户权益反转恢复后，隔离Node20.3/Linux受影响11文件/246项、build:ts及五门通过，无skip；包含原账户续期/摘要与普通审批消费者。NormProof完整图义务满足，同4项既有ceiling advisory/partial；这不是公开协议保证或真实账户互通验收。
 
 当前状态为局部修复，Phase19 **active**；其余审查问题及 §5 外部条件继续开放，不能以单条修复替代最终集成验收。材料位于 `.tmp/phase19-repair/`，修复实现见[裁决 §10](phase-19-decisions.md#10-审查后修复2026-10-14进行中)。
+
+### 26.1 2026-10-15 最终本地集成与独立复核
+
+最终集成源码在 Node20.3/Linux 隔离环境以 4 个 Vitest worker 运行完整套件：799 个文件中 798 通过、1 个文件含 9 个真实 Chromium 跳过；8091 项断言中 8081 通过、10 跳过、0 失败，耗时 422.60 秒。跳过项仅为 env-gated Chromium/public smoke；未将跳过写成通过。此前 28a3824c 的首轮 14 文件失败集合及复查保留为 `full-initial-cache.json`、`full-failed-paths.json`、`full-failed-recheck.json`；中间全套单次 CLI follow-up 失败计数留在裁决 §10.11，随后原源码40项复验留在 `cli-baseline-recheck.json`，不重写历史为全绿。
+
+最终定向证据包括：A07 本地/SSH 增长 UTF-8 与 malformed-byte 14 项通过；账户 usage 及其迁移后的消费者 32 项通过；`build:ts`、单文件 executable、import/config/declaration/node-floor/docs-drift 五门、`verify:result-contract` 6 套/149 项、`test:scripts` 57 项通过；NormProof 的 blocking graph obligations 通过，整体仍因 4 个既有 function-ceiling advisory 为 partial。结果文件为 `.tmp/phase19-repair/full-final.json`、`.tmp/phase19-repair/full-final.log` 及 `a07-review-final.json`。
+
+全套后仅UTF-8边界函数和原consumer测试再补terminal/open末尾游标及malformed-prefix整体decode；两文件15项实际通过，材料 `a07-review-endpoint.json`。因此全套绑定补修前快照，最终小delta有后续定向证据；不是一次最终字节全量运行。独立code lane的20,000组terminal bytes检查为零decode/推进不一致。
+
+两位独立审查者先核对 `review-freeze-final.json` 的96文件和未改动 `.gitignore`；代码最终报告明确记录后续3份证据文档、UTF-8函数及consumer测试变化，原冻结91/96仍匹配，并覆盖额外normproof测试改动。code lane 为 **APPROVE**、无剩余finding；architecture lane 确认 `cli/usage` 迁移消除原 core 方向 BLOCK，保留未知权益缺少只读 inspection/reconciliation 的 **WATCH**；综合为 **COMMENT**。两份最终报告在 `.tmp/phase19-repair/code-review-final.md`、`architecture-review-final.md`，97路径交付快照另存 `delivery-freeze.json`，不冒称早先冻结从未变化。
+
+owner迁移后 Node20.3 与 executable 的 regular/fullscreen PTY 合成 provider 再验通过：读取、拒绝写入、批准写入/committed receipt、usage 计量、重启不重放，账户额度 unsupported 路径无账户请求。结果在 `integration-pty-1791996994370774840/results.json` 和 `integration-pty-1791997053445195601/results.json`；使用末尾UTF-8补修前的构建，不覆盖分页。补修后宿主Node24.15的两种构建及五源码门再次通过。该证据仍不覆盖 A01 非 Linux actual-object binding、A03 真实平台/账户/服务、A12 账单阻断的远端 CI、A25 未观察树及镜像成本，也不提供真实 provider 或设备质量结论。当前工作树仍有未提交修复，Phase19 **active**。
+
+A25新空文件exclusive open+close候选在fresh5000-file baseline的private Git/rg只改善2.03%/2.79%，未达到预先20%双路线门槛；native名称相同但没有产品补丁。此前硬链接/同步失败方向未重复，当前未观察树/真实并发成本开放；材料 `.tmp/phase19-repair/mirror/`，裁决 §10.12。

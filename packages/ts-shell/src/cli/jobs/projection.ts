@@ -24,7 +24,9 @@ export function localPage(job: LocalJob, stream: 'stdout' | 'stderr', offset: nu
   const context = Buffer.from(job[stream], 'base64');
   if (!Number.isSafeInteger(offset) || offset < 0 || offset > context.length) throw new Error('Output offset is outside the retained stream.');
   const redactions = new Set<string>(); redactReportText(context.toString('utf8'), 262144, { preserveLines: true, redactions });
-  const next = utf8PageEnd(context, offset, 16384);
-  const content = job.truncated || redactions.has('unsafe-content') ? 'Sensitive or truncated output is withheld from reports.' : report(context.subarray(offset, next).toString('utf8'), 24000);
+  const next = utf8PageEnd(context, offset, 16384, job.output !== 'complete' && job.output !== 'interrupted');
+  const content = job.truncated || redactions.has('unsafe-content') ? 'Sensitive or truncated output is withheld from reports.'
+    : next === offset && offset < context.length ? 'A UTF-8 character is still arriving; reuse this byte cursor.'
+    : report(context.subarray(offset, next).toString('utf8'), 24000);
   return `Local ${stream}; next byte ${next}/${context.length}; truncated ${job.truncated}; completeness ${job.output}.\n${content}`;
 }

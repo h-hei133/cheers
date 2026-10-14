@@ -80,7 +80,7 @@ test('the complete repository declaration graph matches TypeScript and remains a
   const sources = new Map();
   // Use declared source paths so concurrent runtime fixtures cannot enter this comparison.
   const files = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', 'packages'], { cwd: root }).toString().split('\0');
-  for (const file of files) if (/\.tsx?$/.test(file)) sources.set(file, fs.readFileSync(path.join(root, file), 'utf8'));
+  for (const file of files) if (/\.tsx?$/.test(file) && fs.existsSync(path.join(root, file))) sources.set(file, fs.readFileSync(path.join(root, file), 'utf8'));
   assert.ok(sources.size > 2000, 'the complete source tree must be collected');
   for (const [file, source] of sources) {
     const syntax = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);

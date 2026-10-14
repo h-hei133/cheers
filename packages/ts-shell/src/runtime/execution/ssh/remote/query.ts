@@ -55,7 +55,8 @@ if test "$available" -gt 16384; then available=16384; fi
 context=$(head -c "$size" <&3 | base64 -w0)
 dropped=unknown
 if test -f "$job/${stream}.done" && test ! -L "$job/${stream}.done" && cmp -s -- "$job/${stream}.done" <(printf 'complete\n') \\
- && test -f "$job/${stream}.dropped" && test ! -L "$job/${stream}.dropped" && test "$(stat -c '%s' -- "$job/${stream}.dropped")" -le 32; then
+ && test -f "$job/${stream}.dropped" && test ! -L "$job/${stream}.dropped" && test "$(stat -c '%s' -- "$job/${stream}.dropped")" -le 32 \\
+ && test "$(stat -Lc '%s' /proc/$$/fd/3)" = "$size"; then
  dropped=$(cat -- "$job/${stream}.dropped")
  [[ "$dropped" =~ ^[0-9]{1,20}$ ]]
  cmp -s -- "$job/${stream}.dropped" <(printf '%s\n' "$dropped")

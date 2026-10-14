@@ -4,6 +4,7 @@ import type { McpToolDescriptor } from "../mcp/types.js";
 import type { CoreMcpGateway } from "../mcp/gateway.js";
 import { McpGatewayBlockedError } from "../mcp/gateway.js";
 import { McpClassifiedError, classifyMcpFailure } from "../mcp/errorTaxonomy.js";
+import type { ToolExecutionContext } from '../../tools/types.js';
 
 /**
  * What an MCP tool call does when it actually works.
@@ -45,10 +46,9 @@ function toolDescriptor(overrides: Partial<McpToolDescriptor> = {}): McpToolDesc
   };
 }
 
-/** The tools here read no filesystem and ask no permission; the context is
- * a shape, and the registry's MCP branch never looks at it. */
-function minimalContext(): never {
-  return undefined as never;
+/** No filesystem is read here; the ordinary context still carries cancellation. */
+function minimalContext(): ToolExecutionContext {
+  return { taskId: 'synthetic-mcp-call', workspaceRoot: process.cwd() };
 }
 
 describe("mcp tools in the registry", () => {
