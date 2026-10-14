@@ -8,6 +8,7 @@ import { queryRemoteJob, readRemoteOutput, observationFields } from './remote/qu
 import { cancelRemoteJob } from './remote/cancel.js';
 import { parseRemoteFrame, decoded } from './remote/protocol.js';
 import { validateWorkspace } from './validation.js';
+import { utf8PageEnd } from '../../../core/text/utf8.js';
 
 export interface RemoteObservation {
   readonly invocationId?: string;
@@ -58,11 +59,12 @@ export class SshClient {
     this.check(job.binding);
     const value = await this.request(readRemoteOutput(job, stream, offset), ['id', 'stream', 'offset', 'next', 'size', 'dropped', 'context'], authority, signal);
     const context = decoded(value.context!, 65536);
-    const size = Number(value.size); const nextOffset = Number(value.next);
-    requireSsh(value.id === job.id && value.stream === stream && value.offset === String(offset) && nextOffset === Math.min(size, offset + 16384)
-      && Number.isInteger(size) && size >= 0 && size <= 65536 && nextOffset <= size && context.length === size
-      && Number.isSafeInteger(offset) && offset >= 0 && offset <= nextOffset
+    const size = Number(value.size); const reportedNext = Number(value.next);
+    requireSsh(value.id === job.id && value.stream === stream && value.offset === String(offset) && reportedNext === Math.min(size, offset + 16384)
+      && Number.isInteger(size) && size >= 0 && size <= 65536 && reportedNext <= size && context.length === size
+      && Number.isSafeInteger(offset) && offset >= 0 && offset <= reportedNext
       && (value.dropped === 'unknown' || /^[0-9]{1,20}$/.test(value.dropped!)), 'protocol');
+    const nextOffset = utf8PageEnd(context, offset, 16384);
     return { bytes: context.subarray(offset, nextOffset), context, nextOffset, size,
       truncated: value.dropped === 'unknown' ? 'unknown' as const : BigInt(value.dropped!) > 0n };
   }

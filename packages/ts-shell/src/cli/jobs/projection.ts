@@ -1,6 +1,7 @@
 import { neutraliseForDisplay } from '../../core/text/safety.js';
 import { redactReportText } from '../../core/security/redaction.js';
 import { sameValue } from '../../config/values.js';
+import { utf8PageEnd } from '../../core/text/utf8.js';
 import type { JobsComposition } from './model.js';
 import type { LocalJob, RemoteJob } from '../../workflow/jobs/model.js';
 
@@ -23,7 +24,7 @@ export function localPage(job: LocalJob, stream: 'stdout' | 'stderr', offset: nu
   const context = Buffer.from(job[stream], 'base64');
   if (!Number.isSafeInteger(offset) || offset < 0 || offset > context.length) throw new Error('Output offset is outside the retained stream.');
   const redactions = new Set<string>(); redactReportText(context.toString('utf8'), 262144, { preserveLines: true, redactions });
-  const next = Math.min(context.length, offset + 16384);
+  const next = utf8PageEnd(context, offset, 16384);
   const content = job.truncated || redactions.has('unsafe-content') ? 'Sensitive or truncated output is withheld from reports.' : report(context.subarray(offset, next).toString('utf8'), 24000);
   return `Local ${stream}; next byte ${next}/${context.length}; truncated ${job.truncated}; completeness ${job.output}.\n${content}`;
 }

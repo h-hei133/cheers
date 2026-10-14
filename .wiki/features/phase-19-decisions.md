@@ -2651,3 +2651,10 @@ Node20.3 直接受影响 22 文件/315 项、TypeScript 与 Linux 单文件构�
 - 定向实读参考遥测的外部 hook 名清理：元数据也必须在传输出口前清理，路径/参数不能因字段名称是 name 而免检；采用这一决定。其工具遥测保留结构化 function_args，未提供本项目双重编码检查点的同等保证；本批在原 owner 的序列化之前调用共享过滤器，不另造日志或正则规则。
 - Node20.3 隔离环境 8 文件/53 项、`build:ts` 通过。三项新增反例分别从真实 logger 写入到 trace JSON/HTML、从真实工具目录到独立解压的所有归档成员、从编码工具参数到持久检查点及实际顾问派发；普通可见证据、工具数量和缺失 ID 控制保留。恢复三处旧 owner 时各有一项实际泄漏断言失败，逐字节恢复后组合验证。材料 `.tmp/phase19-repair/a06-reversal.log`、`a08-reversal.log`、`a24-reversal.log`。
 - 五项本地静态/文档门及 diff 空白检查通过。当前证据限本地合成数据路径；本批没有真实凭据/provider 请求、独立审查或最终集成/远端 CI 成功证据，其余 §9 问题继续开放。Phase19 active，交付另验。
+
+### 10.5 A07 — 本地与 SSH 输出的 UTF-8 分页
+
+- [共享文本边界](../../packages/ts-shell/src/core/text/utf8.ts) 将不超过页预算的结束游标回退至完整字符边界，[本地页](../../packages/ts-shell/src/cli/jobs/projection.ts)及 [SSH client](../../packages/ts-shell/src/runtime/execution/ssh/client.ts) 共用。仍以原始字节返回 next/size；手工 offset 指向 continuation byte 时明确拒绝。SSH 先验证原协议的名义 next，再依据返回的完整有界 context 计算展示页游标；保留整段脱敏上下文与原始 journal，不新增分页或执行系统。
+- 定向实读参考截断的 continuation-byte 边界决定，采用“字节预算内退到完整字符”；参考尾部截断会丢弃前缀，本项目可继续分页，故必须将回退位置作为下一页 cursor，不能跳过字节。
+- Node20.3 隔离环境本地 jobs、SSH command/projection/transport 共 5 文件/24 项及 `build:ts` 通过。两项三/四字节反例同时消费真实本地页、SSH client 协议验证与展示，核对逐页拼接等于原文、字节拼接等于原 Buffer、游标持续前进及字符内部 offset 拒绝。分别恢复本地和 SSH 的固定切片时各两项实际出现替换字符而失败，逐字节恢复后两项通过。材料 `.tmp/phase19-repair/a07-local-reversal.log`、`a07-ssh-reversal.log`。
+- 五项本地静态/文档门及 diff 空白检查通过；NormProof 图义务满足、4 项既有 ceiling advisory 保留、整体 partial。SSH 回归使用合成协议响应，未证明真实远端服务；当前最终集成/独立审查/跨平台和精确 CI 仍开放。Phase19 active，交付另验。
