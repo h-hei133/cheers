@@ -2748,3 +2748,9 @@ owner迁移后已再次运行 Node20.3/Linux 与单文件可执行程序 regular
 在全套负载结束后只于临时目录比较新候选：`writeFile('', wx)`改为exclusive open+close以省去空write，不重复此前硬链接/同步方案。原owner的canonical/policy、最多8并发和settle-before-cleanup不变，先固定两条5000文件中位数均改善20%的门槛。
 
 同Node20.3/Linux、50目录、1000/5000文件各3次、native Git/rg exact-name比较，fresh baseline的5000文件private Git/rg中位数为1776.45/1303.71ms，新候选为1740.40/1267.39ms；只改善2.03%/2.79%，不达门槛。两个查询名称均相同，但候选只是隔离估算，无产品补丁/新依赖/authority cache。材料 `.tmp/phase19-repair/mirror/{contract,baseline-results,empty-results,outcome}.json`。保留现有有界空占位并结束该方向；A25整树一致性与真实规模/并发成本仍开放，不将局部合成结果称为已完成交付。
+
+### 10.13 本批交付与精确远端状态（2026-10-15）
+
+A13 owner迁移单独提交 `fce6f6a079106911dd7e5271028f20fdd59b4faa`；A07分页、两项集成夹具、删除路径测试适配及证据提交 `837aa53a27818cae87d0c56f3cab717d484f5d5e`。两笔均已推送至 `feat/phase-18`，远端分支与 PR #1 head读回同 `837aa53a`。交付19路径、97个冻结blob逐一匹配，旧core两个owner删除、非import正文未变、§9历史审计逐字未变；用户 `.gitignore` 未提交且原hash保持。补修后的隔离Node20.3 NormProof无阻断，整体partial/4个既有ceiling advisory，材料 `delta-normproof/`。
+
+精确代码SHA的CI [38604410209](https://github.com/h-hei133/cheers/actions/runs/38604410209)/job115991492715与Watch [38604410443](https://github.com/h-hei133/cheers/actions/runs/38604410443)/job115991494371均completed/failure、steps=[]；独立读取各自annotations确认付款/spending-limit阻止启动。无远端产品执行、无CI通过，不重跑或改变workflow。材料 `.tmp/phase19-repair/integration-delivery.json`、`integration-{ci,watch}-{jobs,annotations}.json`；后续纯证据文档提交的remote状态需按自身SHA另核。全套8081/10与后续15项的来源界限、APPROVE/WATCH综合COMMENT及只读reset receipt查询缺口继续按§10.11保留。Phase19 **active**，A01/A03/A12/A25及真实账户/平台验收仍开放。

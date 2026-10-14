@@ -6703,3 +6703,7 @@ implementation匹配已知mode和当前权限位；顾问/调度复用同一cano
 独立两lane先核对96文件和 `.gitignore`；后续证据文档/UTF-8补修已在代码最终报告区分为91/96原hash保留，额外normproof测试也纳入复核。code为APPROVE、无剩余finding；architecture确认core方向BLOCK已由service/state迁移消除，保留未知receipt无只读inspection/reconciliation的WATCH；综合COMMENT。报告 `.tmp/phase19-repair/*-review-final.{md,json}`，交付另冻97路径。owner迁移后的Node20.3/executable regular/fullscreen PTY再次通过，结果分别在 `integration-pty-1791996994370774840/`、`integration-pty-1791997053445195601/`；该构建早于末尾UTF-8补修且不测分页，补修后宿主Node24.15两种构建及五门再次通过。A01/A03/A12/A25和真实provider/平台仍开放，当前修复未提交/推送，Phase19 active。
 
 全套后独立code再发现UTF-8 terminal/open end-cursor细节，原边界函数与consumer测试补修后15项通过；全套仍绑定小delta前字节，不合并成一次全量证明。新A25空文件exclusive-open-close候选只改善private Git/rg 2.03%/2.79%，未达到先定20%门槛，无产品补丁；不重复旧硬链接/同步方向，真实成本与整树一致性仍开放。
+
+### 2026-10-15 — A02/A07/A13 本批代码已交付，CI仍未启动
+
+模块迁移 `fce6f6a0` 与分页/集成 `837aa53a` 分开提交并推送，远端分支及PR #1 head读回同SHA；19交付路径、97冻结blob匹配，历史审计与用户 `.gitignore`保持。最终两种构建/五门通过，隔离Node20.3 NormProof无阻断、同4advisory。精确CI38604410209/job115991492715、Watch38604410443/job115991494371各自annotations确认付款/spending-limit阻止启动、steps=[]；无远端执行、无CI通过。纯证据文档后续提交另验自身SHA；详见[裁决 §10.13](features/phase-19-decisions.md#1013-本批交付与精确远端状态2026-10-15)，Phase19 active，A01/A03/A12/A25与reset receipt只读查询WATCH继续开放。

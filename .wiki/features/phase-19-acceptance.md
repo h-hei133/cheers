@@ -556,3 +556,7 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 owner迁移后 Node20.3 与 executable 的 regular/fullscreen PTY 合成 provider 再验通过：读取、拒绝写入、批准写入/committed receipt、usage 计量、重启不重放，账户额度 unsupported 路径无账户请求。结果在 `integration-pty-1791996994370774840/results.json` 和 `integration-pty-1791997053445195601/results.json`；使用末尾UTF-8补修前的构建，不覆盖分页。补修后宿主Node24.15的两种构建及五源码门再次通过。该证据仍不覆盖 A01 非 Linux actual-object binding、A03 真实平台/账户/服务、A12 账单阻断的远端 CI、A25 未观察树及镜像成本，也不提供真实 provider 或设备质量结论。当前工作树仍有未提交修复，Phase19 **active**。
 
 A25新空文件exclusive open+close候选在fresh5000-file baseline的private Git/rg只改善2.03%/2.79%，未达到预先20%双路线门槛；native名称相同但没有产品补丁。此前硬链接/同步失败方向未重复，当前未观察树/真实并发成本开放；材料 `.tmp/phase19-repair/mirror/`，裁决 §10.12。
+
+### 26.2 本批代码交付
+
+owner迁移 `fce6f6a079106911dd7e5271028f20fdd59b4faa` 与分页/集成 `837aa53a27818cae87d0c56f3cab717d484f5d5e` 已提交推送；远端分支及PR #1 head均读回后者。19个交付路径、97个冻结blob匹配，历史§9审计保持，`.gitignore`未提交/原hash不变。最后隔离Node20.3 NormProof无阻断、partial保留4项既有advisory。该代码SHA的CI38604410209/job115991492715、Watch38604410443/job115991494371各自annotations确认付款/spending-limit阻止启动、steps=[]，不能称CI通过；后续纯文档提交另核其SHA。材料 `.tmp/phase19-repair/integration-delivery.json`，详细记录见[裁决 §10.13](phase-19-decisions.md#1013-本批交付与精确远端状态2026-10-15)。Phase19 **active**，外部及WATCH缺口不因推送闭合。
