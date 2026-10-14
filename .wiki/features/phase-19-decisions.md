@@ -2846,3 +2846,13 @@ A13 owner迁移单独提交 `fce6f6a079106911dd7e5271028f20fdd59b4faa`；A07分�
 **A25-T01的已观察来源cleanup发布缺口在上述范围内已修复；A25整体保持开放。** 顺序ledger的最后检查不构成所有路径同时稳定，外部进程仍可在单个同步stat后变化；未观察/排除子树、query-start快照、全树/OS原子性及广泛成本均未证明。旧生产42 defaults仍41 complete/1原因未分类拒绝、六期限拒绝；受控cleanup场景不能替原拒绝归因或证明全部默认完成。此前8081pass/10skip全套早于这些delta，不称当前最终字节全套通过。A01/A03/A12继续开放，Phase19 **active**；本批源码/三证据文档交付与对应SHA远端状态另验，历史§9及用户`.gitignore`保持排除。
 
 本批代码 `a1901132a39f4a9a956e98a80df9599f8b03734a` 已提交推送，branch及[PR #1](https://github.com/h-hei133/cheers/pull/1) head均精确读回；5冻结blob、20证据hash及此前10证据hash全部匹配，历史§9与用户`.gitignore`保持、后者排除暂存。PR标题/描述覆盖cleanup发布修复及原41/42限制，逐字读回、仍draft；旧CLI的GraphQL projectCards不兼容后使用REST更新，不改产品。该代码SHA的CI [38627086419](https://github.com/h-hei133/cheers/actions/runs/38627086419)/job116068873438与Watch [38627086402](https://github.com/h-hei133/cheers/actions/runs/38627086402)/job116068873841均completed/failure、steps=[]，各自annotations证实付款/spending-limit未启动；无远端执行或通过，不重试或改workflow。材料 `tracked-view/publication-code-delivery-{freeze,observation}.json`及PR readback。本段后续纯文档交付按自身SHA另验，源码hash保持；A25/Phase19继续active。
+
+### 10.19 A25 — 原生产拒绝的归因证据（2026-10-15，有界诊断未复现，原原因未知）
+
+cleanup证据文档b5b5705e已推送、remote/PR head一致，精确CI38627340675/job116069732034及Watch38627340672/job116069731837各自annotations确认付款/spending-limit未启动、steps=[]，材料 `tracked-view/publication-docs-delivery-observation.json`。原生产拒绝是concurrency1/Git/iteration2，40占位settle、490观测FileHandle全部close、mirror删除，1611.13ms返回generic ViewSourceError；原记录没有throw site或当时source revision差异，故不能仅凭清理完整、后续四次成功或通用文本判为环境/来源变化。原diagnostic每个成功查询也有一个被消费者处理的target拒绝，说明内部throw事件不等于终端失败。
+
+本轮只做有界诊断，保留原生产artifact/hash及当前源码；在隔离Node20.3当前编译owner上按Git/rg、1/2/4并发各一组（共14默认请求）重新读取当次政策native baseline，分query记录失败site、被处理/终端错误与捕获revision差异，仍核查占位settle/句柄close/view remove。诊断observer只在独立进程装饰原方法，路径只存hash、无内容或真实配置；新结果单独保存，不覆盖原生产或宣称重建其原因。若本轮无终端复现，则保持原原因未知，不为通用拒绝增加猜测性产品补丁。
+
+当前b5b5705e编译identity的14请求均complete、零终端拒绝，当次3850 Git/3767 rg政策名称及hash与原baseline一致；全部占位settle、受观测FileHandle close、view remove、每view占位≤8，四并发总峰值32占位/12 FileHandle。不含Dir/pipe/OS树，不据observer耗时声称性能提升。14个内部ViewSourceError全部来自相同path hash、编译`source.js:26`的containment拒绝，经`tree.js:115–120`捕获继续；当时已捕获revision无差异。这些事件有成功终端结果和具体throw site，支持政策排除的分类；不能反推原iteration2终端拒绝也是同一事件。七直接编译模块、冻结两源码、原生产hash和用户`.gitignore`逐字节保持。材料 `tracked-view/refusal-investigation-{results,summary}.json`、独立`.mjs`及log。首轮helper目录深度错误在产品进程启动前失败，修正隔离launcher后实际运行；分类另存`refusal-investigation-setup.json`，不冒称首轮已有产品执行。
+
+本轮结论仅为**当前14有界诊断未复现原终端拒绝**；原41/42全默认验收仍未通过、原原因未知，不新增猜测性产品补丁。来源currency、权限/containment、metadata上限和native返回仍可能产生同一通用拒绝；缺少原throw site/revision时不能排序为已证实原因。继续保留既定整树/query-start/OS原子性、A01/A03/A12和广泛质量边界，Phase19 **active**；本轮仅三证据文档交付，源码不变、不重复构建/套件，按自身SHA另核远端。

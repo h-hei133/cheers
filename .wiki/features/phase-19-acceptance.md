@@ -608,3 +608,9 @@ owner迁移 `fce6f6a079106911dd7e5271028f20fdd59b4faa` 与分页/集成 `837aa53
 A25-T01的cleanup发布检查已局部修复；顺序最后stat、未观察/排除子树、query-start/整树/OS原子性及广泛成本仍无保证。旧生产42 defaults仍41 complete/1原因未分类ViewSourceError、六期限拒绝；本批受控变化不能解释原拒绝或通过全部默认完成验收。8081pass/10skip全套早于本批delta；A01/A03/A12及A25整体仍开放，Phase19 **active**。详见[裁决 §10.18](phase-19-decisions.md#1018-a25--树观察的时间边界2026-10-15清理后发布缺口已局部修复)，五路径交付及精确SHA的远端状态另验，用户`.gitignore`保留排除。
 
 代码a1901132a39f4a9a956e98a80df9599f8b03734a已推送、remote/PR head一致，5冻结blob及20证据hash匹配、历史§9与用户`.gitignore`保持排除；PR描述精确读回、仍draft。精确CI38627086419/job116068873438及Watch38627086402/job116068873841各自annotations证实付款/spending-limit未启动、steps=[]、failure，无远端执行或通过，材料`tracked-view/publication-code-delivery-observation.json`。后续纯证据文档SHA另验，不重复构建/测试；Phase19 active。
+
+### 26.7 原生产拒绝的有界诊断
+
+cleanup证据文档b5b5705e已推送、remote/PR head一致，其精确两workflow各自annotations确认付款/spending-limit未启动、steps=[]，材料 `tracked-view/publication-docs-delivery-observation.json`。当前编译owner在隔离Node20.3按Git/rg、1/2/4并发各一组14默认请求全部complete，3850/3767政策名称与当次native及原baseline hash一致；占位settle/观测FileHandle close/view remove全部满足、每view≤8，四并发总峰值32/12（不含Dir/pipe/OS树）。装饰方法observer逐query发现14个相同path hash的containment内部拒绝，原tree捕获后继续、无捕获revision差异；它们有完整终端结果，不是原终端失败的重建。
+
+七直接编译模块、冻结两源码、原生产artifact/hash、历史审计及用户`.gitignore`保持。初次隔离launcher目录深度错误发生在产品启动前，修正后14次才实际执行；结果/分类分开留存。材料`tracked-view/refusal-investigation-{results,summary,setup}.json`及对应脚本/log，详见[裁决 §10.19](phase-19-decisions.md#1019-a25--原生产拒绝的归因证据2026-10-15有界诊断未复现原原因未知)。本轮不声称性能改善或42默认原验收通过；原41/42、未知原因、A25整树及A01/A03/A12继续开放，Phase19 active。仅三证据文档交付、源码不变，远端状态按新SHA另验。
