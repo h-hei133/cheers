@@ -2322,3 +2322,17 @@ Node20.3/单文件×stable/changed四条实际print CLI通过；stable共4合成
 初次 `--help`/Usage 断言不符既有 CLI 契约，属于保留的 harness/setup 失败，未修改产品迁就检查。三次 CLI 端到端耗时 24.746/28.651/33.403 秒，包含 UNC 加载、请求和退出，不充当首帧或 NTFS 基准。另直接查看此前缺少视觉答复的恢复窗口原分辨率 PNG，中文与重音字形正常；不覆盖真实 IME、系统复制或完整逐帧行为。
 
 材料 `.tmp/windows-cli/`，见[验收 §21](phase-19-acceptance.md)。本轮只补验收文档，未改产品/依赖/构建，不重复全套。非 Linux 对象绑定、NTFS/macOS/交互输入/设备与真实服务仍缺；起点精确 CI 再次被付款/spending-limit 拒绝启动，Phase19 保持 active。
+
+### 8.157 SAFE-02：Windows 规范路径的大小写边界（2026-10-14）
+
+原生 Windows Node20.3 经 WSL UNC 复现：`Root` 与 `root` 的 inode 不同，`path.relative` 却把外部文件当作根内路径，旧读取 owner 返回外部正文和目录名；Linux 对照拒绝。材料 `.tmp/path-identity/case-win32.json`、`case-linux.json`。先比较现有 owner 和本地参考的 Windows 原生 realpath、缺失路径祖先解析决定，再修原路径校验器：Windows 采用 native realpath；根与目标都解析最深现存祖先；规范路径只对盘符/UNC 服务器与共享名兼容大小写，文件系统目录组件按精确分隔边界比较。返回路径原有拼写保留，未建立另一套读取或权限系统。
+
+独立复核实际拒绝了初版的三处兼容回归：普通目录别名复验混用 JavaScript/native realpath、缺失根未规范化、UNC 根锚点被精确大小写比较误拒绝。最终在原目录 owner 复用 `verifyPathContainment` 的 allowed/目标复验，在路径 owner 完成祖先与 namespace 比较；普通 Windows 别名和不同 inode 的大小写目录分别处理。早期 REQUEST CHANGES/BLOCK、差分失败和修复后的证据均保留。
+
+最终 4 个 TS 文件/2 个 production owner，冻结 `.tmp/path-identity/freeze.json`；Node20.3 受影响 **15 文件/185 项**通过，TS/单文件两构建与四源码门通过。完整 judge 的循环和解析义务 satisfied，4 个既有函数上限 advisory 仍为 partial；本批实质修改模块没有超限。五项隔离反转实际失败、正向副本通过：四项 AssertionError，一项目录消费者 ReadChangedError；首次反转记录器只接受 AssertionError 的误分类保留为 harness/setup，最终 `.tmp/path-identity/reversals-effective/results.json` 按真实失败种类核验。
+
+独立代码 **APPROVE**（Node20.3 2 文件/27 项、12 个 Windows 组合断言及 8 个边界检查），架构 **CLEAR**（原生 Windows 22 项/Linux 7 项，含 native fallback）；综合 **APPROVE（限本批冻结）**。固定角色模型不可用没有计为批准；改用继承当前模型的两条独立原生审查 lane，最终实际返回证据。报告 `.tmp/path-identity/review-code.md`、`review-architecture.md`。
+
+作者原生 Windows 25 项/Linux 13 项检查通过；另经实际 Windows Node20.3 `dist/cli.js` 与 Linux 单文件程序各运行拒绝/合法别名两条 print/read 链路，合计 8 次 loopback 合成 POST。本次 tool call ID、拒绝内容/合法中文正文、原文件与隔离配置均核验；外部正文没有进入请求或终端。CLI exit0 仅证明回合结束，越界调用仍是失败。首轮合成服务错误地消费前一回合 tool 结果，属 harness/setup，改为本次 call ID 后复跑通过，未迁就检查修改产品。
+
+详见[验收 §22](phase-19-acceptance.md)，材料 `.tmp/path-identity/`。本批只运行直接受影响套件，§8.153 的历史全套不冒称当前全套；未新增完整 Windows 套件/交互 PTY/真实服务验收。本地 NTFS 仅补只读大小写别名检查，非 Linux 原生对象绑定、未观察树、macOS、真实 IME/设备/服务及精确远端 CI 条件仍开放，Phase19 active。用户 `.gitignore` 原字节保留，提交/推送/精确 CI 单独取证。

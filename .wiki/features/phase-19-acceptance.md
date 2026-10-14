@@ -11,7 +11,7 @@ summary: "记录完整源码图、契约门禁、全套测试、实际 CLI 及�
 
 Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)的 16 批、76 项为范围，分别记录实现、局部验收和剩余条件。W16 修复了此前无法取得完整依赖图证明的检查器，并恢复重构后失效的契约门禁；全阶段完成仍需下面列明的剩余工作。
 
-§1–4 的完整套件和冻结证据属于 W16 提交 `f43ae09ec90a5890b768598ab52a17821c5e9efc`。后续 SAFE-02 Linux 原生读取变更分别记录在 §7–17；最新源码的完整套件已重新运行，见 §18，不能把 W16 的历史全套直接套用到后续源码。§19 补充未改源码的 Windows UNC 读取证据，§20 复核未改源码的 Windows Terminal 前端捕获材料；§21 补充原生 Windows CLI、进程取消和最后一张截图的直接判读。
+§1–4 的完整套件和冻结证据属于 W16 提交 `f43ae09ec90a5890b768598ab52a17821c5e9efc`。后续 SAFE-02 Linux 原生读取变更分别记录在 §7–17，§18 的全套属于 `32b31107` 源码，不能把历史全套直接套用到后续源码。§19–21 补充未改源码的 Windows 读取、前端、CLI 和进程证据；§22 修复 Windows 大小写包含边界并运行直接受影响套件、构建、原生与实际 CLI 检查，没有重新运行当前全套。
 
 ## 1. 本轮源码与验证范围
 
@@ -98,13 +98,13 @@ Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)�
 |---|---|---|
 | Linux/WSL、Node 20.3、单文件程序 | 构建、全套、原生文件/进程/Git/沙箱、两模式 PTY | 用户实际前端逐帧、字体、IME 和系统复制仍需同前端证据；§20 已补 Windows Terminal 像素层局部证据 |
 | Linux X11、媒体设备、语言服务、分析器 | 各适配器的明确能力与有界 native 进程路径 | 未安装/不支持状态继续可见；真实声音设备/Live、其他桌面协议另验 |
-| Windows | 原生 Windows Node 20.3/24.12 访问 WSL UNC：两版各 6 项读取/目录检查通过，见 §19；实际前端抓帧见 §20–21；Node 20.3 原生 CLI 启动/print/read 与进程预取消/取消/超时均通过，见 §21 | 本地 NTFS、原生禁止重解析/对象路径绑定、完整 Windows 套件与交互 CLI、退出后孤儿进程、真实 IME 及设备仍未验 |
+| Windows | 原生 Windows Node 20.3/24.12 访问 WSL UNC：两版各 6 项读取/目录检查通过，见 §19；实际前端抓帧见 §20–21；Node 20.3 原生 CLI 与进程检查见 §21；规范路径的不同大小写目录拒绝、普通 NTFS/UNC 别名读取与目录复验，以及当前实际 read CLI 见 §22 | 本地 NTFS 写入/对象竞态、原生禁止重解析/对象路径绑定、完整 Windows 套件与交互 CLI、退出后孤儿进程、真实 IME 及设备仍未验 |
 | macOS | 部分 profile、接口与纯逻辑用例 | 原生路径/文件描述符、进程树清理、终端与设备尚未取得等价实机证据 |
 | 模型传输与严格预算 | 合成 HTTP/SSE/usage/重试/unknown、统一 request admission | W7-33 四端点真实 TLS/HTTP2 矩阵仍缺；无法证明上界的请求继续拒绝 strict cap 准入 |
 | 公共包、认证、协作和 SSH | 受控服务、签名、ACL、撤权、重连与未知副作用 | 真实账户、公共部署 TLS、真实远端主机/主机密钥和生产互通验收 |
 | SAFE-02 | Linux 公开文件工具的检查/句柄/拒绝/清理及受管编辑目录固定；原生 Git/ripgrep 私有视图、配置准入和 child 完成收据；异步技能发现、批准前捕获与共享预算；读取期间及 catalog 发布前已捕获 manifest/ignore/Git 来源变化拒绝；本地remote-URL条件及native配置错误拒绝；已枚举目录修订、visit先捕获后探测规则，可选native/技能根来源的父目录/alias观察、已知消失传播及成功/null最终复验，见 §7–17 | 非 Linux 实际对象绑定、未观察树与私有镜像剩余成本继续开放；外部 metadata 仍拒绝，未知future hasconfig不宣称支持，资源计数器不约束原生进程内部全部读取 |
 
-技能发现的同步正文/Git 忽略路径已按 §9 替换；§10 拒绝检测到的读取期间源变化，§11–12 在 catalog 发布前复查已捕获 manifest、ignore 与 Git 来源。§14拒绝已枚举目录的已知修订变化，§15修复native visit的规则探测顺序；§16复验可选native来源已观察父目录及alias，§17观察可选技能根parent并保留已知消失状态。SAFE-02继续处理非Linux对象绑定、未观察树和镜像成本，扩展外部metadata/条件支持须重新证明准入。逐源检查不保证其后全部变化或整目录事务。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把W1–W16或Phase19总目标标为完成。
+技能发现的同步正文/Git 忽略路径已按 §9 替换；§10 拒绝检测到的读取期间源变化，§11–12 在 catalog 发布前复查已捕获 manifest、ignore 与 Git 来源。§14拒绝已枚举目录的已知修订变化，§15修复native visit的规则探测顺序；§16复验可选native来源已观察父目录及alias，§17观察可选技能根parent并保留已知消失状态；§22修复Windows大小写边界并保留普通路径别名。SAFE-02继续处理非Linux对象绑定、未观察树和镜像成本，扩展外部metadata/条件支持须重新证明准入。逐源检查不保证其后全部变化或整目录事务。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把W1–W16或Phase19总目标标为完成。
 
 ## 6. 迁移、回退与交付
 
@@ -425,3 +425,21 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 此前缺少视觉路由答复的 `fullscreen-box-restored.png` 本轮由当前助手直接查看原分辨率 **1752×936** 图像，确认 `中文边界`、换行中文及重音字形可见、无缺字方框。PNG SHA256 为 `6a7e830c8c300e302bd25348c40df7d188f4a54eb712749c78c5837087b27270`，记录在上述 `audit.json`；这是补充的直接图片判读，不回填旧外部路由的失败，也不据一张恢复快照证明真实 IME、系统复制或全部逐帧行为。
 
 §18 的全套/构建保持其原执行记录。本轮四个源码门、strict docs 与文档 diff 检查均通过，材料 `.tmp/windows-cli/gates.json` 及对应日志。补证没有发现需要修改产品的回归，仍须保留 §5 的非 Linux 对象绑定、NTFS/macOS/交互输入/设备及真实服务条件。起点精确 CI `38438481424` 的 job `115438584305` 为 completed/failure、`steps=[]`，annotation 再次确认付款/spending-limit 阻止启动。没有远端 CI 通过，Phase19 **active**；本批提交/推送及其精确 CI 单独取证。
+
+## 22. Windows 大小写边界与别名兼容（2026-10-14）
+
+实际 Windows Node20.3 复现了不同 inode 的 `Root`/`root` 被同一词法边界准入，读取和目录 owner 泄出根外结果。最终在原[路径校验器](../../packages/ts-shell/src/core/security/pathJail.ts)和[目录读取器](../../packages/ts-shell/src/runtime/execution/directory.ts)修复：使用文件系统原生规范路径，解析根与目标的现存祖先，只在 Windows namespace 根比较时兼容大小写；其后的目录组件保持精确边界。普通别名不新增读取授权。
+
+| 检查 | 最终结果 | 材料与范围 |
+|---|---|---|
+| 原生 Windows 路径/读取/目录 | 作者 25 项通过；不同大小写根的现存/新建目标拒绝，普通盘符/目录/UNC server/share 别名保持可用 | `windows-final.json`；本地 NTFS 只读检查与 WSL UNC fixture，未创建 NTFS 测试文件 |
+| Linux 对照 | 13 项通过，原文件字节保持 | `linux-final.json` |
+| Node floor 受影响套件 | Node20.3 **15 文件/185 项**，零失败 | `focused-final-freeze.log`；本批不是全仓套件 |
+| 构建与结构门 | TS/单文件构建、import cycles/config consumers/declarations/node floor 均 exit0；完整 judge 两项图义务 satisfied | 对应 `*-final.json`/门禁 JSON 与 `normproof-out/verdict.json`；4 个既有 ceiling advisory 保持 partial |
+| 隔离反转 | 正向 2 文件/27 项通过；五种反转均实际失败 | `reversals-effective/results.json`：4 个 AssertionError、1 个目录消费者 ReadChangedError，不将失败记录器的首次误分类混入有效结果 |
+| 独立代码/架构审查 | **APPROVE / CLEAR**；综合 **APPROVE（限本批冻结）** | `review-code.md`、`review-architecture.md`；代码独立 27 tests、12 个 Windows 组合断言/8 个边界检查；架构 Windows22/Linux7。固定角色模型不可用不计批准，最终两 lane 继承当前模型并实际返回 |
+| 实际工具消息闭环 | Windows Node20.3 `dist/cli.js`、Linux 单文件各拒绝/合法别名两次 print；最终合计 8 个合成 POST，原文件/配置保持 | `cli-windows-final.json`、`cli-exe-final.json`；本次 call ID、拒绝/合法正文及外部字节不泄漏分别核验。exit0 仅为回合完成 |
+
+全部材料位于 `.tmp/path-identity/`，四路径冻结为 `freeze.json`：路径 owner `dc683560…`、目录 owner `649d81cd…`，两测试 `8dafcf78…`/`08592a6f…`；用户 `.gitignore` SHA256 `20e91ccf…` 保持。初始独立 REQUEST CHANGES/BLOCK 与三个实际兼容反例被保留并修复，未将早期失败判作最终通过。CLI 首轮合成服务复用了前一回合 tool 结果，按 **harness/setup drift** 修正为本次 call ID 后完整复跑；`cli-windows.json`/`cli-exe.json` 保留失败，最终结果单列。
+
+证据只关闭该规范路径大小写缺陷和本批引入的兼容回归，不证明非 Linux 原生对象路径绑定、完整 Windows/macOS 套件、交互 PTY/IME/系统复制、真实设备/服务或当前全仓套件。§5 的剩余要求继续有效，Phase19 **active**；strict docs、提交/推送及精确 SHA CI 在本批交付时另验。

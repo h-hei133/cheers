@@ -71,7 +71,8 @@ async function withPathDirectory<T>(root: string, directory: string, options: Di
   const verify = async (): Promise<void> => {
     try {
       const after = await fs.stat(target, { bigint: true })
-      if (realpathSync(root) !== workspace || realpathSync(directory) !== target
+      const current = verifyPathContainment(directory, root)
+      if (realpathSync(root) !== workspace || !current.allowed || current.resolvedPath !== target
         || !after.isDirectory() || readRevision(before) !== readRevision(after)) {
         throw new ReadChangedError()
       }

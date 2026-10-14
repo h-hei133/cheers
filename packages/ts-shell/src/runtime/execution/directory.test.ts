@@ -24,6 +24,19 @@ it('enumerates internal aliases and rejects external directory aliases', async (
   fs.symlinkSync(path.join(root, 'outside'), path.join(workspace, 'escape'))
   await expect(readDirectory(workspace, path.join(workspace, 'escape'))).rejects.toThrow('outside')
 })
+it('rechecks Windows directory casing through the canonical containment owner', async () => {
+  const alias = path.join(workspace, 'SOURCE')
+  const platform = Object.getOwnPropertyDescriptor(process, 'platform')!
+  const exists = fs.existsSync
+  const native = fs.realpathSync.native
+  vi.spyOn(fs, 'existsSync').mockImplementation(file => String(file) === alias || exists(file))
+  vi.spyOn(fs.realpathSync, 'native').mockImplementation(file => String(file) === alias ? directory : native(file))
+  Object.defineProperty(process, 'platform', { value: 'win32' })
+  try {
+    expect((await readDirectory(workspace, alias)).map(entry => entry.name)).toEqual(['public.txt'])
+    await expect(observeDirectory(workspace, alias)).resolves.toBeUndefined()
+  } finally { Object.defineProperty(process, 'platform', platform) }
+})
 it('refuses a changed directory handle before enumeration and closes it', async () => {
   const open = fsp.open
   let handle: Awaited<ReturnType<typeof fsp.open>> | undefined

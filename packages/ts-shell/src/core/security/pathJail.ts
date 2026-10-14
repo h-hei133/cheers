@@ -2,7 +2,7 @@ import path from "node:path";
 import fs from "node:fs";
 
 function canonicalPath(target: string): string {
-  if (process.platform === "linux") {
+  if (process.platform === "linux" || process.platform === "win32") {
     try {
       return fs.realpathSync.native(target);
     } catch {
@@ -40,6 +40,21 @@ function realpathOfDeepestExisting(target: string): string | undefined {
     remainder.push(path.basename(current));
     current = parent;
   }
+}
+
+function containsCanonicalPath(target: string, workspace: string): boolean {
+  if (process.platform === "win32") {
+    const targetRoot = path.parse(target).root;
+    const workspaceRoot = path.parse(workspace).root;
+    // Drive letters and UNC server/share names are case-insensitive; directory
+    // components below that anchor retain their filesystem-owned casing.
+    if (targetRoot.replace(/[\\/]+$/, "").toLowerCase() !== workspaceRoot.replace(/[\\/]+$/, "").toLowerCase()) return false;
+    target = target.slice(targetRoot.length);
+    workspace = workspace.slice(workspaceRoot.length);
+    if (!workspace) return true;
+  }
+  const prefix = workspace.endsWith(path.sep) ? workspace : `${workspace}${path.sep}`;
+  return target === workspace || target.startsWith(prefix);
 }
 
 export interface PathContainmentResult {
@@ -91,13 +106,12 @@ export function verifyPathContainment(
     // the check was skipped and only the lexical prefix was ever consulted.
     const realTarget = realpathOfDeepestExisting(resolvedTarget);
     if (realTarget !== undefined) {
-      const realWorkspace = fs.existsSync(normalizedWorkspace)
-        ? canonicalPath(normalizedWorkspace)
-        : normalizedWorkspace;
-      const realRelative = path.relative(realWorkspace, realTarget);
-      const isRealContained = realRelative !== ".." && !realRelative.startsWith(`..${path.sep}`) && !path.isAbsolute(realRelative);
+      const realWorkspace = realpathOfDeepestExisting(normalizedWorkspace) ?? normalizedWorkspace;
+      // Canonical casing comes from the filesystem. Windows path.relative folds
+      // case even when the underlying directory distinguishes Root from root.
+      const isRealContained = containsCanonicalPath(realTarget, realWorkspace);
 
-      if (!isRealContained && realTarget !== realWorkspace) {
+      if (!isRealContained) {
         return {
           allowed: false,
           resolvedPath: realTarget,

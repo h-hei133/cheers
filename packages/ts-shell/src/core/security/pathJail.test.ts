@@ -110,3 +110,95 @@ describe("a write through a symlinked directory", () => {
     }
   });
 });
+
+describe("canonical directory casing", () => {
+  it("rejects distinct canonical roots even when lexical comparison folds case", () => {
+    const root = path.resolve("case-jail", "Root");
+    const sibling = path.resolve("case-jail", "root");
+    const relative = path.relative.bind(path);
+    const lexical = vi.spyOn(path, "relative").mockImplementation((from, to) => relative(from.toLowerCase(), to.toLowerCase()));
+    const exists = vi.spyOn(fs, "existsSync").mockImplementation(file => !String(file).endsWith("new.txt"));
+    const canonical = vi.spyOn(fs, "realpathSync").mockImplementation(file => String(file));
+    try {
+      for (const target of [sibling, path.join(sibling, "existing.txt"), path.join(sibling, "missing", "new.txt")]) {
+        expect(verifyPathContainment(target, root).allowed).toBe(false);
+      }
+      expect(verifyPathContainment(path.join(root, "inside.txt"), root).allowed).toBe(true);
+    } finally {
+      canonical.mockRestore();
+      exists.mockRestore();
+      lexical.mockRestore();
+    }
+  });
+
+  it("uses filesystem casing to preserve Windows aliases of the same directory", () => {
+    const root = path.resolve("case-jail", "Root");
+    const alias = path.resolve("case-jail", "root");
+    const target = path.join(alias, "existing.txt");
+    const canonicalTarget = path.join(root, "existing.txt");
+    const platform = Object.getOwnPropertyDescriptor(process, "platform")!;
+    const relative = path.relative.bind(path);
+    const lexical = vi.spyOn(path, "relative").mockImplementation((from, to) => relative(from.toLowerCase(), to.toLowerCase()));
+    const exists = vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    const native = vi.spyOn(fs.realpathSync, "native").mockImplementation(file => String(file) === target ? canonicalTarget : root);
+    Object.defineProperty(process, "platform", { value: "win32" });
+    try {
+      expect(verifyPathContainment(target, root)).toMatchObject({ allowed: true, resolvedPath: canonicalTarget });
+      expect(native).toHaveBeenCalledWith(target);
+      expect(native).toHaveBeenCalledWith(root);
+    } finally {
+      Object.defineProperty(process, "platform", platform);
+      native.mockRestore();
+      exists.mockRestore();
+      lexical.mockRestore();
+    }
+  });
+
+  it("canonicalizes the existing ancestor of a new Windows workspace", () => {
+    const parent = path.resolve("case-jail", "Root");
+    const alias = path.resolve("case-jail", "root");
+    const workspace = path.join(alias, "missing");
+    const platform = Object.getOwnPropertyDescriptor(process, "platform")!;
+    const exists = vi.spyOn(fs, "existsSync").mockImplementation(file => String(file) === parent || String(file) === alias);
+    const native = vi.spyOn(fs.realpathSync, "native").mockImplementation(() => parent);
+    Object.defineProperty(process, "platform", { value: "win32" });
+    try {
+      expect(verifyPathContainment("new.txt", workspace)).toMatchObject({
+        allowed: true, resolvedPath: path.join(parent, "missing", "new.txt"),
+      });
+      expect(native).toHaveBeenCalledWith(alias);
+    } finally {
+      Object.defineProperty(process, "platform", platform);
+      native.mockRestore();
+      exists.mockRestore();
+    }
+  });
+
+  it("folds only the Windows namespace anchor when comparing canonical paths", () => {
+    const platform = Object.getOwnPropertyDescriptor(process, "platform")!;
+    const methods = ["resolve", "relative", "isAbsolute", "join", "dirname", "basename", "parse"] as const;
+    const windows = methods.map(method => path.win32[method]);
+    const spies = methods.map((method, index) => vi.spyOn(path, method).mockImplementation(windows[index] as any));
+    const separator = Object.getOwnPropertyDescriptor(path, "sep")!;
+    const exists = vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    const native = vi.spyOn(fs.realpathSync, "native").mockImplementation(file => String(file));
+    Object.defineProperty(process, "platform", { value: "win32" });
+    Object.defineProperty(path, "sep", { value: "\\" });
+    try {
+      const root = "\\\\server\\Share\\Root";
+      expect(verifyPathContainment("\\\\SERVER\\share\\Root\\inside.txt", root).allowed).toBe(true);
+      expect(verifyPathContainment("\\\\SERVER\\share\\root\\outside.txt", root).allowed).toBe(false);
+      expect(verifyPathContainment("\\\\server\\Share\\Root-extra\\outside.txt", root).allowed).toBe(false);
+      expect(verifyPathContainment("\\\\SERVER\\share\\inside.txt", "\\\\server\\Share").allowed).toBe(true);
+      expect(verifyPathContainment("\\\\other\\share\\Root\\inside.txt", root).allowed).toBe(false);
+      expect(verifyPathContainment("c:\\inside.txt", "C:\\").allowed).toBe(true);
+      expect(verifyPathContainment("D:\\inside.txt", "C:\\").allowed).toBe(false);
+    } finally {
+      Object.defineProperty(process, "platform", platform);
+      Object.defineProperty(path, "sep", separator);
+      native.mockRestore();
+      exists.mockRestore();
+      for (const spy of spies) spy.mockRestore();
+    }
+  });
+});

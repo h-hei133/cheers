@@ -6607,3 +6607,7 @@ manifest组件 `d589e8d02c5299f0de4a3a25169b9aea1a742540` 已提交/推送、10�
 ### 2026-10-14 — 原生 Windows CLI 与进程取消验收
 
 Windows Node20.3 经仓库 UNC 运行实际 CLI：零输入启动/EOF、print、read 三条链路通过，共 3 次 loopback 合成 POST，原文件/配置 hash 不变。原 execution owner 的预取消零派发，取消/超时均等待后代 ready 并确认父子 PID 消失；八个 owner 的 ESM 输出与 dist 逐字节相同。首次 `--help` 断言属 harness/setup 并保留，未改产品。另直接判读恢复窗口原图，中文无缺字；不扩称真实 IME 或全部逐帧通过。源码/依赖/构建未改，用户 `.gitignore` 保留；本轮仅文档，见[裁决 §8.156](features/phase-19-decisions.md)、[验收 §21](features/phase-19-acceptance.md)，材料 `.tmp/windows-cli/`。非 Linux 对象绑定、NTFS/macOS/交互/设备/真实服务及 CI 额度条件仍开放，Phase19 active。
+
+### 2026-10-14 — Windows 大小写目录越界修复
+
+原生 Windows Node20.3 复现不同 inode 的 Root/root 被词法大小写折叠误准入、泄出外部文件与目录结果。原路径 owner 采用 native realpath、同一现存祖先解析与 namespace 根大小写兼容，目录 owner 复用规范目标复验；无新增读取系统。独立复核拒绝初版的普通目录别名、缺失根、UNC server/share 三处回归，修复后代码 APPROVE/架构 CLEAR，早期拒绝材料保留。最终4TS/2production，Node20.3受影响15文件/185项、两构建/四源码门和judge图义务通过；4既有ceiling advisory仍partial。五项隔离反转实际失败，正向通过；作者Windows25/Linux13，独立lane另有原生证据。实际Windows CLI与Linux单文件各两条read链路共8合成POST，越界拒绝、合法别名正文和原文件/配置均核验；首轮合成服务误用历史tool结果属harness，修正本次ID后复跑，exit0不升级拒绝结果。见[裁决§8.157](features/phase-19-decisions.md)、[验收§22](features/phase-19-acceptance.md)，材料`.tmp/path-identity/`。用户`.gitignore`原字节保持；当前全套、非Linux对象绑定、平台/交互/真实服务及CI条件仍未证明，Phase19 active，交付另验。
