@@ -2658,3 +2658,12 @@ Node20.3 直接受影响 22 文件/315 项、TypeScript 与 Linux 单文件构�
 - 定向实读参考截断的 continuation-byte 边界决定，采用“字节预算内退到完整字符”；参考尾部截断会丢弃前缀，本项目可继续分页，故必须将回退位置作为下一页 cursor，不能跳过字节。
 - Node20.3 隔离环境本地 jobs、SSH command/projection/transport 共 5 文件/24 项及 `build:ts` 通过。两项三/四字节反例同时消费真实本地页、SSH client 协议验证与展示，核对逐页拼接等于原文、字节拼接等于原 Buffer、游标持续前进及字符内部 offset 拒绝。分别恢复本地和 SSH 的固定切片时各两项实际出现替换字符而失败，逐字节恢复后两项通过。材料 `.tmp/phase19-repair/a07-local-reversal.log`、`a07-ssh-reversal.log`。
 - 五项本地静态/文档门及 diff 空白检查通过；NormProof 图义务满足、4 项既有 ceiling advisory 保留、整体 partial。SSH 回归使用合成协议响应，未证明真实远端服务；当前最终集成/独立审查/跨平台和精确 CI 仍开放。Phase19 active，交付另验。
+
+脱敏修复 `db1be21f1b4550535cea5839d69e5366d37db8eb` 已推送；CI `38569774841`/job `115871610853`、Watch `38569775124`/job `115871612337` 均 failure、`steps=[]`，各自 annotations 确认付款/spending-limit 未启动。分页修复 `ae2d77d5375fca59542f6026f97c1c188c74c10e` 已推送；CI `38570465340`/job `115873996074`、Watch `38570465268`/job `115873995918` 同样各自确认付款/spending-limit 未启动，无远端通过。
+
+### 10.6 A05 — 登出连接的持久凭据镜像
+
+- [连接 owner](../../packages/ts-shell/src/core/commands/connectCommandRuntime.ts) 在原配置 CAS 中同时删除连接及其独占的精确凭据镜像；[凭据策略](../../packages/ts-shell/src/core/commands/connect/credentials.ts) 只处理对应 provider 的匹配 API key/account slot，保留其他连接共用值、独立更新的 fallback、其他 provider/slot 与元数据。外部环境凭据继续独立解析，提示不声称远端 token 已撤销。
+- 定向实读参考凭据存储删除：锁内重读当前持久状态、删除后落盘并更新内存。沿用本项目原 CAS；因本项目支持多连接和备用字段，不能无条件删除整个 provider，只清理所退出连接拥有且无幸存者使用的精确镜像。账户续期原本同步精确镜像，本次移除与其身份口径一致。
+- Node20.3 隔离环境连接/凭据解析/账户续期/配置持久化 4 文件/98 项及 build:ts 通过。实际合成登录→退出→fresh resolution 覆盖 API-key/account，两种凭据均从落盘移除；另有共享连接、独立替换及环境覆盖控制。移除清理接线时两种 fresh resolution 均真实断言失败，源码逐字节恢复后 98 项通过。材料 `.tmp/phase19-repair/a05-reversal.log`。
+- 五项静态/文档门通过，NormProof 图义务满足、4 项既有 ceiling advisory 仍 partial。当前仅本地合成凭据证据，未读取真实配置或发真实认证请求；最终集成、平台及精确远端 CI 继续开放，Phase19 active，交付另验。

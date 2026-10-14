@@ -6659,3 +6659,9 @@ trace全部公开字符串、report外部工具名复用现有有界报告脱敏
 ### 2026-10-14 — A07 输出字符边界
 
 本地/SSH消费共享UTF-8页边界，保留原字节next/size及整段脱敏，字符内部offset明确拒绝。对照参考完整字符切分，分页返回回退cursor以保全后续字节。Node20.3隔离环境5文件/24项及build:ts通过，三/四字节逐页原文与原Buffer核验；各路径反转两项真实乱码失败、精确恢复后通过。见[裁决 §10.5](features/phase-19-decisions.md#105-a07--本地与-ssh-输出的-utf-8-分页)；SSH协议合成证据不代表真实服务，最终门禁/交付另验，其余问题继续，Phase19 active。
+
+脱敏 `db1be21f` 与分页 `ae2d77d5` 均已推送；各自精确 CI/Watch jobs 的 annotations 均确认付款/spending-limit 未启动、steps=[]、failure，详见裁决 §10.5，无远端通过。
+
+### 2026-10-14 — A05 登出凭据镜像
+
+原连接配置 CAS 同时清理被退出连接独占的精确凭据镜像，保留共享连接/独立fallback/外部环境来源。对照参考锁内持久删除及当前状态决定，复用既有配置owner。Node20.3隔离环境4文件/98项、build:ts及五门通过；API-key/account实际登录退出fresh resolution两反转真实失败，恢复后组合通过，NormProof图义务满足、4既有ceiling advisory仍partial。见[裁决 §10.6](features/phase-19-decisions.md#106-a05--登出连接的持久凭据镜像)；没有真实凭据/远端撤销或最终集成证明，交付另验，其余问题继续，Phase19 active。

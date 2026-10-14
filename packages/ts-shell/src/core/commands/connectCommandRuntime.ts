@@ -25,6 +25,7 @@ import {
   resolveProviderTarget,
 } from "./connect/preset.js";
 import { needsUserEndpoint } from "../providers/facts.js";
+import { withoutConnectionCredentials } from './connect/credentials.js';
 import {
   getConnectHelpText,
   renderConnectionStatus,
@@ -298,6 +299,7 @@ export function removeConnection(args: string[], onPersisted?: () => void): stri
   );
   const next: RuntimeConfigFile = {
     ...userConfig,
+    providerCredentials: withoutConnectionCredentials(userConfig.providerCredentials, existing, nextConnections),
     providerConnections: nextConnections,
     activeProviderConnectionId:
       userConfig.activeProviderConnectionId === existing.id

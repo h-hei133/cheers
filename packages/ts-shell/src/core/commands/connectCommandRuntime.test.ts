@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as configStore from '../../config/runtimeConfig.js';
+import { resolveProviderCredential } from '../shell/providerCredentials.js';
 import { ConfigWriteError } from '../../config/outcome.js';
 import {
   getUserRuntimeConfigPath,
@@ -453,5 +454,49 @@ describe("connect command runtime", () => {
     expect(
       stored.providerCredentials?.openai?.accountAuth?.openai?.type,
     ).toBe("openai-chatgpt-account");
+  });
+
+  it.each(['api-key', 'account'])('removes the last %s connection and its credential mirror from fresh resolution', async auth => {
+    __setOpenAIAccountAuthRunnerForTest(async () => ({ accessToken: 'SYNTHETIC_LOGOUT_ACCESS', refreshToken: 'SYNTHETIC_LOGOUT_REFRESH',
+      expiresAt: Date.now() + 3600000, authorizeUrl: 'https://auth.example.invalid/', callbackUrl: 'http://localhost/' }));
+    const args = auth === 'account' ? ['login', 'openai', '--account'] : ['login', 'openai', '--api-key', 'SYNTHETIC_LOGOUT_KEY'];
+    await runConnectCommand(args, { cwd: workspaceRoot });
+    const before = configStore.getRuntimeConfig(workspaceRoot);
+    expect(resolveProviderCredential({ runtimeConfig: before, env: {} }).credential).toBeDefined();
+    const result = await runConnectCommand(['logout', before.activeProviderConnectionId!], { cwd: workspaceRoot });
+    expect(result.output).toContain('Active connection now: none');
+    const fresh = configStore.getRuntimeConfig(workspaceRoot);
+    expect(resolveProviderCredential({ runtimeConfig: fresh, env: {} }).credential).toBeUndefined();
+    expect(JSON.stringify(configStore.readUserRuntimeConfigFile())).not.toMatch(/SYNTHETIC_LOGOUT_(?:ACCESS|REFRESH|KEY)/);
+    expect(resolveProviderCredential({ runtimeConfig: fresh, env: { OPENAI_API_KEY: 'SYNTHETIC_EXTERNAL_KEY' } }).credential)
+      .toMatchObject({ source: 'env', apiKey: 'SYNTHETIC_EXTERNAL_KEY' });
+  });
+
+  it('preserves another connection and an independently replaced fallback credential on logout', async () => {
+    await runConnectCommand(['login', 'openai', '--api-key', 'SYNTHETIC_FIRST'], { cwd: workspaceRoot });
+    const first = configStore.getRuntimeConfig(workspaceRoot).activeProviderConnectionId!;
+    await runConnectCommand(['login', 'openai', '--api-key', 'SYNTHETIC_SECOND'], { cwd: workspaceRoot });
+    await runConnectCommand(['logout', first], { cwd: workspaceRoot });
+    let fresh = configStore.getRuntimeConfig(workspaceRoot);
+    expect(resolveProviderCredential({ runtimeConfig: fresh, env: {} }).credential).toMatchObject({ apiKey: 'SYNTHETIC_SECOND', source: 'connection' });
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    writeUserRuntimeConfigFile({ ...edit.values, providerCredentials: { ...edit.values.providerCredentials,
+      openai: { ...edit.values.providerCredentials?.openai, apiKey: 'SYNTHETIC_INDEPENDENT' } } }, edit);
+    await runConnectCommand(['logout', fresh.activeProviderConnectionId!], { cwd: workspaceRoot });
+    fresh = configStore.getRuntimeConfig(workspaceRoot);
+    expect(fresh.providerConnections).toHaveLength(0);
+    expect(resolveProviderCredential({ runtimeConfig: fresh, env: {} }).credential).toMatchObject({ apiKey: 'SYNTHETIC_INDEPENDENT', source: 'config' });
+  });
+
+  it('retains credentials shared by a surviving connection until its own logout', async () => {
+    await runConnectCommand(['login', 'openai', '--api-key', 'SYNTHETIC_SHARED'], { cwd: workspaceRoot });
+    const first = configStore.getRuntimeConfig(workspaceRoot).activeProviderConnectionId!;
+    await runConnectCommand(['login', 'openai', '--api-key', 'SYNTHETIC_SHARED'], { cwd: workspaceRoot });
+    await runConnectCommand(['logout', first], { cwd: workspaceRoot });
+    let fresh = configStore.getRuntimeConfig(workspaceRoot);
+    expect(fresh.providerCredentials.openai?.apiKey).toBe('SYNTHETIC_SHARED');
+    await runConnectCommand(['logout', fresh.activeProviderConnectionId!], { cwd: workspaceRoot });
+    fresh = configStore.getRuntimeConfig(workspaceRoot);
+    expect(resolveProviderCredential({ runtimeConfig: fresh, env: {} }).credential).toBeUndefined();
   });
 });
