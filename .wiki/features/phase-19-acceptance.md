@@ -596,3 +596,13 @@ owner迁移 `fce6f6a079106911dd7e5271028f20fdd59b4faa` 与分页/集成 `837aa53
 此前完整套件早于本delta；此处仅记录本批局部代码、成本和失败边界，原拒绝原因、完整树一致性、广泛平台/性能、A01/A03/A12继续开放，Phase19 **active**。源码/文档交付及对应SHA的远端状态另验，用户`.gitignore`保留排除。
 
 代码64b004974eb9c9ec18ba9f2e50690a104cfb0e05已推送、remote/PR head同SHA，7冻结blob及10证据hash匹配，用户`.gitignore`保留排除；PR仍draft并明确41/42生产限制。精确CI38622392482/job116052910708及Watch38622392433/job116052909447分别annotations证实付款/spending-limit未启动、steps=[]、failure，无远端执行或通过。材料 `tracked-view/delivery-observation.json`，本段后续纯文档SHA另核，Phase19 active。
+
+### 26.6 已观察来源在清理后的发布检查
+
+发现A25-T01 MEDIUM：旧owner最后verify后还有status/view close与private view remove三个异步阶段，受控子进程在cleanup期间新增已捕获目录的文件，两路仍返回3个旧名称、当时native已有4个。原八场景`tracked-view/temporal-results.json`保留；原owner先真实red3，再把同一次末尾verify移到全部cleanup后、紧接返回，names及无repo的null统一受保护。setup/consume/cleanup错误仍按原优先级传播，无额外ledger遍历或执行平面。
+
+恢复后隔离Node20.3/Linux 21文件/296项零skip通过、两种构建及五门通过，反转旧owner实际3个AssertionError、源码原字节恢复；摘要helper对JSON异常前缀的误判另记，不改原测试结果。NormProof无blocking义务、4既有ceiling advisory/partial。七直接模块编译identity与当前TS一致，新的八时间探针均满足预定纳入/排除/拒绝与受观测close/remove。独立code APPROVE（3文件/63项及34编译探针）、architecture CLEAR（16探针），冻结两个源码无漂移，综合仅本delta APPROVE；报告与材料 `tracked-view/publication-{validation,reversal,source-identity,temporal-results,review-synthesis}.json`及两份独立报告。
+
+当前executable/Node20.3各regular/fullscreen PTY通过共享read、deny/approved patch、committed receipt、restart零重放与来源/配置不变，结果 `integration-pty-1792006826722337061/results.json`、`integration-pty-1792007035918592109/results.json`。Node首轮regular退出误判保留在`integration-pty-1792006826722424994/`，实际process exit0；原helper两次poll间竞态已分类，隔离副本只复查同一predicate、仍断言timeout及零退出，不改产品或原helper。该PTY不证明native枚举竞态或真实服务质量。
+
+A25-T01的cleanup发布检查已局部修复；顺序最后stat、未观察/排除子树、query-start/整树/OS原子性及广泛成本仍无保证。旧生产42 defaults仍41 complete/1原因未分类ViewSourceError、六期限拒绝；本批受控变化不能解释原拒绝或通过全部默认完成验收。8081pass/10skip全套早于本批delta；A01/A03/A12及A25整体仍开放，Phase19 **active**。详见[裁决 §10.18](phase-19-decisions.md#1018-a25--树观察的时间边界2026-10-15清理后发布缺口已局部修复)，五路径交付及精确SHA的远端状态另验，用户`.gitignore`保留排除。

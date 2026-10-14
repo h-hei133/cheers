@@ -6727,3 +6727,9 @@ implementation匹配已知mode和当前权限位；顾问/调度复用同一cano
 生产42 defaults实际41 complete/1原因未分类ViewSourceError拒绝，6 deadlines拒绝；41完整名称exact，48清理满足，追加4诊断不能抹去原拒绝。原helper exit0只证明资源清理，现补complete断言并保留原结果；全部默认完成验收未通过。详见[裁决 §10.17](features/phase-19-decisions.md#1017-a25--git-跟踪文件的重复占位2026-10-15局部优化已验证完整生产验收未通过)及[验收 §26.5](features/phase-19-acceptance.md#265-git-跟踪占位与-canonical-重复工作)。A25拒绝原因/整树一致性/广泛成本和A01/A03/A12继续开放，Phase19 active；用户`.gitignore`保留排除，历史全套不称本delta最终字节证明，GitHub交付另核。
 
 64b00497已推送、branch/PR head同SHA、7冻结blob及10证据hash匹配，PR仍draft并按最终范围更新/读回；用户`.gitignore`保持排除。精确CI38622392482/job116052910708与Watch38622392433/job116052909447各自annotations确认付款/spending-limit未启动，steps=[]、failure，无远端产品执行或CI通过，Phase19 active。
+
+### 2026-10-15 — A25 清理后发布的来源复查
+
+交付证据文档b5ea1172已推送、remote/PR head一致，该SHA两workflow各自annotations确认付款/spending-limit未启动、steps=[]，材料`tracked-view/docs-delivery-observation.json`。继续树观察边界时，八个编译受控场景发现A25-T01 MEDIUM：最后verify后cleanup期间已捕获目录新增，两路仍发布3个旧名称而native已有4个。先记录并保留原结果/三项实际失败，再将原owner同一次末尾verify移到全部close/remove后、紧接返回，保留原错误优先级。
+
+反转恢复后Node20.3/Linux 21文件/296项零skip、两种构建/五门通过，旧owner反转实际3个AssertionError且源码精确恢复；NormProof无blocking义务、4既有advisory/partial。七模块编译identity一致，当前八时间探针通过。两独立lane核对冻结源码：code APPROVE（63项与34编译探针）、architecture CLEAR（16探针），综合仅两文件delta APPROVE。当前Node/executable各两种PTY通过；Node初次退出误判来自helper两次poll间竞态，原失败保留，隔离副本复查同一退出predicate后通过，产品未为探针改动。详见[裁决 §10.18](features/phase-19-decisions.md#1018-a25--树观察的时间边界2026-10-15清理后发布缺口已局部修复)与[验收 §26.6](features/phase-19-acceptance.md#266-已观察来源在清理后的发布检查)。旧生产41/42及原因未分类拒绝保留，不能归因本次受控变化；整树/query-start/OS原子性及A01/A03/A12仍开放，Phase19 active。五路径交付/对应SHA远端状态另验，历史§9与用户`.gitignore`保持。

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { listDirectoryEntries } from '../fileWalk.js';
 import { listWorkspaceFilesViaGit } from '../ignoreRules.js';
 import { searchWithRipgrep, forgetRipgrepBinary } from '../../../core/tools/grepRipgrep.js';
+import { collectSearchFiles } from '../../../core/tools/searchFiles.js';
 import { withNativeReadView } from './index.js';
 import { WalkBudget } from '../walk/budget.js';
 
@@ -162,4 +163,47 @@ linux.each([false, true])('refuses an optional parent alias retarget with cached
   })).rejects.toThrow(/no complete native answer/i);
   expect(changed).toBe(true);
   expect(observed).toContain(alias);
+});
+
+linux.each(['git', 'search'] as const)('refuses %s results after a captured directory changes during view cleanup', async mode => {
+  git('init', '-q');
+  const nested = path.join(root, 'nested');
+  fs.mkdirSync(nested);
+  fs.writeFileSync(path.join(nested, 'public.txt'), 'public');
+  const remove = fs.promises.rm;
+  let changed = false;
+  let mirror = '';
+  vi.spyOn(fs.promises, 'rm').mockImplementation(async (...args) => {
+    if (!changed && path.basename(String(args[0])).startsWith('cheers-native-read-')) {
+      mirror = String(args[0]);
+      childWrite(path.join(nested, 'new.txt'), 'new');
+      changed = true;
+    }
+    return remove(...args);
+  });
+  if (mode === 'git') await expect(listWorkspaceFilesViaGit(root)).rejects.toThrow(/no complete native answer/i);
+  else {
+    await expect(collectSearchFiles({ binary: 'rg', args: ['--no-config', '--files', '--hidden', '--null', '--glob', '!.git/**'],
+      workspaceRoot: root, assertFileAccess: () => {} })).resolves.toEqual({ ok: false, reason: 'failed' });
+  }
+  expect(changed).toBe(true);
+  expect(fs.existsSync(mirror)).toBe(false);
+  expect(fs.readFileSync(path.join(nested, 'new.txt'), 'utf8')).toBe('new');
+});
+
+linux('refuses a no-repository decision after its observed root changes during view cleanup', async () => {
+  const remove = fs.promises.rm;
+  let changed = false;
+  let mirror = '';
+  vi.spyOn(fs.promises, 'rm').mockImplementation(async (...args) => {
+    if (!changed && path.basename(String(args[0])).startsWith('cheers-native-read-')) {
+      mirror = String(args[0]);
+      childWrite(path.join(root, '.gitignore'), 'public.txt\n');
+      changed = true;
+    }
+    return remove(...args);
+  });
+  await expect(listWorkspaceFilesViaGit(root)).rejects.toThrow(/no complete native answer/i);
+  expect(changed).toBe(true);
+  expect(fs.existsSync(mirror)).toBe(false);
 });

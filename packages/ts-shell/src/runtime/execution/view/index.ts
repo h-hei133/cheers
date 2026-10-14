@@ -19,8 +19,10 @@ export async function withNativeReadView<T>(input: NativeViewInput, consume: (so
   const root = fs.realpathSync(input.root);
   input.assertFileAccess(root);
   const mirror = await fsp.mkdtemp(path.join(os.tmpdir(), 'cheers-native-read-'));
+  let sources: ViewSources;
+  let result: T;
   try {
-    const sources = new ViewSources({ ...input, root }, mirror);
+    sources = new ViewSources({ ...input, root }, mirror);
     const handle = await fsp.open(mirror, fs.constants.O_RDONLY | fs.constants.O_DIRECTORY);
     try {
       const statusFile = path.join(mirror, '.native-status');
@@ -36,14 +38,15 @@ export async function withNativeReadView<T>(input: NativeViewInput, consume: (so
           return { ...planNativeRead({ command, args, root, directory: detached ? '/' : directory,
             descriptor: handle.fd, statusDescriptor: status.fd }), verifyExit: code => verifyNativeExit(status, code) };
         };
-        const result = await consume(sources, plan, selection => materializeView(sources, selection));
-        // Absence and fallback decisions also depend on the captured sources.
-        sources.verify();
-        return result;
+        result = await consume(sources, plan, selection => materializeView(sources, selection));
       } finally { await closeReadHandle(status); }
     } finally { await closeReadHandle(handle); }
   } finally {
     try { await fsp.rm(mirror, { recursive: true, force: true }); }
     catch { throw new ReadCleanupError(); }
   }
+  // Closing handles and removing the view yield. Recheck observed sources only
+  // after cleanup settles, before publishing names, absence or fallback.
+  sources.verify();
+  return result;
 }
