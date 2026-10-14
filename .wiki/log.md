@@ -6665,3 +6665,9 @@ trace全部公开字符串、report外部工具名复用现有有界报告脱敏
 ### 2026-10-14 — A05 登出凭据镜像
 
 原连接配置 CAS 同时清理被退出连接独占的精确凭据镜像，保留共享连接/独立fallback/外部环境来源。对照参考锁内持久删除及当前状态决定，复用既有配置owner。Node20.3隔离环境4文件/98项、build:ts及五门通过；API-key/account实际登录退出fresh resolution两反转真实失败，恢复后组合通过，NormProof图义务满足、4既有ceiling advisory仍partial。见[裁决 §10.6](features/phase-19-decisions.md#106-a05--登出连接的持久凭据镜像)；没有真实凭据/远端撤销或最终集成证明，交付另验，其余问题继续，Phase19 active。
+
+`afa42081` 已推送、远端同SHA；精确CI38571317384/Watch38571317465各自annotations确认付款/spending-limit未启动、steps=[]、failure，无远端通过。
+
+### 2026-10-14 — A09/A15/A19 MCP 消费者修复
+
+force复用已认证gateway，临时目录也消费原OAuth服务；完整工具定义/物理连接身份绑定当轮批准，变更后派发前拒绝。父取消贯穿真实SDK请求，保留远端结果未确认及不重放。对照参考连接复用、目录更新与监听清理，在原owner补齐旧批准/真实RPC边界。Node20.3受影响12文件/93项、构建/五门通过，四处反转实际失败1/1/4/1项、精确恢复；NormProof无阻断、4既有advisory/partial。首轮事件metadata断言属测试契约误用，已改核对实际公开分类。见[裁决 §10.7](features/phase-19-decisions.md#107-a09a15a19--mcp-目录批准契约与取消)；最终复验/交付另验，真实服务/最终集成与其余问题继续开放，Phase19 active。

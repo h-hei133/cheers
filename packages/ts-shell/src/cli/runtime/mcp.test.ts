@@ -120,6 +120,53 @@ it.each(["allow-once", "deny"] as const)("runs an annotated plan MCP call only a
   expect(events.find(event => event.type === "tool.result")).toMatchObject({ success: decision === "allow-once" });
 });
 
+it.each(['annotations', 'inputSchema', 'outputSchema', 'connection'] as const)(
+  'refuses an old plan approval after the MCP %s changes under the same tool name', async change => {
+    const definition = path.join(root, 'tool-definition.json'); fs.writeFileSync(definition, '{}');
+    const configPath = path.join(root, '.cheers.mcp.json'); const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    config.mcpServers.local.args.push('--tool-definition', definition); fs.writeFileSync(configPath, JSON.stringify(config));
+    const approve = vi.fn(async (prompt: { id: string }) => {
+      if (change === 'connection') {
+        config.mcpServers.local.env = { SYNTHETIC_CONNECTION_REVISION: 'two' }; fs.writeFileSync(configPath, JSON.stringify(config));
+      } else fs.writeFileSync(definition, JSON.stringify(change === 'annotations' ? { annotations: { readOnlyHint: false } }
+        : { [change]: { type: 'object', properties: { message: { type: 'number' } } } }));
+      return { promptId: prompt.id, decision: 'allow-once' as const, respondedAt: 1 };
+    });
+    const run = await runCliRuntimeInvocation({ ...input(), providerModeEnv: 'real', agentMode: 'plan', permissionScope: 'ask',
+      escalationPromptHandler: approve, mcpGateway: gateway }, {
+      checkProviderReadiness: async () => ({ ok: true }), hooks: new HookDispatcher(),
+      createStep: () => async () => ({ text: '', toolCalls: [{ id: 'old-contract', name: 'mcp__local__echo_message', args: { message: 'old-approval' } }], stopReason: 'stop' }),
+    });
+    const events = []; for await (const event of run.events) events.push(event);
+    expect(approve).toHaveBeenCalledOnce();
+    expect(events.find(event => event.type === 'tool.result')).toMatchObject({ success: false, output: expect.stringMatching(/definition\/connection changed/) });
+    const calls = fs.readFileSync(log, 'utf8').trim().split('\n').map(line => JSON.parse(line)).filter(event => event.event === 'tools/call');
+    expect(calls).toHaveLength(0);
+  },
+);
+
+it('cancels the actual held MCP RPC from the parent turn without replay and preserves a healthy connection', async () => {
+  const abort = new AbortController();
+  const run = await runCliRuntimeInvocation({ ...input(), signal: abort.signal, providerModeEnv: 'real', permissionScope: 'ask',
+    escalationPromptHandler: async prompt => ({ promptId: prompt.id, decision: 'allow-once', respondedAt: 1 }), mcpGateway: gateway }, {
+    checkProviderReadiness: async () => ({ ok: true }), hooks: new HookDispatcher(),
+    createStep: () => async () => ({ text: '', toolCalls: [{ id: 'held', name: 'mcp__local__echo_message', args: { message: 'mcp-hold' } }], stopReason: 'stop' }),
+  });
+  const events = []; const settled = (async () => { for await (const event of run.events) events.push(event); })();
+  const records = () => fs.readFileSync(log, 'utf8').trim().split('\n').map(line => JSON.parse(line));
+  await vi.waitFor(() => expect(records().some(event => event.event === 'tools/call')).toBe(true));
+  abort.abort();
+  try { await vi.waitFor(() => expect(events.some(event => event.type === 'tool.result')).toBe(true), { timeout: 1000 }); }
+  finally { if (!events.some(event => event.type === 'tool.result')) await gateway.close(); await settled; }
+  expect(events.find(event => event.type === 'tool.result')).toMatchObject({ success: false, output: expect.stringContaining('unconfirmed after cancellation'),
+    failureReason: expect.stringContaining('[MCP timeout-cancelled;') });
+  await vi.waitFor(() => expect(records().filter(event => event.event === 'notifications/cancelled')).toHaveLength(1));
+  expect(await gateway.invokeTool('local', 'echo_message', { message: 'after cancellation' })).toEqual({ content: 'echo:after cancellation' });
+  await expect(gateway.invokeTool('local', 'echo_message', { message: 'pre-cancelled' }, undefined, { signal: abort.signal })).rejects.toThrow();
+  expect(records().filter(event => event.event === 'tools/call')).toHaveLength(2);
+  expect(starts()).toHaveLength(1);
+}, 4000);
+
 it("shares the command gateway across two prompt bridges without per-turn shutdown", async () => {
   await gateway.snapshot();
   for (const prompt of ["one", "two"]) {

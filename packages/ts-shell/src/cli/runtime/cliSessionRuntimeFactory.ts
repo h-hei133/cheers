@@ -489,7 +489,8 @@ export function createCliSessionRuntime(input: {
         settled: planningSettlement(input.sessionManager, sessionId, promptEntryId, sessionRuntime, config, input.renderer) };
     },
   });
-  installRuleControlRuntime({ runtimeContext: input.runtimeContext, sessionManager: input.sessionManager, busy: () => sessionRuntime.getCurrentRunController() !== null });
+  installRuleControlRuntime({ runtimeContext: input.runtimeContext, sessionManager: input.sessionManager, mcpGateway: input.mcpGateway,
+    busy: () => sessionRuntime.getCurrentRunController() !== null });
   goalScheduler = installGoalScheduler(input.runtimeContext, input.sessionManager, sessionRuntime, message => input.renderer.renderLine(message));
   const nativeGate = installGitCliRuntime(input, sessionRuntime, isStdinTty);
   installDataTransfer(input.runtimeContext, nativeGate);

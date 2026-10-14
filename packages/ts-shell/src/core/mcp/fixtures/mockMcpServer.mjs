@@ -88,6 +88,8 @@ input.on("line", line => {
       process.exit(1);
     }
     const second = Boolean(request.params?.cursor);
+    const definitionIndex = process.argv.indexOf('--tool-definition');
+    const definition = definitionIndex >= 0 ? JSON.parse(fs.readFileSync(process.argv[definitionIndex + 1], 'utf8')) : {};
     send(request.id, {
       tools: [{
         name: second ? "second_tool" : "echo_message",
@@ -98,6 +100,7 @@ input.on("line", line => {
           outputSchema: { type: "object", properties: { answer: { type: "integer" } }, required: ["answer"] },
         } : {}),
         ...(!second && flags.has("--required-task") ? { execution: { taskSupport: "required" } } : {}),
+        ...definition,
       }],
       ...((flags.has("--paginate") && !second) || flags.has("--repeat-cursor") ? { nextCursor: "next" } : {}),
     });
@@ -105,6 +108,7 @@ input.on("line", line => {
   }
   if (request.method === "tools/call") {
     const message = request.params.arguments?.message ?? "missing";
+    if (message === 'mcp-hold') return;
     if (message === "mcp-notify") process.stdout.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/tools/list_changed" }) + "\n");
     if (message === "mcp-invalid-args") {
       process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: request.id,

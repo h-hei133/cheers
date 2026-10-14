@@ -533,7 +533,7 @@ export function createCoreToolRegistry(options?: {
       description: `[MCP:${tool.serverName}] ${tool.description}`,
       argsSchema: tool.inputSchema ?? { type: 'object' },
       mcpAnnotations: { readOnlyHint: tool.annotations?.readOnlyHint === true },
-      async execute(args, _context) {
+      async execute(args, context) {
         if (!options?.mcpGateway) {
           // A tool without its gateway is a registration mistake, and the
           // mistake is best said here rather than answered with a fake
@@ -547,6 +547,8 @@ export function createCoreToolRegistry(options?: {
             tool.serverName,
             tool.toolName,
             args,
+            undefined,
+            { signal: context.abortSignal, contractId: tool.contractId },
           )
           if (answer.isError) {
             // The server answered, and what it said is a failure in its own

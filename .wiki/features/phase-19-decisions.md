@@ -2667,3 +2667,17 @@ Node20.3 直接受影响 22 文件/315 项、TypeScript 与 Linux 单文件构�
 - 定向实读参考凭据存储删除：锁内重读当前持久状态、删除后落盘并更新内存。沿用本项目原 CAS；因本项目支持多连接和备用字段，不能无条件删除整个 provider，只清理所退出连接拥有且无幸存者使用的精确镜像。账户续期原本同步精确镜像，本次移除与其身份口径一致。
 - Node20.3 隔离环境连接/凭据解析/账户续期/配置持久化 4 文件/98 项及 build:ts 通过。实际合成登录→退出→fresh resolution 覆盖 API-key/account，两种凭据均从落盘移除；另有共享连接、独立替换及环境覆盖控制。移除清理接线时两种 fresh resolution 均真实断言失败，源码逐字节恢复后 98 项通过。材料 `.tmp/phase19-repair/a05-reversal.log`。
 - 五项静态/文档门通过，NormProof 图义务满足、4 项既有 ceiling advisory 仍 partial。当前仅本地合成凭据证据，未读取真实配置或发真实认证请求；最终集成、平台及精确远端 CI 继续开放，Phase19 active，交付另验。
+
+`afa42081f46ea9e817da46ab324f298286076f73` 已推送、远端分支读回一致；CI `38571317384`/job `115876958197`、Watch `38571317465`/job `115876958026` 各自 annotations 确认付款/spending-limit 未启动，failure、`steps=[]`，无远端通过。
+
+### 10.7 A09/A15/A19 — MCP 目录、批准契约与取消
+
+- [force 组合](../../packages/ts-shell/src/cli/runtime/ruleControls.ts) 消费会话原 gateway；[工具目录](../../packages/ts-shell/src/cli/runtime/tools.ts) 的临时 owner 同样注入现有 OAuth 服务并按原生命周期关闭。选择、下一请求及配置/凭据撤销使用相同认证来源，不新建认证存储。
+- [catalog](../../packages/ts-shell/src/core/mcp/catalog.ts) 为完整服务端定义分配不透明 contractId，相同定义在同一物理连接内复用；schema、annotations、输出/执行声明等任一变化或重连均失效。原 catalog 上限和分页保留，只保留当前比较基线。[registry](../../packages/ts-shell/src/core/tools/registry.ts) 捕获该身份并经现有 wrapper 送到 [gateway](../../packages/ts-shell/src/core/mcp/gateway.ts)/[client](../../packages/ts-shell/src/core/mcp/client.ts)；实际派发前复查最新目录、源配置与工作区，拒绝旧批准，不能仅凭名称相同执行。
+- 同一调用链将父 signal 传入连接、发现及真实 SDK tools/call；预取消零派发，在途取消保留“结果未确认、远端可能已发生 effect、未重放”的失败，不承诺回滚。请求监听按原 finally 清理，健康连接可继续后续请求。
+- 定向实读参考 MCP：发现与能力注册复用已连接客户端；list-changed 替换原 registry；取消先检查预取消并清理监听。采用相同 owner/生命周期决定。其替换 registry 不能撤销已经捕获的当轮旧定义，且仅 race Promise 不证明真实 RPC 取消；本项目因此在现有调用边界绑定完整定义并消费 SDK signal，未照搬这两个不足。
+- Node20.3 隔离环境受影响 12 文件/93 项、build:ts及五门通过。实际合成 OAuth→force→下一工具请求只握手一次；临时目录也可认证，凭据撤销后零新增调用。同名 annotations/inputSchema/outputSchema/connection 在 Plan 批准等待期间改变，四项均零 tools/call；未变定义原批准控制仍通过。真实 held RPC 父取消收到一次 notifications/cancelled，零重放，预取消零调用，后续复用同一进程成功。
+- 两处目录接线、旧契约接线、父取消接线分别反转，实际失败 1/1/4/1 项且均为行为断言；源码逐字节恢复。首轮公开 tool.result 的 metadata 断言属于测试契约误用，改为检查事件实际公开的 failureReason 分类和 output；没有修改事件契约。反转后最终两文件复验另记，材料 `.tmp/phase19-repair/a09-shared-reversal.log`、`a09-owned-reversal.log`、`a15-reversal.log`、`a19-reversal.log`。
+- NormProof 无阻断项、同 4 项既有 ceiling advisory/partial。证据是本地合成 HTTP/真实 stdio 协议链，不代表真实账户、部署或平台互通；最终集成/独立审查/精确远端 CI 仍开放，Phase19 active，交付另验。
+
+反转精确恢复后，最终 MCP CLI/HTTP 两文件 25 项通过；这是同一生产源码的复验，不与 93 项累加。

@@ -144,7 +144,7 @@ async function mcpToolsForRun(
     const tools = request.catalogContent ? snapshot.tools.filter(tool => request.catalogContent!.mcpTools?.some(captured => sameValue(captured, tool))) : snapshot.tools;
     if (tools.length === 0) return undefined;
     return { tools, gateway: gateway.invokeTool ? {
-      invokeTool: (server, tool, args) => gateway.invokeTool!(server, tool, args, request.admission),
+      invokeTool: (server, tool, args, _admission, options) => gateway.invokeTool!(server, tool, args, request.admission, options),
     } : undefined };
   } catch (error) {
     // A snapshot that threw registers nothing, so the model is told nothing

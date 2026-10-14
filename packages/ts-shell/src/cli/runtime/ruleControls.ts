@@ -5,9 +5,11 @@ import { captureWorkspaceRoot } from '../../core/workspace/roots.js';
 import { contextAttachments } from './attachments.js';
 import { ruleCommandsFor } from './rules.js';
 import { toolPoolFor } from './tools.js';
+import type { ToolCatalogInput } from '../../core/tools/catalog.js';
 
 /** Install one-use selection and delegate file behavior to its existing owners. */
-export function installRuleControlRuntime(input: { readonly runtimeContext: ShellRuntimeContext; readonly sessionManager: SessionManager; readonly busy?: () => boolean }): void {
+export function installRuleControlRuntime(input: { readonly runtimeContext: ShellRuntimeContext; readonly sessionManager: SessionManager;
+  readonly mcpGateway?: ToolCatalogInput['mcpGateway']; readonly busy?: () => boolean }): void {
   const context = input.runtimeContext;
   const rules = ruleCommandsFor(context, input.busy ?? (() => false));
   let pending: { tool: string; current: () => boolean } | undefined;
@@ -28,7 +30,7 @@ export function installRuleControlRuntime(input: { readonly runtimeContext: Shel
         && captureWorkspaceRoot(cwd, cwd, 'read').identity === root.identity && ticket === version; }
       catch { return false; }
     };
-    const available = await toolPoolFor(context)();
+    const available = await toolPoolFor(context, input.mcpGateway)();
     if (!current()) throw new Error('Tool selection session, workspace or configuration changed.');
     if (!available.has(name)) throw new Error("Tool '" + name + "' is not available in the current tool pool.");
     pending = { tool: name, current };

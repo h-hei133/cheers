@@ -3,6 +3,8 @@ export type McpTransport = 'stdio' | 'http' | 'ws' | 'sdk'
 export type McpConfigScope = 'user' | 'project'
 
 export interface McpToolDescriptor {
+  /** Opaque identity of the full server definition on this physical connection. */
+  readonly contractId?: string
   readonly serverName: string
   readonly toolName: string
   readonly qualifiedName: string
@@ -14,6 +16,11 @@ export interface McpToolDescriptor {
     readonly idempotentHint?: boolean
     readonly openWorldHint?: boolean
   }
+}
+
+export interface McpToolInvocation {
+  readonly signal?: AbortSignal
+  readonly contractId?: string
 }
 
 export interface McpServerConfig {

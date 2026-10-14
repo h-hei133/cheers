@@ -12,7 +12,7 @@ import { McpContentChannel } from "./content/channel.js";
 import type { McpContentRequest, McpContentResult, McpNotificationSnapshot } from "./content/types.js";
 import { McpClassifiedError, classifyMcpFailure } from "./errorTaxonomy.js";
 import type { McpFailureClass } from "./errorTaxonomy.js";
-import type { McpConnectionState, McpToolCallResult, McpToolDescriptor, ScopedMcpServerConfig } from "./types.js";
+import type { McpConnectionState, McpToolCallResult, McpToolDescriptor, McpToolInvocation, ScopedMcpServerConfig } from "./types.js";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_TOOL_PAGES = 100;
@@ -28,6 +28,7 @@ export class CoreMcpClient {
   private closing?: Promise<void>;
   private readonly abort = new AbortController();
   private catalog?: McpToolCatalog;
+  private contractCatalog?: McpToolCatalog;
   private listedTools?: McpToolDescriptor[];
   private catalogRevision = 0;
   private contentChannel?: McpContentChannel;
@@ -117,10 +118,10 @@ export class CoreMcpClient {
     }
   }
 
-  async listTools(admission?: Admission): Promise<McpToolDescriptor[]> {
+  async listTools(admission?: Admission, signal?: AbortSignal): Promise<McpToolDescriptor[]> {
     this.listedTools = undefined;
     this.changed?.();
-    const client = await this.requireClient(admission);
+    const client = await this.requireClient(admission, signal);
     const revision = ++this.catalogRevision;
     if (!client.getServerCapabilities()?.tools) {
       this.catalog = new McpToolCatalog([]);
@@ -138,7 +139,7 @@ export class CoreMcpClient {
         // SDK listTools replaces its metadata cache per page; retain the complete catalog ourselves.
         const result = await this.withCancellation(signal => client.request(
           { method: "tools/list", params: cursor ? { cursor } : {} },
-          ListToolsResultSchema, { timeout: this.timeoutMs, signal }));
+          ListToolsResultSchema, { timeout: this.timeoutMs, signal }), signal);
         if (this.closed || !this.connected || revision !== this.catalogRevision) throw new Error("MCP tool catalog changed during listing");
         metadata.push(...result.tools);
         for (const tool of result.tools) tools.push({
@@ -152,10 +153,12 @@ export class CoreMcpClient {
         if (tools.length > MAX_TOOLS) throw new Error("MCP tool catalog exceeds tool limit");
         cursor = result.nextCursor;
         if (cursor === undefined) {
-          this.catalog = new McpToolCatalog(metadata);
-          this.listedTools = structuredClone(tools);
+          this.catalog = new McpToolCatalog(metadata, this.contractCatalog);
+          this.contractCatalog = this.catalog;
+          const bound = tools.map(tool => ({ ...tool, contractId: this.catalog!.contractId(tool.toolName)! }));
+          this.listedTools = structuredClone(bound);
           this.changed?.();
-          return tools;
+          return bound;
         }
         if (!cursor || cursors.has(cursor)) throw new Error("MCP tool catalog repeated an invalid cursor");
         cursors.add(cursor);
@@ -188,18 +191,22 @@ export class CoreMcpClient {
       ...(live ? live.notifications.snapshot() : { entries: [], dropped: 0 }) };
   }
 
-  async invokeTool(toolName: string, args: Record<string, unknown>, admission?: Admission): Promise<McpToolCallResult> {
-    const client = await this.requireClient(admission);
-    if (!this.catalog) await this.listTools(admission);
+  async invokeTool(toolName: string, args: Record<string, unknown>, admission?: Admission, options?: McpToolInvocation): Promise<McpToolCallResult> {
+    const signal = options?.signal;
+    const client = await this.requireClient(admission, signal);
+    if (!this.catalog) await this.listTools(admission, signal);
     const catalog = this.catalog!;
-    catalog.assertCallable(toolName);
+    catalog.assertCallable(toolName, options?.contractId);
     let response: unknown;
     assertAdmission(admission);
+    signal?.throwIfAborted();
     try {
       response = await this.withCancellation(signal => client.request(
         { method: "tools/call", params: { name: toolName, arguments: args } }, ResultSchema,
-        { timeout: this.timeoutMs, signal }));
+        { timeout: this.timeoutMs, signal }), signal);
     } catch (error) {
+      if (signal?.aborted) throw new McpClassifiedError(classifyMcpFailure({ failureClass: 'timeout-cancelled',
+        detail: 'MCP tool result is unconfirmed after cancellation; remote effects may have occurred. No operation was replayed.' }));
       // Remote rejections are protocol failures; returned data is validated separately below.
       throw protocolFailure(error, "protocol");
     }
@@ -242,6 +249,7 @@ export class CoreMcpClient {
   private async disposeTransport(): Promise<void> {
     this.connected = false;
     this.catalog = undefined;
+    this.contractCatalog = undefined;
     this.contentChannel = undefined;
     await this.transport?.close();
     this.client = undefined;

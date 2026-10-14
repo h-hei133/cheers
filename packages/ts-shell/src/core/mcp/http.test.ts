@@ -14,6 +14,11 @@ import { credentialPath, readCredentials } from '../../cli/mcp/auth/store.js';
 import { validateDiscovery } from '../../cli/mcp/auth/record.js';
 import { loadMcpConfigs } from './config/document.js';
 import type { ToolGateOptions } from '../../turn/tools.js';
+import { createShellRuntimeContext } from '../shell/runtimeContext.js';
+import { getRuntimeConfig } from '../../config/runtimeConfig.js';
+import { installRuleControlRuntime, takeForcedTool } from '../../cli/runtime/ruleControls.js';
+import { createCliMcpGateway } from '../../entrypoints/cliMcpModule.js';
+import { toolPoolFor } from '../../cli/runtime/tools.js';
 
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => { vi.useRealTimers(); await Promise.all(cleanups.splice(0).reverse().map(cleanup => cleanup())); cleanupAdvisorHarnesses(); });
@@ -133,6 +138,25 @@ it('persists renewal before using its bearer token and never replays a lost tool
   expect(f.calls.filter(call => call.route === '/token')).toHaveLength(2);
   const client = f.client(); await client.connect(); await client.listTools(); f.loseResult();
   await expect(client.invokeTool('echo', {})).rejects.toThrow(/no operation was replayed|closed/i);
+  expect(f.calls.filter(call => call.body.includes('tools/call'))).toHaveLength(1);
+});
+
+it('uses the authenticated gateway for force selection and the next tool call, then refuses revoked credentials', async () => {
+  const f = await fixture(); f.requireAuth(); expect((await f.auth()).report?.facts.status).toBe('persisted');
+  const context = createShellRuntimeContext({ cwd: f.root, projectRoot: f.root, gitRoot: null, originalCwd: f.root,
+    rootMode: 'direct', targetPathBase: f.root, gitContext: { insideGit: false, root: null, branch: null, isClean: true },
+    runtimeConfig: { ...getRuntimeConfig(f.root), enableMcpTools: true }, session: f.session });
+  const gateway = createCliMcpGateway(f.root); cleanups.push(() => gateway.close());
+  installRuleControlRuntime({ runtimeContext: context, sessionManager: f.manager, mcpGateway: gateway });
+  await expect(context.forceTool!('mcp__remote__echo')).resolves.toContain('Selected available tool');
+  expect(takeForcedTool(context)).toBe('mcp__remote__echo');
+  const pool = await toolPoolFor(context, gateway)();
+  expect(await pool.get('mcp__remote__echo')!.execute({}, { taskId: 'forced', workspaceRoot: f.root })).toMatchObject({ success: true });
+  expect(f.calls.filter(call => call.body.includes('"method":"initialize"'))).toHaveLength(1);
+  expect((await toolPoolFor(context)()).has('mcp__remote__echo')).toBe(true);
+  fs.unlinkSync(f.service.target); await gateway.configurationChanged('remote');
+  await expect(context.forceTool!('mcp__remote__echo')).rejects.toThrow('not available');
+  expect(takeForcedTool(context)).toBeUndefined();
   expect(f.calls.filter(call => call.body.includes('tools/call'))).toHaveLength(1);
 });
 

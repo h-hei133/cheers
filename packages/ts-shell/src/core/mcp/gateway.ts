@@ -12,6 +12,7 @@ import type {
   McpClientSnapshot,
   McpConnectionState,
   McpToolCallResult,
+  McpToolInvocation,
   ScopedMcpServerConfig,
 } from "./types.js";
 import {
@@ -78,27 +79,33 @@ export class CoreMcpGateway {
     await this.run(async () => { await this.prepare(); });
   }
 
-  invokeTool(serverName: string, toolName: string, args: Record<string, unknown>, admission = this.admissionForOperation?.()): Promise<McpToolCallResult> {
+  invokeTool(serverName: string, toolName: string, args: Record<string, unknown>, admission = this.admissionForOperation?.(), options?: McpToolInvocation): Promise<McpToolCallResult> {
     return this.run(async () => {
+      options?.signal?.throwIfAborted();
       assertAdmission(admission);
       const configs = await this.prepare();
       const config = configs[serverName];
       if (!config) throw unknownServer(serverName);
       assertAdmission(admission);
       const client = this.connectionManager.get(serverName, config, this.workspaceRoot);
-      const state = await client.connect(admission);
+      const state = await client.connect(admission, options?.signal);
       if (state.type !== "connected") throw this.createUnavailableServerBlockedError(state);
       assertAdmission(admission);
-      const liveTools = await client.listTools(admission);
-      if (!liveTools.some(tool => tool.toolName === toolName)) {
+      const liveTools = await client.listTools(admission, options?.signal);
+      if (!liveTools.some(tool => tool.toolName === toolName && (options?.contractId === undefined || tool.contractId === options.contractId))) {
         throw new McpGatewayBlockedError({
-          message: "MCP tool " + toolName + " is unavailable on server " + serverName,
+          message: "MCP tool " + toolName + " is unavailable or its definition/connection changed on server " + serverName,
           blockerKind: "unknown", mcpFailureClass: "tool-unavailable",
           doNext: "Run /mcp refresh " + serverName + " and retry with a visible MCP tool.",
         });
       }
       assertAdmission(admission);
-      return client.invokeTool(toolName, args, admission);
+      if (JSON.stringify(this.loadConfigs()[serverName]) !== JSON.stringify(config)
+        || this.workspaceRoot !== (typeof this.root === 'string' ? this.root : this.root())) {
+        throw new McpGatewayBlockedError({ message: 'MCP source or workspace changed before tool dispatch.',
+          blockerKind: 'unknown', mcpFailureClass: 'tool-unavailable', doNext: 'Refresh tools and obtain a new approval.' });
+      }
+      return client.invokeTool(toolName, args, admission, options);
     });
   }
 
