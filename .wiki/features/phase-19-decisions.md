@@ -2641,3 +2641,13 @@ Node20.3 直接受影响 22 文件/315 项、TypeScript 与 Linux 单文件构�
 - 定向实读参考 edit 的按文件 mutation queue、每次异步 I/O 后检查取消及 BOM/换行保留决定：继续保留原锁生命周期和精确原文政策。参考 `ops.readFile` 为全量读取且无本项目批准计划/操作收据契约，本批不照搬此资源行为；预算贯穿持久化后的实际消费者，不以预览截断代替。
 - Node20.3 隔离环境 patch/operation/writeAccess/workspace-files 共 5 文件/71 项、`build:ts` 通过。四项实际文件扩展覆盖批准后、快照后、发布前和写后读回；所有阶段零无界目标 `readFileSync`，巨型目标零正文读取。前两阶段零目标写入/零操作收据；writer intent 后结果保留 unknown，不因失败即声称零写或已补偿。移除计划预算时四项分别观察到 1/2/5/6 次无界读取而真实失败，精确恢复后组合套件通过。初轮发布前注入误命中元数据 writer、读回探针误用可复用 inode，均属夹具错误，收窄到目标目录及当前目标 inode 后通过。
 - 五项本地静态/文档门及 diff 空白检查通过；NormProof 图义务满足、4 项既有 ceiling advisory 保留、整体 partial。当前证据限本地 patch 资源链；非 Linux 对象保证、最终集成/独立审查/真实平台和精确 CI 继续开放。材料 `.tmp/phase19-repair/a10-reversal.log`、`patch-normproof/`；交付另验，Phase19 active。
+
+`1f142a3e2dd39f7946dede23cd5c923dabf8a52a` 已推送、远端同 SHA。CI `38569160450`/job `115869476209`、Watch `38569160367`/job `115869474787` 均 completed/failure、`steps=[]`；各自 annotations 确认付款/spending-limit 未启动，不计远端通过。
+
+### 10.4 A06/A08/A24 — 诊断及顾问检查点脱敏
+
+- [trace 投影](../../packages/ts-shell/src/observability/diagnostics.ts) 对所有公开字符串统一消费原报告脱敏器及 240 字符上限，包括 timestamp/trace/span/request/tool/component；可选 ID 缺失仍保持 undefined，duration 不推断。[report](../../packages/ts-shell/src/core/commands/reportCommandRuntime.ts) 的外部工具名同样使用原有 scrubber 和 redactions 记录，保留实际数量及 reported/unavailable 语义。
+- [顾问检查点](../../packages/ts-shell/src/advisor/checkpoint.ts) 在 JSON 序列化工具调用前先对 id、工具名和已经编码的 arguments 分别应用原 secret-only scrubber，再保留原有整体过滤、终端字符处理及截断。不能先把参数里的引号再次转义，再期望原始 JSON 凭据规则仍然匹配；未扩大报告过滤去删除顾问所需的正常证据。
+- 定向实读参考遥测的外部 hook 名清理：元数据也必须在传输出口前清理，路径/参数不能因字段名称是 name 而免检；采用这一决定。其工具遥测保留结构化 function_args，未提供本项目双重编码检查点的同等保证；本批在原 owner 的序列化之前调用共享过滤器，不另造日志或正则规则。
+- Node20.3 隔离环境 8 文件/53 项、`build:ts` 通过。三项新增反例分别从真实 logger 写入到 trace JSON/HTML、从真实工具目录到独立解压的所有归档成员、从编码工具参数到持久检查点及实际顾问派发；普通可见证据、工具数量和缺失 ID 控制保留。恢复三处旧 owner 时各有一项实际泄漏断言失败，逐字节恢复后组合验证。材料 `.tmp/phase19-repair/a06-reversal.log`、`a08-reversal.log`、`a24-reversal.log`。
+- 五项本地静态/文档门及 diff 空白检查通过。当前证据限本地合成数据路径；本批没有真实凭据/provider 请求、独立审查或最终集成/远端 CI 成功证据，其余 §9 问题继续开放。Phase19 active，交付另验。

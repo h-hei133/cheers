@@ -21,4 +21,19 @@ describe('/report observability facts', () => {
     expect(report.observability.tools.count).toBe(1);
     fs.rmSync(root, { recursive: true, force: true });
   });
+
+  it('scrubs external tool names in every extracted archive member and reports the redaction', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-report-tools-'));
+    try {
+      sink = new RotatingFileSink({ logDir: root, filePrefix: 'report', pid: 4568 }); setGlobalRotatingFileSink(sink);
+      const target = path.join(root, 'report.zip');
+      const names = ['read', 'external.token=PRIVATE_TOOL_NAME', 'external.sk-syntheticPrivateKey12345'];
+      const result = await runReportCommand([target], { cwd: root, getToolPool: async () => new Map(names.map(name => [name, {} as never])) } as never);
+      const contents = execFileSync('unzip', ['-p', target], { encoding: 'utf8' });
+      expect(contents).not.toMatch(/PRIVATE_TOOL_NAME|syntheticPrivateKey12345/);
+      const report = JSON.parse(execFileSync('unzip', ['-p', target, 'report.json'], { encoding: 'utf8' }));
+      expect(report.observability.tools).toMatchObject({ status: 'reported', count: 3 });
+      expect(report.observability.tools.names).toContain('read'); expect(result.output).toContain('unsafe-content');
+    } finally { sink?.flushAndClose(); fs.rmSync(root, { recursive: true, force: true }); }
+  });
 });

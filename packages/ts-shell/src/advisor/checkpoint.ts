@@ -17,7 +17,8 @@ export function captureAdvisorCheckpoint(store: AdvisorStore, session: Session, 
   const origins = store.getTranscriptEvents(session.id).filter(event => event.type === 'message' && event.id === boundary.sourcePromptEntryId);
   if (origins.length !== 1 || origins[0]?.type !== 'message' || origins[0].role !== 'user') throw new Error('Advisor checkpoint source is unverified.');
   const rendered = boundary.messages.map(message => `${message.role}: ${messageToText(message.content)}${message.tool_calls?.length
-    ? `\nTool calls: ${JSON.stringify(message.tool_calls)}` : ''}`).join('\n\n');
+    ? `\nTool calls: ${JSON.stringify(message.tool_calls.map(call => ({ ...call, id: redactExportText(call.id),
+      function: { name: redactExportText(call.function.name), arguments: redactExportText(call.function.arguments) } })))}` : ''}`).join('\n\n');
   const text = advisorText(rendered, 32768) || '[empty checkpoint]';
   const checkpoint = { id: randomUUID(), timestamp: new Date().toISOString(), sourcePromptEntryId: boundary.sourcePromptEntryId,
     step: boundary.step, willContinue: boundary.willContinue, failed: boundary.failed, text, truncated: rendered.length > 32768,

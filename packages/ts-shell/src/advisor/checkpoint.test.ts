@@ -4,6 +4,7 @@ import { runTurn } from '../turn/session.js';
 import { HookDispatcher } from '../core/hooks/hookDispatcher.js';
 import type { StepFunction } from '../turn/step.js';
 import { readAdvisor } from './store.js';
+import type { AdvisorBoundary } from './model.js';
 
 afterEach(cleanupAdvisorHarnesses);
 
@@ -80,6 +81,21 @@ it('rejects an unverified prompt origin without dispatching or failing the main 
   await setup.runtime.capture({ ...setup.boundary('evidence'), sourcePromptEntryId: 'missing' }, runner, setup.signal);
   expect(runner).not.toHaveBeenCalled(); expect(setup.runtime.view().checkpoints).toHaveLength(0);
   expect(setup.reports.join('\n')).toContain('main turn continues without advice');
+});
+
+it('scrubs encoded tool arguments before checkpoint serialization, storage and advisor dispatch', async () => {
+  const setup = createAdvisorHarness(); const prompts: string[] = [];
+  const original = setup.boundary('VISIBLE_EVIDENCE');
+  const boundary: AdvisorBoundary = { ...original, messages: [...original.messages,
+    { role: 'assistant', content: '', tool_calls: [{ id: 'call-1', type: 'function',
+      function: { name: 'inspect', arguments: JSON.stringify({ token: 'PRIVATE_ARGUMENT_TOKEN', nested: { password: 'PRIVATE_ARGUMENT_PASSWORD' }, keep: 'VISIBLE_ARGUMENT' }) } }] }] };
+  await setup.runtime.capture(boundary, async input => { prompts.push(input.prompt); return advisorResult(); }, setup.signal);
+  const stored = JSON.stringify(setup.runtime.view());
+  expect(prompts).toHaveLength(1);
+  for (const output of [stored, ...prompts]) {
+    expect(output).not.toMatch(/PRIVATE_ARGUMENT_(?:TOKEN|PASSWORD)/);
+    expect(output).toContain('VISIBLE_ARGUMENT'); expect(output).toContain('VISIBLE_EVIDENCE');
+  }
 });
 
 it('an asynchronous checkpoint observer failure remains report-safe and cannot fail a successful main answer', async () => {

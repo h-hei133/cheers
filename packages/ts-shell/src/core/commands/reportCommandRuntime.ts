@@ -100,7 +100,8 @@ export async function runReportCommand(
   const metrics = readMetrics(sink.getLogDir(), sink.getCurrentFilePath(), 2000);
   let tools: readonly string[] = [];
   let toolsStatus: "reported" | "unavailable" = "reported";
-  try { tools = [...(context.getToolPool ? await context.getToolPool() : new Map()).keys()].sort(); }
+  try { tools = [...(context.getToolPool ? await context.getToolPool() : new Map()).keys()].sort()
+    .map(name => redactReportText(name, MAX_FIELD_LENGTH, { redactions, projectRoot })); }
   catch { toolsStatus = "unavailable"; }
 
   const report = {

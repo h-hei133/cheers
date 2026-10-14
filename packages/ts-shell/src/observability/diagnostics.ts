@@ -43,12 +43,15 @@ function parseEntry(line: string): StructuredLogEntry | undefined {
 }
 
 export function traceRows(logs: readonly StructuredLogEntry[]): readonly TraceRow[] {
+  const text = (value: string): string => redactReportText(value, 240, { projectRoot: process.cwd() });
   return logs.map(entry => {
     const fields = entry.fields;
     const requestId = stringField(fields, 'requestId') ?? stringField(fields, 'request_id');
     const toolId = stringField(fields, 'toolCallId') ?? stringField(fields, 'tool_call_id') ?? stringField(fields, 'taskId');
     const durationMs = typeof fields.durationMs === 'number' && Number.isFinite(fields.durationMs) ? fields.durationMs : undefined;
-    return { timestamp: entry.timestamp, traceId: entry.traceId, spanId: entry.spanId, requestId, toolId, durationMs, component: entry.component, message: redactReportText(entry.message, 240, { projectRoot: process.cwd() }) };
+    return { timestamp: text(entry.timestamp), traceId: text(entry.traceId), spanId: text(entry.spanId),
+      requestId: requestId === undefined ? undefined : text(requestId), toolId: toolId === undefined ? undefined : text(toolId),
+      durationMs, component: text(entry.component), message: text(entry.message) };
   });
 }
 
