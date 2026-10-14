@@ -1,11 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { userDataDir } from '../../../paths/userHome.js';
-import { hashContent, inspectWorkspaceFile, pathIdentity } from '../../../workspace/files.js';
-import { commitWorkspaceFile } from '../../../../edit/authority/commit.js';
-import { withFileLock } from '../../../../session/store/sessionFileStore.js';
-import { validateToolArguments } from '../../../tools/arguments.js';
-import type { ResetAttempt } from './model.js';
+import { userDataDir } from '../../core/paths/userHome.js';
+import { hashContent, inspectWorkspaceFile, pathIdentity } from '../../core/workspace/files.js';
+import { commitWorkspaceFile } from '../../edit/authority/commit.js';
+import { withFileLock } from '../../session/store/sessionFileStore.js';
+import { validateToolArguments } from '../../core/tools/arguments.js';
+import type { ResetAttempt } from '../../core/auth/account/usage/model.js';
 
 const text = { type: 'string', minLength: 1, maxLength: 512 };
 const digest = { type: 'string', pattern: '^[a-f0-9]{64}$' };

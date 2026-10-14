@@ -7,7 +7,7 @@ import { SessionManager } from '../../session/SessionManager.js';
 import { HookDispatcher } from '../../core/hooks/hookDispatcher.js';
 import { routeSlashCommand } from '../../core/commands/slashRouter.js';
 import { installUsageRuntime, usageCommandFor, usageResetApproval } from './usage.js';
-import { readResetAttempts, updateResetAttempts } from '../../core/auth/account/usage/state.js';
+import { readResetAttempts, updateResetAttempts } from '../usage/state.js';
 import { hashContent } from '../../core/workspace/files.js';
 import * as network from '../../core/network/connection.js';
 

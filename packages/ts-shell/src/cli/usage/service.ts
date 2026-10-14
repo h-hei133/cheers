@@ -1,18 +1,18 @@
 import { randomUUID } from 'node:crypto';
-import type { OpenAIAccountAuthConfig } from '../../../../config/runtimeConfig.js';
-import { sameValue } from '../../../../config/values.js';
-import type { ProviderCredentialResolution } from '../../../shell/providerCredentials.js';
-import { captureAccountEdit } from '../state.js';
-import { hashContent } from '../../../workspace/files.js';
-import { loadAccountUsage, consumeResetCredit, AccountUsageError } from './remote.js';
+import type { OpenAIAccountAuthConfig } from '../../config/runtimeConfig.js';
+import { sameValue } from '../../config/values.js';
+import type { ProviderCredentialResolution } from '../../core/shell/providerCredentials.js';
+import { captureAccountEdit } from '../../core/auth/account/state.js';
+import { hashContent } from '../../core/workspace/files.js';
+import { loadAccountUsage, consumeResetCredit, AccountUsageError } from '../../core/auth/account/usage/remote.js';
 import { readResetAttempts, updateResetAttempts } from './state.js';
-import type { ResetAttempt, AccountUsage } from './model.js';
-import type { ToolDefinition, ToolExecutionContext } from '../../../../tools/types.js';
-import { runPreparedTool } from '../../../../turn/invoke.js';
-import type { ToolGateOptions } from '../../../../turn/tools.js';
-import { readOnlyTool } from '../../../tools/capability.js';
-import { neutraliseForDisplay } from '../../../text/safety.js';
-import type { EscalationPrompt, EscalationResponse } from '../../../shell/approval/contract.js';
+import type { ResetAttempt, AccountUsage } from '../../core/auth/account/usage/model.js';
+import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js';
+import { runPreparedTool } from '../../turn/invoke.js';
+import type { ToolGateOptions } from '../../turn/tools.js';
+import { readOnlyTool } from '../../core/tools/capability.js';
+import { neutraliseForDisplay } from '../../core/text/safety.js';
+import type { EscalationPrompt, EscalationResponse } from '../../core/shell/approval/contract.js';
 
 export interface AccountUsageHost {
   current(): { readonly workspace: string; readonly sessionId: string; readonly resolution: ProviderCredentialResolution };
