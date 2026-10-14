@@ -2360,3 +2360,21 @@ Node20.3 直接受影响 22 文件/315 项、TypeScript 与 Linux 单文件构�
 独立 code **APPROVE**（34项及12探针）；architecture **WATCH，无 blocker**（61项、Linux分支13探针、隔离原生Windows11探针；两项不支持的UNC symlink夹具not-run）。综合 **COMMENT（限本批）**。架构 lane 原生复现了两次检查之间移出父目录、读取后恢复原目录的漏检：仍返回正文和来源。此项检查点限制须保留，不能将当前修复称为非Linux actual-object绑定。每次新增检查成本随授权根内路径深度增长，尚无深层/高延迟文件系统性能基准。
 
 见[验收 §24](phase-19-acceptance.md)，材料 `.tmp/object-binding/`。早期 Windows 环境没有跨 WSL 转发的结果保留为 unisolated 中间材料；最终 Windows launcher 在实际子进程中断言隔离 home/temp 和 synthetic provider。UNC hardlink/move、错误Node路径、参考probe夹具与参数失败均按harness/setup保存，不计行为通过。当前全套、NTFS/macOS、未观察树/镜像成本、真实设备/服务/W7-33及远端CI要求仍开放；Phase19 **active**，本批提交/推送/精确CI另验。
+
+该检查点修复已提交/推送 `18e93858a0b1070f20fda6747f847637bf3810b8`，远端与 PR #1 同 SHA，冻结源码/文档 blob 和用户 `.gitignore` 原字节核验通过。精确 CI38519142547/job115704587247、Watch38519142544/job115704586815 均付款/spending-limit 阻止启动、steps=[]、failure，没有远端验证通过；材料 `.tmp/object-binding/delivery.json`。
+
+### 8.160 SAFE-02：共享写入边界与原始路径检查（2026-10-14）
+
+原生 Windows Node20.3 的工作区文件 owner 仍使用会折叠大小写的 `path.relative`：不同 inode 的 `Root/root` 被视为同一根，既有/新建/缺失祖先目标准入，pre-read 泄出外部正文，实际 `authority.writeFile` 改写外部文件。绝对路径 facade 还把 sibling 的同名文件映射为授权根内的另一个文件。隔离 baseline 保留实际改写并立即恢复原字节；七项回归在原实现上真实失败，三个控制通过。
+
+裁决在 [core/workspace/files](../../packages/ts-shell/src/core/workspace/files.ts) 复用原 `verifyPathContainment`，同一 owner 在转换为相对路径前沿**原请求路径**向上检查组件，并用 lstat 身份确认已选根或其规范根。内部链接和未选的根链接都拒绝，显式已选根别名与其规范绝对路径继续允许。[写入 facade](../../packages/ts-shell/src/edit/authority/workspace.ts) 委派该 owner，原 guarded committer、undefined/false 拒绝契约和公开结果保持。定向比较 pathname 工具与原生 no-follow 决策后，不把规范目标在根内当作原始路径无链接的证明；没有新执行平面、产品依赖或重复校验系统。
+
+独立两路拒绝了初版的 source-link 漏检/错误映射及测试夹具的大小写敏感要求；中间版本又误拒绝与规范根词法折叠等价的已选别名。原 HIGH/REQUEST CHANGES/BLOCK、失败探针及中间字节均保留；最终修复实际 source walk 与两个显式根身份。测试用 `Root/Outside`、保留后缀拼写的局部词法模拟和不依赖 symlink 权限的局部 fs 模拟；实链接另外由隔离 Linux 探针验证。
+
+最终 3TS/2production，冻结 `.tmp/workspace-boundary/freeze.json`。Node20.3 受影响 **11 文件/142 项**全部通过，两构建与五个本地门通过；完整 judge 的解析/无环义务 satisfied，4 个既有 ceiling advisory 仍使整体 partial，本批 owner 名数9/15。四项隔离反转分别恢复旧检查、错误组件遍历、facade 前缀丢弃和仅选根身份，实际触发10/3/5/1项断言失败；正向14项通过，源码/用户 `.gitignore` 原字节保持。
+
+独立 code **APPROVE**（6文件/88项、编译owner和原生Windows9组）；architecture **CLEAR**（Linux34检查、原生Windows28断言及独立14项测试），综合 **APPROVE，限本批冻结**。两路五个owner转译与dist字节一致，冻结前后hash匹配。UNC上的Linux链接在Windows报EISDIR，创建file link/junction报EPERM/EISDIR；这些native链接控制未验，不计通过。可选native Vitest未执行任何case：Linux依赖树缺Windows Rollup模块，保留为toolchain unavailable。
+
+实际 Linux 单文件 CLI 的越界补丁零写入/零收据，合法批准创建保留精确正文并由原 operation store核验committed收据；共4次loopback合成POST。Windows Node CLI拒绝越界补丁，但合法创建在快照阶段停止，零目标写入；隔离当前/原HEAD owner对照确认原exclusive hardlink在WSL UNC返回ENOTSUP，是既有平台能力限制，**Windows合法创建和收据未通过**。初版harness缺文件异常被finally断言覆盖，修正诊断后另存最终观察，不把exit0计为写入成功。
+
+原生绑定探索的两个候选也不足：`NtCreateFile/OBJ_DONT_REPARSE`只读普通本地Windows对象成功，却拒绝普通WSL UNC（0xc000050b/4395）；没有delete sharing的目录锚点仍允许Windows及Linux发起的UNC移动，句柄仍读原对象，路径返回旧名或错误。材料 `.tmp/object-binding/anchors-windows.json`，没有进入产品。见[验收 §25](phase-19-acceptance.md)。本批局部修复不关闭完整非Linux对象绑定、检查之间的变化、未观察树/镜像成本、Windows创建/NTFS/macOS、IME/设备/真实服务/W7-33及当前全套/远端CI；Phase19 **active**，提交/推送和精确CI另验。

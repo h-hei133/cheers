@@ -6623,3 +6623,11 @@ Windows Node20.3 经仓库 UNC 运行实际 CLI：零输入启动/EOF、print、
 原生Windows复现父目录移出/硬链接替代后leaf完整revision不变而仍读取发布；共享read owner现于open前捕获规范父目录至授权根、在已有检查点复验身份，允许无关sibling更新。2TS/1production，Node20.3受影响22文件/315项、两构建/四源码门通过，完整judge图义务满足、4既有ceiling advisory仍partial，owner函数名15。一次隔离反转令三条拒绝断言真实失败；隔离WindowsNode20.3、Linuxfloor与Windows编译read owner均零read/零发布/关闭。实际WindowsCLI和Linux单文件各2路径共8合成POST，合法正文/越界拒绝、本次ID及原字节核验。用户`.gitignore`原hash保持。
 
 独立code APPROVE、architecture WATCH无blocker，综合COMMENT（限本批）；架构原生确认两次检查之间移出/读取/恢复仍返回正文与来源，完整非Linux对象绑定继续开放。隔离handle-path候选在UNC移动后返回旧路径，另一候选的Windows单文件NAPI终结崩溃均未进入产品；早期环境未跨WSL转发的结果保留为unisolated中间材料，最终native consumer明确断言隔离。见[裁决§8.159](features/phase-19-decisions.md)、[验收§24](features/phase-19-acceptance.md)和`.tmp/object-binding/`。当前全套、NTFS/macOS、未观察树/镜像成本、真实服务/设备/W7-33及CI条件仍开放，Phase19 active；文档门禁/提交/推送另验。
+
+该读取修复 `18e93858a0b1070f20fda6747f847637bf3810b8` 已提交/推送、远端/PR #1同SHA、冻结blob审计通过；用户`.gitignore`原字节排除。精确CI38519142547/job115704587247、Watch38519142544/job115704586815均付款/spending-limit未启动、steps=[]、failure，无远端通过；材料 `.tmp/object-binding/delivery.json`。
+
+### 2026-10-14 — 共享写入边界与原始路径修复
+
+原生Windows真实复现Root/root不同inode越界pre-read和write，及facade同名文件错误映射，原外部字节立即恢复。共享core owner复用规范包含判断，在丢弃输入根前缀前向上检查实际组件/选根身份；薄facade委派同一owner，已选别名/规范根兼容。两路初审拒绝source-link缺口和测试夹具，另修中间canonical别名回归；最终code APPROVE/architecture CLEAR，原拒绝材料保留。3TS/2production，Node20.3受影响11文件/142项、两构建/五门通过；完整judge图义务satisfied、4既有ceiling advisory仍partial，owner名数9/15。四反转实际失败10/3/5/1项、正向14通过，源码/用户`.gitignore`原字节保持。
+
+Linux单文件实际patch CLI拒绝越界、合法批准创建及committed收据原store复验通过；Windows拒绝越界，但合法创建因原exclusive hardlink在UNC报ENOTSUP，原HEAD隔离对照同失败、零目标写入，未计通过。原生no-follow候选拒绝普通UNC，no-delete-sharing锚点仍允许双侧移动，均未入产品。见[裁决§8.160](features/phase-19-decisions.md)、[验收§25](features/phase-19-acceptance.md)，材料 `.tmp/workspace-boundary/`和`.tmp/object-binding/anchors-*`；非Linux绑定/Windows创建及其余平台/真实环境条件仍开放，Phase19 active，提交/推送/精确CI另验。

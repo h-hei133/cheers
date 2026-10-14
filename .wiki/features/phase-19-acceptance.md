@@ -104,7 +104,7 @@ Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)�
 | 公共包、认证、协作和 SSH | 受控服务、签名、ACL、撤权、重连与未知副作用 | 真实账户、公共部署 TLS、真实远端主机/主机密钥和生产互通验收 |
 | SAFE-02 | Linux 公开文件工具的检查/句柄/拒绝/清理及受管编辑目录固定；原生 Git/ripgrep 私有视图、配置准入和 child 完成收据；异步技能发现、批准前捕获与共享预算；读取期间及 catalog 发布前已捕获 manifest/ignore/Git 来源变化拒绝；本地remote-URL条件及native配置错误拒绝；已枚举目录修订、visit先捕获后探测规则，可选native/技能根来源的父目录/alias观察、已知消失传播及成功/null最终复验，见 §7–17 | 非 Linux 实际对象绑定、未观察树与私有镜像剩余成本继续开放；外部 metadata 仍拒绝，未知future hasconfig不宣称支持，资源计数器不约束原生进程内部全部读取 |
 
-技能发现的同步正文/Git 忽略路径已按 §9 替换；§10 拒绝检测到的读取期间源变化，§11–12 在 catalog 发布前复查已捕获 manifest、ignore 与 Git 来源。§14拒绝已枚举目录的已知修订变化，§15修复native visit的规则探测顺序；§16复验可选native来源已观察父目录及alias，§17观察可选技能根parent并保留已知消失状态；§22修复Windows大小写边界并保留普通路径别名，§24拒绝检查点可见的祖先身份替换。SAFE-02继续处理非Linux对象绑定、检查之间及未观察树的变化和镜像成本，扩展外部metadata/条件支持须重新证明准入。逐源检查不保证其后全部变化或整目录事务。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把W1–W16或Phase19总目标标为完成。
+技能发现的同步正文/Git 忽略路径已按 §9 替换；§10 拒绝检测到的读取期间源变化，§11–12 在 catalog 发布前复查已捕获 manifest、ignore 与 Git 来源。§14拒绝已枚举目录的已知修订变化，§15修复native visit的规则探测顺序；§16复验可选native来源已观察父目录及alias，§17观察可选技能根parent并保留已知消失状态；§22修复Windows大小写边界并保留普通路径别名，§24拒绝检查点可见的祖先身份替换，§25将共享写入/pre-read及绝对路径facade的边界检查收回同一source-path owner。SAFE-02继续处理非Linux对象绑定、检查之间及未观察树的变化和镜像成本，扩展外部metadata/条件支持须重新证明准入。逐源检查不保证其后全部变化或整目录事务。早期“继续跟踪”记录不自动变成延期批准。上述缺口存在时，不把W1–W16或Phase19总目标标为完成。
 
 ## 6. 迁移、回退与交付
 
@@ -486,3 +486,29 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 **架构WATCH仍开放：** native Windows lane 在两次检查之间移出父目录、让句柄读取、再恢复原目录，当前实现仍返回 `CHECKPOINT_OBJECT` 并发布来源，见 `review-architecture/checkpoint-win32.json`。保证止于已有检查点观察到的身份变化；不保证检查之间或最后检查之后的变化、非Linux actual-object绑定或整目录事务。新增metadata检查的成本随路径深度增长，未取得高延迟/深层文件系统基准。
 
 隔离handle-path候选在Windows UNC移动后返回旧授权名，见 `node20-object.json` 的真实AssertionError；另一桥接候选的Windows编译产物exit3/NAPI终结崩溃，builtin FFI导入成功也未证明绑定。未增加产品依赖或替换现有执行平面。当前没有重跑全仓/完整Windows套件、scripts、PTY或真实provider；§5的NTFS/macOS、未观察树/镜像成本、前端IME/设备、外部服务/W7-33与远端CI条件继续有效，Phase19 **active**。文档检查、提交blob和精确远端状态另存本批audit/delivery。
+
+检查点组件已提交/推送 `18e93858a0b1070f20fda6747f847637bf3810b8`，远端/PR #1同SHA，源码和文档blob核验通过、用户`.gitignore`原字节排除。CI38519142547/job115704587247、Watch38519142544/job115704586815均付款/spending-limit阻止启动，steps=[]、failure，未计远端验证；材料 `.tmp/object-binding/delivery.json`。
+
+## 25. 共享工作区写入边界与实际路径（2026-10-14）
+
+证据对应 `.tmp/workspace-boundary/freeze.json` 的3TS/2production：core文件owner `c15aacda…`、测试 `c14a2c27…`、edit facade `ce06a124…`。原生Windows baseline真实改写了不同inode的大小写sibling文件并恢复原字节；当前统一复用规范包含判断，在原始路径去掉根前缀前检查实际组件及已选/规范根身份。显式已选根别名保留，未选根链接及内部链接拒绝；普通Windows casing仍允许。
+
+| 检查 | 实际结果 | 材料 |
+|---|---|---|
+| 原生Windows基线 | 既有/新建/缺失祖先目标误准入、pre-read外部正文、实际越界write、facade错误映射 | `before.json`、`before-runner.log`；外部原字节恢复 |
+| 仓库基线/最终受影响 | 原实现7条回归真实失败/3控制通过；最终Node20.3 11文件/142项通过，零skip/failure | `baseline.json`、`affected.json`及其报告目录 |
+| 构建与门禁 | TS/Linux单文件构建、五本地门通过；完整judge图义务satisfied，整体partial（4既有ceiling advisory） | `build.json`、`gates.json`、`normproof-final/verdict.json` |
+| 有效反转 | 四种修改真实触发10/3/5/1项断言失败；正向14项通过，原字节不变 | `reversal.json`、`reversal-1LNWJa/` |
+| 原生Windows最终 | 所有本批越界准入/read/preview/write均拒绝，外部零改写，内部精确BOM/CRLF及普通NTFS只读casing控制通过 | `after.json`、`after-runner.json` |
+| 独立code | APPROVE：6文件/88项、5owner字节一致、编译语义及原生Windows9组 | `review-code.md`；native选根Linux symlink控制unavailable |
+| 独立architecture | CLEAR：Linux34检查、Windows28断言、独立14项测试，源码hash及owner名数9/15核验 | `review-architecture.md`；初始BLOCK/中间回归保留 |
+| 实际Linux单文件patch CLI | 越界零写入/零收据；合法批准创建及committed operation收据原store复验通过，共4合成POST | `cli-exe-linux.json`及报告目录 |
+| 实际Windows Node20.3 patch CLI | 越界零写入/零收据；合法创建因snapshot失败停止，零目标发布，未通过 | `cli-windows-node20.json`；原HEAD/当前snapshot对照均exclusive link ENOTSUP |
+
+独立初审拒绝了原source-link检查遍历错误、facade错误文件映射和case-sensitive测试夹具；中间版本的canonical已选别名误拒也实测并修复。最终两lane都返回证据，综合 **APPROVE，限冻结边界修复**。可选native Vitest在加载Windows Rollup前失败，0case，不称native测试通过；真实Windows symlink/junction控制因UNC EISDIR/EPERM不可运行，另有真实Linux链接与准确标注的词法模型证据。
+
+合法Windows创建失败已单独定位到原guarded committer的exclusive hardlink在WSL UNC报ENOTSUP；恢复原HEAD owner的隔离副本同样失败，非本批新增回归。原harness的finally断言覆盖缺文件异常已修正并保留首轮；不能因CLI exit0和模型回合完成而称写入成功。没有为绕过能力失败取消快照或独占创建约束。
+
+另外两个原生绑定候选未采用：no-follow NtCreateFile对普通WSL UNC返回0xc000050b/4395；no-delete-sharing目录锚点未阻止任一侧移动，句柄原正文仍可读、路径陈旧/报错。证据 `.tmp/object-binding/anchors-windows.json`、`anchors-runner.json`；普通本地Windows只读对象成功不证明UNC或全绑定。
+
+本批保证止于实际pathname的包含与组件身份检查点；不提供OS锁或跨检查点绑定。当前全套、非Linux对象、未观察树/镜像成本、Windows创建/NTFS/macOS、真实IME/复制/设备/服务和W7-33仍开放，Phase19 **active**。用户`.gitignore`原SHA保持排除，提交blob及精确远端结果另存本批audit/delivery。

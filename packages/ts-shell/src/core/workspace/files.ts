@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { verifyPathContainment } from '../security/pathJail.js';
 
 export type FileState = { readonly state: 'absent' } | {
   readonly state: 'exists';
@@ -10,23 +11,44 @@ export type FileState = { readonly state: 'absent' } | {
   readonly mode: number;
 };
 
-/** Refuse links in every component, including links that currently stay inside the root. */
-export function workspaceFilePath(workspaceRoot: string, relativePath: string): string {
-  const root = fs.realpathSync(workspaceRoot);
-  const absolute = path.resolve(root, relativePath);
+/** Validate the source pathname before converting it to a workspace-relative path. */
+export function workspaceRelativePath(workspaceRoot: string, targetPath: string): string {
+  const root = path.resolve(workspaceRoot);
+  const absolute = path.resolve(targetPath);
   const relative = path.relative(root, absolute);
-  if (!relative || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative) || relative.includes('\0')) {
+  if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative) || relative.includes('\0')
+    || !verifyPathContainment(absolute, root).allowed) {
     throw new Error('File target is outside the selected workspace.');
   }
-  let current = root;
-  for (const component of relative.split(path.sep)) {
-    current = path.join(current, component);
+  const boundaries = [root, fs.realpathSync(root)];
+  const boundaryIdentities = boundaries.map(boundary => fileIdentity(fs.lstatSync(boundary)));
+  let current = absolute;
+  // Windows relative() can fold distinct directory names. Inspect the actual
+  // source components and prove its root before callers discard that prefix.
+  for (;;) {
+    const boundary = boundaries.find((candidate, index) => {
+      if (current !== candidate && path.relative(candidate, current) !== '') return false;
+      try { return fileIdentity(fs.lstatSync(current)) === boundaryIdentities[index]; }
+      catch { return false; }
+    });
+    if (boundary !== undefined) break;
     try {
       if (fs.lstatSync(current).isSymbolicLink()) throw new Error('File target contains a symlink.');
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
+    const parent = path.dirname(current);
+    if (parent === current) throw new Error('File target is outside the selected workspace.');
+    current = parent;
   }
+  return relative;
+}
+
+/** Refuse links in every component, including links that currently stay inside the root. */
+export function workspaceFilePath(workspaceRoot: string, relativePath: string): string {
+  const root = fs.realpathSync(workspaceRoot);
+  const absolute = path.resolve(root, relativePath);
+  if (!workspaceRelativePath(root, absolute)) throw new Error('File target is outside the selected workspace.');
   return absolute;
 }
 

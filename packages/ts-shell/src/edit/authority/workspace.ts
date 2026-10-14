@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { commitWorkspaceFile } from './commit.js';
 import { inspectWorkspaceFile, workspaceFilePath } from './state.js';
+import { workspaceRelativePath } from '../../core/workspace/files.js';
 
 export type WorkspaceWriteTargetAuthority =
   | {
@@ -66,7 +67,8 @@ export function createWorkspaceWriteAuthority(workspaceRootInput: string): Works
   const root = fs.realpathSync(workspaceRootInput);
   const relative = (absolute: string) => {
     const lexical = path.relative(path.resolve(workspaceRootInput), path.resolve(absolute));
-    return lexical === '..' || lexical.startsWith(`..${path.sep}`) || path.isAbsolute(lexical) ? path.relative(root, absolute) : lexical;
+    const selected = lexical === '..' || lexical.startsWith(`..${path.sep}`) || path.isAbsolute(lexical) ? root : workspaceRootInput;
+    return workspaceRelativePath(selected, absolute);
   };
   return {
     readFile(absolute) {
