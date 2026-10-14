@@ -514,3 +514,13 @@ WATCH 为非 Linux/bwrap 可用性、较大目录的1.5s补全截止与原生查
 另外两个原生绑定候选未采用：no-follow NtCreateFile对普通WSL UNC返回0xc000050b/4395；no-delete-sharing目录锚点未阻止任一侧移动，句柄原正文仍可读、路径陈旧/报错。证据 `.tmp/object-binding/anchors-windows.json`、`anchors-runner.json`；普通本地Windows只读对象成功不证明UNC或全绑定。
 
 本批保证止于实际pathname的包含与组件身份检查点；不提供OS锁或跨检查点绑定。当前全套、非Linux对象、未观察树/镜像成本、Windows创建/NTFS/macOS、真实IME/复制/设备/服务和W7-33仍开放，Phase19 **active**。用户`.gitignore`原SHA保持排除，提交blob及精确远端结果另存本批audit/delivery。
+
+## 26. 审查后修复验证（2026-10-14，进行中）
+
+全量审查已收束为 25 项，详见[裁决 §9](phase-19-decisions.md#9-全量任务复核2026-10-14审查已收束问题未修复)；审查收束不代表缺陷修复或验收通过。后续结果逐批追加。
+
+| 问题 | 本地证据 | 边界 |
+|---|---|---|
+| A04 grep 降级无界读取 | Node20.3 隔离环境 7 文件/95 项、build:ts 通过；实际增长至上限外时只读 10 MiB + 1 字节、失败且句柄关闭；恰好上限保留兼容；移除接线时回归实际失败、恢复后通过 | Linux 本地证据；NormProof 图义务满足、4 既有 ceiling advisory，整体 partial；最终集成/独立审查/跨平台/远端 CI 未证明 |
+
+当前状态为局部修复，Phase19 **active**；其余审查问题及 §5 外部条件继续开放，不能以单条修复替代最终集成验收。材料位于 `.tmp/phase19-repair/`，修复实现见[裁决 §10](phase-19-decisions.md#10-审查后修复2026-10-14进行中)。

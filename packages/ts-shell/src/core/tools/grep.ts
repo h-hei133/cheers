@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs";
 import { realpathSync } from "node:fs";
-import { ReadChangedError, ReadCleanupError } from '../../runtime/execution/read.js';
+import { ReadChangedError, ReadCleanupError, ReadLimitError } from '../../runtime/execution/read.js';
 import path from "node:path";
 import { approvedResult, deniedResult } from "./toolResultLifecycle.js";
 import type { ToolDefinition, ToolExecutionResult } from "../../tools/types.js";
@@ -176,6 +176,7 @@ export function createGrepToolDefinition(
             authority: TOOL_APPROVED_READ_AUTHORITY, caller: 'core-tool:grep',
             reason: 'Read an approved search candidate.', reportSafeTarget: fullPath,
             assertFileAccess: context.assertFileAccess, abortSignal: context.abortSignal,
+            maxBytes: MAX_SEARCHED_FILE_BYTES,
           });
           const lines = content.split("\n");
 
@@ -192,6 +193,7 @@ export function createGrepToolDefinition(
           }
         } catch (error) {
           if (error instanceof ReadCleanupError) throw error;
+          if (error instanceof ReadLimitError) return deniedResult('Search stopped: a candidate exceeded the read byte limit. Narrow the search or use a stable smaller source.');
           if (error instanceof ReadChangedError) return deniedResult('Search stopped: a source file changed during reading. Retry with a stable source.');
           // Skip unreadable files gracefully
         }

@@ -19,6 +19,13 @@ export class ReadChangedError extends Error {
   }
 }
 
+export class ReadLimitError extends Error {
+  constructor() {
+    super('Complete read exceeds its byte limit.')
+    this.name = 'ReadLimitError'
+  }
+}
+
 /** Resource exhaustion cannot be treated as an absent optional read source. */
 export function isReadResourceFailure(error: unknown): boolean {
   return error !== null && typeof error === 'object' && 'code' in error && typeof error.code === 'string'
@@ -79,7 +86,7 @@ function verifyReadAncestors(ancestors: readonly ReadAncestor[]): void {
 
 /** Read bytes from the verified handle, never by reopening its pathname. */
 export async function readTextFile(request: TextFileReadExecutionRequest): Promise<string> {
-  if (request.maxBytes !== undefined && (!Number.isSafeInteger(request.maxBytes) || request.maxBytes < 1 || request.maxBytes > 8 * 1024 * 1024)) throw new Error('Complete read byte limit is invalid.')
+  if (request.maxBytes !== undefined && (!Number.isSafeInteger(request.maxBytes) || request.maxBytes < 1 || request.maxBytes > 10 * 1024 * 1024)) throw new Error('Complete read byte limit is invalid.')
   return withVerifiedReadTarget(request, 'file', async (handle, verify) => {
     if (request.maxBytes === undefined) return handle.readFile({ encoding: 'utf8', signal: request.abortSignal })
     const chunks: Buffer[] = []; let bytes = 0
@@ -89,7 +96,7 @@ export async function readTextFile(request: TextFileReadExecutionRequest): Promi
       const result = await handle.read(buffer, 0, Math.min(buffer.length, request.maxBytes - bytes + 1), bytes)
       if (!result.bytesRead) break
       bytes += result.bytesRead
-      if (bytes > request.maxBytes) throw new Error('Complete read exceeds its byte limit.')
+      if (bytes > request.maxBytes) throw new ReadLimitError()
       chunks.push(Buffer.from(buffer.subarray(0, result.bytesRead)))
     }
     await verify()

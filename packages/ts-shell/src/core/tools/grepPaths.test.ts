@@ -4,7 +4,7 @@ import os from 'node:os'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDefaultExecutionService } from '../../runtime/execution/service.js'
 import { createGrepToolDefinition } from './grep.js'
-import { forgetRipgrepBinary } from './grepRipgrep.js'
+import { forgetRipgrepBinary, MAX_SEARCHED_FILE_BYTES } from './grepRipgrep.js'
 
 let root: string
 beforeEach(async () => {
@@ -86,4 +86,48 @@ it('uses the verified execution reader and per-file denial in the fallback', asy
   expect(read).toHaveBeenCalled()
   expect(result.output).not.toContain('needle .hidden marker')
   expect(result.output).toContain('needle hidden marker')
+})
+
+it('bounds fallback reads when a candidate grows after its size precheck', async () => {
+  vi.stubEnv('PATH', path.join(root, 'empty-bin'))
+  const file = path.join(root, 'src/file.txt')
+  const service = createDefaultExecutionService()
+  const read = service.readTextFile.bind(service)
+  let bytesRead = 0
+  let closed = false
+  const open = fs.open.bind(fs)
+  vi.spyOn(fs, 'open').mockImplementation(async (...args) => {
+    const handle = await open(...args)
+    if (args[0] === file) {
+      const readChunk = handle.read.bind(handle)
+      vi.spyOn(handle, 'read').mockImplementation(async (...readArgs: Parameters<typeof handle.read>) => {
+        const result = await readChunk(...readArgs)
+        bytesRead += result.bytesRead
+        return result
+      })
+      const close = handle.close.bind(handle)
+      vi.spyOn(handle, 'close').mockImplementation(async () => { await close(); closed = true })
+    }
+    return handle
+  })
+  vi.spyOn(service, 'readTextFile').mockImplementation(async request => {
+    await fs.writeFile(file, Buffer.alloc(MAX_SEARCHED_FILE_BYTES + 65536, 'x'))
+    return read(request)
+  })
+  const result = await createGrepToolDefinition(service).execute({ pattern: 'needle', path: 'src' }, { workspaceRoot: root, taskId: 'growing' })
+  expect(result.success).toBe(false)
+  expect(result.error).toContain('read byte limit')
+  expect(result.output ?? '').not.toContain('No matches')
+  expect(bytesRead).toBe(MAX_SEARCHED_FILE_BYTES + 1)
+  expect(closed).toBe(true)
+})
+
+it('keeps the existing ten MiB candidate boundary usable in the fallback', async () => {
+  vi.stubEnv('PATH', path.join(root, 'empty-bin'))
+  const content = Buffer.alloc(MAX_SEARCHED_FILE_BYTES, 'x')
+  content.write('needle\n')
+  await fs.writeFile(path.join(root, 'src/file.txt'), content)
+  const result = await createGrepToolDefinition(createDefaultExecutionService()).execute({ pattern: 'needle', path: 'src' }, { workspaceRoot: root, taskId: 'bounded' })
+  expect(result.success).toBe(true)
+  expect(result.output).toContain('src/file.txt:1: needle')
 })

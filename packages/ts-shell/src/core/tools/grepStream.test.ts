@@ -134,9 +134,9 @@ it.each(['rewrite', 'replace', 'remove'])('does not return complete fallback mat
   vi.spyOn(fs, 'open').mockImplementation(async (...args) => {
     const handle = await open(...args);
     if (args[0] === file) {
-      captured = handle; const read = handle.readFile.bind(handle);
-      vi.spyOn(handle, 'readFile').mockImplementationOnce(async (options: any) => {
-        const content = await read(options);
+      captured = handle; const read = handle.read.bind(handle);
+      vi.spyOn(handle, 'read').mockImplementationOnce(async (...readArgs: Parameters<typeof handle.read>) => {
+        const content = await read(...readArgs);
         execFileSync(process.execPath, ['-e', 'const fs=require("node:fs");const [file,mode]=process.argv.slice(1);if(mode==="replace")fs.renameSync(file,file+".old");if(mode==="remove")fs.unlinkSync(file);else fs.writeFileSync(file,"changed source")', file, mutation]);
         return content;
       });

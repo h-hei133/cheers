@@ -2612,3 +2612,12 @@ Node20.3 直接受影响 22 文件/315 项、TypeScript 与 Linux 单文件构�
 后续实施按 §4 的依赖与实际 owner，先处理文件/权限/资源边界，再处理命令、目标/研究及动态扩展消费者。每批在动代码前补对应只读参考的具体决定比较，复用已有 reader/writer/ledger/gateway，做能区分本缺陷的 focused 验证；外部前置未满足不阻止无关本地修复，也不允许将未验条件删除或静默延期。最终集成与提交/推送/CI 分别取证，审查台账保留本次起点及未修事实，修复结果另追加。
 
 审计文档已实际通过 strict docs 与 diff 空白检查；推送前四项源码静态门（import-cycles/config-consumers/declarations/node-floor）均通过。独立脚本复算 §4 为 76 个唯一任务，§9.2 连续 A01–A25、分类为 19/3/3；本节 74 个本地链接目标和行号范围存在。strict 保留 118 个既有非阻断源码引用 advisory；这些检查不证明产品行为。用户 `.gitignore` SHA-256 仍为 `20e91ccf19fdc755718372e6fcc9ef77ca6a579280ff4b0dc1f69c73a2eaf2d3`；审计文档提交/推送及其精确 CI 另验。
+
+## 10. 审查后修复（2026-10-14，进行中）
+
+### 10.1 A04 — grep 降级读取资源上限
+
+- [grep owner](../../packages/ts-shell/src/core/tools/grep.ts) 在实际 `readTextFile` 调用传入既有 10 MiB 候选上限；预检后增长的文件最多读取上限加一个探测字节，超限明确返回失败，不能将不完整搜索报告成零匹配。共享 [reader](../../packages/ts-shell/src/runtime/execution/read.ts) 用 `ReadLimitError` 区分超限，支持的最大配置从 8 MiB 扩至既有候选政策的 10 MiB，其他消费者的显式预算不变。
+- 定向实读参考 grep/read：采用原生搜索的流式限额决定，保留本项目缺少原生命令时的必要降级；参考上下文读取采用全量读取后展示截断，不能作为资源保证。本批复用已核验句柄的有界 reader，不另建读取器或匹配系统。
+- Linux、隔离 HOME/USERPROFILE/TMPDIR/CHEERS_TEST_ROOT、Node 20.3 下 grep/searchFailure/read/readCleanup 7 文件/95 项通过，`build:ts` 通过。新增实际增长回归核对失败状态、实际读取 10 MiB + 1 字节及句柄关闭；恰好 10 MiB 文件仍可搜索。原有三条并发修改回归的注入点由 `readFile` 改为实际分块 `read`，保留原拒绝和关闭断言。
+- 移除 grep 的 `maxBytes` 接线时，增长回归实际得到成功而失败；精确恢复源码后该回归通过。NormProof 图义务满足、无阻断项，整体 partial 来自 4 项既有函数数量 advisory。A04 本地修复验证成立；当前最终集成、独立审查、跨平台及精确远端 CI 未由本批证明，其余 §9 问题继续开放。材料 `.tmp/phase19-repair/a04-reversal.log`、`normproof/`；提交/推送另验。
