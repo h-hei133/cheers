@@ -2796,3 +2796,31 @@ A13 owner迁移单独提交 `fce6f6a079106911dd7e5271028f20fdd59b4faa`；A07分�
 实际5000文件/50目录、Node20.3、各三次：baseline Git/rg中位数1838.76/1357.16ms，内部空模板copy1816.41/1343.59ms，仅改善1.22%/1.00%，未达双路20%门槛。模板unlink后复制成功、目标零字节/0600/独立inode、重复目标EEXIST均实际断言通过，六次候选查询累计30000占位copy且名称完全相同；这些是隔离估算而非生产模板安全/生命周期证明。材料 `.tmp/phase19-repair/mirror-live/candidate-results.json`、`candidate.log`、`candidate.mjs`；无产品改动，结束该I/O primitive替换方向。随后仅剖析当前查询的同步路径成本，未经热点证据不缓存authority或改原目录政策。
 
 在同一真实仓库对现有Git/rg各一次做只读CPU profile及同步FS计数：总elapsed约2922.90/2125.54ms，两个查询共native realpath94274次/约801.35ms、exists104826次/335.19ms、JS realpath5049次/88.47ms；CPU self-samples中realpath约915.64ms、access455.92ms，idle2116.20ms。不同计时可能嵌套且observer有开销，不将这些数直接相加或声称完整关键路径证明。该证据否决“只替换JS realpath就能消除主要成本”的猜测；下一方向应先证明可减少哪些重复路径工作而不削弱canonical/deny/变更复验，不能依据计数引入跨请求authority cache。材料 `mirror-live/profile.{json,mjs,cpuprofile}`，无产品修改或性能完成声称。
+
+### 10.17 A25 — Git 跟踪文件的重复占位（2026-10-15，局部优化已验证；完整生产验收未通过）
+
+已提交的实际成本证据为 `ee7d920b6725901c8e6665952cfb6af557b433c4`，远端branch/PR head一致；该SHA的CI38616569550/job116033053837与Watch38616567692/job116033048318各自annotations确认付款/spending-limit未启动、steps=[]，无远端验证通过，材料 `mirror-live/delivery-observation.json`。
+
+继续读原Git/view owner后，确认枚举前已在受准入且复验的私有index上取得`ls-files --cached`名称，tree却仍为其中每个普通文件创建空占位。待验证方向：仅Git索引已有的普通文件省去占位，未跟踪文件、规则/配置快照、目录、链接、实际source/deny与最终ledger检查仍由原owner执行；不省略目录遍历或缓存authority。定向比较参考索引/工作树分离、稀疏工作树和原生名称匹配决定：索引名称不依赖ordinary worktree文件存在，但不能将干净index解释为真实文件未变；本项目仍须保留原路径准入及metadata currency。
+
+这是针对Git index的工作量消除，区别于§10.12/16的双路I/O primitive替换；原双路20%门槛不重写。本候选预先要求5000个跟踪文件及本仓库Git三次中位数各改善至少20%，名称与原实现/政策规范化native完全一致，5000个未跟踪文件控制不得回退超过10%，rg实现与名称不变。先在隔离原型验证Git缺失index文件/混合跟踪/忽略规则/特殊名字与成本，再决定是否修改原`view/tree`；通过后仍需生产回归、反转、构建、独立两lane审查及精确交付。本轮不因此关闭A25整树一致性或A01/A03/A12。
+
+单独省占位的原型已否决：5000跟踪文件Git中位1802.52→1326.41ms（26.41%），本仓库2451.89→2175.39ms（11.28%），未跟踪控制1792.99→1830.59ms（回退2.10%）；精确名称与rg控制一致。首轮helper使用NUL摘要而原证据使用JSON摘要，故初次实际仓库摘要断言失败；修正helper后通过，原失败日志保留，无产品补丁。材料 `.tmp/phase19-repair/tracked-view/prototype{,-initial}.log`、`prototype-results.json`。
+
+随后只评估组合候选：每次检查仍重新canonical target/root并执行原deny/currency；在原deepest-existing解析中先调用成熟原生realpath，成功即省去此前重复exists probe，失败再用原exists判定区分既存解析失败与缺失祖先，不缓存结果。定向比较参考的直接canonicalize与既存/缺失路径分离决定；不采用其保留逻辑symlink作为权限答案的特殊语义。组合门槛仍为Git跟踪5000文件及真实仓库各至少20%、未跟踪控制回退不超过10%、exact names，rg须保持相同名称且成本不回退超过10%；先以隔离ESM loader验证边界及成本，达标前不修改产品，失败则结束此组合方向。
+
+该组合仍未达标：5000跟踪1821.84→1275.12ms（30.01%），真实仓库2528.38→2037.38ms（19.42%），未跟踪控制改善5.57%、rg控制改善1.10%，名称完全匹配；42项现存/缺失/别名/循环链接/实时重定向/解析失败比较通过。材料 `tracked-view/combined-results.json`、`combined.log`、`boundary.log`，无产品补丁，不重跑同一组合求偶然达标。最后只测可直接定位的额外重复工作消除：普通遍历目录由子visit负责mkdir，父只为被跳过目录或不同canonical目标保留占位；已canonical的现存路径无剩余组件时直接返回，避免再次path.join归一化。仍逐目录读取/复验、逐文件检查，门槛与控制不变；同一隔离loader比较最终owner候选，失败则结束此方向。
+
+最终隔离owner候选实际达标：5000跟踪Git1850.26→1199.79ms（35.16%）、本仓库2531.92→1895.31ms（25.14%），5000未跟踪1823.05→1675.32ms（8.10%）、rg1939.23→1804.73ms（6.94%），三次交错采样、全部exact names；全跟踪树零ordinary空文件写入，本仓库每次39个，受观测占位并发仍至多8。材料 `tracked-view/final-candidate-results.json`、`final-candidate.log`；这些为隔离原型，不等于最终生产字节验证。随后只修改原`pathJail`与`view/tree`，无新权限/执行/缓存系统；生产回归与独立审查另验。
+
+初次生产定向19项中18通过/1失败：6个新view场景全通过；旧Windows missing-workspace夹具把所有不存在路径也mock成canonical成功，direct-realpath先探测因此丢了夹具中的缺失后缀。分类为harness/setup drift；将native mock限定为两个既存祖先，其他路径明确ENOENT，原expected后缀、allowed及native调用断言均保留。原 `tracked-view/initial-tests.{log,json}` 保留；真实Windows/macOS平台仍未验，不用模拟平台断言关闭A01/A03。
+
+反转后四个源码/测试hash与用户`.gitignore`精确恢复，Node20.3/Linux隔离受影响21文件/293项通过、零skip；覆盖原生view、ignore、fileWalk、预算、读/清理/写权限、grep及workspace消费者。三项独立组件反转分别实际检出1/1/2个AssertionError场景：恢复旧resolver、取消tracked占位省略、恢复重复目录mkdir；逐项finally恢复原字节。材料 `tracked-view/restored-focused.{log,json}`、`reversals.json`、`reversal-restoration.json`。当前Node20.3 `build:ts`、`build:exe`、五道静态门通过；NormProof无阻断，整体仍partial、同4项既有function-ceiling advisory，未改package/build/workflow。
+
+最终编译owner另在本仓库运行1/2/4并发各三组，共42个默认请求与6个10/100/1000ms期限请求。**默认只有41个完整结果，另1个明确拒绝；不是42个成功，也没有通过预声明的全部默认请求完成验收。** Git c1/iteration2/id2在1611.13ms返回通用ViewSourceError，原精确原因未分类；不能据错误文案推断环境漂移。原helper只断言资源清理而吞掉查询异常，进程exit0不代表所有查询成功；最初对审查者的“全部42”说法已纠正。现helper先保存原结果再断言全部默认complete，保留旧artifact，不用重跑覆盖。追加4个默认Git诊断全部完整且count/hash匹配，但不能解释或抹去原拒绝。材料 `tracked-view/production-results.json`、`production.log`、`diagnostic-results.json`、`diagnostic.log`。
+
+所有41个完整结果与当次政策规范化native名称相同（Git3850/rg3767，含新增测试）；仅对完整样本计算Git/rg的1/2/4并发每请求中位数2009.88/1872.39、2442.21/2331.82、3993.62/3826.78ms，单并发Git仅2/3完成，不将拒绝计为更快成功或与非交错旧样本计算生产提升率。全部48次返回前占位settle、受观测FileHandle关闭、私有目录删除，每view占位峰值仍≤8，总峰值32/FileHandle12。采样RSS108.95MiB、event-loop max429.65ms/p99 128.25ms；不含Dir内部fd/子进程pipe或完整OS进程树。六期限请求全部拒绝完整成功；Git实际12.08/142.83/1014.64ms、rg13.28/106.29/1051.32ms，包含清理超时。七个直接编译owner与当前TS按package ESM转译逐字节一致且hash匹配原生产identity，材料 `tracked-view/evidence-summary.json`。
+
+独立code lane **APPROVE**、architecture lane **CLEAR**，综合**APPROVE仅四文件代码delta**；两份报告与四源码hash独立核验，零finding。code实际运行隔离Node20.3三文件/61项、12个path与8个真实Git场景；architecture实际运行8个编译Git边界场景，含split index、类型变化、忽略tracked subtree、deny ancestor及root replacement拒绝/清理；未把父测试当独立重跑。报告 `tracked-view/{code-review,architecture-review}.{md,json}`、`review-synthesis.json`，均保留原41/42与未分类拒绝，未升级为完整生产或全Phase19批准。
+
+当前构建的Node20.3及executable regular/fullscreen真实PTY各通过read、拒绝patch零写、批准patch/committed receipt、重启零重放、原来源/配置不变；结果 `integration-pty-1792005090647751044/results.json`、`integration-pty-1792005126111955898/results.json`。此PTY核验共享路径读写权限边界，不测tracked枚举或真实provider。此前8081通过/10skip全套早于此delta，不称本批最终字节全套通过。局部优化有定向/反转/独立review证据，原生产全默认完成门槛未通过；A25原拒绝原因、完整树一致性/广泛成本、A01非Linux绑定、A03真实环境及A12远端CI继续开放，Phase19 **active**。提交/推送与精确SHA的CI单独取证。

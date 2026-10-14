@@ -89,6 +89,7 @@ export async function materializeView(sources: ViewSources, selection: ViewSelec
   const { root, budget } = sources.input;
   const selected = sources.target(selection.directory ?? root);
   const pruned: readonly string[] = sources.input.pruneDirectories ?? PRUNED_DIRECTORIES;
+  const trackedFiles = selection.native === 'git' ? new Set(selection.tracked) : undefined;
   const trackedParents = new Set<string>();
   for (const file of selection.tracked ?? []) {
     for (let parent = path.dirname(file); parent !== '.' && parent !== path.dirname(parent); parent = path.dirname(parent)) trackedParents.add(parent);
@@ -117,11 +118,16 @@ export async function materializeView(sources: ViewSources, selection: ViewSelec
       const relative = path.relative(root, file).split(path.sep).join('/');
       const destination = sources.destination(file);
       if (entry.isDirectory()) {
-        await fsp.mkdir(destination, { recursive: true, mode: 0o700 });
-        if (selection.recursive === false || !selection.preserveIgnored && !trackedParents.has(relative) && ignored(rules, `${relative}/`)) continue;
+        const skip = selection.recursive === false || !selection.preserveIgnored && !trackedParents.has(relative) && ignored(rules, `${relative}/`);
+        // The visit creates traversed canonical directories. Keep a name-only
+        // placeholder for omitted directories and distinct logical paths.
+        if (skip || file !== target) await fsp.mkdir(destination, { recursive: true, mode: 0o700 });
+        if (skip) continue;
         await createPlaceholders(sources, files);
         await visit(target, depth + 1, rules);
-      } else if (entry.isFile() && !fs.existsSync(destination)) {
+      } else if (entry.isFile() && !trackedFiles?.has(relative) && !fs.existsSync(destination)) {
+        // Git reads tracked names from the captured index. Rules and other
+        // metadata have already been copied; only untracked names need files.
         files.push(destination);
         if (files.length === 8) await createPlaceholders(sources, files);
       } else if (entry.isSymbolicLink() && !fs.existsSync(destination)) {

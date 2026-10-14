@@ -27,12 +27,13 @@ function realpathOfDeepestExisting(target: string): string | undefined {
   const remainder: string[] = [];
   let current = target;
   for (;;) {
-    if (fs.existsSync(current)) {
-      try {
-        return path.join(canonicalPath(current), ...remainder.reverse());
-      } catch {
-        return undefined;
-      }
+    try {
+      const resolved = canonicalPath(current);
+      return remainder.length === 0 ? resolved : path.join(resolved, ...remainder.reverse());
+    } catch {
+      // A successful resolution already proves existence. Probe only failures
+      // to distinguish a missing ancestor from an existing unresolved object.
+      if (fs.existsSync(current)) return undefined;
     }
     const parent = path.dirname(current);
     // Walking past the root would loop forever, since `dirname("/")` is `"/"`.

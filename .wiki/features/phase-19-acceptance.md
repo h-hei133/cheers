@@ -584,3 +584,13 @@ owner迁移 `fce6f6a079106911dd7e5271028f20fdd59b4faa` 与分页/集成 `837aa53
 原生单查询中位数16.03/21.07ms，私有最慢6092.58ms；采样峰值RSS108.20MiB、event-loop max521.67ms/p99 141.56ms。每view占位峰值8、`fsp.open` FileHandle峰值3，四并发总峰值32/12；不含Dir内部fd、子进程pipe或OS进程树。全部48查询返回前占位settle、受观测FileHandle关闭、私有目录移除。六个短期限均拒绝完整成功，Git实际12.26/135.06/1047.14ms、rg11.19/105.69/1051.99ms，含清理超时；不声称硬时限、全局并发资源上界、全平台或整树事务。
 
 新的内部空模板copy候选在5000文件/50目录各三次只改善Git1.22%/rg1.00%，未到先定双路20%门槛，零长/独立inode/0600/EEXIST及native名称一致只证明隔离原型，无产品补丁。CPU profile指向大量实时canonical/access调用（两个实际查询94274/104826次），JS realpath仅5049次；计时嵌套/observer开销显式保留，不盲改FS primitive或缓存authority。材料 `candidate-results.json`、`profile.json`及对应脚本/profile。本轮补齐本机实际规模/并发/期限资源证据，性能优化、A25整树一致性及A01/A03/A12仍开放，Phase19 active；历史合成结果不重写，源码/配置/用户`.gitignore`保持，交付按自身SHA另验。
+
+### 26.5 Git 跟踪占位与 canonical 重复工作
+
+原`view/tree`省去私有index已有ordinary tracked文件的空占位及重复遍历目录mkdir，原`pathJail`每次fresh canonical成功后省去冗余exists/归一化；失败仍区分既存解析失败与缺失祖先。目录/逐路径权限、规则与index快照、链接、未跟踪占位及最终currency仍保留，无authority cache。先定原型门槛没有回写：最终交错三样本在5000跟踪文件/本仓库Git分别改善35.16%/25.14%，未跟踪/rg控制改善8.10%/6.94%、exact names；较早11.28%/19.42%实际仓库候选被否决且artifact保留。这些是原型比较，未宣称最终生产提升率。
+
+反转恢复后的Node20.3/Linux 21文件/293项通过、零skip，两种构建及五静态门通过；三组件反转实际失败1/1/2场景、源码原字节恢复。NormProof无阻断，同4既有advisory/partial。独立code **APPROVE**（61项及20有限探针）、architecture **CLEAR**（8有限探针），代码delta综合APPROVE，冻结四文件和用户`.gitignore`不变；不等同全部A25或生产验收批准。当前Node/executable各regular/fullscreen PTY通过共享read、deny/approved patch、committed receipt、restart零重放与来源/配置不变，不覆盖tracked枚举或真实provider。
+
+最终编译生产请求42 defaults **41 complete / 1原因未分类的ViewSourceError拒绝**，另6期限拒绝；全部41个完整结果与当次规范化native3850 Git/3767 rg名称相同，全部48次观察清理满足settle/close/remove与每view≤8占位。先定全部默认请求完成验收**未通过**；helper原exit0只证明资源断言完成，现已补默认结果断言并保留原artifact。追加4次完整诊断不替代原拒绝，也不据通用错误归类环境问题。完整样本中位数见[裁决 §10.17](phase-19-decisions.md#1017-a25--git-跟踪文件的重复占位2026-10-15局部优化已验证完整生产验收未通过)，七个直接dist与当前TS及原production hash一致。采样RSS108.95MiB、占位/FileHandle总峰值32/12、event-loop max429.65ms；不统计Dir/pipe/OS树，不保证硬时限。材料 `.tmp/phase19-repair/tracked-view/{evidence-summary,restored-focused,reversals,review-synthesis}.json`、各独立报告，PTY结果 `integration-pty-1792005090647751044/results.json`、`integration-pty-1792005126111955898/results.json`。
+
+此前完整套件早于本delta；此处仅记录本批局部代码、成本和失败边界，原拒绝原因、完整树一致性、广泛平台/性能、A01/A03/A12继续开放，Phase19 **active**。源码/文档交付及对应SHA的远端状态另验，用户`.gitignore`保留排除。

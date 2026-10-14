@@ -109,6 +109,43 @@ describe("a write through a symlinked directory", () => {
       native.mockRestore();
     }
   });
+
+  it("resolves existing targets afresh without a separate existence probe", () => {
+    const file = path.join(workspace, "present.txt");
+    fs.writeFileSync(file, "source");
+    const exists = vi.spyOn(fs, "existsSync");
+    try {
+      expect(verifyPathContainment(file, workspace)).toMatchObject({ allowed: true, resolvedPath: file });
+      expect(verifyPathContainment(file, workspace)).toMatchObject({ allowed: true, resolvedPath: file });
+      expect(exists).not.toHaveBeenCalled();
+    } finally {
+      exists.mockRestore();
+    }
+  });
+
+  it("keeps an existing unresolved target distinct from a missing ancestor", () => {
+    const file = path.join(workspace, "unresolved.txt");
+    fs.writeFileSync(file, "source");
+    const realpath = fs.realpathSync;
+    const native = realpath.native;
+    const failure = new Error("Synthetic resolver failure");
+    const fallback = vi.spyOn(fs, "realpathSync").mockImplementation(target => {
+      if (String(target) === file) throw failure;
+      return realpath(target);
+    });
+    Object.defineProperty(fs.realpathSync, "native", { configurable: true, value: (target: fs.PathLike) => {
+      if (String(target) === file) throw failure;
+      return native(target);
+    } });
+    const exists = vi.spyOn(fs, "existsSync");
+    try {
+      expect(verifyPathContainment(file, workspace)).toMatchObject({ allowed: true, resolvedPath: file });
+      expect(exists).toHaveBeenCalledWith(file);
+    } finally {
+      exists.mockRestore();
+      fallback.mockRestore();
+    }
+  });
 });
 
 describe("canonical directory casing", () => {
@@ -160,7 +197,10 @@ describe("canonical directory casing", () => {
     const workspace = path.join(alias, "missing");
     const platform = Object.getOwnPropertyDescriptor(process, "platform")!;
     const exists = vi.spyOn(fs, "existsSync").mockImplementation(file => String(file) === parent || String(file) === alias);
-    const native = vi.spyOn(fs.realpathSync, "native").mockImplementation(() => parent);
+    const native = vi.spyOn(fs.realpathSync, "native").mockImplementation(file => {
+      if (String(file) === parent || String(file) === alias) return parent;
+      throw Object.assign(new Error("Missing path"), { code: "ENOENT" });
+    });
     Object.defineProperty(process, "platform", { value: "win32" });
     try {
       expect(verifyPathContainment("new.txt", workspace)).toMatchObject({
