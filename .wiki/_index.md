@@ -2,7 +2,7 @@
 
 > Compiled knowledge base for the three-layer autonomous coding agent architecture, proof grounding, and reference models.
 
-Last updated: 2026-10-10
+Last updated: 2026-10-15
 
 ## Statistics
 
@@ -19,7 +19,7 @@ Last updated: 2026-10-10
 - [Keyboard shortcuts and rebinding](guides/keybindings.md)
 - [Themes and automatic appearance](guides/themes.md)
 - [Phase 18 decisions and implementation evidence](features/phase-18-decisions.md)
-- [Phase 19 decisions and implementation evidence](features/phase-19-decisions.md)
+- [Phase 19 closeout and unfinished work](features/phase-19-decisions.md#11-阶段收尾2026-10-15)
 - [Extension registry protocol and capability grants](features/extension-registry.md)
 - [Agent definitions, model routing and lifecycle](features/agent-definitions.md)
 - [SSH sessions, remote jobs and cancellation](features/ssh.md)

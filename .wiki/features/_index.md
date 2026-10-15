@@ -3,7 +3,7 @@ title: "功能开发：pi 对照总索引"
 category: article
 sources: [pi-source-2026-09-20, repo-audit-2026-09-20, phase-5-pre-research-2026-09-23, phase-6-pre-research-2026-09-23, phase-6-execution-2026-09-24, 13-feature-and-defect-register, 14-user-experience-research, phase-19-decisions, verification-15-21]
 created: 2026-09-20
-updated: 2026-10-11
+updated: 2026-10-15
 tags: [features, gap-analysis, pi, index]
 summary: "功能开发前锋探索的总入口。对照本地参考仓 pi，把能力缺口按七个切片分类登记：共 40 项 DEFICIENT、38 项 MISSING、16 项 OURS-ONLY、7 项平手。Phase 0–5 已闭环；Phase 5 的前置研究、裁决、施工与复核均已完成（7 项任务 + 22 项补充裁决），核心是删除 32 文件 / 8,330 行的零消费者「报告投影族」、补上缺失的重试与错误分类、并让 compat 标志真正改变请求形状。裁决经五个独立复核者证伪式复核，推翻主代理 4 项错误（含 T2 闭包方向算错，数字从 36/10,008 更正为 32/8,330）；施工后的复核轮再发现并修复 8 处缺陷，其中一处让每个致命崩溃变成进程带病继续运行。Phase 6 **已完成**（T5a 回写 25 行滞后判定 + T1 HTTP 超时接线 + T2 metrics 采集与读取 + T3 用量按模型分桶 + T4 `/report`），四项代码任务全部有反向验证与实机验证。Phase 6 前置研究与裁决（零代码改动）：重新盘点发现 44 个看似开放的条目里 25 个已实现但未标注，真正仍开放 10 项，其中 3 项是行为缺口（HTTP 超时未接线、metrics 采集面为空、用量记账不按模型分桶）；两个复核者各覆盖一半、均判 incorrect，共推翻主代理 9 处。**§10 续研（2026-09-26）回答「优化 Rust/Python 是否胜过纯 TS」**：实测本仓真瓶颈是 `grep`（1,294ms vs ripgrep 10–30ms，43–130×），但**三家参考实现没有一家自己写搜索算法**——Claude Code 内嵌 ripgrep 二进制、pi 直接 `spawn(rg)`、oh-my-pi 用 napi 链接 ripgrep 的库。**Rust 在 agent 里的真实价值是「原生库的粘合层」，不是「更快的实现」**；而同一速度用纯 TS 的 `spawn(rg)` 即可拿到，成本低一个数量级。Bun `--compile` 实测可用（启动 1,370ms → 200ms，7×；用户免装 Node；产物 106MB；`--version` 有一处缺陷）。**Phase 11 前置研究已完成（2026-09-26，零代码改动）**：见 `08-gap-and-debt-research.md`。5 路只读子代理覆盖内核循环／工具执行／provider 模型／上下文记忆／架构债务五个切片（债务总扫被上游 content_filter 拦截，已重派两个避开敏感阅读面的窄切片）。**头条不是新差距而是三项 P0 既有缺陷**：① `daemonEnabled` 默认 true 而 Rust 执行面缺 cargo 时不降级，**全新安装 bash 100% 失败**（实机复现；本机被用户配置的 false 掩盖）；② `cheers.json` 是 git 跟踪的配置契约却**从不被读取**（CLI 报 max-turns=15 而文件写 30）；③ `/model refresh` 把内置模型的 `compat`/`promptCache`/`vision` **整体抹掉**（实机复现 developer→system、vision true→false），静默回滚 Phase 5/9 已修好的缺陷。差距侧 10 MISSING / 14 DEFICIENT；债务侧三层口径 129 → 90（21,247 行）→ **35 真死文件（6,650 行）**，seam 校验 0 条活引用。子代理 3 项结论经核验被推翻或更正（memory 实际已接线、context 域是子集而非整体未接线）。"
 confidence: high
@@ -11,9 +11,9 @@ confidence: high
 
 # 功能开发：pi 对照总索引
 
-> **2026-10-11：Phase 19 集成验收**：已推进至 W16，完整源码图、契约门禁和本地全套测试已有通过证据。SAFE-02 原生隐式读取、非 Linux 对象保证及外部/用户前端验收仍开放；全阶段保持 active。
+> **2026-10-15：Phase19已结束，保留未完成项。** 用户授权停止继续扩展；16批76项的审核、已修问题和未完成原因见[裁决§11](phase-19-decisions.md#11-阶段收尾2026-10-15)。最终源码本地全套804文件/8173项通过、1项显式跳过；非Linux对象绑定、真实环境/账户与研究质量、远端CI、整树一致性/成本和原枚举拒绝继续保留，见[验收§27](phase-19-acceptance.md#27-阶段收尾与未完成项)。阶段结束不等于全部验收通过。
 >
-> 当前实施依据：[Phase 19 决策与任务规划](phase-19-decisions.md)，共 **16 批、76 个交付任务**；审查过程与证据边界见 [复核记录](verification-15-21.md)（沿用文件名，覆盖 15–24）。
+> Phase19归档依据：[决策与任务规划](phase-19-decisions.md)，共 **16批76个交付任务**；历史研究复核见[复核记录](verification-15-21.md)（沿用文件名，覆盖15–24）。后续未完成项须另行确定范围，不自动恢复本阶段。
 
 | 文档 | 现行内容 |
 |---|---|

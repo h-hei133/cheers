@@ -6771,3 +6771,9 @@ cleanup交付文档b5b5705e已推送、branch/PR head一致，两精确workflow�
 在`53ec3e5c`的未改产品源码上补齐最终隔离Node20.3/Linux全套：804文件、8173项通过、1项显式public smoke跳过、零失败，451.26秒；3631个冻结的非wiki受跟踪文件（含源码、配置和脚本）及34个A31路径保持，用户`.gitignore`原hash未变。材料`browser-cancellation/full-current-{validation,tests,freeze}.json`、`full-current.log`和`full-current-binding.json`。A02当前本地全套证据补齐，不把旧A29/A30结果或本次全套外推成实机/服务/远端通过。
 
 先登记A32：验收首页把A29的801/8136称当前源码，遗漏A30/A31。限定入口核对收束后更正为明确SHA、804/8173及最新证据链接，裁决摘要/进度入口同步更新；历史运行与§9原字节保留，产品/测试/provider/build/scripts/workflow均未改。详见[裁决 §10.31](features/phase-19-decisions.md)和[验收 §26.11](features/phase-19-acceptance.md#2611-a31-最终源码全套与验收索引)。A01实际对象绑定仍未实现、A03真实环境、A12 CI未启动及A25原拒绝/整树/成本继续开放，Phase19 **active**；独立复核、最终冻结、五静态门和空白检查由`browser-cancellation/full-review-synthesis.json`综合绑定，文档提交/推送及精确SHA远端状态另核。
+
+### 2026-10-15 — Phase19结束，保留未完成项
+
+按用户明确允许部分任务未完成并要求收尾的裁决，停止继续产品修复、平台候选和性能实验。16批76项审核范围保留，A01–A32已在[裁决§11](features/phase-19-decisions.md#11-阶段收尾2026-10-15)逐项给出处置；非Linux对象绑定、真实环境/研究质量、账户远端结算、远端CI、整树/成本及原41/42拒绝继续未完成，逐项原因与后续条件见[验收§27](features/phase-19-acceptance.md#27-阶段收尾与未完成项)。原生对象绑定候选现有Node结果exit1、未接受，单文件无终态证据；不继续研发或把局部检查冒充交付。
+
+本次复核原始全套结果和绑定：804文件/8173项通过、1项显式跳过，3631个冻结的非wiki受跟踪文件与34个A31路径仍一致；产品源码未改，不重跑测试/构建。起点`5d8dcb15`的两个精确workflow均已分别读取job/annotation，付款或spending-limit阻止启动、零步骤，无远端验证通过。仅裁决、验收、日志及两个wiki入口更新；§9历史和用户`.gitignore`保持，最终文档提交/推送及自身SHA的CI在PR读回，不无限追加“记录上一文档提交”的提交。阶段结束不等于全部功能/发布验收完成，PR保持draft。
