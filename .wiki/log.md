@@ -6755,3 +6755,11 @@ cleanup交付文档b5b5705e已推送、branch/PR head一致，两精确workflow�
 最终隔离Node20.3/Linux全套801文件、8147项通过、1项显式public smoke跳过、零失败，454.94秒；两种构建、result-contract149项、scripts57项及四源码门通过，NormProof零blocking、4既有ceiling advisory/partial。13路径独立code APPROVE/architecture CLEAR、综合仅delta APPROVE；四个反转各实际失败1项，regular/fullscreen Ctrl-C与print/stdin三信号六路径在合成挂起DNS阶段均取得取消收据、零provider POST，来源/配置不变。原夹具/探针失败保留且已分类，未证明公网或可执行文件取消；A01/A03/A12、A25原41/42未知拒绝/整树/广泛成本、A31继续开放，Phase19 **active**。源码冻结、历史§9与用户`.gitignore`保持，提交/推送及精确SHA的CI另验。
 
 `3e2545272548b5bbf5f07d9ff20a4f97390c6ecd`已提交推送，branch/PR #1 head一致、16冻结blob匹配；PR元数据通过REST更新并精确读回，原`gh pr edit`的Projects classic GraphQL环境失败保留，仍draft。最终文档门/空白检查通过，历史§9和用户`.gitignore`保持排除。该SHA的CI38691396894/job116277872930及Watch38691396951/job116277872903各自annotations确认付款/spending-limit未启动，steps=[]、failure，无远端产品执行或CI通过、不重跑。材料`public-web/cancellation-code-delivery-observation.json`；本段为随后纯文档交付，按自身SHA另验，Phase19 active。
+
+### 2026-10-15 — 受控网络与自动化命令取消
+
+完成A31限定审查并登记R01–R07后，三个显式runner删除重复spawn/kill、复用唯一原生执行owner等待settlement；父signal贯穿实际执行合同，失败观察阻止后续动作、异常退出不被成功JSON覆盖。受控HTTP复用总期限/有界正文owner并保留独立网络事实；注入Playwright清理由资源owner供证，进程closed不升级为浏览器closed，取消不推断动作回滚。详见[裁决 §10.30](features/phase-19-decisions.md#1030-a31--局部修复与验证2026-10-15)与[验收 §26.10](features/phase-19-acceptance.md#2610-受控网络与自动化命令取消)。
+
+隔离Node20.3/Linux focused108文件/613项通过、1项显式public smoke跳过；result-contract149项、scripts57项、四源码门及NormProof零blocking通过，保留4既有ceiling advisory/partial。七反转实际断言失败；编译HTTP证实50ms滴流约58ms结束、提前断流约29ms失败。Node/单文件各regular/fullscreen八个真实PTY验证正文与原生runner普通后代派发后Ctrl-C取消、连接/树关闭、宿主exit0、零provider POST及来源/合成配置不变。原测试/探针失败保留分类，108/613是本批focused证据，旧801/8147全套不覆盖当前delta。
+
+34源码/测试路径独立code APPROVE、architecture CLEAR、综合仅delta APPROVE；最后EOF空白修正由两路明确重新绑定，最终字节两种构建和四源码门再次通过；PTY早于该空白重建，未虚称新binary字节已被旧探针执行。交付状态另验。A31局部修复不保证任意注入工作强制结束、动作回滚、浏览器关闭或跨平台/脱离后代清理。A01/A03/A12、A25原41/42未知拒绝/整树/成本及外部验收继续开放，Phase19 **active**；用户`.gitignore`保持排除、历史§9不变，提交/推送和精确SHA的CI另核。

@@ -50,6 +50,14 @@ describe("browser skill execution executor", () => {
     }
   });
 
+  it("keeps a valid response with a nonzero exit failed", async () => {
+    const executor = skillExecutor("success");
+    fs.appendFileSync(executor.binding.runnerCommand!.args[0]!, "\nprocess.exitCode = 9;\n");
+    const result = await executor.execute(browserRequest(["observe", "local-fixture://route106-demo"]));
+    expect(result).toMatchObject({ status: "failed", executed: false });
+    expect(result.evidence).toContainEqual({ label: "process cleanup", value: "closed" });
+  });
+
   function skillExecutor(kind: "success" | "malformed" | "timeout" | "unsafe-output") {
     const metadata = createBrowserSkillRunnerMetadata({
       runnerId: "skill:route106-browser-runner",

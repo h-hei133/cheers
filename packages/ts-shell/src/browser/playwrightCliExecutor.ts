@@ -1,5 +1,6 @@
 import {
   blockedBrowserExecutorResult,
+  cancelledBrowserExecutorResult,
   type BrowserExecutor,
   type BrowserExecutorContext,
   type BrowserExecutorResult,
@@ -73,6 +74,7 @@ export class BrowserPlaywrightCliLocalFixtureExecutor implements BrowserExecutor
     request: BrowserExecutionRequest,
     context: BrowserExecutorContext = {},
   ): BrowserExecutorResult {
+    if (context.signal?.aborted) return cancelledBrowserExecutorResult(request, this.kind);
     const decision = decideBrowserLocalExecutionAuthority({
       request,
       authority: this.authority,

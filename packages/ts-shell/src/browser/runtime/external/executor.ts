@@ -1,5 +1,6 @@
 import {
   blockedBrowserExecutorResult,
+  cancelledBrowserExecutorResult,
   type BrowserExecutor,
   type BrowserExecutorContext,
   type BrowserExecutorResult,
@@ -51,8 +52,9 @@ export class BrowserExternalRunnerExecutor implements BrowserExecutor {
 
   async execute(
     request: BrowserExecutionRequest,
-    _context: BrowserExecutorContext = {},
+    context: BrowserExecutorContext = {},
   ): Promise<BrowserExecutorResult> {
+    if (context.signal?.aborted) return cancelledBrowserExecutorResult(request, this.kind);
     const authorityDecision = decideBrowserLocalExecutionAuthority({
       request,
       authority: this.authority,
@@ -98,8 +100,9 @@ export class BrowserExternalRunnerExecutor implements BrowserExecutor {
     const processResult = await runBrowserExternalRunnerProcess({
       manifest: this.manifest,
       request: runnerRequest,
+      signal: context.signal,
     });
-    if (!processResult.response || processResult.response.status !== "executed" || !processResult.response.executed) {
+    if (processResult.status !== "executed" || !processResult.response || processResult.response.status !== "executed" || !processResult.response.executed) {
       return processBlockedResult(request, this.manifest.runnerMode, processResult);
     }
     const evidence = processResult.response.evidence;
@@ -117,6 +120,7 @@ export class BrowserExternalRunnerExecutor implements BrowserExecutor {
         { label: "manifest id", value: this.manifest.runnerId },
         { label: "manifest source", value: this.manifest.source },
         { label: "runner status", value: processResult.response.status },
+        { label: "process cleanup", value: processResult.cleanupStatus },
         { label: "sandbox decision", value: runnerRequest.sandboxDecision },
         { label: "allowlist decision", value: runnerRequest.allowlistDecision },
         { label: "confirmation decision", value: runnerRequest.confirmationDecision },
@@ -150,7 +154,7 @@ function processBlockedResult(
   processResult: BrowserExternalRunnerProcessResult,
 ): BrowserExecutorResult {
   return {
-    status: processResult.status === "timed-out" || processResult.status === "invalid-response"
+    status: processResult.status === "cancelled" ? "cancelled" : processResult.status === "timed-out" || processResult.status === "invalid-response"
       ? "blocked"
       : "failed",
     executorKind: "external-runner",
@@ -165,6 +169,8 @@ function processBlockedResult(
       { label: "manifest id", value: "manifest-scoped" },
       { label: "manifest source", value: "manifest-scoped" },
       { label: "runner status", value: processResult.status },
+      { label: "process cleanup", value: processResult.cleanupStatus },
+      { label: "action applied", value: processResult.started ? "unknown" : "no" },
       { label: "sandbox decision", value: "local-fixture:allowed" },
       { label: "allowlist decision", value: "network:none" },
       { label: "confirmation decision", value: "sandbox:confirmed" },

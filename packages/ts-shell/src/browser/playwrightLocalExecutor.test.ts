@@ -56,6 +56,7 @@ describe("browser Playwright local executor", () => {
         version: "test-version",
       }),
       runner: () => ({
+        cleanupStatus: "closed",
         safeExtractionSummary: "Extracted safe route 101 headline.",
         stdout: "<html>sk-testsecret123</html>",
         stderr: "",

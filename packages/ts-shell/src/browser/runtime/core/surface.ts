@@ -6,12 +6,15 @@ export function renderBrowserRuntimeSurface(result: BrowserRuntimeActionLoopResu
   const observation = result.observation;
   return [
     "Browser runtime execution",
-    `- Outcome: ${result.receipt.executed ? "executed" : "blocked"}`,
+    `- Outcome: ${result.receipt.status}`,
     `- Action: ${result.receipt.actionKind}`,
     `- Runtime mode: ${result.receipt.runtimeMode}`,
     `- Policy: ${result.receipt.policyStatus}`,
     `- Executed: ${result.receipt.executed ? "yes" : "no"}`,
-    `- Browser launched: ${result.receipt.browserLaunched ? "yes" : "no"}`,
+    `- Action applied: ${fact(result.receipt.actionApplied)}`,
+    `- Process cleanup: ${result.receipt.processCleanupStatus}`,
+    `- Runtime cleanup: ${result.receipt.runtimeCleanupStatus}`,
+    `- Browser launched: ${fact(result.receipt.browserLaunched)}`,
     `- Public automation: ${result.receipt.publicAutomation ? "yes" : "no"}`,
     `- JavaScript rendered support: ${result.receipt.jsRenderedSupport ? "yes" : "no"}`,
     `- DOM snapshot id: ${safe(result.receipt.domSnapshotId ?? "none")}`,
@@ -31,7 +34,7 @@ export function renderBrowserRuntimeReceiptSurface(receipt: BrowserRuntimeReceip
   return [
     "Browser runtime receipt",
     `- Receipt id: ${safe(receipt.receiptId, 140)}`,
-    `- Status: ${receipt.executed ? "executed" : "blocked"}`,
+    `- Status: ${receipt.status}`,
     `- Runtime mode: ${receipt.runtimeMode}`,
     `- Action: ${receipt.actionKind}`,
     `- Origin scope: ${receipt.originScope.length > 0 ? receipt.originScope.map((origin) => safe(origin, 100)).join(", ") : "none"}`,
@@ -39,7 +42,10 @@ export function renderBrowserRuntimeReceiptSurface(receipt: BrowserRuntimeReceip
     `- Snapshot ids: dom=${safe(receipt.domSnapshotId ?? "none", 100)}; accessibility=${safe(receipt.accessibilitySnapshotId ?? "none", 100)}`,
     `- Action target: ${safe(receipt.actionTargetId ?? "none", 120)}`,
     `- Repair readiness: ${safe(receipt.selectorRepairReadiness ?? "none", 80)}`,
-    `- Browser launched: ${receipt.browserLaunched ? "yes" : "no"}`,
+    `- Action applied: ${fact(receipt.actionApplied)}`,
+    `- Process cleanup: ${receipt.processCleanupStatus}`,
+    `- Runtime cleanup: ${receipt.runtimeCleanupStatus}`,
+    `- Browser launched: ${fact(receipt.browserLaunched)}`,
     `- Public automation: ${receipt.publicAutomation ? "yes" : "no"}`,
     "- Provider/model call: none",
     "- Raw content: excluded",
@@ -48,4 +54,8 @@ export function renderBrowserRuntimeReceiptSurface(receipt: BrowserRuntimeReceip
 
 function safe(value: string, maxLength = 160): string {
   return sanitizeBrowserText(value.replace(/\s+/g, " "), maxLength);
+}
+
+function fact(value: boolean | null): string {
+  return value === null ? "unknown" : value ? "yes" : "no";
 }

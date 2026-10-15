@@ -17,8 +17,12 @@ export interface BrowserRuntimeReceipt {
   readonly provenanceId?: string;
   readonly actionTargetId?: string;
   readonly selectorRepairReadiness?: BrowserSelectorRepairSeed["readiness"];
+  readonly status: "executed" | "blocked" | "failed" | "cancelled";
   readonly executed: boolean;
-  readonly browserLaunched: boolean;
+  readonly actionApplied: boolean | null;
+  readonly processCleanupStatus: "closed" | "not-started" | "unknown";
+  readonly runtimeCleanupStatus: "closed" | "not-started" | "unknown";
+  readonly browserLaunched: boolean | null;
   readonly publicAutomation: boolean;
   readonly jsRenderedSupport: boolean;
   readonly policyStatus: BrowserActionLoopPolicyDecision["status"];
@@ -40,7 +44,10 @@ export function createBrowserRuntimeReceipt(input: {
   readonly actionTarget?: BrowserActionTarget;
   readonly repairSeed?: BrowserSelectorRepairSeed;
 }): BrowserRuntimeReceipt {
-  const executed = input.policy.allowed && input.executorResult?.status !== "blocked" && !!input.executorResult;
+  const outcome = input.executorResult?.status;
+  const status = outcome === "cancelled" ? "cancelled" : outcome === "failed" ? "failed"
+    : input.policy.allowed && (outcome === "observed" || outcome === "acted") ? "executed" : "blocked";
+  const executed = status === "executed";
   return {
     receiptId: deterministicReceiptId(input.request.requestId, input.policy.status),
     runtimeMode: input.manifest?.runtimeMode ?? "unavailable",
@@ -51,8 +58,12 @@ export function createBrowserRuntimeReceipt(input: {
     provenanceId: input.observation?.provenance.provenanceId,
     actionTargetId: input.actionTarget?.targetId,
     selectorRepairReadiness: input.repairSeed?.readiness,
+    status,
     executed,
-    browserLaunched: input.executorResult?.browserLaunched ?? false,
+    actionApplied: input.executorResult ? input.executorResult.actionApplied : false,
+    processCleanupStatus: input.executorResult ? input.executorResult.processCleanupStatus ?? "unknown" : "not-started",
+    runtimeCleanupStatus: input.executorResult ? input.executorResult.runtimeCleanupStatus ?? "unknown" : "not-started",
+    browserLaunched: input.executorResult ? input.executorResult.browserLaunched : false,
     publicAutomation: input.executorResult?.publicAutomation ?? false,
     jsRenderedSupport: input.manifest?.jsRenderedSupport ?? false,
     policyStatus: input.policy.status,
@@ -67,7 +78,7 @@ export function createBrowserRuntimeReceipt(input: {
       ...(input.executorResult?.warnings ?? []),
       ...(input.repairSeed?.warnings ?? []),
     ]),
-    nextAction: sanitizeBrowserText(input.policy.allowed ? "Review sanitized browser observation." : input.policy.nextAction, 220),
+    nextAction: sanitizeBrowserText(executed ? "Review sanitized browser observation." : input.policy.allowed ? "Inspect the stopped runtime and its cleanup evidence before another action." : input.policy.nextAction, 220),
     rawContent: "excluded",
     providerCall: "none",
     modelCall: "none",

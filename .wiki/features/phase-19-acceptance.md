@@ -657,3 +657,13 @@ A30补齐公共只读命令的宿主取消：两个CLI宿主经共同命令桥�
 最终隔离Node20.3/Linux全套801文件、8147项通过，1个显式public smoke跳过、零失败、exit0，Vitest454.94秒；harness455.56秒，源码无变化、全部13复核路径匹配最终冻结。原JSON逐断言统计及日志保留在`cancellation-full-final-{tests,validation}.json`、`cancellation-full-final.log`，A02当前本地全套证据补齐。提交/推送/精确SHA远端状态另验；A01/A03/A12、A25原41/42未知拒绝及整树/广泛成本、A31继续开放，Phase19 **active**。
 
 代码交付`3e2545272548b5bbf5f07d9ff20a4f97390c6ecd`已推送，branch/PR head一致、16个冻结blob匹配，PR标题/正文逐字读回、仍draft，用户`.gitignore`保持排除。该SHA的CI38691396894/job116277872930及Watch38691396951/job116277872903各自annotations确认付款/spending-limit阻止启动，steps=[]、failure；没有远端产品执行/通过，不重跑。材料`cancellation-code-delivery-observation.json`及`cancellation-code-commit-audit.json`；随后纯文档交付另核自身SHA，原源码/全套证据保持，Phase19 active。
+
+### 26.10 受控网络与自动化命令取消
+
+限定补审登记并修复A31-R01–R07。三个显式runner统一复用原生执行owner、等待进程树settlement，异常退出不被成功JSON覆盖；父signal贯穿执行合同及实际调用者，失败观察/阶段间取消阻止后续动作。取消保留已发生或未知动作事实，receipt/surface不再将failed投影为executed；进程与浏览器清理分别报告。注入Playwright缺少owner清理证据时保留unknown，任意不合作callback等待其自身settlement。受控HTTP复用原共享总deadline/有界reader，提前断流不挂起、200/201 Location不当作跳转，访问false/null/true与执行成功独立且贯穿消费者。
+
+隔离Node20.3/Linux受影响108文件/613项通过、1项显式public smoke跳过、零失败；这是A31 focused结果，较早A30的801/8147全套不覆盖本次delta。result-contract149项、scripts57项、四源码门通过，NormProof零blocking、保留4既有ceiling advisory/partial。七项独立副本反转各实际断言失败，源码恢复/保持；首版无限滴流超时不计作反转证明。实际编译HTTP复测unsafe仍保留已访问，50ms滴流约58ms结束、提前断流约29ms失败并settle。材料均位于`.tmp/phase19-repair/browser-cancellation/`：`focused-third-*`、`reversals.json`、`verify-http-results.json`。
+
+Node20.3/单文件各regular/fullscreen八个真实PTY场景全部通过：正文已接收后Ctrl-C保留cancelled及controlled-loopback，实际连接关闭；runner/普通后代启动后Ctrl-C报告cancelled、Executed:no、process cleanup:closed且两个PID不运行。各宿主最终exit0、零provider POST、来源/合成配置字节保持，约22–78ms。`terminal-1792048016109640073/results.json`及`terminal-summary.json`保留结果；原PATH、manifest、换行、分页器同步探针失败单列保留，未弱化语义断言。此项补齐本地可执行文件及受控正文/原生树的派发后终端取消证据，不代表公共DNS后外部服务或真实浏览器清理验收。
+
+独立code APPROVE/architecture CLEAR、零新finding，综合仅34路径delta APPROVE；26个生产模块独立函数计数最高12。最后仅移除processAdapter尾部一个空行，两路明确复核EOF-only rebind，原测试冻结33精确相同/1空白等价，未为此重复套件；最终字节两种构建和四源码门已再次通过且34路径匹配冻结；PTY早于仅EOF空白的重建，不主张旧探针执行了新binary字节，`final-build-binding.json`保留该绑定及边界。交付状态另验，`review-synthesis.json`绑定两份独立报告和验证材料。A31局部缺口已修复，任意注入操作/脱离后代/平台边界仍无普遍强制终止保证；A01/A03/A12、A25原41/42未知拒绝、整树/广泛成本、公共外部验收及远端CI继续开放，Phase19 **active**。历史§9与用户`.gitignore`保持排除。

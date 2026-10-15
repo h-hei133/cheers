@@ -11,6 +11,7 @@ export function renderBrowserControlledNetworkSurface(
     `- Action: ${safe(receipt.actionKind)}`,
     `- Policy: ${safe(receipt.policyStatus)}`,
     "- Public network: no",
+    `- Network used: ${receipt.networkUsed === null ? "unknown" : receipt.networkUsed ? "yes" : "no"}`,
     "- Browser launched: no",
     `- Executed: ${receipt.executed ? "yes" : "no"}`,
     `- Evidence summary: ${safe(receipt.safeSummary, 240)}`,

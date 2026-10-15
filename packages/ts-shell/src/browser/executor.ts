@@ -8,9 +8,10 @@ export type BrowserExecutorKind =
   | "explicit-local"
   | "external-runner"
   | "skill-runner";
-export type BrowserExecutorStatus = "executed" | "blocked" | "failed" | "skipped";
+export type BrowserExecutorStatus = "executed" | "blocked" | "failed" | "skipped" | "cancelled";
 
 export interface BrowserExecutorContext {
+  readonly signal?: AbortSignal;
   readonly now?: () => string;
 }
 
@@ -61,6 +62,7 @@ export class FakeBrowserExecutor implements BrowserExecutor {
   readonly kind = "fake-test" as const;
 
   execute(request: BrowserExecutionRequest, context: BrowserExecutorContext = {}): BrowserExecutorResult {
+    if (context.signal?.aborted) return cancelledBrowserExecutorResult(request, this.kind);
     const timestamp = context.now?.() ?? "2026-05-17T00:00:00.000Z";
     return {
       status: "executed",
@@ -112,5 +114,18 @@ export function blockedBrowserExecutorResult(input: {
     providerCall: "none",
     modelCall: "none",
     browserSessionPersistence: "none",
+  };
+}
+
+export function cancelledBrowserExecutorResult(request: BrowserExecutionRequest, kind: BrowserExecutorKind): BrowserExecutorResult {
+  return {
+    ...blockedBrowserExecutorResult({ request, code: "cancelled", message: "Browser execution cancelled before dispatch." }),
+    status: "cancelled",
+    executorKind: kind,
+    evidence: [
+      { label: "request id", value: request.requestId },
+      { label: "action applied", value: "no" },
+      { label: "cleanup", value: "not-started" },
+    ],
   };
 }

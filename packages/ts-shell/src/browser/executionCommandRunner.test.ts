@@ -142,6 +142,7 @@ describe("browser execution command runner", () => {
           runtimeKind: "module",
         }),
         runner: () => ({
+          cleanupStatus: "closed",
           safeExtractionSummary: "Injected local Playwright summary.",
           stdout: "<main>sk-testsecret123</main>",
           stderr: "",

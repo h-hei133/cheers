@@ -12,6 +12,7 @@ export interface BrowserControlledNetworkReceipt {
   readonly policyStatus: string;
   readonly requestStatus: string;
   readonly publicNetwork: false;
+  readonly networkUsed: boolean | null;
   readonly browserLaunched: false;
   readonly statusCodeSummary: string;
   readonly safeTitle?: string;
@@ -41,6 +42,7 @@ export function createBrowserControlledNetworkReceipt(input: {
     policyStatus: input.policy.status,
     requestStatus: input.executor.status,
     publicNetwork: false,
+    networkUsed: input.executor.networkUsed,
     browserLaunched: false,
     statusCodeSummary: input.executor.statusCode ? `http ${input.executor.statusCode}` : "none",
     safeTitle: input.executor.safeTitle,

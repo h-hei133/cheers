@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { runBrowserProcess, type BrowserProcessCleanup } from "../process.js";
 import { sanitizeBrowserText } from "../../capabilityModel.js";
 import {
   createBrowserRuntimeProtocolRequest,
@@ -10,7 +10,11 @@ import type { BrowserExecutionRequest } from "../../executionContract.js";
 import type { BrowserExternalRuntimeManifest } from "../external/runtimeManifest.js";
 
 export interface BrowserRuntimeProcessAdapterResult {
-  readonly status: "ok" | "unavailable" | "invalid" | "timed-out" | "failed";
+  readonly status: "ok" | "unavailable" | "invalid" | "timed-out" | "failed" | "cancelled";
+  readonly started: boolean;
+  readonly cleanupStatus: BrowserProcessCleanup;
+  readonly terminationFailed?: true;
+  readonly outputFailed?: true;
   readonly protocolRequest: BrowserRuntimeProtocolRequest;
   readonly validation?: BrowserRuntimeProtocolValidation;
   readonly stdoutSummary: string;
@@ -22,6 +26,7 @@ export interface BrowserRuntimeProcessAdapterResult {
 export async function runBrowserRuntimeProcessAdapter(input: {
   readonly request: BrowserExecutionRequest;
   readonly manifest: BrowserExternalRuntimeManifest;
+  readonly signal?: AbortSignal;
 }): Promise<BrowserRuntimeProcessAdapterResult> {
   const protocolRequest = createBrowserRuntimeProtocolRequest({
     request: input.request,
@@ -34,59 +39,37 @@ export async function runBrowserRuntimeProcessAdapter(input: {
       warnings: ["browser-runtime-process-adapter:missing-runner"],
     });
   }
-  return new Promise((resolve) => {
-    const child = spawn(input.manifest.runnerCommand!, input.manifest.runnerArgs, {
-      stdio: ["pipe", "pipe", "pipe"],
-      shell: false,
+  const native = await runBrowserProcess({
+    command: input.manifest.runnerCommand,
+    args: input.manifest.runnerArgs,
+    request: protocolRequest,
+    timeoutMs: input.manifest.timeoutMs,
+    outputBudgetBytes: input.manifest.outputBudgetChars * 4,
+    stderrBudgetBytes: 1_000,
+    signal: input.signal,
+  });
+  const common = {
+    started: native.started,
+    cleanupStatus: native.cleanupStatus,
+    terminationFailed: native.terminationFailed,
+    outputFailed: native.outputFailed,
+    stdoutSummary: native.stdout,
+    stderrSummary: native.stderr,
+  };
+  if (native.status !== "completed") {
+    const status = native.status === "timeout" ? "timed-out" : native.status === "cancelled" ? "cancelled" : "failed";
+    return processResult(status, protocolRequest, {
+      ...common,
+      warnings: [
+        `browser-runtime-process-adapter:${status}`,
+        ...(native.terminationFailed ? ["browser-runtime-process-adapter:termination-unverified"] : []),
+        ...(native.outputFailed ? ["browser-runtime-process-adapter:output-failed"] : []),
+      ],
     });
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-    const timeout = setTimeout(() => {
-      if (!settled) {
-        settled = true;
-        child.kill("SIGKILL");
-        resolve(processResult("timed-out", protocolRequest, {
-          stdoutSummary: stdout,
-          stderrSummary: stderr,
-          warnings: ["browser-runtime-process-adapter:timed-out"],
-        }));
-      }
-    }, input.manifest.timeoutMs);
-    child.stdout.on("data", (chunk: Buffer) => {
-      stdout = bound(stdout + chunk.toString("utf8"), input.manifest.outputBudgetChars);
-    });
-    child.stderr.on("data", (chunk: Buffer) => {
-      stderr = bound(stderr + chunk.toString("utf8"), 1_000);
-    });
-    child.on("error", (error) => {
-      if (!settled) {
-        settled = true;
-        clearTimeout(timeout);
-        resolve(processResult("failed", protocolRequest, {
-          stderrSummary: error.message,
-          warnings: ["browser-runtime-process-adapter:spawn-failed"],
-        }));
-      }
-    });
-    child.on("close", (code) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timeout);
-      const validation = parseBrowserRuntimeProtocolResponseJson(stdout, input.manifest.outputBudgetChars);
-      resolve(processResult(validation.ok && code === 0 ? "ok" : "invalid", protocolRequest, {
-        validation,
-        stdoutSummary: stdout,
-        stderrSummary: stderr,
-        warnings: [
-          ...(code === 0 ? [] : [`browser-runtime-process-adapter:exit-${code ?? "unknown"}`]),
-          ...(validation.ok ? validation.warnings : validation.warnings),
-        ],
-      }));
-    });
-    child.stdin.end(`${JSON.stringify(protocolRequest)}\n`);
+  }
+  const validation = parseBrowserRuntimeProtocolResponseJson(native.stdout, input.manifest.outputBudgetChars);
+  return processResult(validation.ok ? "ok" : "invalid", protocolRequest, {
+    ...common, validation, warnings: validation.warnings,
   });
 }
 
@@ -94,6 +77,10 @@ function processResult(
   status: BrowserRuntimeProcessAdapterResult["status"],
   protocolRequest: BrowserRuntimeProtocolRequest,
   input: {
+    readonly started?: boolean;
+    readonly cleanupStatus?: BrowserProcessCleanup;
+    readonly terminationFailed?: true;
+    readonly outputFailed?: true;
     readonly validation?: BrowserRuntimeProtocolValidation;
     readonly stdoutSummary?: string;
     readonly stderrSummary?: string;
@@ -102,6 +89,10 @@ function processResult(
 ): BrowserRuntimeProcessAdapterResult {
   return {
     status,
+    started: input.started ?? false,
+    cleanupStatus: input.cleanupStatus ?? "not-started",
+    terminationFailed: input.terminationFailed,
+    outputFailed: input.outputFailed,
     protocolRequest,
     validation: input.validation,
     stdoutSummary: sanitizeBrowserText(input.stdoutSummary ?? "", 300),
@@ -114,8 +105,4 @@ function processResult(
       "browser-runtime-process-adapter:no-provider-or-model-call",
     ],
   };
-}
-
-function bound(value: string, budget: number): string {
-  return value.length <= budget ? value : value.slice(0, budget);
 }

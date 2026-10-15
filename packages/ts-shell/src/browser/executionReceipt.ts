@@ -148,6 +148,7 @@ export function deterministicBrowserExecutionReceiptId(
 }
 
 function receiptStatus(result: BrowserExecutorResult): BrowserExecutionReceiptStatus {
+  if (result.status === "cancelled") return "cancelled";
   const runnerStatus = evidenceValue(result, "runner status");
   if (runnerStatus === "timed-out") {
     return "timed-out";

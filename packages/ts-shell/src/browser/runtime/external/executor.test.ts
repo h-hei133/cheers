@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseBrowserCommandArgs } from "../../commandContract.js";
 import { BrowserExternalRunnerExecutor } from "./executor.js";
@@ -29,6 +30,18 @@ describe("browser external runner executor", () => {
     expect(result.status).toBe("executed");
     expect(result.executed).toBe(true);
     expect(result.evidence.some((item) => item.label === "safe observation")).toBe(true);
+  });
+
+  it("keeps a valid response with a nonzero exit failed", async () => {
+    const fixture = createBrowserExternalRunnerScenarioFixture(); cleanupFns.push(fixture.cleanup);
+    fs.appendFileSync(fixture.runnerPath, "\nprocess.exitCode = 9;\n");
+    const validation = validateBrowserExternalRunnerManifest(fixture.manifest);
+    if (!validation.ok) throw new Error("invalid fixture");
+    const executor = new BrowserExternalRunnerExecutor({ manifest: validation.manifest, fixture: validation.fixture });
+    const request = parseBrowserCommandArgs(["execute", "observe", "local-fixture://route103-demo"]).contract!.execution!;
+    const result = await executor.execute(request);
+    expect(result).toMatchObject({ status: "failed", executed: false });
+    expect(result.evidence).toContainEqual({ label: "process cleanup", value: "closed" });
   });
 
   it("blocks unsafe external runner responses", async () => {

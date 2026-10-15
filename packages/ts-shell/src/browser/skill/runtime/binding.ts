@@ -12,6 +12,7 @@ export interface BrowserSkillRuntimeBinding {
   readonly run?: (input: {
     readonly request: BrowserExecutionRequest;
     readonly manifest: BrowserExternalRuntimeManifest;
+    readonly signal?: AbortSignal;
   }) => BrowserRuntimeProtocolResponse | Promise<BrowserRuntimeProtocolResponse>;
 }
 

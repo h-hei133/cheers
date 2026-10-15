@@ -24,7 +24,7 @@ function validReceipt(value: unknown): value is BrowserExecutionReceipt {
   if (!isRecord(value) || !strings(value, receiptStrings) || !optionalStrings(value, receiptOptional) ||
       !onlyKeys(value, [...receiptStrings, ...receiptOptional, "version", "status", "source", "visibility", "actionKind", "executionMode", "evidenceBundle", "replayReadiness", "redactions", "warnings", "executed", "rawContent", "providerCall", "modelCall"])) return false;
   if (value.version !== "browser-execution-receipt/v1" || !date(value.createdAt) ||
-      !oneOf(value.status, ["executed", "blocked", "failed", "timed-out", "invalid-response", "unavailable", "unsafe-output"]) ||
+      !oneOf(value.status, ["executed", "blocked", "failed", "cancelled", "timed-out", "invalid-response", "unavailable", "unsafe-output"]) ||
       !oneOf(value.source, receiptSources) || !oneOf(value.visibility, visibility) ||
       (value.replayedFromSource !== undefined && !oneOf(value.replayedFromSource, receiptSources)) ||
       typeof value.actionKind !== "string" || !isBrowserExecutionActionKind(value.actionKind as BrowserActionKind) ||

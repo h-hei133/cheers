@@ -13,7 +13,7 @@ export interface BrowserRuntimePageState {
 }
 
 export interface BrowserRuntimeExecutorResult {
-  readonly status: "observed" | "acted" | "blocked" | "failed";
+  readonly status: "observed" | "acted" | "blocked" | "failed" | "cancelled";
   readonly runtimeMode: BrowserRuntimeManifest["runtimeMode"];
   readonly actionKind: BrowserExecutionRequest["actionKind"];
   readonly url: string;
@@ -21,8 +21,10 @@ export interface BrowserRuntimeExecutorResult {
   readonly html: string;
   readonly renderedText: string;
   readonly accessibilityNodes: readonly BrowserAccessibilityNodeInput[];
-  readonly actionApplied: boolean;
-  readonly browserLaunched: boolean;
+  readonly actionApplied: boolean | null;
+  readonly processCleanupStatus?: "closed" | "not-started" | "unknown";
+  readonly runtimeCleanupStatus?: "closed" | "not-started" | "unknown";
+  readonly browserLaunched: boolean | null;
   readonly publicAutomation: boolean;
   readonly warnings: readonly string[];
   readonly redactions: readonly string[];
@@ -35,6 +37,7 @@ export interface BrowserRuntimeExecutor {
   execute(input: {
     readonly request: BrowserExecutionRequest;
     readonly manifest: BrowserRuntimeManifest;
+    readonly signal?: AbortSignal;
   }): Promise<BrowserRuntimeExecutorResult> | BrowserRuntimeExecutorResult;
 }
 
@@ -49,7 +52,9 @@ export class SimulatedBrowserRuntimeExecutor implements BrowserRuntimeExecutor {
   execute(input: {
     readonly request: BrowserExecutionRequest;
     readonly manifest: BrowserRuntimeManifest;
+    readonly signal?: AbortSignal;
   }): BrowserRuntimeExecutorResult {
+    if (input.signal?.aborted) return stoppedBrowserRuntimeResult(input.request, input.manifest, "cancelled");
     const targetUrl = input.request.action.url ?? input.request.action.target ?? input.manifest.allowedOrigins[0] ?? "controlled-runtime://missing";
     const page = this.pages.get(normalizeOriginLike(targetUrl)) ?? this.pages.values().next().value;
     if (!page) {
@@ -139,6 +144,8 @@ function runtimeResult(input: {
     renderedText: input.page.renderedText,
     accessibilityNodes: input.page.accessibilityNodes,
     actionApplied: input.actionApplied,
+    processCleanupStatus: "not-started",
+    runtimeCleanupStatus: "not-started",
     browserLaunched: false,
     publicAutomation: false,
     warnings: input.warnings,
@@ -163,4 +170,54 @@ function emptyPage(url: string): BrowserRuntimePageState {
     renderedText: "",
     accessibilityNodes: [],
   };
+}
+
+/** No dispatch occurred unless the caller supplies the prior execution facts. */
+export function stoppedBrowserRuntimeResult(
+  request: BrowserExecutionRequest,
+  manifest: BrowserRuntimeManifest,
+  status: "cancelled" | "failed" | "blocked",
+  facts: {
+    readonly actionApplied?: boolean | null;
+    readonly processCleanupStatus?: "closed" | "not-started" | "unknown";
+    readonly runtimeCleanupStatus?: "closed" | "not-started" | "unknown";
+    readonly browserLaunched?: boolean | null;
+    readonly warnings?: readonly string[];
+    readonly evidence?: readonly string[];
+  } = {},
+): BrowserRuntimeExecutorResult {
+  return {
+    status, runtimeMode: manifest.runtimeMode, actionKind: request.actionKind,
+    url: request.action.url ?? manifest.allowedOrigins[0] ?? "controlled-runtime://stopped",
+    title: status, html: "", renderedText: "", accessibilityNodes: [],
+    actionApplied: facts.actionApplied === undefined ? false : facts.actionApplied,
+    browserLaunched: facts.browserLaunched === undefined ? false : facts.browserLaunched,
+    processCleanupStatus: facts.processCleanupStatus ?? "not-started",
+    runtimeCleanupStatus: facts.runtimeCleanupStatus ?? "not-started",
+    publicAutomation: false, warnings: facts.warnings ?? [], redactions: [],
+    evidence: [...(facts.evidence ?? []), `browser-runtime-executor:${status}`],
+    rawContent: "internal-only",
+  };
+}
+
+/** Await injected work to settle, then preserve cancellation without erasing prior effects. */
+export async function executeBrowserRuntime(input: {
+  readonly request: BrowserExecutionRequest;
+  readonly manifest: BrowserRuntimeManifest;
+  readonly executor: BrowserRuntimeExecutor;
+  readonly signal?: AbortSignal;
+}): Promise<BrowserRuntimeExecutorResult> {
+  if (input.signal?.aborted) return stoppedBrowserRuntimeResult(input.request, input.manifest, "cancelled");
+  try {
+    const result = await input.executor.execute(input);
+    return input.signal?.aborted ? { ...result, status: "cancelled" } : result;
+  } catch {
+    return stoppedBrowserRuntimeResult(input.request, input.manifest, input.signal?.aborted ? "cancelled" : "failed", {
+      actionApplied: ["click", "type"].includes(input.request.actionKind) ? null : false,
+      browserLaunched: null,
+      processCleanupStatus: "unknown",
+      runtimeCleanupStatus: "unknown",
+      warnings: ["browser-runtime-executor:runner-failed", "browser-runtime-executor:runtime-cleanup:unknown"],
+    });
+  }
 }

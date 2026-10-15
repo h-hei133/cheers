@@ -204,6 +204,7 @@ export async function runBrowserCommandAsync(input: {
           ? new BrowserRuntimeAdapterExecutor(input.browserExternalRuntimeManifest, input.browserSkillRuntimeBinding)
           : undefined);
       const runtime = await runBrowserActionLoopExecutor({
+        signal: input.signal,
         request: input.contract.execution,
         manifestLoad,
         executor,

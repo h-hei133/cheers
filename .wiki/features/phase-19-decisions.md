@@ -2968,3 +2968,55 @@ A30实现沿用session runtime作为宿主取消入口，`core/shell/command`只
 代码与三份证据文档已提交推送`3e2545272548b5bbf5f07d9ff20a4f97390c6ecd`，远端branch/PR #1 head同SHA、16个冻结blob匹配；PR按当前runtime/public-web范围更新并逐字读回，仍draft。`gh pr edit`因旧Projects classic GraphQL字段失败，保留`cancellation-pr-edit-first-failure.json`，随后REST更新及读回确认标题/正文精确匹配，未更改产品以处理环境问题。五门中的最终文档门与空白检查通过，历史§9和用户`.gitignore`保持且后者未提交。
 
 精确SHA的CI [38691396894](https://github.com/h-hei133/cheers/actions/runs/38691396894)/job116277872930与Watch [38691396951](https://github.com/h-hei133/cheers/actions/runs/38691396951)/job116277872903均completed/failure、steps=[]，分别读取annotations确认付款/spending-limit阻止启动；无远端产品执行或CI通过，未重跑workflow。材料`cancellation-{code-delivery-observation,code-commit-audit,pr-readback,validation-synthesis-final}.json`。本段随后纯文档提交按自身SHA另核，源码冻结不变，不重复构建/测试；A01/A03/A12/A25/A31开放，Phase19 active。
+
+### 10.28 A31 — 相邻适配器生命周期补充审查（2026-10-15，发现即登记）
+
+继续A31时重新确认当前源码：公共命令已有宿主signal，但`executionCommandRunner`调用`BrowserExecutor.execute`仅传now，action-loop调用的`BrowserRuntimeExecutor.execute`合同无signal，受控回环`httpGet`也无signal。审查范围限于这些入口、默认HTTP/浏览器/显式runner资源owner及结果投影，收束并完成参考比较前不改产品或测试；用户`.gitignore`与历史§9保持。
+
+**A31-R01 HIGH — runtime进程适配器在实际退出前解除等待。** `browser/runtime/core/processAdapter.ts`的timeout回调先标settled，调用`child.kill("SIGKILL")`后立即resolve；后续close因settled直接返回。信号发送不是进程结束或后代/pipe清理证明，因此即使接通父signal，照此返回仍不能支撑宿主idle/清理完成。当前仅确认源码顺序，未声称实际孤儿进程；后续比较原执行服务的process-tree/settlement合同，不能用上层Promise竞速隐藏仍在工作的资源。
+
+受控HTTP同边界还缺response的error/aborted/close监听，且只用socket idle timeout；提前断流或持续滴流的实际行为尚待隔离反例分类，不先归为已复现产品失败。A31保持未修复，Phase19 active。
+
+A31-R01补充：`browser/runtime/external/runner.ts`的timeout同样在kill后立即resolve，close因settled被忽略；两个既有进程owner均须按实际settlement/清理合同处理，不能只在其中一个增加signal字段。
+
+**A31-R02 HIGH — runtime动作结果没有守住失败/动作事实边界。** `runtime/core/adapterExecutor.ts`在协议response为blocked或failed时仍仅按请求种类把click/type的`actionApplied`设为true；`actionLoopExecutor.ts`又在policy允许后无条件返回顶层executed，没有按最终executor的blocked/failed分支保留失败。这不是取消已经撤销动作的证明：取消前动作可能已发生，后续修复须保留实际已发生或未知事实，同时不得把适配器拒绝或失败当作完成。当前为源码确认，尚未运行反例；先登记，再核对receipt及command消费者，审查未收束前不改代码。
+
+A31-R02消费者补充：独立代码lane确认`runtime/core/receipt.ts`把failed也判为executed，`runtime/core/surface.ts`因此能展示Outcome/Executed/Status的成功文案；这是可见投影缺口。A31-R01同样模式还存在于`skill/execution/executor.ts`的timeout分支，纳入同一资源owner审查。
+
+**A31-R03 MEDIUM — 受控网络失败被投影为零网络。** 独立代码lane确认`executionCommandRunner.ts`与`externalNetworkExecutionSurface.ts`仅以controlled receipt.executed判断网络使用；已有响应后unsafe-output/redirect-blocked和派发后timeout/request-failed都会把executed设为false，继而生成no-network-call或Network access:none。公共网络仍为false，但不代表回环请求从未发生。后续须把请求/响应事实与输出是否通过分别保留，取消不清除已观察的访问；当前源码链已确认，实际隔离反例待验，未声称外网访问。
+
+**A31-R04 MEDIUM — 注入Playwright runner成功被当作清理已证实。** 独立架构lane确认`playwrightLifecycle.ts`在任意runner Promise成功后自行追加cleanup:closed并写cleanupStatus:closed，而runner结果没有清理合同、该生命周期也不持有close句柄；catch中的failed-safe亦无清理观察。默认未注入runner仍unavailable，本发现限于显式本地runner，未复现真实浏览器泄漏。后续须由资源owner提供清理证据或保持unknown，不能把普通返回当作关闭证明。审查继续，尚未改产品/测试。
+
+**A31-R05 HIGH — runner有效JSON覆盖了异常进程退出。** 独立代码lane确认`runtime/core/processAdapter.ts`虽将非零退出标invalid，`adapterExecutor.ts`仍优先返回其中validation；有效status:ok的JSON可被投影observed/acted。相邻`runtime/external/runner.ts`和`skill/execution/executor.ts`同样未把exitCode/signal纳入成功条件，消费者只检查response。当前静态链路成立、尚无隔离进程反例。后续须区分协议响应、进程退出与动作事实；异常退出不能获得完成状态，亦不能由此推断此前动作未发生。
+
+**A31-R06 HIGH — 受控HTTP提前断流未按期限结束，滴流越过总预算。** 当前编译owner经真实external bridge、默认`http.get`的隔离Node20.3回环探针确认：50ms manifest预算下，持续15ms滴流约316ms才结束；已写部分正文后断开，650ms观察时owner仍pending，未按原50ms结束。socket idle timeout不能替代请求总deadline，response缺error/aborted/close处理也没有保证Promise settle。材料`browser-cancellation/audit-http-results.json`，各场景仅本地fixture、无provider/真实配置/公网。探针中的竞速仅测量pending，不是产品修复。
+
+同组unsafe探针确认A31-R03：服务端计数1、命令报告Network access:none；这是实际回环访问被清除，不把publicNetwork:false改成公共外发。首版探针读取了bridge不存在的executor字段，requestStatus未入JSON，但实际请求计数、网络文案和时间观察有效；后续改读既有controlled receipt，不将缺字段当作产品事实。源码/测试尚未修改，限定审查将收束后再修复。
+
+**A31-R07 MEDIUM — 受控HTTP也把非跳转Location当作跳转。** 最后核对复用传输的适配语义时确认，`controlledNetworkExecutor.ts`把任意响应Location映射为redirectLocation，200/201可能被当作跨origin跳转拒绝，与此前公共路径A28同类。修复仅对301/302/303/307/308应用跳转判断，保留受控路径原有不自动跟随行为；当前源码确认，尚未新增运行探针。
+
+### 10.29 A31 — 限定审查收束与实现决定（2026-10-15）
+
+限定审查覆盖两个命令执行合同、受控HTTP和网络投影、全部声明的BrowserExecutor/BrowserRuntimeExecutor实现、三个显式进程owner、注入Playwright生命周期及action-loop/receipt/surface。独立代码lane检查22生产owner并返回REQUEST CHANGES，架构lane检查35相关模块并返回BLOCK；两者都是当前缺口的审查结果，不是未来实现批准。报告`browser-cancellation/audit-{code,architecture}.{md,json}`，原HEAD、各自源码hash和用户`.gitignore`复核一致，只有发现即登记的文档变化。A31-R01–R07已记录，产品/测试尚未修改。
+
+只读参考比较在目标检查后完成：pi的`core/tools/bash.ts`执行前检查父signal、取消时处理整棵进程树、等待实际子进程结束后才返回取消/超时，并把非零或signal退出保留为失败；本项目采纳这些决定，直接复用已有`runtime/execution/local`的原生owner及其terminationFailed/outputFailed，不复制另一套spawn/kill。薄`browser/runtime/process`只适配显式manifest/config和有界协议流，不伪造普通工具批准或OS隔离证明。opencode的webfetch把请求及有界正文收集放在同一总timeout内，本项目采纳并复用现有network scope/connection/reader；不引入其框架、重试或另一传输。Playwright MCP的受控fixture等待实际client/context close，本项目据此由注入资源owner提供清理结果，缺失则unknown，不再由普通返回推断closed。
+
+实现将父signal传到受控HTTP、显式runner、注入本地runner和两阶段action-loop，预取消零派发、阶段间取消不发下一动作；自定义不合作的operation等待其自身settlement，不用上层竞速假装清理。受控HTTP复用既有严格origin/loopback审核和共享有界reader，总期限覆盖正文；访问事实独立于成功/安全输出。进程adapter保留显式argv/cwd/env，用唯一原生owner清理整组并等待结果，失败/取消/清理unknown不能被有效JSON抹除；动作已发生/未知与命令完成分开投影，失败观察不触发后续动作。原生session浏览器工具已有自己的action/cleanup lane，与这组命令adapter分开，本轮不更改它、provider/default/build gates或工作流。Phase19 active，外部/平台/远端CI及A25既有开放条件不变。
+
+### 10.30 A31 — 局部修复与验证（2026-10-15）
+
+三个runner已改为复用既有原生执行owner，受控HTTP复用共享总期限/有界正文读取。首轮Node20.3构建通过；受影响77文件中74通过、3失败，416项通过、4失败，材料`browser-cancellation/focused-first-{tests,validation}.json`。四项全部属于旧清理合同的stale expectation：三个成功注入夹具未提供close结果却要求成功，一项异常要求无依据的failed-safe；不以减弱安全断言处理，成功夹具将显式声明资源owner关闭结果，另保留缺证据unknown、取消等待及异常未知的反例。该首轮不是最终验证，A31和Phase19仍active。
+
+第二轮80文件/445项通过、1项失败：新增用例把runtime协议不存在的failed状态当作合法响应，分类harness/setup drift；修正为既有error协议并继续要求failed投影，保留原失败。最终核对A31-R03同一消费者链时发现bridge自身evidence也以executed推断零网络，已一并改为独立访问事实，不扩大网络授权。运行时收据显式区分进程清理与浏览器资源清理，前者本地closed不构成后者closed证明。
+
+最终实现由26个生产/8个测试路径组成：三个显式runner删除原spawn/kill owner，薄`browser/runtime/process`复用唯一原生执行owner，保留literal argv/cwd/env、有界原始协议流、异常退出及termination/output失败。父signal贯穿两个执行合同、全部实际实现及调用者；预取消零派发、失败观察不进入下一动作、取消等待实际operation settlement。有效JSON不能覆盖异常进程退出，取消/失败也不能证明动作回滚；已观察动作保留true，派发后未知为null。注入Playwright由资源owner显式提供cleanup，缺失/异常保留unknown；本地进程closed不等于浏览器closed。
+
+受控HTTP复用共享scope/connection/reader，总期限覆盖有界正文、提前断流实际settle，只对301/302/303/307/308读取Location且不自动跟随。访问事实独立于成功、安全输出和取消，经receipt、bridge、command及surface保留false/null/true，不扩大公共网络权限。当前编译owner真实回环复测：unsafe请求计数1且保留controlled-loopback；50ms预算滴流57.62ms返回timeout；部分正文后断开29.09ms返回request-failed、没有保持pending。材料`browser-cancellation/verify-http-results.json`。
+
+最终受影响隔离Node20.3/Linux组合108文件/613项通过、1项显式public smoke跳过、零失败，75.87秒，`focused-third-{validation,tests,freeze}.json`逐文件/逐断言保留；未把此前A30全套801/8147当作A31当前全套。result-contract六套149项、scripts57项、四源码门通过，NormProof零blocking、同4个既有ceiling advisory/partial。七个独立副本反转均实际断言失败：父signal、总正文期限、失败观察、三runner异常退出、owner清理证据；原作者源码保持。首版无限滴流反转超过45秒，仅记探针超时而非断言证明，清理检查无匹配运行进程；有界副本随后七项真实red，`reversals.json`保留原记录。
+
+Node20.3/单文件各regular/fullscreen真实PTY共八场景通过：真实回环正文中Ctrl-C产生cancelled收据、连接关闭且保留controlled-loopback；显式原生runner与普通后代启动后Ctrl-C，产生cancelled/Executed:no/process cleanup:closed，两个PID均不运行。各宿主随后exit0、零provider POST、来源及合成配置字节保持，取消收据/清理观测约22–78ms。结果`terminal-1792048016109640073/results.json`、`terminal-summary.json`。此前探针的隔离PATH找不到rtk、manifest缺显式tmp路径、跨行匹配、结果分页器/宿主提示同步失败均按harness/setup drift保留，不改产品或安全断言；最终以完整分页器footer、关闭及编辑器恢复同步后才发送exit。不以此证明公网、真实前端/账户/设备、任意脱离后代或跨平台清理。
+
+独立code APPROVE、architecture CLEAR，零新finding，综合仅34路径delta APPROVE；架构lane另实际验证注入操作取消后仍等待自身settlement、signal身份、已发生动作与清理unknown，26生产模块独立AST计数最大12、无超过20。两路报告`review-{code,architecture}.{md,json}`绑定`review-freeze.json`。最后空白检查仅删除processAdapter末尾一个空行，两路独立以当前字节加LF复得旧hash，明确33路径逐字节相同/1路径仅EOF空白；原focused/gates证据保留初始冻结，不虚称重跑测试。最终字节TypeScript/单文件两种构建和四源码门已实际再次通过，34路径均匹配复核冻结，`final-build-binding.json`保留26个编译模块及产物hash。PTY发生在仅EOF空白的重建之前，不虚称旧探针已执行新binary字节；没有语义源码变化。文档/空白门及交付冻结另验。
+
+A31-R01–R07在上述局部合同内已修复。忽略signal的任意注入工作仍须等自身结束，没有强制终止保证；owner自报cleanup不是独立浏览器关闭证明，命令取消也不撤销既有副作用。原生session Chromium lane未变。A01/A03/A12、A25原41/42默认请求中未知拒绝、整树一致性/广泛成本、公共DNS拒绝后的外部验收及精确SHA远端CI继续开放，Phase19 **active**。历史§9和用户`.gitignore`保持，后者不提交。

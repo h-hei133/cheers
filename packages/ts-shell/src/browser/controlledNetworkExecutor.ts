@@ -1,4 +1,7 @@
-import http from "node:http";
+import { requestBrowser } from "../core/network/connection.js";
+import { NetworkError } from "../core/network/error.js";
+import { requestScope, type RequestScope } from "../core/network/request.js";
+import { readResponseText } from "../core/network/response.js";
 import { sanitizeBrowserText } from "./capabilityModel.js";
 import type { BrowserExecutionRequest } from "./executionContract.js";
 import type { BrowserControlledNetworkRunnerManifest } from "./controlledNetworkRunnerManifest.js";
@@ -16,6 +19,7 @@ import {
 export type BrowserControlledNetworkRequestStatus =
   | "executed"
   | "blocked"
+  | "cancelled"
   | "timeout"
   | "redirect-blocked"
   | "unsafe-output"
@@ -25,6 +29,7 @@ export interface BrowserControlledNetworkExecutorResult {
   readonly status: BrowserControlledNetworkRequestStatus;
   readonly executed: boolean;
   readonly publicNetwork: false;
+  readonly networkUsed: boolean | null;
   readonly browserLaunched: false;
   readonly statusCode?: number;
   readonly safeTitle?: string;
@@ -37,10 +42,11 @@ export interface BrowserControlledNetworkExecutorResult {
 }
 
 export async function runBrowserControlledNetworkExecutor(input: {
+  readonly signal?: AbortSignal;
   readonly request: BrowserExecutionRequest;
   readonly policy: BrowserControlledNetworkPolicyDecision;
   readonly manifest: BrowserControlledNetworkRunnerManifest;
-  readonly httpGet?: (url: URL, timeoutMs: number, outputBudgetBytes: number) => Promise<ControlledHttpResponse>;
+  readonly httpGet?: (url: URL, timeoutMs: number, outputBudgetBytes: number, signal?: AbortSignal) => Promise<ControlledHttpResponse>;
 }): Promise<BrowserControlledNetworkExecutorResult> {
   if (!input.policy.allowed) {
     return result("blocked", {
@@ -83,13 +89,23 @@ export async function runBrowserControlledNetworkExecutor(input: {
       evidence: auditRecord.evidence,
     });
   }
+  const scope = requestScope(input.manifest.timeoutMs, input.signal);
+  let networkUsed: boolean | null = false;
   try {
-    const response = await (input.httpGet ?? controlledHttpGet)(
-      url,
-      input.manifest.timeoutMs,
-      input.manifest.outputBudgetBytes,
-    );
-    if (response.redirectLocation) {
+    scope.check();
+    let response: ControlledHttpResponse;
+    if (input.httpGet) {
+      networkUsed = null;
+      response = await input.httpGet(url, input.manifest.timeoutMs, input.manifest.outputBudgetBytes, scope.signal);
+      networkUsed = true;
+    } else {
+      response = await controlledHttpGet(url, scope, input.manifest.outputBudgetBytes, {
+        onDispatch: () => { networkUsed = null; },
+        onResponse: () => { networkUsed = true; },
+      });
+    }
+    scope.check();
+    if ([301, 302, 303, 307, 308].includes(response.statusCode) && response.redirectLocation) {
       const redirectPolicy = decideBrowserRedirectPolicy({
         request: input.request,
         requestedUrl: url.toString(),
@@ -108,6 +124,7 @@ export async function runBrowserControlledNetworkExecutor(input: {
       });
       if (!redirectPolicy.allowed) {
         return result("redirect-blocked", {
+          networkUsed,
           executed: false,
           statusCode: response.statusCode,
           errorSummary: "Redirect target left the controlled loopback origin.",
@@ -137,6 +154,7 @@ export async function runBrowserControlledNetworkExecutor(input: {
     });
     if (response.truncated || hasForbiddenContent(response.body)) {
       return result("unsafe-output", {
+        networkUsed,
         executed: false,
         statusCode: response.statusCode,
         errorSummary: "Controlled-network response was unsafe or over budget.",
@@ -147,6 +165,7 @@ export async function runBrowserControlledNetworkExecutor(input: {
       });
     }
     return result("executed", {
+      networkUsed,
       executed: true,
       statusCode: response.statusCode,
       safeTitle: extractTitle(response.body),
@@ -156,16 +175,21 @@ export async function runBrowserControlledNetworkExecutor(input: {
       evidence: [...response.evidence, ...auditRecord.evidence],
     });
   } catch (error) {
-    const code = error instanceof Error && error.message === "controlled-network-timeout"
-      ? "timeout"
+    const code = error instanceof NetworkError && error.code === "cancelled" ? "cancelled"
+      : error instanceof NetworkError && error.code === "timeout" ? "timeout"
+      : error instanceof NetworkError && error.code === "response_limit" ? "unsafe-output"
       : "request-failed";
     return result(code, {
+      networkUsed,
       executed: false,
-      errorSummary: code === "timeout" ? "Controlled-network request timed out." : "Controlled-network request failed.",
+      errorSummary: code === "timeout" ? "Controlled-network request timed out."
+        : code === "cancelled" ? "Controlled-network request cancelled."
+        : code === "unsafe-output" ? "Controlled-network response exceeded its byte limit."
+        : "Controlled-network request failed.",
       warnings: [code],
       evidence: ["browser-controlled-network-executor:request-error"],
     });
-  }
+  } finally { scope.dispose(); }
 }
 
 export interface ControlledHttpResponse {
@@ -178,54 +202,39 @@ export interface ControlledHttpResponse {
   readonly evidence: readonly string[];
 }
 
-function controlledHttpGet(
+async function controlledHttpGet(
   url: URL,
-  timeoutMs: number,
+  scope: RequestScope,
   outputBudgetBytes: number,
+  observe: { readonly onDispatch: () => void; readonly onResponse: () => void },
 ): Promise<ControlledHttpResponse> {
-  return new Promise((resolve, reject) => {
-    const request = http.get(url, {
-      timeout: timeoutMs,
-      headers: { "user-agent": "cheers-controlled-network-harness" },
-    }, (response) => {
-      const chunks: Buffer[] = [];
-      let size = 0;
-      let truncated = false;
-      response.on("data", (chunk: Buffer) => {
-        size += chunk.length;
-        if (size <= outputBudgetBytes) {
-          chunks.push(chunk);
-        } else {
-          truncated = true;
-        }
-      });
-      response.on("end", () => {
-        resolve({
-          statusCode: response.statusCode ?? 0,
-          // The data handler above already caps `chunks` at outputBudgetBytes of
-          // real bytes, and a string's code-unit count never exceeds its UTF-8
-          // byte count, so this char-based call cannot truncate further. Left as
-          // a plain sanitize rather than adding a byte cap that would be inert.
-          body: sanitizeBrowserText(Buffer.concat(chunks).toString("utf8"), outputBudgetBytes),
-          bodyBytes: size,
-          redirectLocation: response.headers.location,
-          truncated,
-          redactions: [],
-          evidence: [
-            "browser-controlled-network-executor:http-request",
-            `browser-controlled-network-executor:status:${response.statusCode ?? 0}`,
-            "browser-controlled-network-executor:loopback-only",
-            "browser-controlled-network-executor:no-public-internet",
-            "browser-controlled-network-executor:no-browser-launch",
-          ],
-        });
-      });
-    });
-    request.on("timeout", () => {
-      request.destroy(new Error("controlled-network-timeout"));
-    });
-    request.on("error", reject);
+  const response = await requestBrowser(url.toString(), {
+    maxBytes: outputBudgetBytes,
+    headers: { "user-agent": "cheers-controlled-network-harness" },
+    ...observe,
+  }, scope, {
+    admitUrl: value => {
+      const candidate = new URL(value);
+      return candidate.protocol === "http:" && candidate.origin === url.origin && !candidate.username && !candidate.password;
+    },
+    admitAddress: value => value === "127.0.0.1" || value === "::1",
   });
+  const body = response.status >= 300 ? "" : await readResponseText(response, scope, outputBudgetBytes);
+  return {
+    statusCode: response.status,
+    body,
+    bodyBytes: Buffer.byteLength(body),
+    redirectLocation: [301, 302, 303, 307, 308].includes(response.status) ? response.headers.get("location") ?? undefined : undefined,
+    truncated: false,
+    redactions: [],
+    evidence: [
+      "browser-controlled-network-executor:http-request",
+      `browser-controlled-network-executor:status:${response.status}`,
+      "browser-controlled-network-executor:loopback-only",
+      "browser-controlled-network-executor:no-public-internet",
+      "browser-controlled-network-executor:no-browser-launch",
+    ],
+  };
 }
 
 function result(
@@ -236,6 +245,7 @@ function result(
     status,
     executed: input.executed ?? false,
     publicNetwork: false,
+    networkUsed: input.networkUsed === undefined ? false : input.networkUsed,
     browserLaunched: false,
     statusCode: input.statusCode,
     safeTitle: input.safeTitle,

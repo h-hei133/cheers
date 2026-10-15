@@ -252,6 +252,7 @@ export async function runBrowserExternalNetworkExecutionBridgeWithControlledNetw
   });
   const controlledNetworkExecutor = controlledNetworkPolicy.allowed && input.controlledRunnerManifest?.status === "valid"
     ? await runBrowserControlledNetworkExecutor({
+        signal: input.signal,
         request: input.request,
         policy: controlledNetworkPolicy,
         manifest: input.controlledRunnerManifest.manifest,
@@ -351,11 +352,11 @@ export async function runBrowserExternalNetworkExecutionBridgeWithControlledNetw
       `browser-external-network-bridge:runner-manifest:${input.runnerManifest?.status ?? "missing"}`,
       `browser-external-network-bridge:controlled-runner-manifest:${input.controlledRunnerManifest?.status ?? "missing"}`,
       "browser-external-network-bridge:no-browser-launch",
-      controlledNetworkReceipt?.executed
+      controlledNetworkReceipt?.networkUsed === true
         ? "browser-external-network-bridge:controlled-loopback-request"
         : publicReadOnlyReceipt?.publicNetwork === true
           ? "browser-external-network-bridge:public-readonly-request"
-        : publicReadOnlyReceipt?.publicNetwork === null
+        : publicReadOnlyReceipt?.publicNetwork === null || controlledNetworkReceipt?.networkUsed === null
           ? "browser-external-network-bridge:network-outcome-unknown"
           : "browser-external-network-bridge:no-network-call",
       "browser-external-network-bridge:no-mcp-launch",

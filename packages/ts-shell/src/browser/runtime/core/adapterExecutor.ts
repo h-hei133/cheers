@@ -17,6 +17,7 @@ import {
   validateBrowserSkillRuntimeBinding,
   type BrowserSkillRuntimeBinding,
 } from "../../skill/runtime/binding.js";
+import { stoppedBrowserRuntimeResult } from "./executor.js";
 import { validateBrowserRuntimeSnapshots } from "../../snapshotValidation.js";
 
 export class BrowserRuntimeAdapterExecutor implements BrowserRuntimeExecutor {
@@ -34,6 +35,7 @@ export class BrowserRuntimeAdapterExecutor implements BrowserRuntimeExecutor {
   async execute(input: {
     readonly request: BrowserExecutionRequest;
     readonly manifest: BrowserRuntimeManifest;
+    readonly signal?: AbortSignal;
   }): Promise<BrowserRuntimeExecutorResult> {
     const request = input.request;
     const policy = decideBrowserRuntimeAdapterPolicy({ request, manifestLoad: this.manifestLoad });
@@ -42,22 +44,74 @@ export class BrowserRuntimeAdapterExecutor implements BrowserRuntimeExecutor {
     }
     const manifest = this.manifestLoad.manifest;
     const runtimeManifest = this.manifestLoad.runtimeManifest.manifest;
-    const validation = manifest.runtimeMode === "skill-managed"
-      ? await this.runSkillManaged(request)
-      : await this.runExternalProcess(request);
+    if (input.signal?.aborted) return stoppedBrowserRuntimeResult(request, runtimeManifest, "cancelled");
+    const mutation = request.actionKind === "click" || request.actionKind === "type";
+    let validation: BrowserRuntimeProtocolValidation;
+    let processEvidence: readonly string[] = [];
+    let processCleanupStatus: BrowserRuntimeExecutorResult["processCleanupStatus"] = "not-started";
+    if (manifest.runtimeMode === "external-process") {
+      const process = await runBrowserRuntimeProcessAdapter({ request, manifest, signal: input.signal });
+      processCleanupStatus = process.cleanupStatus;
+      processEvidence = [
+        ...process.evidence,
+        `browser-runtime-adapter-executor:process-cleanup:${process.cleanupStatus}`,
+        "browser-runtime-adapter-executor:runtime-cleanup:unknown",
+      ];
+      if (process.status !== "ok" || !process.validation) {
+        return stoppedBrowserRuntimeResult(request, runtimeManifest,
+          process.status === "cancelled" ? "cancelled" : process.status === "unavailable" || process.status === "invalid" ? "blocked" : "failed", {
+            actionApplied: mutation && process.started ? null : false,
+            processCleanupStatus,
+            runtimeCleanupStatus: process.started ? "unknown" : "not-started",
+            browserLaunched: process.started && manifest.browserLaunchAllowed === "explicit-controlled-only" ? null : false,
+            warnings: process.warnings, evidence: processEvidence,
+          });
+      }
+      validation = process.validation;
+    } else {
+      const binding = validateBrowserSkillRuntimeBinding({ manifest, binding: this.skillBinding });
+      if (binding.status !== "ready" || !binding.binding.run) {
+        return blockedResult(request, runtimeManifest.runtimeMode, binding.reason, binding.warnings, binding.evidence);
+      }
+      try {
+        const response = await binding.binding.run({ request, manifest, signal: input.signal });
+        validation = validateBrowserRuntimeProtocolResponse({ response, outputBudgetChars: manifest.outputBudgetChars });
+        processEvidence = ["browser-runtime-adapter-executor:runtime-cleanup:unknown"];
+      } catch {
+        return stoppedBrowserRuntimeResult(request, runtimeManifest, input.signal?.aborted ? "cancelled" : "failed", {
+          actionApplied: mutation ? null : false,
+          processCleanupStatus: "unknown",
+          runtimeCleanupStatus: "unknown",
+          browserLaunched: manifest.browserLaunchAllowed === "explicit-controlled-only" ? null : false,
+          warnings: ["browser-runtime-adapter-executor:runner-failed"],
+          evidence: ["browser-runtime-adapter-executor:runtime-cleanup:unknown"],
+        });
+      }
+    }
     if (!validation.ok) {
-      const invalidValidation = validation as Extract<BrowserRuntimeProtocolValidation, { readonly ok: false }>;
-      return blockedResult(request, runtimeManifest.runtimeMode, invalidValidation.reason, invalidValidation.warnings, invalidValidation.evidence);
+      return stoppedBrowserRuntimeResult(request, runtimeManifest, input.signal?.aborted ? "cancelled" : "blocked", {
+        actionApplied: mutation ? null : false,
+        processCleanupStatus,
+        runtimeCleanupStatus: "unknown",
+        browserLaunched: manifest.browserLaunchAllowed === "explicit-controlled-only" ? null : false,
+        warnings: validation.warnings, evidence: [...processEvidence, ...validation.evidence],
+      });
     }
     const snapshotValidation = validateBrowserRuntimeSnapshots({
       response: validation.response,
       outputBudgetChars: manifest.outputBudgetChars,
     });
     if (snapshotValidation.status !== "valid") {
-      return blockedResult(request, runtimeManifest.runtimeMode, snapshotValidation.warnings[0] ?? "Snapshot validation failed.", snapshotValidation.warnings, snapshotValidation.evidence);
+      return stoppedBrowserRuntimeResult(request, runtimeManifest, input.signal?.aborted ? "cancelled" : "blocked", {
+        actionApplied: mutation ? validation.response.status === "ok" ? true : null : false,
+        processCleanupStatus,
+        runtimeCleanupStatus: "unknown",
+        browserLaunched: manifest.browserLaunchAllowed === "explicit-controlled-only" ? null : false,
+        warnings: snapshotValidation.warnings, evidence: [...processEvidence, ...snapshotValidation.evidence],
+      });
     }
     return {
-      status: validation.response.status === "ok"
+      status: input.signal?.aborted ? "cancelled" : validation.response.status === "ok"
         ? request.actionKind === "click" || request.actionKind === "type" ? "acted" : "observed"
         : validation.response.status === "blocked" ? "blocked" : "failed",
       runtimeMode: runtimeManifest.runtimeMode,
@@ -67,10 +121,13 @@ export class BrowserRuntimeAdapterExecutor implements BrowserRuntimeExecutor {
       html: validation.response.domSnapshotPayload?.html ?? validation.response.domSnapshotPayload?.textSummary ?? "",
       renderedText: validation.response.postActionObservation ?? validation.response.domSnapshotPayload?.textSummary ?? "",
       accessibilityNodes: validation.response.accessibilitySnapshotPayload?.nodes ?? [],
-      actionApplied: request.actionKind === "click" || request.actionKind === "type",
-      browserLaunched: manifest.browserLaunchAllowed === "explicit-controlled-only" && manifest.runtimeMode === "external-process",
+      actionApplied: mutation ? validation.response.status === "ok" ? true : null : false,
+      processCleanupStatus,
+      runtimeCleanupStatus: "unknown",
+      browserLaunched: manifest.browserLaunchAllowed === "explicit-controlled-only" ? null : false,
       publicAutomation: false,
       evidence: [
+        ...processEvidence,
         `browser-runtime-adapter-executor:${manifest.runtimeMode}`,
         `browser-runtime-adapter-executor:policy:${policy.status}`,
         `browser-runtime-adapter-executor:snapshot:${snapshotValidation.status}`,
@@ -90,68 +147,6 @@ export class BrowserRuntimeAdapterExecutor implements BrowserRuntimeExecutor {
     };
   }
 
-  private async runExternalProcess(request: BrowserExecutionRequest): Promise<BrowserRuntimeProtocolValidation> {
-    if (this.manifestLoad.status !== "valid") {
-      return {
-        ok: false,
-        status: "invalid",
-        reason: this.manifestLoad.reason,
-        warnings: this.manifestLoad.warnings,
-        redactions: this.manifestLoad.redactions,
-        evidence: this.manifestLoad.evidence,
-      };
-    }
-    const processResult = await runBrowserRuntimeProcessAdapter({
-      request,
-      manifest: this.manifestLoad.manifest,
-    });
-    if (processResult.validation) {
-      return processResult.validation;
-    }
-    return {
-      ok: false,
-      status: "invalid",
-      reason: processResult.stderrSummary || processResult.status,
-      warnings: processResult.warnings,
-      redactions: [],
-      evidence: processResult.evidence,
-    };
-  }
-
-  private async runSkillManaged(request: BrowserExecutionRequest): Promise<BrowserRuntimeProtocolValidation> {
-    if (this.manifestLoad.status !== "valid") {
-      return {
-        ok: false,
-        status: "invalid",
-        reason: this.manifestLoad.reason,
-        warnings: this.manifestLoad.warnings,
-        redactions: this.manifestLoad.redactions,
-        evidence: this.manifestLoad.evidence,
-      };
-    }
-    const binding = validateBrowserSkillRuntimeBinding({
-      manifest: this.manifestLoad.manifest,
-      binding: this.skillBinding,
-    });
-    if (binding.status !== "ready" || !binding.binding.run) {
-      return {
-        ok: false,
-        status: "invalid",
-        reason: binding.reason,
-        warnings: binding.warnings,
-        redactions: [],
-        evidence: binding.evidence,
-      };
-    }
-    const response = await binding.binding.run({
-      request,
-      manifest: this.manifestLoad.manifest,
-    });
-    return validateBrowserRuntimeProtocolResponse({
-      response,
-      outputBudgetChars: this.manifestLoad.manifest.outputBudgetChars,
-    });
-  }
 }
 
 function blockedResult(

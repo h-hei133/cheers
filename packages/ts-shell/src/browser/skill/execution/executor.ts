@@ -1,11 +1,10 @@
-import { appendWithinByteBudget } from "../../outputBudget.js";
-import { spawn } from "node:child_process";
+import { runBrowserProcess, type BrowserProcessCleanup } from "../../runtime/process.js";
 import type {
   BrowserExecutor,
   BrowserExecutorContext,
   BrowserExecutorResult,
 } from "../../executor.js";
-import { blockedBrowserExecutorResult } from "../../executor.js";
+import { blockedBrowserExecutorResult, cancelledBrowserExecutorResult } from "../../executor.js";
 import type { BrowserExecutionRequest } from "../../executionContract.js";
 import {
   decideBrowserLocalExecutionAuthority,
@@ -28,7 +27,11 @@ import type { BrowserSkillRunnerBinding } from "../runner/binding.js";
 import type { BrowserSkillRunnerMetadata } from "../runner/metadata.js";
 
 export interface BrowserSkillExecutionProcessResult {
-  readonly status: BrowserSkillExecutionStatus;
+  readonly status: BrowserSkillExecutionStatus | "cancelled";
+  readonly started: boolean;
+  readonly cleanupStatus: BrowserProcessCleanup;
+  readonly terminationFailed?: true;
+  readonly outputFailed?: true;
   readonly response?: BrowserSkillExecutionResponse;
   readonly exitCode?: number | null;
   readonly signal?: string | null;
@@ -61,8 +64,9 @@ export class BrowserSkillExecutionExecutor implements BrowserExecutor {
 
   async execute(
     request: BrowserExecutionRequest,
-    _context: BrowserExecutorContext = {},
+    context: BrowserExecutorContext = {},
   ): Promise<BrowserExecutorResult> {
+    if (context.signal?.aborted) return cancelledBrowserExecutorResult(request, this.kind);
     const authorityDecision = decideBrowserLocalExecutionAuthority({
       request,
       authority: this.authority,
@@ -95,8 +99,9 @@ export class BrowserSkillExecutionExecutor implements BrowserExecutor {
     const processResult = await runBrowserSkillExecutionProcess({
       binding: this.binding,
       request: bridge.request,
+      signal: context.signal,
     });
-    if (!processResult.response || processResult.response.status !== "executed" || !processResult.response.executed) {
+    if (processResult.status !== "executed" || !processResult.response || processResult.response.status !== "executed" || !processResult.response.executed) {
       return processBlockedResult(request, this.metadata, this.binding, processResult);
     }
     const evidence = processResult.response.evidence;
@@ -119,6 +124,7 @@ export class BrowserSkillExecutionExecutor implements BrowserExecutor {
         { label: "skill binding mode", value: this.binding.mode },
         { label: "skill execution", value: "skill-managed" },
         { label: "runner status", value: processResult.response.status },
+        { label: "process cleanup", value: processResult.cleanupStatus },
         { label: "sandbox decision", value: bridge.request.sandboxDecision },
         { label: "allowlist decision", value: bridge.request.allowlistDecision },
         { label: "confirmation decision", value: bridge.request.confirmationDecision },
@@ -149,6 +155,7 @@ export class BrowserSkillExecutionExecutor implements BrowserExecutor {
 export async function runBrowserSkillExecutionProcess(input: {
   readonly binding: BrowserSkillRunnerBinding;
   readonly request: unknown;
+  readonly signal?: AbortSignal;
 }): Promise<BrowserSkillExecutionProcessResult> {
   if (!input.binding.runnerCommand) {
     return blocked("unavailable", "No explicit skill runner command was configured.");
@@ -160,119 +167,64 @@ export async function runBrowserSkillExecutionProcess(input: {
   if (browserExternalRunnerHasForbiddenContent(requestJson)) {
     return blocked("invalid-response", "Skill runner request contains unsafe content.");
   }
-  return new Promise((resolve) => {
-    const child = spawn(
-      input.binding.runnerCommand!.command,
-      input.binding.runnerCommand!.args,
-      {
-        cwd: input.binding.runnerCommand!.cwd,
-        stdio: ["pipe", "pipe", "pipe"],
-        env: {
-          PATH: process.env.PATH ?? "",
-          NODE_NO_WARNINGS: "1",
-          CHEERS_BROWSER_SKILL_RUNNER: input.binding.mode,
-        },
-      },
-    );
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-    const budget = input.binding.outputBudgetBytes;
-    const timeout = setTimeout(() => {
-      settled = true;
-      child.kill("SIGKILL");
-      resolve({
-        status: "timed-out",
-        exitCode: null,
-        signal: "SIGKILL",
-        timedOut: true,
-        stdoutSummary: summarizeOutput(stdout, budget),
-        stderrSummary: summarizeOutput(stderr, budget),
-        warnings: ["browser-skill-execution-process:timed-out"],
-        redactions: ["raw-skill-output"],
-        evidence: [
-          "browser-skill-execution-process:timeout",
-          "browser-skill-execution-process:stdout-stderr-summarized",
-        ],
-      });
-    }, input.binding.timeoutMs);
-    child.stdout?.on("data", (chunk: Buffer) => {
-      stdout = appendWithinByteBudget(stdout, chunk.toString("utf8"), budget);
-    });
-    child.stderr?.on("data", (chunk: Buffer) => {
-      stderr = appendWithinByteBudget(stderr, chunk.toString("utf8"), budget);
-    });
-    child.on("error", () => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timeout);
-      resolve(blocked("unavailable", "Skill runner process could not be started."));
-    });
-    child.on("close", (exitCode, signal) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timeout);
-      const parsed = parseRunnerStdout(stdout);
-      if (parsed.ok === false) {
-        resolve({
-          status: "invalid-response",
-          exitCode,
-          signal,
-          timedOut: false,
-          stdoutSummary: summarizeOutput(stdout, budget),
-          stderrSummary: summarizeOutput(stderr, budget),
-          warnings: ["browser-skill-execution-process:invalid-response"],
-          redactions: ["raw-skill-output"],
-          evidence: [
-            "browser-skill-execution-process:invalid-json",
-            "browser-skill-execution-process:stdout-stderr-summarized",
-          ],
-        });
-        return;
-      }
-      const validation = validateBrowserSkillExecutionResponse(parsed.value);
-      if (validation.ok === false) {
-        resolve({
-          status: "unsafe-output",
-          exitCode,
-          signal,
-          timedOut: false,
-          stdoutSummary: summarizeOutput(stdout, budget),
-          stderrSummary: summarizeOutput(stderr, budget),
-          warnings: [...validation.warnings, "browser-skill-execution-process:unsafe-response"],
-          redactions: [...validation.redactions, "raw-skill-output"],
-          evidence: [
-            ...validation.evidence,
-            "browser-skill-execution-process:response-rejected",
-            "browser-skill-execution-process:stdout-stderr-summarized",
-          ],
-        });
-        return;
-      }
-      resolve({
-        status: validation.value.status,
-        response: validation.value,
-        exitCode,
-        signal,
-        timedOut: false,
-        stdoutSummary: "valid JSON response received; raw stdout excluded",
-        stderrSummary: summarizeOutput(stderr, budget),
-        warnings: validation.warnings,
-        redactions: [...validation.redactions, "raw-skill-output"],
-        evidence: [
-          ...validation.evidence,
-          "browser-skill-execution-process:executed",
-          "browser-skill-execution-process:stdout-stderr-summarized",
-          "browser-skill-execution-process:no-provider-or-model-call",
-        ],
-      });
-    });
-    child.stdin?.end(`${requestJson}\n`);
+  const budget = input.binding.outputBudgetBytes;
+  const native = await runBrowserProcess({
+    command: input.binding.runnerCommand.command,
+    args: input.binding.runnerCommand.args,
+    cwd: input.binding.runnerCommand.cwd,
+    env: { PATH: process.env.PATH ?? "", NODE_NO_WARNINGS: "1", CHEERS_BROWSER_SKILL_RUNNER: input.binding.mode },
+    request: input.request,
+    timeoutMs: input.binding.timeoutMs,
+    outputBudgetBytes: budget,
+    signal: input.signal,
   });
+  const common = {
+    exitCode: native.exitCode,
+    started: native.started,
+    cleanupStatus: native.cleanupStatus,
+    terminationFailed: native.terminationFailed,
+    outputFailed: native.outputFailed,
+    timedOut: native.status === "timeout",
+    stdoutSummary: summarizeOutput(native.stdout, budget),
+    stderrSummary: summarizeOutput(native.stderr, budget),
+    redactions: ["raw-skill-output"],
+    evidence: [
+      `browser-skill-execution-process:process-cleanup:${native.cleanupStatus}`,
+      "browser-skill-execution-process:stdout-stderr-summarized",
+      "browser-skill-execution-process:no-provider-or-model-call",
+    ],
+  };
+  if (native.status !== "completed") {
+    const status = native.status === "timeout" ? "timed-out" : native.status === "cancelled" ? "cancelled" : "failed";
+    return { ...common, status, warnings: [
+      `browser-skill-execution-process:${status}`,
+      ...(native.terminationFailed ? ["browser-skill-execution-process:termination-unverified"] : []),
+      ...(native.outputFailed ? ["browser-skill-execution-process:output-failed"] : []),
+    ] };
+  }
+  const parsed = parseRunnerStdout(native.stdout);
+  if (!parsed.ok) {
+    return { ...common, status: "invalid-response", warnings: ["browser-skill-execution-process:invalid-response"] };
+  }
+  const validation = validateBrowserSkillExecutionResponse(parsed.value);
+  if (!validation.ok) {
+    return {
+      ...common,
+      status: "unsafe-output",
+      warnings: [...validation.warnings, "browser-skill-execution-process:unsafe-response"],
+      redactions: [...common.redactions, ...validation.redactions],
+      evidence: [...common.evidence, ...validation.evidence, "browser-skill-execution-process:response-rejected"],
+    };
+  }
+  return {
+    ...common,
+    status: validation.value.status,
+    response: validation.value,
+    stdoutSummary: "valid JSON response received; raw stdout excluded",
+    warnings: validation.warnings,
+    redactions: [...common.redactions, ...validation.redactions],
+    evidence: [...common.evidence, ...validation.evidence, "browser-skill-execution-process:executed"],
+  };
 }
 
 function processBlockedResult(
@@ -282,7 +234,7 @@ function processBlockedResult(
   processResult: BrowserSkillExecutionProcessResult,
 ): BrowserExecutorResult {
   return {
-    status: processResult.status === "timed-out" ||
+    status: processResult.status === "cancelled" ? "cancelled" : processResult.status === "timed-out" ||
       processResult.status === "invalid-response" ||
       processResult.status === "unsafe-output"
       ? "blocked"
@@ -303,6 +255,8 @@ function processBlockedResult(
       { label: "skill binding mode", value: binding.mode },
       { label: "skill execution", value: "skill-managed" },
       { label: "runner status", value: processResult.status },
+      { label: "process cleanup", value: processResult.cleanupStatus },
+      { label: "action applied", value: processResult.started ? "unknown" : "no" },
       { label: "sandbox decision", value: "local-fixture:allowed" },
       { label: "allowlist decision", value: "network:none" },
       { label: "confirmation decision", value: "sandbox:confirmed" },
@@ -343,6 +297,8 @@ function blocked(
 ): BrowserSkillExecutionProcessResult {
   return {
     status,
+    started: false,
+    cleanupStatus: "not-started",
     timedOut: false,
     stdoutSummary: "none",
     stderrSummary: sanitizeBrowserEvidenceText(reason, 180).value,

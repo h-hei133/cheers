@@ -2,6 +2,7 @@ import type { BrowserExecutionActionKind, BrowserExecutionMode } from "./executi
 import type { BrowserExecutorKind } from "./executor.js";
 import type { BrowserEvidenceBundle } from "./evidenceBundle.js";
 export type BrowserExecutionReceiptStatus =
+  | "cancelled"
   | "executed"
   | "blocked"
   | "failed"

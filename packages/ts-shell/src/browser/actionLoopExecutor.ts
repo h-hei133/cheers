@@ -19,6 +19,7 @@ import {
   type BrowserRuntimeManifest,
   type BrowserRuntimeManifestLoadResult,
 } from "./runtime/core/manifest.js";
+import { executeBrowserRuntime } from "./runtime/core/executor.js";
 import type {
   BrowserRuntimeExecutor,
   BrowserRuntimeExecutorResult,
@@ -29,7 +30,7 @@ import type { BrowserActionTarget } from "./actionTarget.js";
 import type { BrowserSelectorRepairSeed } from "./selectorRepairSeed.js";
 
 export interface BrowserRuntimeActionLoopResult {
-  readonly status: "executed" | "blocked" | "unavailable";
+  readonly status: "executed" | "blocked" | "unavailable" | "failed" | "cancelled";
   readonly availability: BrowserRuntimeAvailability;
   readonly policy: BrowserActionLoopPolicyDecision;
   readonly receipt: BrowserRuntimeReceipt;
@@ -46,6 +47,7 @@ export async function runBrowserActionLoopExecutor(input: {
   readonly manifest?: BrowserRuntimeManifest;
   readonly executor?: BrowserRuntimeExecutor;
   readonly now?: () => string;
+  readonly signal?: AbortSignal;
 }): Promise<BrowserRuntimeActionLoopResult> {
   const manifestLoad = input.manifestLoad ?? validateBrowserRuntimeManifest(input.manifest);
   const availability = decideBrowserRuntimeAvailability({
@@ -102,7 +104,11 @@ export async function runBrowserActionLoopExecutor(input: {
         action: { ...input.request.action, actionKind: "observe" },
       } as BrowserExecutionRequest)
     : input.request;
-  const firstResult = await input.executor.execute({ request: snapshotRequest, manifest });
+  const firstResult = await executeBrowserRuntime({ request: snapshotRequest, manifest, executor: input.executor, signal: input.signal });
+  if (firstResult.status !== "observed" && firstResult.status !== "acted") {
+    const receipt = createBrowserRuntimeReceipt({ request: input.request, manifest, policy: earlyPolicy, executorResult: firstResult });
+    return blocked({ availability, policy: earlyPolicy, receipt, executorResult: firstResult, evidence: firstResult.evidence });
+  }
   const observation = createObservation({
     request: input.request,
     manifest,
@@ -148,7 +154,7 @@ export async function runBrowserActionLoopExecutor(input: {
     });
   }
   const actionResult = input.request.actionKind === "click" || input.request.actionKind === "type"
-    ? await input.executor.execute({ request: input.request, manifest })
+    ? await executeBrowserRuntime({ request: input.request, manifest, executor: input.executor, signal: input.signal })
     : firstResult;
   const finalObservation = actionResult === firstResult
     ? observation
@@ -168,7 +174,7 @@ export async function runBrowserActionLoopExecutor(input: {
     repairSeed,
   });
   return {
-    status: "executed",
+    status: receipt.status,
     availability,
     policy,
     receipt,
@@ -182,7 +188,7 @@ export async function runBrowserActionLoopExecutor(input: {
       ...firstResult.evidence,
       ...actionResult.evidence,
       ...(repairSeed?.evidence ?? []),
-      "browser-action-loop-executor:executed",
+      `browser-action-loop-executor:${receipt.status}`,
       "browser-action-loop-executor:no-auto-multistep",
       "browser-action-loop-executor:no-provider-or-model-call",
     ],
@@ -243,7 +249,7 @@ function blocked(input: {
   readonly evidence: readonly string[];
 }): BrowserRuntimeActionLoopResult {
   return {
-    status: "blocked",
+    status: input.receipt.status === "executed" ? "blocked" : input.receipt.status,
     availability: input.availability,
     policy: input.policy,
     receipt: input.receipt,

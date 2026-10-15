@@ -1,5 +1,6 @@
 import {
   blockedBrowserExecutorResult,
+  cancelledBrowserExecutorResult,
   type BrowserExecutor,
   type BrowserExecutorContext,
   type BrowserExecutorResult,
@@ -48,6 +49,7 @@ export class BrowserPlaywrightLocalExecutor implements BrowserExecutor {
     request: BrowserExecutionRequest,
     context: BrowserExecutorContext = {},
   ): Promise<BrowserExecutorResult> {
+    if (context.signal?.aborted) return cancelledBrowserExecutorResult(request, this.kind);
     if (request.actionKind === "navigate" && !request.action.url?.startsWith("local-fixture://")) {
       return blockedBrowserExecutorResult({
         request,
@@ -74,12 +76,13 @@ export class BrowserPlaywrightLocalExecutor implements BrowserExecutor {
       availabilityChecker: this.availabilityChecker,
       runner: this.runner,
       now: context.now,
+      signal: context.signal,
     });
     const evidence = lifecycle.evidence;
     return {
       status: lifecycle.status === "executed"
         ? "executed"
-        : lifecycle.status === "failed"
+        : lifecycle.status === "cancelled" ? "cancelled" : lifecycle.status === "failed"
           ? "failed"
           : "skipped",
       executorKind: this.kind,
@@ -101,6 +104,7 @@ export class BrowserPlaywrightLocalExecutor implements BrowserExecutor {
         { label: "stdout summary", value: evidence.stdoutSummary },
         { label: "stderr summary", value: evidence.stderrSummary },
         { label: "cleanup", value: lifecycle.cleanupStatus },
+        { label: "action applied", value: lifecycle.actionApplied === null ? "unknown" : lifecycle.actionApplied ? "yes" : "no" },
         ...evidence.redactions.map((value) => ({ label: "redaction", value })),
       ],
       warnings: [

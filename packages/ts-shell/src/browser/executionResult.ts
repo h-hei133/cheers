@@ -16,7 +16,7 @@ export interface BrowserExecutionResult {
   readonly skillRunnerReadiness?: BrowserSkillRunnerReadiness;
   readonly receipt: BrowserExecutionReceipt;
   readonly executed: boolean;
-  readonly outcome: "executed" | "blocked" | "failed" | "skipped";
+  readonly outcome: "executed" | "blocked" | "failed" | "skipped" | "cancelled";
   readonly evidence: readonly string[];
   readonly warnings: readonly string[];
   readonly nextAction: string;

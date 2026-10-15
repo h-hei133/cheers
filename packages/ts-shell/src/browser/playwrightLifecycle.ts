@@ -11,6 +11,9 @@ import {
 } from "./playwrightLocalEvidence.js";
 
 export interface BrowserPlaywrightLocalRunnerResult {
+  /** Supplied by the resource owner after its close operation has settled. */
+  readonly cleanupStatus?: "closed" | "not-started" | "unknown";
+  readonly actionApplied?: boolean | null;
   readonly safeTitle?: string;
   readonly safeUrl?: string;
   readonly safeObservationSummary?: string;
@@ -26,19 +29,22 @@ export type BrowserPlaywrightLocalRunner =
     readonly request: BrowserExecutionRequest;
     readonly fixture: BrowserLocalFixture;
     readonly availability: BrowserPlaywrightAvailability;
+    readonly signal?: AbortSignal;
   }) => BrowserPlaywrightLocalRunnerResult | Promise<BrowserPlaywrightLocalRunnerResult>;
 
 export type BrowserPlaywrightLifecycleStatus =
   | "executed"
   | "unavailable"
-  | "failed";
+  | "failed"
+  | "cancelled";
 
 export interface BrowserPlaywrightLifecycleResult {
   readonly status: BrowserPlaywrightLifecycleStatus;
   readonly executed: boolean;
   readonly availability: BrowserPlaywrightAvailability;
   readonly evidence: BrowserPlaywrightLocalEvidence;
-  readonly cleanupStatus: "closed" | "not-started" | "failed-safe";
+  readonly cleanupStatus: "closed" | "not-started" | "unknown";
+  readonly actionApplied: boolean | null;
   readonly reason: string;
   readonly nextAction: string;
   readonly warnings: readonly string[];
@@ -50,16 +56,17 @@ export async function runBrowserPlaywrightLifecycle(input: {
   readonly availabilityChecker?: BrowserPlaywrightAvailabilityChecker;
   readonly runner?: BrowserPlaywrightLocalRunner;
   readonly now?: () => string;
+  readonly signal?: AbortSignal;
 }): Promise<BrowserPlaywrightLifecycleResult> {
   const availability = await resolveBrowserPlaywrightAvailability({
-    checker: input.availabilityChecker,
+    checker: input.signal?.aborted ? undefined : input.availabilityChecker,
   });
-  if (availability.status !== "available" || !input.runner) {
-    const reason = availability.status !== "available"
+  if (input.signal?.aborted || availability.status !== "available" || !input.runner) {
+    const reason = input.signal?.aborted ? "Playwright local execution cancelled before dispatch." : availability.status !== "available"
       ? availability.reason
       : "No explicit Playwright local runner was injected.";
     return {
-      status: "unavailable",
+      status: input.signal?.aborted ? "cancelled" : "unavailable",
       executed: false,
       availability,
       evidence: buildBrowserPlaywrightLocalEvidence({
@@ -79,6 +86,7 @@ export async function runBrowserPlaywrightLifecycle(input: {
         executed: false,
       }),
       cleanupStatus: "not-started",
+      actionApplied: false,
       reason,
       nextAction: availability.status !== "available"
         ? availability.nextAction
@@ -91,7 +99,10 @@ export async function runBrowserPlaywrightLifecycle(input: {
       request: input.request,
       fixture: input.fixture,
       availability,
+      signal: input.signal,
     });
+    const cleanupStatus = runnerResult.cleanupStatus ?? "unknown";
+    const executed = !input.signal?.aborted && cleanupStatus === "closed";
     const timestamp = input.now?.() ?? "2026-05-17T00:00:00.000Z";
     const trace = [
       `fixture:${input.fixture.fixtureId}`,
@@ -99,11 +110,11 @@ export async function runBrowserPlaywrightLifecycle(input: {
       `runtime:${availability.runtimeKind}`,
       `timestamp:${timestamp}`,
       ...(runnerResult.actionTrace ?? []),
-      "cleanup:closed",
+      `cleanup:${cleanupStatus}`,
     ];
     return {
-      status: "executed",
-      executed: true,
+      status: input.signal?.aborted ? "cancelled" : executed ? "executed" : "failed",
+      executed,
       availability,
       evidence: buildBrowserPlaywrightLocalEvidence({
         executionId: input.request.requestId,
@@ -121,16 +132,19 @@ export async function runBrowserPlaywrightLifecycle(input: {
         stdout: runnerResult.stdout,
         stderr: runnerResult.stderr,
         warnings: runnerResult.warnings,
-        executed: true,
+        executed,
       }),
-      cleanupStatus: "closed",
-      reason: "Playwright local fixture execution completed and closed the runtime.",
+      cleanupStatus,
+      actionApplied: runnerResult.actionApplied === undefined ? null : runnerResult.actionApplied,
+      reason: input.signal?.aborted ? "Playwright local execution cancelled; prior effects may remain." : executed
+        ? "Playwright local fixture execution completed; the runner reported runtime closure."
+        : "Playwright local runner settled without verified runtime closure.",
       nextAction: "Review sanitized local evidence; keep external network and persistence disabled.",
-      warnings: runnerResult.warnings ?? [],
+      warnings: [...(runnerResult.warnings ?? []), ...(cleanupStatus !== "closed" ? ["browser-playwright-lifecycle:cleanup-unverified"] : [])],
     };
   } catch {
     return {
-      status: "failed",
+      status: input.signal?.aborted ? "cancelled" : "failed",
       executed: false,
       availability,
       evidence: buildBrowserPlaywrightLocalEvidence({
@@ -144,12 +158,13 @@ export async function runBrowserPlaywrightLifecycle(input: {
           `fixture:${input.fixture.fixtureId}`,
           `action:${input.request.actionKind}`,
           "runner:failed",
-          "cleanup:failed-safe",
+          "cleanup:unknown",
         ],
         warnings: ["browser-playwright-lifecycle:runner-failed"],
         executed: false,
       }),
-      cleanupStatus: "failed-safe",
+      cleanupStatus: "unknown",
+      actionApplied: null,
       reason: "Playwright local runner failed without exposing raw details.",
       nextAction: "Keep execution blocked and inspect the injected runner in a focused test.",
       warnings: ["browser-playwright-lifecycle:runner-failed"],

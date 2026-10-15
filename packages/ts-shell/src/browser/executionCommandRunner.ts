@@ -1,6 +1,7 @@
 import {
   NOOP_BROWSER_EXECUTOR,
   blockedBrowserExecutorResult,
+  cancelledBrowserExecutorResult,
   browserExecutorIsAvailable,
   type BrowserExecutor,
 } from "./executor.js";
@@ -120,9 +121,11 @@ export async function runBrowserExecutionCommand(input: {
           ? "browser-execution-command-runner:public-network-explicit"
           : bridge.publicReadOnlyReceipt?.publicNetwork === null
             ? "browser-execution-command-runner:network-outcome-unknown"
-            : bridge.controlledNetworkReceipt?.executed
+            : bridge.controlledNetworkReceipt?.networkUsed === true
               ? "browser-execution-command-runner:controlled-loopback-request"
-              : "browser-execution-command-runner:no-network-call",
+              : bridge.controlledNetworkReceipt?.networkUsed === null
+                ? "browser-execution-command-runner:network-outcome-unknown"
+                : "browser-execution-command-runner:no-network-call",
         "browser-execution-command-runner:no-mcp-launch",
         "browser-execution-command-runner:no-provider-or-model-call",
       ],
@@ -136,13 +139,17 @@ export async function runBrowserExecutionCommand(input: {
     allowlist: input.networkAllowlist,
     confirmations: input.confirmations,
   });
-  const executorResult = policy.allowed && ["pass", "warning"].includes(preflight.preflightStatus)
-    ? await executor.execute(request, { now: input.now })
+  const settledResult = input.signal?.aborted ? cancelledBrowserExecutorResult(request, executor.kind) : policy.allowed && ["pass", "warning"].includes(preflight.preflightStatus)
+    ? await executor.execute(request, { now: input.now, signal: input.signal })
     : blockedBrowserExecutorResult({
         request,
         code: preflight.preflightStatus === "pass" ? policy.status : `preflight-${preflight.preflightStatus}`,
         message: preflight.blockers[0] ?? policy.reason,
       });
+  const executorResult = input.signal?.aborted && settledResult.status !== "cancelled"
+    ? { ...settledResult, status: "cancelled" as const, executed: false,
+        evidence: [...settledResult.evidence, { label: "action outcome", value: "cancellation does not roll back prior effects" }] }
+    : settledResult;
   const receiptExecutorResult = {
     ...executorResult,
     evidence: [
