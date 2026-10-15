@@ -2940,3 +2940,27 @@ media断言在原FileHandle关闭后异步`stat('/proc/self/fd/N')`；同进程�
 最终完整运行已取得实际终态：隔离Node20.3/Linux、4 worker，**801文件通过，8136断言通过、1个显式公共smoke跳过，零失败，448.28秒、exit0**。`full-complete-fixtures-final-{validation,tests,freeze}.json`及log保留逐文件/逐断言结果，全部源码前后无变化、18交付源码/测试hash与最终独立复核一致，用户`.gitignore`保持。当前真实Chromium/local-server原9项包含在该环境中，未新增skip或放宽时限；先前各次失败与精确对象未知界限仍保留，不被这次通过改写。
 
 A02当前Linux/Node20.3源码的本地全套证据已补齐，A26–A29及A29-R01在已审scope内修复；这不关闭A01非Linux实际对象、A03真实平台/服务/账户/设备和公网成功验收、A12远端执行，或A25原41/42未知拒绝、整树/query-start/OS原子性及广泛成本。完整host-command父取消仍未建立，Phase19 **active**。最终文档/空白检查与21路径交付冻结另验，用户`.gitignore`保留排除、§9历史原字节不变；提交/推送及精确SHA的CI不由本地套件推断。
+
+### 10.25 A30 — 公共网页命令缺失宿主取消链（2026-10-15，发现即登记）
+
+续查确认底层public executor与smoke runner已接收`AbortSignal`，但`CommandContext`、CLI命令桥、`runBrowserLocalCommand`、异步command/execution runner及external-network bridge均未传递父取消。普通终端的Ctrl-C只检查`ShellSessionRuntime.getCurrentRunController()`，该controller当前仅由prompt/compact登记；全屏取消与脚本退出清理也通过同一session runtime。因而直接调用底层传入signal的成功测试不能证明实际`/browser smoke`或公共execute命令会随宿主停止，已有网络请求可能继续到自身期限。
+
+本项先登记为未修复。限定审查普通/全屏/print/stdin的命令入口、运行登记/等待/退出清理及公共execute桥，确认完整生命周期与相邻执行适配器边界；在完成该范围审查与只读参考比较后才实现。不得以仅增加可选signal字段、Promise竞速后返回或清除既有网络事实充当取消完成；预取消零派发、进行中资源关闭、宿主等待到settlement和取消后网络事实须有实际证据。Phase19仍active，A25原未知拒绝不据此归因。
+
+### 10.26 A31 — 相邻浏览器适配器的取消边界（2026-10-15，发现即登记）
+
+同一限定审查确认`controlledNetworkExecutor`的回环`httpGet`及`BrowserExecutorContext`、`BrowserRuntimeExecutor.execute`目前均无父取消端口；action-loop也未传递取消。它们与已支持signal的公共只读执行器是不同执行适配器，不能因为公共请求停止就声称所有浏览器工作均可取消。本轮先修A30公共只读路径与宿主登记/等待，A31保留未修复；未来修补须检查实际进程/浏览器资源、动作已发生事实和各自结果合同，不能只在上层竞速丢弃结果。
+
+A30范围审查已收束：普通终端`interactiveSignals`、全屏`interrupt`、print/stdin的shutdown均汇入session runtime；命令桥是两个宿主的共同上下文入口。只读比较pi的`agent-session.executeBash`与interactive取消分支确认三项决定：执行前登记controller、将原signal交给执行owner、finally解除登记；本方案均采纳，并沿用session runtime的取消后等待语义，使宿主不会在命令settlement之前宣称idle。参考的独立bash集合适用于其并发shell；本项目现有输入队列串行派发，命令owner拒绝重叠登记而不覆盖前一个controller。下层默认公共传输继续独立负责DNS/socket/stream取消及false/null/true网络证据，不改策略门或公网地址审核。
+
+### 10.27 A30 — 公共命令宿主取消实现与验证（2026-10-15）
+
+A30实现沿用session runtime作为宿主取消入口，`core/shell/command`只拥有本地命令的controller/settlement，登记先于执行、finally解除；两个CLI宿主经共同命令桥注入该端口，公共smoke与external execute逐层传递signal。现有`getCurrentRunController`、`cancelCurrentRun`及`waitForIdle`包含命令，等待命令操作及其结果发布的Promise结束后才返回；重叠命令拒绝，不覆盖旧controller，不新增provider调用或执行平面。A31各适配器仍按原结果合同运行，本项不声称它们已可取消，也不新增通用prompt/command并发互斥。默认transport在取消时销毁本地资源，远端close事件由测试单独观察；既有`withinRequest`会在取消时停止等待，忽略signal的自定义client可继续运行，不能把命令结束当作此类client已终止/清理的证明。
+
+隔离Node20.3首轮3文件57项中55通过/2失败，确认新夹具沿用默认HEAD却按GET检查正文；显式GET后12文件159项全通过。随后仅强化idle断言至下一个事件循环，6项再通过，生产字节不变。默认TLS/socket的smoke与execute各验证预取消零DNS/派发、正文中取消关闭连接并保留network=true、无响应取消保留null；宿主三入口与延迟cleanup/拒绝/reentry也有现有测试覆盖。独立副本四个反转各实际失败1项，源码无更改：去除两路父signal、去除settlement等待、去除执行前登记，材料`cancellation-reversals.json`；首次反转launcher因替换子串匹配两处在执行测试前停止，未计有效反转。
+
+实际Node20.3 regular/fullscreen Ctrl-C在默认transport的合成挂起DNS阶段返回cancelled/network=no，宿主保留后显式exit0，约49–52ms；print/live stdin各SIGINT/SIGTERM/SIGHUP先打印相同取消收据，再exit130/143/129，约32–64ms。全部隔离HOME/state、零provider POST、来源/配置不变；DNS仅暂停、不重定向socket或放宽地址/TLS，不证明真实公网或可执行文件的取消。材料`cancellation-terminal-1792044140551651750/results.json`、`cancellation-scripted-1792044321106933763/results.json`。首次print探针保持stdin打开而停在capture-batch，未进入命令，已记录`cancellation-scripted-first-failure.json`；修正为DEVNULL后才取得六项实际证据，不归因产品。
+
+两种构建、四源码门、result-contract149项及scripts57项实际通过；NormProof exit0、零blocking、同4既有ceiling advisory/partial。`cancellation-review-freeze.json`绑定13路径（10生产/3测试）、原HEAD及用户`.gitignore`；独立code lane为APPROVE、architecture lane为CLEAR，均零finding/blocker，综合仅该13路径delta APPROVE。代码lane独立重跑最终三文件57项通过，架构lane独立编译探针验证执行前取消、延迟settlement/重叠拒绝/reentry及原拒绝保留；材料`code-review-cancellation.{md,json}`、`architecture-review-cancellation.{md,json}`及`review-synthesis-cancellation.json`。
+
+最终隔离Node20.3/Linux全套实际exit0：801文件、8147项通过、1个显式public smoke跳过，零失败，Vitest454.94秒（harness455.56秒）。逐文件/逐断言统计见`cancellation-full-final-{tests,validation}.json`及原日志；`cancellation-full-final-freeze.json`包含全部13复核路径且运行期间源码无变化，用户`.gitignore`保持。共享session改动的当前本地全套证据补齐；提交/推送与精确SHA远端状态另验，不把本地全套升级为公网、远端CI或整个阶段完成。Phase19 active，A01/A03/A12、A25原未知拒绝及A31继续开放。

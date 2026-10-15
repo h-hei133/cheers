@@ -34,6 +34,10 @@ import type { SidebarLiveEventStore } from '../../presentation/sidebar/sidebarLi
 export type CommandKind = 'local' | 'prompt' | 'shell-action'
 
 export interface CommandContext {
+  /** The host registers local work until its result and cleanup have settled. */
+  readonly runCancellable?: <T>(operation: (signal: AbortSignal) => Promise<T>) => Promise<T>;
+  /** Parent cancellation for callers without a session host. */
+  readonly signal?: AbortSignal;
   readonly sessionCommand?: (name: import('./navigation/contract.js').SessionCommandName, args: string[], context: CommandContext) => Promise<CommandExecutionResult>;
   readonly dataTransfer?: import('./transfer/contract.js').CommandDataTransfer;
   /** Bound rule/diagnostic/context owner; proposal commands never write directly. */

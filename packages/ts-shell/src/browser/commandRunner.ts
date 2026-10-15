@@ -123,6 +123,7 @@ export function runBrowserCommand(input: {
 }
 
 export async function runBrowserCommandAsync(input: {
+  readonly signal?: AbortSignal;
   readonly contract: BrowserCommandContract;
   readonly capability?: BrowserCapabilityState;
   readonly browserExecutor?: BrowserExecutor;
@@ -222,6 +223,7 @@ export async function runBrowserCommandAsync(input: {
       };
     }
     return runBrowserExecutionCommand({
+      signal: input.signal,
       request: input.contract.execution,
       executor: input.browserExecutor,
       sandboxAuthority: input.browserSandboxAuthority,

@@ -40,6 +40,41 @@ function silentRenderer() {
 }
 
 describe("shell session runtime idle barrier", () => {
+  it('keeps a cancelled local command registered until its cleanup settles', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const runtime = new ShellSessionRuntime({ sessionManager: idleManager(), renderer: silentRenderer(),
+      runPrompt: () => { throw new Error('Unexpected prompt'); } });
+    let signal!: AbortSignal;
+    const running = runtime.commands.run(async current => { signal = current; await gate; return 'cancelled command'; });
+    const controller = runtime.getCurrentRunController();
+    expect(controller).not.toBeNull();
+    await Promise.resolve();
+    expect(controller?.signal).toBe(signal);
+    let idle = false;
+    const cancelled = runtime.cancelAndWait().then(() => { idle = true; });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(signal.aborted).toBe(true); expect(idle).toBe(false);
+    expect(runtime.getCurrentRunController()).toBe(controller);
+    await expect(runtime.commands.run(async () => 'overlap')).rejects.toThrow('still running');
+    expect(runtime.getCurrentRunController()).toBe(controller);
+    release();
+    await expect(running).resolves.toBe('cancelled command');
+    await cancelled;
+    expect(idle).toBe(true); expect(runtime.getCurrentRunController()).toBeNull();
+    await expect(runtime.commands.run(async () => 'next')).resolves.toBe('next');
+  });
+
+  it('preserves a command rejection for both its caller and an existing idle waiter', async () => {
+    const runtime = new ShellSessionRuntime({ sessionManager: idleManager(), renderer: silentRenderer(),
+      runPrompt: () => { throw new Error('Unexpected prompt'); } });
+    const running = runtime.commands.run(async () => { throw new Error('command failed'); });
+    const idle = runtime.waitForIdle();
+    await expect(running).rejects.toThrow('command failed');
+    await expect(idle).rejects.toThrow('command failed');
+    expect(runtime.getCurrentRunController()).toBeNull();
+  });
+
   it("resolves immediately when no run is active", async () => {
     const runtime = new ShellSessionRuntime({
       sessionManager: idleManager(),

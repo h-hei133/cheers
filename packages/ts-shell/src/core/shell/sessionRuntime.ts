@@ -30,6 +30,7 @@ import {
   renderSessionTerminalSurface,
 } from "./sessionTerminalState.js";
 import { ShellStateMachine } from "./stateMachine.js";
+import { ShellCommandRuntime } from "./command.js";
 import type { PermissionScope } from "../../cli/approval/permissionScope.js";
 import type { CompactionOutcome } from "./compaction.js";
 import type { TurnInput } from "../../turn/session.js";
@@ -94,6 +95,7 @@ export interface SessionRuntimeDependencies {
 export type QueryEventObserver = (event: QueryEvent) => void;
 
 export class ShellSessionRuntime {
+  readonly commands = new ShellCommandRuntime();
   private readonly deps: SessionRuntimeDependencies;
   private readonly stateMachine = new ShellStateMachine();
   private readonly eventObservers = new Set<QueryEventObserver>();
@@ -126,7 +128,7 @@ export class ShellSessionRuntime {
   }
 
   getCurrentRunController(): AbortController | null {
-    return this.currentRunController;
+    return this.currentRunController ?? this.commands.current?.controller ?? null;
   }
 
   /** Where input typed during the active run goes; nothing when no run takes input. */
@@ -136,14 +138,12 @@ export class ShellSessionRuntime {
 
   /** Settles when the active run finishes, or immediately when idle. */
   waitForIdle(): Promise<void> {
-    const run = this.currentRun ?? this.lastRun;
-    if (!run) return Promise.resolve();
-    return run.then(
-      () => undefined,
-      (error) => {
-        throw error;
-      },
-    );
+    const command = this.commands.current?.settled;
+    const run = this.currentRun ?? (command ? null : this.lastRun);
+    return Promise.allSettled([run, command]).then(results => {
+      const failed = results.find(result => result.status === 'rejected');
+      if (failed?.status === 'rejected') throw failed.reason;
+    });
   }
 
   /** Abort the active run and wait until it has settled. */
@@ -441,6 +441,7 @@ export class ShellSessionRuntime {
 
   cancelCurrentRun(): void {
     this.deps.onCancelRequested?.();
+    this.commands.current?.controller.abort();
     this.currentRunController?.abort();
     this.stateMachine.interruptRun();
   }

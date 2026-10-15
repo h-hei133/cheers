@@ -47,6 +47,7 @@ export type CliCommandExecution =
     };
 
 export interface BuildCliCommandExecutionInput {
+  readonly runCancellable?: CommandContext['runCancellable'];
   readonly freshState?: CommandContext['freshState'];
   readonly restart?: CommandContext['restart'];
   readonly startupArgs?: CommandContext['startupArgs'];
@@ -168,6 +169,7 @@ export async function buildCliCommandExecution(
       ref: { mode: "explicit-local", root: projectMemoryRootFor(projectRoot) },
     });
   const slashResult = await bridge.routeSlashCommand(input.prompt, {
+    runCancellable: input.runCancellable,
     freshState: input.freshState,
     restart: input.restart,
     startupArgs: input.startupArgs,

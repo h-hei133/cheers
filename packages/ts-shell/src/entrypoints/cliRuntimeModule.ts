@@ -148,6 +148,7 @@ export async function runNonInteractivePrompt(options: {
 
   replayTodosFromMessages(options.runtimeContext.session.id, options.sessionManager.getSession(options.runtimeContext.session.id)?.turns ?? []);
   const resolved = await resolveTurnInputForExecution({
+    runCancellable: operation => options.sessionRuntime.commands.run(operation),
     freshState: options.runtimeContext.freshState,
     restart: options.runtimeContext.restart,
     startupArgs: options.runtimeContext.startupArgs,

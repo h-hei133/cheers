@@ -13,6 +13,7 @@ import { forgetSessionTodos } from "../../core/commands/todoCommandRuntime.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
 import type { CommandReport } from '../../core/commands/report/contract.js';
 import { reportText } from '../../core/commands/report/projection.js';
+import { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
 
 function createHarness(root = "/tmp/project-alpha") {
   const lines: string[] = [];
@@ -66,6 +67,22 @@ function createHarness(root = "/tmp/project-alpha") {
 }
 
 describe("interactive command router", () => {
+  it.each(['interactive', 'piped', 'print'])('registers browser commands with the real %s session host', async mode => {
+    const harness = createHarness();
+    const runtime = new ShellSessionRuntime({ sessionManager: harness.input.sessionManager,
+      renderer: harness.input.renderer, runPrompt: () => { throw new Error('Unexpected provider call'); } });
+    const run = vi.spyOn(runtime.commands, 'run');
+    vi.stubEnv('CHEERS_ENABLE_PUBLIC_WEB_SMOKE', '0');
+    try {
+      const input = { ...harness.input, sessionRuntime: runtime, prompt: '/browser smoke' };
+      if (mode === 'interactive') await routeInteractiveCommand(input);
+      else await runNonInteractivePrompt({ ...input, printMode: mode === 'print' });
+      expect(run).toHaveBeenCalledOnce();
+      expect(harness.lines.join('\n')).toContain('Status: skipped');
+      expect(runtime.getCurrentRunController()).toBeNull();
+    } finally { run.mockRestore(); vi.unstubAllEnvs(); }
+  });
+
   it.each(["interactive", "piped", "print"])("lists current tools in the %s command path", async mode => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "command-tools-"));
     const harness = createHarness(root);

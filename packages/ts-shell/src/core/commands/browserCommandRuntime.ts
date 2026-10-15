@@ -10,11 +10,21 @@ export async function runBrowserLocalCommand(
   args: string[],
   context: CommandContext,
 ): Promise<LocalCommandResult> {
+  return context.runCancellable
+    ? context.runCancellable(signal => executeBrowserLocalCommand(args, { ...context, signal }))
+    : executeBrowserLocalCommand(args, context);
+}
+
+async function executeBrowserLocalCommand(
+  args: string[],
+  context: CommandContext,
+): Promise<LocalCommandResult> {
   const parsed = parseBrowserCommandArgs(args);
   if (parsed.ok && parsed.contract?.mode === "smoke") {
     const smoke = await runBrowserPublicReadOnlyWebSmoke({
       config: context.browserPublicReadOnlyWebSmokeConfig ?? parseBrowserPublicReadOnlyWebSmokeConfig({ env: {} }),
       httpClient: context.browserPublicReadOnlyHttpClient,
+      signal: context.signal,
     });
     const result: LocalCommandResult = {
       kind: "local",
@@ -30,6 +40,7 @@ export async function runBrowserLocalCommand(
   const runResult = parsed.ok && parsed.contract
     ? await runBrowserCommandAsync({
         contract: parsed.contract,
+        signal: context.signal,
         browserExecutor: context.browserExecutor,
         browserSandboxAuthority: context.browserSandboxAuthority,
         browserNetworkAllowlist: context.browserNetworkAllowlist,

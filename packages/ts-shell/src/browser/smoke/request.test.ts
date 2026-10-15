@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { createServer, type RequestOptions, type Server } from 'node:https';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { LookupFunction } from 'node:net';
@@ -7,10 +9,14 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { parseBrowserPublicReadOnlyWebSmokeConfig } from './config.js';
 import { renderBrowserPublicReadOnlyWebSmokeReport } from './report.js';
 import { runBrowserPublicReadOnlyWebSmoke } from './runner.js';
+import { createBrowserPublicReadOnlyWebManifest } from '../publicReadOnlyWebManifest.js';
+import { buildCliCommandExecution } from '../../entrypoints/cliCommandExecutionBridge.js';
+import { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
 
 const fixture = vi.hoisted(() => ({
   dns: vi.fn(), dispatch: vi.fn(), ca: undefined as Buffer | undefined,
   approved: [] as string[],
+  responses: [] as number[],
 }));
 vi.mock('node:dns/promises', () => ({ lookup: fixture.dns }));
 vi.mock('node:https', async () => {
@@ -28,7 +34,10 @@ vi.mock('node:https', async () => {
         else done(null, '127.0.0.1', family);
       });
     };
-    return actual.request(url, { ...options, ca: fixture.ca, lookup }, callback);
+    return actual.request(url, { ...options, ca: fixture.ca, lookup }, response => {
+      callback(response);
+      fixture.responses.push(response.statusCode!);
+    });
   } };
 });
 
@@ -39,9 +48,10 @@ let origin: string;
 let requests: string[];
 let handle: (request: IncomingMessage, response: ServerResponse) => void;
 const timers = new Set<ReturnType<typeof setInterval>>();
+const commandRoots: string[] = [];
 
 beforeEach(async () => {
-  requests = []; fixture.approved = []; fixture.ca = cert;
+  requests = []; fixture.approved = []; fixture.responses = []; fixture.ca = cert;
   fixture.dispatch.mockClear(); fixture.dns.mockReset();
   fixture.dns.mockResolvedValue([{ address: '8.8.8.8', family: 4 }]);
   handle = (_request, response) => { response.writeHead(200, { 'content-type': 'text/plain' }); response.end('public fixture'); };
@@ -55,6 +65,7 @@ afterEach(async () => {
   for (const timer of timers) clearInterval(timer);
   timers.clear(); server.closeAllConnections();
   await new Promise<void>(resolve => server.close(() => resolve()));
+  for (const root of commandRoots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
 function run(method = 'GET', signal?: AbortSignal) {
@@ -65,6 +76,69 @@ function run(method = 'GET', signal?: AbortSignal) {
   } });
   return runBrowserPublicReadOnlyWebSmoke({ config, signal });
 }
+
+function command(mode: 'smoke' | 'execute') {
+  const root = mkdtempSync(path.join(tmpdir(), 'public-command-'));
+  commandRoots.push(root);
+  const manifestPath = path.join(root, 'manifest.json');
+  writeFileSync(manifestPath, JSON.stringify(createBrowserPublicReadOnlyWebManifest({
+    allowedPublicOrigins: [origin], timeoutMs: 2000,
+  })));
+  const lines: string[] = [];
+  const renderer = { renderLine: (line: string) => lines.push(line) };
+  const runtime = new ShellSessionRuntime({ sessionManager: {} as never, renderer: renderer as never,
+    runPrompt: () => { throw new Error('Public commands must not invoke a provider'); } });
+  const pending = buildCliCommandExecution({
+    prompt: mode === 'smoke' ? '/browser smoke' : `/browser execute navigate ${origin}/`,
+    cwd: root, renderer: renderer as never, printMode: true, interactive: false,
+    runCancellable: operation => runtime.commands.run(operation),
+    env: { CHEERS_ENABLE_PUBLIC_WEB_SMOKE: '1', CHEERS_PUBLIC_WEB_SMOKE_URL: `${origin}/`,
+      CHEERS_PUBLIC_WEB_SMOKE_TIMEOUT_MS: '2000', CHEERS_PUBLIC_WEB_SMOKE_METHOD: 'GET',
+      CHEERS_BROWSER_PUBLIC_READONLY_WEB_MANIFEST: manifestPath, CHEERS_BROWSER_PUBLIC_READONLY_WEB_CONFIRM: 'confirmed' },
+  });
+  return { runtime, pending, lines };
+}
+
+it.each(['smoke', 'execute'] as const)('cancels the CLI %s command before DNS or transport dispatch', async mode => {
+  const { runtime, pending, lines } = command(mode);
+  expect(runtime.getCurrentRunController()).not.toBeNull();
+  runtime.cancelCurrentRun();
+  await expect(pending).resolves.toEqual({ kind: 'handled' });
+  expect(lines.join('\n')).toContain('Status: cancelled');
+  expect(lines.join('\n')).toMatch(/Public network(?: used)?: no/);
+  expect(fixture.dns).not.toHaveBeenCalled(); expect(fixture.dispatch).not.toHaveBeenCalled();
+  expect(runtime.getCurrentRunController()).toBeNull();
+});
+
+it.each(['smoke', 'execute'] as const)('cancels the CLI %s body and closes its socket with response evidence intact', async mode => {
+  let closed = false;
+  handle = (_request, response) => {
+    response.once('close', () => { closed = true; });
+    response.writeHead(200, { 'content-type': 'text/plain' });
+    response.write('PRIVATE_PARTIAL_BODY');
+  };
+  const { runtime, pending, lines } = command(mode);
+  await vi.waitFor(() => expect(fixture.responses).toEqual([200]));
+  await runtime.cancelAndWait();
+  await expect(pending).resolves.toEqual({ kind: 'handled' });
+  expect(lines.join('\n')).toContain('Status: cancelled');
+  expect(lines.join('\n')).toMatch(/Public network(?: used)?: yes/);
+  expect(lines.join('\n')).not.toContain('PRIVATE_PARTIAL_BODY');
+  await vi.waitFor(() => expect(closed).toBe(true));
+  expect(requests).toEqual(['GET']); expect(runtime.getCurrentRunController()).toBeNull();
+});
+
+it.each(['smoke', 'execute'] as const)('keeps CLI %s cancellation before response explicitly unknown', async mode => {
+  let closed = false;
+  handle = request => { request.socket.once('close', () => { closed = true; }); };
+  const { runtime, pending, lines } = command(mode);
+  await vi.waitFor(() => expect(requests).toEqual(['GET']));
+  await runtime.cancelAndWait();
+  await expect(pending).resolves.toEqual({ kind: 'handled' });
+  expect(lines.join('\n')).toContain('Status: cancelled');
+  expect(lines.join('\n')).toMatch(/Public network(?: used)?: unknown/);
+  await vi.waitFor(() => expect(closed).toBe(true));
+});
 
 it.each([
   { label: 'private', answers: [{ address: '127.0.0.1', family: 4 }] },

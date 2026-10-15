@@ -51,6 +51,7 @@ export interface BrowserExecutionCommandRunResult {
 }
 
 export async function runBrowserExecutionCommand(input: {
+  readonly signal?: AbortSignal;
   readonly request: BrowserExecutionRequest;
   readonly executor?: BrowserExecutor;
   readonly sandboxAuthority?: BrowserSandboxAuthority;
@@ -90,6 +91,7 @@ export async function runBrowserExecutionCommand(input: {
   });
   if (isExternalNetworkExecutionRequest(request) && executor.kind === "noop") {
     const bridge = await runBrowserExternalNetworkExecutionBridgeWithControlledNetwork({
+      signal: input.signal,
       request,
       sandboxAuthority: input.sandboxAuthority,
       networkAllowlist: input.networkAllowlist,

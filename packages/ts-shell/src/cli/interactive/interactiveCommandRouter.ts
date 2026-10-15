@@ -145,6 +145,7 @@ export async function routeInteractiveCommand(
   const themeBefore = defaultTheme.colorRevision;
 
   const resolved = await buildCliCommandExecution({
+    runCancellable: operation => input.sessionRuntime.commands.run(operation),
     freshState: input.freshState ?? input.runtimeContext.freshState,
     restart: input.runtimeContext.restart,
     startupArgs: input.runtimeContext.startupArgs,

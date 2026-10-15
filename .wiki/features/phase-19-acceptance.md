@@ -643,3 +643,15 @@ A29-R01复审另发现101、600及103后断开遗漏响应观察；原共享conn
 最终`full-complete-fixtures-final-{validation,tests,freeze}.json`绑定同18源码/测试hash及全部冻结源码，真实完整运行801文件、8136项通过、1项显式公共smoke跳过、零失败；没有把27项选择外与环境skip混算，也没有把历次局部套件相加。A02当前Linux/Node20.3本地全套证据已补齐，A26–A29/A29-R01在已审scope内修复；最终文档/空白检查、交付冻结及精确SHA的远端状态另验，原失败快照不删除。
 
 Node20.3/单文件各regular/fullscreen四路真实PTY均观察默认关闭及显式HEAD派发前拒绝，零provider请求、配置/来源不变、process exit0。原生DNS把公共hostname解析到198.18.0.0/15及2001:2::/48保留网段，故真实公网accepted=false；不替换DNS或绕过政策。真实Chromium/local-server原9项已实际通过并纳入当前全套，仍不证明真实前端/平台/账户/设备/远端服务。相关launcher及parser错误单列保留，不归为产品失败或通过。A01/A03/A12、A25原41/42未知拒绝及整树/广泛成本继续开放，Phase19 **active**；本地全套不替代精确SHA的交付/远端证据，用户`.gitignore`保留排除、§9历史审计不变。
+
+### 26.9 公共命令宿主取消
+
+A30补齐公共只读命令的宿主取消：两个CLI宿主经共同命令桥注入原session runtime的本地命令登记，执行前登记controller、执行owner接收signal、finally解除；现有Ctrl-C/退出清理与idle等待均观察到该命令。smoke及external public execute保留预派发false、未响应null、已响应true；取消不清除已经观察到的网络事实。等待边界是命令操作/结果发布的Promise；默认transport的资源销毁已有连接关闭测试，忽略signal的自定义client可在既有`withinRequest`停止等待后继续，终止/清理未证明。相邻受控回环及自动化适配器另记A31，仍未修复，不将本项扩大成全部浏览器取消完成，亦未增加通用prompt/command并发互斥。
+
+隔离Node20.3组合12文件159项通过，随后加强的idle等待断言6项通过；默认TLS测试同时覆盖两公共命令的预取消零DNS/派发、正文中取消且连接关闭、无响应取消及网络事实保留。原首轮GET/HEAD夹具错误保留。四个独立副本反转分别实际失败1项，证明父signal、执行前登记、settlement等待可被回归测试检出，作者工作树源码未变。
+
+真实Node20.3 regular/fullscreen Ctrl-C两项与print/stdin三信号六项均在合成挂起DNS后取得cancelled/network=no；两终端保留宿主并显式exit0，脚本先展示取消收据再exit130/143/129。全部零provider POST、来源/配置不变，约32–64ms；这是隔离宿主取消证据，未绕过DNS地址/TLS策略，不是公网成功或单文件可执行取消验收。首个print探针未关闭stdin、命令未开始，按harness失败留存后修正。
+
+材料位于`.tmp/phase19-repair/public-web/`：`cancellation-{focused,settlement-final}-validation.json`、`cancellation-reversals.json`、`cancellation-terminal-1792044140551651750/results.json`、`cancellation-scripted-1792044321106933763/results.json`及`cancellation-review-freeze.json`。两种构建、四源码门、result-contract149项、scripts57项通过，NormProof零blocking、同4既有ceiling advisory/partial。13路径独立code APPROVE/architecture CLEAR、综合仅delta APPROVE，代码lane独立最终57项及架构lane编译生命周期探针通过；`review-synthesis-cancellation.json`保留自定义client等边界。
+
+最终隔离Node20.3/Linux全套801文件、8147项通过，1个显式public smoke跳过、零失败、exit0，Vitest454.94秒；harness455.56秒，源码无变化、全部13复核路径匹配最终冻结。原JSON逐断言统计及日志保留在`cancellation-full-final-{tests,validation}.json`、`cancellation-full-final.log`，A02当前本地全套证据补齐。提交/推送/精确SHA远端状态另验；A01/A03/A12、A25原41/42未知拒绝及整树/广泛成本、A31继续开放，Phase19 **active**。

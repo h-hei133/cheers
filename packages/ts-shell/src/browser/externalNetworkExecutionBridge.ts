@@ -182,6 +182,7 @@ export function runBrowserExternalNetworkExecutionBridge(input: {
 }
 
 export async function runBrowserExternalNetworkExecutionBridgeWithControlledNetwork(input: {
+  readonly signal?: AbortSignal;
   readonly request: BrowserExecutionRequest;
   readonly sandboxAuthority?: BrowserSandboxAuthority;
   readonly networkAllowlist?: BrowserNetworkAllowlist;
@@ -274,6 +275,7 @@ export async function runBrowserExternalNetworkExecutionBridgeWithControlledNetw
     : undefined;
   const publicReadOnlyExecutor = publicReadOnlyPolicy?.allowed && input.publicReadOnlyWebManifest?.status === "valid"
     ? await runBrowserPublicReadOnlyWebExecutor({
+        signal: input.signal,
         request: input.request,
         policy: publicReadOnlyPolicy,
         manifest: input.publicReadOnlyWebManifest.manifest,
@@ -281,6 +283,7 @@ export async function runBrowserExternalNetworkExecutionBridgeWithControlledNetw
       })
     : publicReadOnlyPolicy && input.publicReadOnlyWebManifest?.status === "valid"
       ? await runBrowserPublicReadOnlyWebExecutor({
+          signal: input.signal,
           request: input.request,
           policy: publicReadOnlyPolicy,
           manifest: input.publicReadOnlyWebManifest.manifest,
