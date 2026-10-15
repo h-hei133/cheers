@@ -6765,3 +6765,9 @@ cleanup交付文档b5b5705e已推送、branch/PR head一致，两精确workflow�
 34源码/测试路径独立code APPROVE、architecture CLEAR、综合仅delta APPROVE；最后EOF空白修正由两路明确重新绑定，最终字节两种构建和四源码门再次通过；PTY早于该空白重建，未虚称新binary字节已被旧探针执行。交付状态另验。A31局部修复不保证任意注入工作强制结束、动作回滚、浏览器关闭或跨平台/脱离后代清理。A01/A03/A12、A25原41/42未知拒绝/整树/成本及外部验收继续开放，Phase19 **active**；用户`.gitignore`保持排除、历史§9不变，提交/推送和精确SHA的CI另核。
 
 代码及三份证据文档已提交推送`d71333c569e7b78df57137fd26c2804d7836dc30`，branch/PR #1 head读回一致、37个冻结blob匹配；用户`.gitignore`保持排除、历史§9不变，五静态门及空白检查通过。精确SHA的CI [38697188356](https://github.com/h-hei133/cheers/actions/runs/38697188356)/job116296436452与Watch [38697188169](https://github.com/h-hei133/cheers/actions/runs/38697188169)/job116296436077各自annotations确认付款/spending-limit阻止启动，steps=[]、failure，无远端产品执行或CI通过，不重跑。材料`browser-cancellation/code-delivery-observation.json`及`code-commit-audit.json`。本段为随后纯证据文档交付，按自身SHA另核远端，不重复源码构建/测试；PR继续draft，Phase19 active。
+
+### 2026-10-15 — A31 最终源码全套与验收索引
+
+在`53ec3e5c`的未改产品源码上补齐最终隔离Node20.3/Linux全套：804文件、8173项通过、1项显式public smoke跳过、零失败，451.26秒；3631个冻结的非wiki受跟踪文件（含源码、配置和脚本）及34个A31路径保持，用户`.gitignore`原hash未变。材料`browser-cancellation/full-current-{validation,tests,freeze}.json`、`full-current.log`和`full-current-binding.json`。A02当前本地全套证据补齐，不把旧A29/A30结果或本次全套外推成实机/服务/远端通过。
+
+先登记A32：验收首页把A29的801/8136称当前源码，遗漏A30/A31。限定入口核对收束后更正为明确SHA、804/8173及最新证据链接，裁决摘要/进度入口同步更新；历史运行与§9原字节保留，产品/测试/provider/build/scripts/workflow均未改。详见[裁决 §10.31](features/phase-19-decisions.md)和[验收 §26.11](features/phase-19-acceptance.md#2611-a31-最终源码全套与验收索引)。A01实际对象绑定仍未实现、A03真实环境、A12 CI未启动及A25原拒绝/整树/成本继续开放，Phase19 **active**；独立复核、最终冻结、五静态门和空白检查由`browser-cancellation/full-review-synthesis.json`综合绑定，文档提交/推送及精确SHA远端状态另核。

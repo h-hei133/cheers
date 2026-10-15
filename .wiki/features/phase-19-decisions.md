@@ -5,7 +5,7 @@ sources: [14-user-experience-research, 15-deep-research-design, 16-tui-composer-
 created: 2026-10-05
 updated: 2026-10-15
 tags: [phase-19, decisions, production, tui, commands, research, goal, collaboration]
-summary: "汇总 14–24 的纠错、维护者裁决、生产契约、分批任务及验收标准。包含完整自主目标、软件与论文深研、八种输入框形态、Git 工作台、顾问、安全分析、公共技能商店和远程协作。此文是待实施计划；文档审查完成不代表功能或生产验收完成。"
+summary: "汇总 14–24 的纠错、维护者裁决、生产契约、分批任务及验收标准。包含完整自主目标、软件与论文深研、八种输入框形态、Git 工作台、顾问、安全分析、公共技能商店和远程协作。此文记录裁决、实施与验证边界；整体目标仍active，本地验证不替代实机、外部服务和发布验收。"
 confidence: mixed
 ---
 
@@ -15,7 +15,7 @@ confidence: mixed
 
 本计划以 Cheers 的 28ff98cee8c4dd63e6752452f73a362ed3559ae3 为源码基线。输入为 [14 的问题与隔离探针](14-user-experience-research.md)、经本轮修订的 15–24，以及 [复核记录](verification-15-21.md)。当前用户要求高于早期研究的建议和 Phase 18 的延期决定；同一问题以本文和本轮明确用户答复为准。
 
-**规划形成时，下面的任务全部尚未实施、未验收。** 随后按用户授权进入实施；当前进展与验证边界见 §8，未列为已实施的任务仍待完成，不能因形成计划就宣布功能完成。
+**规划形成时，下面的任务全部尚未实施、未验收。** 随后按用户授权进入实施；当前实施、补充审查与验证边界见 §8–10，未列为已实施的任务仍待完成，不能因形成计划就宣布功能完成。
 
 [Phase 18 验收表](phase-18-acceptance.md) 的 W7-33 仍沿用“认证前置失败、四端点真实 TLS/HTTP2 矩阵未完成”的历史状态；本轮未重跑。它不阻塞无关的本地设计与实现，却仍是涉及这些端点的发布验收缺口。不得把它改写成 Phase 19 已通过或已取消。
 
@@ -3022,3 +3022,15 @@ Node20.3/单文件各regular/fullscreen真实PTY共八场景通过：真实回�
 A31-R01–R07在上述局部合同内已修复。忽略signal的任意注入工作仍须等自身结束，没有强制终止保证；owner自报cleanup不是独立浏览器关闭证明，命令取消也不撤销既有副作用。原生session Chromium lane未变。A01/A03/A12、A25原41/42默认请求中未知拒绝、整树一致性/广泛成本、公共DNS拒绝后的外部验收及精确SHA远端CI继续开放，Phase19 **active**。历史§9和用户`.gitignore`保持，后者不提交。
 
 代码及三份证据文档已提交推送`d71333c569e7b78df57137fd26c2804d7836dc30`，branch/PR #1 head读回一致、37个冻结blob匹配；用户`.gitignore`保持排除、历史§9不变，五静态门及空白检查通过。精确SHA的CI [38697188356](https://github.com/h-hei133/cheers/actions/runs/38697188356)/job116296436452与Watch [38697188169](https://github.com/h-hei133/cheers/actions/runs/38697188169)/job116296436077各自annotations确认付款/spending-limit阻止启动，steps=[]、failure，无远端产品执行或CI通过，不重跑。材料`browser-cancellation/code-delivery-observation.json`及`code-commit-audit.json`。本段为随后纯证据文档交付，按自身SHA另核远端，不重复源码构建/测试；PR继续draft，Phase19 active。
+
+### 10.31 A02/A32 — 最终源码全套与验收入口时效（2026-10-15，全套通过、入口已更正）
+
+继续总体目标时，起点`53ec3e5cf8a9943504945992b4d64e91488add9d`的工作树仅用户`.gitignore`未提交；34个A31复核路径逐字节匹配最终冻结。原A04–A24代码缺陷及A26–A31已有各自修复/验证记录，但A01/A03/A12/A25等开放条件仍未闭合。A31只有108/613的focused证据，不能沿用A30的801/8147全套。启动记录：本轮在原隔离Node20.3/Linux、合成provider、独立HOME/USERPROFILE/TMPDIR/CHEERS_TEST_ROOT运行当前冻结全套；该启动时进程仍在运行，没有提前宣称通过。
+
+**A32 MEDIUM — 验收入口把历史全套称为当前源码。** `phase-19-acceptance.md`首页第16行仍称补充审核后的“当前源码”已通过801文件/8136项，并只指向§26.8；该结果属于A29，而后续§26.9、§26.10分别修改了A30/A31源码。原始结果本身有效，问题是入口的无范围current表述会把历史证明错误投射到最新源码。先登记，未修改该入口或产品代码；待本轮限定入口/状态引用核对收束、实际全套结束后，按明确SHA/冻结和适用范围更新索引，不覆盖历次失败/通过材料。
+
+限定验收首页、裁决进度入口及根GOAL/PROJECT_GUIDE/wiki索引核对已收束，没有发现另一个新增的无依据完成声明。A32仅更正首页明确源码范围及到最新证据的链接，裁决摘要/§1入口同步说明§8–10包含实施和补修，不改历史§9或任何产品源码。原发现/历史全套保留，不把更正前的current表述继续作为当前证明。
+
+全套已实际结束：804文件/8173项通过、唯一public smoke显式跳过、零失败，exit0，451.26秒；按逐文件和逐断言状态统计，不累加focused或旧全套。运行HEAD`53ec3e5c`、3631个冻结的非wiki受跟踪文件（含源码、配置和脚本）、34个A31路径均与当前/最终复核构建完全相同，用户`.gitignore`hash保持。材料`browser-cancellation/full-current-{validation,tests,freeze}.json`、`full-current.log`与`full-current-binding.json`。本次补齐A02当前Linux/Node20.3全套证据，未扩张到实机/真实服务或CI验收。三证据文档的独立复核、最终冻结、五静态门和空白检查由`browser-cancellation/full-review-synthesis.json`综合绑定，提交/推送及精确SHA远端状态另核，产品/测试/provider/default/build/workflow均无改动。
+
+原§4仍为16批76个唯一任务，范围未缩减。A01是尚未实现的非Linux实际对象绑定，A03是多个适用真实环境/质量格，A12为实际未启动的远端CI，A25仍有整树/广泛成本及原41/42未知拒绝；当前本地全套与A32入口更正均不能关闭这些条件。真实研究质量仍按15§17.2要求隔离provider及明确授权，本轮未读取真实配置；历史auth失败不冒称刚刚重测的凭据状态。Phase19 **active**。

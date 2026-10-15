@@ -13,7 +13,7 @@ Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)�
 
 2026-10-14 对当前起点 `71f87aeb` 的 76 项静态复核已收束，逐项登记的 25 项问题见[裁决 §9](phase-19-decisions.md#9-全量任务复核2026-10-14审查已收束问题未修复)。这些包含未修代码缺陷和历史已披露的交付/证据缺口，审查期间没有修改产品或重新运行套件；本文历史绿色证据不能关闭这些问题。起点分支与 PR 已读回同 SHA，精确 CI/Watch 均因账户付款/额度未启动，仍无当前远端验证通过。
 
-2026-10-15补充审核与公共传输修复后的当前源码已在隔离Node20.3/Linux完成801文件、8136项通过及1项显式public smoke跳过，零失败。最终冻结、夹具归因界限、独立复核及历次失败快照见[§26.8](#268-公共只读传输与最终集成)；真实环境和远端CI仍分别保留开放条件。
+2026-10-15，A31最终源码（代码`d71333c5`，运行HEAD为仅后续文档差异的`53ec3e5c`）已在隔离Node20.3/Linux完成804文件、8173项通过、1项显式public smoke跳过，零失败，451.26秒。当前冻结与证据绑定见[§26.11](#2611-a31-最终源码全套与验收索引)；§26.8的801/8136和§26.9的801/8147分别属于更早源码，不替代此结果。真实环境和远端CI仍分别开放。
 
 §1–4 的完整套件和冻结证据属于 W16 提交 `f43ae09ec90a5890b768598ab52a17821c5e9efc`。后续 SAFE-02 Linux 原生读取变更分别记录在 §7–17，§18 的全套属于 `32b31107` 源码，不能把历史全套直接套用到后续源码。§19–21 补充未改源码的 Windows 读取、前端、CLI 和进程证据；§22 修复 Windows 大小写包含边界并运行直接受影响套件、构建、原生与实际 CLI 检查，没有重新运行当前全套。§23 在未变的 §22 源码上补充原生 Windows ConPTY 两模式交互证据。§24 修复非 Linux 读取检查点可见的父目录替换，并明确保留检查之间变化的缺口。
 
@@ -669,3 +669,18 @@ Node20.3/单文件各regular/fullscreen八个真实PTY场景全部通过：正�
 独立code APPROVE/architecture CLEAR、零新finding，综合仅34路径delta APPROVE；26个生产模块独立函数计数最高12。最后仅移除processAdapter尾部一个空行，两路明确复核EOF-only rebind，原测试冻结33精确相同/1空白等价，未为此重复套件；最终字节两种构建和四源码门已再次通过且34路径匹配冻结；PTY早于仅EOF空白的重建，不主张旧探针执行了新binary字节，`final-build-binding.json`保留该绑定及边界。交付状态另验，`review-synthesis.json`绑定两份独立报告和验证材料。A31局部缺口已修复，任意注入操作/脱离后代/平台边界仍无普遍强制终止保证；A01/A03/A12、A25原41/42未知拒绝、整树/广泛成本、公共外部验收及远端CI继续开放，Phase19 **active**。历史§9与用户`.gitignore`保持排除。
 
 代码及三份证据文档已提交推送`d71333c569e7b78df57137fd26c2804d7836dc30`，branch/PR #1 head读回一致、37个冻结blob匹配；用户`.gitignore`保持排除、历史§9不变，五静态门及空白检查通过。精确SHA的CI [38697188356](https://github.com/h-hei133/cheers/actions/runs/38697188356)/job116296436452与Watch [38697188169](https://github.com/h-hei133/cheers/actions/runs/38697188169)/job116296436077各自annotations确认付款/spending-limit阻止启动，steps=[]、failure，无远端产品执行或CI通过，不重跑。材料`browser-cancellation/code-delivery-observation.json`及`code-commit-audit.json`。本段为随后纯证据文档交付，按自身SHA另核远端，不重复源码构建/测试；PR继续draft，Phase19 active。
+
+### 26.11 A31 最终源码全套与验收索引
+
+当前运行HEAD`53ec3e5cf8a9943504945992b4d64e91488add9d`相对代码`d71333c569e7b78df57137fd26c2804d7836dc30`只有证据文档差异。隔离Node20.3/Linux真实完整运行804文件、8173项通过、1项显式public smoke跳过、零失败、exit0，451.26秒。跳过仅`browser public read-only web smoke scenario optional real public smoke is env-gated`，不是选择外未执行项。逐文件/逐断言JSON与日志位于`browser-cancellation/full-current-{tests,validation,freeze}.json`及`full-current.log`；冻结3631个非wiki受跟踪文件（含源码、配置和脚本），前后逐字节保持、34个A31路径与最终复核/构建冻结完全一致。`full-current-binding.json`保存运行HEAD、SHA-256、全部计数与唯一skip身份。A02当前Linux/Node20.3本地全套证据补齐，旧失败和旧全套分别保留。
+
+A32是在更正前登记的文档时效缺口：本表首页把A29的801/8136称为“当前源码”，未指向后续A30/A31。限定首页、裁决进度入口与项目索引核对已收束，现首页改为上述明确源码范围并指向本节，旧记录不删除。裁决§1也明确§8–10记录实施/补修与验证；原§9历史审计字节保持。此轮只有三份证据文档变化，没有产品、测试、provider、构建、脚本或workflow改动，未因文档更正重复构建/定向套件。
+
+| 仍开放条件 | 当前证据及所缺内容 |
+|---|---|
+| A01 非Linux实际对象绑定 | 当前read owner仍是pathname/祖先检查点；非Linux实际对象绑定尚未实现，不能仅追加平台测试就关闭 |
+| A03 真实环境 | Windows原生桥可用，但IME/系统复制/完整前端、macOS/NTFS写入、真实模型质量/四端点TLS/HTTP2、公共账户/部署/SSH及设备/Live的既有未验格仍未被本地全套覆盖；未访问真实provider材料 |
+| A12 精确远端CI | 起点`53ec3e5c`的CI/Watch均付款/spending-limit未启动、零步骤；后续纯文档SHA另核，不重跑workflow |
+| A25 来源/成本与原拒绝 | 清理后已观察来源复验有效，整树一致性/广泛成本无保证；原41/42默认请求的拒绝原因仍未知，后续成功诊断不覆盖它 |
+
+本次三文档独立复核、最终冻结及五静态门和空白检查由`browser-cancellation/full-review-synthesis.json`综合绑定；仅纯证据文档交付，提交/推送及精确SHA远端状态另核。Phase19 **active**，没有整体完成、发布或远端通过结论；用户`.gitignore`保持排除。
