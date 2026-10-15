@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs'
+import type { FileHandle } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -31,9 +32,17 @@ function request(abortSignal?: AbortSignal): MediaReadRequest {
 }
 
 it('copies only bounded source bytes to an unlinked read-only descriptor with the matching digest', async () => {
-  let descriptor = -1
+  const handles: FileHandle[] = []
+  const open = fs.open
+  vi.spyOn(fs, 'open').mockImplementation(async (...args) => {
+    const handle = await open(...args)
+    handles.push(handle)
+    return handle
+  })
+  let reader: FileHandle | undefined
   await withMediaSource(request(), async source => {
-    descriptor = source.fd
+    reader = handles.find(handle => handle.fd === source.fd)
+    expect(reader).toBeDefined()
     expect(source.bytes).toBe(png.length)
     expect(source.hash).toBe(createHash('sha256').update(png).digest('hex'))
     expect(await fs.readFile('/proc/self/fd/' + source.fd)).toEqual(png)
@@ -42,7 +51,8 @@ it('copies only bounded source bytes to an unlinked read-only descriptor with th
     expect(await fs.readFile('/proc/self/fd/' + source.fd)).toEqual(png)
     await expect(source.verify()).rejects.toMatchObject({ reason: 'changed' })
   }).catch(error => { expect(error).toMatchObject({ reason: 'changed' }) })
-  await expect(fs.stat('/proc/self/fd/' + descriptor)).rejects.toMatchObject({ code: 'ENOENT' })
+  expect(reader?.fd).toBe(-1)
+  await expect(reader!.stat()).rejects.toMatchObject({ code: 'EBADF' })
 })
 
 it('refuses oversized input and format disguises before any native launch', async () => {

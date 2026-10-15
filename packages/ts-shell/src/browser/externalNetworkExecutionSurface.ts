@@ -23,7 +23,7 @@ export function renderBrowserExternalNetworkExecutionSurface(
     `- Risk level: ${result.receipt.riskLevel}`,
     `- Executed: ${result.executed || result.receipt.executed ? "yes" : "no"}`,
     "- Browser process: not launched",
-    `- Network access: ${result.publicReadOnlyReceipt?.executed ? "public-readonly" : result.controlledNetworkReceipt?.executed ? "controlled-loopback" : "none"}`,
+    `- Network access: ${result.publicReadOnlyReceipt?.publicNetwork === true ? "public-readonly" : result.publicReadOnlyReceipt?.publicNetwork === null ? "unknown" : result.controlledNetworkReceipt?.executed ? "controlled-loopback" : "none"}`,
     "- MCP discovery/launch: none",
     "- Provider/model call: none",
     "- Raw content: excluded",

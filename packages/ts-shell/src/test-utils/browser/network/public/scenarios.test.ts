@@ -163,6 +163,18 @@ describe("browser public read-only web scenario examples", () => {
     }
   });
 
+  it("rejects an over-budget injected redirect before requesting its destination", async () => {
+    const fixture = fixtureFor({ responseByteBudget: 128, responses: {
+      "/": { statusCode: 302, headers: { "content-type": "text/plain" }, body: "x".repeat(129), bodyBytes: 129, redirectLocation: "/final" },
+      "/final": { statusCode: 200, headers: { "content-type": "text/plain" }, body: "small" },
+    } });
+    const result = await executePublicReadOnly(browserRequest("navigate", `${fixture.origin}/`), fixture);
+    expect(result.receipt.requestStatus).toBe("unsafe-output");
+    expect(result.receipt.egressDecision).toBe("blocked-output-budget");
+    expect(result.receipt.publicNetwork).toBe(true);
+    expect(fixture.requests).toEqual([`${fixture.origin}/`]);
+  });
+
   it("blocks unsupported content type, over-budget output, credential URL, private target, and sensitive action", async () => {
     const binary = fixtureFor({
       responses: {
@@ -251,6 +263,28 @@ describe("browser public read-only web scenario examples", () => {
     expect(result.output).toContain("JavaScript executed: no");
     expect(result.output).toContain("Executed: yes");
     expect(result.output).not.toContain("<main>");
+  });
+
+  it.each(["rejected", "unknown"])("preserves %s network facts through the external command bridge", async outcome => {
+    const fixture = fixtureFor({ responses: {
+      "/": { statusCode: 200, headers: { "content-type": "application/octet-stream" }, body: "rejected fixture" },
+    } });
+    const parsed = parseBrowserCommandArgs(["execute", "navigate", `${fixture.origin}/`]);
+    const result = await runBrowserCommandAsync({
+      contract: parsed.contract!,
+      browserSandboxAuthority: createBrowserSandboxAuthority({ mode: "future-runtime" }),
+      browserNetworkAllowlist: createBrowserNetworkAllowlist({ allowedOrigins: [{ origin: fixture.origin, mode: "future-runtime" }] }),
+      browserExecutionConfirmations: [{ kind: "network", status: "confirmed" }],
+      browserPublicReadOnlyWebManifest: manifestLoad(fixture.manifest),
+      browserPublicReadOnlyHttpClient: outcome === "unknown" ? async () => { throw new Error("PRIVATE_NETWORK_ERROR"); } : fixture.httpClient,
+    });
+    expect(result.output).toContain(`Network access: ${outcome === "unknown" ? "unknown" : "public-readonly"}`);
+    expect(result.output).toContain(`Public network: ${outcome === "unknown" ? "unknown" : "yes"}`);
+    expect(result.output).toContain("Executed: no");
+    expect(result.output).not.toContain("Not fetched");
+    expect(result.output).not.toContain("PRIVATE_NETWORK_ERROR");
+    expect(result.evidence).not.toContain("browser-execution-command-runner:no-network-call");
+    expect(result.evidence).not.toContain("browser-external-network-bridge:no-network-call");
   });
 
   it("real CLI blocked shape requires confirmation and does not make public network default", async () => {

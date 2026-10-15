@@ -350,9 +350,11 @@ export async function runBrowserExternalNetworkExecutionBridgeWithControlledNetw
       "browser-external-network-bridge:no-browser-launch",
       controlledNetworkReceipt?.executed
         ? "browser-external-network-bridge:controlled-loopback-request"
-        : publicReadOnlyReceipt?.executed
+        : publicReadOnlyReceipt?.publicNetwork === true
           ? "browser-external-network-bridge:public-readonly-request"
-        : "browser-external-network-bridge:no-network-call",
+        : publicReadOnlyReceipt?.publicNetwork === null
+          ? "browser-external-network-bridge:network-outcome-unknown"
+          : "browser-external-network-bridge:no-network-call",
       "browser-external-network-bridge:no-mcp-launch",
     ],
   };

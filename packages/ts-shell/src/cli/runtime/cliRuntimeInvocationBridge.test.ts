@@ -1,6 +1,27 @@
-import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { streamCliRuntimePrompt } from "./cliRuntimeInvocationBridge.js";
+import { createGitRepoFixture } from "../../test-utils/cliHarness.js";
+
+let scratch: string;
+let workspaceRoot: string;
+beforeEach(() => {
+  const base = path.resolve(process.cwd(), "../../.tmp");
+  fs.mkdirSync(base, { recursive: true });
+  scratch = fs.mkdtempSync(path.join(base, "invocation-bridge-"));
+  workspaceRoot = path.join(scratch, "workspace");
+  const home = path.join(scratch, "home");
+  createGitRepoFixture(workspaceRoot); fs.mkdirSync(home);
+  vi.stubEnv("HOME", home); vi.stubEnv("USERPROFILE", home);
+  vi.stubEnv("CHEERS_TEST_ROOT", path.join(scratch, "state"));
+  vi.stubEnv("GIT_CEILING_DIRECTORIES", scratch);
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+  fs.rmSync(scratch, { recursive: true, force: true });
+});
 
 /** A synthetic run, which starts its turn without a readiness wait. */
 function start(overrides: { readonly providerModeEnv?: string; readonly onPromptAccepted?: () => void } = {}) {
@@ -8,7 +29,7 @@ function start(overrides: { readonly providerModeEnv?: string; readonly onPrompt
     prompt: "hello",
     onPromptAccepted: overrides.onPromptAccepted,
     sessionId: "sess_bridge",
-    workspaceRoot: process.cwd(),
+    workspaceRoot,
     signal: new AbortController().signal,
     maxTurns: 1,
     escalationPromptHandler: async (prompt) => ({ promptId: prompt.id, decision: "deny", respondedAt: 1 }),

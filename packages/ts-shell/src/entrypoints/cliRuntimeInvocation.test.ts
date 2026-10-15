@@ -4,7 +4,8 @@ import path from 'node:path';
 import { writeProjectState } from '../core/state/projectState.js';
 import { captureThinkingPreference } from '../core/models/preference.js';
 import * as turnSession from '../turn/session.js';
-import { describe, expect, it, vi } from "vitest";
+import { createGitRepoFixture } from '../test-utils/cliHarness.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createServer } from "node:http";
 import * as accountRenewal from '../core/auth/account/renewal.js';
 import { recordSessionUsage, resetSessionUsage } from "../observability/usageTelemetry.js";
@@ -17,6 +18,22 @@ import {
   type CliRuntimeInvocationDependencies,
   type CliRuntimeInvocationInput,
 } from "./cliRuntimeInvocation.js";
+
+let scratch: string;
+let workspaceRoot: string;
+beforeEach(() => {
+  scratch = fs.mkdtempSync(path.join(os.tmpdir(), "cli-invocation-"));
+  workspaceRoot = path.join(scratch, "workspace");
+  const home = path.join(scratch, "home");
+  createGitRepoFixture(workspaceRoot); fs.mkdirSync(home);
+  vi.stubEnv("HOME", home); vi.stubEnv("USERPROFILE", home);
+  vi.stubEnv("CHEERS_TEST_ROOT", path.join(scratch, "state"));
+  vi.stubEnv("GIT_CEILING_DIRECTORIES", scratch);
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+  fs.rmSync(scratch, { recursive: true, force: true });
+});
 
 const providerCredentialResolution: ProviderCredentialResolution = {
   provider: "openai",
@@ -34,7 +51,7 @@ function baseInput(overrides: Partial<CliRuntimeInvocationInput> = {}): CliRunti
   return {
     sessionId: "sess_123",
     prompt: "write a file",
-    workspaceRoot: process.cwd(),
+    workspaceRoot,
     signal: new AbortController().signal,
     maxTurns: 3,
     escalationPromptHandler: async (prompt) => ({

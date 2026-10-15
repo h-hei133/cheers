@@ -41,7 +41,7 @@ describe("browser network egress guard scenario examples", () => {
 
     expect(result.controlledNetworkReceipt?.egressDecision).toBe("allowed-controlled-origin");
     expect(result.controlledNetworkReceipt?.egressAuditId).toContain("browser-network-audit");
-    expect(renderBrowserNetworkEgressSurface(result.controlledNetworkReceipt!.egressAudit!)).toContain("Public network: no");
+    expect(renderBrowserNetworkEgressSurface(result.controlledNetworkReceipt!.egressAudit!)).toContain("Public network allowed: no");
   });
 
   it("blocks public, private non-harness, credential, and unsupported URLs", () => {

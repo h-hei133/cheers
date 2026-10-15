@@ -6739,3 +6739,9 @@ a1901132已提交推送，branch/PR head同SHA；5冻结blob与20证据hash匹�
 ### 2026-10-15 — A25 原拒绝诊断未复现，原因继续未知
 
 cleanup交付文档b5b5705e已推送、branch/PR head一致，两精确workflow仍付款/spending-limit未启动，材料`tracked-view/publication-docs-delivery-observation.json`。隔离Node20.3当前owner两路1/2/4并发各一组14默认请求均complete、当次native名称/hash一致、观测settle/close/remove满足；14个内部containment拒绝有相同path hash且被原tree处理，不是终端失败。七编译identity、冻结两源码、原生产hash、历史§9与用户`.gitignore`保持；初次launcher在产品启动前目录错误已分类，修正后才实际执行。详见[裁决 §10.19](features/phase-19-decisions.md#1019-a25--原生产拒绝的归因证据2026-10-15有界诊断未复现原原因未知)及[验收 §26.7](features/phase-19-acceptance.md#267-原生产拒绝的有界诊断)。原41/42及未知原因不覆盖、不补猜测性代码，整树/query-start/OS原子性、A01/A03/A12继续开放；仅三证据文档交付，源码不变，Phase19 active，远端按自身SHA另验。
+
+### 2026-10-15 — 公共只读传输与集成夹具修复
+
+补充审查逐项登记A26–A29后收束，再于原public executor复用共享network owner：双层流量限额、全DNS答案审核/绑定、跨跳转总期限、HEAD及Location语义，receipt/UX/report保留false/null/true网络事实。A29-R01补齐拒绝/升级/interim响应观察，原反转实际3项失败且源码恢复。后续全套发现的来源夹具耦合与裸fd观察错误分别受控证明，续接/审批项目复用既有Git fixture、media核对原FileHandle；13个既有场景在12615次祖先扰动下通过，原业务断言/期限保留。历史失败及确切对象未知界限均保留，详见[裁决 §10.20–24](features/phase-19-decisions.md)与[验收 §26.8](features/phase-19-acceptance.md#268-公共只读传输与最终集成)。
+
+最终18源码/测试路径独立code APPROVE、architecture CLEAR、综合仅delta APPROVE，11生产对应两种成功构建；result-contract149项、scripts57项、四源码门和NormProof零blocking通过，保留4既有ceiling advisory/partial。最终隔离Node20.3/Linux全套801文件、8136项通过、1个显式public smoke跳过，零失败，448.28秒；源码冻结保持、A02当前本地全套证据补齐。真实Chromium/local-server9项已通过并纳入该环境；四路Node/executable regular/fullscreen显式公共HEAD因保留DNS地址在派发前拒绝、零provider请求，外部公网accepted=false。完整host取消、A01/A03/A12、A25原41/42及整树/广泛成本仍开放，Phase19 **active**；用户`.gitignore`保持排除、§9历史审计不变，提交/推送及精确SHA的CI另验。

@@ -13,7 +13,7 @@ export function renderBrowserPublicReadOnlyWebSmokeReport(
     `- Status: ${result.status}`,
     `- Policy: ${safe(result.receipt?.policyStatus ?? "none")}`,
     `- Egress decision: ${safe(result.receipt?.egressDecision ?? "none")}`,
-    `- Public network used: ${result.publicNetworkUsed ? "yes" : "no"}`,
+    `- Public network used: ${result.publicNetworkUsed === null ? "unknown" : result.publicNetworkUsed ? "yes" : "no"}`,
     "- Browser launched: no",
     "- JavaScript executed: no",
     `- Evidence summary: ${safe(result.receipt?.evidenceSummary ?? result.reason, 260)}`,

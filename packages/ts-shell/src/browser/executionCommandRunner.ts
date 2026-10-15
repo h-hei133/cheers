@@ -114,9 +114,13 @@ export async function runBrowserExecutionCommand(input: {
           ? ["browser-execution-command-runner:public-readonly-web-executed"]
           : []),
         "browser-execution-command-runner:no-browser-launch",
-        bridge.publicReadOnlyReceipt?.executed
+        bridge.publicReadOnlyReceipt?.publicNetwork === true
           ? "browser-execution-command-runner:public-network-explicit"
-          : "browser-execution-command-runner:no-network-call",
+          : bridge.publicReadOnlyReceipt?.publicNetwork === null
+            ? "browser-execution-command-runner:network-outcome-unknown"
+            : bridge.controlledNetworkReceipt?.executed
+              ? "browser-execution-command-runner:controlled-loopback-request"
+              : "browser-execution-command-runner:no-network-call",
         "browser-execution-command-runner:no-mcp-launch",
         "browser-execution-command-runner:no-provider-or-model-call",
       ],

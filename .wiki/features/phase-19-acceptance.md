@@ -2,7 +2,7 @@
 title: "Phase 19 集成验收与剩余证据"
 category: article
 created: 2026-10-11
-updated: 2026-10-14
+updated: 2026-10-15
 tags: [phase-19, acceptance, validation]
 summary: "记录完整源码图、契约门禁、全套测试、实际 CLI 及平台范围；保留尚未完成的对象隔离和外部验收。"
 ---
@@ -12,6 +12,8 @@ summary: "记录完整源码图、契约门禁、全套测试、实际 CLI 及�
 Phase 19 总目标仍为 **active**。本表以[裁决](phase-19-decisions.md)的 16 批、76 项为范围，分别记录实现、局部验收和剩余条件。W16 修复了此前无法取得完整依赖图证明的检查器，并恢复重构后失效的契约门禁；全阶段完成仍需下面列明的剩余工作。
 
 2026-10-14 对当前起点 `71f87aeb` 的 76 项静态复核已收束，逐项登记的 25 项问题见[裁决 §9](phase-19-decisions.md#9-全量任务复核2026-10-14审查已收束问题未修复)。这些包含未修代码缺陷和历史已披露的交付/证据缺口，审查期间没有修改产品或重新运行套件；本文历史绿色证据不能关闭这些问题。起点分支与 PR 已读回同 SHA，精确 CI/Watch 均因账户付款/额度未启动，仍无当前远端验证通过。
+
+2026-10-15补充审核与公共传输修复后的当前源码已在隔离Node20.3/Linux完成801文件、8136项通过及1项显式public smoke跳过，零失败。最终冻结、夹具归因界限、独立复核及历次失败快照见[§26.8](#268-公共只读传输与最终集成)；真实环境和远端CI仍分别保留开放条件。
 
 §1–4 的完整套件和冻结证据属于 W16 提交 `f43ae09ec90a5890b768598ab52a17821c5e9efc`。后续 SAFE-02 Linux 原生读取变更分别记录在 §7–17，§18 的全套属于 `32b31107` 源码，不能把历史全套直接套用到后续源码。§19–21 补充未改源码的 Windows 读取、前端、CLI 和进程证据；§22 修复 Windows 大小写包含边界并运行直接受影响套件、构建、原生与实际 CLI 检查，没有重新运行当前全套。§23 在未变的 §22 源码上补充原生 Windows ConPTY 两模式交互证据。§24 修复非 Linux 读取检查点可见的父目录替换，并明确保留检查之间变化的缺口。
 
@@ -614,3 +616,30 @@ A25-T01的cleanup发布检查已局部修复；顺序最后stat、未观察/排�
 cleanup证据文档b5b5705e已推送、remote/PR head一致，其精确两workflow各自annotations确认付款/spending-limit未启动、steps=[]，材料 `tracked-view/publication-docs-delivery-observation.json`。当前编译owner在隔离Node20.3按Git/rg、1/2/4并发各一组14默认请求全部complete，3850/3767政策名称与当次native及原baseline hash一致；占位settle/观测FileHandle close/view remove全部满足、每view≤8，四并发总峰值32/12（不含Dir/pipe/OS树）。装饰方法observer逐query发现14个相同path hash的containment内部拒绝，原tree捕获后继续、无捕获revision差异；它们有完整终端结果，不是原终端失败的重建。
 
 七直接编译模块、冻结两源码、原生产artifact/hash、历史审计及用户`.gitignore`保持。初次隔离launcher目录深度错误发生在产品启动前，修正后14次才实际执行；结果/分类分开留存。材料`tracked-view/refusal-investigation-{results,summary,setup}.json`及对应脚本/log，详见[裁决 §10.19](phase-19-decisions.md#1019-a25--原生产拒绝的归因证据2026-10-15有界诊断未复现原原因未知)。本轮不声称性能改善或42默认原验收通过；原41/42、未知原因、A25整树及A01/A03/A12继续开放，Phase19 active。仅三证据文档交付、源码不变，远端状态按新SHA另验。
+
+### 26.8 公共只读传输与最终集成
+
+补充审查发现A26–A29：默认公共smoke全量读取后才限额、未审核绑定DNS地址、非重定向Location被跟随，以及拒绝后丢失实际网络事实。补审收束后在原executor复用共享network owner，编码/解码流分别限额、全部DNS答案审核并绑定socket、保留hostname/TLS、一次总期限跨跳转/读取/发布；HEAD不消费实体正文，仅301/302/303/307/308跟随Location。receipt/report/UX/bridge保留未派发false、派发后未观察响应null、已观察响应true，拒绝/超时/取消不抹去已发生访问。
+
+A29-R01复审另发现101、600及103后断开遗漏响应观察；原共享connection现在先记录实际headers，再独立执行状态拒绝/资源销毁，interim不提前结束请求且最终状态覆盖。默认transport的17项合成TLS/DNS测试由独立code lane在Node20.3实际通过；原观察逻辑反转实际3项失败、103→200控制通过。正文、全部DNS、重定向、网络事实、HEAD、总期限的反转分别实际失败1/1/2/3/1/1项且源码恢复；初版DNS选择零项不算有效反转，原材料保留。修复不增加第二传输或放宽地址/TLS策略，完整host-command父取消生命周期未建立。
+
+| 源码快照/运行 | 文件通过/失败 | 断言通过/失败/跳过 | 实际结论 |
+|---|---:|---:|---|
+| `final-integration/full-tests`，197e757f起点 | 799 / 1 | 8115 / 1 / 1 | 来源复验失败，exit1 |
+| `public-web/full-final`，观察补修前 | 801 / 0 | 8132 / 0 / 1 | exit0，早于A29-R01 |
+| `public-web/full-observation-final` | 799 / 2 | 8128 / 8 / 1 | exit1，保留来源复验及CLI退出失败 |
+| `public-web/full-delivery-final`，夹具修正不完整 | 798 / 3 | 8133 / 3 / 1 | exit1，CLI诊断确认来源复验，另有裸fd断言失败 |
+| `public-web/full-isolated-final`，18路径夹具修正 | 800 / 1 | 8135 / 1 / 1 | exit1，另一completed-current续接夹具exit1，原断言无stdout |
+| `public-web/full-complete-fixtures-final`，续接/审批夹具补齐 | 801 / 0 | 8136 / 0 / 1 | exit0，448.28秒，源码及用户`.gitignore`保持 |
+
+计数按逐文件/逐断言状态，不用runner顶层含skip的passed聚合。两个失败文件原样复查56项通过不解释原失败；受控probe证明临时workspace无`.git`仍捕获仓库祖先，Git ceiling不约束本项目目录owner，另证明关闭后的fd编号可被复用。现有Git fixture建立真实独立项目，media检查原FileHandle的fd=-1/stat EBADF；保留来源保护、实际CLI、正文/hash/变化拒绝和关闭失败断言。修正后4文件/67项零skip通过，207.08秒；探针不声称抓获原失败的确切路径或被复用inode。
+
+§10.23的两路独立补审code **APPROVE**、architecture **CLEAR**、零新finding，综合仅其18路径delta **APPROVE**；先前架构返回429保留，后续lane已明确重新确认，未以失败代理当批准。`delivery-isolated-freeze.json`绑定11生产/7测试文件，生产与两种已成功构建完全一致，构建后只差四个测试；`observation-restored`10文件/133项、result-contract149项及scripts57项分别通过，五门通过，当前NormProof零blocking、同4既有ceiling advisory/partial。材料均在`.tmp/phase19-repair/public-web/`，包括两份`*-review-isolated`、`review-synthesis-isolated.json`及`delivery-isolated-build-binding.json`；后续baseline夹具字节须另补审，不能沿用为最终批准。
+
+该次全套后再次限定复核同文件实际续接/审批输入，剩余current/fallback、long-session、stopped stdin/print/pipe-spawn、writer-started与approval项目也只mkdir。仅补退出诊断，在742次无关祖先目录变化下实际CLI于`SkillDiscovery.observeParent`捕获读取时抛ReadChangedError、原断言真实失败；1项失败、39项选择外未执行，不解释原全套未捕获的确切对象。随后统一复用现有Git fixture建立这些真实项目根，保留所有原权限/来源/输出/收据断言及期限，元数据和missing-key场景不扩大改动。补齐后在12615次同类扰动下13个既有场景全部通过，73.86秒、27项选择外未执行；噪声已移除，源码/用户`.gitignore`保持。材料`fixture-{unmarked-current-red,complete-perturbed-green}-{validation,tests,perturbation}.json`、`delivery-complete-fixtures-freeze.json`；四源码门及NormProof零blocking再次实际通过，完整集成最终结果如上表。
+
+新字节独立补审已实际返回code **APPROVE**、architecture **CLEAR**、零新finding，综合仅当前18路径delta **APPROVE**。独立AST核对原454个expect首参数和35个直接it名称/期限均不变；11生产与此前两种成功构建一致，原失败报告及确切对象未知边界保留。材料`*-review-complete-fixtures.{md,json}`、`review-synthesis-complete-fixtures.json`、`delivery-complete-build-binding.json`及`complete-source-gates.json`；批准不代替全套或外部验收。
+
+最终`full-complete-fixtures-final-{validation,tests,freeze}.json`绑定同18源码/测试hash及全部冻结源码，真实完整运行801文件、8136项通过、1项显式公共smoke跳过、零失败；没有把27项选择外与环境skip混算，也没有把历次局部套件相加。A02当前Linux/Node20.3本地全套证据已补齐，A26–A29/A29-R01在已审scope内修复；最终文档/空白检查、交付冻结及精确SHA的远端状态另验，原失败快照不删除。
+
+Node20.3/单文件各regular/fullscreen四路真实PTY均观察默认关闭及显式HEAD派发前拒绝，零provider请求、配置/来源不变、process exit0。原生DNS把公共hostname解析到198.18.0.0/15及2001:2::/48保留网段，故真实公网accepted=false；不替换DNS或绕过政策。真实Chromium/local-server原9项已实际通过并纳入当前全套，仍不证明真实前端/平台/账户/设备/远端服务。相关launcher及parser错误单列保留，不归为产品失败或通过。A01/A03/A12、A25原41/42未知拒绝及整树/广泛成本继续开放，Phase19 **active**；本地全套不替代精确SHA的交付/远端证据，用户`.gitignore`保留排除、§9历史审计不变。

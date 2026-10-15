@@ -2,7 +2,7 @@ import { sanitizeBrowserText } from "./capabilityModel.js";
 import type { BrowserPublicReadOnlyWebReceipt } from "./publicReadOnlyWebReceipt.js";
 
 export interface BrowserPublicReadOnlyWebUxSummary {
-  readonly status: "executed" | "blocked" | "unavailable";
+  readonly status: "executed" | "blocked" | "cancelled" | "unavailable";
   readonly lines: readonly string[];
   readonly evidence: readonly string[];
 }
@@ -11,14 +11,14 @@ export function createBrowserPublicReadOnlyWebUxSummary(
   receipt: BrowserPublicReadOnlyWebReceipt,
 ): BrowserPublicReadOnlyWebUxSummary {
   const unavailable = receipt.requestStatus === "request-failed" || receipt.requestStatus === "timeout";
-  const status = receipt.executed ? "executed" : unavailable ? "unavailable" : "blocked";
+  const status = receipt.executed ? "executed" : receipt.requestStatus === "cancelled" ? "cancelled" : unavailable ? "unavailable" : "blocked";
   return {
     status,
     lines: [
       `Requested ${safe(receipt.method)} ${safe(receipt.targetOrigin)} for ${safe(receipt.actionKind)}.`,
       receipt.executed
         ? "Allowed by explicit public read-only manifest, allowlist, confirmation, and egress guard."
-        : `Not fetched: ${safe(receipt.policyStatus)} / ${safe(receipt.requestStatus)}.`,
+        : `${receipt.publicNetwork === null ? "Network outcome unknown" : receipt.publicNetwork ? "Response rejected" : "Not fetched"}: ${safe(receipt.policyStatus)} / ${safe(receipt.requestStatus)}.`,
       receipt.executed
         ? `Fetched ${safe(receipt.statusCodeSummary)} with sanitized evidence only.`
         : `Reason: ${safe(receipt.evidenceSummary, 220)}`,

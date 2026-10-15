@@ -17,7 +17,7 @@ export function renderBrowserPublicReadOnlyWebSurface(
     `- Method: ${safe(receipt.method)}`,
     `- Action: ${safe(receipt.actionKind)}`,
     `- Policy: ${safe(receipt.policyStatus)}`,
-    `- Public network: ${receipt.publicNetwork ? "yes" : "no"}`,
+    `- Public network: ${receipt.publicNetwork === null ? "unknown" : receipt.publicNetwork ? "yes" : "no"}`,
     "- Browser launched: no",
     "- JavaScript executed: no",
     `- Executed: ${receipt.executed ? "yes" : "no"}`,

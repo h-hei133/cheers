@@ -3,7 +3,7 @@ title: "Phase 19 裁决：生产正确性、完整交互与自主协作能力"
 category: article
 sources: [14-user-experience-research, 15-deep-research-design, 16-tui-composer-and-theme, 17-tui-status-and-panels, 18-input-slash-startup-context, 19-tools-maturity-and-multifile-edit, 20-configuration-system, 21-session-recovery-and-undo-ux, 22-command-inventory-alignment, 23-command-argument-options, 24-shared-command-parity, verification-15-21]
 created: 2026-10-05
-updated: 2026-10-14
+updated: 2026-10-15
 tags: [phase-19, decisions, production, tui, commands, research, goal, collaboration]
 summary: "汇总 14–24 的纠错、维护者裁决、生产契约、分批任务及验收标准。包含完整自主目标、软件与论文深研、八种输入框形态、Git 工作台、顾问、安全分析、公共技能商店和远程协作。此文是待实施计划；文档审查完成不代表功能或生产验收完成。"
 confidence: mixed
@@ -2856,3 +2856,87 @@ cleanup证据文档b5b5705e已推送、remote/PR head一致，精确CI3862734067
 当前b5b5705e编译identity的14请求均complete、零终端拒绝，当次3850 Git/3767 rg政策名称及hash与原baseline一致；全部占位settle、受观测FileHandle close、view remove、每view占位≤8，四并发总峰值32占位/12 FileHandle。不含Dir/pipe/OS树，不据observer耗时声称性能提升。14个内部ViewSourceError全部来自相同path hash、编译`source.js:26`的containment拒绝，经`tree.js:115–120`捕获继续；当时已捕获revision无差异。这些事件有成功终端结果和具体throw site，支持政策排除的分类；不能反推原iteration2终端拒绝也是同一事件。七直接编译模块、冻结两源码、原生产hash和用户`.gitignore`逐字节保持。材料 `tracked-view/refusal-investigation-{results,summary}.json`、独立`.mjs`及log。首轮helper目录深度错误在产品进程启动前失败，修正隔离launcher后实际运行；分类另存`refusal-investigation-setup.json`，不冒称首轮已有产品执行。
 
 本轮结论仅为**当前14有界诊断未复现原终端拒绝**；原41/42全默认验收仍未通过、原原因未知，不新增猜测性产品补丁。来源currency、权限/containment、metadata上限和native返回仍可能产生同一通用拒绝；缺少原throw site/revision时不能排序为已证实原因。继续保留既定整树/query-start/OS原子性、A01/A03/A12和广泛质量边界，Phase19 **active**；本轮仅三证据文档交付，源码不变、不重复构建/套件，按自身SHA另核远端。
+
+### 10.20 A02/A03 — 当前源码完整集成与真实浏览器（2026-10-15，验收进行中）
+
+上一轮形成实际进展：A25-T01修复a1901132与两批证据文档已交付到197e757f，branch/PR head一致，最终两个精确workflow各自annotations仍确认付款/spending-limit未启动、steps=[]；材料 `tracked-view/publication-diagnostic-delivery-observation.json`。回到全部76项审计的剩余条件：A02的8081pass/10skip集成快照早于后续UTF-8、receipt-status、tracked-view和cleanup发布delta，当前只由各批定向证明；因此本轮冻结当前源码，补一次与完整阶段范围匹配的Node20.3全套，不以历史套件替代最终字节。
+
+此前9项真实Chromium检查因没有可执行浏览器跳过，Playwright-core1.60.0已在现有依赖中。只在仓库内隔离HOME/TMPDIR/browser cache安装其匹配的浏览器，先执行原9项真实browser/local-server集成（导航、取消/已发送effect、第一子资源/popup阻断、service worker、redirect准入），再运行冻结全套；没有改变测试skip条件、package/build/default gate或产品源码。它属于A03浏览器链路的本地实际证据，不能外推为用户前端字体/IME/系统复制、Windows/macOS对象绑定或真实账户/设备/部署通过。源码、历史§9及用户`.gitignore`前后核对，测试副产物按实际状态清理；构建/PTY已有相同源码证据，不为纯文档重复执行。
+
+续轮已确认原进程结束并读取实际产物：真实Chromium两文件/9项通过；冻结`197e757f`的Node20.3完整运行800文件（799通过、1失败），8117项（8115通过、1失败、1显式public smoke跳过），458.39秒、exit1。Vitest JSON顶层把skip计入passed且suite数包含describe，故以逐文件/逐断言及原日志统计，不写成8116项通过。唯一失败为`cliRuntimeInvocationBridge.test.ts`的admission转发场景，栈在`SkillDiscovery.verifySource`复验时抛`ReadChangedError`；当前仅确认失败路径，尚未归因为产品、夹具或环境。保留`final-integration/full-tests.{log,json}`及`full-validation.json`，A02仍未闭合；不能以重跑通过覆盖这次失败。
+
+原第一次launcher还因安装版Vitest不支持`--pool/--maxWorkers/--minWorkers`而在测试执行前退出，已按harness/setup分类并改用原版支持的线程环境变量，未改产品配置/断言。当前再次核对冻结文件与用户`.gitignore`均保持。接下来先调查该唯一失败及§10.21的补充审查，确认问题即登记，审查收束后才动代码。
+
+### 10.21 A26/A27 — 显式公共 smoke 的传输边界（2026-10-15，补充审查发现，尚未修复）
+
+补充A03未执行public smoke时，先追踪实际CLI `/browser smoke`→`browser/smoke/runner.ts`→`publicReadOnlyWebExecutor.ts`的默认client。它会执行显式允许的HTTPS GET/HEAD，并非只有注入fixture；默认关闭不免除启用后的既定资源/公共网络契约。历史§9的76项/25登记快照保留，本节是其后补充发现，不将当时审查改写为已经穷尽。
+
+**A26 HIGH — GET字节预算只在全量读取后检查。** 默认`publicReadOnlyFetch`先`await response.text()`分配整个decoded正文，之后外层才以`bodyBytes`检查manifest预算。无Content-Length或压缩响应即使最终blocked也已全量读取/解码，允许远端在期限内耗用超出配置的内存/工作量。当前只完成源码链确认，没有制造巨型响应或声称实际OOM。原`core/network/connection.ts`和`response.ts`已有编码/解码双层有界reader可复用；不另建fetch系统。
+
+**A27 HIGH — 公共hostname没有审核/绑定实际DNS地址。** `publicReadOnlyWebPolicy`/`networkEgressGuard`只同步检查URL host/origin；默认client直接`undiciFetch(url)`，没有注入DNS审核或socket lookup绑定。允许的公共hostname若解析为private/loopback或混合答案，TLS对hostname的校验并不证明连接地址属于公共网络。原共享`requestPublic`已按全部答案审核、绑定lookup并保留hostname/TLS，可在本consumer复用；本轮未访问内网资源或真实配置，也不声称已经发生外部SSRF。
+
+两个问题发现即登记。下一步先用小型隔离传输反例核查完整读取和拒绝前零派发，并比较参考的bounded streaming/URL-host与地址分离决定；当前冻结全套继续运行原源码，先保留其独立结果，再修改原owner。此次新增修复若改变源码，§10.20的全套须明确绑定补修前快照，不冒称覆盖后续delta。Phase19 active，产品未改、用户`.gitignore`保持。
+
+**A28 MEDIUM — 非重定向响应的Location被当作跳转执行。** 独立代码复核确认`publicReadOnlyWebExecutor.ts`默认client无条件把`location`映射为`redirectLocation`，外层仅检查该字段（当前第87、244行）。允许的GET返回200/201及Location时，会额外请求该地址或报告redirect-blocked，丢掉原有效响应。静态链路已确认，未运行网络反例。后续在原owner仅对301/302/303/307/308跟随Location，覆盖200/201保留原响应与真实跳转仍逐跳审批；立即登记，补充审查结束前不修代码。
+
+**A29 HIGH — 远端已收到请求后失败仍报告未使用公网。** 独立架构复核确认executor的redirect拒绝、不安全正文/content-type、timeout和request-failed分支均写`publicNetwork:false`（当前第112–123、154–173、207–216行）；`publicReadOnlyWebReceipt.ts`原样转发，`browser/smoke/report.ts`显示`Public network used: no`。允许的首个请求已取得远端响应后再因跳转/输出策略拒绝，实际公网访问不会被撤销；无响应时也不能仅从失败判为零发送。静态消费者链支持该结论，不声称当前已发生真实外发。后续将未派发、已派发/已响应、发送结果未知与执行/安全输出结果分别记录，保留拒绝状态，不能只替换传输却继续生成错误的零网络证明；发现即登记。
+
+A26补充：redirect分支在输出预算检查前continue，超限302正文加小型200终稿甚至能成为executed；原跳转夹具正文全为空。A29补充：公共UX的`Not fetched`及external bridge的`no-network-call`也依赖executed，必须一起保留已响应/未知事实。两项均由当前调用链确认，未执行网络反例。
+
+A02失败的夹具问题也已定位并立即记录：bridge测试以`process.cwd()`作为实际workspace，未独立隔离HOME/USERPROFILE；同次全套唯一与其执行区间重叠的`observability/logs/retention.test.ts`在同一cwd创建/删除`.tmp-log-retention-*`。缺失技能根通过`SkillDiscovery.observeParent`捕获cwd目录revision，故无关测试能使桥接场景的来源复验失败。这是可达的共享夹具耦合；原失败没有捕获source路径，时间重叠不能单独证明原throw的具体对象。后续用受控目录变化核实此机制，再将bridge已有三场景放入独立workspace/home，保留admission、真实synthetic turn和队列断言，不削弱产品来源复验。
+
+### 10.22 A26–A29 — 补充审查收束与修复边界（2026-10-15）
+
+在§9的76项全量复核基础上，此次补充检查覆盖public executor/policy、默认传输、真实command和external bridge消费者、receipt/UX/report、共享网络owner及对应测试。代码lane检查24个文件相关部分并检索3个共享网络测试，最终**REQUEST CHANGES**；架构lane最终**BLOCK**，确认A26/A27/A29并指出HEAD适配约束。专用端点曾不可用，继承会话配置的独立lane也曾被限流；这些失败不计批准，最终两份实际返回的否决证据才构成本次综合结果。A26–A29已按发现顺序即时记录，补充审查结束前未改产品或测试。
+
+修复前定向参考比较已完成：审核所有DNS答案并将该结果直接供socket使用，避免再次解析；本项目仍拒绝loopback并保留原hostname/TLS校验。参考HTTP管理请求区分overall与attempt timeout；本入口改为共享owner已有的单次总期限，不自动重试。参考会话技能测试传入独立cwd及用户目录，本项目也隔离现有bridge场景，不让其他测试的目录变化改变其输入。只采纳这些决定，不复制外部实现或引入另一套网络/发现系统。
+
+实施范围为原public executor与下游网络事实投影、共享connection的HEAD/派发与响应观察边界，以及已有bridge测试夹具。HEAD不读取正文，也不把实体的Content-Length/编码元数据当成本次下载；仅301/302/303/307/308跟随Location，错误/跳转正文在headers即丢弃。已响应为已使用、真正未派发为未使用，派发后无响应保持unknown；策略或输出拒绝不抹去访问事实。共享typed错误须分别映射超时、拒绝、限额和取消，输出不带原始异常/正文。现有command契约没有父signal，本次不能声称修复了完整host取消生命周期；仅按实际接通边界验收，原QA平台/外部/CI开放条件保持。
+
+**A29-R01 MEDIUM — HTTP 101拒绝遗漏已响应观察。** 最终独立架构复核在共享`core/network/connection.ts`的upgrade分支发现：服务端已返回101时，owner销毁socket并拒绝`invalid_response`，但没有调用新`onResponse`观察接口。独立Node20.3隔离本地探针实际得到`callbacks:['dispatch']`，因此public executor仍保留unknown而非已观察访问。拒绝本身保持、没有误报零发送；这是A29的证据精度遗漏，先登记，保留原审查及冻结全套结果，待两lane收束后补同一响应边界与针对回归，不把当前审查写成批准。
+
+A29-R01同边界补充：代码lane确认普通response回调也在`onResponse`之前拒绝`status > 599`，Node能够接受但本owner拒绝的600–999状态同样丢失已观察响应事实。架构lane另经编译后的默认smoke入口实际复现101：`request-failed`、`publicNetworkUsed:null`且报告unknown；使用合成TLS/DNS、本地fixture，没有访问外部网络或真实配置。拒绝策略与事实观察应分开，补修范围覆盖同一生命周期而非仅改101显示。
+
+同一发现的最后生命周期检查：两lane各自受控确认103 informational后断开，原生客户端收到103而共享owner未观察，默认smoke仍unknown；103再接200则最终正常成功。因此须观察information而不终止请求，最终响应仍覆盖状态；101继续拒绝升级，普通响应在状态准入之前保留实际观察。目标实现先读后核对Node原生response/information/upgrade事件契约；原参考管理请求只暴露fetch最终Response，没有此低层事件观察接口，不能机械照搬其成功判定。
+
+冻结原15路径的完整Node20.3运行已结束：**801文件全部通过，8132断言通过、1个显式public smoke跳过，492.90秒、exit0**；逐文件/逐断言统计，源码前后无变更，用户`.gitignore`hash保持。材料 `public-web/full-final-{validation,tests,freeze}.json`及原日志。原bridge失败的受控目录probe确认共享workspace可触发来源复验、独立workspace不受影响；最终夹具保留三个真实synthetic/admission/队列场景。原800文件失败快照仍保留，不能证明其缺失source路径的精确对象；本次完整通过也早于尚待补修的A29-R01，不冒称覆盖未来改动。
+
+最终冻结审查已收束：code **REQUEST CHANGES**、architecture **WATCH**，综合**REQUEST CHANGES**，唯一未闭合finding为A29-R01；原独立报告 `public-web/{code,architecture}-review-final.{md,json}`保留。现在才补原connection的普通/information/upgrade观察与默认smoke回归；升级/不支持状态继续拒绝并销毁资源，information不提前结束请求。既有stage-scoped负面marker仅描述配置/预检/策略阶段；两lane未找到把它们当全局零网络事实的生产消费者，不以substring重解释或借此扩大改动。完整host取消与外部验收边界保持。
+
+补修后验证launcher的一次设置错误单独保留：给脚本门的隔离PATH遗漏RTK路径，子进程在任何测试执行前`FileNotFoundError`退出，不能记为产品或门失败/通过。分类`harness/setup drift`，材料`public-web/gate-launch-initial.json`及空初始log；只修临时launcher的RTK定位，不改package、测试门或产品。
+
+临时终端探针初名`pty.py`还遮蔽了Python同名标准库，两个入口均在CLI启动前缺失`openpty`而退出，零公网请求、零终端验收；原字节和两份空结果保留于`public-web/terminal-launch-initial.json`所列材料。仅将临时脚本更名为`smoke-terminal.py`以恢复标准库导入，不把launcher故障归为产品问题或隐去首次失败。
+
+续轮已读取补修后实际终态：`full-observation-final-validation.json`为801文件799通过/2失败、8137项8128通过/8失败/1显式public smoke跳过，470.16秒、exit1，源码及用户`.gitignore`均与冻结一致。6项失败位于仍以`process.cwd()`为workspace、未隔离HOME的`entrypoints/cliRuntimeInvocation.test.ts`，实际栈来自技能来源目录复验；与先前bridge夹具属于同类共享输入耦合，不能通过移除来源检查修复。另2项`cli-baseline.test.ts`为实际CLI的`/continue`子进程exit1，原断言未保留其stdout/stderr，具体原因待核查；不能仅据重跑或时间负载将其归为环境。先登记并分类，再纠正确定的夹具边界，保留原失败快照。
+
+原Node/单文件终端在regular模式均实际显示默认关闭及显式HEAD被策略拒绝，未形成完整双模式验收：临时parser只匹配`- Status`，实际TUI使用`• Status`，读取结果时提前失败，归为探针设置错误。当前Node20.3原生DNS查询确认`example.com`返回`198.18.0.86`和`2001:2::58`两类保留地址，其他两个公共hostname也返回相同保留网段；共享公共地址审核正确在派发前拒绝。仅修临时parser并继续观察双模式，不绕过地址策略、替换DNS或把blocked/no网络计作真实公网成功，外部public smoke验收继续开放。
+
+### 10.23 A02 — 集成夹具的项目边界与句柄身份（2026-10-15，分类后修复中）
+
+原失败两文件在未改源码/时限下复查56项通过，但不据此解释原失败。随后17路径冻结的`full-delivery-final`真实终态为801文件798通过/3失败，8137项8133通过/3失败/1显式public smoke跳过，472.36秒，源码和用户`.gitignore`均未漂移。增加的子进程诊断终于捕获`/continue`失败同样为`SkillDiscovery.verifySource`，另1项entrypoint来源复验及1项media旧fd关闭断言失败。原两次失败、前次早期全绿和本次失败快照分别保留，最终本地集成尚未通过。
+
+已核对并受控证明两个harness机制：项目目录owner按`.git`标记停止祖先遍历，不消费`GIT_CEILING_DIRECTORIES`；临时workspace虽独立，却位于本仓库内部且无标记，仍捕获`.tmp`及其他仓库祖先。`fixture-boundary-probe.json`在原编译owner下观察到无marker的5个外部依赖，改变无关parent即复验拒绝；增加workspace marker后仅本workspace、零外部依赖且同变化不影响。此前仅设Git ceiling的夹具修复不完整。修复只建立独立项目根并保持原runtime来源检查；实际CLI的两个已失败项目使用已有Git fixture初始化，不能把整个fake home作为项目替代原显式路径。
+
+media断言在原FileHandle关闭后异步`stat('/proc/self/fd/N')`；同进程其他worker可复用N。`fd-reuse-probe.json`实际关闭原handle后立即分配同N：数字路径存在，原handle.fd=-1、原handle.stat明确EBADF。应验证原FileHandle对象的关闭，不根据可复用编号推断泄漏。定向参考的临时cwd/agentDir隔离与native关闭后立即检查EBADF决定：同意独立项目/用户输入与原句柄身份；本项目异步、多worker环境不能搬用跨await的裸编号观察。保留正文限额/hash/unlink/变化拒绝断言及原关闭失败场景，仅纠正错误观察对象。两个探针是合成机制证明，不宣称捕获了原失败的确切source路径或被复用inode；首次目录probe模块相对路径错误在产品调用前失败，已单列setup材料。
+
+独立代码报告已实际写入并返回，17路径为APPROVE；架构报告也已完整写入CLEAR，但代理在返回阶段429退出，保留失败事实，后续按最终夹具delta重新确认，不把失败通知当批准。A29-R01修复及共享传输当前无新finding；双模式Node/单文件终端已实际完成4路默认关闭与保留地址拒绝，零provider请求、来源配置不变，`terminal-final-summary.json`明确真实公网accepted=false。Phase19 active，外部/平台/CI及A25边界继续开放。
+
+最终18路径冻结下，四个夹具文件在隔离Node20.3/Linux实际4文件/67项全部通过、零skip，207.08秒；`fixture-final-focused-validation.json`确认源码及用户`.gitignore`保持。两个独立lane已分别实际返回补审：code **APPROVE**、architecture **CLEAR**，无新finding，综合仅本批delta **APPROVE**；架构lane明确重新确认先前生产审查结论，原429失败仍保留。两份`{code,architecture}-review-isolated.{md,json}`绑定`delivery-isolated-freeze.json`，11个生产文件与原已审构建冻结一致，只有四个测试改变；代码lane独立验证原FileHandle关闭及独立项目边界机制，架构lane独立复现裸fd编号复用。
+
+`review-synthesis-isolated.json`保存综合与界限；`delivery-isolated-build-binding.json`逐一核对两种既有成功构建至当前源码只差四个测试，不重跑不受影响的构建。当前NormProof实际exit0、图无环/引用可解析、零blocking，仍同4个既有ceiling advisory/partial，材料`normproof-isolated-final/`。修正夹具后的最终全套`full-isolated-final`正在运行，未赋予通过结论；最终集成、提交、推送及精确SHA的远端状态另验，Phase19仍active。
+
+### 10.24 A02 — 续接夹具仍有未隔离项目（2026-10-15，发现即登记）
+
+`full-isolated-final`实际结束：801文件800通过/1失败，8137项8135通过/1失败/1显式public smoke跳过，438.27秒、exit1，源码冻结及用户`.gitignore`保持。唯一失败为CLI基线的completed-current优先于fallback续接场景，子进程exit1；其原断言同样没有保留stdout/stderr，当前不能仅从退出码判定具体原因。原日志/JSON完整保留，§26.8待终态行须据此更新，不能将67项定向通过写成全套通过。
+
+回查同一文件确认该场景current/fallback项目仍只mkdir、没有独立Git根。限定复核全部实际续接及审批运行输入后，还发现long-session、stopped recovery的stdin/print/pipe-spawn、writer-started及approval项目同样没有标记；non-write stopped场景已有显式git init，元数据查询与missing-key只读命令不等同真实turn。先补失败场景诊断，以受控无关祖先目录变化验证实际CLI触发路径，再按已比较的独立cwd/agentDir决定统一修正这些夹具，复用已有Git fixture，保留显式项目、源复验、原输出/收据断言及原期限。产品代码不随本次夹具修补改变，原失败的确切对象仍按实际证据表述；补审与最终全套必须绑定更新后的测试字节。
+
+仅增加子进程诊断后，对该原场景施加742次无关祖先mkdir/rmdir，实际CLI在`SkillDiscovery.observeParent`→目录读取捕获复验中抛ReadChangedError、原exit-zero断言真实失败，4.15秒；39项为选择外未执行，不称环境skip。材料`fixture-unmarked-current-red-{validation,tests,perturbation}.json`及log。噪声目录已删除、源码及用户`.gitignore`与本次诊断冻结一致；它证明该夹具可受无关祖先变化影响，不重建原全套缺失的stdout或确切对象。现在才补同类夹具边界并用同样扰动复查。
+
+补齐后在12615次同类祖先扰动下，现有13个续接/审批场景全部通过，73.86秒、exit0；27项为选择外未执行，未增加测试或skip门。噪声已移除、源码及用户`.gitignore`保持，材料`fixture-complete-perturbed-green-{validation,tests,perturbation}.json`。新`delivery-complete-fixtures-freeze.json`共18路径，相对上轮只改baseline测试，11生产/其余17路径不变；四源码门再次实际通过，当前NormProof exit0、零blocking、同4既有ceiling advisory/partial。更新字节的`full-complete-fixtures-final`已启动，须读取实际终态，不以受控13项代替全套。
+
+最终两lane补审均已实际返回：code **APPROVE**、architecture **CLEAR**、零新finding，综合只对当前18路径 **APPROVE**，两份`*-review-complete-fixtures.{md,json}`及`review-synthesis-complete-fixtures.json`绑定新冻结。code lane独立AST检查确认原454个expect首参数及35个直接it名称/期限不变，并核对已完成的13项扰动结果；架构lane确认显式current/fallback选择、stopped/writer-started及default-deny审批断言保持。两者均保留原全套确切失败对象未知及新全套待终态，不以review批准代替最终集成。`delivery-complete-build-binding.json`再次确认11生产字节对应两种成功构建，`complete-source-gates.json`记录四源码门及当前结构义务。
+
+最终完整运行已取得实际终态：隔离Node20.3/Linux、4 worker，**801文件通过，8136断言通过、1个显式公共smoke跳过，零失败，448.28秒、exit0**。`full-complete-fixtures-final-{validation,tests,freeze}.json`及log保留逐文件/逐断言结果，全部源码前后无变化、18交付源码/测试hash与最终独立复核一致，用户`.gitignore`保持。当前真实Chromium/local-server原9项包含在该环境中，未新增skip或放宽时限；先前各次失败与精确对象未知界限仍保留，不被这次通过改写。
+
+A02当前Linux/Node20.3源码的本地全套证据已补齐，A26–A29及A29-R01在已审scope内修复；这不关闭A01非Linux实际对象、A03真实平台/服务/账户/设备和公网成功验收、A12远端执行，或A25原41/42未知拒绝、整树/query-start/OS原子性及广泛成本。完整host-command父取消仍未建立，Phase19 **active**。最终文档/空白检查与21路径交付冻结另验，用户`.gitignore`保留排除、§9历史原字节不变；提交/推送及精确SHA的CI不由本地套件推断。

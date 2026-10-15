@@ -821,13 +821,16 @@ describe("CLI streaming baseline (T3)", () => {
       CHEERS_PROVIDER_MODE: "synthetic",
       CHEERS_REAL_HOME: "",
     };
-    const createFixture = (label: string) =>
-      seedStoppedRecoveryContextSession({
+    const createFixture = (label: string) => {
+      const fixture = seedStoppedRecoveryContextSession({
         fakeHomeDir,
         sessionsDir,
         sessionId: `sess_entry_parity_continue_${label}`,
         projectName: `entry-parity-continue-${label}`,
       });
+      createGitRepoFixture(fixture.projectRoot);
+      return fixture;
+    };
 
     const stdinFixture = createFixture("stdin");
     const stdinResult = await runCliStdinToClose({
@@ -2346,7 +2349,7 @@ describe("CLI streaming baseline (T3)", () => {
 
   it("proves CLI current, switch last, and continue share the current session store", async () => {
     const projectRoot = path.join(fakeHomeDir, "cli-continuity-smoke-project");
-    fs.mkdirSync(projectRoot, { recursive: true });
+    createGitRepoFixture(projectRoot);
     const sessionId = "sess_cli_continuity_smoke";
     const pendingPrompt = "CLI continuity smoke pending task";
     seedInterruptedCurrentSession({
@@ -2391,8 +2394,8 @@ describe("CLI streaming baseline (T3)", () => {
     const continuePrompt = "continue the same CLI continuity smoke task";
     const continueResult = runPrint(`/continue ${continuePrompt}`);
     expect(continueResult.error).toBeUndefined();
-    expect(continueResult.status).toBe(0);
     const continueOutput = `${continueResult.stdout ?? ""}${continueResult.stderr ?? ""}`;
+    expect(continueResult.status, continueOutput).toBe(0);
     expect(continueOutput).toContain(`Resumed session ${sessionId}`);
     expect(continueOutput).toContain(`Project context: ${projectRoot}`);
     expect(continueOutput).not.toContain("No recoverable session found");
@@ -2415,8 +2418,8 @@ describe("CLI streaming baseline (T3)", () => {
       fakeHomeDir,
       "completed-continue-fallback-project",
     );
-    fs.mkdirSync(projectRoot, { recursive: true });
-    fs.mkdirSync(fallbackProjectRoot, { recursive: true });
+    createGitRepoFixture(projectRoot);
+    createGitRepoFixture(fallbackProjectRoot);
     fs.writeFileSync(
       path.join(projectRoot, "package.json"),
       JSON.stringify({ name: "completed-continue-diagnostic-smoke" }, null, 2),
@@ -2567,8 +2570,8 @@ describe("CLI streaming baseline (T3)", () => {
     const followUpPrompt = "verify again";
     const continueResult = runPrint(`/continue ${followUpPrompt}`);
     expect(continueResult.error).toBeUndefined();
-    expect(continueResult.status).toBe(0);
     const continueOutput = `${continueResult.stdout ?? ""}${continueResult.stderr ?? ""}`;
+    expect(continueResult.status, continueOutput).toBe(0);
     expect(continueOutput).not.toContain(fallbackSessionId);
     expect(continueOutput).not.toContain("not recoverable");
     expect(continueOutput).not.toContain("No recoverable session found");
@@ -2603,8 +2606,8 @@ describe("CLI streaming baseline (T3)", () => {
       `/continue ${completedSessionId} ${explicitPrompt}`,
     );
     expect(explicitResult.error).toBeUndefined();
-    expect(explicitResult.status).toBe(0);
     const explicitOutput = `${explicitResult.stdout ?? ""}${explicitResult.stderr ?? ""}`;
+    expect(explicitResult.status, explicitOutput).toBe(0);
     expect(explicitOutput).not.toContain("not recoverable");
 
     const completedTranscript = fs.readFileSync(
@@ -2654,6 +2657,7 @@ describe("CLI streaming baseline (T3)", () => {
     const originalHome = process.env.HOME;
     const projectRoot = path.join(fakeHomeDir, "long-session-cli-smoke-project");
     const targetFile = "src/cli-long-session.ts";
+    createGitRepoFixture(projectRoot);
     fs.mkdirSync(path.join(projectRoot, "src"), { recursive: true });
     fs.writeFileSync(
       path.join(projectRoot, targetFile),
@@ -2752,6 +2756,7 @@ describe("CLI streaming baseline (T3)", () => {
       fakeHomeDir,
       "completed-continue-failure-diagnostic-project",
     );
+    createGitRepoFixture(projectRoot);
     fs.mkdirSync(path.join(projectRoot, "src"), { recursive: true });
     fs.writeFileSync(
       path.join(projectRoot, "src", "app.ts"),
@@ -2962,7 +2967,7 @@ describe("CLI streaming baseline (T3)", () => {
       `/continue ${completedSessionId} Read package.js for explicit target guard`,
     );
     expect(explicitResult.error).toBeUndefined();
-    expect(explicitResult.status).toBe(0);
+    expect(explicitResult.status, `${explicitResult.stdout ?? ""}${explicitResult.stderr ?? ""}`).toBe(0);
     const explicitEntries = parseTranscriptJsonl(
       path.join(completedSessionDir, "transcript.jsonl"),
     );
@@ -2984,6 +2989,7 @@ describe("CLI streaming baseline (T3)", () => {
       stopReason,
       nextAction,
     } = seedStoppedRecoveryContextSession({ fakeHomeDir, sessionsDir });
+    createGitRepoFixture(projectRoot);
 
     const runPrint = (prompt: string) =>
       spawnSync(
@@ -3068,6 +3074,7 @@ describe("CLI streaming baseline (T3)", () => {
         sessionId: `sess_writer_started_${writeEffect}_recovery`,
         projectName: `continue-writer-started-${writeEffect}-project`,
       });
+      createGitRepoFixture(projectRoot);
 
       const runPrint = (prompt: string) =>
         spawnSync(
@@ -3240,6 +3247,7 @@ describe("CLI streaming baseline (T3)", () => {
         sessionId: "sess_interactive_stopped_recovery",
         projectName: "interactive-stopped-recovery-context-project",
       });
+    createGitRepoFixture(projectRoot);
 
     const result = await runInteractiveLineSmoke({
       spawnCli,
@@ -3270,7 +3278,7 @@ describe("CLI streaming baseline (T3)", () => {
 
   it("print approval boundary defaults deny without prompt", async () => {
     const projectRoot = path.join(fakeHomeDir, "print-approval-boundary");
-    fs.mkdirSync(projectRoot, { recursive: true });
+    createGitRepoFixture(projectRoot);
 
     const result = await runCliCommandToClose({
       spawnCli,

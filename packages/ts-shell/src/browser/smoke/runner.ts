@@ -23,6 +23,7 @@ export type BrowserPublicReadOnlyWebSmokeStatus =
   | "skipped"
   | "executed"
   | "blocked"
+  | "cancelled"
   | "unavailable";
 
 export interface BrowserPublicReadOnlyWebSmokeResult {
@@ -30,7 +31,7 @@ export interface BrowserPublicReadOnlyWebSmokeResult {
   readonly enabled: boolean;
   readonly targetOrigin?: string;
   readonly method: string;
-  readonly publicNetworkUsed: boolean;
+  readonly publicNetworkUsed: boolean | null;
   readonly browserLaunched: false;
   readonly javascriptExecuted: false;
   readonly receipt?: BrowserPublicReadOnlyWebReceipt;
@@ -45,6 +46,7 @@ export interface BrowserPublicReadOnlyWebSmokeResult {
 export async function runBrowserPublicReadOnlyWebSmoke(input: {
   readonly config: BrowserPublicReadOnlyWebSmokeConfig;
   readonly httpClient?: BrowserPublicReadOnlyHttpClient;
+  readonly signal?: AbortSignal;
 }): Promise<BrowserPublicReadOnlyWebSmokeResult> {
   if (input.config.status === "disabled") {
     return smokeResult("skipped", {
@@ -105,6 +107,7 @@ export async function runBrowserPublicReadOnlyWebSmoke(input: {
     manifest,
     method: input.config.method,
     httpClient: input.httpClient,
+    signal: input.signal,
   });
   const receipt = createBrowserPublicReadOnlyWebReceipt({
     request,
@@ -114,7 +117,7 @@ export async function runBrowserPublicReadOnlyWebSmoke(input: {
   });
   const uxSummary = createBrowserPublicReadOnlyWebUxSummary(receipt);
   const unavailable = executor.status === "request-failed" || executor.status === "timeout";
-  return smokeResult(receipt.executed ? "executed" : unavailable ? "unavailable" : "blocked", {
+  return smokeResult(receipt.executed ? "executed" : executor.status === "cancelled" ? "cancelled" : unavailable ? "unavailable" : "blocked", {
     config: input.config,
     receipt,
     uxSummary,
@@ -149,7 +152,7 @@ function smokeResult(
     enabled: input.config.enabled,
     targetOrigin: input.receipt?.targetOrigin ?? input.config.origin,
     method: input.receipt?.method ?? input.config.method,
-    publicNetworkUsed: input.receipt?.publicNetwork ?? false,
+    publicNetworkUsed: input.receipt ? input.receipt.publicNetwork : false,
     browserLaunched: false,
     javascriptExecuted: false,
     receipt: input.receipt,

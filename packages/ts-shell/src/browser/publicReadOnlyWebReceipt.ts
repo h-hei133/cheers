@@ -13,7 +13,7 @@ export interface BrowserPublicReadOnlyWebReceipt {
   readonly actionKind: BrowserExecutionRequest["actionKind"];
   readonly policyStatus: string;
   readonly requestStatus: string;
-  readonly publicNetwork: boolean;
+  readonly publicNetwork: boolean | null;
   readonly browserLaunched: false;
   readonly javascriptExecuted: false;
   readonly executed: boolean;
@@ -73,7 +73,9 @@ export function createBrowserPublicReadOnlyWebReceipt(input: {
       ...input.policy.evidence,
       ...input.executor.evidence,
       "browser-public-readonly-web-receipt:created",
-      input.executor.publicNetwork
+      input.executor.publicNetwork === null
+        ? "browser-public-readonly-web-receipt:public-network-unknown"
+        : input.executor.publicNetwork
         ? "browser-public-readonly-web-receipt:public-network-yes"
         : "browser-public-readonly-web-receipt:public-network-no",
       "browser-public-readonly-web-receipt:browser-launched-no",

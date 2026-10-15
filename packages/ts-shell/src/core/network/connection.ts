@@ -7,10 +7,14 @@ import { NetworkError } from './error.js';
 import type { RequestScope } from './request.js';
 
 export interface PublicRequest {
-  readonly method?: 'GET' | 'POST' | 'DELETE';
+  readonly method?: 'GET' | 'HEAD' | 'POST' | 'DELETE';
   readonly headers?: Readonly<Record<string, string>>;
   readonly body?: string;
   readonly maxBytes: number;
+  /** Transport handoff does not prove the server received the request. */
+  readonly onDispatch?: () => void;
+  /** Observes each response, including interim headers and rejected statuses. */
+  readonly onResponse?: (status: number) => void;
 }
 
 /** Direct public-web connection; no implicit redirects, proxy DNS, or pooled sockets. */
@@ -41,6 +45,8 @@ async function requestApproved(url: URL, init: PublicRequest, scope: RequestScop
     // Native signal support may close a socket without settling its header promise.
     // Settle the owner directly and close transport resources independently of error events.
     const abort = () => { fail(scope.signal.reason ?? new NetworkError('cancelled')); response?.destroy(); outgoing.destroy(); };
+    init.onDispatch?.();
+    scope.check();
     const outgoing = request(url, {
       method: init.method ?? 'GET', headers: { 'accept-encoding': 'gzip, deflate, br', ...init.headers },
       // This owner handles cancellation; native abort may synchronously close and
@@ -51,15 +57,16 @@ async function requestApproved(url: URL, init: PublicRequest, scope: RequestScop
       response = incoming;
       incoming.once('close', cleanup);
       try {
-        scope.check();
         const status = incoming.statusCode ?? 0;
+        init.onResponse?.(status);
         if (status < 200 || status > 599) throw new NetworkError('invalid_response');
+        scope.check();
         const headers = new Headers();
         for (let index = 0; index < incoming.rawHeaders.length; index += 2) {
           headers.append(incoming.rawHeaders[index]!, incoming.rawHeaders[index + 1]!);
         }
         // Error and redirect payloads are never piped through the consumer or a decoder.
-        const noBody = status < 200 || status >= 300 || status === 204 || status === 205;
+        const noBody = init.method === 'HEAD' || status >= 300 || status === 204 || status === 205;
         if (noBody) incoming.destroy();
         resolve(new Response(noBody ? null : responseBody(incoming, init.maxBytes), { status, headers }));
       } catch (error) { incoming.destroy(); outgoing.destroy(); fail(error); }
@@ -68,7 +75,16 @@ async function requestApproved(url: URL, init: PublicRequest, scope: RequestScop
     // error must not become an unhandled EventEmitter error after direct rejection.
     outgoing.once('error', fail);
     outgoing.once('close', cleanup);
-    outgoing.once('upgrade', (_response, socket) => { socket.destroy(); fail(new NetworkError('invalid_response')); });
+    outgoing.on('information', incoming => {
+      try { init.onResponse?.(incoming.statusCode); scope.check(); }
+      catch (error) { outgoing.destroy(); fail(error); }
+    });
+    outgoing.once('upgrade', (incoming, socket) => {
+      socket.destroy();
+      try { init.onResponse?.(incoming.statusCode ?? 0); }
+      catch (error) { fail(error); return; }
+      fail(new NetworkError('invalid_response'));
+    });
     scope.signal.addEventListener('abort', abort, { once: true });
     if (scope.signal.aborted) abort(); else outgoing.end(init.body);
   });
