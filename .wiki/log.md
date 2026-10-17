@@ -7448,3 +7448,9 @@ PAN-06：copy picker 移除 recent-30 窗口，按新到旧列出全部 block，
 新增 `cli/interactive/picker/hub.ts`：`/hub` 在交互模式下打开只读主从面板，列表按 journal 显示 job/agent/workflow 的 backend、id、状态与命令摘要，详情列显示 status/storedStatus、目录、deadline、exit、live owner、detached 与 dispatch 可能性。订阅每秒重读 journal 并在关闭时清除；`apply` 只返回提示，不取消任务、不写对话。`/jobs` 的取消、暂停、恢复仍走各自的批准路径。非交互 `/hub` 继续输出报告。
 
 **本地验证**：`pickers.test.ts` 39 项通过（`/hub` 有/无 composition 的分支）；`build:ts` 通过。本条写入时尚未提交/推送。
+
+### Phase 20 RENDER-03（部分）：并排 diff 与有界降级
+
+`transcript/diff.ts` 新增 `renderSideBySide`：按 hunk 解析 old/new 行号，removed/added run 按位置配对，未配对侧留白；hunk/rename/BOM/EOL/EOF 元数据保持全宽。宽度 ≥100 时由 `renderLabelled` 自动启用，窄屏回退既有 unified 渲染。行数默认 400、输入字节 64KiB 双预算，零宽字符也计入字节；超限追加截断标记。
+
+**本地验证**：diff 测试 10 项（配对/行号、窄屏回退、双预算、CJK 宽度）；transcript+surface 176 项通过；`build:ts` 通过。本条写入时尚未提交/推送；resize 锚点、左右源复制与手动切换仍待接入 UI-04。

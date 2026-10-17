@@ -307,7 +307,7 @@ function renderLabelled(block: Block, glyph: string, width: number): readonly st
     rows.push(`${BODY_INDENT}${row}`);
   }
   if (block.diff) {
-    rows.push(...renderDiff(block.diff, bodyWidth).map((row) => `${BODY_INDENT}${row}`));
+    rows.push(...renderDiff(block.diff, bodyWidth, { sideBySide: bodyWidth >= 100 }).map((row) => `${BODY_INDENT}${row}`));
   }
   rows.push("");
   return rows;

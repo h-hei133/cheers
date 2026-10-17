@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderDiff } from "./diff.js";
+import { renderDiff, renderSideBySide } from "./diff.js";
 import { stripAnsi } from "../text/ansi.js";
 import { visibleWidth } from "../text/measure.js";
 
@@ -38,5 +38,35 @@ describe("unified diff", () => {
     for (const row of renderDiff("+" + "z".repeat(200), WIDTH)) {
       expect(visibleWidth(row)).toBeLessThanOrEqual(WIDTH);
     }
+  });
+});
+
+describe("side-by-side diff", () => {
+  it("pairs a removed/added run and keeps old/new line numbers", () => {
+    const rows = renderSideBySide("@@ -3,2 +3,3 @@\n-old\n+new\n+extra\n same", 120).map(stripAnsi);
+    expect(rows[0]).toContain("@@ -3,2 +3,3 @@");
+    expect(rows[1]).toContain("old");
+    expect(rows[1]).toContain("new");
+    expect(rows[1]).toMatch(/3\s+3\s+│/);
+    expect(rows[2]).toContain("extra");
+    expect(rows[2]).not.toContain("old");
+    expect(rows[3]).toContain("same");
+  });
+
+  it("falls back to unified when the surface is too narrow", () => {
+    expect(renderDiff("@@ -1 +1 @@\n-a\n+b", 80, { sideBySide: true })).toEqual(renderDiff("@@ -1 +1 @@\n-a\n+b", 80));
+  });
+
+  it("bounds rows and bytes, including zero-width input", () => {
+    const long = "@@ -1 +1 @@\n" + "+x\n".repeat(1000);
+    expect(renderSideBySide(long, 120, { maxRows: 20 }).length).toBeLessThanOrEqual(21);
+    const zeroWidth = "@@ -1 +1 @@\n+" + "\u200b".repeat(70000);
+    const rows = renderSideBySide(zeroWidth, 120, { maxBytes: 1024 }).map(stripAnsi);
+    expect(rows.at(-1)).toContain("truncated");
+  });
+
+  it("keeps every row inside the width, including wide glyphs", () => {
+    const rows = renderSideBySide("@@ -1 +1 @@\n-中文内容\n+中文更新", 120);
+    for (const row of rows) expect(visibleWidth(row)).toBeLessThanOrEqual(120);
   });
 });

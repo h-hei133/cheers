@@ -1,5 +1,6 @@
 import { defaultTheme } from "../../theme/theme.js";
 import { truncateToWidth } from "../text/layout.js";
+import { visibleWidth } from "../text/measure.js";
 
 /**
  * Unified diff rendering with intra-line emphasis.
@@ -17,9 +18,22 @@ interface Emphasis {
   readonly tail: string;
 }
 
-/** Rows for a unified diff, each fitted to `width`. */
-export function renderDiff(diff: string, width: number): string[] {
+export interface DiffRenderOptions {
+  /** Prefer two columns when the surface can afford them. */
+  readonly sideBySide?: boolean;
+  /** Rows and input bytes are bounded independently; zero-width bytes still count. */
+  readonly maxRows?: number;
+  readonly maxBytes?: number;
+}
+
+const SIDE_BY_SIDE_MIN_WIDTH = 100;
+const DEFAULT_MAX_ROWS = 400;
+const DEFAULT_MAX_BYTES = 64 * 1024;
+
+/** Rows for a diff, each fitted to `width`; unified when two columns do not fit. */
+export function renderDiff(diff: string, width: number, options: DiffRenderOptions = {}): string[] {
   if (!diff) return [];
+  if (options.sideBySide && width >= SIDE_BY_SIDE_MIN_WIDTH) return renderSideBySide(diff, width, options);
   const lines = diff.split("\n");
   const rows: string[] = [];
   for (let index = 0; index < lines.length; index++) {
@@ -143,4 +157,90 @@ export function createUnifiedDiff(filePath: string, oldText: string, newText: st
   }
 
   return [...header, ...body].join("\n");
+}
+
+
+/**
+ * Two-column projection of a unified diff.
+ *
+ * A removed/added run is paired by position; a side with no counterpart keeps
+ * its cell blank rather than pretending the lines correspond. Hunk headers,
+ * rename/BOM/EOL/EOF facts and other metadata stay full width above their hunk.
+ * Rows and input bytes are both bounded, so a diff made of zero-width characters
+ * cannot bypass the limit.
+ */
+export function renderSideBySide(diff: string, width: number, options: DiffRenderOptions = {}): string[] {
+  const maxRows = Math.max(1, options.maxRows ?? DEFAULT_MAX_ROWS);
+  const maxBytes = Math.max(1, options.maxBytes ?? DEFAULT_MAX_BYTES);
+  const bytes = Buffer.byteLength(diff, 'utf8');
+  const lines = diff.split('\n');
+  const rows: string[] = [];
+  const truncated = (): void => {
+    if (rows.length < maxRows) rows.push(defaultTheme.dim('… diff truncated by the view budget'));
+  };
+  const numberWidth = 5;
+  const cell = Math.max(8, Math.floor((width - numberWidth * 2 - 5) / 2));
+  const gutter = (left: string, right: string): string =>
+    defaultTheme.dim(`${left.padStart(numberWidth)} ${right.padStart(numberWidth)} │ `);
+  let oldLine = 0;
+  let newLine = 0;
+  let index = 0;
+  let consumed = 0;
+  const push = (row: string): boolean => {
+    if (rows.length >= maxRows) return false;
+    rows.push(row);
+    return true;
+  };
+  while (index < lines.length) {
+    const line = lines[index]!;
+    consumed += Buffer.byteLength(line, 'utf8') + 1;
+    if (consumed > maxBytes) { truncated(); break; }
+    if (HUNK_PREFIXES.some(prefix => line.startsWith(prefix))) {
+      if (line.startsWith('@@')) {
+        const match = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+        if (match) { oldLine = Number(match[1]); newLine = Number(match[2]); }
+      }
+      if (!push(defaultTheme.fg('muted', truncateToWidth(line, width)))) { truncated(); break; }
+      index += 1;
+      continue;
+    }
+    if (line.startsWith(' ')) {
+      const text = line.slice(1);
+      if (!push(gutter(String(oldLine), String(newLine)) + defaultTheme.fg('diffContext', truncateToWidth(text, cell))
+        + ' │ ' + defaultTheme.fg('diffContext', truncateToWidth(text, cell)))) { truncated(); break; }
+      oldLine += 1; newLine += 1; index += 1; continue;
+    }
+    if (line.startsWith('-') || line.startsWith('+')) {
+      const removed: string[] = [];
+      const added: string[] = [];
+      while (index < lines.length && lines[index]!.startsWith('-')) {
+        consumed += Buffer.byteLength(lines[index]!, 'utf8') + 1; removed.push(lines[index]!.slice(1)); index += 1;
+      }
+      while (index < lines.length && lines[index]!.startsWith('+')) {
+        consumed += Buffer.byteLength(lines[index]!, 'utf8') + 1; added.push(lines[index]!.slice(1)); index += 1;
+      }
+      if (consumed > maxBytes) { truncated(); return rows; }
+      const count = Math.max(removed.length, added.length);
+      for (let pair = 0; pair < count; pair++) {
+        const left = removed[pair];
+        const right = added[pair];
+        const leftText = left === undefined ? '' : defaultTheme.fg('diffRemoved', truncateToWidth(left, cell));
+        const rightText = right === undefined ? '' : defaultTheme.fg('diffAdded', truncateToWidth(right, cell));
+        if (!push(gutter(left === undefined ? '' : String(oldLine), right === undefined ? '' : String(newLine))
+          + pad(leftText, cell) + ' │ ' + rightText)) { truncated(); return rows; }
+        if (left !== undefined) oldLine += 1;
+        if (right !== undefined) newLine += 1;
+      }
+      continue;
+    }
+    if (!push(defaultTheme.dim(truncateToWidth(line, width)))) { truncated(); break; }
+    index += 1;
+  }
+  if (bytes > maxBytes && rows.length < maxRows) truncated();
+  return rows;
+}
+
+/** Pad to the cell width without counting escape sequences as cells. */
+function pad(text: string, width: number): string {
+  return text + ' '.repeat(Math.max(0, width - visibleWidth(text)));
 }
