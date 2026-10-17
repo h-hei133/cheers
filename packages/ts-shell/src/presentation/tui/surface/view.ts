@@ -12,6 +12,7 @@ import type { SelectionPoint, SelectionSpan } from "../transcript/selection.js";
 import type { ScrollbarGeometry } from "../transcript/viewport.js";
 import { createViewState, type ChoiceRegions, type ComposerGeometry, type InteractiveView, type ViewContext, type ViewState } from "./contract.js";
 import { TranscriptPane } from "./pane.js";
+import { MIN_TRANSCRIPT_ROWS, composerRowBudget } from "./budget.js";
 
 /**
  * The surface: one frame from host-owned state.
@@ -23,15 +24,6 @@ import { TranscriptPane } from "./pane.js";
  * do. Facts are read from the context at paint time, never copied, so a frame can
  * never show something the host no longer believes.
  */
-
-/** Minimum transcript rows kept visible however tall the chrome grows. */
-const MIN_TRANSCRIPT_ROWS = 1;
-
-/** Total rows the composer may occupy, leaving the transcript at least one row. */
-export function composerRowBudget(height: number): number {
-  const capacity = Math.max(1, height - MIN_TRANSCRIPT_ROWS);
-  return Math.min(capacity, Math.max(3, Math.min(20, Math.floor(height * 0.6))));
-}
 
 export class InteractiveSurface implements InteractiveView {
   choiceRegions: ChoiceRegions = {};

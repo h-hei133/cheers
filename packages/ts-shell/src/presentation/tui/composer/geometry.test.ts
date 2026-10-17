@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { Editor } from '../editor.js';
-import { composerRowBudget } from '../surface/view.js';
+import { composerRowBudget } from '../surface/budget.js';
 import { visibleWidth } from '../text/measure.js';
 import { layoutComposer } from './layout.js';
 import { COMPOSER_SHAPES, type ComposerShapeId } from './shapes.js';
