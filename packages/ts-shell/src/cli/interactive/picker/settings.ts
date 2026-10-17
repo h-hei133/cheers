@@ -1,8 +1,9 @@
 import type { Option } from '../../../presentation/tui/chrome/options.js';
 import { truncateToWidth } from '../../../presentation/tui/text/layout.js';
-import { formatSetting, validateSetting, type SettingDefinition, type SettingsScope } from '../../../config/settings.js';
+import { formatSetting, parseSettingInput, settingEditor, validateSetting, type SettingDefinition, type SettingsScope } from '../../../config/settings.js';
 import type { Picker, PickerOutcome } from '../overlay.js';
 import type { SettingsDraft } from '../settings.js';
+import { CONFIG_SETTINGS } from '../../../config/settings.js';
 import { normalizeStatusItems } from '../../../presentation/tui/chrome/items.js';
 import { statusItemPicker } from './statusItems.js';
 import { settingPreview, type PreferenceHost } from './preview.js';
@@ -15,8 +16,29 @@ interface StagedValue { readonly value: unknown }
 function compact(value: unknown): string { return truncateToWidth(formatSetting(value), 36); }
 
 function inputError(setting: SettingDefinition, text: string): string | undefined {
-  try { return validateSetting(setting, JSON.parse(text)); }
-  catch { return 'Enter a valid JSON value. Strings need double quotes.'; }
+  return parseSettingInput(setting, text).error;
+}
+
+/** The editor's starting text, in the shape that editor reads. */
+function editorText(setting: SettingDefinition, value: unknown): string {
+  const editor = settingEditor(setting);
+  if (value === undefined) return '';
+  if (editor === 'text' || editor === 'theme') return typeof value === 'string' ? value : String(value);
+  if (editor === 'number') return String(value);
+  if (editor === 'list' && Array.isArray(value)) {
+    return value.map(item => typeof item === 'string' ? item : JSON.stringify(item)).join('\n');
+  }
+  return formatSetting(value);
+}
+
+function editorLabel(setting: SettingDefinition): string {
+  const editor = settingEditor(setting);
+  if (editor === 'number') return `Number (${setting.schema.type}). Enter stages the value; Apply saves it.`;
+  if (editor === 'list') return (setting.schema.items as { type?: string } | undefined)?.type === 'object'
+    ? 'One JSON object per line. Enter stages the list; Apply saves it.'
+    : 'One item per line. Enter stages the list; Apply saves it.';
+  if (editor === 'text' || editor === 'theme') return 'Text value. Enter stages the value; Apply saves it.';
+  return `JSON ${setting.schema.type}. Enter stages the value; Apply saves it.`;
 }
 
 function valueEditor(host: SettingsHost, draft: SettingsDraft, setting: SettingDefinition, pending?: StagedValue): Picker {
@@ -31,10 +53,13 @@ function valueEditor(host: SettingsHost, draft: SettingsDraft, setting: SettingD
     title: `Edit ${setting.label} — ${draft.scope}`, form: 'panel', exclusive: true, holdInput: true, empty: '',
     load: async () => [], apply: async () => undefined,
     input: {
-      initial: value === undefined ? '' : formatSetting(value),
-      label: `JSON ${setting.schema.type}. Enter stages the value; Apply saves it.`,
+      initial: editorText(setting, value),
+      label: editorLabel(setting),
       validate: text => inputError(setting, text),
-      apply: async text => ({ next: settingDetail(host, draft, setting, { value: JSON.parse(text) }) }),
+      apply: async text => {
+        const parsed = parseSettingInput(setting, text);
+        return parsed.ok ? { next: settingDetail(host, draft, setting, { value: parsed.value }) } : undefined;
+      },
     },
   };
 }
@@ -126,16 +151,29 @@ function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: Settin
   };
 }
 
+const GROUP_ORDER = ['Session', 'Request', 'Context', 'Retries', 'Network', 'Tools', 'Display'] as const;
+const SETTINGS_GROUPS = GROUP_ORDER.filter(group => CONFIG_SETTINGS.some(setting => setting.group === group));
+
 /** Searchable grouped fields; selecting a row starts an explicit staged edit. */
-export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'): Picker {
+export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user', group?: string): Picker {
   let draft: SettingsDraft | undefined;
+  const active = group && SETTINGS_GROUPS.includes(group) ? group : 'all';
   return {
-    title: `Settings — ${scope} configuration`, form: 'panel', exclusive: true, holdInput: true,
+    title: `Settings — ${scope} configuration${active === 'all' ? '' : ` — ${active}`}`, form: 'panel', exclusive: true, holdInput: true,
     empty: 'Settings could not be loaded. Check your configuration and retry.',
+    chips: {
+      items: [{ id: 'all', label: 'All' }, ...SETTINGS_GROUPS.map(name => ({ id: name, label: name }))],
+      active,
+      select: id => settingsPicker(host, scope, id === 'all' ? undefined : id),
+    },
     async load(): Promise<readonly Option[]> {
       draft = host.openSettings(scope);
-      return draft.definitions.map(setting => ({ id: setting.key, label: `${setting.group} · ${setting.label}`,
-        detail: `${setting.key}. ${setting.description}`, note: `${compact(draft!.values[setting.key].effective)} · ${draft!.values[setting.key].source}` }));
+      const definitions = active === 'all' ? draft.definitions : draft.definitions.filter(setting => setting.group === active);
+      return definitions.map(setting => {
+        const value = draft!.values[setting.key]!;
+        return { id: setting.key, label: `${value.stored !== undefined ? '● ' : ''}${setting.group} · ${setting.label}`,
+          detail: `${setting.key}. ${setting.description}`, note: `${compact(value.effective)} · ${value.source}` };
+      });
     },
     async apply(ids): Promise<PickerOutcome | undefined> {
       if (!draft || ids.length !== 1) return undefined;

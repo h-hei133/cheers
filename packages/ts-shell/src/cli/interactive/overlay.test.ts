@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { OverlayHost, type Picker } from "./overlay.js";
 import { parseKeyEvent } from "../../presentation/tui/input/keys.js";
 import type { Option } from "../../presentation/tui/chrome/options.js";
+import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 import { parseMouseReport } from "../../presentation/tui/input/mouse.js";
 
 const options: Option[] = [
@@ -111,6 +112,23 @@ describe("pointer focus", () => {
     const secondApply = vi.fn();
     press(second.overlay, "\r", secondApply);
     expect(secondApply).toHaveBeenCalledWith(expect.anything(), ["b"]);
+  });
+
+  it("opens the picker a chip selects", async () => {
+    const { overlay } = host();
+    overlay.open(picker({
+      title: "Root",
+      chips: { items: [{ id: "a", label: "All" }, { id: "b", label: "Session" }], active: "a",
+        select: id => picker({ title: `Picked ${id}` }) },
+    }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const rows = overlay.render(60, 20);
+    const row = rows.findIndex(text => text.includes("Session"));
+    expect(row).toBeGreaterThan(0);
+    const column = stripAnsi(rows[row]!).indexOf("Session") + 1;
+    overlay.handlePointer(parseMouseReport(`\x1b[<0;${column};${row + 1}M`)!, 0);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(overlay.render(60, 20)[0]).toContain("Picked b");
   });
 
   it("keeps painted rows clickable after a key that does nothing", async () => {

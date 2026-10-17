@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { CONFIG_FIELDS } from './runtimeConfig.js';
-import { CONFIG_SETTINGS, formatSetting, settingDefinition, settingPatch, validateSetting } from './settings.js';
+import { CONFIG_SETTINGS, settingEditor, parseSettingInput, formatSetting, settingDefinition, settingPatch, validateSetting } from './settings.js';
 import { runSettingsCommand } from '../core/commands/settingsCommandRuntime.js';
 
 it('covers every public file field, expanding TUI leaves and excluding CLI-only exemptions', () => {
@@ -35,4 +35,36 @@ it('renders public file values as round-trippable JSON without terminal controls
   const shown = formatSetting(value);
   expect(shown).not.toMatch(/[\x00-\x1f\x7f-\x9f]/);
   expect(JSON.parse(shown)).toEqual(value);
+});
+
+it('gives every public setting a typed editor, with no JSON fallback for numbers, lists, or text', () => {
+  const expected: Record<string, string> = {
+    maxTurns: 'number', temperature: 'number', topP: 'number', maxOutputTokens: 'number',
+    contextWindow: 'number', reserveTokens: 'number', instructionBudgetBytes: 'number',
+    retryMaxRetries: 'number', providerRetryMaxRetries: 'number', retryBaseDelayMs: 'number',
+    retryMaxDelayMs: 'number', providerConnectTimeoutMs: 'number', providerHeadersTimeoutMs: 'number',
+    providerBodyTimeoutMs: 'number',
+    allowedTools: 'list', allowedModels: 'list', pathRules: 'list', disabledTools: 'list',
+    hiddenToolPrefixes: 'list', denyRules: 'list',
+    modelTokenBudgets: 'object',
+    attentionOnIdle: 'boolean', cacheWarming: 'choice', retryEnabled: 'boolean', enableMcpTools: 'boolean',
+    offline: 'boolean', agentMode: 'choice', steeringMode: 'choice', followUpMode: 'choice',
+    toolDiscovery: 'choice', tuiMode: 'choice', theme: 'theme',
+    'tui.composerShape': 'choice', 'tui.statusItems': 'status-items', 'tui.diagrams': 'choice',
+  };
+  const editors = Object.fromEntries(CONFIG_SETTINGS.map(setting => [setting.key, settingEditor(setting)]));
+  expect(editors).toEqual(expected);
+});
+
+it('parses each editor shape without quoting text or coercing list items', () => {
+  const byKey = (key: string) => CONFIG_SETTINGS.find(setting => setting.key === key)!;
+  expect(parseSettingInput(byKey('maxTurns'), '12')).toEqual({ ok: true, value: 12 });
+  expect(parseSettingInput(byKey('maxTurns'), '1.5').ok).toBe(false);
+  expect(parseSettingInput(byKey('maxTurns'), 'abc').ok).toBe(false);
+  expect(parseSettingInput(byKey('hiddenToolPrefixes'), 'mcp.\nbrowser.')).toEqual({ ok: true, value: ['mcp.', 'browser.'] });
+  expect(parseSettingInput(byKey('allowedTools'), '').value).toEqual([]);
+  expect(parseSettingInput(byKey('pathRules'), '{"path":"src","settings":{}}')).toEqual({ ok: true, value: [{ path: 'src', settings: {} }] });
+  expect(parseSettingInput(byKey('pathRules'), 'not json').ok).toBe(false);
+  expect(parseSettingInput(byKey('theme'), 'custom theme').value).toBe('custom theme');
+  expect(parseSettingInput(byKey('modelTokenBudgets'), '{"openai/gpt": {"reserveTokens": 10}}').ok).toBe(true);
 });

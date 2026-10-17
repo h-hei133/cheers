@@ -1,6 +1,7 @@
 import { OptionModel, type Option } from "../../presentation/tui/chrome/options.js";
 import { renderModal, modalBody } from "../../presentation/tui/chrome/modal.js";
 import { renderPanel } from "../../presentation/tui/chrome/panel.js";
+import { chipStrip, type Chip } from "../../presentation/tui/chrome/chips.js";
 import type { ParsedKeyEvent } from "../../presentation/tui/input/keys.js";
 import type { MouseReport } from "../../presentation/tui/input/mouse.js";
 import { defaultTheme } from "../../presentation/theme/theme.js";
@@ -66,6 +67,8 @@ export interface Picker {
   readonly detailRows?: number;
   /** A second column in the inline panel when the surface is wide enough. */
   readonly detail?: (id: string | undefined) => readonly string[];
+  /** A tab strip; selecting a chip opens the picker it returns. */
+  readonly chips?: { readonly items: readonly Chip[]; readonly active: string; select(id: string): Picker | undefined };
   /** Options to offer; may hit the network or the filesystem. */
   load(signal?: AbortSignal): Promise<readonly Option[]>;
   /** Publish live options until the host releases the subscription on close. */
@@ -109,6 +112,7 @@ export class OverlayHost {
   private actionNotice: string | undefined;
   private unsubscribe: (() => void) | undefined;
   private readonly optionRows = new Map<number, { readonly id: string; readonly from: number; readonly to: number }>();
+  private readonly chipRows = new Map<number, { readonly id: string; readonly from: number; readonly to: number }>();
   private renderedWidth = 0;
 
   // In-TUI modal sub-modes for interactive delete confirmation and rename
@@ -177,6 +181,7 @@ export class OverlayHost {
   /** Rows for the open picker at the given geometry, or none when closed. */
   render(width: number, height: number, availableRows = Math.max(0, height - 6)): string[] {
     this.optionRows.clear();
+    this.chipRows.clear();
     this.renderedWidth = width;
     const picker = this.picker;
     if (!picker) return [];
@@ -231,6 +236,8 @@ export class OverlayHost {
         footer: status ?? picker.footer,
         hideCount: isApproval,
         ...(picker.detail ? { detail: picker.detail } : {}),
+        ...(picker.chips ? { chips: chipStrip(picker.chips.items, picker.chips.active, width) } : {}),
+        onChipRow: (row, id, from, to) => this.chipRows.set(row, { id, from, to }),
         onOptionRow: (row, id, from, to) => this.optionRows.set(row, { id, from: from ?? 0, to: to ?? width }),
       },
       width,
@@ -245,6 +252,12 @@ export class OverlayHost {
     if (!this.loading && !this.actionPending && this.subMode === "none" && top !== undefined &&
         report.kind === "press" && report.button === 0 && !report.shift && !report.alt && !report.ctrl &&
         report.column >= 0 && report.column < this.renderedWidth) {
+      const chip = this.chipRows.get(report.row - top);
+      if (chip && report.column >= chip.from && report.column < chip.to) {
+        const next = this.picker.chips?.select(chip.id);
+        if (next) this.open(next);
+        return true;
+      }
       const hit = this.optionRows.get(report.row - top);
       if (hit && report.column >= hit.from && report.column < hit.to) {
         this.model.focus(hit.id);

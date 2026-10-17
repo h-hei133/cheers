@@ -87,6 +87,69 @@ export function validateSetting(setting: SettingDefinition, value: unknown): str
   return field.validate(value) ? undefined : `Invalid value for ${setting.key}. Expected ${setting.schema.type}.`;
 }
 
+/** The editor a setting gets, derived from its schema rather than its key. */
+export type SettingEditor = "boolean" | "choice" | "number" | "text" | "list" | "object" | "status-items" | "theme";
+
+export function settingEditor(setting: SettingDefinition): SettingEditor {
+  if (setting.key === "tui.statusItems") return "status-items";
+  if (setting.key === "theme") return "theme";
+  if (setting.schema.type === "boolean") return "boolean";
+  if (setting.choices) return "choice";
+  if (setting.schema.type === "integer" || setting.schema.type === "number") return "number";
+  if (setting.schema.type === "array") return "list";
+  if (setting.schema.type === "object") return "object";
+  return "text";
+}
+
+export interface SettingInput {
+  readonly ok: boolean;
+  readonly value?: unknown;
+  readonly error?: string;
+}
+
+/**
+ * Parse an editor's text without coercing unknown or obsolete values away.
+ *
+ * Numbers are accepted only in their own shape, lists are one item per line
+ * (each line JSON when the schema's items are objects), and text stays text so
+ * a hidden prefix such as `mcp.` is expressible without quoting.
+ */
+export function parseSettingInput(setting: SettingDefinition, text: string): SettingInput {
+  const editor = settingEditor(setting);
+  if (editor === "number") {
+    const trimmed = text.trim();
+    if (!trimmed) return { ok: false, error: "Enter a number." };
+    const value = Number(trimmed);
+    if (!Number.isFinite(value)) return { ok: false, error: "Enter a finite number." };
+    if (setting.schema.type === "integer" && !Number.isInteger(value)) return { ok: false, error: "Enter a whole number." };
+    const invalid = validateSetting(setting, value);
+    return invalid ? { ok: false, error: invalid } : { ok: true, value };
+  }
+  if (editor === "list") {
+    const objectItems = (setting.schema.items as { type?: string } | undefined)?.type === "object";
+    const lines = text.split("\n").map(line => line.trim()).filter(Boolean);
+    const items: unknown[] = [];
+    for (const line of lines) {
+      if (!objectItems) { items.push(line); continue; }
+      try { items.push(JSON.parse(line)); }
+      catch { return { ok: false, error: "Each line must be a JSON object." }; }
+    }
+    const invalid = validateSetting(setting, items);
+    return invalid ? { ok: false, error: invalid } : { ok: true, value: items };
+  }
+  if (editor === "text" || editor === "theme") {
+    const invalid = validateSetting(setting, text);
+    return invalid ? { ok: false, error: invalid } : { ok: true, value: text };
+  }
+  try {
+    const value: unknown = JSON.parse(text);
+    const invalid = validateSetting(setting, value);
+    return invalid ? { ok: false, error: invalid } : { ok: true, value };
+  } catch {
+    return { ok: false, error: "Enter a valid JSON value." };
+  }
+}
+
 export function formatSetting(value: unknown): string {
   return value === undefined ? 'unset' : JSON.stringify(value).replace(/[\x7f-\x9f]/g, character => `\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`);
 }

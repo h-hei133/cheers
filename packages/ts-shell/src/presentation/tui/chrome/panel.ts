@@ -2,6 +2,7 @@ import { defaultTheme } from "../../theme/theme.js";
 import { padToWidth, truncateToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
 import type { Option, OptionModel } from "./options.js";
+import type { ChipStrip } from "./chips.js";
 
 /**
  * Inline picker.
@@ -31,6 +32,10 @@ export interface PanelChrome {
   readonly onOptionRow?: (row: number, id: string, from?: number, to?: number) => void;
   /** A second column, when the surface is wide enough to afford one. */
   readonly detail?: (id: string | undefined) => readonly string[];
+  /** A tab strip above the list. */
+  readonly chips?: ChipStrip;
+  /** Records clickable chip spans. */
+  readonly onChipRow?: (row: number, id: string, from: number, to: number) => void;
 }
 
 /** Below this width the detail column is dropped rather than squeezing both. */
@@ -49,8 +54,14 @@ export function renderPanel(
   const rows: string[] = [renderHeader(model, chrome, width)];
   // Header and footer always cost a row each; an overflow notice costs a third,
   // and forgetting to reserve it is how a bounded panel overruns its budget.
-  const overflow = capacity >= 4 && model.total > Math.min(MAX_OPTIONS, capacity - 2);
-  const listRows = Math.min(MAX_OPTIONS, Math.max(0, capacity - (overflow ? 3 : 2)));
+  const chips = capacity >= 3 ? chrome.chips : undefined;
+  const chipRows = chips ? 1 : 0;
+  const overflow = capacity >= 4 + chipRows && model.total > Math.min(MAX_OPTIONS, capacity - 2 - chipRows);
+  const listRows = Math.min(MAX_OPTIONS, Math.max(0, capacity - (overflow ? 3 : 2) - chipRows));
+  if (chips) {
+    rows.push(chips.text);
+    for (const span of chips.spans) chrome.onChipRow?.(rows.length - 1, span.id, span.from, span.to);
+  }
   if (listRows === 0) return [...rows, renderFooter(chrome, width)];
   if (model.total === 0) {
     const message = chrome.state === "error" ? defaultTheme.fg("error", chrome.empty) : defaultTheme.dim(chrome.empty);

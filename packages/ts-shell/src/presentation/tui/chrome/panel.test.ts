@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import { OptionModel, type Option } from './options.js';
 import { renderPanel } from './panel.js';
+import { chipStrip } from './chips.js';
 import { stripAnsi } from '../text/ansi.js';
 import { visibleWidth } from '../text/measure.js';
 
@@ -33,6 +34,17 @@ it('reports selectable row spans that stop before the detail column', () => {
     expect(to).toBeLessThan(100);
     expect(to).toBeGreaterThan(0);
   }
+});
+
+it('renders a chip strip inside the capacity and reports its spans', () => {
+  const hits: Array<[number, string, number, number]> = [];
+  const chips = chipStrip([{ id: 'a', label: 'All' }, { id: 'b', label: 'Session' }], 'a', 40);
+  const rows = renderPanel(model(), { title: 'Pick', empty: 'none', multiple: false, chips,
+    onChipRow: (row, id, from, to) => hits.push([row, id, from, to]) }, 40, 6);
+  expect(rows.length).toBeLessThanOrEqual(6);
+  expect(stripAnsi(rows[1]!)).toContain('Session');
+  expect(hits.map(([, id]) => id)).toEqual(['a', 'b']);
+  expect(hits[1]![3]).toBeGreaterThan(hits[1]![2]);
 });
 
 it('degrades to nothing or a footer at zero and one row', () => {

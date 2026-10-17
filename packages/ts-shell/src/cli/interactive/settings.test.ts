@@ -268,6 +268,22 @@ it('keeps project shape precedence and exposes the user shape when the project c
 });
 
 
+it('exposes the seven settings groups as tabs and marks stored values', async () => {
+  fs.writeFileSync(file, '{"offline":true}');
+  const context = runtime();
+  const host = { openSettings: () => openSettings(context, vi.fn()) };
+  const all = settingsPicker(host);
+  const allItems = await all.load();
+  expect(all.chips?.items.map(item => item.id)).toEqual(['all', 'Session', 'Request', 'Context', 'Retries', 'Network', 'Tools', 'Display']);
+  expect(all.chips?.active).toBe('all');
+  expect(allItems.find(item => item.id === 'offline')?.label.startsWith('● ')).toBe(true);
+  const session = all.chips!.select('Session')!;
+  const sessionItems = await session.load();
+  expect(sessionItems.length).toBeGreaterThan(0);
+  expect(sessionItems.every(item => item.label.includes('Session'))).toBe(true);
+  expect(sessionItems.find(item => item.id === 'offline')?.label.startsWith('● ')).toBe(true);
+});
+
 it('restores the accepted shape after save failure and retains a retryable pending choice', async () => {
   const context = runtime(); const preference = new ComposerPreference(() => context.runtimeConfig, vi.fn());
   const host = { openSettings: () => openSettings(context, vi.fn()), previewComposerShape: preference.propose };
