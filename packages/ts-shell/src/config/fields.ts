@@ -1,5 +1,7 @@
 import { Ajv, type AnySchemaObject, type ValidateFunction } from 'ajv';
 import { booleanSchema, connectionSchema, countSchema, credentialSchema, delaySchema, enumSchema, listSchema, nameSchema, objectSchema, positiveSchema, textSchema, tuiSchemas } from './schema.js';
+import { SCOPE_FIELDS } from './scope/registry.js';
+import type { ScopeFieldPolicy } from './scope/contract.js';
 
 export type ConfigSource = 'project' | 'user' | 'environment' | 'override';
 export type MergePolicy = 'replace' | 'intersect' | 'union' | 'deny' | 'disable' | 'tui';
@@ -13,6 +15,7 @@ export interface ConfigField {
   readonly application: ConfigApplication;
   readonly sensitivity: 'public' | 'personal';
   readonly projectTrust: 'safe' | 'required' | readonly (string | number | boolean)[];
+  readonly scope?: ScopeFieldPolicy;
 }
 export type ConfigFields = Readonly<Record<string, ConfigField>>;
 const ajv = new Ajv({ allErrors: false, strict: true });
@@ -28,7 +31,7 @@ export function createConfigFields(providers: readonly string[]) {
   const personal: ConfigSource[] = ['user'];
   const withOverride: ConfigSource[] = ['project', 'user', 'override'];
   const safe = { projectTrust: 'safe' } as const;
-  return {
+  const fields = {
     schemaVersion: field({ const: 1 }, undefined, 'replace', false, { ...safe, application: 'metadata' }),
     provider: field(enumSchema(providers), personal, 'replace', false, { sensitivity: 'personal' }),
     providerCredentials: field(objectSchema(Object.fromEntries(providers.map(provider => [provider, credentialSchema]))), personal, 'replace', false, { sensitivity: 'personal' }),
@@ -36,6 +39,7 @@ export function createConfigFields(providers: readonly string[]) {
     activeProviderConnectionId: field(textSchema, personal, 'replace', false, { sensitivity: 'personal' }),
     maxTurns: field(positiveSchema, ['project', 'user', 'environment']),
     allowedTools: field(listSchema(nameSchema), withOverride, 'intersect', true, safe),
+    allowedModels: field(listSchema({ type: 'string', pattern: '^[^/\\s]+/[^\\s].*$' }), withOverride, 'intersect', true, safe),
     disabledTools: field(listSchema(nameSchema), undefined, 'union', true, safe),
     hiddenToolPrefixes: field(listSchema(nameSchema), undefined, 'union', true, safe),
     denyRules: field(listSchema(objectSchema({ tool: nameSchema, pattern: textSchema }, ['tool'])), undefined, 'deny', true, safe),
@@ -67,6 +71,10 @@ export function createConfigFields(providers: readonly string[]) {
     providerHeadersTimeoutMs: field({ ...delaySchema, minimum: 1 }),
     providerBodyTimeoutMs: field({ ...delaySchema, minimum: 1 }),
   };
+  for (const key of Object.keys(SCOPE_FIELDS) as (keyof typeof SCOPE_FIELDS)[]) fields[key] = { ...fields[key], scope: SCOPE_FIELDS[key] };
+  const scoped = Object.fromEntries(Object.keys(SCOPE_FIELDS).map(key => [key, fields[key as keyof typeof fields].schema]));
+  return { ...fields, pathRules: field({ ...listSchema(objectSchema({ path: nameSchema, settings: objectSchema(scoped) }, ['path', 'settings'])), maxItems: 128 },
+    undefined, 'deny', true, safe) };
 }
 
 export const tuiFields = Object.fromEntries(Object.entries(tuiSchemas).map(([key, schema]) => [key, field(schema, undefined, 'replace', false, {

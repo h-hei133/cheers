@@ -103,6 +103,7 @@ export class ConfigState {
       return this.result('application-unverified', before);
     }
     const config = projectAccepted(this.publication.config, candidate);
+    if (this.publication.config.configScopes?.revision !== config.configScopes?.revision) this.transition(actual);
     this.publication = freezeDeep({ revision: this.publication.revision + 1, config, requested: candidate, catalog: structuredClone(catalog),
       binding: structuredClone(actual), admissionBlocked: false, diagnostics: candidate.configDiagnostics });
     return this.result('applied', before);

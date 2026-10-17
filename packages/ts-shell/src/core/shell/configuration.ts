@@ -12,6 +12,7 @@ import { resolveProviderCredential } from './providerCredentials.js';
 import type { RuntimeConfig } from '../../config/runtimeConfig.js';
 import { assertCurrentProfile, type ProfileContext } from '../paths/profile/context.js';
 import { ConfigInputError } from '../../config/inputs/model.js';
+import { scopeAdmission } from '../../config/scope/admission.js';
 
 interface ConfigurationContext {
   readonly profile?: ProfileContext;
@@ -21,6 +22,7 @@ interface ConfigurationContext {
   readonly configuration: ConfigState;
   readonly runtimeConfig?: RuntimeConfig;
   readonly projectRoot: string;
+  readonly cwd?: string;
   readonly session: { readonly id: string };
   readonly runtimeConfigOverrides?: RuntimeConfigOverrides;
   readonly resolveConfigTarget?: (config: RuntimeConfig) => ConfigModelTarget;
@@ -58,12 +60,15 @@ export function configurationAdmission(context: ConfigurationContext): () => str
   const binding = configurationBinding(context);
   const substrate = context.configuration.substrateRevision;
   const workspaceRevision = context.workspaceRevision;
+  const scoped = scopeAdmission(context.configuration.current.config.configScopes, context.cwd ?? context.projectRoot);
   return () => {
     if (context.profile) {
       try { assertCurrentProfile(context.profile); }
       catch { return 'Profile storage or identity changed; restart in the owning profile before starting new actions.'; }
     }
     if (context.workspaceIssue) return context.workspaceIssue;
+    const scopeBlocked = scoped();
+    if (scopeBlocked) return scopeBlocked;
     if (workspaceRevision !== context.workspaceRevision) return 'Workspace roots changed; start a new operation.';
     const workspaceBlocked = context.workspaceAdmission?.();
     if (workspaceBlocked) return workspaceBlocked;

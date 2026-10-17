@@ -61,6 +61,9 @@ import { assertAdmission, admittedFetch, type Admission } from '../core/network/
 import { decodeWorkspaceRoots, type WorkspaceRoot } from '../core/workspace/model.js';
 import type { RequestPolicy } from '../core/agent/request/model.js';
 import { createProviderStep, delegatedSteps } from '../cli/provider/step.js';
+import { scopedRuntimeConfig, assertScopedModel } from '../config/scope/projection.js';
+import { scopeAdmission } from '../config/scope/admission.js';
+import { toolScopeBinding } from '../config/scope/tools.js';
 
 type ProviderMode = "synthetic" | "real";
 
@@ -173,7 +176,11 @@ function syntheticToolIntent() {
 export function buildCliRuntimeInvocation(input: CliRuntimeInvocationInput): CliRuntimeInvocationRequest {
   const providerMode: ProviderMode = input.providerModeEnv === "synthetic" ? "synthetic" : "real";
   const { providerModeEnv: _providerModeEnv, ...request } = input;
-  return { ...request, ...(input.thinkingPreference ?? captureThinkingPreference(input.workspaceRoot, input.providerCredentialResolution.thinkingEffort)), providerMode };
+  const runtimeConfig = input.runtimeConfig ? scopedRuntimeConfig(input.runtimeConfig, input.workspaceRoot) : undefined;
+  const scoped = scopeAdmission(runtimeConfig?.configScopes, input.workspaceRoot);
+  return { ...request, ...(input.thinkingPreference ?? captureThinkingPreference(input.workspaceRoot, input.providerCredentialResolution.thinkingEffort)), providerMode,
+    ...(runtimeConfig ? { runtimeConfig } : {}),
+    ...(runtimeConfig?.configScopes ? { maxTurns: Math.min(input.maxTurns, runtimeConfig.maxTurns), admission: () => input.admission?.() ?? scoped() } : {}) };
 }
 
 /**
@@ -190,6 +197,7 @@ export async function runCliRuntimeInvocation(
   const gateway = input.mcpGateway ?? new CoreMcpGateway(input.workspaceRoot);
   const request = buildCliRuntimeInvocation({ ...input, mcpGateway: gateway });
   try {
+    assertScopedModel(request.runtimeConfig, request.providerCredentialResolution);
     const run = request.providerMode === "real"
       ? await deferUntilReady(request, dependencies)
       : await startTurn(request, dependencies);
@@ -464,6 +472,7 @@ async function startTurn(
   const step = control?.step ?? baseStep;
 
   const run = runTurn({
+    configScope: toolScopeBinding(request.runtimeConfig),
     observe: control?.observe,
     background: request.background,
     checkpoint: request.checkpoint,
@@ -476,7 +485,7 @@ async function startTurn(
     subagentHost: {
       step,
       defaultMaxSteps: SUBAGENT_DEFAULT_STEPS,
-      stepForModel: forModel,
+      stepForModel: (model, admission, effort, workspace) => forModel(model, admission, effort, undefined, workspace),
       retry: { enabled: request.runtimeConfig?.retryEnabled, maxRetries: request.runtimeConfig?.retryMaxRetries,
         baseDelayMs: request.runtimeConfig?.retryBaseDelayMs, maxDelayMs: request.runtimeConfig?.retryMaxDelayMs },
     },

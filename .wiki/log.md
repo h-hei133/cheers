@@ -7228,3 +7228,19 @@ CFG-03 新增重复 `--config` JSONC 输入，顺序固定于启动目录并保�
 ### Phase 20 CFG-02：精确 SHA 交付确认
 
 重新读取 `887f349934acd8a19c1d503908b8bd42210b7c72` 的[主 CI 39014487688](https://github.com/h-hei133/cheers/actions/runs/39014487688)，状态 completed/success；TS suite 和最后 NormProof 步骤均实际完成通过，没有沿用前次失败运行的跳过状态。[Architecture Watch 39014487749](https://github.com/h-hei133/cheers/actions/runs/39014487749) 亦 completed/success。CFG-02 产品和两轮夹具 follow-up 的交付闭合；CFG-03 的提交与 CI 继续独立记录。
+
+### Phase 20 CFG-04：按路径作用域设置
+
+在 CFG-03 的 publication 基础上实现路径规则。`config/scope/` 只拥有 typed rule、canonical 路径身份、逐字段解析与不可变派生值；`fields`/`layers`/`provenance`/`state` 继续承担 schema、来源、信任与发布。完整用户合同见[按路径作用域设置](features/config-scopes.md)。
+
+项目规则相对声明项目的 canonical workspace，用户与显式 `--config` 相对各自文件目录；`pathRules` 不接受环境与启动覆盖。规则只接受登记的公开操作字段，provider/credentials/账号池/theme/tui/pathRules 在规则内非法且诊断不回显值。最多 128 条。
+
+匹配使用 canonical 目录组件边界与目录 identity：`/repo/a` 匹配 `a/..cache`、不匹配 `ab`；symlink 别名等价，未创建目标复用最深存在父目录；替换目录、改指链接或 root rebind 使旧快照失效。Windows 仅 drive/UNC 锚点大小写不敏感。
+
+解析按默认 → 各来源 base → 该来源宽→窄规则 → 下一来源；等价 prefix 按声明顺序并给诊断。安全字段只收紧：allowlist 求交、disabled/prefix 求并、deny 累积、false 不被更深规则撤销。多目标操作取共同限制，普通设置冲突显式拒绝。已配置模型 allowlist 无匹配时不回退全局，空集零请求/零工具。
+
+消费接入：`configurationOperation` 为 shell 与 summary/compaction 捕获实际 cwd；`buildCliRuntimeInvocation` 以 workspace 派生会话配置；委派步骤按子代理 workspace 重新派生；工具准备、权限评估、逐文件访问与结果发布共用同一捕获 scope；`ConfigState` 在规则 revision 变化时经 substrate transition 使旧 admission 失效。
+
+**本地验证**：`build:ts` 通过；`config/scope` 20 项、`turn/scope.test.ts` 4 项通过；`src/config` 19 文件 244 项通过。`src/turn`、`src/cli/runtime`、`src/cli/provider`、`src/core/shell`、`src/entrypoints` 组合 81 文件 970 项中仅 `inputStream.goal.test.ts` 2 项失败，原因是既有夹具的 partial publication 缺少新读取的 `config`；补齐夹具后该文件 2 项通过，复跑组合见后续条目。五项静态门禁通过；strict docs 既有 118 条 advisory 保留。
+
+本条写入时尚未提交、推送，没有精确 SHA CI；未运行真实 provider、跨进程并发、Windows/macOS 实机或 Settings 交互。其余 43 项仍待依次交付。

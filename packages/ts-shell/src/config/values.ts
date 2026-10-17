@@ -1,4 +1,9 @@
 import { isRecord } from '../core/values/record.js';
+import type { DenyRule } from '../core/shell/approval/deny.js';
+
+export function normalizeConfigDenials(rules: readonly DenyRule[]): DenyRule[] {
+  return rules.map(rule => ({ tool: rule.tool.trim(), ...(rule.pattern ? { pattern: rule.pattern } : {}) }));
+}
 
 /** Raw config text may contain padding; runtime connection identity does not. */
 export function normalizeConnectionId(value?: string): string | undefined {

@@ -38,6 +38,8 @@ confidence: high
 | [37 命令审计](37-command-implementation-audit.md) | 102声明入口逐名闭合、23宿主端口；接线不等于行为完成 |
 | [Phase 20 决策](phase-20-decisions.md) | 用户裁决、owner/依赖、任务批次、来源映射及验收要求；CFG-01 本地验收完成、交付中 |
 | [Profile 身份与存储](profiles.md) | CFG-01 consumer 清单、启动身份、共享输入、迟到结果与验证边界 |
+| [显式配置输入](config-inputs.md) | CFG-03 有序只读输入、来源权限、完整重载与保存边界 |
+| [按路径作用域设置](config-scopes.md) | CFG-04 规则声明、canonical 匹配、逐字段合并、操作快照与失效 |
 
 ### 0.2 本轮之前的历史文档（01–22）
 

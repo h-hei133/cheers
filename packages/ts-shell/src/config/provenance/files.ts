@@ -3,6 +3,8 @@ export interface ConfigFileOrigin {
   readonly revision: string;
   readonly source: 'project' | 'user';
   readonly position?: number;
+  readonly rule?: number;
+  readonly scope?: string;
 }
 export interface ConfigFileRejection extends ConfigFileOrigin { readonly reason: string }
 export interface ConfigFileOrigins {

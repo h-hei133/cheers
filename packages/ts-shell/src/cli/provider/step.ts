@@ -15,6 +15,9 @@ import { endpointShape } from '../../provider/endpoints/index.js';
 import { toolSchemas } from '../../turn/tools.js';
 import { delegatedTarget } from './target.js';
 import { serviceTierCapability } from '../../core/models/serviceTier.js';
+import { assertScopedModel, scopedRuntimeConfig } from '../../config/scope/projection.js';
+import { scopeAdmission } from '../../config/scope/admission.js';
+import { mergeConfigValue } from '../../config/merge.js';
 
 export interface ProviderStepHost {
   readonly providerMode: 'synthetic' | 'real';
@@ -37,6 +40,7 @@ export function createProviderStep(
   promptContext: SystemPromptContext,
 ): StepFunction {
   const resolution = request.providerCredentialResolution;
+  assertScopedModel(request.runtimeConfig, resolution);
   if (resolution.blocked) throw new Error('The selected connection requires independent login before requests can be sent.');
   // Read once for the whole step function, not once per use: loading the
   // catalogue touches the filesystem, and a run that reloaded it mid-turn could
@@ -108,18 +112,22 @@ export function createProviderStep(
 
 /** Each explicit delegated model is resolved once; unavailable targets never use the main step. */
 export function delegatedSteps(request: ProviderStepHost, tools: ReadonlyMap<string, ToolDefinition>, context: SystemPromptContext, syntheticDefault?: StepFunction) {
-  return (model: string, admission?: () => string | undefined, effort?: ThinkingPreference, providerScope?: 'current'): StepFunction => {
+  return (model: string, admission?: () => string | undefined, effort?: ThinkingPreference, providerScope?: 'current', workspace = request.workspaceRoot): StepFunction => {
     if (request.providerMode === 'synthetic') {
       if (!model && effort === undefined && syntheticDefault) return syntheticDefault;
       throw new Error('Independent model review is unavailable in synthetic provider mode.');
     }
     const main = request.providerCredentialResolution;
+    const scoped = request.runtimeConfig ? scopedRuntimeConfig(request.runtimeConfig, workspace) : undefined;
+    const runtimeConfig = scoped && request.runtimeConfig?.allowedModels !== undefined ? { ...scoped,
+      allowedModels: mergeConfigValue(request.runtimeConfig.allowedModels, scoped.allowedModels ?? request.runtimeConfig.allowedModels, 'intersect') as readonly string[] } : scoped;
     const resolution = model ? providerScope === 'current'
       ? delegatedTarget(`${main.provider}/${model}`, main)
-      : delegatedTarget(model, main, request.runtimeConfig) : main;
-    const admit = () => request.admission?.() ?? admission?.();
+      : delegatedTarget(model, main, runtimeConfig) : main;
+    const scopedAdmission = scopeAdmission(runtimeConfig?.configScopes, workspace);
+    const admit = () => request.admission?.() ?? admission?.() ?? scopedAdmission();
     const requestPolicy = request.requestPolicy?.withAdmission?.(() => { const refusal = admit(); if (refusal) throw new Error(refusal); }) ?? request.requestPolicy;
-    return createProviderStep({ ...request, providerCredentialResolution: resolution,
+    return createProviderStep({ ...request, runtimeConfig, workspaceRoot: workspace, providerCredentialResolution: resolution,
       requestPolicy, admission: admit, ...(effort !== undefined ? { thinkingEffort: effort, thinkingEffortExplicit: true } : {}) }, tools, context);
   };
 }

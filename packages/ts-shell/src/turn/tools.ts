@@ -21,6 +21,8 @@ import { assertSourceAccess } from '../core/query/sourcePolicy.js';
 import { assertArtifactSourceAccess } from '../core/session/artifacts/access.js';
 import { EditOperationError } from '../edit/recovery/operation/write.js';
 import { createComponentLogger } from "../observability/structuredLogger.js";
+import type { ToolScopeBinding } from '../config/scope/tools.js';
+import { bindToolScope, forgetToolScope, toolScopePolicy } from './scope.js';
 
 const traceLogger = createComponentLogger("tool-call");
 
@@ -45,6 +47,7 @@ export interface ToolSchema {
  */
 
 export interface ToolGateOptions {
+  readonly configScope?: ToolScopeBinding;
   readonly background?: ToolExecutionContext['background'];
   readonly correlationId?: string;
   readonly commandProof?: import('../runtime/execution/proof.js').CommandProofObserver;
@@ -115,7 +118,7 @@ export function adaptTools(
       const prepared = prepareArguments(tool.name, args);
       validateToolArguments(tool.argsSchema, prepared);
       if (!tool.prepare) return prepared;
-      const context = preparationContext(tool.name, options, signal);
+      const context = preparationContext(tool.name, options, signal, prepared);
       let refusal: 'blocked' | 'failed' = 'failed';
       const verify = () => {
         signal?.throwIfAborted();
@@ -129,7 +132,9 @@ export function adaptTools(
       try {
         verify();
         const result = prepareToolCall(tool, prepared, context, options, verify);
-        return result instanceof Promise ? result.catch(refused) : result;
+        if (result instanceof Promise) return result.then(selected => { bindToolScope(prepared, selected, options); return selected; }).catch(refused);
+        bindToolScope(prepared, result, options);
+        return result;
       } catch (error) { return refused(error); }
     },
     execute: (toolCallId, args, signal, onUpdate) =>
@@ -164,6 +169,7 @@ async function executeTool(
     const blocked = options.admission?.();
     if (blocked) throw new Error(blocked);
     validateToolArguments(tool.argsSchema, args);
+    toolScopePolicy(tool.name, args, options, preparedToolCall(args, options));
     const binding = workspaceToolBinding(tool.name, args, options.workspaceRoot, options.workspaceRoots);
     const preparation = consumeToolCall(args, options, tool, toolCallId);
     const execute = preparation ? (_args: Record<string, unknown>, context: import('../tools/types.js').ToolExecutionContext) => preparation.execute(context)
@@ -179,25 +185,30 @@ async function executeTool(
       correlationId: options.correlationId,
       commandProof: options.commandProof,
       assertSourceAccess: absolute => {
-        if (tool.name === 'task') preparationContext(tool.name, options).assertSourceAccess!(absolute);
-        else assertArtifactSourceAccess(absolute, options.workspaceRoot, options.sessionId, options.workspaceRoots, options.permissionScope, options.denyRules);
+        if (tool.name === 'task') preparationContext(tool.name, options, signal, args).assertSourceAccess!(absolute);
+        else {
+          const scoped = toolScopePolicy(tool.name, args, options, undefined, absolute);
+          assertArtifactSourceAccess(absolute, options.workspaceRoot, options.sessionId, options.workspaceRoots, options.permissionScope, [...options.denyRules ?? [], ...scoped.denyRules ?? []]);
+        }
       },
       assertFileAccess: (absolutePath) => {
-        if (preparation) { preparationContext(tool.name, options).assertFileAccess!(absolutePath); return; }
+        if (preparation) { preparationContext(tool.name, options, signal, args).assertFileAccess!(absolutePath); return; }
         const blocked = options.admission?.();
         if (blocked) throw new Error(blocked);
+        const scoped = toolScopePolicy(tool.name, args, options, undefined, absolutePath);
+        const denyRules = [...options.denyRules ?? [], ...scoped.denyRules ?? []];
         if (tool.name === 'read' && typeof args.path === 'string' && args.path.startsWith('artifact://')) {
-          assertArtifactSourceAccess(absolutePath, options.workspaceRoot, options.sessionId, options.workspaceRoots, options.permissionScope, options.denyRules);
+          assertArtifactSourceAccess(absolutePath, options.workspaceRoot, options.sessionId, options.workspaceRoots, options.permissionScope, denyRules);
           return;
         }
         const actualArgs = { ...args, path: absolutePath, filePath: absolutePath };
-        if (tool.name === 'browser') assertSourceAccess(absolutePath, options.workspaceRoot, options.workspaceRoots, options.permissionScope, options.denyRules);
+        if (tool.name === 'browser') assertSourceAccess(absolutePath, options.workspaceRoot, options.workspaceRoots, options.permissionScope, denyRules);
         if (tool.name === 'lsp') {
           const fileArgs = { ...actualArgs, backend: 'scanner' };
           const selected = workspaceToolBinding('lsp', fileArgs, options.workspaceRoot, options.workspaceRoots);
           for (const root of new Set([options.workspaceRoot, selected.root])) {
             for (const name of ['lsp', 'read']) {
-              const checked = evaluateToolPermissionScope(name, fileArgs, options.permissionScope, root, options.denyRules);
+              const checked = evaluateToolPermissionScope(name, fileArgs, options.permissionScope, root, denyRules);
               if (checked.denied) throw new Error(checked.reason);
             }
           }
@@ -207,7 +218,7 @@ async function executeTool(
           if (actual.root !== binding.root) throw new Error('The tool target changed workspace roots.');
         }
         const decision = binding.scoped ? evaluateWorkspacePermission(tool.name, actualArgs, options)
-          : evaluateToolPermissionScope(tool.name, actualArgs, options.permissionScope, options.workspaceRoot, options.denyRules);
+          : evaluateToolPermissionScope(tool.name, actualArgs, options.permissionScope, options.workspaceRoot, denyRules);
         if (decision.denied) throw new Error(decision.reason);
       },
       ...(options.commandEnv ? { commandEnv: options.commandEnv } : {}),
@@ -261,6 +272,7 @@ export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<st
       if (permission.blocked) { refusal = 'denied'; return { block: true, reason: permission.blocked }; }
       const afterApproval = options.admission?.();
       if (afterApproval) return { block: true, reason: afterApproval };
+      toolScopePolicy(call.name, args, options, preparedToolCall(args, options));
       if (permission.approved) approvals.set(call.id, permission.approved);
       const decision = await options.hooks.dispatch({
         eventName: "PreToolUse",
@@ -273,6 +285,7 @@ export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<st
       });
       const afterHook = options.admission?.();
       if (afterHook) { approvals.delete(call.id); return { block: true, reason: afterHook }; }
+      toolScopePolicy(call.name, args, options, preparedToolCall(args, options));
       if (decision.decision === "block") {
         approvals.delete(call.id);
         return { block: true, reason: `Blocked by Hook: ${decision.reason || "Action rejected by security/verification hook policy."}` };
@@ -304,7 +317,7 @@ export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<st
       return undefined;
       } finally { if (!authorized) {
         try { tools?.get(call.name)?.onRefusal?.(args, preparationContext(call.name, options), signal?.aborted ? 'cancelled' : refusal); }
-        finally { discardToolCall(args); }
+        finally { discardToolCall(args); forgetToolScope(args); }
       } }
     },
     afterToolCall: async ({ call, args, result, isError }) => {
@@ -344,7 +357,10 @@ export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<st
         // character cannot forge extra lines or repaint the transcript.
         output = `${output}\n\n[Verification feedback]\n${neutraliseForDisplay(redactExportText(decision.feedback))}`;
       }
-      const refused = tools?.get(call.name)?.resultAdmission?.();
+      let refused = tools?.get(call.name)?.resultAdmission?.();
+      try { toolScopePolicy(call.name, args, options); }
+      catch { refused ??= 'Configuration scope changed before result publication.'; }
+      finally { forgetToolScope(args); }
       if (refused) return { isError: true, output: `${output}\n${refused} Actual effect evidence remains visible.`, ...(approval ? { metadata: { approval } } : {}) };
       if (output === result.output && !approval) return undefined;
       return {
@@ -373,7 +389,7 @@ async function askPermission(
   try {
     if (toolName === 'lsp' && args.backend !== 'scanner') bindExecutionTarget(args, args.server, options.workspaceRoot);
     const preparation = preparedToolCall(args, options);
-    evaluation = preparation ? preparationPermission(toolName, preparation, options) : evaluateWorkspacePermission(toolName, args, options, tool);
+    evaluation = preparation ? preparationPermission(toolName, preparation, options, args) : evaluateWorkspacePermission(toolName, args, options, tool);
   }
   catch (error) { return { blocked: error instanceof Error ? error.message : 'Workspace access could not be checked.' }; }
   // A refusal is an answer, not a question. Asking about it would offer the user
@@ -444,9 +460,11 @@ async function askPermission(
 
 /** Denials apply to the requested spelling and to the selected root's relative paths. */
 function evaluateWorkspacePermission(toolName: string, args: Record<string, unknown>, options: ToolGateOptions, tool?: ToolDefinition) {
-  const original = evaluateToolPermissionScope(toolName, args, options.permissionScope, options.workspaceRoot, options.denyRules, tool);
+  const scoped = toolScopePolicy(toolName, args, options);
+  const denyRules = [...options.denyRules ?? [], ...scoped.denyRules ?? []];
+  const original = evaluateToolPermissionScope(toolName, args, options.permissionScope, options.workspaceRoot, denyRules, tool);
   if (original.denied) return original;
   const binding = workspaceToolBinding(toolName, args, options.workspaceRoot, options.workspaceRoots);
   return binding.root === options.workspaceRoot ? original
-    : evaluateToolPermissionScope(toolName, binding.args, options.permissionScope, binding.root, options.denyRules, tool);
+    : evaluateToolPermissionScope(toolName, binding.args, options.permissionScope, binding.root, denyRules, tool);
 }

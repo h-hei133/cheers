@@ -1,7 +1,8 @@
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import type { ShellSessionRuntime } from '../../core/shell/sessionRuntime.js';
 import type { SessionManager } from '../../session/SessionManager.js';
-import { configurationAdmission } from '../../core/shell/configuration.js';
+import { configurationOperation } from '../../core/shell/scope.js';
+import { toolScopeBinding } from '../../config/scope/tools.js';
 import { HookDispatcher } from '../../core/hooks/hookDispatcher.js';
 import { setupBuiltinVerificationHooks } from '../../core/hooks/builtin/index.js';
 import { registerDeclaredHooks } from '../../core/hooks/registration.js';
@@ -41,13 +42,15 @@ export function installGitCliRuntime(input: GitComposition, runtime: ShellSessio
 
 export function gitGateFor(context: ShellRuntimeContext, manager: SessionManager, runtime: ShellSessionRuntime,
   approval: NonNullable<ToolGateOptions['escalationPromptHandler']>, tool: string = 'bash'): ToolGateOptions {
-  const admission = () => configurationAdmission(context)() ?? (!filterVisibleToolNames([tool], context.runtimeConfig).length ? 'The selected native capability is disabled.' : undefined);
+  const operation = configurationOperation(context);
+  const config = operation.config;
+  const admission = () => operation.admission() ?? (!filterVisibleToolNames([tool], config).length ? 'The selected native capability is disabled.' : undefined);
   const hooks = new HookDispatcher(); setupBuiltinVerificationHooks(hooks);
-  registerDeclaredHooks(hooks, context.cwd, { admission, bypassed: context.runtimeConfig.allowUntrustedHooks,
+  registerDeclaredHooks(hooks, context.cwd, { admission, bypassed: config.allowUntrustedHooks,
     requestApproval: async hook => (await approval(buildToolEscalationPrompt('bash', 'execute', hook.command,
       `Declared ${hook.event} hook from ${hook.sourcePath}; approval binds its stored fingerprint.`))).decision !== 'deny' });
   return { sessionId: context.session.id, workspaceRoot: context.cwd, workspaceRoots: context.session.workspaceRoots,
-    agentMode: runtime.getAgentMode(), permissionScope: runtime.getPermissionScope(), denyRules: context.runtimeConfig.denyRules,
+    agentMode: runtime.getAgentMode(), permissionScope: runtime.getPermissionScope(), denyRules: config.denyRules, configScope: toolScopeBinding(config),
     admission, hooks, escalationPromptHandler: approval,
     emit: event => manager.appendQueryEvent(context.session.id, event) };
 }

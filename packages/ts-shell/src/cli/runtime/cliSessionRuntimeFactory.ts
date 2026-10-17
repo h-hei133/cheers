@@ -1,5 +1,7 @@
 import { profileScope } from '../../core/paths/profile/scope.js';
 import type { RuntimeConfig } from "../../config/runtimeConfig.js";
+import { configurationOperation } from '../../core/shell/scope.js';
+import { assertScopedModel } from '../../config/scope/projection.js';
 import type { ProviderCredentialResolution } from "../../core/shell/providerCredentials.js";
 import { configurationAdmission } from "../../core/shell/configuration.js";
 import { refreshShellRuntimeConfig } from "../../core/shell/runtimeContext.js";
@@ -191,6 +193,7 @@ export function createCliSessionRuntime(input: {
   /** The same, with an expiring account token replaced before the request is built. */
   const renewedProvider = async (resolved: ProviderCredentialResolution, config: RuntimeConfig, admission: Admission, catalog: readonly CatalogProvider[], reportFailure = true): Promise<ProviderRenewal> => {
     assertAdmission(admission);
+    assertScopedModel(config, resolved);
     const target = compactionTarget(resolved, catalog);
     if (!target) return {};
     const renewed = await renewStoredAccount({
@@ -244,10 +247,11 @@ export function createCliSessionRuntime(input: {
     }),
     compactHistory: (sessionId, signal, instructions) => {
       signal.throwIfAborted();
-      const { config, catalog } = input.runtimeContext.configuration.current;
+      const operation = configurationOperation(input.runtimeContext);
+      const config = operation.config; const catalog = operation.publication.catalog;
       const workspaceRoot = input.runtimeContext.projectRoot;
       const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
-      const admission = configurationAdmission(input.runtimeContext);
+      const admission = operation.admission;
       return renewedProvider(resolved, config, admission, catalog, false).then(({ provider, failure }) => {
         if (!provider) {
           return {
@@ -285,9 +289,10 @@ export function createCliSessionRuntime(input: {
       });
     },
     summarizeAbandonedTurns: (messages) => {
-      const { config, catalog } = input.runtimeContext.configuration.current;
+      const operation = configurationOperation(input.runtimeContext);
+      const config = operation.config; const catalog = operation.publication.catalog;
       const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
-      const admission = configurationAdmission(input.runtimeContext);
+      const admission = operation.admission;
       return renewedProvider(resolved, config, admission, catalog).then(({ provider }) => {
         assertAdmission(admission);
         if (!provider) return undefined;
@@ -304,11 +309,12 @@ export function createCliSessionRuntime(input: {
       });
     },
     runPrompt: (prompt, signal, _runtimeSeed, _continuityState, attachments, continuityContext, onPromptAccepted): PromptRun => {
-      const publication = input.runtimeContext.configuration.current;
-      const config = publication.config;
+      const operation = configurationOperation(input.runtimeContext);
+      const publication = operation.publication;
+      const config = operation.config;
       const catalog = publication.catalog;
       const backgroundSignal = input.runtimeContext.configuration.backgroundSignal;
-      const parentAdmission = collaborationAdmissionFor(input.runtimeContext, configurationAdmission(input.runtimeContext));
+      const parentAdmission = collaborationAdmissionFor(input.runtimeContext, operation.admission);
       const resolvedCredential =
         input.providerRuntimeBridge.resolveCredentialSnapshot();
       const sessionId = input.runtimeContext.session.id;

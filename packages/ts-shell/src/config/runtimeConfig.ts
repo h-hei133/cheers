@@ -6,13 +6,16 @@ import { createConfigFields, type ConfigField } from "./fields.js";
 import { readConfigDocument } from "./document.js";
 import { ConfigDocumentError } from "./syntax.js";
 import { readConfigEdit, persistConfigEdit, type ConfigEdit } from "./persistence.js";
-import { normalizeConnectionId } from "./values.js";
+import { normalizeConnectionId, normalizeConfigDenials } from "./values.js";
 import { loadConfigLayers, validateRawConfig } from "./layers.js";
 import { captureConfigTrust, type ConfigTrustBinding } from './trust.js';
 import type { ConfigProvenance } from './provenance/model.js';
 import { projectConfigOrigins } from './provenance/projection.js';
 import type { ComposerShapeId } from '../presentation/tui/composer/contract.js';
 import type { ConfigInputs } from './inputs/model.js';
+import type { ConfigScopes } from './scope/model.js';
+import type { PathRule } from './scope/contract.js';
+import { captureConfigScopes, scopeSettings } from './scope/capture.js';
 
 /**
  * Token budgets for one model.
@@ -147,6 +150,10 @@ export interface RuntimeConfig {
   readonly configProvenance: ConfigProvenance;
   readonly configTrust: ConfigTrustBinding;
   readonly configInputs?: ConfigInputs;
+  readonly configScopes?: ConfigScopes;
+  readonly pathRules?: readonly PathRule[];
+  /** Absent means no model restriction; [] permits no model requests. */
+  readonly allowedModels?: readonly string[];
   /** Structured acceptance facts; diagnostic wording never decides publication. */
   readonly configValidation: { readonly valid: boolean; readonly securityBlocked: boolean; readonly constraintsBlocked?: boolean };
   readonly provider: RuntimeProvider;
@@ -381,6 +388,8 @@ export interface RuntimeConfigFile {
   provider?: RuntimeProvider;
   maxTurns?: number;
   allowedTools?: string[];
+  allowedModels?: string[];
+  pathRules?: PathRule[];
   disabledTools?: string[];
   hiddenToolPrefixes?: string[];
   denyRules?: unknown[];
@@ -500,7 +509,7 @@ export function getRuntimeConfig(
   const layer = loadConfigLayers([
     { path: getProjectConfigPath(configTrust.workspaceRoot), source: "project" },
     { path: getUserConfigPath(), source: "user" },
-  ], overrides, CONFIG_FIELDS, configTrust.decision, inputs);
+  ], overrides, CONFIG_FIELDS, configTrust.decision, inputs, configTrust.workspaceRoot);
   // Every accepted field has passed its registry schema before this projection.
   const merged = layer.values as RuntimeConfigFile & RuntimeConfigOverrides;
   const diagnostics = layer.diagnostics;
@@ -511,6 +520,9 @@ export function getRuntimeConfig(
   const config: Omit<RuntimeConfig, 'configProvenance'> = {
     configTrust,
     ...(inputs ? { configInputs: inputs } : {}),
+    ...(merged.pathRules !== undefined ? { pathRules: merged.pathRules } : {}),
+    ...(merged.allowedModels !== undefined ? { allowedModels: merged.allowedModels } : {}),
+    configScopes: captureConfigScopes(layer.scopeLayers ?? [], scopeSettings(DEFAULT_CONFIG), configTrust.workspaceRoot),
     configValidation: { valid: layer.valid, securityBlocked: layer.blocked },
     provider,
     maxTurns,
@@ -521,9 +533,7 @@ export function getRuntimeConfig(
       ? { allowedTools: merged.allowedTools }
       : {}),
     disabledTools: merged.disabledTools ?? DEFAULT_CONFIG.disabledTools,
-    denyRules: (merged.denyRules as DenyRule[] | undefined)?.map(rule => ({
-      tool: rule.tool.trim(), ...(rule.pattern ? { pattern: rule.pattern } : {}),
-    })) ?? DEFAULT_CONFIG.denyRules,
+    denyRules: merged.denyRules !== undefined ? normalizeConfigDenials(merged.denyRules as DenyRule[]) : DEFAULT_CONFIG.denyRules,
     hiddenToolPrefixes:
       merged.hiddenToolPrefixes ?? DEFAULT_CONFIG.hiddenToolPrefixes,
     enableMcpTools: merged.enableMcpTools ?? DEFAULT_CONFIG.enableMcpTools,
@@ -573,6 +583,7 @@ export function getRuntimeConfig(
     configDiagnostics: dedupeDiagnostics(diagnostics),
     configSources: sources,
   };
+  layer.verify();
   return { ...config, configProvenance: projectConfigOrigins(layer.values, config, layer.origins, CONFIG_FIELDS) };
 }
 

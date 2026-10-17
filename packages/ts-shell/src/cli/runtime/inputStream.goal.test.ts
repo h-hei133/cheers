@@ -26,7 +26,7 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(scratch, {
 it('activates the actual pipe scheduler and accepts show/pause while its model turn is held', async () => {
   const manager = new SessionManager(); const session = manager.createNew(root);
   const context = { session, projectRoot: root, cwd: root, runtimeConfig: { denyRules: [] },
-    configuration: { substrateRevision: 0, current: { binding: configurationBinding({ session, projectRoot: root }) } } } as unknown as ShellRuntimeContext;
+    configuration: { substrateRevision: 0, current: { binding: configurationBinding({ session, projectRoot: root }), config: {} } } } as unknown as ShellRuntimeContext;
   const stdin = new PassThrough(); const lines: string[] = []; let sends = 0;
   let started!: () => void; const first = new Promise<void>(resolve => { started = resolve; });
   let shown!: () => void; const show = new Promise<void>(resolve => { shown = resolve; });
@@ -66,7 +66,7 @@ it('activates the actual pipe scheduler and accepts show/pause while its model t
 it('drains an EOF goal activation through the closed pipe host without dispatching a new round', async () => {
   const manager = new SessionManager(); const session = manager.createNew(root);
   const context = { session, projectRoot: root, cwd: root, runtimeConfig: { denyRules: [] },
-    configuration: { substrateRevision: 0, current: { binding: configurationBinding({ session, projectRoot: root }) } } } as unknown as ShellRuntimeContext;
+    configuration: { substrateRevision: 0, current: { binding: configurationBinding({ session, projectRoot: root }), config: {} } } } as unknown as ShellRuntimeContext;
   const stdin = new PassThrough(); const renderer = { renderLine: () => {}, renderChunk: () => {} } as never;
   const runtime = new ShellSessionRuntime({ sessionManager: manager, renderer, runPrompt: async function* () {
     throw new Error('An EOF goal must not dispatch an automatic prompt.');

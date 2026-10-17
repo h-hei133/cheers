@@ -39,6 +39,8 @@ const descriptions = {
   providerHeadersTimeoutMs: ['Network', 'Headers timeout in ms', 'Response header wait timeout'],
   providerBodyTimeoutMs: ['Network', 'Body timeout in ms', 'Response body wait timeout'],
   allowedTools: ['Tools', 'Allowed tools', 'JSON list; intersects other restrictions. Empty permits no tools; unset adds no allowlist'],
+  allowedModels: ['Request', 'Allowed models', 'JSON list of provider/model identifiers; intersects other restrictions. Empty permits no model requests; unset adds no allowlist'],
+  pathRules: ['Request', 'Path rules', 'JSON list of {path, settings} rules; only registered operation fields apply, and safety restrictions accumulate'],
   disabledTools: ['Tools', 'Disabled tools', 'JSON list; combines with other disabled tool lists'],
   hiddenToolPrefixes: ['Tools', 'Hidden tool prefixes', 'JSON list; combines with other hidden prefixes'],
   denyRules: ['Tools', 'Deny rules', 'JSON list of tool/pattern constraints; combines with other deny rules'],

@@ -59,6 +59,7 @@ export interface CompactionSetup {
 }
 
 export interface TurnOptions {
+  readonly configScope?: ToolGateOptions['configScope'];
   /** Observes kernel facts after the ordinary transcript writer and projection have accepted them. */
   readonly observe?: import('../core/agent/events.js').AgentEventListener;
   readonly correlationId?: string;
@@ -177,6 +178,7 @@ function gateOptionsFor(
   emit: (event: QueryEvent) => void,
 ): ToolGateOptions {
   return {
+    configScope: options.configScope,
     admission: options.admission,
     correlationId: options.correlationId,
     commandProof: options.commandProof,
