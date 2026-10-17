@@ -27,6 +27,8 @@ describe("browser external runner CLI scenario examples", () => {
         {
           id: "observe",
           kind: "cli-command",
+          // Real CLI startup can exceed the 10s default on a loaded runner.
+          timeoutMs: 60_000,
           prompt: "/browser execute observe local-fixture://route103-demo",
           assertions: [
             { id: "blocked", kind: "browser-execution-blocked" },
@@ -50,6 +52,8 @@ describe("browser external runner CLI scenario examples", () => {
         {
           id: "observe",
           kind: "cli-command",
+          // Real CLI startup can exceed the 10s default on a loaded runner.
+          timeoutMs: 60_000,
           prompt: "/browser execute observe local-fixture://route103-demo",
           env: fixture.env,
           assertions: [
@@ -62,6 +66,8 @@ describe("browser external runner CLI scenario examples", () => {
         {
           id: "extract",
           kind: "cli-command",
+          // Real CLI startup can exceed the 10s default on a loaded runner.
+          timeoutMs: 60_000,
           prompt: "/browser execute extract route103 summary",
           env: fixture.env,
           assertions: [
@@ -87,6 +93,8 @@ describe("browser external runner CLI scenario examples", () => {
         {
           id: "navigate",
           kind: "cli-command",
+          // Real CLI startup can exceed the 10s default on a loaded runner.
+          timeoutMs: 60_000,
           prompt: "/browser execute navigate https://example.com",
           env: fixture.env,
           assertions: [
@@ -137,6 +145,8 @@ describe("browser external runner CLI scenario examples", () => {
         {
           id: "observe",
           kind: "cli-command",
+          // Real CLI startup can exceed the 10s default on a loaded runner.
+          timeoutMs: 60_000,
           prompt: "/browser execute observe local-fixture://route103-demo",
           env: fixture.env,
           assertions: [
@@ -164,6 +174,8 @@ describe("browser external runner CLI scenario examples", () => {
           {
             id: "observe",
             kind: "cli-command",
+          // Real CLI startup can exceed the 10s default on a loaded runner.
+          timeoutMs: 60_000,
             prompt: "/browser execute observe local-fixture://route103-demo",
             env: fixture.env,
             assertions: [
