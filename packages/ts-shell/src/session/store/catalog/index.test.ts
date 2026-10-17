@@ -79,6 +79,20 @@ it('publishes the runtime current identity before discovery and preserves replay
   expect(JSON.parse(fs.readFileSync(empty.layout.transcriptPath, 'utf8'))).toMatchObject({ type: 'session', id: 'empty' });
 });
 
+it('yields the current session before scanning ten thousand history entries', async () => {
+  const { layout, context, catalog } = fixture();
+  seed(layout, 'current');
+  for (let index = 0; index < 10_000; index++) fs.writeFileSync(path.join(layout.sessionsDir, `entry-${index}`), '');
+  const query = catalog.list(context);
+  const first = await query.next();
+  expect(first.value.status).toBe('scanning');
+  expect(first.value.sessions.map(item => item.id)).toEqual(['current']);
+  // The first frame is produced before directory discovery begins; its cost
+  // does not grow with the number of saved sessions.
+  expect(io.opendir).not.toHaveBeenCalled();
+  await query.return(undefined);
+});
+
 it('bounds directory discovery and summary dispatch per update and closes an abandoned cursor', async () => {
   const { layout, context, catalog } = fixture(); seed(layout, 'current');
   for (let index = 0; index < 240; index++) fs.writeFileSync(path.join(layout.sessionsDir, `file-${index}`), '');

@@ -7520,3 +7520,9 @@ CI 的 `browser/cache/scenarios` 并发三进程测试偶发 `Duplicates/over-bu
 ### 修复：file lock 批测试的调度假设
 
 `fileLock.test.ts` 断言两个反序批次一定得到 `[1,2,3]`，但哪一个批次先拿到第一把锁取决于调度；全量并行时偶发失败。改为接受 `123` 或 `312`，仍然拒绝两个批次的锁内回调交错，这才是互斥不变量。
+
+### Phase 20 START-02（部分）：首帧不随历史规模增长
+
+catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `discoverSessions` 之前产出，包含当前会话、状态 `scanning`，且 `io.opendir` 未被调用。渐进加载与取消沿用既有 iterator/AbortSignal；持久化摘要索引仍未实现。
+
+**本地验证**：catalog 18 项通过。本条写入时尚未提交/推送。

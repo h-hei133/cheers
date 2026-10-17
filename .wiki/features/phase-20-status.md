@@ -25,6 +25,7 @@
 | PAN-06（部分） | `6736f402` | copy 移除 recent-30 窗口 |
 | PAN-07（部分） | 本次 | `/extensions` 为 `/plugin` 别名 |
 | START-01 | `0afab79a` | build manifest、五种拒绝状态、`start`/`start:dev` |
+| START-02（部分） | 本次 | 10k 会话首帧不扫描目录、渐进/取消沿用 iterator |
 
 ## 部分完成（有实现，验收未闭合）
 
