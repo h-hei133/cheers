@@ -85,3 +85,15 @@ describe('durable request accounting', () => {
     expect(ledger.scopes.goal!.breach).toBeUndefined();
   });
 });
+
+describe('credential attribution', () => {
+  it('keeps the non-secret credential identity on the pending attempt across a restart', () => {
+    const attributed: PreparedRequest = { ...request, credentialId: 'openai:work', credentialGeneration: 'aaaaaaaaaaaaaaaa' };
+    const reserved = reserveRequest(fresh(), scope.id, attributed);
+    const decoded = decodeRequestLedger(JSON.parse(JSON.stringify(reserved.ledger)))!;
+    expect(decoded.scopes.goal!.pending['1']).toMatchObject({ credentialId: 'openai:work', credentialGeneration: 'aaaaaaaaaaaaaaaa' });
+    const corrupt = JSON.parse(JSON.stringify(reserved.ledger));
+    corrupt.scopes.goal.pending['1'].credentialGeneration = 'not-a-generation';
+    expect(decodeRequestLedger(corrupt)).toBeUndefined();
+  });
+});

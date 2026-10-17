@@ -38,6 +38,9 @@ export interface PreparedRequest {
   readonly model: string;
   readonly endpoint: string;
   readonly purpose: string;
+  /** Which stored credential sent this; non-secret and rotation-sensitive. */
+  readonly credentialId?: string;
+  readonly credentialGeneration?: string;
   readonly bound?: RequestBound;
 }
 

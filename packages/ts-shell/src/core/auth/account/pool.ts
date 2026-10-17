@@ -75,3 +75,16 @@ export function credentialGeneration(connection: ProviderConnectionConfig): stri
     : connection.apiKey ?? '';
   return createHash('sha256').update(material).digest('hex').slice(0, 16);
 }
+
+/** Non-secret identity for a resolved credential, including config-only slots. */
+export function credentialIdentityFor(provider: RuntimeProvider, credential: {
+  readonly connectionId?: string;
+  readonly accountAuth?: object;
+  readonly apiKey?: string;
+} | undefined): { readonly credentialId: string; readonly generation: string } | undefined {
+  if (!credential) return undefined;
+  const material = credential.accountAuth && Object.keys(credential.accountAuth).length ? credential.accountAuth : credential.apiKey;
+  if (!material) return undefined;
+  return { credentialId: `${provider}:${credential.connectionId ?? 'config'}`,
+    generation: createHash('sha256').update(typeof material === 'string' ? material : JSON.stringify(material)).digest('hex').slice(0, 16) };
+}

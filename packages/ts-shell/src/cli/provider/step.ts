@@ -17,6 +17,7 @@ import { delegatedTarget } from './target.js';
 import { serviceTierCapability } from '../../core/models/serviceTier.js';
 import { assertScopedModel, scopedRuntimeConfig } from '../../config/scope/projection.js';
 import { credentialBlockMessage } from '../../core/shell/providerCredentials.js';
+import { credentialIdentityFor } from '../../core/auth/account/pool.js';
 import { scopeAdmission } from '../../config/scope/admission.js';
 import { mergeConfigValue } from '../../config/merge.js';
 
@@ -77,6 +78,7 @@ export function createProviderStep(
       // answers, and an endpoint is how they want to be asked.
       ...(endpoint ? { endpoint } : {}),
       ...(configuredTier ? { serviceTier: configuredTier } : {}),
+      ...(credentialIdentityFor(resolution.provider, resolution.credential) ?? {}),
     },
     // Without this the request is sent with the global fetch, which has no
     // deadline: a provider that accepts the connection and then never answers

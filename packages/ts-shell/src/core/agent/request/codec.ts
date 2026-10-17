@@ -51,6 +51,8 @@ function validAttempt(value: unknown, sequence: number): value is PendingAttempt
   return isRecord(value) && value.sequence === sequence && typeof value.dispatched === 'boolean' && text(value.requestId)
     && typeof value.bodyDigest === 'string' && /^[a-f0-9]{64}$/.test(value.bodyDigest)
     && typeof value.provider === 'string' && text(value.model) && text(value.endpoint) && text(value.purpose)
+    && (value.credentialId === undefined || text(value.credentialId))
+    && (value.credentialGeneration === undefined || (typeof value.credentialGeneration === 'string' && /^[a-f0-9]{16}$/.test(value.credentialGeneration)))
     && (value.bound === undefined || validRequestBound(value.bound)) && (value.usage === undefined || validModelUsage(value.usage));
 }
 

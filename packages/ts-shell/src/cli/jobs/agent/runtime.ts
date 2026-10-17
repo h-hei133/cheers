@@ -7,6 +7,7 @@ import type { JobsComposition } from '../model.js';
 import { goalPolicyFor } from '../../runtime/goal.js';
 import { buildCompactionWiring } from '../../runtime/compaction.js';
 import { providerAuthorization } from '../../../provider/request/authorization.js';
+import { credentialIdentityFor } from '../../../core/auth/account/pool.js';
 import { providerEndpoint } from '../../../core/models/catalog.js';
 import type { AgentRuntime, AgentOutcome, AgentChild } from '../../../workflow/jobs/agent/model.js';
 import { JobStore } from '../../../workflow/jobs/store.js';
@@ -119,6 +120,7 @@ export async function captureAgentRuntime(host: JobsComposition, input: AgentRun
             const model = resolved.model ?? resolved.credential?.model;
             if (!baseUrl || !model) return {};
             const provider = { baseUrl, model, providerId: resolved.provider,
+              ...(credentialIdentityFor(resolved.provider, resolved.credential) ?? {}),
               headers: providerAuthorization({ apiKey: resolved.credential?.apiKey, accountAuth: resolved.credential?.accountAuth, ...(endpoint ? { endpoint } : {}) }).headers,
               ...(endpoint ? { endpoint } : {}) };
             return { compaction: { ...buildCompactionWiring({ provider, runtimeConfig: config, admission: admit, sessionId: session.id, catalog, requestPolicy: policy }),

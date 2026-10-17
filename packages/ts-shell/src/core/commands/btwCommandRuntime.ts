@@ -4,6 +4,7 @@ import { syntaxHelp } from "./syntax/projection.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import { resolveProviderCredential } from "../shell/providerCredentials.js";
+import { credentialIdentityFor } from "../auth/account/pool.js";
 import { accountAuthFor, providerAuthorization } from "../../provider/request/authorization.js";
 import { requestSimpleCompletion } from "../../provider/request/completion.js";
 import { loadCatalog } from "../models/catalogStore.js";
@@ -79,6 +80,7 @@ export async function runBtwCommand(
             baseUrl: resolution.baseUrl ?? credential?.baseUrl ?? "",
             model,
             providerId: resolution.provider,
+            ...(credentialIdentityFor(resolution.provider, resolution.credential) ?? {}),
             ...(endpoint ? { endpoint } : {}),
             fetchImpl: providerFetchForEndpoint(runtimeConfig, endpoint, endpointShape, context.admission),
             modelTransport: providerModelTransport(runtimeConfig, endpoint, context.admission),

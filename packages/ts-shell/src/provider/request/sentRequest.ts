@@ -42,7 +42,8 @@ export async function sendSentRequest(
   sent: SentRequest,
   signal: AbortSignal | undefined,
   fetchImpl: typeof fetch = fetch,
-  metering?: { readonly policy?: RequestPolicy; readonly transport?: ModelTransport; readonly provider: string; readonly model: string },
+  metering?: { readonly policy?: RequestPolicy; readonly transport?: ModelTransport; readonly provider: string; readonly model: string;
+    readonly credential?: { readonly credentialId: string; readonly generation: string } },
 ): Promise<ProviderUsage | undefined> {
   const body = refreshBody(sent);
   if (!body || signal?.aborted) return undefined;
@@ -50,7 +51,8 @@ export async function sendSentRequest(
   try {
     const serialized = JSON.stringify(body);
     const attempt = await prepareRequestAttempt({ body: serialized, provider: metering?.provider ?? '', model: metering?.model ?? String(body.model ?? ''),
-      endpoint: sent.endpoint ?? 'openai-compatible', purpose: 'cache-refresh', policy: metering?.policy });
+      endpoint: sent.endpoint ?? 'openai-compatible', purpose: 'cache-refresh', policy: metering?.policy,
+      ...(metering?.credential ? { credential: metering.credential } : {}) });
     const headers = new Headers(sent.headers);
     for (const [name, value] of Object.entries(sent.requestHeaders ?? {})) headers.set(name, value);
     const response = await attempt.send(sent.url, {

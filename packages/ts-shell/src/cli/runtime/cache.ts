@@ -21,6 +21,7 @@ export function cacheRefreshFor(input: {
   readonly admission?: () => string | undefined;
   readonly renewHeaders: () => Promise<Readonly<Record<string, string>> | undefined>;
   readonly provider?: { readonly providerId: string; readonly model: string; readonly endpoint?: string };
+  readonly credential?: { readonly credentialId: string; readonly generation: string };
 }): Pick<CacheWarmingOptions, "refresh" | "canRefresh" | "onUsage" | "isCurrent"> {
   const provider = input.provider;
   const fetchImpl = providerFetchForEndpoint(input.runtimeConfig, provider?.endpoint, endpointShape, input.admission);
@@ -35,6 +36,7 @@ export function cacheRefreshFor(input: {
       if (!renewed || signal.aborted || !input.isCurrent()) return;
       return sendSentRequest({ ...sent, headers: renewed }, signal, fetchImpl, {
         policy: input.requestPolicy, provider: provider!.providerId, model: provider!.model,
+        ...(input.credential ? { credential: input.credential } : {}),
         transport: providerModelTransport(input.runtimeConfig, provider!.endpoint, input.admission),
       });
     },

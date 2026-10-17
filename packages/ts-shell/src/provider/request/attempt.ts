@@ -3,6 +3,8 @@ import { ModelAdmissionError, type ModelAttempt, type ModelTransport, type Reque
 import { endpointShape } from '../endpoints/index.js';
 import { modelUsage } from '../response/metering.js';
 import type { ProviderUsage } from '../../turn/completion.js';
+import { clearCredentialBackoff, credentialBackoffRemaining, noteCredentialRateLimit, responseBackoffMs,
+  type CredentialKey } from './backoff.js';
 
 export interface RequestAttempt {
   readonly id?: string;
@@ -14,14 +16,27 @@ export interface RequestAttempt {
 export async function prepareRequestAttempt(request: {
   readonly body: string; readonly provider: string; readonly model: string; readonly endpoint: string;
   readonly purpose: string; readonly requestId?: string; readonly policy?: RequestPolicy;
+  readonly credential?: CredentialKey;
 }): Promise<RequestAttempt> {
   request = Object.freeze({ ...request });
+  // A credential that a provider just rate-limited is not asked again until its
+  // own deadline. Another credential of the same provider is unaffected.
+  if (request.credential) {
+    const remaining = credentialBackoffRemaining(request.credential);
+    if (remaining > 0) throw new Error(`This account was rate limited ${Math.ceil(remaining / 1000)}s ago and is still waiting; use another connection or retry later.`);
+  }
   const proof = request.policy ? await endpointShape(request.endpoint).requestBound?.(request) : undefined;
   const attempt: ModelAttempt | undefined = request.policy?.reserve({
     requestId: request.requestId ?? randomUUID(), bodyDigest: createHash('sha256').update(request.body).digest('hex'),
     provider: request.provider, model: request.model, endpoint: request.endpoint, purpose: request.purpose,
+    ...(request.credential ? { credentialId: request.credential.credentialId, credentialGeneration: request.credential.generation } : {}),
     ...(proof !== undefined ? { bound: proof } : {}),
   });
+  const noteResponse = (response: Response): void => {
+    if (!request.credential) return;
+    if (response.status === 429) noteCredentialRateLimit(request.credential, responseBackoffMs(response.headers));
+    else if (response.ok) clearCredentialBackoff(request.credential);
+  };
   return {
     ...(attempt ? { id: attempt.id } : {}),
     send: async (input, init, fetchImpl, transport) => {
@@ -30,9 +45,15 @@ export async function prepareRequestAttempt(request: {
       try {
         if (init.body !== request.body) throw new ModelAdmissionError('unsupported');
         init.signal?.throwIfAborted();
-        if (transport) return await transport(input, init, beforeDispatch);
+        if (transport) {
+          const response = await transport(input, init, beforeDispatch);
+          noteResponse(response);
+          return response;
+        }
         beforeDispatch();
-        return await fetchImpl(input, init);
+        const response = await fetchImpl(input, init);
+        noteResponse(response);
+        return response;
       } catch (error) {
         // A failed dispatch persistence may have armed a reservation. Preserve unknown outcomes.
         if (!handedOff && !(error instanceof ModelAdmissionError && error.persistence !== 'unchanged')) attempt?.confirmUnsent();

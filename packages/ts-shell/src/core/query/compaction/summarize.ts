@@ -26,6 +26,9 @@ import type { ModelTransport, RequestPolicy } from '../../agent/request/model.js
 
 export interface CompactionProvider {
   readonly providerId?: string;
+  /** Which stored credential sends this summary; non-secret and rotation-sensitive. */
+  readonly credentialId?: string;
+  readonly credentialGeneration?: string;
   readonly baseUrl: string;
   /**
    * Headers this summarization authenticates with.
@@ -156,7 +159,9 @@ export async function requestCompactionSummary(request: CompactionRequest): Prom
     }),
   );
   const attempt = await prepareRequestAttempt({ body, provider: request.provider.providerId ?? '', model: request.provider.model,
-    endpoint: kind ?? 'openai-compatible', purpose: request.purpose ?? 'compaction', policy: request.requestPolicy });
+    endpoint: kind ?? 'openai-compatible', purpose: request.purpose ?? 'compaction', policy: request.requestPolicy,
+    ...(request.provider.credentialId && request.provider.credentialGeneration
+      ? { credential: { credentialId: request.provider.credentialId, generation: request.provider.credentialGeneration } } : {}) });
   const res = await attempt.send(endpointUrl(request.provider.baseUrl, kind, request.provider.model, false), {
     method: "POST",
     headers,

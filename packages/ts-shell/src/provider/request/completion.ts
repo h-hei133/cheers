@@ -32,6 +32,9 @@ export interface SimpleProvider {
    * copy of the name beside the request.
    */
   readonly providerId?: string;
+  /** Which stored credential sends this request; non-secret and rotation-sensitive. */
+  readonly credentialId?: string;
+  readonly credentialGeneration?: string;
   /**
    * Which endpoint kind this request goes to.
    *
@@ -91,7 +94,9 @@ export async function requestSimpleCompletion(
     }),
   );
   const attempt = await prepareRequestAttempt({ body: serialized, provider: request.provider.providerId ?? '', model: request.provider.model,
-    endpoint: kind ?? 'openai-compatible', purpose: 'side-question', policy: request.requestPolicy });
+    endpoint: kind ?? 'openai-compatible', purpose: 'side-question', policy: request.requestPolicy,
+    ...(request.provider.credentialId && request.provider.credentialGeneration
+      ? { credential: { credentialId: request.provider.credentialId, generation: request.provider.credentialGeneration } } : {}) });
   const res = await attempt.send(endpointUrl(request.provider.baseUrl, kind, request.provider.model, false), {
     method: "POST",
     headers,

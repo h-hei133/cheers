@@ -7302,3 +7302,13 @@ CFG-03 把 `/connect use|logout` 的输出改为区分“已存储”与“当�
 **本地验证**：新增 7 项 lease 测试（单所有者、过期 prepared 接管、dispatched 不重放、generation 完成、unknown 持久、并发获取、损坏文件）；`renewal.test.ts` 增至 38 项（含跨进程持有与 unknown 拒绝）全部通过；`core/auth`、`provider/request` 与 `providerCredentials` 12 文件 225 项通过；`build:ts`、Node floor、import cycles、config consumers 通过。合同见[显式账号池 §5](features/account-pool.md#5-refresh-归属与跨进程互斥)。
 
 本条写入时尚未提交/推送；未运行真实 provider 或真实多进程 refresh。
+
+### Phase 20 PRV-05：全请求凭据归属与按代际退避
+
+`PreparedRequest` 增加非秘密 `credentialId`/`credentialGeneration`，由解析凭据派生（连接 id 或 `config`，generation 为凭据材料摘要前缀）。主 turn、子代理、compaction/摘要、btw、jobs 代理与 cache refresh 在构造 provider 目标时携带同一身份，`prepareRequestAttempt` 写入 ledger pending attempt；codec 校验可选字段并在恢复时保留。
+
+新增 `provider/request/backoff.ts`：429 按 `retry-after-ms`/`retry-after` 记录，缺失时 60 秒；键包含 credentialId 与 generation，A 的迟到 429 不影响 B 或轮换后的新代际；发送前在 reserve 之前拒绝，成功响应清除。退避有界（512 条），不改变会话累计预算或既有 pending attempt。
+
+**本地验证**：新增 5 项退避/归属测试（作用域、Retry-After、发送前拒绝、429 记录与成功清除、有界淘汰）与 1 项 ledger 归属往返/坏 generation 拒绝；`provider/request`、`core/agent/request`、`core/query/compaction` 与 `turn/step.test.ts` 共 12 文件 301 项通过；`build:ts` 与四项静态门禁通过。合同见[请求归属与凭据退避](features/request-attribution.md)。
+
+本条写入时尚未提交/推送；未运行真实 provider、多进程或跨平台动态证据。

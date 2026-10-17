@@ -1,6 +1,7 @@
 import { profileScope } from '../../core/paths/profile/scope.js';
 import type { RuntimeConfig } from "../../config/runtimeConfig.js";
 import { configurationOperation } from '../../core/shell/scope.js';
+import { credentialIdentityFor } from '../../core/auth/account/pool.js';
 import { assertScopedModel } from '../../config/scope/projection.js';
 import type { ProviderCredentialResolution } from "../../core/shell/providerCredentials.js";
 import { configurationAdmission } from "../../core/shell/configuration.js";
@@ -186,6 +187,8 @@ export function createCliSessionRuntime(input: {
       model: target.model,
       providerId: target.provider,
       ...(endpointFor(target.provider, catalog) ? { endpoint: endpointFor(target.provider, catalog) } : {}),
+      ...(credentialIdentityFor(target.provider, { connectionId: resolved.credential?.connectionId,
+        accountAuth: target.accountAuth, apiKey: target.apiKey }) ?? {}),
       supportsTemperature: shape.supportsTemperature,
     };
   };
@@ -219,6 +222,8 @@ export function createCliSessionRuntime(input: {
       providerId: target.provider,
       supportsTemperature: resolveRequestShape(catalog, target.provider, target.model, undefined).supportsTemperature,
       ...(endpointFor(target.provider, catalog) ? { endpoint: endpointFor(target.provider, catalog) } : {}),
+      ...(credentialIdentityFor(target.provider, { connectionId: resolved.credential?.connectionId,
+        accountAuth: renewed.accountAuth ?? target.accountAuth, apiKey: target.apiKey }) ?? {}),
     } };
   };
   const reportCredentialPublication = () => {
@@ -366,6 +371,7 @@ export function createCliSessionRuntime(input: {
           ...cacheRefreshFor({ sessionId, runtimeConfig: config, admission,
             requestPolicy,
             ...(activeProvider ? { provider: activeProvider } : {}),
+            ...(credentialIdentityFor(resolved.provider, resolved.credential) ? { credential: credentialIdentityFor(resolved.provider, resolved.credential)! } : {}),
             renewHeaders: async () => (await renewedProvider(resolved, config, admission, catalog)).provider?.headers,
             isCurrent: () => {
               return !admission() && input.runtimeContext.configuration.current === publication &&

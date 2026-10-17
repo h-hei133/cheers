@@ -67,6 +67,9 @@ export interface ProviderTarget {
    * looked like before the catalog could answer at all.
    */
   readonly provider?: string;
+  /** Which stored credential this target uses; non-secret and rotation-sensitive. */
+  readonly credentialId?: string;
+  readonly credentialGeneration?: string;
   /**
    * Which endpoint kind this target speaks.
    *
@@ -413,7 +416,9 @@ export function createStepFunction(request: StepRequest): StepFunction {
         try {
           const body = JSON.stringify(payload);
           const modelAttempt = await prepareRequestAttempt({ body, provider: request.provider.provider ?? '', model: request.provider.model,
-            endpoint, purpose: options.agentMode ? 'subagent' : 'turn', requestId, policy: request.requestPolicy });
+            endpoint, purpose: options.agentMode ? 'subagent' : 'turn', requestId, policy: request.requestPolicy,
+            ...(request.provider.credentialId && request.provider.credentialGeneration
+              ? { credential: { credentialId: request.provider.credentialId, generation: request.provider.credentialGeneration } } : {}) });
           const attemptResponse = await modelAttempt.send(
             endpointUrl(request.provider.baseUrl, endpoint, request.provider.model),
             {
