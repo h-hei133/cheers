@@ -820,6 +820,9 @@ export class InteractiveMode {
     // returns to the newest rows so the echo and the answer are in view.
     this.view.scrollToEnd();
     if (this.busy) {
+      // A new message means the user is waiting on the model, not on a
+      // foreground command: promote that command in place rather than kill it.
+      jobsFor(this.options.runtimeContext)?.registry.promoteForeground?.();
       // A command is never steered: it is not a message for the model, so it
       // waits for the run boundary, like any input to a run that takes none.
       const input = text.startsWith("/") ? undefined : this.options.sessionRuntime.input?.();

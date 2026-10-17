@@ -40,6 +40,10 @@ export interface BackgroundRunner {
    * killed.
    */
   promote?(id: string): 'promoted' | 'settled' | 'refused';
+  /** Settle when a provisional task is promoted, settles, or is refused. */
+  whenPromoted?(id: string): Promise<'promoted' | 'settled' | 'refused'>;
+  /** Promote every provisional foreground task; returns how many were promoted. */
+  promoteForeground?(): number;
   list(): readonly BackgroundTask[];
   get(id: string): BackgroundTask | undefined;
   stop(id: string): Promise<boolean>;

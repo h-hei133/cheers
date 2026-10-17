@@ -63,6 +63,53 @@ it('adopts a foreground child and promotes it without a second spawn', async () 
   expect(handle.pid).toBe(task.pid);
 });
 
+it('promotes every provisional foreground task when a new message arrives', async () => {
+  const local = journal();
+  const owner = new TaskRegistry({ runCommand: vi.fn() }, local); owners.push(owner);
+  const { startStreamed } = await import('../../../runtime/execution/local.js');
+  const make = () => startStreamed({ command: process.execPath, args: ['-e', 'setTimeout(() => {}, 5000)'], cwd: root, onOutput: () => {} }).handle;
+  const first = owner.adopt(make(), { command: 'first', cwd: root });
+  const second = owner.adopt(make(), { command: 'second', cwd: root });
+  const waiting = owner.whenPromoted(first.id);
+  expect(owner.promoteForeground()).toBe(2);
+  expect(await waiting).toBe('promoted');
+  expect(local.get(first.id)).toMatchObject({ status: 'running' });
+  expect(local.get(second.id)).toMatchObject({ status: 'running' });
+  await owner.stop(first.id); await owner.stop(second.id);
+});
+
+it('reports a promoted PID left by a restart as unknown and never replays it', () => {
+  const local = journal();
+  const owner = new TaskRegistry({ runCommand: vi.fn() }, local); owners.push(owner);
+  const id = local.create({ command: 'restarted', cwd: root });
+  local.promote(id, { command: 'restarted', cwd: root }, 424242);
+  expect(owner.get(id)).toMatchObject({ state: 'unknown' });
+  expect(owner.hasLive(id)).toBe(false);
+  expect(() => owner.resume(id, { command: 'restarted', cwd: root })).toThrow(/undispatched/);
+});
+
+it('kills a promoted foreground child when its grant is revoked', async () => {
+  let denied: string | undefined;
+  const local = journal(store, () => denied);
+  const owner = new TaskRegistry({ runCommand: vi.fn() }, local); owners.push(owner);
+  const { startStreamed } = await import('../../../runtime/execution/local.js');
+  const handle = startStreamed({ command: process.execPath, args: ['-e', 'setTimeout(() => {}, 5000)'], cwd: root, onOutput: () => {} }).handle;
+  const task = owner.adopt(handle, { command: 'adopted', cwd: root });
+  expect(owner.promote(task.id)).toBe('promoted');
+  denied = 'Grant revoked';
+  await until(() => !owner.hasLive(task.id));
+  expect(local.get(task.id)).toMatchObject({ status: 'cancelled' });
+});
+
+it('reports settled for a provisional task that finishes before promotion', async () => {
+  const owner = new TaskRegistry({ runCommand: vi.fn() }); owners.push(owner);
+  const { startStreamed } = await import('../../../runtime/execution/local.js');
+  const handle = startStreamed({ command: process.execPath, args: ['-e', 'process.exit(0)'], cwd: root, onOutput: () => {} }).handle;
+  const task = owner.adopt(handle, { command: 'quick', cwd: root });
+  expect(await owner.whenPromoted(task.id)).toBe('settled');
+  expect(owner.get(task.id)).toBeUndefined();
+});
+
 it('refuses promotion when the journal is at capacity and kills the provisional child', async () => {
   const local = journal();
   const owner = new TaskRegistry({ runCommand: vi.fn() }, local); owners.push(owner);

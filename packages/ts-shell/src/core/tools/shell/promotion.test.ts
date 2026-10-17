@@ -52,6 +52,22 @@ it('reports the result when the command settles before promotion', async () => {
   expect(result.output).toContain('late');
 });
 
+it('returns as soon as a new message promotes the command', async () => {
+  const detach = vi.fn();
+  const promote = vi.fn(() => 'promoted' as const);
+  const adopt = vi.fn(() => ({ id: 'task-4', command: 'echo hi', cwd: '/tmp', pid: 4324, startedAt: 0, state: 'running', output: '' }));
+  const service = { startCommand: () => ({ handle: { pid: 4324, onOutput: () => () => {}, detach, kill: async () => {}, result: new Promise(() => {}) },
+    result: new Promise(() => {}) }), runCommand: vi.fn() } as unknown as ExecutionService;
+  const background = { adopt, promote, whenPromoted: () => Promise.resolve('promoted' as const), start: vi.fn(), list: () => [], get: () => undefined,
+    stop: async () => false, onEnded: () => () => {} } as unknown as BackgroundRunner;
+  const bash = createCoreToolRegistry({ executionService: service }).get('bash')!;
+  const context = { workspaceRoot: '/tmp', cwd: '/tmp', sessionId: 's', background, onOutput: () => {} } as unknown as ToolExecutionContext;
+  const result = await bash.execute({ command: 'echo hi' }, context);
+  expect(detach).toHaveBeenCalled();
+  expect(result.success).toBe(true);
+  expect(result.output).toContain('task-4');
+});
+
 it('stops the child when promotion is refused at capacity', async () => {
   vi.useFakeTimers();
   const detach = vi.fn();

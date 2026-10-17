@@ -194,7 +194,7 @@ export function startStreamed(options: StreamOptions): { handle: LocalExecutionH
     get pid() { return child.pid },
     onOutput(listener) { listeners.add(listener); return () => { listeners.delete(listener) } },
     detach() { if (detached) return; detached = true; clearTimeout(timer); options.abortSignal?.removeEventListener('abort', onAbort) },
-    kill() { stop(); return termination ?? Promise.resolve() },
+    kill() { cancelled = true; stop(); return termination ?? Promise.resolve() },
     result,
   }
   return { handle, result }

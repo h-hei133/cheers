@@ -9,7 +9,7 @@ import { taskSnapshot } from './snapshot.js';
 import { closeOutput } from './settlement.js';
 
 interface Operation { readonly controller: AbortController; readonly sink: OutputSink; readonly stdout: StringDecoder;
-  readonly stderr: StringDecoder; settlement: Promise<void>; readonly handle?: LocalExecutionHandle; readonly input?: BackgroundInput; readonly adopted?: boolean; }
+  readonly stderr: StringDecoder; settlement: Promise<void>; readonly handle?: LocalExecutionHandle; readonly input?: BackgroundInput; readonly adopted?: boolean; watch?: ReturnType<typeof setInterval>; }
 
 /** Live handles belong to this owner; restart never signals a numeric PID from a journal. */
 export class TaskRegistry implements BackgroundRunner {
@@ -21,6 +21,8 @@ export class TaskRegistry implements BackgroundRunner {
   private closing = false;
   /** Provisional tasks promoted to the durable journal. */
   private readonly promoted = new Set<string>();
+  /** Outcomes for callers waiting on a provisional task's promotion decision. */
+  private readonly promotion = new Map<string, { readonly promise: Promise<'promoted' | 'settled' | 'refused'>; readonly resolve: (outcome: 'promoted' | 'settled' | 'refused') => void }>();
   spillDirectory: string | undefined;
   constructor(private readonly execution: Pick<ExecutionService, 'runCommand'> = createDefaultExecutionService(),
     private readonly journal?: LocalJournalPort) {}
@@ -49,12 +51,17 @@ export class TaskRegistry implements BackgroundRunner {
       ...(!this.journal && this.spillDirectory ? { spillDirectory: this.spillDirectory } : {}) }), stdout: new StringDecoder('utf8'), stderr: new StringDecoder('utf8'),
       settlement: Promise.resolve(), handle, input, adopted: true };
     this.operations.set(id, operation);
+    let resolvePromotion!: (outcome: 'promoted' | 'settled' | 'refused') => void;
+    const promotion = new Promise<'promoted' | 'settled' | 'refused'>(resolve => { resolvePromotion = resolve; });
+    this.promotion.set(id, { promise: promotion, resolve: resolvePromotion });
     const off = handle.onOutput(text => this.appendAdopted(id, text));
     const settle = async (result: Pick<CommandExecutionResult, 'status' | 'exitCode' | 'terminationFailed' | 'outputFailed' | 'spawnErrorCode'>): Promise<void> => {
       off();
+      if (operation.watch) { clearInterval(operation.watch); operation.watch = undefined; }
       // Publication must finish while the promotion marker is still set; the
       // cleanup below is what makes the task invisible to `hasLive`.
       await this.finish(id, result);
+      this.settlePromotion(id, 'settled');
       this.operations.delete(id);
       if (!this.promoted.has(id)) this.tasks.delete(id);
       this.promoted.delete(id);
@@ -69,21 +76,46 @@ export class TaskRegistry implements BackgroundRunner {
   }
   promote(id: string): 'promoted' | 'settled' | 'refused' {
     const operation = this.operations.get(id); const task = this.tasks.get(id);
-    if (this.promoted.has(id)) return 'promoted';
-    // No live operation means the child settled before the promotion; the
-    // caller still owns the result and must not be told the job was lost.
-    if (!operation?.handle || !operation.input || !task) return 'settled';
-    if (!this.journal) return 'refused';
-    try {
-      this.journal.promote(id, operation.input, task.pid);
-      this.promoted.add(id);
-      return 'promoted';
-    } catch {
-      // Capacity or journal refusal: the provisional task must not keep a live
-      // child that nothing can address, so it is killed here.
-      void operation.handle.kill();
-      return 'refused';
+    const outcome = ((): 'promoted' | 'settled' | 'refused' => {
+      if (this.promoted.has(id)) return 'promoted';
+      // No live operation means the child settled before the promotion; the
+      // caller still owns the result and must not be told the job was lost.
+      if (!operation?.handle || !operation.input || !task) return 'settled';
+      if (!this.journal) return 'refused';
+      try {
+        this.journal.promote(id, operation.input, task.pid);
+        this.promoted.add(id);
+        // A promoted foreground child is admitted exactly like a launched job:
+        // revoking the grant kills the same PID, not a copy of it.
+        operation.watch = setInterval(() => { if (this.journal?.admission(id)) void operation.handle?.kill(); }, 100);
+        operation.watch.unref();
+        return 'promoted';
+      } catch {
+        // Capacity or journal refusal: the provisional task must not keep a live
+        // child that nothing can address, so it is killed here.
+        void operation.handle.kill();
+        return 'refused';
+      }
+    })();
+    this.settlePromotion(id, outcome);
+    return outcome;
+  }
+  whenPromoted(id: string): Promise<'promoted' | 'settled' | 'refused'> {
+    return this.promotion.get(id)?.promise ?? Promise.resolve('settled');
+  }
+  promoteForeground(): number {
+    let promoted = 0;
+    for (const [id, operation] of this.operations) {
+      if (!operation.adopted || this.promoted.has(id)) continue;
+      if (this.promote(id) === 'promoted') promoted++;
     }
+    return promoted;
+  }
+  private settlePromotion(id: string, outcome: 'promoted' | 'settled' | 'refused'): void {
+    const waiter = this.promotion.get(id);
+    if (!waiter) return;
+    this.promotion.delete(id);
+    waiter.resolve(outcome);
   }
   resume(id: string, input: BackgroundInput): BackgroundTask {
     if (this.closing || this.tasks.has(id) || !this.journal) throw new Error('No newly approved queued job is available.');
