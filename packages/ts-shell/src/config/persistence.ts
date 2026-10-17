@@ -9,6 +9,8 @@ import { ConfigDocumentError } from './syntax.js';
 import { patchConfigDocument } from './patch.js';
 import { mergeConfigEdit } from './conflict.js';
 import { ConfigWriteError, type ConfigWriteState } from './outcome.js';
+import { assertProfileIdentity, assertProfileStorage, currentProfile, type ProfileContext } from '../core/paths/profile/context.js';
+import { isWithin } from '../core/paths/profile/identity.js';
 
 export interface ConfigEdit<T> {
   readonly path: string;
@@ -16,9 +18,19 @@ export interface ConfigEdit<T> {
   readonly values: T;
 }
 
+const owners = new WeakMap<ConfigEdit<unknown>, ProfileContext | undefined>();
+
 /** Explicit immutable baselines cannot accidentally survive a spread as raw config. */
 class EditBaseline<T> implements ConfigEdit<T> {
-  constructor(readonly path: string, readonly revision: string | null, readonly values: T) { freezeDeep(this); }
+  constructor(readonly path: string, readonly revision: string | null, readonly values: T) {
+    owners.set(this, currentProfile()); freezeDeep(this);
+  }
+}
+
+function assertOwner(file: string, profile: ProfileContext | undefined): void {
+  if (!profile) return;
+  assertProfileIdentity(profile);
+  if (isWithin(profile.root, file)) assertProfileStorage(file, profile);
 }
 
 function revision(text: string | undefined): string | null {
@@ -26,6 +38,7 @@ function revision(text: string | undefined): string | null {
 }
 
 export function readConfigEdit<T>(filePath: string, fields: ConfigFields): ConfigEdit<T> {
+  assertOwner(filePath, currentProfile());
   const snapshot = readConfigSnapshot(filePath);
   const values = snapshot?.values ?? {};
   validateRawConfig(values, fields);
@@ -41,12 +54,16 @@ export function persistConfigEdit<T>(filePath: string, patch: T, baseline: Confi
   let cleanupFailed = false;
   let savedRevision: string | undefined;
   try {
+    const profile = owners.get(baseline);
+    assertOwner(baseline.path, profile);
+    assertOwner(`${baseline.path}.lock`, profile);
     code = 'invalid-document';
     validateRawConfig(patch, fields);
     const desired = JSON.parse(JSON.stringify({ ...baseline.values, ...patch }));
     validateRawConfig(desired, fields);
     code = 'lock-failed';
     return withFileLock(`${baseline.path}.lock`, () => {
+      assertOwner(baseline.path, profile);
       code = 'invalid-document';
       const current = readConfigSnapshot(baseline.path);
       if (baseline.revision !== null && !current) throw new ConfigWriteError('conflict', 'unchanged');
@@ -63,8 +80,10 @@ export function persistConfigEdit<T>(filePath: string, patch: T, baseline: Confi
       // that changes the path between this check and the atomic rename.
       if (readConfigSnapshot(baseline.path)?.text !== current?.text) throw new ConfigWriteError('conflict', 'unchanged');
       if (text !== current?.text) {
+        assertOwner(baseline.path, profile);
         state = 'unknown'; code = 'write-failed';
         writeTextFileAtomic(baseline.path, text);
+        assertOwner(baseline.path, profile);
         code = 'verification-failed';
         if (readConfigSnapshot(baseline.path)?.text !== text) throw new ConfigWriteError('verification-failed', 'unknown');
         state = 'persisted'; savedRevision = revision(text)!;

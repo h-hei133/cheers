@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import process from "node:process";
+import path from 'node:path';
+import { installProcessProfile } from '../core/paths/profile/context.js';
 import {
   runCliProcess,
 } from "../cli/bootstrap/cliProcessRunner.js";
@@ -8,11 +10,6 @@ import {
 } from "../cli/errors/cliFatalErrorBoundary.js";
 import { installCrashRecorder } from "../observability/crashLog.js";
 import { time } from "../observability/startupTiming.js";
-
-// Installed before anything else runs, so a failure during startup is recorded
-// too — the moment a process is most likely to fall over is while it is still
-// assembling itself.
-installCrashRecorder({ cwd: process.cwd() });
 
 // The elapsed clock includes runtime startup and this entrypoint's dependency
 // evaluation, regardless of when the timing module itself was imported.
@@ -25,6 +22,10 @@ runCliProcess({
   writeOutput: console.log,
   writeError: console.error,
   exit: process.exit,
+  profileSelected: profile => {
+    installProcessProfile(profile);
+    installCrashRecorder({ cwd: process.cwd(), filePath: path.join(profile.root, 'crashes.json') });
+  },
 }).catch((error) => {
   handleCliFatalError({
     error,

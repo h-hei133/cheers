@@ -27,7 +27,8 @@ import { splitByteOrderMark } from "../../runtime/execution/fileText.js";
 import { projectDirectories } from "../../core/project/directories.js";
 import { expandImports } from "./importExpansion.js";
 import { escapeAttribute, neutraliseTagBoundaries } from "../../core/text/safety.js";
-import { userDataSearchDirsFor } from "../../core/paths/userHome.js";
+import { userDataSearchDirsFor, userHomeDir } from "../../core/paths/userHome.js";
+import { assertProfileStorage } from '../../core/paths/profile/context.js';
 
 /**
  * Candidate file names, most specific first.
@@ -101,12 +102,12 @@ export function loadInstructionFiles(options: InstructionLoadOptions): Instructi
 
   const ordered: InstructionFile[] = [];
 
-  const homeDir = options.homeDir ?? process.env.USERPROFILE ?? process.env.HOME ?? os.homedir();
+  const homeDir = options.homeDir ?? userHomeDir();
   // Every directory the user file may live in, current first. Reading only the
   // current one would drop the rules someone already wrote under an earlier name,
   // which is the same loss as deleting them.
   const userFile = userDataSearchDirsFor(homeDir)
-    .map((directory) => loadOneFrom(directory))
+    .map((directory) => loadOneFrom(directory, CANDIDATES, true))
     .find((file) => file !== undefined);
   if (userFile) ordered.push(userFile);
 
@@ -154,9 +155,11 @@ function loadAncestorFiles(cwd: string): InstructionFile[] {
 function loadOneFrom(
   directory: string,
   candidates: readonly string[] = CANDIDATES,
+  user = false,
 ): InstructionFile | undefined {
   for (const candidate of candidates) {
     const filePath = path.join(directory, candidate);
+    if (user) assertProfileStorage(filePath);
     let stats: fs.Stats;
     try {
       stats = fs.statSync(filePath);

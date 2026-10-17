@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { writeTextFileAtomic } from "../session/store/sessionFileStore.js";
 import { withMemoryStoreLock } from "./store/transaction.js";
+import { captureMemoryOwner, assertMemoryOwner } from './store/owner.js';
 import type {
   ProjectMemoryListResult,
   ProjectMemoryLifecycleTombstone,
@@ -40,27 +41,33 @@ export interface CreateProjectMemoryLocalStoreOptions {
 export function createProjectMemoryLocalStore(
   options: CreateProjectMemoryLocalStoreOptions,
 ): ProjectMemoryStore {
-  const ref = normalizeRef(options.ref);
+  const ref = captureMemoryOwner(normalizeRef(options.ref));
   return {
     ref,
     async write(request) {
+      assertMemoryOwner(ref);
       return writeRecord(ref, request);
     },
     async list(listOptions) {
+      assertMemoryOwner(ref);
       return readRecords(ref, listOptions);
     },
     async get(id) {
+      assertMemoryOwner(ref);
       return (await readRecords(ref, { includeInvalidated: true })).records.find(
         (record) => record.id === id,
       );
     },
     async invalidate(request) {
+      assertMemoryOwner(ref);
       return invalidateRecord(ref, request);
     },
     async delete(request) {
+      assertMemoryOwner(ref);
       return deleteRecord(ref, request);
     },
     async health() {
+      assertMemoryOwner(ref);
       return storeHealth(ref);
     },
   };

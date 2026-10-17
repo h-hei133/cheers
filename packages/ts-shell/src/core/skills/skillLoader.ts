@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { userDataSearchDirs } from "../paths/userHome.js";
+import { assertProfileIdentity, assertProfileStorage, currentProfile } from '../paths/profile/context.js';
 import { projectDirectories } from "../project/directories.js";
 import { loadIgnoredDirectories } from "../../runtime/execution/ignoreRules.js";
 import { SkillDiscovery } from './discovery.js';
@@ -123,6 +124,7 @@ const VALID_NAME = /^[a-z0-9-]+$/;
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 
 export class SkillLoader {
+  private readonly profile = currentProfile();
   private readonly roots: readonly { readonly dir: string; readonly source: SkillSource; readonly boundary: string }[];
   /** Paths the user named explicitly, as files or directories. */
   private readonly extraPaths: readonly string[];
@@ -218,6 +220,7 @@ export class SkillLoader {
     /** Named paths that could not be loaded. Empty unless one was named. */
     failures: readonly { readonly filePath: string; readonly message: string }[]
   }> {
+    if (this.profile) assertProfileIdentity(this.profile);
     const skills = new Map<string, Skill>();
     const collisions: SkillCollision[] = [];
     const diagnostics: SkillDiagnostic[] = [];
@@ -229,6 +232,7 @@ export class SkillLoader {
       ...this.roots,
       ...this.extraPaths.map((entry) => ({ dir: entry, source: "cli" as const, boundary: undefined })),
     ]) {
+      if (root.source === 'user') assertProfileStorage(root.dir, this.profile);
       for (const skill of await this.loadRoot(root.dir, root.source, root.boundary, discovery, failures)) {
         diagnostics.push(...inspectSkill(skill));
         const existing = skills.get(skill.name);
@@ -251,6 +255,7 @@ export class SkillLoader {
       }
     }
     discovery.verify();
+    if (this.profile) assertProfileIdentity(this.profile);
     return { skills, collisions, diagnostics, failures };
   }
 
@@ -339,6 +344,7 @@ export class SkillLoader {
    * and it has no way to notice the omission.
    */
   private async scan(dir: string, source: SkillSource, isRoot: boolean, boundary: string, discovery: SkillDiscovery, depth: number): Promise<Skill[]> {
+    if (source === 'user') assertProfileStorage(dir, this.profile);
     this.onSource?.(dir);
     let entries: fs.Dirent[];
     try {
@@ -400,7 +406,12 @@ export class SkillLoader {
   }
 
   private async readSkill(file: string, dirName: string | undefined, source: SkillSource, boundary: string, discovery: SkillDiscovery): Promise<Skill | undefined> {
-    try { return parseSkill(await discovery.content(boundary, file), file, dirName, source); }
+    try {
+      if (source === 'user') assertProfileStorage(file, this.profile);
+      const content = await discovery.content(boundary, file);
+      if (source === 'user') assertProfileStorage(file, this.profile);
+      return parseSkill(content, file, dirName, source);
+    }
     catch (error) { discovery.rethrow(error); return undefined; }
   }
 }

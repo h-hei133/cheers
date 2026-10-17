@@ -1,3 +1,4 @@
+import { profileScope } from '../../../core/paths/profile/scope.js';
 import { isDeepStrictEqual } from "node:util";
 import { DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE, getLatestCompactCheckpoint } from "../../../context/compact/checkpoint/compactLiveCheckpoint.js";
 import { extractProjectMemoryCandidates } from "../../../memory/projectMemoryCandidateExtractor.js";
@@ -14,7 +15,7 @@ export function memoryCatalogStore(projectRoot: string) {
 }
 
 export function observeMemoryCatalog(sessionId: string, changed: () => void): () => void {
-  const scope = `session:${sessionId}`;
+  const scope = profileScope(`session:${sessionId}`);
   const checkpoint = DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE.subscribe?.(scope, changed);
   const review = DEFAULT_PROJECT_MEMORY_REVIEW_STATE_STORE.subscribe?.(scope, changed);
   return () => { checkpoint?.(); review?.(); };
@@ -29,7 +30,7 @@ export async function memoryCatalog(kind: MemoryCatalogKind, context: ShellRunti
     return result.records.map(record => ({ value: record.id, label: record.id,
       detail: `${record.candidateKind} · ${record.invalidatedAt ? "invalidated" : "active"}` }));
   }
-  const scope = `session:${context.session.id}`;
+  const scope = profileScope(`session:${context.session.id}`);
   const latest = getLatestCompactCheckpoint(DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE, scope);
   const candidates = latest ? extractProjectMemoryCandidates({ compactPacket: latest.packet }) : [];
   const state = DEFAULT_PROJECT_MEMORY_REVIEW_STATE_STORE.get(scope);

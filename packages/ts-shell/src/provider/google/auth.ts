@@ -14,7 +14,8 @@
 
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { profileScope } from '../../core/paths/profile/scope.js';
 
 /** A token, and when it stops working. */
 export interface AccessToken {
@@ -82,7 +83,9 @@ export async function accessToken(options: {
   readonly signal?: AbortSignal;
 } = {}): Promise<AccessToken> {
   const env = options.env ?? process.env;
-  const cached = cache;
+  const source = env.GOOGLE_APPLICATION_CREDENTIALS;
+  const cacheKey = profileScope(`google:${source === undefined ? `adc:${adcPath(env)}` : `file:${resolve(source)}`}`);
+  const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt - REFRESH_SKEW_MS > Date.now()) return cached;
 
   const namedPath = env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -97,7 +100,7 @@ export async function accessToken(options: {
       );
     }
     const token = await fromCredentialFile(text, namedPath, options);
-    cache = token;
+    cache.set(cacheKey, token);
     return token;
   }
 
@@ -105,13 +108,13 @@ export async function accessToken(options: {
   const text = await readFile(defaultPath, "utf8").catch(() => undefined);
   if (text !== undefined) {
     const token = await fromCredentialFile(text, defaultPath, options);
-    cache = token;
+    cache.set(cacheKey, token);
     return token;
   }
 
   const fromMetadata = await fromMetadataServer(options);
   if (fromMetadata) {
-    cache = fromMetadata;
+    cache.set(cacheKey, fromMetadata);
     return fromMetadata;
   }
 
@@ -123,11 +126,11 @@ export async function accessToken(options: {
 }
 
 /** The last token this process obtained. */
-let cache: AccessToken | undefined;
+const cache = new Map<string, AccessToken>();
 
 /** Forget the cached token, so the next call obtains a fresh one. */
 export function forgetAccessToken(): void {
-  cache = undefined;
+  cache.clear();
 }
 
 /** A token from a credential file, whichever of the two kinds it holds. */

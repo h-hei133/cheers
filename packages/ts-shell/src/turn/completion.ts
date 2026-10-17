@@ -1,4 +1,4 @@
-import * as fs from "node:fs";
+import { streamTracer } from '../observability/logs/stream.js';
 
 /**
  * Reading a chat completion as it arrives.
@@ -196,33 +196,10 @@ const FINISH_GRACE_MS = 2_000;
 
 const GRACE_EXPIRED = Symbol("finish-grace-expired");
 
-/**
- * Whether to narrate the shape of each stream frame.
- *
- * For diagnosing a host whose stream never finishes: the question is always
- * whether the terminal reason arrived, whether the sentinel did, and whether the
- * socket closed — none of which is visible from the screen.
- *
- * Written to a file rather than the terminal. The interactive surface owns the
- * terminal and repaints it; anything else writing there lands between two frames
- * of a repaint, which scrolls the whole view and repeats lines. Content is never
- * written, only the frame's structure.
- */
-const TRACE_STREAMS = process.env.CHEERS_STREAM_TRACE === "1";
-const TRACE_PATH = process.env.CHEERS_STREAM_TRACE_PATH ?? "stream-trace.log";
-
-function traceStream(message: string): void {
-  if (!TRACE_STREAMS) return;
-  try {
-    fs.appendFileSync(TRACE_PATH, `[stream] ${message}\n`, "utf8");
-  } catch {
-    // A diagnostic must never be the reason a turn fails.
-  }
-}
-
 export async function* readCompletionStream(
   body: ReadableStream<Uint8Array>,
 ): AsyncGenerator<StreamFragment, StreamedCompletion, undefined> {
+  const traceStream = streamTracer();
   const state: StreamState = {
     calls: [],
     byIndex: new Map(),
@@ -260,7 +237,7 @@ export async function* readCompletionStream(
         const split = nextEvent(buffer);
         if (!split) break;
         buffer = split.rest;
-        const step = absorb(split.event, state);
+        const step = absorb(split.event, state, traceStream);
         yield* step.fragments;
         if (step.ended) {
           traceStream("stopped: [DONE] sentinel");
@@ -292,7 +269,7 @@ export async function* readCompletionStream(
   // is the answer.
   buffer += decoder.decode();
   if (!ended && buffer.trim().length > 0) {
-    const step = absorb(buffer, state);
+    const step = absorb(buffer, state, traceStream);
     yield* step.fragments;
     ended = step.ended;
     settled ||= step.settled;
@@ -304,11 +281,7 @@ export async function* readCompletionStream(
     throw new Error("Provider stream ended before it reported the message was complete");
   }
 
-  if (TRACE_STREAMS) {
-    traceStream(
-      `turn ended finish_reason=${state.finishReason ?? "-"} content_chars=${state.content.length} calls=${state.calls.length} usage=${state.usage ? "yes" : "no"}`,
-    );
-  }
+  traceStream(`turn ended finish_reason=${state.finishReason ?? "-"} content_chars=${state.content.length} calls=${state.calls.length} usage=${state.usage ? "yes" : "no"}`);
   return assemble(state);
 }
 
@@ -329,6 +302,7 @@ function nextEvent(buffer: string): { readonly event: string; readonly rest: str
 function absorb(
   event: string,
   state: StreamState,
+  traceStream: (message: string) => void,
 ): { readonly fragments: readonly StreamFragment[]; readonly ended: boolean; readonly settled: boolean } {
   const payload = eventData(event);
   if (payload === undefined) return { fragments: [], ended: false, settled: false };
@@ -346,12 +320,8 @@ function absorb(
   if (parsed.usage) state.usage = parsed.usage;
   const choice = parsed.choices?.[0];
   if (choice?.finish_reason) state.finishReason = choice.finish_reason;
-  if (TRACE_STREAMS) {
-    const keys = choice?.delta ? Object.keys(choice.delta).filter((k) => k !== "content") : [];
-    traceStream(
-      `frame finish_reason=${choice?.finish_reason ?? "-"} delta_keys=${keys.join("|") || "-"} usage=${parsed.usage ? "yes" : "no"}`,
-    );
-  }
+  const keys = choice?.delta ? Object.keys(choice.delta).filter((k) => k !== "content") : [];
+  traceStream(`frame finish_reason=${choice?.finish_reason ?? "-"} delta_keys=${keys.join("|") || "-"} usage=${parsed.usage ? "yes" : "no"}`);
   const delta = choice?.delta;
   // A terminal finish reason ends the answer even though more events may follow.
   // The `[DONE]` sentinel is the documented end of the stream but not a reliable

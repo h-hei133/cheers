@@ -1,3 +1,4 @@
+import { sessionTelemetries } from './usage/state.js';
 import type { ModelCostRates } from "../core/models/catalog.js";
 import type { RequestContext } from '../context/request/model.js';
 
@@ -114,7 +115,6 @@ export function estimateSessionCost(
 
 
 
-const sessionTelemetries: Map<string, SessionUsageTelemetry> = new Map();
 // Weak keys follow the telemetry lifetime; no second session registry to clean up.
 const persistedBaselines = new WeakMap<SessionUsageTelemetry, SessionUsageSnapshot>();
 
@@ -135,7 +135,7 @@ export function recordSessionUsage(
   },
   options: { readonly affectsContext?: boolean; readonly promptMeasured?: boolean } = {},
 ): void {
-  const existing = sessionTelemetries.get(sessionId) ?? emptyTelemetry();
+  const existing = sessionTelemetries().get(sessionId) ?? emptyTelemetry();
   // A report that does not name a model belongs to whichever one last answered:
   // creating a `default` bucket for it would split that model's tokens in two and
   // price them at two different rates.
@@ -202,7 +202,7 @@ export function recordSessionUsage(
     });
   }
 
-  sessionTelemetries.set(sessionId, existing);
+  sessionTelemetries().set(sessionId, existing);
 }
 
 /** Append to the bounded history, dropping the oldest entry once it is full. */
@@ -229,18 +229,18 @@ function emptyTelemetry(): SessionUsageTelemetry {
 }
 
 export function getSessionUsage(sessionId: string): SessionUsageTelemetry {
-  return sessionTelemetries.get(sessionId) ?? emptyTelemetry();
+  return sessionTelemetries().get(sessionId) ?? emptyTelemetry();
 }
 
 export function recordRequestContext(sessionId: string, context: RequestContext): void {
-  const telemetry = sessionTelemetries.get(sessionId) ?? emptyTelemetry();
+  const telemetry = sessionTelemetries().get(sessionId) ?? emptyTelemetry();
   telemetry.requestContext = context;
-  sessionTelemetries.set(sessionId, telemetry);
+  sessionTelemetries().set(sessionId, telemetry);
 }
 
 /** An accepted request has no current measurement until its usage arrives. */
 export function clearContextUsage(sessionId: string): void {
-  const existing = sessionTelemetries.get(sessionId);
+  const existing = sessionTelemetries().get(sessionId);
   if (!existing) return;
   existing.lastPromptTokens = undefined;
   existing.lastPromptMessageCount = 0;
@@ -254,7 +254,7 @@ export function clearContextUsage(sessionId: string): void {
  * happened, and neither event adds measured tokens or requests to the totals.
  */
 export function markContextUnknown(sessionId: string, kind: 'context-reset' | 'usage-gap' = 'context-reset'): void {
-  const existing = sessionTelemetries.get(sessionId);
+  const existing = sessionTelemetries().get(sessionId);
   if (!existing) return;
   if (kind === 'context-reset') delete existing.requestContext;
   clearContextUsage(sessionId);
@@ -272,16 +272,16 @@ export function markContextUnknown(sessionId: string, kind: 'context-reset' | 'u
 }
 
 export function resetSessionUsage(sessionId: string): void {
-  sessionTelemetries.delete(sessionId);
+  sessionTelemetries().delete(sessionId);
 }
 
 /** Restore once on activation. Never replace live, possibly unflushed usage. */
 export function restoreSessionUsage(sessionId: string, snapshot: unknown): void {
-  if (sessionTelemetries.has(sessionId)) return;
+  if (sessionTelemetries().has(sessionId)) return;
   const restored = decodeUsageSnapshot(snapshot);
   if (!restored) return;
   const telemetry = Object.assign(emptyTelemetry(), restored);
-  sessionTelemetries.set(sessionId, telemetry);
+  sessionTelemetries().set(sessionId, telemetry);
   persistedBaselines.set(telemetry, decodeUsageSnapshot(restored)!);
 }
 
@@ -295,7 +295,7 @@ export function persistSessionUsage(
   current: unknown,
   write: (snapshot: SessionUsageSnapshot | undefined) => void,
 ): void {
-  const live = sessionTelemetries.get(sessionId);
+  const live = sessionTelemetries().get(sessionId);
   const snapshot = live
     ? mergeUsageDelta(current, live, persistedBaselines.get(live))
     : decodeUsageSnapshot(current);

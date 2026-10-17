@@ -6,6 +6,7 @@ import { hashContent } from '../authority/content.js';
 import { commitWorkspaceFile } from '../authority/commit.js';
 import { inspectWorkspaceFile } from '../authority/state.js';
 import { prepareLedgerDirectory, readLedgerText, safeRecoveryId, validRecoveryRecord } from './record.js';
+import { assertProfileStorage, currentProfile } from '../../core/paths/profile/context.js';
 export { hashContent } from '../authority/content.js';
 import type {
   OriginalContentAuthorityRecord,
@@ -316,6 +317,7 @@ export async function cleanupRecoveryAuthorityRecord(input: {
   readonly authorityId: string;
   readonly recordId: string;
 }): Promise<RecoveryAuthorityCleanupResult> {
+  const profile = currentProfile();
   const record = await readRecoveryAuthorityRecord(input);
   if (!record) {
     return {
@@ -328,14 +330,18 @@ export async function cleanupRecoveryAuthorityRecord(input: {
     input.ledgerRoot,
     input.authorityId,
   );
-  await fs.rm(recordPath(input.ledgerRoot, input.authorityId, input.recordId), {
+  const target = recordPath(input.ledgerRoot, input.authorityId, input.recordId);
+  assertProfileStorage(target, profile);
+  await fs.rm(target, {
     force: true,
   });
   if (record.beforeContentRef) {
+    assertProfileStorage(path.join(namespaceRoot, record.beforeContentRef), profile);
     await fs.rm(path.join(namespaceRoot, record.beforeContentRef), {
       force: true,
     });
   }
+  assertProfileStorage(namespaceRoot, profile);
   return {
     cleaned: true,
     recordId: input.recordId,
@@ -350,6 +356,7 @@ export async function purgeRecoveryAuthority(input: {
   readonly ledgerRoot: string;
   readonly authorityId: string;
 }): Promise<RecoveryAuthorityCleanupResult> {
+  const profile = currentProfile();
   const config = validateNonDefaultConfig({
     mode: "non-default",
     ledgerRoot: input.ledgerRoot,
@@ -362,10 +369,13 @@ export async function purgeRecoveryAuthority(input: {
       evidence: ["recovery-authority-store:purge-invalid-config"],
     };
   }
-  await fs.rm(authorityNamespaceRoot(config.ledgerRoot, config.authorityId), {
+  const target = authorityNamespaceRoot(config.ledgerRoot, config.authorityId);
+  assertProfileStorage(target, profile);
+  await fs.rm(target, {
     recursive: true,
     force: true,
   });
+  assertProfileStorage(target, profile);
   return {
     cleaned: true,
     evidence: ["recovery-authority-store:purge-namespace-removed"],

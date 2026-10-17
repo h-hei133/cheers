@@ -22,6 +22,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { assertProfileIdentity, currentProfile, profilePath } from './profile/context.js';
 
 /** The directory in use now. */
 const CURRENT_DIRECTORY_NAME = ".cheers";
@@ -36,7 +37,7 @@ const LEGACY_DIRECTORY_NAMES = [".cheer", ".private-agents", ".coding-agents"] a
 
 /** The home directory to resolve against, honouring the environment override. */
 export function userHomeDir(): string {
-  return process.env.USERPROFILE || process.env.HOME || os.homedir();
+  return currentProfile()?.homeDir ?? (process.env.USERPROFILE || process.env.HOME || os.homedir());
 }
 
 /**
@@ -46,7 +47,8 @@ export function userHomeDir(): string {
  * does not keep accreting in a location that is only read.
  */
 export function userDataDir(): string {
-  return path.join(userHomeDir(), CURRENT_DIRECTORY_NAME);
+  const profile = currentProfile();
+  return profile ? profilePath('.', profile) : path.join(userHomeDir(), CURRENT_DIRECTORY_NAME);
 }
 
 /**
@@ -58,7 +60,10 @@ export function userDataDir(): string {
  * uses, which is what keeps the two from diverging.
  */
 export function userDataDirFor(root: string): string {
-  return path.join(root, CURRENT_DIRECTORY_NAME);
+  const profile = currentProfile();
+  if (!profile) return path.join(root, CURRENT_DIRECTORY_NAME);
+  assertProfileHome(root);
+  return profilePath('.', profile);
 }
 
 /**
@@ -68,9 +73,7 @@ export function userDataDirFor(root: string): string {
  * has, or reporting where a value came from — rather than only resolving a path.
  */
 export function userDataSearchDirs(): readonly string[] {
-  return [CURRENT_DIRECTORY_NAME, ...LEGACY_DIRECTORY_NAMES].map((name) =>
-    path.join(userHomeDir(), name),
-  );
+  return userDataSearchDirsFor(userHomeDir());
 }
 
 /**
@@ -80,6 +83,13 @@ export function userDataSearchDirs(): readonly string[] {
  * home directory as an argument instead of reading the environment.
  */
 export function userDataSearchDirsFor(root: string): readonly string[] {
+  const profile = currentProfile();
+  if (profile) {
+    assertProfileHome(root);
+    assertProfileIdentity(profile);
+    if (profile.id !== 'default') return [profile.root];
+    return [profile.root, ...LEGACY_DIRECTORY_NAMES.map(name => path.join(profile.homeDir, name))];
+  }
   return [CURRENT_DIRECTORY_NAME, ...LEGACY_DIRECTORY_NAMES].map((name) => path.join(root, name));
 }
 
@@ -96,6 +106,12 @@ export function userDataSearchDirsFor(root: string): readonly string[] {
  * caller believes it is isolated.
  */
 export function resolveUserDataFile(relativePath: string, root?: string): string {
+  const profile = currentProfile();
+  if (profile) {
+    if (root !== undefined) assertProfileHome(root);
+    const target = profilePath(relativePath, profile);
+    if (profile.id !== 'default') return target;
+  }
   const dirs = root === undefined ? userDataSearchDirs() : userDataSearchDirsFor(root);
   const candidates = dirs.map((dir) => path.join(dir, relativePath));
   return candidates.find((candidate) => fs.existsSync(candidate)) ?? candidates[0]!;
@@ -111,8 +127,19 @@ export function resolveUserDataFile(relativePath: string, root?: string): string
  * current name would lose what an older installation already has.
  */
 export function resolveAllUserDataFiles(relativePath: string, root?: string): readonly string[] {
+  const profile = currentProfile();
+  if (profile) {
+    if (root !== undefined) assertProfileHome(root);
+    const target = profilePath(relativePath, profile);
+    if (profile.id !== 'default') return fs.existsSync(target) ? [target] : [];
+  }
   const dirs = root === undefined ? userDataSearchDirs() : userDataSearchDirsFor(root);
   return dirs
     .map((dir) => path.join(dir, relativePath))
     .filter((candidate) => fs.existsSync(candidate));
+}
+
+function assertProfileHome(root: string): void {
+  const profile = currentProfile();
+  if (profile && fs.realpathSync(root) !== profile.homeDir) throw new Error('The requested home differs from the captured profile.');
 }

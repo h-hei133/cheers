@@ -9,6 +9,7 @@ import { forgetSessionTodos, replayTodosFromMessages } from '../commands/todoCom
 import { restoreSessionUsage } from '../../observability/usageTelemetry.js'
 import type { CommandContext } from '../commands/types.js'
 import type { ContextEntry } from '../../context/attachment/entry.js';
+import { currentProfile } from '../paths/profile/context.js';
 
 export interface ActiveSessionIdentity {
   readonly sessionId: string
@@ -29,6 +30,7 @@ export interface SessionResumeProvenance {
 }
 
 export interface ShellRuntimeContext {
+  readonly profile?: import('../paths/profile/context.js').ProfileContext;
   workspaceRevision?: number;
   workspaceIssue?: string;
   /** Durable workspace authority, supplied by the session store owner. */
@@ -129,6 +131,7 @@ export function createShellRuntimeContext(input: {
   restoreSessionUsage(input.session.id, input.session.usage)
   const configuration = initialConfiguration(input);
   return {
+    profile: currentProfile(),
     workspaceRevision: 0,
     cwd: input.cwd,
     originalCwd: input.originalCwd,

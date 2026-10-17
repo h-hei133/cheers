@@ -7132,3 +7132,21 @@ Cheers 有两项 omp 没有的：**信任门**与**溯源三态**（`Effective/A
 - `npm run verify:docs-drift:strict`退出0：rules dangling=0、docs dangling=0；另有**118条未加前缀源码路径advisory**，门禁只计数不阻断，未把该结果表述为全库文档无问题。`git diff --check`退出0；未跟踪研究文件另由上述直接内容检查覆盖。
 
 本轮仅修改文档；产品、测试、依赖、package scripts及构建行为未改。未运行产品build/tests、provider或PTY，不读取真实provider配置；没有新增运行/性能/跨平台验收证据。用户既有`.gitignore`与文档重排保留，未提交、推送或发布。当前完成的是研究修订及规划，Phase 20产品实现尚未开始。
+
+### 2026-10-17 — Phase 20 CFG-01：profile 身份与存储隔离
+
+从 `03b56c94` 的 main 开始实现 CFG-01。新增 `--profile` / `CHEERS_PROFILE` 启动选择、可移植名称与不可变进程身份。default 保留旧目录兼容；named 使用独立 root，按 canonical workspace 隔离可变 memory、历史、产物及恢复数据。逐类 consumer、共享输入与平台边界见 [profile 身份与存储](features/profiles.md)。其余 Phase 20 任务仍待依次交付。
+
+沿现有 owner 接入 config/catalog、连接与 MCP auth、session/reentry、trust/approval、ledger/usage/jobs、extension、memory、日志、cache/artifact 和远端协作。保留捕获的 owner，换根、链接及迟到发布必须重新检查；writer、restore 与 undo 共用 snapshot root。共享服务使用显式配置 owner/ACL，客户端路由包含 profile 身份；旧未标身份的 peer 索引只供 default 使用。
+
+定向对照目录参考的 portable name、私有 root、显式共享 daemon 与 session-owned artifact 决策；采用其边界，继续使用本仓 owner 和不可变进程身份。对照 bootstrap 的参数消费决定后，修正 flag-looking 值及已被消费的 `--`，避免选错 profile。没有复制参考实现。首版不承诺任意并发文件系统替换的普遍 descriptor 防护，也没有 Windows/macOS 实机证据。
+
+独立源码复审先后发现并推动修复了信任/审批叶子链接、自动用户输入、缓存 loader 换根、保留配置编辑、MCP/crash 回调、SSH namespace、stream trace、启动期 peer singleton 和默认 report 等遗漏。最终 code/spec/security lane 为 APPROVE，独立 architecture lane 为 CLEAR；两条最终结论均为只读源码复审，未冒充独立测试执行。
+
+**本地动态证据**：Linux synthetic/offline 编译后 CLI，在独立 HOME 和同一 Git workspace 下让 A/B 使用相同 session/connection ID，连接列表、会话导出和 current session 均隔离；非法名称拒绝。全屏交互经 `script` 分配真实 stdin/stdout/stderr TTY，A/B 各自历史、连接状态、导出及退出成功。普通 `rtk proxy` 的早期探针只属 line loop。最新 parser 聚焦回归 60 项、report/source/peer 聚焦回归 20 项通过；最终受影响组合回归（`vitest run` 指定 118 文件、`--threads=false`，隔离 Git ceiling）为 118 文件、1272 项全部通过。九项保护逐一撤销均触发真实断言失败、退出 1，之后逐字恢复源码；涵盖 legacy fallback、叶子链接、配置 owner、restore root、委托 token cache、SSH namespace、启动 peer owner、默认 report 迟到写入与参数消费。
+
+最终 `build:ts` 通过；五项静态门禁通过，`test:scripts` 为 57 项通过；本次 81 个含命名函数的变更模块无超 20 项。新增文档相关本地链接均解析。NormProof 退出 0、所有阻断 obligation 满足，整体仍为 partial，保留既有函数上限 advisory；严格 docs gate 的 118 条旧源码引用 advisory 亦保留。
+
+**完整 TS 运行未全绿**：`npm run test -w packages/ts-shell -- --threads=false` 退出 1，813 文件中 812 通过、1 失败；8231 项中 8225 通过、5 失败、1 skipped。五项都在 `webRequests.test.ts`，错误为 `setTimeout is not defined`。定位到先运行 `deviceCode.test.ts` 后的计时器清理；用相同两文件顺序在未修改的 `03b56c94f0276952924f4c2859afdeac026138cb` 独立 worktree 和当前源码均复现相同五项失败。该文件单独运行 44 项通过；分类为既有 Vitest 串行测试隔离问题，本批未修。早期并行运行的其他失败未凭单例重跑推定既有，但后续完整串行运行覆盖并通过了对应文件。本地组合验证、基线反例及 CLI/TTY 原始证据保存在忽略的 `.omx/ultragoal/`，不作为远端 CI 通过证明。
+
+**交付状态（本条写入时）**：本地实现与适用验收完成；尚未提交、推送，也没有本次变更的精确 SHA CI 结果。后续交付另记；整个 Phase 20 仍有 46 项待依次实施。

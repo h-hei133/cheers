@@ -9,7 +9,7 @@ Last updated: 2026-10-17
 - Sources: 11 raw documents (including RFC-001 to RFC-004)
 - Articles: 6 compiled wiki articles (including master thesis)
 - Feature research documents: 37 (01–37, contiguous; merged from 53 after de-duplication)
-  - **Current review (2026-10-17): docs 23–37.** Source and pinned-reference findings were corrected; product implementation and runtime acceptance have not started. Start with [Phase 20 decisions](features/phase-20-decisions.md), [32 Review register](features/32-defect-register-2026-10.md), and [36 Outstanding work](features/36-outstanding-work.md). [37 Command audit](features/37-command-implementation-audit.md) traces 102 declared entries; it does not prove every action works.
+  - **Current work (2026-10-17): Phase 20 CFG-01 delivery.** Source and pinned-reference findings in docs 23–37 were corrected; local implementation and applicable validation of profile identity and storage isolation are complete, with delivery status recorded separately. Start with [Phase 20 decisions](features/phase-20-decisions.md), [Profile boundaries](features/profiles.md), [32 Review register](features/32-defect-register-2026-10.md), and [36 Outstanding work](features/36-outstanding-work.md). [37 Command audit](features/37-command-implementation-audit.md) traces 102 declared entries; it does not prove every action works.
   - **Historical (01–22):** earlier phase research. Many of their verdicts were already implemented or corrected later — read each document's own "更正" section before citing it.
   - Full per-document table: [features/_index.md](features/_index.md) §0.
 - Inventory records: 0 tracked items

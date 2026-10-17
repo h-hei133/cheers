@@ -2,6 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { ArtifactPublicationError, publishArtifact, publishTextArtifact } from './artifacts/publication.js';
 import { verifyPathContainment } from '../security/pathJail.js';
+import { assertProfileStorage, currentProfile } from '../paths/profile/context.js';
+import { profileScope } from '../paths/profile/scope.js';
+import { profileWorkspaceDir } from '../paths/profile/workspace.js';
 
 export interface StoredArtifact {
   readonly id: string;
@@ -18,16 +21,18 @@ export interface StoredArtifact {
 
 export class ArtifactManager {
   private static readonly instances = new Map<string, ArtifactManager>();
-  private readonly workspaceRoot: string;
+  private readonly storageRoot: string;
   private readonly artifactsDir: string;
+  private readonly profile = currentProfile();
   private counter: number = 0;
 
   constructor(workspaceRoot: string = process.cwd(), sessionId: string = "default") {
     if (!/^[A-Za-z0-9_-]+$/.test(sessionId)) throw new Error('Invalid artifact session identity.');
-    this.workspaceRoot = fs.realpathSync(workspaceRoot);
+    const canonicalWorkspace = fs.realpathSync(workspaceRoot);
+    const privateWorkspace = profileWorkspaceDir(canonicalWorkspace, this.profile);
+    this.storageRoot = privateWorkspace ? this.profile!.root : canonicalWorkspace;
     this.artifactsDir = path.join(
-      this.workspaceRoot,
-      ".ts-shell",
+      privateWorkspace ?? path.join(canonicalWorkspace, '.ts-shell'),
       "sessions",
       sessionId,
       "artifacts",
@@ -52,12 +57,13 @@ export class ArtifactManager {
    * a second copy of it would drift the first time the layout changed.
    */
   get directory(): string {
+    assertProfileStorage(this.artifactsDir, this.profile);
     return this.artifactsDir;
   }
 
   static getShared(workspaceRoot: string = process.cwd(), sessionId: string = "default"): ArtifactManager {
     const root = fs.realpathSync(workspaceRoot);
-    const key = JSON.stringify([root, sessionId]);
+    const key = profileScope(JSON.stringify([root, sessionId]));
     let instance = ArtifactManager.instances.get(key);
     if (!instance) {
       instance = new ArtifactManager(root, sessionId);
@@ -80,21 +86,24 @@ export class ArtifactManager {
   assertBinaryStorage(): void {
     try {
       if (process.platform !== 'linux') throw new Error();
-      const checked = verifyPathContainment(this.artifactsDir, this.workspaceRoot);
+      assertProfileStorage(this.artifactsDir, this.profile);
+      const checked = verifyPathContainment(this.artifactsDir, this.storageRoot);
       if (!checked.allowed || checked.resolvedPath !== this.artifactsDir) throw new Error();
       if (fs.existsSync(this.artifactsDir)) this.verifyDirectory();
     } catch { throw new ArtifactPublicationError('not-published', 'complete', this.artifactsDir); }
   }
 
   private async publish(content: Buffer, toolType: string, format: string, lines: number, signal?: AbortSignal): Promise<StoredArtifact> {
+    assertProfileStorage(this.artifactsDir, this.profile);
     const id = String(this.counter++);
     const tag = toolType.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64) || 'output';
     const filename = `${id}.${tag}.${format}`;
     const targetPath = path.join(this.artifactsDir, filename);
-    const checked = verifyPathContainment(this.artifactsDir, this.workspaceRoot);
+    const checked = verifyPathContainment(this.artifactsDir, this.storageRoot);
     if (!checked.allowed || checked.resolvedPath !== this.artifactsDir) throw new Error('Artifact directory resolves through a symbolic link.');
-    const sha256 = format === 'log' ? await publishTextArtifact(this.workspaceRoot, this.artifactsDir, filename, content)
-      : await publishArtifact(this.workspaceRoot, this.artifactsDir, filename, content, signal);
+    const sha256 = format === 'log' ? await publishTextArtifact(this.storageRoot, this.artifactsDir, filename, content)
+      : await publishArtifact(this.storageRoot, this.artifactsDir, filename, content, signal);
+    assertProfileStorage(targetPath, this.profile);
 
     return {
       id,
@@ -127,6 +136,7 @@ export class ArtifactManager {
   }
 
   private verifyDirectory(): void {
+    assertProfileStorage(this.artifactsDir, this.profile);
     if (fs.realpathSync(this.artifactsDir) !== this.artifactsDir) {
       throw new Error('Artifact directory changed or resolves through a symbolic link.');
     }

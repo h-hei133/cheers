@@ -18,6 +18,7 @@ import {
   locateExistingSessionLayout,
   projectSessionFileLayout,
   validateSessionId,
+  assertSessionStoreProfile,
   type SessionFileLayout,
   type SessionStoreLayout,
 } from "./sessionFileLayout.js";
@@ -147,6 +148,7 @@ export class SessionStoreAccess {
   }
 
   listSessions(onSource?: (target: string) => void): Session[] {
+    assertSessionStoreProfile(this.storeLayout, this.storeLayout.sessionsDir);
     // Every directory that may hold sessions, so a listing does not hide the ones
     // written before the directory was renamed. Ids are unique, so an id present
     // in more than one directory is one session, read from the first that has it.
@@ -178,6 +180,7 @@ export class SessionStoreAccess {
   resolveCurrentSessionForProject(
     projectRoot: string,
   ): CurrentSessionSelectionResolution {
+    assertSessionStoreProfile(this.storeLayout, this.storeLayout.currentSessionStorePath);
     return resolveCurrentSessionForProject({
       storePath: this.storeLayout.currentSessionStorePath,
       storeSearchPaths: this.storeLayout.currentSessionStoreSearchPaths,
@@ -188,6 +191,7 @@ export class SessionStoreAccess {
   }
 
   setCurrentSessionForProject(projectRoot: string, sessionId: string): void {
+    assertSessionStoreProfile(this.storeLayout, this.storeLayout.currentSessionStorePath);
     setCurrentSessionSelection({
       storePath: this.storeLayout.currentSessionStorePath,
       storeSearchPaths: this.storeLayout.currentSessionStoreSearchPaths,
@@ -198,6 +202,7 @@ export class SessionStoreAccess {
   }
 
   clearCurrentSessionForProject(projectRoot: string): void {
+    assertSessionStoreProfile(this.storeLayout, this.storeLayout.currentSessionStorePath);
     clearCurrentSessionSelectionForProject({
       storePath: this.storeLayout.currentSessionStorePath,
       storeSearchPaths: this.storeLayout.currentSessionStoreSearchPaths,
@@ -206,18 +211,24 @@ export class SessionStoreAccess {
   }
 
   readStateSnapshotSafely(statePath: string): SessionStateSnapshot | undefined {
+    assertSessionStoreProfile(this.storeLayout, statePath);
     return readStateSnapshotSafely(statePath);
   }
 
   readStateSnapshotRequired(statePath: string): SessionStateSnapshot {
+    assertSessionStoreProfile(this.storeLayout, statePath);
     return readStateSnapshotRequired(statePath);
   }
 
   withSessionStateLock<T>(sessionId: string, action: () => T, options?: { readonly requireExisting?: boolean }): T {
-    return withSessionStateLock(locateExistingSessionLayout(this.storeLayout, sessionId), action, options);
+    return withSessionStateLock(locateExistingSessionLayout(this.storeLayout, sessionId), () => {
+      assertSessionStoreProfile(this.storeLayout);
+      return action();
+    }, options);
   }
 
   writeJsonFileAtomic(filePath: string, payload: unknown): void {
+    assertSessionStoreProfile(this.storeLayout, filePath);
     writeJsonFileAtomic(filePath, payload);
   }
 }

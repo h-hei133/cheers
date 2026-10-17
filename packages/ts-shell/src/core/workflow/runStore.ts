@@ -2,6 +2,7 @@ import path from "node:path";
 import { projectStateDir } from "../state/projectState.js";
 import { readTextFile } from '../workspace/files.js';
 import type { WorkflowRun } from "./runner.js";
+import { assertProfileStorage } from '../paths/profile/context.js';
 
 /**
  * The last workflow run, kept on disk.
@@ -17,7 +18,9 @@ const RUN_FILE = "workflow.json";
 
 /** Where the record lives, beside the project's other durable state. */
 export function runRecordPath(workspaceRoot: string): string {
-  return path.join(projectStateDir(workspaceRoot), RUN_FILE);
+  const target = path.join(projectStateDir(workspaceRoot), RUN_FILE);
+  assertProfileStorage(target);
+  return target;
 }
 
 /** The last recorded run, or none. Never throws. */

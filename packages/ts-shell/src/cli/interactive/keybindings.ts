@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { KEY_BINDINGS, type KeyBinding } from "../../presentation/tui/chrome/keys.js";
 import { resolveUserDataFile, userDataDirFor } from "../../core/paths/userHome.js";
+import { assertProfileStorage } from '../../core/paths/profile/context.js';
 
 /**
  * Which key does what, and how a user changes it.
@@ -123,6 +124,7 @@ export function loadUserKeybindings(root?: string): LoadedKeybindings {
     ? resolveUserDataFile(KEYBINDINGS_FILE)
     : path.join(userDataDirFor(root), KEYBINDINGS_FILE);
   const problems: KeybindingsProblem[] = [];
+  assertProfileStorage(filePath);
   let raw: string;
   try {
     raw = fs.readFileSync(filePath, "utf8");

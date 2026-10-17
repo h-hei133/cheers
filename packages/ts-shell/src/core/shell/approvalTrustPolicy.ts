@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { assertProfileStorage, currentProfile } from '../paths/profile/context.js';
 import type { EscalationPrompt } from "./approval/contract.js";
 import {
   buildCacheKey,
@@ -36,16 +37,19 @@ export interface ApprovalLastHit {
 }
 
 export class ApprovalTrustPolicy {
+  private readonly profile = currentProfile();
   private readonly policyFilePath: string;
   private readonly allowOnceCache = new Set<string>();
   private lastHit: ApprovalLastHit | null = null;
 
   constructor(policyFilePath?: string) {
     this.policyFilePath = policyFilePath ?? defaultPolicyFilePath();
+    assertProfileStorage(this.policyFilePath, this.profile);
   }
 
   /** The fixed source this policy instance reads, including a custom store path. */
   get sourcePath(): string {
+    assertProfileStorage(this.policyFilePath, this.profile);
     return this.policyFilePath;
   }
 
@@ -74,14 +78,17 @@ export class ApprovalTrustPolicy {
   }
 
   hasAllowOnce(cacheKey: string): boolean {
+    assertProfileStorage(this.policyFilePath, this.profile);
     return this.allowOnceCache.has(cacheKey);
   }
 
   rememberAllowOnce(cacheKey: string): void {
+    assertProfileStorage(this.policyFilePath, this.profile);
     this.allowOnceCache.add(cacheKey);
   }
 
   consumeAllowOnce(cacheKey: string): boolean {
+    assertProfileStorage(this.policyFilePath, this.profile);
     const had = this.allowOnceCache.has(cacheKey);
     if (had) {
       this.allowOnceCache.delete(cacheKey);
@@ -249,6 +256,7 @@ export class ApprovalTrustPolicy {
   }
 
   private readState(): PersistedApprovalPolicyState {
+    assertProfileStorage(this.policyFilePath, this.profile);
     if (!fs.existsSync(this.policyFilePath)) {
       return { grants: [] };
     }
@@ -256,7 +264,9 @@ export class ApprovalTrustPolicy {
   }
 
   private writeState(state: PersistedApprovalPolicyState): void {
+    assertProfileStorage(this.policyFilePath, this.profile);
     ensureParentDir(this.policyFilePath);
+    assertProfileStorage(this.policyFilePath, this.profile);
     fs.writeFileSync(
       this.policyFilePath,
       JSON.stringify({ grants: state.grants }, null, 2),

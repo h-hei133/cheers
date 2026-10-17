@@ -1,4 +1,5 @@
 import type { ReadStream } from 'node:tty';
+import type { ProfileContext } from '../../core/paths/profile/context.js';
 
 export interface CliProcessRunnerInput {
   readonly args: readonly string[];
@@ -8,4 +9,6 @@ export interface CliProcessRunnerInput {
   readonly writeOutput: (message: string) => void;
   readonly writeError: (message: string) => void;
   readonly exit: (code: number) => never;
+  /** The executable binds process event sources to the captured launch identity. */
+  readonly profileSelected?: (profile: ProfileContext) => void;
 }

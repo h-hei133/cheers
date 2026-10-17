@@ -36,6 +36,7 @@ export function decodeOperation(value: unknown, scope: OperationScope): Operatio
   if (!object(value) || value.schemaVersion !== 1 || !safeRecoveryId(value.operationId)
     || value.sessionId !== scope.sessionId || !identity(value.workspace)
     || value.workspace.path !== scope.workspace.path || value.workspace.identity !== scope.workspace.identity
+    || JSON.stringify(value.profile) !== JSON.stringify(scope.profile)
     || typeof value.callId !== 'string' || !value.callId || value.callId.length > 512
     || (value.correlationId !== undefined && typeof value.correlationId !== 'string')
     || !Number.isSafeInteger(value.sequence) || (value.sequence as number) < 1

@@ -5,6 +5,8 @@ import {
 } from "../persistentReceiptCache.js";
 import type { BrowserExecutionReceipt } from "../executionReceipt.js";
 import { validateBrowserReceiptCacheManifest, type BrowserReceiptCacheManifest } from "./manifest.js";
+import path from 'node:path';
+import { assertProfileStorage, currentProfile } from '../../core/paths/profile/context.js';
 import { mutateBrowserReceiptCache, type ReceiptCacheMutationResult } from "./mutation.js";
 import {
   listBrowserReceiptCache, lookupBrowserReceiptCache, observeBrowserReceiptCacheHealth,
@@ -45,12 +47,20 @@ export function createBrowserReceiptCacheStore(input: {
   const validation = validateBrowserReceiptCacheManifest(input.manifest);
   if (!validation.ok) throw new Error(validation.reason);
   const manifest = validation.manifest;
+  const profile = currentProfile();
+  const assertOwner = () => {
+    for (const file of ['browser-receipt-cache.jsonl', 'browser-receipt-cache.lock.json']) {
+      assertProfileStorage(path.join(manifest.cacheRoot, file), profile);
+    }
+  };
+  assertOwner();
   const now = input.now ?? (() => new Date().toISOString());
 
   function tombstone(receiptId: string, reason: string, status: "deleted" | "invalidated"): BrowserReceiptCacheMutationResult {
     try {
+      assertOwner();
       const record = createBrowserPersistentReceiptCacheTombstone({ receiptId, reason, status, source: manifest.source, now: now() });
-      const result = mutateBrowserReceiptCache({ manifest, operation: status === "deleted" ? "delete" : "invalidate", record, now });
+      const result = mutateBrowserReceiptCache({ manifest, operation: status === "deleted" ? "delete" : "invalidate", record, now, assertOwner });
       return { ...result, changed: result.outcome === "written", record: result.outcome === "written" ? record : undefined };
     } catch {
       return { ...blocked("Cache tombstone is invalid or unsafe."), changed: false };
@@ -58,7 +68,8 @@ export function createBrowserReceiptCacheStore(input: {
   }
 
   function maintenance(operation: "compact" | "repair"): BrowserReceiptCacheMaintenanceResult {
-    const result = mutateBrowserReceiptCache({ manifest, operation, now });
+    assertOwner();
+    const result = mutateBrowserReceiptCache({ manifest, operation, now, assertOwner });
     return { ...result, changed: result.outcome === "written" };
   }
 
@@ -66,24 +77,25 @@ export function createBrowserReceiptCacheStore(input: {
     manifest,
     writeReceipt(receipt) {
       try {
+        assertOwner();
         if (receipt.replayReadiness.status !== "replay-ready") {
           return { ...blocked("Only replay-ready browser receipts may be persisted."), written: false };
         }
         const record = createBrowserPersistentReceiptCacheRecord({ receipt, source: manifest.source, now });
         if (!record.ok) return { ...blocked(record.reason), evidence: record.evidence, warnings: record.warnings, written: false };
-        const result = mutateBrowserReceiptCache({ manifest, operation: "write", record: record.record, now });
+        const result = mutateBrowserReceiptCache({ manifest, operation: "write", record: record.record, now, assertOwner });
         return { ...result, written: result.outcome === "written", record: result.outcome === "written" ? record.record : undefined };
       } catch {
         return { ...blocked("Cache receipt is invalid or unsafe."), written: false };
       }
     },
-    get: (receiptId) => lookupBrowserReceiptCache(listBrowserReceiptCache(manifest), receiptId),
-    list: () => listBrowserReceiptCache(manifest),
+    get: (receiptId) => { assertOwner(); return lookupBrowserReceiptCache(listBrowserReceiptCache(manifest), receiptId); },
+    list: () => { assertOwner(); return listBrowserReceiptCache(manifest); },
     invalidate: (receiptId, reason) => tombstone(receiptId, reason, "invalidated"),
     delete: (receiptId, reason) => tombstone(receiptId, reason, "deleted"),
     compact: () => maintenance("compact"),
     repair: () => maintenance("repair"),
-    health: () => observeBrowserReceiptCacheHealth(manifest, now),
+    health: () => { assertOwner(); return observeBrowserReceiptCacheHealth(manifest, now); },
   };
 }
 

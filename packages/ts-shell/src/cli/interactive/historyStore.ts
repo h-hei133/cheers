@@ -1,12 +1,16 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { profileWorkspaceDir } from '../../core/paths/profile/workspace.js';
+import { assertProfileStorage } from '../../core/paths/profile/context.js';
 
 const HISTORY_DIR = ".ts-shell";
 const HISTORY_FILE = "prompt-history.txt";
 const MAX_HISTORY_LINES = 500;
 
 function historyPath(projectRoot: string): string {
-  return path.join(projectRoot, HISTORY_DIR, HISTORY_FILE);
+  const file = path.join(profileWorkspaceDir(projectRoot) ?? path.join(projectRoot, HISTORY_DIR), HISTORY_FILE);
+  assertProfileStorage(file);
+  return file;
 }
 
 /**
@@ -35,12 +39,14 @@ export function appendPromptHistory(projectRoot: string, prompt: string): void {
   const trimmed = prompt.trim();
   if (!trimmed) return;
   try {
-    const dir = path.join(projectRoot, HISTORY_DIR);
+    const file = historyPath(projectRoot);
+    const dir = path.dirname(file);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
     const singleLine = trimmed.replace(/\r?\n/g, "\\n");
-    fs.appendFileSync(historyPath(projectRoot), `${singleLine}\n`, "utf8");
+    assertProfileStorage(file);
+    fs.appendFileSync(file, `${singleLine}\n`, "utf8");
   } catch {
     // Non-fatal: disk write error should never interrupt the interactive turn
   }

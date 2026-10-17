@@ -1,13 +1,13 @@
 import fs from 'node:fs';
-import path from 'node:path';
 import { createPublicKey } from 'node:crypto';
-import { userDataDir } from '../../core/paths/userHome.js';
+import { resolveUserDataFile } from '../../core/paths/userHome.js';
+import { profilePathOverride } from '../../core/paths/profile/context.js';
 import { withFileLock, writeJsonFileAtomic } from '../../session/store/sessionFileStore.js';
 import { isRecord } from '../../core/values/record.js';
 import { canonical, digest, name, text } from './validation.js';
 import type { ExtensionSource, TrustAnchor } from '../model.js';
 
-export function sourceFile(): string { return process.env.CHEERS_MARKETPLACES_FILE?.trim() || path.join(userDataDir(), 'marketplaces.json'); }
+export function sourceFile(): string { return profilePathOverride('CHEERS_MARKETPLACES_FILE') || resolveUserDataFile('marketplaces.json'); }
 export function sourceUrl(value: string): URL {
   const url = new URL(value);
   if (url.username || url.password || url.search || url.hash || !['https:', 'http:'].includes(url.protocol) || (url.protocol === 'http:' && !['127.0.0.1', '[::1]', 'localhost'].includes(url.hostname))) throw new Error('Sources require HTTPS or an explicitly selected loopback HTTP address.');

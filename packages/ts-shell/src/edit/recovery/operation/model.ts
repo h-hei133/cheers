@@ -1,4 +1,5 @@
 import type { FileState } from '../../authority/state.js';
+import type { ProfileIdentity } from '../../../core/paths/profile/context.js';
 
 export interface WorkspaceIdentity {
   readonly path: string;
@@ -8,6 +9,7 @@ export interface WorkspaceIdentity {
 export interface OperationScope {
   readonly sessionId: string;
   readonly workspace: WorkspaceIdentity;
+  readonly profile?: ProfileIdentity;
 }
 
 export type ContentVersion = { readonly state: 'absent' } | { readonly state: 'exists'; readonly hash: string; readonly mode?: number };

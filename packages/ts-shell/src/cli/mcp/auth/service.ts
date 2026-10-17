@@ -9,41 +9,47 @@ import type { ScopedMcpServerConfig } from '../../../core/mcp/types.js';
 import type { OAuthDiscoveryState } from '@modelcontextprotocol/sdk/client/auth.js';
 import { McpOAuthProvider } from './provider.js';
 import { credentialPath, readCredentials, saveCredentials } from './store.js';
+import { assertProfileStorage, currentProfile } from '../../../core/paths/profile/context.js';
 
 export class McpAuthService implements McpHttpAuthorization {
+  private readonly profile = currentProfile();
   readonly target: string;
   constructor(readonly name: string, readonly config: ScopedMcpServerConfig) { this.target = credentialPath(name, config); }
   async token(admission?: Admission, signal?: AbortSignal): Promise<string | undefined> {
+    assertProfileStorage(this.target, this.profile);
     if (Object.keys(this.config.headers ?? {}).some(name => name.toLowerCase() === 'authorization')) return undefined;
     return withFileLock(this.target, async () => {
       assertAdmission(admission); signal?.throwIfAborted();
-      const baseline = readCredentials(this.target); const record = baseline.record;
+      const baseline = readCredentials(this.target, this.profile); const record = baseline.record;
       if (!record) return undefined;
       if (record.expiresAt === undefined || record.expiresAt > Date.now() + 30_000) return record.tokens.access_token;
       const provider = new McpOAuthProvider(record.redirectUri, '', undefined, record);
-      if (await auth(provider, { serverUrl: this.config.url!, fetchFn: scopedAuthFetch(this.config.url!, admission, signal) }) !== 'AUTHORIZED') throw new Error('Explicit MCP sign-in is required.');
+      if (await auth(provider, { serverUrl: this.config.url!, fetchFn: scopedAuthFetch(this.config.url!, admission, signal,
+        () => assertProfileStorage(this.target, this.profile)) }) !== 'AUTHORIZED') throw new Error('Explicit MCP sign-in is required.');
       assertAdmission(admission); signal?.throwIfAborted();
-      saveCredentials(this.target, baseline, provider.record(), admission);
+      saveCredentials(this.target, baseline, provider.record(), admission, this.profile);
       return provider.record().tokens.access_token;
     });
   }
   async login(discovery: OAuthDiscoveryState, onAuthorizeUrl: (url: string) => void, admission?: Admission, signal?: AbortSignal): Promise<void> {
-    const baseline = readCredentials(this.target); const nonce = createState(); const lifetime = requestScope(5 * 60_000, signal);
+    const baseline = readCredentials(this.target, this.profile); const nonce = createState(); const lifetime = requestScope(5 * 60_000, signal);
     const server = await startCallbackServer({ path: '/mcp/callback', port: 0, expectedState: nonce, timeoutMs: 5 * 60_000, label: 'MCP sign-in' });
     try {
       lifetime.check(); assertAdmission(admission);
       // A login gets a fresh registration for its actual callback port and selected issuer.
       const provider = new McpOAuthProvider(server.redirectUri, nonce, url => onAuthorizeUrl(url.href), undefined, discovery);
-      const fetchFn = scopedAuthFetch(this.config.url!, admission, lifetime.signal);
+      const fetchFn = scopedAuthFetch(this.config.url!, admission, lifetime.signal, () => assertProfileStorage(this.target, this.profile));
       if (await auth(provider, { serverUrl: this.config.url!, fetchFn }) !== 'REDIRECT') throw new Error('MCP sign-in did not produce an authorization request.');
       const callback = await withinRequest(server.received, lifetime);
       assertAdmission(admission); lifetime.check();
       if (await auth(provider, { serverUrl: this.config.url!, authorizationCode: callback.code, fetchFn }) !== 'AUTHORIZED') throw new Error('MCP authentication was not completed.');
       assertAdmission(admission); lifetime.check();
-      saveCredentials(this.target, baseline, provider.record(), admission);
+      saveCredentials(this.target, baseline, provider.record(), admission, this.profile);
     } finally { lifetime.dispose(); server.close(); }
   }
-  logout(admission?: Admission): void { const baseline = readCredentials(this.target); saveCredentials(this.target, baseline, undefined, admission); }
+  logout(admission?: Admission): void {
+    const baseline = readCredentials(this.target, this.profile); saveCredentials(this.target, baseline, undefined, admission, this.profile);
+  }
 }
 
 export function authorizationForMcp(name: string, config: ScopedMcpServerConfig): McpHttpAuthorization | undefined {
@@ -51,7 +57,9 @@ export function authorizationForMcp(name: string, config: ScopedMcpServerConfig)
 }
 
 /** OAuth discovery/exchange is bounded and never receives configured MCP headers. */
-export function scopedAuthFetch(url: string, admission?: Admission, signal?: AbortSignal) {
+export function scopedAuthFetch(url: string, admission?: Admission, signal?: AbortSignal, assertOwner?: () => void) {
   const fetchFn = mcpFetch(url, { admission, streaming: false });
-  return (input: Parameters<typeof fetchFn>[0], init?: Parameters<typeof fetchFn>[1]) => fetchFn(input, { ...init, signal });
+  return (input: Parameters<typeof fetchFn>[0], init?: Parameters<typeof fetchFn>[1]) => {
+    assertOwner?.(); return fetchFn(input, { ...init, signal });
+  };
 }

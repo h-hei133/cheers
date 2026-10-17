@@ -10,7 +10,7 @@ import type {
   RestoreCommandRequest,
   RestoreCommandResult,
 } from "../../edit/recovery/restoreCommandContract.js";
-import path from "node:path";
+import { snapshotRoot } from '../../edit/recovery/root.js';
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
 /**
@@ -20,7 +20,7 @@ import type { CommandContext, LocalCommandResult } from "./types.js";
  * `/restore` answer about this project instead of refusing for want of a flag.
  */
 export function defaultLedgerRoot(workspaceRoot: string): string {
-  return path.join(workspaceRoot, ".sisyphus", "edit-snapshots");
+  return snapshotRoot(workspaceRoot);
 }
 
 export async function runRestoreLocalCommand(

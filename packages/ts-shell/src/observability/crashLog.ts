@@ -14,6 +14,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { resolveUserDataFile } from "../core/paths/userHome.js";
+import { assertProfileStorage, currentProfile, type ProfileContext } from '../core/paths/profile/context.js';
 
 /** One run that ended badly. */
 export interface CrashRecord {
@@ -62,8 +63,9 @@ export function crashLogPath(): string {
  * A missing or unreadable file reads as no crashes. This runs while the process
  * is already failing, so it must not be the thing that fails.
  */
-export function readCrashLog(filePath: string = crashLogPath()): CrashRecord[] {
+export function readCrashLog(filePath: string = crashLogPath(), profile: ProfileContext | undefined = currentProfile()): CrashRecord[] {
   try {
+    assertProfileStorage(filePath, profile);
     const parsed = JSON.parse(fs.readFileSync(filePath, "utf8")) as unknown;
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(isCrashRecord);
@@ -109,8 +111,10 @@ export function recordCrash(
     readonly sessionId?: string;
   },
   filePath: string = crashLogPath(),
+  profile: ProfileContext | undefined = currentProfile(),
 ): CrashRecord | undefined {
   try {
+    assertProfileStorage(filePath, profile);
     const error = crash.error;
     const record: CrashRecord = {
       timestamp: new Date().toISOString(),
@@ -120,8 +124,9 @@ export function recordCrash(
       cwd: crash.cwd,
       ...(crash.sessionId ? { sessionId: crash.sessionId } : {}),
     };
-    const kept = [...readCrashLog(filePath), record].slice(-MAX_CRASH_RECORDS);
+    const kept = [...readCrashLog(filePath, profile), record].slice(-MAX_CRASH_RECORDS);
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    assertProfileStorage(filePath, profile);
     fs.writeFileSync(filePath, `${JSON.stringify(kept, null, 2)}\n`, "utf8");
     return record;
   } catch {
@@ -159,12 +164,14 @@ export function installCrashRecorder(options: {
   readonly filePath?: string;
 } = {}): () => void {
   const cwd = options.cwd ?? process.cwd();
+  const profile = currentProfile();
+  const filePath = options.filePath ?? crashLogPath();
   const sessionId = (): string | undefined => options.sessionId?.();
 
   const onUncaught = (error: unknown): never => {
     recordCrash(
       { kind: "uncaught-exception", error, cwd, ...(sessionId() ? { sessionId: sessionId() } : {}) },
-      options.filePath,
+      filePath, profile,
     );
     // Rethrown rather than exited: the other listeners still get their turn, and
     // the terminal reports the crash the way it would have without a recorder.
@@ -173,7 +180,7 @@ export function installCrashRecorder(options: {
   const onRejection = (reason: unknown): void => {
     recordCrash(
       { kind: "unhandled-rejection", error: reason, cwd, ...(sessionId() ? { sessionId: sessionId() } : {}) },
-      options.filePath,
+      filePath, profile,
     );
   };
 

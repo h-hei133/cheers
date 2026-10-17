@@ -6,6 +6,7 @@ export type NonInteractiveApprovalMode =
   | "allow-always";
 
 export interface CliOptions {
+  readonly profile?: string;
   readonly sessionId?: string;
   readonly provider?: RuntimeProvider;
   readonly apiKey?: string;

@@ -9,6 +9,8 @@ import { cancelRemoteJob } from './remote/cancel.js';
 import { parseRemoteFrame, decoded } from './remote/protocol.js';
 import { validateWorkspace } from './validation.js';
 import { utf8PageEnd } from '../../../core/text/utf8.js';
+import { assertProfileIdentity, currentProfile } from '../../../core/paths/profile/context.js';
+import { profileScope } from '../../../core/paths/profile/scope.js';
 
 export interface RemoteObservation {
   readonly invocationId?: string;
@@ -18,14 +20,16 @@ export interface RemoteObservation {
   readonly cancellation?: 'selected-cgroup-empty';
 }
 export class SshClient {
+  private readonly owner = currentProfile();
   constructor(readonly transport: SshTransport) {}
   async connect(scope: unknown, authority: ExecutionAuthority, signal?: AbortSignal): Promise<SshWorkspace> {
     const profile = this.transport.profile;
     const value = await this.request(workspaceProbe(profile.selection.workspace), ['root', 'identity', 'uid', 'boot', 'manager', 'cgroup'], authority, signal);
     requireSsh(value.manager === 'systemd-user' && value.cgroup === 'v2', 'unavailable');
+    const namespaceScope = this.owner && this.owner.id !== 'default' ? { profile: profileScope('ssh', this.owner), session: scope } : scope;
     const binding = { profileIdentity: profile.identity, fingerprint: profile.fingerprint, root: decoded(value.root!, 4096).toString('utf8'),
       directoryIdentity: value.identity!, uid: Number(value.uid), bootId: value.boot!,
-      namespace: createHash('sha256').update(JSON.stringify([scope, profile.identity, value.root, value.identity, value.boot])).digest('hex').slice(0, 32) };
+      namespace: createHash('sha256').update(JSON.stringify([namespaceScope, profile.identity, value.root, value.identity, value.boot])).digest('hex').slice(0, 32) };
     validateWorkspace(binding); return Object.freeze(binding);
   }
   async start(job: SshJobSpec, authority: ExecutionAuthority, signal?: AbortSignal): Promise<string> {
@@ -70,7 +74,9 @@ export class SshClient {
   }
   private check(binding: SshWorkspace): void { validateWorkspace(binding); requireSsh(binding.profileIdentity === this.transport.profile.identity, 'changed'); this.transport.profile.check(); }
   private async request(script: string, fields: readonly string[], authority: ExecutionAuthority, signal?: AbortSignal) {
+    if (this.owner) assertProfileIdentity(this.owner);
     const result = await this.transport.run(script, authority, signal);
+    if (this.owner) assertProfileIdentity(this.owner);
     requireSsh(!result.outputLimited, 'output-limit'); requireSsh(result.cleanup === 'complete', 'cleanup');
     requireSsh(result.transport.status === 'completed' && result.transport.exitCode === 0, 'transport');
     return parseRemoteFrame(result.stdout, fields);

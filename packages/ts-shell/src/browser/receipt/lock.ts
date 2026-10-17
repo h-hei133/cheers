@@ -71,6 +71,7 @@ export function acquireBrowserReceiptCacheLock(input: {
   readonly now?: () => string;
   readonly leaseMs?: number;
   readonly lockId?: string;
+  readonly assertOwner?: () => void;
 }): BrowserReceiptCacheLockDecision {
   const now = input.now ?? (() => new Date().toISOString());
   const leaseMs = input.leaseMs ?? 30_000;
@@ -89,11 +90,13 @@ export function acquireBrowserReceiptCacheLock(input: {
   if (!parseBrowserReceiptCacheLock(lock)) return invalidDecision("Browser receipt cache lock options are invalid.");
   const lockPath = browserReceiptCacheLockPath(input.cacheRoot);
   try {
+    input.assertOwner?.();
     fs.mkdirSync(input.cacheRoot, { recursive: true });
+    input.assertOwner?.();
     const fd = fs.openSync(lockPath, "wx", 0o600);
     try {
       fs.writeFileSync(fd, `${JSON.stringify(lock)}\n`, "utf8");
-      return acquired(input.cacheRoot, lock, fs.fstatSync(fd));
+      return acquired(input.cacheRoot, lock, fs.fstatSync(fd), input.assertOwner);
     } finally {
       fs.closeSync(fd);
     }
@@ -175,12 +178,13 @@ export function readBrowserReceiptCacheLock(
 }
 
 /** Cooperative exclusion in a stable local directory; expiration never transfers ownership. */
-function acquired(cacheRoot: string, lock: BrowserReceiptCacheLock, identity: fs.Stats): Extract<BrowserReceiptCacheLockDecision, { status: "acquired" }> {
+function acquired(cacheRoot: string, lock: BrowserReceiptCacheLock, identity: fs.Stats, assertOwner?: () => void): Extract<BrowserReceiptCacheLockDecision, { status: "acquired" }> {
   const lockPath = browserReceiptCacheLockPath(cacheRoot);
   let released: BrowserReceiptCacheLockReleaseResult | undefined;
   function ownsLock(): boolean {
     if (released) return false;
     try {
+      assertOwner?.();
       const currentIdentity = fs.lstatSync(lockPath);
       const file = readReceiptFile(lockPath, 4096);
       if (!currentIdentity.isFile() || currentIdentity.dev !== identity.dev || currentIdentity.ino !== identity.ino || file.status !== "read") return false;

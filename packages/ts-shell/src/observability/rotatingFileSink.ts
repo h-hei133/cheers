@@ -3,6 +3,7 @@ import * as path from "node:path";
 import { orderedLogFiles, tailLines, exportLogFiles } from "./logs/files.js";
 import type { StructuredLogEntry } from "./types.js";
 import { userDataDir } from "../core/paths/userHome.js"
+import { assertProfileStorage, currentProfile, profilePathOverride, type ProfileContext } from '../core/paths/profile/context.js';
 
 export interface RotatingFileSinkOptions {
   readonly logDir?: string;
@@ -29,6 +30,7 @@ const LEGACY_FILE_PREFIXES = ["coding-agent"] as const;
  * Bounds history by age and count while preserving other processes' live logs.
  */
 export class RotatingFileSink {
+  private readonly profile = currentProfile();
   private readonly logDir: string;
   private readonly maxFileSizeBytes: number;
   private readonly maxHistoryDays: number;
@@ -41,9 +43,10 @@ export class RotatingFileSink {
   private initialized: boolean = false;
 
   constructor(options: RotatingFileSinkOptions = {}) {
-    const configuredDir = process.env.CHEERS_LOG_DIR?.trim();
+    const configuredDir = profilePathOverride('CHEERS_LOG_DIR');
     const defaultDir = path.join(userDataDir(), "logs");
     this.logDir = options.logDir ?? (configuredDir || defaultDir);
+    assertProfileStorage(this.logDir, this.profile);
     this.maxFileSizeBytes = (options.maxFileSizeMb ?? 5) * 1024 * 1024;
     this.maxHistoryDays = options.maxHistoryDays ?? 7;
     this.maxFiles = options.maxFiles ?? 20;
@@ -55,17 +58,21 @@ export class RotatingFileSink {
   }
 
   getLogDir(): string {
+    assertProfileStorage(this.logDir, this.profile);
     return this.logDir;
   }
 
   getCurrentFilePath(): string {
+    assertProfileStorage(this.logDir, this.profile);
     if (!this.currentFilePath) {
       this.currentFilePath = this.computeLogPath();
     }
+    assertProfileStorage(this.currentFilePath, this.profile);
     return this.currentFilePath;
   }
   write(entry: StructuredLogEntry): void {
     try {
+      assertProfileStorage(this.logDir, this.profile);
       this.ensureInitialized();
       const line = JSON.stringify(entry) + "\n";
       const lineByteLength = Buffer.byteLength(line, "utf8");
@@ -74,6 +81,7 @@ export class RotatingFileSink {
         this.rotate();
       }
 
+      assertProfileStorage(this.currentFilePath, this.profile);
       fs.appendFileSync(this.currentFilePath, line, "utf8");
       this.currentFileSize += lineByteLength;
     } catch {
@@ -94,7 +102,10 @@ export class RotatingFileSink {
   }
 
   getFiles(strict = false): string[] {
-    return orderedLogFiles(this.logDir, this.getCurrentFilePath(), { familyOnly: true, strict });
+    assertProfileStorage(this.logDir, this.profile);
+    const files = orderedLogFiles(this.logDir, this.getCurrentFilePath(), { familyOnly: true, strict });
+    for (const file of files) assertProfileStorage(file, this.profile);
+    return files;
   }
 
   exportTo(target: string): number {
@@ -104,7 +115,10 @@ export class RotatingFileSink {
   }
 
   clear(): void {
-    for (const file of this.getFiles(true)) fs.writeFileSync(file, "", "utf8");
+    for (const file of this.getFiles(true)) {
+      assertProfileStorage(file, this.profile);
+      fs.writeFileSync(file, "", "utf8");
+    }
     this.currentFileSize = 0;
   }
 
@@ -197,6 +211,7 @@ export class RotatingFileSink {
 
   private removeLog(file: string): boolean {
     try {
+      assertProfileStorage(file, this.profile);
       fs.unlinkSync(file);
       return true;
     } catch (error) {
@@ -217,8 +232,15 @@ export class RotatingFileSink {
 }
 
 let defaultRotatingFileSink: RotatingFileSink | null = null;
+const profileSinks = new WeakMap<ProfileContext, RotatingFileSink>();
 
 export function getGlobalRotatingFileSink(): RotatingFileSink {
+  const profile = currentProfile();
+  if (profile) {
+    let sink = profileSinks.get(profile);
+    if (!sink) { sink = new RotatingFileSink(); profileSinks.set(profile, sink); }
+    return sink;
+  }
   if (!defaultRotatingFileSink) {
     defaultRotatingFileSink = new RotatingFileSink();
   }
@@ -226,5 +248,7 @@ export function getGlobalRotatingFileSink(): RotatingFileSink {
 }
 
 export function setGlobalRotatingFileSink(sink: RotatingFileSink | null): void {
+  const profile = currentProfile();
+  if (profile) { if (sink) profileSinks.set(profile, sink); else profileSinks.delete(profile); return; }
   defaultRotatingFileSink = sink;
 }

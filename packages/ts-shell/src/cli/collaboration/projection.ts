@@ -7,10 +7,16 @@ import type { Binding, Snapshot, Right } from '../../collaboration/contract/mode
 import type { CollaborationComposition } from './model.js';
 import { neutraliseForDisplay } from '../../core/text/safety.js';
 import { redactReportText } from '../../core/security/redaction.js';
+import { assertCurrentProfile, currentProfile } from '../../core/paths/profile/context.js';
+import { profileScope } from '../../core/paths/profile/scope.js';
 
 export function currentBinding(host: CollaborationComposition): Binding {
+  if (host.context.profile) assertCurrentProfile(host.context.profile);
   const session = host.context.session; const root = fs.realpathSync(host.context.projectRoot); const stat = fs.statSync(root);
-  return { sessionId: session.id, sessionCreatedAt: session.createdAt, projectId: digest([root, stat.dev, stat.ino]) };
+  const identity = digest([root, stat.dev, stat.ino]);
+  const profile = host.context.profile ?? currentProfile();
+  return { sessionId: session.id, sessionCreatedAt: session.createdAt, projectId: profile && profile.id !== 'default'
+    ? digest(profileScope(identity, profile)) : identity };
 }
 export function snapshotFor(host: CollaborationComposition, cutover = 0): Snapshot {
   const gathered = gatherExport({ sessionId: host.context.session.id, workspace: host.context.projectRoot, maxSourceBytes: 2 * 1024 * 1024 });

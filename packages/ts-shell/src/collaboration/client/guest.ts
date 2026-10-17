@@ -3,10 +3,12 @@ import { CollaborationClient } from './service.js';
 import { cursorPath, readCursor, saveCursor } from './cursor.js';
 import { digest, integer, object, requireValue, text } from '../contract/value.js';
 import { decodeEvents, decodeSnapshot } from '../contract/snapshot.js';
+import { currentProfile } from '../../core/paths/profile/context.js';
 
 interface CursorRecord { version: 1; origin: string; principal: string; roomId: string; epoch: string;
   binding: Binding; generation: number; cursor: number; events: RelayEvent[]; snapshot?: Snapshot; gap: boolean }
 export class CollaborationGuest {
+  private readonly profileContext = currentProfile();
   readonly roomId: string;
   readonly epoch: string;
   private readonly target: string;
@@ -24,7 +26,7 @@ export class CollaborationGuest {
     const selected = object(result); this.roomId = text(selected.roomId, 128); this.epoch = text(selected.epoch, 36);
     const bound = object(selected.binding); this.binding = { sessionId: text(bound.sessionId, 128), sessionCreatedAt: text(bound.sessionCreatedAt, 64), projectId: text(bound.projectId, 64) };
     this.ticket = text(selected.ticket, 2048); this.expiresAt = integer(selected.expiresAt);
-    this.target = cursorPath(client.profile.origin, client.profile.principal, this.roomId, localIdentity); this.baseline = readCursor(this.target);
+    this.target = cursorPath(client.profile.origin, client.profile.principal, this.roomId, localIdentity); this.baseline = readCursor(this.target, this.profileContext);
     const generation = integer(selected.generation, 1);
     this.record = { version: 1, origin: client.profile.origin, principal: client.profile.principal, roomId: this.roomId, epoch: this.epoch,
       binding: this.binding, generation, cursor: 0, events: [], gap: this.baseline !== undefined };
@@ -64,7 +66,7 @@ export class CollaborationGuest {
       if (snapshot) requireValue(snapshot.cutover <= sequence);
       const next: CursorRecord = { ...this.record, generation, cursor, gap: gap || events.some(event => event.kind === 'relay.gap'),
         events: [...this.record.events, ...events].slice(-128), ...(snapshot ? { snapshot } : {}) };
-      if (digest(next) !== digest(this.baseline)) saveCursor(this.target, this.baseline, next);
+      if (digest(next) !== digest(this.baseline)) saveCursor(this.target, this.baseline, next, this.profileContext);
       this.baseline = next; this.record = next;
     } finally { this.pending = false; }
   }

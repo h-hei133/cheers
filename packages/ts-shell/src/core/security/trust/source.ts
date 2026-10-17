@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { userDataSearchDirs } from '../../paths/userHome.js';
+import { assertProfileStorage } from '../../paths/profile/context.js';
 
 /** Only a missing entry beneath an accessible directory permits fallback. */
 export function isTrustFileMissing(source: string): boolean {
@@ -24,5 +25,6 @@ export function isTrustFileMissing(source: string): boolean {
 
 export function trustSource(): string {
   const candidates = userDataSearchDirs().map(dir => path.join(dir, 'trust.json'));
+  for (const candidate of candidates) assertProfileStorage(candidate);
   return candidates.find(candidate => !isTrustFileMissing(candidate)) ?? candidates[0]!;
 }

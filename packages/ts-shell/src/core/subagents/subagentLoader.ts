@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { SubagentDefinition } from './types.js';
 import { resolveUserDataFile } from '../paths/userHome.js';
+import { assertProfileIdentity, assertProfileStorage, currentProfile } from '../paths/profile/context.js';
 import { BUILTIN_SUBAGENTS } from './builtin.js';
 import { parseDefinition } from './definition.js';
 import { definitionIdentity, pathIdentity, readAgentFile } from './files.js';
@@ -19,6 +20,7 @@ export interface AgentDiscovery {
   readonly diagnostics: readonly string[];
 }
 export class SubagentLoader {
+  private readonly profile = currentProfile();
   readonly workspaceRoot: string;
   readonly userAgentsDir: string;
   constructor(workspaceRoot = process.cwd(), private readonly sourceAccess?: (absolute: string) => void) {
@@ -26,6 +28,7 @@ export class SubagentLoader {
   }
   directories(): readonly string[] { return [this.userAgentsDir, path.join(this.workspaceRoot, '.agents', 'agents'), path.join(this.workspaceRoot, '.agents')]; }
   discover(allowProjectAgents = true): AgentDiscovery {
+    if (this.profile) assertProfileIdentity(this.profile);
     const candidates: AgentCandidate[] = BUILTIN_SUBAGENTS.map(definition => ({ name: definition.name, source: 'builtin', definition: { ...definition, identity: `builtin:${definition.name}` } }));
     const diagnostics: string[] = []; const budget: DiscoveryBudget = { files: 0, bytes: 0,
       walk: new WalkBudget(undefined, { entries: 8192, directories: 512, pathBytes: 1024 * 1024, timeoutMs: 2000 }) };
@@ -68,6 +71,7 @@ export class SubagentLoader {
   }
   private scan(directory: string, source: 'user' | 'project', candidates: AgentCandidate[], diagnostics: string[], budget: DiscoveryBudget, depth: number, skipAgents = false): void {
     try {
+      if (source === 'user') assertProfileStorage(directory, this.profile);
       pathIdentity(directory);
       let entries: fs.Dirent[];
       try { entries = this.entries(directory, budget.walk); } catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return; throw error; }
@@ -84,6 +88,7 @@ export class SubagentLoader {
         let raw: string | undefined;
         let sourceAdmitted = false;
         try {
+          if (source === 'user') assertProfileStorage(target, this.profile);
           this.sourceAccess?.(target); sourceAdmitted = true;
           raw = readAgentFile(target); if (raw === undefined) throw new Error('Definition disappeared.');
           budget.bytes += Buffer.byteLength(raw);

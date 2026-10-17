@@ -1,4 +1,6 @@
 import path from "node:path";
+import { assertProfileStorage } from '../../core/paths/profile/context.js';
+import { snapshotRoot } from './root.js';
 import {
   hashContent,
   type RecoveryAuthorityCaptureBatchResult,
@@ -59,11 +61,11 @@ export function buildEditSnapshotStoreConfig(input: {
   if (input.storage?.mode === "disabled") {
     return { mode: "disabled" };
   }
+  const ledgerRoot = input.storage?.ledgerRoot ?? snapshotRoot(input.workspaceRoot);
+  assertProfileStorage(ledgerRoot);
   return {
     mode: "non-default",
-    ledgerRoot:
-      input.storage?.ledgerRoot ??
-      path.join(input.workspaceRoot, ".sisyphus", "edit-snapshots"),
+    ledgerRoot,
     authorityId:
       input.storage?.authorityId ?? defaultAuthorityId(input.workspaceRoot, input.targetPath),
   };

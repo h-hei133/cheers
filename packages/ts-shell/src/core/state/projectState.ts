@@ -1,8 +1,9 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { resolveUserDataFile } from "../paths/userHome.js";
+import { resolveUserDataFile, userHomeDir } from "../paths/userHome.js";
+import { assertProfileStorage } from '../paths/profile/context.js';
+import { profileWorkspaceDir } from '../paths/profile/workspace.js';
 
 /**
  * Durable per-project state for choices that outlive a turn.
@@ -61,7 +62,9 @@ export function projectRootOf(from: string): string {
  */
 export function projectStateDir(from: string): string {
   const root = projectRootOf(from);
-  const home = process.env.USERPROFILE ?? process.env.HOME ?? os.homedir();
+  const privateRoot = profileWorkspaceDir(root);
+  if (privateRoot) return privateRoot;
+  const home = userHomeDir();
   const digest = crypto.createHash("sha256").update(root).digest("hex").slice(0, 8);
   // The directory is keyed by project path, so the name is stable across the
   // rename and a project recorded under an older directory is found there rather
@@ -74,7 +77,9 @@ export function projectStateDir(from: string): string {
 
 /** Where this project's standing choices are recorded. */
 export function projectStatePath(from: string): string {
-  return path.join(projectStateDir(from), STATE_FILE);
+  const target = path.join(projectStateDir(from), STATE_FILE);
+  assertProfileStorage(target);
+  return target;
 }
 
 /** Everything recorded for this project, or an empty state. */

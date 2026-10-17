@@ -7,6 +7,8 @@ import { hashContent } from '../../authority/content.js';
 import { descriptorPath, ensureWorkspaceDirectory, inspectWorkspaceFile } from '../../authority/state.js';
 import { decodeOperation } from './schema.js';
 import type { EditOperationIdentity, OperationReceipt, OperationScope } from './model.js';
+import { assertProfileStorage, captureProfileIdentity, currentProfile } from '../../../core/paths/profile/context.js';
+import { snapshotRoot } from '../root.js';
 
 interface OperationIndex {
   readonly schemaVersion: 1;
@@ -16,23 +18,33 @@ interface OperationIndex {
 
 export function captureOperationScope(identity: Pick<EditOperationIdentity, 'sessionId' | 'workspaceRoot'>): OperationScope {
   if (!identity.sessionId || identity.sessionId.length > 512 || /[\x00-\x1f\x7f-\x9f]/.test(identity.sessionId)) throw new Error('Edit operation requires a session identity.');
-  return { sessionId: identity.sessionId, workspace: captureWorkspaceRoot(identity.workspaceRoot, identity.workspaceRoot, 'write') };
+  const profile = captureProfileIdentity();
+  return { sessionId: identity.sessionId, workspace: captureWorkspaceRoot(identity.workspaceRoot, identity.workspaceRoot, 'write'), ...(profile ? { profile } : {}) };
 }
 
 export function operationLedgerRoot(scope: OperationScope): string {
-  return path.join(scope.workspace.path, '.sisyphus', 'edit-snapshots');
+  storageRoot(scope);
+  return snapshotRoot(scope.workspace.path, scope.profile);
 }
 
 function directory(scope: OperationScope): string {
-  return path.join('.sisyphus', 'edit-snapshots', 'operations', hashContent(`${scope.sessionId}\0${scope.workspace.identity}`));
+  return path.join(path.relative(storageRoot(scope), operationLedgerRoot(scope)), 'operations', hashContent(`${scope.sessionId}\0${scope.workspace.identity}`));
+}
+
+function storageRoot(scope: OperationScope): string {
+  if (!scope.profile && currentProfile()?.id !== undefined && currentProfile()?.id !== 'default') throw new Error('Edit operation is missing its profile identity.');
+  return scope.profile?.root ?? scope.workspace.path;
 }
 
 function checkScope(scope: OperationScope): void {
   assertWorkspaceRoot({ ...scope.workspace, access: 'write' });
+  assertProfileStorage(storageRoot(scope), scope.profile);
 }
 
 function readJson(scope: OperationScope, relative: string): unknown {
-  const state = inspectWorkspaceFile(scope.workspace.path, relative);
+  const root = storageRoot(scope);
+  assertProfileStorage(path.join(root, relative), scope.profile);
+  const state = inspectWorkspaceFile(root, relative);
   if (state.state === 'absent') return undefined;
   if (Buffer.byteLength(state.content) > 8 * 1024 * 1024) throw new Error('Edit operation ledger exceeds its size limit.');
   return JSON.parse(state.content);
@@ -42,7 +54,7 @@ function readIndex(scope: OperationScope): OperationIndex {
   const value = readJson(scope, path.join(directory(scope), 'index.json')) as OperationIndex | undefined;
   if (value === undefined) {
     let files: string[] = [];
-    try { files = fs.readdirSync(path.join(scope.workspace.path, directory(scope))); }
+    try { files = fs.readdirSync(path.join(storageRoot(scope), directory(scope))); }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
     if (files.some(file => file.endsWith('.json'))) throw new Error('Edit operation index is missing; inspect the existing receipts.');
     return { schemaVersion: 1, sequence: 0, operations: [] };
@@ -53,7 +65,7 @@ function readIndex(scope: OperationScope): OperationIndex {
     || new Set(value.operations.map(entry => entry.operationId)).size !== value.operations.length
     || new Set(value.operations.map(entry => entry.sequence)).size !== value.operations.length) throw new Error('Edit operation index is invalid.');
   const indexed = new Set(['index.json', ...value.operations.map(entry => `${entry.operationId}.json`)]);
-  const stored = fs.readdirSync(path.join(scope.workspace.path, directory(scope))).filter(name => name.endsWith('.json'));
+  const stored = fs.readdirSync(path.join(storageRoot(scope), directory(scope))).filter(name => name.endsWith('.json'));
   if (stored.length !== indexed.size || stored.some(name => !indexed.has(name))) throw new Error('Edit operation index does not account for every receipt.');
   return value;
 }
@@ -81,7 +93,9 @@ export function persistOperation(receipt: OperationReceipt): void {
   checkScope(receipt);
   decodeOperation(receipt, receipt);
   const relative = path.join(directory(receipt), `${receipt.operationId}.json`);
-  const before = inspectWorkspaceFile(receipt.workspace.path, relative);
+  const root = storageRoot(receipt);
+  assertProfileStorage(path.join(root, relative), receipt.profile);
+  const before = inspectWorkspaceFile(root, relative);
   if (before.state === 'exists') {
     const previous = decodeOperation(JSON.parse(before.content), receipt);
     const immutable = (value: OperationReceipt) => JSON.stringify({ ...value, revision: 0, status: '', undo: '', updatedAt: '',
@@ -89,8 +103,9 @@ export function persistOperation(receipt: OperationReceipt): void {
     if (receipt.revision !== previous.revision + 1 || immutable(receipt) !== immutable(previous)) throw new Error('Edit operation receipt changed before publication.');
   } else if (receipt.revision !== 1) throw new Error('Edit operation receipt disappeared before publication.');
   const text = JSON.stringify(receipt);
-  commitWorkspaceFile({ workspaceRoot: receipt.workspace.path, relativePath: relative, expected: before, content: text });
-  if (inspectWorkspaceFile(receipt.workspace.path, relative).state !== 'exists'
+  commitWorkspaceFile({ workspaceRoot: root, relativePath: relative, expected: before, content: text });
+  assertProfileStorage(path.join(root, relative), receipt.profile);
+  if (inspectWorkspaceFile(root, relative).state !== 'exists'
     || JSON.stringify(readOperation(receipt, receipt.operationId)) !== text) throw new Error('Edit operation receipt could not be verified.');
 }
 
@@ -98,15 +113,18 @@ export function persistOperation(receipt: OperationReceipt): void {
 export function withOperationStore<T>(scope: OperationScope, action: () => T): T {
   checkScope(scope);
   const relative = directory(scope);
-  ensureWorkspaceDirectory(scope.workspace.path, relative);
-  const absolute = path.join(scope.workspace.path, relative);
+  const root = storageRoot(scope);
+  ensureWorkspaceDirectory(root, relative);
+  const absolute = path.join(root, relative);
+  assertProfileStorage(absolute, scope.profile);
   const fd = fs.openSync(absolute, fs.constants.O_RDONLY | (fs.constants.O_DIRECTORY ?? 0) | (fs.constants.O_NOFOLLOW ?? 0));
   try {
     if (descriptorPath(fd, absolute) !== absolute) throw new Error('Edit operation store changed path.');
     const lockPath = path.join(process.platform === 'linux' ? `/proc/self/fd/${fd}` : absolute, 'store.lock');
     return withFileLock(lockPath, () => {
       checkScope(scope);
-      inspectWorkspaceFile(scope.workspace.path, path.join(relative, 'index.json'));
+      assertProfileStorage(path.join(absolute, 'store.lock'), scope.profile);
+      inspectWorkspaceFile(root, path.join(relative, 'index.json'));
       return action();
     }, { recovery: 'local-dead', createParent: false });
   } finally { fs.closeSync(fd); }
@@ -120,8 +138,9 @@ export function allocateOperation(input: Omit<OperationReceipt, 'sequence'>): Op
   persistOperation(receipt);
   const next: OperationIndex = { schemaVersion: 1, sequence: receipt.sequence, operations: [...index.operations, { operationId: receipt.operationId, sequence: receipt.sequence }] };
   const relative = path.join(directory(input), 'index.json');
-  commitWorkspaceFile({ workspaceRoot: input.workspace.path, relativePath: relative,
-    expected: inspectWorkspaceFile(input.workspace.path, relative), content: JSON.stringify(next) });
+  const root = storageRoot(input);
+  commitWorkspaceFile({ workspaceRoot: root, relativePath: relative,
+    expected: inspectWorkspaceFile(root, relative), content: JSON.stringify(next) });
   if (JSON.stringify(readIndex(input)) !== JSON.stringify(next)) throw new Error('Edit operation order could not be verified.');
   return receipt;
 }

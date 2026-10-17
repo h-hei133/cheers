@@ -44,7 +44,7 @@ export function createDocumentReadTool(execution: ExecutionService = createDefau
           const artifact = await store.saveBinary(body.bytes, 'document', 'pdf', scope.signal);
           scope.check();
           const media = await execution.readMedia({ operationKind: 'file.read', absolutePath: artifact.path, artifactDirectory: store.directory,
-            workspaceRoot: context.artifactRoot ?? context.workspaceRoot, authority: { mode: 'read-only', source: 'tool-runtime-approval', reason: 'Read a retrieved research PDF artifact.' },
+            workspaceRoot: store.directory, authority: { mode: 'read-only', source: 'tool-runtime-approval', reason: 'Read a retrieved research PDF artifact.' },
             caller: 'research-document', reason: 'Read bounded selected PDF pages.', abortSignal: scope.signal,
             kind: 'pdf', offset: args.offset as number | undefined, limit: args.limit as number | undefined });
           scope.check();

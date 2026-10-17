@@ -54,7 +54,7 @@ export function createReadToolDefinition(executionService: ExecutionService): To
           abortSignal: context.abortSignal,
           absolutePath: resolvedArtifact,
           artifactDirectory: artifactManager.directory,
-          workspaceRoot: context.artifactRoot ?? context.workspaceRoot,
+          workspaceRoot: artifactManager.directory,
           authority: AUTHORITY,
           caller: 'core-tool:read:artifact',
           reason: 'Read session artifact output log.',

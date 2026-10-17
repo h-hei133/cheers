@@ -1,3 +1,4 @@
+import { profileScope } from '../paths/profile/scope.js';
 import {
   adaptCommandResultToSidebarEvent,
   emitSidebarCommandResult,
@@ -13,7 +14,7 @@ import {
 import type { CommandContext, LocalCommandResult } from "./types.js";
 
 export function sidebarSessionScopeId(context: CommandContext): string {
-  return context.sessionId ? `session:${context.sessionId}` : `cwd:${context.cwd}`;
+  return profileScope(context.sessionId ? `session:${context.sessionId}` : `cwd:${context.cwd}`);
 }
 
 export function sidebarLiveEventStoreForContext(

@@ -10,8 +10,10 @@ import { loadCatalog } from '../models/catalogStore.js';
 import type { CatalogProvider } from '../models/catalog.js';
 import { resolveProviderCredential } from './providerCredentials.js';
 import type { RuntimeConfig } from '../../config/runtimeConfig.js';
+import { assertCurrentProfile, type ProfileContext } from '../paths/profile/context.js';
 
 interface ConfigurationContext {
+  readonly profile?: ProfileContext;
   readonly workspaceRevision?: number;
   readonly workspaceIssue?: string;
   readonly workspaceAdmission?: () => string | undefined;
@@ -48,10 +50,16 @@ function validateCandidate(config: RuntimeConfig, context: Pick<ConfigurationCon
 
 /** Ordinary settings stay pinned; safety revocation and substrate changes do not. */
 export function configurationAdmission(context: ConfigurationContext): () => string | undefined {
+  try { if (context.profile) assertCurrentProfile(context.profile); }
+  catch { return () => 'Profile storage or identity changed; restart in the owning profile before starting new actions.'; }
   const binding = configurationBinding(context);
   const substrate = context.configuration.substrateRevision;
   const workspaceRevision = context.workspaceRevision;
   return () => {
+    if (context.profile) {
+      try { assertCurrentProfile(context.profile); }
+      catch { return 'Profile storage or identity changed; restart in the owning profile before starting new actions.'; }
+    }
     if (context.workspaceIssue) return context.workspaceIssue;
     if (workspaceRevision !== context.workspaceRevision) return 'Workspace roots changed; start a new operation.';
     const workspaceBlocked = context.workspaceAdmission?.();

@@ -4,12 +4,14 @@ import * as os from "node:os";
 import type { AgentDescriptor } from "./types.js";
 import { SubagentLoader } from "../subagents/subagentLoader.js";
 import { projectTrust } from "../security/projectTrust.js";
+import { assertProfileIdentity, currentProfile } from '../paths/profile/context.js';
 
 /**
  * AgentRegistryScanner
  * Discovers reachable agents across local UDS sockets, custom subagents, and active agent teams.
  */
 export class AgentRegistryScanner {
+  private profile = currentProfile();
   private readonly workspaceRoot: string;
   private readonly socketDir: string;
 
@@ -20,10 +22,15 @@ export class AgentRegistryScanner {
   }
 
   scanAllReachableAgents(): readonly AgentDescriptor[] {
+    // An ambient scanner can be constructed while CLI modules are loading,
+    // before the immutable launch profile has been installed.
+    const profile = this.profile ??= currentProfile();
+    if (profile) assertProfileIdentity(profile);
     const agents: AgentDescriptor[] = [];
 
     // 1. Scan Local UDS Session Sockets (/tmp/ts-socks-<uid>/session-<id>.sock)
-    if (fs.existsSync(this.socketDir)) {
+    // Legacy peer descriptors have no profile identity and cannot enter a named profile.
+    if ((!profile || profile.id === 'default') && fs.existsSync(this.socketDir)) {
       try {
         const entries = fs.readdirSync(this.socketDir);
         for (const entry of entries) {

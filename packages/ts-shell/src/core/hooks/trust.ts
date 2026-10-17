@@ -23,6 +23,7 @@ import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { resolveUserDataFile, userDataDir } from "../../core/paths/userHome.js"
+import { assertProfileStorage, currentProfile } from '../paths/profile/context.js';
 
 /** The parts of a hook that decide what it does. */
 export interface HookIdentity {
@@ -51,6 +52,7 @@ export function hookFingerprint(hook: HookIdentity): string {
 
 /** The approvals this user has given, keyed by fingerprint. */
 export class HookTrustStore {
+  private readonly profile = currentProfile();
   private readonly storePath: string;
   /** Approvals given during this session, for a store that cannot be written. */
   private readonly sessionApprovals = new Set<string>();
@@ -59,15 +61,18 @@ export class HookTrustStore {
     this.storePath =
       customPath ??
       resolveUserDataFile("hook-trust.json");
+    assertProfileStorage(this.storePath, this.profile);
   }
 
   isTrusted(fingerprint: string): boolean {
+    try { assertProfileStorage(this.storePath, this.profile); } catch { return false; }
     if (this.sessionApprovals.has(fingerprint)) return true;
     return this.read().approved[fingerprint] !== undefined;
   }
 
   /** Remember an approval, for this session and for later ones. */
   recordTrust(fingerprint: string, description = ""): void {
+    assertProfileStorage(this.storePath, this.profile);
     this.sessionApprovals.add(fingerprint);
     const data = this.read();
     const approved = { ...data.approved, [fingerprint]: description };
@@ -76,6 +81,7 @@ export class HookTrustStore {
 
   private read(): TrustFile {
     try {
+      assertProfileStorage(this.storePath, this.profile);
       const parsed = JSON.parse(fs.readFileSync(this.storePath, "utf8")) as TrustFile;
       if (parsed?.version === 1 && parsed.approved) return parsed;
     } catch {
@@ -87,9 +93,12 @@ export class HookTrustStore {
 
   private write(data: TrustFile): void {
     try {
+      assertProfileStorage(this.storePath, this.profile);
       fs.mkdirSync(path.dirname(this.storePath), { recursive: true });
       const temporary = `${this.storePath}.tmp-${process.pid}-${Date.now()}`;
+      assertProfileStorage(temporary, this.profile);
       fs.writeFileSync(temporary, JSON.stringify(data, null, 2), "utf8");
+      assertProfileStorage(this.storePath, this.profile);
       fs.renameSync(temporary, this.storePath);
     } catch {
       // The session approval still holds; only persistence was lost.

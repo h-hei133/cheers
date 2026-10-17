@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { resolveAllUserDataFiles, userDataDir } from "../paths/userHome.js";
+import { assertProfileIdentity, assertProfileStorage, currentProfile } from '../paths/profile/context.js';
 import { projectDirectories } from "../project/directories.js";
 import type { PromptTemplate } from "./expansion.js";
 
@@ -45,6 +46,8 @@ function frontmatterFields(block: string): Map<string, string> {
 }
 
 export class TemplateLoader {
+  private readonly profile = currentProfile();
+  private readonly userRoots: ReadonlySet<string>;
   private readonly roots: readonly string[];
 
   constructor(workspaceRoot: string = process.cwd()) {
@@ -61,8 +64,9 @@ export class TemplateLoader {
     const projectDirs = projectDirectories(workspaceRoot).map((dir) =>
       path.join(dir, ".agents", "prompts"),
     );
+    this.userRoots = new Set(userDirs.length > 0 ? userDirs : [path.join(userDataDir(), 'prompts')]);
     this.roots = [
-      ...(userDirs.length > 0 ? userDirs : [path.join(userDataDir(), "prompts")]),
+      ...this.userRoots,
       ...projectDirs,
     ];
   }
@@ -72,11 +76,14 @@ export class TemplateLoader {
   }
 
   loadDetailed(): LoadedTemplates {
+    if (this.profile) assertProfileIdentity(this.profile);
     const templates = new Map<string, PromptTemplate>();
     const diagnostics: TemplateDiagnostic[] = [];
 
     for (const root of this.roots) {
+      if (this.userRoots.has(root)) assertProfileStorage(root, this.profile);
       for (const file of this.listMarkdown(root)) {
+        if (this.userRoots.has(root)) assertProfileStorage(file, this.profile);
         const name = path.basename(file, path.extname(file));
         if (!VALID_NAME.test(name)) {
           // Reported rather than skipped silently: the file exists and the user

@@ -3,6 +3,7 @@ import path from "node:path";
 import { dark as darkJson, light as lightJson, darkContrast, lightContrast } from "./assets.js";
 import { projectDirectories } from "../../core/project/directories.js";
 import { userDataSearchDirs } from "../../core/paths/userHome.js";
+import { assertProfileStorage } from '../../core/paths/profile/context.js';
 import { projectTrust } from "../../core/security/trust/store.js";
 import { identifyProject } from "../../core/security/trust/identity.js";
 
@@ -99,7 +100,7 @@ function discoverThemes(
   // Preserve the existing load order within each layer. Automatic project
   // resources require their own trust; an explicit CLI path remains user input.
   for (const { directory, project } of themeRoots(workspaceRoot)) {
-    for (const theme of readThemeDirectory(directory, project)) {
+    for (const theme of readThemeDirectory(directory, project, !project)) {
       (project ? automatic : found).set(theme.name, theme);
     }
   }
@@ -155,7 +156,8 @@ function readThemeFile(filePath: string): DiscoveredTheme {
 }
 
 /** Every readable theme file in one directory, ignoring anything malformed. */
-function readThemeDirectory(directory: string, project = false): DiscoveredTheme[] {
+function readThemeDirectory(directory: string, project = false, user = false): DiscoveredTheme[] {
+  if (user) assertProfileStorage(directory);
   const revision = project ? projectTrust.revision() : undefined;
   const root = project ? trustedThemePath(directory) : directory;
   if (!root) return [];
@@ -170,6 +172,7 @@ function readThemeDirectory(directory: string, project = false): DiscoveredTheme
   for (const entry of entries) {
     if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
     const candidate = path.join(root, entry.name);
+    if (user) assertProfileStorage(candidate);
     const filePath = project ? trustedThemePath(candidate) : candidate;
     if (!filePath) continue;
     const theme = readThemeFile(filePath);

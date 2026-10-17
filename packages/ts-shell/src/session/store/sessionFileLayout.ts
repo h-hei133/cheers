@@ -1,10 +1,11 @@
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
-import * as os from "node:os";
-import { resolveAllUserDataFiles, userDataDirFor } from "../../core/paths/userHome.js";
+import { resolveAllUserDataFiles, userDataDirFor, userHomeDir } from "../../core/paths/userHome.js";
 import * as path from "node:path";
+import { assertProfileIdentity, currentProfile, profilePath, type ProfileContext } from '../../core/paths/profile/context.js';
 
 export interface SessionStoreLayout {
+  readonly profile?: ProfileContext;
   readonly sessionsDir: string;
   /**
    * Every directory a session may already live in, current first.
@@ -29,13 +30,14 @@ export interface SessionFileLayout {
 }
 
 export function createSessionStoreLayout(homeDir?: string): SessionStoreLayout {
-  const root = homeDir ?? process.env.USERPROFILE ?? process.env.HOME ?? os.homedir();
+  const root = homeDir ?? userHomeDir();
   const sessionsDir = path.join(userDataDirFor(root), "sessions");
   const currentSessionStorePath = path.join(
     userDataDirFor(root),
     "current-session.json",
   );
   return {
+    ...(currentProfile() ? { profile: currentProfile() } : {}),
     sessionsDir,
     // `resolveAllUserDataFiles` returns only the directories that exist, so the
     // current one is added when nothing is there yet: a fresh install still has
@@ -54,6 +56,7 @@ export function createSessionStoreLayout(homeDir?: string): SessionStoreLayout {
 }
 
 export function ensureSessionStoreLayout(layout: SessionStoreLayout): void {
+  assertSessionStoreProfile(layout, layout.sessionsDir);
   if (!fs.existsSync(layout.sessionsDir)) {
     fs.mkdirSync(layout.sessionsDir, { recursive: true });
   }
@@ -106,11 +109,20 @@ export function locateExistingSessionLayout(
   layout: SessionStoreLayout,
   sessionId: string,
 ): SessionFileLayout {
+  assertSessionStoreProfile(layout);
   for (const sessionsDir of layout.sessionsSearchDirs) {
     const candidate = projectSessionFileLayout({ sessionsDir, sessionId });
+    for (const target of Object.values(candidate)) assertSessionStoreProfile(layout, target);
     if (fs.existsSync(candidate.sessionDir)) {
       return candidate;
     }
   }
   return projectSessionFileLayout({ sessionsDir: layout.sessionsDir, sessionId });
+}
+
+/** A captured store never follows a replaced profile or a link into another one. */
+export function assertSessionStoreProfile(layout: SessionStoreLayout, target?: string): void {
+  if (!layout.profile) return;
+  assertProfileIdentity(layout.profile);
+  if (target && layout.profile.id !== 'default') profilePath(path.relative(layout.profile.root, target), layout.profile);
 }

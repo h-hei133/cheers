@@ -18,6 +18,7 @@ import { authorizeToolCall, consumeToolCall, discardToolCall, preparedToolCall, 
 import { preparationContext, preparationPermission } from './preparation.js';
 import { bindExecutionTarget, executionApprovalPreview } from '../runtime/execution/binding.js';
 import { assertSourceAccess } from '../core/query/sourcePolicy.js';
+import { assertArtifactSourceAccess } from '../core/session/artifacts/access.js';
 import { EditOperationError } from '../edit/recovery/operation/write.js';
 import { createComponentLogger } from "../observability/structuredLogger.js";
 
@@ -179,12 +180,16 @@ async function executeTool(
       commandProof: options.commandProof,
       assertSourceAccess: absolute => {
         if (tool.name === 'task') preparationContext(tool.name, options).assertSourceAccess!(absolute);
-        else assertSourceAccess(absolute, options.workspaceRoot, options.workspaceRoots, options.permissionScope, options.denyRules);
+        else assertArtifactSourceAccess(absolute, options.workspaceRoot, options.sessionId, options.workspaceRoots, options.permissionScope, options.denyRules);
       },
       assertFileAccess: (absolutePath) => {
         if (preparation) { preparationContext(tool.name, options).assertFileAccess!(absolutePath); return; }
         const blocked = options.admission?.();
         if (blocked) throw new Error(blocked);
+        if (tool.name === 'read' && typeof args.path === 'string' && args.path.startsWith('artifact://')) {
+          assertArtifactSourceAccess(absolutePath, options.workspaceRoot, options.sessionId, options.workspaceRoots, options.permissionScope, options.denyRules);
+          return;
+        }
         const actualArgs = { ...args, path: absolutePath, filePath: absolutePath };
         if (tool.name === 'browser') assertSourceAccess(absolutePath, options.workspaceRoot, options.workspaceRoots, options.permissionScope, options.denyRules);
         if (tool.name === 'lsp') {

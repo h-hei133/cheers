@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { resolveUserDataFile } from '../../core/paths/userHome.js';
+import { assertProfileStorage, currentProfile, profilePathOverride } from '../../core/paths/profile/context.js';
 import { withFileLock, writeJsonFileAtomic } from '../../session/store/sessionFileStore.js';
 import { isRecord } from '../../core/values/record.js';
 import { canonical, digest, manifest, name, relativePath, release } from '../registry/validation.js';
@@ -8,7 +9,7 @@ import type { ExtensionState, PackageRecord, VersionRecord, EffectOutcome } from
 import { assertStoragePath } from './paths.js';
 export { assertStoragePath, storageIdentity, assertStorageIdentity } from './paths.js';
 
-export function extensionFile(): string { return process.env.CHEERS_EXTENSIONS_FILE?.trim() || resolveUserDataFile('extensions/registry.json'); }
+export function extensionFile(): string { return profilePathOverride('CHEERS_EXTENSIONS_FILE') || resolveUserDataFile('extensions/registry.json'); }
 export function packageRoot(file = extensionFile()): string { return path.join(path.dirname(file), 'packages'); }
 export function versionPath(record: VersionRecord, file = extensionFile()): string { return path.join(packageRoot(file), record.manifest.name, record.digest); }
 function validVersion(value: unknown): VersionRecord {
@@ -45,16 +46,19 @@ export function readState(file = extensionFile()): ExtensionState {
 }
 export function stateIdentity(state: ExtensionState): string { return digest(canonical(state)); }
 export class ExtensionStore {
+  private readonly profile = currentProfile();
   readonly outcomes: EffectOutcome[] = [];
-  constructor(readonly file = extensionFile(), readonly save = writeJsonFileAtomic) {}
-  read(): ExtensionState { return readState(this.file); }
+  constructor(readonly file = extensionFile(), readonly save = writeJsonFileAtomic) { assertProfileStorage(file, this.profile); }
+  read(): ExtensionState { assertProfileStorage(this.file, this.profile); return readState(this.file); }
   locked<T>(expected: ExtensionState, action: (state: ExtensionState) => T): T {
+    assertProfileStorage(`${this.file}.lock`, this.profile);
     if (this.outcomes.some(outcome => outcome.durability === 'unknown')) throw new Error('Extension publication is uncertain; inspect retained package data and restart before a fresh mutation.');
     return withFileLock(`${this.file}.lock`, () => { const current = this.read(); if (stateIdentity(current) !== stateIdentity(expected)) throw new Error('Approved extension state changed.'); return action(current); });
   }
   publish(state: ExtensionState, outcome: Omit<EffectOutcome, 'durability'>): EffectOutcome {
+    assertProfileStorage(this.file, this.profile);
     const actual: EffectOutcome = { ...outcome, durability: 'confirmed' };
-    try { this.save(this.file, { ...state, revision: state.revision + 1 }); }
+    try { this.save(this.file, { ...state, revision: state.revision + 1 }); assertProfileStorage(this.file, this.profile); }
     catch { const unknown: EffectOutcome = { ...outcome, durability: 'unknown' }; this.outcomes.push(unknown); return unknown; }
     this.outcomes.push(actual); if (this.outcomes.length > 32) this.outcomes.shift(); return actual;
   }

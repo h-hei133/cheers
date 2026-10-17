@@ -1,3 +1,4 @@
+import { profileScope } from '../paths/profile/scope.js';
 import {
   DEFAULT_COMPACT_LIVE_CHECKPOINT_STORE,
   getLatestCompactCheckpoint,
@@ -167,5 +168,5 @@ async function buildPromptWithProjectMemoryInjection(input: {
 }
 
 function compactSessionScopeId(sessionId: string): string {
-  return `session:${sessionId}`;
+  return profileScope(`session:${sessionId}`);
 }

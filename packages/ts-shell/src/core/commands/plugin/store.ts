@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { resolveUserDataFile } from "../../paths/userHome.js";
+import { profilePathOverride } from '../../paths/profile/context.js';
 import { withFileLock, writeJsonFileAtomic } from "../../../session/store/sessionFileStore.js";
 import { isRecord } from "../../values/record.js";
 
@@ -19,7 +20,7 @@ export interface InstalledPlugin {
 }
 
 export function getPluginStoragePath(): string {
-  return process.env.CHEERS_PLUGINS_FILE?.trim() || resolveUserDataFile("plugins.json");
+  return profilePathOverride('CHEERS_PLUGINS_FILE') || resolveUserDataFile("plugins.json");
 }
 
 export function getInstalledPlugins(): InstalledPlugin[] {

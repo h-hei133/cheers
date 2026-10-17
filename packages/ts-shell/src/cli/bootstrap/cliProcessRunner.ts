@@ -58,18 +58,28 @@ import {
 import type { RestartOutcome, RestartPort, RestartRequest } from '../../core/commands/restart/contract.js';
 
 import type { CliProcessRunnerInput } from './contract.js';
+import { createProfileContext, withProfile } from '../../core/paths/profile/context.js';
 export type { CliProcessRunnerInput } from './contract.js';
 
 export async function runCliProcess(
   input: CliProcessRunnerInput,
 ): Promise<void> {
-  let recovery: RestartRequest | undefined;
-  for (;;) {
-    const request = await runCliCycle({ ...input, args: recovery?.argv ?? input.args,
-      launchCwd: recovery?.workingDirectory ?? input.launchCwd }, recovery);
-    if (!request) return;
-    recovery = request;
-  }
+  // Explicit service mode has its own authenticated state owner and protocol.
+  if (input.args[0] === 'serve') { await runCliCycle(input); return; }
+  const parsed = parseCliArgs(input.args, { cwd: input.launchCwd });
+  if (!parsed.ok) { input.writeError(parsed.error.message); input.exit(parsed.error.exitCode); }
+  if (parsed.args.versionRequested) { input.writeOutput(versionLabel()); return; }
+  const profile = createProfileContext({ name: parsed.args.options.profile });
+  input.profileSelected?.(profile);
+  return withProfile(profile, async () => {
+    let recovery: RestartRequest | undefined;
+    for (;;) {
+      const request = await runCliCycle({ ...input, args: recovery?.argv ?? input.args,
+        launchCwd: recovery?.workingDirectory ?? input.launchCwd }, recovery);
+      if (!request) return;
+      recovery = request;
+    }
+  });
 }
 
 async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartRequest): Promise<RestartRequest | undefined> {

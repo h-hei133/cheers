@@ -1,3 +1,4 @@
+import { profileScope } from '../paths/profile/scope.js';
 import { parseCompactSyntax } from "../../context/compact/command/syntax.js";
 import {
   CompactCommandContractError,
@@ -90,7 +91,7 @@ export async function runCompactLocalCommand(
 }
 
 function compactSessionScopeId(context: CommandContext): string {
-  return context.sessionId ? `session:${context.sessionId}` : `cwd:${context.cwd}`;
+  return profileScope(context.sessionId ? `session:${context.sessionId}` : `cwd:${context.cwd}`);
 }
 
 function compactSourceCommand(

@@ -17,7 +17,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { HookEventName } from "./types.js";
-import { resolveUserDataFile, userDataDir } from "../../core/paths/userHome.js"
+import { resolveUserDataFile, userDataDir, userHomeDir } from "../../core/paths/userHome.js"
 
 /**
  * The events a configuration may name.
@@ -78,7 +78,7 @@ export function loadHookDeclarations(
   options?: HookConfigLoadOptions,
 ): HookConfigLoadResult {
   const homeDir =
-    options?.homeDir ?? process.env.USERPROFILE ?? process.env.HOME ?? os.homedir();
+    options?.homeDir ?? userHomeDir();
 
   const hooks: HookDeclaration[] = [];
   const problems: string[] = [];

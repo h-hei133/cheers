@@ -1,5 +1,5 @@
 import { opendir } from 'node:fs/promises';
-import type { SessionStoreLayout } from '../sessionFileLayout.js';
+import { assertSessionStoreProfile, type SessionStoreLayout } from '../sessionFileLayout.js';
 import { CATALOG_LIMITS } from './model.js';
 
 export interface SessionCandidates {
@@ -11,6 +11,7 @@ export interface SessionCandidates {
 /** A live directory cursor, released when the consumer cancels or stops iterating. */
 export async function* discoverSessions(store: SessionStoreLayout, signal?: AbortSignal, onSource?: (target: string) => void): AsyncGenerator<SessionCandidates> {
   for (const directory of store.sessionsSearchDirs) {
+    assertSessionStoreProfile(store, directory);
     signal?.throwIfAborted();
     onSource?.(directory);
     let cursor;
@@ -27,6 +28,7 @@ export async function* discoverSessions(store: SessionStoreLayout, signal?: Abor
         signal?.throwIfAborted();
         const entry = await cursor.read();
         signal?.throwIfAborted();
+        assertSessionStoreProfile(store, directory);
         if (!entry) { if (ids.length) yield { directory, ids, unreadable: 0 }; break; }
         examined++;
         if (entry.isDirectory()) ids.push(entry.name);

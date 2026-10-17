@@ -1,6 +1,6 @@
 import { lstat } from 'node:fs/promises';
 import type { Stats } from 'node:fs';
-import { projectSessionFileLayout, validateSessionId, type SessionFileLayout, type SessionStoreLayout } from './sessionFileLayout.js';
+import { assertSessionStoreProfile, projectSessionFileLayout, validateSessionId, type SessionFileLayout, type SessionStoreLayout } from './sessionFileLayout.js';
 
 export interface SessionFileSize {
   readonly status: 'complete' | 'partial' | 'unknown';
@@ -17,6 +17,7 @@ export class SessionFiles {
   constructor(private readonly layout: SessionStoreLayout) {}
 
   async sizes(sessionIds: readonly string[], signal?: AbortSignal): Promise<ReadonlyMap<string, SessionFileSize>> {
+    assertSessionStoreProfile(this.layout);
     signal?.throwIfAborted();
     if (sessionIds.length > MAX_SIZE_SESSIONS) throw new RangeError('Too many sessions in one file-size sample.');
     const ids = [...new Set(sessionIds)];
@@ -44,6 +45,7 @@ async function locate(layout: SessionStoreLayout, id: string, signal?: AbortSign
   for (const sessionsDir of layout.sessionsSearchDirs) {
     signal?.throwIfAborted();
     const candidate = projectSessionFileLayout({ sessionsDir, sessionId: id });
+    for (const target of Object.values(candidate)) assertSessionStoreProfile(layout, target);
     try {
       const directory = await lstat(candidate.sessionDir);
       signal?.throwIfAborted();

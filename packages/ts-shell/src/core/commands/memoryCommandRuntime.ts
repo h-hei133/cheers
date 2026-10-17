@@ -1,3 +1,4 @@
+import { profileScope } from '../paths/profile/scope.js';
 import { memorySyntax } from "../../memory/commands/syntax.js";
 import { parseSyntax } from "./syntax/parse.js";
 import { syntaxHelp } from "./syntax/projection.js";
@@ -260,7 +261,7 @@ export async function runMemoryLocalCommand(
 }
 
 function memoryReviewSessionScopeId(context: CommandContext): string {
-  return context.sessionId ? `session:${context.sessionId}` : `cwd:${context.cwd}`;
+  return profileScope(context.sessionId ? `session:${context.sessionId}` : `cwd:${context.cwd}`);
 }
 
 function formatMemoryReviewCommandError(error: unknown): string {

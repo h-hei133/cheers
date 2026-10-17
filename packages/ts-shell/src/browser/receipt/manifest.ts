@@ -4,6 +4,7 @@ import { browserActionCacheEntryHasForbiddenContent } from "../actionCacheEntry.
 import { freezeDeep } from "../../core/values/freeze.js";
 import { redactReportText } from "../../core/security/redaction.js";
 import { readReceiptFile } from "./io.js";
+import { assertProfileStorage, currentProfile, profilePathOverride } from '../../core/paths/profile/context.js';
 
 export const BROWSER_RECEIPT_CACHE_MANIFEST_ENV =
   "CHEERS_BROWSER_RECEIPT_CACHE_MANIFEST";
@@ -81,6 +82,8 @@ export function validateBrowserReceiptCacheManifest(
   if (!isSafeExplicitRoot(normalizedRoot)) {
     return invalid("Cache root must be an explicit non-global local path.");
   }
+  try { assertProfileStorage(normalizedRoot); }
+  catch { return invalid('Cache root must stay inside the selected profile.'); }
   let serialized: string;
   try { serialized = JSON.stringify(value); } catch { return invalid("Cache manifest is not serializable."); }
   const redactions = new Set<string>();
@@ -140,8 +143,8 @@ export function loadBrowserReceiptCacheManifestFromEnv(input: {
   readonly readFile?: (path: string) => string;
 } = {}): BrowserReceiptCacheManifestValidation {
   const env = input.env ?? process.env;
-  const manifestPath = env[BROWSER_RECEIPT_CACHE_MANIFEST_ENV];
-  const root = env[BROWSER_RECEIPT_CACHE_ROOT_ENV];
+  const manifestPath = currentProfile() ? profilePathOverride(BROWSER_RECEIPT_CACHE_MANIFEST_ENV) : env[BROWSER_RECEIPT_CACHE_MANIFEST_ENV];
+  const root = currentProfile() ? profilePathOverride(BROWSER_RECEIPT_CACHE_ROOT_ENV) : env[BROWSER_RECEIPT_CACHE_ROOT_ENV];
   if (manifestPath) {
     try {
       const file = input.readFile ? { status: "read", content: input.readFile(manifestPath) } : readReceiptFile(manifestPath, 16_384);

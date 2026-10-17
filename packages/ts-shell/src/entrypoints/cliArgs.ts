@@ -1,4 +1,5 @@
 import path from "node:path";
+import { profileName } from '../core/paths/profile/name.js';
 import { RUNTIME_PROVIDERS, isRuntimeProvider } from "../config/runtimeConfig.js";
 import { listSlashInvocations, subscribeSlashCommands } from "./slashCommandRegistry.js";
 import type {
@@ -20,6 +21,7 @@ export type {
 } from "../cli/options/cliOptions.js";
 
 const VALUE_FLAGS = new Set([
+  "--profile",
   "--project",
   "--attach",
   "--session-id",
@@ -113,6 +115,23 @@ export function parseCliArgs(
   }
 
   const options: CliOptions = {};
+  let profileSelected = false;
+  for (let index = 0; index < rawArgs.length; index += 1) {
+    const flag = rawArgs[index]!;
+    if (flag === '--') break;
+    if (flag === '--profile' || flag.startsWith('--profile=')) {
+      if (profileSelected) return parseError('Select one --profile per process.');
+      profileSelected = true;
+      const value = flag === '--profile' ? rawArgs[++index] : flag.slice('--profile='.length);
+      if (!value?.trim() || value.startsWith('--')) return parseError('Missing value for --profile. Example: --profile work');
+      try { assignOption(options, 'profile', profileName(value)); }
+      catch (error) { return parseError((error as Error).message); }
+    } else if (VALUE_FLAGS.has(flag)) {
+      // A flag-looking value belongs to its existing consumer, even if it
+      // spells --profile. Share the positional scan's value classification.
+      index += 1;
+    }
+  }
 
   // Positional tokens are what is left after flags and the values those flags
   // consume — `VALUE_FLAGS` decides which ones take a value. A value is not a

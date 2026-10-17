@@ -1,6 +1,6 @@
 import { constants, type Stats } from 'node:fs';
 import { lstat, open } from 'node:fs/promises';
-import { projectSessionFileLayout, validateSessionId, type SessionFileLayout, type SessionStoreLayout } from '../sessionFileLayout.js';
+import { assertSessionStoreProfile, projectSessionFileLayout, validateSessionId, type SessionFileLayout, type SessionStoreLayout } from '../sessionFileLayout.js';
 import { CATALOG_LIMITS } from './model.js';
 import { fileVersion } from '../version.js';
 
@@ -16,12 +16,14 @@ export interface CatalogFiles extends CatalogDirectory {
 
 /** Physical identity remains usable even when the saved content needs recovery. */
 export async function locateCatalogDirectory(store: SessionStoreLayout, id: string, signal?: AbortSignal, onSource?: (target: string) => void): Promise<CatalogDirectory | undefined> {
+  assertSessionStoreProfile(store);
   signal?.throwIfAborted();
   if (validateSessionId(id) !== id || id === '.' || id === '..') throw new Error('Invalid session identity.');
   for (const sessionsDir of store.sessionsSearchDirs) {
     signal?.throwIfAborted();
     onSource?.(sessionsDir);
     const layout = projectSessionFileLayout({ sessionsDir, sessionId: id });
+    for (const target of Object.values(layout)) assertSessionStoreProfile(store, target);
     onSource?.(layout.sessionDir);
     let directory: Stats;
     try { directory = await lstat(layout.sessionDir); }

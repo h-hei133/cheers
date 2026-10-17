@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { userDataDir } from '../../paths/userHome.js';
+import { assertProfileStorage } from '../../paths/profile/context.js';
 import { TRUST_LEVELS, TrustWriteError, type ProjectTrustLevel, type TrustDecision, type TrustWriteResult } from './model.js';
 import { identifyProject, covers } from './identity.js';
 import { hasSensitiveProjectResources } from './resources.js';
@@ -18,8 +19,16 @@ export class ProjectTrustStore {
     return ProjectTrustStore.instance ??= new ProjectTrustStore();
   }
 
-  private source(): string { return this.customPath ?? trustSource(); }
-  private target(): string { return this.customPath ?? path.join(userDataDir(), 'trust.json'); }
+  private source(): string {
+    const source = this.customPath ?? trustSource();
+    assertProfileStorage(source);
+    return source;
+  }
+  private target(): string {
+    const target = this.customPath ?? path.join(userDataDir(), 'trust.json');
+    assertProfileStorage(target);
+    return target;
+  }
 
   private diskRevision(): string {
     const revision = trustRevision(this.source());

@@ -4,6 +4,7 @@ import { syntaxHelp } from "./syntax/projection.js";
 import { TODO_LIMITS, parseTodoDocument, renderTodos, serializeTodos, validTodoItems, type TodoItem } from "./todo/model.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
+import { profileScope } from '../paths/profile/scope.js';
 
 export type { TodoItem } from "./todo/model.js";
 
@@ -12,15 +13,15 @@ const EMPTY_TODOS: readonly TodoItem[] = [];
 const USAGE = syntaxHelp(todoSyntax);
 
 export function getSessionTodos(sessionId?: string): readonly TodoItem[] {
-  return sessionId ? listsBySession.get(sessionId) ?? EMPTY_TODOS : EMPTY_TODOS;
+  return sessionId ? listsBySession.get(profileScope(sessionId)) ?? EMPTY_TODOS : EMPTY_TODOS;
 }
 
 export function setSessionTodos(sessionId: string, items: readonly TodoItem[]): void {
-  listsBySession.set(sessionId, items.map((item) => ({ ...item })));
+  listsBySession.set(profileScope(sessionId), items.map((item) => ({ ...item })));
 }
 
 export function forgetSessionTodos(sessionId: string): void {
-  listsBySession.delete(sessionId);
+  listsBySession.delete(profileScope(sessionId));
 }
 
 /** Mutations publish the complete list through the existing command-state journal. */

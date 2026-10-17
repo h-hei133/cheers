@@ -20,6 +20,7 @@ export function mutateBrowserReceiptCache(input: {
   readonly operation: BrowserReceiptCacheLockOperation;
   readonly record?: BrowserPersistentReceiptCacheRecord;
   readonly now: () => string;
+  readonly assertOwner?: () => void;
 }): ReceiptCacheMutationResult {
   const { manifest, operation, record, now } = input;
   const permission = operation === "compact" || operation === "repair" ? "write" : operation;
@@ -30,10 +31,12 @@ export function mutateBrowserReceiptCache(input: {
   if (!maintenance && (!record || !parseBrowserPersistentReceiptCacheRecord(record))) {
     return blocked("Cache mutation record is invalid or unsafe.");
   }
-  const lock = acquireBrowserReceiptCacheLock({ cacheRoot: manifest.cacheRoot, operation, now });
+  input.assertOwner?.();
+  const lock = acquireBrowserReceiptCacheLock({ cacheRoot: manifest.cacheRoot, operation, now, assertOwner: input.assertOwner });
   if (lock.status !== "acquired") return { ...blocked(lock.reason), evidence: lock.evidence, warnings: lock.warnings };
   let result: ReceiptCacheMutationResult;
   try {
+    input.assertOwner?.();
     const recovery = readBrowserReceiptCacheRecordsForRecovery({ manifest });
     const plan = planBrowserReceiptCacheCompaction({ manifest, recovery, mode: operation === "repair" ? "repair" : "compact" });
     const { records: plannedRecords, ...report } = plan;
@@ -45,6 +48,7 @@ export function mutateBrowserReceiptCache(input: {
       const records = maintenance ? plannedRecords : operation === "delete"
         ? [...recovery.records.filter((item) => item.receiptId !== record!.receiptId), record!]
         : [...recovery.records, record!];
+      input.assertOwner?.();
       const write = writeBrowserReceiptCacheFileAtomic({ cacheRoot: manifest.cacheRoot, content: serializeBrowserReceiptCacheRecords(records), ownsLock: lock.ownsLock });
       result = {
         outcome: write.outcome, cleanup: "not-acquired", report: maintenance && write.outcome === "written" ? report : undefined,

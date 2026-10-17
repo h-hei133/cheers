@@ -13,6 +13,7 @@ import { getGlobalRotatingFileSink } from "../../observability/rotatingFileSink.
 import { readStructuredLogs } from "../../observability/diagnostics.js";
 import { readMetrics } from "../../observability/metrics/reader.js";
 import { formatTimingReport } from "../../observability/startupTiming.js";
+import { assertProfileStorage, currentProfile } from '../paths/profile/context.js';
 
 /**
  * `/report` — a bundle someone can attach to a bug report.
@@ -50,6 +51,7 @@ export async function runReportCommand(
   if (!syntax.ok) return { kind: "local", output: `Invalid /report arguments: ${syntax.reason}\n${syntaxHelp(reportSyntax)}` };
   const allowOutside = syntax.flags.has("outside");
   const requested = syntax.args[0];
+  const profile = requested ? undefined : currentProfile();
 
   // A path the user named is judged; the command's own default is not, because a
   // name this command chose cannot be a typo. The default lives in the user data
@@ -144,8 +146,12 @@ export async function runReportCommand(
     "",
   ].join("\n");
 
+  let writeStarted = false;
   try {
+    if (profile) assertProfileStorage(destination, profile);
     fs.mkdirSync(path.dirname(destination), { recursive: true });
+    if (profile) assertProfileStorage(destination, profile);
+    writeStarted = true;
     fs.writeFileSync(
       destination,
       createZipArchive([
@@ -153,10 +159,11 @@ export async function runReportCommand(
         { name: "summary.md", data: summary },
       ]),
     );
+    if (profile) assertProfileStorage(destination, profile);
   } catch (error) {
     return {
       kind: "local",
-      output: `Could not write the report: ${error instanceof Error ? error.message : String(error)}`,
+      output: `${writeStarted ? 'Report write could not be verified' : 'Could not write the report'}: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 

@@ -1,3 +1,4 @@
+import { profileScope } from '../../core/paths/profile/scope.js';
 import type { RuntimeConfig } from "../../config/runtimeConfig.js";
 import type { ProviderCredentialResolution } from "../../core/shell/providerCredentials.js";
 import { configurationAdmission } from "../../core/shell/configuration.js";
@@ -275,7 +276,7 @@ export function createCliSessionRuntime(input: {
           // Previously the command side wrote it before knowing whether any
           // condensing happened, which is how a preview staged an injection.
           checkpoint: {
-            sessionScopeId: `session:${sessionId}`,
+            sessionScopeId: profileScope(`session:${sessionId}`),
             sourceCommand: "/compact",
             projectRoot: workspaceRoot,
           },

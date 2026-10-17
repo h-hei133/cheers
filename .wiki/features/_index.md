@@ -17,7 +17,7 @@ confidence: high
 
 ## 0. 当前研究与Phase 20规划（2026-10-17复核）
 
-23–37是本轮复核的15篇研究。**源码事实与固定参考已修订，产品实现及运行验收尚未开始。** 主入口为[Phase 20决策与任务规划](phase-20-decisions.md)，修订登记见[32](32-defect-register-2026-10.md)，待实现索引见[36](36-outstanding-work.md)。旧“模型全禁用”“确定节省880ms”“17个新面板”“102命令92%完成”等结论已撤销，不能据此施工。
+23–37是本轮复核的15篇研究。**源码事实与固定参考已修订，CFG-01 本地验收完成、交付中，其余任务待依次实施。** 主入口为[Phase 20决策与任务规划](phase-20-decisions.md)，当前合同和 consumer 清单见 [profile 身份与存储边界](profiles.md)，修订登记见[32](32-defect-register-2026-10.md)，待实现索引见[36](36-outstanding-work.md)。旧“模型全禁用”“确定节省880ms”“17个新面板”“102命令92%完成”等结论已撤销，不能据此施工。
 
 | 文档 | 当前内容与边界 |
 |---|---|
@@ -36,7 +36,8 @@ confidence: high
 | [35 面板规格](35-panel-inventory-full.md) | 有效14补面板入口；plugin/extensions同面板、theme进settings、排除omfg |
 | [36 未完成索引](36-outstanding-work.md) | 已决待实现、技术取舍、Phase19留存及证据条件 |
 | [37 命令审计](37-command-implementation-audit.md) | 102声明入口逐名闭合、23宿主端口；接线不等于行为完成 |
-| [Phase 20 决策](phase-20-decisions.md) | 用户裁决、owner/依赖、任务批次、来源映射及验收要求；尚未实现 |
+| [Phase 20 决策](phase-20-decisions.md) | 用户裁决、owner/依赖、任务批次、来源映射及验收要求；CFG-01 本地验收完成、交付中 |
+| [Profile 身份与存储](profiles.md) | CFG-01 consumer 清单、启动身份、共享输入、迟到结果与验证边界 |
 
 ### 0.2 本轮之前的历史文档（01–22）
 
