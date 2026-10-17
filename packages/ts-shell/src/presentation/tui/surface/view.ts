@@ -181,6 +181,10 @@ export class InteractiveSurface implements InteractiveView {
     return true;
   }
 
+  transcriptSource(anchor: SelectionPoint, focus: SelectionPoint): string | undefined {
+    return this.pane.extractSource(anchor, focus);
+  }
+
   composerGeometry(): ComposerGeometry | undefined {
     const geometry = this.lastComposerGeometry;
     if (!geometry || this.context.overlayFullScreen() || geometry.layout.shape !== (this.context.composerShape?.() ?? "default")) return undefined;

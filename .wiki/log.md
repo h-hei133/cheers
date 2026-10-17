@@ -7377,3 +7377,16 @@ loading/empty/error 使用不同颜色，失败不再伪装成空集。新增 `P
 `progress.test.ts` 4 项、`chips.test.ts` 3 项；composer/chrome/overlay/settings/pointer
 组合 14 文件 190 项通过；`build:ts`、import cycles、declarations 通过。
 合同见[UI 容器几何与状态投影](features/ui-containers.md)。本条写入时尚未提交/推送。
+
+### Phase 20 UI-04：transcript 语义源投影
+
+新增 `transcript/source.ts`：每个渲染行可携带 `SourceLine`（block、源文本、
+soft/logical 断点）。`projectText` 用渲染同宽逐逻辑行 wrap；`sourceLinesFor` 只在
+行数完全对齐时给出投影，markdown 结构、折叠块和自定义 rows 渲染器保持 undefined。
+`Transcript.render` 返回与行对齐的 `sources`，pane 的 `extractSource` 仅接受整行、
+单 block 的选区并按 logical 断点拼回原文；pointer 优先使用源投影，未提供或拒绝时
+回退既有渲染文本清理。resize/stream 后投影随帧重建，旧选区不指向旧源。
+
+**本地验证**：`transcript/source.test.ts` 4 项；transcript/surface/selection/pointer
+14 文件 229 项通过；`build:ts` 通过。合同见[UI 容器几何与状态投影 §5](features/ui-containers.md)。
+本条写入时尚未提交/推送。

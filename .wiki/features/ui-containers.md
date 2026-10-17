@@ -38,3 +38,18 @@ picker 各自猜屏幕大小。
 - `chrome/panel.test.ts` 4 项、`chrome/progress.test.ts` 4 项、`chrome/chips.test.ts` 3 项。
 - `overlay.test.ts` 新增详情列点击不聚焦；composer/chrome/overlay/settings/pointer
   组合 14 文件 190 项通过。
+
+## 5. transcript 语义源投影
+
+- `SourceLine` 记录所属 block、该视觉行的源文本与 `soft`/`logical` 断点；
+  `projectText` 用与渲染相同的宽度逐逻辑行 wrap，因此软换行不产生 `\n`。
+- `sourceLinesFor` 只在渲染行数与源行数完全对齐时返回投影；markdown 列表、
+  表格、折叠块或自定义 `rows` 渲染器返回 `undefined`，复制回退到渲染文本清理，
+  不从未知装饰反推原文。
+- 选择复制要求整行起点（首列 0）且终点到达行尾；跨 block 或落在装饰行则拒绝。
+- `Transcript.render` 与屏幕行对齐返回 `sources`；pane 的 `extractSource`
+  按 block 拼接，pointer 优先使用它，未提供时回退 `extractSelection`。
+- 源投影按渲染帧重建；resize/stream 后旧行映射不再存在，选区不会指向旧源。
+
+**验证**：`transcript/source.test.ts` 4 项（soft/logical、对齐拒绝、整行复制、
+中途/装饰行拒绝）；surface/transcript/selection/pointer 14 文件 229 项通过。

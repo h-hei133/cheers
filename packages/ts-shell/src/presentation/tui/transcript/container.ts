@@ -1,5 +1,6 @@
 import { defaultTheme } from "../../theme/theme.js";
 import { type Block, renderBlock, type BlockRenderOptions } from "./blocks.js";
+import { sourceLinesFor, type SourceLine } from "./source.js";
 
 /**
  * Ordered transcript.
@@ -44,6 +45,8 @@ export interface RenderedTranscript {
   readonly rows: readonly string[];
   /** For each row, the index of the block that produced it. */
   readonly owners: readonly number[];
+  /** For each row, its semantic source line when the renderer can state one. */
+  readonly sources: readonly (SourceLine | undefined)[];
 }
 
 export class Transcript {
@@ -146,16 +149,23 @@ export class Transcript {
    * collapsed reasoning block or a tool card that can be expanded.
    */
   render(width: number, options?: BlockRenderOptions): RenderedTranscript {
-    if (this.blocks.length === 0) return { rows: EMPTY, owners: EMPTY as unknown as number[] };
+    if (this.blocks.length === 0) {
+      return { rows: EMPTY, owners: EMPTY as unknown as number[], sources: EMPTY as unknown as (SourceLine | undefined)[] };
+    }
     const rows: string[] = [];
     const owners: number[] = [];
+    const sources: (SourceLine | undefined)[] = [];
     for (let index = 0; index < this.blocks.length; index++) {
-      for (const row of this.rowsFor(this.blocks[index]!, width, options)) {
-        rows.push(row);
+      const block = this.blocks[index]!;
+      const blockRows = this.rowsFor(block, width, options);
+      const blockSources = sourceLinesFor(block, index, width, blockRows);
+      for (let row = 0; row < blockRows.length; row++) {
+        rows.push(blockRows[row]!);
         owners.push(index);
+        sources.push(blockSources[row]);
       }
     }
-    return { rows, owners };
+    return { rows, owners, sources };
   }
 
   /** Rendered rows for one block, memoised while the block cannot change. */

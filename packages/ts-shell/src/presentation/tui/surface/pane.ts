@@ -2,6 +2,9 @@ import type { Block, BlockRenderOptions } from "../transcript/blocks.js";
 import type { FrameLayout } from "../render/frame.js";
 import type { Transcript } from "../transcript/container.js";
 import type { SelectionPoint, SelectionSpan } from "../transcript/selection.js";
+import { joinSourceLines, type SourceLine } from "../transcript/source.js";
+import { stripAnsi } from "../text/ansi.js";
+import { visibleWidth } from "../text/measure.js";
 import {
   needsScrollbar,
   paintScrollbar,
@@ -35,6 +38,9 @@ export class TranscriptPane {
   private total = 0;
   private document: readonly Block[] | undefined;
   sensitiveRows: readonly string[] = [];
+  /** Source lines aligned with the painted screen rows; filler rows have none. */
+  private sources: readonly (SourceLine | undefined)[] = [];
+  private paintedRows: readonly string[] = [];
 
   constructor(private readonly transcript: Transcript) {}
 
@@ -62,13 +68,18 @@ export class TranscriptPane {
       safeWidth,
     );
     const contentWidth = hasScrollbar ? Math.max(1, safeWidth - 1) : safeWidth;
-    const { rows, owners } = this.transcript.render(contentWidth, options);
+    const rendered = this.transcript.render(contentWidth, options);
+    const { rows, owners } = rendered;
     const safeCapacity = layout === "document" ? rows.length : Math.max(1, capacity);
     this.scroller.updateLayout(rows.length, safeCapacity);
     const top = this.scroller.scrollTop;
     const visible = rows.slice(top, top + safeCapacity);
     const filler = Math.max(0, safeCapacity - visible.length);
     this.window = new TranscriptWindow({ top, filler, visible: visible.length, rows, owners });
+    this.sources = [
+      ...Array<SourceLine | undefined>(filler).fill(undefined),
+      ...rendered.sources.slice(top, top + visible.length),
+    ];
     this.capacity = safeCapacity;
     this.width = safeWidth;
     this.total = rows.length;
@@ -82,6 +93,7 @@ export class TranscriptPane {
       : shaded;
     const painted = this.geometry ? paintScrollbar(marked, this.geometry, safeWidth) : marked;
     this.sensitiveRows = painted.filter((row, index) => row && this.blockAtScreenRow(index)?.kind === 'user');
+    this.paintedRows = painted;
     return painted;
   }
 
@@ -152,5 +164,33 @@ export class TranscriptPane {
   blockAtScreenRow(row: number): Block | undefined {
     const index = this.window.blockIndexAt(row);
     return index === undefined ? undefined : this.transcript.blockAt(index);
+  }
+
+  /**
+   * Copy the semantic source under a full-row selection.
+   *
+   * Returns nothing when the drag starts mid-row, crosses blocks, or lands on a
+   * row whose renderer cannot state its source — the caller then falls back to
+   * rendered-cell extraction rather than inventing text.
+   */
+  extractSource(anchor: SelectionPoint, focus: SelectionPoint): string | undefined {
+    const from = anchor.row <= focus.row ? anchor : focus;
+    const to = anchor.row <= focus.row ? focus : anchor;
+    if (from.column > 0) return undefined;
+    const selected: SourceLine[] = [];
+    for (let row = from.row; row <= to.row; row++) {
+      const line = this.sources[row];
+      if (!line) return undefined;
+      if (row === to.row) {
+        const text = stripAnsi(this.paintedRows[row] ?? "");
+        if (to.column < Math.max(0, visibleWidth(text) - 1)) return undefined;
+      }
+      selected.push(line);
+    }
+    if (selected.length === 0) return undefined;
+    const block = selected[0]!.block;
+    if (selected.some((line) => line.block !== block)) return undefined;
+    const text = joinSourceLines(selected);
+    return text || undefined;
   }
 }

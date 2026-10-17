@@ -189,8 +189,6 @@ export class DragSelection {
 
   private extract(anchor: SelectionPoint, focus: SelectionPoint, unit: boolean): string | undefined {
     const options = unit ? { kind: "unit" as const } : {};
-    return this.screen.extract
-      ? this.screen.extract(anchor, focus, options)
-      : extractSelection(this.screen.rows(), anchor, focus, options);
+    return this.screen.extract?.(anchor, focus, options) ?? extractSelection(this.screen.rows(), anchor, focus, options);
   }
 }

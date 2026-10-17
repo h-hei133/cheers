@@ -51,7 +51,10 @@ export class Pointer {
   private autoScrollTimer: ReturnType<typeof setInterval> | undefined;
   private choiceGesture = false;
   constructor(private readonly context: PointerContext) {
-    this.drag = new DragSelection({ rows: () => context.rows() }, (text) => context.copy(text));
+    this.drag = new DragSelection({
+      rows: () => context.rows(),
+      extract: (anchor, focus) => context.view().transcriptSource?.(anchor, focus),
+    }, (text) => context.copy(text));
     this.composerDrag = new DragSelection(
       {
         rows: () => {

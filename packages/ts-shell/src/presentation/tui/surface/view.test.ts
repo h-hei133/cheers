@@ -230,7 +230,7 @@ describe("frame composition", () => {
     expect(rows).toHaveLength(12);
     expect(rows.join("\n")).toContain("what is the plan?");
     expect(rows.join("\n")).toContain("the-model");
-    expect(rows.join("\n")).toContain("❯   follow-up");
+    expect(rows.join("\n")).toContain("❯  follow-up");
     expect(rows[rows.length - 1]).toContain("2 open todos");
   });
 
@@ -241,7 +241,7 @@ describe("frame composition", () => {
     view.setSuggesting(true);
     expect(view.suggestionsOpen).toBe(true);
     const rows = frame(view, { columns: 60, rows: 12 });
-    const prompt = rows.findIndex((row) => row.includes("❯   /mo"));
+    const prompt = rows.findIndex((row) => row.includes("❯  /mo"));
     const candidate = rows.findIndex((row) => row.includes("/mode"));
     const hint = rows.findIndex((row) => row.includes("tab complete"));
     expect(prompt).toBeGreaterThan(-1);
@@ -313,7 +313,7 @@ describe("frame composition", () => {
     const geometry = view.composerGeometry();
     expect(geometry).toBeDefined();
     const content = geometry!.layout.rows.find(row => row.kind === "content")!;
-    expect(rows[geometry!.top + content.screenRow]).toContain("❯   draft");
+    expect(rows[geometry!.top + content.screenRow]).toContain("❯  draft");
     expect(geometry!.bottom).toBeGreaterThanOrEqual(geometry!.top);
     expect(geometry!.rows.map(stripAnsi).join("\n")).toContain("draft");
   });

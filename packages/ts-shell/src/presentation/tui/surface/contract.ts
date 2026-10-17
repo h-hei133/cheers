@@ -202,6 +202,12 @@ export interface InteractiveView extends TerminalFrameProvider {
   /** The block under screen row `row`, for a click that lands on the transcript. */
   blockAtScreenRow(row: number): Block | undefined;
   /**
+   * Semantic source for a full-row transcript selection, when every selected row
+   * can state one. Absent or undefined means the caller must fall back to the
+   * rendered cells instead of guessing at the source.
+   */
+  transcriptSource?(anchor: SelectionPoint, focus: SelectionPoint): string | undefined;
+  /**
    * Collapse or expand the collapsible blocks on screen, and report whether any
    * changed.
    *
