@@ -307,6 +307,14 @@ describe("vim mode", () => {
     expect(surface.editor.getText()).toBe("aef");
   });
 
+  it("maps Ctrl+R to redo in Normal", () => {
+    const { press, surface } = build(false, false, true);
+    const redo = vi.spyOn(surface.editor, "redo");
+    press("\x1b");
+    press("\x12");
+    expect(redo).toHaveBeenCalled();
+  });
+
   it("returns to Insert with i and accepts typed text", () => {
     const { press, surface } = build(false, false, true);
     surface.editor.setText("bc");

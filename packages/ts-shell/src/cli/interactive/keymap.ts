@@ -389,8 +389,10 @@ function vimKey(event: ParsedKeyEvent): VimKey {
   if (event.keyId === "enter") return { key: "enter", text: "" };
   if (event.keyId === "backspace") return { key: "X", text: "X" };
   if (event.keyId === "delete") return { key: "x", text: "x" };
+  // Control chords carry no text; their name is the letter (`ctrl+r` → `r`).
+  if (event.ctrl) return { key: event.name, text: "", ctrl: true };
   const text = event.text ?? "";
-  return { key: text || event.keyId, text, ...(event.ctrl ? { ctrl: true } : {}) };
+  return { key: text || event.keyId, text };
 }
 
 function applyVimEffect(effect: VimEffect, context: KeymapContext): void {

@@ -7494,3 +7494,7 @@ catalog 列表上限由 100 提升到 10000；`SessionListing.load` 接受显式
 ### 修复：并发写入产生重复的 browser receipt 记录
 
 CI 的 `browser/cache/scenarios` 并发三进程测试偶发 `Duplicates/over-budget: 1`。`mutateBrowserReceiptCache` 在锁内按 receiptId 替换旧记录，而不是无条件追加；同一 receipt 的并发写不再留下重复行。新增 store 测试：连续写同一 receipt 两次，列表仍只有一条。
+
+### 修复：Normal 模式 Ctrl+R 无法触发 redo
+
+控制键的 `ParsedKeyEvent.text` 为空，`vimKey` 之前把 `ctrl+r` 当成未知键。改为控制键使用 `event.name` 作为字母，Normal 的 Ctrl+R 正确触发 `editor.redo`；keymap 59 项通过。
