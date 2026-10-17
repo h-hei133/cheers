@@ -131,10 +131,13 @@ it('redacts full retained context before taking text pages and withholds truncat
 it('retains foreground execution uncertainty instead of confirming agent cancellation', async () => {
   vi.stubEnv('CHEERS_SYNTHETIC_TOOLS', '1');
   let began!: () => void; const ready = new Promise<void>(resolve => { began = resolve; });
-  vi.spyOn(native, 'executeLocally').mockImplementation(async options => {
+  vi.spyOn(native, 'startStreamed').mockImplementation(options => {
     began();
-    if (!options.abortSignal!.aborted) await new Promise<void>(resolve => options.abortSignal!.addEventListener('abort', () => resolve(), { once: true }));
-    return { status: 'failed', exitCode: null, stdout: '', stderr: 'Process cleanup is unverified.', terminationFailed: true, failureKind: 'execution_failure' };
+    const result = new Promise<{ stdout: string; stderr: string }>((_resolve, reject) => {
+      const fail = () => reject(Object.assign(new Error('Process cleanup is unverified.'), { stdout: '', stderr: 'Process cleanup is unverified.', code: null, terminationFailed: true }));
+      if (options.abortSignal?.aborted) fail(); else options.abortSignal?.addEventListener('abort', fail, { once: true });
+    });
+    return { handle: { pid: 1, onOutput: () => () => {}, detach: () => {}, kill: async () => {}, result }, result };
   });
   await command('agent Report node version'); await ready;
   const host = jobsFor(context)!; const job = host.agents.journal.list()[0]!;

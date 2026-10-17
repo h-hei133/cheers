@@ -75,9 +75,13 @@ export function createDefaultExecutionService(onCommandSettled?: (result: Pick<C
         ...(request.inheritTerminal ? { inheritTerminal: true } : {}),
         ...(request.cleanupTreeOnExit ? { cleanupTreeOnExit: true } : {}),
       });
+      const settle = (projected: CommandExecutionResult): CommandExecutionResult => {
+        onCommandSettled?.({ terminationFailed: projected.terminationFailed, outputFailed: projected.outputFailed });
+        return projected;
+      };
       const result = started.handle.result.then(
-        ({ stdout, stderr }) => withCommandExecutionProjection(request, 'ts-local', { status: 'completed' as const, exitCode: 0, stdout, stderr }),
-        error => withCommandExecutionProjection(request, 'ts-local', localFailure(error)),
+        ({ stdout, stderr }) => settle(withCommandExecutionProjection(request, 'ts-local', { status: 'completed' as const, exitCode: 0, stdout, stderr })),
+        error => settle(withCommandExecutionProjection(request, 'ts-local', localFailure(error))),
       );
       return { handle: started.handle, result };
     },

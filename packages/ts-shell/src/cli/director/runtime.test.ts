@@ -161,9 +161,13 @@ it('requires a live selection after restart and refuses adopting the retained wo
 it('confirms exact cancellation only after native cleanup settles', async () => {
   let began!: () => void; const ready = new Promise<void>(resolve => { began = resolve; });
   reply = (_body, response) => respond(response, [{ id: 'held-command', name: 'bash', args: { command: 'node -e "setTimeout(() => {}, 10000)"' } }]);
-  vi.spyOn(native, 'executeLocally').mockImplementation(async options => {
-    began(); if (!options.abortSignal!.aborted) await new Promise<void>(resolve => options.abortSignal!.addEventListener('abort', () => resolve(), { once: true }));
-    return { status: 'failed', exitCode: null, stdout: '', stderr: 'Cancelled', failureKind: 'execution_failure' };
+  vi.spyOn(native, 'startStreamed').mockImplementation(options => {
+    began();
+    const result = new Promise<{ stdout: string; stderr: string }>((_resolve, reject) => {
+      const fail = () => reject(Object.assign(new Error('Cancelled'), { stdout: '', stderr: 'Cancelled', code: null }));
+      if (options.abortSignal?.aborted) fail(); else options.abortSignal?.addEventListener('abort', fail, { once: true });
+    });
+    return { handle: { pid: 1, onOutput: () => () => {}, detach: () => {}, kill: async () => {}, result }, result };
   });
   await command('on'); await command('spawn Hold exact command'); await ready;
   const id = jobsFor(context)!.agents.journal.list()[0]!.id;
