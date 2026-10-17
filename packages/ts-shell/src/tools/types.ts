@@ -83,5 +83,10 @@ export interface ToolPreparation {
   readonly previewKind?: 'file-plan' | 'execution'
   readonly targets: readonly { readonly path: string; readonly operation: 'write' | 'delete' }[]
   readonly preview: string
-  readonly execute: (context: ToolExecutionContext) => Promise<ToolExecutionResult>
+  /**
+   * Independently selectable groups. A host that can present them collects a
+   * selection; a host that cannot must not assume the whole plan was chosen.
+   */
+  readonly selections?: readonly { readonly id: string; readonly label: string; readonly files?: readonly string[] }[]
+  readonly execute: (context: ToolExecutionContext, selection?: readonly string[]) => Promise<ToolExecutionResult>
 }

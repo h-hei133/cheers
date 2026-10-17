@@ -75,6 +75,7 @@
 |---|---|---|
 | JOB-01 | 部分 | `LocalExecutionHandle`（`runtime/execution/types.ts`）提供 `pid/onOutput/detach/kill/result`；`startStreamed` 一次 spawn，`collectStreamed` 仅为兼容包装。`ExecutionService.startCommand` 返回 handle 与投影结果。`BackgroundRunner.adopt/promote` 与 `LocalJournal.promote(id,input,pid)` 把前台子进程原地晋升为持久 job，不二次 spawn；晋升前任务对 `list()` 不可见，容量拒绝时 kill 该子进程。bash 工具在默认超时（60s）且交互上下文下走 adopt，超时 `detach` 后晋升；显式 `timeout` 保持原路径。 |
 | JOB-02 | 未开始 | — |
+| EDIT-01 | 部分 | `planPatch` 为每个文件操作生成内容派生的稳定 group id、label 与文件集；同一 group 内的 rename 源/目标与 hunks 不可拆分。`ToolPreparation.selections` 与 `execute(context, selection)` 承载选集；审批响应 `selected` 经 `setPreparedSelection` 绑定到已 prepare 的调用。多 group 且宿主未选集时拒绝执行且零写入；执行前重规划并比较 `fullRevision`，基线或内容改变即拒绝。CLI 审批的 allow-once 明确选择全部 group；逐项勾选 UI 与 desktop 子集选择仍缺。 |
 | START-01 | `scripts/start.test.mjs`（2） | stale 源码仍启动时失败 |
 | START-02/03 | 未开始 | — |
 

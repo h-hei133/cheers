@@ -39,6 +39,8 @@ export type ApprovalDecision = "deny" | "allow-once" | "allow-always";
 export interface ApprovalSettleResult {
   readonly decision: ApprovalDecision;
   readonly reason?: string;
+  /** Group ids the user approved; a whole-plan approval selects every group. */
+  readonly selected?: readonly string[];
 }
 
 export type InteractiveApprovalResult = ApprovalDecision | ApprovalSettleResult;
@@ -80,7 +82,10 @@ export function approvalPicker(
     ].filter(option => permitted(option.id as ApprovalDecision)),
     apply: async (ids): Promise<undefined> => {
       const choice = ids[0] as ApprovalDecision | undefined;
-      onSettle({ decision: choice && permitted(choice) ? choice : "deny" });
+      const decision = choice && permitted(choice) ? choice : "deny";
+      const selected = decision !== "deny" && prompt.context?.selections?.length
+        ? prompt.context.selections.map(selection => selection.id) : undefined;
+      onSettle({ decision, ...(selected ? { selected } : {}) });
       return undefined;
     },
     onDeny: (reason?: string) => {

@@ -5,6 +5,8 @@ export interface EscalationResponse {
   decision: EscalationDecision;
   respondedAt: number;
   userComment?: string;
+  /** Group ids the user approved; absent means the host collected no selection. */
+  selected?: readonly string[];
 }
 
 export interface EscalationPrompt {
@@ -18,6 +20,7 @@ export interface EscalationPrompt {
     /** A complete read-only approval preview; closing it never approves effects. */
     preview?: string;
     previewKind?: 'file-plan' | 'execution';
+    selections?: readonly { readonly id: string; readonly label: string; readonly files?: readonly string[] }[];
   };
   options: EscalationOption[];
   defaultOption: EscalationDecision;

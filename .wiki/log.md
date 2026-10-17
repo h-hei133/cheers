@@ -7540,3 +7540,11 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - `TaskRegistry.adopt(handle,input)` 以临时 UUID 接管已在运行的 PID，输出进入临时 sink；`promote(id)` 通过 `LocalJournal.promote(id,input,pid)` 原地建立持久记录，不二次 spawn。晋升前 `list()` 不显示该任务；容量拒绝时 kill 该子进程。结算在晋升标记仍存在时写 journal，随后清理。
 - bash 工具：默认超时且存在 `background.adopt/promote` 与 `onOutput` 时，spawn 一次并 adopt；60s 后 `detach` + `promote`，返回后台任务 id；晋升失败则 kill 并报告失败。显式 `timeout` 保持原路径。
 - 验证：`runtime/execution` + `workflow/jobs` + `core/tools` 790 通过；`turn` + `cli/runtime` + `cli/interactive` 1309 通过；`local.handle.test.ts` 3 项；晋升/容量测试 2 项。
+
+## 2026-10-18 — EDIT-01 分组选集与审批绑定
+
+- `planPatch` 增加 `groups/fullRevision/selected`：group id 由操作与 hunks 内容派生，label 面向审批；同一 group 内 rename 的源/目标与 hunks 原子；子集计划只保留选中 group 的 planned files，`fullRevision` 保持全集指纹。
+- `ToolPreparation.selections` 与 `execute(context, selection)`；`setPreparedSelection` 把审批响应的 `selected` 绑定到已 prepare 的调用，`consumeToolCall` 前读取。
+- patch 工具在多 group 且无选集时拒绝并零写入；执行前以选中 group 重新规划，基线/内容改变或选集过期即拒绝；单 group 无需额外选集。
+- CLI 审批 allow-once 明确返回全部 group id；无审批宿主的 allow-all 路径不再默认写多 group。
+- 验证：`src/edit` + `src/turn` + `picker` + `src/tools` 522 通过；patch 测试新增子集选择与无选集拒绝。

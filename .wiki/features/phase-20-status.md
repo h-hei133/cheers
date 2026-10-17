@@ -39,10 +39,11 @@
 | PAN-07 | alias、逐项确认 | login/logout 设备码安全显示的端到端验收 |
 | SET-03 | status/theme 预览 | 外部更新撤销的端到端验收 |
 | JOB-01 | 单次 spawn 的 handle、detach/kill、adopt/promote、60s 前台晋升 | 新消息晋升、注册表持有的 deadline 竞争、重启后的 adopted PID 恢复 |
+| EDIT-01 | 稳定 group id、依赖分组、选集传递、无选集拒绝、重规划基线校验 | 逐项勾选 UI、desktop 子集选择、部分写/补偿的端到端故障注入 |
 
 ## 未开始
 
-PAN-08、EDIT-01、JOB-02、START-02/03、QA-01…04、TOOL-02；JOB-01 的新消息晋升与注册表持有的 deadline 竞争仍未完成；PAN-03 输出分页/脱敏、RENDER-03 resize 锚点与左右源复制仍缺。
+PAN-08、JOB-02、START-02/03、QA-01…04、TOOL-02；JOB-01 的新消息晋升与注册表持有的 deadline 竞争、EDIT-01 的逐项勾选 UI 仍未完成；PAN-03 输出分页/脱敏、RENDER-03 resize 锚点与左右源复制仍缺。
 
 ## CI
 

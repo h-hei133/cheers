@@ -14,7 +14,7 @@ import { redactExportText } from "../core/security/redaction.js";
 import { validateToolArguments } from "../core/tools/arguments.js";
 import { workspaceToolBinding } from '../core/workspace/tools.js';
 import type { WorkspaceRoot } from '../core/workspace/model.js';
-import { authorizeToolCall, consumeToolCall, discardToolCall, preparedToolCall, prepareToolCall } from '../tools/preparation.js';
+import { authorizeToolCall, consumeToolCall, discardToolCall, preparedSelection, preparedToolCall, prepareToolCall, setPreparedSelection } from '../tools/preparation.js';
 import { preparationContext, preparationPermission } from './preparation.js';
 import { bindExecutionTarget, executionApprovalPreview } from '../runtime/execution/binding.js';
 import { assertSourceAccess } from '../core/query/sourcePolicy.js';
@@ -171,8 +171,9 @@ async function executeTool(
     validateToolArguments(tool.argsSchema, args);
     toolScopePolicy(tool.name, args, options, preparedToolCall(args, options));
     const binding = workspaceToolBinding(tool.name, args, options.workspaceRoot, options.workspaceRoots);
+    const selection = preparedSelection(args);
     const preparation = consumeToolCall(args, options, tool, toolCallId);
-    const execute = preparation ? (_args: Record<string, unknown>, context: import('../tools/types.js').ToolExecutionContext) => preparation.execute(context)
+    const execute = preparation ? (_args: Record<string, unknown>, context: import('../tools/types.js').ToolExecutionContext) => preparation.execute(context, selection)
       : tool.execute.bind(tool);
     const result = await execute(binding.args, {
       workspaceRoot: binding.root,
@@ -426,7 +427,10 @@ async function askPermission(
   });
   const prompt = buildToolEscalationPrompt(toolName, evaluation.operation, evaluation.target, evaluation.reason);
   const preparation = preparedToolCall(args, options);
-  if (preparation) { prompt.context.preview = preparation.preview; prompt.context.previewKind = preparation.previewKind; }
+  if (preparation) {
+    prompt.context.preview = preparation.preview; prompt.context.previewKind = preparation.previewKind;
+    if (preparation.selections) prompt.context.selections = preparation.selections;
+  }
   else if (toolName === 'lsp' && args.backend !== 'scanner') {
     prompt.context.preview = executionApprovalPreview(args, args.server, options.workspaceRoot);
     prompt.context.previewKind = 'execution';
@@ -455,6 +459,7 @@ async function askPermission(
         : `Blocked: User denied permission for tool '${toolName}' (${evaluation.operation}) on '${evaluation.target}'.`,
     };
   }
+  if (response.selected) setPreparedSelection(args, response.selected);
   options.emit({ type: "approval.resolved", toolName, taskId: toolCallId, outcome: "approved" });
   return { approved: { operation: evaluation.operation, decision: response.decision } };
 }

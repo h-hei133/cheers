@@ -31,19 +31,28 @@ export function createPatchToolDefinition(): ToolDefinition<ToolPreparation> {
         })) throw new Error('FILE_CONTENT_CHANGED: Patch source snapshots no longer match the proposal.');
       }
       const targets = Object.freeze(plan.files.map(file => Object.freeze({ path: path.join(file.workspaceRoot, file.relativePath), operation: file.content === undefined ? 'delete' as const : 'write' as const })));
+      const selections = Object.freeze(plan.groups.map(group => Object.freeze({ id: group.id, label: group.label, files: group.files })));
       const preview = ['Patch plan', `Revision: ${plan.revision}`, ...plan.files.map(file => {
         const before = file.before.state === 'exists' ? file.before.content : '';
         return `${file.content === undefined ? 'Delete' : file.rename ? 'Rename endpoint' : file.before.state === 'absent' ? 'Add' : 'Update'}: ${JSON.stringify(path.join(file.workspaceRoot, file.relativePath))}\n${editDiff(file.relativePath, before, file.content ?? '')}`;
       }), 'Files commit separately. A later failure may require guarded compensation.'].join('\n\n');
       if (Buffer.byteLength(preview) > patchLimits.previewBytes) throw new Error('Patch preview is too large; split the operation before requesting approval.');
-      return Object.freeze({ targets, preview, execute: async (actual: ToolExecutionContext) => {
+      return Object.freeze({ targets, preview, selections, execute: async (actual: ToolExecutionContext, selection?: readonly string[]) => {
+        const chosen = selection ?? (plan.groups.length === 1 ? [plan.groups[0]!.id] : undefined);
+        if (!chosen) throw new Error(`This patch changes ${plan.groups.length} groups; the approval must select which groups to apply. Nothing was written.`);
+        let selectedPlan: ReturnType<typeof planPatch>;
+        try { selectedPlan = planPatch(args.input as string, { ...context, sessionId: context.sessionId!, workspaceRoot: root }, chosen); }
+        catch (error) {
+          throw new Error(`Patch changed after approval or its selection is stale. Nothing was written. ${error instanceof Error ? error.message : ''}`.trim());
+        }
+        if (selectedPlan.fullRevision !== plan.fullRevision) throw new Error('Patch changed after approval. Nothing was written.');
         try {
-          const receipt = await applyPatchPlan(plan, { sessionId: actual.sessionId!, workspaceRoot: actual.artifactRoot ?? actual.workspaceRoot,
+          const receipt = await applyPatchPlan(selectedPlan, { sessionId: actual.sessionId!, workspaceRoot: actual.artifactRoot ?? actual.workspaceRoot,
             callId: actual.taskId, correlationId: actual.correlationId }, actual);
           return receipt ? projectResult(receipt) : { success: true, output: 'Patch contains no changes. No edit operation was recorded.' };
         } catch (error) {
           if (error instanceof EditOperationError) {
-            try { return projectResult(readOperation(plan.scope, error.operationId), error.status); }
+            try { return projectResult(readOperation(selectedPlan.scope, error.operationId), error.status); }
             catch { return { success: false, error: `Patch ${error.operationId}: unknown. Inspect the operation receipt before retrying.`, metadata: { operationId: error.operationId, status: 'unknown' } }; }
           }
           return { success: false, error: error instanceof Error ? error.message : 'Patch preflight failed.' };

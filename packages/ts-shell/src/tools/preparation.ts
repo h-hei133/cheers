@@ -5,6 +5,7 @@ interface PreparedCall {
   readonly owner: object;
   readonly preparation: ToolPreparation;
   callId?: string;
+  selection?: readonly string[];
 }
 
 const calls = new WeakMap<object, PreparedCall>();
@@ -45,5 +46,13 @@ export function consumeToolCall(args: object, owner: object, tool: ToolDefinitio
   if (call.owner !== owner || call.tool !== tool || call.callId !== callId) throw new Error('Prepared tool call was not approved for this execution.');
   return call.preparation;
 }
+
+/** Record the approval host's group selection for this exact prepared call. */
+export function setPreparedSelection(args: object, selection: readonly string[]): void {
+  const call = calls.get(args);
+  if (call) call.selection = Object.freeze([...selection]);
+}
+
+export function preparedSelection(args: object): readonly string[] | undefined { return calls.get(args)?.selection; }
 
 export function discardToolCall(args: object): void { calls.delete(args); }
