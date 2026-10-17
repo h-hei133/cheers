@@ -7516,3 +7516,7 @@ CI 的 `browser/cache/scenarios` 并发三进程测试偶发 `Duplicates/over-bu
 `/model` 在模型行之后追加 session + profile 预设行（`preset:<name>`），详情显示各 role 的 provider/model；选择走 `applyModelPreset` 的默认 role，而不是把预设名当模型。预设库不可读时显示一条禁用的“不可用”行，不影响模型列表。
 
 **本地验证**：pickers 41 项（profile 预设出现在模型列表）；`build:ts` 通过。本条写入时尚未提交/推送。
+
+### 修复：file lock 批测试的调度假设
+
+`fileLock.test.ts` 断言两个反序批次一定得到 `[1,2,3]`，但哪一个批次先拿到第一把锁取决于调度；全量并行时偶发失败。改为接受 `123` 或 `312`，仍然拒绝两个批次的锁内回调交错，这才是互斥不变量。

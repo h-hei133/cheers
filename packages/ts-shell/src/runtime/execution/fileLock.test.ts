@@ -81,7 +81,10 @@ describe("serializing mutations of one file", () => {
       withFileLocks([first, second], async () => { order.push(1); await settle(); order.push(2); }),
       withFileLocks([second, first], async () => { order.push(3); }),
     ]);
-    expect(order).toEqual([1, 2, 3]);
+    // Either batch may win the race; what matters is that neither interleaves
+    // its two files with the other's (which would mean a lock was released or
+    // never held for the whole callback).
+    expect(["123", "312"]).toContain(order.join(""));
   });
   it("does not let two mutations of the same file overlap", async () => {
     const file = join(tempDir(), "a.txt");
