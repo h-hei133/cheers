@@ -50,6 +50,7 @@ confidence: high
 | [UI 容器几何与状态投影](ui-containers.md) | UI-01/02/03 输入区预算、两栏面板、二维命中、进度与 chip 状态 |
 | [启动产物与构建校验](launch-and-build.md) | START-01 构建 manifest、五种拒绝状态与 `start`/`start:dev` |
 | [Phase 20 交付状态](phase-20-status.md) | 已完成/部分/未开始与精确提交证据 |
+| [Phase 20 契约矩阵](phase-20-contract.md) | 任务→所有者→测试→反转条件 |
 
 ### 0.2 本轮之前的历史文档（01–22）
 

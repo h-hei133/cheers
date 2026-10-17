@@ -7466,3 +7466,9 @@ PAN-06：copy picker 移除 recent-30 窗口，按新到旧列出全部 block，
 新增 `transcript/math.ts`：扫描器先保护代码 span、`\$` 与金额，再识别 `$...$`、`\(...\)`；常见希腊字母、运算符、`\frac`、`\sqrt`、上下标转换为可读文本。未知命令连同其参数原样保留，公式字节 >4096、token >512 或嵌套 >16 时整段保留原文；不执行 TeX、shell、网络或宏。`renderInline` 先做数学投影再做强调/代码/链接替换。
 
 **本地验证**：math 4 项（常见公式、金额/代码/转义、未知命令、超预算原文）与 transcript 127 项通过；`build:ts` 通过。本条写入时尚未提交/推送；跨行 `$$` 显示布局、矩阵维度与 HTML 导出共享语义仍待完成。
+
+### Phase 20 QA-01（部分）：契约矩阵
+
+新增[契约矩阵](features/phase-20-contract.md)，逐任务绑定所有者、现有测试与反转条件；未开始与只有本地证据的任务明确标注，不用字段存在或镜像实现充数。QA-02/03 的真实 PTY/provider/平台矩阵仍未运行。
+
+**本地验证**：全量 `test:ts` 8430/8430 通过（fresh dist）；`test:scripts` 59 项通过；`verify:docs-drift:strict` 仅既有 advisory。本条写入时尚未提交/推送。
