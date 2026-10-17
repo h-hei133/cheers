@@ -99,8 +99,10 @@ function modelConfiguration(context: CommandContext) {
 }
 
 function renderCatalogView(context: CommandContext): string {
-  const { config, catalog } = modelConfiguration(context);
-  return renderCatalog({ providers: catalog, availability: availabilitySnapshot({ config, catalog }), configPath: userCatalogPath() });
+  const { config, catalog, active } = modelConfiguration(context);
+  const projected = availabilitySnapshot({ config, catalog });
+  return renderCatalog({ providers: catalog, configPath: userCatalogPath(),
+    availability: { ...projected, activeProvider: active.provider, ...(active.model ? { activeModel: active.model } : {}) } });
 }
 
 function renderModelStatus(context: CommandContext): string {

@@ -3,6 +3,7 @@ import { runModelCommand } from "../../../core/commands/modelCommandRuntime.js";
 import { getRuntimeConfig } from "../../../config/runtimeConfig.js";
 import { loadCatalog } from "../../../core/models/catalogStore.js";
 import { availabilityLabel, availabilitySnapshot } from "../../../core/models/availability.js";
+import { resolveProviderCredential } from "../../../core/shell/providerCredentials.js";
 import type { CommandContext } from "../../../core/commands/types.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
 import type { Picker, PickerOutcome } from "../overlay.js";
@@ -29,7 +30,10 @@ export function modelPicker(context: CommandContext): Picker {
       const publication = context.readConfiguration?.();
       const config = publication?.config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
       const catalog = publication?.catalog ?? loadCatalog();
-      const availability = availabilitySnapshot({ config, catalog });
+      const active = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
+      const projected = availabilitySnapshot({ config, catalog });
+      const availability = { ...projected, activeProvider: active.provider,
+        ...(active.model ? { activeModel: active.model } : {}) };
       const activeProvider = availability.activeProvider;
       const activeModel = availability.activeModel;
       const providers = new Map(availability.providers.map(provider => [provider.provider, provider]));

@@ -7312,3 +7312,9 @@ CFG-03 把 `/connect use|logout` 的输出改为区分“已存储”与“当�
 **本地验证**：新增 5 项退避/归属测试（作用域、Retry-After、发送前拒绝、429 记录与成功清除、有界淘汰）与 1 项 ledger 归属往返/坏 generation 拒绝；`provider/request`、`core/agent/request`、`core/query/compaction` 与 `turn/step.test.ts` 共 12 文件 301 项通过；`build:ts` 与四项静态门禁通过。合同见[请求归属与凭据退避](features/request-attribution.md)。
 
 本条写入时尚未提交/推送；未运行真实 provider、多进程或跨平台动态证据。
+
+### Phase 20：可用性投影尊重 CLI provider 覆盖
+
+PRV-01 的选择器改为以投影的 active provider 判断可选性，但投影只读配置，未采用 `resolveConfigTarget` 的 CLI provider 覆盖；`configuration.test.ts` 因此在 `--provider google` 下把 `google/chosen` 标成 `switch connection first`。该失败在精确 SHA CI 中复现，其余 830 文件通过。
+
+修复让 `/model`、`/model list` 与模型选择器用现有 `resolveConfigTarget` 结果覆盖投影的 active provider/model；投影本身仍只读配置。两文件 42 项通过。此前 PRV-01/02/03/04/05 的 CI 失败记录保留为历史。
