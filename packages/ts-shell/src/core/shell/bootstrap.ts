@@ -109,6 +109,8 @@ export function bootstrapShellRuntime(input: {
   sessionManager: SessionManager;
   renderer: StreamingRenderer;
   requestedSessionId?: string;
+  /** A validated new-process profile handoff always starts a fresh native identity. */
+  freshSessionId?: string;
   allowSessionRootMigration?: boolean;
   emitLifecycleMessages?: boolean;
   /**
@@ -131,6 +133,13 @@ export function bootstrapShellRuntime(input: {
   const requestedRootMode = resolveWorkspaceRootMode(input.gitContext);
 
   const session = (() => {
+    if (input.freshSessionId) {
+      if (input.requestedSessionId) throw new Error('A fresh profile session cannot also resume an existing session.');
+      return input.sessionManager.createNewWithId(input.freshSessionId, requestedProjectRoot, {
+        rootMode: requestedRootMode, requestedWorkspaceRoot: input.requestedWorkspaceRoot ?? input.cwd,
+        targetPathBase: requestedProjectRoot, gitRoot: input.gitContext.root ?? null,
+      });
+    }
     if (!input.requestedSessionId) {
       // Two kinds of run, two answers.
       //

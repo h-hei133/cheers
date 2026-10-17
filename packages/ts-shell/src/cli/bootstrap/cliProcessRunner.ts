@@ -58,7 +58,14 @@ import {
 import type { RestartOutcome, RestartPort, RestartRequest } from '../../core/commands/restart/contract.js';
 
 import type { CliProcessRunnerInput } from './contract.js';
-import { createProfileContext, withProfile } from '../../core/paths/profile/context.js';
+import { createProfileContext, currentProfile, withProfile } from '../../core/paths/profile/context.js';
+import { configurationAdmission } from '../../core/shell/configuration.js';
+import { profileSwitchPort } from './profile/port.js';
+import { freshExecutable } from './profile/invocation.js';
+import { claimSwitchChild, admitSwitchChild } from './profile/admission.js';
+import { drainProfileSwitch } from './profile/handoff.js';
+import { runProfileSwitch } from './profile/process.js';
+import type { SwitchReceipt, SwitchTicket } from './profile/model.js';
 export type { CliProcessRunnerInput } from './contract.js';
 
 export async function runCliProcess(
@@ -69,20 +76,25 @@ export async function runCliProcess(
   const parsed = parseCliArgs(input.args, { cwd: input.launchCwd });
   if (!parsed.ok) { input.writeError(parsed.error.message); input.exit(parsed.error.exitCode); }
   if (parsed.args.versionRequested) { input.writeOutput(versionLabel()); return; }
-  const profile = createProfileContext({ name: parsed.args.options.profile });
+  const handoff = input.process.env?.CHEERS_PROFILE_HANDOFF;
+  const profile = createProfileContext({ name: parsed.args.options.profile, ...(handoff !== undefined ? { mode: 'existing' } : {}) });
+  const child = claimSwitchChild(profile, input.args, handoff);
+  if (child) delete input.process.env.CHEERS_PROFILE_HANDOFF;
+  const switchDepth = child?.plan.depth ?? 0;
   input.profileSelected?.(profile);
   return withProfile(profile, async () => {
     let recovery: RestartRequest | undefined;
     for (;;) {
       const request = await runCliCycle({ ...input, args: recovery?.argv ?? input.args,
-        launchCwd: recovery?.workingDirectory ?? input.launchCwd }, recovery);
+        launchCwd: recovery?.workingDirectory ?? input.launchCwd }, recovery, recovery ? undefined : child, switchDepth);
       if (!request) return;
+      if ('kind' in request) { await runProfileSwitch(request, input); return; }
       recovery = request;
     }
   });
 }
 
-async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartRequest): Promise<RestartRequest | undefined> {
+async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartRequest, child?: SwitchReceipt, switchDepth = 0): Promise<RestartRequest | SwitchTicket | undefined> {
   if (await runCollaborationServiceMode(input)) return;
   setGlobalTraceContext(createTraceContext());
   const logger = createComponentLogger("cli");
@@ -106,6 +118,7 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
     launchCwd: input.launchCwd,
     options,
   });
+  if (child && rootContext.workspaceRoot !== child.plan.workspace.path) throw new Error('Profile handoff workspace changed before bootstrap.');
 
   if (parsedCliArgs.args.doctorRequested) {
     printCliDoctor(rootContext.workspaceRoot, input.launchCwd);
@@ -119,6 +132,7 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
     rootContext,
     writeError: input.writeError,
     exit: input.exit,
+    freshSessionId: child?.targetSessionId,
   });
   time("runtime bootstrapped");
   const {
@@ -127,6 +141,7 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
     recoveryCandidate,
     runtimeContext,
   } = bootstrapRuntime;
+  if (child) admitSwitchChild(child, runtimeContext.session.id, sessionManager.captureReportWriter(runtimeContext.session.id));
   installMediaSurface(runtimeContext, input.process.stdout, input.process.stderr);
   const providerRuntimeBridge = createCliProviderRuntimeBridge({
     runtimeConfig: () => runtimeContext.runtimeConfig,
@@ -153,13 +168,13 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
   const mcpGateway = bootstrapRuntime.mcpGateway;
   let cancelRun: (() => Promise<void>) | undefined;
   let isBusy: (() => boolean) | undefined;
-  let requested: RestartRequest | undefined;
+  let requested: RestartRequest | SwitchTicket | undefined;
   const stopSurface = new AbortController();
   const shutdown = createCliShutdown({
     close: async () => {
       const results = await Promise.allSettled([
         Promise.resolve().then(() => cancelRun?.()),
-        closeMediaFor(runtimeContext), closeDirectorFor(runtimeContext), closeJobsFor(runtimeContext), closeSshFor(runtimeContext),
+        closeMediaFor(runtimeContext), closeDirectorFor(runtimeContext), closeJobsFor(runtimeContext, Boolean(requested && 'kind' in requested)), closeSshFor(runtimeContext),
         closeCollaborationFor(runtimeContext), closeExtensionsFor(runtimeContext), closeTraceDashboard(), mcpGateway.close(),
         Promise.resolve().then(async () => { if (await runtimeContext.freshState?.clearCache?.() === 'unknown') throw new Error('Provider cache cleanup is unverified.'); }),
       ]);
@@ -180,13 +195,27 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
         || request.argv.length !== input.args.length || request.argv.some((arg, index) => arg !== input.args[index])) {
         return { status: 'unavailable', reason: 'Restart identity or startup arguments changed; recovery was not admitted.' };
       }
-      requested = { ...request, workspaceRoot: runtimeContext.projectRoot, workingDirectory: runtimeContext.cwd };
+      const admitted = { ...request, workspaceRoot: runtimeContext.projectRoot, workingDirectory: runtimeContext.cwd };
+      requested = admitted;
       // Let command publication finish before retiring the interactive surface.
       setImmediate(() => stopSurface.abort());
-      return { status: 'requested', request: requested };
+      return { status: 'requested', request: admitted };
     },
   };
   runtimeContext.restart = restart;
+  const activeProfile = currentProfile();
+  if (activeProfile) runtimeContext.profileSwitch = profileSwitchPort({ source: activeProfile,
+    depth: switchDepth,
+    interactive: Boolean(input.stdin.isTTY && input.process.stdout.isTTY && input.process.stderr.isTTY) && !options.printMode && !options.jsonEvents,
+    current: () => ({ sessionId: runtimeContext.session.id,
+      generation: JSON.stringify([runtimeContext.session.createdAt, runtimeContext.workspaceRevision, runtimeContext.configuration.current.revision,
+        runtimeContext.configuration.current.binding.trustRevision]),
+      workspace: runtimeContext.projectRoot, cwd: runtimeContext.cwd, offline: options.offline === true || runtimeContext.runtimeConfig.offline === true }),
+    busy: () => isBusy?.() ?? false, pending: () => requested !== undefined,
+    admission: () => runtimeContext.workspaceAdmission?.() ?? configurationAdmission(runtimeContext)(),
+    executableAvailable: () => { freshExecutable(input.process.execPath, input.process.argv[1]); },
+    retire: ticket => { requested = ticket; setImmediate(() => stopSurface.abort()); },
+  });
 
   try {
     const stdinPromptCapture = recovery && (options.printMode || !input.stdin.isTTY) ? {
@@ -307,7 +336,8 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
     });
     return requested;
   } finally {
-    await shutdown.close();
+    if (requested && 'kind' in requested) await drainProfileSwitch(requested, () => shutdown.close());
+    else await shutdown.close();
   }
 }
 

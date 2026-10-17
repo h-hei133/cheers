@@ -148,6 +148,7 @@ export async function routeInteractiveCommand(
     runCancellable: operation => input.sessionRuntime.commands.run(operation),
     freshState: input.freshState ?? input.runtimeContext.freshState,
     restart: input.runtimeContext.restart,
+    profileSwitch: input.runtimeContext.profileSwitch,
     startupArgs: input.runtimeContext.startupArgs,
     sessionCommand: sessionCommandFor({ runtimeContext: input.runtimeContext, sessionManager: input.sessionManager, sessionRuntime: input.sessionRuntime, dataTransfer: dataTransferFor(input.runtimeContext) }),
     dataTransfer: dataTransferFor(input.runtimeContext),

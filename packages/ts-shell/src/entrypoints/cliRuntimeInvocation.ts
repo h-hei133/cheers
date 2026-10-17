@@ -217,6 +217,11 @@ function deferUntilReady(
   const events = (async function* (): AsyncIterable<QueryEvent> {
     assertAdmission(request.admission);
     request.signal.throwIfAborted();
+    if (request.providerCredentialResolution.blocked) {
+      yield dependencies.createReadinessTerminalEvent({ sessionId: request.sessionId, prompt: request.prompt,
+        stopReason: 'Provider readiness failed (provider-readiness:auth): The selected connection requires independent login.' });
+      return;
+    }
     // Renewed before the readiness check, because the check is what tells the user
     // the credential is usable: one that passes on a token about to expire produces
     // a run that fails a minute later with no hint that the login is the reason.

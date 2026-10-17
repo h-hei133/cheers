@@ -156,3 +156,17 @@ it('observes only native started IDs and refuses an aborted dispatch before spaw
     .toMatchObject({ status: 'cancelled', exitCode: null });
   expect(spawn).not.toHaveBeenCalled(); expect(started).toHaveBeenCalledTimes(1);
 });
+
+it('forwards terminal resize only during the inherited child lifetime and retains tree cleanup', async () => {
+  const child = childProcess(); vi.mocked(killProcessTree).mockResolvedValue(undefined);
+  const before = process.listenerCount('SIGWINCH');
+  const result = executeLocally({ command: 'test', args: [], cwd: '.', inheritTerminal: true, cleanupTreeOnExit: true });
+  expect(spawn).toHaveBeenCalledWith('test', [], expect.objectContaining({ stdio: 'inherit', detached: process.platform !== 'win32' }));
+  process.emit('SIGWINCH');
+  if (process.platform !== 'win32') expect(child.kill).toHaveBeenCalledWith('SIGWINCH');
+  child.emit('close', 0, null);
+  expect((await result).status).toBe('completed');
+  expect(killProcessTree).toHaveBeenCalledWith(child.pid);
+  expect(process.listenerCount('SIGWINCH')).toBe(before);
+  child.kill.mockClear(); process.emit('SIGWINCH'); expect(child.kill).not.toHaveBeenCalled();
+});

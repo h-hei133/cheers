@@ -81,6 +81,7 @@ async function runCommand(request: CommandExecutionRequest): Promise<CommandExec
     ...(request.onStdout ? { onStdout: request.onStdout } : {}),
     ...(request.onStderr ? { onStderr: request.onStderr } : {}),
     ...(request.captureOutput !== undefined ? { captureOutput: request.captureOutput } : {}),
+    ...(request.inheritTerminal ? { inheritTerminal: true } : {}),
     ...(request.cleanupTreeOnExit ? { cleanupTreeOnExit: true } : {}),
   })
 

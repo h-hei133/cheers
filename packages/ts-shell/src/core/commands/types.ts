@@ -151,6 +151,7 @@ export interface CommandContext {
   readonly freshState?: import('./fresh.js').FreshStateOwner
   /** Bootstrap-owned restart handoff; the command only requests it. */
   readonly restart?: import('./restart/contract.js').RestartPort
+  readonly profileSwitch?: import('./profile/contract.js').ProfileSwitchPort
   /** Original process arguments preserved for a controlled restart. */
   readonly startupArgs?: readonly string[]
 }

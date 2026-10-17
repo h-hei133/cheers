@@ -114,6 +114,7 @@ export async function captureAgentRuntime(host: JobsComposition, input: AgentRun
             sessions.message(child, message); proof.published(message);
           },
           prepareProviderResources: resolved => {
+            if (resolved.blocked) throw new Error('The selected connection requires independent login.');
             const baseUrl = resolved.baseUrl ?? resolved.credential?.baseUrl ?? catalog.find(provider => provider.id === resolved.provider)?.baseUrl;
             const model = resolved.model ?? resolved.credential?.model;
             if (!baseUrl || !model) return {};

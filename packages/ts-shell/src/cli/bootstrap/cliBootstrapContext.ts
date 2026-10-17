@@ -75,6 +75,7 @@ export function createCliRootContext(
 }
 
 export interface CreateCliBootstrapRuntimeContextInput {
+  readonly freshSessionId?: string;
   readonly launchCwd: string;
   readonly options: CliOptions;
   readonly rootContext: CliRootContext;
@@ -135,6 +136,7 @@ export function createCliBootstrapRuntimeContext(
         sessionManager,
         renderer,
         requestedSessionId: input.options.sessionId,
+        freshSessionId: input.freshSessionId,
         allowSessionRootMigration: input.options.migrateSessionRoot === true,
         emitLifecycleMessages: false,
         // A one-shot run continues where the user left off; an interactive launch

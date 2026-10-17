@@ -83,9 +83,30 @@ const unavailableRunner: BackgroundRunner = {
 export function jobsRunnerFor(context: ShellRuntimeContext): BackgroundRunner {
   return jobsFor(context)?.registry ?? unavailableRunner;
 }
-export async function closeJobsFor(context: ShellRuntimeContext): Promise<void> {
+/** A profile handoff requires actual settlement, including inner bounded owners. */
+async function drainJobs(host: JobsComposition): Promise<void> {
+  const before = host.jobs.read();
+  const selected = [
+    ...(before.local ?? []).filter(job => host.registry.hasLive(job.id)).map(job => ({ id: job.id, kind: 'local' as const })),
+    ...(before.agents ?? []).filter(job => host.agents.hasLive(job.id)).map(job => ({ id: job.id, kind: 'agents' as const })),
+    ...(before.dags ?? []).filter(job => host.dags.hasLive(job.id)).map(job => ({ id: job.id, kind: 'dags' as const })),
+  ];
+  await Promise.all([host.registry.close(), host.agents.close(), host.dags.close()]);
+  await Promise.all([host.agents.drain(), host.dags.drain()]);
+  const after = host.jobs.read();
+  for (const entry of selected) {
+    const job = after[entry.kind]?.find(job => job.id === entry.id);
+    if (!job || ['running', 'unknown'].includes(job.status)) throw new Error('Job cleanup or publication remains unverified.');
+  }
+}
+export async function closeJobsFor(context: ShellRuntimeContext, requireDrained = false): Promise<void> {
   const installed = jobsInstallations.get(context); if (!installed) return;
   installed.closing = true;
+  if (requireDrained) {
+    const cleanup = Promise.all([...installed.retiring, ...[...installed.hosts.values()].map(drainJobs)]);
+    if (!await settledWithin(cleanup)) throw new Error('Jobs did not complete a verified drain; profile switching is blocked.');
+    jobsInstallations.delete(context); return;
+  }
   await settledWithin(Promise.allSettled([...installed.retiring, ...[...installed.hosts.values()].flatMap(host => [host.registry.close(), host.agents.close(), host.dags.close()])]));
   jobsInstallations.delete(context);
 }

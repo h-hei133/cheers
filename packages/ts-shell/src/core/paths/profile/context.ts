@@ -25,15 +25,15 @@ const contexts = new AsyncLocalStorage<ProfileContext>();
 let processProfile: ProfileContext | undefined;
 
 /** Capture once at launch. Named profiles never consult the default or legacy roots. */
-export function createProfileContext(input: { readonly name?: string; readonly homeDir?: string; readonly env?: NodeJS.ProcessEnv } = {}): ProfileContext {
+export function createProfileContext(input: { readonly name?: string; readonly homeDir?: string; readonly env?: NodeJS.ProcessEnv; readonly mode?: 'existing' } = {}): ProfileContext {
   const env = input.env ?? process.env;
   const id = profileName(input.name ?? env.CHEERS_PROFILE);
   const homeDir = fs.realpathSync(path.resolve(input.homeDir ?? (env.USERPROFILE || env.HOME || os.homedir())));
   const base = path.join(homeDir, '.cheers');
   const selected = id === 'default' ? base : path.join(base, 'profiles', id);
-  if (id !== 'default') assertUnlinkedPath(selected);
-  fs.mkdirSync(selected, { recursive: true, mode: 0o700 });
-  if (id !== 'default') assertUnlinkedPath(selected);
+  if (id !== 'default' || input.mode === 'existing') assertUnlinkedPath(selected);
+  if (input.mode !== 'existing') fs.mkdirSync(selected, { recursive: true, mode: 0o700 });
+  if (id !== 'default' || input.mode === 'existing') assertUnlinkedPath(selected);
   const root = fs.realpathSync(selected);
   const directories = id === 'default' ? [directoryIdentity(root)]
     : [base, path.dirname(selected), selected].map(directoryIdentity);

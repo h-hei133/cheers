@@ -19,6 +19,7 @@ import { mediaDefinitions } from './media/registration.js';
 import { sessionCommandDefinitions } from './navigation/operations.js';
 import { cleanseCommandDefinition } from './cleanse/registration.js';
 import { forceCommandDefinition } from './force/registration.js';
+import { profileDefinition } from './profile/registration.js';
 import { rulesCommandDefinition } from './rules/registration.js';
 import { initSyntax } from './rules/syntax.js';
 import { contextSyntax } from '../../context/attachment/syntax.js';
@@ -146,6 +147,7 @@ export function createCommandRegistry(
   const commands: CommandDefinition[] = [
     ...sessionCommandDefinitions(),
     forceCommandDefinition(),
+    profileDefinition(),
     rulesCommandDefinition(),
     cleanseCommandDefinition(),
     advisorCommandDefinition(),

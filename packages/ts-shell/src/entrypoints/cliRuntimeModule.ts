@@ -151,6 +151,7 @@ export async function runNonInteractivePrompt(options: {
     runCancellable: operation => options.sessionRuntime.commands.run(operation),
     freshState: options.runtimeContext.freshState,
     restart: options.runtimeContext.restart,
+    profileSwitch: options.runtimeContext.profileSwitch,
     startupArgs: options.runtimeContext.startupArgs,
     sessionCommand: sessionCommandFor({ runtimeContext: options.runtimeContext, sessionManager: options.sessionManager, sessionRuntime: options.sessionRuntime, dataTransfer: dataTransferFor(options.runtimeContext) }),
     dataTransfer: dataTransferFor(options.runtimeContext),

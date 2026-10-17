@@ -1,6 +1,6 @@
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
-import { resolveAllUserDataFiles, userDataDirFor, userHomeDir } from "../../core/paths/userHome.js";
+import { profileSearchDirs, userDataSearchDirsFor, userDataDirFor, userHomeDir } from "../../core/paths/userHome.js";
 import * as path from "node:path";
 import { assertProfileIdentity, currentProfile, profilePath, type ProfileContext } from '../../core/paths/profile/context.js';
 
@@ -29,27 +29,30 @@ export interface SessionFileLayout {
   readonly stateLockPath: string;
 }
 
-export function createSessionStoreLayout(homeDir?: string): SessionStoreLayout {
+export function createSessionStoreLayout(homeDir?: string, profile = currentProfile()): SessionStoreLayout {
   const root = homeDir ?? userHomeDir();
-  const sessionsDir = path.join(userDataDirFor(root), "sessions");
+  if (profile && homeDir !== undefined && fs.realpathSync(root) !== profile.homeDir) throw new Error('The requested home differs from the captured profile.');
+  const dataRoot = profile ? profilePath('.', profile) : userDataDirFor(root);
+  const search = profile ? profileSearchDirs(profile) : userDataSearchDirsFor(root);
+  const sessionsDir = path.join(dataRoot, "sessions");
   const currentSessionStorePath = path.join(
-    userDataDirFor(root),
+    dataRoot,
     "current-session.json",
   );
   return {
-    ...(currentProfile() ? { profile: currentProfile() } : {}),
+    ...(profile ? { profile } : {}),
     sessionsDir,
     // `resolveAllUserDataFiles` returns only the directories that exist, so the
     // current one is added when nothing is there yet: a fresh install still has
     // one place to read from and one place to write to, and they are the same.
     sessionsSearchDirs: [
-      ...new Set([sessionsDir, ...resolveAllUserDataFiles("sessions", root)]),
+      ...new Set([sessionsDir, ...search.map(dir => path.join(dir, 'sessions')).filter(target => fs.existsSync(target))]),
     ],
     currentSessionStorePath,
     currentSessionStoreSearchPaths: [
       ...new Set([
         currentSessionStorePath,
-        ...resolveAllUserDataFiles("current-session.json", root),
+        ...search.map(dir => path.join(dir, 'current-session.json')).filter(target => fs.existsSync(target)),
       ]),
     ],
   };

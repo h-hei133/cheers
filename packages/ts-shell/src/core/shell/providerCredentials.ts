@@ -34,6 +34,8 @@ export interface ProviderCredentialResolutionInput {
 }
 
 export interface ProviderCredentialResolution {
+  /** A selected pending connection cannot borrow credentials from another source. */
+  readonly blocked?: 'connection-pending';
   /** Explicit selection inputs retained for identity checks against later settings. */
   readonly selection?: { readonly provider?: RuntimeProvider; readonly baseUrl?: string };
   readonly thinkingEffort?: ThinkingPreference;
@@ -97,6 +99,10 @@ export function resolveProviderCredential(
   const preference = { ...(thinkingEffort !== undefined ? { thinkingEffort } : {}),
     selection: { ...(input.cliProvider !== undefined ? { provider: input.cliProvider } : {}),
       ...(input.cliBaseUrl !== undefined ? { baseUrl: input.cliBaseUrl } : {}) } };
+
+  if (activeConnectionProfile?.status === 'pending') {
+    return { ...preference, provider, expectedEnvVarName, baseUrl, model, blocked: 'connection-pending' };
+  }
 
   const cliApiKey = input.cliApiKey?.trim();
   if (cliApiKey) {

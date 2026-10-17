@@ -37,6 +37,7 @@ export function createProviderStep(
   promptContext: SystemPromptContext,
 ): StepFunction {
   const resolution = request.providerCredentialResolution;
+  if (resolution.blocked) throw new Error('The selected connection requires independent login before requests can be sent.');
   // Read once for the whole step function, not once per use: loading the
   // catalogue touches the filesystem, and a run that reloaded it mid-turn could
   // change request shape between two steps of the same answer.

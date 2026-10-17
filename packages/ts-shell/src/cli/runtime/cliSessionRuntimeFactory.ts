@@ -145,6 +145,7 @@ export function createCliSessionRuntime(input: {
    * refusal. The turn's own path has already renewed by the time it gets here.
    */
   const compactionTarget = (resolved: ProviderCredentialResolution, catalog: readonly CatalogProvider[]) => {
+    if (resolved.blocked) return undefined;
     const credential = resolved.credential;
     const accountAuth = accountAuthFor(resolved.provider, credential ?? {});
     if (!credential?.apiKey && !accountAuth && !endpointShape(endpointFor(resolved.provider, catalog)).signer) return undefined;

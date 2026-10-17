@@ -102,6 +102,19 @@ function dependencies(): { deps: CliRuntimeInvocationDependencies; calls: string
 }
 
 describe("CLI runtime invocation", () => {
+  it('sends nothing for a pending signer-backed connection before independent login', async () => {
+    const renewal = vi.spyOn(accountRenewal, 'renewStoredAccount');
+    const resources = vi.fn(() => ({})); const { deps, calls } = dependencies();
+    try {
+      const run = await runCliRuntimeInvocation(baseInput({ providerCredentialResolution: {
+        provider: 'bedrock', expectedEnvVarName: 'AWS_ACCESS_KEY_ID', blocked: 'connection-pending', baseUrl: 'https://example.invalid', model: 'test-model',
+      }, providerCatalog: [{ id: 'bedrock', label: 'Signer', runtime: 'bedrock', endpoint: 'bedrock-converse', auth: 'none', models: [] }],
+      prepareProviderResources: resources }), deps);
+      await collect(run.events);
+      expect(renewal).not.toHaveBeenCalled(); expect(resources).not.toHaveBeenCalled();
+      expect(calls).toHaveLength(1); expect(calls[0]).toContain('requires independent login');
+    } finally { renewal.mockRestore(); }
+  });
   it('builds dependent resources and the main step from the same renewed captured credential', async () => {
     const auth = { type: 'openai-chatgpt-account' as const, accessToken: 'renewed-test-token', refreshToken: 'test-refresh', expiresAt: Date.now() + 3600000 };
     const renewal = vi.spyOn(accountRenewal, 'renewStoredAccount').mockResolvedValue({ stored: true, writeState: 'persisted', accountAuth: auth });

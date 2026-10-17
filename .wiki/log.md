@@ -7170,3 +7170,25 @@ CFG-01 产品、测试及文档已提交为 `647ae00ed0200474ccefa0e028246acb048
 定向核查目标 Git reader 和测试 owner，并对照参考实现显式覆盖 global/system 配置及清除 inherited repository 变量的决策后，复用 `test-utils/git.ts` 统一环境投影；四处进程内诊断/review/commit 夹具使用可恢复的 stub，实际 print CLI 子进程也显式隔离 system/global/XDG。Git 配置隔离仅属测试，生产 passive helper 拒绝与原断言均保留。新增真实 Git 回归先证明外部 system/global/XDG 配置确实可见，再证明隔离后不可见、仓库位置覆盖无效、repo-local filter 配置仍保留。已安装 Vitest 不支持通过 `stubEnv(undefined)` 删除环境值，测试工具记录原值后显式删除，并由原 registry 恢复。
 
 合成系统过滤器与临时 PATH Git wrapper 覆盖 CLI 白名单子进程后，旧五文件完整重现 15 项失败；结束后逐字恢复。修复版受影响组合为 11 文件、76 项通过，含真实 CLI review、native passive 拒绝、worktree、remote、operation 和 commit 回归。五项静态门禁及 whitespace 检查通过；现有 listener-count warning 未被隐藏。限定范围清理无需额外代码改动。清理后同一合成环境的六文件、42 项再次通过，构建退出 0；最终路径分隔符归一化后，新增两项回归再次通过。独立源码复核两路分别为 APPROVE / CLEAR，并对最终小改动再次确认；两路均未冒充测试执行。此条写入时，本轮新提交/推送和精确 SHA CI 尚待完成。
+
+### Phase 20 CFG-01：精确 SHA 交付确认
+
+上述 Git 夹具隔离修复已提交并推送为 `ba73e36b1016d83398f90f648044e3dd803d10a0`。该 SHA 的 [主 CI 39007578306](https://github.com/h-hei133/cheers/actions/runs/39007578306) 和 [Architecture Watch 39007578308](https://github.com/h-hei133/cheers/actions/runs/39007578308) 均 completed/success。重新读取主 CI job steps，确认安装、五项门禁、script tests、构建、真实 native/browser 测试依赖、TS suite 和最后 NormProof 均实际运行并通过，无上述测试失败后的跳过。本确认只属于该 SHA；前面失败运行保留为历史。CFG-01 交付闭合。
+
+### Phase 20 CFG-02：显式导入恢复与新进程切换
+
+从 `ba73e36b` 继续在 main 实施 CFG-02。新增 `/profile status|list|create|import|recover|switch`，复用现有名称/路径身份、config schema、session graph/export、文件锁和原子写入 owner。管理及 import 位于 `config/profiles/`，生命周期位于 `cli/bootstrap/profile/`，history 的共享投影和 native serialization 保留在 `session/history/`。完整合同与操作示例见 [profiles](features/profiles.md)。
+
+导入先 preview、显式确认版本摘要、锁内重新规划、持久 journal、目标内 staging，再独占发布；metadata 最后可见。重复/中断 recover 核对缺失或相同内容，任何冲突均保留现有数据，包括已 complete 后出现的冲突。当前支持经过校验的用户配置/目录、Markdown 定义及当前 workspace 会话图，不复制 OAuth/MCP/key、grant、脚本/hooks、jobs、pending request、cache 或 current session 选择。连接成为 pending，禁止通过 CLI/env/legacy 凭据或 signer 绕过独立登录。活动 source 会话在读前排除并绑定在摘要中；inactive history 由已捕获 transcript/state 字节投影为新 inactive ID，避免 preview 自写和脱离摘要的二次读取。
+
+切换捕获 source session/workspace/config/trust generation，必须先排空原有 resource owners 并恢复终端，再经唯一 execution service 启动 fresh executable。严格 jobs drain 等待内层 owner 并拒绝 cleanup rejection/timeout/unknown，失败时保留关闭的 installation；spawn 不代表 admitted。子进程 claim 持久 receipt、保存真实 startup report，父进程在结算后核对新会话和清理证据。源码 loader 在 admitted Node PID 内运行，终端 resize 沿原 execution owner 传递；argv/env 不带旧 prompt、provider 凭据或 loader 注入。`/restart` 仍为同 PID/同 profile，保留已校验链深；最多八次切换，超限在退休前拒绝，用户退出并重新启动。未知派发不自动重放。
+
+定向对照目录采用的 source preservation/独占复制、已知 source/executable 选择和新 session identity 决策后实现本仓方案；没有复制实现。相较单次目录 rename，额外保持逐文件 no-clobber、版本绑定和 durable recovery。十二项保护逐项撤销，全部触发真实 AssertionError、退出 1，之后逐字恢复：pending fence、非秘密连接投影、独占发布、metadata 次序、捕获历史、活动会话排除、严格 drain、generation digest、drain 后复查、source PID、resize 及 depth 边界。
+
+**本地验证**：清理前后 import/handoff/jobs 三文件各 25 项通过；清理仅删去没有生产者的 switch `failed` 状态。最终受影响组合（隔离 Git ceiling，指定 95 文件、单线程）1127 项全部通过；现有 listener warning 保留。`build:ts`、`build:exe`、五项静态门禁及 57 项 script tests 通过。NormProof 退出 0，整体 partial，阻断 import obligation 满足，既有四项 module advisory 保留。repository analyzer 对变更模块未报超限；额外 AST 检查发现 `cliSessionRuntimeFactory` 既有 29 个 distinct callback-inclusive names，和 HEAD 完全相同，本批未增加函数，已追加 disposition；不把 regex 漏计表述为全部模块符合上限。
+
+**实际用户路径**：独立 synthetic HOME/workspace、loopback provider、三路真实 TTY 下，编译后 JS、源码 loader 和实际单文件 executable 均通过 source→target→source、不同实际 PID、两层 resize、恢复终端、独立登录、同进程 restart、退出和 native readback；CLI/env key 不能使 pending import 发送请求，实际网络计数为 0。原 supervisor 收到 SIGTERM 后两个 descendant 都消失，结算保持 unknown/exit 1。源 seed 配置和历史字节保持。独立 architecture lane 另行运行 execution owner 的实际 PTY resize；code/spec/security lane 独立运行 9 文件、51 项并验证 fault probes。最终两路分别 APPROVE/CLEAR。
+
+**界限与交付状态**：没有真实 provider、Windows/macOS 或完整八层 TTY 证据；两层动态运行与八次边界测试各自记录，未互相替代。文档链接检查通过，strict docs 的既有 118 条 advisory 保留。此条写入时产品尚未提交/推送，也没有 CFG-02 精确 SHA CI；后续另记。其余 45 项仍待顺序交付。
+
+OMX 的 story checkpoint 仍因已安装版本的 objective alias filter 报 `Codex goal objective mismatch`：活动目标保留用户原始指令，CFG-01/G001 的 ledger 未能标 complete。该工具缺陷不等于产品未交付；继续保留真实 delivery evidence，通过 annotate_ledger 记录，不伪造 snapshot、改写隐藏目标或声明整个 Phase 20 完成。

@@ -22,7 +22,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { assertProfileIdentity, currentProfile, profilePath } from './profile/context.js';
+import { assertProfileIdentity, currentProfile, profilePath, type ProfileContext } from './profile/context.js';
 
 /** The directory in use now. */
 const CURRENT_DIRECTORY_NAME = ".cheers";
@@ -86,11 +86,16 @@ export function userDataSearchDirsFor(root: string): readonly string[] {
   const profile = currentProfile();
   if (profile) {
     assertProfileHome(root);
-    assertProfileIdentity(profile);
-    if (profile.id !== 'default') return [profile.root];
-    return [profile.root, ...LEGACY_DIRECTORY_NAMES.map(name => path.join(profile.homeDir, name))];
+    return profileSearchDirs(profile);
   }
   return [CURRENT_DIRECTORY_NAME, ...LEGACY_DIRECTORY_NAMES].map((name) => path.join(root, name));
+}
+
+/** Read another captured profile without changing the installed process owner. */
+export function profileSearchDirs(profile: ProfileContext): readonly string[] {
+  assertProfileIdentity(profile);
+  return profile.id !== 'default' ? [profile.root]
+    : [profile.root, ...LEGACY_DIRECTORY_NAMES.map(name => path.join(profile.homeDir, name))];
 }
 
 /**

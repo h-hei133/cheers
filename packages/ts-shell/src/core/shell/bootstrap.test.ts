@@ -314,6 +314,20 @@ describe('shell bootstrap', () => {
     expect(result.context.rootBindingDiagnostics.some(item => item.code.endsWith('mismatch'))).toBe(false)
   })
 
+  it('starts the handoff identity despite an unfinished current target session', () => {
+    const manager = new SessionManager();
+    const projectRoot = fs.mkdtempSync(path.join(fakeHome, 'project-handoff-'));
+    const unfinished = manager.createNew(projectRoot);
+    manager.addTurn(unfinished.id, { role: 'user', content: 'old target prompt' });
+    const input = { cwd: projectRoot, runtimeConfig: getRuntimeConfig(projectRoot), gitContext: getWorkflowGitContext(projectRoot),
+      sessionManager: manager, renderer: new StreamingRenderer(), freshSessionId: 'sess_fresh_handoff', adoptCurrentSession: false };
+    const result = bootstrapShellRuntime(input);
+    expect(result.context.session.id).toBe('sess_fresh_handoff');
+    expect(result.context.session.turns).toEqual([]);
+    expect(manager.resume(unfinished.id).turns.map(turn => turn.content)).toEqual(['old target prompt']);
+    expect(() => bootstrapShellRuntime({ ...input, requestedSessionId: unfinished.id })).toThrow('cannot also resume');
+  });
+
   it('resumes project current session by default when no --session-id is provided', () => {
     const sessionManager = new SessionManager()
     const projectRoot = fs.mkdtempSync(path.join(fakeHome, 'project-current-'))

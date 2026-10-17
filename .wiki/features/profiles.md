@@ -5,13 +5,13 @@ sources: [phase-20-decisions.md, 25-model-configuration-and-relays.md]
 created: 2026-10-17
 updated: 2026-10-17
 tags: [features, profiles, configuration]
-summary: "CFG-01 的启动身份、逐类存储 consumer、显式共享输入及验收边界。创建、导入与切换流程归 CFG-02。"
+summary: "Profile 启动身份、逐类存储 consumer、显式导入恢复及受控新进程切换。"
 confidence: high
 ---
 
 # Profile 身份与存储边界
 
-CFG-01 的本地实现与验收已完成，正在交付。本文记录当前实现合同与逐类 consumer；提交、推送及远端 CI 结果分别记入开发日志，不由本清单推导完成状态。规划入口见 [Phase 20](phase-20-decisions.md)，设计来源见 [配置研究 §7.1](25-model-configuration-and-relays.md#71-profile身份与路径)。
+CFG-01 已提交、推送并通过精确 SHA CI；CFG-02 的本地实现、反转验证和独立评审已完成，交付检查进行中。本文记录当前实现合同与逐类 consumer；提交、推送及远端 CI 结果分别记入开发日志。规划入口见 [Phase 20](phase-20-decisions.md)，设计来源见 [配置研究 §7.1](25-model-configuration-and-relays.md#71-profile身份与路径)。
 
 ## 启动身份
 
@@ -38,7 +38,7 @@ CFG-01 的本地实现与验收已完成，正在交付。本文记录当前实�
 | 请求 ledger、usage 与持久 jobs | 会话 state 内；[requests](../../packages/ts-shell/src/session/store/requests.ts)、[job store](../../packages/ts-shell/src/workflow/jobs/store.ts)、[jobs composition](../../packages/ts-shell/src/cli/runtime/jobs.ts)；账户 reset receipt/lock 位于 `P/accounts/resets/<accountKey>.json` / `.lock`，由 [reset state](../../packages/ts-shell/src/cli/usage/state.ts) 拥有 | 会话事实继承捕获的 manager/layout，账户 reset 经选中 root 和现有 workspace writer；不建立第二套账本或 job owner |
 | trust、hooks 和工具审批 | `P/trust.json`、`P/hook-trust.json`、`P/approval-policy.json`；[trust store](../../packages/ts-shell/src/core/security/trust/store.ts)、[hook trust](../../packages/ts-shell/src/core/hooks/trust.ts)、[approval policy](../../packages/ts-shell/src/core/shell/approvalTrustPolicy.ts) | 完整路径检查也覆盖缓存授权；换根或叶子链接不能导入另一 profile 的 grant |
 | 扩展、包与来源 | `P/extensions/registry.json` 及相邻 packages、`P/plugins.json`、`P/marketplaces.json`；[extension store](../../packages/ts-shell/src/extensions/store/state.ts)、[sources](../../packages/ts-shell/src/extensions/registry/sources.ts)、[plugin store](../../packages/ts-shell/src/core/commands/plugin/store.ts) | 捕获的 store 不接受替换 root；显式 path override 同样受 profile containment 限制 |
-| 用户规则及扩展输入 | `P/AGENTS.md`、skills、templates、agents、themes、`P/keybindings.json`、`P/mcp.json`、`P/hooks.json`、`P/sandbox.json`；[instructions](../../packages/ts-shell/src/context/instructions/projectInstructions.ts)、[skill loader](../../packages/ts-shell/src/core/skills/skillLoader.ts)、[template loader](../../packages/ts-shell/src/core/prompts/templateLoader.ts)、[agent loader](../../packages/ts-shell/src/core/subagents/subagentLoader.ts) | 自动用户来源只读选中 profile，缓存 loader 保留 owner；目录与叶子链接均拒绝 |
+| 用户规则及扩展输入 | `P/AGENTS.md`、skills、prompts、agents、themes、`P/keybindings.json`、`P/mcp.json`、`P/hooks.json`、`P/sandbox.json`；[instructions](../../packages/ts-shell/src/context/instructions/projectInstructions.ts)、[skill loader](../../packages/ts-shell/src/core/skills/skillLoader.ts)、[template loader](../../packages/ts-shell/src/core/prompts/templateLoader.ts)、[agent loader](../../packages/ts-shell/src/core/subagents/subagentLoader.ts) | 自动用户来源只读选中 profile，缓存 loader 保留 owner；目录与叶子链接均拒绝 |
 | 可变项目 memory | `W/memory/project`；[memory root](../../packages/ts-shell/src/memory/projectMemoryRoot.ts)、[local store](../../packages/ts-shell/src/memory/projectMemoryLocalStore.ts)、[owner](../../packages/ts-shell/src/memory/store/owner.ts) | 同 workspace 的 A/B 独立；store reference 的捕获身份贯穿异步事务、列表和删除 |
 | 子代理 memory | 用户级 `P/agent-memory/*`；项目及 local 级 `W/memory/*`、`W/memory-local/*`；[agent memory](../../packages/ts-shell/src/core/subagents/agentMemoryManager.ts) | named profile 不把可变 memory 写回项目共享目录 |
 | 项目选择、workflow run 与历史 | `W/state.json`、同 owner run 文件及 `W/prompt-history.txt`；[project state](../../packages/ts-shell/src/core/state/projectState.ts)、[run store](../../packages/ts-shell/src/core/workflow/runStore.ts)、[history](../../packages/ts-shell/src/cli/interactive/historyStore.ts) | 使用 canonical workspace digest，不以同名文件夹或可变 cwd 猜身份 |
@@ -54,7 +54,7 @@ CFG-01 的本地实现与验收已完成，正在交付。本文记录当前实�
 
 项目代码、受信任的项目 instructions/skills/templates/agents/themes、项目配置及显式 CLI 文件输入仍是同一 workspace 的输入，继续经过已有来源与权限检查。普通 profile 隔离不禁止用户显式读取自己获准访问的文件，也不为项目新增 workspace grant。
 
-provider 环境变量、显式 Google/AWS 委托凭据、SSH transport 认证和机器工具属于明确输入。它们不从 default profile 自动复制，也不由 profile 隔离创造新的账户授权。完整导入、live rotating OAuth 的禁止复制和独立登录归 CFG-02/PRV-04。
+provider 环境变量、显式 Google/AWS 委托凭据、SSH transport 认证和机器工具属于明确输入。它们不从 default profile 自动复制，也不由 profile 隔离创造新的账户授权。显式导入的范围和独立登录要求见下文；refresh lineage 的扩展归 PRV-04。
 
 显式 `cheers serve <absolute-private-config.json>` 使用该文件声明的服务状态 owner 和认证 ACL，不安装交互 runtime profile；这是明确选定的共享服务边界。[CLI bootstrap](../../packages/ts-shell/src/cli/bootstrap/cliProcessRunner.ts) 保留独立 service 路径。客户端仍通过携带 profile 身份的 project/room binding 路由，服务进程本身不成为 default 数据回退入口。
 
@@ -75,4 +75,56 @@ provider 环境变量、显式 Google/AWS 委托凭据、SSH transport 认证和
 
 最终受影响组合回归为 118 文件、1272 项通过；九项反转均触发断言失败并逐字恢复源码。最新构建通过，独立 code review 为 APPROVE、architecture 为 CLEAR。
 
-完整 TS 串行运行实际为 812 文件通过、1 文件失败，8225 项通过、5 项失败、1 项 skipped。失败集中在 `webRequests.test.ts`：先运行 `deviceCode.test.ts` 后，Vitest 的计时器清理导致 `setTimeout is not defined`；相同顺序在未修改的 `03b56c94` 独立 worktree 上复现相同五项失败，单文件 44 项通过。本批未修改该既有测试隔离问题，不把完整运行记为绿色。完整命令、反转、独立复审与交付状态在 [开发日志](../log.md) 记录。
+初次完整 TS 串行运行的五项计时器隔离失败，以及两轮 CI 暴露的测试环境问题，已由后续限定测试/workflow 修复处理，历史结果保留在 [开发日志](../log.md)。CFG-01 最终提交 `ba73e36b1016d83398f90f648044e3dd803d10a0` 的 [主 CI](https://github.com/h-hei133/cheers/actions/runs/39007578306) 与 [Architecture Watch](https://github.com/h-hei133/cheers/actions/runs/39007578308) 均实际完成并通过；主 CI 的测试及最后 NormProof 步骤没有跳过。这是该 SHA 的交付证据。
+
+## 创建、导入与恢复
+
+`/profile status` 显示安装的进程身份，`/profile list` 列出可用及不可用的存储，`/profile create <name>` 显式创建空 profile。创建已有 profile 是可核实的幂等操作，不切换或重载当前 runtime。管理合同由 [command syntax](../../packages/ts-shell/src/core/commands/profile/syntax.ts) 和 [config owner](../../packages/ts-shell/src/config/profiles/command.ts) 共同实现。
+
+```text
+/profile create work
+/profile import default --target work
+/profile import default --target work --confirm <preview-digest>
+/profile recover <operation-digest> --target work
+/profile recover <operation-digest> --target work --confirm <preview-digest>
+```
+
+source 和 target 必须已存在且不同；查询缺少的 source 不创建目录。未指定 `--target` 时目标是当前 profile；未选类别时使用全部支持类别，也可用 `--config`、`--catalog`、`--definitions`、`--history` 选择子集。preview 不写目标存储；交互宿主仍会把命令报告写入当前会话。当 source 正是当前 owner 时，当前活动会话在读取前即被排除，排除 ID 绑定在摘要和 journal 中，避免 preview 自己改变确认摘要。其他 inactive history 保留；要迁移该活动会话，应先退出，再从另一 profile 导入。
+
+支持范围如下，preview 也明确显示排除范围：
+
+| 类别 | 保留内容 | 不随导入转移的内容 |
+|---|---|---|
+| config | 经当前用户字段 schema 校验的配置、非秘密连接引用 | API key、账户 OAuth、legacy credential slots；连接统一置为 pending |
+| catalog | 校验后的用户模型目录及支持属性 | 认证材料、刷新 cache、携带认证的 URL |
+| definitions | `AGENTS.md`，`skills/`、`prompts/`、`agents/` 中的 Markdown | 可执行脚本、hooks、包、其他未声明格式 |
+| history | 当前 canonical workspace 的完整可导出会话图，经过现有脱敏规则 | 其他 workspace、权限、请求账本、jobs、恢复 capability、当前会话选择及运行状态 |
+
+历史使用新 inactive session ID，沿现有 [history projection](../../packages/ts-shell/src/session/history/projection.ts) 和 [native serialization](../../packages/ts-shell/src/session/history/files.ts) 保存。图投影只使用已捕获并纳入摘要的 transcript/state 字节，不能二次读取另一版本。导入不复制 trust/approval grant、MCP token、live rotating OAuth 或 pending execution。目标连接必须独立登录；pending 连接在凭据解析前拒绝 CLI/env/legacy 借用，签名授权请求也保留该拒绝。
+
+每次导入最多选择 1024 个文件、32 MiB 总量、单文件 2 MiB，定义嵌套最多 12 层；history 沿用 2 MiB/4096 graph entries 的限制。超限拒绝，不截断。摘要绑定版本、选择、源文件内容与 identity、source/target root、canonical workspace 及活动会话排除。锁内重新规划并在发布前复查，旧摘要不能授权新内容。
+
+[import owner](../../packages/ts-shell/src/config/profiles/import/runtime.ts) 先保存持久 journal，再写目标内的私有 staging，逐文件用独占 hard link 发布；目标已有不同内容时拒绝覆盖，即使上次 receipt 是 complete。session metadata 最后发布，缺 state/transcript 的历史不能提前进入正常发现。中断后显式 recover 会核对当前源版本，协调缺失或逐字相同的目标文件，再恢复剩余发布；源变化、换根、链接、锁释放失败及不确定读回均不能报告完成。操作不提供跨文件崩溃原子性，保留 journal/stage 以供核查，不自动删除不确定数据。
+
+## 受控切换
+
+```text
+/profile switch work
+/profile switch work --confirm <preview-digest>
+```
+
+切换仅支持交互终端。preview 绑定当前 session、workspace/config/trust generation、目录 identity 和目标身份；忙碌、取消、重复退休、陈旧源、缺失目标及超限请求在退休前拒绝。确认后关闭当前表面并恢复终端，现有资源 owner 必须实际排空；job 的内层 owner、cleanup rejection、timeout 或 unknown 都会阻止新进程派发。`/restart` 保持同 PID、同 profile，不用于热改身份。
+
+[bootstrap handoff](../../packages/ts-shell/src/cli/bootstrap/profile/handoff.ts) 通过唯一 `runtime/execution` spawn owner 启动新 executable，继承终端；源码入口的已知 loader 在真正获准的 Node PID 内运行。新的 argv 仅携带 target、workspace 和支持的展示选项，过滤旧提示、恢复动作、CLI/env provider 凭据、路径覆盖及 loader 注入。子进程原子 claim receipt，立即移除 handoff 环境标记，以原生 report writer 保存真实启动记录，再记录 admitted。spawn 本身不等于 admitted；父进程等到子进程结算后核对 receipt、进程清理及新会话实际读回，才报告 verified startup。
+
+持久 receipt 区分 prepared、drained、dispatched、admitting、admitted 和 unknown。`/profile recover <operation>` 在源 profile 检查 switch 状态，不能自动重派未知/已派发操作。失败后源会话保留，用户可显式重新启动并 resume。
+
+每条终端切换链最多八次转换，最多保留八个已排空 supervisor 加一个活动 CLI。深度来自已校验 receipt，跨同进程 `/restart` 保留，不读取普通环境变量来重置；第九次切换在退休前拒绝。达到上限后退出并显式启动新 CLI。现有 supervisor 负责信号、窗口尺寸传递、进程树清理和最终读回；这会占用有界进程资源。
+
+## CFG-02 证据与平台边界
+
+当前 Linux synthetic/offline 实际探针覆盖编译后 JS、源码 loader 和单文件 executable：三路真实 TTY、source→target→source 的不同 PID、两层窗口尺寸传递、终端恢复、独立登录、同 PID `/restart`、退出清理及原生会话读回。向原 supervisor 发送 SIGTERM 后两层子进程均消失且结果报告 unknown。带 CLI/env 凭据的导入 pending 连接对 loopback provider 的实际请求数为零；源 seed 配置和历史字节保持。独立 architecture lane 另行实际验证执行 owner 的 PTY resize。
+
+十二项保护反转均触发真实断言失败并逐字恢复源码，涵盖凭据 fence、秘密投影、独占发布、metadata 次序、捕获历史、活动会话排除、严格 jobs drain、generation 摘要、drain 后复查、源码 PID、resize 及 supervisor 上限。限定变更文件的清理已执行；独立 code/spec/security 为 APPROVE，architecture 为 CLEAR。
+
+没有 Windows/macOS 实机、真实 provider 或完整八层链的 TTY 运行证据。它们不能由 Linux mock、名称校验或两层运行推导；八次上限有边界测试。最终组合测试、构建、提交及精确 SHA CI 分别记录在 [开发日志](../log.md)。

@@ -29,6 +29,21 @@ function createRuntimeConfig(): RuntimeConfig {
 }
 
 describe("provider credential resolution", () => {
+  it.each(['api-key', 'account-auth'] as const)('fences a pending %s connection before CLI, env and legacy credential fallback', authType => {
+    const result = resolveProviderCredential({
+      runtimeConfig: {
+        ...createRuntimeConfig(), activeProviderConnectionId: 'imported',
+        providerConnections: [{ id: 'imported', provider: 'openai', authType, status: 'pending',
+          apiKey: 'must-not-use-stale-key', baseUrl: 'https://pending.invalid/v1', model: 'pending-model',
+          createdAt: '2026-01-01', updatedAt: '2026-01-01' }],
+      },
+      cliApiKey: 'must-not-use-cli-key', env: { OPENAI_API_KEY: 'must-not-use-env-key' },
+    });
+    expect(result).toMatchObject({ blocked: 'connection-pending', provider: 'openai', baseUrl: 'https://pending.invalid/v1', model: 'pending-model' });
+    expect(result.credential).toBeUndefined();
+    expect(JSON.stringify(result)).not.toContain('must-not-use');
+  });
+
   it.each([
     { active: "other", selected: "openai" as const, key: "recent-key", base: "recent" },
     { active: "older", selected: "openai" as const, key: "older-key", base: "older" },

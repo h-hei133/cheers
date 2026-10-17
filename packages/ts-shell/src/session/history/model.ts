@@ -3,6 +3,7 @@ import { gatherExport } from '../export/collect.js';
 import type { ExportEntry } from '../export/model.js';
 import { redactExportText } from '../../core/security/redaction.js';
 import { isRecord } from '../../core/values/record.js';
+import type { SessionStoreLayout } from '../store/sessionFileLayout.js';
 
 export const HISTORY_LIMITS = { bytes: 2 * 1024 * 1024, entries: 4096, text: 256 * 1024, id: 256 } as const;
 export interface HistoryNode {
@@ -29,8 +30,10 @@ export interface HistoryDocument {
 }
 
 /** Export the existing sanitized graph, never credentials, approval metadata or reasoning. */
-export function exportHistory(sessionId: string, workspace: string, title = 'Imported conversation'): string {
-  const result = gatherExport({ sessionId, workspace, maxSourceBytes: HISTORY_LIMITS.bytes });
+export function exportHistory(sessionId: string, workspace: string, title = 'Imported conversation', source?: {
+  readonly layout?: SessionStoreLayout; readonly now?: () => Date; readonly captured?: Parameters<typeof gatherExport>[0]['captured'];
+}): string {
+  const result = gatherExport({ sessionId, workspace, maxSourceBytes: HISTORY_LIMITS.bytes, ...source });
   if (!result.ok) throw new Error(result.reason);
   const { payload } = result;
   if (payload.warnings.length || !payload.leafId) throw new Error('Incomplete history cannot be exported as a complete versioned graph. Inspect /tree and /export first.');

@@ -10,6 +10,8 @@ import { readExportSource, readExportThread } from "./source.js";
 import type { ExportEntry, ExportPayload } from "./model.js";
 import { restoreReport } from '../reports/projection.js';
 import type { ReportTranscriptEntry } from '../reports/model.js';
+import type { SessionStoreLayout } from '../store/sessionFileLayout.js';
+import type { ReadTranscript } from '../transcript/sessionTranscript.js';
 export type { ExportEntry, ExportPayload, ExportTreeNode } from "./model.js";
 
 export type ExportGatherResult =
@@ -22,8 +24,12 @@ export function gatherExport(input: {
   readonly workspace: string;
   readonly now?: () => Date;
   readonly maxSourceBytes?: number;
+  readonly layout?: SessionStoreLayout;
+  /** Already bounded, revision-bound acquisition supplied by a migration owner. */
+  readonly captured?: { readonly transcript: ReadTranscript; readonly thread?: SessionThreadSnapshot };
 }): ExportGatherResult {
-  const source = readExportSource(input.sessionId, input.maxSourceBytes);
+  const source = input.captured ? { ok: true as const, transcript: input.captured.transcript, statePath: undefined }
+    : readExportSource(input.sessionId, input.maxSourceBytes, input.layout);
   if (!source.ok) return source;
   const { transcript, statePath } = source;
   const messages = transcript.events.filter((event): event is Extract<TranscriptEvent, { type: "message" }> => event.type === "message");
@@ -44,9 +50,9 @@ export function gatherExport(input: {
   if (new Set(entries.map(entry => entry.id)).size !== entries.length) {
     return { ok: false, reason: "The transcript has duplicate message identities; branch associations are ambiguous." };
   }
-  let snapshot: SessionThreadSnapshot | undefined;
+  let snapshot = input.captured?.thread;
   try {
-    snapshot = input.maxSourceBytes === undefined ? readStateSnapshotRequired(statePath).thread
+    if (statePath !== undefined) snapshot = input.maxSourceBytes === undefined ? readStateSnapshotRequired(statePath).thread
       : readExportThread(statePath, input.maxSourceBytes);
   } catch {
     // A chronological view remains useful, but must identify its lost branch history.

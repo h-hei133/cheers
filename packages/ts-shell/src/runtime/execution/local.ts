@@ -39,6 +39,7 @@ function collectStreamed(options: {
   onStdout?: (chunk: Buffer) => void | Promise<void>
   onStderr?: (chunk: Buffer) => void | Promise<void>
   captureOutput?: boolean
+  inheritTerminal?: boolean
   /** Already verified read descriptors inherited as child fd 3 and above. */
   readDescriptors?: readonly number[]
 }): Promise<{ stdout: string; stderr: string }> {
@@ -48,7 +49,7 @@ function collectStreamed(options: {
     const child = spawn(options.command, options.args, {
       cwd: options.cwd,
       windowsHide: true,
-      ...(options.readDescriptors || options.input !== undefined || options.onStdin ? {
+      ...(options.inheritTerminal ? { stdio: 'inherit' as const } : options.readDescriptors || options.input !== undefined || options.onStdin ? {
         stdio: [options.input !== undefined || options.onStdin ? 'pipe' : 'ignore', 'pipe', 'pipe', ...(options.readDescriptors ?? [])] as import('node:child_process').StdioOptions,
       } : {}),
       // Only when the caller named one: passing `env: undefined` is the same as
@@ -71,9 +72,14 @@ function collectStreamed(options: {
     let termination: Promise<void> | undefined
     let timer: ReturnType<typeof setTimeout> | undefined
     const consumers = new OutputConsumer()
+    // A detached terminal child keeps tree cleanup but is outside the terminal's
+    // foreground group. Forward resize while this owner still holds that child.
+    const resize = (): void => { if (!nativeClosed && !settled) child.kill('SIGWINCH') }
+    if (options.inheritTerminal && process.platform !== 'win32') process.on('SIGWINCH', resize)
     const finish = (): void => {
       clearTimeout(timer)
       options.abortSignal?.removeEventListener('abort', onAbort)
+      process.off('SIGWINCH', resize)
     }
     const fail = (message: string, details: Record<string, unknown> = {}): void => {
       if (settled) return
@@ -209,6 +215,7 @@ export async function executeLocally(options: {
   onStdout?: (chunk: Buffer) => void | Promise<void>
   onStderr?: (chunk: Buffer) => void | Promise<void>
   captureOutput?: boolean
+  inheritTerminal?: boolean
   /** Already verified read descriptors inherited as child fd 3 and above. */
   readDescriptors?: readonly number[]
 }): Promise<NormalizedExecutionResult> {

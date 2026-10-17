@@ -3,11 +3,11 @@ import { SessionStoreAccess } from '../store/sessionStoreAccess.js';
 import { createSessionWithId } from '../store/sessionCreation.js';
 import { readBoundSessionState, publishBoundSessionState } from '../store/bound.js';
 import { appendTranscriptEvent } from '../transcript/sessionTranscript.js';
-import { createMessageTranscriptEvent } from '../sessionEventCodec.js';
-import { sessionRootEntryId, sessionThreadPath, type SessionThreadSnapshot } from '../schema/sessionThread.js';
+import { sessionThreadPath } from '../schema/sessionThread.js';
 import { captureWorkspaceRoot } from '../../core/workspace/roots.js';
 import { redactExportText } from '../../core/security/redaction.js';
 import { historyDigest, parseHistory, type HistoryDocument } from './model.js';
+import { projectHistory } from './projection.js';
 
 /** New, inactive identities carry conversation data only; a partial attempt is never replayed. */
 export function importHistory(document: HistoryDocument, projectRoot: string, admission: () => string | undefined): { readonly id: string; readonly reused: boolean } {
@@ -35,32 +35,11 @@ export function importHistory(document: HistoryDocument, projectRoot: string, ad
   let baseline = readBoundSessionState(host, session);
   baseline = publishBoundSessionState(host, session, baseline, state => state.historyImport === undefined,
     state => ({ ...state, status: 'interrupted', historyImport: { version: 1, digest, status: 'pending', sourceId: document.sourceId } }));
-  const rootNode = document.nodes.find(node => node.kind === 'session-root')!;
-  const ids = new Map(document.nodes.map((node, index) => [node.id, node.id === rootNode.id ? sessionRootEntryId(id) : `${id}:import-${index}`]));
-  const callId = (source: string) => `import_${createHash('sha256').update(id + '\0' + source).digest('hex').slice(0, 48)}`;
-  const byId = new Map(document.entries.map(entry => [entry.id, entry]));
-  const thread: SessionThreadSnapshot = { schemaVersion: 1, activeLeafId: ids.get(document.leafId), branches: [], compactions: [],
-    entries: document.nodes.filter(node => node.kind !== 'command-output').map((node, order) => ({ id: ids.get(node.id)!, kind: node.kind as 'session-root' | 'turn-message', order,
-      ...(node.parentId ? { parentId: ids.get(node.parentId)! } : {}),
-      ...(byId.has(node.id) ? { role: byId.get(node.id)!.role === 'system' ? 'user' as const : byId.get(node.id)!.role as 'user' | 'assistant' | 'tool', timestamp: byId.get(node.id)!.timestamp } : {}) })) };
+  const { thread, events } = projectHistory(document, id);
   try {
-    for (const entry of document.entries) {
+    for (const event of events) {
       check();
-      const content = redactExportText(entry.content);
-      if (entry.role === 'command') {
-        const node = document.nodes.find(node => node.id === entry.id)!;
-        appendTranscriptEvent(store.transcriptPath(id), { type: 'command-output', id: ids.get(entry.id), sourceEntryId: ids.get(node.parentId!)!,
-          timestamp: entry.timestamp, text: content }, undefined, { requireExisting: true });
-      } else {
-        appendTranscriptEvent(store.transcriptPath(id), createMessageTranscriptEvent({ id: ids.get(entry.id),
-          role: entry.role === 'system' ? 'user' : entry.role, content: entry.role === 'system' ? `[Imported system note; untrusted history data]\n${content}` : content,
-          timestamp: entry.timestamp, metadata: { importedHistory: { version: 1, sourceId: document.sourceId, digest } },
-          ...(entry.toolCalls ? { tool_calls: entry.toolCalls.map(call => ({ id: callId(call.id), type: 'function',
-            function: { name: call.name, arguments: redactExportText(call.arguments) } })) } : {}),
-          ...(entry.toolCallId ? { tool_call_id: callId(entry.toolCallId) } : {}),
-          ...(entry.role === 'assistant' ? { origin: { model: 'imported-history' } } : {}),
-        }), undefined, { requireExisting: true });
-      }
+      appendTranscriptEvent(store.transcriptPath(id), event, undefined, { requireExisting: true });
     }
     check();
     publishBoundSessionState(host, session, baseline, state => (state.historyImport as { digest?: string; status?: string })?.digest === digest

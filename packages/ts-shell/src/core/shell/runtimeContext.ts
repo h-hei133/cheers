@@ -89,6 +89,7 @@ export interface ShellRuntimeContext {
   transientContextAttachments?: readonly ContextEntry[];
   freshState?: CommandContext['freshState'];
   restart?: import('../commands/restart/contract.js').RestartPort;
+  profileSwitch?: import('../commands/profile/contract.js').ProfileSwitchPort;
   startupArgs?: readonly string[];
 }
 

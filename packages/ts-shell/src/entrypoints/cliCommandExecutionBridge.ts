@@ -50,6 +50,7 @@ export interface BuildCliCommandExecutionInput {
   readonly runCancellable?: CommandContext['runCancellable'];
   readonly freshState?: CommandContext['freshState'];
   readonly restart?: CommandContext['restart'];
+  readonly profileSwitch?: CommandContext['profileSwitch'];
   readonly startupArgs?: CommandContext['startupArgs'];
   readonly sessionCommand?: CommandContext['sessionCommand'];
   readonly dataTransfer?: CommandContext['dataTransfer'];
@@ -172,6 +173,7 @@ export async function buildCliCommandExecution(
     runCancellable: input.runCancellable,
     freshState: input.freshState,
     restart: input.restart,
+    profileSwitch: input.profileSwitch,
     startupArgs: input.startupArgs,
     sessionCommand: input.sessionCommand,
     dataTransfer: input.dataTransfer,
