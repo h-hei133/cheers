@@ -7,6 +7,7 @@ import { routeSlashCommand } from '../../core/commands/slashRouter.js';
 import { planningCommandFor } from '../../cli/runtime/planning.js';
 import { readPlan } from './store.js';
 import { planVersion } from './codec.js';
+import { planReport } from './projection.js';
 import { readGoalEdit, writeGoal } from '../goal/store.js';
 import { readGuidance } from '../goal/guidance/store.js';
 import { guidanceVersion } from '../goal/guidance/state.js';
@@ -114,4 +115,14 @@ it('keeps command-only planning sessions across discard, catalog selection and r
   manager.saveTerminated(session.id); expect(readGuidance(manager, manager.getSession(session.id)!).draft?.id).toBe(readGuidance(manager, session).draft?.id);
   const fork = manager.fork(session.id); expect(readGuidance(manager, fork).draft).toBeUndefined(); expect(readPlan(manager, fork).plan).toBeUndefined();
   const empty = manager.createNew(root); expect(manager.discardIfEmpty(empty.id)).toBe(true);
+});
+
+it('projects a plan draft into a structured report without changing the text projection', () => {
+  const plan = { schemaVersion: 1, id: 'plan', revision: 1, text: 'Do the thing', phase: 'draft',
+    criteria: [{ id: 'c1', kind: 'artifact', path: 'out.txt', expected: 'exists' }], createdAt: '', updatedAt: '' } as never;
+  const report = planReport(plan);
+  expect(report.title).toBe('Plan review');
+  expect(report.facts).toMatchObject({ phase: 'draft', criteria: 1, goal: 'unbound' });
+  expect(JSON.stringify(report)).toContain('out.txt');
+  expect(planReport(undefined).facts).toMatchObject({ status: 'none' });
 });

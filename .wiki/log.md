@@ -7591,3 +7591,10 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - `SessionManager.listReentrySummaries` 使用 `.reentry-index.json`：条目以 metadata/state/transcript 的 size+mtime 为戳；命中直接用缓存的 `SessionReentrySummary`，缺失/损坏/过期则重算并原子写回。
 - 首帧路径不变（10k 会话首帧测试仍通过）；显式 resume/fallback 不变。
 - 验证：`src/session` 856 通过；新增索引命中/失效/损坏测试。
+
+## 2026-10-18 — PAN-05 结构化 plan-review 与 btw
+
+- `planReport` 把同一 PlanDraft 投影为 `CommandReport`：版本、阶段、验收项数、goal 绑定、逐项命令/artifact 与“审批只覆盖此草稿”的提示；`/plan`、`/plan-review` 的本地结果同时携带报告。
+- `/btw` 结果增加报告：question、providerRequest、delivered 与答案；仍为带外、不写主会话。
+- `renderLocalCommand` 在渲染器不支持报告时回退纯文本，避免 pipe/测试宿主崩溃。
+- 验证：core/commands + planning 638 通过。

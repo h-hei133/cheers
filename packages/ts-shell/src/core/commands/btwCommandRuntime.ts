@@ -15,6 +15,7 @@ import { endpointShape } from "../../provider/endpoints/index.js";
 import { classifyProviderFailure, type ProviderFailureClass } from "../../provider/registry/provider.js";
 import { ModelAdmissionError } from '../agent/request/model.js';
 import { providerModelTransport } from '../../provider/request/transport.js';
+import { createReport, span } from './report/projection.js';
 
 /** How long a side question may take before it is abandoned. */
 const SIDE_QUESTION_TIMEOUT_MS = 15_000;
@@ -105,6 +106,7 @@ export async function runBtwCommand(
     }
   }
 
+  const delivered = Boolean(answer);
   if (!answer) {
     // Two different situations, and telling them apart is the difference between
     // a user checking their configuration and a user checking their network. A
@@ -127,5 +129,8 @@ export async function runBtwCommand(
   return {
     kind: "local",
     output: lines.join("\n"),
+    report: createReport({ title: 'Side question', facts: { question, delivered, providerRequest: attempted },
+      lines: [{ kind: 'text', spans: [span(answer, 'text')] },
+        { kind: 'text', spans: [span('Out-of-band: this exchange is excluded from the main session history.', 'muted')] }] }),
   };
 }

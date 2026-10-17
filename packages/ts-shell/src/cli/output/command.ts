@@ -22,7 +22,9 @@ export function renderLocalCommand(input: {
       warning = result.stateFailureWarning;
     }
   }
-  if (result.report) renderer.renderReport(result.report);
+  // A renderer without report support still shows the plain text; the report is
+  // an additional view, not the only one.
+  if (result.report && typeof renderer.renderReport === 'function') renderer.renderReport(result.report);
   else renderer.renderLine(input.printMode ? result.output : `\n${result.output}\n`);
   if (warning) renderer.renderLine(warning);
   if (result.report && input.onReport) {

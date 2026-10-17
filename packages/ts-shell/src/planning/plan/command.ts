@@ -12,7 +12,7 @@ import { PlanError, type PlanCriterion } from './model.js';
 import { planVersion, textDigest } from './codec.js';
 import { createPlan, editPlan, reviewPlan } from './state.js';
 import { readPlan, writePlan } from './store.js';
-import { showPlan } from './projection.js';
+import { planReport, showPlan } from './projection.js';
 
 export interface PlanCommandHost {
   beforeChange(): Promise<void>;
@@ -24,7 +24,7 @@ export async function runPlanCommand(name: 'plan' | 'plan-review', args: string[
   const syntax = name === 'plan' ? planSyntax : planReviewSyntax; const parsed = parsePlanningArgs(syntax, args);
   if (!parsed.ok) return { kind: 'local', output: `Invalid /${name} arguments: ${parsed.reason}\n${syntaxHelp(syntax)}` };
   let edit = readPlan(host, session); const action = parsed.action.name;
-  if (action === 'show') return { kind: 'local', output: showPlan(edit.plan) };
+  if (action === 'show') return { kind: 'local', output: showPlan(edit.plan), report: planReport(edit.plan) };
   const goal = decodeGoal(edit.bound.state.goal);
   if (edit.bound.state.goal !== undefined && !goal) throw new PlanError('invalid');
   const goalBinding = goal && !['complete', 'dropped'].includes(goal.phase) ? { id: goal.id, definitionDigest: goalDefinition(goal) } : undefined;
@@ -37,7 +37,7 @@ export async function runPlanCommand(name: 'plan' | 'plan-review', args: string[
     await runtime.beforeChange();
     edit = writePlan(host, session, edit, plan);
     if (action === 'approve') runtime.approve?.(planVersion(plan));
-    if (action !== 'execute') return { kind: 'local', output: showPlan(edit.plan) };
+    if (action !== 'execute') return { kind: 'local', output: showPlan(edit.plan), report: planReport(edit.plan) };
     runtime.setMode('build');
     return { kind: 'prompt', prompt: `Execute this explicitly approved plan through the ordinary tools and permission gates. Approval grants no tool write scope.\nPlan version: ${planVersion(plan)}\n${plan.text}\n${showPlan(plan)}`,
       promptMetadata: { source: 'plan-execution', planVersion: planVersion(plan) }, notice: 'Executing the exact approved plan; tool permissions are required separately.' };
@@ -45,7 +45,7 @@ export async function runPlanCommand(name: 'plan' | 'plan-review', args: string[
   if (!action) {
     const task = planningBody(context.rawCommandArgs, 0, parsed.args);
     await runtime.beforeChange(); runtime.setMode('plan');
-    if (!task.trim()) return { kind: 'local', output: `Read-only plan mode enabled.\n${showPlan(edit.plan)}` };
+    if (!task.trim()) return { kind: 'local', output: `Read-only plan mode enabled.\n${showPlan(edit.plan)}`, report: planReport(edit.plan) };
     return { kind: 'prompt', prompt: `Prepare a plan preview for the following task. Inspect as needed; do not write or execute implementation. The user must review and explicitly approve a draft before execution.\n${task}`,
       promptMetadata: { source: 'plan-draft', planRequest: { id: randomUUID(), previousVersion: edit.plan ? planVersion(edit.plan) : null,
         scope: edit.bound.scope, ...(goalBinding ? { goal: goalBinding } : {}) } }, notice: 'Preparing a draft in read-only plan mode.' };
@@ -62,7 +62,7 @@ export async function runPlanCommand(name: 'plan' | 'plan-review', args: string[
       : editPlan(edit.plan, { criterion: criterion(action, parsed.args, parsed.flags, parsed.values, context.rawCommandArgs) });
   }
   await runtime.beforeChange(); edit = writePlan(host, session, edit, next); runtime.setMode('plan');
-  return { kind: 'local', output: showPlan(edit.plan) };
+  return { kind: 'local', output: showPlan(edit.plan), report: planReport(edit.plan) };
 }
 function criterion(action: string, args: readonly string[], flags: ReadonlyMap<string, string | true>,
   values: ReadonlyMap<string, readonly (string | true)[]>, raw?: string): PlanCriterion {
