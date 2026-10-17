@@ -12,6 +12,48 @@ import { rootIdentity } from '../../../extensions/lifecycle/grants.js';
  * state, so applying is one diff against what was already on disk rather than a
  * sequence of enable/disable commands the user has to type.
  */
+interface PluginChange { readonly name: string; readonly enable: boolean }
+
+/**
+ * One change at a time.
+ *
+ * Enabling or disabling a plugin is a state change the user should see named,
+ * not a silent diff produced by a multi-select. Each confirmation applies only
+ * its own change; skipping keeps the plugin as it is, and cancelling drops the
+ * rest of the batch.
+ */
+function confirmChange(context: CommandContext, changes: readonly PluginChange[], index: number, notes: string[]): Picker {
+  const change = changes[index]!;
+  const verb = change.enable ? 'Enable' : 'Disable';
+  return {
+    title: `Confirm ${verb.toLowerCase()} ${change.name}`,
+    form: 'panel',
+    empty: '',
+    filterable: false,
+    async load(): Promise<readonly Option[]> {
+      return [
+        { id: 'apply', label: `${verb} ${change.name}`, detail: 'Runs the existing extension command; no other plugin changes.' },
+        { id: 'skip', label: 'Skip this change', detail: 'Leave this plugin as it is' },
+        { id: 'cancel', label: 'Cancel remaining changes', detail: 'No further changes are applied' },
+      ];
+    },
+    async apply(ids): Promise<PickerOutcome | undefined> {
+      const choice = ids[0];
+      if (choice === 'cancel') return { note: [...notes, 'Remaining plugin changes were cancelled.'].join('\n') };
+      if (choice === 'apply') {
+        if (context.extensionCommand) notes.push((await context.extensionCommand('plugin', [change.enable ? 'enable' : 'disable', change.name], context)).output);
+        else {
+          const result = await runPluginCommand([change.enable ? 'enable' : 'disable', change.name], context);
+          if (result.kind === 'local') notes.push(result.output);
+        }
+      }
+      return index + 1 < changes.length
+        ? { next: confirmChange(context, changes, index + 1, notes) }
+        : { note: notes.length > 0 ? notes.join('\n') : 'No plugin changes.' };
+    },
+  };
+}
+
 export function pluginPicker(context: CommandContext): Picker {
   return {
     title: "Enabled plugins",
@@ -31,21 +73,21 @@ export function pluginPicker(context: CommandContext): Picker {
     },
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
       const wanted = new Set(ids);
-      const notes: string[] = [];
+      const changes: PluginChange[] = [];
       if (context.extensionCommand) {
         for (const plugin of readState().packages) {
-          const enabled = plugin.activation[rootIdentity(context.cwd)]?.enabled === true; const shouldEnable = wanted.has(plugin.name);
-          if (enabled !== shouldEnable) notes.push((await context.extensionCommand('plugin', [shouldEnable ? 'enable' : 'disable', plugin.name], context)).output);
+          const enabled = plugin.activation[rootIdentity(context.cwd)]?.enabled === true;
+          const shouldEnable = wanted.has(plugin.name);
+          if (enabled !== shouldEnable) changes.push({ name: plugin.name, enable: shouldEnable });
         }
-        return { note: notes.join('\n') || 'No extension changes.' };
+      } else {
+        for (const plugin of getInstalledPlugins()) {
+          const shouldEnable = wanted.has(plugin.name);
+          if (shouldEnable !== plugin.enabled) changes.push({ name: plugin.name, enable: shouldEnable });
+        }
       }
-      for (const plugin of getInstalledPlugins()) {
-        const shouldEnable = wanted.has(plugin.name);
-        if (shouldEnable === plugin.enabled) continue;
-        const result = await runPluginCommand([shouldEnable ? "enable" : "disable", plugin.name], context);
-        if (result.kind === "local") notes.push(result.output);
-      }
-      return { note: notes.length > 0 ? notes.join("\n") : "No plugin changes." };
+      if (changes.length === 0) return { note: context.extensionCommand ? 'No extension changes.' : 'No plugin changes.' };
+      return { next: confirmChange(context, changes, 0, []) };
     },
   };
 }

@@ -7526,3 +7526,9 @@ CI 的 `browser/cache/scenarios` 并发三进程测试偶发 `Duplicates/over-bu
 catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `discoverSessions` 之前产出，包含当前会话、状态 `scanning`，且 `io.opendir` 未被调用。渐进加载与取消沿用既有 iterator/AbortSignal；持久化摘要索引仍未实现。
 
 **本地验证**：catalog 18 项通过。本条写入时尚未提交/推送。
+
+### Phase 20 PAN-07（补充）：插件启停逐项确认
+
+`pluginPicker.apply` 不再直接执行整批 diff，而是按变更顺序打开确认面板：每个面板只启用/禁用一个插件，提供 Apply / Skip / Cancel remaining；跳过不执行，取消丢弃剩余变更。`/extensions` 仍是 `/plugin` 别名，login/logout 继续复用 connect/oauth runtime。
+
+**本地验证**：`plugins.test.ts` 2 项（逐项确认、跳过/取消）、picker+interactiveMode 149 项通过；`build:ts` 通过。本条写入时尚未提交/推送。
