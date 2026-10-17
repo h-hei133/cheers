@@ -2,15 +2,28 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { vi } from 'vitest';
 import { HookDispatcher } from '../core/hooks/hookDispatcher.js';
 import type { ToolGateOptions } from '../turn/tools.js';
 import type { GitStore, GitWorkflowState } from '../workflow/git/operation/store.js';
 import { GitWorkbench } from '../workflow/git/service.js';
 const TMP = fileURLToPath(new URL('../../../../.tmp/', import.meta.url));
+export function gitEnvironment(home: string): NodeJS.ProcessEnv {
+  return { HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: path.join(home, '.config'),
+    GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_SYSTEM: path.join(home, '.gitconfig-system'), GIT_CONFIG_GLOBAL: path.join(home, '.gitconfig'),
+    GIT_DIR: undefined, GIT_WORK_TREE: undefined };
+}
+export function stubGitEnvironment(home: string): void {
+  for (const [key, value] of Object.entries(gitEnvironment(home))) {
+    vi.stubEnv(key, value ?? '');
+    // This Vitest version restores stubs but does not support deleting via stubEnv.
+    if (value === undefined) delete process.env[key];
+  }
+}
 export function gitFixture(unborn = false) {
   fs.mkdirSync(TMP, { recursive: true }); const base = fs.mkdtempSync(path.join(TMP, 'git-test-'));
   const root = path.join(base, 'source'); fs.mkdirSync(root); const home = path.join(base, 'home'); fs.mkdirSync(home);
-  const env = { ...process.env, HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: path.join(home, '.config'), GIT_CEILING_DIRECTORIES: base, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: path.join(home, '.gitconfig') };
+  const env = { ...process.env, ...gitEnvironment(home), GIT_CEILING_DIRECTORIES: base };
   const git = (args: string[], cwd = root) => execFileSync('git', args, { cwd, env, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
   git(['init', '-q', '-b', 'main']); git(['config', 'user.name', 'Synthetic']); git(['config', 'user.email', 'synthetic@example.invalid']);
   if (!unborn) { fs.writeFileSync(path.join(root, 'a.txt'), Array.from({ length: 80 }, (_, index) => `line ${index + 1}`).join('\n') + '\n'); git(['add', '--', 'a.txt']); git(['commit', '-qm', 'initial']); }

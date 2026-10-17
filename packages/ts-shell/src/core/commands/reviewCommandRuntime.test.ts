@@ -1,21 +1,19 @@
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { runReviewCommand } from "./reviewCommandRuntime.js";
-import { gitCommandContext } from "../../test-utils/git.js";
+import { gitCommandContext, stubGitEnvironment, gitFixture } from "../../test-utils/git.js";
 import { routeSlashCommand } from "./slashRouter.js";
 
 let root: string;
+let fixture: ReturnType<typeof gitFixture>;
 const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8" });
-beforeEach(async () => {
-  root = await fs.mkdtemp(path.join(os.tmpdir(), "review-test-"));
-  git("init", "--quiet");
-  git("config", "user.email", "fixture@example.invalid");
-  git("config", "user.name", "Fixture");
+beforeEach(() => {
+  fixture = gitFixture(true); root = fixture.root;
+  stubGitEnvironment(fixture.home);
 });
-afterEach(async () => { await fs.rm(root, { recursive: true, force: true }); });
+afterEach(() => { vi.unstubAllEnvs(); fixture.cleanup(); });
 
 it("reviews staged changes in a repository without a first commit", async () => {
   await fs.writeFile(path.join(root, "new.txt"), "staged evidence\n");

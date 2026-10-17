@@ -1,7 +1,6 @@
-import { gitCommandContext } from "../../test-utils/git.js";
+import { gitCommandContext, stubGitEnvironment, gitFixture } from "../../test-utils/git.js";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { promises as fs } from "node:fs";
-import { execFileSync } from "node:child_process";
 import path from "node:path";
 import os from "node:os";
 import { runClearCommand } from "./clearCommandRuntime.js";
@@ -37,11 +36,14 @@ describe("Modern Slash Commands Subsystem", () => {
   });
 
   it("/review answers locally for a clean tree", async () => {
-    execFileSync("git", ["init", "--quiet", tempDir]);
-    const result = await runReviewCommand(["focus on tests"], { ...gitCommandContext(tempDir), sessionId: "sess_1" });
-    expect(result.kind).toBe("local");
-    if (result.kind !== "local") throw new Error("Expected local clean status");
-    expect(result.output).toContain("Working tree clean");
+    const fixture = gitFixture(true);
+    try {
+      stubGitEnvironment(fixture.home);
+      const result = await runReviewCommand(["focus on tests"], { ...gitCommandContext(fixture.root), sessionId: "sess_1" });
+      expect(result.kind).toBe("local");
+      if (result.kind !== "local") throw new Error("Expected local clean status");
+      expect(result.output).toContain("Working tree clean");
+    } finally { fixture.cleanup(); }
   });
 
   it("/init refuses project inspection without bound source and patch authority", async () => {

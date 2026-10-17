@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { runToolsCommand } from "./toolsCommandRuntime.js";
 import { runCommitCommand } from "./commitCommandRuntime.js";
-import { gitCommandContext } from "../../test-utils/git.js";
+import { gitCommandContext, stubGitEnvironment, gitFixture } from "../../test-utils/git.js";
 import { runThinkingCommand } from "./thinkingCommandRuntime.js";
 import { SessionManager } from "../../session/SessionManager.js";
 import { readSessionModel } from "../../session/model/state.js";
@@ -62,16 +62,16 @@ describe("/tools", () => {
 
 describe("/commit", () => {
   let repo: string;
+  let fixture: ReturnType<typeof gitFixture>;
 
   beforeEach(() => {
-    repo = fs.mkdtempSync(path.join(os.tmpdir(), "commit-cmd-"));
-    execFileSync("git", ["init", "-q", "."], { cwd: repo });
-    execFileSync("git", ["config", "user.email", "t@example.com"], { cwd: repo });
-    execFileSync("git", ["config", "user.name", "Test"], { cwd: repo });
+    fixture = gitFixture(true); repo = fixture.root;
+    stubGitEnvironment(fixture.home);
   });
 
   afterEach(() => {
-    fs.rmSync(repo, { recursive: true, force: true });
+    vi.unstubAllEnvs();
+    fixture.cleanup();
   });
 
   it("reports a clean tree instead of asking for a message", async () => {

@@ -1,8 +1,8 @@
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { stubGitEnvironment, gitFixture } from '../test-utils/git.js';
 import { getWorkflowGitContext, getWorkflowGitDiagnostics } from './gitContext.js';
 import { runDiagnoseCommand, runWorkflowStatusCommand } from '../core/commands/localCommandRuntime.js';
 import { getRuntimeConfig } from '../config/runtimeConfig.js';
@@ -10,8 +10,12 @@ import { renderReport } from '../presentation/tui/report/renderer.js';
 import { stripAnsi } from '../presentation/tui/text/ansi.js';
 
 let root: string;
-beforeEach(() => { root = fs.mkdtempSync(path.join(os.tmpdir(), 'git-diagnosis-')); execFileSync('git', ['init', '-q', root]); });
-afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+let fixture: ReturnType<typeof gitFixture>;
+beforeEach(() => {
+  fixture = gitFixture(true); root = fixture.root;
+  stubGitEnvironment(fixture.home);
+});
+afterEach(() => { vi.unstubAllEnvs(); fixture.cleanup(); });
 
 it('detects repository git state in an isolated workspace', () => {
   execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '--allow-empty', '-qm', 'initial'], { cwd: root });

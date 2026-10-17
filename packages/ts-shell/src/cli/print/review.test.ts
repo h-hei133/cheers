@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { expect, it } from "vitest";
+import { gitEnvironment } from "../../test-utils/git.js";
 
 const run = promisify(execFile);
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../..");
@@ -35,7 +36,7 @@ it("hands /review to one model turn and prints the model answer", async () => {
       providerCredentials: { openai: { apiKey: "synthetic-only", model: "fixture", baseUrl: `http://127.0.0.1:${address.port}/v1` } } }));
     const env: NodeJS.ProcessEnv = {};
     for (const key of ["PATH", "SystemRoot", "WINDIR", "LANG"]) env[key] = process.env[key];
-    Object.assign(env, { HOME: home, USERPROFILE: home, TMPDIR: root, CHEERS_TEST_ROOT: root, CHEERS_PROVIDER_MODE: "real", NO_COLOR: "1" });
+    Object.assign(env, gitEnvironment(home), { TMPDIR: root, CHEERS_TEST_ROOT: root, CHEERS_PROVIDER_MODE: "real", NO_COLOR: "1" });
     await run("git", ["init", "-q", workspace], { env });
     const command = () => {
       const child = run(process.execPath, [path.join(repo, "dist/cli.js"), "--project", workspace, "--no-skills", "--print", "/review data loss"],

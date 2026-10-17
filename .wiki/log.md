@@ -7162,3 +7162,11 @@ CFG-01 产品、测试及文档已提交为 `647ae00ed0200474ccefa0e028246acb048
 本轮 CI 环境修复限于测试与 workflow：Linux job 安装真实 `bubblewrap`，仅在 runner 暴露相应内核项时配置 namespace 准入，随后执行真实隔离 smoke；没有增加失败后绕过隔离的运行路径。对照本地参考项目的依赖安装与 namespace 设置后，保留检查失败即终止，未沿用吞错设置。Git 夹具在自身子进程和五处进程内消费者同步冻结 `XDG_CONFIG_HOME`；此前在外部 XDG 路径下单例复现 attributes 断言失败，修复后五文件 34 项通过。六个拒绝 CLI 场景拆成独立用例，每个仍运行原断言并核对实际 step ID，避免空选择通过；12 项实际通过。
 
 后续本地验证：固定 `deviceCode → webRequests` 两文件顺序 58 项通过；真实 sandbox/process、native view 与 skillLoader 三文件 96 项通过；bwrap smoke、五项静态门禁和 diff whitespace 检查通过。限定变更文件的清理检查无额外改动，两路独立复核分别 APPROVE/CLEAR；未重跑本地完整套件，不能据此写全量已绿。此条写入时 follow-up 尚未提交/推送，其精确 SHA CI 结果仍待后续读回。
+
+### 2026-10-17 — CFG-01 剩余 Git 测试环境隔离
+
+前条 CI/夹具修复已提交并推送为 `b73ea01e45d67c41ab9a44779e5308b66f138b85`，远端 ref 已读回。其 [Architecture Watch](https://github.com/h-hei133/cheers/actions/runs/39005954090) 通过，[主 CI](https://github.com/h-hei133/cheers/actions/runs/39005954094) 完成后仍失败：808 文件通过、5 文件失败；8219 项通过、15 项失败、2 skipped。依赖安装、真实 bwrap smoke、五项门禁、script tests 和构建均通过；主 CI 最后 NormProof 被测试失败跳过。剩余错误都涉及夹具继承系统 Git filters 后的正常安全拒绝，不能据此放开生产检查。
+
+定向核查目标 Git reader 和测试 owner，并对照参考实现显式覆盖 global/system 配置及清除 inherited repository 变量的决策后，复用 `test-utils/git.ts` 统一环境投影；四处进程内诊断/review/commit 夹具使用可恢复的 stub，实际 print CLI 子进程也显式隔离 system/global/XDG。Git 配置隔离仅属测试，生产 passive helper 拒绝与原断言均保留。新增真实 Git 回归先证明外部 system/global/XDG 配置确实可见，再证明隔离后不可见、仓库位置覆盖无效、repo-local filter 配置仍保留。已安装 Vitest 不支持通过 `stubEnv(undefined)` 删除环境值，测试工具记录原值后显式删除，并由原 registry 恢复。
+
+合成系统过滤器与临时 PATH Git wrapper 覆盖 CLI 白名单子进程后，旧五文件完整重现 15 项失败；结束后逐字恢复。修复版受影响组合为 11 文件、76 项通过，含真实 CLI review、native passive 拒绝、worktree、remote、operation 和 commit 回归。五项静态门禁及 whitespace 检查通过；现有 listener-count warning 未被隐藏。限定范围清理无需额外代码改动。清理后同一合成环境的六文件、42 项再次通过，构建退出 0；最终路径分隔符归一化后，新增两项回归再次通过。独立源码复核两路分别为 APPROVE / CLEAR，并对最终小改动再次确认；两路均未冒充测试执行。此条写入时，本轮新提交/推送和精确 SHA CI 尚待完成。
