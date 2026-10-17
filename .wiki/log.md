@@ -7635,3 +7635,8 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 
 - `.reentry-index.json` 在写入时删除已不存在会话的条目；即使本次没有新摘要也因 stale 而 flush，避免索引随删除无限增长。
 - 验证：`src/session` 857 通过；新增删除会话后条目消失测试。
+
+### QA-02 双构建 PTY
+
+- `qa:pty` 依次跑 Node 与 `dist/bin/cheers`，各自临时 HOME/项目与合成 provider；两者均 PASS（6863 bytes）。
+- Windows/macOS、IME、系统复制与真实质量仍未验证。
