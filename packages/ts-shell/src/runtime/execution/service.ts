@@ -60,6 +60,16 @@ export function createDefaultExecutionService(onCommandSettled?: (result: Pick<C
       return result
     },
     startCommand(request) {
+      // A signal already aborted before dispatch must not spawn at all; the
+      // ordinary path would spawn and kill, which is a process the user never
+      // asked to start.
+      if (request.abortSignal?.aborted) {
+        const cancelled = withCommandExecutionProjection(request, 'ts-local',
+          { status: 'cancelled', exitCode: null, stdout: '', stderr: 'Command cancelled before dispatch.' });
+        onCommandSettled?.({ terminationFailed: cancelled.terminationFailed, outputFailed: cancelled.outputFailed });
+        return { handle: { pid: undefined, onOutput: () => () => {}, detach: () => {}, kill: async () => {},
+          result: Promise.resolve({ stdout: '', stderr: '' }) }, result: Promise.resolve(cancelled) };
+      }
       const started = startStreamed({
         command: request.command,
         args: [...request.args],

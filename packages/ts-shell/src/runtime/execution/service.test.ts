@@ -2,7 +2,8 @@ import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import * as native from './local.js'
 
 const executionCommandContractFixture = JSON.parse(
   fsSync.readFileSync(
@@ -295,3 +296,17 @@ function hasVagueAuthorityBoolean(value: unknown): boolean {
   }
   return false
 }
+
+describe('pre-dispatch cancellation', () => {
+  it('does not spawn a command whose signal was already aborted', async () => {
+    const service = createDefaultExecutionService()
+    const spawn = vi.spyOn(native, 'startStreamed')
+    const controller = new AbortController(); controller.abort()
+    const started = service.startCommand!({ operationKind: 'command.run', command: 'sh', args: ['-c', 'true'],
+      cwd: process.cwd(), workspaceRoot: process.cwd(), authority: COMMAND_AUTHORITY, caller: 'cancellation-test',
+      reason: 'verify no spawn after abort', reportSafeCommand: 'true', abortSignal: controller.signal })
+    const result = await started.result
+    expect(spawn).not.toHaveBeenCalled()
+    expect(result.status).toBe('cancelled')
+  })
+})

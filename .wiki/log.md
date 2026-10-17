@@ -7666,3 +7666,8 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 
 - `qa:pty` 扩展为 Node/exe × regular/fullscreen 四格：执行 `/tools`（Esc 关闭 report reader）→ `/sessions current` → `/exit`，断言工具列表与当前会话输出。
 - 四格全部 PASS（6500/8292 bytes）。Windows/macOS、IME、系统复制与真实质量仍未验证。
+
+## 2026-10-18 — startCommand 预派发取消
+
+- `startCommand` 在 `abortSignal` 已中止时不再 spawn：返回 cancelled 投影与惰性 handle，避免“先启动再杀”的无谓进程；`onCommandSettled` 仍报告。
+- 验证：execution 355 通过；新增“已中止不 spawn”测试。
