@@ -7676,3 +7676,9 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 
 - `browser.test.ts` 的 5 个真实 CLI 步骤使用 10s 默认超时；CI 负载下 CLI 启动加配置读取会超过该值，`execute:exit-code` 因 `timedOut` 失败。
 - 步骤超时提高到 60s，断言本身不变；本地 5/5。
+
+## 2026-10-18 — PAN-05 收口
+
+- 面板均为结构化只读：advisor 显示 checkpoint/note 与 epoch/coverage，plan-review 显示版本/阶段/验收项，btw 显示问题/送达/答案；打开面板不发模型请求。
+- 模型工作分别授权：`/advisor review|apply|on|off`、`/plan-review approve|reject|execute`、`/btw` 各自显式触发；plan 执行与 btw 都不写入主会话，旧流不串新面板。
+- 结论：PAN-05 按裁决验收完成；未新增“面板内流式”能力，因为裁决只要求结构化/流式其一且面板查看不得启模型。

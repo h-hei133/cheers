@@ -29,7 +29,7 @@
 | JOB-02 | `7da6e6d4`、`8c7f949f` | 本地 notice、opt-in follow-up（去重/预算/截断）、取消不转后台 |
 | EDIT-01 | `57e1ffb3`、`8c7f949f` | 稳定 group id、依赖分组、选集绑定、无选集拒绝、重规划基线校验、CLI 多选 |
 | START-02 | `3de906fe` | 10k 首帧不扫描；持久摘要索引（mtime/size、损坏即 miss） |
-| PAN-05（部分） | `2a4bafe5` | plan-review/btw 结构化报告；advisor 面板 |
+| PAN-05 | `2a4bafe5`、本次 | advisor 只读面板 + enable/review/apply 分别授权；plan-review 结构化报告与版本化 approve/reject/execute；btw 结构化报告、带外；面板查看不启模型，模型工作只走显式命令/普通 turn |
 | PAN-03（部分） | `070f1405` | hub 本地作业输出页（脱敏/截断）、后续页指引 |
 | PAN-08（部分） | `93302750` | MCP 逐项向导；临时定义 0600 且必删 |
 | START-03（部分） | `a6ba2665` | Node/exe 与 regular/fullscreen/pipe 各 30 次首帧、命令→退出基准 |
