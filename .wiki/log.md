@@ -7560,3 +7560,9 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 
 - `BackgroundRunner.promote` 改为三态 `promoted|settled|refused`：子进程在 deadline 与晋升之间退出时不再被误报为“无法转后台并已停止”，调用方直接取得已结算结果。
 - 验证：promotion 测试新增 settled 分支；promotion + journal 13 通过。
+
+### JOB-01 结算与取消接缝
+
+- `startCommand` 的投影结果现在同样调用 `onCommandSettled`；此前只有 `runCommand` 报告 `terminationFailed/outputFailed`，晋升路径会让 agent job 把未验证的清理误报为“cancelled; live cleanup settled”。
+- 两个取消测试改为 mock `startStreamed`（新的唯一 spawn 接缝），保持“终止未验证 → unknown”的原断言。
+- 全量 `npm run test:ts`：850 文件、8473 通过、1 跳过。
