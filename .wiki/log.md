@@ -7671,3 +7671,8 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 
 - `startCommand` 在 `abortSignal` 已中止时不再 spawn：返回 cancelled 投影与惰性 handle，避免“先启动再杀”的无谓进程；`onCommandSettled` 仍报告。
 - 验证：execution 355 通过；新增“已中止不 spawn”测试。
+
+## 2026-10-18 — 浏览器真实 CLI 场景超时
+
+- `browser.test.ts` 的 5 个真实 CLI 步骤使用 10s 默认超时；CI 负载下 CLI 启动加配置读取会超过该值，`execute:exit-code` 因 `timedOut` 失败。
+- 步骤超时提高到 60s，断言本身不变；本地 5/5。

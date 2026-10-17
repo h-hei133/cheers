@@ -42,6 +42,9 @@ describe("browser Playwright local real CLI scenario examples", () => {
         {
           id: "execute",
           kind: "cli-command",
+          // Real CLI startup under a loaded CI runner can exceed the 10s default;
+          // the assertion is about behavior, not about startup speed.
+          timeoutMs: 60_000,
           prompt: "/browser execute observe local-fixture://route101-demo",
           assertions: [
             { id: "blocked", kind: "browser-execution-blocked" },
@@ -73,6 +76,9 @@ describe("browser Playwright local real CLI scenario examples", () => {
         {
           id: "status",
           kind: "cli-command",
+          // Real CLI startup under a loaded CI runner can exceed the 10s default;
+          // the assertion is about behavior, not about startup speed.
+          timeoutMs: 60_000,
           prompt: "/browser status",
           assertions: [
             { id: "status-section", kind: "stdout-contains", text: "Browser runtime dependency" },
@@ -108,6 +114,9 @@ describe("browser Playwright local real CLI scenario examples", () => {
         {
           id: "observe",
           kind: "cli-command",
+          // Real CLI startup under a loaded CI runner can exceed the 10s default;
+          // the assertion is about behavior, not about startup speed.
+          timeoutMs: 60_000,
           prompt: "/browser execute observe local-fixture://route101-demo",
           env: fixture.env,
           assertions: [
@@ -147,6 +156,9 @@ describe("browser Playwright local real CLI scenario examples", () => {
         {
           id: "navigate",
           kind: "cli-command",
+          // Real CLI startup under a loaded CI runner can exceed the 10s default;
+          // the assertion is about behavior, not about startup speed.
+          timeoutMs: 60_000,
           prompt: "/browser execute navigate https://example.com",
           env: fixture.env,
           assertions: [
@@ -183,6 +195,9 @@ describe("browser Playwright local real CLI scenario examples", () => {
         {
           id: "observe",
           kind: "cli-command",
+          // Real CLI startup under a loaded CI runner can exceed the 10s default;
+          // the assertion is about behavior, not about startup speed.
+          timeoutMs: 60_000,
           prompt: "/browser execute observe local-fixture://route101-demo",
           env: fixture.env,
           assertions: [
