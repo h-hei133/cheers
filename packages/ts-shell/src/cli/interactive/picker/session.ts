@@ -25,6 +25,8 @@ export interface SessionPickerOptions {
   readonly rename?: (sessionId: string, title: string, version?: string) => Promise<string | undefined>;
   /** Toggle a session's pinned state. */
   readonly pin?: (sessionId: string, version?: string) => Promise<string | undefined>;
+  /** How many recent sessions the first page holds; the list can ask for more. */
+  readonly initialLimit?: number;
 }
 
 export function sessionPicker(options: SessionPickerOptions): Picker {
@@ -35,13 +37,17 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
   let offered = new Set<string>();
   let versions = new Map<string, string>();
   const listing = new SessionListing(options.sessionManager);
+  let limit = options.initialLimit ?? 40;
   const accept = (page: SessionListingPage): readonly Option[] => {
     currentUnavailable = page.snapshot.currentUnavailable;
     listingIncomplete = page.stopped === true || page.snapshot.status !== 'complete';
     listingStatus = sessionListingStatus(page);
     offered = new Set(page.snapshot.sessions.map(session => session.id));
     for (const session of page.snapshot.sessions) if (!versions.has(session.id)) versions.set(session.id, session.version);
-    return groupedOptions(page.snapshot.sessions, expected.sessionId, page.sizes);
+    const rows = groupedOptions(page.snapshot.sessions, expected.sessionId, page.sizes);
+    return page.snapshot.sessions.length >= limit && limit < 10_000
+      ? [...rows, { id: 'more', label: 'Load older sessions', detail: `Showing the newest ${limit}; older sessions are still on disk`, note: 'more' }]
+      : rows;
   };
   const blocked = (id: string, action: 'resume' | 'rename' | 'delete' | 'pin'): string | undefined => {
     if (!offered.has(id)) return 'This session was not offered. Reopen the session picker.';
@@ -60,7 +66,7 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
     async load(signal): Promise<readonly Option[]> {
       signal?.throwIfAborted();
       const context = { ...options.context() };
-      const page = await listing.load(context, signal);
+      const page = await listing.load(context, signal, limit);
       signal?.throwIfAborted();
       expected = context;
       versions = new Map();
@@ -70,6 +76,7 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
       const sessionId = ids[0];
       if (!sessionId) return undefined;
+      if (sessionId === 'more') return { next: sessionPicker({ ...options, initialLimit: Math.min(10_000, limit + 40) }) };
       const block = blocked(sessionId, 'resume');
       if (block) return { note: block };
       const note = await options.resume(sessionId);

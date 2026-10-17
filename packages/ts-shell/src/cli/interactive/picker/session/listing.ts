@@ -23,7 +23,7 @@ export class SessionListing {
 
   constructor(private readonly manager: Pick<SessionManager, 'catalog' | 'files'>) {}
 
-  async load(context: SessionSelectionContext, signal?: AbortSignal): Promise<SessionListingPage> {
+  async load(context: SessionSelectionContext, signal?: AbortSignal, limit = 40): Promise<SessionListingPage> {
     signal?.throwIfAborted();
     if (this.request) this.stop(this.request);
     const controller = new AbortController();
@@ -32,7 +32,7 @@ export class SessionListing {
     const release = (): void => signal?.removeEventListener('abort', abort);
     controller.signal.addEventListener('abort', release, { once: true });
     let iterator: AsyncGenerator<SessionCatalogSnapshot>;
-    try { iterator = this.manager.catalog.list(context, controller.signal); }
+    try { iterator = this.manager.catalog.list(context, controller.signal, limit); }
     catch (error) { controller.abort(); release(); throw error; }
     const request: ListingRequest = { controller, iterator, release, versions: new Map() };
     this.request = request;

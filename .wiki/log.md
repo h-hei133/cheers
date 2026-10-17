@@ -7478,3 +7478,9 @@ PAN-06：copy picker 移除 recent-30 窗口，按新到旧列出全部 block，
 新增 `picker/advisor.ts`：裸 `/advisor` 打开只读主从面板，列出 retained checkpoints 与 notes，详情列显示 source prompt、step、digest、epoch、coverage、submitted 状态与经脱敏的文本。打开不启动模型、不提交、不应用；enable/retry/apply 仍走 `/advisor` 的显式路径。`advisorState` 从 bound session 解码，缺少状态时回退到命令。
 
 **本地验证**：pickers 40 项通过；`build:ts` 通过。本条写入时尚未提交/推送；plan-review 与 btw 的结构化面板仍待实施。
+
+### Phase 20 PAN-02（补充）：resume 分页
+
+catalog 列表上限由 100 提升到 10000；`SessionListing.load` 接受显式 limit；resume 列表在结果达到当前页大小时追加可选 `Load older sessions` 行，选择后以 +40 的页大小打开新 picker。分组行仍不可选，pin/rename/delete 的版本校验不变。
+
+**本地验证**：session picker 19 项（45 会话首屏 40 + more，下一页 45 且无 more）通过；`build:ts` 通过。跨目录授权搜索仍未实施。

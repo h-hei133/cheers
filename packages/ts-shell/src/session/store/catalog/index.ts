@@ -20,7 +20,7 @@ export class SessionCatalog {
   async *list(context: SessionSelectionContext, signal?: AbortSignal, limit = 40,
     onSource?: (target: string) => void): AsyncGenerator<SessionCatalogSnapshot> {
     signal?.throwIfAborted();
-    if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new RangeError('Invalid session listing limit.');
+    if (!Number.isInteger(limit) || limit < 1 || limit > 10_000) throw new RangeError('Invalid session listing limit.');
     let scanned = 0;
     let unreadable = 0;
     let limited = 0;

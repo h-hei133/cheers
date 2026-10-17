@@ -16,7 +16,7 @@ function fixture(sessions = [session('current'), session('other')], pin = vi.fn(
   const records = new Map(sessions.map(item => [item.id, item]));
   const context = { sessionId: 'current', projectRoot: '/workspace', busy: false };
   const resume = vi.fn(async () => undefined); const remove = vi.fn(async () => undefined); const rename = vi.fn(async () => undefined);
-  const manager = { catalog: { async *list() { yield { ...sessionChoices([...records.values()].map(record => summarizeSession(record, 'version')), context),
+  const manager = { catalog: { async *list(_context: unknown, _signal?: AbortSignal, limit = 40) { yield { ...sessionChoices([...records.values()].map(record => summarizeSession(record, 'version')), context, limit),
     scanned: records.size, unreadable: 0, limited: 0, status: 'complete' }; } }, getSession: (id: string) => records.get(id),
     files: { sizes: async (ids: readonly string[]) => new Map(ids.map(id => [id, { status: 'complete', bytes: 2048, sampledAt: '2026-10-07T00:00:00Z' }])) } } as unknown as SessionManager;
   return { records, context, resume, remove, rename,
@@ -28,7 +28,7 @@ it('focuses the current identity beyond the recent forty without importing anoth
   entries.push(session('current', '2025-01-01T00:00:00.000Z'), session('foreign', '2027-01-01T00:00:00.000Z', '/elsewhere'));
   const { picker } = fixture(entries);
   const choices = await picker.load();
-  const selectable = choices.filter(item => !item.disabled);
+  const selectable = choices.filter(item => !item.disabled && item.id !== 'more');
   expect(selectable).toHaveLength(41);
   expect(selectable[0]?.id).toBe('recent-00'); expect(selectable.at(-1)?.id).toBe('current');
   expect(selectable.filter(item => item.note?.startsWith('current')).map(item => item.id)).toEqual(['current']);
@@ -114,6 +114,18 @@ it('keeps load failure separate from a filtered-current explanation', async () =
   const output = overlay.render(100, 20).join('\n');
   expect(output).toContain('Saved sessions could not be loaded');
   expect(output).not.toMatch(/hidden by the filter|PRIVATE_PATH/);
+});
+
+it('loads older sessions through an explicit page row', async () => {
+  const entries = Array.from({ length: 45 }, (_, index) => session(`recent-${index.toString().padStart(2, '0')}`, new Date(Date.now() - index * 1000).toISOString()));
+  const { picker } = fixture(entries);
+  const first = await picker.load();
+  expect(first.some(row => row.id === 'more')).toBe(true);
+  expect(first.filter(row => !row.disabled && row.id !== 'more')).toHaveLength(40);
+  const next = (await picker.apply(['more']))!.next!;
+  const second = await next.load();
+  expect(second.some(row => row.id === 'more')).toBe(false);
+  expect(second.filter(row => !row.disabled)).toHaveLength(45);
 });
 
 it('pins the focused session through the existing management path', async () => {

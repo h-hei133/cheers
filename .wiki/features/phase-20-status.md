@@ -14,7 +14,7 @@
 | CMD-01/02 | `0345b44f`、`a4deb45e` | 前缀排序、完整命令提交；102 入口审计沿用既有契约 |
 | SET-01/02 | `734f51a4`、`9ce49b16` | 34 项编辑器、7 组 tab、changed 标记 |
 | SET-03（预览） | `6736f402` | status/theme 预览撤销；Apply 前不写、CAS 保持 |
-| PAN-02（部分） | `6736f402` | 时间分组、`Ctrl+P` pin、tree 连接线 |
+| PAN-02（部分） | `6736f402`、本次 | 时间分组、`Ctrl+P` pin、tree 连接线、resume 分页到 10000 |
 | PAN-03（部分） | 本次 | `/hub` 只读主从面板、1s journal 轮询、详情列 |
 | PAN-05（部分） | 本次 | `/advisor` 只读 checkpoint/note 主从面板 |
 | RENDER-03（部分） | 本次 | 并排 diff、配对行号、双预算、窄屏 unified 回退 |
@@ -30,7 +30,7 @@
 | 任务 | 已做 | 缺 |
 |---|---|---|
 | PAN-01 | model 两栏与详情、同名 relay 区分 | 连接/role/预设的绑定 revision 与搜索验收 |
-| PAN-02 | 分组、pin、树形 | 跨目录授权搜索、10000 会话分页目标、预览/置顶持久验收 |
+| PAN-02 | 分组、pin、树形、分页 | 跨目录授权搜索、预览/置顶持久验收 |
 | PAN-04 | quota 进度 | thinking picker、effort/model 联合约束、unknown 非 0 |
 | PAN-06 | copy 全量、pin | history 完整树、copy 分页/源 revision 到头、back/undo/restore 审计 |
 | PAN-03 | hub 主从视图 | 输出分页/脱敏面板、agents 专用操作与未知状态验收 |
