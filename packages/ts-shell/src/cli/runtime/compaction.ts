@@ -6,7 +6,7 @@ import type { CatalogProvider } from '../../core/models/catalog.js';
 import { resolveContextWindow, resolveTokenBudget } from '../../core/models/window.js';
 import { messageToText } from '../../model-adapters/multimodal.js';
 import { createComponentLogger } from '../../observability/structuredLogger.js';
-import { getSessionUsage } from '../../observability/usageTelemetry.js';
+import { measuredPromptContext } from '../../observability/usageTelemetry.js';
 import { providerFetchForEndpoint } from '../../provider/request/fetch.js';
 import { providerModelTransport } from '../../provider/request/transport.js';
 import { endpointShape, type EndpointKind } from '../../provider/endpoints/index.js';
@@ -121,9 +121,10 @@ export function buildCompactionWiring(input: {
       // since that request. Falls back to the estimate inside planCompaction
       // when no request has reported usage yet.
       measureContextTokens: (messages) => {
-        const usage = getSessionUsage(input.sessionId);
-        if (usage.lastPromptTokens === undefined) return undefined;
-        return usage.lastPromptTokens + estimateTokens(messages.slice(usage.lastPromptMessageCount));
+        const measured = measuredPromptContext(input.sessionId, { provider: provider.providerId, model: provider.model,
+          endpoint: provider.endpoint ?? 'openai-compatible' });
+        if (!measured) return undefined;
+        return measured.tokens + estimateTokens(messages.slice(measured.messageCount));
       },
     },
     summarize: (request) =>

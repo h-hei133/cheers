@@ -3,7 +3,9 @@ import {
   estimateSessionCost,
   estimateUsageCost,
   getSessionUsage,
+  invalidatePromptMeasurement,
   markContextUnknown,
+  measuredPromptContext,
   recordSessionUsage,
   resetSessionUsage,
   totalTokens,
@@ -84,6 +86,24 @@ describe("bucketing", () => {
     const telemetry = getSessionUsage(SESSION);
     expect(telemetry.lastPromptTokens).toBe(500);
     expect(telemetry.lastPromptMessageCount).toBe(7);
+  });
+
+  it("measures only the request that produced the identity", () => {
+    const identity = { provider: 'openai', model: 'm', endpoint: 'openai-compatible', schemaDigest: 'a'.repeat(64), systemDigest: 'b'.repeat(64) };
+    recordSessionUsage(SESSION, { promptTokens: 500, promptMessageCount: 3, model: 'm', provider: 'openai', promptIdentity: identity });
+    expect(measuredPromptContext(SESSION, identity)).toEqual({ tokens: 500, messageCount: 3 });
+    expect(measuredPromptContext(SESSION, { ...identity, model: 'other' })).toBeUndefined();
+    expect(measuredPromptContext(SESSION, { ...identity, endpoint: 'anthropic' })).toBeUndefined();
+    expect(measuredPromptContext(SESSION, { ...identity, schemaDigest: 'c'.repeat(64) })).toBeUndefined();
+    expect(measuredPromptContext(SESSION, { ...identity, systemDigest: 'd'.repeat(64) })).toBeUndefined();
+    invalidatePromptMeasurement(SESSION);
+    expect(measuredPromptContext(SESSION, identity)).toBeUndefined();
+    expect(getSessionUsage(SESSION).lastPromptMessageCount).toBe(0);
+  });
+
+  it("does not invent an identity for an unmeasured prompt", () => {
+    recordSessionUsage(SESSION, { promptTokens: 500, promptMessageCount: 7, model: 'm', provider: 'openai' });
+    expect(measuredPromptContext(SESSION, { provider: 'openai', model: 'm' })).toBeUndefined();
   });
 
   it("keeps cache tokens with the model that reported them", () => {

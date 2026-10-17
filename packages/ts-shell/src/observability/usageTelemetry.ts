@@ -1,6 +1,7 @@
 import { sessionTelemetries } from './usage/state.js';
 import type { ModelCostRates } from "../core/models/catalog.js";
 import type { RequestContext } from '../context/request/model.js';
+import type { PromptMeasurementIdentity } from './usage/model.js';
 
 export type { ModelCostRates };
 
@@ -130,6 +131,8 @@ export function recordSessionUsage(
     provider?: string;
     /** How many messages the request carried, so trailing ones can be counted. */
     promptMessageCount?: number;
+    /** Which model/schema the measurement belongs to; absent means provider/model only. */
+    promptIdentity?: PromptMeasurementIdentity;
     cacheReadTokens?: number;
     cacheWriteTokens?: number;
   },
@@ -177,6 +180,7 @@ export function recordSessionUsage(
   if (options.affectsContext !== false) {
     existing.lastPromptTokens = promptMeasured ? promptTotal : undefined;
     existing.lastPromptMessageCount = promptMeasured ? usage.promptMessageCount ?? 0 : 0;
+    existing.lastPromptIdentity = promptMeasured && usage.promptIdentity ? usage.promptIdentity : undefined;
   }
   existing.turnsCount += 1;
   existing.toolCallsCount += usage.toolCallsCount ?? 0;
@@ -220,12 +224,42 @@ function emptyTelemetry(): SessionUsageTelemetry {
     byModel: Object.create(null) as Record<string, ModelUsageBucket>,
     lastPromptTokens: undefined,
     lastPromptMessageCount: 0,
+    lastPromptIdentity: undefined,
     turnsCount: 0,
     toolCallsCount: 0,
     lastBucketKey: "",
     lastUpdated: Date.now(),
     recentRequests: [],
   };
+}
+
+/**
+ * The measured prompt, only while the identity that produced it still applies.
+ *
+ * A measurement from another model, endpoint, schema or system prompt is not a
+ * slightly wrong number — it is a number about a different request.
+ */
+export function measuredPromptContext(sessionId: string, expected: {
+  readonly provider: string; readonly model: string; readonly endpoint?: string;
+  readonly schemaDigest?: string; readonly systemDigest?: string;
+}): { readonly tokens: number; readonly messageCount: number } | undefined {
+  const telemetry = getSessionUsage(sessionId);
+  const identity = telemetry.lastPromptIdentity;
+  if (telemetry.lastPromptTokens === undefined || !identity) return undefined;
+  if (identity.provider !== expected.provider || identity.model !== expected.model) return undefined;
+  if (expected.endpoint !== undefined && identity.endpoint !== undefined && identity.endpoint !== expected.endpoint) return undefined;
+  if (expected.schemaDigest !== undefined && identity.schemaDigest !== undefined && identity.schemaDigest !== expected.schemaDigest) return undefined;
+  if (expected.systemDigest !== undefined && identity.systemDigest !== undefined && identity.systemDigest !== expected.systemDigest) return undefined;
+  return { tokens: telemetry.lastPromptTokens, messageCount: telemetry.lastPromptMessageCount };
+}
+
+/** A model or schema change makes the live count stale without erasing request evidence. */
+export function invalidatePromptMeasurement(sessionId: string): void {
+  const existing = sessionTelemetries().get(sessionId);
+  if (!existing) return;
+  existing.lastPromptTokens = undefined;
+  existing.lastPromptMessageCount = 0;
+  existing.lastPromptIdentity = undefined;
 }
 
 export function getSessionUsage(sessionId: string): SessionUsageTelemetry {
@@ -244,6 +278,7 @@ export function clearContextUsage(sessionId: string): void {
   if (!existing) return;
   existing.lastPromptTokens = undefined;
   existing.lastPromptMessageCount = 0;
+  existing.lastPromptIdentity = undefined;
 }
 
 /**

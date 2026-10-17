@@ -19,6 +19,7 @@ import { catalogModel, providerEndpoint } from '../../models/catalog.js';
 import type { ThinkingPreference } from '../../models/effort.js';
 import type { CommandContext } from '../types.js';
 import { connectionIdentity, credentialIdentity } from './identity.js';
+import { invalidatePromptMeasurement } from '../../../observability/usageTelemetry.js';
 
 export async function setModel(args: string[], context: CommandContext, global: boolean, requestedEffort?: ThinkingPreference): Promise<string> {
   try { return await selectModel(args, context, global, requestedEffort); }
@@ -183,6 +184,9 @@ async function selectModel(args: string[], context: CommandContext, global: bool
     } catch (error) {
       return sessionFailure(error);
     }
+    // A different model is a different tokenizer: the previous prompt count no
+    // longer describes what the next request will carry.
+    invalidatePromptMeasurement(context.sessionId);
   }
   let configPath: string | undefined;
   if (global) {

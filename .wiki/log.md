@@ -7318,3 +7318,13 @@ CFG-03 把 `/connect use|logout` 的输出改为区分“已存储”与“当�
 PRV-01 的选择器改为以投影的 active provider 判断可选性，但投影只读配置，未采用 `resolveConfigTarget` 的 CLI provider 覆盖；`configuration.test.ts` 因此在 `--provider google` 下把 `google/chosen` 标成 `switch connection first`。该失败在精确 SHA CI 中复现，其余 830 文件通过。
 
 修复让 `/model`、`/model list` 与模型选择器用现有 `resolveConfigTarget` 结果覆盖投影的 active provider/model；投影本身仍只读配置。两文件 42 项通过。此前 PRV-01/02/03/04/05 的 CI 失败记录保留为历史。
+
+### Phase 20 CTX-01/02：计量身份与请求预算
+
+修正 usage 范围缺陷：`promptMessageCount` 由 `messages.length + 1` 改为实际发送的 `messages.length`，下一次测量不再跳过新 assistant 消息及其 tool-call 参数。telemetry 记录 `provider/model/endpoint/schemaDigest/systemDigest` 身份；`measuredPromptContext` 在身份不匹配时返回 unknown，`invalidatePromptMeasurement` 在模型切换时清除旧量但保留请求证据。
+
+新增 `context/request/budget.ts`：完整请求按 `P + O + H <= W` 准入，独立 `inputLimit` 再要求 `P + H <= inputLimit`；等号通过，缺失/非整数返回 unknown，不把估算当上界。软阈值 `min(0.9W, W-O-H)` 只用于提醒。step 在发送前检查，失败返回 `Context overflow:` 失败 step，由现有一次有界 overflow 救援压缩重试。
+
+**本地验证**：新增 6 项预算测试与 3 项 telemetry 身份测试；`context/request`、`usageTelemetry`、`compaction` 与 `turn/step.test.ts` 共 95 项通过；`build:ts` 通过。合同见[请求计量与预算](features/request-budget.md)。
+
+本条写入时尚未提交/推送；未运行真实 provider，也未实现 TOOL-01 的动态 schema 预算。

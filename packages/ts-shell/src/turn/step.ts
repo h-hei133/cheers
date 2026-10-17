@@ -1,5 +1,5 @@
 import { catalogModel } from "../core/models/catalog.js";
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { createComponentLogger } from "../observability/structuredLogger.js";
 import { ModelAdmissionError, type ModelTransport, type RequestPolicy } from '../core/agent/request/model.js';
 import { prepareRequestAttempt, type RequestAttempt } from '../provider/request/attempt.js';
@@ -8,7 +8,8 @@ import type { AgentToolCall } from "../core/agent/tools.js";
 import type { AgentMessage, AgentStopReason } from "../core/agent/state.js";
 import type { AssistantStep } from "../core/agent/loop.js";
 import { parseJsonWithRepair } from "../model-adapters/jsonRepair.js";
-import { clearContextUsage, markContextUnknown, recordSessionUsage } from "../observability/usageTelemetry.js";
+import { clearContextUsage, markContextUnknown, measuredPromptContext, recordSessionUsage } from "../observability/usageTelemetry.js";
+import { promptTokensFor, requestBudget } from '../context/request/budget.js';
 import { captureThinkingPreference } from '../core/models/preference.js';
 import { effortOutputFailure } from '../provider/endpoints/effort.js';
 import { effortCapability } from '../core/models/capability.js';
@@ -137,6 +138,10 @@ export interface StepRequest {
   readonly temperature?: number;
   readonly topP?: number;
   readonly maxOutputTokens?: number;
+  /** Resolved window override; absent uses the catalogue entry. */
+  readonly contextWindow?: number;
+  /** Headroom held back from the shared window. */
+  readonly reserveTokens?: number;
   readonly fetchImpl?: typeof fetch;
   /**
    * The catalog to ask how this model wants requests shaped.
@@ -266,6 +271,9 @@ export function createStepFunction(request: StepRequest): StepFunction {
     const systemPrompt = options.agentMode && request.systemPromptFor
       ? request.systemPromptFor(options.agentMode, tools.map((tool) => tool.function.name))
       : request.systemPrompt;
+    const overhead = { systemPrompt, tools };
+    const schemaDigest = createHash('sha256').update(JSON.stringify(tools)).digest('hex');
+    const systemDigest = createHash('sha256').update(systemPrompt).digest('hex');
     // Steps this call returns all come from the same target, so the origin is
     // stamped once on whatever leaves — an answer, a refusal, or an abort —
     // rather than threaded through each builder's signature. A `return` in
@@ -288,6 +296,16 @@ export function createStepFunction(request: StepRequest): StepFunction {
         effortAccepted ? effort : undefined,
       );
       const endpoint = endpointFor(request);
+      const modelEntry = catalogModel(request.catalog ?? [], request.provider.provider ?? '', request.provider.model);
+      const measured = measuredPromptContext(request.sessionId, { provider: request.provider.provider ?? '',
+        model: request.provider.model, endpoint, schemaDigest, systemDigest });
+      const prompt = promptTokensFor({ messages, overhead, ...(measured ? { measured } : {}) });
+      const budget = requestBudget({ window: request.contextWindow ?? modelEntry?.contextWindow,
+        promptTokens: prompt.tokens, outputTokens: request.maxOutputTokens ?? shape.maxOutputCeiling,
+        reserveTokens: request.reserveTokens, measured: prompt.measured });
+      // A request that cannot fit is not sent: the same bounded overflow rescue
+      // that answers a provider refusal handles this before any bytes leave.
+      if (!budget.ok && budget.reason !== 'unknown') return stamp(errorStep(`${CONTEXT_OVERFLOW_PREFIX}${budget.detail}`));
       // The wire body comes from the protocol's own declaration, so a third
       // protocol is a module rather than a branch here. Everything the two
       // protocols disagree about is either in the table or resolved from the
@@ -540,8 +558,13 @@ export function createStepFunction(request: StepRequest): StepFunction {
             // not reprice tokens that were already spent at the old provider's rate.
             provider: request.provider.provider,
             // The provider counted the prompt it was sent; the message count lets
-            // a later reader add whatever the conversation gained since.
-            promptMessageCount: messages.length + 1,
+            // a later reader add whatever the conversation gained since. It is
+            // the array actually sent: an extra one would skip the assistant
+            // message and its tool arguments on the next measurement.
+            promptMessageCount: messages.length,
+            promptIdentity: { provider: request.provider.provider ?? '', model: request.provider.model, endpoint,
+              schemaDigest: createHash('sha256').update(JSON.stringify(request.tools)).digest('hex'),
+              systemDigest: createHash('sha256').update(request.systemPrompt).digest('hex') },
           }, { promptMeasured: typeof usage.prompt_tokens === 'number' && Number.isFinite(usage.prompt_tokens) && usage.prompt_tokens >= 0 });
           options.onRequestUsage?.(usage);
         } else markContextUnknown(request.sessionId, 'usage-gap');

@@ -104,6 +104,8 @@ export function createProviderStep(
     temperature: request.runtimeConfig?.temperature,
     topP: request.runtimeConfig?.topP,
     maxOutputTokens: request.runtimeConfig?.maxOutputTokens,
+    ...(request.runtimeConfig?.contextWindow !== undefined ? { contextWindow: request.runtimeConfig.contextWindow } : {}),
+    ...(request.runtimeConfig?.reserveTokens !== undefined ? { reserveTokens: request.runtimeConfig.reserveTokens } : {}),
     retry: {
       enabled: request.runtimeConfig?.retryEnabled,
       maxRetries: request.runtimeConfig?.providerRetryMaxRetries,

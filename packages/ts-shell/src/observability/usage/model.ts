@@ -19,6 +19,15 @@ export interface ModelUsageBucket {
   turnsCount: number;
 }
 
+export interface PromptMeasurementIdentity {
+  readonly provider: string;
+  readonly model: string;
+  readonly endpoint?: string;
+  /** Serialized tool schema and assembled system text, hashed. */
+  readonly schemaDigest?: string;
+  readonly systemDigest?: string;
+}
+
 export interface SessionUsageTelemetry {
   /** Last accepted foreground request in this runtime, never persisted as cumulative usage. */
   requestContext?: RequestContext;
@@ -71,6 +80,8 @@ export interface SessionUsageTelemetry {
    * added together before either can answer whether the next request fits.
    */
   lastPromptMessageCount: number;
+  /** What the measurement describes; a different model or schema makes it stale. */
+  lastPromptIdentity?: PromptMeasurementIdentity;
   turnsCount: number;
   toolCallsCount: number;
   /**
