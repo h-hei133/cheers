@@ -17,6 +17,7 @@
 | PAN-02（部分） | `6736f402` | 时间分组、`Ctrl+P` pin、tree 连接线 |
 | PAN-03（部分） | 本次 | `/hub` 只读主从面板、1s journal 轮询、详情列 |
 | RENDER-03（部分） | 本次 | 并排 diff、配对行号、双预算、窄屏 unified 回退 |
+| RENDER-02（部分） | 本次 | 多行 cell、escaped/code pipe、`<br>`、窄屏源码回退与预算 |
 | PAN-04（部分） | `6736f402` | `/usage account` quota 进度投影 |
 | PAN-06（部分） | `6736f402` | copy 移除 recent-30 窗口 |
 | PAN-07（部分） | 本次 | `/extensions` 为 `/plugin` 别名 |
@@ -36,7 +37,7 @@
 
 ## 未开始
 
-PAN-05、PAN-08、INPUT-01、RENDER-01/02、EDIT-01、JOB-01/02、START-02/03、QA-01…04、TOOL-02；PAN-03 输出分页/脱敏、RENDER-03 resize 锚点与左右源复制仍缺。
+PAN-05、PAN-08、INPUT-01、RENDER-01、EDIT-01、JOB-01/02、START-02/03、QA-01…04、TOOL-02；PAN-03 输出分页/脱敏、RENDER-03 resize 锚点与左右源复制仍缺。
 
 ## 当前门禁
 

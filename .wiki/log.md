@@ -7454,3 +7454,9 @@ PAN-06：copy picker 移除 recent-30 窗口，按新到旧列出全部 block，
 `transcript/diff.ts` 新增 `renderSideBySide`：按 hunk 解析 old/new 行号，removed/added run 按位置配对，未配对侧留白；hunk/rename/BOM/EOL/EOF 元数据保持全宽。宽度 ≥100 时由 `renderLabelled` 自动启用，窄屏回退既有 unified 渲染。行数默认 400、输入字节 64KiB 双预算，零宽字符也计入字节；超限追加截断标记。
 
 **本地验证**：diff 测试 10 项（配对/行号、窄屏回退、双预算、CJK 宽度）；transcript+surface 176 项通过；`build:ts` 通过。本条写入时尚未提交/推送；resize 锚点、左右源复制与手动切换仍待接入 UI-04。
+
+### Phase 20 RENDER-02（部分）：多行表格 cell 与源码回退
+
+`markdown.ts` 的表格行解析改为扫描器：反引号 span 与 `\|` 内的竖线保留为 cell 内容；`<br>` 生成显式换行；每个 cell 独立 wrap，行高取最大值并补齐短侧。列宽缩放后按实际总宽回削，CJK 宽字符不再溢出。列数 >16、行数 >200、字节或最小可读宽度（每列 5 cells）不足时回退为完整源码换行，不截断长尾。
+
+**本地验证**：markdown 测试 32 项（escaped/code pipe、`<br>`、窄屏回退、CJK 宽度、列预算），transcript 套件 127 项通过；`build:ts` 通过。本条写入时尚未提交/推送；OSC8 跨行与表格源复制仍待接入 UI-04。

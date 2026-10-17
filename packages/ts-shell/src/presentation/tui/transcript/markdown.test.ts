@@ -196,3 +196,38 @@ it("lets Markdown roles differ from surrounding chrome", () => {
     expect(fence[0]).toContain("\x1b[38;2;96;112;128m┌");
   } finally { defaultTheme.apply(base, "none"); }
 });
+
+describe("table cell semantics", () => {
+  it("keeps escaped and code-span pipes inside their cell", () => {
+    const rows = renderMarkdown("| a | b |\n|---|---|\n| x \\| y | `p | q` |", 80).map(stripAnsi);
+    expect(rows.join("\n")).toContain("x | y");
+    expect(rows.join("\n")).toContain("p | q");
+  });
+
+  it("renders an explicit <br> as a second line and pads the shorter cell", () => {
+    const rows = renderMarkdown("| a | b |\n|---|---|\n| one | first<br>second |", 80).map(stripAnsi);
+    expect(rows.some(row => row.includes("first"))).toBe(true);
+    expect(rows.some(row => row.includes("second"))).toBe(true);
+  });
+
+  it("falls back to the raw table when a column cannot keep three cells", () => {
+    const table = "| left | right |\n|---|---|\n| alpha | beta |";
+    const rows = renderMarkdown(table, 12).map(stripAnsi);
+    const text = rows.join("\n");
+    expect(text).toContain("left");
+    expect(text).toContain("alpha");
+    expect(text).not.toContain("┼");
+  });
+
+  it("stays inside the width for wide glyphs and long cells", () => {
+    const table = "| 名称 | 说明 |\n|---|---|\n| 中文 | " + "长".repeat(200) + " |";
+    for (const row of renderMarkdown(table, 40)) expect(visibleWidth(row)).toBeLessThanOrEqual(40);
+  });
+
+  it("refuses more columns than the budget and shows the source", () => {
+    const header = "|" + Array.from({ length: 20 }, (_, index) => `c${index}`).join("|") + "|";
+    const rule = "|" + Array.from({ length: 20 }, () => "---").join("|") + "|";
+    const rows = renderMarkdown(`${header}\n${rule}\n|${Array.from({ length: 20 }, () => "x").join("|")}|`, 200).map(stripAnsi);
+    expect(rows.join("\n")).toContain("c0");
+  });
+});

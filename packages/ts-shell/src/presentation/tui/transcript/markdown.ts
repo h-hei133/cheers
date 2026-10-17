@@ -21,6 +21,12 @@ import { scanBlocks } from "./markdownScan.js";
 const TABLE_ROW = /^\s*\|(.+)\|\s*$/;
 const TABLE_RULE = /^\s*\|[\s:|-]+\|\s*$/;
 
+/** Bounds that keep one table from becoming the whole frame. */
+const MAX_TABLE_COLUMNS = 16;
+const MAX_TABLE_ROWS = 200;
+const MAX_CELL_BYTES = 4096;
+const MAX_CELL_LINES = 8;
+
 /** Drop a trailing partial code fence so a streaming block does not flicker. */
 export function trimPartialFence(text: string): string {
   const lines = text.split("\n");
@@ -107,16 +113,46 @@ export function renderMarkdown(text: string, width: number): string[] {
 function renderTable(header: string, body: readonly string[], cells: number): string[] {
   const head = splitRow(header);
   const rowsOfCells = body.map(splitRow);
+  const columns = Math.max(head.length, ...rowsOfCells.map(row => row.length));
+  const bytes = [header, ...body].reduce((sum, line) => sum + Buffer.byteLength(line, "utf8"), 0);
+  const separators = (columns - 1) * 3;
+  // A table that cannot keep three readable cells per column, or that exceeds
+  // the column/row/byte budget, is shown as its own source instead of losing
+  // the tail of every cell.
+  if (columns > MAX_TABLE_COLUMNS || rowsOfCells.length > MAX_TABLE_ROWS || bytes > MAX_CELL_BYTES * 4
+    || columns * 5 + separators > cells) return rawTable(header, body, cells);
   const widths = columnWidths([head, ...rowsOfCells], cells);
   const line = defaultTheme.fg("border", widths.map((width) => "─".repeat(width)).join("─┼─"));
-  const rows = [formatRow(head, widths, true), line];
-  for (const row of rowsOfCells) rows.push(formatRow(row, widths, false));
+  const rows = [...formatRow(head, widths, true), line];
+  for (const row of rowsOfCells) rows.push(...formatRow(row, widths, false));
   return rows;
 }
 
+/** The original table, wrapped rather than truncated, when layout cannot help. */
+function rawTable(header: string, body: readonly string[], cells: number): string[] {
+  return [header, ...body].flatMap(line => wrapToWidth(defaultTheme.dim(line), cells));
+}
+
+/**
+ * Split a table row into cells.
+ *
+ * A pipe inside a backtick span or written as `\|` is content, not a separator;
+ * splitting on the raw character loses code and escaped text.
+ */
 function splitRow(line: string): string[] {
   const inner = TABLE_ROW.exec(line)?.[1] ?? "";
-  return inner.split("|").map((cell) => cell.trim());
+  const cells: string[] = [];
+  let current = "";
+  let backticks = 0;
+  for (let index = 0; index < inner.length; index++) {
+    const character = inner[index]!;
+    if (character === "\\" && inner[index + 1] === "|") { current += "|"; index += 1; continue; }
+    if (character === "`") backticks = backticks === 0 ? 1 : 0;
+    if (character === "|" && backticks === 0) { cells.push(current.trim()); current = ""; continue; }
+    current += character;
+  }
+  cells.push(current.trim());
+  return cells;
 }
 
 /** Column widths sized to content, then scaled down to fit the frame. */
@@ -133,15 +169,39 @@ function columnWidths(rows: readonly string[][], cells: number): number[] {
   if (total <= cells) return widths;
   const budget = Math.max(count * 3, cells - separators);
   const scale = budget / (total - separators);
-  return widths.map((width) => Math.max(3, Math.floor(width * scale)));
+  const scaled = widths.map((width) => Math.max(3, Math.floor(width * scale)));
+  // The floor above can overshoot when several columns are already at three;
+  // shave the widest column until the row really fits.
+  while (scaled.reduce((sum, width) => sum + width, 0) + separators > cells) {
+    const widest = scaled.indexOf(Math.max(...scaled));
+    if (scaled[widest]! <= 3) break;
+    scaled[widest] = scaled[widest]! - 1;
+  }
+  return scaled;
 }
 
-function formatRow(row: readonly string[], widths: readonly number[], header: boolean): string {
-  const cellsText = widths.map((width, column) => {
-    const text = row[column] ?? "";
-    return padToWidth(truncateToWidth(header ? defaultTheme.bold(text) : renderInline(text), width), width);
+/** One logical row, wrapped to each column and padded to the tallest cell. */
+function formatRow(row: readonly string[], widths: readonly number[], header: boolean): string[] {
+  const wrapped = widths.map((width, column) => {
+    const source = row[column] ?? "";
+    const segments = source.split(/<br\s*\/?>/i);
+    const lines: string[] = [];
+    for (const segment of segments) {
+      for (const line of wrapToWidth(segment, width)) {
+        lines.push(header ? defaultTheme.bold(line) : renderInline(line));
+        if (lines.length >= MAX_CELL_LINES) break;
+      }
+      if (lines.length >= MAX_CELL_LINES) break;
+    }
+    return lines.length ? lines : [""];
   });
-  return cellsText.join(defaultTheme.fg("border", " │ "));
+  const height = Math.max(...wrapped.map(lines => lines.length));
+  const rows: string[] = [];
+  for (let line = 0; line < height; line++) {
+    rows.push(wrapped.map((lines, column) =>
+      padToWidth(lines[line] ?? "", widths[column]!)).join(defaultTheme.fg("border", " │ ")));
+  }
+  return rows;
 }
 
 /** A fenced block, framed so its boundaries and language are unmistakable. */
