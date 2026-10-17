@@ -157,6 +157,15 @@ export interface AccountAuthRenewal {
   readonly renewed: boolean;
   /** Why the exchange failed, when it did. */
   readonly failure?: string;
+  /** Another process owns the exchange; nothing was sent here. */
+  readonly leaseHeld?: boolean;
+  /** A previous owner may have spent this token; do not replay it. */
+  readonly leaseUnknown?: boolean;
+}
+
+/** Cross-process ownership hooks; the caller owns their storage. */
+export interface RenewalLeaseHooks {
+  acquire: () => { readonly acquired: boolean; readonly unknown?: boolean };
 }
 
 /**
@@ -185,6 +194,9 @@ export async function renewAccountAuthIfExpiring(input: {
   };
   readonly fetchImpl: typeof fetch;
   readonly signal?: AbortSignal;
+  /** Called immediately before the exchange leaves the process. */
+  readonly onDispatch?: () => void;
+  readonly renewalLease?: RenewalLeaseHooks;
 }): Promise<AccountAuthRenewal> {
   const account = accountAuthFor(input.provider, input.credential);
   if (!account) return { renewed: false };
@@ -208,6 +220,10 @@ export async function renewAccountAuthIfExpiring(input: {
     return { accountAuth: shared.accountAuth, renewed: false, ...(shared.failure ? { failure: shared.failure } : {}) };
   }
 
+  const lease = input.renewalLease?.acquire();
+  if (lease && !lease.acquired) {
+    return { renewed: false, ...(lease.unknown ? { leaseUnknown: true } : { leaseHeld: true }) };
+  }
   const run = exchangeAccountAuth({
     provider: input.provider,
     account,
@@ -215,6 +231,7 @@ export async function renewAccountAuthIfExpiring(input: {
     refreshToken,
     fetchImpl: input.fetchImpl,
     ...(input.signal ? { signal: input.signal } : {}),
+    ...(input.onDispatch ? { onDispatch: input.onDispatch } : {}),
   });
   const key = renewalKey(input.provider, refreshToken);
   renewalsInFlight.set(key, run);
@@ -253,6 +270,8 @@ async function exchangeAccountAuth(input: {
   readonly refreshToken: string;
   readonly fetchImpl: typeof fetch;
   readonly signal?: AbortSignal;
+  /** Called immediately before the exchange leaves the process. */
+  readonly onDispatch?: () => void;
 }): Promise<AccountAuthRenewal> {
   try {
     const tokens = await refreshOAuthTokens(input.config, input.refreshToken, input.fetchImpl);

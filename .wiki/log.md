@@ -7290,3 +7290,15 @@ CFG-03 把 `/connect use|logout` 的输出改为区分“已存储”与“当�
 **本地验证**：新增 7 项池测试（校验四类失败、空池、不可用成员、池内选择、显式连接优先、会话亲和、身份/代际）；`core/auth`、`providerCredentials`、`core/models` 14 文件 215 项与 `src/config` 20 文件 248 项通过；`build:ts`、`check:config-consumers`、`verify:import-cycles` 通过。合同见[显式账号池](features/account-pool.md)。
 
 本条写入时尚未提交/推送；未运行真实 provider、跨进程或跨平台动态证据。PRV-04/05 的 lease、durable refresh 阶段与请求归属仍待实施。
+
+### Phase 20 PRV-04：refresh lineage 与跨进程 lease
+
+新增 `core/auth/account/lease.ts`：profile 内 `refresh-leases.json` 以 provider+credentialId+refresh token 摘要标识 lineage，记录 `prepared`/`dispatched`/`unknown`、owner 与 generation，全部操作在锁内重读、原子写入并读回核对。
+
+交换前取得 lease；同进程 single-flight 仍先执行，只有真正交换的调用取得 lease。其他进程遇到活动 lease 时有界等待并重读已保存凭据；过期 `dispatched`/`unknown` 拒绝重放并要求重新登录。成功持久化后按 lineage generation 清除，跟随者也可确认完成；迟到响应仍由 `persistAccountEdit` 的完整身份比较拒绝。持久化失败或交换结果未知标记 `unknown`；lease 清理失败以 `cleanupFailed` 报告，不伪装成已清理。
+
+`renewAccountAuthIfExpiring` 新增 lease 获取与 dispatch 回调，provider 错误文本不进入用户可见失败（避免请求材料泄漏）。
+
+**本地验证**：新增 7 项 lease 测试（单所有者、过期 prepared 接管、dispatched 不重放、generation 完成、unknown 持久、并发获取、损坏文件）；`renewal.test.ts` 增至 38 项（含跨进程持有与 unknown 拒绝）全部通过；`core/auth`、`provider/request` 与 `providerCredentials` 12 文件 225 项通过；`build:ts`、Node floor、import cycles、config consumers 通过。合同见[显式账号池 §5](features/account-pool.md#5-refresh-归属与跨进程互斥)。
+
+本条写入时尚未提交/推送；未运行真实 provider 或真实多进程 refresh。

@@ -50,3 +50,17 @@ OAuth 受众沿用现有凭据类型检查：OpenAI 账户 token、Google 账户
 - 本批不做轮换、quota/429 退避归属和跨进程 refresh lease；这些属于 PRV-04/05。
 - 不复制 live rotating OAuth 到其他 profile；每个 profile 独立登录。
 - 已验证：池校验、空池、不可用成员、池内选择、显式连接优先、会话亲和、身份/代际；未运行真实 provider。
+
+## 5. Refresh 归属与跨进程互斥
+
+同一 refresh token 的交换由 profile 内的 `refresh-leases.json`（`CHEERS_REFRESH_LEASES_FILE` 可覆盖，必须位于 profile 内）协调。lineage key 是 provider + credentialId + refresh token 摘要；条目记录 owner、阶段与 generation：
+
+| 阶段 | 含义 |
+|---|---|
+| `prepared` | 已取得所有权，尚未发送 |
+| `dispatched` | 已越过发送边界，服务端可能已旋转 |
+| `unknown` | 结果不可验证；禁止重放旧 token，需重新登录 |
+
+同进程仍先走既有 single-flight：共享调用不会重复取得 lease，只有真正执行交换的调用取 lease。其他进程遇到活动 lease 时等待有界时间并重读已保存凭据；遇到过期 `dispatched` 或 `unknown` 时直接拒绝发送并要求重新登录。持久化成功后按 lineage generation 清除条目，因此共享调用中的跟随者也能确认完成；generation 不匹配拒绝清除。迟到响应仍由 `persistAccountEdit` 的完整身份比较拒绝，不覆盖重新登录、删除或换连接后的新 generation。
+
+profile 导入不复制 live rotating OAuth，因此不会产生第二个可消费授权；lease 文件也不跨 profile 共享。

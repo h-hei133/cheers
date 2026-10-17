@@ -9,6 +9,7 @@ import * as store from '../../../session/store/sessionFileStore.js';
 import * as authorization from '../../../provider/request/authorization.js';
 import * as persistence from '../../../config/persistence.js';
 import { ConfigWriteError } from '../../../config/outcome.js';
+import { acquireRefreshLease, markRefreshDispatched, markRefreshUnknown, refreshLineage } from './lease.js';
 
 let home: string;
 let root: string;
@@ -311,4 +312,31 @@ it('classifies an identical rotation completed just before locking as unchanged 
     accountAuth: { ...auth(), accessToken: 'fresh-a', refreshToken: 'rotated-a', expiresAt: 9999999999999 } });
   const result = await renewStoredAccount(request());
   expect(result).toMatchObject({ stored: true, writeState: 'unchanged' }); expect(read().theme).toBe('light');
+});
+
+it('refuses to send when another process may have spent the refresh token', async () => {
+  const lineage = { provider: 'openai' as const, credentialId: 'openai:a', generation: 'other', refreshToken: 'refresh-a' };
+  const key = refreshLineage(lineage);
+  expect(acquireRefreshLease({ ...lineage, owner: 'other-process' }).acquired).toBe(true);
+  markRefreshDispatched(key, 'other-process');
+  const input = request();
+  const result = await renewStoredAccount({ ...input, fetchImpl: vi.fn() as unknown as typeof fetch });
+  expect(result).toMatchObject({ stored: false, writeState: 'unchanged' });
+  expect(result.accountAuth).toBeUndefined();
+  expect(result.failure).toMatch(/another process/i);
+  expect(input.fetchImpl).not.toHaveBeenCalled();
+  expect(read().providerConnections?.[0]?.accountAuth?.openai).toEqual(auth());
+});
+
+it('refuses replay after an unknown renewal outcome from another process', async () => {
+  const lineage = { provider: 'openai' as const, credentialId: 'openai:a', generation: 'other', refreshToken: 'refresh-a' };
+  const key = refreshLineage(lineage);
+  acquireRefreshLease({ ...lineage, owner: 'other-process' });
+  markRefreshDispatched(key, 'other-process');
+  markRefreshUnknown(key, 'other-process');
+  const input = request();
+  const result = await renewStoredAccount({ ...input, fetchImpl: vi.fn() as unknown as typeof fetch });
+  expect(result).toMatchObject({ stored: false, writeState: 'unchanged' });
+  expect(result.failure).toMatch(/reconnect|spent/i);
+  expect(input.fetchImpl).not.toHaveBeenCalled();
 });

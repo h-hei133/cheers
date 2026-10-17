@@ -5,7 +5,7 @@ import path from 'node:path';
 import { profileName } from './name.js';
 import { assertDirectoryIdentity, assertUnlinkedPath, directoryIdentity, isWithin, type DirectoryIdentity } from './identity.js';
 
-const PATH_VARIABLES = ['CHEERS_PLUGINS_FILE', 'CHEERS_EXTENSIONS_FILE', 'CHEERS_MARKETPLACES_FILE', 'CHEERS_MODEL_PRESETS_FILE', 'CHEERS_LOG_DIR',
+const PATH_VARIABLES = ['CHEERS_PLUGINS_FILE', 'CHEERS_EXTENSIONS_FILE', 'CHEERS_MARKETPLACES_FILE', 'CHEERS_MODEL_PRESETS_FILE', 'CHEERS_REFRESH_LEASES_FILE', 'CHEERS_LOG_DIR',
   'CHEERS_BROWSER_RECEIPT_CACHE_ROOT', 'CHEERS_BROWSER_RECEIPT_CACHE_MANIFEST', 'CHEERS_STREAM_TRACE_PATH'] as const;
 export type ProfilePathVariable = typeof PATH_VARIABLES[number];
 
