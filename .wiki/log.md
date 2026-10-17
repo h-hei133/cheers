@@ -7360,3 +7360,20 @@ PRV-01 的选择器改为以投影的 active provider 判断可选性，但投�
 **本地验证**：新增 6 项发现测试（初始集合、搜索、加载/拒绝、上限、generation、元工具执行）；`entrypoints`、`core/tools`、`turn/tools`、`turn/session`、`cli/runtime` 组合 67 文件 780 项中，初次 9 项失败均为测试期望全量池或 `task` 未 pinned；将 `task` 纳入 pinned、MCP 行为测试显式使用 full 模式后两文件 33 项通过，组合复跑见后续。`build:ts`、config consumers、import cycles 通过。合同见[动态工具发现](features/tool-discovery.md)。
 
 本条写入时尚未提交/推送；TOOL-02 的描述精简与质量评测、QA-03 的真实任务对比仍待实施。
+
+### Phase 20 UI-01/02/03：输入区预算、两栏面板与状态投影
+
+输入区每侧留白由 2 改为 1；正文上限 16 行，`composerRowBudget` 取
+`min(height-1, max(3, min(20, floor(height*0.6))))`，20 行终端从 7 行提升到 12 行，
+40 行及以上给满 20 行（16 正文 + 至多 4 装饰），transcript 至少保留 1 行。
+
+`renderPanel` 增加可选详情列：宽 ≥ 60 时列表 45%、详情占余下并带分隔线，窄屏退化单栏；
+可选行记录 `{id, from, to}`，详情列点击不聚焦，每帧重建映射使 resize/过滤后的旧命中失效。
+loading/empty/error 使用不同颜色，失败不再伪装成空集。新增 `ProgressProjection`
+（determinate/indeterminate/unknown，后两者绝不输出百分比）与单行 chip 条
+（活动项保持可见、两侧溢出标记）。
+
+**本地验证**：`composer/geometry.test.ts` 8 项、`chrome/panel.test.ts` 4 项、
+`progress.test.ts` 4 项、`chips.test.ts` 3 项；composer/chrome/overlay/settings/pointer
+组合 14 文件 190 项通过；`build:ts`、import cycles、declarations 通过。
+合同见[UI 容器几何与状态投影](features/ui-containers.md)。本条写入时尚未提交/推送。

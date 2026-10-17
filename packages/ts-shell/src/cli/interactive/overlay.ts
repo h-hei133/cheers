@@ -64,6 +64,8 @@ export interface Picker {
   readonly filterable?: boolean;
   /** Rows each option occupies beyond its first, in the full-screen form. */
   readonly detailRows?: number;
+  /** A second column in the inline panel when the surface is wide enough. */
+  readonly detail?: (id: string | undefined) => readonly string[];
   /** Options to offer; may hit the network or the filesystem. */
   load(signal?: AbortSignal): Promise<readonly Option[]>;
   /** Publish live options until the host releases the subscription on close. */
@@ -106,7 +108,7 @@ export class OverlayHost {
   private actionPending = false;
   private actionNotice: string | undefined;
   private unsubscribe: (() => void) | undefined;
-  private readonly optionRows = new Map<number, string>();
+  private readonly optionRows = new Map<number, { readonly id: string; readonly from: number; readonly to: number }>();
   private renderedWidth = 0;
 
   // In-TUI modal sub-modes for interactive delete confirmation and rename
@@ -190,6 +192,7 @@ export class OverlayHost {
       return this.renderDenyReason(width, height);
     }
     const empty = this.loading ? "loading…" : this.loadFailed ? picker.loadError ?? "Options could not be loaded." : picker.empty;
+    const state = this.loading ? "loading" : this.loadFailed ? "error" : undefined;
     const actionHints = (
       picker.onDelete || picker.onRename
         ? `${picker.onDelete ? "^D delete" : ""}  ${picker.onRename ? "^R rename" : ""}`.trim()
@@ -203,8 +206,9 @@ export class OverlayHost {
         {
           title: picker.title,
           empty,
+          ...(state ? { state } : {}),
           detailRows: picker.detailRows ?? 2,
-          onOptionRow: (row, id) => this.optionRows.set(row, id),
+          onOptionRow: (row, id) => this.optionRows.set(row, { id, from: 0, to: width }),
           ...(status ? { status } : picker.footer ? { status: picker.footer } : {}),
           ...(actionHints ? { actionHints } : {}),
         },
@@ -221,11 +225,13 @@ export class OverlayHost {
       {
         title: picker.title,
         empty,
+        ...(state ? { state } : {}),
         multiple: picker.multiple === true,
         filterable: picker.filterable,
         footer: status ?? picker.footer,
         hideCount: isApproval,
-        onOptionRow: (row, id) => this.optionRows.set(row, id),
+        ...(picker.detail ? { detail: picker.detail } : {}),
+        onOptionRow: (row, id, from, to) => this.optionRows.set(row, { id, from: from ?? 0, to: to ?? width }),
       },
       width,
       Math.max(0, Math.min(height, availableRows)),
@@ -239,9 +245,9 @@ export class OverlayHost {
     if (!this.loading && !this.actionPending && this.subMode === "none" && top !== undefined &&
         report.kind === "press" && report.button === 0 && !report.shift && !report.alt && !report.ctrl &&
         report.column >= 0 && report.column < this.renderedWidth) {
-      const id = this.optionRows.get(report.row - top);
-      if (id !== undefined) {
-        this.model.focus(id);
+      const hit = this.optionRows.get(report.row - top);
+      if (hit && report.column >= hit.from && report.column < hit.to) {
+        this.model.focus(hit.id);
         if (!this.picker.multiple) this.picker.previewChange?.(idsOf(this.model.current()));
         this.onChange();
       }

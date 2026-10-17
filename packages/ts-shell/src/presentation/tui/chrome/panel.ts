@@ -20,14 +20,21 @@ export interface PanelChrome {
   readonly title: string;
   /** Shown when the option set is empty. */
   readonly empty: string;
+  /** Distinguishes a failed load from a genuinely empty set. */
+  readonly state?: "loading" | "error";
   readonly footer?: string;
   /** True when rows carry a checkbox rather than a single cursor. */
   readonly multiple: boolean;
   /** Hide the match count in the header. */
   readonly hideCount?: boolean;
-  /** Records selectable rows in the frame being rendered. */
-  readonly onOptionRow?: (row: number, id: string) => void;
+  /** Records selectable rows and their horizontal span in the frame being rendered. */
+  readonly onOptionRow?: (row: number, id: string, from?: number, to?: number) => void;
+  /** A second column, when the surface is wide enough to afford one. */
+  readonly detail?: (id: string | undefined) => readonly string[];
 }
+
+/** Below this width the detail column is dropped rather than squeezing both. */
+const TWO_COLUMN_MIN_WIDTH = 60;
 
 /** Rows for the panel, fitted to `width` and at most `capacity` tall. */
 export function renderPanel(
@@ -46,17 +53,26 @@ export function renderPanel(
   const listRows = Math.min(MAX_OPTIONS, Math.max(0, capacity - (overflow ? 3 : 2)));
   if (listRows === 0) return [...rows, renderFooter(chrome, width)];
   if (model.total === 0) {
-    rows.push(truncateToWidth(`  ${defaultTheme.dim(chrome.empty)}`, width));
+    const message = chrome.state === "error" ? defaultTheme.fg("error", chrome.empty) : defaultTheme.dim(chrome.empty);
+    rows.push(truncateToWidth(`  ${message}`, width));
     rows.push(renderFooter(chrome, width));
     return rows;
   }
   const window = model.window(listRows);
-  const labelWidth = measureLabelWidth(model.visible, width);
+  const twoColumn = chrome.detail !== undefined && width >= TWO_COLUMN_MIN_WIDTH;
+  const listWidth = twoColumn ? Math.max(20, Math.floor(width * 0.45)) : width;
+  const detailWidth = twoColumn ? Math.max(0, width - listWidth - 1) : 0;
+  const detailLines = twoColumn ? chrome.detail!(model.current()?.id) : [];
+  const labelWidth = measureLabelWidth(model.visible, listWidth);
   for (let index = window.offset; index < window.offset + window.count; index++) {
     const option = model.visible[index];
     if (!option) break;
-    if (!option.disabled) chrome.onOptionRow?.(rows.length, option.id);
-    rows.push(renderRow(option, index === model.selectedIndex, model, chrome, labelWidth, width));
+    if (!option.disabled) chrome.onOptionRow?.(rows.length, option.id, 0, listWidth);
+    const row = renderRow(option, index === model.selectedIndex, model, chrome, labelWidth, listWidth);
+    rows.push(twoColumn
+      ? padToWidth(truncateToWidth(row, listWidth), listWidth) + defaultTheme.fg("border", "│")
+        + padToWidth(truncateToWidth(detailLines[index - window.offset] ?? "", detailWidth), detailWidth)
+      : row);
   }
   if (overflow) rows.push(truncateToWidth(`  ${defaultTheme.dim(`↑ ${window.above} · ↓ ${window.below} more`)}`, width));
   rows.push(renderFooter(chrome, width));

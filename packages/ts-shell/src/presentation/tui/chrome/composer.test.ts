@@ -21,12 +21,12 @@ describe("prompt block", () => {
     expect(rows[2]).not.toContain("❯");
   });
 
-  it("keeps two padding cells around source text within the real width", () => {
+  it("keeps one padding cell around source text within the real width", () => {
     const editor = new Editor();
     editor.insert("你好");
     const rows = renderComposer(editor, idle, 40);
     expect(rows.every(row => visibleWidth(row) <= 40)).toBe(true);
-    expect(stripAnsi(rows[1]!)).toBe("❯   你好" + " ".repeat(32));
+    expect(stripAnsi(rows[1]!)).toBe("❯  你好" + " ".repeat(33));
   });
 
   it("carries the cursor marker through for the renderer to place", () => {
@@ -36,7 +36,7 @@ describe("prompt block", () => {
   });
 
   it("reserves the cue and both padding sides from the text budget", () => {
-    expect(composerTextWidth(40)).toBe(34);
+    expect(composerTextWidth(40)).toBe(36);
   });
 
   it("bounds composer output to maxRows and tracks cursor", () => {

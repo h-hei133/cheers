@@ -13,6 +13,9 @@ export interface ComposerFrame {
   readonly text: number;
 }
 
+/** Body rows the composer may show, independent of decoration. */
+export const MAX_COMPOSER_CONTENT_ROWS = 16;
+
 export interface ComposerChrome {
   readonly top: boolean;
   readonly bottom: boolean;
@@ -28,7 +31,9 @@ export function composerFrame(width: number, shape: ComposerShape, scrolling: bo
   let right = shape.side === "caps" || shape.side === "round" || (shape.side === "rail" && scrolling) ? 1 : 0;
   if (bounded < left + right + 5) left = right = 0;
   const gutter = Math.min(visibleWidth(shape.gutter), Math.max(0, bounded - left - right - 5));
-  const padding = Math.min(2, Math.max(0, Math.floor((bounded - left - right - gutter - 1) / 2)));
+  // One cell on each side: the gutter already separates the prompt mark, and a
+  // second blank column pushed the text further right than the design allows.
+  const padding = Math.min(1, Math.max(0, Math.floor((bounded - left - right - gutter - 1) / 2)));
   return { width: bounded, left, right, gutter, padding, text: bounded - left - right - gutter - 2 * padding };
 }
 
@@ -45,7 +50,8 @@ export function composerChrome(shape: ComposerShape, state: ComposerState, width
   if (count() >= limit && (shape.top === "band" || shape.bottom === "merge")) top = false;
   if (count() >= limit) bottom = false;
   if (count() >= limit) top = false;
-  return { top, bottom, gap, footer, contentRows: Number.isFinite(limit) ? Math.max(0, limit - count()) : undefined };
+  const contentRows = Number.isFinite(limit) ? Math.max(0, limit - count()) : MAX_COMPOSER_CONTENT_ROWS;
+  return { top, bottom, gap, footer, contentRows: Math.min(MAX_COMPOSER_CONTENT_ROWS, contentRows) };
 }
 
 /** Status stays owned by its shape: full band, embedded border, or right chip. */

@@ -35,9 +35,9 @@ describe("composer source layout", () => {
     expect(rows.map((row) => row.breakAfter)).toContain("logical");
     expect(copied(layout, start, end)).toBe(source);
     expect(copied(layout, end, start)).toBe(source);
-    expect(rows.every((row) => row.contentColumn === 5)).toBe(true);
-    expect(stripAnsi(rows[0]!.rendered).startsWith("╰─   ")).toBe(true);
-    expect(stripAnsi(rows[1]!.rendered).startsWith("     ")).toBe(true);
+    expect(rows.every((row) => row.contentColumn === 4)).toBe(true);
+    expect(stripAnsi(rows[0]!.rendered).startsWith("╰─  ")).toBe(true);
+    expect(stripAnsi(rows[1]!.rendered).startsWith("    ")).toBe(true);
   });
 
   it("selects either display cell of a tab as the single original tab and shades both cells", () => {
@@ -71,14 +71,14 @@ describe("composer source layout", () => {
     const layout = layoutComposer(draft("abcdefghij\n\n  last  "), { busy: false, shape: "band" }, 12);
     const rows = contentRows(layout);
     expect(rows[0]!.breakAfter).toBe("soft");
-    expect(copied(layout, { row: rows[0]!.screenRow, column: rows[0]!.contentColumn + 3 }, { row: rows[1]!.screenRow, column: rows[1]!.contentColumn + 1 })).toBe("defg");
+    expect(copied(layout, { row: rows[0]!.screenRow, column: rows[0]!.contentColumn + 3 }, { row: rows[1]!.screenRow, column: rows[1]!.contentColumn + 1 })).toBe("defghi");
     expect(copied(layout, { row: rows[1]!.screenRow, column: 100 }, { row: rows[3]!.screenRow, column: 0 })).toBe("\n\n");
   });
 
   it("clamps gutter and padding to source boundaries without selecting decoration", () => {
     const layout = layoutComposer(draft("  x  "), { busy: false, shape: "band" }, 20);
     const row = contentRows(layout)[0]!.screenRow;
-    expect(copied(layout, { row, column: 0 }, { row, column: 4 })).toBe("");
+    expect(copied(layout, { row, column: 0 }, { row, column: 3 })).toBe("");
     expect(copied(layout, { row, column: 11 }, { row, column: 19 })).toBe("");
     const all = selectionFromPoints(layout, { row, column: 0 }, { row, column: 19 });
     const highlighted = highlightComposer(layout, all)[row]!;
@@ -104,7 +104,7 @@ describe("composer source layout", () => {
     const editor = draft("abcdefghij");
     const wide = layoutComposer(editor, { busy: false, shape: "band" }, 30);
     const range = selectionFromPoints(wide, { row: 1, column: 8 }, { row: 1, column: 11 });
-    expect(wide.source.slice(range.start, range.end)).toBe("defg");
+    expect(wide.source.slice(range.start, range.end)).toBe("efgh");
     const narrow = layoutComposer(editor, { busy: false, shape: "band" }, 12);
     expect(highlightComposer(narrow, range).filter((row) => row.includes("\x1b[7m"))).toHaveLength(2);
     editor.insert("!");
@@ -154,6 +154,6 @@ describe("composer source layout", () => {
     };
     expect(copied(layout, { row: 0, column: 0 }, { row: 4, column: 10 })).toBe("one\ntwo");
     expect(copied(layout, { row: 2, column: 0 }, { row: 2, column: 10 })).toBe("");
-    expect(copied(layout, { row: 2, column: 0 }, { row: 3, column: 6 })).toBe("tw");
+    expect(copied(layout, { row: 2, column: 0 }, { row: 3, column: 5 })).toBe("tw");
   });
 });

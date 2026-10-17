@@ -18,6 +18,8 @@ const FRAME_ROWS = 8;
 export interface ModalChrome {
   readonly title: string;
   readonly empty: string;
+  /** Distinguishes a failed load from a genuinely empty set. */
+  readonly state?: "loading" | "error";
   /** Rows each option occupies beyond its first. */
   readonly detailRows: number;
   /** Optional extra action hints shown in the footer (e.g. ^D delete · ^R rename). */
@@ -41,7 +43,8 @@ export function renderModal(
   const capacity = Math.max(1, Math.floor(listRows / perOption));
 
   if (model.total === 0) {
-    rows.push(edge(inner), body(defaultTheme.dim(chrome.empty), inner));
+    const message = chrome.state === "error" ? defaultTheme.fg("error", chrome.empty) : defaultTheme.dim(chrome.empty);
+    rows.push(edge(inner), body(message, inner));
   } else {
     const window = model.window(capacity);
     for (let index = window.offset; index < window.offset + window.count; index++) {

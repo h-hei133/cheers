@@ -40,18 +40,18 @@ describe("composer shapes", () => {
     const rows = layoutComposer(draft("x"), { busy: false }, 40).rows.map((row) => stripAnsi(row.rendered));
     expect(rows).toHaveLength(3);
     expect(rows[0]).toBe("─".repeat(40));
-    expect(rows[1]).toMatch(/^❯   x/);
+    expect(rows[1]).toMatch(/^❯  x/);
     expect(rows[2]).toBe("─".repeat(40));
   });
 
   it("reserves real whitespace independently from gutter and side decoration", () => {
-    const expected = { default: 34, band: 33, borderless: 34, "top-rule": 34, "padded-rules": 36, field: 34, rail: 35, box: 34 };
+    const expected = { default: 36, band: 35, borderless: 36, "top-rule": 36, "padded-rules": 38, field: 36, rail: 37, box: 36 };
     for (const shape of shapes) {
       expect(composerTextWidth(40, shape)).toBe(expected[shape]);
       const row = contents(layoutComposer(draft("x", false), { busy: false, shape }, 40))[0]!;
       const plain = stripAnsi(row.rendered);
-      expect(plain.slice(row.contentColumn - 2, row.contentColumn)).toBe("  ");
-      expect(plain.slice(row.cells[0]!.columnEnd, row.cells[0]!.columnEnd + 2)).toBe("  ");
+      expect(plain.slice(row.contentColumn - 1, row.contentColumn)).toBe(" ");
+      expect(plain.slice(row.cells[0]!.columnEnd, row.cells[0]!.columnEnd + 1)).toBe(" ");
     }
   });
 

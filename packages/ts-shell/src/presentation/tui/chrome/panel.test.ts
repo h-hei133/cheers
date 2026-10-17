@@ -1,0 +1,50 @@
+import { expect, it } from 'vitest';
+import { OptionModel, type Option } from './options.js';
+import { renderPanel } from './panel.js';
+import { stripAnsi } from '../text/ansi.js';
+import { visibleWidth } from '../text/measure.js';
+
+const options: Option[] = Array.from({ length: 12 }, (_, index) => ({ id: `id-${index}`, label: `Option ${index}`, detail: `detail ${index}` }));
+function model(): OptionModel {
+  const value = new OptionModel();
+  value.setOptions(options);
+  return value;
+}
+
+it('renders a detail column only when the width can afford it', () => {
+  const wide = renderPanel(model(), { title: 'Pick', empty: 'none', multiple: false, detail: id => [`for ${id}`, 'second line'] }, 80, 10);
+  expect(wide.length).toBeLessThanOrEqual(10);
+  for (const row of wide) expect(visibleWidth(row)).toBeLessThanOrEqual(80);
+  expect(wide.some(row => stripAnsi(row).includes('│'))).toBe(true);
+  expect(stripAnsi(wide.join('\n'))).toContain('for id-0');
+
+  const narrow = renderPanel(model(), { title: 'Pick', empty: 'none', multiple: false, detail: id => [`for ${id}`] }, 40, 10);
+  expect(narrow.some(row => stripAnsi(row).includes('│'))).toBe(false);
+  for (const row of narrow) expect(visibleWidth(row)).toBeLessThanOrEqual(40);
+});
+
+it('reports selectable row spans that stop before the detail column', () => {
+  const hits: Array<[number, string, number, number]> = [];
+  renderPanel(model(), { title: 'Pick', empty: 'none', multiple: false, detail: () => ['detail'],
+    onOptionRow: (row, id, from, to) => hits.push([row, id, from ?? -1, to ?? -1]) }, 100, 10);
+  expect(hits.length).toBeGreaterThan(0);
+  for (const [, , from, to] of hits) {
+    expect(from).toBe(0);
+    expect(to).toBeLessThan(100);
+    expect(to).toBeGreaterThan(0);
+  }
+});
+
+it('degrades to nothing or a footer at zero and one row', () => {
+  expect(renderPanel(model(), { title: 'Pick', empty: 'none', multiple: false }, 40, 0)).toEqual([]);
+  const one = renderPanel(model(), { title: 'Pick', empty: 'none', multiple: false }, 40, 1);
+  expect(one).toHaveLength(1);
+  expect(visibleWidth(one[0]!)).toBeLessThanOrEqual(40);
+});
+
+it('keeps every row inside the width at tiny widths', () => {
+  for (const width of [0, 1, 2, 3, 10, 20, 59, 60]) {
+    const rows = renderPanel(model(), { title: 'Pick', empty: 'none', multiple: false, detail: () => ['x'] }, width, 8);
+    for (const row of rows) expect(visibleWidth(row)).toBeLessThanOrEqual(width);
+  }
+});

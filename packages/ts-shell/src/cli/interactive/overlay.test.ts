@@ -83,6 +83,36 @@ describe("pointer focus", () => {
     expect(apply).toHaveBeenCalledWith(expect.anything(), [id]);
   });
 
+  it("does not focus a row from a click in the detail column", async () => {
+    const { overlay } = host();
+    overlay.open(picker({ load: async () => [
+      { id: "a", label: "alpha" }, { id: "b", label: "beta" },
+    ], detail: id => [`detail for ${id}`] }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const rows = overlay.render(100, 20);
+    const row = rows.findIndex((text) => text.includes("beta"));
+    expect(row).toBeGreaterThan(0);
+    expect(rows[row]).toContain("│");
+    const top = 5;
+    // The detail column is outside the selectable span.
+    overlay.handlePointer(parseMouseReport(`\x1b[<0;90;${top + row + 1}M`)!, top);
+    const firstApply = vi.fn();
+    press(overlay, "\r", firstApply);
+    expect(firstApply).toHaveBeenCalledWith(expect.anything(), ["a"]);
+
+    const second = host();
+    second.overlay.open(picker({ load: async () => [
+      { id: "a", label: "alpha" }, { id: "b", label: "beta" },
+    ], detail: id => [`detail for ${id}`] }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const secondRows = second.overlay.render(100, 20);
+    const secondRow = secondRows.findIndex((text) => text.includes("beta"));
+    second.overlay.handlePointer(parseMouseReport(`\x1b[<0;5;${top + secondRow + 1}M`)!, top);
+    const secondApply = vi.fn();
+    press(second.overlay, "\r", secondApply);
+    expect(secondApply).toHaveBeenCalledWith(expect.anything(), ["b"]);
+  });
+
   it("keeps painted rows clickable after a key that does nothing", async () => {
     const { overlay } = host();
     const apply = vi.fn();
