@@ -7661,3 +7661,8 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 
 - `budget.test.ts` 的子进程在打印 `ready` 后才注册 stdin 监听，父进程的 `admit` 可能在监听注册前到达并丢失，子进程以 0 退出且无结果。
 - 改为先注册监听再打印 `ready`；连续 3 次单测与整套 11 项通过。
+
+## 2026-10-18 — QA-02 PTY 模式矩阵
+
+- `qa:pty` 扩展为 Node/exe × regular/fullscreen 四格：执行 `/tools`（Esc 关闭 report reader）→ `/sessions current` → `/exit`，断言工具列表与当前会话输出。
+- 四格全部 PASS（6500/8292 bytes）。Windows/macOS、IME、系统复制与真实质量仍未验证。
