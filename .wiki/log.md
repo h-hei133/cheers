@@ -7200,3 +7200,11 @@ CFG-02 已提交推送为 `a843726086e80fb0166352cd1ef4916b5a51da59`，远端 re
 唯一失败为源码重启 PID 测试：临时目录没有本仓源码包的 `type: module`，Node 20.3.0 的 ESM loader 无法接管 CommonJS 夹具。下载精确 Node 20.3.0 到忽略的本仓 cache 后复现；同一入口 CommonJS 失败、ESM 成功。修复仅为测试补 ESM 包身份，并补实际 `./pid.js` 到 `pid.ts` 的传递引用，保留执行 owner 和 admitted PID 相等断言；失败时显示合成子进程 stderr。没有改变产品 loader、Node floor、package scripts 或 CI 断言。
 
 Node 20.3.0 与本地 Node 24.15.0 的相关四文件各 24 项通过；撤销 ESM 夹具保护再次触发 AssertionError/退出 1，随后逐字恢复。精确 Node 20.3.0 的实际源码三路 TTY source→target→source 探针也通过，包含两层 resize、独立登录、同 PID restart、终端恢复、退出及会话读回；pending 凭据实际 loopback 请求为 0。限定测试文件的清理无额外改动，清理后单文件再次通过；五项静态门禁通过。修复的提交、推送及新 SHA CI 继续单独读回；CFG-03 产品实现等待此交付闭合。
+
+### Phase 20 CFG-02：并发日志夹具修复
+
+源码 ESM 夹具修复已提交并推送为 `e8c850d6f698dd8773dcb42f50845020605bff02`，远端 ref 读回一致。该 SHA 的 [Architecture Watch 39013194230](https://github.com/h-hei133/cheers/actions/runs/39013194230) completed/success；[主 CI 39013194210](https://github.com/h-hei133/cheers/actions/runs/39013194210) 仍失败：819 文件、8272 项通过，唯一失败移至 MCP lifecycle 取消测试，2 skipped，最后 NormProof 被跳过。原源码 PID 测试已通过，不能把这轮失败写成 CFG-02 完整交付。
+
+定向检查实际子进程 fixture 后确认，appendFileSync 先创建日志再追加 JSONL，轮询可读到空文件；现 reader 对空字符串做 JSON.parse，产生 Unexpected end of JSON input。只修测试的日志观察器：仅解析换行已结算的记录，完整坏记录仍抛错。既有真实取消测试显式注入空/未完成记录，再读实际日志，继续核对 discovery 已到达、队列写拒绝、零 tools/call 与子 PID 消失。精确 Node 20.3 下旧 reader 确定失败；修复后四个 MCP 文件 46 项通过。定向比较读取持久 JSONL 时忽略空/坏行的已有方案，本测试保留更严格的完整坏行拒绝，没有改 MCP 产品、取消语义或 CI 断言。清理、两路独立审查、提交推送和新 SHA CI 继续单独记录。
+
+该 MCP 夹具的限定清理为 no-op；清理后 lifecycle 11 项通过，五项静态门禁通过，118 条文档 advisory 保留。两路独立审查分别 APPROVE/CLEAR，均独立运行精确 Node 20.3 的 11 项，并核对空/不完整/完整/完整后缀/坏完整记录边界。code lane 另行运行 Node 24。以上只覆盖夹具修复；CFG-03 本地改动不属于这次提交。

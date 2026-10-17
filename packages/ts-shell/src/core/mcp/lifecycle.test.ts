@@ -17,7 +17,8 @@ function configure(workspace: string, entry = config()) {
   fs.writeFileSync(path.join(workspace, ".cheers.mcp.json"), JSON.stringify({ mcpServers: { local: entry } }));
 }
 function records() {
-  return fs.readFileSync(log, "utf8").trim().split("\n").map(line => JSON.parse(line));
+  // The child may have opened the file without finishing its next JSONL record.
+  return fs.readFileSync(log, "utf8").split("\n").slice(0, -1).map(line => JSON.parse(line));
 }
 function alive(pid: number) {
   try { process.kill(pid, 0); return true; }
@@ -39,6 +40,7 @@ beforeEach(() => {
 });
 afterEach(async () => {
   await Promise.all(owners.splice(0).map(owner => owner.close()));
+  vi.restoreAllMocks();
   vi.unstubAllEnvs();
   fs.rmSync(root, { recursive: true, force: true });
 });
@@ -175,12 +177,19 @@ describe("standard MCP connection lifetime", () => {
   it("cancels outstanding discovery and rejects queued writes when shutdown starts", async () => {
     configure(root, config(["--hang-list"]));
     const owner = gateway();
+    const readFile = fs.readFileSync;
+    let pendingReads = 2;
+    vi.spyOn(fs, 'readFileSync').mockImplementation(((file: fs.PathOrFileDescriptor, ...args: unknown[]) => {
+      if (file === log && pendingReads > 0) return --pendingReads === 1 ? '' : '{"event":"tools/';
+      return Reflect.apply(readFile, fs, [file, ...args]);
+    }) as typeof fs.readFileSync);
     const discovery = owner.snapshot().catch(error => error);
     const deadline = Date.now() + 2000;
     while ((!fs.existsSync(log) || !records().some(event => event.event === "tools/list")) && Date.now() < deadline) {
       await new Promise(resolve => setTimeout(resolve, 10));
     }
     expect(records().some(event => event.event === "tools/list")).toBe(true);
+    expect(pendingReads).toBe(0);
     const queued = owner.invokeTool("local", "echo_message", { message: "must not execute" }).catch(error => error);
     await owner.close();
     await discovery;
