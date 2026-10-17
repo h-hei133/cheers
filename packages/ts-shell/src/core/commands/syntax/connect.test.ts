@@ -43,7 +43,7 @@ it("guards directly exported mutators and retains inline key values", async () =
   }
   expect(await addConnection(["openai", "--key=fixture-secret"])).toContain("Connected provider openai");
   expect(JSON.parse(fs.readFileSync(file, "utf8")).providerConnections[0].apiKey).toBe("fixture-secret");
-  expect(activateConnection(["--", "openai"])).toContain("Active connection switched");
+  expect(activateConnection(["--", "openai"])).toContain("Stored active connection:");
 });
 
 it("suggests providers only at their legal position and excludes auth conflicts", () => {

@@ -35,9 +35,9 @@ it("matches labels but accepts exact IDs without revealing credentials or mutati
   expect(edit.text).toBe('"second full id" ');
   expect(fs.readFileSync(file)).toEqual(bytes); expect(fs.statSync(file).mtimeMs).toBe(mtime);
   const selector = scanCommandArgs(edit.text)[0]!.value;
-  expect(activateConnection([selector])).toContain("Active connection switched to second full id.");
+  expect(activateConnection([selector])).toContain("Stored active connection: second full id.");
   expect(JSON.parse(fs.readFileSync(file, "utf8")).activeProviderConnectionId).toBe("second full id");
-  expect(removeConnection([selector])).toContain("Disconnected provider connection second full id.");
+  expect(removeConnection([selector])).toContain("Removed provider connection second full id");
   expect(connectionCatalog().map(item => item.value)).toEqual(["first"]);
 });
 it("distinguishes absent configuration from malformed configuration", () => {

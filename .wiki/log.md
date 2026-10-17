@@ -7274,3 +7274,9 @@ CFG-03 新增重复 `--config` JSONC 输入，顺序固定于启动目录并保�
 **本地验证**：新增 4 项 profile 库测试（保存/列表/删除且不改用户配置、会话整项遮盖、提升后应用、损坏库报错）；`core/commands/model` 5 文件 30 项通过；`build:ts` 通过。合同见[模型角色预设](features/model-presets.md)。
 
 本条写入时尚未提交/推送；未运行真实 provider、UI 面板或跨平台动态证据。
+
+### Phase 20：CFG-03 消息契约的遗留断言
+
+CFG-03 把 `/connect use|logout` 的输出改为区分“已存储”与“当前生效”（`Stored active connection: …`、`Removed provider connection … from primary configuration.`），两个旧测试仍断言 `Active connection switched` / `Disconnected provider connection`。本地与 CFG-04 的精确 SHA CI 均复现这两项失败，其余 826 文件通过。
+
+修复只更新断言到现行输出契约，保留原有文件变更、凭据不回显、catalogue 刷新与直接 mutator 参数校验断言。两文件 31 项通过。此前失败的 CFG-04 与 CFG-05/PRV-01/PRV-02 运行记录保留为历史，不能写成这些 SHA 已全绿。
