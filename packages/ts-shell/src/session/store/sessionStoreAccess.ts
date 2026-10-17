@@ -59,6 +59,9 @@ export class SessionStoreAccess {
     this.ensureLayout();
   }
 
+  /** Directory that holds session directories; the reentry index lives beside them. */
+  get sessionsDir(): string { return this.storeLayout.sessionsDir; }
+
   ensureLayout(): void {
     ensureSessionStoreLayout(this.storeLayout);
   }

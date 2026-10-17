@@ -41,11 +41,12 @@
 | JOB-01 | 单次 spawn、detach/kill、adopt/promote、60s 与新消息晋升、撤权 kill、重启 unknown 不重播 | — |
 | EDIT-01 | 稳定 group id、依赖分组、选集传递、无选集拒绝、重规划基线校验、CLI 多选 | — |
 | JOB-02 | 本地通知、opt-in follow-up 策略（去重/预算/截断）、不重播未知、取消不转后台 | — |
+| START-02 | 首帧 10k 不扫描、持久摘要索引（mtime/size 校验、损坏即 miss） | — |
 | START-03 | `scripts/bench-start.mjs` + `bench:start`：Node/exe `--version` 各 30 次，first/p50/p95/min/max | 交互首帧、键响应、regular/fullscreen/pipe 与受控冷缓存仍未测量（无 PTY 依赖） |
 
 ## 未开始
 
-PAN-08、START-02/03、QA-01…04、TOOL-02；PAN-03 输出分页/脱敏、RENDER-03 resize 锚点与左右源复制仍缺。
+PAN-08、START-03、QA-01…04、TOOL-02；PAN-03 输出分页/脱敏、RENDER-03 resize 锚点与左右源复制仍缺。
 
 ## CI
 

@@ -7,6 +7,8 @@
  * - state.json      -> mutable runtime state snapshot
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
 import type { CurrentSessionSelectionResolution } from "./store/currentSelection.js";
 import { SESSION_APPROVAL_AUDIT_HISTORY_LIMIT } from "./approval/sessionApprovalMemory.js";
 import { type TranscriptEvent } from "./sessionEventCodec.js";
@@ -235,11 +237,64 @@ export class SessionManager extends SessionReadSurface {
     readonly includeUntouched?: boolean;
   }): SessionReentrySummary[] {
     const sessions = input?.includeUntouched === true ? this.listSessions() : this.listRealSessions();
+    const index = this.loadReentryIndex();
+    let changed = false;
+    const summaries = sessions.map((session) => {
+      const stamp = this.reentryStamp(session.id);
+      const cached = stamp === undefined ? undefined : index.get(session.id);
+      if (cached && cached.stamp === stamp) return cached.summary;
+      const summary = this.describeSessionReentry(session.id);
+      if (stamp !== undefined) { index.set(session.id, { stamp, summary }); changed = true; }
+      return summary;
+    });
+    if (changed) this.flushReentryIndex(index);
     return projectSortedSessionReentrySummaries({
-      summaries: sessions.map((session) => this.describeSessionReentry(session.id)),
+      summaries,
       preferredProjectRoot: input?.preferredProjectRoot,
       limit: input?.limit,
     });
+  }
+
+  /**
+   * Summary cache for re-entry listing.
+   *
+   * Reading every session's metadata, state and transcript is the expensive part
+   * of a listing; a persisted index keyed by the three files' size and mtime
+   * avoids it when nothing changed. A missing, corrupt or stale index only costs
+   * a recomputation, never a wrong summary.
+   */
+  private reentryIndexCache?: Map<string, { readonly stamp: string; readonly summary: SessionReentrySummary }>;
+  private reentryStamp(sessionId: string): string | undefined {
+    try {
+      return [this.host.store.metadataPath(sessionId), this.host.store.statePath(sessionId), this.host.store.transcriptPath(sessionId)]
+        .map(file => { const stat = fs.statSync(file); return `${stat.mtimeMs}:${stat.size}`; }).join('|');
+    } catch { return undefined; }
+  }
+  private reentryIndexFile(): string { return path.join(this.host.store.sessionsDir, '.reentry-index.json'); }
+  private loadReentryIndex(): Map<string, { readonly stamp: string; readonly summary: SessionReentrySummary }> {
+    if (this.reentryIndexCache) return this.reentryIndexCache;
+    const index = new Map<string, { readonly stamp: string; readonly summary: SessionReentrySummary }>();
+    try {
+      const parsed = JSON.parse(fs.readFileSync(this.reentryIndexFile(), 'utf8')) as { version?: unknown;
+        entries?: Record<string, { stamp?: unknown; summary?: unknown }> };
+      if (parsed.version === 1 && parsed.entries && typeof parsed.entries === 'object') {
+        for (const [id, entry] of Object.entries(parsed.entries)) {
+          if (typeof entry?.stamp === 'string' && entry.summary && typeof entry.summary === 'object')
+            index.set(id, { stamp: entry.stamp, summary: entry.summary as SessionReentrySummary });
+        }
+      }
+    } catch { /* A missing or damaged index is a cache miss. */ }
+    this.reentryIndexCache = index;
+    return index;
+  }
+  private flushReentryIndex(index: Map<string, { readonly stamp: string; readonly summary: SessionReentrySummary }>): void {
+    const file = this.reentryIndexFile();
+    try {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      const temporary = `${file}.${process.pid}.tmp`;
+      fs.writeFileSync(temporary, JSON.stringify({ version: 1, entries: Object.fromEntries(index) }), 'utf8');
+      fs.renameSync(temporary, file);
+    } catch { /* The listing already succeeded; a cache that cannot persist is not an error. */ }
   }
 
   /**

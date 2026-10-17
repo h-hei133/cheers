@@ -7585,3 +7585,9 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 审批 picker 在多 group patch 时增加 “Choose groups…”：第二个多选面板默认全选，Space 切换，Enter 只应用选中 group；单 group 保持三选一。`ApprovalSettleResult.selected` 经既有 `setPreparedSelection` 绑定到已 prepare 的调用。
 - follow-up 策略抽到 `backgroundNotice.ts`：默认关闭、按 id 去重、每会话预算、4000 字符截断；交互层只负责 notice 与注入。
 - 验证：picker 43；backgroundNotice 3。
+
+## 2026-10-18 — START-02 持久摘要索引
+
+- `SessionManager.listReentrySummaries` 使用 `.reentry-index.json`：条目以 metadata/state/transcript 的 size+mtime 为戳；命中直接用缓存的 `SessionReentrySummary`，缺失/损坏/过期则重算并原子写回。
+- 首帧路径不变（10k 会话首帧测试仍通过）；显式 resume/fallback 不变。
+- 验证：`src/session` 856 通过；新增索引命中/失效/损坏测试。
