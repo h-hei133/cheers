@@ -24,6 +24,7 @@ import { skillPicker } from "./skills.js";
 import { sourcePicker } from "./sources.js";
 import { sessionPicker } from "./session.js";
 import { hubPicker } from "./hub.js";
+import { mcpAddWizard } from "./mcpAdd.js";
 import { advisorPicker } from "./advisor.js";
 import { thinkingPicker } from "./thinking.js";
 import { statusItemPicker } from "./statusItems.js";
@@ -60,6 +61,8 @@ export interface PickerHost extends SettingsHost {
   renameSession(sessionId: string, title: string, version?: string): Promise<string | undefined>;
   pinSession?(sessionId: string, version?: string): Promise<string | undefined>;
   refreshServer(serverName: string): Promise<string | undefined>;
+  addMcpServer?(scope: 'user' | 'project', name: string,
+    definition: { readonly command: string; readonly args: readonly string[] } | { readonly url: string }): Promise<string | undefined>;
   revokeGrant(key: string): Promise<string | undefined>;
   saveStatusItems(items: readonly StatusItemId[]): Promise<string | undefined>;
   /** Show `items` in the band without saving; `undefined` restores the saved band. */
@@ -87,7 +90,8 @@ const PICKERS: Record<string, PickerFactory> = {
       rename: host.renameSession,
       pin: host.pinSession,
     }),
-  mcp: (host) => serverPicker({ gateway: host.mcpGateway, refresh: host.refreshServer }),
+  mcp: (host) => serverPicker({ gateway: host.mcpGateway, refresh: host.refreshServer,
+    ...(host.addMcpServer ? { add: () => mcpAddWizard(host.addMcpServer!) } : {}) }),
   connect: (host) => connectionPicker(host.commandContext),
   permissions: (host) =>
     permissionPicker({

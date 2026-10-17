@@ -7603,3 +7603,9 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 
 - `TranscriptPane` 记录每行所属 block；宽度变化重排后，若用户已向上滚动，则以原顶部 block 及其行内偏移重新定位，而不是沿用旧的绝对行号；跟随末尾时仍贴底。
 - 验证：surface/presentation + interactive 1722 通过；新增“宽度变化后顶部仍是同一 line”测试。
+
+## 2026-10-18 — PAN-08 MCP 添加向导
+
+- `/mcp` 选择器增加 “Add server…”：scope（user/project）→ name（1–64 字母数字 _-）→ transport（stdio/http）→ command/url → confirm；只有最后一步确认才调用既有 `mcp add` 发布。
+- 交互宿主把定义写入 0600 临时 JSONC，调用既有 `runMcpConfigCommand`，无论成功或拒绝都删除；不收集 env/headers 秘密。
+- 验证：picker/mcp/core-mcp 184 通过；向导两步链测试覆盖 stdio/http。

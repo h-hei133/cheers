@@ -17,7 +17,7 @@ export interface ServerPickerOptions {
   readonly refresh: (serverName: string) => Promise<string | undefined>;
 }
 
-export function serverPicker(options: ServerPickerOptions): Picker {
+export function serverPicker(options: ServerPickerOptions & { readonly add?: () => Picker }): Picker {
   return {
     title: "Servers",
     form: "panel",
@@ -25,16 +25,20 @@ export function serverPicker(options: ServerPickerOptions): Picker {
     async load(): Promise<readonly Option[]> {
       const snapshot = await options.gateway.snapshot();
       const toolCounts = countTools(snapshot.tools);
-      return snapshot.clients.map<Option>((client) => ({
-        id: client.name,
-        label: client.name,
-        detail: detailFor(client, toolCounts.get(client.name) ?? 0),
-        note: client.type,
-      }));
+      return [
+        ...snapshot.clients.map<Option>((client) => ({
+          id: client.name,
+          label: client.name,
+          detail: detailFor(client, toolCounts.get(client.name) ?? 0),
+          note: client.type,
+        })),
+        ...(options.add ? [{ id: '__add__', label: 'Add server…', detail: 'Define a new server step by step' }] : []),
+      ];
     },
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
       const name = ids[0];
       if (!name) return undefined;
+      if (name === '__add__') return options.add ? { next: options.add() } : undefined;
       const note = await options.refresh(name);
       return note ? { note } : undefined;
     },

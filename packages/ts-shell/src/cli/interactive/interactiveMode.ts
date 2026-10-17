@@ -10,6 +10,8 @@ import { jobsFor, watchJobsFor } from '../runtime/jobs.js';
 import { createBackgroundFollowUp } from './backgroundNotice.js';
 import { jobsControl, runJobsControl } from '../jobs/control.js';
 import type { Interface as ReadlineInterface } from "node:readline";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import type { ApprovalTrustPolicy } from "../../core/shell/approvalTrustPolicy.js";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
@@ -53,7 +55,7 @@ import { sshControl, runSshControl } from '../ssh/control.js';
 import { isExtensionControl, extensionCommandFor } from '../runtime/extensions.js';
 import { isMcpRequest, isMcpConfiguration, mcpControl } from '../mcp/content.js';
 import { runMcpConfigurationControl } from '../mcp/control.js';
-import { cancelMcpFor } from '../runtime/mcp.js';
+import { cancelMcpFor, mcpCommandFor } from '../runtime/mcp.js';
 import { runCliMcpCommand } from '../../entrypoints/cliMcpModule.js';
 import { isAdvisorControl, advisorCommandFor } from '../runtime/advisor.js';
 import { decodeAdvisor } from '../../advisor/codec.js';
@@ -1062,6 +1064,18 @@ export class InteractiveMode {
         resume: sessionId => this.runCommandLine(`/resume ${sessionId}`),
       }),
       refreshServer: (serverName) => this.runCommandLine(`/mcp refresh ${serverName}`),
+      addMcpServer: async (scope, name, definition) => {
+        // The definition file is the existing publication input; it is private,
+        // short-lived, and deleted whether the command succeeds or refuses.
+        const file = path.join(os.tmpdir(), `cheers-mcp-${process.pid}-${Date.now()}.jsonc`);
+        try {
+          fs.writeFileSync(file, JSON.stringify(definition), { mode: 0o600 });
+          const result = await mcpCommandFor(this.options.runtimeContext)(['add', scope, name, file],
+            { cwd: this.options.runtimeContext.cwd, projectRoot: this.options.runtimeContext.projectRoot,
+              sessionId: this.options.runtimeContext.session.id });
+          return result.kind === 'local' ? result.output : undefined;
+        } finally { try { fs.unlinkSync(file); } catch { /* already gone */ } }
+      },
       revokeGrant: (key) => this.runCommandLine(`/permissions revoke ${key}`),
       sessionTurns: () =>
         this.options.sessionManager.getSession(this.options.runtimeContext.session.id)?.turns ?? [],

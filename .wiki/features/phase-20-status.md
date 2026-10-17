@@ -42,11 +42,12 @@
 | EDIT-01 | 稳定 group id、依赖分组、选集传递、无选集拒绝、重规划基线校验、CLI 多选 | — |
 | JOB-02 | 本地通知、opt-in follow-up 策略（去重/预算/截断）、不重播未知、取消不转后台 | — |
 | START-02 | 首帧 10k 不扫描、持久摘要索引（mtime/size 校验、损坏即 miss） | — |
+| PAN-08 | MCP 逐项向导（scope → name → transport → value → confirm，最后才写）、`/mcp` 选择器 “Add server…”；临时定义文件 0600 且必删 | `/help` 仍为 guide 文本而非 report（有意保留） |
 | START-03 | `scripts/bench-start.mjs` + `bench:start`：Node/exe `--version` 各 30 次，first/p50/p95/min/max | 交互首帧、键响应、regular/fullscreen/pipe 与受控冷缓存仍未测量（无 PTY 依赖） |
 
 ## 未开始
 
-PAN-08、START-03、QA-02/03、TOOL-02；PAN-03 输出分页/脱敏的 hub 面板、RENDER-03 左右源复制仍缺；PAN-05 的流式面板仍缺。
+START-03、QA-02/03、TOOL-02；PAN-03 输出分页/脱敏的 hub 面板、RENDER-03 左右源复制仍缺；PAN-05 的流式面板仍缺。
 
 ## CI
 
