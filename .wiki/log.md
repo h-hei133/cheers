@@ -7390,3 +7390,11 @@ soft/logical 断点）。`projectText` 用渲染同宽逐逻辑行 wrap；`sourc
 **本地验证**：`transcript/source.test.ts` 4 项；transcript/surface/selection/pointer
 14 文件 229 项通过；`build:ts` 通过。合同见[UI 容器几何与状态投影 §5](features/ui-containers.md)。
 本条写入时尚未提交/推送。
+
+### Phase 20 CMD-01/02：命令补全排序与完整词提交
+
+`matchSuggestions` 的前缀匹配改为同一档位，由命令目录自身顺序决定并列名次；此前按标签长度排序使 `/m` 首选 `/mcp`，现在 `/m` 首选 `/model`，精确匹配仍优先。补全列表继续在 `/` 时隐藏 alias，输入前缀时显示并保留 alias 参数与执行路径。
+
+Enter 行为增加“完整命令”判定：当草稿是注册表中的真实命令时直接提交，不再接受此前导航留下的旧候选；不完整命令仍接受补全、不提交。CMD-02 以[命令入口审计](features/37-command-implementation-audit.md)为契约基线；`syntaxCompletions` 的四条路径（动作、flag、参数值、自由文本）、未知参数拒绝及 `continue` 选择器正负例由既有 `syntax/*`、`actions.test.ts`、`commands.test.ts` 与 `continuation.test.ts` 覆盖。
+
+**本地验证**：completion/slashSuggestions/syntax 组合 455 项通过；keymap 54 项、suggestions 13 项通过；`build:ts`、import cycles 通过。本条写入时尚未提交/推送。
