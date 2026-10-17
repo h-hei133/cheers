@@ -46,7 +46,7 @@
 
 ## 未开始
 
-PAN-08、START-03、QA-01…04、TOOL-02；PAN-03 输出分页/脱敏、RENDER-03 resize 锚点与左右源复制仍缺。
+PAN-08、START-03、QA-01…04、TOOL-02；PAN-03 输出分页/脱敏、RENDER-03 左右源复制仍缺。
 
 ## CI
 

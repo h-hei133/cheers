@@ -407,6 +407,17 @@ describe("scrolling", () => {
     expect(view.scroll(1)).toBe(false);
   });
 
+  it("keeps the same content line at the top when the width changes", () => {
+    const view = longConversation(60);
+    view.renderFrame({ columns: 60, rows: 15 });
+    view.scroll(-5);
+    const wide = view.renderFrame({ columns: 60, rows: 15 }).rows;
+    const wideTop = /line (\d+)/.exec(wide.join("\n"))![1];
+    const narrow = view.renderFrame({ columns: 40, rows: 15 }).rows;
+    expect(/line (\d+)/.exec(narrow.join("\n"))![1]).toBe(wideTop);
+    expect(view.scrolledBack).toBeGreaterThan(0);
+  });
+
   it("moves the window under the thumb", () => {
     const view = longConversation(40);
     view.renderFrame({ columns: 60, rows: 15 });

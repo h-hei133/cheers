@@ -7598,3 +7598,8 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - `/btw` 结果增加报告：question、providerRequest、delivered 与答案；仍为带外、不写主会话。
 - `renderLocalCommand` 在渲染器不支持报告时回退纯文本，避免 pipe/测试宿主崩溃。
 - 验证：core/commands + planning 638 通过。
+
+## 2026-10-18 — RENDER-03 resize 锚点
+
+- `TranscriptPane` 记录每行所属 block；宽度变化重排后，若用户已向上滚动，则以原顶部 block 及其行内偏移重新定位，而不是沿用旧的绝对行号；跟随末尾时仍贴底。
+- 验证：surface/presentation + interactive 1722 通过；新增“宽度变化后顶部仍是同一 line”测试。

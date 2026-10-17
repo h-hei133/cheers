@@ -41,6 +41,7 @@ export class TranscriptPane {
   /** Source lines aligned with the painted screen rows; filler rows have none. */
   private sources: readonly (SourceLine | undefined)[] = [];
   private paintedRows: readonly string[] = [];
+  private owners: readonly number[] = [];
 
   constructor(private readonly transcript: Transcript) {}
 
@@ -71,7 +72,16 @@ export class TranscriptPane {
     const rendered = this.transcript.render(contentWidth, options);
     const { rows, owners } = rendered;
     const safeCapacity = layout === "document" ? rows.length : Math.max(1, capacity);
+    // A resize re-wraps every row, so an absolute scrollTop no longer names the
+    // same content. Keep the block at the top and its offset inside that block.
+    const previousTop = this.scroller.scrollTop;
+    const anchor = !this.scroller.isFollowingEnd ? this.owners[previousTop] : undefined;
+    const anchorOffset = anchor === undefined ? 0 : previousTop - this.owners.indexOf(anchor);
     this.scroller.updateLayout(rows.length, safeCapacity);
+    if (anchor !== undefined && !this.scroller.isFollowingEnd) {
+      const start = owners.indexOf(anchor);
+      if (start >= 0) this.scroller.scrollTo(Math.min(owners.length - 1, start + anchorOffset));
+    }
     const top = this.scroller.scrollTop;
     const visible = rows.slice(top, top + safeCapacity);
     const filler = Math.max(0, safeCapacity - visible.length);
@@ -82,6 +92,7 @@ export class TranscriptPane {
     ];
     this.capacity = safeCapacity;
     this.width = safeWidth;
+    this.owners = owners;
     this.total = rows.length;
     this.geometry = hasScrollbar ? scrollbarGeometry(rows.length, safeCapacity, top, safeWidth - 1) : undefined;
     const shaded = this.window.shade([...Array<string>(filler).fill(""), ...visible], selection);
