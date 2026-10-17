@@ -7192,3 +7192,11 @@ CFG-01 产品、测试及文档已提交为 `647ae00ed0200474ccefa0e028246acb048
 **界限与交付状态**：没有真实 provider、Windows/macOS 或完整八层 TTY 证据；两层动态运行与八次边界测试各自记录，未互相替代。文档链接检查通过，strict docs 的既有 118 条 advisory 保留。此条写入时产品尚未提交/推送，也没有 CFG-02 精确 SHA CI；后续另记。其余 45 项仍待顺序交付。
 
 OMX 的 story checkpoint 仍因已安装版本的 objective alias filter 报 `Codex goal objective mismatch`：活动目标保留用户原始指令，CFG-01/G001 的 ledger 未能标 complete。该工具缺陷不等于产品未交付；继续保留真实 delivery evidence，通过 annotate_ledger 记录，不伪造 snapshot、改写隐藏目标或声明整个 Phase 20 完成。
+
+### Phase 20 CFG-02：Node floor 源码启动夹具修复
+
+CFG-02 已提交推送为 `a843726086e80fb0166352cd1ef4916b5a51da59`，远端 ref 读回一致。[Architecture Watch](https://github.com/h-hei133/cheers/actions/runs/39011958152) 完成通过；[主 CI](https://github.com/h-hei133/cheers/actions/runs/39011958189) 的构建、静态门禁和依赖安装通过，TS suite 为 819 文件通过、1 文件失败；8272 项通过、1 项失败、2 skipped。最后 NormProof 被跳过，因此此 SHA 不算交付闭合。
+
+唯一失败为源码重启 PID 测试：临时目录没有本仓源码包的 `type: module`，Node 20.3.0 的 ESM loader 无法接管 CommonJS 夹具。下载精确 Node 20.3.0 到忽略的本仓 cache 后复现；同一入口 CommonJS 失败、ESM 成功。修复仅为测试补 ESM 包身份，并补实际 `./pid.js` 到 `pid.ts` 的传递引用，保留执行 owner 和 admitted PID 相等断言；失败时显示合成子进程 stderr。没有改变产品 loader、Node floor、package scripts 或 CI 断言。
+
+Node 20.3.0 与本地 Node 24.15.0 的相关四文件各 24 项通过；撤销 ESM 夹具保护再次触发 AssertionError/退出 1，随后逐字恢复。精确 Node 20.3.0 的实际源码三路 TTY source→target→source 探针也通过，包含两层 resize、独立登录、同 PID restart、终端恢复、退出及会话读回；pending 凭据实际 loopback 请求为 0。限定测试文件的清理无额外改动，清理后单文件再次通过；五项静态门禁通过。修复的提交、推送及新 SHA CI 继续单独读回；CFG-03 产品实现等待此交付闭合。
