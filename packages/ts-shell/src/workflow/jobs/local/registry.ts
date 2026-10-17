@@ -67,19 +67,22 @@ export class TaskRegistry implements BackgroundRunner {
     });
     return task;
   }
-  promote(id: string): boolean {
+  promote(id: string): 'promoted' | 'settled' | 'refused' {
     const operation = this.operations.get(id); const task = this.tasks.get(id);
-    if (!operation?.handle || !operation.input || !task || !this.journal) return false;
-    if (this.promoted.has(id)) return true;
+    if (this.promoted.has(id)) return 'promoted';
+    // No live operation means the child settled before the promotion; the
+    // caller still owns the result and must not be told the job was lost.
+    if (!operation?.handle || !operation.input || !task) return 'settled';
+    if (!this.journal) return 'refused';
     try {
-      this.journal?.promote(id, operation.input, task.pid);
+      this.journal.promote(id, operation.input, task.pid);
       this.promoted.add(id);
-      return true;
+      return 'promoted';
     } catch {
       // Capacity or journal refusal: the provisional task must not keep a live
       // child that nothing can address, so it is killed here.
       void operation.handle.kill();
-      return false;
+      return 'refused';
     }
   }
   resume(id: string, input: BackgroundInput): BackgroundTask {

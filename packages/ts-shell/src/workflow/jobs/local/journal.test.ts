@@ -56,7 +56,7 @@ it('adopts a foreground child and promotes it without a second spawn', async () 
   const task = owner.adopt(handle, { command: 'adopted-command', cwd: root });
   expect(task.pid).toBe(handle.pid);
   expect(local.list()).toEqual([]);
-  expect(owner.promote(task.id)).toBe(true);
+  expect(owner.promote(task.id)).toBe('promoted');
   expect(local.get(task.id)).toMatchObject({ status: 'running' });
   await until(() => !owner.hasLive(task.id));
   expect(local.get(task.id)).toMatchObject({ status: 'completed', output: 'complete' });
@@ -71,9 +71,9 @@ it('refuses promotion when the journal is at capacity and kills the provisional 
   const first = owner.adopt(make(), { command: 'first', cwd: root });
   const second = owner.adopt(make(), { command: 'second', cwd: root });
   const third = owner.adopt(make(), { command: 'third', cwd: root });
-  expect(owner.promote(first.id)).toBe(true);
-  expect(owner.promote(second.id)).toBe(true);
-  expect(owner.promote(third.id)).toBe(false);
+  expect(owner.promote(first.id)).toBe('promoted');
+  expect(owner.promote(second.id)).toBe('promoted');
+  expect(owner.promote(third.id)).toBe('refused');
   await until(() => !owner.hasLive(third.id));
   await owner.stop(first.id); await owner.stop(second.id);
 });

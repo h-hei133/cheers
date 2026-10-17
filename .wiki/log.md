@@ -7555,3 +7555,8 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 新增 `backgroundFollowUp`（boolean，默认 false，Session 组，immediate）：开启后已退出任务的完成通知以 `background:<id>` 去重、每会话最多 20 条、输出截断 4000 字符，作为原 session 的 follow-up 注入。
 - 取消路径杀进程且不晋升；重启后 journal 的 running/unknown 不自动重播。
 - 验证：`src/config` + `src/cli/interactive` 1127 通过（新增字段后 settings 期望已更新）。
+
+### JOB-01 竞争收口
+
+- `BackgroundRunner.promote` 改为三态 `promoted|settled|refused`：子进程在 deadline 与晋升之间退出时不再被误报为“无法转后台并已停止”，调用方直接取得已结算结果。
+- 验证：promotion 测试新增 settled 分支；promotion + journal 13 通过。

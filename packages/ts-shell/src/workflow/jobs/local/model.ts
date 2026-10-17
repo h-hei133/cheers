@@ -32,8 +32,14 @@ export interface BackgroundRunner {
    * command that finishes in the foreground leaves no journal entry.
    */
   adopt?(handle: import('../../../runtime/execution/types.js').LocalExecutionHandle, input: BackgroundInput): BackgroundTask;
-  /** Promote a provisional task to a durable job; false when capacity refused it. */
-  promote?(id: string): boolean;
+  /**
+   * Promote a provisional task to a durable job.
+   *
+   * `settled` means the child finished before the promotion and its result is
+   * still the caller's; `refused` means capacity rejected it and the child was
+   * killed.
+   */
+  promote?(id: string): 'promoted' | 'settled' | 'refused';
   list(): readonly BackgroundTask[];
   get(id: string): BackgroundTask | undefined;
   stop(id: string): Promise<boolean>;

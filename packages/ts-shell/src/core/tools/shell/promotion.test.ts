@@ -11,7 +11,7 @@ it('promotes a default-timeout foreground command without spawning again', async
   const detach = vi.fn();
   const kill = vi.fn(async () => {});
   const adopt = vi.fn(() => ({ id: 'task-1', command: 'echo hi', cwd: '/tmp', pid: 4321, startedAt: 0, state: 'running', output: '' }));
-  const promote = vi.fn(() => true);
+  const promote = vi.fn(() => 'promoted' as const);
   const startCommand = vi.fn(() => ({
     handle: { pid: 4321, onOutput: () => () => {}, detach, kill, result: new Promise(() => {}) },
     result: new Promise(() => {}),
@@ -32,12 +32,32 @@ it('promotes a default-timeout foreground command without spawning again', async
   expect(result.output).toContain('task-1');
 });
 
+it('reports the result when the command settles before promotion', async () => {
+  vi.useFakeTimers();
+  const detach = vi.fn();
+  const promote = vi.fn(() => 'settled' as const);
+  const adopt = vi.fn(() => ({ id: 'task-3', command: 'echo hi', cwd: '/tmp', pid: 4323, startedAt: 0, state: 'running', output: '' }));
+  const settled = new Promise(resolve => setTimeout(() => resolve({ status: 'completed', exitCode: 0, stdout: 'late', stderr: '' }), 60_050));
+  const service = { startCommand: () => ({ handle: { pid: 4323, onOutput: () => () => {}, detach, kill: async () => {}, result: settled },
+    result: settled }), runCommand: vi.fn() } as unknown as ExecutionService;
+  const background = { adopt, promote, start: vi.fn(), list: () => [], get: () => undefined, stop: async () => false, onEnded: () => () => {} } as unknown as BackgroundRunner;
+  const bash = createCoreToolRegistry({ executionService: service }).get('bash')!;
+  const context = { workspaceRoot: '/tmp', cwd: '/tmp', sessionId: 's', background, onOutput: () => {} } as unknown as ToolExecutionContext;
+  const pending = bash.execute({ command: 'echo hi' }, context);
+  await Promise.resolve();
+  await vi.advanceTimersByTimeAsync(60_050);
+  const result = await pending;
+  expect(promote).toHaveBeenCalledWith('task-3');
+  expect(result.success).toBe(true);
+  expect(result.output).toContain('late');
+});
+
 it('stops the child when promotion is refused at capacity', async () => {
   vi.useFakeTimers();
   const detach = vi.fn();
   const kill = vi.fn(async () => {});
   const adopt = vi.fn(() => ({ id: 'task-2', command: 'echo hi', cwd: '/tmp', pid: 4322, startedAt: 0, state: 'running', output: '' }));
-  const promote = vi.fn(() => false);
+  const promote = vi.fn(() => 'refused' as const);
   const service = { startCommand: () => ({ handle: { pid: 4322, onOutput: () => () => {}, detach, kill, result: new Promise(() => {}) },
     result: new Promise(() => {}) }), runCommand: vi.fn() } as unknown as ExecutionService;
   const background = { adopt, promote, start: vi.fn(), list: () => [], get: () => undefined, stop: async () => false, onEnded: () => () => {} } as unknown as BackgroundRunner;

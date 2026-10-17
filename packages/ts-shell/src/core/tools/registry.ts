@@ -144,13 +144,16 @@ async function runCommandTool(
     ])
     if (raced.kind === 'timeout') {
       started.handle.detach()
-      if (!context.background!.promote!(task.id)) {
+      const promotion = context.background!.promote!(task.id)
+      if (promotion === 'refused') {
         await started.handle.kill()
         return deniedResult('Error: the command could not be moved to the background and was stopped. Nothing is still running.', { status: 'failed', exitCode: 1 })
       }
-      return approvedResult(`Moved to the background as ${task.id} after ${DEFAULT_COMMAND_TIMEOUT_MS / 1000} seconds. It keeps the same process; read it with taskOutput and stop it with taskStop.`)
-    }
-    result = raced.value
+      if (promotion === 'promoted')
+        return approvedResult(`Moved to the background as ${task.id} after ${DEFAULT_COMMAND_TIMEOUT_MS / 1000} seconds. It keeps the same process; read it with taskOutput and stop it with taskStop.`)
+      // It finished between the deadline and the promotion; report the result.
+      result = await started.result
+    } else result = raced.value
   } else {
     result = await executionService.runCommand({ ...request, timeoutMs: timeout.timeoutMs })
   }
