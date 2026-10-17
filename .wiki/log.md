@@ -7254,3 +7254,13 @@ CFG-03 新增重复 `--config` JSONC 输入，顺序固定于启动目录并保�
 同时为本阶段新增字段显式声明来源与应用时点：`allowedModels` 为 project/user/override 的 `next operation` 交集限制，`pathRules` 为 project/user 的 `next operation` 累积规则。
 
 **本地验证**：新增 `config/environment.test.ts` 4 项通过（声明唯一性、优先级、空值、非法值不回显）；`src/config` 20 文件 248 项通过；`build:ts`、`check:config-consumers`、`check:declarations` 通过。CFG-04 的组合复跑为 81 文件 970 项全部通过。本条写入时尚未提交/推送，无精确 SHA CI。
+
+### Phase 20 PRV-01：共享模型可用性投影与精确显示
+
+新增 `core/models/availability.ts`：只读取已接受配置、目录与环境变量，产出 provider/connection 的 `ready`、`credential-missing`、`pending`、`error`、`unsupported`、`unknown` 事实，`measured` 恒为 `unknown`。凭据值不进入投影，endpoint 只保留 host 与 pathname。
+
+模型选择器、`/model list`、`/model status`、连接选择器与 `/connect status` 的 endpoint 显示接入同一投影。选择器只有 active connection 的 provider 行可选，其他行保留可见但禁用并说明需要先切换连接；目录 id 与 runtime 不同的自定义中转站按裸模型名应用，请求目标仍是 active connection。会话选择继续由现有锁内 `connectionId/provider/model/effort` 事务提交。
+
+**本地验证**：新增 6 项投影测试（legacy/env 凭据、pending/error/missing、同 provider 两 relay 与脱敏、无模型与未目录连接、measured 不冒充、endpoint 清洗）；`src/core/models`、模型命令、picker 与 `session/model` 共 20 文件 285 项通过；`build:ts` 与三项静态门禁通过。合同见[模型可用性投影](features/model-availability.md)。
+
+本条写入时尚未提交/推送；未运行真实 provider、跨进程并发或跨平台动态证据。

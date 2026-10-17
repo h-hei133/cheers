@@ -14,6 +14,7 @@ import { projectSessionModel } from "../../session/model/projection.js";
 import { loadCatalog, ensureUserCatalog, userCatalogPath } from "../models/catalogStore.js";
 import { refreshCatalog } from "../models/catalogRefresh.js";
 import { renderCatalog } from "../models/catalogSurface.js";
+import { availabilitySnapshot, type AvailabilitySnapshot } from "../models/availability.js";
 import { resolveProviderCredential } from "../shell/providerCredentials.js";
 import { configurationApplicationNotice } from "./configuration.js";
 import { needsUserEndpoint, providerFacts } from "../providers/facts.js";
@@ -98,18 +99,12 @@ function modelConfiguration(context: CommandContext) {
 }
 
 function renderCatalogView(context: CommandContext): string {
-  const { config, catalog, active } = modelConfiguration(context);
-  return renderCatalog({
-    providers: catalog,
-    connected: new Set(normalizeConnections(config).map(connection => connection.provider)),
-    activeProvider: active.provider,
-    activeModel: active.model,
-    configPath: userCatalogPath(),
-  });
+  const { config, catalog } = modelConfiguration(context);
+  return renderCatalog({ providers: catalog, availability: availabilitySnapshot({ config, catalog }), configPath: userCatalogPath() });
 }
 
 function renderModelStatus(context: CommandContext): string {
-  const { config, active: request } = modelConfiguration(context);
+  const { config, catalog, active: request } = modelConfiguration(context);
   const connections = normalizeConnections(config);
   const activeId = config.activeProviderConnectionId?.trim();
   const activeConnection = connections.find((item) => item.id === activeId);
@@ -135,6 +130,7 @@ function renderModelStatus(context: CommandContext): string {
       activeConnectionId: activeId,
       activeConnection,
       model,
+      availability: availabilitySnapshot({ config, catalog }),
     }),
     "",
     "Use /model list to inspect available models.",
@@ -146,7 +142,10 @@ function renderProviderReadinessLines(input: {
   readonly activeConnectionId?: string;
   readonly activeConnection?: ProviderConnectionConfig;
   readonly model?: string;
+  readonly availability: AvailabilitySnapshot;
 }): string[] {
+  const projected = input.availability.providers.flatMap(provider => provider.connections)
+    .find(connection => connection.connectionId === input.activeConnectionId?.trim());
   if (!input.activeConnectionId) {
     return [
       "Provider readiness",
@@ -163,7 +162,7 @@ function renderProviderReadinessLines(input: {
     ];
   }
 
-  if (input.activeConnection.status === "pending") {
+  if (projected?.state === "pending" || input.activeConnection.status === "pending") {
     return [
       "Provider readiness",
       "- Config status: connection setup is pending.",
@@ -171,7 +170,7 @@ function renderProviderReadinessLines(input: {
     ];
   }
 
-  if (input.activeConnection.status === "error") {
+  if (projected?.state === "error" || input.activeConnection.status === "error") {
     return [
       "Provider readiness",
       "- Config status: connection setup is in error state.",
@@ -179,10 +178,7 @@ function renderProviderReadinessLines(input: {
     ];
   }
 
-  if (
-    input.activeConnection.authType !== "account-auth" &&
-    !input.activeConnection.apiKey?.trim()
-  ) {
+  if (projected?.state === "credential-missing" || (input.activeConnection.authType !== "account-auth" && !input.activeConnection.apiKey?.trim())) {
     return [
       "Provider readiness",
       "- Config status: credential missing for active connection.",

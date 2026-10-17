@@ -40,6 +40,7 @@ confidence: high
 | [Profile 身份与存储](profiles.md) | CFG-01 consumer 清单、启动身份、共享输入、迟到结果与验证边界 |
 | [显式配置输入](config-inputs.md) | CFG-03 有序只读输入、来源权限、完整重载与保存边界 |
 | [按路径作用域设置](config-scopes.md) | CFG-04 规则声明、canonical 匹配、逐字段合并、操作快照与失效 |
+| [模型可用性投影](model-availability.md) | PRV-01 本地可证明状态、脱敏 endpoint、选择器一致行为 |
 
 ### 0.2 本轮之前的历史文档（01–22）
 

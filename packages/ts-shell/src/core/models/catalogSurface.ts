@@ -1,4 +1,5 @@
 import type { CatalogProvider } from "./catalog.js";
+import { availabilityLabel, endpointLabel, type AvailabilitySnapshot } from "./availability.js";
 
 /**
  * Rendering the catalogue.
@@ -11,11 +12,8 @@ import type { CatalogProvider } from "./catalog.js";
 
 export interface CatalogView {
   readonly providers: readonly CatalogProvider[];
-  /** Provider ids with a stored connection. */
-  readonly connected: ReadonlySet<string>;
-  /** The provider and model this session is using, if any. */
-  readonly activeProvider?: string;
-  readonly activeModel?: string;
+  /** Local configuration facts; nothing here implies a live request was made. */
+  readonly availability: AvailabilitySnapshot;
   /** Where a user adds their own providers. */
   readonly configPath: string;
 }
@@ -42,10 +40,11 @@ export function renderCatalog(view: CatalogView): string {
 }
 
 function renderProvider(provider: CatalogProvider, view: CatalogView): string[] {
-  const state = view.connected.has(provider.id) ? "connected" : AUTH_NOTE[provider.auth];
+  const entry = view.availability.providers.find(candidate => candidate.provider === provider.runtime);
+  const state = entry ? availabilityLabel(entry.state) : AUTH_NOTE[provider.auth];
   const marks = [
     provider.custom ? "yours" : undefined,
-    provider.id === view.activeProvider ? "active" : undefined,
+    provider.runtime === view.availability.activeProvider ? "active" : undefined,
     state,
   ].filter(Boolean);
   const head = `**${provider.label}** \`${provider.id}\` — ${marks.join(" · ")}`;
@@ -54,7 +53,7 @@ function renderProvider(provider: CatalogProvider, view: CatalogView): string[] 
   }
   const lines = [head, ""];
   for (const model of provider.models) {
-    const active = provider.id === view.activeProvider && model.id === view.activeModel;
+    const active = provider.runtime === view.availability.activeProvider && model.id === view.availability.activeModel;
     const window = model.contextWindow ? ` · ${Math.round(model.contextWindow / 1000)}k` : "";
     lines.push(`- \`${model.id}\`${window}${active ? " ← active" : ""}`);
   }
@@ -65,7 +64,8 @@ function renderProvider(provider: CatalogProvider, view: CatalogView): string[] 
 /** One line per provider, for a chooser that shows models on the next level. */
 export function summariseProvider(provider: CatalogProvider, connected: boolean): string {
   const parts = [connected ? "connected" : AUTH_NOTE[provider.auth]];
-  if (provider.baseUrl) parts.push(provider.baseUrl);
+  const endpoint = endpointLabel(provider.baseUrl);
+  if (endpoint) parts.push(endpoint);
   if (provider.models.length > 0) parts.push(`${provider.models.length} models`);
   return parts.join(" · ");
 }

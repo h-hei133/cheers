@@ -3,6 +3,7 @@ import { runConnectCommand } from "../../../core/commands/connectCommandRuntime.
 import { CONNECT_PRESETS, normalizeConnections } from "../../../core/commands/connect/preset.js";
 import { loadCatalog } from "../../../core/models/catalogStore.js";
 import { summariseProvider } from "../../../core/models/catalogSurface.js";
+import { availabilityLabel, availabilitySnapshot } from "../../../core/models/availability.js";
 import type { CommandContext } from "../../../core/commands/types.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
 import type { Picker, PickerOutcome } from "../overlay.js";
@@ -31,13 +32,18 @@ export function connectionPicker(context: CommandContext): Picker {
       const connections = normalizeConnections(config);
       const activeId = config.activeProviderConnectionId?.trim();
       const known = new Set<string>(connections.map((connection) => connection.provider));
+      const availability = availabilitySnapshot({ config, catalog: publication?.catalog ?? loadCatalog() });
+      const projected = new Map(availability.providers.flatMap(provider => provider.connections.map(connection => [connection.connectionId, connection])));
 
-      const rows: Option[] = connections.map<Option>((connection) => ({
-        id: `use:${connection.id}`,
-        label: connection.label ?? connection.provider,
-        detail: `${connection.authType}${connection.model ? ` · ${connection.model}` : ""}`,
-        note: connection.id === activeId ? "active" : CONNECTED,
-      }));
+      const rows: Option[] = connections.map<Option>((connection) => {
+        const state = projected.get(connection.id.trim());
+        return {
+          id: `use:${connection.id}`,
+          label: connection.label ?? connection.provider,
+          detail: [connection.authType, connection.model, state?.endpoint].filter(Boolean).join(" · "),
+          note: connection.id === activeId ? "active" : state ? availabilityLabel(state.state) : CONNECTED,
+        };
+      });
 
       // Presets first — those have a login path wired end to end — then every
       // other provider in the catalogue, which is reachable the same way once a

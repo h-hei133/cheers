@@ -5,6 +5,7 @@ import {
   type ProviderConnectionConfig, type RuntimeConfigFile,
 } from "../../../config/runtimeConfig.js";
 import { needsUserEndpoint } from "../../providers/facts.js";
+import { endpointLabel } from "../../models/availability.js";
 import {
   CONNECT_PRESETS,
   normalizeConnections,
@@ -73,11 +74,11 @@ export function renderConnectionStatus(userConfig: Pick<RuntimeConfigFile, "prov
       const openaiAccount = connection.accountAuth?.openai;
       const googleAccount = connection.accountAuth?.google;
       lines.push(
-        `    credential=account-auth${openaiAccount?.accountId ? ` accountId=${openaiAccount.accountId}` : ""}${googleAccount?.accountEmail ? ` email=${googleAccount.accountEmail}` : ""}${googleAccount?.clientId ? ` clientId=${maskClientId(googleAccount.clientId)}` : ""}${connection.baseUrl ? ` baseUrl=${connection.baseUrl}` : ""}${connection.model ? ` model=${connection.model}` : ""}`,
+        `    credential=account-auth${openaiAccount?.accountId ? ` accountId=${openaiAccount.accountId}` : ""}${googleAccount?.accountEmail ? ` email=${googleAccount.accountEmail}` : ""}${googleAccount?.clientId ? ` clientId=${maskClientId(googleAccount.clientId)}` : ""}${endpointLabel(connection.baseUrl) ? ` endpoint=${endpointLabel(connection.baseUrl)}` : ""}${connection.model ? ` model=${connection.model}` : ""}`,
       );
     } else {
       lines.push(
-        `    credential=${renderApiKeyCredentialSummary(connection.apiKey)}${connection.baseUrl ? ` baseUrl=${connection.baseUrl}` : ""}${connection.model ? ` model=${connection.model}` : ""}`,
+        `    credential=${renderApiKeyCredentialSummary(connection.apiKey)}${endpointLabel(connection.baseUrl) ? ` endpoint=${endpointLabel(connection.baseUrl)}` : ""}${connection.model ? ` model=${connection.model}` : ""}`,
       );
     }
   }
