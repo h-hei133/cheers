@@ -664,7 +664,9 @@ describe("CLI streaming baseline (T3)", () => {
       spawnCli,
       fakeHome: fakeHomeDir,
       line: "/sessions current",
-      waitFor: "Current session",
+      // Wait for the last line the assertion reads; waiting for the heading
+      // closed the stream before the ID line was flushed on a slow runner.
+      waitFor: "- ID:",
       envOverrides: {
         CHEERS_PROVIDER_MODE: "synthetic",
       },

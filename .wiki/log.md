@@ -7645,3 +7645,8 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 
 - `/tools` 报告新增 `size`：description/schema 的 UTF-8 字节总数与逐工具字节，明确 `tokens: not-measured`；不把字节数伪装成 token 上界。
 - 验证：tools/report 1 项。
+
+## 2026-10-18 — 修复 baseline 管道测试抖动
+
+- `cli-baseline` 的 `/sessions current` 管道冒烟此前在 “Current session” 一出现就结束并 kill 进程，慢 runner 上 `- ID:` 尚未 flush，导致 `dd43bcce`、`bde00a5e` 的 CI 偶发失败。
+- 改为等待最终被断言的 `- ID:` 行；本地 `cli-baseline` 40/40。
