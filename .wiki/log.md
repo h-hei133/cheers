@@ -7244,3 +7244,13 @@ CFG-03 新增重复 `--config` JSONC 输入，顺序固定于启动目录并保�
 **本地验证**：`build:ts` 通过；`config/scope` 20 项、`turn/scope.test.ts` 4 项通过；`src/config` 19 文件 244 项通过。`src/turn`、`src/cli/runtime`、`src/cli/provider`、`src/core/shell`、`src/entrypoints` 组合 81 文件 970 项中仅 `inputStream.goal.test.ts` 2 项失败，原因是既有夹具的 partial publication 缺少新读取的 `config`；补齐夹具后该文件 2 项通过，复跑组合见后续条目。五项静态门禁通过；strict docs 既有 118 条 advisory 保留。
 
 本条写入时尚未提交、推送，没有精确 SHA CI；未运行真实 provider、跨进程并发、Windows/macOS 实机或 Settings 交互。其余 43 项仍待依次交付。
+
+### Phase 20 CFG-05：按字段声明的环境输入
+
+把原先硬编码的 `CHEERS_MAX_TURNS` 迁入字段注册表：`ConfigField.environment` 是唯一的环境入口，字段工厂在声明未包含 `environment` 来源时直接拒绝启动。首批只声明 `maxTurns`；provider 凭据继续由 provider facts 负责，其余字段不因存在环境变量而隐式开放。
+
+环境值按字段 schema 类型解析（整数/数字、布尔、文本），空或全空白等同未设置；非法、非整数、下界外或超安全整数记录不含原始值的诊断并使本次 publication 拒绝，保留此前接受的配置。优先级保持文件 → 显式输入 → 环境 → 运行覆盖。合同见[显式配置输入 § 环境输入](features/config-inputs.md#环境输入)。
+
+同时为本阶段新增字段显式声明来源与应用时点：`allowedModels` 为 project/user/override 的 `next operation` 交集限制，`pathRules` 为 project/user 的 `next operation` 累积规则。
+
+**本地验证**：新增 `config/environment.test.ts` 4 项通过（声明唯一性、优先级、空值、非法值不回显）；`src/config` 20 文件 248 项通过；`build:ts`、`check:config-consumers`、`check:declarations` 通过。CFG-04 的组合复跑为 81 文件 970 项全部通过。本条写入时尚未提交/推送，无精确 SHA CI。

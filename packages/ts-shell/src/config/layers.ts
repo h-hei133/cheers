@@ -1,5 +1,5 @@
 import { CONFIG_MAX_BYTES, ConfigDocumentError, inspectConfigDocument } from './syntax.js';
-import { type ConfigFields, type ConfigSource, tuiFields } from './fields.js';
+import { type ConfigField, type ConfigFields, type ConfigSource, tuiFields } from './fields.js';
 import { ConfigReferenceError, resolveConfigReferences } from './references.js';
 import { type ConfigOrigin, origin, rejectOrigin, replaceOrigin, traceValue } from './provenance/model.js';
 import { mergeOrigin } from './provenance/merge.js';
@@ -26,6 +26,14 @@ export interface ConfigLayer {
 
 function diagnostic(source: ConfigSource, field: string, code: string, blocked = false): string {
   return `Config ${source} ${field}: ${code}${blocked ? '; tools blocked' : '; value ignored'}.`;
+}
+
+/** Environment text is parsed by the field's declared schema type; anything else stays text. */
+function environmentValue(field: ConfigField, raw: string): unknown {
+  const text = raw.trim();
+  if (field.schema.type === 'integer' || field.schema.type === 'number') return Number(text);
+  if (field.schema.type === 'boolean') return text === 'true' ? true : text === 'false' ? false : text;
+  return text;
 }
 
 function validateTui(value: unknown, source: ConfigSource, layer: ConfigLayer, trust: TrustDecision, file?: ConfigFileOrigin): unknown {
@@ -132,8 +140,14 @@ export function loadConfigLayers(paths: readonly { path: string; source: 'projec
     layer.valid &&= documentLayer.valid; layer.blocked ||= documentLayer.blocked;
     layer.sources.push(candidate.canonical!);
   }
-  const rawMaxTurns = process.env.CHEERS_MAX_TURNS;
-  if (rawMaxTurns) applyConfigLayer(layer, { maxTurns: Number(rawMaxTurns) }, 'environment', fields, trust, undefined, workspace);
+  for (const [key, field] of Object.entries(fields)) {
+    const variable = field.environment;
+    if (!variable) continue;
+    const raw = process.env[variable];
+    // An empty variable is the same statement as an unset one; only a value is validated.
+    if (raw === undefined || raw.trim() === '') continue;
+    applyConfigLayer(layer, { [key]: environmentValue(field, raw) }, 'environment', fields, trust, undefined, workspace);
+  }
   if (overrides !== undefined) {
     try {
       inspectConfigDocument(overrides);

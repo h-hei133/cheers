@@ -15,15 +15,20 @@ export interface ConfigField {
   readonly application: ConfigApplication;
   readonly sensitivity: 'public' | 'personal';
   readonly projectTrust: 'safe' | 'required' | readonly (string | number | boolean)[];
+  /** Declared environment input; only listed fields read the process environment. */
+  readonly environment?: string;
   readonly scope?: ScopeFieldPolicy;
 }
 export type ConfigFields = Readonly<Record<string, ConfigField>>;
 const ajv = new Ajv({ allErrors: false, strict: true });
 ajv.addKeyword({ keyword: 'environment', schemaType: 'boolean', valid: true });
 
-function field(schema: AnySchemaObject, sources: readonly ConfigSource[] = ['project', 'user'], merge: MergePolicy = 'replace', security = false, metadata: Partial<Pick<ConfigField, 'application' | 'sensitivity' | 'projectTrust'>> = {}): ConfigField {
+function field(schema: AnySchemaObject, sources: readonly ConfigSource[] = ['project', 'user'], merge: MergePolicy = 'replace', security = false,
+  metadata: Partial<Pick<ConfigField, 'application' | 'sensitivity' | 'projectTrust' | 'environment'>> = {}): ConfigField {
+  if (metadata.environment && !sources.includes('environment')) throw new Error(`Environment input ${metadata.environment} requires the environment source.`);
   return { schema, validate: ajv.compile(schema), sources, merge, security,
-    application: metadata.application ?? 'next operation', sensitivity: metadata.sensitivity ?? 'public', projectTrust: metadata.projectTrust ?? 'required' };
+    application: metadata.application ?? 'next operation', sensitivity: metadata.sensitivity ?? 'public', projectTrust: metadata.projectTrust ?? 'required',
+    ...(metadata.environment ? { environment: metadata.environment } : {}) };
 }
 
 /** Every accepted input has one schema and source/merge policy, including CLI-only input. */
@@ -37,9 +42,9 @@ export function createConfigFields(providers: readonly string[]) {
     providerCredentials: field(objectSchema(Object.fromEntries(providers.map(provider => [provider, credentialSchema]))), personal, 'replace', false, { sensitivity: 'personal' }),
     providerConnections: field(listSchema(connectionSchema(providers)), personal, 'replace', false, { sensitivity: 'personal' }),
     activeProviderConnectionId: field(textSchema, personal, 'replace', false, { sensitivity: 'personal' }),
-    maxTurns: field(positiveSchema, ['project', 'user', 'environment']),
+    maxTurns: field(positiveSchema, ['project', 'user', 'environment'], 'replace', false, { environment: 'CHEERS_MAX_TURNS' }),
     allowedTools: field(listSchema(nameSchema), withOverride, 'intersect', true, safe),
-    allowedModels: field(listSchema({ type: 'string', pattern: '^[^/\\s]+/[^\\s].*$' }), withOverride, 'intersect', true, safe),
+    allowedModels: field(listSchema({ type: 'string', pattern: '^[^/\\s]+/[^\\s].*$' }), withOverride, 'intersect', true, { ...safe, application: 'next operation' }),
     disabledTools: field(listSchema(nameSchema), undefined, 'union', true, safe),
     hiddenToolPrefixes: field(listSchema(nameSchema), undefined, 'union', true, safe),
     denyRules: field(listSchema(objectSchema({ tool: nameSchema, pattern: textSchema }, ['tool'])), undefined, 'deny', true, safe),
@@ -74,7 +79,7 @@ export function createConfigFields(providers: readonly string[]) {
   for (const key of Object.keys(SCOPE_FIELDS) as (keyof typeof SCOPE_FIELDS)[]) fields[key] = { ...fields[key], scope: SCOPE_FIELDS[key] };
   const scoped = Object.fromEntries(Object.keys(SCOPE_FIELDS).map(key => [key, fields[key as keyof typeof fields].schema]));
   return { ...fields, pathRules: field({ ...listSchema(objectSchema({ path: nameSchema, settings: objectSchema(scoped) }, ['path', 'settings'])), maxItems: 128 },
-    undefined, 'deny', true, safe) };
+    undefined, 'deny', true, { ...safe, application: 'next operation' }) };
 }
 
 export const tuiFields = Object.fromEntries(Object.entries(tuiSchemas).map(([key, schema]) => [key, field(schema, undefined, 'replace', false, {

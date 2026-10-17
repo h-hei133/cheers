@@ -32,3 +32,11 @@ overlay 中的连接可用于当前会话模型选择和 session 预设。hook �
 `/profile switch` 使用新进程的显式目标参数，不继承旧 profile 的输入文件。每个 profile 应独立选择所需文件。默认配置未选择 `--config` 时继续兼容原行为。
 
 交付证据以[开发日志](../log.md)的精确提交、CI 与已运行验证为准；本文不把本地实现等同于已交付。
+
+## 环境输入
+
+普通字段只有在注册表里显式声明 `environment` 变量时才读取进程环境；没有声明就不存在隐式开放。首批声明为 `maxTurns → CHEERS_MAX_TURNS`。provider 凭据的 `OPENAI_API_KEY` 等映射继续由 provider facts owner 负责，不进入普通字段环境表。
+
+优先级保持“项目/用户文件 → 显式输入次序 → 环境 → 运行覆盖”。环境值按字段 schema 类型解析：整数/数字取 `Number`，布尔只接受 `true`/`false`，其余保持文本。空字符串或全空白等同未设置，不产生诊断。
+
+缺失之外的非法值（非数字、非整数、小于下界、超过 `Number.MAX_SAFE_INTEGER`）与文件非法值同样处理：记录 `Config environment <field>: invalid-value`，诊断不含原始值，并使本次 publication 拒绝，保留此前接受的配置。来源树记录 `environment`，不记录值。新增字段必须同时声明 `sources` 包含 `environment`，否则字段工厂在启动时拒绝该声明。
