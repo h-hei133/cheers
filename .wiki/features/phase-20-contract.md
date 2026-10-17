@@ -54,7 +54,7 @@
 | 任务 | 所有者 | 证据 | 反转 |
 |---|---|---|---|
 | PAN-01 | `picker/model.ts` | pickers（39） | 同名 model 无 relay 详情时失败 |
-| PAN-02 | `picker/session.ts`、`tree.ts` | session（18）、tree（2） | 分组行可选中或连接线缺失时失败 |
+| PAN-02 | `picker/session.ts`、`tree.ts` | session（20）、tree（2） | 分组行可选中、连接线缺失或跨项目动作被放行时失败 |
 | PAN-03 | `picker/hub.ts` | pickers（39） | `/hub` 在无 composition 时仍打开或 apply 取消任务时失败 |
 | PAN-04 | `cli/usage/service.ts` | usage（31） | 无限分母输出百分比时失败 |
 | PAN-06 | `picker/copy.ts` | copy（1） | 第 40 个 block 不可复制时失败 |

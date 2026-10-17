@@ -7498,3 +7498,9 @@ CI 的 `browser/cache/scenarios` 并发三进程测试偶发 `Duplicates/over-bu
 ### 修复：Normal 模式 Ctrl+R 无法触发 redo
 
 控制键的 `ParsedKeyEvent.text` 为空，`vimKey` 之前把 `ctrl+r` 当成未知键。改为控制键使用 `event.name` 作为字母，Normal 的 Ctrl+R 正确触发 `editor.redo`；keymap 59 项通过。
+
+### Phase 20 PAN-02（补充）：跨项目会话搜索
+
+`SessionSelectionContext.allProjects` 让 resume 列表扫描全部已授权项目的会话；resume 面板新增 `This project` / `All projects` chip，选择 all 后以同一 catalog 扫描加载。动作仍走 `sessionSelectionBlock` 的当前项目校验，搜索完整不等于跨项目恢复授权。
+
+**本地验证**：session/navigation 20 项与 session+picker 956 项通过；`build:ts` 通过。本条写入时尚未提交/推送。

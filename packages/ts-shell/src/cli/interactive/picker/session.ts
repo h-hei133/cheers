@@ -27,6 +27,8 @@ export interface SessionPickerOptions {
   readonly pin?: (sessionId: string, version?: string) => Promise<string | undefined>;
   /** How many recent sessions the first page holds; the list can ask for more. */
   readonly initialLimit?: number;
+  /** Search every authorized project; actions still enforce the current scope. */
+  readonly allProjects?: boolean;
 }
 
 export function sessionPicker(options: SessionPickerOptions): Picker {
@@ -53,9 +55,15 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
     if (!offered.has(id)) return 'This session was not offered. Reopen the session picker.';
     return sessionSelectionBlock({ expected, current: options.context(), target: options.sessionManager.getSession(id), targetId: id, action });
   };
+  const allProjects = options.allProjects === true;
   return {
     title: "Resume session",
     form: "modal",
+    chips: {
+      items: [{ id: "project", label: "This project" }, { id: "all", label: "All projects" }],
+      active: allProjects ? "all" : "project",
+      select: id => sessionPicker({ ...options, allProjects: id === "all" }),
+    },
     get empty() { return listingIncomplete ? 'No selectable sessions in the loaded results.' : 'No recoverable sessions for this project.'; },
     loadError: 'Saved sessions could not be loaded.',
     footer: 'Session files: logical size; excludes attachments.',
@@ -65,7 +73,7 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
     detailRows: 2,
     async load(signal): Promise<readonly Option[]> {
       signal?.throwIfAborted();
-      const context = { ...options.context() };
+      const context = { ...options.context(), ...(allProjects ? { allProjects: true } : {}) };
       const page = await listing.load(context, signal, limit);
       signal?.throwIfAborted();
       expected = context;

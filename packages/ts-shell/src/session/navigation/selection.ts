@@ -7,6 +7,8 @@ export interface SessionSelectionContext {
   readonly sessionId: string;
   readonly projectRoot: string;
   readonly busy: boolean;
+  /** Search every authorized project, not only the current workspace. */
+  readonly allProjects?: boolean;
 }
 
 export function sessionChoices<T extends Session | SessionSummary>(sessions: readonly T[], context: SessionSelectionContext, limit = 40): {
@@ -14,7 +16,7 @@ export function sessionChoices<T extends Session | SessionSummary>(sessions: rea
   readonly currentUnavailable?: string;
 } {
   const root = normalizePathIdentity(context.projectRoot);
-  const scoped = sessions.filter(session => root !== undefined && normalizePathIdentity(session.projectRoot) === root
+  const scoped = sessions.filter(session => (context.allProjects === true || (root !== undefined && normalizePathIdentity(session.projectRoot) === root))
     && ('reentry' in session ? session.reentry !== 'empty' : sessionHasReentrySurface(session)));
   scoped.sort((left, right) => Number(right.pinned === true) - Number(left.pinned === true)
     || (Date.parse(right.updatedAt) - Date.parse(left.updatedAt)) || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));

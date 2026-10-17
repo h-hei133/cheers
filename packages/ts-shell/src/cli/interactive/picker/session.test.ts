@@ -16,7 +16,7 @@ function fixture(sessions = [session('current'), session('other')], pin = vi.fn(
   const records = new Map(sessions.map(item => [item.id, item]));
   const context = { sessionId: 'current', projectRoot: '/workspace', busy: false };
   const resume = vi.fn(async () => undefined); const remove = vi.fn(async () => undefined); const rename = vi.fn(async () => undefined);
-  const manager = { catalog: { async *list(_context: unknown, _signal?: AbortSignal, limit = 40) { yield { ...sessionChoices([...records.values()].map(record => summarizeSession(record, 'version')), context, limit),
+  const manager = { catalog: { async *list(listContext: typeof context = context, _signal?: AbortSignal, limit = 40) { yield { ...sessionChoices([...records.values()].map(record => summarizeSession(record, 'version')), listContext, limit),
     scanned: records.size, unreadable: 0, limited: 0, status: 'complete' }; } }, getSession: (id: string) => records.get(id),
     files: { sizes: async (ids: readonly string[]) => new Map(ids.map(id => [id, { status: 'complete', bytes: 2048, sampledAt: '2026-10-07T00:00:00Z' }])) } } as unknown as SessionManager;
   return { records, context, resume, remove, rename,
@@ -114,6 +114,17 @@ it('keeps load failure separate from a filtered-current explanation', async () =
   const output = overlay.render(100, 20).join('\n');
   expect(output).toContain('Saved sessions could not be loaded');
   expect(output).not.toMatch(/hidden by the filter|PRIVATE_PATH/);
+});
+
+it('searches all projects without bypassing the action scope', async () => {
+  const entries = [session('current'), session('other'), session('foreign', '2026-10-07T00:00:00.000Z', '/elsewhere')];
+  const { picker } = fixture(entries);
+  const scoped = await picker.load();
+  expect(scoped.some(row => row.id === 'foreign')).toBe(false);
+  const all = picker.chips!.select('all')!;
+  const rows = await all.load();
+  expect(rows.some(row => row.id === 'foreign')).toBe(true);
+  expect((await all.apply(['foreign']))?.note).toBeTruthy();
 });
 
 it('loads older sessions through an explicit page row', async () => {
