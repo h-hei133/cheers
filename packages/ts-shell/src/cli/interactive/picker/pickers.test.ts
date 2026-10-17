@@ -25,6 +25,25 @@ describe("which commands open a chooser", () => {
     },
   );
 
+  it("opens a read-only advisor inspector when state exists", async () => {
+    const state = {
+      schemaVersion: 1, sessionId: 's', sessionCreatedAt: '2026-01-01T00:00:00.000Z',
+      workspace: { path: '/w', identity: 'i' }, epoch: 2, enabled: true, eligible: 1, captured: 1, status: 'reviewed',
+      checkpoints: [{ id: 'checkpoint-1', timestamp: '2026-01-01T00:00:00.000Z', sourcePromptEntryId: 'entry-1', step: 3,
+        willContinue: false, failed: false, digest: 'abc', text: 'captured text', truncated: false, frontier: '', goal: '' }],
+      notes: [{ id: 'note-1', checkpointId: 'checkpoint-1', checkpointDigest: 'abc', epoch: 2, target: 'model/x',
+        timestamp: '2026-01-01T00:00:00.000Z', text: 'advice', coverage: { checkpoints: [{ id: 'checkpoint-1', digest: 'abc' }], truncated: false } }],
+    } as never;
+    const host = { commandContext: CONTEXT, advisorState: () => state } as unknown as PickerHost;
+    expect(opensPicker('/advisor')).toBe(true);
+    expect(pickerFor('/advisor', { commandContext: CONTEXT } as unknown as PickerHost)).toBeUndefined();
+    const picker = pickerFor('/advisor', host)!;
+    const rows = await picker.load();
+    expect(rows.map(row => row.id)).toEqual(['checkpoint:checkpoint-1', 'note:note-1']);
+    expect(picker.detail?.('note:note-1')?.join('\n')).toContain('advice');
+    expect((await picker.apply(['note:note-1']))?.note).toContain('Read-only');
+  });
+
   it("opens the jobs hub only when a job composition exists", () => {
     expect(opensPicker('/hub')).toBe(true);
     const host = { commandContext: CONTEXT } as unknown as PickerHost;

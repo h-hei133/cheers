@@ -7472,3 +7472,9 @@ PAN-06：copy picker 移除 recent-30 窗口，按新到旧列出全部 block，
 新增[契约矩阵](features/phase-20-contract.md)，逐任务绑定所有者、现有测试与反转条件；未开始与只有本地证据的任务明确标注，不用字段存在或镜像实现充数。QA-02/03 的真实 PTY/provider/平台矩阵仍未运行。
 
 **本地验证**：全量 `test:ts` 8430/8430 通过（fresh dist）；`test:scripts` 59 项通过；`verify:docs-drift:strict` 仅既有 advisory。本条写入时尚未提交/推送。
+
+### Phase 20 PAN-05（部分）：advisor 只读面板
+
+新增 `picker/advisor.ts`：裸 `/advisor` 打开只读主从面板，列出 retained checkpoints 与 notes，详情列显示 source prompt、step、digest、epoch、coverage、submitted 状态与经脱敏的文本。打开不启动模型、不提交、不应用；enable/retry/apply 仍走 `/advisor` 的显式路径。`advisorState` 从 bound session 解码，缺少状态时回退到命令。
+
+**本地验证**：pickers 40 项通过；`build:ts` 通过。本条写入时尚未提交/推送；plan-review 与 btw 的结构化面板仍待实施。

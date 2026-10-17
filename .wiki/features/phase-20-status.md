@@ -16,6 +16,7 @@
 | SET-03（预览） | `6736f402` | status/theme 预览撤销；Apply 前不写、CAS 保持 |
 | PAN-02（部分） | `6736f402` | 时间分组、`Ctrl+P` pin、tree 连接线 |
 | PAN-03（部分） | 本次 | `/hub` 只读主从面板、1s journal 轮询、详情列 |
+| PAN-05（部分） | 本次 | `/advisor` 只读 checkpoint/note 主从面板 |
 | RENDER-03（部分） | 本次 | 并排 diff、配对行号、双预算、窄屏 unified 回退 |
 | RENDER-02（部分） | 本次 | 多行 cell、escaped/code pipe、`<br>`、窄屏源码回退与预算 |
 | RENDER-01（部分） | 本次 | 内联数学投影、金额/代码保护、未知命令与超预算保原文 |
@@ -38,7 +39,7 @@
 
 ## 未开始
 
-PAN-05、PAN-08、INPUT-01、EDIT-01、JOB-01/02、START-02/03、QA-01…04、TOOL-02；PAN-03 输出分页/脱敏、RENDER-03 resize 锚点与左右源复制仍缺。
+PAN-08、INPUT-01、EDIT-01、JOB-01/02、START-02/03、QA-01…04、TOOL-02；PAN-03 输出分页/脱敏、RENDER-03 resize 锚点与左右源复制仍缺。
 
 ## 当前门禁
 

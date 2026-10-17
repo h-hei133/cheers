@@ -55,6 +55,8 @@ import { runMcpConfigurationControl } from '../mcp/control.js';
 import { cancelMcpFor } from '../runtime/mcp.js';
 import { runCliMcpCommand } from '../../entrypoints/cliMcpModule.js';
 import { isAdvisorControl, advisorCommandFor } from '../runtime/advisor.js';
+import { decodeAdvisor } from '../../advisor/codec.js';
+import { readBoundSessionState } from '../../session/store/bound.js';
 import { isResearchControl, researchCommandFor } from '../runtime/research.js';
 import { gitWorkbenchFor } from '../runtime/git.js';
 import { SubmissionQueue } from './inputQueue.js';
@@ -1046,6 +1048,7 @@ export class InteractiveMode {
         busy: () => this.stopped || this.closing || (this.busy && !this.pickerPending) || this.options.sessionRuntime.getCurrentRunController() !== null }),
       gitWorkbench: gitWorkbenchFor(this.options.runtimeContext),
       jobs: jobsFor(this.options.runtimeContext),
+      advisorState: () => decodeAdvisor(readBoundSessionState(this.options.sessionManager, this.options.runtimeContext.session).state.advisor),
       ...sessionPickerHost({ runtimeContext: this.options.runtimeContext, sessionManager: this.options.sessionManager,
         busy: () => this.stopped || this.closing || (this.busy && !this.pickerPending) || this.options.sessionRuntime.getCurrentRunController() !== null,
         resume: sessionId => this.runCommandLine(`/resume ${sessionId}`),

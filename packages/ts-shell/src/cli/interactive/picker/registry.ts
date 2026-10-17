@@ -24,6 +24,7 @@ import { skillPicker } from "./skills.js";
 import { sourcePicker } from "./sources.js";
 import { sessionPicker } from "./session.js";
 import { hubPicker } from "./hub.js";
+import { advisorPicker } from "./advisor.js";
 import { statusItemPicker } from "./statusItems.js";
 import { settingsPicker, type SettingsHost } from "./settings.js";
 import { undoPicker } from './undo.js';
@@ -51,6 +52,7 @@ export interface PickerHost extends SettingsHost {
   readonly undo: UndoHost;
   readonly gitWorkbench?: GitWorkbench;
   readonly jobs?: import('../../jobs/model.js').JobsComposition;
+  readonly advisorState?: () => import('../../../advisor/model.js').AdvisorState | undefined;
   sessionContext(): SessionSelectionContext;
   resumeSession(sessionId: string): Promise<string | undefined>;
   deleteSession(sessionId: string, version?: string): Promise<string | undefined>;
@@ -110,6 +112,7 @@ const PICKERS: Record<string, PickerFactory> = {
     }),
   settings: (host) => settingsPicker(host),
   hub: host => host.jobs ? hubPicker(host.jobs) : undefined,
+  advisor: host => { const state = host.advisorState?.(); return state ? advisorPicker(state) : undefined; },
   git: host => gitPicker(host.gitWorkbench),
 };
 
