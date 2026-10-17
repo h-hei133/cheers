@@ -7432,3 +7432,9 @@ PAN-06：copy picker 移除 recent-30 窗口，按新到旧列出全部 block，
 `/plugin` 增加 `extensions` 别名，`/extensions` 与 `/plugins` 走同一命令、同一语法与同一权限；注册表测试断言别名解析到 `plugin`。新增[Phase 20 交付状态](features/phase-20-status.md)，按已完成/部分/未开始分层，记录精确提交与缺失验收，不把本地实现写成已交付。
 
 **本地验证**：`slashCommandRegistry.test.ts` 11 项通过；`build:ts` 通过。本条写入时尚未提交/推送。
+
+### 修复：handoff 依赖的 checklist 工具未被 pinned
+
+全量套件暴露 `cli/handoff/runtime.test.ts` 11 项失败：handoff 的 `StepControlFactory` 要求 `host.tools` 含 `todo`，而 TOOL-01 的 pinned 集合漏了它，动态发现下首请求没有 checklist 工具。将 `todo` 加入 `PINNED_TOOL_NAMES`；`core/tools/discovery` 与 handoff runtime 21 项通过。
+
+全量 `test:ts` 另报 14 个失败文件/28 项；单独复跑 `entrypoints` 163、`turn`+`core/tools`+`cli/runtime` 839、`session` 853 均通过，剩余失败仍在定位，不能据此声称全量通过。

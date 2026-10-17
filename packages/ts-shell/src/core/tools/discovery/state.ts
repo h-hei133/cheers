@@ -10,7 +10,7 @@ import type { ToolDefinition } from '../../../tools/types.js';
  * mechanism: a loaded tool still goes through the same schema validation,
  * permission gate and sandbox as a pinned one.
  */
-export const PINNED_TOOL_NAMES = ['read', 'glob', 'grep', 'bash', 'edit', 'write', 'apply_patch', 'ask', 'task', 'taskOutput', 'taskStop'] as const;
+export const PINNED_TOOL_NAMES = ['read', 'glob', 'grep', 'bash', 'edit', 'write', 'apply_patch', 'ask', 'task', 'taskOutput', 'taskStop', 'todo'] as const;
 export const DISCOVERY_SEARCH_TOOL = 'tool_search';
 export const DISCOVERY_LOAD_TOOL = 'tool_load';
 const LOADED_LIMIT = 32;
