@@ -15,11 +15,12 @@ import type { Picker, PickerOutcome } from "../overlay.js";
  * laid out on screen.
  */
 
-const MAX_BLOCKS = 30;
 const SUMMARY_LENGTH = 70;
 
 export function copyPicker(transcript: Transcript, context: CommandContext): Picker {
-  const blocks = transcript.recent(MAX_BLOCKS).filter((block) => block.text.trim().length > 0);
+  // Every block is listed, newest first: the panel scrolls and filters, so the
+  // old thirty-block window only hid history the user still owns.
+  const blocks = [...transcript.all()].reverse().filter((block) => block.text.trim().length > 0);
   return {
     title: "Copy block",
     form: "panel",

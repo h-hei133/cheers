@@ -2,10 +2,12 @@ import { isComposerShape } from '../../../presentation/tui/composer/shapes.js';
 import type { ComposerShapeId } from '../../../presentation/tui/composer/contract.js';
 import type { ThemePreferences } from '../../../presentation/theme/preview.js';
 import type { ThemePreview } from '../../../presentation/theme/selection.js';
+import type { StatusItemId } from '../../../presentation/tui/chrome/items.js';
 
 export interface PreferenceHost {
   readonly themes?: ThemePreferences;
   previewComposerShape?(shape: ComposerShapeId | undefined): void;
+  previewStatusItems?(items: readonly StatusItemId[] | undefined): void;
 }
 
 /** One picker gets one revocable lease, started only after its predecessor ends. */

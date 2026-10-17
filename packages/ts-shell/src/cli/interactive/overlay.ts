@@ -93,6 +93,8 @@ export interface Picker {
    * The user pressed Ctrl+R to rename the selected option to `newTitle`.
    */
   onRename?(id: string, newTitle: string): Promise<string | undefined> | void;
+  /** The user pressed Ctrl+P to toggle the selected option's pinned state. */
+  onPin?(id: string): Promise<string | undefined> | void;
   /**
    * The user denied permission. If implemented, user can provide an optional
    * reason string, or undefined when denied without reason.
@@ -199,8 +201,8 @@ export class OverlayHost {
     const empty = this.loading ? "loading…" : this.loadFailed ? picker.loadError ?? "Options could not be loaded." : picker.empty;
     const state = this.loading ? "loading" : this.loadFailed ? "error" : undefined;
     const actionHints = (
-      picker.onDelete || picker.onRename
-        ? `${picker.onDelete ? "^D delete" : ""}  ${picker.onRename ? "^R rename" : ""}`.trim()
+      picker.onDelete || picker.onRename || picker.onPin
+        ? `${picker.onDelete ? "^D delete" : ""}  ${picker.onRename ? "^R rename" : ""}  ${picker.onPin ? "^P pin" : ""}`.trim()
         : undefined);
     const status = this.actionPending ? 'Updating…' : this.actionNotice ??
       (!this.loading && !this.loadFailed ? picker.status?.(this.model.visible) : undefined);
@@ -365,7 +367,7 @@ export class OverlayHost {
       if (event.keyId === 'escape' || event.keyId === 'ctrl+c') this.close();
       return true;
     }
-    if (this.loading && ['enter', 'delete', 'ctrl+d', 'ctrl+r'].includes(event.keyId)) return true;
+    if (this.loading && ['enter', 'delete', 'ctrl+d', 'ctrl+r', 'ctrl+p'].includes(event.keyId)) return true;
     const focused = this.model.current()?.id;
     if (this.input) {
       if (event.keyId === 'escape' || event.keyId === 'ctrl+c') this.close();
@@ -516,6 +518,16 @@ export class OverlayHost {
             this.subTargetId = current.id;
             this.subTargetLabel = current.label;
             this.onChange();
+            return true;
+          }
+        }
+        break;
+      }
+      case "ctrl+p": {
+        if (picker.onPin) {
+          const current = this.model.current();
+          if (current) {
+            this.mutate(() => picker.onPin!(current.id));
             return true;
           }
         }

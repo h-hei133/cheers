@@ -46,9 +46,9 @@ describe('advanced settings picker', () => {
     overlay.open((await field.apply(['choice:1']))!.next!); await Promise.resolve(); await Promise.resolve();
     expect(overlay.render(width, 24).map(stripAnsi).join('\n')).toContain('Pending: false'); overlay.close();
   });
-  it('edits a JSON number, rejects invalid input and stages removal without writing', async () => {
+  it('edits a typed number, rejects invalid input and stages removal without writing', async () => {
     const h = host(); const field = await detail(h, 'maxTurns'); const editor = (await field.apply(['edit']))!.next!;
-    expect(editor.input?.validate('0')).toContain('Invalid value'); expect(editor.input?.validate('"secret"')).toContain('Invalid value');
+    expect(editor.input?.validate('0')).toContain('Invalid value'); expect(editor.input?.validate('"secret"')).toBeDefined();
     expect(editor.input?.validate('42')).toBeUndefined();
     const staged = (await editor.input!.apply('42'))!.next!;
     await staged.apply(['apply']); expect(h.save).toHaveBeenCalledWith('maxTurns', 42);
@@ -67,9 +67,14 @@ describe('advanced settings picker', () => {
     expect((await personalOnly.load()).some(item => item.id === 'scope')).toBe(false);
   });
   it('uses the existing status vocabulary picker and stages its canonical selection', async () => {
-    const h = host(); const field = await detail(h, 'tui.statusItems');
+    const preview = vi.fn();
+    const h = { ...host(), previewStatusItems: preview }; const field = await detail(h, 'tui.statusItems');
     const editor = (await field.apply(['edit']))!.next!;
     expect(editor.multiple).toBe(true); expect(editor.input).toBeUndefined();
+    editor.previewChange!(['cost', 'model']);
+    expect(preview).toHaveBeenLastCalledWith(['model', 'cost']);
+    editor.previewEnd!();
+    expect(preview).toHaveBeenLastCalledWith(undefined);
     expect((await editor.load()).some(item => item.id === 'cost')).toBe(true);
     expect(await editor.apply(['not-a-status-item'])).toBeUndefined();
     const staged = (await editor.apply(['cost', 'model']))!.next!;

@@ -53,6 +53,7 @@ export interface PickerHost extends SettingsHost {
   resumeSession(sessionId: string): Promise<string | undefined>;
   deleteSession(sessionId: string, version?: string): Promise<string | undefined>;
   renameSession(sessionId: string, title: string, version?: string): Promise<string | undefined>;
+  pinSession?(sessionId: string, version?: string): Promise<string | undefined>;
   refreshServer(serverName: string): Promise<string | undefined>;
   revokeGrant(key: string): Promise<string | undefined>;
   saveStatusItems(items: readonly StatusItemId[]): Promise<string | undefined>;
@@ -79,6 +80,7 @@ const PICKERS: Record<string, PickerFactory> = {
       resume: host.resumeSession,
       delete: host.deleteSession,
       rename: host.renameSession,
+      pin: host.pinSession,
     }),
   mcp: (host) => serverPicker({ gateway: host.mcpGateway, refresh: host.refreshServer }),
   connect: (host) => connectionPicker(host.commandContext),

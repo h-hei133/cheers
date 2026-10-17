@@ -8,6 +8,7 @@ import type { ToolDefinition, ToolExecutionContext } from '../../tools/types.js'
 import { runPreparedTool } from '../../turn/invoke.js';
 import { readOnlyTool } from '../../core/tools/capability.js';
 import { neutraliseForDisplay } from '../../core/text/safety.js';
+import { renderProgress } from '../../presentation/tui/chrome/progress.js';
 function assertUnspent(attempts: readonly ResetAttempt[], creditId?: string): void {
   if (attempts.some(attempt => ['pending', 'unknown'].includes(attempt.status))) throw new Error('An account reset is pending or unknown. Inspect /usage reset status; reconcile its external result before another consume. Automatic replay is refused.');
   if (creditId && attempts.some(attempt => attempt.credit.id === creditId && ['reset'].includes(attempt.status))) throw new Error('This credit already has a confirmed reset receipt; it cannot be spent again.');
@@ -16,8 +17,12 @@ function safeLabel(binding: Binding): string {
   return neutraliseForDisplay(`openai/${binding.resolution.credential!.connectionId ?? 'configured-account'}; account ${binding.account.accountId}`);
 }
 function usageText(binding: Binding, snapshot: AccountUsage): string {
+  const bars = snapshot.windows.map(window => renderProgress(Number.isFinite(window.usedPercent)
+    ? { kind: 'determinate' as const, label: window.name, used: window.usedPercent, total: 100 }
+    : { kind: 'unknown' as const, label: window.name }, 48));
   return [`Account: ${safeLabel(binding)}`, `Source: ${snapshot.source}`, `Fetched: ${snapshot.fetchedAt}`,
     ...snapshot.windows.map(window => `${window.name}: ${window.usedPercent}% used${window.resetsAt ? `; resets ${window.resetsAt}` : '; reset time unknown'}.`),
+    ...(bars.length ? ['Quota:', ...bars.map(bar => `  ${bar}`)] : []),
     ...(!snapshot.windows.length ? ['Account quota windows: unknown.'] : []),
     snapshot.creditStatus === 'available' ? `Reset credits: ${snapshot.availableCount} reported available; ${snapshot.credits.length} valid unexpired offers.`
       : `Reset credits: ${snapshot.creditStatus}; available count unknown.`].join('\n');

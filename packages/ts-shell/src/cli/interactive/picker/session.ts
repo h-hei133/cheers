@@ -23,6 +23,8 @@ export interface SessionPickerOptions {
   readonly delete?: (sessionId: string, version?: string) => Promise<string | undefined>;
   /** Rename a session. */
   readonly rename?: (sessionId: string, title: string, version?: string) => Promise<string | undefined>;
+  /** Toggle a session's pinned state. */
+  readonly pin?: (sessionId: string, version?: string) => Promise<string | undefined>;
 }
 
 export function sessionPicker(options: SessionPickerOptions): Picker {
@@ -39,9 +41,9 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
     listingStatus = sessionListingStatus(page);
     offered = new Set(page.snapshot.sessions.map(session => session.id));
     for (const session of page.snapshot.sessions) if (!versions.has(session.id)) versions.set(session.id, session.version);
-    return page.snapshot.sessions.map(session => sessionOption(session, expected.sessionId, page.sizes.get(session.id)));
+    return groupedOptions(page.snapshot.sessions, expected.sessionId, page.sizes);
   };
-  const blocked = (id: string, action: 'resume' | 'rename' | 'delete'): string | undefined => {
+  const blocked = (id: string, action: 'resume' | 'rename' | 'delete' | 'pin'): string | undefined => {
     if (!offered.has(id)) return 'This session was not offered. Reopen the session picker.';
     return sessionSelectionBlock({ expected, current: options.context(), target: options.sessionManager.getSession(id), targetId: id, action });
   };
@@ -79,7 +81,56 @@ export function sessionPicker(options: SessionPickerOptions): Picker {
     onRename: options.rename
       ? async (sessionId: string, title: string) => blocked(sessionId, 'rename') ?? options.rename!(sessionId, title, versions.get(sessionId))
       : undefined,
+    onPin: options.pin
+      ? async (sessionId: string) => blocked(sessionId, 'pin') ?? options.pin!(sessionId, versions.get(sessionId))
+      : undefined,
   };
+}
+
+const DAY = 86_400_000;
+
+/** Which time bucket a session belongs to, in the order the chooser shows them. */
+function sessionBucket(at: number, now: number): string {
+  const start = new Date(now); start.setHours(0, 0, 0, 0);
+  const today = start.getTime();
+  if (at >= today) return 'Today';
+  if (at >= today - DAY) return 'Yesterday';
+  if (at >= today - 7 * DAY) return 'Previous 7 days';
+  if (at >= today - 30 * DAY) return 'Previous 30 days';
+  return 'Older';
+}
+
+/**
+ * Sessions with non-selectable group rows.
+ *
+ * Pinned sessions come first as their own group because the ordering already
+ * puts them there; the rest are bucketed by the day they were last used. Group
+ * rows are disabled, so the cursor and the pointer skip them.
+ */
+export function groupedOptions(sessions: readonly SessionSummary[], currentId: string, sizes: ReadonlyMap<string, SessionFileSize>): readonly Option[] {
+  const rows: Option[] = [];
+  const now = Date.now();
+  let bucket: string | undefined;
+  let pinned: boolean | undefined;
+  for (const session of sessions) {
+    const isPinned = session.pinned === true;
+    if (pinned === undefined || pinned !== isPinned) {
+      pinned = isPinned;
+      bucket = undefined;
+      rows.push({ id: `group:pinned:${isPinned}`, label: isPinned ? 'Pinned' : 'Sessions', detail: 'group', disabled: true });
+    }
+    const stamp = session.updatedAt ?? session.createdAt;
+    const at = typeof stamp === 'string' ? Date.parse(stamp) : stamp;
+    const name = at === undefined || Number.isNaN(at) ? 'Older' : sessionBucket(at, now);
+    // Pinned rows already have their own header; a time header under it would
+    // say nothing a reader needs.
+    if (!isPinned && name !== bucket) {
+      bucket = name;
+      rows.push({ id: `group:${isPinned}:${name}`, label: name, detail: 'group', disabled: true });
+    }
+    rows.push(sessionOption(session, currentId, sizes.get(session.id)));
+  }
+  return rows;
 }
 
 /** Recent sessions as options, newest first. */

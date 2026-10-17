@@ -45,7 +45,8 @@ function valueEditor(host: SettingsHost, draft: SettingsDraft, setting: SettingD
   const current = draft.values[setting.key];
   const value = pending ? pending.value : current.stored === undefined ? current.requested : current.stored;
   if (setting.key === 'tui.statusItems') {
-    const picker = statusItemPicker({ current: normalizeStatusItems(value as readonly string[] | undefined), save: async () => undefined, preview: () => {} });
+    const picker = statusItemPicker({ current: normalizeStatusItems(value as readonly string[] | undefined), save: async () => undefined,
+      preview: host.previewStatusItems ?? (() => {}) });
     return { ...picker, title: 'Stage status items — Enter reviews; empty uses defaults', exclusive: true, holdInput: true,
       apply: async ids => validateSetting(setting, ids) ? undefined : ({ next: settingDetail(host, draft, setting, { value: normalizeStatusItems(ids) }) }) };
   }

@@ -35,7 +35,7 @@ export function sessionSelectionBlock(input: {
   readonly current: SessionSelectionContext;
   readonly target: Session | undefined;
   readonly targetId: string;
-  readonly action: 'resume' | 'rename' | 'delete';
+  readonly action: 'resume' | 'rename' | 'delete' | 'pin';
 }): string | undefined {
   const { expected, current, target, targetId, action } = input;
   const root = normalizePathIdentity(current.projectRoot);

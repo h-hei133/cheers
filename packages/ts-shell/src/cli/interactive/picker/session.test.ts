@@ -12,7 +12,7 @@ function session(id: string, updatedAt = '2026-10-07T00:00:00.000Z', projectRoot
   return { id, projectRoot, title: id, updatedAt, createdAt: updatedAt, status: 'completed', turns: [{ role: 'user', content: 'saved conversation' }] };
 }
 
-function fixture(sessions = [session('current'), session('other')]) {
+function fixture(sessions = [session('current'), session('other')], pin = vi.fn(async () => undefined)) {
   const records = new Map(sessions.map(item => [item.id, item]));
   const context = { sessionId: 'current', projectRoot: '/workspace', busy: false };
   const resume = vi.fn(async () => undefined); const remove = vi.fn(async () => undefined); const rename = vi.fn(async () => undefined);
@@ -20,7 +20,7 @@ function fixture(sessions = [session('current'), session('other')]) {
     scanned: records.size, unreadable: 0, limited: 0, status: 'complete' }; } }, getSession: (id: string) => records.get(id),
     files: { sizes: async (ids: readonly string[]) => new Map(ids.map(id => [id, { status: 'complete', bytes: 2048, sampledAt: '2026-10-07T00:00:00Z' }])) } } as unknown as SessionManager;
   return { records, context, resume, remove, rename,
-    picker: sessionPicker({ sessionManager: manager, context: () => ({ ...context }), resume, delete: remove, rename }) };
+    pin, picker: sessionPicker({ sessionManager: manager, context: () => ({ ...context }), resume, delete: remove, rename, pin }) };
 }
 
 it('focuses the current identity beyond the recent forty without importing another project', async () => {
@@ -28,10 +28,11 @@ it('focuses the current identity beyond the recent forty without importing anoth
   entries.push(session('current', '2025-01-01T00:00:00.000Z'), session('foreign', '2027-01-01T00:00:00.000Z', '/elsewhere'));
   const { picker } = fixture(entries);
   const choices = await picker.load();
-  expect(choices).toHaveLength(41);
-  expect(choices[0]?.id).toBe('recent-00'); expect(choices.at(-1)?.id).toBe('current');
-  expect(choices.filter(item => item.note?.startsWith('current')).map(item => item.id)).toEqual(['current']);
-  expect(choices[0]?.detail).toContain('2.0 KiB'); expect(choices[0]?.detail).not.toMatch(/turns?/);
+  const selectable = choices.filter(item => !item.disabled);
+  expect(selectable).toHaveLength(41);
+  expect(selectable[0]?.id).toBe('recent-00'); expect(selectable.at(-1)?.id).toBe('current');
+  expect(selectable.filter(item => item.note?.startsWith('current')).map(item => item.id)).toEqual(['current']);
+  expect(selectable[0]?.detail).toContain('2.0 KiB'); expect(selectable[0]?.detail).not.toMatch(/turns?/);
   const overlay = new OverlayHost(() => {}); overlay.open(picker); await new Promise(resolve => setTimeout(resolve, 0));
   const apply = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), apply);
   expect(apply).toHaveBeenCalledWith(picker, ['current']);
@@ -63,7 +64,7 @@ it.each(['missing', 'foreign', 'empty'] as const)('never bypasses scope or saved
   if (kind === 'empty') { current.turns = []; current.status = 'active'; }
   const setup = fixture([session('other'), ...(kind === 'missing' ? [] : [current])]);
   const choices = await setup.picker.load();
-  expect(choices.map(item => item.id)).toEqual(['other']);
+  expect(choices.filter(item => !item.disabled).map(item => item.id)).toEqual(['other']);
   expect(setup.picker.status?.(choices)).toMatch(/Current session.*(missing|different project|no saved)/);
   const overlay = new OverlayHost(() => {}); overlay.open(setup.picker); await new Promise(resolve => setTimeout(resolve, 0));
   const apply = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), apply);
@@ -113,4 +114,32 @@ it('keeps load failure separate from a filtered-current explanation', async () =
   const output = overlay.render(100, 20).join('\n');
   expect(output).toContain('Saved sessions could not be loaded');
   expect(output).not.toMatch(/hidden by the filter|PRIVATE_PATH/);
+});
+
+it('pins the focused session through the existing management path', async () => {
+  const setup = fixture();
+  const overlay = new OverlayHost(() => {}); overlay.open(setup.picker);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  overlay.handleKey(parseKeyEvent('\x10'), vi.fn());
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(setup.pin).toHaveBeenCalledWith('current', 'version');
+});
+
+it('groups sessions by pin and recency with non-selectable headers', async () => {
+  const { groupedOptions } = await import('./session.js');
+  const now = Date.now();
+  const summary = (id: string, updatedAt: number, pinned?: boolean) => ({
+    id, projectRoot: '/workspace', title: id, ...(pinned ? { pinned: true } : {}), titleComplete: true,
+    createdAt: new Date(updatedAt).toISOString(), updatedAt: new Date(updatedAt).toISOString(),
+    reentry: 'available' as const, quality: 'complete' as const, version: 'v',
+  });
+  const rows = groupedOptions([
+    summary('pinned', now, true),
+    summary('today', now),
+    summary('yesterday', now - 86_400_000),
+    summary('old', Date.parse('2020-01-01T00:00:00.000Z')),
+  ], 'today', new Map());
+  expect(rows.filter(row => row.disabled).map(row => row.label)).toEqual(['Pinned', 'Sessions', 'Today', 'Yesterday', 'Older']);
+  expect(rows.filter(row => !row.disabled).map(row => row.id)).toEqual(['pinned', 'today', 'yesterday', 'old']);
+  expect(rows.filter(row => row.disabled).every(row => row.id.startsWith('group:'))).toBe(true);
 });

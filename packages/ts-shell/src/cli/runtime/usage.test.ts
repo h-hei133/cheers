@@ -139,6 +139,10 @@ it.each([404, 500])('retains known quota windows while reset capability is unava
   const setup = harness(); const remote = protocol({ creditStatus: status });
   const result = await setup.run('/usage account');
   expect(result).toMatchObject({ kind: 'local', output: expect.stringContaining('primary: 25% used') });
+  const output = (result as { output: string }).output;
+  expect(output).toContain('Quota:');
+  expect(output).toContain('█');
+  expect(output).not.toMatch(/unknown%/);
   expect((result as { output: string }).output).toContain(`Reset credits: ${status === 404 ? 'unsupported' : 'unavailable'}; available count unknown`);
   expect(await setup.run('/usage reset')).toMatchObject({ kind: 'local', output: expect.stringContaining('No valid available') });
   expect(remote.posts()).toEqual([]); expect(readResetAttempts(accountKey)).toEqual([]);

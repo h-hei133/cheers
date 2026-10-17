@@ -7408,3 +7408,15 @@ SET-02：设置面板增加 7 个分组 tab（Session/Request/Context/Retries/Ne
 PAN-01：model picker 增加详情列（provider/runtime、endpoint、context、availability、credential、阻塞连接原因），宽屏两栏、窄屏单栏；同名模型按 provider id 区分，不可用行给出切换连接的原因。
 
 **本地验证**：`config/settings.test.ts` 6 项、`cli/interactive/settings.test.ts` 31 项、`panel.test.ts` 5 项、`overlay.test.ts` 47 项、`pickers.test.ts` 38 项通过；`build:ts`、import cycles、declarations 通过。本条写入时尚未提交/推送；SET-03 的 status 预览与外部更新撤销仍待补齐。
+
+### Phase 20 SET-03、PAN-02/04/06：预览、会话分组、配额进度与复制
+
+SET-03：设置里的 `tui.statusItems` 复用 `statusItemPicker` 的真实预览，`preferenceHost.previewStatusItems` 在移焦/关闭时以 `undefined` 撤销；theme 预览在外部选择改变 generation 后拒绝继续 `show`，`end` 不再覆盖外部选择（新增 2 项 selection 测试）。
+
+PAN-02：resume 列表插入不可选的时间分组行（Pinned / Sessions / Today / Yesterday / Previous 7 days / Previous 30 days / Older），置顶会话单独成组；`Ctrl+P` 通过既有 `prepareSessionManagement`/`applySessionManagement` 切换 pinned，带版本校验。tree picker 用 `treePrefix` 绘制 `├─`/`└─` 与祖先竖线，不再只靠缩进。
+
+PAN-04：`/usage account` 在原有百分比文本之后增加 `Quota:` 进度投影，`renderProgress` 只在 usedPercent 有限时画 bar，否则显示 unknown，不伪造百分比。
+
+PAN-06：copy picker 移除 recent-30 窗口，按新到旧列出全部 block，面板滚动与过滤承担分页。
+
+**本地验证**：picker/usage/theme selection/overlay 13 文件 179 项通过；`build:ts` 通过。本条写入时尚未提交/推送；PAN-02 的跨目录授权搜索与 10000 会话分页目标、PAN-04 的 thinking picker 仍待实施。

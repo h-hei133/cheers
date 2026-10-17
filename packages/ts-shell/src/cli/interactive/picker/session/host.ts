@@ -9,9 +9,9 @@ export function sessionPickerHost(input: {
   readonly sessionManager: SessionManager;
   readonly busy: () => boolean;
   readonly resume: (sessionId: string) => Promise<string | undefined>;
-}): Pick<PickerHost, 'sessionContext' | 'resumeSession' | 'deleteSession' | 'renameSession'> {
+}): Pick<PickerHost, 'sessionContext' | 'resumeSession' | 'deleteSession' | 'renameSession' | 'pinSession'> {
   const context = () => ({ sessionId: input.runtimeContext.session.id, projectRoot: input.runtimeContext.projectRoot, busy: input.busy() });
-  const change = async (action: 'rename' | 'delete', sessionId: string, version?: string, title?: string): Promise<string | undefined> => {
+  const change = async (action: 'rename' | 'delete' | 'pin', sessionId: string, version?: string, title?: string): Promise<string | undefined> => {
     const result = await prepareSessionManagement(input.sessionManager, context, action, sessionId);
     if (!result.preview) return result.note;
     if (version && result.preview.version !== version) return 'The saved session changed after the preview. Reopen the session picker.';
@@ -23,5 +23,6 @@ export function sessionPickerHost(input: {
     resumeSession: input.resume,
     deleteSession: (sessionId, version) => change('delete', sessionId, version),
     renameSession: (sessionId, title, version) => change('rename', sessionId, version, title),
+    pinSession: (sessionId, version) => change('pin', sessionId, version),
   };
 }
