@@ -42,7 +42,7 @@
 | PAN-02 | 分组、pin、树形、分页、跨项目搜索 | 预览/置顶持久验收 |
 | PAN-04 | quota 进度、thinking picker | effort/model 联合约束与 unknown 非 0 的更多模型验收 |
 | PAN-06 | copy 全量、pin | history 完整树、copy 分页/源 revision 到头、back/undo/restore 审计 |
-| PAN-03 | hub 主从视图 | 输出分页/脱敏面板、agents 专用操作与未知状态验收 |
+| PAN-03 | hub 主从视图、本地作业输出页（脱敏/截断、后续页指引） | agents 专用操作仍归 `/jobs`；未知状态验收未单列 |
 | PAN-07 | alias、逐项确认 | login/logout 设备码安全显示的端到端验收 |
 | SET-03 | status/theme 预览 | 外部更新撤销的端到端验收 |
 
