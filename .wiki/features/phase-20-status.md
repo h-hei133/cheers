@@ -25,7 +25,14 @@
 | PAN-06（部分） | `6736f402` | copy 移除 recent-30 窗口 |
 | PAN-07（部分） | 本次 | `/extensions` 为 `/plugin` 别名 |
 | START-01 | `0afab79a` | build manifest、五种拒绝状态、`start`/`start:dev` |
-| START-02（部分） | 本次 | 10k 会话首帧不扫描目录、渐进/取消沿用 iterator |
+| JOB-01 | `dd43bcce` | 单次 spawn、detach/kill、adopt/promote、60s/新消息晋升、撤权 kill、重启 unknown 不重播 |
+| JOB-02 | `7da6e6d4`、`8c7f949f` | 本地 notice、opt-in follow-up（去重/预算/截断）、取消不转后台 |
+| EDIT-01 | `57e1ffb3`、`8c7f949f` | 稳定 group id、依赖分组、选集绑定、无选集拒绝、重规划基线校验、CLI 多选 |
+| START-02 | `3de906fe` | 10k 首帧不扫描；持久摘要索引（mtime/size、损坏即 miss） |
+| PAN-05（部分） | `2a4bafe5` | plan-review/btw 结构化报告；advisor 面板 |
+| PAN-03（部分） | `070f1405` | hub 本地作业输出页（脱敏/截断）、后续页指引 |
+| PAN-08（部分） | `93302750` | MCP 逐项向导；临时定义 0600 且必删 |
+| START-03（部分） | `a6ba2665` | Node/exe 与 regular/fullscreen 各 30 次首帧/退出基准 |
 
 ## 部分完成（有实现，验收未闭合）
 
@@ -38,24 +45,21 @@
 | PAN-03 | hub 主从视图 | 输出分页/脱敏面板、agents 专用操作与未知状态验收 |
 | PAN-07 | alias、逐项确认 | login/logout 设备码安全显示的端到端验收 |
 | SET-03 | status/theme 预览 | 外部更新撤销的端到端验收 |
-| JOB-01 | 单次 spawn、detach/kill、adopt/promote、60s 与新消息晋升、撤权 kill、重启 unknown 不重播 | — |
-| EDIT-01 | 稳定 group id、依赖分组、选集传递、无选集拒绝、重规划基线校验、CLI 多选 | — |
-| JOB-02 | 本地通知、opt-in follow-up 策略（去重/预算/截断）、不重播未知、取消不转后台 | — |
-| START-02 | 首帧 10k 不扫描、持久摘要索引（mtime/size 校验、损坏即 miss） | — |
-| PAN-03 | `/hub` 选择本地作业即在 pager 打开带脱敏/截断标记的输出页，并指向 `/jobs show <id> stdout <offset>` 的后续页；远程/未知作业保持只读 note | agents 专用操作仍归 `/jobs`（分别授权） |
-| PAN-08 | MCP 逐项向导（scope → name → transport → value → confirm，最后才写）、`/mcp` 选择器 “Add server…”；临时定义文件 0600 且必删 | `/help` 仍为 guide 文本而非 report（有意保留） |
-| START-03 | `bench:start`：Node/exe `--version` 各 30 次；`bench:interactive`：PTY 下 regular/fullscreen 各 30 次，首帧与 `/exit` 后退出分开报告 | pipe 模式、受控冷缓存、逐键延迟仍未测 |
 
-## 未开始
+## 未闭合
 
-START-03、QA-02/03、TOOL-02；RENDER-03 左右源复制仍缺；PAN-05 的流式面板仍缺。
+- START-03：pipe 模式、受控冷缓存、逐键延迟。
+- PAN-05：流式面板。
+- RENDER-03：并排 diff 的左右源复制。
+- QA-02/03：PTY/双构建/平台矩阵与真实质量（缺环境/模型）。
+- TOOL-02：描述/tokenizer/质量评估（需真实模型）。
 
 ## CI
 
 - `9c8104a6`（copy 测试改为 clipboard sink）：CI success，12m28s。
 - 其后的 docs/advisor/resume 提交在写本文时仍在队列中；以 GitHub run 结果为准，不能把本地通过当成 CI 通过。
 - 更早的失败提交均已被后续修复覆盖：handoff 的 `todo` pin、director feature tools、settings 标签、firstFrame padding、MCP 启动超时、copy 的环境依赖。
-- `57e1ffb3`、`7da6e6d4`、`f0f2f2d2` 的 CI 均因同一对取消测试超时失败（`director/runtime.test.ts`、`jobs/agent/command.test.ts`）：bash 工具改走 `startCommand` 后，测试仍 mock `executeLocally`。`0b8dcdb4` 改为 mock `startStreamed` 并让 `startCommand` 同样报告 settlement；本地全量 8473 通过，CI success（run 39061415399）。`c5da8107`（启动基准脚本与 `bench:start`）CI success（run 39062680340）。
+- `57e1ffb3`、`7da6e6d4`、`f0f2f2d2` 的 CI 均因同一对取消测试超时失败（`director/runtime.test.ts`、`jobs/agent/command.test.ts`）：bash 工具改走 `startCommand` 后，测试仍 mock `executeLocally`。`0b8dcdb4` 改为 mock `startStreamed` 并让 `startCommand` 同样报告 settlement；本地全量 8473 通过，CI success（run 39061415399）。`c5da8107`（启动基准脚本与 `bench:start`）CI success（run 39062680340）。`070f1405` CI success（run 39066438514）。
 - `8c7f949f`、`3de906fe`、`2a4bafe5`、`b913c50e` CI success；`dd43bcce` 的 CI 仅 `cli-baseline.test.ts` 的 pipe-spawn smoke 失败（期望 `- ID:`），本地单跑 40/40 通过，且其后的 SHA 同代码 CI success，归为负载下的 spawn 抖动。
 
 ## 启动基准（2026-10-18，WSL2，Node 20）
