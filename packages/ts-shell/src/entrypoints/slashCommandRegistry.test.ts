@@ -77,6 +77,7 @@ it("enumerates builtins, the interactive entry, aliases, and distinct invocation
   expect(listSlashInvocations().map(entry => entry.name).sort()).toEqual([...listVisibleCommands().flatMap(commandInvocations).map(entry => entry.name), 'back'].sort());
   expect(getSlashInvocation('reload-plugins')).toMatchObject({ commandName: 'plugin', kind: 'named' });
   expect(getSlashInvocation("/models")).toMatchObject({ name: "models", commandName: "model", invocation: "/models", kind: "alias" });
+  expect(getSlashInvocation("/extensions")).toMatchObject({ name: "extensions", commandName: "plugin", invocation: "/extensions", kind: "alias" });
   expect(getSlashInvocation("/RECALL")).toMatchObject({ name: "recall", commandName: "memory", invocation: "/recall", kind: "named", argumentHint: "<query>" });
   expect(capture(renderUserHelp).join("\n")).toContain("/recall");
 });

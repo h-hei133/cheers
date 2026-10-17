@@ -784,7 +784,7 @@ export function createCommandRegistry(
     },
     {
       name: "plugin",
-      aliases: ["plugins"],
+      aliases: ["plugins", "extensions"],
       invocations: [{ name: 'reload-plugins', summary: 'unload and rebuild extension capabilities', argumentHint: '' }],
       kind: "local",
       supportsNonInteractive: true,

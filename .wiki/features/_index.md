@@ -49,6 +49,7 @@ confidence: high
 | [动态工具发现](tool-discovery.md) | TOOL-01 默认 pinned + search/load、权限不变与 generation |
 | [UI 容器几何与状态投影](ui-containers.md) | UI-01/02/03 输入区预算、两栏面板、二维命中、进度与 chip 状态 |
 | [启动产物与构建校验](launch-and-build.md) | START-01 构建 manifest、五种拒绝状态与 `start`/`start:dev` |
+| [Phase 20 交付状态](phase-20-status.md) | 已完成/部分/未开始与精确提交证据 |
 
 ### 0.2 本轮之前的历史文档（01–22）
 

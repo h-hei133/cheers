@@ -7426,3 +7426,9 @@ PAN-06：copy picker 移除 recent-30 窗口，按新到旧列出全部 block，
 新增 `scripts/start-lib.mjs`、`scripts/build-manifest.mjs`、`scripts/start.mjs`。`build:ts` 在 tsc 与 CLI bin 成功后才写 `dist/build-manifest.json`（version、Node、排序源码摘要、buildId、入口）；`npm start` 读取清单并拒绝 missing/truncated/version-mismatch/missing-entry/stale 五种状态，只有 fresh 才用清单入口启动并转发信号。源码开发保留为 `npm run start:dev`。
 
 **本地验证**：`scripts/start.test.mjs` 2 项通过；实机 `node scripts/start.mjs --version` 输出 `0.1.0`，追加源码后输出 stale 并退出 1，恢复后再次通过；`build:ts` 通过，manifest buildId `b0fbac2d63c4`。合同见[启动产物与构建校验](features/launch-and-build.md)。本条写入时尚未提交/推送。
+
+### Phase 20 PAN-07（部分）：`/extensions` 别名与状态记录
+
+`/plugin` 增加 `extensions` 别名，`/extensions` 与 `/plugins` 走同一命令、同一语法与同一权限；注册表测试断言别名解析到 `plugin`。新增[Phase 20 交付状态](features/phase-20-status.md)，按已完成/部分/未开始分层，记录精确提交与缺失验收，不把本地实现写成已交付。
+
+**本地验证**：`slashCommandRegistry.test.ts` 11 项通过；`build:ts` 通过。本条写入时尚未提交/推送。
