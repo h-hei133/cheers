@@ -45,6 +45,7 @@ const descriptions = {
   hiddenToolPrefixes: ['Tools', 'Hidden tool prefixes', 'JSON list; combines with other hidden prefixes'],
   denyRules: ['Tools', 'Deny rules', 'JSON list of tool/pattern constraints; combines with other deny rules'],
   enableMcpTools: ['Tools', 'Enable MCP tools', 'Any configured false disables MCP tools; approvals still apply'],
+  toolDiscovery: ['Tools', 'Tool discovery', 'dynamic starts with pinned tools and loads the rest on request; full sends every schema'],
   theme: ['Display', 'Theme', 'Theme name, including custom themes and auto'],
   tuiMode: ['Display', 'Terminal mode', 'Regular or fullscreen; changes require restart'],
   'tui.composerShape': ['Display', 'Input shape', 'Input appearance; project leaves take precedence. Unset uses default'],

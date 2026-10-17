@@ -11,6 +11,8 @@ import { assertAdmission, type Admission } from '../network/admission.js';
 import { catalogContributions } from '../catalog/contributions.js';
 import { createDefaultExecutionService } from '../../runtime/execution/service.js';
 import { sameValue } from '../../config/values.js';
+import { createToolDiscovery, type ToolDiscovery } from './discovery/state.js';
+import { discoveryTools } from './discovery/tools.js';
 
 export interface ToolCatalogInput {
   /** Fixed content for an independently approved run; executable contributions remain owner-bound. */
@@ -24,6 +26,9 @@ export interface ToolCatalogInput {
   readonly sessionId?: string;
   readonly skillOptions?: { readonly skillPaths?: readonly string[]; readonly noSkills?: boolean };
   readonly runtimeConfig?: RuntimeConfig;
+  /** Model runs start small; command inspection keeps the full pool. */
+  readonly discover?: boolean;
+  readonly initialTools?: readonly string[];
   readonly mcpGateway?: Pick<CoreMcpGateway, "snapshot"> & Partial<Pick<CoreMcpGateway, "invokeTool">>;
 }
 
@@ -47,6 +52,7 @@ export async function captureCatalogContent(input: ToolCatalogInput): Promise<Ca
 export async function loadToolCatalog(input: ToolCatalogInput, override?: () => ReadonlyMap<string, ToolDefinition>): Promise<{
   readonly skills: ReadonlyMap<string, Skill>;
   readonly tools: ReadonlyMap<string, ToolDefinition>;
+  readonly discovery?: ToolDiscovery;
 }> {
   assertAdmission(input.admission);
   const { skills, tools: contributed } = input.catalogContent ?? await captureCatalogContent(input);
@@ -61,7 +67,11 @@ export async function loadToolCatalog(input: ToolCatalogInput, override?: () => 
     if (combined.has(tool.name)) throw new Error('Feature tool registration collides with an existing tool.');
     combined.set(tool.name, tool);
   }
-  return { skills, tools: input.runtimeConfig ? restrictToolPool(combined, input.runtimeConfig) : combined };
+  const restricted = input.runtimeConfig ? restrictToolPool(combined, input.runtimeConfig) : combined;
+  if (!input.discover) return { skills, tools: restricted };
+  const discovery = createToolDiscovery({ catalog: restricted, ...(input.initialTools ? { initial: input.initialTools } : {}) });
+  discovery.attachMeta(discoveryTools(discovery));
+  return { skills, tools: discovery.snapshot(), discovery };
 }
 
 /**

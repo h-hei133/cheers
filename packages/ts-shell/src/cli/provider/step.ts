@@ -18,6 +18,7 @@ import { serviceTierCapability } from '../../core/models/serviceTier.js';
 import { assertScopedModel, scopedRuntimeConfig } from '../../config/scope/projection.js';
 import { credentialBlockMessage } from '../../core/shell/providerCredentials.js';
 import { credentialIdentityFor } from '../../core/auth/account/pool.js';
+import type { ToolDiscovery } from '../../core/tools/discovery/state.js';
 import { scopeAdmission } from '../../config/scope/admission.js';
 import { mergeConfigValue } from '../../config/merge.js';
 
@@ -40,6 +41,7 @@ export function createProviderStep(
   request: ProviderStepHost,
   tools: ReadonlyMap<string, ToolDefinition>,
   promptContext: SystemPromptContext,
+  discovery?: ToolDiscovery,
 ): StepFunction {
   const resolution = request.providerCredentialResolution;
   assertScopedModel(request.runtimeConfig, resolution);
@@ -97,6 +99,7 @@ export function createProviderStep(
     thinkingEffort: request.thinkingEffort,
     thinkingEffortExplicit: request.thinkingEffortExplicit,
     tools: toolSchemas(tools),
+    ...(discovery ? { toolSnapshot: () => toolSchemas(discovery.snapshot()) } : {}),
     catalog,
     // Sampling settings travel with the request, not with the provider: a
     // provider that ignores them still receives a well-formed request, and a
@@ -116,7 +119,8 @@ export function createProviderStep(
 }
 
 /** Each explicit delegated model is resolved once; unavailable targets never use the main step. */
-export function delegatedSteps(request: ProviderStepHost, tools: ReadonlyMap<string, ToolDefinition>, context: SystemPromptContext, syntheticDefault?: StepFunction) {
+export function delegatedSteps(request: ProviderStepHost, tools: ReadonlyMap<string, ToolDefinition>, context: SystemPromptContext,
+  syntheticDefault?: StepFunction, discovery?: ToolDiscovery) {
   return (model: string, admission?: () => string | undefined, effort?: ThinkingPreference, providerScope?: 'current', workspace = request.workspaceRoot): StepFunction => {
     if (request.providerMode === 'synthetic') {
       if (!model && effort === undefined && syntheticDefault) return syntheticDefault;
@@ -133,6 +137,6 @@ export function delegatedSteps(request: ProviderStepHost, tools: ReadonlyMap<str
     const admit = () => request.admission?.() ?? admission?.() ?? scopedAdmission();
     const requestPolicy = request.requestPolicy?.withAdmission?.(() => { const refusal = admit(); if (refusal) throw new Error(refusal); }) ?? request.requestPolicy;
     return createProviderStep({ ...request, runtimeConfig, workspaceRoot: workspace, providerCredentialResolution: resolution,
-      requestPolicy, admission: admit, ...(effort !== undefined ? { thinkingEffort: effort, thinkingEffortExplicit: true } : {}) }, tools, context);
+      requestPolicy, admission: admit, ...(effort !== undefined ? { thinkingEffort: effort, thinkingEffortExplicit: true } : {}) }, tools, context, discovery);
   };
 }

@@ -7348,3 +7348,15 @@ PRV-01 的选择器改为以投影的 active provider 判断可选性，但投�
 **本地验证**：`context/report.test.ts` 6 项、`sessionFacts.test.ts` 9 项与 `usageTelemetry` 22 项通过；新增 stale 事实与首请求估算断言；`build:ts` 通过。合同见[请求计量与预算 §5](features/request-budget.md#5-四态报告)。
 
 本条写入时尚未提交/推送。
+
+### Phase 20 TOOL-01：动态工具发现
+
+新增 `core/tools/discovery/`。默认 `toolDiscovery: "dynamic"`：模型首请求只声明 pinned（read/glob/grep/bash/edit/write/apply_patch/ask/task/taskOutput/taskStop）、`tool_search` 与 `tool_load`；其余通过可见性过滤的工具按名称搜索、加载后在下一请求获得完整 schema。`full` 模式保留全量 schema 供诊断与对照，命令检查（`/tools` 等）始终使用完整池。
+
+搜索只返回稳定名称与摘要，不返回 schema；加载上限 32，未知/元工具自身/超限名称如实拒绝。加载不授予权限：执行仍按当前 schema 校验并经过原 gate、sandbox 与审计。发现状态带可见目录名称与 schema 生成的 generation；一次运行内目录固定，新运行不继承 loaded set。
+
+运行时接入：`loadToolCatalog` 在 discover 时返回初始快照与 discovery；`runTurn`/`AgentCore` 的 tool 列表改为按批次解析，`createToolHooks` 也接受 resolver；step 每次调用读取当前快照，所以加载后的 schema 进入下一次请求与硬预算；委派步骤共享同一 discovery。
+
+**本地验证**：新增 6 项发现测试（初始集合、搜索、加载/拒绝、上限、generation、元工具执行）；`entrypoints`、`core/tools`、`turn/tools`、`turn/session`、`cli/runtime` 组合 67 文件 780 项中，初次 9 项失败均为测试期望全量池或 `task` 未 pinned；将 `task` 纳入 pinned、MCP 行为测试显式使用 full 模式后两文件 33 项通过，组合复跑见后续。`build:ts`、config consumers、import cycles 通过。合同见[动态工具发现](features/tool-discovery.md)。
+
+本条写入时尚未提交/推送；TOOL-02 的描述精简与质量评测、QA-03 的真实任务对比仍待实施。

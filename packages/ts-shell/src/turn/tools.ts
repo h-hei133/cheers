@@ -255,7 +255,8 @@ async function executeTool(
  * feedback (a compile error after an edit, say) is attached to the result so
  * the model reads it with the output it belongs to.
  */
-export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<string, ToolDefinition>): ToolHooks {
+export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<string, ToolDefinition> | (() => ReadonlyMap<string, ToolDefinition>)): ToolHooks {
+  const toolFor = (name: string) => (typeof tools === 'function' ? tools() : tools)?.get(name);
   const doomLoop = new DoomLoopDetector(3);
   const approvals = new Map<string, { operation: string; decision: string }>();
   return {
@@ -265,10 +266,10 @@ export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<st
       try {
       const blocked = options.admission?.();
       if (blocked) return { block: true, reason: blocked };
-      if (tools?.get(call.name)?.prepare && !preparedToolCall(args, options)) return { block: true, reason: 'The original prepared tool call is required.' };
-      const planBlock = planModeBlock(options.agentMode, call.name, args, tools?.get(call.name));
+      if (toolFor(call.name)?.prepare && !preparedToolCall(args, options)) return { block: true, reason: 'The original prepared tool call is required.' };
+      const planBlock = planModeBlock(options.agentMode, call.name, args, toolFor(call.name));
       if (planBlock) return { block: true, reason: planBlock };
-      const permission = await askPermission(call.id, call.name, args, options, signal, tools?.get(call.name));
+      const permission = await askPermission(call.id, call.name, args, options, signal, toolFor(call.name));
       if (permission.blocked) { refusal = 'denied'; return { block: true, reason: permission.blocked }; }
       const afterApproval = options.admission?.();
       if (afterApproval) return { block: true, reason: afterApproval };
@@ -316,7 +317,7 @@ export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<st
       authorized = true;
       return undefined;
       } finally { if (!authorized) {
-        try { tools?.get(call.name)?.onRefusal?.(args, preparationContext(call.name, options), signal?.aborted ? 'cancelled' : refusal); }
+        try { toolFor(call.name)?.onRefusal?.(args, preparationContext(call.name, options), signal?.aborted ? 'cancelled' : refusal); }
         finally { discardToolCall(args); forgetToolScope(args); }
       } }
     },
@@ -357,7 +358,7 @@ export function createToolHooks(options: ToolGateOptions, tools?: ReadonlyMap<st
         // character cannot forge extra lines or repaint the transcript.
         output = `${output}\n\n[Verification feedback]\n${neutraliseForDisplay(redactExportText(decision.feedback))}`;
       }
-      let refused = tools?.get(call.name)?.resultAdmission?.();
+      let refused = toolFor(call.name)?.resultAdmission?.();
       try { toolScopePolicy(call.name, args, options); }
       catch { refused ??= 'Configuration scope changed before result publication.'; }
       finally { forgetToolScope(args); }

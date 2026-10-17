@@ -37,7 +37,7 @@ function input(): CliRuntimeInvocationInput {
     providerCredentialResolution: { provider: "openai", expectedEnvVarName: "OPENAI_API_KEY" },
     agentMode: "build",
     providerModeEnv: "synthetic",
-    runtimeConfig: { ...getRuntimeConfig(root), enableMcpTools: true },
+    runtimeConfig: { ...getRuntimeConfig(root), enableMcpTools: true, toolDiscovery: 'full' },
   };
 }
 beforeEach(() => {
@@ -64,7 +64,7 @@ it("shows exactly the model pool, including skills and MCP, then reflects change
   const snapshot = vi.spyOn(gateway, "snapshot");
   const skill = path.join(root, "SKILL.md");
   fs.writeFileSync(skill, "---\nname: inspect-fixture\ndescription: Inspect this test fixture\n---\nRead the fixture.\n");
-  const runtimeConfig = { ...input().runtimeConfig!, allowedTools: ["read", "skill", "mcp__local__echo_message"],
+  const runtimeConfig = { ...input().runtimeConfig!, toolDiscovery: "full", allowedTools: ["read", "skill", "mcp__local__echo_message"],
     disabledTools: [], hiddenToolPrefixes: [] };
   const binding = configurationBinding({ projectRoot: root, session: { id: 'mcp-inspection' } });
   const configuration = new ConfigState(runtimeConfig, binding);

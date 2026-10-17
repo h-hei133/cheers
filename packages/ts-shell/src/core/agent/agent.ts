@@ -7,7 +7,8 @@ import type { RetryPolicy } from "./retry.js";
 
 export interface AgentCoreOptions {
   readonly initialState?: InitialAgentState;
-  readonly tools?: readonly AgentTool[];
+  /** A function resolves the pool again for each batch, after discovery loaded tools. */
+  readonly tools?: readonly AgentTool[] | (() => readonly AgentTool[]);
   readonly toolExecution?: AgentToolExecutionMode;
   readonly streamStep: AgentLoopConfig["streamStep"];
   readonly beforeToolCall?: ToolHooks["beforeToolCall"];

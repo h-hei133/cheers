@@ -95,6 +95,8 @@ export interface TurnOptions {
   readonly onMessage: (message: SessionMessage) => void;
   readonly step: StepFunction;
   readonly tools: ReadonlyMap<string, ToolDefinition>;
+  /** Read again before each batch so a tool loaded mid-run is available next. */
+  readonly toolSnapshot?: () => ReadonlyMap<string, ToolDefinition>;
   readonly hooks: HookDispatcher;
   /** Model steps a run may take before it is asked to conclude. */
   readonly maxSteps: number;
@@ -223,7 +225,8 @@ export function runTurn(options: TurnOptions): TurnRun {
         ? openingText
         : [{ type: "text" as const, text: openingText }, ...openingImages],
   };
-  const hooks = createToolHooks(gate, options.tools);
+  const toolPool = () => options.toolSnapshot?.() ?? options.tools;
+  const hooks = createToolHooks(gate, toolPool);
   /**
    * The request as it last went out, kept so a refresh can replay it.
    *
@@ -240,7 +243,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     ...(options.steeringMode ? { steeringMode: options.steeringMode } : {}),
     ...(options.followUpMode ? { followUpMode: options.followUpMode } : {}),
     ...(options.retry ? { retry: options.retry } : {}),
-    tools: adaptTools(options.tools, gate).map((tool) =>
+    tools: () => adaptTools(toolPool(), gate).map((tool) =>
       SEQUENTIAL_TOOLS.has(tool.name) ? { ...tool, executionMode: "sequential" as const } : tool,
     ),
     beforeToolCall: hooks.beforeToolCall,

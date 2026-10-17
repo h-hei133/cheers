@@ -135,6 +135,8 @@ export interface StepRequest {
   /** Reuse the session's approved instructions with a delegated mode and tool set. */
   readonly systemPromptFor?: (agentMode: "plan" | "build", toolNames: readonly string[]) => string;
   readonly tools: readonly ToolSchema[];
+  /** Read again for each step so tools loaded mid-run are declared next time. */
+  readonly toolSnapshot?: () => readonly ToolSchema[];
   readonly temperature?: number;
   readonly topP?: number;
   readonly maxOutputTokens?: number;
@@ -267,7 +269,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
     const requestId = options.requestId ?? randomUUID();
     let requestAcceptedAt: number | undefined;
     const allowed = options.allowedTools && new Set(options.allowedTools);
-    const tools = allowed ? request.tools.filter((tool) => allowed.has(tool.function.name)) : request.tools;
+    const declared = request.toolSnapshot?.() ?? request.tools;
+    const tools = allowed ? declared.filter((tool) => allowed.has(tool.function.name)) : declared;
     const systemPrompt = options.agentMode && request.systemPromptFor
       ? request.systemPromptFor(options.agentMode, tools.map((tool) => tool.function.name))
       : request.systemPrompt;

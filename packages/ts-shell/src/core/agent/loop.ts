@@ -86,7 +86,8 @@ export interface NextStepUpdate {
 }
 
 export interface AgentLoopConfig {
-  readonly tools?: readonly AgentTool[];
+  /** A function resolves the pool again for each batch, after discovery loaded tools. */
+  readonly tools?: readonly AgentTool[] | (() => readonly AgentTool[]);
   readonly toolExecution?: AgentToolExecutionMode;
   readonly beforeToolCall?: ToolHooks["beforeToolCall"];
   readonly afterToolCall?: ToolHooks["afterToolCall"];
@@ -302,7 +303,7 @@ async function driveLoop(
           hasMoreToolCalls = true;
         } else {
           const batch = await executeToolBatch(
-            config.tools ?? [],
+            typeof config.tools === 'function' ? config.tools() : config.tools ?? [],
             assistant,
             step.toolCalls,
             hooks,

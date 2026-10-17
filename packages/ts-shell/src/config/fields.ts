@@ -52,6 +52,7 @@ export function createConfigFields(providers: readonly string[]) {
     hiddenToolPrefixes: field(listSchema(nameSchema), undefined, 'union', true, safe),
     denyRules: field(listSchema(objectSchema({ tool: nameSchema, pattern: textSchema }, ['tool'])), undefined, 'deny', true, safe),
     enableMcpTools: field(booleanSchema, undefined, 'disable', true, safe),
+    toolDiscovery: field(enumSchema(['dynamic', 'full']), undefined, 'replace', false, { ...safe, application: 'next operation' }),
     temperature: field({ type: 'number' }),
     topP: field({ type: 'number', minimum: 0, maximum: 1 }),
     maxOutputTokens: field(positiveSchema),

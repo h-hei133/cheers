@@ -186,6 +186,8 @@ export interface RuntimeConfig {
    */
   readonly denyRules: readonly DenyRule[];
   readonly enableMcpTools: boolean;
+  /** Dynamic discovery is the default; full is a diagnostic/parity mode. */
+  readonly toolDiscovery: 'dynamic' | 'full';
   readonly activeProviderConnectionId?: string;
   readonly providerConnections: readonly ProviderConnectionConfig[];
   /** Absent means no pool is declared and existing selection applies. */
@@ -404,6 +406,7 @@ export interface RuntimeConfigFile {
   hiddenToolPrefixes?: string[];
   denyRules?: unknown[];
   enableMcpTools?: boolean;
+  toolDiscovery?: 'dynamic' | 'full';
   activeProviderConnectionId?: string;
   providerConnections?: ProviderConnectionConfig[];
   accountPool?: Record<string, { connections: string[]; baseUrl?: string }>;
@@ -446,6 +449,7 @@ export const DEFAULT_CONFIG: Omit<RuntimeConfig, "configSources" | "configProven
   denyRules: [],
   hiddenToolPrefixes: [],
   enableMcpTools: true,
+  toolDiscovery: 'dynamic',
   activeProviderConnectionId: undefined,
   providerConnections: [],
   providerCredentials: {},
@@ -551,6 +555,7 @@ export function getRuntimeConfig(
     hiddenToolPrefixes:
       merged.hiddenToolPrefixes ?? DEFAULT_CONFIG.hiddenToolPrefixes,
     enableMcpTools: merged.enableMcpTools ?? DEFAULT_CONFIG.enableMcpTools,
+    toolDiscovery: merged.toolDiscovery ?? DEFAULT_CONFIG.toolDiscovery,
     activeProviderConnectionId: normalizeConnectionId(
       merged.activeProviderConnectionId,
     ),

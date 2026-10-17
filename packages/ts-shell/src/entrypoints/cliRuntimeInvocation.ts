@@ -13,6 +13,7 @@ import { defaultHookDispatcher, type HookDispatcher } from "../core/hooks/hookDi
 import { setupBuiltinVerificationHooks } from "../core/hooks/builtin/index.js";
 import { registerDeclaredHooks, type HookApprovalRequest } from "../core/hooks/registration.js";
 import { loadToolCatalog, type CatalogContent, type ToolCatalogInput } from "../core/tools/catalog.js";
+import type { ToolDiscovery } from "../core/tools/discovery/state.js";
 import { loadCatalog } from "../core/models/catalogStore.js";
 import { providerEndpoint, type CatalogProvider } from "../core/models/catalog.js";
 import type { RuntimeConfig } from "../config/runtimeConfig.js";
@@ -144,7 +145,7 @@ export interface CliRuntimeInvocationDependencies {
   readonly checkProviderReadiness: ProviderReadinessChecker;
   readonly createReadinessTerminalEvent: typeof createProviderReadinessCliTerminalEvent;
   /** The model behind a real run; the default speaks to the configured provider. */
-  readonly createStep?: (request: CliRuntimeInvocationRequest, tools: ReadonlyMap<string, ToolDefinition>) => StepFunction;
+  readonly createStep?: (request: CliRuntimeInvocationRequest, tools: ReadonlyMap<string, ToolDefinition>, discovery?: ToolDiscovery) => StepFunction;
   readonly tools?: () => ReadonlyMap<string, ToolDefinition>;
   readonly hooks?: HookDispatcher;
 }
@@ -438,7 +439,8 @@ async function startTurn(
     requestApproval: (hook) => approveDeclaredHook(request, hook),
     bypassed: request.runtimeConfig?.allowUntrustedHooks === true,
   });
-  const { skills, tools: catalogTools } = await loadToolCatalog(request, dependencies.tools);
+  const discover = request.runtimeConfig?.toolDiscovery !== 'full' && !request.forcedTool;
+  const { skills, tools: catalogTools, discovery } = await loadToolCatalog({ ...request, discover }, dependencies.tools);
   const tools = request.forcedTool
     ? new Map([...catalogTools].filter(([name]) => name === request.forcedTool))
     : catalogTools;
@@ -468,13 +470,16 @@ async function startTurn(
   // subagent's tool calls too.
   const baseStep = request.providerMode === "synthetic"
     ? createSyntheticStep({ toolIntent: syntheticToolIntent() })
-    : (dependencies.createStep ?? createProviderStep)(request, tools, promptContext);
-  const forModel = delegatedSteps(request, tools, promptContext, baseStep);
+    : dependencies.createStep
+      ? dependencies.createStep(request, tools, discovery)
+      : createProviderStep(request, tools, promptContext, discovery);
+  const forModel = delegatedSteps(request, tools, promptContext, baseStep, discovery);
   const control = request.stepControl?.({ step: baseStep, forModel, tools, hooks });
   const step = control?.step ?? baseStep;
 
   const run = runTurn({
     configScope: toolScopeBinding(request.runtimeConfig),
+    ...(discovery ? { toolSnapshot: () => discovery.snapshot() } : {}),
     observe: control?.observe,
     background: request.background,
     checkpoint: request.checkpoint,
