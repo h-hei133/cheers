@@ -7630,3 +7630,8 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 
 - 新增 `scripts/qa-pty-smoke.mjs` 与 `npm run qa:pty`：`script` 提供真实 PTY，临时 HOME/项目，合成 provider，执行 `/sessions current` 后 `/exit`，断言 `Current session` 与 exit 0。
 - 结果 PASS（6863 bytes）。这只是 Linux 单点；Windows/macOS、双构建、IME/系统复制与真实质量仍未验证，不算 QA-02 完成。
+
+## 2026-10-18 — 摘要索引清理
+
+- `.reentry-index.json` 在写入时删除已不存在会话的条目；即使本次没有新摘要也因 stale 而 flush，避免索引随删除无限增长。
+- 验证：`src/session` 857 通过；新增删除会话后条目消失测试。

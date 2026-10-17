@@ -247,7 +247,9 @@ export class SessionManager extends SessionReadSurface {
       if (stamp !== undefined) { index.set(session.id, { stamp, summary }); changed = true; }
       return summary;
     });
-    if (changed) this.flushReentryIndex(index);
+    const keep = new Set(sessions.map(session => session.id));
+    const stale = [...index.keys()].some(id => !keep.has(id));
+    if (changed || stale) this.flushReentryIndex(index, keep);
     return projectSortedSessionReentrySummaries({
       summaries,
       preferredProjectRoot: input?.preferredProjectRoot,
@@ -287,9 +289,12 @@ export class SessionManager extends SessionReadSurface {
     this.reentryIndexCache = index;
     return index;
   }
-  private flushReentryIndex(index: Map<string, { readonly stamp: string; readonly summary: SessionReentrySummary }>): void {
+  private flushReentryIndex(index: Map<string, { readonly stamp: string; readonly summary: SessionReentrySummary }>,
+    keep: ReadonlySet<string>): void {
     const file = this.reentryIndexFile();
     try {
+      // A deleted session must not leave its summary behind forever.
+      for (const id of [...index.keys()]) if (!keep.has(id)) index.delete(id);
       fs.mkdirSync(path.dirname(file), { recursive: true });
       const temporary = `${file}.${process.pid}.tmp`;
       fs.writeFileSync(temporary, JSON.stringify({ version: 1, entries: Object.fromEntries(index) }), 'utf8');

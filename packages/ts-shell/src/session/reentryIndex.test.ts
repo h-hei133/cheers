@@ -25,6 +25,17 @@ it('reuses a persisted summary until the session files change', () => {
   expect(manager.listReentrySummaries({ includeUntouched: true }).find(summary => summary.id === session.id)?.title).toBe('Renamed title');
 });
 
+it('drops summaries for sessions that no longer exist', () => {
+  const first = manager.createNew(root); const second = manager.createNew(root);
+  manager.listReentrySummaries({ includeUntouched: true });
+  const sessionsDir = createSessionStoreLayout().sessionsDir;
+  fs.rmSync(path.join(sessionsDir, first.id), { recursive: true, force: true });
+  manager.listReentrySummaries({ includeUntouched: true });
+  const index = JSON.parse(fs.readFileSync(path.join(sessionsDir, '.reentry-index.json'), 'utf8')) as { entries: Record<string, unknown> };
+  expect(index.entries[first.id]).toBeUndefined();
+  expect(index.entries[second.id]).toBeDefined();
+});
+
 it('treats a damaged index as a cache miss', () => {
   const session = manager.createNew(root); manager.renameSession(session.id, 'Still readable');
   manager.listReentrySummaries({ includeUntouched: true });
