@@ -7566,3 +7566,9 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - `startCommand` 的投影结果现在同样调用 `onCommandSettled`；此前只有 `runCommand` 报告 `terminationFailed/outputFailed`，晋升路径会让 agent job 把未验证的清理误报为“cancelled; live cleanup settled”。
 - 两个取消测试改为 mock `startStreamed`（新的唯一 spawn 接缝），保持“终止未验证 → unknown”的原断言。
 - 全量 `npm run test:ts`：850 文件、8473 通过、1 跳过。
+
+## 2026-10-18 — START-03 进程启动基准
+
+- 新增 `scripts/bench-start.mjs` 与 `npm run bench:start`：Node 与单文件 exe 各 30 个新进程，测 `--version` 的 spawn→exit 墙钟，报告 first/p50/p95/min/max；首样本不冒充受控冷启动。
+- 实测（WSL2，Node 20）：Node p50 1030.4ms / p95 1074.6ms；exe p50 497.5ms / p95 526.1ms。
+- 未测交互首帧/键响应/regular/fullscreen/pipe：需要 PTY 与 ready 信号，仓库无 PTY 依赖，不能以进程启动冒充 ready。

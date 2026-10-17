@@ -41,6 +41,7 @@
 | JOB-01 | 单次 spawn 的 handle、detach/kill、adopt/promote、60s 前台晋升 | 新消息晋升、注册表持有的 deadline 竞争、重启后的 adopted PID 恢复 |
 | EDIT-01 | 稳定 group id、依赖分组、选集传递、无选集拒绝、重规划基线校验 | 逐项勾选 UI、desktop 子集选择、部分写/补偿的端到端故障注入 |
 | JOB-02 | 本地通知、opt-in 模型 follow-up（去重/预算/截断）、不重播未知、取消不转后台 | follow-up 的端到端交互测试、重启恢复的故障注入 |
+| START-03 | `scripts/bench-start.mjs` + `bench:start`：Node/exe `--version` 各 30 次，first/p50/p95/min/max | 交互首帧、键响应、regular/fullscreen/pipe 与受控冷缓存仍未测量（无 PTY 依赖） |
 
 ## 未开始
 
@@ -52,6 +53,17 @@ PAN-08、JOB-02、START-02/03、QA-01…04、TOOL-02；JOB-01 的新消息晋升
 - 其后的 docs/advisor/resume 提交在写本文时仍在队列中；以 GitHub run 结果为准，不能把本地通过当成 CI 通过。
 - 更早的失败提交均已被后续修复覆盖：handoff 的 `todo` pin、director feature tools、settings 标签、firstFrame padding、MCP 启动超时、copy 的环境依赖。
 - `57e1ffb3`、`7da6e6d4`、`f0f2f2d2` 的 CI 均因同一对取消测试超时失败（`director/runtime.test.ts`、`jobs/agent/command.test.ts`）：bash 工具改走 `startCommand` 后，测试仍 mock `executeLocally`。`0b8dcdb4` 改为 mock `startStreamed` 并让 `startCommand` 同样报告 settlement；本地全量 8473 通过，CI success（run 39061415399）。
+
+## 启动基准（2026-10-18，WSL2，Node 20）
+
+`npm run bench:start`：每个样本一个新进程，测 spawn 到退出的墙钟时间；首样本单列，因为无特权无法清页缓存，不能称为受控冷启动。
+
+| target | runs | first | p50 | p95 | min | max |
+|---|---|---|---|---|---|---|
+| node `dist/cli.js --version` | 30 | 1991.5ms | 1030.4ms | 1074.6ms | 995.8ms | 1991.5ms |
+| exe `dist/bin/cheers --version` | 30 | 492.7ms | 497.5ms | 526.1ms | 469.7ms | 528.2ms |
+
+未测：交互 ready/首帧/键响应、regular/fullscreen/pipe；这些需要 PTY 与 ready 信号，当前仓库无 PTY 依赖。
 
 ## 本地全量
 

@@ -118,7 +118,8 @@
     "test:delta:release": "cmd /d /s /c \"npm run test:delta:full && npm run test:delta:full && node scripts/delta-nightly.mjs --duration-minutes 1\"",
     "test:coverage:real-shapes": "node scripts/real-shape-coverage.mjs",
     "verify:session-durability:long": "node scripts/verify-session-durability-long.mjs",
-    "start:dev": "npm run start -w packages/ts-shell --"
+    "start:dev": "npm run start -w packages/ts-shell --",
+    "bench:start": "node scripts/bench-start.mjs"
   },
   "engines": {
     "node": ">=20.3.0"
