@@ -7625,3 +7625,8 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 
 - `bench:interactive` 增加 pipe 模式并单独记录命令写入到退出的时间：regular 首帧 p50 1054.6ms、命令→退出 157.5ms；fullscreen 1061.0ms/161.1ms；pipe 1035.7ms/198.8ms。
 - 受控冷缓存仍需特权清页缓存，未以首样本冒充。
+
+## 2026-10-18 — QA-02 Linux PTY 冒烟
+
+- 新增 `scripts/qa-pty-smoke.mjs` 与 `npm run qa:pty`：`script` 提供真实 PTY，临时 HOME/项目，合成 provider，执行 `/sessions current` 后 `/exit`，断言 `Current session` 与 exit 0。
+- 结果 PASS（6863 bytes）。这只是 Linux 单点；Windows/macOS、双构建、IME/系统复制与真实质量仍未验证，不算 QA-02 完成。

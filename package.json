@@ -120,7 +120,8 @@
     "verify:session-durability:long": "node scripts/verify-session-durability-long.mjs",
     "start:dev": "npm run start -w packages/ts-shell --",
     "bench:start": "node scripts/bench-start.mjs",
-    "bench:interactive": "node scripts/bench-interactive.mjs"
+    "bench:interactive": "node scripts/bench-interactive.mjs",
+    "qa:pty": "node scripts/qa-pty-smoke.mjs"
   },
   "engines": {
     "node": ">=20.3.0"

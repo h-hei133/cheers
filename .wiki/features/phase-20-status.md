@@ -51,7 +51,7 @@
 - START-03：受控冷缓存（需清页缓存权限）；逐键延迟目前以 `/exit` 命令处理为代理。
 - PAN-05：流式面板。
 - RENDER-03：并排 diff 的左右源复制。
-- QA-02/03：PTY/双构建/平台矩阵与真实质量（缺环境/模型）。
+- QA-02/03：Linux PTY 冒烟已通过（`npm run qa:pty`，`/sessions current` + `/exit`）；双构建、Windows/macOS/IME/系统复制与真实质量仍缺环境/模型。
 - TOOL-02：描述/tokenizer/质量评估（需真实模型）。
 
 ## CI
