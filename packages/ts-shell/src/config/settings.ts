@@ -48,6 +48,7 @@ const descriptions = {
   toolDiscovery: ['Tools', 'Tool discovery', 'dynamic starts with pinned tools and loads the rest on request; full sends every schema'],
   theme: ['Display', 'Theme', 'Theme name, including custom themes and auto'],
   vimMode: ['Display', 'Vim mode', 'Normal/Insert/Visual/Visual-Line/Replace editing in the prompt; starts in Insert'],
+  backgroundFollowUp: ['Session', 'Background follow-up', 'Send a finished background task as a model follow-up; off means a local notice only'],
   tuiMode: ['Display', 'Terminal mode', 'Regular or fullscreen; changes require restart'],
   'tui.composerShape': ['Display', 'Input shape', 'Input appearance; project leaves take precedence. Unset uses default'],
   'tui.statusItems': ['Display', 'Status items', 'Supported status item names; project leaves take precedence. Empty uses the default band'],

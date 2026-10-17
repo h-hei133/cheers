@@ -267,9 +267,16 @@ export class InteractiveMode {
     excludeRecordingInput(options.runtimeContext, () => this.stopped || Boolean(this.state.editor.getText() || this.questions.question() || this.overlay.active || this.pager.active || this.search.active));
     // Completion is a scoped local notice. Output does not become new user intent
     // or silently dispatch a model request; taskOutput exposes the retained facts.
+    const followUpTasks = new Set<string>();
+    let followUpBudget = 20;
     this.stopWatchingBackground = watchJobsFor(options.runtimeContext, (task) => {
       this.state.transcript.append(textBlock('notice', renderTaskNotice(task)));
       this.tui.requestRender();
+      if (task.state !== 'exited' || !options.runtimeContext.runtimeConfig.backgroundFollowUp) return;
+      if (followUpTasks.has(task.id) || followUpBudget <= 0) return;
+      followUpTasks.add(task.id); followUpBudget--;
+      const output = task.output.length > 4000 ? `${task.output.slice(0, 4000)}\n[output truncated]` : task.output;
+      this.options.sessionRuntime.input?.()?.followUp(`Background task ${task.id} finished (${task.command}). Output:\n${output}`, `background:${task.id}`);
     });
     this.view = new InteractiveSurface(
       {

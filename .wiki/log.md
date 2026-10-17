@@ -7548,3 +7548,10 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - patch 工具在多 group 且无选集时拒绝并零写入；执行前以选中 group 重新规划，基线/内容改变或选集过期即拒绝；单 group 无需额外选集。
 - CLI 审批 allow-once 明确返回全部 group id；无审批宿主的 allow-all 路径不再默认写多 group。
 - 验证：`src/edit` + `src/turn` + `picker` + `src/tools` 522 通过；patch 测试新增子集选择与无选集拒绝。
+
+## 2026-10-18 — JOB-02 opt-in 后台完成 follow-up
+
+- 默认行为保持本地 notice：不写新 prompt、不发模型请求。
+- 新增 `backgroundFollowUp`（boolean，默认 false，Session 组，immediate）：开启后已退出任务的完成通知以 `background:<id>` 去重、每会话最多 20 条、输出截断 4000 字符，作为原 session 的 follow-up 注入。
+- 取消路径杀进程且不晋升；重启后 journal 的 running/unknown 不自动重播。
+- 验证：`src/config` + `src/cli/interactive` 1127 通过（新增字段后 settings 期望已更新）。

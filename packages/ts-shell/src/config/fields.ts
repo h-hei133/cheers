@@ -68,6 +68,9 @@ export function createConfigFields(providers: readonly string[]) {
     agentMode: field(enumSchema(['plan', 'build']), undefined, 'replace', false, { projectTrust: ['plan'] }),
     theme: field(nameSchema, withOverride, 'replace', false, { application: 'immediate' }),
     vimMode: field(booleanSchema, withOverride, 'replace', false, { ...safe, application: 'immediate' }),
+    // A finished background task is a notice by default; turning it into a model
+    // follow-up spends tokens, so it is an explicit personal choice.
+    backgroundFollowUp: field(booleanSchema, withOverride, 'replace', false, { ...safe, application: 'immediate' }),
     tuiMode: field(enumSchema(['regular', 'fullscreen']), undefined, 'replace', false, { ...safe, application: 'restart' }),
     tui: field(objectSchema(tuiSchemas), undefined, 'tui', false, { ...safe, application: 'restart' }),
     retryEnabled: field(booleanSchema, undefined, 'replace', false, { projectTrust: [false] }),

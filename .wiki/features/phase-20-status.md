@@ -40,6 +40,7 @@
 | SET-03 | status/theme 预览 | 外部更新撤销的端到端验收 |
 | JOB-01 | 单次 spawn 的 handle、detach/kill、adopt/promote、60s 前台晋升 | 新消息晋升、注册表持有的 deadline 竞争、重启后的 adopted PID 恢复 |
 | EDIT-01 | 稳定 group id、依赖分组、选集传递、无选集拒绝、重规划基线校验 | 逐项勾选 UI、desktop 子集选择、部分写/补偿的端到端故障注入 |
+| JOB-02 | 本地通知、opt-in 模型 follow-up（去重/预算/截断）、不重播未知、取消不转后台 | follow-up 的端到端交互测试、重启恢复的故障注入 |
 
 ## 未开始
 
