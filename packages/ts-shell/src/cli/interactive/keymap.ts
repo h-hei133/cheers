@@ -3,6 +3,7 @@ import type { ParsedKeyEvent } from "../../presentation/tui/input/keys.js";
 import type { InteractiveView, ViewActions } from "../../presentation/tui/surface/contract.js";
 import { KEY_ACTIONS, type Keybindings } from "./keybindings.js";
 import { getSlashInvocation } from "../../entrypoints/slashCommandRegistry.js";
+import { feedVim, initialVimState, type VimEffect, type VimKey, type VimState } from "../../presentation/tui/editor/modal/state.js";
 
 /**
  * Key routing for the interactive view.
@@ -64,6 +65,8 @@ export interface KeymapContext {
   readonly gesture: { lastCancelAt?: number; lastEscapeAt?: number };
   /** The bindings in force, resolved from the catalogue and the user's file. */
   readonly keybindings: Keybindings;
+  /** Modal editing in the prompt; Insert is the starting mode. */
+  readonly vimMode?: boolean;
 }
 
 /**
@@ -79,9 +82,27 @@ export function dispatchedKeyIds(): readonly string[] {
   return keys;
 }
 
+const vimStates = new WeakMap<object, VimState>();
+
 /** Apply one keystroke to the view. */
 export function routeKey(event: ParsedKeyEvent, context: KeymapContext): void {
   const { view, actions } = context;
+
+  if (context.vimMode) {
+    const editor = view.editor;
+    const state = vimStates.get(editor) ?? initialVimState("insert");
+    // Insert mode keeps the ordinary editor, including submit and suggestions;
+    // only Escape leaves it. Every other mode owns the key, so Enter cannot
+    // submit and a printable character cannot be typed into the draft.
+    if (state.mode !== "insert" || event.keyId === "escape") {
+      const result = feedVim(state, vimKey(event), editor.getText(), editor.snapshot().cursor);
+      vimStates.set(editor, result.state);
+      applyVimEffect(result.effect, context);
+      actions.syncSuggestions(false);
+      actions.redraw();
+      return;
+    }
+  }
 
   if (view.suggestionsOpen && consumeSuggestionKey(event, context)) return;
 
@@ -359,6 +380,39 @@ function opensSuggestions(event: ParsedKeyEvent): boolean {
 function resync(event: ParsedKeyEvent, context: KeymapContext): void {
   context.actions.syncSuggestions(opensSuggestions(event));
   context.actions.redraw();
+}
+
+function vimKey(event: ParsedKeyEvent): VimKey {
+  const arrow = ({ left: "h", right: "l", up: "k", down: "j" } as const)[event.keyId as "left" | "right" | "up" | "down"];
+  if (arrow) return { key: arrow, text: arrow };
+  if (event.keyId === "escape") return { key: "escape" };
+  if (event.keyId === "enter") return { key: "enter", text: "" };
+  if (event.keyId === "backspace") return { key: "X", text: "X" };
+  if (event.keyId === "delete") return { key: "x", text: "x" };
+  const text = event.text ?? "";
+  return { key: text || event.keyId, text, ...(event.ctrl ? { ctrl: true } : {}) };
+}
+
+function applyVimEffect(effect: VimEffect, context: KeymapContext): void {
+  const editor = context.view.editor;
+  switch (effect.kind) {
+    case "edit": {
+      const snapshot = editor.snapshot();
+      // `replace` binds to a snapshot whose caret is inside the range; an
+      // insertion before the caret (O, P) first moves the caret to that point.
+      if (snapshot.cursor < effect.from || snapshot.cursor > effect.to) {
+        if (!editor.setCursorOffset(effect.from)) return;
+      }
+      editor.replace({ snapshot: editor.snapshot(), from: effect.from, to: effect.to, text: effect.text,
+        ...(effect.cursorOffset !== undefined ? { cursorOffset: effect.cursorOffset } : {}) });
+      return;
+    }
+    case "cursor": editor.setCursorOffset(effect.offset); return;
+    case "mode": if (effect.offset !== undefined) editor.setCursorOffset(effect.offset); return;
+    case "undo": editor.undo(); return;
+    case "redo": editor.redo(); return;
+    default: return;
+  }
 }
 
 /** Printable text, which is what an unclaimed key is. */

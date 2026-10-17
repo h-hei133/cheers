@@ -17,6 +17,7 @@
 | PAN-02（部分） | `6736f402`、本次 | 时间分组、`Ctrl+P` pin、tree 连接线、resume 分页到 10000 |
 | PAN-03（部分） | 本次 | `/hub` 只读主从面板、1s journal 轮询、详情列 |
 | PAN-05（部分） | 本次 | `/advisor` 只读 checkpoint/note 主从面板 |
+| INPUT-01（部分） | 本次 | 五模式状态机、vimMode、Normal/Visual Enter 不提交、粘贴优先 |
 | RENDER-03（部分） | 本次 | 并排 diff、配对行号、双预算、窄屏 unified 回退 |
 | RENDER-02（部分） | 本次 | 多行 cell、escaped/code pipe、`<br>`、窄屏源码回退与预算 |
 | RENDER-01（部分） | 本次 | 内联数学投影、金额/代码保护、未知命令与超预算保原文 |

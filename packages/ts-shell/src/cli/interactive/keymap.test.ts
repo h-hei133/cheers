@@ -8,7 +8,7 @@ import { KEY_BINDINGS } from "../../presentation/tui/chrome/keys.js";
 import { dispatchedKeyIds } from "./keymap.js";
 import { Keybindings } from "./keybindings.js";
 
-function build(busy = false, interruptible = false): {
+function build(busy = false, interruptible = false, vimMode = false): {
   press: (data: string) => void;
   surface: InteractiveSurface;
   actions: { [K in keyof KeymapActions]: ReturnType<typeof vi.fn> };
@@ -59,6 +59,7 @@ function build(busy = false, interruptible = false): {
         now: () => clock.now,
         gesture,
         keybindings: new Keybindings(),
+        vimMode,
       }),
   };
 }
@@ -268,6 +269,52 @@ describe("interruption", () => {
     press("\x03");
     press("\x04");
     expect(actions.exit).toHaveBeenCalledOnce();
+  });
+});
+
+describe("vim mode", () => {
+  it("types dd in Insert instead of deleting a line", () => {
+    const { press, surface } = build(false, false, true);
+    surface.editor.setText("one\ntwo");
+    surface.editor.move("doc-start");
+    press("d");
+    press("d");
+    expect(surface.editor.getText()).toBe("ddone\ntwo");
+  });
+
+  it("deletes a line in Normal and never submits Enter", () => {
+    const { press, surface, actions } = build(false, false, true);
+    surface.editor.setText("one\ntwo");
+    surface.editor.move("doc-start");
+    press("\x1b");
+    press("d");
+    press("d");
+    expect(surface.editor.getText()).toBe("two");
+    press("\r");
+    expect(actions.submit).not.toHaveBeenCalled();
+  });
+
+  it("deletes a visual selection", () => {
+    const { press, surface } = build(false, false, true);
+    surface.editor.setText("abcdef");
+    press("\x1b");
+    press("0");
+    press("l");
+    press("v");
+    press("l");
+    press("l");
+    press("d");
+    expect(surface.editor.getText()).toBe("aef");
+  });
+
+  it("returns to Insert with i and accepts typed text", () => {
+    const { press, surface } = build(false, false, true);
+    surface.editor.setText("bc");
+    press("\x1b");
+    press("0");
+    press("i");
+    press("a");
+    expect(surface.editor.getText()).toBe("abc");
   });
 });
 

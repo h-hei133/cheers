@@ -47,6 +47,7 @@ const descriptions = {
   enableMcpTools: ['Tools', 'Enable MCP tools', 'Any configured false disables MCP tools; approvals still apply'],
   toolDiscovery: ['Tools', 'Tool discovery', 'dynamic starts with pinned tools and loads the rest on request; full sends every schema'],
   theme: ['Display', 'Theme', 'Theme name, including custom themes and auto'],
+  vimMode: ['Display', 'Vim mode', 'Normal/Insert/Visual/Visual-Line/Replace editing in the prompt; starts in Insert'],
   tuiMode: ['Display', 'Terminal mode', 'Regular or fullscreen; changes require restart'],
   'tui.composerShape': ['Display', 'Input shape', 'Input appearance; project leaves take precedence. Unset uses default'],
   'tui.statusItems': ['Display', 'Status items', 'Supported status item names; project leaves take precedence. Empty uses the default band'],

@@ -48,7 +48,7 @@ it('gives every public setting a typed editor, with no JSON fallback for numbers
     hiddenToolPrefixes: 'list', denyRules: 'list',
     modelTokenBudgets: 'object',
     attentionOnIdle: 'boolean', cacheWarming: 'choice', retryEnabled: 'boolean', enableMcpTools: 'boolean',
-    offline: 'boolean', agentMode: 'choice', steeringMode: 'choice', followUpMode: 'choice',
+    offline: 'boolean', vimMode: 'boolean', agentMode: 'choice', steeringMode: 'choice', followUpMode: 'choice',
     toolDiscovery: 'choice', tuiMode: 'choice', theme: 'theme',
     'tui.composerShape': 'choice', 'tui.statusItems': 'status-items', 'tui.diagrams': 'choice',
   };

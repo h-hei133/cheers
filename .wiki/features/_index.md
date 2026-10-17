@@ -47,6 +47,7 @@ confidence: high
 | [请求计量与预算](request-budget.md) | CTX-01/02 usage 身份、消息范围与 P+O+H≤W 发送前准入 |
 | [压缩操作与步骤幂等](compaction-operations.md) | CTX-03 逻辑操作/步骤、完成复用、未知不重播与并发互斥 |
 | [动态工具发现](tool-discovery.md) | TOOL-01 默认 pinned + search/load、权限不变与 generation |
+| [输入区模态编辑](vim-mode.md) | INPUT-01 五模式、计数/operator、字素移动与粘贴优先级 |
 | [UI 容器几何与状态投影](ui-containers.md) | UI-01/02/03 输入区预算、两栏面板、二维命中、进度与 chip 状态 |
 | [启动产物与构建校验](launch-and-build.md) | START-01 构建 manifest、五种拒绝状态与 `start`/`start:dev` |
 | [Phase 20 交付状态](phase-20-status.md) | 已完成/部分/未开始与精确提交证据 |

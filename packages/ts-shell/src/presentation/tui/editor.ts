@@ -50,6 +50,10 @@ export class Editor extends EditorBuffer {
 
   private lastWidth = Number.MAX_SAFE_INTEGER;
   private preferredColumn: number | undefined;
+  protected resetVerticalPreference(): void {
+    this.preferredColumn = undefined;
+  }
+
   private readonly history: string[] = [];
   private historyIndex = -1;
   private draft = "";

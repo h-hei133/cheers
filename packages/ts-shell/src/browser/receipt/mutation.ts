@@ -45,9 +45,11 @@ export function mutateBrowserReceiptCache(input: {
     } else if (maintenance && !plan.compacted) {
       result = { outcome: "unchanged", cleanup: "not-acquired", report, evidence: plan.evidence, warnings: plan.warnings, blockers: [] };
     } else {
-      const records = maintenance ? plannedRecords : operation === "delete"
-        ? [...recovery.records.filter((item) => item.receiptId !== record!.receiptId), record!]
-        : [...recovery.records, record!];
+      // A receipt id is the record's identity. Appending a second row for the
+      // same id lets two concurrent writers leave a duplicate that health reads
+      // as over-budget; the newer record supersedes the older one.
+      const records = maintenance ? plannedRecords
+        : [...recovery.records.filter((item) => item.receiptId !== record!.receiptId), record!];
       input.assertOwner?.();
       const write = writeBrowserReceiptCacheFileAtomic({ cacheRoot: manifest.cacheRoot, content: serializeBrowserReceiptCacheRecords(records), ownsLock: lock.ownsLock });
       result = {

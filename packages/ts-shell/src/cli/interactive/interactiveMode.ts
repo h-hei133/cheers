@@ -534,6 +534,7 @@ export class InteractiveMode {
       now: () => Date.now(),
       gesture: this.gesture,
       keybindings: this.preferences.keybindings,
+      vimMode: this.options.runtimeContext.runtimeConfig.vimMode === true,
       actions: {
         submit: (text, disposition, attachments) => this.onSubmit(text, disposition, attachments),
         interrupt: () => void this.interrupt(),

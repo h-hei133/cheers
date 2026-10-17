@@ -46,6 +46,20 @@ describe("browser receipt cache store", () => {
     expect(cacheFile).not.toContain("Route 107 fixture");
   });
 
+  it("replaces a record with the same receipt id instead of appending a duplicate", () => {
+    const store = createBrowserReceiptCacheStore({
+      manifest: createBrowserReceiptCacheManifest({
+        cacheRoot: root,
+        allowedOperations: ["read", "write"],
+      }),
+      now: () => "2026-05-17T00:00:00.000Z",
+    });
+    const receipt = safeReceipt();
+    expect(store.writeReceipt(receipt).written).toBe(true);
+    expect(store.writeReceipt(receipt).written).toBe(true);
+    expect(store.list().records).toHaveLength(1);
+  });
+
   it("reports corrupted records safely", () => {
     const store = createBrowserReceiptCacheStore({
       manifest: createBrowserReceiptCacheManifest({

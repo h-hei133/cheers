@@ -1,6 +1,7 @@
 import { EditHistory } from "./editHistory.js";
 import { nextCluster, previousCluster } from "../text/motion.js";
 import { replaceDraft, type DraftSnapshot, type DraftEdit } from "./replacement.js";
+import { graphemeBoundaries } from "../text/measure.js";
 
 interface EditorSnapshot {
   readonly lines: readonly string[];
@@ -62,6 +63,26 @@ export abstract class EditorBuffer {
   getText(): string {
     return this.lines.join("\n");
   }
+
+  /**
+   * Place the caret at a raw offset on a grapheme boundary.
+   *
+   * Modal motions compute offsets; converting them here keeps the row/column
+   * invariant in one place and refuses a position inside a cluster.
+   */
+  setCursorOffset(offset: number): boolean {
+    const text = this.getText();
+    if (!Number.isInteger(offset) || offset < 0 || offset > text.length) return false;
+    if (!graphemeBoundaries(text).includes(offset)) return false;
+    const before = text.slice(0, offset).split("\n");
+    this.row = before.length - 1;
+    this.column = before[this.row]!.length;
+    this.resetVerticalPreference();
+    return true;
+  }
+
+  /** Subclasses clear their own column preference after a direct caret move. */
+  protected resetVerticalPreference(): void {}
 
   setText(text: string): void {
     this.saveUndo();

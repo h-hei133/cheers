@@ -7484,3 +7484,13 @@ PAN-06：copy picker 移除 recent-30 窗口，按新到旧列出全部 block，
 catalog 列表上限由 100 提升到 10000；`SessionListing.load` 接受显式 limit；resume 列表在结果达到当前页大小时追加可选 `Load older sessions` 行，选择后以 +40 的页大小打开新 picker。分组行仍不可选，pin/rename/delete 的版本校验不变。
 
 **本地验证**：session picker 19 项（45 会话首屏 40 + more，下一页 45 且无 more）通过；`build:ts` 通过。跨目录授权搜索仍未实施。
+
+### Phase 20 INPUT-01（部分）：输入区五模式模态编辑
+
+新增 `editor/modal/state.ts` 纯状态机（Insert/Normal/Visual/Visual-Line/Replace），返回 edit/cursor/mode/undo 意图；`vimMode` 配置字段默认关闭、即时生效。keymap 在 Insert 之外消费全部键，Normal/Visual 的 Enter 不提交；括号粘贴仍走宿主通道，Normal 中粘贴 `dd` 插入文本。移动使用字素与 Unicode 单词边界，计数上限 9999；`editor/buffer.ts` 新增 `setCursorOffset`（仅字素边界），编辑以当前 snapshot 绑定 `DraftEdit`，过期或切字素中间即拒绝。
+
+**本地验证**：`modal/state.test.ts` 7 项、keymap 58 项（含 dd 输入/删除、Visual 删除、i 返回 Insert）、config 396 项组合通过；`build:ts`、config consumers、declarations 通过。本条写入时尚未提交/推送；真实 IME、Visual 鼠标源选区与外部编辑器返回验收仍缺。
+
+### 修复：并发写入产生重复的 browser receipt 记录
+
+CI 的 `browser/cache/scenarios` 并发三进程测试偶发 `Duplicates/over-budget: 1`。`mutateBrowserReceiptCache` 在锁内按 receiptId 替换旧记录，而不是无条件追加；同一 receipt 的并发写不再留下重复行。新增 store 测试：连续写同一 receipt 两次，列表仍只有一条。
