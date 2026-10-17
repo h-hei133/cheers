@@ -7,6 +7,7 @@ import { refreshShellRuntimeConfig } from "../../core/shell/runtimeContext.js";
 import { configurationAdmission } from '../../core/shell/configuration.js';
 import { renderTaskNotice } from '../../workflow/jobs/local/projection.js';
 import { jobsFor, watchJobsFor } from '../runtime/jobs.js';
+import { createBackgroundFollowUp } from './backgroundNotice.js';
 import { jobsControl, runJobsControl } from '../jobs/control.js';
 import type { Interface as ReadlineInterface } from "node:readline";
 import path from "node:path";
@@ -267,16 +268,12 @@ export class InteractiveMode {
     excludeRecordingInput(options.runtimeContext, () => this.stopped || Boolean(this.state.editor.getText() || this.questions.question() || this.overlay.active || this.pager.active || this.search.active));
     // Completion is a scoped local notice. Output does not become new user intent
     // or silently dispatch a model request; taskOutput exposes the retained facts.
-    const followUpTasks = new Set<string>();
-    let followUpBudget = 20;
+    const backgroundFollowUp = createBackgroundFollowUp({ enabled: options.runtimeContext.runtimeConfig.backgroundFollowUp === true });
     this.stopWatchingBackground = watchJobsFor(options.runtimeContext, (task) => {
       this.state.transcript.append(textBlock('notice', renderTaskNotice(task)));
       this.tui.requestRender();
-      if (task.state !== 'exited' || !options.runtimeContext.runtimeConfig.backgroundFollowUp) return;
-      if (followUpTasks.has(task.id) || followUpBudget <= 0) return;
-      followUpTasks.add(task.id); followUpBudget--;
-      const output = task.output.length > 4000 ? `${task.output.slice(0, 4000)}\n[output truncated]` : task.output;
-      this.options.sessionRuntime.input?.()?.followUp(`Background task ${task.id} finished (${task.command}). Output:\n${output}`, `background:${task.id}`);
+      const text = backgroundFollowUp(task);
+      if (text) this.options.sessionRuntime.input?.()?.followUp(text, `background:${task.id}`);
     });
     this.view = new InteractiveSurface(
       {

@@ -7579,3 +7579,9 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 晋升后的任务开始轮询 `journal.admission`，撤权 kill 同一 PID；`handle.kill()` 标记 cancelled，journal 记录 cancelled 而不是 failed。
 - 重启后 journal 残留 running 经 `taskSnapshot` 投影 unknown；`hasLive` false，`resume` 拒绝，不重播。
 - 验证：jobs/execution 368；tools/turn/interactive/jobs 1625。
+
+## 2026-10-18 — EDIT-01 多选审批与 JOB-02 收口
+
+- 审批 picker 在多 group patch 时增加 “Choose groups…”：第二个多选面板默认全选，Space 切换，Enter 只应用选中 group；单 group 保持三选一。`ApprovalSettleResult.selected` 经既有 `setPreparedSelection` 绑定到已 prepare 的调用。
+- follow-up 策略抽到 `backgroundNotice.ts`：默认关闭、按 id 去重、每会话预算、4000 字符截断；交互层只负责 notice 与注入。
+- 验证：picker 43；backgroundNotice 3。
