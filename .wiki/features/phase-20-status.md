@@ -21,7 +21,7 @@
 | RENDER-03（部分） | 本次 | 并排 diff、配对行号、双预算、窄屏 unified 回退 |
 | RENDER-02（部分） | 本次 | 多行 cell、escaped/code pipe、`<br>`、窄屏源码回退与预算 |
 | RENDER-01（部分） | 本次 | 内联数学投影、金额/代码保护、未知命令与超预算保原文 |
-| PAN-04（部分） | `6736f402` | `/usage account` quota 进度投影 |
+| PAN-04（部分） | `6736f402`、本次 | `/usage account` quota 进度投影、`/thinking` effort 选择器 |
 | PAN-06（部分） | `6736f402` | copy 移除 recent-30 窗口 |
 | PAN-07（部分） | 本次 | `/extensions` 为 `/plugin` 别名 |
 | START-01 | `0afab79a` | build manifest、五种拒绝状态、`start`/`start:dev` |
@@ -32,7 +32,7 @@
 |---|---|---|
 | PAN-01 | model 两栏与详情、同名 relay 区分 | 连接/role/预设的绑定 revision 与搜索验收 |
 | PAN-02 | 分组、pin、树形、分页、跨项目搜索 | 预览/置顶持久验收 |
-| PAN-04 | quota 进度 | thinking picker、effort/model 联合约束、unknown 非 0 |
+| PAN-04 | quota 进度、thinking picker | effort/model 联合约束与 unknown 非 0 的更多模型验收 |
 | PAN-06 | copy 全量、pin | history 完整树、copy 分页/源 revision 到头、back/undo/restore 审计 |
 | PAN-03 | hub 主从视图 | 输出分页/脱敏面板、agents 专用操作与未知状态验收 |
 | PAN-07 | alias | login/logout 设备码安全显示、逐项确认验收 |

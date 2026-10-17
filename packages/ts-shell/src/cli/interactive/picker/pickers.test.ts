@@ -25,6 +25,23 @@ describe("which commands open a chooser", () => {
     },
   );
 
+  it("disables effort levels the selected model cannot honour", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "thinking-picker-"));
+    try {
+      const config = getRuntimeConfig(root);
+      const context = { cwd: root, projectRoot: root, sessionId: "s", runtimeConfig: config,
+        readConfiguration: () => ({ config, catalog: loadCatalog() }),
+        resolveConfigTarget: () => ({ provider: "deepseek", model: "deepseek-reasoner" }) } as unknown as CommandContext;
+      expect(opensPicker("/thinking")).toBe(true);
+      const picker = pickerFor("/thinking", { commandContext: context } as unknown as PickerHost)!;
+      const rows = await picker.load();
+      expect(rows.map(row => row.id)).toEqual(["auto", "low", "medium", "high"]);
+      expect(rows.filter(row => row.id !== "auto").every(row => row.disabled && row.note === "unsupported")).toBe(true);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("opens a read-only advisor inspector when state exists", async () => {
     const state = {
       schemaVersion: 1, sessionId: 's', sessionCreatedAt: '2026-01-01T00:00:00.000Z',

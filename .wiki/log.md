@@ -7504,3 +7504,9 @@ CI 的 `browser/cache/scenarios` 并发三进程测试偶发 `Duplicates/over-bu
 `SessionSelectionContext.allProjects` 让 resume 列表扫描全部已授权项目的会话；resume 面板新增 `This project` / `All projects` chip，选择 all 后以同一 catalog 扫描加载。动作仍走 `sessionSelectionBlock` 的当前项目校验，搜索完整不等于跨项目恢复授权。
 
 **本地验证**：session/navigation 20 项与 session+picker 956 项通过；`build:ts` 通过。本条写入时尚未提交/推送。
+
+### Phase 20 PAN-04（补充）：thinking effort 选择器
+
+裸 `/thinking` 打开 effort 面板：auto/low/medium/high，按 `effortCapability` 与当前模型/目录判断 supported/unsupported/unverified；不可兑换的级别禁用并给出原因，unverified 不当作 0 或 supported。选择走既有 `runThinkingCommand`，会话/连接优先级不变。
+
+**本地验证**：pickers 41 项（非 reasoning 模型的 low/medium/high 全部 unsupported）；`build:ts` 通过。本条写入时尚未提交/推送。

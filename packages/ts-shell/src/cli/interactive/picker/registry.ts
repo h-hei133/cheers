@@ -25,6 +25,7 @@ import { sourcePicker } from "./sources.js";
 import { sessionPicker } from "./session.js";
 import { hubPicker } from "./hub.js";
 import { advisorPicker } from "./advisor.js";
+import { thinkingPicker } from "./thinking.js";
 import { statusItemPicker } from "./statusItems.js";
 import { settingsPicker, type SettingsHost } from "./settings.js";
 import { undoPicker } from './undo.js';
@@ -111,6 +112,7 @@ const PICKERS: Record<string, PickerFactory> = {
       preview: host.previewStatusItems,
     }),
   settings: (host) => settingsPicker(host),
+  thinking: host => thinkingPicker(host.commandContext),
   hub: host => host.jobs ? hubPicker(host.jobs) : undefined,
   advisor: host => { const state = host.advisorState?.(); return state ? advisorPicker(state) : undefined; },
   git: host => gitPicker(host.gitWorkbench),
