@@ -11,6 +11,7 @@ import type { CatalogProvider } from '../models/catalog.js';
 import { resolveProviderCredential } from './providerCredentials.js';
 import type { RuntimeConfig } from '../../config/runtimeConfig.js';
 import { assertCurrentProfile, type ProfileContext } from '../paths/profile/context.js';
+import { ConfigInputError } from '../../config/inputs/model.js';
 
 interface ConfigurationContext {
   readonly profile?: ProfileContext;
@@ -18,6 +19,7 @@ interface ConfigurationContext {
   readonly workspaceIssue?: string;
   readonly workspaceAdmission?: () => string | undefined;
   readonly configuration: ConfigState;
+  readonly runtimeConfig?: RuntimeConfig;
   readonly projectRoot: string;
   readonly session: { readonly id: string };
   readonly runtimeConfigOverrides?: RuntimeConfigOverrides;
@@ -27,14 +29,15 @@ interface ConfigurationContext {
 
 export function configurationBinding(context: Omit<ConfigurationContext, 'configuration'>): ConfigBinding {
   return { workspaceRoot: identifyProject(context.projectRoot), sessionId: context.session.id,
-    trustRevision: projectTrust.revision(), overrides: context.runtimeConfigOverrides ?? {} };
+    trustRevision: projectTrust.revision(), overrides: context.runtimeConfigOverrides ?? {},
+    ...(context.runtimeConfig?.configInputs ? { inputs: context.runtimeConfig.configInputs } : {}) };
 }
 
 /** Initial values retain the identity used to filter them, including across resume. */
 export function initialConfiguration(context: Omit<ConfigurationContext, 'configuration'> & { readonly runtimeConfig: RuntimeConfig }): ConfigState {
   let candidate = context.runtimeConfig;
   if (!candidate.configTrust || !configTrustMatches(candidate.configTrust, context.projectRoot, projectTrust.revision())) {
-    candidate = getRuntimeConfig(context.projectRoot, context.runtimeConfigOverrides);
+    candidate = getRuntimeConfig(context.projectRoot, context.runtimeConfigOverrides, candidate.configInputs);
   }
   const binding = { ...configurationBinding(context), workspaceRoot: candidate.configTrust.workspaceRoot,
     trustRevision: candidate.configTrust.revision };
@@ -81,7 +84,12 @@ export function refreshConfiguration(context: ConfigurationContext): ConfigReloa
   const state = context.configuration;
   const ticket = state.begin(configurationBinding(context));
   const catalog = loadCatalog();
-  const candidate = validateCandidate(getRuntimeConfig(context.projectRoot, context.runtimeConfigOverrides), context, catalog);
+  let candidate: RuntimeConfig;
+  try { candidate = validateCandidate(getRuntimeConfig(context.projectRoot, context.runtimeConfigOverrides, ticket.binding.inputs), context, catalog); }
+  catch (error) {
+    if (!(error instanceof ConfigInputError)) throw error;
+    return state.rejectCandidate(ticket, configurationBinding(context), [error.message], error.admissionBlocked);
+  }
   const loadedBinding = configurationBinding(context);
   if (!configTrustMatches(candidate.configTrust, loadedBinding.workspaceRoot, loadedBinding.trustRevision)) {
     return state.rejectCandidate(ticket, loadedBinding, ['Project trust or workspace changed while reading configuration; reload again.']);

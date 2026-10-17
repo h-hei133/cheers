@@ -1,10 +1,11 @@
+import { readFreshConfiguration } from '../configuration.js';
 import path from 'node:path';
 import { loadCatalog } from '../../models/catalogStore.js';
 import { catalogModel, type CatalogProvider } from '../../models/catalog.js';
 import { effortCapability } from '../../models/capability.js';
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../../session/model/state.js';
 import type { SessionModelPreset, SessionModelRole } from '../../../session/model/contract.js';
-import { getRuntimeConfig, type RuntimeConfig } from '../../../config/runtimeConfig.js';
+import { type RuntimeConfig } from '../../../config/runtimeConfig.js';
 import { sameValue } from '../../../config/values.js';
 import type { CommandContext } from '../types.js';
 import { setModel } from './selection.js';
@@ -42,15 +43,15 @@ export function saveModelPreset(sessionId: string, name: string, roles: Readonly
     if (!current || !baseline.projectRoot) return 'Model preset requires a selected model in this session.';
     const root = context?.projectRoot ?? context?.cwd ?? baseline.projectRoot;
     if (path.resolve(root) !== path.resolve(baseline.projectRoot) || context?.admission?.()) return 'Model preset refused: session or workspace changed.';
-    const config = getRuntimeConfig(root);
+    const config = readFreshConfiguration(context ?? { cwd: root });
     const catalog = context?.readConfiguration?.().catalog ?? loadCatalog();
     const failure = validateModelPreset(roles, config, catalog);
     if (failure) return failure;
     if (Object.keys(current.presets ?? {}).length >= 32 && !Object.hasOwn(current.presets ?? {}, name)) return 'Model preset capacity exceeds 32 names.';
     const presets = { ...(current.presets ?? {}), [name]: { roles } satisfies SessionModelPreset };
     writeSessionModel(sessionId, { ...current, presets }, baseline, () => !context?.admission?.()
-      && sameValue(connectionSnapshot(getRuntimeConfig(root).providerConnections), connectionSnapshot(config.providerConnections))
-      && !validateModelPreset(roles, getRuntimeConfig(root), loadCatalog()));
+      && sameValue(connectionSnapshot(readFreshConfiguration(context ?? { cwd: root }).providerConnections), connectionSnapshot(config.providerConnections))
+      && !validateModelPreset(roles, readFreshConfiguration(context ?? { cwd: root }), loadCatalog()));
     return `Model preset '${name}' saved for this session and resume.`;
   } catch { return 'Model preset requires a readable selected model; write outcome is unverified if publication was attempted.'; }
 }
@@ -64,17 +65,16 @@ export async function applyModelPreset(sessionId: string, name: string, role = '
     const target = preset?.roles[role];
     if (!current || !target || !baseline.projectRoot) return `Model preset '${name}' role '${role}' was not found.`;
     const context: CommandContext = suppliedContext ?? { cwd: baseline.projectRoot, projectRoot: baseline.projectRoot, sessionId };
-    const root = context.projectRoot ?? context.cwd;
-    const config = context.readConfiguration?.().config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(root), sessionId);
+    const config = context.readConfiguration?.().config ?? context.runtimeConfig ?? projectSessionModel(readFreshConfiguration(context), sessionId);
     const catalog = context.readConfiguration?.().catalog ?? loadCatalog();
     const failure = validateModelPreset(preset!.roles, config, catalog);
     if (failure) return failure;
     if (config.activeProviderConnectionId !== target.connectionId) return `Model preset refused: select connection '${target.connectionId}' with /connect use before applying this role.`;
     const admission = () => context.admission?.() ?? (!sameValue(readSessionModel(sessionId)?.presets?.[name], preset)
-      || validateModelPreset(preset!.roles, getRuntimeConfig(root), loadCatalog()) ? 'Model preset changed or a role became unavailable.' : undefined);
+      || validateModelPreset(preset!.roles, readFreshConfiguration(context), loadCatalog()) ? 'Model preset changed or a role became unavailable.' : undefined);
     const output = await setModel([`${target.provider}/${target.model}`], { ...context, sessionId, admission }, false, target.thinkingEffort ?? null);
     if (!output.includes(`Model switched to ${target.model}.`)) return output;
-    const effective = projectSessionModel(getRuntimeConfig(root), sessionId);
+    const effective = projectSessionModel(readFreshConfiguration(context), sessionId);
     const selected = readSessionModel(sessionId);
     if (effective.activeProviderConnectionId !== target.connectionId || selected?.model !== target.model
       || selected.thinkingEffort !== (target.thinkingEffort ?? null)

@@ -99,7 +99,8 @@ export async function runConnectCommand(
   else if (action === "use" || action === "activate") output = activateConnection(rest, onPersisted);
   else if (action === "logout" || action === "remove" || action === "rm") output = removeConnection(rest, onPersisted);
   else return { kind: "local", output: `Unknown /connect action: ${action}\n\n${getConnectHelpText()}` };
-  return { kind: "local", output: [output, persisted ? configurationApplicationNotice(context) : undefined].filter(Boolean).join('\n') };
+  return { kind: "local", output: [output, persisted ? configurationApplicationNotice(context,
+    ['provider', 'activeProviderConnectionId', 'providerConnections', 'providerCredentials']) : undefined].filter(Boolean).join('\n') };
 
 }
 
@@ -191,7 +192,7 @@ export async function addConnection(args: string[], onPersisted?: () => void): P
     `Saved key: ${maskApiKey(apiKey)}`,
     ...(baseUrl ? [`Base URL: ${baseUrl}`] : []),
     ...(model ? [`Model: ${model}`] : []),
-    `Default runtime provider switched to ${target.provider}.`,
+    `Stored provider default: ${target.provider}.`,
     `Stored at: ${configPath}`,
     "Use /connect status to inspect active connection details.",
   ].join("\n");
@@ -268,7 +269,7 @@ export function activateConnection(args: string[], onPersisted?: () => void): st
   onPersisted?.();
 
   return [
-    `Active connection switched to ${selected.id}.`,
+    `Stored active connection: ${selected.id}.`,
     `Provider: ${selected.provider}`,
     `Connection type: ${selected.authType}`,
     `Stored at: ${configPath}`,
@@ -314,10 +315,10 @@ export function removeConnection(args: string[], onPersisted?: () => void): stri
   onPersisted?.();
 
   return [
-    `Disconnected provider connection ${existing.id}.`,
+    `Removed provider connection ${existing.id} from primary configuration.`,
     ...(next.activeProviderConnectionId
-      ? [`Active connection now: ${next.activeProviderConnectionId}`]
-      : ["Active connection now: none"]),
+      ? [`Stored active connection now: ${next.activeProviderConnectionId}`]
+      : ["Stored active connection now: none"]),
     `Stored at: ${configPath}`,
   ].join("\n");
 }
@@ -415,7 +416,7 @@ export async function runBrowserAssistedCaptureConnection(
         ? [`Base URL: ${activeConnection.baseUrl}`]
         : []),
       ...(activeConnection?.model ? [`Model: ${activeConnection.model}`] : []),
-      `Default runtime provider switched to ${target.provider}.`,
+      `Stored provider default: ${target.provider}.`,
       `Stored at: ${configPath}`,
     ].join("\n");
   } catch (error) {

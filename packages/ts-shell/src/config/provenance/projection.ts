@@ -1,7 +1,7 @@
 import type { AnySchemaObject } from 'ajv';
 import type { ConfigFields } from '../fields.js';
 import { sameValue } from '../values.js';
-import { type ConfigOrigin, type ConfigProvenance, origin, replaceOrigin, schemaChildren, sourcesOf, traceValue } from './model.js';
+import { type ConfigOrigin, type ConfigProvenance, composeOrigin, origin, replaceOrigin, schemaChildren, traceValue } from './model.js';
 
 function normalizedOrigin(before: unknown, after: unknown, schema: AnySchemaObject, trace: ConfigOrigin): ConfigOrigin {
   if (sameValue(before, after)) return trace;
@@ -19,7 +19,8 @@ export function projectConfigOrigins(raw: Record<string, unknown>, effective: ob
     const trace = traces[key];
     if (raw[key] === undefined) {
       const fallback = traceValue(values[key], field.schema, 'default');
-      return [key, trace ? { ...fallback, rejected: trace.rejected, shadowed: trace.shadowed } : fallback];
+      return [key, trace ? { ...fallback, rejected: trace.rejected, shadowed: trace.shadowed,
+        ...(trace.rejectedFiles ? { rejectedFiles: trace.rejectedFiles } : {}), ...(trace.shadowedFiles ? { shadowedFiles: trace.shadowedFiles } : {}) } : fallback];
     }
     return [key, normalizedOrigin(raw[key], values[key], field.schema, trace ?? origin('derived'))];
   }));
@@ -32,9 +33,9 @@ export function sessionModelOrigins(provenance: ConfigProvenance, connectionInde
     const parent = result[key] ?? origin('default'); const child = parent.children?.[childKey] ?? origin('default');
     const model = replaceOrigin(child.children?.model, origin('session'));
     const children = { ...child.children, model, ...(hasEffort ? { thinkingEffort: replaceOrigin(child.children?.thinkingEffort, origin('session')) } : {}) };
-    const updated = { ...child, children, sources: sourcesOf(Object.values(children)) };
+    const updated = composeOrigin(child, children);
     const siblings = { ...parent.children, [childKey]: updated };
-    result[key] = { ...parent, children: siblings, sources: sourcesOf(Object.values(siblings)) };
+    result[key] = composeOrigin(parent, siblings);
   }
   return result;
 }
@@ -48,7 +49,8 @@ export function displayOrigins(previous: object, applied: object, provenance: Co
     const children = Object.fromEntries(Object.entries(trace.children ?? {}).map(([child, node]) => [child,
       sameValue(((previous as Record<string, unknown>)[key] as Record<string, unknown> | undefined)?.[child], (value as Record<string, unknown>)[child])
         ? provenance[key]?.children?.[child] ?? node : replaceOrigin(provenance[key]?.children?.[child], node)]));
-    result[key] = { ...replaceOrigin(provenance[key], trace), ...(Object.keys(children).length ? { children, sources: sourcesOf(Object.values(children)) } : {}) };
+    const updated = replaceOrigin(provenance[key], trace);
+    result[key] = Object.keys(children).length ? composeOrigin(updated, children) : updated;
   }
   return result;
 }

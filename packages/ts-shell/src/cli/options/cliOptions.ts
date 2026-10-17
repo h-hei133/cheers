@@ -7,6 +7,8 @@ export type NonInteractiveApprovalMode =
 
 export interface CliOptions {
   readonly profile?: string;
+  /** Ordered, personal, read-only JSONC inputs resolved against launch cwd. */
+  readonly configPaths?: readonly string[];
   readonly sessionId?: string;
   readonly provider?: RuntimeProvider;
   readonly apiKey?: string;

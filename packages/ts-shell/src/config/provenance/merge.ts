@@ -1,9 +1,10 @@
 import type { MergePolicy } from '../fields.js';
-import { type ConfigOrigin, origin, replaceOrigin, sourcesOf } from './model.js';
+import { type ConfigOrigin, replaceOrigin, sourcesOf } from './model.js';
+import { contributeFiles, replaceFiles } from './files.js';
 
 function contributions(previous: ConfigOrigin, next: ConfigOrigin, children?: Record<string, ConfigOrigin>): ConfigOrigin {
   return { sources: sourcesOf([previous, next]), shadowed: [...new Set([...previous.shadowed, ...next.shadowed])],
-    rejected: [...previous.rejected, ...next.rejected], ...(children ? { children } : {}) };
+    rejected: [...previous.rejected, ...next.rejected], ...contributeFiles(previous, next), ...(children ? { children } : {}) };
 }
 
 function collectionOrigins(before: unknown[], value: unknown[], result: unknown[], previous: ConfigOrigin, next: ConfigOrigin, policy: MergePolicy): Record<string, ConfigOrigin> {
@@ -24,20 +25,10 @@ function collectionOrigins(before: unknown[], value: unknown[], result: unknown[
 
 /** Mirrors the owning layer merge; it never decides the effective value. */
 export function mergeOrigin(before: unknown, value: unknown, result: unknown, previous: ConfigOrigin | undefined, next: ConfigOrigin, policy: MergePolicy): ConfigOrigin {
-  if (policy === 'tui') {
-    const project = (before ?? {}) as Record<string, unknown>;
-    const rejected = Object.keys(previous?.children ?? {}).filter(key => previous?.children?.[key].rejected.length);
-    const children = Object.fromEntries([...new Set([...Object.keys(result as object), ...rejected])].map(key => {
-      const prior = previous?.children?.[key]; const incoming = next.children?.[key];
-      const fallsThrough = key === 'statusItems' && Array.isArray(project[key]) && (project[key] as unknown[]).length === 0;
-      return [key, prior && Object.hasOwn(project, key) && !fallsThrough ? replaceOrigin(incoming, prior) : replaceOrigin(prior, incoming ?? origin('default'))];
-    }));
-    return { ...contributions(previous ?? origin('default'), next, children), sources: sourcesOf(Object.values(children)) };
-  }
   if (before === undefined || !previous) return replaceOrigin(previous, next);
   if (policy === 'replace') return replaceOrigin(previous, next);
   if (policy === 'disable') return before === false && value !== false
-    ? { ...previous, shadowed: [...new Set([...previous.shadowed, ...next.sources])], rejected: [...previous.rejected, ...next.rejected] }
+    ? { ...previous, shadowed: [...new Set([...previous.shadowed, ...next.sources])], rejected: [...previous.rejected, ...next.rejected], ...replaceFiles(next, previous) }
     : value === false && before !== false ? replaceOrigin(previous, next) : contributions(previous, next);
   return contributions(previous, next, collectionOrigins(before as unknown[], value as unknown[], result as unknown[], previous, next, policy));
 }

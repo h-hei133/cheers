@@ -3,13 +3,12 @@ import { catalogModel } from '../../models/catalog.js';
 import { isThinkingPreference, type ThinkingPreference } from '../../models/effort.js';
 import { readSessionModel } from '../../../session/model/state.js';
 import type { SessionModelRole } from '../../../session/model/contract.js';
-import { getRuntimeConfig } from '../../../config/runtimeConfig.js';
 import { applyModelPreset, saveModelPreset, validateModelPreset, validPresetName } from './preset.js';
 import type { CommandContext, LocalCommandResult } from '../types.js';
 import { parseSyntax } from '../syntax/parse.js';
 import { syntaxHelp } from '../syntax/projection.js';
 import { modelPresetSyntax } from './presetSyntax.js';
-import { configurationApplicationNotice } from '../configuration.js';
+import { configurationApplicationNotice, readFreshConfiguration } from '../configuration.js';
 
 /** Run the session-scoped model preset owner. Presets never write global config. */
 export async function runModelPresetCommand(args: string[], context: CommandContext): Promise<LocalCommandResult> {
@@ -35,7 +34,7 @@ export async function runModelPresetCommand(args: string[], context: CommandCont
     const preset = selection.presets?.[name];
     if (!preset) return { kind: 'local', output: `Model preset '${name}' was not found.` };
     const failure = validateModelPreset(preset.roles, context.readConfiguration?.().config ?? context.runtimeConfig
-      ?? getRuntimeConfig(context.projectRoot ?? context.cwd), context.readConfiguration?.().catalog ?? loadCatalog());
+      ?? readFreshConfiguration(context), context.readConfiguration?.().catalog ?? loadCatalog());
     return { kind: 'local', output: failure ? failure : `Model preset '${name}' is valid for the current catalogue.` };
   }
   if (action === 'save') {
@@ -52,7 +51,7 @@ type RoleParseResult =
 
 function parsePresetRoles(context: CommandContext, selection: SessionModelRole, specs: readonly string[]): RoleParseResult {
   if (specs.length === 0) return { ok: true, roles: { default: selection } };
-  const config = context.runtimeConfig ?? getRuntimeConfig(context.projectRoot ?? context.cwd);
+  const config = context.runtimeConfig ?? readFreshConfiguration(context);
   const catalog = loadCatalog();
   const roles: Record<string, SessionModelRole> = {};
   for (const spec of specs) {

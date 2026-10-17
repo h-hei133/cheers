@@ -4,8 +4,9 @@ import { sameValue } from './values.js';
 import { configRestartRequired, type ConfigReloadResult } from './application.js';
 import { CONFIG_FIELDS } from './runtimeConfig.js';
 import { displayOrigins } from './provenance/projection.js';
-import { origin, sourcesOf } from './provenance/model.js';
+import { composeOrigin, origin } from './provenance/model.js';
 import type { CatalogProvider } from '../core/models/catalog.js';
+import type { ConfigInputs } from './inputs/model.js';
 
 export type { ConfigReloadResult } from './application.js';
 
@@ -14,6 +15,7 @@ export interface ConfigBinding {
   readonly sessionId: string;
   readonly trustRevision: string;
   readonly overrides: RuntimeConfigOverrides;
+  readonly inputs?: ConfigInputs;
 }
 
 export interface ConfigPublication {
@@ -40,7 +42,7 @@ function projectAccepted(installed: RuntimeConfig, candidate: RuntimeConfig): Ru
   const children = { ...installedOrigin.children };
   delete children.composerShape;
   if (composerShape !== undefined) children.composerShape = candidate.configProvenance.tui?.children?.composerShape ?? origin('default');
-  const tuiOrigin = { ...installedOrigin, children, sources: Object.keys(children).length ? sourcesOf(Object.values(children)) : origin('default').sources };
+  const tuiOrigin = composeOrigin(installedOrigin, children);
   return { ...candidate, tui, tuiMode: installed.tuiMode,
     configProvenance: { ...candidate.configProvenance, tui: tuiOrigin, tuiMode: installed.configProvenance.tuiMode } };
 }
@@ -106,11 +108,11 @@ export class ConfigState {
     return this.result('applied', before);
   }
 
-  rejectCandidate(ticket: ConfigTicket, actual: ConfigBinding, diagnostics: readonly string[]): ConfigReloadResult {
+  rejectCandidate(ticket: ConfigTicket, actual: ConfigBinding, diagnostics: readonly string[], admissionBlocked = false): ConfigReloadResult {
     const before = this.publication.requested;
     if (!this.consume(ticket, actual)) return this.result('superseded', before);
     this.retireBackground();
-    this.reject(diagnostics, false);
+    this.reject(diagnostics, admissionBlocked);
     return this.result('rejected', before);
   }
 

@@ -7208,3 +7208,23 @@ Node 20.3.0 与本地 Node 24.15.0 的相关四文件各 24 项通过；撤销 E
 定向检查实际子进程 fixture 后确认，appendFileSync 先创建日志再追加 JSONL，轮询可读到空文件；现 reader 对空字符串做 JSON.parse，产生 Unexpected end of JSON input。只修测试的日志观察器：仅解析换行已结算的记录，完整坏记录仍抛错。既有真实取消测试显式注入空/未完成记录，再读实际日志，继续核对 discovery 已到达、队列写拒绝、零 tools/call 与子 PID 消失。精确 Node 20.3 下旧 reader 确定失败；修复后四个 MCP 文件 46 项通过。定向比较读取持久 JSONL 时忽略空/坏行的已有方案，本测试保留更严格的完整坏行拒绝，没有改 MCP 产品、取消语义或 CI 断言。清理、两路独立审查、提交推送和新 SHA CI 继续单独记录。
 
 该 MCP 夹具的限定清理为 no-op；清理后 lifecycle 11 项通过，五项静态门禁通过，118 条文档 advisory 保留。两路独立审查分别 APPROVE/CLEAR，均独立运行精确 Node 20.3 的 11 项，并核对空/不完整/完整/完整后缀/坏完整记录边界。code lane 另行运行 Node 24。以上只覆盖夹具修复；CFG-03 本地改动不属于这次提交。
+
+### Phase 20 CFG-03：有序输入与完整配置重载
+
+CFG-02 的 MCP 夹具已单独提交并推送为 `887f349934acd8a19c1d503908b8bd42210b7c72`，远端 ref 读回一致。[Architecture Watch 39014487749](https://github.com/h-hei133/cheers/actions/runs/39014487749) 已通过；本条写入时[主 CI 39014487688](https://github.com/h-hei133/cheers/actions/runs/39014487688) 仍在 TS 测试步骤，最后 NormProof 尚未执行，CFG-02 交付仍待确认。
+
+CFG-03 新增重复 `--config` JSONC 输入，顺序固定于启动目录并保留重复位置，经原字段 source/trust/安全合并后再应用环境和运行覆盖。`config/inputs/` 只负责文件选择、身份、字节版本与完整集合复查；`provenance/` 记录不含值的文件/原始 revision/位置，现有 `ConfigState` 仍是唯一 publication owner。独立 rotating accountAuth 文件拒绝，主配置 canonical alias 保留原 owner；未新增凭据 writer。完整用户合同见[显式配置输入](features/config-inputs.md)。
+
+坏文件、捕获身份变化和多文件读取竞争在 publication 前受控拒绝；安全不确定时封锁新动作，保留此前接受的 config/catalog/theme。普通原子替换可在重载接受；alias 或声明目录替换需要重启。Settings 保持字段 patch，`/connect` 区分主文件保存与输入遮盖，模型/session 预设读回复用同组输入，全局保存拒绝复制 overlay 连接数组。`/cd`、会话换根和同 PID restart 保留输入选择；fresh profile switch 不继承旧输入。
+
+在目标实现定位后，定向比较显式文件的固定声明基准、声明次序、缺失/非法硬失败和候选完整读取决策；保持本仓字段级求交/累积/禁用及 publication 事务。独立审查另发现并推动修复了 TUI/session/display 父来源残留、最终 realpath 不确定性、connect 保存措辞及 flag-looking 文件名歧义。script gate 捕获 provenance 的 type/value 混合依赖环，改由无 import 的文件来源模块持有中立结构，原 gate 回归继续保留。
+
+**本地验证**：清理后的 Node 20.3.0 最终受影响组合为 38 文件、595 项全部通过；另外定向 5 文件、43 项通过。`build:ts`、`build:exe` 通过，57 项 script tests 全部通过。五项静态门禁通过，strict docs 既有 118 条 advisory 保留。NormProof 退出 0，阻断 obligation 满足；整体 verdict 仍为 partial，不能称全部 obligation 通过。27 个变更产品模块的 AST 审计最多 19 个 distinct callable names，无超过 20 个。十一项保护分别撤销均触发真实 AssertionError/退出 1，逐字恢复：输入次序、安全求交、来源权限、完整复查、安全准入、模型新鲜读回、复合原始版本、alias 身份、account owner、flag-looking 路径和 connect 保存提示。
+
+编译后 JS 与精确 Node 20.3 源码 loader 的实际 CLI/三路 TTY 均通过有序相对/重复输入、缺失/非法/account-owner 启动拒绝、Settings 来源、连接存储遮盖、坏/好 reload、overlay session 模型、全局保存拒绝、cwd 切换、同 PID/同 session restart、退出及 native readback；loopback 实际请求均为 0。输入字节除明确测试编辑外保持。早期探针修正了会话自动恢复、全屏重绘历史与 cd report panel 的假设，失败的早期 harness 运行不计入验收。单文件 executable 已构建但本批没有单独动态运行；没有真实 provider 或跨平台动态证据。
+
+限定变更文件清理删除 required-context 不可达兼容分支、消除获取/来源 cast 并更新过时注释；保留有调用者的 optional-context 兼容和明确安全拒绝。独立 code lane 最终 APPROVE，独立运行 7 文件、105 项；architecture lane 最终 CLEAR，独立运行 Node 20.3 的 6 文件、118 项、import-cycle 及完整混合边图检查。两路核对十一处恢复 hash。本条写入时 CFG-03 尚未提交/推送，没有该变更的精确 SHA CI；后续另记。其余任务继续依次实施，未完成整个 Phase 20。
+
+### Phase 20 CFG-02：精确 SHA 交付确认
+
+重新读取 `887f349934acd8a19c1d503908b8bd42210b7c72` 的[主 CI 39014487688](https://github.com/h-hei133/cheers/actions/runs/39014487688)，状态 completed/success；TS suite 和最后 NormProof 步骤均实际完成通过，没有沿用前次失败运行的跳过状态。[Architecture Watch 39014487749](https://github.com/h-hei133/cheers/actions/runs/39014487749) 亦 completed/success。CFG-02 产品和两轮夹具 follow-up 的交付闭合；CFG-03 的提交与 CI 继续独立记录。

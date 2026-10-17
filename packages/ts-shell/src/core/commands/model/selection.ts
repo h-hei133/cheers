@@ -1,4 +1,4 @@
-import { getRuntimeConfig, readRuntimeConfigEditAt, getUserRuntimeConfigPath, writeUserRuntimeConfigFile, type RuntimeConfig, type RuntimeConfigFile, type ProviderConnectionConfig, type ProviderCredentialConfig } from '../../../config/runtimeConfig.js';
+import { readRuntimeConfigEditAt, getUserRuntimeConfigPath, writeUserRuntimeConfigFile, type RuntimeConfig, type RuntimeConfigFile, type ProviderConnectionConfig, type ProviderCredentialConfig } from '../../../config/runtimeConfig.js';
 import path from 'node:path';
 import { ConfigWriteError } from '../../../config/outcome.js';
 import { inspectConfigConstraints } from '../../../config/constraints.js';
@@ -9,7 +9,7 @@ import { SessionModelWriteError } from '../../../session/model/outcome.js';
 import { defaultHookDispatcher } from '../../hooks/hookDispatcher.js';
 import { loadCatalog } from '../../models/catalogStore.js';
 import { providerFacts } from '../../providers/facts.js';
-import { configurationApplicationNotice } from '../configuration.js';
+import { configurationApplicationNotice, readFreshConfiguration } from '../configuration.js';
 import { currentModelPreference } from './preference.js';
 import { globalModelFailure } from './outcome.js';
 import { effortCapability } from '../../models/capability.js';
@@ -42,11 +42,11 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   }
   const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
   const config = edit.values;
-  const connections = config.providerConnections ?? [];
-  const activeId = config.activeProviderConnectionId?.trim();
+  const loaded = readFreshConfiguration(context);
+  const connections = loaded.providerConnections;
+  const activeId = loaded.activeProviderConnectionId;
   const activeConnection = connections.find((item) => item.id.trim() === activeId);
-  const provider = activeConnection?.provider ?? config.provider ?? "openai";
-  const loaded = getRuntimeConfig(context.projectRoot ?? context.cwd);
+  const provider = activeConnection?.provider ?? loaded.provider;
   if (!loaded.configValidation.valid) return 'Model switch blocked: the stored configuration is invalid. Correct it and reload before selecting a model.';
   const effective = context.runtimeConfig ?? projectSessionModel(loaded, context.sessionId);
   if (!matchesRequestProvider(context, loaded, provider) || !matchesRequestProvider(context, effective, provider)) {
@@ -74,6 +74,11 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   }
   if (!activeConnection) {
     return `Active connection not found: ${activeId}`;
+  }
+  if (global && (config.activeProviderConnectionId?.trim() !== activeId
+    || !config.providerConnections?.some(item => item.id.trim() === activeId)
+    || loaded.configProvenance.providerConnections.files?.some(file => file.position !== undefined))) {
+    return 'Global model save refused: the selected connection comes from a read-only config input. Save a session preference or edit its owning file explicitly.';
   }
   if (context.admission?.()) return 'Model switch blocked: session, workspace or configuration admission changed.';
   if (context.runtimeConfig && (effective.activeProviderConnectionId?.trim() !== activeId
@@ -125,20 +130,23 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   const beforeCommit = (): boolean => {
     const currentCatalog = loadCatalog();
     if (context.admission?.() || !sameValue(catalogModel(currentCatalog, provider, model), candidate)) return false;
-    const currentConfig = getRuntimeConfig(context.projectRoot ?? context.cwd);
+    const currentConfig = readFreshConfiguration(context);
     if (!matchesRequestProvider(context, currentConfig, provider)) return false;
+    if (currentConfig.activeProviderConnectionId !== activeId
+      || !sameValue(connectionIdentity(currentConfig.providerConnections.find(item => item.id === activeId)), connectionIdentity(activeConnection))
+      || !sameValue(credentialIdentity(currentConfig.providerCredentials[provider]), credentialIdentity(loaded.providerCredentials[provider]))) return false;
     if (providerEndpoint(currentCatalog, provider) !== endpoint || !currentConfig.configValidation.valid
       || !sameValue([currentConfig.maxOutputTokens, currentConfig.contextWindow, currentConfig.reserveTokens, currentConfig.modelTokenBudgets, currentConfig.retryBaseDelayMs, currentConfig.retryMaxDelayMs],
         [loaded.maxOutputTokens, loaded.contextWindow, loaded.reserveTokens, loaded.modelTokenBudgets, loaded.retryBaseDelayMs, loaded.retryMaxDelayMs])) return false;
     if (inspectConfigConstraints(currentConfig, { provider, model, thinkingEffort }, currentCatalog).errors.length) return false;
     const latest = readRuntimeConfigEditAt(edit.path).values;
     return latest.activeProviderConnectionId === config.activeProviderConnectionId && latest.provider === config.provider
-      && sameValue(latest.providerConnections?.find(item => item.id.trim() === activeId), activeConnection)
+      && sameValue(latest.providerConnections?.find(item => item.id.trim() === activeId), config.providerConnections?.find(item => item.id.trim() === activeId))
       && sameValue(latest.providerCredentials?.[provider], config.providerCredentials?.[provider]);
   };
 
   const updatedAt = new Date().toISOString();
-  const nextConnections = connections.map((item) =>
+  const nextConnections = (config.providerConnections ?? []).map((item) =>
     item.id.trim() === activeId ? { ...item, model, thinkingEffort, updatedAt } : item,
   );
   const activeProvider = activeConnection.provider;

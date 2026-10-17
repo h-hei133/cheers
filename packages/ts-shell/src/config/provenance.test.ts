@@ -123,6 +123,7 @@ it('keeps positional maps aligned and drops removed credential branches from the
 });
 
 it('marks only matching session model leaves without attributing credentials to the session', () => {
+  project({ providerConnections: [{ id: 'untrusted-record', provider: 'openai' }] });
   user({ activeProviderConnectionId: 'private-id', providerConnections: [{ id: 'private-id', provider: 'openai', apiKey: 'private-key', model: 'private-base' },
     { id: 'private-other', provider: 'openai', model: 'private-second' }] });
   const config = getRuntimeConfig(root);
@@ -132,6 +133,9 @@ it('marks only matching session model leaves without attributing credentials to 
   expect(trace.providerConnections.children?.['0'].children?.model).toMatchObject({ sources: ['session'], shadowed: ['user'] });
   expect(trace.providerConnections.children?.['0'].children?.apiKey.sources).toEqual(['user']);
   expect(trace.providerConnections.children?.['1'].children?.model.sources).toEqual(['user']);
+  expect(trace.providerConnections.rejectedFiles).toEqual(config.configProvenance.providerConnections.rejectedFiles);
+  expect(trace.providerConnections.rejectedFiles).toHaveLength(1);
+  expect(trace.providerConnections.shadowedFiles).toContainEqual(config.configProvenance.providerConnections.children!['0'].children!.model.files![0]);
   expect(trace.providerCredentials.children?.openai.children?.model.sources).toEqual(['session']);
   expect(config.configProvenance.providerConnections.children?.['0'].children?.model.sources).toEqual(['user']);
   expect(JSON.stringify(trace)).not.toContain('private');

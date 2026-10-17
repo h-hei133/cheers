@@ -7,7 +7,7 @@ const forbiddenKeys = new Set(['__proto__', 'prototype', 'constructor']);
 
 /** Only controlled codes cross the config diagnostic boundary. */
 export class ConfigDocumentError extends Error {
-  constructor(readonly code: 'invalid-json' | 'invalid-document' | 'resource-limit' | 'unsafe-key' | 'unsupported-version' | 'unreadable' | 'duplicate-key' | 'invalid-number' | 'invalid-utf8' | 'edit-mismatch', readonly position?: { offset: number; line: number; column: number }) {
+  constructor(readonly code: 'invalid-json' | 'invalid-document' | 'resource-limit' | 'unsafe-key' | 'unsupported-version' | 'unreadable' | 'duplicate-key' | 'invalid-number' | 'invalid-utf8' | 'edit-mismatch' | 'content-changed', readonly position?: { offset: number; line: number; column: number }) {
     super(position ? `${code} at line ${position.line}, column ${position.column}` : code);
     this.name = 'ConfigDocumentError';
   }

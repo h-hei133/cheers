@@ -44,7 +44,11 @@ function source(context: ShellRuntimeContext, setting: SettingDefinition, reques
   if (!requested && setting.key === 'offline' && process.env[OFFLINE_ENV] !== undefined) return 'environment';
   const [root, leaf] = setting.path;
   const trace = (requested ? context.configuration.current.requested : context.runtimeConfig).configProvenance[root];
-  const label = (leaf ? trace?.children?.[leaf]?.sources : trace?.sources)?.join(' + ') || 'default';
+  const node = leaf ? trace?.children?.[leaf] : trace;
+  const origins = node?.files?.filter(file => file.position !== undefined)
+    .map(file => `input ${file.position! + 1} (${file.path.replace(/[\x00-\x1f\x7f-\x9f]/g, '?').slice(0, 512)})`);
+  const sources = node?.sources.join(' + ') || 'default';
+  const label = origins?.length ? `${sources}: ${origins.join(' + ')}` : sources;
   return !requested && label !== 'default' && !sameValue(effective(context, setting), settingValue(context.runtimeConfig, setting)) ? `derived from ${label}` : label;
 }
 

@@ -66,6 +66,8 @@ import { claimSwitchChild, admitSwitchChild } from './profile/admission.js';
 import { drainProfileSwitch } from './profile/handoff.js';
 import { runProfileSwitch } from './profile/process.js';
 import type { SwitchReceipt, SwitchTicket } from './profile/model.js';
+import { createConfigInputs } from '../../config/inputs/selection.js';
+import type { ConfigInputs } from '../../config/inputs/model.js';
 export type { CliProcessRunnerInput } from './contract.js';
 
 export async function runCliProcess(
@@ -83,10 +85,12 @@ export async function runCliProcess(
   const switchDepth = child?.plan.depth ?? 0;
   input.profileSelected?.(profile);
   return withProfile(profile, async () => {
+    const configInputs = parsed.args.options.configPaths?.length
+      ? createConfigInputs(parsed.args.options.configPaths.map(file => ({ path: file, source: 'user' })), input.launchCwd) : undefined;
     let recovery: RestartRequest | undefined;
     for (;;) {
       const request = await runCliCycle({ ...input, args: recovery?.argv ?? input.args,
-        launchCwd: recovery?.workingDirectory ?? input.launchCwd }, recovery, recovery ? undefined : child, switchDepth);
+        launchCwd: recovery?.workingDirectory ?? input.launchCwd }, recovery, recovery ? undefined : child, switchDepth, configInputs);
       if (!request) return;
       if ('kind' in request) { await runProfileSwitch(request, input); return; }
       recovery = request;
@@ -94,7 +98,7 @@ export async function runCliProcess(
   });
 }
 
-async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartRequest, child?: SwitchReceipt, switchDepth = 0): Promise<RestartRequest | SwitchTicket | undefined> {
+async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartRequest, child?: SwitchReceipt, switchDepth = 0, configInputs?: ConfigInputs): Promise<RestartRequest | SwitchTicket | undefined> {
   if (await runCollaborationServiceMode(input)) return;
   setGlobalTraceContext(createTraceContext());
   const logger = createComponentLogger("cli");
@@ -115,6 +119,7 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
     projectPath: recovery.workspaceRoot, promptArg: undefined, replayFile: undefined, migrateSessionRoot: false }
     : parsedCliArgs.args.options;
   const rootContext = createCliRootContext({
+    configInputs,
     launchCwd: input.launchCwd,
     options,
   });

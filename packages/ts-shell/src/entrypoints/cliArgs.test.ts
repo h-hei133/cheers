@@ -451,3 +451,30 @@ it("reserves distinct invocation names and releases dynamic names after removal"
   } finally { remove(); }
   expect(expectParsed(["/fixture-special", "text"]).options.projectPath).toBe("/fixture-special");
 });
+
+describe('--config ordered inputs', () => {
+  it('retains ordered duplicates and equals values outside project/prompt selection', () => {
+    const parsed = expectParsed(['--config', './one.json', '--config=./two.json', '--config', './one.json', '--print', '/status']);
+    expect(parsed.options.configPaths).toEqual(['./one.json', './two.json', './one.json']);
+    expect(parsed.options.projectPath).toBeUndefined(); expect(parsed.options.promptArg).toBe('/status');
+  });
+
+  it('respects consumed flag-looking values and the actual terminator', () => {
+    const parsed = expectParsed(['--api-key', '--config', '--config=./one.json', '--', '--config', './prompt.json']);
+    expect(parsed.options.configPaths).toEqual(['./one.json']);
+    expect(parsed.options.promptArg).toBe('--config ./prompt.json'); expect(parsed.options.projectPath).toBeUndefined();
+    expect(expectParsed(['--api-key', '--', '--config', './one.json']).options.configPaths).toEqual(['./one.json']);
+  });
+
+  it.each([['--config'], ['--config='], ['--config', '--profile'], Array(33).fill('--config=./one.json')])('rejects missing or excessive explicit inputs: %j', (...args) => {
+    expect(parseCliArgs(args as string[], { cwd: process.cwd() }).ok).toBe(false);
+  });
+
+  it.each(['-p', '-ns'])('rejects a bare flag-looking path consistently, while accepting its explicit relative form: %s', file => {
+    expect(parseCliArgs(['--config', file], { cwd: process.cwd() }).ok).toBe(false);
+    expect(parseCliArgs([`--config=${file}`], { cwd: process.cwd() }).ok).toBe(false);
+    const parsed = expectParsed(['--config', `./${file}`]);
+    expect(parsed.options.configPaths).toEqual([`./${file}`]);
+    expect(parsed.options.printMode).toBe(false); expect(parsed.options.noSkills).toBe(false);
+  });
+});

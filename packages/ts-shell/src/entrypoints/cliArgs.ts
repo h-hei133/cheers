@@ -22,6 +22,7 @@ export type {
 
 const VALUE_FLAGS = new Set([
   "--profile",
+  "--config",
   "--project",
   "--attach",
   "--session-id",
@@ -116,6 +117,7 @@ export function parseCliArgs(
 
   const options: CliOptions = {};
   let profileSelected = false;
+  const configPaths: string[] = [];
   for (let index = 0; index < rawArgs.length; index += 1) {
     const flag = rawArgs[index]!;
     if (flag === '--') break;
@@ -126,12 +128,18 @@ export function parseCliArgs(
       if (!value?.trim() || value.startsWith('--')) return parseError('Missing value for --profile. Example: --profile work');
       try { assignOption(options, 'profile', profileName(value)); }
       catch (error) { return parseError((error as Error).message); }
+    } else if (flag === '--config' || flag.startsWith('--config=')) {
+      const value = flag === '--config' ? rawArgs[++index] : flag.slice('--config='.length);
+      if (!value?.trim() || value.startsWith('-')) return parseError('Missing or ambiguous value for --config. Use a path such as ./settings.json or ./-p.');
+      if (configPaths.length >= 32) return parseError('At most 32 --config inputs may be selected.');
+      configPaths.push(value);
     } else if (VALUE_FLAGS.has(flag)) {
       // A flag-looking value belongs to its existing consumer, even if it
       // spells --profile. Share the positional scan's value classification.
       index += 1;
     }
   }
+  if (configPaths.length) assignOption(options, 'configPaths', configPaths);
 
   // Positional tokens are what is left after flags and the values those flags
   // consume — `VALUE_FLAGS` decides which ones take a value. A value is not a
@@ -139,6 +147,7 @@ export function parseCliArgs(
   // path, because the fallback candidate is any token that names a path.
   const positionalArgs: string[] = [];
   for (let index = 0; index < rawArgs.length; index += 1) {
+    if (rawArgs[index] === '--') break;
     if (VALUE_FLAGS.has(rawArgs[index]!)) {
       index += 1;
       continue;

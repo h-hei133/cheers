@@ -3,11 +3,10 @@ import { loadCatalog } from '../../models/catalogStore.js';
 import { serviceTierCapability } from '../../models/serviceTier.js';
 import { readSessionModelEdit, writeSessionModel, type SessionModelEdit } from '../../../session/model/state.js';
 import type { SessionModelSelection } from '../../../session/model/contract.js';
-import { configurationApplicationNotice } from '../configuration.js';
+import { configurationApplicationNotice, readFreshConfiguration } from '../configuration.js';
 import { parseSyntax } from '../syntax/parse.js';
 import { syntaxHelp } from '../syntax/projection.js';
 import { slowSyntax } from '../slow/syntax.js';
-import { getRuntimeConfig } from '../../../config/runtimeConfig.js';
 import { projectSessionModel } from '../../../session/model/projection.js';
 import { resolveProviderCredential } from '../../shell/providerCredentials.js';
 import { sameValue } from '../../../config/values.js';
@@ -17,7 +16,7 @@ import { catalogModel } from '../../models/catalog.js';
 
 export function effectiveServiceTier(context: CommandContext): string | undefined {
   const config = context.readConfiguration?.().config ?? context.runtimeConfig
-    ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
+    ?? projectSessionModel(readFreshConfiguration(context), context.sessionId);
   const target = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
   return config.providerConnections?.find(item => item.id === config.activeProviderConnectionId && item.provider === target.provider)?.serviceTier
     ?? config.providerCredentials?.[target.provider]?.serviceTier;
@@ -40,7 +39,7 @@ export function setSessionServiceTier(context: CommandContext, tier: string): st
   const selection = baseline.selection;
   if (!selection) return 'Service tier requires a selected model in this session.';
   const root = context.projectRoot ?? context.cwd;
-  const config = context.readConfiguration?.().config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(root), context.sessionId);
+  const config = context.readConfiguration?.().config ?? context.runtimeConfig ?? projectSessionModel(readFreshConfiguration(context), context.sessionId);
   const catalog = context.readConfiguration?.().catalog ?? loadCatalog();
   if (config.activeProviderConnectionId !== selection.connectionId
     || config.providerConnections?.find(item => item.id === selection.connectionId)?.provider !== selection.provider) {
@@ -52,7 +51,7 @@ export function setSessionServiceTier(context: CommandContext, tier: string): st
   }
   try {
     writeSessionModel(context.sessionId, withSessionServiceTier(selection, tier), baseline, () => {
-      const loaded = getRuntimeConfig(root);
+      const loaded = readFreshConfiguration(context);
       return !context.admission?.() && loaded.configValidation.valid
         && sameValue(connectionIdentity(loaded.providerConnections.find(item => item.id === selection.connectionId)), connectionIdentity(config.providerConnections?.find(item => item.id === selection.connectionId)))
         && loaded.activeProviderConnectionId === selection.connectionId
@@ -61,7 +60,7 @@ export function setSessionServiceTier(context: CommandContext, tier: string): st
     });
     const notice = configurationApplicationNotice(context);
     if (notice) return `Service tier preference saved as ${tier}. ${notice}`;
-    const saved = projectSessionModel(getRuntimeConfig(root), context.sessionId);
+    const saved = projectSessionModel(readFreshConfiguration(context), context.sessionId);
     if (saved.providerConnections.find(item => item.id === selection.connectionId)?.serviceTier !== tier) return 'Service tier publication is unverified; inspect the effective model before sending.';
     return `Service tier set to ${tier} for this session. Account availability and pricing remain unverified.`;
   } catch { return 'Service tier write outcome is unverified; inspect the session before retrying.'; }

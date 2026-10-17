@@ -464,7 +464,7 @@ describe("connect command runtime", () => {
     const before = configStore.getRuntimeConfig(workspaceRoot);
     expect(resolveProviderCredential({ runtimeConfig: before, env: {} }).credential).toBeDefined();
     const result = await runConnectCommand(['logout', before.activeProviderConnectionId!], { cwd: workspaceRoot });
-    expect(result.output).toContain('Active connection now: none');
+    expect(result.output).toContain('Stored active connection now: none');
     const fresh = configStore.getRuntimeConfig(workspaceRoot);
     expect(resolveProviderCredential({ runtimeConfig: fresh, env: {} }).credential).toBeUndefined();
     expect(JSON.stringify(configStore.readUserRuntimeConfigFile())).not.toMatch(/SYNTHETIC_LOGOUT_(?:ACCESS|REFRESH|KEY)/);

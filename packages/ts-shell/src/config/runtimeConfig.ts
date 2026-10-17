@@ -12,6 +12,7 @@ import { captureConfigTrust, type ConfigTrustBinding } from './trust.js';
 import type { ConfigProvenance } from './provenance/model.js';
 import { projectConfigOrigins } from './provenance/projection.js';
 import type { ComposerShapeId } from '../presentation/tui/composer/contract.js';
+import type { ConfigInputs } from './inputs/model.js';
 
 /**
  * Token budgets for one model.
@@ -145,6 +146,7 @@ export interface RuntimeConfig {
   /** Value-free origin trees published with the settings they describe. */
   readonly configProvenance: ConfigProvenance;
   readonly configTrust: ConfigTrustBinding;
+  readonly configInputs?: ConfigInputs;
   /** Structured acceptance facts; diagnostic wording never decides publication. */
   readonly configValidation: { readonly valid: boolean; readonly securityBlocked: boolean; readonly constraintsBlocked?: boolean };
   readonly provider: RuntimeProvider;
@@ -492,12 +494,13 @@ export interface RuntimeConfigOverrides {
 export function getRuntimeConfig(
   rootDir: string = process.cwd(),
   overrides?: RuntimeConfigOverrides,
+  inputs?: ConfigInputs,
 ): RuntimeConfig {
   const configTrust = captureConfigTrust(rootDir);
   const layer = loadConfigLayers([
     { path: getProjectConfigPath(configTrust.workspaceRoot), source: "project" },
     { path: getUserConfigPath(), source: "user" },
-  ], overrides, CONFIG_FIELDS, configTrust.decision);
+  ], overrides, CONFIG_FIELDS, configTrust.decision, inputs);
   // Every accepted field has passed its registry schema before this projection.
   const merged = layer.values as RuntimeConfigFile & RuntimeConfigOverrides;
   const diagnostics = layer.diagnostics;
@@ -507,6 +510,7 @@ export function getRuntimeConfig(
 
   const config: Omit<RuntimeConfig, 'configProvenance'> = {
     configTrust,
+    ...(inputs ? { configInputs: inputs } : {}),
     configValidation: { valid: layer.valid, securityBlocked: layer.blocked },
     provider,
     maxTurns,
@@ -601,9 +605,9 @@ export function getUserRuntimeConfigPath(): string {
 /**
  * A config file read to be modified and written back.
  *
- * This deliberately still throws, unlike `getRuntimeConfig`, and the difference
- * is the whole reason the two are separate functions. Callers here take the
- * result, change one field and write the file again; returning an empty object
+ * A missing primary document is editable as an empty one; an unreadable or bad
+ * document always throws. Callers here take the result, change one field and
+ * write the file again; returning an empty object
  * for a file that could not be parsed would make that write replace everything
  * the file held with the one field the command was setting. Losing a config file
  * to a typo is worse than refusing the command that would have done it, so the

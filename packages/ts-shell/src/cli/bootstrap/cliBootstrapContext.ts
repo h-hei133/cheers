@@ -1,6 +1,8 @@
 import type { CoreMcpGateway } from "../../core/mcp/gateway.js";
 import { configurationAdmission } from '../../core/shell/configuration.js';
 import { getRuntimeConfig, type RuntimeConfigOverrides } from "../../config/runtimeConfig.js";
+import { createConfigInputs } from '../../config/inputs/selection.js';
+import type { ConfigInputs } from '../../config/inputs/model.js';
 import type {
   ShellBootstrapResult,
 } from "../../core/shell/bootstrap.js";
@@ -54,6 +56,7 @@ export interface CliBootstrapRuntimeContext extends CliRootContext {
 export interface CreateCliRootContextInput {
   readonly launchCwd: string;
   readonly options: CliOptions;
+  readonly configInputs?: ConfigInputs;
 }
 
 export function createCliRootContext(
@@ -65,7 +68,9 @@ export function createCliRootContext(
   );
   const gitContext = getWorkflowGitContext(runtimeBaseDir);
   const workspaceRoot = gitContext.root ?? runtimeBaseDir;
-  const runtimeConfig = getRuntimeConfig(workspaceRoot, configOverrides(input.options));
+  const inputs = input.configInputs ?? (input.options.configPaths?.length
+    ? createConfigInputs(input.options.configPaths.map(file => ({ path: file, source: 'user' })), input.launchCwd) : undefined);
+  const runtimeConfig = getRuntimeConfig(workspaceRoot, configOverrides(input.options), inputs);
   return {
     runtimeBaseDir,
     gitContext,
