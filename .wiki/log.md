@@ -7510,3 +7510,9 @@ CI 的 `browser/cache/scenarios` 并发三进程测试偶发 `Duplicates/over-bu
 裸 `/thinking` 打开 effort 面板：auto/low/medium/high，按 `effortCapability` 与当前模型/目录判断 supported/unsupported/unverified；不可兑换的级别禁用并给出原因，unverified 不当作 0 或 supported。选择走既有 `runThinkingCommand`，会话/连接优先级不变。
 
 **本地验证**：pickers 41 项（非 reasoning 模型的 low/medium/high 全部 unsupported）；`build:ts` 通过。本条写入时尚未提交/推送。
+
+### Phase 20 PAN-01（补充）：模型面板列出已保存预设
+
+`/model` 在模型行之后追加 session + profile 预设行（`preset:<name>`），详情显示各 role 的 provider/model；选择走 `applyModelPreset` 的默认 role，而不是把预设名当模型。预设库不可读时显示一条禁用的“不可用”行，不影响模型列表。
+
+**本地验证**：pickers 41 项（profile 预设出现在模型列表）；`build:ts` 通过。本条写入时尚未提交/推送。

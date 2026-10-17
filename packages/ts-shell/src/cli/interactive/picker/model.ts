@@ -7,6 +7,9 @@ import { resolveProviderCredential } from "../../../core/shell/providerCredentia
 import type { CommandContext } from "../../../core/commands/types.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
 import type { Picker, PickerOutcome } from "../overlay.js";
+import { applyModelPreset } from "../../../core/commands/model/preset.js";
+import { readProfilePresets } from "../../../core/commands/model/presetStore.js";
+import { readSessionModel } from "../../../session/model/state.js";
 
 /**
  * Model chooser, grouped by provider.
@@ -71,6 +74,19 @@ export function modelPicker(context: CommandContext): Picker {
           details.set(id, modelDetails(provider.label, provider.runtime, entry, state, model.contextWindow, selectable));
         }
       }
+      // Saved presets are separate rows: applying one resolves every role and
+      // then selects its default role, rather than treating the name as a model.
+      if (context.sessionId) {
+        try {
+          const presets = { ...readProfilePresets(), ...(readSessionModel(context.sessionId)?.presets ?? {}) };
+          for (const [name, preset] of Object.entries(presets)) {
+            const roles = Object.entries(preset.roles).map(([role, target]) => `${role}=${target.provider}/${target.model}`).join(", ");
+            rows.push({ id: `preset:${name}`, label: `Preset: ${name}`, detail: roles, note: "saved" });
+          }
+        } catch {
+          rows.push({ id: "preset:unavailable", label: "Model presets unavailable", detail: "The preset library could not be read; models above are unaffected.", disabled: true });
+        }
+      }
       return rows;
     },
     // The detail column keeps the row short while still saying which relay a
@@ -79,6 +95,10 @@ export function modelPicker(context: CommandContext): Picker {
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
       const chosen = ids[0];
       if (!chosen) return undefined;
+      if (chosen.startsWith("preset:")) {
+        if (!context.sessionId) return { note: "Presets require a bound session." };
+        return { note: await applyModelPreset(context.sessionId, chosen.slice("preset:".length), "default", context) };
+      }
       // A catalogue id is not always the runtime name (a custom relay is listed
       // under its own id). `/model use` reads a leading known provider id as a
       // provider switch, which is refused for a relay; a bare model keeps the
