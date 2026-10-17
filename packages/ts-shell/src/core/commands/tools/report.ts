@@ -7,6 +7,8 @@ const PERMISSIONS = "Eligible tools still require the session's permissions and 
 
 export function toolsReport(pool: ReadonlyMap<string, ToolDefinition>): CommandReport {
   const tools = [...pool.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const measured = tools.map(tool => ({ name: tool.name, descriptionBytes: Buffer.byteLength(tool.description, 'utf8'),
+    schemaBytes: Buffer.byteLength(JSON.stringify(tool.argsSchema), 'utf8') }));
   return createReport({ title: `Tools (${tools.length})`,
     columns: [{ label: 'Tool', minWidth: 14 }, { label: 'Plan mode', minWidth: 10 }, { label: 'What it does', minWidth: 24 }],
     lines: [
@@ -19,7 +21,11 @@ export function toolsReport(pool: ReadonlyMap<string, ToolDefinition>): CommandR
       { kind: 'text', spans: [span(PERMISSIONS, 'warning')] },
     ],
     facts: { count: tools.length, tools: tools.map(tool => ({ name: tool.name,
-      description: tool.description, planMode: toolPlanMode(tool.name, tool) })), permission: 'not-evaluated' },
+      description: tool.description, planMode: toolPlanMode(tool.name, tool) })), permission: 'not-evaluated',
+      // Static wire cost only; a token count requires the model's tokenizer.
+      size: { unit: 'utf8-bytes', tokens: 'not-measured',
+        descriptionBytes: measured.reduce((sum, tool) => sum + tool.descriptionBytes, 0),
+        schemaBytes: measured.reduce((sum, tool) => sum + tool.schemaBytes, 0), perTool: measured } },
   });
 }
 

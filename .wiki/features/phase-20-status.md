@@ -52,7 +52,7 @@
 - PAN-05：流式面板。
 - RENDER-03：并排 diff 的左右源复制。
 - QA-02/03：Linux PTY 冒烟已通过 Node 与单文件 exe 两构建（`npm run qa:pty`，`/sessions current` + `/exit`）；Windows/macOS/IME/系统复制与真实质量仍缺环境/模型。
-- TOOL-02：描述/tokenizer/质量评估（需真实模型）。
+- TOOL-02：静态描述/schema 字节成本已进 `/tools` 报告（`size.unit=utf8-bytes`，`tokens=not-measured`）；同模型质量/缓存对比与 tokenizer 校准仍需真实模型。
 
 ## CI
 

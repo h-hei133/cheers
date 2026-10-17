@@ -7640,3 +7640,8 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 
 - `qa:pty` 依次跑 Node 与 `dist/bin/cheers`，各自临时 HOME/项目与合成 provider；两者均 PASS（6863 bytes）。
 - Windows/macOS、IME、系统复制与真实质量仍未验证。
+
+## 2026-10-18 — TOOL-02 静态成本
+
+- `/tools` 报告新增 `size`：description/schema 的 UTF-8 字节总数与逐工具字节，明确 `tokens: not-measured`；不把字节数伪装成 token 上界。
+- 验证：tools/report 1 项。
