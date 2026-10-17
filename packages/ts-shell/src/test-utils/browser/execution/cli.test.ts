@@ -42,6 +42,8 @@ describe("browser CLI execution scenario examples", () => {
         {
           id: "execute",
           kind: "cli-command",
+          // Real CLI startup can exceed the 10s default on a loaded runner.
+          timeoutMs: 60_000,
           prompt: "/browser execute observe local-fixture://route100-demo",
           assertions: [
             { id: "blocked", kind: "browser-execution-blocked" },
@@ -93,6 +95,8 @@ describe("browser CLI execution scenario examples", () => {
         {
           id: "execute",
           kind: "cli-command",
+          // Real CLI startup can exceed the 10s default on a loaded runner.
+          timeoutMs: 60_000,
           prompt: "/browser execute observe local-fixture://route100-demo",
           env: fixture.env,
           assertions: [
@@ -130,6 +134,8 @@ describe("browser CLI execution scenario examples", () => {
         {
           id: "observe",
           kind: "cli-command",
+          // Real CLI startup can exceed the 10s default on a loaded runner.
+          timeoutMs: 60_000,
           prompt: "/browser execute observe local-fixture://route100-demo",
           env: fixture.env,
           assertions: [
@@ -143,6 +149,8 @@ describe("browser CLI execution scenario examples", () => {
         {
           id: "extract",
           kind: "cli-command",
+          // Real CLI startup can exceed the 10s default on a loaded runner.
+          timeoutMs: 60_000,
           prompt: "/browser execute extract route100 summary",
           env: fixture.env,
           assertions: [
@@ -180,6 +188,8 @@ describe("browser CLI execution scenario examples", () => {
         {
           id: "navigate",
           kind: "cli-command",
+          // Real CLI startup can exceed the 10s default on a loaded runner.
+          timeoutMs: 60_000,
           prompt: "/browser execute navigate https://example.com",
           env: fixture.env,
           assertions: [
