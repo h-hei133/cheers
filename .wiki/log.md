@@ -7650,3 +7650,9 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 
 - `cli-baseline` 的 `/sessions current` 管道冒烟此前在 “Current session” 一出现就结束并 kill 进程，慢 runner 上 `- ID:` 尚未 flush，导致 `dd43bcce`、`bde00a5e` 的 CI 偶发失败。
 - 改为等待最终被断言的 `- ID:` 行；本地 `cli-baseline` 40/40。
+
+## 2026-10-18 — RENDER-03 并排源复制
+
+- `layoutSideBySide` 为每行保留 left/right 源文本与分隔列；`sourceLinesFor` 在 command/error 与 framed tool 卡片中定位 diff 行块并映射源；`extractSource` 按选区起始列选择 old/new 一侧，跨分隔列时回退渲染文本。
+- tool 卡片在 inner≥100 时启用并排（此前始终 unified），窄屏仍回退。
+- 验证：surface/transcript 188；新增 command 与 framed tool 两侧复制测试。

@@ -223,7 +223,7 @@ function renderTool(block: Block, width: number): readonly string[] {
     const rows = [`${GUTTER}${glyph} ${name}${detail}`];
     for (const note of notes) rows.push(...wrapToWidth(defaultTheme.dim(note), width));
     if (block.diff) {
-      rows.push(...renderDiff(block.diff, width - BODY_INDENT.length).map((row) => `${BODY_INDENT}${row}`));
+      rows.push(...renderDiff(block.diff, width - BODY_INDENT.length, { sideBySide: width >= 100 }).map((row) => `${BODY_INDENT}${row}`));
     } else if (body) {
       const lines = body.split("\n").length;
       rows.push(`${GUTTER}${defaultTheme.dim(`  ↳ ${lines} ${lines === 1 ? "line" : "lines"} · click to expand`)}`);
@@ -266,7 +266,7 @@ function renderTool(block: Block, width: number): readonly string[] {
     const diffLabel = " Changes ";
     const diffFill = Math.max(0, inner - visibleWidth(diffLabel));
     rows.push(defaultTheme.fg("borderAccent", `├${diffLabel}${"─".repeat(diffFill)}┤`));
-    for (const diffRow of renderDiff(block.diff, inner - 2)) {
+    for (const diffRow of renderDiff(block.diff, inner - 2, { sideBySide: inner - 2 >= 100 })) {
       rows.push(`${defaultTheme.fg("border", "│")} ${padToWidth(diffRow, inner - 2)} ${defaultTheme.fg("border", "│")}`);
     }
   }

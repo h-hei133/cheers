@@ -1,5 +1,7 @@
 import { wrapToWidth } from "../text/layout.js";
+import { stripAnsi } from "../text/ansi.js";
 import type { Block } from "./blocks.js";
+import { layoutSideBySide } from "./diff.js";
 
 /**
  * Semantic source behind a rendered row.
@@ -17,6 +19,12 @@ export interface SourceLine {
   readonly text: string;
   /** `soft` continues the same source line; `logical` ends it. */
   readonly breakAfter: "soft" | "logical";
+  /** Old-side source for a side-by-side diff row. */
+  readonly left?: string;
+  /** New-side source for a side-by-side diff row. */
+  readonly right?: string;
+  /** Divider column; a selection left of it copies old, right copies new. */
+  readonly split?: number;
 }
 
 interface Projection {
@@ -68,6 +76,30 @@ export function sourceLinesFor(
   width: number,
   rows: readonly string[],
 ): readonly (SourceLine | undefined)[] {
+  if (block.diff) {
+    // Tool cards frame the diff in a box and use the inner width; command and
+    // error blocks render it at full width. The split column is shifted by the
+    // card's two-character prefix.
+    const framed = block.kind === "tool" && block.collapsed !== true;
+    const diffWidth = framed ? Math.max(8, Math.max(16, width - 2) - 2) : Math.max(1, width);
+    const layout = layoutSideBySide(block.diff, diffWidth, { sideBySide: diffWidth >= 100 });
+    const visible = (row: string): string => {
+      const text = stripAnsi(row);
+      return (framed ? text.slice(2, 2 + diffWidth) : text).trimEnd();
+    };
+    // A tool card has its own header rows before the diff; find the block of
+    // rows that matches the layout instead of assuming it starts at a fixed offset.
+    let offset = -1;
+    for (let candidate = 0; candidate + layout.rows.length <= rows.length; candidate++) {
+      if (layout.rows.every((row, index) => visible(rows[candidate + index] ?? "") === stripAnsi(row).trimEnd())) { offset = candidate; break; }
+    }
+    if (offset < 0) return rows.map(() => undefined);
+    return rows.map((_, index) => {
+      const source = layout.sources[index - offset];
+      return source ? { block: blockIndex, text: source.left ?? source.right ?? "", breakAfter: "logical" as const,
+        ...source, ...(framed ? { split: source.split + 2 } : {}) } : undefined;
+    });
+  }
   const body = bodyOf(block, width);
   if (!body) return rows.map(() => undefined);
   const projected = projectText(body.text, body.width);

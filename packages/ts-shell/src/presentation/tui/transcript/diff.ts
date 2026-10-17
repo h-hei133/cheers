@@ -169,12 +169,28 @@ export function createUnifiedDiff(filePath: string, oldText: string, newText: st
  * Rows and input bytes are both bounded, so a diff made of zero-width characters
  * cannot bypass the limit.
  */
+export interface DiffRowSource {
+  /** Source text of the left cell; absent when the side is blank. */
+  readonly left?: string;
+  /** Source text of the right cell; absent when the side is blank. */
+  readonly right?: string;
+  /** Column of the divider; selections left of it are old text, right are new. */
+  readonly split: number;
+}
+
 export function renderSideBySide(diff: string, width: number, options: DiffRenderOptions = {}): string[] {
+  return [...layoutSideBySide(diff, width, options).rows];
+}
+
+/** Rows plus the source text behind each row, for selection copy. */
+export function layoutSideBySide(diff: string, width: number, options: DiffRenderOptions = {}):
+{ readonly rows: readonly string[]; readonly sources: readonly (DiffRowSource | undefined)[] } {
   const maxRows = Math.max(1, options.maxRows ?? DEFAULT_MAX_ROWS);
   const maxBytes = Math.max(1, options.maxBytes ?? DEFAULT_MAX_BYTES);
   const bytes = Buffer.byteLength(diff, 'utf8');
   const lines = diff.split('\n');
   const rows: string[] = [];
+  const sources: (DiffRowSource | undefined)[] = [];
   const truncated = (): void => {
     if (rows.length < maxRows) rows.push(defaultTheme.dim('… diff truncated by the view budget'));
   };
@@ -186,11 +202,13 @@ export function renderSideBySide(diff: string, width: number, options: DiffRende
   let newLine = 0;
   let index = 0;
   let consumed = 0;
-  const push = (row: string): boolean => {
+  const push = (row: string, source?: DiffRowSource): boolean => {
     if (rows.length >= maxRows) return false;
     rows.push(row);
+    sources.push(source);
     return true;
   };
+  const split = numberWidth * 2 + 2;
   while (index < lines.length) {
     const line = lines[index]!;
     consumed += Buffer.byteLength(line, 'utf8') + 1;
@@ -207,7 +225,7 @@ export function renderSideBySide(diff: string, width: number, options: DiffRende
     if (line.startsWith(' ')) {
       const text = line.slice(1);
       if (!push(gutter(String(oldLine), String(newLine)) + defaultTheme.fg('diffContext', truncateToWidth(text, cell))
-        + ' │ ' + defaultTheme.fg('diffContext', truncateToWidth(text, cell)))) { truncated(); break; }
+        + ' │ ' + defaultTheme.fg('diffContext', truncateToWidth(text, cell)), { left: text, right: text, split })) { truncated(); break; }
       oldLine += 1; newLine += 1; index += 1; continue;
     }
     if (line.startsWith('-') || line.startsWith('+')) {
@@ -219,7 +237,7 @@ export function renderSideBySide(diff: string, width: number, options: DiffRende
       while (index < lines.length && lines[index]!.startsWith('+')) {
         consumed += Buffer.byteLength(lines[index]!, 'utf8') + 1; added.push(lines[index]!.slice(1)); index += 1;
       }
-      if (consumed > maxBytes) { truncated(); return rows; }
+      if (consumed > maxBytes) { truncated(); return { rows, sources }; }
       const count = Math.max(removed.length, added.length);
       for (let pair = 0; pair < count; pair++) {
         const left = removed[pair];
@@ -227,7 +245,7 @@ export function renderSideBySide(diff: string, width: number, options: DiffRende
         const leftText = left === undefined ? '' : defaultTheme.fg('diffRemoved', truncateToWidth(left, cell));
         const rightText = right === undefined ? '' : defaultTheme.fg('diffAdded', truncateToWidth(right, cell));
         if (!push(gutter(left === undefined ? '' : String(oldLine), right === undefined ? '' : String(newLine))
-          + pad(leftText, cell) + ' │ ' + rightText)) { truncated(); return rows; }
+          + pad(leftText, cell) + ' │ ' + rightText, { ...(left !== undefined ? { left } : {}), ...(right !== undefined ? { right } : {}), split })) { truncated(); return { rows, sources }; }
         if (left !== undefined) oldLine += 1;
         if (right !== undefined) newLine += 1;
       }
@@ -237,7 +255,7 @@ export function renderSideBySide(diff: string, width: number, options: DiffRende
     index += 1;
   }
   if (bytes > maxBytes && rows.length < maxRows) truncated();
-  return rows;
+  return { rows, sources };
 }
 
 /** Pad to the cell width without counting escape sequences as cells. */

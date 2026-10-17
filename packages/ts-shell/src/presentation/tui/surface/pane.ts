@@ -187,11 +187,21 @@ export class TranscriptPane {
   extractSource(anchor: SelectionPoint, focus: SelectionPoint): string | undefined {
     const from = anchor.row <= focus.row ? anchor : focus;
     const to = anchor.row <= focus.row ? focus : anchor;
-    if (from.column > 0) return undefined;
+    const first = this.sources[from.row];
+    const sideSelectable = first?.split !== undefined;
+    const side = sideSelectable && from.column > first!.split! ? "right" : "left";
+    if (from.column > 0 && !sideSelectable) return undefined;
     const selected: SourceLine[] = [];
     for (let row = from.row; row <= to.row; row++) {
       const line = this.sources[row];
       if (!line) return undefined;
+      if (line.split !== undefined) {
+        const text = side === "right" ? line.right : line.left;
+        if (text === undefined) return undefined;
+        selected.push({ ...line, text });
+        continue;
+      }
+      if (sideSelectable) return undefined;
       if (row === to.row) {
         const text = stripAnsi(this.paintedRows[row] ?? "");
         if (to.column < Math.max(0, visibleWidth(text) - 1)) return undefined;

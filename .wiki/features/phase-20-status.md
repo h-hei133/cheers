@@ -18,7 +18,7 @@
 | PAN-03（部分） | 本次 | `/hub` 只读主从面板、1s journal 轮询、详情列 |
 | PAN-05（部分） | 本次 | `/advisor` 只读 checkpoint/note 主从面板；`/plan-review` 增加结构化 `CommandReport`（版本/阶段/验收项/绑定状态），`/btw` 增加问题/是否送达/答案报告；两者仍只读或独立授权 |
 | INPUT-01（部分） | 本次 | 五模式状态机、vimMode、Normal/Visual Enter 不提交、粘贴优先 |
-| RENDER-03（部分） | 本次 | 并排 diff、配对行号、双预算、窄屏 unified 回退 |
+| RENDER-03 | 本次 | 并排 diff（tool 卡片在 inner≥100 时也并排）、配对行号、双预算、窄屏 unified 回退、resize 锚点、左右源复制（command/error 与 framed tool 卡片） |
 | RENDER-02（部分） | 本次 | 多行 cell、escaped/code pipe、`<br>`、窄屏源码回退与预算 |
 | RENDER-01（部分） | 本次 | 内联数学投影、金额/代码保护、未知命令与超预算保原文 |
 | PAN-04（部分） | `6736f402`、本次 | `/usage account` quota 进度投影、`/thinking` effort 选择器 |
@@ -50,7 +50,7 @@
 
 - START-03：受控冷缓存（需清页缓存权限）；逐键延迟目前以 `/exit` 命令处理为代理。
 - PAN-05：流式面板。
-- RENDER-03：并排 diff 的左右源复制。
+
 - QA-02/03：Linux PTY 冒烟已通过 Node 与单文件 exe 两构建（`npm run qa:pty`，`/sessions current` + `/exit`）；Windows/macOS/IME/系统复制与真实质量仍缺环境/模型。
 - TOOL-02：静态描述/schema 字节成本已进 `/tools` 报告（`size.unit=utf8-bytes`，`tokens=not-measured`）；同模型质量/缓存对比与 tokenizer 校准仍需真实模型。
 
