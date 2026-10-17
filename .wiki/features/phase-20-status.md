@@ -15,6 +15,7 @@
 | SET-01/02 | `734f51a4`、`9ce49b16` | 34 项编辑器、7 组 tab、changed 标记 |
 | SET-03（预览） | `6736f402` | status/theme 预览撤销；Apply 前不写、CAS 保持 |
 | PAN-02（部分） | `6736f402` | 时间分组、`Ctrl+P` pin、tree 连接线 |
+| PAN-03（部分） | 本次 | `/hub` 只读主从面板、1s journal 轮询、详情列 |
 | PAN-04（部分） | `6736f402` | `/usage account` quota 进度投影 |
 | PAN-06（部分） | `6736f402` | copy 移除 recent-30 窗口 |
 | PAN-07（部分） | 本次 | `/extensions` 为 `/plugin` 别名 |
@@ -28,6 +29,7 @@
 | PAN-02 | 分组、pin、树形 | 跨目录授权搜索、10000 会话分页目标、预览/置顶持久验收 |
 | PAN-04 | quota 进度 | thinking picker、effort/model 联合约束、unknown 非 0 |
 | PAN-06 | copy 全量、pin | history 完整树、copy 分页/源 revision 到头、back/undo/restore 审计 |
+| PAN-03 | hub 主从视图 | 输出分页/脱敏面板、agents 专用操作与未知状态验收 |
 | PAN-07 | alias | login/logout 设备码安全显示、逐项确认验收 |
 | SET-03 | status/theme 预览 | 外部更新撤销的端到端验收 |
 

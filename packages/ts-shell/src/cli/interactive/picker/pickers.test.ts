@@ -25,6 +25,13 @@ describe("which commands open a chooser", () => {
     },
   );
 
+  it("opens the jobs hub only when a job composition exists", () => {
+    expect(opensPicker('/hub')).toBe(true);
+    const host = { commandContext: CONTEXT } as unknown as PickerHost;
+    expect(pickerFor('/hub', host)).toBeUndefined();
+    expect(pickerFor('/hub', { ...host, jobs: {} as never })).toBeDefined();
+  });
+
   it.each(["/models", "/sessions", "/session", "/providers", "/plugins", "/skills", "/cp", "/approval-policy"])("opens the same chooser for synonymous %s", (command) => {
     expect(opensPicker(command)).toBe(true);
     expect(opensPicker(`${command} argument`)).toBe(false);

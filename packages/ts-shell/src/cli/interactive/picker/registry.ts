@@ -23,6 +23,7 @@ import { serverPicker } from "./servers.js";
 import { skillPicker } from "./skills.js";
 import { sourcePicker } from "./sources.js";
 import { sessionPicker } from "./session.js";
+import { hubPicker } from "./hub.js";
 import { statusItemPicker } from "./statusItems.js";
 import { settingsPicker, type SettingsHost } from "./settings.js";
 import { undoPicker } from './undo.js';
@@ -49,6 +50,7 @@ export interface PickerHost extends SettingsHost {
   readonly statusItems: readonly StatusItemId[];
   readonly undo: UndoHost;
   readonly gitWorkbench?: GitWorkbench;
+  readonly jobs?: import('../../jobs/model.js').JobsComposition;
   sessionContext(): SessionSelectionContext;
   resumeSession(sessionId: string): Promise<string | undefined>;
   deleteSession(sessionId: string, version?: string): Promise<string | undefined>;
@@ -66,7 +68,7 @@ export interface PickerHost extends SettingsHost {
   readonly fork?: (entryId: string) => Promise<undefined>;
 }
 
-type PickerFactory = (host: PickerHost, argument?: string) => Picker;
+type PickerFactory = (host: PickerHost, argument?: string) => Picker | undefined;
 
 const PICKERS: Record<string, PickerFactory> = {
   help: host => helpPicker(host.commandContext ? { root: host.commandContext.cwd, sessionId: host.commandContext.sessionId } : undefined),
@@ -107,6 +109,7 @@ const PICKERS: Record<string, PickerFactory> = {
       preview: host.previewStatusItems,
     }),
   settings: (host) => settingsPicker(host),
+  hub: host => host.jobs ? hubPicker(host.jobs) : undefined,
   git: host => gitPicker(host.gitWorkbench),
 };
 

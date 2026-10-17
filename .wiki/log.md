@@ -7442,3 +7442,9 @@ PAN-06：copy picker 移除 recent-30 窗口，按新到旧列出全部 block，
 ### 修复：全量套件下的编译 CLI 启动测试
 
 全量并行运行时 `cli-baseline.test.ts` 的 3 项 spawn 测试在固定 7s/20s/25s 窗口内拿不到启动输出；单独运行与重建 `dist` 后均通过。将流式测试的观察窗口改为 15s（总超时 30s）、两项 MCP 引导测试总超时改为 60s，断言仍是输出内容而不是固定启动 SLA。目标文件 4 项通过。
+
+### Phase 20 PAN-03（部分）：jobs/hub 主从视图
+
+新增 `cli/interactive/picker/hub.ts`：`/hub` 在交互模式下打开只读主从面板，列表按 journal 显示 job/agent/workflow 的 backend、id、状态与命令摘要，详情列显示 status/storedStatus、目录、deadline、exit、live owner、detached 与 dispatch 可能性。订阅每秒重读 journal 并在关闭时清除；`apply` 只返回提示，不取消任务、不写对话。`/jobs` 的取消、暂停、恢复仍走各自的批准路径。非交互 `/hub` 继续输出报告。
+
+**本地验证**：`pickers.test.ts` 39 项通过（`/hub` 有/无 composition 的分支）；`build:ts` 通过。本条写入时尚未提交/推送。

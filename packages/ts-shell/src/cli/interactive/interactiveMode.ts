@@ -1045,6 +1045,7 @@ export class InteractiveMode {
       undo: undoPickerHost({ runtimeContext: this.options.runtimeContext, sessionManager: this.options.sessionManager,
         busy: () => this.stopped || this.closing || (this.busy && !this.pickerPending) || this.options.sessionRuntime.getCurrentRunController() !== null }),
       gitWorkbench: gitWorkbenchFor(this.options.runtimeContext),
+      jobs: jobsFor(this.options.runtimeContext),
       ...sessionPickerHost({ runtimeContext: this.options.runtimeContext, sessionManager: this.options.sessionManager,
         busy: () => this.stopped || this.closing || (this.busy && !this.pickerPending) || this.options.sessionRuntime.getCurrentRunController() !== null,
         resume: sessionId => this.runCommandLine(`/resume ${sessionId}`),
