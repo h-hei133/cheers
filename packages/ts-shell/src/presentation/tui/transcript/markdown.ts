@@ -4,6 +4,7 @@ import { padToWidth, truncateToWidth, wrapToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
 import { DIAGRAM_LANGUAGE, renderDiagram } from "./mermaid.js";
 import { scanBlocks } from "./markdownScan.js";
+import { projectMath } from "./math.js";
 /**
  * Markdown rendering for assistant prose.
  *
@@ -40,7 +41,7 @@ export function trimPartialFence(text: string): string {
 
 /** Inline emphasis, code spans, and link labels for one line. */
 export function renderInline(text: string): string {
-  return text
+  return projectMath(text)
     .replace(/`([^`]+)`/g, (_match, code: string) => {
       if (code.includes("/") || code.includes("\\") || /\.[a-zA-Z0-9_-]+$/.test(code)) {
         return defaultTheme.fg("filename", code);
