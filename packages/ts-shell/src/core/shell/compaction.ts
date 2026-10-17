@@ -172,6 +172,8 @@ function declineOutcome(reason: CompactionDecline): CompactionOutcome {
       };
     case "unsummarized":
       return { status: "failed", reason: "The provider returned no summary." };
+    case "step-unknown":
+      return { status: "failed", reason: "A previous summary step may already have been sent; it was not repeated. Add a turn or change the instructions, then retry." };
   }
 }
 
@@ -199,6 +201,7 @@ export async function compactSessionHistory(input: CompactionInput): Promise<Com
       signal: input.signal,
       lifecycle,
       force: true,
+      operation: { sessionId: input.sessionId },
     });
   } catch (error) {
     if (input.signal?.aborted) return { status: "failed", reason: "Compaction was cancelled." };

@@ -7328,3 +7328,13 @@ PRV-01 的选择器改为以投影的 active provider 判断可选性，但投�
 **本地验证**：新增 6 项预算测试与 3 项 telemetry 身份测试；`context/request`、`usageTelemetry`、`compaction` 与 `turn/step.test.ts` 共 95 项通过；`build:ts` 通过。合同见[请求计量与预算](features/request-budget.md)。
 
 本条写入时尚未提交/推送；未运行真实 provider，也未实现 TOOL-01 的动态 schema 预算。
+
+### Phase 20 CTX-03：压缩逻辑操作与步骤幂等
+
+新增 `session/compactionOperation.ts`：operation 由 session/provider/model/policy/instructions 标识，step 由被摘要的精确消息、previousSummary 与指令标识。会话目录内 `compaction-operations.json` 记录 `dispatched`/`unknown`/`completed`，锁内重读、原子写入与读回核对，保留 16 操作 × 32 步骤、7 天清理；没有真实会话目录时不写文件，避免投影 session id 污染 profile。
+
+`condenseContext` 在 history 与 prefix 两次摘要前 claim，完成写回摘要，空结果/错误标记 unknown；已完成步骤复用，`dispatched`/`unknown` 返回 `step-unknown` 不重播。并发重复只有第一个取得步骤。前缀步骤只在调用方实际提供 prefix summarizer 时声明，避免永远 dispatched 的占位。手动、自动阈值与 overflow 救援共用同一 store。
+
+**本地验证**：新增 7 项操作测试（claim/replay/completed 复用、unknown 持久、身份分离、损坏文件、并发重复、真实 condense 复用、空摘要后拒绝重播）；`core/shell/compaction.test.ts` 10 项与相关 `session`/`turn` 套件通过（92 文件 913 项中仅初始 3 项因测试 session id 共享而失败，改为无目录 no-op 后全部通过）。`build:ts` 通过。合同见[压缩操作与步骤幂等](features/compaction-operations.md)。
+
+清理了测试首次运行在默认 profile 下创建的 `sessions/{s,sess_compact,sess_turn}/compaction-operations.json`；这些目录只含本次测试生成的文件。本条写入时尚未提交/推送。

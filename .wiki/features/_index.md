@@ -45,6 +45,7 @@ confidence: high
 | [显式账号池](account-pool.md) | PRV-03 封闭成员集合、受众/endpoint 约束、空池零发送与会话亲和 |
 | [请求归属与凭据退避](request-attribution.md) | PRV-05 全发送路径的 credential 身份与按代际 429 退避 |
 | [请求计量与预算](request-budget.md) | CTX-01/02 usage 身份、消息范围与 P+O+H≤W 发送前准入 |
+| [压缩操作与步骤幂等](compaction-operations.md) | CTX-03 逻辑操作/步骤、完成复用、未知不重播与并发互斥 |
 
 ### 0.2 本轮之前的历史文档（01–22）
 

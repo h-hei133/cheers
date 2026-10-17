@@ -2,7 +2,9 @@ import { messageToText } from "../model-adapters/multimodal.js";
 import { ModelAdmissionError } from '../core/agent/request/model.js';
 import type { NextStepSnapshot, NextStepUpdate } from "../core/agent/loop.js";
 import type { AgentMessage } from "../core/agent/state.js";
+import { createHash } from 'node:crypto';
 import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS, estimateRequestTokens, estimateTokens, messageCharCount, type RequestOverhead } from "./context.js";
+import { claimCompactionStep, completeCompactionStep, compactionStepDigest, markCompactionStepUnknown } from './compactionOperation.js';
 
 export const KEEP_RECENT_TOKENS = 20_000;
 
@@ -454,7 +456,9 @@ export type CompactionDecline =
   /** The summary would cost at least what it replaces, so the context could only grow. */
   | "would-not-shrink"
   /** The summarizer produced nothing usable. */
-  | "unsummarized";
+  | "unsummarized"
+  /** A previous step may already have been sent; replaying it is not authorized. */
+  | "step-unknown";
 
 export type CondenseOutcome =
   | ({ readonly status: "condensed" } & CondensedContext)
@@ -507,6 +511,8 @@ export async function condenseContext(input: {
    * lifecycle without a reason is the manual case.
    */
   readonly lifecycleReason?: CompactionReason;
+  /** Durable step identity; absent disables cross-restart reuse (tests, callers without a session). */
+  readonly operation?: { readonly sessionId: string; readonly provider?: string; readonly model?: string };
 }): Promise<CondenseOutcome> {
   const plan = input.force
     ? planCompactionCut(input.messages, input.policy)
@@ -548,16 +554,28 @@ export async function condenseContext(input: {
   const history = input.messages.slice(historyStart, historyEnd);
   const prefix = plan.splitsTurn ? input.messages.slice(Math.max(plan.turnStart, head), plan.cut) : [];
 
+  const operation = input.operation ? { ...input.operation,
+    policyDigest: createHash('sha256').update(JSON.stringify([input.policy.contextWindow, input.policy.reserveTokens ?? null,
+      input.policy.keepRecentTokens ?? null, input.policy.enabled ?? null, input.instructions ?? ''])).digest('hex'),
+    ...(input.instructions !== undefined ? { instructions: input.instructions } : {}) } : undefined;
   let historyText: string | undefined;
   if (history.length > 0) {
-    historyText = await input.summarize({
-      messages: history,
-      previousSummary,
-      instructions: input.instructions,
-      signal: input.signal,
-    });
-    if (!historyText) {
-      return { status: "declined", reason: "unsummarized" };
+    const claim = operation ? claimCompactionStep({ ...operation,
+      stepDigest: compactionStepDigest({ history, previousSummary, instructions: input.instructions }) }) : undefined;
+    if (claim?.unknown) return { status: "declined", reason: "step-unknown" };
+    if (claim?.summary !== undefined) historyText = claim.summary;
+    else {
+      historyText = await input.summarize({
+        messages: history,
+        previousSummary,
+        instructions: input.instructions,
+        signal: input.signal,
+      });
+      if (!historyText) {
+        if (claim?.acquired && operation) markCompactionStepUnknown(claim, operation.sessionId);
+        return { status: "declined", reason: "unsummarized" };
+      }
+      if (claim?.acquired && operation) completeCompactionStep(claim, operation.sessionId, historyText);
     }
   } else if (previousSummary !== undefined) {
     // Nothing new to condense, so the checkpoint it already carries stands as
@@ -567,7 +585,14 @@ export async function condenseContext(input: {
 
   let summary = historyText;
   if (prefix.length > 0) {
-    const prefixText = await input.summarizeTurnPrefix?.(prefix, input.signal);
+    // A caller with no prefix summarizer never sends a prefix step, so it must
+    // not claim one either: a claim without a request would block the next pass.
+    const claim = operation && input.summarizeTurnPrefix ? claimCompactionStep({ ...operation,
+      stepDigest: compactionStepDigest({ history: prefix, instructions: input.instructions }) }) : undefined;
+    if (claim?.unknown) return { status: "declined", reason: "step-unknown" };
+    const prefixText = claim?.summary ?? await input.summarizeTurnPrefix?.(prefix, input.signal);
+    if (prefixText && claim?.acquired && operation) completeCompactionStep(claim, operation.sessionId, prefixText);
+    else if (!prefixText && claim?.acquired && operation) markCompactionStepUnknown(claim, operation.sessionId);
     // The request the tail is answering lives in the prefix, so losing it costs
     // real context. Refusing to compact costs more: the request was already
     // judged too large, and declining leaves it exactly as large as before.
@@ -617,6 +642,10 @@ export function applyCompaction(
 
 export interface CompactionStepOptions {
   readonly summarize: SummarizeHistory;
+  /** Enables durable step reuse across restarts; absent keeps the old in-memory behaviour. */
+  readonly sessionId?: string;
+  readonly provider?: string;
+  readonly model?: string;
   readonly summarizeTurnPrefix?: SummarizeTurnPrefix;
   readonly onError?: (error: unknown) => void;
   readonly onCompact?: (input: {
@@ -660,6 +689,8 @@ export function createCompactionStep(
         signal,
         ...(options.lifecycle ? { lifecycle: options.lifecycle } : {}),
         lifecycleReason: reason,
+        ...(options.sessionId ? { operation: { sessionId: options.sessionId,
+          ...(options.provider ? { provider: options.provider } : {}), ...(options.model ? { model: options.model } : {}) } } : {}),
       });
     } catch (error) {
       if (error instanceof ModelAdmissionError) throw error;

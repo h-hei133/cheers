@@ -290,6 +290,7 @@ export function runTurn(options: TurnOptions): TurnRun {
     prepareNextStep: options.compaction
       ? createCompactionStep(options.compaction.policy, {
           summarize: options.compaction.summarize,
+          sessionId: options.sessionId,
           summarizeTurnPrefix: options.compaction.summarizeTurnPrefix,
           onCompact: options.compaction.onCompact,
           // One builder for both entry points, so a hook sees the same event
@@ -407,6 +408,7 @@ export function runTurn(options: TurnOptions): TurnRun {
         reason: "overflow",
       }),
       lifecycleReason: "overflow",
+      operation: { sessionId: options.sessionId },
     }).catch(error => { if (error instanceof ModelAdmissionError) throw error; return undefined; });
     // A decline here leaves the run reporting the overflow it already hit: the
     // engine judged that condensing would not make the context smaller, so
