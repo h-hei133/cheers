@@ -117,7 +117,7 @@ it('keeps pasted advanced values out of the prompt and queues work until Apply f
   terminal.input('\x1b[200~maxTurns\x1b[201~'); terminal.input('\r');
   await vi.waitFor(() => expect(screen()).toContain('Edit value'));
   host.queue.push('queued operation'); terminal.input('\r');
-  await vi.waitFor(() => expect(screen()).toContain('JSON integer'));
+  await vi.waitFor(() => expect(screen()).toContain('Number (integer)'));
   expect(route).not.toHaveBeenCalled(); expect(host.view.editor.getText()).toBe('');
   terminal.input('\x15'); terminal.input('\x1b[200~27\x1b[201~'); terminal.input('\r');
   await vi.waitFor(() => expect(screen()).toContain('Pending: 27'));

@@ -69,7 +69,11 @@ export async function loadToolCatalog(input: ToolCatalogInput, override?: () => 
   }
   const restricted = input.runtimeConfig ? restrictToolPool(combined, input.runtimeConfig) : combined;
   if (!input.discover) return { skills, tools: restricted };
-  const discovery = createToolDiscovery({ catalog: restricted, ...(input.initialTools ? { initial: input.initialTools } : {}) });
+  // Feature tools are the run's explicit capability, not general catalogue
+  // entries: a director's worker controls or a research probe must be present
+  // in the first request, so they join the initial set alongside pinned tools.
+  const initial = [...(input.initialTools ?? []), ...(input.featureTools ?? []).map(tool => tool.name)];
+  const discovery = createToolDiscovery({ catalog: restricted, ...(initial.length ? { initial } : {}) });
   discovery.attachMeta(discoveryTools(discovery));
   return { skills, tools: discovery.snapshot(), discovery };
 }

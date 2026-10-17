@@ -38,7 +38,7 @@ it("lists the same filtered MCP and skill tools the compiled CLI sends to the mo
     if (!address || typeof address === "string") throw new Error("No fixture address");
     const names = ["mcp__fixture__echo_message", "read", "skill"];
     await fs.writeFile(path.join(home, ".cheers", "config.json"), JSON.stringify({ provider: "openai", enableMcpTools: true,
-      allowedTools: names, providerCredentials: { openai: { apiKey: "test-only-local", model: "fixture-model", baseUrl: `http://127.0.0.1:${address.port}/v1` } } }));
+      toolDiscovery: "full", allowedTools: names, providerCredentials: { openai: { apiKey: "test-only-local", model: "fixture-model", baseUrl: `http://127.0.0.1:${address.port}/v1` } } }));
     await fs.writeFile(skill, "---\nname: inspect-fixture\ndescription: Inspect this fixture\n---\nRead the fixture.\n");
     const mcpLog = path.join(root, "mcp.jsonl");
     await fs.writeFile(path.join(workspace, ".cheers.mcp.json"), JSON.stringify({ mcpServers: {
