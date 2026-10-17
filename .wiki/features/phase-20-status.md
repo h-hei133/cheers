@@ -44,7 +44,7 @@
 | START-02 | 首帧 10k 不扫描、持久摘要索引（mtime/size 校验、损坏即 miss） | — |
 | PAN-03 | `/hub` 选择本地作业即在 pager 打开带脱敏/截断标记的输出页，并指向 `/jobs show <id> stdout <offset>` 的后续页；远程/未知作业保持只读 note | agents 专用操作仍归 `/jobs`（分别授权） |
 | PAN-08 | MCP 逐项向导（scope → name → transport → value → confirm，最后才写）、`/mcp` 选择器 “Add server…”；临时定义文件 0600 且必删 | `/help` 仍为 guide 文本而非 report（有意保留） |
-| START-03 | `scripts/bench-start.mjs` + `bench:start`：Node/exe `--version` 各 30 次，first/p50/p95/min/max | 交互首帧、键响应、regular/fullscreen/pipe 与受控冷缓存仍未测量（无 PTY 依赖） |
+| START-03 | `bench:start`：Node/exe `--version` 各 30 次；`bench:interactive`：PTY 下 regular/fullscreen 各 30 次，首帧与 `/exit` 后退出分开报告 | pipe 模式、受控冷缓存、逐键延迟仍未测 |
 
 ## 未开始
 
@@ -67,7 +67,14 @@ START-03、QA-02/03、TOOL-02；RENDER-03 左右源复制仍缺；PAN-05 的流�
 | node `dist/cli.js --version` | 30 | 1991.5ms | 1030.4ms | 1074.6ms | 995.8ms | 1991.5ms |
 | exe `dist/bin/cheers --version` | 30 | 492.7ms | 497.5ms | 526.1ms | 469.7ms | 528.2ms |
 
-未测：交互 ready/首帧/键响应、regular/fullscreen/pipe；这些需要 PTY 与 ready 信号，当前仓库无 PTY 依赖。
+交互（`npm run bench:interactive`，`script` 提供 PTY，每模式 30 次，`/exit` 在 1200ms 注入）：
+
+| mode | first frame first | first frame p50 | first frame p95 | exit after `/exit` p50 | p95 |
+|---|---|---|---|---|---|
+| regular | 1044.4ms | 1052.3ms | 1081.4ms | 1362.9ms | 1383.5ms |
+| fullscreen | 1074.1ms | 1065.7ms | 1099.3ms | 1362.8ms | 1394.8ms |
+
+未测：pipe 模式、受控冷缓存、逐键延迟（当前只测到 `/exit` 命令处理完成）。
 
 ## 本地全量
 

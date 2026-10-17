@@ -119,7 +119,8 @@
     "test:coverage:real-shapes": "node scripts/real-shape-coverage.mjs",
     "verify:session-durability:long": "node scripts/verify-session-durability-long.mjs",
     "start:dev": "npm run start -w packages/ts-shell --",
-    "bench:start": "node scripts/bench-start.mjs"
+    "bench:start": "node scripts/bench-start.mjs",
+    "bench:interactive": "node scripts/bench-interactive.mjs"
   },
   "engines": {
     "node": ">=20.3.0"
