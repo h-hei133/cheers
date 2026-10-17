@@ -7398,3 +7398,13 @@ soft/logical 断点）。`projectText` 用渲染同宽逐逻辑行 wrap；`sourc
 Enter 行为增加“完整命令”判定：当草稿是注册表中的真实命令时直接提交，不再接受此前导航留下的旧候选；不完整命令仍接受补全、不提交。CMD-02 以[命令入口审计](features/37-command-implementation-audit.md)为契约基线；`syntaxCompletions` 的四条路径（动作、flag、参数值、自由文本）、未知参数拒绝及 `continue` 选择器正负例由既有 `syntax/*`、`actions.test.ts`、`commands.test.ts` 与 `continuation.test.ts` 覆盖。
 
 **本地验证**：completion/slashSuggestions/syntax 组合 455 项通过；keymap 54 项、suggestions 13 项通过；`build:ts`、import cycles 通过。本条写入时尚未提交/推送。
+
+### Phase 20 SET-01/02/03、PAN-01：设置编辑器、分组与模型详情
+
+SET-01：新增 `settingEditor`/`parseSettingInput`。34 个公开设置逐项映射到布尔、choice、数值、列表、对象、文本、status-items 或 theme 编辑器；数值拒绝小数/非有限值，列表逐行解析（对象项逐行 JSON），文本与 theme 保留原文，`hiddenToolPrefixes` 可写任意前缀。未知/过期已存值继续显示，只有提交时校验。
+
+SET-02：设置面板增加 7 个分组 tab（Session/Request/Context/Retries/Network/Tools/Display）与 All；chip 行由 `chipStrip` 生成命中区间，点击 tab 打开对应分组的 picker，All 保持跨组搜索；已存值以 `●` 标记。SET-03 的 preview lease、Apply 前不写、CAS 与写后确认保持既有实现。
+
+PAN-01：model picker 增加详情列（provider/runtime、endpoint、context、availability、credential、阻塞连接原因），宽屏两栏、窄屏单栏；同名模型按 provider id 区分，不可用行给出切换连接的原因。
+
+**本地验证**：`config/settings.test.ts` 6 项、`cli/interactive/settings.test.ts` 31 项、`panel.test.ts` 5 项、`overlay.test.ts` 47 项、`pickers.test.ts` 38 项通过；`build:ts`、import cycles、declarations 通过。本条写入时尚未提交/推送；SET-03 的 status 预览与外部更新撤销仍待补齐。

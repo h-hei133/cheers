@@ -152,7 +152,7 @@ function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: Settin
 }
 
 const GROUP_ORDER = ['Session', 'Request', 'Context', 'Retries', 'Network', 'Tools', 'Display'] as const;
-const SETTINGS_GROUPS = GROUP_ORDER.filter(group => CONFIG_SETTINGS.some(setting => setting.group === group));
+const SETTINGS_GROUPS: readonly string[] = GROUP_ORDER.filter(group => CONFIG_SETTINGS.some(setting => setting.group === group));
 
 /** Searchable grouped fields; selecting a row starts an explicit staged edit. */
 export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user', group?: string): Picker {

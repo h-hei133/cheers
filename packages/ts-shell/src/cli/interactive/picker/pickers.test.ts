@@ -332,6 +332,10 @@ it('marks accepted model and connection selections instead of pending disk selec
     fs.writeFileSync(file, JSON.stringify({ activeProviderConnectionId: 'pending', providerConnections: [{ ...connections[0], id: 'pending', model: 'pending-model' }] }));
     const context = { cwd: root, runtimeConfig };
     expect((await connectionPicker(context).load()).filter(row => row.note === 'active').map(row => row.id)).toEqual(['use:first']);
-    expect((await modelPicker(context).load()).filter(row => row.note === 'active').map(row => row.id)).toEqual([`openai/${model}`]);
+    const picker = modelPicker(context);
+    expect((await picker.load()).filter(row => row.note === 'active').map(row => row.id)).toEqual([`openai/${model}`]);
+    const detail = picker.detail?.(`openai/${model}`) ?? [];
+    expect(detail.join('\n')).toContain('Provider:');
+    expect(detail.join('\n')).toContain('Availability:');
   } finally { vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); }
 });

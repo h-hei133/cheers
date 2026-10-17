@@ -40,3 +40,11 @@ overlay 中的连接可用于当前会话模型选择和 session 预设。hook �
 优先级保持“项目/用户文件 → 显式输入次序 → 环境 → 运行覆盖”。环境值按字段 schema 类型解析：整数/数字取 `Number`，布尔只接受 `true`/`false`，其余保持文本。空字符串或全空白等同未设置，不产生诊断。
 
 缺失之外的非法值（非数字、非整数、小于下界、超过 `Number.MAX_SAFE_INTEGER`）与文件非法值同样处理：记录 `Config environment <field>: invalid-value`，诊断不含原始值，并使本次 publication 拒绝，保留此前接受的配置。来源树记录 `environment`，不记录值。新增字段必须同时声明 `sources` 包含 `environment`，否则字段工厂在启动时拒绝该声明。
+
+## Settings 编辑器与分组
+
+每个公开设置按 schema 选择编辑器，而不是一律落到 JSON：布尔与枚举用 choice，整数/数字用数值输入（整数拒绝小数），数组用逐行列表（对象项逐行 JSON），对象保留 JSON，文本与 theme 用原文输入。`parseSettingInput` 是唯一解析入口，未知或过期的已存值原样显示，只有提交新值时校验；`hiddenToolPrefixes` 可直接写 `mcp.` 这类前缀，不需要 JSON 引号。禁用工具不提供“可见工具全集”选择器，避免把当前可见集合当成完整授权集合。
+
+设置面板顶部是 7 个分组 tab（Session/Request/Context/Retries/Network/Tools/Display）加 All；选择 tab 重新加载该组定义，All 与搜索仍跨组。已存值以 `●` 标记，Effective/Accepted/Stored 的来源继续分行显示，dirty 颜色不替代 stored/accepted/effective/trust 事实。tab 选择是新的 picker，不修改当前 draft。
+
+preview lease 保持现有约束：theme/composer 预览在关闭、移焦或外部更新时 end；Apply 前不写文件；写入使用基线 CAS 与写后读回，未确认时不报告成功。

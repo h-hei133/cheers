@@ -22,6 +22,7 @@ import type { Picker, PickerOutcome } from "../overlay.js";
  * smaller than it is.
  */
 export function modelPicker(context: CommandContext): Picker {
+  const details = new Map<string, readonly string[]>();
   return {
     title: "Model",
     form: "panel",
@@ -39,34 +40,42 @@ export function modelPicker(context: CommandContext): Picker {
       const providers = new Map(availability.providers.map(provider => [provider.provider, provider]));
 
       const rows: Option[] = [];
+      details.clear();
       for (const provider of ordered(catalog, providers)) {
         const entry = providers.get(provider.runtime);
         const state = entry?.state ?? 'unknown';
         const selectable = provider.runtime === activeProvider;
         const endpoint = entry?.endpoint ? ` · ${entry.endpoint}` : '';
         if (provider.models.length === 0) {
+          const id = `${provider.id}/`;
           rows.push({
-            id: `${provider.id}/`,
+            id,
             label: provider.label,
             detail: `${availabilityLabel(state)}${endpoint}`,
             note: selectable ? "no models listed" : "switch connection first",
             disabled: true,
           });
+          details.set(id, modelDetails(provider.label, provider.runtime, entry, state, undefined, selectable));
           continue;
         }
         for (const model of provider.models) {
           const active = provider.runtime === activeProvider && model.id === activeModel;
+          const id = `${provider.id}/${model.id}`;
           rows.push({
-            id: `${provider.id}/${model.id}`,
+            id,
             label: model.id,
             detail: `${provider.label}${model.contextWindow ? ` · ${Math.round(model.contextWindow / 1000)}k` : ""}${selectable ? endpoint : ""}`,
             note: active ? "active" : selectable ? availabilityLabel(state) : "switch connection first",
             ...(selectable ? {} : { disabled: true }),
           });
+          details.set(id, modelDetails(provider.label, provider.runtime, entry, state, model.contextWindow, selectable));
         }
       }
       return rows;
     },
+    // The detail column keeps the row short while still saying which relay a
+    // same-named model belongs to and why an unavailable row cannot be used.
+    detail: id => (id ? details.get(id) ?? [] : []),
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
       const chosen = ids[0];
       if (!chosen) return undefined;
@@ -81,6 +90,25 @@ export function modelPicker(context: CommandContext): Picker {
       return result.kind === "local" ? { note: result.output } : undefined;
     },
   };
+}
+
+function modelDetails(
+  label: string,
+  runtime: string,
+  entry: { readonly endpoint?: string; readonly credential?: string; readonly connections?: readonly { readonly label?: string; readonly reason: string; readonly state: string }[] } | undefined,
+  state: string,
+  contextWindow: number | undefined,
+  selectable: boolean,
+): readonly string[] {
+  const lines = [`Provider: ${label} (${runtime})`];
+  if (entry?.endpoint) lines.push(`Endpoint: ${entry.endpoint}`);
+  if (contextWindow) lines.push(`Context: ${Math.round(contextWindow / 1000)}k tokens`);
+  lines.push(`Availability: ${availabilityLabel(state as never)}`);
+  if (entry?.credential) lines.push(`Credential: ${entry.credential}`);
+  const blocked = entry?.connections?.find(connection => connection.state !== 'ready');
+  if (blocked) lines.push(`${blocked.label ?? blocked.state}: ${blocked.reason}`);
+  if (!selectable) lines.push('Switch the active connection to select this model.');
+  return lines;
 }
 
 /** Providers whose credential resolves first; the rest keep the catalogue's own order. */
