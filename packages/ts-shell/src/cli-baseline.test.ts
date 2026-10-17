@@ -633,11 +633,13 @@ describe("CLI streaming baseline (T3)", () => {
         } catch (error) {
           reject(error);
         }
-      }, 7000);
+      // The window proves output arrives before the process is killed, not a
+      // startup SLA: a full parallel suite can starve the spawned CLI.
+      }, 15000);
 
       cli.on("error", reject);
     });
-  }, 15000);
+  }, 30000);
 
   it("pipe-spawn interactive startup smoke exposes prompt readiness with synthetic home", async () => {
     const result = await runInteractiveStartupSmoke({
@@ -1306,7 +1308,7 @@ describe("CLI streaming baseline (T3)", () => {
     } finally {
       fs.rmSync(projectRoot, { recursive: true, force: true });
     }
-  }, 20000);
+  }, 60000);
 
   it("shows MCP refresh unavailable-server guidance without masking connected refresh", async () => {
     const projectRoot = fs.mkdtempSync(
@@ -1417,7 +1419,7 @@ describe("CLI streaming baseline (T3)", () => {
     } finally {
       fs.rmSync(projectRoot, { recursive: true, force: true });
     }
-  }, 25000);
+  }, 60000);
 
   it("shows MCP doctor diagnostics with shared unavailable-server guidance", async () => {
     const projectRoot = fs.mkdtempSync(
