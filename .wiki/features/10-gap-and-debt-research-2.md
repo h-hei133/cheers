@@ -25,7 +25,7 @@ confidence: high
 > **2026-09-30 实施索引**：本研究的 Phase 17 裁决已按 W1–W6 完成逐项实施与保留处置，
 > 浏览器守卫和钩子文档也已补齐。当前提交、验证、限制与新发现见
 > [phase-17-decisions.md](phase-17-decisions.md) §8 和
-> [13-feature-and-defect-register.md](13-feature-and-defect-register.md)。
+> [11-feature-and-defect-register.md](11-feature-and-defect-register.md)。
 > 以下证据保留为研究时点快照，不作为当前代码状态或删除配额。
 
 ## 0. 本轮范围与执行方式

@@ -1,6 +1,6 @@
-# Phase 16 预研究：从 12 号文档的 14 个候选中选出 10 项并定死做法（2026-09-29）
+# Phase 16 预研究：从 10 号文档的 14 个候选中选出 10 项并定死做法（2026-09-29）
 
-> 输入：[`12-gap-and-debt-research-2.md`](12-gap-and-debt-research-2.md) §9 的候选表（16-A…16-N，14 项）。
+> 输入：[`10-gap-and-debt-research-2.md`](10-gap-and-debt-research-2.md) §9 的候选表（16-A…16-N，14 项）。
 > 本文**不重新做差距盘点**，而是逐项回答「参考实现到底怎么做、我们的缺口精确在哪、最小正确改法是什么」。
 > **零代码改动**，只产出设计依据。
 >
@@ -34,7 +34,7 @@
 | 官方文档（本地 claudecode 为早期版本） | Claude Code 现行 auto memory 规格（见 §1.1） |
 | 读我方实现 | 全部涉及文件的逐行核对 |
 
-**本轮共核实 2 条子代理断言为「方向对但结论需修正」**，并**推翻主代理自己在 12 号文档中的 1 条建议**（§4.2）。见 §6。
+**本轮共核实 2 条子代理断言为「方向对但结论需修正」**，并**推翻主代理自己在 10 号文档中的 1 条建议**（§4.2）。见 §6。
 
 ---
 
@@ -208,9 +208,9 @@ close   -> success:true  "Browser session closed and resources released."
 `reasonCode: PwFailureCode`、`dependency`、`executableSource`、`reason`）
 ——**不需要发明第四套词汇**，把失败原因接出来即可。
 
-### 3.3 16-E：**主代理推翻了 12 号文档自己的建议**
+### 3.3 16-E：**主代理推翻了 10 号文档自己的建议**
 
-12 号文档 §2.3 原建议：「模型侧 `browser` 工具改为经 `/browser` 同一条受控执行路径」。
+10 号文档 §2.3 原建议：「模型侧 `browser` 工具改为经 `/browser` 同一条受控执行路径」。
 本轮二次核实证明**该方向不可行**：
 
 | 证据 | 位置 | 事实 |
@@ -224,7 +224,7 @@ close   -> success:true  "Browser session closed and resources released."
 **不是用户可用的浏览器**。产品里**唯一真能浏览的实现就是 `sessionManager.ts`**。
 
 所以 16-E 的正确形态是**给真实路径补治理**，而非把它接到一个不能浏览的栈上。
-12 号文档 §2.3 已按此**就地更正**（2026-09-29）。
+10 号文档 §2.3 已按此**就地更正**（2026-09-29）。
 
 ### 3.4 出站规则现状与参考取向
 
@@ -349,7 +349,7 @@ after suspend      : "…\x1b[2Kline one\r\n\x1b[2Kline two\r\n…"     ← 整�
 
 ### 5.1b 新发现：render 缓存**先于**折叠失效（主代理探针）
 
-**判定**：**DEFECTIVE（CONFIRMED，探针）**——不在 12 号文档内，本轮新查出。
+**判定**：**DEFECTIVE（CONFIRMED，探针）**——不在 10 号文档内，本轮新查出。
 
 `container.ts:120` 的 `rowsFor` 只对 `block.finalized === true` 的块使用缓存，
 而缓存键是 `width` + `colorRevision` + `imageProtocol`——**不含任何内容或折叠状态**。
@@ -441,7 +441,7 @@ container 上的方法（`setText`/`setCollapsed`/`setStatus`），或在缓存�
 
 | # | 断言 | 来源 | 主代理核实 | 结论 |
 |---|---|---|---|---|
-| 1 | 「模型侧 `browser` 工具改为经 `/browser` 同一条受控路径」 | **主代理自己在 12 号文档 §2.3** | `/browser` 默认 `status:"disabled"`（无 manifest 环境变量），且即便开启只接受 `local-fixture://`；默认执行器是 `NOOP` | **推翻**。12 号文档已就地更正；正确形态是给真实路径补治理 |
+| 1 | 「模型侧 `browser` 工具改为经 `/browser` 同一条受控路径」 | **主代理自己在 10 号文档 §2.3** | `/browser` 默认 `status:"disabled"`（无 manifest 环境变量），且即便开启只接受 `local-fixture://`；默认执行器是 `NOOP` | **推翻**。10 号文档已就地更正；正确形态是给真实路径补治理 |
 | 2 | 「pi 的 todo 状态持久化应学着写进会话状态快照」 | 子代理 fixShape（隐含） | pi 明确**不落外部文件**，靠 tool-result details + 分支重放 | **修正**：写快照**不是**分支正确的；照 pi 需要「工具结果携带可重放状态」 |
 | 3 | 「pi 也按字面量比较 finish_reason，所以按字面量抄是忠实的」 | 子代理 refApproach（隐含） | pi `:578` 传的是**API 联合类型**给 `mapStopReason`；忠实性来自穷尽检查 | **修正**：不学字面量，学**穷尽默认分支** |
 | 4 | 子代理称「`mainScreen.ts` 的 DSR 注释成立（每帧往返）」 | — | pi 根本不查 DSR；我方也不查 | **修正**：注释理由错，真实理由是「不需要」 |
@@ -452,7 +452,7 @@ container 上的方法（`setText`/`setCollapsed`/`setStatus`），或在缓存�
 
 ## 7. 候选裁剪：14 → 10
 
-12 号文档 §9 列出 14 项。按「缺陷严重度 × 依赖 × 体量平衡」裁剪：
+10 号文档 §9 列出 14 项。按「缺陷严重度 × 依赖 × 体量平衡」裁剪：
 
 **纳入 Phase 16（10 项）**：
 

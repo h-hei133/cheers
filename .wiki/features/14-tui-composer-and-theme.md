@@ -381,7 +381,7 @@ export interface ComposerLayout {
 | 步骤 | owner | 交付与依赖 |
 |---|---|---|
 | P1 | `presentation/themes/`、`presentation/theme/` | `default` 色语义、完整逐值表、六个新 token、四预设及旧主题继承，采用 §10.4 已批准映射 |
-| P2 | 语法/状态展示 owner | `mdCodeBlock` fallback 与五状态色生产读者，保持 17 号文档共享 context 阈值 |
+| P2 | 语法/状态展示 owner | `mdCodeBlock` fallback 与五状态色生产读者，保持 15 号文档共享 context 阈值 |
 | P3 | `presentation/tui/composer/`、editor | §11.4 布局/source 契约，保留 viewport；再按 M0–M3 实现八形态 |
 | P4 | surface、pointer | 实际尺寸、逐行几何、source selection、复制与 overlay 生命周期 |
 | P5 | config、tuiSettings、settings 外观页 | 八值配置、默认 default、真实 renderer 预览、取消恢复与 Apply 保存 |

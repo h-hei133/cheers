@@ -1,5 +1,5 @@
 ---
-title: "Phase 17 裁决：把 13 号登记册的 OPEN 项分批落地"
+title: "Phase 17 裁决：把 11 号登记册的 OPEN 项分批落地"
 category: article
 sources: [phase-17-pre-research, 13-feature-and-defect-register, phase-16-decisions]
 created: 2026-09-30
@@ -13,7 +13,7 @@ confidence: high
 # Phase 17 裁决
 
 > 前置研究见 [`phase-17-pre-research.md`](phase-17-pre-research.md)；
-> 条目定义与证据见 [`13-feature-and-defect-register.md`](13-feature-and-defect-register.md)。
+> 条目定义与证据见 [`11-feature-and-defect-register.md`](11-feature-and-defect-register.md)。
 >
 > **本裁决的纪律**：
 > 1. 每条给出**形态**（改哪个文件、什么机制）+ **参考依据**或 `自研` 标记 + **撤销验证**方式；
@@ -28,7 +28,7 @@ confidence: high
 ### 1.1 输入
 
 ```
-13 号登记册：条目 86，OPEN 70
+11 号登记册：条目 86，OPEN 70
   P0  0    P1 12    P2 45    P3 11
 phase-16-decisions §4 移出：16-J 16-L 16-M 16-N + 3 项产品决定
 ```
@@ -281,7 +281,7 @@ style(token: ThemeColorToken, text: string, opts?: {
 |---|---|---|---|
 | **1** | `THM-06` 是否引入 `highlight.js` | (a) 引入 `highlight.js@10.7.3`（只取 core + 21 语言，参考实现的验证选择）；(b) 自写 tokenizer（零依赖，覆盖窄） | **(a)** —— 参考实现已用它验证过「core + 语言子集 + 自写 HTML→ANSI」这条路径，且**不引入第二个依赖**；但这是第 7 个运行时依赖，需维护者定 |
 | **2** | `PRV-07`/`LOP-05` 走 (a) 上下文抹除还是 (b) 不重试 | 见 §3.2 | **(b)**（低成本、直接消除危害）；(a) 是新机制 |
-| **3** | `SES-02` 的锁是否加 **fencing（epoch）** | (a) 加 epoch（真正成立）；(b) **维持现状 + 把保证如实降级写入文档** | **(b)** —— 13 号册已按「如实降级」记录；加 epoch 会动 `state.json` 格式与迁移 |
+| **3** | `SES-02` 的锁是否加 **fencing（epoch）** | (a) 加 epoch（真正成立）；(b) **维持现状 + 把保证如实降级写入文档** | **(b)** —— 11 号册已按「如实降级」记录；加 epoch 会动 `state.json` 格式与迁移 |
 | **4** | `BRW-01`：请求守卫改 **context 级**还是**改为页级 + 改注释** | (a) 扩 `PwBrowserContext.route` 改 context 级；(b) 保持页级、**改掉那句不实注释** | ⚠️ **复核纠正**：初稿的「(b)+弹窗补拦截」**自相矛盾**——`RvAW1Claims` 指出，Playwright 里弹窗是 `BrowserContext` 新生的 `Page`，**要拦弹窗就必须在 context 级观察**（`context.route` 或 `context.on('page')`）。⇒ 两选项必须**互斥**地重写：(a) context 级（真正覆盖弹窗，代价是扩接口）；**(b) 纯页级**：只改注释说清「新开页面不受管辖」，**不声称补了弹窗拦截**。本文倾向 **(b) 纯页级**——因为参考侧**没有可验证先例**，且 (b) 立刻消除「注释说谎」；(a) 留作后续独立裁决 |
 
 ---
@@ -438,7 +438,7 @@ MISS    guardrail_intervened ← Bedrock
 
 **问题**：初稿的 §1.2 声称「12 条 P1 **全部纳入**」，
 但 §2 的五波里**一条 `TUI-*` 都没有**。
-把 13 号册的 12 条 P1 逐条对照裁决文档，发现 **`TUI-01` 缺失**；
+把 11 号册的 12 条 P1 逐条对照裁决文档，发现 **`TUI-01` 缺失**；
 进一步 grep 后确认：**整个 TUI 域 8 条 OPEN 全部不在计划里**
 （`TUI-01/02/03/04/05/06/08/09`）。
 

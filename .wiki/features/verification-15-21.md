@@ -49,17 +49,17 @@ Cheers 源码基线为 28ff98cee8c4dd63e6752452f73a362ed3559ae3。工作开始�
 
 | 原主张或漏洞 | 判定 | 本轮处置与证据 |
 |---|---|---|
-| 新 /deep-research 与旧收集器同名 alias 共存 | WRONG | 同一发布唯一分配；research/deep 随新命令迁移，collector 保留 web-research。见 [15 §6](15-deep-research-design.md)、[slashRouter](../../packages/ts-shell/src/core/commands/slashRouter.ts) |
+| 新 /deep-research 与旧收集器同名 alias 共存 | WRONG | 同一发布唯一分配；research/deep 随新命令迁移，collector 保留 web-research。见 [15 §6](13-deep-research-design.md)、[slashRouter](../../packages/ts-shell/src/core/commands/slashRouter.ts) |
 | 纯 prompt 与既有 loop 已足够提供预算、完整子任务轨迹和研究恢复 | OVERCLAIM / DESIGN-GAP | 新 run/evidence/共享计量与恢复 owner；[runner](../../packages/ts-shell/src/core/subagents/runner.ts#L166) 当前不足以提供这些保证 |
 | 多来源/红队未驳倒即可标强验证；摘要足够完成方法综述 | DESIGN-GAP | support、review、conflict、coverage 分开；全文状态/页节定位与实际引用校验；不得虚构来源 |
-| STORM 是唯一认真做学术模式、只有 Jina 有核验、Semantic Scholar 必须 key | WRONG / OVERCLAIM | STORM 的百科文章定位、GPT Researcher reviewer、Semantic Scholar 匿名端点及限流分别如实记录；具体外部材料见 [15 §12](15-deep-research-design.md) |
+| STORM 是唯一认真做学术模式、只有 Jina 有核验、Semantic Scholar 必须 key | WRONG / OVERCLAIM | STORM 的百科文章定位、GPT Researcher reviewer、Semantic Scholar 匿名端点及限流分别如实记录；具体外部材料见 [15 §12](13-deep-research-design.md) |
 | 一次 API 成功、星数或作者 benchmark 可证明生产可用性 | OVERCLAIM | 保留日期快照和作者报告，取消选型/质量保证推断；接口仍需授权、限流、分页、取消与失败契约 |
 
 ### 3.2 16、17：主题、输入形态与面板
 
 | 原主张或漏洞 | 判定 | 本轮处置与证据 |
 |---|---|---|
-| palette 共有16不变/12修改/独有18，精确对齐却保留三个固定前景 | RECOUNTED / WRONG | 48/67 总集合；共有29=15相同+11 RGB差异+3终端default；独有19/38。按用户裁决落实default语义及三项派生颜色，见 [16](16-tui-composer-and-theme.md) |
+| palette 共有16不变/12修改/独有18，精确对齐却保留三个固定前景 | RECOUNTED / WRONG | 48/67 总集合；共有29=15相同+11 RGB差异+3终端default；独有19/38。按用户裁决落实default语义及三项派生颜色，见 [16](14-tui-composer-and-theme.md) |
 | input 只截断不滚动；只有box需要IME尾 | WRONG | 保留 [editor caret-follow viewport](../../packages/ts-shell/src/presentation/tui/editor.ts#L447)；field/rail/box 共用尾部规则 |
 | 单一 offset 减 gutter 后切带 gutter 的整行；trim/dedent 验证“无空白” | WRONG / DESIGN-GAP | 改为逐行源文映射；保留用户真实空白与逻辑换行；box top-border、实际行高与窄窗预算齐全 |
 | TERM=dumb 自动 none，NO_COLOR 或重定向即无 ANSI | WRONG | 当前 [color 检测](../../packages/ts-shell/src/presentation/theme/color.ts#L17) 无该 TERM 分支；颜色禁用与无控制序列输出分别定义，撤回旧探针过度结论 |
@@ -71,12 +71,12 @@ Cheers 源码基线为 28ff98cee8c4dd63e6752452f73a362ed3559ae3。工作开始�
 | 原主张或漏洞 | 判定 | 本轮处置与证据 |
 |---|---|---|
 | Windows字体/DirectWrite/双缓冲已归因；启动成本可精确分摊 | OVERCLAIM | 只保留regular确定分支问题和历史启动样本；首帧以真实写入/可输入事件计时，未做旧版本对照仍未知 |
-| tools 10,721 chars / 3.5 为2,200–2,500，可拟合真实5.4k | WRONG | 为3,063；完整system约3,334；总22,391 chars按同一除数四舍五入为约6,397（各分项先取整相加为6,398），fixture粗估不是实际token分项。见 [14 §7](14-user-experience-research.md) |
+| tools 10,721 chars / 3.5 为2,200–2,500，可拟合真实5.4k | WRONG | 为3,063；完整system约3,334；总22,391 chars按同一除数四舍五入为约6,397（各分项先取整相加为6,398），fixture粗估不是实际token分项。见 [14 §7](12-user-experience-research.md) |
 | /trust 严格接受枚举、/help 已是帮助浮层 | WRONG / DESIGN-GAP | trust 普通对象查表可接受 constructor/__proto__ 继承值；[命令解析](../../packages/ts-shell/src/core/commands/trustCommandRuntime.ts#L30)与[存储](../../packages/ts-shell/src/core/security/projectTrust.ts#L85)都需枚举验证，非法动作零写并保留原拒绝记录；help 当前输出清单。已修 23 并纳入 CMD-03，未执行真实 trust 写入 |
 | from单起点、trim比较足以接受候选，统一alias可丢rawName | DESIGN-GAP | UTF-16 [from,to)、cursor/revision、保留后缀/空白、多级语法及特殊invocation；补全不执行 /reset |
 | /model use/list废弃、/export仅jsonl、/thinking off保证关闭推理 | WRONG | 修为真实handler语义；[model](../../packages/ts-shell/src/core/commands/modelCommandRuntime.ts#L42)、[export](../../packages/ts-shell/src/core/commands/exportCommandRuntime.ts)、[thinking](../../packages/ts-shell/src/core/commands/thinkingCommandRuntime.ts) |
 | memory delete/invalidate、wake/recall为别名，use接ID、save无需审批目标 | WRONG | 保留不同动作/授权与暂存语义；use接query，save需candidate-id或approved，list/review/approve/reject等完整列出 |
-| 静态虚构theme、tools补全重建默认registry、todo使用位置index | WRONG | 主题真实四预设及发现目录，工具读当前pool；todo稳定ID且非法数字拒绝；全58行重新对照，见 [23](23-command-argument-options.md) |
+| 静态虚构theme、tools补全重建默认registry、todo使用位置index | WRONG | 主题真实四预设及发现目录，工具读当前pool；todo稳定ID且非法数字拒绝；全58行重新对照，见 [23](21-command-argument-options.md) |
 | 43参数、19缺provider、64%语义脱节 | RECOUNTED / OVERCLAIM | 43是hint；44有效参数命令、26 provider、18缺provider。区分错误候选、缺动作、缺flags/二级值、别名搜索和文案，不制造综合覆盖率 |
 
 ### 3.4 19：工具与多文件
@@ -88,7 +88,7 @@ Cheers 源码基线为 28ff98cee8c4dd63e6752452f73a362ed3559ae3。工作开始�
 | 读错误体再slice/去HTML即安全，输出截断等于内存有界 | WRONG / DESIGN-GAP | 错误不读取/输出原文，成功有流式字节/解析预算；read/glob/search分别有资源工作项 |
 | grep借用glob已存在的剥前缀修法 | WRONG | glob当前仅trim；保持路径原义后resolve/containment，不能剥绝对路径改指 |
 | taskStop混淆停止，pi bash为PTY，参考fetch已证明DNS防护 | WRONG / UNVERIFIED | taskStop已有Stop requested；pi实际pipe；参考页面抓取不足以证明peer校验。移除不实比较，DNS/连接绑定单列自研 |
-| browser取消、真LSP、图片/PDF、工具参数与ask真实性没有完整交付 | DESIGN-GAP | 按 [19](19-tools-maturity-and-multifile-edit.md) 补齐正式任务与反例，文件编辑只采用一条apply_patch批次入口 |
+| browser取消、真LSP、图片/PDF、工具参数与ask真实性没有完整交付 | DESIGN-GAP | 按 [19](17-tools-maturity-and-multifile-edit.md) 补齐正式任务与反例，文件编辑只采用一条apply_patch批次入口 |
 
 AbortSignal.any 自 Node 20.3.0 可用，满足本仓 floor；审查过程一度将其误判为新增API，复核官方版本后撤回，没有把该误判写入修订结论。
 
@@ -97,11 +97,11 @@ AbortSignal.any 自 Node 20.3.0 可用，满足本仓 floor；审查过程一度
 | 原主张或漏洞 | 判定 | 本轮处置与证据 |
 |---|---|---|
 | 全字段Project>User、CLI-only字段也强求File parity | DESIGN-GAP | 字段来源/信任/合并policy，保留个人连接与CLI-only约束；安全只能收紧 |
-| 正则JSONC、通用递归merge、错误原值诊断、非法安全字段回默认 | WRONG / DESIGN-GAP | 成熟parser、schema驱动合并、原型/深度边界、安全投影、风险分级失败；见 [20](20-configuration-system.md) |
+| 正则JSONC、通用递归merge、错误原值诊断、非法安全字段回默认 | WRONG / DESIGN-GAP | 成熟parser、schema驱动合并、原型/深度边界、安全投影、风险分级失败；见 [20](18-configuration-system.md) |
 | 保存或reload即生效，atomic rename可防并发丢失 | OVERCLAIM | 字段patch+锁内重读/CAS，candidate revision原子发布，保留overrides；persisted/effective/pending/restart分开 |
 | current裁决与前文全局归零共存；同步stat即无阻塞 | DESIGN-GAP | picker generation及稳定ID焦点；session owner异步有界查询；核心逻辑bytes、legacy/partial/unknown明示 |
 | session过滤加确认框足以安全undo | DESIGN-GAP | 实际提交operation receipt、审批/锁内最终stale-read/写后核验/崩溃对账先于开放执行；[restorePrimitive](../../packages/ts-shell/src/edit/recovery/restorePrimitive.ts#L72) 原路径不能自动满足 |
-| 双Esc需新接draft/note、已找到默认regular现场根因 | WRONG / OVERCLAIM | 既有回填保留，补active-leaf已变而摘要失败的真值；现场视觉仍待验收。见 [21](21-session-recovery-and-undo-ux.md) |
+| 双Esc需新接draft/note、已找到默认regular现场根因 | WRONG / OVERCLAIM | 既有回填保留，补active-leaf已变而摘要失败的真值；现场视觉仍待验收。见 [21](19-session-recovery-and-undo-ux.md) |
 
 ### 3.6 22、24：命令清单与语义比较
 
@@ -112,7 +112,7 @@ AbortSignal.any 自 Node 20.3.0 可用，满足本仓 floor；审查过程一度
 | /permissions=security、/undo=branch、/review=plan-review等可重命名 | WRONG | 分开不同对象/权限与动作，不建立错误重定向；24改称精选比较而非共有全集 |
 | /wt只需半小时接线，/commit只是草稿，费用是账单 | OVERCLAIM / WRONG | worktree迁移独立验收；commit实际委派写入；费用是用量×费率估算 |
 | 参考/model总写全局、临时模型绝不落盘、usage reset可清本地429 | WRONG | 根据真实persist选项/会话日志/账户权益表述；本产品作用域由用户U10决定 |
-| 大型系统仅建议延期 | 被新用户裁决取代 | Git/Advisor/security/商店/远程协作全部正式进入Phase19；[22](22-command-inventory-alignment.md)逐项映射，不以入口数量宣布完成 |
+| 大型系统仅建议延期 | 被新用户裁决取代 | Git/Advisor/security/商店/远程协作全部正式进入Phase19；[22](20-command-inventory-alignment.md)逐项映射，不以入口数量宣布完成 |
 
 ## 4. /goal 无默认预算的专项核查
 

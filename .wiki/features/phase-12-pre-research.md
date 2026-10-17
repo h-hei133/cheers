@@ -5,7 +5,7 @@ summary: "Phase 12 的输入是 08 §4 的 24 项缺口减去 Phase 11 已完成
 
 # Phase 12 前置研究
 
-> **输入**：`08-gap-and-debt-research.md` §4（24 项缺口）、`11-gap-followup-design.md`、
+> **输入**：`08-gap-and-debt-research.md` §4（24 项缺口）、`09-gap-followup-design.md`、
 > `phase-11-decisions.md` §16（6 项待裁决）、以及 Phase 11 复核轮的产出。
 > **输出**：`phase-12-decisions.md` 的任务表与裁决点。
 >

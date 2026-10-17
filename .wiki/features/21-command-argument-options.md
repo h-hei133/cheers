@@ -15,7 +15,7 @@ sources:
   - oh-my-pi/packages/coding-agent/src/slash-commands/builtin-session.ts
   - oh-my-pi/packages/coding-agent/src/slash-commands/builtin-lifecycle.ts
   - pi/packages/coding-agent/src/core/slash-commands.ts
-  - 18-input-slash-startup-context.md
+  - 16-input-slash-startup-context.md
 created: 2026-10-05
 updated: 2026-10-06
 tags: [features, slash-commands, subcommand-options, autocomplete, tui, ux, gap-analysis]
@@ -33,7 +33,7 @@ confidence: high
 
 ### 1.1 业务背景与问题定义
 
-用户要求所有接受参数的命令，在 `/cmd ` 后显示清晰的合法选项或语法说明。[18](18-input-slash-startup-context.md) 的 `/goal` 个案暴露出描述缺失、错误替换范围和连续联想中断；本次覆盖全部调度命令。
+用户要求所有接受参数的命令，在 `/cmd ` 后显示清晰的合法选项或语法说明。[18](16-input-slash-startup-context.md) 的 `/goal` 个案暴露出描述缺失、错误替换范围和连续联想中断；本次覆盖全部调度命令。
 
 缺少 provider、缺少规范动作、无法搜索别名、候选本身非法、二级/flag 不全和仅文案过时是不同缺陷。自由文本命令可以只有准确的 usage，不能为了覆盖率伪造候选。`/model use/list` 仍然合法，初版“已经废弃”的判断已撤回。
 

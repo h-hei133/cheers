@@ -13,7 +13,7 @@ confidence: high
 
 ## 1. 范围、事实与用户裁决
 
-本文承接 [14 号文档](14-user-experience-research.md) §8，覆盖 `/resume` 焦点、会话大小、`/undo` 文件恢复以及双 Esc 分支导航。源码基线为 `28ff98cee8c4dd63e6752452f73a362ed3559ae3`。2026-10-05 复审只修改文档，没有修改产品代码、执行恢复写入或复跑历史探针。
+本文承接 [12 号文档](12-user-experience-research.md) §8，覆盖 `/resume` 焦点、会话大小、`/undo` 文件恢复以及双 Esc 分支导航。源码基线为 `28ff98cee8c4dd63e6752452f73a362ed3559ae3`。2026-10-05 复审只修改文档，没有修改产品代码、执行恢复写入或复跑历史探针。
 
 证据分为**源码事实**、**历史观察**、**已裁定方案**与**待实施验证**。参考项目只能支持被定向检查的具体决策，不能代替 Cheers 的安全与视觉验证。
 
@@ -41,7 +41,7 @@ confidence: high
 - `OptionModel.applyFilter()` 现按稳定 ID 保留焦点，目标离开集合后回退首个 enabled；reload 保留用户明确取消的多选，删除/disabled 条目移出 chosen。
 - load/reload 与异步 rename/delete 完成现在同时绑定 generation 和请求 controller；旧请求成功、失败或旧操作完成均不能刷新新面板。同对象重开仍有独立代际。
 
-14 号文档记录了选择器重开的历史观察。原稿“15 个模型第 10 项切到 4 个会话第 4 项”是可由 clamp 推导的反例，**没有本次实测证据**，不能当独立探针通过记录。
+12 号文档记录了选择器重开的历史观察。原稿“15 个模型第 10 项切到 4 个会话第 4 项”是可由 clamp 推导的反例，**没有本次实测证据**，不能当独立探针通过记录。
 
 ### 2.2 参考证据与采用边界
 
@@ -110,7 +110,7 @@ pi 的 [session-selector.ts](../../../pi/packages/coding-agent/src/modes/interac
   state.lock
 ```
 
-[artifactManager.ts](../../packages/ts-shell/src/core/session/artifactManager.ts#L21) 的大输出 artifact 则位于工作区 `.ts-shell/sessions/<sessionId>/artifacts/`。这是不同存储边界。排除 artifact 是本次大小指标的明确选择，不是声称它永远无法统计；14 号文档把它作为待定口径是合理的。
+[artifactManager.ts](../../packages/ts-shell/src/core/session/artifactManager.ts#L21) 的大输出 artifact 则位于工作区 `.ts-shell/sessions/<sessionId>/artifacts/`。这是不同存储边界。排除 artifact 是本次大小指标的明确选择，不是声称它永远无法统计；12 号文档把它作为待定口径是合理的。
 
 ### 3.2 已裁定指标与结果状态
 

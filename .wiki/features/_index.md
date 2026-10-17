@@ -1,11 +1,11 @@
 ---
 title: "功能开发：pi 对照总索引"
 category: article
-sources: [pi-source-2026-09-20, repo-audit-2026-09-20, phase-5-pre-research-2026-09-23, phase-6-pre-research-2026-09-23, phase-6-execution-2026-09-24, 13-feature-and-defect-register, 14-user-experience-research, phase-19-decisions, verification-15-21]
+sources: [repo-audit-2026-10-17, phase-19-decisions.md, phase-19-acceptance.md, phase-20-decisions.md, 32-defect-register-2026-10.md, verification-15-21.md]
 created: 2026-09-20
-updated: 2026-10-15
+updated: 2026-10-17
 tags: [features, gap-analysis, pi, index]
-summary: "功能开发前锋探索的总入口。对照本地参考仓 pi，把能力缺口按七个切片分类登记：共 40 项 DEFICIENT、38 项 MISSING、16 项 OURS-ONLY、7 项平手。Phase 0–5 已闭环；Phase 5 的前置研究、裁决、施工与复核均已完成（7 项任务 + 22 项补充裁决），核心是删除 32 文件 / 8,330 行的零消费者「报告投影族」、补上缺失的重试与错误分类、并让 compat 标志真正改变请求形状。裁决经五个独立复核者证伪式复核，推翻主代理 4 项错误（含 T2 闭包方向算错，数字从 36/10,008 更正为 32/8,330）；施工后的复核轮再发现并修复 8 处缺陷，其中一处让每个致命崩溃变成进程带病继续运行。Phase 6 **已完成**（T5a 回写 25 行滞后判定 + T1 HTTP 超时接线 + T2 metrics 采集与读取 + T3 用量按模型分桶 + T4 `/report`），四项代码任务全部有反向验证与实机验证。Phase 6 前置研究与裁决（零代码改动）：重新盘点发现 44 个看似开放的条目里 25 个已实现但未标注，真正仍开放 10 项，其中 3 项是行为缺口（HTTP 超时未接线、metrics 采集面为空、用量记账不按模型分桶）；两个复核者各覆盖一半、均判 incorrect，共推翻主代理 9 处。**§10 续研（2026-09-26）回答「优化 Rust/Python 是否胜过纯 TS」**：实测本仓真瓶颈是 `grep`（1,294ms vs ripgrep 10–30ms，43–130×），但**三家参考实现没有一家自己写搜索算法**——Claude Code 内嵌 ripgrep 二进制、pi 直接 `spawn(rg)`、oh-my-pi 用 napi 链接 ripgrep 的库。**Rust 在 agent 里的真实价值是「原生库的粘合层」，不是「更快的实现」**；而同一速度用纯 TS 的 `spawn(rg)` 即可拿到，成本低一个数量级。Bun `--compile` 实测可用（启动 1,370ms → 200ms，7×；用户免装 Node；产物 106MB；`--version` 有一处缺陷）。**Phase 11 前置研究已完成（2026-09-26，零代码改动）**：见 `08-gap-and-debt-research.md`。5 路只读子代理覆盖内核循环／工具执行／provider 模型／上下文记忆／架构债务五个切片（债务总扫被上游 content_filter 拦截，已重派两个避开敏感阅读面的窄切片）。**头条不是新差距而是三项 P0 既有缺陷**：① `daemonEnabled` 默认 true 而 Rust 执行面缺 cargo 时不降级，**全新安装 bash 100% 失败**（实机复现；本机被用户配置的 false 掩盖）；② `cheers.json` 是 git 跟踪的配置契约却**从不被读取**（CLI 报 max-turns=15 而文件写 30）；③ `/model refresh` 把内置模型的 `compat`/`promptCache`/`vision` **整体抹掉**（实机复现 developer→system、vision true→false），静默回滚 Phase 5/9 已修好的缺陷。差距侧 10 MISSING / 14 DEFICIENT；债务侧三层口径 129 → 90（21,247 行）→ **35 真死文件（6,650 行）**，seam 校验 0 条活引用。子代理 3 项结论经核验被推翻或更正（memory 实际已接线、context 域是子集而非整体未接线）。"
+summary: "功能研究与阶段规划总入口。23–37于2026-10-17完成源码及固定参考复核，修订登记见32，统一实施范围和验收见Phase20；本轮仅文档，未实现产品。01–22及旧阶段记录保留历史上下文，Phase19结束但仍有明确未完成项。"
 confidence: high
 ---
 
@@ -15,19 +15,51 @@ confidence: high
 >
 > Phase19归档依据：[决策与任务规划](phase-19-decisions.md)，共 **16批76个交付任务**；历史研究复核见[复核记录](verification-15-21.md)（沿用文件名，覆盖15–24）。后续未完成项须另行确定范围，不自动恢复本阶段。
 
+## 0. 当前研究与Phase 20规划（2026-10-17复核）
+
+23–37是本轮复核的15篇研究。**源码事实与固定参考已修订，产品实现及运行验收尚未开始。** 主入口为[Phase 20决策与任务规划](phase-20-decisions.md)，修订登记见[32](32-defect-register-2026-10.md)，待实现索引见[36](36-outstanding-work.md)。旧“模型全禁用”“确定节省880ms”“17个新面板”“102命令92%完成”等结论已撤销，不能据此施工。
+
+| 文档 | 当前内容与边界 |
+|---|---|
+| [23 输入几何](23-input-surface-geometry.md) | padding1、16正文行的目标；gutter/viewport与应用内复制边界 |
+| [24 Slash与参数](24-slash-completion-defects.md) | canonical/alias、选择状态、共享语法与真实4路径补全 |
+| [25 配置与中转站](25-model-configuration-and-relays.md) | availability/connection身份；profile、预设、overlay、账号池、路径设置全纳入 |
+| [26 压缩](26-compaction-trigger-design.md) | 首请求及完整请求/摘要预算、软策略、计量身份与幂等 |
+| [27 后台执行](27-background-execution.md) | 60秒/新消息提升同进程，取消停止；默认通知、模型跟进显式开 |
+| [28 上下文与工具预算](28-context-display-and-startup-budget.md) | 首轮估算、最终wire证据边界；动态发现默认开、schema/generation/质量 |
+| [29 启动](29-startup-time.md) | 撤销混杂样本因果收益；首帧/ready、reentry、构建新鲜度与同条件测量 |
+| [30 面板与设置](30-panels-and-model-picker.md) | panel/modal真实预算、typed编辑器、来源/信任/保存/预览 |
+| [31 TUI能力](31-tui-capability-matrix.md) | 双侧能力对照；Vim/数学/多行表格/并排diff/精确hunk及源投影 |
+| [32 复核登记](32-defect-register-2026-10.md) | 全15篇修订、原11报告与N/R/A去向，区分源码和动态证据 |
+| [33 面板参考映射](33-omp-panel-mapping.md) | 固定版本命令/组件消费者及四面板族端口、生命周期与原ID |
+| [34 面板改造](34-panel-conversion-plan.md) | 公共原语、依赖顺序、二维命中与实际viewport验收 |
+| [35 面板规格](35-panel-inventory-full.md) | 有效14补面板入口；plugin/extensions同面板、theme进settings、排除omfg |
+| [36 未完成索引](36-outstanding-work.md) | 已决待实现、技术取舍、Phase19留存及证据条件 |
+| [37 命令审计](37-command-implementation-audit.md) | 102声明入口逐名闭合、23宿主端口；接线不等于行为完成 |
+| [Phase 20 决策](phase-20-decisions.md) | 用户裁决、owner/依赖、任务批次、来源映射及验收要求；尚未实现 |
+
+### 0.2 本轮之前的历史文档（01–22）
+
+01–07 是七个能力切片的对照研究；08–13 是缺口盘点与登记；14–22 是各功能域的专项研究。**这些是历史记录**，其中的判定多数已在后续 Phase 中被施工或修正——引用时先看该文档自己的「更正」段落。
+
+---
+
 | 文档 | 现行内容 |
 |---|---|
-| [14 用户体验与工具研究](14-user-experience-research.md) | 原始问题、源码与隔离探针；§11 指向本轮修订方案 |
-| [15 深度研究](15-deep-research-design.md) | `/deep-research` 主名，软件/论文双域、全文读取、真实来源与对抗核验；`/web-research` 保留收集器 |
-| [16 Composer 与主题](16-tui-composer-and-theme.md) | 八形态全部提供、默认 `default`；精确配色与终端默认前景；左右 2 cells、复制保留用户源文 |
-| [17 状态与面板](17-tui-status-and-panels.md) | 区分正常表面与 overlay，复用现有 picker；状态事实、结构化着色和新增语义角色 |
-| [18 输入与上下文](18-input-slash-startup-context.md) | marker/caret、原草稿区间补全、Enter/Tab、启动首帧、字符估算与 usage 区别 |
-| [19 工具成熟度](19-tools-maturity-and-multifile-edit.md) | 运行校验、路径/网络/取消/资源边界；单一 apply_patch 复用 writer，明确 partial/unknown |
-| [20 配置系统](20-configuration-system.md) | 字段 schema/来源/安全合并、JSONC、并发保存、revision reload；模型默认当前会话，显式 --global 改默认 |
-| [21 会话与恢复](21-session-recovery-and-undo-ux.md) | 打开聚焦 current、核心文件逻辑大小；撤销最新已提交 operation，多文件 patch 一组；分支与失败真值 |
-| [22 命令清单](22-command-inventory-alignment.md) | 58 主命令/58 别名，另有交互 back；参考 85 顶层/138 子项是声明数；53 个无词法交集项逐项映射任务 |
-| [23 参数选项](23-command-argument-options.md) | 44 个参数命令、18 个无 provider；共享语法、动态实体、兼容与实际副作用校验 |
-| [24 命令语义对齐](24-shared-command-parity.md) | 20 组精选比较及辅助项；区分同名异义与现有能力，补齐实际功能而非只加入口 |
+| [09 缺口续研设计](09-gap-followup-design.md) | 08 的条目编号沿用；路由期命名残留与新协议（历史文档） |
+| [10 缺口与债务研究 2](10-gap-and-debt-research-2.md) | 第二轮缺口盘点（历史文档） |
+| [11 功能与缺陷登记](11-feature-and-defect-register.md) | 100+ 条历史登记项 |
+| [12 用户体验与工具研究](12-user-experience-research.md) | 原始问题、源码与隔离探针；§11 指向修订方案 |
+| [13 深度研究](13-deep-research-design.md) | `/deep-research` 主名，软件/论文双域、全文读取、真实来源与对抗核验 |
+| [14 Composer 与主题](14-tui-composer-and-theme.md) | 八形态全部提供、默认 `default`；精确配色与终端默认前景 |
+| [15 状态与面板](15-tui-status-and-panels.md) | 区分正常表面与 overlay，复用现有 picker；状态事实与结构化着色 |
+| [16 输入与上下文](16-input-slash-startup-context.md) | marker/caret、原草稿区间补全、Enter/Tab、启动首帧、字符估算与 usage 区别 |
+| [17 工具成熟度](17-tools-maturity-and-multifile-edit.md) | 运行校验、路径/网络/取消/资源边界；单一 apply_patch 复用 writer |
+| [18 配置系统](18-configuration-system.md) | 字段 schema/来源/安全合并、JSONC、并发保存、revision reload |
+| [19 会话与恢复](19-session-recovery-and-undo-ux.md) | 打开聚焦 current；撤销最新已提交 operation；分支与失败真值 |
+| [20 命令清单](20-command-inventory-alignment.md) | 58 主命令/58 别名；参考 85 顶层/138 子项是声明数；53 个无词法交集项逐项映射 |
+| [21 参数选项](21-command-argument-options.md) | 44 个参数命令、18 个无 provider；共享语法、动态实体、兼容与实际副作用校验 |
+| [22 命令语义对齐](22-shared-command-parity.md) | 20 组精选比较；区分同名异义与现有能力 |
 | [实时语音与本地终端录制](media.md) | W14公开Live协议、明确设备批准、秒数用量、转写选择、本地隐私过滤和安全文本回放；范围及验证边界 |
 | [会话与运行时命令控制](command-controls.md) | W15历史/附件、记忆、模型服务层、规则批准、同进程重入与真实清理；能力与验收边界 |
 | [Phase 19 集成验收](phase-19-acceptance.md) | 76 项证据索引、完整结构与契约门禁、跨域反例、迁移回退和未完成条件 |
@@ -959,7 +991,7 @@ Phase 9 裁决已定其边界（路径 1 声明式 + 路径 2 进程外），但
 
 ## 9. Phase 11 续研：08 待办项的深入设计与新发现（**2026-09-26**）
 
-> **见 [`11-gap-followup-design.md`](11-gap-followup-design.md)。零代码改动。**
+> **见 [`09-gap-followup-design.md`](09-gap-followup-design.md)。零代码改动。**
 >
 > 08 是**盘点**（哪些缺口存在），本文是**深化**（每项具体怎么改）。沿用 08 的条目编号，不重复登记。
 >
@@ -1459,7 +1491,7 @@ docs-source 计数为 advisory（118 条，非阻断），未逐条修。
 
 ## 17. Phase 16：第二轮全面差距扫描（**2026-09-28/29**）
 
-> 前置研究全文见 [`12-gap-and-debt-research-2.md`](12-gap-and-debt-research-2.md)。
+> 前置研究全文见 [`10-gap-and-debt-research-2.md`](10-gap-and-debt-research-2.md)。
 > 本轮性质：01–07 与 Phase 0–15 全部收口之后的**第二轮**扫描，
 > 目标从「相比 pi 差在哪」转为「**哪些已登记为完成的东西实测仍不成立**」。
 > **零代码改动**，只产出分类、证据与方向。
@@ -1519,7 +1551,7 @@ docs-source 计数为 advisory（118 条，非阻断），未逐条修。
 
 ### 17.6 建议执行序（16-A…16-N，14 项）
 
-详表见 `12-gap-and-debt-research-2.md` §9。前四项：
+详表见 `10-gap-and-debt-research-2.md` §9。前四项：
 **16-A 记忆注入链** → **16-D+16-E 浏览器假成功与双栈收敛** →
 **16-B `/compact` 合并与钩子** → **16-I `bridgeSafe` 接线或删除**。
 
@@ -1606,7 +1638,7 @@ Zero items skipped; every one committed separately with its own revert verificat
 - **16-H**：pi 的 todo **是扩展**，状态存**工具结果 details**，载入/切分支时**按序重放**
   ⇒ **分支正确**；其 `let todos = []` 也是内存态，持久化来自「结果自带状态」。
 
-### 18.3 主代理在规划中发现的新缺陷（12 号文档未载）
+### 18.3 主代理在规划中发现的新缺陷（10 号文档未载）
 
 | 缺陷 | 证据 | 归属 |
 |---|---|---|
@@ -1642,15 +1674,15 @@ Zero items skipped; every one committed separately with its own revert verificat
 每波末位完成后同步本文件与 `log.md`。
 ---
 
-## 21. 常驻登记册建立：`13-feature-and-defect-register.md`（**2026-09-29/30**）
+## 21. 常驻登记册建立：`11-feature-and-defect-register.md`（**2026-09-29/30**）
 
-> **维护者指示**：`12-gap-and-debt-research-2.md` 的研究面太窄——它只为 Phase 16 服务。
+> **维护者指示**：`10-gap-and-debt-research-2.md` 的研究面太窄——它只为 Phase 16 服务。
 > 要的是**专门用来记录 feature 与不足的文档**，不是某一个 Phase 的前置研究。
-> 故新建**常驻总账** `13-feature-and-defect-register.md`，从此往后追加而不重写。
+> 故新建**常驻总账** `11-feature-and-defect-register.md`，从此往后追加而不重写。
 >
 > **与 08 / 11 / 12 的根本区别**：那三份是**某一轮**的盘点（08 = Phase 11 的盘点、
 > 11 = 08 待办项的深化设计、12 = Phase 16 的预研究），阶段结束即归档；
-> 13 号**不服务任何阶段**，已修复的条目标注状态而不删除，
+> 11 号**不服务任何阶段**，已修复的条目标注状态而不删除，
 > 以免同一个缺陷在两轮之间被反复「重新发现」。
 
 ### 21.1 本轮的做法
@@ -1695,7 +1727,7 @@ Zero items skipped; every one committed separately with its own revert verificat
 > **内核循环（§8bis，此前零覆盖）**、**浏览器逐模块分类表（BRW-00，此前 3 轮未产出）**、
 > **全工具 schema 字段核对（TOL-04，判定无缺陷）**、**MCP 错误分类（OBS-07）**、
 > **日志轮转（OBS-08/09）**、**技能发现（OBS-10）**。
-> **三项明确未完成**（见 13 号文档 §18，不冒充完成）：provider 逐字段请求形状表、
+> **三项明确未完成**（见 11 号文档 §18，不冒充完成）：provider 逐字段请求形状表、
 > `memory`/`context` 逐模块审计、编辑路径原子性与读后写竞态。
 > 期间**更正了自己三处**：TOL-01 被误标为「第二次出现」（实为 Phase 15 已登记的
 > CARRIED-OVER）、浏览器表初版被误标 17 个死模块（实为 **5** 个——
@@ -1723,7 +1755,7 @@ Zero items skipped; every one committed separately with its own revert verificat
 
 ### 21.4 本轮证伪 4 条子代理断言
 
-记录在 13 号文档 §12bis。最值得记的是两条**同型错误**（读旧文档而不回到当前代码）：
+记录在 11 号文档 §12bis。最值得记的是两条**同型错误**（读旧文档而不回到当前代码）：
 `W1TuiSurface` 引用了**已不存在的符号** `alreadyWritten`（Phase 16 的 16-C 已重写），
 并把 `/help` 只列 4 个键的**有意设计**读成遗漏；
 `W2ProviderProtocol` 断言「拒答会被重试」，**探针实测为 NO-RETRY**。
@@ -1742,7 +1774,7 @@ Zero items skipped; every one committed separately with its own revert verificat
 | 沙箱不可用时 | `planSandboxedCommand` 的三种状态**如实上报**，不静默降级为无隔离 |
 | 流式解码 | 全部文本流用 `decode(..., {stream:true})`；Bedrock 二进制帧先 CRC32 校验 |
 
-### 21.6 下一轮的首要任务（本轮未覆盖，见 13 号文档 §13.2）
+### 21.6 下一轮的首要任务（本轮未覆盖，见 11 号文档 §13.2）
 
 `browser/**` **164 模块的逐个** real-vs-demo 判定（自身子代理死于 `content_filter`）；
 每个内置工具的**逐字段**核对；编辑路径的多文件原子性与读后写竞态；
@@ -1755,7 +1787,7 @@ Zero items skipped; every one committed separately with its own revert verificat
 
 > 文档：[`phase-17-pre-research.md`](phase-17-pre-research.md)（参考实现机制研究）、
 > [`phase-17-decisions.md`](phase-17-decisions.md)（38 个交付项 / 6 波 / 4 项独立取舍；实施与验证记录见该文）。
-> **零代码改动。** 输入是 13 号登记册的 **70 条 OPEN**（12 P1 / 45 P2 / 11 P3）
+> **零代码改动。** 输入是 11 号登记册的 **70 条 OPEN**（12 P1 / 45 P2 / 11 P3）
 > 加 `phase-16-decisions.md` §4 移出的 16-J…16-N。
 
 ### 22.1 与前面各阶段的区别
@@ -1809,7 +1841,7 @@ Zero items skipped; every one committed separately with its own revert verificat
 `verify-docs-and-rules-drift.mjs:44` 的 `RULES` **不含 `docs/`**，
 且被引文档在 `DOC_STATUS.md:38,41` 标的是 **`superseded`** 而非 `active`。
 主代理读码确认**复核者对、自己错** ⇒ **真正要同步的是三个测试**。
-**13 号册同一处错误已一并更正**——教训：**门禁的判定范围要读源码，不能从名字推断。**
+**11 号册同一处错误已一并更正**——教训：**门禁的判定范围要读源码，不能从名字推断。**
 
 **其余 6 处改动**：`CMD-01` 的「单点修复」不成立（下游二次切分）；
 `CMD-02` 需补非交互分支；`OBS-08` 应照抄同仓已有的 `readMetricLines`；
@@ -1828,13 +1860,13 @@ brief 把证据门槛写死（无 `file:line` 的 `wrong` 无效、探针返回�
 
 > 文档：[`phase-18-pre-research.md`](phase-18-pre-research.md)（参考实现机制研究）、
 > [`phase-18-decisions.md`](phase-18-decisions.md)（**33 个交付项 / 7 波 / 2 项待裁决 / 4 项明确不做**）。
-> **零代码改动。** 输入是 13 号登记册当前 **23 条唯一 OPEN**
+> **零代码改动。** 输入是 11 号登记册当前 **23 条唯一 OPEN**
 > （其中 21 条从未被任何阶段规划过 + 1 条 Phase 17 之后新登记 `PRV-12` + 1 条裁决保持 OPEN 的 `SES-02`）
-> 加 `12-gap-and-debt-research-2.md` §10 的四项未覆盖面。
+> 加 `10-gap-and-debt-research-2.md` §10 的四项未覆盖面。
 
 ### 23.1 与 Phase 17 的关系
 
-Phase 17 把 13 号册的 **12 条 P1 全部纳入**并实施了 38 个交付项。
+Phase 17 把 11 号册的 **12 条 P1 全部纳入**并实施了 38 个交付项。
 本文档处理**剩下的 P2/P3 与两条从未被规划的域**，并**顺带补上 Phase 17 的一个文档缺口**：
 
 **§1.2 声称「移出（更后阶段）22 项」，但那份裁决通篇没有枚举这 22 项。**
@@ -1899,12 +1931,12 @@ Phase 17 把 13 号册的 **12 条 P1 全部纳入**并实施了 38 个交付项
 
 ### 23.4b W7：一处统计盲区（本轮自查发现）
 
-**初稿只统计 13 号册的 `OPEN` 条目，于是漏了 9 项**：
+**初稿只统计 11 号册的 `OPEN` 条目，于是漏了 9 项**：
 
 - **`THM-03` 标 `PARTIAL`**（Phase 17 只做了 schema+校验，`auto` 与扩充令牌「按裁决延期」——
   那个延期**从未落到任何阶段**）⇒ **`PARTIAL` 不是 `OPEN`，被筛选跳过**。
 - **`SES-08` / `PRV-06` / `BRW-06` 三条「未逐一核验的面」按设计不带状态标记** ⇒ 同样被跳过。
-- 另有 5 项散落在 13 号册 §13.2 / §16.4 / §18 的散文里
+- 另有 5 项散落在 11 号册 §13.2 / §16.4 / §18 的散文里
   （`memory/**`+`context/**` 逐模块、`core/shell` 审计、`context/startup` 行为验证、
   子代理递归与工具继承、TLS/HTTP2 流边界）。
 
@@ -1946,7 +1978,7 @@ catalog 外的 model 会退回 `DEFAULT_REQUEST_SHAPE`）。
 
 > 文档：[`phase-18-decisions.md`](phase-18-decisions.md) **§10**、
 > [`phase-18-pre-research.md`](phase-18-pre-research.md) **§12**、
-> [`13-feature-and-defect-register.md`](13-feature-and-defect-register.md) **§20**。
+> [`11-feature-and-defect-register.md`](11-feature-and-defect-register.md) **§20**。
 > **零代码改动。** 3 个探索子代理（`google-antigravity/gemini-3.8-flash:high`，并发 3，3/3 返回）
 > 分域证伪 Phase 18 的裁决并搜索「文档没有涉及」的 demo 面；主代理逐条亲验。
 
@@ -1955,10 +1987,10 @@ catalog 外的 model 会退回 `DEFAULT_REQUEST_SHAPE`）。
 | 项目 | 数量 |
 |---|---|
 | **裁决修正** | **4**（`W7-30` 翻转为缺陷、`W5-19` 扩大范围、`W3-11` 前提缺失、`W4-14` 补第三条） |
-| **新增登记条目** | **20**（13 号册 §20.1；含 **2 条 P1**） |
+| **新增登记条目** | **20**（11 号册 §20.1；含 **2 条 P1**） |
 | **新增交付项** | **W8：11 项 + 8 小项**（`phase-18-decisions.md` §10.2/§10.3） |
 | **新增待裁决** | **R3**（MCP 协议互操作） |
-| **驳回的子代理断言** | **8**（13 号册 §20.3，含 1 条不存在的函数名） |
+| **驳回的子代理断言** | **8**（11 号册 §20.3，含 1 条不存在的函数名） |
 
 ### 24.2 两条 P1
 

@@ -3588,7 +3588,7 @@ Promise 结算（`finish()` 幂等、无双重 settle）、cancel/timeout 优先
 
 **维护者指示**：「在这基础上继续做一轮针对 08 里面提出的 feature 的研究，也可以添加新的 feature，
 结合 `~/projects/` 目录下的顶尖项目的实现方案（例如 pi 项目）派遣子代理帮助进行深度探索」。
-**产出**：`.wiki/features/11-gap-followup-design.md`（新建，`_index.md` §9 已同步）。**零代码改动**。
+**产出**：`.wiki/features/09-gap-followup-design.md`（新建，`_index.md` §9 已同步）。**零代码改动**。
 
 **定位**：08 是**盘点**（哪些缺口存在），本文是**深化**（每项具体怎么改）。沿用 08 的条目编号。
 
@@ -4793,7 +4793,7 @@ declarations 18+10、node-floor、import-cycles、docs-drift）；`test:scripts`
 
 **性质**：**零代码改动**。01–07 七份切片与 Phase 0–15 全部收口之后的第二轮扫描，
 目标从「相比 pi 差在哪」转为「哪些已登记为完成的东西实测仍不成立」。
-产出 [`features/12-gap-and-debt-research-2.md`](features/12-gap-and-debt-research-2.md)。
+产出 [`features/10-gap-and-debt-research-2.md`](features/10-gap-and-debt-research-2.md)。
 
 **执行**：3 个子代理分域（并发上限 3）+ 主代理自建**模块可达图**（ESM import 解析
 + 从 `entrypoints/cli.tsx` BFS，864 个非测试模块）与 12 个 `npx tsx` / live-CLI 探针。
@@ -4880,7 +4880,7 @@ provider 流内 `error` 帧被吞（探针："Hello" 当完整回答）、Google
 ## [2026-09-29] plan | Phase 16 规划：14 项候选裁为 10 项，产出预研究与裁决，经三路复核修正 15 条
 
 **性质**：**零代码改动**。按维护者指示「不用一次性全规划，取平衡数量」，
-从 `12-gap-and-debt-research-2.md` §9 的 **14 项**候选中裁出 **10 项**进入 Phase 16。
+从 `10-gap-and-debt-research-2.md` §9 的 **14 项**候选中裁出 **10 项**进入 Phase 16。
 
 **产出**：
 [`features/phase-16-pre-research.md`](features/phase-16-pre-research.md)（490 行）
@@ -4904,7 +4904,7 @@ provider 流内 `error` 帧被吞（探针："Hello" 当完整回答）、Google
 - **16-H**：pi 的 todo **是扩展**，状态存**工具结果 details**、载入/切分支**按序重放** ⇒ **分支正确**；
   其 `let todos = []` 同为内存态，持久化来自「结果自带状态」。
 
-**主代理在规划中新查出的缺陷（12 号文档未载）**：
+**主代理在规划中新查出的缺陷（10 号文档未载）**：
 1. **render 缓存先于折叠失效**——探针：20 行 `finalized` 块 `setCollapsed(true)` 后仍 **21 行**、
    `render()` 仍返回展开行 ⇒ **折叠完全不生效**；`TurnSink.notify` 改 `finalized` 块文本后
    行数仍为旧值（绕过缓存即变化）⇒ 根因是缓存键不含内容/折叠状态。
@@ -5064,9 +5064,9 @@ serving stale rows from five untracked mutation sites (16-F).
   会被读成项目路径；按相邻模块模式订阅失效。
 - `.probe_*.ts` 未入 `.gitignore`（本轮之前两次被误提交）⇒ 已加模式。
 
-## [2026-09-30] research | 建立常驻登记册 `13-feature-and-defect-register.md`（68 条）
+## [2026-09-30] research | 建立常驻登记册 `11-feature-and-defect-register.md`（68 条）
 
-**性质**：维护者指出 `12-gap-and-debt-research-2.md` 的研究面只为 Phase 16 服务，要的是
+**性质**：维护者指出 `10-gap-and-debt-research-2.md` 的研究面只为 Phase 16 服务，要的是
 **专门记录 feature 与不足的常驻文档**。故新建总账：**新发现追加、已修复条目标注状态而不删除**，
 避免同一缺陷跨轮被反复「重新发现」。**零代码改动**。
 
@@ -5221,7 +5221,7 @@ serving stale rows from five untracked mutation sites (16-F).
 
 ## [2026-09-30] plan | Phase 17 规划：`phase-17-pre-research.md` + `phase-17-decisions.md`
 
-**输入**：13 号登记册的 **70 条 OPEN**（12 P1 / 45 P2 / 11 P3，机械统计）
+**输入**：11 号登记册的 **70 条 OPEN**（12 P1 / 45 P2 / 11 P3，机械统计）
 ＋ `phase-16-decisions.md` §4 移出的 16-J…16-N。
 
 **方法**：3 个研究子代理（`R1TuiRegular`/`R2ThemeColorCmd`/`R3ProviderStream`，
@@ -5264,7 +5264,7 @@ serving stale rows from five untracked mutation sites (16-F).
   复核者指出 `RULES` 只有 `['AGENTS.md','agent-rules','.wiki/_index.md']`（`verify-docs-and-rules-drift.mjs:44`），
   **不含 `docs/`**；且被引文档在 `DOC_STATUS.md:38,41` 标的是 **`superseded`** 非 `active`。
   主代理读码确认 **复核者对、自己错**。**真正要同步的是三个测试**，不是 docs。
-  ⇒ **13 号册的同一处错误已一并更正**（教训：门禁的判定范围要读源码，不能从名字推断）。
+  ⇒ **11 号册的同一处错误已一并更正**（教训：门禁的判定范围要读源码，不能从名字推断）。
 - **`CMD-01`**「单点修复」不成立：`statuslineCommandRuntime.ts:38-42` 会二次切分。
 - **`CMD-02`**：非交互路径不处理 `show-view`/`set-view` ⇒ 光注册命令不够。
 - **`OBS-08`**：同仓 `metricsCommandRuntime.ts:119-155` 的 `readMetricLines`
@@ -5313,11 +5313,11 @@ features/phase-17-decisions.md §8.7–8.11；新发现的次要 Google 请求�
 随后远端构建通过；7 项测试失败归因于缺少 Chromium 和 ripgrep。
 CI 补充对应原生测试依赖，使用锁定版本安装器，保留原有测试和断言。
 
-## [2026-10-01] plan | Phase 18 规划：29 号文档未完成项的设计级研究 + 裁决 + 三方证伪复核
+## [2026-10-01] plan | Phase 18 规划：27 号文档未完成项的设计级研究 + 裁决 + 三方证伪复核
 
-**输入**：13 号登记册当前 **23 条唯一 `OPEN`** —— 机械统计与 `git show 44eebfd5:`（Phase 17
+**输入**：11 号登记册当前 **23 条唯一 `OPEN`** —— 机械统计与 `git show 44eebfd5:`（Phase 17
 规划时点）对照后确认：**21 条从未被任何阶段规划过**、1 条为 Phase 17 之后新登记的 `PRV-12`、
-1 条为 Phase 17 裁决后**保持 OPEN** 的 `SES-02`；另加 `12-gap-and-debt-research-2.md` §10 的四项未覆盖面。
+1 条为 Phase 17 裁决后**保持 OPEN** 的 `SES-02`；另加 `10-gap-and-debt-research-2.md` §10 的四项未覆盖面。
 **零代码改动**（`git status` 只多出两份新文档）。
 
 **顺带补上 Phase 17 的一处记账缺口**：`phase-17-decisions.md` §1.2 写「移出（更后阶段）22 项」，
@@ -5327,14 +5327,14 @@ CI 补充对应原生测试依赖，使用锁定版本安装器，保留原有�
 **交付**：
 - `features/phase-18-pre-research.md`（~1,000 行）——每条给出我方缺口（`path:line`）、
   参考机制（`repo/path:line` + 引文，或 `NOT-FOUND`）、判定、可实施方向；
-  另补做 12 号 §10 的两项边界（浏览器四分类重算、键位双向 diff）。
+  另补做 10 号 §10 的两项边界（浏览器四分类重算、键位双向 diff）。
 - `features/phase-18-decisions.md`（~620 行）——**33 个交付项 / 7 波**，
   另 **4 项明确不做**（附理由）、**2 项待裁决**、**0 项等待外部输入**（真实 provider 验证已于同日实机执行，见下一条日志）。
 
-**收尾时自查发现一处统计盲区，补入 W7（9 项）**：初稿只统计 13 号册的 `OPEN` 条目，
+**收尾时自查发现一处统计盲区，补入 W7（9 项）**：初稿只统计 11 号册的 `OPEN` 条目，
 于是漏了三类——**`THM-03` 标 `PARTIAL`**（Phase 17 只做了一半，「按裁决延期」的那半
 从未落到任何阶段）、**`SES-08`/`PRV-06`/`BRW-06` 三条按设计不带状态标记的「未逐一核验的面」**、
-以及散落在 13 号册 §13.2/§16.4/§18 散文里的五项（`memory/**`+`context/**` 逐模块、
+以及散落在 11 号册 §13.2/§16.4/§18 散文里的五项（`memory/**`+`context/**` 逐模块、
 `core/shell` 审计、`context/startup` 行为验证、子代理递归与工具继承、TLS/HTTP2 流边界）。
 教训记入文档：**「统计 OPEN」不等于「统计未完成」**。
 其中 W7-30（子代理工具继承）主代理初查即发现**可能已健全**——
@@ -5450,14 +5450,14 @@ catalog 外的 model 会退回 `DEFAULT_REQUEST_SHAPE`）。
 `TUI-11`（指针点不了 picker/补全）、`OBS-13`（别名不参与补全）、`OBS-14`（`newlineKey` 已接线但从不渲染）。
 
 **被驳回的 8 条**（含 1 条**不存在的函数名** `retrySentRequest`、2 条读错调用链、
-2 条没验证复原逻辑）记入 13 号册 §20.3。**规律**：**否定式断言（「从未被调用」「丢参数」）必须自己再 grep 一遍**。
+2 条没验证复原逻辑）记入 11 号册 §20.3。**规律**：**否定式断言（「从未被调用」「丢参数」）必须自己再 grep 一遍**。
 
 **交付**：
 - `phase-18-decisions.md` **§10**（裁决修正 4 条 + **W8 新增 11 项 + 8 小项** + **R3 待裁决** + 驳回记录 + 复核后附计数）；
   `§1.2` 与 frontmatter 同步更新。
 - `phase-18-pre-research.md` **§12**（本文结论未推翻；新增事实表 20 条 + **新 demo 判据** 3 条 + 未覆盖项）；
   frontmatter 同步。
-- `13-feature-and-defect-register.md` **§20**（20 条新条目，逐条附证据 + §20.2 裁决修正表 + §20.3 驳回表 +
+- `11-feature-and-defect-register.md` **§20**（20 条新条目，逐条附证据 + §20.2 裁决修正表 + §20.3 驳回表 +
   §20.4 方法论）；frontmatter 同步。
 - **零代码改动**（`git status` 仅 `.wiki/`）。
 
@@ -6049,30 +6049,30 @@ c8146b40两项远端通过（557文件/5339通过/1跳过）；8a998664两项远
 
 ## [2026-10-05] research | 用户体验与默认工具能力研究
 
-新增 features/14-user-experience-research.md，逐项记录用户体验反馈、当前源码、隔离探针及 pi/oh-my-pi/Codex 对照。确认 slash 别名膨胀、前缀 Enter 状态、resume 选择保留、审批正文混层，以及 write 参数、lsp 读取边界、ask 默认决定、grep 点目录、网络工具取消/错误输出和配置接线等缺口。
+新增 features/12-user-experience-research.md，逐项记录用户体验反馈、当前源码、隔离探针及 pi/oh-my-pi/Codex 对照。确认 slash 别名膨胀、前缀 Enter 状态、resume 选择保留、审批正文混层，以及 write 参数、lsp 读取边界、ask 默认决定、grep 点目录、网络工具取消/错误输出和配置接线等缺口。
 WSL 下 npm start 三次正常退出，输入框出现约 2.48–5.38 秒；确认内部计时不覆盖整个启动过程。合成会话验证分支持久化和界面对话数据更新，未将其提升为用户现场视觉验收。首轮 5.4k 不能与仅工具 schema 的 3,063 粗估直接比较，也不能据此推断上游追加提示。
 本轮仅研究和文档，未改源码、未调用真实 provider、未重跑构建或测试套件。粘贴残影及现场回退显示仍待复现；W7-33 保留 auth/exit3 和真实四端点验收未完成状态。
 docs strict 与 diff check 通过；strict 仍报告 120 个非阻断源码引用 advisory。新文单独核对 109 个本地链接、90 个行号锚点，均有效；临时探针目录已清理。
 
 ## [2026-10-05] research | 用户体验解决方案设计（15–21）
 
-14 号研究只核实问题与现状；本轮新增 7 份研究/设计文档补齐方案，全部零代码改动、未施工：[15 深度研究命令设计]、[16 Composer Shape 与配色]、[17 状态线与面板]、[18 输入/Slash/启动/上下文]、[19 工具成熟度与多文件编辑]、[20 配置系统]、[21 会话恢复/撤销/回退]，另 [verification-15-21] 对承载结论逐条复核。
+12 号研究只核实问题与现状；本轮新增 7 份研究/设计文档补齐方案，全部零代码改动、未施工：[15 深度研究命令设计]、[16 Composer Shape 与配色]、[17 状态线与面板]、[18 输入/Slash/启动/上下文]、[19 工具成熟度与多文件编辑]、[20 配置系统]、[21 会话恢复/撤销/回退]，另 [verification-15-21] 对承载结论逐条复核。
 关键结论：15 判定深度研究缺口在协议与命令形态（local→prompt 型）而非执行平面；16 把 oh-my-pi 的 claude 形态定为新增默认并给 dark 令牌级对照；17 澄清状态带行本恒渲染、用户所见"不显示"实为内容受 usage 门控；18 发现 regular 模式 `mainScreen` 不剥离 `CURSOR_MARKER` 的候选根因；19/20/21 分别给审批噪声分离、配置 schema/溯源、选区归零与会话作用域撤销方案。
-子代理上游模型本轮先后不可用（`vsllm` 返回 403 account_verification_required、另一路由 TLS 证书错误），第 16 号文档与第 21 号文档补全、以及全部复核改由父代理完成；复核发现 18 号把字符估算写成"精确 token 账单"一处，已按原口径修正为估算。
+子代理上游模型本轮先后不可用（`vsllm` 返回 403 account_verification_required、另一路由 TLS 证书错误），第 14 号文档与第 19 号文档补全、以及全部复核改由父代理完成；复核发现 16 号把字符估算写成"精确 token 账单"一处，已按原口径修正为估算。
 本轮仅文档，未改源码、未调用真实 provider、未跑构建/测试。所有设计均未施工；粘贴残影现场根因、启动旧版本对照、W7-33 认证门禁与四端点真实 TLS/HTTP2 验收仍未闭合。
 
 ## [2026-10-05] research | 用户体验方案第二轮：用户裁决落地
 
 用户对 15–21 做出裁决并追加要求，三份文档由三个子代理扩写（模型已恢复），仍零代码改动、未施工。
-16 号：配色定稿为方案 A「精确一致」（覆盖全部 48 令牌 + WCAG 实算，剩余 syntaxBuiltin/mdQuoteText 两项小裁决）；八种 Composer Shape 逐形态可行性 + 中性命名（默认形态用 claude 几何但命名 default，pi→padded-rules，产品 id 不含他项目名）；输入框左右留白按 codex 做法（LIVE_PREFIX_COLS=2，gutter 在文本矩形外，拖选复制无空白；codex 全仓不开鼠标捕获，选区为终端原生）。
-15 号：新增开源调研（7 仓、GitHub API 实测星数，含 jina 唯一真对抗 evaluator）、论文/软件双模、对抗性核验三层设计（自反驳→红队子代理→置信标签，零第二执行平面）、命令面恢复 /deep-research；并澄清历史——被删实现是无模型确定性搜索管线，claimVoter 是 Jaccard 词元聚类，"多智能体/共识投票"只存在于 a06c617d 论文与报告模板文本，从未在代码里。
-17 号：新增命令输出/面板着色设计（语义角色→既有令牌，零新令牌；缺口在正文行 renderInline 只处理行内标记）。
-21 号：resume 行为按用户裁决改为 current 指针（打开即指向当前 session 并在面板标出，替代"归零"）。
+14 号：配色定稿为方案 A「精确一致」（覆盖全部 48 令牌 + WCAG 实算，剩余 syntaxBuiltin/mdQuoteText 两项小裁决）；八种 Composer Shape 逐形态可行性 + 中性命名（默认形态用 claude 几何但命名 default，pi→padded-rules，产品 id 不含他项目名）；输入框左右留白按 codex 做法（LIVE_PREFIX_COLS=2，gutter 在文本矩形外，拖选复制无空白；codex 全仓不开鼠标捕获，选区为终端原生）。
+13 号：新增开源调研（7 仓、GitHub API 实测星数，含 jina 唯一真对抗 evaluator）、论文/软件双模、对抗性核验三层设计（自反驳→红队子代理→置信标签，零第二执行平面）、命令面恢复 /deep-research；并澄清历史——被删实现是无模型确定性搜索管线，claimVoter 是 Jaccard 词元聚类，"多智能体/共识投票"只存在于 a06c617d 论文与报告模板文本，从未在代码里。
+15 号：新增命令输出/面板着色设计（语义角色→既有令牌，零新令牌；缺口在正文行 renderInline 只处理行内标记）。
+19 号：resume 行为按用户裁决改为 current 指针（打开即指向当前 session 并在面板标出，替代"归零"）。
 本轮仅文档：docs strict exit 0（docs_dangling=0，120 条既有 advisory），diff check 通过，工作区仅文档 + 既有 .gitignore 改动。
 
 ## [2026-10-05] research | Slash 命令后续参数选项补研（第三轮）
 
-用户追问：带参数的 slash 命令（如 /goal）如何给用户显示后续选项；此前未专门研究。父代理实测 slashSuggestions 管道并新增 18 号 §9。
+用户追问：带参数的 slash 命令（如 /goal）如何给用户显示后续选项；此前未专门研究。父代理实测 slashSuggestions 管道并新增 16 号 §9。
 实测：`/goal`（裸）只给命令与别名（符合预期）；`/goal `（带空格）确实弹出 `pause/resume/complete/clear`，但四项 detail 全空（subcommandCompletions 未传 description）、输入不匹配前缀（如 `s`）返回 null 直接关窗、且选中后整行被覆写（slashSuggestions 未设 from → keymap setText("pause ") 吞掉 /goal 前缀）。
 对照：oh-my-pi 声明式 SubcommandDef(name/description/usage) 派生带尾空格的补全值、下拉描述与行内幽灵提示；codex 无参数下拉层。
 记录开放产品决策：/goal 词表 Cheers 现为 pause/resume/complete/clear，用户期望 set/resume/drop/pause/show/budget（源自自主 Goal Mode），不私自扩表。
@@ -6084,7 +6084,7 @@ docs strict 与 diff check 通过；strict 仍报告 120 个非阻断源码引�
 22 命令清单对齐：双侧程序化提取（Cheers 58 vs 参考 85 顶层/212 动作）；exact 23 / renamed 15 / ours-only 20；缺失 51 条（high10/med19/low22）+ 三阶段路线。
 23 全命令参数选项：58 条全量审计——43 条接受参数、26 条有 provider、19 条参数型命令无 provider、16 条词表与 handler 脱节；声明式 SubcommandDefinition + 逐命令目标词表 + 5 项开放裁决（含 /goal 词表）。
 24 共有命令功能对齐：20 条双侧共有命令逐条差距 + 缺口分级 + 5 项语义冲突裁决（/undo 写盘、/compact 假压缩、/model 全局持久化等）。
-父代理复核：命令计数（58/43/26/25）、compact 非交互不压缩、undo 只描述不写盘、/goal 词表差异均经源码核对属实；22 号 Phase A 的 /rename 与 /wt 是**提议新增**（Cheers 无此命令，但底层 SessionManager.renameSession 与 core/workflow/gitWorktreeManager 已存在），非既有命令。
+父代理复核：命令计数（58/43/26/25）、compact 非交互不压缩、undo 只描述不写盘、/goal 词表差异均经源码核对属实；20 号 Phase A 的 /rename 与 /wt 是**提议新增**（Cheers 无此命令，但底层 SessionManager.renameSession 与 core/workflow/gitWorktreeManager 已存在），非既有命令。
 本轮仅文档；docs strict 与 diff check 通过，工作区仅文档 + 既有 .gitignore 改动。
 
 ## [2026-10-05] review | 新增研究复审与 Phase 19 规划
@@ -6777,3 +6777,358 @@ cleanup交付文档b5b5705e已推送、branch/PR head一致，两精确workflow�
 按用户明确允许部分任务未完成并要求收尾的裁决，停止继续产品修复、平台候选和性能实验。16批76项审核范围保留，A01–A32已在[裁决§11](features/phase-19-decisions.md#11-阶段收尾2026-10-15)逐项给出处置；非Linux对象绑定、真实环境/研究质量、账户远端结算、远端CI、整树/成本及原41/42拒绝继续未完成，逐项原因与后续条件见[验收§27](features/phase-19-acceptance.md#27-阶段收尾与未完成项)。原生对象绑定候选现有Node结果exit1、未接受，单文件无终态证据；不继续研发或把局部检查冒充交付。
 
 本次复核原始全套结果和绑定：804文件/8173项通过、1项显式跳过，3631个冻结的非wiki受跟踪文件与34个A31路径仍一致；产品源码未改，不重跑测试/构建。起点`5d8dcb15`的两个精确workflow均已分别读取job/annotation，付款或spending-limit阻止启动、零步骤，无远端验证通过。仅裁决、验收、日志及两个wiki入口更新；§9历史和用户`.gitignore`保持，最终文档提交/推送及自身SHA的CI在PR读回，不无限追加“记录上一文档提交”的提交。阶段结束不等于全部功能/发布验收完成，PR保持draft。
+
+### 2026-10-15 — 第二轮体验研究与缺陷复核（文档 25–34）
+
+用户报告 11 项体验问题并指出研究文档 12 的方向偏差（为单个 Phase 做前置研究，而非通用 feature/不足记录）。本轮按新口径重做研究：只读、零源码改动，产出 [25](features/23-input-surface-geometry.md)–[34](features/32-defect-register-2026-10.md) 共 9 份研究文档与 1 份索引。
+
+**方法**：并发 3 个子代理分域探索（ComposerGeometry / SlashAliasArgs / ConfigAndModels / CompactThreshold / BackgroundExec / StartupTime / ContextDisplayAndBudget / TuiOptimizationScan / OtherDefectsScan / PanelsAndModelPicker），主代理逐条复验断言、独立实测并撰写文档。源码基线 `0d30d589`；参考快照 oh-my-pi `c2cb79e4`、pi `4a5d3729`、codex `4210c08d`。
+
+**用户 11 项全部核实为属实或部分属实**，其中两项归因被更正：初始上下文 4,952 tokens 来自 20 个工具 schema 而非 AGENTS.md（空目录实测同值）；「面板太小」的根因是 `MAX_OPTIONS = 8` 而非终端高度。
+
+**5 项自研新发现**：N-01 模型选择器与 `/model list` 对只用 `providerCredentials` 的用户把 51 行全标为不可用（运行时认、UI 不认）；N-02 面板行数被硬编码封顶，任何终端高度恒为 11 行且横切所有 picker；N-03 `getReentryCandidate` 单项占 `runtime bootstrapped` 的 76–88% 且随会话数线性增长；N-04 选中态缺陷的第二个副作用（继续打字清除 `chosen`）；N-05 `/resume` 膨胀源于命令边界划分而非参数设计。
+
+**6 项子代理断言经实测推翻并集中记录**（浏览器假成功、`?alt=sse` 缺失、键位不可重映射、前景超时常量、早期短路、会话锁无 stale 恢复），避免后续误用。
+
+本轮未修改产品源码、测试或配置，未运行测试套件；所有 UI 结论未在真实 PTY 目视确认。§9 历史与用户 `.gitignore` 保持。
+
+### 2026-10-15 — oh-my-pi slash 命令面板逐项对照研究（文档 35–40）
+
+用户指出上一轮面板研究过粗，要求**逐一对照 oh-my-pi 中存在的每一个对应 slash 命令的面板**并按其模式改造。本轮按该口径重做：只读、零源码改动。
+
+**命令全集与映射**：实测 Cheers 顶层命令 **102** 个（`listSlashInvocations`），oh-my-pi **85** 个（`builtin-*.ts` 声明），**同名交集 58 个**。逐命令提取 omp 的 `ctx.show*(…)` 调用，得 **17 组命令在 omp 侧有专用面板**，其中 model / resume / tree / settings / usage 五组规模在 **63–158 KB**，是 Cheers 对应实现的 **10–40 倍**。
+
+**结构性发现**：omp 的面板不是各自为政，而是共用 `HubFrame`（[hub-frame.ts](../oh-my-pi/packages/tui/src/overlays/hub-frame.ts)）——固定五行 Stack（top / split / divider / footer / bottom），两栏几何 `splitBodyWidth = width - sidebar - 7`，sidebar 宽度按内容测量并钳到每个 hub 声明的 `{min, max}`（model 18–26、agents 16–24），footer 为可点击 chip 条。`agents-hub.ts` 的注释直接写明其布局 "mirrors the model hub"。Cheers 侧则是 16 个各自实现的 picker，且行数被 `MAX_OPTIONS = 8` 硬编码封顶（实测任何终端高度恒 11 行）。
+
+**逐面板要点**：`/model` = model-hub 158 KB（kind tabs ×10 + role tabs + preset + fuzzy 语料 + 每 provider 命中数）；`/settings` = 70 KB（10 tab + **444 条设置** + 每 tab fuzzy 语料 + 真实渲染预览）；`/resume` = 74 KB（搜索三段式：字面快路径 / 临时 fuzzy / 噪声阈值 -20，均带成本论证；时间分组；预览防抖 60ms；范围切换）；`/tree` = 63 KB（gutter 3 cells/层 + 统一水平偏移 + 内容最小预算 24 列 + 仅分叉点画连接符）；`/jobs` = 主从分栏；`/mcp` = 6 阶段 18 步向导（`WizardStep` 五 kind + `optional` 槽位降级）。
+
+**参数形态更正**：omp 的 `/resume` 只有 `inlineHint: "[session id|@claude|@codex]"`、**零子命令**，会话管理拆到独立的 `/session`（3 子命令）与 `/fork`（3 子命令）。Cheers 的 `/resume` 暴露 **15 个动作**——膨胀源于命令边界划分而非参数设计。
+
+**产出**：[35 映射](features/33-omp-panel-mapping.md)、[36 共用框架](features/33-omp-panel-mapping.md)、[37 模型与设置](features/33-omp-panel-mapping.md)、[38 会话与树](features/33-omp-panel-mapping.md)、[39 任务与用量](features/33-omp-panel-mapping.md)、[40 改造方案](features/34-panel-conversion-plan.md)（5 个共用原语 + 逐面板清单 + 执行顺序）。
+
+本轮未修改产品源码、测试或配置，未运行测试套件；所有面板结论为源码级证据，未在真实终端目视确认。
+
+### 2026-10-15 — 面板模式裁定、初始上下文归因更正与研究质量自审（文档 41–43）
+
+用户三项指示：①**引入**两栏布局（P-02）与 tab 条（P-03）；②追问「初始上下文为什么 omp 少、它工具更少吗」；③指出此前研究仍有浅薄，要求找出并专项研究。
+
+**裁定已记录**：[40 §7](features/34-panel-conversion-plan.md) 记录 P-01…P-05 全部进入实施范围，并新增四项两栏前置工作（A-01 行数组承载、A-02 宽度来源、A-03 二维鼠标命中、A-04 窄屏退化判定），其中 **A-03 风险最高**——`choiceRegions` 目前按行记录，两栏后同行有左右两个可选区。
+
+**初始上下文归因更正**（[41](features/28-context-display-and-startup-budget.md)）：先反驳「omp 工具更少」——实测 omp 注册 **33** 个工具（Cheers 17）、顶层 **18** 个（Cheers 17），工具更多。真正原因是三重机制：①omp 在 provider 侧**清空工具描述并递归剥离嵌套 schema 描述**（`stripToolDescriptions`），描述只随 prompt 走一次；②`tools.xdev` 默认 true，**13 个 discoverable 工具的 schema 完全不进请求**；③**tokenizer 不是原因**——omp 未知模型默认 `bytes/4`、Cheers 是 `chars/3.5`，仅差 13%，初稿的该推断已被实测推翻。实测 Cheers 全 schema 14,948 字符中嵌套属性描述占 **25%**、参数结构占 66%。
+
+**研究质量自审**（[42](features/32-defect-register-2026-10.md)）：对 25–34 十份文档按「可复现性」定级，判据为行号引用密度（31 号最浅，7 处；33 号最深，34 处）。发现 4 类浅薄：S1 目录级引用代替行号、S2 只测一侧、S3 假阻塞、S4 用规模差当结论。**更正两处自身错误**：26 号误称 omp `resolveThresholdTokens` 源码「不在本仓」（实际在 `packages/agent/src/compaction/compaction.ts:384`，更正后还发现了 **M-08** 机制——触发 token 取 provider 值与本地估算的较大者，防止线上压缩导致历史无界增长）；28 号的 tokenizer 推断错误（见上）。
+
+**R-04 闭环**（[43](features/24-slash-completion-defects.md)）：实测 **85** 个 `argumentHint`（24 号文档写的 62 是数文件字面量所得，漏掉独立注册模块）、74 个有补全、12 个有 hint 无补全。发现 `/git` 的 hint 平铺 11 个动词，但 handler 要求嵌套元数（`diff <staged|unstaged|untracked> <path>`、`branch create|switch|delete <name>`），且 handler 另有一份更准确的 help 文本——**两个真相源不一致**。
+
+**R-01（TUI 特性深挖）与 R-03（配置 schema 深挖）已派子代理**；R-02/R-05 待定。本轮未修改产品源码、测试或配置，未运行测试套件。
+
+### 2026-10-15 — 浅薄项专项深挖闭环（文档 45–46）与设置计数更正
+
+按 [42](features/32-defect-register-2026-10.md) 的 R-01/R-03 派出两个子代理做行号级深挖，主代理逐条复验其断言后定稿。
+
+**R-01（TUI 能力矩阵）已闭环**（[45](features/31-tui-capability-matrix.md)）：把 31 号的「文件大小对照」全部替换为双侧行号级能力对照（实测 markdown 177 行 vs 4,280；editor 325 vs 5,009）。**更正 31 号的 4 处过度声称**——表格、度量、折叠、滚动视图 **Cheers 已具备**（初版误判为「缺失」，属只测一侧）；并更正「编辑器平手」的过宽判定，实测缺 8 项具体能力。确认 4 项真实缺失：树视图（576 行）、表单（658 行）、tab 条（354 行）、进度条（168 行）。其中 tab 条即 [40](features/34-panel-conversion-plan.md) 已裁定的 P-03。
+
+**R-03（配置对照）已闭环**（[46](features/25-model-configuration-and-relays.md)）：omp 真实配置形态是 **YAML**（`models.yml` + `config.yml`），给出 17 个 provider 级与 27 个 model 级字段的完整表、6 层设置分层、7 层凭据级联（含一条 OAuth 池防泄漏规则）、15 类 profile 路径隔离。确认 **omp 只有一套 provider 表**，印证 25 号核心结论。
+
+**设置计数三度更正**：子代理报 385（37 个模块）、本代理初报 444、最终实测 **534 个唯一 id / 535 个 register 调用 / 36 个模块**。已同步更正 33 号与 25 号。教训：`grep -c` 的行锚定方式会漏计，须以「导入模块内去重 id」为准。
+
+R-01…R-05 五项浅薄项**全部闭环**。本轮未修改产品源码、测试或配置，未运行测试套件。
+
+### 2026-10-16 — 第二轮深挖启动：配置系统闭环 + 三项派子代理
+
+用户指出上一轮的覆盖不足：面板研究只覆盖了 17 组命令（omp 有 **67** 个 overlay 文件），启动慢的**根因与参考解法**未研究，配置系统如何完善未答，且 85 个 argumentHint 只抽查了 3 个。
+
+**本代理直接完成的部分（[47](features/25-model-configuration-and-relays.md)）**：
+
+- **更正 doc 20 的四处滞后描述**（其基线 `28ff98ce` 落后于 HEAD）：解析已是 `jsonc-parser`（支持注释与尾逗号）、环境变量替换发生在 **JSON 解析之后**（引号/反斜杠不再破坏文档）、未定义变量**抛错**而非变空串、替换结果**不被二次扫描**。四项均以 `node -e` 实测。
+- **UI 覆盖面实测**：36 个 schema 字段中 32 个进 `/settings`（**89%**），排除 personal 凭据、CLI-only、metadata 后是 **100%**，且有一条测试钉住这个等式。对照 omp：546 个设置中 408 个（**75%**）有 UI 元数据，**138** 个没有——含 `retry.enabled`、`compaction.reserveTokens`、`thinkingBudgets.*` 等用户会想改的项。**按覆盖率 Cheers 反而更完整。**
+- **信任分层是 Cheers 独有**：`projectTrust: 'required'` 的字段在项目信任未建立时拒绝项目值并回落默认（实测 `maxTurns` 项目写 7 → 生效 15），拒绝记录进 `provenance.rejected` 且 `/settings` 显示 `Project value inactive`。omp 的 `config/settings.ts` 中零处 trust 门。
+- **真正的三条缺口**：①按字段环境变量声明（omp 36 处，Cheers 0）②选项级元数据（omp 110 个 `options` 带 token 成本标注，Cheers 是裸 enum）③字段声明与 UI 元数据分处两文件，测试只断言键集合相等、不保证 label/description 质量。
+
+**计数三度更正**：omp 设置总数——子代理报 385、本代理初报 444、二次报 534、**最终 546 唯一 id / 547 register 调用 / 37 个模块**（python + ripgrep 双重复算）。二次的 534 漏了同目录 `./model-settings`（12 个设置）。已同步更正 37/42/46/47 与两个索引。
+
+**同时更正 doc 27**：「项目级文件从不生成」不准确——项目层**被读取**，且 `/settings` 有完整的「Change save scope → Project → Apply」写入路径（[settings.ts:76-77](features/../packages/ts-shell/src/cli/interactive/settings.ts#L76)）。准确表述是**受信任门约束**。文件格式也从 JSON 更正为 JSONC。
+
+**另更正 doc 47 自身的一处过强断言**：初稿称 omp「没有 merge/sensitivity/application/projectTrust」，实测 omp 有 `credential`（8 处）、`pathScoped`（3 处）、`validate`（7 处）、`protocolDefault`。改为逐维对照表，并记录 omp 的 `pathScoped`（按工作目录前缀分片设置）是 Cheers 没有的能力。
+
+**已派 3 个子代理**（`vsllm/gemini-3.8-flash-antigravity:max`，3 并发上限）：`PanelsUncovered`（omp 67 个 overlay 全量映射 + 未读面板逐行）、`StartupDeep`（pi/omp/codex 的构建产物与惰性加载机制）、`ArgAuditFull`（85 个 hint 逐个对照 handler，给出 DELETE/ADD/KEEP 分类）。完成后追加文档。
+
+本轮未修改产品源码或测试。
+
+### 2026-10-16 — 第二轮深挖（续）：启动、参数、面板三问闭环（文档 48–50）
+
+用户指出上一轮覆盖不足：面板只对照了 17 组命令、启动慢的根因未查、85 个 hint 只抽查 3 个。本轮补齐三份文档。
+
+**文档 48 启动深挖**：三家分发形态实测——pi 用 **esbuild 单文件 bundle**（`bin` → `dist/bundle/cli.js`，唯一 external 是原生图像库 `photon-node`，且构建脚本有一条**会让构建失败**的 `validateExternalImports`）、omp 用 **bun `--compile`** 单二进制、codex 用 Rust 原生。**但真正的差异不在打包而在首帧边界**：pi 与 omp 的**默认启动路径从不扫描会话**（只有 `--resume`/`--continue`/`--session` 才扫），而 Cheers 的默认路径**无条件**调 `getReentryCandidate`（633–728 ms，且**串行、无缓存、无提前终止、每会话读 4 份数据**）。omp 另有两条优化：**SQLite 标题索引**（`session_titles` 表，注释原文「multi-hundred-ms on dirs with thousands of sessions」正是 Cheers 现付的代价）与「**stat 全部、只扫描到 limit 为止**」。pi 的会话扫描是 **10 路并发 + 每 10 个渐进发布**。
+
+**文档 49 参数审计**：85 个 hint 逐个分类，结论 **ADD 1 / FIX 10 / FIX-补全 7 / DELETE 0 / KEEP ~74**。核心发现：**66 个 hint 把整棵语法树压进一个字符串**，最长 **475 字符**（`/settings` 列了 32 个设置名——而这些名字本身就是补全候选，同一数据表达两次）。找到用户「一堆文字」的具体来源：①候选列表把 `summary + argumentHint` 拼成一行（[slashSuggestions.ts:28](features/../packages/ts-shell/src/cli/interactive/slashSuggestions.ts#L28)），`/mcp` 行超 500 字符；②`Usage:` 提示在命令名后加空格时整行渲染，`/settings ` 达 **492 字符**。omp 用 34 处结构化 `subcommands` + 33 处 `inlineHint` 分开表达。**「DELETE 为 0」本身是结论**：没有 hint 是纯装饰，问题是表达方式而非多余。
+
+**文档 50 面板全量清单**：补齐 33 号 §8 自承缺口。实测 **omp 有 66 个 overlay 文件**（35–33 号只深读 5 个），Cheers 有 **25 个 picker 承载 19 个命令**（`picker/registry.ts` 的 `PICKERS` 是唯一映射源）。结论：**102 个 Cheers 命令中只有 19%（19 个）有面板**；**17 个命令 Cheers 只有文本输出而 omp 有专用面板**（`/hub` `/agents` `/usage` `/advisor` `/plan-review` 规模差最大）；反向 **Cheers 有 6 个面板 omp 没有**（`/tools` `/permissions` `/statusline` `/undo` `/skill` `/restore`）。另发现 `/theme` 无 picker 尽管主题名可枚举。
+
+**子代理全部失败**：`StartupDeep` 因 `content_filter` 终止（18m58s）；重新派出的 `StartupPi` 与 `ArgAuditFull` 均以 **HTTP 402「当前账户暂无生效套餐」** 失败（账户计费状态，非任务问题）；`PanelsUncovered` 仍在运行。**48–50 三份文档全部由主代理直接完成，未使用子代理产出。**
+
+本轮未修改产品源码或测试。
+
+### 2026-10-16 — 子代理阻塞说明（计费）
+
+本轮共派 4 个子代理，**全部失败**，原因均为账户计费状态而非任务问题：
+
+| 子代理 | 结果 | 原因 |
+|---|---|---|
+| `StartupDeep` | failed（18m58s） | provider `content_filter` |
+| `StartupPi` | failed（33.4s） | **HTTP 402 当前账户暂无生效套餐** |
+| `ArgAuditFull` | failed（19m52s） | **HTTP 402 当前账户暂无生效套餐** |
+| `PanelsUncovered` | failed（26m49s） | **HTTP 402 当前账户暂无生效套餐** |
+| `BillingProbe`（探活） | failed（28.5s） | **HTTP 402 当前账户暂无生效套餐** |
+
+最后一次探活用最小任务（数文件）复测，仍为 402，确认**不是任务复杂度问题**，当前无法派子代理。
+
+**处置**：文档 47–50 四份全部由主代理直接完成，未使用任何子代理产出。其中文档 48（启动深挖）与 50（面板全量）原计划由子代理承担，改由主代理完成，因此**覆盖面以主代理实际读取的文件为限**，已在各文档「未验证项」中列明。
+
+用户如恢复账户套餐，可重新派遣子代理补齐：
+- 文档 50 §8 的 `theme-selector` / `queue-mode-selector` / `show-images-selector` / `model-picker` 无消费者之谜；
+- 文档 48 §7 的 pi bundle 实际体积与启动时间（需先构建 `dist/`）；
+- 文档 49 §6 的 85 个 handler 逐一元数核对（本文只做了长度与 `|` 密度的代理指标）。
+
+### 2026-10-16 — 子代理配额恢复后重派 + 启动实机实测（文档 51）
+
+用户确认配额已恢复，并要求**面板全补**。
+
+**决策已记录**：文档 [50 §7 N-01](features/35-panel-inventory-full.md) 与 [40 §7 Q-08](features/34-panel-conversion-plan.md) 记录「17 个缺面板命令全部进入实施范围」。同时更正 35 号 §4 的三处不准：①`/pin` **在 Cheers 存在**（初版误写「无独立命令」）②`/extensions` `/omfg` **在 Cheers 不存在**（属「先加命令再加面板」）③`/effort` 不存在，对应 `/thinking`；另 `/history` `/report` `/theme` 在 omp 侧没有同名斜杠命令（由键位或控制器打开）。
+
+**首轮 3 个子代理产出全部作废**（重要教训）：
+- 我给三个子代理分配了**同一个输出路径** `local://panels-gap17.md`，三份报告互相覆盖。
+- 更严重的是**内容与任务不符且存在虚构**：三份都写成了「参数提示审计」。已核实 `ArgAuditHandlers` 的报告把 `/continue` `/review` `/theme` `/usage` `/skill` `/copy` `/btw` `/web-research` `/git` `/wt` `/commit` `/tools` 列为「无 hint」，但**实测这些命令全部有 hint**；它引用的 `/model` hint 与真实值完全不同，疑似把 `CommandSyntax` 的动作名当成了 hint 文本。
+- **处置**：全部弃用，重新按 9+8 拆分并分配**不同输出路径**（`panel-specs-a.md` / `panel-specs-b.md`）。
+
+**文档 51 启动实机实测**（全部由主代理运行命令所得）：
+
+| 侧 | `--version` 三次 | 中位 |
+|---|---|---|
+| omp | 0.13 / 0.02 / 0.01 s | ≈0.02 s |
+| codex | 0.14 / 0.06 / 0.05 s | ≈0.06 s |
+| Cheers（编译） | 1.78 / 1.34 / 1.02 s | ≈1.34 s |
+| pi | **未测量**（无 `dist/`、无 `node_modules`，bundle 无法运行） | — |
+
+**会话扫描成本隔离实测**（空 HOME vs 现有 HOME）：`runtime bootstrapped` **65 ms → 946 ms**，差 **约 880 ms**（占 93%）。每会话读 3 文件（`metadata.json`/`state.json`/`transcript.jsonl`）+ 3 次 `existsSync`。
+
+**另一项实测**：仅 import `cliProcessRunner.js` 就要 **1,163 ms** —— `--version` 的短路发生在整个模块图求值**之后**；omp 则用显式启动边界把主图放在动态 import 之后。
+
+**顺带查清一个改变修法的事实**：85 个 hint 中 **82 个由 `syntaxHint()` 从 `CommandSyntax` 派生**，只有 **3 个是手写**（`/git` `/wt` `/usage`）——而 [43](features/24-slash-completion-defects.md) 查出的三个漂移命令**恰好就是这 3 个**。因此 [49](features/24-slash-completion-defects.md) 的修法从「逐个审 85 个字符串」下调为「改 1 个投影函数 + 3 个命令改写 + 7 个补全接线」，已在 24 号加 §0 更正。
+
+本轮未修改产品源码或测试。
+
+### 2026-10-16 — 面板规格与 33 号 HubFrame 过度声称的更正（文档 52）
+
+配额恢复后重派两个面板规格子代理（拆分 9+8，**分配不同输出路径**以避免上一轮的互相覆盖）。
+
+**重大更正：33 号的「全部面板共用 HubFrame」是过度声称**。实测 `grep -rl HubFrame packages/tui/src/overlays/*.ts` 只命中 **3 个**（`model-hub` / `agents-hub` / `hub-frame` 自身），而 66 个 overlay 里 **22 个** `extends OverlayPanel`、**41 个**是其他基类（`extends Container` / `implements Component`）。已给 33 号加 §0 更正，并同步修正 34 号 Q-01 的影响范围（两栏只服务 4 个**已有**面板 + 新增的 `/agents`）。
+
+**这个错误会传播**：两个子代理都**把「HubFrame」当成默认形态**写进规格（`/hub`、`/btw`、`/debug`、`/extensions`、`/omfg` 全被说成用 HubFrame），而 `agent-hub.ts` 中 `HubFrame` 出现 **0** 次。**子代理的幻觉源头正是我方文档的错误。**
+
+**复验方法与结果**（文档 [52](features/35-panel-inventory-full.md)）：主代理逐条核对子代理引用的**文件存在性、基类、常量值、Cheers 侧引用**：
+
+| 复验项 | 结果 |
+|---|---|
+| 引用的 omp 文件路径 | `PanelSpecsA` 8/10 存在；`PanelSpecsB` 6/10 存在 |
+| `cleanse-panel` 常量 | ✅ `SPINNER_INTERVAL_MS = 80`、`MAX_LOG_LINES = 14` |
+| `report-panel` 常量 | ✅ `TEXT_CHROME_ROWS = 5` |
+| `thinking-selector` 数据源 | ✅ `THINKING_EFFORTS` + `AUTO_THINKING` |
+| Cheers 侧引用（7 处） | ✅ 全部存在，且引用的「缺口」描述准确（实测 `usageCommandRuntime.ts` 14 行、`thinkingCommandRuntime.ts` 24 行） |
+| `/hub` 用 HubFrame | ❌ **错**（0 次命中） |
+| 3 个 selector「fully wired」 | ❌ **错**（只有 `test/` 引用） |
+| `btw-history-panel` 用 HubFrame | ❌ **错**（`implements Component, Focusable`） |
+
+**因此文档 52 只收录经复验的字段**，键位表与空态文案明确标注「未逐一复验」。
+
+**另确认一个可移植性事实**：`/extensions` 的 `ExtensionDashboard` 走**全屏 alt-screen + 鼠标追踪**，而 Cheers **已有** alt-screen 原语（`presentation/tui/render/paint.ts:117-118` 的 `ENTER_ALT_SCREEN`/`EXIT_ALT_SCREEN`），该形态可移植。
+
+**文档合并**：初版把「子代理复验记录」与「主代理复验版规格」写成两份（52/53），违反「同类内容不重复」；已合并为一份 **35-panel-inventory-full.md**，并补回合并中丢失的 `/btw` Cheers 侧缺口逐字引用。所有指向旧文件名的链接已更新，`docs_dangling=0`。
+
+本轮未修改产品源码或测试。
+
+
+### 2026-10-16 — 用户四项追问的逐条核实（并入文档 52）
+
+用户追问四件事，全部核实并改写文档 52：
+
+**① P-06 是什么** → 新增 [§3.0](features/35-panel-inventory-full.md)：P-06 是**面板容器**组件（对应 omp 的 `OverlayPanel`），不是某个面板。34 号的 P-01…P-05 是为「改造已有 19 个 picker」设计的（它们都有「选项列表」这个中心概念）；17 个新面板是仪表盘/分栏/流式日志/三区焦点，需要的是「往带边框容器里塞任意子组件」。Cheers 现有两个渲染器都不具备：`panel.ts` 只能渲染列表且行数硬顶，`modal.ts` 只有边框没有容器。
+
+**② omp 里为什么没有 `/report`** → 用户判断正确。实测 `builtin-*.ts` 中**没有 `name: "report"`**。omp 里存在的是内部渲染器 `showCommandReport({title, head?, body})`（[command-controller.ts:252](features/../packages/../oh-my-pi/packages/coding-agent/src/modes/controllers/command-controller.ts#L252)），由 `ssh` / `mcp` / advisor 等命令调用，把只读列表显示在转录之外。**因此「给 Cheers 补 `/report` 面板」这个说法本身是错的**——该做的是引入这个能力，让 Cheers 的 `/cost` `/context` `/tools` `/usage` 只读输出走统一渲染。
+
+**③ theme 挪进 settings** → 用户判断正确，**与 omp 一致**。实测 omp **没有 `/theme` 命令**，主题在 `/settings` 的 `appearance` tab：`theme.dark` / `theme.light` 两个字段，`options: "runtime"`（哨兵值，候选由宿主在打开设置时用 `getAvailableThemes()` 注入）。Cheers 的 `theme` **已经在 settings 里**（Display 组），但只是**自由文本输入**，需接候选来源（T-01/T-02）。**原「`/theme` 需自行设计」的结论作废。**
+
+**④ `/omfg` 是什么** → 不是「紧急重置」。逐字复验其声明：`description: "Forge a TTSR rule from a complaint to stop a recurring behavior"`，即**把一句自然语言抱怨编译成一条规则**，配 8 状态机面板。**Cheers 已有 `/rules propose <feedback>`，语义等价，建议不引入。**
+
+**⑤ `/settings` 是否对照完成** → **两问都成立：未对照完，且确实粗糙**。37/25 号只对照了**覆盖率**（32/36 字段可编辑，89%，高于 omp 的 75%），**没对照编辑体验**：
+
+| 能力 | Cheers | omp |
+|---|---|---|
+| 面板代码 | 260 行 | 2,002 行 |
+| tab 分页 | 无 | 10 个 |
+| 组内分区 | 无（`group · label` 前缀） | `TAB_GROUPS` 每 tab 有序分区 |
+| 模糊搜索 | 无 | 每 tab `FuzzyCorpus` + 跨 tab 聚合 |
+| 已改动计数 | 无 | tab 上显示 |
+| 实时预览 | 无 | 34 处 |
+| 风险提示 / 条件显示 | 无 | `UiBase.warning` / `condition` |
+| 候选值说明 | 裸 enum | `options: [{value,label,description}]` |
+
+Cheers 有两项 omp 没有的：**信任门**与**溯源三态**（`Effective/Accepted/Stored`）。新增任务 SE-01…SE-06。**这是本轮发现的第五个研究盲区**（前四个见 32 号）。
+
+本轮未修改产品源码或测试。
+
+### 2026-10-16 — 设置面板深度对照（文档 53）
+
+用户裁决：**P-06 改为扩展 `panel.ts`**（不新建）、**`/settings` 改造纳入范围**、**`/omfg` 不做**、**先继续一轮深度对照研究**。
+
+**omp 的 settings 外壳（主代理直接读取，因 `SettingsShell` 子代理 `content_filter` 终止）**：`settings-selector.ts` 2,002 行只有 **3 个类**——`MultiSelectSubmenu`(227)、`ProviderLimitsSubmenu`(407)、`SettingsSelectorComponent`(615，**1,387 行，52 个私有方法**)。**7 种编辑器**（submenu / text / providerLimits / multiselect / boolean / number / json）。**搜索算法**：每 tab 懒建一个 `FuzzyCorpus`，跨 tab 结果按 `bestScore` 升序聚合、同分按 tab 声明顺序，每组前插一行 heading。**`TAB_GROUPS`** 为每个 tab 声明有序分区（tools 有 11 个），未分组的设置渲染在顶部。**键盘提示随焦点区变化**（`sections` / `rows` / `rows-sections` 三态）。**secret 语义**：空串 = 清除设置，校验错误内联。
+
+**Cheers 侧两个降低风险的关键发现**：
+
+1. **`renderPanel` 全仓只有 1 个生产调用者**（[overlay.ts:219](features/../packages/ts-shell/src/cli/interactive/overlay.ts#L219)）——用户选「扩展」的爆炸半径是 1 个文件。
+2. **`renderModal` 已支持多行 detail**（`detailRows`），且 `overlay.ts:176` 已按 `form === "modal"` 分发——即 Cheers 面板**已经能渲染多行**，只是 `panel.ts` 那条路径固定单行。
+
+**最重要的发现：`CatalogKind` 就是 `options: "runtime"` 的等价物。** Cheers 已有 **16 种**运行时候选源（`theme` / `tools` / `model` / `skill` / …），且带缓存、失效与目录观察（[catalog.ts:67](features/../packages/ts-shell/src/cli/interactive/completion/catalog.ts#L67)）。`kind: "theme"` 直接产出 `["auto", ...listThemes(...)]`；`kind: "tools"` 产出的每项已带 `detail: tool.description.split("\n")[0]`；`STATUS_ITEMS` 每项已有 `label` + `describe`——**正是 omp 的 `options: [{value,label,description}]` 形态**。因此 35 号提出的 T-01（「需新建运行时候选机制」）**从新建降级为接线**。
+
+**缺陷复核**：D1–D7 七条断言**全部确认**。实测 **32 个设置中只有 10 个有 `choices`**，即 **22/32（69%）目前只能手输 JSON**——这是「粗糙」最具体的一处。
+
+**`choices` 变更风险已查清**：全仓只有 **1 个消费方**（[picker/settings.ts:63](features/../packages/ts-shell/src/cli/interactive/picker/settings.ts#L63)），其余 `\.choices` 命中都是 LLM completion 字段。
+
+**改造顺序建议**：SE-03（候选值说明）→ SE-04（运行时候选，不新建）→ SE-05（warning/condition）→ SE-01（tab）→ SE-02（fuzzy）→ SE-06（预览）。前两项让 22 个裸 JSON 字段变成可选项，**收益最大且不依赖面板结构**。
+
+**推翻自己一条断言（重要）**：35 号 §4.12 把「无实时预览」列为 Cheers 缺陷——**错的**。实测 Cheers **已有** `settingPreview`（[picker/preview.ts](features/../packages/ts-shell/src/cli/interactive/picker/preview.ts)），支持 `theme` 与 `tui.composerShape`，`theme` 用的是可撤销租约（`host.themes.begin(revision)` / `lease.end()`），且 `overlay.ts` **已接线 8 处** `previewChange`/`previewEnd`。而 `statusItemPicker` 另有一套预览（`options.preview(...)` 回调）。
+
+**错误的成因**：只看参考侧「`settings-selector.ts` 有 34 处 preview」就断定目标侧没有——**单侧推断**，与 32 号 S2「只测一侧」同型。已在 52/30 号两处更正。
+
+**另两项降风险发现**：`/theme` 命令**已经在产出结构化候选**（名称 + 描述 + 来源 + 「在用」标记，[themeCommandRuntime.ts:32-45](features/../packages/ts-shell/src/core/commands/themeCommandRuntime.ts#L32)）——SE-04 是**提取已有组装**而非新建；`statusItemPicker` 的候选每项已有 `label` + `describe`，正是 omp 的 `options: [{value,label,description}]` 形态。
+
+**子代理**：`SettingsShell` 因 `content_filter` 失败（omp 侧结构改由主代理读）；`SettingsCheers` 完成但**行号有偏移**（如 `measureLabelWidth` 报 128-133，实测该处是 `renderFooter` 结尾），本文只采用经复验的内容。
+
+本轮未修改产品源码或测试。
+
+### 2026-10-16 — 设置外壳内部机制补全（并入文档 53 §1.7–1.9）
+
+重派 `SettingsInternals` 子代理（前一个 `SettingsShell` 因 `content_filter` 终止），**其行号经主代理复验正确**（`#describeCard` 1135 / `#describePrefs` 813 / `#createSubmenu` 1568 / `settings-list.ts:699-736`）。
+
+**三项可移植机制**：
+
+1. **控件形态选择规则**（[settings-selector.ts:925-948](features/../oh-my-pi/packages/tui/src/overlays/settings-selector.ts#L925)）：选项少且无描述 → **内联分段**；有描述或有实时预览 → **弹出菜单**。即 `style: "auto"` vs `"menu"`。
+2. **行的渲染契约**（[settings-list.ts:699-736](features/../oh-my-pi/packages/tui/src/components/settings-list.ts#L699)）：**「已改动」不是额外徽标，而是整行 label+value 用 accent 高亮**；warning 文案置于 description **之前**；按 `heading+label+value+changed+warning+description` 拼签名**记忆化**；分区标题行是一种独立的 disabled item。
+3. **`PREVIEWED_SETTINGS` 是写死的 7 个键**（theme.dark/theme.light/statusLine.preset/statusLine.separator/statusLine.contextLine/snapcompact.shape/composer.shape）。
+
+**第 3 点修正了一处判断**：omp 的实时预览**也是白名单制、覆盖 7 个键**，与 Cheers 的 `settingPreview`（2 个键）**是同一量级的设计**，不是「omp 有 Cheers 没有」。此前 35 号把它列为「34 处 preview vs Cheers 无」的规模差，属误读。
+
+另补：`MultiSelectSubmenu`（180 行）的键位（Space 切换 / ←→ 移动 / **数字 1-9 直接定位** / 拖拽重排）、`ProviderLimitsSubmenu`（208 行）编辑 `Record<string, number>` 并校验正整数。
+
+**SE-01b 新增**：行渲染契约作为独立任务。
+
+**两处自身计数更正**（收尾复验时发现）：`CONFIG_SETTINGS` 中有 `choices` 的是 **11** 个（非 10），无 choices 的是 **21** 个（66%）；`PREVIEWED_SETTINGS` 是 **7** 个键（非 8）。均已在 30 号更正。
+
+本轮未修改产品源码或测试。
+
+### 2026-10-16 — 清除子代理留下的无关仓库残留（重要）
+
+收尾核对工作区时发现 `package.json` 与 `package-lock.json` 被修改，新增了 `"dependencies": { "pi": "^2.0.5" }`，并安装了 `node_modules/pi` 与 `node_modules/pi-decimals`。
+
+**成因**：`StartupMeasure` 子代理的任务里写的是「measure pi（PRIMARY target）」并给了路径 `/home/wang/projects/pi`。该子代理在 Cheers 仓库内执行了 `npm install pi`——而 npm 上的 `pi` 是**一个计算圆周率的数学库**（`"description": "Going deeper inside of the PI number."`），与参考项目 pi 毫无关系。
+
+**核实**：全仓 `packages/**` 中**没有任何源文件** import `pi`（`grep` 无命中）。
+
+**处置**：`git checkout -- package.json package-lock.json` 还原两个文件，`rm -rf node_modules/pi node_modules/pi-decimals` 移除包。还原后 `require.resolve('pi')` 失败（正常），`node dist/cli.js --version` 仍输出 `0.1.0`，构建产物未受影响。
+
+**教训**：给子代理下任务时，**只读研究类任务必须显式禁止在目标仓库执行安装/写操作**。本文档所有子代理的约束里写了「READ-ONLY，NEVER edit any file」，但**没有禁止运行会改文件的包管理器命令**——子代理把「不要编辑文件」理解为「不要用编辑工具」，而 `npm install` 属于运行命令。下次应在约束里明确列出禁止 `npm install` / `npm i` / 任何写文件的 shell 命令。
+
+本轮未修改产品源码；上述残留已还原，工作区回到「只有 `.wiki/**` 与既有 `.gitignore` 改动」的状态。
+
+### 2026-10-16 — 研究文档去重合并与序号重排（53 → 35）
+
+用户指出研究文档过多，要求合并同源文档并消除空缺序号。
+
+**合并（9 组，29 份 → 14 份）**：
+
+| 保留 | 并入 | 理由 |
+|---|---|---|
+| 24 Slash 候选与参数 | 43 参数提示审计、49 参数全面审计 | 同一主题（argumentHint）的三次研究 |
+| 25 模型配置与中转站 | 46 omp 配置深挖、47 配置系统完善 | 同一主题（配置）的三次研究 |
+| 28 上下文显示与预算 | 41 初始上下文证据 | 41 号是 28 号归因的更正 |
+| 29 启动耗时 | 48 启动深挖、51 启动实测 | 同一主题（启动）的三次研究 |
+| 30 面板与模型选择器 | 53 设置面板深挖 | settings 面板即面板主题 |
+| 31 TUI 能力矩阵 | 45 omp TUI 组件深挖 | 45 号是 31 号的替代深挖 |
+| 32 本轮缺陷登记 | 42 研究质量审计 | 审计是对本轮文档的自我审计 |
+| 33 omp 面板逐项研究 | 36 共用框架、37 模型与设置、38 会话与树、39 任务与用量 | 原为「（一）～（四）」系列，本应同篇 |
+| 35 面板全量清单 | 52 新面板实施规格 | 52 号是 50 号的实施展开 |
+
+并入方式：在被保留文档末尾追加 `## 附：<原标题>` 小节，正文标题**降一级**（代码围栏内不降），保留原文与全部行号引用。
+
+**序号重排**：原编号有空缺（09/10 从未创建、44 号合并后空缺），重排为 **01–35 连续**。同步改写全部引用：
+
+- 链接形式 `](NN-slug.md)` 与 `](features/NN-slug.md)`
+- frontmatter `sources:` 中的 `NN-slug.md`
+- 正文纯文本形式 `NN 号`
+- 两个索引文件（`.wiki/_index.md`、`.wiki/features/_index.md`）
+
+**验证**：指向编号文档的**断链为 0**（脚本核查全部 `.wiki/**` 的 `](NN-*.md)`）；`verify:docs-drift:strict` 与另外四项门禁全绿；`docs_dangling=0`。
+
+**另修**：33 号原有的 3 个指向从未存在过的文件名（`35-omp-session-panels.md` 等）的链接——那是更早一轮遗留的断链，本轮一并改为指向本文各「附：」小节。
+
+**顺带**：合并后 33 号 1,525 行、29 号 658 行、35 号 660 行，偏大但主题单一，未再拆分。
+
+### 2026-10-16 — Slash 命令实现状态审计（文档 37）
+
+用户要求「派遣子代理完成一次对所有 slash 命令的研究，主要是看这些命令是否已经完成相应功能的实现」。派 3 个子代理各覆盖 34 条（102 条全覆盖）。
+
+**结论：STUB = 0。** 复验后：**REAL 69 / HOST-GATED 25 / PARTIAL 4 / 无法确定 4**。即 92% 是「真实现」或「宿主已接线的门控实现」。
+
+**主代理推翻子代理 4 处误判**（这是本轮的关键工作）：
+
+| 子代理断言 | 实测 |
+|---|---|
+| `/record` 无 handler | **错**——`media/registration.ts:9` 注册，走 `context.mediaCommand` |
+| `/shake` 无 handler | **错**——定义在 `navigation/operations.ts:24` |
+| `/share` 无 handler | **错**——`collaboration/registration.ts:7-11` 注册 |
+| `/hub` 是 STUB | **错**——`cli/jobs/command.ts:16-20` 真实调用 `report(hubProjection(host))` |
+
+**误判成因**：三个子代理都**只在 `registry.ts` 里搜命令名**，而这些命令注册在独立模块（`media/`、`navigation/`、`collaboration/`、`jobs/`）。这与 [24 号](features/24-slash-completion-defects.md) 的「62 个 hint」错误**同型**——都是漏计独立注册模块。
+
+**另全量核对宿主接线**：`CommandContext` 声明 **23 个 `*Command` 回调，23/23 全部接线**（`cliRuntimeModule.ts` / `interactiveCommandRouter.ts` / `cliCommandExecutionBridge.ts`）。**不存在「声明了但没实现」的命令。**
+
+**真实缺口只有 2 条**：`/marketplace` 与 `/plugin` —— 语法完备（hint 列 16 个动词）但实现只到「记录/解析」。`marketplaceCommandRuntime.ts:11` 的注释自己写着「**This build does not fetch or search catalogues.**」这类缺口最危险：语法完备、不报错、只是没做事。
+
+**对面板线的影响（好消息）**：17 个待补面板的命令中，`/usage` `/cleanse` `/advisor` `/plan-review` `/hub` `/agents` `/jobs` 等**底层能力都已实现**，缺的只是 UI——**不需要先补功能**，这降低了面板线的工作量估计。
+
+**同时产出**：文档 36（未完成清单）回答「还差什么」，把「已定待做 / 待裁决 / 本地不可验证」三类分开。
+
+本轮未修改产品源码或测试。
+
+### 2026-10-16 — 标注「最新研究成果」边界（回应「合并后分不清哪些是已完成的研究」）
+
+用户反馈：合并去重后分不清哪些是已完成的研究成果。两处索引各加了一段**明确的时间/轮次边界**：
+
+**`.wiki/features/_index.md` 新增 §0「最新一轮研究成果（2026-10-15 / 16）」**：列出本轮 15 份文档（23–37），每份一句话摘要 + 状态（已完成 / 方案待实现 / 索引），并说明 **01–22 是更早各阶段的历史记录**——其中多数判定已在后续 Phase 中施工或修正，引用前先看该文档自己的「更正」段落。
+
+**`.wiki/_index.md` 的 Statistics 段**加了三行子项，指明：
+
+- **本轮（23–37）**是当前成果，入口是 [36 未完成清单](features/36-outstanding-work.md)（已裁决 vs 待裁决）与 [37 命令实现审计](features/37-command-implementation-audit.md)（102 条命令是否真的能用）。
+- **历史（01–22）**的判定可能已被实现或更正。
+
+**同时清除一处合并残留**：`features/_index.md` 里仍有一行 `| [53 设置面板深挖](30-panels-and-model-picker.md) |`——是上一轮合并时漏删的重复行（内容已并入 30 号）。已删除。
+
+门禁五项全绿，`docs_dangling=0`。本轮未修改产品源码或测试。
+
+### 2026-10-17 — 23–37研究复核修订与Phase 20统一规划
+
+按用户要求复核并就地修订全部15篇研究，新增[Phase 20决策与任务规划](features/phase-20-decisions.md)，重写[32复核登记](features/32-defect-register-2026-10.md)与[36待实现索引](features/36-outstanding-work.md)，同步两个wiki索引。Cheers源码基线为`0d30d589ec9023ed24e0794c1215f70398bc418d`；参考证据绑定oh-my-pi `c2cb79e4c227aa4b22c4ccb933ff72fd88bceba4`、Codex `4210c08defe92fe8828f789b6f9fda287ad3709e`及明确区分的pi历史/当前快照。
+
+**研究更正**：撤销普通模型全禁用、登录不写连接、缺JSONC/项目保存/模型补丁/命名session预设等误判；区分panel与modal预算，按32个设置路径的真实编辑器核查；纠正参考工具描述策略，收窄5k/1.5k及880ms样本的归因。现有mid-turn压缩、后台owner与UI通知、真实extension安装/授权/执行均作为扩展基础保留。102个静态命令入口逐名闭合不等于动态完成；旧92%完成率撤销。有效新增面板为13个现入口加jobs共14，另增强plugin，不再沿用17个新面板的字面计数。以上更正替代本日志旧研究条目中的对应结论，旧记录保留为历史。
+
+**用户方向全部入计划**：完整profile、命名模型预设、ordered overlays、账号池及路径设置；动态发现默认开启；交互60秒同进程转后台、新消息可提前、取消仍停止，完成默认通知、模型跟进显式开启；Vim、数学、多行表格、并排diff、精确hunk审批；增强`/plugin`并以`/extensions`作同一别名；`npm start`使用经输入新鲜度与产物完整性校验的构建，保留源码开发入口。沿用每侧1 cell、最多16正文行、现有panel扩展和settings改造裁决。
+
+规划为**10批、47个唯一交付ID**，逐项列owner、依赖、失败/竞态/反转验收，映射全部15篇研究及19个现有picker。定向独立复核补清profile不复制live rotating OAuth、refresh unknown不重播、摘要operation/step与锁内CAS、完整会话树/分页、back/undo/restore各自权限、transcript源投影、构建原子发布及Slash named入口保留。性能数字为待同条件基线校准的候选目标；真实质量/平台证据不以mock或源码存在替代。Phase 19保留的实现及证据缺口继续按其验收§27记录。
+
+**本轮实际文档验证**：
+
+- 对15篇研究、主规划、两个索引及计划指针共19个文件逐文件检查：596个本地链接、335个源码行引用、42个标题锚点；固定SHA参考链接241个唯一URL、92个唯一源码对象，均在本地只读参考仓库核验目标与行号；缺失、越界、冲突标记、围栏、尾空白及末尾换行问题为0。
+- 任务审计确认10批/47唯一ID、15来源文档、10条方向裁决、19个现有picker覆盖；未定义的显式任务ID及显式依赖环为0。
+- `npm run verify:docs-drift:strict`退出0：rules dangling=0、docs dangling=0；另有**118条未加前缀源码路径advisory**，门禁只计数不阻断，未把该结果表述为全库文档无问题。`git diff --check`退出0；未跟踪研究文件另由上述直接内容检查覆盖。
+
+本轮仅修改文档；产品、测试、依赖、package scripts及构建行为未改。未运行产品build/tests、provider或PTY，不读取真实provider配置；没有新增运行/性能/跨平台验收证据。用户既有`.gitignore`与文档重排保留，未提交、推送或发布。当前完成的是研究修订及规划，Phase 20产品实现尚未开始。

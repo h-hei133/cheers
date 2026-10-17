@@ -11,7 +11,7 @@ confidence: high
 
 # 命令功能对齐：精选 20 组语义比较与 Phase 19 决定
 
-本轮为 Markdown 研究纠错和设计，未实现功能、未做运行验收。源码快照与可复算命令数量见 [22](22-command-inventory-alignment.md)：Cheers `28ff98cee8c4dd63e6752452f73a362ed3559ae3`，oh-my-pi `1c0993c3d12e70042169a951663bb2702e2c0a9e`，pi `b2b5c42f6138b73ec4b2f49ec0ca468800f88586`。不同参考项目分开标注，不能把其中一方的行为推广为双方所有版本的保证。
+本轮为 Markdown 研究纠错和设计，未实现功能、未做运行验收。源码快照与可复算命令数量见 [22](20-command-inventory-alignment.md)：Cheers `28ff98cee8c4dd63e6752452f73a362ed3559ae3`，oh-my-pi `1c0993c3d12e70042169a951663bb2702e2c0a9e`，pi `b2b5c42f6138b73ec4b2f49ec0ca468800f88586`。不同参考项目分开标注，不能把其中一方的行为推广为双方所有版本的保证。
 
 ## 1. 范围与纠正后的现状
 
@@ -56,7 +56,7 @@ Cheers 已有 [picker 注册器](../../packages/ts-shell/src/cli/interactive/pic
 
 ### 02. `/resume`
 
-**现状**：[恢复解析](../../packages/ts-shell/src/core/shell/recovery.ts)支持 exact ID、唯一前缀、title、`last`，歧义拒绝；[会话 picker](../../packages/ts-shell/src/cli/interactive/picker/session.ts)已有列表、重命名和删除。原稿“必须精确 ID”及“只差底层函数接线”撤销。当前选区和 session 大小问题仍按 [21](21-session-recovery-and-undo-ux.md)处理。
+**现状**：[恢复解析](../../packages/ts-shell/src/core/shell/recovery.ts)支持 exact ID、唯一前缀、title、`last`，歧义拒绝；[会话 picker](../../packages/ts-shell/src/cli/interactive/picker/session.ts)已有列表、重命名和删除。原稿“必须精确 ID”及“只差底层函数接线”撤销。当前选区和 session 大小问题仍按 [21](19-session-recovery-and-undo-ux.md)处理。
 
 **参考**：oh-my-pi 的[生命周期命令](../../../oh-my-pi/packages/coding-agent/src/slash-commands/builtin-lifecycle.ts)有 `@claude/@codex` 导入选择与 pin；跨工作区发现和外部导入是额外能力，不能因为 ID 可解析就推导已有。
 
@@ -172,7 +172,7 @@ Cheers 已有 [picker 注册器](../../packages/ts-shell/src/cli/interactive/pic
 
 **参考**：oh-my-pi [agents/hub](../../../oh-my-pi/packages/coding-agent/src/slash-commands/builtin-session.ts)分别暴露角色配置和 live Agent Hub，[agents CLI](../../../oh-my-pi/packages/coding-agent/src/commands/agents.ts)还支持 unpack。模板导出不能代替真实运行看板。
 
-**决定/验收**：ECO-04 复用角色覆盖并接模型/effort/来源/权限到真实请求；后台任务总览另交付 ID、依赖、状态、输出、预算和取消，不能只画配置卡片。子代理、顾问和旁路任务计费进入 AUTO-02，父权限不可扩大。运行总览与 tan/jobs 归 FLOW-01，模型交接/director 与持久 worker 协作归 FLOW-02；对应逐项范围见 [22 第 5 节](22-command-inventory-alignment.md)。
+**决定/验收**：ECO-04 复用角色覆盖并接模型/effort/来源/权限到真实请求；后台任务总览另交付 ID、依赖、状态、输出、预算和取消，不能只画配置卡片。子代理、顾问和旁路任务计费进入 AUTO-02，父权限不可扩大。运行总览与 tan/jobs 归 FLOW-01，模型交接/director 与持久 worker 协作归 FLOW-02；对应逐项范围见 [22 第 5 节](20-command-inventory-alignment.md)。
 
 ## 5. 配置、导航及辅助操作（16–20）
 
@@ -182,7 +182,7 @@ Cheers 已有 [picker 注册器](../../packages/ts-shell/src/cli/interactive/pic
 
 **参考**：pi 的[交互设置](../../../pi/packages/coding-agent/src/modes/interactive/interactive-mode.ts)和 oh-my-pi 的配置集合不同。原稿“35+ 项且全部热生效”没有逐项分类证据，撤销固定数量与全热生效保证。
 
-**决定/验收**：按 [20](20-configuration-system.md) 的字段 schema 覆盖设置，明确 session/project/user、敏感度、校验、消费者和生效时点；显示 persisted/effective/next-turn/restart-required。预览不是保存，Apply 前整体验证，失败保留有效配置，并发保存不覆盖别人。归 CFG 全部、UI-06。
+**决定/验收**：按 [20](18-configuration-system.md) 的字段 schema 覆盖设置，明确 session/project/user、敏感度、校验、消费者和生效时点；显示 persisted/effective/next-turn/restart-required。预览不是保存，Apply 前整体验证，失败保留有效配置，并发保存不覆盖别人。归 CFG 全部、UI-06。
 
 ### 17. `/statusline`
 
@@ -247,7 +247,7 @@ Cheers 已有 [picker 注册器](../../packages/ts-shell/src/cli/interactive/pic
 
 完整 Git hunk 暂存面板、实时 Advisor、安全分析、公共技能商店和远端协作/执行均由用户明确纳入 Phase 19，可以分更多批次。本文不存在仍待确认的范围收缩选项。/model 作用域和 /undo 单位也已裁定，不再重复提问。
 
-其余参考无词法交集的 53 项按 [22 第 5 节](22-command-inventory-alignment.md)逐条落实，含 MEDIA-01 语音、MEDIA-02 录制、FLOW-01 后台任务/实时代理总览、FLOW-02 模型交接/持久 worker、FLOW-03 评测优化等独立能力。不能把 voice 解释成 relay、把配置面板解释成任务调度、把一个 PAR 总标题当作已有验收。正式任务 ID 与依赖以 [Phase 19 决策](phase-19-decisions.md)为准。
+其余参考无词法交集的 53 项按 [22 第 5 节](20-command-inventory-alignment.md)逐条落实，含 MEDIA-01 语音、MEDIA-02 录制、FLOW-01 后台任务/实时代理总览、FLOW-02 模型交接/持久 worker、FLOW-03 评测优化等独立能力。不能把 voice 解释成 relay、把配置面板解释成任务调度、把一个 PAR 总标题当作已有验收。正式任务 ID 与依赖以 [Phase 19 决策](phase-19-decisions.md)为准。
 
 ## 7. 文档与实施验收边界
 

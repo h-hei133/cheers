@@ -13,7 +13,7 @@ confidence: mixed
 
 ## 1. 范围与结论口径
 
-本篇基于 [14 号研究](14-user-experience-research.md) §6、Phase 18 裁决及后续用户要求。2026-10-05 文档复审的基线为 Cheers `28ff98cee8c4dd63e6752452f73a362ed3559ae3`，本地参考快照为 pi `b2b5c42f`、oh-my-pi `1c0993c3`。2026-10-09 W8 在 `1ea58289` 基础上实现本文契约；当前源码行为见 §2、§6–§7、§13–§16，本地实现/验收与独立L3批准完成，精确提交与远端结果见Phase19 §8.122。§12 与 §17.3 保留原历史证据，不代表本批执行记录。
+本篇基于 [12 号研究](12-user-experience-research.md) §6、Phase 18 裁决及后续用户要求。2026-10-05 文档复审的基线为 Cheers `28ff98cee8c4dd63e6752452f73a362ed3559ae3`，本地参考快照为 pi `b2b5c42f`、oh-my-pi `1c0993c3`。2026-10-09 W8 在 `1ea58289` 基础上实现本文契约；当前源码行为见 §2、§6–§7、§13–§16，本地实现/验收与独立L3批准完成，精确提交与远端结果见Phase19 §8.122。§12 与 §17.3 保留原历史证据，不代表本批执行记录。
 
 **现行结论**：深度研究必须具备模型驱动的分解、迭代检索与阅读、缺口检测、声明级证据、对抗核验和综合报告，覆盖软件与论文。命令 prompt 是研究简报入口；可执行的权限、预算、来源真实性、恢复与结果保证必须由运行时承担。会话持久化不等于研究阶段可恢复，步数上限不等于主子代理总预算，来源列表不等于声明已被证据支持。
 
@@ -185,7 +185,7 @@ core 命令保留纯 syntax/薄注册，CLI 通过注入 handler 与 feature too
 
 | 批次 | 内容与依赖 | 完成条件 |
 |---|---|---|
-| R0 | 19 号工具安全/资源修复；通用主子 admission、持久 run 与恢复 | 网络/解析预取消、预算总量、重启不重置额度、部分结果契约通过故障验证 |
+| R0 | 17 号工具安全/资源修复；通用主子 admission、持久 run 与恢复 | 网络/解析预取消、预算总量、重启不重置额度、部分结果契约通过故障验证 |
 | R1 | research owner、brief/run/evidence 与命令迁移 | 单一命名路由；实际 fetch/read 产生证据；报告和校验消费者拒绝伪造引用 |
 | R2 | 软件来源与学术元数据/全文获取解析 | 版本/论文 id 锚定；真实全文与页/节定位；受限/失败不伪装完整阅读 |
 | R3 | 受限研究员与独立反证审查 | plan/deny 不绕过；共享预算；反证、来源独立性、核验状态独立入报告 |
@@ -202,7 +202,7 @@ R1 可以先产生可审查的中间价值，但不称完整深度研究交付�
 | R2 | 大量来源冲垮上下文/内存 | 获取与解析预算、分段证据、子上下文；压缩摘要不替代可定位原证据 |
 | R3 | 编造来源或引错内容 | fetch/read 生产的 source id、定位/hash、声明绑定验证；人工/模型语义核验仍会漏判 |
 | R4 | 子任务绕过父预算或计划权限 | 通用共享计量、允许能力交集且任一 deny 优先、只读 delegation capability，不能自动升 build |
-| R5 | 网络错误泄漏或 SSRF/取消缺口 | 19 号网络任务前置；错误无 raw body，连接级 IP/redirect/TLS 边界 |
+| R5 | 网络错误泄漏或 SSRF/取消缺口 | 17 号网络任务前置；错误无 raw body，连接级 IP/redirect/TLS 边界 |
 | R6 | 金额/usage 不可确定仍宣称硬预算 | 缺可信计量时 unknown/unsupported；严格模式 fail closed |
 | R7 | alias 冲突与文档漂移 | 同次移除 collector 旧别名，全入口迁移测试 |
 | R8 | 学术 API 限流、权限或字段变更 | capability/provider 配置、总期限、Retry-After、分页/字节上限与稳定错误分类 |
@@ -226,8 +226,8 @@ R1 可以先产生可审查的中间价值，但不称完整深度研究交付�
 
 仓内依据：
 
-- [14 号研究](14-user-experience-research.md)、[19 号工具研究](19-tools-maturity-and-multifile-edit.md)、[21 号恢复研究](21-session-recovery-and-undo-ux.md)。
-- [Phase 18 裁决](phase-18-decisions.md) 第 43 项 CMD-09、[13 号登记册](13-feature-and-defect-register.md) 与 [旧研究专题](../wiki/theses/deep-research-command-architecture.md)。
+- [12 号研究](12-user-experience-research.md)、[17 号工具研究](17-tools-maturity-and-multifile-edit.md)、[19 号恢复研究](19-session-recovery-and-undo-ux.md)。
+- [Phase 18 裁决](phase-18-decisions.md) 第 43 项 CMD-09、[11 号登记册](11-feature-and-defect-register.md) 与 [旧研究专题](../wiki/theses/deep-research-command-architecture.md)。
 - 当前 collector、命令、loop、subagent、toolPolicy、session 和 execution 路径见 §2、§3、§7。
 - 历史对象 `89c1dd18`、`22671e5a`、`a06c617d`，命令与事实见 §12.0。
 

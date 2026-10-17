@@ -1,23 +1,23 @@
 ---
-title: "Phase 17 前置研究：把 13 号登记册的 OPEN 项对照参考实现做设计级研究"
+title: "Phase 17 前置研究：把 11 号登记册的 OPEN 项对照参考实现做设计级研究"
 category: article
 sources: [13-feature-and-defect-register, phase-16-decisions, phase-17-reference-survey]
 created: 2026-09-30
 updated: 2026-09-30
 reviewed: 2026-09-30（3 个研究子代理 + 主代理逐条亲验）
 tags: [features, gap-analysis, phase-17, reference-survey, design]
-summary: "Phase 17 的前置研究。输入不是「再扫一遍差距」，而是 13 号登记册里 70 条已核实的 OPEN 条目（12 P1 / 45 P2 / 11 P3），加上 12 号文档移出的 16-J…16-N。本文对每条做两件事：①把参考实现（pi 为主）解决同一类问题的**机制**读到可实施的精度（file:line + 关键代码）；②写清我方缺口的精确位置与形态。**零代码改动**。所有参考断言由主代理亲验（子代理研究结果逐条复验），被推翻的记入 §9。"
+summary: "Phase 17 的前置研究。输入不是「再扫一遍差距」，而是 11 号登记册里 70 条已核实的 OPEN 条目（12 P1 / 45 P2 / 11 P3），加上 10 号文档移出的 16-J…16-N。本文对每条做两件事：①把参考实现（pi 为主）解决同一类问题的**机制**读到可实施的精度（file:line + 关键代码）；②写清我方缺口的精确位置与形态。**零代码改动**。所有参考断言由主代理亲验（子代理研究结果逐条复验），被推翻的记入 §9。"
 confidence: high
 ---
 
 # Phase 17 前置研究
 
-> **本文的定位**：`12-gap-and-debt-research-2.md` 与 `13-feature-and-defect-register.md` 是**盘点**
+> **本文的定位**：`10-gap-and-debt-research-2.md` 与 `11-feature-and-defect-register.md` 是**盘点**
 > （哪里有缺口、证据是什么）。本文是**设计级研究**——回答「参考实现到底怎么解决的、
 > 我方缺口精确在哪、按什么形态改」。
 >
-> **与 13 号册的关系**：13 号是常驻总账（记录事实与状态），本文**不改 13 号**，
-> 只在需要时引用条目号。施工后由 13 号标注状态。
+> **与 11 号册的关系**：11 号是常驻总账（记录事实与状态），本文**不改 11 号**，
+> 只在需要时引用条目号。施工后由 11 号标注状态。
 >
 > **纪律**（沿用本仓既有要求）：
 > 1. 参考侧断言必须给出 `<repo>/<path>:<line>` 并引关键代码；不接受「pi 做得更好」。
@@ -30,14 +30,14 @@ confidence: high
 > **2026-09-30 实施索引**：本研究的 Phase 17 裁决已按 W1–W6 完成逐项实施与保留处置，
 > 浏览器守卫和钩子文档也已补齐。当前提交、验证、限制与新发现见
 > [phase-17-decisions.md](phase-17-decisions.md) §8 和
-> [13-feature-and-defect-register.md](13-feature-and-defect-register.md)。
+> [11-feature-and-defect-register.md](11-feature-and-defect-register.md)。
 > 以下证据保留为研究时点快照，不作为当前代码状态或删除配额。
 
 ## 0. 输入与范围
 
 ### 0.1 输入的准确数字
 
-对 13 号册做一次机械统计（正则解析 `### <ID> · … — \`STATUS\` \`SEV\``）：
+对 11 号册做一次机械统计（正则解析 `### <ID> · … — \`STATUS\` \`SEV\``）：
 
 ```
 条目总数 86    OPEN 70
@@ -64,13 +64,13 @@ confidence: high
 | `CTX-07` | JSONL 任一行损坏 ⇒ `list()`/`health()` 整体抛 |
 | `CDE-03` | `sandbox/` 834 行进程内沙箱模型从未被实例化 |
 
-### 0.2 另需纳入的：12 号文档移出的项
+### 0.2 另需纳入的：10 号文档移出的项
 
 `phase-16-decisions.md` §4 把五项移出 Phase 16、注明「Phase 17 或独立裁决」：
 
 | 项 | 内容 | 本轮的处置 |
 |---|---|---|
-| **16-J** | 死代码清理（`edit/patch` 三角 429 行、`runtimeHandoffProjection.ts` 502 行、`workspaceFileContract.ts` 205 行、`core/harness/**` 归位） | 并入，见 §7（13 号册已把它收窄为 `CDE-01/02/05`） |
+| **16-J** | 死代码清理（`edit/patch` 三角 429 行、`runtimeHandoffProjection.ts` 502 行、`workspaceFileContract.ts` 205 行、`core/harness/**` 归位） | 并入，见 §7（11 号册已把它收窄为 `CDE-01/02/05`） |
 | **16-L** | Bedrock 端到端 | **不做**：无账号。协议正确性已在 `PRV-08` 一类的读码+单测级覆盖 |
 | **16-M** | `NO_COLOR`/`FORCE_COLOR`/truecolor/`tuiMode:"stream"` | 并入 `THM-01/04`（`"stream"` 已在 16-F 删除） |
 | **16-N** | 代码围栏语法着色 | 并入 `THM-06` |
@@ -847,7 +847,7 @@ route: async (pattern: unknown, handler: (route: unknown) => unknown) => {
 | 其中 `sandbox/` 四件 | 816 行 |
 | 其中 `runtime/extensions` + `runtime/resources` | 651 行 |
 
-**`TOL-02` 的判决已定**（见 13 号册）：`edit/patch` 三角**删除**——
+**`TOL-02` 的判决已定**（见 11 号册）：`edit/patch` 三角**删除**——
 理由不是「不可达」，而是**反向用例**：
 `conflict.ts:121-142` 用顺序文本搜索，对 `gamma→beta` + `beta→delta`
 这种**互不相交**的级联会**误报冲突**；而 `editEngine.ts:430-441` 的
@@ -899,7 +899,7 @@ pi 的权限模型是 `permissionMode`（在 subagent 定义里）+ 扩展 `tool
 | **alt-screen 分栏侧栏** | 产品决定；Phase 15/16 两次记为 backlog | 同上 |
 | **MCP SSE/HTTP 传输** | 与 15-A 分离，避免一个提交背两个协议 | `phase-15-decisions.md` |
 | **扩展宿主**（programmatic extension API） | Phase 8 已裁决不做（**写进代码的防御立场**） | `phase-8-decisions.md` |
-| **凭据路径的主动测试** | 两次 `content_filter` 的读面，按本仓纪律留给维护者 | 13 号册 §13.2 |
+| **凭据路径的主动测试** | 两次 `content_filter` 的读面，按本仓纪律留给维护者 | 11 号册 §13.2 |
 
 **关于「扩展宿主」的一点新证据**：`pi/packages/coding-agent/src/core/extensions/types.ts`
 声明了 **49 个 `type:` 事件**（`session_start`/`tool_call`/`tool_result`/
@@ -992,7 +992,7 @@ R2 的结论：pi 的探测只看 `COLORTERM`/`TERM`/`TERM_PROGRAM`，
 
 R2 未给出找到的对应物。我方 `sgr.ts:11-13` 的**文档**声称支持冒号分隔，
 `:43-56` 只 `split(";")`。
-⇒ **处置回到 13 号册已有的判断**：先确认生产者是否真会产出冒号形式；
+⇒ **处置回到 11 号册已有的判断**：先确认生产者是否真会产出冒号形式；
 **若不产出，改文档比改代码诚实**（本轮仍未确认，标 `INFERENCE`）。
 
 ### 4bis.5 `CMD-01`（slash 引号参数）
@@ -1053,7 +1053,7 @@ R2 的结果中该项未展开。**处置不依赖参考实现**：
 
 - `PRV-09` 中各端点的**精确行号**（R3 给了行号，主代理只确认了**形态存在**与
   `never` 穷尽检查的描述，未逐行核对 18 个 Google 枚举值）；
-- `PRV-11` 中「`projectProviderRegistry` 445 行」的**精确行数**（13 号册记 ~445）；
+- `PRV-11` 中「`projectProviderRegistry` 445 行」的**精确行数**（11 号册记 ~445）；
 - `oh-my-pi` 的 66 令牌与「80+ 预设」的**精确数字**（只确认了 schema 存在）；
 - `pi` 日志实现（本轮**未查**，`OBS-08` 因此是自研）。
 

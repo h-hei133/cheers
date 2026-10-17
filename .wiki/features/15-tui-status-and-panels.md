@@ -80,7 +80,7 @@ pi/oh-my-pi 另有本地估算路径；估算与 provider 报告应分开显示�
 
 `default` 窗口来自 resolver 的假定预算，当前默认为 64,000；其值可能与 catalog 恰巧相同，**数字相等不表示来源相同**。紧凑状态可显示 `?/64k assumed`，详情保留 warning；config 高于 catalog 的警告也必须可见。若显示 `~4k est`，必须标本地估算，不占用 provider reported 的字段。
 
-默认形态采用 16 号文档的顶线 chip/底栏挂载，不要求所有形态都保留一条填充 band。状态语义相同，几何由 shape 决定；不得重复绘制两份状态。
+默认形态采用 14 号文档的顶线 chip/底栏挂载，不要求所有形态都保留一条填充 band。状态语义相同，几何由 shape 决定；不得重复绘制两份状态。
 
 ### 2.6 风险与待验证项
 
@@ -99,7 +99,7 @@ TTY 本地命令通常经 `routeInteractiveCommand` → [cliCommandExecutionBrid
 
 ### 3.2 命令口径与迁移矩阵
 
-完整命令盘点由 [22-command-inventory-alignment.md](22-command-inventory-alignment.md)、[23-command-argument-options.md](23-command-argument-options.md)、[24-shared-command-parity.md](24-shared-command-parity.md) 共同约束。14 号文档的 UI 口径是 **59 = 58 个该配置下的 dispatch 命令 + picker-only `back`**；历史 F17-04 的“58 可见”是当时配置的观察，不能当完整 UI 命令总数。MCP 门控和动态扩展会改变集合。
+完整命令盘点由 [20-command-inventory-alignment.md](20-command-inventory-alignment.md)、[21-command-argument-options.md](21-command-argument-options.md)、[22-shared-command-parity.md](22-shared-command-parity.md) 共同约束。12 号文档的 UI 口径是 **59 = 58 个该配置下的 dispatch 命令 + picker-only `back`**；历史 F17-04 的“58 可见”是当时配置的观察，不能当完整 UI 命令总数。MCP 门控和动态扩展会改变集合。
 
 [slashCommandRegistry.ts](../../packages/ts-shell/src/entrypoints/slashCommandRegistry.ts#L51) 的共同投影包含 builtin、picker-only 和 extensions；`/help`、slash suggestions、picker 与文档生成须消费该投影并订阅变化。直接调用 `listVisibleCommands` 会漏 `back` 和动态扩展。
 
@@ -112,7 +112,7 @@ TTY 本地命令通常经 `routeInteractiveCommand` → [cliCommandExecutionBrid
 | `/theme` | 当前主题目录文本 | 内存预览选择器，Esc 恢复，Apply 保存 |
 | `/hotkey`、`/context`、`/cost`、`/diagnose`、`/sidebar`、`/metrics` | 报告 | 结构化只读报告；inline/fullscreen 自适应 |
 | `/tools` | 目录/详情 | 列表到详情；报告源数据可复用 |
-| `/undo`、`/restore` 的操作分支 | 恢复/写盘 | 接 21 号文档完整预览、权限、stale-read、writer 与结果链 |
+| `/undo`、`/restore` 的操作分支 | 恢复/写盘 | 接 19 号文档完整预览、权限、stale-read、writer 与结果链 |
 | `/thinking`、`/fast`、`/shell`、`/view` | 设置或状态 | 适合选择器的分支用显式 Apply；导航不改运行语义 |
 | `/statusline list`、`/settings <name>`、带参命令 | 文本或明确执行 | 保留可脚本化路径；不可与裸命令重复计数 |
 | `/log tail`、`/entries`、`/timings`、导出等 | 流或管道 | 保留文本/JSON 契约，按用途增加浏览视图 |
@@ -130,7 +130,7 @@ Enter 选择后将规范命令与必要参数提示填入 composer，并关闭�
 
 #### P2 主题与形态：纯视觉预览
 
-主题与 16 号文档形态共享真实 renderer 预览；预览仅内存，不写配置。Esc/取消/错误恢复进入前状态；Apply 保存并显示实际结果。主题来源、预览项和保存层可见，保存失败不伪装成功。
+主题与 14 号文档形态共享真实 renderer 预览；预览仅内存，不写配置。Esc/取消/错误恢复进入前状态；Apply 保存并显示实际结果。主题来源、预览项和保存层可见，保存失败不伪装成功。
 
 #### P3 只读报告与详情
 
@@ -140,7 +140,7 @@ Enter 选择后将规范命令与必要参数提示填入 composer，并关闭�
 
 #### P4 恢复/写操作面板
 
-面板列表选择只选择目标。预览、确认和批准为独立状态；执行复用 recovery owner 的守卫与 stale-read，writer 结果与验证证据决定成功。确认框本身不是授权系统，也不能把 partial/failed/unverified 升为成功。具体契约见 [21-session-recovery-and-undo-ux.md](21-session-recovery-and-undo-ux.md)。
+面板列表选择只选择目标。预览、确认和批准为独立状态；执行复用 recovery owner 的守卫与 stale-read，writer 结果与验证证据决定成功。确认框本身不是授权系统，也不能把 partial/failed/unverified 升为成功。具体契约见 [19-session-recovery-and-undo-ux.md](19-session-recovery-and-undo-ux.md)。
 
 #### P5 语义设置
 
@@ -188,7 +188,7 @@ canonical/alias 先收敛，否则相同命令不同拼写会进入不同面板�
 ## 4. Phase 19 交付顺序与决定
 
 1. 统一命令 metadata/canonical 投影与状态事实来源，修正 alias/picker-only/扩展一致性。
-2. 完成 16 号文档主题默认色与映射；实现结构化报告及纯文本/JSON 输出边界。
+2. 完成 14 号文档主题默认色与映射；实现结构化报告及纯文本/JSON 输出边界。
 3. 接入主题/形态预览、只读报告 host、help 填入 composer；逐命令迁移 context/cost/tools/hotkey/diagnose/sidebar/metrics。
 4. 语义设置按 Apply 生效；恢复和其他写操作面板接各 owner 的授权/执行/证据链。大型功能全部在 Phase 19 分批交付，不因面板工作量而删减。
 
@@ -224,7 +224,7 @@ D1–D6、结构化 spans/columns、只读报告生命周期、help 两步提交
 
 ### 6.3 角色到主题 token
 
-报告角色复用既有 token；主题新增项与默认色由 [16-tui-composer-and-theme.md](16-tui-composer-and-theme.md) §10 统一定义，不在本文件另定调色板。
+报告角色复用既有 token；主题新增项与默认色由 [14-tui-composer-and-theme.md](14-tui-composer-and-theme.md) §10 统一定义，不在本文件另定调色板。
 
 | 语义角色 | token / 样式 | 说明 |
 |---|---|---|
@@ -266,7 +266,7 @@ D1–D6、结构化 spans/columns、只读报告生命周期、help 两步提交
 
 ### 6.6 目标示例（未实施）
 
-下面 `⟨role/token⟩` 是文档注记，不是最终显示文本。目标颜色来自 16 号最终表；示例不是本轮真实渲染结果。
+下面 `⟨role/token⟩` 是文档注记，不是最终显示文本。目标颜色来自 14 号最终表；示例不是本轮真实渲染结果。
 
 `/help`：
 

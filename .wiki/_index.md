@@ -2,12 +2,16 @@
 
 > Compiled knowledge base for the three-layer autonomous coding agent architecture, proof grounding, and reference models.
 
-Last updated: 2026-10-15
+Last updated: 2026-10-17
 
 ## Statistics
 
 - Sources: 11 raw documents (including RFC-001 to RFC-004)
 - Articles: 6 compiled wiki articles (including master thesis)
+- Feature research documents: 37 (01–37, contiguous; merged from 53 after de-duplication)
+  - **Current review (2026-10-17): docs 23–37.** Source and pinned-reference findings were corrected; product implementation and runtime acceptance have not started. Start with [Phase 20 decisions](features/phase-20-decisions.md), [32 Review register](features/32-defect-register-2026-10.md), and [36 Outstanding work](features/36-outstanding-work.md). [37 Command audit](features/37-command-implementation-audit.md) traces 102 declared entries; it does not prove every action works.
+  - **Historical (01–22):** earlier phase research. Many of their verdicts were already implemented or corrected later — read each document's own "更正" section before citing it.
+  - Full per-document table: [features/_index.md](features/_index.md) §0.
 - Inventory records: 0 tracked items
 - Datasets: 0 manifests
 - Outputs: 0 generated artifacts
@@ -20,6 +24,7 @@ Last updated: 2026-10-15
 - [Themes and automatic appearance](guides/themes.md)
 - [Phase 18 decisions and implementation evidence](features/phase-18-decisions.md)
 - [Phase 19 closeout and unfinished work](features/phase-19-decisions.md#11-阶段收尾2026-10-15)
+- [Phase 20 decisions and implementation plan](features/phase-20-decisions.md)
 - [Extension registry protocol and capability grants](features/extension-registry.md)
 - [Agent definitions, model routing and lifecycle](features/agent-definitions.md)
 - [SSH sessions, remote jobs and cancellation](features/ssh.md)
@@ -29,7 +34,13 @@ Last updated: 2026-10-15
 - [Fixed evaluator improvement workflow](features/improve.md)
 - [Live voice and local terminal recording](features/media.md)
 - [Session and runtime command controls](features/command-controls.md)
-- [Feature and defect register](features/13-feature-and-defect-register.md)
+- [Feature and defect register](features/11-feature-and-defect-register.md)
+- [Research review register: all 15 documents and corrected claims](features/32-defect-register-2026-10.md)
+- [oh-my-pi panel study: command mapping and four panel families](features/33-omp-panel-mapping.md)
+- [Panel conversion plan: shared primitives and per-panel targets](features/34-panel-conversion-plan.md)
+- [Panel inventory and specs: 14 panel additions and existing consumers](features/35-panel-inventory-full.md)
+- [Outstanding work: Phase 20 scope and remaining evidence](features/36-outstanding-work.md)
+- [Command audit: 102 declared entries and their evidence boundaries](features/37-command-implementation-audit.md)
 - [All Sources](raw/_index.md)
 - [Concepts](wiki/concepts/_index.md)
 - [Topics](wiki/topics/_index.md)
@@ -55,6 +66,11 @@ Last updated: 2026-10-15
 
 ## Recent Activity
 
+- 2026-10-17: Reviewed and corrected all feature studies 23–37, recorded explicit product choices, and compiled the Phase 20 implementation plan. This round changed documentation only.
+
+- 2026-10-15: Corrected the initial-context attribution (tool schema presentation, not tool count) and audited the round's own research quality as feature documents 41–43
+- 2026-10-15: Per-command panel study against oh-my-pi compiled as feature documents 35–40 (command mapping, shared hub frame, model/settings/session/tree/jobs/usage/copy/MCP panels, conversion plan)
+- 2026-10-15: Round-2 user-experience research compiled as feature documents 25–34 (input geometry, slash completion, model config, compaction trigger, background execution, context budget, startup time, panels, TUI matrix, defect register)
 - 2026-08-28: Ingested deep research audit on architectural debts and compiled Top-Tier Coding Agent Architecture Gap Analysis
 - 2026-08-28: Ingested 2 source notes and compiled 4 foundational wiki articles
 - 2026-08-28: Initialized project wiki structure and category indexes

@@ -1,7 +1,7 @@
 ---
 title: "18：输入框、Slash 命令、启动耗时与首轮上下文研究与方案设计"
 category: article
-sources: [user-experience-report-2026-10-05, 14-user-experience-research.md, current-source-28ff98ce, pi, oh-my-pi, codex]
+sources: [user-experience-report-2026-10-05, 12-user-experience-research.md, current-source-28ff98ce, pi, oh-my-pi, codex]
 created: 2026-10-05
 updated: 2026-10-05
 tags: [research, tui, editor, slash-commands, startup, timings, context, token-accounting, subcommands]
@@ -13,7 +13,7 @@ confidence: high
 
 ## 1. 范围与目标
 
-本研究基于用户反馈及 [14：交互体验、工具成熟度与上下文来源研究](14-user-experience-research.md) 的现状梳理，聚焦用户提出的 6 个核心交互与性能问题进行深入机理剖析、参考项目对比和具体方案设计：
+本研究基于用户反馈及 [14：交互体验、工具成熟度与上下文来源研究](12-user-experience-research.md) 的现状梳理，聚焦用户提出的 6 个核心交互与性能问题进行深入机理剖析、参考项目对比和具体方案设计：
 1. **短单行粘贴光标视觉残影**：输入 `Hello` 等短单行文本时，硬件光标处出现前一个字符的视觉重影（如 `He│llo` 误读为 `Heello`），正常逐字输入不出现。
 2. **Slash 命令前缀输入后 Enter 不补全**：输入 `/res` 显示候选，但按 Enter 发送未补全的原字符串 `/res`（导致未知命令错误）。
 3. **裸 `/` 候选列表别名过度膨胀**：58 个调度命令加 UI 专用 `/back`，再展开 58 个别名形成 117 行候选，列表信息噪声极大。
@@ -27,7 +27,7 @@ confidence: high
 
 ## 2. 相对 doc 14 的证据增量与边界
 
-[doc 14](14-user-experience-research.md) 对未知原因和测量口径的保留是正确的。本次审查补充源码证据，并撤回本研究初版超出证据的确定性解释：
+[doc 14](12-user-experience-research.md) 对未知原因和测量口径的保留是正确的。本次审查补充源码证据，并撤回本研究初版超出证据的确定性解释：
 
 1. **粘贴与光标**：内存探针证明样本没有重复插入，不能证明终端像素没有残影。源码确认 regular 正常界面未统一剥离 `CURSOR_MARKER`，也未把编辑器 caret 映射到该模式的光标账本；尚未证明这是用户 Windows Terminal 现象的根因。
 2. **Slash 交互**：`selected=0` 的视觉高亮与 `chosen=moved` 的接受条件不一致；`/res` 会直接提交草稿，而且当前排序首项是 `/reset`。必须分别处理候选接受、排序和完整命令执行，不能用补全动作触发新会话。
@@ -201,7 +201,7 @@ it("submits on enter when no candidate was chosen", () => {
 
 ### 4.4 Phase 19 交互决定（待施工）
 
-本方案采用参考项目的高亮项接受和空查询别名收敛，但不采用候选接受后立即执行的策略：Cheers 的 `/reset` 等候选会改变会话，排序或前缀命中不足以表达执行意图。补全只修改草稿；执行必须由用户对一条完整合法调用显式提交。契约与完整编辑范围定义以 [23 §4](23-command-argument-options.md#4-统一语法与补全契约待施工) 为准。
+本方案采用参考项目的高亮项接受和空查询别名收敛，但不采用候选接受后立即执行的策略：Cheers 的 `/reset` 等候选会改变会话，排序或前缀命中不足以表达执行意图。补全只修改草稿；执行必须由用户对一条完整合法调用显式提交。契约与完整编辑范围定义以 [23 §4](21-command-argument-options.md#4-统一语法与补全契约待施工) 为准。
 
 | 输入和按键 | 目标行为 |
 |---|---|
@@ -327,13 +327,13 @@ doc 14 历史样本中，从 `npm start` 到终端出现输入框为 **2,482–5
 本次只修改 Markdown，未运行 build/tests/PTY/provider。后续实施必须验证：
 
 1. regular/fullscreen/overlay 下 marker 不泄漏、caret 随滚动和暂停恢复准确；实机录制普通输入与 bracketed paste，区分字符串、ANSI 字节与像素证据。
-2. `/help` 单 Enter、`/res` 接受后不执行 `/reset`、别名原始语义、补全不截断前后文；详细矩阵见 [23 §7](23-command-argument-options.md#7-实施验收标准)。
+2. `/help` 单 Enter、`/res` 接受后不执行 `/reset`、别名原始语义、补全不截断前后文；详细矩阵见 [23 §7](21-command-argument-options.md#7-实施验收标准)。
 3. 以真实 first-paint/write 与可交互事件验证 `/timings`，重复启动矩阵后才能声称改进幅度。
 4. 隔离 provider 捕获最终 payload 的精确字节并交叉验证 token 口径；无 tokenizer 时只给估算。
 
 ## 9. 问题六：Slash 命令后续参数选项（Subcommand Options）呈现机制与设计
 
-> **本节是单命令（`/goal`）的实证样本**。该痛点实为**全仓横切**：58 条调度命令中 43 条声明 `argumentHint`；按实际有效语法分类有 44 条参数型命令，其中 26 条挂接补全 provider、18 条没有 provider。全量审计、逐命令目标词表与声明式设计见 [23：全命令参数与子命令选项](23-command-argument-options.md)。
+> **本节是单命令（`/goal`）的实证样本**。该痛点实为**全仓横切**：58 条调度命令中 43 条声明 `argumentHint`；按实际有效语法分类有 44 条参数型命令，其中 26 条挂接补全 provider、18 条没有 provider。全量审计、逐命令目标词表与声明式设计见 [23：全命令参数与子命令选项](21-command-argument-options.md)。
 
 ### 9.1 当前现状深度剖析与源码链路验证
 
@@ -544,7 +544,7 @@ oh-my-pi 在交互深度与工程复用性上采用声明式投影：
 | **维护成本** | 字典表、注册表、运行时多处可能漂移 | 候选和描述可从单点派生；运行时仍需核对 | 中（需为各命令手工实现补全闭包） | 低（无此功能） |
 ### 9.4 架构与交互设计（待施工）
 
-本节不再维护第二套 `SubcommandDefinition`、偏移和 Enter 伪实现。跨命令契约统一见 [23 §4](23-command-argument-options.md#4-统一语法与补全契约待施工)，其约束在 `/goal` 同样适用：
+本节不再维护第二套 `SubcommandDefinition`、偏移和 Enter 伪实现。跨命令契约统一见 [23 §4](21-command-argument-options.md#4-统一语法与补全契约待施工)，其约束在 `/goal` 同样适用：
 
 1. Goal owner 的同一语法产生 parser/validator、help、候选描述与动态 usage；不能仅在补全字典追加后端不支持的动词。
 2. `set` 的 objective 属于自由文本，`budget` 属于经校验的数值/关闭设置，`pause/resume/drop/show` 属于动作。不能把所有 token 都建模成相同子命令字符串。

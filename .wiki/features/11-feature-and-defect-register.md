@@ -556,7 +556,7 @@ const [rawName, ...args] = input.slice(1).split(/\s+/).filter(Boolean);
 /back 2  -> Unknown slash command: /back
 ```
 
-**修正子代理结论**：它报「`/back` 完全不可路由」，读的是 12 号文档的旧状态，**与现状不符**。
+**修正子代理结论**：它报「`/back` 完全不可路由」，读的是 10 号文档的旧状态，**与现状不符**。
 **仍然成立的**只是带参数形式。**由于已不再对外宣传带参数形式**，
 这是「体验毛刺」而非「错误承诺」，故下调为 `P3`。
 
@@ -1174,7 +1174,7 @@ if (event.type === "error") {
 that cannot change the outcome, and would delay the failure until the provider chose to close」。
 
 **即两个端点对同一问题给出相反处置，且 Bedrock 那侧的理由完全适用于 Anthropic。**
-Phase 16 的 12 号文档已记此项；**本轮确认仍未修**（并补上了「两处相反」的对照）。
+Phase 16 的 10 号文档已记此项；**本轮确认仍未修**（并补上了「两处相反」的对照）。
 
 **方向**：把 `continue` 改为立即 throw（保留 `drain()` 已产出的 fragment，
 与 `:509-515` 的 `catch` 分支同一模式）。
@@ -2620,7 +2620,7 @@ edit/patch/apply/conflict.ts (219)
 
 | # | 断言 | 来源 | 核实 | 结论 |
 |---|---|---|---|---|
-| 1 | `regular` 模式因 `mainScreen.ts:112-133` 的 `alreadyWritten` 记账「**行数没增加就整段跳过**」，且 `firstDifference` 只比 `sharedContent` 导致漂移 | `W1TuiSurface` `REGULAR-SCREEN-DRIFT` | **`alreadyWritten` 这个符号已不存在**——Phase 16 的 16-C 把整套记账重写了。探针实测：同一行文本增长**会被重写**（`frame2 (grew in place)` 输出了 `hello world`）。它引的是 12 号文档的**旧代码状态** | **错**，剔除。**方向上仍然成立的部分**是「`documentRows` 不带装饰」——但那是我方新发现的 TUI-01（高亮/选区/滚动条丢失），不是漂移 |
+| 1 | `regular` 模式因 `mainScreen.ts:112-133` 的 `alreadyWritten` 记账「**行数没增加就整段跳过**」，且 `firstDifference` 只比 `sharedContent` 导致漂移 | `W1TuiSurface` `REGULAR-SCREEN-DRIFT` | **`alreadyWritten` 这个符号已不存在**——Phase 16 的 16-C 把整套记账重写了。探针实测：同一行文本增长**会被重写**（`frame2 (grew in place)` 输出了 `hello world`）。它引的是 10 号文档的**旧代码状态** | **错**，剔除。**方向上仍然成立的部分**是「`documentRows` 不带装饰」——但那是我方新发现的 TUI-01（高亮/选区/滚动条丢失），不是漂移 |
 | 2 | `stop()` 先 `terminal.stop()` 后异步 `leaveScreen`，**二者竞态损坏终端状态** | `W1TuiSurface` | `terminal.ts:207` 的 `stop()` 走的是 **`writeSync`（同步）**，不存在「异步未刷出」；`regular` 模式在 `engine.ts:268` 提前 return，这条路径**根本不执行**。**残余**只是 `:285` 的异步 `write` 可能赶不上 `exit`，且本轮**未复现** | **部分错**，降为 TUI-06（P2 + `INFERENCE`），且必须如实标注「未复现」 |
 | 3 | `/help` 只列 4 个键而 `keybindings.ts` 有 39 个 ⇒ **35 个动作的帮助缺失** | `W1TuiSurface` `KEYBINDING-HELP-DISCREPANCY` | `slashCommandRegistry.ts:169-170` 的注释写明**这是有意的**（「键都在一张表里，在这里再念一遍就是帮助开始宣传没人绑的键」）并指向 `/hotkey`。子代理把设计读成了遗漏 | **错**，剔除。**仍成立的部分**是 `/hotkey` 不反映用户重绑定，且两表 chord 一致**没有测试保护**——记入 TUI-09 |
 | 4 | **生产环境流内 `error`、拒答等失败会被无差别重试** | `W2ProviderProtocol` 笔记本 | 探针（`isRetryableFailure` 真实消息形状）：`Network error: Provider reported an error mid-stream: content_filter` → **NO-RETRY**；`…refused the prompt: SAFETY` → **NO-RETRY**；`socket hang up` → RETRY。`retry.ts:85-86` 的 `REFUSAL` 模式先于 `RETRYABLE_FAILURE` 检查，且 `/content.?filter/` 命中 `content_filter` | **错**，剔除。**仍成立的**是**原因不同**：它不重试不是因为「识别为拒答」，而是因为 `errorMessage` 为空不匹配任何模式——记入 PRV-03 |

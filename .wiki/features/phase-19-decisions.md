@@ -13,7 +13,7 @@ confidence: mixed
 
 ## 1. 范围、基线与效力
 
-本计划以 Cheers 的 28ff98cee8c4dd63e6752452f73a362ed3559ae3 为源码基线。输入为 [14 的问题与隔离探针](14-user-experience-research.md)、经本轮修订的 15–24，以及 [复核记录](verification-15-21.md)。当前用户要求高于早期研究的建议和 Phase 18 的延期决定；同一问题以本文和本轮明确用户答复为准。
+本计划以 Cheers 的 28ff98cee8c4dd63e6752452f73a362ed3559ae3 为源码基线。输入为 [14 的问题与隔离探针](12-user-experience-research.md)、经本轮修订的 15–24，以及 [复核记录](verification-15-21.md)。当前用户要求高于早期研究的建议和 Phase 18 的延期决定；同一问题以本文和本轮明确用户答复为准。
 
 **当前状态：Phase19已结束，保留未完成项。** 用户已明确允许部分任务未完成并要求收尾，最终裁决、逐项原因与交付状态见[§11](#11-阶段收尾2026-10-15)。§8–10中的active及进行中是当时记录，不表示继续启动阶段；原需求和历史失败不删除，也不改称全部生产验收通过。
 
@@ -51,20 +51,20 @@ confidence: mixed
 
 | 事实 | 对 Phase 19 的影响 | 证据 |
 |---|---|---|
-| 通用注册表 58 个主命令、58 个别名、26 个补全 provider；额外交互 /back 使静态交互入口为 59 | 不能以 58 宣称已覆盖全部 TUI 入口；扩展命令继续动态加入 | [registry](../../packages/ts-shell/src/core/commands/registry.ts#L71)、[交互目录](../../packages/ts-shell/src/entrypoints/slashCommandRegistry.ts#L62)、[22](22-command-inventory-alignment.md) |
-| 43 个 argumentHint 不等于参数命令数；按 23 的行为分类为 44 个参数命令，其中 18 个无 provider | hint/provider/handler 三种口径分别维护；自由文本用 usage 提示，不伪造动作 | [23](23-command-argument-options.md) |
-| 参考 85 顶层、138 展开子项合计 223 个声明；不是 212 个去重动作 | 词法计数不能作为功能覆盖率或交付目标 | [22](22-command-inventory-alignment.md) |
-| 14 个 picker、plan 执行约束、会话新建、rename/delete、branch summary、retry、输入队列已经接线 | 扩展和修复现有 owner；不重建“缺失的 ModalHost/Plan/Session 引擎” | [picker 注册](../../packages/ts-shell/src/cli/interactive/picker/registry.ts#L63)、[工具策略](../../packages/ts-shell/src/core/query/toolPolicy.ts#L51)、[24](24-shared-command-parity.md) |
+| 通用注册表 58 个主命令、58 个别名、26 个补全 provider；额外交互 /back 使静态交互入口为 59 | 不能以 58 宣称已覆盖全部 TUI 入口；扩展命令继续动态加入 | [registry](../../packages/ts-shell/src/core/commands/registry.ts#L71)、[交互目录](../../packages/ts-shell/src/entrypoints/slashCommandRegistry.ts#L62)、[22](20-command-inventory-alignment.md) |
+| 43 个 argumentHint 不等于参数命令数；按 23 的行为分类为 44 个参数命令，其中 18 个无 provider | hint/provider/handler 三种口径分别维护；自由文本用 usage 提示，不伪造动作 | [23](21-command-argument-options.md) |
+| 参考 85 顶层、138 展开子项合计 223 个声明；不是 212 个去重动作 | 词法计数不能作为功能覆盖率或交付目标 | [22](20-command-inventory-alignment.md) |
+| 14 个 picker、plan 执行约束、会话新建、rename/delete、branch summary、retry、输入队列已经接线 | 扩展和修复现有 owner；不重建“缺失的 ModalHost/Plan/Session 引擎” | [picker 注册](../../packages/ts-shell/src/cli/interactive/picker/registry.ts#L63)、[工具策略](../../packages/ts-shell/src/core/query/toolPolicy.ts#L51)、[24](22-shared-command-parity.md) |
 | /clear 已建立新会话边界并保留非空旧会话；/reset、/cls 为其别名 | /new 是兼容直达入口；前缀 /res 的候选接受绝不能直接执行 /reset | [clear](../../packages/ts-shell/src/core/commands/clearCommandRuntime.ts#L4)、[history](../../packages/ts-shell/src/cli/interactive/history.ts#L159) |
 | /model list/use 已存在；/fast 当前只改温度；/commit 会委派真实提交 | 分别修补全、设计真实 service-tier 能力、保留提交的写入边界，不能套用错误命令说明 | [model](../../packages/ts-shell/src/core/commands/modelCommandRuntime.ts#L42)、[fast](../../packages/ts-shell/src/core/commands/fastCommandRuntime.ts#L5)、[commit](../../packages/ts-shell/src/core/commands/commitCommandRuntime.ts#L95) |
 | executionService.readTextFile 本身不做路径 jail；LSP 不止 hover 存在直接 filePath 入口 | SAFE-02 检查所有读取入口及最终目标，不能仅换一个读取函数 | [service](../../packages/ts-shell/src/runtime/execution/service.ts#L41)、[lsp readSource](../../packages/ts-shell/src/core/tools/lsp.ts#L238) |
-| 内存预检、进程内锁、逐文件 atomic rename 都不等于跨文件事务 | 多文件与 undo 必须显示部分提交、条件补偿和未知结果 | [service](../../packages/ts-shell/src/runtime/execution/service.ts#L74)、[恢复桥](../../packages/ts-shell/src/edit/recovery/restoreExecutionBridge.ts#L54)、[19](19-tools-maturity-and-multifile-edit.md) |
-| 配置已有局部 parser/normalizer，但缺完整 schema；个人连接优先有明确设计原因 | 不全字段 project-first，不将 CLI-only 豁免搬进文件，不用原值诊断泄露凭据 | [runtimeConfig](../../packages/ts-shell/src/config/runtimeConfig.ts#L477)、[20](20-configuration-system.md) |
-| 默认 TUI 是 fullscreen；regular 路径存在 marker/caret 问题，但用户现场残影尚未归因 | 修确定缺陷，再以真实终端画面验证；不能把修代码当成现场根因已证实 | [默认配置](../../packages/ts-shell/src/config/runtimeConfig.ts#L425)、[render](../../packages/ts-shell/src/presentation/tui/render/engine.ts#L321)、[18](18-input-slash-startup-context.md) |
-| 输入已有 caret-follow viewport；回退已有 note/draft 链路 | 保留并补边界，不重新实现已经存在的滚动和回填 | [editor](../../packages/ts-shell/src/presentation/tui/editor.ts#L447)、[rewind](../../packages/ts-shell/src/cli/interactive/picker/rewind.ts#L64)、[21](21-session-recovery-and-undo-ux.md) |
-| 5.4k 是用户首条消息后的用量显示；历史 fixture 的工具粗估 3,063、完整 system 3,334，不能据此拟合真实分项 | 区分 wire bytes、tokenizer 计数、字符估算与 provider usage | [14 §7](14-user-experience-research.md)、[usage](../../packages/ts-shell/src/observability/usageTelemetry.ts#L139) |
+| 内存预检、进程内锁、逐文件 atomic rename 都不等于跨文件事务 | 多文件与 undo 必须显示部分提交、条件补偿和未知结果 | [service](../../packages/ts-shell/src/runtime/execution/service.ts#L74)、[恢复桥](../../packages/ts-shell/src/edit/recovery/restoreExecutionBridge.ts#L54)、[19](17-tools-maturity-and-multifile-edit.md) |
+| 配置已有局部 parser/normalizer，但缺完整 schema；个人连接优先有明确设计原因 | 不全字段 project-first，不将 CLI-only 豁免搬进文件，不用原值诊断泄露凭据 | [runtimeConfig](../../packages/ts-shell/src/config/runtimeConfig.ts#L477)、[20](18-configuration-system.md) |
+| 默认 TUI 是 fullscreen；regular 路径存在 marker/caret 问题，但用户现场残影尚未归因 | 修确定缺陷，再以真实终端画面验证；不能把修代码当成现场根因已证实 | [默认配置](../../packages/ts-shell/src/config/runtimeConfig.ts#L425)、[render](../../packages/ts-shell/src/presentation/tui/render/engine.ts#L321)、[18](16-input-slash-startup-context.md) |
+| 输入已有 caret-follow viewport；回退已有 note/draft 链路 | 保留并补边界，不重新实现已经存在的滚动和回填 | [editor](../../packages/ts-shell/src/presentation/tui/editor.ts#L447)、[rewind](../../packages/ts-shell/src/cli/interactive/picker/rewind.ts#L64)、[21](19-session-recovery-and-undo-ux.md) |
+| 5.4k 是用户首条消息后的用量显示；历史 fixture 的工具粗估 3,063、完整 system 3,334，不能据此拟合真实分项 | 区分 wire bytes、tokenizer 计数、字符估算与 provider usage | [14 §7](12-user-experience-research.md)、[usage](../../packages/ts-shell/src/observability/usageTelemetry.ts#L139) |
 | 当前 /goal 按项目保存 objective/phase/updatedAt，主要作用是提示词注入 | 新增真正的会话目标运行状态、共享计量、调度和恢复；旧目标迁移不能自动开始执行 | [projectState](../../packages/ts-shell/src/core/state/projectState.ts#L26)、[prompt](../../packages/ts-shell/src/turn/prompt.ts#L111) |
-| 相同 loop 不意味着子任务已有完整轨迹、压缩与可恢复研究阶段 | AUTO/RSC 显式接线子任务事件、预算和恢复；不能只写一份研究 prompt | [runner](../../packages/ts-shell/src/core/subagents/runner.ts#L166)、[15](15-deep-research-design.md) |
+| 相同 loop 不意味着子任务已有完整轨迹、压缩与可恢复研究阶段 | AUTO/RSC 显式接线子任务事件、预算和恢复；不能只写一份研究 prompt | [runner](../../packages/ts-shell/src/core/subagents/runner.ts#L166)、[15](13-deep-research-design.md) |
 
 ## 3. 贯穿各批次的生产契约
 
@@ -402,7 +402,7 @@ SAFE-01 已实现并完成本地验证；其余 75 项仍未完成。§7.4 为�
 
 - Owner：[参数校验](../../packages/ts-shell/src/core/tools/arguments.ts) 使用 Ajv 8.20.0 与 ajv-formats 3.0.1（MIT，已有依赖树中的库，现声明为直接依赖）；校验 draft-07/2019-09/2020-12 的类型、必填、成员、范围、格式与组合。未知/无效 schema、未解析引用、异步 schema 拒绝执行；不远程加载引用、不强转、不填默认值、不删除参数。按 schema 内容缓存，动态 schema 改变后重新编译。
 - 顺序：[turn 适配](../../packages/ts-shell/src/turn/tools.ts) 在 kernel 的 prepareArguments 阶段校验，先于审批及 PreToolUse；实际调用前再次校验。write/edit 直接入口共用同一校验器，在文件锁/读取/writer 之前拒绝。显式 `content: ""` 仍有效；edit 三种形式的互斥及非空 edits 数组纳入声明 schema，删除重复的手写形状与互斥检查。
-- 定向对照：按 [19 号研究 §3.1](19-tools-maturity-and-multifile-edit.md#31-write运行时-schema-与精确前置状态) 所指工具验证链，实读参考验证函数与循环的准备阶段。同意“声明 schema 实际校验且先于 before-tool hook”；不采用其参数强转与错误回显原始参数的行为，理由是本阶段明确禁止非字符串文件内容被替换成其他内容，且诊断不得泄露输入。错误只报告约束类别，不回显输入值。
+- 定向对照：按 [17 号研究 §3.1](17-tools-maturity-and-multifile-edit.md#31-write运行时-schema-与精确前置状态) 所指工具验证链，实读参考验证函数与循环的准备阶段。同意“声明 schema 实际校验且先于 before-tool hook”；不采用其参数强转与错误回显原始参数的行为，理由是本阶段明确禁止非字符串文件内容被替换成其他内容，且诊断不得泄露输入。错误只报告约束类别，不回显输入值。
 - 验证：Node 20.3.0、仓内隔离 HOME/USERPROFILE/TMPDIR/CHEERS_TEST_ROOT 下 `npm run test:ts -- src/core/tools src/core/agent src/turn`，40 文件/574 项通过；同版本 `npm run build:ts` 通过。初轮非隔离环境有一条既有 sampling 测试失败（temperature 字段缺失），隔离环境原样通过，未修改 provider 实现或该测试。五条原有 edit 报错文案断言按 schema 错误更新，拒绝和文件不变断言保留。
 - 反转：[新增回归](../../packages/ts-shell/src/core/tools/arguments.test.ts) 在移除 prepare 校验时 1 失败/15 通过；移除 write/edit 直接校验时 11 失败/5 通过。测试服务已替换为无副作用实现；每次反转后校验精确字节恢复，最终重建并重跑上述 574 项通过。
 - 编译产物：仓内隔离探针经实际 kernel→审批→内置 writer 调用，5 类非法 write 内容均零审批、零 pre-use hook、BOM/CRLF 文件字节不变；合法空字符串经一次批准写成空文件。探针使用编译模块，不称 CLI/PTY 或真实模型验收；无真实 provider 请求。
@@ -414,7 +414,7 @@ SAFE-01 已实现并完成本地验证；其余 75 项仍未完成。§7.4 为�
 
 - [LSP](../../packages/ts-shell/src/core/tools/lsp.ts) 的全部五种操作对显式 filePath 先做 workspace containment；hover 删除直接同步读盘，所有读取经同一个 readSource 与执行服务；工作区扫描对每个返回路径再次检查，外部绝对路径、父目录逃逸和稳定的外部符号链接均在服务读取前拒绝。文件名空白保留，不再 trim 后改指另一个文件。
 - [路径策略](../../packages/ts-shell/src/core/tools/permissionContext.ts) 派生请求原文、read selector 去除后的文件路径、规范化绝对/相对路径和 canonical 路径供 deny 匹配。保留原始规则匹配，增加 LSP filePath 与内部符号链接最终目标匹配；artifact URI 不伪装成工作区路径。turn 向工具提供逐文件拒绝检查，LSP 扫描消费它，不能用一次 workspaceSymbol 调用绕过指定文件的拒绝规则。
-- 定向比较基于 [19 号研究 §3.2](19-tools-maturity-and-multifile-edit.md)：实读参考只读目标的 realpath 校验与读取接线。同意先校验 canonical containment、以通过检查的 canonical 路径打开、执行阶段重新核验，保留用户请求名称用于展示；本批实现前两项和 LSP 每次读取前的重新核验，打开后的身份校验仍未完成。路径边界采用完整 `..` 路径段比较，修正 `..notes` 被误当父目录的缺陷；不按字符串前缀猜父目录。
+- 定向比较基于 [17 号研究 §3.2](17-tools-maturity-and-multifile-edit.md)：实读参考只读目标的 realpath 校验与读取接线。同意先校验 canonical containment、以通过检查的 canonical 路径打开、执行阶段重新核验，保留用户请求名称用于展示；本批实现前两项和 LSP 每次读取前的重新核验，打开后的身份校验仍未完成。路径边界采用完整 `..` 路径段比较，修正 `..notes` 被误当父目录的缺陷；不按字符串前缀猜父目录。
 - 新回归覆盖全部五操作的三类逃逸、hover 真实服务接线、空白文件名、显式/扫描路径的 canonical deny、read selector 和 artifact 规则独立性、合法双点开头文件。Node 20.3、仓内隔离 HOME/USERPROFILE/TMPDIR/CHEERS_TEST_ROOT 下 32 文件/419 项通过，`build:ts` 通过。移除 workspace target 围栏时 7 失败/11 通过；移除 LSP 逐文件拒绝检查时 1 失败/17 通过；精确字节恢复后重建并复跑 419 项通过。
 - import-cycles、config-consumers、declarations、node-floor 通过；NormProof 两项图义务 satisfied，整体仍为 6 项既有函数上限 advisory 导致 partial。未取得新增独立审查、PTY、真实提供方或跨平台文件句柄证据，后续批次不得以本节替代这些验收。
 
@@ -427,7 +427,7 @@ SAFE-02 继续推进，尚未完成。`f1b01f84` 的 CI `37329604006` 和 Archit
 - [artifact 存储](../../packages/ts-shell/src/core/session/artifactManager.ts) 删除全局单实例，按 canonical workspace 与 session ID 复用；read、bash、glob、grep、目录输出与后台任务的既有产物目录接线传入会话身份。仅解析数字 ID，暂存文件、歧义 ID、越界符号链接或被替换的目录不解析为产物。读取请求显式携带 artifact 目录，但它只能收窄 workspace 范围，不能授予外部文件访问。
 - 存储构造不再创建目录，保存前检查目录边界；恢复实例扫描已有编号，发布使用排他链接而不覆盖同名历史文件。删除失败后直写与伪成功回退，实际发布失败即失败；暂存文件清理为 best effort，不能声称磁盘故障时一定无残留。工具标签仅用于有界安全文件名，会话 ID 必须是单段有效身份。
 - 兼容：没有 session ID 的调用仍使用原 default 目录；现有产物文件保留。具备明确 session ID 的调用不自动回退到无归属的旧 default 产物，以免相同数字 ID 读错来源；旧数据仍可经明确的工作区文件路径访问。产物 ID 不是内容签名或跨进程写入所有权证明，本批不增加这类保证。
-- 定向对照：沿 [19 号研究](19-tools-maturity-and-multifile-edit.md) 读取参考的 canonical 读取与 artifact 协议/存储实现。同意“按已检查的真实目标读取”“优先绑定调用会话”“数字 ID 与发布失败真实呈现”；不采用跨其他活动会话目录继续查找的回退，以保持本任务的会话范围。参考的暂存发布与保留旧文件决策在本实现中使用现有 TypeScript 文件系统能力完成，没有新增执行平面。
+- 定向对照：沿 [17 号研究](17-tools-maturity-and-multifile-edit.md) 读取参考的 canonical 读取与 artifact 协议/存储实现。同意“按已检查的真实目标读取”“优先绑定调用会话”“数字 ID 与发布失败真实呈现”；不采用跨其他活动会话目录继续查找的回退，以保持本任务的会话范围。参考的暂存发布与保留旧文件决策在本实现中使用现有 TypeScript 文件系统能力完成，没有新增执行平面。
 - 验证：Linux、Node 20.3、仓内隔离 HOME/USERPROFILE/TMPDIR/CHEERS_TEST_ROOT 下，execution、core/tools、artifact 与 turn/tools 共 38 文件/371 项通过，`build:ts` 通过。服务退回按路径直接读取时 7 失败/2 通过；artifact 缓存去掉 session 身份时 2 失败/6 通过；恢复吞掉 write/edit 预读错误时 2 失败/4 通过。每次恢复精确字节，最终重新构建并复跑 371 项通过。
 - 编译模块隔离探针经实际 kernel→工具适配→执行服务验证同 ID 的两会话各读自身产物、缺失会话拒绝，以及打开后文件移出工作区时零内容读取并关闭句柄；模型请求为零。此为编译模块证据，不称 CLI/PTY 或真实 provider 验收。
 - import-cycles、config-consumers、declarations、node-floor 通过；NormProof 图义务 satisfied、函数数量仍为 6 项既有 advisory，整体 partial。尚未取得本批独立审查或非 Linux 文件句柄证据：其他平台当前只有文件身份/路径复查，不承诺同等的描述符路径保证。SAFE-02 的 grep 原生/回退、目录枚举、写入最终对象的拒绝检查及剩余竞态仍待核实和收口，不能由本批文本读取证据代替。
@@ -439,7 +439,7 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 
 - [grep](../../packages/ts-shell/src/core/tools/grep.ts) 保留路径原文，包括点开头和首尾空白；统一 canonical containment、拒绝规则与文件类型检查，支持工作区内部绝对路径、内部符号链接和单文件目标。回退匹配完整路径或目录边界，搜索 src 不再包含 src-other；读取经现有执行服务的已核验句柄，传入逐文件拒绝与取消信号。
 - [原生搜索](../../packages/ts-shell/src/core/tools/grepRipgrep.ts) 在探测二进制前检查目标，并在异步探测后复查。仅可执行文件确实不存在时回退；启动权限错误、非零退出、缺失脚本解释器均返回失败。执行 owner 保留 spawnErrorCode，与进程退出码分开，不按错误文案猜测。使用 which 4.0.0（ISC，Node ^16.13.0 || >=18.0.0）解析 PATH/PATHEXT，开发类型 @types/which 3.0.4，避免重写平台可执行文件查找。
-- 定向比较沿 [19 号研究 §3.4](19-tools-maturity-and-multifile-edit.md#34-grep保持路径原义) 检查参考的搜索入口、路径包装与 normalize/resolve 实现：认同先解析和检查目标、保留点前缀、不默认 trim；不引入其 Unicode 空白或 @ 前缀改写。参考缺失二进制时下载或报错，本项目保留既有本地 walk 回退。研究中的“trim 后输入”裁决修正为原样输入，避免改指另一个合法文件。
+- 定向比较沿 [17 号研究 §3.4](17-tools-maturity-and-multifile-edit.md#34-grep保持路径原义) 检查参考的搜索入口、路径包装与 normalize/resolve 实现：认同先解析和检查目标、保留点前缀、不默认 trim；不引入其 Unicode 空白或 @ 前缀改写。参考缺失二进制时下载或报错，本项目保留既有本地 walk 回退。研究中的“trim 后输入”裁决修正为原样输入，避免改指另一个合法文件。
 - 验证：Node 20.3、仓内隔离 HOME/USERPROFILE/TMPDIR/CHEERS_TEST_ROOT 下，execution、core/tools、artifact 与 turn/tools 共 39 文件/381 项通过，build:ts 通过。新增 10 项路径与启动错误回归；恢复前导字符剥离时 4 失败/6 通过，恢复宽泛目录前缀匹配时 1 失败/9 通过，恢复所有探测失败都回退时 3 失败/7 通过；精确字节恢复后重建并复跑 381 项通过。
 - 编译模块隔离探针核实原生路径零 walk、缺失二进制恰一次 walk，二者均搜索 .hidden 而不混入 hidden，并拒绝损坏的原生程序；模型请求为零。此证据不等于 CLI/PTY、Windows 或真实 provider 验收。
 - import-cycles、config-consumers、declarations、node-floor 通过；NormProof 两项图义务 satisfied，整体 partial 仍来自 6 项既有函数上限 advisory。原生搜索尚未提供逐文件 deny 与完整竞态防护；目录枚举、最终写入对象及非 Linux 句柄保证继续归 SAFE-02，未取得独立审查或跨平台运行证据。
@@ -451,7 +451,7 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 
 - [写入服务](../../packages/ts-shell/src/runtime/execution/service.ts) 在创建父目录前检查 canonical containment、逐文件拒绝及预取消；目录创建和快照持久化返回后再次检查。已有文件在 [文件 authority](../../packages/ts-shell/src/edit/authority/workspace.ts) 打开并核验描述符后，以实际对象路径检查策略，再截断与写入，拒绝时始终关闭句柄。创建路径在排他打开前及打开后分别检查，不再只依赖工具预读时的检查。
 - [工具接线](../../packages/ts-shell/src/core/tools/registry.ts) 将 assertFileAccess 与 abortSignal 传到最终写入请求；保留现有锁、精确 expectedContent 比较及快照机制。authority 使用核验后的 canonical workspace，支持符号链接工作区根；完整父目录段判断允许 ..notes 等普通文件名，不将其当作目录逃逸。
-- 定向比较：按 [19 号研究](19-tools-maturity-and-multifile-edit.md) 实读参考写工具的 mutation queue、目录创建和写入流程；采用“异步操作完成后检查取消，未结束前不释放锁”的决定。参考的可注入 mkdir/writeFile 没有本项目的最终对象拒绝契约，本批保留现有描述符 authority 并接入策略，不复制直接按路径写入实现。
+- 定向比较：按 [17 号研究](17-tools-maturity-and-multifile-edit.md) 实读参考写工具的 mutation queue、目录创建和写入流程；采用“异步操作完成后检查取消，未结束前不释放锁”的决定。参考的可注入 mkdir/writeFile 没有本项目的最终对象拒绝契约，本批保留现有描述符 authority 并接入策略，不复制直接按路径写入实现。
 - 验证：Linux、Node 20.3、仓内隔离 HOME/USERPROFILE/TMPDIR/CHEERS_TEST_ROOT，execution、core/tools、edit、turn/tools、sandbox 和工具策略共 53 文件/455 项通过，build:ts 通过。新增 10 项覆盖创建前拒绝/取消、外部父目录链接零新建目录、快照后取消/拒绝、打开后目标改名到拒绝路径、write/edit 接线、双点文件名与链接工作区。初轮 mock 未保留快照模块辅助导出，修正测试 setup；并行环境中 fd 可被其他线程复用，关闭断言改为核对实际 close 调用，保留内容不变与拒绝断言。
 - 反转：移除快照后及最终写入策略接线时 2 失败/8 通过；移除描述符路径拒绝时 1 失败/9 通过。反转后源码精确字节恢复，最终组合套件通过。编译模块隔离探针验证拒绝写入保留原文、预取消零目录创建、edit 预读后拒绝最终写入、合法嵌套文件写入；模型请求为零，不称 CLI/PTY 验收。
 - import-cycles、config-consumers、declarations、node-floor 通过；NormProof 图义务 satisfied，整体 partial 仍为 6 项既有函数上限 advisory。旧 workspace-safety 脚本引用的 sandbox/runtime 测试路径与场景已不存在，未把该旧门禁当作通过；本批运行当前 sandbox 套件及真实编译工具拒绝探针，旧综合 CLI 门禁迁移仍待处理。
@@ -461,7 +461,7 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 ### 8.6 SAFE-02 — 写前快照实际读取对象（2026-10-06，进行中）
 
 - [文件 authority](../../packages/ts-shell/src/edit/authority/workspace.ts) 的 readVerifiedFile 接收可选实际路径检查；打开并核验句柄后，在读取正文前调用，检查失败直接传播并关闭句柄。只把原有正文 IO 错误保留为 undefined，拒绝/取消不被 catch 转成“没有旧内容”。[写入服务](../../packages/ts-shell/src/runtime/execution/service.ts) 的首次快照读取和持久化后的 expectedContent 复查均传入同一检查。
-- 沿 [19 号研究](19-tools-maturity-and-multifile-edit.md) 再次定向检查参考只读目标解析：授权评估与执行之间可能发生符号链接替换，执行必须重新解析并验证。同意实际使用前复验；本项目在已有句柄 authority 内完成，不增加另一个快照读取系统。保留未传检查参数的其他 authority 调用兼容性，不将它们也宣称为已接入逐文件策略。
+- 沿 [17 号研究](17-tools-maturity-and-multifile-edit.md) 再次定向检查参考只读目标解析：授权评估与执行之间可能发生符号链接替换，执行必须重新解析并验证。同意实际使用前复验；本项目在已有句柄 authority 内完成，不增加另一个快照读取系统。保留未传检查参数的其他 authority 调用兼容性，不将它们也宣称为已接入逐文件策略。
 - Linux、Node 20.3、仓内隔离环境下 execution/core-tools/edit/turn-tools 共 51 文件/426 项通过，build:ts 通过。新增两项在首次快照读取和条件复查打开后，将文件改名到拒绝路径，验证拒绝、零正文读取、关闭句柄与正确的快照调用次数。移除两处策略接线时 2 失败/10 通过，精确恢复后组合套件通过。
 - 编译模块探针经真实写入服务与 authority 验证打开后改名到拒绝目标时零正文读取、无快照产物、原文不变；模型请求为零。import-cycles/config-consumers/declarations/node-floor 通过，NormProof 无阻断项，仍有 6 项既有函数数量 advisory。未运行独立审查、PTY、跨平台验收。
 - 上批 `81fe8dcc` 已推送，Architecture Watch `37338065442` 成功，CI `37338065230` 最近查询仍 in_progress。SAFE-02 仍进行中：目录枚举、原生搜索逐文件拒绝、创建竞态及非 Linux 描述符边界未由本批解决。
@@ -471,7 +471,7 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 
 - [遍历 owner](../../packages/ts-shell/src/runtime/execution/fileWalk.ts) 接收逐路径拒绝与取消信号。显式目录在 readdir 前后核验范围与策略；候选输出核验 canonical 目标及祖先目录，外部符号链接和拒绝目录后代不输出。walk 进入子目录前检查，在读取本地忽略文件前检查；[ignore owner](../../packages/ts-shell/src/runtime/execution/ignoreRules.ts) 的目录 matcher 也接收相同过滤。
 - [执行服务](../../packages/ts-shell/src/runtime/execution/service.ts) 拒绝工作区外枚举根并返回拒绝的 Promise；glob、LSP、grep 回退传入检查与取消，read 目录列表接入相同选项。[目录呈现](../../packages/ts-shell/src/core/tools/directoryListing.ts) 将省略原因写为 ignore 或 access rules，避免将权限隐藏误报为纯忽略规则。保留缺失目录返回空列表的既有约定，其他错误不据此伪装为缺失；..notes 等合法名称不再按父目录前缀排除。
-- 定向比较沿 [19 号研究](19-tools-maturity-and-multifile-edit.md) 检查参考目录工具的路径解析、存在/类型检查、readdir 与逐条 stat；保留本项目共享遍历/忽略 owner，未新增平行列表系统。参考没有本批逐路径 deny 契约，不能把其直接 readdir 当作权限围栏。本批继续保留原生 Git 的忽略与 tracked 语义，对结果再检查，不退回一个不同语义的枚举器。
+- 定向比较沿 [17 号研究](17-tools-maturity-and-multifile-edit.md) 检查参考目录工具的路径解析、存在/类型检查、readdir 与逐条 stat；保留本项目共享遍历/忽略 owner，未新增平行列表系统。参考没有本批逐路径 deny 契约，不能把其直接 readdir 当作权限围栏。本批继续保留原生 Git 的忽略与 tracked 语义，对结果再检查，不退回一个不同语义的枚举器。
 - 验证：Linux、Node 20.3、仓内隔离环境下 execution/core-tools/turn-tools 共 40 文件/393 项通过，build:ts 通过。新增 8 项覆盖有/无 Git 的拒绝文件、拒绝目录后代、内外部链接、外部枚举根、预取消/拒绝零 readdir、walk 不进入拒绝目录或读拒绝忽略文件、read/glob 实际接线及双点文件名。最初 fixture 位于父仓库内，被父 Git 忽略规则覆盖，移至隔离 TMPDIR 后验证两条真实分支；未改产品忽略语义来适应 fixture。
 - 反转移除实际路径拒绝回调时 6 失败/2 通过，精确恢复后上述组合套件通过。编译模块探针分别在非 Git 与 Git 合成工作区运行真实 read/glob，均隐藏拒绝目录及其内容并保留公开文件；模型请求为零。import-cycles/config-consumers/declarations/node-floor 通过；NormProof 无阻断项，整体 partial 仍来自 6 项既有函数数量 advisory。
 - `81fe8dcc` 的 CI `37338065230` 已核实成功；快照提交 `30c26b7a` 的 Architecture Watch `37338755126` 成功，CI `37338755092` 最近查询仍 in_progress。未取得本批独立审查、PTY 或跨平台运行证据。
@@ -482,7 +482,7 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 
 - [原生 grep](../../packages/ts-shell/src/core/tools/grepRipgrep.ts) 在调用上下文携带文件策略时，先通过原生 --files/--null 枚举候选，再交给 [候选 owner](../../packages/ts-shell/src/core/tools/searchFiles.ts) 核验常规文件、canonical containment、目标及祖先目录拒绝规则。正文搜索仅传入允许的明确文件列表；全部拒绝时不启动正文搜索。未提供文件策略的兼容直接调用保留原路径搜索，不能把它们宣称为已受额外 deny 约束。
 - 使用现有执行 owner 流式收集 NUL 分隔名称，处理跨块 UTF-8，候选输出上限 16 MiB，超限停止并返回 output-limit，残缺记录返回失败。允许列表按保守的 16,000 字节 argv 大小分批，枚举与后续搜索共用总 deadline；每批启动前再核验，保留结果前及返回前重新核验，策略撤回后的正文不输出。仅缺失二进制仍允许原有 walk 回退。
-- 定向比较沿 [19 号研究](19-tools-maturity-and-multifile-edit.md) 实读参考 grep 的参数构造和流式 JSON 读取：保留原生 --hidden/glob、-- 分隔模式/路径及 JSON 行处理；参考直接以目录启动搜索，没有同等逐文件回调契约，本批扩展为原生候选加明确文件搜索，不重写匹配器或换成逐文件 JavaScript 正则。枚举和匹配共用同一个参数 owner，避免两处 glob/大小语义漂移。
+- 定向比较沿 [17 号研究](17-tools-maturity-and-multifile-edit.md) 实读参考 grep 的参数构造和流式 JSON 读取：保留原生 --hidden/glob、-- 分隔模式/路径及 JSON 行处理；参考直接以目录启动搜索，没有同等逐文件回调契约，本批扩展为原生候选加明确文件搜索，不重写匹配器或换成逐文件 JavaScript 正则。枚举和匹配共用同一个参数 owner，避免两处 glob/大小语义漂移。
 - 验证：Linux、Node 20.3、仓内隔离环境下 execution/core-tools/turn-tools 共 41 文件/400 项通过，build:ts 通过。7 项新增测试检查正文进程 argv 不含拒绝文件、全拒绝零正文进程、点目录和原生忽略、输出到达时撤回策略、长列表分批无丢失、超大枚举终止和残缺枚举失败。移除目标/祖先拒绝检查时 4 失败/3 通过，精确恢复后最终组合套件通过。
 - 编译模块探针经实际内置 grep 与原生程序验证公开内容可搜索、拒绝目录内容不输出、回退 walk 次数为零；模型请求为零。import-cycles/config-consumers/declarations/node-floor 通过；NormProof 无阻断项，6 项既有函数上限 advisory 保持，整体 partial。未取得本批独立审查、PTY 或非 Linux 运行证据。
 - 上批 `6e339370` 的 Architecture Watch `37339975289` 已成功，CI `37339974843` 最近查询仍 in_progress。SAFE-02 仍未完成：本批是稳定目标下的原生逐文件准入，候选检查与子进程打开之间尚存在竞态，原生内部忽略配置读取仍不受回调约束；输出复查不能证明子进程从未读取随后被替换的拒绝对象。目录/创建竞态及非 Linux 文件身份边界仍待完成。
@@ -621,7 +621,7 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - 对照参考声明式 subcommand 的单源描述和候选派生，采用这一决定并把运行时校验也接入；其候选构造只处理一级动作，后续多级参数合法性仍需由本项目解析器逐项实现。对照参考信任模块的字符串枚举验证，采用显式值比较；另外在本项目 setter 直接设边界，不能仅依赖调用端类型声明。参考对损坏配置拒绝保存的决定已注意到，属于后续存储完整性工作，未以本批枚举守卫冒充完成。
 - Linux、Node 20.3、隔离环境下 8 文件/177 项通过，build:ts 通过。恢复旧 trust handler、移除 setter 枚举守卫、恢复 parseInt 接受、删除额外参数拒绝四组反转均失败；逐字节恢复后组合套件再次通过。真实 regular/fullscreen CLI 先记录 untrusted，再输入 constructor/__proto__/on extra/session extra/status extra，文件内容与 mtime 均不变，两模式 exit 0、无模型请求。
 - import cycles/config consumers/declarations/node floor 通过；call reachability 7 个既有 advisory，NormProof 阻断义务通过且保留 5 个既有函数数量 advisory。前批 3fe750c7 的 CI 37364227880 最近为 in_progress、Architecture Watch 37364227869 为 queued，不计成功。
-- **CMD-03 尚未完成**：本批只迁移上述三条命令；23 号全量表其余命令、flags、多级语法、动态实体及 model/export/memory/restore 的语义仍待处理。CMD-04、SAFE-02 和其余 Phase 19 任务继续。
+- **CMD-03 尚未完成**：本批只迁移上述三条命令；21 号全量表其余命令、flags、多级语法、动态实体及 model/export/memory/restore 的语义仍待处理。CMD-04、SAFE-02 和其余 Phase 19 任务继续。
 
 
 ### 8.22 CMD-03：export/restore 严格 flags 与确认隔离
@@ -1554,7 +1554,7 @@ SAFE-04 已实现并完成 Linux 本地验证；SAFE-02 仍未完成。上一批
 - TUI 提供可选 input-ready/first-layout/first-write 观察，真实输入 listener 安装和 deferred enable、有效布局、stdout 成功 callback 分别发出。两个 painter 都传递写入回调；[FrameStartup](../../packages/ts-shell/src/presentation/tui/render/startup.ts)拥有一次性回调及 stop/restart 撤销，不让旧写入污染新启动。未启用计时不安装这些观察。没有将 stream callback 当作像素确认或性能提升证明。
 - 最终 Node 20.3 构建和 7 文件/122 项通过，见 `.tmp/startup-check-ax4w0yv0`；既有 build:exe 成功生成本机产物，见 `.tmp/startup-exe-final-wsdbxctx`，未更改 package scripts/build 行为。三组有效反转覆盖进程起点、写入时机和 deferred input，恢复后 60 项；抽取 owner 后再反转最终写入回调，恢复后 51 项，见 `.tmp/phase19-config/report-replay-reversals/1791329364359423483`、`1791329559311131575`。源码副本均逐字节/SHA-256 恢复。
 - 独立代码 APPROVE（116 项，owner 抽取后 51 项），架构 CLEAR（79 项/4 文件与 import-cycle gate），见 `.tmp/timing-architecture-CryAID`。审查识别条件表达式内 callback 导致 engine 超过 20；职责移入 render/startup 后 engine 保持 20→20，terminal 既有字段箭头计数未增长。
-- 两模式实际 npm/tsx/JS/exe 各五次，以及关闭计时 JS 各五次，共 50 场全部通过，见 `.tmp/sm-642699446`。每次从外部启动前到 VT prompt、再到 composer 输入回显分别计时；内部 listener/layout/write 顺序正确，配置不变、零模型 message。重复四场的提示符中位数 regular/fullscreen：npm 2121/2088ms、tsx 1550/1552ms、JS 894/882ms、exe 410/411ms。关闭计时 JS 为 898/915ms，不能宣称零开销；冷/暖应用缓存、未控制 OS 缓存、P95 与早期夹具失败详见 [研究18 §5.5](18-input-slash-startup-context.md#55-ui-07-启动事件与入口矩阵2026-10-07)。没有声称本批比旧提交更快。
+- 两模式实际 npm/tsx/JS/exe 各五次，以及关闭计时 JS 各五次，共 50 场全部通过，见 `.tmp/sm-642699446`。每次从外部启动前到 VT prompt、再到 composer 输入回显分别计时；内部 listener/layout/write 顺序正确，配置不变、零模型 message。重复四场的提示符中位数 regular/fullscreen：npm 2121/2088ms、tsx 1550/1552ms、JS 894/882ms、exe 410/411ms。关闭计时 JS 为 898/915ms，不能宣称零开销；冷/暖应用缓存、未控制 OS 缓存、P95 与早期夹具失败详见 [研究18 §5.5](16-input-slash-startup-context.md#55-ui-07-启动事件与入口矩阵2026-10-07)。没有声称本批比旧提交更快。
 - 上批 `a8774cfa` 已推送，Architecture Watch 37546372288 成功；CI 37546372317 当前仍运行。本批远端按新 SHA 核实。UI-07 的实际请求上下文账目及完整 Phase 19 继续，Windows 像素/真实 IME 仍未验证。
 - 五项静态 gates、43 项 script tests 与 NormProof 0 blocking 通过，见 `.tmp/startup-gates-zjry1oxl`；既有五项函数计数 advisory 和 120 项文档来源 advisory 保留。
 
@@ -2427,20 +2427,20 @@ Node20.3 直接受影响 22 文件/315 项、TypeScript 与 Linux 单文件构�
 #### A03 — QA-02：必要的真实环境验收仍未完成（高，验收证据缺失）
 
 - **契约**：QA-02、§7.3 及 [集成验收 §5](phase-19-acceptance.md#5-平台协议与剩余工作)要求按适用平台/协议取得实际证据；受控服务、PTY 字节和合成请求各自不能证明真实前端、账户或部署互通。
-- **已确认未验格**：UI-01–03 的真实 IME/系统复制及完整前端逐帧；SAFE-02 的非 Linux 对象绑定（A01）和 Windows 本地写入/macOS；AUTO-02/PAR-03 所涉及的 W7-33 四端点真实 TLS/HTTP2；RSC-05/[15 §17.2](15-deep-research-design.md#172-真实质量验收)的软件版本、论文方法、混合域与有意冲突来源四类真实模型质量样本，以及 TOOL-02/RSC-02 的跨平台 PDF 获取/解析；ECO-01–03/05 的公共包源和账户互通；REM-01–05 的部署 TLS、真实远端主机/密钥与 SSH；MEDIA-01 的真实设备、声音及 Live 服务。验收 §19–25 的局部证据没有覆盖这些格。
+- **已确认未验格**：UI-01–03 的真实 IME/系统复制及完整前端逐帧；SAFE-02 的非 Linux 对象绑定（A01）和 Windows 本地写入/macOS；AUTO-02/PAR-03 所涉及的 W7-33 四端点真实 TLS/HTTP2；RSC-05/[15 §17.2](13-deep-research-design.md#172-真实质量验收)的软件版本、论文方法、混合域与有意冲突来源四类真实模型质量样本，以及 TOOL-02/RSC-02 的跨平台 PDF 获取/解析；ECO-01–03/05 的公共包源和账户互通；REM-01–05 的部署 TLS、真实远端主机/密钥与 SSH；MEDIA-01 的真实设备、声音及 Live 服务。验收 §19–25 的局部证据没有覆盖这些格。
 - **证据/影响**：这是当前文档明确保留、独立文档复核再次确认的未完成清单，不是这些能力运行失败的断言，也不把显式允许的 `unsupported` 平台或严格预算当成新缺陷。当前保持 active 正确；“本地实现”不能被改成全阶段验收完成。
 - **后续验收**：在各原 owner 的适用环境补真实链路，配置/凭据只能通过既定显式 opt-in 门禁，记录适用范围和真实失败类别。精确源码的提交、推送、CI 和发布状态另行从外部实态取证；本轮没有读取真实 provider 配置或把旧提交的 CI 结论沿用到新 SHA。
 
 #### A04 — TOOL-01：grep 降级路径的实际读取没有字节上限（高，代码缺陷）
 
-- **契约**：[19 §3.7](19-tools-maturity-and-multifile-edit.md#37-readglob-与-fallback限制实际工作量)要求 fallback 同样限制实际读取工作量，不能以输出截断或读取前 stat 替代内存界。
+- **契约**：[19 §3.7](17-tools-maturity-and-multifile-edit.md#37-readglob-与-fallback限制实际工作量)要求 fallback 同样限制实际读取工作量，不能以输出截断或读取前 stat 替代内存界。
 - **当前证据**：[grep](../../packages/ts-shell/src/core/tools/grep.ts#L160) 在原生程序不存在时，先 `await fs.stat(fullPath)` 并检查 `MAX_SEARCHED_FILE_BYTES`，随后调用 `executionService.readTextFile`，但没有传 `maxBytes`。[read owner](../../packages/ts-shell/src/runtime/execution/read.ts#L81) 在 `maxBytes === undefined` 时直接 `handle.readFile` 全量读取；原 owner 已有可复用的限额分块分支。
 - **触发/影响**：文件在前一次 stat 后、实际读取前增长并保持稳定时，新句柄可以读入任意大的正文；读取后的 revision 复验不能撤销已分配的内存，若增长早于新句柄的初始 stat 还可能直接返回大正文。随后 `split` 继续复制数据。此项依据当前调用链静态确认，未运行大文件/内存探针；不声称已发生 OOM。
 - **后续修复/验收**：在原 grep 读取调用上使用现有 `maxBytes` 契约，将限额触发报告为明确的不完整/资源失败，不能静默当成完整零匹配；用一个受控增长反例验证上限发生在读取中。全量复核结束前暂不改代码。
 
 #### A05 — PAR-03：退出最后一个连接后仍可使用其持久凭据（高，代码缺陷）
 
-- **契约**：[22 的 logout 处置](22-command-inventory-alignment.md#5-53-个参考无词法交集项的-phase-19-处置)要求区分 session 解绑和持久凭据移除；正常请求不能在报告无连接后悄悄继续使用刚退出的登录。
+- **契约**：[22 的 logout 处置](20-command-inventory-alignment.md#5-53-个参考无词法交集项的-phase-19-处置)要求区分 session 解绑和持久凭据移除；正常请求不能在报告无连接后悄悄继续使用刚退出的登录。
 - **当前证据**：[连接创建](../../packages/ts-shell/src/core/commands/connectCommandRuntime.ts#L168) 同时写入 `providerConnections` 与 `providerCredentials`；账户登录也保存这两处。相同 owner 的 `removeConnection`（第 297–318 行）仅删连接列表，保留整个 `providerCredentials`，却报告 `Disconnected`/`Active connection now: none`。[凭据解析](../../packages/ts-shell/src/core/shell/providerCredentials.ts#L203) 在没有连接时仍返回该配置中的 API key 或账户认证；[实际请求装配](../../packages/ts-shell/src/cli/provider/step.ts#L59) 不要求 connection ID 就使用它构造认证头。`/logout` 是到同一 owner 的薄别名。
 - **触发/影响**：无环境或 CLI 凭据覆盖时，登录一个连接，再退出最后一个连接，重载/重启后普通 prompt 仍能解析到退出前的持久凭据。独立代码 lane 提出，主代理已核对创建→移除→解析→请求装配；本轮仅静态取证，没有读取真实密钥或发请求。
 - **后续修复/验收**：在原 auth/config owner 明确解绑与移除凭据的作用域，用现有字段 CAS 同时清理属于所退出连接的备用凭据，保留其他连接和外部提供的凭据。隔离覆盖 API-key 与 account-auth 的登录→退出→fresh resolution，并验证其他连接不被误删；报告不能暗示已撤销远端 token。全量复核结束前不修代码。
@@ -2496,7 +2496,7 @@ Node20.3 直接受影响 22 文件/315 项、TypeScript 与 Linux 单文件构�
 
 #### A13 — PAR-03：账户额度与权益兑换仍只有未知占位，未交付原裁决能力（中，未完成交付）
 
-- **契约**：[22 §5 第 46 项](22-command-inventory-alignment.md#5-53-个参考无词法交集项的-phase-19-处置)要求独立账户额度入口、可得额度和实际权益消耗预览/确认；[24 §10](24-shared-command-parity.md#10-costusagestats)还要求账户、来源、更新时间、幂等及外部失败状态。无可用协议时如实 unknown 是正确兜底，不等于整个能力已经交付。
+- **契约**：[22 §5 第 46 项](20-command-inventory-alignment.md#5-53-个参考无词法交集项的-phase-19-处置)要求独立账户额度入口、可得额度和实际权益消耗预览/确认；[24 §10](22-shared-command-parity.md#10-costusagestats)还要求账户、来源、更新时间、幂等及外部失败状态。无可用协议时如实 unknown 是正确兜底，不等于整个能力已经交付。
 - **当前证据**：[实际 usage handler](../../packages/ts-shell/src/core/commands/usageCommandRuntime.ts#L5)只接受 show/status，读取本地 session telemetry，恒定返回 `Account quota: unknown` 与 `Reset credit: unavailable`；没有调用账户额度 owner，也没有账户选择、获取时间或权益预览/批准/执行入口。[命令注册](../../packages/ts-shell/src/core/commands/registry.ts#L560)只装配这个 handler。当前生产源码定向查找 quota/credit/redeem/entitlement 未找到对应能力消费者；相关测试只断言上述未知字符串。§8.140 虽已披露未知，却把 W15 本地实现整体记为完成，没有修订原交付项或给出替代验收。
 - **参考/影响**：已在只读参考的同类入口核对账户枚举、精确 provider/credential target、`redeemResetCredit` 实际调用及交互确认分支；这是特定账户协议的能力，不能复制成任意 provider 均可重置的承诺。本项是确定的交付差距，不把现有 truthful unknown 当作错误，也不声称已知某个真实账户的可用权益。
 - **后续验收**：先在原 auth/usage owner 明确并核查可支持的外部协议及账户范围，接入来源/时间/状态快照；权益操作须绑定确切账户、实际消耗预览、单独批准、幂等与未知外部结果。无能力的协议继续明确 unavailable，不能拿本地计数、清限流或未知占位替代该交付。全部任务审查结束前不开始实现。
@@ -2559,7 +2559,7 @@ Node20.3 直接受影响 22 文件/315 项、TypeScript 与 Linux 单文件构�
 
 #### A22 — RSC-01：指定 brief 文件仅交给模型自行读取，实际未读也可继续研究（中，代码缺陷）
 
-- **契约**：[15 §6.2](15-deep-research-design.md)要求 `--brief` 文件先经正常 read 权限、containment 和字节预算；显式指定的研究输入不能静默遗漏，读取失败须反映在 run 状态/限制中。
+- **契约**：[15 §6.2](13-deep-research-design.md)要求 `--brief` 文件先经正常 read 权限、containment 和字节预算；显式指定的研究输入不能静默遗漏，读取失败须反映在 run 状态/限制中。
 - **当前证据**：request 只保存 `briefPath`；[research prompt](../../packages/ts-shell/src/research/run/prompts.ts#L44)要求模型自行 read，但 [brief stage acceptance](../../packages/ts-shell/src/research/run/stages.ts#L18)只检查返回 brief 的 schema/revision/mode/question ID。原 child 获只读工具权限并记录实际 source receipts，brief acceptance 没有消费这些 receipt，也没有在创建时由正常 read owner先取得指定文件。父 deny 本身有效，未发现越权读取；缺的是对必需输入是否取得的实际核验。
 - **触发/影响**：带 `--brief constraints.md` 启动研究，brief 子上下文零工具读取，或读取被拒绝后仍返回合法 brief JSON，host 接受并继续 investigate/report，没有标记指定输入缺失。此项针对确切必需输入，不要求宿主证明模型理解或遵守全部正文语义；本轮静态核对实际输入、prompt、stage 和 source consumer，未运行模型探针。
 - **后续修复/验收**：复用现有 read/source 权限及 bounded reader先绑定指定简报，或由原阶段 owner 强制核验本次实际读取及其成功/完整性再接受派生 brief；拒绝/缺失/超限明确停住或保留输入未验证状态。一个指定输入未读/deny 的反例不得进入完整研究成功，合法受限读取仍保留预算与原路径语义。全量复核结束前不修代码。
@@ -3066,7 +3066,7 @@ A31-R01–R07在上述局部合同内已修复。忽略signal的任意注入工�
 | A03 / UI-01–03、QA-02 | 真实IME、系统选择/复制、完整用户前端逐帧仍未验；已有PTY、ConPTY及像素层局部证据见[验收§19–23](phase-19-acceptance.md#19-windows-unc-读取局部验收2026-10-13) | 需要实际前端、输入法和系统交互验收；自动字节断言不能补足，本阶段不继续追加终端探针 |
 | A03 / SAFE-02、TOOL-02、RSC-02、QA-02 | Windows本地NTFS写入/对象竞态、完整Windows套件、macOS原生文件/进程/终端，以及跨平台PDF获取/解析未取得完整证据；见验收§5 | 缺相应平台和原生运行矩阵；后续按平台分别验收，不把接口或Linux结果外推 |
 | A03 / AUTO-02、PAR-03、QA-02 | W7-33四端点真实TLS/HTTP2矩阵未完成；严格预算在无法证明完整请求上界时仍为unsupported | 真实传输需原有显式opt-in入口及可用服务；unsupported为现有准入契约，不以本地估算放宽它 |
-| A03 / RSC-05 | [研究质量验收](15-deep-research-design.md#172-真实质量验收)的四类真实模型样本仍未完成 | 合成来源、阶段和审查测试不证明研究质量；需单独的真实模型质量任务及明确授权，未读取真实配置 |
+| A03 / RSC-05 | [研究质量验收](13-deep-research-design.md#172-真实质量验收)的四类真实模型样本仍未完成 | 合成来源、阶段和审查测试不证明研究质量；需单独的真实模型质量任务及明确授权，未读取真实配置 |
 | A03、A13 / PAR-03、ECO-01–03/05 | 真实账户额度/权益互通、公共包源及认证互通未验；§10.14只提供本地pending/unknown收据查询，可信远端原请求结算缺明确API保证 | 需要服务与账户互通证据及可信原请求查询协议；unknown围栏继续保留，不自动重试、释放或用余额变化猜成功 |
 | A03 / REM-01–05 | 部署TLS、真实远端主机/主机密钥、SSH与生产协作互通未验；受控服务和权限/恢复证据见验收§3–5 | 需要明确部署、主机和身份条件；本阶段不建立新的外部服务或主机授权 |
 | A03 / MEDIA-01、TOOL-05 | 真实声音设备、Live服务及其他桌面协议的适用验收未完成；已有Linux X11与受控媒体边界 | 需要实机设备、权限与服务；不可用/不支持继续如实显示，不以转写或浏览器替代 |

@@ -57,3 +57,7 @@ rtk/
 # bug, and this keeps its output out of a commit until the bug is found.
 /undefined/
 packages/ts-shell/undefined/
+
+.claude/
+.sisyphus/
+.tmp/

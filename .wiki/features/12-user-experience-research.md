@@ -233,7 +233,7 @@ Codex 使用带类型/schema 的 TOML 配置及 profiles，包含上下文、推
 
 这是一条有界网页资料收集路径。当前没有模型生成后续研究问题、迭代调查、综合论证、事实核验或生成研究综述的等价链路。
 
-提交 `89c1dd18` 删除旧 deepResearcher/claimVoter/reportGenerator，新增 collector。[原登记册](13-feature-and-defect-register.md#L3113) 曾列“接模型改进”或“改名去伪”两条方向；[Phase 18 裁决](phase-18-decisions.md#L2139) 记录选择改名分支；[当前专题文档](../wiki/theses/deep-research-command-architecture.md) 也已按资料收集能力描述。
+提交 `89c1dd18` 删除旧 deepResearcher/claimVoter/reportGenerator，新增 collector。[原登记册](11-feature-and-defect-register.md#L3113) 曾列“接模型改进”或“改名去伪”两条方向；[Phase 18 裁决](phase-18-decisions.md#L2139) 记录选择改名分支；[当前专题文档](../wiki/theses/deep-research-command-architecture.md) 也已按资料收集能力描述。
 
 这些材料说明改动的来源，不构成用户对本次方向的追认。用户现在明确要求改进深度研究能力，而非把目标收缩为网页收集。**去掉未实现机制的宣称是已完成的诚实化工作；用户期待的深度研究仍是能力和方向缺口。** 同样不能反向声称被删除的旧实现已经有可靠的多代理研究能力。本轮只登记差异，没有重新设计或实现研究引擎。
 
@@ -470,20 +470,20 @@ V13 的脚本错误已定位：粘贴 Hello、左移三次后 Ctrl+U 只删除�
 
 ## 11. 解决方案研究的下游文档（2026-10-05 增补）
 
-本文件（14 号）记录问题、现状与当时的隔离探针。15–24 补充方案，并在本轮按源码、参考实现和用户裁决直接纠正原正文。它们均为研究设计；实施范围、依赖和验收以 [Phase 19 决策与任务规划](phase-19-decisions.md) 为准。
+本文件（12 号）记录问题、现状与当时的隔离探针。15–24 补充方案，并在本轮按源码、参考实现和用户裁决直接纠正原正文。它们均为研究设计；实施范围、依赖和验收以 [Phase 19 决策与任务规划](phase-19-decisions.md) 为准。
 
 | 问题（本文件章节） | 方案文档 | 覆盖内容 |
 |---|---|---|
-| §6 深度研究被改方向 | [15：深度研究](15-deep-research-design.md) | `/deep-research` 为主名，research/deep aliases 同步迁移；软件与论文全文、真实来源、对抗核验、共享预算及恢复 |
-| §4.2 配色与输入框样式 | [16：Composer 与主题](16-tui-composer-and-theme.md) | 八形态全部提供、默认 `default`、中性命名；精确配色与终端默认前景、左右各 2 cells、复制保留源文 |
-| §3、§4.3、§8.2 状态带与面板 | [17：状态与面板](17-tui-status-and-panels.md) | 区分正常界面与 overlay；复用现有 picker，补状态事实与结构化着色，明确新增主题角色 |
-| §2.1/§2.2/§2.4/§7 输入、启动与上下文 | [18：输入与上下文](18-input-slash-startup-context.md) | regular marker/caret 修复、原草稿区间补全、别名语义、真实首帧计时、估算与 usage 分账 |
-| §4.1、§9 工具与多文件编辑 | [19：工具成熟度](19-tools-maturity-and-multifile-edit.md) | 运行校验、路径/网络/取消/资源边界；单一 apply_patch 复用 writer，部分提交与未知结果如实保留 |
-| §5 高级配置 | [20：配置系统](20-configuration-system.md) | 字段 schema/来源/合并与安全策略，JSONC、并发保存、revision reload、设置实际生效；model 会话默认、显式 --global |
-| §8 resume/undo/回退 | [21：会话与恢复](21-session-recovery-and-undo-ux.md) | 打开聚焦 current、异步逻辑文件大小；撤销最新已提交 operation，多文件 patch 一组；分支与失败真值 |
-| §2、§4 命令覆盖 | [22：命令清单](22-command-inventory-alignment.md) | 注册字段与参考声明的可复算清单、53 个无词法交集入口逐项处置，不把名称差异当能力缺失 |
-| §2.1 命令后续选项 | [23：参数选项](23-command-argument-options.md) | 44 个参数命令、18 个无 provider 的行为分类；help/parser/completion 共用语法，动态值与副作用验证 |
-| §4 命令能力 | [24：语义对齐](24-shared-command-parity.md) | 20 组精选比较及辅助项，复用已有能力；自主目标、Git、安全、生态、协作及其他新增工作流均入 Phase 19 |
+| §6 深度研究被改方向 | [15：深度研究](13-deep-research-design.md) | `/deep-research` 为主名，research/deep aliases 同步迁移；软件与论文全文、真实来源、对抗核验、共享预算及恢复 |
+| §4.2 配色与输入框样式 | [16：Composer 与主题](14-tui-composer-and-theme.md) | 八形态全部提供、默认 `default`、中性命名；精确配色与终端默认前景、左右各 2 cells、复制保留源文 |
+| §3、§4.3、§8.2 状态带与面板 | [17：状态与面板](15-tui-status-and-panels.md) | 区分正常界面与 overlay；复用现有 picker，补状态事实与结构化着色，明确新增主题角色 |
+| §2.1/§2.2/§2.4/§7 输入、启动与上下文 | [18：输入与上下文](16-input-slash-startup-context.md) | regular marker/caret 修复、原草稿区间补全、别名语义、真实首帧计时、估算与 usage 分账 |
+| §4.1、§9 工具与多文件编辑 | [19：工具成熟度](17-tools-maturity-and-multifile-edit.md) | 运行校验、路径/网络/取消/资源边界；单一 apply_patch 复用 writer，部分提交与未知结果如实保留 |
+| §5 高级配置 | [20：配置系统](18-configuration-system.md) | 字段 schema/来源/合并与安全策略，JSONC、并发保存、revision reload、设置实际生效；model 会话默认、显式 --global |
+| §8 resume/undo/回退 | [21：会话与恢复](19-session-recovery-and-undo-ux.md) | 打开聚焦 current、异步逻辑文件大小；撤销最新已提交 operation，多文件 patch 一组；分支与失败真值 |
+| §2、§4 命令覆盖 | [22：命令清单](20-command-inventory-alignment.md) | 注册字段与参考声明的可复算清单、53 个无词法交集入口逐项处置，不把名称差异当能力缺失 |
+| §2.1 命令后续选项 | [23：参数选项](21-command-argument-options.md) | 44 个参数命令、18 个无 provider 的行为分类；help/parser/completion 共用语法，动态值与副作用验证 |
+| §4 命令能力 | [24：语义对齐](22-shared-command-parity.md) | 20 组精选比较及辅助项，复用已有能力；自主目标、Git、安全、生态、协作及其他新增工作流均入 Phase 19 |
 
 **复核记录**：[verification-15-21](verification-15-21.md) 保留文件名，覆盖范围已扩至 15–24；区分历史父代理抽查、本轮分域源码审查和修订后复核，不把不可用审查算通过。预算未填写即无累计 cap、显式 cap 统一准入、完整大型系统范围、undo/model/三项配色均已按用户答复裁定。
 

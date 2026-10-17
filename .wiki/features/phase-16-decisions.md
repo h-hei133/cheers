@@ -1,6 +1,6 @@
 # Phase 16 裁决：10 项（2026-09-29）
 
-> 预研究见 [`phase-16-pre-research.md`](phase-16-pre-research.md)；差距盘点见 [`12-gap-and-debt-research-2.md`](12-gap-and-debt-research-2.md)。
+> 预研究见 [`phase-16-pre-research.md`](phase-16-pre-research.md)；差距盘点见 [`10-gap-and-debt-research-2.md`](10-gap-and-debt-research-2.md)。
 > 本文对 10 项逐条给形态与顺序。**每项独立提交 + 撤销验证 + 七门禁**。
 
 ---
@@ -968,7 +968,7 @@ $ cheers --print "/model use openai/gpt-4"→ Target project does not exist: /mo
 | **16-M** `NO_COLOR`/`FORCE_COLOR`/truecolor/`tuiMode:"stream"` | P3；属「补标准支持」而非修缺陷。`"stream"` 无行为一项可顺手在 16-F 里删类型取值（见 §5 待确认） |
 | **16-N** 代码围栏语法着色 | P3 增强；参考侧有 56 令牌可照抄，体量适合作独立阶段 |
 | **项目记忆自动注入模式**（Claude Code 式索引常驻） | §2 16-A 第 4 条：产品模型变更 + 提示注入面，独立裁决 |
-| **真正的 alt-screen 分栏侧栏** | 12 号文档 §3.3 已记，产品决定 |
+| **真正的 alt-screen 分栏侧栏** | 10 号文档 §3.3 已记，产品决定 |
 | **MCP SSE/HTTP 传输、per-prompt gateway 重建** | Phase 15 已记 backlog |
 
 ---

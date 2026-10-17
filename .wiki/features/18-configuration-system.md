@@ -13,10 +13,10 @@ confidence: high
 
 ## 1. 范围与证据口径
 
-本文承接 [14 号文档](14-user-experience-research.md) §5，审查高级配置、文件与 UI 联动、来源追踪及配置安全。源码基线为 `28ff98cee8c4dd63e6752452f73a362ed3559ae3`。2026-10-05 复审修正了原稿的错误事实、无依据数值和不完整伪代码；这里只修改研究文档，**没有修改或验证产品实现**。
+本文承接 [12 号文档](12-user-experience-research.md) §5，审查高级配置、文件与 UI 联动、来源追踪及配置安全。源码基线为 `28ff98cee8c4dd63e6752452f73a362ed3559ae3`。2026-10-05 复审修正了原稿的错误事实、无依据数值和不完整伪代码；这里只修改研究文档，**没有修改或验证产品实现**。
 
 - **源码**：当前目标实现及定向参考源码支持的事实。
-- **历史观察**：14 号文档既有隔离探针结果；本次未复跑，不升级为新验证结果。
+- **历史观察**：12 号文档既有隔离探针结果；本次未复跑，不升级为新验证结果。
 - **已裁定方案**：Phase 19 应实施的契约；不代表当前功能已经可用。
 - **待实施验证**：边界测试、性能测量和真实终端验收；不以方案文字替代证据。
 
@@ -48,7 +48,7 @@ Phase 19 保留普通字段既有 `default → project → user` 的兼容行为
 
 ### 2.3 缺完整 schema，但并非零校验
 
-[RuntimeConfigFile](../../packages/ts-shell/src/config/runtimeConfig.ts#L362) 的 TypeScript 类型不能验证文件中的值。14 号文档历史探针记录普通 `maxTurns`、`temperature`、`retryEnabled` 的错误值可进入有效配置；这一缺口仍有源码支持。
+[RuntimeConfigFile](../../packages/ts-shell/src/config/runtimeConfig.ts#L362) 的 TypeScript 类型不能验证文件中的值。12 号文档历史探针记录普通 `maxTurns`、`temperature`、`retryEnabled` 的错误值可进入有效配置；这一缺口仍有源码支持。
 
 原稿“零运行时断言”“diagnostics 只有两种”不成立：
 
@@ -156,7 +156,7 @@ Node `>=20.3.0`、TypeScript 和单文件分发不构成“零依赖”约束。
 
 在 config owner 中聚合领域字段定义，包含输入映射、允许来源、验证/合并策略、默认/可选语义、敏感级别、UI 控件及生效边界。UI 只消费可编辑字段的投影；注册一个条目不等于已经有正确生产消费。
 
-设置面板展示有效值、来源、目标保存范围和 pending/restart 状态。选择行不保存、不改变执行语义；Apply 才发字段补丁。主题/输入框形态可按 [16](16-tui-composer-and-theme.md) 进行可撤销临时预览，Esc 恢复预览前状态。保存范围不能仅由 winning layer 自动推断，因为 env/CLI 来源并非可写文件，项目写入也需要明确的 scope。
+设置面板展示有效值、来源、目标保存范围和 pending/restart 状态。选择行不保存、不改变执行语义；Apply 才发字段补丁。主题/输入框形态可按 [16](14-tui-composer-and-theme.md) 进行可撤销临时预览，Esc 恢复预览前状态。保存范围不能仅由 winning layer 自动推断，因为 env/CLI 来源并非可写文件，项目写入也需要明确的 scope。
 
 高级项通过搜索和分组可发现；秘密字段使用专用安全连接界面，不能因泛型 registry 就把原始凭据显示到通用列表。
 

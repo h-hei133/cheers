@@ -28,7 +28,7 @@ confidence: high
 | 顶层与子项声明合计 | 不适用 | 223 = 85 + 138 | 不是去重功能数，也不是所有模式均可调用的动作数 |
 | 参数补全提供者 | 26 / 58 | 静态物化 29 / 85；TUI runtime 30 / 85 | 参考 28 个带子项的命令，加 `move`；TUI 再加 `switch`。数量与选项质量、可执行性分开评估 |
 
-证据：[Cheers 注册表](../../packages/ts-shell/src/core/commands/registry.ts)、[额外 `/back` 与动态注册](../../packages/ts-shell/src/entrypoints/slashCommandRegistry.ts)、[参考注册与补全物化](../../../oh-my-pi/packages/coding-agent/src/slash-commands/builtin-registry.ts)、[压缩模式](../../../oh-my-pi/packages/coding-agent/src/session/compact-modes.ts)、[思考等级](../../../oh-my-pi/packages/tui/src/thinking.ts)。参数替换范围、说明与解析契约见 [23](23-command-argument-options.md)。
+证据：[Cheers 注册表](../../packages/ts-shell/src/core/commands/registry.ts)、[额外 `/back` 与动态注册](../../packages/ts-shell/src/entrypoints/slashCommandRegistry.ts)、[参考注册与补全物化](../../../oh-my-pi/packages/coding-agent/src/slash-commands/builtin-registry.ts)、[压缩模式](../../../oh-my-pi/packages/coding-agent/src/session/compact-modes.ts)、[思考等级](../../../oh-my-pi/packages/tui/src/thinking.ts)。参数替换范围、说明与解析契约见 [23](21-command-argument-options.md)。
 
 ### 1.2 词法关系
 
@@ -58,7 +58,7 @@ refNoToken = ref.filter(command => intersection(token(command), oursTokens).size
 
 ## 2. Cheers 58 条注册定义
 
-下表是 **registry metadata**，不是完整 handler 语法。`—` 表示未声明；“有”只表示有 `getArgumentCompletions`。例如 `/goal` 的注册提示仍是 `<goal instruction>`，不能推断 handler 只有一种形式。真实解析、交互拦截及补全见 [23](23-command-argument-options.md)。摘要保留注册原文以便复算；摘要与行为的已知偏差在第 4 节修正，不能以摘要证明功能。
+下表是 **registry metadata**，不是完整 handler 语法。`—` 表示未声明；“有”只表示有 `getArgumentCompletions`。例如 `/goal` 的注册提示仍是 `<goal instruction>`，不能推断 handler 只有一种形式。真实解析、交互拦截及补全见 [23](21-command-argument-options.md)。摘要保留注册原文以便复算；摘要与行为的已知偏差在第 4 节修正，不能以摘要证明功能。
 
 | # | name | aliases | group / kind | argumentHint | 补全 | summary（注册原文） | execute 入口 |
 |---|---|---|---|---|---|---|---|
@@ -235,7 +235,7 @@ refNoToken = ref.filter(command => intersection(token(command), oursTokens).size
 | `/commit` / `/git` | 同一 Git owner 已接通 staged/index/worktree、split diff 与 hunk；模型 commit 只拟消息并调用 host 绑定的 `git_commit`。 | stage/commit/merge/push 分别审批；原生读回与收据保存结果分开，未知远端写先 reconcile。 |
 | `/wt` | 已复用 manager 与同 ID session rebind，复制精确 index/工作树/未跟踪内容并保留源。 | 当前 source read grant 和 destination deny 均检查；冲突/子模块/转换后 clean bytes 不匹配拒绝迁移；外改/replacement/ignored 用户文件保留。 |
 
-证据：[新会话](../../packages/ts-shell/src/cli/runtime/session.ts)、[会话选择器](../../packages/ts-shell/src/cli/interactive/picker/session.ts)、[键位](../../packages/ts-shell/src/cli/interactive/keybindings.ts)、[工具策略](../../packages/ts-shell/src/core/query/toolPolicy.ts)、[忙时交互](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts)、[fast](../../packages/ts-shell/src/core/commands/fastCommandRuntime.ts)、[goal](../../packages/ts-shell/src/core/commands/goalCommandRuntime.ts)、[commit](../../packages/ts-shell/src/core/commands/commitCommandRuntime.ts)、[worktree](../../packages/ts-shell/src/core/workflow/gitWorktreeManager.ts)。其他语义审查见 [24](24-shared-command-parity.md)。
+证据：[新会话](../../packages/ts-shell/src/cli/runtime/session.ts)、[会话选择器](../../packages/ts-shell/src/cli/interactive/picker/session.ts)、[键位](../../packages/ts-shell/src/cli/interactive/keybindings.ts)、[工具策略](../../packages/ts-shell/src/core/query/toolPolicy.ts)、[忙时交互](../../packages/ts-shell/src/cli/interactive/interactiveMode.ts)、[fast](../../packages/ts-shell/src/core/commands/fastCommandRuntime.ts)、[goal](../../packages/ts-shell/src/core/commands/goalCommandRuntime.ts)、[commit](../../packages/ts-shell/src/core/commands/commitCommandRuntime.ts)、[worktree](../../packages/ts-shell/src/core/workflow/gitWorktreeManager.ts)。其他语义审查见 [24](22-shared-command-parity.md)。
 
 ## 5. 53 个参考无词法交集项的 Phase 19 处置
 
@@ -297,7 +297,7 @@ refNoToken = ref.filter(command => intersection(token(command), oursTokens).size
 | 52 | login | 复用 Provider 登录 | 明确入口到 `/connect login`，复用认证 owner；Provider/账号/作用域明确，不近似匹配错账号。 | PAR-03 |
 | 53 | logout | 复用 Provider 退出 | 复用 `/connect logout`，区分 session 解绑及持久凭据移除；外部失败不报已退出。 | PAR-03 |
 
-`skills`、`marketplace`、`plugins` 因有词法交集而不在此表，**不代表公共生态已齐全**。完整公共技能商店已纳入 Phase 19：真实来源/查询、固定版本/完整性校验、安装审批、隔离脚本执行、升级/回滚/卸载和依赖审计均需交付，详见 [24](24-shared-command-parity.md)。
+`skills`、`marketplace`、`plugins` 因有词法交集而不在此表，**不代表公共生态已齐全**。完整公共技能商店已纳入 Phase 19：真实来源/查询、固定版本/完整性校验、安装审批、隔离脚本执行、升级/回滚/卸载和依赖审计均需交付，详见 [24](22-shared-command-parity.md)。
 
 
 ### 5.1 大型扩展的参考证据边界
@@ -312,7 +312,7 @@ refNoToken = ref.filter(command => intersection(token(command), oursTokens).size
 
 ## 6. 已完成的裁决与实施依赖
 
-1. **命名**：保留现有主名与兼容 alias。唯一明确迁移是恢复 `/deep-research` 主名，`research/deep` 随新研究入口在同一发布迁移，并从轻量 `/web-research` collector 移除这些 alias；帮助说明行为变化，按 [15](15-deep-research-design.md) 分清两种能力。新增参考名称先校验语义，不批量重定向。
+1. **命名**：保留现有主名与兼容 alias。唯一明确迁移是恢复 `/deep-research` 主名，`research/deep` 随新研究入口在同一发布迁移，并从轻量 `/web-research` collector 移除这些 alias；帮助说明行为变化，按 [15](13-deep-research-design.md) 分清两种能力。新增参考名称先校验语义，不批量重定向。
 2. **别名展示**：空前缀按主命令去重；输入 alias 仍可匹配并回显所属命令。解析保留 raw 调用信息，尤其 `/recall`、`/retain`，折叠展示不改变执行。
 3. **模型**：用户已选默认当前 session，随 session 保存供 resume；仅显式 `--global` 改全局默认。模型/思考等级完整验证后共同生效，失败无半更新。
 4. **撤销**：用户已选最近一次已提交编辑操作，多文件 patch 算一组。先预览确认，再走 restore 权限/路径/stale-content/恢复链；确认不允许覆盖用户后续编辑，partial 与未验证保持可见。
