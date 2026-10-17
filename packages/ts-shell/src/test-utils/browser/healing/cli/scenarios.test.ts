@@ -133,12 +133,12 @@ describe("browser self-healing apply real CLI scenario examples", () => {
     expect(fs.readFileSync(fixture.manifestPath, "utf8")).not.toContain("RAW_");
   }, 20000);
 
-  it("blocks external, unsafe, missing, invalid, global, and unconfirmed repair apply", async () => {
+  it.each(["external", "unsafe", "missing-manifest", "invalid-manifest", "global", "unconfirmed"])("blocks %s repair apply", async kind => {
     const fixture = track(createBrowserSelfHealingApplyCliScenarioFixture({ manifestKind: "local-fixture" }));
     const invalidRoot = tempRoot("browser-self-healing-cli-invalid-");
     const invalidManifest = writeInvalidBrowserSelfHealingApplyCliManifest(invalidRoot);
     const result = await runAgentCliScenario({
-      scenario: scenario("route115-blocked-repairs", [
+      scenario: scenario(`route115-blocked-repair-${kind}`, [
         repairStep("external", fixture.proposalIds.externalBlocked, fixture.manifestPath, {
           assertions: [
             { id: "external", kind: "stdout-contains", text: "apply-blocked-external-network" },
@@ -163,11 +163,12 @@ describe("browser self-healing apply real CLI scenario examples", () => {
           prompt: `/browser repair apply ${fixture.proposalIds.runnerBinding} --manifest ${fixture.manifestPath}`,
           assertions: [{ id: "confirm", kind: "stdout-contains", text: "missing-explicit-user-confirmation" }],
         },
-      ]),
+      ].filter(step => step.id === kind)),
       projectPath: projectRoot(),
       homeDir: tempRoot("cheers-route115-home-"),
     });
 
+    expect(result.steps.map(step => step.stepId)).toEqual([kind]);
     expect(agentCliAssertionFailures(result)).toEqual([]);
     expect(fixture.inspectManifest().warningMarkers).toEqual([]);
   }, 30000);

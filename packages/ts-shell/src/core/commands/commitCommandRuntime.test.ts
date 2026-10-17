@@ -9,7 +9,7 @@ let fixture: ReturnType<typeof gitFixture>;
 const git = (...args: string[]) => fixture.git(args);
 beforeEach(() => {
   fixture = gitFixture(true); root = fixture.root;
-  for (const key of ['HOME', 'USERPROFILE', 'GIT_CEILING_DIRECTORIES', 'GIT_CONFIG_NOSYSTEM', 'GIT_CONFIG_GLOBAL']) vi.stubEnv(key, fixture.env[key as keyof typeof fixture.env]!);
+  for (const key of ['HOME', 'USERPROFILE', 'XDG_CONFIG_HOME', 'GIT_CEILING_DIRECTORIES', 'GIT_CONFIG_NOSYSTEM', 'GIT_CONFIG_GLOBAL']) vi.stubEnv(key, fixture.env[key as keyof typeof fixture.env]!);
   fs.writeFileSync(path.join(root, "new.txt"), "staged evidence\n");
   git("add", "new.txt");
 });

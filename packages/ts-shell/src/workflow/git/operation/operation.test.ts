@@ -17,7 +17,7 @@ import { GitCommitIntent } from './intent.js';
 
 describe('exact native Git approval', () => {
   let fixture: ReturnType<typeof gitFixture>;
-  beforeEach(() => { fixture = gitFixture(); for (const key of ['HOME', 'USERPROFILE', 'GIT_CEILING_DIRECTORIES', 'GIT_CONFIG_NOSYSTEM', 'GIT_CONFIG_GLOBAL']) vi.stubEnv(key, fixture.env[key as keyof typeof fixture.env]!); });
+  beforeEach(() => { fixture = gitFixture(); for (const key of ['HOME', 'USERPROFILE', 'XDG_CONFIG_HOME', 'GIT_CEILING_DIRECTORIES', 'GIT_CONFIG_NOSYSTEM', 'GIT_CONFIG_GLOBAL']) vi.stubEnv(key, fixture.env[key as keyof typeof fixture.env]!); });
   afterEach(() => { vi.unstubAllEnvs(); fixture.cleanup(); });
   it('stages only a selected original hunk and unstage preserves every worktree byte', async () => {
     const original = fs.readFileSync(path.join(fixture.root, 'a.txt'), 'utf8'); const changed = original.replace('line 2\n', 'changed 2\n').replace('line 70\n', 'changed 70\n');

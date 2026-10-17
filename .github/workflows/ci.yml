@@ -61,10 +61,14 @@ jobs:
       - name: Build TypeScript packages
         run: npm run build:ts
 
-      - name: Install native search test dependency
+      - name: Install native execution test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y ripgrep
+          sudo apt-get install --no-install-recommends -y ripgrep bubblewrap
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          bwrap --unshare-all --ro-bind / / --proc /proc --dev /dev -- /bin/true
 
       - name: Install Chromium test dependency
         run: node node_modules/playwright-core/cli.js install --with-deps chromium

@@ -10,7 +10,7 @@ const TMP = fileURLToPath(new URL('../../../../.tmp/', import.meta.url));
 export function gitFixture(unborn = false) {
   fs.mkdirSync(TMP, { recursive: true }); const base = fs.mkdtempSync(path.join(TMP, 'git-test-'));
   const root = path.join(base, 'source'); fs.mkdirSync(root); const home = path.join(base, 'home'); fs.mkdirSync(home);
-  const env = { ...process.env, HOME: home, USERPROFILE: home, GIT_CEILING_DIRECTORIES: base, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: path.join(home, '.gitconfig') };
+  const env = { ...process.env, HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: path.join(home, '.config'), GIT_CEILING_DIRECTORIES: base, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: path.join(home, '.gitconfig') };
   const git = (args: string[], cwd = root) => execFileSync('git', args, { cwd, env, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
   git(['init', '-q', '-b', 'main']); git(['config', 'user.name', 'Synthetic']); git(['config', 'user.email', 'synthetic@example.invalid']);
   if (!unborn) { fs.writeFileSync(path.join(root, 'a.txt'), Array.from({ length: 80 }, (_, index) => `line ${index + 1}`).join('\n') + '\n'); git(['add', '--', 'a.txt']); git(['commit', '-qm', 'initial']); }

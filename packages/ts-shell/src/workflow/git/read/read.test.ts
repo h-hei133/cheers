@@ -9,7 +9,7 @@ import { getWorkflowGitContext, getWorkflowGitDiagnostics } from '../../gitConte
 
 describe('native Git truth and safe passive inspection', () => {
   let fixture: ReturnType<typeof gitFixture>;
-  beforeEach(() => { fixture = gitFixture(); for (const key of ['HOME', 'USERPROFILE', 'GIT_CEILING_DIRECTORIES', 'GIT_CONFIG_NOSYSTEM', 'GIT_CONFIG_GLOBAL']) vi.stubEnv(key, fixture.env[key as keyof typeof fixture.env]!); });
+  beforeEach(() => { fixture = gitFixture(); for (const key of ['HOME', 'USERPROFILE', 'XDG_CONFIG_HOME', 'GIT_CEILING_DIRECTORIES', 'GIT_CONFIG_NOSYSTEM', 'GIT_CONFIG_GLOBAL']) vi.stubEnv(key, fixture.env[key as keyof typeof fixture.env]!); });
   afterEach(() => { vi.unstubAllEnvs(); fixture.cleanup(); });
   it('retains both index/worktree versions and NUL literal paths, rename and binary identity', async () => {
     const original = fs.readFileSync(path.join(fixture.root, 'a.txt'), 'utf8');

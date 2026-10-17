@@ -10,7 +10,7 @@ import { runNativeGit } from './gate.js';
 
 describe('remote Git unknown result reconciliation', () => {
   let fixture: ReturnType<typeof gitFixture>;
-  beforeEach(() => { fixture = gitFixture(); for (const key of ['HOME', 'USERPROFILE', 'GIT_CEILING_DIRECTORIES', 'GIT_CONFIG_NOSYSTEM', 'GIT_CONFIG_GLOBAL']) vi.stubEnv(key, fixture.env[key as keyof typeof fixture.env]!); });
+  beforeEach(() => { fixture = gitFixture(); for (const key of ['HOME', 'USERPROFILE', 'XDG_CONFIG_HOME', 'GIT_CEILING_DIRECTORIES', 'GIT_CONFIG_NOSYSTEM', 'GIT_CONFIG_GLOBAL']) vi.stubEnv(key, fixture.env[key as keyof typeof fixture.env]!); });
   afterEach(() => { vi.unstubAllEnvs(); fixture.cleanup(); });
   it('binds exact remote URL/ref, retains a lost push reply, queries before any fresh write and never retries', async () => {
     const remote = path.join(fixture.base, 'remote.git'); fixture.git(['init', '--bare', '-q', remote]); fixture.git(['remote', 'add', 'origin', remote]);

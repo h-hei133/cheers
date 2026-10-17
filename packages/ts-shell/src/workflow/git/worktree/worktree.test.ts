@@ -14,7 +14,7 @@ import { assertSourceAccess } from '../../../core/query/sourcePolicy.js';
 describe('owned worktree migration preserves source and destination truth', () => {
   let fixture: ReturnType<typeof gitFixture>;
   let owned: Map<string, CheckoutIdentity & { branch: string; head: string }>;
-  beforeEach(() => { fixture = gitFixture(); owned = new Map(); for (const key of ['HOME', 'USERPROFILE', 'GIT_CEILING_DIRECTORIES', 'GIT_CONFIG_NOSYSTEM', 'GIT_CONFIG_GLOBAL']) vi.stubEnv(key, fixture.env[key as keyof typeof fixture.env]!); });
+  beforeEach(() => { fixture = gitFixture(); owned = new Map(); for (const key of ['HOME', 'USERPROFILE', 'XDG_CONFIG_HOME', 'GIT_CEILING_DIRECTORIES', 'GIT_CONFIG_NOSYSTEM', 'GIT_CONFIG_GLOBAL']) vi.stubEnv(key, fixture.env[key as keyof typeof fixture.env]!); });
   afterEach(() => { vi.unstubAllEnvs(); fixture.cleanup(); });
   function binding(changed = true): WorktreeBinding { return {
     migrate: () => ({ changed, note: changed ? 'Same session binding migrated.' : 'Rebind did not commit.' }),

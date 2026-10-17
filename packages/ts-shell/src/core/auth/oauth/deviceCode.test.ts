@@ -20,14 +20,16 @@ import { classifyDeviceTokenResponse, DeviceFlowError, pollDeviceFlow, type Poll
 function recordingSleep(): { delays: number[]; restore: () => void } {
   const delays: number[] = [];
   const realSetTimeout = globalThis.setTimeout;
-  vi.spyOn(globalThis, "setTimeout").mockImplementation(((callback: () => void, ms?: number) => {
+  // A scoped global stub leaves no timer spy for another suite's
+  // restoreAllMocks to reinstall while its fake clock owns the global.
+  vi.stubGlobal("setTimeout", ((callback: () => void, ms?: number) => {
     delays.push(ms ?? 0);
     return realSetTimeout(callback, 0);
   }) as unknown as typeof setTimeout);
   return {
     delays,
     restore: () => {
-      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
     },
   };
 }

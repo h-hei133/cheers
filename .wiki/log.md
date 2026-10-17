@@ -7150,3 +7150,15 @@ Cheers 有两项 omp 没有的：**信任门**与**溯源三态**（`Effective/A
 **完整 TS 运行未全绿**：`npm run test -w packages/ts-shell -- --threads=false` 退出 1，813 文件中 812 通过、1 失败；8231 项中 8225 通过、5 失败、1 skipped。五项都在 `webRequests.test.ts`，错误为 `setTimeout is not defined`。定位到先运行 `deviceCode.test.ts` 后的计时器清理；用相同两文件顺序在未修改的 `03b56c94f0276952924f4c2859afdeac026138cb` 独立 worktree 和当前源码均复现相同五项失败。该文件单独运行 44 项通过；分类为既有 Vitest 串行测试隔离问题，本批未修。早期并行运行的其他失败未凭单例重跑推定既有，但后续完整串行运行覆盖并通过了对应文件。本地组合验证、基线反例及 CLI/TTY 原始证据保存在忽略的 `.omx/ultragoal/`，不作为远端 CI 通过证明。
 
 **交付状态（本条写入时）**：本地实现与适用验收完成；尚未提交、推送，也没有本次变更的精确 SHA CI 结果。后续交付另记；整个 Phase 20 仍有 46 项待依次实施。
+
+### 2026-10-17 — CFG-01 交付与计时器测试夹具修复
+
+CFG-01 产品、测试及文档已提交为 `647ae00ed0200474ccefa0e028246acb0483d78b` 并推送 `origin/main`；远端 ref 已读回相同 SHA。该 SHA 的 [NormProof Architecture Watch](https://github.com/h-hei133/cheers/actions/runs/39004758804) 全部步骤实际运行并通过。[主 CI](https://github.com/h-hei133/cheers/actions/runs/39004758769) 已实际完成依赖安装、五项静态检查、script tests、构建与测试依赖安装；TS 测试最终失败：813 文件中 781 通过、32 失败，8231 项中 8028 通过、201 失败、2 skipped，主 CI 内最后的 NormProof 步骤被跳过。大量失败明确报缺少 `bwrap`；另有继承 runner XDG 路径的全局 Git attributes 夹具失败，以及六次串行 CLI 共用 30 秒的超时。没有沿用旧 SHA 的账单/未启动结果，也不把独立 Architecture Watch 通过改写为主 CI 通过。
+
+随后修复前条中已按同序基线复现的测试隔离缺陷：`core/auth/oauth/deviceCode.test.ts` 的 `recordingSleep` 用可清除 registry 的 global stub 替换全局 timer spy，结束时恢复该 stub。Vitest 0.34 的 spy registry 会保留已恢复 spy，后续文件的 `restoreAllMocks` 能在 fake clock 活跃时重装旧 timer；这正是同序五项 `setTimeout` 错误的来源。定向对照参考测试的 scoped timer cleanup，并核查已安装 Vitest 的两种 registry 生命周期后实施；产品 OAuth、网络重试与任何测试断言均未改变。
+
+使用固定的 `deviceCode → webRequests` 顺序复验，原夹具 5 项失败，修复后 2 文件、58 项通过；保留 interval、拒绝、取消、deadline 与响应体边界断言。本次未重跑耗时完整套件，不把前条全量失败结果改写为通过。夹具修复的提交、独立复核与最终 CI 读回继续分别记录。
+
+本轮 CI 环境修复限于测试与 workflow：Linux job 安装真实 `bubblewrap`，仅在 runner 暴露相应内核项时配置 namespace 准入，随后执行真实隔离 smoke；没有增加失败后绕过隔离的运行路径。对照本地参考项目的依赖安装与 namespace 设置后，保留检查失败即终止，未沿用吞错设置。Git 夹具在自身子进程和五处进程内消费者同步冻结 `XDG_CONFIG_HOME`；此前在外部 XDG 路径下单例复现 attributes 断言失败，修复后五文件 34 项通过。六个拒绝 CLI 场景拆成独立用例，每个仍运行原断言并核对实际 step ID，避免空选择通过；12 项实际通过。
+
+后续本地验证：固定 `deviceCode → webRequests` 两文件顺序 58 项通过；真实 sandbox/process、native view 与 skillLoader 三文件 96 项通过；bwrap smoke、五项静态门禁和 diff whitespace 检查通过。限定变更文件的清理检查无额外改动，两路独立复核分别 APPROVE/CLEAR；未重跑本地完整套件，不能据此写全量已绿。此条写入时 follow-up 尚未提交/推送，其精确 SHA CI 结果仍待后续读回。
