@@ -110,7 +110,7 @@ describe('goal request policies', () => {
 import { goalRequestPolicy } from ${JSON.stringify(path.resolve('src/planning/goal/budget.ts'))};
 const input = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const host = { getSessionDirPath: () => process.argv[3] };
-try { const policy = goalRequestPolicy(host, input.session); console.log('ready'); await new Promise(resolve => process.stdin.once('data', resolve)); const attempt = policy.reserve(input.request); attempt.dispatch(); attempt.settle({ version: 1, inputTokens: 10, outputTokens: 2, complete: true }); console.log('admitted'); }
+try { const policy = goalRequestPolicy(host, input.session); const admitted = new Promise(resolve => process.stdin.once('data', resolve)); console.log('ready'); await admitted; const attempt = policy.reserve(input.request); attempt.dispatch(); attempt.settle({ version: 1, inputTokens: 10, outputTokens: 2, complete: true }); console.log('admitted'); }
 catch (error) { console.log(error.code); }
 `);
     const children: ReturnType<typeof spawn>[] = []; let ready = 0;

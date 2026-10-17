@@ -7656,3 +7656,8 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - `layoutSideBySide` 为每行保留 left/right 源文本与分隔列；`sourceLinesFor` 在 command/error 与 framed tool 卡片中定位 diff 行块并映射源；`extractSource` 按选区起始列选择 old/new 一侧，跨分隔列时回退渲染文本。
 - tool 卡片在 inner≥100 时启用并排（此前始终 unified），窄屏仍回退。
 - 验证：surface/transcript 188；新增 command 与 framed tool 两侧复制测试。
+
+## 2026-10-18 — 修复跨进程预算测试竞态
+
+- `budget.test.ts` 的子进程在打印 `ready` 后才注册 stdin 监听，父进程的 `admit` 可能在监听注册前到达并丢失，子进程以 0 退出且无结果。
+- 改为先注册监听再打印 `ready`；连续 3 次单测与整套 11 项通过。
