@@ -11,6 +11,7 @@ import type { CommandContext } from '../types.js';
 import { setModel } from './selection.js';
 import { projectSessionModel } from '../../../session/model/projection.js';
 import { connectionSnapshot } from './identity.js';
+import { deleteProfilePreset, ProfilePresetError, readProfilePresets, saveProfilePreset } from './presetStore.js';
 
 export interface ModelPresetTarget extends SessionModelRole {}
 export function validPresetName(name: string): boolean {
@@ -56,23 +57,37 @@ export function saveModelPreset(sessionId: string, name: string, roles: Readonly
   } catch { return 'Model preset requires a readable selected model; write outcome is unverified if publication was attempted.'; }
 }
 
-/** The ordinary model owner applies only a role on the currently active connection. */
+/** Resolve a name from the session first; a session entry hides the library entry whole. */
+export function resolveModelPreset(sessionId: string | undefined, name: string): { readonly preset: SessionModelPreset; readonly source: 'session' | 'profile' } | undefined {
+  const session = sessionId ? readSessionModel(sessionId)?.presets?.[name] : undefined;
+  if (session) return { preset: session, source: 'session' };
+  const profile = readProfilePresets()[name];
+  return profile ? { preset: profile, source: 'profile' } : undefined;
+}
+
+/** One explicit apply: every role is validated, one role is selected in one session transaction. */
 export async function applyModelPreset(sessionId: string, name: string, role = 'default', suppliedContext?: CommandContext): Promise<string> {
   try {
     const baseline = readSessionModelEdit(sessionId);
     const current = baseline.selection;
-    const preset = current?.presets?.[name];
+    const resolved = resolveModelPreset(sessionId, name);
+    const preset = resolved?.preset;
     const target = preset?.roles[role];
-    if (!current || !target || !baseline.projectRoot) return `Model preset '${name}' role '${role}' was not found.`;
+    if (!current || !preset || !target || !baseline.projectRoot) return `Model preset '${name}' role '${role}' was not found.`;
     const context: CommandContext = suppliedContext ?? { cwd: baseline.projectRoot, projectRoot: baseline.projectRoot, sessionId };
     const config = context.readConfiguration?.().config ?? context.runtimeConfig ?? projectSessionModel(readFreshConfiguration(context), sessionId);
     const catalog = context.readConfiguration?.().catalog ?? loadCatalog();
-    const failure = validateModelPreset(preset!.roles, config, catalog);
+    const failure = validateModelPreset(preset.roles, config, catalog);
     if (failure) return failure;
     if (config.activeProviderConnectionId !== target.connectionId) return `Model preset refused: select connection '${target.connectionId}' with /connect use before applying this role.`;
-    const admission = () => context.admission?.() ?? (!sameValue(readSessionModel(sessionId)?.presets?.[name], preset)
-      || validateModelPreset(preset!.roles, readFreshConfiguration(context), loadCatalog()) ? 'Model preset changed or a role became unavailable.' : undefined);
-    const output = await setModel([`${target.provider}/${target.model}`], { ...context, sessionId, admission }, false, target.thinkingEffort ?? null);
+    const unchanged = () => resolved.source === 'session'
+      ? sameValue(readSessionModel(sessionId)?.presets?.[name], preset)
+      : sameValue(readProfilePresets()[name], preset);
+    const admission = () => context.admission?.() ?? (!unchanged()
+      || validateModelPreset(preset.roles, readFreshConfiguration(context), loadCatalog()) ? 'Model preset changed or a role became unavailable.' : undefined);
+    // A bare model keeps the active connection, which is the connection just checked;
+    // a catalogue-id prefix would read as a provider switch for custom relays.
+    const output = await setModel([target.model], { ...context, sessionId, admission }, false, target.thinkingEffort ?? null);
     if (!output.includes(`Model switched to ${target.model}.`)) return output;
     const effective = projectSessionModel(readFreshConfiguration(context), sessionId);
     const selected = readSessionModel(sessionId);
@@ -81,6 +96,53 @@ export async function applyModelPreset(sessionId: string, name: string, role = '
       || effective.providerConnections.find(connection => connection.id === target.connectionId)?.model !== target.model) {
       return 'Model preset application is unverified; inspect the effective model before sending.';
     }
-    return `Model preset '${name}' role '${role}' applied for this session.\n${output}`;
-  } catch { return 'Model preset application outcome is unverified; inspect the session before retrying.'; }
+    return `Model preset '${name}' role '${role}' applied for this session from the ${resolved.source} owner.\n${output}`;
+  } catch (error) {
+    return error instanceof ProfilePresetError ? error.message : 'Model preset application outcome is unverified; inspect the session before retrying.';
+  }
+}
+
+export function saveProfileModelPreset(name: string, roles: Readonly<Record<string, ModelPresetTarget>>, context?: CommandContext): string {
+  if (!validPresetName(name)) return 'Model preset name is invalid.';
+  const config = readFreshConfiguration(context ?? { cwd: process.cwd() });
+  const failure = validateModelPreset(roles, config, context?.readConfiguration?.().catalog ?? loadCatalog());
+  if (failure) return failure;
+  try {
+    const result = saveProfilePreset(name, { roles });
+    return result === 'replaced'
+      ? `Model preset '${name}' replaced in this profile's library.`
+      : `Model preset '${name}' saved in this profile's library.`;
+  } catch (error) { return error instanceof ProfilePresetError ? error.message : 'Model preset library write outcome is unverified.'; }
+}
+
+export function promoteModelPreset(sessionId: string, name: string, context?: CommandContext): string {
+  const preset = readSessionModel(sessionId)?.presets?.[name];
+  if (!preset) return `Session model preset '${name}' was not found.`;
+  return saveProfileModelPreset(name, preset.roles, context);
+}
+
+export function deleteProfileModelPreset(name: string): string {
+  try {
+    return deleteProfilePreset(name) === 'deleted'
+      ? `Model preset '${name}' deleted from this profile's library.`
+      : `Model preset '${name}' was not found in this profile's library.`;
+  } catch (error) { return error instanceof ProfilePresetError ? error.message : 'Model preset library delete outcome is unverified.'; }
+}
+
+export interface ModelPresetListing {
+  readonly name: string;
+  readonly source: 'session' | 'profile';
+  readonly roles: readonly string[];
+  readonly shadowed?: 'profile';
+}
+
+export function listModelPresets(sessionId?: string): readonly ModelPresetListing[] {
+  const session = sessionId ? readSessionModel(sessionId)?.presets ?? {} : {};
+  const profile = readProfilePresets();
+  const names = [...new Set([...Object.keys(session), ...Object.keys(profile)])].sort();
+  return names.map(name => {
+    const preset = session[name] ?? profile[name]!;
+    return { name, source: session[name] ? 'session' as const : 'profile' as const, roles: Object.keys(preset.roles),
+      ...(session[name] && profile[name] ? { shadowed: 'profile' as const } : {}) };
+  });
 }

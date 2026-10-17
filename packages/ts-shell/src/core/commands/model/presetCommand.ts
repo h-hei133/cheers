@@ -3,7 +3,9 @@ import { catalogModel } from '../../models/catalog.js';
 import { isThinkingPreference, type ThinkingPreference } from '../../models/effort.js';
 import { readSessionModel } from '../../../session/model/state.js';
 import type { SessionModelRole } from '../../../session/model/contract.js';
-import { applyModelPreset, saveModelPreset, validateModelPreset, validPresetName } from './preset.js';
+import { applyModelPreset, deleteProfileModelPreset, listModelPresets, promoteModelPreset, resolveModelPreset,
+  saveModelPreset, saveProfileModelPreset, validateModelPreset, validPresetName } from './preset.js';
+import { ProfilePresetError } from './presetStore.js';
 import type { CommandContext, LocalCommandResult } from '../types.js';
 import { parseSyntax } from '../syntax/parse.js';
 import { syntaxHelp } from '../syntax/projection.js';
@@ -18,29 +20,37 @@ export async function runModelPresetCommand(args: string[], context: CommandCont
   const selection = sessionId ? readSessionModel(sessionId) : undefined;
   const action = parsed.action.name;
   if (action === 'status' || action === 'list') {
-    if (!selection) return { kind: 'local', output: 'Model presets require an active selected model in this session.' };
-    const presets = Object.entries(selection.presets ?? {});
-    if (presets.length === 0) return { kind: 'local', output: 'No model presets are saved for this session.' };
-    return { kind: 'local', output: ['Session model presets', ...presets.map(([name, preset]) => `- ${name}: ${Object.keys(preset.roles).join(', ')}`)].join('\n') };
+    try {
+      const presets = listModelPresets(sessionId);
+      if (presets.length === 0) return { kind: 'local', output: 'No model presets are saved for this session or profile.' };
+      return { kind: 'local', output: ['Model presets', ...presets.map(preset =>
+        `- ${preset.name} [${preset.source}]${preset.shadowed ? ' (hides profile entry)' : ''}: ${preset.roles.join(', ')}`)].join('\n') };
+    } catch (error) { return { kind: 'local', output: error instanceof ProfilePresetError ? error.message : 'Model preset library could not be read.' }; }
   }
-  if (!sessionId || !selection) return { kind: 'local', output: 'Model presets require an active selected model in this session; no global preference was changed.' };
   const name = parsed.args[0]?.trim();
   if (!name) return { kind: 'local', output: `Invalid /modelpreset arguments: Missing name.\n${syntaxHelp(modelPresetSyntax)}` };
+  if (action === 'delete') return { kind: 'local', output: deleteProfileModelPreset(name) };
+  if (!sessionId || !selection) return { kind: 'local', output: 'Model presets require an active selected model in this session; no global preference was changed.' };
   if (action === 'apply' || action === 'use') {
     const output = await applyModelPreset(sessionId, name, parsed.args[1]?.trim() || 'default', context);
     return { kind: 'local', output };
   }
+  if (action === 'promote') return { kind: 'local', output: promoteModelPreset(sessionId, name, context) };
   if (action === 'validate') {
-    const preset = selection.presets?.[name];
-    if (!preset) return { kind: 'local', output: `Model preset '${name}' was not found.` };
-    const failure = validateModelPreset(preset.roles, context.readConfiguration?.().config ?? context.runtimeConfig
+    let resolved;
+    try { resolved = resolveModelPreset(sessionId, name); }
+    catch (error) { return { kind: 'local', output: error instanceof ProfilePresetError ? error.message : 'Model preset library could not be read.' }; }
+    if (!resolved) return { kind: 'local', output: `Model preset '${name}' was not found.` };
+    const failure = validateModelPreset(resolved.preset.roles, context.readConfiguration?.().config ?? context.runtimeConfig
       ?? readFreshConfiguration(context), context.readConfiguration?.().catalog ?? loadCatalog());
-    return { kind: 'local', output: failure ? failure : `Model preset '${name}' is valid for the current catalogue.` };
+    return { kind: 'local', output: failure ? failure : `Model preset '${name}' from the ${resolved.source} owner is valid for the current catalogue.` };
   }
   if (action === 'save') {
     const roles = parsePresetRoles(context, selection, parsed.args.slice(1));
     if (!roles.ok) return { kind: 'local', output: roles.reason };
-    return { kind: 'local', output: saveModelPreset(sessionId, name, roles.roles, context) };
+    return { kind: 'local', output: parsed.flags.has('profile')
+      ? saveProfileModelPreset(name, roles.roles, context)
+      : saveModelPreset(sessionId, name, roles.roles, context) };
   }
   return { kind: 'local', output: `Unknown /modelpreset action: ${action}\n${syntaxHelp(modelPresetSyntax)}` };
 }

@@ -41,6 +41,7 @@ confidence: high
 | [显式配置输入](config-inputs.md) | CFG-03 有序只读输入、来源权限、完整重载与保存边界 |
 | [按路径作用域设置](config-scopes.md) | CFG-04 规则声明、canonical 匹配、逐字段合并、操作快照与失效 |
 | [模型可用性投影](model-availability.md) | PRV-01 本地可证明状态、脱敏 endpoint、选择器一致行为 |
+| [模型角色预设](model-presets.md) | PRV-02 会话兼容、profile 库、整项遮盖与单次事务应用 |
 
 ### 0.2 本轮之前的历史文档（01–22）
 

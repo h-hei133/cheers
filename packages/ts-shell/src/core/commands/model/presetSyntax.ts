@@ -4,7 +4,9 @@ import type { CommandSyntax } from '../syntax/model.js';
 export const modelPresetSyntax: CommandSyntax = {
   name: 'modelpreset',
   defaultAction: 'status',
-  flags: [],
+  flags: [
+    { name: 'profile', kind: 'boolean', summary: 'save into the profile library instead of this session' },
+  ],
   actions: [
     { name: 'status', aliases: ['list'], summary: 'show saved session model presets' },
     {
@@ -23,6 +25,16 @@ export const modelPresetSyntax: CommandSyntax = {
         { name: 'name', kind: 'text', required: true },
         { name: 'role', kind: 'text' },
       ],
+    },
+    {
+      name: 'promote',
+      summary: 'copy a session preset into the profile library',
+      parameters: [{ name: 'name', kind: 'text', required: true }],
+    },
+    {
+      name: 'delete',
+      summary: 'delete a name from the profile library',
+      parameters: [{ name: 'name', kind: 'text', required: true }],
     },
     {
       name: 'validate',

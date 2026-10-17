@@ -7264,3 +7264,13 @@ CFG-03 新增重复 `--config` JSONC 输入，顺序固定于启动目录并保�
 **本地验证**：新增 6 项投影测试（legacy/env 凭据、pending/error/missing、同 provider 两 relay 与脱敏、无模型与未目录连接、measured 不冒充、endpoint 清洗）；`src/core/models`、模型命令、picker 与 `session/model` 共 20 文件 285 项通过；`build:ts` 与三项静态门禁通过。合同见[模型可用性投影](features/model-availability.md)。
 
 本条写入时尚未提交/推送；未运行真实 provider、跨进程并发或跨平台动态证据。
+
+### Phase 20 PRV-02：会话预设兼容与 profile 预设库
+
+保留既有 session 预设格式与 `save/apply/validate` 行为；新增 profile 库 `model-presets.json`（`CHEERS_MODEL_PRESETS_FILE` 可覆盖且必须位于 profile 内），锁内重读、原子写入与读回核对，损坏结构报错而不当空库。
+
+新增 `save --profile`、`promote`、`delete`；`list` 合并显示 `[session]`/`[profile]` 并标注会话遮盖 profile。同名整项由会话获胜，禁止跨层拼角色。应用前验证全部角色的目录模型、effort 能力、连接存在与状态，任一失败整体拒绝；选中角色仍由现有 session 锁内事务写入 `connectionId/provider/model/effort`，不写全局配置。自定义中转站按裸模型名应用，避免 provider 前缀被误读为切换。
+
+**本地验证**：新增 4 项 profile 库测试（保存/列表/删除且不改用户配置、会话整项遮盖、提升后应用、损坏库报错）；`core/commands/model` 5 文件 30 项通过；`build:ts` 通过。合同见[模型角色预设](features/model-presets.md)。
+
+本条写入时尚未提交/推送；未运行真实 provider、UI 面板或跨平台动态证据。

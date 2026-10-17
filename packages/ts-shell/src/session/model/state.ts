@@ -24,7 +24,8 @@ export function decodeSessionModel(value: unknown): SessionModelSelection | unde
   return { ...(candidate.thinkingEffort !== undefined ? { thinkingEffort: candidate.thinkingEffort as ThinkingPreference } : {}), ...(serviceTier !== undefined ? { serviceTier: serviceTier.trim() } : {}), ...(presets ? { presets } : {}), ...(candidate.skillful !== undefined ? { skillful: candidate.skillful } : {}), ...(contextWindow !== undefined ? { contextWindow: contextWindow as number } : {}), connectionId: (candidate.connectionId as string).trim(), provider: (candidate.provider as string).trim(), model: (candidate.model as string).trim() };
 }
 
-function decodePresets(value: unknown): Readonly<Record<string, SessionModelPreset>> | undefined {
+/** Shared with the profile library so both owners accept exactly the same shape. */
+export function decodePresets(value: unknown): Readonly<Record<string, SessionModelPreset>> | undefined {
   if (value === undefined) return undefined;
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
   if (Object.keys(value).length > 32) return undefined;
