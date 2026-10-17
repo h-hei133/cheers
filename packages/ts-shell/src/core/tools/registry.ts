@@ -110,8 +110,8 @@ async function runCommandTool(
   }
   const proof = startCommandProof(command, context)
   context.commandProof?.started(proof, context.assertSourceAccess)
-  const result = await executionService.runCommand({
-    operationKind: 'command.run',
+  const request = {
+    operationKind: 'command.run' as const,
     command: sandbox.command ?? shellBin,
     args: sandbox.args ?? shellArgs,
     cwd: context.workspaceRoot,
@@ -120,11 +120,40 @@ async function runCommandTool(
     caller: 'core-tool:bash',
     reason: 'Run an approved workspace command.',
     reportSafeCommand: command,
-    timeoutMs: timeout.timeoutMs,
     abortSignal: context.abortSignal,
     ...(context.commandEnv ? { env: context.commandEnv } : {}),
     ...(context.onOutput ? { onOutput: context.onOutput } : {}),
-  })
+  }
+  // An interactive default-timeout command is spawned once and adopted by the
+  // job owner. If it outlives the foreground window it is promoted in place,
+  // keeping the same PID; an explicit timeout keeps the ordinary path.
+  const promotable = requestedTimeoutSeconds === undefined && context.background?.adopt && context.background.promote
+    && context.onOutput && executionService.startCommand
+  let result: Awaited<ReturnType<ExecutionService['runCommand']>>
+  if (promotable) {
+    const started = executionService.startCommand!(request)
+    const task = context.background!.adopt!(started.handle, { command, cwd: context.workspaceRoot, timeoutMs: 300_000,
+      authority: TOOL_APPROVED_COMMAND_AUTHORITY, ...(context.commandEnv ? { env: context.commandEnv } : {}) })
+    const deadline = new Promise<'timeout'>(resolve => {
+      const timer = setTimeout(() => resolve('timeout'), DEFAULT_COMMAND_TIMEOUT_MS)
+      timer.unref?.()
+    })
+    const raced = await Promise.race([
+      started.result.then(value => ({ kind: 'result' as const, value })),
+      deadline.then(() => ({ kind: 'timeout' as const })),
+    ])
+    if (raced.kind === 'timeout') {
+      started.handle.detach()
+      if (!context.background!.promote!(task.id)) {
+        await started.handle.kill()
+        return deniedResult('Error: the command could not be moved to the background and was stopped. Nothing is still running.', { status: 'failed', exitCode: 1 })
+      }
+      return approvedResult(`Moved to the background as ${task.id} after ${DEFAULT_COMMAND_TIMEOUT_MS / 1000} seconds. It keeps the same process; read it with taskOutput and stop it with taskStop.`)
+    }
+    result = raced.value
+  } else {
+    result = await executionService.runCommand({ ...request, timeoutMs: timeout.timeoutMs })
+  }
   context.commandProof?.settled({ ...proof, settledAt: new Date().toISOString(), status: result.status, exitCode: result.exitCode }, context.assertSourceAccess)
   const artifactManager = ArtifactManager.getShared(context.workspaceRoot, context.sessionId)
   const isOk = result.status === 'completed' && result.exitCode === 0

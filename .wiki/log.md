@@ -7532,3 +7532,11 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 `pluginPicker.apply` 不再直接执行整批 diff，而是按变更顺序打开确认面板：每个面板只启用/禁用一个插件，提供 Apply / Skip / Cancel remaining；跳过不执行，取消丢弃剩余变更。`/extensions` 仍是 `/plugin` 别名，login/logout 继续复用 connect/oauth runtime。
 
 **本地验证**：`plugins.test.ts` 2 项（逐项确认、跳过/取消）、picker+interactiveMode 149 项通过；`build:ts` 通过。本条写入时尚未提交/推送。
+
+## 2026-10-18 — JOB-01 前台任务原地晋升
+
+- `startStreamed` 成为唯一 spawn 路径，返回 `{handle, result}`；`detach` 只解除等待与 deadline/abort 监听，不杀子进程；`kill` 杀精确进程树。`collectStreamed` 保留为结果包装。
+- `ExecutionService.startCommand` 用同一 handle 投影 `CommandExecutionResult`；`localFailure` 从 `executeLocally` 提取，保证两条路径同一失败分类。
+- `TaskRegistry.adopt(handle,input)` 以临时 UUID 接管已在运行的 PID，输出进入临时 sink；`promote(id)` 通过 `LocalJournal.promote(id,input,pid)` 原地建立持久记录，不二次 spawn。晋升前 `list()` 不显示该任务；容量拒绝时 kill 该子进程。结算在晋升标记仍存在时写 journal，随后清理。
+- bash 工具：默认超时且存在 `background.adopt/promote` 与 `onOutput` 时，spawn 一次并 adopt；60s 后 `detach` + `promote`，返回后台任务 id；晋升失败则 kill 并报告失败。显式 `timeout` 保持原路径。
+- 验证：`runtime/execution` + `workflow/jobs` + `core/tools` 790 通过；`turn` + `cli/runtime` + `cli/interactive` 1309 通过；`local.handle.test.ts` 3 项；晋升/容量测试 2 项。

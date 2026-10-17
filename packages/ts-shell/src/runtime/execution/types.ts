@@ -169,6 +169,19 @@ export interface CommandExecutionRequest {
 }
 
 /** Bounded writes settle only after the pipe has consumed the supplied bytes. */
+/** A live command the caller can detach from without losing the process. */
+export interface LocalExecutionHandle {
+  /** The spawned leader's PID, once the OS has assigned it. */
+  readonly pid: number | undefined;
+  /** Combined stdout/stderr chunks from now on. */
+  onOutput(listener: (chunk: string) => void): () => void;
+  /** Stop waiting without killing the child; its result settles on exit. */
+  detach(): void;
+  /** Kill the exact process tree; resolves once the kill was dispatched. */
+  kill(): Promise<void>;
+  readonly result: Promise<{ stdout: string; stderr: string }>;
+}
+
 export interface ExecutionInput {
   write(chunk: Buffer): Promise<void>
   end(): void
@@ -300,6 +313,14 @@ export interface ExecutionService {
   readonly writeTextFile: (request: TextFileWriteExecutionRequest) => Promise<TextFileWriteResult | void>
   readonly listFilesRecursive: (request: FileListExecutionRequest) => Promise<readonly string[]>
   readonly runCommand: (request: CommandExecutionRequest) => Promise<CommandExecutionResult>
+  /**
+   * Spawn a command and hand back its live handle.
+   *
+   * The result promise projects the same `CommandExecutionResult` as
+   * `runCommand`; the handle lets the caller detach without killing the child
+   * and lets the job owner adopt the exact PID that was spawned.
+   */
+  readonly startCommand?: (request: CommandExecutionRequest) => { readonly handle: LocalExecutionHandle; readonly result: Promise<CommandExecutionResult> }
 }
 
 export interface MediaReadRequest extends TextFileReadExecutionRequest {

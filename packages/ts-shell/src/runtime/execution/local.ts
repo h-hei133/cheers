@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { killProcessTree, trackChildPid, untrackChildPid } from '../../core/shell/platform/processTree.js'
-import type { ExecutionInput, NormalizedExecutionResult } from './types.js'
+import type { ExecutionInput, LocalExecutionHandle, NormalizedExecutionResult } from './types.js'
 import { OutputConsumer } from './stream.js'
 
 /**
@@ -22,7 +22,7 @@ import { OutputConsumer } from './stream.js'
  * which path ran. Output is forwarded as it arrives rather than buffered: the
  * point is that a command which prints for a minute looks alive for that minute.
  */
-function collectStreamed(options: {
+interface StreamOptions {
   command: string
   args: string[]
   cwd: string
@@ -42,10 +42,12 @@ function collectStreamed(options: {
   inheritTerminal?: boolean
   /** Already verified read descriptors inherited as child fd 3 and above. */
   readDescriptors?: readonly number[]
-}): Promise<{ stdout: string; stderr: string }> {
-  // Built by hand rather than with `Promise.withResolvers`, which needs Node 22:
-  // this package declares `>=20.3.0` and `check:node-floor` enforces it.
-  return new Promise((resolve, reject) => {
+}
+
+export function startStreamed(options: StreamOptions): { handle: LocalExecutionHandle; result: Promise<{ stdout: string; stderr: string }> } {
+  let resolveResult!: (value: { stdout: string; stderr: string }) => void;
+  let rejectResult!: (reason?: unknown) => void;
+  const result = new Promise<{ stdout: string; stderr: string }>((resolve, reject) => { resolveResult = resolve; rejectResult = reject; });
     const child = spawn(options.command, options.args, {
       cwd: options.cwd,
       windowsHide: true,
@@ -61,6 +63,8 @@ function collectStreamed(options: {
       // timed-out command leaves the turn waiting on a result forever.
       detached: process.platform !== 'win32',
     })
+    const listeners = new Set<(chunk: string) => void>()
+    let detached = false
     let stdout = ''
     let stderr = ''
     let timedOut = false
@@ -85,7 +89,7 @@ function collectStreamed(options: {
       if (settled) return
       settled = true
       finish()
-      reject(Object.assign(new Error(message), {
+      rejectResult(Object.assign(new Error(message), {
         stdout, stderr: stderr || message, timedOut, cancelled, ...(streamFailed ? { outputFailed: true } : {}), ...details,
       }))
     }
@@ -129,7 +133,7 @@ function collectStreamed(options: {
     child.stdout?.on('data', (chunk: Buffer) => {
       const text = chunk.toString()
       if (options.captureOutput !== false) stdout += text
-      consumers.consume([child.stdout, child.stderr], () => { options.onOutput(text); return options.onStdout?.(chunk); },
+      consumers.consume([child.stdout, child.stderr], () => { options.onOutput(text); for (const listener of listeners) listener(text); return options.onStdout?.(chunk); },
         () => { streamFailed = true; stop(true) })
     })
     child.stderr?.on('data', (chunk: Buffer) => {
@@ -183,10 +187,22 @@ function collectStreamed(options: {
         }
         finish()
         settled = true
-        resolve({ stdout, stderr })
+        resolveResult({ stdout, stderr })
       })
     })
-  })
+  const handle: LocalExecutionHandle = {
+    get pid() { return child.pid },
+    onOutput(listener) { listeners.add(listener); return () => { listeners.delete(listener) } },
+    detach() { if (detached) return; detached = true; clearTimeout(timer); options.abortSignal?.removeEventListener('abort', onAbort) },
+    kill() { stop(); return termination ?? Promise.resolve() },
+    result,
+  }
+  return { handle, result }
+}
+
+/** Wait for the stream to settle; the historical entry point for one command. */
+function collectStreamed(options: StreamOptions): Promise<{ stdout: string; stderr: string }> {
+  return startStreamed(options).result
 }
 
 /**
@@ -234,6 +250,11 @@ export async function executeLocally(options: {
       stderr,
     }
   } catch (error) {
+    return localFailure(error)
+  }
+}
+
+export function localFailure(error: unknown): NormalizedExecutionResult {
     const execError = error as {
       stdout?: string
       stderr?: string
@@ -286,4 +307,4 @@ export async function executeLocally(options: {
       ...(execError.terminationFailed || execError.inputFailed ? { failureKind: 'execution_failure' as const } : {}),
     }
   }
-}
+

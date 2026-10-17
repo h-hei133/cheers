@@ -47,6 +47,37 @@ it('persists the fence before a real child starts and never replays that ID afte
   expect(launch).toHaveBeenCalledTimes(1); expect(await reader.stop(task.id)).toBe(false);
 });
 
+it('adopts a foreground child and promotes it without a second spawn', async () => {
+  const local = journal();
+  const owner = new TaskRegistry({ runCommand: vi.fn() }, local); owners.push(owner);
+  const { startStreamed } = await import('../../../runtime/execution/local.js');
+  const { handle } = startStreamed({ command: process.execPath,
+    args: ['-e', 'setTimeout(() => { console.log("adopted"); process.exit(0) }, 250)'], cwd: root, onOutput: () => {} });
+  const task = owner.adopt(handle, { command: 'adopted-command', cwd: root });
+  expect(task.pid).toBe(handle.pid);
+  expect(local.list()).toEqual([]);
+  expect(owner.promote(task.id)).toBe(true);
+  expect(local.get(task.id)).toMatchObject({ status: 'running' });
+  await until(() => !owner.hasLive(task.id));
+  expect(local.get(task.id)).toMatchObject({ status: 'completed', output: 'complete' });
+  expect(handle.pid).toBe(task.pid);
+});
+
+it('refuses promotion when the journal is at capacity and kills the provisional child', async () => {
+  const local = journal();
+  const owner = new TaskRegistry({ runCommand: vi.fn() }, local); owners.push(owner);
+  const { startStreamed } = await import('../../../runtime/execution/local.js');
+  const make = () => startStreamed({ command: process.execPath, args: ['-e', 'setTimeout(() => {}, 5000)'], cwd: root, onOutput: () => {} }).handle;
+  const first = owner.adopt(make(), { command: 'first', cwd: root });
+  const second = owner.adopt(make(), { command: 'second', cwd: root });
+  const third = owner.adopt(make(), { command: 'third', cwd: root });
+  expect(owner.promote(first.id)).toBe(true);
+  expect(owner.promote(second.id)).toBe(true);
+  expect(owner.promote(third.id)).toBe(false);
+  await until(() => !owner.hasLive(third.id));
+  await owner.stop(first.id); await owner.stop(second.id);
+});
+
 it('resumes only freshly admitted undispatched intent, preserves cwd and keeps unrelated sessions separate', async () => {
   const subdir = path.join(root, 'child'); fs.mkdirSync(subdir); const queued = journal();
   const id = queued.create({ command: 'pwd', cwd: subdir }); queued.pause(id);

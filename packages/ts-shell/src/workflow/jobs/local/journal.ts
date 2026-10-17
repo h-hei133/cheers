@@ -33,6 +33,17 @@ export class LocalJournal implements LocalJournalPort {
       return { ...current, scope, local: [...local, job] };
     }); this.admissions.set(id, admission); return id;
   }
+  promote(id: string, input: BackgroundInput, pid: number | undefined): void {
+    if (!this.list().some(job => job.id === id)) this.create(input, { id, origin: this.origin() });
+    this.arm(id);
+    this.started(id);
+    if (pid !== undefined) {
+      // The native owner already observed the PID; keep the journal's record
+      // consistent without a second dispatch.
+      const job = this.get(id);
+      this.change(job, { note: `The native execution owner adopted PID ${pid}.` });
+    }
+  }
   arm(id: string): void {
     if (this.admission(id)) throw new JobStateError('unavailable');
     const job = this.get(id); if (job.dispatchPossible || job.status !== 'queued') throw new JobStateError('conflict');
@@ -49,7 +60,7 @@ export class LocalJournal implements LocalJournalPort {
     const bytes = Buffer.concat([old, chunk.subarray(0, Math.max(0, 65536 - old.length))]);
     this.change(job, { [stream]: bytes.toString('base64'), truncated: job.truncated || chunk.length > 65536 - old.length });
   }
-  finish(id: string, result: CommandExecutionResult): void {
+  finish(id: string, result: Pick<CommandExecutionResult, 'status' | 'exitCode' | 'terminationFailed' | 'outputFailed' | 'spawnErrorCode'>): void {
     const job = this.get(id);
     const unknown = result.terminationFailed === true;
     const status = unknown ? 'unknown' : result.status === 'completed' && result.exitCode === 0 ? 'completed'

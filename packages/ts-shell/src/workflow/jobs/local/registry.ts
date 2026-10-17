@@ -1,4 +1,6 @@
 import { StringDecoder } from 'node:string_decoder';
+import { randomUUID } from 'node:crypto';
+import type { LocalExecutionHandle } from '../../../runtime/execution/types.js';
 import { createDefaultExecutionService } from '../../../runtime/execution/service.js';
 import type { CommandExecutionResult, ExecutionService } from '../../../runtime/execution/types.js';
 import { createOutputSink, type OutputSink } from './output.js';
@@ -7,7 +9,7 @@ import { taskSnapshot } from './snapshot.js';
 import { closeOutput } from './settlement.js';
 
 interface Operation { readonly controller: AbortController; readonly sink: OutputSink; readonly stdout: StringDecoder;
-  readonly stderr: StringDecoder; settlement: Promise<void>; }
+  readonly stderr: StringDecoder; settlement: Promise<void>; readonly handle?: LocalExecutionHandle; readonly input?: BackgroundInput; readonly adopted?: boolean; }
 
 /** Live handles belong to this owner; restart never signals a numeric PID from a journal. */
 export class TaskRegistry implements BackgroundRunner {
@@ -17,6 +19,8 @@ export class TaskRegistry implements BackgroundRunner {
   private readonly listeners = new Set<(task: BackgroundTask) => void>();
   private nextId = 1;
   private closing = false;
+  /** Provisional tasks promoted to the durable journal. */
+  private readonly promoted = new Set<string>();
   spillDirectory: string | undefined;
   constructor(private readonly execution: Pick<ExecutionService, 'runCommand'> = createDefaultExecutionService(),
     private readonly journal?: LocalJournalPort) {}
@@ -35,6 +39,48 @@ export class TaskRegistry implements BackgroundRunner {
     if (this.closing) throw new Error('Local job owner is closing.');
     const id = this.journal?.create(input) ?? `bg_${this.nextId++}`;
     return this.launch(id, input);
+  }
+  adopt(handle: LocalExecutionHandle, input: BackgroundInput): BackgroundTask {
+    if (this.closing) throw new Error('Local job owner is closing.');
+    const id = randomUUID();
+    const task: BackgroundTask = { id, command: input.command, cwd: input.cwd, pid: handle.pid, startedAt: Date.now(), state: 'running', output: '' };
+    this.tasks.set(id, task);
+    const operation: Operation = { controller: new AbortController(), sink: createOutputSink({ limitBytes: 65536, label: id,
+      ...(!this.journal && this.spillDirectory ? { spillDirectory: this.spillDirectory } : {}) }), stdout: new StringDecoder('utf8'), stderr: new StringDecoder('utf8'),
+      settlement: Promise.resolve(), handle, input, adopted: true };
+    this.operations.set(id, operation);
+    const off = handle.onOutput(text => this.appendAdopted(id, text));
+    const settle = async (result: Pick<CommandExecutionResult, 'status' | 'exitCode' | 'terminationFailed' | 'outputFailed' | 'spawnErrorCode'>): Promise<void> => {
+      off();
+      // Publication must finish while the promotion marker is still set; the
+      // cleanup below is what makes the task invisible to `hasLive`.
+      await this.finish(id, result);
+      this.operations.delete(id);
+      if (!this.promoted.has(id)) this.tasks.delete(id);
+      this.promoted.delete(id);
+    };
+    handle.result.then(() => void settle({ status: 'completed', exitCode: 0 })).catch((error: unknown) => {
+      const failure = error as { cancelled?: boolean; timedOut?: boolean; code?: number | string | null; terminationFailed?: boolean; outputFailed?: boolean };
+      void settle({ status: failure.cancelled ? 'cancelled' : failure.timedOut ? 'timeout' : 'failed',
+        exitCode: typeof failure.code === 'number' ? failure.code : null,
+        ...(failure.terminationFailed ? { terminationFailed: true } : {}), ...(failure.outputFailed ? { outputFailed: true } : {}) });
+    });
+    return task;
+  }
+  promote(id: string): boolean {
+    const operation = this.operations.get(id); const task = this.tasks.get(id);
+    if (!operation?.handle || !operation.input || !task || !this.journal) return false;
+    if (this.promoted.has(id)) return true;
+    try {
+      this.journal?.promote(id, operation.input, task.pid);
+      this.promoted.add(id);
+      return true;
+    } catch {
+      // Capacity or journal refusal: the provisional task must not keep a live
+      // child that nothing can address, so it is killed here.
+      void operation.handle.kill();
+      return false;
+    }
   }
   resume(id: string, input: BackgroundInput): BackgroundTask {
     if (this.closing || this.tasks.has(id) || !this.journal) throw new Error('No newly approved queued job is available.');
@@ -74,13 +120,25 @@ export class TaskRegistry implements BackgroundRunner {
   }
   async stop(id: string): Promise<boolean> {
     const operation = this.operations.get(id); if (!operation) return false;
-    operation.controller.abort(); await operation.settlement;
+    if (operation.handle) await operation.handle.kill();
+    else operation.controller.abort();
+    await operation.settlement;
     return this.get(id)?.state === 'killed';
   }
   async close(): Promise<void> {
     this.closing = true; const selected = [...this.operations.values()];
-    for (const operation of selected) operation.controller.abort();
+    for (const operation of selected) {
+      if (operation.handle) void operation.handle.kill();
+      else operation.controller.abort();
+    }
     await Promise.allSettled(selected.map(operation => operation.settlement));
+  }
+  private appendAdopted(id: string, text: string): void {
+    const operation = this.operations.get(id); if (!operation) return;
+    if (this.promoted.has(id)) this.journal?.output(id, 'stdout', Buffer.from(text));
+    void operation.sink.append(text);
+    this.tasks.set(id, { ...this.tasks.get(id)!, output: operation.sink.tail, outputTruncated: operation.sink.truncated,
+      get outputPath() { return operation.sink.spillPath; } });
   }
   private append(id: string, stream: 'stdout' | 'stderr', bytes: Buffer): void | Promise<void> {
     const operation = this.operations.get(id)!;
@@ -90,7 +148,7 @@ export class TaskRegistry implements BackgroundRunner {
       get outputPath() { return operation.sink.spillPath; } });
     return pending;
   }
-  private async finish(id: string, result: CommandExecutionResult): Promise<void> {
+  private async finish(id: string, result: Pick<CommandExecutionResult, 'status' | 'exitCode' | 'terminationFailed' | 'outputFailed' | 'spawnErrorCode'>): Promise<void> {
     const operation = this.operations.get(id)!;
     // The journal already contains the original bytes. Decoder tails belong to
     // the live text sink only; writing them back would invent replacement bytes
@@ -99,7 +157,11 @@ export class TaskRegistry implements BackgroundRunner {
     const stderrTail = operation.stderr.end();
     await closeOutput(operation.sink, stdoutTail + stderrTail);
     let publicationFailed = false;
-    try { this.journal?.finish(id, result); } catch { publicationFailed = true; }
+    // A foreground-adopted task is journaled only after promotion; an ordinary
+    // launched task is journaled from the start.
+    if (!operation.adopted || this.promoted.has(id)) {
+      try { this.journal?.finish(id, result); } catch { publicationFailed = true; }
+    }
     const task: BackgroundTask = { ...this.tasks.get(id)!, state: publicationFailed || result.terminationFailed ? 'unknown'
       : result.status === 'cancelled' ? 'killed' : 'exited', exitCode: result.exitCode ?? undefined,
       output: operation.sink.tail, outputTruncated: operation.sink.truncated, outputPath: operation.sink.spillPath,

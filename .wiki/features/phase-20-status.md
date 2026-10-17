@@ -38,10 +38,11 @@
 | PAN-03 | hub 主从视图 | 输出分页/脱敏面板、agents 专用操作与未知状态验收 |
 | PAN-07 | alias、逐项确认 | login/logout 设备码安全显示的端到端验收 |
 | SET-03 | status/theme 预览 | 外部更新撤销的端到端验收 |
+| JOB-01 | 单次 spawn 的 handle、detach/kill、adopt/promote、60s 前台晋升 | 新消息晋升、注册表持有的 deadline 竞争、重启后的 adopted PID 恢复 |
 
 ## 未开始
 
-PAN-08、INPUT-01、EDIT-01、JOB-01/02、START-02/03、QA-01…04、TOOL-02；PAN-03 输出分页/脱敏、RENDER-03 resize 锚点与左右源复制仍缺。
+PAN-08、EDIT-01、JOB-02、START-02/03、QA-01…04、TOOL-02；JOB-01 的新消息晋升与注册表持有的 deadline 竞争仍未完成；PAN-03 输出分页/脱敏、RENDER-03 resize 锚点与左右源复制仍缺。
 
 ## CI
 

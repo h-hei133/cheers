@@ -3,7 +3,7 @@ import { readTextFile } from './read.js'
 import { readTextPage } from './page.js'
 import { readMedia, processCleanupFailed } from './media/index.js'
 import { verifyPathContainment } from '../../core/security/pathJail.js'
-import { executeLocally } from './local.js'
+import { executeLocally, localFailure, startStreamed } from './local.js'
 import type { NormalizedExecutionResult } from './types.js'
 import {
   classifyCommandExecutionOutcome,
@@ -58,6 +58,28 @@ export function createDefaultExecutionService(onCommandSettled?: (result: Pick<C
       const result = await runCommand(request)
       onCommandSettled?.({ terminationFailed: result.terminationFailed, outputFailed: result.outputFailed })
       return result
+    },
+    startCommand(request) {
+      const started = startStreamed({
+        command: request.command,
+        args: [...request.args],
+        cwd: request.cwd,
+        ...(request.abortSignal ? { abortSignal: request.abortSignal } : {}),
+        ...(request.env ? { env: request.env } : {}),
+        onOutput: request.onOutput ?? (() => {}),
+        ...(request.onStarted ? { onStarted: request.onStarted } : {}),
+        ...(request.onStdin ? { onStdin: request.onStdin } : {}),
+        ...(request.onStdout ? { onStdout: request.onStdout } : {}),
+        ...(request.onStderr ? { onStderr: request.onStderr } : {}),
+        ...(request.captureOutput !== undefined ? { captureOutput: request.captureOutput } : {}),
+        ...(request.inheritTerminal ? { inheritTerminal: true } : {}),
+        ...(request.cleanupTreeOnExit ? { cleanupTreeOnExit: true } : {}),
+      });
+      const result = started.handle.result.then(
+        ({ stdout, stderr }) => withCommandExecutionProjection(request, 'ts-local', { status: 'completed' as const, exitCode: 0, stdout, stderr }),
+        error => withCommandExecutionProjection(request, 'ts-local', localFailure(error)),
+      );
+      return { handle: started.handle, result };
     },
   }
 }
