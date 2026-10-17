@@ -7609,3 +7609,8 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - `/mcp` 选择器增加 “Add server…”：scope（user/project）→ name（1–64 字母数字 _-）→ transport（stdio/http）→ command/url → confirm；只有最后一步确认才调用既有 `mcp add` 发布。
 - 交互宿主把定义写入 0600 临时 JSONC，调用既有 `runMcpConfigCommand`，无论成功或拒绝都删除；不收集 env/headers 秘密。
 - 验证：picker/mcp/core-mcp 184 通过；向导两步链测试覆盖 stdio/http。
+
+## 2026-10-18 — PAN-03 hub 输出面板
+
+- `/hub` 选中本地作业时返回 `CommandReport`，pager 展示 `localPage` 的首个有界页（同一脱敏/截断规则），并给出后续页的 `/jobs show <id> stdout <offset>`；远程/未知作业仍是只读 note，不触发取消或写会话。
+- 验证：hub 输出面板 2 项；picker 184。

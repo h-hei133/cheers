@@ -1,4 +1,6 @@
 import { hubProjection } from '../../jobs/hub.js';
+import { localPage } from '../../jobs/projection.js';
+import { createReport, span } from '../../../core/commands/report/projection.js';
 import type { JobsComposition } from '../../jobs/model.js';
 import type { Option } from '../../../presentation/tui/chrome/options.js';
 import type { Picker } from '../overlay.js';
@@ -61,7 +63,17 @@ export function hubPicker(jobs: JobsComposition): Picker {
       return () => clearInterval(timer);
     },
     detail: id => (id ? details.get(id) ?? [] : []),
-    async apply() {
+    async apply(ids) {
+      const id = ids[0];
+      const job = id ? jobs.local.get(id) : undefined;
+      if (job) {
+        // The pager scrolls this page; later offsets stay with `/jobs show`, which
+        // applies the same redaction and truncation rules.
+        const text = localPage(job, 'stdout', 0);
+        return { report: createReport({ title: `Output ${id!.slice(0, 8)}`, facts: { status: job.status, stream: 'stdout', offset: 0 },
+          lines: [...text.split('\n').map(line => ({ kind: 'text' as const, spans: [span(line, 'code')] })),
+            { kind: 'text' as const, spans: [span('Later pages: /jobs show <id> stdout <offset>.', 'muted')] }] }) };
+      }
       return { note: 'Read-only view. Use /jobs show <id> for output, or /jobs cancel <id> for a separately approved action.' };
     },
   };
