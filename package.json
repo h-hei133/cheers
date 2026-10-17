@@ -17,7 +17,7 @@
     "audit:recent": "node scripts/show-audit.mjs",
     "workflow:status": "node scripts/workflow-status.mjs",
     "build": "npm run build --workspaces",
-    "build:ts": "npm run build -w packages/ts-shell && node scripts/build-cli-bin.mjs",
+    "build:ts": "npm run build -w packages/ts-shell && node scripts/build-cli-bin.mjs && node scripts/build-manifest.mjs",
     "build:cli": "npm run build:ts",
     "build:exe": "node scripts/build-cli-executable.mjs",
     "test": "npm run test:gate:golden-main-path && node scripts/test-all-stacks.mjs",
@@ -26,7 +26,7 @@
     "test:gate:golden-main-path": "npm run test:gate:golden-main-path -w packages/ts-shell",
     "test:all": "npm run test:gate:golden-main-path && node scripts/test-all-stacks.mjs",
     "dev": "npm run dev -w packages/ts-shell --",
-    "start": "npm run start -w packages/ts-shell --",
+    "start": "node scripts/start.mjs",
     "start:live:interactive": "node scripts/live-interactive-runner.mjs",
     "validate": "node scripts/validate-structure.mjs",
     "worktree:create": "node scripts/worktree-create.mjs",
@@ -117,7 +117,8 @@
     "test:delta:nightly": "node scripts/delta-nightly.mjs --duration-minutes 45",
     "test:delta:release": "cmd /d /s /c \"npm run test:delta:full && npm run test:delta:full && node scripts/delta-nightly.mjs --duration-minutes 1\"",
     "test:coverage:real-shapes": "node scripts/real-shape-coverage.mjs",
-    "verify:session-durability:long": "node scripts/verify-session-durability-long.mjs"
+    "verify:session-durability:long": "node scripts/verify-session-durability-long.mjs",
+    "start:dev": "npm run start -w packages/ts-shell --"
   },
   "engines": {
     "node": ">=20.3.0"
