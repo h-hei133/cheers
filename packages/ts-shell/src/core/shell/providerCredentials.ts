@@ -7,6 +7,7 @@ import type {
   ProviderConnectionConfig,
   RuntimeProvider,
 } from "../../config/runtimeConfig.js";
+import { selectPooledConnection, type PoolBlock } from '../auth/account/pool.js';
 
 export type ProviderCredentialSource = "cli" | "env" | "connection" | "config";
 export type ProviderCredentialAuthMode = "api-key" | "account-auth";
@@ -31,11 +32,13 @@ export interface ProviderCredentialResolutionInput {
   readonly cliBaseUrl?: string;
   readonly cliModel?: string;
   readonly env?: NodeJS.ProcessEnv;
+  /** When the configuration declares a pool, selection stays inside it. */
+  readonly pool?: { readonly sessionId?: string };
 }
 
 export interface ProviderCredentialResolution {
   /** A selected pending connection cannot borrow credentials from another source. */
-  readonly blocked?: 'connection-pending';
+  readonly blocked?: 'connection-pending' | PoolBlock;
   /** Explicit selection inputs retained for identity checks against later settings. */
   readonly selection?: { readonly provider?: RuntimeProvider; readonly baseUrl?: string };
   readonly thinkingEffort?: ThinkingPreference;
@@ -51,19 +54,19 @@ export function resolveProviderCredential(
 ): ProviderCredentialResolution {
   const env = input.env ?? process.env;
   const providerFromConfig = input.runtimeConfig.provider;
-  const activeConnection =
-    input.runtimeConfig.providerConnections.find(
-      (connection) =>
-        connection.id === input.runtimeConfig.activeProviderConnectionId &&
-        (input.cliProvider === undefined || connection.provider === input.cliProvider),
-    ) ??
-    pickFallbackConnection(
-      input.runtimeConfig.providerConnections,
-      input.cliProvider ?? providerFromConfig,
-    ) ??
-    null;
-  const provider =
-    input.cliProvider ?? activeConnection?.provider ?? input.runtimeConfig.provider;
+  const explicitConnection = input.runtimeConfig.providerConnections.find(
+    (connection) =>
+      connection.id === input.runtimeConfig.activeProviderConnectionId &&
+      (input.cliProvider === undefined || connection.provider === input.cliProvider),
+  ) ?? null;
+  const provider = input.cliProvider ?? explicitConnection?.provider ?? providerFromConfig;
+  const poolDeclared = Boolean(input.runtimeConfig.accountPool?.[provider]);
+  const pooled = explicitConnection || input.cliApiKey?.trim() ? undefined
+    : poolDeclared && !input.runtimeConfig.configValidation.valid ? { blocked: 'pool-unavailable' as const }
+    : selectPooledConnection({ config: input.runtimeConfig, provider, env,
+      ...(input.pool?.sessionId ? { sessionId: input.pool.sessionId } : {}) });
+  const activeConnection = explicitConnection ?? pooled?.connection
+    ?? (pooled ? null : pickFallbackConnection(input.runtimeConfig.providerConnections, provider)) ?? null;
   const expectedEnvVarName = getProviderApiKeyEnvVarName(provider);
   const configProfile = input.runtimeConfig.providerCredentials[provider];
   const activeConnectionProfile =
@@ -100,8 +103,35 @@ export function resolveProviderCredential(
     selection: { ...(input.cliProvider !== undefined ? { provider: input.cliProvider } : {}),
       ...(input.cliBaseUrl !== undefined ? { baseUrl: input.cliBaseUrl } : {}) } };
 
+  // A declared pool is the whole authorization for this provider. Neither an
+  // empty pool nor an unusable member falls back to env or profile keys.
+  if (pooled?.blocked) return { ...preference, provider, expectedEnvVarName, blocked: pooled.blocked };
+
   if (activeConnectionProfile?.status === 'pending') {
     return { ...preference, provider, expectedEnvVarName, baseUrl, model, blocked: 'connection-pending' };
+  }
+
+  // A pool member's credential is the connection's own. An environment key or a
+  // profile key would name a different account, which is exactly what the pool
+  // was declared to exclude.
+  if (pooled?.connection) {
+    if (connectionAccountAuth && activeConnectionProfile?.authType === 'account-auth') {
+      return { ...preference, provider, expectedEnvVarName, baseUrl, model,
+        credential: { provider, authMode: 'account-auth', accountAuth: connectionAccountAuth, baseUrl, model,
+          source: 'connection', connectionId: activeConnectionProfile.id, envVarName: expectedEnvVarName } };
+    }
+    const pooledKey = activeConnectionProfile?.apiKey?.trim();
+    if (pooledKey) {
+      return { ...preference, provider, expectedEnvVarName, baseUrl, model,
+        credential: { provider, authMode: 'api-key', apiKey: pooledKey, baseUrl, model,
+          source: 'connection', connectionId: activeConnectionProfile?.id, envVarName: expectedEnvVarName } };
+    }
+    if (connectionAccountAuth) {
+      return { ...preference, provider, expectedEnvVarName, baseUrl, model,
+        credential: { provider, authMode: 'account-auth', accountAuth: connectionAccountAuth, baseUrl, model,
+          source: 'connection', connectionId: activeConnectionProfile?.id, envVarName: expectedEnvVarName } };
+    }
+    return { ...preference, provider, expectedEnvVarName, baseUrl, model, blocked: 'pool-unavailable' };
   }
 
   const cliApiKey = input.cliApiKey?.trim();
@@ -347,4 +377,11 @@ function vertexBaseUrlFromEnvironment(
   const { project, location } = vertexTarget(env);
   if (!project || !location) return undefined;
   return vertexBaseUrl({ project, location });
+}
+
+/** One place decides how a refused resolution is described to a person. */
+export function credentialBlockMessage(blocked: NonNullable<ProviderCredentialResolution['blocked']>): string {
+  if (blocked === 'pool-empty') return 'The account pool for this provider is empty; add a member connection or remove the pool before requests can be sent.';
+  if (blocked === 'pool-unavailable') return 'No connection in the account pool has a usable credential; sign in to a pool member before requests can be sent.';
+  return 'The selected connection requires independent login before requests can be sent.';
 }

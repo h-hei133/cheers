@@ -1,6 +1,6 @@
 import type { ProviderConnectionAuthType, ProviderConnectionConfig, ProviderCredentialConfig, RuntimeConfig, RuntimeProvider } from '../../config/runtimeConfig.js';
 import type { CatalogProvider } from './catalog.js';
-import { providerFacts } from '../providers/facts.js';
+import { connectionCredentialState, credentialSources } from '../auth/account/presence.js';
 
 /**
  * What the configuration says about a provider, without asking the provider.
@@ -10,7 +10,7 @@ import { providerFacts } from '../providers/facts.js';
  * endpoint has answered recently. Only the first two are knowable locally, so
  * they are reported separately and a live check is never implied.
  */
-export type AvailabilityState = 'ready' | 'credential-missing' | 'pending' | 'error' | 'unsupported' | 'unknown';
+export type AvailabilityState = 'ready' | 'credential-missing' | 'pending' | 'error' | 'unsupported' | 'pool-empty' | 'pool-unavailable' | 'unknown';
 
 /** The fields this projection reads; a stored file and an accepted runtime both have them. */
 export interface AvailabilityConfig {
@@ -18,6 +18,7 @@ export interface AvailabilityConfig {
   readonly activeProviderConnectionId?: string;
   readonly providerConnections?: readonly ProviderConnectionConfig[];
   readonly providerCredentials?: Partial<Record<RuntimeProvider, ProviderCredentialConfig>>;
+  readonly accountPool?: Readonly<Partial<Record<RuntimeProvider, { readonly connections: readonly string[] }>>>;
 }
 
 export interface ConnectionAvailability {
@@ -40,6 +41,8 @@ export interface ProviderAvailability {
   readonly credential: 'present' | 'missing';
   readonly endpoint?: string;
   readonly connections: readonly ConnectionAvailability[];
+  /** Declared authorization set, when the configuration has one for this provider. */
+  readonly pool?: { readonly members: number; readonly available: number };
   readonly models: readonly { readonly id: string; readonly contextWindow?: number }[];
   /** No probe is made here; a configured credential is not a measured round trip. */
   readonly measured: 'unknown';
@@ -69,37 +72,18 @@ export function availabilityLabel(state: AvailabilityState): string {
     case 'pending': return 'setup pending';
     case 'error': return 'setup error';
     case 'unsupported': return 'not in catalogue';
+    case 'pool-empty': return 'account pool empty';
+    case 'pool-unavailable': return 'account pool unavailable';
     default: return 'unverified';
   }
 }
 
-function credentialSources(config: AvailabilityConfig, provider: RuntimeProvider, env: NodeJS.ProcessEnv) {
-  const profile = config.providerCredentials?.[provider];
-  const envName = providerFacts(provider).apiKeyEnvVar;
-  return {
-    env: Boolean(env[envName]?.trim()),
-    configApiKey: Boolean(profile?.apiKey?.trim()),
-    configAccount: Boolean(profile?.accountAuth && Object.keys(profile.accountAuth).length),
-  };
-}
-
-function connectionState(config: AvailabilityConfig, connection: ProviderConnectionConfig, env: NodeJS.ProcessEnv): { state: AvailabilityState; reason: string } {
-  if (connection.status === 'pending') return { state: 'pending', reason: 'Login or setup is pending; finish it before requests.' };
-  if (connection.status === 'error') return { state: 'error', reason: 'Connection setup ended in an error state; sign in again.' };
-  if (connection.authType === 'account-auth' && connection.accountAuth && Object.keys(connection.accountAuth).length) {
-    return { state: 'ready', reason: 'Account credential is stored on this connection.' };
+function providerState(connections: readonly ConnectionAvailability[], credential: 'present' | 'missing', catalogued: boolean,
+  pool?: { readonly members: number; readonly available: number }): AvailabilityState {
+  if (pool) {
+    if (pool.members === 0) return 'pool-empty';
+    if (pool.available === 0) return 'pool-unavailable';
   }
-  if (connection.apiKey?.trim()) return { state: 'ready', reason: 'API key is stored on this connection.' };
-  if (connection.accountAuth && Object.keys(connection.accountAuth).length) {
-    return { state: 'ready', reason: 'Account credential is stored on this connection.' };
-  }
-  const legacy = credentialSources(config, connection.provider, env);
-  if (legacy.env) return { state: 'ready', reason: `Credential comes from ${providerFacts(connection.provider).apiKeyEnvVar}.` };
-  if (legacy.configApiKey || legacy.configAccount) return { state: 'ready', reason: 'Credential comes from the provider profile, not this connection.' };
-  return { state: 'credential-missing', reason: 'No credential is stored for this connection.' };
-}
-
-function providerState(connections: readonly ConnectionAvailability[], credential: 'present' | 'missing', catalogued: boolean): AvailabilityState {
   if (connections.some(connection => connection.state === 'ready')) return 'ready';
   if (connections.some(connection => connection.state === 'pending')) return 'pending';
   if (connections.some(connection => connection.state === 'error')) return 'error';
@@ -125,10 +109,11 @@ export function availabilitySnapshot(input: {
     const projected = declared.map(connection => projectConnection(config, connection, env));
     const legacy = credentialSources(config, provider.runtime, env);
     const credential = legacy.env || legacy.configApiKey || legacy.configAccount || projected.some(item => item.state === 'ready') ? 'present' : 'missing';
-    const state = providerState(projected, credential, true);
+    const pool = poolFacts(config, provider.runtime, projected);
+    const state = providerState(projected, credential, true, pool);
     providers.push({ provider: provider.runtime, label: provider.label, catalogued: true, state, credential,
       endpoint: endpointLabel(declared.find(connection => connection.baseUrl)?.baseUrl ?? provider.baseUrl),
-      connections: projected, models: provider.models.map(model => ({ id: model.id, ...(model.contextWindow ? { contextWindow: model.contextWindow } : {}) })), measured: 'unknown' });
+      connections: projected, ...(pool ? { pool } : {}), models: provider.models.map(model => ({ id: model.id, ...(model.contextWindow ? { contextWindow: model.contextWindow } : {}) })), measured: 'unknown' });
     seen.add(provider.runtime);
   }
   // A stored connection for a provider the catalogue no longer lists still exists,
@@ -137,10 +122,11 @@ export function availabilitySnapshot(input: {
     if (seen.has(connection.provider)) continue;
     const projected = [projectConnection(config, connection, env)];
     const legacy = credentialSources(config, connection.provider, env);
+    const pool = poolFacts(config, connection.provider, projected);
     providers.push({ provider: connection.provider, label: connection.label ?? connection.provider, catalogued: false,
-      state: providerState(projected, legacy.env || legacy.configApiKey || legacy.configAccount ? 'present' : 'missing', false),
+      state: providerState(projected, legacy.env || legacy.configApiKey || legacy.configAccount ? 'present' : 'missing', false, pool),
       credential: legacy.env || legacy.configApiKey || legacy.configAccount || projected[0]!.state === 'ready' ? 'present' : 'missing',
-      endpoint: endpointLabel(connection.baseUrl), connections: projected, models: [], measured: 'unknown' });
+      endpoint: endpointLabel(connection.baseUrl), connections: projected, ...(pool ? { pool } : {}), models: [], measured: 'unknown' });
     seen.add(connection.provider);
   }
 
@@ -152,8 +138,14 @@ export function availabilitySnapshot(input: {
     providers };
 }
 
+function poolFacts(config: AvailabilityConfig, provider: RuntimeProvider, projected: readonly ConnectionAvailability[]) {
+  const entry = config.accountPool?.[provider];
+  if (!entry) return undefined;
+  return { members: entry.connections.length, available: projected.filter(item => item.state === 'ready').length };
+}
+
 function projectConnection(config: AvailabilityConfig, connection: ProviderConnectionConfig, env: NodeJS.ProcessEnv): ConnectionAvailability {
-  const state = connectionState(config, connection, env);
+  const state = connectionCredentialState(config, connection, env);
   return { connectionId: connection.id.trim(), provider: connection.provider, authType: connection.authType,
     ...(connection.label ? { label: connection.label } : {}), ...(connection.model ? { model: connection.model } : {}),
     ...(endpointLabel(connection.baseUrl) ? { endpoint: endpointLabel(connection.baseUrl) } : {}), ...state };

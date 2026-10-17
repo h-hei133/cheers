@@ -42,6 +42,7 @@ confidence: high
 | [按路径作用域设置](config-scopes.md) | CFG-04 规则声明、canonical 匹配、逐字段合并、操作快照与失效 |
 | [模型可用性投影](model-availability.md) | PRV-01 本地可证明状态、脱敏 endpoint、选择器一致行为 |
 | [模型角色预设](model-presets.md) | PRV-02 会话兼容、profile 库、整项遮盖与单次事务应用 |
+| [显式账号池](account-pool.md) | PRV-03 封闭成员集合、受众/endpoint 约束、空池零发送与会话亲和 |
 
 ### 0.2 本轮之前的历史文档（01–22）
 

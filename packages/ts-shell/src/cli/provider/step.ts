@@ -16,6 +16,7 @@ import { toolSchemas } from '../../turn/tools.js';
 import { delegatedTarget } from './target.js';
 import { serviceTierCapability } from '../../core/models/serviceTier.js';
 import { assertScopedModel, scopedRuntimeConfig } from '../../config/scope/projection.js';
+import { credentialBlockMessage } from '../../core/shell/providerCredentials.js';
 import { scopeAdmission } from '../../config/scope/admission.js';
 import { mergeConfigValue } from '../../config/merge.js';
 
@@ -41,7 +42,7 @@ export function createProviderStep(
 ): StepFunction {
   const resolution = request.providerCredentialResolution;
   assertScopedModel(request.runtimeConfig, resolution);
-  if (resolution.blocked) throw new Error('The selected connection requires independent login before requests can be sent.');
+  if (resolution.blocked) throw new Error(credentialBlockMessage(resolution.blocked));
   // Read once for the whole step function, not once per use: loading the
   // catalogue touches the filesystem, and a run that reloaded it mid-turn could
   // change request shape between two steps of the same answer.

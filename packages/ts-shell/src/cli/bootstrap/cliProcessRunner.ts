@@ -151,6 +151,7 @@ async function runCliCycle(input: CliProcessRunnerInput, recovery?: RestartReque
   const providerRuntimeBridge = createCliProviderRuntimeBridge({
     runtimeConfig: () => runtimeContext.runtimeConfig,
     options,
+    sessionId: () => runtimeContext.session.id,
   });
   // The configured theme has to be applied to the shared palette before any
   // surface renders, or the first frame is drawn in the default and never

@@ -62,6 +62,7 @@ import { decodeWorkspaceRoots, type WorkspaceRoot } from '../core/workspace/mode
 import type { RequestPolicy } from '../core/agent/request/model.js';
 import { createProviderStep, delegatedSteps } from '../cli/provider/step.js';
 import { scopedRuntimeConfig, assertScopedModel } from '../config/scope/projection.js';
+import { credentialBlockMessage } from '../core/shell/providerCredentials.js';
 import { scopeAdmission } from '../config/scope/admission.js';
 import { toolScopeBinding } from '../config/scope/tools.js';
 
@@ -226,8 +227,9 @@ function deferUntilReady(
     assertAdmission(request.admission);
     request.signal.throwIfAborted();
     if (request.providerCredentialResolution.blocked) {
+      const reason = request.providerCredentialResolution.blocked;
       yield dependencies.createReadinessTerminalEvent({ sessionId: request.sessionId, prompt: request.prompt,
-        stopReason: 'Provider readiness failed (provider-readiness:auth): The selected connection requires independent login.' });
+        stopReason: `Provider readiness failed (provider-readiness:auth): ${credentialBlockMessage(reason)}` });
       return;
     }
     // Renewed before the readiness check, because the check is what tells the user

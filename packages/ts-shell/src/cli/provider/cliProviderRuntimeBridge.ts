@@ -14,19 +14,22 @@ export interface CliProviderRuntimeBridge {
 }
 
 /** Configuration validation and request dispatch resolve the same target. */
-export function resolveCliCredential(runtimeConfig: RuntimeConfig, options: Pick<CliOptions, 'provider' | 'apiKey'>, env: NodeJS.ProcessEnv = process.env): ProviderCredentialResolution {
-  return resolveProviderCredential({ runtimeConfig, cliProvider: options.provider, cliApiKey: options.apiKey, env });
+export function resolveCliCredential(runtimeConfig: RuntimeConfig, options: Pick<CliOptions, 'provider' | 'apiKey'>,
+  env: NodeJS.ProcessEnv = process.env, sessionId?: string): ProviderCredentialResolution {
+  return resolveProviderCredential({ runtimeConfig, cliProvider: options.provider, cliApiKey: options.apiKey, env,
+    ...(sessionId ? { pool: { sessionId } } : {}) });
 }
 
 export function createCliProviderRuntimeBridge(input: {
   readonly runtimeConfig: () => RuntimeConfig;
   readonly options: Pick<CliOptions, "provider" | "apiKey">;
   readonly env?: NodeJS.ProcessEnv;
+  readonly sessionId?: () => string | undefined;
 }): CliProviderRuntimeBridge {
   const env = input.env ?? process.env;
   return {
     resolveCredentialSnapshot: () => {
-      return resolveCliCredential(input.runtimeConfig(), input.options, env);
+      return resolveCliCredential(input.runtimeConfig(), input.options, env, input.sessionId?.());
     },
     providerModeEnv: () => env.CHEERS_PROVIDER_MODE,
     realProviderSmokeOptIn: () =>

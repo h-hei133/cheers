@@ -129,6 +129,14 @@ export interface ProviderCredentialConfig {
   readonly accountAuth?: ProviderAccountAuthConfig;
 }
 
+export interface AccountPoolEntry {
+  /** Explicit authorization; an empty list permits no request for this provider. */
+  readonly connections: readonly string[];
+  /** When present, every member must share this endpoint. */
+  readonly baseUrl?: string;
+}
+export type AccountPool = Readonly<Partial<Record<RuntimeProvider, AccountPoolEntry>>>;
+
 export interface ProviderConnectionConfig {
   readonly id: string;
   readonly provider: RuntimeProvider;
@@ -180,6 +188,8 @@ export interface RuntimeConfig {
   readonly enableMcpTools: boolean;
   readonly activeProviderConnectionId?: string;
   readonly providerConnections: readonly ProviderConnectionConfig[];
+  /** Absent means no pool is declared and existing selection applies. */
+  readonly accountPool?: AccountPool;
   readonly providerCredentials: Readonly<
     Partial<Record<RuntimeProvider, ProviderCredentialConfig>>
   >;
@@ -396,6 +406,7 @@ export interface RuntimeConfigFile {
   enableMcpTools?: boolean;
   activeProviderConnectionId?: string;
   providerConnections?: ProviderConnectionConfig[];
+  accountPool?: Record<string, { connections: string[]; baseUrl?: string }>;
   providerCredentials?: Partial<
     Record<RuntimeProvider, ProviderCredentialConfig>
   >;
@@ -516,6 +527,9 @@ export function getRuntimeConfig(
   const sources = layer.sources;
   const provider = merged.provider ?? DEFAULT_CONFIG.provider;
   const maxTurns = merged.maxTurns ?? DEFAULT_CONFIG.maxTurns;
+  const providerConnections = normalizeProviderConnections(merged.providerConnections);
+  const accountPool = normalizeAccountPool(merged.accountPool);
+  const poolIssue = accountPoolIssue(accountPool, providerConnections);
 
   const config: Omit<RuntimeConfig, 'configProvenance'> = {
     configTrust,
@@ -523,7 +537,7 @@ export function getRuntimeConfig(
     ...(merged.pathRules !== undefined ? { pathRules: merged.pathRules } : {}),
     ...(merged.allowedModels !== undefined ? { allowedModels: merged.allowedModels } : {}),
     configScopes: captureConfigScopes(layer.scopeLayers ?? [], scopeSettings(DEFAULT_CONFIG), configTrust.workspaceRoot),
-    configValidation: { valid: layer.valid, securityBlocked: layer.blocked },
+    configValidation: { valid: layer.valid && !poolIssue, securityBlocked: layer.blocked },
     provider,
     maxTurns,
     // Left absent when unset, rather than defaulted to an empty list: an empty
@@ -540,9 +554,8 @@ export function getRuntimeConfig(
     activeProviderConnectionId: normalizeConnectionId(
       merged.activeProviderConnectionId,
     ),
-    providerConnections: normalizeProviderConnections(
-      merged.providerConnections,
-    ),
+    providerConnections,
+    ...(accountPool ? { accountPool } : {}),
     providerCredentials: normalizeProviderCredentials(
       merged.providerCredentials,
     ),
@@ -580,7 +593,7 @@ export function getRuntimeConfig(
     providerConnectTimeoutMs: merged.providerConnectTimeoutMs ?? DEFAULT_CONFIG.providerConnectTimeoutMs,
     providerHeadersTimeoutMs: merged.providerHeadersTimeoutMs ?? DEFAULT_CONFIG.providerHeadersTimeoutMs,
     providerBodyTimeoutMs: merged.providerBodyTimeoutMs ?? DEFAULT_CONFIG.providerBodyTimeoutMs,
-    configDiagnostics: dedupeDiagnostics(diagnostics),
+    configDiagnostics: dedupeDiagnostics([...diagnostics, ...(poolIssue ? [poolIssue] : [])]),
     configSources: sources,
   };
   layer.verify();
@@ -718,6 +731,36 @@ function normalizeProviderCredentials(
   }
 
   return normalized;
+}
+
+function normalizeAccountPool(pool: RuntimeConfigFile['accountPool']): AccountPool | undefined {
+  if (!pool || typeof pool !== 'object' || Array.isArray(pool)) return undefined;
+  const entries: Record<string, AccountPoolEntry> = {};
+  for (const [provider, value] of Object.entries(pool)) {
+    if (!isRuntimeProvider(provider) || !value || typeof value !== 'object') continue;
+    const connections = (value.connections ?? []).map(id => normalizeConnectionId(id)).filter((id): id is string => Boolean(id));
+    const baseUrl = value.baseUrl?.trim().replace(/\/+$/, '');
+    entries[provider] = { connections, ...(baseUrl ? { baseUrl } : {}) };
+  }
+  return Object.keys(entries).length ? entries : undefined;
+}
+
+/** A pool may narrow authorization, never invent it: every member must exist for that provider. */
+function accountPoolIssue(pool: AccountPool | undefined, connections: readonly ProviderConnectionConfig[]): string | undefined {
+  if (!pool) return undefined;
+  for (const [provider, entry] of Object.entries(pool)) {
+    const seen = new Set<string>();
+    for (const id of entry.connections) {
+      if (seen.has(id)) return `Config accountPool ${provider}: duplicate connection '${id}'.`;
+      seen.add(id);
+      const connection = connections.find(candidate => candidate.id === id);
+      if (!connection || connection.provider !== provider) return `Config accountPool ${provider}: connection '${id}' is missing or belongs to another provider.`;
+      if (entry.baseUrl && connection.baseUrl?.trim().replace(/\/+$/, '') !== entry.baseUrl) {
+        return `Config accountPool ${provider}: connection '${id}' does not use the declared endpoint.`;
+      }
+    }
+  }
+  return undefined;
 }
 
 function normalizeProviderConnections(

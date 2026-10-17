@@ -7280,3 +7280,13 @@ CFG-03 新增重复 `--config` JSONC 输入，顺序固定于启动目录并保�
 CFG-03 把 `/connect use|logout` 的输出改为区分“已存储”与“当前生效”（`Stored active connection: …`、`Removed provider connection … from primary configuration.`），两个旧测试仍断言 `Active connection switched` / `Disconnected provider connection`。本地与 CFG-04 的精确 SHA CI 均复现这两项失败，其余 826 文件通过。
 
 修复只更新断言到现行输出契约，保留原有文件变更、凭据不回显、catalogue 刷新与直接 mutator 参数校验断言。两文件 31 项通过。此前失败的 CFG-04 与 CFG-05/PRV-01/PRV-02 运行记录保留为历史，不能写成这些 SHA 已全绿。
+
+### Phase 20 PRV-03：显式账号池
+
+新增 `accountPool` 配置（仅 user/override）与 `core/auth/account/pool.ts`。成员必须是同一 provider 的既有连接，不得重复；声明 `baseUrl` 时 endpoint 必须一致；任一校验失败使本次配置无效。空池表示零授权，成员全部不可用返回 `pool-unavailable`，两种情况都不回退环境变量或 profile 兼容 key。
+
+选择规则：显式 active connection 与 CLI key 优先；否则只在池内按稳定会话哈希选择并保持亲和（有界内存表，不写会话文件）。池成员凭据只来自连接自身。新增非秘密 `credentialId` 与轮换敏感的 `generation`；可用性投影增加 `pool-empty`/`pool-unavailable` 与成员计数。凭据解析的 blocked 原因接入 step 与 readiness 文案。
+
+**本地验证**：新增 7 项池测试（校验四类失败、空池、不可用成员、池内选择、显式连接优先、会话亲和、身份/代际）；`core/auth`、`providerCredentials`、`core/models` 14 文件 215 项与 `src/config` 20 文件 248 项通过；`build:ts`、`check:config-consumers`、`verify:import-cycles` 通过。合同见[显式账号池](features/account-pool.md)。
+
+本条写入时尚未提交/推送；未运行真实 provider、跨进程或跨平台动态证据。PRV-04/05 的 lease、durable refresh 阶段与请求归属仍待实施。
