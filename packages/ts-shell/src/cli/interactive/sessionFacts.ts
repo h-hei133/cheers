@@ -5,7 +5,7 @@ import os from "node:os";
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { StatusFacts } from "../../presentation/tui/chrome/items.js";
 import type { WelcomeState } from "../../presentation/tui/chrome/welcome.js";
-import { estimateSessionCost, getSessionUsage, totalTokens } from "../../observability/usageTelemetry.js";
+import { estimateSessionCost, getSessionUsage, measuredPromptContext, totalTokens } from "../../observability/usageTelemetry.js";
 import { getSessionTodos } from "../../core/commands/todoCommandRuntime.js";
 
 /**
@@ -53,6 +53,7 @@ export function readStatusFacts(
   const { config, catalog } = context.configuration.current;
   const active = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
   const usage = getSessionUsage(context.session.id);
+  const measured = active.model ? measuredPromptContext(context.session.id, { provider: active.provider, model: active.model }) : undefined;
   // Summed across the models that answered, each at the rate published for the
   // provider that served it. A session that switched models — or providers — spent
   // tokens at more than one price, and the status band must not show the newest
@@ -79,7 +80,7 @@ export function readStatusFacts(
     contextWindow: window.window,
     contextWindowSource: window.source,
     contextWarning: window.warning,
-    ...(usage.lastPromptTokens !== undefined ? { contextUsed: usage.lastPromptTokens } : {}),
+    ...(measured ? { contextUsed: measured.tokens } : {}),
     ...(totalTokens(usage) > 0 ? { sessionTokens: totalTokens(usage) } : {}),
     ...(usage.turnsCount > 0 ? { turns: usage.turnsCount } : {}),
     ...(cost > 0 || zeroCostSupported

@@ -7,7 +7,7 @@ import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import { loadCatalog } from "../models/catalogStore.js";
 import { resolveContextWindow, resolveTokenBudget } from "../models/window.js";
 import { resolveProviderCredential } from "../shell/providerCredentials.js";
-import { getSessionUsage, totalTokens } from "../../observability/usageTelemetry.js";
+import { getSessionUsage, measuredPromptContext, totalTokens } from "../../observability/usageTelemetry.js";
 import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS } from "../../session/context.js";
 import { toolSchemas } from "../../turn/tools.js";
 import { createCoreToolRegistry } from "../tools/registry.js";
@@ -64,7 +64,12 @@ export async function runContextCommand(
   const schemaSize = textSize(JSON.stringify(toolSchemas(registry)));
   const schemaTokens = Math.round(schemaSize.codeUnits / CHARS_PER_TOKEN);
 
-  const report = contextReport({ resolution, used: telemetry?.lastPromptTokens, reserve,
+  const measured = sessionId && active.model
+    ? measuredPromptContext(sessionId, { provider: active.provider, model: active.model })
+    : undefined;
+  const measurement = measured ? 'measured' as const
+    : telemetry?.lastPromptTokens !== undefined ? 'stale' as const : 'unknown' as const;
+  const report = contextReport({ resolution, used: measured?.tokens, measurement, reserve,
     schemaTokens, schemaSize, request: telemetry?.requestContext, toolCount: registry.size, totalTokens: telemetry ? totalTokens(telemetry) : 0,
     turns: telemetry?.turnsCount ?? 0 });
   return { kind: "local", output: reportText(report), report };

@@ -49,3 +49,22 @@ step 在构造请求后、发送前检查预算。失败返回带 `Context overf
 - 未实现 TOOL-01 的动态 schema 加载预算；schema 变化通过下一次请求身份与 `schemaDigest` 失效。
 - 未改变 provider 的实际拒绝与重试分类。
 - 已验证：身份不匹配、无效计量、等号/超界、输出与 reserve 边界、独立输入上限、软阈值钳制、measured 前缀追加；未运行真实 provider。
+
+## 5. 四态报告
+
+`/context` 与状态栏只使用一个分类：
+
+| 状态 | 条件 | 报告 |
+|---|---|---|
+| `measured` | 存在与当前 provider/model（及可用的 endpoint/schema/system 摘要）匹配的测量 | 显示 tokens 与窗口占比 |
+| `stale` | 有旧测量，但身份不匹配 | 明确说明属于另一模型/端点/schema，不显示为当前值 |
+| `estimated` | 没有测量 | 给出当前工具 schema 的首请求下限估算，并说明会话 token 在发送前不估算 |
+| `unknown` | 无测量且无可信估算输入 | 只报告未知 |
+
+状态栏 `contextUsed` 只在 measured 时出现；旧的无身份记录在模型切换清空之前仍可用。窗口、reserve 与模型解析来自同一次 configuration publication，报告不会为了数字去探测 provider 或读取网络。
+
+## 6. 边界
+
+- 首请求估算只覆盖当前工具 schema；system 文本与用户输入在发送前不作为 token 上界。
+- 未改变 `/context` 的工具池加载路径（它可能刷新扩展/MCP，但不发起 provider 请求）。
+- 已验证：measured/stale/unknown 事实、首请求估算行、状态栏不回退旧值、legacy 记录在失效前可用；未运行真实 provider。

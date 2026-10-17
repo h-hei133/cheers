@@ -7338,3 +7338,13 @@ PRV-01 的选择器改为以投影的 active provider 判断可选性，但投�
 **本地验证**：新增 7 项操作测试（claim/replay/completed 复用、unknown 持久、身份分离、损坏文件、并发重复、真实 condense 复用、空摘要后拒绝重播）；`core/shell/compaction.test.ts` 10 项与相关 `session`/`turn` 套件通过（92 文件 913 项中仅初始 3 项因测试 session id 共享而失败，改为无目录 no-op 后全部通过）。`build:ts` 通过。合同见[压缩操作与步骤幂等](features/compaction-operations.md)。
 
 清理了测试首次运行在默认 profile 下创建的 `sessions/{s,sess_compact,sess_turn}/compaction-operations.json`；这些目录只含本次测试生成的文件。本条写入时尚未提交/推送。
+
+### Phase 20 CTX-04：首请求估算与四态上下文报告
+
+`/context` 与状态栏改用统一测量分类：`measured`（身份匹配）、`stale`（旧测量属于另一模型/端点/schema）、`estimated`（无测量时给出当前工具 schema 的首请求下限）与 `unknown`。报告明确 stale 不冒充当前值，并新增首请求估算行；`contextUsed` 只在 measured 时进入状态栏。
+
+无身份的历史记录仍视为可用测量，直到模型切换通过 `invalidatePromptMeasurement` 清除；窗口、reserve、模型解析来自同一 configuration publication，不触发 provider 探测。
+
+**本地验证**：`context/report.test.ts` 6 项、`sessionFacts.test.ts` 9 项与 `usageTelemetry` 22 项通过；新增 stale 事实与首请求估算断言；`build:ts` 通过。合同见[请求计量与预算 §5](features/request-budget.md#5-四态报告)。
+
+本条写入时尚未提交/推送。

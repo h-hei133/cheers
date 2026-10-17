@@ -24,7 +24,7 @@ it('keeps exact wire dimensions, raw estimates, tokenizer absence and provider u
 
 it('retains independent measured, estimated and unknown context facts', () => {
   const report = contextReport({ ...input, used: 64000 });
-  expect(report.facts).toMatchObject({ prompt: { status: 'reported', tokens: 64000 }, freeTokens: 119000,
+  expect(report.facts).toMatchObject({ prompt: { status: 'measured', tokens: 64000 }, freeTokens: 119000,
     toolSchemas: { status: 'estimate', method: 'characters', tokens: 8000, toolCount: 22 } });
   expect(reportText(report)).toContain('32.0% used');
   expect(report.lines.flatMap(line => line.kind === 'text' ? line.spans : [])).toEqual(expect.arrayContaining([
@@ -32,9 +32,13 @@ it('retains independent measured, estimated and unknown context facts', () => {
   ]));
   expect(reportText(report)).toContain('119,000 free before the 17,000-token reserve');
   const unknown = contextReport({ ...input, used: undefined });
-  expect(unknown.facts.prompt).toEqual({ status: 'unknown' });
+  expect(unknown.facts.prompt).toMatchObject({ status: 'unknown', estimate: { status: 'estimated', tokens: 8000, basis: 'current-tool-schemas' } });
   expect(unknown.facts.session).toEqual({ recordedTokens: 72000, recordedTurns: 2 });
-  expect(contextReport({ ...input, used: 0 }).facts.prompt).toEqual({ status: 'reported', tokens: 0 });
+  expect(contextReport({ ...input, used: 0 }).facts.prompt).toEqual({ status: 'measured', tokens: 0 });
+  const stale = contextReport({ ...input, used: undefined, measurement: 'stale' });
+  expect(stale.facts.prompt).toMatchObject({ status: 'stale', estimate: { status: 'estimated', basis: 'current-tool-schemas' } });
+  expect(reportText(stale)).toContain('different model, endpoint or schema');
+  expect(reportText(stale)).toContain('First request estimate');
 });
 
 it.each([[49, 'normal'], [50, 'elevated'], [70, 'high'], [90, 'critical']] as const)(

@@ -9,6 +9,8 @@ import { requestDetails } from './request.js';
 export function contextReport(input: {
   readonly resolution: ResolvedContextWindow;
   readonly used: number | undefined;
+  /** Whether the measurement describes the current request identity. */
+  readonly measurement?: 'measured' | 'stale' | 'unknown';
   readonly reserve: number;
   readonly schemaTokens: number;
   readonly schemaSize?: TextSize;
@@ -18,6 +20,7 @@ export function contextReport(input: {
   readonly turns: number;
 }) {
   const { resolution, used, reserve, schemaTokens, toolCount } = input;
+  const measurement = input.measurement ?? (used === undefined ? 'unknown' : 'measured');
   const window = resolution.window;
   const free = used === undefined ? undefined : Math.max(0, window - used - reserve);
   const compactAt = Math.max(0, window - reserve);
@@ -29,7 +32,11 @@ export function contextReport(input: {
   if (used === undefined) {
     lines.push({ kind: 'text', bullet: true, spans: [span('Current tool schema estimate: '),
       span(`~${schemaTokens.toLocaleString()}`, 'number'), span(` tokens (${toolCount} tools)`)] },
-    { kind: 'space' }, { kind: 'text', spans: [span('Current prompt usage is unknown. No provider measurement is available for this context.')] });
+    { kind: 'space' }, { kind: 'text', spans: [span(measurement === 'stale'
+      ? 'The last provider measurement belongs to a different model, endpoint or schema, so it is not the current context. No current measurement is available.'
+      : 'Current prompt usage is unknown. No provider measurement is available for this context.')] },
+    { kind: 'text', spans: [span('First request estimate: at least '), span(`~${schemaTokens.toLocaleString()}`, 'number'),
+      span(' tokens from the current tool schemas. Conversation tokens are not estimated before a request is sent.')] });
   } else {
     lines.push({ kind: 'text', bullet: true, spans: [...bar(used, reserve, window), span('  '),
       span(`${((used / window) * 100).toFixed(1)}%`, `context-${contextPressure(used, window)}`), span(' used')] },
@@ -55,7 +62,9 @@ export function contextReport(input: {
   return createReport({ title: 'Context window',
     columns: [{ label: 'What', minWidth: 20 }, { label: 'Value', align: 'right', minWidth: 8 }, { label: 'How it is known', minWidth: 24 }],
     lines, facts: { window: { tokens: window, source: resolution.source, warning: resolution.warning ?? null },
-      prompt: used === undefined ? { status: 'unknown' } : { status: 'reported', tokens: used },
+      prompt: used === undefined ? { status: measurement === 'stale' ? 'stale' : 'unknown',
+        estimate: { status: 'estimated', tokens: schemaTokens, basis: 'current-tool-schemas' } }
+        : { status: 'measured', tokens: used },
       reserveTokens: reserve, freeTokens: free ?? null, compactAtTokens: compactAt,
       toolSchemas: { status: 'estimate', method: 'characters', tokens: schemaTokens, toolCount,
         characterUnit: 'utf16-code-units', divisor: CHARS_PER_TOKEN, size: input.schemaSize ? { ...input.schemaSize } : null },

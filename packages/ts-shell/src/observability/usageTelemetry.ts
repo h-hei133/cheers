@@ -245,7 +245,10 @@ export function measuredPromptContext(sessionId: string, expected: {
 }): { readonly tokens: number; readonly messageCount: number } | undefined {
   const telemetry = getSessionUsage(sessionId);
   const identity = telemetry.lastPromptIdentity;
-  if (telemetry.lastPromptTokens === undefined || !identity) return undefined;
+  if (telemetry.lastPromptTokens === undefined) return undefined;
+  // A record written before identity existed is still the latest measurement;
+  // model changes after it clear the value through invalidatePromptMeasurement.
+  if (!identity) return { tokens: telemetry.lastPromptTokens, messageCount: telemetry.lastPromptMessageCount };
   if (identity.provider !== expected.provider || identity.model !== expected.model) return undefined;
   if (expected.endpoint !== undefined && identity.endpoint !== undefined && identity.endpoint !== expected.endpoint) return undefined;
   if (expected.schemaDigest !== undefined && identity.schemaDigest !== undefined && identity.schemaDigest !== expected.schemaDigest) return undefined;

@@ -101,8 +101,10 @@ describe("bucketing", () => {
     expect(getSessionUsage(SESSION).lastPromptMessageCount).toBe(0);
   });
 
-  it("does not invent an identity for an unmeasured prompt", () => {
+  it("keeps a legacy measurement usable until a model change clears it", () => {
     recordSessionUsage(SESSION, { promptTokens: 500, promptMessageCount: 7, model: 'm', provider: 'openai' });
+    expect(measuredPromptContext(SESSION, { provider: 'openai', model: 'm' })).toEqual({ tokens: 500, messageCount: 7 });
+    invalidatePromptMeasurement(SESSION);
     expect(measuredPromptContext(SESSION, { provider: 'openai', model: 'm' })).toBeUndefined();
   });
 
