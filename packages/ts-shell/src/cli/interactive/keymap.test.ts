@@ -350,6 +350,20 @@ describe("completion interception", () => {
     expect(actions.submit).toHaveBeenCalledWith(command);
   });
 
+  it("submits a complete command instead of an old selection", () => {
+    const { press, surface, actions } = build();
+    surface.editor.setText("/model");
+    surface.suggestions.setItems([
+      completionEdit({ value: "/model", label: "/model" }, surface.editor.snapshot(), 0, 6),
+      completionEdit({ value: "/memory", label: "/memory" }, surface.editor.snapshot(), 0, 6),
+    ]);
+    surface.setSuggesting(true);
+    press("\x1b[B");
+    press("\r");
+    expect(actions.submit).toHaveBeenCalledWith("/model");
+    expect(surface.editor.getText()).toBe("");
+  });
+
   it("accepts the selection on enter once the user has navigated the list", () => {
     const { press, surface, actions } = build();
     surface.suggestions.setItems([

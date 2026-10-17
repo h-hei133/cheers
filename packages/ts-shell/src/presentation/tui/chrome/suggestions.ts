@@ -40,7 +40,9 @@ function score(query: string, candidate: Suggestion): number {
   if (!query) return Tier.Prefix;
   const label = stripSigil(candidate.label.toLowerCase());
   if (label === query) return Tier.Exact;
-  if (label.startsWith(query)) return Tier.Prefix + (100 - Math.min(99, label.length));
+  // Prefix matches share one rank, so the catalogue's own order decides among
+  // them. Shortening by label length ranked `/mcp` above `/model` for `/m`.
+  if (label.startsWith(query)) return Tier.Prefix;
   if (label.includes(query)) return Tier.Substring;
   let cursor = 0;
   let gaps = 0;

@@ -388,8 +388,12 @@ function consumeSuggestionKey(event: ParsedKeyEvent, context: KeymapContext): bo
   const incomplete = edit !== undefined && written.length > 0 && (written.startsWith("/")
     ? written.toLowerCase() !== insertion.toLowerCase()
     : written !== insertion);
+  // A whole command typed out submits, even if the list was navigated earlier:
+  // accepting an old candidate here would execute something the user did not type.
+  const complete = edit !== undefined && written.startsWith("/") &&
+    getSlashInvocation(written.toLowerCase()) !== undefined;
   const accepts = action === "tui.input.tab" ||
-    (action === "tui.input.submit" && (view.suggestions.chosen || incomplete));
+    (action === "tui.input.submit" && !complete && (view.suggestions.chosen || incomplete));
   if (accepts) {
     if (!chosen) return false;
     // A stale or unbound candidate must never edit or fall through to submit.

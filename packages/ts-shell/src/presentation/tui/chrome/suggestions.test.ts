@@ -17,7 +17,7 @@ describe("ranking", () => {
 
   it("ranks prefix matches above subsequence matches", () => {
     const ranked = matchSuggestions("m", commands).map((item) => item.label);
-    expect(ranked.slice(0, 3)).toEqual(["/mcp", "/model", "/memory"]);
+    expect(ranked.slice(0, 3)).toEqual(["/model", "/mcp", "/memory"]);
   });
 
   it("still finds a subsequence match", () => {
