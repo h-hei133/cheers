@@ -32,7 +32,7 @@
 | PAN-05（部分） | `2a4bafe5` | plan-review/btw 结构化报告；advisor 面板 |
 | PAN-03（部分） | `070f1405` | hub 本地作业输出页（脱敏/截断）、后续页指引 |
 | PAN-08（部分） | `93302750` | MCP 逐项向导；临时定义 0600 且必删 |
-| START-03（部分） | `a6ba2665` | Node/exe 与 regular/fullscreen 各 30 次首帧/退出基准 |
+| START-03（部分） | `a6ba2665` | Node/exe 与 regular/fullscreen/pipe 各 30 次首帧、命令→退出基准 |
 
 ## 部分完成（有实现，验收未闭合）
 
@@ -48,7 +48,7 @@
 
 ## 未闭合
 
-- START-03：pipe 模式、受控冷缓存、逐键延迟。
+- START-03：受控冷缓存（需清页缓存权限）；逐键延迟目前以 `/exit` 命令处理为代理。
 - PAN-05：流式面板。
 - RENDER-03：并排 diff 的左右源复制。
 - QA-02/03：PTY/双构建/平台矩阵与真实质量（缺环境/模型）。
@@ -71,14 +71,15 @@
 | node `dist/cli.js --version` | 30 | 1991.5ms | 1030.4ms | 1074.6ms | 995.8ms | 1991.5ms |
 | exe `dist/bin/cheers --version` | 30 | 492.7ms | 497.5ms | 526.1ms | 469.7ms | 528.2ms |
 
-交互（`npm run bench:interactive`，`script` 提供 PTY，每模式 30 次，`/exit` 在 1200ms 注入）：
+交互（`npm run bench:interactive`，`script` 提供 PTY 或 pipe，每模式 30 次，`/exit` 在 1200ms 注入）：
 
-| mode | first frame first | first frame p50 | first frame p95 | exit after `/exit` p50 | p95 |
-|---|---|---|---|---|---|
-| regular | 1044.4ms | 1052.3ms | 1081.4ms | 1362.9ms | 1383.5ms |
-| fullscreen | 1074.1ms | 1065.7ms | 1099.3ms | 1362.8ms | 1394.8ms |
+| mode | first frame first | first frame p50 | first frame p95 | `/exit` 后退出 p50 | p95 | 命令→退出 p50 | p95 |
+|---|---|---|---|---|---|---|---|
+| regular | 1041.4ms | 1054.6ms | 1086.0ms | 1361.4ms | 1395.5ms | 157.5ms | 190.5ms |
+| fullscreen | 1055.6ms | 1061.0ms | 1139.0ms | 1365.3ms | 1391.1ms | 161.1ms | 187.1ms |
+| pipe | 1081.5ms | 1035.7ms | 1082.0ms | 1402.3ms | 1682.6ms | 198.8ms | 480.6ms |
 
-未测：pipe 模式、受控冷缓存、逐键延迟（当前只测到 `/exit` 命令处理完成）。
+未测：受控冷缓存（清页缓存需特权，首样本单列但不冒充冷启动）。
 
 ## 本地全量
 

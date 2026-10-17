@@ -7620,3 +7620,8 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 新增 `scripts/bench-interactive.mjs` 与 `npm run bench:interactive`：用 `script` 提供 PTY，临时 HOME/项目，1200ms 后注入 `/exit`；每模式 30 次，首帧与退出延迟分开统计。
 - 实测：regular 首帧 p50 1052.3ms/p95 1081.4ms；fullscreen p50 1065.7ms/p95 1099.3ms；`/exit` 后退出 p50 约 1363ms。
 - 未测 pipe、受控冷缓存与逐键延迟。
+
+### START-03 pipe 与命令延迟
+
+- `bench:interactive` 增加 pipe 模式并单独记录命令写入到退出的时间：regular 首帧 p50 1054.6ms、命令→退出 157.5ms；fullscreen 1061.0ms/161.1ms；pipe 1035.7ms/198.8ms。
+- 受控冷缓存仍需特权清页缓存，未以首样本冒充。

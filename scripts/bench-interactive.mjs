@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const runs = Math.max(2, Number(process.env.BENCH_RUNS ?? 30));
-const modes = ['regular', 'fullscreen'];
+const modes = ['regular', 'fullscreen', 'pipe'];
 const cli = path.join(root, 'dist/cli.js');
 if (!fs.existsSync(cli)) { console.error('Build first: npm run build:ts'); process.exit(2); }
 
@@ -32,19 +32,25 @@ function sample(mode) {
   fs.writeFileSync(path.join(home, '.cheers', 'config.json'), JSON.stringify({ tuiMode: mode }));
   const started = performance.now();
   return new Promise((resolve, reject) => {
-    const child = spawn('script', ['-qec', `${process.execPath} ${JSON.stringify(cli)}`, '/dev/null'],
-      { cwd: project, env: { ...process.env, HOME: home, USERPROFILE: home, GIT_CEILING_DIRECTORIES: os.tmpdir() } });
+    const child = mode === 'pipe'
+      ? spawn(process.execPath, [cli], { cwd: project, env: { ...process.env, HOME: home, USERPROFILE: home, GIT_CEILING_DIRECTORIES: os.tmpdir() } })
+      : spawn('script', ['-qec', `${process.execPath} ${JSON.stringify(cli)}`, '/dev/null'],
+        { cwd: project, env: { ...process.env, HOME: home, USERPROFILE: home, GIT_CEILING_DIRECTORIES: os.tmpdir() } });
     let firstByte;
     child.stdout.once('data', () => { firstByte = performance.now() - started; });
     child.stdout.resume();
     child.stderr.resume();
-    const exitTimer = setTimeout(() => child.stdin.write('/exit\r'), 1200);
+    let commandAt;
+    const exitTimer = setTimeout(() => { commandAt = performance.now() - started; child.stdin.write('/exit\r'); }, 1200);
     const hardStop = setTimeout(() => { child.kill('SIGKILL'); reject(new Error('interactive run did not exit')); }, 15_000);
     child.on('exit', code => {
       clearTimeout(exitTimer); clearTimeout(hardStop);
       fs.rmSync(home, { recursive: true, force: true }); fs.rmSync(project, { recursive: true, force: true });
       if (code !== 0 || firstByte === undefined) reject(new Error(`interactive run exited ${code} without a frame`));
-      else resolve({ firstByte, exit: performance.now() - started });
+      else {
+        const exit = performance.now() - started;
+        resolve({ firstByte, exit, commandToExit: exit - (commandAt ?? 1200) });
+      }
     });
     child.on('error', reject);
   });
@@ -56,7 +62,9 @@ for (const mode of modes) {
   for (let index = 0; index < runs; index++) samples.push(await sample(mode));
   const first = samples.map(sample => sample.firstByte).sort((a, b) => a - b);
   const exit = samples.map(sample => sample.exit).sort((a, b) => a - b);
+  const command = samples.map(sample => sample.commandToExit).sort((a, b) => a - b);
   report.push({ mode, runs, first: { first: Number(samples[0].firstByte.toFixed(1)), p50: Number(percentile(first, 50).toFixed(1)), p95: Number(percentile(first, 95).toFixed(1)) },
-    exitAfterCommand: { p50: Number(percentile(exit, 50).toFixed(1)), p95: Number(percentile(exit, 95).toFixed(1)) } });
+    exitAfterCommand: { p50: Number(percentile(exit, 50).toFixed(1)), p95: Number(percentile(exit, 95).toFixed(1)) },
+    commandToExit: { p50: Number(percentile(command, 50).toFixed(1)), p95: Number(percentile(command, 95).toFixed(1)) } });
 }
 process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
