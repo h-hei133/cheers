@@ -55,7 +55,9 @@ profile 库文件形如 `{ "version": 1, "presets": { "<name>": { "roles": { …
 
 `advisor` 用于已明确启用的 checkpoint 审核。保存/应用预设不启用审核；`/advisor on` 才启用，恢复会话后仍需重新启用。`/advisor configure connection/model` 的明确模型优先；省略目标的 `/advisor configure [--every N]` 恢复使用会话角色并保持关闭。缺少角色、连接失效、scope 或 effort 不兼容都拒绝，不借用 subagent 或父模型。审核继续独立、无工具，建议必须通过 `/advisor apply <id>` 显式提交。
 
-审核结果绑定配置 publication、模型 revision、目标/effort、目录能力与凭据身份，派发、发布和应用均检查；A→B→A 不复活旧建议。CLI 捕获的请求函数还固定其 publication/model revision，配置重载后手动 review 不能复用旧连接闭包。若主回合期间发生 publication 更新（包括凭据续期发布），本回合明确报告跳过 checkpoint；下一次新回合重新捕获后恢复审核。独立 advisor 账号的自动续期仍沿现有委派路径，其完整生命周期在 PRV-04/05 继续复核。
+审核结果绑定配置 publication、模型 revision、目标/effort、目录能力与凭据身份，派发、发布和应用均检查；A→B→A 不复活旧建议。CLI 捕获的请求函数还固定其 publication/model revision，配置重载后手动 review 不能复用旧连接闭包。若主回合期间发生 publication 更新（包括主账号凭据续期发布），本回合明确报告跳过 checkpoint；下一次新回合重新捕获后恢复审核。
+
+独立 advisor 账号在已授权审核的准备阶段续期，然后冻结实际新目标。只有本次准备的已验证 token 发布可以推进该审核的 publication；设置、目录、模型或账号变化仍拒绝。准备共用审核超时/取消及 pending 生命周期，未启用或未到检查频率时不做交换。普通 subagent 同样在发送前续期，多角色共享一个 owner 的交换，但每次复用都验证原存储回执，不能复用已被删除或重新登录的缓存。
 
 ## 4. 边界
 

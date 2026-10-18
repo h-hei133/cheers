@@ -19,7 +19,7 @@ export function resolveAdvisorSelection(input: {
   const role = input.target ? undefined : input.config.sessionModelRoles?.advisor;
   const target = input.target ?? role;
   if (!target) throw new Error('Advisor role is unavailable.');
-  const selected = delegatedTarget(target, input.main, input.config);
+  const selected = delegatedTarget(target, input.main, input.config, input.catalog);
   assertScopedModel(input.config, selected);
   if (selected.provider === input.main.provider && selected.model === input.main.model) throw new Error('Advisor requires an independent model.');
   const model = catalogModel(input.catalog, selected.provider, selected.model!, catalogBaseUrl(input.catalog, selected.provider, selected.baseUrl));

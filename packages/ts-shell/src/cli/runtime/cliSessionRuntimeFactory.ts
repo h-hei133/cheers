@@ -235,6 +235,7 @@ export function createCliSessionRuntime(input: {
   const reportCredentialPublication = () => {
     const result = refreshShellRuntimeConfig(input.runtimeContext);
     if (result.status !== 'applied') input.renderer.renderLine('Credential saved; configuration was not applied. Reload status: ' + result.status + '.');
+    return result.status === 'applied';
   };
   let goalScheduler: GoalScheduler | undefined;
   const sessionRuntime: ShellSessionRuntime = new ShellSessionRuntime({

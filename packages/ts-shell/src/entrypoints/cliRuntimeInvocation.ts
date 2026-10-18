@@ -45,6 +45,7 @@ import {
 import { DEFAULT_ENDPOINT_KIND, endpointShape } from "../provider/endpoints/index.js";
 import { accountAuthFor, providerAuthorization } from "../provider/request/authorization.js";
 import { renewStoredAccount } from "../core/auth/account/renewal.js";
+import { projectAccountAuth } from '../core/auth/account/projection.js';
 import type {
   GoogleAccountAuthConfig,
   OpenAIAccountAuthConfig,
@@ -82,7 +83,7 @@ export interface CliRuntimeInvocationInput {
   readonly goalObjective?: string;
   readonly workspaceRoots?: readonly WorkspaceRoot[];
   readonly admission?: Admission;
-  readonly onCredentialPersisted?: () => void;
+  readonly onCredentialPersisted?: (rotation?: import('../cli/provider/renewal.js').AccountRotation) => boolean | void;
   /** Built after renewal from the same captured provider binding as the main request. */
   readonly prepareProviderResources?: (resolution: ProviderCredentialResolution) => {
     readonly compaction?: CompactionSetup;
@@ -268,6 +269,8 @@ function deferUntilReady(
     request = {
       ...request,
       providerCatalog: catalog,
+      ...(request.runtimeConfig && renewed.stored && renewed.accountAuth
+        ? { runtimeConfig: projectAccountAuth(request.runtimeConfig, resolution, renewed.accountAuth) } : {}),
       providerCredentialResolution: {
         ...resolution,
         baseUrl,
@@ -502,6 +505,7 @@ async function startTurn(
       modelRoles: { ...request.runtimeConfig?.sessionModelRoles },
       defaultMaxSteps: SUBAGENT_DEFAULT_STEPS,
       stepForModel: (model, admission, effort, workspace) => forModel(model, admission, effort, undefined, workspace),
+      prepareModel: (model, admission, effort, workspace, publication) => forModel.prepare(model, admission, effort, workspace, publication),
       retry: { enabled: request.runtimeConfig?.retryEnabled, maxRetries: request.runtimeConfig?.retryMaxRetries,
         baseDelayMs: request.runtimeConfig?.retryBaseDelayMs, maxDelayMs: request.runtimeConfig?.retryMaxDelayMs },
     },

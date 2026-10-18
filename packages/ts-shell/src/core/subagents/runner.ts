@@ -68,7 +68,14 @@ export interface SubagentRunInput {
  * that built it, and passing them through the tool context would put the model
  * side into a layer that has no business holding it.
  */
-export type SubagentRunner = (input: SubagentRunInput) => Promise<SubagentRunResult>;
+export type SubagentPreparation = Pick<SubagentRunInput, 'definition' | 'modelRole' | 'workspace' | 'admission' | 'signal'> & {
+  readonly accountPublication?: import('../auth/account/contract.js').AccountPublication;
+};
+export interface SubagentRunner {
+  (input: SubagentRunInput): Promise<SubagentRunResult>;
+  /** Prepare the same bound selection without starting model work. */
+  readonly prepare?: (input: SubagentPreparation) => Promise<void>;
+}
 
 export interface SubagentRunResult {
   /** Non-secret selection made by the request host, including an automatic session role. */

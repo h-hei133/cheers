@@ -10,6 +10,7 @@ import * as store from '../session/store/sessionFileStore.js';
 import { runCliRuntimeInvocation, type CliRuntimeInvocationInput, type CliRuntimeInvocationRequest } from './cliRuntimeInvocation.js';
 import { createProviderReadinessCliTerminalEvent } from './providerReadinessCliSurface.js';
 import type { QueryEvent } from '../core/query/runtime/events.js';
+import { delegatedSteps } from '../cli/provider/step.js';
 
 let home: string;
 let root: string;
@@ -59,6 +60,20 @@ it('confirms scoped storage before publishing, readiness, dependent resources an
   expect(deps.checkProviderReadiness).toHaveBeenCalledWith(expect.objectContaining({ accountAuth: fresh }));
   expect(deps.createStep).toHaveBeenCalledOnce();
   expect(deps.createStep.mock.calls[0]![0].providerCredentialResolution.credential?.accountAuth).toEqual(fresh);
+});
+
+it('carries verified main renewal into an explicit named role without a second refresh', async () => {
+  const renew = vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockResolvedValue({ renewed: true, accountAuth: fresh });
+  const config = getRuntimeConfig(root); const deps = dependencies();
+  deps.createStep.mockImplementation(captured => async () => {
+    await delegatedSteps(captured, new Map(), {}).prepare({ connectionId: 'a', provider: 'openai', model: 'gpt-5.2' });
+    return { text: 'Prepared same account', toolCalls: [], stopReason: 'stop' };
+  });
+  const run = await runCliRuntimeInvocation({ ...request(), runtimeConfig: config }, deps);
+  expect((await collect(run.events)).at(-1)).toMatchObject({ type: 'query.completed', result: { status: 'completed' } });
+  expect(renew).toHaveBeenCalledOnce();
+  expect(config.providerConnections[0]?.accountAuth?.openai).toEqual(old);
+  expect(deps.createStep.mock.calls[0]![0].runtimeConfig?.providerConnections[0]?.accountAuth?.openai).toEqual(fresh);
 });
 
 it.each(['relogin', 'delete', 'suppressed'])('prevents readiness and dispatch after %s persistence rejection', async kind => {

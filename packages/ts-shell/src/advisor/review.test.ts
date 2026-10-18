@@ -8,6 +8,20 @@ import * as files from '../session/store/sessionFileStore.js';
 
 afterEach(cleanupAdvisorHarnesses);
 
+it('preparation timeout retains its pending claim until storage work settles and never dispatches a late model request', async () => {
+  const setup = createAdvisorHarness({ target: 'openai/review-model', every: 1, timeoutMs: 100, mode: 'turn' });
+  let finish!: () => void;
+  const prepare = vi.fn(() => new Promise<void>(resolve => { finish = resolve; }));
+  const run = vi.fn(async () => advisorResult('Must not dispatch'));
+  await setup.runtime.capture(setup.boundary('prepare held'), Object.assign(run, { prepare }), setup.signal);
+  expect(setup.runtime.view()).toMatchObject({ status: 'timeout', notes: [] });
+  expect(setup.runtime.view().pending).toBeDefined();
+  await expect(setup.runtime.reviewLatest()).rejects.toThrow(/not settled/);
+  expect(prepare).toHaveBeenCalledOnce(); expect(run).not.toHaveBeenCalled();
+  finish(); await vi.waitFor(() => expect(setup.runtime.view().pending).toBeUndefined());
+  expect(run).not.toHaveBeenCalled(); expect(setup.runtime.view().notes).toHaveLength(0);
+});
+
 it('bounded timeout retains an abort-ignoring execution, prevents a second review and drains the original session without late notes', async () => {
   const setup = createAdvisorHarness({ target: 'openai/review-model', every: 1, timeoutMs: 100, mode: 'turn' });
   let finish!: (value: SubagentRunResult) => void; let started!: () => void; const ready = new Promise<void>(resolve => { started = resolve; });

@@ -47,7 +47,7 @@ OAuth 受众沿用现有凭据类型检查：OpenAI 账户 token、Google 账户
 
 ## 4. 边界
 
-- refresh lease 与请求凭据代次已接入；独立 advisor/subagent 的发送前续期、完整 quota/429 归属仍按 PRV-04/05 继续复核。
+- refresh lease、请求凭据代次与独立 advisor/subagent 的发送前续期已接入；完整 quota/429 与历史成本归属仍按 PRV-04/05 继续复核。
 - 不复制 live rotating OAuth 到其他 profile；每个 profile 独立登录。
 - 已验证：池校验、空池、不可用成员、池内选择、显式连接优先、会话亲和、身份/代际；未运行真实 provider。
 
@@ -70,3 +70,11 @@ OAuth 受众沿用现有凭据类型检查：OpenAI 账户 token、Google 账户
 本地证据包含真实两个 Node 进程与本机 HTTP 的成功、稳定 refresh token、删除、重登录及响应丢失五格；每格只发送一次交换。未访问真实账号，不能据此宣称真实 provider 或全部委派消费者已完成验收。
 
 profile 导入不复制 live rotating OAuth，因此不会产生第二个可消费授权；lease 文件也不跨 profile 共享。
+
+## 6. 委派请求的续期与发布
+
+普通子代理与顾问在实际请求前复用同一账号续期 owner。单次运行最多缓存 32 个捕获的账号身份；并发模型共享正在进行的交换和已验证结果。每次复用仍读取原 `AccountEdit` 的存储回执，删除、重登录、拓扑或镜像变化都拒绝，不能仅凭内存里的新 token 继续发送。目录提供的默认地址用于请求校验，不写入原凭据身份。
+
+已开始的交换即使被取消也完成条件持久化，但取消后不再派发模型请求。只有存储验证通过才发布新凭据；主账号续期也不可变地更新当前运行配置的精确 owner/镜像，使随后按名称选择的角色使用新凭据。
+
+顾问准备发生在原超时、取消和 durable pending 生命周期内；关闭或未命中 every-N 的 checkpoint 不续期。只允许该次准备通过其专属 publication 回调接纳经过验证的 token 字段变化，普通委派和并发顾问不能互相接纳对方的发布。设置、模型 revision、目录、作用域或账号身份变化仍使旧审核失效；准备超时后保留 pending，直至准备真正结束。

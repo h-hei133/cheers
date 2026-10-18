@@ -33,7 +33,7 @@ class ConfigTicket {
 }
 
 /** Keep restart-only display values installed while publishing the live input preference. */
-function projectAccepted(installed: RuntimeConfig, candidate: RuntimeConfig): RuntimeConfig {
+export function projectAccepted(installed: RuntimeConfig, candidate: RuntimeConfig): RuntimeConfig {
   const { composerShape } = candidate.tui ?? {};
   const tui = { ...installed.tui };
   if (composerShape === undefined) delete tui.composerShape;

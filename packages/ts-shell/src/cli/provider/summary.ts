@@ -29,7 +29,7 @@ export function captureSummaryRole(input: {
   const role = input.config.sessionModelRoles?.summary;
   if (!role) return undefined;
   const main = resolveProviderCredential({ runtimeConfig: input.config, env: {} });
-  const selected = delegatedTarget(role, main, input.config);
+  const selected = delegatedTarget(role, main, input.config, input.catalog);
   const resolution = { ...selected, baseUrl: catalogBaseUrl(input.catalog, selected.provider, selected.baseUrl ?? selected.credential?.baseUrl) };
   assertScopedModel(input.config, resolution);
   const model = catalogModel(input.catalog, role.provider, role.model, resolution.baseUrl);
@@ -52,7 +52,7 @@ export function captureSummaryRole(input: {
   const renew = async (): Promise<CompactionProvider> => {
     assertAdmission(input.admission);
     if (!input.workspaceRoot) throw new Error('The summary role workspace is unavailable.');
-    const renewed = await renewStoredAccount({ workspaceRoot: input.workspaceRoot, resolution, admission: input.admission,
+    const renewed = await renewStoredAccount({ workspaceRoot: input.workspaceRoot, resolution: selected, admission: input.admission,
       fetchImpl: admittedFetch(providerFetchFromTimeouts(providerTimeoutsFrom(input.config)), input.admission) });
     if (renewed.failure) throw new Error(renewed.failure);
     if (renewed.stored) input.onCredentialPersisted?.();

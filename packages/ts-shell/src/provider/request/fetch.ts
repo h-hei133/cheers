@@ -1,5 +1,7 @@
 import { admittedFetch, type Admission } from "../../core/network/admission.js";
-import { Agent, ProxyAgent, fetch as undiciFetch } from "undici";
+import { type Agent, type ProxyAgent, fetch as undiciFetch } from "undici/index.js";
+import { requestFetch, requestUrl } from './client.js';
+import { providerDispatchers } from './connection.js';
 
 export interface ProviderFetchEnvironment {
   readonly CHEERS_PROVIDER_PROXY?: string;
@@ -91,30 +93,21 @@ export function createProviderFetchFromEnv(
 ): typeof fetch {
   const config = resolveProviderTransportConfig(options.env ?? process.env, options.timeouts);
   const baseFetch = options.fetchImpl ?? (undiciFetch as unknown as typeof fetch);
-  const directDispatcher = new Agent({
-    connect: { timeout: config.connectTimeoutMs },
-    headersTimeout: config.headersTimeoutMs,
-    bodyTimeout: config.bodyTimeoutMs,
-  });
-  const proxyDispatcher = config.proxyUrl
-    ? new ProxyAgent({
-        uri: config.proxyUrl,
-        connect: { timeout: config.connectTimeoutMs },
-        headersTimeout: config.headersTimeoutMs,
-        bodyTimeout: config.bodyTimeoutMs,
-      })
-    : undefined;
+  const { direct: directDispatcher, proxy: proxyDispatcher } = providerDispatchers(config);
 
-  return (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = getRequestUrl(input);
+  const selectDispatcher = (url: URL): Agent | ProxyAgent => {
     const decision = resolveTransportDecision(url.hostname, config, Boolean(proxyDispatcher));
     const dispatcher = decision.mode === "proxy" ? proxyDispatcher! : directDispatcher;
     if (config.diagnosticsEnabled) {
       console.error(renderProviderTransportDiagnostic(url, decision, config));
     }
+    return dispatcher;
+  };
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (process.versions.bun && !options.fetchImpl) return requestFetch(input, init, selectDispatcher);
     return await baseFetch(input, {
       ...(init ?? {}),
-      dispatcher,
+      dispatcher: selectDispatcher(requestUrl(input)),
     } as RequestInit & { dispatcher: Agent | ProxyAgent });
   }) as typeof fetch;
 }
@@ -134,7 +127,7 @@ export function createProviderFetchFromEnv(
 export function withRequestSigner(base: typeof fetch, signer: RequestSigner): typeof fetch {
   return (async (input: RequestInfo | URL, init?: RequestInit) => {
     const method = (init?.method ?? "GET").toUpperCase();
-    const url = String(getRequestUrl(input));
+    const url = String(requestUrl(input));
     const headers = headerRecord(init?.headers);
     const body = typeof init?.body === "string" ? init.body : undefined;
     const signed = await signer({
@@ -413,16 +406,6 @@ function matchesNoProxy(hostname: string, entries: readonly string[]): boolean {
     }
   }
   return false;
-}
-
-function getRequestUrl(input: RequestInfo | URL): URL {
-  if (input instanceof URL) {
-    return input;
-  }
-  if (typeof input === "string") {
-    return new URL(input);
-  }
-  return new URL(input.url);
 }
 
 function parsePositiveInteger(value: string | undefined, fallback: number): number {

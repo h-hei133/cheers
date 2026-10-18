@@ -2,7 +2,7 @@
 title: "按路径作用域设置"
 category: article
 created: 2026-10-17
-updated: 2026-10-17
+updated: 2026-10-18
 tags: [configuration, scope, phase-20]
 summary: "路径规则是配置派生，不是新的workspace授权：固定声明基准、canonical目录组件匹配、逐字段安全合并、不可变操作快照与失效边界。"
 ---
@@ -51,7 +51,9 @@ summary: "路径规则是配置派生，不是新的workspace授权：固定声�
 
 `ConfigScopes` 在配置发布时冻结：profile、home、workspace、每个来源的 base/规则、规则 revision。操作捕获该对象后，模型步骤、委派步骤、压缩、工具准备、权限评估和结果发布只使用捕获的 scope；`await`、重试和后台完成不重新选择路径。
 
-规则 revision 变化由 `ConfigState` 的 substrate transition 使旧 admission 失效；trust 撤销、workspace 变化和 profile 身份变化沿原 `configurationAdmission` 路径拒绝。设置保存仍走字段 patch/CAS，不把派生后的 effective 值写回文件。
+作用域指纹包含行为字段、来源绑定、顺序化的层/规则、默认值以及 profile/home/workspace 身份。它不包含配置文件的原始字节 revision 或无关账号 provenance，因此仅保存 token 不会误撤销操作准入；完整来源和文件 revision 仍保留在 scope 中用于解释和条件写入。
+
+实际作用域变化由 `ConfigState` 的 substrate transition 使旧 admission 失效，已观察到的 A→B→A 不复活旧操作；trust 撤销、workspace 变化和 profile 身份变化沿原 `configurationAdmission` 路径拒绝。设置保存仍走字段 patch/CAS，不把派生后的 effective 值写回文件，也不因指纹稳定而放宽账号条件保存。
 
 ## 5. 边界
 

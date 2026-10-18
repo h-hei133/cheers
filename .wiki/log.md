@@ -7816,3 +7816,18 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 新编译模块的真实两个 Node 进程与本机合成 HTTP 验证五格通过：旋转 refresh token、稳定 refresh token、删除连接、有诱惑性 fallback 的重登录/owner 检查、丢响应后另进程重试。每格恰好一次刷新 HTTP，跟随者不改存储字节，丢响应 lease 保留 unknown；夹具已清理。产物为 `.omx/verification/phase20/renewal.process.mjs` 与对应 log。没有访问真实账号，本批没有新跑 PTY。
 - 独立代码 APPROVE、架构 CLEAR；各自运行 4 文件/102 项通过。四项静态门禁通过，NormProof 退出 0、verdict partial，原九项函数上限 advisory 保持，触及模块未越界。最终文档 drift 和 diff 在文档完成后检查。
 - 本条写入时续期前置批尚未提交/推送；下一批接入独立 subagent/advisor，保留 advisor publication/model 身份隔离，不能因续期自动放宽。全部 47 项继续原范围，本批不构成 PRV-04/05、W2 或全阶段完成。
+
+
+### PRV-02/04 委派续期与可执行文件传输
+
+- 续期前置批 `30c838271d6c0673e7740f7b1375301731174a5a` 已推送；本轮重新读回 Architecture Watch `39107413351` 与 CI `39107413330`，两者均 success。此前目录批 `760b0788` 的失败记录不改写。
+- 普通子代理与顾问在发送前复用账号续期 owner；单次运行至多缓存 32 个捕获身份，共享同 owner 的并发交换。缓存复用仍验证原存储回执，删除/重登录/拓扑或镜像变化拒绝；只有已验证的新凭据可发布。目录默认地址参与实际请求校验，但不改变原凭据身份。主账号续期不可变地投影原 owner/镜像，随后具名角色不再读取旧 token。
+- 顾问准备置于原超时、取消与 durable pending 生命周期内；关闭或未到 every-N 不续期。该次准备只能通过专属回调接纳精确 token 发布，设置/目录/模型变化仍拒绝，普通委派与并发审核不能互相接纳发布。已开始交换即使取消也完成条件持久化，但不再发模型请求；准备超时保留 pending 直到真正结束。主账号发布导致当回合预捕获 checkpoint 跳过的既有限制仍保留，下一新回合恢复，未宣称本批解决。
+- 实际 pathRules 暴露原 scope 指纹混入整个文件 revision/无关认证来源，保存 token 即撤销准入。指纹现只包含 scope 行为、来源绑定与身份，完整 provenance 仍保留；实际 scope 变化、已观察 A→B→A 与字段/账号 CAS 不放宽。共享凭据类型移至 auth 叶子契约，旧 resolver 类型导出保留，消除了 NormProof 发现的类型依赖环。
+- Node OAuth PTY 先通过，但可执行文件绕过明确代理。定位证实 Bun 1.3.14 的内置 undici shim 忽略 dispatcher，空/false 代理选项也不能屏蔽环境代理；首次合成诊断因此越过本机代理抵达外部端点，未使用真实账号。后续独立探针改用 `.invalid` 域名与清理后的代理环境。采用已安装库的实际 dispatcher/request，不新增依赖、全局环境改写或发送后换传输重试；Node 保留既有 Fetch。
+- 可执行文件的 request/Response 适配保留重定向上限和方法/凭据规则、逐目标路由、压缩响应和流式取消。原运行时 WebStream 桥还会挂住流读取，Readable.toWeb 又在就绪探测丢弃未读响应时崩溃；现复用 BodyReadable 迭代器，立即投影 signal/source error，以需求驱动 EOF，未读/满缓冲/已接收完但未消费的响应取消均不再返回旧字节。代理 TLS、CONNECT 与目标 TLS 有真实 deadline，IP 代理省略 IP SNI 但仍验证证书。只读参考和上游契约对照采用实际请求边界与明确代理决定，保留本项目更强的 owner/lease/CAS；适配器限定已序列化 provider payload，明确拒绝损坏 gzip/raw-deflate 错标，不承诺通用 Fetch 的历史宽容行为。
+- 最终受影响集 42 文件/459 测试通过；包括实际 Bun 子进程回归，不是只检查传入选项。相对 `30c83827` 类型诊断 149/149、无新增，不代表全项目 tsc 通过。中间构建曾因已删除的 request 选项类型失败，修正后两构建通过，最终 TS manifest `866d46648b83`。
+- 六项有效反转均实际退出 1：发布比较移除为 2 失败/1 通过，缓存 owner 检查移除为 3 失败，scope 指纹与主配置投影各 1 失败，恢复旧 native body 桥产生 1 失败及真实未读取消崩溃，恢复 EOF 预取为 1 失败。未选中的定向用例不计通过；全部用测试加载/子进程 preload 反转，产品源码没有回退。产物在 `.omx/verification/phase20/delegated.*`。
+- 最终独立代码 APPROVE、架构 CLEAR；代码最终 39 项、架构最终 43 项通过（集合重叠，不相加）。两路另验证真实本机代理/直连、CONNECT/TLS/头/体 deadline、流取消、重定向与压缩；架构验证信任 IP SAN 成功、错误证书在 CONNECT 前拒绝，以及 40 次未读取消全部关闭 socket。此前提出的代理覆盖、未读取消崩溃、缓冲与 EOF 后取消漏洞均已修复并回归。保留的适配范围/严格压缩取舍已写入 provider 文档。
+- 最终隔离 Linux PTY Node/exe × regular/fullscreen 四格通过：整套预设、显式 advisor on/off/on、B/high 顾问与 A/low 主请求、每格一次实际本机 TLS OAuth 交换，仅 owner token 字段变化、pathRules 保持准入、退出 0；额外源码 Bun 两格也通过。只用合成配置/凭据，夹具与临时证书已清理，不把它们当作真实 provider 验收。
+- import cycles、config consumers、declarations、Node floor 与脚本测试 59 项通过；NormProof 无环/解析义务满足，仍为原 9 个函数上限 advisory，触及模块未新增越界。strict docs drift 与 diff 在本条完成后运行。本条记录时本批尚未提交/推送，后续按实际 SHA 记录 CI；PRV-03…05 完整审计、历史 relay 成本、CTX-03 与其余全部 47 项继续，不能据此宣称 W2 或阶段完成。

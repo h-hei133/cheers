@@ -1,4 +1,4 @@
-import { runSubagent, type SubagentRunner, type SubagentRunResult } from "../core/subagents/runner.js";
+import { runSubagent, type SubagentRunner, type SubagentRunResult, type SubagentPreparation } from "../core/subagents/runner.js";
 import { subagentMode } from "../core/subagents/boundary.js";
 import { delegationTools } from '../core/subagents/capability.js';
 import type { ToolDefinition } from "../tools/types.js";
@@ -14,6 +14,8 @@ export interface SubagentHost {
   readonly defaultModel?: SessionModelRole;
   readonly modelRoles?: Readonly<Record<string, SessionModelRole | undefined>>;
   readonly stepForModel?: (model: string | SessionModelRole, admission?: () => string | undefined, effort?: import('../core/models/effort.js').ThinkingPreference, workspace?: string) => StepFunction | Promise<StepFunction>;
+  readonly prepareModel?: (model: string | SessionModelRole, admission?: () => string | undefined, effort?: import('../core/models/effort.js').ThinkingPreference, workspace?: string,
+    publication?: SubagentPreparation['accountPublication']) => Promise<void>;
 }
 
 /** Bind each delegated run to the parent's policies and its own narrower mode. */
@@ -22,7 +24,21 @@ export function createSubagentRunner(
   tools: ReadonlyMap<string, ToolDefinition>,
   parent: ToolGateOptions,
 ): SubagentRunner {
-  return async (input) => {
+  const select = (input: SubagentPreparation) => {
+    const admission = () => input.signal?.aborted ? 'Delegated request cancelled.' : parent.admission?.() ?? input.admission?.();
+    const refused = admission(); if (refused) throw new Error(refused);
+    const role = input.modelRole ? host.modelRoles?.[input.modelRole.name] : host.defaultModel;
+    if (!input.definition.model && input.modelRole && (!role || JSON.stringify(role) !== input.modelRole.identity)) {
+      throw new Error('Requested delegated role is unavailable or changed.');
+    }
+    const model = input.definition.model ?? role;
+    const effort = input.definition.effort !== undefined ? input.definition.effort
+      : !input.definition.model && role ? role.thinkingEffort ?? null : undefined;
+    const selection: SubagentRunResult['selection'] = { model: typeof model === 'string' ? model : model ? `${model.connectionId}/${model.model}` : undefined,
+      effort, source: input.definition.model ? 'definition' : role ? 'session-role' : 'parent' };
+    return { model, effort, selection, admission };
+  };
+  const runner: SubagentRunner = async (input) => {
     if (input.capability) {
       try {
         const allowed = delegationTools(input.capability, tools, parent.denyRules, input.definition.name);
@@ -33,17 +49,12 @@ export function createSubagentRunner(
       } catch { return { text: '', failed: true, failure: 'Read-only delegation admission refused.', steps: 0, allowedTools: [] }; }
     }
     let step: StepFunction | undefined;
-    const role = input.modelRole ? host.modelRoles?.[input.modelRole.name] : host.defaultModel;
-    if (!input.definition.model && input.modelRole && (!role || JSON.stringify(role) !== input.modelRole.identity)) {
-      return { text: '', failed: true, failure: 'Requested delegated role is unavailable or changed.', steps: 0, allowedTools: [] };
-    }
-    const model = input.definition.model ?? role;
-    const effort = input.definition.effort !== undefined ? input.definition.effort
-      : !input.definition.model && role ? role.thinkingEffort ?? null : undefined;
-    const selection: SubagentRunResult['selection'] = { model: typeof model === 'string' ? model : model ? `${model.connectionId}/${model.model}` : undefined,
-      effort, source: input.definition.model ? 'definition' : role ? 'session-role' : 'parent' };
+    let selected: ReturnType<typeof select>;
+    try { selected = select(input); }
+    catch { return { text: '', failed: true, failure: 'Requested delegated role is unavailable or changed.', steps: 0, allowedTools: [] }; }
+    const { model, effort, selection, admission } = selected;
     try { step = model || effort !== undefined || (input.admission || parent.configScope && input.workspace !== parent.workspaceRoot) && host.stepForModel
-      ? await host.stepForModel?.(model ?? '', input.admission, effort, input.workspace) : host.step; }
+      ? await host.stepForModel?.(model ?? '', admission, effort, input.workspace) : host.step; }
     catch { return { selection, text: '', failed: true, failure: 'Requested delegated model is unavailable.', steps: 0, allowedTools: [] }; }
     if (!step) return { selection, text: '', failed: true, failure: 'Requested delegated model is unavailable.', steps: 0, allowedTools: [] };
     const agentMode = subagentMode(parent.agentMode, input.definition.permissionMode, input.agentMode);
@@ -61,4 +72,9 @@ export function createSubagentRunner(
     });
     return { ...result, agentMode, selection };
   };
+  return Object.assign(runner, { prepare: async (input: SubagentPreparation): Promise<void> => {
+    const { model, effort, admission } = select(input);
+    await host.prepareModel?.(model ?? '', admission, effort, input.workspace, input.accountPublication);
+    const refused = admission(); if (refused) throw new Error(refused);
+  } });
 }

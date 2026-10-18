@@ -4,7 +4,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { createAdvisorHarness, cleanupAdvisorHarnesses, advisorResult } from '../../test-utils/advisor.js';
 import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../config/runtimeConfig.js';
 import { ConfigState } from '../../config/state.js';
-import { configurationBinding } from '../../core/shell/configuration.js';
+import { configurationAdmission, configurationBinding, refreshConfiguration } from '../../core/shell/configuration.js';
 import type { ShellRuntimeContext } from '../../core/shell/runtimeContext.js';
 import { loadCatalog, writeCatalogCache } from '../../core/models/catalogStore.js';
 import { resolveProviderCredential } from '../../core/shell/providerCredentials.js';
@@ -19,6 +19,7 @@ import { readBoundSessionState } from '../../session/store/bound.js';
 import { runAdvisorCommand } from '../../advisor/command.js';
 import type { SubagentRunInput, SubagentRunResult } from '../../core/subagents/runner.js';
 import { advisorFor, advisorCheckpointFor } from './advisor.js';
+import * as authorization from '../../provider/request/authorization.js';
 
 const servers: http.Server[] = [];
 afterEach(async () => {
@@ -26,10 +27,13 @@ afterEach(async () => {
   cleanupAdvisorHarnesses();
 });
 
-async function fixture() {
+const oldAccount = { type: 'openai-chatgpt-account' as const, accessToken: 'synthetic-old', refreshToken: 'synthetic-refresh', expiresAt: 1, accountId: 'b' };
+const freshAccount = { ...oldAccount, accessToken: 'synthetic-fresh', refreshToken: 'synthetic-rotated', expiresAt: Date.now() + 3600000 };
+
+async function fixture(account: boolean | 'environment' | 'scope' = false) {
   const setup = createAdvisorHarness(false, false);
   vi.stubEnv('OPENAI_API_KEY', '');
-  const callbacks: { main?: () => void } = {};
+  const callbacks: { main?: () => void; publish?: () => void } = {};
   const requests: Array<{ path: string; credential?: string; model: string; effort?: string; tools?: unknown[]; messages: unknown[] }> = [];
   const server = http.createServer(async (request, response) => {
     const chunks: Buffer[] = []; for await (const chunk of request) chunks.push(Buffer.from(chunk));
@@ -42,15 +46,21 @@ async function fixture() {
   });
   servers.push(server); await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const address = server.address(); if (!address || typeof address === 'string') throw new Error('Missing fixture port');
+  const advisorModel = account ? 'gpt-5.4' : 'namespace/advisor';
+  if (account === 'environment') { vi.stubEnv('DELEGATED_TEST_ACCESS', oldAccount.accessToken); vi.stubEnv('DELEGATED_TEST_REFRESH', oldAccount.refreshToken); }
+  const storedAccount = account === 'environment' ? { ...oldAccount, accessToken: '${DELEGATED_TEST_ACCESS}', refreshToken: '${DELEGATED_TEST_REFRESH}' } : oldAccount;
   writeUserRuntimeConfigFile({ provider: 'openai', activeProviderConnectionId: 'a', maxOutputTokens: 10, reserveTokens: 100,
+    ...(account === 'scope' ? { pathRules: [{ path: setup.root, settings: { maxOutputTokens: 10 } }] } : {}),
     retryEnabled: false, retryMaxRetries: 0, providerRetryMaxRetries: 0, cacheWarming: 'off',
-    providerConnections: ['a', 'b'].map(id => ({ id, provider: 'openai', authType: 'api-key', apiKey: `synthetic-${id}`, model: 'main',
+    providerConnections: ['a', 'b'].map(id => ({ id, provider: 'openai', model: id === 'b' ? advisorModel : 'main',
+      ...(account && id === 'b' ? { authType: 'account-auth' as const, accountAuth: { openai: storedAccount } }
+        : { authType: 'api-key' as const, apiKey: `synthetic-${id}` }),
       baseUrl: `http://127.0.0.1:${address.port}/${id}/v1`, status: 'connected', createdAt: '2026-01-01', updatedAt: '2026-01-01' })) },
   readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
   writeCatalogCache([{ id: 'openai', models: [{ id: 'main', reasoning: true, contextWindow: 32000, maxTokens: 10 },
-    { id: 'namespace/advisor', reasoning: true, contextWindow: 32000, maxTokens: 10 }] }]);
+    { id: advisorModel, reasoning: true, contextWindow: 32000, maxTokens: 10 }] }]);
   const command = { cwd: setup.root, projectRoot: setup.root, sessionId: setup.session.id };
-  expect((await runModelPresetCommand(['save', 'work', '--profile', 'default=a/main@low', 'advisor=b/namespace/advisor@high'], command)).output).toContain('saved');
+  expect((await runModelPresetCommand(['save', 'work', '--profile', 'default=a/main@low', `advisor=b/${advisorModel}@high`], command)).output).toContain('saved');
   expect((await runModelPresetCommand(['apply', 'work', '--all'], command)).output).toContain('all roles applied');
   const config = projectSessionModel(getRuntimeConfig(setup.root), setup.session.id);
   const binding = { projectRoot: setup.root, session: setup.session };
@@ -63,13 +73,15 @@ async function fixture() {
   return { ...setup, requests, command, context, renderer, advisor, reports, callbacks };
 }
 
-async function invoke(setup: Awaited<ReturnType<typeof fixture>>) {
+async function invoke(setup: Awaited<ReturnType<typeof fixture>>, signal = setup.signal) {
   const config = projectSessionModel(getRuntimeConfig(setup.root), setup.session.id);
   const run = await runCliRuntimeInvocation({ sessionId: setup.session.id, workspaceRoot: setup.root, prompt: 'Review fixture',
-    agentMode: 'build', permissionScope: 'ask', signal: setup.signal, maxTurns: 1, runtimeConfig: config, providerCatalog: loadCatalog(),
+    agentMode: 'build', permissionScope: 'ask', signal, maxTurns: 1, runtimeConfig: config, providerCatalog: loadCatalog(),
     providerCredentialResolution: resolveProviderCredential({ runtimeConfig: config, env: {} }), providerModeEnv: 'real',
     requestPolicy: goalRequestPolicy(setup.manager, setup.session),
+    admission: configurationAdmission(setup.context),
     checkpoint: advisorCheckpointFor(setup.context, setup.manager, setup.renderer, setup.sourcePromptEntryId),
+    onCredentialPersisted: () => { setup.callbacks.publish?.(); return refreshConfiguration(setup.context).status === 'applied'; },
     escalationPromptHandler: async prompt => ({ promptId: prompt.id, decision: 'deny', respondedAt: Date.now() }),
   }, { checkProviderReadiness: async () => ({ ok: true }), tools: () => new Map() });
   for await (const _event of run.events) { /* Exercise the actual main turn and delegated request. */ }
@@ -181,4 +193,64 @@ it('reports a publication change during the main request and resumes advice on a
   await invoke(setup);
   expect(setup.requests.map(row => row.model)).toEqual(['main', 'main', 'namespace/advisor']);
   expect(setup.advisor.view().notes).toHaveLength(1);
+});
+
+it.each([true, 'environment', 'scope'] as const)('prepares an expired independent account (%s) only for an eligible review and publishes a usable note for the renewed target', async kind => {
+  const setup = await fixture(kind);
+  const renew = vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockImplementation(async input => input.credential.accountAuth
+    ? { renewed: true, accountAuth: freshAccount } : { renewed: false });
+  await invoke(setup);
+  expect(renew.mock.calls.filter(([input]) => input.credential.accountAuth)).toHaveLength(0);
+  setup.advisor.configure({ every: 2, mode: 'turn', timeoutMs: 10000 }); setup.advisor.setEnabled(true);
+  await invoke(setup);
+  expect(renew.mock.calls.filter(([input]) => input.credential.accountAuth)).toHaveLength(0);
+  await invoke(setup);
+  expect(renew.mock.calls.filter(([input]) => input.credential.accountAuth)).toHaveLength(1);
+  expect(setup.requests.map(row => row.model)).toEqual(['main', 'main', 'main', 'gpt-5.4']);
+  expect(setup.requests.at(-1)).toMatchObject({ credential: 'Bearer synthetic-fresh', effort: 'high' });
+  expect(getRuntimeConfig(setup.root).providerConnections.find(row => row.id === 'b')?.accountAuth?.openai).toEqual(freshAccount);
+  expect(setup.advisor.view().status).toBe('reviewed');
+  const note = setup.advisor.view().notes[0]!;
+  expect(setup.advisor.apply(note.id).noteId).toBe(note.id);
+});
+
+it.each(['settings', 'catalog', 'model'] as const)('an unrelated %s change inside credential publication cannot be adopted by preparation', async kind => {
+  const setup = await fixture(true); setup.advisor.setEnabled(true);
+  vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockImplementation(async input => input.credential.accountAuth
+    ? { renewed: true, accountAuth: freshAccount } : { renewed: false });
+  setup.callbacks.publish = () => {
+    if (kind === 'model') { const edit = readSessionModelEdit(setup.session.id); writeSessionModel(setup.session.id, { ...edit.selection!, roles: {} }, edit); }
+    else if (kind === 'catalog') writeCatalogCache(loadCatalog().map(provider => ({ ...provider, models: provider.models.map(model => ({ ...model, contextWindow: 64000 })) })));
+    else { const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath()); writeUserRuntimeConfigFile({ ...edit.values, temperature: 0.2 }, edit); }
+  };
+  await invoke(setup);
+  expect(setup.requests.map(row => row.model)).toEqual(['main']);
+  expect(setup.advisor.view().notes).toHaveLength(0); expect(setup.advisor.view().pending).toBeUndefined();
+});
+
+it.each(['cancel', 'configuration'] as const)('persists started renewal but refuses advisor dispatch after %s', async kind => {
+  const setup = await fixture(true); setup.advisor.setEnabled(true); const controller = new AbortController();
+  vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockImplementation(async input => {
+    if (!input.credential.accountAuth) return { renewed: false };
+    if (kind === 'cancel') controller.abort(); else setup.context.configuration.recordDisplay({ theme: 'light' });
+    return { renewed: true, accountAuth: freshAccount };
+  });
+  await invoke(setup, controller.signal);
+  // A cancelled exchange may settle after its caller; the retained claim must then clear.
+  await vi.waitFor(() => expect(setup.advisor.view().pending).toBeUndefined());
+  expect(setup.requests.map(row => row.model)).toEqual(['main']);
+  expect(getRuntimeConfig(setup.root).providerConnections.find(row => row.id === 'b')?.accountAuth?.openai).toEqual(freshAccount);
+  expect(setup.advisor.view().notes).toHaveLength(0);
+});
+
+it('an old manual runner fails before account preparation after a configuration publication', async () => {
+  const setup = await fixture(true);
+  const renew = vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockResolvedValue({ renewed: false });
+  setup.advisor.configure({ every: 2, mode: 'turn', timeoutMs: 10000 }); setup.advisor.setEnabled(true);
+  await invoke(setup);
+  setup.context.configuration.recordDisplay({ theme: 'light' });
+  await setup.advisor.reviewLatest();
+  expect(renew.mock.calls.filter(([input]) => input.credential.accountAuth)).toHaveLength(0);
+  expect(setup.requests.map(row => row.model)).toEqual(['main']);
+  expect(setup.advisor.view()).toMatchObject({ notes: [], status: 'error' });
 });

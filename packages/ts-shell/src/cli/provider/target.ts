@@ -2,9 +2,11 @@ import { isRuntimeProvider, type RuntimeConfig } from '../../config/runtimeConfi
 import { resolveProviderCredential, type ProviderCredentialResolution } from '../../core/shell/providerCredentials.js';
 import { providerFacts } from '../../core/providers/facts.js';
 import type { SessionModelRole } from '../../session/model/contract.js';
+import { catalogBaseUrl, type CatalogProvider } from '../../core/models/catalog.js';
 
 /** An exact target names an existing connection or provider; a bare model stays on its captured provider. */
-export function delegatedTarget(target: string | SessionModelRole, main: ProviderCredentialResolution, config?: RuntimeConfig): ProviderCredentialResolution {
+export function delegatedTarget(target: string | SessionModelRole, main: ProviderCredentialResolution, config?: RuntimeConfig,
+  catalog: readonly CatalogProvider[] = []): ProviderCredentialResolution {
   const text = typeof target === 'string' ? target : target.model;
   if (!text.trim() || text !== text.trim() || /[\s\x00-\x1f\x7f-\x9f]/.test(text) || text.length > 512) throw new Error('Delegated model target is invalid.');
   const slash = text.indexOf('/'); const owner = typeof target !== 'string' ? target.connectionId : slash < 0 ? main.provider : text.slice(0, slash);
@@ -27,7 +29,8 @@ export function delegatedTarget(target: string | SessionModelRole, main: Provide
     if (!config || !isRuntimeProvider(owner)) throw new Error('Delegated provider is unavailable.');
     resolution = resolveProviderCredential({ runtimeConfig: { ...config, sessionConnection: undefined }, cliProvider: owner, cliModel: model });
   }
-  if (resolution.model !== model || !resolution.credential || !resolution.baseUrl) throw new Error('Delegated model has no usable provider binding.');
+  if (resolution.model !== model || !resolution.credential
+    || !catalogBaseUrl(catalog, resolution.provider, resolution.baseUrl ?? resolution.credential.baseUrl)) throw new Error('Delegated model has no usable provider binding.');
   const allowed = providerFacts(resolution.provider).accountAuthAllowedModels;
   if (resolution.credential.authMode === 'account-auth' && allowed && !allowed.includes(model)) throw new Error('Delegated model is unavailable for this account binding.');
   return resolution;

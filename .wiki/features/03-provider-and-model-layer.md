@@ -179,6 +179,10 @@ npx tsx /tmp/probe.mts
 
 ### 2.6 ~~HTTP 超时只能靠环境变量~~ ✅ **2026-09-24 已收口（Phase 6 T1）**
 
+> **2026-10-18 可执行文件返工**：传输明确加载已安装的 dispatcher 实现，避免运行时兼容层忽略代理与超时。Node 保留既有 Fetch；可执行文件复用同一 dispatcher 的 request 接口，通过 `provider/request/client.ts`、`body.ts` 接入原生 Response。代理关闭/no-proxy 不借用环境代理，明确代理不被无关环境 NO_PROXY 覆盖。`connection.ts` 同时约束代理 TLS、CONNECT 响应和目标 TLS；IP 代理不发送 IP SNI，证书仍验证实际 hostname/IP。
+>
+> 适配层限定于已序列化的 provider 请求，发送前物化一次请求体；响应保持有界流式读取、取消和异常传播，包括未读取就丢弃以及满队列后取消。重定向有次数上限、逐目标重选传输并移除跨源凭据；没有失败后换传输重放。gzip/zlib-deflate/Brotli 在错误响应中也解码；损坏压缩、缺失 gzip trailer 和错标为 zlib-deflate 的 raw-deflate 均拒绝，不承诺通用 Fetch 的历史宽容行为。
+
 > **收口说明**：把 `provider/request/fetch.ts` 的实现**接进了活轨**——
 > `createProviderStep` 传 `fetchImpl`（`cliRuntimeInvocation.ts:439`），
 > 压缩路径同样传（`cliSessionRuntimeFactory.ts:125,137`）；

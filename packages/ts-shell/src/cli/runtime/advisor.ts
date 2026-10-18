@@ -12,6 +12,8 @@ import { readAdvisor, writeAdvisor } from '../../advisor/store.js';
 import type { BoundSessionHost } from '../../session/store/bound.js';
 import { readSessionModelEdit } from '../../session/model/state.js';
 import { projectModelSelection } from '../../session/model/projection.js';
+import { accountPublicationMatches } from '../provider/publication.js';
+import type { SubagentRunner } from '../../core/subagents/runner.js';
 
 const runtimes = new WeakMap<ShellRuntimeContext, AdvisorRuntime>();
 
@@ -40,7 +42,7 @@ export function advisorCommandFor(context: ShellRuntimeContext, store: SessionMa
 }
 export function advisorCheckpointFor(context: ShellRuntimeContext, store: SessionManager, renderer: Pick<StreamingRenderer, 'renderLine'>,
   sourcePromptEntryId?: string): TurnCheckpointHandler {
-  const publication = context.configuration.current;
+  let publication = context.configuration.current;
   const sessionId = context.session.id;
   const modelRevision = readSessionModelEdit(sessionId).revision;
   const admission = (): string | undefined => {
@@ -56,11 +58,29 @@ export function advisorCheckpointFor(context: ShellRuntimeContext, store: Sessio
       if (advisorFor(context, store, renderer).view().enabled) renderer.renderLine('Advisor checkpoint skipped because its request configuration changed. Review resumes on a fresh turn.');
       return;
     }
-    await advisorFor(context, store, renderer).capture({ ...checkpoint, sourcePromptEntryId }, input => {
+    const bound: SubagentRunner = input => {
       const blocked = admission();
       if (blocked) return Promise.resolve({ text: '', failed: true, failure: blocked, steps: 0, allowedTools: [] });
       return runner({ ...input, admission: () => input.admission?.() ?? admission() });
-    }, signal);
+    };
+    const prepared = Object.assign(bound, { prepare: async (input: Parameters<NonNullable<SubagentRunner['prepare']>>[0]) => {
+      const admit = () => input.signal?.aborted ? 'Advisor preparation cancelled.' : input.admission?.() ?? admission();
+      const refusal = admit(); if (refusal) throw new Error(refusal);
+      let active = true;
+      try {
+        await runner.prepare?.({ ...input, admission: admit, accountPublication: (rotation, publish) => {
+          const before = context.configuration.current;
+          const eligible = active && !admit() && before === publication;
+          // Persistence already succeeded. Even a stale advisor must publish that storage outcome.
+          const applied = publish();
+          const after = context.configuration.current;
+          if (eligible && applied === true && context.session.id === sessionId
+            && readSessionModelEdit(sessionId).revision === modelRevision && accountPublicationMatches(before, after, rotation)) publication = after;
+        } });
+        const blocked = admit(); if (blocked) throw new Error(blocked);
+      } finally { active = false; }
+    } });
+    await advisorFor(context, store, renderer).capture({ ...checkpoint, sourcePromptEntryId }, prepared, signal);
   };
 }
 export function pauseAdvisor(context: ShellRuntimeContext, store: BoundSessionHost): void {

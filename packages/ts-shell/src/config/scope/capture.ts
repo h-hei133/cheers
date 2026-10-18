@@ -16,6 +16,27 @@ import { assertScopePath, captureScopePath } from './path.js';
 
 export const MAX_SCOPE_RULES = 128;
 
+function originBinding(node: ConfigOrigin): object {
+  return { ...node, ...Object.fromEntries(['files', 'shadowedFiles', 'rejectedFiles'].flatMap(key => {
+    const files = node[key as 'files'];
+    return files ? [[key, files.map(({ revision: _revision, ...binding }) => binding)]] : [];
+  })), ...(node.children ? { children: Object.fromEntries(Object.entries(node.children).map(([key, child]) => [key, originBinding(child)])) } : {}) };
+}
+
+function scopedOrigins(origins: Readonly<Record<string, ConfigOrigin>>): object {
+  return Object.fromEntries(Object.entries(origins).filter(([key]) => Object.hasOwn(SCOPE_FIELDS, key)).map(([key, node]) => [key, originBinding(node)]));
+}
+
+/** Document revisions protect writes separately; only scope behavior and source identity revoke a scope. */
+function programRevision(program: Omit<ConfigScopes, 'revision'>): string {
+  const layers = program.layers.map(layer => {
+    const { revision: _revision, ...file } = layer.file ?? {};
+    return { ...layer, ...(layer.file ? { file } : {}), origins: scopedOrigins(layer.origins),
+      rules: layer.rules.map(rule => ({ ...rule, origins: scopedOrigins(rule.origins) })) };
+  });
+  return createHash('sha256').update(JSON.stringify({ ...program, layers })).digest('hex');
+}
+
 export function scopeSettings(values: object): ScopeSettings {
   const settings: ScopeSettings = Object.fromEntries(Object.entries(values).filter(([key, value]) => Object.hasOwn(SCOPE_FIELDS, key) && value !== undefined));
   return settings.denyRules ? { ...settings, denyRules: normalizeConfigDenials(settings.denyRules) } : settings;
@@ -39,9 +60,9 @@ export function captureScopeLayer(base: ScopeSettings, origins: Readonly<Record<
 export function captureConfigScopes(layers: readonly ScopeLayer[], defaults: ScopeSettings, workspace: string): ConfigScopes | undefined {
   if (!layers.some(layer => layer.rules.length)) return undefined;
   if (layers.reduce((sum, layer) => sum + layer.rules.length, 0) > MAX_SCOPE_RULES) throw new ConfigInputError('scope-resource-limit');
-  const program: ConfigScopes = { revision: createHash('sha256').update(JSON.stringify(layers)).digest('hex'),
-    profile: currentProfile(), home: fs.realpathSync(userHomeDir()), workspace: captureScopePath(workspace, workspace, true),
+  const captured = { profile: currentProfile(), home: fs.realpathSync(userHomeDir()), workspace: captureScopePath(workspace, workspace, true),
     defaults: structuredClone(defaults), layers: structuredClone(layers) };
+  const program: ConfigScopes = { ...captured, revision: programRevision(captured) };
   assertConfigScopes(program);
   return freezeDeep(program);
 }

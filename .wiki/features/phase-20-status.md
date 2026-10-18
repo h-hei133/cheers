@@ -10,7 +10,7 @@
 |---|---|---|
 | W1 CFG-01…05 | CFG-02/04 发现并修复导入相对路径规则改变目标的问题；default、named、legacy、preview 后源变化回归通过 | 继续核查全部身份 consumer、配置快照及失效合同 |
 | W4 UI-01…04 | UI-02/03 修复固定八项上限、详情被候选数裁短、tab 点击区域覆盖、缺键盘切组及 modal 不显示分组；可用矩形和旧命中失效回归通过 | 其余公共原语、源选区及各消费者仍按合同复核 |
-| W2 | PRV-01/02、PAN-01 修复同 provider 多 relay 精确选择、revision 与 preset CAS；subagent/summary/advisor 角色消费已接通；CLI/env/旧配置选择有明确 provider 绑定；目录按实际/默认地址绑定完整元数据，歧义在续期、readiness 和模型发送前拒绝 | 独立委派账号续期、历史 relay 成本归属、PRV-03…05 完整复核仍开放 |
+| W2 | PRV-01/02、PAN-01 修复同 provider 多 relay 精确选择、revision 与 preset CAS；角色消费及独立 subagent/advisor 续期已接通；目录按实际/默认地址绑定完整元数据；本地发现并修复可执行文件代理、超时和流取消问题 | 主账号发布后的本回合 checkpoint 跳过、历史 relay 成本归属、PRV-03…05 完整复核仍开放 |
 | W3 | 既有实现尚未完成本次逐条复核 | CTX-01…04、TOOL-01 的请求、拒绝、并发和恢复证据 |
 | W5 | SET-02 已修复选中分组后无法搜索其他组的问题；复用文字匹配排序，跨组按最佳得分和固定组序展示；清空搜索回原组，从详情 Back 回字段所属组并聚焦 | CMD-01/02、SET-01/03 全部验收；SET-02 其余来源/状态细节继续按合同核查 |
 | W6 | modal 的项目范围切组现已可达；不能由此证明完整目录分页/搜索 | PAN-01…08 各动作、只读边界、分页和 revision |
@@ -34,6 +34,8 @@ advisor 批已推送为 `a7e32d44bcebcbb043760c1d390e7011ed3acf38`，Architectur
 provider-only 批已推送为 `c6206819db11c88984f95d0dee2c59eed4d9c23a`，Architecture Watch `39103714478`、CI `39103714477` 均 success。精确 endpoint 目录批已有本地受影响 40 文件/555 项、三项有效反转、双构建、八格隔离 PTY 与独立代码/架构复核；其提交与 CI 按开发日志后续证据记录，不把当前通过扩大为全部 47 项完成。
 
 目录批已推送为 `760b078855a4c08ab980dbd85c254e6a343bb5fe`，Architecture Watch `39106440957` success；CI `39106440859` 有一项既有 `grepStream` 夹具 `spawn ETXTBSY` 失败（8652 通过、2 跳过），不能记为 CI success。后续续期前置返工修复 peer 错账号读回和刷新发送标记漏调用，独立顾问/子代理续期接入仍未闭合；细节及验证见日志。
+
+续期前置批已推送为 `30c838271d6c0673e7740f7b1375301731174a5a`，Architecture Watch `39107413351` 与 CI `39107413330` 均 success。后续委派续期、精确 token publication、scope 指纹与可执行文件传输返工的验证/交付边界继续按日志记录；此处不把本地修复视为新 SHA CI 成功，也不收窄全部 47 项范围。
 
 用户已允许后续验证的环境/真实模型项：START-03 受控冷缓存及剩余响应测量、QA-02 跨平台/IME/系统复制、QA-03 真实质量、TOOL-02 成本与 tokenizer 校准。**这项保留不覆盖可在本地完成的缺失实现和合成端到端验收。**
 

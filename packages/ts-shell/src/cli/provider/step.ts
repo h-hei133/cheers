@@ -22,6 +22,8 @@ import type { ToolDiscovery } from '../../core/tools/discovery/state.js';
 import { scopeAdmission } from '../../config/scope/admission.js';
 import { mergeConfigValue } from '../../config/merge.js';
 import type { SessionModelRole } from '../../session/model/contract.js';
+import { assertAdmission } from '../../core/network/admission.js';
+import { delegatedRenewal, type AccountRotation, type AccountPublication } from './renewal.js';
 
 export interface ProviderStepHost {
   readonly providerMode: 'synthetic' | 'real';
@@ -36,6 +38,7 @@ export interface ProviderStepHost {
   readonly thinkingEffort?: ThinkingPreference;
   readonly thinkingEffortExplicit?: boolean;
   readonly serviceTier?: string;
+  readonly onCredentialPersisted?: (rotation?: AccountRotation) => boolean | void;
 }
 
 export function createProviderStep(
@@ -125,9 +128,11 @@ export function createProviderStep(
 /** Each explicit delegated model is resolved once; unavailable targets never use the main step. */
 export function delegatedSteps(request: ProviderStepHost, tools: ReadonlyMap<string, ToolDefinition>, context: SystemPromptContext,
   syntheticDefault?: StepFunction, discovery?: ToolDiscovery) {
-  return (model: string | SessionModelRole, admission?: () => string | undefined, effort?: ThinkingPreference, providerScope?: 'current', workspace = request.workspaceRoot): StepFunction => {
+  const renew = delegatedRenewal(request);
+  const catalog = request.providerCatalog ?? loadCatalog();
+  const select = (model: string | SessionModelRole, admission?: () => string | undefined, effort?: ThinkingPreference, providerScope?: 'current', workspace = request.workspaceRoot) => {
     if (request.providerMode === 'synthetic') {
-      if (!model && effort === undefined && syntheticDefault) return syntheticDefault;
+      if (!model && effort === undefined && syntheticDefault) return { step: syntheticDefault, prepare: async () => {} };
       throw new Error('Independent model review is unavailable in synthetic provider mode.');
     }
     const main = request.providerCredentialResolution;
@@ -135,12 +140,28 @@ export function delegatedSteps(request: ProviderStepHost, tools: ReadonlyMap<str
     const runtimeConfig = scoped && request.runtimeConfig?.allowedModels !== undefined ? { ...scoped,
       allowedModels: mergeConfigValue(request.runtimeConfig.allowedModels, scoped.allowedModels ?? request.runtimeConfig.allowedModels, 'intersect') as readonly string[] } : scoped;
     const resolution = model ? providerScope === 'current' && typeof model === 'string'
-      ? delegatedTarget(`${main.provider}/${model}`, main)
-      : delegatedTarget(model, main, runtimeConfig) : main;
+      ? delegatedTarget(`${main.provider}/${model}`, main, undefined, catalog)
+      : delegatedTarget(model, main, runtimeConfig, catalog) : main;
     const scopedAdmission = scopeAdmission(runtimeConfig?.configScopes, workspace);
     const admit = () => request.admission?.() ?? admission?.() ?? scopedAdmission();
+    assertAdmission(admit);
     const requestPolicy = request.requestPolicy?.withAdmission?.(() => { const refusal = admit(); if (refusal) throw new Error(refusal); }) ?? request.requestPolicy;
-    return createProviderStep({ ...request, runtimeConfig, workspaceRoot: workspace, providerCredentialResolution: resolution,
-      requestPolicy, admission: admit, ...(effort !== undefined ? { thinkingEffort: effort, thinkingEffortExplicit: true } : {}) }, tools, context, discovery);
+    const selected = { ...request, providerCatalog: catalog, runtimeConfig, workspaceRoot: workspace, providerCredentialResolution: resolution,
+      requestPolicy, admission: admit, ...(effort !== undefined ? { thinkingEffort: effort, thinkingEffortExplicit: true } : {}) };
+    // Validate the captured request before any refresh side effect. Building a step does not send.
+    let active = createProviderStep(selected, tools, context, discovery);
+    let credential = resolution.credential?.accountAuth;
+    const prepare = async (publication?: AccountPublication) => {
+      const fresh = await renew(resolution, admit, publication);
+      if (fresh.credential?.accountAuth !== credential) {
+        active = createProviderStep({ ...selected, providerCredentialResolution: fresh }, tools, context, discovery);
+        credential = fresh.credential?.accountAuth;
+      }
+    };
+    const step: StepFunction = async (...args) => { args[1]?.throwIfAborted(); await prepare(); args[1]?.throwIfAborted(); return active(...args); };
+    return { step, prepare };
   };
+  return Object.assign((...args: Parameters<typeof select>): StepFunction => select(...args).step,
+    { prepare: async (model: string | SessionModelRole, admission?: () => string | undefined, effort?: ThinkingPreference,
+      workspace?: string, publication?: AccountPublication): Promise<void> => { await select(model, admission, effort, undefined, workspace).prepare(publication); } });
 }

@@ -9,6 +9,7 @@ import { resolveProviderCredential, type ProviderCredentialResolution } from '..
 import { accountAuthKey } from '../../providers/facts.js';
 import { identifyProject } from '../../security/trust/identity.js';
 import { freezeDeep } from '../../values/freeze.js';
+import type { AccountRotation } from './contract.js';
 
 interface Snapshot {
   readonly source: string;
@@ -112,16 +113,21 @@ function rotated(edit: AccountEdit, accountAuth: AccountAuthConfig): RuntimeConf
 
 /** A peer's saved rotation must still belong to the exact captured owner. */
 export function readAccountRotation(edit: AccountEdit): AccountAuthConfig | undefined {
+  return readAccountRotationReceipt(edit)?.accountAuth;
+}
+
+export function readAccountRotationReceipt(edit: AccountEdit): AccountRotation | undefined {
   const current = snapshot(edit.workspaceRoot, edit.resolution);
   const original = edit.resolution.credential?.accountAuth;
   const accountAuth = current.resolution.credential?.accountAuth;
-  if (!original || !accountAuth || sameValue(original, accountAuth) || accountAuth.expiresAt <= Date.now()
+  if (!current.edit.revision || !edit.snapshot.edit.revision || !original || !accountAuth || sameValue(original, accountAuth) || accountAuth.expiresAt <= Date.now()
     || !sameAccountIdentity(original, accountAuth)) return undefined;
   const expected = { ...edit.resolution, credential: { ...edit.resolution.credential!, accountAuth } };
   if (current.source !== edit.snapshot.source || current.edit.path !== edit.snapshot.edit.path
     || !sameValue(identity(current.resolution), identity(expected))
     || !sameValue(selectors(current.edit.values, edit.resolution.provider), selectors(rotated(edit, accountAuth), edit.resolution.provider))) return undefined;
-  return accountAuth;
+  return { resolution: edit.resolution, accountAuth, storage: { source: current.source, path: current.edit.path,
+    previousRevision: edit.snapshot.edit.revision, revision: current.edit.revision } };
 }
 
 /** Save only the captured owner and an exact-identity mirror, then verify its use. */
