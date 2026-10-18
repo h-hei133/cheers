@@ -1,4 +1,5 @@
 import type { Session } from "../schema/sessionRecord.js";
+import { randomUUID } from 'node:crypto';
 import type {
   SessionCompactionRecord,
   SessionThreadSnapshot,
@@ -42,7 +43,7 @@ export function createDurableSessionBranch(input: {
   readonly switchReason?: string;
 }): SessionThreadSnapshot {
   const current = readSessionThreadSnapshot(input);
-  const thread = createSessionBranch({
+  const thread = { ...createSessionBranch({
     snapshot: current,
     sessionId: input.session.id,
     parentEntryId: input.parentEntryId,
@@ -50,7 +51,7 @@ export function createDurableSessionBranch(input: {
     createdAt: input.createdAt,
     ...(input.branchId ? { branchId: input.branchId } : {}),
     ...(input.switchReason ? { switchReason: input.switchReason } : {}),
-  });
+  }), navigationRevision: randomUUID() };
   writeSessionState({
     session: input.session,
     layout: input.layout,
@@ -74,11 +75,11 @@ export function switchDurableSessionActiveLeaf(input: {
       throw new Error('The session branch or project changed while preparing navigation.');
     }
     const current = catchUpSessionThread(state.thread ?? buildLinearSessionThreadSnapshot(input.session), input.session);
-    const thread = switchSessionActiveLeaf({
+    const thread = { ...switchSessionActiveLeaf({
       snapshot: current,
       leafEntryId: input.leafEntryId,
       ...(input.branchId ? { branchId: input.branchId } : {}),
-    });
+    }), navigationRevision: randomUUID() };
     input.beforeWrite?.();
     // Navigation changes the thread only, preserving unrelated state read under the lock.
     writeJsonFileAtomic(input.layout.statePath, { ...state, thread });

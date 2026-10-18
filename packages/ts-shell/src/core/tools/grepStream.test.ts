@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
+import { existsSync } from 'node:fs';
 import os from "node:os";
 import path from "node:path";
 import { forgetRipgrepBinary, ripgrepArgs, searchWithRipgrep } from "./grepRipgrep.js";
@@ -23,7 +24,8 @@ beforeEach(async () => {
   await fs.mkdir(workspace);
   await fs.writeFile(path.join(workspace, "a.ts"), "中文 needle\n");
   await fs.writeFile(path.join(root, "package.json"), JSON.stringify({ type: "commonjs" }));
-  await fs.writeFile(path.join(root, "rg"), `#!${process.execPath}
+  await fs.writeFile(path.join(root, "rg"), '', { mode: 0o755 });
+  await fs.writeFile(path.join(root, "producer.cjs"), `
 const mode = process.env.GREP_FIXTURE_MODE;
 if (process.argv.includes("--version") && mode !== "probe-hang") process.exit(0);
 if (process.argv.includes("--files")) { process.stdout.write("a.ts\\0"); return; }
@@ -37,21 +39,26 @@ else if (mode === "utf8") {
 } else if (mode === "limit") { process.stdout.write(record.repeat(5000)); setInterval(() => {}, 1000); }
 else if (mode === "none") process.exit(1);
 else setInterval(() => {}, 1000);
-`, { mode: 0o755 });
+`);
   vi.stubEnv("PATH", `${root}${path.delimiter}${process.env.PATH ?? "/usr/bin:/bin"}`);
   const actual = await vi.importActual<typeof import("../../runtime/execution/local.js")>("../../runtime/execution/local.js");
   vi.mocked(executeLocally).mockImplementation(input => {
+    // Run the fresh fixture as data through a stable interpreter. Executing a
+    // just-written script directly can hit ETXTBSY on hosted Linux runners.
+    const run = (request: typeof input) => (request.command === 'rg' || request.command === path.join(root, 'rg')) && existsSync(path.join(root, 'rg'))
+      ? actual.executeLocally({ ...request, command: process.execPath, args: [path.join(root, 'producer.cjs'), ...(request.args ?? [])] })
+      : actual.executeLocally(request);
     // This streaming fixture is a Node script, whose interpreter is absent
     // from the native view. Exercise its enumeration through the execution
     // owner; native.test.ts covers actual bwrap enumeration with native tools.
     if (path.basename(input.command) === "bwrap" && input.args?.includes("--files")) {
       const command = input.args.indexOf("--") + 1;
-      return actual.executeLocally({ ...input, command: input.args[command]!, args: input.args.slice(command + 1) }).then(result => {
+      return run({ ...input, command: input.args[command]!, args: input.args.slice(command + 1) }).then(result => {
         if (result.status === 'completed' || result.status === 'failed') completeNativeRead(input, result.exitCode!);
         return result;
       });
     }
-    return actual.executeLocally(input);
+    return run(input);
   });
   forgetRipgrepBinary();
 });

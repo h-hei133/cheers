@@ -13,6 +13,9 @@ import {
 } from "./sessionFileStore.js";
 import type { SessionFileLayout } from "./sessionFileLayout.js";
 import { persistSessionUsage } from "../../observability/usageTelemetry.js";
+import { resolve } from 'node:path';
+
+const heldStateLocks = new Set<string>();
 
 export function readStateSnapshotSafely(
   statePath: string,
@@ -39,7 +42,17 @@ export function withSessionStateLock<T>(
   action: () => T,
   options?: { readonly requireExisting?: boolean },
 ): T {
-  return withFileLock(layout.stateLockPath, action, { createParent: !options?.requireExisting });
+  const key = resolve(layout.stateLockPath);
+  return withFileLock(layout.stateLockPath, () => {
+    heldStateLocks.add(key);
+    try { return action(); }
+    finally { heldStateLocks.delete(key); }
+  }, { createParent: !options?.requireExisting });
+}
+
+/** Metadata delegates to an existing synchronous state owner; other state lock calls remain nonreentrant. */
+export function withSessionMetadataLock<T>(layout: Pick<SessionFileLayout, 'stateLockPath'>, action: () => T): T {
+  return heldStateLocks.has(resolve(layout.stateLockPath)) ? action() : withSessionStateLock(layout, action);
 }
 
 export function writeSessionState(input: {

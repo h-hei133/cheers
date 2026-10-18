@@ -501,18 +501,14 @@ describe("a single turn larger than the budget", () => {
     expect(condensed.summary).toContain("turn opener summary");
   });
 
-  it("falls back to the history summary when the prefix cannot be summarized", async () => {
+  it("preserves history when the prefix cannot be summarized", async () => {
     const condensed = await condenseContext({
       messages: withHistory(),
       policy: giantPolicy,
       summarize: async () => "history summary",
       summarizeTurnPrefix: async () => undefined,
     });
-    // Losing the opener costs context, but refusing to compact costs more: the
-    // context was already judged too large, and the kept tail still continues.
-    expect(condensed.status).toBe("condensed");
-    if (condensed.status !== "condensed") throw new Error("unreachable");
-    expect(condensed.summary).toBe("history summary");
+    expect(condensed).toEqual({ status: 'declined', reason: 'unsummarized' });
   });
 
   it("refuses to drop history it could not summarize", async () => {
@@ -625,10 +621,10 @@ describe("repeated compaction", () => {
     // what it said on every pass.
     expect(seen).toHaveLength(1);
     expect(seen[0]!.previousSummary).toBe("prior checkpoint text");
-    expect(seen[0]!.messages).toBe(2);
+    expect(seen[0]!.messages).toBe(3);
   });
 
-  it("carries a checkpoint forward when there is nothing new to condense", async () => {
+  it("includes the split opener when no prefix summarizer is installed", async () => {
     const summarize = vi.fn(async () => "should not be called");
     // The checkpoint and one long exchange: everything before the kept tail is
     // the checkpoint itself, whose own text is already the summary to carry.
@@ -645,7 +641,7 @@ describe("repeated compaction", () => {
 
     expect(condensed.status).toBe("condensed");
     if (condensed.status !== "condensed") throw new Error("unreachable");
-    expect(condensed.summary).toBe("prior checkpoint text");
-    expect(summarize).not.toHaveBeenCalled();
+    expect(condensed.summary).toBe("should not be called");
+    expect(summarize).toHaveBeenCalledOnce();
   });
 });

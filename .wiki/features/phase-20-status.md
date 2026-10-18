@@ -10,8 +10,8 @@
 |---|---|---|
 | W1 CFG-01…05 | CFG-02/04 发现并修复导入相对路径规则改变目标的问题；default、named、legacy、preview 后源变化回归通过 | 继续核查全部身份 consumer、配置快照及失效合同 |
 | W4 UI-01…04 | UI-02/03 修复固定八项上限、详情被候选数裁短、tab 点击区域覆盖、缺键盘切组及 modal 不显示分组；可用矩形和旧命中失效回归通过 | 其余公共原语、源选区及各消费者仍按合同复核 |
-| W2 | 连接/角色/目录、委派续期和主/cache/辅助费用已有逐批证据；主账号精确 token 发布后的本回合 checkpoint 现通过接纳、拒绝、异常与四格 PTY 验证 | 主账号 checkpoint 批提交/远端按日志记录；PRV-03…05 完整复核仍开放 |
-| W3 | 既有实现尚未完成本次逐条复核 | CTX-01…04、TOOL-01 的请求、拒绝、并发和恢复证据 |
+| W2 | 连接/角色/目录、委派续期、主/cache/辅助费用及池限制/退避已有逐批证据；只读可用性现共用完整池拓扑、自身凭据与当前代次等待，active 不可用和无目录成员保真 | 本批提交/远端按日志记录；完整 consumer/publication 与 provider/endpoint/受众复核仍开放 |
+| W3 | CTX-03 有界分段/合并、永久重播证据、原生 source CAS 与精确发布证明已有本地及独立验收；自动/overflow 未验证发布停止 turn | 两项架构 WATCH 为容量拒绝和锁内同步 I/O，已记录取舍；本批提交/远端按日志；CTX-01/02/04、TOOL-01 继续复核 |
 | W5 | SET-02 已修复选中分组后无法搜索其他组的问题；复用文字匹配排序，跨组按最佳得分和固定组序展示；清空搜索回原组，从详情 Back 回字段所属组并聚焦 | CMD-01/02、SET-01/03 全部验收；SET-02 其余来源/状态细节继续按合同核查 |
 | W6 | modal 的项目范围切组现已可达；不能由此证明完整目录分页/搜索 | PAN-01…08 各动作、只读边界、分页和 revision |
 | W7/W8/W9 | 尚未完成本次逐条复核 | INPUT-01、RENDER-01…03、EDIT-01、JOB-01/02、START-01/02 的完整裁决 |
@@ -54,6 +54,10 @@ PRV-04 谱系批本地验收通过：38 文件/682 项、14 项有效反转、�
 谱系批已推送为 `87a55c5f0b4fcbdab5a063e0b74a6d399c0f0692`；Architecture Watch `39140810147` success，CI `39140810129` failure，7 项入口续期测试失败、8808 项通过。失败来自旧夹具伪造续期 payload，未提供新的原生响应凭证；当前夹具改走实际原生解码、验证 HTTP 前 dispatched，并补伪造结果拒绝，8 项通过。此失败记录保留，不当作旧 SHA CI 通过。
 
 PRV-03/05 池限制与退避返工本地验收：最终受影响 23 文件/439 项、19 项有效加载时反转、两构建、实际 CLI 子请求/本机 HTTP/账本与独立进程读回、Linux 四格隔离 PTY均通过；最终 L3 APPROVED、6 文件/105 项和实际 HTTP 竞争探针通过，计数重叠不相加。新 SHA 提交/推送/CI 仍按开发日志与实际查询记录。完整辅助 consumer/publication、可用性投影、provider/endpoint/受众绑定、CTX-03 和其余任务继续，不增加用户推迟项。
+
+池限制/退避批已推送为 `2e0ffe09af81b7d0aa0619658ca9e0f7bba5cf56`；Architecture Watch `39144013465` success。CI `39144013469`/job `117724050073` 于 `2026-10-18T16:24:28Z` completed/failure，前十三步 success，8860 项通过、3 跳过；唯一失败为既有 `grepStream` 测试探测新写脚本时的 `spawn ETXTBSY`，入口续期用例已通过，NormProof skipped。原始日志及精确 SHA JSON 已保存，不重写旧 run 的失败结果。后续可用性投影/测试夹具和 CTX-03 正在本地实施，尚未交付。
+
+可用性/CTX-03 本地返工验收：最终受影响51文件/520项、双构建、9编译HTTP/restart场景、Linux四格PTY、14摘要及9可用性有效反转、脚本59项和五项静态门禁均通过。类型反向环已按owner contract修复，独立delta确认接口与运行emit一致。可用性综合APPROVED/CLEAR；CTX code APPROVE/architecture WATCH，按规则综合COMMENT，容量8192与锁内同步I/O取舍见compaction-operations。产品/测试manifest和当前构建绑定已读回；提交/推送/精确SHA CI按日志后续记录，不宣称整个W3或Phase20完成。
 
 ## 历史实现与交付记录（不代表本次复核通过）
 

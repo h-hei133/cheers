@@ -17,6 +17,7 @@ import type { ModelTransport, RequestPolicy } from '../../agent/request/model.js
 import type { ResolvedRequestShape } from '../../models/requestShape.js';
 import { promptTokensFor, requestBudget } from '../../../context/request/budget.js';
 import type { ProviderUsage } from '../../../turn/completion.js';
+import { SummaryAdmissionError, type CompactionDispatch } from '../../../session/compaction/contract.js';
 
 /**
  * One summarization request.
@@ -75,6 +76,7 @@ export interface CompactionProvider {
  * are represented in the text the summarizer is given instead.
  */
 export interface CompactionChatMessage {
+  readonly tool_calls?: readonly import('../../../turn/prompt.js').ChatToolCall[];
   readonly role: "system" | "user" | "assistant" | "tool";
   /**
    * Text only, deliberately.
@@ -89,6 +91,7 @@ export interface CompactionChatMessage {
 }
 
 export interface CompactionRequest {
+  readonly dispatch?: CompactionDispatch;
   /** Report billing before summary validation or a budget breach can reject the result. */
   readonly onUsage?: (usage: ProviderUsage | undefined) => void;
   readonly requestPolicy?: RequestPolicy;
@@ -158,7 +161,7 @@ export function prepareCompactionMessages(request: Pick<CompactionRequest, 'mess
   if (request.provider.contextWindow !== undefined) {
     const budget = requestBudget({ window: request.provider.contextWindow, outputTokens: maxOutputTokens,
       reserveTokens: request.provider.reserveTokens, promptTokens: promptTokensFor({ messages: messages.map(message => ({ ...message, content: message.content ?? '' })) }).tokens, measured: false });
-    if (budget.ok === false && budget.reason !== 'unknown') throw new Error(`Summary request refused: ${budget.detail}`);
+    if (budget.ok === false && budget.reason !== 'unknown') throw new SummaryAdmissionError(`Summary request refused: ${budget.detail}`);
   }
   return messages;
 }
@@ -186,12 +189,18 @@ export async function requestCompactionSummary(request: CompactionRequest): Prom
     endpoint: kind ?? 'openai-compatible', purpose: request.purpose ?? 'compaction', policy: request.requestPolicy,
     ...(request.provider.credentialId && request.provider.credentialGeneration
       ? { credential: { credentialId: request.provider.credentialId, generation: request.provider.credentialGeneration } } : {}) });
+  const transport: ModelTransport | undefined = request.dispatch ? (input, init, beforeDispatch) => {
+    const handoff = (): void => { beforeDispatch(); request.dispatch!.dispatch(); };
+    if (request.modelTransport) return request.modelTransport(input, init, handoff);
+    handoff();
+    return fetchImpl(input, init);
+  } : request.modelTransport;
   const res = await attempt.send(endpointUrl(request.provider.baseUrl, kind, request.provider.model, false), {
     method: "POST",
     headers,
     body,
     signal: request.signal,
-  }, fetchImpl, request.modelTransport);
+  }, fetchImpl, transport);
   if (!res.ok) { attempt.settle(); return undefined; }
   const completion = endpointShape(kind).readBody(await res.json());
   request.onUsage?.(completion.usage);

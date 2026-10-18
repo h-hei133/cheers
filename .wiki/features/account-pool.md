@@ -49,6 +49,8 @@ OAuth 受众沿用现有凭据类型检查：OpenAI 账户 token、Google 账户
 
 可用性投影新增 `pool-empty` / `pool-unavailable` 状态与 `pool.members/available` 计数；`/model`、连接选择器与 `/model status` 继续使用同一投影。
 
+可用集合与请求选择共用 `availablePoolConnections`。完整拓扑校验后才筛选自身合法凭据、状态及当前 generation 的等待；池外、ambient、无效 account-auth 和 foreign 成员不能计入可用数。无目录 provider 仍保留全部连接。只读检查不选择亲和、续期、发布配置或访问网络；active 连接不可用也展示拒绝原因。
+
 ## 4. 边界
 
 - refresh lease、请求凭据代次与独立 advisor/subagent 的发送前续期已接入；完整 quota/429 与历史成本归属仍按 PRV-04/05 继续复核。

@@ -77,7 +77,10 @@ export function handleAppendTranscriptEvent(
   sessionId: string,
   event: TranscriptEvent,
 ): void {
-  appendTranscriptEventToStore(store.transcriptPath(sessionId), event);
+  // A turn/query append must serialize with compaction's final source check.
+  store.withSessionStateLock(sessionId, () => {
+    appendTranscriptEventToStore(store.transcriptPath(sessionId), event, undefined, { requireExisting: true });
+  }, { requireExisting: true });
 }
 
 export function handleGetTranscriptEvents(

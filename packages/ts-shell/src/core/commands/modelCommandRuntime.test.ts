@@ -8,6 +8,9 @@ import { getUserRuntimeConfigPath, getRuntimeConfig } from "../../config/runtime
 import { writeUserRuntimeConfigFile } from "../../config/runtimeConfig.js";
 import { runConnectCommand } from "./connectCommandRuntime.js";
 import { runModelCommand } from "./modelCommandRuntime.js";
+import { credentialIdentityFor } from '../auth/account/pool.js';
+import { ownedConnectionCredential } from '../auth/account/presence.js';
+import { noteCredentialRateLimit, resetCredentialBackoffForTests } from '../auth/account/backoff.js';
 
 describe("model command runtime", () => {
   const originalHome = process.env.USERPROFILE;
@@ -31,6 +34,7 @@ describe("model command runtime", () => {
   });
 
   afterEach(() => {
+    resetCredentialBackoffForTests();
     vi.restoreAllMocks();
     if (originalHome === undefined) delete process.env.USERPROFILE;
     else process.env.USERPROFILE = originalHome;
@@ -47,6 +51,21 @@ describe("model command runtime", () => {
     expect(result.output).toContain("Provider: openai");
     expect(result.output).toContain("Provider readiness");
     expect(result.output).toContain("npm run verify:provider-readiness");
+  });
+
+  it.each(['outside', 'waiting'])('reports the active %s connection as unavailable in its pool', async scenario => {
+    const runtime = getRuntimeConfig(workspaceRoot);
+    const active = runtime.providerConnections.find(connection => connection.id === runtime.activeProviderConnectionId)!;
+    const sibling = { ...active, id: 'pool-sibling' };
+    const runtimeConfig = { ...runtime, providerConnections: [active, sibling], accountPool: {
+      [active.provider]: { connections: scenario === 'outside' ? [sibling.id] : [active.id] },
+    } };
+    if (scenario === 'waiting') noteCredentialRateLimit(credentialIdentityFor(active.provider, ownedConnectionCredential(active))!, 60_000);
+    const before = fs.readFileSync(getUserRuntimeConfigPath());
+    const result = await runModelCommand(['status'], { cwd: workspaceRoot, runtimeConfig });
+    expect(result.output).toContain('active connection is unavailable in the account pool');
+    expect(result.output).not.toContain('active connection and model are configured');
+    expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
   });
 
   it('uses the accepted snapshot for model and connection status despite pending disk edits', async () => {

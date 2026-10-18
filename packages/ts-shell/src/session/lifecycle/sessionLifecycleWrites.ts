@@ -43,12 +43,12 @@ import {
   handleAppendTranscriptEvent,
   handleApplyQueryEventToState,
 } from "../agent/persistence.js";
-import { appendCompactionEvent } from "../transcript/sessionTranscript.js";
 import { reconcilePendingLifecycleForSession } from "../recovery/sessionRecoveryRuntime.js";
 import type { RecoverySnapshot } from "../recovery/sessionRecoverySnapshot.js";
 import { sessionHasConversation } from "../presentation/sessionReentrySurface.js";
 import { captureReportWriter } from '../reports/persistence.js';
 import type { ReportWriter } from '../reports/model.js';
+import { SessionCompactionWrites } from '../compaction/writes.js';
 
 const sessionLogger = createComponentLogger("SessionManager");
 
@@ -74,8 +74,8 @@ export interface SessionLifecycleWriteHost {
   ): SessionStateSnapshot;
 }
 
-export abstract class SessionLifecycleWrites {
-  protected constructor(protected readonly host: SessionLifecycleWriteHost) {}
+export abstract class SessionLifecycleWrites extends SessionCompactionWrites {
+  protected constructor(protected readonly host: SessionLifecycleWriteHost) { super(host.store); }
 
   private createSessionLifecycleCallbacks() {
     return {
@@ -247,19 +247,4 @@ export abstract class SessionLifecycleWrites {
     handleAppendQueryEvent(this.host.store, sessionId, event, source);
   }
 
-  appendCompactionEntry(
-    sessionId: string,
-    input: {
-      readonly summary: string;
-      readonly firstKeptEntryId?: string;
-      readonly keptMessages?: number;
-      readonly tokensBefore?: number;
-    },
-  ): void {
-    const transcriptPath = this.host.store.transcriptPath(sessionId);
-    appendCompactionEvent(transcriptPath, {
-      ...input,
-      timestamp: new Date().toISOString(),
-    });
-  }
 }

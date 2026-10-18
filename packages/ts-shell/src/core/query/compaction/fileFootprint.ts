@@ -101,6 +101,12 @@ export function parseFileFootprintXml(text: string | undefined): FileFootprint {
   };
 }
 
+/** Fold verified child checkpoints without asking the model to preserve their file lists. */
+export function mergeCheckpointFootprints(checkpoints: readonly string[]): FileFootprint {
+  return checkpoints.reduce((combined, checkpoint) => mergeFileFootprints(combined, parseFileFootprintXml(checkpoint)),
+    { readFiles: [], modifiedFiles: [] } as FileFootprint);
+}
+
 /**
  * What one compaction knows about files, given what the last one recorded.
  *

@@ -12,9 +12,13 @@ export type TranscriptLifecycleEventName =
   | "run-terminated";
 
 export interface CompactionTranscriptEntry {
+  /** Requires a later matching commit marker before model-context projection. */
+  publication?: 'prepared';
   type: "compaction";
   id?: string;
   summary: string;
+  /** New receipts apply only on this captured path or its descendants. */
+  sourceActivePath?: readonly string[];
   firstKeptEntryId?: string;
   /** Messages immediately before this entry that stay in the context verbatim. */
   keptMessages?: number;
@@ -106,6 +110,7 @@ export type TranscriptEvent =
     }
   | { type: "query-event"; id?: string; sourceEntryId?: string; event: QueryEvent; timestamp: string }
   | CompactionTranscriptEntry
+  | { type: 'compaction-commit'; id: string; compactionId: string; digest: string; timestamp: string }
   | ReportTranscriptEntry
   | BranchSummaryTranscriptEntry;
 
@@ -244,11 +249,15 @@ export function createQueryTranscriptEvent(input: {
 }
 
 export function encodeTranscriptEvent(event: TranscriptEvent): string {
-  return JSON.stringify(event);
+  // Older readers reject this new wire type instead of applying an unverified summary.
+  return JSON.stringify(event.type === 'compaction' && event.publication === 'prepared'
+    ? { ...event, type: 'compaction-prepared' } : event);
 }
 
 export function decodeTranscriptLine(line: string): TranscriptEvent {
-  return JSON.parse(line) as TranscriptEvent;
+  const decoded = classifyTranscriptLine(line);
+  if (decoded.kind !== 'entry') throw new Error('Transcript entry is unreadable.');
+  return decoded.event;
 }
 
 export function decodeTranscriptLineSafe(
@@ -295,6 +304,11 @@ export function classifyTranscriptLine(line: string): TranscriptLine {
   }
   if (isTranscriptHeader(parsed)) return { kind: "header", header: parsed };
   if (isReadableTranscriptEvent(parsed)) return { kind: "entry", event: parsed as TranscriptEvent };
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) &&
+    (parsed as Record<string, unknown>).type === 'compaction-prepared') {
+    const event = { ...parsed, type: 'compaction', publication: 'prepared' };
+    if (isReadableTranscriptEvent(event)) return { kind: 'entry', event: event as TranscriptEvent };
+  }
   return { kind: "unreadable" };
 }
 

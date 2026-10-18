@@ -15,6 +15,7 @@ import {
 } from "../sessionEventCodec.js";
 import type { SessionMessage } from "../schema/sessionMessage.js";
 import type { Session } from "../schema/sessionRecord.js";
+import { publishedCompactionEvents } from '../compaction/publication.js';
 
 /**
  * The whole transcript: its format version, and the entries in order.
@@ -94,9 +95,8 @@ export function parseTranscript(text: string): ReadTranscript {
  * conversation is currently made of is a question about the thread, so the thread
  * answers it: the active path names the messages in view.
  *
- * Only message lines are filtered by branch. Compaction and branch-summary lines
- * keep applying, because they describe how to read the history rather than being
- * part of it, and dropping them would put back the messages a checkpoint replaced.
+ * New compaction receipts require their captured path to remain a prefix of the
+ * branch in view. Older receipts keep their historical global interpretation.
  *
  * Falling back to the whole transcript when no thread has been written keeps a
  * session recorded before any of this existed loading exactly as it did.
@@ -106,7 +106,9 @@ export function projectBranchMessages(
   activeEntryIds: readonly string[] | undefined,
   knownEntryIds?: readonly string[],
 ): SessionMessage[] {
-  if (activeEntryIds === undefined) return projectTranscriptMessages(events);
+  if (activeEntryIds === undefined) return projectTranscriptMessages(
+    publishedCompactionEvents(events).filter(event => event.type !== 'compaction' || event.sourceActivePath === undefined),
+  );
   const onBranch = new Set(activeEntryIds);
   const known = knownEntryIds === undefined ? onBranch : new Set(knownEntryIds);
 
@@ -117,7 +119,9 @@ export function projectBranchMessages(
   // reads as "this session said nothing" rather than "these two files disagree",
   // so the transcript wins.
   if (messages.length > 0 && !messages.some((event) => event.id !== undefined && known.has(event.id))) {
-    return projectTranscriptMessages(events);
+    return projectTranscriptMessages(
+      publishedCompactionEvents(events).filter(event => event.type !== 'compaction' || event.sourceActivePath === undefined),
+    );
   }
 
   // A branch summary records what was left behind, so it stops applying once the
@@ -126,7 +130,7 @@ export function projectBranchMessages(
   // names are the test — a note whose abandoned turns are on the active path
   // describes the conversation in front of the reader, not one they left.
   return projectTranscriptMessages(
-    events.filter((event) => {
+    publishedCompactionEvents(events).filter((event) => {
       if (event.type === "message") {
         return event.id !== undefined && onBranch.has(event.id);
       }
@@ -135,6 +139,9 @@ export function projectBranchMessages(
         // them, so there is nothing to test it with and it stays.
         const names = event.abandonedEntryIds ?? [];
         return names.length === 0 || !names.some((id) => onBranch.has(id));
+      }
+      if (event.type === 'compaction' && event.sourceActivePath) {
+        return event.sourceActivePath.every((id, index) => activeEntryIds[index] === id);
       }
       return true;
     }),
@@ -234,7 +241,7 @@ export function projectTranscriptMessages(
 ): SessionMessage[] {
   let messages: SessionMessage[] = [];
 
-  for (const event of events) {
+  for (const event of publishedCompactionEvents(events)) {
     if (event.type === "compaction") {
       // Re-anchor context at the compaction checkpoint, keeping the most
       // recent messages verbatim behind it.

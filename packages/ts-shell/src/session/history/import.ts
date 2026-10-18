@@ -39,7 +39,9 @@ export function importHistory(document: HistoryDocument, projectRoot: string, ad
   try {
     for (const event of events) {
       check();
-      appendTranscriptEvent(store.transcriptPath(id), event, undefined, { requireExisting: true });
+      store.withSessionStateLock(id, () => {
+        appendTranscriptEvent(store.transcriptPath(id), event, undefined, { requireExisting: true });
+      }, { requireExisting: true });
     }
     check();
     publishBoundSessionState(host, session, baseline, state => (state.historyImport as { digest?: string; status?: string })?.digest === digest

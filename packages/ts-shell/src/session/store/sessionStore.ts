@@ -13,7 +13,7 @@ import { createTranscriptHeader, type TranscriptEvent } from "../sessionEventCod
 import { sessionThreadPath } from "../schema/sessionThread.js";
 import { readJsonFileWithRetry, writeJsonFileAtomic } from "./sessionFileStore.js";
 import type { SessionFileLayout } from "./sessionFileLayout.js";
-import { readStateSnapshotRequired, writeSessionState } from "./sessionStateStore.js";
+import { readStateSnapshotRequired, writeSessionState, withSessionMetadataLock } from "./sessionStateStore.js";
 import { decodeContextEntries } from '../../context/attachment/entry.js';
 
 export function sessionExistsAtLayout(layout: Pick<SessionFileLayout, "sessionDir">): boolean {
@@ -55,8 +55,9 @@ export function writeSessionRecord(input: {
 
 export function writeSessionMetadataRecord(input: {
   readonly session: Session;
-  readonly layout: Pick<SessionFileLayout, "metadataPath">;
+  readonly layout: Pick<SessionFileLayout, "metadataPath" | "stateLockPath">;
 }): void {
+  withSessionMetadataLock(input.layout, () => {
   const metadata = projectSessionMetadata(input.session);
   // Pinning is owned by session management, independent of an older live view.
   // Creation and a concurrent catalog read can observe the metadata path
@@ -72,6 +73,7 @@ export function writeSessionMetadataRecord(input: {
     else delete metadata.pinned;
   }
   writeJsonFileAtomic(input.layout.metadataPath, metadata);
+  });
 }
 
 export function readSessionMetadataRecord(metadataPath: string): SessionMetadata | undefined {

@@ -14,7 +14,7 @@ const roots: string[] = [];
 afterEach(() => { vi.mocked(fs.renameSync).mockClear(); vi.mocked(fs.fsyncSync).mockClear(); for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }); });
 
 const writers = {
-  metadata: (file: string) => writeSessionMetadataRecord({ layout: { metadataPath: file }, session: {
+  metadata: (file: string) => writeSessionMetadataRecord({ layout: { metadataPath: file, stateLockPath: `${file}.state.lock` }, session: {
     id: "saved", projectRoot: "/workspace", status: "active", createdAt: "today", updatedAt: "today", turns: [],
   } }),
   registry: (file: string) => writeSessionRegistryStore({ storePath: file, store: { schemaVersion: 1, byProjectRoot: {} } }),

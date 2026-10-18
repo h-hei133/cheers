@@ -2,15 +2,22 @@ import { messageToText } from "../model-adapters/multimodal.js";
 import { ModelAdmissionError } from '../core/agent/request/model.js';
 import type { NextStepSnapshot, NextStepUpdate } from "../core/agent/loop.js";
 import type { AgentMessage } from "../core/agent/state.js";
-import { createHash } from 'node:crypto';
 import { CHARS_PER_TOKEN, DEFAULT_RESERVE_TOKENS, estimateRequestTokens, estimateTokens, messageCharCount, type RequestOverhead } from "./context.js";
-import { claimCompactionStep, completeCompactionStep, compactionStepDigest, markCompactionStepUnknown } from './compactionOperation.js';
+import { digest } from './compaction/state.js';
+import { generateCompaction, CompactionStepUnknown } from './compaction/generation.js';
+import type { CompactionAuthority, CompactionOperationInput, CompactionSource, SummarizeHistory, SummarizeTurnPrefix } from './compaction/contract.js';
+import { CompactionPublicationError } from './compaction/contract.js';
+import { freezeDeep } from '../core/values/freeze.js';
+
+export type { SummarizeHistory, SummarizeRequest, SummarizeTurnPrefix } from './compaction/contract.js';
 
 export const KEEP_RECENT_TOKENS = 20_000;
 
 export interface CompactionPolicy {
   /** Digest of the captured summary target, effort and model capabilities; never credentials. */
   readonly summaryIdentity?: string;
+  /** Maximum tokens per legal history/prefix/merge request. */
+  readonly segmentTokens?: number;
   readonly contextWindow: number;
   readonly reserveTokens?: number;
   /**
@@ -103,29 +110,6 @@ export interface CompactionLifecycle {
     readonly keptMessages: number;
     readonly tokensBefore: number;
   }) => Promise<void> | void;
-}
-
-/**
- * What a summarizer is asked to condense, and what is already known about it.
- *
- * `previousSummary` is the checkpoint this history already begins with, so the
- * messages beside it are what has been added since. Handing both over lets the
- * summarizer revise that checkpoint instead of summarizing the conversation a
- * second time — and a summary of a summary sheds a little of what it said on
- * every pass.
- */
-export interface SummarizeRequest {
-  readonly messages: readonly AgentMessage[];
-  readonly previousSummary?: string;
-  /** What the user asked the summary to pay attention to, if anything. */
-  readonly instructions?: string;
-  readonly signal?: AbortSignal;
-}
-
-export interface SummarizeHistory {
-  (request: SummarizeRequest): Promise<string | undefined>;
-  /** Pure local validation, before durable request claims or any summary send. */
-  readonly preflight?: (request: SummarizeRequest) => void;
 }
 
 export function shouldCompact(
@@ -372,23 +356,6 @@ function isBelowThreshold(
   return !shouldCompact(tokensBefore, policy.contextWindow, reserve, policy.enabled ?? true);
 }
 
-/**
- * What the token budget was reached in the middle of a turn, so the opening of
- * that turn is summarized on its own.
- *
- * A separate summarizer because the prefix is asked a different question: not
- * "what happened so far" but "what was being attempted here", since the kept
- * tail is the work that followed it.
- */
-export interface SummarizeTurnPrefix {
-  (messages: readonly AgentMessage[], signal?: AbortSignal): Promise<string | undefined>;
-  /** Pure local validation, before durable request claims or any summary send. */
-  readonly preflight?: (messages: readonly AgentMessage[], signal?: AbortSignal) => void;
-}
-
-/** Marks where the framing of a split turn begins inside a merged checkpoint. */
-const TURN_CONTEXT_MARKER = "**Turn Context (split turn):**";
-
 export interface CondensedContext {
   readonly plan: CompactionPlan;
   readonly summary: string;
@@ -463,7 +430,8 @@ export type CompactionDecline =
   /** The summarizer produced nothing usable. */
   | "unsummarized"
   /** A previous step may already have been sent; replaying it is not authorized. */
-  | "step-unknown";
+  | "step-unknown"
+  | "cancelled";
 
 export type CondenseOutcome =
   | ({ readonly status: "condensed" } & CondensedContext)
@@ -483,7 +451,7 @@ export type CondenseOutcome =
  * make: a caller that can speak to the user has to tell "there was nothing worth
  * replacing" apart from "the summarizer failed".
  */
-export async function condenseContext(input: {
+export interface CondenseInput {
   readonly messages: readonly AgentMessage[];
   readonly policy: CompactionPolicy;
   readonly summarize: SummarizeHistory;
@@ -502,7 +470,7 @@ export async function condenseContext(input: {
    */
   readonly force?: boolean;
   /**
-   * Told before and after the condensation, and able to refuse it.
+   * Before generation may refuse it; callers dispatch after only following verified commit.
    *
    * Both entry points pass one so a hook sees the same event with the same
    * `reason` whether the user typed `/compact` or the window filled up.
@@ -517,8 +485,51 @@ export async function condenseContext(input: {
    */
   readonly lifecycleReason?: CompactionReason;
   /** Durable step identity; absent disables cross-restart reuse (tests, callers without a session). */
-  readonly operation?: { readonly sessionId: string; readonly provider?: string; readonly model?: string };
-}): Promise<CondenseOutcome> {
+  readonly operation?: Omit<CompactionOperationInput, "policyDigest">;
+}
+
+const pendingCompactions = new Map<string, Promise<CondenseOutcome>>();
+
+/** Identical work in this process joins one generation; other processes consult durable claims. */
+export async function condenseContext(input: CondenseInput): Promise<CondenseOutcome> {
+  const original = freezeDeep(structuredClone(input.messages));
+  const source = input.operation?.source;
+  // Triggering uses the caller's complete request; generation uses the same
+  // captured stored conversation for manual, automatic and overflow callers.
+  if (source && !input.force && isBelowThreshold(original, input.policy)) {
+    return { status: 'declined', reason: 'below-threshold' };
+  }
+  const captured = { ...input, messages: source ? freezeDeep(structuredClone(source.history)) : original,
+    ...(source ? { force: true } : {}),
+    policy: Object.freeze({ ...input.policy }), operation: input.operation && freezeDeep({ ...input.operation }) };
+  const key = captured.operation ? digest([{ ...captured.operation,
+    source: captured.operation.source && { sessionId: captured.operation.source.sessionId,
+      identity: captured.operation.source.replayIdentity ?? captured.operation.source.identity } },
+    captured.messages, captured.instructions, captured.policy.summaryIdentity,
+    captured.policy.contextWindow, captured.policy.reserveTokens, captured.policy.keepRecentTokens, captured.policy.segmentTokens,
+    captured.policy.enabled, Boolean(captured.summarizeTurnPrefix)]) : undefined;
+  const joined = key ? pendingCompactions.get(key) : undefined;
+  const pending = joined ?? generateContext(captured);
+  if (key && !joined) pendingCompactions.set(key, pending);
+  try {
+    const result = await pending;
+    if (input.signal?.aborted) return { status: 'declined', reason: 'cancelled' };
+    if (result.status !== 'condensed' || !source) return result;
+    // Shared generation never shares a caller's runtime system prefix or opening
+    // envelope. Rebuild its checkpoint and exact kept tail from that caller.
+    const offset = original.length - captured.messages.length;
+    const plan = { ...result.plan, cut: result.plan.cut + offset,
+      turnStart: result.plan.turnStart < 0 ? -1 : result.plan.turnStart + offset,
+      tokensBefore: input.force ? estimateTokens(original)
+        : input.policy.measureContextTokens?.(original) ?? estimateRequestTokens(original, input.policy.overhead) };
+    const messages = applyCompaction(original, plan, result.summary);
+    return { ...result, plan, messages, tokensAfter: estimateTokens(messages) };
+  } finally {
+    if (key && !joined && pendingCompactions.get(key) === pending) pendingCompactions.delete(key);
+  }
+}
+
+async function generateContext(input: CondenseInput): Promise<CondenseOutcome> {
   const plan = input.force
     ? planCompactionCut(input.messages, input.policy)
     : planCompaction(input.messages, input.policy);
@@ -558,52 +569,22 @@ export async function condenseContext(input: {
 
   const history = input.messages.slice(historyStart, historyEnd);
   const prefix = plan.splitsTurn ? input.messages.slice(Math.max(plan.turnStart, head), plan.cut) : [];
-  const historyRequest = { messages: history, previousSummary, instructions: input.instructions, signal: input.signal };
-  if (history.length) input.summarize.preflight?.(historyRequest);
-  if (prefix.length) input.summarizeTurnPrefix?.preflight?.(prefix, input.signal);
-
   const operation = input.operation ? { ...input.operation,
-    policyDigest: createHash('sha256').update(JSON.stringify([input.policy.contextWindow, input.policy.reserveTokens ?? null,
-      input.policy.keepRecentTokens ?? null, input.policy.enabled ?? null, input.instructions ?? '',
-      ...(input.policy.summaryIdentity === undefined ? [] : [input.policy.summaryIdentity])])).digest('hex'),
-    ...(input.instructions !== undefined ? { instructions: input.instructions } : {}) } : undefined;
-  let historyText: string | undefined;
-  if (history.length > 0) {
-    const claim = operation ? claimCompactionStep({ ...operation,
-      stepDigest: compactionStepDigest({ history, previousSummary, instructions: input.instructions }) }) : undefined;
-    if (claim?.unknown) return { status: "declined", reason: "step-unknown" };
-    if (claim?.summary !== undefined) historyText = claim.summary;
-    else {
-      historyText = await input.summarize(historyRequest);
-      if (!historyText) {
-        if (claim?.acquired && operation) markCompactionStepUnknown(claim, operation.sessionId);
-        return { status: "declined", reason: "unsummarized" };
-      }
-      if (claim?.acquired && operation) completeCompactionStep(claim, operation.sessionId, historyText);
-    }
-  } else if (previousSummary !== undefined) {
-    // Nothing new to condense, so the checkpoint it already carries stands as
-    // the summary of the history being replaced.
-    historyText = previousSummary;
+    policyDigest: digest([input.policy.contextWindow, input.policy.reserveTokens, input.policy.keepRecentTokens,
+      input.policy.enabled, input.policy.summaryIdentity, input.policy.segmentTokens, input.instructions, plan,
+      'bounded-segments-v2', Boolean(input.summarizeTurnPrefix),
+      input.messages]) } : undefined;
+  let summary: string | undefined;
+  try {
+    summary = await generateCompaction({ history, prefix, previousSummary, instructions: input.instructions,
+      signal: input.signal, maxTokens: input.policy.segmentTokens, operation,
+      summarize: input.summarize, summarizeTurnPrefix: input.summarizeTurnPrefix });
+  } catch (error) {
+    if (input.signal?.aborted) return { status: 'declined', reason: 'cancelled' };
+    if (error instanceof CompactionStepUnknown) return { status: 'declined', reason: 'step-unknown' };
+    throw error;
   }
-
-  let summary = historyText;
-  if (prefix.length > 0) {
-    // A caller with no prefix summarizer never sends a prefix step, so it must
-    // not claim one either: a claim without a request would block the next pass.
-    const claim = operation && input.summarizeTurnPrefix ? claimCompactionStep({ ...operation,
-      stepDigest: compactionStepDigest({ history: prefix, instructions: input.instructions }) }) : undefined;
-    if (claim?.unknown) return { status: "declined", reason: "step-unknown" };
-    const prefixText = claim?.summary ?? await input.summarizeTurnPrefix?.(prefix, input.signal);
-    if (prefixText && claim?.acquired && operation) completeCompactionStep(claim, operation.sessionId, prefixText);
-    else if (!prefixText && claim?.acquired && operation) markCompactionStepUnknown(claim, operation.sessionId);
-    // The request the tail is answering lives in the prefix, so losing it costs
-    // real context. Refusing to compact costs more: the request was already
-    // judged too large, and declining leaves it exactly as large as before.
-    if (prefixText) {
-      summary = historyText ? `${historyText}\n\n---\n\n${TURN_CONTEXT_MARKER}\n\n${prefixText}` : prefixText;
-    }
-  }
+  if (input.signal?.aborted) return { status: 'declined', reason: 'cancelled' };
   if (!summary) {
     return { status: "declined", reason: "unsummarized" };
   }
@@ -622,12 +603,6 @@ export async function condenseContext(input: {
   // The head the checkpoint replaces spans from the first message it discards
   // to the cut, which includes any earlier checkpoint it was merged with.
   const summarized = plan.cut - head;
-  await input.lifecycle?.after?.({
-    reason: input.lifecycleReason ?? "manual",
-    summary,
-    keptMessages: plan.keptMessages,
-    tokensBefore: plan.tokensBefore,
-  });
   return { status: "condensed", plan, summary, messages, summarized, tokensAfter: after };
 }
 
@@ -646,6 +621,7 @@ export function applyCompaction(
 
 export interface CompactionStepOptions {
   readonly summarize: SummarizeHistory;
+  readonly authority?: CompactionAuthority;
   /** Enables durable step reuse across restarts; absent keeps the old in-memory behaviour. */
   readonly sessionId?: string;
   readonly provider?: string;
@@ -656,7 +632,7 @@ export interface CompactionStepOptions {
     readonly summary: string;
     readonly keptMessages: number;
     readonly tokensBefore: number;
-  }) => void;
+  }) => void | boolean;
   readonly lifecycle?: CompactionLifecycle;
   readonly reason?: CompactionReason;
 }
@@ -670,7 +646,7 @@ export function createCompactionStep(
   options: CompactionStepOptions,
 ): (snapshot: NextStepSnapshot, signal?: AbortSignal) => Promise<NextStepUpdate | undefined> {
   const reason = options.reason ?? "threshold";
-  return async (snapshot, signal) => {
+  const step = async (snapshot: NextStepSnapshot, signal?: AbortSignal): Promise<NextStepUpdate | undefined> => {
     if (signal?.aborted) {
       return undefined;
     }
@@ -684,7 +660,9 @@ export function createCompactionStep(
     // here: one place dispatches the hooks, so the manual and automatic paths
     // cannot report different payloads for the same event.
     let condensed: CondenseOutcome;
+    let source: CompactionSource | undefined;
     try {
+      source = options.authority?.capture(snapshot.messages);
       condensed = await condenseContext({
         messages: snapshot.messages,
         policy,
@@ -694,6 +672,7 @@ export function createCompactionStep(
         ...(options.lifecycle ? { lifecycle: options.lifecycle } : {}),
         lifecycleReason: reason,
         ...(options.sessionId ? { operation: { sessionId: options.sessionId,
+          ...(source ? { source } : {}), ...(options.authority?.identity ? { identity: options.authority.identity } : {}),
           ...(options.provider ? { provider: options.provider } : {}), ...(options.model ? { model: options.model } : {}) } } : {}),
       });
     } catch (error) {
@@ -710,8 +689,17 @@ export function createCompactionStep(
     if (condensed.status === "declined") {
       return undefined;
     }
+    if (signal?.aborted) return undefined;
     const { plan, summary } = condensed;
-    options.onCompact?.({ summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore });
+    if (source && options.authority) {
+      const committed = options.authority.commit({ source, summary, keptMessages: plan.keptMessages,
+        tokensBefore: plan.tokensBefore, signal, admission: options.authority.admission });
+      if (committed.status === 'unverified') throw new CompactionPublicationError();
+      if (committed.status !== 'committed') return undefined;
+    }
+    if (options.onCompact?.({ summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore }) === false) return undefined;
+    await options.lifecycle?.after?.({ reason, summary, keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore });
     return { messages: condensed.messages };
   };
+  return step;
 }

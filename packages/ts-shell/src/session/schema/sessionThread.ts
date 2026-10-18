@@ -60,6 +60,8 @@ export interface SessionCompactionRecord {
 
 export interface SessionThreadSnapshot {
   readonly schemaVersion: 1;
+  /** Monotonic navigation identity, including a return to the original branch. */
+  readonly navigationRevision?: string;
   readonly entries: readonly SessionThreadEntry[];
   readonly activeLeafId?: string;
   readonly activeBranchId?: string;

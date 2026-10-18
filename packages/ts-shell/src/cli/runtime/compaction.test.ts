@@ -170,6 +170,22 @@ it('uses one accepted catalogue per operation for requests and compaction after 
   expect(original.policy.contextWindow).toBe(10_000);
 });
 
+it('binds fallback summary replay to effective output limits across unchanged publication reloads', () => {
+  const deps = runtime(true);
+  deps.runPrompt('before reload', new AbortController().signal);
+  const original = fixture.compaction!.policy.summaryIdentity;
+  const configuration = fixture.configuration!;
+  const before = configuration.current;
+  configuration.publish(configuration.begin(before.binding), before.config, before.binding);
+  deps.runPrompt('unchanged reload', new AbortController().signal);
+  expect(fixture.compaction!.policy.summaryIdentity).toBe(original);
+  const current = configuration.current;
+  configuration.publish(configuration.begin(current.binding), { ...current.config, maxOutputTokens: 256 }, current.binding);
+  deps.runPrompt('changed summary output', new AbortController().signal);
+  expect(fixture.compaction!.policy.summaryIdentity).not.toBe(original);
+  expect(received).toEqual([]);
+});
+
 it.each([true, false])("allows signed background refresh eligibility without a static key (apiKey=%s)", withKey => {
   fixture.config.offline = false;
   runtime(withKey).runPrompt("hello", new AbortController().signal);

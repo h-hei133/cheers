@@ -14,6 +14,7 @@ import { createShellRuntimeContext, refreshShellRuntimeConfig, switchActiveSessi
 import { createCliProviderRuntimeBridge } from '../../provider/cliProviderRuntimeBridge.js';
 import { saveProfileModelPreset } from '../../../core/commands/model/preset.js';
 import { runModelCommand } from '../../../core/commands/modelCommandRuntime.js';
+import { connectionPicker } from './connections.js';
 
 let home: string;
 let manager: SessionManager;
@@ -33,6 +34,25 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(home, { re
 
 const id = (connection = 'b', model = 'shared') => `model:${JSON.stringify([connection, 'openai', model])}`;
 const context = () => ({ cwd: home, projectRoot: home, sessionId });
+
+it('shows an active pool-outside connection as unavailable and only allows a pool member', async () => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, accountPool: { openai: { connections: ['b'] } } }, edit);
+  const runtimeConfig = getRuntimeConfig(home);
+  const before = fs.readFileSync(getUserRuntimeConfigPath());
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected probe'));
+  const connections = await connectionPicker({ ...context(), runtimeConfig }).load();
+  expect(connections.find(row => row.id === 'use:a')?.note).toBe('active · account pool unavailable');
+  expect(connections.find(row => row.id === 'use:b')?.note).toBe('credential present');
+  const picker = modelPicker({ ...context(), runtimeConfig });
+  const rows = await picker.load();
+  expect(rows.find(row => row.id === id('a'))).toMatchObject({ disabled: true, note: 'account pool unavailable' });
+  expect(rows.find(row => row.id === id('b'))?.disabled).not.toBe(true);
+  expect((await picker.apply([id('b')]))?.note).toContain('Connection: b');
+  expect(resolveProviderCredential({ runtimeConfig: projectSessionModel(getRuntimeConfig(home), sessionId), env: {} }).credential?.connectionId).toBe('b');
+  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+  expect(fetch).not.toHaveBeenCalled();
+});
 
 it('distinguishes two relays, publishes the exact request target, and restores it on resume without changing defaults', async () => {
   const shell = createShellRuntimeContext({ cwd: home, originalCwd: home, projectRoot: home, targetPathBase: home,

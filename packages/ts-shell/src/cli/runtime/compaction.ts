@@ -17,6 +17,22 @@ import { TURN_PREFIX_COMPACTION_PROMPT } from '../../core/query/compaction/summa
 import { toChatMessages } from '../../turn/prompt.js';
 import { captureSummaryRole } from '../provider/summary.js';
 import { sessionUsageRecorder } from '../../session/store/usage.js';
+import { createHash } from 'node:crypto';
+import type { CompactionDispatch } from '../../session/compaction/contract.js';
+import { sessionCompactionAuthority } from '../../session/compaction/authority.js';
+import type { SessionManager } from '../../session/SessionManager.js';
+import type { ConfigPublication, ConfigState } from '../../config/state.js';
+
+/** Bind the captured publication and native session owner at each compaction entry point. */
+export function nativeCompactionAuthority(input: {
+  readonly sessionId: string; readonly workspaceRoot: string; readonly admission: Admission;
+  readonly publication: ConfigPublication; readonly configuration: ConfigState; readonly store: SessionManager;
+}) {
+  return sessionCompactionAuthority({ sessionId: input.sessionId, workspaceRoot: input.workspaceRoot,
+    admission: input.admission, isCurrent: () => input.configuration.current === input.publication,
+    capture: input.store.captureCompactionSource.bind(input.store, input.sessionId),
+    commit: input.store.appendCompactionIfCurrent.bind(input.store) });
+}
 
 /**
  * Messages for a compaction call.
@@ -31,6 +47,7 @@ export function toCompactionMessages(messages: readonly AgentMessage[]): readonl
     role: message.role,
     content: messageToText(message.content),
     ...(message.tool_call_id ? { tool_call_id: message.tool_call_id } : {}),
+    ...(message.tool_calls ? { tool_calls: message.tool_calls } : {}),
   }));
 }
 
@@ -68,6 +85,8 @@ export function buildCompactionWiring(input: {
     readonly providerId: string;
     /** Which endpoint kind the summarizer must speak, when not the default. */
     readonly endpoint?: EndpointKind;
+    readonly credentialId?: string;
+    readonly credentialGeneration?: string;
   };
   readonly runtimeConfig: RuntimeConfig;
   readonly admission?: Admission;
@@ -89,7 +108,7 @@ export function buildCompactionWiring(input: {
   const summaryRole = captureSummaryRole({ config: runtimeConfig, catalog: input.catalog, workspaceRoot: input.workspaceRoot,
     admission: input.admission, onCredentialPersisted: input.onCredentialPersisted });
   const send = async (request: Omit<Parameters<typeof requestCompactionSummary>[0], 'provider' | 'fetchImpl'>) => {
-    const summaryProvider = summaryRole ? await summaryRole.resolve() : provider;
+    const summaryProvider = summaryRole ? await summaryRole.resolve() : { ...provider, ...summaryLimits };
     return requestCompactionSummary({ ...request, provider: summaryProvider,
       onUsage: usageFor({ provider: summaryProvider.providerId ?? '', model: summaryProvider.model,
         baseUrl: summaryProvider.baseUrl, rates: catalogModel(input.catalog, summaryProvider.providerId ?? '', summaryProvider.model, summaryProvider.baseUrl)?.cost }),
@@ -99,11 +118,11 @@ export function buildCompactionWiring(input: {
   const historyRequest = (request: Parameters<SummarizeHistory>[0]) => ({
     requestPolicy: input.requestPolicy, maxOutputTokens: runtimeConfig.maxOutputTokens,
     messages: toCompactionMessages(request.messages), previousSummary: request.previousSummary,
-    instructions: request.instructions, signal: request.signal,
+    instructions: request.instructions, signal: request.signal, dispatch: request.dispatch,
   });
-  const prefixRequest = (messages: readonly AgentMessage[], signal?: AbortSignal) => ({
+  const prefixRequest = (messages: readonly AgentMessage[], signal?: AbortSignal, dispatch?: CompactionDispatch) => ({
     requestPolicy: input.requestPolicy, maxOutputTokens: runtimeConfig.maxOutputTokens, purpose: 'turn-summary' as const,
-    messages: toCompactionMessages(messages), prompt: TURN_PREFIX_COMPACTION_PROMPT, signal,
+    messages: toCompactionMessages(messages), prompt: TURN_PREFIX_COMPACTION_PROMPT, signal, dispatch,
   });
   // Resolved per model rather than read from one global number: the catalog
   // knows each model's window, and using a single value compacted a million-token
@@ -118,9 +137,11 @@ export function buildCompactionWiring(input: {
   if (resolvedWindow.warning !== undefined) {
     windowLogger.warn(resolvedWindow.warning);
   }
+  const summaryLimits = summaryRole?.limits ?? { contextWindow: resolvedWindow.window,
+    maxOutputTokens: runtimeConfig.maxOutputTokens, reserveTokens: runtimeConfig.reserveTokens };
   return {
     policy: {
-      ...(summaryRole ? { summaryIdentity: summaryRole.identity } : {}),
+      summaryIdentity: summaryRole?.identity ?? createHash('sha256').update(JSON.stringify([provider, summaryLimits])).digest('hex'),
       contextWindow: resolvedWindow.window,
       // Per-model budgets where the user set them, the global value otherwise.
       // A single global budget cannot suit every model: the same "keep the last
@@ -153,11 +174,13 @@ export function buildCompactionWiring(input: {
       },
     },
     summarize: Object.assign((request: Parameters<SummarizeHistory>[0]) => send(historyRequest(request)),
-      summaryRole ? { preflight: (request: Parameters<SummarizeHistory>[0]) => { prepareCompactionMessages({ ...historyRequest(request), provider: summaryRole.limits }); } } : {}),
+      { dispatchAware: true, preflight: (request: Parameters<SummarizeHistory>[0]) => {
+        prepareCompactionMessages({ ...historyRequest(request), provider: summaryLimits }); } }),
     // Asked a different question from the history summary: this is the opening
     // of a turn whose continuation is kept, so it explains the work that
     // follows rather than recapping what came before.
-    summarizeTurnPrefix: Object.assign((messages: readonly AgentMessage[], signal?: AbortSignal) => send(prefixRequest(messages, signal)),
-      summaryRole ? { preflight: (messages: readonly AgentMessage[], signal?: AbortSignal) => { prepareCompactionMessages({ ...prefixRequest(messages, signal), provider: summaryRole.limits }); } } : {}),
+    summarizeTurnPrefix: Object.assign((messages: readonly AgentMessage[], signal?: AbortSignal, dispatch?: CompactionDispatch) => send(prefixRequest(messages, signal, dispatch)),
+      { dispatchAware: true, preflight: (messages: readonly AgentMessage[], signal?: AbortSignal) => {
+        prepareCompactionMessages({ ...prefixRequest(messages, signal), provider: summaryLimits }); } }),
   };
 }

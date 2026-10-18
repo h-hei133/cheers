@@ -42,6 +42,7 @@ import { getSessionUsage, recordRequestContext } from '../observability/usageTel
  */
 
 export interface CompactionSetup {
+  readonly authority?: import('../session/compaction/contract.js').CompactionAuthority;
   readonly policy: CompactionPolicy;
   readonly summarize: SummarizeHistory;
   /**
@@ -296,6 +297,7 @@ export function runTurn(options: TurnOptions): TurnRun {
           sessionId: options.sessionId,
           summarizeTurnPrefix: options.compaction.summarizeTurnPrefix,
           onCompact: options.compaction.onCompact,
+          authority: options.compaction.authority,
           // One builder for both entry points, so a hook sees the same event
           // with the same reason whether the window filled up or the user asked.
           lifecycle: buildCompactionLifecycle({
@@ -393,6 +395,9 @@ export function runTurn(options: TurnOptions): TurnRun {
     // threshold check standing in the way: the provider already refused the
     // request, so the context is over budget by definition, not by estimate.
     const kept = messages.slice(0, -1);
+    const source = options.compaction.authority?.capture(kept);
+    const lifecycle = buildCompactionLifecycle({ hooks: options.hooks, sessionId: options.sessionId,
+      workspaceRoot: options.workspaceRoot, reason: 'overflow' });
     const condensed = await condenseContext({
       messages: kept,
       policy: options.compaction.policy,
@@ -404,26 +409,31 @@ export function runTurn(options: TurnOptions): TurnRun {
       // is `overflow`: a hook that watches for the context being cut has to see
       // this one, or the case that discards the most context is the one it never
       // hears about. `overflow` was a declared reason with no producer.
-      lifecycle: buildCompactionLifecycle({
-        hooks: options.hooks,
-        sessionId: options.sessionId,
-        workspaceRoot: options.workspaceRoot,
-        reason: "overflow",
-      }),
+      lifecycle,
       lifecycleReason: "overflow",
-      operation: { sessionId: options.sessionId },
+      operation: { sessionId: options.sessionId, source, identity: options.compaction.authority?.identity },
     }).catch(error => { if (error instanceof ModelAdmissionError) throw error; return undefined; });
     // A decline here leaves the run reporting the overflow it already hit: the
     // engine judged that condensing would not make the context smaller, so
     // retrying the same request would fail the same way.
     if (!condensed || condensed.status === "declined") return false;
+    if (options.signal.aborted) return false;
     const { plan } = condensed;
+    if (source && options.compaction.authority) {
+      const committed = options.compaction.authority.commit({ source, summary: condensed.summary,
+        keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore, signal: options.signal,
+        admission: options.compaction.authority.admission });
+      if (committed.status === 'unverified') throw new CompactionPublicationError();
+      if (committed.status !== 'committed') return false;
+    }
     options.compaction.onCompact({
       summary: condensed.summary,
       keptMessages: plan.keptMessages,
       tokensBefore: plan.tokensBefore,
     });
     core.state.messages = condensed.messages;
+    await lifecycle.after?.({ reason: 'overflow', summary: condensed.summary,
+      keptMessages: plan.keptMessages, tokensBefore: plan.tokensBefore });
     return true;
   };
 
@@ -518,3 +528,4 @@ function persist(onMessage: (message: SessionMessage) => void, message: AgentMes
   const { stopReason: _stopReason, errorMessage: _errorMessage, ...stored } = message;
   onMessage(stored);
 }
+import { CompactionPublicationError } from '../session/compaction/contract.js';

@@ -4,7 +4,7 @@ import { createSession, createSessionWithId } from '../store/sessionCreation.js'
 import { readSessionFileVersion } from '../store/version.js';
 import type { SessionStoreAccess } from '../store/sessionStoreAccess.js';
 import { sameValue } from '../../config/values.js';
-import { forkThread } from './fork.js';
+import { forkThread, forkTranscriptEvents } from './fork.js';
 
 export interface SessionForkOptions {
   readonly activate?: boolean;
@@ -53,9 +53,11 @@ export function forkSession(input: {
   const forked = options?.sessionId === undefined ? createSession(creation) : createSessionWithId({ ...creation, sessionId: options.sessionId });
   try {
     const transcriptPath = store.transcriptPath(forked.id);
-    for (const event of events) {
-      appendTranscriptEvent(transcriptPath, event.type === 'command-output' && event.sourceEntryId === sessionRootEntryId(source.id)
-        ? { ...event, sourceEntryId: sessionRootEntryId(forked.id) } : event, undefined, { requireExisting: true });
+    for (const event of forkTranscriptEvents(events, source.id, forked.id)) {
+      store.withSessionStateLock(forked.id, () => {
+        appendTranscriptEvent(transcriptPath, event.type === 'command-output' && event.sourceEntryId === sessionRootEntryId(source.id)
+          ? { ...event, sourceEntryId: sessionRootEntryId(forked.id) } : event, undefined, { requireExisting: true });
+      }, { requireExisting: true });
     }
     const copied = forkThread({ ...thread, activeLeafId: forkLeaf }, source.id, forked.id);
     store.writeSessionState(forked, { thread: copied });

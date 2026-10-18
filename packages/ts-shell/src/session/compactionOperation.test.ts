@@ -1,11 +1,10 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SessionManager } from './SessionManager.js';
-import { condenseContext, planCompactionCut, type CompactionPolicy } from './compaction.js';
-import { claimCompactionStep, completeCompactionStep, compactionOperationsPath, compactionStepDigest, markCompactionStepUnknown } from './compactionOperation.js';
+import { condenseContext, type CompactionPolicy } from './compaction.js';
+import { claimCompactionStep, completeCompactionStep, compactionOperationsPath, dispatchCompactionStep, markCompactionStepUnknown } from './compactionOperation.js';
 import type { AgentMessage } from '../core/agent/state.js';
 
 let home: string;
@@ -23,6 +22,7 @@ it('claims one step, refuses replay, and returns the completed summary', () => {
   const first = claimCompactionStep({ ...operation(), stepDigest: 'step-one' });
   expect(first.acquired).toBe(true);
   expect(claimCompactionStep({ ...operation(), stepDigest: 'step-one' })).toMatchObject({ acquired: false, unknown: true });
+  dispatchCompactionStep(first);
   completeCompactionStep(first, sessionId, 'stored summary');
   expect(claimCompactionStep({ ...operation(), stepDigest: 'step-one' })).toMatchObject({ acquired: false, summary: 'stored summary' });
   expect(claimCompactionStep({ ...operation(), stepDigest: 'step-two' }).acquired).toBe(true);
@@ -42,7 +42,7 @@ it('separates operations by summarizer and instruction identity', () => {
 });
 
 it('reports a corrupt operation file instead of treating it as empty', () => {
-  fs.writeFileSync(compactionOperationsPath(sessionId), '{"version":1,"operations":{"x":{"steps":{}}}}');
+  fs.writeFileSync(compactionOperationsPath(sessionId), '{"version":2,"operations":{"x":{"steps":{}}}}');
   expect(() => claimCompactionStep({ ...operation(), stepDigest: 'step' })).toThrow(/invalid operation/i);
 });
 
@@ -66,15 +66,15 @@ it('reuses a completed summary instead of paying for the same step twice', async
   if (second.status === 'condensed') expect(second.summary).toBe('summary');
 });
 
-it('refuses a concurrent duplicate instead of paying twice', async () => {
+it('joins a concurrent duplicate instead of paying twice', async () => {
   let release!: () => void;
   const pending = new Promise<void>(resolve => { release = resolve; });
   const summarize = vi.fn(async () => { await pending; return 'summary'; });
   const first = condenseContext({ messages: messages(), policy, summarize, force: true, operation: { sessionId } });
-  const second = await condenseContext({ messages: messages(), policy, summarize, force: true, operation: { sessionId } });
-  expect(second).toMatchObject({ status: 'declined', reason: 'step-unknown' });
+  const second = condenseContext({ messages: messages(), policy, summarize, force: true, operation: { sessionId } });
   release();
   expect((await first).status).toBe('condensed');
+  expect((await second).status).toBe('condensed');
   expect(summarize).toHaveBeenCalledOnce();
 });
 
@@ -88,13 +88,11 @@ it('declines an unknown step without calling the summarizer again', async () => 
   expect(summarize).not.toHaveBeenCalled();
 });
 
-it('preserves claims written before summary roles when no role is selected', async () => {
-  const history = messages(); const plan = planCompactionCut(history, policy)!;
-  const policyDigest = createHash('sha256').update(JSON.stringify([4000, 0, 100, null, ''])).digest('hex');
-  claimCompactionStep({ sessionId, policyDigest,
-    stepDigest: compactionStepDigest({ history: history.slice(0, plan.splitsTurn ? plan.turnStart : plan.cut) }) });
+it('refuses V1 records whose previous eviction cannot establish unsent requests', async () => {
+  const history = messages();
+  fs.writeFileSync(compactionOperationsPath(sessionId), JSON.stringify({ version: 1, operations: {} }));
   const summarize = vi.fn(async () => 'unexpected retry');
-  expect(await condenseContext({ messages: history, policy, summarize, force: true, operation: { sessionId } }))
-    .toMatchObject({ status: 'declined', reason: 'step-unknown' });
+  await expect(condenseContext({ messages: history, policy, summarize, force: true, operation: { sessionId } }))
+    .rejects.toThrow(/incomplete replay evidence/);
   expect(summarize).not.toHaveBeenCalled();
 });

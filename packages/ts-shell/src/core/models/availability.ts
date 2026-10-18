@@ -1,6 +1,7 @@
-import type { ProviderConnectionAuthType, ProviderConnectionConfig, ProviderCredentialConfig, RuntimeConfig, RuntimeProvider } from '../../config/runtimeConfig.js';
+import type { AccountPool, ProviderConnectionAuthType, ProviderConnectionConfig, ProviderCredentialConfig, RuntimeProvider } from '../../config/runtimeConfig.js';
 import type { CatalogProvider } from './catalog.js';
 import { connectionCredentialState, credentialSources } from '../auth/account/presence.js';
+import { availablePoolConnections } from '../auth/account/pool.js';
 
 /**
  * What the configuration says about a provider, without asking the provider.
@@ -18,7 +19,8 @@ export interface AvailabilityConfig {
   readonly activeProviderConnectionId?: string;
   readonly providerConnections?: readonly ProviderConnectionConfig[];
   readonly providerCredentials?: Partial<Record<RuntimeProvider, ProviderCredentialConfig>>;
-  readonly accountPool?: Readonly<Partial<Record<RuntimeProvider, { readonly connections: readonly string[] }>>>;
+  readonly accountPool?: AccountPool;
+  readonly configValidation?: { readonly valid: boolean };
 }
 
 export interface ConnectionAvailability {
@@ -83,6 +85,7 @@ function providerState(connections: readonly ConnectionAvailability[], credentia
   if (pool) {
     if (pool.members === 0) return 'pool-empty';
     if (pool.available === 0) return 'pool-unavailable';
+    return 'ready';
   }
   if (connections.some(connection => connection.state === 'ready')) return 'ready';
   if (connections.some(connection => connection.state === 'pending')) return 'pending';
@@ -100,16 +103,12 @@ export function availabilitySnapshot(input: {
   const config = input.config;
   const activeConnectionId = config.activeProviderConnectionId?.trim() || undefined;
   const connections = (config.providerConnections ?? []).filter(connection => Boolean(connection.id?.trim() && connection.provider));
-  const catalogById = new Map(input.catalog.map(provider => [provider.id, provider]));
   const providers: ProviderAvailability[] = [];
   const seen = new Set<string>();
 
   for (const provider of input.catalog) {
     const declared = connections.filter(connection => connection.provider === provider.runtime);
-    const projected = declared.map(connection => projectConnection(config, connection, env));
-    const legacy = credentialSources(config, provider.runtime, env);
-    const credential = legacy.env || legacy.configApiKey || legacy.configAccount || projected.some(item => item.state === 'ready') ? 'present' : 'missing';
-    const pool = poolFacts(config, provider.runtime, projected);
+    const { projected, credential, pool } = providerProjection(config, provider.runtime, declared, env);
     const state = providerState(projected, credential, true, pool);
     providers.push({ provider: provider.runtime, label: provider.label, catalogued: true, state, credential,
       endpoint: endpointLabel(declared.find(connection => connection.baseUrl)?.baseUrl ?? provider.baseUrl),
@@ -120,12 +119,10 @@ export function availabilitySnapshot(input: {
   // and saying so is more useful than dropping it from every surface.
   for (const connection of connections) {
     if (seen.has(connection.provider)) continue;
-    const projected = [projectConnection(config, connection, env)];
-    const legacy = credentialSources(config, connection.provider, env);
-    const pool = poolFacts(config, connection.provider, projected);
+    const declared = connections.filter(candidate => candidate.provider === connection.provider);
+    const { projected, credential, pool } = providerProjection(config, connection.provider, declared, env);
     providers.push({ provider: connection.provider, label: connection.label ?? connection.provider, catalogued: false,
-      state: providerState(projected, legacy.env || legacy.configApiKey || legacy.configAccount ? 'present' : 'missing', false, pool),
-      credential: legacy.env || legacy.configApiKey || legacy.configAccount || projected[0]!.state === 'ready' ? 'present' : 'missing',
+      state: providerState(projected, credential, false, pool), credential,
       endpoint: endpointLabel(connection.baseUrl), connections: projected, ...(pool ? { pool } : {}), models: [], measured: 'unknown' });
     seen.add(connection.provider);
   }
@@ -138,14 +135,23 @@ export function availabilitySnapshot(input: {
     providers };
 }
 
-function poolFacts(config: AvailabilityConfig, provider: RuntimeProvider, projected: readonly ConnectionAvailability[]) {
+function providerProjection(config: AvailabilityConfig, provider: RuntimeProvider, declared: readonly ProviderConnectionConfig[], env: NodeJS.ProcessEnv) {
   const entry = config.accountPool?.[provider];
-  if (!entry) return undefined;
-  return { members: entry.connections.length, available: projected.filter(item => item.state === 'ready').length };
+  const usable = entry ? new Set((config.configValidation?.valid === false ? [] : availablePoolConnections({
+    config: { accountPool: config.accountPool, providerConnections: config.providerConnections ?? [], providerCredentials: config.providerCredentials ?? {} },
+    provider,
+  }) ?? []).map(connection => connection.id.trim())) : undefined;
+  const projected = declared.map(connection => projectConnection(config, connection, env, usable));
+  const legacy = credentialSources(config, provider, env);
+  const present = usable ? usable.size > 0 : legacy.env || legacy.configApiKey || legacy.configAccount || projected.some(item => item.state === 'ready');
+  return { projected, credential: present ? 'present' as const : 'missing' as const,
+    ...(entry ? { pool: { members: entry.connections.length, available: usable!.size } } : {}) };
 }
 
-function projectConnection(config: AvailabilityConfig, connection: ProviderConnectionConfig, env: NodeJS.ProcessEnv): ConnectionAvailability {
-  const state = connectionCredentialState(config, connection, env);
+function projectConnection(config: AvailabilityConfig, connection: ProviderConnectionConfig, env: NodeJS.ProcessEnv, usable?: ReadonlySet<string>): ConnectionAvailability {
+  const own = connectionCredentialState(usable ? {} : config, connection, usable ? {} : env);
+  const state = usable && own.state === 'ready' && !usable.has(connection.id.trim())
+    ? { state: 'pool-unavailable' as const, reason: 'The current account pool does not authorize an available credential on this connection.' } : own;
   return { connectionId: connection.id.trim(), provider: connection.provider, authType: connection.authType,
     ...(connection.label ? { label: connection.label } : {}), ...(connection.model ? { model: connection.model } : {}),
     ...(endpointLabel(connection.baseUrl) ? { endpoint: endpointLabel(connection.baseUrl) } : {}), ...state };

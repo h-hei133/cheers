@@ -2,7 +2,7 @@
 title: "模型可用性投影"
 category: article
 created: 2026-10-17
-updated: 2026-10-18
+updated: 2026-10-19
 tags: [models, providers, phase-20]
 summary: "本地可证明的 provider/connection 可用性事实、脱敏endpoint与选择器一致行为；不把打开UI变成认证探针。"
 ---
@@ -15,15 +15,18 @@ summary: "本地可证明的 provider/connection 可用性事实、脱敏endpoin
 
 | 事实 | 含义 |
 |---|---|
-| `ready` | 至少一个连接或兼容/环境凭据能解析出凭据 |
+| `ready` | 无池时至少一个连接或兼容/环境凭据可解析；有池时至少一个完整合法池成员有自己的可用凭据 |
 | `credential-missing` | 目录中存在，但没有任何本地凭据来源 |
 | `pending` / `error` | 连接自身的持久状态，优先于凭据判断 |
 | `unsupported` | 存在已保存连接，但当前目录没有该 provider |
 | `unknown` | 未取得可判定事实；保留文本降级 |
+| `pool-empty` / `pool-unavailable` | 池明确为空，或完整拓扑/自身凭据/当前代次等待不允许任何成员 |
 
 `measured` 始终为 `unknown`：配置中的 key 不是一次成功往返。真实可用性仍由显式 live 检查或实际请求记录，不由选择器推断。
 
 凭据来源覆盖 CLI 之外的级联事实：连接自身 API key/account、环境变量、provider profile 的兼容凭据。凭据值不进入投影；连接与 provider 只输出 `credential` 事实和受控原因。
+
+声明账号池后，`core/auth/account/pool.ts` 的 `availablePoolConnections` 同时供请求选择与投影检查完整成员、provider、重复及 endpoint 拓扑，再检查自身合法凭据与当前 generation 的等待。环境、profile 及池外连接不能提高 pool.available；无目录 provider 保留全部已声明连接。无效配置保持不可用。检查不选亲和、不刷新认证、不发布配置、不发网络；过期等待清理由原等待 owner 处理。
 
 ## 2. Endpoint 脱敏
 
@@ -35,7 +38,7 @@ summary: "本地可证明的 provider/connection 可用性事实、脱敏endpoin
 |---|---|
 | `/model` 与 `/model list` | provider 行显示凭据事实；默认 list 与数据列表使用实际 endpoint 对应的目录，归属歧义时拒绝列出可选模型 |
 | 模型选择器 | 按连接逐模型展示，行内优先显示 connection ID，详情列展示脱敏 endpoint；active 匹配实际请求的连接、模型、endpoint 和凭据；CLI/env/旧配置凭据可通过 provider 行选择模型；无匹配目录项时以只读行显示实际模型；pending/error/无自身凭据项保留原因；预设提供具名角色和整套应用 |
-| 连接选择器 | 每行显示 `active` 或投影状态及脱敏 endpoint |
+| 连接选择器 | 每行显示投影状态及脱敏 endpoint；active 目标失去池授权时仍显示不可用原因 |
 | `/model status` | readiness 行由投影的 pending/error/credential-missing 决定，再检查 base URL 与模型 |
 
 选择器保留目标对象，不从 label 或后续目录重新解析地址。目录 owner 先确定实际地址（明确地址优先，否则规范 provider 的目录默认地址），再匹配相同 runtime、地址去尾部斜线后相等的 alias。唯一 alias 拥有模型及全部元数据；缺字段或缺模型保持未知，不借用官方条目或另一 relay。没有匹配 alias 时才使用规范 provider 目录，多个 alias 声明同一地址时拒绝选择和请求。
@@ -63,6 +66,6 @@ service tier 与 context window 校验实际请求的 provider/model，CLI model
 ## 5. 边界
 
 - 具名连接及无具名连接的 CLI/env/旧配置模型选择、恢复、精确目录能力和歧义拒绝路径有本地合成验证。独立委派账号续期仍需完整复核；不能由此宣称完整 PRV-01…05 已闭合。
-- 历史 usage 仍只带 provider/model 时，成本保持原规范/唯一模型查找，不因当前默认地址而被改记成 relay 价格；跨 relay 的历史成本归属仍是 PRV-05 未完成实现。
+- 历史成本按请求发送前捕获的目的地及价格计算；旧 provider/model 记录保留明确兼容解释，缺价不借用当前目录。主、cache 和辅助请求已有本地证据，完整 PRV-05 consumer/publication 仍按范围复核。
 - 未验证真实 provider、跨进程并发或 Windows/macOS 实机。
 - `unknown` 不等于不可用，`ready` 也不等于远端已确认；两者都不会被写成成功。

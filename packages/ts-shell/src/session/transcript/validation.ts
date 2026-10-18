@@ -55,7 +55,12 @@ export function isReadableTranscriptEvent(value: unknown): boolean {
     case "lifecycle": return typeof value.event === "string" && optionalString(value.detail);
     case "query-event": return queryEvent(value.event);
     case "compaction": return typeof value.summary === "string" && optionalString(value.firstKeptEntryId) &&
+      (value.publication === undefined || value.publication === 'prepared') &&
+      (value.sourceActivePath === undefined || (Array.isArray(value.sourceActivePath) && value.sourceActivePath.length > 0 &&
+        value.sourceActivePath.every(id => typeof id === 'string' && id.length > 0) && new Set(value.sourceActivePath).size === value.sourceActivePath.length)) &&
       (value.keptMessages === undefined || (Number.isInteger(value.keptMessages) && Number(value.keptMessages) >= 0));
+    case 'compaction-commit': return typeof value.compactionId === 'string' && value.compactionId.length > 0
+      && typeof value.digest === 'string' && /^[a-f0-9]{64}$/.test(value.digest);
     case "branch_summary": return Number.isInteger(value.droppedTurns) && Number(value.droppedTurns) >= 0 &&
       optionalString(value.summary) && optionalString(value.toEntryId) &&
       (value.abandonedEntryIds === undefined || (Array.isArray(value.abandonedEntryIds) && value.abandonedEntryIds.every(id => typeof id === "string")));

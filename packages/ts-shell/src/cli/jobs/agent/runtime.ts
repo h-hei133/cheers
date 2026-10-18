@@ -6,6 +6,7 @@ import { jobAdmission } from '../authority.js';
 import type { JobsComposition } from '../model.js';
 import { goalPolicyFor } from '../../runtime/goal.js';
 import { buildCompactionWiring } from '../../runtime/compaction.js';
+import { sessionCompactionAuthority } from '../../../session/compaction/authority.js';
 import { providerAuthorization } from '../../../provider/request/authorization.js';
 import { credentialIdentityFor } from '../../../core/auth/account/pool.js';
 import { providerEndpoint } from '../../../core/models/catalog.js';
@@ -126,7 +127,12 @@ export async function captureAgentRuntime(host: JobsComposition, input: AgentRun
               ...(endpoint ? { endpoint } : {}) };
             return { compaction: { ...buildCompactionWiring({ provider, runtimeConfig: config, admission: admit, sessionId: session.id, catalog, requestPolicy: policy,
               workspaceRoot: session.projectRoot }),
-              onCompact: record => { if (admit()) throw new Error('Agent compaction admission changed.'); host.manager.appendCompactionEntry(session.id, record); } } };
+              authority: sessionCompactionAuthority({ sessionId: session.id, workspaceRoot: host.context.cwd,
+                admission: admit,
+                isCurrent: () => host.context.configuration.current === publication,
+                capture: () => host.manager.captureCompactionSource(session.id),
+                commit: record => host.manager.appendCompactionIfCurrent(record) }),
+              onCompact: () => { if (admit()) throw new Error('Agent compaction admission changed.'); } } };
           },
         }, { hooks: new HookDispatcher(), checkProviderReadiness: checkRealProviderReadiness, createReadinessTerminalEvent: createProviderReadinessCliTerminalEvent });
         for await (const event of invocation.events) {

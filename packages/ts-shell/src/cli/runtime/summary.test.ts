@@ -206,7 +206,7 @@ it('does not reuse a completed summary after the role effort changes', async () 
   expect(setup.requests.map(request => request.effort)).toEqual(['high', 'high', 'low', 'low']);
 });
 
-it('renews only the summary account once before both history and prefix sends', async () => {
+it('renews the summary account once and refuses append across the resulting configuration publication', async () => {
   const setup = await fixture('gpt-5.4'); const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
   const old = { type: 'openai-chatgpt-account' as const, accessToken: 'synthetic-old', refreshToken: 'synthetic-refresh', expiresAt: 1, accountId: 'b' };
   const fresh = { ...old, accessToken: 'synthetic-fresh', refreshToken: 'synthetic-rotated', expiresAt: Date.now() + 3600000 };
@@ -214,7 +214,9 @@ it('renews only the summary account once before both history and prefix sends', 
     ? { ...connection, authType: 'account-auth', apiKey: undefined, accountAuth: { openai: old } } : connection) }, edit);
   const renewal = observeOAuthRenewal(fresh);
   const { deps } = runtime(setup);
-  expect(await deps.compactHistory!(setup.session.id, setup.signal)).toMatchObject({ status: 'compacted' });
+  const history = setup.manager.getSession(setup.session.id)!.turns;
+  expect(await deps.compactHistory!(setup.session.id, setup.signal)).toMatchObject({ status: 'failed', reason: expect.stringContaining('Configuration changed') });
+  expect(setup.manager.getSession(setup.session.id)!.turns).toEqual(history);
   expect(renewal).toHaveBeenCalledOnce();
   expect(setup.requests.map(request => request.credential)).toEqual(['Bearer synthetic-fresh', 'Bearer synthetic-fresh']);
   const stored = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;

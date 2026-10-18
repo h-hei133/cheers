@@ -7933,3 +7933,22 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 两构建通过，TS manifest `6ee15cd6870a`；源 digest与exe hash绑定读回。编译模块实际12次本机HTTP覆盖各低层purpose、70-token共享cap、池切换后cap拒绝、unknown/partial不自动重播；新独立进程保留账本证据。实际CLI授权子请求三次发送、12 input/3 output，拒绝子请求只有两次主发送、8/2，global config字节不变。另两次实际乱序HTTP保留约60秒等待，池外显式/委派复现均转为拒绝。
 - Linux Node/exe × regular/fullscreen四格隔离PTY通过：整套预设、显式advisor on/off/on、池内A/low原生续期后同回合B/high顾问，每格五次模型发送和一次受限本机TLS OAuth、持久V2派发/terminal/successor、只改owner token、pathRules准入、退出0。临时home/证书已清理；合成服务不等同真实模型验收。
 - 四项静态门禁和脚本59项通过；NormProof退出0，无环/解析义务satisfied，仍为原九项函数上限advisory，触及模块无新增越界。最终静态门禁/strict docs drift/diff在本条后运行。本条写入时尚未提交推送，新SHA CI待实际查询；完整辅助consumer/publication、可用性投影、provider/endpoint/受众绑定、CTX-03和全部其余任务继续，只有用户原四项环境/真实模型要求推迟。
+
+### 上批精确 SHA CI 终态与后续返工
+
+- 池限制/退避批已提交并推送为 `2e0ffe09af81b7d0aa0619658ca9e0f7bba5cf56`；实际读回 Architecture Watch `39144013465` completed/success。主 CI `39144013469`/job `117724050073` completed/failure，终态 `2026-10-18T16:24:28Z`，精确 SHA 已核对；前十三步 success，第十四步唯一 `grepStream.test.ts` 失败是探测新写 executable 时 `spawn ETXTBSY`，8860 项通过、3 跳过，入口续期测试已通过，NormProof skipped。历史目录批曾命中同一夹具错误；原始 failed log 和 authoritative JSON 保存在 `.omx/verification/phase20/request.ci-39144013469.*`，旧 run 不当作通过。
+- 当前编译产物的纯可用性复现确认八种池状态与请求解析不一致：池外、缺自身凭据、规范化重复、缺失/外来成员、endpoint 不匹配、空池及等待中的 generation 仍被界面计为可用。零网络、零个人配置读取；后续复用 account owner 的完整拓扑/自有凭据/等待校验，保留无池兼容级联、pending/error、全部未收录连接，显示 active 池拒绝。证据在 `availability.audit.md`、`availability.probe.before.log`；尚未交付。
+- CTX-03 已进入原 owner 的持久 claim/分段/条件追加返工。新配置 publication（包括摘要自身续期）仍使原捕获操作失效，不能通过推迟通知伪装身份未变。unknown 保留、合法段与合并、manual/auto 同一提交以及最终真实进程/反转/四格 PTY/L3 仍待验收；全部 47 项和用户原四项推迟范围不变。
+
+
+### PRV-01/03 可用性与 CTX-03 原生摘要返工
+
+- 只读可用性与真实池选择共用完整 topology、own credential 和当前 generation 等待集合；池外、ambient、缺失/foreign/重复成员、endpoint 不匹配及无效配置保持不可用。无目录 provider 保留全部连接，active 不可用仍显示原因。检查不选亲和、不续期、不写配置、不发网络。稳定 Node interpreter 执行 grep producer 数据，修复 hosted Linux 的 ETXTBSY 夹具，不增加生产重试。
+- CTX-03 原 owner 拆为合同、状态、调度、生成、authority、commit、publication 与 writes；兼容表面只导出。V2 prepared/dispatched/unknown/completed 配不可变 claim 和原生 mutation 能力；真实 HTTP 前验证交接；只有精确原 prepared 可释放。材料按七天/16 operation/32 step 淘汰，所有 replay tombstone 永久保留，8192 身份拒绝新增；V1 整文件 fail closed。
+- 合法 tool 配对的有界 source/prefix/merge 各自复用原预算、ledger/usage 和 request owner，拒绝重复 tool id、超大不可分组/merge，保留确定性文件足迹。手动/自动/overflow 使用原生 canonical history，分别恢复调用方 system/opening/tail，逻辑重播身份与精确 commit freshness 分开，修复 undefined digest 曾使自动路径静默禁用的问题。
+- 普通 transcript/metadata writer 共用原 state lock；commit 捕获 profile/store、inode/字节、branch/history/model/context 与 config/instruction authority，最终准入后重捕获、紧邻 append 检查取消。新 turn、A→B→A、改指令/配置均拒绝旧写入。先 prepared wire/fsync/readback，后完整唯一有序 proof；未验证即时结果不发 PostCompact/checkpoint/query.completed，自动/overflow 停止 turn。首次不确定材料重载 inert，较晚完整 proof 可恢复先前已精确验证的 summary，不能倒写即时成功。receipt 只适用于捕获路径及后代，fork 仅重映射有效证明；实际旧 reader 拒绝新 wire。
+- 独立可用性 code APPROVE/architecture CLEAR，产品 manifest `74be821e09c7238d83d0adfb6b850fd7f7b8f4e4c36758117af31faac3379d93`；全部产品/测试 hash 复核不变。CTX 广泛独立 code APPROVE（15 文件/206 项及 24 反例）、architecture WATCH（15 场景、31 模块 AST）绑定 d4c15cab；随后脚本门禁发现 mixed type 反向环，移动三项摘要接口到 owning contract、保留原路径 type reexport 修复。最终新 manifest `3c836cfb476a811dd77225dd8697d865be17b26cac90b960f07c8a59cf694bc3`，两独立 delta 均验证原字节反构建 hash、运行 emit 一致、旧 alias 同符号及完整无环图，code 79 项通过。原广泛运行保留原绑定，不伪装为重新执行，计数与 root 集重叠不相加。
+- 按 code-review 规则综合 CTX 为 COMMENT。两项非阻断 WATCH 已作明确取舍并写入 compaction-operations：永久证据容量可能拒绝后续摘要、完整 source/fsync/readback 在锁内同步 I/O 可能延迟其他 writer；不承诺无限可用或跨文件/网络崩溃原子性。独立 verdict 不是新 SHA CI 或整个阶段完成。
+- 最终 root 受影响 51 文件/520 项通过；三文件 type move 后另 31 文件/352 项通过，集合重叠。两构建通过，TS manifest d9aa3e99b3b8、exe 98 MB。9 个独立编译进程本机 HTTP 场景通过：成功 23 send/1 commit；unknown 两发送后重启零发送；new turn/branch return/instruction/publication 各 23 send/零 commit；取消一发送；超大 merge 12 send 后拒绝；真正 would-not-shrink 一发送/nothing，成本保留且历史不变。前轮大摘要仅证明 oversized merge，不能当作 shrink 证据；补强探针首次用了错误拒绝文字断言，失败日志保留，按现合同修复夹具而未改产品。
+- 新构建 Linux Node/exe × regular/fullscreen 四格 PTY 全通过：整套预设、B/high 手动与自动摘要、A/low 主请求、HTTP 前 durable dispatched、prepared/proof 对及 completed ledger、全局配置原字节不变、退出 0。14 项摘要与9 项可用性加载时反转实际导致断言失败/exit1，源码未回退；最终摘要反转重跑全14项通过。编译可用性 probe 同样通过。全部使用隔离合成 home/本机 HTTP，无真实 provider。
+- 五项静态门禁和脚本59项通过；初次 scripts 58/59 的类型环失败保留。仓库 tgz NormProof 实际退出0、partial，无环和 unresolved-specifier 满足，原9项 ceiling advisory；callback-inclusive 触及模块计数不新增越界。diff check 通过，最终 docs gate 在本条之后运行。本条时本批尚未提交/推送，远端结果待按精确 SHA 读回；PRV-03…05 完整 consumer/publication/provider-endpoint-audience、CTX-01/02/04/TOOL-01 及其余全部47项继续，只保留用户原四项推迟范围。

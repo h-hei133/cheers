@@ -2,46 +2,62 @@
 title: "压缩操作与步骤幂等"
 category: article
 created: 2026-10-17
-updated: 2026-10-18
+updated: 2026-10-19
 tags: [context, compaction, phase-20]
-summary: "压缩步骤复用与未知拒绝的现有机制；摘要角色身份和发送前预算预检已接通，完整生命周期、保留及分段合同仍待返工。"
+summary: "摘要的有界分段、永久重播证据与原生会话条件发布；不确定发送和未验证写入不能变成成功。"
 ---
 
 # 压缩操作与步骤幂等
 
-`session/compactionOperation.ts` 把摘要请求当作有身份的逻辑操作：
+`session/compaction/` 拥有请求合同、调度、步骤状态、原生提交及发布证明；`session/compactionOperation.ts` 只保留兼容导出。手动、自动阈值和 overflow 使用同一份不可变原生历史生成摘要，分别重建调用方的 system、当前 turn opening 和保留尾部。
 
 ```text
-operation = session + provider + model + policy + instructions
-step      = 被摘要的精确消息、previousSummary 与指令的摘要
+operation = session + provider + model + policy + instructions + logical source + authority
+step      = 精确消息 + previousSummary + instructions + history/prefix/merge stage
 ```
 
-策略包含 window、reserve、keepRecent、enabled 与指令；选择 `summary` 角色时还包含连接/模型/effort、凭据代际、模型能力与摘要请求限制的非秘密摘要。未选择角色时保持原键兼容，防止升级后重新发送已有 unknown 步骤。角色摘要和主模型压缩策略分开解析；已完成材料仅在相同键下复用。完整分段/合并调度仍待 CTX-03 返工，不能把存在步骤记录当作该调度已实现。
+策略包含 window、reserve、keepRecent、enabled、segmentTokens 与有效摘要目标限制。明确 summary 角色还绑定 connection/model/effort、凭据代际和目录能力的非秘密摘要；fallback 也包含实际摘要限制。逻辑重播身份与提交时的精确新鲜度分开：同内容指令 touch、恢复 metadata、临时配置 publication 和分支往返不能授权重发 unknown，但会使原在途提交失效。
 
-## 1. 持久状态
+## 1. 持久步骤
 
-记录位于会话目录的 `compaction-operations.json`：
+会话目录的 `compaction-operations.json` 使用 V2，在原文件锁内重读、原子写入及精确读回核对。claim 使用不可变随机 id，只有原生取得的本次句柄可以 mutation；跟随者及复制、伪造句柄只读。
 
 | 状态 | 含义 |
 |---|---|
-| `dispatched` | 请求可能已经发出 |
-| `unknown` | 结果不可验证；不得自动重播 |
-| `completed` | 已保存摘要，可直接复用 |
+| `prepared` | 本次已取得步骤，尚未验证传输交接；仅原 owner 能证明未发送并释放 |
+| `dispatched` | 实际 HTTP 前交接已持久化并读回；请求可能已发送 |
+| `unknown` | 发送或结果不可验证，拒绝自动重播 |
+| `completed` | 已验证摘要材料可复用；材料淘汰后身份仍保留，不能再次授权发送 |
 
-所有写入在 `.lock` 内重读、原子写入并读回核对。最多保留 16 个操作、每个 32 个步骤，超过 7 天的记录清理。没有真实会话目录时不写任何文件；投影出的 session id 不会污染 profile。
+七天、每操作 32 条、最多 16 个操作仅限制可复用摘要材料。所有 prepared/dispatched/unknown/completed 身份作为重播证据保留；总计 8192 个身份时拒绝新增步骤。不能删除记录给请求腾空间。V1 曾可能淘汰未知请求，整文件拒绝自动使用，不能从缺记录推定未发送。
 
-## 2. 行为
+原生路径始终绑定已捕获的 profile 和会话目录身份。删除、替换或换 profile 不能降级为无文件 claim 或重新创建同名会话。无目录行为只供明确合成调用，不能替代产品持久合同。
 
-- 同一操作/步骤重复调用：已完成则复用摘要，不再请求 provider；`dispatched`/`unknown` 则返回 `step-unknown` 拒绝，不重播可能已计费的请求。
-- 并发重复：第一个取得步骤，第二个立即得到 `step-unknown`；provider 只被调用一次。
-- 摘要返回空或抛错：标记 `unknown`，保留失败事实；取消同样不把步骤当作已完成。
-- 前缀摘要只在调用方实际提供 prefix summarizer 时声明步骤；没有 summarizer 时不留下永远 `dispatched` 的占位。
-- 明确摘要角色的 history 与 prefix 请求先用发送端共用的完整消息构造执行纯预算预检，全部通过才开始 claim；窗口不足是零发送拒绝，重试不会变成 `step-unknown`。实际发送再次检查同一预算。
-- 手动 `/compact`、自动阈值与 overflow 救援共用同一 store；`would-not-shrink`、取消与无合法切点仍在摘要之后按原规则拒绝，不覆盖历史。
+## 2. 有界生成与请求计量
 
-## 3. 边界
+- 合法单元保留 tool call/result 配对，重复 tool id 或不可分的大组拒绝。最多 64 个 source segment，每 segment 最多 512 条消息、默认估算 16000 tokens；source 与 merge 合计最多 128 次发送，过大的合并输入同样拒绝。
+- history、prefix 和 merge 分别走原请求预算、attempt ledger、credential attribution 和 usage owner。每次完整返回的用量先记录，再验证摘要；拒绝、取消后的完整材料仍保留已知成本。
+- 纯预算预检先于 claim。真实 dispatch 在已有 transport 的实际交接点持久化；明确未交接的本次 prepared 可释放，未知交接不能自动重试。
+- 同 operation/step 只派发一次；完成材料直接复用，未知段使重启后整个原调度拒绝，不能跳过未知段继续生成。
+- 原有 checkpoint 与各 segment 的确定性文件足迹合并保留，不依赖摘要模型重新列出路径。
+- would-not-shrink、无合法切点、hook 拒绝和取消均不覆盖原历史；overflow 仍沿原有界救援路径。
 
-- 摘要结果的应用仍由现有调用方更新；完整 history/branch/owner revision CAS、config publication 绑定和恢复合同尚待逐路径复核，不能宣称 CTX-03 已闭合。
-- 当前保留上限和过期清理会移除记录，尚未独立保留 unresolved claim；其他发送前错误也可能留下 dispatched。上述局限意味着不能笼统保证跨任意时间/容量不重播；本批仅消除新增摘要窗口预检的已知零发送误报。
-- 未实现跨进程 lease；同一 profile 的两个进程写同一会话目录时由文件锁串行化，但步骤状态不是分布式事务。
-- 已验证：完成复用、未知拒绝、并发重复、操作身份分离、损坏文件、前缀占位；未运行真实 provider。
+## 3. 原生条件发布
+
+生成前捕获 profile/store、metadata 与 transcript 的 inode/字节、分支路径和导航 revision、模型、上下文及指令/config authority。普通 transcript 和 metadata writer 复用原 session state lock；metadata 仅能委托给当前同步持锁 owner，其他 state transaction 不提供一般重入。
+
+提交在该锁内重新准入并捕获完整 source，最后一次准入后再次捕获，再紧邻 append 检查取消。新 turn、分支 A→B→A、模型/上下文、指令或配置发布变化使迟到摘要拒绝。摘要材料及已知成本可以保留，但拒绝不是历史写入成功。
+
+先写 `compaction-prepared` wire record，fsync 并核对完整字节，随后才写绑定唯一 id、完整摘要 digest 和顺序的 `compaction-commit` proof，再 fsync/readback。没有唯一且在后的精确证明时 prepared 材料不进入模型上下文；旧 reader 拒绝新 wire 类型，不能将未验证材料当作旧成功摘要。
+
+即时报 unverified 的调用不发布 PostCompact、checkpoint 或成功 context update。自动阈值与 overflow 抛出固定安全错误并停止 turn，不产生普通 query.completed。若摘要已先获得精确验证且后续完整 marker 在重载时可验证，重载可恢复更强发布证据；不能把该恢复可能性改写为即时成功。初次摘要写入本身不确定时保持 inert。
+
+新 receipt 仅适用于捕获的分支路径及其后代，rewind/sibling 保留原对话。fork 只重映射已经验证的 root/path/proof，不把无效材料复制成有效摘要。legacy receipt 保留明确历史解释。
+
+## 4. 运行边界与验收
+
+- 8192 份永久证据是安全容量限制。长会话可能拒绝后续摘要；当前没有自动清证据或 V1 修复命令，应保留原会话并另建会话，不能手工清文件来获得发送授权。
+- 完整 source 校验、fsync/readback 及 operation 文件重写在原锁内执行同步 I/O，大历史会延迟其他 writer。真实性优先；后续优化需真实规模测量且不能弱化精确身份或重播证据。
+- 文件锁不提供网络/多文件崩溃原子性，也不提供无限可用性；未知发送、存储和 lock cleanup 始终独立报告。
+- 本地合成测试、独立代码/架构反例、加载时反转、独立进程 HTTP/restart 与 Linux Node/exe × regular/fullscreen PTY 证据见开发日志。架构为 WATCH，代码通道为 APPROVE，按规则合成 COMMENT；两项运行取舍已明确记录。
+- 未运行真实摘要质量、Windows/macOS 实机；该批不等于整个 W3 或 Phase 20 完成。提交、推送和精确 SHA CI 以开发日志为准。

@@ -7,6 +7,7 @@ import { readSessionFileVersion } from '../store/version.js';
 import { normalizePathIdentity } from '../continuation/roots.js';
 import { switchDurableSessionActiveLeaf } from '../store/threadState.js';
 import { appendBranchSummaryEvent } from '../transcript/sessionTranscript.js';
+import { withSessionStateLock } from '../store/sessionStateStore.js';
 
 /** A report-safe warning after a leaf write; callers must reread its actual outcome. */
 export class SessionNavigationWarning extends Error {
@@ -62,13 +63,13 @@ export async function revertSession(
     },
   });
   try {
-    appendBranchSummaryEvent(layout.transcriptPath, {
+    withSessionStateLock(layout, () => appendBranchSummaryEvent(layout.transcriptPath, {
       ...(summary !== undefined ? { summary } : {}),
       droppedTurns: abandoned.length,
       toEntryId: entryId,
       abandonedEntryIds: abandoned.flatMap(turn => turn.id === undefined ? [] : [turn.id]),
       timestamp: new Date().toISOString(),
-    });
+    }), { requireExisting: true });
   } catch {
     throw new SessionNavigationWarning('The branch note could not be saved completely.', abandoned.length);
   }

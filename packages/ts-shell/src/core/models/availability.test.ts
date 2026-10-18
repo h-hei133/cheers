@@ -1,7 +1,12 @@
-import { expect, it } from 'vitest';
+import { afterEach, expect, it } from 'vitest';
 import type { RuntimeConfig } from '../../config/runtimeConfig.js';
 import type { CatalogProvider } from './catalog.js';
 import { availabilitySnapshot, endpointLabel } from './availability.js';
+import { credentialIdentityFor } from '../auth/account/pool.js';
+import { ownedConnectionCredential } from '../auth/account/presence.js';
+import { noteCredentialRateLimit, resetCredentialBackoffForTests } from '../auth/account/backoff.js';
+
+afterEach(resetCredentialBackoffForTests);
 
 const catalog: CatalogProvider[] = [
   { id: 'openai', label: 'OpenAI', runtime: 'openai', auth: 'api-key', envVar: 'OPENAI_API_KEY',
@@ -73,4 +78,91 @@ it('shows only a host and path from an endpoint', () => {
   expect(endpointLabel('https://user:pass@host.example:8443/v1/?token=secret#frag')).toBe('host.example:8443/v1');
   expect(endpointLabel('not a url')).toBeUndefined();
   expect(endpointLabel('')).toBeUndefined();
+});
+
+it('counts only usable authorized members and never borrows ambient credentials for a pool', () => {
+  const snapshot = availabilitySnapshot({ config: config({ providerConnections: [
+    connection('usable', 'openai', { apiKey: 'synthetic-own' }),
+    connection('bare', 'openai'),
+    connection('outside', 'openai', { apiKey: 'synthetic-outside' }),
+    connection('pending', 'openai', { apiKey: 'synthetic-pending', status: 'pending' }),
+    connection('error', 'openai', { apiKey: 'synthetic-error', status: 'error' }),
+  ], providerCredentials: { openai: { apiKey: 'synthetic-profile' } },
+  accountPool: { openai: { connections: ['usable', 'bare', 'pending', 'error'] } } }),
+  catalog, env: { OPENAI_API_KEY: 'synthetic-env' } });
+  const provider = snapshot.providers.find(item => item.provider === 'openai')!;
+  expect(provider).toMatchObject({ state: 'ready', credential: 'present', pool: { members: 4, available: 1 } });
+  expect(provider.connections.map(item => [item.connectionId, item.state])).toEqual([
+    ['usable', 'ready'], ['bare', 'credential-missing'], ['outside', 'pool-unavailable'], ['pending', 'pending'], ['error', 'error'],
+  ]);
+  expect(JSON.stringify(snapshot)).not.toContain('synthetic-');
+});
+
+it.each([
+  { members: ['inside'], slots: [connection('inside', 'openai')], available: 0 },
+  { members: ['missing'], slots: [connection('outside', 'openai', { apiKey: 'synthetic' })], available: 0 },
+  { members: ['inside', 'missing'], slots: [connection('inside', 'openai', { apiKey: 'synthetic' })], available: 0 },
+  { members: ['inside', ' inside '], slots: [connection('inside', 'openai', { apiKey: 'synthetic' })], available: 0 },
+  { members: ['inside'], slots: [connection('inside', 'openai', { apiKey: 'synthetic' }), connection(' inside ', 'openai', { apiKey: 'synthetic' })], available: 0 },
+  { members: ['inside', 'foreign'], slots: [connection('inside', 'openai', { apiKey: 'synthetic' }), connection('foreign', 'anthropic', { apiKey: 'synthetic' })], available: 0 },
+  { members: ['inside'], slots: [connection('inside', 'openai', { apiKey: 'synthetic', baseUrl: 'https://other.invalid/v1' })], baseUrl: 'https://owned.invalid/v1', available: 0 },
+  { members: ['inside'], slots: [connection('inside', 'openai', { apiKey: 'synthetic', baseUrl: 'https://owned.invalid/v1/' })], baseUrl: 'https://owned.invalid/v1', available: 1 },
+])('projects the complete captured topology before availability: %j', ({ members, slots, baseUrl, available }) => {
+  const snapshot = availabilitySnapshot({ config: config({ providerConnections: slots,
+    providerCredentials: { openai: { apiKey: 'synthetic-profile' } },
+    accountPool: { openai: { connections: members, ...(baseUrl ? { baseUrl } : {}) } } }), catalog, env: { OPENAI_API_KEY: 'synthetic-env' } });
+  expect(snapshot.providers.find(provider => provider.provider === 'openai')).toMatchObject({
+    state: available ? 'ready' : 'pool-unavailable', credential: available ? 'present' : 'missing',
+    pool: { members: members.length, available },
+  });
+});
+
+it('projects empty authorization with zero availability and no ambient credential', () => {
+  const snapshot = availabilitySnapshot({ config: config({ providerConnections: [connection('outside', 'openai', { apiKey: 'synthetic' })],
+    accountPool: { openai: { connections: [] } }, providerCredentials: { openai: { apiKey: 'synthetic-profile' } } }),
+  catalog, env: { OPENAI_API_KEY: 'synthetic-env' } });
+  expect(snapshot.providers.find(provider => provider.provider === 'openai')).toMatchObject({
+    state: 'pool-empty', credential: 'missing', pool: { members: 0, available: 0 },
+    connections: [{ connectionId: 'outside', state: 'pool-unavailable' }],
+  });
+});
+
+it('excludes a waiting selected generation and admits a newly rotated credential', () => {
+  const waiting = connection('waiting', 'openai', { apiKey: 'synthetic-first' });
+  noteCredentialRateLimit(credentialIdentityFor('openai', ownedConnectionCredential(waiting))!, 60_000);
+  const captured = config({ providerConnections: [waiting], accountPool: { openai: { connections: ['waiting'] } } });
+  expect(availabilitySnapshot({ config: captured, catalog, env: {} }).providers[0]).toMatchObject({
+    state: 'pool-unavailable', credential: 'missing', pool: { available: 0 }, connections: [{ state: 'pool-unavailable' }],
+  });
+  const rotated = { ...captured, providerConnections: [{ ...waiting, apiKey: 'synthetic-second' }] };
+  expect(availabilitySnapshot({ config: rotated, catalog, env: {} }).providers[0]).toMatchObject({ state: 'ready', pool: { available: 1 } });
+});
+
+it.each([
+  undefined,
+  { anthropic: { type: 'anthropic-claude-account', accessToken: 'synthetic-foreign' } },
+  { openai: { type: 'anthropic-claude-account', accessToken: 'synthetic-wrong-type' } },
+  { openai: { type: 'openai-chatgpt-account', accessToken: ' ' } },
+])('refuses unavailable preferred account material without selecting a retained key: %j', accountAuth => {
+  const snapshot = availabilitySnapshot({ config: config({ providerConnections: [connection('account', 'openai', {
+    authType: 'account-auth', apiKey: 'synthetic-retained', accountAuth,
+  })], accountPool: { openai: { connections: ['account'] } } }), catalog, env: { OPENAI_API_KEY: 'synthetic-env' } });
+  expect(snapshot.providers[0]).toMatchObject({ state: 'pool-unavailable', credential: 'missing', pool: { available: 0 },
+    connections: [{ state: 'credential-missing' }] });
+});
+
+it('keeps every uncatalogued connection and counts an authorized later member', () => {
+  const snapshot = availabilitySnapshot({ config: config({ providerConnections: [
+    connection('first', 'bedrock', { apiKey: 'synthetic-first' }), connection('second', 'bedrock', { apiKey: 'synthetic-second' }),
+  ], accountPool: { bedrock: { connections: ['second'] } } }), catalog, env: {} });
+  expect(snapshot.providers.find(provider => provider.provider === 'bedrock')).toMatchObject({ catalogued: false, state: 'ready',
+    credential: 'present', pool: { members: 1, available: 1 }, connections: [
+      { connectionId: 'first', state: 'pool-unavailable' }, { connectionId: 'second', state: 'ready' },
+    ] });
+});
+
+it('does not report ready members from a rejected captured configuration', () => {
+  const snapshot = availabilitySnapshot({ config: config({ providerConnections: [connection('inside', 'openai', { apiKey: 'synthetic' })],
+    accountPool: { openai: { connections: ['inside'] } }, configValidation: { valid: false, securityBlocked: false } }), catalog, env: {} });
+  expect(snapshot.providers[0]).toMatchObject({ state: 'pool-unavailable', credential: 'missing', pool: { available: 0 } });
 });

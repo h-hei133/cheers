@@ -41,7 +41,8 @@ export function connectionPicker(context: CommandContext): Picker {
           id: `use:${connection.id}`,
           label: connection.label ?? connection.provider,
           detail: [connection.authType, connection.model, state?.endpoint].filter(Boolean).join(" · "),
-          note: connection.id === activeId ? "active" : state ? availabilityLabel(state.state) : CONNECTED,
+          note: connection.id === activeId ? state && state.state !== 'ready' ? `active · ${availabilityLabel(state.state)}` : "active"
+            : state ? availabilityLabel(state.state) : CONNECTED,
         };
       });
 

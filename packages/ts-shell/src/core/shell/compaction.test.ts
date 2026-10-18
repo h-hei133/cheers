@@ -23,6 +23,7 @@ const POLICY: CompactionPolicy = { contextWindow: 900, reserveTokens: 0, keepRec
 function store(turns: SessionMessage[]): CompactionStore & { entries: Array<{ summary: string; keptMessages: number }> } {
   const entries: Array<{ summary: string; keptMessages: number }> = [];
   return {
+    syntheticCompaction: true,
     entries,
     getSession: () => ({ turns }),
     appendCompactionEntry: (_id, input) => {
@@ -56,7 +57,7 @@ describe("session compaction", () => {
     expect(outcome.kept).toBe(3);
     expect(outcome.tokensAfter).toBeLessThan(outcome.tokensBefore);
     expect(requests).toHaveLength(1);
-    expect(requests[0]!.messages).toHaveLength(8);
+    expect(requests[0]!.messages).toHaveLength(9);
     expect(target.entries).toEqual([{ summary: "checkpoint summary", keptMessages: 3 }]);
     expect(getSessionUsage("sess_compact").lastPromptTokens).toBeUndefined();
     // Summed across the per-model buckets: the session total is derived, not stored.

@@ -77,7 +77,7 @@ import { markContextUnknown } from "../../observability/usageTelemetry.js";
 import { recordCount } from "../../observability/metrics.js";
 import type { CatalogProvider } from "../../core/models/catalog.js";
 import type { CompactionSetup } from "../../turn/session.js";
-import { buildCompactionWiring, toCompactionMessages, type CompactionProvider } from './compaction.js';
+import { buildCompactionWiring, nativeCompactionAuthority, toCompactionMessages, type CompactionProvider } from './compaction.js';
 import { providerModelTransport } from '../../provider/request/transport.js';
 import { installRuleControlRuntime, takeForcedTool } from './ruleControls.js';
 import { contextEntryStillAuthorized, renderContextEntry, assertContextBounds } from '../../context/attachment/entry.js';
@@ -283,6 +283,8 @@ export function createCliSessionRuntime(input: {
         return compactSessionHistory({
           store: input.sessionManager,
           sessionId,
+          authority: nativeCompactionAuthority({ sessionId, workspaceRoot, admission,
+            publication: operation.publication, configuration: input.runtimeContext.configuration, store: input.sessionManager }),
           policy: wiring.policy,
           summarize: wiring.summarize,
           summarizeTurnPrefix: wiring.summarizeTurnPrefix,
@@ -412,8 +414,9 @@ export function createCliSessionRuntime(input: {
           ? {
               ...buildCompactionWiring({ provider: activeProvider, runtimeConfig: config, admission, sessionId, catalog, requestPolicy,
                 workspaceRoot: input.runtimeContext.projectRoot, onCredentialPersisted: reportCredentialPublication }),
-              onCompact: (record) => {
-                input.sessionManager.appendCompactionEntry(sessionId, record);
+              authority: nativeCompactionAuthority({ sessionId, workspaceRoot: input.runtimeContext.projectRoot,
+                admission, publication, configuration: input.runtimeContext.configuration, store: input.sessionManager }),
+              onCompact: () => {
                 markContextUnknown(sessionId);
                 // Counted at the point a compaction actually happened, which is
                 // low frequency, so recording it inline is not a hot path.

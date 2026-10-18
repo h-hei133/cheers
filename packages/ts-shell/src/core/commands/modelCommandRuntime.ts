@@ -181,6 +181,14 @@ function renderProviderReadinessLines(input: {
     ];
   }
 
+  if (projected?.state === "pool-unavailable") {
+    return [
+      "Provider readiness",
+      "- Config status: active connection is unavailable in the account pool.",
+      "- Next: select an available pool member or correct the account pool configuration.",
+    ];
+  }
+
   if (projected?.state === "credential-missing" || (input.activeConnection.authType !== "account-auth" && !input.activeConnection.apiKey?.trim())) {
     return [
       "Provider readiness",

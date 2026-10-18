@@ -15,6 +15,10 @@ import {
   type SummarizeTurnPrefix,
 } from "../../session/compaction.js";
 import type { SessionMessage } from "../../session/schema/sessionMessage.js";
+import type { CompactionAuthority, CompactionCommit, CompactionCommitInput, CompactionSource } from '../../session/compaction/contract.js';
+import { digest } from '../../session/compaction/state.js';
+import { CompactionOperationError, SummaryAdmissionError } from '../../session/compaction/contract.js';
+import { ModelAdmissionError } from '../agent/request/model.js';
 
 /**
  * The lifecycle a compaction reports through, built once for both entry points.
@@ -88,14 +92,19 @@ export type CompactionOutcome =
   | { readonly status: "busy" };
 
 export interface CompactionStore {
+  /** Explicit test-only synchronous writer; production stores use native verified commit. */
+  readonly syntheticCompaction?: true;
   getSession(sessionId: string): { readonly turns: readonly SessionMessage[] } | undefined;
   appendCompactionEntry(
     sessionId: string,
     input: { readonly summary: string; readonly keptMessages: number; readonly tokensBefore?: number },
   ): void;
+  captureCompactionSource?(sessionId: string): CompactionSource;
+  appendCompactionIfCurrent?(input: CompactionCommitInput): CompactionCommit;
 }
 
 export interface CompactionInput {
+  readonly authority?: CompactionAuthority;
   readonly store: CompactionStore;
   readonly sessionId: string;
   /** The window, reserve, and recent-tail budget the compaction works to. */
@@ -174,11 +183,21 @@ function declineOutcome(reason: CompactionDecline): CompactionOutcome {
       return { status: "failed", reason: "The provider returned no summary." };
     case "step-unknown":
       return { status: "failed", reason: "A previous summary step may already have been sent; it was not repeated. Add a turn or change the instructions, then retry." };
+    case 'cancelled': return { status: 'failed', reason: 'Compaction was cancelled.' };
   }
 }
 
 export async function compactSessionHistory(input: CompactionInput): Promise<CompactionOutcome> {
-  const turns = selectModelContext(input.store.getSession(input.sessionId));
+  let source: CompactionSource;
+  try {
+    if (!input.authority && !input.store.captureCompactionSource && !input.store.syntheticCompaction) {
+      return { status: 'failed', reason: 'A verified compaction storage owner is required.' };
+    }
+    source = input.authority?.capture() ?? input.store.captureCompactionSource?.(input.sessionId) ?? {
+      sessionId: input.sessionId, identity: digest(input.store.getSession(input.sessionId)),
+      history: structuredClone(selectModelContext(input.store.getSession(input.sessionId))) };
+  } catch { return { status: 'failed', reason: 'Compaction source is unavailable.' }; }
+  const turns = source.history;
   const reason = input.reason ?? "manual";
   const lifecycle = buildCompactionLifecycle({
     ...(input.hooks ? { hooks: input.hooks } : {}),
@@ -201,24 +220,39 @@ export async function compactSessionHistory(input: CompactionInput): Promise<Com
       signal: input.signal,
       lifecycle,
       force: true,
-      operation: { sessionId: input.sessionId },
+      operation: { sessionId: input.sessionId, source,
+        ...(input.authority?.identity ? { identity: input.authority.identity } : {}) },
     });
   } catch (error) {
     if (input.signal?.aborted) return { status: "failed", reason: "Compaction was cancelled." };
-    return { status: "failed", reason: error instanceof Error ? error.message : String(error) };
+    const reason = error instanceof CompactionOperationError || error instanceof ModelAdmissionError
+      || error instanceof SummaryAdmissionError
+      ? error.message : 'The summary request failed; history was retained.';
+    return { status: "failed", reason };
   }
   if (condensed.status === "declined") {
     return declineOutcome(condensed.reason);
   }
-  input.store.appendCompactionEntry(input.sessionId, {
+  if (input.signal?.aborted) return { status: 'failed', reason: 'Compaction was cancelled.' };
+  const commitInput: CompactionCommitInput = { source,
     summary: condensed.summary,
     keptMessages: condensed.plan.keptMessages,
     tokensBefore: condensed.plan.tokensBefore,
-  });
+    signal: input.signal, admission: input.authority?.admission };
+  const committed = input.authority ? input.authority.commit(commitInput) : input.store.appendCompactionIfCurrent?.(commitInput);
+  if (committed && committed.status !== 'committed') return { status: 'failed', reason: committed.reason };
+  if (!committed) {
+    if (!input.store.syntheticCompaction) return { status: 'failed', reason: 'A verified compaction commit is required.' };
+    if (digest(input.store.getSession(input.sessionId)) !== source.identity) return { status: 'failed', reason: 'The session source changed while its summary was generated.' };
+    try { input.store.appendCompactionEntry(input.sessionId, commitInput); }
+    catch { return { status: 'failed', reason: 'Compaction append could not be verified.' }; }
+  }
 
   // The gauge showed the last request's context; that request predates the
   // checkpoint, so its number is no longer a fact until the next response.
   markContextUnknown(input.sessionId);
+  await lifecycle.after?.({ reason, summary: condensed.summary,
+    keptMessages: condensed.plan.keptMessages, tokensBefore: condensed.plan.tokensBefore });
   // After the entry is stored, so a reader of the checkpoint and a reader of the
   // session see the same compaction.
   if (input.checkpoint) {

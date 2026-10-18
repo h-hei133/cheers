@@ -56,18 +56,25 @@ export function selectPooledConnection(input: PoolInput): PoolSelection | undefi
   const entry = input.config.accountPool?.[input.provider];
   if (!entry) return undefined;
   if (entry.connections.length === 0) return { blocked: 'pool-empty' };
+  const members = availablePoolConnections(input);
+  if (!members?.length) return { blocked: 'pool-unavailable' };
+  const selected = order(members, input, poolSignature(entry))[0]!;
+  if (input.sessionId) remember(`${input.sessionId}\u0000${input.provider}\u0000${poolSignature(entry)}`, `${selected.id}\u0000${credentialGeneration(selected)}`);
+  return { connection: selected, credentialId: credentialIdentity(selected), generation: credentialGeneration(selected) };
+}
+
+/** The request's usable authorization set, without selecting or changing affinity. */
+export function availablePoolConnections(input: PoolInput): readonly ProviderConnectionConfig[] | undefined {
+  const entry = input.config.accountPool?.[input.provider];
+  if (!entry) return undefined;
   const topology = poolMembers(entry, input);
-  if (!topology) return { blocked: 'pool-unavailable' };
-  const members = topology.filter(connection => {
+  if (!topology) return [];
+  return topology.filter(connection => {
     if (input.connectionId !== undefined && connection.id !== input.connectionId) return false;
     if (connection.status === 'pending' || connection.status === 'error') return false;
     const identity = credentialIdentityFor(connection.provider, ownedConnectionCredential(connection));
     return identity !== undefined && credentialBackoffRemaining(identity) === 0;
   });
-  if (members.length === 0) return { blocked: 'pool-unavailable' };
-  const selected = order(members, input, poolSignature(entry))[0]!;
-  if (input.sessionId) remember(`${input.sessionId}\u0000${input.provider}\u0000${poolSignature(entry)}`, `${selected.id}\u0000${credentialGeneration(selected)}`);
-  return { connection: selected, credentialId: credentialIdentity(selected), generation: credentialGeneration(selected) };
 }
 
 /** Validate the complete captured topology before availability can narrow it. */
