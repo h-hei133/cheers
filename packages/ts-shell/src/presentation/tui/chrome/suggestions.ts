@@ -2,14 +2,14 @@ import { defaultTheme } from "../../theme/theme.js";
 import { padToWidth, truncateToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
 import type { DraftEdit } from "../editor/replacement.js";
+import { matchRank } from '../text/search.js';
 
 /**
  * Completion candidates below the prompt.
  *
  * Matching is tiered rather than a single fuzzy score: an exact or prefix match
  * always outranks a subsequence match, so typing the first letters of a command
- * never has a stranger sitting above it. Scoring stays inside this module so the
- * ranking is one decision, not one per call site.
+ * never has a stranger sitting above it. Text ranking is shared with pickers.
  */
 
 export interface Suggestion {
@@ -23,38 +23,13 @@ export interface Suggestion {
 
 const MAX_VISIBLE = 8;
 
-const enum Tier {
-  Exact = 1000,
-  Prefix = 900,
-  Substring = 700,
-  Subsequence = 500,
-  Detail = 200,
-}
-
 /**
  * Rank of one candidate against `query`, or 0 when it does not match at all.
  * Both sides drop a leading sigil so typing `/mo` prefix-matches `/model`
  * exactly as typing `mo` does.
  */
 function score(query: string, candidate: Suggestion): number {
-  if (!query) return Tier.Prefix;
-  const label = stripSigil(candidate.label.toLowerCase());
-  if (label === query) return Tier.Exact;
-  // Prefix matches share one rank, so the catalogue's own order decides among
-  // them. Shortening by label length ranked `/mcp` above `/model` for `/m`.
-  if (label.startsWith(query)) return Tier.Prefix;
-  if (label.includes(query)) return Tier.Substring;
-  let cursor = 0;
-  let gaps = 0;
-  let previous = -1;
-  for (let index = 0; index < label.length && cursor < query.length; index++) {
-    if (label[index] !== query[cursor]) continue;
-    if (previous >= 0) gaps += index - previous - 1;
-    previous = index;
-    cursor += 1;
-  }
-  if (cursor === query.length) return Math.max(Tier.Subsequence - gaps * 5, Tier.Detail + 1);
-  return candidate.detail?.toLowerCase().includes(query) ? Tier.Detail : 0;
+  return matchRank(query, stripSigil(candidate.label), candidate.detail);
 }
 
 function stripSigil(text: string): string {

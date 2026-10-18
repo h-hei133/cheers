@@ -27,6 +27,9 @@ export interface Option {
   readonly disabled?: boolean;
 }
 
+/** A picker may project its loaded options for a query without reloading them. */
+export type OptionFilter = (query: string, options: readonly Option[]) => readonly Option[];
+
 export class OptionModel {
   private all: readonly Option[] = [];
   private matches: readonly Option[] = [];
@@ -34,6 +37,8 @@ export class OptionModel {
   private offset = 0;
   private query = "";
   private readonly chosen = new Set<string>();
+
+  constructor(private readonly filterOptions?: OptionFilter) {}
 
   /** Replace the option set, keeping any prior multi-select state. */
   setOptions(options: readonly Option[]): void {
@@ -127,7 +132,7 @@ export class OptionModel {
   private applyFilter(): void {
     const focused = this.current()?.id;
     const needle = this.query.trim().toLowerCase();
-    this.matches = needle
+    this.matches = this.filterOptions ? this.filterOptions(needle, this.all) : needle
       ? this.all.filter((option) => haystack(option).includes(needle))
       : this.all;
     const retained = this.matches.findIndex(option => option.id === focused && !option.disabled);

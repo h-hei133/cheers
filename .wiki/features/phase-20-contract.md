@@ -50,7 +50,7 @@
 | CMD-01 | `chrome/suggestions.ts`、`keymap.ts` | suggestions（13）、keymap（54） | `/m` 首选 `/mcp` 或完整命令接受旧候选时失败 |
 | CMD-02 | `syntax/*`、`37` 审计 | syntax 套件、actions/commands | 未知参数被接受时失败 |
 | SET-01 | `config/settings.ts`、`picker/settings.ts` | `settings.test.ts`（6）、picker（11） | 数值/列表落回 JSON 时失败 |
-| SET-02 | `picker/settings.ts` | settings（31）、panel chips | 分组 tab 不重新加载或已存值无标记时失败 |
+| SET-02 | `picker/settings.ts`、`chrome/options.ts`、`text/search.ts` | settings（31）、picker/settings（15）、原 slash 排序测试；四格 PTY 从 Session 搜索 `mxtrns` 找到 Request 的 Maximum turns | 先按当前分组裁剪搜索全集时，真实 overlay 输入/粘贴用例失败；清空查询未回原组、Back 未聚焦所属组或已存值无标记时失败 |
 | SET-03 | `picker/preview.ts` | settings preview、theme selection（2） | 预览关闭后仍覆盖显示时失败 |
 
 ## W6 面板

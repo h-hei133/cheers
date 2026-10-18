@@ -22,6 +22,67 @@ async function detail(h = host(), key = 'attentionOnIdle') {
 }
 
 describe('advanced settings picker', () => {
+  it('searches every group with literal-first fuzzy ranking and restores the selected group when cleared', async () => {
+    const h = host();
+    const picker = settingsPicker(h, 'user', 'Session');
+    const options = await picker.load();
+    expect(picker.filterOptions!('', options).some(option => option.id === 'maxTurns')).toBe(false);
+    const fuzzy = picker.filterOptions!('mxtrns', options);
+    expect(fuzzy[0]?.id).toBe('maxTurns');
+    expect(picker.title).toContain('Search all groups');
+    expect(picker.chips?.active).toBe('all');
+    expect(picker.filterOptions!('maxturns', options)[0]?.id).toBe('maxTurns');
+    expect(picker.filterOptions!('no-such-setting', options)).toEqual([]);
+    const restored = picker.filterOptions!('', options);
+    expect(restored.length).toBeGreaterThan(0);
+    expect(restored.every(option => option.label.includes('Session ·'))).toBe(true);
+    expect(picker.chips?.active).toBe('Session');
+    expect(picker.title).toContain(' — Session');
+    expect(h.save).not.toHaveBeenCalled();
+  });
+  it('keeps cross-group matches grouped by best rank with stable ties', async () => {
+    const picker = settingsPicker(host()); const options = await picker.load();
+    const results = picker.filterOptions!('tokens', options);
+    expect(results.length).toBeGreaterThan(2);
+    expect(picker.filterOptions!('tokens', [...options])).toEqual(results);
+    const groupNames = results.map(option => CONFIG_SETTINGS.find(setting => setting.key === option.id)!.group);
+    const blocks = groupNames.filter((group, index) => index === 0 || groupNames[index - 1] !== group);
+    expect(new Set(blocks).size).toBe(blocks.length);
+    expect(picker.filterOptions!('contextwindow', options)[0]?.id).toBe('contextWindow');
+  });
+  it('routes typed and pasted cross-group searches through the real overlay without saving', async () => {
+    const h = host(); const overlay = new OverlayHost(() => {});
+    overlay.open(settingsPicker(h, 'user', 'Session'));
+    await Promise.resolve(); await Promise.resolve();
+    overlay.handlePaste('mxtrns');
+    let output = overlay.render(120, 40).map(stripAnsi).join('\n');
+    expect(output).toContain('Search all groups');
+    expect(output).toContain('Maximum turns');
+    for (let index = 0; index < 6; index++) overlay.handleKey(parseKeyEvent('\x7f'), vi.fn());
+    output = overlay.render(120, 40).map(stripAnsi).join('\n');
+    expect(output).toContain('[Session]');
+    expect(output).not.toContain('Maximum turns');
+    overlay.handleKey(parseKeyEvent('maxTurns'), vi.fn());
+    const applied: Promise<void>[] = [];
+    overlay.handleKey(parseKeyEvent('\r'), (picker, ids) => { applied.push(picker.apply(ids).then(outcome => {
+      if (outcome?.next) overlay.open(outcome.next);
+    })); });
+    await Promise.all(applied); await Promise.resolve();
+    expect(overlay.render(120, 40).map(stripAnsi).join('\n')).toContain('Maximum turns — save to user');
+    overlay.close(); expect(h.save).not.toHaveBeenCalled();
+  });
+  it('returns from a search result to its owning group with that field focused', async () => {
+    const h = host(); const picker = settingsPicker(h, 'user', 'Session'); await picker.load();
+    const detail = (await picker.apply(['maxTurns']))!.next!;
+    const back = (await detail.apply(['back']))!.next!;
+    expect(back.chips?.active).toBe('Request');
+    expect(back.initialSelection).toBe('maxTurns');
+    const overlay = new OverlayHost(() => {}); overlay.open(back);
+    await Promise.resolve(); await Promise.resolve();
+    const apply = vi.fn(); overlay.handleKey(parseKeyEvent('\r'), apply);
+    expect(apply).toHaveBeenCalledWith(back, ['maxTurns']);
+    expect(h.save).not.toHaveBeenCalled();
+  });
   it('lists searchable grouped advanced fields without personal credentials or CLI exemptions', async () => {
     const h = host(); const picker = settingsPicker(h); const options = await picker.load();
     expect(options.some(item => item.id === 'maxOutputTokens' && item.label.includes('Request'))).toBe(true);

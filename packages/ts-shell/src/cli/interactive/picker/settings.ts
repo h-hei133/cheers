@@ -1,5 +1,6 @@
 import type { Option } from '../../../presentation/tui/chrome/options.js';
 import { truncateToWidth } from '../../../presentation/tui/text/layout.js';
+import { matchRank } from '../../../presentation/tui/text/search.js';
 import { formatSetting, parseSettingInput, settingEditor, validateSetting, type SettingDefinition, type SettingsScope } from '../../../config/settings.js';
 import type { Picker, PickerOutcome } from '../overlay.js';
 import type { SettingsDraft } from '../settings.js';
@@ -129,7 +130,7 @@ function settingDetail(host: SettingsHost, draft: SettingsDraft, setting: Settin
       if (id === 'edit' && !setting.choices) return { next: valueEditor(host, draft, setting, pending) };
       if (id === 'unset') return { next: settingDetail(host, draft, setting, { value: undefined }, failure) };
       if (id === 'scope' && setting.policy.sources.includes('project')) return { next: scopePicker(host, setting, draft.scope) };
-      if (id === 'back') return { next: settingsPicker(host, draft.scope) };
+      if (id === 'back') return { next: settingsPicker(host, draft.scope, setting.group, setting.key) };
       if (id === 'apply' && pending) {
         let current = draft;
         if (failure) {
@@ -156,21 +157,31 @@ const GROUP_ORDER = ['Session', 'Request', 'Context', 'Retries', 'Network', 'Too
 const SETTINGS_GROUPS: readonly string[] = GROUP_ORDER.filter(group => CONFIG_SETTINGS.some(setting => setting.group === group));
 
 /** Searchable grouped fields; selecting a row starts an explicit staged edit. */
-export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user', group?: string): Picker {
+export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user', group?: string, selected?: string): Picker {
   let draft: SettingsDraft | undefined;
   const active = group && SETTINGS_GROUPS.includes(group) ? group : 'all';
+  let searching = false;
+  const groups = new Map<string, string>();
   return {
-    title: `Settings — ${scope} configuration${active === 'all' ? '' : ` — ${active}`}`, form: 'panel', exclusive: true, holdInput: true,
+    get title() { return `Settings — ${scope} configuration${searching ? ' — Search all groups' : active === 'all' ? '' : ` — ${active}`}`; },
+    form: 'panel', exclusive: true, holdInput: true,
+    ...(selected ? { initialSelection: selected } : {}),
     empty: 'Settings could not be loaded. Check your configuration and retry.',
     chips: {
       items: [{ id: 'all', label: 'All' }, ...SETTINGS_GROUPS.map(name => ({ id: name, label: name }))],
-      active,
+      get active() { return searching ? 'all' : active; },
       select: id => settingsPicker(host, scope, id === 'all' ? undefined : id),
+    },
+    filterOptions(query, options) {
+      searching = query.length > 0;
+      if (!searching) return active === 'all' ? options : options.filter(option => groups.get(option.id) === active);
+      return searchSettings(query, options, groups);
     },
     async load(): Promise<readonly Option[]> {
       draft = host.openSettings(scope);
-      const definitions = active === 'all' ? draft.definitions : draft.definitions.filter(setting => setting.group === active);
-      return definitions.map(setting => {
+      groups.clear();
+      return draft.definitions.map(setting => {
+        groups.set(setting.key, setting.group);
         const value = draft!.values[setting.key]!;
         return { id: setting.key, label: `${value.stored !== undefined ? '● ' : ''}${setting.group} · ${setting.label}`,
           detail: `${setting.key}. ${setting.description}`, note: `${compact(value.effective)} · ${value.source}` };
@@ -182,4 +193,15 @@ export function settingsPicker(host: SettingsHost, scope: SettingsScope = 'user'
       return setting ? { next: settingDetail(host, draft, setting) } : undefined;
     },
   };
+}
+
+function searchSettings(query: string, options: readonly Option[], groups: ReadonlyMap<string, string>): readonly Option[] {
+  const ranked = options.map((option, order) => ({ option, order, group: groups.get(option.id) ?? '',
+    rank: Math.max(matchRank(query, option.id), matchRank(query, option.label, `${option.detail ?? ''} ${option.note ?? ''}`)),
+  })).filter(entry => entry.rank > 0);
+  const best = new Map<string, number>();
+  for (const entry of ranked) best.set(entry.group, Math.max(best.get(entry.group) ?? 0, entry.rank));
+  return ranked.sort((a, b) => (best.get(b.group)! - best.get(a.group)!) ||
+    SETTINGS_GROUPS.indexOf(a.group) - SETTINGS_GROUPS.indexOf(b.group) || b.rank - a.rank || a.order - b.order)
+    .map(entry => entry.option);
 }

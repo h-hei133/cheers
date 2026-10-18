@@ -48,6 +48,8 @@ completion. Enter, Escape, Ctrl+C, Up/Down, Space, Backspace, Delete, Ctrl+D, Ct
 confirmation, cancellation, navigation and editing. Assigning a group action to one of these keys reports the problem
 and drops that binding; any other keys in the same entry remain available.
 
+In Settings, typing searches all groups, including when a group is selected. Field keys and labels support literal and fuzzy matching; results stay grouped, with the best-matching group first. Clearing the query returns to the previous group. Back from a field's detail returns to its group with that field selected. Searching and navigating do not save a value.
+
 ## Default actions
 
 <!-- key-actions:start -->
@@ -115,6 +117,7 @@ Gestures are not action IDs and cannot be rebound in `keybindings.json`.
 
 In a picker or completion list, a left click selects the displayed row. Press Enter to choose or complete it;
 multi-select pickers still use Space to toggle and Enter to apply. Clicks do not apply settings or approve actions.
+
 An open picker owns pointer input, so it cannot drag or collapse the transcript underneath it.
 The editor supports text selection by dragging; clicking to position its caret is not supported.
 

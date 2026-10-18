@@ -15,6 +15,7 @@ import { parseKeyEvent } from '../../presentation/tui/input/keys.js';
 import { Editor } from '../../presentation/tui/editor.js';
 import { layoutComposer } from '../../presentation/tui/composer/layout.js';
 import { stripAnsi } from '../../presentation/tui/text/ansi.js';
+import { OptionModel } from '../../presentation/tui/chrome/options.js';
 
 let root: string;
 let file: string;
@@ -278,10 +279,16 @@ it('exposes the seven settings groups as tabs and marks stored values', async ()
   expect(all.chips?.active).toBe('all');
   expect(allItems.find(item => item.id === 'offline')?.label.startsWith('● ')).toBe(true);
   const session = all.chips!.select('Session')!;
-  const sessionItems = await session.load();
+  const list = new OptionModel(session.filterOptions);
+  list.setOptions(await session.load());
+  const sessionItems = list.visible;
   expect(sessionItems.length).toBeGreaterThan(0);
   expect(sessionItems.every(item => item.label.includes('Session'))).toBe(true);
   expect(sessionItems.find(item => item.id === 'offline')?.label.startsWith('● ')).toBe(true);
+  list.setFilter('maxTurns');
+  expect(list.visible[0]?.id).toBe('maxTurns');
+  list.setFilter('');
+  expect(list.visible).toEqual(sessionItems);
 });
 
 it('restores the accepted shape after save failure and retains a retryable pending choice', async () => {

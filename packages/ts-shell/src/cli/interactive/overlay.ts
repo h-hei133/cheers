@@ -1,4 +1,4 @@
-import { OptionModel, type Option } from "../../presentation/tui/chrome/options.js";
+import { OptionModel, type Option, type OptionFilter } from "../../presentation/tui/chrome/options.js";
 import { renderModal, modalBody } from "../../presentation/tui/chrome/modal.js";
 import { renderPanel } from "../../presentation/tui/chrome/panel.js";
 import { chipStrip, type Chip } from "../../presentation/tui/chrome/chips.js";
@@ -64,6 +64,8 @@ export interface Picker {
    * right read as filter text being typed.
    */
   readonly filterable?: boolean;
+  /** Search/group projection over the full loaded catalogue; performs no I/O. */
+  readonly filterOptions?: OptionFilter;
   /** Rows each option occupies beyond its first, in the full-screen form. */
   readonly detailRows?: number;
   /** A second column in the inline panel when the surface is wide enough. */
@@ -140,7 +142,7 @@ export class OverlayHost {
   open(picker: Picker): void {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
-    this.model = new OptionModel();
+    this.model = new OptionModel(picker.filterOptions);
     ++this.generation;
     this.actionPending = false;
     this.actionNotice = undefined;

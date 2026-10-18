@@ -7694,3 +7694,14 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 真实 Linux PTY：隔离 HOME/USERPROFILE/CHEERS_TEST_ROOT、合成 provider、120×40；Node/exe × regular/fullscreen 四格均通过 `/settings` 正反切组、`/resume` 项目范围切组、Esc 关闭、`/exit` 退出 0；fullscreen 两格额外通过 tab 鼠标点击。终端解析器先补设备状态响应兼容，regular 鼠标按既有合同排除，未将这些测试夹具问题计为产品通过。
 - `build:ts`、`build:exe`、import cycles、config consumers、declarations、Node floor、strict docs drift 通过；docs 有 118 条既有非阻断 source advisory。函数计数无新增越界模块；现有 9 模块仍需按各自返工任务处理。NormProof 退出 0、verdict partial，无环及未解析 import 义务 satisfied，函数上限义务因上述 9 模块 failed（advisory）。两路独立复核为代码 APPROVE / 架构 CLEAR；首次专用模型 503 未算批准，随后两个独立默认模型上下文返回了实质意见。
 - 新确认的后续缺口：SET-02 在选中分组后只搜索该组；当前修复只接通分组交互，不能据此关闭“跨 tab 搜索”。本批记录时尚未提交/推送或运行新 SHA 的 CI，后续以 Git 与 GitHub 实际结果为准。
+
+### SET-02 跨组搜索返工
+
+- 上述基础批现已提交并推送为 `d622d491`。CI run `39094520395` 在本条记录时仍运行测试，Architecture Watch run `39094520337` success；不以单个工作流通过替代 CI。
+- `settingsPicker` 现在加载同一 scope 内全部已授权定义；无查询时只投影所选组，查询时跨组搜索。`OptionModel` 增加纯投影端口，默认过滤行为保留；搜索不重新读配置、不写文件、不创建第二套设置状态。
+- 把原 slash 的精确/前缀/子串/子序列/详情排序规则移入共享文字 owner，保留 slash 归一化和原排序回归。settings 同时匹配字段 key/label/detail/note，按组内最佳得分排序组、同分按固定组序，组内按得分及原声明顺序。结果并非全局逐项分数排序；这是保留组连续性的明确选择。
+- 与本地只读参考的分组搜索决定一致：查询涵盖全部组、分组排序保持确定性、清空后恢复进入搜索前的组；从详情返回作为导航落到字段所属组并聚焦字段。未引入另一套通用搜索引擎或设置容器。
+- 新测试覆盖模糊 key `mxtrns`、精确 key、空结果、稳定分组、清空回跳、实际 overlay 的输入/粘贴/选择和 Back 焦点；搜索/取消均断言不保存。旧测试将 `load()` 的全集误作当前组显示结果，已改为使用真实 `OptionModel` 投影，保留原 stored 标记断言并增加跨组/恢复检查；没有弱化验收。
+- 本地 5 文件/163 项初验通过；更新旧显示断言后，完整受影响 `src/cli/interactive src/presentation/tui` 114 文件/1563 项通过。测试加载阶段恢复“所选组先裁剪全集”的逻辑，真实 overlay 的跨组搜索用例因找不到 Maximum turns 失败；工作区源文件不改写。
+- 两构建均通过；隔离合成 PTY 四格全部通过，从 Session 组输入 `mxtrns` 找到 Request 字段、清空回 Session，并复验键盘切组、fullscreen 点击、resume、取消和退出。cycles/config consumers/declarations/Node floor 通过；NormProof 导入/无环满足，函数上限仍为同一组 9 个既有 advisory，触及模块均不超限。
+- 第二批独立复核：代码 APPROVE / 架构 CLEAR；架构首次限流后重试取得实质意见。记录时搜索批尚未提交/推送，新 SHA CI 待后续实际运行；Phase 20 的其他未复核合同和用户保留环境项继续开放。
