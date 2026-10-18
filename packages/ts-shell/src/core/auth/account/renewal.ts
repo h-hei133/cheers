@@ -5,12 +5,16 @@ import { accountAuthFor, renewAccountAuthIfExpiring } from '../../../provider/re
 import type { ProviderCredentialResolution } from '../../shell/providerCredentials.js';
 import { assertAdmission, type Admission } from '../../network/admission.js';
 import { isExpiring } from '../oauth/flow.js';
-import { captureAccountEdit, persistAccountEdit, readAccountRotation, type AccountEdit } from './state.js';
+import { captureAccountEdit, persistAccountEdit, readAccountRotationReceipt, type AccountEdit } from './state.js';
+import type { AccountRotation } from './contract.js';
+import { sameValue } from '../../../config/values.js';
 import { acquireRefreshLease, finishRefreshLease, markRefreshDispatched, markRefreshUnknown,
   readRefreshLease, refreshLineage, releaseRefreshLease } from './lease.js';
 
 export interface StoredAccountRenewal {
   readonly accountAuth?: AccountAuthConfig;
+  /** Optional in-memory proof for consumers of the credential publication. */
+  readonly rotation?: AccountRotation;
   /** The returned token was confirmed in its captured storage identity. */
   readonly stored: boolean;
   readonly writeState: ConfigWriteState;
@@ -27,15 +31,22 @@ function generation(account: AccountAuthConfig): string {
   return createHash('sha256').update(JSON.stringify(account)).digest('hex').slice(0, 16);
 }
 
-async function waitForPeerRenewal(key: string, edit: AccountEdit): Promise<AccountAuthConfig | undefined> {
+async function waitForPeerRenewal(key: string, edit: AccountEdit): Promise<AccountRotation | undefined> {
   for (let attempt = 0; attempt < 25; attempt++) {
     await new Promise(resolve => setTimeout(resolve, 200));
     const lease = readRefreshLease(key);
     if (lease?.phase === 'unknown') return undefined;
     if (lease) continue;
-    return readAccountRotation(edit);
+    return readAccountRotationReceipt(edit);
   }
   return undefined;
+}
+
+function rotationFor(edit: AccountEdit, accountAuth: AccountAuthConfig): AccountRotation | undefined {
+  try {
+    const rotation = readAccountRotationReceipt(edit);
+    return rotation && sameValue(rotation.accountAuth, accountAuth) ? rotation : undefined;
+  } catch { return undefined; }
 }
 
 /** A spent token is conditionally saved even if the initiating operation ended.
@@ -70,7 +81,7 @@ export async function renewStoredAccount(input: {
       onDispatch: () => { markRefreshDispatched(key, owner); dispatched = true; } });
     if (result.leaseHeld) {
       const fresh = await waitForPeerRenewal(key, edit);
-      return fresh ? { accountAuth: fresh, stored: true, writeState: 'unchanged' }
+      return fresh ? { accountAuth: fresh.accountAuth, rotation: fresh, stored: true, writeState: 'unchanged' }
         : { stored: false, writeState: 'unchanged', failure: 'Another process is renewing this login; retry shortly.' };
     }
     if (result.leaseUnknown) return { stored: false, writeState: 'unchanged',
@@ -88,9 +99,10 @@ export async function renewStoredAccount(input: {
       if (dispatched) markRefreshUnknown(key, owner);
       throw error;
     }
+    const rotation = rotationFor(edit, saved.accountAuth);
     try { finishRefreshLease(key, lineage.generation); }
-    catch { return { ...saved, stored: true, cleanupFailed: true }; }
-    return { ...saved, stored: true };
+    catch { return { ...saved, ...(rotation ? { rotation } : {}), stored: true, cleanupFailed: true }; }
+    return { ...saved, ...(rotation ? { rotation } : {}), stored: true };
   } catch (error) {
     try { if (dispatched) markRefreshUnknown(key, owner); else releaseRefreshLease(key, owner); } catch { /* The durable state stays as written. */ }
     const state = error instanceof ConfigWriteError ? error.state : 'unchanged';

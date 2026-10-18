@@ -7858,3 +7858,16 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 六项加载时反转实际退出 1：摘要用量移除 4 失败、侧问用量移除 3 失败、cache 用量移除 2 失败、委派恢复清主 context 为 4 失败/1 通过、丢失捕获 profile scope 为 1 失败、取消 pending owner 检查为 1 失败。未选中的定向用例不计通过；产品源码未回退。产物为 `.omx/verification/phase20/auxiliary.reversals.*`。
 - 新编译模块的两个独立 Node 辅助记录器并发累计、第三进程恢复通过：一旧桶、三新目标/价格桶共 180 tokens/5 次记录，锁内 delta 与重复 flush 不重复，其他 state 不变。Linux 隔离 PTY Node/exe × regular/fullscreen 四格均通过，每格九次实际主/自动摘要/手动摘要/侧问发送与落盘桶、价格和次数完全一致；侧问保持其他 state/global config 字节，退出 0。首次探针误等欢迎提示，随后误要求侧问带主模型 effort，均为夹具合同问题；按实际输入提示和侧问合同修正，未为夹具改产品行为。仅本机 HTTP/合成凭据，夹具已清理；产物为 `auxiliary.process.*`、`auxiliary.pty.py` 与 `auxiliary/`。
 - 本条写入时尚未提交/推送辅助批，新 SHA CI 待实际读回。主账号发布后的本回合 checkpoint 跳过、PRV-03…05 完整审计、CTX-03 生命周期/分段/历史 CAS 及其余全部 47 项继续；本批不构成 W2 或全阶段完成。最终 strict docs drift 与 diff 检查在本条写入后运行。
+
+
+### PRV-02/04 主请求续期与当回合顾问检查点
+
+- 辅助费用批已推送为 `6b1eab75cfa089f8f7424e25746fee296ef6bc26`；Architecture Watch `39131315169` success。实际查询 CI `39131315102` 与 job `117686908263` 仍为 in_progress，步骤 9 从 `2026-10-18T13:23:30Z` 开始运行，尚未给出终态；未取消、重启或记为通过。
+- 主账号本地和 peer 续期返回已验证的原存储回执，主请求前发布交给已经捕获的 checkpoint。复用精确 token 字段/配置 publication 比较，只有原 session/model revision、单次 publication 与 owner 都匹配才接纳当前回合。设置、目录、模型和请求中途变更仍拒绝。共享同一账号但不同模型的主请求/顾问使用新 token，只交换一次；不放宽同 provider/model 的顾问拒绝合同。
+- 发布观察者不能阻断已确认的存储结果：遗漏、重复调用、调用前后抛错均恰好发布一次，发布者自己的错误仍抛出。缺回执明确传递 undefined，不构造假证明；宿主拒绝或未确认、保留原配置对象、模型 reader 异常都使旧 checkpoint 失效，下一新回合重新捕获。回执仅通过原生端口，不进入模型/事件或持久化请求。
+- 只读参考对照采用凭据特定发布、revision/sequence 拒绝迟到结果及现有凭据路由的决定，保留本项目更强的 owner/CAS/lease 和角色绑定，不新增第二套配置或续期系统。原回合纯 token 发布误跳过的限制在本批修复；完整账号池/刷新/账本验收仍不据此关闭。
+- 独立 reviewer 发现拒绝但保留旧对象和缺回执组合的接纳漏洞。三项实际本机请求反例在修复前失败，均收到额外顾问请求；修复后通过。共享账号测试最初少第二请求，分类为 configure 后会关闭顾问的夹具合同问题，改为配置后显式 on，未修改产品启用语义。最终 APPROVED，独立 7 文件/138 项通过；本地最终受影响 32 文件/518 项通过，集合重叠不相加。
+- 类型诊断相对 `6b1eab75` 为 149/149、无新增，不代表全项目 tsc 通过。两种构建通过，最终 TS manifest `fba2eb6bb62d`；四项静态门禁、脚本测试 59 项通过。NormProof 退出 0、verdict partial，无环/解析义务 satisfied，仍为原 9 个函数上限 advisory，触及模块未新增越界。
+- 六项加载时反转实际退出 1：撤掉主回执投递 3 失败、撤掉 peer 回执 2 失败/12 通过、撤掉精确 publication 比较 2 失败/2 通过、撤掉失败 fence 3 失败、缺回执不通知 1 失败、恢复 observer 异常传播 1 失败。未选中的用例不计通过，产品源码未回退。产物为 `.omx/verification/phase20/checkpoint.reversals.*`。
+- 最终构建的 Linux Node/exe × regular/fullscreen 隔离 PTY 四格均通过：整套预设、显式顾问 on/off/on、A/low 主请求续期后同回合 B/high 顾问、每格五次实际模型发送和一次受限本机 TLS OAuth 交换，仅 owner token 字段变化、pathRules 保持准入、退出 0。夹具与临时证书已清理；只使用合成凭据，不当作真实 provider 验收。产物为 `checkpoint.pty.py`、log 和 `checkpoint/`。
+- 本条写入时尚未提交/推送本批，新 SHA CI 待实际读回。最终 strict docs drift 与 diff 检查在本条写入后执行；PRV-03…05 完整复核、CTX-03 生命周期/分段/历史 CAS 及其余全部 47 项继续，四项用户保留环境/真实质量要求不变，本批不构成 W2 或阶段完成。

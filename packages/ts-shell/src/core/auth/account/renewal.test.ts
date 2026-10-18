@@ -49,6 +49,9 @@ it('renews only the captured account and its exact mirror while preserving other
   expect(saved.providerConnections?.[0]?.updatedAt).toBe(before.providerConnections?.[0]?.updatedAt);
   expect(saved.providerCredentials?.openai?.accountAuth?.openai).toEqual(result.accountAuth);
   expect(saved.theme).toBe('light'); expect(input.fetchImpl).toHaveBeenCalledOnce();
+  expect(result.rotation).toMatchObject({ resolution: input.resolution, accountAuth: result.accountAuth,
+    storage: { source: file, path: file } });
+  expect(result.rotation!.storage.previousRevision).not.toBe(result.rotation!.storage.revision);
 });
 
 it('does not replace a different fallback account and keeps config-source renewal distinct', async () => {
@@ -193,7 +196,10 @@ it.each([true, false])('accepts a completed peer renewal without rewriting stora
     return { renewed: false, leaseHeld: true };
   });
   const fetchImpl = vi.fn() as unknown as typeof fetch;
-  expect(await renewStoredAccount({ workspaceRoot: root, resolution, fetchImpl })).toMatchObject({ stored: true, writeState: 'unchanged', accountAuth: fresh });
+  const result = await renewStoredAccount({ workspaceRoot: root, resolution, fetchImpl });
+  expect(result).toMatchObject({ stored: true, writeState: 'unchanged', accountAuth: fresh,
+    rotation: { resolution, accountAuth: fresh, storage: { source: file, path: file } } });
+  expect(result.rotation!.storage.previousRevision).not.toBe(result.rotation!.storage.revision);
   expect(fetchImpl).not.toHaveBeenCalled(); expect(fs.readFileSync(file)).toEqual(peerBytes!);
   expect(read().providerConnections?.[0]).toEqual(before.providerConnections?.[0]);
   expect(read().providerCredentials).toEqual(before.providerCredentials);

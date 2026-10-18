@@ -14,6 +14,7 @@ import { readSessionModelEdit } from '../../session/model/state.js';
 import { projectModelSelection } from '../../session/model/projection.js';
 import { accountPublicationMatches } from '../provider/publication.js';
 import type { SubagentRunner } from '../../core/subagents/runner.js';
+import type { AccountPublication } from '../../core/auth/account/contract.js';
 
 const runtimes = new WeakMap<ShellRuntimeContext, AdvisorRuntime>();
 
@@ -43,16 +44,30 @@ export function advisorCommandFor(context: ShellRuntimeContext, store: SessionMa
 export function advisorCheckpointFor(context: ShellRuntimeContext, store: SessionManager, renderer: Pick<StreamingRenderer, 'renderLine'>,
   sourcePromptEntryId?: string): TurnCheckpointHandler {
   let publication = context.configuration.current;
+  let publicationValid = true;
   const sessionId = context.session.id;
   const modelRevision = readSessionModelEdit(sessionId).revision;
   const admission = (): string | undefined => {
     try {
-      if (context.session.id === sessionId && context.configuration.current === publication
+      if (publicationValid && context.session.id === sessionId && context.configuration.current === publication
         && readSessionModelEdit(sessionId).revision === modelRevision) return undefined;
     } catch { /* An unreadable binding cannot authorize the captured provider closure. */ }
     return 'Advisor runner configuration changed; run a new turn before reviewing.';
   };
-  return async (checkpoint, runner, signal) => {
+  const accountPublication: AccountPublication = (rotation, publish) => {
+    const before = context.configuration.current;
+    const eligible = !admission() && before === publication;
+    publicationValid = false;
+    // Verified persistence is published even when this observer has become stale.
+    const applied = publish();
+    const after = context.configuration.current;
+    if (eligible && rotation && applied === true && context.session.id === sessionId
+      && readSessionModelEdit(sessionId).revision === modelRevision && accountPublicationMatches(before, after, rotation)) {
+      publication = after;
+      publicationValid = true;
+    }
+  };
+  const handler: TurnCheckpointHandler = async (checkpoint, runner, signal) => {
     if (!sourcePromptEntryId) return;
     if (admission()) {
       if (advisorFor(context, store, renderer).view().enabled) renderer.renderLine('Advisor checkpoint skipped because its request configuration changed. Review resumes on a fresh turn.');
@@ -69,19 +84,16 @@ export function advisorCheckpointFor(context: ShellRuntimeContext, store: Sessio
       let active = true;
       try {
         await runner.prepare?.({ ...input, admission: admit, accountPublication: (rotation, publish) => {
-          const before = context.configuration.current;
-          const eligible = active && !admit() && before === publication;
           // Persistence already succeeded. Even a stale advisor must publish that storage outcome.
-          const applied = publish();
-          const after = context.configuration.current;
-          if (eligible && applied === true && context.session.id === sessionId
-            && readSessionModelEdit(sessionId).revision === modelRevision && accountPublicationMatches(before, after, rotation)) publication = after;
+          if (active && !admit()) accountPublication(rotation, publish);
+          else publish();
         } });
         const blocked = admit(); if (blocked) throw new Error(blocked);
       } finally { active = false; }
     } });
     await advisorFor(context, store, renderer).capture({ ...checkpoint, sourcePromptEntryId }, prepared, signal);
   };
+  return Object.assign(handler, { accountPublication });
 }
 export function pauseAdvisor(context: ShellRuntimeContext, store: BoundSessionHost): void {
   try {

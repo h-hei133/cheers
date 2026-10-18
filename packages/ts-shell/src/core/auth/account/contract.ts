@@ -7,4 +7,5 @@ export interface AccountRotation {
   readonly accountAuth: AccountAuthConfig;
   readonly storage: { readonly source: string; readonly path: string; readonly previousRevision: string; readonly revision: string };
 }
-export type AccountPublication = (rotation: AccountRotation, publish: () => boolean | void) => void;
+/** A stored credential must be published; only a verified receipt can admit captured requests. */
+export type AccountPublication = (rotation: AccountRotation | undefined, publish: () => boolean | void) => void;

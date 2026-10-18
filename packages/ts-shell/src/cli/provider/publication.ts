@@ -1,7 +1,7 @@
 import { CONFIG_FIELDS, type RuntimeConfig } from '../../config/runtimeConfig.js';
 import { projectAccepted, type ConfigPublication } from '../../config/state.js';
 import { sameValue } from '../../config/values.js';
-import type { AccountRotation } from '../../core/auth/account/contract.js';
+import type { AccountRotation, AccountPublication } from '../../core/auth/account/contract.js';
 import { sameAccountIdentity } from '../../core/auth/account/state.js';
 import { accountAuthKey } from '../../core/providers/facts.js';
 import { schemaChildren, type ConfigOrigin } from '../../config/provenance/model.js';
@@ -56,4 +56,23 @@ export function accountPublicationMatches(before: ConfigPublication, after: Conf
     || after.admissionBlocked || after.revision !== before.revision + 1) return false;
   const requested = rotated(before.requested, rotation);
   return sameValue({ ...before, revision: after.revision, config: projectAccepted(before.config, rotated(before.config, rotation)), requested }, after);
+}
+
+/** An observer can adopt the receipt, but cannot prevent or repeat its publication. */
+export function publishAccountRotation(rotation: AccountRotation | undefined, publish: () => boolean | void,
+  observer?: AccountPublication): void {
+  let outcome: { value: boolean | void } | { error: unknown } | undefined;
+  const once = () => {
+    if (!outcome) {
+      try { outcome = { value: publish() }; }
+      catch (error) { outcome = { error }; }
+    }
+    if ('error' in outcome) throw outcome.error;
+    return outcome.value;
+  };
+  if (observer) {
+    try { observer(rotation, once); }
+    catch { /* Observer failure cannot prevent the main request's publication. */ }
+  }
+  once();
 }

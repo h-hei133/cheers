@@ -46,6 +46,7 @@ import { DEFAULT_ENDPOINT_KIND, endpointShape } from "../provider/endpoints/inde
 import { accountAuthFor, providerAuthorization } from "../provider/request/authorization.js";
 import { renewStoredAccount } from "../core/auth/account/renewal.js";
 import { projectAccountAuth } from '../core/auth/account/projection.js';
+import { publishAccountRotation } from '../cli/provider/publication.js';
 import type {
   GoogleAccountAuthConfig,
   OpenAIAccountAuthConfig,
@@ -251,7 +252,9 @@ function deferUntilReady(
       resolution: request.providerCredentialResolution,
       fetchImpl: admittedFetch(providerFetch(request.runtimeConfig), request.admission),
     });
-    if (renewed.stored) request.onCredentialPersisted?.();
+    if (renewed.stored) {
+      publishAccountRotation(renewed.rotation, () => request.onCredentialPersisted?.(renewed.rotation), request.checkpoint?.accountPublication);
+    }
     if (renewed.failure) {
       // The same terminal shape a failed readiness check produces, because it is
       // the same class of problem: the credential cannot be used, and the run
