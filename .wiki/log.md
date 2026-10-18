@@ -7871,3 +7871,14 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 六项加载时反转实际退出 1：撤掉主回执投递 3 失败、撤掉 peer 回执 2 失败/12 通过、撤掉精确 publication 比较 2 失败/2 通过、撤掉失败 fence 3 失败、缺回执不通知 1 失败、恢复 observer 异常传播 1 失败。未选中的用例不计通过，产品源码未回退。产物为 `.omx/verification/phase20/checkpoint.reversals.*`。
 - 最终构建的 Linux Node/exe × regular/fullscreen 隔离 PTY 四格均通过：整套预设、显式顾问 on/off/on、A/low 主请求续期后同回合 B/high 顾问、每格五次实际模型发送和一次受限本机 TLS OAuth 交换，仅 owner token 字段变化、pathRules 保持准入、退出 0。夹具与临时证书已清理；只使用合成凭据，不当作真实 provider 验收。产物为 `checkpoint.pty.py`、log 和 `checkpoint/`。
 - 本条写入时尚未提交/推送本批，新 SHA CI 待实际读回。最终 strict docs drift 与 diff 检查在本条写入后执行；PRV-03…05 完整复核、CTX-03 生命周期/分段/历史 CAS 及其余全部 47 项继续，四项用户保留环境/真实质量要求不变，本批不构成 W2 或阶段完成。
+
+
+### PRV-04 未确认刷新记录的年龄保留
+
+- 主请求 checkpoint 批已推送为 `c0f065385597e6cb3a5138b22a5fb7ba65360ad6`；Architecture Watch `39133444455` success，实际读回 CI `39133444370` 及 job `117693098001` 仍为 in_progress，正在运行 TypeScript suite。更早辅助费用批 CI `39131315102` 也仍在原 job 的脚本测试步骤，无终态，未取消或重启。
+- 复核发现 lease 的无关 mutation 会在时间阈值后删除 dispatched/unknown，后继 acquire 把可能已消耗的旧 refresh token 当新授权。两项反例在修复前实际失败，1 年后的无关清理已删除原记录。现只淘汰未发送 prepared；未确认记录跨 1/10/100 年完整保留，101 年后即使 access generation 改变仍拒绝同旧 token。正常 verified finish、未发送 takeover 与新 refresh token 路径不变。
+- 只读参考采用锁内重读、durable lease、CAS 与交换后的条件保存，明确保留更强的未确认记录：健康所有权 TTL 不能作为已发送 token 重播许可，没有复制参考的租约过期接管语义。继续使用既有 lease 文件，不新增消费账本。
+- 最终本地受影响 7 文件/147 项通过；两种构建通过，TS manifest `ea06516e46d6`。四项静态门禁和脚本测试 59 项通过；NormProof 退出 0、verdict partial，无环/解析义务 satisfied，原 9 个函数上限 advisory 保持，产品函数数量未增加。本批仅移除错误清理分支，未另跑完整项目 tsc 或 PTY。
+- 加载时恢复旧年龄清理，实际退出 1、两项失败；产品 hash 前后相同。首次反转使用 workspace 相对 config 路径而未运行测试，分类为夹具 setup，保留独立日志；改用绝对 config 后才取得有效反转。产物为 `.omx/verification/phase20/retention.reverse.*`。
+- 新编译模块的两个独立 seed/restart 进程场景（dispatched、unknown）通过：epoch=1 陈旧记录经无关账号 mutation 仍保留，实际 renewStoredAccount 拒绝、零 HTTP、配置字节不变，夹具已清理。仅本机 HTTP/合成凭据，未访问真实账号；产物为 `retention.process.mjs` 与 log。
+- 最终独立复核 APPROVED、4 文件/81 项实际通过；已确认成功 finish、重新登录、未发送接管及续期集成，另读回两进程和有效反转证据。与本地集重叠不相加。本条写入时尚未提交/推送，strict docs drift/diff 在本条后运行。不同存储槽位的消费 lineage、旧键迁移及 rotated-persisted 恢复仍开放；PRV-03/05 全请求限制/配额/归属、CTX-03 与其余全部 47 项继续，四项用户保留要求不变，本批不是 PRV-04 或阶段完成声明。

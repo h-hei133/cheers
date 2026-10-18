@@ -40,6 +40,25 @@ it('takes over an expired lease that never dispatched', () => {
   expect(acquireRefreshLease({ ...lineage, owner: 'two', now: Date.now() + 5 * 60_000 })).toMatchObject({ acquired: true });
 });
 
+it.each(['dispatched', 'unknown'] as const)('retains a %s lineage through long idle periods and unrelated cleanup', phase => {
+  const started = 1_000;
+  const key = refreshLineage(lineage);
+  acquireRefreshLease({ ...lineage, owner: 'original', now: started });
+  markRefreshDispatched(key, 'original', started);
+  if (phase === 'unknown') markRefreshUnknown(key, 'original', started);
+  const original = readRefreshLease(key);
+  for (const years of [1, 10, 100]) {
+    const now = started + years * 365 * 24 * 60 * 60_000;
+    const other = { ...lineage, refreshToken: `unrelated-${years}` };
+    expect(acquireRefreshLease({ ...other, owner: 'other', now }).acquired).toBe(true);
+    releaseRefreshLease(refreshLineage(other), 'other', now);
+    expect(readRefreshLease(key)).toEqual(original);
+  }
+  expect(acquireRefreshLease({ ...lineage, generation: 'replacement-access', owner: 'later',
+    now: started + 101 * 365 * 24 * 60 * 60_000 })).toMatchObject({ acquired: false, unknown: true, holder: 'original' });
+  expect(readRefreshLease(key)?.phase).toBe('unknown');
+});
+
 it('completes by lineage generation rather than by writer', () => {
   const key = refreshLineage(lineage);
   acquireRefreshLease({ ...lineage, owner: 'leader' });

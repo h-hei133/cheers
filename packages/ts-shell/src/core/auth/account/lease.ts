@@ -88,10 +88,9 @@ function mutate<T>(action: (leases: Record<string, LeaseRecord>, now: number) =>
     const file = readFile();
     const leases = { ...file.leases };
     for (const [key, value] of Object.entries(leases)) {
-      // A dispatched entry is evidence that the token may have been spent; it is
-      // never dropped on the short lease horizon.
+      // Only unsent preparation expires. Age cannot prove that a dispatched or
+      // unknown token is safe to spend again, including during unrelated cleanup.
       if (value.phase === 'prepared' && value.expiresAt < now - LEASE_TTL_MS) delete leases[key];
-      else if (value.phase !== 'prepared' && value.expiresAt < now - UNKNOWN_TTL_MS) delete leases[key];
     }
     const result = action(leases, now);
     writeFile({ version: VERSION, leases });

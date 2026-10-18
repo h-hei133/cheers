@@ -65,11 +65,15 @@ OAuth 受众沿用现有凭据类型检查：OpenAI 账户 token、Google 账户
 
 发送标记在实际刷新 fetch 之前持久化并读回；标记无法验证则不发送。已经开始的交换发生网络失败、响应丢失或存储不可验证时，保留 `unknown`，后继调用不重放原 refresh token。
 
+只有未发送的 `prepared` 记录按时间淘汰。`dispatched/unknown` 不因年龄或其他账号的清理而删除；过期只取消活动所有权，不证明旧 token 可以再次消耗。多年后重启、更换 access generation 或操作其他 lineage 仍保留拒绝事实；正常已验证持久化继续按原 generation 完成清理，新 refresh token 不受旧记录限制。
+
 等待 peer 完成的调用仍使用交换前捕获的 `AccountEdit`：配置存储位置、provider、连接、endpoint、账号元数据、原始选择规则和镜像必须与该 owner 的旋转结果一致。原连接消失不能借用 provider 槽；不把另一账号的新 token 当作成功。完成凭据必须有变化且仍有效；服务端保留 refresh token、只更新 access token/expiry 也可接受。读回验证不重写 peer 已保存的配置。
 
 本地证据包含真实两个 Node 进程与本机 HTTP 的成功、稳定 refresh token、删除、重登录及响应丢失五格；每格只发送一次交换。未访问真实账号，不能据此宣称真实 provider 或全部委派消费者已完成验收。
 
 profile 导入不复制 live rotating OAuth，因此不会产生第二个可消费授权；lease 文件也不跨 profile 共享。
+
+不同存储槽位的同一消费 lineage 互斥、旧键迁移以及 `rotated-persisted` 故障恢复仍须按 PRV-04 复核；当前的年龄保留修复不能代替这些验收。
 
 ## 6. 委派请求的续期与发布
 

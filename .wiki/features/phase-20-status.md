@@ -43,6 +43,8 @@ provider-only 批已推送为 `c6206819db11c88984f95d0dee2c59eed4d9c23a`，Archi
 
 辅助费用批已推送为 `6b1eab75cfa089f8f7424e25746fee296ef6bc26`，Architecture Watch `39131315169` success；本轮实际查询 CI `39131315102` 及 job `117686908263` 仍为 in_progress，不能记为通过。主请求续期 checkpoint 批的受影响 32 文件/518 项、六项有效反转、双构建、四格隔离 PTY 与独立 7 文件/138 项复核均通过。缺回执或未确认发布即失效，已保存的凭据仍恰好发布一次；完整 PRV-03…05、CTX-03 与其余任务继续原范围，交付状态以日志和实际 SHA 为准。
 
+checkpoint 批已推送为 `c0f065385597e6cb3a5138b22a5fb7ba65360ad6`，Architecture Watch `39133444455` success；CI `39133444370` 仍为 in_progress。随后 PRV-04 复核发现按年龄删除 dispatched/unknown 使旧 token 重新获准的缺口，修复后受影响 7 文件/147 项、有效反转和两个独立进程重启场景通过，实际续期零 HTTP。该证据只覆盖年龄重播窗口；lineage/旧键迁移、rotated-persisted、完整账号限制与请求账本继续开放，独立复核和新 SHA 交付按开发日志记录。
+
 用户已允许后续验证的环境/真实模型项：START-03 受控冷缓存及剩余响应测量、QA-02 跨平台/IME/系统复制、QA-03 真实质量、TOOL-02 成本与 tokenizer 校准。**这项保留不覆盖可在本地完成的缺失实现和合成端到端验收。**
 
 ## 历史实现与交付记录（不代表本次复核通过）
