@@ -10,7 +10,7 @@
 |---|---|---|
 | W1 CFG-01…05 | CFG-02/04 发现并修复导入相对路径规则改变目标的问题；default、named、legacy、preview 后源变化回归通过 | 继续核查全部身份 consumer、配置快照及失效合同 |
 | W4 UI-01…04 | UI-02/03 修复固定八项上限、详情被候选数裁短、tab 点击区域覆盖、缺键盘切组及 modal 不显示分组；可用矩形和旧命中失效回归通过 | 其余公共原语、源选区及各消费者仍按合同复核 |
-| W2 | PRV-01/02、PAN-01 修复同 provider 多 relay 精确选择、load-time revision 绑定及跨连接 preset session CAS；失效连接禁止默认回退、明确凭据不串 CLI/env；委派与账号刷新接通所选 owner | 无连接 legacy/env-only 选择、目录同名歧义、完整角色策略 consumer、PRV-03…05 完整复核仍开放 |
+| W2 | PRV-01/02、PAN-01 修复同 provider 多 relay 精确选择、load-time revision 绑定及跨连接 preset session CAS；失效连接禁止默认回退、明确凭据不串 CLI/env；委派与账号刷新接通所选 owner；命令支持空会话应用 profile 角色、明确连接保存与 provider 歧义拒绝 | 无连接 legacy/env-only 选择、目录同名歧义、完整角色策略 consumer、PRV-03…05 完整复核仍开放 |
 | W3 | 既有实现尚未完成本次逐条复核 | CTX-01…04、TOOL-01 的请求、拒绝、并发和恢复证据 |
 | W5 | SET-02 已修复选中分组后无法搜索其他组的问题；复用文字匹配排序，跨组按最佳得分和固定组序展示；清空搜索回原组，从详情 Back 回字段所属组并聚焦 | CMD-01/02、SET-01/03 全部验收；SET-02 其余来源/状态细节继续按合同核查 |
 | W6 | modal 的项目范围切组现已可达；不能由此证明完整目录分页/搜索 | PAN-01…08 各动作、只读边界、分页和 revision |

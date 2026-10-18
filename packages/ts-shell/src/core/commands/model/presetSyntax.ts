@@ -14,7 +14,7 @@ export const modelPresetSyntax: CommandSyntax = {
       summary: 'save the current model or explicit role targets as a preset',
       parameters: [
         { name: 'name', kind: 'text', required: true },
-        { name: 'role=provider/model[@effort]', kind: 'text', rest: true },
+        { name: 'role=connection-or-provider/model[@effort]', kind: 'text', rest: true },
       ],
     },
     {

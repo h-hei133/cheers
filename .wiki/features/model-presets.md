@@ -24,13 +24,17 @@ profile 库文件形如 `{ "version": 1, "presets": { "<name>": { "roles": { …
 
 | 命令 | 行为 |
 |---|---|
-| `save <name> [role=provider/model[@effort]]` | 保存到当前会话；无显式角色时使用当前选择 |
+| `save <name> [role=connection-or-provider/model[@effort]]` | 保存到当前会话；无显式角色时使用当前选择 |
 | `save <name> --profile …` | 保存到 profile 库；同名整项替换并明确报告 replaced |
 | `promote <name>` | 把会话预设复制到 profile 库 |
 | `delete <name>` | 从 profile 库删除；返回 deleted 或 was not found |
 | `list` / `status` | 合并列出，标注 `[session]` / `[profile]`，同名时标注会话遮盖 profile |
-| `apply <name> [role]` | 先查会话，再查 profile；整项解析，不跨层拼角色 |
+| `apply <name> [role]` | 先查会话，再查 profile；整项解析，不跨层拼角色；空会话可直接应用 profile 项 |
 | `validate <name>` | 用同一解析顺序验证全部角色 |
+
+明确角色可用 `review=relay-b/model@high` 指定连接。连接 ID 的精确匹配优先于 provider 名；provider 名匹配多个连接时，只有当前 session 的 connection ID 和 provider 同时匹配才能消歧，否则要求明确连接。目录 alias 还需 runtime 与 endpoint 匹配，不选第一个同协议连接。模型 ID 中的后续 `/` 保留。
+
+显式 `save --profile` 与 `validate` 可在无 session 时管理库；未提供角色目标的 save 需要已选模型。`apply` 总是需要 session，但不要求先选一次模型。删除 profile 项后若同名 session 项仍存在，命令明确报告该 owner 仍可用。
 
 ## 3. 遮盖与应用
 

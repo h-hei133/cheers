@@ -7720,3 +7720,16 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - Linux PTY 120×40、隔离 HOME/USERPROFILE/CHEERS_TEST_ROOT，Node/exe × regular/fullscreen 四格通过：搜索同名模型、选择 relay B、发起一次本机 HTTP fixture 请求、验证 B 的 readiness/request 路径和合成 credential/model、全局配置字节不变、退出 0。首次断言要求紧凑列完整显示长标签，改为检查优先展示的连接 ID；fixture 补齐 readiness GET 后四格通过。未访问真实 provider 配置或真实服务。
 - `build:ts`、`build:exe`、cycles/config consumers/declarations/Node floor/strict docs drift 通过；docs 保留 118 条既有非阻断 source advisory。NormProof 退出 0、verdict partial，导入/无环 satisfied，函数上限仍是 9 个既有 advisory，触及模块未超限。额外运行 TypeScript 诊断比较：旧生产图 151 条、当前 149 条、无新增；修正所触及 decoder 已验证字段的类型收窄，不能把该比较称为全项目 tsc 通过。
 - 文档撤回“其他连接必须先改全局”的旧描述，并继续开放无具名连接的 legacy/env-only 精确选择、目录同名能力歧义、完整角色策略 consumer 及其余 Phase 20 裁决。本条记录时尚未提交/推送本批，新 SHA CI 需后续实际确认；本批通过不代表 PRV/PAN 全任务或整个 Phase 20 完成。
+
+
+### PRV-02 命令入口与角色地址返工
+
+- 上批具名连接修复已提交并推送为 `aecc4bcbd8badc0aa64e3fa98cec13365c8d9253`；Architecture Watch `39096940456` success，CI `39096940454` 在本条记录时仍运行中。
+- 沿命令调用链发现 UI/helper 已允许空会话应用 profile 角色，但 `presetCommand` 的旧前置检查仍拒绝；原角色解析还只能按 provider 找连接，不能明确选择同 provider 的第二条 relay。本批把解析移入 `core/commands/model/roles.ts`，移除命令 owner 的旧解析体，不保留两套路径。
+- 明确 `role=connection/model[@effort]` 优先精确连接 ID；provider target 只有唯一候选或当前 session 的 connection ID 与 provider 同时匹配才接受，多候选不再取第一项。custom catalog alias 按 runtime 和 endpoint 匹配，模型名后续 `/` 保留。精确 ID 重复也拒绝。
+- `save --profile` 的明确角色与 `validate` 不要求先选模型或存在 session；`apply` 仍需 session，但空会话可用。无明确角色的 save 仍需已选模型，session 保存继续走既有 owner。删除 profile 后若同名 session 项仍存，输出明确说明剩余 owner 可用。
+- 与只读参考的精确匹配和歧义拒绝原则比较：保留已有 provider/model 输入，不采用模糊候选或自动首项来决定持久角色的连接。应用继续走上一批的精确 session CAS，无默认全局写入。
+- 两路独立复核均发现第一版消歧只检查 connection ID，旧 OpenAI 选择的 ID 被复用为 Google 时可错误选择；已补 provider 比较及真实命令回归，断言歧义时不创建 profile 项。修复后代码 APPROVE / 架构 CLEAR；代码复核另跑 3 文件、22 测试通过。
+- 本地最终 9 文件、142 测试通过。初验时将命令 owner 反转到 `aecc4bcb`，9 项中 4 项失败；单独反转 provider 身份比较，定向运行的旧身份消歧用例失败（其余 10 项因 `-t` 未执行）。反转只在加载阶段替换源，不改工作区。
+- 两构建、cycles/config consumers/declarations/Node floor/strict docs drift 通过；NormProof 仍为导入/无环满足及既有函数上限 advisory，没有新增超限。Node/exe × regular/fullscreen 四格隔离 Linux PTY 均通过：空会话 `/modelpreset save --profile` → validate → apply 具名角色，之后本机 HTTP fixture 收到指定 relay B 的路径/模型/合成凭据；配置字节未变、退出 0，没有访问真实账号。
+- 此批仅补齐具名角色命令路径。完整角色策略的自动 consumer、无具名连接选择、目录同名能力歧义和其余 Phase 20 任务继续开放；本条记录时本批尚未提交/推送，新 SHA CI 另行确认。

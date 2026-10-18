@@ -10,6 +10,7 @@ import { routeSlashCommand } from '../slashRouter.js';
 import { runModelPresetCommand } from './presetCommand.js';
 import { writeCatalogCache } from '../../models/catalogStore.js';
 import { projectSessionModel } from '../../../session/model/projection.js';
+import { readProfilePresets } from './presetStore.js';
 
 let home = '';
 let sessionId = '';
@@ -45,6 +46,68 @@ it('saves and applies a session preset through the command owner', async () => {
   const applied = await runModelPresetCommand(['apply', 'review'], context);
   expect(applied.output).toContain("applied for this session");
   expect(readSessionModel(sessionId)?.model).toBe('base-model');
+});
+
+it('saves, validates and applies an explicit profile role before a session model has been selected', async () => {
+  const context = { cwd: home, projectRoot: home, sessionId };
+  const global = fs.readFileSync(getUserRuntimeConfigPath());
+  expect(readSessionModel(sessionId)).toBeUndefined();
+  expect((await runModelPresetCommand(['save', 'fresh', '--profile', 'default=fixture/next-model@high'], context)).output).toContain('saved');
+  expect((await runModelPresetCommand(['validate', 'fresh'], context)).output).toContain('is valid');
+  expect((await runModelPresetCommand(['apply', 'fresh'], context)).output).toContain('applied for this session');
+  expect(readSessionModel(sessionId)).toMatchObject({ connectionId: 'fixture', model: 'next-model', thinkingEffort: 'high' });
+  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global);
+});
+
+it('binds explicit same-provider relay targets and refuses ambiguous provider-only saves without a current choice', async () => {
+  const context = { cwd: home, projectRoot: home, sessionId };
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, providerConnections: [...edit.values.providerConnections!, {
+    ...edit.values.providerConnections![0]!, id: 'second', baseUrl: 'https://second.example.invalid/v1',
+  }] }, edit);
+  expect((await runModelPresetCommand(['save', 'ambiguous', '--profile', 'review=openai/next-model'], context)).output).toContain('ambiguous');
+  expect(readProfilePresets().ambiguous).toBeUndefined();
+  expect((await runModelPresetCommand(['save', 'exact', '--profile', 'review=second/next-model@auto'], context)).output).toContain('saved');
+  expect(readProfilePresets().exact.roles.review).toEqual({ connectionId: 'second', provider: 'openai', model: 'next-model', thinkingEffort: null });
+  expect((await runModelPresetCommand(['apply', 'exact', 'review'], context)).output).toContain('Connection: second');
+});
+
+it('does not use a stale session connection with a changed provider to resolve an ambiguous role', async () => {
+  const context = { cwd: home, projectRoot: home, sessionId };
+  await routeSlashCommand('/model base-model', { ...context, interactive: true });
+  writeCatalogCache([{ id: 'google', models: [{ id: 'next-model', reasoning: true }] }]);
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, provider: 'google', providerConnections: ['fixture', 'second'].map(id => ({
+    ...edit.values.providerConnections![0]!, id, provider: 'google' as const, model: 'next-model',
+  })) }, edit);
+  expect(readSessionModel(sessionId)?.provider).toBe('openai');
+  expect((await runModelPresetCommand(['save', 'stale', '--profile', 'review=google/next-model'], context)).output).toContain('ambiguous');
+  expect(readProfilePresets().stale).toBeUndefined();
+});
+
+it('allows explicit profile library management without a session but refuses session application', async () => {
+  const context = { cwd: home, projectRoot: home };
+  expect((await runModelPresetCommand(['save', 'library', '--profile', 'review=fixture/next-model'], context)).output).toContain('saved');
+  expect((await runModelPresetCommand(['validate', 'library'], context)).output).toContain('is valid');
+  expect((await runModelPresetCommand(['apply', 'library', 'review'], context)).output).toContain('requires an active session');
+  expect(readSessionModel(sessionId)).toBeUndefined();
+});
+
+it('keeps slash-containing model ids after an exact connection prefix', async () => {
+  writeCatalogCache([{ id: 'openai', models: [{ id: 'namespace/model', reasoning: true }] }]);
+  const context = { cwd: home, projectRoot: home, sessionId };
+  expect((await runModelPresetCommand(['save', 'slash', '--profile', 'review=fixture/namespace/model@low'], context)).output).toContain('saved');
+  expect(readProfilePresets().slash.roles.review.model).toBe('namespace/model');
+});
+
+it('reports the remaining session owner after deleting a shadowed profile preset', async () => {
+  const context = { cwd: home, projectRoot: home, sessionId };
+  await routeSlashCommand('/model base-model', { ...context, interactive: true });
+  expect((await runModelPresetCommand(['save', 'shared'], context)).output).toContain('saved');
+  expect((await runModelPresetCommand(['promote', 'shared'], context)).output).toContain('saved');
+  expect((await runModelPresetCommand(['delete', 'shared'], context)).output).toContain("The session preset 'shared' remains available");
+  expect(readProfilePresets().shared).toBeUndefined();
+  expect((await runModelPresetCommand(['apply', 'shared'], context)).output).toContain('from the session owner');
 });
 
 it('saves a preset for legacy connections whose optional timestamps are synthesized during reads', async () => {
