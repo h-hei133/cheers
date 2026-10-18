@@ -49,7 +49,6 @@
 ## 未闭合
 
 - START-03：受控冷缓存（需清页缓存权限）；逐键延迟目前以 `/exit` 命令处理为代理。
-- PAN-05：流式面板。
 
 - QA-02/03：Linux PTY 矩阵已通过 Node/exe × regular/fullscreen（`npm run qa:pty`：`/tools` 后 Esc 关闭 reader、`/sessions current`、`/exit`）；Windows/macOS/IME/系统复制与真实质量仍缺环境/模型。
 - TOOL-02：静态描述/schema 字节成本已进 `/tools` 报告（`size.unit=utf8-bytes`，`tokens=not-measured`）；同模型质量/缓存对比与 tokenizer 校准仍需真实模型。
