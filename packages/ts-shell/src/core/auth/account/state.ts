@@ -10,6 +10,8 @@ import { accountAuthKey } from '../../providers/facts.js';
 import { identifyProject } from '../../security/trust/identity.js';
 import { freezeDeep } from '../../values/freeze.js';
 import type { AccountRotation } from './contract.js';
+import { accountGeneration, credentialDigest } from './lineage.js';
+import type { RefreshBinding } from './lease/model.js';
 
 interface Snapshot {
   readonly source: string;
@@ -109,6 +111,17 @@ function rotated(edit: AccountEdit, accountAuth: AccountAuthConfig): RuntimeConf
     ...(credential?.source === 'config' || edit.mirror ? { providerCredentials: { ...before.providerCredentials,
       [provider]: { ...profile, accountAuth: { ...profile?.accountAuth, [slot]: rotatedAuth(profile?.accountAuth?.[slot], accountAuth) } } } } : {}),
   };
+}
+
+/** Storage ownership excludes rotating fields, while generation includes the complete credential. */
+export function accountBinding(edit: AccountEdit, accountAuth = edit.resolution.credential!.accountAuth!): RefreshBinding {
+  const { resolution, snapshot: captured } = edit;
+  const { accessToken: _access, refreshToken: _refresh, expiresAt: _expiry, ...metadata } = accountAuth;
+  const expected = { ...resolution, credential: { ...resolution.credential!, accountAuth } };
+  return { owner: credentialDigest([captured.source, captured.edit.path, resolution.provider, resolution.credential?.source,
+    resolution.credential?.connectionId, edit.mirror, resolution.baseUrl ?? resolution.credential?.baseUrl, metadata]),
+    generation: accountGeneration(accountAuth),
+    storage: credentialDigest([selectors(rotated(edit, accountAuth), resolution.provider), identity(expected)]) };
 }
 
 /** A peer's saved rotation must still belong to the exact captured owner. */

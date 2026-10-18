@@ -2,6 +2,7 @@ import type { AccountAuthConfig, RuntimeProvider } from "../../config/runtimeCon
 import { isExpiring, refreshOAuthTokens, type OAuthProviderConfig } from "../../core/auth/oauth/flow.js";
 import { googleOAuthConfig, openAIOAuthConfig, resolveGoogleClientId } from "../../core/auth/oauth/providers.js";
 import { DEFAULT_ENDPOINT_KIND, endpointShape, type EndpointKind } from "../endpoints/index.js";
+import { accountGeneration, credentialDigest, refreshLineage } from '../../core/auth/account/lineage.js';
 
 /**
  * How one provider request authenticates.
@@ -161,11 +162,15 @@ export interface AccountAuthRenewal {
   readonly leaseHeld?: boolean;
   /** A previous owner may have spent this token; do not replay it. */
   readonly leaseUnknown?: boolean;
+  /** Opaque native-response capability; no token or response body is serialized here. */
+  readonly production?: object;
 }
 
 /** Cross-process ownership hooks; the caller owns their storage. */
 export interface RenewalLeaseHooks {
   acquire: () => { readonly acquired: boolean; readonly unknown?: boolean };
+  /** Exact captured store, owner, grant and attempt; foreign slots cannot join. */
+  readonly shareKey?: string;
 }
 
 /**
@@ -212,12 +217,14 @@ export async function renewAccountAuthIfExpiring(input: {
     };
   }
 
-  const inFlight = renewalsInFlight.get(renewalKey(input.provider, refreshToken));
+  const key = renewalKey(input.provider, account, input.renewalLease?.shareKey);
+  const inFlight = renewalsInFlight.get(key);
   if (inFlight) {
     // The token this call read is already being replaced by the exchange it is
     // waiting on, so the answer is that exchange's, not a second one's.
     const shared = await inFlight;
-    return { accountAuth: shared.accountAuth, renewed: false, ...(shared.failure ? { failure: shared.failure } : {}) };
+    return { accountAuth: shared.accountAuth, renewed: false, ...(shared.production ? { production: shared.production } : {}),
+      ...(shared.failure ? { failure: shared.failure } : {}) };
   }
 
   const lease = input.renewalLease?.acquire();
@@ -232,8 +239,8 @@ export async function renewAccountAuthIfExpiring(input: {
     fetchImpl: input.fetchImpl,
     ...(input.signal ? { signal: input.signal } : {}),
     ...(input.onDispatch ? { onDispatch: input.onDispatch } : {}),
+    scope: input.renewalLease?.shareKey ?? '',
   });
-  const key = renewalKey(input.provider, refreshToken);
   renewalsInFlight.set(key, run);
   try {
     return await run;
@@ -251,12 +258,20 @@ export async function renewAccountAuthIfExpiring(input: {
  * request join the first account's exchange and receive its token — the wrong
  * identity, silently, which is worse than the extra exchange it saved.
  */
-function renewalKey(provider: RuntimeProvider, refreshToken: string): string {
-  return `${provider}\u0000${refreshToken}`;
+function renewalKey(provider: RuntimeProvider, account: AccountAuthConfig, scope?: string): string {
+  return credentialDigest([provider, accountGeneration(account), scope ?? 'unbound']);
 }
 
 /** The renewals in flight, one per credential, so a spent token is exchanged once. */
 const renewalsInFlight = new Map<string, Promise<AccountAuthRenewal>>();
+const productions = new WeakMap<object, { readonly scope: string; readonly generation: string; readonly lineage: string }>();
+
+/** Only a native exchange for this exact captured attempt can supply successor material. */
+export function nativeAccountProduction(result: AccountAuthRenewal, scope: string): { readonly generation: string; readonly lineage: string } | undefined {
+  const proof = result.production && productions.get(result.production);
+  return proof && proof.scope === scope && result.accountAuth && proof.generation === accountGeneration(result.accountAuth)
+    ? { generation: proof.generation, lineage: proof.lineage } : undefined;
+}
 
 /** The label a user knows a provider by, for a message they have to act on. */
 function providerLabel(provider: RuntimeProvider): string {
@@ -272,21 +287,23 @@ async function exchangeAccountAuth(input: {
   readonly signal?: AbortSignal;
   /** Called immediately before the exchange leaves the process. */
   readonly onDispatch?: () => void;
+  readonly scope: string;
 }): Promise<AccountAuthRenewal> {
   try {
     const tokens = await refreshOAuthTokens(input.config, input.refreshToken, (url, init) => {
       input.onDispatch?.();
       return input.fetchImpl(url, init);
     });
-    return {
-      accountAuth: {
+    const accountAuth: AccountAuthConfig = {
         ...input.account,
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
         expiresAt: tokens.expiresAt,
-      },
-      renewed: true,
-    };
+      };
+    const production = Object.freeze({});
+    productions.set(production, { scope: input.scope, generation: accountGeneration(accountAuth),
+      lineage: refreshLineage({ provider: input.provider, refreshToken: accountAuth.refreshToken, clientId: input.config.clientId }) });
+    return { accountAuth, renewed: true, production };
   } catch (error) {
     return {
       accountAuth: input.account,

@@ -5,6 +5,11 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as configStore from '../../config/runtimeConfig.js';
 import { resolveProviderCredential } from '../shell/providerCredentials.js';
+import * as persistence from '../../config/persistence.js';
+import { loginOpenAIAccountViaAuthorizationCodeFlow } from './openaiAccountAuth.js';
+import * as store from '../../session/store/sessionFileStore.js';
+import { refreshLeasesPath } from '../auth/account/lease.js';
+import { renewStoredAccount } from '../auth/account/renewal.js';
 import { ConfigWriteError } from '../../config/outcome.js';
 import {
   getUserRuntimeConfigPath,
@@ -15,6 +20,19 @@ import {
   __setOpenAIAccountAuthRunnerForTest,
   runConnectCommand,
 } from "./connectCommandRuntime.js";
+
+async function nativeLogin(accessToken = 'native-access', refreshToken = 'native-refresh', accountId = 'native-account', response?: () => Promise<Response> | Response) {
+  return loginOpenAIAccountViaAuthorizationCodeFlow({
+    openBrowser: async address => {
+      const url = new URL(address), redirect = new URL(url.searchParams.get('redirect_uri')!);
+      redirect.searchParams.set('code', 'synthetic-code'); redirect.searchParams.set('state', url.searchParams.get('state')!);
+      const callback = await fetch(redirect); expect(callback.ok).toBe(true);
+    },
+    fetchImpl: vi.fn(async () => response ? response() : new Response(JSON.stringify({ access_token: accessToken, refresh_token: refreshToken, expires_in: 3600,
+      id_token: `header.${Buffer.from(JSON.stringify({ sub: accountId })).toString('base64url')}.signature` }),
+      { headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch,
+  });
+}
 
 describe("connect command runtime", () => {
   const originalHome = process.env.USERPROFILE;
@@ -108,12 +126,12 @@ describe("connect command runtime", () => {
       accessToken: 'synthetic-access', refreshToken: 'synthetic-refresh', expiresAt: Date.now() + 3600000,
       authorizeUrl: 'https://example.invalid/authorize', callbackUrl: 'http://localhost/callback',
     }));
-    const save = configStore.writeUserRuntimeConfigFile;
+    const save = persistence.persistConfigEdit;
     let calls = 0;
-    const spy = vi.spyOn(configStore, 'writeUserRuntimeConfigFile').mockImplementation((value, baseline) => {
+    const spy = vi.spyOn(persistence, 'persistConfigEdit').mockImplementation((...args: Parameters<typeof persistence.persistConfigEdit>) => {
       calls++;
-      if (calls !== 2) return save(value, baseline);
-      if (state === 'persisted') save(value, baseline);
+      if (calls !== 2) return save(...args);
+      if (state === 'persisted') save(...args);
       throw new ConfigWriteError(state === 'persisted' ? 'lock-failed' : 'write-failed', state);
     });
     await expect(runConnectCommand(['login', 'openai', mode], { cwd: workspaceRoot })).rejects.toMatchObject({ state });
@@ -403,14 +421,7 @@ describe("connect command runtime", () => {
   });
 
   it("creates openai account-auth connection and marks it active", async () => {
-    __setOpenAIAccountAuthRunnerForTest(async () => ({
-      accessToken: "acct-access-token",
-      refreshToken: "acct-refresh-token",
-      expiresAt: Date.now() + 3600_000,
-      accountId: "acct_123",
-      authorizeUrl: "https://auth.openai.com/oauth/authorize?...",
-      callbackUrl: "http://localhost:1455/auth/callback",
-    }));
+    __setOpenAIAccountAuthRunnerForTest(() => nativeLogin('acct-access-token', 'acct-refresh-token', 'acct_123'));
 
     const result = await runConnectCommand(["login", "openai", "--account"], {
       cwd: workspaceRoot,
@@ -499,4 +510,173 @@ describe("connect command runtime", () => {
     fresh = configStore.getRuntimeConfig(workspaceRoot);
     expect(resolveProviderCredential({ runtimeConfig: fresh, env: {} }).credential).toBeUndefined();
   });
+
+  it('mints a login grant only for a native token exchange and never for a raw override', async () => {
+    __setOpenAIAccountAuthRunnerForTest(async () => ({ accessToken: 'raw-access', refreshToken: 'raw-refresh', expiresAt: Date.now() + 3600000,
+      authorizeUrl: 'https://example.invalid/', callbackUrl: 'http://localhost/', production: {} }));
+    const raw = await runConnectCommand(['login', 'openai', '--account'], { cwd: workspaceRoot });
+    expect(raw.output).toContain('Automatic renewal remains unverified');
+    const rejected = JSON.parse(fs.readFileSync(refreshLeasesPath(), 'utf8')).leases;
+    expect(Object.values(rejected).map((row: any) => row.grant)).toEqual([undefined]);
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 7200000);
+    const resolution = resolveProviderCredential({ runtimeConfig: configStore.getRuntimeConfig(workspaceRoot), env: {} });
+    const replay = vi.fn() as unknown as typeof fetch;
+    expect((await renewStoredAccount({ workspaceRoot, resolution, fetchImpl: replay })).stored).toBe(false);
+    expect(replay).not.toHaveBeenCalled(); clock.mockRestore();
+    __setOpenAIAccountAuthRunnerForTest(() => nativeLogin());
+    const native = await runConnectCommand(['login', 'openai', '--account'], { cwd: workspaceRoot });
+    expect(native.output).not.toContain('Automatic renewal remains unverified');
+    const ledger = fs.readFileSync(refreshLeasesPath(), 'utf8'); const rows = JSON.parse(ledger).leases as Record<string, { grant?: { origin?: string } }>;
+    expect(Object.values(rows).map(row => row.grant?.origin)).toContain('login');
+    expect(ledger).not.toMatch(/native-access|native-refresh|raw-access|raw-refresh/);
+  });
+
+  it.each(['delete', 'provider', 'duplicate', 'status', 'mirror'] as const)('rejects a native login when its pending owner changes: %s', async change => {
+    __setOpenAIAccountAuthRunnerForTest(async () => {
+      const result = await nativeLogin();
+      const file = getUserRuntimeConfigPath(), value = JSON.parse(fs.readFileSync(file, 'utf8')) as configStore.RuntimeConfigFile;
+      const pending = value.providerConnections![0]!;
+      if (change === 'delete') value.providerConnections = [];
+      if (change === 'provider') value.providerConnections = [{ ...pending, provider: 'google' }];
+      if (change === 'duplicate') value.providerConnections!.push({ ...pending });
+      if (change === 'status') value.providerConnections = [{ ...pending, status: 'connected' }];
+      if (change === 'mirror') value.providerCredentials = { openai: { apiKey: 'independent-key' } };
+      fs.writeFileSync(file, JSON.stringify(value)); return result;
+    });
+    await expect(runConnectCommand(['login', 'openai', '--account'], { cwd: workspaceRoot })).rejects.toMatchObject({ code: 'conflict', state: 'unchanged' });
+    expect(fs.existsSync(refreshLeasesPath())).toBe(false);
+    expect(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8')).not.toContain('native-access');
+  });
+
+  it('rechecks pending identity under the actual config lock before granting native credentials', async () => {
+    __setOpenAIAccountAuthRunnerForTest(() => nativeLogin());
+    const lock = store.withFileLock; let captures = 0;
+    vi.spyOn(store, 'withFileLock').mockImplementation((name, run, options) => lock(name, () => {
+      if (name === `${getUserRuntimeConfigPath()}.lock` && ++captures === 2) {
+        const value = JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8'));
+        value.providerConnections[0].label = 'changed-during-lock'; fs.writeFileSync(getUserRuntimeConfigPath(), JSON.stringify(value));
+      }
+      return run();
+    }, options));
+    await expect(runConnectCommand(['login', 'openai', '--account'], { cwd: workspaceRoot })).rejects.toMatchObject({ code: 'conflict', state: 'unchanged' });
+    const rows = JSON.parse(fs.readFileSync(refreshLeasesPath(), 'utf8')).leases;
+    expect(Object.values(rows).every((row: any) => !row.grant)).toBe(true);
+  });
+
+  it('preserves old opaque uncertainty and truthful native access storage without issuing a login grant', async () => {
+    fs.mkdirSync(path.dirname(refreshLeasesPath()), { recursive: true });
+    fs.writeFileSync(refreshLeasesPath(), JSON.stringify({ version: 1, leases: { opaque: { owner: 'old', phase: 'unknown',
+      generation: 'old', expiresAt: 1, updatedAt: 1 } } }));
+    __setOpenAIAccountAuthRunnerForTest(() => nativeLogin());
+    const result = await runConnectCommand(['login', 'openai', '--account'], { cwd: workspaceRoot });
+    expect(result.output).toContain('Access credentials were stored'); expect(result.output).toContain('independent fresh profile');
+    expect(configStore.readUserRuntimeConfigFile().providerConnections?.[0]?.accountAuth?.openai?.accessToken).toBe('native-access');
+    const ledger = JSON.parse(fs.readFileSync(refreshLeasesPath(), 'utf8')); expect(ledger.legacy.opaque.phase).toBe('unknown');
+    expect(Object.keys(ledger.leases)).toHaveLength(0);
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 7200000);
+    const resolution = resolveProviderCredential({ runtimeConfig: configStore.getRuntimeConfig(workspaceRoot), env: {} });
+    const fetchImpl = vi.fn() as unknown as typeof fetch;
+    expect((await renewStoredAccount({ workspaceRoot, resolution, fetchImpl })).stored).toBe(false); expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+
+  it.each(['http', 'malformed', 'transport'] as const)('renders native login %s failures without token endpoint content', async kind => {
+    const marker = 'PRIVATE_LOGIN_RESPONSE_SENTINEL';
+    __setOpenAIAccountAuthRunnerForTest(() => nativeLogin('', '', '', () => {
+      if (kind === 'transport') throw new Error(marker);
+      return new Response(marker, { status: kind === 'http' ? 400 : 200 });
+    }));
+    const result = await runConnectCommand(['login', 'openai', '--account'], { cwd: workspaceRoot });
+    expect(result.output).toContain('account-auth login failed'); expect(result.output).not.toContain(marker);
+    expect(result.output).toContain(kind === 'http' ? 'HTTP 400' : kind === 'malformed' ? 'could not be decoded' : 'transport failed');
+    expect(configStore.readUserRuntimeConfigFile().providerConnections?.[0]?.status).toBe('error');
+  });
+
+  it('keeps known consumption blocked through a same-token native login and grants an independent native token', async () => {
+    __setOpenAIAccountAuthRunnerForTest(() => nativeLogin('first-access', 'shared-token'));
+    await runConnectCommand(['login', 'openai', '--account'], { cwd: workspaceRoot });
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 7200000);
+    let resolution = resolveProviderCredential({ runtimeConfig: configStore.getRuntimeConfig(workspaceRoot), env: {} });
+    const lost = vi.fn(async () => { throw new Error('synthetic response lost'); }) as unknown as typeof fetch;
+    expect((await renewStoredAccount({ workspaceRoot, resolution, fetchImpl: lost })).stored).toBe(false); expect(lost).toHaveBeenCalledOnce();
+    __setOpenAIAccountAuthRunnerForTest(() => nativeLogin('repeated-access', 'shared-token'));
+    const repeated = await runConnectCommand(['login', 'openai', '--account'], { cwd: workspaceRoot });
+    expect(repeated.output).toContain('Automatic renewal remains unverified');
+    clock.mockReturnValue(Date.now() + 7200000);
+    resolution = resolveProviderCredential({ runtimeConfig: configStore.getRuntimeConfig(workspaceRoot), env: {} });
+    const replay = vi.fn() as unknown as typeof fetch;
+    expect((await renewStoredAccount({ workspaceRoot, resolution, fetchImpl: replay })).stored).toBe(false); expect(replay).not.toHaveBeenCalled();
+    __setOpenAIAccountAuthRunnerForTest(() => nativeLogin('independent-access', 'independent-token'));
+    const independent = await runConnectCommand(['login', 'openai', '--account'], { cwd: workspaceRoot });
+    expect(independent.output).not.toContain('Automatic renewal remains unverified');
+    const ledger = JSON.parse(fs.readFileSync(refreshLeasesPath(), 'utf8'));
+    expect(Object.values(ledger.leases).flatMap((row: any) => Object.values(row.attempts)).some((attempt: any) => attempt.phase === 'unknown')).toBe(true);
+    expect(Object.values(ledger.leases).filter((row: any) => row.grant?.origin === 'login')).toHaveLength(2);
+  });
+
+  it('does not follow a changed runtime home after native login returns', async () => {
+    const source = getUserRuntimeConfigPath(), other = path.join(fakeHome, 'replacement-home');
+    fs.mkdirSync(other, { recursive: true });
+    __setOpenAIAccountAuthRunnerForTest(async () => {
+      const result = await nativeLogin(); process.env.HOME = other; process.env.USERPROFILE = other; return result;
+    });
+    await expect(runConnectCommand(['login', 'openai', '--account'], { cwd: workspaceRoot })).rejects.toMatchObject({ code: 'conflict', state: 'unchanged' });
+    expect(fs.readFileSync(source, 'utf8')).not.toContain('native-access');
+    expect(fs.existsSync(getUserRuntimeConfigPath())).toBe(false);
+  });
+
+
+  it.each(['drop', 'throw'] as const)('refuses credential storage when native login reservation cannot be verified: %s', async failure => {
+    __setOpenAIAccountAuthRunnerForTest(() => nativeLogin());
+    const writer = store.writeJsonFileAtomic;
+    vi.spyOn(store, 'writeJsonFileAtomic').mockImplementation((target, value) => {
+      if (target !== refreshLeasesPath()) return writer(target, value);
+      if (failure === 'throw') throw new Error('PRIVATE_RESERVATION_WRITE_SENTINEL');
+    });
+    await expect(runConnectCommand(['login', 'openai', '--account'], { cwd: workspaceRoot })).rejects.toMatchObject({ code: 'write-failed', state: 'unchanged' });
+    const stored = configStore.readUserRuntimeConfigFile();
+    expect(stored.providerConnections?.[0]?.status).toBe('pending'); expect(stored.providerConnections?.[0]?.accountAuth).toBeUndefined();
+    expect(stored.providerCredentials?.openai?.accountAuth).toBeUndefined();
+    const resolution = resolveProviderCredential({ runtimeConfig: configStore.getRuntimeConfig(workspaceRoot), env: {} });
+    const replay = vi.fn() as unknown as typeof fetch;
+    expect((await renewStoredAccount({ workspaceRoot, resolution, fetchImpl: replay })).stored).toBe(false); expect(replay).not.toHaveBeenCalled();
+    expect(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8')).not.toMatch(/native-access|native-refresh|PRIVATE_RESERVATION/);
+  });
+
+
+  it('does not publish a native login grant or default-switch claim after the verified writer target changes', async () => {
+    __setOpenAIAccountAuthRunnerForTest(() => nativeLogin());
+    const persist = persistence.persistConfigEdit; let writes = 0;
+    vi.spyOn(persistence, 'persistConfigEdit').mockImplementation((...args: Parameters<typeof persistence.persistConfigEdit>) => {
+      const result = persist(...args);
+      if (++writes === 2) {
+        const value = JSON.parse(fs.readFileSync(getUserRuntimeConfigPath(), 'utf8')); value.activeProviderConnectionId = 'another';
+        fs.writeFileSync(getUserRuntimeConfigPath(), JSON.stringify(value));
+      }
+      return result;
+    });
+    await expect(runConnectCommand(['login', 'openai', '--account'], { cwd: workspaceRoot })).rejects.toMatchObject({ code: 'verification-failed', state: 'persisted' });
+    const rows = JSON.parse(fs.readFileSync(refreshLeasesPath(), 'utf8')).leases;
+    expect(Object.values(rows).every((row: any) => !row.grant)).toBe(true);
+    expect(configStore.readUserRuntimeConfigFile().providerConnections?.[0]?.accountAuth?.openai?.accessToken).toBe('native-access');
+  });
+
+
+  it.each(['zero', 'delayed'] as const)('rejects an expired native login result before enrollment or credential storage: %s', async kind => {
+    const now = Date.now(), clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    __setOpenAIAccountAuthRunnerForTest(async () => {
+      const result = kind === 'zero' ? await nativeLogin('', '', '', () => new Response(JSON.stringify({
+        access_token: 'expired-native-access', refresh_token: 'expired-native-refresh', expires_in: 0,
+      }), { headers: { 'content-type': 'application/json' } })) : await nativeLogin();
+      if (kind === 'delayed') clock.mockReturnValue(now + 7200000);
+      return result;
+    });
+    const result = await runConnectCommand(['login', 'openai', '--account'], { cwd: workspaceRoot });
+    expect(result.output).toContain('account-auth login failed'); expect(result.output).toContain('expired access token');
+    const stored = configStore.readUserRuntimeConfigFile();
+    expect(stored.providerConnections?.[0]?.status).toBe('error'); expect(stored.providerConnections?.[0]?.accountAuth).toBeUndefined();
+    expect(stored.providerCredentials?.openai?.accountAuth).toBeUndefined(); expect(fs.existsSync(refreshLeasesPath())).toBe(false);
+    expect(result.output).not.toMatch(/expired-native-access|expired-native-refresh/);
+  });
+
 });

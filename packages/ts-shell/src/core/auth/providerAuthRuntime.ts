@@ -1,4 +1,16 @@
 import { ConfigWriteError } from '../../config/outcome.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { persistConfigEdit } from '../../config/persistence.js';
+import { sameValue } from '../../config/values.js';
+import { CONFIG_FIELDS, getRuntimeConfig } from '../../config/runtimeConfig.js';
+import { resolveProviderCredential } from '../shell/providerCredentials.js';
+import { accountBinding, captureAccountEdit } from './account/state.js';
+import { grantRefreshLogin, reserveRefreshLogin, refreshLeasesPath, captureLeaseStore, type RefreshStore } from './account/lease.js';
+import { accountGeneration, credentialDigest } from './account/lineage.js';
+import { nativeOAuthLogin, OAuthExchangeError } from './oauth/flow.js';
+import { oauthConfigFor } from './oauth/providers.js';
 import { AccountAuthConfig, type GoogleAccountAuthConfig, type OpenAIAccountAuthConfig, type ProviderConnectionConfig, readRuntimeConfigEditAt, getUserRuntimeConfigPath, type RuntimeConfigFile, type RuntimeProvider, writeUserRuntimeConfigFile } from "../../config/runtimeConfig.js";
 import { providerFacts } from "../providers/facts.js";
 import { openAIProviderAuthContract } from "../commands/openaiAccountAuth.js";
@@ -29,12 +41,37 @@ let testOpenAILoginOverride:
   | ((...args: Parameters<ProviderAuthContract["loginAccountAuth"]>) => ReturnType<ProviderAuthContract["loginAccountAuth"]>)
   | undefined;
 
+interface PendingLogin {
+  readonly source: string;
+  readonly target: string;
+  readonly leaseStore: RefreshStore;
+  readonly connection: ProviderConnectionConfig;
+  readonly mirror: RuntimeConfigFile['providerCredentials'];
+  readonly workspaceRoot: string;
+}
+
+function capturePendingLogin(source: string, connection: ProviderConnectionConfig, workspaceRoot: string): PendingLogin {
+  const target = fs.realpathSync(source), current = readRuntimeConfigEditAt(target).values;
+  const matches = current.providerConnections?.filter(item => item.id.trim() === connection.id) ?? [];
+  if (matches.length !== 1 || !sameValue(matches[0], connection)) throw new ConfigWriteError('conflict', 'unchanged');
+  return { source: path.resolve(source), target, leaseStore: captureLeaseStore(refreshLeasesPath()), connection: structuredClone(connection),
+    mirror: structuredClone(current.providerCredentials), workspaceRoot };
+}
+
+function pendingMatches(pending: PendingLogin, current: Readonly<RuntimeConfigFile>): boolean {
+  const matches = current.providerConnections?.filter(item => item.id.trim() === pending.connection.id) ?? [];
+  return path.resolve(getUserRuntimeConfigPath()) === pending.source && fs.realpathSync(pending.source) === pending.target
+    && matches.length === 1 && sameValue(matches[0], pending.connection)
+    && sameValue(current.providerCredentials?.[pending.connection.provider], pending.mirror?.[pending.connection.provider]);
+}
+
 export async function runProviderAccountAuthLogin(input: {
   readonly provider: RuntimeProvider;
   readonly providerLabel: string;
   readonly defaultModel?: string;
   readonly labelOverride?: string;
   readonly onPersisted?: () => void;
+  readonly workspaceRoot?: string;
 }): Promise<string> {
   const contract = resolveProviderAuthContract(input.provider);
   if (!contract) {
@@ -59,11 +96,12 @@ export async function runProviderAccountAuthLogin(input: {
     createdAt: now,
     updatedAt: now,
   };
-  persistConnectionPatch({
+  const pendingPath = persistConnectionPatch({
     patchKind: "insert-pending",
     connectionId,
     pendingConnection,
   });
+  const pending = capturePendingLogin(pendingPath, pendingConnection, input.workspaceRoot ?? process.cwd());
   input.onPersisted?.();
 
   try {
@@ -74,12 +112,17 @@ export async function runProviderAccountAuthLogin(input: {
         `Provider ${input.provider} returned unsupported account-auth payload.`,
       );
     }
+    if ((input.provider === 'openai' || input.provider === 'google') && accountAuth.expiresAt <= Date.now()) {
+      throw new OAuthExchangeError('expiry', input.providerLabel, 'token exchange');
+    }
     const summary = persistConnectedAccountAuth({
       provider: input.provider,
       connectionId,
       accountAuth,
       authorizeUrl: authResult.authorizeUrl,
       callbackUrl: authResult.callbackUrl,
+      pending,
+      nativeResult: authResult,
     });
     input.onPersisted?.();
 
@@ -92,19 +135,22 @@ export async function runProviderAccountAuthLogin(input: {
       `Callback URL: ${summary.callbackUrl}`,
       `Default runtime provider switched to ${summary.provider}.`,
       `Stored at: ${summary.configPath}`,
-    ].join("\n");
+      summary.refreshWarning,
+    ].filter(Boolean).join("\n");
   } catch (error) {
     if (error instanceof ConfigWriteError) throw error;
     const configPath = persistConnectionPatch({
       patchKind: "mark-error",
       connectionId,
+      pending,
     });
     input.onPersisted?.();
     return [
       `${input.providerLabel} account-auth login failed.`,
       `Connection ID: ${connectionId}`,
       "State transition: pending -> error",
-      `Reason: ${error instanceof Error ? error.message : String(error)}`,
+      `Reason: ${error instanceof OAuthExchangeError ? error.message : input.provider === 'openai' || input.provider === 'google'
+        ? 'The authorization flow did not complete. Retry the login.' : error instanceof Error ? error.message : String(error)}`,
       `Stored at: ${configPath}`,
       `Retry with: /connect login ${input.provider} --account`,
     ].join("\n");
@@ -149,9 +195,12 @@ function persistConnectedAccountAuth(input: {
   readonly accountAuth: AccountAuthConfig;
   readonly authorizeUrl: string;
   readonly callbackUrl: string;
-}): ProviderAccountAuthConnectionSummary {
-  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  readonly pending: PendingLogin;
+  readonly nativeResult: ProviderAccountAuthResult;
+}): ProviderAccountAuthConnectionSummary & { readonly refreshWarning?: string } {
+  const edit = readRuntimeConfigEditAt(input.pending.target);
   const latest = edit.values;
+  if (!pendingMatches(input.pending, latest)) throw new ConfigWriteError('conflict', 'unchanged');
   const updatedAt = new Date().toISOString();
   const nextConnections = normalizeConnections(latest).map((connection) =>
     connection.id === input.connectionId
@@ -186,13 +235,49 @@ function persistConnectedAccountAuth(input: {
       },
     },
   };
-  const configPath = writeUserRuntimeConfigFile(next, edit);
+  const oauth = input.provider === 'openai' || input.provider === 'google'
+    ? oauthConfigFor(input.provider, 'clientId' in input.accountAuth ? input.accountAuth.clientId : undefined) : undefined;
+  let enrollment: ReturnType<typeof reserveRefreshLogin>;
+  try {
+    if (oauth) enrollment = reserveRefreshLogin({ provider: input.provider, refreshToken: input.accountAuth.refreshToken,
+      ...('clientId' in input.accountAuth ? { clientId: input.accountAuth.clientId } : {}), store: input.pending.leaseStore,
+      owner: credentialDigest([input.pending.source, input.pending.target, input.provider, input.connectionId,
+        input.pending.connection, input.pending.mirror?.[input.provider]]), generation: accountGeneration(input.accountAuth),
+      native: nativeOAuthLogin(input.nativeResult, oauth) });
+  } catch {
+    // Without durable enrollment, a later compatibility baseline could grant these unverified credentials.
+    throw new ConfigWriteError('write-failed', 'unchanged');
+  }
+  const configPath = persistConfigEdit(input.pending.target, next, edit, CONFIG_FIELDS, current => pendingMatches(input.pending, current));
+  const confirmed = readRuntimeConfigEditAt(input.pending.target).values;
+  const expected: RuntimeConfigFile = JSON.parse(JSON.stringify(next));
+  if (path.resolve(getUserRuntimeConfigPath()) !== input.pending.source || fs.realpathSync(input.pending.source) !== input.pending.target
+    || confirmed.provider !== input.provider || confirmed.activeProviderConnectionId !== input.connectionId
+    || !sameValue(confirmed.providerConnections?.filter(item => item.id.trim() === input.connectionId), expected.providerConnections?.filter(item => item.id === input.connectionId))
+    || !sameValue(confirmed.providerCredentials?.[input.provider], expected.providerCredentials?.[input.provider])) {
+    throw new ConfigWriteError('verification-failed', 'persisted');
+  }
+  let refreshWarning: string | undefined;
+  if (input.provider === 'openai' || input.provider === 'google') {
+    try {
+      if (!enrollment || !oauth || !nativeOAuthLogin(input.nativeResult, oauth)) throw new Error('native login unavailable');
+      const runtime = getRuntimeConfig(input.pending.workspaceRoot);
+      const resolution = resolveProviderCredential({ runtimeConfig: { ...runtime, provider: input.provider,
+        activeProviderConnectionId: input.connectionId, sessionConnection: { id: input.connectionId, provider: input.provider } }, env: {} });
+      const captured = captureAccountEdit(input.pending.workspaceRoot, resolution);
+      if (!sameValue(resolution.credential?.accountAuth, input.accountAuth) || !captured.mirror
+        || !grantRefreshLogin(enrollment, accountBinding(captured))) throw new Error('grant unavailable');
+    } catch {
+      refreshWarning = 'Access credentials were stored. Automatic renewal remains unverified; use an independent fresh profile for a new login.';
+    }
+  }
   return {
     connectionId: input.connectionId,
     provider: input.provider,
     configPath,
     authorizeUrl: input.authorizeUrl,
     callbackUrl: input.callbackUrl,
+    ...(refreshWarning ? { refreshWarning } : {}),
   };
 }
 
@@ -200,8 +285,9 @@ function persistConnectionPatch(input: {
   readonly patchKind: "insert-pending" | "mark-error";
   readonly connectionId: string;
   readonly pendingConnection?: ProviderConnectionConfig;
+  readonly pending?: PendingLogin;
 }): string {
-  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const edit = readRuntimeConfigEditAt(input.pending?.target ?? getUserRuntimeConfigPath());
   const latest = edit.values;
   if (input.patchKind === "insert-pending" && input.pendingConnection) {
     return writeUserRuntimeConfigFile({
@@ -222,6 +308,9 @@ function persistConnectionPatch(input: {
         }
       : connection,
   );
+  if (input.pending) return persistConfigEdit(input.pending.target, {
+    ...latest, providerConnections: nextConnections,
+  }, edit, CONFIG_FIELDS, current => pendingMatches(input.pending!, current));
   return writeUserRuntimeConfigFile({
     ...latest,
     providerConnections: nextConnections,
@@ -262,7 +351,7 @@ function normalizeBaseUrl(baseUrl?: string): string | undefined {
 }
 
 function buildConnectionId(provider: RuntimeProvider): string {
-  return `${provider}-${Date.now().toString(36)}`;
+  return `${provider}-${randomUUID()}`;
 }
 
 /**

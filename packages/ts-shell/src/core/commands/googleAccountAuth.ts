@@ -23,6 +23,7 @@ export interface GoogleAccountAuthResult {
   readonly clientId: string;
   readonly authorizeUrl: string;
   readonly callbackUrl: string;
+  readonly production?: object;
 }
 
 export interface GoogleAccountAuthOptions extends OAuthLoginOptions {
@@ -45,6 +46,7 @@ export async function loginGoogleAccountViaAuthorizationCodeFlow(
     clientId,
     authorizeUrl: result.authorizeUrl,
     callbackUrl: result.callbackUrl,
+    production: result.production,
   };
 }
 

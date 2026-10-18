@@ -1,6 +1,6 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { accountAuthFor, providerAuthorization, renewAccountAuthIfExpiring } from "./authorization.js";
 import { createStepFunction } from "../../turn/step.js";
 import { resetSessionUsage } from "../../observability/usageTelemetry.js";
@@ -321,4 +321,19 @@ describe("renewing a token that is about to expire", () => {
     expect(a.renewed).toBe(false);
     expect(b.renewed).toBe(false);
   });
+});
+
+
+it('does not share native credentials across different captured lease scopes for the exact same account', async () => {
+  let release!: () => void; const held = new Promise<void>(resolve => { release = resolve; });
+  const credential = { accountAuth: openAIAuth({ expiresAt: Date.now() - 1 }) };
+  const fetchImpl = vi.fn(async () => { await held; return new Response(JSON.stringify({ access_token: 'scope-owned-fresh', refresh_token: 'scope-next', expires_in: 3600 }),
+    { headers: { 'content-type': 'application/json' } }); }) as unknown as typeof fetch;
+  const leader = renewAccountAuthIfExpiring({ provider: 'openai', credential, fetchImpl,
+    renewalLease: { shareKey: 'store-owner-grant-attempt-a', acquire: () => ({ acquired: true }) } });
+  const follower = renewAccountAuthIfExpiring({ provider: 'openai', credential, fetchImpl,
+    renewalLease: { shareKey: 'store-owner-grant-attempt-b', acquire: () => ({ acquired: false }) } });
+  release(); const [completed, isolated] = await Promise.all([leader, follower]);
+  expect(isolated).toEqual({ renewed: false, leaseHeld: true }); expect(isolated.accountAuth).toBeUndefined(); expect(isolated.production).toBeUndefined();
+  expect(completed.accountAuth?.accessToken).toBe('scope-owned-fresh'); expect(fetchImpl).toHaveBeenCalledOnce();
 });

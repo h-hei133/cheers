@@ -1,3 +1,4 @@
+import { observeOAuthRenewal } from '../../test-utils/oauth.js';
 import fs from 'node:fs';
 import http from 'node:http';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -208,8 +209,7 @@ it('reports a publication change during the main request and resumes advice on a
 
 it.each(['main', 'main-environment', 'main-scope'] as const)('keeps the current checkpoint eligible after a verified %s account renewal and produces a usable advisor note', async kind => {
   const setup = await fixture(kind); setup.advisor.setEnabled(true);
-  const renew = vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockImplementation(async input => input.credential.accountAuth
-    ? { renewed: true, accountAuth: freshAccount } : { renewed: false });
+  const renew = observeOAuthRenewal(freshAccount);
   await invoke(setup);
   expect(renew.mock.calls.filter(([input]) => input.credential.accountAuth)).toHaveLength(1);
   expect(setup.requests.map(row => row.model)).toEqual(['gpt-5.4', 'namespace/advisor']);
@@ -219,7 +219,7 @@ it.each(['main', 'main-environment', 'main-scope'] as const)('keeps the current 
   const note = setup.advisor.view().notes[0]!;
   expect(setup.advisor.apply(note.id).noteId).toBe(note.id);
   expect(setup.reports.join('\n')).not.toContain('checkpoint skipped');
-  expect(getRuntimeConfig(setup.root).providerConnections.find(row => row.id === 'a')?.accountAuth?.openai).toEqual(freshAccount);
+  expect(getRuntimeConfig(setup.root).providerConnections.find(row => row.id === 'a')?.accountAuth?.openai).toMatchObject({ ...freshAccount, expiresAt: expect.any(Number) });
   const scope = readGoalEdit(setup.manager, setup.session).goal!.id;
   expect(decodeRequestLedger(readBoundSessionState(setup.manager, setup.session).state.requestLedger)!.scopes[scope])
     .toMatchObject({ inputTokens: 8, outputTokens: 2, pending: {} });
@@ -227,8 +227,7 @@ it.each(['main', 'main-environment', 'main-scope'] as const)('keeps the current 
 
 it.each(['settings', 'catalog', 'model', 'main-request'] as const)('does not accept unrelated %s changes with a main-account renewal', async kind => {
   const setup = await fixture('main'); setup.advisor.setEnabled(true);
-  vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockImplementation(async input => input.credential.accountAuth
-    ? { renewed: true, accountAuth: freshAccount } : { renewed: false });
+  observeOAuthRenewal(freshAccount);
   const change = () => {
     if (kind === 'model') { const edit = readSessionModelEdit(setup.session.id); writeSessionModel(setup.session.id, { ...edit.selection!, roles: {} }, edit); }
     else if (kind === 'catalog') writeCatalogCache(loadCatalog().map(provider => ({ ...provider, models: provider.models.map(model => ({ ...model, contextWindow: 64000 })) })));
@@ -241,7 +240,7 @@ it.each(['settings', 'catalog', 'model', 'main-request'] as const)('does not acc
   expect(setup.requests.filter(row => row.model === 'namespace/advisor')).toHaveLength(0);
   expect(setup.advisor.view().notes).toHaveLength(0);
   expect(setup.advisor.view().pending).toBeUndefined();
-  expect(getRuntimeConfig(setup.root).providerConnections.find(row => row.id === 'a')?.accountAuth?.openai).toEqual(freshAccount);
+  expect(getRuntimeConfig(setup.root).providerConnections.find(row => row.id === 'a')?.accountAuth?.openai).toMatchObject({ ...freshAccount, expiresAt: expect.any(Number) });
 });
 
 it('uses the newly persisted main token for an advisor sharing the same account without a second exchange', async () => {
@@ -251,8 +250,7 @@ it('uses the newly persisted main token for an advisor sharing the same account 
   refreshConfiguration(setup.context);
   await runAdvisorCommand(['configure', 'a/gpt-5.3-codex'], setup.command, setup.advisor, false);
   await runAdvisorCommand(['on'], setup.command, setup.advisor, false);
-  const renew = vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockImplementation(async input => input.credential.accountAuth
-    ? { renewed: true, accountAuth: freshAccount } : { renewed: false });
+  const renew = observeOAuthRenewal(freshAccount);
   await invoke(setup);
   expect(renew).toHaveBeenCalledOnce();
   expect(setup.requests.map(row => [row.path, row.credential, row.model])).toEqual([
@@ -264,8 +262,7 @@ it('uses the newly persisted main token for an advisor sharing the same account 
 
 it.each(['missing-receipt', 'missing-retained', 'publication-declined', 'declined-retained', 'omitted-retained'] as const)('does not accept a main renewal checkpoint when %s', async kind => {
   const setup = await fixture('main'); setup.advisor.setEnabled(true);
-  vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockImplementation(async input => input.credential.accountAuth
-    ? { renewed: true, accountAuth: freshAccount } : { renewed: false });
+  observeOAuthRenewal(freshAccount);
   if (kind.startsWith('missing-')) {
     const renew = accounts.renewStoredAccount;
     vi.spyOn(accounts, 'renewStoredAccount').mockImplementation(async input => {
@@ -286,8 +283,7 @@ it.each(['missing-receipt', 'missing-retained', 'publication-declined', 'decline
 
 it('continues the main request when the checkpoint model reader fails just after credential publication', async () => {
   const setup = await fixture('main'); setup.advisor.setEnabled(true);
-  vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockImplementation(async input => input.credential.accountAuth
-    ? { renewed: true, accountAuth: freshAccount } : { renewed: false });
+  observeOAuthRenewal(freshAccount);
   const published = vi.fn(); setup.callbacks.publish = published;
   setup.callbacks.afterPublish = () => {
     vi.spyOn(modelState, 'readSessionModelEdit').mockImplementationOnce(() => { throw new Error('Fixture model reader unavailable'); });
@@ -302,8 +298,7 @@ it('continues the main request when the checkpoint model reader fails just after
 
 it.each([true, 'environment', 'scope'] as const)('prepares an expired independent account (%s) only for an eligible review and publishes a usable note for the renewed target', async kind => {
   const setup = await fixture(kind);
-  const renew = vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockImplementation(async input => input.credential.accountAuth
-    ? { renewed: true, accountAuth: freshAccount } : { renewed: false });
+  const renew = observeOAuthRenewal(freshAccount);
   await invoke(setup);
   expect(renew.mock.calls.filter(([input]) => input.credential.accountAuth)).toHaveLength(0);
   setup.advisor.configure({ every: 2, mode: 'turn', timeoutMs: 10000 }); setup.advisor.setEnabled(true);
@@ -313,7 +308,7 @@ it.each([true, 'environment', 'scope'] as const)('prepares an expired independen
   expect(renew.mock.calls.filter(([input]) => input.credential.accountAuth)).toHaveLength(1);
   expect(setup.requests.map(row => row.model)).toEqual(['main', 'main', 'main', 'gpt-5.4']);
   expect(setup.requests.at(-1)).toMatchObject({ credential: 'Bearer synthetic-fresh', effort: 'high' });
-  expect(getRuntimeConfig(setup.root).providerConnections.find(row => row.id === 'b')?.accountAuth?.openai).toEqual(freshAccount);
+  expect(getRuntimeConfig(setup.root).providerConnections.find(row => row.id === 'b')?.accountAuth?.openai).toMatchObject({ ...freshAccount, expiresAt: expect.any(Number) });
   expect(setup.advisor.view().status).toBe('reviewed');
   const note = setup.advisor.view().notes[0]!;
   expect(setup.advisor.apply(note.id).noteId).toBe(note.id);
@@ -321,8 +316,7 @@ it.each([true, 'environment', 'scope'] as const)('prepares an expired independen
 
 it.each(['settings', 'catalog', 'model'] as const)('an unrelated %s change inside credential publication cannot be adopted by preparation', async kind => {
   const setup = await fixture(true); setup.advisor.setEnabled(true);
-  vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockImplementation(async input => input.credential.accountAuth
-    ? { renewed: true, accountAuth: freshAccount } : { renewed: false });
+  observeOAuthRenewal(freshAccount);
   setup.callbacks.publish = () => {
     if (kind === 'model') { const edit = readSessionModelEdit(setup.session.id); writeSessionModel(setup.session.id, { ...edit.selection!, roles: {} }, edit); }
     else if (kind === 'catalog') writeCatalogCache(loadCatalog().map(provider => ({ ...provider, models: provider.models.map(model => ({ ...model, contextWindow: 64000 })) })));
@@ -335,16 +329,14 @@ it.each(['settings', 'catalog', 'model'] as const)('an unrelated %s change insid
 
 it.each(['cancel', 'configuration'] as const)('persists started renewal but refuses advisor dispatch after %s', async kind => {
   const setup = await fixture(true); setup.advisor.setEnabled(true); const controller = new AbortController();
-  vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockImplementation(async input => {
-    if (!input.credential.accountAuth) return { renewed: false };
+  observeOAuthRenewal(freshAccount, () => {
     if (kind === 'cancel') controller.abort(); else setup.context.configuration.recordDisplay({ theme: 'light' });
-    return { renewed: true, accountAuth: freshAccount };
   });
   await invoke(setup, controller.signal);
   // A cancelled exchange may settle after its caller; the retained claim must then clear.
   await vi.waitFor(() => expect(setup.advisor.view().pending).toBeUndefined());
   expect(setup.requests.map(row => row.model)).toEqual(['main']);
-  expect(getRuntimeConfig(setup.root).providerConnections.find(row => row.id === 'b')?.accountAuth?.openai).toEqual(freshAccount);
+  expect(getRuntimeConfig(setup.root).providerConnections.find(row => row.id === 'b')?.accountAuth?.openai).toMatchObject({ ...freshAccount, expiresAt: expect.any(Number) });
   expect(setup.advisor.view().notes).toHaveLength(0);
 });
 

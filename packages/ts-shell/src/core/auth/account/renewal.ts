@@ -1,56 +1,51 @@
-import { createHash, randomUUID } from 'node:crypto';
-import type { AccountAuthConfig } from '../../../config/runtimeConfig.js';
+import { credentialDigest } from './lineage.js';
 import { ConfigWriteError, type ConfigWriteState } from '../../../config/outcome.js';
-import { accountAuthFor, renewAccountAuthIfExpiring } from '../../../provider/request/authorization.js';
+import { accountAuthFor, nativeAccountProduction, renewAccountAuthIfExpiring } from '../../../provider/request/authorization.js';
+import type { AccountAuthConfig } from '../../../config/runtimeConfig.js';
 import type { ProviderCredentialResolution } from '../../shell/providerCredentials.js';
 import { assertAdmission, type Admission } from '../../network/admission.js';
 import { isExpiring } from '../oauth/flow.js';
-import { captureAccountEdit, persistAccountEdit, readAccountRotationReceipt, type AccountEdit } from './state.js';
+import { accountBinding, captureAccountEdit, persistAccountEdit, readAccountRotationReceipt, type AccountEdit } from './state.js';
 import type { AccountRotation } from './contract.js';
 import { sameValue } from '../../../config/values.js';
-import { acquireRefreshLease, finishRefreshLease, markRefreshDispatched, markRefreshUnknown,
-  readRefreshLease, refreshLineage, releaseRefreshLease } from './lease.js';
+import { acquireRefreshLease, finishRefreshLease, markRefreshDispatched, markRefreshUnknown, readRefreshAttempt,
+  recordRefreshProduction, refreshLeasesPath, captureLeaseStore, releaseRefreshLease, type RefreshClaim } from './lease.js';
 
 export interface StoredAccountRenewal {
   readonly accountAuth?: AccountAuthConfig;
   /** Optional in-memory proof for consumers of the credential publication. */
   readonly rotation?: AccountRotation;
-  /** The returned token was confirmed in its captured storage identity. */
   readonly stored: boolean;
   readonly writeState: ConfigWriteState;
   readonly cleanupFailed?: boolean;
   readonly failure?: string;
 }
 
-function credentialId(resolution: ProviderCredentialResolution): string {
-  return `${resolution.provider}:${resolution.credential?.connectionId ?? 'config'}`;
+function receiptFor(edit: AccountEdit, claim: RefreshClaim): AccountRotation | undefined {
+  const attempt = readRefreshAttempt(claim);
+  if (attempt?.phase !== 'rotated-persisted' || !attempt.production) return undefined;
+  const rotation = readAccountRotationReceipt(edit);
+  return rotation && sameValue(accountBinding(edit, rotation.accountAuth), {
+    owner: attempt.production.owner, generation: attempt.production.generation, storage: attempt.production.storage,
+  }) ? rotation : undefined;
 }
 
-/** The same lineage identity the pool uses, derived from the credential material. */
-function generation(account: AccountAuthConfig): string {
-  return createHash('sha256').update(JSON.stringify(account)).digest('hex').slice(0, 16);
-}
-
-async function waitForPeerRenewal(key: string, edit: AccountEdit): Promise<AccountRotation | undefined> {
+async function waitForPeerRenewal(claim: RefreshClaim, edit: AccountEdit): Promise<AccountRotation | undefined> {
   for (let attempt = 0; attempt < 25; attempt++) {
     await new Promise(resolve => setTimeout(resolve, 200));
-    const lease = readRefreshLease(key);
-    if (lease?.phase === 'unknown') return undefined;
-    if (lease) continue;
-    return readAccountRotationReceipt(edit);
+    const current = readRefreshAttempt(claim);
+    if (current?.phase === 'rotated-persisted') return receiptFor(edit, claim);
+    if (current?.phase === 'unknown') return undefined;
   }
   return undefined;
 }
 
-function rotationFor(edit: AccountEdit, accountAuth: AccountAuthConfig): AccountRotation | undefined {
-  try {
-    const rotation = readAccountRotationReceipt(edit);
-    return rotation && sameValue(rotation.accountAuth, accountAuth) ? rotation : undefined;
-  } catch { return undefined; }
+function failed(): StoredAccountRenewal {
+  return { stored: false, writeState: 'unchanged',
+    failure: 'A previous renewal may have spent this login. Reconnect with an independent login before retrying.' };
 }
 
-/** A spent token is conditionally saved even if the initiating operation ended.
- * Permission to dispatch the next request remains the caller's admission check. */
+/** The native response is fingerprinted before storage; only exact verified storage grants its successor. */
 export async function renewStoredAccount(input: {
   readonly workspaceRoot: string;
   readonly resolution: ProviderCredentialResolution;
@@ -58,58 +53,70 @@ export async function renewStoredAccount(input: {
   readonly admission?: Admission;
 }): Promise<StoredAccountRenewal> {
   const original = accountAuthFor(input.resolution.provider, input.resolution.credential ?? {});
-  if (!original || !isExpiring(original.expiresAt)) return { accountAuth: original, stored: false, writeState: 'unchanged' };
-
-  const owner = randomUUID();
-  const lineage = { provider: input.resolution.provider, credentialId: credentialId(input.resolution),
-    generation: generation(original), refreshToken: original.refreshToken };
-  const key = refreshLineage(lineage);
-  let ownsLease = false;
+  if (!original || !original.refreshToken?.trim() || !['openai', 'google'].includes(input.resolution.provider)) {
+    return { accountAuth: original, stored: false, writeState: 'unchanged' };
+  }
+  const expiring = isExpiring(original.expiresAt);
+  let claim: RefreshClaim | undefined;
   let dispatched = false;
   try {
     assertAdmission(input.admission);
+    const store = captureLeaseStore(refreshLeasesPath());
     const edit = captureAccountEdit(input.workspaceRoot, input.resolution);
+    const lease = acquireRefreshLease({ provider: input.resolution.provider,
+      credentialId: `${input.resolution.provider}:${input.resolution.credential?.connectionId ?? 'config'}`,
+      refreshToken: original.refreshToken, ...('clientId' in original ? { clientId: original.clientId } : {}),
+      store, binding: accountBinding(edit), prepare: expiring });
+    claim = lease.claim;
+    if (lease.recovered) {
+      if (original.expiresAt <= Date.now()) return { stored: false, writeState: 'unchanged',
+        failure: 'Account credential storage was recovered, but its access token has expired. Retry to renew the saved login.' };
+      return { accountAuth: original, stored: true, writeState: 'unchanged' };
+    }
+    if (!expiring) return { accountAuth: original, stored: false, writeState: 'unchanged' };
+    if (lease.unknown || !claim) return failed();
+    const captured = claim;
+    const scope = credentialDigest([captured.file, captured.profile?.rootIdentity, captured.key, captured.grantId, captured.attemptId,
+      captured.binding.owner, captured.binding.generation]);
     const result = await renewAccountAuthIfExpiring({ provider: input.resolution.provider,
       credential: input.resolution.credential ?? {}, fetchImpl: input.fetchImpl,
-      renewalLease: { acquire: () => {
-        try {
-          const lease = acquireRefreshLease({ ...lineage, owner });
-          ownsLease = lease.acquired;
-          return { acquired: lease.acquired, ...(lease.unknown ? { unknown: true } : {}) };
-        } catch { return { acquired: false, unknown: true }; }
-      } },
-      onDispatch: () => { markRefreshDispatched(key, owner); dispatched = true; } });
+      renewalLease: { shareKey: scope, acquire: () => ({ acquired: lease.acquired }) },
+      onDispatch: () => { markRefreshDispatched(captured); dispatched = true; } });
     if (result.leaseHeld) {
-      const fresh = await waitForPeerRenewal(key, edit);
+      const fresh = await waitForPeerRenewal(captured, edit);
       return fresh ? { accountAuth: fresh.accountAuth, rotation: fresh, stored: true, writeState: 'unchanged' }
         : { stored: false, writeState: 'unchanged', failure: 'Another process is renewing this login; retry shortly.' };
     }
-    if (result.leaseUnknown) return { stored: false, writeState: 'unchanged',
-      failure: 'A previous renewal may have spent this login. Reconnect the account before retrying.' };
-    if (result.failure || !result.accountAuth) {
-      if (dispatched) markRefreshUnknown(key, owner); else if (ownsLease) releaseRefreshLease(key, owner);
-      // Provider error text is not repeated here: it can carry request material.
+    const proof = nativeAccountProduction(result, scope);
+    if (result.failure || !result.accountAuth || !proof || sameValue(original, result.accountAuth)
+      || result.accountAuth.expiresAt <= Date.now()) {
+      if (dispatched) markRefreshUnknown(captured); else if (lease.acquired) releaseRefreshLease(captured);
       return { stored: false, writeState: 'unchanged',
-        failure: 'Account credential renewal failed. Reconnect the account, then retry.' };
+        failure: 'Account credential renewal failed or its native response was not verified. Reconnect the account, then retry.' };
     }
-    let saved: { accountAuth: AccountAuthConfig; writeState: 'unchanged' | 'persisted' };
-    try { saved = persistAccountEdit(edit, result.accountAuth); }
-    catch (error) {
-      // The server may have rotated the token while storage refused it.
-      if (dispatched) markRefreshUnknown(key, owner);
-      throw error;
+    const produced = { ...accountBinding(edit, result.accountAuth), lineage: proof.lineage };
+    if (produced.generation !== proof.generation) throw new Error('Native credential fingerprint mismatch.');
+    recordRefreshProduction(captured, produced);
+    const saved = persistAccountEdit(edit, result.accountAuth);
+    try { finishRefreshLease(captured, accountBinding(edit, saved.accountAuth)); }
+    catch {
+      // Saved bytes are truthful, but finalization must be recovered from this exact native fingerprint.
+      return { ...saved, stored: true, cleanupFailed: true };
     }
-    const rotation = rotationFor(edit, saved.accountAuth);
-    try { finishRefreshLease(key, lineage.generation); }
-    catch { return { ...saved, ...(rotation ? { rotation } : {}), stored: true, cleanupFailed: true }; }
-    return { ...saved, ...(rotation ? { rotation } : {}), stored: true };
+    const rotation = receiptFor(edit, captured);
+    if (!rotation) throw new ConfigWriteError('verification-failed', saved.writeState);
+    return { ...saved, rotation, stored: true };
   } catch (error) {
-    try { if (dispatched) markRefreshUnknown(key, owner); else releaseRefreshLease(key, owner); } catch { /* The durable state stays as written. */ }
+    try {
+      if (claim) {
+        const current = readRefreshAttempt(claim);
+        if (dispatched || current?.production) markRefreshUnknown(claim); else releaseRefreshLease(claim);
+      }
+    } catch { /* Preserve the last verified durable state. */ }
     const state = error instanceof ConfigWriteError ? error.state : 'unchanged';
     const code = error instanceof ConfigWriteError ? error.code : 'unavailable';
     const cleanupFailed = error instanceof ConfigWriteError && error.cleanupFailed;
-    return { stored: false, writeState: state,
-      ...(cleanupFailed ? { cleanupFailed: true } : {}),
+    return { stored: false, writeState: state, ...(cleanupFailed ? { cleanupFailed: true } : {}),
       failure: `Account credential renewal was not accepted (${code}; write state: ${state}${cleanupFailed ? '; lock cleanup failed' : ''}). Reload or reconnect before retrying.` };
   }
 }

@@ -7882,3 +7882,40 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 加载时恢复旧年龄清理，实际退出 1、两项失败；产品 hash 前后相同。首次反转使用 workspace 相对 config 路径而未运行测试，分类为夹具 setup，保留独立日志；改用绝对 config 后才取得有效反转。产物为 `.omx/verification/phase20/retention.reverse.*`。
 - 新编译模块的两个独立 seed/restart 进程场景（dispatched、unknown）通过：epoch=1 陈旧记录经无关账号 mutation 仍保留，实际 renewStoredAccount 拒绝、零 HTTP、配置字节不变，夹具已清理。仅本机 HTTP/合成凭据，未访问真实账号；产物为 `retention.process.mjs` 与 log。
 - 最终独立复核 APPROVED、4 文件/81 项实际通过；已确认成功 finish、重新登录、未发送接管及续期集成，另读回两进程和有效反转证据。与本地集重叠不相加。本条写入时尚未提交/推送，strict docs drift/diff 在本条后运行。不同存储槽位的消费 lineage、旧键迁移及 rotated-persisted 恢复仍开放；PRV-03/05 全请求限制/配额/归属、CTX-03 与其余全部 47 项继续，四项用户保留要求不变，本批不是 PRV-04 或阶段完成声明。
+
+
+### 前三批远端终态与 PRV-04 谱系返工
+
+- 实际读回辅助费用批 `6b1eab75cfa089f8f7424e25746fee296ef6bc26` 的 CI `39131315102`：completed/failure，终态更新时间 `2026-10-18T14:08:17Z`。job/check-run `117686908263` 的失败注释为 hosted runner lost communication；前八步 success，终态 API 中第九步仍为 in_progress，后续步骤 pending。失败日志为空，原始 archive 22 bytes、零条目。归因为 GitHub 报告的 runner 通信丢失；底层原因未证实，没有测试断言失败证据，也不能记为该 SHA 测试通过。未重启 run 或改动 CI/脚本。证据在 `.omx/verification/phase20/auxiliary.ci-39131315102.md` 及原始 archive；此前 pending 观察保留。
+- checkpoint 批 `c0f065385597e6cb3a5138b22a5fb7ba65360ad6` 的 CI `39133444370` 已实际读回 completed/success，更新时间 `2026-10-18T14:03:18Z`；Architecture Watch `39133444455` success。年龄保留批已推送为 `e4ae423de3a931b82b09a5dde137cc87565663f8`，CI `39134059372` completed/success，更新时间 `2026-10-18T14:16:20Z`；Architecture Watch `39134059381` success。两次核对均验证完整 head SHA，不改写旧失败记录。
+- PRV-04 继续返工：两个独立进程对复制槽位的同一 token 实际发送两次刷新，外来槽位直到配置 CAS 才失败。当前批处理槽位无关消费谱系、owner 绑定 grant、不可变 attempt、原生响应指纹、保留 rotated-persisted 和旧账本不确定性；具体源码仍在实施，尚未作为通过或交付记录。复现与验收矩阵在 `.omx/verification/phase20/lineage.before.*`、`lineage.process.mjs`、`lineage.audit.md`。
+- PRV-03…05 完整审计、CTX-03 及其余全部 47 项继续原范围；只保留用户明确推迟的四项环境/真实模型验证，不能用旧批 CI 通过关闭新谱系批或全阶段。
+
+
+### PRV-03/05 后续返工的已复现缺口
+
+- 对当前构建的纯凭据解析复现：主请求使用池内唯一成员，显式 active connection 与辅助角色仍取得池外凭据。原账号池文档和测试允许池外显式选择，和 Phase 20 §4.3/PRV-03 的封闭授权及子作用域只收紧裁决冲突；后续按裁决纠正这一旧期待，无池显式选择仍保留。复现退出 1，没有读取个人配置或发网络请求。
+- 两次实际本机 HTTP、确定性 response barrier 复现：较新 429 设置约 60 秒退避，较早请求的迟到 200 把同一 captured credential generation 的等待清为 0，错误允许提前再请求。参考限制级联拒绝池外 fallback、退避 owner 保留乱序响应最长 deadline；后续在现凭据与请求 owner 内修复，不新增执行/账本系统。
+- 证据与后续验收在 `.omx/verification/phase20/pool.inheritance.*`、`backoff.order.*`、`request.audit.md`。当前只完成缺陷确认和参考决定比较，产品未修复；排在正在实施的 PRV-04 谱系批之后，不把审计产物当通过或交付。
+
+
+### CTX-03 后续生命周期返工的已复现缺口
+
+- 三组独立 seed/restart 进程使用隔离合成会话：原 unknown 摘要步骤经过 100 年、33 个后继步骤或 17 个后继操作均再次取得 claim，允许自动重播。旧文档已指出保留上限的限制，本轮实际确认三条路径；尚未修复。
+- 实际手动压缩 owner 的合成存储复现：摘要生成后取消，以及生成期间增加新 turn，均调用一次提交并返回 compacted，缺少取消/历史 revision 最终 fence。复现退出 1，不涉及真实模型或个人配置。
+- 参考的共享 history/prefix 生成逐请求合计用量，手动/自动追加前再次检查取消；后续采用这些决定，并补本项目裁决要求的 durable unknown、claim fencing、history/branch/owner CAS 和合法分段。当前整段 history 加 prefix 的两个步骤不能等同于完整 segmentation/merge 调度。
+- 证据在 `.omx/verification/phase20/compaction.retention.*`、`compaction.commit.*`、`compaction.audit.md`。该批按依赖排在 PRV-03…05 后续验收之后，当前只确认缺口，CTX-03 和全阶段仍开放。
+
+
+### PRV-04 消费谱系、原生授权与精确存储恢复
+
+- 两独立进程的同 token 复制槽位复现，修复前实际发送两次刷新；V2 使用可信 provider/issuer/client 与 trimmed token 的槽位无关谱系，grant 绑定精确存储 owner/完整凭据。先持久化并读回 dispatched，再发送；同 owner 共享键绑定 store/grant/attempt，外来槽位在 HTTP 前拒绝且不给原生凭据。不可变 attempt 的 rotated-persisted 永久保留，stable token 也必须取得后继新 grant，不由 access generation 改变重新授权。
+- 原生 refresh/login 能力只在实际 token exchange 创建。配置保存前记录无秘密的下一凭据/谱系/owner/storage 指纹，保存由原 `AccountEdit` 条件验证，账本收尾同时保留消费历史和后继 grant。同 owner 跟随者可在 leader 写失败后独立保存唯一原生结果；迟到 unknown/release/finish 不回退 terminal。配置保存后账本写失败保留真实存储和 cleanup 未确认，重启只能用自己精确的原生存储指纹零 HTTP 恢复，复制后继不能借用证明。
+- V1 只按原 opaque owner/token key 映射；matched dispatched/unknown 和无法识别的 store-wide 不确定性不按年龄消失，旧 reader 拒绝 V2。只释放证实未发送的过期准备。V1 已删除的成功记录无法重建，证据为空的现有配置 enrollment 是兼容假设；独立权威存储不提供全局 mutex，profile import 继续丢弃 live rotating OAuth 并要求独立登录。
+- 登录在凭据写入前预留 enrollment；drop/throw/读回失败中止存储、报告 unchanged，不使未验证 payload 日后借用 baseline 授权。已有消费不确定性可保留 access 存储和明确续期警告；pending/provider/mirror/active 和写后原目标必须完全匹配才能 grant 或报告默认切换。HTTP/transport/decode 失败只显示安全类别，不回显 body、异常原文或凭据。
+- 独立复核发现并修复：已过期的原生刷新输出提前授予后继、保存后过期的恢复返回可用 success，以及固定账本路径绕过 profile 替换检测。接纳时已过期或完全未变的响应保持 unknown、无保存/后继；尚有效的短 lifetime 仍允许。恢复补完账本后若 access 已过期，零 HTTP、不给凭据并要求普通重试；下一次才合法使用后继。默认/named profile 的目录身份与绝对 file/lock 路径同时捕获，每次读及锁内 mutation 前后复查，替换目录不能派发；后续 current scope 不改写原 store。
+- 最终受影响集 38 文件/682 项通过；实施集 11 文件/288 项，独立最终 5 文件/178 项及六格原生流程/profile 反例复测通过，集合重叠不相加。L3 最终 APPROVED，精确源码指纹 `7d087d65885cb330ee8652410ab53c019bbd9acacfd1c3fe095f9578a946d9e5`。类型诊断相对 `e4ae423d` 为 149/149、无新增，不代表全项目 tsc 通过。
+- 14 项加载时反转均取得实际断言失败并退出 1：谱系槽位1、共享范围1、历史保留2、原生证明1、未识别 V1 fence3、dispatch fence1、精确恢复1、登录 baseline 排除1、reservation2、后继 enrollment1、过期输出2、过期恢复1、过期登录2、profile 身份2。未选中用例不计通过，原本即拒绝负 expiry 的两项不冒充反转失败。首轮共享变体只有超时，复制恢复用例又被过期保护遮蔽，均保留为无效反转；加强共享测试并改用直接 lease owner 断言后才得到有效证据。产品源码 hash 前后相同，产物为 `lineage.reversals.*`。
+- 两种构建通过，最终 TS manifest `81924e45b820`；与最终源码 digest/exe hash 的绑定已读回。新构建的复制槽位实际一次 HTTP；五组独立进程恢复验证旋转、stable 两代、保存后账本失败、过期恢复后普通重试和同 owner follower。三组 V1 seed/restart 全部零 HTTP、配置字节不变、旧 reader 拒绝 V2。default/named 替换各零 HTTP、原账本字节不变；有效 A scope 在后续 B context 仍只写 A 并发一次本机 HTTP。夹具均已清理，产物为 `lineage.process.*`、`lineage.recovery.*`、`lineage.migration.*`、`lineage.profile.*`。
+- 最终隔离 Linux PTY Node/exe × regular/fullscreen 四格通过：整套角色预设、显式 advisor on/off/on、A/low 续期后同回合 B/high 顾问、每格五次实际本机模型发送和一次受限 TLS OAuth 交换；HTTP 前 V2 dispatched 与后续 retained terminal/精确 successor grant 均确认，仅 owner token 字段改变，pathRules 保持准入、退出 0。只使用合成凭据/本机服务，临时 home/证书已清理，不当作真实 provider 验收。产物为 `lineage.pty.py`、log 与 `lineage/`。
+- 四项静态门禁及脚本测试 59 项通过；NormProof 退出 0、无环/解析义务 satisfied，仍为原九项函数上限 advisory，触及模块无新增越界。最终 strict docs drift/diff 在本条写入后运行。本条写入时尚未提交/推送，新 SHA CI 待实际查询；PRV-03/05 池外授权/迟到 success 清退避、CTX-03 与全部其余任务继续，四项用户保留验证范围不变，本批不构成全 PRV-04、W2 或 Phase 20 完成声明。

@@ -1,10 +1,10 @@
+import { observeOAuthRenewal } from '../../test-utils/oauth.js';
 import fs from 'node:fs';
 import http from 'node:http';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createAdvisorHarness, cleanupAdvisorHarnesses } from '../../test-utils/advisor.js';
 import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../config/runtimeConfig.js';
 import { resolveProviderCredential } from '../../core/shell/providerCredentials.js';
-import * as authorization from '../../provider/request/authorization.js';
 import * as persistence from '../../config/persistence.js';
 import { delegatedSteps } from './step.js';
 
@@ -45,7 +45,7 @@ async function fixture(catalogDefault = false) {
 
 it.each([false, true])('shares one verified rotation across two delegated models with catalog default %s and sends only the stored credential', async catalogDefault => {
   const setup = await fixture(catalogDefault);
-  const renew = vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockResolvedValue({ renewed: true, accountAuth: fresh });
+  const renew = observeOAuthRenewal(fresh);
   await Promise.all([setup.send(), setup.send('gpt-5.2')]);
   expect(renew).toHaveBeenCalledOnce(); expect(setup.published).toHaveBeenCalledOnce();
   expect(setup.requests).toHaveLength(2);
@@ -54,7 +54,7 @@ it.each([false, true])('shares one verified rotation across two delegated models
 });
 
 it.each(['logout', 'relogin', 'topology'] as const)('cached renewal cannot survive %s and never sends a replacement owner', async kind => {
-  const setup = await fixture(); const renew = vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockResolvedValue({ renewed: true, accountAuth: fresh });
+  const setup = await fixture(); const renew = observeOAuthRenewal(fresh);
   await setup.select.prepare('b/gpt-5.4');
   const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath()); const connections = edit.values.providerConnections!;
   writeUserRuntimeConfigFile({ ...edit.values, providerConnections: kind === 'logout' ? connections.filter(row => row.id !== 'b')
@@ -67,7 +67,7 @@ it.each(['logout', 'relogin', 'topology'] as const)('cached renewal cannot survi
 });
 
 it('unverified persistence prevents delegated publication and HTTP', async () => {
-  const setup = await fixture(); vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockResolvedValue({ renewed: true, accountAuth: fresh });
+  const setup = await fixture(); observeOAuthRenewal(fresh);
   vi.spyOn(persistence, 'persistConfigEdit').mockImplementation(() => {});
   await expect(setup.send()).rejects.toThrow(/not accepted/);
   expect(setup.published).not.toHaveBeenCalled(); expect(setup.requests).toEqual([]);
@@ -76,7 +76,7 @@ it('unverified persistence prevents delegated publication and HTTP', async () =>
 it('concurrent normal and preparing waiters cannot adopt each other\'s publication', async () => {
   const setup = await fixture();
   let release!: () => void; const held = new Promise<void>(resolve => { release = resolve; });
-  vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockImplementation(async () => { await held; return { renewed: true, accountAuth: fresh }; });
+  observeOAuthRenewal(fresh, () => held);
   const normal = setup.send();
   const publication = vi.fn((_rotation, publish) => publish());
   const preparing = setup.select.prepare('b/gpt-5.4', undefined, undefined, undefined, publication);

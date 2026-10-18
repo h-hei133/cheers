@@ -1,3 +1,4 @@
+import { observeOAuthRenewal } from '../../test-utils/oauth.js';
 import fs from 'node:fs';
 import http from 'node:http';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -18,7 +19,6 @@ import type { CompactionSetup } from '../../turn/session.js';
 import { readGoalEdit, writeGoal } from '../../planning/goal/store.js';
 import { readBoundSessionState } from '../../session/store/bound.js';
 import { decodeRequestLedger } from '../../core/agent/request/codec.js';
-import * as authorization from '../../provider/request/authorization.js';
 import * as attempts from '../../provider/request/attempt.js';
 import { credentialIdentityFor } from '../../core/auth/account/pool.js';
 import { compactionOperationsPath } from '../../session/compactionOperation.js';
@@ -212,13 +212,13 @@ it('renews only the summary account once before both history and prefix sends', 
   const fresh = { ...old, accessToken: 'synthetic-fresh', refreshToken: 'synthetic-rotated', expiresAt: Date.now() + 3600000 };
   writeUserRuntimeConfigFile({ ...edit.values, providerConnections: edit.values.providerConnections!.map(connection => connection.id === 'b'
     ? { ...connection, authType: 'account-auth', apiKey: undefined, accountAuth: { openai: old } } : connection) }, edit);
-  const renewal = vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockResolvedValue({ renewed: true, accountAuth: fresh });
+  const renewal = observeOAuthRenewal(fresh);
   const { deps } = runtime(setup);
   expect(await deps.compactHistory!(setup.session.id, setup.signal)).toMatchObject({ status: 'compacted' });
   expect(renewal).toHaveBeenCalledOnce();
   expect(setup.requests.map(request => request.credential)).toEqual(['Bearer synthetic-fresh', 'Bearer synthetic-fresh']);
   const stored = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
-  expect(stored.providerConnections!.find(connection => connection.id === 'b')?.accountAuth?.openai).toEqual(fresh);
+  expect(stored.providerConnections!.find(connection => connection.id === 'b')?.accountAuth?.openai).toMatchObject({ ...fresh, expiresAt: expect.any(Number) });
   expect(stored.providerConnections!.find(connection => connection.id === 'a')).toEqual(edit.values.providerConnections![0]);
   expect(stored.activeProviderConnectionId).toBe('a');
 });

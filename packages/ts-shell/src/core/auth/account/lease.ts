@@ -1,166 +1,155 @@
-import fs from 'node:fs';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { resolveUserDataFile } from '../../paths/userHome.js';
 import { profilePathOverride } from '../../paths/profile/context.js';
-import { withFileLock, writeJsonFileAtomic } from '../../../session/store/sessionFileStore.js';
-import { isRecord } from '../../values/record.js';
-import type { RuntimeProvider } from '../../../config/runtimeConfig.js';
-import { sameValue } from '../../../config/values.js';
+import { legacyRefreshLineage, refreshLineage, type RefreshIdentity } from './lineage.js';
+import { captureLeaseStore, mapLegacy, mutateLeases, readLeases } from './lease/state.js';
+import { claimAttempt, finalize, producedAttempt, recover } from './lease/transition.js';
+import { RefreshLeaseError, type RefreshBinding, type RefreshClaim, type RefreshProduction, type RefreshAttempt, type LoginClaim, type RefreshStore } from './lease/model.js';
 
-/**
- * Cross-process refresh ownership.
- *
- * An in-process single flight stops two callers in one process from spending the
- * same refresh token. A second process has its own map, so the same token can
- * still be exchanged twice — the second exchange fails because the first already
- * rotated it, and the account looks randomly broken. This file is the shared
- * record of which process owns which exchange, and how far it got.
- */
-export type RefreshPhase = 'prepared' | 'dispatched' | 'unknown';
-const VERSION = 1;
+export { RefreshLeaseError, refreshLineage, captureLeaseStore };
+export type { RefreshPhase, RefreshBinding, RefreshClaim, RefreshProduction, RefreshStore } from './lease/model.js';
 const LEASE_TTL_MS = 2 * 60_000;
-const UNKNOWN_TTL_MS = 7 * 24 * 60 * 60_000;
 
-interface LeaseRecord {
-  readonly owner: string;
-  readonly phase: RefreshPhase;
-  readonly generation: string;
-  readonly expiresAt: number;
-  readonly updatedAt: number;
-}
-interface LeaseFile { readonly version: number; readonly leases: Record<string, LeaseRecord> }
-
-export interface RefreshLeaseInput {
-  readonly provider: RuntimeProvider;
+export interface RefreshLeaseInput extends RefreshIdentity {
   readonly credentialId: string;
-  readonly generation: string;
-  readonly refreshToken: string;
+  readonly binding: RefreshBinding;
+  readonly file?: string;
+  readonly store?: RefreshStore;
   readonly owner?: string;
   readonly now?: number;
   readonly ttlMs?: number;
+  readonly prepare?: boolean;
 }
 
 export interface RefreshLeaseResult {
   readonly acquired: boolean;
   readonly owner: string;
-  /** The previous owner may have spent the token; replaying it is not authorized. */
   readonly unknown?: boolean;
   readonly holder?: string;
+  readonly claim?: RefreshClaim;
+  readonly recovered?: boolean;
 }
-
-export class RefreshLeaseError extends Error {}
 
 export function refreshLeasesPath(): string {
   return profilePathOverride('CHEERS_REFRESH_LEASES_FILE') || resolveUserDataFile('refresh-leases.json');
 }
 
-/** The refresh token is the thing an exchange spends, so it names the lineage. */
-export function refreshLineage(input: Pick<RefreshLeaseInput, 'provider' | 'credentialId' | 'refreshToken'>): string {
-  return createHash('sha256').update(`${input.provider}\u0000${input.credentialId}\u0000${createHash('sha256').update(input.refreshToken).digest('hex')}`).digest('hex');
-}
-
-function readFile(): LeaseFile {
-  let raw: unknown;
-  try { raw = JSON.parse(fs.readFileSync(refreshLeasesPath(), 'utf8')); }
-  catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { version: VERSION, leases: {} };
-    throw new RefreshLeaseError('Refresh lease state could not be read.');
-  }
-  if (!isRecord(raw) || raw.version !== VERSION || !isRecord(raw.leases)) throw new RefreshLeaseError('Refresh lease state has an unsupported shape.');
-  const leases: Record<string, LeaseRecord> = {};
-  for (const [key, value] of Object.entries(raw.leases)) {
-    if (!isRecord(value) || typeof value.owner !== 'string' || !['prepared', 'dispatched', 'unknown'].includes(String(value.phase))
-      || typeof value.generation !== 'string' || !Number.isSafeInteger(value.expiresAt) || !Number.isSafeInteger(value.updatedAt)) {
-      throw new RefreshLeaseError('Refresh lease state contains an invalid entry.');
+/** A baseline is compatibility enrollment, not evidence of earlier unrecorded exchanges. */
+export function acquireRefreshLease(input: RefreshLeaseInput): RefreshLeaseResult {
+  const store = input.store ?? captureLeaseStore(input.file ?? refreshLeasesPath());
+  const owner = input.owner ?? randomUUID(), now = input.now ?? Date.now();
+  const key = refreshLineage(input), oldKey = legacyRefreshLineage(input);
+  return mutateLeases(store, state => {
+    mapLegacy(state, key, oldKey, now);
+    if (Object.values(state.legacy).some(record => record.phase !== 'prepared')) return { acquired: false, owner, unknown: true };
+    const recovered = recover(state, key, input.binding, store, now);
+    if (recovered) return { acquired: false, owner, recovered: true };
+    const row = state.leases[key] ??= { attempts: {} };
+    const existing = row.active ? row.attempts[row.active] : undefined;
+    // A durable native response already names this successor. A copied slot cannot enroll it.
+    if (!row.grant && Object.values(state.leases).some(candidate => Object.values(candidate.attempts).some(attempt =>
+      attempt.production?.lineage === key))) {
+      return { acquired: false, owner, unknown: true };
     }
-    leases[key] = { owner: value.owner, phase: value.phase as RefreshPhase, generation: value.generation, expiresAt: value.expiresAt as number, updatedAt: value.updatedAt as number };
-  }
-  return { version: VERSION, leases };
-}
-
-function writeFile(file: LeaseFile): void {
-  writeJsonFileAtomic(refreshLeasesPath(), file);
-  if (!sameValue(readFile().leases, file.leases)) throw new RefreshLeaseError('Refresh lease state write could not be verified.');
-}
-
-function mutate<T>(action: (leases: Record<string, LeaseRecord>, now: number) => T, now = Date.now()): T {
-  return withFileLock(`${refreshLeasesPath()}.lock`, () => {
-    const file = readFile();
-    const leases = { ...file.leases };
-    for (const [key, value] of Object.entries(leases)) {
-      // Only unsent preparation expires. Age cannot prove that a dispatched or
-      // unknown token is safe to spend again, including during unrelated cleanup.
-      if (value.phase === 'prepared' && value.expiresAt < now - LEASE_TTL_MS) delete leases[key];
+    if (!row.grant && !row.enrollment && Object.values(row.attempts).every(attempt => attempt.phase === 'prepared' && attempt.expiresAt < now)) {
+      delete row.active;
+      row.grant = { ...input.binding, id: randomUUID(), origin: 'baseline' };
     }
-    const result = action(leases, now);
-    writeFile({ version: VERSION, leases });
-    return result;
+    if (!row.grant || row.grant.owner !== input.binding.owner || row.grant.generation !== input.binding.generation) {
+      return { acquired: false, owner, unknown: true, ...(existing ? { holder: existing.owner } : {}) };
+    }
+    if (Object.values(row.attempts).some(attempt => attempt.grantId === row.grant!.id && attempt.phase === 'rotated-persisted')) {
+      return { acquired: false, owner, unknown: true };
+    }
+    if (existing) {
+      const claim = { ...store, key, owner: existing.owner, grantId: existing.grantId, attemptId: existing.id, binding: input.binding };
+      if (existing.phase === 'unknown' || (existing.phase === 'dispatched' && existing.expiresAt < now)) {
+        if (existing.phase !== 'unknown') row.attempts[existing.id] = { ...existing, phase: 'unknown', updatedAt: now };
+        return { acquired: false, owner, holder: existing.owner, unknown: true, claim };
+      }
+      if (existing.expiresAt >= now) return { acquired: false, owner, holder: existing.owner, claim };
+      // Only an unsent preparation may be replaced. Its immutable attempt stays fenced.
+      delete row.active;
+    }
+    if (input.prepare === false) return { acquired: false, owner, ...(recovered ? { recovered: true } : {}) };
+    const id = randomUUID();
+    row.attempts[id] = { id, owner, grantId: row.grant.id, generation: input.binding.generation, phase: 'prepared',
+      updatedAt: now, expiresAt: now + (input.ttlMs ?? LEASE_TTL_MS) };
+    row.active = id; row.latest = id;
+    return { acquired: true, owner, claim: { ...store, key, owner, grantId: row.grant.id, attemptId: id, binding: input.binding },
+      ...(recovered ? { recovered: true } : {}) };
   });
 }
 
-/** Claim the lineage before anything is sent. An expired dispatched lease stays unknown. */
-export function acquireRefreshLease(input: RefreshLeaseInput): RefreshLeaseResult {
-  const owner = input.owner ?? randomUUID();
-  const now = input.now ?? Date.now();
-  const ttl = input.ttlMs ?? LEASE_TTL_MS;
+export function markRefreshDispatched(claim: RefreshClaim, now = Date.now()): void {
+  mutateLeases(claim, state => {
+    const existing = claimAttempt(state, claim), row = state.leases[claim.key]!;
+    if (row.active !== claim.attemptId || row.grant?.id !== claim.grantId || existing.phase !== 'prepared') {
+      throw new RefreshLeaseError('Refresh attempt ownership changed before dispatch.');
+    }
+    row.attempts[existing.id] = { ...existing, phase: 'dispatched', updatedAt: now, expiresAt: now + LEASE_TTL_MS };
+  });
+}
+
+export function recordRefreshProduction(claim: RefreshClaim, production: RefreshProduction, now = Date.now()): void {
+  mutateLeases(claim, state => producedAttempt(state, claim, production, now));
+}
+
+export function finishRefreshLease(claim: RefreshClaim, saved: RefreshBinding, now = Date.now()): void {
+  mutateLeases(claim, state => finalize(state, claim, saved, now));
+}
+
+/** A late leader cannot regress terminal consumption or erase its successor. */
+export function markRefreshUnknown(claim: RefreshClaim, now = Date.now()): void {
+  mutateLeases(claim, state => {
+    const existing = claimAttempt(state, claim), row = state.leases[claim.key]!;
+    if (row.active !== claim.attemptId || existing.phase === 'rotated-persisted') return;
+    if (existing.phase === 'dispatched' || existing.phase === 'unknown') {
+      row.attempts[existing.id] = { ...existing, phase: 'unknown', updatedAt: now };
+    }
+  });
+}
+
+export function releaseRefreshLease(claim: RefreshClaim): void {
+  mutateLeases(claim, state => {
+    const existing = claimAttempt(state, claim), row = state.leases[claim.key]!;
+    if (row.active === claim.attemptId && existing.phase === 'prepared') delete row.active;
+  });
+}
+
+export function readRefreshAttempt(claim: RefreshClaim): RefreshAttempt | undefined {
+  const row = readLeases(claim).leases[claim.key], attempt = row?.attempts[claim.attemptId];
+  return attempt?.grantId === claim.grantId && attempt.owner === claim.owner ? attempt : undefined;
+}
+
+export function readRefreshLease(key: string, source: string | RefreshStore = refreshLeasesPath()): RefreshAttempt | undefined {
+  const row = readLeases(typeof source === 'string' ? captureLeaseStore(source) : source).leases[key];
+  return row && (row.active || row.latest) ? row.attempts[(row.active || row.latest)!] : undefined;
+}
+
+/** New login storage cannot later borrow compatibility enrollment after native verification failed. */
+export function reserveRefreshLogin(input: RefreshIdentity & { readonly file?: string; readonly store?: RefreshStore; readonly owner: string;
+  readonly generation: string; readonly native: boolean }): LoginClaim | undefined {
   const key = refreshLineage(input);
-  return mutate((leases) => {
-    const existing = leases[key];
-    if (existing && existing.expiresAt >= now) {
-      return { acquired: false, owner, holder: existing.owner, ...(existing.phase === 'unknown' ? { unknown: true } : {}) };
-    }
-    if (existing?.phase === 'dispatched' || existing?.phase === 'unknown') {
-      // The previous owner may have spent the token and lost the answer. Taking
-      // over would replay a token the provider may have already rotated.
-      leases[key] = { ...existing, phase: 'unknown', updatedAt: now, expiresAt: now + UNKNOWN_TTL_MS };
-      return { acquired: false, owner, unknown: true, holder: existing.owner };
-    }
-    leases[key] = { owner, phase: 'prepared', generation: input.generation, updatedAt: now, expiresAt: now + ttl };
-    return { acquired: true, owner };
-  }, now);
+  const store = input.store ?? captureLeaseStore(input.file ?? refreshLeasesPath());
+  return mutateLeases(store, state => {
+    if (Object.values(state.legacy).some(record => record.phase !== 'prepared')) return undefined;
+    const row = state.leases[key];
+    if (row && (row.grant || row.enrollment || Object.keys(row.attempts).length)) return undefined;
+    const enrollment = { id: randomUUID(), owner: input.owner, generation: input.generation, native: input.native };
+    state.leases[key] = { enrollment, attempts: {} };
+    return { ...store, ...enrollment, key };
+  });
 }
 
-export function markRefreshDispatched(key: string, owner: string, now = Date.now()): void {
-  mutate((leases) => {
-    const existing = leases[key];
-    if (!existing || existing.owner !== owner || existing.phase !== 'prepared') throw new RefreshLeaseError('Refresh lease ownership changed before dispatch.');
-    leases[key] = { ...existing, phase: 'dispatched', updatedAt: now, expiresAt: now + LEASE_TTL_MS };
-  }, now);
-}
-
-/**
- * Clear the lineage after the token was stored.
- *
- * A follower that shared the exchange may persist it instead of the owner, so
- * completion is identified by the lineage generation rather than by the writer.
- * The key already includes the spent refresh token, so a new login cannot be
- * cleared by this call.
- */
-export function finishRefreshLease(key: string, generation: string, now = Date.now()): void {
-  mutate((leases) => {
-    const existing = leases[key];
-    if (!existing) return;
-    if (existing.generation !== generation) throw new RefreshLeaseError('Refresh lease generation changed before completion.');
-    delete leases[key];
-  }, now);
-}
-
-/** The server may have rotated the token; keep the lineage blocked until re-login. */
-export function markRefreshUnknown(key: string, owner: string, now = Date.now()): void {
-  mutate((leases) => {
-    const existing = leases[key];
-    if (!existing || existing.owner !== owner) return;
-    leases[key] = { ...existing, phase: 'unknown', updatedAt: now, expiresAt: now + UNKNOWN_TTL_MS };
-  }, now);
-}
-
-export function releaseRefreshLease(key: string, owner: string, now = Date.now()): void {
-  mutate((leases) => {
-    const existing = leases[key];
-    if (existing?.owner === owner && existing.phase === 'prepared') delete leases[key];
-  }, now);
-}
-
-export function readRefreshLease(key: string): LeaseRecord | undefined {
-  return readFile().leases[key];
+/** A native login grants only its unique reserved lineage after exact owner storage verification. */
+export function grantRefreshLogin(claim: LoginClaim, binding: RefreshBinding): boolean {
+  return mutateLeases(claim, state => {
+    const row = state.leases[claim.key], enrollment = row?.enrollment;
+    if (!enrollment || !enrollment.native || enrollment.id !== claim.id || enrollment.owner !== claim.owner
+      || enrollment.generation !== claim.generation || binding.generation !== claim.generation
+      || row.grant || Object.keys(row.attempts).length || Object.values(state.legacy).some(record => record.phase !== 'prepared')) return false;
+    row.grant = { ...binding, id: randomUUID(), origin: 'login', predecessor: enrollment.id };
+    return true;
+  });
 }

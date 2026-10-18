@@ -23,6 +23,7 @@ export interface OpenAIAccountAuthResult {
   readonly accountId?: string;
   readonly authorizeUrl: string;
   readonly callbackUrl: string;
+  readonly production?: object;
 }
 
 export async function loginOpenAIAccountViaAuthorizationCodeFlow(
@@ -36,6 +37,7 @@ export async function loginOpenAIAccountViaAuthorizationCodeFlow(
     ...(result.accountId ? { accountId: result.accountId } : {}),
     authorizeUrl: result.authorizeUrl,
     callbackUrl: result.callbackUrl,
+    production: result.production,
   };
 }
 

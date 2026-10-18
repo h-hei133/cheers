@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { createHash } from 'node:crypto';
 import { createPkcePair, createState } from "./pkce.js";
 import { startCallbackServer } from "./callback.js";
 
@@ -45,6 +46,32 @@ export interface OAuthTokens {
   /** The identity the token is scoped to, when the provider says. */
   readonly accountId?: string;
   readonly accountEmail?: string;
+  /** In-memory native login capability, never credential storage. */
+  readonly production?: object;
+}
+
+const loginProductions = new WeakMap<object, { readonly issuer: string; readonly client: string; readonly provider: string; readonly digest: string }>();
+
+export class OAuthExchangeError extends Error {
+  constructor(readonly code: 'http' | 'transport' | 'cancelled' | 'decode' | 'response' | 'access' | 'metadata' | 'expiry',
+    provider: string, step: string, readonly status?: number) {
+    const detail = { http: `failed with HTTP ${status}`, transport: 'transport failed', cancelled: 'cancelled',
+      decode: 'response could not be decoded', response: 'returned an invalid token response',
+      access: 'returned no access token', metadata: 'returned invalid token metadata', expiry: 'returned an expired access token' }[code];
+    super(`${provider}: ${step} ${detail}.`);
+  }
+}
+
+function loginDigest(tokens: OAuthTokens, provider: string): string {
+  return createHash('sha256').update(JSON.stringify([tokens.accessToken, tokens.refreshToken, tokens.expiresAt,
+    provider === 'openai' ? tokens.accountId ?? '' : tokens.accountEmail ?? ''])).digest('hex');
+}
+
+/** Raw payloads and proofs from another issuer/client or credential cannot authorize enrollment. */
+export function nativeOAuthLogin(tokens: OAuthTokens, config: OAuthProviderConfig): boolean {
+  const proof = tokens.production && loginProductions.get(tokens.production);
+  return !!proof && proof.issuer === config.tokenUrl && proof.client === config.clientId && proof.provider === config.id
+    && proof.digest === loginDigest(tokens, config.id);
 }
 
 export interface OAuthLoginResult extends OAuthTokens {
@@ -193,20 +220,22 @@ async function exchangeCode(
     ...(config.clientSecret ? { client_secret: config.clientSecret } : {}),
   });
   const payload = await post(config, body, input.fetchImpl, "token exchange");
-  return {
+  const tokens: OAuthTokens = {
     accessToken: payload.access_token,
     refreshToken: payload.refresh_token ?? "",
     expiresAt: expiryOf(payload),
     ...identity(payload),
   };
+  const production = Object.freeze({});
+  loginProductions.set(production, { issuer: config.tokenUrl, client: config.clientId, provider: config.id, digest: loginDigest(tokens, config.id) });
+  return { ...tokens, production };
 }
 
 /**
  * One form-encoded POST to the token endpoint.
  *
- * The body is never echoed on failure: it carries the authorization code and, for
- * a refresh, the refresh token itself. The status and the server's own message are
- * enough to act on and safe to show.
+ * Token endpoint response bodies can also contain credentials. Failure reports
+ * retain the provider, step and status without reading or echoing that body.
  */
 async function post(
   config: OAuthProviderConfig,
@@ -214,20 +243,31 @@ async function post(
   fetchImpl: typeof fetch,
   step: string,
 ): Promise<TokenPayload> {
-  const response = await fetchImpl(config.tokenUrl, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-  });
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    throw new Error(
-      `${config.label}: ${step} failed with HTTP ${response.status}${detail ? `: ${detail.slice(0, 300)}` : ""}`,
-    );
+  let response: Response;
+  try {
+    response = await fetchImpl(config.tokenUrl, {
+      method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: body.toString(),
+    });
+  } catch (error) {
+    const kind = error instanceof Error && error.name === 'AbortError' ? 'cancelled' : 'transport';
+    throw new OAuthExchangeError(kind, config.label, step);
   }
-  const payload = (await response.json()) as Partial<TokenPayload>;
+  if (!response.ok) {
+    void response.body?.cancel().catch(() => undefined);
+    throw new OAuthExchangeError('http', config.label, step, response.status);
+  }
+  let decoded: unknown;
+  try { decoded = await response.json(); }
+  catch { throw new OAuthExchangeError('decode', config.label, step); }
+  if (!decoded || typeof decoded !== 'object' || Array.isArray(decoded)) throw new OAuthExchangeError('response', config.label, step);
+  const payload = decoded as Partial<TokenPayload>;
   if (typeof payload.access_token !== "string" || payload.access_token.length === 0) {
-    throw new Error(`${config.label}: ${step} returned no access token.`);
+    throw new OAuthExchangeError('access', config.label, step);
+  }
+  if ((payload.refresh_token !== undefined && typeof payload.refresh_token !== 'string')
+    || (payload.id_token !== undefined && typeof payload.id_token !== 'string')
+    || (payload.expires_in !== undefined && (typeof payload.expires_in !== 'number' || !Number.isFinite(payload.expires_in) || payload.expires_in < 0))) {
+    throw new OAuthExchangeError('metadata', config.label, step);
   }
   return payload as TokenPayload;
 }

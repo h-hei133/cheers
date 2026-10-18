@@ -3,7 +3,7 @@ import { createServer, type Server } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
 import { createPkcePair, createState } from "./pkce.js";
 import { startCallbackServer } from "./callback.js";
-import { isExpiring, refreshOAuthTokens, runOAuthLogin, type OAuthProviderConfig } from "./flow.js";
+import { nativeOAuthLogin, isExpiring, refreshOAuthTokens, runOAuthLogin, type OAuthProviderConfig } from "./flow.js";
 import { oauthConfigFor, oauthProviderIds } from "./providers.js";
 
 const CONFIG: OAuthProviderConfig = {
@@ -354,4 +354,33 @@ describe("the providers this build can sign into", () => {
       if (saved !== undefined) process.env.GOOGLE_OAUTH_CLIENT_ID = saved;
     }
   });
+});
+
+
+it('binds a native login proof to its issuer, client, provider and exact returned credential', async () => {
+  const endpoint = tokenEndpoint({ access_token: 'native-proof-access', refresh_token: 'native-proof-refresh', expires_in: 3600 });
+  const result = await runOAuthLogin(CONFIG, { fetchImpl: endpoint.fetchImpl,
+    openBrowser: browserThatRedirects(state => `?code=native-code&state=${state}`) });
+  expect(nativeOAuthLogin(result, CONFIG)).toBe(true);
+  expect(nativeOAuthLogin({ ...result, production: {} }, CONFIG)).toBe(false);
+  expect(nativeOAuthLogin({ ...result, accessToken: 'copied-other-generation' }, CONFIG)).toBe(false);
+  expect(nativeOAuthLogin(result, { ...CONFIG, tokenUrl: 'https://other.invalid/token' })).toBe(false);
+  expect(nativeOAuthLogin(result, { ...CONFIG, clientId: 'other-client' })).toBe(false);
+  expect(nativeOAuthLogin(result, { ...CONFIG, id: 'other-provider' })).toBe(false);
+});
+
+
+it.each(['http', 'malformed', 'transport', 'abort'] as const)('keeps native token %s failures report-safe without exposing response text', async kind => {
+  const marker = 'PRIVATE_TOKEN_ENDPOINT_SENTINEL';
+  const fetchImpl = (async () => {
+    if (kind === 'transport') throw new Error(marker);
+    if (kind === 'abort') throw new DOMException(marker, 'AbortError');
+    return new Response(marker, { status: kind === 'http' ? 400 : 200 });
+  }) as typeof fetch;
+  let failure: unknown;
+  try { await runOAuthLogin(CONFIG, { fetchImpl, openBrowser: browserThatRedirects(state => `?code=private-code&state=${state}`) }); }
+  catch (error) { failure = error; }
+  expect(failure).toBeInstanceOf(Error); const message = (failure as Error).message;
+  expect(message).toContain('Test sign-in: token exchange'); expect(message).not.toContain(marker); expect(message).not.toContain('private-code');
+  expect(message).toContain(kind === 'http' ? 'HTTP 400' : kind === 'malformed' ? 'could not be decoded' : kind === 'abort' ? 'cancelled' : 'transport failed');
 });

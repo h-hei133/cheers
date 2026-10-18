@@ -45,7 +45,11 @@ provider-only 批已推送为 `c6206819db11c88984f95d0dee2c59eed4d9c23a`，Archi
 
 checkpoint 批已推送为 `c0f065385597e6cb3a5138b22a5fb7ba65360ad6`，Architecture Watch `39133444455` success；CI `39133444370` 仍为 in_progress。随后 PRV-04 复核发现按年龄删除 dispatched/unknown 使旧 token 重新获准的缺口，修复后受影响 7 文件/147 项、有效反转和两个独立进程重启场景通过，实际续期零 HTTP。该证据只覆盖年龄重播窗口；lineage/旧键迁移、rotated-persisted、完整账号限制与请求账本继续开放，独立复核和新 SHA 交付按开发日志记录。
 
+后续实际终态核对：辅助费用批 CI `39131315102` 为 failure，GitHub 注释 hosted runner lost communication；原始日志为空，没有测试失败断言证据，不能记为通过。checkpoint 批 CI `39133444370` 为 success；年龄保留批 `e4ae423de3a931b82b09a5dde137cc87565663f8` 的 CI `39134059372` 与 Architecture Watch `39134059381` 均 success。完整 SHA、时间与分类见日志。PRV-04 两独立进程的复制槽位复现仍发送两次刷新，新的谱系/grant/attempt/原生响应证据返工正在实施，尚未验收或交付。
+
 用户已允许后续验证的环境/真实模型项：START-03 受控冷缓存及剩余响应测量、QA-02 跨平台/IME/系统复制、QA-03 真实质量、TOOL-02 成本与 tokenizer 校准。**这项保留不覆盖可在本地完成的缺失实现和合成端到端验收。**
+
+PRV-04 谱系批本地验收通过：38 文件/682 项、14 项有效反转、两构建、跨进程复制槽位/五组恢复/三组 V1 迁移/default 与 named profile 替换拒绝、Linux Node/exe × regular/fullscreen 四格 PTY。最终独立复核 APPROVED、5 文件/178 项及原生探针通过，计数与本地集重叠不相加。完整 TypeScript 诊断相对 `e4ae423d` 为 149/149、无新增，不能记为全项目 tsc 通过。该批提交/推送/新 SHA CI 按日志及实际查询记录；PRV-03/05 已复现的池外授权与乱序退避、CTX-03 和其余全部 47 项继续原范围。
 
 ## 历史实现与交付记录（不代表本次复核通过）
 

@@ -1,3 +1,4 @@
+import { observeOAuthRenewal } from '../../test-utils/oauth.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,7 +11,6 @@ import { configurationBinding } from '../../core/shell/configuration.js';
 import { resolveProviderCredential } from '../../core/shell/providerCredentials.js';
 import type { SessionRuntimeDependencies } from '../../core/shell/sessionRuntime.js';
 import type { CliRuntimeInvocationInput } from '../../entrypoints/cliRuntimeInvocation.js';
-import * as authorization from '../../provider/request/authorization.js';
 import * as store from '../../session/store/sessionFileStore.js';
 import * as persistence from '../../config/persistence.js';
 import { createCacheWarmingRunner } from '../../turn/cacheWarm.js';
@@ -93,16 +93,16 @@ function refresh(deps: SessionRuntimeDependencies) {
 }
 
 it.each(['manual', 'abandoned'])('stores rotation before %s summary HTTP dispatch', async kind => {
-  vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockResolvedValue({ renewed: true, accountAuth: fresh });
+  observeOAuthRenewal(fresh);
   const { deps, context } = runtime();
   if (kind === 'manual') await deps.compactHistory!('summary-renewal', new AbortController().signal);
   else expect(await deps.summarizeAbandonedTurns!([])).toContain('<compacted-summary>\nSUMMARY\n</compacted-summary>');
   expect(received).toEqual([{ authorization: 'Bearer fresh-test', stored: true }]);
-  expect(context.runtimeConfig.providerConnections[0]?.accountAuth?.openai).toEqual(fresh);
+  expect(context.runtimeConfig.providerConnections[0]?.accountAuth?.openai).toMatchObject({ ...fresh, expiresAt: expect.any(Number) });
 });
 
 it.each(['manual', 'abandoned', 'cache'].flatMap(kind => ['unknown', 'persisted'].map(state => ({ kind, state }))))('reports $state storage and blocks $kind dispatch/publication after verification fails', async ({ kind, state }) => {
-  vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockResolvedValue({ renewed: true, accountAuth: fresh });
+  observeOAuthRenewal(fresh);
   if (state === 'unknown') vi.spyOn(store, 'writeTextFileAtomic').mockImplementation(() => {});
   else {
     const persist = persistence.persistConfigEdit;
@@ -125,20 +125,17 @@ it.each(['manual', 'abandoned', 'cache'].flatMap(kind => ['unknown', 'persisted'
 
 it('saves a started rotation but does not send a cancelled manual summary', async () => {
   const controller = new AbortController();
-  vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockImplementation(async () => {
-    controller.abort(new Error('operation ended')); return { renewed: true, accountAuth: fresh };
-  });
+  observeOAuthRenewal(fresh, () => { controller.abort(new Error('operation ended')); });
   const { deps } = runtime();
   await expect(deps.compactHistory!('summary-renewal', controller.signal)).rejects.toThrow('operation ended');
-  expect(read().providerConnections?.[0]?.accountAuth?.openai).toEqual(fresh); expect(received).toEqual([]);
+  expect(read().providerConnections?.[0]?.accountAuth?.openai).toMatchObject({ ...fresh, expiresAt: expect.any(Number) }); expect(received).toEqual([]);
 });
 
 it.each(['signal', 'admission'].flatMap(end => ['unknown', 'persisted'].map(state => ({ end, state }))))('keeps $state storage failure visible when manual summary $end ends', async ({ end, state }) => {
   const controller = new AbortController(); const { deps, context, renderLine } = runtime();
-  vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockImplementation(async () => {
+  observeOAuthRenewal(fresh, () => {
     if (end === 'signal') controller.abort(new Error('operation ended'));
     else context.session.id = 'another-session';
-    return { renewed: true, accountAuth: fresh };
   });
   if (state === 'unknown') vi.spyOn(store, 'writeTextFileAtomic').mockImplementation(() => {});
   else {
@@ -154,9 +151,9 @@ it.each(['signal', 'admission'].flatMap(end => ['unknown', 'persisted'].map(stat
 });
 
 it('stores a cache rotation and stops the request captured before credential publication', async () => {
-  const renewal = vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockResolvedValue({ renewed: true, accountAuth: fresh });
+  const renewal = observeOAuthRenewal(fresh);
   const { deps, context } = runtime(); const publication = context.configuration.current;
   expect(await refresh(deps)).toBeUndefined();
-  expect(renewal).toHaveBeenCalledOnce(); expect(read().providerConnections?.[0]?.accountAuth?.openai).toEqual(fresh);
+  expect(renewal).toHaveBeenCalledOnce(); expect(read().providerConnections?.[0]?.accountAuth?.openai).toMatchObject({ ...fresh, expiresAt: expect.any(Number) });
   expect(context.configuration.current).not.toBe(publication); expect(received).toEqual([]);
 });

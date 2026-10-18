@@ -29,6 +29,7 @@ export interface ProviderAccountAuthResult {
   readonly clientId?: string;
   readonly authorizeUrl: string;
   readonly callbackUrl: string;
+  readonly production?: object;
 }
 
 export interface ProviderAuthContract {

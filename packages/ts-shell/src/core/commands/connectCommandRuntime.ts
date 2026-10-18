@@ -94,7 +94,7 @@ export async function runConnectCommand(
   let persisted = false;
   const onPersisted = () => { persisted = true; };
   let output: string;
-  if (action === "login") output = await addConnection(rest, onPersisted);
+  if (action === "login") output = await addConnection(rest, onPersisted, context.cwd);
   else if (action === "set") output = await addConnectionFromLegacyAuthSet(rest, onPersisted);
   else if (action === "use" || action === "activate") output = activateConnection(rest, onPersisted);
   else if (action === "logout" || action === "remove" || action === "rm") output = removeConnection(rest, onPersisted);
@@ -104,7 +104,7 @@ export async function runConnectCommand(
 
 }
 
-export async function addConnection(args: string[], onPersisted?: () => void): Promise<string> {
+export async function addConnection(args: string[], onPersisted?: () => void, workspaceRoot?: string): Promise<string> {
   const syntax = parseConnectArgs(["login", ...args]);
   if (!syntax.ok) return `Invalid /connect arguments: ${syntax.reason}\n${syntaxHelp(connectSyntax)}`;
   const parsed = { positionals: syntax.args, flags: Object.fromEntries(syntax.flags) };
@@ -119,7 +119,7 @@ export async function addConnection(args: string[], onPersisted?: () => void): P
   }
 
   if (parsed.flags.account === true) {
-    return await runAccountAuthConnection(target, parsed.flags.label, onPersisted);
+    return await runAccountAuthConnection(target, parsed.flags.label, onPersisted, workspaceRoot);
   }
 
   if (parsed.flags.browser === true) {
@@ -454,6 +454,7 @@ export async function runAccountAuthConnection(
   target: ConnectPreset,
   labelFlag?: string | boolean,
   onPersisted?: () => void,
+  workspaceRoot?: string,
 ): Promise<string> {
   return runProviderAccountAuthLogin({
     provider: target.provider,
@@ -461,5 +462,6 @@ export async function runAccountAuthConnection(
     defaultModel: target.defaultModel,
     labelOverride: parseFlagValue(labelFlag),
     onPersisted,
+    workspaceRoot,
   });
 }

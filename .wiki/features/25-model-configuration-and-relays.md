@@ -163,7 +163,7 @@ overlay默认只读输入；显式编辑目标沿用[persistence.ts:35](../../pa
 
 账号池是显式授权集合，限定profile、provider、connection endpoint/协议、OAuth受众/tenant/region。稳定credentialId和generation不等于数组下标/email；空集合代表零授权，限制无效必须拒绝，不能回退env或默认账号。主请求、compact、advisor、subagent、标题及cache warming都继承同一限制，子作用域只可收紧。
 
-沿用现[account/state.ts:69](../../packages/ts-shell/src/core/auth/account/state.ts#L69)精确归属与条件保存，在[authorization.ts:203](../../packages/ts-shell/src/provider/request/authorization.ts#L203)的进程内single-flight之上增加跨进程refresh lease、锁内重读、CAS与owner fencing。存储owner的profile+credentialId+generation与可消费refresh lineage分别建模：互斥须覆盖同一lineage，不能靠换profile/id制造第二次授权。首版用§7.1的独立重登录避免跨profile live-token克隆；不暗中共享default的refresh authority。迟到refresh不得覆盖删除/重新登录，不能先花token再争lease。
+沿用现[account/state.ts:69](../../packages/ts-shell/src/core/auth/account/state.ts#L69)精确归属与条件保存，在[authorization.ts](../../packages/ts-shell/src/provider/request/authorization.ts)进入进程内 single-flight 之前，先捕获 owner 并取得槽位无关的跨进程 refresh 授权；共享必须绑定原存储、grant 和不可变 attempt，条件保存继续由账号 owner 负责。存储owner的profile+credentialId+generation与可消费refresh lineage分别建模：互斥须覆盖同一lineage，不能靠换profile/id制造第二次授权。首版用§7.1的独立重登录避免跨profile live-token克隆；不暗中共享default的refresh authority。迟到refresh不得覆盖删除/重新登录，不能先花token再争lease。
 
 lease/CAS不能保证网络副作用恰好一次。当前[exchange后返回](../../packages/ts-shell/src/provider/request/authorization.ts#L258)与[后置保存](../../packages/ts-shell/src/core/auth/account/renewal.ts#L31)之间仍有故障窗口。新增refresh持久状态prepared→dispatched→rotated-persisted，以及unknown；dispatch前记录归属，服务器可能已旋转而响应丢失、取消或落盘前退出时保留unknown。lease过期不证明未发送，接管者不能重放同一旧token；仅provider明确支持可安全重用/幂等时按其契约恢复，否则要求重新登录。迟到成功响应仍按原owner/generation条件保存，取消等待不应直接丢弃唯一新token。
 

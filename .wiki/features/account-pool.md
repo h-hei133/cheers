@@ -53,27 +53,38 @@ OAuth 受众沿用现有凭据类型检查：OpenAI 账户 token、Google 账户
 
 ## 5. Refresh 归属与跨进程互斥
 
-同一 refresh token 的交换由 profile 内的 `refresh-leases.json`（`CHEERS_REFRESH_LEASES_FILE` 可覆盖，必须位于 profile 内）协调。lineage key 是 provider + credentialId + refresh token 摘要；条目记录 owner、阶段与 generation：
+同一 profile 的权威 `refresh-leases.json` 使用 V2；`CHEERS_REFRESH_LEASES_FILE` 覆盖仍必须位于 profile 内。实现与合成验收已完成，提交、推送和远端结果以开发日志为准；旧批的并发和年龄测试不能作为 V2 全部验收。
 
-| 阶段 | 含义 |
+消费谱系由可信 provider/issuer/client 与去除首尾空白的 refresh token 摘要确定，不包含连接 id。每个授权 grant 另绑定权威存储、精确槽位/镜像 owner 与完整凭据摘要；显示用的 credential generation 不作为刷新许可。复制槽位不能取得同一谱系的第二份授权。
+
+| 持久事实 | 含义 |
 |---|---|
-| `prepared` | 已取得所有权，尚未发送 |
-| `dispatched` | 已越过发送边界，服务端可能已旋转 |
-| `unknown` | 结果不可验证；禁止重放旧 token，需重新登录 |
+| grant | 有唯一 id 的当前授权，记录 baseline、native login 或已验证旋转来源 |
+| prepared | 不可变 attempt 已取得 grant，尚未发送；只可接管已过期的未发送准备 |
+| dispatched | 实际 HTTP 前已写入并读回；可能已消费 token |
+| unknown | 无法验证交换结果或保存；保留拒绝，不凭过期/改 access 字段授权重播 |
+| native production | 配置写入前记录下一凭据、谱系与精确 owner/storage 指纹，不含原始 token 或响应 |
+| rotated-persisted | 原 attempt 的消费和存储已确认，永久保留 predecessor；只给精确已存结果建立后继 grant |
 
-同进程仍先走既有 single-flight：共享调用不会重复取得 lease，只有真正执行交换的调用取 lease。其他进程遇到活动 lease 时等待有界时间并重读已保存凭据；遇到过期 `dispatched` 或 `unknown` 时直接拒绝发送并要求重新登录。持久化成功后按 lineage generation 清除条目，因此共享调用中的跟随者也能确认完成；generation 不匹配拒绝清除。迟到响应仍由 `persistAccountEdit` 的完整身份比较拒绝，不覆盖重新登录、删除或换连接后的新 generation。
+同进程与跨进程均先捕获实际 `AccountEdit`、固定权威账本路径并取得谱系授权，再进入原生 single-flight。同进程共享键包含存储、owner、grant 与 attempt；同 owner 的跟随者可以取得唯一原生结果并独立条件保存，另一槽位不能取得原生凭据或外来存储回执。跨进程跟随者只等对应 attempt 的 terminal，再验证自己捕获的 owner。等待者不把条目删除当作成功。
 
-发送标记在实际刷新 fetch 之前持久化并读回；标记无法验证则不发送。已经开始的交换发生网络失败、响应丢失或存储不可验证时，保留 `unknown`，后继调用不重放原 refresh token。
+固定路径同时保留启动时的 profile 目录身份；每次账本读取和锁内 mutation 都重新验证，包括 default profile。原目录被删除、替换或改为链接后，旧 attempt 不能在同名新目录派发；后续环境或当前 profile 变化也不能把原操作改指向另一存储。
 
-只有未发送的 `prepared` 记录按时间淘汰。`dispatched/unknown` 不因年龄或其他账号的清理而删除；过期只取消活动所有权，不证明旧 token 可以再次消耗。多年后重启、更换 access generation 或操作其他 lineage 仍保留拒绝事实；正常已验证持久化继续按原 generation 完成清理，新 refresh token 不受旧记录限制。
+原生响应能力只在实际 token exchange 内创建；任意返回对象或伪造 capability 不能授权下一代。响应先写无秘密指纹，再由 `persistAccountEdit` 条件保存并读回确认，最后在账本同一次 mutation 中保留消费历史和授予后继。服务端保留 refresh token 时，后继使用同一谱系的新 grant；旧 grant 和 attempt 不能被新 access generation 复活。迟到 unknown/release/finish 必须检查原不可变 attempt/grant，不能回退 terminal 或删除后继。
 
-等待 peer 完成的调用仍使用交换前捕获的 `AccountEdit`：配置存储位置、provider、连接、endpoint、账号元数据、原始选择规则和镜像必须与该 owner 的旋转结果一致。原连接消失不能借用 provider 槽；不把另一账号的新 token 当作成功。完成凭据必须有变化且仍有效；服务端保留 refresh token、只更新 access token/expiry 也可接受。读回验证不重写 peer 已保存的配置。
+刷新响应的 access 凭据在接纳时必须尚未过期；已过期或完全未变化的原生结果保留 unknown，不保存为可用后继，也不在下次调用自动重播。尚有效但进入 60 秒续期窗口的凭据仍可接纳，该窗口不等于实际过期。
 
-本地证据包含真实两个 Node 进程与本机 HTTP 的成功、稳定 refresh token、删除、重登录及响应丢失五格；每格只发送一次交换。未访问真实账号，不能据此宣称真实 provider 或全部委派消费者已完成验收。
+配置已存但账本完成写失败时，已存 access 凭据仍是事实，返回 cleanup 未确认。新进程只能用当前**自己的**存储匹配此前持久化的原生指纹，补完账本且零 HTTP；复制其他槽位的凭据、仅发现配置字节变化或缺少原生响应指纹都不能恢复授权。当前没有跨网络与文件的崩溃原子性承诺。
 
-profile 导入不复制 live rotating OAuth，因此不会产生第二个可消费授权；lease 文件也不跨 profile 共享。
+恢复时若已存 access 凭据已经过期，仍补完消费历史，但明确报告需重试，不返回过期凭据作为成功结果；下一次普通调用才可使用已经验证的后继 grant 刷新。无法识别的旧记录在恢复前检查，已有登录预留不能被后继授权覆盖。
 
-不同存储槽位的同一消费 lineage 互斥、旧键迁移以及 `rotated-persisted` 故障恢复仍须按 PRV-04 复核；当前的年龄保留修复不能代替这些验收。
+V1 使用同一权威文件和锁迁移，旧 reader 必须拒绝 V2。能由当前 owner/token 重算的原 opaque key 才能映射，matched dispatched/unknown 保留；删除/改名后无法识别的旧记录保持 store-wide fence，不能按年龄淘汰。只有证实未发送的过期 prepared 可以释放。V1 曾删除的成功消费记录无法重建；证据为空的现有配置 enrollment 是明确的兼容假设，不是证明 token 从未使用。
+
+新的 native login 同样需要实际 authorization-code exchange 的能力，以及未变更的 pending slot/provider/mirror 和写后确认。原始返回 payload 不能 mint grant。已知谱系历史或无法识别的 V1 不确定性不被重登录覆盖；可以保留已确认存储的 access 凭据，但必须显示 automatic renewal 未验证及独立 fresh profile 登录路径。
+
+新的登录在凭据保存前持久化 enrollment，防止未验证返回值日后借用 baseline 兼容授权。预留写入抛错、丢写或读回失败时，中止凭据保存并报告 write state unchanged；已经存在的消费不确定性则可保留 access 存储并显示续期警告。OpenAI/Google 登录结果接纳时也必须尚有效；过期结果不建立连接凭据或 grant。写后 provider/active 选择与精确 pending owner 都必须一致，才能报告默认切换成功。
+
+首版 profile 导入继续丢弃 live rotating OAuth，目标要求独立登录；不同权威存储之间不提供共享 mutex，不能宣称任意手动复制 token 到两个独立 profile 仍可全局互斥。账本不跨 profile 暗中共享。
 
 ## 6. 委派请求的续期与发布
 
