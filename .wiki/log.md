@@ -7806,3 +7806,13 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 两路最终结论代码 APPROVE / 架构 CLEAR。代码独立 143 项及 direct-step 83 项通过；架构最终 step/stream/catalog 94 项通过，之前 summary/completion 等 59 项通过（集合重叠，不相加）。两构建通过，TS manifest `15759ac2a850`。Linux 隔离 PTY Node/exe × regular/fullscreen × 明确/默认地址八格全部通过：模型菜单 16k 元数据、relay 专属模型、命令切换、真实本机请求 high→strong、输出字段和温度遗漏检查、全局配置字节不变、退出 0。仅使用合成凭据。
 - cycles、config consumers（53/53）、declarations、Node floor 与脚本测试 59 项通过；NormProof 退出 0、verdict partial，导入/无环 satisfied，仍是原 9 个函数上限 advisory，触及产品模块均未越界。最终 strict docs drift 与 diff 检查在文档完成后运行。
 - 本条记录时目录批尚未提交/推送，新 SHA CI 待实际读回。独立 advisor/subagent 账号续期、PRV-03…05、CTX-03 完整 history/branch/owner CAS 与未决 claim 留存，以及其余 47 项继续推进；本批不构成 W2 或阶段完成声明。
+
+### PRV-04 刷新发送与跨进程读回
+
+- 目录批已推送为 `760b078855a4c08ab980dbd85c254e6a343bb5fe`；Architecture Watch `39106440957` success，CI `39106440859` failure。唯一失败为既有 grepStream 取消夹具启动时 `spawn ETXTBSY`，8652 通过、1 失败、2 跳过；同一未改 suite 本地 13 项通过。没有重启或把该 run 记为成功，失败输出保留于 `.omx/verification/phase20/catalog.ci-failed.log`。
+- 续期 peer 读回复用 account state 捕获的 owner 和选择规则，验证配置存储路径、provider、连接、endpoint、账号身份、拓扑及精确镜像。删除原连接不得借 provider 槽，重登录不能接受另一账号；保留 refresh token、仅变 access token/expiry 的有效旋转也可确认，读回不重写存储。
+- 实际 OAuth refresh fetch 此前未调用已传入的 `onDispatch`。现于 HTTP 前持久化并验证发送标记；标记失败零发送，响应丢失保留 unknown，后继调用不重放可能已经消耗的 refresh token。只读参考采用锁内重验、已开始交换必须完成条件持久化的决定，保留本项目更强的 owner/CAS/lease 边界，没有第二套凭据存储。
+- 最终产品代码受影响 9 文件/170 测试通过。相对 `760b0788` 类型诊断 149/149、无新增，不代表全项目 tsc 通过。两种构建通过，TS manifest `a30934ef2560`。peer reader 与 dispatch 两项加载时反转均实际退出 1，分别 10 失败/2 通过及 2 失败，产品源未回退。
+- 新编译模块的真实两个 Node 进程与本机合成 HTTP 验证五格通过：旋转 refresh token、稳定 refresh token、删除连接、有诱惑性 fallback 的重登录/owner 检查、丢响应后另进程重试。每格恰好一次刷新 HTTP，跟随者不改存储字节，丢响应 lease 保留 unknown；夹具已清理。产物为 `.omx/verification/phase20/renewal.process.mjs` 与对应 log。没有访问真实账号，本批没有新跑 PTY。
+- 独立代码 APPROVE、架构 CLEAR；各自运行 4 文件/102 项通过。四项静态门禁通过，NormProof 退出 0、verdict partial，原九项函数上限 advisory 保持，触及模块未越界。最终文档 drift 和 diff 在文档完成后检查。
+- 本条写入时续期前置批尚未提交/推送；下一批接入独立 subagent/advisor，保留 advisor publication/model 身份隔离，不能因续期自动放宽。全部 47 项继续原范围，本批不构成 PRV-04/05、W2 或全阶段完成。

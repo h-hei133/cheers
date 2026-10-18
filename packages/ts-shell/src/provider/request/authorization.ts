@@ -274,7 +274,10 @@ async function exchangeAccountAuth(input: {
   readonly onDispatch?: () => void;
 }): Promise<AccountAuthRenewal> {
   try {
-    const tokens = await refreshOAuthTokens(input.config, input.refreshToken, input.fetchImpl);
+    const tokens = await refreshOAuthTokens(input.config, input.refreshToken, (url, init) => {
+      input.onDispatch?.();
+      return input.fetchImpl(url, init);
+    });
     return {
       accountAuth: {
         ...input.account,

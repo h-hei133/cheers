@@ -2,7 +2,7 @@
 title: "显式账号池"
 category: article
 created: 2026-10-17
-updated: 2026-10-17
+updated: 2026-10-18
 tags: [auth, accounts, phase-20]
 summary: "按 provider 限定的封闭连接集合：显式成员、endpoint/OAuth 受众约束、稳定 credential 身份、会话亲和；空池零发送且不回退环境或 profile 凭据。"
 ---
@@ -47,7 +47,7 @@ OAuth 受众沿用现有凭据类型检查：OpenAI 账户 token、Google 账户
 
 ## 4. 边界
 
-- 本批不做轮换、quota/429 退避归属和跨进程 refresh lease；这些属于 PRV-04/05。
+- refresh lease 与请求凭据代次已接入；独立 advisor/subagent 的发送前续期、完整 quota/429 归属仍按 PRV-04/05 继续复核。
 - 不复制 live rotating OAuth 到其他 profile；每个 profile 独立登录。
 - 已验证：池校验、空池、不可用成员、池内选择、显式连接优先、会话亲和、身份/代际；未运行真实 provider。
 
@@ -62,5 +62,11 @@ OAuth 受众沿用现有凭据类型检查：OpenAI 账户 token、Google 账户
 | `unknown` | 结果不可验证；禁止重放旧 token，需重新登录 |
 
 同进程仍先走既有 single-flight：共享调用不会重复取得 lease，只有真正执行交换的调用取 lease。其他进程遇到活动 lease 时等待有界时间并重读已保存凭据；遇到过期 `dispatched` 或 `unknown` 时直接拒绝发送并要求重新登录。持久化成功后按 lineage generation 清除条目，因此共享调用中的跟随者也能确认完成；generation 不匹配拒绝清除。迟到响应仍由 `persistAccountEdit` 的完整身份比较拒绝，不覆盖重新登录、删除或换连接后的新 generation。
+
+发送标记在实际刷新 fetch 之前持久化并读回；标记无法验证则不发送。已经开始的交换发生网络失败、响应丢失或存储不可验证时，保留 `unknown`，后继调用不重放原 refresh token。
+
+等待 peer 完成的调用仍使用交换前捕获的 `AccountEdit`：配置存储位置、provider、连接、endpoint、账号元数据、原始选择规则和镜像必须与该 owner 的旋转结果一致。原连接消失不能借用 provider 槽；不把另一账号的新 token 当作成功。完成凭据必须有变化且仍有效；服务端保留 refresh token、只更新 access token/expiry 也可接受。读回验证不重写 peer 已保存的配置。
+
+本地证据包含真实两个 Node 进程与本机 HTTP 的成功、稳定 refresh token、删除、重登录及响应丢失五格；每格只发送一次交换。未访问真实账号，不能据此宣称真实 provider 或全部委派消费者已完成验收。
 
 profile 导入不复制 live rotating OAuth，因此不会产生第二个可消费授权；lease 文件也不跨 profile 共享。

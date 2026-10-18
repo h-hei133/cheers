@@ -1,12 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { accountAuthKey } from '../../providers/facts.js';
-import { getRuntimeConfig, type AccountAuthConfig } from '../../../config/runtimeConfig.js';
+import type { AccountAuthConfig } from '../../../config/runtimeConfig.js';
 import { ConfigWriteError, type ConfigWriteState } from '../../../config/outcome.js';
 import { accountAuthFor, renewAccountAuthIfExpiring } from '../../../provider/request/authorization.js';
 import type { ProviderCredentialResolution } from '../../shell/providerCredentials.js';
 import { assertAdmission, type Admission } from '../../network/admission.js';
 import { isExpiring } from '../oauth/flow.js';
-import { captureAccountEdit, persistAccountEdit } from './state.js';
+import { captureAccountEdit, persistAccountEdit, readAccountRotation, type AccountEdit } from './state.js';
 import { acquireRefreshLease, finishRefreshLease, markRefreshDispatched, markRefreshUnknown,
   readRefreshLease, refreshLineage, releaseRefreshLease } from './lease.js';
 
@@ -28,29 +27,13 @@ function generation(account: AccountAuthConfig): string {
   return createHash('sha256').update(JSON.stringify(account)).digest('hex').slice(0, 16);
 }
 
-/** Re-read the stored slot after another process finished; never invent a token. */
-function storedAccountAuth(workspaceRoot: string, resolution: ProviderCredentialResolution): AccountAuthConfig | undefined {
-  const slot = accountAuthKey(resolution.provider);
-  if (!slot) return undefined;
-  const config = getRuntimeConfig(workspaceRoot);
-  const connectionId = resolution.credential?.connectionId;
-  if (connectionId) {
-    const connection = config.providerConnections.find(candidate => candidate.id === connectionId);
-    const auth = connection?.accountAuth?.[slot];
-    if (auth) return auth;
-  }
-  return config.providerCredentials[resolution.provider]?.accountAuth?.[slot];
-}
-
-async function waitForPeerRenewal(key: string, workspaceRoot: string, resolution: ProviderCredentialResolution,
-  original: AccountAuthConfig): Promise<AccountAuthConfig | undefined> {
+async function waitForPeerRenewal(key: string, edit: AccountEdit): Promise<AccountAuthConfig | undefined> {
   for (let attempt = 0; attempt < 25; attempt++) {
     await new Promise(resolve => setTimeout(resolve, 200));
     const lease = readRefreshLease(key);
     if (lease?.phase === 'unknown') return undefined;
     if (lease) continue;
-    const fresh = storedAccountAuth(workspaceRoot, resolution);
-    return fresh && fresh.refreshToken !== original.refreshToken ? fresh : undefined;
+    return readAccountRotation(edit);
   }
   return undefined;
 }
@@ -86,7 +69,7 @@ export async function renewStoredAccount(input: {
       } },
       onDispatch: () => { markRefreshDispatched(key, owner); dispatched = true; } });
     if (result.leaseHeld) {
-      const fresh = await waitForPeerRenewal(key, input.workspaceRoot, input.resolution, original);
+      const fresh = await waitForPeerRenewal(key, edit);
       return fresh ? { accountAuth: fresh, stored: true, writeState: 'unchanged' }
         : { stored: false, writeState: 'unchanged', failure: 'Another process is renewing this login; retry shortly.' };
     }

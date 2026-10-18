@@ -9,7 +9,7 @@ import * as store from '../../../session/store/sessionFileStore.js';
 import * as authorization from '../../../provider/request/authorization.js';
 import * as persistence from '../../../config/persistence.js';
 import { ConfigWriteError } from '../../../config/outcome.js';
-import { acquireRefreshLease, markRefreshDispatched, markRefreshUnknown, refreshLineage } from './lease.js';
+import { acquireRefreshLease, markRefreshDispatched, markRefreshUnknown, readRefreshLease, refreshLineage } from './lease.js';
 import { projectModelSelection } from '../../../session/model/projection.js';
 
 let home: string;
@@ -179,6 +179,53 @@ it('lets shared callers independently confirm the same rotated credential withou
   expect(fetchImpl).toHaveBeenCalledOnce(); expect(results.every(result => result.stored)).toBe(true);
   expect(results.map(result => result.writeState).sort()).toEqual(['persisted', 'unchanged']);
   expect(results[0].accountAuth).toEqual(results[1].accountAuth);
+});
+
+it.each([true, false])('accepts a completed peer renewal without rewriting storage (rotating refresh token: %s)', async rotates => {
+  const before = read();
+  const config = projectModelSelection(getRuntimeConfig(root), { connectionId: 'b', connectionScope: 'session', provider: 'openai', model: 'gpt-5.3-codex' });
+  const resolution = resolveProviderCredential({ runtimeConfig: config, env: {} });
+  const fresh = { ...auth('b'), accessToken: 'peer-fresh-b', refreshToken: rotates ? 'peer-rotated-b' : 'refresh-b', expiresAt: Date.now() + 3600000 };
+  let peerBytes: Buffer;
+  vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockImplementation(async () => {
+    write({ ...read(), theme: 'light', providerConnections: [connection('a'), { ...connection('b'), accountAuth: { openai: fresh } }] });
+    peerBytes = fs.readFileSync(file);
+    return { renewed: false, leaseHeld: true };
+  });
+  const fetchImpl = vi.fn() as unknown as typeof fetch;
+  expect(await renewStoredAccount({ workspaceRoot: root, resolution, fetchImpl })).toMatchObject({ stored: true, writeState: 'unchanged', accountAuth: fresh });
+  expect(fetchImpl).not.toHaveBeenCalled(); expect(fs.readFileSync(file)).toEqual(peerBytes!);
+  expect(read().providerConnections?.[0]).toEqual(before.providerConnections?.[0]);
+  expect(read().providerCredentials).toEqual(before.providerCredentials);
+});
+
+it.each(['delete', 'relogin', 'endpoint', 'provider', 'status', 'duplicate', 'store', 'mirror', 'expired', 'unchanged'] as const)('refuses peer renewal after the captured owner changes: %s', async change => {
+  const selected = change === 'mirror' ? 'a' : 'b';
+  const config = projectModelSelection(getRuntimeConfig(root), { connectionId: selected, connectionScope: 'session', provider: 'openai', model: 'gpt-5.3-codex' });
+  const resolution = resolveProviderCredential({ runtimeConfig: config, env: {} });
+  const fresh = change === 'unchanged' ? auth(selected) : { ...auth(selected), accessToken: 'PRIVATE_PEER_TOKEN', refreshToken: 'peer-rotated', expiresAt: change === 'expired' ? 1 : Date.now() + 3600000 };
+  let peerBytes: Buffer;
+  vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockImplementation(async () => {
+    let records = read().providerConnections!.map(item => item.id === selected ? { ...item, accountAuth: { openai: fresh } } : item);
+    if (change === 'delete') records = records.filter(item => item.id !== selected);
+    if (change === 'relogin') records = records.map(item => item.id === selected ? { ...item, accountAuth: { openai: { ...fresh, accountId: 'another-account' } } } : item);
+    if (change === 'endpoint') records = records.map(item => item.id === selected ? { ...item, baseUrl: 'https://changed.invalid' } : item);
+    if (change === 'provider') records = records.map(item => item.id === selected ? { ...item, provider: 'google' as const } : item);
+    if (change === 'status') records = records.map(item => item.id === selected ? { ...item, status: 'error' as const } : item);
+    if (change === 'duplicate') records.push(records.find(item => item.id === selected)!);
+    write({ ...read(), providerConnections: records,
+      ...(change === 'delete' ? { providerCredentials: { openai: { accountAuth: { openai: fresh } } } } : {}) });
+    if (change === 'store') {
+      const replacement = path.join(home, 'replacement.json'); fs.renameSync(file, replacement); fs.symlinkSync(replacement, file);
+    }
+    peerBytes = fs.readFileSync(file);
+    return { renewed: false, leaseHeld: true };
+  });
+  const result = await renewStoredAccount({ workspaceRoot: root, resolution, fetchImpl: vi.fn() as unknown as typeof fetch });
+  expect(result).toMatchObject({ stored: false, writeState: 'unchanged' });
+  expect(result.accountAuth).toBeUndefined(); expect(result.failure).toBeDefined();
+  expect(JSON.stringify(result)).not.toContain('PRIVATE_PEER_TOKEN');
+  expect(fs.readFileSync(file)).toEqual(peerBytes!);
 });
 
 it('does not trust a shared response with different account metadata or expose provider failures', async () => {
@@ -404,4 +451,35 @@ it('refuses replay after an unknown renewal outcome from another process', async
   expect(result).toMatchObject({ stored: false, writeState: 'unchanged' });
   expect(result.failure).toMatch(/reconnect|spent/i);
   expect(input.fetchImpl).not.toHaveBeenCalled();
+});
+
+it('records dispatch before refresh HTTP and retains uncertainty after a lost response', async () => {
+  const key = refreshLineage({ provider: 'openai', credentialId: 'openai:a', refreshToken: 'refresh-a' });
+  const input = request();
+  const fetchImpl = vi.fn(async () => {
+    expect(readRefreshLease(key)?.phase).toBe('dispatched');
+    throw new TypeError('PRIVATE_PROVIDER_RESPONSE_LOST');
+  }) as unknown as typeof fetch;
+  const result = await renewStoredAccount({ ...input, fetchImpl });
+  expect(result).toMatchObject({ stored: false, writeState: 'unchanged' });
+  expect(JSON.stringify(result)).not.toContain('PRIVATE');
+  expect(readRefreshLease(key)?.phase).toBe('unknown');
+  const retry = await renewStoredAccount({ ...input, fetchImpl });
+  expect(retry.failure).toContain('may have spent');
+  expect(retry.accountAuth).toBeUndefined();
+  expect(fetchImpl).toHaveBeenCalledOnce();
+  expect(read().providerConnections?.[0]?.accountAuth?.openai).toEqual(auth());
+});
+
+it('does not send refresh HTTP when recording dispatch cannot be verified', async () => {
+  const key = refreshLineage({ provider: 'openai', credentialId: 'openai:a', refreshToken: 'refresh-a' });
+  const writer = store.writeJsonFileAtomic;
+  vi.spyOn(store, 'writeJsonFileAtomic').mockImplementation((file, value) => {
+    if (JSON.stringify(value).includes('"phase":"dispatched"')) return;
+    writer(file, value);
+  });
+  const input = request(); const result = await renewStoredAccount(input);
+  expect(result).toMatchObject({ stored: false, writeState: 'unchanged' });
+  expect(input.fetchImpl).not.toHaveBeenCalled();
+  expect(readRefreshLease(key)).toBeUndefined();
 });

@@ -110,6 +110,20 @@ function rotated(edit: AccountEdit, accountAuth: AccountAuthConfig): RuntimeConf
   };
 }
 
+/** A peer's saved rotation must still belong to the exact captured owner. */
+export function readAccountRotation(edit: AccountEdit): AccountAuthConfig | undefined {
+  const current = snapshot(edit.workspaceRoot, edit.resolution);
+  const original = edit.resolution.credential?.accountAuth;
+  const accountAuth = current.resolution.credential?.accountAuth;
+  if (!original || !accountAuth || sameValue(original, accountAuth) || accountAuth.expiresAt <= Date.now()
+    || !sameAccountIdentity(original, accountAuth)) return undefined;
+  const expected = { ...edit.resolution, credential: { ...edit.resolution.credential!, accountAuth } };
+  if (current.source !== edit.snapshot.source || current.edit.path !== edit.snapshot.edit.path
+    || !sameValue(identity(current.resolution), identity(expected))
+    || !sameValue(selectors(current.edit.values, edit.resolution.provider), selectors(rotated(edit, accountAuth), edit.resolution.provider))) return undefined;
+  return accountAuth;
+}
+
 /** Save only the captured owner and an exact-identity mirror, then verify its use. */
 export function persistAccountEdit(edit: AccountEdit, accountAuth: AccountAuthConfig): { accountAuth: AccountAuthConfig; writeState: 'unchanged' | 'persisted' } {
   const { resolution, snapshot: captured } = edit;
