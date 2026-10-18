@@ -43,6 +43,8 @@ export interface SubagentRunInput {
   /** Observes actual native results, before any model output can claim evidence. */
   readonly observeTool?: (context: AfterToolCallContext) => Promise<{ readonly suffix?: string; readonly metadata?: Record<string, unknown> } | undefined>;
   readonly definition: SubagentDefinition;
+  /** Native consumer binding; the host refuses a missing or changed role without fallback. */
+  readonly modelRole?: { readonly name: string; readonly identity: string };
   /** Requested restriction; the host intersects it with its own permission boundary. */
   readonly agentMode?: "plan" | "build";
   /** What the caller asked the subagent to do. */

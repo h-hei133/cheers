@@ -12,6 +12,7 @@ export interface SubagentHost {
   readonly defaultMaxSteps: number;
   readonly retry?: AgentLoopConfig['retry'];
   readonly defaultModel?: SessionModelRole;
+  readonly modelRoles?: Readonly<Record<string, SessionModelRole | undefined>>;
   readonly stepForModel?: (model: string | SessionModelRole, admission?: () => string | undefined, effort?: import('../core/models/effort.js').ThinkingPreference, workspace?: string) => StepFunction | Promise<StepFunction>;
 }
 
@@ -32,11 +33,15 @@ export function createSubagentRunner(
       } catch { return { text: '', failed: true, failure: 'Read-only delegation admission refused.', steps: 0, allowedTools: [] }; }
     }
     let step: StepFunction | undefined;
-    const model = input.definition.model ?? host.defaultModel;
+    const role = input.modelRole ? host.modelRoles?.[input.modelRole.name] : host.defaultModel;
+    if (!input.definition.model && input.modelRole && (!role || JSON.stringify(role) !== input.modelRole.identity)) {
+      return { text: '', failed: true, failure: 'Requested delegated role is unavailable or changed.', steps: 0, allowedTools: [] };
+    }
+    const model = input.definition.model ?? role;
     const effort = input.definition.effort !== undefined ? input.definition.effort
-      : !input.definition.model && host.defaultModel ? host.defaultModel.thinkingEffort ?? null : undefined;
+      : !input.definition.model && role ? role.thinkingEffort ?? null : undefined;
     const selection: SubagentRunResult['selection'] = { model: typeof model === 'string' ? model : model ? `${model.connectionId}/${model.model}` : undefined,
-      effort, source: input.definition.model ? 'definition' : host.defaultModel ? 'session-role' : 'parent' };
+      effort, source: input.definition.model ? 'definition' : role ? 'session-role' : 'parent' };
     try { step = model || effort !== undefined || (input.admission || parent.configScope && input.workspace !== parent.workspaceRoot) && host.stepForModel
       ? await host.stepForModel?.(model ?? '', input.admission, effort, input.workspace) : host.step; }
     catch { return { selection, text: '', failed: true, failure: 'Requested delegated model is unavailable.', steps: 0, allowedTools: [] }; }

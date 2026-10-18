@@ -3,7 +3,13 @@ import type { TurnCheckpoint } from '../turn/checkpoint.js';
 import type { SubagentRunner } from '../core/subagents/runner.js';
 import type { ProcessOwner } from '../core/state/owner.js';
 
-export interface AdvisorConfig { readonly target: string; readonly every: number; readonly timeoutMs: number; readonly mode: 'turn' | 'end' }
+export interface AdvisorConfig { readonly target?: string; readonly every: number; readonly timeoutMs: number; readonly mode: 'turn' | 'end' }
+export interface AdvisorTarget {
+  readonly label: string;
+  readonly identity: string;
+  readonly model?: string;
+  readonly modelRole?: { readonly name: string; readonly identity: string };
+}
 export type AdvisorStatus = 'off' | 'ready' | 'held' | 'reviewing' | 'reviewed' | 'paused' | 'no-model' | 'unavailable' | 'error' | 'timeout' | 'cancelled' | 'stale';
 export interface AdvisorCheckpoint {
   readonly id: string;
@@ -24,6 +30,7 @@ export interface AdvisorNote {
   readonly checkpointDigest: string;
   readonly epoch: number;
   readonly target: string;
+  readonly targetIdentity?: string;
   readonly timestamp: string;
   readonly text: string;
   readonly submittedAt?: string;
@@ -42,4 +49,4 @@ export interface AdvisorState extends BoundSessionScope {
   readonly pending?: { readonly id: string; readonly epoch: number; readonly checkpointId: string; readonly startedAt: string; readonly owner?: ProcessOwner };
 }
 export interface AdvisorBoundary extends TurnCheckpoint { readonly sourcePromptEntryId: string }
-export interface AdvisorReview { readonly checkpoint: AdvisorCheckpoint; readonly runner: SubagentRunner; readonly signal?: AbortSignal }
+export interface AdvisorReview { readonly checkpoint: AdvisorCheckpoint; readonly target: AdvisorTarget; readonly runner: SubagentRunner; readonly signal?: AbortSignal }

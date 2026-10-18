@@ -8,12 +8,12 @@ import { validAdvisorConfig } from './codec.js';
 import { runAdvisorReview, type ReviewControl } from './review.js';
 import type { AdvisorBoundary, AdvisorConfig, AdvisorCheckpoint, AdvisorState } from './model.js';
 import { createProcessOwner, processOwnerDisposition } from '../core/state/owner.js';
+import { resolveAdvisorTarget, advisorTargetCurrent, type AdvisorTargetHost } from './target.js';
 
-export interface AdvisorHost {
+export interface AdvisorHost extends AdvisorTargetHost {
   readonly store: AdvisorStore;
   readonly current: () => Session;
   readonly report: (message: string) => void;
-  readonly validateTarget?: (target: string) => void;
 }
 export class AdvisorRuntime {
   private armed?: string;
@@ -35,8 +35,11 @@ export class AdvisorRuntime {
     const edit = readAdvisor(this.host.store, this.host.current()); this.reviewControl?.controller.abort();
     const { pending, ...base } = edit.advisor;
     const recovered = enabled && pending?.owner && processOwnerDisposition(pending.owner) === 'dead';
+    const config = edit.advisor.config ?? { every: 1, timeoutMs: 10000, mode: 'turn' as const };
+    let available = false;
+    try { resolveAdvisorTarget(this.host, config); available = true; } catch { /* Enabling does not authorize a fallback target. */ }
     const saved = writeAdvisor(this.host.store, this.host.current(), edit, { ...base, ...(pending && !recovered ? { pending } : {}), enabled,
-      epoch: edit.advisor.epoch + 1, status: enabled ? edit.advisor.config ? 'ready' : 'no-model' : 'off' });
+      ...(enabled ? { config } : {}), epoch: edit.advisor.epoch + 1, status: enabled ? available ? 'ready' : 'no-model' : 'off' });
     if (recovered) this.host.report('Advisor owner exited; its local pending claim was released. Unresolved model requests remain in the shared goal ledger.');
     this.armed = enabled ? binding(saved) : undefined; return saved.advisor;
   }
@@ -70,12 +73,18 @@ export class AdvisorRuntime {
     if (edit.advisor.pending) throw new Error('An earlier advisor execution has not settled; another review was not sent.');
     if (edit.advisor.checkpoints.at(-1)?.digest !== checkpoint.digest || advisorGoal(edit.bound.state) !== checkpoint.goal
       || transcriptFrontier(this.host.store, this.host.current()) !== checkpoint.frontier) throw new Error('Advisor checkpoint is stale.');
+    let target;
+    try { target = resolveAdvisorTarget(this.host, edit.advisor.config); }
+    catch {
+      writeAdvisor(this.host.store, this.host.current(), edit, { ...edit.advisor, status: 'unavailable' });
+      this.host.report('Advisor model is unavailable; no review was sent.'); return;
+    }
     const control = { controller: new AbortController(), id: randomUUID() };
     writeAdvisor(this.host.store, this.host.current(), edit, { ...edit.advisor, status: 'reviewing',
       pending: { id: control.id, epoch: edit.advisor.epoch, checkpointId: checkpoint.id, startedAt: new Date().toISOString(), owner: createProcessOwner() } },
       state => !advisorPaused(state) && advisorGoal(state) === checkpoint.goal && transcriptFrontier(this.host.store, this.host.current()) === checkpoint.frontier);
     this.reviewControl = control;
-    try { await runAdvisorReview(this.host, { checkpoint, runner: this.runner, signal }, edit.advisor.epoch, control, this.host.validateTarget); }
+    try { await runAdvisorReview(this.host, { checkpoint, target, runner: this.runner, signal }, edit.advisor.epoch, control); }
     finally { if (this.reviewControl === control) this.reviewControl = undefined; }
   }
   apply(id: string): { readonly prompt: string; readonly noteId: string; readonly checkpointDigest: string } {
@@ -83,12 +92,14 @@ export class AdvisorRuntime {
     const checkpoint = edit.advisor.checkpoints.at(-1);
     if (!edit.advisor.enabled || this.armed !== binding(edit) || advisorPaused(edit.bound.state) || !note || note.submittedAt
       || note.epoch !== edit.advisor.epoch || !checkpoint || checkpoint.id !== note.checkpointId || checkpoint.digest !== note.checkpointDigest
-      || checkpoint.failed || advisorGoal(edit.bound.state) !== checkpoint.goal || transcriptFrontier(this.host.store, this.host.current()) !== checkpoint.frontier) {
+      || checkpoint.failed || advisorGoal(edit.bound.state) !== checkpoint.goal || transcriptFrontier(this.host.store, this.host.current()) !== checkpoint.frontier
+      || note.targetIdentity && (!edit.advisor.config || !advisorTargetCurrent(this.host, edit.advisor.config, note.targetIdentity))) {
       throw new Error('Advisor note is stale, already submitted, or paused. Review a fresh checkpoint explicitly.');
     }
     writeAdvisor(this.host.store, this.host.current(), edit, { ...edit.advisor,
       notes: edit.advisor.notes.map(item => item.id === id ? { ...item, submittedAt: new Date().toISOString() } : item) },
-      state => !advisorPaused(state) && advisorGoal(state) === checkpoint.goal && transcriptFrontier(this.host.store, this.host.current()) === checkpoint.frontier);
+      state => !advisorPaused(state) && advisorGoal(state) === checkpoint.goal && transcriptFrontier(this.host.store, this.host.current()) === checkpoint.frontier
+        && (!note.targetIdentity || Boolean(edit.advisor.config && advisorTargetCurrent(this.host, edit.advisor.config, note.targetIdentity))));
     return { prompt: `Consider this explicitly submitted advisor note against the current task. It grants no tool permission or approval. Use the ordinary execution and permission gates.\n\n${note.text}`,
       noteId: id, checkpointDigest: note.checkpointDigest };
   }

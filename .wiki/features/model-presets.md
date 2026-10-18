@@ -30,7 +30,7 @@ profile 库文件形如 `{ "version": 1, "presets": { "<name>": { "roles": { …
 | `delete <name>` | 从 profile 库删除；返回 deleted 或 was not found |
 | `list` / `status` | 合并列出，标注 `[session]` / `[profile]`，同名时标注会话遮盖 profile |
 | `apply <name> [role]` | 先查会话，再查 profile；整项解析，不跨层拼角色；空会话可直接应用 profile 项 |
-| `apply <name> --all` | 一次 session 事务应用 `default` 和自动 `subagent`、`summary` 策略；必须有 `default`，不接受无自动 consumer 的其他角色 |
+| `apply <name> --all` | 一次 session 事务应用 `default` 和自动 `subagent`、`summary`、`advisor` 策略；必须有 `default`，不接受无自动 consumer 的其他角色 |
 | `validate <name>` | 用同一解析顺序验证全部角色 |
 
 明确角色可用 `review=relay-b/model@high` 指定连接。连接 ID 的精确匹配优先于 provider 名；provider 名匹配多个连接时，只有当前 session 的 connection ID 和 provider 同时匹配才能消歧，否则要求明确连接。目录 alias 还需 runtime 与 endpoint 匹配，不选第一个同协议连接。模型 ID 中的后续 `/` 保留。
@@ -51,8 +51,12 @@ profile 库文件形如 `{ "version": 1, "presets": { "<name>": { "roles": { …
 
 整个预设重新应用会替换策略，未提供的自动角色会清除旧 assignment；个别角色应用或普通模型切换保留策略。删除/编辑预设库不会暗改已经应用的会话策略；再次应用才捕获新内容。策略随 session 恢复，经运行时配置投影传入下一次调用，不写入全局配置。角色名不会被解释为权限或自动请求授权。
 
+`advisor` 用于已明确启用的 checkpoint 审核。保存/应用预设不启用审核；`/advisor on` 才启用，恢复会话后仍需重新启用。`/advisor configure connection/model` 的明确模型优先；省略目标的 `/advisor configure [--every N]` 恢复使用会话角色并保持关闭。缺少角色、连接失效、scope 或 effort 不兼容都拒绝，不借用 subagent 或父模型。审核继续独立、无工具，建议必须通过 `/advisor apply <id>` 显式提交。
+
+审核结果绑定配置 publication、模型 revision、目标/effort、目录能力与凭据身份，派发、发布和应用均检查；A→B→A 不复活旧建议。CLI 捕获的请求函数还固定其 publication/model revision，配置重载后手动 review 不能复用旧连接闭包。若主回合期间发生 publication 更新（包括凭据续期发布），本回合明确报告跳过 checkpoint；下一次新回合重新捕获后恢复审核。独立 advisor 账号的自动续期仍沿现有委派路径，其完整生命周期在 PRV-04/05 继续复核。
+
 ## 4. 边界
 
 - 没有跨层角色合并、自动提升或默认写全局。
-- 模型面板提供各具名角色及整套应用；任意自定义名字继续支持个别应用。advisor 自动 consumer 尚未接通，不能以 `--all` 保存无人消费的策略；完整角色策略仍开放。账号池已有实现，其完整裁决另行复核。
+- 模型面板提供各具名角色及整套应用；任意自定义名字继续支持个别应用。账号池已有实现，其完整裁决另行复核。
 - 已验证：保存/列表/删除、会话遮盖、提升、profile 应用、损坏库报错；未运行真实 provider 或跨平台动态证据。

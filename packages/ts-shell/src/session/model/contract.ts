@@ -15,6 +15,7 @@ export interface SessionModelPreset {
 export interface SessionModelPolicy {
   readonly subagent?: SessionModelRole;
   readonly summary?: SessionModelRole;
+  readonly advisor?: SessionModelRole;
 }
 
 /** A model preference contains no credential and applies only to its connection. */

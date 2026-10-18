@@ -59,6 +59,7 @@ export function createProviderStep(
     throw new Error(`Configured service tier '${configuredTier}' is not verified for ${resolution.provider}/${resolution.model}.`);
   }
   const system = systemPromptSnapshot(request.agentMode, promptContext);
+  const identity = credentialIdentityFor(resolution.provider, resolution.credential);
   return createStepFunction({
     requestPolicy: request.requestPolicy,
     modelTransport: providerModelTransport(request.runtimeConfig, endpoint, request.admission),
@@ -81,7 +82,7 @@ export function createProviderStep(
       // answers, and an endpoint is how they want to be asked.
       ...(endpoint ? { endpoint } : {}),
       ...(configuredTier ? { serviceTier: configuredTier } : {}),
-      ...(credentialIdentityFor(resolution.provider, resolution.credential) ?? {}),
+      ...(identity ? { credentialId: identity.credentialId, credentialGeneration: identity.generation } : {}),
     },
     // Without this the request is sent with the global fetch, which has no
     // deadline: a provider that accepts the connection and then never answers

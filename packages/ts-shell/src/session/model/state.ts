@@ -37,10 +37,10 @@ function decodeRole(value: unknown): SessionModelRole | undefined {
 }
 
 function decodePolicy(value: unknown): SessionModelPolicy | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => key !== 'subagent' && key !== 'summary')) return undefined;
+  if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => key !== 'subagent' && key !== 'summary' && key !== 'advisor')) return undefined;
   const raw = value as Record<string, unknown>;
-  const roles: { subagent?: SessionModelRole; summary?: SessionModelRole } = {};
-  for (const key of ['subagent', 'summary'] as const) {
+  const roles: { subagent?: SessionModelRole; summary?: SessionModelRole; advisor?: SessionModelRole } = {};
+  for (const key of ['subagent', 'summary', 'advisor'] as const) {
     if (!Object.hasOwn(raw, key)) continue;
     const role = decodeRole(raw[key]);
     if (!role) return undefined;

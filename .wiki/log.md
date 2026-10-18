@@ -7768,3 +7768,16 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 两构建通过，TS manifest `dffb4cb65919`。隔离 Linux PTY Node/exe × regular/fullscreen 四格通过：保存/验证/整套应用预设，自动及手动摘要实际到 B/high，主请求继续 A/low，全局配置字节不变、退出 0。首轮夹具固定 usage 导致自动阈值不可达；其后近期回合过短，正确触发无旧历史拒绝；再修正成功提示匹配后四格通过。均为本机 HTTP 合成凭据，无真实账号访问。
 - cycles、config consumers（53/53）、declarations、Node floor、strict docs drift 和 diff 检查通过。NormProof 退出 0、总 verdict partial，导入与无环 satisfied，仍是原 9 个函数上限 advisory，触及模块未越界。
 - 本条记录时本批尚未提交/推送，精确 SHA 的 CI 待后续读回。advisor 自动角色、主请求与 btw 的 generation 映射、legacy/env-only 精确选择、同名目录能力仍开放。CTX-03 的完整 history/branch/owner CAS、分段归并、未决 claim 的淘汰规则及其他发送前失败仍需修复；本批不构成完整 PRV-02、CTX-03 或全部 47 项完成声明。
+
+### PRV-02/05 顾问角色与凭据请求归属
+
+- summary 批已提交并推送为 `c901a58fd9376e3fbc76ecee9cf9303e6c09f666`，CI `39101028310`、Architecture Watch `39101028311` 均 success。
+- 整套预设接通 advisor；明确 `/advisor configure connection/model` 优先，省略目标的 configure 恢复会话角色并保持关闭。`/advisor on` 才启用，重启仍需重启用；role 配置不赋予发送或写入授权。真实主 turn → checkpoint → 独立无工具 runner 使用精确 B/model/high，普通主请求仍为 A/low；角色失效拒绝，未使用 subagent 策略或父账号作候选。
+- 请求身份映射修复主请求/委派/btw 中 `generation` 与 `credentialGeneration` 的合同不匹配；本机真实 HTTP 逐路径验证 A 迟到 429 不影响 B，A 再发为零发送拒绝、A 新代次可发，原 ledger 保留 A 的未决身份且累计 12 input/3 output，没有重置预算。
+- 顾问 target hash 包含配置/模型 revision、精确连接/凭据代次和目录能力；发送、在途检查、锁内发布及 apply 校验同一身份。架构复核发现手动 review 可能把新目标与旧请求闭包组合，已把 CLI 捕获的 runner 绑定原 publication/model revision，后续调用和每次 admission 都拒绝旧闭包。配置在主请求期间变化则明确报告跳过本回合 checkpoint，新回合恢复；主凭据续期发布也保守触发此规则。独立委派账号的完整续期仍为 PRV-04/05 待办，未声称本批覆盖它。
+- 参考取舍：同意显式顾问模型覆盖角色及按实际凭据隔离退避；本项目不采用角色缺失时的候选链、effort 静默降级，也不引入参考的凭据数据库。具体角色失效、精确 effort、无角色回退和凭据代次均有反例。
+- 受影响组合 27 文件/273 测试通过；新增 skip 与扩大调用消费者后 14 文件/136 项通过（两集合有重叠，不相加）。首轮两条跨进程测试从错误 cwd 寻找 tsx，改为 package 工作目录后 7 文件/49 项通过，未修改或跳过测试。类型诊断相对 `c901a58f` 为 149/149、无新增，不代表全项目 tsc 通过。
+- 反转实际退出 1：移除 generation 映射后 3/3 失败；移除 advisor consumer 后 1 失败/1 通过/10 未选择；移除旧闭包隔离后 1 失败/11 未选择。反转均为测试加载替换，工作区产品源未回退。
+- 代码最终 APPROVE：独立 11 文件/105 项，再验 13 项 advisor；架构最终 CLEAR：独立 8 文件/75 项，最后 skip 回归 1 通过/12 未选择。两构建通过，最终 TS manifest `4ea1b159f83d`。隔离 Linux PTY Node/exe × regular/fullscreen 四格通过：预设保存/validate/apply、on/off/on、B/high 顾问与 A/low 主请求、全局配置字节不变、退出 0；没有真实账号访问。
+- cycles、config consumers（53/53）、declarations、Node floor、diff 通过。第一次裸 npx 查找公开 registry 中不存在的 normproof 包失败，随后改用仓库 `.normproof` 内 CI 同款包运行成功；不能把首次命令记为通过。NormProof 退出 0、verdict partial，仍为既有函数上限 advisory；触及模块未越界。strict docs drift 在最终文档写入后另行执行。
+- 本条记录时当前批尚未提交/推送，新 SHA CI 待实际读回；全部 47 项范围继续，优先处理 legacy/env-only 精确选择、同名目录能力、委派账号续期与 CTX-03 完整生命周期，其他任务未因本批通过而自动标记完成。

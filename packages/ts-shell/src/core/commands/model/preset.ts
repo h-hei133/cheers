@@ -81,8 +81,8 @@ export function resolveModelPreset(sessionId: string | undefined, name: string):
 
 export function wholePresetFailure(preset: SessionModelPreset): string | undefined {
   if (!preset.roles.default) return 'Whole preset application requires a default role.';
-  return Object.keys(preset.roles).some(name => name !== 'default' && name !== 'subagent' && name !== 'summary')
-    ? 'Whole preset application supports default, subagent and summary roles. Apply other named roles individually; they have no automatic consumer.' : undefined;
+  return Object.keys(preset.roles).some(name => name !== 'default' && name !== 'subagent' && name !== 'summary' && name !== 'advisor')
+    ? 'Whole preset application supports default, subagent, summary and advisor roles. Apply other named roles individually; they have no automatic consumer.' : undefined;
 }
 
 /** One explicit apply: the default and automatic role policy share the same session transaction. */
@@ -106,6 +106,7 @@ export async function applyModelPreset(sessionId: string, name: string, role = '
     const roles: SessionModelPolicy | undefined = whole ? {
       ...(preset.roles.subagent ? { subagent: preset.roles.subagent } : {}),
       ...(preset.roles.summary ? { summary: preset.roles.summary } : {}),
+      ...(preset.roles.advisor ? { advisor: preset.roles.advisor } : {}),
     } : undefined;
     const output = await setModelTarget(target, { ...context, sessionId, admission }, baseline, roles);
     if (!output.includes(`Model switched to ${target.model}.`)) return output;

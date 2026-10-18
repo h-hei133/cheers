@@ -179,6 +179,18 @@ it('refuses an unavailable explicit model with zero main-step fallback', async (
   expect(main).not.toHaveBeenCalled();
 });
 
+it.each(['missing', 'changed'])('refuses a %s native role without using the generic subagent policy', async change => {
+  const role = { connectionId: 'review', provider: 'openai', model: 'review-model', thinkingEffort: 'high' as const };
+  const main = vi.fn(); const select = vi.fn();
+  const run = createSubagentRunner({ step: main, stepForModel: select, defaultMaxSteps: 1, defaultModel: role,
+    modelRoles: change === 'missing' ? {} : { advisor: { ...role, thinkingEffort: 'low' } } }, new Map(), {
+    sessionId: 'model-role', workspaceRoot: process.cwd(), permissionScope: 'ask', hooks: {} as ToolGateOptions['hooks'], emit: () => {},
+  });
+  expect(await run({ ...request, modelRole: { name: 'advisor', identity: JSON.stringify(role) } }))
+    .toMatchObject({ failed: true, steps: 0, failure: 'Requested delegated role is unavailable or changed.' });
+  expect(main).not.toHaveBeenCalled(); expect(select).not.toHaveBeenCalled();
+});
+
 it('enforces a default-model delegated admission fence before startup and each native request', async () => {
   const main = vi.fn(async () => ({ text: 'reading', toolCalls: [{ id: 'read', name: 'read', args: {} }], stopReason: 'stop' as const }));
   let refusal: string | undefined = 'initially fenced';

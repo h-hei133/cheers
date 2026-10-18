@@ -3,7 +3,7 @@ import type { AdvisorState } from './model.js';
 
 export function showAdvisor(state: AdvisorState, dump = false): string {
   return [`Advisor ${state.status}; ${state.enabled ? 'enabled setting' : 'off'}.`,
-    state.config ? `Target: ${state.config.target}; mode: ${state.config.mode}; every: ${state.config.every}; timeout: ${state.config.timeoutMs}ms.` : 'No model configured.',
+    state.config ? `Target: ${state.config.target ?? 'session advisor role'}; mode: ${state.config.mode}; every: ${state.config.every}; timeout: ${state.config.timeoutMs}ms.` : 'No model configured.',
     `Checkpoints: ${state.checkpoints.length} retained of ${state.captured}; eligible boundaries: ${state.eligible}; notes: ${state.notes.length}.`,
     ...(state.pending ? ['Execution pending or drain unconfirmed; another review cannot start.'] : []),
     'Reviews are bounded and awaited. Advice has no write or approval authority; apply explicitly through the ordinary prompt path.',

@@ -62,6 +62,7 @@ export async function runBtwCommand(
   let attempted = false;
   let failure: ProviderFailureClass | undefined;
   const accountAuth = credential ? accountAuthFor(resolution.provider, credential) : undefined;
+  const identity = credentialIdentityFor(resolution.provider, credential);
   if (credential?.apiKey || accountAuth || endpointShape(endpoint).signer) {
     attempted = true;
     const model = resolution.model ?? credential?.model ?? "";
@@ -81,7 +82,7 @@ export async function runBtwCommand(
             baseUrl: resolution.baseUrl ?? credential?.baseUrl ?? "",
             model,
             providerId: resolution.provider,
-            ...(credentialIdentityFor(resolution.provider, resolution.credential) ?? {}),
+            ...(identity ? { credentialId: identity.credentialId, credentialGeneration: identity.generation } : {}),
             ...(endpoint ? { endpoint } : {}),
             fetchImpl: providerFetchForEndpoint(runtimeConfig, endpoint, endpointShape, context.admission),
             modelTransport: providerModelTransport(runtimeConfig, endpoint, context.admission),

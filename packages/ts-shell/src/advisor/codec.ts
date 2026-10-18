@@ -2,7 +2,7 @@ import { isRecord } from '../core/values/record.js';
 import type { AdvisorConfig, AdvisorState } from './model.js';
 
 export function validAdvisorConfig(value: unknown): value is AdvisorConfig {
-  return isRecord(value) && text(value.target, 512) && /^[^\s/]+\/[^\s]+$/.test(value.target)
+  return isRecord(value) && (value.target === undefined || text(value.target, 512) && /^[^\s/]+\/[^\s]+$/.test(value.target))
     && integer(value.every, 1, 100) && integer(value.timeoutMs, 100, 60000) && ['turn', 'end'].includes(String(value.mode));
 }
 export function decodeAdvisor(value: unknown): AdvisorState | undefined {
@@ -26,7 +26,7 @@ function checkpoint(value: unknown): boolean {
 }
 function note(value: unknown): boolean {
   return isRecord(value) && text(value.id, 256) && text(value.checkpointId, 256) && digest(value.checkpointDigest)
-    && integer(value.epoch, 0) && text(value.target, 512) && timestamp(value.timestamp) && text(value.text, 8192)
+    && integer(value.epoch, 0) && text(value.target, 512) && (value.targetIdentity === undefined || digest(value.targetIdentity)) && timestamp(value.timestamp) && text(value.text, 8192)
     && isRecord(value.coverage) && typeof value.coverage.truncated === 'boolean' && Array.isArray(value.coverage.checkpoints)
     && value.coverage.checkpoints.length > 0 && value.coverage.checkpoints.length <= 16
     && value.coverage.checkpoints.every(item => isRecord(item) && text(item.id, 256) && digest(item.digest))
