@@ -119,11 +119,13 @@ export async function captureAgentRuntime(host: JobsComposition, input: AgentRun
             const baseUrl = resolved.baseUrl ?? resolved.credential?.baseUrl ?? catalog.find(provider => provider.id === resolved.provider)?.baseUrl;
             const model = resolved.model ?? resolved.credential?.model;
             if (!baseUrl || !model) return {};
+            const identity = credentialIdentityFor(resolved.provider, resolved.credential);
             const provider = { baseUrl, model, providerId: resolved.provider,
-              ...(credentialIdentityFor(resolved.provider, resolved.credential) ?? {}),
+              ...(identity ? { credentialId: identity.credentialId, credentialGeneration: identity.generation } : {}),
               headers: providerAuthorization({ apiKey: resolved.credential?.apiKey, accountAuth: resolved.credential?.accountAuth, ...(endpoint ? { endpoint } : {}) }).headers,
               ...(endpoint ? { endpoint } : {}) };
-            return { compaction: { ...buildCompactionWiring({ provider, runtimeConfig: config, admission: admit, sessionId: session.id, catalog, requestPolicy: policy }),
+            return { compaction: { ...buildCompactionWiring({ provider, runtimeConfig: config, admission: admit, sessionId: session.id, catalog, requestPolicy: policy,
+              workspaceRoot: session.projectRoot }),
               onCompact: record => { if (admit()) throw new Error('Agent compaction admission changed.'); host.manager.appendCompactionEntry(session.id, record); } } };
           },
         }, { hooks: new HookDispatcher(), checkProviderReadiness: checkRealProviderReadiness, createReadinessTerminalEvent: createProviderReadinessCliTerminalEvent });

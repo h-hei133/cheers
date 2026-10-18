@@ -35,16 +35,17 @@ declareEndpoint("openai-compatible", {
   body: (input) => ({
     model: input.model,
     messages: [
-      ...(input.systemPrompt ? [{ role: "system" as const, content: input.systemPrompt }] : []),
+      ...(input.systemPrompt ? [{ role: input.systemRole ?? 'system', content: input.systemPrompt }] : []),
       ...input.messages,
     ],
     // Gated the same way the full request gates it. A caller that declares the
     // model rejects a temperature gets a request without one, whether or not the
     // call carries tools.
-    ...(input.temperature !== undefined && input.supportsTemperature !== false
+    ...(input.temperature !== undefined && input.supportsTemperature !== false && !input.thinkingLevelName
       ? { temperature: input.temperature }
       : {}),
-    ...(input.maxOutputTokens !== undefined ? { max_tokens: input.maxOutputTokens } : {}),
+    ...(input.reasoningEffort && input.thinkingLevelName ? { reasoning_effort: input.thinkingLevelName } : {}),
+    ...(input.maxOutputTokens !== undefined ? { [input.maxTokensField ?? 'max_tokens']: input.maxOutputTokens } : {}),
   }),
   /**
    * The full turn: the conversation, the tools, and the model's own vocabulary

@@ -69,3 +69,27 @@ it("preserves temperature capability and the explicit token ceiling for single m
   expect(endpointBody("anthropic-messages", { ...input, supportsTemperature: false })).not.toHaveProperty("temperature");
   expect(endpointBody("anthropic-messages", input).temperature).toBe(0.2);
 });
+
+it.each(['openai-compatible', 'anthropic-messages', 'bedrock-converse-stream', 'google-generative-ai', 'google-vertex'])(
+  'carries summary reasoning and output controls through the %s single-request protocol', async endpoint => {
+    let body: Record<string, unknown> | undefined;
+    await requestCompactionSummary({ provider: { model: 'reasoning', baseUrl: 'https://fixture.test', endpoint, headers: {},
+      shape: { systemRole: 'developer', maxTokensField: 'max_completion_tokens', reasoningEffort: true, thinkingLevelName: 'high',
+        thinkingBudgetTokens: 2048, supportsTemperature: true, vision: false, assistantAfterToolResult: false, allowEmptySignature: false } },
+      messages, maxOutputTokens: 4096, temperature: 0.2, fetchImpl: async (_url, init) => {
+        body = JSON.parse(String(init?.body));
+        return new Response('{}', { status: 503 });
+      } });
+    expect(body).toBeDefined();
+    expect(body!.tools).toBeUndefined();
+    if (endpoint === 'openai-compatible') {
+      expect(body).toMatchObject({ reasoning_effort: 'high', max_completion_tokens: 4096 });
+      expect(body!.max_tokens).toBeUndefined(); expect(body!.temperature).toBeUndefined();
+    } else if (endpoint === 'anthropic-messages') {
+      expect(body).toMatchObject({ stream: false, max_tokens: 4096, thinking: { type: 'enabled', budget_tokens: 2048 } });
+      expect(body!.temperature).toBeUndefined();
+    } else if (endpoint === 'bedrock-converse-stream') {
+      expect(body).toMatchObject({ inferenceConfig: { maxTokens: 4096 }, additionalModelRequestFields: { thinking: { type: 'enabled', budget_tokens: 2048 } } });
+      expect(body).not.toHaveProperty('inferenceConfig.temperature');
+    } else expect(body).toMatchObject({ generationConfig: { maxOutputTokens: 4096, thinkingConfig: { thinkingBudget: 2048 } } });
+  });

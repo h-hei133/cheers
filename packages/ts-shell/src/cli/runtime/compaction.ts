@@ -12,9 +12,10 @@ import { providerModelTransport } from '../../provider/request/transport.js';
 import { endpointShape, type EndpointKind } from '../../provider/endpoints/index.js';
 import { KEEP_RECENT_TOKENS, type CompactionPolicy, type SummarizeHistory, type SummarizeTurnPrefix } from '../../session/compaction.js';
 import { DEFAULT_RESERVE_TOKENS, estimateTokens } from '../../session/context.js';
-import { requestCompactionSummary, type CompactionChatMessage, type CompactionProvider as SummaryProvider } from '../../core/query/compaction/summarize.js';
+import { prepareCompactionMessages, requestCompactionSummary, type CompactionChatMessage, type CompactionProvider as SummaryProvider } from '../../core/query/compaction/summarize.js';
 import { TURN_PREFIX_COMPACTION_PROMPT } from '../../core/query/compaction/summarizer.js';
 import { toChatMessages } from '../../turn/prompt.js';
+import { captureSummaryRole } from '../provider/summary.js';
 
 /**
  * Messages for a compaction call.
@@ -55,6 +56,8 @@ interface CompactionWiring {
  * token budget.
  */
 export function buildCompactionWiring(input: {
+  readonly workspaceRoot?: string;
+  readonly onCredentialPersisted?: () => void;
   readonly requestPolicy?: RequestPolicy;
   readonly provider: {
     /** Built from the resolved credential, so an account token reaches this path too. */
@@ -80,8 +83,23 @@ export function buildCompactionWiring(input: {
 }): CompactionWiring {
   const provider = input.provider;
   const runtimeConfig = input.runtimeConfig;
-  const fetchImpl = providerFetchForEndpoint(runtimeConfig, provider.endpoint, endpointShape, input.admission);
-  const modelTransport = providerModelTransport(runtimeConfig, provider.endpoint, input.admission);
+  const summaryRole = captureSummaryRole({ config: runtimeConfig, catalog: input.catalog, workspaceRoot: input.workspaceRoot,
+    admission: input.admission, onCredentialPersisted: input.onCredentialPersisted });
+  const send = async (request: Omit<Parameters<typeof requestCompactionSummary>[0], 'provider' | 'fetchImpl'>) => {
+    const summaryProvider = summaryRole ? await summaryRole.resolve() : provider;
+    return requestCompactionSummary({ ...request, provider: summaryProvider,
+      fetchImpl: providerFetchForEndpoint(runtimeConfig, summaryProvider.endpoint, endpointShape, input.admission),
+      modelTransport: providerModelTransport(runtimeConfig, summaryProvider.endpoint, input.admission) });
+  };
+  const historyRequest = (request: Parameters<SummarizeHistory>[0]) => ({
+    requestPolicy: input.requestPolicy, maxOutputTokens: runtimeConfig.maxOutputTokens,
+    messages: toCompactionMessages(request.messages), previousSummary: request.previousSummary,
+    instructions: request.instructions, signal: request.signal,
+  });
+  const prefixRequest = (messages: readonly AgentMessage[], signal?: AbortSignal) => ({
+    requestPolicy: input.requestPolicy, maxOutputTokens: runtimeConfig.maxOutputTokens, purpose: 'turn-summary' as const,
+    messages: toCompactionMessages(messages), prompt: TURN_PREFIX_COMPACTION_PROMPT, signal,
+  });
   // Resolved per model rather than read from one global number: the catalog
   // knows each model's window, and using a single value compacted a million-token
   // model at sixty-four thousand.
@@ -96,6 +114,7 @@ export function buildCompactionWiring(input: {
   }
   return {
     policy: {
+      ...(summaryRole ? { summaryIdentity: summaryRole.identity } : {}),
       contextWindow: resolvedWindow.window,
       // Per-model budgets where the user set them, the global value otherwise.
       // A single global budget cannot suit every model: the same "keep the last
@@ -127,30 +146,12 @@ export function buildCompactionWiring(input: {
         return measured.tokens + estimateTokens(messages.slice(measured.messageCount));
       },
     },
-    summarize: (request) =>
-      requestCompactionSummary({
-        requestPolicy: input.requestPolicy, modelTransport, maxOutputTokens: runtimeConfig.maxOutputTokens,
-        provider,
-        // The same deadlines as the main request. A summarization that hangs is
-        // as fatal to a turn as an answer that hangs, and harder to notice: the
-        // conversation looks idle rather than broken.
-        fetchImpl,
-        messages: toCompactionMessages(request.messages),
-        previousSummary: request.previousSummary,
-        instructions: request.instructions,
-        signal: request.signal,
-      }),
+    summarize: Object.assign((request: Parameters<SummarizeHistory>[0]) => send(historyRequest(request)),
+      summaryRole ? { preflight: (request: Parameters<SummarizeHistory>[0]) => { prepareCompactionMessages({ ...historyRequest(request), provider: summaryRole.limits }); } } : {}),
     // Asked a different question from the history summary: this is the opening
     // of a turn whose continuation is kept, so it explains the work that
     // follows rather than recapping what came before.
-    summarizeTurnPrefix: (messages, signal) =>
-      requestCompactionSummary({
-        requestPolicy: input.requestPolicy, modelTransport, maxOutputTokens: runtimeConfig.maxOutputTokens, purpose: 'turn-summary',
-        provider,
-        fetchImpl,
-        messages: toCompactionMessages(messages),
-        prompt: TURN_PREFIX_COMPACTION_PROMPT,
-        signal,
-      }),
+    summarizeTurnPrefix: Object.assign((messages: readonly AgentMessage[], signal?: AbortSignal) => send(prefixRequest(messages, signal)),
+      summaryRole ? { preflight: (messages: readonly AgentMessage[], signal?: AbortSignal) => { prepareCompactionMessages({ ...prefixRequest(messages, signal), provider: summaryRole.limits }); } } : {}),
   };
 }

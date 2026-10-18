@@ -91,6 +91,7 @@ declareEndpoint("google-vertex", {
       tools: [],
       allowTools: false,
       temperature: input.temperature ?? 0,
+      ...(input.thinkingBudgetTokens !== undefined ? { thinkingBudgetTokens: input.thinkingBudgetTokens } : {}),
       supportsTemperature: input.supportsTemperature,
       ...(input.maxOutputTokens !== undefined ? { maxOutputTokens: input.maxOutputTokens } : {}),
     }) as never,

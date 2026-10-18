@@ -121,7 +121,8 @@ export interface EndpointShape {
 }
 
 /** A request with no tools, which is what a summarizer or a side question sends. */
-export interface SimpleRequest {
+export interface SimpleRequest extends Partial<Pick<TurnRequest,
+  'systemRole' | 'maxTokensField' | 'reasoningEffort' | 'thinkingLevelName' | 'thinkingBudgetTokens' | 'allowEmptySignature'>> {
   readonly model: string;
   readonly messages: readonly ChatMessage[];
   /** A system instruction, when the caller has one. */

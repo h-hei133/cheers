@@ -328,9 +328,11 @@ function simpleAsTurn(input: SimpleRequest): TurnRequest {
     temperature: input.temperature ?? 0,
     ...(input.maxOutputTokens !== undefined ? { maxOutputTokens: input.maxOutputTokens } : {}),
     ...(input.supportsTemperature !== undefined ? { supportsTemperature: input.supportsTemperature } : {}),
-    systemRole: "system",
-    reasoningEffort: false,
-    maxTokensField: "max_tokens",
+    systemRole: input.systemRole ?? 'system',
+    reasoningEffort: input.reasoningEffort ?? false,
+    thinkingLevelName: input.thinkingLevelName,
+    thinkingBudgetTokens: input.thinkingBudgetTokens,
+    maxTokensField: input.maxTokensField ?? 'max_tokens',
     assistantAfterToolResult: false,
   };
 }

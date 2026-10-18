@@ -7756,3 +7756,15 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 两构建通过，TS manifest `265d99cd46ed`。隔离 Linux PTY Node/exe × regular/fullscreen 四格通过：空会话保存 profile 预设、validate、整套 apply、真实任务预览/一次性批准、A/low → B/high → A/low、全局配置字节不变与退出 0。首轮夹具遗漏交互批准，停在审批预览；补齐审批操作后四格通过，没有绕开产品审批或访问真实账号。
 - cycles、config consumers（53/53）、declarations、Node floor、strict docs drift、diff 检查通过；docs 保留 118 条既有非阻断引用提示。NormProof 退出 0，导入/无环 satisfied，总 verdict partial，仍为同一组 9 个函数上限 advisory，本批未新增越界。
 - 本条记录时尚未提交/推送此批，新 SHA CI 后续读回。摘要和 advisor 自动角色、无具名连接的精确选择、目录同名能力及其余全部 47 项仍在原范围内；本批不是完整 PRV-02 或 Phase 20 完成声明。
+
+### PRV-02 摘要角色与请求预算
+
+- 整套预设/subagent 批已提交并推送为 `94122f3f7c97beab3eae8b0bf8e7f29f28e436e5`；CI `39099444888`、Architecture Watch `39099444862` 均 success。
+- 整套预设支持 summary；手动压缩、自动/overflow、子代理压缩、turn-prefix 与分支摘要消费精确 connection/model/effort。主模型继续决定压缩阈值、保留尾部和用量显示，摘要模型决定请求协议、窗口、输出与 reserve。账号续期由同一次捕获复用，每次 resolve 仍检查 admission；凭据 generation 明确映射到请求合同，五种简单请求协议都接收 effort/output 控制。
+- 复用身份包含角色、endpoint、凭据身份、目录能力、请求形状与预算；未设置角色时保留原 operation hash，避免升级后绕过旧 unknown claim。history/prefix 都先构造完整请求并预检预算，再开始任何 claim/send；派发仍复用同一校验。确定未发送的预算拒绝不创建 operation 文件，重试保持零发送。
+- 参考取舍：同意独立角色精确模型/effort 及授权解析，拒绝参考实现的候选回退链，因为明确配置的角色失效不能改用父账号。沿现有 provider、compaction 与 session owner 接线，没有新增请求引擎或凭据存储。
+- 最终受影响集 36 文件/518 测试通过；类型诊断与 `94122f3f` 比较为 149/149、无新增，不代表全项目 tsc 通过。移除摘要 consumer 后 13 项失败；移除预检后 1 项失败/12 跳过；移除摘要复用身份后 1 项失败/12 跳过。反转只在测试加载时替换；封装脚本末尾的日志命令退出码不被当作 Vitest 退出码。
+- 独立代码 APPROVE、架构 CLEAR；最终两路分别验证 4 文件/62 项、4 文件/71 项。复核发现的 stale OAuth 重复续期、遗漏当前输出/effort 与 credential generation、复用身份不完整、预算拒绝遗留 dispatched claim 均已修复并有回归。
+- 两构建通过，TS manifest `dffb4cb65919`。隔离 Linux PTY Node/exe × regular/fullscreen 四格通过：保存/验证/整套应用预设，自动及手动摘要实际到 B/high，主请求继续 A/low，全局配置字节不变、退出 0。首轮夹具固定 usage 导致自动阈值不可达；其后近期回合过短，正确触发无旧历史拒绝；再修正成功提示匹配后四格通过。均为本机 HTTP 合成凭据，无真实账号访问。
+- cycles、config consumers（53/53）、declarations、Node floor、strict docs drift 和 diff 检查通过。NormProof 退出 0、总 verdict partial，导入与无环 satisfied，仍是原 9 个函数上限 advisory，触及模块未越界。
+- 本条记录时本批尚未提交/推送，精确 SHA 的 CI 待后续读回。advisor 自动角色、主请求与 btw 的 generation 映射、legacy/env-only 精确选择、同名目录能力仍开放。CTX-03 的完整 history/branch/owner CAS、分段归并、未决 claim 的淘汰规则及其他发送前失败仍需修复；本批不构成完整 PRV-02、CTX-03 或全部 47 项完成声明。

@@ -37,11 +37,16 @@ function decodeRole(value: unknown): SessionModelRole | undefined {
 }
 
 function decodePolicy(value: unknown): SessionModelPolicy | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => key !== 'subagent')) return undefined;
+  if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => key !== 'subagent' && key !== 'summary')) return undefined;
   const raw = value as Record<string, unknown>;
-  if (!Object.hasOwn(raw, 'subagent')) return {};
-  const subagent = decodeRole(raw.subagent);
-  return subagent ? { subagent } : undefined;
+  const roles: { subagent?: SessionModelRole; summary?: SessionModelRole } = {};
+  for (const key of ['subagent', 'summary'] as const) {
+    if (!Object.hasOwn(raw, key)) continue;
+    const role = decodeRole(raw[key]);
+    if (!role) return undefined;
+    roles[key] = role;
+  }
+  return roles;
 }
 
 /** Shared with the profile library so both owners accept exactly the same shape. */

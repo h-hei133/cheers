@@ -9,6 +9,8 @@ import { claimCompactionStep, completeCompactionStep, compactionStepDigest, mark
 export const KEEP_RECENT_TOKENS = 20_000;
 
 export interface CompactionPolicy {
+  /** Digest of the captured summary target, effort and model capabilities; never credentials. */
+  readonly summaryIdentity?: string;
   readonly contextWindow: number;
   readonly reserveTokens?: number;
   /**
@@ -120,9 +122,11 @@ export interface SummarizeRequest {
   readonly signal?: AbortSignal;
 }
 
-export type SummarizeHistory = (
-  request: SummarizeRequest,
-) => Promise<string | undefined>;
+export interface SummarizeHistory {
+  (request: SummarizeRequest): Promise<string | undefined>;
+  /** Pure local validation, before durable request claims or any summary send. */
+  readonly preflight?: (request: SummarizeRequest) => void;
+}
 
 export function shouldCompact(
   tokens: number,
@@ -376,10 +380,11 @@ function isBelowThreshold(
  * "what happened so far" but "what was being attempted here", since the kept
  * tail is the work that followed it.
  */
-export type SummarizeTurnPrefix = (
-  messages: readonly AgentMessage[],
-  signal?: AbortSignal,
-) => Promise<string | undefined>;
+export interface SummarizeTurnPrefix {
+  (messages: readonly AgentMessage[], signal?: AbortSignal): Promise<string | undefined>;
+  /** Pure local validation, before durable request claims or any summary send. */
+  readonly preflight?: (messages: readonly AgentMessage[], signal?: AbortSignal) => void;
+}
 
 /** Marks where the framing of a split turn begins inside a merged checkpoint. */
 const TURN_CONTEXT_MARKER = "**Turn Context (split turn):**";
@@ -553,10 +558,14 @@ export async function condenseContext(input: {
 
   const history = input.messages.slice(historyStart, historyEnd);
   const prefix = plan.splitsTurn ? input.messages.slice(Math.max(plan.turnStart, head), plan.cut) : [];
+  const historyRequest = { messages: history, previousSummary, instructions: input.instructions, signal: input.signal };
+  if (history.length) input.summarize.preflight?.(historyRequest);
+  if (prefix.length) input.summarizeTurnPrefix?.preflight?.(prefix, input.signal);
 
   const operation = input.operation ? { ...input.operation,
     policyDigest: createHash('sha256').update(JSON.stringify([input.policy.contextWindow, input.policy.reserveTokens ?? null,
-      input.policy.keepRecentTokens ?? null, input.policy.enabled ?? null, input.instructions ?? ''])).digest('hex'),
+      input.policy.keepRecentTokens ?? null, input.policy.enabled ?? null, input.instructions ?? '',
+      ...(input.policy.summaryIdentity === undefined ? [] : [input.policy.summaryIdentity])])).digest('hex'),
     ...(input.instructions !== undefined ? { instructions: input.instructions } : {}) } : undefined;
   let historyText: string | undefined;
   if (history.length > 0) {
@@ -565,12 +574,7 @@ export async function condenseContext(input: {
     if (claim?.unknown) return { status: "declined", reason: "step-unknown" };
     if (claim?.summary !== undefined) historyText = claim.summary;
     else {
-      historyText = await input.summarize({
-        messages: history,
-        previousSummary,
-        instructions: input.instructions,
-        signal: input.signal,
-      });
+      historyText = await input.summarize(historyRequest);
       if (!historyText) {
         if (claim?.acquired && operation) markCompactionStepUnknown(claim, operation.sessionId);
         return { status: "declined", reason: "unsummarized" };

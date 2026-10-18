@@ -82,6 +82,7 @@ import { installRuleControlRuntime, takeForcedTool } from './ruleControls.js';
 import { contextEntryStillAuthorized, renderContextEntry, assertContextBounds } from '../../context/attachment/entry.js';
 import { sourceReaderFor } from '../data/access.js';
 import { installUsageRuntime, usageResetApproval } from './usage.js';
+import { captureSummaryRole } from '../provider/summary.js';
 
 interface ProviderRenewal {
   readonly provider?: CompactionProvider;
@@ -177,6 +178,8 @@ export function createCliSessionRuntime(input: {
     // either. The compaction body carries no temperature of its own; the flag
     // is what the protocols gate on.
     const shape = resolveRequestShape(catalog, target.provider, target.model, undefined);
+    const identity = credentialIdentityFor(target.provider, { connectionId: resolved.credential?.connectionId,
+      accountAuth: target.accountAuth, apiKey: target.apiKey });
     return {
       headers: providerAuthorization({
         apiKey: target.apiKey,
@@ -187,8 +190,7 @@ export function createCliSessionRuntime(input: {
       model: target.model,
       providerId: target.provider,
       ...(endpointFor(target.provider, catalog) ? { endpoint: endpointFor(target.provider, catalog) } : {}),
-      ...(credentialIdentityFor(target.provider, { connectionId: resolved.credential?.connectionId,
-        accountAuth: target.accountAuth, apiKey: target.apiKey }) ?? {}),
+      ...(identity ? { credentialId: identity.credentialId, credentialGeneration: identity.generation } : {}),
       supportsTemperature: shape.supportsTemperature,
     };
   };
@@ -211,6 +213,8 @@ export function createCliSessionRuntime(input: {
     }
     if (renewed.stored) reportCredentialPublication();
     assertAdmission(admission);
+    const identity = credentialIdentityFor(target.provider, { connectionId: resolved.credential?.connectionId,
+      accountAuth: renewed.accountAuth ?? target.accountAuth, apiKey: target.apiKey });
     return { provider: {
       headers: providerAuthorization({
         apiKey: target.apiKey,
@@ -222,8 +226,7 @@ export function createCliSessionRuntime(input: {
       providerId: target.provider,
       supportsTemperature: resolveRequestShape(catalog, target.provider, target.model, undefined).supportsTemperature,
       ...(endpointFor(target.provider, catalog) ? { endpoint: endpointFor(target.provider, catalog) } : {}),
-      ...(credentialIdentityFor(target.provider, { connectionId: resolved.credential?.connectionId,
-        accountAuth: renewed.accountAuth ?? target.accountAuth, apiKey: target.apiKey }) ?? {}),
+      ...(identity ? { credentialId: identity.credentialId, credentialGeneration: identity.generation } : {}),
     } };
   };
   const reportCredentialPublication = () => {
@@ -257,7 +260,10 @@ export function createCliSessionRuntime(input: {
       const workspaceRoot = input.runtimeContext.projectRoot;
       const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
       const admission = operation.admission;
-      return renewedProvider(resolved, config, admission, catalog, false).then(({ provider, failure }) => {
+      const main = config.sessionModelRoles?.summary
+        ? Promise.resolve({ provider: compactionProvider(resolved, catalog) } as ProviderRenewal)
+        : renewedProvider(resolved, config, admission, catalog, false);
+      return main.then(({ provider, failure }) => {
         if (!provider) {
           return {
             status: "failed" as const,
@@ -266,7 +272,8 @@ export function createCliSessionRuntime(input: {
         }
         assertAdmission(admission);
         signal.throwIfAborted();
-        const wiring = buildCompactionWiring({ provider, runtimeConfig: config, admission, sessionId, catalog,
+        const wiring = buildCompactionWiring({ provider, runtimeConfig: config, admission, sessionId, catalog, workspaceRoot,
+          onCredentialPersisted: reportCredentialPublication,
           requestPolicy: goalPolicyFor(input.runtimeContext, input.sessionManager) });
         return compactSessionHistory({
           store: input.sessionManager,
@@ -298,7 +305,10 @@ export function createCliSessionRuntime(input: {
       const config = operation.config; const catalog = operation.publication.catalog;
       const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
       const admission = operation.admission;
-      return renewedProvider(resolved, config, admission, catalog).then(({ provider }) => {
+      const role = captureSummaryRole({ config, catalog, workspaceRoot: input.runtimeContext.projectRoot, admission,
+        onCredentialPersisted: reportCredentialPublication });
+      const selected = role ? role.resolve().then(provider => ({ provider })) : renewedProvider(resolved, config, admission, catalog);
+      return selected.then(({ provider }) => {
         assertAdmission(admission);
         if (!provider) return undefined;
         return requestCompactionSummary({
@@ -390,7 +400,8 @@ export function createCliSessionRuntime(input: {
 
         const compaction: CompactionSetup | undefined = activeProvider
           ? {
-              ...buildCompactionWiring({ provider: activeProvider, runtimeConfig: config, admission, sessionId, catalog, requestPolicy }),
+              ...buildCompactionWiring({ provider: activeProvider, runtimeConfig: config, admission, sessionId, catalog, requestPolicy,
+                workspaceRoot: input.runtimeContext.projectRoot, onCredentialPersisted: reportCredentialPublication }),
               onCompact: (record) => {
                 input.sessionManager.appendCompactionEntry(sessionId, record);
                 markContextUnknown(sessionId);

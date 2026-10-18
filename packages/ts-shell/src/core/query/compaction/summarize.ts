@@ -14,6 +14,8 @@ import { endpointBody, endpointKind, endpointUrl, type EndpointKind } from "../.
 import { endpointShape } from '../../../provider/endpoints/index.js';
 import { prepareRequestAttempt } from '../../../provider/request/attempt.js';
 import type { ModelTransport, RequestPolicy } from '../../agent/request/model.js';
+import type { ResolvedRequestShape } from '../../models/requestShape.js';
+import { promptTokensFor, requestBudget } from '../../../context/request/budget.js';
 
 /**
  * One summarization request.
@@ -25,6 +27,10 @@ import type { ModelTransport, RequestPolicy } from '../../agent/request/model.js
  */
 
 export interface CompactionProvider {
+  readonly shape?: ResolvedRequestShape;
+  readonly contextWindow?: number;
+  readonly maxOutputTokens?: number;
+  readonly reserveTokens?: number;
   readonly providerId?: string;
   /** Which stored credential sends this summary; non-secret and rotation-sensitive. */
   readonly credentialId?: string;
@@ -129,8 +135,10 @@ export interface CompactionRequest {
   readonly previousSummary?: string;
 }
 
-/** The checkpoint message replacing `messages`, or nothing when the provider could not produce one. */
-export async function requestCompactionSummary(request: CompactionRequest): Promise<string | undefined> {
+/** Pure preflight uses the same complete messages as the eventual summary send. */
+export function prepareCompactionMessages(request: Pick<CompactionRequest, 'messages' | 'previousSummary' | 'instructions' | 'prompt' | 'maxOutputTokens'> & {
+  readonly provider: Pick<CompactionProvider, 'contextWindow' | 'maxOutputTokens' | 'reserveTokens'>;
+}): readonly CompactionChatMessage[] {
   const previousSummary = request.previousSummary?.trim();
   // Revising a checkpoint and summarizing from scratch are different questions,
   // so the default prompt follows which one is being asked. An explicit prompt
@@ -139,23 +147,36 @@ export async function requestCompactionSummary(request: CompactionRequest): Prom
   const prompt = request.instructions?.trim()
     ? `${base}\n\nThe user asked the summary to focus on: ${request.instructions.trim()}`
     : base;
-  // Always the caller's, so this request carries the same transport and deadlines
-  // as the main one. There is no global-fetch fallback: it is what let a caller
-  // keep the unbounded transport without anything failing.
+  const messages = [
+    ...(previousSummary ? [{ role: 'user' as const, content: `<previous-summary>\n${previousSummary}\n</previous-summary>` }] : []),
+    ...request.messages, { role: 'user' as const, content: prompt },
+  ];
+  const maxOutputTokens = request.provider.maxOutputTokens ?? request.maxOutputTokens;
+  if (request.provider.contextWindow !== undefined) {
+    const budget = requestBudget({ window: request.provider.contextWindow, outputTokens: maxOutputTokens,
+      reserveTokens: request.provider.reserveTokens, promptTokens: promptTokensFor({ messages: messages.map(message => ({ ...message, content: message.content ?? '' })) }).tokens, measured: false });
+    if (budget.ok === false && budget.reason !== 'unknown') throw new Error(`Summary request refused: ${budget.detail}`);
+  }
+  return messages;
+}
+
+/** The checkpoint message replacing `messages`, or nothing when the provider could not produce one. */
+export async function requestCompactionSummary(request: CompactionRequest): Promise<string | undefined> {
+  const previousSummary = request.previousSummary?.trim();
+  const messages = prepareCompactionMessages(request);
   const fetchImpl = request.fetchImpl;
   const headers = new Headers(request.provider.headers);
-  headers.set("accept", "application/json");
+  headers.set('accept', 'application/json');
   const kind = endpointKind(request.provider.endpoint);
+  const maxOutputTokens = request.provider.maxOutputTokens ?? request.maxOutputTokens;
   const body = JSON.stringify(
     endpointBody(kind, {
+      ...request.provider.shape,
       model: request.provider.model,
-      ...(request.maxOutputTokens !== undefined ? { maxOutputTokens: request.maxOutputTokens } : {}),
+      ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
       ...(request.provider.supportsTemperature !== undefined ? { supportsTemperature: request.provider.supportsTemperature } : {}),
       ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
-      messages: [
-        ...(previousSummary ? [{ role: 'user' as const, content: `<previous-summary>\n${previousSummary}\n</previous-summary>` }] : []),
-        ...request.messages, { role: 'user' as const, content: prompt },
-      ],
+      messages,
     }),
   );
   const attempt = await prepareRequestAttempt({ body, provider: request.provider.providerId ?? '', model: request.provider.model,

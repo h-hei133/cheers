@@ -1,10 +1,11 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SessionManager } from './SessionManager.js';
-import { condenseContext, type CompactionPolicy } from './compaction.js';
-import { claimCompactionStep, completeCompactionStep, compactionOperationsPath, markCompactionStepUnknown } from './compactionOperation.js';
+import { condenseContext, planCompactionCut, type CompactionPolicy } from './compaction.js';
+import { claimCompactionStep, completeCompactionStep, compactionOperationsPath, compactionStepDigest, markCompactionStepUnknown } from './compactionOperation.js';
 import type { AgentMessage } from '../core/agent/state.js';
 
 let home: string;
@@ -84,5 +85,16 @@ it('declines an unknown step without calling the summarizer again', async () => 
   summarize.mockClear();
   const repeated = await condenseContext({ messages: messages(), policy, summarize, force: true, operation: { sessionId } });
   expect(repeated).toMatchObject({ status: 'declined', reason: 'step-unknown' });
+  expect(summarize).not.toHaveBeenCalled();
+});
+
+it('preserves claims written before summary roles when no role is selected', async () => {
+  const history = messages(); const plan = planCompactionCut(history, policy)!;
+  const policyDigest = createHash('sha256').update(JSON.stringify([4000, 0, 100, null, ''])).digest('hex');
+  claimCompactionStep({ sessionId, policyDigest,
+    stepDigest: compactionStepDigest({ history: history.slice(0, plan.splitsTurn ? plan.turnStart : plan.cut) }) });
+  const summarize = vi.fn(async () => 'unexpected retry');
+  expect(await condenseContext({ messages: history, policy, summarize, force: true, operation: { sessionId } }))
+    .toMatchObject({ status: 'declined', reason: 'step-unknown' });
   expect(summarize).not.toHaveBeenCalled();
 });

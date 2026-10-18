@@ -14,6 +14,7 @@ export interface SessionModelPreset {
 /** Automatic consumers supported by the runtime; arbitrary names remain manual preset roles. */
 export interface SessionModelPolicy {
   readonly subagent?: SessionModelRole;
+  readonly summary?: SessionModelRole;
 }
 
 /** A model preference contains no credential and applies only to its connection. */
