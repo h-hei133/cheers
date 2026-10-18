@@ -16,9 +16,9 @@ export function cacheLines(cache: CostModel['cache']): ReportLine[] {
       span(' prompt tokens were sent again, across '), span(waste.totals.missCount, 'number'), span(' requests (estimated overlap)')] },
     { kind: 'text', bullet: true, spans: [span('Estimated extra cost against a cache read: '),
       span(money(waste.totals.missedCost), 'number'), span('; based on published rates, not an invoice')] });
-    const switched = waste.misses.filter(miss => miss.modelChanged).length;
+    const switched = waste.misses.filter(miss => miss.modelChanged || miss.endpointChanged).length;
     if (switched > 0) lines.push({ kind: 'text', bullet: true, spans: [span(switched, 'number'),
-      span(' followed a model change; those could not have been cache reads at all')] });
+      span(' followed a model or destination change; those could not have been cache reads at all')] });
     const idled = waste.misses.filter(miss => miss.idleMs > CACHE_TTL_MS).length;
     if (idled > 0) lines.push({ kind: 'text', bullet: true, spans: [span(idled, 'number'),
       span(` followed an idle gap longer than ${Math.round(CACHE_TTL_MS / 60000)} minutes, long enough for a cache to expire`)] });

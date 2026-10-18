@@ -43,6 +43,7 @@ export interface StatusFacts {
   /** Estimate for recorded usage, never a claim of complete billing. */
   readonly costUsd?: number;
   readonly costRates?: 'catalog' | 'assumed';
+  readonly costPartial?: boolean;
   readonly turns?: number;
   readonly agentMode?: string;
   /** How much the session may do before it has to ask. */
@@ -134,7 +135,7 @@ export function renderStatusItem(id: StatusItemId, facts: StatusFacts): string |
     case "session-tokens":
       return facts.sessionTokens ? defaultTheme.dim(`${formatTokens(facts.sessionTokens)} tok`) : undefined;
     case "cost":
-      return facts.costUsd !== undefined ? defaultTheme.dim(`est $${facts.costUsd.toFixed(4)}${facts.costRates === 'assumed' ? ' assumed rates' : ''}`) : undefined;
+      return facts.costUsd !== undefined ? defaultTheme.dim(`est $${facts.costUsd.toFixed(4)}${facts.costPartial ? ' partial' : ''}${facts.costRates === 'assumed' ? ' assumed rates' : ''}`) : undefined;
     case "turns":
       return facts.turns ? defaultTheme.dim(`${facts.turns} turn${facts.turns === 1 ? "" : "s"}`) : undefined;
     case "todos":

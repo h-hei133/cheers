@@ -59,7 +59,7 @@ export function readStatusFacts(
   // tokens at more than one price, and the status band must not show the newest
   // rate applied to all of them. Resolving against the active provider would do
   // exactly that.
-  const { cost, everyRatePublished, zeroCostSupported } = estimateSessionCost(usage, (provider, model) =>
+  const { cost, usesAssumedRates, partial, zeroCostSupported } = estimateSessionCost(usage, (provider, model) =>
     resolveModelCost(catalog, provider, model),
   );
   const window = resolveContextWindow({ catalog, provider: active.provider, model: active.model, baseUrl: active.baseUrl, configured: config.contextWindow });
@@ -84,7 +84,7 @@ export function readStatusFacts(
     ...(totalTokens(usage) > 0 ? { sessionTokens: totalTokens(usage) } : {}),
     ...(usage.turnsCount > 0 ? { turns: usage.turnsCount } : {}),
     ...(cost > 0 || zeroCostSupported
-      ? { costUsd: cost, costRates: everyRatePublished ? 'catalog' : 'assumed' } as const : {}),
+      ? { costUsd: cost, costRates: usesAssumedRates ? 'assumed' : 'catalog', costPartial: partial } as const : {}),
   };
 }
 

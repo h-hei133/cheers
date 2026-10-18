@@ -8,6 +8,7 @@ import { runContextCommand } from '../../core/commands/contextCommandRuntime.js'
 import type { ShellRuntimeContext } from "../../core/shell/runtimeContext.js";
 import type { RuntimeConfig } from "../../config/runtimeConfig.js";
 import { withConfiguration } from "../../test-utils/configuration.js";
+import { captureUsageAttribution } from '../../observability/usage/identity.js';
 
 function context(sessionId: string, overrides: Partial<RuntimeConfig> = {}): ShellRuntimeContext {
   return withConfiguration({
@@ -46,6 +47,29 @@ describe("model name", () => {
 });
 
 describe("status facts", () => {
+  it('shows only the captured known subtotal when another destination has no prices, including after resume', () => {
+    const id = 'status-captured-cost';
+    try {
+      const runtime = context(id);
+      const capture = (baseUrl: string, rates?: { promptPerMTok: number; completionPerMTok: number }) =>
+        captureUsageAttribution({ provider: 'openai', model: 'opus-5', baseUrl, rates });
+      recordSessionUsage(id, { attribution: capture('https://priced.invalid', { promptPerMTok: 1, completionPerMTok: 2 }), promptTokens: 1_000_000 });
+      recordSessionUsage(id, { attribution: capture('https://unknown.invalid'), promptTokens: 1_000_000 });
+      const snapshot = structuredClone(getSessionUsage(id));
+      for (const resumed of [false, true]) {
+        if (resumed) { resetSessionUsage(id); restoreSessionUsage(id, snapshot); }
+        const facts = readStatusFacts(runtime);
+        expect(facts).toMatchObject({ costUsd: 1, costRates: 'catalog', costPartial: true, sessionTokens: 2_000_000 });
+        expect(stripAnsi(renderStatusItem('cost', facts)!)).toBe('est $1.0000 partial');
+      }
+      recordSessionUsage(id, { model: 'legacy', promptTokens: 1_000_000 });
+      const mixed = readStatusFacts(runtime);
+      expect(mixed).toMatchObject({ costRates: 'assumed', costPartial: true });
+      expect(mixed.costUsd).toBeCloseTo(1.14);
+      expect(stripAnsi(renderStatusItem('cost', mixed)!)).toBe('est $1.1400 partial assumed rates');
+    } finally { resetSessionUsage(id); }
+  });
+
   it("keeps the configured window visible while fresh usage remains unknown", () => {
     // Reporting 0% before any request has been accounted for is a fabricated fact.
     resetSessionUsage("fresh");

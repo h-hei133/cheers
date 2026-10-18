@@ -2,6 +2,9 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { cacheRefreshFor } from "./cache.js";
+import { getSessionUsage, recordSessionUsage, resetSessionUsage } from '../../observability/usageTelemetry.js';
+import { costModel } from '../../core/commands/cost/model.js';
+import * as usageStore from '../../session/store/usage.js';
 
 let server: http.Server;
 let url: string;
@@ -18,8 +21,30 @@ beforeEach(async () => {
   url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
 afterEach(async () => {
+  vi.restoreAllMocks();
+  resetSessionUsage('cache-prices');
   server.closeAllConnections();
   await new Promise<void>(resolve => server.close(() => resolve()));
+});
+
+it('retains the captured cache destination and prices without changing foreground context', async () => {
+  const write = vi.spyOn(usageStore, 'writeSessionUsage').mockImplementation(() => {});
+  const prices = { promptPerMTok: 3, completionPerMTok: 6 };
+  const cache = cacheRefreshFor({ sessionId: 'cache-prices', runtimeConfig: {} as never,
+    provider: { providerId: 'fixture', model: 'fixture' }, baseUrl: url, rates: prices,
+    isCurrent: () => true, renewHeaders: async () => ({}),
+  });
+  recordSessionUsage('cache-prices', { provider: 'main', model: 'm', promptTokens: 400 });
+  const key = getSessionUsage('cache-prices').lastBucketKey;
+  prices.promptPerMTok = 99;
+  const usage = await cache.refresh!(captured(), new AbortController().signal);
+  cache.onUsage!(usage!);
+  expect(write).toHaveBeenCalledOnce();
+  expect(getSessionUsage('cache-prices')).toMatchObject({ lastBucketKey: key, lastPromptTokens: 400 });
+  expect(getSessionUsage('cache-prices').recentRequests).toHaveLength(1);
+  const bucket = costModel(getSessionUsage('cache-prices'), []).buckets.find(item => item.provider === 'fixture');
+  expect(bucket).toMatchObject({ rateBasis: 'captured', rates: { promptPerMTok: 3 }, promptTokens: 100, completionTokens: 1 });
+  expect(bucket?.estimate.usd).toBeCloseTo(0.000306);
 });
 
 function captured(headers: Record<string, string> = {}) {

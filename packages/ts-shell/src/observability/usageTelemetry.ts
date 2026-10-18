@@ -1,7 +1,9 @@
 import { sessionTelemetries } from './usage/state.js';
 import type { ModelCostRates } from "../core/models/catalog.js";
 import type { RequestContext } from '../context/request/model.js';
-import type { PromptMeasurementIdentity } from './usage/model.js';
+import type { PromptMeasurementIdentity, UsageAttribution } from './usage/model.js';
+import { attributedBucketKey, bucketRates, cacheIdentity, decodeAttribution, usageBucketKey } from './usage/identity.js';
+export { splitBucketKey, usageBucketKey } from './usage/identity.js';
 
 export type { ModelCostRates };
 
@@ -17,27 +19,6 @@ export type { ModelUsageBucket, SessionUsageTelemetry, UsageHistoryEntry, Sessio
  * session that runs all day.
  */
 export const MAX_RECENT_REQUESTS = 64;
-
-/** A bucket key: the provider that served the request, and the model that answered. */
-export function usageBucketKey(provider: string, model: string): string {
-  // No provider recorded means the key is just the model. Keeping the separator
-  // would render every such bucket as `/model` in the report, which reads like a
-  // missing value rather than an unknown one.
-  return provider ? `${provider}/${model}` : model;
-}
-
-/**
- * Split a bucket key back into its parts.
- *
- * The model can contain slashes — `deepseek-ai/DeepSeek-V4-Flash` is a real id —
- * so the provider is everything before the first one and the model is the rest.
- */
-export function splitBucketKey(key: string): { readonly provider: string; readonly model: string } {
-  const separator = key.indexOf("/");
-  return separator === -1
-    ? { provider: "", model: key }
-    : { provider: key.slice(0, separator), model: key.slice(separator + 1) };
-}
 
 /** Per-million-token rates used for the session cost estimate. */
 export const USAGE_RATES = { promptPerMTok: 0.14, completionPerMTok: 0.28 } as const;
@@ -82,24 +63,25 @@ export function totalTokens(telemetry: SessionUsageTelemetry): number {
 /**
  * Estimated session spend, summed across the models that answered.
  *
- * `rateFor` supplies the published rates for a model, or nothing when the model
- * does not publish any — in which case the fallback applies and the caller is
- * expected to say so. Taking a lookup rather than a rate keeps this module free
- * of the catalog, which it does not otherwise import.
+ * Captured rates remain attached to the request that spent the tokens. Only
+ * legacy records use `rateFor` and its labelled fallback; an unknown captured
+ * price stays unknown after later catalog changes.
  */
 export function estimateSessionCost(
   telemetry: SessionUsageTelemetry,
   rateFor: (provider: string, model: string) => ModelCostRates | undefined,
-): { readonly cost: number; readonly everyRatePublished: boolean; readonly zeroCostSupported: boolean; readonly fullyAllocated: boolean } {
+): { readonly cost: number; readonly everyRatePublished: boolean; readonly zeroCostSupported: boolean;
+  readonly fullyAllocated: boolean; readonly usesAssumedRates: boolean; readonly partial: boolean } {
   let cost = 0;
   let everyRatePublished = true;
+  let usesAssumedRates = false;
+  let unpriced = false;
   let allocated = true;
   let recorded = 0;
   for (const [key, bucket] of Object.entries(telemetry.byModel)) {
     recorded += bucket.totalTokens;
     allocated &&= bucket.totalTokens === bucket.promptTokens + bucket.completionTokens + bucket.cacheReadTokens + bucket.cacheWriteTokens;
-    const { provider, model } = splitBucketKey(key);
-    const published = rateFor(provider, model);
+    const published = bucketRates(key, bucket, rateFor);
     // A published rate that omits the cache prices is not a published rate for a
     // bucket that spent cache tokens: those are priced at zero below, and a footer
     // claiming the rates are the model's own would be false for the row above it.
@@ -107,11 +89,17 @@ export function estimateSessionCost(
       (bucket.cacheReadTokens > 0 && published?.cacheReadPerMTok === undefined) ||
       (bucket.cacheWriteTokens > 0 && published?.cacheWritePerMTok === undefined);
     if (!published || cacheUnpriced) everyRatePublished = false;
-    cost += estimateUsageCost(bucket, published ?? USAGE_RATES);
+    // Legacy records retain the explicitly labelled fallback. A captured absence
+    // is evidence that these tokens have no known price, even after catalog edits.
+    const rates = published ?? (bucket.attribution ? undefined : USAGE_RATES);
+    usesAssumedRates ||= !published && !bucket.attribution;
+    unpriced ||= !rates || cacheUnpriced;
+    if (rates) cost += estimateUsageCost(bucket, rates);
   }
   // A total-only report supplies no category prices. Zero is supportable only
   // when actual recorded tokens have a complete allocation and published rates.
-  return { cost, everyRatePublished, fullyAllocated: allocated, zeroCostSupported: cost === 0 && recorded > 0 && allocated && everyRatePublished };
+  return { cost, everyRatePublished, fullyAllocated: allocated, usesAssumedRates, partial: unpriced || !allocated,
+    zeroCostSupported: cost === 0 && recorded > 0 && allocated && everyRatePublished };
 }
 
 
@@ -129,6 +117,8 @@ export function recordSessionUsage(
     model?: string;
     /** Which provider served the request; part of the bucket key. */
     provider?: string;
+    /** Actual destination and immutable price snapshot, captured before dispatch. */
+    attribution?: UsageAttribution;
     /** How many messages the request carried, so trailing ones can be counted. */
     promptMessageCount?: number;
     /** Which model/schema the measurement belongs to; absent means provider/model only. */
@@ -142,7 +132,7 @@ export function recordSessionUsage(
   // A report that does not name a model belongs to whichever one last answered:
   // creating a `default` bucket for it would split that model's tokens in two and
   // price them at two different rates.
-  const key = usage.model
+  const key = usage.attribution ? attributedBucketKey(usage.attribution) : usage.model
     ? usageBucketKey(usage.provider ?? "", usage.model)
     : existing.lastBucketKey || usageBucketKey(usage.provider ?? "", "default");
 
@@ -159,7 +149,12 @@ export function recordSessionUsage(
   const existingBucket = Object.prototype.hasOwnProperty.call(existing.byModel, key)
     ? existing.byModel[key]
     : undefined;
+  const attribution = usage.attribution ? decodeAttribution(key, usage.attribution) : existingBucket?.attribution;
+  if (existingBucket && JSON.stringify(existingBucket.attribution) !== JSON.stringify(attribution)) {
+    throw new Error('Conflicting session usage attribution');
+  }
   const bucket = existingBucket ?? {
+    ...(attribution ? { attribution } : {}),
     promptTokens: 0,
     completionTokens: 0,
     totalTokens: 0,
@@ -198,10 +193,12 @@ export function recordSessionUsage(
       cacheReadTokens: cacheRead,
       cacheWriteTokens: cacheWrite,
       bucketKey: key,
+      ...(attribution ? { attribution } : {}),
       timestamp: existing.lastUpdated,
-      // Sticky: once any request reported cache activity, a later request that
-      // reports none is a total miss rather than a provider that cannot cache.
-      reportedCache: (previous?.reportedCache ?? false) || cacheRead + cacheWrite > 0,
+      // A price edit keeps cache support, while a destination or model switch
+      // cannot establish that the new request supports cache accounting.
+      reportedCache: cacheRead + cacheWrite > 0 || Boolean(previous?.reportedCache &&
+        cacheIdentity(previous.bucketKey, previous.attribution) === cacheIdentity(key, attribution)),
       kind: promptMeasured ? "request" : "usage-gap",
     });
   }
@@ -219,6 +216,7 @@ function pushHistory(telemetry: SessionUsageTelemetry, entry: UsageHistoryEntry)
 /** A session with nothing recorded yet. */
 function emptyTelemetry(): SessionUsageTelemetry {
   return {
+    schemaVersion: 2,
     // Null-prototyped: bucket keys come from model ids, and an inherited property
     // would be mistaken for a bucket.
     byModel: Object.create(null) as Record<string, ModelUsageBucket>,

@@ -384,6 +384,7 @@ export function createCliSessionRuntime(input: {
           // write price — the opposite of what a refresh is for.
           ...cacheRefreshFor({ sessionId, runtimeConfig: config, admission,
             requestPolicy,
+            ...(warmingTarget ? { baseUrl: warmingTarget.baseUrl, rates: warmingModel?.cost } : {}),
             ...(activeProvider ? { provider: activeProvider } : {}),
             ...(credentialIdentityFor(resolved.provider, resolved.credential) ? { credential: credentialIdentityFor(resolved.provider, resolved.credential)! } : {}),
             renewHeaders: async () => (await renewedProvider(resolved, config, admission, catalog)).provider?.headers,

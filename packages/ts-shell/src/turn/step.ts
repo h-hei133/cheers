@@ -9,6 +9,7 @@ import type { AgentMessage, AgentStopReason } from "../core/agent/state.js";
 import type { AssistantStep } from "../core/agent/loop.js";
 import { parseJsonWithRepair } from "../model-adapters/jsonRepair.js";
 import { clearContextUsage, markContextUnknown, measuredPromptContext, recordSessionUsage } from "../observability/usageTelemetry.js";
+import { captureUsageAttribution } from '../observability/usage/identity.js';
 import { promptTokensFor, requestBudget } from '../context/request/budget.js';
 import { captureThinkingPreference } from '../core/models/preference.js';
 import { effortOutputFailure } from '../provider/endpoints/effort.js';
@@ -307,6 +308,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
       );
       const endpoint = endpointFor(request);
       const modelEntry = catalogModel(request.catalog ?? [], request.provider.provider ?? '', request.provider.model, catalogAddress);
+      const usageAttribution = captureUsageAttribution({ provider: request.provider.provider ?? '', model: request.provider.model,
+        baseUrl: request.provider.baseUrl, rates: modelEntry?.cost });
       const measured = measuredPromptContext(request.sessionId, { provider: request.provider.provider ?? '',
         model: request.provider.model, endpoint, schemaDigest, systemDigest });
       const prompt = promptTokensFor({ messages, overhead, ...(measured ? { measured } : {}) });
@@ -563,6 +566,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
         if (hasUsage(usage)) {
           recordSessionUsage(request.sessionId, {
             ...usageFromProvider(usage),
+            attribution: usageAttribution,
             model: request.provider.model,
             // Recorded with the bucket, not looked up later: a provider switch must
             // not reprice tokens that were already spent at the old provider's rate.

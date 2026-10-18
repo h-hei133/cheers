@@ -14,6 +14,8 @@ import { projectSessionFileLayout } from "./sessionFileLayout.js";
 import { writeJsonFileAtomic } from "./sessionFileStore.js";
 import { loadSessionRecord, writeSessionRecord } from "./sessionStore.js";
 import { readStateSnapshotSafely, withSessionStateLock, writeSessionState } from "./sessionStateStore.js";
+import { attributedBucketKey, captureUsageAttribution, legacyBucketKey } from '../../observability/usage/identity.js';
+import { costModel } from '../../core/commands/cost/model.js';
 
 const ID = "sess_usage_roundtrip";
 let directory: string;
@@ -30,6 +32,35 @@ function activate(session: Session) {
 }
 
 describe("session usage persistence seams", () => {
+  it('migrates legacy identity through real state writes and keeps captured prices on activation', () => {
+    const layout = projectSessionFileLayout({ sessionsDir: directory, sessionId: ID });
+    const session: Session = { id: ID, projectRoot: directory, createdAt: 'now', updatedAt: 'now', status: 'active', turns: [] };
+    writeSessionRecord({ session, layout });
+    const attribution = captureUsageAttribution({ provider: 'fixture', model: 'same', baseUrl: 'https://relay.invalid/v1',
+      rates: { promptPerMTok: 3, completionPerMTok: 6 } });
+    const key = attributedBucketKey(attribution);
+    const before = readStateSnapshotSafely(layout.statePath)!;
+    writeJsonFileAtomic(layout.statePath, { ...before, usage: {
+      byModel: { [key]: { promptTokens: 100, completionTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalTokens: 100, turnsCount: 1 } },
+      turnsCount: 1, toolCallsCount: 0, lastBucketKey: key, lastUpdated: 1,
+    } });
+    activate(loadSessionRecord({ sessionId: ID, layout, cwd: directory }));
+    recordSessionUsage(ID, { attribution, promptTokens: 1_000_000 });
+    writeSessionUsage(ID, layout);
+    resetSessionUsage(ID);
+    activate(loadSessionRecord({ sessionId: ID, layout, cwd: directory }));
+    const usage = getSessionUsage(ID);
+    expect(usage.byModel[legacyBucketKey(key)]).toMatchObject({ totalTokens: 100 });
+    expect(usage.byModel[key]).toMatchObject({ attribution, totalTokens: 1_000_000 });
+    expect(usage.byModel[legacyBucketKey(key)]?.attribution).toBeUndefined();
+    expect(totalTokens(usage)).toBe(1_000_100);
+    expect(costModel(usage, []).buckets.find(bucket => bucket.attribution)?.estimate.usd).toBe(3);
+    expect(usage.lastPromptTokens).toBeUndefined();
+    const saved = fs.readFileSync(layout.statePath, 'utf8');
+    writeSessionUsage(ID, layout);
+    expect(fs.readFileSync(layout.statePath, 'utf8')).toBe(saved);
+  });
+
   it("persists both query and lifecycle writes, survives pre-activation rewrites, and restores on activation", () => {
     const layout = projectSessionFileLayout({ sessionsDir: directory, sessionId: ID });
     const session: Session = { id: ID, projectRoot: directory, createdAt: "now", updatedAt: "now", status: "active", turns: [] };

@@ -7831,3 +7831,18 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 最终独立代码 APPROVE、架构 CLEAR；代码最终 39 项、架构最终 43 项通过（集合重叠，不相加）。两路另验证真实本机代理/直连、CONNECT/TLS/头/体 deadline、流取消、重定向与压缩；架构验证信任 IP SAN 成功、错误证书在 CONNECT 前拒绝，以及 40 次未读取消全部关闭 socket。此前提出的代理覆盖、未读取消崩溃、缓冲与 EOF 后取消漏洞均已修复并回归。保留的适配范围/严格压缩取舍已写入 provider 文档。
 - 最终隔离 Linux PTY Node/exe × regular/fullscreen 四格通过：整套预设、显式 advisor on/off/on、B/high 顾问与 A/low 主请求、每格一次实际本机 TLS OAuth 交换，仅 owner token 字段变化、pathRules 保持准入、退出 0；额外源码 Bun 两格也通过。只用合成配置/凭据，夹具与临时证书已清理，不把它们当作真实 provider 验收。
 - import cycles、config consumers、declarations、Node floor 与脚本测试 59 项通过；NormProof 无环/解析义务满足，仍为原 9 个函数上限 advisory，触及模块未新增越界。strict docs drift 与 diff 在本条完成后运行。本条记录时本批尚未提交/推送，后续按实际 SHA 记录 CI；PRV-03…05 完整审计、历史 relay 成本、CTX-03 与其余全部 47 项继续，不能据此宣称 W2 或阶段完成。
+
+
+### PRV-05 历史目的地与费用快照
+
+- 委派续期/传输批 `788b0d3ca4d9dbad0b5e04583c32d2ab0fdd3c50` 已推送；本轮实际读回 Architecture Watch `39111926775` 与 CI `39111926771` 均 success。没有把旧失败 run 或本地输出改写成远端通过。
+- 主请求与 cache 刷新在发送前复制实际目的地和价格；同 provider/model 的不同路径 relay、同目标后续改价分别累计，晚到响应不跟随当前选择。只持久化地址摘要和安全 origin，不保存地址的用户信息、路径、查询或 fragment。未知价格不借用当前目录/官方价格，免费、已知小计、部分/全部未知分别显示；状态栏不把部分已知小计冒充 fallback。
+- 累计快照升至 schema v2。旧记录保留原 provider/model 的当前价格查找，并对保留命名空间内的任意旧模型名作一次无碰撞转义；锁内 delta、失败写入重试和重复 flush 不重复累计。缓存比较独立于价格版本；改价保留连续性，换目的地和 legacy/新身份边界不推导缓存支持。
+- 只读参考对照采用“按该次模型价格先计算、再累积历史”的决定，保留本项目更强的目的地、缺价与旧记录区分；不复制其假定所有主类别均有价格的合同，也不新建第二套 usage/请求账本。反转回归绑定发送前捕获、历史价格、旧键迁移、缓存身份类型和部分估算事实。
+- 独立复核发现缓存身份字符串与任意旧模型名可能碰撞，已改为带类型的 JSON 元组；原复现重跑得到 `[true,false]`、50% hit、1 条可计量请求。最终 FIXED/APPROVED、3 文件/45 项通过，前轮 8 文件/148 项通过（集合重叠，不相加）。首选固定角色 reviewer 因模型不可用失败，未被当成批准；后续可用的独立 reviewer 实际完成复核。
+- 本地受影响集 22 文件/295 项通过；最终报告单复数文字调整后，另跑 attribution/cost 两文件/37 项通过。类型诊断相对 `788b0d3c` 为 149/149、无新增，不代表全项目 tsc 通过。首次检查发现新 attribution 接口不满足 report 的 JSON 值合同，已在 report 边界投影为具体 JSON 对象；新状态测试首次用精确浮点比较失败，改为费用容差加最终显示文本断言，未改变产品数值。
+- 五项加载时反转均实际退出 1：移除发送前捕获 2 失败；恢复当前目录重算 5 失败/1 通过；取消旧键转义、取消缓存类型命名空间、取消 partial 标记各 1 失败。未选中的定向用例不计通过，产品源码未回退。产物为 `.omx/verification/phase20/usage.reverse-*` 与 `usage.reversals.result.json`。
+- 两种构建通过，最终 TS manifest `d972c7e654e0`。新编译模块的两独立 Node 进程并发累计、第三进程恢复通过：一旧桶、三新价格/目标桶共 180 tokens/5 次记录，重复落盘不增量，其他 state 字段不变，已知小计与未知覆盖保真。夹具已清理，产物为 `usage.process.mjs`、对应 result。
+- Linux 隔离 PTY Node/exe × regular/fullscreen 四格全部通过：实际 A/B/C 请求、同名模型的两组价格与缺价、只读 cost reader、退出后修改当前目录价格、通过 `--session-id` 在新进程恢复、再次只读查看、全局配置字节不变、退出 0。探针前几次因选择错模型、误用恢复参数、欢迎文字被历史滚出屏幕及 reader 关闭未同步而失败，均分类为夹具问题；最终等待实际输入提示和 reader footer，未为夹具改产品行为。只使用本机 HTTP 和合成凭据，产物为 `usage.pty.py`、log 及 `usage/`。
+- cycles、config consumers（53/53）、declarations、Node floor 与脚本测试 59 项通过。NormProof 退出 0、verdict partial，无环/解析义务 satisfied，仍为原 9 项函数上限 advisory；修改模块均未越界。最终 strict docs drift 与 diff 在本条写入后执行。
+- 本条写入时尚未提交/推送本批，新 SHA CI 待实际读回。裁决开头的旧“已实现”概括已按当前返工状态纠正；辅助请求费用投影、主账号发布后的本回合 checkpoint、PRV-03…05 完整审计、CTX-03 及其余全部 47 项继续原范围。本批不构成 W2 或阶段完成。

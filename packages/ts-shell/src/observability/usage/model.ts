@@ -8,8 +8,21 @@
  * attributed to the wrong model.
  */
 import type { RequestContext } from '../../context/request/model.js';
+import type { ModelCostRates } from '../../core/models/catalog.js';
+
+export interface UsageAttribution {
+  readonly provider: string;
+  readonly model: string;
+  /** Digest of the actual base address; never a raw credential-bearing URL. */
+  readonly endpointId: string;
+  /** Display origin only, without userinfo, path, query or fragment. */
+  readonly origin?: string;
+  /** Prices captured before sending. Null means no published price was known. */
+  readonly rates: Readonly<ModelCostRates> | null;
+}
 
 export interface ModelUsageBucket {
+  readonly attribution?: UsageAttribution;
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
@@ -29,10 +42,12 @@ export interface PromptMeasurementIdentity {
 }
 
 export interface SessionUsageTelemetry {
+  readonly schemaVersion?: 2;
   /** Last accepted foreground request in this runtime, never persisted as cumulative usage. */
   requestContext?: RequestContext;
   /**
-   * Usage per model, keyed by `<provider>/<model>`.
+   * Usage per destination and captured price, with legacy provider/model keys.
+   * Keys are opaque; attributed buckets carry their own identity.
    *
    * The only place token counts live. A session-level total would be a second
    * copy that could disagree with the buckets it was derived from, and the whole
@@ -106,11 +121,12 @@ export interface SessionUsageTelemetry {
  * reported no cache activity at all can be told from one that reported zero.
  */
 export interface UsageHistoryEntry {
+  readonly attribution?: UsageAttribution;
   /** The prompt the provider was sent, in total. */
   promptTokens: number;
   readonly cacheReadTokens: number;
   readonly cacheWriteTokens: number;
-  /** `<provider>/<model>`, for spotting a switch that re-bills the prompt. */
+  /** Opaque accounting bucket key. Attribution distinguishes destination from price changes. */
   readonly bucketKey: string;
   readonly timestamp: number;
   /**
@@ -138,4 +154,4 @@ export interface UsageHistoryEntry {
 
 /** Durable cumulative counts. Context measurements belong to the live runtime. */
 export type SessionUsageSnapshot = Pick<SessionUsageTelemetry,
-  "byModel" | "turnsCount" | "toolCallsCount" | "lastBucketKey" | "lastUpdated">;
+  "schemaVersion" | "byModel" | "turnsCount" | "toolCallsCount" | "lastBucketKey" | "lastUpdated">;

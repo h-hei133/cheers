@@ -1,5 +1,6 @@
 import type { ModelCostRates } from "../core/models/catalog.js";
-import { splitBucketKey, type UsageHistoryEntry } from "./usageTelemetry.js";
+import type { UsageHistoryEntry } from "./usage/model.js";
+import { bucketIdentity, bucketRates, cacheIdentity } from './usage/identity.js';
 
 /**
  * What the prompt cache failed to save.
@@ -38,6 +39,7 @@ export interface CacheMiss {
   readonly idleMs: number;
   /** Whether these tokens were sent to a different model than last time. */
   readonly modelChanged: boolean;
+  readonly endpointChanged?: boolean;
 }
 
 /** All the misses found in a history, and what they cost. */
@@ -98,6 +100,8 @@ interface Comparable {
   readonly paidTokens: number;
   readonly rates: ModelCostRates;
   readonly bucketKey: string;
+  readonly modelKey: string;
+  readonly attributed: boolean;
   readonly timestamp: number;
 }
 
@@ -156,16 +160,18 @@ export function findCacheWaste(
  */
 function comparable(entry: UsageHistoryEntry, rateFor: CacheRateLookup): Comparable | undefined {
   if (entry.promptTokens <= 0) return undefined;
-  const { provider, model } = splitBucketKey(entry.bucketKey);
-  const rates = rateFor(provider, model);
-  if (!rates) return undefined;
+  const rates = bucketRates(entry.bucketKey, entry, rateFor);
+  if (!rates || rates.cacheReadPerMTok === undefined) return undefined;
+  const identity = bucketIdentity(entry.bucketKey, entry);
   const cacheRead = entry.cacheReadTokens;
   return {
     promptTokens: entry.promptTokens,
     cacheReadTokens: cacheRead,
     paidTokens: entry.promptTokens - cacheRead,
     rates,
-    bucketKey: entry.bucketKey,
+    bucketKey: cacheIdentity(entry.bucketKey, entry.attribution),
+    modelKey: JSON.stringify([identity.provider, identity.model]),
+    attributed: entry.attribution !== undefined,
     timestamp: entry.timestamp,
   };
 }
@@ -179,6 +185,9 @@ function comparable(entry: UsageHistoryEntry, rateFor: CacheRateLookup): Compara
  * request for tokens it never sent would invent a miss.
  */
 function detectMiss(previous: Comparable, current: Comparable): CacheMiss | undefined {
+  // A legacy entry never identified an endpoint. Migration cannot establish
+  // either continuity or an observed destination switch across that boundary.
+  if (previous.attributed !== current.attributed) return undefined;
   const shared = Math.min(previous.promptTokens, current.promptTokens);
   const missedTokens = shared - current.cacheReadTokens;
   if (missedTokens <= NOISE_FLOOR_TOKENS) return undefined;
@@ -196,7 +205,8 @@ function detectMiss(previous: Comparable, current: Comparable): CacheMiss | unde
     missedTokens,
     missedCost: pricePerMillion(extraPerToken, missedTokens),
     idleMs: Math.max(0, current.timestamp - previous.timestamp),
-    modelChanged: current.bucketKey !== previous.bucketKey,
+    modelChanged: current.modelKey !== previous.modelKey,
+    ...(current.attributed ? { endpointChanged: current.bucketKey !== previous.bucketKey && current.modelKey === previous.modelKey } : {}),
   };
 }
 

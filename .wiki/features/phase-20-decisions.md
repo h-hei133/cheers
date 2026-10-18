@@ -3,7 +3,7 @@ title: "Phase 20 决策与任务规划"
 category: article
 sources: [repo-audit-2026-10-17, 23-input-surface-geometry.md, 24-slash-completion-defects.md, 25-model-configuration-and-relays.md, 26-compaction-trigger-design.md, 27-background-execution.md, 28-context-display-and-startup-budget.md, 29-startup-time.md, 30-panels-and-model-picker.md, 31-tui-capability-matrix.md, 32-defect-register-2026-10.md, 33-omp-panel-mapping.md, 34-panel-conversion-plan.md, 35-panel-inventory-full.md, 36-outstanding-work.md, 37-command-implementation-audit.md, phase-19-acceptance.md]
 created: 2026-10-17
-updated: 2026-10-17
+updated: 2026-10-18
 tags: [features, phase-20, decisions, implementation-plan]
 summary: "研究23–37复核后的统一规划。范围包括完整profile、overlay、路径设置、预设、账号池、动态工具发现默认开启、压缩/计量、后台提升、启动、面板与设置，以及Vim/数学/多行表格/并排diff/精确hunk审批。保留单一TS执行面与已有信任/事务/账本；本文不是实现或验收完成声明。"
 confidence: high
@@ -13,7 +13,7 @@ confidence: high
 
 ## 1. 范围与证据基线
 
-本阶段改善日常交互，并把新纳入的配置、工具发现、渲染和授权能力做成可交付的产品路径。**CFG-01/02 已通过精确 SHA CI；CFG-03 的本地实现、CLI/PTY、Node floor 回归与独立复核已完成，正在提交与验证交付；CFG-04/05 的本地实现与聚焦验收完成，PRV-01 已接入共享可用性投影，PRV-02 的 profile 预设库与 PRV-03 的显式账号池、PRV-04 的 refresh lease 与 PRV-05 的请求归属与 CTX-01–04 与 TOOL-01 的计量、预算、压缩步骤幂等、四态报告、动态工具发现与离线成本/质量测量已实现；交付状态以开发日志为准。** 当前 consumer 清单及合同见 [profile 身份与存储边界](profiles.md)、[显式配置输入](config-inputs.md)、[按路径作用域设置](config-scopes.md)、[模型可用性投影](model-availability.md)、[模型角色预设](model-presets.md)、[显式账号池](account-pool.md)、[请求归属与凭据退避](request-attribution.md)、[请求计量与预算](request-budget.md)、[压缩操作与步骤幂等](compaction-operations.md)和[动态工具发现](tool-discovery.md)。任务表的验收是交付要求，不代表已经通过；提交、推送及 CI 结果以开发日志中的实际证据为准。
+本阶段改善日常交互，并把新纳入的配置、工具发现、渲染和授权能力做成可交付的产品路径。**2026-10-18 已撤回先前“仅剩四项”的完成结论，全部 47 项按原范围返工复核；历史实现与旧测试不能自动兑换成本次验收通过。** 当前 consumer 清单及合同见 [profile 身份与存储边界](profiles.md)、[显式配置输入](config-inputs.md)、[按路径作用域设置](config-scopes.md)、[模型可用性投影](model-availability.md)、[模型角色预设](model-presets.md)、[显式账号池](account-pool.md)、[请求归属与凭据退避](request-attribution.md)、[请求计量与预算](request-budget.md)、[压缩操作与步骤幂等](compaction-operations.md)和[动态工具发现](tool-discovery.md)。任务表的验收是交付要求，不代表已经通过；当前复核范围见[交付状态](phase-20-status.md)，提交、推送及 CI 结果以开发日志中的实际证据为准。
 
 Cheers源码基线为`0d30d589ec9023ed24e0794c1215f70398bc418d`。本轮按`AGENTS.md`、[重构规则与现状](../refactor/plan.md)、[开发日志](../log.md)及[Phase 19收尾](phase-19-acceptance.md#27-阶段收尾与未完成项)定位后，复核全部23–37。历史01–22及Phase 19是能力与契约来源，不因本次规划重新开放已结束阶段。
 

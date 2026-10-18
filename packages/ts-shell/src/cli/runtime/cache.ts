@@ -9,6 +9,8 @@ import { writeSessionUsage } from "../../session/store/usage.js";
 import { createComponentLogger } from "../../observability/structuredLogger.js";
 import type { RequestPolicy } from '../../core/agent/request/model.js';
 import { providerModelTransport } from '../../provider/request/transport.js';
+import { captureUsageAttribution } from '../../observability/usage/identity.js';
+import type { ModelCostRates } from '../../core/models/catalog.js';
 
 const logger = createComponentLogger("cache-warming");
 
@@ -21,9 +23,13 @@ export function cacheRefreshFor(input: {
   readonly admission?: () => string | undefined;
   readonly renewHeaders: () => Promise<Readonly<Record<string, string>> | undefined>;
   readonly provider?: { readonly providerId: string; readonly model: string; readonly endpoint?: string };
+  readonly baseUrl?: string;
+  readonly rates?: ModelCostRates;
   readonly credential?: { readonly credentialId: string; readonly generation: string };
 }): Pick<CacheWarmingOptions, "refresh" | "canRefresh" | "onUsage" | "isCurrent"> {
   const provider = input.provider;
+  const attribution = provider && input.baseUrl !== undefined ? captureUsageAttribution({ provider: provider.providerId,
+    model: provider.model, baseUrl: input.baseUrl, rates: input.rates }) : undefined;
   const fetchImpl = providerFetchForEndpoint(input.runtimeConfig, provider?.endpoint, endpointShape, input.admission);
   const canRefresh = (sent: SentRequest): boolean => provider !== undefined &&
     (sent.endpoint ?? DEFAULT_ENDPOINT_KIND) === (provider.endpoint ?? DEFAULT_ENDPOINT_KIND) && canRefreshSentRequest(sent);
@@ -44,6 +50,7 @@ export function cacheRefreshFor(input: {
       if (!provider || !hasUsage(usage)) return;
       recordSessionUsage(input.sessionId, {
         ...usageFromProvider(usage), provider: provider.providerId, model: provider.model,
+        ...(attribution ? { attribution } : {}),
       }, { affectsContext: false });
       try {
         writeSessionUsage(input.sessionId);

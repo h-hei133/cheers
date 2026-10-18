@@ -415,8 +415,10 @@ describe("createStepFunction", () => {
     // Nested under `prompt_tokens_details` on this family of providers. Cache
     // traffic is per model, so it is read from the bucket for the model that
     // answered rather than from a session-level field.
-    expect(getSessionUsage("sess_cache_openai").byModel.m?.cacheReadTokens).toBe(768);
-    expect(getSessionUsage("sess_cache_openai").byModel.m?.promptTokens).toBe(232);
+    expect(Object.values(getSessionUsage("sess_cache_openai").byModel)).toMatchObject([{
+      attribution: { provider: '', model: 'm', origin: 'https://provider.test', rates: null },
+      cacheReadTokens: 768, promptTokens: 232,
+    }]);
     expect(getSessionUsage("sess_cache_openai").lastPromptTokens).toBe(1000);
     resetSessionUsage("sess_cache_openai");
   });
@@ -441,11 +443,11 @@ describe("createStepFunction", () => {
     await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
 
     const usage = getSessionUsage("sess_cache_anthropic");
-    expect(usage.byModel.m?.cacheReadTokens).toBe(512);
-    expect(usage.byModel.m?.cacheWriteTokens).toBe(256);
-    expect(usage.byModel.m?.promptTokens).toBe(1000);
+    expect(Object.values(usage.byModel)).toMatchObject([{
+      attribution: { provider: '', model: 'm', origin: 'https://provider.test', rates: null },
+      cacheReadTokens: 512, cacheWriteTokens: 256, promptTokens: 1000, totalTokens: 1778,
+    }]);
     expect(usage.lastPromptTokens).toBe(1768);
-    expect(usage.byModel.m?.totalTokens).toBe(1778);
     resetSessionUsage("sess_cache_anthropic");
   });
 
@@ -464,8 +466,10 @@ describe("createStepFunction", () => {
     await step([{ role: "user", content: "hi" }], undefined, {}, { allowTools: true });
 
     const usage = getSessionUsage("sess_cache_none");
-    expect(usage.byModel.m?.cacheReadTokens).toBe(0);
-    expect(usage.byModel.m?.cacheWriteTokens).toBe(0);
+    expect(Object.values(usage.byModel)).toMatchObject([{
+      attribution: { provider: '', model: 'm', origin: 'https://provider.test', rates: null },
+      cacheReadTokens: 0, cacheWriteTokens: 0,
+    }]);
     resetSessionUsage("sess_cache_none");
   });
 

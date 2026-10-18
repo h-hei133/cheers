@@ -23,6 +23,7 @@
 | PRV-03 | `core/auth/account/{pool,presence}.ts` | `account-pool` 测试 | 池外发送回退到 env/profile 时失败 |
 | PRV-04 | `core/auth/account/lease.ts` | `lease.test.ts`（7）、renewal（38） | dispatched/unknown 被提前清理时失败 |
 | PRV-05 | `provider/request/backoff.ts` | backoff（5）、ledger | A 的 429 阻塞 B 时失败 |
+| PRV-05 历史费用 | `observability/usage/`、`turn/step.ts`、`cli/runtime/cache.ts`、`core/commands/cost/` | attribution、turn/usage、store/usage、cache、sessionFacts；本机 HTTP 晚到响应及多进程真实落盘 | 移除发送前捕获、按当前目录重算、取消旧键转义、缓存类型命名空间或 partial 状态标记时失败；完整 PRV-05 仍开放 |
 
 ## W3 上下文与工具
 
