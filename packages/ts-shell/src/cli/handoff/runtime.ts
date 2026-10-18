@@ -18,6 +18,7 @@ import type { RequestPolicy } from '../../core/agent/request/model.js';
 import { resolveContextWindow, resolveTokenBudget } from '../../core/models/window.js';
 import { DEFAULT_RESERVE_TOKENS } from '../../session/context.js';
 import { armedHandoffs, liveHandoffs } from './state.js';
+import { resolveProviderCredential } from '../../core/shell/providerCredentials.js';
 
 export class HandoffRun {
   private row: Handoff;
@@ -64,7 +65,8 @@ export class HandoffRun {
     resources.cacheWarming?.stop();
     const { config, catalog } = this.context.configuration.current;
     const target = this.row.target;
-    const window = resolveContextWindow({ catalog, provider: target.provider, model: target.model, configured: config.contextWindow }).window;
+    const current = this.context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
+    const window = resolveContextWindow({ catalog, provider: target.provider, model: target.model, baseUrl: current.baseUrl, configured: config.contextWindow }).window;
     const reserve = resolveTokenBudget(config.modelTokenBudgets, target.provider, target.model, 'reserveTokens', config.reserveTokens, DEFAULT_RESERVE_TOKENS);
     return { ...resources, cacheWarming: undefined, ...(resources.compaction ? { compaction: { ...resources.compaction,
       policy: { ...resources.compaction.policy, contextWindow: Math.min(window, resources.compaction.policy.contextWindow),

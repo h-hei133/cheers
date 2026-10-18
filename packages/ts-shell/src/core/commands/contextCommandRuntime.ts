@@ -55,6 +55,7 @@ export async function runContextCommand(
     catalog: publication?.catalog ?? loadCatalog(),
     provider: active.provider,
     model: active.model,
+    baseUrl: active.baseUrl,
     configured: runtimeConfig.contextWindow,
   });
   const reserve = resolveTokenBudget(runtimeConfig.modelTokenBudgets, active.provider, active.model, "reserveTokens", runtimeConfig.reserveTokens, DEFAULT_RESERVE_TOKENS);

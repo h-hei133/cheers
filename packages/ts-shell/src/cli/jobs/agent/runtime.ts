@@ -85,7 +85,7 @@ export async function captureAgentRuntime(host: JobsComposition, input: AgentRun
       const backgroundStore = new JobStore(host.manager, () => session);
       const background = new TaskRegistry(undefined, new LocalJournal(backgroundStore, () => origin, () => admit));
       const config = publication.config; const catalog = publication.catalog;
-      const endpoint = providerEndpoint(catalog, resolution.provider);
+      const endpoint = providerEndpoint(catalog, resolution.provider, resolution.baseUrl);
       let status: AgentOutcome['status'] = 'failed';
       try {
         if (admit()) throw new Error('Agent admission refused.'); signal.throwIfAborted();

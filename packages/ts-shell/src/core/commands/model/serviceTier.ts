@@ -12,7 +12,7 @@ import { resolveProviderCredential } from '../../shell/providerCredentials.js';
 import { sameValue } from '../../../config/values.js';
 import path from 'node:path';
 import { connectionIdentity } from './identity.js';
-import { catalogModel } from '../../models/catalog.js';
+import { catalogProvider } from '../../models/catalog.js';
 import { selectedModelMatches, selectionRequest } from './target.js';
 
 export function effectiveServiceTier(context: CommandContext): string | undefined {
@@ -51,7 +51,8 @@ export function setSessionServiceTier(context: CommandContext, tier: string): st
     return 'Service tier refused: the selected model differs from the current request or its credential is unavailable.';
   }
   if (context.admission?.() || baseline.projectRoot === undefined || path.resolve(baseline.projectRoot) !== path.resolve(root)) return 'Service tier refused: session or workspace admission changed.';
-  if (serviceTierCapability(catalog, selection.provider, selection.model, tier) !== 'supported') {
+  if (catalogProvider(catalog, selection.provider, request.baseUrl).ambiguous) return 'Service tier refused: multiple catalogue entries claim this endpoint.';
+  if (serviceTierCapability(catalog, selection.provider, selection.model, tier, request.baseUrl) !== 'supported') {
     return `Service tier refused: ${selection.provider}/${selection.model} does not advertise ${tier}.`;
   }
   try {
@@ -60,8 +61,8 @@ export function setSessionServiceTier(context: CommandContext, tier: string): st
       return !context.admission?.() && loaded.configValidation.valid
         && sameValue(connectionIdentity(loaded.providerConnections.find(item => item.id === selection.connectionId)), connectionIdentity(config.providerConnections?.find(item => item.id === selection.connectionId)))
         && selectedModelMatches(loaded, selection) && sameValue(selectionRequest(context, loaded, selection), request)
-        && sameValue(catalogModel(loadCatalog(), selection.provider, selection.model), catalogModel(catalog, selection.provider, selection.model))
-        && serviceTierCapability(loadCatalog(), selection.provider, selection.model, tier) === 'supported';
+        && sameValue(catalogProvider(loadCatalog(), selection.provider, request.baseUrl), catalogProvider(catalog, selection.provider, request.baseUrl))
+        && serviceTierCapability(loadCatalog(), selection.provider, selection.model, tier, request.baseUrl) === 'supported';
     });
     const notice = configurationApplicationNotice(context);
     if (notice) return `Service tier preference saved as ${tier}. ${notice}`;

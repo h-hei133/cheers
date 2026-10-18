@@ -63,7 +63,7 @@ import type { InteractiveApprovalResult } from "../interactive/picker/approval.j
 import { requestCompactionSummary } from "../../core/query/compaction/summarize.js";
 import { providerFetchForEndpoint, providerFetchFromTimeouts, providerTimeoutsFrom } from "../../provider/request/fetch.js";
 import { accountAuthFor, providerAuthorization } from "../../provider/request/authorization.js";
-import { catalogModel, providerEndpoint } from "../../core/models/catalog.js";
+import { catalogBaseUrl, catalogModel, catalogProvider, providerEndpoint } from "../../core/models/catalog.js";
 import { resolveRequestShape } from "../../core/models/requestShape.js";
 import { endpointShape, type EndpointKind } from "../../provider/endpoints/index.js";
 import { projectMemoryRootFor } from "../../memory/projectMemoryRoot.js";
@@ -150,10 +150,11 @@ export function createCliSessionRuntime(input: {
    */
   const compactionTarget = (resolved: ProviderCredentialResolution, catalog: readonly CatalogProvider[]) => {
     if (resolved.blocked) return undefined;
+    if (catalogProvider(catalog, resolved.provider, resolved.baseUrl ?? resolved.credential?.baseUrl).ambiguous) return undefined;
     const credential = resolved.credential;
     const accountAuth = accountAuthFor(resolved.provider, credential ?? {});
-    if (!credential?.apiKey && !accountAuth && !endpointShape(endpointFor(resolved.provider, catalog)).signer) return undefined;
-    const baseUrl = resolved.baseUrl ?? credential?.baseUrl;
+    if (!credential?.apiKey && !accountAuth && !endpointShape(endpointFor(resolved.provider, catalog, resolved.baseUrl)).signer) return undefined;
+    const baseUrl = catalogBaseUrl(catalog, resolved.provider, resolved.baseUrl ?? credential?.baseUrl);
     const model = resolved.model ?? credential?.model;
     if (!baseUrl || !model) return undefined;
     return {
@@ -166,8 +167,8 @@ export function createCliSessionRuntime(input: {
   };
 
   /** The endpoint kind a provider is reached through, when the catalog names one. */
-  const endpointFor = (provider: string, catalog: readonly CatalogProvider[]): EndpointKind | undefined =>
-    providerEndpoint(catalog, provider);
+  const endpointFor = (provider: string, catalog: readonly CatalogProvider[], baseUrl?: string): EndpointKind | undefined =>
+    providerEndpoint(catalog, provider, baseUrl);
 
   /** The provider the turn's own compaction summarizes with. */
   const compactionProvider = (resolved: ProviderCredentialResolution, catalog: readonly CatalogProvider[]): CompactionProvider | undefined => {
@@ -177,21 +178,22 @@ export function createCliSessionRuntime(input: {
     // that rejects a temperature does not get one in its summary request
     // either. The compaction body carries no temperature of its own; the flag
     // is what the protocols gate on.
-    const shape = resolveRequestShape(catalog, target.provider, target.model, undefined);
+    const shape = resolveRequestShape(catalog, target.provider, target.model, undefined, target.baseUrl);
     const identity = credentialIdentityFor(target.provider, { connectionId: resolved.credential?.connectionId,
       accountAuth: target.accountAuth, apiKey: target.apiKey });
     return {
       headers: providerAuthorization({
         apiKey: target.apiKey,
         accountAuth: target.accountAuth,
-        ...(endpointFor(target.provider, catalog) ? { endpoint: endpointFor(target.provider, catalog) } : {}),
+        ...(endpointFor(target.provider, catalog, target.baseUrl) ? { endpoint: endpointFor(target.provider, catalog, target.baseUrl) } : {}),
       }).headers,
       baseUrl: target.baseUrl,
       model: target.model,
       providerId: target.provider,
-      ...(endpointFor(target.provider, catalog) ? { endpoint: endpointFor(target.provider, catalog) } : {}),
+      ...(endpointFor(target.provider, catalog, target.baseUrl) ? { endpoint: endpointFor(target.provider, catalog, target.baseUrl) } : {}),
       ...(identity ? { credentialId: identity.credentialId, credentialGeneration: identity.generation } : {}),
       supportsTemperature: shape.supportsTemperature,
+      shape,
     };
   };
 
@@ -219,13 +221,14 @@ export function createCliSessionRuntime(input: {
       headers: providerAuthorization({
         apiKey: target.apiKey,
         accountAuth: renewed.accountAuth ?? target.accountAuth,
-        ...(endpointFor(target.provider, catalog) ? { endpoint: endpointFor(target.provider, catalog) } : {}),
+        ...(endpointFor(target.provider, catalog, target.baseUrl) ? { endpoint: endpointFor(target.provider, catalog, target.baseUrl) } : {}),
       }).headers,
       baseUrl: target.baseUrl,
       model: target.model,
       providerId: target.provider,
-      supportsTemperature: resolveRequestShape(catalog, target.provider, target.model, undefined).supportsTemperature,
-      ...(endpointFor(target.provider, catalog) ? { endpoint: endpointFor(target.provider, catalog) } : {}),
+      shape: resolveRequestShape(catalog, target.provider, target.model, undefined, target.baseUrl),
+      supportsTemperature: resolveRequestShape(catalog, target.provider, target.model, undefined, target.baseUrl).supportsTemperature,
+      ...(endpointFor(target.provider, catalog, target.baseUrl) ? { endpoint: endpointFor(target.provider, catalog, target.baseUrl) } : {}),
       ...(identity ? { credentialId: identity.credentialId, credentialGeneration: identity.generation } : {}),
     } };
   };
@@ -355,7 +358,7 @@ export function createCliSessionRuntime(input: {
         // from the catalogue entry this run is talking to.
         const warmingTarget = compactionTarget(resolved, catalog);
         const warmingModel = warmingTarget
-          ? catalogModel(catalog, warmingTarget.provider, warmingTarget.model)
+          ? catalogModel(catalog, warmingTarget.provider, warmingTarget.model, warmingTarget.baseUrl)
           : undefined;
         // Automatic compaction needs a provider to write the checkpoint; without
         // one the turn runs with the history it has and overflow reports itself.

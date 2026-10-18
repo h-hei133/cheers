@@ -23,7 +23,7 @@
  * limit silently overruling them.
  */
 
-import type { CatalogProvider, ModelCostRates } from './catalog.js'
+import { catalogBaseUrl, catalogModel, catalogProvider, type CatalogProvider, type ModelCostRates } from './catalog.js'
 import type { ModelTokenBudget } from '../../config/runtimeConfig.js'
 
 /**
@@ -53,6 +53,7 @@ export interface WindowResolutionInput {
   readonly catalog: readonly CatalogProvider[]
   readonly provider: string
   readonly model?: string
+  readonly baseUrl?: string
   /** The user's configured window, if any. */
   readonly configured?: number
 }
@@ -81,8 +82,14 @@ function catalogWindow(
   catalog: readonly CatalogProvider[],
   provider: string,
   model: string | undefined,
+  baseUrl?: string,
 ): { window?: number; claimedBy?: string[] } {
   if (model === undefined) return {}
+  if (catalogBaseUrl(catalog, provider, baseUrl) !== undefined) {
+    const binding = catalogProvider(catalog, provider, baseUrl)
+    return { window: binding.entry?.models.find(candidate => candidate.id === model)?.contextWindow,
+      ...(binding.conflicts ? { claimedBy: binding.conflicts } : {}) }
+  }
 
   const entry = catalog.find((candidate) => candidate.id === provider)
   const direct = entry?.models.find((candidate) => candidate.id === model)?.contextWindow
@@ -103,24 +110,17 @@ function catalogWindow(
 /**
  * What the catalog charges for one model, if it says.
  *
- * Resolved by the same rule as the window — the provider first, then the model id
- * alone when exactly one provider claims it — so the price and the window come
- * from the same entry rather than from two different guesses about which model is
- * running.
+ * A known address selects that exact catalogue owner. Older usage has only a
+ * provider/model pair: preserve its canonical or unique-model lookup, without
+ * attributing those historical tokens to the current default relay.
  */
 export function resolveModelCost(
   catalog: readonly CatalogProvider[],
   provider: string,
   model: string | undefined,
+  baseUrl?: string,
 ): ModelCostRates | undefined {
-  if (model === undefined) return undefined
-  const direct = catalog
-    .find((candidate) => candidate.id === provider)
-    ?.models.find((candidate) => candidate.id === model)?.cost
-  if (direct !== undefined) return direct
-
-  const claims = catalog.flatMap(candidate => candidate.models.filter(entry => entry.id === model))
-  return claims.length === 1 ? claims[0]?.cost : undefined
+  return catalogModel(catalog, provider, model, baseUrl)?.cost
 }
 
 /**
@@ -132,7 +132,7 @@ export function resolveModelCost(
  */
 export function resolveContextWindow(input: WindowResolutionInput): ResolvedContextWindow {
   if (input.configured !== undefined && input.configured > 0) {
-    const fromCatalog = catalogWindow(input.catalog, input.provider, input.model).window
+    const fromCatalog = catalogWindow(input.catalog, input.provider, input.model, input.baseUrl).window
     if (fromCatalog !== undefined && input.configured > fromCatalog) {
       // Not refused: a provider may serve more than this catalog knows about.
       // Worth saying out loud, because if it does not, the failure arrives as a
@@ -149,7 +149,7 @@ export function resolveContextWindow(input: WindowResolutionInput): ResolvedCont
     return { window: input.configured, source: 'config' }
   }
 
-  const { window: fromCatalog, claimedBy } = catalogWindow(input.catalog, input.provider, input.model)
+  const { window: fromCatalog, claimedBy } = catalogWindow(input.catalog, input.provider, input.model, input.baseUrl)
   if (fromCatalog !== undefined && fromCatalog > 0) {
     return { window: fromCatalog, source: 'catalog' }
   }

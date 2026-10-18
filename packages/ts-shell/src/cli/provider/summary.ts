@@ -3,7 +3,7 @@ import type { RuntimeConfig } from '../../config/runtimeConfig.js';
 import { assertScopedModel } from '../../config/scope/projection.js';
 import { credentialIdentityFor } from '../../core/auth/account/pool.js';
 import { renewStoredAccount } from '../../core/auth/account/renewal.js';
-import { catalogModel, providerEndpoint, type CatalogProvider } from '../../core/models/catalog.js';
+import { catalogBaseUrl, catalogModel, providerEndpoint, type CatalogProvider } from '../../core/models/catalog.js';
 import { effortCapability } from '../../core/models/capability.js';
 import { resolveRequestShape } from '../../core/models/requestShape.js';
 import { outputLimitFailure, reserveLimitFailure } from '../../core/models/limits.js';
@@ -29,14 +29,15 @@ export function captureSummaryRole(input: {
   const role = input.config.sessionModelRoles?.summary;
   if (!role) return undefined;
   const main = resolveProviderCredential({ runtimeConfig: input.config, env: {} });
-  const resolution = delegatedTarget(role, main, input.config);
+  const selected = delegatedTarget(role, main, input.config);
+  const resolution = { ...selected, baseUrl: catalogBaseUrl(input.catalog, selected.provider, selected.baseUrl ?? selected.credential?.baseUrl) };
   assertScopedModel(input.config, resolution);
-  const model = catalogModel(input.catalog, role.provider, role.model);
-  if (!model || effortCapability(input.catalog, role.provider, role.model, role.thinkingEffort ?? null) === 'unsupported') {
+  const model = catalogModel(input.catalog, role.provider, role.model, resolution.baseUrl);
+  if (!model || effortCapability(input.catalog, role.provider, role.model, role.thinkingEffort ?? null, resolution.baseUrl) === 'unsupported') {
     throw new Error('The summary role model or reasoning effort is unavailable.');
   }
-  const shape = resolveRequestShape(input.catalog, role.provider, role.model, role.thinkingEffort ?? undefined);
-  const endpoint = providerEndpoint(input.catalog, role.provider);
+  const shape = resolveRequestShape(input.catalog, role.provider, role.model, role.thinkingEffort ?? undefined, resolution.baseUrl);
+  const endpoint = providerEndpoint(input.catalog, role.provider, resolution.baseUrl);
   const maxOutputTokens = input.config.maxOutputTokens ?? shape.maxOutputCeiling;
   const reserveTokens = resolveTokenBudget(input.config.modelTokenBudgets, role.provider, role.model, 'reserveTokens', input.config.reserveTokens, 0);
   const failure = outputLimitFailure(maxOutputTokens, model.maxTokens, model.contextWindow)

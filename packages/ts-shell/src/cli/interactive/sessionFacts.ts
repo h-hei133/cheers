@@ -62,7 +62,7 @@ export function readStatusFacts(
   const { cost, everyRatePublished, zeroCostSupported } = estimateSessionCost(usage, (provider, model) =>
     resolveModelCost(catalog, provider, model),
   );
-  const window = resolveContextWindow({ catalog, provider: active.provider, model: active.model, configured: config.contextWindow });
+  const window = resolveContextWindow({ catalog, provider: active.provider, model: active.model, baseUrl: active.baseUrl, configured: config.contextWindow });
   return {
     model: active.model ?? active.provider,
     provider: active.provider,

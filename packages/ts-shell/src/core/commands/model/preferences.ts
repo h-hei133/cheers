@@ -2,7 +2,7 @@ import path from 'node:path';
 import type { CommandContext } from '../types.js';
 import type { SessionModelSelection } from '../../../session/model/contract.js';
 import type { CatalogProvider } from '../../models/catalog.js';
-import { catalogModel } from '../../models/catalog.js';
+import { catalogProvider } from '../../models/catalog.js';
 import { loadCatalog } from '../../models/catalogStore.js';
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../../session/model/state.js';
 import { projectSessionModel } from '../../../session/model/projection.js';
@@ -12,7 +12,7 @@ import { configurationApplicationNotice, readFreshConfiguration } from '../confi
 import { selectedModelMatches, selectionRequest } from './target.js';
 
 /** Publish a small session preference through the same active identity and CAS fences. */
-export function publishModelPreference(context: CommandContext, update: (selection: SessionModelSelection, catalog: readonly CatalogProvider[]) => SessionModelSelection): string | undefined {
+export function publishModelPreference(context: CommandContext, update: (selection: SessionModelSelection, catalog: readonly CatalogProvider[], baseUrl?: string) => SessionModelSelection): string | undefined {
   if (!context.sessionId) return 'An active selected session model is required.';
   try {
     const baseline = readSessionModelEdit(context.sessionId);
@@ -30,15 +30,16 @@ export function publishModelPreference(context: CommandContext, update: (selecti
       || (selection.connectionScope === 'provider' && (request.blocked || !request.credential))) {
       return 'The selected model differs from the current request or its credential is unavailable. Reload before changing preferences.';
     }
-    const next = update(selection, catalog);
+    if (catalogProvider(catalog, selection.provider, request.baseUrl).ambiguous) return 'Model preference refused: multiple catalogue entries claim this endpoint.';
+    const next = update(selection, catalog, request.baseUrl);
     writeSessionModel(context.sessionId, next, baseline, () => {
       const actual = projectSessionModel(readFreshConfiguration(context), context.sessionId);
       const currentCatalog = loadCatalog();
       return !context.admission?.() && actual.configValidation.valid && selectedModelMatches(actual, selection)
         && sameValue(selectionRequest(context, actual, selection), request)
         && sameValue(connectionIdentity(actual.providerConnections.find(item => item.id === selection.connectionId)), connectionIdentity(config.providerConnections?.find(item => item.id === selection.connectionId)))
-        && sameValue(catalogModel(currentCatalog, selection.provider, selection.model), catalogModel(catalog, selection.provider, selection.model))
-        && sameValue(update(selection, currentCatalog), next);
+        && sameValue(catalogProvider(currentCatalog, selection.provider, request.baseUrl), catalogProvider(catalog, selection.provider, request.baseUrl))
+        && sameValue(update(selection, currentCatalog, request.baseUrl), next);
     });
     if (!sameValue(readSessionModel(context.sessionId), next)) return 'Preference publication is unverified; inspect the session before retrying.';
     return configurationApplicationNotice(context);

@@ -43,6 +43,8 @@ profile 库文件形如 `{ "version": 1, "presets": { "<name>": { "roles": { …
 
 应用前验证每个角色：名称与目标形状、目录中真实模型、effort 能力、连接存在且 provider 一致且状态为 `connected`、自身凭据、账号允许模型、模型 scope 与请求预算约束。任一角色失败则整个应用拒绝，不产生半更新。
 
+角色能力按实际连接地址匹配目录 alias，包括规范 provider 的默认地址。唯一 alias 的缺字段不借用官方模型；重复地址声明拒绝。summary/advisor 消费同一目标的协议和请求元数据；摘要 HTTP 保留输出字段、effort 映射和温度支持声明。
+
 选中的角色通过现有 `session/model/state.ts` 锁内事务写入 `connectionId/provider/model/effort`，只改当前会话，不写全局配置。目标连接可与当前连接不同；连接、模型和 effort 在同一次 session CAS 中提交，不需先修改全局 `/connect use`。空会话也可应用 profile 预设。任一角色缺少自身凭据、预设 owner/内容变化、session/config/catalog revision 变化或请求 override 改变目标时拒绝；已选择连接失效不会退回默认账号。
 
 `apply --all` 同时保存默认目标与 `modelSelection.roles`。`subagent` 用于未明确指定模型的普通子代理，选择该角色的精确连接/模型/effort；定义中的显式模型优先，只有 effort 的定义覆盖角色 effort。子请求仍走现有 scope、权限、请求账本与预算；角色失效时失败，不回退主账号。工具结果报告选中的目标、effort 与来源，零发送失败不会伪称执行成功。

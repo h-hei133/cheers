@@ -512,13 +512,30 @@ export const BUILTIN_PROVIDERS: readonly CatalogProvider[] = [
 export function providerEndpoint(
   catalog: readonly CatalogProvider[],
   provider: string,
+  baseUrl?: string,
 ): EndpointKind | undefined {
   // Passed through as declared, whatever it is. Mapping "anything that is not
   // this one kind" onto the default is what a closed union forced, and it read a
   // third protocol as the default shape — sending it a body its endpoint does not
   // accept, with nothing to say why. An unknown name now reaches `endpointShape`,
   // which names the kinds it does know.
-  return catalog.find((candidate) => candidate.id === provider)?.endpoint;
+  return catalogProvider(catalog, provider, baseUrl).entry?.endpoint;
+}
+
+/** Resolve the request address before selecting its catalogue metadata. */
+export function catalogBaseUrl(catalog: readonly CatalogProvider[], provider: string, baseUrl?: string): string | undefined {
+  return baseUrl ?? catalog.find(candidate => candidate.id === provider)?.baseUrl;
+}
+
+/** An exact relay catalogue owns all of its metadata, including unknown fields. */
+export function catalogProvider(catalog: readonly CatalogProvider[], provider: string, baseUrl?: string): {
+  readonly entry?: CatalogProvider; readonly ambiguous: boolean; readonly conflicts?: string[];
+} {
+  const address = catalogBaseUrl(catalog, provider, baseUrl);
+  const aliases = address === undefined ? [] : catalog.filter(candidate => candidate.runtime === provider && candidate.id !== provider
+    && candidate.baseUrl !== undefined && candidate.baseUrl.replace(/\/+$/, '') === address.replace(/\/+$/, ''));
+  if (aliases.length > 1) return { ambiguous: true, conflicts: aliases.map(candidate => candidate.id) };
+  return { entry: aliases[0] ?? catalog.find(candidate => candidate.id === provider), ambiguous: false };
 }
 
 /**
@@ -537,8 +554,10 @@ export function catalogModel(
   catalog: readonly CatalogProvider[],
   provider: string,
   model: string | undefined,
+  baseUrl?: string,
 ): CatalogModel | undefined {
   if (model === undefined) return undefined;
+  if (baseUrl !== undefined) return catalogProvider(catalog, provider, baseUrl).entry?.models.find(candidate => candidate.id === model);
   const direct = catalog
     .find((candidate) => candidate.id === provider)
     ?.models.find((candidate) => candidate.id === model);

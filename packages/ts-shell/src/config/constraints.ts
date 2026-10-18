@@ -1,5 +1,5 @@
 import { DEFAULT_CONFIG, type RuntimeConfig } from './runtimeConfig.js';
-import { catalogModel, providerEndpoint, type CatalogProvider } from '../core/models/catalog.js';
+import { catalogBaseUrl, catalogModel, catalogProvider, providerEndpoint, type CatalogProvider } from '../core/models/catalog.js';
 import { resolveContextWindow, resolveTokenBudget } from '../core/models/window.js';
 import { outputLimitFailure, reserveLimitFailure } from '../core/models/limits.js';
 import { effortCapability } from '../core/models/capability.js';
@@ -10,28 +10,31 @@ import { effortOutputFailure } from '../provider/endpoints/effort.js';
 export interface ConfigModelTarget {
   readonly provider: string;
   readonly model?: string;
+  readonly baseUrl?: string;
   readonly thinkingEffort?: ThinkingPreference;
 }
 
 /** Final relations use the same target, precedence and window as the consumers. */
 export function inspectConfigConstraints(config: RuntimeConfig, target: ConfigModelTarget, catalog: readonly CatalogProvider[]) {
+  target = { ...target, baseUrl: catalogBaseUrl(catalog, target.provider, target.baseUrl) };
   const errors: string[] = [];
   const notices: string[] = [];
   if ((config.retryBaseDelayMs ?? DEFAULT_CONFIG.retryBaseDelayMs!) > (config.retryMaxDelayMs ?? DEFAULT_CONFIG.retryMaxDelayMs!)) {
     errors.push('retryBaseDelayMs must not exceed retryMaxDelayMs.');
   }
-  const entry = catalogModel(catalog, target.provider, target.model);
+  if (catalogProvider(catalog, target.provider, target.baseUrl).ambiguous) errors.push('Multiple model catalogue entries claim the selected endpoint. Resolve the duplicate entries before sending.');
+  const entry = catalogModel(catalog, target.provider, target.model, target.baseUrl);
   const window = resolveContextWindow({ catalog, ...target, configured: config.contextWindow });
   const outputFailure = outputLimitFailure(config.maxOutputTokens ?? entry?.maxTokens, entry?.maxTokens, window.window);
   if (outputFailure) errors.push(outputFailure);
   const reserve = resolveTokenBudget(config.modelTokenBudgets, target.provider, target.model, 'reserveTokens', config.reserveTokens, DEFAULT_CONFIG.reserveTokens!);
   const reserveFailure = reserveLimitFailure(reserve, window.window);
   if (reserveFailure) errors.push(reserveFailure);
-  if (target.thinkingEffort && effortCapability(catalog, target.provider, target.model, target.thinkingEffort) === 'unsupported') {
+  if (target.thinkingEffort && effortCapability(catalog, target.provider, target.model, target.thinkingEffort, target.baseUrl) === 'unsupported') {
     errors.push('The selected model does not support this reasoning effort. Select another level or use /thinking auto.');
   }
   try {
-    const shape = endpointShape(providerEndpoint(catalog, target.provider));
+    const shape = endpointShape(providerEndpoint(catalog, target.provider, target.baseUrl));
     const failure = target.thinkingEffort ? effortOutputFailure(shape, config.maxOutputTokens ?? entry?.maxTokens) : undefined;
     if (failure) errors.push(failure);
   } catch { errors.push('The selected model endpoint is unavailable.'); }
@@ -48,7 +51,8 @@ export function inspectConfigConstraints(config: RuntimeConfig, target: ConfigMo
     }
     const provider = key.slice(0, separator);
     const model = key.slice(separator + 1);
-    const resolved = resolveContextWindow({ catalog, provider, model, configured: config.contextWindow });
+    const resolved = resolveContextWindow({ catalog, provider, model,
+      ...(provider === target.provider ? { baseUrl: target.baseUrl } : {}), configured: config.contextWindow });
     // Unknown inactive models have no capacity to verify. Their active use is
     // checked above against the actual runtime fallback or explicit window.
     if (resolved.source === 'default' && (provider !== target.provider || model !== target.model)) {

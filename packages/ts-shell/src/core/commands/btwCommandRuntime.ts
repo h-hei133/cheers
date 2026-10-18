@@ -9,7 +9,7 @@ import { accountAuthFor, providerAuthorization } from "../../provider/request/au
 import { requestSimpleCompletion } from "../../provider/request/completion.js";
 import { loadCatalog } from "../models/catalogStore.js";
 import { resolveRequestShape } from "../models/requestShape.js";
-import { providerEndpoint } from "../models/catalog.js";
+import { catalogBaseUrl, catalogProvider, providerEndpoint } from "../models/catalog.js";
 import { providerFetchForEndpoint } from "../../provider/request/fetch.js";
 import { endpointShape } from "../../provider/endpoints/index.js";
 import { classifyProviderFailure, type ProviderFailureClass } from "../../provider/registry/provider.js";
@@ -56,7 +56,9 @@ export async function runBtwCommand(
   const resolution = context.resolveConfigTarget?.(runtimeConfig) ?? resolveProviderCredential({ runtimeConfig });
   const credential = resolution.credential;
   const catalog = publication?.catalog ?? loadCatalog();
-  const endpoint = providerEndpoint(catalog, resolution.provider);
+  const baseUrl = catalogBaseUrl(catalog, resolution.provider, resolution.baseUrl ?? credential?.baseUrl);
+  if (catalogProvider(catalog, resolution.provider, baseUrl).ambiguous) return { kind: 'local', output: 'Side question refused: multiple model catalogue entries claim this endpoint.' };
+  const endpoint = providerEndpoint(catalog, resolution.provider, baseUrl);
 
   let answer = "";
   let attempted = false;
@@ -66,12 +68,13 @@ export async function runBtwCommand(
   if (credential?.apiKey || accountAuth || endpointShape(endpoint).signer) {
     attempted = true;
     const model = resolution.model ?? credential?.model ?? "";
-    const shape = resolveRequestShape(catalog, resolution.provider, model, undefined);
+    const shape = resolveRequestShape(catalog, resolution.provider, model, undefined, baseUrl);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), SIDE_QUESTION_TIMEOUT_MS);
     try {
       answer =
         (await requestSimpleCompletion({
+          shape,
           requestPolicy: context.requestPolicy,
           provider: {
             headers: providerAuthorization({
@@ -79,7 +82,7 @@ export async function runBtwCommand(
               ...(accountAuth ? { accountAuth } : {}),
               ...(endpoint ? { endpoint } : {}),
             }).headers,
-            baseUrl: resolution.baseUrl ?? credential?.baseUrl ?? "",
+            baseUrl: baseUrl ?? "",
             model,
             providerId: resolution.provider,
             ...(identity ? { credentialId: identity.credentialId, credentialGeneration: identity.generation } : {}),

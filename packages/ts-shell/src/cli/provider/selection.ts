@@ -19,7 +19,7 @@ export function executionChoice(model: string, effort: ThinkingPreference | unde
   // Public qualification may select a model on this connection, never another connection with a matching ID.
   const target = delegatedTarget(model, resolution);
   const choice = { ...source, model: target.model!, thinkingEffort: effort === undefined ? source.thinkingEffort : effort };
-  const constraints = inspectConfigConstraints(config, choice, catalog);
+  const constraints = inspectConfigConstraints(config, { ...choice, baseUrl: resolution.baseUrl }, catalog);
   if (constraints.errors.length) throw new Error(`Execution model is unavailable: ${constraints.errors.join(' ')}`);
   return choice;
 }

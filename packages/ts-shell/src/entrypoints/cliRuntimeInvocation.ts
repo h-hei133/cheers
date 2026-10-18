@@ -15,7 +15,7 @@ import { registerDeclaredHooks, type HookApprovalRequest } from "../core/hooks/r
 import { loadToolCatalog, type CatalogContent, type ToolCatalogInput } from "../core/tools/catalog.js";
 import type { ToolDiscovery } from "../core/tools/discovery/state.js";
 import { loadCatalog } from "../core/models/catalogStore.js";
-import { providerEndpoint, type CatalogProvider } from "../core/models/catalog.js";
+import { catalogBaseUrl, catalogProvider, providerEndpoint, type CatalogProvider } from "../core/models/catalog.js";
 import type { RuntimeConfig } from "../config/runtimeConfig.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { buildSystemPrompt, systemPromptSnapshot, type SystemPromptContext } from "../turn/prompt.js";
@@ -233,6 +233,14 @@ function deferUntilReady(
         stopReason: `Provider readiness failed (provider-readiness:auth): ${credentialBlockMessage(reason)}` });
       return;
     }
+    const catalog = request.providerCatalog ?? loadCatalog();
+    const target = request.providerCredentialResolution;
+    const baseUrl = catalogBaseUrl(catalog, target.provider, target.baseUrl ?? target.credential?.baseUrl);
+    if (catalogProvider(catalog, target.provider, baseUrl).ambiguous) {
+      yield dependencies.createReadinessTerminalEvent({ sessionId: request.sessionId, prompt: request.prompt,
+        stopReason: 'Provider readiness failed (provider-readiness:configuration): multiple model catalogue entries claim this endpoint.' });
+      return;
+    }
     // Renewed before the readiness check, because the check is what tells the user
     // the credential is usable: one that passes on a token about to expire produces
     // a run that fails a minute later with no hint that the login is the reason.
@@ -256,14 +264,13 @@ function deferUntilReady(
     }
     assertAdmission(request.admission);
     request.signal.throwIfAborted();
-    const catalog = request.providerCatalog ?? loadCatalog();
     const resolution = request.providerCredentialResolution;
     request = {
       ...request,
       providerCatalog: catalog,
       providerCredentialResolution: {
         ...resolution,
-        baseUrl: resolution.baseUrl ?? resolution.credential?.baseUrl ?? catalog.find(entry => entry.id === resolution.provider)?.baseUrl,
+        baseUrl,
         ...(renewed.accountAuth && resolution.credential ? {
           credential: { ...resolution.credential, accountAuth: renewed.accountAuth },
         } : {}),
@@ -275,7 +282,7 @@ function deferUntilReady(
       accountAuth: request.providerCredentialResolution.credential?.accountAuth,
       baseUrl: request.providerCredentialResolution.baseUrl,
       model: request.providerCredentialResolution.model,
-      endpoint: providerEndpoint(catalog, request.providerCredentialResolution.provider) ?? DEFAULT_ENDPOINT_KIND,
+      endpoint: providerEndpoint(catalog, request.providerCredentialResolution.provider, request.providerCredentialResolution.baseUrl) ?? DEFAULT_ENDPOINT_KIND,
       signal: request.signal,
       fetchImpl: admittedFetch(providerFetch(request.runtimeConfig), request.admission),
     });

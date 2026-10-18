@@ -12,6 +12,7 @@ import { parseModelArgs, modelSyntax } from "./model/syntax.js";
 import { syntaxHelp } from "./syntax/projection.js";
 import { projectSessionModel } from "../../session/model/projection.js";
 import { loadCatalog, ensureUserCatalog, userCatalogPath } from "../models/catalogStore.js";
+import { catalogProvider } from '../models/catalog.js';
 import { refreshCatalog } from "../models/catalogRefresh.js";
 import { renderCatalog } from "../models/catalogSurface.js";
 import { availabilitySnapshot, type AvailabilitySnapshot } from "../models/availability.js";
@@ -233,7 +234,8 @@ export async function readModelCatalog(refresh = false, sessionId?: string, runt
   if (refresh) await refreshModels(context);
   const { catalog, active } = modelConfiguration(context);
   const allowed = active.credential?.authMode === 'account-auth' ? providerFacts(active.provider).accountAuthAllowedModels : undefined;
-  return { provider: active.provider, models: allowed ?? catalog.find(entry => entry.id === active.provider)?.models.map(model => model.id) ?? [],
+  const binding = catalogProvider(catalog, active.provider, active.baseUrl ?? active.credential?.baseUrl);
+  return { provider: active.provider, models: binding.ambiguous ? [] : allowed ?? binding.entry?.models.map(model => model.id) ?? [],
     active: active.model, offline: true };
 }
 
@@ -259,7 +261,9 @@ async function listModels(args: string[], refresh: boolean, context: CommandCont
   if (refresh) snapshot = modelConfiguration(context);
   const { catalog, active } = snapshot;
   const provider = requested ?? active.provider;
-  const entry = catalog.find(item => item.id === provider);
+  const binding = catalogProvider(catalog, provider, provider === active.provider ? active.baseUrl ?? active.credential?.baseUrl : undefined);
+  if (binding.ambiguous) return 'Model list unavailable: multiple catalogue entries claim the active endpoint.';
+  const entry = binding.entry;
 
   const activeModel = provider === active.provider ? active.model : undefined;
   if (provider === 'openai' && active.provider === provider && active.credential?.authMode === 'account-auth') {

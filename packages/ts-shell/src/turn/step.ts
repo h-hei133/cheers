@@ -1,4 +1,4 @@
-import { catalogModel } from "../core/models/catalog.js";
+import { catalogModel, catalogProvider } from "../core/models/catalog.js";
 import { createHash, randomUUID } from 'node:crypto';
 import { createComponentLogger } from "../observability/structuredLogger.js";
 import { ModelAdmissionError, type ModelTransport, type RequestPolicy } from '../core/agent/request/model.js';
@@ -283,10 +283,16 @@ export function createStepFunction(request: StepRequest): StepFunction {
     // this body that forgets the stamp is invisible to the type, which is why
     // every exit goes through it.
     const stamp = (step: AssistantStep): AssistantStep => (origin ? { ...step, origin } : step);
+    // Older direct adapters supplied only a model and URL. Without the runtime
+    // provider identity, retain their unique-model catalogue lookup.
+    const catalogAddress = request.provider.provider ? request.provider.baseUrl : undefined;
     let streamAttempts = 0;
     for (;;) {
       const effort = effortAccepted ? captured.thinkingEffort ?? undefined : undefined;
-      if (explicitEffort && effort && effortCapability(request.catalog ?? [], request.provider.provider ?? '', request.provider.model, effort) === 'unsupported') {
+      if (catalogProvider(request.catalog ?? [], request.provider.provider ?? '', catalogAddress).ambiguous) {
+        return stamp(errorStep('The model catalogue has multiple entries for this endpoint. Resolve them before sending.'));
+      }
+      if (explicitEffort && effort && effortCapability(request.catalog ?? [], request.provider.provider ?? '', request.provider.model, effort, catalogAddress) === 'unsupported') {
         return stamp(errorStep('The selected model does not support this reasoning effort. Select another level or use /thinking auto.'));
       }
       // Resolved per attempt rather than once, because the shape depends on the
@@ -297,9 +303,10 @@ export function createStepFunction(request: StepRequest): StepFunction {
         request.provider.provider ?? "",
         request.provider.model,
         effortAccepted ? effort : undefined,
+        catalogAddress,
       );
       const endpoint = endpointFor(request);
-      const modelEntry = catalogModel(request.catalog ?? [], request.provider.provider ?? '', request.provider.model);
+      const modelEntry = catalogModel(request.catalog ?? [], request.provider.provider ?? '', request.provider.model, catalogAddress);
       const measured = measuredPromptContext(request.sessionId, { provider: request.provider.provider ?? '',
         model: request.provider.model, endpoint, schemaDigest, systemDigest });
       const prompt = promptTokensFor({ messages, overhead, ...(measured ? { measured } : {}) });
@@ -463,7 +470,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
                   ? { systemSources: request.systemPromptSources } : {}) }),
               endpoint,
               maxTokensField: shape.maxTokensField,
-              reasoning: catalogModel(request.catalog ?? [], request.provider.provider ?? "", request.provider.model)?.reasoning,
+              reasoning: modelEntry?.reasoning,
               url: endpointUrl(request.provider.baseUrl, endpoint, request.provider.model),
               headers: request.provider.headers,
               requestHeaders,

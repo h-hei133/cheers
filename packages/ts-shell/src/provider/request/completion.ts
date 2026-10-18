@@ -4,6 +4,7 @@ import { REFUSAL } from "../../core/agent/retry.js";
 import type { ChatMessage } from "../../turn/prompt.js";
 import type { ModelTransport, RequestPolicy } from '../../core/agent/request/model.js';
 import { prepareRequestAttempt } from './attempt.js';
+import type { ResolvedRequestShape } from '../../core/models/requestShape.js';
 
 /**
  * One out-of-band model call.
@@ -49,6 +50,7 @@ export interface SimpleProvider {
 }
 
 export interface SimpleCompletionRequest {
+  readonly shape?: ResolvedRequestShape;
   readonly requestPolicy?: RequestPolicy;
   readonly provider: SimpleProvider;
   readonly messages: readonly ChatMessage[];
@@ -88,6 +90,7 @@ export async function requestSimpleCompletion(
   headers.set("accept", "application/json");
   const serialized = JSON.stringify(
     endpointBody(kind, {
+      ...request.shape,
       model: request.provider.model, systemPrompt, messages,
       ...(request.maxOutputTokens !== undefined ? { maxOutputTokens: request.maxOutputTokens } : {}),
       ...(request.supportsTemperature !== undefined ? { supportsTemperature: request.supportsTemperature } : {}),

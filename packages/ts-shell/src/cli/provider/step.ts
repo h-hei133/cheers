@@ -7,7 +7,7 @@ import type { ToolDefinition } from '../../tools/types.js';
 import { buildSystemPrompt, systemPromptSnapshot, type SystemPromptContext } from '../../turn/prompt.js';
 import { createStepFunction, type StepFunction } from '../../turn/step.js';
 import { loadCatalog } from '../../core/models/catalogStore.js';
-import { providerEndpoint } from '../../core/models/catalog.js';
+import { catalogBaseUrl, catalogProvider, providerEndpoint } from '../../core/models/catalog.js';
 import { accountAuthFor, providerAuthorization } from '../../provider/request/authorization.js';
 import { providerModelTransport } from '../../provider/request/transport.js';
 import { providerFetchForEndpoint } from '../../provider/request/fetch.js';
@@ -51,11 +51,13 @@ export function createProviderStep(
   // catalogue touches the filesystem, and a run that reloaded it mid-turn could
   // change request shape between two steps of the same answer.
   const catalog = request.providerCatalog ?? loadCatalog();
-  const endpoint = providerEndpoint(catalog, resolution.provider);
+  const baseUrl = catalogBaseUrl(catalog, resolution.provider, resolution.baseUrl ?? resolution.credential?.baseUrl);
+  if (catalogProvider(catalog, resolution.provider, baseUrl).ambiguous) throw new Error('The model catalogue has multiple entries for this endpoint. Resolve them before sending.');
+  const endpoint = providerEndpoint(catalog, resolution.provider, baseUrl);
   const configuredTier = request.serviceTier ?? request.runtimeConfig?.providerConnections
     ?.find(item => item.id === resolution.credential?.connectionId)?.serviceTier
     ?? request.runtimeConfig?.providerCredentials?.[resolution.provider]?.serviceTier;
-  if (configuredTier && serviceTierCapability(catalog, resolution.provider, resolution.model, configuredTier) !== 'supported') {
+  if (configuredTier && serviceTierCapability(catalog, resolution.provider, resolution.model, configuredTier, baseUrl) !== 'supported') {
     throw new Error(`Configured service tier '${configuredTier}' is not verified for ${resolution.provider}/${resolution.model}.`);
   }
   const system = systemPromptSnapshot(request.agentMode, promptContext);
@@ -72,7 +74,7 @@ export function createProviderStep(
         accountAuth: accountAuthFor(resolution.provider, resolution.credential ?? {}),
         ...(endpoint ? { endpoint } : {}),
       }).headers,
-      baseUrl: resolution.baseUrl ?? resolution.credential?.baseUrl ?? "",
+      baseUrl: baseUrl ?? "",
       model: resolution.model ?? resolution.credential?.model ?? "",
       // The catalog is keyed by provider id, so the request shape cannot be
       // resolved without it.

@@ -9,7 +9,7 @@ import { resolveProviderCredential } from '../../core/shell/providerCredentials.
 import { loadCatalog, writeCatalogCache } from '../../core/models/catalogStore.js';
 import { runModelPresetCommand } from '../../core/commands/model/presetCommand.js';
 import { projectSessionModel } from '../../session/model/projection.js';
-import { readSessionModel } from '../../session/model/state.js';
+import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../session/model/state.js';
 import { condenseContext } from '../../session/compaction.js';
 import { createCliSessionRuntime } from './cliSessionRuntimeFactory.js';
 import type { SessionRuntimeDependencies } from '../../core/shell/sessionRuntime.js';
@@ -45,11 +45,11 @@ afterEach(async () => {
 async function fixture(summaryModel = 'namespace/summary') {
   const setup = createAdvisorHarness(false, false);
   vi.stubEnv('OPENAI_API_KEY', '');
-  const requests: Array<{ path: string; credential?: string; model: string; effort?: string; messages: unknown[] }> = [];
+  const requests: Array<{ path: string; credential?: string; model: string; effort?: string; messages: unknown[]; body: Record<string, unknown> }> = [];
   const server = http.createServer(async (request, response) => {
     const chunks: Buffer[] = []; for await (const chunk of request) chunks.push(Buffer.from(chunk));
     const body = JSON.parse(Buffer.concat(chunks).toString());
-    requests.push({ path: request.url!, credential: request.headers.authorization, model: body.model, effort: body.reasoning_effort, messages: body.messages });
+    requests.push({ path: request.url!, credential: request.headers.authorization, model: body.model, effort: body.reasoning_effort, messages: body.messages, body });
     response.writeHead(200, { 'content-type': 'application/json' });
     response.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'Condensed fixture history.' }, finish_reason: 'stop' }],
       usage: { prompt_tokens: 4, completion_tokens: 1, total_tokens: 5 } }));
@@ -86,6 +86,43 @@ function runtime(setup: Awaited<ReturnType<typeof fixture>>) {
   } as never);
   return { deps: observed.deps!, context };
 }
+
+it.each([false, true])('uses the exact relay request shape for summaries (independent role: %s)', async role => {
+  const setup = await fixture();
+  if (!role) {
+    const edit = readSessionModelEdit(setup.session.id);
+    writeSessionModel(setup.session.id, { ...edit.selection!, roles: undefined }, edit);
+  }
+  const config = getRuntimeConfig(setup.root);
+  const connection = config.providerConnections.find(item => item.id === (role ? 'b' : 'a'))!;
+  writeCatalogCache([...loadCatalog(), { id: 'relay-summary', label: 'Summary relay', runtime: 'openai', auth: 'api-key', baseUrl: connection.baseUrl,
+    models: [{ id: role ? 'namespace/summary' : 'main', contextWindow: 32000, maxTokens: 100, reasoning: true,
+      thinkingLevelMap: { high: 'strong' }, compat: { maxTokensField: 'max_completion_tokens', systemRole: 'developer', supportsTemperature: false } }] }]);
+  const { deps } = runtime(setup);
+  expect(await deps.summarizeAbandonedTurns!(setup.manager.getSession(setup.session.id)!.turns)).toContain('Condensed fixture history.');
+  expect(setup.requests).toHaveLength(1);
+  expect(setup.requests[0]).toMatchObject({ path: `/${role ? 'b' : 'a'}/v1/chat/completions`, body: { max_completion_tokens: 100 } });
+  expect(setup.requests[0].body).not.toHaveProperty('max_tokens');
+  expect(setup.requests[0].body).not.toHaveProperty('temperature');
+  if (role) expect(setup.requests[0].effort).toBe('strong');
+});
+
+it.each([false, true])('refuses duplicate relay claims before compaction sends (independent role: %s)', async role => {
+  const setup = await fixture();
+  if (!role) {
+    const edit = readSessionModelEdit(setup.session.id);
+    writeSessionModel(setup.session.id, { ...edit.selection!, roles: undefined }, edit);
+  }
+  const connection = getRuntimeConfig(setup.root).providerConnections.find(item => item.id === (role ? 'b' : 'a'))!;
+  writeCatalogCache([...loadCatalog(), ...['alias-one', 'alias-two'].map(id => ({ id, label: id, runtime: 'openai' as const, auth: 'api-key' as const,
+    baseUrl: connection.baseUrl, models: [{ id: role ? 'namespace/summary' : 'main', contextWindow: 32000, maxTokens: 100, reasoning: true }] }))]);
+  const { deps } = runtime(setup);
+  const before = structuredClone(setup.manager.getSession(setup.session.id)!.turns);
+  const result = await Promise.resolve().then(() => deps.compactHistory!(setup.session.id, setup.signal)).catch(() => ({ status: 'failed' }));
+  expect(result).toMatchObject({ status: 'failed' });
+  expect(setup.requests).toHaveLength(0);
+  expect(setup.manager.getSession(setup.session.id)!.turns).toEqual(before);
+});
 
 it.each(['manual', 'automatic', 'branch', 'prefix'])('routes %s summaries to the exact role while preserving the main window and shared ledger', async kind => {
   const setup = await fixture(); const global = fs.readFileSync(getUserRuntimeConfigPath());

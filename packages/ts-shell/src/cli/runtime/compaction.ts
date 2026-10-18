@@ -2,7 +2,7 @@ import type { RuntimeConfig } from '../../config/runtimeConfig.js';
 import type { Admission } from '../../core/network/admission.js';
 import type { RequestPolicy } from '../../core/agent/request/model.js';
 import type { AgentMessage } from '../../core/agent/state.js';
-import type { CatalogProvider } from '../../core/models/catalog.js';
+import { catalogProvider, type CatalogProvider } from '../../core/models/catalog.js';
 import { resolveContextWindow, resolveTokenBudget } from '../../core/models/window.js';
 import { messageToText } from '../../model-adapters/multimodal.js';
 import { createComponentLogger } from '../../observability/structuredLogger.js';
@@ -82,6 +82,7 @@ export function buildCompactionWiring(input: {
   readonly catalog: readonly CatalogProvider[];
 }): CompactionWiring {
   const provider = input.provider;
+  if (catalogProvider(input.catalog, provider.providerId, provider.baseUrl).ambiguous) throw new Error('The model catalogue has multiple entries for this endpoint. Resolve them before compacting.');
   const runtimeConfig = input.runtimeConfig;
   const summaryRole = captureSummaryRole({ config: runtimeConfig, catalog: input.catalog, workspaceRoot: input.workspaceRoot,
     admission: input.admission, onCredentialPersisted: input.onCredentialPersisted });
@@ -107,6 +108,7 @@ export function buildCompactionWiring(input: {
     catalog: input.catalog,
     provider: provider.providerId,
     model: provider.model,
+    baseUrl: provider.baseUrl,
     configured: runtimeConfig.contextWindow,
   });
   if (resolvedWindow.warning !== undefined) {

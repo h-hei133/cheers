@@ -33,12 +33,14 @@ summary: "本地可证明的 provider/connection 可用性事实、脱敏endpoin
 
 | 表面 | 行为 |
 |---|---|
-| `/model` 与 `/model list` | provider 行显示凭据事实；active 由 `activeProvider/activeModel` 判定 |
+| `/model` 与 `/model list` | provider 行显示凭据事实；默认 list 与数据列表使用实际 endpoint 对应的目录，归属歧义时拒绝列出可选模型 |
 | 模型选择器 | 按连接逐模型展示，行内优先显示 connection ID，详情列展示脱敏 endpoint；active 匹配实际请求的连接、模型、endpoint 和凭据；CLI/env/旧配置凭据可通过 provider 行选择模型；无匹配目录项时以只读行显示实际模型；pending/error/无自身凭据项保留原因；预设提供具名角色和整套应用 |
 | 连接选择器 | 每行显示 `active` 或投影状态及脱敏 endpoint |
 | `/model status` | readiness 行由投影的 pending/error/credential-missing 决定，再检查 base URL 与模型 |
 
-选择器保留目标对象，不从 label 或后续目录重新解析地址。规范 provider 的目录可用于同协议 relay；relay 专用目录只关联地址相符的连接。目录无法明确解析的能力保持未验证，不能从另一条 relay 的同名条目猜测。
+选择器保留目标对象，不从 label 或后续目录重新解析地址。目录 owner 先确定实际地址（明确地址优先，否则规范 provider 的目录默认地址），再匹配相同 runtime、地址去尾部斜线后相等的 alias。唯一 alias 拥有模型及全部元数据；缺字段或缺模型保持未知，不借用官方条目或另一 relay。没有匹配 alias 时才使用规范 provider 目录，多个 alias 声明同一地址时拒绝选择和请求。
+
+模型/思考菜单、preset、上下文与 tier 校验、主请求、委派、顾问、侧问和摘要沿同一归属读取能力与协议；输出字段、effort 映射、温度支持、缓存元数据和容量均随实际 endpoint。歧义检查先于主请求的账号续期与 readiness，侧问及压缩也不得发送。目录默认地址同样适用，不要求为使用默认地址额外保存一条连接。原始 URL 不新增到会话模型或临时选择的公开状态中。
 
 当前模型与全局默认连接分别判定；自动回退的具名连接可正确显示 active，CLI/env 凭据不能因此被归到保存的另一账号。选择器与命令的 reasoning effort 都来自实际请求解析结果，再沿原项目偏好回退；不能混用默认 provider 的 effort。只读当前项不提供保存动作。
 
@@ -60,6 +62,7 @@ service tier 与 context window 校验实际请求的 provider/model，CLI model
 
 ## 5. 边界
 
-- 具名连接及无具名连接的 CLI/env/旧配置模型选择、恢复和拒绝路径有本地合成验证。目录同名能力歧义和独立委派账号续期仍待后续返工；不能由此宣称完整 PRV-01…05 已闭合。
+- 具名连接及无具名连接的 CLI/env/旧配置模型选择、恢复、精确目录能力和歧义拒绝路径有本地合成验证。独立委派账号续期仍需完整复核；不能由此宣称完整 PRV-01…05 已闭合。
+- 历史 usage 仍只带 provider/model 时，成本保持原规范/唯一模型查找，不因当前默认地址而被改记成 relay 价格；跨 relay 的历史成本归属仍是 PRV-05 未完成实现。
 - 未验证真实 provider、跨进程并发或 Windows/macOS 实机。
 - `unknown` 不等于不可用，`ready` 也不等于远端已确认；两者都不会被写成成功。

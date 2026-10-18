@@ -1,4 +1,4 @@
-import { catalogModel, providerEndpoint, type CatalogProvider } from './catalog.js';
+import { catalogBaseUrl, catalogModel, providerEndpoint, type CatalogProvider } from './catalog.js';
 import { endpointShape } from '../../provider/endpoints/index.js';
 
 export type ServiceTierCapability = 'supported' | 'unsupported' | 'unverified';
@@ -9,12 +9,13 @@ export function serviceTierCapability(
   provider: string,
   model: string | undefined,
   tier: string | undefined,
+  baseUrl?: string,
 ): ServiceTierCapability {
   if (tier === undefined) return 'supported';
-  const wire = endpointShape(providerEndpoint(catalog, provider)).serviceTiers;
+  const wire = endpointShape(providerEndpoint(catalog, provider, baseUrl)).serviceTiers;
   if (!wire?.includes(tier)) return 'unsupported';
   if (tier === 'default' || tier === 'auto') return 'supported';
-  const entry = catalogModel(catalog, provider, model);
+  const entry = catalogModel(catalog, provider, model, catalogBaseUrl(catalog, provider, baseUrl));
   if (!entry?.serviceTiers) return 'unverified';
   return entry.serviceTiers.includes(tier) ? 'supported' : 'unsupported';
 }

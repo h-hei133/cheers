@@ -1,6 +1,5 @@
 import type { CommandContext, LocalCommandResult } from '../types.js';
-import { loadCatalog } from '../../models/catalogStore.js';
-import { catalogModel } from '../../models/catalog.js';
+import { catalogBaseUrl, catalogModel } from '../../models/catalog.js';
 import { readSessionModel } from '../../../session/model/state.js';
 import { parseSyntax } from '../syntax/parse.js';
 import { syntaxHelp } from '../syntax/projection.js';
@@ -20,12 +19,11 @@ export async function runExtendedContextCommand(args: string[], context: Command
     return { kind: 'local', output: refusal ?? 'Extended context disabled for this session.' };
   }
   if (action !== 'on' && action !== 'enable') return { kind: 'local', output: 'Usage: /extended-context [on|off|status]' };
-  const entry = catalogModel(context.readConfiguration?.().catalog ?? loadCatalog(), selection.provider, selection.model);
-  const window = entry?.contextWindow;
-  if (!window) return { kind: 'local', output: `Extended context refused: no provider/model-supported window is published for ${selection.provider}/${selection.model}.` };
-  const refusal = publishModelPreference(context, (selected, catalog) => {
-    const supported = catalogModel(catalog, selected.provider, selected.model)?.contextWindow;
+  let window: number | undefined;
+  const refusal = publishModelPreference(context, (selected, catalog, baseUrl) => {
+    const supported = catalogModel(catalog, selected.provider, selected.model, catalogBaseUrl(catalog, selected.provider, baseUrl))?.contextWindow;
     if (!supported) throw new PreferenceCapabilityError('Extended context refused: this exact model has no published window.');
+    window = supported;
     return { ...selected, contextWindow: supported };
   });
   return { kind: 'local', output: refusal ?? `Extended context enabled at the catalog window (${window} tokens) for this session.` };

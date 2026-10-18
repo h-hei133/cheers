@@ -1,10 +1,12 @@
 import { effortCapability } from '../../../core/models/capability.js';
 import { loadCatalog } from '../../../core/models/catalogStore.js';
-import { currentModelPreference } from '../../../core/commands/model/preference.js';
+import { captureModelChoice } from '../../../core/commands/model/choice.js';
+import { captureThinkingPreference } from '../../../core/models/preference.js';
+import { catalogProvider } from '../../../core/models/catalog.js';
+import { resolveProviderCredential } from '../../../core/shell/providerCredentials.js';
 import { runThinkingCommand } from '../../../core/commands/thinkingCommandRuntime.js';
 import { getRuntimeConfig } from '../../../config/runtimeConfig.js';
 import { projectSessionModel } from '../../../session/model/projection.js';
-import type { ThinkingPreference } from '../../../core/models/effort.js';
 import type { CommandContext } from '../../../core/commands/types.js';
 import type { Option } from '../../../presentation/tui/chrome/options.js';
 import type { Picker, PickerOutcome } from '../overlay.js';
@@ -21,39 +23,39 @@ const LEVELS = ['auto', 'low', 'medium', 'high'] as const;
  * so the same session/connection precedence applies.
  */
 export function thinkingPicker(context: CommandContext): Picker {
-  const preference = (): { readonly model?: string; readonly thinkingEffort: ThinkingPreference | null } => {
-    const config = context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
-    const current = currentModelPreference(config, context.projectRoot ?? context.cwd);
-    return { ...(current.model ? { model: current.model } : {}), thinkingEffort: current.thinkingEffort };
-  };
+  let choice: ReturnType<typeof captureModelChoice> | undefined;
   return {
     title: 'Thinking effort',
     form: 'panel',
     empty: 'No effort levels are available for the selected model.',
     async load(): Promise<readonly Option[]> {
-      const current = preference();
+      try { choice = captureModelChoice(context); } catch { choice = undefined; }
       const publication = context.readConfiguration?.();
-      const catalog = publication?.catalog ?? loadCatalog();
-      const target = context.resolveConfigTarget?.(publication?.config ?? context.runtimeConfig ?? getRuntimeConfig(context.projectRoot ?? context.cwd));
-      const provider = target?.provider ?? 'openai';
-      const model = target?.model ?? current.model;
+      const config = choice?.config ?? publication?.config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
+      const catalog = choice?.catalog ?? publication?.catalog ?? loadCatalog();
+      const target = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
+      const { provider, model, baseUrl } = target;
+      const current = captureThinkingPreference(context.projectRoot ?? context.cwd, target.thinkingEffort);
+      const ambiguous = catalogProvider(catalog, provider, baseUrl).ambiguous;
       return LEVELS.map(level => {
         const effort = level === 'auto' ? null : level;
-        const capability = effortCapability(catalog, provider, model, effort);
+        const capability = effortCapability(catalog, provider, model, effort, baseUrl);
         const active = current.thinkingEffort === effort;
         return {
           id: level,
           label: level === 'auto' ? 'auto (provider decides)' : level,
           detail: level === 'auto' ? 'No explicit effort is sent.' : `Request ${level} reasoning effort.`,
-          note: active ? 'active' : capability,
-          disabled: capability === 'unsupported',
+          note: ambiguous ? 'model catalogue endpoint is ambiguous' : active ? 'active' : capability,
+          disabled: ambiguous || capability === 'unsupported',
         };
       });
     },
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
       const level = ids[0];
       if (!level || !(LEVELS as readonly string[]).includes(level)) return undefined;
-      const result = await runThinkingCommand([level === 'auto' ? 'off' : level], context);
+      const expired = choice?.admission();
+      if (expired) return { note: expired };
+      const result = await runThinkingCommand([level === 'auto' ? 'off' : level], { ...context, ...(choice ? { admission: choice.admission } : {}) });
       return result.kind === 'local' ? { note: result.output } : undefined;
     },
   };

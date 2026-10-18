@@ -21,7 +21,7 @@
  */
 
 import type { CatalogModel, CatalogProvider, ThinkingLevel } from "./catalog.js";
-import { THINKING_LEVELS } from "./catalog.js";
+import { THINKING_LEVELS, catalogBaseUrl, catalogModel } from "./catalog.js";
 
 /** What a request needs to know, with every choice already decided. */
 export interface ResolvedRequestShape {
@@ -128,8 +128,9 @@ export function resolveRequestShape(
   provider: string,
   model: string | undefined,
   level: ThinkingLevel | undefined,
+  baseUrl?: string,
 ): ResolvedRequestShape {
-  const entry = findModel(catalog, provider, model);
+  const entry = catalogModel(catalog, provider, model, catalogBaseUrl(catalog, provider, baseUrl));
   // A model nobody described still gets its level sent under its own name. That
   // is what happened before the catalog could describe a model at all, and the
   // alternative — staying silent because the model is unknown — would disable a
@@ -199,23 +200,3 @@ const THINKING_BUDGET_TOKENS: Record<ThinkingLevel, number> = {
   medium: 8_192,
   high: 16_384,
 };
-
-/** The catalogue entry for a model, by provider first and then by id alone. */
-function findModel(
-  catalog: readonly CatalogProvider[],
-  provider: string,
-  model: string | undefined,
-): CatalogModel | undefined {
-  if (model === undefined) return undefined;
-  const direct = catalog
-    .find((candidate) => candidate.id === provider)
-    ?.models.find((candidate) => candidate.id === model);
-  if (direct !== undefined) return direct;
-
-  // Two providers serving the same id may disagree about how to talk to it, so
-  // an ambiguous id is left unresolved rather than guessed at.
-  const claims = catalog
-    .map((candidate) => candidate.models.find((entry) => entry.id === model))
-    .filter((entry): entry is CatalogModel => entry !== undefined);
-  return claims.length === 1 ? claims[0] : undefined;
-}

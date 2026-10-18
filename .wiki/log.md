@@ -7793,3 +7793,16 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 代码最终 APPROVE，最新独立 95 项通过、此前账号续期 44 项通过；架构最终 CLEAR，前轮 8 文件/199 项、最后 28 项通过（集合重叠，不相加）。最终产物 Linux PTY Node/exe × regular/fullscreen × config/env/CLI 共 12 格通过：打开菜单无模型/认证探针，选择后和命令换模型后的真实请求目标/effort 正确，全局配置字节不变，退出 0；全程本机合成凭据。
 - cycles、config consumers（53/53）、declarations、Node floor、脚本测试 59 项通过。NormProof 退出 0、总 verdict partial，导入/无环 satisfied，仍为原 9 个函数上限 advisory，行为修改模块未新增越界。最终 strict docs drift 与 diff 检查在文档写入后运行。
 - 本条写入时尚未提交/推送本批，精确 SHA CI 待后续实际读回。目录同名能力歧义、独立委派账号续期、CTX-03 完整生命周期与其余全部 47 项继续原范围，不因本批通过自动闭合。
+
+### PRV-01/02 精确 endpoint 目录与请求元数据
+
+- provider-only 批已推送为 `c6206819db11c88984f95d0dee2c59eed4d9c23a`，Architecture Watch `39103714478`、CI `39103714477` 均 success；实际完成后才记录成功，未重复启动工作流。
+- 目录 owner 先解析明确地址或规范 provider 默认地址，再按 runtime 和去尾斜线后的完整地址匹配 alias。唯一 alias 拥有模型、effort、tier、协议、窗口、输出、缓存与兼容元数据；缺字段/缺模型不借用官方或其他 relay。无 alias 才用规范目录；重复声明拒绝选择、续期前 readiness、主/委派/侧问及压缩发送。未将 URL 加入会话模型或公开临时选择合同。
+- 菜单、默认 `/model list`、preset、thinking/context/tier 偏好、status/context、handoff、主请求、摘要与顾问都接上实际目标。小偏好锁内比较目录 owner，thinking picker 使用现有 choice revision；hook 后目录变更拒绝提交。侧问及无角色摘要原先仅传温度支持，本批补齐现有 shape 端口，使输出字段和其他兼容元数据真正进入 HTTP。
+- 只读参考对照采用将模型能力、协议和地址保持为同一身份的决定；保留本项目目录/请求/凭据 owner、会话 CAS 和显式失败状态，没有引入另一套模型注册或凭据系统。无地址历史 cost 仍保留旧 provider/model 查找，不能把当前 relay 价格套到旧 usage；精确历史成本归属继续是 PRV-05 的本地实现待办。
+- 两路独立复核发现默认地址在歧义检查之后才补齐，会先发送 readiness，且列表与菜单仍漏 relay 专属模型。修复后真实 readiness checker 零调用、HTTP 零发送回归通过。新夹具先误保留旧连接、再用同 ID 缓存后项覆盖了模型列表；已按实际配置/目录合并合同修正，没有放宽产品断言。
+- 最终受影响 40 文件/555 测试通过。首次扩大集合为 548 通过/7 失败：旧 direct-step API 不提供可选 provider 身份，新的 URL 查找破坏其唯一模型兼容行为。已在该入口保留旧合同，生产宿主仍提供明确 provider；原测试不改，重跑全部通过。最终类型比较 `c6206819` 为 149/149、无新增，不等于全项目 tsc 通过。
+- 三项测试加载反转实际退出 1：恢复官方目录优先后 8 失败/5 通过；移除 readiness 前歧义拒绝后 2 失败；移除侧问与普通摘要 shape 传递后 2 失败/1 通过。其余为定向筛选未运行，不是被跳过的验收；产品源未回退。产物位于 `.omx/verification/phase20/catalog.*`。
+- 两路最终结论代码 APPROVE / 架构 CLEAR。代码独立 143 项及 direct-step 83 项通过；架构最终 step/stream/catalog 94 项通过，之前 summary/completion 等 59 项通过（集合重叠，不相加）。两构建通过，TS manifest `15759ac2a850`。Linux 隔离 PTY Node/exe × regular/fullscreen × 明确/默认地址八格全部通过：模型菜单 16k 元数据、relay 专属模型、命令切换、真实本机请求 high→strong、输出字段和温度遗漏检查、全局配置字节不变、退出 0。仅使用合成凭据。
+- cycles、config consumers（53/53）、declarations、Node floor 与脚本测试 59 项通过；NormProof 退出 0、verdict partial，导入/无环 satisfied，仍是原 9 个函数上限 advisory，触及产品模块均未越界。最终 strict docs drift 与 diff 检查在文档完成后运行。
+- 本条记录时目录批尚未提交/推送，新 SHA CI 待实际读回。独立 advisor/subagent 账号续期、PRV-03…05、CTX-03 完整 history/branch/owner CAS 与未决 claim 留存，以及其余 47 项继续推进；本批不构成 W2 或阶段完成声明。

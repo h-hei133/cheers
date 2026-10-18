@@ -1,7 +1,7 @@
 import { readFreshConfiguration } from '../configuration.js';
 import path from 'node:path';
 import { loadCatalog } from '../../models/catalogStore.js';
-import { catalogModel, type CatalogProvider } from '../../models/catalog.js';
+import { catalogBaseUrl, catalogModel, type CatalogProvider } from '../../models/catalog.js';
 import { effortCapability } from '../../models/capability.js';
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../../session/model/state.js';
 import type { SessionModelPolicy, SessionModelPreset, SessionModelRole } from '../../../session/model/contract.js';
@@ -32,18 +32,18 @@ export function validateModelPreset(roles: Readonly<Record<string, ModelPresetTa
   for (const [role, target] of entries) {
     if (!validPresetName(role) || !target || ![target.connectionId, target.provider, target.model].every(value =>
       typeof value === 'string' && value.trim().length > 0 && value.length <= 256)) return 'Model preset contains an invalid role or target.';
-    if (!catalogModel(catalog, target.provider, target.model)) return `Model preset refused: ${target.provider}/${target.model} has no verified catalogue entry.`;
-    const capability = effortCapability(catalog, target.provider, target.model, target.thinkingEffort ?? null);
+    const resolution = config ? resolveProviderCredential({ runtimeConfig: projectModelSelection(config, { ...target, connectionScope: 'session' }) }) : undefined;
+    if (!catalogModel(catalog, target.provider, target.model, catalogBaseUrl(catalog, target.provider, resolution?.baseUrl))) return `Model preset refused: ${target.provider}/${target.model} has no verified catalogue entry.`;
+    const capability = effortCapability(catalog, target.provider, target.model, target.thinkingEffort ?? null, resolution?.baseUrl);
     if (capability !== 'supported') return `Model preset refused: ${target.provider}/${target.model} reasoning effort ${target.thinkingEffort ?? 'auto'} is ${capability}.`;
     if (config && !config.providerConnections.some(connection => connection.id === target.connectionId
       && connection.provider === target.provider && connection.status === 'connected')) return `Model preset refused: connection '${target.connectionId}' is unavailable or belongs to a different provider.`;
-    if (config) {
-      const resolution = resolveProviderCredential({ runtimeConfig: projectModelSelection(config, { ...target, connectionScope: 'session' }) });
+    if (config && resolution) {
       if (resolution.blocked || !resolution.credential) return `Model preset refused: connection '${target.connectionId}' has no usable credential.`;
       const allowed = providerFacts(resolution.provider).accountAuthAllowedModels;
       if (resolution.credential.authMode === 'account-auth' && allowed && !allowed.includes(target.model)) return `Model preset refused: role '${role}' is unavailable for this account binding.`;
       try { assertScopedModel(config, resolution); } catch { return `Model preset refused: role '${role}' is outside the allowed model scope.`; }
-      const constraints = inspectConfigConstraints(config, target, catalog);
+      const constraints = inspectConfigConstraints(config, { ...target, baseUrl: resolution.baseUrl }, catalog);
       if (constraints.errors.length) return `Model preset refused: role '${role}': ${constraints.errors.join(' ')}`;
     }
   }

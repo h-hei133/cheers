@@ -2,7 +2,7 @@ import { projectModelSelection, projectSessionModel } from "../../../session/mod
 import { getRuntimeConfig } from "../../../config/runtimeConfig.js";
 import { loadCatalog } from "../../../core/models/catalogStore.js";
 import { availabilityLabel, availabilitySnapshot, endpointLabel, type ConnectionAvailability } from "../../../core/models/availability.js";
-import { catalogModel, type CatalogProvider } from "../../../core/models/catalog.js";
+import { catalogBaseUrl, catalogModel, catalogProvider, type CatalogProvider } from "../../../core/models/catalog.js";
 import { effortCapability } from "../../../core/models/capability.js";
 import { resolveProviderCredential } from "../../../core/shell/providerCredentials.js";
 import type { CommandContext } from "../../../core/commands/types.js";
@@ -34,6 +34,7 @@ export function modelPicker(context: CommandContext): Picker {
       const config = choice?.config ?? publication?.config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
       const catalog = choice?.catalog ?? publication?.catalog ?? loadCatalog();
       const active = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
+      const activeAddress = catalogBaseUrl(catalog, active.provider, active.baseUrl ?? active.credential?.baseUrl);
       const availability = availabilitySnapshot({ config, catalog });
       const thinkingEffort = captureThinkingPreference(context.projectRoot ?? context.cwd, active.thinkingEffort).thinkingEffort;
       const rows: Option[] = [];
@@ -42,10 +43,10 @@ export function modelPicker(context: CommandContext): Picker {
         - Number(!availability.providers.some(item => item.provider === right.runtime && item.state === 'ready')));
       for (const provider of ordered) {
         const entry = availability.providers.find(item => item.provider === provider.runtime);
-        const connections = (entry?.connections ?? []).filter(connection => matchesCatalog(provider, connection, config.providerConnections));
+        const connections = (entry?.connections ?? []).filter(connection => matchesCatalog(provider, connection, config.providerConnections, catalog));
         const providerSlot = active.provider === provider.runtime && !active.credential?.connectionId
-          && (provider.id === provider.runtime || Boolean(active.baseUrl && provider.baseUrl
-            && active.baseUrl.replace(/\/+$/, '') === provider.baseUrl.replace(/\/+$/, '')));
+          && (provider.id === provider.runtime || Boolean(activeAddress && provider.baseUrl
+            && activeAddress.replace(/\/+$/, '') === provider.baseUrl.replace(/\/+$/, '')));
         for (const connection of providerSlot ? [...connections, undefined] : connections.length ? connections : [undefined]) {
           if (!provider.models.length) {
             const id = rowId(connection?.connectionId, provider.id, '');
@@ -57,19 +58,21 @@ export function modelPicker(context: CommandContext): Picker {
             const id = rowId(connection?.connectionId, provider.id, model.id);
             if (seen.has(id)) continue;
             seen.add(id);
-            const unsupported = effortCapability(catalog, provider.runtime, model.id, thinkingEffort) === 'unsupported';
             const target: SessionModelTarget = connection ? { connectionId: connection.connectionId, provider: connection.provider, model: model.id, thinkingEffort }
               : { connectionScope: 'provider', provider: provider.runtime, model: model.id, thinkingEffort };
             const candidate = connection || providerSlot ? projectModelSelection(config, scopedModelTarget(target)) : undefined;
             const resolution = candidate ? !connection && context.resolveConfigTarget ? context.resolveConfigTarget(candidate)
               : resolveProviderCredential({ runtimeConfig: candidate }) : undefined;
+            const ambiguous = catalogProvider(catalog, provider.runtime, resolution?.baseUrl).ambiguous;
+            const unsupported = effortCapability(catalog, provider.runtime, model.id, thinkingEffort, resolution?.baseUrl) === 'unsupported';
             const selected = Boolean(!active.blocked && active.credential
               && connection?.connectionId === active.credential.connectionId && provider.runtime === active.provider && model.id === active.model
               && resolution?.baseUrl === active.baseUrl && sameValue(resolution?.credential, active.credential));
             const reason = !connection && !providerSlot ? 'configure a connection' : connection && connection.state !== 'ready' ? availabilityLabel(connection.state)
               : resolution?.blocked || !resolution?.credential ? 'credential unavailable'
+              : ambiguous ? 'model catalogue endpoint is ambiguous'
               : unsupported ? 'reasoning effort unsupported' : !choice?.baseline ? 'active session required' : undefined;
-            const metadata = catalogModel(catalog, provider.runtime, model.id);
+            const metadata = catalogModel(catalog, provider.runtime, model.id, catalogBaseUrl(catalog, provider.runtime, resolution?.baseUrl));
             rows.push({ id, label: model.id,
               detail: [connection?.connectionId ?? (resolution?.credential ? `${resolution.credential.source} credential` : undefined), connection?.label, provider.label, connection?.endpoint ?? endpointLabel(resolution?.baseUrl),
                 metadata?.contextWindow ? `${Math.round(metadata.contextWindow / 1000)}k` : undefined].filter(Boolean).join(' · '),
@@ -163,8 +166,8 @@ function modelDetails(provider: CatalogProvider, connection?: ConnectionAvailabi
 
 /** Canonical provider models work through relays; a relay-specific catalogue must match its address. */
 function matchesCatalog(provider: CatalogProvider, connection: ConnectionAvailability,
-  connections: readonly { readonly id: string; readonly baseUrl?: string }[]): boolean {
+  connections: readonly { readonly id: string; readonly baseUrl?: string }[], catalog: readonly CatalogProvider[]): boolean {
   if (provider.id === provider.runtime) return true;
-  const baseUrl = connections.find(item => item.id === connection.connectionId)?.baseUrl;
+  const baseUrl = catalogBaseUrl(catalog, provider.runtime, connections.find(item => item.id === connection.connectionId)?.baseUrl);
   return Boolean(baseUrl && provider.baseUrl && baseUrl.replace(/\/+$/, '') === provider.baseUrl.replace(/\/+$/, ''));
 }
