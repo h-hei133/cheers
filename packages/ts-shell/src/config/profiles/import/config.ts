@@ -1,6 +1,8 @@
+import path from 'node:path';
 import { CONFIG_FIELDS, type ProviderConnectionConfig, type ProviderCredentialConfig, type RuntimeProvider } from '../../runtimeConfig.js';
 import { parseConfigText } from '../../syntax.js';
 import { serializeConfigDocument } from '../../document.js';
+import type { PathRule } from '../../scope/contract.js';
 
 /** Reject credential-bearing URL forms without reporting the input. */
 export function nonsecretUrl(value: string): string {
@@ -13,7 +15,8 @@ export function nonsecretUrl(value: string): string {
 }
 
 /** Validate raw declared values without resolving any source environment references. */
-export function importConfig(text: string): string {
+export function importConfig(text: string, sourcePath: string): string {
+  if (!path.isAbsolute(sourcePath)) throw new Error('Imported configuration requires its captured source path.');
   const raw = parseConfigText(text);
   const result: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(raw)) {
@@ -21,7 +24,10 @@ export function importConfig(text: string): string {
     if (!field || !field.sources.includes('user')) continue;
     if (!field.validate(value)) throw new Error('Imported configuration contains an invalid declared field.');
     if (name === 'providerCredentials') continue;
-    result[name] = value;
+    // Moving a declaration must not retarget its restrictions to the new profile.
+    result[name] = name === 'pathRules'
+      ? (value as readonly PathRule[]).map(rule => ({ ...rule, path: path.resolve(path.dirname(sourcePath), rule.path) }))
+      : value;
   }
   const connections = [...(result.providerConnections as ProviderConnectionConfig[] | undefined ?? [])];
   for (const [provider, value] of Object.entries(raw.providerCredentials as Record<string, ProviderCredentialConfig> | undefined ?? {})) {

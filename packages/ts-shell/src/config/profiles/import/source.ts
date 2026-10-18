@@ -10,7 +10,7 @@ export interface SourceCapture {
   readonly sources: ImportSource[];
   readonly roots: readonly DirectoryIdentity[];
   read(absolute: string): string | undefined;
-  first(relative: string): string | undefined;
+  first(relative: string): { readonly path: string; readonly content: string } | undefined;
   entries(directory: string, depth?: number): readonly string[];
   check(): void;
 }
@@ -45,8 +45,9 @@ export function captureSources(request: ImportRequest): SourceCapture {
   };
   const first = (relative: string) => {
     for (const root of roots) {
-      const text = read(path.join(root.path, relative));
-      if (text !== undefined) return text;
+      const file = path.join(root.path, relative);
+      const content = read(file);
+      if (content !== undefined) return { path: file, content };
     }
     return undefined;
   };

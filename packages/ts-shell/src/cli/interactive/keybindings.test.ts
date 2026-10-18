@@ -46,9 +46,44 @@ describe("keybindings", () => {
     expect(bindings.actionFor("ctrl+g")).toBe("app.editor.external");
   });
 
+  it('keeps grouped-picker bindings separate from editor bindings and resolves their own conflicts', () => {
+    const bindings = new Keybindings();
+    expect(bindings.actionFor('tab')).toBe('tui.input.tab');
+    expect(bindings.actionFor('shift+tab')).toBe('app.thinking.cycle');
+    expect(bindings.actionFor('tab', 'overlay')).toBe('tui.overlay.nextGroup');
+    expect(bindings.actionFor('shift+tab', 'overlay')).toBe('tui.overlay.previousGroup');
+    expect(bindings.conflicts()).toEqual([]);
+    bindings.setUserConfig({ 'tui.overlay.nextGroup': 'alt+n', 'tui.overlay.previousGroup': [] });
+    expect(bindings.actionFor('tab', 'overlay')).toBeUndefined();
+    expect(bindings.actionFor('shift+tab', 'overlay')).toBeUndefined();
+    expect(bindings.actionFor('alt+n', 'overlay')).toBe('tui.overlay.nextGroup');
+    expect(bindings.actionFor('alt+n')).toBeUndefined();
+    expect(bindings.actionFor('tab')).toBe('tui.input.tab');
+    expect(bindings.guide(true).find(row => row.does.startsWith('Next picker group'))?.keys).toEqual(['alt+n']);
+    bindings.setUserConfig({ 'tui.overlay.previousGroup': 'tab' });
+    expect(bindings.actionFor('tab', 'overlay')).toBe('tui.overlay.previousGroup');
+    expect(bindings.conflicts()).toEqual([{ key: 'tab', actionIds: ['tui.overlay.previousGroup', 'tui.overlay.nextGroup'] }]);
+  });
+
   it("leaves a key no action claims unbound, so it can still be text", () => {
     // An unbound key is not an error: it falls through to the editor.
     expect(new Keybindings().actionFor("ctrl+p")).toBeUndefined();
+  });
+
+  it('reports reserved picker controls and keeps the remaining group bindings usable', () => {
+    const config = { 'tui.overlay.nextGroup': ['ENTER', 'escape', 'down', 'alt+n'], 'tui.overlay.previousGroup': 'ctrl+p' };
+    writeConfig(JSON.stringify(config));
+    const loaded = loadUserKeybindings();
+    expect(loaded.config).toEqual({ 'tui.overlay.nextGroup': ['alt+n'], 'tui.overlay.previousGroup': [] });
+    expect(loaded.problems).toHaveLength(2);
+    expect(loaded.problems.every(problem => problem.message.includes('reserved picker'))).toBe(true);
+    for (const bindings of [new Keybindings(config), new Keybindings(loaded.config)]) {
+      expect(bindings.keysFor('tui.overlay.nextGroup')).toEqual(['alt+n']);
+      expect(bindings.keysFor('tui.overlay.previousGroup')).toEqual([]);
+      expect(bindings.actionFor('enter', 'overlay')).toBeUndefined();
+      expect(bindings.actionFor('enter')).toBe('tui.input.submit');
+      expect(bindings.actionFor('alt+n', 'overlay')).toBe('tui.overlay.nextGroup');
+    }
   });
 
   it("replaces the defaults for a rebound action rather than adding to them", () => {

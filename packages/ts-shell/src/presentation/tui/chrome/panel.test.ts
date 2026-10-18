@@ -36,6 +36,31 @@ it('reports selectable row spans that stop before the detail column', () => {
   }
 });
 
+it.each([[18, 15], [34, 31], [54, 51]])('uses a %i-row budget to show %i candidates', (capacity, count) => {
+  const value = new OptionModel();
+  value.setOptions(Array.from({ length: 51 }, (_, index) => ({ id: String(index), label: `Model ${index}` })));
+  const hits: string[] = [];
+  const rows = renderPanel(value, { title: 'Models', empty: 'none', multiple: false,
+    onOptionRow: (_row, id) => hits.push(id) }, 100, capacity);
+  expect(hits).toHaveLength(count);
+  expect(rows.length).toBeLessThanOrEqual(capacity);
+  expect(hits.at(-1)).toBe(String(count - 1));
+});
+
+it('uses the available detail height when filtering leaves only one candidate', () => {
+  const value = model();
+  value.setFilter('Option 11');
+  const hits: Array<[number, string]> = [];
+  const rows = renderPanel(value, { title: 'Pick', empty: 'none', multiple: false,
+    detail: () => ['Model: selected', 'Connection: personal', 'Status: unavailable', 'Reason: sign in required'],
+    onOptionRow: (row, id) => hits.push([row, id]) }, 100, 8);
+  expect(stripAnsi(rows.join('\n'))).toContain('Reason: sign in required');
+  expect(rows).toHaveLength(6);
+  expect(hits).toEqual([[1, 'id-11']]);
+  expect(rows.length).toBeLessThanOrEqual(8);
+  for (const row of rows) expect(visibleWidth(row)).toBeLessThanOrEqual(100);
+});
+
 it('renders a chip strip inside the capacity and reports its spans', () => {
   const hits: Array<[number, string, number, number]> = [];
   const chips = chipStrip([{ id: 'a', label: 'All' }, { id: 'b', label: 'Session' }], 'a', 40);

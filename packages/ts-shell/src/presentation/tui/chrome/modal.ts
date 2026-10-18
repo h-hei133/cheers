@@ -3,6 +3,7 @@ import { padToWidth, truncateToWidth, wrapToWidth } from "../text/layout.js";
 import { visibleWidth } from "../text/measure.js";
 import { CURSOR_MARKER } from "../render/paint.js";
 import type { Option, OptionModel } from "./options.js";
+import type { ChipStrip } from './chips.js';
 
 /**
  * Full-screen picker.
@@ -26,6 +27,9 @@ export interface ModalChrome {
   readonly actionHints?: string;
   readonly status?: string;
   readonly onOptionRow?: (row: number, id: string) => void;
+  readonly chips?: ChipStrip;
+  readonly groupHint?: string;
+  readonly onChipRow?: (row: number, id: string, from: number, to: number) => void;
 }
 
 /** A full-screen frame exactly `height` rows tall and `width` columns wide. */
@@ -35,11 +39,20 @@ export function renderModal(
   width: number,
   height: number,
 ): string[] {
+  width = Math.max(0, Math.floor(width));
+  height = Math.max(0, Math.floor(height));
+  if (width === 0 || height === 0) return [];
   const inner = Math.max(20, width - 2);
-  const rows: string[] = [top(chrome.title, model, inner), searchRow(model, inner), divider(inner)];
+  const rows: string[] = [top(chrome.title, model, inner), searchRow(model, inner)];
+  const chips = height >= 5 ? chrome.chips : undefined;
+  if (chips) {
+    for (const span of chips.spans) chrome.onChipRow?.(rows.length, span.id, span.from + 2, span.to + 2);
+    rows.push(body(chips.text, inner));
+  }
+  rows.push(divider(inner));
   const statusRows = chrome.status ? wrapToWidth(chrome.status, inner - 2).slice(0, 2) : [];
   const perOption = 2 + Math.max(0, chrome.detailRows);
-  const listRows = Math.max(perOption, height - FRAME_ROWS - statusRows.length);
+  const listRows = Math.max(perOption, height - FRAME_ROWS - statusRows.length - Number(!!chips));
   const capacity = Math.max(1, Math.floor(listRows / perOption));
 
   if (model.total === 0) {
@@ -64,9 +77,9 @@ export function renderModal(
 
   while (rows.length < height - 2 - statusRows.length) rows.push(edge(inner));
   for (const line of statusRows) rows.push(body(defaultTheme.dim(line), inner));
-  rows.push(body(footer(inner, chrome.actionHints), inner));
+  rows.push(body(footer(inner, chrome.actionHints, chips ? chrome.groupHint : undefined), inner));
   rows.push(bottom(inner));
-  return rows.slice(0, height);
+  return rows.slice(0, height).map(row => truncateToWidth(row, width));
 }
 
 /** One option: a marked headline plus its wrapped detail and note lines. */
@@ -134,9 +147,9 @@ export function modalBody(text: string, inner: number): string {
 }
 const body = modalBody;
 
-function footer(inner: number, actionHints?: string): string {
+function footer(inner: number, actionHints?: string, groupHint?: string): string {
   const hints = actionHints ? `  ·  ${actionHints}` : "";
   return defaultTheme.dim(
-    truncateToWidth(`type to filter  ·  ↑↓ move  ·  ↵ choose${hints}  ·  esc cancel`, inner - 2),
+    truncateToWidth(`${groupHint ? `${groupHint}  ·  ` : ''}type to filter  ·  ↑↓ move  ·  ↵ choose${hints}  ·  esc cancel`, inner - 2),
   );
 }

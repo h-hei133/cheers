@@ -14,7 +14,6 @@ import type { ChipStrip } from "./chips.js";
  */
 
 const MARKER_WIDTH = 4;
-const MAX_OPTIONS = 8;
 
 export interface PanelChrome {
   readonly filterable?: boolean;
@@ -34,6 +33,7 @@ export interface PanelChrome {
   readonly detail?: (id: string | undefined) => readonly string[];
   /** A tab strip above the list. */
   readonly chips?: ChipStrip;
+  readonly groupHint?: string;
   /** Records clickable chip spans. */
   readonly onChipRow?: (row: number, id: string, from: number, to: number) => void;
 }
@@ -56,8 +56,8 @@ export function renderPanel(
   // and forgetting to reserve it is how a bounded panel overruns its budget.
   const chips = capacity >= 3 ? chrome.chips : undefined;
   const chipRows = chips ? 1 : 0;
-  const overflow = capacity >= 4 + chipRows && model.total > Math.min(MAX_OPTIONS, capacity - 2 - chipRows);
-  const listRows = Math.min(MAX_OPTIONS, Math.max(0, capacity - (overflow ? 3 : 2) - chipRows));
+  const overflow = capacity >= 4 + chipRows && model.total > capacity - 2 - chipRows;
+  const listRows = Math.max(0, capacity - (overflow ? 3 : 2) - chipRows);
   if (chips) {
     rows.push(chips.text);
     for (const span of chips.spans) chrome.onChipRow?.(rows.length - 1, span.id, span.from, span.to);
@@ -75,14 +75,15 @@ export function renderPanel(
   const detailWidth = twoColumn ? Math.max(0, width - listWidth - 1) : 0;
   const detailLines = twoColumn ? chrome.detail!(model.current()?.id) : [];
   const labelWidth = measureLabelWidth(model.visible, listWidth);
-  for (let index = window.offset; index < window.offset + window.count; index++) {
+  const bodyRows = Math.min(listRows, Math.max(window.count, detailLines.length));
+  for (let rowIndex = 0; rowIndex < bodyRows; rowIndex++) {
+    const index = window.offset + rowIndex;
     const option = model.visible[index];
-    if (!option) break;
-    if (!option.disabled) chrome.onOptionRow?.(rows.length, option.id, 0, listWidth);
-    const row = renderRow(option, index === model.selectedIndex, model, chrome, labelWidth, listWidth);
+    if (option && !option.disabled) chrome.onOptionRow?.(rows.length, option.id, 0, listWidth);
+    const row = option ? renderRow(option, index === model.selectedIndex, model, chrome, labelWidth, listWidth) : "";
     rows.push(twoColumn
       ? padToWidth(truncateToWidth(row, listWidth), listWidth) + defaultTheme.fg("border", "│")
-        + padToWidth(truncateToWidth(detailLines[index - window.offset] ?? "", detailWidth), detailWidth)
+        + padToWidth(truncateToWidth(detailLines[rowIndex] ?? "", detailWidth), detailWidth)
       : row);
   }
   if (overflow) rows.push(truncateToWidth(`  ${defaultTheme.dim(`↑ ${window.above} · ↓ ${window.below} more`)}`, width));
@@ -139,11 +140,14 @@ function rowMarker(option: Option, active: boolean, model: OptionModel, chrome: 
 }
 
 function renderFooter(chrome: PanelChrome, width: number): string {
-  if (chrome.footer) return defaultTheme.dim(truncateToWidth(
-    visibleWidth(`  ${chrome.footer}`) <= width ? `  ${chrome.footer}` : "Esc to close", width));
+  if (chrome.footer) {
+    const footer = [chrome.groupHint, chrome.footer].filter(Boolean).join(' · ');
+    return defaultTheme.dim(truncateToWidth(visibleWidth(`  ${footer}`) <= width ? `  ${footer}` : "Esc to close", width));
+  }
   const keys = chrome.multiple
     ? ["↑↓ move", "space toggle", "↵ apply", "esc cancel"]
     : ["↑↓ move", "↵ choose", "esc cancel"];
+  if (chrome.groupHint) keys.unshift(chrome.groupHint);
   return defaultTheme.dim(truncateToWidth(`  ${chrome.filterable === false ? '' : 'type to filter  ·  '}${keys.join("  ·  ")}`, width));
 }
 

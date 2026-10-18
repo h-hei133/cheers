@@ -252,7 +252,7 @@ export class InteractiveMode {
       },
       write: (data) => this.terminal.write(data),
     });
-    this.overlay = new OverlayHost(() => this.tui.requestRender());
+    this.overlay = new OverlayHost(() => this.tui.requestRender(), this.preferences.keybindings);
     this.tui = new TUI(this.terminal, options.scheduler);
     this.theme = followTheme({
       workspaceRoot: options.runtimeContext.projectRoot,

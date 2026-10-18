@@ -4,6 +4,7 @@ import { parseKeyEvent } from "../../presentation/tui/input/keys.js";
 import type { Option } from "../../presentation/tui/chrome/options.js";
 import { stripAnsi } from "../../presentation/tui/text/ansi.js";
 import { parseMouseReport } from "../../presentation/tui/input/mouse.js";
+import { Keybindings } from './keybindings.js';
 
 const options: Option[] = [
   { id: "a", label: "alpha" },
@@ -114,21 +115,132 @@ describe("pointer focus", () => {
     expect(secondApply).toHaveBeenCalledWith(expect.anything(), ["b"]);
   });
 
-  it("opens the picker a chip selects", async () => {
+  it.each(['a', 'b', 'c'])("opens the picker for any visible chip: %s", async (id) => {
     const { overlay } = host();
+    const items = [{ id: 'a', label: 'All' }, { id: 'b', label: 'Session' }, { id: 'c', label: 'Tools' }];
     overlay.open(picker({
       title: "Root",
-      chips: { items: [{ id: "a", label: "All" }, { id: "b", label: "Session" }], active: "a",
+      chips: { items, active: "a",
         select: id => picker({ title: `Picked ${id}` }) },
     }));
     await new Promise((resolve) => setTimeout(resolve, 0));
     const rows = overlay.render(60, 20);
     const row = rows.findIndex(text => text.includes("Session"));
     expect(row).toBeGreaterThan(0);
-    const column = stripAnsi(rows[row]!).indexOf("Session") + 1;
+    const column = stripAnsi(rows[row]!).indexOf(items.find(item => item.id === id)!.label) + 1;
     overlay.handlePointer(parseMouseReport(`\x1b[<0;${column};${row + 1}M`)!, 0);
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(overlay.render(60, 20)[0]).toContain("Picked b");
+    expect(overlay.render(60, 20)[0]).toContain(`Picked ${id}`);
+  });
+
+  it.each([['\t', 'b'], ['\x1b[Z', 'c']])('selects a tab with keyboard input %j', async (key, id) => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    overlay.open(picker({ title: 'Root', chips: {
+      items: [{ id: 'a', label: 'All' }, { id: 'b', label: 'Session' }, { id: 'c', label: 'Tools' }],
+      active: 'a', select: next => picker({ title: `Picked ${next}` }),
+    } }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    press(overlay, key!, apply);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(overlay.render(60, 20)[0]).toContain(`Picked ${id}`);
+    expect(apply).not.toHaveBeenCalled();
+  });
+
+  it('invalidates chip hit spans when a different picker opens before the next frame', async () => {
+    const { overlay } = host();
+    const select = vi.fn();
+    overlay.open(picker({ chips: { items: [{ id: 'old', label: 'Old' }], active: 'old', select } }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    overlay.render(60, 20);
+    overlay.open(picker({ chips: { items: [{ id: 'new', label: 'New' }], active: 'new', select } }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    overlay.handlePointer(parseMouseReport('\x1b[<0;2;2M')!, 0);
+    expect(select).not.toHaveBeenCalled();
+  });
+
+  it('uses current remapped group actions and only advertises keys that remain bound', async () => {
+    const bindings = new Keybindings({ 'tui.overlay.nextGroup': 'alt+n', 'tui.overlay.previousGroup': [] });
+    const overlay = new OverlayHost(() => {}, bindings);
+    const select = vi.fn((id: string) => picker({ title: `Picked ${id}` }));
+    overlay.open(picker({ chips: { items: [{ id: 'a', label: 'All' }, { id: 'b', label: 'Session' }], active: 'a', select } }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const footer = stripAnsi(overlay.render(120, 20).at(-1)!);
+    expect(footer).toContain('alt+n');
+    expect(footer).not.toContain('shift+tab');
+    press(overlay, '\t'); press(overlay, '\x1b[Z');
+    expect(select).not.toHaveBeenCalled();
+    bindings.setUserConfig({ 'tui.overlay.nextGroup': 'alt+m', 'tui.overlay.previousGroup': [] });
+    press(overlay, '\x1bn'); expect(select).not.toHaveBeenCalled();
+    press(overlay, '\x1bm'); expect(select).toHaveBeenCalledWith('b');
+  });
+
+  it('renders modal groups and keeps keyboard and pointer selection on the displayed group', async () => {
+    const { overlay } = host();
+    const items = [{ id: 'current', label: 'This project' }, { id: 'all', label: 'All projects' }];
+    const grouped = (active: string): Picker => picker({ form: 'modal', title: 'Resume',
+      chips: { items, active, select: grouped } });
+    overlay.open(grouped('current'));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(stripAnsi(overlay.render(80, 20).join('\n'))).toContain('[This project]');
+    press(overlay, '\t');
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const rows = overlay.render(80, 20).map(stripAnsi);
+    expect(rows.join('\n')).toContain('[All projects]');
+    const row = rows.findIndex(text => text.includes('This project'));
+    const column = rows[row]!.indexOf('This project');
+    overlay.handlePointer(parseMouseReport(`\x1b[<0;${column + 1};${row + 1}M`)!, 0);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(stripAnsi(overlay.render(80, 20).join('\n'))).toContain('[This project]');
+    for (const height of [0, 1, 2, 4, 8]) expect(overlay.render(20, height).length).toBeLessThanOrEqual(height);
+  });
+
+  it('keeps reserved confirmation and cancellation keys available in grouped pickers', async () => {
+    const bindings = new Keybindings({ 'tui.overlay.nextGroup': 'enter', 'tui.overlay.previousGroup': 'escape' });
+    const overlay = new OverlayHost(() => {}, bindings);
+    const select = vi.fn(); const apply = vi.fn();
+    const grouped = picker({ chips: { items: [{ id: 'all', label: 'All' }], active: 'all', select } });
+    overlay.open(grouped);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(stripAnsi(overlay.render(120, 20).at(-1)!)).not.toContain('group');
+    press(overlay, '\r', apply);
+    expect(apply).toHaveBeenCalledWith(grouped, ['a']);
+    overlay.open(grouped);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    press(overlay, '\x1b');
+    expect(overlay.active).toBe(false);
+    expect(select).not.toHaveBeenCalled();
+  });
+
+  it.each(['keyboard', 'pointer'] as const)('allows %s group changes during loading and ignores the old result', async input => {
+    const { overlay } = host();
+    const apply = vi.fn();
+    let oldSignal: AbortSignal | undefined;
+    let settleOld!: (items: readonly Option[]) => void;
+    const oldLoad = new Promise<readonly Option[]>(resolve => { settleOld = resolve; });
+    const next = picker({ title: 'All projects', load: async () => [{ id: 'new', label: 'New session' }] });
+    const select = vi.fn(() => next);
+    overlay.open(picker({ form: 'modal', title: 'Current project',
+      load: signal => { oldSignal = signal; return oldLoad; },
+      chips: { items: [{ id: 'current', label: 'Current project' }, { id: 'all', label: 'All projects' }], active: 'current', select },
+    }));
+    const rows = overlay.render(100, 20).map(stripAnsi);
+    if (input === 'keyboard') press(overlay, '\t');
+    else {
+      const row = rows.findIndex(text => text.includes('All projects'));
+      const column = rows[row]!.indexOf('All projects');
+      overlay.handlePointer(parseMouseReport(`\x1b[<0;${column + 1};${row + 1}M`)!, 0);
+    }
+    expect(select).toHaveBeenCalledWith('all');
+    expect(oldSignal?.aborted).toBe(true);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    settleOld([{ id: 'old', label: 'Late session' }]);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const rendered = stripAnsi(overlay.render(100, 20).join('\n'));
+    expect(rendered).toContain('New session');
+    expect(rendered).not.toContain('Late session');
+    press(overlay, '\r', apply);
+    expect(apply).toHaveBeenCalledWith(next, ['new']);
   });
 
   it("keeps painted rows clickable after a key that does nothing", async () => {

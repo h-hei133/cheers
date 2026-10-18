@@ -43,6 +43,11 @@ Use distinct keys to avoid ambiguity. Malformed JSON falls back to defaults. Unk
 a string or list of strings are reported and ignored. Unusable chords are reported and dropped; if none remain, that
 action becomes unbound rather than falling back to its defaults.
 
+Group navigation applies only while a grouped picker owns input, so its Tab binding does not conflict with editor
+completion. Enter, Escape, Ctrl+C, Up/Down, Space, Backspace, Delete, Ctrl+D, Ctrl+P and Ctrl+R remain reserved for picker
+confirmation, cancellation, navigation and editing. Assigning a group action to one of these keys reports the problem
+and drops that binding; any other keys in the same entry remain available.
+
 ## Default actions
 
 <!-- key-actions:start -->
@@ -70,6 +75,8 @@ action becomes unbound rather than falling back to its defaults.
 | `tui.input.newLine` | `shift+enter` / `alt+enter` / `ctrl+j` | Insert a new line instead of sending |
 | `tui.input.submit` | `enter` | Send the prompt |
 | `tui.input.tab` | `tab` | Complete the highlighted candidate |
+| `tui.overlay.nextGroup` | `tab` | Next picker group |
+| `tui.overlay.previousGroup` | `shift+tab` | Previous picker group |
 | `tui.altScreen.top` | `ctrl+home` | Go to the oldest rows, or the start of the draft |
 | `tui.altScreen.bottom` | `ctrl+end` | Go to the newest rows, or the end of the draft |
 | `tui.altScreen.search` | `ctrl+shift+f` | Find text in the transcript |

@@ -12,6 +12,7 @@ import { ManualScheduler, RecordingTerminal } from "../../../test-utils/terminal
 import { COMPOSER_SHAPES } from "../composer/shapes.js";
 import type { ComposerShapeId } from "../composer/contract.js";
 import { Pointer } from "../../../cli/interactive/pointer.js";
+import { OverlayHost } from "../../../cli/interactive/overlay.js";
 
 /** Facts a test can change between frames; the surface reads them at paint time. */
 interface Facts {
@@ -150,6 +151,28 @@ describe("the document a main-screen frame reports", () => {
 });
 
 describe("frame composition", () => {
+  it('allocates a real panel from the remaining viewport alongside a long draft', async () => {
+    const overlay = new OverlayHost(() => {});
+    overlay.open({ title: 'Models', form: 'panel', empty: 'none', apply: async () => undefined,
+      load: async () => Array.from({ length: 51 }, (_, index) => ({ id: String(index), label: `Candidate ${index}` })),
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const { view } = surface({ overlayRows: (width, height, available) => overlay.render(width, height, available) });
+    view.editor.setText(Array.from({ length: 40 }, (_, index) => `draft ${index}`).join('\n'));
+    let largestCount = 0;
+    for (const columns of [20, 40, 80, 120, 200]) {
+      for (const rows of [8, 24, 40, 80]) {
+        const rendered = frame(view, { columns, rows });
+        expect(rendered.length).toBeLessThanOrEqual(rows);
+        for (const line of rendered) expect(visibleWidth(line)).toBeLessThanOrEqual(columns);
+        largestCount = Math.max(largestCount, rendered.filter(line => /Candidate \d+/.test(line)).length);
+      }
+    }
+    expect(largestCount).toBe(51);
+    expect(view.editor.snapshot().text).toContain('draft 39');
+    overlay.close();
+  });
+
   it("rejects old shape hit regions before an accepted configuration change is painted", () => {
     let shape: ComposerShapeId = "default";
     const { view } = surface({ composerShape: () => shape });

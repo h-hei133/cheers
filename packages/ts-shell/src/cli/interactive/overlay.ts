@@ -2,6 +2,7 @@ import { OptionModel, type Option } from "../../presentation/tui/chrome/options.
 import { renderModal, modalBody } from "../../presentation/tui/chrome/modal.js";
 import { renderPanel } from "../../presentation/tui/chrome/panel.js";
 import { chipStrip, type Chip } from "../../presentation/tui/chrome/chips.js";
+import { Keybindings } from './keybindings.js';
 import type { ParsedKeyEvent } from "../../presentation/tui/input/keys.js";
 import type { MouseReport } from "../../presentation/tui/input/mouse.js";
 import { defaultTheme } from "../../presentation/theme/theme.js";
@@ -114,7 +115,7 @@ export class OverlayHost {
   private actionNotice: string | undefined;
   private unsubscribe: (() => void) | undefined;
   private readonly optionRows = new Map<number, { readonly id: string; readonly from: number; readonly to: number }>();
-  private readonly chipRows = new Map<number, { readonly id: string; readonly from: number; readonly to: number }>();
+  private readonly chipRows = new Map<number, Array<{ readonly id: string; readonly from: number; readonly to: number }>>();
   private renderedWidth = 0;
 
   // In-TUI modal sub-modes for interactive delete confirmation and rename
@@ -123,7 +124,7 @@ export class OverlayHost {
   private subTargetLabel: string | undefined;
   private renameDraft = "";
   private denyDraft = "";
-  constructor(private readonly onChange: () => void) {}
+  constructor(private readonly onChange: () => void, private readonly bindings = new Keybindings()) {}
 
   get active(): boolean {
     return this.picker !== undefined;
@@ -145,6 +146,7 @@ export class OverlayHost {
     this.actionNotice = undefined;
     this.input = picker.input ? new InputForm(picker.input) : undefined;
     this.optionRows.clear();
+    this.chipRows.clear();
     this.picker?.previewEnd?.();
     this.picker = picker;
     this.loading = true;
@@ -170,6 +172,7 @@ export class OverlayHost {
     this.generation++;
     this.input = undefined;
     this.optionRows.clear();
+    this.chipRows.clear();
     this.picker?.previewEnd?.();
     this.picker = undefined;
     this.subMode = "none";
@@ -206,6 +209,17 @@ export class OverlayHost {
         : undefined);
     const status = this.actionPending ? 'Updating…' : this.actionNotice ??
       (!this.loading && !this.loadFailed ? picker.status?.(this.model.visible) : undefined);
+    const groupKeys = picker.chips ? ['tui.overlay.previousGroup', 'tui.overlay.nextGroup'].flatMap(id =>
+      this.bindings.keysFor(id).filter(key => this.bindings.actionFor(key, 'overlay') === id)) : [];
+    const chipChrome = {
+      ...(picker.chips ? { chips: chipStrip(picker.chips.items, picker.chips.active, picker.form === 'modal' ? Math.max(0, width - 4) : width) } : {}),
+      ...(groupKeys.length ? { groupHint: `${groupKeys.join('/')} group` } : {}),
+      onChipRow: (row: number, id: string, from: number, to: number) => {
+        const spans = this.chipRows.get(row) ?? [];
+        spans.push({ id, from, to });
+        this.chipRows.set(row, spans);
+      },
+    };
 
     if (picker.form === "modal") {
       return renderModal(
@@ -215,6 +229,7 @@ export class OverlayHost {
           empty,
           ...(state ? { state } : {}),
           detailRows: picker.detailRows ?? 2,
+          ...chipChrome,
           onOptionRow: (row, id) => this.optionRows.set(row, { id, from: 0, to: width }),
           ...(status ? { status } : picker.footer ? { status: picker.footer } : {}),
           ...(actionHints ? { actionHints } : {}),
@@ -238,8 +253,7 @@ export class OverlayHost {
         footer: status ?? picker.footer,
         hideCount: isApproval,
         ...(picker.detail ? { detail: picker.detail } : {}),
-        ...(picker.chips ? { chips: chipStrip(picker.chips.items, picker.chips.active, width) } : {}),
-        onChipRow: (row, id, from, to) => this.chipRows.set(row, { id, from, to }),
+        ...chipChrome,
         onOptionRow: (row, id, from, to) => this.optionRows.set(row, { id, from: from ?? 0, to: to ?? width }),
       },
       width,
@@ -251,15 +265,16 @@ export class OverlayHost {
   handlePointer(report: MouseReport, top?: number): boolean {
     if (!this.picker) return false;
     if (this.input) return true;
-    if (!this.loading && !this.actionPending && this.subMode === "none" && top !== undefined &&
+    if (!this.actionPending && this.subMode === "none" && top !== undefined &&
         report.kind === "press" && report.button === 0 && !report.shift && !report.alt && !report.ctrl &&
         report.column >= 0 && report.column < this.renderedWidth) {
-      const chip = this.chipRows.get(report.row - top);
-      if (chip && report.column >= chip.from && report.column < chip.to) {
+      const chip = this.chipRows.get(report.row - top)?.find(span => report.column >= span.from && report.column < span.to);
+      if (chip) {
         const next = this.picker.chips?.select(chip.id);
         if (next) this.open(next);
         return true;
       }
+      if (this.loading) return true;
       const hit = this.optionRows.get(report.row - top);
       if (hit && report.column >= hit.from && report.column < hit.to) {
         this.model.focus(hit.id);
@@ -506,6 +521,17 @@ export class OverlayHost {
         this.onChange();
         return true;
       }
+    }
+
+    const groupAction = this.bindings.actionFor(event.keyId, 'overlay');
+    if (!isApprovalPicker && picker.chips?.items.length &&
+        (groupAction === 'tui.overlay.nextGroup' || groupAction === 'tui.overlay.previousGroup')) {
+      const chips = picker.chips;
+      const current = Math.max(0, chips.items.findIndex(chip => chip.id === chips.active));
+      const index = (current + (groupAction === 'tui.overlay.nextGroup' ? 1 : -1) + chips.items.length) % chips.items.length;
+      const next = chips.select(chips.items[index]!.id);
+      if (next) this.open(next);
+      return true;
     }
 
     switch (event.keyId) {

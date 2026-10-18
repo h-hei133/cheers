@@ -7682,3 +7682,15 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 面板均为结构化只读：advisor 显示 checkpoint/note 与 epoch/coverage，plan-review 显示版本/阶段/验收项，btw 显示问题/送达/答案；打开面板不发模型请求。
 - 模型工作分别授权：`/advisor review|apply|on|off`、`/plan-review approve|reject|execute`、`/btw` 各自显式触发；plan 执行与 btw 都不写入主会话，旧流不串新面板。
 - 结论：PAN-05 按裁决验收完成；未新增“面板内流式”能力，因为裁决只要求结构化/流式其一且面板查看不得启模型。
+
+## 2026-10-18 — Phase 20 返工：配置导入与面板基础
+
+- 复核基线 `12a7d4e0`。撤回“仅四项未闭合”的总括结论；原记录中的部分实现、重复状态与未运行验收不能合并成完成。`phase-20-status.md` 保留历史证据并列明本次复核范围；尚未逐条检查的任务继续开放。
+- CFG-02/04：导入配置的相对路径规则原样进入另一 profile 后会改变限制目标，真实工具 scope 的空 allowlist 因而失效。导入规划现在携带实际捕获的源路径，在 preview 时将规则声明锚定到源配置目录；default、named、legacy 都保留原目标。沿现 digest、锁内重规划和发布前源检查，源变化拒绝发布，不改源文件。
+- UI-02/03：panel 使用 surface 提供的全部可用高度，移除固定八候选上限；只有一个候选时仍能显示其完整有界详情。每个 tab 都保存独立二维点击区域，打开/关闭清理旧命中。panel/modal 共用分组投影，Tab/Shift+Tab 通过现 keybindings 的 overlay 作用域切组并可重绑定；保留编辑器补全/思考切换及审批/文字子界面的输入优先级。
+- 只读参考取舍：保留配置来源的固定 base directory、逐帧独立 tab hit zones、子菜单优先消费输入和有界可见窗口；均与本次方案一致。未复制参考 UI 容器或另一套配置解析器。regular 的鼠标仍归终端，fullscreen 的点击走已有 Pointer owner。
+- 本地验证：最小相关集 12 文件/189 项通过；完整受影响域 `src/config src/cli/interactive src/presentation/tui` 在 4 worker 下 135 文件/1813 项通过。首次默认并发运行有 11 个套件加载期 `[birpc] fetch` 超时及一次目录捕获变化错误，降低并发后同范围全部通过，未放宽断言或修改产品以绕过失败。
+- 反转：只在测试加载阶段换回基线的导入配置、panel/modal、overlay/keybindings 实现，现有工作区不被改写；151 项中 20 项失败、131 项通过。失败覆盖三种来源的真实 scope 拒绝、非末尾 tab 点击、键盘切组、旧 hit、modal 分组、详情完整性和 51 候选可达；恢复当前实现的上述完整受影响域全部通过。
+- 真实 Linux PTY：隔离 HOME/USERPROFILE/CHEERS_TEST_ROOT、合成 provider、120×40；Node/exe × regular/fullscreen 四格均通过 `/settings` 正反切组、`/resume` 项目范围切组、Esc 关闭、`/exit` 退出 0；fullscreen 两格额外通过 tab 鼠标点击。终端解析器先补设备状态响应兼容，regular 鼠标按既有合同排除，未将这些测试夹具问题计为产品通过。
+- `build:ts`、`build:exe`、import cycles、config consumers、declarations、Node floor、strict docs drift 通过；docs 有 118 条既有非阻断 source advisory。函数计数无新增越界模块；现有 9 模块仍需按各自返工任务处理。NormProof 退出 0、verdict partial，无环及未解析 import 义务 satisfied，函数上限义务因上述 9 模块 failed（advisory）。两路独立复核为代码 APPROVE / 架构 CLEAR；首次专用模型 503 未算批准，随后两个独立默认模型上下文返回了实质意见。
+- 新确认的后续缺口：SET-02 在选中分组后只搜索该组；当前修复只接通分组交互，不能据此关闭“跨 tab 搜索”。本批记录时尚未提交/推送或运行新 SHA 的 CI，后续以 Git 与 GitHub 实际结果为准。

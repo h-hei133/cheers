@@ -27,12 +27,12 @@ export function planImport(request: ImportRequest): ImportPlan {
   const capture = captureSources(request);
   const files: ImportFile[] = [];
   if (request.categories.includes('config')) {
-    const text = capture.first('config.json');
-    if (text !== undefined) files.push({ relative: 'config.json', content: importConfig(text), metadata: false });
+    const file = capture.first('config.json');
+    if (file !== undefined) files.push({ relative: 'config.json', content: importConfig(file.content, file.path), metadata: false });
   }
   if (request.categories.includes('catalog')) {
-    const text = capture.first('models.json');
-    if (text !== undefined) files.push({ relative: 'models.json', content: importCatalog(text), metadata: false });
+    const file = capture.first('models.json');
+    if (file !== undefined) files.push({ relative: 'models.json', content: importCatalog(file.content), metadata: false });
   }
   if (request.categories.includes('definitions')) files.push(...definitionFiles(capture));
   if (request.categories.includes('history')) files.push(...collectHistory({ source: request.source, target: request.target, workspace: request.workspace.path,

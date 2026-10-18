@@ -7,24 +7,17 @@ import { assertProfileStorage } from '../../core/paths/profile/context.js';
 /**
  * Which key does what, and how a user changes it.
  *
- * The catalogue below is the whole contract: every key the surface dispatches is
- * named here, and a key that is not in the catalogue is not a binding. Routing
- * consults the resolved table rather than switching on key ids, so rebinding is a
- * data change and a key that no action claims reaches the editor as text instead
- * of silently doing nothing.
- *
- * Action ids are namespaced by the surface they belong to, matching the convention
- * other tools in this space use. Where a name means the same thing here as it does
- * there, the same id is used, so a config file is portable. Where the meaning
- * differs the id differs too: sharing a name for a different action would give
- * someone moving their config a binding that silently does the wrong thing, which
- * is worse than an unfamiliar name.
+ * The catalogue covers configurable actions. Picker confirmation, cancellation,
+ * navigation and editing controls remain local to OverlayHost; scoped group
+ * bindings must leave those controls available while the picker owns input.
  */
 
 export interface KeybindingDefinition {
   /** Keys bound when the user has not rebound the action. Empty means unbound. */
   readonly defaultKeys: readonly string[];
   readonly description: string;
+  /** Scoped actions only participate while their surface owns the input. */
+  readonly scope?: 'overlay';
 }
 
 /**
@@ -69,6 +62,8 @@ export const KEY_ACTIONS: Record<string, KeybindingDefinition> = {
   },
   "tui.input.submit": { defaultKeys: ["enter"], description: "Send the prompt" },
   "tui.input.tab": { defaultKeys: ["tab"], description: "Complete the highlighted candidate" },
+  "tui.overlay.nextGroup": { defaultKeys: ["tab"], description: "Next picker group", scope: 'overlay' },
+  "tui.overlay.previousGroup": { defaultKeys: ["shift+tab"], description: "Previous picker group", scope: 'overlay' },
   "tui.altScreen.top": { defaultKeys: ["ctrl+home"], description: "Go to the oldest rows, or the start of the draft" },
   "tui.altScreen.bottom": { defaultKeys: ["ctrl+end"], description: "Go to the newest rows, or the end of the draft" },
   // Not ctrl+f: that is the emacs-style cursor-right the editor already binds, and
@@ -170,11 +165,16 @@ export function loadUserKeybindings(root?: string): LoadedKeybindings {
           "which this terminal cannot produce (known modifiers: ctrl, alt, shift, meta).",
       });
     }
+    const scope = KEY_ACTIONS[actionId]!.scope;
+    const reserved = keys.filter(key => !availableKey(key, scope));
+    if (reserved.length) problems.push({
+      message: `\`${actionId}\` names reserved picker controls ${reserved.map(key => `\`${key}\``).join(', ')}; those bindings are ignored.`,
+    });
     // Recorded even when nothing usable is left. Leaving the action out would
     // make the disk path disagree with handing the same object to `setUserConfig`
     // — the omitted action keeps its default keys, so a rebind the user asked for
     // to a chord this terminal cannot send silently leaves the old key in place.
-    config[actionId] = keys;
+    config[actionId] = keys.filter(key => availableKey(key, scope));
   }
   return { config, problems };
 }
@@ -256,6 +256,17 @@ export interface KeybindingConflict {
   readonly actionIds: readonly string[];
 }
 
+function bindingKey(keyId: string, scope?: 'overlay'): string {
+  return JSON.stringify([scope ?? 'main', keyId]);
+}
+
+const PICKER_CONTROL_KEYS = new Set(['enter', 'escape', 'ctrl+c', 'up', 'down', 'space', 'backspace',
+  'delete', 'ctrl+d', 'ctrl+p', 'ctrl+r']);
+
+function availableKey(key: string, scope?: 'overlay'): boolean {
+  return scope !== 'overlay' || !PICKER_CONTROL_KEYS.has(key);
+}
+
 /**
  * The bindings in force, as a lookup from key to action.
  *
@@ -275,8 +286,9 @@ export class Keybindings {
   }
 
   /** The action a key is bound to, or nothing when no action claims it. */
-  actionFor(keyId: string): string | undefined {
-    return Object.hasOwn(this.byKey, keyId) ? this.byKey[keyId] : undefined;
+  actionFor(keyId: string, scope?: 'overlay'): string | undefined {
+    const key = bindingKey(keyId, scope);
+    return Object.hasOwn(this.byKey, key) ? this.byKey[key] : undefined;
   }
 
   /** The keys bound to an action, in the order they were declared. */
@@ -288,8 +300,8 @@ export class Keybindings {
   guide(fullScreen: boolean): readonly KeyBinding[] {
     const actions = Object.entries(KEY_ACTIONS).map(([id, definition]): KeyBinding => {
       const base = KEY_BINDINGS.find((row) => row.keys.some((key) => definition.defaultKeys.includes(key)));
-      const keys = this.keysFor(id).filter((key) => this.actionFor(key) === id);
-      const availability = !fullScreen && id === "tui.altScreen.search" ? " (requires fullscreen mode)" : "";
+      const keys = this.keysFor(id).filter((key) => this.actionFor(key, definition.scope) === id);
+      const availability = definition.scope === 'overlay' ? ' (grouped picker)' : !fullScreen && id === "tui.altScreen.search" ? " (requires fullscreen mode)" : "";
       return {
         keys,
         does: definition.description + availability,
@@ -319,7 +331,7 @@ export class Keybindings {
   private rebuild(): void {
     const byKey: Record<string, string> = Object.create(null) as Record<string, string>;
     const byAction: Record<string, readonly string[]> = Object.create(null) as Record<string, readonly string[]>;
-    const claimants = new Map<string, string[]>();
+    const claimants = new Map<string, { key: string; actionIds: string[] }>();
 
     for (const [actionId, definition] of Object.entries(KEY_ACTIONS)) {
       // A user binding replaces the defaults for that action rather than adding
@@ -328,34 +340,35 @@ export class Keybindings {
       // Normalized on read, not only on load: a caller may hand this a config
       // object directly, and a bare string iterated as a key list would produce
       // one binding per character.
-      const keys = override === undefined
+      const keys = (override === undefined
         ? definition.defaultKeys
-        : (normalizeEntry(override) ?? definition.defaultKeys);
+        : (normalizeEntry(override) ?? definition.defaultKeys)).filter(key => availableKey(key, definition.scope));
       byAction[actionId] = [...keys];
       for (const key of keys) {
         if (key === "") continue;
-        const existing = byKey[key];
+        const slot = bindingKey(key, definition.scope);
+        const existing = byKey[slot];
         if (existing !== undefined && existing !== actionId) {
           // A key bound by the user beats one that only has its default, so the
           // config file does what it says even when it collides with a default.
           const existingIsUser = this.config[existing] !== undefined;
           const incomingIsUser = override !== undefined;
           const loser = existingIsUser && !incomingIsUser ? actionId : existing;
-          const list = claimants.get(key) ?? [];
-          list.push(loser);
-          claimants.set(key, list);
+          const claim = claimants.get(slot) ?? { key, actionIds: [] };
+          claim.actionIds.push(loser);
+          claimants.set(slot, claim);
           if (loser === actionId) continue;
         }
-        byKey[key] = actionId;
+        byKey[slot] = actionId;
       }
     }
 
     this.byKey = byKey;
     this.byAction = byAction;
     this.conflictList.length = 0;
-    for (const [key, actionIds] of claimants) {
-      const winner = byKey[key]!;
-      this.conflictList.push({ key, actionIds: [winner, ...actionIds.filter((id) => id !== winner)] });
+    for (const [slot, claim] of claimants) {
+      const winner = byKey[slot]!;
+      this.conflictList.push({ key: claim.key, actionIds: [winner, ...claim.actionIds.filter((id) => id !== winner)] });
     }
   }
 }

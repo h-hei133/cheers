@@ -100,6 +100,8 @@ source 和 target 必须已存在且不同；查询缺少的 source 不创建目
 | definitions | `AGENTS.md`，`skills/`、`prompts/`、`agents/` 中的 Markdown | 可执行脚本、hooks、包、其他未声明格式 |
 | history | 当前 canonical workspace 的完整可导出会话图，经过现有脱敏规则 | 其他 workspace、权限、请求账本、jobs、恢复 capability、当前会话选择及运行状态 |
 
+配置中的相对 `pathRules.path` 在 preview 时按实际源配置文件目录解析为绝对声明路径，包含 default 的 legacy 来源。导入保留原规则目标，不将源 profile 内的目录替换为目标目录；原有绝对路径同样保留目标含义。源文件保持原字节，转换后的目标内容纳入原导入摘要，源规则在确认前变化仍拒绝发布。
+
 历史使用新 inactive session ID，沿现有 [history projection](../../packages/ts-shell/src/session/history/projection.ts) 和 [native serialization](../../packages/ts-shell/src/session/history/files.ts) 保存。图投影只使用已捕获并纳入摘要的 transcript/state 字节，不能二次读取另一版本。导入不复制 trust/approval grant、MCP token、live rotating OAuth 或 pending execution。目标连接必须独立登录；pending 连接在凭据解析前拒绝 CLI/env/legacy 借用，签名授权请求也保留该拒绝。
 
 每次导入最多选择 1024 个文件、32 MiB 总量、单文件 2 MiB，定义嵌套最多 12 层；history 沿用 2 MiB/4096 graph entries 的限制。超限拒绝，不截断。摘要绑定版本、选择、源文件内容与 identity、source/target root、canonical workspace 及活动会话排除。锁内重新规划并在发布前复查，旧摘要不能授权新内容。

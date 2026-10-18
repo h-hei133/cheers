@@ -19,13 +19,13 @@ function model(options: readonly Option[] = many): OptionModel {
 }
 
 describe("inline panel", () => {
-  it("limits visible choices to eight and keeps the focused choice in the physical budget", () => {
+  it("uses the physical budget and keeps the focused choice visible after shrinking", () => {
     const list = model(); list.focus("id-24");
     const painted: string[] = [];
     const chrome = { title: "Pick", empty: "none", multiple: false, footer: "Enter to insert · Esc to close", onOptionRow: (_row: number, id: string) => painted.push(id) };
     const rows = renderPanel(list, chrome, 100, 50);
-    expect(painted).toHaveLength(8); expect(painted).toContain("id-24");
-    expect(rows).toHaveLength(11);
+    expect(painted).toEqual(many.map(option => option.id));
+    expect(rows).toHaveLength(many.length + 2);
     for (const capacity of [0, 1, 2, 3, 4, 6]) {
       painted.length = 0;
       const fitted = renderPanel(list, chrome, 15, capacity);

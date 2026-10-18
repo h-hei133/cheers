@@ -2,11 +2,14 @@
 
 每一行把任务绑定到所有者、当前测试与一个反转条件。测试通过只证明该行；没有真实 provider、PTY、跨平台或发布证据的行仍保持开放。
 
+2026-10-18 返工复核发现旧表有状态漂移：实现存在或测试数量不能替代完整裁决。当前复核范围及未闭合项见 [交付状态](phase-20-status.md#返工复核2026-10-18)；以下未重新验收的行均是历史证据索引。
+
 ## W1 配置
 
 | 任务 | 所有者 | 证据 | 反转 |
 |---|---|---|---|
 | CFG-01/02 | `config/runtimeConfig.ts`、`config/identity` | `runtimeConfig.test.ts`、`config/*` | 去掉显式输入次序后 `config` 断言失败 |
+| CFG-02/04 导入路径规则 | `config/profiles/import/{config,plan,source}.ts` | `import/scope.test.ts`（4）；验证导入后真实工具 scope 的空 allowlist 仍拒绝 read，源变化拒绝发布 | 恢复直接复制相对路径后 default/named/legacy 三例失败 |
 | CFG-03 | `config/layers.ts` | `layers.test.ts` | 显式输入不再遮盖文件值时失败 |
 | CFG-04 | `config/scope/*` | `scope/*.test.ts`（20） | 目录身份/安全字段不再累积时失败 |
 | CFG-05 | `config/fields.ts`、`layers.ts` | `environment.test.ts` | 空环境值不再忽略时失败 |
@@ -35,8 +38,9 @@
 | 任务 | 所有者 | 证据 | 反转 |
 |---|---|---|---|
 | UI-01 | `composer/frame.ts`、`surface/budget.ts` | `geometry.test.ts`（8） | padding 改回 2 或正文超过 16 行时失败 |
-| UI-02 | `chrome/panel.ts`、`overlay.ts` | `panel.test.ts`（5）、overlay（47） | 详情列点击聚焦或窄屏不退化时失败 |
+| UI-02 | `chrome/panel.ts`、`chrome/modal.ts`、`overlay.ts` | panel（9）、picker（16）、surface/view（40）；20–200 列、8–80 行，长草稿和 51 候选 | 固定八项上限、按候选数截短详情或窄屏越界时失败 |
 | UI-03 | `chrome/{progress,chips}.ts` | progress（4）、chips（3） | unknown 输出百分比时失败 |
+| UI-03 分组输入 | `overlay.ts`、`keybindings.ts`、`chrome/{panel,modal}.ts` | overlay（57）、keybindings（25）；Node/exe 两模式 PTY 的 settings/resume 切组 | 每行只保留最后一个 hit、删除键盘切组或复用已关闭面板 hit 时失败 |
 | UI-04 | `transcript/source.ts`、`surface/pane.ts` | `source.test.ts`（4） | 软换行插入 `\n` 或装饰行参与复制时失败 |
 
 ## W5 命令与设置
@@ -67,7 +71,7 @@
 | RENDER-01（部分） | `transcript/math.ts` | math（4） | 金额被当公式或未知命令丢失参数时失败 |
 | RENDER-02（部分） | `transcript/markdown.ts` | markdown（32） | code pipe 被拆 cell 或窄屏截断长尾时失败 |
 | RENDER-03（部分） | `transcript/diff.ts` | diff（10） | 零宽内容绕过字节预算时失败 |
-| INPUT-01、EDIT-01 | — | 未开始 | — |
+| INPUT-01 | `editor/modal/state.ts`、`cli/interactive/keymap.ts` | 已有实现，计数/operator/文本对象、IME/粘贴及完整五模式合同待本次复核 | 不再以“未开始”描述已有代码，也不把少量模式测试当完整交付 |
 
 ## W8/W9
 
@@ -78,12 +82,12 @@
 | EDIT-01 | 完成 | `planPatch` 为每个文件操作生成内容派生的稳定 group id、label 与文件集；同一 group 内的 rename 源/目标与 hunks 不可拆分。`ToolPreparation.selections` 与 `execute(context, selection)` 承载选集；审批响应 `selected` 经 `setPreparedSelection` 绑定到已 prepare 的调用。多 group 且宿主未选集时拒绝执行且零写入；执行前重规划并比较 `fullRevision`，基线或内容改变即拒绝。CLI 审批在多 group 时提供 “Choose groups…” 多选（默认全选，Space 切换），选出的 id 随 allow-once 返回；单 group 仍三选一。desktop 宿主可直接返回 `selected` 子集。 |
 | START-01 | `scripts/start.test.mjs`（2） | stale 源码仍启动时失败 |
 | START-02 | 完成 | 首帧前不扫描历史（10k 会话测试）；`listReentrySummaries` 使用 `.reentry-index.json` 持久摘要索引，键为 metadata/state/transcript 的 size+mtime，缺失/损坏/过期只导致重算；显式 resume/fallback 路径不变。 |
-| START-03 | 部分 | `bench:start` 测 Node/exe `--version` 的 30 次 spawn→exit，first/p50/p95/min/max；交互首帧/键响应/ready 与 regular/fullscreen/pipe 未测。 |
+| START-03 | 部分 | 历史 `bench:start`、`bench:interactive` 已记录 Node/exe 版本启动及 regular/fullscreen/pipe 首帧/退出数据；受控冷缓存、真实逐键响应和 ready 边界仍未闭合，不能用退出延迟代替。 |
 
 ## W10
 
 | 任务 | 证据 |
 |---|---|
 | QA-01 | 本矩阵 + 各反转测试 |
-| QA-02/03 | 未运行真实 PTY/provider/平台矩阵 |
+| QA-02/03 | 已有 Linux 合成 PTY；本次增加 Node/exe × regular/fullscreen 的 settings/resume 切组和关闭；完整本地工作流、跨平台及真实质量仍未闭合 |
 | QA-04 | 本地门禁与精确提交；CI 以 run 结果为准 |
