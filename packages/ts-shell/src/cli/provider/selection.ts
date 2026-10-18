@@ -17,7 +17,7 @@ export function executionChoice(model: string, effort: ThinkingPreference | unde
   resolution: ProviderCredentialResolution, config: RuntimeConfig, catalog: readonly CatalogProvider[]): ModelChoice {
   if (model.includes('/') && model.slice(0, model.indexOf('/')) !== source.provider) throw new Error('Execution models must use the active provider connection.');
   // Public qualification may select a model on this connection, never another connection with a matching ID.
-  const target = delegatedTarget(model, resolution, undefined, catalog);
+  const target = delegatedTarget(model, resolution, config, catalog, 'current');
   const choice = { ...source, model: target.model!, thinkingEffort: effort === undefined ? source.thinkingEffort : effort };
   const constraints = inspectConfigConstraints(config, { ...choice, baseUrl: resolution.baseUrl }, catalog);
   if (constraints.errors.length) throw new Error(`Execution model is unavailable: ${constraints.errors.join(' ')}`);

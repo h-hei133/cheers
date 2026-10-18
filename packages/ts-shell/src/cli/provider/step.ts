@@ -142,7 +142,7 @@ export function delegatedSteps(request: ProviderStepHost, tools: ReadonlyMap<str
     const runtimeConfig = scoped && request.runtimeConfig?.allowedModels !== undefined ? { ...scoped,
       allowedModels: mergeConfigValue(request.runtimeConfig.allowedModels, scoped.allowedModels ?? request.runtimeConfig.allowedModels, 'intersect') as readonly string[] } : scoped;
     const resolution = model ? providerScope === 'current' && typeof model === 'string'
-      ? delegatedTarget(`${main.provider}/${model}`, main, undefined, catalog)
+      ? delegatedTarget(`${main.provider}/${model}`, main, runtimeConfig, catalog, 'current')
       : delegatedTarget(model, main, runtimeConfig, catalog) : main;
     const scopedAdmission = scopeAdmission(runtimeConfig?.configScopes, workspace);
     const admit = () => request.admission?.() ?? admission?.() ?? scopedAdmission();

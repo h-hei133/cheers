@@ -8,6 +8,7 @@ import type {
   RuntimeProvider,
 } from "../../config/runtimeConfig.js";
 import { selectPooledConnection } from '../auth/account/pool.js';
+import { ownedConnectionCredential } from '../auth/account/presence.js';
 import type { ProviderCredentialResolution } from '../auth/credential.js';
 export type {
   ProviderCredentialSource, ProviderCredentialAuthMode,
@@ -52,13 +53,30 @@ export function resolveProviderCredential(
       (input.cliProvider === undefined || connection.provider === input.cliProvider),
   ) || null;
   const provider = input.cliProvider ?? explicitConnection?.provider ?? providerFromConfig;
+  const capturedProvider = providerBinding ? providerFromConfig : boundConnection ? boundConnection.provider
+    : input.runtimeConfig.providerConnections.find(connection => connection.id === input.runtimeConfig.activeProviderConnectionId)?.provider ?? providerFromConfig;
+  const capturedPool = input.runtimeConfig.accountPool?.[capturedProvider];
+  if (input.cliProvider !== undefined && input.cliProvider !== capturedProvider && capturedPool) {
+    return { provider, expectedEnvVarName: getProviderApiKeyEnvVarName(provider),
+      blocked: capturedPool.connections.length === 0 ? 'pool-empty' : 'pool-required' };
+  }
   const poolDeclared = Boolean(input.runtimeConfig.accountPool?.[provider]);
-  if (providerBinding && poolDeclared) return { provider, expectedEnvVarName: getProviderApiKeyEnvVarName(provider), blocked: 'pool-required' };
-  const pooled = explicitConnection || input.cliApiKey?.trim() ? undefined
-    : poolDeclared && !input.runtimeConfig.configValidation.valid ? { blocked: 'pool-unavailable' as const }
+  // A declared pool is the complete authorization, including explicit selections.
+  const pooled = input.runtimeConfig.accountPool?.[provider]?.connections.length === 0 ? { blocked: 'pool-empty' as const }
+    : poolDeclared && input.runtimeConfig.configValidation?.valid === false ? { blocked: 'pool-unavailable' as const }
     : selectPooledConnection({ config: input.runtimeConfig, provider, env,
+      ...(!providerBinding && input.runtimeConfig.activeProviderConnectionId
+        && (input.cliProvider === undefined || input.cliProvider === capturedProvider)
+        ? { connectionId: input.runtimeConfig.activeProviderConnectionId } : {}),
       ...(input.pool?.sessionId ? { sessionId: input.pool.sessionId } : {}) });
-  const activeConnection = explicitConnection ?? pooled?.connection
+  if (pooled?.blocked) return { provider, expectedEnvVarName: getProviderApiKeyEnvVarName(provider), blocked: pooled.blocked };
+  if (poolDeclared && (providerBinding
+    || (input.cliApiKey?.trim() && input.cliApiKey.trim() !== pooled?.connection?.apiKey?.trim())
+    || (input.cliBaseUrl !== undefined && normalizeBaseUrl(input.cliBaseUrl) !== normalizeBaseUrl(pooled?.connection?.baseUrl
+      ?? input.runtimeConfig.providerCredentials[provider]?.baseUrl)))) {
+    return { provider, expectedEnvVarName: getProviderApiKeyEnvVarName(provider), blocked: 'pool-required' };
+  }
+  const activeConnection = pooled?.connection ?? explicitConnection
     ?? (pooled || providerBinding ? null : pickFallbackConnection(input.runtimeConfig.providerConnections, provider)) ?? null;
   const expectedEnvVarName = getProviderApiKeyEnvVarName(provider);
   const configProfile = input.runtimeConfig.providerCredentials[provider];
@@ -98,10 +116,6 @@ export function resolveProviderCredential(
       ...(boundConnection ? { connectionId: boundConnection.id } : {}),
       ...(input.cliBaseUrl !== undefined ? { baseUrl: input.cliBaseUrl } : {}) } };
 
-  // A declared pool is the whole authorization for this provider. Neither an
-  // empty pool nor an unusable member falls back to env or profile keys.
-  if (pooled?.blocked) return { ...preference, provider, expectedEnvVarName, blocked: pooled.blocked };
-
   if (activeConnectionProfile?.status === 'pending') {
     return { ...preference, provider, expectedEnvVarName, baseUrl, model, blocked: 'connection-pending' };
   }
@@ -110,21 +124,16 @@ export function resolveProviderCredential(
   // profile key would name a different account, which is exactly what the pool
   // was declared to exclude.
   if (pooled?.connection || boundConnection) {
-    if (connectionAccountAuth && activeConnectionProfile?.authType === 'account-auth') {
+    const owned = ownedConnectionCredential(activeConnectionProfile!);
+    if (owned.accountAuth) {
       return { ...preference, provider, expectedEnvVarName, baseUrl, model,
-        credential: { provider, authMode: 'account-auth', accountAuth: connectionAccountAuth, baseUrl, model,
-          source: 'connection', connectionId: activeConnectionProfile.id, envVarName: expectedEnvVarName } };
+        credential: { provider, authMode: 'account-auth', accountAuth: owned.accountAuth, baseUrl, model,
+          source: 'connection', connectionId: owned.connectionId, envVarName: expectedEnvVarName } };
     }
-    const pooledKey = activeConnectionProfile?.apiKey?.trim();
-    if (pooledKey) {
+    if (owned.apiKey) {
       return { ...preference, provider, expectedEnvVarName, baseUrl, model,
-        credential: { provider, authMode: 'api-key', apiKey: pooledKey, baseUrl, model,
-          source: 'connection', connectionId: activeConnectionProfile?.id, envVarName: expectedEnvVarName } };
-    }
-    if (connectionAccountAuth) {
-      return { ...preference, provider, expectedEnvVarName, baseUrl, model,
-        credential: { provider, authMode: 'account-auth', accountAuth: connectionAccountAuth, baseUrl, model,
-          source: 'connection', connectionId: activeConnectionProfile?.id, envVarName: expectedEnvVarName } };
+        credential: { provider, authMode: 'api-key', apiKey: owned.apiKey, baseUrl, model,
+          source: 'connection', connectionId: owned.connectionId, envVarName: expectedEnvVarName } };
     }
     return { ...preference, provider, expectedEnvVarName, baseUrl, model, blocked: boundConnection ? 'connection-unavailable' : 'pool-unavailable' };
   }

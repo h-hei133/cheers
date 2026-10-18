@@ -2,7 +2,7 @@
 title: "请求归属与凭据退避"
 category: article
 created: 2026-10-17
-updated: 2026-10-18
+updated: 2026-10-19
 summary: "每次真实发送记录非秘密 credential 身份；429 按凭据代际退避，另一账号不受影响，轮换不重置会话预算。"
 ---
 
@@ -21,12 +21,13 @@ summary: "每次真实发送记录非秘密 credential 身份；429 按凭据代
 
 ## 2. 退避
 
-`provider/request/backoff.ts` 维护有界（512 条）的凭据退避表：
+`core/auth/account/backoff.ts` 是唯一凭据等待表的 owner；`provider/request/backoff.ts` 解析响应 header 并保留薄导出。池选择与实际发送读同一等待事实：
 
 - 响应 429 时按 `retry-after-ms`、`retry-after`（秒或日期）记录；缺失时使用 60 秒。
 - 退避键包含 credentialId 与 generation：A 账号迟到 429 只阻塞 A，B 账号与轮换后的新代际不受影响。
-- 发送前若该代际仍在等待，请求在 reserve 之前拒绝，不产生 ledger 预留或网络副作用。
-- 同一凭据的成功响应清除其退避。
+- 初次准备、异步请求证明完成后 reserve 前、实际 transport handoff 前都重新检查该代际。reserve 前拒绝不留预留；已预留但证实未交接时确认 unsent，未知或已持久派发的结果不释放。
+- 只淘汰已过期等待，保留所有仍有效期限；迟到成功和较短兄弟 429 不缩短较长 deadline。超过一天的等待不截短；正数秒到毫秒的溢出饱和到有限上限，不能变成零等待。
+- 凭据键在准备时复制并冻结，调用方随后修改对象不能把等待或 response 归属改到另一代次。
 
 退避只影响该凭据能否再次发送，不改变会话累计预算、cap 或已有 pending attempt；轮换账号不会清空 session 账本。失败分类与重试次数仍由现有 turn/provider retry owner 决定。
 
@@ -48,4 +49,4 @@ summary: "每次真实发送记录非秘密 credential 身份；429 按凭据代
 
 - 服务端 quota、余额与真实计费仍由 usage/account owner 显示（PAN-04），本机制只处理发送前的凭据退避。
 - 未知或已输出部分流不因轮换自动重播；仍按 ledger 的 unknown 规则保留。
-- 已验证：退避作用域、Retry-After 解析、发送前拒绝、成功清除、有界淘汰、ledger 归属字段；未运行真实 provider 或多进程动态证据。
+- 本轮已验证迟到成功/乱序 429、超长/溢出 header、超过 512 个 active waits、准备与交接间竞争及 immutable credential key。实际本机 HTTP 与新进程读回确认共享 cap、unknown/partial 证据；这些低层 purpose 探针不代替全部辅助消费者验收。完整 PRV-03/05 和真实 provider 验证仍按当前任务范围推进。

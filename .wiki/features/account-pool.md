@@ -2,7 +2,7 @@
 title: "显式账号池"
 category: article
 created: 2026-10-17
-updated: 2026-10-18
+updated: 2026-10-19
 tags: [auth, accounts, phase-20]
 summary: "按 provider 限定的封闭连接集合：显式成员、endpoint/OAuth 受众约束、稳定 credential 身份、会话亲和；空池零发送且不回退环境或 profile 凭据。"
 ---
@@ -29,15 +29,19 @@ OAuth 受众沿用现有凭据类型检查：OpenAI 账户 token、Google 账户
 
 | 情形 | 结果 |
 |---|---|
-| 显式 active connection | 使用该连接，即使它在池外 |
-| CLI 显式 API key | 使用 CLI 凭据 |
+| 显式 active connection | 必须是完整合法池中的可用成员；池外或仍在退避时拒绝 |
+| CLI 显式 API key/endpoint/provider | 已声明池时不得扩大授权；无池保留原覆盖行为 |
 | 已声明池 | 只在池成员中选择 |
 | 池为空 | `pool-empty`，不发送 |
 | 池成员均不可用 | `pool-unavailable`，不发送 |
 
 池模式下凭据只来自被选中的连接本身（accountAuth 或 API key），不回退到 `OPENAI_API_KEY` 等环境变量或 provider profile 的兼容 key；这些来源不属于池授权。
 
-同一 session 内按稳定哈希选择成员并记住结果，后续请求保持亲和；成员被删除或失去凭据时重新选择。亲和表有界（1024 个会话键），不写入会话文件。
+实际解析再次校验捕获的完整拓扑，包括缺失、重复及去除空白后重复、外来 provider 和声明 endpoint 不匹配。显式委派保留完整父拓扑；有父 provider 池时，具名外来连接和角色也不能通过重写绑定扩大它。bare/current-provider 委派同样校验原池。
+
+可用成员必须有自己的合法凭据。首选 account-auth 缺少对应槽位、类型不符或 access token 为空时拒绝，不改用保留的 API key；环境及 profile 凭据不能让池成员变成可用。池选择与实际请求使用同一个所选材料 generation。
+
+同一 session 内按稳定哈希选择成员并记住结果，后续请求保持亲和；成员被删除、失去凭据、换代或仍在退避时不复用旧 pin。普通亲和可以选择可用兄弟成员，显式连接不自动换账号。亲和表有界（1024 个会话键），不写入会话文件；切换不清空 session cap。
 
 ## 3. 身份
 
@@ -49,7 +53,7 @@ OAuth 受众沿用现有凭据类型检查：OpenAI 账户 token、Google 账户
 
 - refresh lease、请求凭据代次与独立 advisor/subagent 的发送前续期已接入；完整 quota/429 与历史成本归属仍按 PRV-04/05 继续复核。
 - 不复制 live rotating OAuth 到其他 profile；每个 profile 独立登录。
-- 已验证：池校验、空池、不可用成员、池内选择、显式连接优先、会话亲和、身份/代际；未运行真实 provider。
+- 本轮已验证完整拓扑、显式/CLI/委派限制、owned credential/实际代次、等待亲和、实际 CLI 子请求与共享账本、Linux 四格隔离 PTY。独立复核、反转和精确交付证据见开发日志；完整 PRV-03/05 仍开放，未运行真实 provider。
 
 ## 5. Refresh 归属与跨进程互斥
 

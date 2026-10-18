@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { AccountPool, ProviderConnectionConfig, RuntimeConfig, RuntimeProvider } from '../../../config/runtimeConfig.js';
-import { connectionCredentialState } from './presence.js';
+import { credentialBackoffRemaining } from './backoff.js';
+import { ownedConnectionCredential } from './presence.js';
 
 /**
  * Explicit account authorization.
@@ -25,6 +26,8 @@ export interface PoolInput {
   readonly provider: RuntimeProvider;
   readonly sessionId?: string;
   readonly env?: NodeJS.ProcessEnv;
+  /** Explicit targets must be authorized and usable; they never choose a sibling. */
+  readonly connectionId?: string;
 }
 
 /** Session affinity, bounded so a long-lived process cannot accumulate sessions. */
@@ -44,7 +47,7 @@ function order(candidates: readonly ProviderConnectionConfig[], input: PoolInput
   if (!input.sessionId) return candidates;
   const key = `${input.sessionId}\u0000${input.provider}\u0000${signature}`;
   const remembered = affinity.get(key);
-  const start = candidates.findIndex(candidate => candidate.id === remembered);
+  const start = candidates.findIndex(candidate => `${candidate.id}\u0000${credentialGeneration(candidate)}` === remembered);
   const offset = start >= 0 ? start : createHash('sha256').update(key).digest().readUInt32BE(0) % candidates.length;
   return [...candidates.slice(offset), ...candidates.slice(0, offset)];
 }
@@ -53,15 +56,36 @@ export function selectPooledConnection(input: PoolInput): PoolSelection | undefi
   const entry = input.config.accountPool?.[input.provider];
   if (!entry) return undefined;
   if (entry.connections.length === 0) return { blocked: 'pool-empty' };
-  const env = input.env ?? process.env;
-  const members = entry.connections
-    .map(id => input.config.providerConnections.find(connection => connection.id === id && connection.provider === input.provider))
-    .filter((connection): connection is ProviderConnectionConfig => Boolean(connection))
-    .filter(connection => connectionCredentialState(input.config, connection, env).state === 'ready');
+  const topology = poolMembers(entry, input);
+  if (!topology) return { blocked: 'pool-unavailable' };
+  const members = topology.filter(connection => {
+    if (input.connectionId !== undefined && connection.id !== input.connectionId) return false;
+    if (connection.status === 'pending' || connection.status === 'error') return false;
+    const identity = credentialIdentityFor(connection.provider, ownedConnectionCredential(connection));
+    return identity !== undefined && credentialBackoffRemaining(identity) === 0;
+  });
   if (members.length === 0) return { blocked: 'pool-unavailable' };
   const selected = order(members, input, poolSignature(entry))[0]!;
-  if (input.sessionId) remember(`${input.sessionId}\u0000${input.provider}\u0000${poolSignature(entry)}`, selected.id);
+  if (input.sessionId) remember(`${input.sessionId}\u0000${input.provider}\u0000${poolSignature(entry)}`, `${selected.id}\u0000${credentialGeneration(selected)}`);
   return { connection: selected, credentialId: credentialIdentity(selected), generation: credentialGeneration(selected) };
+}
+
+/** Validate the complete captured topology before availability can narrow it. */
+function poolMembers(entry: NonNullable<AccountPool[RuntimeProvider]>, input: PoolInput): ProviderConnectionConfig[] | undefined {
+  const seen = new Set<string>();
+  const members: ProviderConnectionConfig[] = [];
+  const endpoint = entry.baseUrl?.trim().replace(/\/+$/, '');
+  for (const rawId of entry.connections) {
+    const id = rawId.trim();
+    if (!id || seen.has(id)) return undefined;
+    seen.add(id);
+    const matches = input.config.providerConnections.filter(connection => connection.id.trim() === id);
+    const connection = matches[0];
+    if (matches.length !== 1 || !connection || connection.provider !== input.provider
+      || (endpoint && connection.baseUrl?.trim().replace(/\/+$/, '') !== endpoint)) return undefined;
+    members.push(connection);
+  }
+  return members;
 }
 
 /** Stable across renames of the same stored slot; not derived from an array index. */
@@ -70,10 +94,8 @@ export function credentialIdentity(connection: ProviderConnectionConfig): string
 }
 
 export function credentialGeneration(connection: ProviderConnectionConfig): string {
-  const material = connection.accountAuth && Object.keys(connection.accountAuth).length
-    ? JSON.stringify(connection.accountAuth)
-    : connection.apiKey ?? '';
-  return createHash('sha256').update(material).digest('hex').slice(0, 16);
+  return credentialIdentityFor(connection.provider, ownedConnectionCredential(connection))?.generation
+    ?? createHash('sha256').update('').digest('hex').slice(0, 16);
 }
 
 /** Non-secret identity for a resolved credential, including config-only slots. */

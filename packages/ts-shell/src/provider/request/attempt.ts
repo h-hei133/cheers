@@ -3,7 +3,7 @@ import { ModelAdmissionError, type ModelAttempt, type ModelTransport, type Reque
 import { endpointShape } from '../endpoints/index.js';
 import { modelUsage } from '../response/metering.js';
 import type { ProviderUsage } from '../../turn/completion.js';
-import { clearCredentialBackoff, credentialBackoffRemaining, noteCredentialRateLimit, responseBackoffMs,
+import { credentialBackoffRemaining, noteCredentialRateLimit, responseBackoffMs,
   type CredentialKey } from './backoff.js';
 
 export interface RequestAttempt {
@@ -18,14 +18,16 @@ export async function prepareRequestAttempt(request: {
   readonly purpose: string; readonly requestId?: string; readonly policy?: RequestPolicy;
   readonly credential?: CredentialKey;
 }): Promise<RequestAttempt> {
-  request = Object.freeze({ ...request });
+  request = Object.freeze({ ...request, ...(request.credential ? { credential: Object.freeze({ ...request.credential }) } : {}) });
   // A credential that a provider just rate-limited is not asked again until its
   // own deadline. Another credential of the same provider is unaffected.
-  if (request.credential) {
-    const remaining = credentialBackoffRemaining(request.credential);
-    if (remaining > 0) throw new Error(`This account was rate limited ${Math.ceil(remaining / 1000)}s ago and is still waiting; use another connection or retry later.`);
-  }
+  const assertCredentialReady = (): void => {
+    const remaining = request.credential ? credentialBackoffRemaining(request.credential) : 0;
+    if (remaining > 0) throw new Error(`This account is rate limited and must wait ${Math.ceil(remaining / 1000)}s; use another connection or retry later.`);
+  };
+  assertCredentialReady();
   const proof = request.policy ? await endpointShape(request.endpoint).requestBound?.(request) : undefined;
+  assertCredentialReady();
   const attempt: ModelAttempt | undefined = request.policy?.reserve({
     requestId: request.requestId ?? randomUUID(), bodyDigest: createHash('sha256').update(request.body).digest('hex'),
     provider: request.provider, model: request.model, endpoint: request.endpoint, purpose: request.purpose,
@@ -35,13 +37,12 @@ export async function prepareRequestAttempt(request: {
   const noteResponse = (response: Response): void => {
     if (!request.credential) return;
     if (response.status === 429) noteCredentialRateLimit(request.credential, responseBackoffMs(response.headers));
-    else if (response.ok) clearCredentialBackoff(request.credential);
   };
   return {
     ...(attempt ? { id: attempt.id } : {}),
     send: async (input, init, fetchImpl, transport) => {
       let handedOff = false;
-      const beforeDispatch = () => { attempt?.dispatch(); handedOff = true; };
+      const beforeDispatch = () => { assertCredentialReady(); attempt?.dispatch(); handedOff = true; };
       try {
         if (init.body !== request.body) throw new ModelAdmissionError('unsupported');
         init.signal?.throwIfAborted();

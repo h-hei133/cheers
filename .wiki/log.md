@@ -7919,3 +7919,17 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 两种构建通过，最终 TS manifest `81924e45b820`；与最终源码 digest/exe hash 的绑定已读回。新构建的复制槽位实际一次 HTTP；五组独立进程恢复验证旋转、stable 两代、保存后账本失败、过期恢复后普通重试和同 owner follower。三组 V1 seed/restart 全部零 HTTP、配置字节不变、旧 reader 拒绝 V2。default/named 替换各零 HTTP、原账本字节不变；有效 A scope 在后续 B context 仍只写 A 并发一次本机 HTTP。夹具均已清理，产物为 `lineage.process.*`、`lineage.recovery.*`、`lineage.migration.*`、`lineage.profile.*`。
 - 最终隔离 Linux PTY Node/exe × regular/fullscreen 四格通过：整套角色预设、显式 advisor on/off/on、A/low 续期后同回合 B/high 顾问、每格五次实际本机模型发送和一次受限 TLS OAuth 交换；HTTP 前 V2 dispatched 与后续 retained terminal/精确 successor grant 均确认，仅 owner token 字段改变，pathRules 保持准入、退出 0。只使用合成凭据/本机服务，临时 home/证书已清理，不当作真实 provider 验收。产物为 `lineage.pty.py`、log 与 `lineage/`。
 - 四项静态门禁及脚本测试 59 项通过；NormProof 退出 0、无环/解析义务 satisfied，仍为原九项函数上限 advisory，触及模块无新增越界。最终 strict docs drift/diff 在本条写入后运行。本条写入时尚未提交/推送，新 SHA CI 待实际查询；PRV-03/05 池外授权/迟到 success 清退避、CTX-03 与全部其余任务继续，四项用户保留验证范围不变，本批不构成全 PRV-04、W2 或 Phase 20 完成声明。
+
+
+## 2026-10-19
+
+### PRV-03/05 完整池限制与凭据等待
+
+- 谱系批已提交推送为 `87a55c5f0b4fcbdab5a063e0b74a6d399c0f0692`。Architecture Watch `39140810147` success；CI `39140810129`/job `117714666952` completed/failure，终态 `2026-10-18T15:42:19Z`。前十三步 success，第十四步七项 `entrypoints/renewal.test.ts` 断言失败，8808 项通过、3 跳过，NormProof skipped。旧夹具直接伪造续期结果被新原生凭证合同正确拒绝；改为 transport 注入 HTTP 响应、实际 OAuth 解码及派发前持久记录断言，保留原存储/取消测试并新增伪造拒绝，八项通过。原失败日志保存于 `.omx/verification/phase20/lineage.ci-39140810129.failed.log`；不重启或改写旧 run。
+- 当前解析对显式/CLI/委派校验完整捕获池，缺失、规范化重复、外来 provider 和声明 endpoint 不兼容都拒绝；empty 零发送、无池覆盖保持。委派保留完整父拓扑并拒绝跨父池 provider；普通亲和按实际所选 API/account generation 与等待重新选择，显式等待账号不自动换。共享 owned credential owner 校验 account 类型/非空 access，首选 account 槽位缺失也不借用保留 API key；不退回环境/profile 凭据。
+- 唯一等待表移到 account owner，响应 header 解析与薄兼容导出保留在 request owner。只淘汰到期记录，超过 512 个有效等待和超过一天的期限仍保留；迟到成功/较短兄弟 429 不清除较长 deadline，正数秒溢出保持有限饱和等待。捕获 credential key 冻结；异步证明后 reserve 前及实际 handoff 前重查，证实未发送才释放，未知持久派发不释放。参考比较采用封闭限制继承和最长 deadline 的决定，保留现有 TypeScript owner、request attempt 和共享 cap，不建第二套解析器/执行面。
+- 首轮 L3 找到具名外来 provider 绕过、极大 Retry-After 溢出成零等待、首选 account 缺槽位借 API key；三项修复及独立反例复测通过。构建另外发现 captured provider 的字符串索引 TS7053，改从已验证 binding/connection 派生合法 provider 后通过；初次构建失败日志保留。最终 L3 APPROVED，6 文件/105 项及本机 HTTP 竞争探针：receiver=1、reserve=2、dispatch=1、confirmed-unsent=1。源码指纹 `56bc33a7230c4567de50e91a2ea9e726693444e543ece7c815d6b50d3c352716`，审查前后九个产品/六个测试文件一致。
+- 最终受影响 23 文件/439 项通过；实施冻结集先为18文件/336项，独立集重叠不相加。完整项目非 strict 生产诊断相对 `87a55c5` 为149/149、无新增，不代表全项目 tsc 干净；strict NodeNext 生产构建通过。19项加载时反转均实际断言失败并退出1，无timeout冒充，产品 hash不变；包括完整 child topology、parent provider、owned material/mode/generation、等待亲和、期限保留/解析、reserve/handoff fences和未知持久派发。
+- 两构建通过，TS manifest `6ee15cd6870a`；源 digest与exe hash绑定读回。编译模块实际12次本机HTTP覆盖各低层purpose、70-token共享cap、池切换后cap拒绝、unknown/partial不自动重播；新独立进程保留账本证据。实际CLI授权子请求三次发送、12 input/3 output，拒绝子请求只有两次主发送、8/2，global config字节不变。另两次实际乱序HTTP保留约60秒等待，池外显式/委派复现均转为拒绝。
+- Linux Node/exe × regular/fullscreen四格隔离PTY通过：整套预设、显式advisor on/off/on、池内A/low原生续期后同回合B/high顾问，每格五次模型发送和一次受限本机TLS OAuth、持久V2派发/terminal/successor、只改owner token、pathRules准入、退出0。临时home/证书已清理；合成服务不等同真实模型验收。
+- 四项静态门禁和脚本59项通过；NormProof退出0，无环/解析义务satisfied，仍为原九项函数上限advisory，触及模块无新增越界。最终静态门禁/strict docs drift/diff在本条后运行。本条写入时尚未提交推送，新SHA CI待实际查询；完整辅助consumer/publication、可用性投影、provider/endpoint/受众绑定、CTX-03和全部其余任务继续，只有用户原四项环境/真实模型要求推迟。

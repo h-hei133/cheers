@@ -99,3 +99,17 @@ it.each(['deleted', 'provider-reused', 'scope'])('refuses a %s subagent binding 
   await invoke(setup);
   expect(setup.requests.map(row => row.path)).toEqual(['/a/v1/chat/completions', '/a/v1/chat/completions']);
 });
+
+it.each([false, true])('the real CLI child route inherits the complete authorized pool (childAuthorized=%s)', async childAuthorized => {
+  const setup = await fixture(); const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, accountPool: { openai: { connections: childAuthorized ? ['a', 'b'] : ['a'] } } }, edit);
+  const before = fs.readFileSync(getUserRuntimeConfigPath());
+  await invoke(setup);
+  expect(setup.requests.map(row => [row.path, row.credential])).toEqual(childAuthorized ? [
+    ['/a/v1/chat/completions', 'Bearer synthetic-a'], ['/b/v1/chat/completions', 'Bearer synthetic-b'], ['/a/v1/chat/completions', 'Bearer synthetic-a'],
+  ] : [['/a/v1/chat/completions', 'Bearer synthetic-a'], ['/a/v1/chat/completions', 'Bearer synthetic-a']]);
+  const scope = readGoalEdit(setup.manager, setup.session).goal!.id;
+  expect(decodeRequestLedger(readBoundSessionState(setup.manager, setup.session).state.requestLedger)!.scopes[scope])
+    .toMatchObject({ inputTokens: childAuthorized ? 12 : 8, outputTokens: childAuthorized ? 3 : 2, pending: {} });
+  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(before);
+});

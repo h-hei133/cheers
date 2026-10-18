@@ -222,7 +222,8 @@ it.each([{ connections: [] }, { connections: ['named'] }])('cannot use provider 
   const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
   writeUserRuntimeConfigFile({ ...edit.values, providerConnections: [connection()], accountPool: { openai: pool } }, edit);
   const selected = projectSessionModel(getRuntimeConfig(home), sessionId);
-  expect(resolveProviderCredential({ runtimeConfig: selected, cliApiKey: 'synthetic-cli', env: { OPENAI_API_KEY: 'synthetic-env' } }).blocked).toBe('pool-required');
+  expect(resolveProviderCredential({ runtimeConfig: selected, cliApiKey: 'synthetic-cli', env: { OPENAI_API_KEY: 'synthetic-env' } }).blocked)
+    .toBe(pool.connections.length === 0 ? 'pool-empty' : 'pool-required');
   const before = readSessionModelEdit(sessionId);
   expect((await runModelCommand(['base'], context())).output).toContain('blocked');
   expect(readSessionModelEdit(sessionId)).toEqual(before);
