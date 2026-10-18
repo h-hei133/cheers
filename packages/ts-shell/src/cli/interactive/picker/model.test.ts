@@ -151,6 +151,47 @@ it('orders configured providers before unavailable catalogue entries', async () 
   expect(rows[0]?.disabled).not.toBe(true);
 });
 
+it('marks the resolved fallback connection active when no global connection is selected', async () => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, activeProviderConnectionId: undefined,
+    providerConnections: edit.values.providerConnections!.map(item => item.id === 'b' ? { ...item, updatedAt: '2026-02-01' } : item) }, edit);
+  const picker = modelPicker(context()); const rows = await picker.load();
+  expect(rows.filter(row => row.note === 'active').map(row => row.id)).toEqual([id()]);
+  expect(rows.some(row => row.id === 'model:current')).toBe(false);
+});
+
+it('uses the request provider effort when CLI provider selection differs from the global default', async () => {
+  vi.stubEnv('GEMINI_API_KEY', '');
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, providerConnections: [
+    { ...edit.values.providerConnections![0], thinkingEffort: 'high' },
+    { ...edit.values.providerConnections![1], provider: 'google', thinkingEffort: 'low' },
+  ] }, edit);
+  writeCatalogCache([{ id: 'google', models: [{ id: 'shared', reasoning: true }] }]);
+  const picker = modelPicker({ ...context(), resolveConfigTarget: config => resolveProviderCredential({ runtimeConfig: config, cliProvider: 'google' }) });
+  const row = (await picker.load()).find(item => item.note === 'active');
+  expect(row?.id).toBe(`model:${JSON.stringify(['b', 'google', 'shared'])}`);
+  expect(picker.detail?.(row!.id)).toContain('Reasoning effort: low');
+  expect((await picker.apply([row!.id]))?.note).toContain('Reasoning effort: low');
+  expect(readSessionModel(sessionId)).toMatchObject({ provider: 'google', connectionId: 'b', thinkingEffort: 'low' });
+});
+
+it.each(['env', 'cli'] as const)('shows an active %s request without attributing its account to a named connection', async source => {
+  if (source === 'env') vi.stubEnv('OPENAI_API_KEY', 'synthetic-env-account');
+  const picker = modelPicker({ ...context(), resolveConfigTarget: config => resolveProviderCredential({ runtimeConfig: config,
+    ...(source === 'cli' ? { cliApiKey: 'synthetic-cli-account', cliBaseUrl: 'https://synthetic-user:synthetic-password@override.invalid/v1?key=synthetic-query#synthetic-fragment' } : {}) }) });
+  const before = readSessionModelEdit(sessionId); const global = fs.readFileSync(getUserRuntimeConfigPath());
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected probe'));
+  const rows = await picker.load();
+  expect(rows.filter(row => row.note === 'active')).toEqual([expect.objectContaining({ id: 'model:current', label: 'shared', disabled: true })]);
+  expect(picker.detail?.('model:current')).toContain(`Credential source: ${source}`);
+  expect(JSON.stringify([rows, picker.detail?.('model:current')])).not.toMatch(/synthetic-(?:env|cli|user|password|query|fragment)/);
+  if (source === 'cli') expect(picker.detail?.('model:current')).toContain('Endpoint: override.invalid/v1');
+  expect((await picker.apply(['model:current']))?.note).toContain('unavailable');
+  expect(readSessionModelEdit(sessionId)).toEqual(before); expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
 it('keeps later model changes on the session connection and changes defaults only with an explicit global save', async () => {
   const picker = modelPicker(context()); await picker.load();
   expect((await picker.apply([id()]))?.note).toContain('Connection: b');

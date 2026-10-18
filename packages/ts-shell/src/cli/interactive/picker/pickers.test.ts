@@ -364,11 +364,11 @@ describe("approval chooser", () => {
 
 it('marks accepted model and connection selections instead of pending disk selections', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'accepted-pickers-'));
-  vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root);
+  vi.stubEnv('HOME', root); vi.stubEnv('USERPROFILE', root); vi.stubEnv('OPENAI_API_KEY', '');
   try {
     const provider = loadCatalog().find(item => item.id === 'openai')!;
     const model = provider.models[0]!.id;
-    const connections = [{ id: 'first', provider: 'openai' as const, authType: 'api-key' as const,
+    const connections = [{ id: 'first', provider: 'openai' as const, authType: 'api-key' as const, apiKey: 'synthetic-accepted-account',
       model, status: 'connected' as const, createdAt: 'now', updatedAt: 'now' }];
     const runtimeConfig = { ...getRuntimeConfig(root), activeProviderConnectionId: 'first', providerConnections: connections };
     const file = getUserRuntimeConfigPath(); fs.mkdirSync(path.dirname(file), { recursive: true });

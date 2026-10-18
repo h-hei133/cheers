@@ -1,7 +1,7 @@
 import { projectModelSelection, projectSessionModel } from "../../../session/model/projection.js";
 import { getRuntimeConfig } from "../../../config/runtimeConfig.js";
 import { loadCatalog } from "../../../core/models/catalogStore.js";
-import { availabilityLabel, availabilitySnapshot, type ConnectionAvailability } from "../../../core/models/availability.js";
+import { availabilityLabel, availabilitySnapshot, endpointLabel, type ConnectionAvailability } from "../../../core/models/availability.js";
 import { catalogModel, type CatalogProvider } from "../../../core/models/catalog.js";
 import { effortCapability } from "../../../core/models/capability.js";
 import { resolveProviderCredential } from "../../../core/shell/providerCredentials.js";
@@ -14,7 +14,7 @@ import { readSessionModel } from "../../../session/model/state.js";
 import type { SessionModelRole } from "../../../session/model/contract.js";
 import { captureModelChoice } from "../../../core/commands/model/choice.js";
 import { setModelTarget } from "../../../core/commands/model/selection.js";
-import { currentModelPreference } from "../../../core/commands/model/preference.js";
+import { captureThinkingPreference } from "../../../core/models/preference.js";
 import { sameValue } from "../../../config/values.js";
 
 /** Every actionable row retains its exact target and the inputs used to display it. */
@@ -34,7 +34,7 @@ export function modelPicker(context: CommandContext): Picker {
       const catalog = choice?.catalog ?? publication?.catalog ?? loadCatalog();
       const active = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
       const availability = availabilitySnapshot({ config, catalog });
-      const thinkingEffort = currentModelPreference(config, context.projectRoot ?? context.cwd).thinkingEffort ?? null;
+      const thinkingEffort = captureThinkingPreference(context.projectRoot ?? context.cwd, active.thinkingEffort).thinkingEffort;
       const rows: Option[] = [];
       const seen = new Set<string>();
       const ordered = [...catalog].sort((left, right) => Number(!availability.providers.some(item => item.provider === left.runtime && item.state === 'ready'))
@@ -53,12 +53,13 @@ export function modelPicker(context: CommandContext): Picker {
             const id = rowId(connection?.connectionId, provider.id, model.id);
             if (seen.has(id)) continue;
             seen.add(id);
-            const selected = Boolean(connection && connection.connectionId === config.activeProviderConnectionId
-              && provider.runtime === active.provider && model.id === active.model);
             const unsupported = effortCapability(catalog, provider.runtime, model.id, thinkingEffort) === 'unsupported';
             const candidate = connection ? projectModelSelection(config, { connectionScope: 'session', connectionId: connection.connectionId,
               provider: connection.provider, model: model.id, thinkingEffort }) : undefined;
             const resolution = candidate ? resolveProviderCredential({ runtimeConfig: candidate }) : undefined;
+            const selected = Boolean(!active.blocked && active.credential && connection
+              && connection.connectionId === active.credential.connectionId && provider.runtime === active.provider && model.id === active.model
+              && resolution?.baseUrl === active.baseUrl && sameValue(resolution?.credential, active.credential));
             const reason = !connection ? 'configure a connection' : connection.state !== 'ready' ? availabilityLabel(connection.state)
               : resolution?.blocked || !resolution?.credential ? 'connection credential unavailable'
               : unsupported ? 'reasoning effort unsupported' : !choice?.baseline ? 'active session required' : undefined;
@@ -80,6 +81,18 @@ export function modelPicker(context: CommandContext): Picker {
             }
           }
         }
+      }
+      // Overrides and legacy credentials can supply a current request without a
+      // matching named connection. Keep that fact visible without inventing one.
+      if (active.model && !rows.some(row => row.note === 'active')) {
+        const id = 'model:current';
+        const endpoint = endpointLabel(active.baseUrl);
+        const note = active.blocked ? 'request blocked' : active.credential ? 'active' : 'credential missing';
+        rows.unshift({ id, label: active.model, detail: [active.credential ? `${active.credential.source} credential` : 'Current request', active.provider, endpoint].filter(Boolean).join(' · '),
+          note, disabled: true });
+        details.set(id, [`Provider: ${active.provider}`, `Model: ${active.model}`, `Status: ${note}`, `Reasoning effort: ${thinkingEffort ?? 'auto'}`,
+          ...(active.credential ? [`Credential source: ${active.credential.source}`] : []), ...(endpoint ? [`Endpoint: ${endpoint}`] : []),
+          'Remote availability: unverified']);
       }
       if (context.sessionId) {
         try {

@@ -7733,3 +7733,14 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 本地最终 9 文件、142 测试通过。初验时将命令 owner 反转到 `aecc4bcb`，9 项中 4 项失败；单独反转 provider 身份比较，定向运行的旧身份消歧用例失败（其余 10 项因 `-t` 未执行）。反转只在加载阶段替换源，不改工作区。
 - 两构建、cycles/config consumers/declarations/Node floor/strict docs drift 通过；NormProof 仍为导入/无环满足及既有函数上限 advisory，没有新增超限。Node/exe × regular/fullscreen 四格隔离 Linux PTY 均通过：空会话 `/modelpreset save --profile` → validate → apply 具名角色，之后本机 HTTP fixture 收到指定 relay B 的路径/模型/合成凭据；配置字节未变、退出 0，没有访问真实账号。
 - 此批仅补齐具名角色命令路径。完整角色策略的自动 consumer、无具名连接选择、目录同名能力歧义和其余 Phase 20 任务继续开放；本条记录时本批尚未提交/推送，新 SHA CI 另行确认。
+
+### PRV-01、PAN-01 当前请求事实与 CI 回归修复
+
+- `aecc4bcb` 的 CI `39096940454` 已结束：857 文件/8540 测试通过，两个模型菜单测试失败，Architecture Watch `39096940456` success。后续角色命令批已提交并推送为 `9bb899cef48dbbb086fad5e31627766dbbefe846`，Architecture Watch `39097452988` success，CI `39097452989` 记录时仍运行；没有重跑或以本地通过代替结果。
+- 两条 CI 失败在本地原样复现：一个直接向未 load 的 picker 传旧字符串 ID，另一个用旧 ID 查 active。测试现在用明确合成目录加载真实菜单、选择所显示的行，并继续断言异步 hook 后换 session 零写入、零 PostModelSwitch；配置测试保留 accepted/pending 目录与真实当前模型断言。
+- 沿失败路径发现产品当前项按全局 active ID 判定，既漏掉实际回退连接，也会将 CLI/env 账号归到保存的连接。改为匹配解析所得 connection/model/endpoint/credential；没有等价具名项时，用只读当前行展示模型和凭据来源。来源置于紧凑详情开头，避免窄列先截掉；endpoint 继续用既有脱敏函数，打开列表零探针、零保存。
+- 与只读参考的 current/default 分离决定一致；本项目还需要区分同 provider 多连接及凭据来源，因此不能仅比 provider/model。新增回归覆盖无全局连接的实际回退、CLI/env 来源、URL userinfo/query/fragment 不外泄和只读项不能执行。
+- 独立代码复核发现 CLI provider 与默认 provider 不同时，模型正确但 effort 仍来自默认连接；已改用实际解析结果并沿原项目偏好回退。新增真实 picker 从 OpenAI/high 到 Google/low 的显示及实际应用测试；最终代码 APPROVE / 架构 CLEAR，独立代码复核 4 文件/69 测试通过。
+- 完整受影响域 76 文件/1052 测试通过；首次运行一条旧 accepted-picker 夹具无自身 key、借用了宿主环境，已补明确合成 key 并清空环境 key，保留原 accepted 与 pending 身份断言。最终显示顺序修改后 4 文件/69 项通过。测试加载时仅恢复旧 model picker，27 项中 5 项失败、22 项通过，工作区源文件不变。
+- 两构建通过；Node/exe × regular/fullscreen 四格隔离 Linux PTY 全通过：显示当前 env 凭据来源，选择 relay B，随后本机 HTTP fixture 收到 B 的路径/模型/自身合成凭据；全局配置不变、退出 0。首轮 PTY 因紧凑列截断凭据来源失败，调整来源显示顺序后四格通过。没有访问真实 provider 配置或服务。
+- cycles/config consumers/declarations/Node floor 通过；NormProof 退出 0、verdict partial，仍有既有函数上限 advisory，触及 owner 没有新增函数。提交/推送及新 SHA CI 待本条记录后的实际结果；完整角色策略、无连接精确选择、目录同名能力及其余 Phase 20 仍开放。

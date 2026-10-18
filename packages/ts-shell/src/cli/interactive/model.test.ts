@@ -15,6 +15,7 @@ import type { CliMcpGateway } from '../../entrypoints/cliMcpModule.js';
 import { pickerFor, type PickerHost } from './picker/registry.js';
 import { StreamingRenderer } from '../../presentation/terminal/streaming.js';
 import { RecordingTerminal } from '../../test-utils/terminalDouble.js';
+import { writeCatalogCache } from '../../core/models/catalogStore.js';
 
 let root: string;
 let mode: InteractiveMode | undefined;
@@ -24,6 +25,7 @@ beforeEach(() => {
   writeUserRuntimeConfigFile({ provider: 'openai', activeProviderConnectionId: 'fixture', providerConnections: [{
     id: 'fixture', provider: 'openai', authType: 'api-key', apiKey: 'SYNTHETIC_KEY', model: 'base', status: 'connected', createdAt: '2026-01-01', updatedAt: '2026-01-01',
   }] }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+  writeCatalogCache([{ id: 'openai', models: [{ id: 'gpt-5.4' }] }]);
 });
 afterEach(() => { mode?.stop(); mode = undefined; vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); });
 
@@ -48,8 +50,10 @@ it('binds the real model picker to its opening session and project across a dela
     return undefined;
   });
   const picker = pickerFor('/model', host)!;
+  const target = (await picker.load()).find(row => row.label === 'gpt-5.4');
+  expect(target).toBeDefined(); expect(target?.disabled).not.toBe(true);
   const original = fs.readFileSync(getUserRuntimeConfigPath());
-  const pending = picker.apply(['openai/gpt-5.4']);
+  const pending = picker.apply([target!.id]);
   await vi.waitFor(() => expect(hook).toHaveBeenCalledOnce());
   switchActiveSession(context, second); const revision = context.configuration.current.revision;
   release(); const result = await pending;

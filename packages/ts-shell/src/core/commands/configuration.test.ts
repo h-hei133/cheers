@@ -84,7 +84,10 @@ it('keeps menus, completion, and context on the accepted catalogue until success
     const result = await runModelCommand(args, context);
     expect(result.output).toContain('accepted-only'); expect(result.output).not.toContain('pending-only');
   }
-  expect((await modelPicker(context).load()).find(row => row.id === 'google/chosen')?.note).toBe('active');
+  const models = await modelPicker(context).load();
+  expect(models.find(row => row.note === 'active')).toMatchObject({ label: 'chosen', detail: expect.stringContaining('cli') });
+  expect(models.some(row => row.label === 'accepted-only')).toBe(true);
+  expect(models.some(row => row.label === 'pending-only')).toBe(false);
   expect((await loader('model', new AbortController().signal)).map(row => row.value)).toContain('google/accepted-only');
   expect(fetch).not.toHaveBeenCalled();
   fs.writeFileSync(file, JSON.stringify({ ...settings, maxOutputTokens: 3000 }));

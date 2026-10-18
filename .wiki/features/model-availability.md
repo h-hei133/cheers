@@ -34,11 +34,13 @@ summary: "本地可证明的 provider/connection 可用性事实、脱敏endpoin
 | 表面 | 行为 |
 |---|---|
 | `/model` 与 `/model list` | provider 行显示凭据事实；active 由 `activeProvider/activeModel` 判定 |
-| 模型选择器 | 按连接逐模型展示，行内优先显示 connection ID，详情列展示脱敏 endpoint；有凭据的 provider 优先，pending/error/无自身凭据项保留原因；预设按具名角色提供选择 |
+| 模型选择器 | 按连接逐模型展示，行内优先显示 connection ID，详情列展示脱敏 endpoint；active 匹配实际请求的连接、模型、endpoint 和凭据；无匹配具名项时以只读行显示实际模型和凭据来源；有凭据的 provider 优先，pending/error/无自身凭据项保留原因；预设按具名角色提供选择 |
 | 连接选择器 | 每行显示 `active` 或投影状态及脱敏 endpoint |
 | `/model status` | readiness 行由投影的 pending/error/credential-missing 决定，再检查 base URL 与模型 |
 
 选择器保留目标对象，不从 label 或后续目录重新解析地址。规范 provider 的目录可用于同协议 relay；relay 专用目录只关联地址相符的连接。目录无法明确解析的能力保持未验证，不能从另一条 relay 的同名条目猜测。
+
+当前模型与全局默认连接分别判定；自动回退的具名连接可正确显示 active，CLI/env 凭据不能因此被归到保存的另一账号。reasoning effort 来自实际请求解析结果，再沿原项目偏好回退；不能混用默认 provider 的 effort。只读当前项不提供保存动作，无具名连接的模型选择仍属下方未闭合范围。
 
 ## 4. 选择身份与失败
 
