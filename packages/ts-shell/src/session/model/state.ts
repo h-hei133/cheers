@@ -14,6 +14,7 @@ export function decodeSessionModel(value: unknown): SessionModelSelection | unde
   const candidate = value as Record<string, unknown>;
   if (![candidate.connectionId, candidate.provider, candidate.model].every(item => typeof item === "string" && item.trim().length > 0)) return undefined;
   if (Object.hasOwn(candidate, 'thinkingEffort') && !isThinkingPreference(candidate.thinkingEffort)) return undefined;
+  if (candidate.connectionScope !== undefined && candidate.connectionScope !== 'session') return undefined;
   const serviceTier = candidate.serviceTier;
   if (serviceTier !== undefined && (typeof serviceTier !== 'string' || serviceTier.trim().length === 0 || serviceTier.length > 64)) return undefined;
   const presets = decodePresets(candidate.presets);
@@ -21,7 +22,7 @@ export function decodeSessionModel(value: unknown): SessionModelSelection | unde
   if (candidate.skillful !== undefined && typeof candidate.skillful !== 'boolean') return undefined;
   const contextWindow = candidate.contextWindow;
   if (contextWindow !== undefined && (!Number.isSafeInteger(contextWindow) || (contextWindow as number) < 1)) return undefined;
-  return { ...(candidate.thinkingEffort !== undefined ? { thinkingEffort: candidate.thinkingEffort as ThinkingPreference } : {}), ...(serviceTier !== undefined ? { serviceTier: serviceTier.trim() } : {}), ...(presets ? { presets } : {}), ...(candidate.skillful !== undefined ? { skillful: candidate.skillful } : {}), ...(contextWindow !== undefined ? { contextWindow: contextWindow as number } : {}), connectionId: (candidate.connectionId as string).trim(), provider: (candidate.provider as string).trim(), model: (candidate.model as string).trim() };
+  return { ...(candidate.connectionScope === 'session' ? { connectionScope: 'session' as const } : {}), ...(candidate.thinkingEffort !== undefined ? { thinkingEffort: candidate.thinkingEffort as ThinkingPreference } : {}), ...(serviceTier !== undefined ? { serviceTier: (serviceTier as string).trim() } : {}), ...(presets ? { presets } : {}), ...(candidate.skillful !== undefined ? { skillful: candidate.skillful as boolean } : {}), ...(contextWindow !== undefined ? { contextWindow: contextWindow as number } : {}), connectionId: (candidate.connectionId as string).trim(), provider: (candidate.provider as string).trim(), model: (candidate.model as string).trim() };
 }
 
 /** Shared with the profile library so both owners accept exactly the same shape. */

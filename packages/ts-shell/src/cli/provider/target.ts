@@ -12,14 +12,15 @@ export function delegatedTarget(target: string, main: ProviderCredentialResoluti
   let resolution: ProviderCredentialResolution;
   if (connection) {
     if (connection.status === 'pending' || connection.status === 'error') throw new Error('Delegated connection is unavailable.');
-    resolution = resolveProviderCredential({ runtimeConfig: { ...config!, providerConnections: [connection], activeProviderConnectionId: connection.id },
+    resolution = resolveProviderCredential({ runtimeConfig: { ...config!, providerConnections: [connection], activeProviderConnectionId: connection.id,
+      sessionConnection: { id: connection.id, provider: connection.provider } },
       cliProvider: connection.provider, cliModel: model, env: {} });
     if (resolution.credential?.connectionId !== connection.id) throw new Error('Delegated connection has no usable credential.');
   } else if (owner === main.provider) {
     resolution = { ...main, model, ...(main.credential ? { credential: { ...main.credential, model } } : {}) };
   } else {
     if (!config || !isRuntimeProvider(owner)) throw new Error('Delegated provider is unavailable.');
-    resolution = resolveProviderCredential({ runtimeConfig: config, cliProvider: owner, cliModel: model });
+    resolution = resolveProviderCredential({ runtimeConfig: { ...config, sessionConnection: undefined }, cliProvider: owner, cliModel: model });
   }
   if (resolution.model !== model || !resolution.credential || !resolution.baseUrl) throw new Error('Delegated model has no usable provider binding.');
   const allowed = providerFacts(resolution.provider).accountAuthAllowedModels;

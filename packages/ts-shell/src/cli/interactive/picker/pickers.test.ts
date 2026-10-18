@@ -376,12 +376,12 @@ it('marks accepted model and connection selections instead of pending disk selec
     const context = { cwd: root, runtimeConfig };
     expect((await connectionPicker(context).load()).filter(row => row.note === 'active').map(row => row.id)).toEqual(['use:first']);
     const picker = modelPicker(context);
-    expect((await picker.load()).filter(row => row.note === 'active').map(row => row.id)).toEqual([`openai/${model}`]);
+    expect((await picker.load()).filter(row => row.note === 'active').map(row => row.id)).toEqual([`model:${JSON.stringify(["first", "openai", model])}`]);
     const presetFile = path.join(root, ".cheers", "model-presets.json");
     fs.writeFileSync(presetFile, JSON.stringify({ version: 1, presets: { fast: { roles: { default: { connectionId: "first", provider: "openai", model } } } } }));
     const presetRows = await modelPicker({ ...context, sessionId: "sess_preset" }).load();
     expect(presetRows.find(row => row.id === "preset:fast")?.detail).toContain(`openai/${model}`);
-    const detail = picker.detail?.(`openai/${model}`) ?? [];
+    const detail = picker.detail?.(`model:${JSON.stringify(["first", "openai", model])}`) ?? [];
     expect(detail.join('\n')).toContain('Provider:');
     expect(detail.join('\n')).toContain('Availability:');
   } finally { vi.unstubAllEnvs(); fs.rmSync(root, { recursive: true, force: true }); }

@@ -7705,3 +7705,18 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 本地 5 文件/163 项初验通过；更新旧显示断言后，完整受影响 `src/cli/interactive src/presentation/tui` 114 文件/1563 项通过。测试加载阶段恢复“所选组先裁剪全集”的逻辑，真实 overlay 的跨组搜索用例因找不到 Maximum turns 失败；工作区源文件不改写。
 - 两构建均通过；隔离合成 PTY 四格全部通过，从 Session 组输入 `mxtrns` 找到 Request 字段、清空回 Session，并复验键盘切组、fullscreen 点击、resume、取消和退出。cycles/config consumers/declarations/Node floor 通过；NormProof 导入/无环满足，函数上限仍为同一组 9 个既有 advisory，触及模块均不超限。
 - 第二批独立复核：代码 APPROVE / 架构 CLEAR；架构首次限流后重试取得实质意见。记录时搜索批尚未提交/推送，新 SHA CI 待后续实际运行；Phase 20 的其他未复核合同和用户保留环境项继续开放。
+
+
+### PRV-01/02、PAN-01 具名连接与角色选择返工
+
+- 前两批交付结果已确认：`d622d491` 的 CI `39094520395` / Architecture Watch `39094520337`，`425e290b` 的 CI `39095154347` / Architecture Watch `39095154368` 均 success。查询中的一次 GitHub EOF 没有当作失败或触发重复工作流。
+- W1 配置/作用域/信任复核集 27 文件、316 测试通过；没有据此关闭全部 consumer。随后确认模型面板只传 provider/model，无法区分同 provider 的两条 relay；preset 也拒绝跨连接，与裁决冲突。
+- 面板现在保留精确 target 对象，紧凑行优先显示连接 ID，详情展示脱敏 endpoint、effort 与本地凭据事实；保留有凭据 provider 优先顺序。打开时绑定 profile、session 模型 revision、工作区、接受的 publication、磁盘配置、目录和凭据环境；应用前及锁内检查变化，旧选择不能重新解释为另一连接。打开面板不发网络请求。
+- 明确选择与 preset 角色应用复用原 session 锁内 CAS，一次写入 connection/model/effort，默认不写全局。`connectionScope: session` 区分明确的会话连接与兼容的旧模型偏好；后续 `/model use` 保持会话连接，显式 `--global` 才保存默认连接。profile 预设可应用到空会话；面板提供每个具名角色，全部角色先验证，session 对同名 profile 仍整项遮盖。
+- 独立复核先返回 REQUEST CHANGES / BLOCK，指出失效连接静默回退、凭据被 CLI/env 换账号、ready-first 排序回退，以及新绑定影响委派和刷新。全部修复后两路返回代码 APPROVE / 架构 CLEAR，独立代码复核额外运行 6 文件、124 测试通过。运行时 `sessionConnection` 断言只来自会话投影，不存入配置：连接删除、provider 变化或 error 阻止发送，但面板仍能选择有效替代连接；明确连接使用自身凭据，冲突的 CLI provider/endpoint/key 拒绝，普通配置的既有级联保留。
+- 委派的明确连接替换主会话断言，跨 provider 委派不继承主连接限制；账号刷新按解析结果捕获的 connection owner 重读，而不是把 profile 默认账号当作当前账号，继续使用原 raw-config selector/CAS 与精确镜像更新。新增刷新成功、删除/重登录迟到响应测试，断言全局默认账号及其镜像不被覆盖。
+- 参考取舍：采用已选对象传入 session 切换、全局保存显式触发、按具名 owner 读取最新凭据的边界；保留本项目原事务、身份检查、hooks 和失败状态，不采用先保存全局角色再切换 live 模型的顺序。未引入平行选择器或凭据仓库。
+- 验证：受影响模型、session、config、provider、account、shell 和 picker 域 90 文件、1029 测试通过；最终类型收窄后 4 文件、91 测试通过；追加后续模型选择与显式 global 保存用例后，picker/model 19 项通过。测试加载时反转到修改前实现，17 项中 13 项失败；另外仅反转失效连接、凭据优先级、委派绑定及刷新 owner 四个边界，65 项中 7 项失败、58 项通过。反转不改工作区源文件。
+- Linux PTY 120×40、隔离 HOME/USERPROFILE/CHEERS_TEST_ROOT，Node/exe × regular/fullscreen 四格通过：搜索同名模型、选择 relay B、发起一次本机 HTTP fixture 请求、验证 B 的 readiness/request 路径和合成 credential/model、全局配置字节不变、退出 0。首次断言要求紧凑列完整显示长标签，改为检查优先展示的连接 ID；fixture 补齐 readiness GET 后四格通过。未访问真实 provider 配置或真实服务。
+- `build:ts`、`build:exe`、cycles/config consumers/declarations/Node floor/strict docs drift 通过；docs 保留 118 条既有非阻断 source advisory。NormProof 退出 0、verdict partial，导入/无环 satisfied，函数上限仍是 9 个既有 advisory，触及模块未超限。额外运行 TypeScript 诊断比较：旧生产图 151 条、当前 149 条、无新增；修正所触及 decoder 已验证字段的类型收窄，不能把该比较称为全项目 tsc 通过。
+- 文档撤回“其他连接必须先改全局”的旧描述，并继续开放无具名连接的 legacy/env-only 精确选择、目录同名能力歧义、完整角色策略 consumer 及其余 Phase 20 裁决。本条记录时尚未提交/推送本批，新 SHA CI 需后续实际确认；本批通过不代表 PRV/PAN 全任务或整个 Phase 20 完成。

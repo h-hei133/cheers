@@ -2,14 +2,14 @@
 title: "模型可用性投影"
 category: article
 created: 2026-10-17
-updated: 2026-10-17
+updated: 2026-10-18
 tags: [models, providers, phase-20]
 summary: "本地可证明的 provider/connection 可用性事实、脱敏endpoint与选择器一致行为；不把打开UI变成认证探针。"
 ---
 
 # 模型可用性投影
 
-`core/models/availability.ts` 是 provider、连接与凭据状态的唯一本地投影。它只读取已接受的配置、目录和环境变量，不发起网络请求，也不声称端点已通过实测。
+`core/models/availability.ts` 提供 provider、连接与凭据状态的共享脱敏投影。明确选择连接时，模型面板还用请求解析器检查该连接自身的凭据；普通 provider 的环境/兼容凭据事实不等于某条连接获准借用该账号。两条路径均不发起网络请求，也不声称端点已通过实测。
 
 ## 1. 状态
 
@@ -34,18 +34,24 @@ summary: "本地可证明的 provider/connection 可用性事实、脱敏endpoin
 | 表面 | 行为 |
 |---|---|
 | `/model` 与 `/model list` | provider 行显示凭据事实；active 由 `activeProvider/activeModel` 判定 |
-| 模型选择器 | 只有 active connection 的 provider 行可选；其余行保留可见但禁用并注明 `switch connection first`；同一 provider 的多个中转站由连接列表区分 |
+| 模型选择器 | 按连接逐模型展示，行内优先显示 connection ID，详情列展示脱敏 endpoint；有凭据的 provider 优先，pending/error/无自身凭据项保留原因；预设按具名角色提供选择 |
 | 连接选择器 | 每行显示 `active` 或投影状态及脱敏 endpoint |
 | `/model status` | readiness 行由投影的 pending/error/credential-missing 决定，再检查 base URL 与模型 |
 
-目录 id 与 runtime 不同（自定义中转站）时，选择器按裸模型名应用，因为 `/model use <catalog-id>/<model>` 会被当作 provider 切换而拒绝；请求目标仍是 active connection。
+选择器保留目标对象，不从 label 或后续目录重新解析地址。规范 provider 的目录可用于同协议 relay；relay 专用目录只关联地址相符的连接。目录无法明确解析的能力保持未验证，不能从另一条 relay 的同名条目猜测。
 
 ## 4. 选择身份与失败
 
-会话选择继续由 `session/model/state.ts` 在锁内以 `connectionId + provider + model + thinkingEffort` 提交；投影不写任何配置。打开选择器、刷新列表或渲染状态都不修改连接、模型或 effort，也不产生请求。
+会话选择继续由 `session/model/state.ts` 在锁内以 `connectionId + provider + model + thinkingEffort` 提交。明确连接选择带 `connectionScope: session`，投影覆盖本会话的连接并产生运行时 `sessionConnection` 断言；旧的仅模型偏好仍只在原连接为默认连接时生效。默认选择不写全局；普通 `/model use` 后续模型修改保持已有会话连接，只有显式 `--global` 才尝试修改默认值。
+
+打开面板时捕获 profile、会话模型 revision、工作区、接受的配置 publication、磁盘配置、目录和凭据环境；选择前与锁内重新检查，变化则要求重开。保存后配置发布失败会单独报告，不把已保存当作已应用。
+
+明确的会话连接只能使用自身凭据；不兼容的 CLI provider/endpoint/key override 阻止选择和请求，普通配置既有凭据级联不变。连接删除、provider 变化或 error 状态会阻止发送，用户仍可打开面板选择有效替代连接；不会静默退回全局默认。委派的明确连接替换主会话断言，账号刷新则按已捕获的连接 owner 重读和 CAS，不把默认账号当作本会话账号。
+
+打开选择器、刷新列表或渲染状态都不修改连接、模型或 effort，也不产生请求。
 
 ## 5. 边界
 
-- 未实现 PAN-01 的两栏面板、PRV-02 的 profile 预设库、PRV-03 的账号池。
+- 本轮只闭合具名连接的选择、恢复和拒绝路径；无具名连接的 legacy/env-only 精确选择、目录同名能力歧义和完整角色策略 consumer 仍待复核。两栏面板和 profile 预设库已存在，不再列为未实现。
 - 未验证真实 provider、跨进程并发或 Windows/macOS 实机。
 - `unknown` 不等于不可用，`ready` 也不等于远端已确认；两者都不会被写成成功。

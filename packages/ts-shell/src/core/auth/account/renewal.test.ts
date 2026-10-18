@@ -10,6 +10,7 @@ import * as authorization from '../../../provider/request/authorization.js';
 import * as persistence from '../../../config/persistence.js';
 import { ConfigWriteError } from '../../../config/outcome.js';
 import { acquireRefreshLease, markRefreshDispatched, markRefreshUnknown, refreshLineage } from './lease.js';
+import { projectModelSelection } from '../../../session/model/projection.js';
 
 let home: string;
 let root: string;
@@ -57,6 +58,38 @@ it('does not replace a different fallback account and keeps config-source renewa
   write({ provider: 'openai', providerCredentials: { openai: { baseUrl: 'https://config.invalid/v1', accountAuth: { openai: auth() } } } });
   const second = await renewStoredAccount(request()); expect(second.stored).toBe(true);
   expect(read().providerConnections).toBeUndefined(); expect(read().providerCredentials?.openai?.accountAuth?.openai).toEqual(second.accountAuth);
+});
+
+it('renews the explicitly selected session account while leaving the profile default and its mirror unchanged', async () => {
+  const before = read();
+  const config = projectModelSelection(getRuntimeConfig(root), { connectionId: 'b', connectionScope: 'session', provider: 'openai', model: 'gpt-5.3-codex' });
+  const resolution = resolveProviderCredential({ runtimeConfig: config, env: {} });
+  expect(resolution.selection?.connectionId).toBe('b');
+  const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ access_token: 'fresh-b', refresh_token: 'rotated-b', expires_in: 3600 }),
+    { headers: { 'Content-Type': 'application/json' } })) as unknown as typeof fetch;
+  const result = await renewStoredAccount({ workspaceRoot: root, resolution, fetchImpl });
+  expect(result).toMatchObject({ stored: true, writeState: 'persisted', accountAuth: { accessToken: 'fresh-b', accountId: 'b' } });
+  expect(fetchImpl).toHaveBeenCalledOnce();
+  expect(read().activeProviderConnectionId).toBe('a');
+  expect(read().providerConnections?.[0]).toEqual(before.providerConnections?.[0]);
+  expect(read().providerCredentials).toEqual(before.providerCredentials);
+  expect(read().providerConnections?.[1]?.accountAuth?.openai).toEqual(result.accountAuth);
+});
+
+it.each(['delete', 'relogin'])('refuses a late session-account rotation after %s without changing the default account', async change => {
+  const before = read();
+  const config = projectModelSelection(getRuntimeConfig(root), { connectionId: 'b', connectionScope: 'session', provider: 'openai', model: 'gpt-5.3-codex' });
+  const resolution = resolveProviderCredential({ runtimeConfig: config, env: {} });
+  const fetchImpl = vi.fn(async () => {
+    write({ ...read(), providerConnections: change === 'delete' ? [connection('a')]
+      : [connection('a'), { ...connection('b'), accountAuth: { openai: auth('new-b') } }] });
+    return response();
+  }) as unknown as typeof fetch;
+  const result = await renewStoredAccount({ workspaceRoot: root, resolution, fetchImpl });
+  expect(result).toMatchObject({ stored: false, writeState: 'unchanged' });
+  expect(result.accountAuth).toBeUndefined(); expect(fetchImpl).toHaveBeenCalledOnce();
+  expect(read().providerConnections?.[0]).toEqual(before.providerConnections?.[0]);
+  expect(read().providerCredentials).toEqual(before.providerCredentials);
 });
 
 it.each(['relogin', 'delete', 'selection', 'endpoint', 'fallback-order', 'provider', 'model'])('refuses a delayed response after %s changes', kind => {

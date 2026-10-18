@@ -85,7 +85,7 @@ it('keeps session skill controls while clearing model-specific controls on apply
   expect(readSessionModel(sessionId)?.contextWindow).toBeUndefined();
 });
 
-it('refuses a role on a different connection and rejects unavailable companion roles before any selection write', async () => {
+it('applies a role on a different connection and rejects unavailable companion roles before any selection write', async () => {
   const context = { cwd: home, projectRoot: home, sessionId };
   await routeSlashCommand('/model base-model', { ...context, interactive: true });
   const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
@@ -97,9 +97,11 @@ it('refuses a role on a different connection and rejects unavailable companion r
     connectionId: 'second', provider: 'openai', model: 'next-model',
   } } } } }, readSessionModelEdit(sessionId));
   const before = readSessionModel(sessionId);
-  expect((await runModelPresetCommand(['apply', 'second'], context)).output).toContain('select connection');
-  expect(readSessionModel(sessionId)).toEqual(before);
-  expect(projectSessionModel(getRuntimeConfig(home), sessionId).activeProviderConnectionId).toBe('fixture');
+  const global = fs.readFileSync(getUserRuntimeConfigPath());
+  expect((await runModelPresetCommand(['apply', 'second'], context)).output).toContain('applied for this session');
+  expect(readSessionModel(sessionId)).toMatchObject({ connectionId: 'second', model: 'next-model', connectionScope: 'session' });
+  expect(projectSessionModel(getRuntimeConfig(home), sessionId).activeProviderConnectionId).toBe('second');
+  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global);
   writeSessionModel(sessionId, { ...before!, presets: { mixed: { roles: {
     default: { connectionId: 'fixture', provider: 'openai', model: 'next-model' },
     reviewer: { connectionId: 'fixture', provider: 'openai', model: 'unknown-model' },

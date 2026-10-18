@@ -2,7 +2,7 @@
 title: "模型角色预设"
 category: article
 created: 2026-10-17
-updated: 2026-10-17
+updated: 2026-10-18
 tags: [models, presets, phase-20]
 summary: "会话预设原位兼容，profile库显式保存/提升/删除；同名整项由会话遮盖，应用验证全部角色并在一次session事务内选择目标。"
 ---
@@ -38,12 +38,12 @@ profile 库文件形如 `{ "version": 1, "presets": { "<name>": { "roles": { …
 
 应用前验证每个角色：名称与目标形状、目录中真实模型、effort 能力、连接存在且 provider 一致且状态为 `connected`。任一角色失败则整个应用拒绝，不产生半更新。
 
-选中的角色通过现有 `session/model/state.ts` 锁内事务写入 `connectionId/provider/model/effort`，只改当前会话，不写全局配置。目标连接不是当前连接时拒绝并提示先 `/connect use`，与手动切换的规则一致。
+选中的角色通过现有 `session/model/state.ts` 锁内事务写入 `connectionId/provider/model/effort`，只改当前会话，不写全局配置。目标连接可与当前连接不同；连接、模型和 effort 在同一次 session CAS 中提交，不需先修改全局 `/connect use`。空会话也可应用 profile 预设。任一角色缺少自身凭据、预设 owner/内容变化、session/config/catalog revision 变化或请求 override 改变目标时拒绝；已选择连接失效不会退回默认账号。
 
 角色名的消费者是显式的 `apply` 动作；后台 advisor、压缩、子代理不会因为某个角色名而自动换模型。角色名不会被解释为权限或自动请求授权。
 
 ## 4. 边界
 
 - 没有跨层角色合并、自动提升或默认写全局。
-- 未实现 PAN-01 的角色编辑面板与 PRV-03 的账号池。
+- 模型面板已列出预设的各具名角色并可应用；角色编辑、完整角色策略的自动 consumer 仍未由本批闭合。账号池已有实现，其完整裁决另行复核。
 - 已验证：保存/列表/删除、会话遮盖、提升、profile 应用、损坏库报错；未运行真实 provider 或跨平台动态证据。

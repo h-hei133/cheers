@@ -18,8 +18,8 @@
 
 | 任务 | 所有者 | 证据 | 反转 |
 |---|---|---|---|
-| PRV-01 | `core/models/availability.ts` | `availability` 测试、`configuration.test.ts` | endpoint 带 userinfo 时失败 |
-| PRV-02 | `core/commands/model/preset*` | `preset` 测试（30） | 会话预设不再整体遮盖 profile 时失败 |
+| PRV-01 具名连接选择 | `core/commands/model/{choice,selection}.ts`、`session/model/`、`core/shell/providerCredentials.ts` | `picker/model.test.ts`、session/model、providerCredentials；合成 relay 请求及恢复 | 删除 revision 检查、丢失连接后退回默认或使用 CLI/env 的另一账号时失败 |
+| PRV-02 具名角色应用 | `core/commands/model/preset*` | presetCommand、presetStore、picker/model；空 session 应用 profile 角色 | 跨连接改回拒绝、同名跨层合并或任一无效角色仍写入时失败；自动角色 consumer 另行复核 |
 | PRV-03 | `core/auth/account/{pool,presence}.ts` | `account-pool` 测试 | 池外发送回退到 env/profile 时失败 |
 | PRV-04 | `core/auth/account/lease.ts` | `lease.test.ts`（7）、renewal（38） | dispatched/unknown 被提前清理时失败 |
 | PRV-05 | `provider/request/backoff.ts` | backoff（5）、ledger | A 的 429 阻塞 B 时失败 |
@@ -57,7 +57,7 @@
 
 | 任务 | 所有者 | 证据 | 反转 |
 |---|---|---|---|
-| PAN-01 | `picker/model.ts` | pickers（39） | 同名 model 无 relay 详情时失败 |
+| PAN-01 连接/具名角色选择 | `picker/model.ts` | picker/model、pickers；两栏内保留 target 对象和 admission | 同名 model 不区分 connection、失效项可执行或只应用默认角色时失败 |
 | PAN-02 | `picker/session.ts`、`tree.ts` | session（20）、tree（2） | 分组行可选中、连接线缺失或跨项目动作被放行时失败 |
 | PAN-03 | `picker/hub.ts` | pickers（39） | `/hub` 在无 composition 时仍打开或 apply 取消任务时失败 |
 | PAN-04 | `cli/usage/service.ts` | usage（31） | 无限分母输出百分比时失败 |

@@ -1,0 +1,181 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { modelPicker } from './model.js';
+import { SessionManager } from '../../../session/SessionManager.js';
+import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../../config/runtimeConfig.js';
+import { loadCatalog, writeCatalogCache } from '../../../core/models/catalogStore.js';
+import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../../session/model/state.js';
+import { projectSessionModel } from '../../../session/model/projection.js';
+import { defaultHookDispatcher } from '../../../core/hooks/hookDispatcher.js';
+import { resolveProviderCredential } from '../../../core/shell/providerCredentials.js';
+import { createShellRuntimeContext, refreshShellRuntimeConfig, switchActiveSession } from '../../../core/shell/runtimeContext.js';
+import { createCliProviderRuntimeBridge } from '../../provider/cliProviderRuntimeBridge.js';
+import { saveProfileModelPreset } from '../../../core/commands/model/preset.js';
+import { runModelCommand } from '../../../core/commands/modelCommandRuntime.js';
+
+let home: string;
+let manager: SessionManager;
+let sessionId: string;
+beforeEach(() => {
+  home = fs.mkdtempSync(path.join(os.tmpdir(), 'cheers-model-choice-'));
+  vi.stubEnv('HOME', home); vi.stubEnv('USERPROFILE', home); vi.stubEnv('OPENAI_API_KEY', '');
+  writeUserRuntimeConfigFile({ provider: 'openai', activeProviderConnectionId: 'a', providerConnections: ['a', 'b'].map(id => ({
+    id, provider: 'openai' as const, label: `Relay ${id}`, authType: 'api-key' as const, apiKey: `synthetic-${id}`,
+    baseUrl: `https://${id}.example.invalid/v1`, model: 'shared', status: 'connected' as const,
+    createdAt: '2026-01-01', updatedAt: '2026-01-01',
+  })) }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
+  writeCatalogCache([{ id: 'openai', models: [{ id: 'shared', reasoning: true }, { id: 'other', reasoning: true }] }]);
+  manager = new SessionManager(); sessionId = manager.createNew(home).id;
+});
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(home, { recursive: true, force: true }); });
+
+const id = (connection = 'b', model = 'shared') => `model:${JSON.stringify([connection, 'openai', model])}`;
+const context = () => ({ cwd: home, projectRoot: home, sessionId });
+
+it('distinguishes two relays, publishes the exact request target, and restores it on resume without changing defaults', async () => {
+  const shell = createShellRuntimeContext({ cwd: home, originalCwd: home, projectRoot: home, targetPathBase: home,
+    rootMode: 'direct', gitRoot: null, gitContext: { insideGit: false, root: null, branch: null, isClean: null },
+    session: manager.getSession(sessionId)!, runtimeConfig: getRuntimeConfig(home) });
+  const bridge = createCliProviderRuntimeBridge({ runtimeConfig: () => shell.runtimeConfig, options: {}, env: {} });
+  const picker = modelPicker({ ...context(), readConfiguration: () => shell.configuration.current,
+    resolveConfigTarget: config => resolveProviderCredential({ runtimeConfig: config, env: {} }),
+    refreshRuntimeConfig: () => refreshShellRuntimeConfig(shell) });
+  const global = fs.readFileSync(getUserRuntimeConfigPath());
+  const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected probe'));
+  const rows = await picker.load();
+  expect(rows.find(row => row.id === id('a'))).toMatchObject({ label: 'shared', note: 'active' });
+  expect(rows.find(row => row.id === id())).toMatchObject({ label: 'shared', detail: expect.stringContaining('b.example.invalid/v1') });
+  expect(picker.detail?.(id()).join('\n')).toContain('Connection: b');
+  expect((await picker.apply([id()]))?.note).toContain('Connection: b');
+  expect(bridge.resolveCredentialSnapshot().credential).toMatchObject({ connectionId: 'b', model: 'shared', baseUrl: 'https://b.example.invalid/v1', apiKey: 'synthetic-b' });
+  expect(shell.runtimeConfig.configProvenance.activeProviderConnectionId.sources).toEqual(['session']);
+  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global);
+  expect(fetch).not.toHaveBeenCalled();
+  manager.persistUserPromptBarrier(sessionId, 'retain exact target'); manager.saveInterrupted(sessionId);
+  const resumed = new SessionManager(); expect(resumed.tryResume(sessionId)).toMatchObject({ ok: true });
+  switchActiveSession(shell, manager.createNew(home));
+  expect(bridge.resolveCredentialSnapshot().credential?.connectionId).toBe('a');
+  switchActiveSession(shell, resumed.getSession(sessionId)!);
+  expect(bridge.resolveCredentialSnapshot().credential?.connectionId).toBe('b');
+});
+
+it.each(['connection', 'catalog', 'session', 'environment', 'publication'])('rejects a stale %s before hooks or writes', async change => {
+  let revision = 1;
+  const config = getRuntimeConfig(home); const catalog = loadCatalog();
+  const picker = modelPicker({ ...context(), readConfiguration: () => ({ config, catalog, revision }) });
+  await picker.load();
+  if (change === 'connection') {
+    const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+    writeUserRuntimeConfigFile({ ...edit.values, providerConnections: edit.values.providerConnections!.map(item => item.id === 'b' ? { ...item, apiKey: 'synthetic-rotated' } : item) }, edit);
+  } else if (change === 'catalog') writeCatalogCache([{ id: 'openai', models: [{ id: 'shared', contextWindow: 512_000 }] }]);
+  else if (change === 'session') writeSessionModel(sessionId, { connectionId: 'a', provider: 'openai', model: 'other' }, readSessionModelEdit(sessionId));
+  else if (change === 'environment') vi.stubEnv('OPENAI_API_KEY', 'synthetic-env');
+  else revision++;
+  const before = readSessionModelEdit(sessionId); const global = fs.readFileSync(getUserRuntimeConfigPath());
+  const hook = vi.spyOn(defaultHookDispatcher, 'dispatch');
+  expect((await picker.apply([id()]))?.note).toContain('expired');
+  expect(readSessionModelEdit(sessionId)).toEqual(before);
+  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global);
+  expect(hook).not.toHaveBeenCalled();
+});
+
+it('retains the displayed session revision across an asynchronous hook and refuses a competing selection', async () => {
+  const picker = modelPicker(context()); await picker.load();
+  vi.spyOn(defaultHookDispatcher, 'dispatch').mockImplementation(async event => {
+    if (event.eventName === 'PreModelSwitch') writeSessionModel(sessionId, { connectionId: 'a', provider: 'openai', model: 'other' }, readSessionModelEdit(sessionId));
+    return undefined;
+  });
+  expect((await picker.apply([id()]))?.note).toContain('blocked');
+  expect(readSessionModel(sessionId)).toMatchObject({ connectionId: 'a', model: 'other' });
+});
+
+it.each(['pending', 'error'])('keeps %s connections visible without making them actionable', async status => {
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  writeUserRuntimeConfigFile({ ...edit.values, providerConnections: edit.values.providerConnections!.map(item => item.id === 'b' ? { ...item, status: status as 'pending' | 'error' } : item) }, edit);
+  const picker = modelPicker(context());
+  expect((await picker.load()).find(row => row.id === id())?.disabled).toBe(true);
+  expect((await picker.apply([id()]))?.note).toContain('unavailable');
+  expect(readSessionModel(sessionId)).toBeUndefined();
+});
+
+it.each(['deleted', 'provider-changed', 'error'])('blocks an explicit session target that becomes %s and allows choosing a replacement', async change => {
+  const picker = modelPicker(context()); await picker.load();
+  expect((await picker.apply([id()]))?.note).toContain('Connection: b');
+  const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
+  const connections = change === 'deleted' ? edit.values.providerConnections!.filter(item => item.id !== 'b')
+    : edit.values.providerConnections!.map(item => item.id !== 'b' ? item : change === 'provider-changed'
+      ? { ...item, provider: 'google' as const } : { ...item, status: 'error' as const });
+  writeUserRuntimeConfigFile({ ...edit.values, providerConnections: connections }, edit);
+  const effective = projectSessionModel(getRuntimeConfig(home), sessionId);
+  const resolution = resolveProviderCredential({ runtimeConfig: effective, env: { OPENAI_API_KEY: 'synthetic-env' } });
+  expect(effective.activeProviderConnectionId).toBe('b');
+  expect(resolution.blocked).toBe('connection-unavailable'); expect(resolution.credential).toBeUndefined();
+  const replacement = modelPicker(context()); await replacement.load();
+  expect((await replacement.apply([id('a')]))?.note).toContain('Connection: a');
+  expect(resolveProviderCredential({ runtimeConfig: projectSessionModel(getRuntimeConfig(home), sessionId), env: {} }).credential?.connectionId).toBe('a');
+});
+
+it.each(['model', 'baseUrl'])('refuses a request %s override that would send a different target', async field => {
+  const picker = modelPicker({ ...context(), resolveConfigTarget: config => {
+    const result = resolveProviderCredential({ runtimeConfig: config, env: {} });
+    return { ...result, [field]: field === 'model' ? 'other' : 'https://different.example.invalid/v1' };
+  } });
+  await picker.load();
+  expect((await picker.apply([id()]))?.note).toContain('request overrides change its target');
+  expect(readSessionModel(sessionId)).toBeUndefined();
+});
+
+it('keeps the selected connection credential when an environment account is configured', async () => {
+  vi.stubEnv('OPENAI_API_KEY', 'synthetic-env-account');
+  const picker = modelPicker(context()); await picker.load();
+  expect((await picker.apply([id()]))?.note).toContain('Connection: b');
+  const config = projectSessionModel(getRuntimeConfig(home), sessionId);
+  expect(resolveProviderCredential({ runtimeConfig: config }).credential).toMatchObject({ connectionId: 'b', apiKey: 'synthetic-b', source: 'connection' });
+  expect(resolveProviderCredential({ runtimeConfig: getRuntimeConfig(home) }).credential).toMatchObject({ apiKey: 'synthetic-env-account', source: 'env' });
+  const override = resolveProviderCredential({ runtimeConfig: config, cliApiKey: 'synthetic-other-account' });
+  expect(override.blocked).toBe('connection-overridden'); expect(override.credential).toBeUndefined();
+});
+
+it('refuses a CLI credential override before persisting an exact connection choice', async () => {
+  const picker = modelPicker({ ...context(), resolveConfigTarget: config => resolveProviderCredential({ runtimeConfig: config, cliApiKey: 'synthetic-other-account' }) });
+  await picker.load();
+  expect((await picker.apply([id()]))?.note).toContain('request overrides change its target');
+  expect(readSessionModel(sessionId)).toBeUndefined();
+});
+
+it('orders configured providers before unavailable catalogue entries', async () => {
+  const rows = await modelPicker(context()).load();
+  expect(rows[0]?.detail).toContain('Relay a');
+  expect(rows[0]?.disabled).not.toBe(true);
+});
+
+it('keeps later model changes on the session connection and changes defaults only with an explicit global save', async () => {
+  const picker = modelPicker(context()); await picker.load();
+  expect((await picker.apply([id()]))?.note).toContain('Connection: b');
+  const global = fs.readFileSync(getUserRuntimeConfigPath());
+  expect((await runModelCommand(['other'], context())).output).toContain('Connection: b');
+  expect(readSessionModel(sessionId)).toMatchObject({ connectionScope: 'session', connectionId: 'b', model: 'other' });
+  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global);
+  expect((await runModelCommand(['shared', '--global'], context())).output).toContain('Global default stored at');
+  expect(readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values.activeProviderConnectionId).toBe('b');
+});
+
+it('applies a named profile role in an empty session and rejects later preset replacement', async () => {
+  const roles = { default: { connectionId: 'a', provider: 'openai', model: 'shared' },
+    review: { connectionId: 'b', provider: 'openai', model: 'other', thinkingEffort: 'high' as const } };
+  expect(saveProfileModelPreset('work', roles, context())).toContain('saved');
+  const picker = modelPicker(context());
+  expect((await picker.load()).find(row => row.id === 'preset:work:review')?.detail).toContain('b · openai/other');
+  const global = fs.readFileSync(getUserRuntimeConfigPath());
+  expect((await picker.apply(['preset:work:review']))?.note).toContain("role 'review' applied");
+  expect(readSessionModel(sessionId)).toMatchObject({ connectionId: 'b', model: 'other', thinkingEffort: 'high', connectionScope: 'session' });
+  expect(projectSessionModel(getRuntimeConfig(home), sessionId).activeProviderConnectionId).toBe('b');
+  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global);
+  await picker.load();
+  expect(saveProfileModelPreset('work', { default: roles.default }, context())).toContain('replaced');
+  const before = readSessionModelEdit(sessionId);
+  expect((await picker.apply(['preset:work:review']))?.note).toContain('preset changed');
+  expect(readSessionModelEdit(sessionId)).toEqual(before);
+});

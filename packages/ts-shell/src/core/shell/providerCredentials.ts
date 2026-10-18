@@ -38,9 +38,9 @@ export interface ProviderCredentialResolutionInput {
 
 export interface ProviderCredentialResolution {
   /** A selected pending connection cannot borrow credentials from another source. */
-  readonly blocked?: 'connection-pending' | PoolBlock;
+  readonly blocked?: 'connection-pending' | 'connection-unavailable' | 'connection-overridden' | PoolBlock;
   /** Explicit selection inputs retained for identity checks against later settings. */
-  readonly selection?: { readonly provider?: RuntimeProvider; readonly baseUrl?: string };
+  readonly selection?: { readonly provider?: RuntimeProvider; readonly baseUrl?: string; readonly connectionId?: string };
   readonly thinkingEffort?: ThinkingPreference;
   readonly provider: RuntimeProvider;
   readonly credential?: ResolvedProviderCredential;
@@ -54,6 +54,17 @@ export function resolveProviderCredential(
 ): ProviderCredentialResolution {
   const env = input.env ?? process.env;
   const providerFromConfig = input.runtimeConfig.provider;
+  const binding = input.runtimeConfig.sessionConnection;
+  const boundConnection = binding && input.runtimeConfig.providerConnections.find(connection => connection.id === binding.id
+    && connection.provider === binding.provider && connection.status !== 'error');
+  if (binding && (!boundConnection || input.runtimeConfig.activeProviderConnectionId !== binding.id)) {
+    return { provider: providerFromConfig, expectedEnvVarName: getProviderApiKeyEnvVarName(providerFromConfig), blocked: 'connection-unavailable' };
+  }
+  if (boundConnection && ((input.cliProvider !== undefined && input.cliProvider !== boundConnection.provider)
+    || (input.cliApiKey?.trim() && input.cliApiKey.trim() !== boundConnection.apiKey?.trim())
+    || (input.cliBaseUrl !== undefined && normalizeBaseUrl(input.cliBaseUrl) !== normalizeBaseUrl(boundConnection.baseUrl)))) {
+    return { provider: boundConnection.provider, expectedEnvVarName: getProviderApiKeyEnvVarName(boundConnection.provider), blocked: 'connection-overridden' };
+  }
   const explicitConnection = input.runtimeConfig.providerConnections.find(
     (connection) =>
       connection.id === input.runtimeConfig.activeProviderConnectionId &&
@@ -101,6 +112,7 @@ export function resolveProviderCredential(
   const thinkingEffort = preferredEffort(activeConnectionProfile, configProfile);
   const preference = { ...(thinkingEffort !== undefined ? { thinkingEffort } : {}),
     selection: { ...(input.cliProvider !== undefined ? { provider: input.cliProvider } : {}),
+      ...(boundConnection ? { connectionId: boundConnection.id } : {}),
       ...(input.cliBaseUrl !== undefined ? { baseUrl: input.cliBaseUrl } : {}) } };
 
   // A declared pool is the whole authorization for this provider. Neither an
@@ -114,7 +126,7 @@ export function resolveProviderCredential(
   // A pool member's credential is the connection's own. An environment key or a
   // profile key would name a different account, which is exactly what the pool
   // was declared to exclude.
-  if (pooled?.connection) {
+  if (pooled?.connection || boundConnection) {
     if (connectionAccountAuth && activeConnectionProfile?.authType === 'account-auth') {
       return { ...preference, provider, expectedEnvVarName, baseUrl, model,
         credential: { provider, authMode: 'account-auth', accountAuth: connectionAccountAuth, baseUrl, model,
@@ -131,7 +143,7 @@ export function resolveProviderCredential(
         credential: { provider, authMode: 'account-auth', accountAuth: connectionAccountAuth, baseUrl, model,
           source: 'connection', connectionId: activeConnectionProfile?.id, envVarName: expectedEnvVarName } };
     }
-    return { ...preference, provider, expectedEnvVarName, baseUrl, model, blocked: 'pool-unavailable' };
+    return { ...preference, provider, expectedEnvVarName, baseUrl, model, blocked: boundConnection ? 'connection-unavailable' : 'pool-unavailable' };
   }
 
   const cliApiKey = input.cliApiKey?.trim();
@@ -381,6 +393,8 @@ function vertexBaseUrlFromEnvironment(
 
 /** One place decides how a refused resolution is described to a person. */
 export function credentialBlockMessage(blocked: NonNullable<ProviderCredentialResolution['blocked']>): string {
+  if (blocked === 'connection-overridden') return 'Request overrides differ from the session-selected connection. Restart without the conflicting provider, endpoint or API key override.';
+  if (blocked === 'connection-unavailable') return 'The session-selected connection is unavailable. Open /model and select an available connection before sending.';
   if (blocked === 'pool-empty') return 'The account pool for this provider is empty; add a member connection or remove the pool before requests can be sent.';
   if (blocked === 'pool-unavailable') return 'No connection in the account pool has a usable credential; sign in to a pool member before requests can be sent.';
   return 'The selected connection requires independent login before requests can be sent.';

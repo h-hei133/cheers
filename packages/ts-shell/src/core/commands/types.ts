@@ -144,7 +144,7 @@ export interface CommandContext {
   /** Resolve the request provider using the host's explicit selection inputs. */
   readonly resolveConfigTarget?: (config: RuntimeConfig) => ProviderCredentialResolution
   /** Read the configuration and catalogue from one accepted publication. */
-  readonly readConfiguration?: () => { readonly config: RuntimeConfig; readonly catalog: readonly CatalogProvider[]; readonly binding?: import('../../config/state.js').ConfigBinding }
+  readonly readConfiguration?: () => { readonly config: RuntimeConfig; readonly catalog: readonly CatalogProvider[]; readonly revision?: number; readonly binding?: import('../../config/state.js').ConfigBinding }
   readonly admission?: () => string | undefined
   readonly refreshRuntimeConfig?: () => import('../../config/application.js').ConfigReloadResult
   /** Local transport/cursor/cache owners used by `/fresh`; transcript is never part of this port. */

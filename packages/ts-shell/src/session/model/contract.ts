@@ -14,6 +14,8 @@ export interface SessionModelPreset {
 /** A model preference contains no credential and applies only to its connection. */
 export interface SessionModelSelection {
   readonly connectionId: string;
+  /** Explicit connection choices override the profile default for this session. */
+  readonly connectionScope?: 'session';
   readonly provider: string;
   readonly model: string;
   readonly thinkingEffort?: ThinkingPreference;

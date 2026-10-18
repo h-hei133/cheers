@@ -8,8 +8,10 @@ import type { SessionModelPreset, SessionModelRole } from '../../../session/mode
 import { type RuntimeConfig } from '../../../config/runtimeConfig.js';
 import { sameValue } from '../../../config/values.js';
 import type { CommandContext } from '../types.js';
-import { setModel } from './selection.js';
-import { projectSessionModel } from '../../../session/model/projection.js';
+import { setModelTarget } from './selection.js';
+import { captureModelChoice } from './choice.js';
+import { projectModelSelection, projectSessionModel } from '../../../session/model/projection.js';
+import { resolveProviderCredential } from '../../shell/providerCredentials.js';
 import { connectionSnapshot } from './identity.js';
 import { deleteProfilePreset, ProfilePresetError, readProfilePresets, saveProfilePreset } from './presetStore.js';
 
@@ -32,6 +34,10 @@ export function validateModelPreset(roles: Readonly<Record<string, ModelPresetTa
     if (capability !== 'supported') return `Model preset refused: ${target.provider}/${target.model} reasoning effort ${target.thinkingEffort ?? 'auto'} is ${capability}.`;
     if (config && !config.providerConnections.some(connection => connection.id === target.connectionId
       && connection.provider === target.provider && connection.status === 'connected')) return `Model preset refused: connection '${target.connectionId}' is unavailable or belongs to a different provider.`;
+    if (config) {
+      const resolution = resolveProviderCredential({ runtimeConfig: projectModelSelection(config, { ...target, connectionScope: 'session' }) });
+      if (resolution.blocked || !resolution.credential) return `Model preset refused: connection '${target.connectionId}' has no usable credential.`;
+    }
   }
   return undefined;
 }
@@ -73,21 +79,16 @@ export async function applyModelPreset(sessionId: string, name: string, role = '
     const resolved = resolveModelPreset(sessionId, name);
     const preset = resolved?.preset;
     const target = preset?.roles[role];
-    if (!current || !preset || !target || !baseline.projectRoot) return `Model preset '${name}' role '${role}' was not found.`;
+    if (!preset || !target || !baseline.projectRoot) return `Model preset '${name}' role '${role}' was not found.`;
     const context: CommandContext = suppliedContext ?? { cwd: baseline.projectRoot, projectRoot: baseline.projectRoot, sessionId };
-    const config = context.readConfiguration?.().config ?? context.runtimeConfig ?? projectSessionModel(readFreshConfiguration(context), sessionId);
-    const catalog = context.readConfiguration?.().catalog ?? loadCatalog();
+    const choice = captureModelChoice({ ...context, sessionId });
+    const { config, catalog } = choice;
     const failure = validateModelPreset(preset.roles, config, catalog);
     if (failure) return failure;
-    if (config.activeProviderConnectionId !== target.connectionId) return `Model preset refused: select connection '${target.connectionId}' with /connect use before applying this role.`;
-    const unchanged = () => resolved.source === 'session'
-      ? sameValue(readSessionModel(sessionId)?.presets?.[name], preset)
-      : sameValue(readProfilePresets()[name], preset);
-    const admission = () => context.admission?.() ?? (!unchanged()
+    const unchanged = () => sameValue(resolveModelPreset(sessionId, name), resolved);
+    const admission = () => choice.admission() ?? (!unchanged()
       || validateModelPreset(preset.roles, readFreshConfiguration(context), loadCatalog()) ? 'Model preset changed or a role became unavailable.' : undefined);
-    // A bare model keeps the active connection, which is the connection just checked;
-    // a catalogue-id prefix would read as a provider switch for custom relays.
-    const output = await setModel([target.model], { ...context, sessionId, admission }, false, target.thinkingEffort ?? null);
+    const output = await setModelTarget(target, { ...context, sessionId, admission }, baseline);
     if (!output.includes(`Model switched to ${target.model}.`)) return output;
     const effective = projectSessionModel(readFreshConfiguration(context), sessionId);
     const selected = readSessionModel(sessionId);

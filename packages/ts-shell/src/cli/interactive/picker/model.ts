@@ -1,143 +1,137 @@
-import { projectSessionModel } from "../../../session/model/projection.js";
-import { runModelCommand } from "../../../core/commands/modelCommandRuntime.js";
+import { projectModelSelection, projectSessionModel } from "../../../session/model/projection.js";
 import { getRuntimeConfig } from "../../../config/runtimeConfig.js";
 import { loadCatalog } from "../../../core/models/catalogStore.js";
-import { availabilityLabel, availabilitySnapshot } from "../../../core/models/availability.js";
+import { availabilityLabel, availabilitySnapshot, type ConnectionAvailability } from "../../../core/models/availability.js";
+import { catalogModel, type CatalogProvider } from "../../../core/models/catalog.js";
+import { effortCapability } from "../../../core/models/capability.js";
 import { resolveProviderCredential } from "../../../core/shell/providerCredentials.js";
 import type { CommandContext } from "../../../core/commands/types.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
 import type { Picker, PickerOutcome } from "../overlay.js";
-import { applyModelPreset } from "../../../core/commands/model/preset.js";
+import { applyModelPreset, resolveModelPreset } from "../../../core/commands/model/preset.js";
 import { readProfilePresets } from "../../../core/commands/model/presetStore.js";
 import { readSessionModel } from "../../../session/model/state.js";
+import type { SessionModelRole } from "../../../session/model/contract.js";
+import { captureModelChoice } from "../../../core/commands/model/choice.js";
+import { setModelTarget } from "../../../core/commands/model/selection.js";
+import { currentModelPreference } from "../../../core/commands/model/preference.js";
+import { sameValue } from "../../../config/values.js";
 
-/**
- * Model chooser, grouped by provider.
- *
- * A model name is not an address: several providers serve the same names, at
- * different endpoints and different prices. So every row carries its provider, and
- * applying sends `<provider>/<model>` — a choice made here says exactly as much as
- * a choice typed, which is what keeps the two from diverging.
- *
- * A row is selectable only when `/model use` can actually apply it: a model of the
- * provider behind the active connection. Rows elsewhere stay visible, with the
- * reason they cannot be applied, because hiding them would make the catalogue look
- * smaller than it is.
- */
+/** Every actionable row retains its exact target and the inputs used to display it. */
 export function modelPicker(context: CommandContext): Picker {
   const details = new Map<string, readonly string[]>();
+  const actions = new Map<string, () => Promise<string>>();
   return {
     title: "Model",
     form: "panel",
     empty: "No providers in the catalogue.",
     async load(): Promise<readonly Option[]> {
+      details.clear(); actions.clear();
+      let choice: ReturnType<typeof captureModelChoice> | undefined;
+      try { choice = captureModelChoice(context); } catch { /* Read-only discovery still works without a saved session. */ }
       const publication = context.readConfiguration?.();
-      const config = publication?.config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
-      const catalog = publication?.catalog ?? loadCatalog();
+      const config = choice?.config ?? publication?.config ?? context.runtimeConfig ?? projectSessionModel(getRuntimeConfig(context.projectRoot ?? context.cwd), context.sessionId);
+      const catalog = choice?.catalog ?? publication?.catalog ?? loadCatalog();
       const active = context.resolveConfigTarget?.(config) ?? resolveProviderCredential({ runtimeConfig: config });
-      const projected = availabilitySnapshot({ config, catalog });
-      const availability = { ...projected, activeProvider: active.provider,
-        ...(active.model ? { activeModel: active.model } : {}) };
-      const activeProvider = availability.activeProvider;
-      const activeModel = availability.activeModel;
-      const providers = new Map(availability.providers.map(provider => [provider.provider, provider]));
-
+      const availability = availabilitySnapshot({ config, catalog });
+      const thinkingEffort = currentModelPreference(config, context.projectRoot ?? context.cwd).thinkingEffort ?? null;
       const rows: Option[] = [];
-      details.clear();
-      for (const provider of ordered(catalog, providers)) {
-        const entry = providers.get(provider.runtime);
-        const state = entry?.state ?? 'unknown';
-        const selectable = provider.runtime === activeProvider;
-        const endpoint = entry?.endpoint ? ` · ${entry.endpoint}` : '';
-        if (provider.models.length === 0) {
-          const id = `${provider.id}/`;
-          rows.push({
-            id,
-            label: provider.label,
-            detail: `${availabilityLabel(state)}${endpoint}`,
-            note: selectable ? "no models listed" : "switch connection first",
-            disabled: true,
-          });
-          details.set(id, modelDetails(provider.label, provider.runtime, entry, state, undefined, selectable));
-          continue;
-        }
-        for (const model of provider.models) {
-          const active = provider.runtime === activeProvider && model.id === activeModel;
-          const id = `${provider.id}/${model.id}`;
-          rows.push({
-            id,
-            label: model.id,
-            detail: `${provider.label}${model.contextWindow ? ` · ${Math.round(model.contextWindow / 1000)}k` : ""}${selectable ? endpoint : ""}`,
-            note: active ? "active" : selectable ? availabilityLabel(state) : "switch connection first",
-            ...(selectable ? {} : { disabled: true }),
-          });
-          details.set(id, modelDetails(provider.label, provider.runtime, entry, state, model.contextWindow, selectable));
+      const seen = new Set<string>();
+      const ordered = [...catalog].sort((left, right) => Number(!availability.providers.some(item => item.provider === left.runtime && item.state === 'ready'))
+        - Number(!availability.providers.some(item => item.provider === right.runtime && item.state === 'ready')));
+      for (const provider of ordered) {
+        const entry = availability.providers.find(item => item.provider === provider.runtime);
+        const connections = (entry?.connections ?? []).filter(connection => matchesCatalog(provider, connection, config.providerConnections));
+        for (const connection of connections.length ? connections : [undefined]) {
+          if (!provider.models.length) {
+            const id = rowId(connection?.connectionId, provider.id, '');
+            rows.push({ id, label: provider.label, detail: connection?.label ?? connection?.connectionId,
+              note: 'no models listed', disabled: true });
+            details.set(id, modelDetails(provider, connection));
+          }
+          for (const model of provider.models) {
+            const id = rowId(connection?.connectionId, provider.id, model.id);
+            if (seen.has(id)) continue;
+            seen.add(id);
+            const selected = Boolean(connection && connection.connectionId === config.activeProviderConnectionId
+              && provider.runtime === active.provider && model.id === active.model);
+            const unsupported = effortCapability(catalog, provider.runtime, model.id, thinkingEffort) === 'unsupported';
+            const candidate = connection ? projectModelSelection(config, { connectionScope: 'session', connectionId: connection.connectionId,
+              provider: connection.provider, model: model.id, thinkingEffort }) : undefined;
+            const resolution = candidate ? resolveProviderCredential({ runtimeConfig: candidate }) : undefined;
+            const reason = !connection ? 'configure a connection' : connection.state !== 'ready' ? availabilityLabel(connection.state)
+              : resolution?.blocked || !resolution?.credential ? 'connection credential unavailable'
+              : unsupported ? 'reasoning effort unsupported' : !choice?.baseline ? 'active session required' : undefined;
+            const metadata = catalogModel(catalog, provider.runtime, model.id);
+            rows.push({ id, label: model.id,
+              detail: [connection?.connectionId, connection?.label, provider.label, connection?.endpoint,
+                metadata?.contextWindow ? `${Math.round(metadata.contextWindow / 1000)}k` : undefined].filter(Boolean).join(' · '),
+              note: selected ? 'active' : reason ?? availabilityLabel(connection!.state),
+              ...(reason ? { disabled: true } : {}) });
+            const displayed = connection && (resolution?.blocked || !resolution?.credential)
+              ? { ...connection, state: 'credential-missing' as const, reason: 'This explicit connection needs its own credential.' } : connection;
+            details.set(id, [...modelDetails(provider, displayed), `Reasoning effort: ${thinkingEffort ?? 'auto'}`,
+              ...(metadata?.contextWindow ? [`Context: ${metadata.contextWindow} tokens`] : []), ...(reason ? [reason] : [])]);
+            if (!reason && connection && choice) {
+              const target: SessionModelRole = { connectionId: connection.connectionId, provider: connection.provider, model: model.id, thinkingEffort };
+              const captured = choice;
+              actions.set(id, async () => captured.admission() ?? setModelTarget(target,
+                { ...context, admission: captured.admission }, captured.baseline));
+            }
+          }
         }
       }
-      // Saved presets are separate rows: applying one resolves every role and
-      // then selects its default role, rather than treating the name as a model.
       if (context.sessionId) {
         try {
           const presets = { ...readProfilePresets(), ...(readSessionModel(context.sessionId)?.presets ?? {}) };
           for (const [name, preset] of Object.entries(presets)) {
-            const roles = Object.entries(preset.roles).map(([role, target]) => `${role}=${target.provider}/${target.model}`).join(", ");
-            rows.push({ id: `preset:${name}`, label: `Preset: ${name}`, detail: roles, note: "saved" });
+            const resolved = resolveModelPreset(context.sessionId, name);
+            for (const [role, target] of Object.entries(preset.roles)) {
+              const id = role === 'default' ? `preset:${name}` : `preset:${name}:${role}`;
+              rows.push({ id, label: `Preset: ${name}${role === 'default' ? '' : ` / ${role}`}`,
+                detail: `${target.connectionId} · ${target.provider}/${target.model}`, note: resolved?.source });
+              details.set(id, [`Preset: ${name}`, `Role: ${role}`, `Source: ${resolved?.source}`,
+                `Connection: ${target.connectionId}`, `Model: ${target.provider}/${target.model}`, `Reasoning effort: ${target.thinkingEffort ?? 'auto'}`]);
+              if (choice) {
+                const captured = choice;
+                actions.set(id, async () => {
+                  const admission = () => captured.admission() ?? (sameValue(resolveModelPreset(context.sessionId, name), resolved)
+                    ? undefined : 'Model preset changed. Reopen the model picker.');
+                  return admission() ?? applyModelPreset(context.sessionId!, name, role, { ...context, admission });
+                });
+              }
+            }
           }
         } catch {
-          rows.push({ id: "preset:unavailable", label: "Model presets unavailable", detail: "The preset library could not be read; models above are unaffected.", disabled: true });
+          rows.push({ id: "preset:unavailable", label: "Model presets unavailable", detail: "The preset library could not be read.", disabled: true });
         }
       }
       return rows;
     },
-    // The detail column keeps the row short while still saying which relay a
-    // same-named model belongs to and why an unavailable row cannot be used.
     detail: id => (id ? details.get(id) ?? [] : []),
     async apply(ids: readonly string[]): Promise<PickerOutcome | undefined> {
-      const chosen = ids[0];
-      if (!chosen) return undefined;
-      if (chosen.startsWith("preset:")) {
-        if (!context.sessionId) return { note: "Presets require a bound session." };
-        return { note: await applyModelPreset(context.sessionId, chosen.slice("preset:".length), "default", context) };
-      }
-      // A catalogue id is not always the runtime name (a custom relay is listed
-      // under its own id). `/model use` reads a leading known provider id as a
-      // provider switch, which is refused for a relay; a bare model keeps the
-      // active connection and is what the row actually means.
-      const separator = chosen.indexOf('/');
-      const entry = separator > 0 ? (context.readConfiguration?.().catalog ?? loadCatalog()).find(provider => provider.id === chosen.slice(0, separator)) : undefined;
-      const target = entry && entry.id !== entry.runtime ? chosen.slice(separator + 1) : chosen;
-      const result = await runModelCommand(["use", target], context);
-      return result.kind === "local" ? { note: result.output } : undefined;
+      if (!ids[0]) return undefined;
+      const action = actions.get(ids[0]);
+      return { note: action ? await action() : 'Model selection unavailable. Reopen the picker in an active session.' };
     },
   };
 }
 
-function modelDetails(
-  label: string,
-  runtime: string,
-  entry: { readonly endpoint?: string; readonly credential?: string; readonly connections?: readonly { readonly label?: string; readonly reason: string; readonly state: string }[] } | undefined,
-  state: string,
-  contextWindow: number | undefined,
-  selectable: boolean,
-): readonly string[] {
-  const lines = [`Provider: ${label} (${runtime})`];
-  if (entry?.endpoint) lines.push(`Endpoint: ${entry.endpoint}`);
-  if (contextWindow) lines.push(`Context: ${Math.round(contextWindow / 1000)}k tokens`);
-  lines.push(`Availability: ${availabilityLabel(state as never)}`);
-  if (entry?.credential) lines.push(`Credential: ${entry.credential}`);
-  const blocked = entry?.connections?.find(connection => connection.state !== 'ready');
-  if (blocked) lines.push(`${blocked.label ?? blocked.state}: ${blocked.reason}`);
-  if (!selectable) lines.push('Switch the active connection to select this model.');
-  return lines;
+function rowId(connection: string | undefined, provider: string, model: string): string {
+  return `model:${JSON.stringify([connection ?? null, provider, model])}`;
 }
 
-/** Providers whose credential resolves first; the rest keep the catalogue's own order. */
-function ordered<T extends { readonly runtime: string }>(
-  providers: readonly T[],
-  availability: ReadonlyMap<string, { readonly state: string }>,
-): T[] {
-  return [
-    ...providers.filter((provider) => availability.get(provider.runtime)?.state === 'ready'),
-    ...providers.filter((provider) => availability.get(provider.runtime)?.state !== 'ready'),
-  ];
+function modelDetails(provider: CatalogProvider, connection?: ConnectionAvailability): readonly string[] {
+  return [`Provider: ${provider.label} (${provider.runtime})`,
+    ...(connection ? [`Connection: ${connection.connectionId}`, ...(connection.endpoint ? [`Endpoint: ${connection.endpoint}`] : []),
+      `Availability: ${availabilityLabel(connection.state)}`, connection.reason] : ['Availability: configure a connection']),
+    'Remote availability: unverified'];
+}
+
+/** Canonical provider models work through relays; a relay-specific catalogue must match its address. */
+function matchesCatalog(provider: CatalogProvider, connection: ConnectionAvailability,
+  connections: readonly { readonly id: string; readonly baseUrl?: string }[]): boolean {
+  if (provider.id === provider.runtime) return true;
+  const baseUrl = connections.find(item => item.id === connection.connectionId)?.baseUrl;
+  return Boolean(baseUrl && provider.baseUrl && baseUrl.replace(/\/+$/, '') === provider.baseUrl.replace(/\/+$/, ''));
 }

@@ -13,7 +13,8 @@ const main: ProviderCredentialResolution = { provider: 'openai', model: 'primary
 it('resolves an exact connected connection and requested model rather than its configured model or main binding', () => {
   const connection = { id: 'review-connection', provider: 'openai' as const, status: 'connected' as const, authType: 'api-key' as const,
     apiKey: 'synthetic-connection-only', baseUrl: 'http://127.0.0.1:2/v1', model: 'configured-model', createdAt: '2026-10-01', updatedAt: '2026-10-01' };
-  const config = { ...getRuntimeConfig(), providerConnections: [connection], activeProviderConnectionId: connection.id, providerCredentials: {} };
+  const config = { ...getRuntimeConfig(), providerConnections: [connection], activeProviderConnectionId: 'main',
+    sessionConnection: { id: 'main', provider: 'openai' }, providerCredentials: {} };
   expect(delegatedTarget('review-connection/requested-model', main, config)).toMatchObject({ provider: 'openai', model: 'requested-model', baseUrl: connection.baseUrl,
     credential: { connectionId: connection.id, model: 'requested-model', source: 'connection', apiKey: connection.apiKey } });
 });

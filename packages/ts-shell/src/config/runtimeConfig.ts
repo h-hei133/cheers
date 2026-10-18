@@ -189,6 +189,8 @@ export interface RuntimeConfig {
   /** Dynamic discovery is the default; full is a diagnostic/parity mode. */
   readonly toolDiscovery: 'dynamic' | 'full';
   readonly activeProviderConnectionId?: string;
+  /** Session-owned target assertion, derived at publication and never persisted as configuration. */
+  readonly sessionConnection?: { readonly id: string; readonly provider: string };
   readonly providerConnections: readonly ProviderConnectionConfig[];
   /** Absent means no pool is declared and existing selection applies. */
   readonly accountPool?: AccountPool;
