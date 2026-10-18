@@ -34,7 +34,7 @@ summary: "本地可证明的 provider/connection 可用性事实、脱敏endpoin
 | 表面 | 行为 |
 |---|---|
 | `/model` 与 `/model list` | provider 行显示凭据事实；active 由 `activeProvider/activeModel` 判定 |
-| 模型选择器 | 按连接逐模型展示，行内优先显示 connection ID，详情列展示脱敏 endpoint；active 匹配实际请求的连接、模型、endpoint 和凭据；无匹配具名项时以只读行显示实际模型和凭据来源；有凭据的 provider 优先，pending/error/无自身凭据项保留原因；预设按具名角色提供选择 |
+| 模型选择器 | 按连接逐模型展示，行内优先显示 connection ID，详情列展示脱敏 endpoint；active 匹配实际请求的连接、模型、endpoint 和凭据；无匹配具名项时以只读行显示实际模型和凭据来源；有凭据的 provider 优先，pending/error/无自身凭据项保留原因；预设提供具名角色和整套应用 |
 | 连接选择器 | 每行显示 `active` 或投影状态及脱敏 endpoint |
 | `/model status` | readiness 行由投影的 pending/error/credential-missing 决定，再检查 base URL 与模型 |
 

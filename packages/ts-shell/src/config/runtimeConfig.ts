@@ -15,6 +15,7 @@ import type { ComposerShapeId } from '../presentation/tui/composer/contract.js';
 import type { ConfigInputs } from './inputs/model.js';
 import type { ConfigScopes } from './scope/model.js';
 import type { PathRule } from './scope/contract.js';
+import type { SessionModelPolicy } from '../session/model/contract.js';
 import { captureConfigScopes, scopeSettings } from './scope/capture.js';
 
 /**
@@ -191,6 +192,8 @@ export interface RuntimeConfig {
   readonly activeProviderConnectionId?: string;
   /** Session-owned target assertion, derived at publication and never persisted as configuration. */
   readonly sessionConnection?: { readonly id: string; readonly provider: string };
+  /** Runtime projection from the session; never a stored configuration field. */
+  readonly sessionModelRoles?: SessionModelPolicy;
   readonly providerConnections: readonly ProviderConnectionConfig[];
   /** Absent means no pool is declared and existing selection applies. */
   readonly accountPool?: AccountPool;

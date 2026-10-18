@@ -21,6 +21,7 @@ import { credentialIdentityFor } from '../../core/auth/account/pool.js';
 import type { ToolDiscovery } from '../../core/tools/discovery/state.js';
 import { scopeAdmission } from '../../config/scope/admission.js';
 import { mergeConfigValue } from '../../config/merge.js';
+import type { SessionModelRole } from '../../session/model/contract.js';
 
 export interface ProviderStepHost {
   readonly providerMode: 'synthetic' | 'real';
@@ -121,7 +122,7 @@ export function createProviderStep(
 /** Each explicit delegated model is resolved once; unavailable targets never use the main step. */
 export function delegatedSteps(request: ProviderStepHost, tools: ReadonlyMap<string, ToolDefinition>, context: SystemPromptContext,
   syntheticDefault?: StepFunction, discovery?: ToolDiscovery) {
-  return (model: string, admission?: () => string | undefined, effort?: ThinkingPreference, providerScope?: 'current', workspace = request.workspaceRoot): StepFunction => {
+  return (model: string | SessionModelRole, admission?: () => string | undefined, effort?: ThinkingPreference, providerScope?: 'current', workspace = request.workspaceRoot): StepFunction => {
     if (request.providerMode === 'synthetic') {
       if (!model && effort === undefined && syntheticDefault) return syntheticDefault;
       throw new Error('Independent model review is unavailable in synthetic provider mode.');
@@ -130,7 +131,7 @@ export function delegatedSteps(request: ProviderStepHost, tools: ReadonlyMap<str
     const scoped = request.runtimeConfig ? scopedRuntimeConfig(request.runtimeConfig, workspace) : undefined;
     const runtimeConfig = scoped && request.runtimeConfig?.allowedModels !== undefined ? { ...scoped,
       allowedModels: mergeConfigValue(request.runtimeConfig.allowedModels, scoped.allowedModels ?? request.runtimeConfig.allowedModels, 'intersect') as readonly string[] } : scoped;
-    const resolution = model ? providerScope === 'current'
+    const resolution = model ? providerScope === 'current' && typeof model === 'string'
       ? delegatedTarget(`${main.provider}/${model}`, main)
       : delegatedTarget(model, main, runtimeConfig) : main;
     const scopedAdmission = scopeAdmission(runtimeConfig?.configScopes, workspace);

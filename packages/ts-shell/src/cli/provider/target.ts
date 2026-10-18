@@ -1,14 +1,19 @@
 import { isRuntimeProvider, type RuntimeConfig } from '../../config/runtimeConfig.js';
 import { resolveProviderCredential, type ProviderCredentialResolution } from '../../core/shell/providerCredentials.js';
 import { providerFacts } from '../../core/providers/facts.js';
+import type { SessionModelRole } from '../../session/model/contract.js';
 
 /** An exact target names an existing connection or provider; a bare model stays on its captured provider. */
-export function delegatedTarget(target: string, main: ProviderCredentialResolution, config?: RuntimeConfig): ProviderCredentialResolution {
-  if (!target.trim() || target !== target.trim() || /[\s\x00-\x1f\x7f-\x9f]/.test(target) || target.length > 512) throw new Error('Delegated model target is invalid.');
-  const slash = target.indexOf('/'); const owner = slash < 0 ? main.provider : target.slice(0, slash);
-  const model = slash < 0 ? target : target.slice(slash + 1);
+export function delegatedTarget(target: string | SessionModelRole, main: ProviderCredentialResolution, config?: RuntimeConfig): ProviderCredentialResolution {
+  const text = typeof target === 'string' ? target : target.model;
+  if (!text.trim() || text !== text.trim() || /[\s\x00-\x1f\x7f-\x9f]/.test(text) || text.length > 512) throw new Error('Delegated model target is invalid.');
+  const slash = text.indexOf('/'); const owner = typeof target !== 'string' ? target.connectionId : slash < 0 ? main.provider : text.slice(0, slash);
+  const model = typeof target !== 'string' || slash < 0 ? text : text.slice(slash + 1);
   if (!model) throw new Error('Delegated model target is unavailable.');
-  const connection = config?.providerConnections.find(item => item.id === owner);
+  const matches = config?.providerConnections.filter(item => item.id === owner) ?? [];
+  if (matches.length > 1) throw new Error('Delegated connection is ambiguous.');
+  const connection = matches[0];
+  if (typeof target !== 'string' && (!connection || connection.provider !== target.provider)) throw new Error('Delegated role connection is unavailable.');
   let resolution: ProviderCredentialResolution;
   if (connection) {
     if (connection.status === 'pending' || connection.status === 'error') throw new Error('Delegated connection is unavailable.');

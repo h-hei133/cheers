@@ -17,6 +17,7 @@ export async function runModelPresetCommand(args: string[], context: CommandCont
   const sessionId = context.sessionId;
   const selection = sessionId ? readSessionModel(sessionId) : undefined;
   const action = parsed.action.name;
+  if (parsed.flags.has('all') && action !== 'apply') return { kind: 'local', output: '--all is only valid when applying a preset.' };
   if (action === 'status' || action === 'list') {
     try {
       const presets = listModelPresets(sessionId);
@@ -33,7 +34,8 @@ export async function runModelPresetCommand(args: string[], context: CommandCont
   }
   if (action === 'apply' || action === 'use') {
     if (!sessionId) return { kind: 'local', output: 'Applying a model preset requires an active session.' };
-    const output = await applyModelPreset(sessionId, name, parsed.args[1]?.trim() || 'default', context);
+    if (parsed.flags.has('all') && parsed.args[1]) return { kind: 'local', output: 'Use --all without an individual role.' };
+    const output = await applyModelPreset(sessionId, name, parsed.args[1]?.trim() || 'default', context, parsed.flags.has('all'));
     return { kind: 'local', output };
   }
   if (action === 'promote') return { kind: 'local', output: sessionId ? promoteModelPreset(sessionId, name, context) : 'Promoting a model preset requires an active session.' };

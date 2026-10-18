@@ -4,7 +4,7 @@ import { loadCatalog } from '../../models/catalogStore.js';
 import { catalogModel, type CatalogProvider } from '../../models/catalog.js';
 import { effortCapability } from '../../models/capability.js';
 import { readSessionModel, readSessionModelEdit, writeSessionModel } from '../../../session/model/state.js';
-import type { SessionModelPreset, SessionModelRole } from '../../../session/model/contract.js';
+import type { SessionModelPolicy, SessionModelPreset, SessionModelRole } from '../../../session/model/contract.js';
 import { type RuntimeConfig } from '../../../config/runtimeConfig.js';
 import { sameValue } from '../../../config/values.js';
 import type { CommandContext } from '../types.js';
@@ -13,6 +13,9 @@ import { captureModelChoice } from './choice.js';
 import { projectModelSelection, projectSessionModel } from '../../../session/model/projection.js';
 import { resolveProviderCredential } from '../../shell/providerCredentials.js';
 import { connectionSnapshot } from './identity.js';
+import { inspectConfigConstraints } from '../../../config/constraints.js';
+import { assertScopedModel } from '../../../config/scope/projection.js';
+import { providerFacts } from '../../providers/facts.js';
 import { deleteProfilePreset, ProfilePresetError, readProfilePresets, saveProfilePreset } from './presetStore.js';
 
 export interface ModelPresetTarget extends SessionModelRole {}
@@ -37,6 +40,11 @@ export function validateModelPreset(roles: Readonly<Record<string, ModelPresetTa
     if (config) {
       const resolution = resolveProviderCredential({ runtimeConfig: projectModelSelection(config, { ...target, connectionScope: 'session' }) });
       if (resolution.blocked || !resolution.credential) return `Model preset refused: connection '${target.connectionId}' has no usable credential.`;
+      const allowed = providerFacts(resolution.provider).accountAuthAllowedModels;
+      if (resolution.credential.authMode === 'account-auth' && allowed && !allowed.includes(target.model)) return `Model preset refused: role '${role}' is unavailable for this account binding.`;
+      try { assertScopedModel(config, resolution); } catch { return `Model preset refused: role '${role}' is outside the allowed model scope.`; }
+      const constraints = inspectConfigConstraints(config, target, catalog);
+      if (constraints.errors.length) return `Model preset refused: role '${role}': ${constraints.errors.join(' ')}`;
     }
   }
   return undefined;
@@ -71,13 +79,20 @@ export function resolveModelPreset(sessionId: string | undefined, name: string):
   return profile ? { preset: profile, source: 'profile' } : undefined;
 }
 
-/** One explicit apply: every role is validated, one role is selected in one session transaction. */
-export async function applyModelPreset(sessionId: string, name: string, role = 'default', suppliedContext?: CommandContext): Promise<string> {
+export function wholePresetFailure(preset: SessionModelPreset): string | undefined {
+  if (!preset.roles.default) return 'Whole preset application requires a default role.';
+  return Object.keys(preset.roles).some(name => name !== 'default' && name !== 'subagent')
+    ? 'Whole preset application supports default and subagent roles. Apply other named roles individually; they have no automatic consumer.' : undefined;
+}
+
+/** One explicit apply: the default and automatic role policy share the same session transaction. */
+export async function applyModelPreset(sessionId: string, name: string, role = 'default', suppliedContext?: CommandContext, whole = false): Promise<string> {
   try {
     const baseline = readSessionModelEdit(sessionId);
-    const current = baseline.selection;
     const resolved = resolveModelPreset(sessionId, name);
     const preset = resolved?.preset;
+    if (whole && preset && wholePresetFailure(preset)) return wholePresetFailure(preset)!;
+    if (whole && role !== 'default') return 'Whole preset application cannot select an individual role.';
     const target = preset?.roles[role];
     if (!preset || !target || !baseline.projectRoot) return `Model preset '${name}' role '${role}' was not found.`;
     const context: CommandContext = suppliedContext ?? { cwd: baseline.projectRoot, projectRoot: baseline.projectRoot, sessionId };
@@ -88,16 +103,18 @@ export async function applyModelPreset(sessionId: string, name: string, role = '
     const unchanged = () => sameValue(resolveModelPreset(sessionId, name), resolved);
     const admission = () => choice.admission() ?? (!unchanged()
       || validateModelPreset(preset.roles, readFreshConfiguration(context), loadCatalog()) ? 'Model preset changed or a role became unavailable.' : undefined);
-    const output = await setModelTarget(target, { ...context, sessionId, admission }, baseline);
+    const roles: SessionModelPolicy | undefined = whole ? (preset.roles.subagent ? { subagent: preset.roles.subagent } : {}) : undefined;
+    const output = await setModelTarget(target, { ...context, sessionId, admission }, baseline, roles);
     if (!output.includes(`Model switched to ${target.model}.`)) return output;
     const effective = projectSessionModel(readFreshConfiguration(context), sessionId);
     const selected = readSessionModel(sessionId);
     if (effective.activeProviderConnectionId !== target.connectionId || selected?.model !== target.model
       || selected.thinkingEffort !== (target.thinkingEffort ?? null)
+      || (whole && !sameValue(selected.roles, roles))
       || effective.providerConnections.find(connection => connection.id === target.connectionId)?.model !== target.model) {
       return 'Model preset application is unverified; inspect the effective model before sending.';
     }
-    return `Model preset '${name}' role '${role}' applied for this session from the ${resolved.source} owner.\n${output}`;
+    return `Model preset '${name}' ${whole ? 'all roles' : `role '${role}'`} applied for this session from the ${resolved.source} owner.\n${output}`;
   } catch (error) {
     return error instanceof ProfilePresetError ? error.message : 'Model preset application outcome is unverified; inspect the session before retrying.';
   }

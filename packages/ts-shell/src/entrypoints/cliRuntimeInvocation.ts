@@ -491,6 +491,7 @@ async function startTurn(
     commandEnv: commandEnvironmentFor(request),
     subagentHost: {
       step,
+      defaultModel: request.runtimeConfig?.sessionModelRoles?.subagent,
       defaultMaxSteps: SUBAGENT_DEFAULT_STEPS,
       stepForModel: (model, admission, effort, workspace) => forModel(model, admission, effort, undefined, workspace),
       retry: { enabled: request.runtimeConfig?.retryEnabled, maxRetries: request.runtimeConfig?.retryMaxRetries,

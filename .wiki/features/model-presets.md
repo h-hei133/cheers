@@ -30,6 +30,7 @@ profile 库文件形如 `{ "version": 1, "presets": { "<name>": { "roles": { …
 | `delete <name>` | 从 profile 库删除；返回 deleted 或 was not found |
 | `list` / `status` | 合并列出，标注 `[session]` / `[profile]`，同名时标注会话遮盖 profile |
 | `apply <name> [role]` | 先查会话，再查 profile；整项解析，不跨层拼角色；空会话可直接应用 profile 项 |
+| `apply <name> --all` | 一次 session 事务应用 `default` 和自动 `subagent` 策略；必须有 `default`，不接受无自动 consumer 的其他角色 |
 | `validate <name>` | 用同一解析顺序验证全部角色 |
 
 明确角色可用 `review=relay-b/model@high` 指定连接。连接 ID 的精确匹配优先于 provider 名；provider 名匹配多个连接时，只有当前 session 的 connection ID 和 provider 同时匹配才能消歧，否则要求明确连接。目录 alias 还需 runtime 与 endpoint 匹配，不选第一个同协议连接。模型 ID 中的后续 `/` 保留。
@@ -40,14 +41,16 @@ profile 库文件形如 `{ "version": 1, "presets": { "<name>": { "roles": { …
 
 同名时会话整项获胜；profile 的角色不会补进会话缺失的角色。删除 profile 条目后若会话仍有同名预设，应用继续使用会话条目。
 
-应用前验证每个角色：名称与目标形状、目录中真实模型、effort 能力、连接存在且 provider 一致且状态为 `connected`。任一角色失败则整个应用拒绝，不产生半更新。
+应用前验证每个角色：名称与目标形状、目录中真实模型、effort 能力、连接存在且 provider 一致且状态为 `connected`、自身凭据、账号允许模型、模型 scope 与请求预算约束。任一角色失败则整个应用拒绝，不产生半更新。
 
 选中的角色通过现有 `session/model/state.ts` 锁内事务写入 `connectionId/provider/model/effort`，只改当前会话，不写全局配置。目标连接可与当前连接不同；连接、模型和 effort 在同一次 session CAS 中提交，不需先修改全局 `/connect use`。空会话也可应用 profile 预设。任一角色缺少自身凭据、预设 owner/内容变化、session/config/catalog revision 变化或请求 override 改变目标时拒绝；已选择连接失效不会退回默认账号。
 
-角色名的消费者是显式的 `apply` 动作；后台 advisor、压缩、子代理不会因为某个角色名而自动换模型。角色名不会被解释为权限或自动请求授权。
+`apply --all` 同时保存默认目标与 `modelSelection.roles`。当前自动 consumer 是 `subagent`：普通子代理未明确指定模型时使用该角色的精确连接/模型/effort；定义中的显式模型优先，只有 effort 的定义覆盖角色 effort。子请求仍走现有 scope、权限、请求账本与预算；角色失效时失败，不回退主账号。工具结果报告选中的目标、effort 与来源，零发送失败不会伪称执行成功。
+
+整个预设重新应用会替换策略，未提供 `subagent` 时清除旧 assignment；个别角色应用或普通模型切换保留策略。删除/编辑预设库不会暗改已经应用的会话策略；再次应用才捕获新内容。策略随 session 恢复，经运行时配置投影传入下一次调用，不写入全局配置。角色名不会被解释为权限或自动请求授权。
 
 ## 4. 边界
 
 - 没有跨层角色合并、自动提升或默认写全局。
-- 模型面板已列出预设的各具名角色并可应用；角色编辑、完整角色策略的自动 consumer 仍未由本批闭合。账号池已有实现，其完整裁决另行复核。
+- 模型面板提供各具名角色及整套应用；任意自定义名字继续支持个别应用。`summary`、advisor 等自动 consumer 尚未接通，不能以 `--all` 保存无人消费的策略；完整角色策略仍开放。账号池已有实现，其完整裁决另行复核。
 - 已验证：保存/列表/删除、会话遮盖、提升、profile 应用、损坏库报错；未运行真实 provider 或跨平台动态证据。

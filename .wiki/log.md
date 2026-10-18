@@ -7744,3 +7744,15 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 完整受影响域 76 文件/1052 测试通过；首次运行一条旧 accepted-picker 夹具无自身 key、借用了宿主环境，已补明确合成 key 并清空环境 key，保留原 accepted 与 pending 身份断言。最终显示顺序修改后 4 文件/69 项通过。测试加载时仅恢复旧 model picker，27 项中 5 项失败、22 项通过，工作区源文件不变。
 - 两构建通过；Node/exe × regular/fullscreen 四格隔离 Linux PTY 全通过：显示当前 env 凭据来源，选择 relay B，随后本机 HTTP fixture 收到 B 的路径/模型/自身合成凭据；全局配置不变、退出 0。首轮 PTY 因紧凑列截断凭据来源失败，调整来源显示顺序后四格通过。没有访问真实 provider 配置或服务。
 - cycles/config consumers/declarations/Node floor 通过；NormProof 退出 0、verdict partial，仍有既有函数上限 advisory，触及 owner 没有新增函数。提交/推送及新 SHA CI 待本条记录后的实际结果；完整角色策略、无连接精确选择、目录同名能力及其余 Phase 20 仍开放。
+
+### PRV-02 整套预设与自动子代理角色
+
+- 当前请求显示修复已提交并推送为 `d40f3fdcbadd603924cce44373a59e99a40a43ec`，CI `39098179492` 与 Architecture Watch `39098179387` 均 success。前两批 CI `39096940454`、`39097452989` 均因相同的两个旧菜单测试失败，未称为通过。
+- `/modelpreset apply <name> --all` 与模型面板的整套条目将 default 和自动角色策略放进同一次 session CAS；要求 default，当前支持 subagent，其他角色仍可个别应用但不冒充自动 consumer。策略随会话恢复，整套替换清除缺席角色，普通模型切换和个别角色应用保留策略；修改或删除预设库不追溯改变已应用策略。模型面板使用独立条目 ID，避免与名为 all 的手动角色混淆。
+- 真实子代理宿主在派发时消费精确 connection/provider/model/effort 对象，保留模型 ID 中的斜线；明确 definition.model 优先，只有 effort 的 definition 覆盖角色 effort。删除、重复或复用为另一 provider 的连接拒绝，scope 与请求账本继续沿原消费者。task 返回请求模型、effort 与来源，避免把角色 B/high 误报成父模型继承；该事实不把失败改成已发送或成功。
+- 应用前逐角色核查账号可用模型、scope 和请求预算约束；持久化前失败及发布后抛错保持原有 unknown/unverified 结果，不产生半套角色。参考取舍：同意整套替换时清除未列出的映射；本项目仍使用一次 session CAS，不采用先改 global 再切 live 的顺序。没有另建请求引擎、凭据库或策略持久层。
+- 最终受影响集 25 文件/312 测试通过；真实 invocation → task → 子代理 → 本机 HTTP 测试断言 A/low → B/high → A/low、实际返回的角色报告及共享账本 12 input/3 output。去掉真实宿主角色消费后 6 项中 5 失败；去掉角色状态写入后 10 项中 4 失败。两项反转均仅在测试加载阶段替换，不改工作区源。
+- 代码复核先指出 task 错报继承，修复并补 HTTP 返回报告断言后 APPROVE，独立 6 文件/67 项通过；架构最终 CLEAR，独立 3 文件/25 项通过，确认结果合同、失败边界及函数上限。类型诊断与 `d40f3fdc` 比较为 149/149、无新增，不能称全项目 tsc 通过。
+- 两构建通过，TS manifest `265d99cd46ed`。隔离 Linux PTY Node/exe × regular/fullscreen 四格通过：空会话保存 profile 预设、validate、整套 apply、真实任务预览/一次性批准、A/low → B/high → A/low、全局配置字节不变与退出 0。首轮夹具遗漏交互批准，停在审批预览；补齐审批操作后四格通过，没有绕开产品审批或访问真实账号。
+- cycles、config consumers（53/53）、declarations、Node floor、strict docs drift、diff 检查通过；docs 保留 118 条既有非阻断引用提示。NormProof 退出 0，导入/无环 satisfied，总 verdict partial，仍为同一组 9 个函数上限 advisory，本批未新增越界。
+- 本条记录时尚未提交/推送此批，新 SHA CI 后续读回。摘要和 advisor 自动角色、无具名连接的精确选择、目录同名能力及其余全部 47 项仍在原范围内；本批不是完整 PRV-02 或 Phase 20 完成声明。

@@ -6,6 +6,7 @@ import { AgentMemoryManager } from "../subagents/agentMemoryManager.js";
 import { defaultHookDispatcher } from "../hooks/hookDispatcher.js";
 import { projectTrust } from "../security/projectTrust.js";
 import { bindRole } from '../subagents/admission.js';
+import type { SubagentRunResult } from '../subagents/runner.js';
 
 /**
  * /task & /agent tool
@@ -84,6 +85,7 @@ export function createTaskToolDefinition(
       let subagentFailure = "";
       let allowedTools: readonly string[] = [];
       let stepsTaken = 0;
+      let modelSelection: SubagentRunResult['selection'];
       let startAttempted = false;
       const fail = (message: string): void => {
         subagentFailure = [subagentFailure, message.trim() || "the subagent failed"].filter(Boolean).join("; ");
@@ -133,6 +135,7 @@ export function createTaskToolDefinition(
             : result.agentMode === "build" ? "BUILD (Standard)" : "not reported by runner";
           allowedTools = result.allowedTools;
           stepsTaken = result.steps;
+          modelSelection = result.selection;
           if (result.failed) fail(result.failure || "the subagent failed");
           else if (!result.text.trim()) fail("the subagent returned no answer");
           if (role.admission()) fail('Agent definition changed during the task; returned work is partial.');
@@ -165,12 +168,14 @@ export function createTaskToolDefinition(
         role.close();
       }
 
+      const requestedEffort = modelSelection?.effort !== undefined ? modelSelection.effort : subagentDef?.effort;
       const lines: string[] = [
         `# 🤖 Subagent Task ${subagentFailure ? "Failed" : "Completed"} (\`${subtaskId}\`)`, "",
         `- **Agent Type**: \`${agentType}\` (${subagentDef?.source || "dynamic"})`,
         `- **Description**: ${description}`, `- **Mode**: \`${mode}\``,
-        `- **Requested model**: ${subagentDef?.model ?? 'inherited from parent'}`,
-        `- **Requested effort**: ${subagentDef?.effort === null ? 'provider default' : subagentDef?.effort ?? 'inherited from parent'} (selected-model capability is checked at dispatch; unknown capability remains unverified)`,
+        `- **Requested model**: ${modelSelection?.model ?? subagentDef?.model ?? 'session default'}`,
+        `- **Requested effort**: ${requestedEffort === null ? 'provider default' : requestedEffort ?? 'session default'} (selected-model capability is checked at dispatch; unknown capability remains unverified)`,
+        ...(modelSelection ? [`- **Model source**: ${modelSelection.source === 'session-role' ? 'session role' : modelSelection.source}`] : []),
         `- **Filesystem Isolation**: \`${allocated ? `Git Worktree (${effectiveWorkspace})` : shouldIsolate ? "not established" : "Shared Workspace"}\``,
         ...(release ? [`- **Worktree cleanup**: ${release.outcome}`] : []),
         ...(contextStr ? [`- **Context Attached**: ${contextStr}`] : []),

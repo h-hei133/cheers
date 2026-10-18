@@ -7,7 +7,7 @@ import { sameValue } from '../../config/values.js';
 import { SessionModelWriteError, type ModelWriteState } from './outcome.js';
 
 import { isThinkingPreference, type ThinkingPreference } from '../../core/models/effort.js';
-import type { SessionModelPreset, SessionModelRole, SessionModelSelection } from "./contract.js";
+import type { SessionModelPolicy, SessionModelPreset, SessionModelRole, SessionModelSelection } from "./contract.js";
 
 export function decodeSessionModel(value: unknown): SessionModelSelection | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
@@ -19,10 +19,29 @@ export function decodeSessionModel(value: unknown): SessionModelSelection | unde
   if (serviceTier !== undefined && (typeof serviceTier !== 'string' || serviceTier.trim().length === 0 || serviceTier.length > 64)) return undefined;
   const presets = decodePresets(candidate.presets);
   if (candidate.presets !== undefined && !presets) return undefined;
+  const roles = decodePolicy(candidate.roles);
+  if (candidate.roles !== undefined && !roles) return undefined;
   if (candidate.skillful !== undefined && typeof candidate.skillful !== 'boolean') return undefined;
   const contextWindow = candidate.contextWindow;
   if (contextWindow !== undefined && (!Number.isSafeInteger(contextWindow) || (contextWindow as number) < 1)) return undefined;
-  return { ...(candidate.connectionScope === 'session' ? { connectionScope: 'session' as const } : {}), ...(candidate.thinkingEffort !== undefined ? { thinkingEffort: candidate.thinkingEffort as ThinkingPreference } : {}), ...(serviceTier !== undefined ? { serviceTier: (serviceTier as string).trim() } : {}), ...(presets ? { presets } : {}), ...(candidate.skillful !== undefined ? { skillful: candidate.skillful as boolean } : {}), ...(contextWindow !== undefined ? { contextWindow: contextWindow as number } : {}), connectionId: (candidate.connectionId as string).trim(), provider: (candidate.provider as string).trim(), model: (candidate.model as string).trim() };
+  return { ...(roles ? { roles } : {}), ...(candidate.connectionScope === 'session' ? { connectionScope: 'session' as const } : {}), ...(candidate.thinkingEffort !== undefined ? { thinkingEffort: candidate.thinkingEffort as ThinkingPreference } : {}), ...(serviceTier !== undefined ? { serviceTier: (serviceTier as string).trim() } : {}), ...(presets ? { presets } : {}), ...(candidate.skillful !== undefined ? { skillful: candidate.skillful as boolean } : {}), ...(contextWindow !== undefined ? { contextWindow: contextWindow as number } : {}), connectionId: (candidate.connectionId as string).trim(), provider: (candidate.provider as string).trim(), model: (candidate.model as string).trim() };
+}
+
+function decodeRole(value: unknown): SessionModelRole | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const item = value as Record<string, unknown>;
+  if (![item.connectionId, item.provider, item.model].every(field => typeof field === 'string' && field.trim())
+    || (item.thinkingEffort !== undefined && !isThinkingPreference(item.thinkingEffort))) return undefined;
+  return { connectionId: (item.connectionId as string).trim(), provider: (item.provider as string).trim(), model: (item.model as string).trim(),
+    ...(item.thinkingEffort !== undefined ? { thinkingEffort: item.thinkingEffort as ThinkingPreference } : {}) };
+}
+
+function decodePolicy(value: unknown): SessionModelPolicy | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => key !== 'subagent')) return undefined;
+  const raw = value as Record<string, unknown>;
+  if (!Object.hasOwn(raw, 'subagent')) return {};
+  const subagent = decodeRole(raw.subagent);
+  return subagent ? { subagent } : undefined;
 }
 
 /** Shared with the profile library so both owners accept exactly the same shape. */
@@ -37,12 +56,9 @@ export function decodePresets(value: unknown): Readonly<Record<string, SessionMo
     if (!roles || typeof roles !== 'object' || Array.isArray(roles) || Object.keys(roles).length > 16) return undefined;
     const normalized: Record<string, SessionModelRole> = {};
     for (const [role, target] of Object.entries(roles)) {
-      const item = target as Record<string, unknown>;
-      if (!/^[a-zA-Z0-9._-]{1,64}$/.test(role) || ['__proto__', 'constructor', 'prototype'].includes(role) || !item || typeof item !== 'object' || Array.isArray(item)
-        || typeof item.connectionId !== 'string' || typeof item.provider !== 'string' || typeof item.model !== 'string'
-        || !item.connectionId.trim() || !item.provider.trim() || !item.model.trim()
-        || (item.thinkingEffort !== undefined && !isThinkingPreference(item.thinkingEffort))) return undefined;
-      normalized[role] = { connectionId: item.connectionId.trim(), provider: item.provider.trim(), model: item.model.trim(), ...(item.thinkingEffort !== undefined ? { thinkingEffort: item.thinkingEffort as ThinkingPreference } : {}) };
+      const item = decodeRole(target);
+      if (!/^[a-zA-Z0-9._-]{1,64}$/.test(role) || ['__proto__', 'constructor', 'prototype'].includes(role) || !item) return undefined;
+      normalized[role] = item;
     }
     if (Object.keys(normalized).length === 0) return undefined;
     result[name] = { roles: normalized };

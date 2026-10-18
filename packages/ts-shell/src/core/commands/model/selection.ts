@@ -4,7 +4,7 @@ import { ConfigWriteError } from '../../../config/outcome.js';
 import { inspectConfigConstraints } from '../../../config/constraints.js';
 import { sameValue } from '../../../config/values.js';
 import { projectModelSelection, projectSessionModel } from '../../../session/model/projection.js';
-import type { SessionModelRole } from '../../../session/model/contract.js';
+import type { SessionModelPolicy, SessionModelRole } from '../../../session/model/contract.js';
 import { readSessionModelEdit, writeSessionModel, type SessionModelEdit, type SessionModelReceipt } from '../../../session/model/state.js';
 import { SessionModelWriteError } from '../../../session/model/outcome.js';
 import { defaultHookDispatcher } from '../../hooks/hookDispatcher.js';
@@ -23,11 +23,11 @@ import { connectionIdentity, credentialIdentity } from './identity.js';
 import { invalidatePromptMeasurement } from '../../../observability/usageTelemetry.js';
 import { resolveProviderCredential } from '../../shell/providerCredentials.js';
 
-interface ExactSelection { readonly target: SessionModelRole; readonly baseline?: SessionModelEdit }
+interface ExactSelection { readonly target: SessionModelRole; readonly baseline?: SessionModelEdit; readonly roles?: SessionModelPolicy }
 
 /** Pickers and presets pass an exact address, never a label to parse again. */
-export async function setModelTarget(target: SessionModelRole, context: CommandContext, baseline?: SessionModelEdit): Promise<string> {
-  try { return await selectModel([], context, false, target.thinkingEffort ?? null, { target, baseline }); }
+export async function setModelTarget(target: SessionModelRole, context: CommandContext, baseline?: SessionModelEdit, roles?: SessionModelPolicy): Promise<string> {
+  try { return await selectModel([], context, false, target.thinkingEffort ?? null, { target, baseline, roles }); }
   catch { return 'Model selection outcome is unverified. Inspect saved session preferences before retrying.'; }
 }
 
@@ -180,6 +180,7 @@ async function selectModel(args: string[], context: CommandContext, global: bool
     },
   };
   let receipt: SessionModelReceipt | undefined;
+  const roles = exact?.roles ?? sessionEdit?.selection?.roles;
   if (context.sessionId) {
     try {
       receipt = writeSessionModel(context.sessionId, {
@@ -192,6 +193,7 @@ async function selectModel(args: string[], context: CommandContext, global: bool
         // them when switching the active target; a switch must not silently
         // delete resume-scoped controls.
         ...(sessionEdit?.selection?.presets ? { presets: sessionEdit.selection.presets } : {}),
+        ...(roles ? { roles } : {}),
         // Skill listing is a session control and follows the session across
         // model changes. Service tier and context window are model-specific;
         // omitting them makes the new model resolve its own defaults.

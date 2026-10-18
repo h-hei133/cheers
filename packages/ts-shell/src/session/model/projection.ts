@@ -3,7 +3,7 @@ import { readSessionModel } from "./state.js";
 import { sessionModelOrigins } from '../../config/provenance/projection.js';
 import type { SessionModelSelection } from './contract.js';
 
-type ModelConfig = Partial<Pick<RuntimeConfig, "provider" | "activeProviderConnectionId" | "sessionConnection" | "providerConnections" | "providerCredentials" | "configProvenance" | "contextWindow">>;
+type ModelConfig = Partial<Pick<RuntimeConfig, "provider" | "activeProviderConnectionId" | "sessionConnection" | "sessionModelRoles" | "providerConnections" | "providerCredentials" | "configProvenance" | "contextWindow">>;
 
 /** Overlay a session preference without mutating shared defaults or credentials. */
 export function projectSessionModel<T extends ModelConfig>(config: T, sessionId?: string): T {
@@ -21,6 +21,7 @@ export function projectModelSelection<T extends ModelConfig>(config: T, selectio
   return {
     ...config,
     ...binding,
+    ...(selection.roles ? { sessionModelRoles: selection.roles } : {}),
     ...(selection.connectionScope === 'session' ? { provider: connection.provider } : {}),
     ...(selection.contextWindow !== undefined ? { contextWindow: selection.contextWindow } : {}),
     ...(config.configProvenance ? { configProvenance: sessionModelOrigins(config.configProvenance, config.providerConnections!.indexOf(connection), selection.provider, selection.thinkingEffort !== undefined, selection.connectionScope === 'session') } : {}),

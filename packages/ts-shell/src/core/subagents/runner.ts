@@ -69,6 +69,8 @@ export interface SubagentRunInput {
 export type SubagentRunner = (input: SubagentRunInput) => Promise<SubagentRunResult>;
 
 export interface SubagentRunResult {
+  /** Non-secret selection made by the request host, including an automatic session role. */
+  readonly selection?: { readonly model?: string; readonly effort?: import('../models/effort.js').ThinkingPreference; readonly source: 'definition' | 'session-role' | 'parent' };
   /** Final answer separately from intermediate narration. */
   readonly finalText?: string;
   /** Set by the host that built the actual tool gate; absent for unbound runners. */

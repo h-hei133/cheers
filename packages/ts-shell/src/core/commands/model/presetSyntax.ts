@@ -6,6 +6,7 @@ export const modelPresetSyntax: CommandSyntax = {
   defaultAction: 'status',
   flags: [
     { name: 'profile', kind: 'boolean', summary: 'save into the profile library instead of this session' },
+    { name: 'all', kind: 'boolean', summary: 'apply default and subagent roles together; omitted assignments are cleared' },
   ],
   actions: [
     { name: 'status', aliases: ['list'], summary: 'show saved session model presets' },
@@ -20,7 +21,7 @@ export const modelPresetSyntax: CommandSyntax = {
     {
       name: 'apply',
       aliases: ['use'],
-      summary: 'apply one role from a saved preset',
+      summary: 'apply one role, or all supported roles with --all',
       parameters: [
         { name: 'name', kind: 'text', required: true },
         { name: 'role', kind: 'text' },

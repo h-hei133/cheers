@@ -8,7 +8,7 @@ import { resolveProviderCredential } from "../../../core/shell/providerCredentia
 import type { CommandContext } from "../../../core/commands/types.js";
 import type { Option } from "../../../presentation/tui/chrome/options.js";
 import type { Picker, PickerOutcome } from "../overlay.js";
-import { applyModelPreset, resolveModelPreset } from "../../../core/commands/model/preset.js";
+import { applyModelPreset, resolveModelPreset, wholePresetFailure } from "../../../core/commands/model/preset.js";
 import { readProfilePresets } from "../../../core/commands/model/presetStore.js";
 import { readSessionModel } from "../../../session/model/state.js";
 import type { SessionModelRole } from "../../../session/model/contract.js";
@@ -99,6 +99,20 @@ export function modelPicker(context: CommandContext): Picker {
           const presets = { ...readProfilePresets(), ...(readSessionModel(context.sessionId)?.presets ?? {}) };
           for (const [name, preset] of Object.entries(presets)) {
             const resolved = resolveModelPreset(context.sessionId, name);
+            const allId = `preset-all:${name}`;
+            const failure = wholePresetFailure(preset);
+            rows.push({ id: allId, label: `Preset: ${name} / all`, detail: 'Default and automatic subagent model', note: failure ?? resolved?.source,
+              ...(failure || !choice ? { disabled: true } : {}) });
+            details.set(allId, [failure ?? 'Apply all supported roles in one session update.',
+              ...Object.entries(preset.roles).map(([role, target]) => `${role}: ${target.connectionId} · ${target.provider}/${target.model} · ${target.thinkingEffort ?? 'auto'}`)]);
+            if (!failure && choice) {
+              const captured = choice;
+              actions.set(allId, async () => {
+                const admission = () => captured.admission() ?? (sameValue(resolveModelPreset(context.sessionId, name), resolved)
+                  ? undefined : 'Model preset changed. Reopen the model picker.');
+                return admission() ?? applyModelPreset(context.sessionId!, name, 'default', { ...context, admission }, true);
+              });
+            }
             for (const [role, target] of Object.entries(preset.roles)) {
               const id = role === 'default' ? `preset:${name}` : `preset:${name}:${role}`;
               rows.push({ id, label: `Preset: ${name}${role === 'default' ? '' : ` / ${role}`}`,
