@@ -37,7 +37,10 @@ function snapshot(workspaceRoot: string, selected: ProviderCredentialResolution)
     throw new ConfigWriteError('conflict', 'unchanged');
   }
   const selectedId = selected.selection?.connectionId;
-  const target = selectedId ? { ...config, activeProviderConnectionId: selectedId,
+  const target = selected.selection?.credentialScope === 'provider'
+    ? { ...config, provider: selected.provider, activeProviderConnectionId: undefined,
+      sessionConnection: { scope: 'provider' as const, provider: selected.provider } }
+    : selectedId ? { ...config, activeProviderConnectionId: selectedId,
     sessionConnection: { id: selectedId, provider: selected.provider } } : config;
   const resolution = resolveProviderCredential({ runtimeConfig: target,
     cliProvider: selected.selection?.provider, cliBaseUrl: selected.selection?.baseUrl });

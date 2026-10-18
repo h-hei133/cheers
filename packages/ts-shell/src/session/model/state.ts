@@ -12,9 +12,12 @@ import type { SessionModelPolicy, SessionModelPreset, SessionModelRole, SessionM
 export function decodeSessionModel(value: unknown): SessionModelSelection | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const candidate = value as Record<string, unknown>;
-  if (![candidate.connectionId, candidate.provider, candidate.model].every(item => typeof item === "string" && item.trim().length > 0)) return undefined;
+  if (![candidate.provider, candidate.model].every(item => typeof item === "string" && item.trim().length > 0)) return undefined;
+  if (candidate.connectionScope === 'provider'
+    ? candidate.connectionId !== undefined
+    : typeof candidate.connectionId !== 'string' || !candidate.connectionId.trim()) return undefined;
   if (Object.hasOwn(candidate, 'thinkingEffort') && !isThinkingPreference(candidate.thinkingEffort)) return undefined;
-  if (candidate.connectionScope !== undefined && candidate.connectionScope !== 'session') return undefined;
+  if (candidate.connectionScope !== undefined && candidate.connectionScope !== 'session' && candidate.connectionScope !== 'provider') return undefined;
   const serviceTier = candidate.serviceTier;
   if (serviceTier !== undefined && (typeof serviceTier !== 'string' || serviceTier.trim().length === 0 || serviceTier.length > 64)) return undefined;
   const presets = decodePresets(candidate.presets);
@@ -24,7 +27,9 @@ export function decodeSessionModel(value: unknown): SessionModelSelection | unde
   if (candidate.skillful !== undefined && typeof candidate.skillful !== 'boolean') return undefined;
   const contextWindow = candidate.contextWindow;
   if (contextWindow !== undefined && (!Number.isSafeInteger(contextWindow) || (contextWindow as number) < 1)) return undefined;
-  return { ...(roles ? { roles } : {}), ...(candidate.connectionScope === 'session' ? { connectionScope: 'session' as const } : {}), ...(candidate.thinkingEffort !== undefined ? { thinkingEffort: candidate.thinkingEffort as ThinkingPreference } : {}), ...(serviceTier !== undefined ? { serviceTier: (serviceTier as string).trim() } : {}), ...(presets ? { presets } : {}), ...(candidate.skillful !== undefined ? { skillful: candidate.skillful as boolean } : {}), ...(contextWindow !== undefined ? { contextWindow: contextWindow as number } : {}), connectionId: (candidate.connectionId as string).trim(), provider: (candidate.provider as string).trim(), model: (candidate.model as string).trim() };
+  const address = candidate.connectionScope === 'provider' ? { connectionScope: 'provider' as const }
+    : { connectionId: (candidate.connectionId as string).trim(), ...(candidate.connectionScope === 'session' ? { connectionScope: 'session' as const } : {}) };
+  return { ...address, ...(roles ? { roles } : {}), ...(candidate.thinkingEffort !== undefined ? { thinkingEffort: candidate.thinkingEffort as ThinkingPreference } : {}), ...(serviceTier !== undefined ? { serviceTier: (serviceTier as string).trim() } : {}), ...(presets ? { presets } : {}), ...(candidate.skillful !== undefined ? { skillful: candidate.skillful as boolean } : {}), ...(contextWindow !== undefined ? { contextWindow: contextWindow as number } : {}), provider: (candidate.provider as string).trim(), model: (candidate.model as string).trim() };
 }
 
 function decodeRole(value: unknown): SessionModelRole | undefined {

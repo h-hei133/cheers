@@ -183,10 +183,11 @@ it.each(['env', 'cli'] as const)('shows an active %s request without attributing
   const before = readSessionModelEdit(sessionId); const global = fs.readFileSync(getUserRuntimeConfigPath());
   const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('unexpected probe'));
   const rows = await picker.load();
-  expect(rows.filter(row => row.note === 'active')).toEqual([expect.objectContaining({ id: 'model:current', label: 'shared', disabled: true })]);
-  expect(picker.detail?.('model:current')).toContain(`Credential source: ${source}`);
-  expect(JSON.stringify([rows, picker.detail?.('model:current')])).not.toMatch(/synthetic-(?:env|cli|user|password|query|fragment)/);
-  if (source === 'cli') expect(picker.detail?.('model:current')).toContain('Endpoint: override.invalid/v1');
+  const activeId = source === 'cli' ? `model:${JSON.stringify([null, 'openai', 'shared'])}` : 'model:current';
+  expect(rows.filter(row => row.note === 'active')).toEqual([expect.objectContaining({ id: activeId, label: 'shared' })]);
+  expect(picker.detail?.(activeId)).toContain(`Credential source: ${source}`);
+  expect(JSON.stringify([rows, picker.detail?.(activeId)])).not.toMatch(/synthetic-(?:env|cli|user|password|query|fragment)/);
+  if (source === 'cli') expect(picker.detail?.(activeId)).toContain('Endpoint: override.invalid/v1');
   expect((await picker.apply(['model:current']))?.note).toContain('unavailable');
   expect(readSessionModelEdit(sessionId)).toEqual(before); expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global);
   expect(fetch).not.toHaveBeenCalled();

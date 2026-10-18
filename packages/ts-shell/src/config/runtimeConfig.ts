@@ -191,7 +191,8 @@ export interface RuntimeConfig {
   readonly toolDiscovery: 'dynamic' | 'full';
   readonly activeProviderConnectionId?: string;
   /** Session-owned target assertion, derived at publication and never persisted as configuration. */
-  readonly sessionConnection?: { readonly id: string; readonly provider: string };
+  readonly sessionConnection?: { readonly id: string; readonly provider: string; readonly scope?: never }
+    | { readonly scope: 'provider'; readonly provider: string; readonly id?: never };
   /** Runtime projection from the session; never a stored configuration field. */
   readonly sessionModelRoles?: SessionModelPolicy;
   readonly providerConnections: readonly ProviderConnectionConfig[];

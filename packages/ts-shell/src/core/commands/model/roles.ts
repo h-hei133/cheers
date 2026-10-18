@@ -4,7 +4,7 @@ import type { RuntimeConfig, ProviderConnectionConfig } from '../../../config/ru
 import { loadCatalog } from '../../models/catalogStore.js';
 import type { CatalogProvider } from '../../models/catalog.js';
 import { isThinkingPreference, type ThinkingPreference } from '../../models/effort.js';
-import type { SessionModelRole } from '../../../session/model/contract.js';
+import type { SessionModelRole, SessionModelTarget } from '../../../session/model/contract.js';
 import { validPresetName } from './preset.js';
 
 export type RoleParseResult =
@@ -12,9 +12,9 @@ export type RoleParseResult =
   | { readonly ok: false; readonly reason: string };
 
 /** A named connection wins over a provider name; provider-only choices must be unambiguous. */
-export function parsePresetRoles(context: CommandContext, selection: SessionModelRole | undefined, specs: readonly string[]): RoleParseResult {
-  if (!specs.length) return selection ? { ok: true, roles: { default: selection } }
-    : { ok: false, reason: 'Select a model first, or supply explicit role=connection/model[@effort] targets.' };
+export function parsePresetRoles(context: CommandContext, selection: SessionModelTarget | undefined, specs: readonly string[]): RoleParseResult {
+  if (!specs.length) return selection?.connectionId !== undefined ? { ok: true, roles: { default: { ...selection, connectionId: selection.connectionId } } }
+    : { ok: false, reason: 'Preset roles require a named connection. Select one first, or supply explicit role=connection/model[@effort] targets.' };
   const publication = context.readConfiguration?.();
   const config = publication?.config ?? context.runtimeConfig ?? readFreshConfiguration(context);
   const catalog = publication?.catalog ?? loadCatalog();
@@ -36,7 +36,7 @@ export function parsePresetRoles(context: CommandContext, selection: SessionMode
   return { ok: true, roles };
 }
 
-function resolveTarget(target: string, selection: SessionModelRole | undefined, config: RuntimeConfig, catalog: readonly CatalogProvider[]): SessionModelRole | string {
+function resolveTarget(target: string, selection: SessionModelTarget | undefined, config: RuntimeConfig, catalog: readonly CatalogProvider[]): SessionModelRole | string {
   const slash = target.indexOf('/');
   const owner = slash > 0 ? target.slice(0, slash) : undefined;
   const matches = owner ? config.providerConnections.filter(connection => connection.id === owner) : [];

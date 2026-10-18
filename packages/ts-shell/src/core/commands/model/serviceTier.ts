@@ -13,6 +13,7 @@ import { sameValue } from '../../../config/values.js';
 import path from 'node:path';
 import { connectionIdentity } from './identity.js';
 import { catalogModel } from '../../models/catalog.js';
+import { selectedModelMatches, selectionRequest } from './target.js';
 
 export function effectiveServiceTier(context: CommandContext): string | undefined {
   const config = context.readConfiguration?.().config ?? context.runtimeConfig
@@ -41,9 +42,13 @@ export function setSessionServiceTier(context: CommandContext, tier: string): st
   const root = context.projectRoot ?? context.cwd;
   const config = context.readConfiguration?.().config ?? context.runtimeConfig ?? projectSessionModel(readFreshConfiguration(context), context.sessionId);
   const catalog = context.readConfiguration?.().catalog ?? loadCatalog();
-  if (config.activeProviderConnectionId !== selection.connectionId
-    || config.providerConnections?.find(item => item.id === selection.connectionId)?.provider !== selection.provider) {
+  if (!selectedModelMatches(config, selection)) {
     return 'Service tier refused: the saved selection differs from the active connection. Select its connection and model again.';
+  }
+  const request = selectionRequest(context, config, selection);
+  if (request.provider !== selection.provider || request.model !== selection.model
+    || (selection.connectionScope === 'provider' && (request.blocked || !request.credential))) {
+    return 'Service tier refused: the selected model differs from the current request or its credential is unavailable.';
   }
   if (context.admission?.() || baseline.projectRoot === undefined || path.resolve(baseline.projectRoot) !== path.resolve(root)) return 'Service tier refused: session or workspace admission changed.';
   if (serviceTierCapability(catalog, selection.provider, selection.model, tier) !== 'supported') {
@@ -51,17 +56,19 @@ export function setSessionServiceTier(context: CommandContext, tier: string): st
   }
   try {
     writeSessionModel(context.sessionId, withSessionServiceTier(selection, tier), baseline, () => {
-      const loaded = readFreshConfiguration(context);
+      const loaded = projectSessionModel(readFreshConfiguration(context), context.sessionId);
       return !context.admission?.() && loaded.configValidation.valid
         && sameValue(connectionIdentity(loaded.providerConnections.find(item => item.id === selection.connectionId)), connectionIdentity(config.providerConnections?.find(item => item.id === selection.connectionId)))
-        && loaded.activeProviderConnectionId === selection.connectionId
+        && selectedModelMatches(loaded, selection) && sameValue(selectionRequest(context, loaded, selection), request)
         && sameValue(catalogModel(loadCatalog(), selection.provider, selection.model), catalogModel(catalog, selection.provider, selection.model))
         && serviceTierCapability(loadCatalog(), selection.provider, selection.model, tier) === 'supported';
     });
     const notice = configurationApplicationNotice(context);
     if (notice) return `Service tier preference saved as ${tier}. ${notice}`;
     const saved = projectSessionModel(readFreshConfiguration(context), context.sessionId);
-    if (saved.providerConnections.find(item => item.id === selection.connectionId)?.serviceTier !== tier) return 'Service tier publication is unverified; inspect the effective model before sending.';
+    const savedTier = selection.connectionScope === 'provider' ? saved.providerCredentials[saved.provider]?.serviceTier
+      : saved.providerConnections.find(item => item.id === selection.connectionId)?.serviceTier;
+    if (savedTier !== tier) return 'Service tier publication is unverified; inspect the effective model before sending.';
     return `Service tier set to ${tier} for this session. Account availability and pricing remain unverified.`;
   } catch { return 'Service tier write outcome is unverified; inspect the session before retrying.'; }
 }

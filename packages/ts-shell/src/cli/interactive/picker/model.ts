@@ -11,7 +11,8 @@ import type { Picker, PickerOutcome } from "../overlay.js";
 import { applyModelPreset, resolveModelPreset, wholePresetFailure } from "../../../core/commands/model/preset.js";
 import { readProfilePresets } from "../../../core/commands/model/presetStore.js";
 import { readSessionModel } from "../../../session/model/state.js";
-import type { SessionModelRole } from "../../../session/model/contract.js";
+import type { SessionModelTarget } from "../../../session/model/contract.js";
+import { scopedModelTarget } from "../../../core/commands/model/target.js";
 import { captureModelChoice } from "../../../core/commands/model/choice.js";
 import { setModelTarget } from "../../../core/commands/model/selection.js";
 import { captureThinkingPreference } from "../../../core/models/preference.js";
@@ -42,7 +43,10 @@ export function modelPicker(context: CommandContext): Picker {
       for (const provider of ordered) {
         const entry = availability.providers.find(item => item.provider === provider.runtime);
         const connections = (entry?.connections ?? []).filter(connection => matchesCatalog(provider, connection, config.providerConnections));
-        for (const connection of connections.length ? connections : [undefined]) {
+        const providerSlot = active.provider === provider.runtime && !active.credential?.connectionId
+          && (provider.id === provider.runtime || Boolean(active.baseUrl && provider.baseUrl
+            && active.baseUrl.replace(/\/+$/, '') === provider.baseUrl.replace(/\/+$/, '')));
+        for (const connection of providerSlot ? [...connections, undefined] : connections.length ? connections : [undefined]) {
           if (!provider.models.length) {
             const id = rowId(connection?.connectionId, provider.id, '');
             rows.push({ id, label: provider.label, detail: connection?.label ?? connection?.connectionId,
@@ -54,27 +58,29 @@ export function modelPicker(context: CommandContext): Picker {
             if (seen.has(id)) continue;
             seen.add(id);
             const unsupported = effortCapability(catalog, provider.runtime, model.id, thinkingEffort) === 'unsupported';
-            const candidate = connection ? projectModelSelection(config, { connectionScope: 'session', connectionId: connection.connectionId,
-              provider: connection.provider, model: model.id, thinkingEffort }) : undefined;
-            const resolution = candidate ? resolveProviderCredential({ runtimeConfig: candidate }) : undefined;
-            const selected = Boolean(!active.blocked && active.credential && connection
-              && connection.connectionId === active.credential.connectionId && provider.runtime === active.provider && model.id === active.model
+            const target: SessionModelTarget = connection ? { connectionId: connection.connectionId, provider: connection.provider, model: model.id, thinkingEffort }
+              : { connectionScope: 'provider', provider: provider.runtime, model: model.id, thinkingEffort };
+            const candidate = connection || providerSlot ? projectModelSelection(config, scopedModelTarget(target)) : undefined;
+            const resolution = candidate ? !connection && context.resolveConfigTarget ? context.resolveConfigTarget(candidate)
+              : resolveProviderCredential({ runtimeConfig: candidate }) : undefined;
+            const selected = Boolean(!active.blocked && active.credential
+              && connection?.connectionId === active.credential.connectionId && provider.runtime === active.provider && model.id === active.model
               && resolution?.baseUrl === active.baseUrl && sameValue(resolution?.credential, active.credential));
-            const reason = !connection ? 'configure a connection' : connection.state !== 'ready' ? availabilityLabel(connection.state)
-              : resolution?.blocked || !resolution?.credential ? 'connection credential unavailable'
+            const reason = !connection && !providerSlot ? 'configure a connection' : connection && connection.state !== 'ready' ? availabilityLabel(connection.state)
+              : resolution?.blocked || !resolution?.credential ? 'credential unavailable'
               : unsupported ? 'reasoning effort unsupported' : !choice?.baseline ? 'active session required' : undefined;
             const metadata = catalogModel(catalog, provider.runtime, model.id);
             rows.push({ id, label: model.id,
-              detail: [connection?.connectionId, connection?.label, provider.label, connection?.endpoint,
+              detail: [connection?.connectionId ?? (resolution?.credential ? `${resolution.credential.source} credential` : undefined), connection?.label, provider.label, connection?.endpoint ?? endpointLabel(resolution?.baseUrl),
                 metadata?.contextWindow ? `${Math.round(metadata.contextWindow / 1000)}k` : undefined].filter(Boolean).join(' · '),
-              note: selected ? 'active' : reason ?? availabilityLabel(connection!.state),
+              note: selected ? 'active' : reason ?? (connection ? availabilityLabel(connection.state) : 'ready'),
               ...(reason ? { disabled: true } : {}) });
             const displayed = connection && (resolution?.blocked || !resolution?.credential)
               ? { ...connection, state: 'credential-missing' as const, reason: 'This explicit connection needs its own credential.' } : connection;
-            details.set(id, [...modelDetails(provider, displayed), `Reasoning effort: ${thinkingEffort ?? 'auto'}`,
+            details.set(id, [...modelDetails(provider, displayed, !connection ? resolution?.credential?.source : undefined),
+              ...(!connection && resolution?.baseUrl ? [`Endpoint: ${endpointLabel(resolution.baseUrl)}`] : []), `Reasoning effort: ${thinkingEffort ?? 'auto'}`,
               ...(metadata?.contextWindow ? [`Context: ${metadata.contextWindow} tokens`] : []), ...(reason ? [reason] : [])]);
-            if (!reason && connection && choice) {
-              const target: SessionModelRole = { connectionId: connection.connectionId, provider: connection.provider, model: model.id, thinkingEffort };
+            if (!reason && choice) {
               const captured = choice;
               actions.set(id, async () => captured.admission() ?? setModelTarget(target,
                 { ...context, admission: captured.admission }, captured.baseline));
@@ -101,7 +107,7 @@ export function modelPicker(context: CommandContext): Picker {
             const resolved = resolveModelPreset(context.sessionId, name);
             const allId = `preset-all:${name}`;
             const failure = wholePresetFailure(preset);
-            rows.push({ id: allId, label: `Preset: ${name} / all`, detail: 'Default and automatic subagent model', note: failure ?? resolved?.source,
+            rows.push({ id: allId, label: `Preset: ${name} / all`, detail: 'Default and automatic model roles', note: failure ?? resolved?.source,
               ...(failure || !choice ? { disabled: true } : {}) });
             details.set(allId, [failure ?? 'Apply all supported roles in one session update.',
               ...Object.entries(preset.roles).map(([role, target]) => `${role}: ${target.connectionId} · ${target.provider}/${target.model} · ${target.thinkingEffort ?? 'auto'}`)]);
@@ -148,10 +154,10 @@ function rowId(connection: string | undefined, provider: string, model: string):
   return `model:${JSON.stringify([connection ?? null, provider, model])}`;
 }
 
-function modelDetails(provider: CatalogProvider, connection?: ConnectionAvailability): readonly string[] {
+function modelDetails(provider: CatalogProvider, connection?: ConnectionAvailability, source?: string): readonly string[] {
   return [`Provider: ${provider.label} (${provider.runtime})`,
     ...(connection ? [`Connection: ${connection.connectionId}`, ...(connection.endpoint ? [`Endpoint: ${connection.endpoint}`] : []),
-      `Availability: ${availabilityLabel(connection.state)}`, connection.reason] : ['Availability: configure a connection']),
+      `Availability: ${availabilityLabel(connection.state)}`, connection.reason] : source ? [`Credential source: ${source}`] : ['Availability: configure a connection']),
     'Remote availability: unverified'];
 }
 

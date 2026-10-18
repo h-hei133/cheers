@@ -24,7 +24,7 @@ profile 库文件形如 `{ "version": 1, "presets": { "<name>": { "roles": { …
 
 | 命令 | 行为 |
 |---|---|
-| `save <name> [role=connection-or-provider/model[@effort]]` | 保存到当前会话；无显式角色时使用当前选择 |
+| `save <name> [role=connection-or-provider/model[@effort]]` | 保存到当前会话；无显式角色时使用当前命名连接选择；provider-only 会话需提供命名连接目标 |
 | `save <name> --profile …` | 保存到 profile 库；同名整项替换并明确报告 replaced |
 | `promote <name>` | 把会话预设复制到 profile 库 |
 | `delete <name>` | 从 profile 库删除；返回 deleted 或 was not found |

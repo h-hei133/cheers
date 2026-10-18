@@ -38,9 +38,9 @@ export interface ProviderCredentialResolutionInput {
 
 export interface ProviderCredentialResolution {
   /** A selected pending connection cannot borrow credentials from another source. */
-  readonly blocked?: 'connection-pending' | 'connection-unavailable' | 'connection-overridden' | PoolBlock;
+  readonly blocked?: 'connection-pending' | 'connection-unavailable' | 'connection-overridden' | 'pool-required' | PoolBlock;
   /** Explicit selection inputs retained for identity checks against later settings. */
-  readonly selection?: { readonly provider?: RuntimeProvider; readonly baseUrl?: string; readonly connectionId?: string };
+  readonly selection?: { readonly provider?: RuntimeProvider; readonly baseUrl?: string; readonly connectionId?: string; readonly credentialScope?: 'provider' };
   readonly thinkingEffort?: ThinkingPreference;
   readonly provider: RuntimeProvider;
   readonly credential?: ResolvedProviderCredential;
@@ -55,29 +55,35 @@ export function resolveProviderCredential(
   const env = input.env ?? process.env;
   const providerFromConfig = input.runtimeConfig.provider;
   const binding = input.runtimeConfig.sessionConnection;
-  const boundConnection = binding && input.runtimeConfig.providerConnections.find(connection => connection.id === binding.id
+  const providerBinding = binding?.scope === 'provider' ? binding : undefined;
+  const boundConnection = binding && !providerBinding && input.runtimeConfig.providerConnections.find(connection => connection.id === binding.id
     && connection.provider === binding.provider && connection.status !== 'error');
-  if (binding && (!boundConnection || input.runtimeConfig.activeProviderConnectionId !== binding.id)) {
+  if (binding && !providerBinding && (!boundConnection || input.runtimeConfig.activeProviderConnectionId !== binding.id)) {
     return { provider: providerFromConfig, expectedEnvVarName: getProviderApiKeyEnvVarName(providerFromConfig), blocked: 'connection-unavailable' };
+  }
+  if (providerBinding && (providerBinding.provider !== providerFromConfig
+    || (input.cliProvider !== undefined && input.cliProvider !== providerBinding.provider))) {
+    return { provider: providerFromConfig, expectedEnvVarName: getProviderApiKeyEnvVarName(providerFromConfig), blocked: 'connection-overridden' };
   }
   if (boundConnection && ((input.cliProvider !== undefined && input.cliProvider !== boundConnection.provider)
     || (input.cliApiKey?.trim() && input.cliApiKey.trim() !== boundConnection.apiKey?.trim())
     || (input.cliBaseUrl !== undefined && normalizeBaseUrl(input.cliBaseUrl) !== normalizeBaseUrl(boundConnection.baseUrl)))) {
     return { provider: boundConnection.provider, expectedEnvVarName: getProviderApiKeyEnvVarName(boundConnection.provider), blocked: 'connection-overridden' };
   }
-  const explicitConnection = input.runtimeConfig.providerConnections.find(
+  const explicitConnection = !providerBinding && input.runtimeConfig.providerConnections.find(
     (connection) =>
       connection.id === input.runtimeConfig.activeProviderConnectionId &&
       (input.cliProvider === undefined || connection.provider === input.cliProvider),
-  ) ?? null;
+  ) || null;
   const provider = input.cliProvider ?? explicitConnection?.provider ?? providerFromConfig;
   const poolDeclared = Boolean(input.runtimeConfig.accountPool?.[provider]);
+  if (providerBinding && poolDeclared) return { provider, expectedEnvVarName: getProviderApiKeyEnvVarName(provider), blocked: 'pool-required' };
   const pooled = explicitConnection || input.cliApiKey?.trim() ? undefined
     : poolDeclared && !input.runtimeConfig.configValidation.valid ? { blocked: 'pool-unavailable' as const }
     : selectPooledConnection({ config: input.runtimeConfig, provider, env,
       ...(input.pool?.sessionId ? { sessionId: input.pool.sessionId } : {}) });
   const activeConnection = explicitConnection ?? pooled?.connection
-    ?? (pooled ? null : pickFallbackConnection(input.runtimeConfig.providerConnections, provider)) ?? null;
+    ?? (pooled || providerBinding ? null : pickFallbackConnection(input.runtimeConfig.providerConnections, provider)) ?? null;
   const expectedEnvVarName = getProviderApiKeyEnvVarName(provider);
   const configProfile = input.runtimeConfig.providerCredentials[provider];
   const activeConnectionProfile =
@@ -112,6 +118,7 @@ export function resolveProviderCredential(
   const thinkingEffort = preferredEffort(activeConnectionProfile, configProfile);
   const preference = { ...(thinkingEffort !== undefined ? { thinkingEffort } : {}),
     selection: { ...(input.cliProvider !== undefined ? { provider: input.cliProvider } : {}),
+      ...(providerBinding ? { credentialScope: 'provider' as const } : {}),
       ...(boundConnection ? { connectionId: boundConnection.id } : {}),
       ...(input.cliBaseUrl !== undefined ? { baseUrl: input.cliBaseUrl } : {}) } };
 
@@ -393,7 +400,8 @@ function vertexBaseUrlFromEnvironment(
 
 /** One place decides how a refused resolution is described to a person. */
 export function credentialBlockMessage(blocked: NonNullable<ProviderCredentialResolution['blocked']>): string {
-  if (blocked === 'connection-overridden') return 'Request overrides differ from the session-selected connection. Restart without the conflicting provider, endpoint or API key override.';
+  if (blocked === 'connection-overridden') return 'Request overrides differ from the session-selected credential binding. Restart without the conflicting provider, endpoint or API key override.';
+  if (blocked === 'pool-required') return 'Provider credentials cannot replace a declared account pool. Select an available pool connection or explicitly remove the pool.';
   if (blocked === 'connection-unavailable') return 'The session-selected connection is unavailable. Open /model and select an available connection before sending.';
   if (blocked === 'pool-empty') return 'The account pool for this provider is empty; add a member connection or remove the pool before requests can be sent.';
   if (blocked === 'pool-unavailable') return 'No connection in the account pool has a usable credential; sign in to a pool member before requests can be sent.';

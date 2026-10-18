@@ -7781,3 +7781,15 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 代码最终 APPROVE：独立 11 文件/105 项，再验 13 项 advisor；架构最终 CLEAR：独立 8 文件/75 项，最后 skip 回归 1 通过/12 未选择。两构建通过，最终 TS manifest `4ea1b159f83d`。隔离 Linux PTY Node/exe × regular/fullscreen 四格通过：预设保存/validate/apply、on/off/on、B/high 顾问与 A/low 主请求、全局配置字节不变、退出 0；没有真实账号访问。
 - cycles、config consumers（53/53）、declarations、Node floor、diff 通过。第一次裸 npx 查找公开 registry 中不存在的 normproof 包失败，随后改用仓库 `.normproof` 内 CI 同款包运行成功；不能把首次命令记为通过。NormProof 退出 0、verdict partial，仍为既有函数上限 advisory；触及模块未越界。strict docs drift 在最终文档写入后另行执行。
 - 本条记录时当前批尚未提交/推送，新 SHA CI 待实际读回；全部 47 项范围继续，优先处理 legacy/env-only 精确选择、同名目录能力、委派账号续期与 CTX-03 完整生命周期，其他任务未因本批通过而自动标记完成。
+
+### PRV-01/PAN-01 无命名连接的模型选择
+
+- advisor 批已提交并推送为 `a7e32d44bcebcbb043760c1d390e7011ed3acf38`；Architecture Watch `39102165544`、CI `39102165549` 均 success。CI 在本批开发期间仍运行，完成后才记为成功，没有重启 run。
+- CLI/env/旧 provider 配置可以从菜单或 `/model` 选择模型，使用明确的 `connectionScope: provider` 联合类型，沿已有 session CAS、hook、发布和恢复流程；不虚构连接或保存凭据。运行时禁止借用命名连接，声明账号池时拒绝；`--global` 仅在没有其他默认 owner 时允许，并在锁内重验。角色预设继续要求命名连接，无法直接保存 provider-only 当前模型时有明确反馈。
+- 参考对照同意先验证实际授权、会话保存 provider/model、仅显式选项写 global；保留本项目更强的 revision、hook 与凭据身份检查。service tier/context 偏好检查实际 provider/model；旧无 scope 会话保留原 CLI/env 级联，环境凭据在锁内改变会拒绝。provider 槽账号续期只更新该槽，凭据删除/账号池变更后的迟到结果不保存。
+- 独立复核发现并修复 CLI provider 与全局 provider 不同时继承错 effort、旧偏好被误用强连接绑定、CLI model 覆盖后误保存旧模型 tier/context。新增目录/环境/会话/账号池/凭据并发回归、恢复与全局字节检查，以及三种来源的本机真实 HTTP model/effort/tier 断言。HTTP 首轮夹具未传 CLI 宿主负责的 effort 捕获，补齐宿主合同后通过，没有改变产品请求默认值。
+- 最终受影响集 23 文件/313 测试通过，含新增 provider 28 项及账号续期 44 项。类型诊断相对 `a7e32d44` 为 149/149、无新增，不代表全项目 tsc 通过。严格构建首轮发现 provider 字符串索引未收窄，修复后两构建通过，最终 TS manifest `59c1e086c756`。
+- 四项反转均实际退出 1：恢复“必须命名连接”后 3 失败；恢复命名 fallback 后 1 失败；移除 hook 后请求身份比较后 1 失败；把旧偏好强制投影成精确连接后 3 失败/1 通过。仅测试加载时替换，产品源未回退；产物位于 `.omx/verification/phase20/provider.*`。
+- 代码最终 APPROVE，最新独立 95 项通过、此前账号续期 44 项通过；架构最终 CLEAR，前轮 8 文件/199 项、最后 28 项通过（集合重叠，不相加）。最终产物 Linux PTY Node/exe × regular/fullscreen × config/env/CLI 共 12 格通过：打开菜单无模型/认证探针，选择后和命令换模型后的真实请求目标/effort 正确，全局配置字节不变，退出 0；全程本机合成凭据。
+- cycles、config consumers（53/53）、declarations、Node floor、脚本测试 59 项通过。NormProof 退出 0、总 verdict partial，导入/无环 satisfied，仍为原 9 个函数上限 advisory，行为修改模块未新增越界。最终 strict docs drift 与 diff 检查在文档写入后运行。
+- 本条写入时尚未提交/推送本批，精确 SHA CI 待后续实际读回。目录同名能力歧义、独立委派账号续期、CTX-03 完整生命周期与其余全部 47 项继续原范围，不因本批通过自动闭合。

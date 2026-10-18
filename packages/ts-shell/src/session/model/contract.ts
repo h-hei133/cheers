@@ -18,14 +18,21 @@ export interface SessionModelPolicy {
   readonly advisor?: SessionModelRole;
 }
 
-/** A model preference contains no credential and applies only to its connection. */
-export interface SessionModelSelection {
-  readonly connectionId: string;
-  /** Explicit connection choices override the profile default for this session. */
-  readonly connectionScope?: 'session';
+/** A provider-slot choice cannot be mistaken for a missing named connection. */
+export interface ProviderModelTarget {
+  readonly connectionScope: 'provider';
+  readonly connectionId?: never;
   readonly provider: string;
   readonly model: string;
   readonly thinkingEffort?: ThinkingPreference;
+}
+
+export type SessionModelTarget = SessionModelRole | ProviderModelTarget;
+
+/** Preferences contain no credential; legacy named selections keep their original scope. */
+export type SessionModelSelection = (ProviderModelTarget | (SessionModelRole & {
+  readonly connectionScope?: 'session';
+})) & {
   /** Provider service tier for this session, when the active model advertises it. */
   readonly serviceTier?: string;
   readonly presets?: Readonly<Record<string, SessionModelPreset>>;
