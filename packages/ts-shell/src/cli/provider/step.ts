@@ -24,6 +24,7 @@ import { mergeConfigValue } from '../../config/merge.js';
 import type { SessionModelRole } from '../../session/model/contract.js';
 import { assertAdmission } from '../../core/network/admission.js';
 import { delegatedRenewal, type AccountRotation, type AccountPublication } from './renewal.js';
+import { sessionUsageSink } from '../../session/store/usage.js';
 
 export interface ProviderStepHost {
   readonly providerMode: 'synthetic' | 'real';
@@ -66,6 +67,7 @@ export function createProviderStep(
   const system = systemPromptSnapshot(request.agentMode, promptContext);
   const identity = credentialIdentityFor(resolution.provider, resolution.credential);
   return createStepFunction({
+    recordAuxiliaryUsage: sessionUsageSink(request.sessionId),
     requestPolicy: request.requestPolicy,
     modelTransport: providerModelTransport(request.runtimeConfig, endpoint, request.admission),
     provider: {

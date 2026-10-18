@@ -9,13 +9,16 @@ import { accountAuthFor, providerAuthorization } from "../../provider/request/au
 import { requestSimpleCompletion } from "../../provider/request/completion.js";
 import { loadCatalog } from "../models/catalogStore.js";
 import { resolveRequestShape } from "../models/requestShape.js";
-import { catalogBaseUrl, catalogProvider, providerEndpoint } from "../models/catalog.js";
+import { catalogBaseUrl, catalogModel, catalogProvider, providerEndpoint } from "../models/catalog.js";
 import { providerFetchForEndpoint } from "../../provider/request/fetch.js";
 import { endpointShape } from "../../provider/endpoints/index.js";
 import { classifyProviderFailure, type ProviderFailureClass } from "../../provider/registry/provider.js";
 import { ModelAdmissionError } from '../agent/request/model.js';
 import { providerModelTransport } from '../../provider/request/transport.js';
 import { createReport, span } from './report/projection.js';
+import { captureUsageAttribution } from '../../observability/usage/identity.js';
+import { recordSessionUsage } from '../../observability/usageTelemetry.js';
+import { hasUsage, usageFromProvider } from '../../provider/response/usage.js';
 
 /** How long a side question may take before it is abandoned. */
 const SIDE_QUESTION_TIMEOUT_MS = 15_000;
@@ -69,12 +72,20 @@ export async function runBtwCommand(
     attempted = true;
     const model = resolution.model ?? credential?.model ?? "";
     const shape = resolveRequestShape(catalog, resolution.provider, model, undefined, baseUrl);
+    const attribution = captureUsageAttribution({ provider: resolution.provider, model, baseUrl: baseUrl ?? '',
+      rates: catalogModel(catalog, resolution.provider, model, baseUrl)?.cost });
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), SIDE_QUESTION_TIMEOUT_MS);
     try {
       answer =
         (await requestSimpleCompletion({
           shape,
+          onUsage: usage => {
+            if (!hasUsage(usage)) return;
+            const record = { ...usageFromProvider(usage), provider: resolution.provider, model, attribution };
+            if (context.recordAuxiliaryUsage) context.recordAuxiliaryUsage(record);
+            else if (context.sessionId) recordSessionUsage(context.sessionId, record, { affectsContext: false });
+          },
           requestPolicy: context.requestPolicy,
           provider: {
             headers: providerAuthorization({

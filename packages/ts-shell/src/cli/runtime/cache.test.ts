@@ -4,7 +4,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { cacheRefreshFor } from "./cache.js";
 import { getSessionUsage, recordSessionUsage, resetSessionUsage } from '../../observability/usageTelemetry.js';
 import { costModel } from '../../core/commands/cost/model.js';
-import * as usageStore from '../../session/store/usage.js';
+import { createAdvisorHarness, cleanupAdvisorHarnesses } from '../../test-utils/advisor.js';
+import { readBoundSessionState } from '../../session/store/bound.js';
 
 let server: http.Server;
 let url: string;
@@ -21,6 +22,7 @@ beforeEach(async () => {
   url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
 afterEach(async () => {
+  cleanupAdvisorHarnesses();
   vi.restoreAllMocks();
   resetSessionUsage('cache-prices');
   server.closeAllConnections();
@@ -28,23 +30,25 @@ afterEach(async () => {
 });
 
 it('retains the captured cache destination and prices without changing foreground context', async () => {
-  const write = vi.spyOn(usageStore, 'writeSessionUsage').mockImplementation(() => {});
+  const setup = createAdvisorHarness(false, false);
+  const sessionId = setup.session.id;
   const prices = { promptPerMTok: 3, completionPerMTok: 6 };
-  const cache = cacheRefreshFor({ sessionId: 'cache-prices', runtimeConfig: {} as never,
+  const cache = cacheRefreshFor({ sessionId, runtimeConfig: {} as never,
     provider: { providerId: 'fixture', model: 'fixture' }, baseUrl: url, rates: prices,
     isCurrent: () => true, renewHeaders: async () => ({}),
   });
-  recordSessionUsage('cache-prices', { provider: 'main', model: 'm', promptTokens: 400 });
-  const key = getSessionUsage('cache-prices').lastBucketKey;
+  recordSessionUsage(sessionId, { provider: 'main', model: 'm', promptTokens: 400 });
+  const key = getSessionUsage(sessionId).lastBucketKey;
   prices.promptPerMTok = 99;
   const usage = await cache.refresh!(captured(), new AbortController().signal);
-  cache.onUsage!(usage!);
-  expect(write).toHaveBeenCalledOnce();
-  expect(getSessionUsage('cache-prices')).toMatchObject({ lastBucketKey: key, lastPromptTokens: 400 });
-  expect(getSessionUsage('cache-prices').recentRequests).toHaveLength(1);
-  const bucket = costModel(getSessionUsage('cache-prices'), []).buckets.find(item => item.provider === 'fixture');
+  expect(usage).toMatchObject({ prompt_tokens: 100, completion_tokens: 1 });
+  expect(readBoundSessionState(setup.manager, setup.session).state.usage).toMatchObject({ turnsCount: 2 });
+  expect(getSessionUsage(sessionId)).toMatchObject({ lastBucketKey: key, lastPromptTokens: 400 });
+  expect(getSessionUsage(sessionId).recentRequests).toHaveLength(1);
+  const bucket = costModel(getSessionUsage(sessionId), []).buckets.find(item => item.provider === 'fixture');
   expect(bucket).toMatchObject({ rateBasis: 'captured', rates: { promptPerMTok: 3 }, promptTokens: 100, completionTokens: 1 });
   expect(bucket?.estimate.usd).toBeCloseTo(0.000306);
+  resetSessionUsage(sessionId);
 });
 
 function captured(headers: Record<string, string> = {}) {

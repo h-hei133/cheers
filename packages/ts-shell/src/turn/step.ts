@@ -8,7 +8,7 @@ import type { AgentToolCall } from "../core/agent/tools.js";
 import type { AgentMessage, AgentStopReason } from "../core/agent/state.js";
 import type { AssistantStep } from "../core/agent/loop.js";
 import { parseJsonWithRepair } from "../model-adapters/jsonRepair.js";
-import { clearContextUsage, markContextUnknown, measuredPromptContext, recordSessionUsage } from "../observability/usageTelemetry.js";
+import { clearContextUsage, markContextUnknown, measuredPromptContext, recordSessionUsage, type SessionUsageRecord } from "../observability/usageTelemetry.js";
 import { captureUsageAttribution } from '../observability/usage/identity.js';
 import { promptTokensFor, requestBudget } from '../context/request/budget.js';
 import { captureThinkingPreference } from '../core/models/preference.js';
@@ -124,6 +124,7 @@ export type StepFunction = (
 ) => Promise<AssistantStep>;
 
 export interface StepRequest {
+  readonly recordAuxiliaryUsage?: (usage: SessionUsageRecord) => void;
   readonly requestPolicy?: RequestPolicy;
   readonly modelTransport?: ModelTransport;
   readonly thinkingEffort?: ThinkingPreference;
@@ -310,7 +311,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
       const modelEntry = catalogModel(request.catalog ?? [], request.provider.provider ?? '', request.provider.model, catalogAddress);
       const usageAttribution = captureUsageAttribution({ provider: request.provider.provider ?? '', model: request.provider.model,
         baseUrl: request.provider.baseUrl, rates: modelEntry?.cost });
-      const measured = measuredPromptContext(request.sessionId, { provider: request.provider.provider ?? '',
+      const measured = options.agentMode ? undefined : measuredPromptContext(request.sessionId, { provider: request.provider.provider ?? '',
         model: request.provider.model, endpoint, schemaDigest, systemDigest });
       const prompt = promptTokensFor({ messages, overhead, ...(measured ? { measured } : {}) });
       const budget = requestBudget({ window: request.contextWindow ?? modelEntry?.contextWindow,
@@ -463,7 +464,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
           if (attemptResponse.ok) {
             requestAcceptedAt = Date.now();
             traceLogger.info("provider request accepted", { requestId, endpoint, provider: request.provider.provider, model: request.provider.model, attempt });
-            clearContextUsage(request.sessionId);
+            if (!options.agentMode) clearContextUsage(request.sessionId);
             response = attemptResponse;
             responseAttempt = modelAttempt;
             options.onRequestSent?.({
@@ -562,9 +563,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
         const completion = await readCompletion(response, watched, endpoint);
         traceLogger.info("provider request completed", { requestId, endpoint, provider: request.provider.provider, model: request.provider.model, attempt: streamAttempts, usage: Boolean(completion.usage), durationMs: requestAcceptedAt === undefined ? undefined : Math.max(0, Date.now() - requestAcceptedAt) });
         const usage = completion.usage;
-        responseAttempt?.settle(usage);
         if (hasUsage(usage)) {
-          recordSessionUsage(request.sessionId, {
+          const record: SessionUsageRecord = {
             ...usageFromProvider(usage),
             attribution: usageAttribution,
             model: request.provider.model,
@@ -579,15 +579,19 @@ export function createStepFunction(request: StepRequest): StepFunction {
             promptIdentity: { provider: request.provider.provider ?? '', model: request.provider.model, endpoint,
               schemaDigest: createHash('sha256').update(JSON.stringify(request.tools)).digest('hex'),
               systemDigest: createHash('sha256').update(request.systemPrompt).digest('hex') },
-          }, { promptMeasured: typeof usage.prompt_tokens === 'number' && Number.isFinite(usage.prompt_tokens) && usage.prompt_tokens >= 0 });
+          };
+          if (options.agentMode && request.recordAuxiliaryUsage) request.recordAuxiliaryUsage(record);
+          else recordSessionUsage(request.sessionId, record, { affectsContext: !options.agentMode,
+            promptMeasured: typeof usage.prompt_tokens === 'number' && Number.isFinite(usage.prompt_tokens) && usage.prompt_tokens >= 0 });
           options.onRequestUsage?.(usage);
-        } else markContextUnknown(request.sessionId, 'usage-gap');
+        } else if (!options.agentMode) markContextUnknown(request.sessionId, 'usage-gap');
+        responseAttempt?.settle(usage);
         const completed = toStep(completion, watched);
         return stamp(shownAnything && completed.stopReason === "error"
           ? { ...completed, retriesExhausted: true }
           : completed);
       } catch (error) {
-        markContextUnknown(request.sessionId, 'usage-gap');
+        if (!options.agentMode) markContextUnknown(request.sessionId, 'usage-gap');
         if (error instanceof ModelAdmissionError) return stamp({ ...failedStep(error.message, shown, undefined, true), admissionFailure: error.code });
         if (signal?.aborted) return stamp(abortedStep(shown));
         const detail = error instanceof Error ? error.message : String(error);

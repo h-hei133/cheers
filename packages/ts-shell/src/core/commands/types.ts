@@ -54,6 +54,8 @@ export interface CommandContext {
   readonly sshCommand?: (args: string[], context: CommandContext) => Promise<CommandExecutionResult>;
   readonly extensionCommand?: (kind: 'marketplace' | 'plugin', args: string[], context: CommandContext) => Promise<LocalCommandResult>;
   readonly requestPolicy?: import('../agent/request/model.js').RequestPolicy;
+  /** Captured session accounting owner; side requests must not update the main context gauge. */
+  readonly recordAuxiliaryUsage?: (usage: import('../../observability/usageTelemetry.js').SessionUsageRecord) => void;
   /** Feature handler supplied by the CLI's current session composition. */
   readonly goalCommand?: (args: string[], context: CommandContext) => Promise<LocalCommandResult>
   readonly planningCommand?: (name: 'plan' | 'plan-review' | 'guided-goal', args: string[], context: CommandContext) => Promise<CommandExecutionResult>

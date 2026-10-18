@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { ModelAdmissionError } from '../../core/agent/request/model.js';
 import { sendSentRequest, type SentRequest } from "./sentRequest.js";
 
 /**
@@ -188,7 +189,9 @@ it("replays Google with explicitly disabled thinking and preserves that setting"
 
 it("does not admit usage from an unfinished stream", async () => {
   const impl = (async () => new Response('data: {"choices":[{"delta":{"content":"partial"}}],"usage":{"prompt_tokens":100}}\n\n', { headers: { "content-type": "text/event-stream" } })) as typeof fetch;
-  expect(await sendSentRequest(sent, undefined, impl)).toBeUndefined();
+  const onUsage = vi.fn();
+  expect(await sendSentRequest(sent, undefined, impl, { provider: 'fixture', model: 'm', onUsage })).toBeUndefined();
+  expect(onUsage).not.toHaveBeenCalled();
 });
 
 it.each([false, true])("does not admit refused response usage (stream=%s)", async stream => {
@@ -197,7 +200,10 @@ it.each([false, true])("does not admit refused response usage (stream=%s)", asyn
   const impl = (async () => new Response(stream ? `data: ${JSON.stringify(body)}\n\ndata: [DONE]\n\n` : JSON.stringify(body), {
     headers: { "content-type": stream ? "text/event-stream" : "application/json" },
   })) as typeof fetch;
-  expect(await sendSentRequest(sent, undefined, impl)).toBeUndefined();
+  const onUsage = vi.fn();
+  expect(await sendSentRequest(sent, undefined, impl, { provider: 'fixture', model: 'm', onUsage })).toBeUndefined();
+  expect(onUsage).toHaveBeenCalledOnce();
+  expect(onUsage).toHaveBeenCalledWith(expect.objectContaining({ prompt_tokens: 100, completion_tokens: 1 }));
 });
 
 it.each([false, true])("rejects usage when transport ignores cancellation (stream=%s)", async stream => {
@@ -209,7 +215,10 @@ it.each([false, true])("rejects usage when transport ignores cancellation (strea
       headers: { "content-type": stream ? "text/event-stream" : "application/json" },
     });
   }) as typeof fetch;
-  expect(await sendSentRequest(sent, controller.signal, impl)).toBeUndefined();
+  const onUsage = vi.fn();
+  expect(await sendSentRequest(sent, controller.signal, impl, { provider: 'fixture', model: 'm', onUsage })).toBeUndefined();
+  expect(onUsage).toHaveBeenCalledOnce();
+  expect(onUsage).toHaveBeenCalledWith(expect.objectContaining({ prompt_tokens: 100 }));
 });
 
 it.each([
@@ -220,5 +229,22 @@ it.each([
   ["bedrock-converse-stream", { output: { message: { content: [] } }, stopReason: "content_filtered", usage: { inputTokens: 100, outputTokens: 1 } }],
 ])("does not admit rejected native JSON usage on %s", async (endpoint, body) => {
   const impl = (async () => new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } })) as typeof fetch;
-  expect(await sendSentRequest({ ...sent, endpoint, reasoning: false }, undefined, impl)).toBeUndefined();
+  const onUsage = vi.fn();
+  expect(await sendSentRequest({ ...sent, endpoint, reasoning: false }, undefined, impl, { provider: 'fixture', model: 'm', onUsage })).toBeUndefined();
+  expect(onUsage).toHaveBeenCalledOnce();
+  expect(onUsage).toHaveBeenCalledWith(expect.objectContaining({ prompt_tokens: 100, completion_tokens: 1 }));
+});
+
+it('records cache billing before the shared ledger rejects an over-budget settlement', async () => {
+  const onUsage = vi.fn();
+  const settle = vi.fn(() => {
+    expect(onUsage).toHaveBeenCalledOnce();
+    throw new ModelAdmissionError('breach', 'persisted');
+  });
+  const impl = (async () => Response.json({ choices: [], usage: { prompt_tokens: 100, completion_tokens: 1 } })) as typeof fetch;
+  await expect(sendSentRequest(sent, undefined, impl, { provider: 'fixture', model: 'm', onUsage,
+    policy: { reserve: () => ({ id: 'fixture', dispatch() {}, confirmUnsent() {}, settle }) },
+  })).rejects.toMatchObject({ code: 'breach' });
+  expect(onUsage).toHaveBeenCalledWith(expect.objectContaining({ prompt_tokens: 100, completion_tokens: 1 }));
+  expect(settle).toHaveBeenCalledOnce();
 });

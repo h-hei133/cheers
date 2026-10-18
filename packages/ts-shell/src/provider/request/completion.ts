@@ -5,6 +5,7 @@ import type { ChatMessage } from "../../turn/prompt.js";
 import type { ModelTransport, RequestPolicy } from '../../core/agent/request/model.js';
 import { prepareRequestAttempt } from './attempt.js';
 import type { ResolvedRequestShape } from '../../core/models/requestShape.js';
+import type { ProviderUsage } from '../../turn/completion.js';
 
 /**
  * One out-of-band model call.
@@ -50,6 +51,8 @@ export interface SimpleProvider {
 }
 
 export interface SimpleCompletionRequest {
+  /** Billing evidence belongs to the caller's captured session, even for a refused answer. */
+  readonly onUsage?: (usage: ProviderUsage | undefined) => void;
   readonly shape?: ResolvedRequestShape;
   readonly requestPolicy?: RequestPolicy;
   readonly provider: SimpleProvider;
@@ -121,6 +124,7 @@ export async function requestSimpleCompletion(
     throw error;
   }
   const completion = endpointShape(kind).readBody(body);
+  request.onUsage?.(completion.usage);
   attempt.settle(completion.usage);
   const choice = completion.choices?.[0];
   if (REFUSAL.test(choice?.finish_reason ?? "")) {

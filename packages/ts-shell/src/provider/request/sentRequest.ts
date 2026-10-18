@@ -43,6 +43,7 @@ export async function sendSentRequest(
   signal: AbortSignal | undefined,
   fetchImpl: typeof fetch = fetch,
   metering?: { readonly policy?: RequestPolicy; readonly transport?: ModelTransport; readonly provider: string; readonly model: string;
+    readonly onUsage?: (usage: ProviderUsage | undefined) => void;
     readonly credential?: { readonly credentialId: string; readonly generation: string } },
 ): Promise<ProviderUsage | undefined> {
   const body = refreshBody(sent);
@@ -65,6 +66,7 @@ export async function sendSentRequest(
     const shape = endpointShape(sent.endpoint);
     let usage: ProviderUsage | undefined;
     let finishReason: string | null | undefined;
+    let hasMessage = true;
     if (isEventStream(response)) {
       const reader = shape.readStream(response.body!);
       let next = await reader.next();
@@ -72,12 +74,13 @@ export async function sendSentRequest(
       ({ usage, finishReason } = next.value);
     } else {
       const completion = shape.readBody(await response.json());
-      if (!completion.choices?.[0]?.message) { attempt.settle(completion.usage); return undefined; }
+      hasMessage = Boolean(completion.choices?.[0]?.message);
       usage = completion.usage;
-      finishReason = completion.choices[0].finish_reason;
+      finishReason = completion.choices?.[0]?.finish_reason;
     }
+    metering?.onUsage?.(usage);
     attempt.settle(usage);
-    if (signal?.aborted || (finishReason != null && !["stop", "length", "tool_calls"].includes(finishReason))) return undefined;
+    if (!hasMessage || signal?.aborted || (finishReason != null && !["stop", "length", "tool_calls"].includes(finishReason))) return undefined;
     return usage;
   } catch (error) {
     if (error instanceof ModelAdmissionError) throw error;

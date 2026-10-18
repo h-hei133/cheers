@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { requestCompactionSummary } from "./summarize.js";
 import { parseFileFootprintXml } from "./fileFootprint.js";
+import { ModelAdmissionError } from '../../agent/request/model.js';
 
 /**
  * What a compaction writes back is what the next one reads. The footprint is
@@ -35,6 +36,27 @@ const readCall = (path: string) => ({
 });
 
 describe("requestCompactionSummary", () => {
+  it('reports billed usage even when the response has no summary', async () => {
+    const onUsage = vi.fn();
+    expect(await requestCompactionSummary({ provider: { headers: {}, baseUrl: 'https://provider.invalid', model: 'm' },
+      messages: [], fetchImpl: (async () => Response.json({ choices: [], usage: { prompt_tokens: 7, completion_tokens: 2 } })) as typeof fetch,
+      onUsage })).toBeUndefined();
+    expect(onUsage).toHaveBeenCalledOnce();
+    expect(onUsage).toHaveBeenCalledWith(expect.objectContaining({ prompt_tokens: 7, completion_tokens: 2 }));
+  });
+
+  it('retains billing evidence when the shared budget rejects the reported usage', async () => {
+    const onUsage = vi.fn();
+    const settle = vi.fn(() => {
+      expect(onUsage).toHaveBeenCalledOnce();
+      throw new ModelAdmissionError('breach', 'persisted');
+    });
+    await expect(requestCompactionSummary({ provider: { headers: {}, baseUrl: 'https://provider.invalid', model: 'm' },
+      messages: [], fetchImpl: (async () => Response.json({ choices: [{ message: { content: 'summary' } }], usage: { prompt_tokens: 7, completion_tokens: 2 } })) as typeof fetch,
+      onUsage, requestPolicy: { reserve: () => ({ id: 'fixture', dispatch() {}, confirmUnsent() {}, settle }) },
+    })).rejects.toMatchObject({ code: 'breach' });
+    expect(onUsage).toHaveBeenCalledOnce(); expect(settle).toHaveBeenCalledOnce();
+  });
   it("names the files this compaction saw", async () => {
     const { provider, fetchImpl } = providerReturning("a summary");
     const checkpoint = await requestCompactionSummary({

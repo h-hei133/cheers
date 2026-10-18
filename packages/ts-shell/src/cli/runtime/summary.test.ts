@@ -22,6 +22,8 @@ import * as authorization from '../../provider/request/authorization.js';
 import * as attempts from '../../provider/request/attempt.js';
 import { credentialIdentityFor } from '../../core/auth/account/pool.js';
 import { compactionOperationsPath } from '../../session/compactionOperation.js';
+import { getSessionUsage, recordSessionUsage, totalTokens } from '../../observability/usageTelemetry.js';
+import { costModel } from '../../core/commands/cost/model.js';
 
 const observed = vi.hoisted(() => ({ deps: undefined as SessionRuntimeDependencies | undefined, compaction: undefined as CompactionSetup | undefined }));
 // Exercise the production composition and real summary engine without starting UI/scheduling loops.
@@ -63,7 +65,7 @@ async function fixture(summaryModel = 'namespace/summary') {
       model: 'main', baseUrl: `http://127.0.0.1:${address.port}/${id}/v1`, status: 'connected', createdAt: '2026-01-01', updatedAt: '2026-01-01' })) },
   readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
   writeCatalogCache([{ id: 'openai', models: [{ id: 'main', reasoning: true, contextWindow: 4000, maxTokens: 100 },
-    { id: summaryModel, reasoning: true, contextWindow: 32000, maxTokens: 100 }] }]);
+    { id: summaryModel, reasoning: true, contextWindow: 32000, maxTokens: 100, cost: { promptPerMTok: 2, completionPerMTok: 4 } }] }]);
   const context = { cwd: setup.root, projectRoot: setup.root, sessionId: setup.session.id };
   expect((await runModelPresetCommand(['save', 'work', '--profile', 'default=a/main@low', `summary=b/${summaryModel}@high`], context)).output).toContain('saved');
   expect((await runModelPresetCommand(['apply', 'work', '--all'], context)).output).toContain('all roles applied');
@@ -126,6 +128,8 @@ it.each([false, true])('refuses duplicate relay claims before compaction sends (
 
 it.each(['manual', 'automatic', 'branch', 'prefix'])('routes %s summaries to the exact role while preserving the main window and shared ledger', async kind => {
   const setup = await fixture(); const global = fs.readFileSync(getUserRuntimeConfigPath());
+  recordSessionUsage(setup.session.id, { provider: 'openai', model: 'main', promptTokens: 400, completionTokens: 1 });
+  const history = structuredClone(getSessionUsage(setup.session.id).recentRequests);
   const { deps } = runtime(setup);
   const prepare = vi.spyOn(attempts, 'prepareRequestAttempt');
   writeGoal(setup.manager, setup.session, readGoalEdit(setup.manager, setup.session), { type: 'set', objective: 'Condense fixture' });
@@ -149,6 +153,17 @@ it.each(['manual', 'automatic', 'branch', 'prefix'])('routes %s summaries to the
   expect(decodeRequestLedger(readBoundSessionState(setup.manager, setup.session).state.requestLedger)!.scopes[goal]).toMatchObject({ inputTokens: 4 * count, outputTokens: count, pending: {} });
   expect(readSessionModel(setup.session.id)).toMatchObject({ connectionId: 'a', model: 'main', roles: { summary: { connectionId: 'b', thinkingEffort: 'high' } } });
   expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(global);
+  expect(totalTokens(getSessionUsage(setup.session.id))).toBe(401 + 5 * count);
+  const saved = readBoundSessionState(setup.manager, setup.session).state.usage!;
+  expect(Object.values(saved.byModel).find(bucket => bucket.attribution?.model === 'namespace/summary'))
+    .toMatchObject({ attribution: { provider: 'openai', rates: { promptPerMTok: 2, completionPerMTok: 4 } },
+      promptTokens: 4 * count, completionTokens: count, turnsCount: count });
+  expect(costModel(getSessionUsage(setup.session.id), []).buckets.find(bucket => bucket.model === 'namespace/summary')?.estimate.usd)
+    .toBeCloseTo(0.000012 * count);
+  if (kind !== 'manual') {
+    expect(getSessionUsage(setup.session.id).lastPromptTokens).toBe(400);
+    expect(getSessionUsage(setup.session.id).recentRequests).toEqual(history);
+  }
 });
 
 it.each(['deleted', 'provider-reused', 'scope', 'effort', 'window', 'output', 'thinking-output'])('refuses a %s summary target without sending to the parent or changing history', async change => {

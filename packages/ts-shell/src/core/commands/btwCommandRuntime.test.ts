@@ -4,6 +4,11 @@ import { loadCatalog } from "../models/catalogStore.js";
 import { providerFetchForEndpoint } from "../../provider/request/fetch.js";
 import { resolveProviderCredential } from "../shell/providerCredentials.js";
 import { routeSlashCommand } from "./slashRouter.js";
+import { createAdvisorHarness, cleanupAdvisorHarnesses } from '../../test-utils/advisor.js';
+import { getSessionUsage, recordSessionUsage, resetSessionUsage } from '../../observability/usageTelemetry.js';
+import { readBoundSessionState } from '../../session/store/bound.js';
+import { costModel } from './cost/model.js';
+import { sessionUsageSink } from '../../session/store/usage.js';
 
 vi.mock("../../config/runtimeConfig.js", async () => ({
   ...await vi.importActual<typeof import('../../config/runtimeConfig.js')>('../../config/runtimeConfig.js'),
@@ -21,7 +26,33 @@ beforeEach(() => {
   } as never);
   vi.mocked(loadCatalog).mockReturnValue([{ id: "fixture", name: "Fixture", endpoint: "openai-compatible", models: [{ id: "m", name: "Model" }] }] as never);
 });
-afterEach(() => { vi.clearAllMocks(); vi.useRealTimers(); });
+afterEach(() => { cleanupAdvisorHarnesses(); vi.clearAllMocks(); vi.useRealTimers(); });
+
+it.each(['stop', 'content_filter', 'empty'])('persists side-question fees for a %s response without changing main context or history', async finish => {
+  const setup = createAdvisorHarness(false, false);
+  const prices = { promptPerMTok: 3, completionPerMTok: 6 };
+  vi.mocked(loadCatalog).mockReturnValue([{ id: 'fixture', models: [{ id: 'm', cost: prices }] }] as never);
+  recordSessionUsage(setup.session.id, { provider: 'main', model: 'm', promptTokens: 400, promptMessageCount: 2 });
+  const foreground = structuredClone(getSessionUsage(setup.session.id));
+  const turns = structuredClone(setup.manager.getSession(setup.session.id)!.turns);
+  vi.mocked(providerFetchForEndpoint).mockReturnValue((async () => {
+    prices.promptPerMTok = 99;
+    return Response.json({ choices: [{ message: { content: finish === 'empty' ? '' : 'answer' }, finish_reason: finish === 'content_filter' ? finish : 'stop' }],
+      usage: { prompt_tokens: 100, completion_tokens: 2, total_tokens: 102 } });
+  }) as typeof fetch);
+  const result = await runBtwCommand(['question'], { cwd: setup.root, projectRoot: setup.root, sessionId: setup.session.id,
+    recordAuxiliaryUsage: sessionUsageSink(setup.session.id) });
+  expect(result.report?.facts?.delivered).toBe(finish === 'stop');
+  const saved = readBoundSessionState(setup.manager, setup.session).state.usage!;
+  expect(Object.values(saved.byModel).find(bucket => bucket.attribution)).toMatchObject({
+    promptTokens: 100, completionTokens: 2, attribution: { rates: { promptPerMTok: 3 } },
+  });
+  expect(costModel(getSessionUsage(setup.session.id), []).buckets.find(bucket => bucket.attribution)?.estimate.usd).toBeCloseTo(0.000312);
+  expect(getSessionUsage(setup.session.id)).toMatchObject({ lastPromptTokens: 400, lastPromptMessageCount: 2,
+    lastBucketKey: foreground.lastBucketKey, recentRequests: foreground.recentRequests });
+  expect(setup.manager.getSession(setup.session.id)!.turns).toEqual(turns);
+  resetSessionUsage(setup.session.id);
+});
 
 it.each([true, false, undefined])("uses catalog temperature capability %s for side questions", async (supportsTemperature) => {
   vi.mocked(loadCatalog).mockReturnValue([{ id: "fixture", name: "Fixture", endpoint: "google-generative-ai", models: [

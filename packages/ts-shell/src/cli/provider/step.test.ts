@@ -15,6 +15,7 @@ import { readBoundSessionState } from '../../session/store/bound.js';
 import { createTaskToolDefinition } from '../../core/tools/taskTool.js';
 import { runTurn } from '../../turn/session.js';
 import { runAgentsCommand } from '../../core/subagents/command.js';
+import { getSessionUsage } from '../../observability/usageTelemetry.js';
 
 const servers: http.Server[] = [];
 afterEach(async () => {
@@ -113,11 +114,15 @@ it('sends actual different body.model with independent tool-free context, shares
   const setup = createAdvisorHarness(); writeGoal(setup.manager, setup.session, readGoalEdit(setup.manager, setup.session), { type: 'set', objective: 'Independent review' });
   const server = await wire(setup); const mainStep = createProviderStep(server.request, new Map(), {});
   await mainStep([{ role: 'user', content: 'PRIVATE_MAIN_CONTEXT_NOT_INCLUDED_IN_REVIEW' }], setup.signal, {}, { allowTools: false });
+  const foreground = structuredClone(getSessionUsage(setup.session.id));
   await setup.runtime.capture(setup.boundary('BOUND_SNAPSHOT_TOOL_EVIDENCE'), server.runner, setup.signal);
   expect(server.main).not.toHaveBeenCalled(); expect(server.received.map(body => body.model)).toEqual(['primary-model', 'review-model']);
   expect(JSON.stringify(server.received[1])).toContain('BOUND_SNAPSHOT_TOOL_EVIDENCE');
   expect(JSON.stringify(server.received[1])).not.toContain('PRIVATE_MAIN_CONTEXT_NOT_INCLUDED_IN_REVIEW'); expect(server.received[1]!.tools ?? []).toHaveLength(0);
   expect(setup.runtime.view().notes[0]!.text).toBe('INDEPENDENT_ADVISOR_FINDING');
+  expect(getSessionUsage(setup.session.id)).toMatchObject({ lastPromptTokens: foreground.lastPromptTokens,
+    lastPromptMessageCount: foreground.lastPromptMessageCount, lastBucketKey: foreground.lastBucketKey,
+    lastPromptIdentity: foreground.lastPromptIdentity, recentRequests: foreground.recentRequests, turnsCount: 2 });
   const scope = () => decodeRequestLedger(readBoundSessionState(setup.manager, setup.session).state.requestLedger)!.scopes[readGoalEdit(setup.manager, setup.session).goal!.id]!;
   expect(scope()).toMatchObject({ inputTokens: 8, outputTokens: 2, historyUnknown: false, pending: {} });
   writeGoal(setup.manager, setup.session, readGoalEdit(setup.manager, setup.session), { type: 'budget', cap: 0 });

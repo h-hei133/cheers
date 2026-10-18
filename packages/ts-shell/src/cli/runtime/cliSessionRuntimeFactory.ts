@@ -64,6 +64,7 @@ import { requestCompactionSummary } from "../../core/query/compaction/summarize.
 import { providerFetchForEndpoint, providerFetchFromTimeouts, providerTimeoutsFrom } from "../../provider/request/fetch.js";
 import { accountAuthFor, providerAuthorization } from "../../provider/request/authorization.js";
 import { catalogBaseUrl, catalogModel, catalogProvider, providerEndpoint } from "../../core/models/catalog.js";
+import { sessionUsageRecorder } from '../../session/store/usage.js';
 import { resolveRequestShape } from "../../core/models/requestShape.js";
 import { endpointShape, type EndpointKind } from "../../provider/endpoints/index.js";
 import { projectMemoryRootFor } from "../../memory/projectMemoryRoot.js";
@@ -307,6 +308,8 @@ export function createCliSessionRuntime(input: {
     summarizeAbandonedTurns: (messages) => {
       const operation = configurationOperation(input.runtimeContext);
       const config = operation.config; const catalog = operation.publication.catalog;
+      const usageFor = sessionUsageRecorder(input.runtimeContext.session.id);
+      const requestPolicy = goalPolicyFor(input.runtimeContext, input.sessionManager);
       const resolved = input.providerRuntimeBridge.resolveCredentialSnapshot();
       const admission = operation.admission;
       const role = captureSummaryRole({ config, catalog, workspaceRoot: input.runtimeContext.projectRoot, admission,
@@ -316,7 +319,9 @@ export function createCliSessionRuntime(input: {
         assertAdmission(admission);
         if (!provider) return undefined;
         return requestCompactionSummary({
-          requestPolicy: goalPolicyFor(input.runtimeContext, input.sessionManager), purpose: 'branch-summary', maxOutputTokens: config.maxOutputTokens,
+          requestPolicy, purpose: 'branch-summary', maxOutputTokens: config.maxOutputTokens,
+          onUsage: usageFor({ provider: provider.providerId ?? '', model: provider.model, baseUrl: provider.baseUrl,
+            rates: catalogModel(catalog, provider.providerId ?? '', provider.model, provider.baseUrl)?.cost }),
           modelTransport: providerModelTransport(config, provider.endpoint, admission),
           provider,
           // The third of the three summarisers, and the one that was missed: it kept

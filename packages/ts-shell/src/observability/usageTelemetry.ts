@@ -1,4 +1,4 @@
-import { sessionTelemetries } from './usage/state.js';
+import { currentUsage, sessionTelemetries } from './usage/state.js';
 import type { ModelCostRates } from "../core/models/catalog.js";
 import type { RequestContext } from '../context/request/model.js';
 import type { PromptMeasurementIdentity, UsageAttribution } from './usage/model.js';
@@ -126,9 +126,11 @@ export function recordSessionUsage(
     cacheReadTokens?: number;
     cacheWriteTokens?: number;
   },
-  options: { readonly affectsContext?: boolean; readonly promptMeasured?: boolean } = {},
+  options: { readonly affectsContext?: boolean; readonly promptMeasured?: boolean;
+    readonly scope?: Map<string, SessionUsageTelemetry> } = {},
 ): void {
-  const existing = sessionTelemetries().get(sessionId) ?? emptyTelemetry();
+  const scope = options.scope ?? sessionTelemetries();
+  const existing = currentUsage(sessionId, scope) ?? emptyTelemetry();
   // A report that does not name a model belongs to whichever one last answered:
   // creating a `default` bucket for it would split that model's tokens in two and
   // price them at two different rates.
@@ -203,8 +205,11 @@ export function recordSessionUsage(
     });
   }
 
-  sessionTelemetries().set(sessionId, existing);
+  scope.set(sessionId, existing);
 }
+
+/** One normalized accounting record shared by the runtime and injected session sinks. */
+export type SessionUsageRecord = Parameters<typeof recordSessionUsage>[1];
 
 /** Append to the bounded history, dropping the oldest entry once it is full. */
 function pushHistory(telemetry: SessionUsageTelemetry, entry: UsageHistoryEntry): void {
@@ -264,7 +269,7 @@ export function invalidatePromptMeasurement(sessionId: string): void {
 }
 
 export function getSessionUsage(sessionId: string): SessionUsageTelemetry {
-  return sessionTelemetries().get(sessionId) ?? emptyTelemetry();
+  return currentUsage(sessionId) ?? emptyTelemetry();
 }
 
 export function recordRequestContext(sessionId: string, context: RequestContext): void {
@@ -313,7 +318,7 @@ export function resetSessionUsage(sessionId: string): void {
 
 /** Restore once on activation. Never replace live, possibly unflushed usage. */
 export function restoreSessionUsage(sessionId: string, snapshot: unknown): void {
-  if (sessionTelemetries().has(sessionId)) return;
+  if (currentUsage(sessionId)) return;
   const restored = decodeUsageSnapshot(snapshot);
   if (!restored) return;
   const telemetry = Object.assign(emptyTelemetry(), restored);
@@ -330,8 +335,9 @@ export function persistSessionUsage(
   sessionId: string,
   current: unknown,
   write: (snapshot: SessionUsageSnapshot | undefined) => void,
+  scope = sessionTelemetries(),
 ): void {
-  const live = sessionTelemetries().get(sessionId);
+  const live = currentUsage(sessionId, scope);
   const snapshot = live
     ? mergeUsageDelta(current, live, persistedBaselines.get(live))
     : decodeUsageSnapshot(current);

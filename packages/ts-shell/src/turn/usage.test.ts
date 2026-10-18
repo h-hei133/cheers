@@ -3,14 +3,62 @@ import type { AddressInfo } from 'node:net';
 import { afterEach, expect, it } from 'vitest';
 import type { CatalogProvider } from '../core/models/catalog.js';
 import { costModel } from '../core/commands/cost/model.js';
-import { getSessionUsage, resetSessionUsage } from '../observability/usageTelemetry.js';
+import { getSessionUsage, recordSessionUsage, resetSessionUsage, totalTokens } from '../observability/usageTelemetry.js';
 import { createStepFunction } from './step.js';
+import { ModelAdmissionError } from '../core/agent/request/model.js';
 
 const sessionId = 'actual-relay-accounting';
 let server: http.Server | undefined;
 afterEach(async () => {
   resetSessionUsage(sessionId);
   if (server) { server.closeAllConnections(); await new Promise<void>(resolve => server!.close(() => resolve())); }
+});
+
+it.each(['success', 'missing-usage', 'http-error', 'malformed', 'cancel'])('keeps the parent context intact across a delegated %s request', async scenario => {
+  recordSessionUsage(sessionId, { provider: 'openai', model: 'same', promptTokens: 9000, promptMessageCount: 0,
+    promptIdentity: { provider: 'openai', model: 'same', endpoint: 'openai-compatible' } });
+  const foreground = structuredClone(getSessionUsage(sessionId));
+  const received: string[] = [];
+  server = http.createServer((request, response) => {
+    received.push(request.url!); request.resume();
+    response.writeHead(scenario === 'http-error' ? 503 : 200, { 'content-type': 'application/json' });
+    if (scenario === 'cancel') { response.flushHeaders(); return; }
+    response.end(scenario === 'malformed' ? '{' : JSON.stringify({ choices: [{ message: { content: 'auxiliary answer' }, finish_reason: 'stop' }],
+      ...(scenario === 'success' ? { usage: { prompt_tokens: 10, completion_tokens: 2 } } : {}) }));
+  });
+  await new Promise<void>(resolve => server!.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const step = createStepFunction({ provider: { headers: {}, provider: 'openai', model: 'same', baseUrl },
+    workspaceRoot: process.cwd(), sessionId, systemPrompt: '', tools: [], contextWindow: 1000, reserveTokens: 0, maxOutputTokens: 10,
+    catalog: [{ id: 'openai', baseUrl, models: [{ id: 'same', contextWindow: 1000, maxTokens: 10, cost: { promptPerMTok: 2, completionPerMTok: 4 } }] }],
+    retry: { enabled: false } });
+  const controller = new AbortController();
+  let accepted!: () => void; const headers = new Promise<void>(resolve => { accepted = resolve; });
+  const pending = step([{ role: 'user', content: 'independent prompt' }], controller.signal, {}, { allowTools: false, agentMode: 'plan', onRequestSent: accepted });
+  if (scenario === 'cancel') {
+    await headers;
+    expect(getSessionUsage(sessionId).lastPromptTokens).toBe(9000);
+    controller.abort();
+  }
+  const result = await pending;
+  expect(result.stopReason).toBe(scenario === 'success' || scenario === 'missing-usage' ? 'stop' : scenario === 'cancel' ? 'aborted' : 'error');
+  expect(received).toHaveLength(1);
+  expect(getSessionUsage(sessionId)).toMatchObject({ lastPromptTokens: 9000, lastPromptMessageCount: 0,
+    lastPromptIdentity: foreground.lastPromptIdentity, lastBucketKey: foreground.lastBucketKey, recentRequests: foreground.recentRequests });
+  expect(totalTokens(getSessionUsage(sessionId))).toBe(scenario === 'success' ? 9012 : 9000);
+});
+
+it('retains foreground billing when reported usage breaches the reserved budget', async () => {
+  const step = createStepFunction({ provider: { headers: {}, provider: 'fixture', model: 'm', baseUrl: 'https://provider.invalid' },
+    workspaceRoot: process.cwd(), sessionId, systemPrompt: '', tools: [],
+    fetchImpl: (async () => Response.json({ choices: [{ message: { content: 'answer' }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 10, completion_tokens: 2 } })) as typeof fetch,
+    requestPolicy: { reserve: () => ({ id: 'fixture', dispatch() {}, confirmUnsent() {}, settle() { throw new ModelAdmissionError('breach', 'persisted'); } }) },
+  });
+  const result = await step([], undefined, {}, { allowTools: false });
+  expect(result).toMatchObject({ stopReason: 'error', admissionFailure: 'breach' });
+  expect(totalTokens(getSessionUsage(sessionId))).toBe(12);
+  expect(getSessionUsage(sessionId).turnsCount).toBe(1);
 });
 
 it('attributes late HTTP responses to the exact relay and prices captured before dispatch', async () => {

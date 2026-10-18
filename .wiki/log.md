@@ -7846,3 +7846,15 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - Linux 隔离 PTY Node/exe × regular/fullscreen 四格全部通过：实际 A/B/C 请求、同名模型的两组价格与缺价、只读 cost reader、退出后修改当前目录价格、通过 `--session-id` 在新进程恢复、再次只读查看、全局配置字节不变、退出 0。探针前几次因选择错模型、误用恢复参数、欢迎文字被历史滚出屏幕及 reader 关闭未同步而失败，均分类为夹具问题；最终等待实际输入提示和 reader footer，未为夹具改产品行为。只使用本机 HTTP 和合成凭据，产物为 `usage.pty.py`、log 及 `usage/`。
 - cycles、config consumers（53/53）、declarations、Node floor 与脚本测试 59 项通过。NormProof 退出 0、verdict partial，无环/解析义务 satisfied，仍为原 9 项函数上限 advisory；修改模块均未越界。最终 strict docs drift 与 diff 在本条写入后执行。
 - 本条写入时尚未提交/推送本批，新 SHA CI 待实际读回。裁决开头的旧“已实现”概括已按当前返工状态纠正；辅助请求费用投影、主账号发布后的本回合 checkpoint、PRV-03…05 完整审计、CTX-03 及其余全部 47 项继续原范围。本批不构成 W2 或阶段完成。
+
+
+### PRV-05 辅助请求计量与会话归属
+
+- 历史费用批 `ea770c7be9d6bf826054b15d3384bb45fdaedcd8` 已推送；本轮实际读回 Architecture Watch `39124441199` 与 CI `39124441229` 均 success。此前失败 run 记录保持原样。
+- 侧问、手动/自动/前缀/分支摘要、普通委派/顾问和 cache 刷新接入原用量 owner、会话锁及增量合并。每次真实发送捕获目的地/价格；拒绝、空摘要、完整但取消的缓存响应与共享预算结算超限仍保存返回的用量证据。缓存是否保活和费用累计分开，不新增账本或自动重试模型。未完成流没有完整证据，不能推定真实结算。
+- 委派不借主 prompt 测量作预算，也不清除或覆盖主 context、最后模型桶和 prompt/cache 历史。只读参考对照采用按各次请求价格累计及把摘要/分支费用计入会话的决定；保留本项目更强的共享预算、原 store 绑定、拒绝费用和缺价区分，不把参考仅随成功摘要返回用量的做法当作拒绝费用合同。
+- 独立复核先 ESCALATE：旧响应先记入按 ID 的内存，失效目录虽立即不写，后续普通保存却会把旧 21 tokens 写入同 ID 新会话。修复后捕获原 profile registry scope、补无 profile 的 home 隔离，并在普通读/恢复/保存前淘汰失效 owner。原目录仍有效但锁/写入失败保留增量；删除/替换后仅报告未能持久化，不重建或转记新会话。最终 APPROVED，独立 5 文件/47 项通过，原污染复现得到新会话仅 5 tokens/新模型桶，旧 21 tokens 未进入。
+- 最终产品受影响集 70 文件/865 测试通过；随后仅补普通 writeSessionState 断言，owner 文件 10 项再通过。类型诊断相对 `ea770c7b` 为 149/149、无新增，不代表全项目 tsc 通过。两种构建通过，最终 TS manifest `a163d38fa316`；脚本测试 59 项及四项静态门禁通过。NormProof 首次因 PATH 无命令未运行，改用仓库同 CI 的自包含 bundle 后实际退出 0；无环/解析义务 satisfied，仍为原 9 项函数上限 advisory，触及模块未新增越界。
+- 六项加载时反转实际退出 1：摘要用量移除 4 失败、侧问用量移除 3 失败、cache 用量移除 2 失败、委派恢复清主 context 为 4 失败/1 通过、丢失捕获 profile scope 为 1 失败、取消 pending owner 检查为 1 失败。未选中的定向用例不计通过；产品源码未回退。产物为 `.omx/verification/phase20/auxiliary.reversals.*`。
+- 新编译模块的两个独立 Node 辅助记录器并发累计、第三进程恢复通过：一旧桶、三新目标/价格桶共 180 tokens/5 次记录，锁内 delta 与重复 flush 不重复，其他 state 不变。Linux 隔离 PTY Node/exe × regular/fullscreen 四格均通过，每格九次实际主/自动摘要/手动摘要/侧问发送与落盘桶、价格和次数完全一致；侧问保持其他 state/global config 字节，退出 0。首次探针误等欢迎提示，随后误要求侧问带主模型 effort，均为夹具合同问题；按实际输入提示和侧问合同修正，未为夹具改产品行为。仅本机 HTTP/合成凭据，夹具已清理；产物为 `auxiliary.process.*`、`auxiliary.pty.py` 与 `auxiliary/`。
+- 本条写入时尚未提交/推送辅助批，新 SHA CI 待实际读回。主账号发布后的本回合 checkpoint 跳过、PRV-03…05 完整审计、CTX-03 生命周期/分段/历史 CAS 及其余全部 47 项继续；本批不构成 W2 或全阶段完成。最终 strict docs drift 与 diff 检查在本条写入后运行。

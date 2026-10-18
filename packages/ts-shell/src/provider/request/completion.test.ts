@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { requestSimpleCompletion } from "./completion.js";
 import { endpointShape } from "../endpoints/index.js";
+import { ModelAdmissionError } from '../../core/agent/request/model.js';
 
 /**
  * The out-of-band request path.
@@ -29,6 +30,21 @@ function capturingFetch(): {
 }
 
 describe("an out-of-band completion", () => {
+  it.each(['content_filter', 'stop'])('reports billed usage before rejecting a %s answer or a budget breach', async finish_reason => {
+    const onUsage = vi.fn();
+    const settle = vi.fn(() => {
+      expect(onUsage).toHaveBeenCalledWith(expect.objectContaining({ prompt_tokens: 7, completion_tokens: 2 }));
+      throw new ModelAdmissionError('breach', 'persisted');
+    });
+    await expect(requestSimpleCompletion({
+      provider: { headers: {}, baseUrl: 'https://provider.invalid', model: 'm', fetchImpl: (async () => Response.json({
+        choices: [{ message: { content: 'partial answer' }, finish_reason }], usage: { prompt_tokens: 7, completion_tokens: 2 },
+      })) as typeof fetch }, messages: [{ role: 'user', content: 'hello' }], onUsage,
+      requestPolicy: { reserve: () => ({ id: 'fixture', dispatch() {}, confirmUnsent() {}, settle }) },
+    })).rejects.toMatchObject({ code: 'breach' });
+    expect(onUsage).toHaveBeenCalledOnce();
+    expect(settle).toHaveBeenCalledOnce();
+  });
   it.each([
     ["openai-compatible", { choices: [{ message: { content: null, refusal: "Refused" }, finish_reason: "stop" }] }],
     ["openai-compatible", { choices: [{ message: { content: "Partial answer", refusal: "Refused" }, finish_reason: "stop" }] }],

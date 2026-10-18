@@ -50,6 +50,7 @@ import type { StructuredLogger } from "../observability/structuredLogger.js";
 import { StreamingRenderer } from "../presentation/terminal/streaming.js";
 import type { SessionContinuitySnapshot } from "../session/SessionManager.js";
 import { SessionManager } from "../session/SessionManager.js";
+import { sessionUsageSink } from '../session/store/usage.js';
 import {
   analyzeApprovalModeConflict,
   materializeApprovalModeObject,
@@ -177,6 +178,7 @@ export async function runNonInteractivePrompt(options: {
     commitCommand: commitCommandFor(options.runtimeContext),
     planningCommand: planningCommandFor(options.runtimeContext, options.sessionManager, options.sessionRuntime),
     requestPolicy: goalPolicyFor(options.runtimeContext, options.sessionManager),
+    recordAuxiliaryUsage: sessionUsageSink(options.runtimeContext.session.id),
     prompt: trimmedPrompt,
     cwd: options.runtimeContext.cwd,
     projectRoot: options.runtimeContext.projectRoot,

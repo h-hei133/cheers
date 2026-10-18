@@ -15,6 +15,7 @@ import type { CompactionSetup } from "../../turn/session.js";
 import type { RequestSigner } from "../../provider/request/fetch.js";
 import { createCacheWarmingRunner } from "../../turn/cacheWarm.js";
 import { loadCatalog } from '../../core/models/catalogStore.js';
+import { getSessionUsage, resetSessionUsage, totalTokens } from '../../observability/usageTelemetry.js';
 
 const fixture = vi.hoisted(() => ({
   deps: undefined as SessionRuntimeDependencies | undefined,
@@ -89,6 +90,7 @@ beforeEach(async () => {
   baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
 afterEach(async () => {
+  resetSessionUsage('signed-summary');
   server.closeAllConnections();
   await new Promise<void>(resolve => server.close(() => resolve()));
   vi.unstubAllEnvs(); fs.rmSync(scratch, { recursive: true, force: true });
@@ -115,11 +117,15 @@ function runtime(withKey: boolean) {
 
 it.each([true, false])("signs side questions with final JSON URL/body (apiKey=%s)", async withKey => {
   runtime(withKey);
-  const result = await runBtwCommand(["question"], { cwd: process.cwd() });
+  const result = await runBtwCommand(["question"], { cwd: process.cwd(), sessionId: 'signed-summary' });
   expect(result.output).toContain("SUMMARY_ANSWER");
   expect(signed).toHaveLength(1);
   expect(received).toEqual([{ path: "/model/fixture-model/converse", body: JSON.parse(signed[0]!.body!),
     signature: "signed-1", accept: "application/json" }]);
+  expect(totalTokens(getSessionUsage('signed-summary'))).toBe(101);
+  expect(Object.values(getSessionUsage('signed-summary').byModel)[0]).toMatchObject({
+    promptTokens: 20, cacheReadTokens: 80, completionTokens: 1, attribution: { rates: { promptPerMTok: 10 } },
+  });
 });
 
 it.each([true, false])("signs manual history and prefix summaries (apiKey=%s)", async withKey => {

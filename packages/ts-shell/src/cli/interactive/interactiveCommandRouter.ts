@@ -36,6 +36,7 @@ import {
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
 import type { StreamingRenderer } from "../../presentation/terminal/streaming.js";
 import type { SessionManager } from "../../session/SessionManager.js";
+import { sessionUsageSink } from '../../session/store/usage.js';
 import { readSessionNavigation } from '../../session/query/navigation.js';
 import type { ApprovalModeObject } from "../approval/approvalModeContract.js";
 import {
@@ -176,6 +177,7 @@ export async function routeInteractiveCommand(
     commitCommand: commitCommandFor(input.runtimeContext),
     planningCommand: planningCommandFor(input.runtimeContext, input.sessionManager, input.sessionRuntime, input.readline),
     requestPolicy: goalPolicyFor(input.runtimeContext, input.sessionManager),
+    recordAuxiliaryUsage: sessionUsageSink(input.runtimeContext.session.id),
     prompt: input.prompt,
     ...(input.attachments ? { attachments: input.attachments } : {}),
     cwd: input.runtimeContext.cwd,

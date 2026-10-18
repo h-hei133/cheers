@@ -16,6 +16,7 @@ import { prepareRequestAttempt } from '../../../provider/request/attempt.js';
 import type { ModelTransport, RequestPolicy } from '../../agent/request/model.js';
 import type { ResolvedRequestShape } from '../../models/requestShape.js';
 import { promptTokensFor, requestBudget } from '../../../context/request/budget.js';
+import type { ProviderUsage } from '../../../turn/completion.js';
 
 /**
  * One summarization request.
@@ -88,6 +89,8 @@ export interface CompactionChatMessage {
 }
 
 export interface CompactionRequest {
+  /** Report billing before summary validation or a budget breach can reject the result. */
+  readonly onUsage?: (usage: ProviderUsage | undefined) => void;
   readonly requestPolicy?: RequestPolicy;
   readonly modelTransport?: ModelTransport;
   readonly maxOutputTokens?: number;
@@ -191,6 +194,7 @@ export async function requestCompactionSummary(request: CompactionRequest): Prom
   }, fetchImpl, request.modelTransport);
   if (!res.ok) { attempt.settle(); return undefined; }
   const completion = endpointShape(kind).readBody(await res.json());
+  request.onUsage?.(completion.usage);
   attempt.settle(completion.usage);
   const summaryContent = completion.choices?.[0]?.message?.content;
   if (!summaryContent) return undefined;

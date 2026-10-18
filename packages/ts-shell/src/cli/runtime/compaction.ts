@@ -2,7 +2,7 @@ import type { RuntimeConfig } from '../../config/runtimeConfig.js';
 import type { Admission } from '../../core/network/admission.js';
 import type { RequestPolicy } from '../../core/agent/request/model.js';
 import type { AgentMessage } from '../../core/agent/state.js';
-import { catalogProvider, type CatalogProvider } from '../../core/models/catalog.js';
+import { catalogModel, catalogProvider, type CatalogProvider } from '../../core/models/catalog.js';
 import { resolveContextWindow, resolveTokenBudget } from '../../core/models/window.js';
 import { messageToText } from '../../model-adapters/multimodal.js';
 import { createComponentLogger } from '../../observability/structuredLogger.js';
@@ -16,6 +16,7 @@ import { prepareCompactionMessages, requestCompactionSummary, type CompactionCha
 import { TURN_PREFIX_COMPACTION_PROMPT } from '../../core/query/compaction/summarizer.js';
 import { toChatMessages } from '../../turn/prompt.js';
 import { captureSummaryRole } from '../provider/summary.js';
+import { sessionUsageRecorder } from '../../session/store/usage.js';
 
 /**
  * Messages for a compaction call.
@@ -82,6 +83,7 @@ export function buildCompactionWiring(input: {
   readonly catalog: readonly CatalogProvider[];
 }): CompactionWiring {
   const provider = input.provider;
+  const usageFor = sessionUsageRecorder(input.sessionId);
   if (catalogProvider(input.catalog, provider.providerId, provider.baseUrl).ambiguous) throw new Error('The model catalogue has multiple entries for this endpoint. Resolve them before compacting.');
   const runtimeConfig = input.runtimeConfig;
   const summaryRole = captureSummaryRole({ config: runtimeConfig, catalog: input.catalog, workspaceRoot: input.workspaceRoot,
@@ -89,6 +91,8 @@ export function buildCompactionWiring(input: {
   const send = async (request: Omit<Parameters<typeof requestCompactionSummary>[0], 'provider' | 'fetchImpl'>) => {
     const summaryProvider = summaryRole ? await summaryRole.resolve() : provider;
     return requestCompactionSummary({ ...request, provider: summaryProvider,
+      onUsage: usageFor({ provider: summaryProvider.providerId ?? '', model: summaryProvider.model,
+        baseUrl: summaryProvider.baseUrl, rates: catalogModel(input.catalog, summaryProvider.providerId ?? '', summaryProvider.model, summaryProvider.baseUrl)?.cost }),
       fetchImpl: providerFetchForEndpoint(runtimeConfig, summaryProvider.endpoint, endpointShape, input.admission),
       modelTransport: providerModelTransport(runtimeConfig, summaryProvider.endpoint, input.admission) });
   };
