@@ -23,14 +23,16 @@ summary: "按 provider 限定的封闭连接集合：显式成员、endpoint/OAu
 
 加载时逐项检查：成员必须存在、属于声明的 provider、不得重复；声明 `baseUrl` 时每个成员的 endpoint 必须与之一致。任一失败使本次配置无效并给出不含秘密的诊断，不会静默丢弃成员。
 
-OAuth 受众沿用现有凭据类型检查：OpenAI 账户 token、Google 账户 token 与订阅 token 各自只发给对应 provider；池不会把一种 token 当作另一种。
+OpenAI/Google 槽位检查现有凭据类型；subscription 保留在 Anthropic/Copilot 的既有槽位。两种 subscription 仍共享类型，没有完整 issuer/受众证明，不能据此宣称跨 provider 受众隔离完成。
+
+账号请求地址来自凭据所属配置或连接、subscription 签发地址，缺省时使用内置地址。连接自身账号不继承 provider profile 地址；CLI 与签发/存储地址冲突即拒绝，模型目录不能把缺省账号搬到其他地址。主请求、委派、摘要、cache、agent 和 `/btw` 共用地址校验，在续期与发送之前拒绝。API key 保留原目录地址回退。显式存储地址只证明配置 owner 绑定，不证明 OAuth 受众或原生协议合法。
 
 ## 2. 选择
 
 | 情形 | 结果 |
 |---|---|
 | 显式 active connection | 必须是完整合法池中的可用成员；池外或仍在退避时拒绝 |
-| CLI 显式 API key/endpoint/provider | 已声明池时不得扩大授权；无池保留原覆盖行为 |
+| CLI 显式 API key/endpoint/provider | 已声明池时不得扩大授权；无池 API key 保留覆盖，账号地址仍校验 owner |
 | 已声明池 | 只在池成员中选择 |
 | 池为空 | `pool-empty`，不发送 |
 | 池成员均不可用 | `pool-unavailable`，不发送 |
@@ -55,6 +57,7 @@ OAuth 受众沿用现有凭据类型检查：OpenAI 账户 token、Google 账户
 
 - refresh lease、请求凭据代次与独立 advisor/subagent 的发送前续期已接入；完整 quota/429 与历史成本归属仍按 PRV-04/05 继续复核。
 - 不复制 live rotating OAuth 到其他 profile；每个 profile 独立登录。
+- subscription 配置规范化现已保留；完整 subscription 续期、原生账号协议及受众仍开放。OpenAI 账号尚无原生 Responses adapter，Google 账号 scope/协议也须继续核验；合成兼容协议成功不能替代这些实现。
 - 本轮已验证完整拓扑、显式/CLI/委派限制、owned credential/实际代次、等待亲和、实际 CLI 子请求与共享账本、Linux 四格隔离 PTY。独立复核、反转和精确交付证据见开发日志；完整 PRV-03/05 仍开放，未运行真实 provider。
 
 ## 5. Refresh 归属与跨进程互斥
@@ -94,7 +97,7 @@ V1 使用同一权威文件和锁迁移，旧 reader 必须拒绝 V2。能由当
 
 ## 6. 委派请求的续期与发布
 
-普通子代理与顾问在实际请求前复用同一账号续期 owner。单次运行最多缓存 32 个捕获的账号身份；并发模型共享正在进行的交换和已验证结果。每次复用仍读取原 `AccountEdit` 的存储回执，删除、重登录、拓扑或镜像变化都拒绝，不能仅凭内存里的新 token 继续发送。目录提供的默认地址用于请求校验，不写入原凭据身份。
+普通子代理与顾问在实际请求前复用同一账号续期 owner。单次运行最多缓存 32 个捕获的账号身份；并发模型共享正在进行的交换和已验证结果。每次复用仍读取原 `AccountEdit` 的存储回执，删除、重登录、拓扑或镜像变化都拒绝，不能仅凭内存里的新 token 继续发送。账号地址先按 owner 校验；请求使用的缺省地址不写入原凭据存储身份，主请求 readiness 后也保持这一合同。
 
 已开始的交换即使被取消也完成条件持久化，但取消后不再派发模型请求。只有存储验证通过才发布新凭据；主账号续期也不可变地更新当前运行配置的精确 owner/镜像，使随后按名称选择的角色使用新凭据。
 

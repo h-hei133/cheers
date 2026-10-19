@@ -43,14 +43,24 @@ async function fixture(catalogDefault = false) {
   return { ...setup, requests, published, select, send };
 }
 
-it.each([false, true])('shares one verified rotation across two delegated models with catalog default %s and sends only the stored credential', async catalogDefault => {
-  const setup = await fixture(catalogDefault);
+it('shares one verified rotation across two delegated models and sends only the stored credential', async () => {
+  const setup = await fixture();
   const renew = observeOAuthRenewal(fresh);
   await Promise.all([setup.send(), setup.send('gpt-5.2')]);
   expect(renew).toHaveBeenCalledOnce(); expect(setup.published).toHaveBeenCalledOnce();
   expect(setup.requests).toHaveLength(2);
   expect(setup.requests.map(row => row.model).sort()).toEqual(['gpt-5.2', 'gpt-5.4']);
   expect(setup.requests.every(row => row.authorization === 'Bearer synthetic-fresh' && row.stored)).toBe(true);
+});
+
+it('refuses a catalogue relocation before renewing an account with no declared endpoint', async () => {
+  const setup = await fixture(true);
+  const renew = observeOAuthRenewal(fresh);
+  const bytes = fs.readFileSync(getUserRuntimeConfigPath());
+  expect(() => setup.send()).toThrow(/catalogue cannot override/);
+  expect(renew).not.toHaveBeenCalled(); expect(setup.published).not.toHaveBeenCalled();
+  expect(setup.requests).toEqual([]);
+  expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(bytes);
 });
 
 it.each(['logout', 'relogin', 'topology'] as const)('cached renewal cannot survive %s and never sends a replacement owner', async kind => {

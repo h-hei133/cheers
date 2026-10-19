@@ -27,3 +27,12 @@ export function sameArraySlots(before: unknown[], after: unknown[]): boolean {
     return true;
   });
 }
+
+export function normalizeBaseUrl(baseUrl?: string): string | undefined {
+  const trimmed = baseUrl?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  return trimmed.replace(/\/+$/, "");
+}

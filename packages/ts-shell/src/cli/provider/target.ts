@@ -2,7 +2,8 @@ import { isRuntimeProvider, type RuntimeConfig } from '../../config/runtimeConfi
 import { resolveProviderCredential, type ProviderCredentialResolution } from '../../core/shell/providerCredentials.js';
 import { providerFacts } from '../../core/providers/facts.js';
 import type { SessionModelRole } from '../../session/model/contract.js';
-import { catalogBaseUrl, type CatalogProvider } from '../../core/models/catalog.js';
+import type { CatalogProvider } from '../../core/models/catalog.js';
+import { providerCredentialBaseUrl } from '../../core/auth/account/target.js';
 
 /** An exact target names an existing connection or provider; a bare model stays on its captured provider. */
 export function delegatedTarget(target: string | SessionModelRole, main: ProviderCredentialResolution, config?: RuntimeConfig,
@@ -38,7 +39,7 @@ export function delegatedTarget(target: string | SessionModelRole, main: Provide
     resolution = resolveProviderCredential({ runtimeConfig: { ...config, sessionConnection: undefined }, cliProvider: owner, cliModel: model });
   }
   if (resolution.model !== model || !resolution.credential
-    || !catalogBaseUrl(catalog, resolution.provider, resolution.baseUrl ?? resolution.credential.baseUrl)) throw new Error('Delegated model has no usable provider binding.');
+    || !providerCredentialBaseUrl(catalog, resolution)) throw new Error('Delegated model has no usable provider binding.');
   const allowed = providerFacts(resolution.provider).accountAuthAllowedModels;
   if (resolution.credential.authMode === 'account-auth' && allowed && !allowed.includes(model)) throw new Error('Delegated model is unavailable for this account binding.');
   return resolution;

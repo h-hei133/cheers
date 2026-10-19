@@ -8,6 +8,11 @@ import { createGitRepoFixture } from '../test-utils/cliHarness.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createServer } from "node:http";
 import * as accountRenewal from '../core/auth/account/renewal.js';
+import { captureAccountEdit } from '../core/auth/account/state.js';
+import { getRuntimeConfig, getUserRuntimeConfigPath } from '../config/runtimeConfig.js';
+import { resolveProviderCredential } from '../core/shell/providerCredentials.js';
+import { providerCredentialBaseUrl } from '../core/auth/account/target.js';
+import { BUILTIN_PROVIDERS } from '../core/models/catalog.js';
 import { recordSessionUsage, resetSessionUsage } from "../observability/usageTelemetry.js";
 import { createTaskToolDefinition } from "../core/tools/taskTool.js";
 import type { QueryEvent } from "../core/query/runtime/events.js";
@@ -102,6 +107,56 @@ function dependencies(): { deps: CliRuntimeInvocationDependencies; calls: string
 }
 
 describe("CLI runtime invocation", () => {
+  for (const provider of ['openai', 'google'] as const) {
+    it.each(['config', 'connection'] as const)(`preserves the ${provider} %s storage binding after readiness chooses a default endpoint`, async source => {
+      vi.stubEnv('OPENAI_API_KEY', ''); vi.stubEnv('GOOGLE_API_KEY', '');
+      const account = { type: provider === 'openai' ? 'openai-chatgpt-account' : 'google-gemini-account',
+        accessToken: 'synthetic-access', refreshToken: 'synthetic-refresh', expiresAt: Date.now() + 3_600_000,
+        ...(provider === 'google' ? { clientId: 'synthetic-client' } : {}) };
+      const configPath = getUserRuntimeConfigPath();
+      fs.mkdirSync(path.dirname(configPath), { recursive: true });
+      fs.writeFileSync(configPath, JSON.stringify({ provider,
+        ...(source === 'config' ? { providerCredentials: { [provider]: { accountAuth: { [provider]: account } } } }
+          : { activeProviderConnectionId: 'owner', providerConnections: [{ id: 'owner', provider, authType: 'account-auth',
+              status: 'connected', accountAuth: { [provider]: account } }] }) }));
+      const config = getRuntimeConfig(workspaceRoot);
+      const selected = resolveProviderCredential({ runtimeConfig: config, env: {} });
+      const bytes = fs.readFileSync(configPath);
+      const effective = providerCredentialBaseUrl(BUILTIN_PROVIDERS, selected);
+      const readiness = vi.fn(async input => { expect(input.baseUrl).toBe(effective); return { ok: true as const }; });
+      const resources = vi.fn((resolution: ProviderCredentialResolution) => {
+        expect(captureAccountEdit(workspaceRoot, resolution).resolution.credential?.accountAuth).toEqual(account);
+        expect(resolution.baseUrl).toBeUndefined();
+        return {};
+      });
+      const { deps, calls } = dependencies();
+      const run = await runCliRuntimeInvocation(baseInput({ providerModeEnv: 'real', providerCredentialResolution: selected,
+        runtimeConfig: config, providerCatalog: BUILTIN_PROVIDERS, prepareProviderResources: resources }), { ...deps, checkProviderReadiness: readiness });
+      await collect(run.events);
+      expect(readiness).toHaveBeenCalledOnce(); expect(resources).toHaveBeenCalledOnce();
+      expect(calls).toEqual(['step']);
+      expect(fs.readFileSync(configPath)).toEqual(bytes);
+    });
+  }
+  it('reports a catalogue/account endpoint conflict before renewal, readiness or resource construction', async () => {
+    const renewal = vi.spyOn(accountRenewal, 'renewStoredAccount');
+    const resources = vi.fn(() => ({}));
+    const { deps, calls } = dependencies();
+    try {
+      const run = await runCliRuntimeInvocation(baseInput({ providerModeEnv: 'real',
+        providerCredentialResolution: { provider: 'openai', expectedEnvVarName: 'OPENAI_API_KEY',
+          credential: { provider: 'openai', source: 'config', authMode: 'account-auth', envVarName: 'OPENAI_API_KEY',
+            accountAuth: { type: 'openai-chatgpt-account', accessToken: 'synthetic-access', refreshToken: 'synthetic-refresh', expiresAt: 1 } } },
+        providerCatalog: [{ id: 'openai', runtime: 'openai', label: 'Foreign', auth: 'oauth', baseUrl: 'https://foreign.invalid/v1', models: [] }],
+        prepareProviderResources: resources }), deps);
+      expect(await collect(run.events)).toEqual([event('readiness-event')]);
+      expect(renewal).not.toHaveBeenCalled();
+      expect(resources).not.toHaveBeenCalled();
+      expect(calls).toHaveLength(1);
+      expect(calls[0]).toContain('provider-readiness:configuration');
+      expect(calls[0]).not.toContain('synthetic');
+    } finally { renewal.mockRestore(); }
+  });
   it('sends nothing for a pending signer-backed connection before independent login', async () => {
     const renewal = vi.spyOn(accountRenewal, 'renewStoredAccount');
     const resources = vi.fn(() => ({})); const { deps, calls } = dependencies();

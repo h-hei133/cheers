@@ -7,7 +7,7 @@ import type { ToolDefinition } from '../../tools/types.js';
 import { buildSystemPrompt, systemPromptSnapshot, type SystemPromptContext } from '../../turn/prompt.js';
 import { createStepFunction, type StepFunction } from '../../turn/step.js';
 import { loadCatalog } from '../../core/models/catalogStore.js';
-import { catalogBaseUrl, catalogProvider, providerEndpoint } from '../../core/models/catalog.js';
+import { catalogProvider, providerEndpoint } from '../../core/models/catalog.js';
 import { accountAuthFor, providerAuthorization } from '../../provider/request/authorization.js';
 import { providerModelTransport } from '../../provider/request/transport.js';
 import { providerFetchForEndpoint } from '../../provider/request/fetch.js';
@@ -25,6 +25,7 @@ import type { SessionModelRole } from '../../session/model/contract.js';
 import { assertAdmission } from '../../core/network/admission.js';
 import { delegatedRenewal, type AccountRotation, type AccountPublication } from './renewal.js';
 import { sessionUsageSink } from '../../session/store/usage.js';
+import { providerCredentialBaseUrl } from '../../core/auth/account/target.js';
 
 export interface ProviderStepHost {
   readonly providerMode: 'synthetic' | 'real';
@@ -55,7 +56,7 @@ export function createProviderStep(
   // catalogue touches the filesystem, and a run that reloaded it mid-turn could
   // change request shape between two steps of the same answer.
   const catalog = request.providerCatalog ?? loadCatalog();
-  const baseUrl = catalogBaseUrl(catalog, resolution.provider, resolution.baseUrl ?? resolution.credential?.baseUrl);
+  const baseUrl = providerCredentialBaseUrl(catalog, resolution);
   if (catalogProvider(catalog, resolution.provider, baseUrl).ambiguous) throw new Error('The model catalogue has multiple entries for this endpoint. Resolve them before sending.');
   const endpoint = providerEndpoint(catalog, resolution.provider, baseUrl);
   const configuredTier = request.serviceTier ?? request.runtimeConfig?.providerConnections

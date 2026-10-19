@@ -7960,3 +7960,15 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - root 相关3文件/29项通过；独立 code lane 的 projection/codec/output 3文件/36项通过，集合重叠不相加。加载时恢复 unchecked JSON.parse，两个拒绝断言实际失败、退出1；产品源码未改。最初新增 legacy id 误写为 `legacy_3`，一次夹具断言失败后按原 `line-3` 合同纠正，未改变产品。
 - 指定 review 模型两路均503不可用，不当作批准；继承当前会话模型的两个独立通道完成 code APPROVE/architecture CLEAR。架构独立执行实际 codec/validation/output，额外验证已有 id 与 prepared wire 保真。审查 test hash `77f8d92f7def5a9d9a2b7f03792d5a32510646472a81d8c4580b8eac52c632dd` 与最终读取一致。四项静态门禁和脚本59项通过；本批仅测试/文档，无产品构建或PTY重跑。最终 docs/diff在本条后运行，当前尚未提交/推送；新 SHA CI待读回。
 - PRV-03 仍有实际账号 endpoint 覆盖发送外来地址、subscription 规范化丢失的隔离复现，见 `audience.probe.*`；已经定位现 owner 并只读比较账号原生协议/地址决定，尚未修复。全部47项继续，四项用户推迟范围保持。
+
+
+### PRV-03 账号地址与 subscription consumer 返工
+
+- decoder 批已提交推送为 `e6311a1415b0fa1cc3ee9c090edad99b84065b17`。本轮实际读回 CI `39248899708`/job `118047529763` 于 `2026-10-19T12:14:43Z` completed/success，所有步骤 success；Architecture Watch `39248899786` success。旧 `da01dd60` 失败仍保留，不据此闭合其他任务。
+- 原编译探针已确认 OpenAI 账号经 CLI 外站覆盖收到一次真实本机HTTP，合成canary到达外站；Copilot配置校验有效却丢subscription。现在配置owner保留Anthropic/Copilot合法subscription，拒绝wrong-provider槽位；解析捕获实际credential source的地址，不借provider profile地址给connection自己的账号。CLI与存储/签发地址冲突返回无凭据的blocked；模型目录不能迁移缺省账号。主请求、委派、summary、compaction/cache、agent及btw共用目标owner，续期前拒绝。API key目录回退保留。
+- 独立架构复核发现无显式地址的主请求把内置地址写入resolution，导致后续AccountEdit与存储身份不符；readiness独立使用有效地址，account resolution保留原存储地址。新增OpenAI/Google × config/connection四个真实captureAccountEdit回归；有效反转实际抛出unchanged配置冲突。
+- 类型/规范化移到config/account，旧runtimeConfig类型导出保留。原runtimeConfig函数22降20。初次type-only抽取被NormProof全源图判环，账号接口移动到其owner消除回边；操作中误移ThinkingPreference被构建TS2304和独立复核捕获，已移回。完整生产非strict诊断相对e6311a14为149/149、无新增，不代表全项目tsc干净；最终生产构建通过。
+- root最终受影响24文件/426项通过；五组加载时反转实际断言失败/exit1：subscription保留7项、resolver绑定10项、profile地址借用2项、catalog搬迁3项、main存储投影4项。未回退产品源码。前轮同步抛错用了异步reject断言、Google夹具缺clientId，均按当前合同修正，失败分类为harness/setup，未弱化拒绝。实际新编译HTTP外站覆盖零发送，subscription保留，config原字节不变。
+- 两构建通过，最终TS manifest `456c2865ed70`，exe SHA256 `2d39cf188ea2a8432e27c9a80a66cd6c6aaa255591d550b6486a03c98de149df`；18文件产品/测试manifest `de462da3d367a8c151b645b68a50ad66adc55baf89ecc20f5b933b3a875eb3a6`。最终Linux Node/exe × regular/fullscreen四格实际PTY通过：持久subscription、本机声明owner地址、批准前零写入、一次批准、receipt文件、保存transcript/state、exit0；home全清。普通write直接显示批准，无file-plan pager；会话详情需Esc关闭，regular pyte旧cell残留导致早期关闭断言timeout，修为关闭后fresh raw prompt同步；未改产品规避。合成兼容协议不代表真实账号协议验收。证据在 `.omx/verification/phase20/account.*` 与 `account/`。
+- 最终两独立通道绑定新manifest：code APPROVE，最后4文件/76项及旧export同符号、目标语义诊断0；architecture WATCH，无新blocker，全部type/import图及原接口AST一致。早期15文件/325与布局/最终子集重叠，不与root相加。按code-review规则综合COMMENT，WATCH明确为默认地址仍来自模型catalog、尚无issuer/原生协议证明；账户文档已纠正旧受众完成表述。
+- 四项静态门禁、脚本59项和diff通过。仓库tgz NormProof exit0/partial，无环与unresolved义务satisfied，剩八项旧ceiling advisory；CLI直接normproof不可用后使用CI相同tgz路径，未把命令缺失算通过。最终docs gate在本条后运行。当前尚未提交推送；新SHA CI待读回。完整OAuth受众、OpenAI Responses、Google scope/协议、subscription续期与所有47项继续，仅用户原四项环境/真实质量要求推迟。

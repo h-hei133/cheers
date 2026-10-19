@@ -1,3 +1,4 @@
+import type { ThinkingPreference } from '../core/models/effort.js';
 import os from "node:os";
 import path from "node:path";
 import { resolveUserDataFile, userDataDir } from "../core/paths/userHome.js"
@@ -6,7 +7,9 @@ import { createConfigFields, type ConfigField } from "./fields.js";
 import { readConfigDocument } from "./document.js";
 import { ConfigDocumentError } from "./syntax.js";
 import { readConfigEdit, persistConfigEdit, type ConfigEdit } from "./persistence.js";
-import { normalizeConnectionId, normalizeConfigDenials } from "./values.js";
+import { normalizeBaseUrl, normalizeConnectionId, normalizeConfigDenials } from "./values.js";
+import { normalizeProviderAccountAuth, type AccountAuthConfig, type ProviderAccountAuthConfig } from './account.js';
+export type { OpenAIAccountAuthConfig, GoogleAccountAuthConfig, SubscriptionAccountAuthConfig, AccountAuthConfig, ProviderAccountAuthConfig } from './account.js';
 import { loadConfigLayers, validateRawConfig } from "./layers.js";
 import { captureConfigTrust, type ConfigTrustBinding } from './trust.js';
 import type { ConfigProvenance } from './provenance/model.js';
@@ -65,61 +68,6 @@ export type ProviderConnectionAuthType =
   | "api-key"
   | "account-auth"
   | "browser-assisted-capture";
-
-export interface OpenAIAccountAuthConfig {
-  readonly type: "openai-chatgpt-account";
-  readonly accessToken: string;
-  readonly refreshToken: string;
-  readonly expiresAt: number;
-  readonly accountId?: string;
-}
-
-export interface GoogleAccountAuthConfig {
-  readonly type: "google-gemini-account";
-  readonly accessToken: string;
-  readonly refreshToken: string;
-  readonly expiresAt: number;
-  readonly clientId: string;
-  readonly accountEmail?: string;
-}
-
-/**
- * A credential from a subscription rather than from a registered API client.
- *
- * The flows that issue one — a device code entered elsewhere, a loopback
- * callback on a fixed port — produce a token that is renewed with a different
- * token rather than by signing in again, which is why the refresh material is
- * kept beside it. It carries no account id: the subscription is the identity.
- */
-export interface SubscriptionAccountAuthConfig {
-  readonly type: "subscription";
-  readonly accessToken: string;
-  readonly refreshToken: string;
-  readonly expiresAt: number;
-  /** The API base the subscription is routed to, when the issuer states one. */
-  readonly baseUrl?: string;
-}
-
-/**
- * Any credential an account sign-in can produce.
- *
- * Named once because it is threaded through the resolver, the readiness check,
- * the authorization layer and the request path: spelling the union out at each
- * of those is how a new kind of credential gets added to most of them and missed
- * in one, and the miss shows up as a credential silently not being sent.
- */
-export type AccountAuthConfig =
-  | OpenAIAccountAuthConfig
-  | GoogleAccountAuthConfig
-  | SubscriptionAccountAuthConfig;
-
-export interface ProviderAccountAuthConfig {
-  readonly openai?: OpenAIAccountAuthConfig;
-  readonly google?: GoogleAccountAuthConfig;
-  readonly subscription?: SubscriptionAccountAuthConfig;
-}
-
-import type { ThinkingPreference } from '../core/models/effort.js';
 
 export interface ProviderCredentialConfig {
   readonly apiKey?: string;
@@ -844,89 +792,6 @@ function normalizeProviderConnections(
   }
 
   return normalized;
-}
-
-function normalizeProviderAccountAuth(
-  provider: RuntimeProvider,
-  accountAuth?: ProviderAccountAuthConfig,
-): ProviderAccountAuthConfig | undefined {
-  if (!accountAuth) {
-    return undefined;
-  }
-
-  if (provider === "openai") {
-    const openai = accountAuth.openai;
-    if (!openai || openai.type !== "openai-chatgpt-account") {
-      return undefined;
-    }
-
-    const accessToken = openai.accessToken?.trim();
-    const refreshToken = openai.refreshToken?.trim();
-    const expiresAt = Number(openai.expiresAt);
-    const accountId = openai.accountId?.trim();
-    if (
-      !accessToken ||
-      !refreshToken ||
-      !Number.isFinite(expiresAt) ||
-      expiresAt <= 0
-    ) {
-      return undefined;
-    }
-
-    return {
-      openai: {
-        type: "openai-chatgpt-account",
-        accessToken,
-        refreshToken,
-        expiresAt,
-        ...(accountId ? { accountId } : {}),
-      },
-    };
-  }
-
-  if (provider === "google") {
-    const google = accountAuth.google;
-    if (!google || google.type !== "google-gemini-account") {
-      return undefined;
-    }
-
-    const accessToken = google.accessToken?.trim();
-    const refreshToken = google.refreshToken?.trim();
-    const expiresAt = Number(google.expiresAt);
-    const clientId = google.clientId?.trim();
-    const accountEmail = google.accountEmail?.trim();
-    if (
-      !accessToken ||
-      !refreshToken ||
-      !clientId ||
-      !Number.isFinite(expiresAt) ||
-      expiresAt <= 0
-    ) {
-      return undefined;
-    }
-
-    return {
-      google: {
-        type: "google-gemini-account",
-        accessToken,
-        refreshToken,
-        expiresAt,
-        clientId,
-        ...(accountEmail ? { accountEmail } : {}),
-      },
-    };
-  }
-
-  return undefined;
-}
-
-function normalizeBaseUrl(baseUrl?: string): string | undefined {
-  const trimmed = baseUrl?.trim();
-  if (!trimmed) {
-    return undefined;
-  }
-
-  return trimmed.replace(/\/+$/, "");
 }
 
 function getRuntimeConfigHomeDir(): string {

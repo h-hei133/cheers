@@ -15,7 +15,7 @@ import { registerDeclaredHooks, type HookApprovalRequest } from "../core/hooks/r
 import { loadToolCatalog, type CatalogContent, type ToolCatalogInput } from "../core/tools/catalog.js";
 import type { ToolDiscovery } from "../core/tools/discovery/state.js";
 import { loadCatalog } from "../core/models/catalogStore.js";
-import { catalogBaseUrl, catalogProvider, providerEndpoint, type CatalogProvider } from "../core/models/catalog.js";
+import { catalogProvider, providerEndpoint, type CatalogProvider } from "../core/models/catalog.js";
 import type { RuntimeConfig } from "../config/runtimeConfig.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { buildSystemPrompt, systemPromptSnapshot, type SystemPromptContext } from "../turn/prompt.js";
@@ -44,6 +44,7 @@ import {
 } from "../provider/request/fetch.js";
 import { DEFAULT_ENDPOINT_KIND, endpointShape } from "../provider/endpoints/index.js";
 import { accountAuthFor, providerAuthorization } from "../provider/request/authorization.js";
+import { providerCredentialBaseUrl } from '../core/auth/account/target.js';
 import { renewStoredAccount } from "../core/auth/account/renewal.js";
 import { projectAccountAuth } from '../core/auth/account/projection.js';
 import { publishAccountRotation } from '../cli/provider/publication.js';
@@ -237,7 +238,13 @@ function deferUntilReady(
     }
     const catalog = request.providerCatalog ?? loadCatalog();
     const target = request.providerCredentialResolution;
-    const baseUrl = catalogBaseUrl(catalog, target.provider, target.baseUrl ?? target.credential?.baseUrl);
+    let baseUrl: string | undefined;
+    try { baseUrl = providerCredentialBaseUrl(catalog, target); }
+    catch {
+      yield dependencies.createReadinessTerminalEvent({ sessionId: request.sessionId, prompt: request.prompt,
+        stopReason: 'Provider readiness failed (provider-readiness:configuration): the selected endpoint conflicts with the account credential binding.' });
+      return;
+    }
     if (catalogProvider(catalog, target.provider, baseUrl).ambiguous) {
       yield dependencies.createReadinessTerminalEvent({ sessionId: request.sessionId, prompt: request.prompt,
         stopReason: 'Provider readiness failed (provider-readiness:configuration): multiple model catalogue entries claim this endpoint.' });
@@ -276,7 +283,7 @@ function deferUntilReady(
         ? { runtimeConfig: projectAccountAuth(request.runtimeConfig, resolution, renewed.accountAuth) } : {}),
       providerCredentialResolution: {
         ...resolution,
-        baseUrl,
+        baseUrl: resolution.credential?.accountAuth ? resolution.baseUrl : baseUrl,
         ...(renewed.accountAuth && resolution.credential ? {
           credential: { ...resolution.credential, accountAuth: renewed.accountAuth },
         } : {}),
@@ -286,9 +293,9 @@ function deferUntilReady(
       provider: request.providerCredentialResolution.provider,
       apiKey: request.providerCredentialResolution.credential?.apiKey ?? "",
       accountAuth: request.providerCredentialResolution.credential?.accountAuth,
-      baseUrl: request.providerCredentialResolution.baseUrl,
+      baseUrl,
       model: request.providerCredentialResolution.model,
-      endpoint: providerEndpoint(catalog, request.providerCredentialResolution.provider, request.providerCredentialResolution.baseUrl) ?? DEFAULT_ENDPOINT_KIND,
+      endpoint: providerEndpoint(catalog, request.providerCredentialResolution.provider, baseUrl) ?? DEFAULT_ENDPOINT_KIND,
       signal: request.signal,
       fetchImpl: admittedFetch(providerFetch(request.runtimeConfig), request.admission),
     });

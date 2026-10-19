@@ -63,7 +63,8 @@ import type { InteractiveApprovalResult } from "../interactive/picker/approval.j
 import { requestCompactionSummary } from "../../core/query/compaction/summarize.js";
 import { providerFetchForEndpoint, providerFetchFromTimeouts, providerTimeoutsFrom } from "../../provider/request/fetch.js";
 import { accountAuthFor, providerAuthorization } from "../../provider/request/authorization.js";
-import { catalogBaseUrl, catalogModel, catalogProvider, providerEndpoint } from "../../core/models/catalog.js";
+import { providerCredentialBaseUrl } from '../../core/auth/account/target.js';
+import { catalogModel, catalogProvider, providerEndpoint } from "../../core/models/catalog.js";
 import { sessionUsageRecorder } from '../../session/store/usage.js';
 import { resolveRequestShape } from "../../core/models/requestShape.js";
 import { endpointShape, type EndpointKind } from "../../provider/endpoints/index.js";
@@ -151,11 +152,11 @@ export function createCliSessionRuntime(input: {
    */
   const compactionTarget = (resolved: ProviderCredentialResolution, catalog: readonly CatalogProvider[]) => {
     if (resolved.blocked) return undefined;
-    if (catalogProvider(catalog, resolved.provider, resolved.baseUrl ?? resolved.credential?.baseUrl).ambiguous) return undefined;
+    const baseUrl = providerCredentialBaseUrl(catalog, resolved);
+    if (catalogProvider(catalog, resolved.provider, baseUrl).ambiguous) return undefined;
     const credential = resolved.credential;
     const accountAuth = accountAuthFor(resolved.provider, credential ?? {});
-    if (!credential?.apiKey && !accountAuth && !endpointShape(endpointFor(resolved.provider, catalog, resolved.baseUrl)).signer) return undefined;
-    const baseUrl = catalogBaseUrl(catalog, resolved.provider, resolved.baseUrl ?? credential?.baseUrl);
+    if (!credential?.apiKey && !accountAuth && !endpointShape(endpointFor(resolved.provider, catalog, baseUrl)).signer) return undefined;
     const model = resolved.model ?? credential?.model;
     if (!baseUrl || !model) return undefined;
     return {

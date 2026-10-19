@@ -61,6 +61,10 @@ PRV-03/05 池限制与退避返工本地验收：最终受影响 23 文件/439 �
 
 可用性/CTX-03 批 `da01dd609797100d6077c15331b86c500452986b` 已推送，Architecture Watch success；CI `39154482779` completed/failure，唯一旧未知 transcript 类型期待失败、8925项通过、3跳过。当前测试保留未知拒绝并补已知legacy兼容和malformed拒绝；root29项、独立36项、两项实际反转失败及独立APPROVE/CLEAR已有证据。仅测试/文档修正，提交及新SHA CI按日志后续记录。PRV-03 endpoint/账号受众、subscription consumer与CTX-01/02/04、TOOL-01及其余任务仍开放。
 
+decoder 批已推送为 `e6311a1415b0fa1cc3ee9c090edad99b84065b17`，实际读回 CI `39248899708`/job `118047529763` 于 `2026-10-19T12:14:43Z` completed/success，Architecture Watch `39248899786` success。
+
+账号地址/subscription 批最终本地验收：受影响24文件/426项、五组有效反转、双构建、外站覆盖零HTTP及Linux四格隔离PTY通过。主readiness保留账号存储地址，后续真实AccountEdit不再产生缺省地址冲突；配置账号owner降至20函数且全源图无回边。独立code APPROVE/architecture WATCH，按规则综合COMMENT：内置默认仍归模型目录，完整issuer/受众、原生Responses/Google/subscription协议与subscription续期继续开放。最终产品/测试manifest和构建指纹已匹配；该批提交/推送/精确SHA CI按开发日志后续记录，全部47项范围不变。
+
 ## 历史实现与交付记录（不代表本次复核通过）
 
 | 任务 | 提交 | 证据 |

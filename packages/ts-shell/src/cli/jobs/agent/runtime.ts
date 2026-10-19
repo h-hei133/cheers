@@ -8,6 +8,7 @@ import { goalPolicyFor } from '../../runtime/goal.js';
 import { buildCompactionWiring } from '../../runtime/compaction.js';
 import { sessionCompactionAuthority } from '../../../session/compaction/authority.js';
 import { providerAuthorization } from '../../../provider/request/authorization.js';
+import { providerCredentialBaseUrl } from '../../../core/auth/account/target.js';
 import { credentialIdentityFor } from '../../../core/auth/account/pool.js';
 import { providerEndpoint } from '../../../core/models/catalog.js';
 import type { AgentRuntime, AgentOutcome, AgentChild } from '../../../workflow/jobs/agent/model.js';
@@ -117,7 +118,7 @@ export async function captureAgentRuntime(host: JobsComposition, input: AgentRun
           },
           prepareProviderResources: resolved => {
             if (resolved.blocked) throw new Error('The selected connection requires independent login.');
-            const baseUrl = resolved.baseUrl ?? resolved.credential?.baseUrl ?? catalog.find(provider => provider.id === resolved.provider)?.baseUrl;
+            const baseUrl = providerCredentialBaseUrl(catalog, resolved);
             const model = resolved.model ?? resolved.credential?.model;
             if (!baseUrl || !model) return {};
             const identity = credentialIdentityFor(resolved.provider, resolved.credential);

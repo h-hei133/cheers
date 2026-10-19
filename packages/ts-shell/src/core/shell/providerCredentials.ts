@@ -9,6 +9,7 @@ import type {
 } from "../../config/runtimeConfig.js";
 import { selectPooledConnection } from '../auth/account/pool.js';
 import { ownedConnectionCredential } from '../auth/account/presence.js';
+import { BUILTIN_PROVIDERS } from '../models/catalog.js';
 import type { ProviderCredentialResolution } from '../auth/credential.js';
 export type {
   ProviderCredentialSource, ProviderCredentialAuthMode,
@@ -29,6 +30,29 @@ export interface ProviderCredentialResolutionInput {
 export function resolveProviderCredential(
   input: ProviderCredentialResolutionInput,
 ): ProviderCredentialResolution {
+  const resolution = resolveCredential(input);
+  const credential = resolution.credential;
+  if (!credential?.accountAuth) return resolution;
+  const connection = credential.connectionId
+    ? input.runtimeConfig.providerConnections.find(item => item.id === credential.connectionId && item.provider === resolution.provider)
+    : undefined;
+  const profile = input.runtimeConfig.providerCredentials[resolution.provider];
+  const accountBaseUrl = normalizeBaseUrl(credential.accountAuth.type === 'subscription' ? credential.accountAuth.baseUrl : undefined);
+  const storedBaseUrl = normalizeBaseUrl(credential.source === 'connection' ? connection?.baseUrl : profile?.baseUrl);
+  const ownerBaseUrl = accountBaseUrl ?? storedBaseUrl;
+  const effectiveOwner = ownerBaseUrl ?? normalizeBaseUrl(BUILTIN_PROVIDERS.find(item => item.id === resolution.provider)?.baseUrl);
+  // CLI and catalogue selection cannot move an account credential off its captured owner.
+  if ((accountBaseUrl && storedBaseUrl && accountBaseUrl !== storedBaseUrl)
+    || (input.cliBaseUrl !== undefined && normalizeBaseUrl(input.cliBaseUrl) !== effectiveOwner)) {
+    return { selection: resolution.selection, provider: resolution.provider, expectedEnvVarName: resolution.expectedEnvVarName,
+      model: resolution.model, blocked: 'connection-overridden' };
+  }
+  return { ...resolution, baseUrl: ownerBaseUrl, credential: { ...credential, baseUrl: ownerBaseUrl } };
+}
+
+function resolveCredential(
+  input: ProviderCredentialResolutionInput,
+): ProviderCredentialResolution {
   const env = input.env ?? process.env;
   const providerFromConfig = input.runtimeConfig.provider;
   const binding = input.runtimeConfig.sessionConnection;
@@ -44,7 +68,8 @@ export function resolveProviderCredential(
   }
   if (boundConnection && ((input.cliProvider !== undefined && input.cliProvider !== boundConnection.provider)
     || (input.cliApiKey?.trim() && input.cliApiKey.trim() !== boundConnection.apiKey?.trim())
-    || (input.cliBaseUrl !== undefined && normalizeBaseUrl(input.cliBaseUrl) !== normalizeBaseUrl(boundConnection.baseUrl)))) {
+    || (!ownedConnectionCredential(boundConnection).accountAuth && input.cliBaseUrl !== undefined
+      && normalizeBaseUrl(input.cliBaseUrl) !== normalizeBaseUrl(boundConnection.baseUrl)))) {
     return { provider: boundConnection.provider, expectedEnvVarName: getProviderApiKeyEnvVarName(boundConnection.provider), blocked: 'connection-overridden' };
   }
   const explicitConnection = !providerBinding && input.runtimeConfig.providerConnections.find(
@@ -72,8 +97,9 @@ export function resolveProviderCredential(
   if (pooled?.blocked) return { provider, expectedEnvVarName: getProviderApiKeyEnvVarName(provider), blocked: pooled.blocked };
   if (poolDeclared && (providerBinding
     || (input.cliApiKey?.trim() && input.cliApiKey.trim() !== pooled?.connection?.apiKey?.trim())
-    || (input.cliBaseUrl !== undefined && normalizeBaseUrl(input.cliBaseUrl) !== normalizeBaseUrl(pooled?.connection?.baseUrl
-      ?? input.runtimeConfig.providerCredentials[provider]?.baseUrl)))) {
+    || ((!pooled?.connection || !ownedConnectionCredential(pooled.connection).accountAuth)
+      && input.cliBaseUrl !== undefined && normalizeBaseUrl(input.cliBaseUrl) !== normalizeBaseUrl(pooled?.connection?.baseUrl
+        ?? input.runtimeConfig.providerCredentials[provider]?.baseUrl)))) {
     return { provider, expectedEnvVarName: getProviderApiKeyEnvVarName(provider), blocked: 'pool-required' };
   }
   const activeConnection = pooled?.connection ?? explicitConnection

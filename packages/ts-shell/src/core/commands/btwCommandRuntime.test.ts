@@ -14,7 +14,7 @@ vi.mock("../../config/runtimeConfig.js", async () => ({
   ...await vi.importActual<typeof import('../../config/runtimeConfig.js')>('../../config/runtimeConfig.js'),
   getRuntimeConfig: () => ({}),
 }));
-vi.mock("../shell/providerCredentials.js", () => ({ resolveProviderCredential: vi.fn(() => ({
+vi.mock("../shell/providerCredentials.js", async () => ({ ...await vi.importActual<typeof import('../shell/providerCredentials.js')>('../shell/providerCredentials.js'), resolveProviderCredential: vi.fn(() => ({
   provider: "fixture", model: "m", baseUrl: "https://provider.test",
   credential: { apiKey: "synthetic" },
 })) }));
@@ -27,6 +27,19 @@ beforeEach(() => {
   vi.mocked(loadCatalog).mockReturnValue([{ id: "fixture", name: "Fixture", endpoint: "openai-compatible", models: [{ id: "m", name: "Model" }] }] as never);
 });
 afterEach(() => { cleanupAdvisorHarnesses(); vi.clearAllMocks(); vi.useRealTimers(); });
+
+it.each(['blocked', 'catalogue'] as const)('refuses a %s endpoint override before side-question HTTP', async source => {
+  vi.mocked(resolveProviderCredential).mockReturnValue(source === 'blocked'
+    ? { provider: 'openai', expectedEnvVarName: 'OPENAI_API_KEY', blocked: 'connection-overridden' }
+    : { provider: 'openai', expectedEnvVarName: 'OPENAI_API_KEY',
+        credential: { provider: 'openai', source: 'config', authMode: 'account-auth', envVarName: 'OPENAI_API_KEY',
+          accountAuth: { type: 'openai-chatgpt-account', accessToken: 'synthetic', refreshToken: 'synthetic', expiresAt: 1 } } });
+  vi.mocked(loadCatalog).mockReturnValue([{ id: 'openai', runtime: 'openai', label: 'Foreign', auth: 'oauth', baseUrl: 'https://foreign.invalid/v1', models: [] }]);
+  const result = await runBtwCommand(['question'], { cwd: '/synthetic' });
+  expect(result.output).toContain('Side question refused');
+  expect(result.output).not.toContain('synthetic');
+  expect(providerFetchForEndpoint).not.toHaveBeenCalled();
+});
 
 it.each(['stop', 'content_filter', 'empty'])('persists side-question fees for a %s response without changing main context or history', async finish => {
   const setup = createAdvisorHarness(false, false);

@@ -3,13 +3,14 @@ import { textSyntax, parseTextArgs } from "./syntax/text.js";
 import { syntaxHelp } from "./syntax/projection.js";
 import type { CommandContext, LocalCommandResult } from "./types.js";
 import { getRuntimeConfig } from "../../config/runtimeConfig.js";
-import { resolveProviderCredential } from "../shell/providerCredentials.js";
+import { credentialBlockMessage, resolveProviderCredential } from "../shell/providerCredentials.js";
 import { credentialIdentityFor } from "../auth/account/pool.js";
 import { accountAuthFor, providerAuthorization } from "../../provider/request/authorization.js";
+import { providerCredentialBaseUrl } from '../auth/account/target.js';
 import { requestSimpleCompletion } from "../../provider/request/completion.js";
 import { loadCatalog } from "../models/catalogStore.js";
 import { resolveRequestShape } from "../models/requestShape.js";
-import { catalogBaseUrl, catalogModel, catalogProvider, providerEndpoint } from "../models/catalog.js";
+import { catalogModel, catalogProvider, providerEndpoint } from "../models/catalog.js";
 import { providerFetchForEndpoint } from "../../provider/request/fetch.js";
 import { endpointShape } from "../../provider/endpoints/index.js";
 import { classifyProviderFailure, type ProviderFailureClass } from "../../provider/registry/provider.js";
@@ -59,7 +60,10 @@ export async function runBtwCommand(
   const resolution = context.resolveConfigTarget?.(runtimeConfig) ?? resolveProviderCredential({ runtimeConfig });
   const credential = resolution.credential;
   const catalog = publication?.catalog ?? loadCatalog();
-  const baseUrl = catalogBaseUrl(catalog, resolution.provider, resolution.baseUrl ?? credential?.baseUrl);
+  if (resolution.blocked) return { kind: 'local', output: `Side question refused: ${credentialBlockMessage(resolution.blocked)}` };
+  let baseUrl: string | undefined;
+  try { baseUrl = providerCredentialBaseUrl(catalog, resolution); }
+  catch { return { kind: 'local', output: 'Side question refused: the selected endpoint conflicts with the account credential binding.' }; }
   if (catalogProvider(catalog, resolution.provider, baseUrl).ambiguous) return { kind: 'local', output: 'Side question refused: multiple model catalogue entries claim this endpoint.' };
   const endpoint = providerEndpoint(catalog, resolution.provider, baseUrl);
 

@@ -3,7 +3,7 @@ import type { RuntimeConfig } from '../../config/runtimeConfig.js';
 import { assertScopedModel } from '../../config/scope/projection.js';
 import { credentialIdentityFor } from '../../core/auth/account/pool.js';
 import { renewStoredAccount } from '../../core/auth/account/renewal.js';
-import { catalogBaseUrl, catalogModel, providerEndpoint, type CatalogProvider } from '../../core/models/catalog.js';
+import { catalogModel, providerEndpoint, type CatalogProvider } from '../../core/models/catalog.js';
 import { effortCapability } from '../../core/models/capability.js';
 import { resolveRequestShape } from '../../core/models/requestShape.js';
 import { outputLimitFailure, reserveLimitFailure } from '../../core/models/limits.js';
@@ -16,6 +16,7 @@ import { providerFetchFromTimeouts, providerTimeoutsFrom } from '../../provider/
 import { endpointShape } from '../../provider/endpoints/index.js';
 import { effortOutputFailure } from '../../provider/endpoints/effort.js';
 import { delegatedTarget } from './target.js';
+import { providerCredentialBaseUrl } from '../../core/auth/account/target.js';
 
 /** Capture an exact summary role; refresh its account only when a summary is requested. */
 export function captureSummaryRole(input: {
@@ -30,7 +31,7 @@ export function captureSummaryRole(input: {
   if (!role) return undefined;
   const main = resolveProviderCredential({ runtimeConfig: input.config, env: {} });
   const selected = delegatedTarget(role, main, input.config, input.catalog);
-  const resolution = { ...selected, baseUrl: catalogBaseUrl(input.catalog, selected.provider, selected.baseUrl ?? selected.credential?.baseUrl) };
+  const resolution = { ...selected, baseUrl: providerCredentialBaseUrl(input.catalog, selected) };
   assertScopedModel(input.config, resolution);
   const model = catalogModel(input.catalog, role.provider, role.model, resolution.baseUrl);
   if (!model || effortCapability(input.catalog, role.provider, role.model, role.thinkingEffort ?? null, resolution.baseUrl) === 'unsupported') {
