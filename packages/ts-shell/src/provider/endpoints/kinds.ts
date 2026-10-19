@@ -124,6 +124,8 @@ export interface EndpointShape {
 export interface SimpleRequest extends Partial<Pick<TurnRequest,
   'systemRole' | 'maxTokensField' | 'reasoningEffort' | 'thinkingLevelName' | 'thinkingBudgetTokens' | 'allowEmptySignature'>> {
   readonly model: string;
+  readonly provider?: string;
+  readonly replayBinding?: string;
   readonly messages: readonly ChatMessage[];
   /** A system instruction, when the caller has one. */
   readonly systemPrompt?: string;
@@ -157,6 +159,7 @@ export interface SimpleRequest extends Partial<Pick<TurnRequest,
 export interface TurnRequest {
   readonly model: string;
   readonly provider?: string;
+  readonly replayBinding?: string;
   readonly systemPrompt: string;
   readonly messages: readonly ChatMessage[];
   readonly tools: readonly ToolSchema[];

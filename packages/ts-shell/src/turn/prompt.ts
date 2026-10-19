@@ -24,6 +24,7 @@ export interface ChatMessage {
   readonly content?: string | readonly MultimodalContentBlock[] | null;
   readonly tool_calls?: readonly ChatToolCall[];
   readonly tool_call_id?: string;
+  readonly origin?: SessionMessage['origin'];
   /**
    * The working out an assistant turn came with, and the provider's signature
    * over it; see `SessionMessage.reasoning`.
@@ -171,6 +172,7 @@ export function toChatMessages(history: readonly SessionMessage[] = []): ChatMes
         content: message.content ?? (calls ? null : ""),
         ...(calls ? { tool_calls: calls } : {}),
         ...(message.reasoning ? { reasoning: message.reasoning } : {}),
+        ...(message.origin ? { origin: message.origin } : {}),
       });
       if (calls && calls.length > 0) pendingCalls = calls.map((call) => ({ id: call.id, name: call.function.name }));
     } else if (message.role === "tool" && message.tool_call_id && pendingCalls) {

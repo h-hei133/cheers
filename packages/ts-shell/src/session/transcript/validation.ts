@@ -28,7 +28,8 @@ function message(value: Record<string, unknown>): boolean {
   return ROLES.has(value.role) && content(value.content) && toolCalls(value.tool_calls) &&
     optionalString(value.tool_call_id) && optionalString(value.failureClass) &&
     (value.metadata === undefined || record(value.metadata)) &&
-    (origin === undefined || (record(origin) && typeof origin.model === "string" && optionalString(origin.provider))) &&
+    (origin === undefined || (record(origin) && typeof origin.model === "string" && optionalString(origin.provider)
+      && (origin.replayBinding === undefined || (typeof origin.replayBinding === 'string' && /^[a-f0-9]{64}$/.test(origin.replayBinding))))) &&
     (reasoning === undefined || (record(reasoning) && typeof reasoning.text === "string" && optionalString(reasoning.signature) &&
       (reasoning.redacted === undefined || typeof reasoning.redacted === "boolean")));
 }

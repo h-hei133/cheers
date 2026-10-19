@@ -6,6 +6,7 @@ import type { ModelTransport, RequestPolicy } from '../../core/agent/request/mod
 import { prepareRequestAttempt } from './attempt.js';
 import type { ResolvedRequestShape } from '../../core/models/requestShape.js';
 import type { ProviderUsage } from '../../turn/completion.js';
+import { requestReplayBinding } from './replay.js';
 
 /**
  * One out-of-band model call.
@@ -94,7 +95,8 @@ export async function requestSimpleCompletion(
   const serialized = JSON.stringify(
     endpointBody(kind, {
       ...request.shape,
-      model: request.provider.model, systemPrompt, messages,
+      model: request.provider.model, provider: request.provider.providerId,
+      replayBinding: requestReplayBinding({ ...request.provider, provider: request.provider.providerId }), systemPrompt, messages,
       ...(request.maxOutputTokens !== undefined ? { maxOutputTokens: request.maxOutputTokens } : {}),
       ...(request.supportsTemperature !== undefined ? { supportsTemperature: request.supportsTemperature } : {}),
     }),
@@ -129,6 +131,10 @@ export async function requestSimpleCompletion(
   const choice = completion.choices?.[0];
   if (REFUSAL.test(choice?.finish_reason ?? "")) {
     request.onFailure?.("provider_safety_block");
+    return undefined;
+  }
+  if (choice?.finish_reason === 'error' || choice?.finish_reason === 'length') {
+    request.onFailure?.(classifyProviderFailure({ insufficientOutput: true }));
     return undefined;
   }
   const text = choice?.message?.content?.trim();

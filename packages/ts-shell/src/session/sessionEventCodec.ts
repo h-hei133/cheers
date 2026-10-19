@@ -80,6 +80,7 @@ export type TranscriptEvent =
       origin?: {
         readonly provider?: string;
         readonly model: string;
+        readonly replayBinding?: string;
       };
       /**
        * The working out an assistant answer came with, and the provider's

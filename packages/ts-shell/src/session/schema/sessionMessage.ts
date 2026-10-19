@@ -46,6 +46,7 @@ export interface SessionMessage {
   origin?: {
     readonly provider?: string;
     readonly model: string;
+    readonly replayBinding?: string;
   };
   /**
    * What kind of provider failure produced this message, when one did.

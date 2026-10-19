@@ -57,7 +57,7 @@ OpenAI/Google 槽位检查现有凭据类型；subscription 保留在 Anthropic/
 
 - refresh lease、请求凭据代次与独立 advisor/subagent 的发送前续期已接入；完整 quota/429 与历史成本归属仍按 PRV-04/05 继续复核。
 - 不复制 live rotating OAuth 到其他 profile；每个 profile 独立登录。
-- subscription 配置规范化现已保留；完整 subscription 续期、原生账号协议及受众仍开放。OpenAI 账号尚无原生 Responses adapter，Google 账号 scope/协议也须继续核验；合成兼容协议成功不能替代这些实现。
+- subscription 配置规范化现已保留；完整 subscription 续期、原生账号协议及受众仍开放。[Responses 公开协议](provider-protocols.md)已接入现有注册表，但 OpenAI 账号仍须绑定账户服务地址、stream-only 与能力合同，Google 账号 scope/协议也须继续核验；合成协议成功不能替代这些实现。
 - 本轮已验证完整拓扑、显式/CLI/委派限制、owned credential/实际代次、等待亲和、实际 CLI 子请求与共享账本、Linux 四格隔离 PTY。独立复核、反转和精确交付证据见开发日志；完整 PRV-03/05 仍开放，未运行真实 provider。
 
 ## 5. Refresh 归属与跨进程互斥

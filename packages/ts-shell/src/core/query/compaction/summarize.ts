@@ -179,6 +179,7 @@ export async function requestCompactionSummary(request: CompactionRequest): Prom
     endpointBody(kind, {
       ...request.provider.shape,
       model: request.provider.model,
+      provider: request.provider.providerId,
       ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
       ...(request.provider.supportsTemperature !== undefined ? { supportsTemperature: request.provider.supportsTemperature } : {}),
       ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
@@ -205,6 +206,7 @@ export async function requestCompactionSummary(request: CompactionRequest): Prom
   const completion = endpointShape(kind).readBody(await res.json());
   request.onUsage?.(completion.usage);
   attempt.settle(completion.usage);
+  if (['error', 'length', 'refusal', 'content_filter'].includes(completion.choices?.[0]?.finish_reason ?? '')) return undefined;
   const summaryContent = completion.choices?.[0]?.message?.content;
   if (!summaryContent) return undefined;
   const { rawSummary } = parseCompactedSummary(summaryContent);

@@ -62,6 +62,9 @@ export interface CompletedBody {
   readonly usage?: ProviderUsage;
   /** The working out, when the provider sent it separately from the answer. */
   readonly reasoning?: string;
+  /** Opaque protocol replay material; may exist without visible reasoning. */
+  readonly reasoningSignature?: string;
+  readonly reasoningRedacted?: boolean;
 }
 
 export interface StreamedCompletion {

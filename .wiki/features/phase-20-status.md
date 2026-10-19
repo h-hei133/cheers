@@ -65,6 +65,8 @@ decoder 批已推送为 `e6311a1415b0fa1cc3ee9c090edad99b84065b17`，实际读�
 
 账号地址/subscription 批最终本地验收：受影响24文件/426项、五组有效反转、双构建、外站覆盖零HTTP及Linux四格隔离PTY通过。主readiness保留账号存储地址，后续真实AccountEdit不再产生缺省地址冲突；配置账号owner降至20函数且全源图无回边。独立code APPROVE/architecture WATCH，按规则综合COMMENT：内置默认仍归模型目录，完整issuer/受众、原生Responses/Google/subscription协议与subscription续期继续开放。最终产品/测试manifest和构建指纹已匹配；该批提交/推送/精确SHA CI按开发日志后续记录，全部47项范围不变。
 
+账号地址/subscription 批已提交推送为 `e83e596ef72a9e89096f209d05349e163d2c780d`；CI `39255262496`/job `118068837295` 于 `2026-10-19T13:06:28Z` completed/success，Architecture Watch `39255262491` success。公开 Responses 协议基座本地受影响18文件/280项、十组有效反转、双构建、编译本机HTTP与Linux四格PTY通过；完整有序加密回放和捕获地址/凭据代次 binding 沿现消息链保留。独立审查和精确交付见开发日志。该基座仍不闭合账户issuer/stream-only/cap、Google、subscription及其余全部任务。
+
 ## 历史实现与交付记录（不代表本次复核通过）
 
 | 任务 | 提交 | 证据 |

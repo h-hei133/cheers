@@ -19,6 +19,7 @@ import type { ThinkingPreference } from '../core/models/effort.js';
 import { microcompactMessages } from "../core/query/microCompact.js";
 import { isEventStream, type ProviderUsage, type StreamedToolCall } from "./completion.js";
 import { DEFAULT_ENDPOINT_KIND, endpointKind, endpointShape, endpointTurnBody, endpointUrl, type EndpointKind } from "../provider/endpoints/index.js";
+import { requestReplayBinding } from '../provider/request/replay.js';
 import type { SentRequest } from "../provider/request/sentRequest.js";
 import { classifyProviderFailure, type ProviderFailureClass } from "../provider/registry/provider.js";
 import { toChatMessages, type ChatMessage } from "./prompt.js";
@@ -267,6 +268,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
     request.provider.model || request.provider.provider
       ? { ...(request.provider.provider ? { provider: request.provider.provider } : {}), model: request.provider.model }
       : undefined;
+  const replayBinding = requestReplayBinding(request.provider);
   return async (messages, signal, listener, options): Promise<AssistantStep> => {
     const requestId = options.requestId ?? randomUUID();
     let requestAcceptedAt: number | undefined;
@@ -284,7 +286,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
     // rather than threaded through each builder's signature. A `return` in
     // this body that forgets the stamp is invisible to the type, which is why
     // every exit goes through it.
-    const stamp = (step: AssistantStep): AssistantStep => (origin ? { ...step, origin } : step);
+    const stamp = (step: AssistantStep): AssistantStep => (origin ? { ...step, origin: step.origin ?? origin } : step);
     // Older direct adapters supplied only a model and URL. Without the runtime
     // provider identity, retain their unique-model catalogue lookup.
     const catalogAddress = request.provider.provider ? request.provider.baseUrl : undefined;
@@ -360,6 +362,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
         }) ?? {};
         payload = endpointTurnBody(endpoint, {
           model: request.provider.model,
+          provider: request.provider.provider,
+          replayBinding,
           systemPrompt,
           messages: withFinalStepNotice(
             bridgeToolResults(
@@ -586,7 +590,9 @@ export function createStepFunction(request: StepRequest): StepFunction {
           options.onRequestUsage?.(usage);
         } else if (!options.agentMode) markContextUnknown(request.sessionId, 'usage-gap');
         responseAttempt?.settle(usage);
-        const completed = toStep(completion, watched);
+        const decoded = toStep(completion, watched);
+        const completed = completion.reasoningSignature && endpoint === 'openai-responses' && origin
+          ? { ...decoded, origin: { ...origin, replayBinding } } : decoded;
         return stamp(shownAnything && completed.stopReason === "error"
           ? { ...completed, retriesExhausted: true }
           : completed);
@@ -662,6 +668,7 @@ async function readCompletion(
   }
   const stream = endpointShape(endpoint).readStream(response.body!);
   let streamed = "";
+  try {
   for (;;) {
     const step = await stream.next();
     if (step.done === true) {
@@ -670,6 +677,7 @@ async function readCompletion(
         usage: step.value.usage,
         reasoning: step.value.reasoning,
         ...(step.value.reasoningSignature ? { reasoningSignature: step.value.reasoningSignature } : {}),
+        ...(step.value.reasoningRedacted ? { reasoningRedacted: true } : {}),
         streamed,
       };
     }
@@ -680,6 +688,9 @@ async function readCompletion(
     streamed += step.value.text;
     listener.onText?.(step.value.text);
   }
+  } finally {
+    await stream.return(undefined as never);
+  }
 }
 
 /** Shape the assembled response into a kernel step. */
@@ -687,7 +698,10 @@ export function toStep(completion: CompletionShape, listener: StepListener): Ass
   const choice = completion.choices?.[0];
   const message = choice?.message;
   if (!message) return errorStep("Empty response from provider");
-  const { text, calls } = liftInlineCalls(message.content ?? "", message.tool_calls ?? []);
+  // A truncated text block cannot authorize an inline invocation assembled from prose.
+  const { text, calls } = choice?.finish_reason === 'length'
+    ? { text: message.content ?? '', calls: message.tool_calls ?? [] }
+    : liftInlineCalls(message.content ?? "", message.tool_calls ?? []);
   if (text) {
     if (completion.streamed === undefined) listener.onText?.(text);
     else if (text !== completion.streamed) listener.onReplace?.(text);
@@ -700,10 +714,10 @@ export function toStep(completion: CompletionShape, listener: StepListener): Ass
     // Carried so the next request in this trajectory can hand the reasoning back
     // signed. It is not shown a second time — the deltas already were — but a
     // provider that signed it rejects the request that omits it.
-    ...(completion.reasoning
+    ...(completion.reasoning || completion.reasoningSignature
       ? {
           reasoning: {
-            text: completion.reasoning,
+            text: completion.reasoning ?? '',
             ...(completion.reasoningSignature ? { signature: completion.reasoningSignature } : {}),
             ...(completion.reasoningRedacted ? { redacted: true } : {}),
           },

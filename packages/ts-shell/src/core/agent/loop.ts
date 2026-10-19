@@ -73,6 +73,7 @@ export interface AssistantStep {
   readonly origin?: {
     readonly provider?: string;
     readonly model: string;
+    readonly replayBinding?: string;
   };
 }
 export interface NextStepSnapshot {
