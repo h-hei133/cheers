@@ -8025,3 +8025,11 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - TypeScript诊断相对usage提交149/149、无新增，仍非全项目tsc通过。cycles/config消费者/declarations/Node floor、脚本59项通过；NormProof blocking义务0未闭合，8项既有ceiling advisory保留partial。独立architecture全21产品owner均≤20函数、无回边/未解析。最终29文件manifest `77a547ed3af9e3c6182a7621d9e48a57e7f734301fda60cd7dd90565d7bb8663`；codeAPPROVE，独立首次16文件375项及最后两文件delta/replay34项通过（与root重叠不相加）。冻结后的ID映射缺陷已修复、重新双构建/编译/PTY/受影响验证。架构最终报告、docs门与交付SHA按后续实际记录。
 - 公开真实API兼容性/entitlement、subscription discriminator/native续期及其余Phase20任务继续；仅用户原环境/真实质量验收推迟，全部47项范围保持active。
 - 最终独立codeAPPROVE报告SHA256 `6cbc7728abca40a5c1f685657976121f2cc6febc863330d44724b325c7238e0a`，architectureCLEAR报告SHA256 `4742dc6c64c85300ac3e0c09799310578a2489cc55a11c994ca42a94ed134676`，均精确绑定同一29文件manifest；综合APPROVE限本批。严格docs门通过，118既有advisory保留。usage修正CI `39279497980` 已实际读回completed/success，Watch `39279497944` success；旧原生提交失败记录保留。Google提交/推送/CI依后续实际结果记录。
+
+### 2026-10-20 Google交付及SSE断言校正
+
+Google原生OAuth/有序签名批已推送为 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7`，远端main完整SHA读回一致。Architecture Watch `39284913470` success；CI `39284913496`/job `118168018187` 于 `2026-10-19T16:39:57Z` completed/failure。887文件通过、1失败、1跳过；9107项通过、2失败、3跳过，962.69s。失败仅为既有SSE测试的Google GenAI/Vertex畸形多行JSON后仍期待stop；本批合同要求拒绝流权威并返回error。旧SHA失败保留，run/job及原始失败日志已保存。
+
+当前仅校正 `provider/endpoints/sse.test.ts` 的Google畸形JSON终态，保留合法多行/多字节与其他协议既有断言；工具及reasoningSignature均不应有权威。独立评审指出原opaqueReplay断言读错codec层，已改为该层实际reasoningSignature字段。订阅批独立返工继续，未并入本次测试/文档交付；精确验证/评审及新SHA CI后续记录。整个Phase20保持active。
+
+SSE校正精确1文件/19项通过，独立code另跑19项并APPROVE、architecture另跑19项并CLEAR，计数重叠不累加。最终测试SHA256 `488cc438b3d46752f14e3e0b6cb0f252f21913fa82e2d580473c4f22fb5a21cd`；code报告 `319b26586f03843d4b5f63786d814007b16faef9df3d03cb67d8bce20ccfc41d`，architecture报告 `5963f7465c8f6c76b04093f8923cd35046297150635865fe274ebcb5734d827d`。综合APPROVE仅测试修正；该无签名fixture只证畸形JSON拒绝终态/无虚构文本，签名能力反例仍由已交付replay套件承担。新SHA提交/推送/CI后续实际查询，订阅产品修改保持未提交。

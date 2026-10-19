@@ -41,7 +41,11 @@ describe.each(["openai-compatible", "anthropic-messages", "google-generative-ai"
       `data: ${JSON.stringify(payload("valid"))}\n\n` + `data: ${JSON.stringify(terminal)}\n\n`;
     const result = await read(endpoint, wire);
     expect(result.message.content).toBe("valid");
-    expect(result.finishReason).toBe("stop");
+    expect(result.finishReason).toBe(endpoint.startsWith('google-') ? 'error' : 'stop');
+    if (endpoint.startsWith('google-')) {
+      expect(result.message.tool_calls).toBeUndefined();
+      expect(result.reasoningSignature).toBeUndefined();
+    }
   });
 });
 
