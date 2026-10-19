@@ -22,6 +22,7 @@ import type { CompactionDispatch } from '../../session/compaction/contract.js';
 import { sessionCompactionAuthority } from '../../session/compaction/authority.js';
 import type { SessionManager } from '../../session/SessionManager.js';
 import type { ConfigPublication, ConfigState } from '../../config/state.js';
+import { configuredOutputLimit } from '../../provider/request/output.js';
 
 /** Bind the captured publication and native session owner at each compaction entry point. */
 export function nativeCompactionAuthority(input: {
@@ -116,12 +117,12 @@ export function buildCompactionWiring(input: {
       modelTransport: providerModelTransport(runtimeConfig, summaryProvider.endpoint, input.admission) });
   };
   const historyRequest = (request: Parameters<SummarizeHistory>[0]) => ({
-    requestPolicy: input.requestPolicy, maxOutputTokens: runtimeConfig.maxOutputTokens,
+    requestPolicy: input.requestPolicy, maxOutputTokens: summaryRole ? summaryRole.limits.maxOutputTokens : configuredOutputLimit(runtimeConfig, provider.endpoint),
     messages: toCompactionMessages(request.messages), previousSummary: request.previousSummary,
     instructions: request.instructions, signal: request.signal, dispatch: request.dispatch,
   });
   const prefixRequest = (messages: readonly AgentMessage[], signal?: AbortSignal, dispatch?: CompactionDispatch) => ({
-    requestPolicy: input.requestPolicy, maxOutputTokens: runtimeConfig.maxOutputTokens, purpose: 'turn-summary' as const,
+    requestPolicy: input.requestPolicy, maxOutputTokens: summaryRole ? summaryRole.limits.maxOutputTokens : configuredOutputLimit(runtimeConfig, provider.endpoint), purpose: 'turn-summary' as const,
     messages: toCompactionMessages(messages), prompt: TURN_PREFIX_COMPACTION_PROMPT, signal, dispatch,
   });
   // Resolved per model rather than read from one global number: the catalog
@@ -138,7 +139,7 @@ export function buildCompactionWiring(input: {
     windowLogger.warn(resolvedWindow.warning);
   }
   const summaryLimits = summaryRole?.limits ?? { contextWindow: resolvedWindow.window,
-    maxOutputTokens: runtimeConfig.maxOutputTokens, reserveTokens: runtimeConfig.reserveTokens };
+    maxOutputTokens: configuredOutputLimit(runtimeConfig, provider.endpoint), reserveTokens: runtimeConfig.reserveTokens };
   return {
     policy: {
       summaryIdentity: summaryRole?.identity ?? createHash('sha256').update(JSON.stringify([provider, summaryLimits])).digest('hex'),

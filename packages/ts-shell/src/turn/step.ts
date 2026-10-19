@@ -73,6 +73,7 @@ export interface ProviderTarget {
   /** Which stored credential this target uses; non-secret and rotation-sensitive. */
   readonly credentialId?: string;
   readonly credentialGeneration?: string;
+  readonly replayOwner?: string;
   /**
    * Which endpoint kind this target speaks.
    *
@@ -310,6 +311,10 @@ export function createStepFunction(request: StepRequest): StepFunction {
         catalogAddress,
       );
       const endpoint = endpointFor(request);
+      let protocol;
+      try { protocol = endpointShape(endpoint); }
+      catch (error) { return stamp(errorStep(error instanceof Error ? error.message : String(error))); }
+      const output = protocol.outputControl === 'provider' ? undefined : request.maxOutputTokens ?? shape.maxOutputCeiling;
       const modelEntry = catalogModel(request.catalog ?? [], request.provider.provider ?? '', request.provider.model, catalogAddress);
       const usageAttribution = captureUsageAttribution({ provider: request.provider.provider ?? '', model: request.provider.model,
         baseUrl: request.provider.baseUrl, rates: modelEntry?.cost });
@@ -317,7 +322,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
         model: request.provider.model, endpoint, schemaDigest, systemDigest });
       const prompt = promptTokensFor({ messages, overhead, ...(measured ? { measured } : {}) });
       const budget = requestBudget({ window: request.contextWindow ?? modelEntry?.contextWindow,
-        promptTokens: prompt.tokens, outputTokens: request.maxOutputTokens ?? shape.maxOutputCeiling,
+        promptTokens: prompt.tokens, outputTokens: output ?? shape.maxOutputCeiling,
         reserveTokens: request.reserveTokens, measured: prompt.measured });
       // A request that cannot fit is not sent: the same bounded overflow rescue
       // that answers a provider refusal handles this before any bytes leave.
@@ -338,7 +343,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
       let payload: Record<string, unknown>;
       let requestHeaders: Readonly<Record<string, string>> = {};
       try {
-        const outputFailure = outputLimitFailure(request.maxOutputTokens ?? shape.maxOutputCeiling, shape.maxOutputCeiling);
+        const outputFailure = outputLimitFailure(output, shape.maxOutputCeiling);
         if (outputFailure) return stamp(errorStep(outputFailure));
         const budgetFailure = explicitEffort && effort ? effortOutputFailure(endpointShape(endpoint), request.maxOutputTokens ?? shape.maxOutputCeiling) : undefined;
         if (budgetFailure) return stamp(errorStep(budgetFailure));
@@ -378,8 +383,8 @@ export function createStepFunction(request: StepRequest): StepFunction {
           vision: shape.vision,
           temperature: request.temperature ?? 0.7,
           ...(request.topP != null ? { topP: request.topP } : {}),
-          ...((request.maxOutputTokens ?? shape.maxOutputCeiling) != null
-            ? { maxOutputTokens: request.maxOutputTokens ?? shape.maxOutputCeiling }
+          ...((request.maxOutputTokens ?? output) != null
+            ? { maxOutputTokens: request.maxOutputTokens ?? output }
             : {}),
           ...(shape.reasoningEffort && shape.thinkingLevelName
             ? { thinkingLevelName: shape.thinkingLevelName }
@@ -591,7 +596,7 @@ export function createStepFunction(request: StepRequest): StepFunction {
         } else if (!options.agentMode) markContextUnknown(request.sessionId, 'usage-gap');
         responseAttempt?.settle(usage);
         const decoded = toStep(completion, watched);
-        const completed = completion.reasoningSignature && endpoint === 'openai-responses' && origin
+        const completed = completion.reasoningSignature && protocol.opaqueReplay && origin
           ? { ...decoded, origin: { ...origin, replayBinding } } : decoded;
         return stamp(shownAnything && completed.stopReason === "error"
           ? { ...completed, retriesExhausted: true }
@@ -659,6 +664,10 @@ async function readCompletion(
   endpoint?: EndpointKind,
 ): Promise<CompletionShape> {
   if (!isEventStream(response)) {
+    if (endpointShape(endpoint).simpleResponse === 'stream') {
+      await response.body?.cancel().catch(() => undefined);
+      throw new Error('The account service did not return an event stream.');
+    }
     // A provider that ignored `stream: true` answers with one JSON body; the
     // text then arrives in a single delta. The two endpoints disagree about the
     // body's shape as well, so the whole-body case is read the same way the

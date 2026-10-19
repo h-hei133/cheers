@@ -274,7 +274,7 @@ export function providerFetchForEndpoint(
   const base = admittedFetch((input, init) => {
     init?.signal?.throwIfAborted();
     beforeDispatch?.(init);
-    return configured(input, init);
+    return configured(input, endpoint === 'openai-account-responses' ? { ...init, redirect: 'error' } : init);
   }, admission);
   if (!signer) return base;
 

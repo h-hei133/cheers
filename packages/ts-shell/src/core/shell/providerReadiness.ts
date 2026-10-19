@@ -10,6 +10,7 @@ import { buildUnavailableResult } from "../tools/toolPolicyResult.js";
 import { redactProviderFailureDetail } from "./providerFailureRedaction.js";
 import { getProviderApiKeyEnvVarName } from "./providerCredentials.js";
 import { needsUserEndpoint, providerFacts } from "../providers/facts.js";
+import { accountProtocol, assertAccountAddress } from '../auth/account/policy.js';
 
 const DEFAULT_PROVIDER_NETWORK_RECONNECT_ATTEMPTS = 5;
 
@@ -93,7 +94,15 @@ export async function checkRealProviderReadiness(
 ): Promise<ProviderReadinessCheckResult> {
   const provider = options.provider ?? "openai";
   options.signal?.throwIfAborted();
-  const endpoint = options.endpoint ?? providerEndpoint(BUILTIN_PROVIDERS, provider);
+  let endpoint = options.endpoint ?? providerEndpoint(BUILTIN_PROVIDERS, provider);
+  try {
+    assertAccountAddress(options.accountAuth, options.baseUrl);
+    const native = accountProtocol(options.accountAuth);
+    if (native) {
+      if (options.endpoint && options.endpoint !== native.endpoint) throw new Error('Account protocol mismatch.');
+      endpoint = native.endpoint;
+    }
+  } catch { return { ok: false, failure: { kind: 'missing-config', stopReason: 'Provider readiness failed: the account issuer endpoint or protocol conflicts with the selected request.' } }; }
   const shape = endpointShape(endpoint);
 
   const envVarName = getProviderApiKeyEnvVarName(provider);
@@ -113,22 +122,14 @@ export async function checkRealProviderReadiness(
   const accountAuthExpired =
     options.accountAuth && options.accountAuth.expiresAt <= Date.now();
   if (accountAuthExpired) {
-    const refreshToken = options.accountAuth?.refreshToken?.trim();
-    if (!refreshToken) {
       return {
         ok: false,
         failure: {
           kind: "auth",
           stopReason:
-            "Provider readiness failed (provider-readiness:auth): account-auth token is expired and refresh token is missing. Re-run /connect login openai --account.",
+            "Provider readiness failed (provider-readiness:auth): account-auth token is expired. Renew and confirm storage or reconnect before sending.",
         },
       };
-    }
-
-    // A refresh token is present, so the token can be renewed. The renewal happens
-    // on the invocation path, before this check runs and before the request is
-    // built, so an expiring token is replaced rather than carried into the turn.
-    return { ok: true };
   }
 
   if (provider === "openai" && accountAccess && (endpoint ?? DEFAULT_ENDPOINT_KIND) === DEFAULT_ENDPOINT_KIND) {

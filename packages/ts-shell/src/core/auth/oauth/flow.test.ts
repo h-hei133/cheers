@@ -5,6 +5,7 @@ import { createPkcePair, createState } from "./pkce.js";
 import { startCallbackServer } from "./callback.js";
 import { nativeOAuthLogin, isExpiring, refreshOAuthTokens, runOAuthLogin, type OAuthProviderConfig } from "./flow.js";
 import { oauthConfigFor, oauthProviderIds } from "./providers.js";
+import { accountToken } from '../../../test-utils/oauth.js';
 
 const CONFIG: OAuthProviderConfig = {
   id: "test",
@@ -55,6 +56,42 @@ function browserThatRedirects(query: (state: string) => string): (url: string) =
     await fetch(redirect.toString()).catch(() => undefined);
   };
 }
+
+it.each(['missing', 'subject', 'organization', 'namespace', 'malformed'])('refuses a new OpenAI login with %s access identity despite an exact ID-token claim', async kind => {
+  const claims = kind === 'subject' ? { sub: 'account' } : kind === 'organization' ? { organizations: [{ id: 'account' }] }
+    : kind === 'namespace' ? { 'https://foreign.test/auth': { chatgpt_account_id: 'account' } } : {};
+  const access = kind === 'malformed' ? 'malformed' : `header.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.signature`;
+  const endpoint = tokenEndpoint({ access_token: access, refresh_token: 'synthetic-refresh', expires_in: 3600,
+    id_token: accountToken('id-display', 'account') });
+  await expect(runOAuthLogin({ ...CONFIG, id: 'openai' }, { openBrowser: browserThatRedirects(state => `?code=code&state=${state}`),
+    fetchImpl: endpoint.fetchImpl })).rejects.toThrow(/metadata/);
+  expect(endpoint.sent).toHaveLength(1);
+});
+
+it('accepts the exact OpenAI access identity and ignores a distinct ID-token subject', async () => {
+  const endpoint = tokenEndpoint({ access_token: accountToken('access', 'account'), refresh_token: 'synthetic-refresh', expires_in: 3600,
+    id_token: `header.${Buffer.from(JSON.stringify({ sub: 'subject' })).toString('base64url')}.signature` });
+  const result = await runOAuthLogin({ ...CONFIG, id: 'openai' }, { openBrowser: browserThatRedirects(state => `?code=code&state=${state}`), fetchImpl: endpoint.fetchImpl });
+  expect(result.accountId).toBe('account'); expect(nativeOAuthLogin(result, { ...CONFIG, id: 'openai' })).toBeDefined();
+});
+
+it.each([307, 308])('does not forward a refresh form to a foreign %s redirect', async status => {
+  let foreign = 0, issuer = 0;
+  const receiver = createServer((request, response) => { foreign++; request.resume(); response.end('{}'); });
+  const listen = (server: Server) => new Promise<string>(resolve => server.listen(0, '127.0.0.1', () => {
+    const address = server.address(); if (!address || typeof address === 'string') throw new Error('No address');
+    resolve(`http://127.0.0.1:${address.port}`);
+  }));
+  const destination = await listen(receiver);
+  const source = createServer((request, response) => { issuer++; request.resume(); response.writeHead(status, { location: destination }); response.end(); });
+  const address = await listen(source);
+  try {
+    await expect(refreshOAuthTokens({ ...CONFIG, tokenUrl: address }, 'synthetic-private-refresh')).rejects.toThrow(/transport/);
+    expect(issuer).toBe(1); expect(foreign).toBe(0);
+  } finally {
+    for (const server of [source, receiver]) { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
+  }
+});
 
 describe("PKCE", () => {
   it("derives the challenge from the verifier the way the spec says", () => {
@@ -230,7 +267,7 @@ describe("the whole flow", () => {
 
   it("reads the account and email out of the id token", async () => {
     const claims = Buffer.from(
-      JSON.stringify({ email: "someone@example.com", "https://api.example.com/auth": { chatgpt_account_id: "acct_9" } }),
+      JSON.stringify({ email: "someone@example.com", "https://api.openai.com/auth": { chatgpt_account_id: "acct_9" } }),
     ).toString("base64url");
     const { fetchImpl } = tokenEndpoint({
       access_token: "at",

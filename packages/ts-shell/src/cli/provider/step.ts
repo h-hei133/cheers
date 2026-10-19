@@ -7,7 +7,7 @@ import type { ToolDefinition } from '../../tools/types.js';
 import { buildSystemPrompt, systemPromptSnapshot, type SystemPromptContext } from '../../turn/prompt.js';
 import { createStepFunction, type StepFunction } from '../../turn/step.js';
 import { loadCatalog } from '../../core/models/catalogStore.js';
-import { catalogProvider, providerEndpoint } from '../../core/models/catalog.js';
+import { catalogProvider } from '../../core/models/catalog.js';
 import { accountAuthFor, providerAuthorization } from '../../provider/request/authorization.js';
 import { providerModelTransport } from '../../provider/request/transport.js';
 import { providerFetchForEndpoint } from '../../provider/request/fetch.js';
@@ -25,7 +25,9 @@ import type { SessionModelRole } from '../../session/model/contract.js';
 import { assertAdmission } from '../../core/network/admission.js';
 import { delegatedRenewal, type AccountRotation, type AccountPublication } from './renewal.js';
 import { sessionUsageSink } from '../../session/store/usage.js';
-import { providerCredentialBaseUrl } from '../../core/auth/account/target.js';
+import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../core/auth/account/target.js';
+import { accountReplayOwner } from '../../core/auth/account/replay.js';
+import { configuredOutputLimit } from '../../provider/request/output.js';
 
 export interface ProviderStepHost {
   readonly providerMode: 'synthetic' | 'real';
@@ -58,11 +60,11 @@ export function createProviderStep(
   const catalog = request.providerCatalog ?? loadCatalog();
   const baseUrl = providerCredentialBaseUrl(catalog, resolution);
   if (catalogProvider(catalog, resolution.provider, baseUrl).ambiguous) throw new Error('The model catalogue has multiple entries for this endpoint. Resolve them before sending.');
-  const endpoint = providerEndpoint(catalog, resolution.provider, baseUrl);
+  const endpoint = providerCredentialEndpoint(catalog, resolution, baseUrl);
   const configuredTier = request.serviceTier ?? request.runtimeConfig?.providerConnections
     ?.find(item => item.id === resolution.credential?.connectionId)?.serviceTier
     ?? request.runtimeConfig?.providerCredentials?.[resolution.provider]?.serviceTier;
-  if (configuredTier && serviceTierCapability(catalog, resolution.provider, resolution.model, configuredTier, baseUrl) !== 'supported') {
+  if (configuredTier && serviceTierCapability(catalog, resolution.provider, resolution.model, configuredTier, baseUrl, endpoint) !== 'supported') {
     throw new Error(`Configured service tier '${configuredTier}' is not verified for ${resolution.provider}/${resolution.model}.`);
   }
   const system = systemPromptSnapshot(request.agentMode, promptContext);
@@ -81,6 +83,7 @@ export function createProviderStep(
         ...(endpoint ? { endpoint } : {}),
       }).headers,
       baseUrl: baseUrl ?? "",
+      replayOwner: accountReplayOwner(request.workspaceRoot, resolution),
       model: resolution.model ?? resolution.credential?.model ?? "",
       // The catalog is keyed by provider id, so the request shape cannot be
       // resolved without it.
@@ -116,7 +119,7 @@ export function createProviderStep(
     // run that sets none keeps the step's own defaults.
     temperature: request.runtimeConfig?.temperature,
     topP: request.runtimeConfig?.topP,
-    maxOutputTokens: request.runtimeConfig?.maxOutputTokens,
+    maxOutputTokens: configuredOutputLimit(request.runtimeConfig, endpoint),
     ...(request.runtimeConfig?.contextWindow !== undefined ? { contextWindow: request.runtimeConfig.contextWindow } : {}),
     ...(request.runtimeConfig?.reserveTokens !== undefined ? { reserveTokens: request.runtimeConfig.reserveTokens } : {}),
     retry: {

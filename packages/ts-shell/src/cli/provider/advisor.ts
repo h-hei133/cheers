@@ -3,8 +3,8 @@ import type { AdvisorTarget } from '../../advisor/model.js';
 import type { RuntimeConfig } from '../../config/runtimeConfig.js';
 import { assertScopedModel } from '../../config/scope/projection.js';
 import { credentialIdentityFor } from '../../core/auth/account/pool.js';
-import { catalogModel, providerEndpoint, type CatalogProvider } from '../../core/models/catalog.js';
-import { providerCredentialBaseUrl } from '../../core/auth/account/target.js';
+import { catalogModel, type CatalogProvider } from '../../core/models/catalog.js';
+import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../core/auth/account/target.js';
 import { effortCapability } from '../../core/models/capability.js';
 import type { ProviderCredentialResolution } from '../../core/shell/providerCredentials.js';
 import { delegatedTarget } from './target.js';
@@ -29,7 +29,7 @@ export function resolveAdvisorSelection(input: {
     throw new Error('Advisor role model or effort is unavailable.');
   }
   const identity = createHash('sha256').update(JSON.stringify([input.revision, target, selected.provider, selected.model,
-    baseUrl, credentialIdentityFor(selected.provider, selected.credential), model, providerEndpoint(input.catalog, selected.provider, baseUrl)])).digest('hex');
+    baseUrl, credentialIdentityFor(selected.provider, selected.credential), model, providerCredentialEndpoint(input.catalog, selected, baseUrl)])).digest('hex');
   return { identity, label: input.target ?? `${role!.connectionId}/${role!.model}${role!.thinkingEffort ? `@${role!.thinkingEffort}` : ''}`,
     ...(input.target ? { model: input.target } : { modelRole: { name: 'advisor', identity: JSON.stringify(role) } }) };
 }

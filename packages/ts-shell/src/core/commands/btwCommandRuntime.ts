@@ -6,11 +6,12 @@ import { getRuntimeConfig } from "../../config/runtimeConfig.js";
 import { credentialBlockMessage, resolveProviderCredential } from "../shell/providerCredentials.js";
 import { credentialIdentityFor } from "../auth/account/pool.js";
 import { accountAuthFor, providerAuthorization } from "../../provider/request/authorization.js";
-import { providerCredentialBaseUrl } from '../auth/account/target.js';
+import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../auth/account/target.js';
+import { configuredOutputLimit } from '../../provider/request/output.js';
 import { requestSimpleCompletion } from "../../provider/request/completion.js";
 import { loadCatalog } from "../models/catalogStore.js";
 import { resolveRequestShape } from "../models/requestShape.js";
-import { catalogModel, catalogProvider, providerEndpoint } from "../models/catalog.js";
+import { catalogModel, catalogProvider } from "../models/catalog.js";
 import { providerFetchForEndpoint } from "../../provider/request/fetch.js";
 import { endpointShape } from "../../provider/endpoints/index.js";
 import { classifyProviderFailure, type ProviderFailureClass } from "../../provider/registry/provider.js";
@@ -65,7 +66,7 @@ export async function runBtwCommand(
   try { baseUrl = providerCredentialBaseUrl(catalog, resolution); }
   catch { return { kind: 'local', output: 'Side question refused: the selected endpoint conflicts with the account credential binding.' }; }
   if (catalogProvider(catalog, resolution.provider, baseUrl).ambiguous) return { kind: 'local', output: 'Side question refused: multiple model catalogue entries claim this endpoint.' };
-  const endpoint = providerEndpoint(catalog, resolution.provider, baseUrl);
+  const endpoint = providerCredentialEndpoint(catalog, resolution, baseUrl);
 
   let answer = "";
   let attempted = false;
@@ -109,7 +110,8 @@ export async function runBtwCommand(
             { role: "system", content: SIDE_QUESTION_SYSTEM_PROMPT },
             { role: "user", content: question },
           ],
-          maxOutputTokens: runtimeConfig.maxOutputTokens ?? shape.maxOutputCeiling,
+          maxOutputTokens: configuredOutputLimit(runtimeConfig, endpoint)
+            ?? (endpointShape(endpoint).outputControl === 'provider' ? undefined : shape.maxOutputCeiling),
           supportsTemperature: shape.supportsTemperature,
           signal: controller.signal,
           onFailure: (classification) => { failure = classification; },

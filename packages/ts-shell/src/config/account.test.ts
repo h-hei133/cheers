@@ -59,7 +59,7 @@ describe('persisted subscription credentials', () => {
   for (const provider of ['openai', 'google'] as const) {
     for (const source of ['config', 'connection', 'pool'] as const) {
       it(`keeps ${provider} ${source} accounts on their owner when a CLI endpoint changes`, () => {
-        const baseUrl = `https://owner.invalid/${provider}/v1`;
+        const baseUrl = provider === 'openai' ? 'https://chatgpt.com/backend-api' : `https://owner.invalid/${provider}/v1`;
         const auth = { type: provider === 'openai' ? 'openai-chatgpt-account' : 'google-gemini-account',
           accessToken: 'synthetic-access', refreshToken: 'synthetic-refresh', expiresAt: Date.now() + 3_600_000,
           ...(provider === 'google' ? { clientId: 'synthetic-client' } : {}) };

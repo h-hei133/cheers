@@ -11,6 +11,7 @@ import { grantRefreshLogin, reserveRefreshLogin, refreshLeasesPath, captureLease
 import { accountGeneration, credentialDigest } from './account/lineage.js';
 import { nativeOAuthLogin, OAuthExchangeError } from './oauth/flow.js';
 import { oauthConfigFor } from './oauth/providers.js';
+import { accountProtocol } from './account/policy.js';
 import { AccountAuthConfig, type GoogleAccountAuthConfig, type OpenAIAccountAuthConfig, type ProviderConnectionConfig, readRuntimeConfigEditAt, getUserRuntimeConfigPath, type RuntimeConfigFile, type RuntimeProvider, writeUserRuntimeConfigFile } from "../../config/runtimeConfig.js";
 import { providerFacts } from "../providers/facts.js";
 import { openAIProviderAuthContract } from "../commands/openaiAccountAuth.js";
@@ -209,6 +210,7 @@ function persistConnectedAccountAuth(input: {
           authType: "account-auth" as const,
           model: resolveAccountAuthModel(input.provider, connection.model),
           accountAuth: toProviderAccountAuthConfig(input.provider, input.accountAuth),
+          ...(accountProtocol(input.accountAuth) ? { baseUrl: accountProtocol(input.accountAuth)!.baseUrl } : {}),
           status: "connected" as const,
           updatedAt,
         }
@@ -232,6 +234,7 @@ function persistConnectedAccountAuth(input: {
           latest.providerCredentials?.[input.provider]?.model,
         ),
         accountAuth: toProviderAccountAuthConfig(input.provider, input.accountAuth),
+        ...(accountProtocol(input.accountAuth) ? { baseUrl: accountProtocol(input.accountAuth)!.baseUrl } : {}),
       },
     },
   };

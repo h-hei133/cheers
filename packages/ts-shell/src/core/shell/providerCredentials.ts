@@ -11,6 +11,7 @@ import { selectPooledConnection } from '../auth/account/pool.js';
 import { ownedConnectionCredential } from '../auth/account/presence.js';
 import { BUILTIN_PROVIDERS } from '../models/catalog.js';
 import type { ProviderCredentialResolution } from '../auth/credential.js';
+import { accountProtocol, assertAccountAddress } from '../auth/account/policy.js';
 export type {
   ProviderCredentialSource, ProviderCredentialAuthMode,
   ResolvedProviderCredential, ProviderCredentialResolution,
@@ -40,7 +41,11 @@ export function resolveProviderCredential(
   const accountBaseUrl = normalizeBaseUrl(credential.accountAuth.type === 'subscription' ? credential.accountAuth.baseUrl : undefined);
   const storedBaseUrl = normalizeBaseUrl(credential.source === 'connection' ? connection?.baseUrl : profile?.baseUrl);
   const ownerBaseUrl = accountBaseUrl ?? storedBaseUrl;
-  const effectiveOwner = ownerBaseUrl ?? normalizeBaseUrl(BUILTIN_PROVIDERS.find(item => item.id === resolution.provider)?.baseUrl);
+  try { assertAccountAddress(credential.accountAuth, ownerBaseUrl); }
+  catch { return { selection: resolution.selection, provider: resolution.provider, expectedEnvVarName: resolution.expectedEnvVarName,
+    model: resolution.model, blocked: 'connection-overridden' }; }
+  const effectiveOwner = ownerBaseUrl ?? accountProtocol(credential.accountAuth)?.baseUrl
+    ?? normalizeBaseUrl(BUILTIN_PROVIDERS.find(item => item.id === resolution.provider)?.baseUrl);
   // CLI and catalogue selection cannot move an account credential off its captured owner.
   if ((accountBaseUrl && storedBaseUrl && accountBaseUrl !== storedBaseUrl)
     || (input.cliBaseUrl !== undefined && normalizeBaseUrl(input.cliBaseUrl) !== effectiveOwner)) {

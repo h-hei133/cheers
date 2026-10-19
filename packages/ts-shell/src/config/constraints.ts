@@ -1,31 +1,44 @@
 import { DEFAULT_CONFIG, type RuntimeConfig } from './runtimeConfig.js';
-import { catalogBaseUrl, catalogModel, catalogProvider, providerEndpoint, type CatalogProvider } from '../core/models/catalog.js';
+import { catalogBaseUrl, catalogModel, catalogProvider, type CatalogProvider } from '../core/models/catalog.js';
 import { resolveContextWindow, resolveTokenBudget } from '../core/models/window.js';
 import { outputLimitFailure, reserveLimitFailure } from '../core/models/limits.js';
 import { effortCapability } from '../core/models/capability.js';
 import type { ThinkingPreference } from '../core/models/effort.js';
 import { endpointShape } from '../provider/endpoints/index.js';
 import { effortOutputFailure } from '../provider/endpoints/effort.js';
+import type { ProviderCredentialResolution } from '../core/auth/credential.js';
+import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../core/auth/account/target.js';
+import { configuredOutputLimit } from '../provider/request/output.js';
 
 export interface ConfigModelTarget {
   readonly provider: string;
   readonly model?: string;
   readonly baseUrl?: string;
   readonly thinkingEffort?: ThinkingPreference;
+  readonly credential?: ProviderCredentialResolution['credential'];
 }
 
 /** Final relations use the same target, precedence and window as the consumers. */
 export function inspectConfigConstraints(config: RuntimeConfig, target: ConfigModelTarget, catalog: readonly CatalogProvider[]) {
-  target = { ...target, baseUrl: catalogBaseUrl(catalog, target.provider, target.baseUrl) };
   const errors: string[] = [];
   const notices: string[] = [];
+  const resolution = target;
+  let endpoint: string | undefined;
+  let output: number | undefined;
+  try {
+    target = { ...target, baseUrl: target.credential ? providerCredentialBaseUrl(catalog, resolution)
+      : catalogBaseUrl(catalog, target.provider, target.baseUrl) };
+    endpoint = providerCredentialEndpoint(catalog, resolution, target.baseUrl);
+    output = configuredOutputLimit(config, endpoint)
+      ?? (endpointShape(endpoint).outputControl === 'provider' ? undefined : catalogModel(catalog, target.provider, target.model, target.baseUrl)?.maxTokens);
+  } catch { errors.push('The selected model endpoint or output control is unavailable.'); }
   if ((config.retryBaseDelayMs ?? DEFAULT_CONFIG.retryBaseDelayMs!) > (config.retryMaxDelayMs ?? DEFAULT_CONFIG.retryMaxDelayMs!)) {
     errors.push('retryBaseDelayMs must not exceed retryMaxDelayMs.');
   }
   if (catalogProvider(catalog, target.provider, target.baseUrl).ambiguous) errors.push('Multiple model catalogue entries claim the selected endpoint. Resolve the duplicate entries before sending.');
   const entry = catalogModel(catalog, target.provider, target.model, target.baseUrl);
   const window = resolveContextWindow({ catalog, ...target, configured: config.contextWindow });
-  const outputFailure = outputLimitFailure(config.maxOutputTokens ?? entry?.maxTokens, entry?.maxTokens, window.window);
+  const outputFailure = outputLimitFailure(output, entry?.maxTokens, window.window);
   if (outputFailure) errors.push(outputFailure);
   const reserve = resolveTokenBudget(config.modelTokenBudgets, target.provider, target.model, 'reserveTokens', config.reserveTokens, DEFAULT_CONFIG.reserveTokens!);
   const reserveFailure = reserveLimitFailure(reserve, window.window);
@@ -34,8 +47,8 @@ export function inspectConfigConstraints(config: RuntimeConfig, target: ConfigMo
     errors.push('The selected model does not support this reasoning effort. Select another level or use /thinking auto.');
   }
   try {
-    const shape = endpointShape(providerEndpoint(catalog, target.provider, target.baseUrl));
-    const failure = target.thinkingEffort ? effortOutputFailure(shape, config.maxOutputTokens ?? entry?.maxTokens) : undefined;
+    const shape = endpointShape(endpoint);
+    const failure = target.thinkingEffort ? effortOutputFailure(shape, output) : undefined;
     if (failure) errors.push(failure);
   } catch { errors.push('The selected model endpoint is unavailable.'); }
   if (target.model && window.source === 'default') notices.push('Model context capacity is unverified; the runtime fallback window is in use.');

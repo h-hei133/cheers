@@ -1,4 +1,5 @@
-import { observeOAuthRenewal } from '../../test-utils/oauth.js';
+import { accountWire, accountCompletion } from '../../test-utils/account.js';
+import { accountToken, observeOAuthRenewal } from '../../test-utils/oauth.js';
 import fs from 'node:fs';
 import http from 'node:http';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -52,6 +53,9 @@ async function fixture(summaryModel = 'namespace/summary') {
     const chunks: Buffer[] = []; for await (const chunk of request) chunks.push(Buffer.from(chunk));
     const body = JSON.parse(Buffer.concat(chunks).toString());
     requests.push({ path: request.url!, credential: request.headers.authorization, model: body.model, effort: body.reasoning_effort, messages: body.messages, body });
+    if (body.stream === true && Array.isArray(body.input)) {
+      response.writeHead(200, { 'content-type': 'text/event-stream' }); response.end(accountCompletion('Summary fixture answer')); return;
+    }
     response.writeHead(200, { 'content-type': 'application/json' });
     response.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'Condensed fixture history.' }, finish_reason: 'stop' }],
       usage: { prompt_tokens: 4, completion_tokens: 1, total_tokens: 5 } }));
@@ -209,16 +213,18 @@ it('does not reuse a completed summary after the role effort changes', async () 
 it('renews the summary account once and refuses append across the resulting configuration publication', async () => {
   const setup = await fixture('gpt-5.4'); const edit = readRuntimeConfigEditAt(getUserRuntimeConfigPath());
   const old = { type: 'openai-chatgpt-account' as const, accessToken: 'synthetic-old', refreshToken: 'synthetic-refresh', expiresAt: 1, accountId: 'b' };
-  const fresh = { ...old, accessToken: 'synthetic-fresh', refreshToken: 'synthetic-rotated', expiresAt: Date.now() + 3600000 };
-  writeUserRuntimeConfigFile({ ...edit.values, providerConnections: edit.values.providerConnections!.map(connection => connection.id === 'b'
-    ? { ...connection, authType: 'account-auth', apiKey: undefined, accountAuth: { openai: old } } : connection) }, edit);
+  const fresh = { ...old, accessToken: accountToken('synthetic-fresh', 'b'), refreshToken: 'synthetic-rotated', expiresAt: Date.now() + 3600000 };
+  writeUserRuntimeConfigFile({ ...edit.values, maxOutputTokens: undefined, providerConnections: edit.values.providerConnections!.map(connection => connection.id === 'b'
+    ? { ...connection, baseUrl: 'https://chatgpt.com/backend-api', authType: 'account-auth', apiKey: undefined, accountAuth: { openai: old } } : connection) }, edit);
+  const address = new URL(edit.values.providerConnections!.find(connection => connection.id === 'b')!.baseUrl!);
+  accountWire(address.origin, '/b/v1/codex/responses');
   const renewal = observeOAuthRenewal(fresh);
   const { deps } = runtime(setup);
   const history = setup.manager.getSession(setup.session.id)!.turns;
   expect(await deps.compactHistory!(setup.session.id, setup.signal)).toMatchObject({ status: 'failed', reason: expect.stringContaining('Configuration changed') });
   expect(setup.manager.getSession(setup.session.id)!.turns).toEqual(history);
   expect(renewal).toHaveBeenCalledOnce();
-  expect(setup.requests.map(request => request.credential)).toEqual(['Bearer synthetic-fresh', 'Bearer synthetic-fresh']);
+  expect(setup.requests.map(request => request.credential)).toEqual([`Bearer ${fresh.accessToken}`, `Bearer ${fresh.accessToken}`]);
   const stored = readRuntimeConfigEditAt(getUserRuntimeConfigPath()).values;
   expect(stored.providerConnections!.find(connection => connection.id === 'b')?.accountAuth?.openai).toMatchObject({ ...fresh, expiresAt: expect.any(Number) });
   expect(stored.providerConnections!.find(connection => connection.id === 'a')).toEqual(edit.values.providerConnections![0]);

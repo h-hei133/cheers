@@ -6,6 +6,8 @@ export interface OpenAIAccountAuthConfig {
   readonly refreshToken: string;
   readonly expiresAt: number;
   readonly accountId?: string;
+  /** New independent login identity; preserved only by verified renewal. */
+  readonly loginId?: string;
 }
 
 export interface GoogleAccountAuthConfig {
@@ -73,6 +75,7 @@ export function normalizeProviderAccountAuth(
     const refreshToken = openai.refreshToken?.trim();
     const expiresAt = Number(openai.expiresAt);
     const accountId = openai.accountId?.trim();
+    const loginId = openai.loginId?.trim();
     if (
       !accessToken ||
       !refreshToken ||
@@ -89,6 +92,7 @@ export function normalizeProviderAccountAuth(
         refreshToken,
         expiresAt,
         ...(accountId ? { accountId } : {}),
+        ...(loginId ? { loginId } : {}),
       },
     };
   }

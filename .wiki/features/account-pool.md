@@ -25,7 +25,7 @@ summary: "按 provider 限定的封闭连接集合：显式成员、endpoint/OAu
 
 OpenAI/Google 槽位检查现有凭据类型；subscription 保留在 Anthropic/Copilot 的既有槽位。两种 subscription 仍共享类型，没有完整 issuer/受众证明，不能据此宣称跨 provider 受众隔离完成。
 
-账号请求地址来自凭据所属配置或连接、subscription 签发地址，缺省时使用内置地址。连接自身账号不继承 provider profile 地址；CLI 与签发/存储地址冲突即拒绝，模型目录不能把缺省账号搬到其他地址。主请求、委派、摘要、cache、agent 和 `/btw` 共用地址校验，在续期与发送之前拒绝。API key 保留原目录地址回退。显式存储地址只证明配置 owner 绑定，不证明 OAuth 受众或原生协议合法。
+OpenAI 账号由 issuer 固定选择账户服务地址和原生 Responses 协议；存储/CLI 显式地址不相符即拒绝。其他账号地址仍来自所属配置/连接、subscription 签发地址及内置缺省值。连接自身账号不继承 provider profile 地址；模型目录不能搬迁账号凭据。主请求、委派、摘要、cache、agent 和 `/btw` 共用校验，在续期与发送之前拒绝；原生 OpenAI 没有 cache refresh 能力。API key 保留原目录地址回退。其他 provider 的显式存储绑定不能证明 OAuth 受众或原生协议合法。
 
 ## 2. 选择
 
@@ -57,7 +57,7 @@ OpenAI/Google 槽位检查现有凭据类型；subscription 保留在 Anthropic/
 
 - refresh lease、请求凭据代次与独立 advisor/subagent 的发送前续期已接入；完整 quota/429 与历史成本归属仍按 PRV-04/05 继续复核。
 - 不复制 live rotating OAuth 到其他 profile；每个 profile 独立登录。
-- subscription 配置规范化现已保留；完整 subscription 续期、原生账号协议及受众仍开放。[Responses 公开协议](provider-protocols.md)已接入现有注册表，但 OpenAI 账号仍须绑定账户服务地址、stream-only 与能力合同，Google 账号 scope/协议也须继续核验；合成协议成功不能替代这些实现。
+- subscription 配置规范化现已保留，完整 subscription 身份/续期及 Google scope/原生协议继续开放。[原生请求协议](provider-protocols.md)已独立声明 OpenAI 账户 issuer、stream-only、provider-owned output 和 grant 绑定回放；合成协议成功不证明真实账户 entitlement 或远端兼容性。
 - 本轮已验证完整拓扑、显式/CLI/委派限制、owned credential/实际代次、等待亲和、实际 CLI 子请求与共享账本、Linux 四格隔离 PTY。独立复核、反转和精确交付证据见开发日志；完整 PRV-03/05 仍开放，未运行真实 provider。
 
 ## 5. Refresh 归属与跨进程互斥

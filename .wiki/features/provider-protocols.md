@@ -15,6 +15,14 @@ summary: "现有端点注册表中的 Responses 请求、终态、工具与加�
 
 SSE 处理分块 UTF-8、CR/LF、多行 data、注释及最后未分隔事件，单帧限制 8 MiB。只有明确终态接纳完成；已完成内容、阶段和工具参数不能被后续事件替换。已存在的加密材料保持原值，终态可补回 item done 未提供的材料。失败保留已显示文字和身份匹配的 usage，外来响应身份不产生本请求计量。完成或消费者退出均取消并释放 reader。
 
-完整有序 output 保存到版本化 opaque reasoning signature，沿原消息、transcript 和 resume 路径保留，允许没有可见 reasoning text。回放前校验协议形状、原消息文字和工具语义、选定 provider/model，以及捕获 endpoint/address/实际凭据代次的脱敏 binding。服务端 canonical model 名称只是 metadata，不替代请求 alias 身份。变更地址、账号、代次或消息以及旧 transcript 缺 binding 时，以公开文字/工具重建，丢弃 opaque 回放；当前策略保守地在续期后也重建，尚不承诺加密推理跨续期连续性。
+完整有序 output 保存到版本化 opaque reasoning signature，沿原消息、transcript 和 resume 路径保留，允许没有可见 reasoning text。回放前校验协议形状、原消息文字和工具语义、选定 provider/model，以及捕获 endpoint/address/实际凭据代次的脱敏 binding。服务端 canonical model 名称只是 metadata，不替代请求 alias 身份。公开 API 在代次变化后保守重建；账户协议只有经原生登录/续期的精确存储 grant 才保持跨续期回放身份。地址、账号、槽位、profile、消息变更及旧 transcript 缺 binding 时仍重建公开文字/工具。
 
 官方合同来源：[Responses streaming](https://developers.openai.com/api/docs/guides/streaming-responses)、[function calling](https://developers.openai.com/api/docs/guides/function-calling)、[reasoning](https://developers.openai.com/api/docs/guides/reasoning)。账户服务虽使用 Responses wire family，但其地址、stream-only、输出上限、缓存刷新和 OAuth entitlement 必须独立声明及验证。**公开适配器不代表 ChatGPT 账户、Google scope/原生协议、subscription 身份或续期已经完成。**
+
+OpenAI 账户的 issuer 固定选择 `https://chatgpt.com/backend-api/codex/responses` 和 `openai-account-responses`，独立于模型目录；存储及 CLI 显式地址不相符即拒绝。API key 保持目录协议选择。登录要求 access token 中精确的 `https://api.openai.com/auth.chatgpt_account_id`，续期必须返回同一账户；subject、organization、其他 namespace 和 ID-token 不能替代。交换已派发而身份缺失/不相符时保持 unknown，不保存或发布新凭据，也不自动重试。同 issuer token 交换和原生生成均拒绝重定向，防止凭据被转发。
+
+原生账户 full turn、委派、agent、摘要、压缩和 `/btw` 都使用 `stream:true`、`store:false` 及非空 instructions。辅助请求也完整消费 SSE 并关闭 reader。账户协议没有通用 models probe、缓存刷新、service tier 或可信 requestBound；配置默认 output cap 让位于 provider，任何显式 `maxOutputTokens` 在派发前拒绝，不能把目录估算上限当作服务端强制上界。预算需要证明的请求仍按原合同拒绝。
+
+账户 decoder 额外接纳 `response.done`；终态缺 output 时只从连续且封口的 `output_item.done` 重建。缺 wire model 使用账户专属 opaque schema，并继续由已捕获的请求 provider/model/binding 校验。created model 若存在则保持并校验，终态不能改名。截断、失败、身份矛盾、稀疏/未封口 output 和非法工具参数不产生执行权限。
+
+新登录保存独立 `loginId`，续期保留它；它本身不是证明。回放 owner 读取现有 lease store，要求 login/rotation grant 的 owner、generation、storage 精确匹配且未准备/派发/未知/消费。恢复已消费前代、原始替换 token/expiry/loginId、复制槽位/账本或替换 profile 目录均不能保留 stable binding。旧配置无原生 grant 时仍使用保守代次 binding。合成 HTTP/TLS、独立进程与 PTY 验证覆盖此合同，不能证明真实账户 entitlement 或远端兼容性；Google scope/原生协议和 subscription 身份/续期继续开放。

@@ -18,6 +18,7 @@ import type { ResolvedRequestShape } from '../../models/requestShape.js';
 import { promptTokensFor, requestBudget } from '../../../context/request/budget.js';
 import type { ProviderUsage } from '../../../turn/completion.js';
 import { SummaryAdmissionError, type CompactionDispatch } from '../../../session/compaction/contract.js';
+import { readCompletion } from '../../../provider/response/read.js';
 
 /**
  * One summarization request.
@@ -172,8 +173,8 @@ export async function requestCompactionSummary(request: CompactionRequest): Prom
   const messages = prepareCompactionMessages(request);
   const fetchImpl = request.fetchImpl;
   const headers = new Headers(request.provider.headers);
-  headers.set('accept', 'application/json');
   const kind = endpointKind(request.provider.endpoint);
+  headers.set('accept', endpointShape(kind).simpleResponse === 'stream' ? 'text/event-stream' : 'application/json');
   const maxOutputTokens = request.provider.maxOutputTokens ?? request.maxOutputTokens;
   const body = JSON.stringify(
     endpointBody(kind, {
@@ -203,7 +204,7 @@ export async function requestCompactionSummary(request: CompactionRequest): Prom
     signal: request.signal,
   }, fetchImpl, transport);
   if (!res.ok) { attempt.settle(); return undefined; }
-  const completion = endpointShape(kind).readBody(await res.json());
+  const completion = await readCompletion(kind, res);
   request.onUsage?.(completion.usage);
   attempt.settle(completion.usage);
   if (['error', 'length', 'refusal', 'content_filter'].includes(completion.choices?.[0]?.finish_reason ?? '')) return undefined;

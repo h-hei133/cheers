@@ -1,3 +1,4 @@
+import { accountToken } from '../../test-utils/oauth.js';
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -160,19 +161,19 @@ describe("renewing a token that is about to expire", () => {
     const fetchImpl = (async (_url: string, init?: RequestInit) => {
       tokens.push(String(init?.body ?? ""));
       return new Response(
-        JSON.stringify({ access_token: "renewed", refresh_token: "rotated", expires_in: 3600 }),
+        JSON.stringify({ access_token: accountToken('renewed'), refresh_token: "rotated", expires_in: 3600 }),
         { status: 200, headers: { "content-type": "application/json" } },
       );
     }) as unknown as typeof fetch;
 
     const result = await renewAccountAuthIfExpiring({
       provider: "openai",
-      credential: { accountAuth: openAIAuth({ expiresAt: Date.now() - 1 }) },
+      credential: { accountAuth: openAIAuth({ accountId: "a", expiresAt: Date.now() - 1 }) },
       fetchImpl,
     });
 
     expect(result.renewed).toBe(true);
-    expect(result.accountAuth?.accessToken).toBe("renewed");
+    expect(result.accountAuth?.accessToken).toBe(accountToken('renewed'));
     expect(result.accountAuth?.refreshToken).toBe("rotated");
     expect(tokens[0]).toContain("grant_type=refresh_token");
   });
@@ -200,7 +201,7 @@ describe("renewing a token that is about to expire", () => {
     // of the problem, which reads as a network fault; naming the login is the only
     // version the user can act on.
     const fetchImpl = (async () => new Response("nope", { status: 400 })) as unknown as typeof fetch;
-    const credential = { accountAuth: openAIAuth({ expiresAt: Date.now() - 1 }) };
+    const credential = { accountAuth: openAIAuth({ accountId: "a", expiresAt: Date.now() - 1 }) };
 
     const result = await renewAccountAuthIfExpiring({ provider: "openai", credential, fetchImpl });
     expect(result.renewed).toBe(false);
@@ -235,11 +236,11 @@ describe("renewing a token that is about to expire", () => {
       exchanges += 1;
       await gate;
       return new Response(
-        JSON.stringify({ access_token: "renewed", refresh_token: "rotated", expires_in: 3600 }),
+        JSON.stringify({ access_token: accountToken('renewed'), refresh_token: "rotated", expires_in: 3600 }),
         { status: 200, headers: { "content-type": "application/json" } },
       );
     }) as unknown as typeof fetch;
-    const credential = { accountAuth: openAIAuth({ expiresAt: Date.now() - 1 }) };
+    const credential = { accountAuth: openAIAuth({ accountId: "a", expiresAt: Date.now() - 1 }) };
 
     const first = renewAccountAuthIfExpiring({ provider: "openai", credential, fetchImpl });
     const second = renewAccountAuthIfExpiring({ provider: "openai", credential, fetchImpl });
@@ -247,10 +248,10 @@ describe("renewing a token that is about to expire", () => {
     const [a, b] = await Promise.all([first, second]);
 
     expect(exchanges).toBe(1);
-    expect(a.accountAuth?.accessToken).toBe("renewed");
+    expect(a.accountAuth?.accessToken).toBe(accountToken('renewed'));
     // The caller that waited reads the token the exchange produced, not its own
     // stale copy.
-    expect(b.accountAuth?.accessToken).toBe("renewed");
+    expect(b.accountAuth?.accessToken).toBe(accountToken('renewed'));
     // Only the caller that ran the exchange writes it back.
     expect(a.renewed).toBe(true);
     expect(b.renewed).toBe(false);
@@ -273,19 +274,19 @@ describe("renewing a token that is about to expire", () => {
       seen.push(token);
       await gate;
       return new Response(
-        JSON.stringify({ access_token: `renewed-for-${token}`, refresh_token: "rotated", expires_in: 3600 }),
+        JSON.stringify({ access_token: accountToken(`renewed-for-${token}`, token), refresh_token: "rotated", expires_in: 3600 }),
         { status: 200, headers: { "content-type": "application/json" } },
       );
     }) as unknown as typeof fetch;
 
     const first = renewAccountAuthIfExpiring({
       provider: "openai",
-      credential: { accountAuth: openAIAuth({ expiresAt: Date.now() - 1, refreshToken: "account-one" }) },
+      credential: { accountAuth: openAIAuth({ accountId: "account-one", expiresAt: Date.now() - 1, refreshToken: "account-one" }) },
       fetchImpl,
     });
     const second = renewAccountAuthIfExpiring({
       provider: "openai",
-      credential: { accountAuth: openAIAuth({ expiresAt: Date.now() - 1, refreshToken: "account-two" }) },
+      credential: { accountAuth: openAIAuth({ accountId: "account-two", expiresAt: Date.now() - 1, refreshToken: "account-two" }) },
       fetchImpl,
     });
     release?.();
@@ -294,8 +295,8 @@ describe("renewing a token that is about to expire", () => {
     // Two accounts, two exchanges.
     expect(seen.sort()).toEqual(["account-one", "account-two"]);
     // Each caller keeps its own identity.
-    expect(a.accountAuth?.accessToken).toBe("renewed-for-account-one");
-    expect(b.accountAuth?.accessToken).toBe("renewed-for-account-two");
+    expect(a.accountAuth?.accessToken).toBe(accountToken('renewed-for-account-one', 'account-one'));
+    expect(b.accountAuth?.accessToken).toBe(accountToken('renewed-for-account-two', 'account-two'));
   });
 
   it("shares a failed exchange with the caller that waited for it", async () => {
@@ -307,7 +308,7 @@ describe("renewing a token that is about to expire", () => {
       exchanges += 1;
       return new Response("nope", { status: 400 });
     }) as unknown as typeof fetch;
-    const credential = { accountAuth: openAIAuth({ expiresAt: Date.now() - 1 }) };
+    const credential = { accountAuth: openAIAuth({ accountId: "a", expiresAt: Date.now() - 1 }) };
 
     const first = renewAccountAuthIfExpiring({ provider: "openai", credential, fetchImpl });
     const second = renewAccountAuthIfExpiring({ provider: "openai", credential, fetchImpl });
@@ -326,8 +327,8 @@ describe("renewing a token that is about to expire", () => {
 
 it('does not share native credentials across different captured lease scopes for the exact same account', async () => {
   let release!: () => void; const held = new Promise<void>(resolve => { release = resolve; });
-  const credential = { accountAuth: openAIAuth({ expiresAt: Date.now() - 1 }) };
-  const fetchImpl = vi.fn(async () => { await held; return new Response(JSON.stringify({ access_token: 'scope-owned-fresh', refresh_token: 'scope-next', expires_in: 3600 }),
+  const credential = { accountAuth: openAIAuth({ accountId: "a", expiresAt: Date.now() - 1 }) };
+  const fetchImpl = vi.fn(async () => { await held; return new Response(JSON.stringify({ access_token: accountToken('scope-owned-fresh'), refresh_token: 'scope-next', expires_in: 3600 }),
     { headers: { 'content-type': 'application/json' } }); }) as unknown as typeof fetch;
   const leader = renewAccountAuthIfExpiring({ provider: 'openai', credential, fetchImpl,
     renewalLease: { shareKey: 'store-owner-grant-attempt-a', acquire: () => ({ acquired: true }) } });
@@ -335,5 +336,5 @@ it('does not share native credentials across different captured lease scopes for
     renewalLease: { shareKey: 'store-owner-grant-attempt-b', acquire: () => ({ acquired: false }) } });
   release(); const [completed, isolated] = await Promise.all([leader, follower]);
   expect(isolated).toEqual({ renewed: false, leaseHeld: true }); expect(isolated.accountAuth).toBeUndefined(); expect(isolated.production).toBeUndefined();
-  expect(completed.accountAuth?.accessToken).toBe('scope-owned-fresh'); expect(fetchImpl).toHaveBeenCalledOnce();
+  expect(completed.accountAuth?.accessToken).toBe(accountToken('scope-owned-fresh')); expect(fetchImpl).toHaveBeenCalledOnce();
 });

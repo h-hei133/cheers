@@ -43,6 +43,12 @@ export type EndpointKind = string;
 
 /** What one endpoint needs to say about itself. */
 export interface EndpointShape {
+  /** Auxiliary requests may require the same native stream as full turns. */
+  readonly simpleResponse?: 'stream';
+  /** The provider owns output length when no request ceiling is supported. */
+  readonly outputControl?: 'provider';
+  /** The codec retains opaque output whose replay must carry request ownership. */
+  readonly opaqueReplay?: boolean;
   /** Trusted complete-input and enforced-inclusive-output proof; absence means cap unsupported. */
   readonly requestBound?: (request: { readonly body: string; readonly provider: string; readonly model: string }) => RequestBound | Promise<RequestBound | undefined> | undefined;
   /** Where the final turn body carries context; used for size-only observations. */

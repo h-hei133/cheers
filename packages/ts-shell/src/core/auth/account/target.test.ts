@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_PROVIDERS, type CatalogProvider } from '../../models/catalog.js';
 import type { ProviderCredentialResolution } from '../credential.js';
-import { providerCredentialBaseUrl } from './target.js';
+import { providerCredentialBaseUrl, providerCredentialEndpoint } from './target.js';
 
 function account(baseUrl?: string): ProviderCredentialResolution {
   return { provider: 'openai', expectedEnvVarName: 'OPENAI_API_KEY', ...(baseUrl ? { baseUrl } : {}),
@@ -13,15 +13,16 @@ describe('captured account endpoint', () => {
   const foreign: readonly CatalogProvider[] = [{ id: 'openai', runtime: 'openai', label: 'Fixture', auth: 'oauth',
     baseUrl: 'https://foreign.invalid/v1', models: [] }];
 
-  it('refuses a catalogue relocation without a captured account address', () => {
-    expect(() => providerCredentialBaseUrl(foreign, account())).toThrow('catalogue cannot override');
-    expect(providerCredentialBaseUrl(BUILTIN_PROVIDERS, account())).toBe('https://api.openai.com/v1');
-    expect(providerCredentialBaseUrl([], account())).toBe('https://api.openai.com/v1');
-    expect(providerCredentialBaseUrl([{ ...foreign[0]!, baseUrl: ' https://api.openai.com/v1/ ' }], account())).toBe('https://api.openai.com/v1');
+  it('ignores catalogue relocation and uses the issuer account route', () => {
+    for (const catalog of [foreign, BUILTIN_PROVIDERS, [], [{ ...foreign[0]!, baseUrl: ' https://api.openai.com/v1/ ' }]]) {
+      expect(providerCredentialBaseUrl(catalog, account())).toBe('https://chatgpt.com/backend-api');
+      expect(providerCredentialEndpoint(catalog, account())).toBe('openai-account-responses');
+    }
   });
 
-  it('uses the configured account address independently of other catalogue endpoints', () => {
-    expect(providerCredentialBaseUrl(foreign, account('https://owner.invalid/v1'))).toBe('https://owner.invalid/v1');
+  it('refuses an explicitly configured address outside the issuer route', () => {
+    expect(() => providerCredentialBaseUrl(foreign, account('https://owner.invalid/v1'))).toThrow('account issuer');
+    expect(providerCredentialBaseUrl(foreign, account(' https://chatgpt.com/backend-api/ '))).toBe('https://chatgpt.com/backend-api');
   });
 
   it('retains catalogue fallback for API keys', () => {

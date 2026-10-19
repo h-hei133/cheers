@@ -1,4 +1,4 @@
-import { observeOAuthRenewal } from '../../test-utils/oauth.js';
+import { accountToken, observeOAuthRenewal } from '../../test-utils/oauth.js';
 import fs from 'node:fs';
 import http from 'node:http';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -6,11 +6,12 @@ import { createAdvisorHarness, cleanupAdvisorHarnesses } from '../../test-utils/
 import { getRuntimeConfig, getUserRuntimeConfigPath, readRuntimeConfigEditAt, writeUserRuntimeConfigFile } from '../../config/runtimeConfig.js';
 import { resolveProviderCredential } from '../../core/shell/providerCredentials.js';
 import * as persistence from '../../config/persistence.js';
+import * as transport from '../../provider/request/fetch.js';
 import { delegatedSteps } from './step.js';
 
 const servers: http.Server[] = [];
 const old = { type: 'openai-chatgpt-account' as const, accountId: 'b', accessToken: 'synthetic-old', refreshToken: 'synthetic-refresh', expiresAt: 1 };
-const fresh = { ...old, accessToken: 'synthetic-fresh', refreshToken: 'synthetic-rotated', expiresAt: Date.now() + 3600000 };
+const fresh = { ...old, accessToken: accountToken('synthetic-fresh', 'b'), refreshToken: 'synthetic-rotated', expiresAt: Date.now() + 3600000 };
 afterEach(async () => {
   for (const server of servers.splice(0)) { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
   cleanupAdvisorHarnesses();
@@ -24,16 +25,26 @@ async function fixture(catalogDefault = false) {
     const body = JSON.parse(Buffer.concat(chunks).toString());
     requests.push({ model: body.model, authorization: request.headers.authorization,
       stored: getRuntimeConfig(setup.root).providerConnections.find(row => row.id === 'b')?.accountAuth?.openai?.accessToken === fresh.accessToken });
-    response.writeHead(200, { 'content-type': 'application/json' });
-    response.end(JSON.stringify({ choices: [{ message: { content: 'Prepared account answer' }, finish_reason: 'stop' }], usage: { prompt_tokens: 2, completion_tokens: 1 } }));
+    expect(request.url).toBe('/codex/responses');
+    expect(body).toMatchObject({ store: false, stream: true });
+    expect(body).not.toHaveProperty('max_output_tokens');
+    response.writeHead(200, { 'content-type': 'text/event-stream' });
+    response.end('data: ' + JSON.stringify({ type: 'response.completed', response: { id: 'r', status: 'completed', output: [{ type: 'message', id: 'm', role: 'assistant', content: [{ type: 'output_text', text: 'Prepared account answer' }] }], usage: { input_tokens: 2, output_tokens: 1, total_tokens: 3 } } }) + '\n\n');
   });
   servers.push(server); await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const address = server.address(); if (!address || typeof address === 'string') throw new Error('Fixture missing address');
   const baseUrl = `http://127.0.0.1:${address.port}/v1`;
+  const create = transport.providerFetchForEndpoint;
+  vi.spyOn(transport, 'providerFetchForEndpoint').mockImplementation((config, endpoint, shape, admission, beforeDispatch) => endpoint !== 'openai-account-responses'
+    ? create(config, endpoint, shape, admission, beforeDispatch) : (url, init) => {
+    expect(String(url)).toBe('https://chatgpt.com/backend-api/codex/responses');
+    const refused = admission?.(); if (refused) throw new Error(refused); beforeDispatch?.(init);
+    return fetch(`http://127.0.0.1:${address.port}/codex/responses`, init);
+  });
   writeUserRuntimeConfigFile({ provider: 'openai', activeProviderConnectionId: 'a', retryEnabled: false, providerRetryMaxRetries: 0,
-    maxOutputTokens: 10, reserveTokens: 0, providerConnections: [
+    reserveTokens: 0, providerConnections: [
       { id: 'a', provider: 'openai', authType: 'api-key', apiKey: 'synthetic-a', model: 'main', baseUrl, status: 'connected' },
-      { id: 'b', provider: 'openai', authType: 'account-auth', accountAuth: { openai: old }, model: 'gpt-5.4', ...(catalogDefault ? {} : { baseUrl }), status: 'connected' },
+      { id: 'b', provider: 'openai', authType: 'account-auth', accountAuth: { openai: old }, model: 'gpt-5.4', ...(catalogDefault ? { baseUrl } : { baseUrl: 'https://chatgpt.com/backend-api' }), status: 'connected' },
     ] }, readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
   const config = getRuntimeConfig(setup.root); const published = vi.fn();
   const select = delegatedSteps({ providerMode: 'real', providerCredentialResolution: resolveProviderCredential({ runtimeConfig: config, env: {} }),
@@ -46,18 +57,19 @@ async function fixture(catalogDefault = false) {
 it('shares one verified rotation across two delegated models and sends only the stored credential', async () => {
   const setup = await fixture();
   const renew = observeOAuthRenewal(fresh);
-  await Promise.all([setup.send(), setup.send('gpt-5.2')]);
+  const answers = await Promise.all([setup.send(), setup.send('gpt-5.2')]);
+  expect(answers.map(answer => [answer.stopReason, answer.text])).toEqual([['stop', 'Prepared account answer'], ['stop', 'Prepared account answer']]);
   expect(renew).toHaveBeenCalledOnce(); expect(setup.published).toHaveBeenCalledOnce();
   expect(setup.requests).toHaveLength(2);
   expect(setup.requests.map(row => row.model).sort()).toEqual(['gpt-5.2', 'gpt-5.4']);
-  expect(setup.requests.every(row => row.authorization === 'Bearer synthetic-fresh' && row.stored)).toBe(true);
+  expect(setup.requests.every(row => row.authorization === `Bearer ${fresh.accessToken}` && row.stored)).toBe(true);
 });
 
-it('refuses a catalogue relocation before renewing an account with no declared endpoint', async () => {
+it('refuses an explicit foreign account endpoint before renewal', async () => {
   const setup = await fixture(true);
   const renew = observeOAuthRenewal(fresh);
   const bytes = fs.readFileSync(getUserRuntimeConfigPath());
-  expect(() => setup.send()).toThrow(/catalogue cannot override/);
+  expect(() => setup.send()).toThrow(/usable credential/);
   expect(renew).not.toHaveBeenCalled(); expect(setup.published).not.toHaveBeenCalled();
   expect(setup.requests).toEqual([]);
   expect(fs.readFileSync(getUserRuntimeConfigPath())).toEqual(bytes);

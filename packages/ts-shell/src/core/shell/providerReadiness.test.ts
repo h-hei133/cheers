@@ -50,7 +50,7 @@ describe("provider readiness boundary", () => {
     })).toEqual({ ok: true });
   });
 
-  it("probes a selected native protocol even when the provider supports account-auth admission", async () => {
+  it("refuses a foreign account protocol without a readiness probe", async () => {
     let calls = 0;
     const result = await checkRealProviderReadiness({
       provider: "openai", endpoint: "anthropic-messages", apiKey: "", baseUrl: "https://gateway.invalid/v1",
@@ -65,8 +65,8 @@ describe("provider readiness boundary", () => {
         return new Response("ok");
       },
     });
-    expect(result).toEqual({ ok: true });
-    expect(calls).toBe(1);
+    expect(result).toMatchObject({ ok: false, failure: { kind: 'missing-config' } });
+    expect(calls).toBe(0);
   });
 
   it.each([200, 401, 403])("preserves HTTP %s when releasing an errored response body fails", async status => {

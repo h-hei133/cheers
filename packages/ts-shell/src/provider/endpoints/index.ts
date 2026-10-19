@@ -16,6 +16,7 @@ import "./bedrockConverse.js";
 import "./googleGenAI.js";
 import "./googleVertex.js";
 import "./responses/index.js";
+import "./responses/account.js";
 
 export {
   DEFAULT_ENDPOINT_KIND,

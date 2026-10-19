@@ -1,4 +1,5 @@
-import { observeOAuthRenewal } from '../../test-utils/oauth.js';
+import { accountWire, accountCompletion } from '../../test-utils/account.js';
+import { accountToken, observeOAuthRenewal } from '../../test-utils/oauth.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -44,7 +45,7 @@ let server: http.Server;
 let baseUrl: string;
 let received: { authorization?: string; stored: boolean }[];
 const old = { type: 'openai-chatgpt-account' as const, accessToken: 'old-test', refreshToken: 'refresh-test', expiresAt: 1, accountId: 'a' };
-const fresh = { ...old, accessToken: 'fresh-test', refreshToken: 'rotated-test', expiresAt: Date.now() + 3600000 };
+const fresh = { ...old, accessToken: accountToken('fresh-test', 'a'), refreshToken: 'rotated-test', expiresAt: Date.now() + 3600000 };
 function read(): RuntimeConfigFile { return JSON.parse(fs.readFileSync(file, 'utf8')); }
 function write(value: RuntimeConfigFile) { fs.writeFileSync(file, JSON.stringify(value)); }
 beforeEach(async () => {
@@ -58,12 +59,14 @@ beforeEach(async () => {
     for await (const _chunk of request) { /* consume the local request */ }
     received.push({ authorization: request.headers.authorization,
       stored: read().providerConnections?.[0]?.accountAuth?.openai?.accessToken === fresh.accessToken });
-    response.writeHead(200, { 'content-type': 'application/json' });
-    response.end(JSON.stringify({ choices: [{ message: { content: 'SUMMARY' }, finish_reason: 'stop' }], usage: { prompt_tokens: 2 } }));
+    expect(request.url).toBe('/codex/responses');
+    response.writeHead(200, { 'content-type': 'text/event-stream' });
+    response.end(accountCompletion('SUMMARY'));
   });
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const address = server.address(); if (!address || typeof address === 'string') throw new Error('Missing local address');
-  baseUrl = `http://127.0.0.1:${address.port}/v1`;
+  accountWire(`http://127.0.0.1:${address.port}`);
+  baseUrl = 'https://chatgpt.com/backend-api';
   write({ provider: 'openai', activeProviderConnectionId: 'a', offline: false,
     providerConnections: [{ id: 'a', provider: 'openai', authType: 'account-auth', accountAuth: { openai: old },
       baseUrl, model: 'probe', status: 'connected' }] });
@@ -88,7 +91,7 @@ function runtime() {
 function refresh(deps: SessionRuntimeDependencies) {
   deps.runPrompt('hello', new AbortController().signal);
   const options = vi.mocked(createCacheWarmingRunner).mock.calls.at(-1)![0];
-  return options.refresh({ url: `${baseUrl}/chat/completions`, headers: {},
+  return options.refresh({ url: `${baseUrl}/codex/responses`, headers: {},
     body: JSON.stringify({ model: 'probe', messages: [{ role: 'user', content: 'hello' }] }) }, new AbortController().signal);
 }
 
@@ -97,11 +100,11 @@ it.each(['manual', 'abandoned'])('stores rotation before %s summary HTTP dispatc
   const { deps, context } = runtime();
   if (kind === 'manual') await deps.compactHistory!('summary-renewal', new AbortController().signal);
   else expect(await deps.summarizeAbandonedTurns!([])).toContain('<compacted-summary>\nSUMMARY\n</compacted-summary>');
-  expect(received).toEqual([{ authorization: 'Bearer fresh-test', stored: true }]);
+  expect(received).toEqual([{ authorization: `Bearer ${fresh.accessToken}`, stored: true }]);
   expect(context.runtimeConfig.providerConnections[0]?.accountAuth?.openai).toMatchObject({ ...fresh, expiresAt: expect.any(Number) });
 });
 
-it.each(['manual', 'abandoned', 'cache'].flatMap(kind => ['unknown', 'persisted'].map(state => ({ kind, state }))))('reports $state storage and blocks $kind dispatch/publication after verification fails', async ({ kind, state }) => {
+it.each(['manual', 'abandoned'].flatMap(kind => ['unknown', 'persisted'].map(state => ({ kind, state }))))('reports $state storage and blocks $kind dispatch/publication after verification fails', async ({ kind, state }) => {
   observeOAuthRenewal(fresh);
   if (state === 'unknown') vi.spyOn(store, 'writeTextFileAtomic').mockImplementation(() => {});
   else {
@@ -150,10 +153,11 @@ it.each(['signal', 'admission'].flatMap(end => ['unknown', 'persisted'].map(stat
   expect(renderLine).not.toHaveBeenCalled(); expect(received).toEqual([]);
 });
 
-it('stores a cache rotation and stops the request captured before credential publication', async () => {
+it('refuses cache refresh without renewing or publishing a native account', async () => {
   const renewal = observeOAuthRenewal(fresh);
-  const { deps, context } = runtime(); const publication = context.configuration.current;
+  const { deps, context, renderLine } = runtime(); const publication = context.configuration.current;
   expect(await refresh(deps)).toBeUndefined();
-  expect(renewal).toHaveBeenCalledOnce(); expect(read().providerConnections?.[0]?.accountAuth?.openai).toMatchObject({ ...fresh, expiresAt: expect.any(Number) });
-  expect(context.configuration.current).not.toBe(publication); expect(received).toEqual([]);
+  expect(renewal).not.toHaveBeenCalled(); expect(read().providerConnections?.[0]?.accountAuth?.openai).toEqual(old);
+  expect(context.configuration.current).toBe(publication); expect(received).toEqual([]);
+  expect(renderLine).not.toHaveBeenCalled();
 });

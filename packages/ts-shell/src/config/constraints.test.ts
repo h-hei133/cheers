@@ -47,6 +47,20 @@ function shell(providerOverride?: RuntimeProvider, apiKey?: string, env: NodeJS.
     resolveConfigTarget: config => resolveCliCredential(config, { provider: providerOverride, apiKey }, env) });
 }
 
+it('uses native account protocol and provider-owned output across startup, reload, preset and model selection', async () => {
+  save({ providerConnections: [{ ...settings.providerConnections![0]!, apiKey: undefined, authType: 'account-auth', model: 'gpt-5.4',
+    baseUrl: 'https://chatgpt.com/backend-api', accountAuth: { openai: { type: 'openai-chatgpt-account', accountId: 'a',
+      accessToken: 'synthetic', refreshToken: 'synthetic-refresh', expiresAt: Date.now() + 3600000 } } }] });
+  fs.writeFileSync(userCatalogPath(), JSON.stringify({ providers: { openai: { endpoint: 'catalog-unknown',
+    models: [{ id: 'gpt-5.4', contextWindow: 64000, maxTokens: 10, reasoning: true }] } } }));
+  const context = shell(); expect(context.runtimeConfig.configValidation.valid).toBe(true);
+  expect((await runModelCommand(['use', 'gpt-5.4', '--effort', 'high'], { cwd: root, projectRoot: root,
+    sessionId: context.session.id, runtimeConfig: context.runtimeConfig })).output).toContain('Model switched');
+  save({ maxOutputTokens: 4096 });
+  const rejected = refreshShellRuntimeConfig(context);
+  expect(rejected.status).toBe('rejected'); expect(rejected.diagnostics.join(' ')).toContain('output control');
+});
+
 it.each([
   [{ maxOutputTokens: 64_001 }, 'model output limit'],
   [{ contextWindow: 4_096, reserveTokens: 0 }, 'leave input space'],

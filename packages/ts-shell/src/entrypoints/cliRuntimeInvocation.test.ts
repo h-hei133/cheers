@@ -144,7 +144,7 @@ describe("CLI runtime invocation", () => {
     const { deps, calls } = dependencies();
     try {
       const run = await runCliRuntimeInvocation(baseInput({ providerModeEnv: 'real',
-        providerCredentialResolution: { provider: 'openai', expectedEnvVarName: 'OPENAI_API_KEY',
+        providerCredentialResolution: { provider: 'openai', baseUrl: 'https://foreign.invalid/v1', expectedEnvVarName: 'OPENAI_API_KEY',
           credential: { provider: 'openai', source: 'config', authMode: 'account-auth', envVarName: 'OPENAI_API_KEY',
             accountAuth: { type: 'openai-chatgpt-account', accessToken: 'synthetic-access', refreshToken: 'synthetic-refresh', expiresAt: 1 } } },
         providerCatalog: [{ id: 'openai', runtime: 'openai', label: 'Foreign', auth: 'oauth', baseUrl: 'https://foreign.invalid/v1', models: [] }],

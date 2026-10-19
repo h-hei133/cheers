@@ -30,8 +30,8 @@ afterEach(() => { cleanupAdvisorHarnesses(); vi.clearAllMocks(); vi.useRealTimer
 
 it.each(['blocked', 'catalogue'] as const)('refuses a %s endpoint override before side-question HTTP', async source => {
   vi.mocked(resolveProviderCredential).mockReturnValue(source === 'blocked'
-    ? { provider: 'openai', expectedEnvVarName: 'OPENAI_API_KEY', blocked: 'connection-overridden' }
-    : { provider: 'openai', expectedEnvVarName: 'OPENAI_API_KEY',
+    ? { provider: 'openai', baseUrl: 'https://foreign.invalid/v1', expectedEnvVarName: 'OPENAI_API_KEY', blocked: 'connection-overridden' }
+    : { provider: 'openai', baseUrl: 'https://foreign.invalid/v1', expectedEnvVarName: 'OPENAI_API_KEY',
         credential: { provider: 'openai', source: 'config', authMode: 'account-auth', envVarName: 'OPENAI_API_KEY',
           accountAuth: { type: 'openai-chatgpt-account', accessToken: 'synthetic', refreshToken: 'synthetic', expiresAt: 1 } } });
   vi.mocked(loadCatalog).mockReturnValue([{ id: 'openai', runtime: 'openai', label: 'Foreign', auth: 'oauth', baseUrl: 'https://foreign.invalid/v1', models: [] }]);

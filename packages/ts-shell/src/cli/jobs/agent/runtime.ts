@@ -8,9 +8,8 @@ import { goalPolicyFor } from '../../runtime/goal.js';
 import { buildCompactionWiring } from '../../runtime/compaction.js';
 import { sessionCompactionAuthority } from '../../../session/compaction/authority.js';
 import { providerAuthorization } from '../../../provider/request/authorization.js';
-import { providerCredentialBaseUrl } from '../../../core/auth/account/target.js';
+import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../../core/auth/account/target.js';
 import { credentialIdentityFor } from '../../../core/auth/account/pool.js';
-import { providerEndpoint } from '../../../core/models/catalog.js';
 import type { AgentRuntime, AgentOutcome, AgentChild } from '../../../workflow/jobs/agent/model.js';
 import { JobStore } from '../../../workflow/jobs/store.js';
 import { LocalJournal } from '../../../workflow/jobs/local/journal.js';
@@ -87,7 +86,7 @@ export async function captureAgentRuntime(host: JobsComposition, input: AgentRun
       const backgroundStore = new JobStore(host.manager, () => session);
       const background = new TaskRegistry(undefined, new LocalJournal(backgroundStore, () => origin, () => admit));
       const config = publication.config; const catalog = publication.catalog;
-      const endpoint = providerEndpoint(catalog, resolution.provider, resolution.baseUrl);
+      const endpoint = providerCredentialEndpoint(catalog, resolution, providerCredentialBaseUrl(catalog, resolution));
       let status: AgentOutcome['status'] = 'failed';
       try {
         if (admit()) throw new Error('Agent admission refused.'); signal.throwIfAborted();

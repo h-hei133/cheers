@@ -1,3 +1,4 @@
+import { providerCredentialEndpoint } from '../../auth/account/target.js';
 import type { CommandContext, LocalCommandResult } from '../types.js';
 import { loadCatalog } from '../../models/catalogStore.js';
 import { serviceTierCapability } from '../../models/serviceTier.js';
@@ -52,7 +53,7 @@ export function setSessionServiceTier(context: CommandContext, tier: string): st
   }
   if (context.admission?.() || baseline.projectRoot === undefined || path.resolve(baseline.projectRoot) !== path.resolve(root)) return 'Service tier refused: session or workspace admission changed.';
   if (catalogProvider(catalog, selection.provider, request.baseUrl).ambiguous) return 'Service tier refused: multiple catalogue entries claim this endpoint.';
-  if (serviceTierCapability(catalog, selection.provider, selection.model, tier, request.baseUrl) !== 'supported') {
+  if (serviceTierCapability(catalog, selection.provider, selection.model, tier, request.baseUrl, providerCredentialEndpoint(catalog, request, request.baseUrl)) !== 'supported') {
     return `Service tier refused: ${selection.provider}/${selection.model} does not advertise ${tier}.`;
   }
   try {
@@ -62,7 +63,7 @@ export function setSessionServiceTier(context: CommandContext, tier: string): st
         && sameValue(connectionIdentity(loaded.providerConnections.find(item => item.id === selection.connectionId)), connectionIdentity(config.providerConnections?.find(item => item.id === selection.connectionId)))
         && selectedModelMatches(loaded, selection) && sameValue(selectionRequest(context, loaded, selection), request)
         && sameValue(catalogProvider(loadCatalog(), selection.provider, request.baseUrl), catalogProvider(catalog, selection.provider, request.baseUrl))
-        && serviceTierCapability(loadCatalog(), selection.provider, selection.model, tier, request.baseUrl) === 'supported';
+        && serviceTierCapability(loadCatalog(), selection.provider, selection.model, tier, request.baseUrl, providerCredentialEndpoint(catalog, request, request.baseUrl)) === 'supported';
     });
     const notice = configurationApplicationNotice(context);
     if (notice) return `Service tier preference saved as ${tier}. ${notice}`;

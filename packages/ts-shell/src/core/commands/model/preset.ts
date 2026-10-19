@@ -43,7 +43,7 @@ export function validateModelPreset(roles: Readonly<Record<string, ModelPresetTa
       const allowed = providerFacts(resolution.provider).accountAuthAllowedModels;
       if (resolution.credential.authMode === 'account-auth' && allowed && !allowed.includes(target.model)) return `Model preset refused: role '${role}' is unavailable for this account binding.`;
       try { assertScopedModel(config, resolution); } catch { return `Model preset refused: role '${role}' is outside the allowed model scope.`; }
-      const constraints = inspectConfigConstraints(config, { ...target, baseUrl: resolution.baseUrl }, catalog);
+      const constraints = inspectConfigConstraints(config, { ...target, baseUrl: resolution.baseUrl, credential: resolution.credential }, catalog);
       if (constraints.errors.length) return `Model preset refused: role '${role}': ${constraints.errors.join(' ')}`;
     }
   }

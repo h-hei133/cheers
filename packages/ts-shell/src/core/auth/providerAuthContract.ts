@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type {
   GoogleAccountAuthConfig,
   OpenAIAccountAuthConfig,
@@ -79,6 +80,7 @@ export function toOpenAIAccountAuthConfig(
     refreshToken: result.refreshToken,
     expiresAt: result.expiresAt,
     ...(result.accountId ? { accountId: result.accountId } : {}),
+    loginId: randomUUID(),
   };
 }
 

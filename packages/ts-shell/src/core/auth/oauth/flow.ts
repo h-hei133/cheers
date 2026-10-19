@@ -167,7 +167,7 @@ export async function refreshOAuthTokens(
     // turns a working login into a dead one at the next refresh.
     refreshToken: payload.refresh_token ?? refreshToken,
     expiresAt: expiryOf(payload),
-    ...identity(payload),
+    ...identity(payload, config.id),
   };
 }
 
@@ -224,8 +224,9 @@ async function exchangeCode(
     accessToken: payload.access_token,
     refreshToken: payload.refresh_token ?? "",
     expiresAt: expiryOf(payload),
-    ...identity(payload),
+    ...identity(payload, config.id),
   };
+  if (config.id === 'openai' && !tokens.accountId) throw new OAuthExchangeError('metadata', config.label, 'token exchange');
   const production = Object.freeze({});
   loginProductions.set(production, { issuer: config.tokenUrl, client: config.clientId, provider: config.id, digest: loginDigest(tokens, config.id) });
   return { ...tokens, production };
@@ -246,7 +247,7 @@ async function post(
   let response: Response;
   try {
     response = await fetchImpl(config.tokenUrl, {
-      method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: body.toString(),
+      method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: body.toString(), redirect: 'error',
     });
   } catch (error) {
     const kind = error instanceof Error && error.name === 'AbortError' ? 'cancelled' : 'transport';
@@ -279,16 +280,14 @@ function expiryOf(payload: TokenPayload): number {
 }
 
 /**
- * Who the token belongs to, from the id token when there is one.
- *
- * The id token is a JWT the provider signed for this client. It is read here for
- * display only, never trusted for authorization, so the signature is not checked —
- * and it is base64 rather than encrypted, so a malformed one is a missing name
- * rather than a failure.
+ * Account metadata comes only from the issuer's successful token exchange.
+ * OpenAI's access claim identifies the generation account; subject and ID-token
+ * display metadata cannot substitute for it. The exchange transport supplies
+ * issuer trust, and the renewal owner compares this claim before admitting tokens.
  */
-function identity(payload: TokenPayload): { accountId?: string; accountEmail?: string } {
-  if (!payload.id_token) return {};
-  const segment = payload.id_token.split(".")[1];
+function identity(payload: TokenPayload, provider: string): { accountId?: string; accountEmail?: string } {
+  const token = provider === 'openai' ? payload.access_token : payload.id_token;
+  const segment = token?.split(".")[1];
   if (!segment) return {};
   try {
     const claims = JSON.parse(Buffer.from(segment, "base64url").toString("utf8")) as Record<string, unknown>;
@@ -300,25 +299,12 @@ function identity(payload: TokenPayload): { accountId?: string; accountEmail?: s
   }
 }
 
-/** The account or organisation id, wherever this provider chose to put it. */
+/** Exact account-service claim; subject and organization identifiers are distinct. */
 function accountIdFrom(claims: Record<string, unknown>): string | undefined {
-  for (const value of Object.values(claims)) {
-    if (value && typeof value === "object" && !Array.isArray(value)) {
-      const nested = value as Record<string, unknown>;
-      for (const key of Object.keys(nested)) {
-        if (key.endsWith("account_id") && typeof nested[key] === "string") return nested[key] as string;
-      }
-    }
-  }
-  for (const key of Object.keys(claims)) {
-    if (key.endsWith("account_id") && typeof claims[key] === "string") return claims[key] as string;
-  }
-  const organizations = claims.organizations;
-  if (Array.isArray(organizations)) {
-    const first = organizations[0] as { id?: unknown } | undefined;
-    if (first && typeof first.id === "string") return first.id;
-  }
-  return typeof claims.sub === "string" ? claims.sub : undefined;
+  const auth = claims['https://api.openai.com/auth'];
+  if (!auth || typeof auth !== 'object' || Array.isArray(auth)) return undefined;
+  const id = (auth as Record<string, unknown>).chatgpt_account_id;
+  return typeof id === 'string' && id.trim() ? id.trim() : undefined;
 }
 
 /** Hand the URL to whatever opens links on this platform. */

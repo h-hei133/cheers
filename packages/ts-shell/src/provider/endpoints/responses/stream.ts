@@ -56,31 +56,47 @@ function assembled(body: CompletedBody, shown: string): StreamedCompletion {
 }
 
 /** Only an explicit native terminal can complete a response; partial tools never execute. */
-export async function* readResponseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<StreamFragment, StreamedCompletion, undefined> {
-  const slots = new Map<number, Slot>(); let shown = ''; let responseId: string | undefined;
+export async function* readResponseStream(body: ReadableStream<Uint8Array>, account = false): AsyncGenerator<StreamFragment, StreamedCompletion, undefined> {
+  const slots = new Map<number, Slot>(); let shown = ''; let responseId: string | undefined; let responseModel: string | undefined;
   try {
     for await (const event of responseEvents(body)) {
       if (event.type === 'response.created') {
         if (!isRecord(event.response) || typeof event.response.id !== 'string' || (responseId && responseId !== event.response.id)) throw new Error('Response identity changed.');
         responseId = event.response.id;
+        if (account && typeof event.response.model === 'string' && event.response.model) {
+          if (responseModel && responseModel !== event.response.model) throw new Error('Response model changed.');
+          responseModel = event.response.model;
+        }
       }
       if (event.response_id !== undefined) {
         if (typeof event.response_id !== 'string' || !event.response_id || (responseId && event.response_id !== responseId)) throw new Error('Response event belongs to another response.');
         responseId = event.response_id;
       }
       if (event.type === 'error') return assembled(responseFailure(shown), shown);
-      if (event.type === 'response.failed' || event.type === 'response.completed' || event.type === 'response.incomplete') {
-        const terminal = event.response;
-        if (!isRecord(terminal) || typeof terminal.id !== 'string' || !terminal.id || (responseId && terminal.id !== responseId)) {
+      if (event.type === 'response.failed' || event.type === 'response.completed' || event.type === 'response.incomplete'
+        || (account && event.type === 'response.done')) {
+        if (!isRecord(event.response) || typeof event.response.id !== 'string' || !event.response.id || (responseId && event.response.id !== responseId)) {
           return assembled(responseFailure(shown), shown);
         }
+        let terminal: Record<string, unknown> = event.response;
         const usage = responseUsage(terminal.usage);
-        if (terminal.status !== (event.type === 'response.completed' ? 'completed' : event.type === 'response.incomplete' ? 'incomplete' : 'failed')) return assembled(responseFailure(shown, usage), shown);
+        const status = event.type === 'response.done' ? terminal.status
+          : event.type === 'response.completed' ? 'completed' : event.type === 'response.incomplete' ? 'incomplete' : 'failed';
+        if (!['completed', 'incomplete', 'failed'].includes(String(status)) || terminal.status !== status) return assembled(responseFailure(shown, usage), shown);
+        if (account && responseModel) {
+          if (terminal.model !== undefined && terminal.model !== responseModel) return assembled(responseFailure(shown, usage), shown);
+          terminal = { ...terminal, model: responseModel };
+        }
+        // The account service may omit output at the terminal; sealed contiguous items are authoritative.
+        if (account && terminal.output === undefined && slots.size
+          && Array.from({ length: slots.size }, (_, index) => slots.get(index)).every(slot => slot?.done)) {
+          terminal = { ...terminal, output: Array.from({ length: slots.size }, (_, index) => slots.get(index)!.done) };
+        }
         const output = responseOutput(terminal.output);
         if (event.type === 'response.failed' || !output || [...slots].some(([index, slot]) => !output[index] || !matches(slot, output[index]!))) {
           return assembled(responseFailure(shown, usage), shown);
         }
-        const completed = readResponse(terminal);
+        const completed = readResponse(terminal, account);
         const text = completed.choices?.[0]?.message?.content ?? '';
         if (!text.startsWith(shown)) return assembled(responseFailure(shown, usage), shown);
         if (text.length > shown.length) yield { kind: 'text', text: text.slice(shown.length) };

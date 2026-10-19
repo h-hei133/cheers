@@ -7984,3 +7984,26 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 最终双构建通过，TS manifest `6fc6266c5152`，exe SHA256 `8c98c53e5754f7bc8df0e6eade396bce263ea767f499334b40b2feea7823bda9`。编译模块本机HTTP五情形共7发送：complete主/side/compact、length、failed、foreign、truncated；后三类无重播，foreign/truncated无usage，已报告reasoning不双加。最终Linux Node/exe × regular/fullscreen四格PTY通过：原生Response output、empty reasoning cipher、canonical alias、同回合加密工具回放、批准前零写入、Allow once真实receipt、transcript/state保存与exit0；配置字节不变，fixture home清理。全部合成隔离，未运行真实provider。
 - 四项静态门禁、scripts59项、strict docs/diff通过；仓库tgz NormProof退出0/partial，完整源图无环、unresolved满足，8项旧ceiling advisory，触及模块无新增越界。非strict生产诊断相对e83为149/149无新增，不能记全项目tsc通过。首次build非法failure class和后续callback窄化TS18046已修；初次保持连接测试缺SSE空行timeout属夹具、失败日志保留，未改产品绕过。
 - 当前公开协议批尚未提交推送；新SHA CI待实际查询。账户issuer端点/stream-only/输出cap、Google scope/协议、subscription类型身份与续期，以及其余全部47项继续；只保留用户原四项环境/真实模型推迟范围。
+
+
+### 公开 Responses 基座交付与 CI
+
+- 前条公开协议批已提交推送为 `5fbede8ca57bb8ad3b83e989802b3768b57e0513`，远端 main 完整 SHA 已读回。CI `39261638484` / job `118090503736` 于 `2026-10-19T13:52:27Z` completed/success；883 文件通过、1 文件跳过，9009 项通过、3 项跳过。Architecture Watch `39261638354` completed/success。前条“尚未提交/推送”保留为写入当时状态，不改写旧证据。
+- 查询结果与日志在 `.omx/verification/phase20/responses.ci-39261638484.json`、同 run log 和 `responses.watch-39261638354.json`。此交付只证明公开协议基座；全 Phase 20 仍 active。
+
+### OpenAI 原生账户 issuer、SSE 与 grant 绑定回放
+
+- 账户 issuer 独立拥有 `https://chatgpt.com/backend-api/codex/responses` 与 `openai-account-responses`，模型目录不能决定账号协议，存储/CLI 外来地址在续期/发送前拒绝。API key 维持目录路线；主/委派/agent/摘要/压缩/btw、配置约束、模型选择/预设/临时选择和tier consumer共用同一拥有者。无通用models probe/cache refresh/requestBound/service tier；默认4096让位provider-owned output，显式cap/tier零生成派发。目录maxTokens只作预算估算，不作服务端强制证明。
+- 辅助调用完整消费stream-only SSE，账户额外接纳response.done；缺output只重建连续封口items，缺model使用账户专属opaque schema，created model存在时保持/校验。原provider/model/address/slot/profile与消息语义binding不放宽，失败/截断/未封口/稀疏/矛盾/非法工具均零可执行授权，usage只归匹配身份。
+- 原生登录只接受access token精确账户claim，续期缺失/foreign/malformed/sub/organization/其他namespace和ID-token替代均拒绝。已派发失败保持unknown、零保存/发布/重复HTTP。OAuth form与生成transport都redirect:error，实际307/308反例外站零发送。对照成熟参考的精确access账户声明和请求model拥有者决定，保留本项目TypeScript endpoint与原request/permission/execution owner。
+- 新登录loginId只作稳定身份成分，真正回放证明来自现有lease login/rotation grant精确owner/generation/storage。verified renewal延续binding；raw token/expiry/loginId/account替换、复制slot/profile/ledger、active/unknown、目录替换及恢复rotated-persisted前代均不取得stable owner。旧账号无原生grant仍按代次保守重建，不由editable loginId授信。
+- 独立审查找出并修复OAuth redirect泄漏、缺续期claim被接纳、native done/outputless/model-less丢回放以及恢复已消费前代仍取得owner。最终code APPROVE/architecture CLEAR，综合APPROVE（限本批）；最终59路径manifest `996e289a626c85e3717db65b74ef687bee7edc5338c9e1124cdcf2f2b211a203`。独立14文件/261项及实际原生login→存储grant→renewal/profile/反例探针通过，和root集合重叠不相加；最终manifest追加的唯一test能力断言单独复核/绑定。
+- root受影响46文件/797项通过；后续前代修复replay11项和能力断言account17项通过，均是已有集增量。TS/exe最终构建通过（manifest20b5920ae260）；四静态门、scripts59项通过，完整类型诊断相对5fbede8c为149/149、无新增，非全tsc通过。裸normproof缺命令已记录；改用CI同款仓库tgz实际exit0/partial，cycles/unresolved satisfied，8项既有ceiling advisory，触及39个production owner均≤20。
+- 最终12项加载时反转取得实际断言失败exit1：issuer/protocol/cap/stream/reduced output/model-less/grant/predecessor/renewal identity/login claim/redirect/config constraints。首轮stream反转只有timeout、部分root filters误选无关同名suite产生加载失败，均不计有效；最终include精确单文件重跑12项全为断言证据。产品hash不变，材料 `native.reverse-*-final.log`、`native.reversals-final.json`。
+- 最新构建Linux四格PTY Node/exe×regular/fullscreen通过：issuer-only受控TLS proxy、HTTP前dispatched续期并原owner存储、两次原生模型请求/无wire model加密tool回放、preview零write与一次性approval、receipt实写、btw第三次SSE、会话存储与exit0；无models probe、无显式cap。只合成凭据与本机服务，证书/临时home已清理，不证明真实entitlement。前三轮session pager断言把残留screen/alternate buffer当未关闭，最后按模式等真实关闭后四格通过；失败日志保留，不改产品来迎合夹具。
+- 材料在 `.omx/verification/phase20/native.*` 和 `native/`；文档门在本条写入后运行。此刻尚未提交/推送，新SHA CI待实际观察；Google scope/原生协议、subscription discriminator/续期与其余全部47项继续，用户原四项环境/真实质量延期不扩大。
+
+- 交付前最后一行账户能力断言改变了构建源码摘要（构建清单包含测试），已重新完成 TS/exe 构建并读回 fresh：manifest `37313fcfbdfce59fa2c76a0e5298e9e348e5ca214a6b88cecc445140257d791e`，sourceDigest `952e85551e5c3207751f3ce2323da477e470431bf5ef57b30569b41b7fae7456`，exe SHA256 `acb9cb7aff4f6d247899271a88aff0dfa59edb68ac8bb9bd606366519cb3db9f`。刷新产物的 Node/exe × regular/fullscreen TLS PTY 再次四格通过，证据 `native.pty-delivery.log`；编译模块的实际登录/存储grant/续期、前代及profile拒绝、辅助SSE与307/308外站零发送探针 exit0，结果 `native.compiled.result.json`。首轮生成脚本残留类型标注为harness语法失败，未执行产品；修为正式TypeScript transpile后运行。两个构建绑定读取误用接口/路径已纠正，仅最终fresh读取算证据。
+- 最终独立评审文档精确绑定manifest `996e289a…211a203`：code report SHA256 `21637cde7acdfc2f8df8617d2044fd7753083be5c9e809ce22a64576a99fbcf9`，architecture report SHA256 `b5497f60a71d39fe1bdfcfe2014682af3febc1f86be17dfb886c24a3296105b4`；后者已核对NormProof原始verdict、全部59文件hash和唯一测试差量，CLEAR。此追加写入仍未提交推送；远端结果按后续查询记录。
+
+- 首次staged diff检查发现新policy文件EOF额外空行，命令序列仍创建本地未推送提交，属于执行疏漏。现仅删一个末尾LF，59文件manifest改为 `471a047b35421a78f4696a0edbacdf9f3db3c5be226336c4ce33bc17ac39a650`；两路独立按旧本地HEAD字节核对只有该空白差量，code APPROVE/architecture CLEAR，最终报告SHA分别 `9ea7e535dd0605375329cf3d6d5abc44aed65ba8263c4d981598d202fe890d10` 与 `3db815dab6834c541c56942722c77576b981796fa4c41c8bcc955370721088ae`。TS重建manifest `590a46e60240691a33ca1e691d36ab49879a475c9971ad61ed9e9485c3dbb147`，sourceDigest fresh；2013非测试emit逐文件hash零变化，exe仍 `acb9cb7aff4f6d247899271a88aff0dfa59edb68ac8bb9bd606366519cb3db9f`。前述交付PTY/编译探针是空行修正前运行，修正后的相同编译产品证明保持该验证证据，不重复整套测试。最后staged diff及文档门通过后修订本地提交再推送。

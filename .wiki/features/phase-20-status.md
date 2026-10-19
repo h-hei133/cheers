@@ -67,6 +67,12 @@ decoder 批已推送为 `e6311a1415b0fa1cc3ee9c090edad99b84065b17`，实际读�
 
 账号地址/subscription 批已提交推送为 `e83e596ef72a9e89096f209d05349e163d2c780d`；CI `39255262496`/job `118068837295` 于 `2026-10-19T13:06:28Z` completed/success，Architecture Watch `39255262491` success。公开 Responses 协议基座本地受影响18文件/280项、十组有效反转、双构建、编译本机HTTP与Linux四格PTY通过；完整有序加密回放和捕获地址/凭据代次 binding 沿现消息链保留。独立审查和精确交付见开发日志。该基座仍不闭合账户issuer/stream-only/cap、Google、subscription及其余全部任务。
 
+公开 Responses 批 `5fbede8ca57bb8ad3b83e989802b3768b57e0513` 已推送；CI `39261638484`/job `118090503736` 于 `2026-10-19T13:52:27Z` completed/success，883 文件通过、1 跳过，9009 项通过、3 跳过；Architecture Watch `39261638354` success。
+
+原生 OpenAI 账户返工本地受影响46文件/797项、后续 consumed-predecessor 修复11项与账户能力断言17项通过（集合重叠不相加），双构建、12项有效反转、Linux Node/exe × regular/fullscreen 四格隔离 TLS PTY通过。issuer 固定协议、辅助 SSE、显式 cap/tier 拒绝、精确 access 账户声明及原生 grant 跨续期回放均有反例；实际登录/续期/旧前代/profile复制和目录替换验证保持原 owner。独立 code APPROVE/architecture CLEAR；能力断言版 manifest `996e289a…211a203`，随后仅修新文件EOF空行，最终59文件 manifest `471a047b…ac39a650`。类型诊断149/149无新增，仍非全项目tsc通过；静态门与脚本59项通过，NormProof blocking义务通过、8项旧ceiling advisory。提交/推送/精确SHA CI按日志后续证据记录。Google、subscription及其余47项范围继续，仅用户原环境/真实质量项推迟。
+
+交付前已因最后测试断言刷新双构建，TS manifest `37313fcfbdfc`、源码摘要fresh匹配；刷新产物四格TLS PTY和编译模块原生grant/身份/SSE/redirect探针均通过。EOF空行修正后TS manifest `590a46e60240`再次fresh，2013非测试emit与exe均未变化；前述PTY/编译探针发生在修正前，产品编译字节一致。两路最终独立评审均重新精确绑定59文件manifest `471a047b…ac39a650`，综合APPROVE限本批。当前本地提交待修订，尚未推送与新SHA CI。
+
 ## 历史实现与交付记录（不代表本次复核通过）
 
 | 任务 | 提交 | 证据 |

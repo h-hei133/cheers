@@ -10,9 +10,10 @@ export function serviceTierCapability(
   model: string | undefined,
   tier: string | undefined,
   baseUrl?: string,
+  endpoint?: string,
 ): ServiceTierCapability {
   if (tier === undefined) return 'supported';
-  const wire = endpointShape(providerEndpoint(catalog, provider, baseUrl)).serviceTiers;
+  const wire = endpointShape(endpoint ?? providerEndpoint(catalog, provider, baseUrl)).serviceTiers;
   if (!wire?.includes(tier)) return 'unsupported';
   if (tier === 'default' || tier === 'auto') return 'supported';
   const entry = catalogModel(catalog, provider, model, catalogBaseUrl(catalog, provider, baseUrl));

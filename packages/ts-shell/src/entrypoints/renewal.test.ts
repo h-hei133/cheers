@@ -1,3 +1,4 @@
+import { accountToken } from '../test-utils/oauth.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -18,7 +19,7 @@ let home: string;
 let root: string;
 let file: string;
 const old = { type: 'openai-chatgpt-account' as const, accessToken: 'old-test', refreshToken: 'refresh-test', expiresAt: 1, accountId: 'a' };
-const fresh = { ...old, accessToken: 'fresh-test', refreshToken: 'rotated-test', expiresAt: Date.now() + 3600000 };
+const fresh = { ...old, accessToken: accountToken('fresh-test'), refreshToken: 'rotated-test', expiresAt: Date.now() + 3600000 };
 function write(value: RuntimeConfigFile) { fs.writeFileSync(file, JSON.stringify(value)); }
 function read(): RuntimeConfigFile { return JSON.parse(fs.readFileSync(file, 'utf8')); }
 function nativeExchange(change: () => void = () => {}) {

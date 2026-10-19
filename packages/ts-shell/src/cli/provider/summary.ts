@@ -3,7 +3,7 @@ import type { RuntimeConfig } from '../../config/runtimeConfig.js';
 import { assertScopedModel } from '../../config/scope/projection.js';
 import { credentialIdentityFor } from '../../core/auth/account/pool.js';
 import { renewStoredAccount } from '../../core/auth/account/renewal.js';
-import { catalogModel, providerEndpoint, type CatalogProvider } from '../../core/models/catalog.js';
+import { catalogModel, type CatalogProvider } from '../../core/models/catalog.js';
 import { effortCapability } from '../../core/models/capability.js';
 import { resolveRequestShape } from '../../core/models/requestShape.js';
 import { outputLimitFailure, reserveLimitFailure } from '../../core/models/limits.js';
@@ -16,7 +16,8 @@ import { providerFetchFromTimeouts, providerTimeoutsFrom } from '../../provider/
 import { endpointShape } from '../../provider/endpoints/index.js';
 import { effortOutputFailure } from '../../provider/endpoints/effort.js';
 import { delegatedTarget } from './target.js';
-import { providerCredentialBaseUrl } from '../../core/auth/account/target.js';
+import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../core/auth/account/target.js';
+import { configuredOutputLimit } from '../../provider/request/output.js';
 
 /** Capture an exact summary role; refresh its account only when a summary is requested. */
 export function captureSummaryRole(input: {
@@ -38,8 +39,9 @@ export function captureSummaryRole(input: {
     throw new Error('The summary role model or reasoning effort is unavailable.');
   }
   const shape = resolveRequestShape(input.catalog, role.provider, role.model, role.thinkingEffort ?? undefined, resolution.baseUrl);
-  const endpoint = providerEndpoint(input.catalog, role.provider, resolution.baseUrl);
-  const maxOutputTokens = input.config.maxOutputTokens ?? shape.maxOutputCeiling;
+  const endpoint = providerCredentialEndpoint(input.catalog, selected, resolution.baseUrl);
+  const maxOutputTokens = configuredOutputLimit(input.config, endpoint)
+    ?? (endpointShape(endpoint).outputControl === 'provider' ? undefined : shape.maxOutputCeiling);
   const reserveTokens = resolveTokenBudget(input.config.modelTokenBudgets, role.provider, role.model, 'reserveTokens', input.config.reserveTokens, 0);
   const failure = outputLimitFailure(maxOutputTokens, model.maxTokens, model.contextWindow)
     ?? (model.contextWindow ? reserveLimitFailure(reserveTokens, model.contextWindow) : undefined)

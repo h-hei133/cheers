@@ -3,6 +3,12 @@ import type { AccountAuthConfig } from '../config/runtimeConfig.js';
 import * as authorization from '../provider/request/authorization.js';
 import * as transport from '../provider/request/fetch.js';
 
+/** Synthetic exchange token with the exact account-service claim. */
+export function accountToken(marker: string, accountId = 'a'): string {
+  const claims = { 'https://api.openai.com/auth': { chatgpt_account_id: accountId } };
+  return `synthetic.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.${marker}`;
+}
+
 /** Intercept only synthetic OAuth HTTP; the actual flow, dispatch marker and native proof still run. */
 export function observeOAuthRenewal(account: AccountAuthConfig, beforeResponse?: () => Promise<void> | void) {
   const create = transport.providerFetchFromTimeouts;

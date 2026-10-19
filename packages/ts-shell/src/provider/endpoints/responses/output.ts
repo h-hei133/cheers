@@ -61,7 +61,7 @@ function count(value: unknown): number | undefined {
 }
 
 /** Terminal errors retain cost evidence but never admit partially assembled tool calls. */
-export function readResponse(body: unknown): CompletedBody {
+export function readResponse(body: unknown, account = false): CompletedBody {
   if (!isRecord(body)) return responseFailure('');
   const usage = responseUsage(body.usage);
   const finish = responseFinish(body);
@@ -74,8 +74,9 @@ export function readResponse(body: unknown): CompletedBody {
     ...(success && projected.calls.length ? { tool_calls: projected.calls } : {}) },
     finish_reason: success && projected.calls.length ? 'tool_calls' : reason }], usage,
     reasoning: projected.reasoning,
-    ...(success && typeof body.model === 'string' && output.length ? { reasoningSignature: JSON.stringify({
-      protocol: 'openai-responses', version: 1, model: body.model, output,
+    ...(success && (account || typeof body.model === 'string') && output.length ? { reasoningSignature: JSON.stringify({
+      protocol: account ? 'openai-account-responses' : 'openai-responses', version: 1,
+      ...(typeof body.model === 'string' ? { model: body.model } : {}), output,
     }) } : {}) };
 }
 

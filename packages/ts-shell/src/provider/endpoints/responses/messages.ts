@@ -10,7 +10,10 @@ function replay(message: ChatMessage, provider: string | undefined, model: strin
     || message.origin.provider !== provider || message.origin.model !== model) return undefined;
   try {
     const value: unknown = JSON.parse(message.reasoning.signature);
-    if (!isRecord(value) || value.protocol !== 'openai-responses' || value.version !== 1 || typeof value.model !== 'string') return undefined;
+    if (!isRecord(value) || value.version !== 1) return undefined;
+    if (value.protocol === 'openai-account-responses') {
+      if (value.model !== undefined && typeof value.model !== 'string') return undefined;
+    } else if (value.protocol !== 'openai-responses' || typeof value.model !== 'string') return undefined;
     const output = responseOutput(value.output, true);
     if (!output) return undefined;
     const projected = outputProjection(output);

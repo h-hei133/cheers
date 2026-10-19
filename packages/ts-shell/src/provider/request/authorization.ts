@@ -116,6 +116,9 @@ export function providerAuthorization(input: {
     if (account.type === "openai-chatgpt-account" && account.accountId) {
       headers["chatgpt-account-id"] = account.accountId;
     }
+    if (account.type === 'openai-chatgpt-account' && input.endpoint === 'openai-account-responses' && !account.accountId?.trim()) {
+      throw new Error('The account login has no account identity. Reconnect before sending a request.');
+    }
     return { headers, mode: "account-auth" };
   }
 
@@ -294,6 +297,9 @@ async function exchangeAccountAuth(input: {
       input.onDispatch?.();
       return input.fetchImpl(url, init);
     });
+    if (input.account.type === 'openai-chatgpt-account' && (!tokens.accountId || tokens.accountId !== input.account.accountId)) {
+      throw new Error('Renewal returned a different account identity.');
+    }
     const accountAuth: AccountAuthConfig = {
         ...input.account,
         accessToken: tokens.accessToken,

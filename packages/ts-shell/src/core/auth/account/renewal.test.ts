@@ -1,3 +1,4 @@
+import { accountToken } from '../../../test-utils/oauth.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -16,20 +17,20 @@ import { projectModelSelection } from '../../../session/model/projection.js';
 let home: string;
 let root: string;
 let file: string;
-const auth = (name = 'a'): OpenAIAccountAuthConfig => ({ type: 'openai-chatgpt-account', accessToken: `old-${name}`,
+const auth = (name = 'a'): OpenAIAccountAuthConfig => ({ type: 'openai-chatgpt-account', accessToken: accountToken(`old-${name}`, name),
   refreshToken: `refresh-${name}`, expiresAt: 1, accountId: name });
 const connection = (id: string) => ({ id, provider: 'openai' as const, authType: 'account-auth' as const,
-  accountAuth: { openai: auth(id) }, baseUrl: 'https://account.invalid/v1', status: 'connected' as const,
+  accountAuth: { openai: auth(id) }, baseUrl: 'https://chatgpt.com/backend-api', status: 'connected' as const,
   createdAt: '2026-01-01', updatedAt: id === 'a' ? '2026-01-03' : '2026-01-02' });
 const initial = (): RuntimeConfigFile => ({ provider: 'openai', activeProviderConnectionId: 'a',
   providerConnections: [connection('a'), connection('b')], providerCredentials: { openai: { accountAuth: { openai: auth() } } } });
 function write(value: RuntimeConfigFile) { fs.writeFileSync(file, JSON.stringify(value)); }
 function read(): RuntimeConfigFile { return JSON.parse(fs.readFileSync(file, 'utf8')); }
-function response() { return new Response(JSON.stringify({ access_token: 'fresh-a', refresh_token: 'rotated-a', expires_in: 3600 }),
+function response(accountId = 'a') { return new Response(JSON.stringify({ access_token: accountToken('fresh-a', accountId), refresh_token: 'rotated-a', expires_in: 3600 }),
   { headers: { 'Content-Type': 'application/json' } }); }
 function request(change: () => void = () => {}) {
   const resolution = resolveProviderCredential({ runtimeConfig: getRuntimeConfig(root), env: {} });
-  const fetchImpl = vi.fn(async () => { change(); return response(); }) as unknown as typeof fetch;
+  const fetchImpl = vi.fn(async () => { change(); return response(resolution.credential?.accountAuth?.accountId); }) as unknown as typeof fetch;
   return { workspaceRoot: root, resolution, fetchImpl };
 }
 beforeEach(() => {
@@ -41,10 +42,27 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(home, { recursive: true, force: true }); });
 
+it.each([
+  ['missing', 'synthetic.no-claim.token'], ['malformed', 'synthetic.!.token'],
+  ['foreign', accountToken('foreign', 'b')],
+  ['subject', `synthetic.${Buffer.from(JSON.stringify({ sub: 'a', organizations: [{ id: 'a' }] })).toString('base64url')}.token`],
+  ['namespace', `synthetic.${Buffer.from(JSON.stringify({ 'https://foreign.test/auth': { chatgpt_account_id: 'a' } })).toString('base64url')}.token`],
+])('keeps a dispatched renewal with %s identity unknown, with zero storage/publication or repeat HTTP', async (_kind, accessToken) => {
+  const before = fs.readFileSync(file), input = request();
+  input.fetchImpl = vi.fn(async () => new Response(JSON.stringify({ access_token: accessToken, refresh_token: 'synthetic-next', expires_in: 3600 }),
+    { headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch;
+  const result = await renewStoredAccount(input);
+  expect(result).toMatchObject({ stored: false, writeState: 'unchanged' });
+  expect(result.accountAuth).toBeUndefined(); expect(result.rotation).toBeUndefined(); expect(fs.readFileSync(file)).toEqual(before);
+  const attempt = readRefreshLease(refreshLineage({ provider: 'openai', refreshToken: auth().refreshToken }));
+  expect(attempt?.phase).toBe('unknown'); expect(attempt?.production).toBeUndefined();
+  expect((await renewStoredAccount(input)).stored).toBe(false); expect(input.fetchImpl).toHaveBeenCalledOnce();
+});
+
 it('renews only the captured account and its exact mirror while preserving other settings and ordering', async () => {
   const before = read(); const input = request(() => write({ ...read(), theme: 'light' }));
   const result = await renewStoredAccount(input); const saved = read();
-  expect(result).toMatchObject({ stored: true, writeState: 'persisted', accountAuth: { accessToken: 'fresh-a', refreshToken: 'rotated-a', accountId: 'a' } });
+  expect(result).toMatchObject({ stored: true, writeState: 'persisted', accountAuth: { accessToken: accountToken('fresh-a', 'a'), refreshToken: 'rotated-a', accountId: 'a' } });
   expect(saved.providerConnections?.[0]?.accountAuth?.openai).toEqual(result.accountAuth);
   expect(saved.providerConnections?.[1]).toEqual(before.providerConnections?.[1]);
   expect(saved.providerConnections?.[0]?.updatedAt).toBe(before.providerConnections?.[0]?.updatedAt);
@@ -59,7 +77,7 @@ it('does not replace a different fallback account and keeps config-source renewa
   write({ ...initial(), providerCredentials: { openai: { accountAuth: { openai: auth('fallback') } } } });
   const result = await renewStoredAccount(request()); expect(result.stored).toBe(true);
   expect(read().providerCredentials?.openai?.accountAuth?.openai).toEqual(auth('fallback'));
-  write({ provider: 'openai', providerCredentials: { openai: { baseUrl: 'https://config.invalid/v1', accountAuth: { openai: auth('config') } } } });
+  write({ provider: 'openai', providerCredentials: { openai: { baseUrl: 'https://chatgpt.com/backend-api', accountAuth: { openai: auth('config') } } } });
   const second = await renewStoredAccount(request()); expect(second.stored).toBe(true);
   expect(read().providerConnections).toBeUndefined(); expect(read().providerCredentials?.openai?.accountAuth?.openai).toEqual(second.accountAuth);
 });
@@ -69,10 +87,10 @@ it('renews the explicitly selected session account while leaving the profile def
   const config = projectModelSelection(getRuntimeConfig(root), { connectionId: 'b', connectionScope: 'session', provider: 'openai', model: 'gpt-5.3-codex' });
   const resolution = resolveProviderCredential({ runtimeConfig: config, env: {} });
   expect(resolution.selection?.connectionId).toBe('b');
-  const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ access_token: 'fresh-b', refresh_token: 'rotated-b', expires_in: 3600 }),
+  const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ access_token: accountToken('fresh-b', 'b'), refresh_token: 'rotated-b', expires_in: 3600 }),
     { headers: { 'Content-Type': 'application/json' } })) as unknown as typeof fetch;
   const result = await renewStoredAccount({ workspaceRoot: root, resolution, fetchImpl });
-  expect(result).toMatchObject({ stored: true, writeState: 'persisted', accountAuth: { accessToken: 'fresh-b', accountId: 'b' } });
+  expect(result).toMatchObject({ stored: true, writeState: 'persisted', accountAuth: { accessToken: accountToken('fresh-b', 'b'), accountId: 'b' } });
   expect(fetchImpl).toHaveBeenCalledOnce();
   expect(read().activeProviderConnectionId).toBe('a');
   expect(read().providerConnections?.[0]).toEqual(before.providerConnections?.[0]);
@@ -89,7 +107,7 @@ it('renews an explicitly selected provider account without borrowing or updating
   expect(resolution.credential?.connectionId).toBeUndefined();
   const fetchImpl = vi.fn(async () => response()) as unknown as typeof fetch;
   const result = await renewStoredAccount({ workspaceRoot: root, resolution, fetchImpl });
-  expect(result).toMatchObject({ stored: true, writeState: 'persisted', accountAuth: { accessToken: 'fresh-a' } });
+  expect(result).toMatchObject({ stored: true, writeState: 'persisted', accountAuth: { accessToken: accountToken('fresh-a', 'a') } });
   expect(read().providerConnections).toEqual(before.providerConnections);
   expect(read().activeProviderConnectionId).toBe('a');
   expect(read().providerCredentials?.openai?.accountAuth?.openai).toEqual(result.accountAuth);
@@ -143,7 +161,7 @@ it.each(['relogin', 'delete', 'selection', 'endpoint', 'fallback-order', 'provid
   });
   return renewStoredAccount(input).then(result => {
     expect(result.stored).toBe(false); expect(result.accountAuth).toBeUndefined(); expect(result.writeState).toBe('unchanged');
-    expect(result.failure).toBeDefined(); expect(fs.readFileSync(file, 'utf8')).not.toContain('"fresh-a"');
+    expect(result.failure).toBeDefined(); expect(fs.readFileSync(file, 'utf8')).not.toContain(accountToken('fresh-a'));
   });
 });
 
@@ -155,7 +173,7 @@ it('checks a fallback selector again inside the configuration lock', async () =>
   }, options));
   const result = await renewStoredAccount(input);
   expect(result).toMatchObject({ stored: false, writeState: 'unchanged' }); expect(result.accountAuth).toBeUndefined();
-  expect(fs.readFileSync(file, 'utf8')).not.toContain('"fresh-a"');
+  expect(fs.readFileSync(file, 'utf8')).not.toContain(accountToken('fresh-a'));
 });
 
 it('never hands unverified tokens to a caller when a writer silently drops the save', async () => {
@@ -190,7 +208,7 @@ it.each([true, false])('accepts a natively proven peer renewal without rewriting
   const config = projectModelSelection(getRuntimeConfig(root), { connectionId: 'b', connectionScope: 'session', provider: 'openai', model: 'gpt-5.3-codex' });
   const resolution = resolveProviderCredential({ runtimeConfig: config, env: {} });
   let release!: () => void; const held = new Promise<void>(resolve => { release = resolve; });
-  const fetchImpl = vi.fn(async () => { await held; return new Response(JSON.stringify({ access_token: 'peer-fresh-b',
+  const fetchImpl = vi.fn(async () => { await held; return new Response(JSON.stringify({ access_token: accountToken('peer-fresh-b', 'b'),
     refresh_token: rotates ? 'peer-rotated-b' : 'refresh-b', expires_in: 3600 }), { headers: { 'Content-Type': 'application/json' } }); }) as unknown as typeof fetch;
   const native = authorization.renewAccountAuthIfExpiring;
   vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockImplementationOnce(native).mockResolvedValueOnce({ renewed: false, leaseHeld: true });
@@ -261,7 +279,7 @@ it('finishes conditional storage after exchange even if operation admission is r
 });
 
 it.each(['accessToken', 'refreshToken', 'accountId'])('rejects changed environment reference %s before saving', async field => {
-  vi.stubEnv('RENEWAL_VALUE', field === 'accessToken' ? 'old-a' : field === 'refreshToken' ? 'refresh-a' : 'a');
+  vi.stubEnv('RENEWAL_VALUE', field === 'accessToken' ? accountToken('old-a', 'a') : field === 'refreshToken' ? 'refresh-a' : 'a');
   const value = initial(); value.providerConnections![0]!.accountAuth!.openai = { ...auth(), [field]: '${RENEWAL_VALUE}' };
   write(value); const before = fs.readFileSync(file);
   const result = await renewStoredAccount(request(() => vi.stubEnv('RENEWAL_VALUE', 'changed')));
@@ -270,12 +288,12 @@ it.each(['accessToken', 'refreshToken', 'accountId'])('rejects changed environme
 });
 
 it('renews interpolated credentials without copying unrelated placeholders into tokens', async () => {
-  vi.stubEnv('RENEWAL_ACCESS', 'old-a'); vi.stubEnv('RENEWAL_REFRESH', 'refresh-a');
+  vi.stubEnv('RENEWAL_ACCESS', accountToken('old-a', 'a')); vi.stubEnv('RENEWAL_REFRESH', 'refresh-a');
   const value = initial(); value.providerConnections![0]!.accountAuth!.openai = {
     ...auth(), accessToken: '${RENEWAL_ACCESS}', refreshToken: '${RENEWAL_REFRESH}',
   }; write(value);
   const result = await renewStoredAccount(request());
-  expect(result).toMatchObject({ stored: true, accountAuth: { accessToken: 'fresh-a', refreshToken: 'rotated-a' } });
+  expect(result).toMatchObject({ stored: true, accountAuth: { accessToken: accountToken('fresh-a', 'a'), refreshToken: 'rotated-a' } });
   expect(read().providerConnections?.[1]).toEqual(value.providerConnections?.[1]);
 });
 
@@ -361,11 +379,11 @@ it('preserves raw identity references in each selected and mirrored slot during 
   value.providerConnections![0]!.accountAuth!.openai = { ...auth(), accountId: '${RENEWAL_ACCOUNT}' };
   value.providerCredentials!.openai!.accountAuth!.openai = { ...auth(), accountId: ' a ' }; write(value);
   const input = request(); const result = await renewStoredAccount(input);
-  expect(result).toMatchObject({ stored: true, accountAuth: { accountId: 'a', accessToken: 'fresh-a' } });
+  expect(result).toMatchObject({ stored: true, accountAuth: { accountId: 'a', accessToken: accountToken('fresh-a', 'a') } });
   expect(input.fetchImpl).toHaveBeenCalledOnce();
   expect(read().providerConnections?.[0]?.accountAuth?.openai?.accountId).toBe('${RENEWAL_ACCOUNT}');
   expect(read().providerCredentials?.openai?.accountAuth?.openai?.accountId).toBe(' a ');
-  expect(read().providerCredentials?.openai?.accountAuth?.openai?.accessToken).toBe('fresh-a');
+  expect(read().providerCredentials?.openai?.accountAuth?.openai?.accessToken).toBe(accountToken('fresh-a', 'a'));
 });
 
 it('preserves Google client and email references during successful rotation', async () => {
@@ -375,9 +393,9 @@ it('preserves Google client and email references during successful rotation', as
   write({ provider: 'google', providerCredentials: { google: { accountAuth: { google } } } });
   const input = request(); const result = await renewStoredAccount(input);
   expect(input.fetchImpl).toHaveBeenCalledOnce();
-  expect(result).toMatchObject({ stored: true, accountAuth: { accessToken: 'fresh-a', clientId: 'client-a', accountEmail: 'a@example.test' } });
+  expect(result).toMatchObject({ stored: true, accountAuth: { accessToken: accountToken('fresh-a', 'a'), clientId: 'client-a', accountEmail: 'a@example.test' } });
   expect(read().providerCredentials?.google?.accountAuth?.google).toEqual({ ...google,
-    accessToken: 'fresh-a', refreshToken: 'rotated-a', expiresAt: result.accountAuth!.expiresAt });
+    accessToken: accountToken('fresh-a', 'a'), refreshToken: 'rotated-a', expiresAt: result.accountAuth!.expiresAt });
 });
 
 it('refuses a same-process copied token in another slot before native single-flight', async () => {
@@ -415,7 +433,7 @@ it('lets a shared follower recover storage after its leader fails to write', asy
   const first = renewStoredAccount({ ...input, fetchImpl }); const second = renewStoredAccount({ ...input, fetchImpl });
   release(); const [leader, follower] = await Promise.all([first, second]);
   expect(leader).toMatchObject({ stored: false, writeState: 'unknown' }); expect(leader.accountAuth).toBeUndefined();
-  expect(follower).toMatchObject({ stored: true, writeState: 'persisted', accountAuth: { accessToken: 'fresh-a' } });
+  expect(follower).toMatchObject({ stored: true, writeState: 'persisted', accountAuth: { accessToken: accountToken('fresh-a', 'a') } });
   expect(fetchImpl).toHaveBeenCalledOnce(); expect(JSON.stringify(leader)).not.toContain('PRIVATE');
 });
 
@@ -427,7 +445,7 @@ it('verifies selection after the atomic writer has already confirmed a saved rot
   const result = await renewStoredAccount(request());
   expect(result).toMatchObject({ stored: false, writeState: 'persisted' }); expect(result.accountAuth).toBeUndefined();
   expect(result.failure).toContain('verification-failed');
-  expect(read().providerConnections?.[0]?.accountAuth?.openai?.accessToken).toBe('fresh-a');
+  expect(read().providerConnections?.[0]?.accountAuth?.openai?.accessToken).toBe(accountToken('fresh-a', 'a'));
 });
 
 it('classifies an exact native rotation saved just before locking as unchanged and preserves unrelated edits', async () => {
@@ -438,7 +456,7 @@ it('classifies an exact native rotation saved just before locking as unchanged a
       const attempts = Object.values(state.leases).flatMap((row: any) => Object.values(row.attempts)) as any[];
       const production = attempts.find(attempt => attempt.production)?.production;
       expect(production).toBeDefined();
-      const current = read(), fresh = { ...auth(), accessToken: 'fresh-a', refreshToken: 'rotated-a', expiresAt: nativeExpiry };
+      const current = read(), fresh = { ...auth(), accessToken: accountToken('fresh-a', 'a'), refreshToken: 'rotated-a', expiresAt: nativeExpiry };
       write({ ...current, theme: 'light', providerConnections: current.providerConnections!.map(record => record.id === 'a'
         ? { ...record, accountAuth: { openai: fresh } } : record), providerCredentials: { openai: { accountAuth: { openai: fresh } } } });
     }
@@ -536,10 +554,10 @@ it('blocks an unchanged stale cloned slot after successful consumption on a subs
 
 it('allows a stable-token native successor while rejecting its stale predecessor and fabricated access generation', async () => {
   const before = read(), now = Date.now(); const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
-  const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ access_token: 'stable-fresh', expires_in: 3600 }),
+  const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ access_token: accountToken('stable-fresh', 'a'), expires_in: 3600 }),
     { headers: { 'Content-Type': 'application/json' } })) as unknown as typeof fetch;
   const input = request(), first = await renewStoredAccount({ ...input, fetchImpl });
-  expect(first).toMatchObject({ stored: true, accountAuth: { accessToken: 'stable-fresh', refreshToken: 'refresh-a' } });
+  expect(first).toMatchObject({ stored: true, accountAuth: { accessToken: accountToken('stable-fresh', 'a'), refreshToken: 'refresh-a' } });
   const verified = read(); write(before);
   expect((await renewStoredAccount({ ...request(), fetchImpl })).stored).toBe(false);
   write({ ...before, providerConnections: before.providerConnections!.map(item => item.id === 'a'
@@ -600,7 +618,7 @@ it('keeps the captured ledger path after a runtime override changes during nativ
 it('keeps an unchanged native response unknown instead of reauthorizing the same complete generation', async () => {
   vi.spyOn(Date, 'now').mockReturnValue(0);
   const before = fs.readFileSync(file), input = request();
-  input.fetchImpl = vi.fn(async () => new Response(JSON.stringify({ access_token: 'old-a', refresh_token: 'refresh-a', expires_in: 0.001 }),
+  input.fetchImpl = vi.fn(async () => new Response(JSON.stringify({ access_token: accountToken('old-a', 'a'), refresh_token: 'refresh-a', expires_in: 0.001 }),
     { headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch;
   const result = await renewStoredAccount(input);
   expect(result).toMatchObject({ stored: false, writeState: 'unchanged' }); expect(result.accountAuth).toBeUndefined();
@@ -612,7 +630,7 @@ it('keeps an unchanged native response unknown instead of reauthorizing the same
 it.each([true, false].flatMap(rotates => [0, -1].map(expires => ({ rotates, expires }))))('rejects unusable native access expiry $expires with rotating refresh $rotates before production or config save', async ({ rotates, expires }) => {
   const now = Date.now(); vi.spyOn(Date, 'now').mockReturnValue(now);
   const before = fs.readFileSync(file), input = request();
-  input.fetchImpl = vi.fn(async () => new Response(JSON.stringify({ access_token: 'unusable-fresh',
+  input.fetchImpl = vi.fn(async () => new Response(JSON.stringify({ access_token: accountToken('unusable-fresh', 'a'),
     refresh_token: rotates ? 'unusable-next' : 'refresh-a', expires_in: expires }), { headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch;
   const result = await renewStoredAccount(input);
   expect(result).toMatchObject({ stored: false, writeState: 'unchanged' }); expect(result.accountAuth).toBeUndefined();
@@ -625,10 +643,10 @@ it.each([true, false].flatMap(rotates => [0, -1].map(expires => ({ rotates, expi
 
 it('accepts native access that is still valid inside the refresh scheduling threshold', async () => {
   const now = Date.now(); vi.spyOn(Date, 'now').mockReturnValue(now); const input = request();
-  input.fetchImpl = vi.fn(async () => new Response(JSON.stringify({ access_token: 'short-valid', refresh_token: 'short-next', expires_in: 10 }),
+  input.fetchImpl = vi.fn(async () => new Response(JSON.stringify({ access_token: accountToken('short-valid', 'a'), refresh_token: 'short-next', expires_in: 10 }),
     { headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch;
   const result = await renewStoredAccount(input);
-  expect(result).toMatchObject({ stored: true, accountAuth: { accessToken: 'short-valid', expiresAt: now + 10000 } });
+  expect(result).toMatchObject({ stored: true, accountAuth: { accessToken: accountToken('short-valid', 'a'), expiresAt: now + 10000 } });
   expect(readRefreshLease(refreshLineage({ provider: 'openai', refreshToken: 'refresh-a' }))?.phase).toBe('rotated-persisted');
 });
 

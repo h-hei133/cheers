@@ -1,3 +1,4 @@
+import { accountToken } from '../../test-utils/oauth.js';
 import { readRuntimeConfigEditAt } from "../../config/runtimeConfig.js";
 import fs from "node:fs";
 import os from "node:os";
@@ -28,8 +29,8 @@ async function nativeLogin(accessToken = 'native-access', refreshToken = 'native
       redirect.searchParams.set('code', 'synthetic-code'); redirect.searchParams.set('state', url.searchParams.get('state')!);
       const callback = await fetch(redirect); expect(callback.ok).toBe(true);
     },
-    fetchImpl: vi.fn(async () => response ? response() : new Response(JSON.stringify({ access_token: accessToken, refresh_token: refreshToken, expires_in: 3600,
-      id_token: `header.${Buffer.from(JSON.stringify({ sub: accountId })).toString('base64url')}.signature` }),
+    fetchImpl: vi.fn(async () => response ? response() : new Response(JSON.stringify({ access_token: accountToken(accessToken, accountId), refresh_token: refreshToken, expires_in: 3600,
+      id_token: `header.${Buffer.from(JSON.stringify({ sub: 'distinct-subject' })).toString('base64url')}.signature` }),
       { headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch,
   });
 }
@@ -570,7 +571,7 @@ describe("connect command runtime", () => {
     __setOpenAIAccountAuthRunnerForTest(() => nativeLogin());
     const result = await runConnectCommand(['login', 'openai', '--account'], { cwd: workspaceRoot });
     expect(result.output).toContain('Access credentials were stored'); expect(result.output).toContain('independent fresh profile');
-    expect(configStore.readUserRuntimeConfigFile().providerConnections?.[0]?.accountAuth?.openai?.accessToken).toBe('native-access');
+    expect(configStore.readUserRuntimeConfigFile().providerConnections?.[0]?.accountAuth?.openai?.accessToken).toBe(accountToken('native-access', 'native-account'));
     const ledger = JSON.parse(fs.readFileSync(refreshLeasesPath(), 'utf8')); expect(ledger.legacy.opaque.phase).toBe('unknown');
     expect(Object.keys(ledger.leases)).toHaveLength(0);
     vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 7200000);
@@ -658,7 +659,7 @@ describe("connect command runtime", () => {
     await expect(runConnectCommand(['login', 'openai', '--account'], { cwd: workspaceRoot })).rejects.toMatchObject({ code: 'verification-failed', state: 'persisted' });
     const rows = JSON.parse(fs.readFileSync(refreshLeasesPath(), 'utf8')).leases;
     expect(Object.values(rows).every((row: any) => !row.grant)).toBe(true);
-    expect(configStore.readUserRuntimeConfigFile().providerConnections?.[0]?.accountAuth?.openai?.accessToken).toBe('native-access');
+    expect(configStore.readUserRuntimeConfigFile().providerConnections?.[0]?.accountAuth?.openai?.accessToken).toBe(accountToken('native-access', 'native-account'));
   });
 
 
@@ -666,7 +667,7 @@ describe("connect command runtime", () => {
     const now = Date.now(), clock = vi.spyOn(Date, 'now').mockReturnValue(now);
     __setOpenAIAccountAuthRunnerForTest(async () => {
       const result = kind === 'zero' ? await nativeLogin('', '', '', () => new Response(JSON.stringify({
-        access_token: 'expired-native-access', refresh_token: 'expired-native-refresh', expires_in: 0,
+        access_token: accountToken('expired-native-access', 'native-account'), refresh_token: 'expired-native-refresh', expires_in: 0,
       }), { headers: { 'content-type': 'application/json' } })) : await nativeLogin();
       if (kind === 'delayed') clock.mockReturnValue(now + 7200000);
       return result;

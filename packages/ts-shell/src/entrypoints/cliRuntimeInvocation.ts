@@ -15,7 +15,7 @@ import { registerDeclaredHooks, type HookApprovalRequest } from "../core/hooks/r
 import { loadToolCatalog, type CatalogContent, type ToolCatalogInput } from "../core/tools/catalog.js";
 import type { ToolDiscovery } from "../core/tools/discovery/state.js";
 import { loadCatalog } from "../core/models/catalogStore.js";
-import { catalogProvider, providerEndpoint, type CatalogProvider } from "../core/models/catalog.js";
+import { catalogProvider, type CatalogProvider } from "../core/models/catalog.js";
 import type { RuntimeConfig } from "../config/runtimeConfig.js";
 import type { ToolDefinition } from "../tools/types.js";
 import { buildSystemPrompt, systemPromptSnapshot, type SystemPromptContext } from "../turn/prompt.js";
@@ -44,7 +44,7 @@ import {
 } from "../provider/request/fetch.js";
 import { DEFAULT_ENDPOINT_KIND, endpointShape } from "../provider/endpoints/index.js";
 import { accountAuthFor, providerAuthorization } from "../provider/request/authorization.js";
-import { providerCredentialBaseUrl } from '../core/auth/account/target.js';
+import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../core/auth/account/target.js';
 import { renewStoredAccount } from "../core/auth/account/renewal.js";
 import { projectAccountAuth } from '../core/auth/account/projection.js';
 import { publishAccountRotation } from '../cli/provider/publication.js';
@@ -295,7 +295,7 @@ function deferUntilReady(
       accountAuth: request.providerCredentialResolution.credential?.accountAuth,
       baseUrl,
       model: request.providerCredentialResolution.model,
-      endpoint: providerEndpoint(catalog, request.providerCredentialResolution.provider, baseUrl) ?? DEFAULT_ENDPOINT_KIND,
+      endpoint: providerCredentialEndpoint(catalog, request.providerCredentialResolution, baseUrl) ?? DEFAULT_ENDPOINT_KIND,
       signal: request.signal,
       fetchImpl: admittedFetch(providerFetch(request.runtimeConfig), request.admission),
     });

@@ -63,8 +63,9 @@ import type { InteractiveApprovalResult } from "../interactive/picker/approval.j
 import { requestCompactionSummary } from "../../core/query/compaction/summarize.js";
 import { providerFetchForEndpoint, providerFetchFromTimeouts, providerTimeoutsFrom } from "../../provider/request/fetch.js";
 import { accountAuthFor, providerAuthorization } from "../../provider/request/authorization.js";
-import { providerCredentialBaseUrl } from '../../core/auth/account/target.js';
-import { catalogModel, catalogProvider, providerEndpoint } from "../../core/models/catalog.js";
+import { providerCredentialBaseUrl, providerCredentialEndpoint } from '../../core/auth/account/target.js';
+import { configuredOutputLimit } from '../../provider/request/output.js';
+import { catalogModel, catalogProvider } from "../../core/models/catalog.js";
 import { sessionUsageRecorder } from '../../session/store/usage.js';
 import { resolveRequestShape } from "../../core/models/requestShape.js";
 import { endpointShape, type EndpointKind } from "../../provider/endpoints/index.js";
@@ -156,21 +157,18 @@ export function createCliSessionRuntime(input: {
     if (catalogProvider(catalog, resolved.provider, baseUrl).ambiguous) return undefined;
     const credential = resolved.credential;
     const accountAuth = accountAuthFor(resolved.provider, credential ?? {});
-    if (!credential?.apiKey && !accountAuth && !endpointShape(endpointFor(resolved.provider, catalog, baseUrl)).signer) return undefined;
+    if (!credential?.apiKey && !accountAuth && !endpointShape(providerCredentialEndpoint(catalog, resolved, baseUrl)).signer) return undefined;
     const model = resolved.model ?? credential?.model;
     if (!baseUrl || !model) return undefined;
     return {
       provider: resolved.provider,
       apiKey: credential?.apiKey,
       accountAuth,
+      endpoint: providerCredentialEndpoint(catalog, resolved, baseUrl),
       baseUrl,
       model,
     };
   };
-
-  /** The endpoint kind a provider is reached through, when the catalog names one. */
-  const endpointFor = (provider: string, catalog: readonly CatalogProvider[], baseUrl?: string): EndpointKind | undefined =>
-    providerEndpoint(catalog, provider, baseUrl);
 
   /** The provider the turn's own compaction summarizes with. */
   const compactionProvider = (resolved: ProviderCredentialResolution, catalog: readonly CatalogProvider[]): CompactionProvider | undefined => {
@@ -187,12 +185,12 @@ export function createCliSessionRuntime(input: {
       headers: providerAuthorization({
         apiKey: target.apiKey,
         accountAuth: target.accountAuth,
-        ...(endpointFor(target.provider, catalog, target.baseUrl) ? { endpoint: endpointFor(target.provider, catalog, target.baseUrl) } : {}),
+        ...(target.endpoint ? { endpoint: target.endpoint } : {}),
       }).headers,
       baseUrl: target.baseUrl,
       model: target.model,
       providerId: target.provider,
-      ...(endpointFor(target.provider, catalog, target.baseUrl) ? { endpoint: endpointFor(target.provider, catalog, target.baseUrl) } : {}),
+      ...(target.endpoint ? { endpoint: target.endpoint } : {}),
       ...(identity ? { credentialId: identity.credentialId, credentialGeneration: identity.generation } : {}),
       supportsTemperature: shape.supportsTemperature,
       shape,
@@ -223,14 +221,14 @@ export function createCliSessionRuntime(input: {
       headers: providerAuthorization({
         apiKey: target.apiKey,
         accountAuth: renewed.accountAuth ?? target.accountAuth,
-        ...(endpointFor(target.provider, catalog, target.baseUrl) ? { endpoint: endpointFor(target.provider, catalog, target.baseUrl) } : {}),
+        ...(target.endpoint ? { endpoint: target.endpoint } : {}),
       }).headers,
       baseUrl: target.baseUrl,
       model: target.model,
       providerId: target.provider,
       shape: resolveRequestShape(catalog, target.provider, target.model, undefined, target.baseUrl),
       supportsTemperature: resolveRequestShape(catalog, target.provider, target.model, undefined, target.baseUrl).supportsTemperature,
-      ...(endpointFor(target.provider, catalog, target.baseUrl) ? { endpoint: endpointFor(target.provider, catalog, target.baseUrl) } : {}),
+      ...(target.endpoint ? { endpoint: target.endpoint } : {}),
       ...(identity ? { credentialId: identity.credentialId, credentialGeneration: identity.generation } : {}),
     } };
   };
@@ -322,7 +320,7 @@ export function createCliSessionRuntime(input: {
         assertAdmission(admission);
         if (!provider) return undefined;
         return requestCompactionSummary({
-          requestPolicy, purpose: 'branch-summary', maxOutputTokens: config.maxOutputTokens,
+          requestPolicy, purpose: 'branch-summary', maxOutputTokens: configuredOutputLimit(config, provider.endpoint),
           onUsage: usageFor({ provider: provider.providerId ?? '', model: provider.model, baseUrl: provider.baseUrl,
             rates: catalogModel(catalog, provider.providerId ?? '', provider.model, provider.baseUrl)?.cost }),
           modelTransport: providerModelTransport(config, provider.endpoint, admission),

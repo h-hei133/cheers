@@ -7,6 +7,7 @@ import { prepareRequestAttempt } from './attempt.js';
 import type { ResolvedRequestShape } from '../../core/models/requestShape.js';
 import type { ProviderUsage } from '../../turn/completion.js';
 import { requestReplayBinding } from './replay.js';
+import { readCompletion } from '../response/read.js';
 
 /**
  * One out-of-band model call.
@@ -38,6 +39,7 @@ export interface SimpleProvider {
   /** Which stored credential sends this request; non-secret and rotation-sensitive. */
   readonly credentialId?: string;
   readonly credentialGeneration?: string;
+  readonly replayOwner?: string;
   /**
    * Which endpoint kind this request goes to.
    *
@@ -91,7 +93,7 @@ export async function requestSimpleCompletion(
     .join("\n\n");
   const messages = request.messages.filter((message) => message.role !== "system");
   const headers = new Headers(request.provider.headers);
-  headers.set("accept", "application/json");
+  headers.set("accept", endpointShape(kind).simpleResponse === 'stream' ? 'text/event-stream' : 'application/json');
   const serialized = JSON.stringify(
     endpointBody(kind, {
       ...request.shape,
@@ -116,16 +118,15 @@ export async function requestSimpleCompletion(
     request.onFailure?.(classifyProviderFailure({ status: res.status }));
     return undefined;
   }
-  let body: unknown;
+  let completion: Awaited<ReturnType<typeof readCompletion>>;
   try {
-    body = await res.json();
+    completion = await readCompletion(kind, res);
   } catch (error) {
     if (error instanceof SyntaxError) {
       request.onFailure?.(classifyProviderFailure({ message: "invalid response json" }));
     }
     throw error;
   }
-  const completion = endpointShape(kind).readBody(body);
   request.onUsage?.(completion.usage);
   attempt.settle(completion.usage);
   const choice = completion.choices?.[0];

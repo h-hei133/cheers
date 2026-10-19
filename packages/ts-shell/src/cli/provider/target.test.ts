@@ -29,8 +29,8 @@ it.each(['pending', 'error', 'missing-key'] as const)('rejects %s exact connecti
 it('rejects unsupported account-auth override and an unavailable provider instead of choosing the main model', () => {
   const account: ProviderCredentialResolution = { ...main, credential: { ...main.credential!, authMode: 'account-auth', apiKey: undefined,
     accountAuth: { type: 'openai-chatgpt-account', accessToken: 'synthetic-account-only', refreshToken: 'synthetic-refresh', expiresAt: Date.now() + 60000 } } };
-  expect(() => delegatedTarget('unsupported-model-for-account-auth', account)).toThrow(/unavailable/);
-  expect(() => delegatedTarget('unknown-provider/requested-model', main, getRuntimeConfig())).toThrow(/unavailable/);
+  expect(() => delegatedTarget('unsupported-model-for-account-auth', account)).toThrow(/unavailable|endpoint/);
+  expect(() => delegatedTarget('unknown-provider/requested-model', main, getRuntimeConfig())).toThrow(/unavailable|endpoint/);
 });
 
 it('supports an explicit bare delegated model only on the captured provider', () => {

@@ -1,3 +1,5 @@
+import { providerCredentialEndpoint } from '../../auth/account/target.js';
+import { configuredOutputLimit } from '../../../provider/request/output.js';
 import { readRuntimeConfigEditAt, getUserRuntimeConfigPath, writeUserRuntimeConfigFile, isRuntimeProvider, type RuntimeConfig, type RuntimeConfigFile } from '../../../config/runtimeConfig.js';
 import path from 'node:path';
 import { ConfigWriteError } from '../../../config/outcome.js';
@@ -16,7 +18,7 @@ import { globalModelFailure } from './outcome.js';
 import { effortCapability } from '../../models/capability.js';
 import { endpointShape } from '../../../provider/endpoints/index.js';
 import { effortOutputFailure } from '../../../provider/endpoints/effort.js';
-import { catalogBaseUrl, catalogModel, catalogProvider, providerEndpoint } from '../../models/catalog.js';
+import { catalogBaseUrl, catalogModel, catalogProvider } from '../../models/catalog.js';
 import type { ThinkingPreference } from '../../models/effort.js';
 import type { CommandContext } from '../types.js';
 import { connectionIdentity, credentialIdentity } from './identity.js';
@@ -88,14 +90,15 @@ async function selectModel(args: string[], context: CommandContext, global: bool
   if (catalogProvider(catalog, provider, baseUrl).ambiguous) return 'Model switch blocked: multiple catalogue entries claim this endpoint.';
   const capability = effortCapability(catalog, provider, model, thinkingEffort, baseUrl);
   const candidate = catalogModel(catalog, provider, model, catalogBaseUrl(catalog, provider, baseUrl));
-  const endpoint = providerEndpoint(catalog, provider, baseUrl);
+  const selectedRequest = request ?? actual;
+  const endpoint = providerCredentialEndpoint(catalog, selectedRequest, baseUrl);
   if (capability === 'unsupported') return 'Model switch blocked: this model does not support the selected reasoning effort. Choose another level or --effort auto.';
   // Publication reloads this cap; startup overrides currently declare no output limit.
-  const budgetFailure = thinkingEffort === null ? undefined : effortOutputFailure(endpointShape(endpoint), loaded.maxOutputTokens ?? candidate?.maxTokens);
+  const budgetFailure = thinkingEffort === null ? undefined : effortOutputFailure(endpointShape(endpoint), configuredOutputLimit(loaded, endpoint) ?? (endpointShape(endpoint).outputControl === 'provider' ? undefined : candidate?.maxTokens));
   if (budgetFailure) return `Model switch blocked: ${budgetFailure}`;
   const capabilityNotice = !candidate ? 'Model catalogue entry is unavailable; capability is unverified. Use /model refresh or /model config. Remote availability is not verified.'
     : capability === 'unverified' ? 'Effort capability is unverified in the model catalogue. Use /model refresh or /model config to update metadata; remote availability is not verified.' : undefined;
-  const constraints = inspectConfigConstraints(loaded, { provider, model, thinkingEffort, baseUrl }, catalog);
+  const constraints = inspectConfigConstraints(loaded, { provider, model, thinkingEffort, baseUrl, credential: selectedRequest.credential }, catalog);
   if (constraints.errors.length) return `Model switch blocked: ${constraints.errors.join(' ')}`;
   if (!providerSlot && !activeId) {
     return "No active connection. Run /connect login ... first.";
@@ -170,10 +173,10 @@ async function selectModel(args: string[], context: CommandContext, global: bool
     if (currentConfig.activeProviderConnectionId !== loaded.activeProviderConnectionId
       || !sameValue(connectionIdentity(currentConfig.providerConnections.find(item => item.id === activeId)), connectionIdentity(activeConnection))
       || !sameValue(credentialIdentity(currentConfig.providerCredentials[provider]), credentialIdentity(loaded.providerCredentials[provider]))) return false;
-    if (providerEndpoint(currentCatalog, provider, baseUrl) !== endpoint || !currentConfig.configValidation.valid
+    if (providerCredentialEndpoint(currentCatalog, selectedRequest, baseUrl) !== endpoint || !currentConfig.configValidation.valid
       || !sameValue([currentConfig.maxOutputTokens, currentConfig.contextWindow, currentConfig.reserveTokens, currentConfig.modelTokenBudgets, currentConfig.retryBaseDelayMs, currentConfig.retryMaxDelayMs],
         [loaded.maxOutputTokens, loaded.contextWindow, loaded.reserveTokens, loaded.modelTokenBudgets, loaded.retryBaseDelayMs, loaded.retryMaxDelayMs])) return false;
-    if (inspectConfigConstraints(currentConfig, { provider, model, thinkingEffort, baseUrl }, currentCatalog).errors.length) return false;
+    if (inspectConfigConstraints(currentConfig, { provider, model, thinkingEffort, baseUrl, credential: selectedRequest.credential }, currentCatalog).errors.length) return false;
     const latest = readRuntimeConfigEditAt(edit.path).values;
     return latest.activeProviderConnectionId === config.activeProviderConnectionId && latest.provider === config.provider
       && sameValue(latest.providerConnections?.find(item => item.id.trim() === activeId), config.providerConnections?.find(item => item.id.trim() === activeId))

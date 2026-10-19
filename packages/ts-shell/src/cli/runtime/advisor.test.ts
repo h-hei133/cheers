@@ -1,4 +1,5 @@
-import { observeOAuthRenewal } from '../../test-utils/oauth.js';
+import { accountWire, accountCompletion } from '../../test-utils/account.js';
+import { accountToken, observeOAuthRenewal } from '../../test-utils/oauth.js';
 import fs from 'node:fs';
 import http from 'node:http';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -31,7 +32,7 @@ afterEach(async () => {
 });
 
 const oldAccount = { type: 'openai-chatgpt-account' as const, accessToken: 'synthetic-old', refreshToken: 'synthetic-refresh', expiresAt: 1, accountId: 'b' };
-const freshAccount = { ...oldAccount, accessToken: 'synthetic-fresh', refreshToken: 'synthetic-rotated', expiresAt: Date.now() + 3600000 };
+const freshAccount = { ...oldAccount, accessToken: accountToken('synthetic-fresh', 'b'), refreshToken: 'synthetic-rotated', expiresAt: Date.now() + 3600000 };
 
 async function fixture(account: boolean | 'environment' | 'scope' | 'main' | 'main-environment' | 'main-scope' = false) {
   const setup = createAdvisorHarness(false, false);
@@ -43,28 +44,33 @@ async function fixture(account: boolean | 'environment' | 'scope' | 'main' | 'ma
   const server = http.createServer(async (request, response) => {
     const chunks: Buffer[] = []; for await (const chunk of request) chunks.push(Buffer.from(chunk));
     const body = JSON.parse(Buffer.concat(chunks).toString());
-    requests.push({ path: request.url!, credential: request.headers.authorization, model: body.model, effort: body.reasoning_effort, tools: body.tools, messages: body.messages });
+    requests.push({ path: request.url!, credential: request.headers.authorization, model: body.model, effort: body.reasoning?.effort ?? body.reasoning_effort, tools: body.tools, messages: body.input ?? body.messages });
     if (body.model === mainModel) callbacks.main?.();
+    if (body.stream === true && Array.isArray(body.input)) {
+      expect(body).not.toHaveProperty('max_output_tokens');
+      response.writeHead(200, { 'content-type': 'text/event-stream' }); response.end(accountCompletion('Advisor fixture answer')); return;
+    }
     response.writeHead(200, { 'content-type': 'application/json' });
     response.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'Advisor fixture answer' }, finish_reason: 'stop' }],
       usage: { prompt_tokens: 4, completion_tokens: 1, total_tokens: 5 } }));
   });
   servers.push(server); await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const address = server.address(); if (!address || typeof address === 'string') throw new Error('Missing fixture port');
+  if (account) accountWire(`http://127.0.0.1:${address.port}`, `/${mainOwner ? 'a' : 'b'}/v1/codex/responses`);
   const advisorModel = account && !mainOwner ? 'gpt-5.4' : 'namespace/advisor';
   const environment = account === 'environment' || account === 'main-environment';
   if (environment) { vi.stubEnv('DELEGATED_TEST_ACCESS', oldAccount.accessToken); vi.stubEnv('DELEGATED_TEST_REFRESH', oldAccount.refreshToken); }
   const storedAccount = environment ? { ...oldAccount, accessToken: '${DELEGATED_TEST_ACCESS}', refreshToken: '${DELEGATED_TEST_REFRESH}' } : oldAccount;
-  writeUserRuntimeConfigFile({ provider: 'openai', activeProviderConnectionId: 'a', maxOutputTokens: 10, reserveTokens: 100,
-    ...(account === 'scope' || account === 'main-scope' ? { pathRules: [{ path: setup.root, settings: { maxOutputTokens: 10 } }] } : {}),
+  writeUserRuntimeConfigFile({ provider: 'openai', activeProviderConnectionId: 'a', ...(account ? {} : { maxOutputTokens: 10 }), reserveTokens: 100,
+    ...(account === 'scope' || account === 'main-scope' ? { pathRules: [{ path: setup.root, settings: { reserveTokens: 100 } }] } : {}),
     retryEnabled: false, retryMaxRetries: 0, providerRetryMaxRetries: 0, cacheWarming: 'off',
     providerConnections: ['a', 'b'].map(id => ({ id, provider: 'openai', model: id === 'b' ? advisorModel : mainModel,
       ...(account && id === (mainOwner ? 'a' : 'b') ? { authType: 'account-auth' as const, accountAuth: { openai: storedAccount } }
         : { authType: 'api-key' as const, apiKey: `synthetic-${id}` }),
-      baseUrl: `http://127.0.0.1:${address.port}/${id}/v1`, status: 'connected', createdAt: '2026-01-01', updatedAt: '2026-01-01' })) },
+      baseUrl: account && id === (mainOwner ? 'a' : 'b') ? 'https://chatgpt.com/backend-api' : `http://127.0.0.1:${address.port}/${id}/v1`, status: 'connected', createdAt: '2026-01-01', updatedAt: '2026-01-01' })) },
   readRuntimeConfigEditAt(getUserRuntimeConfigPath()));
-  writeCatalogCache([{ id: 'openai', models: [{ id: mainModel, reasoning: true, contextWindow: 32000, maxTokens: 10 },
-    { id: advisorModel, reasoning: true, contextWindow: 32000, maxTokens: 10 }] }]);
+  writeCatalogCache([{ id: 'openai', models: [{ id: mainModel, reasoning: true, contextWindow: 32000, maxTokens: account ? 8192 : 10 },
+    { id: advisorModel, reasoning: true, contextWindow: 32000, maxTokens: account ? 8192 : 10 }] }]);
   const command = { cwd: setup.root, projectRoot: setup.root, sessionId: setup.session.id };
   expect((await runModelPresetCommand(['save', 'work', '--profile', `default=a/${mainModel}@low`, `advisor=b/${advisorModel}@high`], command)).output).toContain('saved');
   expect((await runModelPresetCommand(['apply', 'work', '--all'], command)).output).toContain('all roles applied');
@@ -213,7 +219,7 @@ it.each(['main', 'main-environment', 'main-scope'] as const)('keeps the current 
   await invoke(setup);
   expect(renew.mock.calls.filter(([input]) => input.credential.accountAuth)).toHaveLength(1);
   expect(setup.requests.map(row => row.model)).toEqual(['gpt-5.4', 'namespace/advisor']);
-  expect(setup.requests[0]).toMatchObject({ credential: 'Bearer synthetic-fresh', effort: 'low' });
+  expect(setup.requests[0]).toMatchObject({ credential: `Bearer ${freshAccount.accessToken}`, effort: 'low' });
   expect(setup.requests[1]).toMatchObject({ credential: 'Bearer synthetic-b', effort: 'high', tools: undefined });
   expect(setup.advisor.view().notes).toHaveLength(1);
   const note = setup.advisor.view().notes[0]!;
@@ -246,7 +252,7 @@ it.each(['settings', 'catalog', 'model', 'main-request'] as const)('does not acc
 it('uses the newly persisted main token for an advisor sharing the same account without a second exchange', async () => {
   const setup = await fixture('main'); setup.advisor.setEnabled(true);
   writeCatalogCache(loadCatalog().map(provider => ({ ...provider,
-    models: [...provider.models, { id: 'gpt-5.3-codex', reasoning: true, contextWindow: 32000, maxTokens: 10 }] })));
+    models: [...provider.models, { id: 'gpt-5.3-codex', reasoning: true, contextWindow: 32000, maxTokens: 8192 }] })));
   refreshConfiguration(setup.context);
   await runAdvisorCommand(['configure', 'a/gpt-5.3-codex'], setup.command, setup.advisor, false);
   await runAdvisorCommand(['on'], setup.command, setup.advisor, false);
@@ -254,8 +260,8 @@ it('uses the newly persisted main token for an advisor sharing the same account 
   await invoke(setup);
   expect(renew).toHaveBeenCalledOnce();
   expect(setup.requests.map(row => [row.path, row.credential, row.model])).toEqual([
-    ['/a/v1/chat/completions', 'Bearer synthetic-fresh', 'gpt-5.4'],
-    ['/a/v1/chat/completions', 'Bearer synthetic-fresh', 'gpt-5.3-codex'],
+    ['/a/v1/codex/responses', `Bearer ${freshAccount.accessToken}`, 'gpt-5.4'],
+    ['/a/v1/codex/responses', `Bearer ${freshAccount.accessToken}`, 'gpt-5.3-codex'],
   ]);
   expect(setup.advisor.view().notes).toHaveLength(1);
 });
@@ -276,7 +282,7 @@ it.each(['missing-receipt', 'missing-retained', 'publication-declined', 'decline
   }
   await invoke(setup);
   expect(setup.requests.map(row => row.model)).toEqual(['gpt-5.4']);
-  expect(setup.requests[0]).toMatchObject({ credential: 'Bearer synthetic-fresh' });
+  expect(setup.requests[0]).toMatchObject({ credential: `Bearer ${freshAccount.accessToken}` });
   expect(setup.advisor.view().notes).toHaveLength(0);
   expect(setup.reports.join('\n')).toContain('checkpoint skipped');
 });
@@ -291,7 +297,7 @@ it('continues the main request when the checkpoint model reader fails just after
   await invoke(setup);
   expect(published).toHaveBeenCalledOnce();
   expect(setup.requests.map(row => row.model)).toEqual(['gpt-5.4']);
-  expect(setup.requests[0]).toMatchObject({ credential: 'Bearer synthetic-fresh' });
+  expect(setup.requests[0]).toMatchObject({ credential: `Bearer ${freshAccount.accessToken}` });
   expect(setup.advisor.view().notes).toHaveLength(0);
   expect(setup.reports.join('\n')).toContain('checkpoint skipped');
 });
@@ -307,7 +313,7 @@ it.each([true, 'environment', 'scope'] as const)('prepares an expired independen
   await invoke(setup);
   expect(renew.mock.calls.filter(([input]) => input.credential.accountAuth)).toHaveLength(1);
   expect(setup.requests.map(row => row.model)).toEqual(['main', 'main', 'main', 'gpt-5.4']);
-  expect(setup.requests.at(-1)).toMatchObject({ credential: 'Bearer synthetic-fresh', effort: 'high' });
+  expect(setup.requests.at(-1)).toMatchObject({ credential: `Bearer ${freshAccount.accessToken}`, effort: 'high' });
   expect(getRuntimeConfig(setup.root).providerConnections.find(row => row.id === 'b')?.accountAuth?.openai).toMatchObject({ ...freshAccount, expiresAt: expect.any(Number) });
   expect(setup.advisor.view().status).toBe('reviewed');
   const note = setup.advisor.view().notes[0]!;
