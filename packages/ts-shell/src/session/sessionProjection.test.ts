@@ -15,7 +15,9 @@ import {
   createLifecycleTranscriptEvent,
   createMessageTranscriptEvent,
   createQueryTranscriptEvent,
+  classifyTranscriptLine,
   decodeTranscriptLine,
+  decodeTranscriptLineSafe,
   encodeTranscriptEvent,
   transcriptEventToSessionMessage,
 } from "./sessionEventCodec.js";
@@ -83,20 +85,39 @@ describe("session substrate projections", () => {
     });
   });
 
-  it("keeps unknown or legacy transcript lines parse-compatible", () => {
-    expect(
-      decodeTranscriptLine(
-        JSON.stringify({
-          type: "legacy-event",
-          payload: { preserved: true },
-          timestamp: "2026-05-19T00:00:00.000Z",
-        }),
-      ),
-    ).toEqual({
+  it("rejects unknown transcript types through both decoder paths", () => {
+    const line = JSON.stringify({
       type: "legacy-event",
       payload: { preserved: true },
       timestamp: "2026-05-19T00:00:00.000Z",
     });
+    expect(() => decodeTranscriptLine(line)).toThrow("Transcript entry is unreadable.");
+    expect(decodeTranscriptLineSafe(line, 3)).toBeUndefined();
+    expect(classifyTranscriptLine(line)).toEqual({ kind: "unreadable" });
+  });
+
+  it("reads recognized legacy messages without rewriting their entry ids", () => {
+    const legacy = {
+      type: "message",
+      role: "user",
+      content: "resume this",
+      timestamp: "2026-05-19T00:00:00.000Z",
+    };
+    const line = JSON.stringify(legacy);
+    expect(decodeTranscriptLine(line)).toEqual(legacy);
+    expect(decodeTranscriptLineSafe(line)).toEqual(legacy);
+    expect(decodeTranscriptLineSafe(line, 3)).toEqual({ ...legacy, id: "line-3" });
+  });
+
+  it("rejects recognized events with malformed replay containers", () => {
+    const line = JSON.stringify({
+      type: "query-event",
+      event: { type: "turn.completed", output: null },
+      timestamp: "2026-05-19T00:00:00.000Z",
+    });
+    expect(() => decodeTranscriptLine(line)).toThrow("Transcript entry is unreadable.");
+    expect(decodeTranscriptLineSafe(line, 4)).toBeUndefined();
+    expect(classifyTranscriptLine(line)).toEqual({ kind: "unreadable" });
   });
 
   it("projects session reentry summaries and preserves scoring semantics", () => {

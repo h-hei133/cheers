@@ -59,6 +59,8 @@ PRV-03/05 池限制与退避返工本地验收：最终受影响 23 文件/439 �
 
 可用性/CTX-03 本地返工验收：最终受影响51文件/520项、双构建、9编译HTTP/restart场景、Linux四格PTY、14摘要及9可用性有效反转、脚本59项和五项静态门禁均通过。类型反向环已按owner contract修复，独立delta确认接口与运行emit一致。可用性综合APPROVED/CLEAR；CTX code APPROVE/architecture WATCH，按规则综合COMMENT，容量8192与锁内同步I/O取舍见compaction-operations。产品/测试manifest和当前构建绑定已读回；提交/推送/精确SHA CI按日志后续记录，不宣称整个W3或Phase20完成。
 
+可用性/CTX-03 批 `da01dd609797100d6077c15331b86c500452986b` 已推送，Architecture Watch success；CI `39154482779` completed/failure，唯一旧未知 transcript 类型期待失败、8925项通过、3跳过。当前测试保留未知拒绝并补已知legacy兼容和malformed拒绝；root29项、独立36项、两项实际反转失败及独立APPROVE/CLEAR已有证据。仅测试/文档修正，提交及新SHA CI按日志后续记录。PRV-03 endpoint/账号受众、subscription consumer与CTX-01/02/04、TOOL-01及其余任务仍开放。
+
 ## 历史实现与交付记录（不代表本次复核通过）
 
 | 任务 | 提交 | 证据 |
