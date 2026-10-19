@@ -73,6 +73,10 @@ decoder 批已推送为 `e6311a1415b0fa1cc3ee9c090edad99b84065b17`，实际读�
 
 交付前已因最后测试断言刷新双构建，TS manifest `37313fcfbdfc`、源码摘要fresh匹配；刷新产物四格TLS PTY和编译模块原生grant/身份/SSE/redirect探针均通过。EOF空行修正后TS manifest `590a46e60240`再次fresh，2013非测试emit与exe均未变化；前述PTY/编译探针发生在修正前，产品编译字节一致。两路最终独立评审均重新精确绑定59文件manifest `471a047b…ac39a650`，综合APPROVE限本批。当前本地提交待修订，尚未推送与新SHA CI。
 
+原生账户批 `09e141c8ea7a885693cff221db7bb23cfd4dc632` 已推送，Architecture Watch `39273753281` success；CI `39273753508`/job `118132587473` 于 `2026-10-19T15:14:05Z` completed/failure，9019通过、30失败、3跳过。失败均为usage/reset旧夹具绑定外站，被新issuer规则拒绝；当前仅修账户夹具并保留API-key外站、增加账户外站零HTTP回归，最终本地/独立评审及新SHA交付以日志后续证据为准。整个Phase20继续active。
+
+usage夹具最终1文件/32项通过，独立code实际另跑相同32项并APPROVE，architecture原始字节验证CLEAR；重叠不累加。测试SHA256 `336f85e0…71afe920`，两路报告已独立保存。仅usage测试/两份文档单独交付，Google批仍未提交；新SHA CI尚待实际读取。
+
 ## 历史实现与交付记录（不代表本次复核通过）
 
 | 任务 | 提交 | 证据 |

@@ -18,7 +18,7 @@ const accountKey = hashContent(`openai\0${accountId}`);
 const credit = { id: 'credit-first', status: 'available', reset_type: 'codex_rate_limits', expires_at: '2030-01-01T00:00:00.000Z' };
 function writeConfig(change: Partial<RuntimeConfigFile> = {}) {
   fs.writeFileSync(configPath, JSON.stringify({ provider: 'openai', activeProviderConnectionId: 'selected', providerConnections: [{ id: 'selected', provider: 'openai',
-    authType: 'account-auth', baseUrl: 'https://endpoint.example.invalid/v1', status: 'connected', createdAt: '2026-01-01', updatedAt: '2026-01-01',
+    authType: 'account-auth', baseUrl: 'https://chatgpt.com/backend-api', status: 'connected', createdAt: '2026-01-01', updatedAt: '2026-01-01',
     accountAuth: { openai: { type: 'openai-chatgpt-account', accessToken: 'SYNTHETIC_ACCOUNT_TOKEN', refreshToken: 'SYNTHETIC_REFRESH_TOKEN', accountId, expiresAt: Date.now() + 3600000 } } }], ...change }));
 }
 function harness(options: { decision?: 'allow-once' | 'allow-always' | 'deny'; mode?: 'plan' | 'build'; denied?: boolean; deniedTool?: string; onGate?: () => void; onApproval?: () => void; onEmit?: ToolGateOptions['emit']; missingApproval?: boolean } = {}) {
@@ -66,6 +66,16 @@ beforeEach(() => {
   vi.stubEnv('HOME', home); vi.stubEnv('USERPROFILE', home); vi.stubEnv('OPENAI_API_KEY', ''); vi.stubEnv('GIT_CEILING_DIRECTORIES', scratch); writeConfig();
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); fs.rmSync(scratch, { recursive: true, force: true }); });
+
+it('refuses a configured foreign account address before any usage or reset HTTP', async () => {
+  const value = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  value.providerConnections[0].baseUrl = 'https://endpoint.example.invalid/v1';
+  writeConfig(value); const setup = harness(); const remote = protocol();
+  for (const input of ['/usage account', '/usage reset']) {
+    expect(await setup.run(input)).toMatchObject({ kind: 'local', output: expect.stringContaining('unsupported') });
+  }
+  expect(remote.calls).toEqual([]); expect(setup.approval).not.toHaveBeenCalled();
+});
 
 it('uses the real usage route, shows source/time and explicitly approves the exact earliest credit before one confirmed consume', async () => {
   const setup = harness(); const remote = protocol({ code: 'reset' });

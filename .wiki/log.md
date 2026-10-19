@@ -8007,3 +8007,9 @@ catalog 测试新增 10,000 个历史目录条目：`list` 的第一帧在 `disc
 - 最终独立评审文档精确绑定manifest `996e289a…211a203`：code report SHA256 `21637cde7acdfc2f8df8617d2044fd7753083be5c9e809ce22a64576a99fbcf9`，architecture report SHA256 `b5497f60a71d39fe1bdfcfe2014682af3febc1f86be17dfb886c24a3296105b4`；后者已核对NormProof原始verdict、全部59文件hash和唯一测试差量，CLEAR。此追加写入仍未提交推送；远端结果按后续查询记录。
 
 - 首次staged diff检查发现新policy文件EOF额外空行，命令序列仍创建本地未推送提交，属于执行疏漏。现仅删一个末尾LF，59文件manifest改为 `471a047b35421a78f4696a0edbacdf9f3db3c5be226336c4ce33bc17ac39a650`；两路独立按旧本地HEAD字节核对只有该空白差量，code APPROVE/architecture CLEAR，最终报告SHA分别 `9ea7e535dd0605375329cf3d6d5abc44aed65ba8263c4d981598d202fe890d10` 与 `3db815dab6834c541c56942722c77576b981796fa4c41c8bcc955370721088ae`。TS重建manifest `590a46e60240691a33ca1e691d36ab49879a475c9971ad61ed9e9485c3dbb147`，sourceDigest fresh；2013非测试emit逐文件hash零变化，exe仍 `acb9cb7aff4f6d247899271a88aff0dfa59edb68ac8bb9bd606366519cb3db9f`。前述交付PTY/编译探针是空行修正前运行，修正后的相同编译产品证明保持该验证证据，不重复整套测试。最后staged diff及文档门通过后修订本地提交再推送。
+
+### 原生账户批交付、CI失败分类与夹具修正
+
+- 原生账户批已提交并推送为 `09e141c8ea7a885693cff221db7bb23cfd4dc632`，远端main完整SHA已读回。CI `39273753508` / job `118132587473` 于 `2026-10-19T15:14:05Z` completed/failure，884文件通过、1文件失败、1跳过；9019项通过、30失败、3跳过。前13步均success，NormProof主CI步骤skipped；独立Architecture Watch `39273753281` success。旧SHA失败不改写为通过。
+- 30失败均为既有CLI usage/reset夹具将OpenAI账户绑定外站，native issuer校验现正确拒绝，该suite未进上一受影响集合。修正账户夹具为固定issuer，API-key外站拒绝用例保留，并新增账户外站usage/reset零HTTP/零批准断言；原31项已通过，最终32项及独立评审证据按后续运行记录。这是test/harness随合同调整，不放宽产品issuer规则。完整authoritative JSON及原始失败日志在 `native.ci-39273753508.*`。
+- 最终本地 `native.usage-final.log` 为1文件/32项通过；独立code lane另跑相同32项通过（重叠不相加），APPROVE；architecture精确原始字节重建确认只有夹具及新增拒绝测试，CLEAR。测试SHA256 `336f85e0bd5ca511b4dccf1905cfb5d7623b2e241cf161cfd52f1a3e71afe920`，两份独立报告分别 `ac2bafad4f40679869fdd699dc91f4c65c9bb7ac4372ee8a8616880cf78409d4`、`5128ae6c23d2133c12e72e84fa0d90228f02f34e35373c0eae625b1088f7baff`。原委派503 lane未计为批准；本修正仅交付usage测试和两份状态文档，Google改动留在工作区。提交/推送及新SHA CI继续以实际查询记录。
