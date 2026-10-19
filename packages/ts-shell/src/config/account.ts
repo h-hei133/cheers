@@ -17,6 +17,12 @@ export interface GoogleAccountAuthConfig {
   readonly expiresAt: number;
   readonly clientId: string;
   readonly accountEmail?: string;
+  /** The own desktop client's secret, when its token endpoint requires one. */
+  readonly clientSecret?: string;
+  /** Scopes actually granted by the successful native OAuth exchange. */
+  readonly scopes?: readonly string[];
+  /** Billing project captured at login, never borrowed from another request. */
+  readonly quotaProject?: string;
 }
 
 /**
@@ -108,6 +114,10 @@ export function normalizeProviderAccountAuth(
     const expiresAt = Number(google.expiresAt);
     const clientId = google.clientId?.trim();
     const accountEmail = google.accountEmail?.trim();
+    const clientSecret = google.clientSecret?.trim();
+    const quotaProject = google.quotaProject?.trim();
+    const scopes = Array.isArray(google.scopes) && google.scopes.every(scope => typeof scope === 'string' && scope.trim())
+      ? [...new Set(google.scopes.map(scope => scope.trim()))].sort() : undefined;
     if (
       !accessToken ||
       !refreshToken ||
@@ -126,6 +136,9 @@ export function normalizeProviderAccountAuth(
         expiresAt,
         clientId,
         ...(accountEmail ? { accountEmail } : {}),
+        ...(clientSecret ? { clientSecret } : {}),
+        ...(quotaProject ? { quotaProject } : {}),
+        ...(scopes ? { scopes } : {}),
       },
     };
   }

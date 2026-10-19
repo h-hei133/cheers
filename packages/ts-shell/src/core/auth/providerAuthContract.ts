@@ -28,6 +28,9 @@ export interface ProviderAccountAuthResult {
   readonly accountId?: string;
   readonly accountEmail?: string;
   readonly clientId?: string;
+  readonly clientSecret?: string;
+  readonly scopes?: readonly string[];
+  readonly quotaProject?: string;
   readonly authorizeUrl: string;
   readonly callbackUrl: string;
   readonly production?: object;
@@ -93,6 +96,9 @@ export function toGoogleAccountAuthConfig(
     refreshToken: result.refreshToken,
     expiresAt: result.expiresAt,
     clientId: result.clientId ?? "",
+    ...(result.clientSecret ? { clientSecret: result.clientSecret } : {}),
+    ...(result.scopes ? { scopes: result.scopes } : {}),
+    ...(result.quotaProject ? { quotaProject: result.quotaProject } : {}),
     ...(result.accountEmail ? { accountEmail: result.accountEmail } : {}),
   };
 }

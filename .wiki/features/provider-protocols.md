@@ -2,9 +2,9 @@
 title: "原生请求协议与回放"
 category: article
 created: 2026-10-19
-updated: 2026-10-19
+updated: 2026-10-20
 tags: [provider, protocol, replay]
-summary: "现有端点注册表中的 Responses 请求、终态、工具与加密回放合同；公开 API 与账户服务能力分别验证。"
+summary: "现有端点注册表中的 Responses 和 Gemini 请求、终态、工具与签名回放合同；公开 API 与账户服务能力分别验证。"
 ---
 
 # 原生请求协议与回放
@@ -25,4 +25,12 @@ OpenAI 账户的 issuer 固定选择 `https://chatgpt.com/backend-api/codex/resp
 
 账户 decoder 额外接纳 `response.done`；终态缺 output 时只从连续且封口的 `output_item.done` 重建。缺 wire model 使用账户专属 opaque schema，并继续由已捕获的请求 provider/model/binding 校验。created model 若存在则保持并校验，终态不能改名。截断、失败、身份矛盾、稀疏/未封口 output 和非法工具参数不产生执行权限。
 
-新登录保存独立 `loginId`，续期保留它；它本身不是证明。回放 owner 读取现有 lease store，要求 login/rotation grant 的 owner、generation、storage 精确匹配且未准备/派发/未知/消费。恢复已消费前代、原始替换 token/expiry/loginId、复制槽位/账本或替换 profile 目录均不能保留 stable binding。旧配置无原生 grant 时仍使用保守代次 binding。合成 HTTP/TLS、独立进程与 PTY 验证覆盖此合同，不能证明真实账户 entitlement 或远端兼容性；Google scope/原生协议和 subscription 身份/续期继续开放。
+新登录保存独立 `loginId`，续期保留它；它本身不是证明。回放 owner 读取现有 lease store，要求 login/rotation grant 的 owner、generation、storage 精确匹配且未准备/派发/未知/消费。恢复已消费前代、原始替换 token/expiry/loginId、复制槽位/账本或替换 profile 目录均不能保留 stable binding。旧配置无原生 grant 时仍使用保守代次 binding。合成 HTTP/TLS、独立进程与 PTY 验证覆盖此合同，不能证明真实账户 entitlement 或远端兼容性；subscription 身份/续期继续开放。
+
+Google 自有 Desktop OAuth 使用公开 Gemini API：issuer 固定 `https://generativelanguage.googleapis.com`，账户 endpoint 为 `google-account-generative-ai`，复用现有 `google-generative-ai` codec。生成分别使用 `:generateContent` JSON 与 `:streamGenerateContent?alt=sse`；models 使用 `/v1beta/models`。Bearer 与登录捕获的 `x-goog-user-project` 同时发送，不借用 API key、ADC 或另一个项目；OAuth、生成和账户 models 都拒绝重定向。旧 compatibility 地址或未知 scope/project 在 HTTP 前拒绝。官方 [OAuth quickstart](https://ai.google.dev/gemini-api/docs/oauth) 允许 cloud-platform；它不证明托管订阅 entitlement。
+
+登录保存实际 granted scopes、可选自有 client secret 和 quota project，proof 同时绑定这些字段与 issuer/client/token。省略响应 scope 继承请求集；续期使用捕获的 secret/scope，不读取后来的环境值。任何规范化 grant 集变化在派发后保留 unknown，零保存/发布/自动重播。既有原生 grant、跨进程 lease 和 `AccountEdit` CAS 保留；项目、secret、scope 或槽位并发修改不能被旧响应覆盖。
+
+共享 Gemini codec 保存有序签名 parts 到既有版本化 opaque signature，并沿 transcript/resume 保留。签名可位于 thought、text、functionCall 或签名单独 part；流内同一文字块增量合并，签名保留原关联，不拼接不同签名。回放校验 provider/model、捕获地址/凭据/项目 binding，以及当前文字、reasoning 和有序调用参数；身份或消息变化则不转发旧签名。缺原生 call id 时内部匹配 id 不写成外来 functionResponse id，后来 fallback 调用复用 id 时重新建立其映射。Google 续期代次变化后保守丢弃旧 opaque 材料，未承诺跨续期连续性。
+
+明确 STOP 且完整合法输出才产生工具或 opaque 回放。error、refusal、length、畸形帧/参数、冲突终态和终态后新增内容均不能取得工具权限；usage-only 尾帧保持计量。opaque 捕获限制 4096 parts / 1 MiB，未知输出形状保守拒绝。合成四格 TLS PTY、实际编译模块及反转验证覆盖这些合同；真实服务兼容性与 entitlement 仍属于原先推迟的真实模型验收。

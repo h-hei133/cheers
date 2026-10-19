@@ -112,7 +112,7 @@ describe("CLI runtime invocation", () => {
       vi.stubEnv('OPENAI_API_KEY', ''); vi.stubEnv('GOOGLE_API_KEY', '');
       const account = { type: provider === 'openai' ? 'openai-chatgpt-account' : 'google-gemini-account',
         accessToken: 'synthetic-access', refreshToken: 'synthetic-refresh', expiresAt: Date.now() + 3_600_000,
-        ...(provider === 'google' ? { clientId: 'synthetic-client' } : {}) };
+        ...(provider === 'google' ? { clientId: 'synthetic-client', scopes: ['https://www.googleapis.com/auth/cloud-platform'], quotaProject: 'synthetic-project' } : {}) };
       const configPath = getUserRuntimeConfigPath();
       fs.mkdirSync(path.dirname(configPath), { recursive: true });
       fs.writeFileSync(configPath, JSON.stringify({ provider,

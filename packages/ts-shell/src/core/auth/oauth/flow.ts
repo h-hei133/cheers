@@ -34,6 +34,8 @@ export interface OAuthProviderConfig {
   readonly authorizeParams?: Readonly<Record<string, string>>;
   /** Client secret, for the providers that still demand one from a public client. */
   readonly clientSecret?: string;
+  /** Billing project captured by an own-client Google login. */
+  readonly quotaProject?: string;
   /** Whether a mismatched callback state is fatal; a few servers omit it entirely. */
   readonly requireState?: boolean;
 }
@@ -46,11 +48,14 @@ export interface OAuthTokens {
   /** The identity the token is scoped to, when the provider says. */
   readonly accountId?: string;
   readonly accountEmail?: string;
+  readonly scopes?: readonly string[];
+  readonly clientSecret?: string;
+  readonly quotaProject?: string;
   /** In-memory native login capability, never credential storage. */
   readonly production?: object;
 }
 
-const loginProductions = new WeakMap<object, { readonly issuer: string; readonly client: string; readonly provider: string; readonly digest: string }>();
+const loginProductions = new WeakMap<object, { readonly issuer: string; readonly client: string; readonly provider: string; readonly digest: string; readonly binding: string }>();
 
 export class OAuthExchangeError extends Error {
   constructor(readonly code: 'http' | 'transport' | 'cancelled' | 'decode' | 'response' | 'access' | 'metadata' | 'expiry',
@@ -64,14 +69,18 @@ export class OAuthExchangeError extends Error {
 
 function loginDigest(tokens: OAuthTokens, provider: string): string {
   return createHash('sha256').update(JSON.stringify([tokens.accessToken, tokens.refreshToken, tokens.expiresAt,
-    provider === 'openai' ? tokens.accountId ?? '' : tokens.accountEmail ?? ''])).digest('hex');
+    provider === 'openai' ? tokens.accountId ?? '' : tokens.accountEmail ?? '', provider === 'google' ? tokens.scopes : undefined, provider === 'google' ? [tokens.clientSecret ?? '', tokens.quotaProject ?? ''] : []])).digest('hex');
+}
+
+function loginConfigBinding(config: OAuthProviderConfig): string {
+  return createHash('sha256').update(JSON.stringify(config.id === 'google' ? [config.clientSecret ?? '', config.quotaProject ?? ''] : [])).digest('hex');
 }
 
 /** Raw payloads and proofs from another issuer/client or credential cannot authorize enrollment. */
 export function nativeOAuthLogin(tokens: OAuthTokens, config: OAuthProviderConfig): boolean {
   const proof = tokens.production && loginProductions.get(tokens.production);
   return !!proof && proof.issuer === config.tokenUrl && proof.client === config.clientId && proof.provider === config.id
-    && proof.digest === loginDigest(tokens, config.id);
+    && proof.binding === loginConfigBinding(config) && proof.digest === loginDigest(tokens, config.id);
 }
 
 export interface OAuthLoginResult extends OAuthTokens {
@@ -168,6 +177,7 @@ export async function refreshOAuthTokens(
     refreshToken: payload.refresh_token ?? refreshToken,
     expiresAt: expiryOf(payload),
     ...identity(payload, config.id),
+    scopes: grantedScopes(payload, config),
   };
 }
 
@@ -181,6 +191,7 @@ interface TokenPayload {
   readonly refresh_token?: string;
   readonly id_token?: string;
   readonly expires_in?: number;
+  readonly scope?: string;
 }
 
 /** The authorize URL, with the provider's own required parameters folded in. */
@@ -225,10 +236,12 @@ async function exchangeCode(
     refreshToken: payload.refresh_token ?? "",
     expiresAt: expiryOf(payload),
     ...identity(payload, config.id),
+    scopes: grantedScopes(payload, config),
   };
+  if (config.id === 'google') Object.assign(tokens, { ...(config.clientSecret ? { clientSecret: config.clientSecret } : {}), ...(config.quotaProject ? { quotaProject: config.quotaProject } : {}) });
   if (config.id === 'openai' && !tokens.accountId) throw new OAuthExchangeError('metadata', config.label, 'token exchange');
   const production = Object.freeze({});
-  loginProductions.set(production, { issuer: config.tokenUrl, client: config.clientId, provider: config.id, digest: loginDigest(tokens, config.id) });
+  loginProductions.set(production, { issuer: config.tokenUrl, client: config.clientId, provider: config.id, digest: loginDigest(tokens, config.id), binding: loginConfigBinding(config) });
   return { ...tokens, production };
 }
 
@@ -267,10 +280,16 @@ async function post(
   }
   if ((payload.refresh_token !== undefined && typeof payload.refresh_token !== 'string')
     || (payload.id_token !== undefined && typeof payload.id_token !== 'string')
+    || (payload.scope !== undefined && typeof payload.scope !== 'string')
     || (payload.expires_in !== undefined && (typeof payload.expires_in !== 'number' || !Number.isFinite(payload.expires_in) || payload.expires_in < 0))) {
     throw new OAuthExchangeError('metadata', config.label, step);
   }
   return payload as TokenPayload;
+}
+
+/** OAuth omission means the requested scope; an explicit reduced grant stays reduced. */
+function grantedScopes(payload: TokenPayload, config: OAuthProviderConfig): readonly string[] {
+  return [...new Set((payload.scope ?? config.scope).split(/\s+/).filter(Boolean))].sort();
 }
 
 /** When the access token stops working, in epoch milliseconds. */

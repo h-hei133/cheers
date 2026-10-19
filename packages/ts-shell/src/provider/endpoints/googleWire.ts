@@ -19,27 +19,10 @@
 
 import { formatNonVisionFallback, messageToText, type MultimodalContentBlock } from "../../model-adapters/multimodal.js";
 import type { CompletedBody, StreamFragment, StreamedCompletion } from "../../turn/completion.js";
-
-/** A part of a message. The wire treats the field names as the discriminator. */
-export interface GooglePart {
-  readonly text?: string;
-  readonly inlineData?: { readonly mimeType: string; readonly data: string };
-  readonly thought?: boolean;
-  readonly thoughtSignature?: string;
-  readonly functionCall?: { readonly name?: string; readonly args?: Record<string, unknown>; readonly id?: string };
-  readonly functionResponse?: {
-    readonly name: string;
-    readonly parts?: readonly GooglePart[];
-    readonly response: Record<string, unknown>;
-    readonly id?: string;
-  };
-}
-
-/** One conversation turn. The role is `user` or `model`. */
-export interface GoogleContent {
-  readonly role?: string;
-  readonly parts: readonly GooglePart[];
-}
+import { validGoogleFrame } from './google/frame.js';
+import type { GooglePart, GoogleContent, GoogleMessage } from './google/model.js';
+import { appendGoogleOutput, createGoogleOutput, googleOutput, googleProjection, googleSignature, replayGoogle, legacyGoogleSignature } from './google/replay.js';
+export type { GooglePart, GoogleContent, GoogleMessage } from './google/model.js';
 
 /** The request, as both endpoints spell it. */
 export interface GoogleRequestBody {
@@ -48,20 +31,6 @@ export interface GoogleRequestBody {
   readonly generationConfig?: Record<string, unknown>;
   readonly tools?: readonly { readonly functionDeclarations: readonly Record<string, unknown>[] }[];
   readonly toolConfig?: { readonly functionCallingConfig: { readonly mode: string } };
-}
-
-/** What a message carries, in the terms this file needs. */
-export interface GoogleMessage {
-  readonly role: "system" | "user" | "assistant" | "tool";
-  readonly content?: string | readonly MultimodalContentBlock[] | null;
-  readonly tool_calls?: readonly {
-    readonly id: string;
-    readonly function: { readonly name: string; readonly arguments: string };
-  }[];
-  readonly tool_call_id?: string;
-  /** The name of the tool a result belongs to; the protocol matches on it. */
-  readonly toolName?: string;
-  readonly reasoning?: { readonly text: string; readonly signature?: string; readonly redacted?: boolean };
 }
 
 /** The text of a message whose content may be absent. */
@@ -99,9 +68,10 @@ export function parseArguments(arguments_: string): Record<string, unknown> {
  * tidy-up: the API rejects a request whose count of response parts does not match
  * its count of call parts, and one result per turn is how that happens.
  */
-export function convertContents(messages: readonly GoogleMessage[], model = "", vision = false): GoogleContent[] {
+export function convertContents(messages: readonly GoogleMessage[], model = "", vision = false, provider?: string, binding?: string): GoogleContent[] {
   const contents: GoogleContent[] = [];
   const toolCallNames = new Map<string, string>();
+  const nativeCallIds = new Map<string, string | undefined>();
   const nestedImages = Number(/(?:^|\/)gemini-(\d+)(?:[.-]|$)/i.exec(model)?.[1] ?? 0) >= 3;
   let pendingImages: GooglePart[] = [];
   const flushImages = (): void => {
@@ -129,7 +99,8 @@ export function convertContents(messages: readonly GoogleMessage[], model = "", 
           name: resolvedName,
           response: { output: output || (images.length > 0 ? "(see attached image)" : "") },
           ...(nestedImages && images.length > 0 ? { parts: images } : {}),
-          ...(message.tool_call_id ? { id: message.tool_call_id } : {}),
+          ...(message.tool_call_id && (!nativeCallIds.has(message.tool_call_id) || nativeCallIds.get(message.tool_call_id))
+            ? { id: nativeCallIds.get(message.tool_call_id) ?? message.tool_call_id } : {}),
         },
       };
       const previous = contents[contents.length - 1];
@@ -149,6 +120,15 @@ export function convertContents(messages: readonly GoogleMessage[], model = "", 
       continue;
     }
 
+    const native = replayGoogle(message, provider, model, binding);
+    if (native) {
+      for (const call of message.tool_calls ?? []) toolCallNames.set(call.id, call.function.name);
+      let index = 0;
+      for (const part of native) if (part.functionCall) {
+        nativeCallIds.set(message.tool_calls![index++]!.id, part.functionCall.id);
+      }
+      contents.push({ role: 'model', parts: native }); continue;
+    }
     const parts: GooglePart[] = [];
     if (message.reasoning?.text) {
       // The signature goes back with the text it covers, in the same part. A
@@ -157,13 +137,14 @@ export function convertContents(messages: readonly GoogleMessage[], model = "", 
       parts.push({
         text: message.reasoning.text,
         thought: true,
-        ...(message.reasoning.signature ? { thoughtSignature: message.reasoning.signature } : {}),
+        ...(legacyGoogleSignature(message, provider, model, binding) ? { thoughtSignature: message.reasoning.signature } : {}),
       });
     }
     const text = textOf(message.content);
     if (text) parts.push({ text });
     for (const call of message.tool_calls ?? []) {
       toolCallNames.set(call.id, call.function.name);
+      nativeCallIds.delete(call.id);
       parts.push({
         functionCall: {
           name: call.function.name,
@@ -241,46 +222,31 @@ export function mapGoogleFinishReason(reason: string | undefined): string | unde
 }
 
 /** Extract tool calls from parts in the same shape both stream and body readers produce. */
-function toolCallsFromParts(parts: readonly GooglePart[]): Array<{ id: string; name: string; args: string }> {
-  const calls: Array<{ id: string; name: string; args: string }> = [];
-  for (const part of parts) {
-    if (part.functionCall) {
-      calls.push({
-        id: part.functionCall.id ?? `call_${calls.length}`,
-        name: part.functionCall.name ?? "",
-        args: JSON.stringify(part.functionCall.args ?? {}),
-      });
-    }
-  }
-  return calls;
-}
-
 /** The answer out of a non-streamed response. */
 export function readGoogleBody(body: unknown): CompletedBody {
   const candidate = (body as Chunk)?.candidates?.[0];
   const usage = googleUsage((body as Chunk)?.usageMetadata);
-  const parts = candidate?.content?.parts ?? [];
-  const text = parts.map((part) => part.text ?? "").join("");
-  const calls = toolCallsFromParts(parts);
+  const parts = googleOutput(candidate?.content?.parts ?? []);
+  const projected = googleProjection(parts ?? []);
   const finish_reason = mapGoogleFinishReason((body as Chunk)?.promptFeedback?.blockReason ?? candidate?.finishReason);
+  const valid = validGoogleFrame(body) && !!parts;
+  const complete = valid && finish_reason === 'stop';
+  const signature = complete ? googleSignature(parts) : undefined;
   return {
     ...(usage ? { usage } : {}),
+    reasoning: projected.reasoning,
+    ...(signature ? { reasoningSignature: signature } : {}),
     choices: [
       {
         message: {
-          content: text,
-          ...(calls.length > 0
+          content: projected.text,
+          ...(complete && projected.calls.length > 0
             ? {
-                tool_calls: calls.map((call, index) => ({
-                  id: call.id,
-                  type: "function" as const,
-                  function: { name: call.name, arguments: call.args },
-                  index,
-                })),
+                tool_calls: projected.calls,
               }
             : {}),
         },
-        ...(finish_reason ? { finish_reason } : {}),
+        finish_reason: valid ? finish_reason ?? 'error' : 'error',
       },
     ],
   };
@@ -301,11 +267,11 @@ export async function* readGoogleStream(
   let buffer = "";
   let text = "";
   let reasoning = "";
-  let reasoningSignature = "";
+  const output = createGoogleOutput();
+  let malformed = false;
   let finishReason: string | undefined;
   let usage: StreamedCompletion["usage"];
   let blocked: string | undefined;
-  const calls: Array<{ id: string; name: string; args: string }> = [];
   // Async iteration releases the body when the consumer stops after a fragment.
   for await (const chunk of body as unknown as AsyncIterable<Uint8Array>) {
     buffer += decoder.decode(chunk, { stream: true });
@@ -320,11 +286,13 @@ export async function* readGoogleStream(
 
       let parsed: Chunk;
       try {
-        parsed = JSON.parse(payload) as Chunk;
+        const value: unknown = JSON.parse(payload);
+        if (!validGoogleFrame(value)) { malformed = true; continue; }
+        parsed = value as Chunk;
       } catch {
         // A partial or malformed event is skipped rather than failing the stream;
         // the alternative turns one bad frame into no answer at all.
-        continue;
+        malformed = true; continue;
       }
       if (parsed.promptFeedback?.blockReason) {
         blocked = parsed.promptFeedback.blockReasonMessage ?? parsed.promptFeedback.blockReason;
@@ -332,18 +300,20 @@ export async function* readGoogleStream(
       }
 
       const candidate = parsed.candidates?.[0];
-      if (candidate?.finishReason) finishReason = mapGoogleFinishReason(candidate.finishReason);
+      if (finishReason !== undefined && candidate?.content?.parts?.length) { malformed = true; continue; }
+      if (candidate?.finishReason && (finishReason === undefined || finishReason === 'stop')) finishReason = mapGoogleFinishReason(candidate.finishReason);
       if (parsed.usageMetadata) {
         usage = googleUsage(parsed.usageMetadata);
       }
 
-      calls.push(...toolCallsFromParts(candidate?.content?.parts ?? []));
+      const parts = googleOutput(candidate?.content?.parts ?? []);
+      if (!parts) { malformed = true; continue; }
+      if (!appendGoogleOutput(output, parts)) malformed = true;
       for (const part of candidate?.content?.parts ?? []) {
         if (part.functionCall) continue;
         if (!part.text) continue;
         if (part.thought) {
           reasoning += part.text;
-          if (part.thoughtSignature) reasoningSignature += part.thoughtSignature;
           yield { kind: "reasoning", text: part.text };
         } else {
           text += part.text;
@@ -365,24 +335,28 @@ export async function* readGoogleStream(
     const payload = dataOf(buffer);
     if (payload !== undefined) {
       try {
-        const parsed = JSON.parse(payload) as Chunk;
+        const value: unknown = JSON.parse(payload);
+        if (!validGoogleFrame(value)) throw new Error('Malformed Google response frame.');
+        const parsed = value as Chunk;
         if (parsed.promptFeedback?.blockReason) {
           throw new Error(
             `The provider refused the prompt: ${parsed.promptFeedback.blockReasonMessage ?? parsed.promptFeedback.blockReason}`,
           );
         }
         const candidate = parsed.candidates?.[0];
-        if (candidate?.finishReason) finishReason = mapGoogleFinishReason(candidate.finishReason);
+        if (finishReason !== undefined && candidate?.content?.parts?.length) throw new Error('Content arrived after Google completion.');
+        if (candidate?.finishReason && (finishReason === undefined || finishReason === 'stop')) finishReason = mapGoogleFinishReason(candidate.finishReason);
         if (parsed.usageMetadata) {
           usage = googleUsage(parsed.usageMetadata);
         }
-        calls.push(...toolCallsFromParts(candidate?.content?.parts ?? []));
+        const parts = googleOutput(candidate?.content?.parts ?? []);
+        if (!parts) throw new Error('Malformed Google model output.');
+        if (!appendGoogleOutput(output, parts)) malformed = true;
         for (const part of candidate?.content?.parts ?? []) {
           if (part.functionCall) continue;
           if (!part.text) continue;
           if (part.thought) {
             reasoning += part.text;
-            if (part.thoughtSignature) reasoningSignature += part.thoughtSignature;
             yield { kind: "reasoning", text: part.text };
           } else {
             text += part.text;
@@ -391,7 +365,7 @@ export async function* readGoogleStream(
         }
       } catch (error) {
         if (error instanceof Error && error.message.startsWith("The provider refused")) throw error;
-        // A partial or malformed tail is skipped like any other bad frame.
+        malformed = true;
       }
     }
   }
@@ -400,24 +374,23 @@ export async function* readGoogleStream(
     throw new Error("Provider stream ended before it reported the message was complete");
   }
 
+  const valid = googleOutput(output.parts);
+  const complete = !malformed && !!valid && finishReason === 'stop';
+  const projected = googleProjection(output.parts);
+  const reasoningSignature = complete ? googleSignature(output.parts) : undefined;
   return {
     message: {
       role: "assistant",
       content: text,
-      ...(calls.length > 0
+      ...(complete && projected.calls.length > 0
         ? {
-            tool_calls: calls.map((call, index) => ({
-              id: call.id,
-              type: "function" as const,
-              function: { name: call.name, arguments: call.args },
-              index,
-            })),
+            tool_calls: projected.calls,
           }
         : {}),
     },
     reasoning,
     ...(reasoningSignature ? { reasoningSignature } : {}),
-    ...(finishReason ? { finishReason } : {}),
+    finishReason: malformed || !valid ? 'error' : finishReason,
     ...(usage ? { usage } : {}),
   } as StreamedCompletion;
 }
@@ -449,6 +422,8 @@ function dataOf(raw: string): string | undefined {
 /** The request body, shared with the other Google endpoint. */
 export function googleBody(input: {
   readonly model: string;
+  readonly provider?: string;
+  readonly replayBinding?: string;
   readonly vision?: boolean;
   readonly systemPrompt: string;
   readonly messages: readonly Parameters<typeof convertContents>[0][number][];
@@ -463,7 +438,7 @@ export function googleBody(input: {
 }): GoogleRequestBody {
   const tools = input.allowTools ? convertTools(input.tools) : undefined;
   return {
-    contents: convertContents(input.messages, input.model, input.vision ?? false),
+    contents: convertContents(input.messages, input.model, input.vision ?? false, input.provider, input.replayBinding),
     ...(input.systemPrompt.trim() !== ""
       ? { systemInstruction: { parts: [{ text: input.systemPrompt }] } }
       : {}),

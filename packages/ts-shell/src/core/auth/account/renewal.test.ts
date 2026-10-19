@@ -337,7 +337,7 @@ it('rejects a new preferred configuration while renewing a fallback source', asy
 
 it.each(['clientId', 'accountEmail'])('rejects shared Google tokens carrying different %s metadata', async field => {
   const google = { type: 'google-gemini-account' as const, accessToken: 'old', refreshToken: 'refresh', expiresAt: 1,
-    clientId: 'client-a', accountEmail: 'a@example.test' };
+    clientId: 'client-a', accountEmail: 'a@example.test', scopes: ['https://www.googleapis.com/auth/cloud-platform'], quotaProject: 'synthetic-project' };
   write({ provider: 'google', providerCredentials: { google: { accountAuth: { google } } } });
   const renewal = vi.spyOn(authorization, 'renewAccountAuthIfExpiring').mockResolvedValue({ renewed: false,
     accountAuth: { ...google, [field]: 'different', accessToken: 'PRIVATE_FRESH' } });
@@ -389,11 +389,11 @@ it('preserves raw identity references in each selected and mirrored slot during 
 it('preserves Google client and email references during successful rotation', async () => {
   vi.stubEnv('RENEWAL_CLIENT', 'client-a'); vi.stubEnv('RENEWAL_EMAIL', 'a@example.test');
   const google = { type: 'google-gemini-account' as const, accessToken: 'old', refreshToken: 'refresh', expiresAt: 1,
-    clientId: '${RENEWAL_CLIENT}', accountEmail: '${RENEWAL_EMAIL}' };
+    clientId: '${RENEWAL_CLIENT}', accountEmail: '${RENEWAL_EMAIL}', scopes: ['https://www.googleapis.com/auth/cloud-platform'], quotaProject: 'synthetic-project' };
   write({ provider: 'google', providerCredentials: { google: { accountAuth: { google } } } });
   const input = request(); const result = await renewStoredAccount(input);
   expect(input.fetchImpl).toHaveBeenCalledOnce();
-  expect(result).toMatchObject({ stored: true, accountAuth: { accessToken: accountToken('fresh-a', 'a'), clientId: 'client-a', accountEmail: 'a@example.test' } });
+  expect(result).toMatchObject({ stored: true, accountAuth: { accessToken: accountToken('fresh-a', 'a'), clientId: 'client-a', accountEmail: 'a@example.test', scopes: ['https://www.googleapis.com/auth/cloud-platform'], quotaProject: 'synthetic-project' } });
   expect(read().providerCredentials?.google?.accountAuth?.google).toEqual({ ...google,
     accessToken: accountToken('fresh-a', 'a'), refreshToken: 'rotated-a', expiresAt: result.accountAuth!.expiresAt });
 });

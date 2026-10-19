@@ -5,6 +5,7 @@ import {
   type OAuthLoginOptions,
   type OAuthTokens,
 } from "../auth/oauth/flow.js";
+import { assertGoogleAccount } from '../auth/account/google.js';
 import { googleOAuthConfig, resolveGoogleClientId } from "../auth/oauth/providers.js";
 
 /**
@@ -24,26 +25,38 @@ export interface GoogleAccountAuthResult {
   readonly authorizeUrl: string;
   readonly callbackUrl: string;
   readonly production?: object;
+  readonly clientSecret?: string;
+  readonly scopes?: readonly string[];
+  readonly quotaProject?: string;
 }
 
 export interface GoogleAccountAuthOptions extends OAuthLoginOptions {
   /** Desktop OAuth client id; falls back to GOOGLE_OAUTH_CLIENT_ID. */
   readonly clientId?: string;
   readonly clientSecret?: string;
+  readonly quotaProject?: string;
 }
 
 export async function loginGoogleAccountViaAuthorizationCodeFlow(
   options?: GoogleAccountAuthOptions,
 ): Promise<GoogleAccountAuthResult> {
   const clientId = resolveGoogleClientId(options?.clientId);
-  const secret = options?.clientSecret ?? process.env.GOOGLE_OAUTH_CLIENT_SECRET?.trim();
-  const result = await runOAuthLogin(googleOAuthConfig(clientId, secret), options ?? {});
+  const secret = options?.clientSecret?.trim() || process.env.GOOGLE_OAUTH_CLIENT_SECRET?.trim();
+  const quotaProject = options?.quotaProject?.trim() || process.env.GOOGLE_CLOUD_QUOTA_PROJECT?.trim()
+    || process.env.GOOGLE_CLOUD_PROJECT?.trim();
+  const config = { ...googleOAuthConfig(clientId, secret), quotaProject };
+  assertGoogleAccount({ scopes: config.scope.split(/\s+/), quotaProject });
+  const result = await runOAuthLogin(config, options ?? {});
+  assertGoogleAccount({ scopes: result.scopes, quotaProject });
   return {
     accessToken: result.accessToken,
     refreshToken: result.refreshToken,
     expiresAt: result.expiresAt,
     ...(result.accountEmail ? { accountEmail: result.accountEmail } : {}),
     clientId,
+    ...(secret ? { clientSecret: secret } : {}),
+    scopes: result.scopes,
+    quotaProject,
     authorizeUrl: result.authorizeUrl,
     callbackUrl: result.callbackUrl,
     production: result.production,

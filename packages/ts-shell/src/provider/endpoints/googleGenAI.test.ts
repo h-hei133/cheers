@@ -175,18 +175,20 @@ describe("the request body", () => {
     // reasoning, which is why it travels with the text it covers.
     const body = endpointTurnBody("google-generative-ai", {
       ...BASE,
+      provider: 'google', replayBinding: 'a'.repeat(64),
       messages: [
         {
           role: "assistant",
           content: "answer",
-          reasoning: { text: "thought", signature: "SIG" },
+          reasoning: { text: "thought", signature: "U0lH" },
+          origin: { provider: 'google', model: BASE.model, replayBinding: 'a'.repeat(64) },
         },
       ],
     });
 
     const contents = body.contents as ReadonlyArray<{ parts: ReadonlyArray<Record<string, unknown>> }>;
     const thought = contents[0]!.parts.find((part) => part.thought === true);
-    expect(thought).toMatchObject({ text: "thought", thoughtSignature: "SIG" });
+    expect(thought).toMatchObject({ text: "thought", thoughtSignature: "U0lH" });
   });
 });
 
@@ -246,7 +248,8 @@ describe("reading the answer", () => {
 
     expect(result.text).toBe("answer");
     expect(result.reasoning).toBe("why");
-    expect(result.signature).toBe("SIG");
+    expect(JSON.parse(result.signature!)).toMatchObject({ protocol: 'google-generative-ai', version: 1,
+      parts: [{ text: 'why', thought: true, thoughtSignature: 'SIG' }, { text: 'answer' }] });
   });
 
   it("collects a tool call, which arrives whole rather than in pieces", async () => {
@@ -327,7 +330,7 @@ describe("reading the answer", () => {
     expect(step.value.finishReason).toBe("length");
   });
 
-  it("reads non-streamed body preserving functionCall tool calls and finishReason", () => {
+  it("withholds non-streamed functionCall tools from a truncated response while preserving finishReason", () => {
     const shape = endpointShape("google-generative-ai");
     const body = shape.readBody({
       candidates: [
@@ -345,12 +348,7 @@ describe("reading the answer", () => {
 
     expect(body.choices?.[0]?.message?.content).toBe("calling tool");
     expect(body.choices?.[0]?.finish_reason).toBe("length");
-    expect(body.choices?.[0]?.message?.tool_calls).toHaveLength(1);
-    expect(body.choices?.[0]?.message?.tool_calls?.[0]).toMatchObject({
-      id: "call_1",
-      type: "function",
-      function: { name: "bash", arguments: '{"command":"ls"}' },
-    });
+    expect(body.choices?.[0]?.message?.tool_calls).toBeUndefined();
   });
 });
 

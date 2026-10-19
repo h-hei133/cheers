@@ -1,7 +1,12 @@
+import { assertGoogleAccount } from './google.js';
 import type { AccountAuthConfig } from '../../../config/account.js';
 
 /** A login's issuer owns its generation route, independently of model metadata. */
 export function accountProtocol(account: AccountAuthConfig | undefined): { readonly baseUrl: string; readonly endpoint: string } | undefined {
+  if (account?.type === 'google-gemini-account') {
+    assertGoogleAccount(account);
+    return { baseUrl: 'https://generativelanguage.googleapis.com', endpoint: 'google-account-generative-ai' };
+  }
   return account?.type === 'openai-chatgpt-account'
     ? { baseUrl: 'https://chatgpt.com/backend-api', endpoint: 'openai-account-responses' } : undefined;
 }

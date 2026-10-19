@@ -1,3 +1,4 @@
+import { assertGoogleAccount, assertGoogleScopes } from '../../core/auth/account/google.js';
 import type { AccountAuthConfig, RuntimeProvider } from "../../config/runtimeConfig.js";
 import { isExpiring, refreshOAuthTokens, type OAuthProviderConfig } from "../../core/auth/oauth/flow.js";
 import { googleOAuthConfig, openAIOAuthConfig, resolveGoogleClientId } from "../../core/auth/oauth/providers.js";
@@ -82,6 +83,10 @@ export function providerAuthorization(input: {
    */
   readonly endpoint?: EndpointKind;
 }): ProviderAuthorization {
+  if (input.accountAuth?.type === 'google-gemini-account') {
+    assertGoogleAccount(input.accountAuth);
+    if (input.endpoint !== 'google-account-generative-ai') throw new Error('Google account protocol conflicts with the native API login.');
+  }
   // An endpoint whose credential headers are not the default bearer takes the
   // key directly: there is no account flow for it, and sending `Authorization`
   // anyway is a request the host rejects for a reason that looks like a bad key.
@@ -89,7 +94,7 @@ export function providerAuthorization(input: {
   // asks the shape for them rather than composing one here. The comparison is
   // against the declared default rather than a spelled-out name, so the two
   // cannot disagree about which kind that is.
-  if (input.endpoint !== undefined && input.endpoint !== DEFAULT_ENDPOINT_KIND) {
+  if (!input.accountAuth && input.endpoint !== undefined && input.endpoint !== DEFAULT_ENDPOINT_KIND) {
     const shape = endpointShape(input.endpoint);
     // An endpoint whose credential is computed per request declares a signer and
     // needs no key here. Refusing it for the absence of one would make a
@@ -112,6 +117,7 @@ export function providerAuthorization(input: {
       ...(input.endpoint ? endpointShape(input.endpoint).headers() : {}),
       Authorization: `Bearer ${account.accessToken}`,
     };
+    if (account.type === 'google-gemini-account') headers['x-goog-user-project'] = account.quotaProject!;
     // The account-scoped endpoint rejects a token whose account is not named.
     if (account.type === "openai-chatgpt-account" && account.accountId) {
       headers["chatgpt-account-id"] = account.accountId;
@@ -139,7 +145,8 @@ function oauthConfigFor(
   if (provider === "openai") return openAIOAuthConfig();
   if (provider === "google") {
     const clientId = "clientId" in account ? account.clientId : "";
-    return googleOAuthConfig(resolveGoogleClientId(clientId || undefined));
+    const config = googleOAuthConfig(resolveGoogleClientId(clientId || undefined), 'clientSecret' in account ? account.clientSecret : undefined);
+    return { ...config, scope: 'scopes' in account && account.scopes ? account.scopes.join(' ') : config.scope };
   }
   return undefined;
 }
@@ -208,6 +215,10 @@ export async function renewAccountAuthIfExpiring(input: {
 }): Promise<AccountAuthRenewal> {
   const account = accountAuthFor(input.provider, input.credential);
   if (!account) return { renewed: false };
+  if (account.type === 'google-gemini-account') {
+    try { assertGoogleAccount(account); }
+    catch { return { renewed: false, failure: 'Google account scope or billing project is unverified. Reconnect before renewal.' }; }
+  }
   if (!isExpiring(account.expiresAt)) return { accountAuth: account, renewed: false };
 
   const config = oauthConfigFor(input.provider, account);
@@ -297,6 +308,12 @@ async function exchangeAccountAuth(input: {
       input.onDispatch?.();
       return input.fetchImpl(url, init);
     });
+    if (input.account.type === 'google-gemini-account') {
+      assertGoogleScopes(tokens.scopes);
+      if (JSON.stringify([...new Set(tokens.scopes ?? [])].sort()) !== JSON.stringify([...new Set(input.account.scopes ?? [])].sort())) {
+        throw new Error('Renewal changed the captured Google account grant.');
+      }
+    }
     if (input.account.type === 'openai-chatgpt-account' && (!tokens.accountId || tokens.accountId !== input.account.accountId)) {
       throw new Error('Renewal returned a different account identity.');
     }

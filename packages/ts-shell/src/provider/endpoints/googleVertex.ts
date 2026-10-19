@@ -73,6 +73,7 @@ export function vertexTarget(env: Readonly<Record<string, string | undefined>>):
 }
 
 declareEndpoint("google-vertex", {
+  opaqueReplay: true,
   contextFields: { system: 'systemInstruction', conversation: 'contents', tools: 'tools' },
   // The base address carries the account; this adds the model and the method.
   // The streaming form is a different method name, and the query is what asks for
@@ -86,6 +87,8 @@ declareEndpoint("google-vertex", {
   body: (input) =>
     googleBody({
       model: input.model,
+      provider: input.provider,
+      replayBinding: input.replayBinding,
       systemPrompt: input.systemPrompt ?? "",
       messages: input.messages as never,
       tools: [],
@@ -98,6 +101,8 @@ declareEndpoint("google-vertex", {
   turnBody: (input) =>
     googleBody({
       model: input.model,
+      provider: input.provider,
+      replayBinding: input.replayBinding,
       vision: input.vision,
       systemPrompt: input.systemPrompt,
       messages: input.messages as never,

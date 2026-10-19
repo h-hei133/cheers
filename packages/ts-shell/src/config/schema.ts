@@ -28,7 +28,7 @@ const authFields = {
 const authRequired = ['type', 'accessToken', 'refreshToken', 'expiresAt'];
 const accountAuth = objectSchema({
   openai: objectSchema({ ...authFields, type: { const: 'openai-chatgpt-account' }, accountId: referenceSchema, loginId: nameSchema }, authRequired),
-  google: objectSchema({ ...authFields, type: { const: 'google-gemini-account' }, clientId: referenceSchema, accountEmail: referenceSchema }, [...authRequired, 'clientId']),
+  google: objectSchema({ ...authFields, type: { const: 'google-gemini-account' }, clientId: referenceSchema, accountEmail: referenceSchema, clientSecret: referenceSchema, scopes: listSchema(nameSchema), quotaProject: referenceSchema }, [...authRequired, 'clientId']),
   subscription: objectSchema({ ...authFields, type: { const: 'subscription' }, baseUrl: referenceSchema }, authRequired),
 });
 

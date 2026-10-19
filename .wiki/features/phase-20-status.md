@@ -77,6 +77,10 @@ decoder 批已推送为 `e6311a1415b0fa1cc3ee9c090edad99b84065b17`，实际读�
 
 usage夹具最终1文件/32项通过，独立code实际另跑相同32项并APPROVE，architecture原始字节验证CLEAR；重叠不累加。测试SHA256 `336f85e0…71afe920`，两路报告已独立保存。仅usage测试/两份文档单独交付，Google批仍未提交；新SHA CI尚待实际读取。
 
+usage修正 `61ec1bc0a15282c56792086176d87a7e4a18a0c9` 已推送、远端SHA读回；CI `39279497980`当前in_progress，Watch `39279497944` success。Google批最终37文件/674项、14项有效反转、双构建、编译HTTP/存储探针和四格隔离TLS PTY通过；实际scope/project/secret、issuer/原生codec、unknown零重播和有序签名回放沿既有owner。29文件manifest `77a547ed…7bb8663`、类型149/149零新增；静态门/脚本59通过，NormProof0blocking/8旧advisory。独立codeAPPROVE及architecture最终绑定按日志后续记录；Google尚未提交推送或CI。subscription身份/续期及其余全部47项继续，真实环境/质量仅按用户原推迟范围。
+
+usage修正CI `39279497980` 后续读回completed/success，Watch success。Google最终双路独立codeAPPROVE/architectureCLEAR精确绑定manifest `77a547ed…7bb8663`，严格docs门通过；综合APPROVE限本批，提交/推送及新SHA CI按开发日志后续查询记录。
+
 ## 历史实现与交付记录（不代表本次复核通过）
 
 | 任务 | 提交 | 证据 |

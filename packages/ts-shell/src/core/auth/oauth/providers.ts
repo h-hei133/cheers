@@ -130,6 +130,7 @@ interface OAuthProviderDeclaration {
  * The single place a caller asks "can this be signed into, and with what", so a
  * surface does not have to know which providers exist.
  */
-export function oauthConfigFor(provider: string, clientId?: string): OAuthProviderConfig | undefined {
-  return signInProviders.find((candidate) => candidate.id === provider)?.make(clientId);
+export function oauthConfigFor(provider: string, clientId?: string, clientSecret?: string, quotaProject?: string): OAuthProviderConfig | undefined {
+  const config = signInProviders.find((candidate) => candidate.id === provider)?.make(clientId);
+  return config && provider === 'google' ? { ...config, ...(clientSecret ? { clientSecret } : {}), ...(quotaProject ? { quotaProject } : {}) } : config;
 }

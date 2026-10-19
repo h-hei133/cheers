@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   checkRealProviderReadiness,
   createProviderReadinessTerminalEvent,
@@ -7,6 +7,32 @@ import { redactProviderFailureDetail } from "./providerFailureRedaction.js";
 import { DEFAULT_ENDPOINT_KIND } from "../../provider/endpoints/index.js";
 
 describe("provider readiness boundary", () => {
+  it.each([{ scopes: undefined }, { quotaProject: undefined }])('reports unverified Google metadata %j before any HTTP', async patch => {
+    const fetchImpl = vi.fn();
+    const result = await checkRealProviderReadiness({ provider: 'google', model: 'gemini-fixture',
+      accountAuth: { type: 'google-gemini-account', accessToken: 'synthetic-access', refreshToken: 'synthetic-refresh',
+        expiresAt: Date.now() + 3600_000, clientId: 'synthetic-client', scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+        quotaProject: 'synthetic-project', ...patch }, fetchImpl });
+    expect(result).toMatchObject({ ok: false, failure: { kind: 'missing-config' } }); expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('uses the native account issuer, bearer and captured project despite an ambient API key', async () => {
+    vi.stubEnv('GOOGLE_API_KEY', 'synthetic-outside-key');
+    try {
+      const urls: string[] = [];
+      const result = await checkRealProviderReadiness({ provider: 'google', model: 'gemini-fixture',
+        accountAuth: { type: 'google-gemini-account', accessToken: 'synthetic-access', refreshToken: 'synthetic-refresh',
+          expiresAt: Date.now() + 3600_000, clientId: 'synthetic-client', scopes: ['https://www.googleapis.com/auth/cloud-platform'], quotaProject: 'synthetic-project' },
+        fetchImpl: async (input, init) => {
+          urls.push(String(input)); const headers = new Headers(init?.headers);
+          expect(headers.get('authorization')).toBe('Bearer synthetic-access');
+          expect(headers.get('x-goog-user-project')).toBe('synthetic-project'); expect(headers.has('x-goog-api-key')).toBe(false);
+          expect(init?.redirect).toBe('error'); return new Response('{}');
+        } });
+      expect(result).toEqual({ ok: true }); expect(urls).toEqual(['https://generativelanguage.googleapis.com/v1beta/models']);
+    } finally { vi.unstubAllEnvs(); }
+  });
+
   it.each([
     { provider: "anthropic" as const, url: "https://api.anthropic.com/v1/models", header: "x-api-key" },
     { provider: "google-ai" as const, url: "https://generativelanguage.googleapis.com/v1beta/models", header: "x-goog-api-key" },

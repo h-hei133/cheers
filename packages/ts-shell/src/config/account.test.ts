@@ -59,10 +59,10 @@ describe('persisted subscription credentials', () => {
   for (const provider of ['openai', 'google'] as const) {
     for (const source of ['config', 'connection', 'pool'] as const) {
       it(`keeps ${provider} ${source} accounts on their owner when a CLI endpoint changes`, () => {
-        const baseUrl = provider === 'openai' ? 'https://chatgpt.com/backend-api' : `https://owner.invalid/${provider}/v1`;
+        const baseUrl = provider === 'openai' ? 'https://chatgpt.com/backend-api' : 'https://generativelanguage.googleapis.com';
         const auth = { type: provider === 'openai' ? 'openai-chatgpt-account' : 'google-gemini-account',
           accessToken: 'synthetic-access', refreshToken: 'synthetic-refresh', expiresAt: Date.now() + 3_600_000,
-          ...(provider === 'google' ? { clientId: 'synthetic-client' } : {}) };
+          ...(provider === 'google' ? { clientId: 'synthetic-client', scopes: ['https://www.googleapis.com/auth/cloud-platform'], quotaProject: 'synthetic-project' } : {}) };
         const values = source === 'config' ? { providerCredentials: { [provider]: { baseUrl, accountAuth: { [provider]: auth } } } }
           : { activeProviderConnectionId: 'owner',
               ...(source === 'pool' ? { accountPool: { [provider]: { connections: ['owner'], baseUrl } } } : {}),
@@ -85,7 +85,7 @@ describe('persisted subscription credentials', () => {
     it(`does not lend a provider-level endpoint to the ${provider} connection account`, () => {
       const auth = { type: provider === 'openai' ? 'openai-chatgpt-account' : 'google-gemini-account',
         accessToken: 'synthetic-access', refreshToken: 'synthetic-refresh', expiresAt: Date.now() + 3_600_000,
-        ...(provider === 'google' ? { clientId: 'synthetic-client' } : {}) };
+        ...(provider === 'google' ? { clientId: 'synthetic-client', scopes: ['https://www.googleapis.com/auth/cloud-platform'], quotaProject: 'synthetic-project' } : {}) };
       fs.writeFileSync(getUserRuntimeConfigPath(), JSON.stringify({ provider, activeProviderConnectionId: 'owner',
         providerCredentials: { [provider]: { baseUrl: 'https://foreign.invalid/v1' } },
         providerConnections: [{ id: 'owner', provider, authType: 'account-auth', accountAuth: { [provider]: auth }, status: 'connected' }] }));

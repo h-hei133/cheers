@@ -95,12 +95,14 @@ export async function checkRealProviderReadiness(
   const provider = options.provider ?? "openai";
   options.signal?.throwIfAborted();
   let endpoint = options.endpoint ?? providerEndpoint(BUILTIN_PROVIDERS, provider);
+  let nativeBaseUrl: string | undefined;
   try {
     assertAccountAddress(options.accountAuth, options.baseUrl);
     const native = accountProtocol(options.accountAuth);
     if (native) {
       if (options.endpoint && options.endpoint !== native.endpoint) throw new Error('Account protocol mismatch.');
       endpoint = native.endpoint;
+      nativeBaseUrl = native.baseUrl;
     }
   } catch { return { ok: false, failure: { kind: 'missing-config', stopReason: 'Provider readiness failed: the account issuer endpoint or protocol conflicts with the selected request.' } }; }
   const shape = endpointShape(endpoint);
@@ -146,7 +148,7 @@ export async function checkRealProviderReadiness(
 
   const fetchImpl = options.fetchImpl ?? createProviderFetchFromEnv();
   const timeoutMs = options.timeoutMs ?? 5000;
-  const baseUrl = normalizeBaseUrl(options.baseUrl ?? BUILTIN_PROVIDERS.find(entry => entry.id === provider)?.baseUrl ?? "");
+  const baseUrl = normalizeBaseUrl(options.baseUrl ?? nativeBaseUrl ?? BUILTIN_PROVIDERS.find(entry => entry.id === provider)?.baseUrl ?? "");
   const model = options.model?.trim();
 
   if (!baseUrl || needsUserEndpoint(provider)) {
@@ -193,6 +195,7 @@ export async function checkRealProviderReadiness(
     try {
       options.signal?.throwIfAborted();
       const response = await fetchImpl(`${baseUrl}${shape.modelsPath}`, {
+        ...(options.accountAuth ? { redirect: 'error' as const } : {}),
         method: "GET",
         headers,
         signal: controller.signal,

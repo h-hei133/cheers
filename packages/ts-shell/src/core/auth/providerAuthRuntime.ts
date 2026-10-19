@@ -239,7 +239,8 @@ function persistConnectedAccountAuth(input: {
     },
   };
   const oauth = input.provider === 'openai' || input.provider === 'google'
-    ? oauthConfigFor(input.provider, 'clientId' in input.accountAuth ? input.accountAuth.clientId : undefined) : undefined;
+    ? oauthConfigFor(input.provider, 'clientId' in input.accountAuth ? input.accountAuth.clientId : undefined,
+      'clientSecret' in input.accountAuth ? input.accountAuth.clientSecret : undefined, 'quotaProject' in input.accountAuth ? input.accountAuth.quotaProject : undefined) : undefined;
   let enrollment: ReturnType<typeof reserveRefreshLogin>;
   try {
     if (oauth) enrollment = reserveRefreshLogin({ provider: input.provider, refreshToken: input.accountAuth.refreshToken,
