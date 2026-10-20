@@ -44,8 +44,14 @@ export class CoreMcpGateway {
     return loadMcpConfigs(this.workspaceRoot, !projectTrust.isProjectUntrusted(this.workspaceRoot));
   }
 
-  snapshot(admission = this.admissionForOperation?.()): Promise<McpClientSnapshot> {
-    return this.run(async () => { assertAdmission(admission); return this.readSnapshot(await this.prepare(), admission); });
+  snapshot(admission = this.admissionForOperation?.(), signal?: AbortSignal): Promise<McpClientSnapshot> {
+    return this.run(async () => {
+      signal?.throwIfAborted();
+      assertAdmission(admission);
+      const configs = await this.prepare();
+      signal?.throwIfAborted();
+      return this.readSnapshot(configs, admission, signal);
+    }, signal);
   }
 
   /** Read existing catalogs only; workspace reconciliation belongs to explicit operations. */
@@ -55,19 +61,22 @@ export class CoreMcpGateway {
     return this.connectionManager.peekSnapshot(this.loadConfigs());
   }
 
-  refresh(target: string = "all", options?: { exactTarget: boolean }): Promise<McpClientSnapshot> {
+  refresh(target: string = "all", options?: { exactTarget: boolean; signal?: AbortSignal }): Promise<McpClientSnapshot> {
     const admission = this.admissionForOperation?.();
     return this.run(async () => {
+      options?.signal?.throwIfAborted();
       assertAdmission(admission);
       const configs = await this.prepare();
+      options?.signal?.throwIfAborted();
       const name = target.trim();
       const all = !options?.exactTarget && (!name || name.toLowerCase() === "all");
       if (!all && !Object.hasOwn(configs, name)) {
         throw unknownServer(name);
       }
       await this.connectionManager.close(all ? undefined : name);
-      return this.readSnapshot(all ? configs : { [name]: configs[name]! }, admission);
-    });
+      options?.signal?.throwIfAborted();
+      return this.readSnapshot(all ? configs : { [name]: configs[name]! }, admission, options?.signal);
+    }, options?.signal);
   }
 
   /** Revocation begins before queued work settles; config publication never starts discovery. */
@@ -164,14 +173,30 @@ export class CoreMcpGateway {
     return this.closing ??= Promise.all([this.connectionManager.shutdown(), this.queue]).then(() => {});
   }
 
-  private run<T>(operation: () => Promise<T>): Promise<T> {
+  private run<T>(operation: () => Promise<T>, signal?: AbortSignal): Promise<T> {
     if (this.closed) return Promise.reject(new Error("MCP gateway is closed"));
-    const result = this.queue.then(() => {
+    if (signal?.aborted) return Promise.reject(signal.reason);
+    const queued = this.queue.then(() => {
       if (this.closed) throw new Error("MCP gateway is closed");
+      signal?.throwIfAborted();
       return operation();
     });
-    this.queue = result.catch(() => {});
-    return result;
+    this.queue = queued.catch(() => {});
+    if (!signal) return queued;
+    return new Promise<T>((resolve, reject) => {
+      const abort = (): void => reject(signal.reason);
+      const finish = (): void => signal.removeEventListener("abort", abort);
+      signal.addEventListener("abort", abort, { once: true });
+      if (signal.aborted) {
+        finish();
+        reject(signal.reason);
+        return;
+      }
+      queued.then(
+        value => { finish(); resolve(value); },
+        error => { finish(); reject(error); },
+      );
+    });
   }
 
   private async synchronizeWorkspace(): Promise<void> {
@@ -199,17 +224,19 @@ export class CoreMcpGateway {
     return configs;
   }
 
-  private async readSnapshot(configs: Record<string, ScopedMcpServerConfig>, admission?: Admission): Promise<McpClientSnapshot> {
+  private async readSnapshot(configs: Record<string, ScopedMcpServerConfig>, admission?: Admission, signal?: AbortSignal): Promise<McpClientSnapshot> {
     const clients: McpConnectionState[] = [];
     const tools: McpClientSnapshot["tools"] = [];
     for (const [name, config] of Object.entries(configs)) {
+      signal?.throwIfAborted();
       assertAdmission(admission);
       const client = this.connectionManager.get(name, config, this.workspaceRoot);
-      let state = await client.connect(admission);
+      let state = await client.connect(admission, signal);
       if (state.type === "connected") {
+        signal?.throwIfAborted();
         assertAdmission(admission);
         try {
-          tools.push(...await client.listTools(admission));
+          tools.push(...await client.listTools(admission, signal));
         } catch (error) {
           await this.connectionManager.close(name);
           state = { type: "failed", name, config, error: classifyMcpFailure({
@@ -220,6 +247,7 @@ export class CoreMcpGateway {
       }
       clients.push(state);
     }
+    signal?.throwIfAborted();
     assertAdmission(admission);
     return { clients, tools };
   }

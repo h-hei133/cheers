@@ -105,4 +105,33 @@ describe("runCliMcpCommand", () => {
     expect(captured.lines).toContain("- BlockerKind: environment-not-ready");
     expect(captured.lines).toContain("- DoNext: Fix MCP config.");
   });
+
+  it.each(["status", "refresh"] as const)("forwards cancellation to a pending %s request", async action => {
+    const captured = captureRenderer();
+    const controller = new AbortController();
+    let received: AbortSignal | undefined;
+    const pending = (signal?: AbortSignal) => new Promise<McpClientSnapshot>((_, reject) => {
+      received = signal;
+      signal?.addEventListener("abort", () => reject(new Error("cancelled")), { once: true });
+    });
+    const gateway: CliMcpGateway = {
+      snapshot: (_admission, signal) => pending(signal),
+      refresh: (_target, options) => pending(options?.signal),
+    };
+
+    const running = runCliMcpCommand({
+      renderer: captured.renderer,
+      gateway,
+      mcpAction: action,
+      signal: controller.signal,
+    });
+    await Promise.resolve();
+    controller.abort();
+    await expect(Promise.race([
+      running,
+      new Promise((_, reject) => setTimeout(() => reject(new Error("MCP command did not settle")), 1_000)),
+    ])).resolves.toBeUndefined();
+
+    expect(received).toBe(controller.signal);
+  });
 });

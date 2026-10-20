@@ -46,13 +46,13 @@ export class CollaborationHost {
   }
   check(): void { requireValue(!this.closed && !this.failed && this.ports.current() && Date.now() < this.leaseUntil, 'stale'); this.client.profile.check(); }
   status(): string { return this.closed ? 'stopped' : this.failed || Date.now() >= this.leaseUntil ? 'disconnected' : 'hosting'; }
-  async request(operation: string, data: unknown, mutation = true) {
-    this.check(); const response = await this.client.request(operation, { roomId: this.roomId, owner: this.owner, data }, mutation);
+  async request(operation: string, data: unknown, mutation = true, signal?: AbortSignal) {
+    this.check(); const response = await this.client.request(operation, { roomId: this.roomId, owner: this.owner, data }, mutation, signal);
     requireValue(!this.closed && !this.failed && response.epoch === this.epoch && this.ports.current(), 'stale'); return response;
   }
-  async close(remote = true): Promise<void> {
+  async close(remote = true, signal?: AbortSignal): Promise<void> {
     let failure: unknown;
-    try { if (remote && !this.closed) await this.request('stop', {}); } catch (error) { failure = error; }
+    try { if (remote && !this.closed) await this.request('stop', {}, true, signal); } catch (error) { failure = error; }
     finally { this.closed = true; clearTimeout(this.timer); this.unsubscribe?.(); this.ports.invalid(); }
     if (failure) throw failure;
   }

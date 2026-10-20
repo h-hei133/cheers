@@ -140,20 +140,40 @@ describe('durable goal scheduling', () => {
     expect(submit).toHaveBeenCalledOnce(); expect(goal().runOwner).not.toBeNull();
   });
 
+  it('settles the attached host captured by a round after that host is detached', async () => {
+    const { scheduler } = setup(async () => ({ text: 'answer', toolCalls: [], stopReason: 'stop' }));
+    let release!: () => void;
+    const settled = vi.fn();
+    const detach = scheduler.attach({
+      ready: () => true,
+      submit: () => new Promise<void>(resolve => { release = resolve; }),
+      settled,
+    });
+    scheduler.start();
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+
+    detach();
+    release();
+    await vi.waitFor(() => expect(settled).toHaveBeenCalledOnce());
+  });
+
   it('responds to pause after bounded drain without clearing a hung round or admitting a replacement', async () => {
     const { scheduler } = setup(async () => ({ text: 'answer', toolCalls: [], stopReason: 'stop' }));
     let release!: () => void;
+    const settled = vi.fn();
     const hung = new Promise<void>(resolve => { release = resolve; });
-    scheduler.attach({ ready: () => true, submit: () => hung }); scheduler.start();
+    scheduler.attach({ ready: () => true, submit: () => hung, settled }); scheduler.start();
     await vi.waitFor(() => expect(goal().scheduling).toMatchObject({ phase: 'running', pendingRound: true }));
     const owner = goal().runOwner; const started = Date.now();
     await scheduler.stop('user'); await scheduler.wait();
     expect(Date.now() - started).toBeLessThan(1800);
+    expect(settled).toHaveBeenCalledOnce();
     expect(goal()).toMatchObject({ phase: 'paused', runOwner: owner, scheduling: { phase: 'draining', pendingRound: true, drain: 'unknown' } });
     expect((await command(['resume'])).output).toContain('not saved: recovery-required');
     expect(() => claimGoalRun(manager, session, createRunOwner())).toThrow();
     release();
     await vi.waitFor(() => expect(goal().scheduling?.reason).toBe('recovery-required'));
+    expect(settled).toHaveBeenCalledOnce();
   });
 
   it('recovers a proven dead process owner without replaying its interrupted round', async () => {

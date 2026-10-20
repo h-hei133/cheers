@@ -21,9 +21,41 @@ import type { Acceptance } from '../../collaboration/contract/model.js';
 import { readBoundSessionState } from '../../session/store/bound.js';
 import { decodeRequestLedger } from '../../core/agent/request/codec.js';
 import { runSessionGoalCommand } from '../../planning/goal/command.js';
+import { runCollaborationCommand } from './command.js';
 
 const cleanups: (() => Promise<void> | void)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); cleanupAdvisorHarnesses(); vi.restoreAllMocks(); });
+
+it('binds a pending collaboration test request to the host cancellation signal', async () => {
+  const pending = new AbortController();
+  let received: AbortSignal | undefined;
+  const request = vi.fn((_operation: string, _input: unknown, _mutation: boolean, signal?: AbortSignal) =>
+    new Promise((_, reject) => {
+      received = signal;
+      signal?.addEventListener('abort', () => reject(new Error('cancelled')), { once: true });
+    }));
+  const host = {
+    pending,
+    client: {
+      profile: { origin: 'https://collab.test', principal: 'alice', check() {} },
+      request,
+    },
+  } as never;
+
+  const running = runCollaborationCommand(host, 'collab', ['test'], {
+    cwd: '/workspace',
+    projectRoot: '/workspace',
+    sessionId: 'sess_collab',
+  } as never);
+  await vi.waitFor(() => expect(request).toHaveBeenCalledOnce());
+  pending.abort();
+  const result = await running;
+
+  expect(received).toBe(pending.signal);
+  expect(result.kind).toBe('local');
+  expect(result.kind === 'local' && result.output).toContain('Collaboration refused or unavailable');
+}, 2_000);
+
 async function setup(withGoal = false) {
   const session = createAdvisorHarness(false, false); const serviceFixture = fixture(); cleanups.push(serviceFixture.cleanup);
   if (withGoal) await runSessionGoalCommand(['set', 'Meter explicitly adopted remote work'],
@@ -84,7 +116,9 @@ it('keeps share/dump preview and denied publication at zero service effects', as
 it.each([false, true])('dispatches only after explicit acceptance and retains native usage/provenance (goal=%s)', async withGoal => {
   const s = await setup(withGoal); await s.command('collab', ['profile', s.profileFile]); await s.command('collab', ['start', '{"bob":["observe","ask"]}']);
   const proposed = await s.proposal(); expect(s.runs()).toBe(0);
-  const accepted = await s.command('collab', ['accept', String(proposed.proposalId)]); expect(accepted.kind).toBe('prompt'); if (accepted.kind !== 'prompt') throw new Error('No prompt');
+  const accepted = await s.command('collab', ['accept', String(proposed.proposalId)]);
+  expect(accepted.kind, accepted.kind === 'local' ? accepted.output : undefined).toBe('prompt');
+  if (accepted.kind !== 'prompt') throw new Error('No prompt');
   expect(s.runs()).toBe(0); await s.runtime.executePrompt(s.session.id, accepted.prompt, { promptMetadata: accepted.promptMetadata }); expect(s.runs()).toBe(1);
   const prompt = s.manager.getSession(s.session.id)!.turns.find(turn => turn.metadata?.collaboration);
   expect(object(prompt!.metadata!.collaboration).principal).toBe('bob'); expect(object(prompt!.metadata!.collaboration).acceptedBy).toBe('alice');

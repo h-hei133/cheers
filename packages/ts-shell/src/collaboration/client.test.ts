@@ -69,6 +69,34 @@ it('aborts a held native request and never automatically repeats it', async () =
   const signal = new AbortController(); const pending = client.request('publish', { data: {} }, true, signal.signal); await ready; signal.abort();
   await expect(pending).rejects.toBeInstanceOf(UnknownMutation); expect(requests).toBe(1);
 });
+it.each(['poll', 'propose'] as const)('inherits the parent cancellation through expired-ticket %s work', async operation => {
+  const s = setup(); const selected = profile(s, 'bob', 'http://127.0.0.1:24001').selected;
+  const client = new CollaborationClient(selected); cleanups.push(() => client.close());
+  let inherited: AbortSignal | undefined;
+  const request = vi.spyOn(client, 'request').mockImplementation((_operation, _input, _mutation, parent) =>
+    new Promise((_, reject) => {
+      inherited = parent;
+      parent?.addEventListener('abort', () => reject(new Error('cancelled')), { once: true });
+    }));
+  const guest = new CollaborationGuest(client, 'local-id', {
+    roomId: 'room',
+    epoch: 'epoch',
+    generation: 1,
+    binding: bound,
+    ticket: 'expired-ticket',
+    expiresAt: Date.now() - 1,
+  }, () => true);
+  cleanups.push(() => guest.close());
+  const controller = new AbortController();
+  const pending = operation === 'poll'
+    ? guest.poll(controller.signal)
+    : guest.propose('ask', 'hello', controller.signal);
+
+  await vi.waitFor(() => expect(request).toHaveBeenCalledOnce());
+  controller.abort();
+  await expect(pending).rejects.toThrow('cancelled');
+  expect(inherited?.aborted).toBe(true);
+});
 it('explicitly rejoins a changed host generation with a visible cursor gap and no stale snapshot', async () => {
   const s = setup(); const isolatedHome = path.join(s.root, 'home'); fs.mkdirSync(isolatedHome); vi.stubEnv('HOME', isolatedHome); vi.stubEnv('USERPROFILE', isolatedHome);
   const selected = profile(s, 'bob', 'http://127.0.0.1:24001').selected;

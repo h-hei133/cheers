@@ -56,6 +56,45 @@ describe("captured channel", () => {
     expect(renderer.captured).toBe(false);
   });
 
+  it("routes output without claiming transcript ownership", () => {
+    const renderer = new StreamingRenderer();
+    const lines: string[] = [];
+    renderer.setSink({
+      line: text => lines.push(text),
+      chunk: () => {},
+    }, { ownsTranscript: false });
+
+    renderer.renderLine("line-mode output");
+
+    expect(lines).toEqual(["line-mode output"]);
+    expect(renderer.captured).toBe(true);
+    expect(renderer.transcriptOwned).toBe(false);
+  });
+
+  it("waits for the device callback before reporting the flush complete", async () => {
+    const original = process.stdout.write;
+    let complete: ((error?: Error | null) => void) | undefined;
+    process.stdout.write = vi.fn((
+      _chunk: unknown,
+      callback?: (error?: Error | null) => void,
+    ) => {
+      complete = callback;
+      return false;
+    }) as unknown as typeof process.stdout.write;
+    try {
+      const renderer = new StreamingRenderer();
+      let flushed = false;
+      const pending = renderer.flush().then(() => { flushed = true; });
+
+      expect(flushed).toBe(false);
+      complete?.();
+      await pending;
+      expect(flushed).toBe(true);
+    } finally {
+      process.stdout.write = original;
+    }
+  });
+
   it("returns to the device once the sink is cleared", () => {
     const { written, restore } = captureStdout();
     try {

@@ -8077,3 +8077,24 @@ SSE校正已推送为 `ec658966f541c5e9d245fb3f34d79d88425f80b3`，远端main读
 - 当前本地已通过 `test:scripts` 91 项、TypeScript、import cycles、config consumers、declarations、Node floor、strict docs drift 与 `git diff --check`；docs drift 保留 118 条既有 advisory。`normproof` 命令在当前环境不可用，不能记为通过。
 - 本批提交 `a425420aafdc46140075e4b4560c53727f929212` 已推送，远端 main 完整 SHA 读回。CI `39413554234`/job `118596969632` 于 `2026-10-20T11:30:52Z` completed/success，16m12s；Architecture Watch `39413554208`/job `118596969793` 于 `2026-10-20T11:15:01Z` completed/success。
 - START-02 仍缺完整 CLI 首帧渲染与用户选择后的 late-result fencing；START-01 仍缺 fresh packaged gate 与远端结果；START-03、QA-02/03、TOOL-02 的用户已允许环境/真实模型项继续延期。全部 47 项 Phase 20 范围保持 active。
+
+### 2026-10-20 START-02 首帧恢复提示与用户意图 fence
+
+- `createStartupRecoveryHint` 现在是 one-shot lifecycle：TUI 只在 `onFirstWrite` 后启动，line 模式只在 prompt write callback 后启动；键盘、鼠标、粘贴、picker apply 和 line 原始输入只推进一次 interaction revision，最终 publish 前再次检查 session/project/config/interaction generation。loop 关闭后到达的 delayed callback 被显式失效。
+- `StreamingRenderer` 区分 routing `captured` 与 `transcriptOwned`：line mode 保留 turn boundary，同时 `/sessions` 仍走非交互 overview。teardown 先关闭 readline、释放 signal/queue hooks，再恢复旧 sink，避免 `--resume` 泄漏到全局 stdout；失败路径先撤 signal close handler，不会把初始化错误变成 `exit(0)`，cleanup 自身抛错时也继续释放并恢复 sink。
+- `runCliProcess` 集成测试覆盖 fullscreen visibility、startup notice router、first-frame 触发与真实 recovery hint wiring；hint 进入 interactive transcript，且不直写 `process.stdout`。
+- 聚焦回归 11 文件/126 项通过：streaming 7、cliStartupSurface 3、startupNotice 3、recoveryHint 9、startup 5、cliProcessRunner 1、firstFrame 22、interactiveLoop 5、lineLoop 16、interactiveMode 43、cliCommandExecutionBridge 12。反转分别复现 routing ownership、immediate first frame、early sink restore、missing cleanup、duplicate intent、teardown-before-restore、failure-as-success、teardown exception 与 delayed callback 的失败。
+- 全量 `npm run test:ts` 本轮实际为 9213 passed / 49 failed，耗时 605s；失败集中在整套并发下 20–45s 子进程超时及 CLI baseline 争用，不计为全量绿。随后单独复跑 `cli-baseline` pipe EOF、print command、`test-utils/cli/scenarios` 4 项与 `browser/execution/process` 1 项均通过。
+- fresh TS manifest `8d06ea26f557`，inputs digest `6444c5af4368ec036bb9892f014b4eaad3c6c78dc87eceb128f7d1b480a35c1a`，artifact digest `49f426c97a616c5083c4b5afb1b8fa56f4f5d45ad8d96ca457a33cbc437b5aa7`；exe 102,619,264 bytes、SHA-256 `c43bcd483e6ffc371ff826c63c229e8128ddd3e7a4c7c7d4d889a6078bde55ed`。`verify:cli-entry` 全项通过。
+- `qa:pty` 连续两次通过 Node/exe × regular/fullscreen 四格：等待首帧与 seeded `Recovery hint`，`/sessions current` 输出与 startup 标题匹配精确 current id，`/tools` picker 打开后 Esc 关闭，再 `/exit` 并以 exit 0 证明输入已回到 prompt。
+- `test:scripts` 91 项、import cycles、config consumers、declarations、Node floor、strict docs drift 与 `git diff --check` 通过；docs drift 保留 118 条既有 advisory。`normproof` 命令在当前环境不可用，未记为通过。
+- 本轮修改尚未提交/推送；新 SHA CI 与最终独立复核另行记录，不把当前工作树通过写成远端通过。
+
+### 2026-10-21 START-02 独立复核返工与 PTY 隔离
+
+- 独立复核发现并修复：line prompt write callback / stdout `error` 的异步失败原先只记录 warning，可能让循环永久挂起；MCP gateway 在队列等待阶段忽略 abort，关闭会被前序请求拖住；PTY smoke 继承 `CHEERS_HOME_OVERRIDE`、provider 凭据和 XDG/Git 配置，可能绕过临时 HOME。line 失败现在统一进入 rejection；MCP `run` 让排队请求与 signal 竞速且不会在取消后启动发现；PTY 子进程使用隔离的 home、test root、XDG、TMPDIR、Git 配置与 provider 环境。
+- 新增异步写失败、stream error、MCP queued abort、PTY 环境隔离和 sink 恢复 marker 回归均通过；聚焦集 4 文件/50 项、脚本 92 项通过；`qa:pty` 在隔离环境下 Node/exe × regular/fullscreen 四格通过。
+- `/tools` 报告现在把 description/schema UTF-8 字节列和汇总写进普通文本，而非只藏在 `facts`；token 仍明确为 `not-measured`，真实模型质量/缓存/tokenizer 项保持未验。
+- 全量 `npm run test:ts` 本轮实际出现 20 项失败，全部集中在 browser CLI 子进程场景的 exit-code/输出缺失；同一组 11 个失败文件以 `--single-thread` 串行复跑得到 85 项通过、1 项跳过。并发负载失败不能记为全量绿。
+- fresh TS build `c80b84f0d7af`，inputs digest `9c5cafc1dd17`，artifact digest `4bb084c80969`；exe 102,668,416 bytes、SHA-256 `9420876813f3`。`verify:cli-entry`、`start --version`、import cycles、config consumers、declarations、Node floor、strict docs drift、`git diff --check` 均通过；docs drift 保留 118 条既有 advisory，module facade 保持 8 项既有 advisory（本批触及的 lineLoop 未新增越界）。仓库 tgz 的 NormProof 实际退出 0、verdict partial，blocking unresolved-specifier 义务 satisfied，仍为 8 项既有函数上限 advisory。
+- 本批尚未提交/推送；新 SHA CI、最终独立复核和远端结果仍待实际读回，不把工作树结果写成交付完成。

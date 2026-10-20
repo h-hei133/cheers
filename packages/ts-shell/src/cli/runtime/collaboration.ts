@@ -20,6 +20,9 @@ export function collaborationCommandFor(context: ShellRuntimeContext): NonNullab
     finally { host.pending = undefined; }
   };
 }
+export function cancelCollaborationFor(context: ShellRuntimeContext): void {
+  collaborationHosts.get(context)?.pending?.abort();
+}
 export async function closeCollaborationFor(context: ShellRuntimeContext): Promise<void> {
   const host = collaborationHosts.get(context); if (!host) return;
   host.pending?.abort(); host.guest?.close();

@@ -9,13 +9,21 @@ export function toolsReport(pool: ReadonlyMap<string, ToolDefinition>): CommandR
   const tools = [...pool.values()].sort((a, b) => a.name.localeCompare(b.name));
   const measured = tools.map(tool => ({ name: tool.name, descriptionBytes: Buffer.byteLength(tool.description, 'utf8'),
     schemaBytes: Buffer.byteLength(JSON.stringify(tool.argsSchema), 'utf8') }));
+  const measurements = new Map(measured.map(item => [item.name, item]));
   return createReport({ title: `Tools (${tools.length})`,
-    columns: [{ label: 'Tool', minWidth: 14 }, { label: 'Plan mode', minWidth: 10 }, { label: 'What it does', minWidth: 24 }],
+    columns: [{ label: 'Tool', minWidth: 14 }, { label: 'Plan mode', minWidth: 10 },
+      { label: 'Description bytes', minWidth: 8, align: 'right' }, { label: 'Schema bytes', minWidth: 8, align: 'right' },
+      { label: 'What it does', minWidth: 24 }],
     lines: [
       ...tools.map((tool): ReportLine => ({ kind: 'columns', cells: [
-        [span(tool.name, 'code')], [span(toolPlanMode(tool.name, tool))], [span(toolSummary(tool.description))],
+        [span(tool.name, 'code')], [span(toolPlanMode(tool.name, tool))],
+        [span(measurements.get(tool.name)!.descriptionBytes, 'number')],
+        [span(measurements.get(tool.name)!.schemaBytes, 'number')],
+        [span(toolSummary(tool.description))],
       ] })),
       { kind: 'space' },
+      { kind: 'text', spans: [span(`Static wire cost: ${measured.reduce((sum, tool) => sum + tool.descriptionBytes, 0)} description bytes + ${measured.reduce((sum, tool) => sum + tool.schemaBytes, 0)} schema bytes. `),
+        span('Token counts require the target model tokenizer and are not measured here.', 'muted')] },
       { kind: 'text', spans: [span('/tools <name>', 'command'), span(" shows one tool's arguments.")] },
       { kind: 'text', spans: [span('Plan mode permits only read-only bash commands and browser actions.')] },
       { kind: 'text', spans: [span(PERMISSIONS, 'warning')] },
@@ -40,12 +48,15 @@ export function toolReport(tool: ToolDefinition): CommandReport {
         description: typeof shape.description === 'string' ? shape.description : '' };
     }) : [];
   const planMode = toolPlanMode(tool.name, tool);
+  const descriptionBytes = Buffer.byteLength(tool.description, 'utf8');
+  const schemaBytes = Buffer.byteLength(JSON.stringify(tool.argsSchema), 'utf8');
   return createReport({ title: tool.name,
     columns: [{ label: 'Argument', minWidth: 14 }, { label: 'Type', minWidth: 8 },
       { label: 'Required', minWidth: 8 }, { label: 'Description', minWidth: 24 }],
     lines: [
       ...tool.description.trim().split(/\r?\n/).map((text): ReportLine => ({ kind: 'text', spans: [span(text)] })),
       { kind: 'space' },
+      { kind: 'text', spans: [span(`Static wire cost: ${descriptionBytes} description bytes + ${schemaBytes} schema bytes. Token count: not measured.`)] },
       { kind: 'text', spans: [span('Plan mode: '), span(planMode, planMode === 'blocked' ? 'warning' : 'text')] },
       { kind: 'text', spans: [span(PERMISSIONS, 'warning')] },
       { kind: 'space' },
@@ -53,7 +64,8 @@ export function toolReport(tool: ToolDefinition): CommandReport {
         [span(arg.name, 'argument')], [span(arg.type, 'code')], [span(arg.required ? 'yes' : 'no')], [span(arg.description)],
       ] })) : [{ kind: 'text' as const, spans: [span('No top-level arguments are declared.')] }]),
     ],
-    facts: { name: tool.name, description: tool.description, planMode, arguments: args, permission: 'not-evaluated' },
+    facts: { name: tool.name, description: tool.description, planMode, arguments: args, permission: 'not-evaluated',
+      size: { unit: 'utf8-bytes', tokens: 'not-measured', descriptionBytes, schemaBytes } },
   });
 }
 

@@ -14,7 +14,7 @@
 | W3 | CTX-03 有界分段/合并、永久重播证据、原生 source CAS 与精确发布证明已有本地及独立验收；自动/overflow 未验证发布停止 turn | 两项架构 WATCH 为容量拒绝和锁内同步 I/O，已记录取舍；本批提交/远端按日志；CTX-01/02/04、TOOL-01 继续复核 |
 | W5 | SET-02 已修复选中分组后无法搜索其他组的问题；复用文字匹配排序，跨组按最佳得分和固定组序展示；清空搜索回原组，从详情 Back 回字段所属组并聚焦 | CMD-01/02、SET-01/03 全部验收；SET-02 其余来源/状态细节继续按合同核查 |
 | W6 | modal 的项目范围切组现已可达；不能由此证明完整目录分页/搜索 | PAN-01…08 各动作、只读边界、分页和 revision |
-| W7/W8/W9 | 2026-10-20 返工已补上同文件 hunk 的 baseline/content identity、detach 后保留晋升总期限、adopted settlement、follow-up 脱敏/reload、轻量 `--help`/`--version`、首帧 bootstrap 扫描探针，以及最终 Markdown/HTML code-span、diff rows/bytes/rename 与 copy 反例 | START-02 的完整 CLI 首帧证据、START-01 的 fresh packaged gate 与 CI，以及其余 INPUT/RENDER consumer 仍按合同复核 |
+| W7/W8/W9 | 2026-10-20 返工已补上同文件 hunk 的 baseline/content identity、detach 后保留晋升总期限、adopted settlement、follow-up 脱敏/reload、轻量 `--help`/`--version`、首帧 bootstrap 扫描探针，以及最终 Markdown/HTML code-span、diff rows/bytes/rename 与 copy 反例；START-02 现有 packaged 首帧恢复提示与用户意图 fence，START-01 fresh packaged gate 已在本工作树通过 | 其余 INPUT/RENDER consumer 仍按合同复核；START-01/02 的新提交 CI 与跨平台验收另行取证 |
 | W10 | 本批 135 文件/1813 测试通过；修改前实现使 20 项回归失败；两路独立复核通过；Node/exe × regular/fullscreen 的 settings/resume 切组、关闭与退出 PTY 通过 | QA-01/02/04 随后续返工累积；本批不等于全阶段交付 |
 
 本批静态检查、构建、提交和 CI 的精确状态见开发日志。本轮 PTY 鼠标只验证 fullscreen；regular 仍由终端负责鼠标滚动与选择。
@@ -103,11 +103,11 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 | PAN-04（部分） | `6736f402`、本次 | `/usage account` quota 进度投影、`/thinking` effort 选择器 |
 | PAN-06（部分） | `6736f402` | copy 移除 recent-30 窗口 |
 | PAN-07（部分） | 本次 | `/extensions` 为 `/plugin` 别名 |
-| START-01（补强） | `0afab79a`、本次 | build manifest、五种拒绝状态、`start`/`start:dev`；轻量 `--version`/`--help`、组合参数和坏配置准入 |
+| START-01（补强） | `0afab79a`、本次 | build manifest、五种拒绝状态、`start`/`start:dev`；轻量 `--version`/`--help`、组合参数和坏配置准入；fresh packaged gate 通过 |
 | JOB-01（补强） | `dd43bcce`、本次 | 单次 spawn、detach/kill、adopt/promote、60s/新消息晋升、撤权 kill、重启 unknown 不重播；detach 后保留 settlement 与 300s 总期限 |
 | JOB-02（补强） | `7da6e6d4`、`8c7f949f`、本次 | 本地 notice、opt-in follow-up（去重/预算/截断）、脱敏/reload、取消不转后台 |
 | EDIT-01（补强） | `57e1ffb3`、`8c7f949f`、本次 | 稳定且绑定 baseline/hunk content/add content 的 group id、依赖分组、同文件 hunk 选集、无选集拒绝、重规划 revision、requested/selected/skipped receipt |
-| START-02（部分） | `3de906fe`、本次 | 10k 首帧不扫描；持久摘要索引；0/100/1k/10k bootstrap 不枚举探针；完整 CLI 首帧仍待验收 |
+| START-02（本地证据闭合） | `3de906fe`、本次 | 10k 首帧不扫描；持久摘要索引；0/100/1k/10k bootstrap 不枚举探针；TUI/line 首帧 write completion 后 recovery hint；routing sink 与 transcript ownership 分离；键盘/鼠标/粘贴/picker/line 用户意图 fence；line close/stop 主动取消 MCP/SSH/collaboration/current run 并释放 goal scheduler；真实 scheduler drain 超时结算 captured host，sink 对迟到 goal dispatch 保持 discard fence；teardown sink 顺序、`runCliProcess` fullscreen 集成与 Node/exe × regular/fullscreen 两次 seeded PTY |
 | PAN-05 | `2a4bafe5`、本次 | advisor 只读面板 + enable/review/apply 分别授权；plan-review 结构化报告与版本化 approve/reject/execute；btw 结构化报告、带外；面板查看不启模型，模型工作只走显式命令/普通 turn |
 | PAN-03（部分） | `070f1405` | hub 本地作业输出页（脱敏/截断）、后续页指引 |
 | PAN-08（部分） | `93302750` | MCP 逐项向导；临时定义 0600 且必删 |
@@ -129,9 +129,9 @@ usage修正CI `39279497980` 后续读回completed/success，Watch success。Goog
 
 - START-03：受控冷缓存（需清页缓存权限）；逐键延迟目前以 `/exit` 命令处理为代理。
 
-- QA-02/03：Linux PTY 矩阵已通过 Node/exe × regular/fullscreen（`npm run qa:pty`：`/tools` 后 Esc 关闭 reader、`/sessions current`、`/exit`）；Windows/macOS/IME/系统复制与真实质量仍缺环境/模型。
+- QA-02/03：Linux PTY 矩阵已连续两次通过 Node/exe × regular/fullscreen（`npm run qa:pty`：等待首帧与 seeded recovery hint，`/sessions current` 精确匹配 startup/current id，`/tools` picker 后 Esc 关闭，再 `/exit`）；Windows/macOS/IME/系统复制与真实质量仍缺环境/模型。
 - TOOL-02：静态描述/schema 字节成本已进 `/tools` 报告（`size.unit=utf8-bytes`，`tokens=not-measured`）；同模型质量/缓存对比与 tokenizer 校准仍需真实模型。
-- QA-02 本地前置仍缺 line/pipe、profile 切换、任务/discovery/approval/settings save 的合成端到端链路；QA-01 当前矩阵也不是 47 项全覆盖。
+- QA-02 本地前置仍缺 line/pipe、profile 切换、任务/discovery/approval/settings save 的合成端到端链路；QA-01 矩阵已补齐独立任务行，但仍不能作为 47 项全闭合证明。
 
 ## CI
 
@@ -208,4 +208,27 @@ Google批 `311573ca63f7cbd6e8e4b8d8f417ebc34d83a7a7` 已推送、远端读回；
 - 多轮定向反转分别产生 10、4、3、2 个实际失败：撤销 `stop` settlement、timeout 传播或 detach deadline 后 JOB 用例失败；把函数型 follow-up policy 退化为布尔值后 reload 用例失败；合并同文件 hunk、移除 hunk/add content identity 后 identity 用例失败；恢复 escaped/multi-run 误解析、link label 不递归、固定多计换行字节、纯 rename 早退或把 `---`/`+++` header 当改动后，最终 renderer 与 diff 边界用例失败；强制 bootstrap 调用 `listSessions` 后 0 会话探针失败。反转源码已恢复，`git diff --check` 通过。
 - 最终受影响 14 文件/303 项通过；fresh TS 构建 `fae6df0de84b`、exe 102,615,168 bytes/SHA-256 `a2ad338ad80429db850e5c98e930d19d8b63d9167ed87aaae0dcd3400a7de70d`，`verify:cli-entry` 全项与 Linux Node/exe × regular/fullscreen 四格 PTY 通过。`test:scripts` 91 项、TypeScript、import cycles、config consumers、declarations、Node floor、strict docs drift 与 `git diff --check` 通过；docs drift 保留 118 条既有 advisory。
 - 本批提交 `a425420aafdc46140075e4b4560c53727f929212` 已推送、远端 main 完整 SHA 读回。CI `39413554234`/job `118596969632` completed/success（16m12s）；Architecture Watch `39413554208`/job `118596969793` completed/success。该证据绑定上述精确 SHA，不改写此前任何失败记录。
-- 仍未闭合：START-02 需要真实 CLI 首帧渲染和用户选择后的 late-result fencing；START-01 需要 fresh build 后的 packaged gate、提交/推送/精确 SHA CI；RENDER/PAN 其余消费者仍按原合同复核。START-03、QA-02/03、TOOL-02 的用户已允许环境/真实模型项继续延期，不把本轮合成测试替代它们。
+- 仍未闭合：START-01/02 的新提交/推送/精确 SHA CI；RENDER/PAN 其余消费者仍按原合同复核。START-03、QA-02/03、TOOL-02 的用户已允许环境/真实模型项继续延期，不把本轮合成测试替代它们。
+
+### 2026-10-20 START-02 首帧恢复提示与用户意图 fence
+
+- `createStartupRecoveryHint` 是 one-shot lifecycle：TUI 只在 `onFirstWrite` 后启动，line 模式只在 prompt write callback 后启动；键盘、鼠标、粘贴、picker apply 与 line 原始输入只推进一次 interaction revision，最终 publish 前再次校验 session/project/config/interaction generation。line close/stop 也推进 fence，delayed callback/result 被显式失效；recovery/startup logger 抛错不会再形成 rejected promise。
+- `StreamingRenderer` 区分 `captured`（输出已路由）与 `transcriptOwned`（host 自己绘制 turn chrome）：line mode 为 `captured=true`、`transcriptOwned=false`，因此 turn boundary 保留且 `/sessions` 仍走非交互 overview。line close/stop 主动 abort MCP signal、取消 SSH/collaboration pending、取消 current run 并 detach goal scheduler；真实 scheduler drain 超时只结算一次 captured host。若 goal dispatch 尚未真正 settle，line sink 保持安装并在 `goalOutputActive=false` 时丢弃迟到输出，dispatch settle 后才恢复旧 sink。
+- line close/fail 的同步/异步错误统一进入 `failLineLoop`：关闭前 rejection 会让 loop reject 并撤销 signal close handler，正常 EOF 后的迟到 rejection 只记录、不把成功关闭改成失败；cleanup 各阶段与 logger 自身异常均不能阻断 sink 恢复。
+- MCP `snapshot/refresh` 将 signal 贯穿到 client connect/listTools；collaboration 的 inspect/test/receipt/start/join/ACL/stop/share/propose 以及 expired-ticket refresh/poll 都继承 host pending signal，claim/dispatch/ACL 保持 mutation 语义。
+- `runCliProcess` 集成测试覆盖 fullscreen 与 line visibility、startup notice router、first-frame 触发和真实 recovery hint wiring；hint 进入 interactive transcript，且不直接写 `process.stdout`。
+- 聚焦回归 14 文件/157 项通过：streaming 7、cliStartupSurface 3、startupNotice 4、recoveryHint 10、startup 5、cliProcessRunner 2、firstFrame 22、interactiveLoop 5、lineLoop 28、lineLoopGoal 2、interactiveMode 43、cliCommandExecutionBridge 12、cliMcpModule 5、collaboration/command 9。另有真实 gateway abort、真实 scheduler captured-host/drain 和 guest expired-ticket abort 定向测试通过。
+- 8 项定向反转均取得实际失败：sink gate、scheduler drain settle、guest parent signal、MCP signal forwarding、collaboration signal forwarding、recovery logger isolation、close-handler settle、line-handler failure cleanup 与失败路径 signal release；源码均已恢复并复跑通过。
+- 本轮较早一次全量 `npm run test:ts` 实际为 9213 passed / 49 failed，耗时 605s；失败集中在整套并发下 20–45s 子进程超时及 CLI baseline 争用，不计为全量绿。最终修复后未重跑全量，交付前仍以精确 SHA CI 为准。
+- fresh TS build `bd5cc4951f3938e316dcbc7fb3b46e829d49a93ce7a684d88ad121406bbf5448`，inputs digest `a2bd5f4a4e3b166b719c839b52776b415f44d6ae3c7065e084103288300d0d2c`，artifact digest `25044855dbdd183cdfd8ac5476f8afde2261bf9e72b3af2088fa15be08d43568`；exe 102,668,416 bytes、SHA-256 `b8060dd8a4ca6d6a56a380f766ed44b0aa072c59c6626b05218d3dc2356778f4`。`verify:cli-entry` 全项通过。
+- `qa:pty` 连续两次通过 Node/exe × regular/fullscreen 四格：等待首帧与 seeded `Recovery hint`，`/sessions current` 输出与 startup 标题匹配精确 current id，`/tools` picker 打开后 Esc 关闭，再 `/exit` 并以 exit 0 证明输入已回到 prompt。
+- `test:scripts` 91 项、import cycles、config consumers、declarations、Node floor、strict docs drift 与 `git diff --check` 通过；docs drift 保留 118 条既有 advisory。`normproof` 命令在当前环境不可用，未记为通过。
+
+### 2026-10-21 START-02 独立复核返工与 PTY 隔离
+
+- 独立复核复现了三个产品缺陷并已修复：line prompt write callback / stdout `error` 的异步失败原先只记录 warning，可能让循环永久挂起；MCP gateway 在队列等待阶段忽略 abort，关闭会被前序请求拖住；PTY smoke 继承 `CHEERS_HOME_OVERRIDE`、provider 凭据和 XDG/Git 配置，可能绕过临时 HOME。line 失败现在统一进入 rejection；MCP `run` 让排队请求与 signal 竞速且不会在取消后启动发现；PTY 子进程使用隔离的 home、test root、XDG、TMPDIR、Git 配置与 provider 环境。
+- 新增的异步写失败、stream error、MCP queued abort、PTY 环境隔离和 sink 恢复 marker 回归均通过；聚焦集 4 文件/50 项、脚本 92 项通过。`qa:pty` 在隔离环境下 Node/exe × regular/fullscreen 四格通过。
+- `/tools` 报告现在把 description/schema UTF-8 字节列和汇总写进普通文本，而非只藏在 `facts`；token 仍明确为 `not-measured`，真实模型质量/缓存/tokenizer 项保持未验。
+- 全量 `npm run test:ts` 本轮实际出现 20 项失败，全部集中在 browser CLI 子进程场景的 exit-code/输出缺失；将同一组 11 个失败文件以 `--single-thread` 串行复跑得到 85 项通过、1 项跳过，说明并发负载下的场景夹具失败仍需在 CI/串行车道单独观察，不能记为全量绿。
+- fresh TS build `c80b84f0d7af`，inputs digest `9c5cafc1dd17`，artifact digest `4bb084c80969`；exe 102,668,416 bytes、SHA-256 `9420876813f3`。`verify:cli-entry`、`start --version`、import cycles、config consumers、declarations、Node floor、strict docs drift、`git diff --check` 均通过；docs drift 保留 118 条既有 advisory，module facade 保持 8 项既有 advisory（本批触及的 lineLoop 未新增越界）。仓库 tgz 的 NormProof 实际退出 0、verdict partial，blocking unresolved-specifier 义务 satisfied，仍为 8 项既有函数上限 advisory。
+- 本批尚未提交/推送；新 SHA CI、最终独立复核和远端结果仍待实际读回，不把工作树结果写成交付完成。

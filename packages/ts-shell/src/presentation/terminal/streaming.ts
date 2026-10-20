@@ -18,23 +18,43 @@ export interface RendererSink {
   chunk(text: string): void;
 }
 
+export interface RendererSinkOptions {
+  /**
+   * Whether the sink is a transcript host that draws its own turn boundaries.
+   * A routing sink such as the line loop forwards prose without owning chrome.
+   */
+  readonly ownsTranscript?: boolean;
+}
+
 export class StreamingRenderer {
   private sink: RendererSink | undefined;
+  private transcriptOwner = false;
 
   /** Route output to `sink`; the returned function restores the previous sink. */
-  setSink(sink: RendererSink): () => void {
+  setSink(sink: RendererSink, options: RendererSinkOptions = {}): () => void {
     const previous = this.sink;
+    const previousTranscriptOwner = this.transcriptOwner;
     this.sink = sink;
-    return () => { this.sink = previous; };
+    this.transcriptOwner = options.ownsTranscript ?? true;
+    return () => {
+      this.sink = previous;
+      this.transcriptOwner = previousTranscriptOwner;
+    };
   }
 
   clearSink(): void {
     this.sink = undefined;
+    this.transcriptOwner = false;
   }
 
-  /** Whether output is currently being captured rather than written to stdout. */
+  /** Whether output is routed away from the process stdout device. */
   get captured(): boolean {
     return this.sink !== undefined;
+  }
+
+  /** Whether the host draws turn chrome itself instead of the plain runtime. */
+  get transcriptOwned(): boolean {
+    return this.transcriptOwner;
   }
 
   renderLine(line: string): void {
@@ -61,8 +81,19 @@ export class StreamingRenderer {
     process.stdout.write(chunk);
   }
 
-  flush(): void {
-    // Chunks are written straight through; nothing is buffered here.
+  /** Wait until writes already queued on the device have completed. */
+  flush(): Promise<void> {
+    if (this.sink) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      try {
+        process.stdout.write("", (error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 
   /** Erase the current line, for hosts that own the cursor themselves. */

@@ -12,6 +12,7 @@ import type { ShellSessionRuntime } from "../../core/shell/sessionRuntime.js";
 import type { SessionManager } from "../../session/SessionManager.js";
 import type { StructuredLogger } from "../../observability/structuredLogger.js";
 import { stripAnsi } from "../../presentation/tui/text/ansi.js";
+import type { Picker } from "./overlay.js";
 
 /**
  * Boot the real host against a recording device.
@@ -126,6 +127,104 @@ describe("transcript search ownership", () => {
 });
 
 describe("first painted frame", () => {
+  it.each(["regular", "fullscreen"] as const)(
+    "reports the %s first frame only after the device accepts its write",
+    screen => {
+      const onFirstFrame = vi.fn();
+      const { mode, terminal, scheduler } = boot({ onFirstFrame }, screen);
+
+      mode.start();
+      expect(onFirstFrame).not.toHaveBeenCalled();
+
+      scheduler.flush();
+      expect(terminal.writes.length).toBeGreaterThan(0);
+      expect(onFirstFrame).toHaveBeenCalledOnce();
+
+      scheduler.flush();
+      expect(onFirstFrame).toHaveBeenCalledOnce();
+      mode.stop();
+    },
+  );
+
+  it("reports user intent from actual key input", () => {
+    const onUserIntent = vi.fn();
+    const { mode, terminal, scheduler } = boot({ onUserIntent }, "fullscreen");
+
+    mode.start();
+    scheduler.flush();
+    terminal.drain();
+    terminal.input("x");
+    scheduler.flush();
+
+    expect(onUserIntent).toHaveBeenCalledOnce();
+    mode.stop();
+  });
+
+  it("reports user intent from actual mouse input", () => {
+    const onUserIntent = vi.fn();
+    const { mode, terminal, scheduler } = boot({ onUserIntent }, "fullscreen");
+
+    mode.start();
+    scheduler.flush();
+    terminal.drain();
+    terminal.input("\x1b[<0;1;1M");
+    scheduler.flush();
+
+    expect(onUserIntent).toHaveBeenCalledOnce();
+    mode.stop();
+  });
+
+  it("reports user intent from actual paste input", () => {
+    const onUserIntent = vi.fn();
+    const { mode, terminal, scheduler } = boot({ onUserIntent }, "fullscreen");
+
+    mode.start();
+    scheduler.flush();
+    terminal.drain();
+    terminal.input("\x1b[200~draft\x1b[201~");
+    scheduler.flush();
+
+    expect(onUserIntent).toHaveBeenCalledOnce();
+    mode.stop();
+  });
+
+  it("routes startup notices into the interactive transcript", () => {
+    let startupNotice: ((line: string) => void) | undefined;
+    const { mode, terminal, scheduler } = boot({
+      setStartupNotice: notice => { startupNotice = notice; },
+    }, "fullscreen");
+
+    mode.start();
+    scheduler.flush();
+    terminal.drain();
+    startupNotice?.("Recovery hint: /resume");
+    scheduler.flush();
+
+    expect(stripAnsi(terminal.drain())).toContain("Recovery hint: /resume");
+    mode.stop();
+  });
+
+  it("reports user intent when a picker choice is applied", () => {
+    const onUserIntent = vi.fn();
+    const { mode, scheduler } = boot({ onUserIntent }, "fullscreen");
+    const host = mode as unknown as {
+      applyPicker(picker: Picker, ids: readonly string[]): void;
+    };
+    const picker = {
+      title: "Choice",
+      form: "modal",
+      load: async () => [],
+      apply: async () => undefined,
+    } as Picker;
+
+    mode.start();
+    scheduler.flush();
+    host.applyPicker(picker, ["choice"]);
+
+    expect(onUserIntent).toHaveBeenCalledOnce();
+    mode.stop();
+  });
+
   it("reaches the device instead of throwing", () => {
     const { mode, terminal, scheduler } = boot();
     mode.start();

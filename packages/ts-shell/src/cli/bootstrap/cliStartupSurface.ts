@@ -17,6 +17,7 @@ import { supportsFullScreenSurface } from "../interactive/surfaceCapability.js";
 export interface CliStartupSurfaceProjection {
   readonly startupPlan: CliStartupPlan;
   readonly showStartupSurface: boolean;
+  readonly fullScreenHost: boolean;
 }
 
 export interface ProjectAndRenderCliStartupSurfaceInput {
@@ -32,9 +33,28 @@ export interface ProjectAndRenderCliStartupSurfaceInput {
   readonly providerModeEnv?: string;
 }
 
-export function projectAndRenderCliStartupSurface(
+export function projectCliStartupSurfaceVisibility(input: {
+  readonly options: Pick<CliOptions, "printMode" | "replayFile">;
+  readonly stdin?: NodeJS.ReadStream;
+  readonly stdout?: NodeJS.WriteStream;
+  readonly nonInteractivePromptCount: number;
+  readonly stdinTransportMode: StdinTransportMode;
+}): Pick<CliStartupSurfaceProjection, "fullScreenHost" | "showStartupSurface"> {
+  const fullScreenHost =
+    !input.options.printMode &&
+    !input.options.replayFile &&
+    input.nonInteractivePromptCount === 0 &&
+    supportsFullScreenSurface(input.stdin, input.stdout);
+  return {
+    fullScreenHost,
+    showStartupSurface:
+      !fullScreenHost && input.stdinTransportMode !== "capture-batch",
+  };
+}
+
+export async function projectAndRenderCliStartupSurface(
   input: ProjectAndRenderCliStartupSurfaceInput,
-): CliStartupSurfaceProjection {
+): Promise<CliStartupSurfaceProjection> {
   const startupPlan = projectCliStartupPlan({
     options: input.options,
     cliModePlan: input.cliModePlan,
@@ -53,13 +73,8 @@ export function projectAndRenderCliStartupSurface(
   // console startup surface too would scroll unmanaged text under it. Only a
   // real terminal gets that host: over a pipe the surface is the only intro
   // there is, and harnesses wait on it for readiness.
-  const fullScreenHost =
-    !input.options.printMode &&
-    !input.options.replayFile &&
-    input.nonInteractivePromptCount === 0 &&
-    supportsFullScreenSurface(input.stdin, input.stdout);
-  const showStartupSurface =
-    !fullScreenHost && input.stdinTransportMode !== "capture-batch";
+  const { fullScreenHost, showStartupSurface } =
+    projectCliStartupSurfaceVisibility(input);
   if (showStartupSurface) {
     renderStartupSurface(input.bootstrapRuntime.renderer, {
       runtimeContext: input.bootstrapRuntime.runtimeContext,
@@ -76,10 +91,12 @@ export function projectAndRenderCliStartupSurface(
       executionPath: "ts-local",
       stdinTransportMode: startupPlan.stdinTransportMode,
     });
+    await input.bootstrapRuntime.renderer.flush();
   }
 
   return {
     startupPlan,
     showStartupSurface,
+    fullScreenHost,
   };
 }

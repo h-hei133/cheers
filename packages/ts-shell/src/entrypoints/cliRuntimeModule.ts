@@ -403,7 +403,7 @@ export async function executeResolvedPromptTurn(options: {
     });
     // A host that captures output draws its own turn boundaries; emitting these
     // as prose too would put duplicate chrome inside its transcript.
-    if (!options.renderer.captured) {
+    if (!options.renderer.transcriptOwned) {
       options.renderer.renderLine(
         formatTurnStartBoundary({
           turnNumber: turnLabel,
@@ -449,7 +449,7 @@ export async function executeResolvedPromptTurn(options: {
       });
       return;
     }
-    if (!options.printMode && !options.renderer.captured) {
+    if (!options.printMode && !options.renderer.transcriptOwned) {
       options.renderer.renderLine(formatExecutionStartedLine(turnOrigin));
     }
     recordCount("cli.prompts", 1, {
@@ -488,7 +488,7 @@ export async function executeResolvedPromptTurn(options: {
       turnEndStatus = "interrupted";
       // A surface that captures output announces the interruption in its own
       // transcript; only a plain terminal needs the fallback block.
-      if (!options.renderer.captured) {
+      if (!options.renderer.transcriptOwned) {
         renderTurnResultFallback(options.renderer, {
           outcome: "interrupted",
           detail: "Current request was cancelled before completion.",
@@ -526,7 +526,7 @@ export async function executeResolvedPromptTurn(options: {
         turnEndStatus,
       },
     );
-    if (interactiveTurn && !options.renderer.captured) {
+    if (interactiveTurn && !options.renderer.transcriptOwned) {
       options.renderer.renderLine(
         formatTurnEndBoundary({
           turnNumber: turnLabel,

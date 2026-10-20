@@ -19,16 +19,17 @@ export async function runCollaborationCommand(host: CollaborationComposition, na
   if (!parsed.ok) return { kind: 'local', output: `Invalid /${name} arguments: ${parsed.reason}\n${syntaxHelp(syntax)}` };
   try {
     const action = parsed.action.name;
-    if (name === 'share') return { kind: 'local', output: await runShare(host, action, parsed.args) };
+    const signal = host.pending?.signal;
+    if (name === 'share') return { kind: 'local', output: await runShare(host, action, parsed.args, signal) };
     if (name === 'dump') return { kind: 'local', output: await runDump(host, action, parsed.args, parsed.flags.has('raw'), command) };
-    if (action === 'accept') return await acceptRemoteProposal(host, parsed.args[0]!);
-    return { kind: 'local', output: await runControl(host, action, parsed.args) };
+    if (action === 'accept') return await acceptRemoteProposal(host, parsed.args[0]!, signal);
+    return { kind: 'local', output: await runControl(host, action, parsed.args, signal) };
   } catch (error) {
     return { kind: 'local', output: error instanceof UnknownMutation ? `Mutation outcome unknown; request ${error.requestId}. Query /collab receipt ${error.requestId}; no automatic retry.`
       : `Collaboration refused or unavailable. ${display(error instanceof Error ? error.message : 'No effect was confirmed.')} No operation was automatically retried.` };
   }
 }
-async function runControl(host: CollaborationComposition, action: string, args: readonly string[]): Promise<string> {
+async function runControl(host: CollaborationComposition, action: string, args: readonly string[], signal?: AbortSignal): Promise<string> {
   if (action === 'status') return display({ profile: host.client ? { origin: host.client.profile.origin, principal: host.client.profile.principal, protocol: 1 } : 'not-selected',
     host: host.host ? { roomId: host.host.roomId, epoch: host.host.epoch, generation: host.host.owner.generation, status: host.host.status() } : 'not-hosting',
     guest: host.guest ? { roomId: host.guest.roomId, epoch: host.guest.epoch, status: host.guest.status() } : 'not-joined', activeAcceptance: host.active?.acceptance.acceptanceId });
@@ -36,16 +37,16 @@ async function runControl(host: CollaborationComposition, action: string, args: 
   if (action === 'events') { requireValue(host.guest, 'unavailable'); return display(host.guest.view()); }
   if (action === 'leave') { host.guest?.close(); host.guest = undefined; return 'Guest connection released; local transcript and workspace unchanged.'; }
   if (action === 'proposals') return display(host.proposals);
-  if (action === 'inspect') return display(await inspectRemoteProposal(host, args[0]!));
+  if (action === 'inspect') return display(await inspectRemoteProposal(host, args[0]!, signal));
   requireValue(host.client, 'unavailable'); host.client.profile.check();
-  if (action === 'test') { const response = await host.client.request('hello', { data: {} }); return `Service identity/version: ${display(response.result)}; no room/share/model/tool created.`; }
-  if (action === 'receipt') return display((await host.client.request('receipt', { data: { requestId: uuid(args[0]) } })).result);
-  if (action === 'start') return startHost(host, args[0]);
-  if (action === 'resume') return startHost(host, undefined, args[0]);
-  if (action === 'stop') return stopHost(host);
-  if (action === 'join') return joinRoom(host, args[0]!);
-  if (action === 'grant' || action === 'revoke') return changeRights(host, args[0]!, action === 'grant' ? args[1] : undefined);
-  if (action === 'ask' || action === 'cancel') return proposeRemote(host, action, args[0]!);
+  if (action === 'test') { const response = await host.client.request('hello', { data: {} }, false, signal); return `Service identity/version: ${display(response.result)}; no room/share/model/tool created.`; }
+  if (action === 'receipt') return display((await host.client.request('receipt', { data: { requestId: uuid(args[0]) } }, false, signal)).result);
+  if (action === 'start') return startHost(host, args[0], undefined, signal);
+  if (action === 'resume') return startHost(host, undefined, args[0], signal);
+  if (action === 'stop') return stopHost(host, signal);
+  if (action === 'join') return joinRoom(host, args[0]!, signal);
+  if (action === 'grant' || action === 'revoke') return changeRights(host, args[0]!, action === 'grant' ? args[1] : undefined, signal);
+  if (action === 'ask' || action === 'cancel') return proposeRemote(host, action, args[0]!, signal);
   requireValue(false);
 }
 async function selectProfile(host: CollaborationComposition, target: string): Promise<string> {

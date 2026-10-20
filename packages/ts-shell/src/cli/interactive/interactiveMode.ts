@@ -121,6 +121,14 @@ export interface InteractiveModeOptions {
   readonly logger: StructuredLogger;
   readonly approvalTrustPolicy: ApprovalTrustPolicy;
   readonly fallbackSessionId?: string;
+  /** Runs once after the first frame write has reached the output stream. */
+  readonly onFirstFrame?: () => void;
+  /** Lets startup suggestions yield to a user selection or submission. */
+  readonly onUserIntent?: () => void;
+  /** Installs a transcript writer for notices that arrive outside a turn. */
+  readonly setStartupNotice?: (
+    notice: ((line: string) => void) | undefined,
+  ) => void;
   readonly initialMcpGateway: CliMcpGateway;
   readonly setReadline?: (readline: ReadlineInterface | null) => void;
   readonly setInteractiveApprovalPrompt?: (
@@ -414,9 +422,11 @@ export class InteractiveMode {
     );
     this.stdin.onKey((event) => this.onKey(event));
     this.stdin.onMouse((report) => {
+      this.options.onUserIntent?.();
       if (this.alternateScreen || this.pager.active || this.overlay.fullScreen) this.pointer.handle(report);
     });
     this.stdin.onPaste((text) => {
+      this.options.onUserIntent?.();
       if (this.pager.handlePaste(text)) { this.tui.requestRender(); return; }
       if (this.overlay.handlePaste(text) || this.pickerInputPending.has(this.overlay.revision)) return;
       // A paste while the full-screen editor is up belongs to it, whole; a paste
@@ -459,12 +469,28 @@ export class InteractiveMode {
       },
     });
     this.preferences.reload();
+    this.options.setStartupNotice?.((line) => {
+      if (this.stopped) return;
+      this.state.transcript.append(textBlock("notice", line));
+      this.view.scrollToEnd();
+      this.tui.requestRender({ force: true });
+    });
     // `regular` keeps the conversation in the terminal's own scrollback, so a
     // session that ends leaves something to scroll back through. `fullscreen` is
     // the private screen.
+    const observers = startupObservers();
+    const onFirstWrite = observers.onFirstWrite;
     this.tui.start({
       useAlternateScreen: this.alternateScreen,
-      ...startupObservers(),
+      ...observers,
+      ...(this.options.onFirstFrame
+        ? {
+            onFirstWrite: () => {
+              onFirstWrite?.();
+              this.options.onFirstFrame?.();
+            },
+          }
+        : {}),
     });
     // After the first frame, not before it: the first paint decides what the
     // surface looks like, and a reload landing in the middle of it would be
@@ -476,6 +502,7 @@ export class InteractiveMode {
   stop(): void {
     if (this.stopped) return;
     this.stopped = true;
+    this.options.setStartupNotice?.(undefined);
     if (this.tick) clearInterval(this.tick);
     this.tick = undefined;
     this.pager.close();
@@ -504,6 +531,7 @@ export class InteractiveMode {
 
 
   private onKey(event: Parameters<typeof routeKey>[0]): void {
+    this.options.onUserIntent?.();
     if (this.pickerInputPending.has(this.overlay.revision) && !this.overlay.active) return;
     this.catalogs.cancel();
     this.completionStatus = undefined;
@@ -849,6 +877,7 @@ export class InteractiveMode {
     promptMetadata?: Record<string, unknown>,
   ): Promise<void> {
     const automatic = promptMetadata !== undefined;
+    if (!automatic) this.options.onUserIntent?.();
     this.pager.close();
     this.overlay.close();
     // Queued input reaches this same dispatch point after the current operation
@@ -983,6 +1012,7 @@ export class InteractiveMode {
 
   /** Hand the choice to the picker that produced it and surface what it reports. */
   private applyPicker(picker: Picker, ids: readonly string[]): void {
+    this.options.onUserIntent?.();
     const revision = this.overlay.revision;
     const persistReport = reportWriter(this.options.sessionManager, this.options.runtimeContext.session.id);
     if (picker.holdInput) this.pickerInputPending.set(revision, (this.pickerInputPending.get(revision) ?? 0) + 1);

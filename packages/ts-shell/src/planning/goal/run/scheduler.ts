@@ -26,6 +26,7 @@ export class GoalScheduler {
   private token?: string;
   private timer?: ReturnType<typeof setTimeout>;
   private active?: Promise<void>;
+  private activeRound?: { readonly host: GoalSubmissionHost; settled: boolean };
   private outcome: NonNullable<GoalScheduling['lastOutcome']> = 'answer';
   private failure?: GoalRunReason;
   private cancelling = false;
@@ -86,6 +87,7 @@ export class GoalScheduler {
     if (timeout) clearTimeout(timeout);
     if (!drained && this.token === token) {
       try { stopGoalRun(this.deps.store, session, token, reason, 'unknown'); } catch { /* Retain the unresolved owner. */ }
+      if (this.activeRound) this.settleHost(this.activeRound);
       this.deps.report('Goal scheduling paused; execution drain is unconfirmed. The owner and unresolved usage remain retained.');
     }
   }
@@ -110,10 +112,11 @@ export class GoalScheduler {
       if (!this.bound()) { await this.stop('session-changed'); return; }
       const goal = readGoalEdit(this.deps.store, this.session).goal;
       if (!goal || goal.id !== this.goalId || goal.runOwner?.token !== this.token || goal.phase !== 'active') { await this.stop(goal?.scheduling?.reason ?? 'user'); return; }
-      if (!this.host.ready()) { this.schedule(); return; }
-      const edit = beginGoalRound(this.deps.store, this.session, this.token, () => this.bound() && this.host.ready());
+      const host = this.host;
+      if (!host.ready()) { this.schedule(); return; }
+      const edit = beginGoalRound(this.deps.store, this.session, this.token, () => this.bound() && host.ready());
       // The same callback is checked again after publication, immediately before handoff.
-      if (!this.bound() || !this.host.ready()) {
+      if (!this.bound() || !host.ready()) {
         cancelUnsubmittedRound(this.deps.store, this.session, this.token); this.schedule(); return;
       }
       this.outcome = 'answer'; this.failure = undefined;
@@ -121,21 +124,24 @@ export class GoalScheduler {
       let dispatched = false;
       const submission = Promise.resolve().then(async () => {
         const latest = readGoalEdit(this.deps.store, this.session!).goal;
-        if (!this.bound() || !this.host.ready() || !latest || latest.id !== this.goalId || latest.runOwner?.token !== this.token || latest.phase !== 'active') {
+        if (!this.bound() || !host.ready() || !latest || latest.id !== this.goalId || latest.runOwner?.token !== this.token || latest.phase !== 'active') {
           cancelUnsubmittedRound(this.deps.store, this.session!, this.token!); return;
         }
         dispatched = true;
-        await this.host.submit(prompt, { source: 'goal-continuation', goalId: latest.id, ownerToken: this.token, round: latest.scheduling!.round });
+        await host.submit(prompt, { source: 'goal-continuation', goalId: latest.id, ownerToken: this.token, round: latest.scheduling!.round });
       });
-      this.active = this.drive(submission, () => dispatched);
+      const round = { host, settled: false };
+      this.activeRound = round;
+      this.active = this.drive(submission, () => dispatched, round);
       await this.active;
     } catch (error) {
-      this.deps.report(`Goal scheduling paused: ${runFailure(error)}.`);
-      await this.stop(runFailure(error));
+      const failure = runFailure(error);
+      if (!this.stopRequested) this.deps.report(`Goal scheduling paused: ${failure}.`);
+      await this.stop(failure);
     }
   }
 
-  private async drive(submission: Promise<void>, dispatched: () => boolean): Promise<void> {
+  private async drive(submission: Promise<void>, dispatched: () => boolean, round: { readonly host: GoalSubmissionHost; settled: boolean }): Promise<void> {
     const session = this.session!; const token = this.token!;
     const watcher = setInterval(() => {
       try {
@@ -151,20 +157,27 @@ export class GoalScheduler {
     finally { clearInterval(watcher); }
     try {
       if (dispatched()) settleGoalRound(this.deps.store, session, token, this.outcome, this.failure);
-      this.deps.afterRoundSettled?.(session);
+      if (!this.stopRequested) this.deps.afterRoundSettled?.(session);
       const edit = readGoalEdit(this.deps.store, session);
       if (edit.goal?.phase !== 'active') {
-        if (this.failure) this.deps.report(`Goal scheduling paused: ${this.failure}. Goal completion was not inferred.`);
+        if (this.failure && !this.stopRequested) this.deps.report(`Goal scheduling paused: ${this.failure}. Goal completion was not inferred.`);
         this.clearOwner();
       }
     } catch (error) {
-      this.deps.report(`Goal round settlement unverified: ${runFailure(error)}. Recovery is required; no new round will be dispatched.`);
+      if (!this.stopRequested) this.deps.report(`Goal round settlement unverified: ${runFailure(error)}. Recovery is required; no new round will be dispatched.`);
       try { stopGoalRun(this.deps.store, session, token, 'recovery-required', 'unknown'); } catch { /* Retain pending round. */ }
       this.stopRequested = true;
     }
     this.active = undefined;
-    this.host.settled?.();
+    this.settleHost(round);
+    if (this.activeRound === round) this.activeRound = undefined;
     if (!this.stopRequested) this.schedule();
+  }
+
+  private settleHost(round: { readonly host: GoalSubmissionHost; settled: boolean }): void {
+    if (round.settled) return;
+    round.settled = true;
+    try { round.host.settled?.(); } catch { /* Host notification cannot block durable settlement. */ }
   }
 
   private bound(): boolean {

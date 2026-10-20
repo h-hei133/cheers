@@ -72,6 +72,8 @@ export interface InteractiveCommandRouterInput {
   readonly forceTool?: import('../../core/commands/types.js').CommandContext['forceTool'];
   readonly promptMetadata?: Record<string, unknown>;
   readonly prompt: string;
+  /** Cancels line-mode control work when its owning surface closes. */
+  readonly signal?: AbortSignal;
   /** Images the draft referred to; carried beside the text, not inside it. */
   readonly attachments?: PromptAttachments;
   readonly readline: ReadlineInterface;
@@ -357,6 +359,7 @@ export async function routeInteractiveCommand(
       mcpAction: slashResult.mcpAction,
       mcpTarget: slashResult.mcpTarget,
       mcpContent: slashResult.mcpContent,
+      ...(input.signal ? { signal: input.signal } : {}),
     });
     return { turnNumber: nextTurnNumber, ...(themeChanged ? { themeChanged: true } : {}) };
   }

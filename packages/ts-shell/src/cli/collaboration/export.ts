@@ -12,24 +12,24 @@ import { inspectWorkspaceFile } from '../../core/workspace/files.js';
 import { commitWorkspaceFile } from '../../edit/authority/commit.js';
 import { digest } from '../../collaboration/contract/value.js';
 
-export async function runShare(host: CollaborationComposition, action: string, args: readonly string[]): Promise<string> {
+export async function runShare(host: CollaborationComposition, action: string, args: readonly string[], signal?: AbortSignal): Promise<string> {
   if (action === 'preview') return snapshotPreview(snapshotFor(host));
   requireValue(host.client, 'unavailable'); const client = host.client;
   if (action === 'read') {
-    const response = await client.request('read-share', { data: { shareId: identifier(args[0]) } });
+    const response = await client.request('read-share', { data: { shareId: identifier(args[0]) } }, false, signal);
     const result = object(response.result); return snapshotPreview(decodeSnapshot(result.snapshot));
   }
   if (action === 'publish') {
     const acl = args[0]!.split(',').map(identifier); requireValue(acl.length > 0 && acl.length <= 32);
     const ttl = integer(Number(args[1]), 60, 86400); const snapshot = snapshotFor(host); const bound = currentBinding(host);
-    const result = await approveOperation(host, 'publish share', `Send this read-only projection to ${client.profile.origin} as ${client.profile.principal}\nAuthenticated recipients: ${acl.join(', ')}\nExpires after ${ttl} seconds. The share ID is a locator; identity and ACL are still required.\n${snapshotPreview(snapshot)}`, async () => {
-      const response = await client.request('publish', { data: { binding: bound, snapshot, acl, ttl } }, true);
+    const result = await approveOperation(host, 'publish share', `Send this read-only projection to ${client.profile.origin} as ${client.profile.principal}\nAuthenticated recipients: ${acl.join(', ')}\nExpires after ${ttl} seconds. The share ID is a locator; identity and ACL are still required.\n${snapshotPreview(snapshot)}`, async execution => {
+      const response = await client.request('publish', { data: { binding: bound, snapshot, acl, ttl } }, true, execution.abortSignal);
       return { success: true, output: `Share published on ${client.profile.origin}: ${display(response.result)}. Read via /share read <shareId> using an authorized profile.`, metadata: { status: 'published' } };
     }); return result.output;
   }
   const shareId = identifier(args[0]);
-  const result = await approveOperation(host, action + ' share', `${action} share ${shareId} at ${client.profile.origin}. Stored content is removed and authenticated access is revoked.`, async () => {
-    const response = await client.request(action === 'delete' ? 'delete-share' : 'revoke-share', { data: { shareId } }, true);
+  const result = await approveOperation(host, action + ' share', `${action} share ${shareId} at ${client.profile.origin}. Stored content is removed and authenticated access is revoked.`, async execution => {
+    const response = await client.request(action === 'delete' ? 'delete-share' : 'revoke-share', { data: { shareId } }, true, execution.abortSignal);
     return { success: true, output: `Share mutation: ${display(response.result)}`, metadata: { status: action === 'delete' ? 'deleted' : 'revoked' } };
   }); return result.output;
 }

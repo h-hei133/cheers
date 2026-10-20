@@ -43,18 +43,20 @@ export class CollaborationGuest {
   close(): void { this.closed = true; this.controller.abort(); clearTimeout(this.timer); }
   status(): string { return this.closed ? 'left' : this.failed || !this.current() ? 'disconnected' : 'observing'; }
   view(): unknown { return { status: this.status(), ...this.record }; }
-  async propose(kind: 'ask' | 'cancel', value: string): Promise<unknown> {
+  async propose(kind: 'ask' | 'cancel', value: string, parent?: AbortSignal): Promise<unknown> {
     requireValue(!this.closed && !this.failed && this.current(), 'stale');
-    await this.refreshTicket();
+    await this.refreshTicket(parent);
+    const signal = parent ? AbortSignal.any([this.controller.signal, parent]) : this.controller.signal;
     const result = await this.client.request('propose', { roomId: this.roomId, ticket: this.ticket,
-      data: kind === 'ask' ? { kind, text: value } : { kind, target: value } }, true, this.controller.signal);
+      data: kind === 'ask' ? { kind, text: value } : { kind, target: value } }, true, signal);
     requireValue(result.epoch === this.epoch && this.current(), 'stale'); return result.result;
   }
-  async poll(): Promise<void> {
+  async poll(parent?: AbortSignal): Promise<void> {
     requireValue(!this.closed && !this.failed && this.current() && !this.pending, 'busy'); this.pending = true;
     try {
-      await this.refreshTicket();
-      const response = await this.client.request('poll', { roomId: this.roomId, ticket: this.ticket, data: { after: this.record.cursor } }, false, this.controller.signal);
+      await this.refreshTicket(parent);
+      const signal = parent ? AbortSignal.any([this.controller.signal, parent]) : this.controller.signal;
+      const response = await this.client.request('poll', { roomId: this.roomId, ticket: this.ticket, data: { after: this.record.cursor } }, false, signal);
       requireValue(response.epoch === this.epoch && this.current() && !this.closed, 'stale');
       const page = object(response.result); requireValue(page.roomId === this.roomId && page.epoch === this.epoch);
       const generation = integer(page.generation); requireValue(this.record.generation === 0 || generation === this.record.generation, 'gap');
@@ -70,9 +72,10 @@ export class CollaborationGuest {
       this.baseline = next; this.record = next;
     } finally { this.pending = false; }
   }
-  private async refreshTicket(): Promise<void> {
+  private async refreshTicket(parent?: AbortSignal): Promise<void> {
     if (Date.now() < this.expiresAt - 2_000) return;
-    const response = await this.client.request('join', { roomId: this.roomId, data: {} }, false, this.controller.signal);
+    const signal = parent ? AbortSignal.any([this.controller.signal, parent]) : this.controller.signal;
+    const response = await this.client.request('join', { roomId: this.roomId, data: {} }, false, signal);
     const selected = object(response.result); requireValue(response.epoch === this.epoch && digest(selected.binding) === digest(this.binding), 'stale');
     this.ticket = text(selected.ticket, 2048); this.expiresAt = integer(selected.expiresAt);
   }

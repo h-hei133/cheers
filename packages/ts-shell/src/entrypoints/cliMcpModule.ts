@@ -38,7 +38,10 @@ export async function runCliMcpCommand(input: {
     if (mcpAction === "refresh" || mcpAction === "test") {
       const refreshTarget =
         mcpAction !== "test" && (!mcpTarget || mcpTarget.toLowerCase() === "all") ? "all" : mcpTarget ?? "";
-      const snapshot = await input.gateway.refresh(refreshTarget, { exactTarget: mcpAction === "test" });
+      const snapshot = await input.gateway.refresh(refreshTarget, {
+        exactTarget: mcpAction === "test",
+        ...(input.signal ? { signal: input.signal } : {}),
+      });
       if (mcpAction === "test") {
         input.renderer.renderLine("MCP test: negotiated connection and tool discovery only; no tools called.");
         renderMcpDoctorControlPlane(input.renderer, snapshot, mcpTarget);
@@ -48,7 +51,7 @@ export async function runCliMcpCommand(input: {
       return;
     }
 
-    const snapshot = await input.gateway.snapshot();
+    const snapshot = await input.gateway.snapshot(undefined, input.signal);
     if (mcpAction === "tools") {
       renderMcpToolsControlPlane(input.renderer, snapshot, mcpTarget);
       return;

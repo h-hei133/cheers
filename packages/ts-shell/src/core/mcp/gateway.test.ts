@@ -41,6 +41,47 @@ describe("core MCP gateway (W3)", () => {
     fs.rmSync(workspaceRoot, { recursive: true, force: true });
   });
 
+  it("honors an already-aborted signal before MCP discovery", async () => {
+    const gateway = new CoreMcpGateway(workspaceRoot);
+    gateways.push(gateway);
+    const controller = new AbortController();
+    controller.abort();
+    const connect = vi.spyOn(CoreMcpClient.prototype, "connect");
+
+    await expect(gateway.snapshot(undefined, controller.signal)).rejects.toMatchObject({ name: "AbortError" });
+    await expect(gateway.refresh("all", {
+      exactTarget: false,
+      signal: controller.signal,
+    })).rejects.toMatchObject({ name: "AbortError" });
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  it("rejects a queued snapshot promptly without starting discovery after cancellation", async () => {
+    fs.writeFileSync(path.join(workspaceRoot, ".cheers.mcp.json"), JSON.stringify({ mcpServers: {
+      held: { transport: "stdio", command: "never-spawn" },
+    } }));
+    let release!: () => void;
+    const blocked = new Promise<void>(resolve => { release = resolve; });
+    const connect = vi.spyOn(CoreMcpClient.prototype, "connect").mockImplementation(async function () {
+      await blocked;
+      return { type: "connected", name: this.name, config: this.config };
+    });
+    vi.spyOn(CoreMcpClient.prototype, "listTools").mockResolvedValue([]);
+    const gateway = new CoreMcpGateway(workspaceRoot);
+    gateways.push(gateway);
+
+    const first = gateway.snapshot();
+    await vi.waitFor(() => expect(connect).toHaveBeenCalledOnce());
+    const controller = new AbortController();
+    const queued = gateway.snapshot(undefined, controller.signal);
+    controller.abort();
+
+    await expect(queued).rejects.toMatchObject({ name: "AbortError" });
+    expect(connect).toHaveBeenCalledOnce();
+    release();
+    await first;
+  });
+
   it.each(['queue', 'connection'])('rechecks admission after the %s boundary before further MCP effects', async stage => {
     let blocked = false;
     const admission = () => blocked ? 'configuration revoked' : undefined;

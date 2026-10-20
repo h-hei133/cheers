@@ -29,7 +29,8 @@
 
 | 任务 | 所有者 | 证据 | 反转 |
 |---|---|---|---|
-| CTX-01/02 | `context/request/budget.ts`、telemetry | budget（6）、telemetry（22） | `P+O+H>W` 仍发送时失败 |
+| CTX-01 | `context/request/budget.ts`、telemetry | budget（6）、telemetry（22） | `P+O+H>W` 仍发送时失败 |
+| CTX-02 | `context/request/budget.ts`、`session/compaction`、turn | budget（6）；等号、软触发、独立 input limit、measured prefix 均按同一预算 | 去掉软触发边界、允许超界 reserve/output 或把 measured prefix 之前内容重复计量时失败 |
 | CTX-03 | `session/compactionOperation.ts` | 操作测试（7） | unknown 步骤被重播时失败 |
 | CTX-04 | `context/report` | report（6）、sessionFacts（9） | stale 被当作当前值报告时失败 |
 | TOOL-01 | `core/tools/discovery/*`、`core/tools/catalog.ts` | discovery（10）、handoff/director | `todo` 或 run feature tool 不在首请求时失败 |
@@ -62,8 +63,10 @@
 | PAN-02 | `picker/session.ts`、`tree.ts` | session（20）、tree（2） | 分组行可选中、连接线缺失或跨项目动作被放行时失败 |
 | PAN-03 | `picker/hub.ts` | pickers（39） | `/hub` 在无 composition 时仍打开或 apply 取消任务时失败 |
 | PAN-04 | `cli/usage/service.ts` | usage（31） | 无限分母输出百分比时失败 |
+| PAN-05（部分） | `picker/advisor.ts`、`core/commands/report/projection.ts`、`btwCommandRuntime` | advisor 只读 checkpoint/note 面板；plan-review 与 btw 结构化报告；打开面板不发模型请求，模型工作走显式命令 | 面板打开触发模型、旧流串入新面板或 plan/btw 越权写入主会话时失败 |
 | PAN-06（部分） | `picker/copy.ts`、`transcript/container.ts` | copy（3）；100 项分页、continuation、source revision 和 stale selection | 第 40 个 block 不可复制、revision 变化后仍复制或下一页丢失时失败 |
 | PAN-07 | `registry.ts` | slashCommandRegistry（11） | `/extensions` 不解析到 plugin 时失败 |
+| PAN-08（部分） | `picker/mcpAdd.ts`、`picker/{help,tools,skills}.ts`、`core/commands/tools/report.ts` | mcpAdd（2）、help/tools；逐步 scope/name/transport/confirm，临时定义 0600 且无论成功拒绝都删除；report 只读 | 未确认即发布、临时定义残留或打开 report 触发执行时失败 |
 
 ## W7 输入与渲染
 
@@ -83,14 +86,16 @@
 | JOB-01 | `LocalExecutionHandle`、一次 spawn 的 `adopt/promote`、原 PID 晋升、容量拒绝与重启 unknown 路径；`local.handle`（4）、`journal`（19）、`service`（8）、`promotion`（4）覆盖 detach 后保留生命周期 deadline、adopted settlement、kill gate、撤权、容量拒绝和重启不重播。 | 撤销 `stop` 的 settlement 等待、timeout 传播或在 `detach()` 清除 timer 时，对应真实子进程/服务用例失败。 |
 | JOB-02 | 本地 notice、opt-in follow-up、去重/预算/截断、配置 reload 重新读取 enable 策略，以及命令/输出两侧脱敏；`backgroundNotice.test.ts` 6 项通过。 | 将函数型 enable 策略退化为构造时布尔值后，reload 用例实际失败。 |
 | EDIT-01 | 稳定 group id、源基线、hunk indexes/content 与 add content 身份绑定、依赖组、同文件双 hunk 选集、重规划 revision 检查、无选集拒绝，以及 requested/selected/skipped receipt；`batch.test.ts` 38 项通过。 | 将同文件 hunk 合并成单组、改变源基线、改变同基线 hunk 内容或 add 内容后，对应选集/identity 用例实际失败或拒绝。 |
-| START-01（部分） | build manifest 已绑定 lockfile、构建配置、编译器/标准库、全部 emit 字节、五个运行资产和受控 entry；`start.test` 覆盖 journal 恢复、活动/stale build lock fail-closed、恢复期间竞争者拒绝、越界/未登记入口、篡改产物与 launcher/package-main 回滚。`--version`/`--help` 现在由轻量入口在加载 runtime 图前处理；组合参数 `--profile default --help`、`--help --print` 和坏配置正常准入均有覆盖。 | 仍需最终 fresh build 的 packaged gate、CI 与精确 SHA；stale lock 需人工确认后清理，本轮本地通过不等于任务或 CI 完成。 |
-| START-02（部分） | 10k catalog 首屏测试、持久 reentry 摘要索引，以及真实 `createCliBootstrapRuntimeContext` 在 0/100/1k/10k 目录下不调用 `listSessions` 的探针已加入；startup surface 后才 `setImmediate` 加载 recovery hint。 | 仍需通过完整 CLI 首帧渲染路径记录实际帧和用户选择后的 late-result fencing；当前单元探针不能替代端到端启动证据。 |
+| START-01（本地证据闭合） | build manifest 已绑定 lockfile、构建配置、编译器/标准库、全部 emit 字节、五个运行资产和受控 entry；`start.test` 覆盖 journal 恢复、活动/stale build lock fail-closed、恢复期间竞争者拒绝、越界/未登记入口、篡改产物与 launcher/package-main 回滚。`--version`/`--help` 现在由轻量入口在加载 runtime 图前处理；组合参数、坏配置准入与 fresh packaged gate 均已通过。 | stale lock 仍需人工确认后清理；本地 packaged gate 不等于新提交的 CI，精确 SHA CI 另行取证。 |
+| START-02（本地证据闭合） | 10k catalog 首屏、持久 reentry 索引、0/100/1k/10k 不枚举探针；recovery hint 由实际 TUI `onFirstWrite` 或 line prompt write callback 启动；routing sink 与 transcript ownership 分离，line mode 保留 turn boundary 且 `/sessions` 仍走非交互 overview；用户键盘、鼠标、粘贴、picker 与 line 输入只推进一次 fence；teardown 在 sink 恢复前完成，失败路径不调用 `exit(0)`，cleanup 自身抛错或 logger 抛错也保证 sink 恢复；line prompt callback 与 stdout `error` 的异步失败均进入同一 rejection，不再静默挂起；真实 `GoalScheduler` drain 超时结算 captured host，line sink 在 goal dispatch 真正完成前保持 discard fence；MCP snapshot/refresh 在队列等待阶段即可取消，collaboration ticket/poll/propose 继承关闭 signal；`runCliProcess` 集成测试证明 fullscreen hint 经 transcript 且不直写 stdout；Node/exe × regular/fullscreen seeded PTY 连续通过并匹配精确 current session。 | 真实跨平台/IME 仍归 QA-02；本行不把 Linux PTY 外推为平台矩阵完成。 |
 | START-03（部分） | 历史 `bench:start`、`bench:interactive` 已记录 Node/exe 版本启动及 regular/fullscreen/pipe 首帧/退出数据。 | benchmark 未消费 ready/layout/write 观察点，未同步实际 prompt，交互矩阵仍为 Node-only，且缺少 raw sample、构建摘要和受控冷缓存；受控冷缓存及真实 ready 测量仍未闭合。 |
 
 ## W10
 
 | 任务 | 证据 |
 |---|---|
-| QA-01 | 本矩阵 + 各反转测试；2026-10-20 复核确认矩阵仍缺 `TOOL-02`、`PAN-05`、`PAN-08` 的独立行，`CTX-02`/`QA-03` 仍为合并行，不能作为 47 项全覆盖证明。 |
-| QA-02/03 | 已有 Linux 合成 PTY；本次增加 Node/exe × regular/fullscreen 的 settings/resume 切组和关闭；line/pipe、profile/task/discovery/approval/save 合成链路、跨平台及真实质量仍未闭合。 |
+| QA-01 | 本矩阵 + 各反转测试；`CTX-02`、`TOOL-02`、`PAN-05`、`PAN-08`、`QA-03` 已拆成独立行；但行存在不等于任务完成，仍按各行状态累积。 |
+| QA-02 | 已有 Linux 合成 PTY；本次增加 Node/exe × regular/fullscreen 的 settings/resume 切组、关闭、首帧后 recovery hint 和命令退出；line/pipe、profile/task/discovery/approval/save 合成链路及跨平台仍未闭合。 |
+| QA-03 | START-03 启动数据、RENDER/INPUT 回归与合成 PTY 可作质量前置；§6 预注册指标、真实模型任务集和安全回归的真实质量证据仍缺，mock 不替代。 |
+| TOOL-02（部分） | `/tools` 报告 description/schema 的 UTF-8 字节数、逐工具成本列与文本摘要，明确 `tokens=not-measured`；同模型/任务/权限的总请求、发现额外成本、关键参数质量与 tokenizer/多语言误差仍待真实模型。 |
 | QA-04 | 本地门禁与精确提交；CI 以 run 结果为准 |

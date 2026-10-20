@@ -12,6 +12,8 @@ import { InteractiveMode } from "./interactiveMode.js";
 import type { InteractiveApprovalResult } from "./picker/approval.js";
 import { runLineLoop } from "./lineLoop.js";
 import { supportsFullScreenSurface } from "./surfaceCapability.js";
+import type { RenderScheduler } from "../../presentation/tui/render/frame.js";
+import type { TerminalDevice } from "../../presentation/tui/terminal.js";
 
 /**
  * Interactive session entry point.
@@ -33,7 +35,15 @@ export interface InteractiveLoopInput {
   readonly logger: StructuredLogger;
   readonly approvalTrustPolicy: ApprovalTrustPolicy;
   readonly fallbackSessionId?: string;
+  readonly onFirstFrame?: () => void;
+  readonly onUserIntent?: () => void;
+  readonly setStartupNotice?: (
+    notice: ((line: string) => void) | undefined,
+  ) => void;
   readonly initialMcpGateway: CliMcpGateway;
+  /** Test seams for exercising the real host without the process terminal. */
+  readonly terminal?: TerminalDevice;
+  readonly scheduler?: RenderScheduler;
   readonly setReadline: (readline: readline.Interface | null) => void;
   readonly setInteractiveApprovalPrompt?: (
     handler: ((prompt: EscalationPrompt) => Promise<InteractiveApprovalResult>) | undefined,
@@ -65,6 +75,7 @@ export async function runInteractiveLoop(input: InteractiveLoopInput): Promise<v
   if (!supportsFullScreenSurface(stdin, stdout)) {
     await runLineLoop({
       stdin,
+      stdout,
       process: input.process ?? process,
       runtimeContext: input.runtimeContext,
       sessionRuntime: input.sessionRuntime,
@@ -73,6 +84,8 @@ export async function runInteractiveLoop(input: InteractiveLoopInput): Promise<v
       logger: input.logger,
       approvalTrustPolicy: input.approvalTrustPolicy,
       fallbackSessionId: input.fallbackSessionId,
+      onFirstFrame: input.onFirstFrame,
+      onUserIntent: input.onUserIntent,
       initialMcpGateway: input.initialMcpGateway,
       setReadline: input.setReadline,
       setActiveNonInteractiveApprovalMode: input.setActiveNonInteractiveApprovalMode,
@@ -91,7 +104,12 @@ export async function runInteractiveLoop(input: InteractiveLoopInput): Promise<v
     logger: input.logger,
     approvalTrustPolicy: input.approvalTrustPolicy,
     fallbackSessionId: input.fallbackSessionId,
+    onFirstFrame: input.onFirstFrame,
+    onUserIntent: input.onUserIntent,
+    setStartupNotice: input.setStartupNotice,
     initialMcpGateway: input.initialMcpGateway,
+    terminal: input.terminal,
+    scheduler: input.scheduler,
     setReadline: input.setReadline,
     setInteractiveApprovalPrompt: input.setInteractiveApprovalPrompt,
     setActiveNonInteractiveApprovalMode: input.setActiveNonInteractiveApprovalMode,
